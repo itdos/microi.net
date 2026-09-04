@@ -5,8 +5,9 @@ import path from "node:path";
 const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || "";
 const PASSWORD = process.env.PW_TEST_PASSWORD || "";
+const OS_CLIENT = process.env.PW_OS_CLIENT || "iTdos";
 const STANDALONE = process.env.PW_AI_WORKFLOW_STANDALONE === "1";
-const TENANT_URL = `${FRONTEND}/?OsClient=iTdos`;
+const TENANT_URL = `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`;
 const ROUTE_PREFIX = STANDALONE ? "" : "/micro-app/microi-ai-workflow";
 const ARTIFACT_DIR = path.resolve(process.cwd(), process.env.PW_SCREENSHOT_DIR || "../.tmp/ai-workflow-v103-acceptance");
 
@@ -105,7 +106,7 @@ async function expectRelationshipViewport(page, studio, globe, viewportLabel) {
     return metrics;
 }
 
-test("AI 工作流 v1.0.3 修复 3D 控件、相机、首屏滚动、骨架与拖放", async ({ page }) => {
+test("AI 工作流平台应用验收：3D 控件、相机、首屏滚动、骨架与拖放", async ({ page }) => {
     test.skip(!ACCOUNT || !PASSWORD, "需要受保护的真实测试帐号密码");
     await fs.mkdir(ARTIFACT_DIR, { recursive: true });
     const pageErrors = [];
@@ -167,11 +168,19 @@ test("AI 工作流 v1.0.3 修复 3D 控件、相机、首屏滚动、骨架与�
     await page.screenshot({ path: path.join(ARTIFACT_DIR, "01b-relationship-globe-first-screen-1440x900.png"), fullPage: false });
 
     const blueprintNav = page.getByRole("button", { name: "业务蓝图", exact: true }).first();
+    const blueprintListResponse = page.waitForResponse(
+        response => /\/api\/V8Engine\/ListBlueprints(?:\?|$)/i.test(response.url()),
+        { timeout: 90_000 }
+    );
     await blueprintNav.click();
     await expect(page.getByTestId("route-skeleton-library")).toBeVisible();
+    const blueprintListPayload = await (await blueprintListResponse).json();
+    expect(Number(blueprintListPayload?.Code), blueprintListPayload?.Msg || "业务蓝图列表读取失败").toBe(1);
+    expect(String(blueprintListPayload?.Msg || "")).not.toContain("doesn't exist");
     await page.screenshot({ path: path.join(ARTIFACT_DIR, "02-blueprint-route-skeleton.png"), fullPage: false });
     await expect(page.getByTestId("blueprint-library")).toBeVisible({ timeout: 45_000 });
     await expect(page.getByTestId("route-skeleton-library")).toBeHidden({ timeout: 45_000 });
+    await expect(page.getByRole("alert").filter({ hasText: "读取失败" })).toHaveCount(0);
 
     const firstCard = page.locator(".blueprint-card").first();
     if (await firstCard.isVisible({ timeout: 12_000 }).catch(() => false)) {

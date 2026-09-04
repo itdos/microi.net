@@ -1,7 +1,7 @@
 ---
 title: Microi吾码
 titleTemplate: 开源 AI 开发框架
-description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、AI 低代码、微服务与 V8 引擎；在典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。
+description: Microi吾码是开源 AI 开发框架，融合 30+ 成熟引擎、AI 低代码、微服务与 V8 引擎；在典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。
 ---
 
 <div align="center">
@@ -10,7 +10,7 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 
 # Microi 吾码
 
-<p class="mci-doc-home-subtitle"><strong>开源 AI 开发框架：</strong>20+ 成熟引擎融合 AI 低代码、微服务与 V8 引擎，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。</p>
+<p class="mci-doc-home-subtitle"><strong>开源 AI 开发框架：</strong>30+ 成熟引擎融合 AI 低代码、微服务与 V8 引擎，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。</p>
 
 <p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
 
@@ -34,9 +34,9 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 
 ## Microi吾码 AI平台 架构图
 
-[![Microi吾码 AI平台 架构图](/images/microi-ai-platform-architecture.svg)](/images/microi-ai-platform-architecture.svg)
+[![Microi吾码 AI平台 架构图](/images/microi-ai-platform-architecture-2026.09.04.1.svg)](/images/microi-ai-platform-architecture-2026.09.04.1.svg)
 
-> 点击图片可在弹层中放大、缩小和拖动查看。图中以 V8 引擎为在线运行核心，优先展示 AI、低代码、数据集成、自动化、平台治理与多端交付等 20+ 成熟系统引擎；治理细节继续参见 [AI 平台治理中心](/doc/system-engine/ai-platform-governance)。
+> 点击图片可在弹层中放大、缩小和拖动查看。图中以 V8 引擎为在线运行核心，优先展示 AI、低代码、数据集成、自动化、平台治理与多端交付等 30+ 成熟系统引擎；治理细节继续参见 [AI 平台治理中心](/doc/system-engine/ai-platform-governance)。
 
 ## 📸 预览图
 
@@ -88,11 +88,11 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 > SVG 负责展示整体关系；下面的同步索引由同一份架构能力数据自动生成，便于新用户、搜索引擎和 AI 完整识别平台边界。
 
 <!-- MICROI_ARCHITECTURE_CAPABILITIES:START -->
-<!-- capability-source-sha256:2487b9dfdb4485ab0459d5aa151f7dde83bbc1fffdda5bb561b3cb772fcd4aef -->
+<!-- capability-source-sha256:22658bafc091427ad63131407d374059cec4c68be21bdd8f542a3af7c2034683 -->
 | 架构层 | 核心职责 | 关键能力 |
 |---|---|---|
 | **AI 开发与智能引擎** | 理解需求、设计系统、生成并校验变更 | AI 引擎、多模型网关、RAG、NL2SQL / NL2V8、Agent / Tool Calling、MCP / Skills、业务架构蓝图、AI 工作流、Preview / Diff |
-| **低代码核心业务引擎** | 以 20+ 成熟引擎建模并运行企业业务 | 表单、模块、接口 / 类型化数据、界面、打印、可写报表、工作流、SaaS、应用商城 |
+| **低代码核心业务引擎** | 以 30+ 成熟引擎建模并运行企业业务 | 表单、模块、接口 / 类型化数据、界面、打印、可写报表、工作流、SaaS、应用商城 |
 | **V8 运行与集成核心** | 在线运行可信业务逻辑并连接平台原子能力 | 接口引擎、FormEngine、V8 / SQL / JSON、Dos.ORM、HTTP、Redis、MongoDB、MQ / MQTT、Office / OCR、Webhook / SignalR |
 | **数据、集成与自动化引擎** | 连接数据库、服务、文件、设备与消息通道 | 缓存、扩展数据库、搜索、采集、任务调度、MQ / MQTT、通知、翻译引擎（多语言）、OCR / 视觉 / 图片、分布式存储 / HDFS、文件柜 |
 | **平台治理、安全与可靠运行** | 统一设置、身份、权限、观测、升级与恢复 | AI 平台治理、系统设置、系统日志/监控、OsClient、DiyToken、SSO、分布式租约、幂等、Trace / 告警、Docker / K8s |
@@ -103,7 +103,7 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 <details>
 <summary>查看架构图完整功能索引（226 个唯一标签）</summary>
 
-- **平台价值：** 10×+、Token 更省、10×+、典型交付更快、20+、成熟引擎复用、在线生效、V8 无需编译发布
+- **平台价值：** 10×+、Token 更省、10×+、典型交付更快、30+、成熟引擎复用、在线生效、V8 无需编译发布
 - **全端入口：** PC 管理端、Vue 3、WebOS、桌面多任务、移动自适应、H5 / 触控、UniApp / App、Android / iOS、微信小程序、多端复用、AI 应用 / Agent、Web / UniApp、前端微服务、多页路由、Microi.VSCode、资源树 / 调试、MCP / Skills、Codex / OpenClaw、OpenAPI / SDK、HTTP / JS
 - **系统引擎总览：** AI 引擎、V8引擎、表单引擎、模块引擎、接口引擎、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、缓存引擎、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎（多语言）、OCR 引擎、视觉引擎、图片处理引擎、分布式存储 / HDFS、文件柜、模板引擎、Office 引擎、前端微服务、Microi.UI、多端客户端、3D / CAD / 数据大屏、Unity / WebGL、应用商城、系统设置、系统日志 / 监控、扩展数据库、蓝牙打印、AI 平台治理、AI 工作流 / 蓝图
 - **AI 开发与智能引擎：** AI 引擎、多模型网关、智能模型路由、密钥隔离、流式对话、多模态、AI 助手、AI 数据分析、知识库 RAG、向量检索、NL2SQL、NL2V8、Agent、Tool Calling、Prompt 模板、上下文记忆、AI 应用工作台、AI 在线编程、AI 本地编程、Microi.VSCode、MCP、Skills、CLI / Plugins、OpenClaw、业务架构蓝图、系统关系图谱、AI 工作流 / 蓝图、状态机、Automation Flow、流程挖掘、Manifest 建模、Preview / Diff
@@ -123,7 +123,7 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 
 ## 📖 平台简介
 
-**Microi吾码** 是面向中大型企业应用的**开源 AI 开发框架**。它以 20+ 成熟引擎为底座，融合 AI 低代码、V8 在线编程、前端微服务与 .NET / Vue 源码扩展；VS Code 插件、MCP 与 Skills 会把平台 API、业务代码和数据库结构交给 AI，使低代码开发者、专业开发者与 AI Agent 在同一套工程和治理体系中协作。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2025 年正式开源**。
+**Microi吾码** 是面向中大型企业应用的**开源 AI 开发框架**。它以 30+ 成熟引擎为底座，融合 AI 低代码、V8 在线编程、前端微服务与 .NET / Vue 源码扩展；VS Code 插件、MCP 与 Skills 会把平台 API、业务代码和数据库结构交给 AI，使低代码开发者、专业开发者与 AI Agent 在同一套工程和治理体系中协作。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2025 年正式开源**。
 
 强大的 [**API 接口引擎**](https://microi.net/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持[**在线 AI 编程**](https://microi.net/doc/v8-engine/ai-apiengine)与[**本地 AI 编程（VS Code 插件）**](https://microi.net/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)。
 
@@ -133,7 +133,7 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 
 | 概览 | 说明 |
 |---|---|
-| **持续演进** | 平台始于 2014 年，已有 10+ 年持续产品演进；提供 20+ 核心系统引擎，支持自然语言建模、代码生成与可审计交付，并采用 MIT 开放源码协议。 |
+| **持续演进** | 平台始于 2014 年，已有 10+ 年持续产品演进；提供 30+ 核心系统引擎，支持自然语言建模、代码生成与可审计交付，并采用 MIT 开放源码协议。 |
 | **AI 编程、数据分析** | VS Code 插件一键拉取业务代码与数据库结构，并为 VS Code / Codex / Copilot / Claude / Cursor 提供 V8、Schema、MCP 和 Skills 上下文；AI 生成业务模型、配置及少量 V8 / 前端扩展，保存后可远程执行、调试和回读。AI 数据分析默认使用大模型关键词扩展、权限感知 Schema 搜索与精确字段回读，向量数据库作为可选增强；同时支持模型、训练、微调和提示词管理，并可接入 OpenClaw 远程 Agent。 |
 | **API 接口引擎** | 在线使用 JavaScript 编写后端 API 接口，支持 AI 在线编程 + VS Code 本地 AI 编程。无需编译发布，保存即生效；支持 Get、Post 请求，支持返回 JSON、字符串、文件、HTML 等，并支持自定义接口地址、分布式锁、权限、自定义扩展函数。 |
 | **系统引擎** | AI 引擎、V8 引擎、表单引擎、接口引擎、界面引擎、打印引擎、工作流引擎、Office 引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS 引擎、搜索引擎、消息队列引擎、IoT 物联网 MQTT 引擎、报表引擎、3D 引擎、goView 数据大屏、定制组件、应用商城、多数据库扩展、微服务、任务调度、自定义导出模板、单点登录、聊天系统、公众号平台管理等。 |
@@ -147,7 +147,7 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 
 | 对比维度 | 传统定制代码 + AI | Microi吾码 + AI |
 |---|---|---|
-| AI 生成范围 | 数据访问、权限、CRUD、流程、页面和部署胶水代码都要从头生成 | 复用 20+ 成熟引擎，AI 主要处理业务模型、配置和少量 V8 / 前端扩展 |
+| AI 生成范围 | 数据访问、权限、CRUD、流程、页面和部署胶水代码都要从头生成 | 复用 30+ 成熟引擎，AI 主要处理业务模型、配置和少量 V8 / 前端扩展 |
 | 上下文与 Token | 反复解释框架、表结构、接口规范和历史代码，长上下文随项目持续膨胀 | Skills、V8 类型提示、实时 Schema、业务蓝图与 MCP 自动提供准确上下文 |
 | 交付速度 | 先生成大量代码，再编译、联调、补权限、补部署和回归 | 建模、生成、远程执行、调试、回读与验收形成闭环，开箱即可进入业务开发 |
 | 稳定性与成熟度 | 每个项目重复实现通用底座，代码面大、差异多 | 平台自 2014 年持续演进，权限、表单、工作流、SaaS、缓存和分布式能力统一复用 |

@@ -127,7 +127,7 @@ namespace Dos.ORM
                     return new DosResult(1, null, "字段已存在，已跳过物理列创建。");
                 }
 
-                param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
+                param.FieldType = NormalizeFieldType(param.FieldType);
                 var sql = $"ALTER TABLE [{param.TableName}] ADD [{param.FieldName}] {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")}";
 
                 if (!param.FieldLabel.DosIsNullOrWhiteSpace())
@@ -165,7 +165,7 @@ namespace Dos.ORM
                 return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
+            param.FieldType = NormalizeFieldType(param.FieldType);
 
 
             //修改列名：EXEC sp_rename ‘表名.[原有列名]’, ‘新列名’ , ‘COLUMN’;
@@ -238,7 +238,10 @@ namespace Dos.ORM
                             '' AS extra,
                             c.is_nullable,
                             c.data_type AS column_type,
-                            c.character_maximum_length
+                            c.character_maximum_length,
+                            c.numeric_precision,
+                            c.numeric_scale,
+                            c.datetime_precision
                         FROM information_schema.columns c
                         LEFT JOIN sys.columns sc
                           ON sc.object_id = OBJECT_ID(QUOTENAME(c.table_schema) + '.' + QUOTENAME(c.table_name))
@@ -269,6 +272,10 @@ namespace Dos.ORM
                 var result = dosSession.FromSql(sql)
                     .AddInParameter("tableName", DbType.String, param.TableName)
                     .ToList<information_schema_columns>();
+                foreach (var column in result)
+                {
+                    column.column_type = BuildPhysicalColumnType(column);
+                }
                 return new DosResultList<information_schema_columns>(1, result);
             }
             catch (Exception ex)
@@ -306,6 +313,69 @@ namespace Dos.ORM
             if (string.IsNullOrWhiteSpace(identifier))
                 return false;
             return System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$");
+        }
+
+        /// <summary>
+        /// 吾码字段元数据长期以 MySQL 类型名保存。SQL Server DDL 必须在 ORM
+        /// 方言边界统一转换长文本类型，避免启动自愈、表单设计器等不同调用方
+        /// 各自维护映射，并使用可保存 Unicode 的现代大字段类型。
+        /// </summary>
+        internal static string NormalizeFieldType(string fieldType)
+        {
+            if (string.IsNullOrWhiteSpace(fieldType))
+                return fieldType;
+
+            var normalized = fieldType.Trim();
+            switch (normalized.ToLowerInvariant())
+            {
+                case "tinytext":
+                case "text":
+                case "mediumtext":
+                case "longtext":
+                case "ntext":
+                    return "nvarchar(max)";
+                default:
+                    return normalized;
+            }
+        }
+
+        /// <summary>
+        /// INFORMATION_SCHEMA.COLUMNS.DATA_TYPE 不包含长度或精度。将它直接回传
+        /// ALTER COLUMN 会把 nvarchar(20) 退化为 nvarchar(1)，并在存量值上触发截断。
+        /// </summary>
+        internal static string BuildPhysicalColumnType(information_schema_columns column)
+        {
+            var dataType = column?.data_type?.Trim();
+            if (string.IsNullOrWhiteSpace(dataType))
+                return column?.column_type?.Trim();
+
+            switch (dataType.ToLowerInvariant())
+            {
+                case "char":
+                case "varchar":
+                case "nchar":
+                case "nvarchar":
+                case "binary":
+                case "varbinary":
+                    if (column.character_maximum_length == -1)
+                        return $"{dataType}(max)";
+                    if (column.character_maximum_length > 0)
+                        return $"{dataType}({column.character_maximum_length.Value})";
+                    break;
+                case "decimal":
+                case "numeric":
+                    if (column.numeric_precision.HasValue && column.numeric_scale.HasValue)
+                        return $"{dataType}({column.numeric_precision.Value},{column.numeric_scale.Value})";
+                    break;
+                case "datetime2":
+                case "datetimeoffset":
+                case "time":
+                    if (column.datetime_precision.HasValue)
+                        return $"{dataType}({column.datetime_precision.Value})";
+                    break;
+            }
+
+            return dataType;
         }
 
         private static SemaphoreSlim EnterTableDdlGate(DbServiceParam param, out string error)

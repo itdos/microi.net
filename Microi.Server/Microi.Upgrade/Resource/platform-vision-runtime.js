@@ -7,8 +7,8 @@
  */
 
 // Microi 官方接口引擎：platform-vision-runtime
-// Version: v1.1.2
-// VISION_DETECT_TRACK_SEARCH_VOTE_ASYNC_AI_FALLBACK_V4
+// Version: v1.2.0
+// VISION_HISTORY_CORRECTION_ATTRIBUTES_PRICE_V1
 var visionParam = V8.Param || {};
 var visionAction = text(visionParam.Action || 'Bootstrap').toLowerCase();
 var visionUser = V8.CurrentUser || {};
@@ -17,6 +17,7 @@ if (!text(visionUser.Id)) return { Code: 1001, Msg: '登录身份已过期。' }
 
 if (visionAction === 'recognize') return await recognize(visionParam);
 if (visionAction === 'enroll') return await enroll(visionParam);
+if (visionAction === 'correct') return await correct(visionParam);
 if (visionAction === 'result') return getResult(visionParam);
 if (visionAction === 'recent') return getRecent(visionParam);
 if (visionAction === 'subjects') return getSubjects(visionParam);
@@ -110,7 +111,8 @@ async function recognize(param) {
     ],
     _SelectFields: [
       'Id', 'SampleNo', 'SubjectId', 'SubjectName', 'CategoryId', 'CategoryName',
-      'EmbeddingBase64', 'ModelKey', 'ModelVersion', 'QualityScore'
+      'EmbeddingBase64', 'ModelKey', 'ModelVersion', 'QualityScore', 'FrozenState',
+      'FreshnessPercent', 'EstimatedPriceMin', 'EstimatedPriceMax', 'PriceUnit', 'Currency'
     ],
     _OrderBy: 'QualityScore',
     _OrderByType: 'DESC',
@@ -256,6 +258,7 @@ async function recognize(param) {
       ? uploadPrivateImage(image, requestNo, 'requests')
       : { Ok: true, Path: '' };
     var retainedPath = retainedUpload.Ok ? retainedUpload.Path : '';
+    var localFacts = factsFromDatabase(matchedSample, matchedSubject);
     var localRow = attachAnalysis({
       RequestNo: requestNo,
       FrameId: frameId,
@@ -268,6 +271,14 @@ async function recognize(param) {
       CategoryName: text(matchedSubject.CategoryName || bestItem.CategoryName),
       LocalSimilarity: round6(similarity),
       Confidence: round6(similarity),
+      FrozenState: localFacts.FrozenState,
+      FreshnessPercent: localFacts.FreshnessPercent,
+      AttributeSource: localFacts.AttributeSource,
+      EstimatedPriceMin: localFacts.EstimatedPriceMin,
+      EstimatedPriceMax: localFacts.EstimatedPriceMax,
+      PriceUnit: localFacts.PriceUnit,
+      Currency: localFacts.Currency,
+      PriceSource: localFacts.PriceSource,
       ProfileKey: text(profile.ProfileKey),
       ModelKey: text(vector.ModelKey),
       ModelVersion: text(vector.ModelVersion),
@@ -306,6 +317,9 @@ async function recognize(param) {
       && flag(param.ConsentConfirmed, false);
   }
   if (!aiEnabled) {
+    var unmatchedUpload = shouldRetainInput(profile, mode)
+      ? uploadPrivateImage(image, requestNo, 'requests')
+      : { Ok: true, Path: '' };
     var unmatchedRow = attachAnalysis({
       RequestNo: requestNo,
       FrameId: frameId,
@@ -317,6 +331,7 @@ async function recognize(param) {
       ModelKey: text(vector.ModelKey),
       ModelVersion: text(vector.ModelVersion),
       InputFileName: image.FileName,
+      InputFilePath: unmatchedUpload.Ok ? unmatchedUpload.Path : '',
       InputSha256: text(V8.EncryptHelper.Sha256Hex(image.Base64)).toLowerCase(),
       ImageWidth: Number(vector.ImageWidth || 0),
       ImageHeight: Number(vector.ImageHeight || 0),
@@ -324,7 +339,7 @@ async function recognize(param) {
       RequestedAt: DateNow('yyyy-MM-dd HH:mm:ss'),
       CompletedAt: DateNow('yyyy-MM-dd HH:mm:ss'),
       ElapsedMs: new Date().getTime() - started,
-      ErrorMessage: mode === 'Face' && !flag(param.ConsentConfirmed, false)
+      ErrorMessage: !unmatchedUpload.Ok ? unmatchedUpload.Message : mode === 'Face' && !flag(param.ConsentConfirmed, false)
         ? '人脸 AI 回退需要本次明确知情同意。'
         : ''
     }, analysisMeta);
@@ -490,6 +505,7 @@ async function enroll(param) {
     };
   }
   var privatePath = privateUpload.Path;
+  var samplePrice = priceSnapshot(param, subject);
   var added = V8.FormEngine.AddFormData('mci_vision_sample', {
     SampleNo: sampleNo,
     SubjectId: text(subject.Id),
@@ -507,6 +523,13 @@ async function enroll(param) {
     QualityScore: Number(vector.QualityScore || 0),
     Status: 'Ready',
     Source: text(param.Source || 'Manual'),
+    FrozenState: normalizeFrozenState(param.FrozenState),
+    FreshnessPercent: nullableNumber(param.FreshnessPercent, 0, 100),
+    EstimatedPriceMin: samplePrice.EstimatedPriceMin,
+    EstimatedPriceMax: samplePrice.EstimatedPriceMax,
+    PriceUnit: samplePrice.PriceUnit,
+    Currency: samplePrice.Currency,
+    SourceRequestId: safeKey(param.SourceRequestId, 80),
     EnrolledAt: DateNow('yyyy-MM-dd HH:mm:ss')
   });
   if (!added || Number(added.Code) !== 1) return added;
@@ -535,11 +558,130 @@ async function enroll(param) {
       ModelVersion: text(vector.ModelVersion),
       QualityScore: Number(vector.QualityScore || 0),
       Status: 'Ready',
+      FrozenState: normalizeFrozenState(param.FrozenState),
+      FreshnessPercent: nullableNumber(param.FreshnessPercent, 0, 100),
+      EstimatedPriceMin: samplePrice.EstimatedPriceMin,
+      EstimatedPriceMax: samplePrice.EstimatedPriceMax,
+      PriceUnit: samplePrice.PriceUnit,
+      Currency: samplePrice.Currency,
       DetectionIndex: Number(selectedDetection.Index || 0),
       DetectionCount: enrollmentDetections.length,
       Warnings: vector.Warnings || []
     },
     Msg: '视觉样本录入成功。'
+  };
+}
+
+async function correct(param) {
+  var requestNo = safeKey(param.RequestId || param.RequestNo, 80);
+  var subjectId = safeKey(param.SubjectId, 80);
+  if (!requestNo) return { Code: 0, Msg: 'RequestId 不能为空。' };
+  if (!subjectId) return { Code: 0, Msg: '请选择修正后的识别对象。' };
+  var request = getRequest(requestNo);
+  if (!request) return { Code: 2, Msg: '识别记录不存在。' };
+  if (text(request.Status) === 'Received' || text(request.Status) === 'AiPending') {
+    return { Code: 0, Msg: '识别仍在处理中，请等待结果后再修正。' };
+  }
+  var subject = getSubject(subjectId);
+  if (!subject || Number(subject.Enabled || 0) !== 1) return { Code: 0, Msg: '修正对象不存在或已停用。' };
+  if (normalizeMode(subject.RecognitionMode) !== normalizeMode(request.Mode)) {
+    return { Code: 0, Msg: '修正对象与本次识别模式不一致。' };
+  }
+  if (text(request.Mode) === 'Face' && !flag(param.ConsentConfirmed, false)) {
+    return { Code: 0, Msg: '修正人脸识别前必须确认已取得本人或其它合法授权。' };
+  }
+  var saveAsSample = flag(param.SaveAsSample, true);
+  if (saveAsSample && !text(request.InputFilePath)) {
+    return { Code: 0, Msg: '本次识别画面未保留，无法写入样本；可以取消“同时存入样本”后仅修正记录。' };
+  }
+  var before = runHook('Before', 'Correct', {
+    RequestId: requestNo,
+    SubjectId: subjectId,
+    Mode: text(request.Mode),
+    SaveAsSample: saveAsSample
+  });
+  if (!before || Number(before.Code) !== 1) return before || { Code: 0, Msg: '视觉纠错 Hook 未返回结果。' };
+
+  var savedSample = null;
+  if (saveAsSample) {
+    savedSample = getSampleBySourceRequest(requestNo, subjectId);
+    if (!savedSample) {
+      var bytesResult = await V8.HDFS.GetPrivateFileByte({
+        FilePathName: text(request.InputFilePath),
+        Limit: true
+      });
+      if (!bytesResult || Number(bytesResult.Code) !== 1 || !bytesResult.Data) {
+        return { Code: 0, Msg: text(bytesResult && bytesResult.Msg) || '读取历史识别画面失败，未写入样本。' };
+      }
+      var enrolled = await enroll({
+        SubjectId: subjectId,
+        Mode: text(request.Mode),
+        FileName: text(request.InputFileName || 'vision-correction.jpg'),
+        FileByteBase64: System.Convert.ToBase64String(bytesResult.Data),
+        ConsentConfirmed: text(request.Mode) === 'Face' && flag(param.ConsentConfirmed, false),
+        Source: 'Correction',
+        SourceRequestId: requestNo,
+        FrozenState: param.FrozenState,
+        FreshnessPercent: param.FreshnessPercent,
+        EstimatedPriceMin: param.EstimatedPriceMin,
+        EstimatedPriceMax: param.EstimatedPriceMax,
+        PriceUnit: param.PriceUnit,
+        Currency: param.Currency
+      });
+      if (!enrolled || Number(enrolled.Code) !== 1 || !enrolled.Data) return enrolled;
+      savedSample = enrolled.Data;
+    }
+  }
+
+  var frozenState = hasValue(param.FrozenState) ? normalizeFrozenState(param.FrozenState) : normalizeFrozenState(request.FrozenState);
+  var freshness = hasValue(param.FreshnessPercent)
+    ? nullableNumber(param.FreshnessPercent, 0, 100)
+    : nullableNumber(request.FreshnessPercent, 0, 100);
+  var manualAttributes = frozenState !== 'Unknown' || freshness !== null;
+  var correctedPrice = priceSnapshot(param, subject, request);
+  var manualPrice = hasValue(param.EstimatedPriceMin) || hasValue(param.EstimatedPriceMax)
+    || hasValue(param.PriceUnit) || hasValue(param.Currency);
+  var correctedAt = DateNow('yyyy-MM-dd HH:mm:ss');
+  var update = {
+    Id: text(request.Id),
+    Status: 'Corrected',
+    MatchSource: 'Manual',
+    OriginalMatchSource: text(request.OriginalMatchSource || request.MatchSource || 'None'),
+    SubjectId: text(subject.Id),
+    SubjectName: text(subject.Name),
+    CategoryId: text(subject.CategoryId),
+    CategoryName: text(subject.CategoryName),
+    Confidence: 1,
+    FrozenState: frozenState,
+    FreshnessPercent: freshness,
+    AttributeSource: manualAttributes ? 'Manual' : text(request.AttributeSource || 'None'),
+    EstimatedPriceMin: correctedPrice.EstimatedPriceMin,
+    EstimatedPriceMax: correctedPrice.EstimatedPriceMax,
+    PriceUnit: correctedPrice.PriceUnit,
+    Currency: correctedPrice.Currency,
+    PriceSource: manualPrice ? 'Manual' : correctedPrice.HasPrice ? 'Database' : text(request.PriceSource || 'None'),
+    CorrectionStatus: savedSample ? 'Sampled' : 'Corrected',
+    CorrectionNote: cleanText(param.CorrectionNote, 500),
+    CorrectedAt: correctedAt,
+    CorrectedBy: cleanText(visionUser.Name || visionUser.Account || visionUser.Id, 100),
+    SavedSampleId: text(savedSample && savedSample.Id),
+    CompletedAt: correctedAt,
+    ErrorMessage: ''
+  };
+  var saved = V8.FormEngine.UptFormData('mci_vision_request', update);
+  if (!saved || Number(saved.Code) !== 1) return saved;
+  runHook('After', 'Correct', {
+    RequestId: requestNo,
+    SubjectId: subjectId,
+    Mode: text(request.Mode),
+    SaveAsSample: saveAsSample,
+    SampleId: text(savedSample && savedSample.Id)
+  });
+  var corrected = getRequest(requestNo) || update;
+  return {
+    Code: 1,
+    Data: publicRequest(corrected),
+    Msg: savedSample ? '识别结果已修正，并已将当前画面写入样本库。' : '识别结果已修正。'
   };
 }
 
@@ -585,7 +727,10 @@ function getSubjects(param) {
   if (mode) where.push(['AND', 'RecognitionMode', '=', mode]);
   var result = V8.FormEngine.GetTableData('mci_vision_subject', {
     _Where: where,
-    _SelectFields: ['Id', 'ObjectNo', 'Name', 'CategoryId', 'CategoryName', 'ObjectType', 'RecognitionMode', 'ReviewRequired'],
+    _SelectFields: [
+      'Id', 'ObjectNo', 'Name', 'CategoryId', 'CategoryName', 'ObjectType', 'RecognitionMode', 'ReviewRequired',
+      'DefaultPriceMin', 'DefaultPriceMax', 'PriceUnit', 'Currency'
+    ],
     _OrderBy: 'Name',
     _OrderByType: 'ASC',
     _PageIndex: 1,
@@ -609,7 +754,10 @@ function recentRows(pageSize) {
     _SelectFields: [
       'Id', 'RequestNo', 'FrameId', 'StreamSessionId', 'FrameSequence', 'Mode', 'Status', 'MatchSource', 'SubjectId', 'SubjectName',
       'CategoryId', 'CategoryName', 'LocalSimilarity', 'Confidence', 'AiLabel', 'AiCategory',
-      'AiDescription', 'AiCandidates', 'ModelKey', 'ModelVersion', 'QualityScore', 'BackgroundTaskId',
+      'AiDescription', 'AiCandidates', 'FrozenState', 'FreshnessPercent', 'AttributeSource',
+      'EstimatedPriceMin', 'EstimatedPriceMax', 'PriceUnit', 'Currency', 'PriceSource',
+      'OriginalMatchSource', 'CorrectionStatus', 'CorrectionNote', 'CorrectedAt', 'CorrectedBy', 'SavedSampleId',
+      'ModelKey', 'ModelVersion', 'QualityScore', 'BackgroundTaskId', 'InputFileName', 'InputFilePath',
       'RequestedAt', 'CompletedAt', 'ElapsedMs', 'DetectionsJson', 'StabilityJson', 'ErrorMessage', 'CreateTime'
     ],
     _OrderBy: 'CreateTime',
@@ -693,7 +841,7 @@ function getSubject(id) {
     Id: id,
     _SelectFields: [
       'Id', 'ObjectNo', 'Name', 'CategoryId', 'CategoryName', 'ObjectType', 'RecognitionMode',
-      'ThresholdOverride', 'ReviewRequired', 'Enabled'
+      'ThresholdOverride', 'ReviewRequired', 'DefaultPriceMin', 'DefaultPriceMax', 'PriceUnit', 'Currency', 'Enabled'
     ]
   });
   return result && Number(result.Code) === 1 ? result.Data : null;
@@ -702,7 +850,27 @@ function getSubject(id) {
 function getSample(sampleNo) {
   var result = V8.FormEngine.GetFormData('mci_vision_sample', {
     _Where: [['SampleNo', '=', sampleNo]],
-    _SelectFields: ['Id', 'SampleNo', 'SubjectId', 'SubjectName', 'CategoryName', 'Mode', 'ModelKey', 'ModelVersion', 'QualityScore', 'Status']
+    _SelectFields: [
+      'Id', 'SampleNo', 'SubjectId', 'SubjectName', 'CategoryName', 'Mode', 'ModelKey', 'ModelVersion',
+      'QualityScore', 'Status', 'FrozenState', 'FreshnessPercent', 'EstimatedPriceMin', 'EstimatedPriceMax',
+      'PriceUnit', 'Currency', 'SourceRequestId'
+    ]
+  });
+  return result && Number(result.Code) === 1 ? result.Data : null;
+}
+
+function getSampleBySourceRequest(requestNo, subjectId) {
+  var result = V8.FormEngine.GetFormData('mci_vision_sample', {
+    _Where: [
+      ['SourceRequestId', '=', requestNo],
+      ['AND', 'SubjectId', '=', subjectId],
+      ['AND', 'Status', '=', 'Ready']
+    ],
+    _SelectFields: [
+      'Id', 'SampleNo', 'SubjectId', 'SubjectName', 'CategoryName', 'Mode', 'ModelKey', 'ModelVersion',
+      'QualityScore', 'Status', 'FrozenState', 'FreshnessPercent', 'EstimatedPriceMin', 'EstimatedPriceMax',
+      'PriceUnit', 'Currency', 'SourceRequestId'
+    ]
   });
   return result && Number(result.Code) === 1 ? result.Data : null;
 }
@@ -713,7 +881,10 @@ function getRequest(requestNo) {
     _SelectFields: [
       'Id', 'RequestNo', 'FrameId', 'StreamSessionId', 'FrameSequence', 'Mode', 'Status', 'MatchSource', 'SubjectId', 'SubjectName',
       'CategoryId', 'CategoryName', 'LocalSimilarity', 'Confidence', 'AiLabel', 'AiCategory',
-      'AiDescription', 'AiCandidates', 'ModelKey', 'ModelVersion', 'QualityScore', 'BackgroundTaskId',
+      'AiDescription', 'AiCandidates', 'FrozenState', 'FreshnessPercent', 'AttributeSource',
+      'EstimatedPriceMin', 'EstimatedPriceMax', 'PriceUnit', 'Currency', 'PriceSource',
+      'OriginalMatchSource', 'CorrectionStatus', 'CorrectionNote', 'CorrectedAt', 'CorrectedBy', 'SavedSampleId',
+      'ModelKey', 'ModelVersion', 'QualityScore', 'BackgroundTaskId', 'InputFileName', 'InputFilePath',
       'RequestedAt', 'CompletedAt', 'ElapsedMs', 'DetectionsJson', 'StabilityJson', 'ErrorMessage', 'CreateTime'
     ]
   });
@@ -748,6 +919,22 @@ function publicRequest(row) {
       Description: text(row.AiDescription),
       Candidates: parseJson(row.AiCandidates, [])
     } : null,
+    FrozenState: normalizeFrozenState(row.FrozenState),
+    FreshnessPercent: nullableNumber(row.FreshnessPercent, 0, 100),
+    AttributeSource: text(row.AttributeSource || 'None'),
+    EstimatedPriceMin: nullableNumber(row.EstimatedPriceMin, 0, 100000000),
+    EstimatedPriceMax: nullableNumber(row.EstimatedPriceMax, 0, 100000000),
+    PriceUnit: text(row.PriceUnit),
+    Currency: text(row.Currency || 'CNY'),
+    PriceSource: text(row.PriceSource || 'None'),
+    OriginalMatchSource: text(row.OriginalMatchSource),
+    CorrectionStatus: text(row.CorrectionStatus || 'None'),
+    CorrectionNote: text(row.CorrectionNote),
+    CorrectedAt: text(row.CorrectedAt),
+    CorrectedBy: text(row.CorrectedBy),
+    SavedSampleId: text(row.SavedSampleId),
+    HasImage: !!text(row.InputFilePath),
+    ImageUrl: privateImageUrl(text(row.InputFilePath)),
     ModelKey: text(row.ModelKey),
     ModelVersion: text(row.ModelVersion),
     QualityScore: Number(row.QualityScore || 0),
@@ -956,6 +1143,72 @@ function attachAnalysis(row, meta) {
   return row;
 }
 
+function factsFromDatabase(sample, subject) {
+  sample = sample || {};
+  subject = subject || {};
+  var frozenState = normalizeFrozenState(sample.FrozenState);
+  var freshness = nullableNumber(sample.FreshnessPercent, 0, 100);
+  var price = priceSnapshot(sample, subject);
+  return {
+    FrozenState: frozenState,
+    FreshnessPercent: freshness,
+    AttributeSource: frozenState !== 'Unknown' || freshness !== null ? 'Database' : 'None',
+    EstimatedPriceMin: price.EstimatedPriceMin,
+    EstimatedPriceMax: price.EstimatedPriceMax,
+    PriceUnit: price.PriceUnit,
+    Currency: price.Currency,
+    PriceSource: price.HasPrice ? 'Database' : 'None'
+  };
+}
+
+function priceSnapshot(primary, subject, fallback) {
+  primary = primary || {};
+  subject = subject || {};
+  fallback = fallback || {};
+  var minimum = hasValue(primary.EstimatedPriceMin)
+    ? nullableNumber(primary.EstimatedPriceMin, 0, 100000000)
+    : hasValue(subject.DefaultPriceMin)
+      ? nullableNumber(subject.DefaultPriceMin, 0, 100000000)
+      : nullableNumber(fallback.EstimatedPriceMin, 0, 100000000);
+  var maximum = hasValue(primary.EstimatedPriceMax)
+    ? nullableNumber(primary.EstimatedPriceMax, 0, 100000000)
+    : hasValue(subject.DefaultPriceMax)
+      ? nullableNumber(subject.DefaultPriceMax, 0, 100000000)
+      : nullableNumber(fallback.EstimatedPriceMax, 0, 100000000);
+  if (minimum !== null && maximum !== null && minimum > maximum) {
+    var swap = minimum;
+    minimum = maximum;
+    maximum = swap;
+  }
+  var unit = cleanText(primary.PriceUnit, 30) || cleanText(subject.PriceUnit, 30) || cleanText(fallback.PriceUnit, 30);
+  var currency = cleanText(primary.Currency, 10) || cleanText(subject.Currency, 10) || cleanText(fallback.Currency, 10) || 'CNY';
+  return {
+    EstimatedPriceMin: minimum,
+    EstimatedPriceMax: maximum,
+    PriceUnit: unit,
+    Currency: currency,
+    HasPrice: minimum !== null || maximum !== null
+  };
+}
+
+function privateImageUrl(path) {
+  if (!text(path)) return '';
+  try {
+    var result = V8.Method.GetPrivateFileUrl({
+      OsClient: V8.OsClient,
+      FilePathName: path,
+      Limit: true
+    });
+    if (!result || Number(result.Code) !== 1 || !result.Data) return '';
+    var data = result.Data;
+    return typeof data === 'string'
+      ? text(data)
+      : text(data.Url || data.url || data.FileUrl || data.Path);
+  } catch (e) {
+    return '';
+  }
+}
+
 function publicBox(box) {
   if (!box) return null;
   return {
@@ -1040,7 +1293,14 @@ function runHook(stage, action, metadata) {
   for (var key in metadata) {
     if (Object.prototype.hasOwnProperty.call(metadata, key)) payload[key] = metadata[key];
   }
-  return V8.ApiEngine.Run('platform-vision-custom-hook', payload);
+  var result = V8.ApiEngine.Run('platform-vision-custom-hook', payload);
+  // Correct 是 v1.2.0 新增动作；CreateIfMissing 扩展点不会覆盖租户旧代码。
+  // 仅兼容旧版默认 Hook 的精确“不支持动作”响应，其它租户拒绝或异常仍按原样生效。
+  if (action === 'Correct' && result && Number(result.Code) !== 1
+      && text(result.Msg) === '不支持的视觉 Hook 动作。') {
+    return { Code: 1, Data: { LegacyHookCompatible: true, Stage: stage, Action: action } };
+  }
+  return result;
 }
 
 function readImage(param) {
@@ -1193,6 +1453,28 @@ function clampNumber(value, minimum, maximum, fallback) {
   var parsed = Number(value);
   if (!isFinite(parsed)) parsed = fallback;
   return Math.max(minimum, Math.min(maximum, parsed));
+}
+
+function nullableNumber(value, minimum, maximum) {
+  if (!hasValue(value)) return null;
+  var parsed = Number(value);
+  if (!isFinite(parsed)) return null;
+  return Math.round(Math.max(minimum, Math.min(maximum, parsed)) * 100) / 100;
+}
+
+function normalizeFrozenState(value) {
+  var state = text(value).toLowerCase();
+  if (state === 'frozen' || state === 'true' || state === '1' || state === '冰冻' || state === '冷冻') return 'Frozen';
+  if (state === 'notfrozen' || state === 'false' || state === '0' || state === '非冰冻' || state === '未冰冻' || state === '新鲜') return 'NotFrozen';
+  return 'Unknown';
+}
+
+function hasValue(value) {
+  return value !== null && value !== undefined && text(value) !== '';
+}
+
+function cleanText(value, maximum) {
+  return text(value).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').substring(0, maximum || 500);
 }
 
 function round6(value) {

@@ -5,7 +5,7 @@ description: Microi吾码开源 AI 开发框架 - 账号密码登录、手机号
 head:
   - - meta
     - name: keywords
-      content: Microi吾码登录,账号密码登录,手机号注册,找回密码,开源AI开发框架,AI应用开发平台,AI低代码,20+引擎,微服务,V8引擎
+      content: Microi吾码登录,账号密码登录,手机号注册,找回密码,开源AI开发框架,AI应用开发平台,AI低代码,30+引擎,微服务,V8引擎
   - - meta
     - property: og:title
       content: 登录 - Microi吾码 开源 AI 开发框架

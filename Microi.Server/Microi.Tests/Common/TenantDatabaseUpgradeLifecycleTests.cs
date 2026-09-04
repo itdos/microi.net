@@ -24,22 +24,30 @@ public sealed class TenantDatabaseUpgradeLifecycleTests
     }
 
     [Fact]
-    public void CoordinatorReadsServerVersionSkipsCoveredProgramsAndAdvancesOnlyThroughVersionChain()
+    public void CoordinatorUsesVersionFastPathBeforePrerequisitesAndRechecksUnderLease()
     {
         var root = FindRepositoryRoot();
         var coordinator = Read(root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs");
         var upgrade = Read(root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs");
 
+        var versionRead = coordinator.IndexOf("beforeVersion = ReadServerVersion(runtimeClient)", StringComparison.Ordinal);
+        var fastPath = coordinator.IndexOf("if (IsVersionAtLeast(beforeVersion, targetVersion))", StringComparison.Ordinal);
         var prerequisite = coordinator.IndexOf("EnsureRuntimePhysicalPrerequisitesAsync", StringComparison.Ordinal);
         var lease = coordinator.IndexOf("UpgradeDistributedLease.TryAcquire", StringComparison.Ordinal);
-        var versionRead = coordinator.IndexOf("beforeVersion = ReadServerVersion(runtimeClient)", StringComparison.Ordinal);
+        var leasedVersionRead = coordinator.IndexOf(
+            "beforeVersion = ReadServerVersion(runtimeClient)", versionRead + 1, StringComparison.Ordinal);
         var pending = coordinator.IndexOf("NeedUpgrade(beforeVersion, program.Value)", StringComparison.Ordinal);
         var versionChain = coordinator.IndexOf("Upgrade(beforeVersion, runtimeClient)", StringComparison.Ordinal);
-        Assert.True(prerequisite >= 0 && lease > prerequisite && versionRead > lease
-                    && pending > versionRead && versionChain > pending);
+        Assert.True(versionRead >= 0 && fastPath > versionRead && prerequisite > fastPath
+                    && lease > prerequisite && leasedVersionRead > lease
+                    && pending > leasedVersionRead && versionChain > pending);
         Assert.Contains("PersistServerVersionForwardOnlyAsync", upgrade, StringComparison.Ordinal);
         Assert.Contains("ServerVersion 未越过失败步骤", coordinator, StringComparison.Ordinal);
         Assert.Contains("AlreadyCurrent = alreadyCurrent", coordinator, StringComparison.Ordinal);
+        Assert.Contains("FastPath = true", coordinator, StringComparison.Ordinal);
+        Assert.Contains("RuntimeInvariantsChecked = Array.Empty<string>()", coordinator, StringComparison.Ordinal);
+        Assert.DoesNotContain("RequiredRuntimeInvariantNames", coordinator, StringComparison.Ordinal);
+        Assert.DoesNotContain("RunCoordinatorInvariantAsync", coordinator, StringComparison.Ordinal);
         Assert.Contains("BackgroundTaskRuntime.TryUpdateProgress", coordinator, StringComparison.Ordinal);
         Assert.Contains("BackgroundTaskRuntime.TryAppendLog", coordinator, StringComparison.Ordinal);
         Assert.DoesNotContain("OsClientModel?[\"DbConn\"]", coordinator, StringComparison.Ordinal);

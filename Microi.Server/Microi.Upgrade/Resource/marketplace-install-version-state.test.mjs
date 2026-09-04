@@ -139,11 +139,91 @@ test("official platform notices include missing and outdated applications withou
     );
 
     assert.deepEqual(JSON.parse(JSON.stringify(context.result)), [true, true, false, false]);
-    assert.match(listSource, /Version:\s*v1\.4\.9/);
+    assert.match(listSource, /Version:\s*v1\.5\.0/);
     assert.match(listSource, /StoreInstallStatus !== "Uninstalled"\) installedCount\+\+/);
-    assert.match(listSource, /isPlatformMaintenanceNotice\(item\.StoreInstallStatus\)\) notices\.push/);
+    assert.match(listSource, /isPlatformMaintenanceNotice\(item\.StoreInstallStatus\) \|\| missingVersion/);
+    assert.match(listSource, /MARKETPLACE_PLATFORM_NOTICE_ROW_ISOLATION_V1/);
     assert.match(bulkSource, /status != 'Uninstalled' && status != 'Outdated'/);
     assert.match(bulkSource, /InstallAction:\s*status == 'Outdated'/);
+});
+
+test("newest install tombstone wins over an older active duplicate", () => {
+    const state = resolveInstallState([
+        {
+            Id: "deleted-new",
+            AppId: "app.microi.store",
+            AppVersionInstall: "v7.7.25",
+            InstallStatus: "Installed",
+            IsDeleted: 1,
+            UpdateTime: "2026-09-04 10:00:00"
+        },
+        {
+            Id: "active-old",
+            AppId: "app.microi.store",
+            AppVersionInstall: "v7.7.25",
+            InstallStatus: "Installed",
+            IsDeleted: 0,
+            UpdateTime: "2026-09-03 10:00:00"
+        }
+    ]);
+    assert.equal(state.StoreInstallStatus, "Uninstalled");
+});
+
+test("platform notice response isolates missing AppId and missing version rows", () => {
+    const context = {
+        V8: {
+            Param: {
+                Action: "CheckPlatformApps",
+                ApplicationType: "Platform",
+                ApplicationTypes: ["Platform"],
+                InstalledVersions: []
+            },
+            CurrentUser: {},
+            Method: {},
+            SysConfig: { FileServer: "https://static.example.com" },
+            FormEngine: {
+                GetTableData() {
+                    return {
+                        Code: 1,
+                        Data: [
+                            {
+                                Id: "store-key",
+                                AppId: null,
+                                AppKey: "app.key-only",
+                                AppName: "Key only",
+                                AppVersion: "v1.0.3",
+                                ApplicationType: "Platform",
+                                IsApprove: 1
+                            },
+                            {
+                                Id: "store-version",
+                                AppId: null,
+                                AppKey: null,
+                                AppName: "Missing version",
+                                AppVersion: null,
+                                ApplicationType: "Platform",
+                                IsApprove: 1
+                            }
+                        ],
+                        DataCount: 2
+                    };
+                }
+            }
+        },
+        DateNow: () => "2026-09-04 13:18:00",
+        result: null
+    };
+
+    vm.runInNewContext(`result = (function () {\n${listSource}\n})();`, context);
+    const result = JSON.parse(JSON.stringify(context.result));
+    assert.equal(result.Code, 1);
+    assert.equal(result.Data.NoticeCount, 2);
+    assert.equal(result.Data.IntegrityIssueCount, 2);
+    assert.equal(result.Data.Notices[0].AppId, "app.key-only");
+    assert.equal(result.Data.Notices[0].DataIntegrityIssue, "MissingAppId");
+    assert.equal(result.Data.Notices[1].AppId, "store:store-version");
+    assert.equal(result.Data.Notices[1].Status, "Abnormal");
+    assert.equal(result.Data.Notices[1].DataIntegrityIssue, "MissingAppVersion");
 });
 
 test("marketplace preview resolves the installed public entry and strips private signatures", () => {

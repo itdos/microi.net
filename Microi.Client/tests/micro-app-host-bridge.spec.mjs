@@ -112,6 +112,25 @@ test("platform print bridge is fixed to the current tenant backend and registere
     }
 });
 
+test("host action results survive batched resize data and expose actionable failures", () => {
+    const payload = bridge.createMicroAppHostActionResult({
+        action: "openPlatformPrint",
+        requestId: "request-print-1"
+    }, false, null, Object.assign(new Error("平台打印组件尚未就绪"), {
+        code: "HOST_PRINT_DIALOG_NOT_READY"
+    }));
+    const merged = { ...payload, type: "host:resize", availableWidth: 1280 };
+
+    assert.equal(payload.hostActionResult.type, "micro-app:host-action-result");
+    assert.equal(payload.hostActionResult.requestId, "request-print-1");
+    assert.equal(merged.hostActionResult.requestId, "request-print-1");
+    assert.equal(payload.error.code, "HOST_PRINT_DIALOG_NOT_READY");
+    assert.match(payload.error.cause, /打印组件/);
+    assert.match(payload.error.solution, /刷新页面/);
+    assert.equal(payload.error.retryable, true);
+    assert.equal(payload.error.resultUnknown, false);
+});
+
 test("the page host connects dispatch actions to router and TagsView behavior", () => {
     const host = read("src/views/micro-app/host.vue");
     assert.match(host, /webBase:\s*window\.location\.origin/);
@@ -124,7 +143,10 @@ test("the page host connects dispatch actions to router and TagsView behavior", 
     assert.match(host, /case "replaceTab"/);
     assert.match(host, /this\.\$router\.replace\(target\)/);
     assert.match(host, /window\.addEventListener\("page-refresh"/);
-    assert.match(host, /MICRO_APP_HOST_ACTION_RESULT_TYPE/);
+    assert.match(host, /createMicroAppHostActionResult\(request, success, data, error\)/);
+    assert.match(host, /window\.microApp\.forceSetData\(this\.microAppName, payload\)/);
+    assert.match(host, /app\.data = payload/);
+    assert.match(host, /this\.deliverMicroAppData\(payload, true\)/);
     assert.match(host, /case "refreshCurrentUser"[\s\S]*RefreshLoginUser/);
     assert.match(host, /case "openPlatformPrint"[\s\S]*this\.openPlatformPrint/);
     assert.match(host, /refPlatformPrintDialog/);

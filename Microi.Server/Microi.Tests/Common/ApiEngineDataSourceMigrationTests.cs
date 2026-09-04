@@ -123,15 +123,15 @@ public class ApiEngineDataSourceMigrationTests
     }
 
     [Fact]
-    public void Upgrade34_IsVersionGatedTransactionalAndRunsBeforeVersionRead()
+    public void Upgrade34_IsVersionGatedTransactionalAndSealedIntoOneTimeBaseline()
     {
         var root = FindRepositoryRoot();
         var migration = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "34-UpgradeDataSourceToApiEngine.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
-        var coordinator = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
+        var baseline = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "36-UpgradeRuntimeInvariantBaseline.cs"));
 
         Assert.Equal("6.9.9.0", Upgrade34.Version);
         Assert.Contains("BeginTransaction()", migration, StringComparison.Ordinal);
@@ -139,12 +139,9 @@ public class ApiEngineDataSourceMigrationTests
         Assert.Contains("trans.Rollback()", migration, StringComparison.Ordinal);
         Assert.Contains("SET {orm.GetFieldName(\"IsDeleted\")} = @p0", migration, StringComparison.Ordinal);
         Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade34.Version)", upgrade, StringComparison.Ordinal);
-        var invariantIndex = coordinator.IndexOf("RequiredRuntimeInvariantNames[11]", StringComparison.Ordinal);
-        var versionReadIndex = coordinator.IndexOf(
-            "beforeVersion = ReadServerVersion(runtimeClient)",
-            StringComparison.Ordinal);
-        Assert.True(invariantIndex >= 0);
-        Assert.True(versionReadIndex > invariantIndex);
+        Assert.Contains("OneTimeInvariantNames[7], () => new Upgrade34().Run(osClient)", baseline, StringComparison.Ordinal);
+        Assert.Contains("new Upgrade36().Run", upgrade, StringComparison.Ordinal);
+        Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade36.Version)", upgrade, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

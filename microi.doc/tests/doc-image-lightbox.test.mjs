@@ -29,7 +29,7 @@ test('platform introduction raw HTML cases join one Fancybox gallery', () => {
     assert.match(image, /data-fancybox="platform-preview"/)
     assert.match(image, /alt="[^"]+"/)
   }
-  assert.match(index, /microi-ai-platform-architecture\.svg/)
+  assert.match(index, /microi-ai-platform-architecture-\d{4}\.\d{2}\.\d{2}\.\d+\.svg/)
 })
 
 test('MicroService cases share Fancybox and use equal half-width desktop columns', () => {

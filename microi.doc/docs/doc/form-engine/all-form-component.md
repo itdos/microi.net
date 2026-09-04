@@ -214,6 +214,7 @@ AI/MCP 创建图片字段时应写入 `diy_field.Config.ImgUpload`，推荐完�
 >* 上例只用 `Code -> XiangmuBM` 匹配主表，`Name -> XiangmuMC` 只负责回填，避免 Excel 缺少名称时组合匹配失败。
 >* 旧版 `TableChildCallbackField`、`ImportRelations`、`ImportBackfillFields` 和单字段匹配配置仍兼容读取；新版前端会合并去重，并在字段下次保存时清除旧键。
 >* 在主表详情子表区域、左右树形页面或通过 `V8.OpenAnyTable` 带主表条件打开子表后导入时，即使 Excel 没有主表关联列，也应由前端把固定主表关系传给 `/api/FormEngine/ImportDiyTableRow`，后端再补齐外键和 `FieldRelations` 回填列。
+>* 子表回查索引必须匹配真实物理隔离方式：物理表有 `OsClient` 时要求以 `(OsClient, 外键)` 开头；独立租户表没有该列时要求以 `(外键)` 开头。物理字段或索引读取失败时配置应拒绝，不能新增无业务语义的 `OsClient` 列规避校验。
 
 ## 地图(点) Map
 

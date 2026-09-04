@@ -4,6 +4,7 @@ using System.Data;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
@@ -651,6 +652,26 @@ namespace Microi.net
             };
         }
 
+        internal static string BuildSqlServerPreservingControlAlterSql(
+            SchemaField field,
+            string currentPhysicalType)
+        {
+            if (field == null) throw new ArgumentNullException(nameof(field));
+            if (!field.Control) throw new ArgumentException("字段不是控制列。", nameof(field));
+
+            var physicalType = (currentPhysicalType ?? string.Empty).Trim();
+            if (!Regex.IsMatch(
+                    physicalType,
+                    @"^(?:(?:n?varchar|n?char|varbinary|binary)\((?:max|\d+)\)|(?:decimal|numeric)\(\d+,\d+\)|(?:datetime2|datetimeoffset|time)\(\d+\)|[a-z][a-z0-9_]*)$",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            {
+                throw new InvalidOperationException(
+                    $"无法安全保留 {field.TableName}.{field.Name} 的 SQL Server 物理类型：{currentPhysicalType ?? "<null>"}。");
+            }
+
+            return $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {physicalType} NOT NULL";
+        }
+
         public static string BuildCreateIndexSql(SchemaDialect dialect, SchemaIndex index)
         {
             var unique = index.Unique ? "UNIQUE " : string.Empty;
@@ -960,7 +981,12 @@ WHERE c.object_id=OBJECT_ID(@p0) AND c.name=@p1")
                 return;
             }
 
-            client.Db.FromSql(BuildControlAlterSql(dialect, field)).ExecuteNonQuery();
+            var alterSql = dialect == SchemaDialect.SqlServer
+                ? BuildSqlServerPreservingControlAlterSql(
+                    field,
+                    GetSqlServerPhysicalColumnType(client, field.TableName, field.Name))
+                : BuildControlAlterSql(dialect, field);
+            client.Db.FromSql(alterSql).ExecuteNonQuery();
             if (dialect == SchemaDialect.SqlServer) EnsureSqlServerDefault(client, field);
 
             if (!IsColumnNotNull(client, dialect, field.TableName, field.Name))
@@ -971,6 +997,33 @@ WHERE c.object_id=OBJECT_ID(@p0) AND c.name=@p1")
                 throw new InvalidOperationException(
                     $"{field.TableName}.{field.Name} 默认值回读为[{actualDefault ?? "<null>"}]，预期[{field.DefaultValue}]。");
             }
+        }
+
+        private static string GetSqlServerPhysicalColumnType(
+            OsClientSecret client,
+            string tableName,
+            string columnName)
+        {
+            var dbInfo = DiyCommon.GetDbInfo("SqlServer");
+            var result = MicroiEngine.ORM(dbInfo.DbType).GetColumns(new DbServiceParam
+            {
+                OsClient = client.OsClient,
+                TableName = tableName,
+                DbSession = client.Db,
+                DbInfo = dbInfo
+            });
+            if (result.Code != 1 || result.Data == null)
+                throw new InvalidOperationException(
+                    $"读取 {tableName}.{columnName} SQL Server 物理类型失败：{result.Msg}");
+
+            var column = result.Data.FirstOrDefault(item => string.Equals(
+                item.column_name,
+                columnName,
+                StringComparison.OrdinalIgnoreCase));
+            if (column?.column_type.DosIsNullOrWhiteSpace() != false)
+                throw new InvalidOperationException(
+                    $"未找到 {tableName}.{columnName} 的 SQL Server 物理类型。");
+            return column.column_type;
         }
 
         private static void EnsureSqlServerDefault(OsClientSecret client, SchemaField field)

@@ -21,6 +21,57 @@ export const OFFICIAL_APP_INSTALLED_FIELDS = [
     "CreateTime"
 ];
 
+function normalizedInstalledRecordTime(row) {
+    for (const field of ["UpdateTime", "InstallTime", "LastCheckTime", "CreateTime"]) {
+        const value = String(row?.[field] || "").trim();
+        if (!value) continue;
+        const parsed = Date.parse(value.replace(" ", "T"));
+        if (Number.isFinite(parsed)) return parsed;
+        const numeric = Number(value.replace(/[^0-9]/g, "").slice(0, 17));
+        if (Number.isFinite(numeric)) return numeric;
+    }
+    return 0;
+}
+
+function installedRecordAliases(row) {
+    return [
+        ["store", row?.StoreId],
+        ["app", row?.AppId],
+        ["name", row?.AppName],
+        ["id", row?.Id]
+    ]
+        .map(([prefix, value]) => [prefix, String(value || "").trim().toLowerCase()])
+        .filter(([, value]) => value)
+        .map(([prefix, value]) => `${prefix}:${value}`);
+}
+
+// The notification check needs only a small install-state projection. Collapse
+// duplicate history before crossing the public-store boundary, but retain the
+// newest tombstone because it authoritatively means "uninstalled".
+export function normalizeInstalledVersionsForOfficialCheck(rows, maxRows = 5000) {
+    const projected = (Array.isArray(rows) ? rows : [])
+        .map((row, index) => ({
+            row: Object.fromEntries(OFFICIAL_APP_INSTALLED_FIELDS
+                .filter((field) => Object.prototype.hasOwnProperty.call(row || {}, field))
+                .map((field) => [field, row[field]])),
+            index,
+            time: normalizedInstalledRecordTime(row)
+        }))
+        .filter((item) => installedRecordAliases(item.row).length > 0)
+        .sort((left, right) => right.time - left.time || left.index - right.index);
+
+    const selected = [];
+    const aliases = new Set();
+    for (const item of projected) {
+        const itemAliases = installedRecordAliases(item.row);
+        if (itemAliases.some((alias) => aliases.has(alias))) continue;
+        selected.push(item.row);
+        itemAliases.forEach((alias) => aliases.add(alias));
+        if (selected.length >= Math.max(1, Number(maxRows) || 5000)) break;
+    }
+    return selected;
+}
+
 // Single-flight runner with a durable trailing request. Calls made while a run is
 // awaiting I/O are coalesced, but at least one further run is guaranteed after
 // the active one completes. This keeps task-completion refreshes from being lost
@@ -257,18 +308,23 @@ export function normalizeOfficialAppNotices(result) {
             const item = { ...(row || {}) };
             item.Status = item.Status || item.StoreInstallStatus || item.AppInstallStatus || "";
             item.StoreId = item.StoreId || item.Id || "";
-            item.AppId = item.AppId || item.AppKey || "";
+            item.AppId = item.AppId || item.AppKey || (item.StoreId ? `store:${item.StoreId}` : "");
+            item.AppKey = item.AppKey || (String(item.AppId || "").startsWith("store:") ? "" : item.AppId);
             item.AppVersion = item.AppVersion || item.CurrentVersion || "";
             item.InstalledVersion = item.InstalledVersion || item.AppVersionInstall || "";
             item.AppVersionInstall = item.AppVersionInstall || item.InstalledVersion || "";
+            if (!item.AppVersion && (item.Status === "Uninstalled" || item.Status === "Outdated")) {
+                item.Status = "Abnormal";
+                item.DataIntegrityIssue = item.DataIntegrityIssue || "MissingAppVersion";
+            }
             return item;
         })
         .filter((item) => (!item.ApplicationType || item.ApplicationType === "Platform")
-            && (item.Status === "Uninstalled" || item.Status === "Outdated"));
+            && (item.Status === "Uninstalled" || item.Status === "Outdated" || item.Status === "Abnormal"));
 
-    const invalid = actionable.find((item) => !item.StoreId || !item.AppId || !item.AppVersion);
+    const invalid = actionable.find((item) => !item.StoreId || !item.AppId);
     if (invalid) {
-        throw new Error("商城源返回了缺少 StoreId、AppId 或 AppVersion 的平台应用通知。");
+        throw new Error("商城源返回了缺少 StoreId 或稳定应用标识的平台应用通知。");
     }
     return actionable;
 }

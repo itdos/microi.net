@@ -33,6 +33,7 @@ public static class MicroiApiHostExtensions
     public sealed record HostContext(
         Stopwatch Timer,
         string ServerVersion,
+        string DatabaseTypeName,
         string DatabaseConnection,
         string RedisConnection);
 
@@ -67,12 +68,13 @@ public static class MicroiApiHostExtensions
 
         var timer = Stopwatch.StartNew();
         var serverVersion = builder.ConfigureMicroiWebHost();
+        var databaseTypeName = ResolveDatabaseTypeName();
         var databaseConnection = ResolveDatabaseConnection();
         var redisConnection = RedisConnBuilder.BuildDefaultRedisConn();
 
         Console.WriteLine("Microi：【成功】开始初始化！");
         Console.WriteLine($"Microi：【成功】您的平台服务器端版本号：v{serverVersion}");
-        return new HostContext(timer, serverVersion, databaseConnection, redisConnection);
+        return new HostContext(timer, serverVersion, databaseTypeName, databaseConnection, redisConnection);
     }
 
     /// <summary>
@@ -351,6 +353,15 @@ public static class MicroiApiHostExtensions
                    EnvironmentVariableTarget.Process)
                ?? ConfigHelper.GetAppSettings("OsClientDbConn")
                ?? string.Empty;
+    }
+
+    public static string ResolveDatabaseTypeName()
+    {
+        return Environment.GetEnvironmentVariable(
+                   "OsClientDbType",
+                   EnvironmentVariableTarget.Process)
+               ?? ConfigHelper.GetAppSettings("OsClientDbType")
+               ?? "MySql";
     }
 
     private static void LoadLocalEnvironment()

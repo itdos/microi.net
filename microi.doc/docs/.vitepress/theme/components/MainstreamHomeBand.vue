@@ -28,7 +28,7 @@ const isVisible = computed(() => {
 
 const proofItems = [
   { value: '10+ 年', label: '持续产品演进' },
-  { value: '20+', label: '核心系统引擎' },
+  { value: '30+', label: '核心系统引擎' },
   { value: 'AI', label: '零代码AI编程' },
   { value: 'MIT', label: '开放源码协议' }
 ]

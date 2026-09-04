@@ -91,13 +91,13 @@ import MicroAppRuntimeError from "./runtime-error.vue";
 import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 import { hasRenderableMicroAppContent, shouldAutoRecoverMicroApp } from "./render-health.js";
 import {
-    MICRO_APP_HOST_ACTION_RESULT_TYPE,
-    MICRO_APP_HOST_PROTOCOL,
     createMicroAppHostCapabilities,
+    createMicroAppHostActionResult,
     normalizeHostMessage,
     normalizeHostPlatformPrint,
     normalizeHostRouteTarget,
     normalizeHostTabTitle,
+    normalizeMicroAppHostActionError,
     parseMicroAppHostAction
 } from "./host-bridge.js";
 import { applyMicroAppToken } from "./token-sync";
@@ -538,13 +538,10 @@ export default {
                 }
                 this.sendHostActionResult(request, true, result);
             } catch (error) {
-                const message = error?.message || String(error);
-                this.sendHostActionResult(request, false, null, {
-                    code: error?.code || "HOST_ACTION_FAILED",
-                    message
-                });
+                const failure = normalizeMicroAppHostActionError(error, request.action);
+                this.sendHostActionResult(request, false, null, failure);
                 const silent = request.data?.silent === true || request.data?.Silent === true;
-                if (!silent) this.$message?.error?.(message);
+                if (!silent) this.$message?.error?.(`${failure.message}（${failure.code}）。${failure.solution}`);
             }
         },
         async refreshCurrentUserFromServer() {
@@ -561,18 +558,37 @@ export default {
             this.diyStore.setCurrentUser(result.Data);
             return { accepted: true };
         },
-        sendHostActionResult(request, success, data = null, error = null) {
+        deliverMicroAppData(payload, force = false) {
+            if (force && this.microAppName && typeof window.microApp?.forceSetData === "function") {
+                try {
+                    window.microApp.forceSetData(this.microAppName, payload);
+                    return true;
+                } catch (error) {
+                    console.warn(`[MicroAppHost] forceSetData failed for ${this.microAppName}`, error);
+                }
+            }
             const app = this.$refs.microApp;
-            if (!app || typeof app.setData !== "function") return;
-            app.setData({
-                type: MICRO_APP_HOST_ACTION_RESULT_TYPE,
-                protocol: MICRO_APP_HOST_PROTOCOL,
-                requestId: request.requestId,
-                action: request.action,
-                success,
-                data,
-                error
-            });
+            if (app && "data" in app) {
+                app.data = payload;
+                return true;
+            }
+            if (app && typeof app.setData === "function") {
+                app.setData(payload);
+                return true;
+            }
+            if (this.microAppName && typeof window.microApp?.setData === "function") {
+                window.microApp.setData(this.microAppName, payload);
+                return true;
+            }
+            return false;
+        },
+        sendHostActionResult(request, success, data = null, error = null) {
+            const payload = createMicroAppHostActionResult(request, success, data, error);
+            const delivered = this.deliverMicroAppData(payload, true);
+            if (!delivered) {
+                console.error(`[MicroAppHost] unable to return ${request.action || "unknown"} result (${request.requestId || "no-request-id"})`);
+            }
+            return delivered;
         },
         setGlobalOverlay(input) {
             const visible = input?.visible ?? input?.Visible ?? input?.open ?? input?.Open;
@@ -739,7 +755,7 @@ export default {
                     FormMode: formMode,
                     DefaultValues: input?.defaultValues || input?.DefaultValues || {},
                     SubmitEvent: () => {
-                        this.$refs.microApp?.setData?.({
+                        this.deliverMicroAppData({
                             type: "micro-app:form-saved",
                             data: { tableName: "sys_microistore", id: tableRowId, formMode }
                         });
@@ -1180,10 +1196,7 @@ export default {
             this.pushViewportContract();
         },
         pushViewportContract() {
-            const app = this.$refs.microApp;
-            if (app && typeof app.setData === "function") {
-                app.setData({ ...this.microAppData, type: "host:resize" });
-            }
+            this.deliverMicroAppData({ ...this.microAppData, type: "host:resize" });
         },
         forcePushRuntimeContext(type = "host:context") {
             const data = { ...this.microAppData, type };

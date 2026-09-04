@@ -1,10 +1,11 @@
-export const architectureVersion = '2026.09.03.2'
+export const architectureVersion = '2026.09.04.1'
 export const platformVersion = 'v7.9.0'
+export const architectureAssetBaseName = `microi-ai-platform-architecture-${architectureVersion}`
 
 export const valueCards = [
   ['10×+', 'Token 更省'],
   ['10×+', '典型交付更快'],
-  ['20+', '成熟引擎复用'],
+  ['30+', '成熟引擎复用'],
   ['在线生效', 'V8 无需编译发布']
 ]
 
@@ -40,7 +41,7 @@ export const panels = [
   },
   {
     x: 40, y: 566, w: 545, h: 314, code: '02', title: '低代码核心业务引擎', accent: '#b995ff',
-    subtitle: '20+ 成熟引擎开箱复用',
+    subtitle: '30+ 成熟引擎开箱复用',
     items: [
       '表单引擎', '模块引擎', '接口引擎', '接口数据源',
       '界面引擎', '打印引擎', '报表引擎', '工作流引擎 v4',
@@ -124,7 +125,7 @@ export const architectureLayers = [
   },
   {
     name: '低代码核心业务引擎',
-    responsibility: '以 20+ 成熟引擎建模并运行企业业务',
+    responsibility: '以 30+ 成熟引擎建模并运行企业业务',
     capabilities: ['表单', '模块', '接口 / 类型化数据', '界面', '打印', '可写报表', '工作流', 'SaaS', '应用商城']
   },
   {

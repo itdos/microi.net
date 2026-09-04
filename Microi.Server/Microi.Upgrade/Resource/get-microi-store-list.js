@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store
- * Version: v1.4.9
+ * Version: v1.5.0
  * Function:
  * - 读取统一应用商城列表并计算租户安装状态；批量平台安装时优先返回应用商城自举包。
  */
@@ -108,7 +108,7 @@ function isDeletedInstallRecord(row) {
 }
 function addMap(map, prefix, key, row) {
   key = lower(key);
-  if (!key || isDeletedInstallRecord(row)) return;
+  if (!key) return;
   var mapKey = prefix + ":" + key, existing = map[mapKey];
   if (!existing || installedRecordTime(row) > installedRecordTime(existing)) map[mapKey] = row;
 }
@@ -408,7 +408,22 @@ for (var i = 0; i < source.length; i++) {
   app.Name = text(app.AppName || app.Name);
   app.AppName = app.Name;
   app.Description = text(app.AppDetail || app.Description);
-  app.AppKey = text(app.AppKey || app.AppId);
+  // MARKETPLACE_STABLE_APPLICATION_IDENTITY_V1：历史数据可能只写了 AppKey。
+  // 列表与通知都先补齐对称标识；极端情况下两者都为空时，仅在响应中使用
+  // StoreId 派生的临时标识，绝不把该值回写为商城业务主键。
+  var sourceAppId = trim(app.AppId);
+  var sourceAppKey = trim(app.AppKey);
+  var stableIdentity = sourceAppId || sourceAppKey;
+  var identityFallback = "";
+  if (!stableIdentity && trim(app.Id)) {
+    stableIdentity = "store:" + trim(app.Id);
+    identityFallback = "StoreId";
+  } else if (!sourceAppId && sourceAppKey) {
+    identityFallback = "AppKey";
+  }
+  app.AppId = stableIdentity;
+  app.AppKey = sourceAppKey || sourceAppId;
+  app.MarketplaceIdentityFallback = identityFallback;
   app.ApplicationType = runtimeType;
   app.AppType = runtimeType;
   app.Category = category;
@@ -423,23 +438,33 @@ for (var i = 0; i < source.length; i++) {
 }
 
 if (checkPlatformApps) {
-  var notices = [], installedCount = 0, platformCount = 0;
+  var notices = [], installedCount = 0, platformCount = 0, integrityIssueCount = 0;
   for (var n = 0; n < all.length; n++) {
     var item = all[n];
     if (item.ApplicationType !== "Platform") continue;
     platformCount++;
     // InstalledCount 表示目标租户已存在安装记录；可更新/版本异常仍属于已安装。
     if (item.StoreInstallStatus !== "Uninstalled") installedCount++;
-    if (isPlatformMaintenanceNotice(item.StoreInstallStatus)) notices.push({
-      Status: item.StoreInstallStatus, AppId: item.AppId, StoreId: item.Id, AppName: item.AppName,
+    var missingVersion = !trim(item.AppVersion || item.CurrentVersion);
+    var hasIntegrityIssue = !!item.MarketplaceIdentityFallback || missingVersion;
+    if (hasIntegrityIssue) integrityIssueCount++;
+    // MARKETPLACE_PLATFORM_NOTICE_ROW_ISOLATION_V1：一条历史脏数据不能再让所有
+    // 租户的整批检查失败。缺版本的行作为“版本异常”显式展示，不伪装成最新；
+    // 仅缺 AppId 时仍可依赖不可变 StoreId 安装，并保留降级诊断。
+    if (isPlatformMaintenanceNotice(item.StoreInstallStatus) || missingVersion) notices.push({
+      Status: missingVersion ? "Abnormal" : item.StoreInstallStatus,
+      AppId: item.AppId, AppKey: item.AppKey, StoreId: item.Id, AppName: item.AppName,
       AppVersion: item.AppVersion, InstalledVersion: item.InstalledVersion, AppAuthor: item.AppAuthor,
       AppUpdateTime: item.AppUpdateTime, AppPreview: item.AppPreview, ApplicationType: item.ApplicationType,
-      Category: item.Category, Visibility: item.Visibility
+      Category: item.Category, Visibility: item.Visibility,
+      DataIntegrityIssue: missingVersion ? "MissingAppVersion" : (item.MarketplaceIdentityFallback ? "MissingAppId" : ""),
+      MarketplaceIdentityFallback: item.MarketplaceIdentityFallback
     });
   }
   return { Code: 1, Data: {
     Notices: notices, NoticeCount: notices.length, PlatformCount: platformCount,
     OfficialCount: platformCount, InstalledCount: installedCount,
+    IntegrityIssueCount: integrityIssueCount, HasIntegrityWarnings: integrityIssueCount > 0,
     CheckedAt: typeof DateNow === "function" ? DateNow("yyyy-MM-dd HH:mm:ss") : System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
   }};
 }

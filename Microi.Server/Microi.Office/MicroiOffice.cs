@@ -37,6 +37,8 @@ namespace Microi.net
         private const int MaxImportErrorDetails = 100;
         private const string ImportErrorPolicyRollbackAll = "RollbackAll";
         private const string ImportErrorPolicyContinueOnError = "ContinueOnError";
+        private const string ImportPreflightApiEnginePrefix = "ApiEngine:";
+        private const int MaxImportIdempotencyKeyLength = 80;
 
         /// <summary>
         /// 通用的 dynamic 参数转换方法
@@ -1497,6 +1499,174 @@ namespace Microi.net
             throw new ArgumentException($"不支持的导入错误处理策略【{value}】，仅支持 {ImportErrorPolicyRollbackAll} 或 {ImportErrorPolicyContinueOnError}。");
         }
 
+        public static string ResolveImportPreflightApiEngineKeyForTest(string importV8)
+        {
+            if (importV8.DosIsNullOrWhiteSpace()) return "";
+            var value = importV8.Trim();
+            if (!value.StartsWith(ImportPreflightApiEnginePrefix, StringComparison.OrdinalIgnoreCase)) return "";
+            var apiEngineKey = value.Substring(ImportPreflightApiEnginePrefix.Length).Trim();
+            if (apiEngineKey.DosIsNullOrWhiteSpace()
+                || apiEngineKey.Length > 128
+                || !Regex.IsMatch(apiEngineKey, @"^[A-Za-z0-9][A-Za-z0-9._-]*$"))
+            {
+                throw new ArgumentException(
+                    $"ImportV8 服务端导入钩子格式无效，应为 {ImportPreflightApiEnginePrefix}<ApiEngineKey>。");
+            }
+            return apiEngineKey;
+        }
+
+        public static string NormalizeImportIdempotencyKeyForTest(string value)
+        {
+            if (value.DosIsNullOrWhiteSpace()) return "";
+            var normalized = value.Trim();
+            if (normalized.Length > MaxImportIdempotencyKeyLength
+                || !Regex.IsMatch(normalized, @"^[A-Za-z0-9][A-Za-z0-9._:-]*$"))
+            {
+                throw new ArgumentException("导入幂等键格式无效，请重新选择文件后再试。");
+            }
+            return normalized;
+        }
+
+        public static string BuildImportIdempotencyCacheKeyForTest(
+            string osClient,
+            string tableId,
+            string sysMenuId,
+            string userId,
+            string idempotencyKey)
+        {
+            return $"Microi:{osClient}:ImportTableDataRequest:{tableId}:{sysMenuId}:{userId}:{idempotencyKey}";
+        }
+
+        private static JObject ImportParseIdempotencyState(object value)
+        {
+            var text = value?.ToString();
+            if (text.DosIsNullOrWhiteSpace()) return null;
+            try { return JObject.Parse(text); }
+            catch { return null; }
+        }
+
+        private static async Task ImportSetIdempotencyStateAsync(
+            IMicroiCache cache,
+            string cacheKey,
+            string status,
+            string message = null)
+        {
+            if (cache == null || cacheKey.DosIsNullOrWhiteSpace()) return;
+            var safeMessage = message ?? "";
+            if (safeMessage.Length > 2000) safeMessage = safeMessage.Substring(0, 2000);
+            var payload = new JObject
+            {
+                ["Status"] = status,
+                ["Message"] = safeMessage,
+                ["UpdatedUtc"] = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture)
+            };
+            var expiry = string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "Running", StringComparison.OrdinalIgnoreCase)
+                ? TimeSpan.FromHours(2)
+                : TimeSpan.FromHours(24);
+            await cache.SetAsync(cacheKey, payload.ToString(Formatting.None), expiry);
+        }
+
+        private static JArray ImportBuildPreflightRows(
+            List<dynamic> fileDataList,
+            JObject fixedField,
+            List<JObject> importFieldList,
+            DiyTableRowParam param)
+        {
+            var rows = new JArray();
+            for (var sourceIndex = 0; sourceIndex < (fileDataList?.Count ?? 0); sourceIndex++)
+            {
+                var source = ImportGetRowDictionary((object)fileDataList[sourceIndex]);
+                var excelRow = ImportGetExcelRowNumber(source, sourceIndex, param);
+                if (source == null)
+                {
+                    throw new Exception($"Excel 第【{excelRow}】行不是可识别的数据对象。");
+                }
+
+                var normalized = new JObject { ["_ExcelRow"] = excelRow };
+                foreach (var field in importFieldList ?? new List<JObject>())
+                {
+                    var fieldName = field?["Name"].Val<string>();
+                    if (fieldName.DosIsNullOrWhiteSpace()
+                        || string.Equals(fieldName, "Id", StringComparison.OrdinalIgnoreCase)
+                        || !ImportTryGetFieldValue(source, fixedField, field, out var value))
+                    {
+                        continue;
+                    }
+                    if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true
+                        && string.Equals(fieldName, "TenantId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    try
+                    {
+                        var dbValue = ImportBuildDbValue(value, field);
+                        normalized[fieldName] = dbValue == null
+                            ? JValue.CreateNull()
+                            : JToken.FromObject(dbValue);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"Excel 第【{excelRow}】行字段[{field?["Label"].Val<string>()}]校验失败：{ex.Message}", ex);
+                    }
+                }
+                rows.Add(normalized);
+            }
+            return rows;
+        }
+
+        private static async Task ImportRunPreflightHookAsync(
+            string apiEngineKey,
+            JArray rows,
+            JObject fixedField,
+            DiyTableRowParam param,
+            string tableName,
+            string importErrorPolicy,
+            string fileName,
+            int uniqueRuleCount,
+            DbTrans trans)
+        {
+            if (apiEngineKey.DosIsNullOrWhiteSpace()) return;
+            var hookParam = new JObject
+            {
+                ["OsClient"] = param.OsClient,
+                ["TableId"] = param.TableId,
+                ["TableName"] = tableName,
+                ["SysMenuId"] = param._SysMenuId ?? "",
+                ["Rows"] = rows ?? new JArray(),
+                ["FixedValues"] = fixedField?.DeepClone() ?? new JObject(),
+                ["ImportErrorPolicy"] = importErrorPolicy,
+                ["ImportFileName"] = fileName ?? "",
+                ["ImportIdempotencyKey"] = param._ImportIdempotencyKey ?? "",
+                ["UniqueRuleCount"] = uniqueRuleCount
+            };
+            if (param._CurrentUser != null)
+            {
+                hookParam["_CurrentUser"] = param._CurrentUser.DeepClone();
+            }
+
+            var rawResult = await MicroiEngine.ApiEngine.RunAsync(apiEngineKey, hookParam, trans);
+            if (rawResult == null)
+            {
+                throw new Exception($"导入服务端校验接口【{apiEngineKey}】未返回结果。");
+            }
+
+            JObject hookResult;
+            try { hookResult = rawResult as JObject ?? JObject.FromObject((object)rawResult); }
+            catch (Exception ex)
+            {
+                throw new Exception($"导入服务端校验接口【{apiEngineKey}】返回格式无效：{ex.Message}", ex);
+            }
+            var code = hookResult["Code"]?.ToObject<int?>();
+            var message = hookResult["Msg"]?.ToString()
+                ?? hookResult["Message"]?.ToString()
+                ?? "未提供错误原因";
+            if (code != 1)
+            {
+                throw new Exception($"导入服务端校验未通过：{message}");
+            }
+        }
+
         private class ImportUniqueRule
         {
             public string Type { get; set; }
@@ -2243,8 +2413,58 @@ namespace Microi.net
     {
         var diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
         var importStepList = new List<string>();
+        var importIdempotencyCacheKey = "";
         try
         {
+            string normalizedIdempotencyKey;
+            try
+            {
+                normalizedIdempotencyKey = NormalizeImportIdempotencyKeyForTest(param._ImportIdempotencyKey);
+            }
+            catch (Exception ex)
+            {
+                result = new DosResult(0, null, ex.Message);
+                return;
+            }
+            param._ImportIdempotencyKey = normalizedIdempotencyKey;
+            if (!normalizedIdempotencyKey.DosIsNullOrWhiteSpace())
+            {
+                importIdempotencyCacheKey = BuildImportIdempotencyCacheKeyForTest(
+                    osClient,
+                    param.TableId,
+                    param._SysMenuId ?? "",
+                    param._CurrentUser?["Id"].Val<string>() ?? "",
+                    normalizedIdempotencyKey);
+                var previousState = ImportParseIdempotencyState(
+                    await diyCacheBase.GetAsync(importIdempotencyCacheKey));
+                var previousStatus = previousState?["Status"]?.ToString() ?? "";
+                var previousMessage = previousState?["Message"]?.ToString() ?? "";
+                if (previousStatus.Equals("Pending", StringComparison.OrdinalIgnoreCase)
+                    || previousStatus.Equals("Running", StringComparison.OrdinalIgnoreCase)
+                    || previousStatus.Equals("Succeeded", StringComparison.OrdinalIgnoreCase))
+                {
+                    result = new DosResult(1, new
+                    {
+                        Idempotent = true,
+                        Status = previousStatus,
+                        IdempotencyKey = normalizedIdempotencyKey
+                    }, previousStatus.Equals("Succeeded", StringComparison.OrdinalIgnoreCase)
+                        ? "同一导入请求此前已成功完成，本次未重复写入。"
+                        : "同一导入请求正在处理中，本次未重复创建任务。");
+                    return;
+                }
+                if (previousStatus.Equals("Failed", StringComparison.OrdinalIgnoreCase))
+                {
+                    result = new DosResult(0, new
+                    {
+                        Idempotent = true,
+                        Status = previousStatus,
+                        IdempotencyKey = normalizedIdempotencyKey
+                    }, "同一导入请求此前已失败：" + previousMessage + "；如已修正数据，请重新选择文件后提交。");
+                    return;
+                }
+            }
+
             var isStartStep = (string)await diyCacheBase.GetAsync(startSign) == "1";
             if (isStartStep)
             {
@@ -2252,16 +2472,23 @@ namespace Microi.net
                 return;
             }
             await diyCacheBase.SetAsync(startSign, "1");
+            await ImportSetIdempotencyStateAsync(
+                diyCacheBase,
+                importIdempotencyCacheKey,
+                "Pending",
+                "导入请求已接收，等待后台处理。");
             if (files.Count != 1)
             {
                 await diyCacheBase.SetAsync(startSign, "0");
                 importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！必须且只能上传一个 Excel 或 CSV 文件！");
                 await diyCacheBase.SetAsync(stepSign, importStepList);
+                await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", "必须且只能上传一个 Excel 或 CSV 文件！");
                 result = new DosResult(0, null, "必须且只能上传一个 Excel 或 CSV 文件！");
                 return;
             }
 
             var file = files[0];
+            var importFileName = file.FileName;
             var fileSuffix = Path.GetExtension(file.FileName)?.ToLowerInvariant();
             if (file.Length <= 0 || file.Length > MaxImportExcelFileBytes)
             {
@@ -2269,6 +2496,7 @@ namespace Microi.net
                 result = new DosResult(0, null, $"Excel/CSV 文件必须大于0且不超过{MaxImportExcelFileBytes / 1024 / 1024}MB！");
                 importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{result.Msg}");
                 await diyCacheBase.SetAsync(stepSign, importStepList);
+                await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", result.Msg);
                 return;
             }
             if (fileSuffix != ".xls" && fileSuffix != ".xlsx" && fileSuffix != ".csv")
@@ -2277,6 +2505,7 @@ namespace Microi.net
                 result = new DosResult(0, null, "只允许导入真实的 .xls、.xlsx 或 .csv 文件！");
                 importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{result.Msg}");
                 await diyCacheBase.SetAsync(stepSign, importStepList);
+                await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", result.Msg);
                 return;
             }
             string importErrorPolicy;
@@ -2290,6 +2519,7 @@ namespace Microi.net
                 result = new DosResult(0, null, ex.Message);
                 importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
                 await diyCacheBase.SetAsync(stepSign, importStepList);
+                await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", ex.Message);
                 return;
             }
 
@@ -2326,6 +2556,42 @@ namespace Microi.net
             {
                 await diyCacheBase.SetAsync(startSign, "0");
                 result = new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " DiyTable-Id：" + param.TableId);
+                await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", result.Msg);
+                return;
+            }
+
+            var importPreflightApiEngineKey = "";
+            if (!param._SysMenuId.DosIsNullOrWhiteSpace())
+            {
+                var importMenu = dbSession.From<SysMenu>()
+                    .Where(menu => menu.Id == param._SysMenuId && menu.IsDeleted == 0)
+                    .First();
+                if (importMenu == null
+                    || !string.Equals(importMenu.DiyTableId, param.TableId, StringComparison.OrdinalIgnoreCase))
+                {
+                    await diyCacheBase.SetAsync(startSign, "0");
+                    result = new DosResult(0, null, "导入菜单不存在或未绑定当前数据表，请刷新页面后重试。");
+                    await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", result.Msg);
+                    return;
+                }
+                try
+                {
+                    importPreflightApiEngineKey = ResolveImportPreflightApiEngineKeyForTest(importMenu.ImportV8);
+                }
+                catch (Exception ex)
+                {
+                    await diyCacheBase.SetAsync(startSign, "0");
+                    result = new DosResult(0, null, ex.Message);
+                    await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", result.Msg);
+                    return;
+                }
+            }
+            if (!importPreflightApiEngineKey.DosIsNullOrWhiteSpace()
+                && importErrorPolicy != ImportErrorPolicyRollbackAll)
+            {
+                await diyCacheBase.SetAsync(startSign, "0");
+                result = new DosResult(0, null, "当前模块启用了服务端整批校验，只允许“任一行失败则全部回滚”策略。");
+                await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", result.Msg);
                 return;
             }
 
@@ -2351,6 +2617,11 @@ namespace Microi.net
                 var failedCount = 0;
                 try
                 {
+                    await ImportSetIdempotencyStateAsync(
+                        diyCacheBase,
+                        importIdempotencyCacheKey,
+                        "Running",
+                        "后台导入任务正在执行。");
                     if (!OfficeDocumentSecurity.HasExpectedFileSignature(fileSuffix, fileByte))
                     {
                         throw new ArgumentException($"上传内容与文件类型{fileSuffix}不一致或文件已损坏。");
@@ -2450,6 +2721,16 @@ namespace Microi.net
                     var uniqueRuleDescription = ImportDescribeUniqueRules(uniqueRules);
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：错误处理策略：【{importErrorPolicy}】。");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：重复数据判断：【{uniqueRuleDescription}】。任一规则命中同一记录则修改，均未命中则新增。");
+                    JArray importPreflightRows = null;
+                    if (!importPreflightApiEngineKey.DosIsNullOrWhiteSpace())
+                    {
+                        importPreflightRows = ImportBuildPreflightRows(
+                            fileDataList,
+                            guanlianField,
+                            importFieldList,
+                            param);
+                        importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已启用服务端整批校验接口【{importPreflightApiEngineKey}】；校验、锁定和写入将共用同一数据库事务。");
+                    }
                     await diyCacheBase.SetAsync(stepSign, importStepList);
 
                     var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(
@@ -2465,6 +2746,21 @@ namespace Microi.net
                         {
                             try
                             {
+                                if (!importPreflightApiEngineKey.DosIsNullOrWhiteSpace())
+                                {
+                                    await ImportRunPreflightHookAsync(
+                                        importPreflightApiEngineKey,
+                                        importPreflightRows,
+                                        guanlianField,
+                                        param,
+                                        diyTableModel.Name,
+                                        importErrorPolicy,
+                                        importFileName,
+                                        uniqueRules.Count,
+                                        trans);
+                                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：服务端整批校验通过，正在写入数据...");
+                                    await diyCacheBase.SetAsync(stepSign, importStepList);
+                                }
                                 for (var sourceIndex = 0; sourceIndex < fileDataList.Count; sourceIndex++)
                                 {
                                     var itemEObj = ImportGetRowDictionary((object)fileDataList[sourceIndex]);
@@ -2591,6 +2887,11 @@ namespace Microi.net
                         });
                     await diyCacheBase.SetAsync(stepSign, importStepList);
                     await diyCacheBase.SetAsync(startSign, "0");
+                    await ImportSetIdempotencyStateAsync(
+                        diyCacheBase,
+                        importIdempotencyCacheKey,
+                        "Succeeded",
+                        $"导入完成：成功{successCount}条，新增{addedCount}条，修改{updatedCount}条，失败{failedCount}条。");
                 }
                 catch (Exception ex)
                 {
@@ -2607,6 +2908,7 @@ namespace Microi.net
                             Error = ex.Message
                         }, false);
                     await diyCacheBase.SetAsync(startSign, "0");
+                    await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", ex.Message);
                     MicroiEngine.QueueSystemLog(param.OsClient, "Office", "DataImportFailed", "Excel 数据导入失败", ex.ToString(), 2, false, param.TableId);
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：lastSql：{lastSqlLog}");
@@ -2614,11 +2916,16 @@ namespace Microi.net
                     await diyCacheBase.SetAsync(stepSign, importStepList);
                 }
             });
-            result = new DosResult(1, null);
+            result = new DosResult(1, new
+            {
+                IdempotencyKey = param._ImportIdempotencyKey,
+                Status = "Pending"
+            }, "导入请求已接收，请查看导入进度。");
         }
         catch (Exception ex)
         {
             await diyCacheBase.SetAsync(startSign, "0");
+            await ImportSetIdempotencyStateAsync(diyCacheBase, importIdempotencyCacheKey, "Failed", ex.Message);
             MicroiEngine.QueueSystemLog(param.OsClient, "Office", "DataImportInitializationFailed", "Excel 数据导入初始化失败", ex.ToString(), 2, false, param.TableId);
             importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
             importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：{ImportBuildExceptionDebug(ex)}");

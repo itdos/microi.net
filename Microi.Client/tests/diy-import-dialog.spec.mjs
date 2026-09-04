@@ -80,6 +80,8 @@ test("confirmed standard import uploads the original file with the exact server 
     assert.match(dialogSource, /_ImportColumnsJson/);
     assert.match(dialogSource, /_ImportMetaJson/);
     assert.match(dialogSource, /_ImportErrorPolicy/);
+    assert.match(dialogSource, /_ImportIdempotencyKey/);
+    assert.match(dialogSource, /importIdempotencyKey = this\.DiyCommon\.NewGuid\(\)/);
     assert.match(dialogSource, /ImportDiyTableRow/);
     assert.match(tableSource, /:diyFieldList="DiyFieldList"/);
     assert.match(tableSource, /:diyTableModel="CurrentDiyTableModel"/);
@@ -93,6 +95,8 @@ test("users choose rollback or continue and see authoritative table unique rules
     assert.match(dialogSource, /ImportUniqueRules/);
     assert.match(dialogSource, /ImportNoUniqueRules/);
     assert.match(dialogSource, /uniqueRuleText/);
+    assert.match(dialogSource, /requiresAtomicImport/);
+    assert.match(dialogSource, /\^ApiEngine:/);
     assert.match(designSource, /\.mci-import-dialog__policy-grid/);
     assert.match(designSource, /\.mci-import-dialog__unique-rules/);
 });
@@ -106,7 +110,7 @@ test("page V8 retains the declarative background import bridge with the same pre
     assert.match(dialogSource, /_ImportUniqueRulesJson/);
     assert.match(dialogSource, /_ImportErrorPolicy/);
     assert.match(dialogSource, /ApiEngine\.RunBackground/);
-    assert.match(dialogSource, /\/api\/BackgroundTask\/List/);
+    assert.match(dialogSource, /\/apiengine\/platform-background-task/);
     assert.match(dialogSource, /microi-background-task-started/);
     assert.match(dialogSource, /TERMINAL_TASK_STATUSES/);
 });

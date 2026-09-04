@@ -6,8 +6,8 @@
  */
 
 // Microi 官方接口引擎：platform-vision-ai-worker
-// Version: v1.0.3
-// VISION_AI_WORKER_RESILIENT_MODEL_RETRY_V3
+// Version: v1.1.0
+// VISION_AI_FRESHNESS_FROZEN_PRICE_V1
 var workerParam = V8.Param || {};
 var requestNo = safeKey(workerParam.RequestId || workerParam.RequestNo, 80);
 if (!requestNo) return { Code: 0, Msg: 'RequestId 不能为空。' };
@@ -55,7 +55,7 @@ try {
   var systemPrompt = mode === 'Face'
     ? '你是合规的视觉分类器。数据库人脸样本已经匹配失败。禁止猜测、确认或暗示现实身份、姓名、犯罪记录、种族、健康、政治等敏感属性；只能返回“未识别人员”以及中性、可见的服饰或场景描述。只输出一个 JSON 对象，不要 Markdown。'
     : '你是零售与通用物体视觉分类器。识别画面中心、秤台或主要区域内最可能的商品、物体、动物、植物或建筑。先确保大类判断正确，再给出能可靠确认的具体品种；例如能看出是鱼但无法可靠区分鱼种时，label 必须返回“鱼”、category 返回“水产鱼类”，不能因为鱼种不确定而返回“无法判断”。若有多个同类物品，名称仍返回品类并在描述中说明可见数量。只输出一个 JSON 对象，不要 Markdown。';
-  var defaultPrompt = 'JSON 必须严格使用：{"label":"具体中文名称或可靠大类","category":"中文类别","description":"不超过80字的可见事实","confidence":0.0,"candidates":[{"label":"候选名称","confidence":0.0}]}。confidence 范围 0 到 1，候选最多3个；只有连物体大类也看不清时 label 才写“无法判断”且置信度低。';
+  var defaultPrompt = 'JSON 必须严格使用：{"label":"具体中文名称或可靠大类","category":"中文类别","description":"不超过80字的可见事实","confidence":0.0,"candidates":[{"label":"候选名称","confidence":0.0}],"frozenState":"Frozen|NotFrozen|Unknown","freshnessPercent":null,"estimatedPriceMin":null,"estimatedPriceMax":null,"priceUnit":"斤、个、台、件等或空字符串","currency":"CNY"}。confidence 范围 0 到 1，候选最多3个；只有连物体大类也看不清时 label 才写“无法判断”且置信度低。仅对生鲜、水产、肉类、蔬果等从可见外观判断是否冰冻和新鲜度，无法判断时分别返回 Unknown 和 null；价格按中国常见零售市场给保守区间，无法可靠估计时返回 null，不能伪装成数据库定价。';
   var customPrompt = text(profile.AiPrompt);
   if (customPrompt.length > 1200) customPrompt = customPrompt.substring(0, 1200);
   var aiModels = resolveAiModels(profile);
@@ -91,6 +91,17 @@ try {
   var description = cleanText(parsed.description, 500);
   var confidence = clampNumber(parsed.confidence, 0, 1, 0);
   var candidates = sanitizeCandidates(parsed.candidates);
+  var frozenState = normalizeFrozenState(parsed.frozenState);
+  var freshness = nullableNumber(parsed.freshnessPercent, 0, 100);
+  var priceMin = nullableNumber(parsed.estimatedPriceMin, 0, 100000000);
+  var priceMax = nullableNumber(parsed.estimatedPriceMax, 0, 100000000);
+  if (priceMin !== null && priceMax !== null && priceMin > priceMax) {
+    var priceSwap = priceMin;
+    priceMin = priceMax;
+    priceMax = priceSwap;
+  }
+  var priceUnit = cleanText(parsed.priceUnit, 30);
+  var currency = cleanText(parsed.currency, 10) || 'CNY';
   if (mode === 'Face') {
     label = '未识别人员';
     category = category || '人员';
@@ -109,6 +120,14 @@ try {
     AiCategory: category,
     AiDescription: description,
     AiCandidates: JSON.stringify(candidates),
+    FrozenState: frozenState,
+    FreshnessPercent: freshness,
+    AttributeSource: frozenState !== 'Unknown' || freshness !== null ? 'AI' : 'None',
+    EstimatedPriceMin: priceMin,
+    EstimatedPriceMax: priceMax,
+    PriceUnit: priceUnit,
+    Currency: currency,
+    PriceSource: priceMin !== null || priceMax !== null ? 'AI' : 'None',
     AiModelId: text(aiModel.Id),
     CompletedAt: DateNow('yyyy-MM-dd HH:mm:ss'),
     ElapsedMs: elapsedFrom(request.RequestedAt),
@@ -137,6 +156,14 @@ try {
   request.AiCategory = update.AiCategory;
   request.AiDescription = update.AiDescription;
   request.AiCandidates = update.AiCandidates;
+  request.FrozenState = update.FrozenState;
+  request.FreshnessPercent = update.FreshnessPercent;
+  request.AttributeSource = update.AttributeSource;
+  request.EstimatedPriceMin = update.EstimatedPriceMin;
+  request.EstimatedPriceMax = update.EstimatedPriceMax;
+  request.PriceUnit = update.PriceUnit;
+  request.Currency = update.Currency;
+  request.PriceSource = update.PriceSource;
   request.CompletedAt = update.CompletedAt;
   request.ElapsedMs = update.ElapsedMs;
   return { Code: 1, Data: publicResult(request), Msg: 'AI 视觉识别完成。' };
@@ -187,7 +214,10 @@ function getRequest(value) {
     _SelectFields: [
       'Id', 'RequestNo', 'FrameId', 'Mode', 'Status', 'MatchSource', 'SubjectId', 'SubjectName',
       'CategoryId', 'CategoryName', 'LocalSimilarity', 'Confidence', 'AiLabel', 'AiCategory',
-      'AiDescription', 'AiCandidates', 'ProfileKey', 'ModelKey', 'ModelVersion', 'QualityScore',
+      'AiDescription', 'AiCandidates', 'FrozenState', 'FreshnessPercent', 'AttributeSource',
+      'EstimatedPriceMin', 'EstimatedPriceMax', 'PriceUnit', 'Currency', 'PriceSource',
+      'OriginalMatchSource', 'CorrectionStatus', 'CorrectionNote', 'CorrectedAt', 'CorrectedBy', 'SavedSampleId',
+      'ProfileKey', 'ModelKey', 'ModelVersion', 'QualityScore',
       'InputFileName', 'InputFilePath', 'BackgroundTaskId', 'RequestedAt', 'CompletedAt',
       'ElapsedMs', 'ErrorMessage', 'CreateTime'
     ]
@@ -345,6 +375,15 @@ function publicResult(row) {
     Ai: text(row.AiLabel) ? {
       Label: text(row.AiLabel), Category: text(row.AiCategory), Description: text(row.AiDescription), Candidates: parseJson(row.AiCandidates, [])
     } : null,
+    FrozenState: normalizeFrozenState(row.FrozenState),
+    FreshnessPercent: nullableNumber(row.FreshnessPercent, 0, 100),
+    AttributeSource: text(row.AttributeSource || 'None'),
+    EstimatedPriceMin: nullableNumber(row.EstimatedPriceMin, 0, 100000000),
+    EstimatedPriceMax: nullableNumber(row.EstimatedPriceMax, 0, 100000000),
+    PriceUnit: text(row.PriceUnit),
+    Currency: text(row.Currency || 'CNY'),
+    PriceSource: text(row.PriceSource || 'None'),
+    CorrectionStatus: text(row.CorrectionStatus || 'None'),
     CompletedAt: text(row.CompletedAt),
     ElapsedMs: Number(row.ElapsedMs || 0),
     ErrorMessage: text(row.ErrorMessage)
@@ -372,6 +411,20 @@ function clampNumber(value, minimum, maximum, fallback) {
   var parsed = Number(value);
   if (!isFinite(parsed)) parsed = fallback;
   return Math.max(minimum, Math.min(maximum, parsed));
+}
+
+function nullableNumber(value, minimum, maximum) {
+  if (value === null || value === undefined || text(value) === '') return null;
+  var parsed = Number(value);
+  if (!isFinite(parsed)) return null;
+  return Math.round(Math.max(minimum, Math.min(maximum, parsed)) * 100) / 100;
+}
+
+function normalizeFrozenState(value) {
+  var state = text(value).toLowerCase();
+  if (state === 'frozen' || state === 'true' || state === '1' || state === '冰冻' || state === '冷冻') return 'Frozen';
+  if (state === 'notfrozen' || state === 'false' || state === '0' || state === '非冰冻' || state === '未冰冻' || state === '新鲜') return 'NotFrozen';
+  return 'Unknown';
 }
 
 function safeKey(value, maximum) {

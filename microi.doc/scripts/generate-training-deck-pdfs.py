@@ -146,7 +146,7 @@ def build_variant(variant: str, label: str) -> dict[str, object]:
     writer.add_metadata({
         "/Title": f"Microi吾码 AI 开发框架技术培训大纲（{label}）",
         "/Author": "Microi吾码",
-        "/Subject": "45页功能点培训：20+引擎、AI数据分析、AI创作、MCP、全端交付与企业案例",
+        "/Subject": "45页功能点培训：30+引擎、AI数据分析、AI创作、MCP、全端交付与企业案例",
         "/Creator": "Microi吾码官网预生成培训课件",
     })
     with public_pdf.open("wb") as stream:

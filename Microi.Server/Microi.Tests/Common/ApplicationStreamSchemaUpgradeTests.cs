@@ -101,6 +101,12 @@ public sealed class ApplicationStreamSchemaUpgradeTests
         Assert.Equal(
             "ALTER TABLE [sys_microistore] ALTER COLUMN [PublishProtocolVersion] int NOT NULL",
             Upgrade25.BuildControlAlterSql(Upgrade25.SchemaDialect.SqlServer, protocol));
+        var publishMode = Control("sys_osclients", "ApplicationStreamPublishMode");
+        Assert.Equal(
+            "ALTER TABLE [sys_osclients] ALTER COLUMN [ApplicationStreamPublishMode] nvarchar(20) NOT NULL",
+            Upgrade25.BuildSqlServerPreservingControlAlterSql(publishMode, "nvarchar(20)"));
+        Assert.Throws<InvalidOperationException>(() =>
+            Upgrade25.BuildSqlServerPreservingControlAlterSql(publishMode, "nvarchar(20); DROP TABLE x"));
         Assert.Equal(
             "ALTER TABLE sys_microistore MODIFY (PublishProtocolVersion NUMBER(10) DEFAULT 2 NOT NULL)",
             Upgrade25.BuildControlAlterSql(Upgrade25.SchemaDialect.Oracle, protocol));

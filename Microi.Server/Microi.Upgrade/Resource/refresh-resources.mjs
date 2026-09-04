@@ -100,7 +100,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 2_007_002
+    if (versionNumber < 2_007_004
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -156,8 +156,10 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
       || !content.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
       || !content.includes('PACKAGE_REPLAY_VERSION_GUARD_V2')
+      || !content.includes('SQLSERVER_PHYSICAL_SCHEMA_DIALECT_V1')
+      || !content.includes('SQLSERVER_PHYSICAL_FIELD_CHANGE_V1')
       || !content.includes('OBJECT_STORAGE_FORBIDDEN')) {
-      throw new Error(`${name} 低于 v2.7.2 或缺少更新日志租户回填唯一键修复、目标租户 NOT NULL 回填、PageEngine 显式可选引用、生成实体物理前置列自愈、跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、宿主可信内置官方包重放、Managed 包资源覆盖升级及统一应用商城能力，拒绝降级本地基线`);
+      throw new Error(`${name} 低于 v2.7.4 或缺少 SQL Server 物理结构及字段变更方言、更新日志租户回填唯一键修复、目标租户 NOT NULL 回填、PageEngine 显式可选引用、生成实体物理前置列自愈、跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、宿主可信内置官方包重放、Managed 包资源覆盖升级及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -354,6 +356,8 @@ function validateReleaseCandidate(name, content) {
         'platform-create-tenant',
         'platform-external-login-binding',
         'platform-wechat-user-binding',
+        'platform-chanjet-callback-v2',
+        'platform-chanjet-callback-v2-hook',
         'platform-service-health',
         'microi-init',
         'mci-system-observability-action',
@@ -389,6 +393,43 @@ function validateReleaseCandidate(name, content) {
         || !requiredCapabilities.includes('V8.Method.GetBackendVersion')
         || !requiredCapabilities.includes('ApiEngine:platform-service-health')) {
         throw new Error(`${name} 缺少固定匿名服务健康与后端版本契约。`);
+      }
+      const chanjetCallback = packageEngineMap.get('platform-chanjet-callback-v2');
+      const chanjetHook = packageEngineMap.get('platform-chanjet-callback-v2-hook');
+      const chanjetCallbackCode = String(chanjetCallback?.ApiV8Code || '');
+      const systemSettingsDataSet = (packageModel?.DataSets || []).find(
+        item => String(item?.TableName || '').toLowerCase() === 'mci_system_setting');
+      const systemSettingRows = new Map((systemSettingsDataSet?.Rows || []).map(
+        row => [String(row?.ConfigKey || ''), row]));
+      const chanjetEnabledSetting = systemSettingRows.get('Integration.Chanjet.CallbackV2.Enabled');
+      const chanjetAesSetting = systemSettingRows.get('Integration.Chanjet.CallbackV2.AesKey');
+      const chanjetAppKeysSetting = systemSettingRows.get('Integration.Chanjet.CallbackV2.AppKeys');
+      if (semanticNumber(chanjetCallback?.Version) < 1_000_000
+        || Number(chanjetCallback?.IsEnable) !== 1
+        || Number(chanjetCallback?.StopHttp) !== 1
+        || Number(chanjetCallback?.AllowAnonymous) !== 0
+        || Number(chanjetCallback?.EnableLog) !== 0
+        || !chanjetCallbackCode.includes('RequireManagedProtocolContext')
+        || !chanjetCallbackCode.includes('platform-chanjet-callback-v2-hook')
+        || Number(chanjetHook?.StopHttp) !== 1
+        || Number(chanjetHook?.AllowAnonymous) !== 0
+        || packageModel?.ResourcePolicies?.ApiEngines?.['platform-chanjet-callback-v2']?.UpgradePolicy !== 'Managed'
+        || packageModel?.ResourcePolicies?.ApiEngines?.['platform-chanjet-callback-v2-hook']?.UpgradePolicy !== 'CreateIfMissing'
+        || !requiredCapabilities.includes('ApiEngine:platform-chanjet-callback-v2@v1.0.0')) {
+        throw new Error(`${name} 缺少畅捷通 V2 可信回调与租户 Hook 契约。`);
+      }
+      if (String(systemSettingsDataSet?.ConflictPolicy || '') !== 'InsertIfMissing'
+        || String(chanjetEnabledSetting?.ConfigValue || '') !== 'false'
+        || Number(chanjetEnabledSetting?.IsPublic) !== 0
+        || Number(chanjetEnabledSetting?.IsSecret) !== 0
+        || Number(chanjetEnabledSetting?.IsEnabled) !== 0
+        || Number(chanjetAesSetting?.IsPublic) !== 0
+        || Number(chanjetAesSetting?.IsSecret) !== 1
+        || Number(chanjetAesSetting?.IsEnabled) !== 0
+        || Number(chanjetAppKeysSetting?.IsPublic) !== 0
+        || Number(chanjetAppKeysSetting?.IsSecret) !== 1
+        || Number(chanjetAppKeysSetting?.IsEnabled) !== 0) {
+        throw new Error(`${name} 缺少默认关闭且租户私有的畅捷通 V2 回调配置模板。`);
       }
       const controllerSlimFacades = new Map([
         ['mci-system-observability-action', 'V8.Method.ManageSystemObservability'],
@@ -538,6 +579,8 @@ function validateReleaseCandidate(name, content) {
       const modelEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store-model');
       const versionsEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store-versions');
       const visibilityField = fields.find(field => field.TableName === 'sys_microistore' && field.Name === 'IsPublic');
+      const storeTable = (packageModel.DiyTables || []).find(table => table?.Name === 'sys_microistore');
+      const storeSubmitBefore = String(storeTable?.SubmitBeforeServerV8 || '');
       const deprecatedMenuUrls = new Map([
         ['01KXFSG8153B3VZPZ45WNCCFHR', '/microi-store-installed'],
         ['01KXFSG7MZ40CY8KCWCZZZJH2M', '/microi-store-published'],
@@ -589,7 +632,7 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 2_007_002
+        || importerVersionNumber < 2_007_004
         || !importerCode.includes('API_ENGINE_RESOURCE_BASELINE_V1')
         || !importerCode.includes('JSON_SWITCH_LITERAL_UNQUOTE_V1')
         || !importerCode.includes('MYSQL_BIT_NUMERIC_COMPAT_V1')
@@ -599,6 +642,7 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1')
         || !importerCode.includes('MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1')
         || !importerCode.includes('PAGE_ENGINE_OPTIONAL_REFERENCE_V1')
+        || !importerCode.includes('SQLSERVER_PHYSICAL_FIELD_CHANGE_V1')
         || !importerCode.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
         || !importerCode.includes('TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1')
         || !importerCode.includes('V8.Method.RequireManagedProtocolContext')
@@ -619,6 +663,8 @@ function validateReleaseCandidate(name, content) {
         || !String(publisherEngine?.ApiV8Code || '').includes('MARKETPLACE_SOURCE_DEFAULT_PRIVATE_V1')
         || !String(publisherEngine?.ApiV8Code || '').includes('MARKETPLACE_IMMUTABLE_INSTALL_SNAPSHOT_V1')
         || !String(publisherEngine?.ApiV8Code || '').includes('MARKETPLACE_CURRENT_PACKAGE_REPAIR_CAS_V1')
+        || !String(publisherEngine?.ApiV8Code || '').includes('MARKETPLACE_STABLE_APPLICATION_IDENTITY_V1')
+        || !String(publisherEngine?.ApiV8Code || '').includes('marketplaceIdentityReadbackMatches')
         || !String(publisherEngine?.ApiV8Code || '').includes("Build: storeVisibility ? 'PublicHdfs' : 'PrivateHdfs'")
         || engineVersionNumber(prepareAssetsEngine) < 1_002_000
         || !String(prepareAssetsEngine?.ApiV8Code || '').includes('MARKETPLACE_AI_ASSET_VISIBILITY_V1')
@@ -643,7 +689,15 @@ function validateReleaseCandidate(name, content) {
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('ApiEngine:bulk-import-microi-store-packages@v1.3.9')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
-          .includes('ApiEngine:get-microi-store@v1.4.8')
+          .includes('ApiEngine:get-microi-store@v1.5.0')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:ai_app_publish_store@v1.9.24')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('Marketplace:StableApplicationIdentityV1')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('Marketplace:PlatformNoticeRowIsolationV1')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('Marketplace:InstalledVersionTombstonePrecedenceV1')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('Marketplace:DeterministicInstallVersionStateV1')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
@@ -710,10 +764,14 @@ function validateReleaseCandidate(name, content) {
         || !deprecatedMenusValid
         || !menuUrlsUnique
         || !runtimeBundleValid
-        || engineVersionNumber(listEngine) < 1_004_000
+        || engineVersionNumber(listEngine) < 1_005_000
         || !String(listEngine?.ApiV8Code || '').includes('ownedOnly')
         || !String(listEngine?.ApiV8Code || '').includes('V8.Param.Visibility')
         || !String(listEngine?.ApiV8Code || '').includes('BULK_PLATFORM_BOOTSTRAP_ORDER_V1')
+        || !String(listEngine?.ApiV8Code || '').includes('MARKETPLACE_PLATFORM_NOTICE_ROW_ISOLATION_V1')
+        || !String(listEngine?.ApiV8Code || '').includes('MARKETPLACE_STABLE_APPLICATION_IDENTITY_V1')
+        || !storeSubmitBefore.includes('Version: v1.1.4')
+        || !storeSubmitBefore.includes('MARKETPLACE_STABLE_APPLICATION_IDENTITY_V1')
         || engineVersionNumber(modelEngine) < 1_003_001
         || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_PLAIN_OBJECT_STRIP_V1')
         || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_PINNED_INSTALL_SNAPSHOT_V1')

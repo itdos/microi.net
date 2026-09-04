@@ -164,8 +164,9 @@ MCP 建模只使用：
 ### MCP 创建 `TableChild` 的两阶段流程
 
 1. 创建主表和独立子表；在子表创建真实外键（如 `VisitId varchar(50)`）。
-2. 在子表为回查创建租户组合索引（通常 `(OsClient, VisitId)`），索引写入 Manifest
-   `tables[].indexes`，并以 `microi_get_table_indexes` 回读。
+2. 在子表为回查创建与物理隔离方式一致的索引：表有 `OsClient` 时通常为
+   `(OsClient, VisitId)`，独立租户表没有该列时为 `(VisitId)`。索引写入 Manifest
+   `tables[].indexes`，并以 `microi_get_table_indexes` 回读；物理字段回读失败时停止配置。
 3. 为子表创建绑定其 `diyTableId` 的隐藏 CRUD 菜单：`Display=0`、`AppDisplay=0`、
    `HasChild=0`。
 4. 在完整系统 Manifest 的主表字段声明：

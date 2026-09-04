@@ -274,8 +274,8 @@ namespace Microi.net
                 }
                 backgroundTaskRuntimeInvariantApplied = true;
                 // 数据库备份控制面是运行时基础设施，不能只依赖 ServerVersion。
-                // 历史环境可能已经推进版本号，但物理表仍缺少后续补充的字段；每次启动
-                // 都在分布式升级租约内做一次幂等回读/修复，避免业务代码先于结构上线。
+                // 历史环境可能已经推进旧版版本号，但物理表仍缺少后续补充的字段；
+                // 在 Upgrade36 一次性基线尚未完成时于分布式租约内回读/修复。
                 runtimeInvariantStage = "Upgrade24-数据库备份";
                 var databaseBackupInvariantMessages = await new Upgrade24()
                     .Run(osClientSecret.OsClient).ConfigureAwait(false);
@@ -1003,10 +1003,10 @@ namespace Microi.net
             {
                 try
                 {
-                    // ServerVersion 可能已是当前值，但商城资源随后才首次安装，或
-                    // 历史恢复只带回了列而漏掉唯一索引。每次启动先做轻量物理
-                    // readback，只有缺列/缺索引/SQL Server Unicode 路径形状不符
-                    // 时才执行完整 Upgrade25。
+                    // ServerVersion 可能已是旧版当前值，但商城资源随后才首次安装，或
+                    // 历史恢复只带回了列而漏掉唯一索引。Upgrade36 一次性基线推进前
+                    // 做轻量物理 readback，只有缺列/缺索引/SQL Server Unicode 路径
+                    // 形状不符时才执行完整 Upgrade25。
                     var schemaMsgs = await new Upgrade25()
                         .EnsureApplicationStreamV3SchemaInvariant(osClientSecret.OsClient)
                         .ConfigureAwait(false);
@@ -1376,6 +1376,37 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级36 --2026-09-04【一次性运行时不变量基线】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade36.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade36().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级36 - 2026-09-04】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级36 - 2026-09-04】成功！后续启动可按ServerVersion快速跳过历史链。");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade36.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级36失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级36 - 2026-09-04】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 保持新旧接口引擎字段元数据兼容【必须】
             try
             {
@@ -1463,7 +1494,7 @@ namespace Microi.net
                     systemLogContent,
                     3,
                     false,
-                    UpgradeAppStore.Version);
+                    Upgrade36.Version);
                 if (!queued)
                 {
                     Console.WriteLine(
@@ -3204,23 +3235,25 @@ if (_microiLegacyMenuConfigChanged) {
             }
 
             var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
-            var sql = dbType == "MySql"
-                ? $"ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {fieldType} NULL"
-                : $"ALTER TABLE [{tableName}] ADD [{columnName}] {fieldType} NULL";
-            try
+            var dbInfo = DiyCommon.GetDbInfo(dbType);
+            var addResult = MicroiEngine.ORM(dbInfo.DbType).AddColumn(new DbServiceParam
             {
-                osClientSecret.Db.FromSql(sql).ExecuteNonQuery();
-                Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【补齐表字段】{tableName}.{columnName}");
-            }
-            catch (Exception ex)
+                TableName = tableName,
+                FieldName = columnName,
+                FieldType = fieldType,
+                FieldNotNull = false,
+                OsClientModel = osClientSecret,
+                DbInfo = dbInfo,
+                OsClient = osClientSecret.OsClient,
+                DbSession = osClientSecret.Db
+            });
+            if (addResult.Code != 1)
             {
-                if (ex.Message.Contains("Duplicate column", StringComparison.OrdinalIgnoreCase)
-                    || ex.Message.Contains("Column names in each table must be unique", StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-                throw;
+                throw new InvalidOperationException(
+                    $"补齐表字段 {tableName}.{columnName} 失败：{addResult.Msg}");
             }
+
+            Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【补齐表字段】{tableName}.{columnName}");
         }
 
         private bool ColumnExists(OsClientSecret osClientSecret, string tableName, string columnName)
@@ -3394,7 +3427,8 @@ if (_microiLegacyMenuConfigChanged) {
                 new KeyValuePair<string, string>("Upgrade32-V8运行限制", Upgrade32.Version),
                 new KeyValuePair<string, string>("Upgrade33-表单V8运行限制", Upgrade33.Version),
                 new KeyValuePair<string, string>("Upgrade34-数据源迁移接口引擎", Upgrade34.Version),
-                new KeyValuePair<string, string>("Upgrade35-文件上传负向开关", Upgrade35.Version)
+                new KeyValuePair<string, string>("Upgrade35-文件上传负向开关", Upgrade35.Version),
+                new KeyValuePair<string, string>("Upgrade36-一次性运行时不变量基线", Upgrade36.Version)
             };
         }
 
