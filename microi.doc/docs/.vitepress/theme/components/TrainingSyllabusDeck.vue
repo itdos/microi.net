@@ -47,6 +47,56 @@ interface AtlasGroup {
   entryIds: readonly string[]
 }
 
+interface WhyAdvantage {
+  no: string
+  code: string
+  title: string
+  proof: string
+  side: 'left' | 'right'
+}
+
+// 第 03 页只引用本课件后续章节可展开、可演示、可验收的能力，避免把品牌主张写成空泛口号。
+const whyDeliveryStages = ['AI 对话建模', '自动实现', '全自动测试', '受控发布', '运行治理'] as const
+
+const whyTrustSignals = ['开源可控', 'SaaS 多租户', '多数据库', '全端统一'] as const
+
+const whyAdvantages: WhyAdvantage[] = [
+  {
+    no: '01', code: 'AI NATIVE', title: '零代码 AI 对话',
+    proof: '一句话生成大型企业应用', side: 'left',
+  },
+  {
+    no: '02', code: 'CROSS PLATFORM', title: '跨平台全端',
+    proof: 'PC · H5 · 小程序 · App · Unity', side: 'left',
+  },
+  {
+    no: '03', code: 'PERFORMANCE', title: '高性能底座',
+    proof: '.NET 10 · Vue 3 · Redis · L1 + L2', side: 'left',
+  },
+  {
+    no: '04', code: 'DISTRIBUTED', title: '分布式原生',
+    proof: '多节点 · MQ · 任务 · 幂等', side: 'left',
+  },
+  {
+    no: '05', code: 'COMPOSABLE', title: '插件化引擎',
+    proof: '20+ 引擎 · 应用商城', side: 'right',
+  },
+  {
+    no: '06', code: 'MICROSERVICE', title: '微服务扩展',
+    proof: '低代码 · V8 · 微服务 · 源码', side: 'right',
+  },
+  {
+    no: '07', code: 'VERIFIED', title: '全自动化测试',
+    proof: '规划 · 预演 · 测试 · 构建 · 回读', side: 'right',
+  },
+  {
+    no: '08', code: 'GOVERNED', title: '企业级治理',
+    proof: '权限 · SSO · 审计 · AI 治理', side: 'right',
+  },
+]
+
+const whyAdvantagesOn = (side: WhyAdvantage['side']) => whyAdvantages.filter(item => item.side === side)
+
 const pdfDownloadPaths = {
   dark: '/downloads/microi-ai-development-framework-training-syllabus-dark.pdf',
   light: '/downloads/microi-ai-development-framework-training-syllabus-light.pdf',
@@ -503,7 +553,7 @@ const atlasEntries: AtlasEntry[] = [...engineSlides, ...atlasSupplementalEntries
 const introSlides: SlideMeta[] = [
   { id: 'opening', chapter: '01', kind: 'cover', nav: '培训开场', title: 'Microi吾码 AI 开发框架', summary: '面向企业研发团队的功能培训与实战讲解大纲。' },
   { id: 'framework-choice', chapter: '02', kind: 'decision', nav: '框架选型', title: '企业研发，为什么要先选一套开源 AI 开发框架？', summary: '直接从需求生成代码与基于成熟框架开发，关注点和长期成本完全不同。' },
-  { id: 'why-microi', chapter: '03', kind: 'why', nav: '为什么吾码', title: '为什么选择 Microi吾码 AI 开发框架？', summary: '用开源底座、连续开发、成熟引擎和 AI 工具链承接企业级交付。' },
+  { id: 'why-microi', chapter: '03', kind: 'why', nav: '为什么选择吾码？', title: '为什么选择吾码？', summary: 'AI 原生、企业级、全生命周期——通用能力全部复用，团队只聚焦业务差异。' },
   { id: 'quick-start', chapter: '04', kind: 'start', nav: '快速开始', title: '三种方式开始使用，再让 AI 接管开发环境', summary: '先获得可运行平台，再通过 VS Code、CLI 与 MCP 建立 AI 交付链路。' },
   { id: 'engine-atlas', chapter: '05', kind: 'atlas', nav: '20+ 引擎总览', title: '一张架构图，进入 Microi吾码全部核心能力', summary: '选择企业最关心的引擎现场展开；每个入口都打开对应官方文档。' },
   { id: 'mcp-delivery', chapter: '06', kind: 'mcp', nav: 'MCP 智能交付', title: 'MCP 让 AI 理解、操作并验收真实平台', summary: '不是复制代码答案，而是读取事实、预演变更、受控执行并自动回读。' },
@@ -843,7 +893,14 @@ onBeforeUnmount(() => {
 
           <template v-else-if="slide.kind === 'why'">
             <header class="mci-training-slide__heading mci-deck-reveal"><div><p class="mci-deck-eyebrow">03 · WHY MICROI</p><h2>{{ slide.title }}</h2><p>{{ slide.summary }}</p></div><span>{{ padSlide(index) }}</span></header>
-            <div class="mci-why-layout"><div class="mci-why-core mci-deck-reveal"><i></i><img src="/icon.png" alt=""><span>MICROI</span><strong>企业 AI 研发底座</strong><small>.NET 10 · Vue 3 · Redis · 多数据库</small></div><div class="mci-why-points"><article class="mci-deck-reveal"><span>01</span><strong>开源且可掌控</strong><small>源码、数据和部署路径掌握在企业手中。</small></article><article class="mci-deck-reveal"><span>02</span><strong>20+ 成熟引擎</strong><small>表单到 AI、流程到文件，开箱复用。</small></article><article class="mci-deck-reveal"><span>03</span><strong>四层连续开发</strong><small>低代码、V8、微服务、源码逐级扩展。</small></article><article class="mci-deck-reveal"><span>04</span><strong>MCP + Skills</strong><small>AI 读取事实、按规则操作并自动验收。</small></article><article class="mci-deck-reveal"><span>05</span><strong>SaaS 与全端</strong><small>多租户、多数据库、PC、移动与小程序。</small></article><article class="mci-deck-reveal"><span>06</span><strong>成熟交付经验</strong><small>大量企业项目沉淀为可复用产品能力。</small></article></div></div>
+            <div class="mci-why-layout">
+              <section class="mci-why-command" aria-label="Microi吾码企业应用能力矩阵">
+                <div class="mci-why-rail is-left" aria-label="Microi吾码开发底座优势"><article v-for="(advantage, advantageIndex) in whyAdvantagesOn('left')" :key="advantage.no" class="mci-why-node mci-deck-reveal" :style="{ '--mci-deck-order': advantageIndex }"><span>{{ advantage.no }}</span><div><small>{{ advantage.code }}</small><strong>{{ advantage.title }}</strong><p>{{ advantage.proof }}</p></div><i aria-hidden="true"></i></article></div>
+                <div class="mci-why-hub mci-deck-reveal" aria-label="从一句业务需求到大型企业应用上线"><i class="mci-why-hub__ring is-a" aria-hidden="true"></i><i class="mci-why-hub__ring is-b" aria-hidden="true"></i><div class="mci-why-hub__mark"><img src="/icon.png" alt="Microi吾码"><span>AI NATIVE · ENTERPRISE READY</span></div><strong>一句话，<em>开发大型企业应用</em></strong><small>真实 Schema · 权限 · 20+ 引擎上下文</small><ol class="mci-why-flow" aria-label="从需求到运行治理的五步闭环"><li v-for="(stage, stageIndex) in whyDeliveryStages" :key="stage"><i>{{ String(stageIndex + 1).padStart(2, '0') }}</i><span>{{ stage }}</span></li></ol><b>零代码提速，工程化不设上限</b></div>
+                <div class="mci-why-rail is-right" aria-label="Microi吾码交付治理优势"><article v-for="(advantage, advantageIndex) in whyAdvantagesOn('right')" :key="advantage.no" class="mci-why-node mci-deck-reveal" :style="{ '--mci-deck-order': advantageIndex + 4 }"><i aria-hidden="true"></i><div><small>{{ advantage.code }}</small><strong>{{ advantage.title }}</strong><p>{{ advantage.proof }}</p></div><span>{{ advantage.no }}</span></article></div>
+              </section>
+              <footer class="mci-why-proof mci-deck-reveal" aria-label="Microi吾码可信基础"><span v-for="signal in whyTrustSignals" :key="signal"><i aria-hidden="true"></i>{{ signal }}</span><strong>一套底座，贯通开发、交付与长期演进</strong></footer>
+            </div>
           </template>
 
           <template v-else-if="slide.kind === 'start'">

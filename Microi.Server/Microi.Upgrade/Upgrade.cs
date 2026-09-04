@@ -1345,6 +1345,37 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级35 --2026-09-04【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade35.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade35().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级35 - 2026-09-04】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级35 - 2026-09-04】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade35.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级35失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级35 - 2026-09-04】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 保持新旧接口引擎字段元数据兼容【必须】
             try
             {
@@ -3362,7 +3393,8 @@ if (_microiLegacyMenuConfigChanged) {
                 new KeyValuePair<string, string>("Upgrade31-翻译租户设置", Upgrade31.Version),
                 new KeyValuePair<string, string>("Upgrade32-V8运行限制", Upgrade32.Version),
                 new KeyValuePair<string, string>("Upgrade33-表单V8运行限制", Upgrade33.Version),
-                new KeyValuePair<string, string>("Upgrade34-数据源迁移接口引擎", Upgrade34.Version)
+                new KeyValuePair<string, string>("Upgrade34-数据源迁移接口引擎", Upgrade34.Version),
+                new KeyValuePair<string, string>("Upgrade35-文件上传负向开关", Upgrade35.Version)
             };
         }
 

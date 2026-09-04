@@ -166,3 +166,7 @@ artifacts/
 /test-results/
 AI测试要用到的帐号密码.txt
 
+# Python 本地解释器缓存不属于源码或交付制品。
+**/__pycache__/
+*.pyc
+

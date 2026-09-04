@@ -36,8 +36,31 @@ const pages = [
   {
     name: 'profile', route: '/#/pages/profile/index', root: '.profile-page', ready: '.menu-group',
     allowedHttpErrors: ['/api/HDFS/OpenPrivateFile']
+  },
+  {
+    name: 'mall-points-live', route: '/#/pages/mall/index', root: '.mall-container', ready: '.cat-item--points',
+    clickText: '积分商城', afterReady: '.product-card, .empty-state', expectedText: ['积分商城']
+  },
+  {
+    name: 'casebook-pdf-live', route: '/#/pages/native/casebook?id=01M1JW6BZNHEQVX3TCDAF45P0H',
+    root: '.casebook-page', ready: '.secondary-button', expectedText: ['导出并分享 PDF']
+  },
+  {
+    name: 'device-iot-live', route: '/#/pages/native-form/index?table=Diy_KehuSB&id=75361f8c-b5bb-41a8-9e55-6d1b80ff3555&mode=View&title=设备详情',
+    root: '.native-form-page', ready: '.related-tabs', clickText: 'Iot物联网', afterReady: '.join-form__snapshot',
+    expectedText: ['IoT物联网', '客户设备关联已建立，但尚未收到有效的跃龙设备ID或实时数据', 'IMEI', '147388157491047']
   }
 ]
+
+const requestedPages = String(process.env.XJY_SMOKE_TARGET || '')
+  .split(',')
+  .map((item) => item.trim())
+  .filter(Boolean)
+const activePages = requestedPages.length
+  ? pages.filter((item) => requestedPages.includes(item.name))
+  : pages
+
+if (!activePages.length) throw new Error(`Unknown XJY_SMOKE_TARGET: ${process.env.XJY_SMOKE_TARGET}`)
 
 function fail(message) { throw new Error(message) }
 function delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)) }
@@ -276,7 +299,7 @@ async function main() {
         return { present: Boolean(value), length: value.length, literalNull: /^(null|undefined|\[\]|\{\})$/i.test(value), absolute: /^(https?:|data:|blob:)/i.test(value) };
       } catch (error) { return { parseError: true }; }
     })()`)
-    for (const page of pages) {
+    for (const page of activePages) {
       context = page.name
       const consoleStart = consoleErrors.length
       const httpStart = httpErrors.length
@@ -293,6 +316,21 @@ async function main() {
       if (page.settled) await waitFor(cdp, `Boolean(document.querySelector(${JSON.stringify(page.settled)}))`, 25000)
       if (page.settledExpression) await waitFor(cdp, page.settledExpression, page.settledTimeout || 25000)
       await delay(800)
+      if (page.clickText) {
+        // Build the browser expression separately so account data never enters
+        // the page script or diagnostic output.
+        const didClick = await evaluate(cdp, `(() => {
+          const wanted = ${JSON.stringify(page.clickText)};
+          const candidates = [...document.querySelectorAll('.related-tabs__item, .cat-item, button, .mci-btn')];
+          const target = candidates.find((item) => (item.innerText || '').includes(wanted));
+          if (!target) return false;
+          target.click();
+          return true;
+        })()`)
+        if (!didClick) fail(`Live interaction target missing: ${page.name}`)
+        if (page.afterReady) await waitFor(cdp, `Boolean(document.querySelector(${JSON.stringify(page.afterReady)}))`, 25000)
+        await delay(800)
+      }
       let interaction = null
       if (page.checkPeriod || page.checkRefresh) {
         const requestStart = apiRequests.length

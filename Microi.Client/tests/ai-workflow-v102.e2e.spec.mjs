@@ -8,7 +8,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD || "";
 const STANDALONE = process.env.PW_AI_WORKFLOW_STANDALONE === "1";
 const TENANT_URL = `${FRONTEND}/?OsClient=iTdos`;
 const ROUTE_PREFIX = STANDALONE ? "" : "/micro-app/microi-ai-workflow";
-const ARTIFACT_DIR = path.resolve(process.cwd(), process.env.PW_SCREENSHOT_DIR || "../.tmp/ai-workflow-v102-acceptance");
+const ARTIFACT_DIR = path.resolve(process.cwd(), process.env.PW_SCREENSHOT_DIR || "../.tmp/ai-workflow-v103-acceptance");
 
 test.use({ viewport: { width: 1920, height: 1080 }, ignoreHTTPSErrors: true, channel: process.env.PW_BROWSER_CHANNEL || "msedge" });
 test.setTimeout(300_000);
@@ -66,7 +66,46 @@ function overlaps(first, second) {
         && first.y < second.y + second.height && first.y + first.height > second.y;
 }
 
-test("AI 工作流 v1.0.2 修复 3D 控件、相机、紧凑布局、骨架与拖放", async ({ page }) => {
+async function expectRelationshipViewport(page, studio, globe, viewportLabel) {
+    const metrics = await page.evaluate(() => {
+        const studioElement = document.querySelector('[data-testid="ai-workflow-relationship-studio"]');
+        const globeElement = document.querySelector('[data-testid="relationship-globe"]');
+        const scrollingElement = document.scrollingElement || document.documentElement;
+        const scrollOwners = [];
+        let current = studioElement;
+        while (current) {
+            const style = getComputedStyle(current);
+            if (/auto|scroll/.test(style.overflowY) && current.scrollHeight > current.clientHeight + 2) {
+                scrollOwners.push({
+                    tag: current.tagName,
+                    className: current.className || "",
+                    overflowY: style.overflowY,
+                    clientHeight: current.clientHeight,
+                    scrollHeight: current.scrollHeight
+                });
+            }
+            current = current.parentElement;
+        }
+        return {
+            viewportHeight: window.innerHeight,
+            documentOverflowY: scrollingElement.scrollHeight - scrollingElement.clientHeight,
+            documentOverflowX: scrollingElement.scrollWidth - scrollingElement.clientWidth,
+            studioBottom: studioElement?.getBoundingClientRect().bottom || 0,
+            globeBottom: globeElement?.getBoundingClientRect().bottom || 0,
+            ancestorScrollOwners: scrollOwners
+        };
+    });
+    expect(metrics.documentOverflowY, `${viewportLabel} 不得出现页面级纵向滚动条`).toBeLessThanOrEqual(2);
+    expect(metrics.documentOverflowX, `${viewportLabel} 不得出现页面级横向滚动条`).toBeLessThanOrEqual(2);
+    expect(metrics.studioBottom, `${viewportLabel} 关系工作台底部应在首屏内`).toBeLessThanOrEqual(metrics.viewportHeight + 2);
+    expect(metrics.globeBottom, `${viewportLabel} 3D 关系图底部应在首屏内`).toBeLessThanOrEqual(metrics.viewportHeight + 2);
+    expect(metrics.ancestorScrollOwners, `${viewportLabel} 关系页祖先容器不得形成第二纵向滚动层`).toEqual([]);
+    await expect(studio).toBeVisible();
+    await expect(globe).toBeVisible();
+    return metrics;
+}
+
+test("AI 工作流 v1.0.3 修复 3D 控件、相机、首屏滚动、骨架与拖放", async ({ page }) => {
     test.skip(!ACCOUNT || !PASSWORD, "需要受保护的真实测试帐号密码");
     await fs.mkdir(ARTIFACT_DIR, { recursive: true });
     const pageErrors = [];
@@ -119,7 +158,13 @@ test("AI 工作流 v1.0.2 修复 3D 控件、相机、紧凑布局、骨架与�
     const cameraAfter = await globe.getAttribute("data-camera-state");
     const cameraDelta = String(cameraAfter).split(",").reduce((maximum, value, index) => Math.max(maximum, Math.abs(Number(value) - Number(String(cameraBefore).split(",")[index]))), 0);
     expect(cameraDelta, "点击节点不得重置相机；只允许 OrbitControls 阻尼的亚像素收敛").toBeLessThan(0.25);
+    await expectRelationshipViewport(page, studio, globe, "1920x1080");
     await page.screenshot({ path: path.join(ARTIFACT_DIR, "01-relationship-globe-compact-round-controls.png"), fullPage: false });
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(350);
+    await expectRelationshipViewport(page, studio, globe, "1440x900");
+    await page.screenshot({ path: path.join(ARTIFACT_DIR, "01b-relationship-globe-first-screen-1440x900.png"), fullPage: false });
 
     const blueprintNav = page.getByRole("button", { name: "业务蓝图", exact: true }).first();
     await blueprintNav.click();

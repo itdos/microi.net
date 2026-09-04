@@ -28,7 +28,7 @@ const apiProgramSource = await readCanonicalText(new URL("../../Microi.net.Api/P
 const tableActionsSource = await readCanonicalText(new URL("../../../Microi.Client/src/views/form-engine/mixins/diy-table-actions.mixin.js", import.meta.url));
 const functionSource = source.match(/var countPageTabs = function \(value\) \{[\s\S]*?\n\};/);
 const physicalNotNullBackfillSource = source.match(
-  /var prepareNotNullColumnData = function \(tableName, columnName, sourceColumn, targetColumn\) \{[\s\S]*?\n    \};/
+  /\/\/ MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1[\s\S]*?var prepareNotNullColumnData = function \(tableName, columnName, sourceColumn, targetColumn\) \{[\s\S]*?\n    \};/
 );
 const mysqlOffpageHelpersSource = source.match(
   /var isMysqlRowSizeTooLargeError = function \(error\) \{[\s\S]*?(?=\n    var applyPersistedMysqlOffpageOverrides)/
@@ -250,7 +250,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.7\.1/);
+  assert.match(source, /Version: v2\.7\.2/);
 });
 
 test("standalone Web and UniApp installs always expose a target-tenant launch menu", () => {
@@ -614,7 +614,39 @@ function runAdminMenuPermissionFixture(options = {}) {
 
 function runPhysicalNotNullBackfillFixture(sourceColumn, options = {}) {
   const calls = [];
+  let remainingNullCount = options.nullCount ?? 3;
+  let changeLogRows = (options.changeLogRows || []).map(row => ({ ...row }));
+  const targetTenant = String(options.osClient === undefined ? "tenant-a" : options.osClient).trim();
+  const isMissingTenant = value => value === null || value === undefined || String(value).trim() === "";
+  if (options.changeLogRows) {
+    remainingNullCount = changeLogRows.filter(row => isMissingTenant(row.OsClient)).length;
+  }
+  const matchingChangeLogCandidates = () => {
+    const target = targetTenant.toLowerCase();
+    return changeLogRows.filter(row => {
+      const tenant = String(row.OsClient ?? "").trim().toLowerCase();
+      if (!isMissingTenant(row.OsClient) && tenant !== target) return false;
+      return changeLogRows.some(other => (
+        isMissingTenant(other.OsClient)
+        && String(other.StoreId).toLowerCase() === String(row.StoreId).toLowerCase()
+        && String(other.Version).toLowerCase() === String(row.Version).toLowerCase()
+      ));
+    });
+  };
+  const countCollisionGroups = () => {
+    const groups = new Map();
+    for (const row of matchingChangeLogCandidates()) {
+      const key = `${String(row.StoreId).toLowerCase()}\u001f${String(row.Version).toLowerCase()}`;
+      const rows = groups.get(key) || [];
+      rows.push(row);
+      groups.set(key, rows);
+    }
+    return [...groups.values()].filter(rows => (
+      rows.length > 1 && rows.some(row => isMissingTenant(row.OsClient))
+    )).length;
+  };
   const fixtureContext = {
+    debugLog: {},
     isSafeIdentifier(value) {
       return !!value && /^[A-Za-z0-9_]+$/.test(String(value));
     },
@@ -644,11 +676,30 @@ function runPhysicalNotNullBackfillFixture(sourceColumn, options = {}) {
               return command;
             },
             ToArray() {
-              return [{ NullCount: options.nullCount ?? 3 }];
+              if (/SELECT c\.`Id`/.test(sql)) return matchingChangeLogCandidates();
+              if (/CollisionGroupCount/.test(sql)) {
+                return [{ CollisionGroupCount: countCollisionGroups() }];
+              }
+              return [{ NullCount: remainingNullCount }];
             },
             ExecuteNonQuery() {
               call.executed = true;
-              return options.nullCount ?? 3;
+              if (/^DELETE FROM `sys_microistore_changelog`/.test(sql)) {
+                const ids = call.parameters.slice(1).map(([, value]) => String(value));
+                if (options.deleteAffected !== undefined) return options.deleteAffected;
+                const before = changeLogRows.length;
+                changeLogRows = changeLogRows.filter(row => !ids.includes(String(row.Id)));
+                remainingNullCount = changeLogRows.filter(row => isMissingTenant(row.OsClient)).length;
+                return before - changeLogRows.length;
+              }
+              const affected = remainingNullCount;
+              if (/^UPDATE `sys_microistore_changelog`/.test(sql)) {
+                changeLogRows = changeLogRows.map(row => (
+                  isMissingTenant(row.OsClient) ? { ...row, OsClient: targetTenant } : row
+                ));
+              }
+              remainingNullCount = 0;
+              return affected;
             },
           };
           return command;
@@ -660,13 +711,15 @@ function runPhysicalNotNullBackfillFixture(sourceColumn, options = {}) {
     `${physicalNotNullBackfillSource[0]}\nresult = prepareNotNullColumnData;`,
     fixtureContext
   );
-  const count = fixtureContext.result(
-    "mci_ai_app_version",
+  const invoke = () => fixtureContext.result(
+    options.tableName || "mci_ai_app_version",
     sourceColumn.COLUMN_NAME,
     sourceColumn,
     { IS_NULLABLE: options.targetNullable || "YES" }
   );
-  return { calls, count };
+  const count = invoke();
+  const repeatCount = options.repeat ? invoke() : undefined;
+  return { calls, count, repeatCount, changeLogRows, debugLog: fixtureContext.debugLog };
 }
 
 function runMysqlOffpageFallbackFixture() {
@@ -960,11 +1013,12 @@ test("physical schema sync backfills all legacy application publish NULLs before
     assert.equal(String(column.COLUMN_DEFAULT), expectedDefaults.get(column.COLUMN_NAME), column.COLUMN_NAME);
     const result = runPhysicalNotNullBackfillFixture(column);
     assert.equal(result.count, 3, column.COLUMN_NAME);
-    assert.equal(result.calls.length, 2, column.COLUMN_NAME);
+    assert.equal(result.calls.length, 3, column.COLUMN_NAME);
     assert.match(result.calls[0].sql, /SELECT COUNT\(1\).*IS NULL/);
     assert.match(result.calls[1].sql, /UPDATE `mci_ai_app_version` SET `[A-Za-z0-9_]+` = @p0.*IS NULL/);
     assert.deepEqual(result.calls[1].parameters, [["@p0", column.COLUMN_DEFAULT]]);
     assert.equal(result.calls[1].executed, true);
+    assert.match(result.calls[2].sql, /SELECT COUNT\(1\).*IS NULL/);
   }
 
   assert.match(
@@ -1003,11 +1057,13 @@ test("physical NOT NULL backfill can explicitly use the authoritative target ten
   const result = runPhysicalNotNullBackfillFixture(tenantColumn, {
     nullCount: 21,
     osClient: "xjy",
+    tableName: "sys_microistore_changelog",
   });
   assert.equal(result.count, 21);
-  assert.equal(result.calls.length, 2);
-  assert.match(result.calls[1].sql, /SET `OsClient` = @p0.*IS NULL/);
-  assert.deepEqual(result.calls[1].parameters, [["@p0", "xjy"]]);
+  assert.equal(result.calls.length, 4);
+  assert.match(result.calls[2].sql, /SET `OsClient` = @p0.*IS NULL/);
+  assert.deepEqual(result.calls[2].parameters, [["@p0", "xjy"]]);
+  assert.match(result.calls[3].sql, /SELECT COUNT\(1\).*TRIM/);
 
   assert.throws(
     () => runPhysicalNotNullBackfillFixture(
@@ -1026,6 +1082,73 @@ test("physical NOT NULL backfill can explicitly use the authoritative target ten
       { osClient: "xjy" },
     ),
     /不支持的NOT NULL回填来源/,
+  );
+});
+
+test("marketplace changelog tenant backfill repairs the reported unique-key collision and repeats cleanly", () => {
+  const tenantColumn = {
+    TABLE_NAME: "sys_microistore_changelog",
+    COLUMN_NAME: "OsClient",
+    COLUMN_TYPE: "varchar(50)",
+    IS_NULLABLE: "NO",
+    COLUMN_DEFAULT: null,
+    BACKFILL_VALUE_SOURCE: "TargetOsClient",
+  };
+  const result = runPhysicalNotNullBackfillFixture(tenantColumn, {
+    osClient: "iTdos",
+    tableName: "sys_microistore_changelog",
+    repeat: true,
+    changeLogRows: [
+      { Id: "legacy-a", OsClient: null, StoreId: "store-a", Version: "v7.6.2", IsDeleted: 0 },
+      { Id: "current-z", OsClient: "iTdos", StoreId: "store-a", Version: "v7.6.2", IsDeleted: 0 },
+      { Id: "legacy-deleted", OsClient: "  ", StoreId: "store-a", Version: "v7.6.2", IsDeleted: 1 },
+      { Id: "legacy-only", OsClient: null, StoreId: "store-b", Version: "v1.0.0", IsDeleted: 0 },
+      { Id: "other-tenant", OsClient: "customer-b", StoreId: "store-a", Version: "v7.6.2", IsDeleted: 0 },
+    ],
+  });
+
+  assert.equal(result.count, 1, "the result reports only the row actually backfilled after collision repair");
+  assert.equal(result.repeatCount, 0, "a repeat run should perform no further writes");
+  assert.deepEqual(
+    result.changeLogRows.map(row => [row.Id, row.OsClient]),
+    [
+      ["current-z", "iTdos"],
+      ["legacy-only", "iTdos"],
+      ["other-tenant", "customer-b"],
+    ],
+  );
+  const deleteCall = result.calls.find(call => /^DELETE FROM `sys_microistore_changelog`/.test(call.sql));
+  assert.ok(deleteCall, "collision repair must remove only duplicate candidate ids");
+  assert.deepEqual(deleteCall.parameters, [
+    ["@p0", "iTdos"],
+    ["@p1", "legacy-a"],
+    ["@p2", "legacy-deleted"],
+  ]);
+  assert.match(result.debugLog.physical_schema_changelog_tenant_collision_repair, /冲突组1个/);
+  assert.match(result.debugLog.physical_schema_changelog_tenant_collision_repair, /移除无效重复记录2条/);
+  assert.match(source, /MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1/);
+});
+
+test("marketplace changelog collision repair fails closed on concurrent row changes", () => {
+  const tenantColumn = {
+    TABLE_NAME: "sys_microistore_changelog",
+    COLUMN_NAME: "OsClient",
+    COLUMN_TYPE: "varchar(50)",
+    IS_NULLABLE: "NO",
+    COLUMN_DEFAULT: null,
+    BACKFILL_VALUE_SOURCE: "TargetOsClient",
+  };
+  assert.throws(
+    () => runPhysicalNotNullBackfillFixture(tenantColumn, {
+      osClient: "iTdos",
+      tableName: "sys_microistore_changelog",
+      deleteAffected: 0,
+      changeLogRows: [
+        { Id: "legacy", OsClient: null, StoreId: "store-a", Version: "v7.6.2", IsDeleted: 0 },
+        { Id: "current", OsClient: "iTdos", StoreId: "store-a", Version: "v7.6.2", IsDeleted: 0 },
+      ],
+    }),
+    /发生并发变化.*事务已阻止提交/,
   );
 });
 
@@ -1835,7 +1958,8 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
   assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 8\)/);
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 7, 1\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 7, 2\)/);
+  assert.match(appStoreUpgradeSource, /MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1/);
   assert.match(appStoreUpgradeSource, /V8TrustedExecutionContext\.EnterManagedProtocol\([\s\S]*?"import-microi-store-package"/);
   assert.match(appStoreUpgradeSource, /dynamic\s+installResult\s*;/);
   assert.doesNotMatch(appStoreUpgradeSource, /DosResult\s+installResult\s*;/);
@@ -1897,7 +2021,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*2_007_001/);
+  assert.match(refreshSource, /versionNumber\s*<\s*2_007_002/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -1910,7 +2034,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /versionNumber\s*<\s*1_009_016/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_007_033/);
   assert.match(refreshSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_007_001/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_007_002/);
   assert.match(refreshSource, /TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);

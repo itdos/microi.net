@@ -119,9 +119,9 @@
 | 单帐号每日额度 | 2048 MB |
 | 单租户每日额度 | 20480 MB |
 
-Upgrade16 会在 `sys_osclients` 增加六个可空租户字段：
+Upgrade16/Upgrade35 会在 `sys_osclients` 增加六个现行可空租户字段：
 
-`FileUploadEnabled`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB`。
+`DisableFileUpload`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB`。`DisableFileUpload` 默认关闭即允许上传，只有显式开启才禁止；旧 `FileUploadEnabled` 隐藏并仅供未升级节点兼容。
 
 有效业务值按当前租户 `sys_osclients` → 代码默认值取第一项，租户可以提高或降低业务默认值。最终结果仍受平台固定灾难保护、API 接收硬顶和反向代理上限约束；这些边界不接受租户覆盖。帐号与租户日额度在共享 Redis 中原子预留，适用于多节点；Redis 不可用时失败关闭。普通交互式上传强制使用私有桶，且一级目录只能是 `file`、`img`、`avatar`、`editor`。可信后台任务仍受平台灾难保护上限。
 

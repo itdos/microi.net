@@ -360,7 +360,7 @@ Use this reference when exact field names are needed for core platform configura
 
 | 字段 | 标签 | 类型 | 控件 | 说明 |
 |---|---|---|---|---|
-| `FileUploadEnabled` | 启用文件上传 | `int` | `Switch` | 关闭后禁止当前租户的交互式上传；空值按启用。可信平台任务仍受全局大小硬上限。 |
+| `DisableFileUpload` | 关闭文件上传 | `int` | `Switch` | 默认关闭且允许上传；只有 `1/true` 才禁止当前租户交互式上传。旧 `FileUploadEnabled` 仅作未升级节点兼容并在新版表单隐藏。 |
 | `FileUploadMaxFileMB` | 单文件上限MB | `int` | `NumberText` | 租户业务值；留空依次使用环境变量、appsettings、代码默认值，最终受独立 Absolute/HTTP 上限保护。 |
 | `FileUploadMaxRequestMB` | 单次总量上限MB | `int` | `NumberText` | 租户一次上传全部文件的业务合计；留空按回退链取值，最终受独立 Absolute/HTTP 上限保护。 |
 | `FileUploadMaxCount` | 单次文件数上限 | `int` | `NumberText` | 租户业务值；必须为正整数，留空按回退链取值，最终受 AbsoluteMaxFileCount 保护。 |
