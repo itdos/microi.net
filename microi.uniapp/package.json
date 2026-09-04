@@ -68,7 +68,7 @@
     "check:task-permission-device-reference": "node --test scripts/test-task-permission-and-device-reference.mjs",
     "check:task-scan-submit": "node --test scripts/test-task-scan-submit-guard.mjs",
     "check:task-map-coordinate-permission": "node scripts/check-task-map-coordinate-permission.mjs",
-    "check:task-flow-capabilities": "node --test scripts/test-task-flow-capabilities.mjs",
+    "check:task-flow-capabilities": "node --test scripts/test-task-flow-capabilities.mjs scripts/test-task-detail-presentation.mjs scripts/test-service-record-view.mjs",
     "check:task-list-visibility": "node --test scripts/test-task-list-visibility.mjs",
     "check:task-post-service-permission": "npm run check:task-flow-capabilities",
     "check:list-session": "node --test scripts/test-list-session.mjs",
