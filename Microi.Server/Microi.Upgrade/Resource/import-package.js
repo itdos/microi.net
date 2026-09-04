@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.7.1
+ * Version: v2.7.2
  * Function:
- * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
+ * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员/全角色只读基线安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
  */
 
 // ==================== 参数接收与校验 ====================
@@ -1834,6 +1834,10 @@ try {
         AdminRoleLimitInserted: 0,
         AdminRoleLimitUpdated: 0,
         AdminRoleLimitSkipped: 0,
+        MenuReadGrantInserted: 0,
+        MenuReadGrantUpdated: 0,
+        MenuReadGrantSkipped: 0,
+        MenuReadGrantOptionalMissing: 0,
         ReferenceRowsUpdated: 0,
         FlowInserted: 0,
         FlowUpdated: 0,
@@ -7176,6 +7180,177 @@ try {
         }
     }
 
+    // ALL_ROLE_MENU_READ_GRANT_V1
+    // 受信官方包可声明“所有有效角色”的菜单 Read 基线。该策略只补 Read、绝不
+    // 删除或降级客户已有权限，并在每次安装/更新时幂等执行，适合首页这类所有
+    // 登录账号都必须访问的公共入口。社区包不得借此把自身菜单扩散给全部角色。
+    var applyPackageMenuReadGrants = function () {
+        var policyRoot = parseJsonObject(Package.ResourcePolicies, {});
+        var rawGrants = policyRoot.MenuReadGrants || [];
+        if (typeof rawGrants == 'string') {
+            try { rawGrants = JSON.parse(rawGrants || '[]'); }
+            catch (grantParseError) {
+                throw new Error('菜单只读基线策略不是有效JSON：' + grantParseError.message);
+            }
+        }
+        if (!rawGrants || rawGrants.length === undefined || typeof rawGrants == 'string') {
+            throw new Error('ResourcePolicies.MenuReadGrants 必须是数组');
+        }
+        if (rawGrants.length === 0) return;
+        if (rawGrants.length > 50) throw new Error('菜单只读基线策略最多声明50个菜单');
+        if (!trustedOfficialPlatformPackage) {
+            throw new Error('只有受信官方平台应用包可以声明所有角色菜单只读基线');
+        }
+
+        var roleResult = V8.FormEngine.GetTableData('sys_role', {
+            _SelectFields: ['Id', 'Name', 'Level', 'IsDeleted'],
+            _OrderBy: 'CreateTime',
+            _OrderByType: 'ASC',
+            _PageIndex: 1,
+            _PageSize: 5000
+        });
+        if (!roleResult || (roleResult.Code != 1 && roleResult.Code != 2)) {
+            throw new Error('查询菜单只读基线目标角色失败：' + ((roleResult && roleResult.Msg) || '接口无返回'));
+        }
+        var roles = roleResult.Code == 1 && roleResult.Data ? roleResult.Data : [];
+        if (Number(roleResult.DataCount || roles.length) > roles.length) {
+            throw new Error('有效角色超过单次安全处理上限5000，请拆分租户角色后重试');
+        }
+        if (roles.length === 0) throw new Error('未找到有效角色，无法建立首页菜单只读基线');
+
+        for (var grantIndex = 0; grantIndex < rawGrants.length; grantIndex++) {
+            var grant = rawGrants[grantIndex] || {};
+            var sourceMenuId = String(grant.MenuId || grant.ResourceId || '').trim();
+            var selector = String(grant.RoleSelector || 'AllActiveRoles');
+            var onMissing = String(grant.OnMissing || 'Fail').toLowerCase();
+            var permissions = grant.Permissions || ['Read'];
+            if (typeof permissions == 'string') {
+                try { permissions = JSON.parse(permissions || '[]'); }
+                catch (permissionParseError) { permissions = [permissions]; }
+            }
+            if (!sourceMenuId) throw new Error('菜单只读基线缺少 MenuId');
+            if (selector != 'AllActiveRoles') {
+                throw new Error('菜单只读基线仅支持 RoleSelector=AllActiveRoles');
+            }
+            if (!permissions || permissions.length !== 1 || String(permissions[0]) != 'Read') {
+                throw new Error('菜单只读基线只允许声明 Permissions=["Read"]');
+            }
+            if (onMissing != 'fail' && onMissing != 'skip') {
+                throw new Error('菜单只读基线 OnMissing 仅支持 Fail 或 Skip');
+            }
+
+            var targetMenuId = String(findMappedId(sourceMenuId) || '').trim();
+            var menuResult = V8.FormEngine.GetFormData('sys_menu', {
+                Id: targetMenuId,
+                _SelectFields: ['Id', 'Name', 'IsDeleted']
+            });
+            if (menuResult && menuResult.Code == 2) {
+                if (onMissing == 'skip') {
+                    stats.MenuReadGrantOptionalMissing++;
+                    debugLog['menu_read_grant_optional_missing_' + grantIndex] = sourceMenuId;
+                    continue;
+                }
+                throw new Error('菜单只读基线引用的菜单不存在：' + sourceMenuId);
+            }
+            if (!menuResult || menuResult.Code != 1 || !menuResult.Data) {
+                throw new Error('读取菜单只读基线目标失败：' + sourceMenuId + '，'
+                    + ((menuResult && menuResult.Msg) || '接口无返回'));
+            }
+            var targetMenu = menuResult.Data;
+
+            for (var grantRoleIndex = 0; grantRoleIndex < roles.length; grantRoleIndex++) {
+                var role = roles[grantRoleIndex] || {};
+                if (!role.Id || Number(role.IsDeleted || 0) === 1) continue;
+                var roleLimits = readAdministratorMenuRoleLimits(role.Id, targetMenu.Id);
+                var alreadyReadable = false;
+                for (var existingLimitIndex = 0; existingLimitIndex < roleLimits.length; existingLimitIndex++) {
+                    var existingPermissions = parseMenuPermissionArray((roleLimits[existingLimitIndex] || {}).Permission);
+                    for (var existingPermissionIndex = 0; existingPermissionIndex < existingPermissions.length; existingPermissionIndex++) {
+                        if (String(existingPermissions[existingPermissionIndex]).replace(/^['\"]|['\"]$/g, '') == 'Read') {
+                            alreadyReadable = true;
+                            break;
+                        }
+                    }
+                    if (alreadyReadable) break;
+                }
+                if (alreadyReadable) {
+                    stats.MenuReadGrantSkipped++;
+                    continue;
+                }
+
+                if (roleLimits.length > 0) {
+                    var writableLimit = null;
+                    for (var writableIndex = 0; writableIndex < roleLimits.length; writableIndex++) {
+                        if (roleLimits[writableIndex] && roleLimits[writableIndex].Id) {
+                            writableLimit = roleLimits[writableIndex];
+                            break;
+                        }
+                    }
+                    if (!writableLimit) {
+                        throw new Error('角色[' + (role.Name || role.Id) + ']菜单权限记录缺少Id，无法补齐Read');
+                    }
+                    var mergedPermissions = [];
+                    var mergedSeen = {};
+                    var currentPermissions = parseMenuPermissionArray(writableLimit.Permission);
+                    for (var currentPermissionIndex = 0; currentPermissionIndex < currentPermissions.length; currentPermissionIndex++) {
+                        appendUniqueMenuPermission(mergedPermissions, mergedSeen, currentPermissions[currentPermissionIndex]);
+                    }
+                    appendUniqueMenuPermission(mergedPermissions, mergedSeen, 'Read');
+                    var updateGrantResult = runWriteWithRetry(function () {
+                        return writeAdministratorMenuRoleLimit('Upt', {
+                            Id: writableLimit.Id,
+                            Permission: JSON.stringify(mergedPermissions)
+                        });
+                    }, 'menu_read_grant_upt_' + role.Id + '_' + targetMenu.Id);
+                    if (!updateGrantResult || updateGrantResult.Code != 1) {
+                        throw new Error('补齐角色[' + (role.Name || role.Id) + ']菜单['
+                            + (targetMenu.Name || targetMenu.Id) + ']Read失败：'
+                            + ((updateGrantResult && updateGrantResult.Msg) || '接口无返回'));
+                    }
+                    assertAdministratorMenuPermissionReadback(role, targetMenu, ['Read']);
+                    stats.MenuReadGrantUpdated++;
+                    continue;
+                }
+
+                var deterministicId = String(V8.EncryptHelper.MD5Encrypt(
+                    'app-menu-all-role-read|' + String(V8.OsClient || '').toLowerCase() + '|'
+                    + String(role.Id).toLowerCase() + '|' + String(targetMenu.Id).toLowerCase()
+                )).toLowerCase();
+                var addGrantResult = runWriteWithRetry(function () {
+                    return writeAdministratorMenuRoleLimit('Add', {
+                        Id: deterministicId,
+                        Customer: V8.OsClient,
+                        RoleId: role.Id,
+                        FkId: targetMenu.Id,
+                        Type: 'Menu',
+                        Permission: '["Read"]',
+                        CreateTime: nowText()
+                    });
+                }, 'menu_read_grant_add_' + role.Id + '_' + targetMenu.Id);
+                if (!addGrantResult || addGrantResult.Code != 1) {
+                    if (isDuplicatePrimaryError(addGrantResult)) {
+                        roleLimits = readAdministratorMenuRoleLimits(role.Id, targetMenu.Id);
+                        if (roleLimits.length > 0) {
+                            grantRoleIndex--;
+                            continue;
+                        }
+                    }
+                    throw new Error('新增角色[' + (role.Name || role.Id) + ']菜单['
+                        + (targetMenu.Name || targetMenu.Id) + ']Read失败：'
+                        + ((addGrantResult && addGrantResult.Msg) || '接口无返回'));
+                }
+                assertAdministratorMenuPermissionReadback(role, targetMenu, ['Read']);
+                stats.MenuReadGrantInserted++;
+            }
+        }
+        invalidateAdministratorRoleLimitAuthorizationCache();
+        debugLog.menuReadGrantResult = '新增' + stats.MenuReadGrantInserted + '，补齐'
+            + stats.MenuReadGrantUpdated + '，已存在' + stats.MenuReadGrantSkipped
+            + '，可选菜单缺失' + stats.MenuReadGrantOptionalMissing;
+    };
+    applyPackageMenuReadGrants();
+    // ALL_ROLE_MENU_READ_GRANT_V1_END
+
     var migratedMenuIds = {};
     var migrateLegacyMenus = function (binding, fieldName, values) {
         if (!binding) return;
@@ -8610,6 +8785,8 @@ try {
             物理字段同步: '重命名' + (stats.PhysicalFieldsRenamed || 0) + '个，修改' + (stats.PhysicalFieldsModified || 0) + '个，新增' + (stats.PhysicalFieldsAdded || 0) + '个',
             菜单: '新增' + stats.MenuInserted + '条，修改' + stats.MenuUpdated + '条，Id对齐' + stats.MenuIdRemapped + '条',
             系统管理员菜单权限: '新增' + stats.AdminRoleLimitInserted + '条，补齐' + stats.AdminRoleLimitUpdated + '条，已完整' + stats.AdminRoleLimitSkipped + '条',
+            全角色菜单只读基线: '新增' + stats.MenuReadGrantInserted + '条，补齐' + stats.MenuReadGrantUpdated
+                + '条，已存在' + stats.MenuReadGrantSkipped + '条，可选菜单缺失' + stats.MenuReadGrantOptionalMissing + '个',
             引用修复: '更新' + stats.ReferenceRowsUpdated + '行',
             工作流: '新增' + stats.FlowInserted + '条，修改' + stats.FlowUpdated + '条',
             工作流节点: '新增' + stats.NodeInserted + '条，修改' + stats.NodeUpdated + '条',

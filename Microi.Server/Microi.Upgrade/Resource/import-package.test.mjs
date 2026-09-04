@@ -55,9 +55,13 @@ const dataSetImportSource = source.match(
 const adminMenuPermissionSource = source.match(
   /\/\/ ADMIN_MENU_PERMISSION_V1[\s\S]*?\/\/ ADMIN_MENU_PERMISSION_V1_END/
 );
+const allRoleMenuReadGrantSource = source.match(
+  /\/\/ ALL_ROLE_MENU_READ_GRANT_V1[\s\S]*?\/\/ ALL_ROLE_MENU_READ_GRANT_V1_END/
+);
 
 assert.ok(dataSetImportSource, "InsertIfMissing dataset importer should be extractable");
 assert.ok(adminMenuPermissionSource, "administrator menu-permission helper should be extractable");
+assert.ok(allRoleMenuReadGrantSource, "all-role menu Read policy should be extractable");
 
 function extractNamedFunction(sourceText, name) {
   const start = sourceText.indexOf(`function ${name}(`);
@@ -250,7 +254,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.7\.1/);
+  assert.match(source, /Version: v2\.7\.2/);
 });
 
 test("standalone Web and UniApp installs always expose a target-tenant launch menu", () => {
@@ -798,6 +802,34 @@ test("PageTabs only preserves a real multi-tab target", () => {
     assert.equal(countPageTabs(value), expected, `unexpected count for ${JSON.stringify(value)}`);
   }
   assert.match(source, /existingPageTabsCount\s*>\s*1/);
+});
+
+test("trusted official packages may only add an idempotent Read baseline for all active roles", () => {
+  const policySource = allRoleMenuReadGrantSource[0];
+  assert.match(policySource, /trustedOfficialPlatformPackage/);
+  assert.match(policySource, /RoleSelector=AllActiveRoles/);
+  assert.match(policySource, /Permissions=\["Read"\]/);
+  assert.match(policySource, /appendUniqueMenuPermission\(mergedPermissions, mergedSeen, 'Read'\)/);
+  assert.match(policySource, /assertAdministratorMenuPermissionReadback\(role, targetMenu, \['Read'\]\)/);
+  assert.match(policySource, /findMappedId\(sourceMenuId\)/);
+  assert.match(policySource, /invalidateAdministratorRoleLimitAuthorizationCache\(\)/);
+  assert.doesNotMatch(policySource, /DelFormData|DELETE FROM sys_rolelimit/i);
+
+  const grants = saasPackageModel.ResourcePolicies.MenuReadGrants;
+  assert.equal(grants.length, 5);
+  assert.ok(grants.every(item => (
+    item.RoleSelector === "AllActiveRoles"
+    && item.Permissions.length === 1
+    && item.Permissions[0] === "Read"
+  )));
+  assert.equal(grants.filter(item => item.OnMissing === "Fail").length, 2);
+  assert.equal(grants.filter(item => item.OnMissing === "Skip").length, 3);
+
+  const embeddedImporter = packageModel.SysApiEngines.find(
+    item => item.ApiEngineKey === "import-microi-store-package",
+  );
+  assert.equal(embeddedImporter.Version, "v2.7.2");
+  assert.match(embeddedImporter.ApiV8Code, /ALL_ROLE_MENU_READ_GRANT_V1/);
 });
 
 test("new application menus grant complete permissions to every administrator role idempotently", () => {
@@ -1897,7 +1929,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*2_007_001/);
+  assert.match(refreshSource, /versionNumber\s*<\s*2_007_002/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -1910,7 +1942,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /versionNumber\s*<\s*1_009_016/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_007_033/);
   assert.match(refreshSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_007_001/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_007_002/);
   assert.match(refreshSource, /TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
