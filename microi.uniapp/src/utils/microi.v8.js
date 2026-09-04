@@ -4,8 +4,8 @@
  * 统一封装吾码接口引擎、表单引擎、文件服务、登录态与旧版 V8 前端接口。
  */
 
-// 默认把这些状态码视为登录态失效，便于各端统一跳转或清理缓存。
-const DEFAULT_AUTH_CODES = [401, -1, 1001, 1002];
+// 只有平台明确的认证状态码才允许清理 DiyToken；Code=-1 可能只是普通业务失败。
+const DEFAULT_AUTH_CODES = [401, 1001, 1002];
 
 // 禁用常见占位图和外部二维码资源，避免前端误把临时素材带到正式项目。
 const DEFAULT_BLOCKED_ASSET = /(qrserver\.com|create-qr-code|picsum\.photos|placehold\.co|placeholder\.com|dummyimage\.com)/i;
