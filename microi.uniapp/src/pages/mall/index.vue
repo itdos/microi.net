@@ -34,10 +34,19 @@
         <!-- 全部 -->
         <view
           class="cat-item"
-          :class="{ active: !currentCategory }"
+          :class="{ active: !currentCategory && !pointsOnly }"
           @tap="selectMainCategory(null)"
         >
           <text>{{ t('common.all') }}</text>
+        </view>
+        <view
+          v-if="pointsMallEnabled"
+          class="cat-item cat-item--points"
+          :class="{ active: pointsOnly }"
+          @tap="selectPointsMall"
+        >
+          <text class="points-mark">积</text>
+          <text>积分商城</text>
         </view>
         <!-- 一级分类 -->
         <view v-for="cat in categoryTree" :key="cat.Id" class="cat-group">
@@ -93,19 +102,23 @@
               <text class="card-title">{{ item.ShangpinMC || t('mall.noProductName') }}</text>
               <text class="card-model" v-if="item.ShangpinBH">{{ item.ShangpinBH }}</text>
               <view class="card-prices">
-                <view class="cp-rent" v-if="item.ShangpinLX === '设备' && item.ZulinXJ">
+                <view class="points-price" v-if="Number(item.JifenDH || 0) > 0">
+                  <text class="points-price__value">{{ Number(item.JifenDH) }}</text>
+                  <text class="points-price__unit">积分兑换</text>
+                </view>
+                <view class="cp-rent" v-else-if="item.ShangpinLX === '设备' && item.ZulinXJ">
                   <text class="cp-label">{{ t('mall.lease') }}</text>
                   <text class="cp-val">¥{{ formatNum(item.ZulinXJ) }}</text>
                 </view>
-                <view class="cp-buy" v-if="item.ShangpinLX === '耗材'">
+                <view class="cp-buy" v-if="Number(item.JifenDH || 0) <= 0 && item.ShangpinLX === '耗材'">
                   <text class="cp-label">{{ t('mall.filter') }}</text>
                   <text class="cp-val">¥{{ formatNum(item.Xianjia || item.Yuanjia) }}</text>
                 </view>
-                <view class="cp-buy" v-if="item.ShangpinLX === '设备'">
+                <view class="cp-buy" v-if="Number(item.JifenDH || 0) <= 0 && item.ShangpinLX === '设备'">
                   <text class="cp-label">{{ t('mall.purchase') }}</text>
                   <text class="cp-val">¥{{ formatNum(item.Xianjia || item.Yuanjia) }}</text>
                 </view>
-                <view class="cp-rent" v-if="item.ShangpinLX !== '设备' && item.ShangpinLX !== '耗材'">
+                <view class="cp-rent" v-if="Number(item.JifenDH || 0) <= 0 && item.ShangpinLX !== '设备' && item.ShangpinLX !== '耗材'">
                   <text class="cp-val">¥{{ formatNum(item.Xianjia || item.ZulinXJ || item.Yuanjia) }}</text>
                 </view>
               </view>
@@ -213,6 +226,7 @@ export default {
       categoryTree: [],
       currentMainId: null,    // 当前选中的一级分类Id
       currentCategory: null,  // 实际传给API的分类Id（可能是一级或二级）
+      pointsOnly: false,
       // 商品
       products: [],
       loading: true,
@@ -236,6 +250,9 @@ export default {
   },
 
   computed: {
+    pointsMallEnabled() {
+      return Boolean(appConfig.features && appConfig.features.pointsMall)
+    },
     hasActiveFilter() {
       return this.appliedTypes.length > 0 || this.appliedPriceMin || this.appliedPriceMax
     }
@@ -320,6 +337,7 @@ export default {
 
     // 选择一级分类
     selectMainCategory(cat) {
+      this.pointsOnly = false
       if (!cat) {
         // 选择"全部"
         this.currentMainId = null
@@ -355,8 +373,18 @@ export default {
 
     // 选择二级分类
     selectSubCategory(parent, sub) {
+      this.pointsOnly = false
       this.currentMainId = parent.Id
       this.currentCategory = sub.Id
+      this.loadProducts()
+    },
+
+    selectPointsMall() {
+      if (this.pointsOnly) return
+      this.pointsOnly = true
+      this.currentMainId = '__points__'
+      this.currentCategory = null
+      this.categoryTree.forEach((item) => { item._expanded = false })
       this.loadProducts()
     },
 
@@ -379,7 +407,8 @@ export default {
           keyword: this.keyword,
           types: this.appliedTypes,
           priceMin: this.appliedPriceMin,
-          priceMax: this.appliedPriceMax
+          priceMax: this.appliedPriceMax,
+          pointsOnly: this.pointsOnly
         })
         // 已被新请求覆盖，丢弃
         if (seq !== this._loadProductsSeq) return
@@ -681,6 +710,23 @@ export default {
   white-space: nowrap;
 }
 
+.cat-item--points {
+  gap: 8rpx;
+}
+
+.points-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  background: #fff1d6;
+  color: #b86b00;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
 .sub-cat-list {
   background: #fff;
 }
@@ -793,6 +839,23 @@ export default {
 .cp-rent, .cp-buy {
   display: flex;
   align-items: center;
+}
+
+.points-price {
+  display: flex;
+  align-items: baseline;
+  color: #b85f00;
+}
+
+.points-price__value {
+  font-size: 32rpx;
+  font-weight: 750;
+}
+
+.points-price__unit {
+  margin-left: 7rpx;
+  font-size: 20rpx;
+  font-weight: 600;
 }
 
 .cp-label {

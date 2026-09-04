@@ -56,7 +56,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/print-engine.md` | print-engine, v8-frontend-events | 服务端模板打印与蓝牙直连边界 |
 | `system-engine/bluetooth-printer.md` | v8-frontend-events, print-engine, microi-client-frontend, microi-microservice | GP-M322 与 CC4 双型号、TSPL/CPCL/ESC-POS、BLE/SPP、微服务平台普通打印桥、旧 V8 兼容及实机验收 |
 | `system-engine/report-engine.md` | report-engine | 虚拟报表和导出 |
-| `system-engine/saas-engine.md` | v8-saas-multi-tenant | 租户识别和 SaaS 配置 |
+| `system-engine/saas-engine.md` | v8-saas-multi-tenant | 租户识别、SaaS 配置、ZIP 开库进度与长任务租约 |
 | `system-engine/search-engine.md` | search-engine | Elasticsearch 索引和查询 |
 | `system-engine/spider-engine.md` | spider-engine | 浏览器采集和 Worker |
 | `system-engine/ocr-engine.md` | ocr-engine, v8-file-upload, v8-saas-multi-tenant, v8-security | 图片/PDF 文字识别、独立模型服务、租户配置、V8/HTTP/MCP 调用、安全边界与生产验收 |
@@ -66,7 +66,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/visualization-engine.md` | page-engine, microi-ui | 3D、CAD、goView 与数据大屏能力边界 |
 | `system-engine/wf-engine.md` | v8-workflow | 工作流设计和事件 |
 | `v8-engine/ai-apiengine.md` | ai-engine, v8-api-config | AI 辅助接口引擎开发 |
-| `v8-engine/api-engine.md` | v8-api-config, v8-utilities | 接口上下文、配置和调用 |
+| `v8-engine/api-engine.md` | v8-api-config, v8-utilities | 接口上下文、配置、分布式锁续租和调用 |
 | `v8-engine/apiengine-index.md` | v8-crud-api, v8-api-config | 接口引擎实战和规范 |
 | `v8-engine/form-engine.md` | v8-crud-api, v8-formengine-http | FormEngine API 与 HTTP |
 | `v8-engine/mcp-server.md` | microi-system-delivery, microi-codex-installer, v8-security | MCP 工具、确认、审计、文件、日志、备份与访问密钥 |
