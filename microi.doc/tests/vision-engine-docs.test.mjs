@@ -38,7 +38,12 @@ test('vision guide preserves runtime, database-first and AI-pending contracts', 
     'StreamSessionId',
     '暂停',
     '继续',
-    '再次识别',
+    '立即识别当前帧',
+    '最近识别',
+    'Correct',
+    'Corrected',
+    '新鲜度',
+    '预估价格',
     'builtin-visual-fingerprint-v1',
   ]) assert.match(guide, new RegExp(token.replaceAll('.', '\\.'), 'u'))
 })

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,26 +8,10 @@ namespace Microi.net
 {
     public partial class MicroiUpgrade
     {
-        private static readonly string[] RequiredRuntimeInvariantNames =
-        {
-            "平台运行时接口闭包",
-            "Upgrade21-持久后台任务",
-            "Upgrade23-SaaS运行时结构",
-            "Upgrade25-应用发布租户门禁",
-            "Upgrade25-应用发布V3结构",
-            "Upgrade26-访问密钥菜单",
-            "Upgrade28-用户首页与商城事件",
-            "Upgrade29-OCR租户配置",
-            "Upgrade30-后端运行配置",
-            "Upgrade31-翻译引擎配置",
-            "Upgrade33-表单V8限额",
-            "Upgrade34-数据源迁移接口引擎",
-            "Upgrade35-文件上传负向开关"
-        };
-
         /// <summary>
         /// 启动、新租户开通和管理员手动补跑共用的单租户升级入口。
-        /// 数据库版本只在全部历史迁移成功后前向推进；当前运行时不变量始终幂等复检。
+        /// 数据库版本只在全部历史迁移成功后前向推进；已达到当前基线的租户只读一次
+        /// ServerVersion 后立即返回，不再对每个子租户重放不断增长的历史不变量。
         /// </summary>
         public async Task<DosResult> UpgradeTenantAsync(
             string osClient,
@@ -77,6 +60,19 @@ namespace Microi.net
             try
             {
                 ThrowIfCancelled(backgroundTaskId, cancellationToken);
+                Report(backgroundTaskId, 2, "正在读取数据库升级版本", 0, 1);
+                beforeVersion = ReadServerVersion(runtimeClient);
+                if (IsVersionAtLeast(beforeVersion, targetVersion))
+                {
+                    return BuildAlreadyCurrentResult(
+                        runtimeClient,
+                        backgroundTaskId,
+                        beforeVersion,
+                        targetVersion,
+                        "ServerVersion已覆盖当前一次性运行时基线，已快速跳过历史升级链。");
+                }
+
+                ThrowIfCancelled(backgroundTaskId, cancellationToken);
                 Report(backgroundTaskId, 3, "正在检查升级所需物理字段", 0, 1);
                 var prerequisite = await EnsureRuntimePhysicalPrerequisitesAsync(
                         runtimeClient, cancellationToken)
@@ -120,100 +116,27 @@ namespace Microi.net
                 using (upgradeLease)
                 using (UpgradeExecutionLeaseContext.Enter(upgradeLease))
                 {
-                    var total = RequiredRuntimeInvariantNames.Length
-                                + GetVersionedUpgradePrograms().Count + 4;
+                    var total = GetVersionedUpgradePrograms().Count + 4;
                     var current = 0;
                     upgradeLease.ThrowIfLost();
                     Report(backgroundTaskId, 5, "已取得升级租约", ++current, total);
 
-                    await RunCoordinatorInvariantAsync(
-                        runtimeClient,
-                        upgradeLease,
-                        backgroundTaskId,
-                        RequiredRuntimeInvariantNames[0],
-                        async () =>
-                        {
-                            // The official application-source tenant is the authority for
-                            // Managed resources.  It must be updated through the signed
-                            // application-source workflow, never by replaying the embedded
-                            // customer baseline during host startup.  Treat this invariant
-                            // as source-managed so a pending source publication cannot form
-                            // a bootstrap deadlock (API cannot start -> source cannot sync).
-                            if (UpgradeAppStore.IsOfficialSourceTenant(runtimeClient.OsClient))
-                            {
-                                AppendLog(backgroundTaskId,
-                                    "当前租户是官方应用源；平台运行时接口闭包由官方应用源同步维护，本次数据库升级不反向覆盖。");
-                                return new List<string>();
-                            }
-                            var result = await UpgradeAppStore
-                                .EnsureStartupDependenciesUnderLeaseAsync(runtimeClient)
-                                .ConfigureAwait(false);
-                            if (result.Code != 1)
-                            {
-                                // License recovery can finish while the startup invariant is
-                                // reading the database. Re-evaluate after the readback result so
-                                // an official source never bricks its own API during that window.
-                                if (UpgradeAppStore.IsOfficialSourceResult(result)
-                                    || UpgradeAppStore.IsOfficialSourceTenant(runtimeClient.OsClient))
-                                {
-                                    AppendLog(backgroundTaskId,
-                                        "已在校验过程中确认当前租户是官方应用源；接口闭包差异等待官方应用源同步，本次数据库升级继续。");
-                                    return new List<string>();
-                                }
-                                throw new InvalidOperationException(result.Msg);
-                            }
-                            return new List<string>();
-                        }).ConfigureAwait(false);
-                    Report(backgroundTaskId, 10, "平台运行时接口闭包已就绪", ++current, total);
-
-                    var invariants = new List<KeyValuePair<string, Func<Task<List<string>>>>>
-                    {
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[1], () => new Upgrade21().Run(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[2], () => new Upgrade23().Run(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[3], () => new Upgrade25().EnsureTenantGateInvariant(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[4], () => new Upgrade25().EnsureApplicationStreamV3SchemaInvariant(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[5], () => new Upgrade26().Run(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[6], () => new Upgrade28().Run(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[7], () => new Upgrade29().Run(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[8], () => new Upgrade30().Run(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[9], () => new Upgrade31().Run(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[10], () => new Upgrade33().Run(runtimeClient.OsClient, false)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[11], () => new Upgrade34().Run(runtimeClient.OsClient)),
-                        new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[12], () => new Upgrade35().Run(runtimeClient.OsClient))
-                    };
-
-                    foreach (var invariant in invariants)
-                    {
-                        ThrowIfCancelled(backgroundTaskId, cancellationToken);
-                        await RunCoordinatorInvariantAsync(
-                                runtimeClient,
-                                upgradeLease,
-                                backgroundTaskId,
-                                invariant.Key,
-                                invariant.Value)
-                            .ConfigureAwait(false);
-                        current++;
-                        Report(backgroundTaskId,
-                            10 + (int)Math.Round(current * 35D / total),
-                            invariant.Key + "已完成",
-                            current,
-                            total);
-                    }
-
+                    // The optimistic read above avoids acquiring a distributed lease for
+                    // already-current tenants. Re-read under the lease so two nodes that
+                    // observed an old version cannot both replay the migration chain.
                     upgradeLease.ThrowIfLost();
                     beforeVersion = ReadServerVersion(runtimeClient);
+                    if (IsVersionAtLeast(beforeVersion, targetVersion))
+                    {
+                        safeReloadPoint = true;
+                        return BuildAlreadyCurrentResult(
+                            runtimeClient,
+                            backgroundTaskId,
+                            beforeVersion,
+                            targetVersion,
+                            "其它节点已推进到当前一次性运行时基线，本节点已在租约内快速跳过。");
+                    }
+
                     var pendingPrograms = GetVersionedUpgradePrograms()
                         .Where(program => NeedUpgrade(beforeVersion, program.Value))
                         .ToList();
@@ -221,7 +144,7 @@ namespace Microi.net
                     current += skippedPrograms;
                     AppendLog(backgroundTaskId,
                         $"版本门禁检查完成：当前={FormatVersionForLog(beforeVersion)}，目标={FormatVersionForLog(targetVersion)}，待执行={pendingPrograms.Count}，已覆盖跳过={skippedPrograms}。");
-                    Report(backgroundTaskId, 48, "正在执行版本迁移链", current, total);
+                    Report(backgroundTaskId, 10, "正在执行版本迁移链", current, total);
 
                     foreach (var program in pendingPrograms)
                     {
@@ -278,7 +201,7 @@ namespace Microi.net
                                      && ParseFourPartVersion(beforeVersion, "升级前ServerVersion")
                                          .CompareTo(ParseFourPartVersion(targetVersion, "目标ServerVersion")) >= 0;
                 var message = alreadyCurrent
-                    ? "租户数据库版本已是当前版本；运行时不变量已完成复检。"
+                    ? "租户数据库版本已是当前版本。"
                     : "租户数据库升级完成。";
                 if (!cacheReloaded)
                 {
@@ -295,7 +218,8 @@ namespace Microi.net
                     TargetVersion = targetVersion,
                     AfterVersion = afterVersion,
                     AlreadyCurrent = alreadyCurrent,
-                    RuntimeInvariantsChecked = RequiredRuntimeInvariantNames,
+                    FastPath = false,
+                    RuntimeInvariantsChecked = Upgrade36.OneTimeInvariantNames,
                     CacheReloaded = cacheReloaded,
                     CacheMessage = cacheReloaded ? null : cacheMessage
                 }, message);
@@ -343,26 +267,36 @@ namespace Microi.net
                        .ToScalar<string>() ?? string.Empty;
         }
 
-        private static async Task RunCoordinatorInvariantAsync(
-            OsClientSecret runtimeClient,
-            UpgradeDistributedLease upgradeLease,
-            string backgroundTaskId,
-            string step,
-            Func<Task<List<string>>> action)
+        private static bool IsVersionAtLeast(string actualVersion, string targetVersion)
         {
-            upgradeLease.ConfirmOwnership();
-            AppendLog(backgroundTaskId, step + "：开始。");
-            Console.WriteLine(
-                $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【{step}】开始。");
-            var messages = await action().ConfigureAwait(false);
-            upgradeLease.ConfirmOwnership();
-            if (messages?.Count > 0)
+            return !actualVersion.DosIsNullOrWhiteSpace()
+                   && ParseFourPartVersion(actualVersion, "当前ServerVersion")
+                       .CompareTo(ParseFourPartVersion(targetVersion, "目标ServerVersion")) >= 0;
+        }
+
+        private static DosResult BuildAlreadyCurrentResult(
+            OsClientSecret runtimeClient,
+            string backgroundTaskId,
+            string currentVersion,
+            string targetVersion,
+            string reason)
+        {
+            var message = "租户数据库版本已是当前版本；未取得升级租约、未执行历史迁移、未刷新缓存。";
+            Report(backgroundTaskId, 100, message, 1, 1);
+            AppendLog(backgroundTaskId,
+                $"升级快路径：当前={FormatVersionForLog(currentVersion)}，目标={FormatVersionForLog(targetVersion)}；{reason}");
+            return new DosResult(1, new
             {
-                throw new InvalidOperationException(string.Join("；", messages));
-            }
-            AppendLog(backgroundTaskId, step + "：成功。");
-            Console.WriteLine(
-                $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【{step}】成功。");
+                OsClient = runtimeClient.OsClient,
+                BeforeVersion = currentVersion,
+                TargetVersion = targetVersion,
+                AfterVersion = currentVersion,
+                AlreadyCurrent = true,
+                FastPath = true,
+                RuntimeInvariantsChecked = Array.Empty<string>(),
+                CacheReloaded = false,
+                CacheMessage = (string)null
+            }, message);
         }
 
         private static void ThrowIfCancelled(

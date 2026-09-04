@@ -17,18 +17,21 @@ test('application-store package embeds package-aware installation and immediate 
 
   const importerEngine = engines.get('import-microi-store-package');
   const listEngine = engines.get('get-microi-store');
-  assert.equal(importerEngine?.Version, 'v2.7.2');
-  assert.equal(listEngine?.Version, 'v1.4.9');
+  assert.equal(importerEngine?.Version, 'v2.7.4');
+  assert.equal(listEngine?.Version, 'v1.5.0');
   assert.equal(normalize(importerEngine?.ApiV8Code), normalize(importer));
   assert.equal(normalize(listEngine?.ApiV8Code), normalize(storeList));
 
   for (const fieldName of ['RequiredPlatformCapabilities', 'Capabilities']) {
     const capabilities = packageModel.PackageInfo[fieldName] || [];
-    assert.ok(capabilities.includes('ApiEngine:import-microi-store-package@v2.7.2'));
+    assert.ok(capabilities.includes('ApiEngine:import-microi-store-package@v2.7.4'));
     assert.ok(capabilities.includes('Importer:MarketplaceChangelogTenantCollisionRepairV1'));
     assert.ok(capabilities.includes('ApiEngine:get-microi-store-model@v1.4.0'));
-    assert.ok(capabilities.includes('ApiEngine:get-microi-store@v1.4.9'));
-    assert.ok(capabilities.includes('ApiEngine:get-microi-store@v1.4.8'));
+    assert.ok(capabilities.includes('ApiEngine:get-microi-store@v1.5.0'));
+    assert.ok(capabilities.includes('Marketplace:StableApplicationIdentityV1'));
+    assert.ok(capabilities.includes('Marketplace:PlatformNoticeRowIsolationV1'));
+    assert.ok(capabilities.includes('Marketplace:InstalledVersionTombstonePrecedenceV1'));
+    assert.ok(capabilities.includes('ClientFeature:OfficialPlatformNoticeRowIsolationV1'));
     assert.ok(capabilities.includes('Marketplace:PublicApplicationEntryUrlV1'));
     assert.ok(capabilities.includes('Installer:StandaloneApplicationLaunchMenuV1'));
     assert.ok(capabilities.includes('Installer:PackageRuntimeVersionSeparationV1'));
@@ -39,8 +42,9 @@ test('application-store package embeds package-aware installation and immediate 
     assert.ok(capabilities.includes('ClientFeature:MarketplaceMenuRefreshV1'));
     assert.ok(capabilities.includes('Importer:PhysicalNotNullTenantBackfillV1'));
     assert.ok(capabilities.includes('Importer:PageEngineOptionalReferenceV1'));
-    assert.ok(!capabilities.some(item => /^ApiEngine:import-microi-store-package@(?!v2\.7\.2$)/.test(item)));
-    assert.ok(!capabilities.some(item => /^ApiEngine:get-microi-store@(?!v1\.4\.(?:8|9)$)/.test(item)));
+    assert.ok(capabilities.includes('Importer:SqlServerPhysicalSchemaV1'));
+    assert.ok(!capabilities.some(item => /^ApiEngine:import-microi-store-package@(?!v2\.7\.4$)/.test(item)));
+    assert.ok(!capabilities.some(item => /^ApiEngine:get-microi-store@(?!v1\.5\.0$)/.test(item)));
   }
 });
 

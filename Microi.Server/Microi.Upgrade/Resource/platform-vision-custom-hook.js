@@ -12,7 +12,7 @@ var hookParam = V8.Param || {};
 var hookStage = String(hookParam.Stage || 'Before');
 var hookAction = String(hookParam.Action || 'Recognize');
 var allowedStages = { Before: true, After: true };
-var allowedActions = { Recognize: true, Enroll: true, AiFallback: true };
+var allowedActions = { Recognize: true, Enroll: true, AiFallback: true, Correct: true };
 if (!allowedStages[hookStage]) return { Code: 0, Msg: '不支持的视觉 Hook 阶段。' };
 if (!allowedActions[hookAction]) return { Code: 0, Msg: '不支持的视觉 Hook 动作。' };
 

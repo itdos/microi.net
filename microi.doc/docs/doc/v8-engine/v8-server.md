@@ -1763,6 +1763,8 @@ var stable = await V8.Vision.Stabilize({
 
 一般业务不要直接把公开向量发到浏览器，而应调用官方 `platform-vision-runtime`：它从当前租户样本库读取候选，在数据库未命中时先返回 `AiPending`，再通过持久后台任务调用 Microi.AI。特征向量使用接口引擎绑定的保护能力保存，公开响应和租户 Hook 不包含向量、图片或 AI 提示词。
 
+运行时动作包括 `Recognize/Enroll/Result/Recent/Correct`。`Recent/Result` 只可返回 `HasImage` 和由 `V8.Method.GetPrivateFileUrl` 生成的短期授权图片地址，禁止返回 `InputFilePath` 或图片 Base64。`Correct` 重新校验当前租户的对象与模式，保存原识别结果、修正人和原因；`SaveAsSample=true` 时按来源请求幂等录入。对于水产、生鲜和蔬菜，返回的冰冻状态、新鲜度与预估价格必须分别携带 `Database/AI/Manual` 来源，AI 估价不能直接作为门店正式售价或订单结算依据。
+
 ## V8.Office
 
 `V8.Office` 可在接口引擎中生成 Excel、Word、PowerPoint 文件。导出方法返回 `DosResult<byte[]>`，接口引擎需要开启【响应文件】，并把 `Data` 转成 Base64 返回。
@@ -2264,6 +2266,14 @@ if (meta.FileType === 'csv' && parsed.DataAppend) {
 - `ContinueOnError`：捕获行错误并继续处理下一行，最终返回 `Code:1`，同时返回 `Added/Updated/Failed/Errors`。若数据库异常已使当前事务不可继续，应先做整批预校验或改用平台允许的独立幂等行操作，不能声称已继续。
 
 菜单【导入接口替换】与 `V8.OpenImportDialog` 后台接口引擎都必须遵守以上策略；区别只是前者使用 `V8.FilesByteBase64` 在服务端重读原文件，后者读取 `_ImportRowsJson` 的确认后映射行。
+
+#### 保留标准导入、仅增加事务内整批校验
+
+业务只需要增加跨行汇总、额度或并发校验时，不必替换整套导入接口。将模块 `ImportV8` 配置为 `ApiEngine:<ApiEngineKey>`，标准 `/api/FormEngine/ImportDiyTableRow` 会继续负责权限、原文件复核、字段映射、唯一规则、进度和写入，并在 `RollbackAll` 的同一数据库事务内、实际写入前调用指定接口引擎。
+
+接口引擎从 `V8.Param.Rows` 读取服务端规范化后的整批行，从 `V8.Param.FixedValues` 读取父表固定值；另有 `TableId/TableName/SysMenuId/ImportErrorPolicy/ImportFileName/ImportIdempotencyKey/UniqueRuleCount`。此处的 `V8.DbTrans` 与后续标准写入共用事务，适合先按稳定顺序锁定额度行，再重新汇总并校验。接口只返回 `Code:1` 放行或 `Code!=1` 拒绝，不应自行写入、`Commit` 或 `Rollback`。
+
+启用该钩子后只允许 `RollbackAll`。TableChild 内导入时，平台固定父记录外键覆盖 Excel 同名列，避免把数据写到其它父记录。客户端每次重新选择文件生成新的 `_ImportIdempotencyKey`，同一 HTTP 重试沿用该键；服务端按租户、表、菜单和用户隔离请求状态，避免重复创建写入任务。它不负责判断“相同文件以一个全新请求再次上传”是否属于业务重复。
 
 ### 发送邮件 SendEmail
 >* 源码实现在 `Microi.Server/Microi.Office/MicroiOffice.cs`（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Office/MicroiOffice.cs) / [Gitee](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Office/MicroiOffice.cs)）。

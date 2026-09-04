@@ -6,6 +6,7 @@ import {
     OFFICIAL_STORE_LIST_PATH,
     consumeCompletedPlatformMaintenanceTransitions,
     createCoalescedTrailingRunner,
+    normalizeInstalledVersionsForOfficialCheck,
     normalizeOfficialAppNotices,
     requestOfficialStoreList
 } from "../src/utils/official-app-notice.js";
@@ -174,8 +175,63 @@ test("通知只接受权威未安装和可更新状态，响应缺失时失败�
             Code: 1,
             Data: { Notices: [{ AppId: "broken", Status: "Uninstalled", ApplicationType: "Platform" }] }
         }),
-        /缺少 StoreId、AppId 或 AppVersion/
+        /缺少 StoreId 或稳定应用标识/
     );
+});
+
+test("单条商城历史脏数据按 StoreId 隔离且缺版本时显式标记异常", () => {
+    const rows = normalizeOfficialAppNotices({
+        Code: 1,
+        Data: {
+            Notices: [
+                { StoreId: "store-key", AppKey: "app.key", AppVersion: "v1.0.3", Status: "Uninstalled", ApplicationType: "Platform" },
+                { StoreId: "store-only", AppName: "历史应用", Status: "Uninstalled", ApplicationType: "Platform" },
+                { StoreId: "store-good", AppId: "app.good", AppVersion: "v2.0.0", Status: "Outdated", ApplicationType: "Platform" }
+            ]
+        }
+    });
+
+    assert.equal(rows.length, 3);
+    assert.equal(rows[0].AppId, "app.key");
+    assert.equal(rows[1].AppId, "store:store-only");
+    assert.equal(rows[1].Status, "Abnormal");
+    assert.equal(rows[1].DataIntegrityIssue, "MissingAppVersion");
+    assert.equal(rows[2].Status, "Outdated");
+});
+
+test("已安装版本投影去重并保留最新软删除记录", () => {
+    const rows = normalizeInstalledVersionsForOfficialCheck([
+        {
+            Id: "new",
+            StoreId: "store-a",
+            AppId: "app.a",
+            AppName: "应用A",
+            AppVersionInstall: "v2.0.0",
+            IsDeleted: 1,
+            UpdateTime: "2026-09-04 10:00:00",
+            UntrustedLargeField: "must-not-cross-boundary"
+        },
+        {
+            Id: "old",
+            StoreId: "store-a",
+            AppId: "app.a",
+            AppName: "应用A",
+            AppVersionInstall: "v1.0.0",
+            IsDeleted: 0,
+            UpdateTime: "2026-09-03 10:00:00"
+        },
+        {
+            Id: "other",
+            StoreId: "store-b",
+            AppId: "app.b",
+            AppVersionInstall: "v1.0.0",
+            UpdateTime: "2026-09-02 10:00:00"
+        }
+    ]);
+
+    assert.deepEqual(rows.map((row) => row.Id), ["new", "other"]);
+    assert.equal(rows[0].IsDeleted, 1);
+    assert.equal(Object.prototype.hasOwnProperty.call(rows[0], "UntrustedLargeField"), false);
 });
 
 test("平台维护任务的首次终态与正常迁移都只消费一次", () => {

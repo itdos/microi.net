@@ -54,7 +54,7 @@ test('presentation covers the complete technical learning path', () => {
     'Docker 一键安装',
     '官网注册并开通免费 SaaS 租户',
     '@microi.net/cli',
-    '20+ 引擎总览',
+    '30+ 引擎总览',
     'MCP 智能交付',
     'MCP 让 AI 理解、操作并验收真实平台',
     '业务蓝图',
@@ -291,4 +291,40 @@ test('presentation styles provide isolated responsive, motion, and 16:9 print co
   ]) assert.ok(styles.includes(token), `missing style contract: ${token}`)
 
   assert.doesNotMatch(styles, /^(?:button|img|h1|h2)\s*\{/mu, 'generic selectors must remain scoped to the deck')
+})
+
+test('dark and light PDF actions keep theme-independent WCAG-readable color pairs', () => {
+  const styles = read('docs/.vitepress/theme/styles/training-syllabus-deck.scss')
+  const readHexToken = (name) => {
+    const match = styles.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, 'iu'))
+    assert.ok(match, `missing PDF action color token: ${name}`)
+    return match[1]
+  }
+  const rgb = value => [1, 3, 5].map(index => Number.parseInt(value.slice(index, index + 2), 16))
+  const luminance = (value) => {
+    const channels = rgb(value).map(channel => {
+      const normalized = channel / 255
+      return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+  }
+  const contrast = (foreground, background) => {
+    const values = [luminance(foreground), luminance(background)].sort((left, right) => right - left)
+    return (values[0] + 0.05) / (values[1] + 0.05)
+  }
+
+  for (const [foreground, background] of [
+    ['--mci-deck-pdf-dark-text', '--mci-deck-pdf-dark-bg'],
+    ['--mci-deck-pdf-dark-text', '--mci-deck-pdf-dark-bg-hover'],
+    ['--mci-deck-pdf-light-text', '--mci-deck-pdf-light-bg'],
+    ['--mci-deck-pdf-light-text', '--mci-deck-pdf-light-bg-hover'],
+  ]) {
+    assert.ok(
+      contrast(readHexToken(foreground), readHexToken(background)) >= 4.5,
+      `${foreground} on ${background} must meet WCAG AA`,
+    )
+  }
+
+  assert.match(styles, /a\.is-dark-pdf\s*\{[\s\S]*?-webkit-text-fill-color:\s*var\(--mci-deck-pdf-dark-text\)\s*!important;/u)
+  assert.match(styles, /a\.is-light-pdf\s*\{[\s\S]*?-webkit-text-fill-color:\s*var\(--mci-deck-pdf-light-text\)\s*!important;/u)
 })

@@ -5,9 +5,9 @@
 | 表 | 主业务键 | 关键字段 |
 |---|---|---|
 | `mci_vision_category` | `CategoryNo` | Name、Scope、ParentId、Sort、Enabled |
-| `mci_vision_subject` | `ObjectNo` | Name、CategoryId、ObjectType、RecognitionMode、ThresholdOverride、ReviewRequired |
-| `mci_vision_sample` | `SampleNo` | SubjectId、Mode、ImagePath、EmbeddingBase64、ModelKey、QualityScore、Status |
-| `mci_vision_request` | `RequestNo` | Mode、Status、MatchSource、StreamSessionId、FrameSequence、DetectionsJson、StabilityJson、AI 字段、耗时 |
+| `mci_vision_subject` | `ObjectNo` | Name、CategoryId、ObjectType、RecognitionMode、ThresholdOverride、ReviewRequired、默认价格/单位/币种 |
+| `mci_vision_sample` | `SampleNo` | SubjectId、Mode、ImagePath、EmbeddingBase64、ModelKey、QualityScore、Status、冰冻/新鲜度/价格及来源请求 |
+| `mci_vision_request` | `RequestNo` | Mode、Status、MatchSource、StreamSessionId、FrameSequence、DetectionsJson、StabilityJson、AI 字段、冰冻/新鲜度/价格及各自来源、纠错审计、耗时 |
 | `mci_vision_profile` | `ProfileKey` | 两类 ModelKey/Threshold、TopK、CandidateLimit、HnswEfSearch、连续投票、AI 开关、取帧间隔、保留策略 |
 
 数据库隔离租户的业务表物理层可能没有 `OsClient` 列；建索引前必须以 `microi_get_db_schema` 和物理索引回读为准。若当前部署是共享表租户模型，才把真实租户字段放到唯一索引前缀，不能机械套用。
@@ -31,11 +31,14 @@
 | `AiPending` | `None` | 否 | 后台任务已接受 |
 | `Unmatched` | `None` | 是 | 未命中且 AI 关闭 |
 | `AiMatched` | `AI` | 是 | AI 标签已回写 |
+| `Corrected` | `Manual` | 是 | 用户已把结果修正为当前租户的可信对象 |
 | `Failed` | `None` | 是 | 本地流水线或 Worker 最终失败 |
 | `ManualReview` | `None` | 是 | 高风险场景需要人工复核 |
 | `LowQuality` | `None` | 是 | 低于质量阈值 |
 
 `Status` 与 `MatchSource` 必须一起返回。AI 成功不应填充 `SubjectId`，除非后续人工确认并通过正常业务接口绑定。
+
+生鲜字段同样保留独立来源：`FrozenStateSource`、`FreshnessSource`、`PriceSource` 只能是 `Database/AI/Manual/None`。数据库命中时样本字段优先、对象默认价格次之；未命中后 AI 才能补充。价格是区间与单位估计，不是订单或称重结算事实。
 
 ## Runtime 请求
 
@@ -82,9 +85,23 @@ Face 模式必须 `ConsentConfirmed=true`；服务端不能只信任前端 check
 
 服务端读取对象的 Category/Mode，不能信任调用方自行提交 SubjectName、CategoryName 或 ModelKey。
 
+### Correct
+
+```json
+{
+  "Action": "Correct",
+  "RequestNo": "待修正识别记录",
+  "SubjectId": "当前租户正确对象Id",
+  "CorrectionReason": "人工复核原因",
+  "SaveAsSample": true
+}
+```
+
+服务端必须重新读取请求和对象，校验租户、权限、启用状态与识别模式；保存原结果、修正人、时间和原因。`SaveAsSample=true` 时按来源请求幂等录入，不能因重试重复生成样本，也不能绕过正常 `Enroll` 的图片、质量、模型和人脸同意门禁。
+
 ## 公开结果最小字段
 
-允许返回：RequestNo、FrameId、StreamSessionId、FrameSequence、Mode、Status、MatchSource、SubjectId/Name、CategoryId/Name、LocalSimilarity、Confidence、对象框/TrackId、Stability、AiLabel/Category/Description/Candidates、ModelKey/Version、ImageWidth/Height、QualityScore、RequestedAt、CompletedAt、ElapsedMs、ErrorMessage。
+允许返回：RequestNo、FrameId、StreamSessionId、FrameSequence、Mode、Status、MatchSource、SubjectId/Name、CategoryId/Name、LocalSimilarity、Confidence、对象框/TrackId、Stability、AiLabel/Category/Description/Candidates、FrozenState/Freshness/EstimatedPrice/Unit/Currency 及各自来源、ModelKey/Version、ImageWidth/Height、QualityScore、HasImage、短期授权 ImageUrl、RequestedAt、CompletedAt、ElapsedMs、ErrorMessage 和不含秘密的纠错审计摘要。
 
 禁止返回：EmbeddingBase64、InputFilePath、图片 Base64、模型磁盘路径、AI Provider Key、系统提示词、后台任务内部载荷。
 
@@ -138,6 +155,9 @@ Face 模式必须 `ConsentConfirmed=true`；服务端不能只信任前端 check
 - Worker 成功/失败/重复消费收敛；
 - AI 关闭直接 Unmatched；
 - 低质量不进入匹配；
+- 生鲜字段数据库优先、AI 只在未命中后补充，字段来源不会串改；
+- Correct 校验对象与模式、保存原结果和审计，SaveAsSample 按 RequestNo 幂等；
+- Recent/Result 的历史图片只返回授权 URL，不返回原始私有路径；
 - 受保护向量只能在同租户同核心引擎解开；
 - Hook 不接收敏感载荷且 CreateIfMissing 不被升级覆盖。
 
@@ -146,8 +166,10 @@ Face 模式必须 `ConsentConfirmed=true`；服务端不能只信任前端 check
 - 已登录真实菜单打开 MicroService，不是独立 Mock 页面；
 - 桌面、窄屏、暗色、键盘焦点和文字对比度；
 - 上传预览、清除、重复选择、错误格式/超限；
-- 摄像头授权拒绝、成功、暂停、继续、再次识别、关闭与卸载清理；
-- Database/AiPending/AI/Unmatched/LowQuality/AiFailed 状态；
+- 摄像头授权拒绝、成功、暂停、继续、强制当前帧、快速关闭与卸载清理；覆盖 getUserMedia/video.play 与关闭竞态；
+- Database/AiPending/AI/Manual/Unmatched/LowQuality/AiFailed 状态和数据库→AI 两段进度；
+- 桌面全宽三栏；390×844 竖屏和短横屏中采集、结果、最近记录同屏，页面级无纵向滚动且不被宿主底栏遮挡；
+- 历史缩略图授权加载、原画弹窗、纠错和可选存样本；
 - FaceConsent 默认未勾选，未同意按钮禁用且后端拒绝；
 - Console/PageError/失败请求为 0 或逐项解释。
 

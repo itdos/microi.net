@@ -27,6 +27,14 @@ namespace Microi.net
             return int.TryParse(RelationValue(source, name), out var value) ? value : 0;
         }
 
+        internal static T ReadMcpPatchValue<T>(JObject source, string name)
+        {
+            var token = source?[name];
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+                return default;
+            return token.ToObject<T>();
+        }
+
         private static JObject ParseRelationConfig(string config)
         {
             if (config.DosIsNullOrWhiteSpace()) return null;
@@ -154,6 +162,39 @@ namespace Microi.net
             return errors;
         }
 
+        /// <summary>
+        /// TableChild 回查索引必须遵循目标表的真实租户隔离方式：
+        /// 共享库表存在 OsClient 时要求 (OsClient, FK)，独立库表没有 OsClient 时要求 (FK)。
+        /// </summary>
+        public static List<string> BuildTableChildRequiredIndexPrefixForTest(
+            IEnumerable<string> physicalColumns,
+            string childForeignKey)
+        {
+            var available = new HashSet<string>(
+                (physicalColumns ?? Enumerable.Empty<string>())
+                    .Where(value => !value.DosIsNullOrWhiteSpace()),
+                StringComparer.OrdinalIgnoreCase);
+            var required = new List<string>();
+            if (available.Contains("OsClient")) required.Add("OsClient");
+            if (!childForeignKey.DosIsNullOrWhiteSpace()) required.Add(childForeignKey);
+            return required;
+        }
+
+        public static bool HasTableChildRequiredIndexForTest(
+            IEnumerable<TableIndexInfo> indexes,
+            IEnumerable<string> physicalColumns,
+            string childForeignKey)
+        {
+            var required = BuildTableChildRequiredIndexPrefixForTest(physicalColumns, childForeignKey);
+            if (required.Count == 0) return false;
+            return (indexes ?? Enumerable.Empty<TableIndexInfo>()).Any(index =>
+                index?.Columns != null
+                && index.Columns.Count >= required.Count
+                && required.Select((column, position) =>
+                        string.Equals(index.Columns[position], column, StringComparison.OrdinalIgnoreCase))
+                    .All(matches => matches));
+        }
+
         private static async Task<(bool Ok, string Msg)> ValidateMcpFieldRelationAsync(
             string osClient,
             string currentTableId,
@@ -265,18 +306,28 @@ namespace Microi.net
             if (isTableChild && targetTable != null)
             {
                 var childForeignKey = RelationValue(configObject, "TableChildFkFieldName");
-                var indexResult = GetTableIndexes(osClient, RelationValue(targetTable, "Name"));
+                var resolvedChildTableName = RelationValue(targetTable, "Name");
+                var physicalColumnsResult = GetTablePhysicalColumns(osClient, resolvedChildTableName);
+                if (physicalColumnsResult.Code != 1)
+                {
+                    errors.Add("TableChild 子表物理字段回读失败：" + physicalColumnsResult.Msg);
+                    return (false, "关系组件配置校验失败：" + string.Join("；", errors));
+                }
+
+                var indexResult = GetTableIndexes(osClient, resolvedChildTableName);
                 if (indexResult.Code != 1)
                 {
                     errors.Add("TableChild 子表索引回读失败：" + indexResult.Msg);
                 }
-                else if (!(indexResult.Data as IEnumerable<TableIndexInfo> ?? Enumerable.Empty<TableIndexInfo>()).Any(index =>
-                    index.Columns != null
-                    && index.Columns.Count >= 2
-                    && string.Equals(index.Columns[0], "OsClient", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(index.Columns[1], childForeignKey, StringComparison.OrdinalIgnoreCase)))
+                else if (!HasTableChildRequiredIndexForTest(
+                    indexResult.Data,
+                    physicalColumnsResult.Data,
+                    childForeignKey))
                 {
-                    errors.Add($"TableChild 子表必须存在以 (OsClient, {childForeignKey}) 开头的组合索引");
+                    var requiredPrefix = BuildTableChildRequiredIndexPrefixForTest(
+                        physicalColumnsResult.Data,
+                        childForeignKey);
+                    errors.Add($"TableChild 子表必须存在以 ({string.Join(", ", requiredPrefix)}) 开头的索引");
                 }
             }
             return errors.Count == 0

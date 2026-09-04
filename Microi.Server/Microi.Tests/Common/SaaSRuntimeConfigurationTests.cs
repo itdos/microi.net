@@ -230,6 +230,53 @@ public class SaaSRuntimeConfigurationTests
             "生产后端源码发现未授权环境变量读取：" + string.Join("；", violations));
     }
 
+    [Fact]
+    public void MainTenantDatabaseConfig_ProcessBootstrapOverridesSeedProviderMetadata()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Core", "SaaSEngine", "OsClient.cs"));
+        var start = source.IndexOf(
+            "private static void EnsureMainTenantDatabaseConfig", StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "private static bool IsConfiguredMainTenant", start, StringComparison.Ordinal);
+
+        Assert.True(start >= 0 && end > start, "EnsureMainTenantDatabaseConfig source boundary was not found.");
+        var method = source[start..end];
+        Assert.Contains("osClientModel[\"DbConn\"] = dbConn", method, StringComparison.Ordinal);
+        Assert.Contains("osClientModel[\"DbType\"] = dbType", method, StringComparison.Ordinal);
+        Assert.DoesNotMatch(
+            @"string\.IsNullOrWhiteSpace\(currentDb(?:Conn|Type)\)[\s\S]{0,100}osClientModel\[""Db(?:Conn|Type)""\]",
+            method);
+        Assert.Matches(
+            @"string\.IsNullOrWhiteSpace\(currentDbReadConn\)[\s\S]*?osClientModel\[""DbReadConn""\]\s*=\s*currentDbConn;[\s\S]*?osClientModel\[""DbReadType""\]\s*=\s*currentDbType;",
+            method);
+    }
+
+    [Fact]
+    public void QuartzJobStore_UsesTheConfiguredSqlServerProvider()
+    {
+        var root = FindRepositoryRoot();
+        var extensionSource = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Job", "MicroiJobExtension.cs"));
+        var schedulerSource = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Job", "MicroiQuartzScheduledTask.cs"));
+        var programSource = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Program.cs"));
+        var jobProject = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Job", "Microi.Job.csproj"));
+
+        Assert.Contains("AddMicroiJob(host.DatabaseConnection, host.DatabaseTypeName)", programSource);
+        Assert.Contains("ConfigurePersistentStore(x, databaseType, quartzDbConn)", extensionSource);
+        Assert.Contains("options.UseSqlServer(connectionString)", extensionSource);
+        Assert.Contains("Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz", extensionSource);
+        Assert.Contains("return databaseType == DatabaseType.SqlServer ? \"SqlServer\" : \"MySql\"", extensionSource);
+        Assert.Contains("GetDriverDelegateType(databaseType)", schedulerSource);
+        Assert.Contains("GetProviderName(databaseType)", schedulerSource);
+        Assert.DoesNotContain("x.UseMySql(quartzDbConn)", extensionSource);
+        Assert.Contains("Microsoft.Data.SqlClient", jobProject);
+    }
+
     [Theory]
     [InlineData("数据库、案例、文档、资料/install-microi.sh")]
     [InlineData("数据库、案例、文档、资料/install-microi-offline.sh")]
@@ -454,6 +501,24 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
+    public void OfficialInstaller_SelectsSqlServerCompatibilityLevelFromTheActualEngine()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "数据库、案例、文档、资料", "install-microi.sh"));
+
+        Assert.Contains("SERVERPROPERTY('ProductMajorVersion')", source, StringComparison.Ordinal);
+        Assert.Contains("WHEN @major >= 16 THEN 160", source, StringComparison.Ordinal);
+        Assert.Contains("WHEN @major = 15 THEN 150", source, StringComparison.Ordinal);
+        Assert.Contains("WHEN @major = 14 THEN 140", source, StringComparison.Ordinal);
+        Assert.Contains("EXEC sys.sp_executesql @compatSql", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "ALTER DATABASE [${DATABASE_NAME}] SET COMPATIBILITY_LEVEL = 160;",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OfficialInstaller_HandlesTerminalEncodingBeforeUserVisibleOutput()
     {
         var root = FindRepositoryRoot();
@@ -608,31 +673,27 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
-    public void TenantUpgradeCoordinator_MaintainsApplicationStreamV3SchemaBeforeVersionChain()
+    public void PendingUpgradeChainMaintainsApplicationStreamV3SchemaBeforeBaselineAdvances()
     {
         var root = FindRepositoryRoot();
         var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
+        var coordinator = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
 
         var gateInvariantIndex = source.IndexOf("EnsureTenantGateInvariant", StringComparison.Ordinal);
         var streamSchemaInvariantIndex = source.IndexOf("EnsureApplicationStreamV3SchemaInvariant", StringComparison.Ordinal);
-        var versionChainIndex = source.IndexOf("Upgrade(beforeVersion, runtimeClient)", StringComparison.Ordinal);
+        var baselineIndex = source.IndexOf("new Upgrade36().Run", StringComparison.Ordinal);
 
         Assert.True(gateInvariantIndex >= 0,
-            "The hosted prerequisite pass must maintain the tenant application gate schema.");
+            "A pending upgrade must maintain the tenant application gate schema.");
         Assert.True(streamSchemaInvariantIndex > gateInvariantIndex,
             "The V3 stream schema must be maintained after its tenant gate.");
-        Assert.True(versionChainIndex > streamSchemaInvariantIndex,
-            "Runtime application publish prerequisites must be ready before the versioned upgrade chain.");
-        Assert.Matches(
-            @"RequiredRuntimeInvariantNames\[3\],\s*\(\)\s*=>\s*new Upgrade25\(\)\.EnsureTenantGateInvariant",
-            source);
-        Assert.Matches(
-            @"RequiredRuntimeInvariantNames\[4\],\s*\(\)\s*=>\s*new Upgrade25\(\)\.EnsureApplicationStreamV3SchemaInvariant",
-            source);
-        Assert.Matches(
-            @"private static async Task RunCoordinatorInvariantAsync[\s\S]*?upgradeLease\.ConfirmOwnership\(\);[\s\S]*?var messages = await action\(\)[\s\S]*?upgradeLease\.ConfirmOwnership\(\);",
-            source);
+        Assert.True(baselineIndex > streamSchemaInvariantIndex,
+            "Application publish prerequisites must be ready before the one-time baseline advances.");
+        Assert.DoesNotContain("EnsureTenantGateInvariant", coordinator, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureApplicationStreamV3SchemaInvariant", coordinator, StringComparison.Ordinal);
+        Assert.Contains("if (IsVersionAtLeast(beforeVersion, targetVersion))", coordinator, StringComparison.Ordinal);
     }
 
     [Fact]

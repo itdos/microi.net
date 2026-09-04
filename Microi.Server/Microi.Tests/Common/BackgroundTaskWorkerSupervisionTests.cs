@@ -396,6 +396,30 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.DoesNotContain("'\"Id\" \"Status\"'", sql);
     }
 
+    [Fact]
+    public void SqlServerBackgroundTaskSql_QuotesReservedProjectionAliases()
+    {
+        var client = new Microi.net.OsClientSecret
+        {
+            OsClientModel = new Newtonsoft.Json.Linq.JObject
+            {
+                ["DbType"] = "SqlServer"
+            }
+        };
+
+        var sql = Microi.net.BackgroundTaskStore.QuoteSqlIdentifiers(
+            client,
+            "SELECT WorkCurrent AS Current,WorkTotal AS Total FROM mci_background_task " +
+            "WHERE RuntimeOsClientType=@runtimeType AND Msg='Current Total'");
+
+        Assert.Contains("[WorkCurrent] AS [Current]", sql);
+        Assert.Contains("[WorkTotal] AS [Total]", sql);
+        Assert.Contains("FROM [mci_background_task]", sql);
+        Assert.Contains("[RuntimeOsClientType]=@runtimeType", sql);
+        Assert.Contains("[Msg]='Current Total'", sql);
+        Assert.DoesNotContain("'[Current] [Total]'", sql);
+    }
+
     private static string FindServerRoot()
     {
         var repositoryRoot = Environment.GetEnvironmentVariable("MICROI_TEST_REPOSITORY_ROOT");

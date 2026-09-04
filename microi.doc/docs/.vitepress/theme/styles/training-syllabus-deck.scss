@@ -35,6 +35,16 @@
   --mci-deck-code-string: #67e8f9;
   --mci-deck-shadow: 0 24px 70px rgba(27, 38, 58, .14);
   --mci-deck-shadow-soft: 0 12px 34px rgba(27, 38, 58, .09);
+  /* 这两个动作代表 PDF 自身的明暗版本，因此保持主题无关的实色配对；
+   * 同时避免官网文档皮肤的全局链接色再次覆盖按钮文字。 */
+  --mci-deck-pdf-dark-bg: #8f1020;
+  --mci-deck-pdf-dark-bg-hover: #a91428;
+  --mci-deck-pdf-dark-text: #ffffff;
+  --mci-deck-pdf-dark-border: #b83243;
+  --mci-deck-pdf-light-bg: #f8fafc;
+  --mci-deck-pdf-light-bg-hover: #e2e8f0;
+  --mci-deck-pdf-light-text: #172033;
+  --mci-deck-pdf-light-border: #64748b;
   --mci-deck-radius-card: var(--mci-radius-xl, 20px);
   --mci-deck-radius-panel: var(--mci-radius-2xl, 24px);
   --mci-deck-radius-control: var(--mci-radius-md, 12px);
@@ -433,7 +443,19 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
 }
 
 .mci-training-deck__top-actions .is-primary { border-color: transparent; color: #ffffff; background: var(--mci-deck-primary-strong); }
-.mci-training-deck__top-actions .is-light-pdf { border-color: rgba(15, 23, 42, .14); color: #172033; background: #f8fafc; }
+.mci-training-ppt-page .mci-training-deck__top-actions a.is-dark-pdf {
+  border-color: var(--mci-deck-pdf-dark-border) !important;
+  color: var(--mci-deck-pdf-dark-text) !important;
+  background: var(--mci-deck-pdf-dark-bg) !important;
+  -webkit-text-fill-color: var(--mci-deck-pdf-dark-text) !important;
+}
+
+.mci-training-ppt-page .mci-training-deck__top-actions a.is-light-pdf {
+  border-color: var(--mci-deck-pdf-light-border) !important;
+  color: var(--mci-deck-pdf-light-text) !important;
+  background: var(--mci-deck-pdf-light-bg) !important;
+  -webkit-text-fill-color: var(--mci-deck-pdf-light-text) !important;
+}
 .mci-training-deck__top-actions svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .mci-training-deck__top-actions span { font-size: 12px; font-weight: 720; white-space: nowrap; }
 
@@ -453,6 +475,16 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-deck-closing__actions button:hover { transform: translateY(-2px); }
   .mci-training-deck__top-actions button:hover::after,
   .mci-training-deck__top-actions a:hover::after { opacity: 1; }
+  .mci-training-ppt-page .mci-training-deck__top-actions a.is-dark-pdf:hover {
+    color: var(--mci-deck-pdf-dark-text) !important;
+    background: var(--mci-deck-pdf-dark-bg-hover) !important;
+    -webkit-text-fill-color: var(--mci-deck-pdf-dark-text) !important;
+  }
+  .mci-training-ppt-page .mci-training-deck__top-actions a.is-light-pdf:hover {
+    color: var(--mci-deck-pdf-light-text) !important;
+    background: var(--mci-deck-pdf-light-bg-hover) !important;
+    -webkit-text-fill-color: var(--mci-deck-pdf-light-text) !important;
+  }
   .mci-training-deck__rail button:hover { border-color: var(--mci-deck-line-strong); transform: translateY(-1px); }
 }
 

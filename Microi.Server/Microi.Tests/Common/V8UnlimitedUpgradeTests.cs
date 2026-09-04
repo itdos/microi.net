@@ -43,11 +43,17 @@ public class V8UnlimitedUpgradeTests
         Assert.Contains("[\"OsClient\"] = \"varchar(255)\"", upgrade, StringComparison.Ordinal);
         Assert.Contains("[\"TableInEdit\"] = \"int\"", upgrade, StringComparison.Ordinal);
         Assert.Contains("[\"AddCallbakApi\"] = \"varchar(500)\"", upgrade, StringComparison.Ordinal);
+        Assert.Contains("beforeVersion = ReadServerVersion(runtimeClient)", coordinator, StringComparison.Ordinal);
+        Assert.Contains("IsVersionAtLeast(beforeVersion, targetVersion)", coordinator, StringComparison.Ordinal);
         Assert.Contains("EnsureRuntimePhysicalPrerequisitesAsync(", coordinator, StringComparison.Ordinal);
         Assert.Contains("runtimeClient, cancellationToken", coordinator, StringComparison.Ordinal);
         Assert.True(
+            coordinator.IndexOf("beforeVersion = ReadServerVersion(runtimeClient)", StringComparison.Ordinal)
+            < coordinator.IndexOf("EnsureRuntimePhysicalPrerequisitesAsync", StringComparison.Ordinal));
+        Assert.True(
             coordinator.IndexOf("EnsureRuntimePhysicalPrerequisitesAsync", StringComparison.Ordinal)
-            < coordinator.IndexOf("new Upgrade21()", StringComparison.Ordinal));
+            < coordinator.IndexOf("UpgradeDistributedLease.TryAcquire", StringComparison.Ordinal));
+        Assert.DoesNotContain("new Upgrade21()", coordinator, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -145,15 +151,15 @@ public class V8UnlimitedUpgradeTests
     }
 
     [Fact]
-    public void Upgrade33_ResetsExistingTablesOnce_AndStartupOnlyInitializesNullValues()
+    public void Upgrade33_ResetsExistingTablesOnce_AndBaselineOnlyInitializesNullValues()
     {
         var root = FindRepositoryRoot();
         var migration = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "33-UpgradeDiyTableV8RuntimeLimit.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
-        var coordinator = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
+        var baseline = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "36-UpgradeRuntimeInvariantBaseline.cs"));
 
         Assert.Equal("6.9.8.9", Upgrade33.Version);
         Assert.Contains("UPDATE {orm.GetTableName(\"diy_table\")}", migration, StringComparison.Ordinal);
@@ -168,20 +174,9 @@ public class V8UnlimitedUpgradeTests
         Assert.Contains("[\"Visible\"] = 0", migration, StringComparison.Ordinal);
         Assert.DoesNotContain("[\"IsDeleted\"] = 1", migration, StringComparison.Ordinal);
         Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade33.Version)", upgrade, StringComparison.Ordinal);
-        var leaseContextIndex = coordinator.IndexOf(
-            "using (UpgradeExecutionLeaseContext.Enter(upgradeLease))",
-            StringComparison.Ordinal);
-        var invariantIndex = coordinator.IndexOf("RequiredRuntimeInvariantNames[10]", StringComparison.Ordinal);
-        Assert.Contains(".Run(runtimeClient.OsClient, false)", coordinator, StringComparison.Ordinal);
-        Assert.Contains("RunCoordinatorInvariantAsync(", coordinator, StringComparison.Ordinal);
-        var versionReadIndex = coordinator.IndexOf(
-            "beforeVersion = ReadServerVersion(runtimeClient)",
-            StringComparison.Ordinal);
-        var versionGateIndex = coordinator.IndexOf("Upgrade(beforeVersion, runtimeClient)", StringComparison.Ordinal);
-        Assert.True(leaseContextIndex >= 0);
-        Assert.True(invariantIndex > leaseContextIndex);
-        Assert.True(versionReadIndex > invariantIndex);
-        Assert.True(versionGateIndex > versionReadIndex);
+        Assert.Contains("OneTimeInvariantNames[6], () => new Upgrade33().Run(osClient, false)", baseline, StringComparison.Ordinal);
+        Assert.Contains("UpgradeExecutionLeaseContext.ThrowIfLost()", baseline, StringComparison.Ordinal);
+        Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade36.Version)", upgrade, StringComparison.Ordinal);
     }
 
     private static int Count(string value, string needle)

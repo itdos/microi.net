@@ -26,7 +26,7 @@
 | `platform-vision-runtime` | 样本库优先匹配、状态机、私有文件、后台任务、业务 Hook | 训练模型或把密钥交给前端 |
 | `platform-vision-ai-worker` | 对未命中图片调用 Microi.AI，回写最终结果并清理敏感输入 | 把人脸模型猜测当成真实身份 |
 | `platform-vision-custom-hook` | 留给租户追加日志、写业务表、触发通知等低敏元数据逻辑 | 接收图片、向量、AI 提示词或身份敏感信息 |
-| `microi-vision` 前端微服务 | 图片上传、摄像头取帧、连续识别、结果来源、样本录入 | 在浏览器内持有模型或伪造最终匹配结论 |
+| `microi-vision` 前端微服务 | 图片上传、摄像头取帧、连续识别、分阶段来源、最近记录、纠错与样本录入 | 在浏览器内持有模型或伪造最终匹配结论 |
 
 ## 识别状态机
 
@@ -58,6 +58,7 @@ LocalMatched      AiPending / Unmatched
 | `AiPending` | `None` | 数据库未命中，AI 后台任务已受理 |
 | `Unmatched` | `None` | 数据库未命中且 AI 回退已关闭 |
 | `AiMatched` | `AI` | AI 返回一般物体/商品语义结果 |
+| `Corrected` | `Manual` | 用户已把历史识别修正为当前租户中的可信对象 |
 | `Failed` | `None` | 流水线或 AI 调用失败，可按业务规则复核或重试 |
 | `LowQuality` | `None` | 图片质量未达到策略下限，未进入判断 |
 
@@ -74,7 +75,7 @@ LocalMatched      AiPending / Unmatched
 | 识别记录 | `mci_vision_request` | 数据库命中、AI 处理中、AI 结果、耗时和清理状态 |
 | 识别配置 | `mci_vision_profile` | 模型 Key、阈值、Top-K、视频间隔、AI 回退和保留策略 |
 
-核心接口引擎为 `platform-vision-runtime`，动作包含 `Bootstrap`、`Capabilities`、`Dashboard`、`Subjects`、`Recognize`、`Enroll`、`Result` 和 `Recent`。AI Worker 与四个核心/选项引擎由商城应用以 `Managed` 策略维护；`platform-vision-custom-hook` 必须声明为 `CreateIfMissing`，升级不能覆盖租户自己的业务代码。
+核心接口引擎为 `platform-vision-runtime`，动作包含 `Bootstrap`、`Capabilities`、`Dashboard`、`Subjects`、`Recognize`、`Enroll`、`Result`、`Recent` 和 `Correct`。AI Worker 与四个核心/选项引擎由商城应用以 `Managed` 策略维护；`platform-vision-custom-hook` 必须声明为 `CreateIfMissing`，升级不能覆盖租户自己的业务代码。
 
 ## 快速使用
 
@@ -87,6 +88,7 @@ LocalMatched      AiPending / Unmatched
 - 所属分类：`生鲜水产`
 - 对象类型：`Product`
 - 识别模式：`General`
+- 默认价格下限/上限、计价单位与币种：例如 `18`、`35`、`斤`、`CNY`
 
 人员对象应使用 `ObjectType=Person`，保存事件会强制切换到 `RecognitionMode=Face`。人员分类只能选择 `Face` 或 `All` 识别域。
 
@@ -104,7 +106,7 @@ var result = await V8.ApiEngine.Run('platform-vision-runtime', {
 return result;
 ```
 
-样本目标由 `V8.Vision.Analyze` 检测/对齐后生成对象级向量，再使用绑定当前租户和当前接口引擎的保护能力保存；旧宿主在升级窗口内才兼容回退到 `V8.Vision.Extract`。公开结果、Hook 和列表默认都不返回向量正文。
+样本目标由 `V8.Vision.Analyze` 检测/对齐后生成对象级向量，再使用绑定当前租户和当前接口引擎的保护能力保存；旧宿主在升级窗口内才兼容回退到 `V8.Vision.Extract`。生鲜样本还可录入是否冰冻、新鲜度、预估价格、单位与币种，数据库命中时这些字段连同 `Database` 来源一起返回。公开结果、Hook 和列表默认都不返回向量正文。
 
 ### 单图识别
 
@@ -127,9 +129,11 @@ return result;
 
 同一个 `RequestId` 重试会读取原请求，不重复入队。AI 任务使用共享数据库后台任务，不依赖单机内存队列。
 
+工作台把识别过程明确拆成两段：先显示“数据库正在匹配”；命中时显示“数据库已命中，无需 AI 回退”，未命中时显示“数据库未命中，正在由 AI 模型识别”。最终对象、新鲜度、冰冻状态和预估价格分别保留 `Database`、`AI` 或 `Manual` 来源，不把不同来源伪装成同一个可信度。预估价格仅作参考，收银仍应以门店商品主数据和实际称重为准。
+
 ### 连续视频帧
 
-浏览器使用 `getUserMedia` 打开前置或后置摄像头，按 `FrameIntervalMs` 将画面压缩成 JPEG 帧后调用 `Recognize`。工作台提供开启、暂停、继续、再次识别和关闭；每次开启建立新的 `StreamSessionId`，每帧递增 `FrameSequence`，静止画面在浏览器端直接跳过，服务端按 TrackId 做连续帧投票。手机浏览器必须使用 HTTPS（localhost 调试除外）。可信 .NET 宿主也可把 RTSP/WebRTC 解码后的帧流传给：
+浏览器使用 `getUserMedia` 打开前置或后置摄像头，按 `FrameIntervalMs` 将画面压缩成 JPEG 帧后调用 `Recognize`。工作台提供开启、暂停、继续、立即识别当前帧和关闭；每次开启建立新的 `StreamSessionId`，每帧递增 `FrameSequence`，自动连续模式会跳过静止画面，人工点击“立即识别”则强制提交当前帧。服务端按 TrackId 做连续帧投票。手机浏览器必须使用 HTTPS（localhost 调试除外）。可信 .NET 宿主也可把 RTSP/WebRTC 解码后的帧流传给：
 
 ```csharp
 IAsyncEnumerable<DosResult<MicroiVisionExtractResult>> results =
@@ -140,6 +144,14 @@ IAsyncEnumerable<DosResult<MicroiVisionAnalyzeResult>> detectedResults =
 ```
 
 Microi.Vision 不直接接受调用方传入的任意 RTSP URL、摄像头账号或网络 Header。摄像头协议、断线重连和取帧留在可信宿主或边缘网关，可避免 SSRF、凭据泄漏和 API 进程长期持有视频连接。
+
+### 工作台布局、最近识别与纠错
+
+桌面工作台占满宿主可用宽度，把“采集与识别、识别结果、最近识别”放在同一行；上传竖图或打开摄像头后，画面使用有界 `object-fit: contain`，不会把页面向下撑高。手机竖屏在一个宿主可用高度内紧凑显示三块内容，短横屏切换为三列；页面本身不产生纵向滚动，最近记录列表只在自己的区域内滚动，并避开平台底部菜单和安全区。
+
+“最近识别”中的缩略图来自 `Recent/Result` 返回的临时授权私有文件 URL，前端永远不读取或拼接原始 HDFS 路径。点击缩略图可查看当时画面；点击“修正”可选择当前租户中的正确对象、填写原因，并决定是否把该画面加入样本库。`Correct` 会把记录改为 `Corrected/Manual`、保存原始识别来源和审计信息；选择“同时存入样本库”时按来源请求幂等录入，避免重复样本。AI 结果不会未经人工确认自动进入可信样本库。
+
+摄像头关闭必须先同步切换界面状态并使本次打开操作失效，再停止轨道、清空 `srcObject`。打开摄像头、`video.play()`、关闭和组件卸载之间使用操作令牌防止旧异步流程把已经关闭的摄像头重新置为开启。
 
 ## V8.Vision 原子能力
 
@@ -225,7 +237,7 @@ var stable = await V8.Vision.Stabilize({
 
 ## AI 回退与数据保留
 
-`AiFallbackEnabled` 默认开启，`FaceAiFallbackEnabled` 可单独关闭。数据库未命中时先返回 `AiPending`，让收银或监控页面保持响应；后台任务把私有临时图片交给当前租户配置的 Microi.AI 模型，完成后更新同一识别记录。
+`AiFallbackEnabled` 默认开启，`FaceAiFallbackEnabled` 可单独关闭。数据库未命中时先返回 `AiPending`，让收银或监控页面保持响应；后台任务把私有临时图片交给当前租户配置的 Microi.AI 模型，完成后更新同一识别记录。对于水产、生鲜、蔬菜等普通物体，Worker 可一并返回冰冻状态、新鲜度百分比和价格区间/单位/币种，并把这些字段的来源标为 `AI`；这类模型估计不得冒充食品安全检测、检疫结论或门店正式售价。
 
 AI 回退关闭时返回 `Unmatched`，不产生外部模型调用。调用失败返回 `Failed`，不能把网络错误改写成“未识别到商品”。通用图片按 `RetainInputDays` 清理；人脸模式默认立即删除输入。样本原图的长期保留需由业务管理员另行制定权限和期限。
 
@@ -256,9 +268,13 @@ AI 回退关闭时返回 `Unmatched`，不产生外部模型调用。调用失�
 - [ ] `V8.Vision.GetCapabilities()` 明确区分内置指纹和生产模型包；
 - [ ] 同一图片录入后再识别返回 `LocalMatched/Database`，相似度达到配置阈值；
 - [ ] 未知图片先返回 `AiPending`，随后同一 `RequestNo` 收敛为 `AiMatched` 或 `Failed`；
-- [ ] 摄像头可暂停、继续、再次识别和关闭，`StreamSessionId/FrameSequence` 连续且静止帧不会反复提交；
+- [ ] 数据库匹配中、数据库命中/失败、AI 识别中和最终来源在界面上分阶段可见；
+- [ ] 摄像头可暂停、继续、强制识别当前帧和关闭，`StreamSessionId/FrameSequence` 连续且自动模式不会反复提交静止帧；
 - [ ] 关闭 AI 后未知图片直接返回 `Unmatched`，没有后台任务；
 - [ ] 摄像头单帧与连续帧能停止、恢复，不会无限并发或重复入队；
+- [ ] 桌面采集/结果/最近识别同屏且占满宿主可用宽度；390×844 竖屏和短横屏均无页面级滚动、无底部菜单遮挡；
+- [ ] 最近记录可通过授权 URL 查看原画，可人工纠错，并可选择幂等保存为样本；历史响应不泄漏原始文件路径；
+- [ ] 生鲜的冰冻状态、新鲜度和预估价格分别显示值与来源，数据库字段优先、AI 仅在未命中后回退；
 - [ ] 工作台跟随宿主租户主题色、浅色/深色即时切换，且至少通过一个非默认主题色的真实浏览器视觉验收；
 - [ ] 人脸未明确同意时前端阻止提交，后端也执行独立校验；
 - [ ] 向量、图片 Base64、模型路径、AI 密钥和敏感身份不出现在公开响应或普通日志；

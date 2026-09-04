@@ -168,6 +168,92 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
         Assert.All(expected, field => Assert.Contains(field, packageFieldNames));
     }
 
+    [Fact]
+    public void ChanjetV2Settings_AcceptBoundedJsonOrDelimitedAppKeySets()
+    {
+        Assert.True(ChanjetV2ProtocolGatewaySettings.TryCreate(
+            "tenant-v2",
+            "1234567890123456",
+            "[\"app-a\",\"APP-A\",\"app-b\"]",
+            out var jsonSettings));
+        Assert.Equal(3, jsonSettings.AllowedAppKeyCount);
+        Assert.False(jsonSettings.IsAllowedAppKey("App-A"));
+        Assert.True(jsonSettings.IsAllowedAppKey("APP-A"));
+        Assert.True(jsonSettings.IsAllowedAppKey("app-b"));
+        Assert.False(jsonSettings.IsAllowedAppKey("app-c"));
+
+        Assert.True(ChanjetV2ProtocolGatewaySettings.TryCreate(
+            "tenant-v2",
+            "123456789012345678901234",
+            "app-a; app-b\napp-c",
+            out var delimitedSettings));
+        Assert.Equal(3, delimitedSettings.AllowedAppKeyCount);
+    }
+
+    [Theory]
+    [InlineData("short", "app-a")]
+    [InlineData("1234567890123456", "")]
+    [InlineData("1234567890123456", "[]")]
+    [InlineData("1234567890123456", "[\"ok\",42]")]
+    public void ChanjetV2Settings_InvalidCryptographicOrAllowListInputFailsClosed(
+        string aesKey,
+        string appKeys)
+    {
+        Assert.False(ChanjetV2ProtocolGatewaySettings.TryCreate(
+            "tenant-v2",
+            aesKey,
+            appKeys,
+            out _));
+    }
+
+    [Fact]
+    public void ChanjetV2Callback_IsAdditiveTenantBoundAndManaged()
+    {
+        var root = FindRepositoryRoot();
+        var message = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "MessageController.cs"));
+        var settings = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Core", "SaaSEngine", "ChanjetV2ProtocolGatewaySettings.cs"));
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+        var systemSettings = Assert.Single(package["DataSets"]!
+            .Children<JObject>()
+            .Where(item => string.Equals(
+                item.Value<string>("TableName"),
+                "mci_system_setting",
+                StringComparison.OrdinalIgnoreCase)));
+        var settingRows = systemSettings["Rows"]!
+            .Children<JObject>()
+            .ToDictionary(row => row.Value<string>("ConfigKey")!, StringComparer.Ordinal);
+
+        Assert.Contains("Route(\"ReceiveV2\")", message, StringComparison.Ordinal);
+        Assert.Contains("OsClient.DosIsNullOrWhiteSpace()", message, StringComparison.Ordinal);
+        Assert.Contains("RunTrustedProtocolAsync(", message, StringComparison.Ordinal);
+        Assert.Contains("ChanjetCallbackV2EngineKey", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetConfigOsClient", settings, StringComparison.Ordinal);
+        Assert.Contains("TenantSystemSettingsSecurity.LoadSnapshot", settings, StringComparison.Ordinal);
+        Assert.Contains("Integration.Chanjet.CallbackV2.Enabled", settings, StringComparison.Ordinal);
+        Assert.Contains("Integration.Chanjet.CallbackV2.AesKey", settings, StringComparison.Ordinal);
+        Assert.Contains("Integration.Chanjet.CallbackV2.AppKeys", settings, StringComparison.Ordinal);
+
+        var enabled = settingRows["Integration.Chanjet.CallbackV2.Enabled"];
+        Assert.Equal("false", enabled.Value<string>("ConfigValue"));
+        Assert.Equal(0, enabled.Value<int>("IsPublic"));
+        Assert.Equal(0, enabled.Value<int>("IsSecret"));
+        Assert.Equal(0, enabled.Value<int>("IsEnabled"));
+
+        foreach (var key in new[]
+                 {
+                     "Integration.Chanjet.CallbackV2.AesKey",
+                     "Integration.Chanjet.CallbackV2.AppKeys"
+                 })
+        {
+            Assert.Equal(0, settingRows[key].Value<int>("IsPublic"));
+            Assert.Equal(1, settingRows[key].Value<int>("IsSecret"));
+            Assert.Equal(0, settingRows[key].Value<int>("IsEnabled"));
+        }
+    }
+
     private static JObject Model(string osClient, string state, string origins)
     {
         return new JObject

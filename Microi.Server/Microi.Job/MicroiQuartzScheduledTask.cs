@@ -18,6 +18,7 @@ using System.Security.Cryptography;
 using EnumsNET;
 using System.Threading;
 using Dos.Common;
+using Dos.ORM;
 using Microi.net;
 
 namespace Microi.net
@@ -114,6 +115,13 @@ namespace Microi.net
                     return;
                 try
                 {
+                    var databaseType = MicroiJobExtension.ResolveQuartzDatabaseType();
+                    var normalizedConnectionString = ConnectionStringCompatibility.Normalize(
+                        databaseType,
+                        connectionString,
+                        100,
+                        120,
+                        600);
                     // 获取原始的 Scheduler
                     _scheduler = await _schedulerFactory.GetScheduler();
                     // 停止原始 Scheduler
@@ -135,7 +143,7 @@ namespace Microi.net
 
                         // 作业存储 - 必须配置
                         ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-                        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.MySQLDelegate, Quartz",
+                        ["quartz.jobStore.driverDelegateType"] = MicroiJobExtension.GetDriverDelegateType(databaseType),
                         ["quartz.jobStore.tablePrefix"] = "microi_job_",
                         ["quartz.jobStore.dataSource"] = "default",
                         ["quartz.jobStore.useProperties"] = "false", // 改为 false 可能更稳定
@@ -145,8 +153,8 @@ namespace Microi.net
                         ["quartz.serializer.type"] = "json",
 
                         // 数据源
-                        ["quartz.dataSource.default.connectionString"] = connectionString,
-                        ["quartz.dataSource.default.provider"] = "MySql"
+                        ["quartz.dataSource.default.connectionString"] = normalizedConnectionString,
+                        ["quartz.dataSource.default.provider"] = MicroiJobExtension.GetProviderName(databaseType)
                     };
 
                     // 创建新的 SchedulerFactory

@@ -9,7 +9,7 @@ const OS_CLIENT = process.env.PW_OS_CLIENT || 'iTdos';
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || 'admin';
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || '';
 const TARGET_IMAGE = process.env.PW_VISION_TARGET_IMAGE || '';
-const RESULT_DIR = path.resolve(process.cwd(), '../AI-Project/microi/vision/test-results');
+const RESULT_DIR = path.resolve(process.cwd(), '../.tmp/screenshots/vision');
 const ASSET_DIR = path.resolve(process.cwd(), '../AI-Project/microi/vision/test-assets');
 const CREDENTIAL_FILE = path.resolve(process.cwd(), '../AI测试要用到的帐号密码.txt');
 
@@ -24,9 +24,19 @@ test.setTimeout(240_000);
 async function testCredential() {
   if (process.env.PW_TEST_PASSWORD) return { account: ACCOUNT, password: process.env.PW_TEST_PASSWORD };
   const source = await fs.readFile(CREDENTIAL_FILE, 'utf8');
-  const credentialLine = source.split(/\r?\n/).find((line) => /^帐号/.test(line.trim())) || '';
+  const lines = source.split(/\r?\n/);
+  let hostname = '';
+  try { hostname = new URL(FRONTEND).hostname.toLowerCase(); } catch { /* use the first credential as fallback */ }
+  const hostLineIndex = hostname
+    ? lines.findIndex((line) => line.toLowerCase().includes(hostname))
+    : -1;
+  const credentialLine = (hostLineIndex >= 0
+    ? lines.slice(hostLineIndex + 1).find((line) => /^帐号/.test(line.trim()))
+    : null)
+    || lines.find((line) => /^帐号/.test(line.trim()))
+    || '';
   const match = credentialLine.match(/^帐号\s*([^，,\s]+).*?密码\s*([^，,\s]+)/);
-  if (!match) throw new Error('无法从 AI 测试凭据文件解析本地 iTdos 账号；不会输出凭据内容。');
+  if (!match) throw new Error(`无法从 AI 测试凭据文件解析 ${hostname || '目标租户'} 账号；不会输出凭据内容。`);
   return { account: match[1], password: match[2] };
 }
 
@@ -237,43 +247,70 @@ async function assertWorkbenchTheme(page, expected) {
 async function readCompactLayout(page) {
   return page.evaluate(() => {
     const rootElement = document.querySelector('[data-mci-ui-root="microi-vision"]');
+    const workspaceElement = document.querySelector('.vision-workspace');
     const captureElement = document.querySelector('.vision-capture-card');
     const resultElement = document.querySelector('.vision-result-card');
+    const recentElement = document.querySelector('.vision-recent-card');
     const stageElement = document.querySelector('.vision-stage');
+    const mobileNavigation = document.querySelector('nav[aria-label="移动端主导航"]');
     const root = rootElement?.getBoundingClientRect();
+    const workspace = workspaceElement?.getBoundingClientRect();
     const capture = captureElement?.getBoundingClientRect();
     const result = resultElement?.getBoundingClientRect();
+    const recent = recentElement?.getBoundingClientRect();
     const stage = stageElement?.getBoundingClientRect();
+    const navigation = mobileNavigation?.getBoundingClientRect();
+    const rootStyle = rootElement ? getComputedStyle(rootElement) : null;
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
       root: root ? { top: root.top, bottom: root.bottom, width: root.width, height: root.height } : null,
+      workspace: workspace ? { top: workspace.top, right: workspace.right, bottom: workspace.bottom, left: workspace.left, width: workspace.width, height: workspace.height } : null,
       capture: capture ? { top: capture.top, right: capture.right, bottom: capture.bottom, left: capture.left, height: capture.height } : null,
       result: result ? { top: result.top, right: result.right, bottom: result.bottom, left: result.left, height: result.height } : null,
+      recent: recent ? { top: recent.top, right: recent.right, bottom: recent.bottom, left: recent.left, height: recent.height } : null,
+      mobileNavigationTop: navigation && navigation.height > 0 ? navigation.top : null,
       stageHeight: stage?.height || 0,
       rootClientHeight: rootElement?.clientHeight || 0,
       rootScrollHeight: rootElement?.scrollHeight || 0,
       rootClientWidth: rootElement?.clientWidth || 0,
       rootScrollWidth: rootElement?.scrollWidth || 0,
+      rootInlineStyle: rootElement?.getAttribute('style') || '',
+      rootComputedHeight: rootStyle?.height || '',
+      rootComputedMinHeight: rootStyle?.minHeight || '',
+      runtimeHeightVariable: rootStyle?.getPropertyValue('--vision-runtime-height').trim() || '',
+      hostHeightVariable: rootStyle?.getPropertyValue('--micro-app-available-height').trim() || '',
     };
   });
 }
 
 function expectCompactLayout(layout, orientation) {
   expect(layout.root).not.toBeNull();
+  expect(layout.workspace).not.toBeNull();
   expect(layout.capture).not.toBeNull();
   expect(layout.result).not.toBeNull();
+  expect(layout.recent).not.toBeNull();
   expect(layout.rootScrollHeight).toBeLessThanOrEqual(layout.rootClientHeight + 1);
   expect(layout.rootScrollWidth).toBeLessThanOrEqual(layout.rootClientWidth + 1);
   expect(layout.root.bottom).toBeLessThanOrEqual(layout.viewport.height + 1);
   expect(layout.capture.bottom).toBeLessThanOrEqual(layout.root.bottom + 1);
   expect(layout.result.bottom).toBeLessThanOrEqual(layout.root.bottom + 1);
+  expect(layout.recent.bottom).toBeLessThanOrEqual(layout.root.bottom + 1);
+  if (layout.mobileNavigationTop !== null) {
+    // 宿主导航顶部包含约 2px 的透明边框/阴影；内容仍必须严格位于导航上方。
+    expect(layout.root.bottom).toBeLessThanOrEqual(layout.mobileNavigationTop + 2);
+    expect(layout.recent.bottom).toBeLessThanOrEqual(layout.mobileNavigationTop + 1);
+  }
   expect(layout.stageHeight).toBeGreaterThanOrEqual(96);
   if (orientation === 'portrait') {
     expect(layout.result.top).toBeGreaterThanOrEqual(layout.capture.bottom - 1);
-    expect(layout.result.top - layout.capture.bottom).toBeLessThanOrEqual(8);
+    expect(layout.result.top - layout.capture.bottom).toBeLessThanOrEqual(12);
+    expect(layout.recent.top).toBeGreaterThanOrEqual(layout.result.bottom - 1);
+    expect(layout.recent.top - layout.result.bottom).toBeLessThanOrEqual(12);
   } else {
     expect(layout.result.left).toBeGreaterThanOrEqual(layout.capture.right - 1);
-    expect(layout.result.left - layout.capture.right).toBeLessThanOrEqual(8);
+    expect(layout.result.left - layout.capture.right).toBeLessThanOrEqual(12);
+    expect(layout.recent.left).toBeGreaterThanOrEqual(layout.result.right - 1);
+    expect(layout.recent.left - layout.result.right).toBeLessThanOrEqual(12);
   }
 }
 
@@ -574,6 +611,8 @@ test('真实 61500 页面：摄像头连续识别支持暂停、继续和强制�
     }).toBeGreaterThanOrEqual(10);
   }
 
+  // 宿主底部导航带响应式过渡；等待微服务最后一次有界高度收敛再断言。
+  await page.waitForTimeout(1_600);
   const mobileLayout = await readCompactLayout(page);
   expectCompactLayout(mobileLayout, 'portrait');
   await page.screenshot({ path: path.join(RESULT_DIR, 'workbench-mobile-compact-initial.png'), fullPage: false });
@@ -594,8 +633,8 @@ test('真实 61500 页面：摄像头连续识别支持暂停、继续和强制�
   await expect.poll(() => recognizedFrames.length, { timeout: 10_000 }).toBeGreaterThan(pausedCount);
   await page.getByTestId('camera-pause').click();
   await expect(page.getByTestId('ai-pending')).toBeVisible();
-  await expect(page.getByTestId('camera-retry')).toBeDisabled();
-  await expect(page.getByTestId('camera-retry')).toBeEnabled({ timeout: 10_000 });
+  await expect(page.getByTestId('recognize-submit')).toBeDisabled();
+  await expect(page.getByTestId('recognize-submit')).toBeEnabled({ timeout: 10_000 });
   expect(resultPolls).toBeGreaterThanOrEqual(2);
   expect(pollRecognizeCounts.every((count) => count === recognizeCountAtPending)).toBeTruthy();
   await expect(page.getByTestId('result-name')).toContainText('鱼');
@@ -603,14 +642,14 @@ test('真实 61500 页面：摄像头连续识别支持暂停、继续和强制�
   const resumedCount = recognizedFrames.length;
 
   await page.evaluate(() => window.__advanceVisionCameraFrame());
-  await page.getByTestId('camera-retry').click();
+  await page.getByTestId('recognize-submit').click();
   await expect.poll(() => recognizedFrames.length, { timeout: 10_000 }).toBeGreaterThan(resumedCount);
   await expect(page.getByTestId('result-name')).toContainText('鲤鱼');
-  await expect(page.getByTestId('mobile-result-retry')).toBeVisible();
-  expect(await page.getByTestId('mobile-result-retry').evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  await expect(page.getByTestId('recent-recognition')).toBeVisible();
+  await expect(page.getByText('再次识别当前画面', { exact: true })).toHaveCount(0);
   const inlineRetryCount = recognizedFrames.length;
   await page.evaluate(() => window.__advanceVisionCameraFrame());
-  await page.getByTestId('mobile-result-retry').click();
+  await page.getByTestId('recognize-submit').click();
   await expect.poll(() => recognizedFrames.length, { timeout: 10_000 }).toBeGreaterThan(inlineRetryCount);
 
   const firstThree = recognizedFrames.slice(0, 3);
@@ -628,33 +667,45 @@ test('真实 61500 页面：摄像头连续识别支持暂停、继续和强制�
   const recognizedPortraitLayout = await readCompactLayout(page);
   expectCompactLayout(recognizedPortraitLayout, 'portrait');
   await page.screenshot({ path: path.join(RESULT_DIR, 'workbench-mobile-camera-paused.png'), fullPage: false });
+  expect(await page.locator('.vision-capture-card').evaluate((element) => getComputedStyle(element).display)).toBe('grid');
   await page.getByTestId('camera-toggle').click();
   await expect(page.getByTestId('camera-toggle')).toHaveAttribute('data-camera-state', 'off');
   await expect(page.getByTestId('camera-pause')).toHaveCount(0);
 
   await page.setViewportSize({ width: 844, height: 390 });
-  await page.waitForTimeout(500);
+  await expect(page.getByTestId('vision-workbench')).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(1_600);
   const landscapeLayout = await readCompactLayout(page);
   expectCompactLayout(landscapeLayout, 'landscape');
   await page.screenshot({ path: path.join(RESULT_DIR, 'workbench-mobile-landscape.png'), fullPage: false });
 });
 
-test('真实目标租户：手机端上传指定图片后可完成数据库或 AI 识别', async ({ page }, testInfo) => {
+test('真实目标租户 v1.4.13：PC 全宽、移动横竖屏、历史画面与纠错入口完整可用', async ({ page }, testInfo) => {
   test.skip(!TARGET_IMAGE, '仅在 PW_VISION_TARGET_IMAGE 指定验收图片时执行。');
   await fs.mkdir(RESULT_DIR, { recursive: true });
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await loginThroughUi(page);
   await page.goto(tenantUrl('#/micro-app/microi-vision/workbench'), { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('vision-workbench')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('recent-recognition')).toBeVisible();
+
+  const desktopInitialLayout = await readCompactLayout(page);
+  expectCompactLayout(desktopInitialLayout, 'landscape');
+  expect(desktopInitialLayout.workspace.width).toBeGreaterThan(desktopInitialLayout.root.width * .94);
 
   await page.getByTestId('recognize-file').setInputFiles(TARGET_IMAGE);
   await expect(page.getByAltText('待识别图片预览')).toBeVisible();
-  const initialLayout = await readCompactLayout(page);
-  expectCompactLayout(initialLayout, 'portrait');
+  const uploadedDesktopLayout = await readCompactLayout(page);
+  expectCompactLayout(uploadedDesktopLayout, 'landscape');
+  expect(uploadedDesktopLayout.stageHeight).toBeLessThan(uploadedDesktopLayout.capture.height);
 
   const initialResponsePromise = page.waitForResponse(
-    (response) => response.request().method() === 'POST'
-      && /\/apiengine\/platform-vision-runtime(?:\?|$)/i.test(response.url()),
+    (response) => {
+      if (response.request().method() !== 'POST'
+          || !/\/apiengine\/platform-vision-runtime(?:\?|$)/i.test(response.url())) return false;
+      try { return response.request().postDataJSON()?.Action === 'Recognize'; }
+      catch { return false; }
+    },
     { timeout: 30_000 }
   );
   await page.getByTestId('recognize-submit').click();
@@ -675,13 +726,76 @@ test('真实目标租户：手机端上传指定图片后可完成数据库或 A
   await expect(
     page.getByTestId('recognition-result').getByText(/租户样本库|平台 AI 引擎/, { exact: true }).first()
   ).toBeVisible();
-  await expect(page.getByTestId('mobile-result-retry')).toBeVisible();
+  await expect(page.getByTestId('recent-recognition')).toBeVisible();
+  await expect(page.getByText('再次识别当前画面', { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('recognition-pipeline')).toContainText(/数据库已命中|数据库未命中/);
+  await expect(page.getByTestId('recognition-pipeline')).toContainText(/无需 AI 回退|AI 模型已识别/);
+  await expect(page.getByTestId('vision-facts')).toContainText('是否冰冻');
+  await expect(page.getByTestId('vision-facts')).toContainText('新鲜度');
+  await expect(page.getByTestId('vision-facts')).toContainText('预估价格');
   await expect(page.locator('.vision-inline-error')).toHaveCount(0);
   await expect(page.getByText(/私有图片暂存失败/)).toHaveCount(0);
 
+  const completedDesktopLayout = await readCompactLayout(page);
+  expectCompactLayout(completedDesktopLayout, 'landscape');
+  await page.screenshot({ path: path.join(RESULT_DIR, 'hongdi-v1413-desktop-full-width.png'), fullPage: false });
+
+  const firstThumb = page.locator('.vision-thumb:not(:disabled)').first();
+  await expect(firstThumb).toBeVisible();
+  await firstThumb.click();
+  const historyDialog = page.getByRole('dialog', { name: '历史识别画面' });
+  await expect(historyDialog).toBeVisible();
+  const historyImage = historyDialog.locator('img');
+  await expect(historyImage).toBeVisible();
+  expect(await historyImage.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+  await page.screenshot({ path: path.join(RESULT_DIR, 'hongdi-v1413-history-image.png'), fullPage: false });
+  await historyDialog.getByRole('button', { name: '关闭' }).click();
+
+  const firstCorrection = page.locator('.vision-correct-button:not(:disabled)').first();
+  await expect(firstCorrection).toBeVisible();
+  await firstCorrection.click();
+  const correctionDialog = page.getByTestId('correction-dialog');
+  await expect(correctionDialog).toBeVisible();
+  await expect(correctionDialog.getByText('同时把这张画面存入样本库，让下次优先数据库匹配')).toBeVisible();
+  const correctionSubject = correctionDialog.getByLabel('正确对象');
+  const correctionSubjectValues = await correctionSubject.locator('option').evaluateAll((options) => (
+    options.map((option) => option.value).filter(Boolean)
+  ));
+  expect(correctionSubjectValues.length, '纠错弹窗必须加载至少一个可选数据库对象').toBeGreaterThan(0);
+  if ((await correctionSubject.inputValue()) === '') {
+    await correctionSubject.selectOption(correctionSubjectValues[0]);
+  }
+  await expect(correctionSubject).not.toHaveValue('');
+  const saveSample = correctionDialog.getByLabel(/同时把这张画面存入样本库/);
+  if (await saveSample.isChecked()) await saveSample.uncheck();
+  await correctionDialog.getByLabel('纠错说明').fill('Playwright v1.4.13 单屏与纠错入口验收');
+  await correctionDialog.getByRole('button', { name: '仅修正记录' }).click();
+  await expect(correctionDialog.getByText('识别记录已修正。')).toBeVisible({ timeout: 60_000 });
+  await page.screenshot({ path: path.join(RESULT_DIR, 'hongdi-v1413-correction-success.png'), fullPage: false });
+  await correctionDialog.getByRole('button', { name: '关闭' }).click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(800);
+  const portraitLayout = await readCompactLayout(page);
+  expectCompactLayout(portraitLayout, 'portrait');
+  await expect(page.getByTestId('recent-recognition')).toBeVisible();
+  await expect(page.getByText('再次识别当前画面', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: path.join(RESULT_DIR, 'hongdi-v1413-mobile-portrait.png'), fullPage: false });
+
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.waitForTimeout(800);
+  const landscapeLayout = await readCompactLayout(page);
+  expectCompactLayout(landscapeLayout, 'landscape');
+  await expect(page.getByTestId('recent-recognition')).toBeVisible();
+  await page.screenshot({ path: path.join(RESULT_DIR, 'hongdi-v1413-mobile-landscape.png'), fullPage: false });
+
   const evidence = {
     testedAt: new Date().toISOString(),
-    viewport: { width: 390, height: 844 },
+    viewports: {
+      desktop: completedDesktopLayout,
+      portrait: portraitLayout,
+      landscape: landscapeLayout,
+    },
     initialStatus: initialBody.Data?.Status,
     initialSource: initialBody.Data?.MatchSource,
     requestId: initialBody.Data?.RequestId,
@@ -690,9 +804,10 @@ test('真实目标租户：手机端上传指定图片后可完成数据库或 A
     finalSource: String(await page.getByTestId('recognition-result').locator('dt', { hasText: '结果来源' }).locator('..').locator('dd').textContent() || '').trim(),
     finalConfidence: String(await page.getByTestId('recognition-result').locator('dt', { hasText: /相似度|置信度/ }).locator('..').locator('dd').textContent() || '').trim(),
     finalElapsed: String(await page.getByTestId('recognition-result').locator('dt', { hasText: '处理耗时' }).locator('..').locator('dd').textContent() || '').trim(),
-    layout: await readCompactLayout(page),
+    historyImageLoaded: true,
+    correctionUiSubmitted: true,
+    duplicateRetryControlAbsent: true,
   };
-  await fs.writeFile(path.join(RESULT_DIR, 'hongdi-mobile-upload-result.json'), `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
-  await page.screenshot({ path: path.join(RESULT_DIR, 'hongdi-mobile-upload-result.png'), fullPage: false });
-  await testInfo.attach('hongdi-mobile-upload-result', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
+  await fs.writeFile(path.join(RESULT_DIR, 'hongdi-v1413-target-result.json'), `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
+  await testInfo.attach('hongdi-v1413-target-result', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
 });

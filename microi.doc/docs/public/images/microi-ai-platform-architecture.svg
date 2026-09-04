@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="architecture-title architecture-desc" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
   <title id="architecture-title">Microi吾码 AI平台 架构图</title>
   <desc id="architecture-desc">以 V8引擎为运行核心，醒目展示 AI、低代码、接口、数据、集成、自动化、治理、多端交付与可靠运行等全部 Microi吾码系统引擎。</desc>
-  <metadata id="architecture-source">{&quot;architectureVersion&quot;:&quot;2026.09.03.2&quot;,&quot;platformVersion&quot;:&quot;v7.9.0&quot;,&quot;capabilitySourceHash&quot;:&quot;2487b9dfdb4485ab0459d5aa151f7dde83bbc1fffdda5bb561b3cb772fcd4aef&quot;}</metadata>
+  <metadata id="architecture-source">{&quot;architectureVersion&quot;:&quot;2026.09.04.1&quot;,&quot;platformVersion&quot;:&quot;v7.9.0&quot;,&quot;capabilitySourceHash&quot;:&quot;22658bafc091427ad63131407d374059cec4c68be21bdd8f542a3af7c2034683&quot;}</metadata>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#020716"/><stop offset=".48" stop-color="#07152b"/><stop offset="1" stop-color="#020713"/></linearGradient>
     <linearGradient id="header-line" x1="0" x2="1"><stop stop-color="#4de8ff"/><stop offset=".5" stop-color="#b995ff"/><stop offset="1" stop-color="#48e7a6"/></linearGradient>
@@ -65,7 +65,7 @@
   <text x="40" y="55" class="title">Microi吾码 AI平台 架构图</text>
   <rect x="475" y="28" width="86" height="34" rx="17" class="version-badge"/>
   <text x="518" y="50" text-anchor="middle" class="version-text">v7.9.0</text>
-  <text x="40" y="82" class="subtitle">OPEN-SOURCE AI DEVELOPMENT FRAMEWORK · 20+ SYSTEM ENGINES · BUILD → INTEGRATE → DELIVER → OBSERVE</text>
+  <text x="40" y="82" class="subtitle">OPEN-SOURCE AI DEVELOPMENT FRAMEWORK · 30+ SYSTEM ENGINES · BUILD → INTEGRATE → DELIVER → OBSERVE</text>
   <g transform="translate(930 20)">
     <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
     <path d="M12 62H210" stroke="#4de8ff" stroke-width="2"/>
@@ -79,7 +79,7 @@
   </g><g transform="translate(1406 20)">
     <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
     <path d="M12 62H210" stroke="#48e7a6" stroke-width="2"/>
-    <text x="16" y="31" class="value-main">20+</text>
+    <text x="16" y="31" class="value-main">30+</text>
     <text x="16" y="53" class="value-sub">成熟引擎复用</text>
   </g><g transform="translate(1644 20)">
     <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
@@ -283,7 +283,7 @@
     <path d="M55 567H228" stroke="#b995ff" stroke-width="3"/>
     <text x="56" y="597" class="panel-code" fill="#b995ff">02</text>
     <text x="101" y="596" class="panel-title">低代码核心业务引擎</text>
-    <text x="569" y="595" text-anchor="end" class="panel-sub">20+ 成熟引擎开箱复用</text>
+    <text x="569" y="595" text-anchor="end" class="panel-sub">30+ 成熟引擎开箱复用</text>
     <g data-feature="表单引擎">
     <path d="M58 624H171L176 629V645L171 650H58L53 645V629Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="62" cy="637" r="2" fill="#b995ff"/>

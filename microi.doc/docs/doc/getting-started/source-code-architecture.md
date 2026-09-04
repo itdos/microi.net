@@ -6,9 +6,9 @@ Microi吾码不是单一的后台管理模板。完整工程由低代码运行�
 
 ## Microi吾码系统架构全景
 
-[![Microi吾码 AI 平台系统架构图，展示全部核心系统引擎](/images/microi-ai-platform-architecture.svg)](/images/microi-ai-platform-architecture.svg)
+[![Microi吾码 AI 平台系统架构图，展示全部核心系统引擎](/images/microi-ai-platform-architecture-2026.09.04.1.svg)](/images/microi-ai-platform-architecture-2026.09.04.1.svg)
 
-> 点击架构图可放大查看。图中优先展示当前平台真实存在的 20+ 系统引擎，并以 V8 引擎为在线运行核心；下文继续把这些能力映射到具体源码目录与扩展边界。
+> 点击架构图可放大查看。图中优先展示当前平台真实存在的 30+ 系统引擎，并以 V8 引擎为在线运行核心；下文继续把这些能力映射到具体源码目录与扩展边界。
 
 ## 中大型应用不是高代码与低代码二选一
 

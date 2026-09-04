@@ -36,12 +36,12 @@ Microi.Vision 是可信 .NET 宿主中的最小视觉原子层，只负责：
 
 | 组件 | 策略 | 职责 |
 |---|---|---|
-| `platform-vision-runtime` | `Managed` | Recognize/Enroll/Result/Recent/Bootstrap/Capabilities |
+| `platform-vision-runtime` | `Managed` | Recognize/Enroll/Result/Recent/Correct/Bootstrap/Capabilities |
 | `platform-vision-ai-worker` | `Managed` | 持久任务消费、Microi.AI 视觉调用、回写与敏感图片清理 |
 | `platform-vision-category-options` | `Managed` | 当前租户启用分类选项 |
 | `platform-vision-subject-options` | `Managed` | 当前租户启用对象选项 |
 | `platform-vision-custom-hook` | `CreateIfMissing` | 租户自己的低敏业务扩展，官方升级永不覆盖 |
-| `microi-vision/workbench` | MicroService | 图片、摄像头帧、连续模式、来源状态、样本录入 |
+| `microi-vision/workbench` | MicroService | 图片、摄像头帧、连续模式、来源阶段、最近记录、纠错与样本录入 |
 
 详细数据、状态、协议和验收规范见 [architecture-and-acceptance.md](references/architecture-and-acceptance.md)。
 
@@ -58,7 +58,9 @@ Microi.Vision 是可信 .NET 宿主中的最小视觉原子层，只负责：
 7. AI 开启时先保存私有输入并创建共享后台任务，立即返回 `Status=AiPending`；
 8. Worker 收敛到 `AiMatched` 或 `Failed`，前端用同一 `RequestNo` 轮询。
 
-不得同步阻塞前端等待大模型，不得把 AI 结果自动写入可信对象主数据，也不得把本地相似度与 AI 置信度混成一个分数。
+不得同步阻塞前端等待大模型，不得把 AI 结果自动写入可信对象主数据，也不得把本地相似度与 AI 置信度混成一个分数。生鲜的冰冻状态、新鲜度、预估价格/单位/币种也必须按字段保存 `Database/AI/Manual` 来源：样本或对象主数据优先，只有数据库未命中后才允许 AI 推断；AI 价格只是非约束估计，不能直接覆盖门店售价。
+
+历史记录纠错使用 `Correct` 动作：只允许绑定当前租户中启用且模式兼容的对象，记录原标签、原来源、修正人、时间和原因；选择 `SaveAsSample` 时通过来源 `RequestNo` 做幂等录入。AI 结果不得自动加入 `Ready` 样本，必须由有权限的用户明确确认。`Recent/Result` 只返回 `HasImage` 与后端生成的短期授权 URL，禁止把 `InputFilePath`、图片 Base64 或永久公开地址交给浏览器。
 
 ## V8 原子函数
 
@@ -116,13 +118,17 @@ var voted = await V8.Vision.Stabilize({
 
 ## 视频入口
 
-前端使用 `getUserMedia` 并按 `FrameIntervalMs` 取帧，必须提供开启、暂停、继续、再次识别和关闭操作；每次打开摄像头生成新的 `StreamSessionId`，每帧递增 `FrameSequence`。可信边缘宿主将 RTSP/WebRTC 解码为 `IAsyncEnumerable<MicroiVisionExtractParam>` 后调用 `RecognizeFramesAsync`。Microi.Vision 不直接连接调用方提交的 RTSP URL，不保存摄像头账号，不承担流媒体服务器职责。
+前端使用 `getUserMedia` 并按 `FrameIntervalMs` 取帧，必须提供开启、暂停、继续、立即识别当前帧和关闭操作；每次打开摄像头生成新的 `StreamSessionId`，每帧递增 `FrameSequence`。自动连续模式允许跳过相同画面，人工主按钮必须显式绕过前端去重以提交当前帧。可信边缘宿主将 RTSP/WebRTC 解码为 `IAsyncEnumerable<MicroiVisionExtractParam>` 后调用 `RecognizeFramesAsync`。Microi.Vision 不直接连接调用方提交的 RTSP URL，不保存摄像头账号，不承担流媒体服务器职责。
+
+打开摄像头、`getUserMedia`、`video.play()`、关闭和组件卸载之间必须使用递增操作令牌或等价取消机制。关闭时先同步写入关闭态并使旧操作失效，再停止轨道和清空 `srcObject`；不能等待媒体清理完成后才改 UI，否则快速关闭会被较早的异步打开流程反向覆盖。移动控件或条件渲染按钮可在 `pointerdown` 立即执行停止语义，并对随后 `click` 做短时去重，防止 DOM 重排吞掉关闭操作。
 
 连续帧必须有：最大图片大小、最小间隔、单客户端串行、取消/停止、RequestId 幂等、网络退避和后台任务去重。不能每个视频帧都无界调用大模型。接口返回 `AiPending` 后，前端必须进入 single-flight 状态：暂停提交新帧，只轮询当前 `RequestId`，直到 `AiMatched/AiFailed/Unmatched`、超时或用户取消后才允许下一帧；禁止并行创建多个 AI 任务。
 
 跨版本接口字段必须在协议边界归一化。连续稳定结果至少兼容 `.NET` 原子常用的 `VoteCount/WindowCount/AverageConfidence` 与历史接口的 `Votes/WindowSize/Confidence`，前端只读取归一化 DTO，任何真实响应都不得展示 `undefined/undefined`。
 
-手机收银/巡检工作台属于高频全屏操作面：在宿主提供的可用高度内同时露出取景区、主要识别按钮、当前状态和核心结果，不依赖纵向滚动才能完成一次识别；竖屏上下分区、短横屏左右分区，且不得改变已验收的桌面布局。相机权限拒绝、AI 等待、终态结果和重试操作都要在当前视口可见。
+手机收银/巡检工作台属于高频全屏操作面：在宿主提供的可用高度内同时露出取景区、主要识别按钮、当前状态、核心结果和“最近识别”入口，不依赖页面纵向滚动才能完成一次识别；竖屏按采集/结果/最近记录三段紧凑分配，短横屏改为三列，且不得改变已验收的桌面布局。历史列表可以成为卡片内部的唯一滚动区。相机权限拒绝、数据库匹配中、数据库未命中、AI 等待、终态结果和恢复操作都要在当前视口可见，平台底部菜单和安全区不得遮挡按钮。
+
+桌面工作台使用宿主可用宽度，不再用固定窄版 `max-width`；采集、结果、最近记录同屏三栏。预览使用有界容器和 `object-fit: contain`，上传竖图或打开摄像头不能撑高整个页面。不要同时提供语义重复的底部“再次识别当前画面”和主操作按钮；保留一个清晰的“立即识别”，连续模式另提供暂停/继续。
 
 ## 交付顺序
 
@@ -141,6 +147,8 @@ var voted = await V8.Vision.Stabilize({
 
 - 禁止用 HTTP 200、构建成功、Mock UI、同一图片命中代替真实商品/人脸准确率。
 - 禁止把大模型标签伪装成数据库命中或权威身份。
+- 禁止把 AI 新鲜度、冰冻状态或估价伪装成传感器、检疫、食品安全结论或正式售价。
+- 禁止把历史识别的原始私有文件路径或永久公开 URL 返回前端，也禁止未经人工确认把 AI 结果自动沉淀为可信样本。
 - 禁止在接口参数中接受模型目录、任意本地路径、任意网络地址或执行提供程序。
 - 禁止把图片 Base64、原始人脸、向量、提示词、AI Key 写入 Hook 或普通日志。
 - 禁止用进程内队列、`static` 字典或本地文件作为 AI 任务完成事实源。
@@ -149,4 +157,4 @@ var voted = await V8.Vision.Stabilize({
 
 ## 验收输出
 
-最终报告至少分开列出：源码测试、5 表/字段/索引、7 菜单、5 引擎/4 事件、微服务源码与构建哈希、商城包与版本、框架制品、目标节点版本、真实浏览器、真实图片素材来源、数据库命中、AI 回退、人脸同意、模型准确率和未执行的物理设备测试。
+最终报告至少分开列出：源码测试、5 表/字段/索引、7 菜单、5 引擎/4 事件、微服务源码与构建哈希、商城包与版本、框架制品、目标节点版本、真实浏览器、PC/手机横竖屏布局、历史图片与纠错、真实图片素材来源、数据库命中、AI 回退、生鲜属性/价格来源、人脸同意、模型准确率和未执行的物理设备测试。
