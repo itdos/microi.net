@@ -216,12 +216,12 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
             root, "Microi.Server", "Microi.Core", "SaaSEngine", "ChanjetV2ProtocolGatewaySettings.cs"));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
-        var systemSettings = Assert.Single(package["DataSets"]!
-            .Children<JObject>()
-            .Where(item => string.Equals(
+        var systemSettings = Assert.Single(
+            package["DataSets"]!.Children<JObject>(),
+            item => string.Equals(
                 item.Value<string>("TableName"),
                 "mci_system_setting",
-                StringComparison.OrdinalIgnoreCase)));
+                StringComparison.OrdinalIgnoreCase));
         var settingRows = systemSettings["Rows"]!
             .Children<JObject>()
             .ToDictionary(row => row.Value<string>("ConfigKey")!, StringComparer.Ordinal);
