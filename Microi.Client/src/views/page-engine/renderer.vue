@@ -1,7 +1,13 @@
 <template>
     <div class="home" :class="{ 'is-embedded': isEmbedded }">
         <formRenderer v-if="remoteObj.Id" :remoteObj="remoteObj" />
-        <div v-else class="pe-page-skeleton">
+        <div v-else-if="loadError" class="pe-page-error">
+            <div class="pe-page-error__code">!</div>
+            <h2>首页加载失败</h2>
+            <p>{{ loadError }}</p>
+            <button type="button" @click="loadFormData">重新加载</button>
+        </div>
+        <div v-else-if="isLoading" class="pe-page-skeleton">
             <div class="pe-page-skeleton__header"></div>
             <div class="pe-page-skeleton__stats">
                 <span v-for="item in 4" :key="'stat-' + item"></span>
@@ -47,6 +53,8 @@ export default {
                 CanDesign: false,
                 IsEmbedded: false
             },
+            isLoading: true,
+            loadError: "",
             pageEngineStore: null
         };
     },
@@ -87,13 +95,16 @@ export default {
     },
     created: function () {
         //获取页面参数
-        this.pageid = this.$route.query.Id || this.$route.params?.Id || "";
+        var menuParams = new URLSearchParams(String(this.$route.meta?.UrlParam || ""));
+        this.pageid = this.$route.query.Id
+            || this.$route.query.id
+            || this.$route.params?.Id
+            || this.$route.params?.id
+            || menuParams.get("Id")
+            || menuParams.get("id")
+            || "";
         this.filePath = this.$route.query.filePath || this.$route.params?.filePath || "";
-        this.RoutePath = this.$route.fullPath;
-        let index = this.$route.fullPath.indexOf("?"); // 找到逗号的位置
-        if (index !== -1) {
-            this.RoutePath = this.$route.fullPath.slice(0, index); // 截断字符串
-        }
+        this.RoutePath = this.$route.path;
     },
     methods: {
         openPageDesigner(pageId) {
@@ -128,6 +139,9 @@ export default {
             window.dispatchEvent(new CustomEvent("microi:page-engine-design-context", { detail: detail }));
         },
         async loadFormData() {
+            this.isLoading = true;
+            this.loadError = "";
+            this.remoteObj.Id = "";
             // 使用 postMessage 发送数据给 iframe
             var _where = [];
             if (this.pageid) {
@@ -145,12 +159,25 @@ export default {
                 });
             }
             
-            var res = await DiyCommon.FormEngine.GetFormData({
+            var request = {
                 FormEngineKey: "mic_page",
                 _Where: _where
-            });
+            };
+            // 界面引擎也必须走当前菜单的只读授权，不能退化成 mic_page 表直连。
+            // 只为确实绑定 mic_page 的菜单传权限上下文，避免历史错误绑定影响其它界面引擎菜单。
+            var routeMeta = this.$route.meta || {};
+            var isPlatformHomeMenu = String(routeMeta.Id || "").toLowerCase() === "daa16941-afa8-4263-a77d-26a14b679bbd";
+            var isPageEngineMenu = String(routeMeta.DiyTableName || "").toLowerCase() === "mic_page";
+            if (routeMeta.Id && routeMeta.DiyTableId && (isPageEngineMenu || isPlatformHomeMenu)) {
+                request._SysMenuId = this.$route.meta.Id;
+            }
 
-            if (res.Code === 1 && res.Data) {
+            try {
+                var res = await DiyCommon.FormEngine.GetFormData(request);
+                if (!res || res.Code !== 1 || !res.Data) {
+                    this.loadError = (res && res.Msg) || "未找到可访问的首页配置，请联系管理员检查首页只读权限。";
+                    return;
+                }
                 var JsonObj = {};
                 this.pageid = res.Data.Id;
                 if (res.Data.JsonObj) {
@@ -172,6 +199,11 @@ export default {
                     IsEmbedded: this.isEmbedded
                 };
                 this.publishPageDesignContext();
+            } catch (error) {
+                console.error("[PageEngine] load failed:", error);
+                this.loadError = (error && error.message) || "首页数据请求异常，请稍后重试。";
+            } finally {
+                this.isLoading = false;
             }
         },
         registerEventListeners() {
@@ -301,6 +333,51 @@ body.pe-embedded-document #app {
     min-height: calc(100vh - 130px);
     padding: 12px;
     box-sizing: border-box;
+}
+
+.pe-page-error {
+    width: min(560px, calc(100% - 32px));
+    margin: 72px auto;
+    padding: 44px 32px;
+    text-align: center;
+    color: var(--el-text-color-regular, #606266);
+    background: var(--el-bg-color, #fff);
+    border: 1px solid var(--el-border-color-light, #ebeef5);
+    border-radius: 14px;
+    box-shadow: 0 12px 36px rgba(31, 45, 61, 0.08);
+}
+
+.pe-page-error__code {
+    width: 54px;
+    height: 54px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    color: var(--el-color-danger, #f56c6c);
+    background: var(--el-color-danger-light-9, #fef0f0);
+    font-size: 34px;
+    line-height: 54px;
+    font-weight: 700;
+}
+
+.pe-page-error h2 {
+    margin: 0 0 12px;
+    color: var(--el-text-color-primary, #303133);
+    font-size: 22px;
+}
+
+.pe-page-error p {
+    margin: 0 auto 24px;
+    line-height: 1.7;
+    word-break: break-word;
+}
+
+.pe-page-error button {
+    padding: 9px 22px;
+    color: #fff;
+    background: var(--el-color-primary, #409eff);
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
 }
 
 .pe-page-skeleton__header,
