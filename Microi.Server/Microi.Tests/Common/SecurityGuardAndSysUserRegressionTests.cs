@@ -399,7 +399,10 @@ public class SecurityGuardAndSysUserRegressionTests
         Assert.DoesNotContain("UPDATE sys_osclients SET FileUploadEnabled", migration);
         Assert.DoesNotContain("UPDATE sys_osclients SET DisableFileUpload", migration);
 
-        Assert.Equal("v7.8.25", package["PackageInfo"]?["Version"]?.Value<string>());
+        // 上传开关的资源合同从 v7.8.25 生效，后续无关功能升版不能导致该回归误报。
+        Assert.True(Version.TryParse(
+            package["PackageInfo"]?["Version"]?.Value<string>()?.TrimStart('v', 'V'),
+            out var packageVersion) && packageVersion >= new Version(7, 8, 25));
         var fields = package["DiyFields"]!.Values<JObject>().ToList();
         var disableField = fields.Single(item =>
             item["TableName"]?.Value<string>() == "sys_osclients"
