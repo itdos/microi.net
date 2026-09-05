@@ -1,4 +1,5 @@
 using Microi.net;
+using Newtonsoft.Json.Linq;
 
 namespace Dos.Common.Tests;
 
@@ -54,5 +55,106 @@ public class MicroiOfficeImportPreflightTests
     {
         Assert.Throws<ArgumentException>(() =>
             MicroiOffice.NormalizeImportIdempotencyKeyForTest(value));
+    }
+
+    [Fact]
+    public void PreflightFixedValues_AppliesWhitelistedBusinessField()
+    {
+        var fixedField = new JObject();
+        var hookResult = JObject.Parse("""
+            { "Code": 1, "Data": { "FixedValues": { "XiangmuID": "project-1" } } }
+            """);
+
+        var applied = MicroiOffice.ApplyImportPreflightFixedValuesForTest(
+            hookResult,
+            fixedField,
+            ImportFields());
+
+        Assert.Equal(new[] { "XiangmuID" }, applied);
+        Assert.Equal("project-1", fixedField["XiangmuID"]?.ToString());
+    }
+
+    [Fact]
+    public void PreflightFixedValues_CannotOverrideParentContext()
+    {
+        var fixedField = JObject.Parse("""{ "XiangmuID": "parent-project" }""");
+        var hookResult = JObject.Parse("""
+            { "Code": 1, "Data": { "FixedValues": { "XiangmuID": "other-project" } } }
+            """);
+
+        var error = Assert.Throws<Exception>(() =>
+            MicroiOffice.ApplyImportPreflightFixedValuesForTest(
+                hookResult,
+                fixedField,
+                ImportFields()));
+
+        Assert.Contains("覆盖既有固定上下文", error.Message);
+        Assert.Equal("parent-project", fixedField["XiangmuID"]?.ToString());
+    }
+
+    [Theory]
+    [InlineData("Id")]
+    [InlineData("CreateTime")]
+    [InlineData("UnknownField")]
+    public void PreflightFixedValues_RejectsProtectedOrUnknownFields(string fieldName)
+    {
+        var hookResult = new JObject
+        {
+            ["Code"] = 1,
+            ["Data"] = new JObject
+            {
+                ["FixedValues"] = new JObject { [fieldName] = "unsafe" }
+            }
+        };
+
+        Assert.Throws<Exception>(() =>
+            MicroiOffice.ApplyImportPreflightFixedValuesForTest(
+                hookResult,
+                new JObject(),
+                ImportFields()));
+    }
+
+    [Fact]
+    public void PreflightFixedValues_RejectsObjectValues()
+    {
+        var hookResult = JObject.Parse("""
+            { "Code": 1, "Data": { "FixedValues": { "XiangmuID": { "Id": "project-1" } } } }
+            """);
+
+        var error = Assert.Throws<Exception>(() =>
+            MicroiOffice.ApplyImportPreflightFixedValuesForTest(
+                hookResult,
+                new JObject(),
+                ImportFields()));
+
+        Assert.Contains("非空标量值", error.Message);
+    }
+
+    private static IReadOnlyList<JObject> ImportFields()
+    {
+        return new[]
+        {
+            new JObject
+            {
+                ["Name"] = "XiangmuID",
+                ["Label"] = "项目Id",
+                ["Type"] = "varchar(36)",
+                ["Component"] = "Text"
+            },
+            new JObject
+            {
+                ["Name"] = "Id",
+                ["Label"] = "Id",
+                ["Type"] = "varchar(36)",
+                ["Component"] = "Guid"
+            },
+            new JObject
+            {
+                ["Name"] = "CreateTime",
+                ["Label"] = "创建时间",
+                ["Type"] = "datetime",
+                ["Component"] = "DateTime"
+            }
+        };
     }
 }

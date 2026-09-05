@@ -4,7 +4,7 @@ import { set_sidebar } from "../../en/guide/set_sidebar.mts";
 export const en = defineConfig({
 	base: "/en",
 	title: "Microi吾码",
-	lang: "en_US",
+	lang: "en-US",
 	description: "Microi吾码 官方文档",
 	head: [
 		["meta", { name: "author", content: "Microi风闲,Anderson. ᴹⁱᶜʳᵒⁱ" }],

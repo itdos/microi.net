@@ -348,10 +348,14 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.Contains("EnsureConfiguredMainTenantReadyAsync", apiHost);
         Assert.Contains("EnsureMainTenantReadyAsync(clientModel", startupGate);
         Assert.Contains("EnsureStartupDependenciesAsync(mainTenant", startupGate);
-        Assert.Contains("EnsureStartupDependenciesUnderLeaseAsync", coordinator);
+        var versionChain = File.ReadAllText(Path.Combine(serverRoot, "Microi.Upgrade", "Upgrade.cs"));
+        Assert.Contains("EnsureRuntimePhysicalPrerequisitesAsync", coordinator);
+        Assert.Contains("EnsureStartupDependenciesUnderLeaseAsync", versionChain);
+        Assert.Contains("EnsureMarketplaceMetadataBootstrapUnderLeaseAsync", versionChain);
         Assert.DoesNotContain("【自动升级状态】", program);
         Assert.Contains("【自动升级状态】", startupGate);
-        Assert.Contains("【自动升级状态】", coordinator);
+        Assert.Contains("UpgradeProgress.WriteLine", coordinator);
+        Assert.Contains("【自动升级状态】", File.ReadAllText(Path.Combine(serverRoot, "Microi.Upgrade", "UpgradeProgress.cs")));
     }
 
     [Fact]
@@ -711,7 +715,7 @@ public class PlatformRuntimeUpgradeGateTests
 
         Assert.True(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.message-notification.json", package })));
-        Assert.Equal("v1.0.15", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("v1.0.16", package["PackageInfo"]?["Version"]?.ToString());
         Assert.Equal(string.Empty, expectedHook.Invoke(
             null, new object[] { "platform-chat-system-message" }));
         Assert.Equal("platform-message-notification-custom-hook", expectedHook.Invoke(

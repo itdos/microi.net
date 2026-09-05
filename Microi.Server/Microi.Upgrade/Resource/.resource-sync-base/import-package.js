@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.7.4
+ * Version: v2.7.13
  * Function:
  * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
  */
@@ -119,8 +119,13 @@ function ensureGeneratedEntityPhysicalPrerequisites(maxChangedTables) {
         }
         return map;
     }
-    function ensureTableColumns(tableName, definitions, allowWrite) {
+    function ensureTableColumns(tableName, definitions, allowWrite, createInPackageDdl) {
         var existing = readColumns(tableName);
+        // ABSENT_PACKAGE_TABLE_DEFER_DDL_V1: first-time installations do not yet
+        // have sys_microistore. Its owning package creates it in the DDL phase;
+        // ALTER before CREATE would abort every legacy tenant without a store.
+        if (createInPackageDdl && Object.keys(existing).length == 0)
+            return { Missing: 0, Written: false };
         var pendingDefinitions = [];
         for (var definitionIndex = 0; definitionIndex < definitions.length; definitionIndex++) {
             var definition = definitions[definitionIndex];
@@ -232,6 +237,7 @@ function ensureGeneratedEntityPhysicalPrerequisites(maxChangedTables) {
             // MARKETPLACE_HDFS_PACKAGE_POINTER_SCHEMA_V1：商城包安装前一次性补齐
             // 内容指针列；MySQL 会合并为单条 ALTER，避免大表逐列重建八次。
             TableName: 'sys_microistore',
+            CreateInPackageDdl: true,
             Definitions: [
                 ['PackageId', textType(50)], ['PackageStorageMode', textType(50)],
                 ['PackageHdfsPath', textType(2000)], ['PackageSha256', textType(100)],
@@ -248,7 +254,8 @@ function ensureGeneratedEntityPhysicalPrerequisites(maxChangedTables) {
         var prerequisiteResult = ensureTableColumns(
             prerequisiteTable.TableName,
             prerequisiteTable.Definitions,
-            changedTableCount < maxChangedTables
+            changedTableCount < maxChangedTables,
+            prerequisiteTable.CreateInPackageDdl === true
         );
         if (prerequisiteResult.Missing < 1) continue;
         if (prerequisiteResult.Written) changedTableCount++;
@@ -284,6 +291,7 @@ var physicalBootstrapOwnsSlice = physicalBootstrapChunkingEnabled
     && !startupDependencyBootstrapOnlyRequested
     && (!physicalBootstrapPhase || physicalBootstrapPhase == 'Prerequisites');
 var activeImportStage = '物理前置检查';
+var activeImportResource = '';
 
 try {
     var generatedEntityPhysicalBootstrap = ensureGeneratedEntityPhysicalPrerequisites(
@@ -336,6 +344,7 @@ try {
 } catch (physicalBootstrapError) {
     return {
         Code: 0,
+        Data: { '失败阶段': '物理前置检查' },
         Msg: '应用安装前置物理结构自检失败：'
             + (physicalBootstrapError && physicalBootstrapError.message
                 ? physicalBootstrapError.message
@@ -578,6 +587,9 @@ var applicationAssetChunkUploads = 0;
 var applicationAssetChunkBase64Chars = 0;
 var applicationAssetPreviouslyUploaded = parseInt(backgroundCheckpoint.ApplicationAssetUploaded || 0, 10);
 if (isNaN(applicationAssetPreviouslyUploaded)) applicationAssetPreviouslyUploaded = 0;
+// BACKGROUND_ASSET_RESUME_REQUIRED_V1：每片都会从包头重建运行清单，必须按
+// 已持久化文件摘要复用前片资产；禁用复用会使单文件分片永久重传第一项。
+if (backgroundChunkingEnabled) resumeInstall = true;
 
 var applicationAssetContentLength = function (file) {
     file = file || {};
@@ -599,8 +611,25 @@ var markApplicationAssetUploaded = function (file) {
     applicationAssetChunkBase64Chars += applicationAssetContentLength(file);
 };
 
-var buildApplicationAssetContinuation = function (bundleIndex, assetKind, assetIndex, totalAssets) {
+var buildApplicationAssetContinuation = function (bundleIndex, assetKind, assetIndex, totalAssets, completedAssets) {
     var uploaded = applicationAssetPreviouslyUploaded + applicationAssetChunkUploads;
+    // APPLICATION_ASSET_DISTINCT_PROGRESS_V1：上传尝试次数可能包含旧任务的重复
+    // 重传，不能作为完成数。以本片已验证并写入的文件位置报告真实进度。
+    var completed = Math.max(0, Number(completedAssets === undefined ? assetIndex : completedAssets) || 0);
+    var total = Math.max(0, Number(totalAssets) || 0);
+    if (total > 0) completed = Math.min(completed, total);
+    // APPLICATION_ASSET_NO_PROGRESS_GUARD_V1：摘要/元数据异常不能伪装成无限
+    // 成功分片；允许短暂修复，连续三片停在同一持久位置时保留检查点并报错。
+    var sameCursor = String(backgroundCheckpoint.Phase || '') == 'ApplicationAssets'
+        && Number(backgroundCheckpoint.BundleIndex || 0) == bundleIndex
+        && String(backgroundCheckpoint.AssetKind || '') == assetKind
+        && Number(backgroundCheckpoint.AssetIndex || 0) == assetIndex;
+    var stalledSlices = sameCursor ? Math.max(0, Number(backgroundCheckpoint.ApplicationAssetStalledSlices) || 0) + 1 : 0;
+    if (stalledSlices >= 3) {
+        throw new Error('APPLICATION_ASSET_NO_PROGRESS：应用资产连续三片未推进，已停止重复上传。'
+            + ' BundleIndex=' + bundleIndex + '，AssetKind=' + assetKind + '，AssetIndex=' + assetIndex
+            + '；请核对 mci_ai_app_file 的 AppId/FilePath/ContentHash/Size/HdfsPath 与目标租户运行文件摘要及存储权限。');
+    }
     return {
         Code: 1,
         Data: {
@@ -611,12 +640,15 @@ var buildApplicationAssetContinuation = function (bundleIndex, assetKind, assetI
                     AssetKind: assetKind,
                     AssetIndex: assetIndex,
                     ApplicationAssetUploaded: uploaded,
+                    ApplicationAssetCompleted: completed,
+                    ApplicationAssetStalledSlices: stalledSlices,
                     Progress: 65
                 }),
-                Current: uploaded,
-                Total: totalAssets > 0 ? totalAssets : null,
+                Current: completed,
+                Total: total > 0 ? total : null,
                 Progress: 65,
-                Msg: '应用资产已完成一个安全分片，将从持久化检查点继续'
+                Msg: '应用资产已验证 ' + completed + (total > 0 ? '/' + total : '')
+                    + '，将从持久化检查点继续（应用 ' + (bundleIndex + 1) + '，' + assetKind + '，索引 ' + assetIndex + '）'
             }
         },
         Msg: '应用资产分片已提交，后台任务将自动继续'
@@ -2029,18 +2061,25 @@ try {
 
     // 安装包是跨租户资产：HTML 中的发布端 ApiBase/OsClient 不能原样带到目标环境。
     // 每次安装都按目标租户重写运行时上下文，因此公开入口无需查询参数。
-    var rewriteApplicationRuntimeContext = function (rootPath, relativePath, base64) {
+    var rewriteApplicationRuntimeContext = function (rootPath, relativePath, base64, serverHostedInline) {
         if (!/^(ai-app-publish|micro-app)\//i.test(String(rootPath || '')) || !/\.html?$/i.test(String(relativePath || ''))) {
             return base64;
         }
         var apiBase = firstTextParam([V8.SysConfig && V8.SysConfig.ApiBase]).replace(/\/+$/g, '');
-        if (!apiBase) throw new Error('SysConfig.ApiBase不能为空，无法写入应用运行时上下文');
+        if (!apiBase && serverHostedInline !== true) throw new Error('SysConfig.ApiBase不能为空，无法写入应用运行时上下文');
         var contextJson = JSON.stringify({ ApiBase: apiBase, OsClient: String(V8.OsClient || '') })
             .replace(/</g, '\\u003c')
             .replace(/\u2028/g, '\\u2028')
             .replace(/\u2029/g, '\\u2029');
         var html = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(String(base64 || '')));
-        var runtimeScript = '<script data-microi-runtime-context="true">(function(){var c=' + contextJson + ';window.__MICROI_APP_CONTEXT__=Object.assign({},window.__MICROI_APP_CONTEXT__||{},c);window.MICROI_API_BASE=c.ApiBase;window.MICROI_OS_CLIENT=c.OsClient;})();<\/script>';
+        // DATABASE_INLINE_SERVING_API_CONTEXT_V1: an old tenant may predate the
+        // ApiBase field. DatabaseOnly microservices are served by this API, so
+        // their actual entry URL determines the endpoint (including /v2 proxies).
+        // Public HDFS HTML still requires an explicitly configured ApiBase.
+        var resolveServingApi = !apiBase && serverHostedInline === true
+            ? 'var u=new URL(window.__MICRO_APP_PUBLIC_PATH__||window.location.href);var p=u.pathname.indexOf("/micro-app/");if(p<0||!/^https?:$/.test(u.protocol))throw new Error("无法识别内置应用的API服务地址");c.ApiBase=u.origin+u.pathname.substring(0,p);'
+            : '';
+        var runtimeScript = '<script data-microi-runtime-context="true">(function(){var c=' + contextJson + ';' + resolveServingApi + 'window.__MICROI_APP_CONTEXT__=Object.assign({},window.__MICROI_APP_CONTEXT__||{},c);window.MICROI_API_BASE=c.ApiBase;window.MICROI_OS_CLIENT=c.OsClient;})();<\/script>';
         var existing = /<script\b[^>]*data-microi-runtime-context=["']true["'][^>]*>[\s\S]*?<\/script>/i;
         if (existing.test(html)) html = html.replace(existing, runtimeScript);
         else {
@@ -2353,12 +2392,16 @@ try {
     var getApplicationRow = function (tableName, rowId, where) {
         if (rowId) {
             var existingById = V8.FormEngine.GetFormData(tableName, { Id: rowId, _PageSize: 1 });
+            if (!existingById || (existingById.Code != 1 && existingById.Code != 2))
+                throw new Error('读取应用资源失败：' + tableName + '；' + ((existingById && existingById.Msg) || '接口无返回'));
             if (existingById && existingById.Code == 1 && existingById.Data && existingById.Data.Id) {
                 return existingById.Data;
             }
         }
         if (!where || !where.length) return null;
         var existingByWhere = V8.FormEngine.GetFormData(tableName, { _Where: where, _PageSize: 1 });
+        if (!existingByWhere || (existingByWhere.Code != 1 && existingByWhere.Code != 2))
+            throw new Error('读取应用资源失败：' + tableName + '；' + ((existingByWhere && existingByWhere.Msg) || '接口无返回'));
         return existingByWhere && existingByWhere.Code == 1 && existingByWhere.Data && existingByWhere.Data.Id
             ? existingByWhere.Data
             : null;
@@ -2366,6 +2409,7 @@ try {
 
     var upsertApplicationRow = function (tableName, where, row) {
         row = row || {};
+        if (tableName == 'mci_ai_app_file') return persistApplicationAsset(row);
         var existing = getApplicationRow(tableName, row.Id, where);
         if (existing && existing.Id) {
             row.Id = existing.Id;
@@ -2378,35 +2422,162 @@ try {
         }, 'app_add_' + tableName + '_' + (row.Id || 'new'));
     };
 
+    // APPLICATION_ASSET_CURRENT_ROWS_V1：同一路径可同时有当前、暂存、归档文件。
+    // 源码流发布以空 VersionId 表示当前文件；不可把暂存/历史版本用于续传、更新或清理。
+    // 恢复列表与写入必须采用同一主库、同一范围和排序，不能列表取旧行而更新新行。
+    var applicationAssetCurrentPredicate = function () {
+        return '(' + quotePhysicalIdentifier('VersionId') + ' IS NULL OR '
+            + quotePhysicalIdentifier('VersionId') + " = '') AND LOWER(COALESCE("
+            + quotePhysicalIdentifier('StorageScope') + ", '')) NOT IN ('privatesourcestaged','privatesourcearchived')";
+    };
+    var readCurrentApplicationAssetRows = function (appId, filePath, includeDeleted) {
+        var columns = ['Id', 'AppId', 'FilePath', 'HdfsPath', 'PublishHdfsPath', 'StorageScope', 'ContentHash', 'Size', 'VersionId', 'IsDeleted'];
+        var projection = [];
+        for (var columnIndex = 0; columnIndex < columns.length; columnIndex++) {
+            var quotedColumn = quotePhysicalIdentifier(columns[columnIndex]);
+            // 旧 MySQL CHAR(36) 会被 Connector/NET 自动按 Guid 物化；ULID 也是合法
+            // 平台标识，读取身份列时显式投影为文本，兼容从旧资产检查点直接恢复。
+            if (/^(Id|AppId|VersionId)$/.test(columns[columnIndex])) {
+                projection.push((runtimeIsSqlServer ? 'CAST(' + quotedColumn + ' AS nvarchar(128))'
+                    : (runtimeIsOracle ? 'CAST(' + quotedColumn + ' AS VARCHAR2(128))'
+                    : 'CONCAT(' + quotedColumn + ", '')")) + ' AS ' + quotedColumn);
+            } else projection.push(quotedColumn);
+        }
+        var sql = 'SELECT ' + (runtimeIsSqlServer ? 'TOP (20001) ' : '') + projection.join(',')
+            + ' FROM ' + quotePhysicalIdentifier('mci_ai_app_file')
+            + ' WHERE ' + quotePhysicalIdentifier('AppId') + '=@p0 AND ' + applicationAssetCurrentPredicate();
+        if (!includeDeleted) sql += ' AND COALESCE(' + quotePhysicalIdentifier('IsDeleted') + ',0)=0';
+        if (filePath !== undefined) sql += ' AND LOWER(' + quotePhysicalIdentifier('FilePath') + ')=LOWER(@p1)';
+        sql += ' ORDER BY COALESCE(' + quotePhysicalIdentifier('IsDeleted') + ',0) ASC,'
+            + 'CASE WHEN ' + quotePhysicalIdentifier('UpdateTime') + ' IS NULL AND '
+            + quotePhysicalIdentifier('CreateTime') + ' IS NULL THEN 1 ELSE 0 END ASC,'
+            + 'COALESCE(' + quotePhysicalIdentifier('UpdateTime') + ',' + quotePhysicalIdentifier('CreateTime') + ') DESC,'
+            + quotePhysicalIdentifier('Id') + ' ASC';
+        if (!runtimeIsSqlServer) sql += runtimeIsOracle ? ' FETCH FIRST 20001 ROWS ONLY' : ' LIMIT 20001';
+        var query = (V8.DbTrans || V8.Db).FromSql(sql).AddInParameter('@p0', appId);
+        if (filePath !== undefined) query = query.AddInParameter('@p1', filePath);
+        var rows = query.ToArray();
+        if (!rows || rows.length === undefined || rows.length > 20000) {
+            throw new Error('APPLICATION_ASSET_METADATA_READ_FAILED：当前应用文件元数据返回格式错误或超过20000条，AppId=' + appId);
+        }
+        return rows;
+    };
+
     var loadExistingApplicationAssets = function (appId) {
-        var existingApplicationAssets = {};
+        var existingApplicationAssets = Object.create(null);
         if (!resumeInstall || !appId) return existingApplicationAssets;
-        var result = V8.FormEngine.GetTableData('mci_ai_app_file', {
-            _Where: [['AppId', '=', appId]],
-            _SelectFields: ['Id', 'FilePath', 'HdfsPath', 'PublishHdfsPath', 'StorageScope', 'ContentHash', 'Size'],
-            _PageIndex: 1,
-            _PageSize: 20000
-        });
-        var rows = result && result.Code == 1 && result.Data ? result.Data : [];
+        // APPLICATION_ASSET_METADATA_READ_REQUIRED_V1：读取失败不能当作没有文件，
+        // 否则每片都会重复上传已提交对象，并把元数据故障伪装成安装进度。
+        var rows;
+        try { rows = readCurrentApplicationAssetRows(appId); }
+        catch (readError) {
+            throw new Error('APPLICATION_ASSET_METADATA_READ_FAILED：读取应用断点文件元数据失败，AppId='
+                + appId + '；' + String(readError && readError.message || readError));
+        }
         for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
             var row = rows[rowIndex] || {};
             var path = normalizeApplicationPath(row.FilePath);
-            if (path) existingApplicationAssets[path.toLowerCase()] = row;
+            // 新行在前，只保留第一次命中，旧重复行不能覆盖刚验证的当前行。
+            if (path && !existingApplicationAssets[path.toLowerCase()]) existingApplicationAssets[path.toLowerCase()] = row;
         }
         return existingApplicationAssets;
     };
 
-    var reuseApplicationAsset = function (existingApplicationAssets, filePath, file) {
+    var applicationAssetHasPathHash = null;
+    var persistApplicationAsset = function (row) {
+        // APPLICATION_ASSET_PRIMARY_WRITE_READBACK_V1：这是安装器自有的文件协议元数据。
+        // 普通 FormEngine 在旧字段缓存下会静默丢弃未识别字段，且默认从库读可能滞后；
+        // 固定表/列白名单以当前租户主库事务写入并回读。默认每片一文件，最多50个，
+        // 查询只发生在实际写入时；不修改其它应用、暂存版本、历史记录或租户配置。
+        var appId = String(row.AppId || '');
+        var filePath = normalizeApplicationPath(row.FilePath);
+        if (!appId || !filePath || !row.HdfsPath || !row.ContentHash) {
+            throw new Error('APPLICATION_ASSET_METADATA_INVALID：应用文件缺少身份、路径或摘要：' + filePath);
+        }
+        var existingRows = readCurrentApplicationAssetRows(appId, filePath, true);
+        var existing = existingRows.length ? existingRows[0] : null;
+        var rowId = existing ? String(existing.Id) : String(V8.EncryptHelper.MD5Encrypt(
+            'marketplace-file:' + String(V8.OsClient || '').toLowerCase() + ':' + appId.toLowerCase() + ':' + filePath.toLowerCase())).toLowerCase();
+        var now = DateNow('yyyy-MM-dd HH:mm:ss');
+        var data = {
+            AppId: appId, AppName: row.AppName || '', FilePath: filePath,
+            FileName: row.FileName || applicationFileName(filePath), FileType: row.FileType || applicationFileType(filePath),
+            HdfsPath: String(row.HdfsPath), PublishHdfsPath: row.PublishHdfsPath || null,
+            StorageScope: row.StorageScope || 'Private', ContentHash: String(row.ContentHash).toLowerCase(),
+            Size: Number(row.Size || 0), IsDirectory: 0, Version: Number(row.Version || 1),
+            VersionId: null, IsDeleted: 0, UpdateTime: now
+        };
+        if (applicationAssetHasPathHash === null) {
+            applicationAssetHasPathHash = false;
+            var physicalColumns = runtimeIsOracle
+                ? V8.Db.FromSql('SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME=UPPER(@p0)').AddInParameter('@p0', 'mci_ai_app_file').ToArray()
+                : readTargetPhysicalColumns('mci_ai_app_file');
+            for (var physicalIndex = 0; physicalIndex < physicalColumns.length; physicalIndex++) {
+                if (String(getPhysicalValue(physicalColumns[physicalIndex], ['COLUMN_NAME', 'ColumnName', 'Name']) || '').toLowerCase() == 'filepathhash') applicationAssetHasPathHash = true;
+            }
+        }
+        if (applicationAssetHasPathHash) data.FilePathHash = applicationFileSha256Base64(V8.Base64.StringToBase64(filePath));
+        if (!existing) {
+            data.Id = rowId;
+            data.CreateTime = now;
+            data.UserId = installUser.Id || '';
+            data.UserName = installUser.Name || installUser.Account || '';
+        }
+        var names = Object.keys(data), assignments = [], values = [], quotedNames = [];
+        for (var fieldIndex = 0; fieldIndex < names.length; fieldIndex++) {
+            quotedNames.push(quotePhysicalIdentifier(names[fieldIndex]));
+            assignments.push(quotePhysicalIdentifier(names[fieldIndex]) + '=@p' + fieldIndex);
+            values.push('@p' + fieldIndex);
+        }
+        var sql = existing
+            ? 'UPDATE ' + quotePhysicalIdentifier('mci_ai_app_file') + ' SET ' + assignments.join(',')
+                + ' WHERE ' + quotePhysicalIdentifier('Id') + '=@id AND ' + quotePhysicalIdentifier('AppId') + '=@appId AND ' + applicationAssetCurrentPredicate()
+            : 'INSERT INTO ' + quotePhysicalIdentifier('mci_ai_app_file') + ' (' + quotedNames.join(',') + ') VALUES (' + values.join(',') + ')';
+        var query = (V8.DbTrans || V8.Db).FromSql(sql);
+        for (var parameterIndex = 0; parameterIndex < names.length; parameterIndex++) query = query.AddInParameter('@p' + parameterIndex, data[names[parameterIndex]]);
+        if (existing) query = query.AddInParameter('@id', rowId).AddInParameter('@appId', appId);
+        query.ExecuteNonQuery();
+        var verifiedRows = readCurrentApplicationAssetRows(appId, filePath);
+        var verified = null;
+        for (var verifyIndex = 0; verifyIndex < verifiedRows.length; verifyIndex++) {
+            if (String(verifiedRows[verifyIndex].Id) == rowId) { verified = verifiedRows[verifyIndex]; break; }
+        }
+        if (!verified || String(verified.ContentHash || '').toLowerCase() != data.ContentHash
+            || Number(verified.Size) != data.Size || String(verified.HdfsPath || '') != data.HdfsPath) {
+            throw new Error('APPLICATION_ASSET_METADATA_WRITE_VERIFY_FAILED：写入文件元数据后主库回读不一致，AppId='
+                + appId + '，FilePath=' + filePath + '，Id=' + rowId + '；检查点未推进。');
+        }
+        row.Id = rowId;
+        return { Code: 1, Data: verified };
+    };
+
+    var reuseApplicationAsset = function (existingApplicationAssets, filePath, file, runtimeRoot) {
         if (!resumeInstall) return null;
         var normalizedPath = normalizeApplicationPath(filePath);
         var existing = existingApplicationAssets[normalizedPath.toLowerCase()];
         if (!existing || !existing.Id || !existing.HdfsPath) return null;
         var expectedHash = firstTextParam([file && file.Sha256, file && file.Hash, file && file.ContentHash]).toLowerCase();
         var actualHash = firstTextParam([existing.ContentHash]).toLowerCase();
-        if (expectedHash && actualHash != expectedHash) return null;
         var expectedSize = Number((file && file.Size) || 0);
+        // RUNTIME_CONTEXT_ASSET_RESUME_V1：入口 HTML 上传前会写入目标租户上下文，
+        // 因此落库的是改写后字节的摘要。恢复时必须做同样的改写后再比较，不能拿
+        // 发布端包内摘要反复否定刚上传的文件；源码及非 HTML 保持原摘要口径。
+        if (runtimeRoot && /\.html?$/i.test(String(file && (file.Path || file.FilePath || file.RelativePath || file.FileName) || ''))) {
+            var packagedBase64 = firstTextParam([file && file.FileByteBase64, file && file.ContentBase64, file && file.Base64]);
+            if (!packagedBase64 && file && file.Content !== undefined && file.Content !== null) {
+                packagedBase64 = V8.Base64.StringToBase64(String(file.Content));
+            }
+            if (!packagedBase64) return null;
+            var runtimePath = normalizeApplicationPath(file.Path || file.FilePath || file.RelativePath || file.FileName);
+            var rewrittenBase64 = rewriteApplicationRuntimeContext(runtimeRoot, runtimePath, packagedBase64);
+            if (rewrittenBase64 != packagedBase64 || !expectedHash) {
+                expectedHash = applicationFileSha256Base64(rewrittenBase64);
+                expectedSize = base64DecodedSize(rewrittenBase64);
+            }
+        }
+        if (expectedHash && actualHash != expectedHash) return null;
         var actualSize = Number(existing.Size || 0);
-        if (!expectedHash && expectedSize > 0 && actualSize != expectedSize) return null;
+        if (expectedSize > 0 && actualSize != expectedSize) return null;
         if (!expectedHash && expectedSize <= 0) return null;
         return {
             Path: normalizedPath,
@@ -2614,7 +2785,13 @@ try {
         }
         var appKey = firstTextParam([app.AppKey, app.MsKey, V8.Param.AppId, Package.PackageInfo.AppId]);
         if (!appKey) throw new Error('ApplicationBundle.Application.AppKey 不能为空');
-        var appId = firstTextParam([app.Id, bundle.AppId, V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid()]);
+        // APPLICATION_ASSET_STABLE_APP_ID_V1：省略应用 Id 的旧包在文件上传结束后
+        // 才写商城主行，前面的每个分片必须得到同一 Id，才能找到已提交的文件。
+        var appId = firstTextParam([app.Id, bundle.AppId]);
+        if (!appId) {
+            appId = String(V8.EncryptHelper.MD5Encrypt('marketplace-application:'
+                + String(V8.OsClient || '').toLowerCase() + ':' + appKey.toLowerCase())).toLowerCase();
+        }
         var appName = firstTextParam([app.Name, app.MsName, Package.PackageInfo.Name, appKey]);
         var existingApp = getApplicationRow('sys_microistore', appId, [['AppKey', '=', appKey]]);
         var preserveExistingNativeMenus = !!(existingApp && existingApp.Id);
@@ -2651,6 +2828,7 @@ try {
         for (var i = 0; i < sourceFiles.length; i++) {
             var sourceFile = sourceFiles[i] || {};
             var sourcePath = normalizeApplicationPath(sourceFile.Path || sourceFile.FilePath || sourceFile.RelativePath || sourceFile.FileName);
+            activeImportResource = appKey + ':Source:' + sourcePath;
             expectedApplicationPaths[sourcePath.toLowerCase()] = true;
             var sourceUpload = reuseApplicationAsset(existingApplicationAssets, sourcePath, sourceFile);
             if (!sourceUpload) {
@@ -2809,6 +2987,7 @@ try {
         for (var b = 0; b < buildAssets.length; b++) {
             var buildFile = buildAssets[b] || {};
             var buildRelativePath = normalizeApplicationPath(buildFile.Path || buildFile.FilePath || buildFile.RelativePath || buildFile.FileName);
+            activeImportResource = appKey + ':Build:' + buildRelativePath;
             var buildMetadataPath = 'dist/' + buildRelativePath;
             if (!useDatabaseOnlyBuild) expectedApplicationPaths[buildMetadataPath.toLowerCase()] = true;
             var runtimeBuildBase64 = '';
@@ -2820,11 +2999,11 @@ try {
                 if (!runtimeBuildBase64) {
                     throw new Error('DB运行模式缺少内嵌编译内容：' + buildRelativePath);
                 }
-                runtimeBuildBase64 = rewriteApplicationRuntimeContext(buildRoot, buildRelativePath, runtimeBuildBase64);
+                runtimeBuildBase64 = rewriteApplicationRuntimeContext(buildRoot, buildRelativePath, runtimeBuildBase64, useDatabaseOnlyBuild);
             }
             var buildUpload = useDatabaseOnlyBuild
                 ? null
-                : reuseApplicationAsset(existingApplicationAssets, buildMetadataPath, buildFile);
+                : reuseApplicationAsset(existingApplicationAssets, buildMetadataPath, buildFile, buildRoot);
             var buildWasReused = !!buildUpload;
             // MOVE_OBJECT_UNAVAILABLE_RESUME_V1：部分历史节点能够上传并读取公有对象，
             // 但尚未实现 MoveObject，或存储账号只有 Put/Get 而没有 Move/Delete 权限。
@@ -2864,7 +3043,7 @@ try {
                 stats.ApplicationBuildAssetsReused++;
             } else {
                 if (shouldContinueApplicationAssets(buildFile)) {
-                    return buildApplicationAssetContinuation(bundleIndex, 'Build', b, totalBundleAssets);
+                    return buildApplicationAssetContinuation(bundleIndex, 'Build', b, totalBundleAssets, sourceFiles.length + b);
                 }
                 buildUpload = uploadApplicationAsset(buildRoot, buildFile, false);
                 markApplicationAssetUploaded(buildFile);
@@ -2884,7 +3063,7 @@ try {
             if (!useDatabaseOnlyBuild && buildWasReused
                 && !buildUsesPersistedMoveFallback && !buildPathRepaired) {
                 if (shouldContinueApplicationAssets(buildFile)) {
-                    return buildApplicationAssetContinuation(bundleIndex, 'BuildRepair', b, totalBundleAssets);
+                    return buildApplicationAssetContinuation(bundleIndex, 'BuildRepair', b, totalBundleAssets, sourceFiles.length + b);
                 }
                 buildUpload = uploadApplicationAsset(buildRoot, buildFile, false);
                 markApplicationAssetUploaded(buildFile);
@@ -3054,13 +3233,12 @@ try {
             debugLog['database_only_pointer_reset_' + appKey] = '已清理跨租户 v3 pointer，并切换为本租户数据库运行时';
         }
         if (sourceExpected) {
-            var installedSources = V8.FormEngine.GetTableData('mci_ai_app_file', {
-                _Where: [['AppId', '=', appId], ['AND', 'StorageScope', '=', 'Private']],
-                _SelectFields: ['Id'],
-                _PageIndex: 1,
-                _PageSize: 1
-            });
-            if (!installedSources || installedSources.Code != 1 || !installedSources.Data || !installedSources.Data.length) {
+            var installedSources = readCurrentApplicationAssetRows(appId);
+            var installedPrivateSourceCount = 0;
+            for (var sourceCheckIndex = 0; sourceCheckIndex < installedSources.length; sourceCheckIndex++) {
+                if (String(installedSources[sourceCheckIndex].StorageScope || '').toLowerCase() == 'private') installedPrivateSourceCount++;
+            }
+            if (!installedPrivateSourceCount) {
                 throw new Error('私有源码写入后回读为空，已停止安装，请检查目标租户私有 HDFS 配置。');
             }
         }
@@ -3964,6 +4142,35 @@ try {
 
     restorePersistentIdMaps();
     rebuildLegacyCheckpointIdMaps();
+
+    // DATASET_TABLE_PREFLIGHT_V1：旧包允许显式复用目标已安装的表；目标缺表时
+    // 必须在 DDL/字段/接口写入之前发现资源缺口，禁止耗时安装到最后才失败。
+    var validateDataSetTablePrerequisites = function () {
+        var dataSets = Package.DataSets || [];
+        if (typeof dataSets == 'string') dataSets = JSON.parse(dataSets || '[]');
+        for (var dataSetIndex = 0; dataSetIndex < dataSets.length; dataSetIndex++) {
+            var targetName = String(dataSets[dataSetIndex].TableName || '');
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(targetName)) throw new Error('数据集目标表名无效：' + targetName);
+            var declaredTable = false;
+            var declaredDdl = false;
+            for (var tableIndex = 0; tableIndex < (Package.DiyTables || []).length; tableIndex++) {
+                if (String(Package.DiyTables[tableIndex].Name || '').toLowerCase() == targetName.toLowerCase()) declaredTable = true;
+            }
+            for (var ddlIndex = 0; ddlIndex < (Package.DDLStatements || []).length; ddlIndex++) {
+                var definition = Package.DDLStatements[ddlIndex];
+                if (String(definition.TableName || '').toLowerCase() == targetName.toLowerCase()
+                    && /\bCREATE\s+TABLE\b/i.test(String(definition.DDL || ''))) declaredDdl = true;
+            }
+            if (declaredTable && declaredDdl) continue;
+            var query = runtimeIsSqlServer
+                ? 'SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG=DB_NAME() AND LOWER(TABLE_NAME)=LOWER(@p0)'
+                : 'SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LOWER(TABLE_NAME)=LOWER(@p0)';
+            if (runtimeIsOracle) query = 'SELECT TABLE_NAME FROM USER_TABLES WHERE LOWER(TABLE_NAME)=LOWER(@p0)';
+            var existing = V8.Db.FromSql(query).AddInParameter('@p0', targetName).ToArray();
+            if (!existing || existing.length == 0) throw new Error('数据集依赖预检失败：目标表 ' + targetName + ' 尚未创建，应用包必须补齐表定义和建表资源后重新发布。');
+        }
+    };
+    validateDataSetTablePrerequisites();
 
     // ==================== 步骤0：执行DDL创建表和字段 ====================
     activeImportStage = '步骤0-物理表与DDL';
@@ -4930,6 +5137,20 @@ try {
         return map;
     };
 
+    // UNUSED_WORKFLOW_PHYSICAL_SCHEMA_V1：旧导出器无条件附带工作流物理列。
+    // 没有工作流资源或显式表依赖的包不能修改这些可选插件表，更不能要求它们已安装。
+    var isUnusedWorkflowPhysicalSchema = function (tableName) {
+        var name = String(tableName || '').toLowerCase();
+        if (['wf_flowdesign', 'wf_node', 'wf_line'].indexOf(name) < 0) return false;
+        if ((Package.WfFlowDesigns || []).length || (Package.WfNodes || []).length || (Package.WfLines || []).length) return false;
+        var resources = (Package.DiyTables || []).concat(Package.DDLStatements || [], Package.DataSets || [], Package.SysMenus || []);
+        for (var index = 0; index < resources.length; index++) {
+            var resource = resources[index] || {};
+            if (String(resource.TableName || resource.DiyTableName || resource.Name || '').toLowerCase() == name) return false;
+        }
+        return true;
+    };
+
     var groupPackagePhysicalColumns = function (columns, tableFilterMap) {
         var grouped = {};
         columns = columns || [];
@@ -4940,6 +5161,7 @@ try {
             if (!tableName || !columnName || !isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) continue;
 
             var tableKey = String(tableName).toLowerCase();
+            if (isUnusedWorkflowPhysicalSchema(tableKey)) continue;
             if (tableFilterMap && !tableFilterMap[tableKey]) continue;
             if (!grouped[tableKey]) {
                 grouped[tableKey] = {
@@ -5408,6 +5630,73 @@ try {
         throw new Error('SQL Server 暂不支持的应用包 DDL：' + String(ddlItem.DDL || '').substring(0, 120));
     };
 
+    // PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1: CREATE IF NOT EXISTS does not
+    // update old CHAR(36) identifiers. Connector/NET treats those as Guid even
+    // when the package now uses ULID strings. Apply only an explicitly declared
+    // identifier widening, keeping the target's complete column definition.
+    var repairDeclaredLegacyIdentifierStorage = function (ddlItem) {
+        if (runtimeIsSqlServer || runtimeIsOracle) return 0;
+        var tableName = String(ddlItem.TableName || '');
+        var ownsTable = false;
+        for (var tableIndex = 0; tableIndex < (Package.DiyTables || []).length; tableIndex++) {
+            if (String(Package.DiyTables[tableIndex].Name || '').toLowerCase() === tableName.toLowerCase()) ownsTable = true;
+        }
+        if (!ownsTable || !isSafeIdentifier(tableName)) return 0;
+        var declared = {}, match;
+        var pattern = /(?:^|[,\n(])\s*`([A-Za-z_][A-Za-z0-9_]*)`\s+varchar\s*\((\d+)\)/gi;
+        while ((match = pattern.exec(String(ddlItem.DDL || ''))) !== null) {
+            if (/id$/i.test(match[1]) && Number(match[2]) >= 36) declared[match[1].toLowerCase()] = Number(match[2]);
+        }
+        if (Object.keys(declared).length === 0) return 0;
+        var targetColumns = getTargetPhysicalColumns(tableName);
+        var modifications = [];
+        var currentDefinition = '';
+        for (var columnKey in declared) {
+            var column = targetColumns[columnKey];
+            if (!column || normalizeSqlType(column.COLUMN_TYPE) !== 'char(36)') continue;
+            if (!currentDefinition) {
+                var ddlRows = V8.Db.FromSql('SHOW CREATE TABLE ' + quotePhysicalIdentifier(tableName)).ToArray();
+                currentDefinition = String(getPhysicalValue(ddlRows && ddlRows[0], ['Create Table', 'CreateTable']) || '');
+                if (!currentDefinition) throw new Error('旧标识列兼容无法读取原始DDL：' + tableName);
+            }
+            var columnName = String(column.COLUMN_NAME);
+            var lines = currentDefinition.split(/\r?\n/), original = '';
+            var columnPattern = new RegExp('^\\s*`' + columnName + '`\\s+char\\(36\\)', 'i');
+            for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+                if (columnPattern.test(lines[lineIndex])) original = lines[lineIndex].replace(/,\s*$/, '').trim();
+            }
+            if (!original) throw new Error('旧标识列兼容无法保留原始定义：' + tableName + '.' + columnName);
+            modifications.push('MODIFY COLUMN ' + original.replace(/^(\s*`[^`]+`\s+)char\(36\)/i, '$1varchar(' + declared[columnKey] + ')'));
+        }
+        if (modifications.length) {
+            // MYSQL_IDENTIFIER_FOREIGN_KEY_SCOPE_V1：外键涉及的转换使用后端
+            // 专用非池化连接，不删除外键，不把会话检查开关泄漏给其它请求。
+            var foreignKeys = V8.Db.FromSql(
+                'SELECT COUNT(*) AS ForeignKeyCount FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE '
+                + 'WHERE REFERENCED_TABLE_NAME IS NOT NULL AND '
+                + '((TABLE_SCHEMA=DATABASE() AND LOWER(TABLE_NAME)=LOWER(@p0)) OR '
+                + '(REFERENCED_TABLE_SCHEMA=DATABASE() AND LOWER(REFERENCED_TABLE_NAME)=LOWER(@p0)))'
+            ).AddInParameter('@p0', tableName).ToArray();
+            if (Number(getPhysicalValue(foreignKeys && foreignKeys[0], ['ForeignKeyCount', 'FOREIGNKEYCOUNT', 'foreignkeycount']) || 0) > 0) {
+                if (typeof V8.Db.WidenMySqlIdentifierColumns !== 'function')
+                    throw new Error('旧标识列涉及外键，当前后端缺少安全兼容方法，请先升级平台框架：' + tableName);
+                var specifications = [];
+                for (var declaredColumn in declared) specifications.push(declaredColumn + ':' + declared[declaredColumn]);
+                V8.Db.WidenMySqlIdentifierColumns(tableName, specifications.join(','));
+                debugLog['legacy_identifier_foreign_keys_' + tableName] = '保留外键，在独立非池化连接内完成标识列兼容';
+            } else {
+                V8.Db.FromSql('ALTER TABLE ' + quotePhysicalIdentifier(tableName) + ' ' + modifications.join(', ')).ExecuteNonQuery();
+            }
+            var verified = getTargetPhysicalColumns(tableName);
+            for (var key in declared) {
+                if (targetColumns[key] && normalizeSqlType(targetColumns[key].COLUMN_TYPE) === 'char(36)'
+                    && (!verified[key] || normalizeSqlType(verified[key].COLUMN_TYPE) !== 'varchar(' + declared[key] + ')'))
+                    throw new Error('旧标识列兼容回读失败：' + tableName + '.' + key);
+            }
+            debugLog['legacy_identifier_storage_' + tableName] = '按应用包声明无损扩宽' + modifications.length + '个标识列，原默认值、注释和约束保留';
+        }
+        return modifications.length;
+    };
     var ddlTablesChecked = {};
     for (var i = 0; i < ddlStatements.length; i++) {
         var ddlItem = ddlStatements[i];
@@ -5493,6 +5782,7 @@ try {
         var ddlTableKey = String(ddlInfo.TableName || ddlItem.TableName).toLowerCase();
         if (ddlInfo.Kind == 'index' || ddlTablesChecked[ddlTableKey]) continue;
         ddlTablesChecked[ddlTableKey] = true;
+        repairDeclaredLegacyIdentifierStorage(ddlItem);
 
         // 无论表是新创建还是已存在，都检查并补充缺失的字段。
         try {
@@ -6712,7 +7002,7 @@ try {
     }
 
     // ==================== 步骤3：处理sys_menu数据 ====================
-    activeImportStage = '步骤3-菜单与权限';
+    activeImportStage = '步骤2.6-应用源码与运行文件';
 
     // 应用资产依赖 sys_microistore / mci_ai_app_file / sys_microiservice 等基础表，必须在 DDL、表定义、字段和物理列完成后再安装。
     var applicationBundles = [];
@@ -6745,6 +7035,9 @@ try {
             '在线应用资产已提交，将在新执行片中导入菜单、流程、接口和随包数据'
         );
     }
+
+    activeImportStage = '步骤3-菜单与权限';
+    activeImportResource = '';
 
     // POST_SCHEMA_MICROSERVICE_BINDING_RESTORE_V1：大型应用包会在
     // ApplicationAssets 执行片写入运行时后切换到 PostSchema。执行片切换会
@@ -7033,6 +7326,8 @@ try {
     var administratorRoleLimitPhysicalFallback = false;
     var administratorRoleLimitMetadataError = '';
     var administratorRoleLimitPhysicalWriteOccurred = false;
+    var administratorIdTextSql = 'CAST(Id AS ' + (runtimeIsSqlServer ? 'VARCHAR(64)'
+        : runtimeIsOracle ? 'VARCHAR2(64)' : 'CHAR(64)') + ') AS Id';
     var parseMenuPermissionArray = function (value) {
         if (value === null || value === undefined || value === '') return [];
         if (Array.isArray(value)) return value;
@@ -7078,18 +7373,55 @@ try {
     };
     var getAdministratorRolesForMenuGrant = function () {
         if (administratorRolesForMenuGrant !== null) return administratorRolesForMenuGrant;
-        var roleResult = V8.FormEngine.GetTableData('sys_role', {
-            _Where: [['Level', '>=', 9999]],
-            _SelectFields: ['Id', 'Name', 'Level', 'IsDeleted'],
-            _OrderBy: 'Level',
-            _OrderByType: 'DESC',
-            _PageIndex: 1,
-            _PageSize: 1000
-        });
-        if (!roleResult || (roleResult.Code != 1 && roleResult.Code != 2)) {
-            throw new Error('查询系统管理员角色失败：' + ((roleResult && roleResult.Msg) || '接口无返回'));
+        // ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1: the first marketplace installation
+        // precedes the SaaS package which owns role metadata. Query the current
+        // tenant's authoritative physical roles, including legacy NULL deletes.
+        var readRoles = function () {
+            return V8.Db.FromSql('SELECT ' + administratorIdTextSql + ', Name, ' + quotePhysicalIdentifier('Level')
+                + ', IsDeleted FROM sys_role WHERE ' + quotePhysicalIdentifier('Level')
+                + ' >= @p0 AND (IsDeleted <> @p1 OR IsDeleted IS NULL) ORDER BY '
+                + quotePhysicalIdentifier('Level') + ' DESC')
+                .AddInParameter('@p0', 9999).AddInParameter('@p1', 1).ToArray() || [];
+        };
+        var roleRows = readRoles();
+        if (roleRows.length === 0 && trustedOfficialPlatformPackage) {
+            // An early empty tenant may retain its active administrator and the
+            // original role reference while both role tables are empty. Restore
+            // only that missing link; never promote a user, re-enable a role,
+            // overwrite an existing role, or trust a role id supplied by a package.
+            var legacyRoleId = '5db47859-35a3-411a-a1f7-99482e057d24';
+            var roleCount = Number(V8.Db.FromSql('SELECT COUNT(*) FROM sys_role').ToScalar());
+            var limitCount = Number(V8.Db.FromSql('SELECT COUNT(*) FROM sys_rolelimit').ToScalar());
+            if (roleCount === 0 && limitCount === 0) {
+                var users = V8.Db.FromSql('SELECT RoleIds, ' + quotePhysicalIdentifier('Level')
+                    + ', State, IsDeleted FROM sys_user WHERE RoleIds LIKE @p0')
+                    .AddInParameter('@p0', '%' + legacyRoleId + '%').ToArray() || [];
+                var activeAdministratorFound = false;
+                for (var userIndex = 0; userIndex < users.length; userIndex++) {
+                    var user = users[userIndex] || {};
+                    var roleIds = parseMenuPermissionArray(user.RoleIds);
+                    var referencesLegacyRole = false;
+                    for (var idIndex = 0; idIndex < roleIds.length; idIndex++) {
+                        if (String(roleIds[idIndex]).toLowerCase() === legacyRoleId) referencesLegacyRole = true;
+                    }
+                    if (!referencesLegacyRole) continue;
+                    if (!(Number(user.Level) >= 9999)) {
+                        throw new Error('旧管理员角色被非管理员账号引用，已阻止自动恢复，避免扩大权限');
+                    }
+                    if (Number(user.State) === 1 && Number(user.IsDeleted || 0) !== 1) activeAdministratorFound = true;
+                }
+                if (activeAdministratorFound) {
+                    V8.Db.FromSql('INSERT INTO sys_role (Id, Name, ' + quotePhysicalIdentifier('Level')
+                        + ', IsDeleted, CreateTime) VALUES (@p0, @p1, @p2, @p3, CURRENT_TIMESTAMP)')
+                        .AddInParameter('@p0', legacyRoleId).AddInParameter('@p1', '系统管理员')
+                        .AddInParameter('@p2', 9999).AddInParameter('@p3', 0).ExecuteNonQuery();
+                    roleRows = readRoles();
+                    if (roleRows.length !== 1 || String(roleRows[0].Id).toLowerCase() !== legacyRoleId)
+                        throw new Error('旧管理员角色恢复后回读不一致，已阻止提交');
+                    debugLog.admin_role_bootstrap = '仅恢复现有活动管理员已引用的缺失系统角色；账号和角色绑定未修改';
+                }
+            }
         }
-        var roleRows = roleResult && roleResult.Code == 1 && roleResult.Data ? roleResult.Data : [];
         administratorRolesForMenuGrant = [];
         for (var roleIndex = 0; roleIndex < roleRows.length; roleIndex++) {
             var role = roleRows[roleIndex] || {};
@@ -7118,7 +7450,7 @@ try {
     var readAdministratorMenuRoleLimitsPhysical = function (roleId, menuId) {
         try {
             var rows = V8.Db.FromSql(
-                'SELECT Id, Permission FROM sys_rolelimit WHERE RoleId = @p0 AND FkId = @p1 AND Type = @p2'
+                'SELECT ' + administratorIdTextSql + ', Permission FROM sys_rolelimit WHERE RoleId = @p0 AND FkId = @p1 AND Type = @p2'
             )
                 .AddInParameter('@p0', roleId)
                 .AddInParameter('@p1', menuId)
@@ -8240,42 +8572,13 @@ try {
         removeApiEngineCacheValue(apiAddress);
 
         var latest = null;
-        if (!isMissingValue(apiEngineKey)) {
-            var latestByKey = V8.FormEngine.GetFormData('sys_apiengine', {
-                OsClient: V8.OsClient,
-                _Where: [['ApiEngineKey', '=', apiEngineKey]],
-                _PageSize: 1
-            });
-            if (latestByKey.Code == 1 && latestByKey.Data) {
-                latest = latestByKey.Data;
-            }
-        }
-        if (!latest && !isMissingValue(apiEngineId)) {
-            var latestById = V8.FormEngine.GetFormData('sys_apiengine', {
-                OsClient: V8.OsClient,
-                Id: apiEngineId,
-                _PageSize: 1
-            });
-            if (latestById.Code == 1 && latestById.Data) {
-                latest = latestById.Data;
-            }
-        }
-        if (!latest && !isMissingValue(apiAddress)) {
-            var latestByAddress = V8.FormEngine.GetFormData('sys_apiengine', {
-                OsClient: V8.OsClient,
-                _Where: [['ApiAddress', '=', apiAddress]],
-                _PageSize: 1
-            });
-            if (latestByAddress.Code == 1 && latestByAddress.Data) {
-                latest = latestByAddress.Data;
-            }
-        }
-
         // PACKAGE_API_ENGINE_PHYSICAL_READBACK_FALLBACK_V1：部分旧租户的
         // sys_apiengine 物理行完整，但 diy_table/diy_field 元数据损坏或缓存仍是
         // 旧投影，FormEngine 三种别名回读都会返回空。导入器此前已经用参数化
         // 物理查询确定了资源身份，因此这里用同一物理事实完成强回读与缓存重建，
         // 不能把真实存在的 Managed 接口误判成“写入后不存在”。
+        // PACKAGE_API_ENGINE_AUTHORITATIVE_READBACK_V2：直接读取当前租户物理行，
+        // 不再先经过正在被安装器修改的元数据与旧缓存，避免空投影或空引用阻断强回读。
         var recoveredPhysicalReadback = false;
         if (!latest && !isMissingValue(apiEngineKey)) {
             latest = V8.Db.FromSql(
@@ -8302,7 +8605,7 @@ try {
         if (recoveredPhysicalReadback) {
             debugLog['apiengine_physical_readback_recovery_'
                 + String(apiEngineKey || apiEngineId || apiAddress)] =
-                'FormEngine 回读为空，已按参数化物理事实重建接口缓存';
+                '已按当前租户参数化物理事实重建接口缓存';
         }
 
         if (!latest) return null;
@@ -8569,6 +8872,7 @@ try {
 
         for (var i = 0; i < sysApiEngines.length; i++) {
             var apiEngine = sysApiEngines[i];
+            activeImportResource = 'sys_apiengine:' + String(apiEngine && apiEngine.ApiEngineKey || i);
             var apiEnginePolicy = getApiEngineResourcePolicy(apiEngine.ApiEngineKey);
 
             // 升级资源入口只在官方租户独立维护，禁止应用数据包覆盖或安装它。
@@ -8789,6 +9093,7 @@ try {
 
     // ==================== 步骤8：导入应用随包数据 ====================
     activeImportStage = '步骤8-随包数据';
+    activeImportResource = '';
 
     // DATASET_INSERT_IF_MISSING_V1：配置种子可声明 InsertIfMissing，并用
     // ConflictFields 做稳定业务键存在性检查。应用更新不得覆盖客户已经修改过的
@@ -9156,6 +9461,7 @@ try {
         Msg: '导入失败（阶段：' + activeImportStage + '）：' + error.message,
         Data: {
             失败阶段: activeImportStage,
+            失败资源: activeImportResource,
             错误信息: error.message,
             错误堆栈: error.stack
         }

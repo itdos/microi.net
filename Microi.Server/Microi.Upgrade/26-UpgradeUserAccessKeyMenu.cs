@@ -56,7 +56,7 @@ V8.Result = typeof V8.OpenDialog === ""function""
                     // 老业务库可能没有平台内置【系统账号】模块。访问密钥按钮是可选
                     // 菜单增强，不应阻止其它数据库升级；HostedService 会在以后每次
                     // 启动时幂等重试，模块一旦安装即可自动补齐按钮。
-                    Console.WriteLine($"Microi：【基础应用升级】租户[{osClient}]未安装系统账号模块，跳过访问密钥动态按钮。");
+                    UpgradeProgress.WriteLine($"Microi：【基础应用升级】租户[{osClient}]未安装系统账号模块，跳过访问密钥动态按钮。");
                     return messages;
                 }
 

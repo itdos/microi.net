@@ -169,7 +169,7 @@ namespace Microi.net
                             messages.Add($"恢复 {TableName} 元数据失败：{adoptResult.Msg}");
                             return messages;
                         }
-                        Console.WriteLine(
+                        UpgradeProgress.WriteLine(
                             $"Microi：【兼容修复】【{osClient}】已接管现有物理表 {TableName} 并补齐表单引擎元数据。");
                     }
 

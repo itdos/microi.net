@@ -13,7 +13,8 @@ public sealed class UpgradeGovernanceTests
         var root = FindRepositoryRoot();
         var upgrade = Read(root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs");
         var baseline = Read(root, "Microi.Server", "Microi.Upgrade", "36-UpgradeRuntimeInvariantBaseline.cs");
-        Assert.Contains("NeedUpgrade(CurrentVersion, Upgrade36.Version)", upgrade, StringComparison.Ordinal);
+        Assert.Contains("StartVersionStep(CurrentVersion, Upgrade36.Version)", upgrade, StringComparison.Ordinal);
+        Assert.Contains("var needed = NeedUpgrade(currentVersion, targetVersion)", upgrade, StringComparison.Ordinal);
         Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade36.Version)", upgrade, StringComparison.Ordinal);
         Assert.Contains("UpgradeExecutionLeaseContext.ThrowIfLost()", baseline, StringComparison.Ordinal);
         Assert.Contains("new Upgrade35().Run(osClient)", baseline, StringComparison.Ordinal);

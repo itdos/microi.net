@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: export-microi-store-package
- * Version: v1.2.9
+ * Version: v1.2.10
  * Function:
  * - 导出或持久发布 Microi 应用安装包；支持预制平台包、UTF-8 HDFS、FormEngine fence CAS、两阶段不可变快照收口，并同步服务端与客户端最低版本门禁。
  */
@@ -1070,6 +1070,11 @@ try {
     }
 
     for (var st = 0; st < someTableList.length; st++) {
+        // UNUSED_WORKFLOW_PHYSICAL_SCHEMA_V1：实际导出工作流时才附带其依赖列。
+        // 显式选择的工作流表已由 exportTables 加入，不受此过滤影响。
+        var dependencyTableName = String(someTableList[st].Name || '').toLowerCase();
+        if (['wf_flowdesign', 'wf_node', 'wf_line'].indexOf(dependencyTableName) >= 0
+            && !exportFlows.length && !exportNodes.length && !exportLines.length) continue;
         addUniqueTableName(physicalTableNameMap, physicalTableNames, someTableList[st].Name);
     }
 

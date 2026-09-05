@@ -12,6 +12,9 @@ import ProfilePage from "./components/ProfilePage.vue";
 import ProfileLocaleSwitch from "./components/ProfileLocaleSwitch.vue";
 import MciNugetStats from "./components/MciNugetStats.vue";
 import TrainingSyllabusDeck from "./components/TrainingSyllabusDeck.vue";
+import NotFoundPage from './components/NotFoundPage.vue';
+import DocBreadcrumbs from './components/DocBreadcrumbs.vue';
+import { usePageSeo } from './use-page-seo.mjs';
 import { getDocVisualProfile } from './doc-visual-profiles.js';
 import "./styles/index.scss";
 import "./styles/home-glow.scss";
@@ -51,6 +54,7 @@ function persistExplicitAppearance(isDark: boolean) {
 const MicroiLayout = defineComponent({
     name: 'MicroiLayout',
     setup() {
+        usePageSeo()
         const { isDark } = useData()
         const route = useRoute()
 
@@ -70,6 +74,11 @@ const MicroiLayout = defineComponent({
                 : undefined
 
             return h(DefaultTheme.Layout, { class: layoutClass }, {
+                'not-found': () => h(NotFoundPage),
+                'doc-before': () => h(DocBreadcrumbs),
+                'doc-footer-before': () => /^(?:\/en)?\/(?:doc|case)\//.test(route.path || '')
+                    ? h('p', { style: 'margin-top:24px;font-size:13px;color:var(--mci-site-muted)' }, [h('a', { href: '/llms.txt' }, route.path.startsWith('/en/') ? 'Documentation index for AI tools' : '供 AI 工具使用的文档索引')])
+                    : null,
                 'nav-bar-content-after': () => h(Fragment, null, [h(ProfileLocaleSwitch), h(UserBar)]),
                 'sidebar-nav-after': () => /^(?:\/en)?\/doc\//.test(route.path || '')
                     ? h(MciNugetStats, { variant: 'sidebar' })

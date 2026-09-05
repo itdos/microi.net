@@ -78,7 +78,7 @@ description: Microi 移动端质量门禁，适用于 UniApp/H5/微信小程序�
 - 使用真实系统账号登录后，必须验证“我的”页显示已登录角色，首页/工单/报告不再出现未登录提示，刷新页面或切换底部导航后仍保持一致。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-003 sha256=0a9274750cb6f507b87c417eb66e5f9aa60918c6ead87c7eb2855e209aa30e61 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-003 sha256=a35f20404acbf61814f9475610f881f7c60effc0ce3bb8797cee300cd3349ba7 -->
 ## 2.1 登录验证码必须跟随 Sys_Config.EnableCaptcha
 
 PC 端、H5、App、微信小程序或任何自定义前端只要调用 `/api/SysUser/login`、`/api/SysUser/Login` 或 `V8.Login(param)`，都必须先读取 `Sys_Config` 的 `EnableCaptcha` 配置，并按配置决定是否展示和提交图形验证码。

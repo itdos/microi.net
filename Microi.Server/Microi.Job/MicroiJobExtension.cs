@@ -36,6 +36,12 @@ namespace Microi.net
                     600);
                 services.AddQuartz(q =>
                 {
+                    // 集群节点必须拥有不同的 InstanceId；默认 NON_CLUSTERED 会让共享库中的
+                    // 多个节点互相覆盖心跳和触发器归属。名称保持原值，以兼容既有持久化任务。
+                    q.SchedulerId = "AUTO";
+                    // 持久化集群中的新增/解锁不保证唤醒另一节点。限制预取与空闲轮询窗口，
+                    // 避免节点提前持有远期触发器时，让已到期的秒级任务等待默认的 30 秒窗口。
+                    q.SetProperty("quartz.scheduler.idleWaitTime", "1000");
                     //-------使用内存存储作为临时配置 --延迟启动未实验成功
                     // q.UseInMemoryStore();
                     // q.UseSimpleTypeLoader();
@@ -113,16 +119,19 @@ namespace Microi.net
             if (databaseType == DatabaseType.SqlServer)
             {
                 options.UseSqlServer(connectionString);
-                return;
             }
-            options.UseMySql(connectionString);
+            else
+            {
+                options.UseMySql(connectionString);
+            }
+            options.SetProperty("quartz.jobStore.driverDelegateType", GetDriverDelegateType(databaseType));
         }
 
         internal static string GetDriverDelegateType(DatabaseType databaseType)
         {
             return databaseType == DatabaseType.SqlServer
-                ? "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz"
-                : "Quartz.Impl.AdoJobStore.MySQLDelegate, Quartz";
+                ? typeof(MicroiTenantSqlServerDelegate).AssemblyQualifiedName
+                : typeof(MicroiTenantMySqlDelegate).AssemblyQualifiedName;
         }
 
         internal static string GetProviderName(DatabaseType databaseType)

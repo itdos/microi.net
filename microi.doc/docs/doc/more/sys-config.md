@@ -97,6 +97,8 @@ var clientSecret = privateSettings['Login.Gitee.ClientSecret'];
 
 登录页入口统一使用 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub` 五个负向开关，字段标签分别为“关闭生物登录入口”“关闭Authenticator登录入口”“关闭Gitee登录入口”“关闭微信登录入口”“关闭GitHub登录入口”。它们缺失、空值或 `0/false` 时默认显示入口，只有显式 `1/true` 才关闭；旧 `Login*Display` 字段仅作兼容回退并隐藏。`DisableAiAssistant` 同样保持负向开关语义。
 
+AI 助手只保留“关闭AI助手图标”一个设置项：`DisableAiAssistant=1/true` 表示隐藏图标，`0/false` 表示显示。旧版“显示AI助手图标”（`IsShowAiAssistant`）已从官方母版字段元数据和新版系统设置安装包移除，不再作为新项目配置入口。已有数据库的旧物理列可保留供尚未升级的定制客户端兼容；字段 Id 可能曾被新开关复用，维护旧租户时须先按表名与字段名定位，不能直接套用旧 Id 删除。
+
 ## 界面风格：框架来源标识与水印
 
 微服务和定制组件的来源标识由吾码宿主统一渲染，子应用不需要自行实现，也不存在租户级显示开关。`RenderSourceBadgeMode` 已停用并从系统设置移除：来源标识始终可发现，避免用户在不知道内容来源的情况下误改宿主或子应用。

@@ -84,7 +84,8 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 - v6.3.6 还必须保持 AI助手包的 DDL、PhysicalColumns、DiyTables、DiyFields、DataSets 全层不再包含重复的 `mci_ai_app_version`、`mci_ai_app_file`、`sys_microistore`，这些表交回 Store/SaaS 既有平台包维护；当前仅 AI助手包拥有的 `app_mic_aiapp`、`mci_ai_app` 继续保留。
 - 普通角色必须匹配启用的 `mci_ai_role_policy`。只有后端可信的 `V8.CurrentUser.Level >= 9999` 可以在新安装租户缺少角色策略时获得安全兜底：从目标租户动态读取已启用业务域和模型，范围为 `All`，仍保持 `AllowRawSql=false`、敏感字段默认关闭。不得相信客户端提交的 Level、角色名或账号名。
 - 当租户要求“所有角色均可使用 AI 助手”时，必须为 `sys_role` 中每个目标角色建立显式启用策略；受限角色使用 `Self`/`Department` 与最小业务域，管理角色才可使用经确认的 `All`。禁止把“人人可打开助手”实现成普通角色默认全库可读。
-- `Sys_Config.DisableAiAssistant` 是负向开关：缺失、空值或 `0/false` 都显示 AI 助手，只有显式 `1/true` 才关闭图标。商城升级应复用旧 `IsShowAiAssistant` 的字段元数据 Id 就地改名；兼容读取可以保留旧物理列，但旧字段元数据必须在 PC 与移动端隐藏，禁止同时暴露正向、负向两个开关。关闭该开关前后都要做策略覆盖验收：回读 `sys_role` 与 `mci_ai_role_policy`，断言每个目标角色都有唯一启用策略，`AllowedDomains`、`AllowedModels` 均非空且模型仍处于启用状态；再至少用超级管理员、普通员工和客户身份分别调用 `Bootstrap`，确认 `Enabled=true` 且返回范围符合角色。仅看到入口图标不算可用。
+- `Sys_Config.DisableAiAssistant` 是负向开关：缺失、空值或 `0/false` 都显示 AI 助手，只有显式 `1/true` 才关闭图标。历史包曾复用旧 `IsShowAiAssistant` 的字段元数据 Id 就地改名；因此清理旧开关必须按当前表名和字段名回读定位，不能只按历史 Id 删除，避免误删已复用该 Id 的新开关。官方母版必须通过标准 MCP 删除旧字段元数据，不能仅隐藏；新版包的 DiyFields、PhysicalColumns、DDL 及生成器均不得重新创建旧开关。平台删除字段可保留存量物理列兼容，但新前端只读取 DisableAiAssistant，不得重建正向开关或改写租户现有配置值。关闭该开关前后都要做策略覆盖验收：回读 `sys_role` 与 `mci_ai_role_policy`，断言每个目标角色都有唯一启用策略，`AllowedDomains`、`AllowedModels` 均非空且模型仍处于启用状态；再至少用超级管理员、普通员工和客户身份分别调用 `Bootstrap`，确认 `Enabled=true` 且返回范围符合角色。仅看到入口图标不算可用。
+- 提审要求关闭 AI 入口时，必须把“关闭AI助手图标”设为 `DisableAiAssistant=1`，从数据库、客户端实际配置接口和入口逐层验收，不能用旧正向字段为 `0` 代替。官方包发布与其他租户安装是两个独立动作；未执行目标租户安装或字段清理时，不得宣称全体存量租户已移除旧元数据。
 - 角色策略存在但 `AllowedModels` 为空时，客户端最终仍会得到无可用模型；不得把它误判为前端角色拦截。应补齐当前租户启用模型白名单并回读，而不是删除 `mci_ai_role_policy` 校验或在客户端强制把 `Enabled` 改成 `true`。
 - 商城包不能携带发布租户的角色 Id、模型 Id 或密钥；应携带业务域定义和接口引擎，由安装后的目标租户动态发现自己的启用模型。发布后回读 `sys_microistore.AppVersion/AppPakcet`，并真实执行 `Bootstrap` 验证超级管理员可用、模型非空、快捷问题存在。
 

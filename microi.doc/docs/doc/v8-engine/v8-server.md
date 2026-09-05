@@ -2289,7 +2289,9 @@ if (meta.FileType === 'csv' && parsed.DataAppend) {
 
 业务只需要增加跨行汇总、额度或并发校验时，不必替换整套导入接口。将模块 `ImportV8` 配置为 `ApiEngine:<ApiEngineKey>`，标准 `/api/FormEngine/ImportDiyTableRow` 会继续负责权限、原文件复核、字段映射、唯一规则、进度和写入，并在 `RollbackAll` 的同一数据库事务内、实际写入前调用指定接口引擎。
 
-接口引擎从 `V8.Param.Rows` 读取服务端规范化后的整批行，从 `V8.Param.FixedValues` 读取父表固定值；另有 `TableId/TableName/SysMenuId/ImportErrorPolicy/ImportFileName/ImportIdempotencyKey/UniqueRuleCount`。此处的 `V8.DbTrans` 与后续标准写入共用事务，适合先按稳定顺序锁定额度行，再重新汇总并校验。接口只返回 `Code:1` 放行或 `Code!=1` 拒绝，不应自行写入、`Commit` 或 `Rollback`。
+校验接口通常只返回 `{ Code: 1 }`。支持安全回填的平台会在 `V8.Param.Capabilities.PreflightFixedValuesV1` 传入 `true`；接口确认该能力后，如果能依据当前用户有权访问的权威数据，唯一推导出整批共同缺失的业务字段，可以返回 `{ Code: 1, Data: { FixedValues: { ProjectId: "..." } } }`。平台会再次校验：字段必须是当前表的可导入业务字段，值必须是非空标量，且不得设置 Id、审计、租户等平台字段，也不得覆盖 TableChild 已固定的父记录上下文；通过后该值才会用于本批全部写入。无法唯一推导时应返回 `Code != 1`，并在 `Msg` 中说明缺失信息和可操作的解决方法。
+
+接口引擎从 `V8.Param.Rows` 读取服务端规范化后的整批行，从 `V8.Param.FixedValues` 读取父表固定值；另有 `TableId/TableName/SysMenuId/ImportErrorPolicy/ImportFileName/ImportIdempotencyKey/UniqueRuleCount/Capabilities`。此处的 `V8.DbTrans` 与后续标准写入共用事务，适合先按稳定顺序锁定额度行，再重新汇总并校验。接口以 `Code:1` 放行（可选返回上述 `Data.FixedValues`）或以 `Code!=1` 拒绝，不应自行写入、`Commit` 或 `Rollback`。
 
 启用该钩子后只允许 `RollbackAll`。TableChild 内导入时，平台固定父记录外键覆盖 Excel 同名列，避免把数据写到其它父记录。客户端每次重新选择文件生成新的 `_ImportIdempotencyKey`，同一 HTTP 重试沿用该键；服务端按租户、表、菜单和用户隔离请求状态，避免重复创建写入任务。它不负责判断“相同文件以一个全新请求再次上传”是否属于业务重复。
 
@@ -2392,6 +2394,7 @@ WFNodeStart：流程节点开始V8事件
 | 短信 | `V8.Sms.Send` | 供应商配置必须脱敏，发送接口要有频率、金额/条数、模板和收件人限制 |
 | 爬虫 | `V8.Spider` | 属于高风险 Worker 能力；必须使用租户目标地址策略、租户/用户会话隔离、并发和运行时限，禁止脚本指定浏览器可执行文件 |
 | 主机监控 | `V8.System` | CPU、内存、磁盘、网络等运维数据仅供管理员/运维，不应从普通或匿名接口返回 |
+| 任务调度 | `V8.Method.SaveScheduleJob`、`V8.Method.ManageScheduleJob` | 仅当前租户超级管理员；保存只允许接口引擎任务。表单先检查 `ManageScheduleJob({Action:'Capabilities'})` 的 `RuntimeOnly` 能力，再直接调用 `SaveScheduleJob` 并传 `RuntimeOnly:true`：仅同步 Quartz 并回读状态，由原表单事务写元数据。直接调用可保留业务 `ApiEngineKey`，避免嵌套 `V8.ApiEngine.Run` 将同名路由参数改成管理接口 Key；默认保存仍写完整任务。不能用 HTTP 回调本平台或在提交事件中再次写当前表 |
 | 支付、微信、DNS | 对应 `V8.*` 扩展 | 单独校验签名、幂等键、回调重放、金额与租户凭据，不要返回密钥 |
 
 动态建表、动态字段、数据库备份/清空、缓存连接管理、接口引擎代码写入等属于控制面能力。即使某个低层方法在 V8 对象上可见，也不等于普通业务脚本可以安全暴露；控制面 HTTP API 还会独立执行 `Level >= 9999` 管理员门禁。

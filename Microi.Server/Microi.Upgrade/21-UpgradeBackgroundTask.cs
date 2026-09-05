@@ -144,7 +144,7 @@ namespace Microi.net
                         messages.Add($"接管现有 {TableName} 物理表失败：{adopt.Msg}");
                         return messages;
                     }
-                    Console.WriteLine(
+                    UpgradeProgress.WriteLine(
                         $"Microi：【兼容修复】【{osClient}】已接管半安装的 {TableName} 物理表并补齐表单引擎元数据。");
                 }
 
@@ -257,7 +257,7 @@ namespace Microi.net
                 await ClearMetadataCacheAsync(osClient, tableId);
                 if (messages.Count == 0 && repairedPhysicalColumns.Count > 0)
                 {
-                    Console.WriteLine(
+                    UpgradeProgress.WriteLine(
                         $"Microi：【后台任务兼容修复】【{osClient}】已补齐 {TableName} 物理字段"
                         + $"{repairedPhysicalColumns.Count}个：{string.Join(",", repairedPhysicalColumns)}。");
                 }

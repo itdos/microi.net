@@ -1155,7 +1155,7 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
 });
 
 test('官网发布接口以固定白名单、事务行锁和哈希保护多节点写入', () => {
-  assert.match(officialEngineSource, /Version: v1\.3\.5/);
+  assert.match(officialEngineSource, /Version: v1\.3\.7/);
   assert.match(officialEngineSource, /V8\.Method\.AuthorizeOfficialResourcePublish\(\)/);
   assert.doesNotMatch(officialEngineSource, /Number\(currentUser\.Level/);
   assert.match(officialEngineSource, /function lockPublishRows\(\)/);

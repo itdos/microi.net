@@ -19,6 +19,8 @@
 		"audit:visual": "node scripts/check-doc-readability.mjs --report",
 		"check:content": "npm run check:links && npm run check:sidebar && npm run check:repositories && npm run check:readability && npm run test:microservice-docs && npm run test:image-lightbox && npm run test:ai-media && npm run test:ai-capability-docs && npm run test:homepage && npm run test:training-deck && npm run test:architecture && npm run test:app-preview && npm run test:update-log && npm run test:v8-first-routes && npm run test:ocr-docs && npm run test:vision-docs",
 		"check:seo": "node scripts/check-seo.mjs",
+		"test:seo": "node --test tests/seo.test.mjs",
+		"check:seo:http": "node scripts/check-http-seo.mjs",
 		"check:theme": "node scripts/check-default-dark.mjs",
 		"test:app-preview": "node --test docs/.vitepress/theme/utils/app-preview-url.test.mjs docs/.vitepress/theme/utils/upload-resource-url.test.mjs docs/.vitepress/theme/utils/app-changelog.test.mjs tests/uniapp-preview-mode.test.mjs tests/ai-app-card-experience.test.mjs",
 		"test:update-log": "node --test tests/update-log-scope-banner.test.mjs",
@@ -35,10 +37,10 @@
 		"test:training-deck": "node --test tests/training-syllabus-deck.test.mjs",
 		"test:architecture": "node --test tests/ai-platform-architecture.test.mjs",
 		"test:marketplace": "node --test tests/marketplace-query-state.test.mjs tests/site-session.test.mjs",
-		"docs:dev": "npm run check:content && vitepress dev docs --host",
-		"dev": "npm run check:content && vitepress dev docs --host",
-		"docs:build": "npm run check:content && vitepress build docs && npm run check:theme && npm run check:seo",
-		"build": "npm run check:content && vitepress build docs && npm run check:theme && npm run check:seo",
+		"docs:dev": "vitepress dev docs --host",
+		"dev": "vitepress dev docs --host",
+		"docs:build": "npm run check:content && npm run test:seo && vitepress build docs && npm run check:theme && npm run check:seo",
+		"build": "npm run check:content && npm run test:seo && vitepress build docs && npm run check:theme && npm run check:seo",
 		"docs:preview": "vitepress preview docs"
 	},
 	"devDependencies": {

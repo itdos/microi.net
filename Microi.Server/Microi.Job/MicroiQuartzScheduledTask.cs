@@ -49,7 +49,7 @@ namespace Microi.net
         /// default_group，导致不同租户安装同名应用任务时互相覆盖。新组名同时
         /// 包含可读租户片段与稳定摘要，既隔离租户，也避免超长或特殊字符。
         /// </summary>
-        private static string GetTenantGroup(string osClient)
+        internal static string GetTenantGroup(string osClient)
         {
             var tenant = NormalizeJobTenant(osClient);
             var readable = Regex.Replace(tenant, "[^a-z0-9_-]", "_");
@@ -136,6 +136,7 @@ namespace Microi.net
                         // 基本配置
                         ["quartz.scheduler.instanceName"] = "MicroiJobScheduler",
                         ["quartz.scheduler.instanceId"] = "AUTO",
+                        ["quartz.scheduler.idleWaitTime"] = "1000",
 
                         // 线程池
                         ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
@@ -146,6 +147,7 @@ namespace Microi.net
                         ["quartz.jobStore.driverDelegateType"] = MicroiJobExtension.GetDriverDelegateType(databaseType),
                         ["quartz.jobStore.tablePrefix"] = "microi_job_",
                         ["quartz.jobStore.dataSource"] = "default",
+                        ["quartz.jobStore.clustered"] = "true",
                         ["quartz.jobStore.useProperties"] = "false", // 改为 false 可能更稳定
                         ["quartz.jobStore.performSchemaValidation"] = "false",
 
@@ -268,7 +270,10 @@ namespace Microi.net
                 {
                     Code = 1,
                     Data = jobs,
-                    DataCount = jobs.Count
+                    DataCount = jobs.Count,
+                    // 元数据中的执行时间不证明调度线程在运行；一并提供当前节点诊断，
+                    // 供可信任务管理入口区分“任务已保存”和“实际调度器已启动”。
+                    DataAppend = await GetSchedulerDiagnostics()
                 };
             }
             catch (Exception ex)
@@ -734,6 +739,29 @@ namespace Microi.net
             return model;
         }
 
+        private async Task<object> GetSchedulerDiagnostics()
+        {
+            var metadata = await _scheduler.GetMetaData();
+            using var hash = SHA256.Create();
+            var instanceHash = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(_scheduler.SchedulerInstanceId)))
+                .Replace("-", "").Substring(0, 16).ToLowerInvariant();
+            return new
+            {
+                Scheduler = new
+                {
+                    _scheduler.IsStarted,
+                    _scheduler.InStandbyMode,
+                    _scheduler.IsShutdown,
+                    metadata.RunningSince,
+                    metadata.NumberOfJobsExecuted,
+                    metadata.ThreadPoolSize,
+                    metadata.JobStoreSupportsPersistence,
+                    metadata.JobStoreClustered,
+                    InstanceHash = instanceHash
+                }
+            };
+        }
+
         private static TimeZoneInfo ResolveTimeZone(string timeZoneId)
         {
             if (timeZoneId.IsNullOrWhiteSpace()) return TimeZoneInfo.Local;
@@ -810,7 +838,7 @@ namespace Microi.net
                     new DiyWhere(){ Name = "Status", Value = "正常", Type = "=" }
                 },
             };
-            DosResultList<dynamic> result = MicroiEngine.FormEngine.GetTableData(param);
+            DosResultList<dynamic> result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             if (result.Code == 1 && result.Data != null)
             {
                 foreach (dynamic data in result.Data)
@@ -819,14 +847,16 @@ namespace Microi.net
                     {
                         MicroiSearchJobModel model = new MicroiSearchJobModel()
                         {
-                            Name = data.JobName
+                            Name = data.JobName,
+                            // 同名任务属于不同租户分组，查询运行态必须和后续写回使用同一租户。
+                            OsClient = osClient
                         };
-                        var detailResult = GetJobDetail(model).GetAwaiter().GetResult();
+                        var detailResult = await GetJobDetail(model);
                         if (detailResult.Code == 1)
                         {
                             string str = JsonHelper.Serialize(detailResult.Data);
                             MicroiJobModel jobModel = JsonHelper.Deserialize<MicroiJobModel>(str);
-                            MicroiEngine.FormEngine.UptFormData(new
+                            await MicroiEngine.FormEngine.UptFormDataAsync(new
                             {
                                 FormEngineKey = MicroiJobConst.dataTable,
                                 Id = data.Id,
