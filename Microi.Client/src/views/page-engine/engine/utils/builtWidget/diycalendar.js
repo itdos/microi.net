@@ -8,5 +8,13 @@ export const diycalendar = {
   widgetOption: {
     height: 600,
   },
-  widgetParams: [],
+  widgetParams: [
+    {
+      sort: 0,
+      label: '日历表单模块',
+      type: 'sysmenu',
+      value: '',
+      typeOptions: {},
+    },
+  ],
 }

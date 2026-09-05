@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   buildRenderManifest,
   compileDetailPreset,
@@ -202,6 +203,39 @@ assert.deepEqual(
   '跨端卡片引用的全部字段都必须进入列表查询'
 )
 
+const listMetricMenu = {
+  ...menu,
+  ViewSchema: JSON.stringify({
+    Views: [{
+      Key: 'customer-list-pc',
+      Scene: 'List',
+      Device: 'PC',
+      Layout: {
+        Hero: {
+          Metrics: [
+            { Key: 'amount', Label: '预计金额', Source: 'Field', Field: 'YuqiJYJE', Format: 'currency' },
+            {
+              Key: 'month', Label: '本月客户', ApiEngineKey: 'module-stats',
+              ValuePath: 'Data.Metrics.month', Tone: 'primary', Suffix: '条', RefreshSeconds: 120
+            },
+            { Key: 'total', Label: '客户总量', Source: 'DataCount', Tone: 'info', Suffix: '条' }
+          ]
+        }
+      }
+    }]
+  })
+}
+const listMetricConfig = compileListConfig(buildRenderManifest(listMetricMenu, {
+  scene: 'List',
+  device: 'PC'
+}))
+assert.equal(listMetricConfig.metrics.length, 3, '列表应完整编译平台 Hero 指标')
+assert.equal(listMetricConfig.metrics[1].source, 'ApiEngine')
+assert.equal(listMetricConfig.metrics[1].valuePath, 'Data.Metrics.month')
+assert.equal(listMetricConfig.metrics[1].refreshSeconds, 120)
+assert.equal(listMetricConfig.metrics[2].source, 'DataCount', '无字段的 DataCount 指标不得被过滤')
+assert.equal(listMetricConfig.metrics[2].tone, 'info')
+
 const disabledFormMenu = { ...menu, EnableViewSchema: 0 }
 assert.equal(
   selectViewDefinition(disabledFormMenu, { scene: 'Detail', device: 'Mobile' }),
@@ -241,5 +275,14 @@ const retiredDiyConfig = extractViewSchema({
   DiyConfig: menu.ViewSchema
 })
 assert.equal(retiredDiyConfig.Views.length, 0)
+
+const listPageSource = readFileSync(new URL('../src/pages/business/list.vue', import.meta.url), 'utf8')
+const metricLoaderSource = readFileSync(new URL('../src/platform/view-metrics.js', import.meta.url), 'utf8')
+assert.match(listPageSource, /scene:\s*'List',[\s\S]*?device:\s*'PC'/,
+  '移动业务列表必须回读平台 List-PC Hero 指标作为移动端缺省统计')
+assert.match(listPageSource, /buildModuleFilterPayload\(this\.config, options\)/,
+  '列表与平台统计接口必须使用同一筛选条件')
+assert.match(metricLoaderSource, /MetricKeys:\s*metricKeys/,
+  '同一接口的多个 Hero 指标必须通过 MetricKeys 批量请求')
 
 console.log('ViewSchema checks passed.')

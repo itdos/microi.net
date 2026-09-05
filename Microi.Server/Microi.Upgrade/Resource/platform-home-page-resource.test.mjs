@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { compareSemanticVersions } from './application-store-replica-sync.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const page = JSON.parse(fs.readFileSync(path.join(directory, 'platform-home-page.json'), 'utf8'));
@@ -36,7 +37,8 @@ test('PAGE5 starts with the shared AI composer and contains the complete operati
 });
 
 test('SaaS package delivers PAGE5 by stable-id upsert and declares its client/runtime dependencies', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.8.18');
+  // 首页合同允许后续 SaaS 包继续演进，不能把其它功能正常升版误判为首页回归。
+  assert.ok(compareSemanticVersions(packageModel.PackageInfo.Version, 'v7.8.18') >= 0);
   const dataSets = packageModel.DataSets.filter(item => (
     String(item.TableName || '').toLowerCase() === 'mic_page'
   ));
