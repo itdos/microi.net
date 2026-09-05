@@ -18,6 +18,8 @@ namespace Microi.net
             string backgroundTaskId = null,
             CancellationToken cancellationToken = default)
         {
+            using var progressScope = UpgradeProgress.EnsureTenant(osClient);
+            UpgradeProgress.Configure(GetUpgradeProgressSteps());
             osClient = (osClient ?? string.Empty).Trim();
             if (osClient.DosIsNullOrWhiteSpace())
             {
@@ -62,6 +64,7 @@ namespace Microi.net
                 ThrowIfCancelled(backgroundTaskId, cancellationToken);
                 Report(backgroundTaskId, 2, "正在读取数据库升级版本", 0, 1);
                 beforeVersion = ReadServerVersion(runtimeClient);
+                UpgradeProgress.Complete("检查租户版本");
                 if (IsVersionAtLeast(beforeVersion, targetVersion))
                 {
                     return BuildAlreadyCurrentResult(
@@ -74,6 +77,7 @@ namespace Microi.net
 
                 ThrowIfCancelled(backgroundTaskId, cancellationToken);
                 Report(backgroundTaskId, 3, "正在检查升级所需物理字段", 0, 1);
+                UpgradeProgress.Begin("准备运行时结构");
                 var prerequisite = await EnsureRuntimePhysicalPrerequisitesAsync(
                         runtimeClient, cancellationToken)
                     .ConfigureAwait(false);
@@ -181,6 +185,7 @@ namespace Microi.net
                     Report(backgroundTaskId, 94, "版本迁移链执行成功", current, total);
                 }
 
+                UpgradeProgress.Begin("刷新缓存");
                 var cacheReloaded = false;
                 string cacheMessage = null;
                 try
@@ -208,6 +213,7 @@ namespace Microi.net
                     message += " 多语言缓存刷新未成功，但数据库升级结果已保存；可清理该租户缓存后重试。";
                     AppendLog(backgroundTaskId, "多语言缓存刷新未成功：" + (cacheMessage ?? "无返回"));
                 }
+                UpgradeProgress.Complete("刷新缓存");
                 Report(backgroundTaskId, 100, message, 1, 1);
                 AppendLog(backgroundTaskId,
                     $"升级结果：升级前={FormatVersionForLog(beforeVersion)}，目标={FormatVersionForLog(targetVersion)}，升级后={FormatVersionForLog(afterVersion)}，已是当前版本={alreadyCurrent}。");
@@ -318,7 +324,11 @@ namespace Microi.net
             int current,
             int total)
         {
-            Console.WriteLine("Microi：【租户数据库升级】" + message);
+            if (progress == 100) UpgradeProgress.CompleteAll();
+            progress = UpgradeProgress.Percent;
+            current = UpgradeProgress.CompletedCount;
+            total = UpgradeProgress.TotalCount;
+            UpgradeProgress.WriteLine("Microi：【租户数据库升级】" + message);
             BackgroundTaskRuntime.TryUpdateProgress(
                 backgroundTaskId,
                 Math.Max(0, Math.Min(100, progress)),
@@ -360,7 +370,7 @@ namespace Microi.net
                                     : " " + diagnostic);
             BackgroundTaskRuntime.TryUpdateProgress(
                 backgroundTaskId, null, publicMessage, null, null);
-            Console.WriteLine(
+            UpgradeProgress.WriteLine(
                 $"Microi：【Error异常】【{osClient}】租户数据库升级失败：{publicMessage}");
             var systemLogContent =
                 $"BeforeVersion={beforeVersion ?? string.Empty}; " +
@@ -383,7 +393,7 @@ namespace Microi.net
                 backgroundTaskId);
             if (!queued)
             {
-                Console.WriteLine(
+                UpgradeProgress.WriteLine(
                     $"Microi：【Warning警告】平台自动升级【{osClient}】系统日志队列暂不可用，协调器失败详情已保留在控制台日志。");
             }
             return new DosResult(0, new

@@ -40,7 +40,7 @@ namespace Microi.net
                     .AddInParameter("@p1", legacyDefaultLimitMemoryMb)
                     .ExecuteNonQuery();
 
-                Console.WriteLine(
+                UpgradeProgress.WriteLine(
                     $"Microi：【提示】平台自动升级【{osClient}】已将 {affected} 个接口引擎的历史默认内存预算从 1024MB 提升到 2048MB。");
                 await Task.CompletedTask;
             }

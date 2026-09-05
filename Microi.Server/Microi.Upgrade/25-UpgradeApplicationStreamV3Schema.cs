@@ -346,7 +346,7 @@ namespace Microi.net
                     dialect);
                 if (legacyVersionBackfill.FileCount > 0)
                 {
-                    Console.WriteLine(
+                    UpgradeProgress.WriteLine(
                         $"Microi：【自动升级状态】【{osClient}】【Upgrade25-历史应用文件归档】成功："
                         + $"应用={legacyVersionBackfill.ApplicationCount}，文件={legacyVersionBackfill.FileCount}，"
                         + $"新建历史版本={legacyVersionBackfill.CreatedVersionCount}，"

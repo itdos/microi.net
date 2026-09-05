@@ -14,12 +14,12 @@ namespace Microi.net
                 services.AddSingleton<IMicroiUpgrade, MicroiUpgrade>();
                 services.AddSingleton<MicroiStartupGate>();
                 services.AddHostedService<MicroiUpgradeHostedService>();
-                Console.WriteLine("Microi：【成功】注入【服务器端自动升级】插件成功！");
+                UpgradeProgress.WriteLine("Microi：【成功】注入【服务器端自动升级】插件成功！");
                 return services;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】注入【服务器端自动升级】插件失败：" + ex.Message);
+                UpgradeProgress.WriteLine("Microi：【Error异常】注入【服务器端自动升级】插件失败：" + ex.Message);
                 return services;
             }
         }

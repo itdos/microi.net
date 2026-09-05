@@ -275,7 +275,7 @@ namespace Microi.net
                         patch)
                     .ConfigureAwait(false);
                 UpgradeExecutionLeaseContext.ConfirmOwnership();
-                Console.WriteLine(
+                UpgradeProgress.WriteLine(
                     $"Microi：【兼容修复】平台升级[{osClient}]在 FormEngine 元数据写入异常后，"
                     + $"已通过受限参数化物理路径更新 {tableName}.{id}；"
                     + $"原始错误={SanitizePhysicalFallbackDiagnosticText(formEngineFailure.Msg)}");
@@ -889,7 +889,7 @@ return ''";
 
                     if (failures == 1 || failures % 6 == 0)
                     {
-                        Console.WriteLine(
+                        UpgradeProgress.WriteLine(
                             $"Microi：【警告】平台升级分布式租约续租暂时失败，第{failures}次，将在"
                             + $"{RenewRetryIntervalMilliseconds / 1000}秒后重试：{ex.Message}");
                     }

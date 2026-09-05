@@ -250,7 +250,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.7\.4/);
+  assert.ok(compareSemanticVersions(source.match(/Version:\s*(v\d+\.\d+\.\d+)/)[1], 'v2.7.5') >= 0);
 });
 
 test("standalone Web and UniApp installs always expose a target-tenant launch menu", () => {
@@ -455,7 +455,7 @@ function runAdminMenuPermissionFixture(options = {}) {
       Permission: '["Read","LegacyButton"]',
     },
   ]);
-  const calls = { add: [], update: [], physical: [], cache: [] };
+  const calls = { add: [], update: [], physical: [], cache: [], roleInserts: [] };
   let duplicateInjected = false;
   const menuModel = clone(options.menuModel || {
     Id: "menu-new",
@@ -469,6 +469,10 @@ function runAdminMenuPermissionFixture(options = {}) {
     AdminRoleLimitSkipped: 0,
   };
   const fixtureContext = {
+    runtimeIsSqlServer: false,
+    runtimeIsOracle: false,
+    trustedOfficialPlatformPackage: options.trustedOfficial !== false,
+    quotePhysicalIdentifier: name => name,
     menuModel,
     stats,
     debugLog: {},
@@ -490,7 +494,7 @@ function runAdminMenuPermissionFixture(options = {}) {
       },
       FormEngine: {
         GetTableData(tableName, param) {
-          if (tableName === "sys_role") return { Code: 1, Data: clone(roles) };
+          if (tableName === "sys_role") throw new Error('Role metadata is unavailable during bootstrap');
           if (tableName !== "sys_rolelimit") throw new Error(`unexpected table ${tableName}`);
           if (options.roleLimitReadResult) return clone(options.roleLimitReadResult);
           if (options.missingRoleLimitMetadata) {
@@ -541,9 +545,10 @@ function runAdminMenuPermissionFixture(options = {}) {
         FromSql(sql) {
           const call = { sql, parameters: [], executed: false };
           calls.physical.push(call);
-          if (/^SELECT /i.test(sql) && options.physicalReadError) {
+          if (/^SELECT .*FROM sys_rolelimit /i.test(sql) && options.physicalReadError) {
             throw new Error(options.physicalReadError);
           }
+          if (/^SELECT .*FROM sys_role(?: |$)/i.test(sql) && options.roleReadError) throw new Error(options.roleReadError);
           if (!/^SELECT /i.test(sql) && options.physicalWriteError) {
             throw new Error(options.physicalWriteError);
           }
@@ -554,13 +559,26 @@ function runAdminMenuPermissionFixture(options = {}) {
             },
             ToArray() {
               const values = call.parameters.map(item => item[1]);
+              if (/FROM sys_role WHERE/.test(sql)) return clone(roles.filter(row => Number(row.Level) >= 9999 && Number(row.IsDeleted || 0) !== 1));
+              if (/FROM sys_user WHERE/.test(sql)) return clone(options.users || []);
               return clone(roleLimits.filter(row => (
                 row.RoleId === values[0] && row.FkId === values[1] && row.Type === values[2]
               )));
             },
+            ToScalar() {
+              if (sql === 'SELECT COUNT(*) FROM sys_role') return roles.length;
+              if (sql === 'SELECT COUNT(*) FROM sys_rolelimit') return roleLimits.length;
+              throw new Error(`Unexpected scalar ${sql}`);
+            },
             ExecuteNonQuery() {
               call.executed = true;
               const values = call.parameters.map(item => item[1]);
+              if (/^INSERT INTO sys_role /.test(sql)) {
+                const row = { Id: values[0], Name: values[1], Level: values[2], IsDeleted: values[3] };
+                calls.roleInserts.push(clone(row));
+                if (!options.dropRoleInsert) roles.push(row);
+                return 1;
+              }
               if (/^INSERT /i.test(sql)) {
                 if (roleLimits.some(row => row.Id === values[0])) {
                   throw new Error("Duplicate entry 'same' for key 'PRIMARY'");
@@ -1083,6 +1101,42 @@ test("physical NOT NULL backfill can explicitly use the authoritative target ten
     ),
     /不支持的NOT NULL回填来源/,
   );
+});
+
+test('administrator discovery works before role metadata exists and excludes non-admin or deleted roles', () => {
+  const result = runAdminMenuPermissionFixture({ roles: [
+    { Id: 'active-admin', Level: 9999, IsDeleted: null },
+    { Id: 'ordinary', Level: 9998, IsDeleted: 0 },
+    { Id: 'deleted-admin', Level: 9999, IsDeleted: 1 },
+  ], roleLimits: [] });
+  assert.deepEqual(result.calls.add.map(row => row.RoleId), ['active-admin']);
+  assert.equal(result.calls.roleInserts.length, 0);
+  assert.throws(() => runAdminMenuPermissionFixture({ roleReadError: 'connection denied' }), /connection denied/);
+});
+
+test('trusted empty-tenant bootstrap restores only the missing role already referenced by an active administrator', () => {
+  const id = '5db47859-35a3-411a-a1f7-99482e057d24';
+  const user = { RoleIds: JSON.stringify([id]), Level: 9999, State: 1, IsDeleted: 0 };
+  const result = runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [user], missingRoleLimitMetadata: true });
+  assert.deepEqual(result.calls.roleInserts, [{ Id: id, Name: '系统管理员', Level: 9999, IsDeleted: 0 }]);
+  assert.equal(result.roleLimits.length, 1);
+  assert.equal(result.roleLimits[0].RoleId, id);
+  assert.ok(result.calls.physical.every(call => !/UPDATE sys_user|INSERT INTO sys_user/.test(call.sql)));
+  const replay = runAdminMenuPermissionFixture({ roles: result.calls.roleInserts, roleLimits: result.roleLimits, users: [user] });
+  assert.equal(replay.calls.roleInserts.length, 0);
+  assert.equal(replay.calls.add.length + replay.calls.update.length, 0);
+  for (const variant of [
+    { trustedOfficial: false },
+    { users: [] },
+    { users: [{ ...user, State: 0 }] },
+    { users: [{ ...user, IsDeleted: 1 }] },
+    { users: [{ ...user, RoleIds: JSON.stringify(['some-other-role']) }] },
+    { roles: [{ Id: id, Level: 9999, IsDeleted: 1 }] },
+    { roles: [{ Id: 'tenant-role', Level: 1, IsDeleted: 0 }] },
+    { roleLimits: [{ Id: 'orphan', RoleId: id }] },
+  ]) assert.throws(() => runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [user], ...variant }), /未找到有效的系统管理员角色/);
+  assert.throws(() => runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [user, { ...user, Level: 1 }] }), /非管理员账号引用/);
+  assert.throws(() => runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [user], dropRoleInsert: true }), /恢复后回读不一致/);
 });
 
 test("marketplace changelog tenant backfill repairs the reported unique-key collision and repeats cleanly", () => {
@@ -1958,7 +2012,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
   assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 8\)/);
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 7, 4\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 7, 13\)/);
   assert.match(source, /SQLSERVER_PHYSICAL_SCHEMA_DIALECT_V1/);
   assert.match(source, /SQLSERVER_PHYSICAL_FIELD_CHANGE_V1/);
   assert.match(source, /FROM sys\.default_constraints dc/);
@@ -1967,7 +2021,8 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(source, /i\.is_primary_key = 0 AND i\.is_unique_constraint = 0/);
   assert.match(appStoreUpgradeSource, /MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1/);
   assert.match(appStoreUpgradeSource, /V8TrustedExecutionContext\.EnterManagedProtocol\([\s\S]*?"import-microi-store-package"/);
-  assert.match(appStoreUpgradeSource, /dynamic\s+installResult\s*;/);
+  assert.match(appStoreUpgradeSource, /object\s+installResult\s*;/);
+  assert.match(appStoreUpgradeSource, /GetInstallFailureMessage\(installResult\)/);
   assert.doesNotMatch(appStoreUpgradeSource, /DosResult\s+installResult\s*;/);
   assert.doesNotMatch(appStoreUpgradeSource, /AllowAnonymous,\s*Lock\s*\r?\nFROM sys_apiengine/);
   assert.match(appStoreUpgradeSource, /GetInstalledV8FirstApplicationRuntimeRepairReason[\s\S]*?SELECT \*[\s\S]*?FROM sys_apiengine/);
@@ -2103,7 +2158,7 @@ test("API-engine readback normalizes legacy flag shapes and physically reconcile
     V8: {
       OsClient: "tenant-a",
       FormEngine: {
-        GetFormData: () => ({ Code: 2 }),
+        GetFormData: () => { throw new Error('old metadata projection is unavailable'); },
       },
       Cache: {
         Remove: key => cache.delete(key),
@@ -2213,7 +2268,7 @@ test("legacy physical prerequisites commit at most one metadata table per backgr
       "formbannericon", "formbannerbackgroundfield", "formbannertagfields", "formbannermetrics",
     ]),
     diy_field: new Set(),
-    sys_microistore: new Set(),
+    sys_microistore: new Set(["id"]),
   };
   const alterSql = [];
   const fixture = {
@@ -2289,6 +2344,54 @@ test("legacy physical prerequisites commit at most one metadata table per backgr
   assert.equal(modern.RemainingTableCount, 0);
   assert.deepEqual([...modern.Added], []);
   assert.equal(alterSql.length, 4, "no-op modern tenants must not receive an empty ALTER slice");
+
+  delete schemas.sys_microistore;
+  const firstInstall = fixture.result(999);
+  assert.equal(firstInstall.ChangedTableCount, 0);
+  assert.equal(firstInstall.RemainingTableCount, 0);
+  assert.equal(alterSql.length, 4, "an absent marketplace table must reach its package CREATE phase without ALTER");
+
+  schemas.sys_microistore = new Set(["id"]);
+  const afterPackageCreate = fixture.result(999);
+  assert.equal(afterPackageCreate.ChangedTableCount, 1);
+  assert.equal(afterPackageCreate.Added.length, 8);
+  assert.equal(alterSql.length, 5, "an existing old marketplace still receives all pointer columns");
+  assert.equal(fixture.result(999).ChangedTableCount, 0, "replay after CREATE and backfill is a no-op");
+});
+
+test("database-only legacy tenant runtime derives its own serving API and keeps tenant identity", () => {
+  const fixture = {
+    V8: { SysConfig: {}, OsClient: 'legacy-child' },
+    firstTextParam: values => values.find(value => value) || '',
+    System: {
+      Text: { Encoding: { UTF8: { GetString: value => value.toString('utf8'), GetBytes: value => Buffer.from(value, 'utf8') } } },
+      Convert: { FromBase64String: value => Buffer.from(value, 'base64'), ToBase64String: value => Buffer.from(value).toString('base64') },
+    },
+  };
+  const runtimeHelper = source.slice(source.indexOf('var rewriteApplicationRuntimeContext = function ('), source.indexOf('// PUBLIC_APPLICATION_ENTRY_URL_V1'));
+  vm.runInNewContext(`${runtimeHelper}; result=rewriteApplicationRuntimeContext;`, fixture);
+  const html = '<html><head><script data-microi-runtime-context="true">publisherContext()</script></head><body>app</body></html>';
+  const input = Buffer.from(html).toString('base64');
+  assert.throws(() => fixture.result('micro-app/app/v1', 'index.html', input), /ApiBase/);
+  const rewritten = Buffer.from(fixture.result('micro-app/app/v1', 'index.html', input, true), 'base64').toString();
+  assert.doesNotMatch(rewritten, /publisherContext/);
+  const script = rewritten.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1];
+  for (const [entry, expected] of [
+    ['https://tenant-api.example/micro-app/legacy-child/app/index.html', 'https://tenant-api.example'],
+    ['https://tenant-api.example/v2/micro-app/legacy-child/app/', 'https://tenant-api.example/v2'],
+  ]) {
+    const window = { __MICRO_APP_PUBLIC_PATH__: entry, location: { href: 'about:blank' }, __MICROI_APP_CONTEXT__: { ApiBase: 'https://publisher.example', OsClient: 'publisher' } };
+    vm.runInNewContext(script, { window, URL });
+    assert.equal(window.MICROI_API_BASE, expected);
+    assert.equal(window.MICROI_OS_CLIENT, 'legacy-child');
+  }
+  assert.throws(() => vm.runInNewContext(script, { window: { location: { href: 'https://cdn.example/assets/index.html' } }, URL }), /API/);
+  fixture.V8.SysConfig.ApiBase = 'https://configured.example/custom';
+  const configured = Buffer.from(fixture.result('micro-app/app/v1', 'index.html', input, true), 'base64').toString();
+  const window = {};
+  vm.runInNewContext(configured.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1], { window });
+  assert.equal(window.MICROI_API_BASE, 'https://configured.example/custom');
+  assert.equal(window.MICROI_OS_CLIENT, 'legacy-child');
 });
 
 test("import failures identify the active package stage", () => {

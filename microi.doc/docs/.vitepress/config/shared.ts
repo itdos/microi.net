@@ -2,13 +2,16 @@ import { defineConfig } from "vitepress";
 import { groupIconMdPlugin, groupIconVitePlugin, localIconLoader } from "vitepress-plugin-group-icons";
 import mdItCustomAttrs from "markdown-it-custom-attrs";
 import { createSeoHead, transformSeoHtml, transformSeoPageData } from './seo'
+import { SITE_URL, filterSitemapItems } from './seo-policy.mjs'
+import { writeDiscoveryIndex } from '../../../scripts/seo-discovery.mjs'
 
 export const shared = defineConfig({
 	title: "Microi吾码",
 	appearance: "dark",
 	lastUpdated: true,
 	sitemap: {
-		hostname: "https://www.microi.net",
+		hostname: SITE_URL,
+		transformItems: filterSitemapItems,
 	},
 	markdown: {
 		theme: "github-dark",
@@ -27,6 +30,7 @@ export const shared = defineConfig({
 	transformPageData: transformSeoPageData,
 	transformHead: createSeoHead,
 	transformHtml: transformSeoHtml,
+	buildEnd: writeDiscoveryIndex,
 	themeConfig: {
 		logo: "/icon.png",
 		socialLinks: [

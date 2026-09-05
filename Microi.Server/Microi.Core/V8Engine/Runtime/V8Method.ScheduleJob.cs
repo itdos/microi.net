@@ -23,6 +23,9 @@ namespace Microi.net
                 var action = GetJsonString(request, "Action").Trim();
                 switch (action.ToLowerInvariant())
                 {
+                    case "capabilities":
+                        // 老节点会对未知动作返回失败，接口引擎据此在产生调度副作用前提示升级。
+                        return new DosResult(1, new { RuntimeOnly = true });
                     case "getbynames":
                     {
                         var names = (request["Names"] as JArray ?? new JArray())
@@ -149,7 +152,11 @@ namespace Microi.net
                 request.Remove("DllName");
                 request.Remove("JobPath");
 
-                var result = V8McpLogic.SaveJob(osClient, request)
+                // RuntimeOnly 仅切换元数据的事务所有者，不放宽管理员/租户/接口类型校验。
+                // 表单事件只同步 Quartz，避免在提交前另开事务再次写当前任务行。
+                var runtimeOnly = request["RuntimeOnly"]?.Type == JTokenType.Boolean
+                    && request["RuntimeOnly"].Value<bool>();
+                var result = V8McpLogic.SaveJob(osClient, request, persistMetadata: !runtimeOnly)
                     .ConfigureAwait(false).GetAwaiter().GetResult();
                 return result == null
                     ? new DosResult(0, null, "保存定时任务没有返回结果。")

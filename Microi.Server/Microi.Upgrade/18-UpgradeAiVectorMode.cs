@@ -141,7 +141,7 @@ namespace Microi.net
                 // 将来安装当前 AI 引擎资源时会直接获得完整字段。
                 if (tableResult.Code != 1 || tableResult.Data == null)
                 {
-                    Console.WriteLine(
+                    UpgradeProgress.WriteLine(
                         $"Microi：【提示】平台自动升级【{osClient}】未找到 {TableName}，跳过 AI 向量模式元数据升级。");
                     return messages;
                 }

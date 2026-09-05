@@ -54,7 +54,7 @@ namespace Microi.net
             foreach (var step in steps)
             {
                 UpgradeExecutionLeaseContext.ThrowIfLost();
-                Console.WriteLine(
+                UpgradeProgress.WriteLine(
                     $"Microi：【自动升级状态】【{osClient}】【Upgrade36基线：{step.Key}】开始。");
                 var stepMessages = await step.Value().ConfigureAwait(false);
                 UpgradeExecutionLeaseContext.ThrowIfLost();
@@ -67,7 +67,7 @@ namespace Microi.net
                     }
                     return failures;
                 }
-                Console.WriteLine(
+                UpgradeProgress.WriteLine(
                     $"Microi：【自动升级状态】【{osClient}】【Upgrade36基线：{step.Key}】成功。");
             }
 
