@@ -5,7 +5,7 @@
     <mci-skeleton v-if="loading" type="detail" :rows="7" />
     <view v-else-if="error" class="error-state"><text class="error-state__mark">!</text><text class="error-state__title">任务加载失败</text><text class="error-state__text">{{ error }}</text><view class="error-state__button" @tap="loadAll(true)"><text>重新加载</text></view></view>
 
-    <scroll-view v-else class="detail-scroll" scroll-y :refresher-enabled="true" :refresher-triggered="refreshing" @refresherrefresh="refresh">
+    <scroll-view v-else class="detail-scroll" :class="{ 'detail-scroll--with-actions': bottomActions.length }" scroll-y :refresher-enabled="true" :refresher-triggered="refreshing" @refresherrefresh="refresh">
       <view v-if="stale" class="offline-tip"><text>当前先展示最近缓存，联网后下拉可刷新</text></view>
 
       <view class="hero-band">
@@ -36,11 +36,20 @@
       </scroll-view>
       <view class="timeline-divider"></view>
 
-      <view class="action-band">
+      <view class="action-band" :class="{ 'action-band--four': quickActions.length === 4 }">
         <view v-for="action in quickActions" :key="action.key" class="quick-action" hover-class="quick-action--pressed" @tap="runQuickAction(action.key)">
           <view class="quick-action__icon" :class="`tone-${action.tone || 'blue'}`"><image :src="action.icon" mode="aspectFit" /></view><text>{{ action.label }}</text>
           <text v-if="action.key === 'devices'" class="quick-action__badge">{{ completedDeviceCount }}/{{ devices.length }}</text>
         </view>
+      </view>
+
+      <view v-if="needsFlowCapabilities && capabilityError" class="flow-warning">
+        <view class="flow-warning__icon"><text>!</text></view>
+        <view class="flow-warning__copy">
+          <text class="flow-warning__title">流程操作加载失败</text>
+          <text class="flow-warning__text">{{ capabilityError }}</text>
+        </view>
+        <view class="flow-warning__retry" hover-class="flow-warning__retry--pressed" @tap="reloadCapabilities"><text>重新加载</text></view>
       </view>
 
       <view v-for="(group, index) in metadataGroups" :key="`${group.name}:${index}`" class="section-band metadata-section">
@@ -69,7 +78,7 @@
     </scroll-view>
 
     <view v-if="bottomActions.length" class="bottom-bar">
-      <view v-for="action in bottomActions" :key="action.key" class="bottom-button" :class="`bottom-button--${action.style || 'plain'}`" :disabled="submitting" hover-class="bottom-button--pressed" @tap="runBottomAction(action.key)"><text>{{ action.label }}</text></view>
+      <view v-for="action in bottomActions" :key="action.key" class="bottom-button" :class="`bottom-button--${action.style || 'plain'}`" :disabled="submitting" hover-class="bottom-button--pressed" @tap="runBottomAction(action.key)"><text v-if="action.iconText" class="bottom-button__icon">{{ action.iconText }}</text><text>{{ action.label }}</text></view>
     </view>
 
     <view v-if="assignVisible" class="sheet-mask" @tap="assignVisible = false"><view class="bottom-sheet" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>指派服务人员</text><view @tap="assignVisible = false"><text>×</text></view></view><view class="sheet-search"><input v-model="userKeyword" placeholder="搜索姓名、帐号或部门" confirm-type="search" @input="scheduleUserSearch" @confirm="searchUsers" /><text @tap="resetUserSearch">重置</text></view><scroll-view class="user-list" scroll-y><mci-skeleton v-if="usersLoading" type="list" :rows="4" /><template v-else><view v-for="user in users" :key="user.Id" class="user-row" :class="{ active: selectedUser && selectedUser.Id === user.Id }" @tap="selectedUser = user"><view class="user-avatar"><text>{{ (user.Name || user.Account || '人').slice(0,1) }}</text></view><view><text class="user-name">{{ user.Name || user.Account }}</text><text class="user-meta">{{ [user.DeptName, user.RoleName, user.Phone].filter(Boolean).join(' · ') }}</text></view><text class="user-check">{{ selectedUser && selectedUser.Id === user.Id ? '✓' : '' }}</text></view></template></scroll-view><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="assignVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="confirmAssign"><text>确认指派</text></view></view></view></view>
@@ -87,6 +96,7 @@ import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
 import { callApiEngine, findMenu, formatDateTime, openForm } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
+import { buildTaskTimeline } from '@/tenants/xjy/task-detail-presentation.mjs'
 import {
   hasTaskPermission,
   loadServiceUsers,
@@ -98,11 +108,10 @@ import {
   updateTask
 } from '@/utils/xjy-task.js'
 
-const TIMELINE_STATES = ['待接单', '待服务', '待商家验收', '待客户验收', '待评价', '已结束']
 const CUSTOM_DETAIL_FIELDS = new Set([
   'ShouhouFWBH', 'DingdanBH', 'KehuID', 'Leixing', 'ShouhouLX', 'Zhuangtai', 'ShouhouRYID',
   'YujiSHSJ', 'YuyueSJ', 'JiedanSJ', 'ShangmenSJ', 'FinishTime',
-  'ShangjiaYSSJ', 'KehuYSSJ', 'Pingjia', 'ZhuipingNR',
+  'ShangjiaYSSJ', 'KehuYSSJ', 'PingjiaSJ', 'Pingjia', 'ZhuipingNR', 'ServiceRecordId',
   'CreateTime', 'UpdateTime', 'CreateUser', 'OsClient'
 ])
 
@@ -110,7 +119,7 @@ export default {
   mixins: [themeMixin],
   data() {
     return {
-      id: '', task: {}, devices: [], taskCapabilities: [], currentUser: {}, loading: true, refreshing: false,
+      id: '', task: {}, devices: [], taskCapabilities: [], capabilityError: '', currentUser: {}, loading: true, refreshing: false,
       stale: false, error: '', submitting: false, assignVisible: false, usersLoading: false, users: [],
       metadataDefinition: null, taskMenuId: '', expandedMetadata: {},
       selectedUser: null, userKeyword: '', userSearchTimer: null, userLoadRequestId: 0, timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
@@ -135,9 +144,7 @@ export default {
       })).filter((group) => group.fields.length)
     },
     timeline() {
-      const currentIndex = Math.max(0, TIMELINE_STATES.indexOf(this.task.state))
-      const times = [this.task.CreateTime, this.task.acceptedTime, this.task.finishTime, this.task.ShangjiaYSSJ, this.task.KehuYSSJ, this.task.UpdateTime]
-      return TIMELINE_STATES.map((name, index) => ({ name, active: index <= currentIndex, current: index === currentIndex, time: formatDateTime(times[index], true) }))
+      return buildTaskTimeline(this.task, (value) => formatDateTime(value, true))
     },
     timeRows() {
       return [
@@ -153,11 +160,16 @@ export default {
       return (pending || this.timeRows[this.timeRows.length - 1] || {}).field
     },
     quickActions() {
-      return [
+      const actions = [
         { key: 'customer', label: '客户详情', icon: '/static/xjy/business/kehu.png', tone: 'blue' },
         { key: 'checkin', label: '现场打卡', icon: '/static/xjy/business/dw.png', tone: 'orange' },
         { key: 'devices', label: '任务设备', icon: '/static/xjy/business/shebei.png', tone: 'violet' }
       ]
+      if (this.task.ServiceRecordId) actions.push({ key: 'archive', label: '档案结果', icon: '/static/xjy/business/fwjllb.png', tone: 'green' })
+      return actions
+    },
+    needsFlowCapabilities() {
+      return ['待商家验收', '待客户验收', '待评价'].includes(this.task.state)
     },
     bottomActions() {
       const state = this.task.state
@@ -170,7 +182,7 @@ export default {
       if (state === '待服务' && (this.isOwner || this.isAdmin)) return [{ key: 'cancel', label: '撤销接单', style: 'plain' }, { key: 'finish', label: '去完成服务', style: 'primary' }]
       if (state === '待商家验收') return [{ key: 'merchantReject', label: '退回处理', style: 'danger-plain' }, { key: 'merchantPass', label: '验收通过', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
       if (state === '待客户验收') return [{ key: 'customerReject', label: '退回处理', style: 'danger-plain' }, { key: 'customerPass', label: '确认验收', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
-      if (state === '待评价' && this.canRunTaskAction('evaluate')) return [{ key: 'evaluate', label: '评价本次服务', style: 'primary' }]
+      if (state === '待评价' && this.canRunTaskAction('evaluate')) return [{ key: 'evaluate', label: '评价本次服务', style: 'primary', iconText: '★' }]
       if (/已结束|已完成/.test(String(state)) && this.task.Pingjia && !this.task.ZhuipingNR) return [{ key: 'followUp', label: '追加评价', style: 'plain' }]
       return []
     }
@@ -191,7 +203,12 @@ export default {
       this.error = ''
       try {
         const definitionRequest = loadNativeFormDefinition('Diy_ShouhouDD', refresh).catch(() => this.metadataDefinition)
-        const capabilityRequest = loadTaskFlowCapabilities(this.id, refresh).catch(() => ({ actions: [] }))
+        this.capabilityError = ''
+        // 流程权限必须由服务端裁定；请求失败时安全关闭操作，并把失败原因显式交给用户重试。
+        const capabilityRequest = loadTaskFlowCapabilities(this.id, refresh).catch((error) => {
+          this.capabilityError = (error && error.message) || '请检查网络后重试'
+          return { actions: [] }
+        })
         const menuRequest = findMenu(
           ['售后订单', '售后任务', '我的任务'],
           'Diy_ShouhouDD',
@@ -251,6 +268,24 @@ export default {
       if (key === 'devices') {
         const query = [`taskId=${encodeURIComponent(this.id)}`, `taskType=${encodeURIComponent(this.task.type || '')}`].join('&')
         return uni.navigateTo({ url: `/pages/task/devices?${query}` })
+      }
+      if (key === 'archive' && this.task.ServiceRecordId) {
+        return uni.navigateTo({ url: `/pages/native/service-record?id=${encodeURIComponent(this.task.ServiceRecordId)}&mode=view` })
+      }
+    },
+    async reloadCapabilities() {
+      if (this.submitting) return
+      this.submitting = true
+      this.capabilityError = ''
+      try {
+        const capabilities = await loadTaskFlowCapabilities(this.id, true)
+        this.taskCapabilities = capabilities.actions || []
+        if (!this.taskCapabilities.length) uni.showToast({ title: '当前账号没有可执行的流程操作', icon: 'none' })
+      } catch (error) {
+        this.capabilityError = (error && error.message) || '流程操作加载失败'
+        uni.showToast({ title: this.capabilityError, icon: 'none' })
+      } finally {
+        this.submitting = false
       }
     },
     async runBottomAction(key) {
@@ -348,7 +383,8 @@ export default {
 .detail-page { height: 100vh; overflow: hidden; }
 .nav-more { width: 70rpx; height: 62rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #315563; font-size: 26rpx; letter-spacing: 2rpx; transition: transform .18s ease, background .18s ease; }
 .nav-more--pressed { transform: scale(.94); background: #edf5f8; }
-.detail-scroll { height: calc(100vh - var(--mci-safe-top) - 92rpx - 112rpx - var(--mci-safe-bottom)); }
+.detail-scroll { height: calc(100vh - var(--mci-safe-top) - 92rpx); }
+.detail-scroll--with-actions { height: calc(100vh - var(--mci-safe-top) - 92rpx - 112rpx - var(--mci-safe-bottom)); }
 .offline-tip { padding: 12rpx 22rpx; color: #7c5b1c; background: #fff8e6; font-size: 21rpx; }
 .hero-band { position: relative; overflow: hidden; min-height: 276rpx; padding: 30rpx 26rpx 26rpx; color: #fff; background: #063b5c; box-sizing: border-box; }
 .hero-band__water, .hero-band__shade { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -360,8 +396,8 @@ export default {
 .hero-band__title, .hero-band__no { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hero-band__title { font-size: 32rpx; font-weight: 750; }
 .hero-band__no { margin-top: 6rpx; color: rgba(255,255,255,.68); font-size: 21rpx; }
-.hero-band__status { flex: none; max-width: 170rpx; padding: 8rpx 12rpx; border-radius: 6px; background: rgba(227,152,38,.9); font-size: 20rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hero-band__status.is-progress { background: rgba(20,141,176,.9); }.hero-band__status.is-review { background: rgba(117,86,180,.9); }.hero-band__status.is-success { background: rgba(20,118,83,.9); }.hero-band__status.is-danger { background: rgba(181,65,59,.9); }
+.hero-band__status { flex: none; max-width: 170rpx; padding: 8rpx 12rpx; border-radius: 6px; color: #3b2807; background: rgba(227,152,38,.94); font-size: 24rpx; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-band__status.is-progress { color: #fff; background: rgba(0,92,128,.95); }.hero-band__status.is-review { color: #fff; background: rgba(101,65,148,.95); }.hero-band__status.is-success { color: #fff; background: rgba(15,101,71,.95); }.hero-band__status.is-danger { color: #fff; background: rgba(158,49,45,.95); }
 .hero-band__meta { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin-top: 34rpx; }
 .hero-band__meta view { min-width: 0; padding: 0 12rpx; border-right: 1px solid rgba(255,255,255,.24); text-align: center; }.hero-band__meta view:last-child { border-right: none; }
 .hero-band__meta text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.hero-band__meta text:first-child { font-size: 25rpx; font-weight: 700; }.hero-band__meta text:last-child { margin-top: 6rpx; color: rgba(255,255,255,.65); font-size: 19rpx; }
@@ -374,10 +410,15 @@ export default {
 .timeline-step__name, .timeline-step__time { display: block; }.timeline-step__name { margin-top: 10rpx; color: #66808a; font-size: 20rpx; }.timeline-step.active .timeline-step__name { color: #24505f; font-weight: 650; }.timeline-step__time { margin-top: 4rpx; color: #9aaab0; font-size: 17rpx; }
 .service-time-scroll { border-top: 10rpx solid #f1f6f8; border-bottom: 0; }.service-time-row { padding-top: 25rpx; }.service-time-step { width: 176rpx; padding: 0 4rpx 5rpx; border-radius: 8px; box-sizing: border-box; transition: background .16s ease, transform .16s ease; }.service-time-step.editable { cursor: pointer; }.service-time-step--pressed { background: #edf7fa; transform: scale(.985); }.service-time-step .timeline-step__name { white-space: nowrap; }.service-time-step .timeline-step__time { min-height: 44rpx; padding: 0 3rpx; white-space: normal; line-height: 1.35; }.timeline-divider { height: 14rpx; border-top: 1px solid #e5edef; border-bottom: 1px solid #e5edef; background: #f1f6f8; box-sizing: border-box; }
 .action-band { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 18rpx 12rpx; background: #fff; }
+.action-band--four { grid-template-columns: repeat(4,minmax(0,1fr)); }
 .quick-action { position: relative; min-width: 0; min-height: 112rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; transition: background .16s ease; }.quick-action--pressed { background: #edf5f8; }
 .quick-action__icon { width: 52rpx; height: 52rpx; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: #087da8; background: #e8f6fa; font-size: 23rpx; font-weight: 700; }.quick-action__icon image { width: 32rpx; height: 32rpx; }.quick-action__icon.tone-green { color: #167658; background: #e8f7f1; }.quick-action__icon.tone-orange { color: #bd6813; background: #fff2df; }.quick-action__icon.tone-violet { color: #6d4ba5; background: #f1ecfa; }
 .quick-action > text { max-width: 100%; margin-top: 9rpx; overflow: hidden; color: #45636e; text-overflow: ellipsis; white-space: nowrap; font-size: 21rpx; }
 .quick-action > .quick-action__badge { position: absolute; top: 1rpx; right: 8rpx; max-width: none; min-width: 90rpx; margin-top: 0; padding: 5rpx 9rpx; border-radius: 999rpx; color: #e54625;  font-size: 17rpx; font-weight: 700; line-height: 1.2; text-align: center; overflow: visible; }
+.flow-warning { display: grid; grid-template-columns: 48rpx minmax(0,1fr) auto; gap: 14rpx; align-items: center; margin: 14rpx 24rpx 0; padding: 18rpx 20rpx; border: 1rpx solid #f0d9ae; border-radius: 8rpx; background: #fff9ed; }
+.flow-warning__icon { display: flex; align-items: center; justify-content: center; width: 42rpx; height: 42rpx; border-radius: 50%; background: #9f5c05; color: #fff; font-size: 24rpx; font-weight: 750; }
+.flow-warning__copy { min-width: 0; }.flow-warning__title, .flow-warning__text { display: block; }.flow-warning__title { color: #70531d; font-size: 23rpx; font-weight: 700; }.flow-warning__text { margin-top: 4rpx; overflow: hidden; color: #947542; font-size: 20rpx; text-overflow: ellipsis; white-space: nowrap; }
+.flow-warning__retry { display: flex; align-items: center; justify-content: center; min-width: 112rpx; min-height: 88rpx; padding: 0 12rpx; border: 1rpx solid #d99a35; border-radius: 7rpx; color: #9b6514; font-size: 21rpx; font-weight: 650; }.flow-warning__retry--pressed { background: #faedcf; transform: scale(.97); }
 .section-band { margin-top: 14rpx; padding: 0 26rpx; background: #fff; }
 .section-heading { min-height: 82rpx; display: flex; align-items: center; border-bottom: 1px solid #edf2f4; color: #244954; font-size: 27rpx; font-weight: 700; }
 .section-heading__copy { min-width: 0; flex: 1; display: flex; align-items: center; }
@@ -398,9 +439,10 @@ export default {
 .info-row__label { color: #71868f; font-size: 23rpx; }.info-row__value-wrap { display: flex; align-items: center; justify-content: flex-end; min-width: 0; gap: 10rpx; }.info-row__value { color: #294b57; font-size: 24rpx; line-height: 1.55; text-align: right; word-break: break-all; }.inline-icon { flex: none; width: 49rpx; height: 49rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #087da8; background: #eaf6f9; font-size: 20rpx; }
 .time-row { min-height: 82rpx; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f0f4f5; }.time-row:last-child { border-bottom: none; }.time-row__label, .time-row__value { display: block; }.time-row__label { color: #71868f; font-size: 21rpx; }.time-row__value { margin-top: 5rpx; color: #294b57; font-size: 24rpx; }.time-row__action { color: #087da8; font-size: 21rpx; }.time-row.editable { cursor: pointer; }
 .text-block { padding: 19rpx 0; border-bottom: 1px solid #f0f4f5; }.text-block:last-child { border-bottom: none; }.text-block__label, .text-block__value { display: block; }.text-block__label { color: #71868f; font-size: 21rpx; }.text-block__value { margin-top: 8rpx; color: #294b57; font-size: 24rpx; line-height: 1.68; white-space: pre-wrap; word-break: break-all; }.text-block--warning { margin: 13rpx 0; padding: 17rpx; border-left: 3px solid #cf6d2d; background: #fff6ed; }.detail-spacer { height: 35rpx; }
-.bottom-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; display: flex; gap: 13rpx; padding: 15rpx 21rpx calc(15rpx + var(--mci-safe-bottom)); border-top: 1px solid #e3ebee; background: rgba(255,255,255,.97); }.bottom-button { flex: 1; min-width: 0; height: 82rpx; border-radius: 7px; color: #486670; background: #edf3f5; font-size: 25rpx; font-weight: 700; line-height: 82rpx; text-align: center; transition: transform .16s ease; }.bottom-button--primary { color: #fff; background: #e54625; }.bottom-button--success { color: #fff; background: #137657; }.bottom-button--danger-plain { color: #b4433e; background: #fff0ef; }.bottom-button--pressed { transform: scale(.98); }
+.bottom-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; display: flex; gap: 13rpx; padding: 15rpx 21rpx calc(15rpx + var(--mci-safe-bottom)); border-top: 1px solid #e3ebee; background: rgba(255,255,255,.97); }.bottom-button { flex: 1; min-width: 0; height: 82rpx; display: flex; align-items: center; justify-content: center; gap: 10rpx; border-radius: 7px; color: #486670; background: #edf3f5; font-size: 25rpx; font-weight: 700; line-height: 1; text-align: center; transition: transform .16s ease; }.bottom-button__icon { font-size: 27rpx; line-height: 1; }.bottom-button--primary { color: #fff; background: #e54625; }.bottom-button--success { color: #fff; background: #137657; }.bottom-button--danger-plain { color: #b4433e; background: #fff0ef; }.bottom-button--pressed { transform: scale(.98); }
 .error-state { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50rpx; text-align: center; }.error-state__mark { width: 78rpx; height: 78rpx; border-radius: 50%; color: #fff; background: #c34c47; font-size: 42rpx; line-height: 78rpx; }.error-state__title { margin-top: 20rpx; font-size: 29rpx; font-weight: 700; }.error-state__text { margin-top: 9rpx; color: #788c94; font-size: 23rpx; }.error-state__button { margin-top: 26rpx; padding: 16rpx 34rpx; border-radius: 6px; color: #fff; background: #087da8; font-size: 23rpx; }
 .sheet-mask { position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; background: rgba(11,32,40,.5); }.bottom-sheet { width: 100%; max-height: 82vh; padding: 12rpx 25rpx calc(22rpx + var(--mci-safe-bottom)); border-radius: 8px 8px 0 0; background: #fff; box-sizing: border-box; animation: sheetUp .22s ease-out both; }.bottom-sheet--compact { max-height: 64vh; }.sheet-handle { width: 70rpx; height: 8rpx; margin: 0 auto 18rpx; border-radius: 4rpx; background: #d5e0e4; }.sheet-heading { min-height: 64rpx; display: flex; align-items: center; justify-content: space-between; color: #17333e; font-size: 30rpx; font-weight: 750; }.sheet-heading > view { width: 54rpx; height: 54rpx; border-radius: 50%; color: #698089; background: #f0f5f7; font-size: 34rpx; line-height: 54rpx; text-align: center; }.sheet-search { display: grid; grid-template-columns: minmax(0,1fr) 90rpx; align-items: center; height: 72rpx; margin: 15rpx 0; padding-left: 20rpx; border: 1px solid #dce7eb; border-radius: 7px; background: #f6f9fa; }.sheet-search input { width: 100%; font-size: 23rpx; }.sheet-search > text { color: #087da8; font-size: 22rpx; text-align: center; }.user-list { max-height: 48vh; }.user-row { min-height: 88rpx; display: grid; grid-template-columns: 54rpx minmax(0,1fr) 42rpx; gap: 13rpx; align-items: center; padding: 6rpx 10rpx; border-bottom: 1px solid #edf2f4; box-sizing: border-box; }.user-row.active { background: #edf8fb; }.user-avatar { width: 50rpx; height: 50rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: #087da8; font-size: 22rpx; }.user-name, .user-meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.user-name { color: #294b57; font-size: 24rpx; font-weight: 650; }.user-meta { margin-top: 4rpx; color: #84969d; font-size: 19rpx; }.user-check { color: #087da8; font-size: 27rpx; text-align: center; }.sheet-actions { display: grid; grid-template-columns: 1fr 1.7fr; gap: 13rpx; margin-top: 22rpx; }.sheet-button { height: 80rpx; border-radius: 7px; font-size: 25rpx; font-weight: 700; line-height: 80rpx; text-align: center; }.sheet-button--plain { color: #496671; background: #edf3f5; }.sheet-button--primary { color: #fff; background: #e54625; }.sheet-button--danger { color: #fff; background: #b4433e; }.datetime-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; margin: 24rpx 0; }.picker-control { height: 78rpx; padding: 0 18rpx; border: 1px solid #dce7eb; border-radius: 7px; color: #294b57; background: #f6f9fa; font-size: 24rpx; line-height: 78rpx; text-align: center; }.reason-textarea { width: 100%; height: 190rpx; margin-top: 20rpx; padding: 18rpx; border: 1px solid #dce7eb; border-radius: 7px; background: #f6f9fa; box-sizing:border-box; font-size: 24rpx; line-height: 1.6; }.rating-row { min-height: 72rpx; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #edf2f4; color: #405f69; font-size: 23rpx; }.rating-star { margin-left: 10rpx; color: #d7e0e3; font-size: 37rpx; }.rating-star.active { color: #efac28; }.evaluation-tags { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 18rpx; }.evaluation-tags view { padding: 10rpx 15rpx; border: 1px solid #dce7eb; border-radius: 6px; color: #607982; background: #f7fafb; font-size: 21rpx; }.evaluation-tags view.active { border-color: #087da8; color: #087da8; background: #edf8fb; }
+.bottom-button--primary, .sheet-button--primary { background: #c6381f; }
 @keyframes sheetUp { from{transform:translateY(100%);opacity:.7}to{transform:translateY(0);opacity:1} }
 @media (prefers-reduced-motion: reduce) { .bottom-sheet, .bottom-button, .quick-action, .service-time-step { animation: none; transition: none; } }
 </style>

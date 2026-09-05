@@ -6,6 +6,8 @@
       :initial-tab="currentView"
       :work-menu-id="workMenuId"
       :flow-menu-id="flowMenuId"
+      :notice-menu-id="noticeMenuId"
+      :calendar-menu-id="calendarMenuId"
       embedded
     />
   </div>
@@ -32,6 +34,8 @@ const currentView = computed(() => {
 
 const workMenuId = computed(() => props.widgetObj.widgetParams?.[1]?.value || '')
 const flowMenuId = computed(() => props.widgetObj.widgetParams?.[2]?.value || '')
+const noticeMenuId = computed(() => props.widgetObj.widgetParams?.[3]?.value || '')
+const calendarMenuId = computed(() => props.widgetObj.widgetParams?.[4]?.value || '')
 
 onBeforeUnmount(() => {
   workCenterComp.value = null

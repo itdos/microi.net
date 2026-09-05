@@ -33,7 +33,7 @@
               <image v-for="(photo, index) in item._photos.slice(0, 3)" :key="photo" :src="photo" mode="aspectFill" @tap.stop="previewPhotos(item._photos, index)" />
               <view v-if="item._photos.length > 3" class="photo-more"><text>+{{ item._photos.length - 3 }}</text></view>
             </view>
-            <view class="case-foot"><text>{{ item._pending ? '保存案例册时一并添加' : canEditCase ? '编辑案例详情' : item.TuijianPY || '查看案例详情' }}</text><text>{{ item._pending ? '待保存' : '›' }}</text></view>
+            <view class="case-foot"><text>{{ item._pending ? '保存案例册时一并添加' : '查看案例详情' }}</text><text>{{ item._pending ? '待保存' : '›' }}</text></view>
           </view>
         </view>
         <view v-else-if="bookId || canEdit" class="empty-state"><view class="empty-mark"><text>案</text></view><text class="empty-title">{{ bookId ? '尚未收录客户案例' : '尚未选择客户案例' }}</text></view>
@@ -121,7 +121,6 @@ export default {
       if (!this.bookId) return Boolean(this.currentUser.TenantId)
       return canEditMenuRecord(this.bookMenuId, this.currentUser)
     },
-    canEditCase() { return canEditMenuRecord(this.casePhotoContext.sysMenuId, this.currentUser) },
     canExportPdf() { return Boolean(this.bookId && appConfig.features && appConfig.features.casebookPdf) },
     hasPendingChildren() { return this.children.some((item) => item._pending) },
     savingBook() { return this.creating || this.addingCases },
@@ -420,13 +419,14 @@ export default {
         return
       }
       const menuId = String(this.casePhotoContext.sysMenuId || '')
-      const mode = this.canEditCase ? 'Edit' : 'View'
       const params = [
         `table=${encodeURIComponent(CASE_CHILD_TABLE)}`,
         `id=${encodeURIComponent(item.Id)}`,
-        `mode=${encodeURIComponent(mode)}`,
+        `mode=${encodeURIComponent('View')}`,
         `title=${encodeURIComponent('案例详情')}`
       ]
+      // 卡片只负责进入详情；有编辑权限时由详情页展示明确的“编辑”按钮，
+      // 避免用户查看已收录案例时被直接带入可修改表单。
       // 列表缩略图与详情图必须复用同一个已授权菜单。否则详情页虽能读取记录，
       // 私有文件解析仍会因缺少 SysMenuId 失败关闭并显示“图片暂不可用”。
       if (menuId) {

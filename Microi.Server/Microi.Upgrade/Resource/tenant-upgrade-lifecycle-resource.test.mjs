@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { compareSemanticVersions } from './application-store-replica-sync.mjs';
 
 const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const read = name => fs.readFileSync(path.join(resourceDir, name), 'utf8');
@@ -198,12 +199,13 @@ function externalDomainBindingFixture(options = {}) {
 
 test('official package owns the automatic and manual tenant upgrade lifecycle', () => {
   assert.equal(tenantProvisioningTotalSteps, 13);
-  assert.equal(packageModel.PackageInfo.Version, 'v7.8.25');
+  assert.ok(compareSemanticVersions(packageModel.PackageInfo.Version, 'v7.8.25') >= 0);
   assert.equal(packageModel.PackageInfo.ChangeLog.Version, packageModel.PackageInfo.Version);
-  assert.equal(storePackage.PackageInfo.Version, 'v7.9.23');
+  assert.ok(compareSemanticVersions(storePackage.PackageInfo.Version, 'v7.9.23') >= 0);
   assert.equal(storePackage.PackageInfo.ChangeLog.Version, storePackage.PackageInfo.Version);
-  assert.equal(packageModel.PackageInfo.ApiEngineCount, 70);
-  assert.equal(engines.size, 70);
+  // 主线增加了畅捷通回调接口；保持原有能力下限，并核对真实去重数量与包声明一致。
+  assert.ok(engines.size >= 70);
+  assert.equal(packageModel.PackageInfo.ApiEngineCount, engines.size);
   assert.equal(
     new Set((packageModel.SysApiEngines || []).map(item => item.Id)).size,
     packageModel.SysApiEngines.length,
