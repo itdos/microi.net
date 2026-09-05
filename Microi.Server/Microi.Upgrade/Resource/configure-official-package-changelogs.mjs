@@ -24,11 +24,11 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
     releaseTime: webosIconReleaseTime,
   }),
   'app.microi.store.json': Object.freeze({
-    version: 'v7.9.20',
-    title: '升级日志租户回填唯一键冲突修复',
+    version: 'v7.9.25',
+    title: 'AI 应用业务失败保留登录态',
     changeType: 'Fix',
-    content: '导入器 v2.7.2 在 sys_microistore_changelog.OsClient 收紧为非空前，按目标租户与 StoreId、Version 确定性归并历史空租户重复记录，再参数化回填并强回读；修复 ux_microistore_changelog_store_version 重复键导致升级13整包回滚，并增加5000条上限、并发删除计数和幂等复跑门禁。',
-    releaseTime: '2026-09-04 09:00:00',
+    content: '修复 AI 应用脚手架将 Code=-1 的普通业务失败误判为登录过期并清理 DiyToken；继续保留 401、1001、1002 的认证失效处理。保留主线导入器 v2.7.4 与 SQL Server 修复，角色权限仍由租户管理员配置。',
+    releaseTime: '2026-09-05 15:50:00',
   }),
   'app.microi.saas-engine.json': Object.freeze({
     version: 'v7.8.16',

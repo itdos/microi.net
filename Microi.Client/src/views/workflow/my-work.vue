@@ -310,7 +310,7 @@
                         {{ "日历" }}
                     </span>
                 </template>
-                <MicroiCalendar />
+                <MicroiCalendar :menu-id="calendarMenuId" />
             </el-tab-pane>
 
             <!-- ====== Tab 3: 公告 ====== -->
@@ -416,6 +416,14 @@ export default {
             default: ""
         },
         flowMenuId: {
+            type: String,
+            default: ""
+        },
+        noticeMenuId: {
+            type: String,
+            default: ""
+        },
+        calendarMenuId: {
             type: String,
             default: ""
         }
@@ -645,13 +653,15 @@ export default {
             var self = this;
             self.noticeLoading = true;
             try {
-                var result = await self.DiyCommon.FormEngine.GetTableData({
+                var noticeParams = {
                     FormEngineKey: "diy_notice",
                     _PageSize: self.noticePageSize,
                     _PageIndex: self.noticePageIndex,
                     _OrderBy: "CreateTime",
                     _OrderByType: "DESC"
-                });
+                };
+                if (self.noticeMenuId) noticeParams._SysMenuId = self.noticeMenuId;
+                var result = await self.DiyCommon.FormEngine.GetTableData(noticeParams);
                 if (result && result.Code === 1) {
                     self.noticeList = (result.Data || []).map(function (item) {
                         item._expanded = false;
@@ -680,12 +690,14 @@ export default {
             var self = this;
             try {
                 var lastReadTime = localStorage.getItem("Microi.NoticeLastReadTime") || "2000-01-01 00:00:00";
-                var result = await self.DiyCommon.FormEngine.GetTableData({
+                var unreadParams = {
                     FormEngineKey: "diy_notice",
                     _PageSize: 1,
                     _SelectFields: ["Id"],
                     _Where: [{ Name: "CreateTime", Value: lastReadTime, Type: ">" }]
-                });
+                };
+                if (self.noticeMenuId) unreadParams._SysMenuId = self.noticeMenuId;
+                var result = await self.DiyCommon.FormEngine.GetTableData(unreadParams);
                 if (result && result.Code === 1) {
                     self.noticeUnreadCount = result.DataCount || 0;
                 }

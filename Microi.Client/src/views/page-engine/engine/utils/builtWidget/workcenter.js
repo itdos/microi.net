@@ -36,5 +36,19 @@ export const workcenter = {
       value: '',
       typeOptions: {},
     },
+    {
+      sort: 3,
+      label: '公告表单模块',
+      type: 'sysmenu',
+      value: '',
+      typeOptions: {},
+    },
+    {
+      sort: 4,
+      label: '日历表单模块',
+      type: 'sysmenu',
+      value: '',
+      typeOptions: {},
+    },
   ],
 }

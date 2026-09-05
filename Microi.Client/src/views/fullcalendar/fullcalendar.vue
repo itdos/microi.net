@@ -1,5 +1,5 @@
 <template>
-    <div class="microi-calendar" :class="{ 'is-embedded': embedded }" ref="calendarRoot">
+    <div class="microi-calendar" :class="{ 'is-embedded': embedded, 'is-read-only': readOnly }" ref="calendarRoot">
         <!-- 日历统计卡片 -->
         <div class="cal-stats">
             <div class="cal-stat-card today-card">
@@ -119,7 +119,11 @@ export default {
     name: "MicroiCalendar",
     components: { FullCalendar },
     props: {
-        embedded: { type: Boolean, default: false }
+        embedded: { type: Boolean, default: false },
+        // readOnly 是显式可选模式，首页嵌入本身不会自动开启。
+        readOnly: { type: Boolean, default: false },
+        // 首页菜单只为查询补 Read 上下文；增删改继续沿用原有表单权限，避免降级既有能力。
+        menuId: { type: String, default: "" }
     },
     data() {
         return {
@@ -141,15 +145,15 @@ export default {
                     }
                 },
                 headerToolbar: {
-                    left: "addEvent prev,next today",
+                    left: this.readOnly ? "prev,next today" : "addEvent prev,next today",
                     center: "title",
                     right: "dayGridMonth,timeGridWeek,timeGridDay"
                 },
                 locales: [zhLocale],
                 locale: "zh-cn",
                 initialView: "dayGridMonth",
-                editable: true,
-                selectable: true,
+                editable: !this.readOnly,
+                selectable: !this.readOnly,
                 selectMirror: true,
                 dayMaxEvents: true,
                 weekends: true,
@@ -157,14 +161,14 @@ export default {
                 contentHeight: "auto",
                 expandRows: true,
                 eventDisplay: "block",
-                eventResizableFromStart: true,
+                eventResizableFromStart: !this.readOnly,
                 nowIndicator: true,
                 navLinks: true,
                 events: this.fetchEvents,
-                select: this.handleDateSelect,
-                eventClick: this.handleEventClick,
-                eventDrop: this.handleEventDrop,
-                eventResize: this.handleEventResize
+                select: this.readOnly ? undefined : this.handleDateSelect,
+                eventClick: this.readOnly ? undefined : this.handleEventClick,
+                eventDrop: this.readOnly ? undefined : this.handleEventDrop,
+                eventResize: this.readOnly ? undefined : this.handleEventResize
             }
         };
     },
@@ -180,6 +184,19 @@ export default {
         async loadCalendarStats() {
             var self = this;
             try {
+                if (self.menuId) {
+                    var tableResult = await self.DiyCommon.FormEngine.GetTableData({
+                        FormEngineKey: TABLE_KEY,
+                        _SysMenuId: self.menuId,
+                        _SelectFields: ["Id", "StartTime", "State"],
+                        _PageIndex: 1,
+                        _PageSize: 5000
+                    });
+                    if (tableResult && tableResult.Code === 1) {
+                        self.setCalendarStats(tableResult.Data || []);
+                    }
+                    return;
+                }
                 var result = await self.DiyCommon.ApiEngine.Run("calendar-stats", {});
                 if (result && result.Code === 1 && result.Data) {
                     self.calStats = result.Data;
@@ -187,6 +204,30 @@ export default {
             } catch (e) {
                 console.error("加载日历统计失败:", e);
             }
+        },
+        setCalendarStats(rows) {
+            var now = new Date();
+            var startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            var endOfDay = new Date(startOfDay);
+            endOfDay.setDate(endOfDay.getDate() + 1);
+            var startOfWeek = new Date(startOfDay);
+            startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7));
+            var endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(endOfWeek.getDate() + 7);
+            var startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            var endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            var stats = { Today: 0, Week: 0, Month: 0, Pending: 0 };
+            (rows || []).forEach(function (row) {
+                var date = new Date(row.StartTime);
+                if (!isNaN(date.getTime())) {
+                    if (date >= startOfDay && date < endOfDay) stats.Today++;
+                    if (date >= startOfWeek && date < endOfWeek) stats.Week++;
+                    if (date >= startOfMonth && date < endOfMonth) stats.Month++;
+                }
+                var state = String(row.State === null || row.State === undefined ? "" : row.State);
+                if (state !== "已完成" && state !== "1") stats.Pending++;
+            });
+            this.calStats = stats;
         },
         updateCalendarHeight() {
             var self = this;
@@ -227,14 +268,16 @@ export default {
             try {
                 var startStr = self.formatDate(fetchInfo.start);
                 var endStr = self.formatDate(fetchInfo.end);
-                var result = await self.DiyCommon.FormEngine.GetTableData({
+                var queryParams = {
                     FormEngineKey: TABLE_KEY,
                     _PageSize: 500,
                     _Where: [
                         { Name: "StartTime", Value: endStr, Type: "<=" },
                         { Name: "EndTime", Value: startStr, Type: ">=" }
                     ]
-                });
+                };
+                if (self.menuId) queryParams._SysMenuId = self.menuId;
+                var result = await self.DiyCommon.FormEngine.GetTableData(queryParams);
                 if (result && result.Code === 1 && result.Data) {
                     successCallback(
                         result.Data.map(function (item) {
@@ -262,6 +305,7 @@ export default {
         // 选择日期区间 → 打开新建弹窗
         handleDateSelect(selectInfo) {
             var self = this;
+            if (self.readOnly) return;
             selectInfo.view.calendar.unselect();
             self.editingEventId = null;
             self.form = {
@@ -277,6 +321,7 @@ export default {
         // 点击事件 → 打开编辑弹窗
         handleEventClick(clickInfo) {
             var self = this;
+            if (self.readOnly) return;
             var event = clickInfo.event;
             self.editingEventId = event.id;
             self.form = {
@@ -292,6 +337,10 @@ export default {
         // 拖拽日程 → 更新时间
         async handleEventDrop(info) {
             var self = this;
+            if (self.readOnly) {
+                info.revert();
+                return;
+            }
             try {
                 var result = await self.DiyCommon.FormEngine.UptFormData({
                     FormEngineKey: TABLE_KEY,
@@ -314,6 +363,10 @@ export default {
         // 调整日程时长 → 更新结束时间
         async handleEventResize(info) {
             var self = this;
+            if (self.readOnly) {
+                info.revert();
+                return;
+            }
             try {
                 var result = await self.DiyCommon.FormEngine.UptFormData({
                     FormEngineKey: TABLE_KEY,
@@ -336,6 +389,7 @@ export default {
         // 提交新建/编辑
         async handleSubmit() {
             var self = this;
+            if (self.readOnly) return;
             try {
                 await self.$refs.formRef.validate();
             } catch (e) {
@@ -374,6 +428,7 @@ export default {
         // 删除日程
         handleDelete() {
             var self = this;
+            if (self.readOnly) return;
             self.DiyCommon.OsConfirm("确定要删除该日程吗？", async function () {
                 self.submitting = true;
                 try {
@@ -406,6 +461,7 @@ export default {
         // 新增日程（工具栏按钮）
         handleAddEvent() {
             var self = this;
+            if (self.readOnly) return;
             self.editingEventId = null;
             self.form = {
                 Title: "",

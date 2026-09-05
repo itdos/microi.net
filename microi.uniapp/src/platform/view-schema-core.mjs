@@ -137,13 +137,15 @@ function normalizeMetric(metric, index = 0) {
   const source = metric || {}
   const field = cleanString(firstValue(source, ['Field', 'field']), 100)
   const apiEngineKey = cleanString(firstValue(source, ['ApiEngineKey', 'apiEngineKey']), 100)
-  if (!field && !apiEngineKey) return null
   const requestedSourceType = canonical(
     firstValue(source, ['Source', 'source']),
-    ['Field', 'ApiEngine'],
+    ['Field', 'ApiEngine', 'DataCount', 'PageCount'],
     apiEngineKey ? 'ApiEngine' : 'Field'
   )
-  const sourceType = requestedSourceType === 'ApiEngine' && !apiEngineKey ? 'Field' : requestedSourceType
+  const sourceType = requestedSourceType === 'ApiEngine' && !apiEngineKey
+    ? (field ? 'Field' : '')
+    : requestedSourceType
+  if (!sourceType || (sourceType === 'Field' && !field)) return null
   const result = {
     Key: cleanString(firstValue(source, ['Key', 'key']), 100) || field || `metric:${index}`,
     Label: cleanString(firstValue(source, ['Label', 'label']), 100) || field,
@@ -152,17 +154,27 @@ function normalizeMetric(metric, index = 0) {
   if (field) result.Field = field
   if (apiEngineKey) result.ApiEngineKey = apiEngineKey
   const valueField = cleanString(firstValue(source, ['ValueField', 'valueField']), 200)
+  const valuePath = cleanString(firstValue(source, ['ValuePath', 'valuePath']), 300)
   if (valueField) result.ValueField = valueField
+  if (valuePath) result.ValuePath = valuePath
   const paramMap = normalizeParamValue(firstValue(source, ['ParamMap', 'paramMap', 'Params', 'params']))
   if (paramMap && Object.keys(paramMap).length) result.ParamMap = paramMap
+  const prefix = cleanString(firstValue(source, ['Prefix', 'prefix']), 20)
   const suffix = cleanString(firstValue(source, ['Suffix', 'suffix', 'Unit', 'unit']), 20)
   const format = cleanString(firstValue(source, ['Format', 'format']), 50)
   const icon = cleanString(firstValue(source, ['Icon', 'icon']), 500)
+  const tone = cleanString(firstValue(source, ['Tone', 'tone']), 50)
   const color = cleanString(firstValue(source, ['Color', 'color']), 50)
+  const defaultValue = firstValue(source, ['DefaultValue', 'defaultValue'])
+  const refreshSeconds = Number(firstValue(source, ['RefreshSeconds', 'refreshSeconds']))
+  if (prefix) result.Prefix = prefix
   if (suffix) result.Suffix = suffix
   if (format) result.Format = format
   if (icon) result.Icon = icon
+  if (tone) result.Tone = tone
   if (color) result.Color = color
+  if (defaultValue !== undefined && defaultValue !== null && defaultValue !== '') result.DefaultValue = defaultValue
+  if (Number.isFinite(refreshSeconds) && refreshSeconds > 0) result.RefreshSeconds = refreshSeconds
   return result
 }
 
@@ -612,11 +624,16 @@ export function compileDetailPreset(manifest) {
       field: metric.Field,
       apiEngineKey: metric.ApiEngineKey,
       valueField: metric.ValueField,
+      valuePath: metric.ValuePath,
       paramMap: metric.ParamMap,
+      prefix: metric.Prefix,
       suffix: metric.Suffix,
       format: metric.Format,
       icon: metric.Icon,
-      color: metric.Color
+      tone: metric.Tone,
+      color: metric.Color,
+      defaultValue: metric.DefaultValue,
+      refreshSeconds: metric.RefreshSeconds
     })),
     sections,
     summaries: (layout.Summaries || []).map((field) => compactObject({
@@ -736,6 +753,24 @@ export function compileListConfig(manifest, fieldDefinitions = []) {
     statisticsField: layout.Statistics.Field,
     statisticsLabel: layout.Statistics.Label,
     statisticsFormat: layout.Statistics.Format,
+    metrics: (layout.Hero.Metrics || []).map((metric) => compactObject({
+      key: metric.Key,
+      label: metric.Label,
+      source: metric.Source,
+      field: metric.Field,
+      apiEngineKey: metric.ApiEngineKey,
+      valueField: metric.ValueField,
+      valuePath: metric.ValuePath,
+      paramMap: metric.ParamMap,
+      prefix: metric.Prefix,
+      suffix: metric.Suffix,
+      format: metric.Format,
+      icon: metric.Icon,
+      tone: metric.Tone,
+      color: metric.Color,
+      defaultValue: metric.DefaultValue,
+      refreshSeconds: metric.RefreshSeconds
+    })),
     actionSchema: manifest.Actions || [],
     hideIndex: card.HideIndex === true,
     showCreateTime: card.ShowCreateTime !== false,

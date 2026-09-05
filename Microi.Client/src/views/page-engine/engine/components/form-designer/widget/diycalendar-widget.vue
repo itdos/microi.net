@@ -4,6 +4,7 @@
       :is="calendarComp"
       :key="'diycalendar_' + widgetObj.widgetOption.number"
       embedded
+      :menu-id="calendarMenuId"
     />
   </div>
 </template>
@@ -29,6 +30,7 @@ const autoHeight = computed(() => {
 })
 
 const isDesignMode = computed(() => route.path.startsWith('/mic/autopage'))
+const calendarMenuId = computed(() => props.widgetObj.widgetParams?.[0]?.value || '')
 
 onBeforeUnmount(() => {
   calendarComp.value = null
