@@ -2460,6 +2460,15 @@ namespace Dos.ORM
             return new SqlSection(this, compatibleSql);
         }
 
+        /// <summary>
+        /// Widens declared legacy MySQL CHAR(36) identifiers without removing foreign keys.
+        /// columnSpecifications is a comma-separated list such as Id:36,ParentId:50.
+        /// </summary>
+        public int WidenMySqlIdentifierColumns(string tableName, string columnSpecifications)
+        {
+            return MySqlIdentifierStorageCompatibility.Widen(db, tableName, columnSpecifications);
+        }
+
         #endregion
     }
 }

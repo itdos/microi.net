@@ -4,8 +4,10 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const packageData = JSON.parse(fs.readFileSync(new URL('./app.microi.saas-engine.json', import.meta.url), 'utf8'));
+const standaloneJobPackage = JSON.parse(fs.readFileSync(new URL('./StandaloneApplications/app.microi.job.json', import.meta.url), 'utf8'));
 const engineCode = fs.readFileSync(new URL('./platform-schedule-job.js', import.meta.url), 'utf8').trim();
 const eventCode = fs.readFileSync(new URL('./platform-schedule-job-submit-before.js', import.meta.url), 'utf8').trim();
+const clientEventCode = fs.readFileSync(new URL('./platform-schedule-job-submit-client.js', import.meta.url), 'utf8').trim();
 const statsCode = fs.readFileSync(new URL('./mci-module-presentation-stats.js', import.meta.url), 'utf8').trim();
 const legacyRoutes = [
   '/api/Job/GetAllJob',
@@ -17,7 +19,7 @@ const legacyRoutes = [
   '/api/Job/DeleteJob'
 ];
 
-function runEngine(param) {
+function runEngine(param, supportsRuntimeOnly = true) {
   const calls = [];
   const context = {
     V8: {
@@ -39,6 +41,9 @@ function runEngine(param) {
       Method: {
         ManageScheduleJob(request) {
           calls.push({ type: 'manage', request });
+          if (request.Action === 'Capabilities') return supportsRuntimeOnly
+            ? { Code: 1, Data: { RuntimeOnly: true } }
+            : { Code: 0, Msg: '不支持的操作' };
           if (request.Action === 'GetByNames') return { Code: 1, Data: [] };
           if (request.Action === 'GetDetail') {
             return { Code: 1, Data: { Status: '正常', LastTime: '', NextTime: '', CronExpression: '0 0 0 1 1 ? 2099' } };
@@ -63,7 +68,7 @@ test('SaaS 官方包包含 Managed 定时任务接口引擎', () => {
   const engine = packageData.SysApiEngines.find(item => item.ApiEngineKey === 'platform-schedule-job');
   assert.ok(engine);
   assert.equal(engine.ApiV8Code.replace(/\r\n/g, '\n').trim(), engineCode.replace(/\r\n/g, '\n'));
-  assert.equal(engine.Version, 'v1.0.1');
+  assert.equal(engine.Version, 'v1.0.2');
   assert.equal(engine.ApiRoutes, legacyRoutes.join(';'));
   assert.deepEqual(packageData.ResourcePolicies.ApiEngines['platform-schedule-job'], {
     Ownership: 'Platform',
@@ -128,11 +133,12 @@ test('旧 Job 路由兼容路径租户后缀、拒绝非 POST，规范入口动�
   assert.ok(canonicalResult.calls.some(item => item.type === 'manage' && item.request.Action === 'Pause'));
 });
 
-test('diy_schedule_job 只通过接口引擎编排且不再调用旧 Job Controller', () => {
+test('diy_schedule_job 通过调度原子保留业务接口Key且不回调 HTTP', () => {
   const table = packageData.DiyTables.find(item => String(item.Name || '').toLowerCase() === 'diy_schedule_job');
   assert.ok(table);
   assert.equal(table.SubmitBeforeServerV8.replace(/\r\n/g, '\n').trim(), eventCode.replace(/\r\n/g, '\n'));
-  assert.match(table.SubmitBeforeServerV8, /V8\.ApiEngine\.Run\('platform-schedule-job'/);
+  assert.match(table.SubmitBeforeServerV8, /V8\.Method\.SaveScheduleJob\(para\)/);
+  assert.doesNotMatch(table.SubmitBeforeServerV8, /V8\.ApiEngine\.Run/);
   assert.doesNotMatch(`${table.SubmitBeforeServerV8}\n${table.OutFormV8}`, /\/api\/Job\//i);
 });
 
@@ -179,4 +185,101 @@ test('任务调度启用指标按真实“正常”状态统计', () => {
 test('官方包元数据与接口引擎数量一致', () => {
   assert.equal(packageData.PackageInfo.ApiEngineCount, packageData.SysApiEngines.length);
   assert.equal(packageData.PackageInfo.MenuCount, packageData.SysMenus.length);
+});
+
+test('独立任务调度应用交付修复事件及字段，同时保留底层接口的单一所有权', () => {
+  assert.equal(standaloneJobPackage.PackageInfo.AppId, 'app.microi.job');
+  const table = standaloneJobPackage.DiyTables.find(item => item.Name === 'diy_schedule_job');
+  assert.ok(table);
+  const normalize = code => String(code || '').replace(/\r\n/g, '\n').trim();
+  assert.equal(normalize(table.SubmitBeforeServerV8), normalize(eventCode));
+  assert.equal(normalize(table.SubmitFormV8), normalize(clientEventCode));
+  const keyField = standaloneJobPackage.DiyFields.find(item => item.TableId === table.Id && item.Name === 'JobName');
+  assert.match(keyField.Placeholder, /test111/);
+  assert.ok(standaloneJobPackage.SysMenus.some(item => item.Url === '/job-engine'));
+  assert.ok(standaloneJobPackage.SysMenus.some(item => item.Url === '/dingshirenwurz'));
+  assert.equal(standaloneJobPackage.PackageInfo.TableCount, 2);
+  assert.equal(standaloneJobPackage.PackageInfo.DataRowCount, 0);
+  assert.deepEqual(standaloneJobPackage.DataSets, []);
+  assert.ok(!(standaloneJobPackage.SysApiEngines || []).some(item => item.ApiEngineKey === 'platform-schedule-job'));
+  assert.deepEqual(standaloneJobPackage.ResourcePolicies.ApiEngines, {});
+});
+
+test('新增和编辑只同步调度运行态，重名校验共享表单事务且不发送 HTTP', () => {
+  for (const action of ['Insert', 'Add', 'Update', 'Upt']) {
+    const transaction = {};
+    let called = false;
+    const V8 = {
+      Form: { Id: 'job-id', JobName: 'test111', JobType: '1', ApiEngineKey: 'health' },
+      FormSubmitAction: action, DbTrans: transaction,
+      FormEngine: { GetFormData: (table, query, trans) => {
+        assert.equal(table, 'diy_schedule_job');
+        assert.equal(trans, transaction);
+        return { Code: 2 };
+      } },
+      Method: { ManageScheduleJob: () => ({ Code: 1, Data: { RuntimeOnly: true } }), SaveScheduleJob: param => {
+        called = true;
+        assert.equal(param.ApiEngineKey, 'health');
+        assert.equal(param.RuntimeOnly, true);
+        return { Code: 1, Data: { Status: '暂停', NextTime: '2099-01-01' } };
+      } }
+    };
+    vm.runInNewContext(`(function(){${eventCode}})()`, { V8 });
+    assert.equal(called, true);
+    assert.equal(V8.Form.Status, '暂停');
+  }
+});
+
+test('同名任务和调度失败阻止保存，删除失效任务不要求接口配置', () => {
+  const V8 = {
+    Form: { Id: 'new-id', JobName: 'test111', JobType: '1', ApiEngineKey: 'health' },
+    FormSubmitAction: 'Insert', DbTrans: {},
+    FormEngine: { GetFormData: () => ({ Code: 1, Data: { Id: 'existing-id' } }) },
+    Method: { ManageScheduleJob: () => ({ Code: 1, Data: { RuntimeOnly: true } }), SaveScheduleJob: () => { throw Error('不应覆盖既有调度'); } }
+  };
+  const duplicate = vm.runInNewContext(`(function(){${eventCode}})()`, { V8 });
+  assert.equal(duplicate.Code, 0);
+  assert.match(duplicate.Msg, /已存在/);
+  V8.FormEngine.GetFormData = () => ({ Code: 2 });
+  V8.Method.SaveScheduleJob = () => ({ Code: 0, Msg: '无效Cron' });
+  assert.equal(vm.runInNewContext(`(function(){${eventCode}})()`, { V8 }).Msg, '无效Cron');
+  V8.FormSubmitAction = 'Delete';
+  V8.Form.ApiEngineKey = '';
+  V8.Method.ManageScheduleJob = param => { assert.equal(param.Action, 'Delete'); return { Code: 1 }; };
+  vm.runInNewContext(`(function(){${eventCode}})()`, { V8 });
+});
+
+test('表单直接检查旧节点能力，不能依赖租户可能尚未升级的管理接口', () => {
+  const V8 = {
+    Form: { Id: 'id', JobName: 'test111', JobType: '1', ApiEngineKey: 'business-engine' },
+    FormSubmitAction: 'Add', DbTrans: {},
+    FormEngine: { GetFormData: () => ({ Code: 2 }) },
+    Method: { ManageScheduleJob: () => ({ Code: 0 }), SaveScheduleJob: () => { throw Error('旧节点不能进入保存'); } }
+  };
+  const result = vm.runInNewContext(`(function(){${eventCode}})()`, { V8 });
+  assert.equal(result.Code, 0);
+  assert.match(result.Msg, /请先更新平台后端/);
+});
+
+test('任务 Key 与后端支持字符一致，test111 以及分隔符可保存', () => {
+  for (const key of ['test111', 'test_111', 'test-111', 'test.111', 'bad key', '中文', '1bad', 'a'.repeat(51)]) {
+    const V8 = {
+      FormSubmitAction: 'Insert', Result: true,
+      Form: { JobType: '1', JobName: key, ApiEngineKey: 'health', ZhiXingZQLB: '高级模式', CronExpression: '0 0 0 1 1 ? 2099' },
+      Tips() {}, FormSet() {}
+    };
+    vm.runInNewContext(`(function(){${clientEventCode}})()`, { V8 });
+    assert.equal(V8.Result !== false, key.startsWith('test'), key);
+  }
+});
+
+test('旧版后端在同步调度前明确要求升级，避免重新进入元数据事务锁等待', () => {
+  const param = { Action: 'Save', RuntimeOnly: true, JobName: 'test111', ApiEngineKey: 'health', CronExpression: '0 0 0 1 1 ? 2099' };
+  const oldBackend = runEngine(param, false);
+  assert.equal(oldBackend.result.Code, 0);
+  assert.match(oldBackend.result.Msg, /请先更新平台后端/);
+  assert.equal(oldBackend.calls.filter(item => item.type === 'save').length, 0);
+  const currentBackend = runEngine(param);
+  assert.equal(currentBackend.result.Code, 1);
+  assert.equal(currentBackend.calls.filter(item => item.type === 'save').length, 1);
 });

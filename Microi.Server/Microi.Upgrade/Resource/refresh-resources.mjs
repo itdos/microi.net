@@ -138,6 +138,10 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('ADMIN_MENU_PERMISSION_V1')
       || !content.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
       || !content.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
+      || !content.includes('ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1')
+      || !content.includes('PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1')
+      || !content.includes('UNUSED_WORKFLOW_PHYSICAL_SCHEMA_V1')
+      || !content.includes('MYSQL_IDENTIFIER_FOREIGN_KEY_SCOPE_V1')
       || !content.includes('PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1')
       || !content.includes('MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1')
       || !content.includes('PAGE_ENGINE_OPTIONAL_REFERENCE_V1')
@@ -191,7 +195,7 @@ function validateReleaseCandidate(name, content) {
   }
   if (name === 'official-resource-api.js') {
     if (!content.includes('ApiEngineKey: get-microi-upgrade-resource')
-      || !content.includes('Version: v1.3.5')
+      || !content.includes('Version: v1.3.7')
       || !content.includes('V8.Method.AuthorizeOfficialResourcePublish()')
       || !content.includes('ExpectedRemoteSha256')
       || !content.includes('function lockPublishRows()')
@@ -649,6 +653,8 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
+        || !importerCode.includes('ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1')
+        || !importerCode.includes('PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1')
         || !importerCode.includes('PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1')
         || !importerCode.includes('MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1')
         || !importerCode.includes('PAGE_ENGINE_OPTIONAL_REFERENCE_V1')
@@ -827,6 +833,8 @@ function validateReleaseCandidate(name, content) {
       || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')
       || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
       || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
+        || !importerCode.includes('ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1')
+        || !importerCode.includes('PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1')
       || !importerCode.includes('PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1')
       || !importerCode.includes('MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1')
       || !importerCode.includes('PAGE_ENGINE_OPTIONAL_REFERENCE_V1')) {
@@ -884,6 +892,8 @@ function validateReleaseCandidate(name, content) {
               'BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1',
               'ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1',
               'ADMIN_MENU_PERMISSION_DB_TIME_V1',
+              'ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1',
+              'PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1',
             ].filter(marker => !importerCode.includes(marker)),
           }),
         );

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { validateOfficialPackageInstallContracts } from './resource-sync-core.mjs';
+import { validateOfficialPackageInstallContracts, validateOfficialDataSetSchemaClosure } from './resource-sync-core.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const officialPackageNames = fs.readdirSync(directory)
@@ -12,8 +12,10 @@ const officialPackageNames = fs.readdirSync(directory)
 function fixture(overrides = {}) {
   return JSON.stringify({
     PackageInfo: { Name: 'SaaS引擎' },
-    PhysicalColumns: [],
-    DiyTables: [],
+    PhysicalColumns: ['Id', 'JsonObj'].map(COLUMN_NAME => ({ TABLE_NAME: 'mic_page', COLUMN_NAME })),
+    DiyTables: [{ Id: 'page-table', Name: 'mic_page' }],
+    DiyFields: ['Id', 'JsonObj'].map(Name => ({ TableId: 'page-table', Name })),
+    DDLStatements: [{ TableName: 'mic_page', DDL: 'CREATE TABLE `mic_page` (`Id` varchar(36), `JsonObj` mediumtext)' }],
     SysMenus: [],
     DataSets: [],
     ...overrides,
@@ -40,6 +42,22 @@ test('all official packages satisfy physical migration and PageEngine reference 
       name,
     );
   }
+});
+
+test('dataset closure rejects missing tables, fields, physical columns and DDL before publication', () => {
+  const complete = JSON.parse(fixture({ DataSets: [{ TableName: 'mic_page', Rows: [{ Id: '1', JsonObj: '{}' }], ConflictFields: ['Id'] }] }));
+  assert.doesNotThrow(() => validateOfficialDataSetSchemaClosure('fixture', complete));
+  for (const key of ['DiyTables', 'DiyFields', 'DDLStatements', 'PhysicalColumns']) {
+    assert.throws(() => validateOfficialDataSetSchemaClosure('fixture', { ...complete, [key]: [] }), /缺少完整建表资源/);
+  }
+  for (const key of ['DiyFields', 'PhysicalColumns']) {
+    const incomplete = structuredClone(complete);
+    incomplete[key] = incomplete[key].slice(0, 1);
+    assert.throws(() => validateOfficialDataSetSchemaClosure('fixture', incomplete), /mic_page.jsonobj/);
+  }
+  const missingDdlField = structuredClone(complete);
+  missingDdlField.DDLStatements[0].DDL = 'CREATE TABLE `mic_page` (`Id` varchar(36))';
+  assert.throws(() => validateOfficialDataSetSchemaClosure('fixture', missingDdlField), /mic_page.jsonobj/);
 });
 
 test('official package gate rejects a dangling PageEngine diytable reference', () => {

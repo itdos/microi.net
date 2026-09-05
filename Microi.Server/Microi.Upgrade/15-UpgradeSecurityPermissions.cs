@@ -41,7 +41,7 @@ namespace Microi.net
 
                 if (protectedTableIds.Count == 0)
                 {
-                    Console.WriteLine(
+                    UpgradeProgress.WriteLine(
                         $"Microi：【信息】平台自动升级【{osClient}】【升级15】未发现管理员专用表元数据，无需清理表级直连权限。");
                     return messages;
                 }
@@ -105,7 +105,7 @@ namespace Microi.net
                     UpgradeExecutionLeaseContext.ThrowIfLost();
                     await FormEngineAuthorizationCache.InvalidateAsync(osClient)
                         .ConfigureAwait(false);
-                    Console.WriteLine(
+                    UpgradeProgress.WriteLine(
                         $"Microi：【成功】平台自动升级【{osClient}】【升级15】已清理 {deletedCount} 条普通角色敏感表直连权限；菜单权限未改动。");
                 }
             }

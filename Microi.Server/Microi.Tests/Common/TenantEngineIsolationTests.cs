@@ -120,6 +120,54 @@ public class TenantEngineIsolationTests
             .AsBoolean());
     }
 
+    [Fact]
+    public void IncompleteExtensionDatabase_DoesNotBlockMainDatabaseOrOtherExtensions()
+    {
+        var client = new OsClientSecret
+        {
+            OsClient = "tenant_with_incomplete_extension",
+            DataBasesInitialized = true,
+            DataBasesLoadedAtUtc = DateTime.UtcNow,
+            DataBases = new List<OsClientDataBase>
+            {
+                new() { DbKey = "incomplete", DbType = "", DbName = "incomplete" },
+                new() { DbKey = "archive", DbType = "MySql", DbConn = "Server=127.0.0.1;Database=unused;Uid=test;Pwd=test;" }
+            }
+        };
+        var databases = OsClient.GetAllClientDataBase(client);
+        Assert.Equal(2, databases.Count);
+        Assert.Contains("incomplete", databases.Keys);
+        Assert.Null(client.DataBases[0].Db);
+        Assert.Null(client.DataBases[1].Db);
+        var engine = new Engine();
+        engine.SetValue("V8", new V8EngineParam { Dbs = databases });
+        Assert.Equal("function", engine.Evaluate("typeof V8.Dbs.archive.FromSql").AsString());
+        Assert.NotNull(client.DataBases[1].Db);
+        var error = Assert.Throws<InvalidOperationException>(() => databases["incomplete"]);
+        Assert.Contains("incomplete", error.Message);
+        Assert.Contains(client.OsClient, error.Message);
+        Assert.NotNull(databases["archive"]);
+    }
+
+    [Fact]
+    public void LazyExtensionCollection_ResolvesOnlyRequestedKeyOnceAndKeepsTenantInstancesSeparate()
+    {
+        var first = new V8DatabaseCollection();
+        var second = new V8DatabaseCollection();
+        var firstCount = 0;
+        var secondCount = 0;
+        first.AddLazy("same", () => { firstCount++; return first.Open("MySql", "Server=127.0.0.1;Database=tenant_a;Uid=test;Pwd=test;"); });
+        second.AddLazy("same", () => { secondCount++; return second.Open("MySql", "Server=127.0.0.1;Database=tenant_b;Uid=test;Pwd=test;"); });
+        Assert.True(first.ContainsKey("same"));
+        Assert.Equal(0, firstCount);
+        Assert.Equal(0, secondCount);
+        Assert.True(first.TryGetValue("SAME", out var session));
+        Assert.Same(session, first["same"]);
+        Assert.Equal(1, firstCount);
+        Assert.Equal(0, secondCount);
+        Assert.NotSame(session, second["same"]);
+    }
+
     private static string InvokeTenantResolver(Type engineType, string requestedOsClient)
     {
         var method = engineType.GetMethod(

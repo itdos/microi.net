@@ -2,8 +2,8 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://microi.net/sitemap.xml
+Sitemap: https://www.microi.net/sitemap.xml
 
-# 禁止爬取构建产物和内部文件
-Disallow: /assets/
+# 页面渲染需要公开的 JS、CSS、字体和图片；搜索与 AI 检索爬虫均可读取。
+# 登录和个人资料页由 HTML noindex 控制，避免阻止指令回读。
 Disallow: /.vitepress/

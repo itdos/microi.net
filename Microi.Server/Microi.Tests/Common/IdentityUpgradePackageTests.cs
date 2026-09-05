@@ -16,7 +16,9 @@ public class IdentityUpgradePackageTests
             root, "Microi.Server", "Microi.Upgrade", "13-UpgradeAppStore.cs"));
 
         Assert.Contains("OsClient.ClientList.Values", hostedService, StringComparison.Ordinal);
-        Assert.Contains("foreach (var tenantName in tenantNames)", hostedService, StringComparison.Ordinal);
+        Assert.Contains("for (var index = 0; index < tenantNames.Count; index++)", hostedService, StringComparison.Ordinal);
+        Assert.Contains("var tenantName = tenantNames[index]", hostedService, StringComparison.Ordinal);
+        Assert.Contains("UpgradeProgress.EnterTenant(tenantName, index + 1, tenantNames.Count, batch)", hostedService, StringComparison.Ordinal);
         Assert.Contains("UpgradeTenantAsync(tenantName", hostedService, StringComparison.Ordinal);
         Assert.Contains("SaaSEnginePackageResourceName", appStoreUpgrade, StringComparison.Ordinal);
         Assert.Contains(

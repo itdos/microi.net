@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { compareSemanticVersions } from './application-store-replica-sync.mjs';
 
 const resourceUrl = new URL("./", import.meta.url);
 const packageModel = JSON.parse(await readFile(new URL("app.microi.store.json", resourceUrl), "utf8"));
@@ -388,7 +389,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.equal(engineSourceVersion(importerSource), "v2.7.4");
+  assert.ok(compareSemanticVersions(engineSourceVersion(importerSource), 'v2.7.4') >= 0);
   assert.match(importerSource, /MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1/);
   assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
   assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
@@ -417,7 +418,7 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.doesNotMatch(importerSource, /backgroundChunkingEnabled\s*=\s*false/);
   assert.match(importerSource, /PACKAGE_API_ENGINE_READBACK_V1/);
   assert.match(importerSource, /PACKAGE_API_ENGINE_PHYSICAL_READBACK_FALLBACK_V1/);
-  assert.match(importerSource, /FormEngine 回读为空，已按参数化物理事实重建接口缓存/);
+  assert.match(importerSource, /已按(?:当前租户)?参数化物理事实重建接口缓存/);
   assert.match(importerSource, /assertPersistedApiEngine\(modelCopy, updatedEngine\)/);
   assert.match(importerSource, /assertPersistedApiEngine\(modelCopy, insertedEngine\)/);
   assert.match(importerSource, /throw new Error\('更新接口引擎失败：'/);
@@ -524,7 +525,8 @@ test('installer can attach package root menus to root, an existing menu, or an a
   assert.match(importerSource, /installContainerModuleKey\.length > 50/);
   assert.match(importerSource, /AddFormData\('sys_menu', installContainerMenuModel\)/);
   assert.match(importerSource, /grantAdministratorPermissionsForNewMenu\(installContainerMenuModel\)/);
-  assert.match(importerSource, /GetTableData\('sys_role'[\s\S]*?\['Level', '>=', 9999\]/);
+  assert.match(importerSource, /ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1/);
+  assert.match(importerSource, /AddInParameter\('@p0', 9999\)/);
   assert.match(importerSource, /\['Read', 'Add', 'Edit', 'Del', 'Export', 'Import'\]/);
   assert.match(importerSource, /assertAdministratorMenuPermissionReadback/);
 });

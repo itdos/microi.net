@@ -11,7 +11,7 @@ if (process.argv.includes('--sync-base')) {
 const SYS_CONFIG_TABLE_ID = 'c8570fa6-c10f-4014-8cb4-4b046e7ba69c';
 const INTERFACE_STYLE_TAB_ID = 'f7e10da1-0b96-4624-90ea-07c7e6991b74';
 const TARGET_VERSION = 'v7.5.29';
-const OBSOLETE_FIELD_NAMES = new Set(['RenderSourceBadgeMode']);
+const OBSOLETE_FIELD_NAMES = new Set(['RenderSourceBadgeMode', 'IsShowAiAssistant']);
 
 const FIELD_IDS = {
   FrameworkWatermarkEnabled: '6d872b50-ef21-4cf3-8ec0-000000000002',
@@ -229,9 +229,9 @@ function configurePackage(packagePath) {
     {
       name: 'FrameworkPresentationGroup', label: 'AI 与框架水印', sort: 1900,
       description: 'AI 助手与全屏框架水印', icon: 'fas fa-fingerprint',
-      scopeMode: 'FieldCount', fieldCount: 8,
+      scopeMode: 'FieldCount', fieldCount: 7,
       fields: [
-        ['IsShowAiAssistant', 1910], ['DisableAiAssistant', 1920],
+        ['DisableAiAssistant', 1920],
         ['FrameworkWatermarkEnabled', 1930], ['FrameworkWatermarkContent', 1940], ['FrameworkWatermarkDirection', 1950],
         ['FrameworkWatermarkOpacity', 1960], ['FrameworkWatermarkDensity', 1970], ['FrameworkWatermarkFontSize', 1980],
       ],

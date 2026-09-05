@@ -87,7 +87,9 @@ namespace Microi.net
                     DataBase = param.DbName,
                     Table = param.TableName
                 };
-                var result = TMongodbHelper<dynamic>.Insert(host, model);
+                // ObjectSerializer wraps a Dictionary passed as dynamic in _v, hiding both
+                // business fields and the deterministic _id from normal MongoDB queries.
+                var result = TMongodbHelper<BsonDocument>.Insert(host, CreateInsertDocument(model));
 
                 return new DosResult(result.Code, model, result.Msg);
             }
@@ -148,6 +150,11 @@ namespace Microi.net
             {
                 return new DosResult(0, null, ex.Message);
             }
+        }
+
+        private static BsonDocument CreateInsertDocument(Dictionary<string, object> model)
+        {
+            return new BsonDocument(model);
         }
 
         /// <summary>

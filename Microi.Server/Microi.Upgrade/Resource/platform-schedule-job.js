@@ -7,8 +7,16 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-schedule-job
+ * Version: v1.0.2
+ * Function:
+ * - 管理当前租户任务列表、运行态、保存、暂停、恢复和删除；兼容旧Job路由，表单保存先检查RuntimeOnly能力后只同步Quartz。
+ */
+
 // Microi官方接口引擎：platform-schedule-job
-// Version: v1.0.1
+// Version: v1.0.2
 // 表数据、状态合并与动作编排在接口引擎；七条旧 /api/Job/* 路由按可信请求路径兼容。
 
 var param = V8.Param || {};
@@ -85,6 +93,13 @@ if (action === 'detail') {
 }
 
 if (action === 'save') {
+  // 旧节点可能忽略新增参数；先确认能力，禁止回退到会重复写当前表的旧保存路径。
+  if (param.RuntimeOnly === true) {
+    var capability = V8.Method.ManageScheduleJob({ Action: 'Capabilities' });
+    if (!capability || capability.Code !== 1 || !capability.Data || capability.Data.RuntimeOnly !== true) {
+      return { Code: 0, Msg: '当前平台后端不支持任务表单事务保存，请先更新平台后端，再更新SaaS引擎应用。' };
+    }
+  }
   var saveResult = V8.Method.SaveScheduleJob(param);
   if (!saveResult || saveResult.Code !== 1 || !saveResult.Data) return saveResult;
   return {

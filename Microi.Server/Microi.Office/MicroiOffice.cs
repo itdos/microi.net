@@ -39,6 +39,13 @@ namespace Microi.net
         private const string ImportErrorPolicyContinueOnError = "ContinueOnError";
         private const string ImportPreflightApiEnginePrefix = "ApiEngine:";
         private const int MaxImportIdempotencyKeyLength = 80;
+        private static readonly HashSet<string> ImportPreflightProtectedFixedFields = new HashSet<string>(
+            new[]
+            {
+                "Id", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted",
+                "OsClient", "TenantId", "TenantName"
+            },
+            StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// 通用的 dynamic 参数转换方法
@@ -1615,10 +1622,127 @@ namespace Microi.net
             return rows;
         }
 
-        private static async Task ImportRunPreflightHookAsync(
+        private static List<string> ImportApplyPreflightFixedValues(
+            JObject hookResult,
+            JObject fixedField,
+            List<JObject> importFieldList)
+        {
+            var data = hookResult?["Data"] as JObject;
+            var fixedValuesToken = data?["FixedValues"];
+            if (fixedValuesToken == null || fixedValuesToken.Type == JTokenType.Null)
+            {
+                return new List<string>();
+            }
+            if (fixedValuesToken.Type != JTokenType.Object)
+            {
+                throw new Exception("导入服务端校验接口返回的 Data.FixedValues 必须是字段名到固定值的 JSON 对象。");
+            }
+            if (fixedField == null)
+            {
+                throw new Exception("平台未提供导入固定字段容器，无法应用服务端校验回填值。");
+            }
+
+            var fixedValues = (JObject)fixedValuesToken;
+            if (fixedValues.Properties().Count() > MaxImportExcelColumns)
+            {
+                throw new Exception($"导入服务端校验接口返回的固定字段超过上限 {MaxImportExcelColumns} 个。");
+            }
+
+            var fieldsByName = (importFieldList ?? new List<JObject>())
+                .Where(field => field != null && !field["Name"].Val<string>().DosIsNullOrWhiteSpace())
+                .GroupBy(field => field["Name"].Val<string>(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var appliedFields = new List<string>();
+            foreach (var property in fixedValues.Properties())
+            {
+                var requestedName = property.Name?.Trim();
+                if (requestedName.DosIsNullOrWhiteSpace()
+                    || !fieldsByName.TryGetValue(requestedName, out var field))
+                {
+                    throw new Exception($"导入服务端校验接口尝试回填未授权字段【{requestedName}】；只能返回当前表的可导入业务字段。");
+                }
+
+                var fieldName = field["Name"].Val<string>();
+                if (ImportPreflightProtectedFixedFields.Contains(fieldName))
+                {
+                    throw new Exception($"导入服务端校验接口不得回填平台保护字段【{fieldName}】。");
+                }
+                if (property.Value == null
+                    || property.Value.Type == JTokenType.Null
+                    || property.Value.Type == JTokenType.Undefined
+                    || property.Value.Type == JTokenType.Object
+                    || property.Value.Type == JTokenType.Array)
+                {
+                    throw new Exception($"导入服务端校验接口返回的固定字段【{fieldName}】必须是非空标量值。");
+                }
+
+                object dbValue;
+                try
+                {
+                    dbValue = ImportBuildDbValue(ImportJTokenToObject(property.Value), field);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"导入服务端校验接口返回的固定字段【{fieldName}】格式无效：{ex.Message}", ex);
+                }
+                if (dbValue == null || dbValue.ToString().DosIsNullOrWhiteSpace())
+                {
+                    throw new Exception($"导入服务端校验接口返回的固定字段【{fieldName}】不能为空。");
+                }
+
+                var existingProperty = fixedField.Properties().FirstOrDefault(current =>
+                    string.Equals(current.Name, fieldName, StringComparison.OrdinalIgnoreCase));
+                if (existingProperty != null
+                    && existingProperty.Value != null
+                    && existingProperty.Value.Type != JTokenType.Null
+                    && !existingProperty.Value.ToString().DosIsNullOrWhiteSpace())
+                {
+                    object existingDbValue;
+                    try
+                    {
+                        existingDbValue = ImportBuildDbValue(ImportJTokenToObject(existingProperty.Value), field);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"既有固定字段【{fieldName}】格式无效：{ex.Message}", ex);
+                    }
+                    var existingToken = existingDbValue == null ? JValue.CreateNull() : JToken.FromObject(existingDbValue);
+                    var requestedToken = JToken.FromObject(dbValue);
+                    if (!JToken.DeepEquals(existingToken, requestedToken))
+                    {
+                        throw new Exception($"导入服务端校验接口尝试覆盖既有固定上下文字段【{fieldName}】，已拒绝执行。");
+                    }
+                    if (!string.Equals(existingProperty.Name, fieldName, StringComparison.Ordinal))
+                    {
+                        existingProperty.Remove();
+                        fixedField[fieldName] = requestedToken;
+                    }
+                    continue;
+                }
+
+                existingProperty?.Remove();
+                fixedField[fieldName] = JToken.FromObject(dbValue);
+                appliedFields.Add(fieldName);
+            }
+            return appliedFields;
+        }
+
+        public static IReadOnlyList<string> ApplyImportPreflightFixedValuesForTest(
+            JObject hookResult,
+            JObject fixedField,
+            IEnumerable<JObject> importFieldList)
+        {
+            return ImportApplyPreflightFixedValues(
+                hookResult,
+                fixedField,
+                importFieldList?.ToList() ?? new List<JObject>());
+        }
+
+        private static async Task<List<string>> ImportRunPreflightHookAsync(
             string apiEngineKey,
             JArray rows,
             JObject fixedField,
+            List<JObject> importFieldList,
             DiyTableRowParam param,
             string tableName,
             string importErrorPolicy,
@@ -1626,7 +1750,7 @@ namespace Microi.net
             int uniqueRuleCount,
             DbTrans trans)
         {
-            if (apiEngineKey.DosIsNullOrWhiteSpace()) return;
+            if (apiEngineKey.DosIsNullOrWhiteSpace()) return new List<string>();
             var hookParam = new JObject
             {
                 ["OsClient"] = param.OsClient,
@@ -1638,7 +1762,11 @@ namespace Microi.net
                 ["ImportErrorPolicy"] = importErrorPolicy,
                 ["ImportFileName"] = fileName ?? "",
                 ["ImportIdempotencyKey"] = param._ImportIdempotencyKey ?? "",
-                ["UniqueRuleCount"] = uniqueRuleCount
+                ["UniqueRuleCount"] = uniqueRuleCount,
+                ["Capabilities"] = new JObject
+                {
+                    ["PreflightFixedValuesV1"] = true
+                }
             };
             if (param._CurrentUser != null)
             {
@@ -1665,6 +1793,7 @@ namespace Microi.net
             {
                 throw new Exception($"导入服务端校验未通过：{message}");
             }
+            return ImportApplyPreflightFixedValues(hookResult, fixedField, importFieldList);
         }
 
         private class ImportUniqueRule
@@ -2748,16 +2877,21 @@ namespace Microi.net
                             {
                                 if (!importPreflightApiEngineKey.DosIsNullOrWhiteSpace())
                                 {
-                                    await ImportRunPreflightHookAsync(
+                                    var preflightFixedFields = await ImportRunPreflightHookAsync(
                                         importPreflightApiEngineKey,
                                         importPreflightRows,
                                         guanlianField,
+                                        importFieldList,
                                         param,
                                         diyTableModel.Name,
                                         importErrorPolicy,
                                         importFileName,
                                         uniqueRules.Count,
                                         trans);
+                                    if (preflightFixedFields.Any())
+                                    {
+                                        importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：服务端整批校验已安全回填固定字段【{string.Join("、", preflightFixedFields)}】；该值将应用于本批全部数据。");
+                                    }
                                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：服务端整批校验通过，正在写入数据...");
                                     await diyCacheBase.SetAsync(stepSign, importStepList);
                                 }

@@ -45,6 +45,23 @@ namespace Microi.net
             return osClient;
         }
 
+        /// <summary>
+        /// Normalize the provider's cold metadata row to the same shape as its JSON cache.
+        /// Historical MySQL char(36) identifiers can arrive as System.Guid, not string.
+        /// This is a read projection; it never changes tenant keys or physical column types.
+        /// </summary>
+        protected internal static JObject NormalizeDiyTableStorageMetadata(object value)
+        {
+            if (value == null) return null;
+            var row = value is JObject source ? (JObject)source.DeepClone() : JObject.FromObject(value);
+            foreach (var key in new[] { "Id", "DataBaseId" })
+            {
+                if (row[key] is JValue identifier && identifier.Value is Guid guid)
+                    row[key] = guid.ToString("D");
+            }
+            return row;
+        }
+
         private static int IntOrDefaultWhenMissing(JObject param, string name, int defaultValue)
         {
             var token = param?[name];
@@ -2454,7 +2471,7 @@ LIMIT 1")
             if (result.Code == 1)
             {
                 // 转换为 JObject 后再存入缓存，确保序列化后类型一致
-                var jObjectData = result.Data is JObject ? (JObject)result.Data : JObject.FromObject(result.Data);
+                var jObjectData = NormalizeDiyTableStorageMetadata((object)result.Data);
                 await cache.SetAsync<JObject>(cacheKey, jObjectData);
                 result.Data = TranslateDiyTableForReturn(jObjectData, osClient, _Lang);
             }
