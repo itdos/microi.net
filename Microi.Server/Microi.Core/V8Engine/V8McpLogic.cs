@@ -5233,7 +5233,7 @@ namespace Microi.net
             }
         }
 
-        public static async Task<DosResult<object>> SaveJob(string osClient, JObject param)
+        public static async Task<DosResult<object>> SaveJob(string osClient, JObject param, bool persistMetadata = true)
         {
             try
             {
@@ -5243,13 +5243,18 @@ namespace Microi.net
                 if (jobName.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "JobName 不能为空");
                 if (cronExpression.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "CronExpression 不能为空");
 
-                var existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_schedule_job", new
-                {
-                    OsClient = osClient,
-                    _Where = new List<object>() { new List<object>() { "JobName", "=", jobName } }
-                });
                 var id = param["JobId"].Val<string>() ?? param["Id"].Val<string>();
-                if (id.DosIsNullOrWhiteSpace() && existing.Code == 1 && existing.Data != null) id = (string)existing.Data.Id;
+                // 表单提交事件已经持有当前行事务，不能另开连接查询/写回当前表。
+                // 普通 MCP/商城调用仍负责元数据持久化，保持原有幂等保存语义。
+                if (persistMetadata && id.DosIsNullOrWhiteSpace())
+                {
+                    var existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_schedule_job", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object>() { new List<object>() { "JobName", "=", jobName } }
+                    });
+                    if (existing.Code == 1 && existing.Data != null) id = (string)existing.Data.Id;
+                }
                 if (id.DosIsNullOrWhiteSpace()) id = Ulid.NewUlid().ToString();
 
                 var model = new MicroiAddJobModel
@@ -5303,6 +5308,20 @@ namespace Microi.net
                 }
 
                 var runtime = JObject.FromObject(quartzReadback.Data);
+                if (!persistMetadata)
+                {
+                    return new DosResult<object>(1, new
+                    {
+                        JobId = id,
+                        JobName = jobName,
+                        QuartzSaved = true,
+                        MetadataSaved = false,
+                        Status = runtime["Status"]?.ToString() ?? "正常",
+                        LastTime = runtime["LastTime"]?.ToString() ?? "",
+                        NextTime = runtime["NextTime"]?.ToString() ?? "",
+                        Message = "调度运行态已回读；任务元数据由调用方表单事务保存。"
+                    });
+                }
                 var jobData = new JObject
                 {
                     ["Id"] = id,

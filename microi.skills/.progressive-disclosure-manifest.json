@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-03T22:41:44.248Z",
+  "generatedAt": "2026-09-05T06:43:32.791Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -534,8 +534,8 @@
       ]
     },
     "microi-mobile-app-quality": {
-      "originalSha256": "93fa4dfc2810c33e426e11c3c0b37f874b0dfb0bf60d2b92ad11865e2c0faf3f",
-      "originalLines": 448,
+      "originalSha256": "6a91cbc1ae49e576ae465b252b260a43dfc861cf3af2618cac636a429106d632",
+      "originalLines": 459,
       "prefixSha256": "f8c7ff069eba59ee314557b078d3684b92eb05d232adebfe2a0a01002e66b581",
       "prefixBytes": 1087,
       "entryLines": 182,
@@ -568,7 +568,7 @@
           "id": "microi-mobile-app-quality-003",
           "ordinal": 3,
           "destination": "microi-mobile-app-quality/SKILL.md",
-          "sha256": "0a9274750cb6f507b87c417eb66e5f9aa60918c6ead87c7eb2855e209aa30e61",
+          "sha256": "a35f20404acbf61814f9475610f881f7c60effc0ce3bb8797cee300cd3349ba7",
           "lines": 25,
           "heading": "2.1 登录验证码必须跟随 Sys_Config.EnableCaptcha"
         },
@@ -712,8 +712,8 @@
           "id": "microi-mobile-app-quality-021",
           "ordinal": 21,
           "destination": "microi-mobile-app-quality/references/progressive-02-9-主题切换必须真实且全局生效.md",
-          "sha256": "cd4c6f6931993874addd85149b0e5a778a38a0a4fb551275154fa5cbe4c10022",
-          "lines": 21,
+          "sha256": "13405c8ce231e9db8920cd8e1c4e0db26a32c1b5ac967113abee1391985ebfcd",
+          "lines": 32,
           "heading": "最终交付清单"
         }
       ],

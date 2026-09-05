@@ -296,6 +296,15 @@ export function validateOfficialPackageInstallContracts(name, content) {
   }
 
   for (const column of Array.isArray(packageModel.PhysicalColumns) ? packageModel.PhysicalColumns : []) {
+    const tableName = String(column?.TABLE_NAME ?? column?.TableName ?? '').toLowerCase();
+    // UNUSED_WORKFLOW_PHYSICAL_SCHEMA_V1：防止发布母库已安装插件掩盖空库依赖。
+    if (['wf_flowdesign', 'wf_node', 'wf_line'].includes(tableName)
+        && !['WfFlowDesigns', 'WfNodes', 'WfLines'].some(key => packageModel[key]?.length)
+        && !['DiyTables', 'DDLStatements', 'DataSets', 'SysMenus'].some(key =>
+          (packageModel[key] || []).some(row =>
+            String(row.TableName || row.DiyTableName || row.Name || '').toLowerCase() === tableName))) {
+      throw new Error(`${name} 包含未使用的工作流物理依赖 ${tableName}，应从导出包移除，禁止要求目标租户预装可选插件`);
+    }
     const columnName = String(column?.COLUMN_NAME ?? column?.ColumnName ?? column?.Name ?? '').trim();
     const nullable = String(column?.IS_NULLABLE ?? column?.IsNullable ?? '').trim().toUpperCase();
     const backfillSource = String(
@@ -380,6 +389,44 @@ export function validateOfficialPackageInstallContracts(name, content) {
         }
       }
       inspectPageValue(pageJson, row?.Id || '(unknown)');
+    }
+  }
+  validateOfficialDataSetSchemaClosure(name, packageModel);
+}
+
+// DATASET_SCHEMA_CLOSURE_V1: 官方母库已有物理表不能代替包的建表资源。
+// 发布前从实际种子字段反向检查，禁止让缺表错误到客户安装的最后阶段才暴露。
+export function validateOfficialDataSetSchemaClosure(name, packageModel) {
+  const normalize = value => String(value || '').trim().toLowerCase();
+  const dataSets = packageModel.DataSets || [];
+  const dataRows = dataSets.reduce((count, dataSet) => count + (dataSet.Rows || []).length, 0);
+  for (const [field, actual] of [['DataSetCount', dataSets.length], ['DataRowCount', dataRows]]) {
+    if (packageModel.PackageInfo?.[field] !== undefined && packageModel.PackageInfo[field] !== actual) {
+      throw new Error(`${name} ${field} 与数据集正文不一致：声明 ${packageModel.PackageInfo[field]}，实际 ${actual}`);
+    }
+  }
+  for (const dataSet of dataSets) {
+    const tableName = normalize(dataSet.TableName);
+    const table = (packageModel.DiyTables || []).find(row => normalize(row.Name) === tableName);
+    const ddl = (packageModel.DDLStatements || []).filter(row => normalize(row.TableName) === tableName
+      && /\bCREATE\s+TABLE\b/i.test(String(row.DDL || ''))).map(row => row.DDL).join('\n');
+    const physical = new Set((packageModel.PhysicalColumns || [])
+      .filter(row => normalize(row.TABLE_NAME) === tableName).map(row => normalize(row.COLUMN_NAME)));
+    const fields = new Set((packageModel.DiyFields || [])
+      .filter(row => table && normalize(row.TableId) === normalize(table.Id)).map(row => normalize(row.Name)));
+    // FormEngine.AddTable 固定创建的六个系统字段可不重复声明 diy_field；物理列和
+    // 建表语句仍逐项验证。业务字段不可借此豁免。
+    for (const field of ['id', 'createtime', 'updatetime', 'userid', 'username', 'isdeleted']) fields.add(field);
+    if (!table || !ddl || !physical.has('id') || !(packageModel.DiyFields || []).some(row => table && normalize(row.TableId) === normalize(table.Id))) {
+      throw new Error(`${name} 数据集 ${dataSet.TableName} 缺少完整建表资源（DiyTables/DiyFields/DDLStatements/PhysicalColumns），禁止依赖发布母库已有结构`);
+    }
+    const required = new Set(['id', ...(dataSet.ConflictFields || []).map(normalize)]);
+    for (const row of dataSet.Rows || []) for (const key of Object.keys(row)) required.add(normalize(key));
+    const ddlColumns = new Set([...ddl.matchAll(/(?:^|[,\n(])\s*[`"\[]([A-Za-z_][A-Za-z0-9_]*)[`"\]]\s+[A-Za-z]/g)].map(match => normalize(match[1])));
+    for (const field of required) {
+      if (!physical.has(field) || !fields.has(field) || !ddlColumns.has(field)) {
+        throw new Error(`${name} 数据集 ${dataSet.TableName}.${field} 缺少字段元数据或物理建表列`);
+      }
     }
   }
 }

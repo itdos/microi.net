@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.3.5
+ * Version: v1.3.7
  * Function:
  * - 匿名读取固定白名单中的吾码升级资源；超级管理员可通过 SHA 乐观锁原子发布升级资源，新版应用包写入 HDFS 并仅持久化可校验指针。
  */
@@ -578,11 +578,61 @@ function validatePublishResource(name, content) {
     throw new Error("升级资源[" + name + "]包名或版本不正确");
   }
   validateV8FirstPackage(name, packageModel);
+  validatePackageChangeLog(packageModel);
   return {
     Version: text(packageModel.PackageInfo.Version),
     PackageModel: packageModel,
     ExactSelections: exactPackageSelections(packageModel, name)
   };
+}
+
+// OFFICIAL_RESOURCE_CHANGELOG_BEFORE_POINTER_V1：升级资源专用发布也必须先持久化
+// 当前精确版本的更新日志，不能只在包正文携带 ChangeLog 而让商城详情缺少记录。
+// 日志独立提交后再更新包指针，后续包写入失败也不丢失发布历史；同内容重试复用日志。
+function validatePackageChangeLog(packageModel) {
+  var info = packageModel && packageModel.PackageInfo || {};
+  var changeLog = info.ChangeLog || {};
+  if (!text(info.Version) || text(changeLog.Version) !== text(info.Version)) {
+    throw new Error('官方应用更新日志版本必须精确匹配包版本');
+  }
+  for (var i = 0; i < 3; i++) {
+    var field = ['Title', 'ChangeType', 'Content'][i];
+    if (!text(changeLog[field]).trim()) throw new Error('官方应用更新日志缺少 ' + field);
+  }
+  return changeLog;
+}
+
+function ensurePackageChangeLog(storeId, packageModel) {
+  var changeLog = validatePackageChangeLog(packageModel);
+  function readRows() {
+    return V8.Db.FromSql('SELECT Id,Version,Title,ChangeType,Content,IsDeleted FROM sys_microistore_changelog WHERE StoreId=@p0 AND Version=@p1')
+      .AddInParameter('@p0', storeId).AddInParameter('@p1', changeLog.Version).ToArray();
+  }
+  var existing = readRows();
+  if (existing && existing.length > 0) {
+    for (var i = 0; i < existing.length; i++) {
+      if (Number(existing[i].IsDeleted || 0) !== 1
+          && text(existing[i].Title) === text(changeLog.Title)
+          && text(existing[i].ChangeType) === text(changeLog.ChangeType)
+          && text(existing[i].Content) === text(changeLog.Content)) return;
+    }
+    throw new Error('官方应用当前版本更新日志已存在且内容不一致，必须使用新版本发布：' + changeLog.Version);
+  }
+  var saved = V8.FormEngine.AddFormData('sys_microistore_changelog', {
+    Id: String(V8.Method.NewGuid()), StoreId: storeId, Version: changeLog.Version,
+    Title: changeLog.Title, ChangeType: changeLog.ChangeType, Content: changeLog.Content,
+    ReleaseTime: text(changeLog.ReleaseTime) || DateNow('yyyy-MM-dd HH:mm:ss'),
+    IsDeleted: 0, OsClient: V8.OsClient
+  });
+  if (!saved || saved.Code !== 1) throw new Error('官方应用更新日志保存失败：' + text(saved && saved.Msg));
+  var verified = readRows();
+  if (!verified || verified.length !== 1
+      || text(verified[0].Content) !== text(changeLog.Content)
+      || text(verified[0].Title) !== text(changeLog.Title)
+      || text(verified[0].ChangeType) !== text(changeLog.ChangeType)
+      || Number(verified[0].IsDeleted || 0) === 1) {
+    throw new Error('官方应用更新日志写入后强回读不一致：' + changeLog.Version);
+  }
 }
 
 var liveApiEngineFields = [
@@ -781,6 +831,7 @@ function preparePublishedApiEngineProjection() {
     packageHashes[item.Name] = actualSha;
     var validated = validatePublishResource(item.Name, text(current.Data.Content));
     var packageModel = validated.PackageModel || {};
+    ensurePackageChangeLog(current.Data.RowId, packageModel);
     var policies = packageModel.ResourcePolicies && packageModel.ResourcePolicies.ApiEngines;
     var engines = asArray(packageModel.SysApiEngines);
     for (var engineIndex = 0; engineIndex < engines.length; engineIndex++) {
@@ -962,6 +1013,7 @@ function applyPublishResource(item, current) {
     });
   } else {
     var exactSelections = validated.ExactSelections;
+    ensurePackageChangeLog(current.Data.RowId, validated.PackageModel);
     var storageResult = V8.ApiEngine.Run("microi-store-package-storage", {
       Action: "Store",
       StoreId: current.Data.RowId,

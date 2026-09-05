@@ -71,7 +71,7 @@ namespace Microi.net
                 : level >= 3
                     ? "【Error异常】"
                     : "【Warning警告】";
-            Console.WriteLine($"Microi：{status}平台自动升级【升级13资源】【{title}】{content}");
+            UpgradeProgress.WriteLine($"Microi：{status}平台自动升级【升级13资源】【{title}】{content}");
             MicroiEngine.QueueSystemLog(
                 null,
                 "PlatformUpgrade",
@@ -112,7 +112,7 @@ namespace Microi.net
         // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
         // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
         private const int ImporterLimitMemoryMb = 8192;
-        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 7, 4);
+        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 7, 13);
         private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 8);
         private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
         private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 1);
@@ -314,10 +314,18 @@ namespace Microi.net
                 && code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1")
                 && code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1")
                 && code.Contains("PACKAGE_API_ENGINE_PHYSICAL_READBACK_FALLBACK_V1")
+                && code.Contains("PACKAGE_API_ENGINE_AUTHORITATIVE_READBACK_V2")
+                && code.Contains("DATASET_TABLE_PREFLIGHT_V1")
                 && code.Contains("activeImportStage = '步骤2-字段定义'")
                 && code.Contains("TableName: 'diy_field'")
                 && code.Contains("['OsClient', textType(255)]")
                 && code.Contains("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1")
+                && code.Contains("ABSENT_PACKAGE_TABLE_DEFER_DDL_V1")
+                && code.Contains("DATABASE_INLINE_SERVING_API_CONTEXT_V1")
+                && code.Contains("ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1")
+                && code.Contains("PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1")
+                && code.Contains("UNUSED_WORKFLOW_PHYSICAL_SCHEMA_V1")
+                && code.Contains("MYSQL_IDENTIFIER_FOREIGN_KEY_SCOPE_V1")
                 && code.Contains("PACKAGE_MANAGED_OVERWRITE_V2")
                 && code.Contains("PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2")
                 && code.Contains("PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1")
@@ -1174,7 +1182,7 @@ namespace Microi.net
         {
             if (IsOfficialSourceTenant(osClient))
             {
-                Console.WriteLine($"Microi：【基础应用升级】租户[{osClient}]是吾码官方应用源，跳过基础应用包完整性回写检查。");
+                UpgradeProgress.WriteLine($"Microi：【基础应用升级】租户[{osClient}]是吾码官方应用源，跳过基础应用包完整性回写检查。");
                 return Task.FromResult(false);
             }
 
@@ -2025,7 +2033,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
 
         private static Task<bool> RefreshRequired(string osClient, string reason)
         {
-            Console.WriteLine($"Microi：【基础应用升级】租户[{osClient}]需要修复：{reason}。");
+            UpgradeProgress.WriteLine($"Microi：【基础应用升级】租户[{osClient}]需要修复：{reason}。");
             return Task.FromResult(true);
         }
 
@@ -2684,18 +2692,19 @@ WHERE {idColumn}=@p0");
 
         private static HashSet<string> ReadStartupDependencyPhysicalFields(
             DbSession database,
-            string osClient)
+            string osClient,
+            string tableName = "sys_apiengine")
         {
             var columnResult = MicroiEngine.ORM(database.Db.DbProvider.DatabaseType).GetColumns(
                 new DbServiceParam
                 {
                     OsClient = osClient,
-                    TableName = "sys_apiengine",
+                    TableName = tableName,
                     DbSession = database
                 });
             if (columnResult?.Code != 1 || columnResult.Data == null)
                 throw new InvalidOperationException(
-                    "读取 sys_apiengine 物理字段失败：" + (columnResult?.Msg ?? "接口无返回"));
+                    $"读取 {tableName} 物理字段失败：" + (columnResult?.Msg ?? "接口无返回"));
 
             var fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var token in JArray.FromObject(columnResult.Data))
@@ -2708,6 +2717,162 @@ WHERE {idColumn}=@p0");
             if (fields.Count == 0)
                 throw new InvalidOperationException("sys_apiengine 物理字段回读为空，拒绝盲目写入启动接口闭包。");
             return fields;
+        }
+
+        /// <summary>
+        /// 商城恢复入口的最小自举：从受信表单/模块引擎包补缺核心自描述与菜单元数据，
+        /// 不安装业务资源、不覆盖已有字段或写成功版本。菜单物理列存在但元数据缺失时，
+        /// FormEngine 会静默忽略新绑定字段，商城先于模块包安装便无法自行恢复。
+        /// 调用者必须位于已有版本门及租户升级租约内；物理表/固定列仍由前置门禁负责。
+        /// </summary>
+        internal static async Task EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(OsClientSecret client, bool menuOnly = false)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            EnsureLegacyMetadataIdentifierStorage(client);
+            var resources = await LoadUpgradeResourcesAsync().ConfigureAwait(false);
+            var database = client.Db;
+            var physicalTables = ReadStartupDependencyPhysicalFields(database, client.OsClient, "diy_table");
+            var physicalFields = ReadStartupDependencyPhysicalFields(database, client.OsClient, "diy_field");
+            var repaired = 0;
+            var cacheKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using var trans = database.BeginTransaction();
+            try
+            {
+                // MARKETPLACE_MENU_METADATA_BOOTSTRAP_V1: use the owning package
+                // as the schema source; only missing fields backed by physical
+                // menu columns are restored, never tenant field customizations.
+                foreach (var name in menuOnly ? new[] { "sys_menu" } : new[] { "diy_table", "diy_field" })
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    if (!database.TableExists(name))
+                        throw new InvalidOperationException($"商城自举缺少核心物理表 {name}。");
+                    var package = JObject.Parse(resources[name == "sys_menu" ? ModuleEnginePackageResourceName : FormEnginePackageResourceName]);
+                    var menuColumns = name == "sys_menu" ? ReadStartupDependencyPhysicalFields(database, client.OsClient, name) : null;
+                    var source = (package["DiyTables"] as JArray)?.OfType<JObject>()
+                        .SingleOrDefault(row => string.Equals(row["Name"]?.ToString(), name, StringComparison.OrdinalIgnoreCase))
+                        ?? throw new InvalidOperationException($"官方所属应用包缺少商城自举元数据 {name}。");
+                    var sourceId = source["Id"].ToString();
+                    var existing = trans.FromSql($"SELECT * FROM {QuoteIdentifier(database, "diy_table")} WHERE LOWER({QuoteIdentifier(database, "Name")})=LOWER(@p0)")
+                        .AddInParameter("p0", name).ToList<dynamic>()
+                        .Select(row => JObject.FromObject((object)row)).ToList();
+                    var current = existing.FirstOrDefault(row => string.Equals(row["Id"]?.ToString(), sourceId, StringComparison.OrdinalIgnoreCase))
+                        ?? existing.FirstOrDefault(row => ReadStartupSwitch(row["IsDeleted"]) != 1)
+                        ?? existing.FirstOrDefault();
+                    var tableId = current?["Id"]?.ToString();
+                    if (current == null)
+                    {
+                        var model = (JObject)source.DeepClone();
+                        tableId = ResolveBootstrapInsertId(database, trans, "diy_table", sourceId);
+                        model["Id"] = tableId;
+                        model["DataBaseId"] = "";
+                        model["DataBaseName"] = "";
+                        InsertBootstrapMetadata(database, trans, "diy_table", model, physicalTables, client.OsClient);
+                        repaired++;
+                    }
+                    else if (ReadStartupSwitch(current["IsDeleted"]) == 1)
+                    {
+                        trans.FromSql($"UPDATE {QuoteIdentifier(database, "diy_table")} SET {QuoteIdentifier(database, "IsDeleted")}=0 WHERE {QuoteIdentifier(database, "Id")}=@p0")
+                            .AddInParameter("p0", tableId).ExecuteNonQuery();
+                        repaired++;
+                    }
+                    if (string.IsNullOrWhiteSpace(tableId))
+                        throw new InvalidOperationException($"商城自举元数据缺少稳定 Id：{name}。");
+                    var existingFields = new HashSet<string>(trans.FromSql($"SELECT {QuoteIdentifier(database, "Name")} FROM {QuoteIdentifier(database, "diy_field")} WHERE {QuoteIdentifier(database, "TableId")}=@p0 AND ({QuoteIdentifier(database, "IsDeleted")}=0 OR {QuoteIdentifier(database, "IsDeleted")} IS NULL)")
+                        .AddInParameter("p0", tableId).ToList<dynamic>()
+                        .Select(row => JObject.FromObject((object)row)["Name"]?.ToString() ?? ""), StringComparer.OrdinalIgnoreCase);
+                    foreach (var sourceField in (package["DiyFields"] as JArray)?.OfType<JObject>()
+                                 .Where(field => string.Equals(field["TableId"]?.ToString(), sourceId, StringComparison.OrdinalIgnoreCase))
+                                 ?? Enumerable.Empty<JObject>())
+                    {
+                        var fieldName = sourceField["Name"]?.ToString();
+                        if (existingFields.Contains(fieldName) || (menuColumns != null && !menuColumns.Contains(fieldName))) continue;
+                        var model = (JObject)sourceField.DeepClone();
+                        model["Id"] = ResolveBootstrapInsertId(database, trans, "diy_field", sourceField["Id"]?.ToString());
+                        model["TableId"] = tableId;
+                        model["TableName"] = name;
+                        InsertBootstrapMetadata(database, trans, "diy_field", model, physicalFields, client.OsClient);
+                        existingFields.Add(fieldName);
+                        repaired++;
+                    }
+                    cacheKeys.Add(name);
+                    cacheKeys.Add(tableId);
+                }
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                trans.Commit();
+            }
+            catch
+            {
+                trans.Rollback();
+                throw;
+            }
+            if (repaired == 0) return;
+            foreach (var key in cacheKeys)
+            {
+                await MicroiEngine.CacheTenant.Cache(client.OsClient).RemoveAsync($"Microi:{client.OsClient}:FormData:diy_table:{key.ToLowerInvariant()}");
+                await MicroiEngine.CacheTenant.Cache(client.OsClient).RemoveAsync($"Microi:{client.OsClient}:FormData:diy_table_field_list:{key.ToLowerInvariant()}");
+            }
+            UpgradeProgress.WriteLine($"Microi：【兼容修复】【{client.OsClient}】已从受信所属应用包补齐商城自举元数据 {repaired} 条，既有字段与业务数据保持原样。");
+        }
+
+        // MySQL parses CHAR(36) before materialization. Mixed UUID/ULID metadata
+        // cannot be repaired by a row projection alone. Only core bootstrap identity
+        // columns are expanded; business schemas remain owned by their application.
+        // SHOW CREATE preserves defaults, keys, nullability, charset and comments.
+        internal static int EnsureLegacyMetadataIdentifierStorage(OsClientSecret client)
+        {
+            var database = client?.Db;
+            if (database?.Db?.DbProvider?.DatabaseType != DatabaseType.MySql) return 0;
+            var repaired = 0;
+            foreach (var table in new[] { "diy_table", "diy_field" })
+            {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                var columns = database.FromSql(@"SELECT COLUMN_NAME FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=@p0 AND DATA_TYPE='char'
+AND CHARACTER_MAXIMUM_LENGTH=36
+AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
+                    .AddInParameter("p0", table).ToList<dynamic>()
+                    .Select(row => Convert.ToString((object)row.COLUMN_NAME)).ToArray();
+                if (columns.Length == 0) continue;
+                // Core metadata can also retain customer foreign keys. Share the
+                // same isolated, constraint-preserving atom as package installation.
+                UpgradeExecutionLeaseContext.ConfirmOwnership();
+                repaired += database.WidenMySqlIdentifierColumns(table,
+                    string.Join(",", columns.Select(column => column + ":36")));
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+            }
+            if (repaired > 0)
+                UpgradeProgress.WriteLine($"Microi：【兼容修复】【{client.OsClient}】已将 {repaired} 个核心元数据标识列从 char(36) 无损扩展为 varchar(36)，兼容 UUID 与 ULID。");
+            return repaired;
+        }
+
+        private static string ResolveBootstrapInsertId(DbSession database, DbTrans trans, string table, string sourceId)
+        {
+            if (!string.IsNullOrWhiteSpace(sourceId)
+                && Convert.ToInt32(trans.FromSql($"SELECT COUNT(1) FROM {QuoteIdentifier(database, table)} WHERE {QuoteIdentifier(database, "Id")}=@p0")
+                    .AddInParameter("p0", sourceId).ToScalar()) == 0) return sourceId;
+            return Guid.NewGuid().ToString();
+        }
+
+        private static void InsertBootstrapMetadata(DbSession database, DbTrans trans, string table, JObject source,
+            HashSet<string> physicalFields, string osClient)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            var model = (JObject)source.DeepClone();
+            model["OsClient"] = osClient;
+            model["IsDeleted"] = 0;
+            model["CreateTime"] = DateTime.Now;
+            model["UpdateTime"] = DateTime.Now;
+            model.Remove("UserId");
+            model.Remove("UserName");
+            var fields = model.Properties().Where(field => physicalFields.Contains(field.Name)).ToArray();
+            var statement = trans.FromSql($"INSERT INTO {QuoteIdentifier(database, table)} ({string.Join(",", fields.Select(field => QuoteIdentifier(database, field.Name)))}) VALUES ({string.Join(",", fields.Select((_, i) => "@p" + i))})");
+            for (var index = 0; index < fields.Length; index++)
+                statement.AddInParameter("p" + index, ReadDatabaseValue(database, fields[index].Name, fields[index].Value));
+            if (statement.ExecuteNonQuery() != 1)
+                throw new InvalidOperationException($"商城自举元数据写入失败：{table}.{model["Name"]}。");
+            if (Convert.ToInt32(trans.FromSql($"SELECT COUNT(1) FROM {QuoteIdentifier(database, table)} WHERE {QuoteIdentifier(database, "Id")}=@p0 AND {QuoteIdentifier(database, "IsDeleted")}=0")
+                    .AddInParameter("p0", model["Id"].ToString()).ToScalar()) != 1)
+                throw new InvalidOperationException($"商城自举元数据强回读失败：{table}.{model["Name"]}。");
         }
 
         /// <summary>
@@ -2917,7 +3082,7 @@ WHERE {idColumn}=@p0");
             var onlineResourceNames = RequiredResourceNames
                 .Where(resourceName => !string.Equals(resourceName, BuildAiAppResourceName, StringComparison.Ordinal))
                 .ToArray();
-            Console.WriteLine($"Microi：【基础应用升级】开始并行读取吾码官方升级资源（共{onlineResourceNames.Length}项，单项超时8秒）。");
+            UpgradeProgress.WriteLine($"Microi：【基础应用升级】开始并行读取吾码官方升级资源（共{onlineResourceNames.Length}项，单项超时8秒）。");
             var downloads = await Task.WhenAll(onlineResourceNames.Select(DownloadOfficialResourceAsync));
             var failures = downloads.Where(item => !item.Succeeded).ToArray();
             if (failures.Length > 0)
@@ -2942,7 +3107,7 @@ WHERE {idColumn}=@p0");
                 return bundledResources;
             }
 
-            Console.WriteLine("Microi：【基础应用升级】官方资源整组校验成功，使用在线最新版。");
+            UpgradeProgress.WriteLine("Microi：【基础应用升级】官方资源整组校验成功，使用在线最新版。");
             var resources = downloads.ToDictionary(item => item.ResourceName, item => item.Content, StringComparer.Ordinal);
             // 构建器随当前服务器版本发布，确保客户即使连接到较旧的官方资源服务，
             // 也不会再次安装缺少租户 ApiBase/OsClient 上下文的旧入口发布逻辑。
@@ -2976,7 +3141,7 @@ WHERE {idColumn}=@p0");
                         return OfficialResourceDownloadResult.Failure(resourceName, validationError);
                     }
 
-                    Console.WriteLine($"Microi：【基础应用升级】已从吾码官方数据库获取并校验升级资源：{resourceName}");
+                    UpgradeProgress.WriteLine($"Microi：【基础应用升级】已从吾码官方数据库获取并校验升级资源：{resourceName}");
                     return OfficialResourceDownloadResult.Success(resourceName, content);
                 }
             }
@@ -3468,10 +3633,10 @@ WHERE {idColumn}=@p0");
             var packageContent = NormalizePackageExecutionLimits(resources[resourceName]);
             if (IsPackageVersionAlreadyInstalled(osClient, packageContent, out var installedVersion))
             {
-                Console.WriteLine($"Microi：【基础应用升级】【{osClient}】{packageName}已安装同版本[{installedVersion}]，执行覆盖式重放以修复资源漂移。");
+                UpgradeProgress.WriteLine($"Microi：【基础应用升级】【{osClient}】{packageName}已安装同版本[{installedVersion}]，执行覆盖式重放以修复资源漂移。");
             }
-            Console.WriteLine($"Microi：【基础应用升级】开始导入{packageName}：{resourceName}");
-            dynamic installResult;
+            UpgradeProgress.WriteLine($"Microi：【基础应用升级】开始导入{packageName}：{resourceName}");
+            object installResult;
             // Upgrade13 is the only caller allowed to mark a package as the
             // validated embedded official baseline. The authorization lives in
             // an AsyncLocal host scope bound to this fixed importer and tenant;
@@ -3490,13 +3655,14 @@ WHERE {idColumn}=@p0");
                     EmbeddedOfficialPackageResourceName = resourceName
                 });
             }
-            if (installResult.Code != 1)
+            var installFailure = GetInstallFailureMessage(installResult);
+            if (installFailure != null)
             {
-                msgs.Add($"{packageName}导入失败：{installResult.Msg}{FormatInstallFailureDetails(installResult.Data)}");
+                msgs.Add($"{packageName}导入失败：{installFailure}");
                 return;
             }
 
-            Console.WriteLine($"Microi：【基础应用升级】{packageName}导入完成。");
+            UpgradeProgress.WriteLine($"Microi：【基础应用升级】{packageName}导入完成。");
         }
 
         private static bool IsPackageVersionAlreadyInstalled(
@@ -3553,7 +3719,7 @@ WHERE {idColumn}=@p0");
             {
                 // 老库可能尚无版本表或只有部分历史字段。版本读取失败只能降级为正常
                 // 幂等导入，不能阻断升级，也不能把未知状态误判成“已安装”。
-                Console.WriteLine($"Microi：【基础应用升级】【{osClient}】读取应用包安装版本失败，将执行幂等导入：{ex.Message}");
+                UpgradeProgress.WriteLine($"Microi：【基础应用升级】【{osClient}】读取应用包安装版本失败，将执行幂等导入：{ex.Message}");
                 installedVersion = string.Empty;
                 return false;
             }
@@ -3736,6 +3902,25 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             }
         }
 
+        internal static string GetInstallFailureMessage(object result)
+        {
+            // V8 may return only { Code, Msg }. Optional Data must never mask the
+            // original failure with a second dynamic member-access exception.
+            if (result == null) return "导入器未返回结果。";
+            try
+            {
+                var model = result as JObject ?? JObject.FromObject(result);
+                if (int.TryParse(model["Code"]?.ToString(), out var code) && code == 1)
+                    return null;
+                return (model["Msg"]?.ToString() ?? "导入器未返回有效的成功状态。")
+                    + FormatInstallFailureDetails(model["Data"]);
+            }
+            catch (Exception ex)
+            {
+                return $"导入器返回值无法解析（{ex.GetType().Name}）。";
+            }
+        }
+
         private static string FormatInstallFailureDetails(object data)
         {
             try
@@ -3744,7 +3929,15 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var token = data as JToken ?? JToken.FromObject(data);
                 var detail = (token as JObject)?.Properties().FirstOrDefault(property =>
                     property.Name.StartsWith("失败详情", StringComparison.Ordinal));
-                if (detail?.Value == null) return string.Empty;
+                if (detail?.Value == null)
+                {
+                    // 只附加导入器的资源定位和调用栈，不记录 Param、用户信息或包正文。
+                    var resource = token["失败资源"]?.ToString();
+                    var stack = token["错误堆栈"]?.ToString();
+                    if (string.IsNullOrWhiteSpace(resource) && string.IsNullOrWhiteSpace(stack)) return string.Empty;
+                    var diagnostic = $"；失败资源={resource}；调用栈={stack}";
+                    return diagnostic.Length > 2000 ? diagnostic.Substring(0, 2000) : diagnostic;
+                }
 
                 // 只记录导入器明确返回的失败列表，不把整份应用包或其它统计信息写入日志。
                 var detailJson = detail.Value.ToString(Formatting.None);
@@ -3990,7 +4183,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     {
                         await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{engineApiAddress}");
                     }
-                    Console.WriteLine($"Microi：【基础应用升级】已为[{engineKey}]补充局部时间回退/受控ZIP兼容，客户全局V8保持不变。");
+                    UpgradeProgress.WriteLine($"Microi：【基础应用升级】已为[{engineKey}]补充局部时间回退/受控ZIP兼容，客户全局V8保持不变。");
                 }
             }
             catch (Exception ex)
@@ -4038,7 +4231,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
 
             if (IsOfficialSourceTenant(osClient))
             {
-                Console.WriteLine($"Microi：【基础应用升级】租户[{osClient}]是吾码官方应用源，跳过导入器及基础应用包回写；其它升级步骤不受影响。");
+                UpgradeProgress.WriteLine($"Microi：【基础应用升级】租户[{osClient}]是吾码官方应用源，跳过导入器及基础应用包回写；其它升级步骤不受影响。");
                 return msgs;
             }
 
@@ -4052,12 +4245,13 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             {
                 foreach (var nullableError in nullableErrors)
                 {
-                    Console.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】失败：{nullableError}");
+                    UpgradeProgress.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】失败：{nullableError}");
                 }
                 msgs.AddRange(nullableErrors);
                 return msgs;
             }
-            Console.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】全部检查成功。");
+            UpgradeProgress.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】全部检查成功。");
+            await EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(OsClient.GetClient(osClient), menuOnly: true).ConfigureAwait(false);
             
             #region 导入数据包V8
             //更新应用商城的导入数据包接口引擎
@@ -4262,7 +4456,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             if (publishAiAppResult.Code != 1)
             {
                 // AI 发布器不是应用商城启动的前置条件，老库缺少可选字段时不应阻断三套基础包。
-                Console.WriteLine("Microi：【基础应用升级】AI应用发布商城接口升级跳过：" + publishAiAppResult.Msg);
+                UpgradeProgress.WriteLine("Microi：【基础应用升级】AI应用发布商城接口升级跳过：" + publishAiAppResult.Msg);
             }
             else
             {
@@ -4362,7 +4556,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
 
                 foreach (var tableName in CoreNullableTables)
                 {
-                    Console.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】开始检查表：{tableName}。");
+                    UpgradeProgress.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】开始检查表：{tableName}。");
                     var columnsResult = orm.GetColumns(new DbServiceParam
                     {
                         OsClient = osClient,
@@ -4390,7 +4584,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                         }
                         if (columnType.DosIsNullOrWhiteSpace()) continue;
 
-                        Console.WriteLine(
+                        UpgradeProgress.WriteLine(
                             $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】开始调整：{tableName}.{columnName}，类型={columnType}。"
                         );
                         var changeResult = orm.ChangeColumn(new DbServiceParam
@@ -4408,14 +4602,14 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                         if (changeResult.Code == 1)
                         {
                             changedCount++;
-                            Console.WriteLine(
+                            UpgradeProgress.WriteLine(
                                 $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】调整成功：{tableName}.{columnName}。"
                             );
                         }
                         else
                         {
                             errors.Add($"核心表 {tableName}.{columnName} 调整为允许为空失败：{changeResult.Msg}");
-                            Console.WriteLine(
+                            UpgradeProgress.WriteLine(
                                 $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】调整失败：{tableName}.{columnName}；{changeResult.Msg}"
                             );
                         }
@@ -4423,11 +4617,11 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
 
                     if (changedCount > 0)
                     {
-                        Console.WriteLine(
+                        UpgradeProgress.WriteLine(
                             $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】表调整成功：{tableName}，已将{changedCount}个字段调整为允许为空。"
                         );
                     }
-                    Console.WriteLine(
+                    UpgradeProgress.WriteLine(
                         $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】表检查完成：{tableName}，本次调整={changedCount}。"
                     );
                 }
