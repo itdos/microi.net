@@ -144,7 +144,7 @@ function assertOfficialPair({
 test('message-notification and Store selected ApiEngine key sets stay exact and policy-closed', () => {
   assertPackageKeyClosure(messagePackage, MESSAGE_SELECTED_API_ENGINE_KEYS);
   assertPackageKeyClosure(storePackage, STORE_SELECTED_API_ENGINE_KEYS);
-  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.14');
+  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.16');
   assert.equal(storePackage.PackageInfo.ChangeLog?.Version, storePackage.PackageInfo.Version);
   assert.match(String(storePackage.PackageInfo.ChangeHistory || ''), /v7\.7\.27/);
 });

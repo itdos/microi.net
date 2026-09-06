@@ -76,10 +76,11 @@ namespace Microi.net
                 error = "当前安全原子能力只允许生成无人声纯音乐；带歌词歌曲需要独立版权审核流程。";
                 return false;
             }
-            var model = (param.Model ?? PrimaryModel).Trim().ToLowerInvariant();
-            if (model != PrimaryModel)
+            var model = (param.Model ?? PrimaryModel).Trim();
+            // 模型可用性由当前租户 mic_ai 的能力目录验证；协议参数层不再固定单一型号。
+            if (!AiMediaModelSupport.IsValidModelId(model))
             {
-                error = "当前 MiniMax 官方音乐生成只允许 music-3.0。";
+                error = "音乐模型标识无效，请从 AI 引擎目录重新选择。";
                 return false;
             }
             var sampleRate = param.SampleRate == 0 ? 44100 : param.SampleRate;
@@ -128,7 +129,8 @@ namespace Microi.net
                 Format = format,
                 DurationSeconds = durationSeconds,
                 RequestBody = body,
-                Fingerprint = Sha256(body + "|fallback-duration:" + durationSeconds)
+                Fingerprint = Sha256(body + "|fallback-duration:" + durationSeconds
+                    + (string.IsNullOrWhiteSpace(param.AiModelId) ? "" : "|ai-model-id:" + param.AiModelId.Trim()))
             };
             return true;
         }

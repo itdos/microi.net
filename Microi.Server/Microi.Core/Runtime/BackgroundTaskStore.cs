@@ -279,6 +279,25 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1 AND Id
                 .ToFirst<BackgroundTaskRecord>());
         }
 
+        internal static bool ResumeImageResult(BackgroundTaskRecord task, JObject frozenParam)
+        {
+            if (task == null || task.Status != "Failed" || !AiImageBackgroundTaskService.IsImageWorker(task.ApiEngineKey)) return false;
+            var client = GetRequiredClient(task.OsClient);
+            // 仅当前所有者的失败任务可以恢复；CAS 与 Worker 的 fencing 共同阻止跨节点重复认领。
+            return FromSql(client, $@"UPDATE {TableName} SET Status='Pending',StatusText='恢复已有图片',
+Msg='正在恢复供应商已有图片，未重新生成',ParamJson=@param,AttemptCount=0,EndTime=NULL,
+NextRunTime=@now,LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@now
+WHERE Id=@id AND OsClient=@tenant AND UserKey=@user AND Status='Failed' AND CancelRequested=0
+AND FencingToken=@fence AND ApiEngineKey=@worker AND (IsDeleted=0 OR IsDeleted IS NULL)
+AND {RuntimeScopePredicate}")
+                .AddInParameter("param", frozenParam.ToString(Newtonsoft.Json.Formatting.None))
+                .AddInParameter("now", DbTime(DateTime.Now.AddSeconds(1)))
+                .AddInParameter("id", task.Id).AddInParameter("tenant", task.OsClient).AddInParameter("user", task.UserKey)
+                .AddInParameter("fence", task.FencingToken).AddInParameter("worker", task.ApiEngineKey)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType()).AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
+                .ExecuteNonQuery() == 1;
+        }
+
         public static int ClearSucceeded(string osClient, string userKey)
         {
             var client = GetRequiredClient(osClient);

@@ -519,6 +519,55 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Equal(string.Empty, error);
     }
 
+    [Theory]
+    [InlineData("v2.8.7", true)]
+    [InlineData("v2.8.2", false)]
+    public void BootstrapRuntimeReconciliation_KeepsCodeAndVersionTogetherAcrossRepeatedChecks(
+        string targetVersion,
+        bool newerCode)
+    {
+        const string ownerCode = "var Package = V8.Param.Package; sys_microistore;";
+        var targetCode = ownerCode + (newerCode ? " // newer supported importer" : "");
+        var source = new JObject
+        {
+            ["Version"] = "v2.8.2", ["ApiV8Code"] = ownerCode,
+            ["ApiAddress"] = "/apiengine/import-microi-store-package",
+            ["StopHttp"] = 0, ["AllowAnonymous"] = 0
+        };
+        var target = new JObject
+        {
+            ["Id"] = "stable-target-id", ["Version"] = targetVersion,
+            ["ApiV8Code"] = targetCode, ["IsDeleted"] = 1, ["IsEnable"] = 0,
+            ["StopHttp"] = 1, ["AllowAnonymous"] = 1, ["ApiAddress"] = "/stale-route"
+        };
+        var columns = new HashSet<string>(new[]
+        {
+            "Id", "Version", "ApiV8Code", "IsDeleted", "IsEnable",
+            "StopHttp", "AllowAnonymous", "ApiAddress", "UpdateTime"
+        }, StringComparer.OrdinalIgnoreCase);
+
+        for (var iteration = 0; iteration < 2; iteration++)
+        {
+            Assert.False(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
+                "import-microi-store-package", target["Version"]!.ToString(),
+                target["ApiV8Code"]!.ToString(), source["Version"]!.ToString(), ownerCode,
+                out var error));
+            Assert.Equal(string.Empty, error);
+            var updates = ChildTenantPlatformAppControlService.BuildBootstrapRuntimeReconciliation(
+                columns, source, new DateTime(2026, 9, 6, 12, 0, iteration));
+            foreach (var update in updates) target[update.Key] = JToken.FromObject(update.Value);
+
+            Assert.Equal(targetVersion, target["Version"]!.ToString());
+            Assert.Equal(targetCode, target["ApiV8Code"]!.ToString());
+            Assert.Equal("stable-target-id", target["Id"]!.ToString());
+            Assert.Equal(source["ApiAddress"]!.ToString(), target["ApiAddress"]!.ToString());
+            Assert.Equal(0, target["IsDeleted"]!.Value<int>());
+            Assert.Equal(1, target["IsEnable"]!.Value<int>());
+            Assert.Equal(0, target["StopHttp"]!.Value<int>());
+            Assert.Equal(0, target["AllowAnonymous"]!.Value<int>());
+        }
+    }
+
     private static JObject Tenant(
         string osClient,
         string name,

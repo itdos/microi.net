@@ -69,6 +69,8 @@ namespace Microi.net
             // Tenant, credentials, executable code and authorization metadata.
             "sys_osclients",
             "sys_config",
+            // 全局可执行代码只能由管理员维护，普通角色误授表权限也不能修改。
+            "mci_global_function",
             "sys_apiengine",
             "diy_table",
             "diy_field",

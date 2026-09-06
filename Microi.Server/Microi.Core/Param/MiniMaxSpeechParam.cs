@@ -7,6 +7,7 @@ namespace Microi.net
     public sealed class MiniMaxSpeechGenerateParam
     {
         public string RequestId { get; set; }
+        public string AiModelId { get; set; }
         public string Text { get; set; }
         public string Speaker { get; set; } = "female";
         public string VoiceId { get; set; }

@@ -1122,7 +1122,22 @@ namespace Microi.net
                 }
                 return client;
             }
-            throw new Exception($"Microi：【Error异常】未找到OsClient：{(osClient ?? "")}");
+            // 新租户可能由另一节点登记；Redis 淘汰、重启或缓存失效后不能永久依赖
+            // 启动时的 ClientList。仅回源当前三参数，绝不借用其它网络/环境的配置。
+            var runtime = MicroiEngine.TryGetService<IOsClientRuntime>();
+            if (!_isCacheInitializing && runtime != null
+                && !string.Equals(osClient, OsClientDefault.OsClient, StringComparison.OrdinalIgnoreCase))
+            {
+                var targetKey = osClient;
+                var recovered = TenantRuntimeRecovery.Resolve(
+                    $"{OsClientDefault.OsClient}:{OsClientDefault.OsClientType}:{OsClientDefault.OsClientNetwork}:{targetKey}",
+                    () => TryResolveUniqueLoadedClient(targetKey, out _, out var loaded, out var ambiguous)
+                          && !ambiguous ? loaded : null,
+                    () => runtime.ReloadSingleOsClient(targetKey));
+                if (recovered != null) return recovered;
+            }
+            throw new Exception($"Microi：【Error异常】未找到OsClient：{osClient}；请检查当前运行分区"
+                + $"[{OsClientDefault.OsClientType}/{OsClientDefault.OsClientNetwork}]中已启用的租户配置。");
         }
         /// <summary>
         /// 

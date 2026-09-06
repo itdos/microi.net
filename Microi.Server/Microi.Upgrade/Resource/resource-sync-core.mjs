@@ -234,6 +234,15 @@ function currentChangeHistoryRecords(changeHistory, version) {
   return [];
 }
 
+function hasObjectCoercionPlaceholder(value) {
+  if (typeof value === 'string') {
+    return /(?:^|[\r\n,])\s*\[object Object\](?=\s*(?:$|[\r\n,]))/.test(value);
+  }
+  if (Array.isArray(value)) return value.some(hasObjectCoercionPlaceholder);
+  if (value && typeof value === 'object') return Object.values(value).some(hasObjectCoercionPlaceholder);
+  return false;
+}
+
 export function validateOfficialPackageChangeLog(name, content) {
   if (!Object.hasOwn(readablePackageNames, name)) return;
 
@@ -258,6 +267,11 @@ export function validateOfficialPackageChangeLog(name, content) {
     if (typeof changeLog[fieldName] !== 'string' || !changeLog[fieldName].trim()) {
       throw new Error(`${name} 的 PackageInfo.ChangeLog.${fieldName} 不能为空`);
     }
+  }
+  // 当前版本说明齐全也不能掩盖更早历史被 String(对象数组) 破坏；发布前保留原文并失败关闭。
+  // 只识别独立的转换占位记录，不误拒绝正常说明正文中提到该错误文本的句子。
+  if (hasObjectCoercionPlaceholder(packageInfo?.ChangeHistory)) {
+    throw new Error(`${name} 的 PackageInfo.ChangeHistory 包含对象转换占位符，必须从已验证历史恢复原文后再发布`);
   }
   if (!changeHistoryCoversVersion(packageInfo?.ChangeHistory, packageVersion)) {
     throw new Error(`${name} 的 PackageInfo.ChangeHistory 未覆盖当前版本 ${packageVersion}`);

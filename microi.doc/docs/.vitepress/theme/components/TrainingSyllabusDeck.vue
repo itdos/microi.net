@@ -561,7 +561,7 @@ const introSlides: SlideMeta[] = [
 
 const outroSlides: SlideMeta[] = [
   { id: 'multi-end', chapter: '43', kind: 'multi-end', nav: '全端兼容', title: '一套业务能力，进入企业每一个终端', summary: 'PC、WebOS、H5、小程序、Android、iOS、微服务与 Unity 共享平台能力。' },
-  { id: 'success-cases', chapter: '44', kind: 'cases', nav: '成功案例', title: '从 CRM、ERP 到 MES / 制造协同的真实交付', summary: '用已公开案例数据理解吾码如何支撑复杂系统、长期运行与多租户复制。' },
+  { id: 'success-cases', chapter: '44', kind: 'cases', nav: '成功案例', title: '跨越行业边界，让业务价值落地', summary: '从工厂车间到商业服务，从组织管理到公共运营，Microi吾码已在多类行业的实际业务中落地应用。' },
   { id: 'closing', chapter: '45', kind: 'closing', nav: '致辞', title: '把 AI 的速度，变成企业可持续交付力', summary: '掌握平台能力，建立可复用、可验证、可演进的 AI 研发方式。' },
 ]
 
@@ -623,10 +623,14 @@ const devices = [
   { code: '3D', title: 'Unity / WebGL', text: '数字孪生与沉浸场景' },
 ]
 
-const successCases = [
-  { code: 'ERP', title: '服装 ERP', metric: '1 个月', facts: ['146 个模块', '141 张表', '68 个 API', '80 个 SaaS 数据库'], href: '/case/erp/erp-case1.html' },
-  { code: 'MES', title: '集团制造协同', metric: '200+ 模块', facts: ['241 张表', '339 个 API', '11 个外部数据库', '10+ 人协作'], href: '/case/ims/ims-case1.html' },
-  { code: 'CRM', title: '客户关系管理', metric: '1 个月', facts: ['200+ 模块', '252 张表', '76 个 API', '29 条工作流'], href: '/case/crm/crm-case1.html' },
+// 场景归纳自 case-index 的公开清单，只展示业务类别；不复制客户、系统名称或推断单案收益。
+const caseIndustries = [
+  { title: '工业制造', scenes: '纺织服装 · 机械制造 · 汽车配套', icon: 'M3 21V9l6 3V9l6 3V3h5v18H3ZM7 16h1m3 0h1m4 0h1M7 19h1m3 0h1m4 0h1' },
+  { title: '商贸与消费', scenes: '零售商城 · 进销存 · 会员服务', icon: 'M3 10l2-6h14l2 6M4 10v10h16V10M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M9 20v-6h6v6' },
+  { title: '组织与经营', scenes: '人力资源 · 财税服务 · 资产管理', icon: 'M8 7V4h8v3M3 7h18v13H3V7Zm0 6 9 3 9-3M10 12h4' },
+  { title: '园区与公共服务', scenes: '园区运营 · 智慧社区 · 停车服务', icon: 'M3 21V9h8v12M11 21V3h10v18M6 13h2m-2 4h2m6-10h4m-4 4h4m-4 4h4M2 21h20' },
+  { title: '专业服务', scenes: '医疗健康 · 教育教务 · 法律服务', icon: 'M4 5h6l2 2 2-2h6v14h-6l-2 2-2-2H4V5Zm8 2v14M7 9h2m-2 4h2m6-4h2m-2 4h2' },
+  { title: '物流与农业', scenes: '国际物流 · 农业牧场 · 物联管理', icon: 'M12 3 3 8v9l9 5 9-5V8l-9-5ZM3 8l9 5 9-5M12 13v9M7.5 5.5l9 5V15' },
 ]
 
 const deckRef = ref<HTMLElement | null>(null)
@@ -932,9 +936,32 @@ onBeforeUnmount(() => {
           </template>
 
           <template v-else-if="slide.kind === 'cases'">
-            <header class="mci-training-slide__heading mci-deck-reveal"><div><p class="mci-deck-eyebrow">{{ slide.chapter }} · PROVEN DELIVERY</p><h2>{{ slide.title }}</h2><p>{{ slide.summary }}</p></div><span>{{ padSlide(index) }}</span></header>
-            <div class="mci-case-grid"><a v-for="(item, itemIndex) in successCases" :key="item.code" class="mci-case-card mci-deck-reveal" :href="item.href" target="_blank" rel="noopener noreferrer" :style="{ '--mci-deck-order': itemIndex }"><header><span>{{ item.code }}</span><strong>{{ item.metric }}</strong></header><h3>{{ item.title }}</h3><div><i v-for="fact in item.facts" :key="fact">{{ fact }}</i></div><small>查看完整案例 ↗</small></a></div>
-            <div class="mci-case-proof mci-deck-reveal"><span><strong>200+</strong> 软件项目交付</span><span><strong>500+</strong> 客户服务经验</span><span><strong>214</strong> 脱敏案例索引</span><a href="/case/case-index.html" target="_blank" rel="noopener noreferrer">打开全部成功案例 ↗</a></div>
+            <div class="mci-case-showcase">
+              <div class="mci-case-story">
+                <p class="mci-case-kicker mci-deck-reveal"><span></span>成功案例 <i> / </i> 行业实践</p>
+                <h2 class="mci-case-title mci-deck-reveal">跨越行业边界<br><strong>让业务价值落地</strong></h2>
+                <p class="mci-case-lead mci-deck-reveal">{{ slide.summary }}</p>
+                <dl class="mci-case-metrics mci-deck-reveal" aria-label="2018 至 2025 年公开应用数据">
+                  <div><dt>已交付软件</dt><dd>200<span>+</span><small>套</small></dd></div>
+                  <div><dt>已应用客户</dt><dd>500<span>+</span><small>家</small></dd></div>
+                </dl>
+                <p class="mci-case-period mci-deck-reveal">2018—2025 · 持续积累的行业实践</p>
+              </div>
+              <div class="mci-case-coverage">
+                <header class="mci-case-coverage__heading mci-deck-reveal"><h3>多元行业，共同选择</h3><span>典型应用场景</span></header>
+                <div class="mci-case-industries">
+                  <article v-for="(industry, industryIndex) in caseIndustries" :key="industry.title" class="mci-case-industry mci-deck-reveal" :style="{ '--mci-deck-order': industryIndex }">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="industry.icon" /></svg>
+                    <h4>{{ industry.title }}</h4>
+                    <p>{{ industry.scenes }}</p>
+                  </article>
+                </div>
+              </div>
+            </div>
+            <footer class="mci-case-footer mci-deck-reveal">
+              <p class="mci-case-statement">行业各有不同，<strong>业务落地一脉相通。</strong></p>
+              <div class="mci-case-source"><p>数据来源：官网成功案例页（2018—2025）；场景按公开清单归纳。</p><a href="/case/case-index.html" target="_blank" rel="noopener noreferrer">查看案例概览 <span aria-hidden="true">↗</span></a></div>
+            </footer>
           </template>
 
           <template v-else-if="slide.kind === 'closing'">

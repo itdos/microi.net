@@ -288,7 +288,21 @@ test("the security page renders complete diagnostics and current tenant branding
     assert.match(component, /SysConfig\?\.SysTitle/);
     assert.match(component, /overflow-wrap:\s*anywhere/);
     assert.doesNotMatch(component, /text-overflow:\s*ellipsis/);
-    assert.match(backgroundTaskCenter, /skipAuthorization:\s*true/);
+    // 商城直连已抽到 fetch 封装；验证真正发出的请求仍不携带租户认证，
+    // 而不是要求组件继续保留旧 PostAsync 的配置字段。
+    assert.match(backgroundTaskCenter, /await requestOfficialStoreList\(/);
+    const { requestOfficialStoreList } = await import("../src/utils/official-app-notice.js");
+    let officialRequests = 0;
+    await requestOfficialStoreList({ Action: "CheckPlatformApps" }, {
+        fetchImpl: async (url, options) => {
+            officialRequests++;
+            assert.equal(new URL(url).origin, "https://api.itdos.com");
+            assert.equal(options.credentials, "omit");
+            assert.deepEqual(options.headers, { "Content-Type": "application/json", apiengine: "1" });
+            return { ok: true, status: 200, text: async () => JSON.stringify({ Code: 1, Data: { Notices: [] } }) };
+        }
+    });
+    assert.equal(officialRequests, 1);
     assert.match(backgroundTaskCenter, /suppressAuthFailure:\s*true/);
     assert.match(backgroundTaskCenter, /suppressErrorNotification:\s*true/);
 });

@@ -51,7 +51,7 @@ const dependencies = Object.freeze([
     name: '平台后台任务',
     source: 'platform-background-task.js',
     id: '97e9cc2f-a544-468c-b885-000000000013',
-    version: 'v1.1.0',
+    version: 'v1.1.1',
     apiAddress: '/apiengine/platform-background-task',
     category: '平台内置',
     enableLog: 0,

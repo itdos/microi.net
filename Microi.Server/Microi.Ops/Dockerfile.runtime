@@ -1,0 +1,8 @@
+# 用已经完成 npm build、dotnet publish 的目录作为构建上下文。
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+LABEL io.microi.ops.controller="true" org.opencontainers.image.title="Microi.Ops" org.opencontainers.image.version="1.0.1"
+WORKDIR /app
+COPY . .
+ENV ASPNETCORE_URLS=http://+:8080 OPS_DATA_DIR=/microi/ops/data OPS_LOG_DIR=/microi/logs/ops
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "Microi.Ops.dll"]

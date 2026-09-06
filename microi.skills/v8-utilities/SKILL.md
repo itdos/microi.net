@@ -60,6 +60,10 @@ var clientDecoded = V8.Base64.decode(clientEncoded);
 
 ## 能力选择
 
+- 日期基础函数由新版后端运行时自举，不能要求租户先配置 DateNow 才能安装应用。全局函数管理使用系统设置子表 `mci_global_function`，按 `SysConfigId + Runtime(Client/Server) + FunctionName` 隔离，一行一个同名 function 声明；用 `V8.Method.ValidateGlobalFunction` 只解析验证，不执行源码。
+- 原有前后端全局 V8 必须保留，合并顺序为内置日期、函数库、租户原有代码；同名原有函数优先。不得用官方全局脚本整段覆盖客户脚本。函数库种子 `InsertIfMissing`，不得升级覆盖客户已改源码。
+- 列表和合并代码走 L1/Redis，表单引擎真实提交后更新租户版本并通知其它节点；回滚不变更版本。禁止通过直接 SQL 修改函数库规避失效。前端已打开页面需要刷新。
+
 | 需求 | 专项 Skill |
 |---|---|
 | 表单 CRUD、`_Where` | `v8-crud-api`、`v8-sql-query` |

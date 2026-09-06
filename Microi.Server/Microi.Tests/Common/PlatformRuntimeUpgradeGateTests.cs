@@ -251,6 +251,8 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.Equal(0, persisted["Lock"]?.Value<int>());
         Assert.Equal("[]", persisted["ApiRole"]?.ToString());
         Assert.Equal("[]", persisted["Files"]?.ToString());
+        Assert.Equal("", persisted["Version"]?.ToString());
+        Assert.Null(source["Version"]);
     }
 
     [Fact]
@@ -310,7 +312,7 @@ public class PlatformRuntimeUpgradeGateTests
         importedWithoutLegacyMetadata["Version"] = "";
         importedWithoutLegacyMetadata["StopHttp"] = null;
 
-        Assert.Equal(
+        Assert.StartsWith(
             "Version与包内Managed版本不一致",
             Assert.IsType<string>(contractError.Invoke(
                 null,
@@ -323,6 +325,63 @@ public class PlatformRuntimeUpgradeGateTests
             Assert.IsType<string>(contractError.Invoke(
                 null,
                 new object[] { tenantCustomized, bundledInit })));
+    }
+
+    [Theory]
+    [InlineData("v1.0.0", true)]
+    [InlineData("v1.0.0                                            ", true)]
+    [InlineData("V1.0.0                                            ", true)]
+    [InlineData("v1.0.1                                            ", false)]
+    [InlineData("v1.0                                              ", false)]
+    [InlineData(" v1.0.0", false)]
+    [InlineData("v1.0.0\t", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void StartupDependencyGate_AcceptsOnlyFixedWidthVersionPadding(string? storedVersion, bool expectedReady)
+    {
+        // SQL Server CHAR/NCHAR 会补 U+0020。仅该存储差异应通过，真正版本漂移仍须修复。
+        var source = new JObject
+        {
+            ["ApiV8Code"] = "return { Code: 1 };",
+            ["ApiAddress"] = "/apiengine/database-backup-download",
+            ["IsEnable"] = 1,
+            ["StopHttp"] = 0,
+            ["AllowAnonymous"] = 0,
+            ["Version"] = "v1.0.0"
+        };
+        var stored = (JObject)source.DeepClone();
+        stored["Version"] = storedVersion;
+        var error = Assert.IsType<string>(GetPrivateStaticMethod("GetStartupDependencyContractError")
+            .Invoke(null, new object[] { stored, source }));
+
+        if (expectedReady)
+            Assert.Empty(error);
+        else
+        {
+            Assert.StartsWith("Version与包内Managed版本不一致", error);
+            Assert.Contains("包版本=\"v1.0.0\"", error);
+            Assert.Contains("数据库版本=", error);
+            Assert.Contains("字符数=", error);
+        }
+        Assert.Equal(storedVersion, stored["Version"]?.Value<string>());
+        Assert.Equal("v1.0.0", source["Version"]?.ToString());
+    }
+
+    [Theory]
+    [InlineData("version")]
+    [InlineData("VERSION")]
+    public void StartupDependencyGate_ReadsLegacyVersionColumnCasing(string columnName)
+    {
+        var source = new JObject { ["ApiV8Code"] = "return 1;", ["Version"] = "v1.0.0" };
+        var stored = (JObject)source.DeepClone();
+        stored.Remove("Version");
+        stored[columnName] = "v1.0.0";
+        Assert.Empty(Assert.IsType<string>(GetPrivateStaticMethod("GetStartupDependencyContractError")
+            .Invoke(null, new object[] { stored, source })));
+        stored[columnName] = "v0.0.0";
+        Assert.Contains("数据库版本=\"v0.0.0\"", Assert.IsType<string>(
+            GetPrivateStaticMethod("GetStartupDependencyContractError")
+                .Invoke(null, new object[] { stored, source })));
     }
 
     [Fact]

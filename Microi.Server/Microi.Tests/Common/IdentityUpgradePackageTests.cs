@@ -170,14 +170,14 @@ public class IdentityUpgradePackageTests
 
         var bundle = Assert.Single(package["ApplicationBundles"]?.Children<JObject>()
             .Where(item => item["Application"]?["AppKey"]?.Value<string>() == "microi-platform-service") ?? []);
-        Assert.Equal("v1.9.16", bundle["VersionNo"]?.Value<string>());
+        Assert.Equal("v1.9.17", bundle["VersionNo"]?.Value<string>());
         Assert.False(bundle["IncludeSource"]?.Value<bool>());
-        Assert.Equal(58, bundle["Application"]?["CurrentVersion"]?.Value<int>());
-        Assert.Equal("v1.9.16", bundle["Application"]?["BuildVersion"]?.Value<string>());
-        Assert.Equal("v1.9.16", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal(59, bundle["Application"]?["CurrentVersion"]?.Value<int>());
+        Assert.Equal("v1.9.17", bundle["Application"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal("v1.9.17", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
         Assert.Equal("db", bundle["MicroService"]?["StorageMode"]?.Value<string>());
         Assert.All(bundle["Routes"]?.Children<JObject>() ?? [], route =>
-            Assert.Equal("v1.9.16", route["BuildVersion"]?.Value<string>()));
+            Assert.Equal("v1.9.17", route["BuildVersion"]?.Value<string>()));
         Assert.False(bundle["PackageAssets"]?["IncludeSource"]?.Value<bool>());
         Assert.Null(bundle["PackageAssets"]?["SourceZip"]);
         Assert.Null(bundle["PackageAssets"]?["BuildZip"]);
@@ -189,6 +189,9 @@ public class IdentityUpgradePackageTests
         Assert.Contains(routes, route =>
             route["RoutePath"]?.Value<string>() == "/system-settings"
             && route["PageTitle"]?.Value<string>() == "租户系统设置");
+        Assert.Contains(routes, route =>
+            route["RoutePath"]?.Value<string>() == "/platform-ops"
+            && route["PageTitle"]?.Value<string>() == "平台运维中心");
         var buildAssets = bundle["BuildAssets"]?.Children<JObject>().ToList() ?? [];
         Assert.NotEmpty(buildAssets);
         Assert.Contains(buildAssets, asset =>

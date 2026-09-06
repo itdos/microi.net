@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "SSO 身份联邦",
-    "Version": "v7.5.11",
+    "Version": "v7.6.0",
     "CreateTime": "2026-08-21T12:00:00.000Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -18,7 +18,58 @@
     "DataRowCount": 0,
     "AiApplicationCount": 0,
     "Description": "Microi 吾码官方双向 SSO 应用：OIDC、SAML2、CAS 与存量 Token 兼容。全部公开 HTTP 路由、连接投影、JIT/绑定、角色映射、审计与租户 Hook 均由应用接口引擎交付；Microi.net 只保留签名验签、协议编解码、一次性票据和 DiyToken 等不可覆盖的可信原子。",
-    "ChangeHistory": "2026-09-05 v7.5.11 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object]",
+    "ChangeHistory": [
+      {
+        "Version": "v7.6.0",
+        "Date": "2026-09-06",
+        "Description": "从已提交的 v7.5.10 官方源码恢复八条被错误字符串化的历史更新记录，保留 v7.5.11 的可选工作流依赖修复；本次只修复发行元数据，不改变 SSO 引擎、表、字段、菜单、权限、协议或租户配置。"
+      },
+      {
+        "Version": "v7.5.11",
+        "Date": "2026-09-05",
+        "Description": "修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。"
+      },
+      {
+        "Version": "v7.5.10",
+        "Date": "2026-09-02",
+        "Description": "将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。"
+      },
+      {
+        "Version": "v7.5.9",
+        "Date": "2026-08-30",
+        "Description": "将原 SsoProtocolGatewayController 的 24 个 OIDC、SAML2、CAS 与登录编排路由全部迁入官方 Managed 接口引擎；新增受控 HTTP 响应与 {OsClient} 路径模板能力，C# 仅保留不可由租户覆盖的协议、安全和票据原子，CreateIfMissing 个性化 Hook 继续归租户维护。"
+      },
+      {
+        "Version": "v7.5.8",
+        "Date": "2026-08-26",
+        "Description": "将所有官方 Managed SSO 接口归一为 Platform 所有权，避免 Upgrade13 重放内置包时被误判为从平台资源降级到普通应用资源。"
+      },
+      {
+        "Version": "v7.5.7",
+        "Date": "2026-08-25",
+        "Description": "统一官方 Managed 接口醒目恢复提示；SSO 安全事件只通过脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 直接返回成功且后续官方升级永不覆盖，并补齐结构化更新日志硬门禁。"
+      },
+      {
+        "Version": "v7.5.6",
+        "Date": "2026-08-25",
+        "Description": "统一官方 Managed 接口醒目恢复提示；SSO 安全事件经脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 仅返回成功。"
+      },
+      {
+        "Version": "v7.5.2",
+        "Date": "2026-08-21",
+        "Description": "把连接投影、身份解析、绑定/JIT、角色映射、Claim 投影、审计和存量 Token 登录迁入 Managed 接口引擎；新增 CreateIfMissing 租户 Hook，C# 仅保留可信协议原子。"
+      },
+      {
+        "Version": "v7.5.1",
+        "Date": "2026-08-21",
+        "Description": "补充宿主 SSO API、协议端点和客户端能力要求，防止旧宿主静默安装不可运行的配置包。"
+      },
+      {
+        "Version": "v7.5.0",
+        "Date": "2026-08-21",
+        "Description": "建立双向 OIDC、SAML2、CAS 身份联邦配置模型、分组表单和双端模块视图。"
+      }
+    ],
     "AppId": "app.microi.sso",
     "RequiredPlatformCapabilities": [
       "ApiEngine:sso_capabilities",
@@ -38,11 +89,11 @@
     ],
     "ApplicationType": "Platform",
     "ChangeLog": {
-      "Version": "v7.5.11",
-      "Title": "基础应用可选工作流依赖修复",
+      "Version": "v7.6.0",
+      "Title": "恢复 SSO 完整历史更新说明",
       "ChangeType": "Fix",
-      "Content": "修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。",
-      "ReleaseTime": "2026-09-05 19:16:00"
+      "Content": "从已提交的 v7.5.10 官方源码恢复八条被错误字符串化的历史更新记录，保留 v7.5.11 的可选工作流依赖修复；本次只修复发行元数据，不改变 SSO 引擎、表、字段、菜单、权限、协议或租户配置。",
+      "ReleaseTime": "2026-09-06 19:50:00"
     }
   },
   "DDLStatements": [

@@ -2,15 +2,16 @@
     <section class="music-studio" data-testid="ai-music-studio">
         <div class="music-workbench">
             <div class="music-copy">
-                <span>AI MUSIC · MiniMax Music 3</span>
+                <span>AI MUSIC</span>
                 <h1>一句灵感，生成可直接试听的配乐</h1>
-                <p>选择方向、补充情绪和乐器。优先使用正式 music-3.0；账号受官方退役策略限制时，自动切换官方开源 MiniMax-Music3，成品永久写入当前租户 HDFS。公开算力可能排队或限额，生产环境可在服务端配置 Hugging Face Token。</p>
+                <p>选择 AI 引擎与音乐模型，补充情绪、节奏和乐器。生成后可直接试听，音轨会保存到当前空间。</p>
                 <div class="music-signal" aria-hidden="true">
                     <i v-for="index in 32" :key="index" :style="{ height: `${18 + ((index * 17) % 58)}px` }"></i>
                 </div>
             </div>
 
             <div class="music-form-panel">
+                <AiMediaModelSelect v-model="mediaSelection" capability="music" :disabled="loading" />
                 <div class="music-section-heading">
                     <div><span>STYLE</span><strong>选择音乐方向</strong></div>
                     <small>单击后仍可继续修改描述</small>
@@ -52,8 +53,8 @@
                 </div>
 
                 <div class="music-specs">
-                    <span><strong>music-3.0</strong><small>优先模型</small></span>
-                    <span><strong>Music3</strong><small>官方开源回退</small></span>
+                    <span><strong>{{ mediaSelection?.Model || '请选择' }}</strong><small>当前模型</small></span>
+                    <span><strong>{{ mediaSelection?.EngineName || 'AI 引擎' }}</strong><small>当前服务</small></span>
                     <span><strong>纯音乐</strong><small>安全边界</small></span>
                     <span><strong>HDFS</strong><small>永久保存</small></span>
                 </div>
@@ -64,6 +65,7 @@
                     size="large"
                     :icon="Headset"
                     :loading="loading"
+                    :disabled="!mediaSelection"
                     data-testid="ai-music-run"
                     @click="generateMusic"
                 >{{ loading ? "正在作曲" : "生成 AI 配乐" }}</el-button>
@@ -97,10 +99,12 @@
 import { computed, getCurrentInstance, ref } from "vue";
 import { Download, Headset } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
+import AiMediaModelSelect from './ai-media-model-select.vue';
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
 const loading = ref(false);
+const mediaSelection = ref(null);
 const prompt = ref("");
 const durationSeconds = ref(20);
 const activePreset = ref("");
@@ -138,6 +142,8 @@ function requestId() {
 }
 
 async function generateMusic() {
+    if (loading.value) return;
+    if (!mediaSelection.value) { ElMessage.warning('请先选择音乐模型'); return; }
     if (!prompt.value.trim()) {
         ElMessage.warning("请先描述想要的音乐");
         return;
@@ -154,7 +160,8 @@ async function generateMusic() {
             body: JSON.stringify({
                 RequestId: requestId(),
                 Prompt: prompt.value.trim(),
-                Model: "music-3.0",
+                Model: mediaSelection.value.Model,
+                AiModelId: mediaSelection.value.AiModelId,
                 IsInstrumental: true,
                 SampleRate: 44100,
                 Bitrate: 256000,

@@ -56,7 +56,7 @@ namespace Microi.net
     /// 租户自动开通服务
     /// 用于用户注册后自动创建数据库、SaaS租户记录并初始化空库
     /// </summary>
-    public class TenantProvisioningService
+    public partial class TenantProvisioningService
     {
         /// <summary>
         /// 空库SQL文件路径（相对于应用程序根目录）
@@ -665,8 +665,27 @@ namespace Microi.net
                 return new DosResult(0, null,
                     "当前后端未加载租户数据库升级服务，不能把未升级的租户标记为创建成功。");
             }
+            // 空库的 ServerVersion 可能已覆盖物理迁移，但其中的应用安装器仍是旧版。
+            // 开通、恢复和显式修复必须先确认当前程序集的运行协议闭包，才能把租户交给
+            // 通知中心自助升级。复用已有共享租约、Managed 包所有权和强回读；不在每次
+            // 宿主启动重放历史升级链，也不以清空/降低 ServerVersion 强制补跑。
+            var runtimeReady = await EnsureProvisionedTenantRuntimeAsync(
+                    upgrade, OsClientExtend.GetClient(osClient))
+                .ConfigureAwait(false);
+            if (runtimeReady.Code != 1) return runtimeReady;
             return await upgrade
                 .UpgradeTenantAsync(osClient, backgroundTaskId)
+                .ConfigureAwait(false);
+        }
+
+        internal static async Task<DosResult> EnsureProvisionedTenantRuntimeAsync(
+            IMicroiUpgrade upgrade,
+            OsClientSecret runtimeClient)
+        {
+            var physical = await upgrade.EnsureRuntimePhysicalPrerequisitesAsync(runtimeClient)
+                .ConfigureAwait(false);
+            if (physical.Code != 1) return physical;
+            return await upgrade.EnsureStartupDependenciesAsync(runtimeClient)
                 .ConfigureAwait(false);
         }
 
@@ -1119,7 +1138,7 @@ namespace Microi.net
                 }
 
                 EnsureProvisioningColumns(mainClient);
-                var list = mainClient.Db.FromSql(
+                var rows = mainClient.Db.FromSql(
                         @"SELECT Id, OsClient, ClientName, DomainName, IsEnable, CreateTime, UpdateTime
                           FROM sys_osclients
                           WHERE IsDeleted = 0 AND OwnerUserId = @p0
@@ -1127,7 +1146,12 @@ namespace Microi.net
                     .AddInParameter("p0", userId)
                     .ToArray();
 
-                var usedQuota = list?.Length ?? 0;
+                // 同一物理租户可有多条网络分区登记，个人中心和配额按租户计数。
+                var list = (rows ?? Array.Empty<dynamic>())
+                    .GroupBy(row => DynamicHelper.GetDynamicStringValue((object)row, "OsClient", ""),
+                        StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First()).ToArray();
+                var usedQuota = list.Length;
                 var tenantDatabaseQuota = GetTenantDatabaseQuota(mainClient, userId);
                 var remainingQuota = Math.Max(tenantDatabaseQuota - usedQuota, 0);
 
@@ -1332,16 +1356,16 @@ namespace Microi.net
             }
 
             var canonicalTenantKey = tenantRow.OsClient?.ToString() ?? "";
-            var targetClient = OsClientExtend.GetClient(canonicalTenantKey);
-            if (targetClient?.Db == null)
+            OsClientSecret targetClient;
+            try
             {
-                try
-                {
-                    MicroiEngine.GetService<IOsClientRuntime>()
-                        .ReloadSingleOsClient(canonicalTenantKey);
-                    targetClient = OsClientExtend.GetClient(canonicalTenantKey);
-                }
-                catch { }
+                // GetClient 会抛异常，不能先调用它再用 null 判断触发恢复。
+                // 统一租户解析负责当前分区的数据库回源，所有者授权仍必须先完成。
+                targetClient = OsClientExtend.GetClient(canonicalTenantKey);
+            }
+            catch
+            {
+                return new DosResult(0, null, "租户在当前服务运行分区尚未就绪，请联系平台管理员恢复 SaaS 租户运行登记后重试。");
             }
             if (targetClient?.Db == null)
             {
@@ -1695,7 +1719,7 @@ namespace Microi.net
                 return 0;
             }
 
-            return mainClient.Db.FromSql(@"SELECT COUNT(*) FROM sys_osclients
+            return mainClient.Db.FromSql(@"SELECT COUNT(DISTINCT OsClient) FROM sys_osclients
                     WHERE IsDeleted = 0 AND OwnerUserId = @p0")
                 .AddInParameter("p0", userId)
                 .ToScalar<int>();
@@ -3594,6 +3618,8 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     AddUserField("Phone", phone);
                     AddUserField("Name", string.IsNullOrWhiteSpace(userName) ? phone : userName);
                     AddUserField("Pwd", encryptedPwd, false, true);
+                    var passwordEncoding = TenantAdminCredentialSecurity.DetectProvisionedPasswordEncoding(encryptedPwd);
+                    if (!string.IsNullOrWhiteSpace(passwordEncoding)) AddUserField("PwdEncode", passwordEncoding);
                     AddUserField("OsClient", osClient, false);
 
                     if (assignments.Count > 0)

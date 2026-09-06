@@ -7,6 +7,7 @@ namespace Microi.net
     public sealed class MiniMaxVideoCreateParam
     {
         public string RequestId { get; set; }
+        public string AiModelId { get; set; }
         public string Prompt { get; set; }
         public string Model { get; set; } = "MiniMax-Hailuo-2.3";
         public int Duration { get; set; } = 6;

@@ -13,7 +13,7 @@ export LC_ALL=en_US.UTF-8 2>/dev/null || export LC_ALL=C.UTF-8 2>/dev/null || tr
 
 echo ''
 echo '=================================================================='
-echo 'Microi：离线安装包制作工具 v2026-04-01'
+echo 'Microi：离线安装包制作工具 v2026-09-06 15:58:58'
 echo '=================================================================='
 echo ''
 echo '此脚本将在当前目录生成 microi-offline.zip 离线安装包。'
@@ -69,7 +69,7 @@ IMAGES=(
   "registry.cn-hangzhou.aliyuncs.com/microios/qdrant:latest"
   "registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest"
   "registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev:latest"
-  "registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest"
+  "registry.cn-hangzhou.aliyuncs.com/microios/microi-ops:v1.0.1"
 )
 
 for img in "${IMAGES[@]}"; do

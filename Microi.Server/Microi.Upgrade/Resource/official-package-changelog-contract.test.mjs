@@ -121,6 +121,32 @@ test('官方应用包发布门禁对缺失、错版、空字段和不一致历�
   }));
 });
 
+test('发布门禁拒绝历史数组被强转为占位字符串，即使当前版本说明完整', () => {
+  const current = { Version: 'v1.2.3', Date: '2026-08-25', Description: '当前说明。' };
+  const previous = [{ Version: 'v1.2.2', Date: '2026-08-24', Description: '必须保留的历史。' }];
+  for (const history of [
+    `2026-08-25 v1.2.3 当前说明。\n${String(previous)}`,
+    [current, String(previous)],
+    [current, { ...previous[0], Description: String(previous) }],
+  ]) {
+    assert.throws(() => validateOfficialPackageChangeLog('app.microi.sso.json', JSON.stringify({
+      PackageInfo: {
+        Version: current.Version,
+        ChangeLog: { Version: current.Version, Title: '发布说明', ChangeType: 'Fix', Content: current.Description, ReleaseTime: '2026-08-25 12:00:00' },
+        ChangeHistory: history,
+      },
+    })), /ChangeHistory.*对象转换占位符/);
+  }
+  const explanation = '修复旧历史被转换为 [object Object] 的问题，保留原始发布说明。';
+  assert.doesNotThrow(() => validateOfficialPackageChangeLog('app.microi.sso.json', JSON.stringify({
+    PackageInfo: {
+      Version: current.Version,
+      ChangeLog: { Version: current.Version, Title: '历史修复', ChangeType: 'Fix', Content: explanation, ReleaseTime: '2026-08-25 12:00:00' },
+      ChangeHistory: [{ ...current, Description: explanation }, ...previous],
+    },
+  })));
+});
+
 test('官网三方同步自动提版时同步推进结构化日志和历史记录', () => {
   const stringHistory = {
     Version: 'v7.7.1',

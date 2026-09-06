@@ -13,7 +13,7 @@ const { createSeoHead, transformSeoPageData, transformSeoHtml } = await import(`
 const context = (relativePath, extra = {}) => ({ page: relativePath.replace(/\.md$/, '.html'), pageData: { relativePath, title: '接口引擎', ...extra }, siteConfig: { srcDir: docs } })
 
 test('HTML metadata preserves greater-than signs inside quoted attributes', () => {
-  assert.deepEqual(headTags('<head><meta name="description" content="Code: x => x &gt; 1"><link rel="canonical" href="https://www.microi.net/"></head>', 'meta'), [{ name: 'description', content: 'Code: x => x > 1' }])
+  assert.deepEqual(headTags('<head><meta name="description" content="Code: x => x &gt; 1"><link rel="canonical" href="https://microi.net/"></head>', 'meta'), [{ name: 'description', content: 'Code: x => x > 1' }])
 })
 
 test('404 keeps server-rendered content available until the client mounts', () => {
@@ -25,6 +25,7 @@ test('404 keeps server-rendered content available until the client mounts', () =
 })
 
 test('canonical preserves real document identities and normalizes directory aliases', () => {
+  assert.equal(SITE_URL, 'https://microi.net')
   assert.equal(canonicalPath('doc/index.md'), '/doc/')
   assert.equal(canonicalPath('/doc/index.html?from=search#intro'), '/doc/')
   assert.equal(canonicalPath('en/doc/v8-engine/v8-server.md'), '/en/doc/v8-engine/v8-server.html')
