@@ -50,6 +50,9 @@ namespace Microi.net
             {
                 return false;
             }
+            // 等待中转结果的任务不能占满 Worker，至少给真实供应商执行留一个名额。
+            if (string.Equals(apiEngineKey, AiImageBackgroundTaskService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)
+                && IsImageRelayAtCapacity(active, workerParallelism)) return false;
             if (!IsPlatformMaintenance(apiEngineKey)) return true;
 
             // Installation/schema work is serialized only inside its own tenant.
@@ -115,8 +118,13 @@ namespace Microi.net
             {
                 excluded.UnionWith(PlatformMaintenanceApiEngineKeys);
             }
+            if (IsImageRelayAtCapacity(active, workerParallelism)) excluded.Add(AiImageBackgroundTaskService.WorkerApiEngineKey);
             return excluded.ToArray();
         }
+
+        private static bool IsImageRelayAtCapacity(IEnumerable<BackgroundTaskLaneState> active, int workerParallelism)
+            => active.Count(x => string.Equals(x.ApiEngineKey, AiImageBackgroundTaskService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase))
+                >= Math.Max(MinimumWorkerParallelism, workerParallelism) - 1;
 
         internal static string LaneConcurrencyKey(string apiEngineKey)
         {

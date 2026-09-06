@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -14,6 +15,29 @@ function read(relativePath) {
 function normalizeSource(value) {
   return `${String(value || '').replace(/\r\n?/g, '\n').replace(/\n*$/g, '')}\n`;
 }
+
+test('queue response projects old runtime records without exposing persisted payloads or changing task input', () => {
+  const source = read('Microi.Server/Microi.Upgrade/Resource/platform-background-task.js');
+  for (const tenant of ['main-tenant', 'child-tenant']) {
+    const param = {Action:'RunApiEngine', TargetApiEngineKey:'bulk-import-microi-store-packages', Options:{IdempotencyKey:'repeat-key'}};
+    const record = {Id:'persisted-task', Status:'Pending', Msg:'x'.repeat(100000),
+      ParamJson:'private parameters', TrustedUserJson:'secret context', CheckpointJson:'large checkpoint',
+      ResultJson:'large result', Log:'large log', Result:{Package:'large package'}};
+    let calls=0;
+    const output=vm.runInNewContext(`(function(){${source}\n})()`,{V8:{OsClient:tenant,Param:param,Method:{ManageBackgroundTask(input){
+      assert.equal(input,param); calls++; return {Code:1,Data:record,Msg:'queued'};
+    }}}});
+    assert.equal(calls,1);
+    assert.equal(output.Code,1);
+    assert.equal(output.Data.Id,record.Id);
+    assert.equal(output.Data.Msg.length,2000);
+    assert.equal(output.Data.HasLog,true);
+    assert.equal(output.Data.HasResult,true);
+    for (const key of ['ParamJson','TrustedUserJson','CheckpointJson','ResultJson','Log','Result']) assert.equal(output.Data[key],undefined);
+    assert.ok(JSON.stringify(output).length<3000);
+    assert.equal(record.Msg.length,100000);
+  }
+});
 
 test('official background task engine owns action routing and calls one trusted V8 primitive', () => {
   const source = read('Microi.Server/Microi.Upgrade/Resource/platform-background-task.js');
@@ -34,7 +58,7 @@ test('application-store package delivers every startup endpoint and managed poli
       key: 'platform-background-task',
       source: 'Microi.Server/Microi.Upgrade/Resource/platform-background-task.js',
       address: '/apiengine/platform-background-task',
-      version: 'v1.1.0',
+      version: 'v1.1.1',
       capabilities: [
         'ServerFeature:V8.ManageBackgroundTask',
         'ApiEngine:platform-background-task@v1.1.0',
@@ -88,6 +112,7 @@ test('application-store package delivers every startup endpoint and managed poli
     assert.equal(engine.IsEnable, 1);
     assert.equal(engine.StopHttp, 0);
     assert.equal(engine.AllowAnonymous, 0);
+    if (dependency.key === 'platform-background-task') assert.equal(engine.Lock, 1);
     assert.equal(engine.ApiV8Code, normalizeSource(read(dependency.source)));
     assert.deepEqual(packageModel.ResourcePolicies.ApiEngines[dependency.key], {
       Ownership: 'Platform',

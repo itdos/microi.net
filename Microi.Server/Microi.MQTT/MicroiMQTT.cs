@@ -121,8 +121,9 @@ namespace Microi.net
             }
             catch (System.Net.Sockets.SocketException sox) when (sox.SocketErrorCode == System.Net.Sockets.SocketError.AddressAlreadyInUse)
             {
+                MqttStartupDiagnostics.Report(OsClientDefault.OsClient, "PortOccupied",
+                    MqttStartupDiagnostics.Describe(sox, port));
                 await ResetFailedBrokerAsync();
-                WriteMqttDiagnostic(OsClientDefault.OsClient, "PortOccupied", "MQTT Broker 启动失败：端口被占用", $"TCP 端口：{port}", 3);
             }
             catch (System.Net.Sockets.SocketException sox) when (
                 RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
@@ -143,14 +144,18 @@ namespace Microi.net
                 }
                 catch (Exception fallbackException)
                 {
+                    MqttStartupDiagnostics.Report(OsClientDefault.OsClient, "FallbackPortFailed",
+                        "主端口被系统拒绝（AccessDenied）；" + MqttStartupDiagnostics.Describe(fallbackException, port, fallbackPort,
+                            new[] { clientModel?.OsClientModel?["MqttCertPassword"]?.ToString() }));
                     await ResetFailedBrokerAsync();
-                    WriteMqttDiagnostic(OsClientDefault.OsClient, "FallbackPortFailed", "MQTT Broker 主端口与备用端口均启动失败", $"原端口：{port}；备用端口：{fallbackPort}\n{fallbackException}", 3);
                 }
             }
             catch (System.Exception ex)
             {
+                MqttStartupDiagnostics.Report(OsClientDefault.OsClient, "BrokerStartFailed",
+                    MqttStartupDiagnostics.Describe(ex, port, secrets:
+                        new[] { clientModel?.OsClientModel?["MqttCertPassword"]?.ToString() }));
                 await ResetFailedBrokerAsync();
-                WriteMqttDiagnostic(OsClientDefault.OsClient, "BrokerStartFailed", "MQTT Broker 启动失败", ex.ToString(), 3);
             }
         }
 
@@ -215,10 +220,20 @@ namespace Microi.net
             failedServer.RetainedMessageChangedAsync -= OnRetainedMessageChanged;
             try
             {
-                await failedServer.StopAsync();
+                var stop = failedServer.StopAsync();
+                // MQTTnet 在监听初始化半途失败时，停止等待不能挡住后续宿主启动。
+                if (await Task.WhenAny(stop, Task.Delay(TimeSpan.FromSeconds(3))) == stop)
+                    await stop;
+                else
+                    _ = stop.ContinueWith(task => { var ignored = task.Exception; },
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
             }
             catch
             {
+            }
+            finally
+            {
+                failedServer.Dispose();
             }
         }
 
@@ -575,9 +590,10 @@ namespace Microi.net
                 return apiEngineReference;
             }
 
-            var model = apiEngineResult.Data is JObject json
+            // DosResult.Data 是 dynamic，先收敛为 JObject，防止运行时把 Val 当成 JValue 成员调用。
+            JObject model = apiEngineResult.Data is JObject json
                 ? json
-                : JObject.FromObject(apiEngineResult.Data);
+                : JObject.FromObject((object)apiEngineResult.Data);
             var apiEngineKey = model["ApiEngineKey"]?.Val<string>();
             return apiEngineKey.DosIsNullOrWhiteSpace()
                 ? apiEngineReference

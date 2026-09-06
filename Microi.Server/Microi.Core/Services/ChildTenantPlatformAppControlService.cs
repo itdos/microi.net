@@ -1511,6 +1511,28 @@ WHERE TABLE_CATALOG=DB_NAME() AND LOWER(TABLE_NAME)=LOWER(@p0)";
             return row == null ? null : JObject.FromObject((object)row);
         }
 
+        /// <summary>
+        /// 只补正执行入口和访问开关。未替换源码时必须保留其 Version，
+        /// 否则较新的子租户源码会被标为主租户旧版，下次自愈误报同版本冲突。
+        /// </summary>
+        internal static IReadOnlyDictionary<string, object> BuildBootstrapRuntimeReconciliation(
+            HashSet<string> columns,
+            JObject source,
+            DateTime now)
+        {
+            var updates = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            if (columns.Contains("IsDeleted")) updates["IsDeleted"] = 0;
+            if (columns.Contains("IsEnable")) updates["IsEnable"] = 1;
+            foreach (var column in new[] { "StopHttp", "AllowAnonymous" })
+            {
+                if (columns.Contains(column))
+                    updates[column] = BootstrapSwitchLiteral(ToDatabaseValue(source?[column]));
+            }
+            if (columns.Contains("ApiAddress")) updates["ApiAddress"] = ToDatabaseValue(source?["ApiAddress"]);
+            if (columns.Contains("UpdateTime")) updates["UpdateTime"] = now.ToString("yyyy-MM-dd HH:mm:ss");
+            return updates;
+        }
+
         private static void ReconcileTargetApiEngineRuntime(
             OsClientSecret client,
             HashSet<string> columns,
@@ -1521,22 +1543,15 @@ WHERE TABLE_CATALOG=DB_NAME() AND LOWER(TABLE_NAME)=LOWER(@p0)";
             var assignments = new List<string>();
             var parameters = new List<object>();
             var quote = IdentifierQuote(client);
-            if (columns.Contains("IsDeleted")) assignments.Add($"{quote("IsDeleted")}=0");
-            if (columns.Contains("IsEnable")) assignments.Add($"{quote("IsEnable")}=1");
-            if (columns.Contains("StopHttp"))
-                assignments.Add($"{quote("StopHttp")}={BootstrapSwitchLiteral(ToDatabaseValue(source?["StopHttp"]))}");
-            if (columns.Contains("AllowAnonymous"))
-                assignments.Add($"{quote("AllowAnonymous")}={BootstrapSwitchLiteral(ToDatabaseValue(source?["AllowAnonymous"]))}");
-            foreach (var column in new[] { "ApiAddress", "Version" })
+            foreach (var update in BuildBootstrapRuntimeReconciliation(columns, source, DateTime.Now))
             {
-                if (!columns.Contains(column)) continue;
-                assignments.Add($"{quote(column)}=@u{parameters.Count}");
-                parameters.Add(ToDatabaseValue(source?[column]));
-            }
-            if (columns.Contains("UpdateTime"))
-            {
-                assignments.Add($"{quote("UpdateTime")}=@u{parameters.Count}");
-                parameters.Add(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                if (ApiEngineSwitchColumns.Contains(update.Key))
+                {
+                    assignments.Add($"{quote(update.Key)}={BootstrapSwitchLiteral(update.Value)}");
+                    continue;
+                }
+                assignments.Add($"{quote(update.Key)}=@u{parameters.Count}");
+                parameters.Add(update.Value);
             }
             if (assignments.Count == 0) return;
             var sql = $"UPDATE {quote("sys_apiengine")} SET {string.Join(",", assignments)} "

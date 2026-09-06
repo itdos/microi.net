@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: export-microi-store-package
- * Version: v1.2.10
+ * Version: v1.3.0
  * Function:
  * - 导出或持久发布 Microi 应用安装包；支持预制平台包、UTF-8 HDFS、FormEngine fence CAS、两阶段不可变快照收口，并同步服务端与客户端最低版本门禁。
  */
@@ -1056,6 +1056,8 @@ try {
             Where: selectionMode == 'Where' ? safeWhere : [],
             ConflictPolicy: conflictPolicy,
             ConflictFields: conflictFields,
+            // 配置子表种子保留显式父记录绑定，安装时解析目标租户 Id，不固化发布者的 Id。
+            ParentBinding: selection.ParentBinding || undefined,
             Rows: cleanRows
         });
     }

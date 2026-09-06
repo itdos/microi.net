@@ -30,6 +30,31 @@ namespace Microi.net.Api
         private readonly AiProxyService _proxyService;
         private const string AiPlatformAccountEngineKey = "platform-ai-account";
 
+        // OAuth Token、PKCE 与加密存储是可信原生协议边界。普通模型行编辑仍由表单/接口引擎管理。
+        [HttpPost, PlatformAdminOnly]
+        public async Task<JsonResult> BeginMediaOAuth([FromBody] JObject param)
+        {
+            var context = await GetCurrentUserContextAsync();
+            Response.Headers["Cache-Control"] = "no-store";
+            return Json(await AiMediaOAuthService.BeginAsync(context.OsClient, context.UserId, param?["AiModelId"]?.ToString()));
+        }
+
+        [HttpPost, PlatformAdminOnly]
+        public async Task<JsonResult> PollMediaOAuth([FromBody] JObject param)
+        {
+            var context = await GetCurrentUserContextAsync();
+            Response.Headers["Cache-Control"] = "no-store";
+            return Json(await AiMediaOAuthService.PollAsync(context.OsClient, context.UserId, param?["SessionId"]?.ToString()));
+        }
+
+        [HttpPost, PlatformAdminOnly, RequestSizeLimit(65536)]
+        public async Task<JsonResult> ImportMediaOAuth([FromBody] JObject param)
+        {
+            var context = await GetCurrentUserContextAsync();
+            Response.Headers["Cache-Control"] = "no-store";
+            return Json(await AiMediaOAuthService.ImportAsync(context.OsClient, param?["AiModelId"]?.ToString(), param?["Credential"] as JObject));
+        }
+
         public AiController(
             IMicroiAI microiAi,
             SubscriptionService subService,
@@ -402,8 +427,28 @@ namespace Microi.net.Api
                     rawBody));
         }
 
+        /// <summary>媒体协议能力目录只返回公开模型投影，配置和密钥解析归 AI 插件。</summary>
+        [HttpGet]
+        public async Task<JsonResult> GetMediaModels()
+        {
+            var token = await DiyToken.GetCurrentToken();
+            var user = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
+            Response.Headers["Cache-Control"] = "no-store";
+            var runtime = MicroiEngine.TryGetService<IAiMediaModelRuntime>();
+            return Json(runtime == null ? AiImageBackgroundTaskService.RuntimeUnavailable()
+                : await runtime.GetModelsAsync(token?.OsClient, user?["Id"]?.ToString()));
+        }
+
+        [HttpGet("/v1/microi/media_models")]
+        [AllowAnonymous]
+        public JsonResult RelayMediaModels()
+        {
+            var runtime = MicroiEngine.TryGetService<IAiMediaModelRuntime>();
+            return Json(runtime == null ? AiImageBackgroundTaskService.RuntimeUnavailable() : runtime.GetRelayModels());
+        }
+
         /// <summary>
-        /// 对话图片生成。MiniMax-M3 负责语义路由，image-01 负责图片输出；
+        /// 媒体模型按当前租户 AI 引擎选择；历史路由名继续兼容。
         /// 供应商 Key 与 Base64 不离开后端，结果先持久化到当前租户 HDFS。
         /// </summary>
         [HttpPost]
@@ -411,12 +456,65 @@ namespace Microi.net.Api
         {
             var token = await DiyToken.GetCurrentToken();
             var currentUser = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
-            return Json(await _proxyService.GenerateAuthenticatedImageAsync(
+            var runtime = MicroiEngine.TryGetService<IAiImageTaskRuntime>();
+            if (runtime == null) return Json(AiImageBackgroundTaskService.RuntimeUnavailable());
+            return Json(await runtime.QueueAuthenticatedAsync(
                 currentUser?["Id"]?.ToString(),
                 token?.OsClient ?? string.Empty,
                 currentUser,
-                param,
-                HttpContext.RequestAborted));
+                param));
+        }
+
+        /// <summary>读取当前登录用户的图片持久任务，不触发生成或再次占用生成额度。</summary>
+        [HttpGet]
+        public async Task<JsonResult> GetMiniMaxImageTask(string taskId)
+        {
+            var token = await DiyToken.GetCurrentToken();
+            var currentUser = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
+            Response.Headers["Cache-Control"] = "no-store";
+            return Json(AiImageBackgroundTaskService.GetStatus(token?.OsClient ?? string.Empty,
+                currentUser?["Id"]?.ToString(), taskId));
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> RecoverMiniMaxImageTask([FromQuery] string taskId)
+        {
+            var token = await DiyToken.GetCurrentToken();
+            var user = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
+            Response.Headers["Cache-Control"] = "no-store";
+            return Json(AiImageBackgroundTaskService.RecoverResult(token?.OsClient ?? string.Empty, user?["Id"]?.ToString(), taskId));
+        }
+
+        [HttpPost("/v1/microi/image_tasks/{taskId}/recover")]
+        [AllowAnonymous]
+        public async Task<JsonResult> MiniMaxRelayRecoverImage([FromRoute] string taskId)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            var runtime = MicroiEngine.TryGetService<IAiImageTaskRuntime>();
+            if (runtime == null) return Json(AiImageBackgroundTaskService.RuntimeUnavailable());
+            return Json(await runtime.RecoverRelayTaskAsync(Request.Headers["Authorization"].ToString(), taskId));
+        }
+
+        /// <summary>吾码节点之间的持久图片任务协议，不冒充 MiniMax 同步 Base64 接口。</summary>
+        [HttpPost("/v1/microi/image_tasks")]
+        [AllowAnonymous]
+        public async Task<JsonResult> MiniMaxRelayQueueImage([FromBody] MiniMaxImageGenerateParam param)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            var runtime = MicroiEngine.TryGetService<IAiImageTaskRuntime>();
+            if (runtime == null) return Json(AiImageBackgroundTaskService.RuntimeUnavailable());
+            return Json(await runtime.QueueRelayAsync(
+                Request.Headers["Authorization"].ToString(), Request.Headers["Idempotency-Key"].ToString(), param));
+        }
+
+        [HttpGet("/v1/microi/image_tasks/{taskId}")]
+        [AllowAnonymous]
+        public async Task<JsonResult> MiniMaxRelayGetImageTask([FromRoute] string taskId)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            var runtime = MicroiEngine.TryGetService<IAiImageTaskRuntime>();
+            if (runtime == null) return Json(AiImageBackgroundTaskService.RuntimeUnavailable());
+            return Json(await runtime.GetRelayTaskAsync(Request.Headers["Authorization"].ToString(), taskId));
         }
 
         /// <summary>
@@ -499,6 +597,18 @@ namespace Microi.net.Api
                 rawBody,
                 Request.Headers["Idempotency-Key"].ToString(),
                 HttpContext.RequestAborted);
+            return MiniMaxRelayContent(result);
+        }
+
+        /// <summary>配音兼容协议入口：鉴权、幂等、供应商密钥与生成实现仍在 Microi.AI。</summary>
+        [HttpPost("/v1/t2a_v2")]
+        [AllowAnonymous]
+        public async Task<ContentResult> MiniMaxRelayGenerateSpeech()
+        {
+            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+            var result = await _proxyService.ExecuteMiniMaxSpeechRelayAsync(
+                Request.Headers["Authorization"].ToString(), Request.Headers["Idempotency-Key"].ToString(),
+                await reader.ReadToEndAsync(), HttpContext.RequestAborted);
             return MiniMaxRelayContent(result);
         }
 

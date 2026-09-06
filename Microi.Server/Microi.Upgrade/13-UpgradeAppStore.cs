@@ -2324,8 +2324,10 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 // 同一租户的一轮启动闭包使用同一份物理字段快照。旧库可能一次缺少
                 // 数十个接口，逐条重复查询 information_schema 会显著拖慢容器启动。
                 var physicalFields = ReadStartupDependencyPhysicalFields(client.Db, client.OsClient);
+                var dependencies = LoadBundledStartupDependencyEngines();
+                EnsureStartupDependencyVersionStorage(client.Db, physicalFields, dependencies);
                 var dependencyIndex = 0;
-                foreach (var packaged in LoadBundledStartupDependencyEngines())
+                foreach (var packaged in dependencies)
                 {
                     if (dependencyIndex++ % 10 == 0)
                         UpgradeExecutionLeaseContext.ConfirmOwnership();
@@ -2333,6 +2335,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                         UpgradeExecutionLeaseContext.ThrowIfLost();
                     var source = (JObject)packaged.DeepClone();
                     var key = source["ApiEngineKey"]?.ToString();
+                    string writtenId;
                     var isTenantHook = IsCreateIfMissingRuntimeDependency(source);
                     var existing = ReadStartupDependencyEngine(client.Db, key, ignoreKeyCase: true);
                     if (existing != null)
@@ -2374,6 +2377,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                         patch["OsClient"] = client.OsClient;
                         patch["IsDeleted"] = 0;
                         patch["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                        writtenId = patch["Id"]?.ToString();
                         var updateCount = PersistStartupDependencyDirect(
                             client.Db,
                             patch,
@@ -2419,6 +2423,7 @@ WHERE {QuoteIdentifier(client.Db, "Id")}=@p0")
                         persistedSource["IsDeleted"] = 0;
                         persistedSource["CreateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                         persistedSource["UpdateTime"] = persistedSource["CreateTime"];
+                        writtenId = persistedSource["Id"]?.ToString();
                         var addCount = PersistStartupDependencyDirect(
                             client.Db,
                             persistedSource,
@@ -2457,7 +2462,10 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                         return new DosResult(0, new
                         {
                             ApiEngineKey = key,
-                            ContractError = contractError
+                            ContractError = contractError,
+                            WrittenId = writtenId,
+                            ReadbackId = readback?["Id"]?.ToString(),
+                            VersionColumnPresent = physicalFields.Contains("Version")
                         }, $"平台运行时接口[{key}]写入后强回读不一致：{contractError}");
                     }
                     await InvalidateStartupDependencyCacheAsync(client.OsClient, readback)
@@ -2662,6 +2670,10 @@ WHERE {idColumn}=@p0");
                 result["ApiRole"] = "[]";
             if (result["Files"].Val<string>().DosIsNullOrWhiteSpace())
                 result["Files"] = "[]";
+            // 包允许未声明版本的扩展接口，旧库的 Version 可能是 NOT NULL。
+            // 空版本仅补可存储的空串，不能伪造 Managed 包要求的版本号。
+            if (result["Version"] == null || result["Version"].Type == JTokenType.Null)
+                result["Version"] = string.Empty;
             if (key.DosIsNullOrWhiteSpace()
                 || result["Id"].Val<string>().DosIsNullOrWhiteSpace()
                 || result["ApiAddress"].Val<string>().DosIsNullOrWhiteSpace()
@@ -2717,6 +2729,75 @@ WHERE {idColumn}=@p0");
             if (fields.Count == 0)
                 throw new InvalidOperationException("sys_apiengine 物理字段回读为空，拒绝盲目写入启动接口闭包。");
             return fields;
+        }
+
+        /// <summary>
+        /// Version 是启动 Managed 协议的一部分。SQL Server 历史库可能缺列或长度
+        /// 小于包版本；在既有共享租约内只补列/扩容，不收缩、不转换其它字段类型。
+        /// </summary>
+        private static void EnsureStartupDependencyVersionStorage(
+            DbSession database,
+            HashSet<string> physicalFields,
+            IReadOnlyList<JObject> dependencies)
+        {
+            var requiredLength = dependencies
+                .Where(source => !IsCreateIfMissingRuntimeDependency(source))
+                .Select(source => source["Version"]?.ToString().Length ?? 0)
+                .DefaultIfEmpty(0).Max();
+            if (requiredLength == 0) return;
+            if (database.Db.DbProvider.DatabaseType != DatabaseType.SqlServer
+                && database.Db.DbProvider.DatabaseType != DatabaseType.SqlServer9)
+            {
+                if (!physicalFields.Contains("Version"))
+                    throw new InvalidOperationException("sys_apiengine 缺少启动闭包必需物理字段 Version，请先完成物理字段升级。");
+                return;
+            }
+
+            // 使用当前连接实际解析的表，避免其它 schema 的同名表干扰字段判断。
+            var rawColumn = database.FromSql(@"SELECT TYPE_NAME(user_type_id) AS TypeName,
+    max_length AS MaxLength, is_nullable AS IsNullable, is_computed AS IsComputed,
+    collation_name AS CollationName
+FROM sys.columns WHERE object_id=OBJECT_ID(N'sys_apiengine') AND name=N'Version'")
+                .First<dynamic>();
+            JObject column = rawColumn == null ? null : JObject.FromObject(rawColumn);
+            var targetLength = Math.Max(50, requiredLength);
+            if (targetLength > 4000)
+                throw new InvalidOperationException("启动包 Version 超出 SQL Server 版本列支持的长度，拒绝写入。");
+            string sql = null;
+            if (column == null)
+            {
+                sql = $"ALTER TABLE [sys_apiengine] ADD [Version] nvarchar({targetLength}) NULL";
+            }
+            else
+            {
+                var type = column["TypeName"]?.ToString().ToLowerInvariant();
+                if (ReadStartupSwitch(column["IsComputed"]) == 1
+                    || (type != "nvarchar" && type != "varchar" && type != "nchar" && type != "char"
+                        && type != "ntext" && type != "text"))
+                {
+                    throw new InvalidOperationException(
+                        $"sys_apiengine.Version 必须是可写文本列，当前类型={type}，计算列={column["IsComputed"]}。");
+                }
+                var bytes = column["MaxLength"].Value<int>();
+                var capacity = type == "nvarchar" || type == "nchar" ? bytes / 2 : bytes;
+                if (bytes != -1 && type != "text" && type != "ntext" && capacity < requiredLength)
+                {
+                    var nullable = ReadStartupSwitch(column["IsNullable"]) == 1 ? "NULL" : "NOT NULL";
+                    var collation = column["CollationName"]?.ToString();
+                    if (string.IsNullOrEmpty(collation)
+                        || !System.Text.RegularExpressions.Regex.IsMatch(collation, "^[A-Za-z0-9_]+$"))
+                        throw new InvalidOperationException("sys_apiengine.Version 排序规则无法确认，拒绝修改物理列。");
+                    sql = $"ALTER TABLE [sys_apiengine] ALTER COLUMN [Version] {type}({targetLength}) COLLATE {collation} {nullable}";
+                }
+            }
+            if (sql != null)
+            {
+                UpgradeExecutionLeaseContext.ConfirmOwnership();
+                database.FromSql(sql).ExecuteNonQuery();
+                UpgradeExecutionLeaseContext.ConfirmOwnership();
+            }
+            // Version 不再被旧字段快照静默过滤；其值必须与包一起写入并强回读。
+            physicalFields.Add("Version");
         }
 
         /// <summary>
@@ -2908,6 +2989,9 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
                     throw new InvalidOperationException(
                         $"sys_apiengine 缺少启动闭包必需物理字段 {requiredField}，请先完成物理字段升级。");
             }
+            if (!string.IsNullOrWhiteSpace(source["Version"]?.ToString())
+                && !physicalFields.Contains("Version"))
+                throw new InvalidOperationException("sys_apiengine 缺少启动闭包必需物理字段 Version，拒绝省略版本后写入。");
 
             var fields = persisted.Properties()
                 .Where(property => existingId.DosIsNullOrWhiteSpace()
@@ -3008,11 +3092,17 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
             }
             if (!string.IsNullOrWhiteSpace(source?["Version"]?.ToString())
                 && !string.Equals(
-                    row["Version"]?.ToString(),
+                    // SQL Server 的 CHAR/NCHAR 版本列会补尾部 U+0020 空格。
+                    // 写回同一版本仍会补齐，逐字比较会让启动门禁永久失败、每次重启重复覆盖。
+                    // 仅消除物理存储填充；空值、缺段或真正不同的版本仍必须按 Managed 包修复。
+                    row.GetValue("Version", StringComparison.OrdinalIgnoreCase)?.ToString().TrimEnd(' '),
                     source["Version"]?.ToString(),
                     StringComparison.OrdinalIgnoreCase))
             {
-                return "Version与包内Managed版本不一致";
+                return "Version与包内Managed版本不一致：包版本="
+                       + DescribeStartupDependencyVersion(source["Version"])
+                       + "，数据库版本=" + DescribeStartupDependencyVersion(
+                           row.GetValue("Version", StringComparison.OrdinalIgnoreCase));
             }
             if (source?["ApiRoutes"] != null
                 && !string.Equals(
@@ -3023,6 +3113,14 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
                 return "ApiRoutes与包内Managed路由不一致";
             }
             return string.Empty;
+        }
+
+        private static string DescribeStartupDependencyVersion(JToken value)
+        {
+            var text = value?.Type == JTokenType.Null ? null : value?.ToString();
+            // 显示空值和不可见字符，限制异常字段长度，避免错误日志无限膨胀。
+            var preview = text != null && text.Length > 80 ? text.Substring(0, 80) + "..." : text;
+            return JsonConvert.SerializeObject(preview) + "（字符数=" + (text?.Length ?? 0) + "）";
         }
 
         private static string NormalizeStartupDependencySource(string source)

@@ -2582,6 +2582,13 @@ namespace Microi.net
                 var appKey = NormalizeMicroServiceKey(SafeJString(app, "AppKey", SafeJString(app, "AppId")));
                 if (IsBlank(appKey)) return new DosResult<object>(0, null, "应用 AppKey 不合法");
 
+                if (protocolVersion == ApplicationAssetStreamV3ProtocolVersion)
+                {
+                    // 查询进度不能等待正在进行的 HDFS 批次持有的发布锁；此分支只读且保留完整鉴权和冻结事实校验。
+                    var verificationStatus = ReadApplicationAssetV3VerificationStatus(osClient, app, param);
+                    if (verificationStatus != null) return verificationStatus;
+                }
+
                 DosResult<object> publishResult = null;
                 var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam
                 {

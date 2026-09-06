@@ -20,10 +20,74 @@ import {
   runApplicationDirectoryStreamPublish,
   tryLegacyMicroServiceStreamPublishFallback,
   validateLocalApplicationAssetSize,
+  validateApplicationAssetV3FinalizeEvidence,
 } from './server.js';
 
 const EMPTY_ROUTE_SNAPSHOT_JSON = '[]';
 const EMPTY_ROUTE_SNAPSHOT_HASH = crypto.createHash('sha256').update(EMPTY_ROUTE_SNAPSHOT_JSON, 'utf8').digest('hex');
+
+test('v3 durable verification exposes pending progress; manifest-only replay never uploads or finalizes', async () => {
+  const root = createTempDirectory();
+  try {
+    fs.writeFileSync(path.join(root, 'index.html'), '<!doctype html><title>verify</title>');
+    const manifest = await buildLocalApplicationAssetManifest(root);
+    const input = {
+      appIdOrKey: 'durable-verify', versionNo: 'v1.0.0', directory: root,
+      publishMode: 'stage' as const, verificationOnly: true, protocolVersion: 3 as const,
+      expectedGateEpoch: '2', requestId: 'durable-verify-request', requestFingerprint: 'a'.repeat(64),
+      sourceManifestHash: 'b'.repeat(64), runtimeManifestHash: manifest.manifestHash,
+      deliveryBatchId: 'durable-verify-batch', routes: [],
+      routeSnapshotJson: EMPTY_ROUTE_SNAPSHOT_JSON, routeSnapshotHash: EMPTY_ROUTE_SNAPSHOT_HASH,
+      expectedCurrentVersion: 1, expectedAppVersion: 'v0.9.0', expectedPublishFence: '10',
+      expectedPublishRowVersion: '10', expectedVersionRowVersion: null,
+      expectedActivePublishVersionId: null, expectedCommittedPublishVersionId: null,
+      confirmExecution: 'durable-verify',
+    };
+    const prefix = `microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/durable-verify/releases/v1.0.0/requests/${input.requestFingerprint}`;
+    let complete = false; let calls = 0;
+    const data = () => ({
+      ProtocolVersion: 3, PublishMode: 'stage', GateEpoch: '2', V3Only: true, AllowedModes: ['stage', 'finalize'],
+      AppId: 'verify-app', AppKey: 'durable-verify', VersionId: 'verify-version', VersionNo: 'v1.0.0',
+      RequestId: input.requestId, RequestFingerprint: input.requestFingerprint, DeliveryBatchId: input.deliveryBatchId,
+      RouteSnapshotJson: input.routeSnapshotJson, RouteSnapshotHash: input.routeSnapshotHash,
+      RuntimeManifestHash: input.runtimeManifestHash, SourceManifestHash: input.sourceManifestHash,
+      PublishFence: '10', PublishRowVersion: '10', VersionRowVersion: complete ? '3' : '1', FencingToken: '11',
+      PublishState: complete ? 'ReleaseVerified' : 'Verifying', PhaseState: complete ? 'ReleaseVerified' : 'Verifying',
+      PointerState: 'Uncommitted', Pending: !complete, Completed: false,
+      ReleasePrefix: prefix, ReleaseEntryPath: `${prefix}/assets/index.html`,
+      StableResolverPath: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/durable-verify/assets/index.html',
+      VerificationTaskId: 'verify-version', VerifiedCount: complete ? 1 : 0,
+      TotalCount: 1, VerifiedBytes: complete ? manifest.totalSize : 0, TotalBytes: manifest.totalSize,
+    });
+    const client = {
+      uploadApplicationAssetResumable: async () => { throw Error('Must not reupload'); },
+      uploadApplicationAssetStream: async () => { throw Error('Must not reupload'); },
+      finalizeApplicationStreamPublish: async (body: Record<string, unknown>) => {
+        calls++; assert.equal(body.PublishMode, 'stage'); assert.equal(body.RequestId, input.requestId);
+        return { Code: 1, Data: data() };
+      },
+    } as unknown as MicroiClient;
+    const pending = await runApplicationDirectoryStreamPublish(client, input);
+    assert.equal(pending.isError, undefined);
+    const receipt = parseToolJson(pending);
+    assert.equal(receipt.Pending, true); assert.equal(receipt.PublishState, 'Verifying');
+    assert.equal(receipt.uploadedCount, 0); assert.equal(receipt.stagedCount, 0);
+    complete = true;
+    const verified = parseToolJson(await runApplicationDirectoryStreamPublish(client, input));
+    assert.equal(verified.Pending, false); assert.equal(verified.PublishState, 'ReleaseVerified');
+    assert.equal(verified.uploadedCount, 0); assert.equal(calls, 2);
+    complete = false;
+    const expected = { ...resolveApplicationAssetStreamV3Contract(input, manifest.manifestHash)!, appIdOrKey: input.appIdOrKey,
+      versionNo: input.versionNo, publishMode: 'stage' as const, entryPath: 'index.html', encodedEntryPath: 'index.html',
+      assetCount: 1, totalSize: manifest.totalSize };
+    for (const mutation of [
+      { Pending: false }, { PhaseState: 'ReleaseVerified' }, { PointerState: 'Committed' },
+      { Completed: true }, { VerificationTaskId: 'foreign-task' }, { VerifiedCount: 2 },
+      { VerifiedBytes: -1 }, { VerifiedBytes: null }, { TotalCount: 2 }, { PublishFence: '11' },
+      { RequestFingerprint: 'f'.repeat(64) }, { RuntimeManifestHash: 'f'.repeat(64) },
+    ]) assert.throws(() => validateApplicationAssetV3FinalizeEvidence({ Code: 1, Msg: '', Data: { ...data(), ...mutation } }, expected));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
 
 test('MCP route canonical JSON 与 Node/Core 固定 UTF-8 hash 向量一致并拒绝非 safe integer', () => {
   const snapshot = buildApplicationAssetStreamV3RouteSnapshot([

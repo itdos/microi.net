@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { Base64 } from "js-base64";
 import {
     decodeLegacyDiyFieldSources,
@@ -38,4 +39,21 @@ test("all historical field source slots use the safe decoder", () => {
     assert.equal(model.Config.Sql, "SELECT * FROM 客户");
     assert.equal(model.Config.V8Code, "return { Code: 1 };");
     assert.equal(model.Config.OpenTable.SubmitV8, "return V8.Form.Id;");
+});
+
+test("旧全局 V8 编码在同步及异步初始化中可执行且不重复解码明文", async () => {
+    const source = "V8.Extend.greeting = function () { return '吾码'; };";
+    for (const input of [source, Base64.encode(source)]) {
+        const decoded = decodeLegacyFieldSource(input);
+        const syncV8 = { Extend: {} };
+        new Function("V8", decoded)(syncV8);
+        assert.equal(syncV8.Extend.greeting(), "吾码");
+        const asyncV8 = { Extend: {} };
+        const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+        await new AsyncFunction("V8", decoded)(asyncV8);
+        assert.equal(asyncV8.Extend.greeting(), "吾码");
+    }
+    const runtime = readFileSync(new URL("../src/utils/diy.common.js", import.meta.url), "utf8");
+    assert.equal((runtime.match(/decodeLegacyFieldSource\(store\.state\.DiyStore\.SysConfig\.GlobalV8Code\)/g) || []).length, 2);
+    assert.doesNotMatch(runtime, /eval\(store\.state\.DiyStore\.SysConfig\.GlobalV8Code\)/);
 });

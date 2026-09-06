@@ -234,9 +234,19 @@ const engines = [
     history: '2026-08-25 v2.0.2 登录初始化只返回递归脱敏的会话投影，密码材料、AI Key 与一次性票据绝不进入响应。\n2026-08-25 v2.0.1 纳入 SaaS 官方 Managed 升级链；匿名阶段仅返回公开设置，原始 DiyToken 经后端重验且租户一致后才返回用户与权限菜单。'
   },
   {
+    key: 'platform-tenant-runtime-registration', name: '平台恢复自助租户运行登记',
+    file: 'platform-tenant-runtime-registration.js', id: '91fb4cb1-8b8d-5a0b-9f04-b1c6c3d1cc80', enableLog: 0,
+    history: '2026-09-06 v1.0.0 检查并幂等补齐自助租户网络登记；保留原配置、数据库和密码，主租户管理员经精确确认后执行。'
+  },
+  {
     key: 'platform-create-tenant', name: '平台创建租户', file: 'platform-create-tenant.js',
     id: '019d2a01-9d63-7f91-8c01-000000000009', enableLog: 1,
     history: '2026-08-25 v1.0.0 将当前用户创建租户的业务编排迁入 Managed 接口引擎，底层只保留可信开通原子。'
+  },
+  {
+    key: 'platform-tenant-admin-credential-repair', name: '平台修复自助租户管理员密码编码',
+    file: 'platform-tenant-admin-credential-repair.js', id: 'd9f39c6a-74c1-53d8-9a30-25f28d61a445', enableLog: 0,
+    history: '2026-09-06 v1.0.0 仅对可验证的历史 DES 密文修正空库遗留 V8 标记，不改变密码，不解密自定义算法或单向哈希。'
   },
   {
     key: 'admin_repair_saas_tenant_database_access', name: '平台修复子租户数据库连接',

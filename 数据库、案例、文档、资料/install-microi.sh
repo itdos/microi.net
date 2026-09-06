@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-09-04 14:07:31
+# 版本：v2026-09-06 16:52:23
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -14,7 +14,7 @@
 #   microi-install-minio      - MinIO 对象存储（可选择复用已有服务，此时不生成）
 #   microi-install-ocr        - PaddleX/PaddleOCR CPU 文字识别服务（默认安装）
 #   microi-install-app        - 平台应用（API + Web）
-#   microi-install-watchtower - 自动更新服务
+#   microi-ops - 独立平台运维中心（默认仅通知）
 #   microi-install-libretranslate - LibreTranslate 翻译服务（默认安装基础套餐）
 #   microi-install-ollama     - Ollama Embedding 服务（不推荐，默认不安装）
 #   microi-install-qdrant     - Qdrant 向量数据库（不推荐，默认不安装）
@@ -30,7 +30,76 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-09-04 14:07:31"
+
+# Ops 写入的镜像摘要覆盖始终紧随原编排，临时修复覆盖仍拥有最后优先级。
+microi_compose() {
+  local args=("$@") effective=() base='' inserted=0 item index
+  for item in "${args[@]}"; do
+    case "$item" in *docker-compose.ops.yml) docker compose "${args[@]}"; return $? ;; esac
+  done
+  for ((index=0; index<${#args[@]}; index++)); do
+    item="${args[index]}"
+    effective+=("$item")
+    if [ "$item" = '-f' ] && [ "$inserted" = 0 ]; then
+      index=$((index+1)); base="${args[index]}"; effective+=("$base"); inserted=1
+      if [ -f "$(dirname "$base")/docker-compose.ops.yml" ]; then
+        effective+=('-f' "$(dirname "$base")/docker-compose.ops.yml")
+      fi
+    fi
+  done
+  if [ "$inserted" = 0 ] && [ -f './docker-compose.ops.yml' ]; then
+    case "${args[0]:-}" in config|up|pull|ps|stop|start|restart|down)
+      effective=('-f' './docker-compose.yml' '-f' './docker-compose.ops.yml' "${effective[@]}") ;;
+    esac
+  fi
+  docker compose "${effective[@]}"
+}
+
+microi_install_ops() {
+  local ops_image="${MICROI_INSTALL_OPS_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/microi-ops:v1.0.1}"
+  local ops_port="${OPS_HTTP_PORT:-61880}"
+  local ops_initial_mode=Notify
+  if [ "${MICROI_OPS_OFFLINE:-0}" = 1 ]; then ops_initial_mode=Manual; fi
+  if [ -f /microi/ops/config/ops.env ]; then
+    echo 'Microi：已有 Ops 配置；保留账号、原启停状态及更新策略。'
+    return 0
+  fi
+  if ! docker image inspect "$ops_image" >/dev/null 2>&1; then
+    if [ "${MICROI_OPS_OFFLINE:-0}" = 1 ]; then
+      echo 'Microi：离线包缺少 Ops 镜像，请重新准备离线包；核心平台继续运行。'
+      return 1
+    fi
+    docker pull "$ops_image" || return 1
+  fi
+  mkdir -p /microi/ops /microi/logs/ops || return 1
+  docker run --rm --name microi-ops-bootstrap --memory 256m --cpus 1 \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /microi/ops:/microi/ops -v /microi/logs/ops:/microi/logs/ops \
+    -e "OPS_BOOTSTRAP_IMAGE=$ops_image" -e "OPS_HTTP_PORT=$ops_port" \
+    -e "OPS_BOOTSTRAP_INITIAL_MODE=$ops_initial_mode" \
+    -e "OPS_PUBLIC_URL=${OPS_PUBLIC_URL:-http://localhost:$ops_port}" \
+    -e "OPS_PLATFORM_API_URL=${OPS_PLATFORM_API_URL:-}" \
+    -e "OPS_ALLOWED_FRAME_ORIGINS=${OPS_ALLOWED_FRAME_ORIGINS:-}" \
+    "$ops_image" --bootstrap || return 1
+  microi_compose -f /microi/ops/docker-compose.yml config --quiet || return 1
+  microi_compose -f /microi/ops/docker-compose.yml up -d || return 1
+  local attempt
+  for attempt in $(seq 1 30); do
+    if curl --noproxy '*' -fsS "http://127.0.0.1:$ops_port/health" >/dev/null; then
+      echo "Microi：Ops 已就绪，本机入口 http://127.0.0.1:$ops_port；初始更新模式 $ops_initial_mode。"
+      echo 'Microi：独立账号和随机密码保存在 /microi/ops/config/ops.env（仅服务器管理员可读）。'
+      echo 'Microi：请为 Ops 配置独立 HTTPS 反向代理，并同步 OPS_PUBLIC_URL、允许嵌入的域名和 SaaS MicroiOpsUrl。'
+      echo 'Microi：数据 /microi/ops/data，TXT 日志 /microi/logs/ops；旧 Watchtower 仅在明确迁移后暂停。'
+      return 0
+    fi
+    sleep 2
+  done
+  echo 'Microi：Ops 尚未就绪，请查看 docker logs microi-ops；已保留配置，不影响 API/Web。'
+  return 1
+}
+
+
+SCRIPT_VERSION="v2026-09-06 16:52:23"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -407,7 +476,7 @@ repair_add_container_compose_candidate() {
 repair_config_has_app_services() {
   local compose_file="$1"
   local services=""
-  services=$(docker compose -f "${compose_file}" config --services 2>/dev/null) || return 1
+  services=$(microi_compose -f "${compose_file}" config --services 2>/dev/null) || return 1
   printf '%s\n' "${services}" | grep -Fxq 'microi-install-api' \
     && printf '%s\n' "${services}" | grep -Fxq 'microi-install-client'
 }
@@ -863,7 +932,7 @@ networks:
 EOF
   chmod 600 "${override_file}"
   if ! MICROI_REPAIR_DB_CONN="${db_conn}" MICROI_REPAIR_MONGO_CONN="${mongo_conn}" \
-    docker compose -p "${project_name}" -f "${compose_file}" -f "${override_file}" \
+    microi_compose -p "${project_name}" -f "${compose_file}" -f "${override_file}" \
     config > "${migrated_file}"; then
     echo 'Microi：错误：无法生成容器内网版应用编排。'
     return 1
@@ -971,7 +1040,7 @@ services:
 EOF
   chmod 600 "${override_file}"
   docker rm -f microi-install-api microi-install-client > /dev/null 2>&1 || true
-  if docker compose -p "${project_name}" -f "${compose_file}" -f "${override_file}" \
+  if microi_compose -p "${project_name}" -f "${compose_file}" -f "${override_file}" \
     up -d --force-recreate --no-deps microi-install-api microi-install-client; then
     echo 'Microi：已使用修复前的 API/Web 镜像和原编排配置完成自动恢复。'
     return 0
@@ -993,6 +1062,33 @@ repair_mode_cleanup() {
 }
 
 repair_microi_app() {
+  if [ -n "$(docker ps --filter label=io.microi.ops.controller=true --format '{{.Names}}' 2>/dev/null)" ]; then
+    echo 'Microi：Ops 正在运行，请从平台运维中心发起 API/Web 更新；命令行救援前应先停止此 Ops，避免两个控制器竞争。'
+    return 1
+  fi
+  # 官方救援使用同一宿主机数据目录；自定义映射无法共享此锁时不得假定已经互斥。
+  local ops_controller ops_data_dir ops_data_source
+  while IFS= read -r ops_controller; do
+    [ -n "$ops_controller" ] || continue
+    ops_data_dir=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$ops_controller" | sed -n 's/^OPS_DATA_DIR=//p') || return 1
+    ops_data_source=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/microi/ops/data"}}{{.Source}}{{end}}{{end}}' "$ops_controller") || return 1
+    if [ "${ops_data_dir:-/microi/ops/data}" != '/microi/ops/data' ] || [ "$ops_data_source" != '/microi/ops/data' ]; then
+      echo 'Microi：检测到自定义 Ops 数据目录，当前一键修复无法共享执行锁，请通过该 Ops 的原部署配置完成救援；未修改 API/Web。'
+      return 1
+    fi
+  done < <(docker ps -a --filter label=io.microi.ops.controller=true --format '{{.Names}}')
+  # 与 .NET FileShare.None 使用同一个 flock。CLI 先开始时也阻止 Ops 在修复中途启动，
+  # 文件锁由内核随进程退出释放，不使用可能留下永久死锁的 marker 文件。
+  if ! command -v flock >/dev/null 2>&1; then
+    echo 'Microi：命令行修复需要 util-linux 的 flock，请先安装；未修改 API/Web。'
+    return 1
+  fi
+  mkdir -p /microi/ops/data || return 1
+  exec {OPS_REPAIR_LOCK_FD}>/microi/ops/data/controller.lock
+  if ! flock -n "$OPS_REPAIR_LOCK_FD"; then
+    echo 'Microi：另一个 Ops 或命令行修复持有执行锁，未修改 API/Web。'
+    return 1
+  fi
   local candidate=""
   local canonical_file=""
   local canonical_hash=""
@@ -1024,7 +1120,7 @@ repair_microi_app() {
   command -v curl > /dev/null 2>&1 || { echo 'Microi：错误：缺少 curl。'; return 1; }
   command -v openssl > /dev/null 2>&1 || { echo 'Microi：错误：缺少 openssl。'; return 1; }
   docker info > /dev/null 2>&1 || { echo 'Microi：错误：Docker daemon 当前不可访问。'; return 1; }
-  docker compose version > /dev/null 2>&1 || { echo 'Microi：错误：需要 Docker Compose V2。'; return 1; }
+  microi_compose version > /dev/null 2>&1 || { echo 'Microi：错误：需要 Docker Compose V2。'; return 1; }
 
   REPAIR_TEMP_DIR=$(mktemp -d /tmp/microi_app_repair_XXXXXX)
   chmod 700 "${REPAIR_TEMP_DIR}"
@@ -1044,7 +1140,7 @@ repair_microi_app() {
     if repair_config_has_app_services "${candidate}"; then
       candidate_index=$((candidate_index + 1))
       canonical_file="${REPAIR_TEMP_DIR}/candidate-${candidate_index}.yml"
-      docker compose -f "${candidate}" config > "${canonical_file}"
+      microi_compose -f "${candidate}" config > "${canonical_file}"
       chmod 600 "${canonical_file}"
       canonical_hash=$(repair_hash_file "${canonical_file}")
       if [ -z "${selected_file}" ]; then
@@ -1098,7 +1194,7 @@ repair_microi_app() {
     chmod 600 "${panel_file}"
     selected_file="${panel_file}"
     selected_canonical="${REPAIR_TEMP_DIR}/panel-canonical.yml"
-    docker compose -p "${project_name}" -f "${selected_file}" config > "${selected_canonical}"
+    microi_compose -p "${project_name}" -f "${selected_file}" config > "${selected_canonical}"
     chmod 600 "${selected_canonical}"
     echo "Microi：已将完整应用编排恢复到宝塔目录：${selected_file} ✓"
   fi
@@ -1142,7 +1238,7 @@ repair_microi_app() {
   echo "Microi：修复前配置、容器元数据和旧镜像恢复点已保存：${backup_dir} ✓"
 
   echo 'Microi：正在按现场 Compose 配置拉取 API/Web 镜像...'
-  if ! docker compose -p "${project_name}" -f "${selected_file}" \
+  if ! microi_compose -p "${project_name}" -f "${selected_file}" \
     pull microi-install-api microi-install-client; then
     echo 'Microi：错误：镜像拉取失败，未删除任何应用容器。'
     return 1
@@ -1150,7 +1246,7 @@ repair_microi_app() {
 
   echo 'Microi：正在移除并重建两个无状态应用容器（不会操作任何数据容器/数据卷）...'
   docker rm -f microi-install-api microi-install-client > /dev/null 2>&1 || true
-  if ! docker compose -p "${project_name}" -f "${selected_file}" \
+  if ! microi_compose -p "${project_name}" -f "${selected_file}" \
     up -d --force-recreate --no-deps microi-install-api microi-install-client; then
     echo 'Microi：错误：新 API/Web 容器创建失败，正在自动恢复修复前镜像...'
     repair_restore_previous_app_images "${selected_file}" "${project_name}" \
@@ -3442,7 +3538,7 @@ fi
 ensure_docker_daemon
 
 # === 检查并安装 Docker Compose V2 ===
-if docker compose version > /dev/null 2>&1; then
+if microi_compose version > /dev/null 2>&1; then
   echo "Microi：Docker Compose 版本: $(docker compose version --short 2>/dev/null || docker compose version) ✓"
 else
   echo 'Microi：未检测到 Docker Compose V2 插件，正在自动安装...'
@@ -3455,14 +3551,14 @@ else
       sudo yum install -y docker-compose-plugin 2>/dev/null
     fi
   fi
-  if ! docker compose version > /dev/null 2>&1; then
+  if ! microi_compose version > /dev/null 2>&1; then
     # 手动安装 compose 插件
     echo 'Microi：包管理器安装失败，尝试手动安装 Docker Compose 插件...'
     COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/' || echo "2.27.0")
     sudo mkdir -p /usr/local/lib/docker/cli-plugins
     sudo curl -SL "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose 2>/dev/null
     sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-    if ! docker compose version > /dev/null 2>&1; then
+    if ! microi_compose version > /dev/null 2>&1; then
       echo 'Microi：错误：Docker Compose V2 安装失败，请手动安装后重试。'
       exit 1
     fi
@@ -4024,12 +4120,12 @@ compose_up() {
   project_name=$(basename "${project_dir}")
   echo ""
   echo "Microi：正在部署编排 [${project_name}]..."
-  if ! (cd "${project_dir}" && docker compose config > /dev/null); then
+  if ! (cd "${project_dir}" && microi_compose config > /dev/null); then
     echo "Microi：错误：编排 [${project_name}] 静态校验失败，未启动容器 ✗"
     exit 1
   fi
   # 使用 if 包裹避免 set -e 在子shell失败时直接退出脚本
-  if (cd "${project_dir}" && docker compose up -d); then
+  if (cd "${project_dir}" && microi_compose up -d); then
     echo "Microi：编排 [${project_name}] 部署成功 ✓"
   else
     echo "Microi：错误：编排 [${project_name}] 部署失败 ✗"
@@ -4037,7 +4133,7 @@ compose_up() {
     # 自动输出容器日志帮助排查
     echo '------------------------------------------------------------------'
     echo 'Microi：尝试输出相关容器日志：'
-    for cname in $(cd "${project_dir}" && docker compose ps -a --format '{{.Name}}' 2>/dev/null); do
+    for cname in $(cd "${project_dir}" && microi_compose ps -a --format '{{.Name}}' 2>/dev/null); do
       echo "--- 容器 ${cname} 日志 ---"
       docker logs "${cname}" 2>&1 | tail -30
     done
@@ -4055,11 +4151,11 @@ compose_up_optional() {
   project_name=$(basename "${project_dir}")
   echo ""
   echo "Microi：正在部署附加编排 [${project_name}]..."
-  if ! (cd "${project_dir}" && docker compose config > /dev/null); then
+  if ! (cd "${project_dir}" && microi_compose config > /dev/null); then
     echo "Microi：警告：附加编排 [${project_name}] 静态校验失败，未启动容器。"
     return 1
   fi
-  if (cd "${project_dir}" && docker compose up -d); then
+  if (cd "${project_dir}" && microi_compose up -d); then
     echo "Microi：附加编排 [${project_name}] 已启动 ✓"
     return 0
   fi
@@ -4070,7 +4166,7 @@ compose_up_optional() {
     [ -n "${cname}" ] || continue
     echo "--- 容器 ${cname} 日志 ---"
     docker logs "${cname}" 2>&1 | tail -30 || true
-  done < <(cd "${project_dir}" && docker compose ps -a --format '{{.Name}}' 2>/dev/null || true)
+  done < <(cd "${project_dir}" && microi_compose ps -a --format '{{.Name}}' 2>/dev/null || true)
   return 1
 }
 
@@ -6173,50 +6269,16 @@ echo '[步骤10/11] 平台应用与附加能力处理完成 ✓'
 
 
 # ============================================================
-# 步骤11：部署 Watchtower 自动更新
+# 步骤11：部署独立 Microi.Ops 平台运维中心
 # ============================================================
 echo ''
-echo '[步骤11/11] 部署 Watchtower 自动更新'
-echo '------------------------------------------------------------------'
-INSTALL_CURRENT_STAGE="步骤11/11 部署 Watchtower 自动更新"
-
-WATCHTOWER_DIR="${COMPOSE_BASE_DIR}/microi-install-watchtower"
-
-echo "Microi：Watchtower 监控容器: microi-install-api, microi-install-client"
-
-mkdir -p "${WATCHTOWER_DIR}"
-cat > "${WATCHTOWER_DIR}/docker-compose.yml" <<EOF
-services:
-  microi-install-watchtower:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest
-    container_name: microi-install-watchtower
-${COMPOSE_SERVICE_NETWORK}
-    restart: always
-    privileged: true
-    tty: true
-    stdin_open: true
-    environment:
-      - DOCKER_API_VERSION=1.40
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    # The upstream default is 86400 seconds. A five-minute poll keeps patch
-    # releases timely while rolling-restart avoids taking both monitored
-    # services down together.
-    command: --interval 300 --rolling-restart microi-install-api microi-install-client
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "10"
-${COMPOSE_EXTERNAL_NETWORKS}
-EOF
-echo "Microi：Watchtower 编排文件已生成 ✓"
-
-compose_up "${WATCHTOWER_DIR}"
-
-echo ''
-echo '[步骤11/11] Watchtower 部署完成 ✓'
-
+echo '[步骤11/11] 部署平台运维中心（默认仅通知更新）'
+INSTALL_CURRENT_STAGE='步骤11/11 部署平台运维中心'
+if microi_install_ops; then
+  echo '[步骤11/11] 平台运维中心配置完成 ✓'
+else
+  record_optional_component_failure 'Microi.Ops' '安装未完成，请按官网文档查看保留的配置并单独安装。'
+fi
 
 # ============================================================
 # 输出所有服务信息
@@ -6291,9 +6353,9 @@ echo "API:         容器 microi-install-api,        端口 ${API_PORT}"
 echo "Client:      容器 microi-install-client,        端口 ${VUE_PORT}"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-app/"
 echo ""
-echo "Watchtower:  容器 microi-install-watchtower"
+echo "Microi.Ops:  独立运维容器 microi-ops；编排 /microi/ops/docker-compose.yml"
 echo "             监控: microi-install-api, microi-install-client"
-echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-watchtower/"
+echo "             编排目录: /microi/ops/；TXT 日志: /microi/logs/ops/"
 echo ''
 if [ "${INSTALL_MICROI_NETWORK}" == "1" ]; then
   echo "Docker网络:  microi（bridge，subnet ${MICROI_NETWORK_SUBNET}，gateway ${MICROI_NETWORK_GATEWAY}）"
@@ -6349,7 +6411,7 @@ echo ''
 echo '------------------------------------------------------------------'
 echo '编排项目列表：'
 echo '------------------------------------------------------------------'
-docker compose ls 2>/dev/null | grep 'microi-install' || docker compose ls 2>/dev/null || true
+microi_compose ls 2>/dev/null | grep 'microi-install' || microi_compose ls 2>/dev/null || true
 echo ''
 echo '------------------------------------------------------------------'
 echo '容器运行状态：'

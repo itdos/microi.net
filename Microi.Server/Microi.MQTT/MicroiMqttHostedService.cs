@@ -45,12 +45,12 @@ namespace Microi.net
                 await _mqtt.StartServerAsync(client).ConfigureAwait(false);
                 if (_mqtt.IsRunning)
                     Console.WriteLine("Microi：【成功】【MQTT】插件启动成功！");
-                else
-                    Console.WriteLine("Microi：【Error异常】【MQTT】插件未能启动，请查看系统日志中的 MQTT 诊断信息。");
+                // StartServerAsync 的失败分支已同时输出具体原因、解决方案和系统日志。
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】MQTT延迟启动失败：{ex.Message}");
+                MqttStartupDiagnostics.Report(osClient, "HostedStartupFailed",
+                    MqttStartupDiagnostics.Describe(ex, 1883));
             }
         }
     }

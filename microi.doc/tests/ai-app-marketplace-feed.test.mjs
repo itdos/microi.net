@@ -163,6 +163,36 @@ test('official_ai_apps 精确 AppKey 走单条快速通道，不读取全量列�
   assert.equal(tableReads, 0)
 })
 
+test('私有运行时不进入官网列表、精确详情或搜索兜底，独立公开微服务仍可见', () => {
+  const rows = [
+    { Id: 'public-package', AppKey: 'engine-package', AppName: '公开平台安装包', ApplicationType: 'Platform', IsApprove: 1, IsPublic: 1 },
+    { Id: 'private-runtime', AppKey: 'engine-runtime', AppName: '运行时内部关键词', ApplicationType: 'MicroService', Status: 'Published', BuildStatus: 'Success', IsPublic: 0, IsRecommend: 1 },
+    { Id: 'private-web', AppKey: 'private-web', AppName: '私有独立应用', ApplicationType: 'Web', Status: 'Published', BuildStatus: 'Success', IsPublic: 'false' },
+    { Id: 'dns', AppKey: 'domain-dns-manager', AppName: '域名解析管理', ApplicationType: 'MicroService', Status: 'Published', BuildStatus: 'Success', IsPublic: true },
+    { Id: 'legacy', AppKey: 'legacy-package', AppName: '历史公开应用', ApplicationType: 'Platform', IsApprove: 1, IsPublic: null }
+  ]
+  const run = Param => new Function('V8', engineSource)({
+    Param, SysConfig: {}, FormEngine: {
+      GetTableData(_table, query) {
+        assert.ok(query._SelectFields.includes('IsPublic'))
+        return { Code: 1, Data: rows, DataCount: rows.length }
+      },
+      GetFormData(_table, query) {
+        assert.ok(query._SelectFields.includes('IsPublic'))
+        return { Code: 1, Data: rows.find(row => row.AppKey === Param.ExactAppKey) }
+      }
+    }
+  })
+  assert.deepEqual(new Set(run({}).Data.map(row => row.AppKey)), new Set(['engine-package', 'domain-dns-manager', 'legacy-package']))
+  assert.equal(run({ ExactAppKey: 'engine-runtime' }).DataCount, 0)
+  assert.equal(run({ ExactAppKey: 'private-web' }).DataCount, 0)
+  assert.equal(run({ ExactAppKey: 'domain-dns-manager' }).DataCount, 1)
+  assert.equal(run({ Keyword: '域名解析管理' }).Data[0].AppKey, 'domain-dns-manager')
+  const fallback = run({ Keyword: '运行时内部关键词' })
+  assert.equal(fallback.DataCount, 0)
+  assert.ok(fallback.DataAppend.Search.RelatedApps.every(row => !['engine-runtime', 'private-web'].includes(row.AppKey)))
+})
+
 test('official_ai_apps 在普通分类内始终推荐优先，再按所选条件排序', () => {
   const rows = [
     { Id: 'ordinary-new', AppKey: 'ordinary-new', AppName: '普通新应用', ApplicationType: 'Platform', Category: 'business', IsApprove: 1, IsRecommend: 0, AppUpdateTime: '2026-08-27' },

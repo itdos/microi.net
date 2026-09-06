@@ -1,0 +1,8 @@
+bin/
+obj/
+wwwroot/
+Client/node_modules/
+!Client/package-lock.json
+Tests/bin/
+Tests/obj/
+test-results/
