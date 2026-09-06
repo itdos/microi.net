@@ -161,6 +161,7 @@ try {
 - 设备/告警/工单等业务事实优先进入关系库，高频遥测可进入 MongoDB，大附件进入对象存储
 - RabbitMQ 租户凭据在 SaaS 引擎登记前必须先在真实 RabbitMQ 创建 user/vhost/权限；内嵌 MQTT Broker 直接校验 SaaS 中的 MQTT 凭据，使用外部 MQTT Broker 时另行完成真实 Broker 账号、ACL 与适配器配置
 - `ConnectedClients` 只代表当前 MQTT 节点的诊断快照，不是集群全局在线事实
+- MQTT 启动失败必须在控制台直接输出脱敏的底层原因、监听端口和针对性解决建议，并将同一诊断写入系统日志；不能只提示“查看系统日志”。端口占用须核对 PID 和节点归属，不得结束所有后端进程。
 - 内嵌 MQTT Broker 不具备跨节点共享会话/订阅/retained 的集群一致性；多 API 节点生产部署应使用支持集群的外部 Broker，或把内嵌 Broker 固定到独立节点并由负载入口路由，不能让每个 API 节点各自充当一套独立 Broker
 - MQTT 生产配置、安全语义、事件字段可用性和上线清单以 [MQTT 生产参考](references/mqtt-production.md) 为准
 <!-- /microi-progressive:chunk -->

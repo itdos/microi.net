@@ -1048,6 +1048,8 @@ await V8.ApiEngine.RunBackground(
 
 预计超过 2 分钟、500 条、1000 个扇出子操作、100 次外部调用，或安装/初始化/迁移/备份类动作，应使用后台任务。未知总量不要伪造百分比；超过 10 分钟必须由后端按 checkpoint 分片。详见[任务调度与后台任务](../system-engine/job)。
 
+`RunBackground` 返回 `Code=1` 表示任务已持久化入队，`Data` 只包含 `Id`、状态、进度、时间、消息及 `HasLog/HasResult` 等摘要。完整日志和结果应通过通知中心详情，或 `/apiengine/platform-background-task` 的 `Detail` 动作按任务 Id 读取；不要依赖提交响应中的任务参数、身份上下文、检查点或完整结果。重复提交同一逻辑操作应复用 `IdempotencyKey`，并等待任务达到 `Succeeded/100%` 后再确认业务完成。
+
 ## V8.DataSourceEngine
 >* 历史数据源引擎兼容入口。`Run` 返回 Promise，并兼容回调；旧 `GetData` 已弃用
 >* 新版本将数据源迁移为带 `DataSourceType` 的接口引擎，推荐新代码直接使用 `V8.ApiEngine.Run`。本入口和旧 Controller 地址仍会解析旧 `DataSourceKey`，并执行迁移后的接口引擎

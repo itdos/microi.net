@@ -6,7 +6,7 @@
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
 
-默认安装 **主数据库 + Redis + MinIO + MongoDB + 低代码平台程序（API + Web）+ Watchtower**，并默认尝试安装 **PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）** 两项附加能力。已有 MySQL 或 MinIO 的客户也可在交互中选择复用，安装器会跳过对应容器、数据目录、编排和宿主机端口。OCR 或 LibreTranslate 镜像、网络、容器健康检查、Upgrade29/Upgrade31 配置任一失败时，只会跳过对应附加能力并输出警告，不会回滚或中断已经通过 liveness/readiness 的核心平台；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
+默认安装 **主数据库 + Redis + MinIO + MongoDB + 低代码平台程序（API + Web）**，并默认尝试安装 **Microi.Ops 平台运维中心 + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）** 附加能力。已有 MySQL 或 MinIO 的客户也可在交互中选择复用，安装器会跳过对应容器、数据目录、编排和宿主机端口。附加组件镜像、网络、容器健康检查或对应配置失败时，只会跳过对应附加能力并输出警告，不会回滚或中断已经通过 liveness/readiness 的核心平台；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
 
 > **权限说明：** 一键安装和一键更新/修复需要创建 `/microi`、数据目录、防火墙规则及宿主机资源限制。下面两条脚本命令可保持原样复制：root 帐号会直接执行；普通帐号会在步骤 1 之前请求一次 `sudo` 并以 root 重新执行，不会再到步骤 5 创建 `/microi/compose` 时才报 `mkdir: Permission denied`。精简系统没有 `sudo` 时，脚本会在任何宿主机变更前明确停止，请先执行 `su -` 切换到 root 后重试。
 
@@ -53,7 +53,8 @@ Docker 的 `cpus`、`mem_limit` 是**单容器**上限。如果给 API 和数据
 - 安装器创建持久化的 `/etc/systemd/system/microi.slice`。Docker 使用 `systemd` cgroup 驱动时，Compose 写入 `cgroup_parent: microi.slice`；使用 `cgroupfs` 时写入 `cgroup_parent: /microi.slice`。
 - 当前一键安装只支持由宿主机 systemd 管理的 rootful Docker；检测到 rootless Docker 或不具备 CPU/内存 cgroup 控制器时，会在写入 Slice 和启动新容器前停止。
 - cgroup v2 会设置父级 `MemoryMax`、`CPUQuota` 和 `MemorySwapMax=0`；cgroup v1 会设置 `MemoryLimit`、`CPUQuota`，内核启用 swap accounting 时再把父级内存与 Swap 合计限制为同一数值。
-- Redis、MongoDB、Web、MinIO、OCR、LibreTranslate、Watchtower、Ollama、Qdrant 以及临时工具容器都不加入这个共享池，也不由本方案新增 Docker CPU/内存硬限制。
+- Redis、MongoDB、Web、MinIO、OCR、LibreTranslate、Ollama、Qdrant 以及临时工具容器都不加入这个共享池，也不由本方案新增 Docker CPU/内存硬限制。
+- Microi.Ops 使用独立编排和独立资源限制（默认 512 MiB / 1 CPU），不加入 API/主数据库共享池，避免平台升级或该池耗尽时连带中断运维入口。
 - 复用已有 MySQL 时，外部数据库不在安装器管理的本机父 cgroup 内，因此本机共享池实际只约束吾码 API；外部数据库必须在它自己的宿主机或服务平台单独保护。
 - 安装器在启动容器前回读父级 CPU、内存和 Swap 控制文件，启动每个编排前执行 `docker compose config`，启动后再用 `docker inspect` 确认 API 与本脚本创建的主数据库已进入同一 `CgroupParent`。
 
@@ -107,7 +108,7 @@ services:
     cgroup_parent: microi.slice # 与 API 完全相同
 ```
 
-API 和主数据库必须使用完全相同的 `cgroup_parent`，也不要再分别写固定 `cpus` / `mem_limit`。Redis、MongoDB、MinIO、OCR、LibreTranslate、Web、Watchtower 以及可选 Ollama/Qdrant 不写这个属性。修改后按顺序验收：
+API 和主数据库必须使用完全相同的 `cgroup_parent`，也不要再分别写固定 `cpus` / `mem_limit`。Redis、MongoDB、MinIO、OCR、LibreTranslate、Web、Microi.Ops 以及可选 Ollama/Qdrant 不写这个属性。修改后按顺序验收：
 
 ```bash
 # 1. 装载并启动共享父级
@@ -209,8 +210,8 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 
 1. 回读现有 API/Web 容器的 Compose project、配置文件和镜像，静态校验 API 十项启动配置及数据库连接串结构；先把 Compose、容器元数据和旧镜像恢复点保存到应用编排目录的 `.repair-backups/<时间>/`。
 2. 创建/复用 `microi` 共享 bridge 网络，将脚本新装的数据库、Redis、MongoDB、MinIO 容器接入该网络；通过安装标签识别已有 MySQL/MinIO，保留外部连接串、host-gateway 和 SaaS 存储配置，不查找或重建对应容器。如果脚本管理的数据库连接串缺少用户、密码或端口，修复器会从唯一匹配的现有数据库容器安装环境中恢复完整连接串，全程不输出密码；无法精确匹配容器或凭据时会在删除应用容器前停止。
-3. 按现场 Compose 拉取镜像，临时停止 Watchtower，只删除并重建 `microi-install-api`、`microi-install-client` 两个无状态应用容器，从而接管丢失标签或归属漂移造成的同名容器冲突。
-4. 重建后回读十项启动配置和 `microi` 网络，依次验证 API liveness、readiness；失败时自动尝试用修复前镜像恢复。最后恢复原本正在运行的 Watchtower。
+3. 检测运行中的 Microi.Ops，存在时拒绝并行修复；先在 Ops 确认无活动任务并切为手动，再明确停止 Ops 才能使用命令行救援。按现场 Compose 与 `docker-compose.ops.yml` 镜像覆盖拉取镜像，临时停止原本正在运行的旧 Watchtower，只删除并重建 `microi-install-api`、`microi-install-client` 两个无状态应用容器，从而接管丢失标签或归属漂移造成的同名容器冲突。
+4. 重建后回读十项启动配置和 `microi` 网络，依次验证 API liveness、readiness；失败时自动尝试用修复前镜像恢复。最后只恢复原本正在运行的旧 Watchtower；本来关闭的自动更新器保持关闭。
 
 > 该命令不会删除或重建主数据库、Redis、MongoDB、MinIO 容器，不会删除它们的数据目录或 Docker volume，也不会改动客户已有 MySQL/MinIO 服务，更不会执行 `docker compose down -v`。API、Web 前端重建时会有短暂中断。宝塔标准编排目录存在而应用编排仅位于 `/microi/compose` 时，修复器会把已经完整解析的应用配置恢复到宝塔目录后再重建，使编排重新可管理。
 
@@ -269,7 +270,7 @@ bash install-microi-offline.sh
 ::: warning 离线脚本版本边界
 - 离线安装器独立维护，不能再假定与当前在线脚本功能完全一致；制作包前必须确认三个脚本版本相同。
 - 当前 OCR 默认安装、Upgrade29 字段等待和 SaaS 配置回读以本页在线安装脚本为准。完全离线环境需要额外把固定 OCR 镜像执行 `docker save`/`docker load`，再按下方 OCR 手动编排部署并在健康后配置 SaaS 引擎。
-- Watchtower 自动更新服务需要联网才能生效；完全离线环境不应把“容器已启动”当成已完成更新验证。
+- 离线镜像清单包含 Microi.Ops，首次安装默认为「仅手动」。先通过 `docker load` 导入镜像，再在 Ops 勾选「仅使用本地镜像」并选择目标标签；不会定时访问镜像仓库。缺失 Ops 镜像时报告警告，不转为联网拉取，也不回滚核心平台。
 :::
 
 ---
@@ -1230,11 +1231,11 @@ services:
 
 ---
 
-### 6️⃣ 低代码平台程序编排（Api + Web + Watchtower）
+### 6️⃣ 低代码平台程序编排（Api + Web）
 
 ::: tip 说明
 - 请将所有参数修改为实际参数，以下镜像均为公开开源版镜像
-- `microi-web` 编排的 `OsClient` 可不指定，默认为空（SaaS 模式）
+- `microi-client` 编排的 `OsClient` 可不指定，默认为空（SaaS 模式）
 - API 容器只允许下面十个启动引导配置：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。其它后端运行参数统一在主租户 SaaS 引擎中动态维护，不要再增加 `MICROI_*` 或自定义 `AppSettings` 环境变量。`ASPNETCORE_*` / `DOTNET_*` 仅属于 .NET 宿主配置。
 - 下方旧式手工示例中的 `172.27.221.211` 表示 API 容器确实可达的外部数据库/缓存宿主机，并不表示推荐让同机 Docker 依赖绕宿主机端口；同机容器部署应建立共享 bridge 网络，改用对应容器 DNS 与内部端口。无论哪种方式，都不要把 API 容器中的 `127.0.0.1` / `localhost` 当成其它容器。
 :::
@@ -1292,20 +1293,85 @@ services:
     tty: true
     stdin_open: true
 
-  watchtower:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest
-    container_name: watchtower
-    restart: always  
-    privileged: true
-    tty: true
-    stdin_open: true
-    volumes:  
-      - /etc/localtime:/etc/localtime
-      - /root/.docker/config.json:/config.json
-      - /var/run/docker.sock:/var/run/docker.sock  
-    command: --cleanup --include-stopped --interval 10 microi-api microi-web
 ```
 :::
+
+
+### 平台运维中心 Microi.Ops：独立升级入口
+
+[Watchtower 上游](https://github.com/containrrr/watchtower) 已于 **2025 年 12 月 17 日**归档，并声明不再维护。新安装不再部署 Watchtower，改由 **Microi.Ops / 吾码平台运维中心**提供 API/Web 的手动更新、定时检查、下载、维护窗口更新、状态与日志。现有 Watchtower 保留现场和启停选择，完成受管范围核对后再迁移；不能同时让两个更新器改同一个 API/Web。
+
+Ops 是独立 .NET 10 容器，页面使用吾码 UI。即使 API/Web 正在更新或已经停止，独立登录、任务进度、本地日志仍可使用。系统引擎菜单通过 iframe 打开它，同时展示访问 URL、复制地址和新窗口链接。请将地址加入书签，反向代理也必须独立于被更新的 API/Web 容器。
+
+#### 安装与两套登录
+
+新版一键安装在核心平台就绪后尝试部署 Ops；安装失败会报告警告，核心平台继续运行。编排位于 `/microi/ops/docker-compose.yml`，账号和随机密码保存在 `/microi/ops/config/ops.env`（权限 600），不输出到安装日志。Ops 帐号默认名为 `opsadmin`，密码无通用默认值。已有配置不会被再次安装覆盖。
+
+已有平台可用一次性引导生成独立编排，下面容器名适用于一键安装；手工部署须改为实际 `microi-api`、`microi-client`。API/Web 应共享用户自建 Docker 网络，域名须改为自己的实际地址。
+
+```bash
+docker run --rm --name microi-ops-bootstrap --memory 256m --cpus 1 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /microi/ops:/microi/ops -v /microi/logs/ops:/microi/logs/ops \
+  -e OPS_BOOTSTRAP_API_NAME=microi-install-api \
+  -e OPS_BOOTSTRAP_WEB_NAME=microi-install-client \
+  -e OPS_PUBLIC_URL=https://ops.example.com \
+  -e OPS_PLATFORM_API_URL=https://api.example.com \
+  -e OPS_ALLOWED_FRAME_ORIGINS=https://web.example.com \
+  registry.cn-hangzhou.aliyuncs.com/microios/microi-ops:v1.0.1 --bootstrap
+docker compose -f /microi/ops/docker-compose.yml config --quiet
+docker compose -f /microi/ops/docker-compose.yml up -d
+```
+
+默认宿主机监听为 `127.0.0.1:61880`，通过独立 HTTPS 反向代理开放访问。代理转发 `Host` 和 `X-Forwarded-Proto`；`OPS_TRUSTED_PROXY_IPS` 填 Ops 实际看到的代理 IP，多个用分号。引导默认登记共享 Docker 网络网关；代理在容器中时改用其固定 IP。`OPS_PUBLIC_URL` 与浏览器实际访问地址保持一致。示例仅放入已配置好证书的 Ops 域名 HTTPS `server` 块：
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:61880;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 60s;
+}
+```
+
+在「SaaS 引擎 → 后端运行配置」填写 `MicroiOpsUrl`，更新「SaaS引擎」「系统日志/监控」「应用商城」后，从「系统引擎 → 平台运维中心」进入。入口和平台连接信息都不包含运维密码。允许嵌入的 Web Origin 填入 `OPS_ALLOWED_FRAME_ORIGINS`，以分号分隔；推荐平台与 Ops 使用同站点的不同 HTTPS 子域名。浏览器阻止跨站 iframe Cookie 时使用新窗口入口。
+
+独立 Ops 登录成功后，可在「平台连接」再次登录吾码平台。该登录读取当前系统设置、RSA 密码公钥、`EnableCaptcha` 和隐私协议；开启验证码时显示验证码，设置读取失败时不会绕过验证。平台账号只用于必要日志回传，不取代独立运维权限。平台密码不持久保存，DiyToken 在 Ops 本地加密，解除连接后移除。
+
+#### 目录、日志与保留策略
+
+| 宿主机目录 | 用途 |
+|---|---|
+| `/microi/ops/config` | 账号、部署清单、可选私有镜像仓库凭据 |
+| `/microi/ops/data` | SQLite 任务账本、待投递日志、加密凭据和密钥；须整体备份 |
+| `/microi/logs/ops` | Ops TXT 文件，按 UTC 日期和 10 MiB 分卷，默认保留 30 天 |
+| `/microi/logs/exports` | 指定容器标准输出的人工导出文件 |
+| `/microi/compose/...` | 原平台编排及 Ops 写入的镜像摘要覆盖文件 |
+
+`OPS_LOG_DIR` 指定 **Ops 容器内** TXT 路径，卷映射指定服务器实际目录。例如 `-v /microi/logs/ops:/microi/logs/ops` 配合 `OPS_LOG_DIR=/microi/logs/ops`。`OPS_LOG_RETENTION_DAYS` 控制 1–365 天保留期；清理只针对 Ops 自己的 TXT 和已投递旧事件，不删除待投递记录、任务账本、数据库、上传文件或其它容器卷。不要把整个 `/microi` 当成日志目录清理。
+
+必要事件先提交 Ops 独立 SQLite，再写 TXT；平台恢复时通过 `platform-ops-event-ingest` 写入现有 **MongoDB 系统日志**。平台确认 MongoDB 持久化后才回执，稳定 EventId 防止断线重试重复写日志。在「系统日志/监控」选择「平台运维」，查询 `Category=Operations / Source=Microi.Ops`。API 需要包含新增的 `IngestOpsEvent` 原子方法；旧 API 返回升级提示时，日志仍保留在 Ops 等待补投。
+
+所有吾码自行维护的应用日志建议放入 `/microi/logs/<组件>`，但各组件的容器内真实文件路径须按其程序配置映射。[Docker 标准输出日志](https://docs.docker.com/engine/logging/configure/)由 logging driver 管理：Ops 编排设置 `max-size=10m / max-file=3`，其它容器保持原配置并可按容量调整。不要移动 Docker data-root、直接截断 `/var/lib/docker/containers` 日志或为统一目录搬迁存量数据库卷。
+
+#### 更新、恢复和旧 Watchtower
+
+在线初次安装为 **检查并通知**，离线初次安装为 **仅手动**；策略保存在持久卷中，重启后不重新开启自动更新。页面还支持自动下载和维护窗口自动更新。默认每小时检查、Asia/Shanghai 02:00–05:00，支持跨午夜。引导仅给 Web 开启自动更新与兼容回退资格，API 的数据库兼容性需要管理员审查后在部署清单明确声明。
+
+每次更新先生成固定镜像摘要的计划，拉取全部镜像后才停止旧服务；任务显示当前阶段、下载字节和可计算的预计时间。API 启动后还要通过 `platform-ops-readiness` 验证租户数据库、Redis 与 V8。单副本切换会短暂中断，未知阶段不显示假倒计时。Ops 重启会恢复同一任务，成功的相同镜像不会再升级。原来停止的容器仍保持停止，匿名卷和挂载数据保留。
+
+成功切换会在真实 API/Web Compose 目录写入 `docker-compose.ops.yml`。新版一键安装/修复自动加载它；宝塔或手工 Compose 也必须同时加载原文件和覆盖文件，避免后续重建退回旧镜像：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ops.yml config --quiet
+docker compose -f docker-compose.yml -f docker-compose.ops.yml up -d
+```
+
+旧容器以 `*-ops-old-<任务>` 保留，关闭自动重启。声明兼容时健康检查失败会恢复旧容器；存在数据库不兼容或外部并发改动时保留现场等待人工处理。**镜像恢复不等于数据库恢复**，Ops 不自动清库、降级数据库、更新数据库容器或清理全机旧镜像。
+
+存量 Watchtower 只有在管理范围明确且只覆盖本次 API/Web 时，才允许通过 Ops 暂停或恢复；管理其它应用的实例须先在原编排拆分范围。恢复 Watchtower 前将 Ops 改为仅手动，暂停后同步原编排防止其它工具重建。Ops 提供吾码所需的更新能力，v1 不承诺完整兼容 Watchtower 任意 cron、钩子或通知插件，也不支持 Swarm/Kubernetes/多主机。
+
+Ops 自身更新使用宿主机上独立 Compose，不能在正在运行的控制器内自行替换自己。若 Ops 也无法使用，先确认无活动任务并停止该控制器，再执行命令行一键修复；主机或 Docker 守护进程故障仍须通过 SSH/服务器面板处理。Ops 拥有 Docker socket 管理权限，仅向主机运维管理员开放，不向普通平台用户和可编辑 V8 暴露通用 Docker 命令。
 
 #### 大文件上传的 nginx 反向代理配置
 
@@ -1883,13 +1949,10 @@ systemctl enable docker.service
 ## 📝 Docker 常用命令
 ::: details 展开查看 powershell 代码（42 行）
 ```powershell
-批量清理docker日志文件（第一个符号#要一并执行）
-#!/bin/bash
-logfiles=$(find /var/lib/docker/containers/ -type f -name *-json.log)  
-for logfile in $logfiles  
-    do 
-        cat /dev/null > $logfile  
-    done
+# Docker 标准输出通过 logging.max-size / max-file 控制轮转。
+# 导出一个明确指定的吾码容器日志，不直接修改 Docker 内部日志文件。
+mkdir -p /microi/logs/exports
+docker logs --since 24h --timestamps microi-api > /microi/logs/exports/microi-api.txt 2>&1
 
 #docker restart 容器名称/容器Id  //重启docker
 #docker stop 容器名称/容器Id  //停止docker

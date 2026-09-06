@@ -24,7 +24,7 @@ import { createV8AI } from "./v8-ai.js";
 import { reportApiServiceFailure, reportApiServiceRecovered } from "./api-service-status.js";
 import { applyLegacySysMenuConfigFallback } from "./sys-menu-legacy-compat.js";
 import { prepareCodeEditorTransport } from "./code-editor-transport.js";
-import { decodeLegacyDiyFieldSources } from "./field-source-codec.js";
+import { decodeLegacyDiyFieldSources, decodeLegacyFieldSource } from "./field-source-codec.js";
 import { normalizeTableChildFieldRelations } from "./table-child-relations.js";
 import { normalizeFormSwitchValue } from "./form-switch-value.js";
 import { createPlatformNotificationApi } from "./platform-notification.js";
@@ -5315,7 +5315,9 @@ var DiyCommon = {
                     if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
                         try {
                             console.time("Microi：【性能监控】执行全局V8引擎代码耗时");
-                            await eval("(async () => {\n " + store.state.DiyStore.SysConfig.GlobalV8Code + " \n})()");
+                            // 系统配置的旧协议会返回 Base64；仅解码经往返验证的源码，兼容明文及旧缓存。
+                            const globalV8Code = decodeLegacyFieldSource(store.state.DiyStore.SysConfig.GlobalV8Code);
+                            await eval("(async () => {\n " + globalV8Code + " \n})()");
                             console.timeEnd("Microi：【性能监控】执行全局V8引擎代码耗时");
                             DiyCommon._globalV8CodeExecuted = true; // 标记已执行
                         } catch (error) {
@@ -5423,7 +5425,9 @@ var DiyCommon = {
                 if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
                     try {
                         console.time("Microi：【性能监控】执行全局V8引擎代码耗时");
-                        eval(store.state.DiyStore.SysConfig.GlobalV8Code);
+                        // 同步初始化也必须采用相同解码边界，不能直接执行旧协议编码串。
+                        const globalV8Code = decodeLegacyFieldSource(store.state.DiyStore.SysConfig.GlobalV8Code);
+                        eval(globalV8Code);
                         console.timeEnd("Microi：【性能监控】执行全局V8引擎代码耗时");
                         DiyCommon._globalV8CodeExecuted = true; // 标记已执行
                     } catch (error) {

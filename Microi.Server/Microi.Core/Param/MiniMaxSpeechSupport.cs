@@ -79,10 +79,11 @@ namespace Microi.net
                 error = $"{speaker} 角色只允许使用固定系统音色 {expectedVoice}。";
                 return false;
             }
-            var model = (param.Model ?? "speech-2.8-hd").Trim().ToLowerInvariant();
-            if (model != "speech-2.8-hd")
+            var model = (param.Model ?? "speech-2.8-hd").Trim();
+            // 真实型号仍必须通过服务端 mic_ai 路由验证；通用协议允许配置兼容的新型号。
+            if (!AiMediaModelSupport.IsValidModelId(model))
             {
-                error = "对白画质优先规范固定使用 speech-2.8-hd。";
+                error = "配音模型标识无效，请从 AI 引擎目录重新选择。";
                 return false;
             }
             var speed = param.Speed == 0 ? 1m : param.Speed;
@@ -155,7 +156,7 @@ namespace Microi.net
                 Channel = channel,
                 Format = format,
                 RequestBody = body,
-                Fingerprint = Sha256(body),
+                Fingerprint = Sha256(body + (string.IsNullOrWhiteSpace(param.AiModelId) ? "" : "|ai-model-id:" + param.AiModelId.Trim())),
                 TextHash = Sha256(text)
             };
             return true;

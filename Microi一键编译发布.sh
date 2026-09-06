@@ -860,13 +860,44 @@ sleep 1
 # 开始执行
 # ══════════════════════════════════════════════════════════════
 
+# 测试构建也使用共享输出，先取得独占权；服务保持运行供业务回归使用。
+if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ]; then
+    print_phase "取得工作区发布独占权"
+    acquire_workspace_lock
+fi
+
+# 在升版、官方资源写入、NuGet/Docker 推送之前执行完整业务回归。
+# 此处需要仍在运行的已加载候选源码的测试 API，因此必须早于 PrepareRelease。
+# 缺少隔离测试租户/凭据、测试失败或跳过均停止发布；不能靠 AI 提示词代替门禁。
+if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
+    print_phase "发布前全量自动化测试（失败即停止）"
+    MICROI_RELEASE_CANDIDATE="$PWD/.tmp/microi-release-gate/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
+    if ! node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
+        print_fail "无法记录七个仓库的候选源码；已停止发布。"
+    fi
+    if command -v pwsh >/dev/null 2>&1; then
+        _test_powershell="pwsh"
+    elif command -v powershell.exe >/dev/null 2>&1; then
+        _test_powershell="powershell.exe"
+    else
+        print_fail "缺少 PowerShell，无法执行 Microi.Tests Full 发布门禁。"
+    fi
+    if ! "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
+        -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode Full -Configuration Release \
+        -ResultsDirectory "$PWD/.tmp/microi-release-gate/$(date +%Y%m%d-%H%M%S)"; then
+        print_fail "全量测试未通过；已停止升版、官方应用资源写入和平台发布。请修复后重跑，禁止跳过失败用例。"
+    fi
+    if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
+        print_fail "验收期间源码发生变化；必须重新加载最终候选并重跑 Full。"
+    fi
+    print_success "Microi.Tests Full 全量回归通过"
+fi
+
 # 编译/发布会改写共享输出目录，必须先取得工作区级互斥权。Windows 下随后只结束
 # 当前工作区的 61501 后端、61500 Vite 及额外 Release 后端；浏览器、VS Code、
 # Playwright Test Server、数据库和 Redis 一律不碰。这样多个 AI 共用服务时不会靠
 # “结束所有 node/dotnet/chrome”碰运气，也不会把 Release DLL 留在运行进程中。
 if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ]; then
-    print_phase "取得工作区发布独占权"
-    acquire_workspace_lock
     if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
         print_step "识别并停止当前工作区的共享开发服务，检查 Release DLL 文件锁..."
         if ! prepare_release_workspace; then
@@ -908,7 +939,7 @@ if [ "$BUMP_VERSION" = true ]; then
         ((update_count++)) || true
     done < <(
         {
-            find Microi.Server -maxdepth 2 -name "*.csproj" -not -path "*/obj/*" -not -path "*/bin/*" 2>/dev/null
+            find Microi.Server -maxdepth 2 -name "*.csproj" -not -path "*/obj/*" -not -path "*/bin/*" -not -path "*/Microi.Ops/*" 2>/dev/null
             # Windows 目录联接可以被 dotnet 正常编译，但 MSYS find 不会穿越联接枚举子仓项目。
             # 闭源包必须与平台版本同步，否则 pack 会生成上一版并被发布门禁拒绝。
             for closed_source_project in \
@@ -942,6 +973,11 @@ if [ "$BUMP_VERSION" = true ]; then
 fi
 
 # ─── 阶段（条件）: 双向同步官方升级资源 ──────────────────
+if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
+    if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
+        print_fail "升版后的源码尚未通过 Full；请用当前版本重新加载共享服务并重跑发布。Microi.Ops 保持独立版本。"
+    fi
+fi
 # 后端发布产物会把 Resource 下的基础应用打入程序集，因此必须在编译前完成
 # 本地 / iTdos 官网三方合并。仅官网有更新时无需 Token；需要写回官网时由
 # MICROI_UPGRADE_RESOURCE_TOKEN 提供管理员令牌。冲突或发布后回读不一致会终止发布。
@@ -950,7 +986,7 @@ if [ "$PUBLISH_BACKEND" = true ]; then
     if ! command -v node >/dev/null 2>&1; then
         print_fail "未找到 Node.js，无法执行升级资源三方同步"
     fi
-    if ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish --allow-verified-offline; then
+    if ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate; then
         print_fail "升级资源同步失败；已阻止后端发布，避免官网与内置应用商城互相覆盖"
     fi
     print_success "升级资源安全检查已完成（实时同步或已验证离线基线，详见上方明细）"

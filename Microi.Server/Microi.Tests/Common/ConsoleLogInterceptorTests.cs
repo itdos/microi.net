@@ -7,6 +7,18 @@ namespace Microi.Tests.Common
     public class ConsoleLogInterceptorTests
     {
         [Fact]
+        public void MqttStartupDiagnosisIsVisibleDespiteOrdinaryConsoleFiltering()
+        {
+            using var original = new StringWriter();
+            var interceptor = new ConsoleLogInterceptor(original);
+            var detail = MqttStartupDiagnostics.Describe(
+                new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.AddressAlreadyInUse), 1883);
+            interceptor.WriteLine("Microi：【❌启动失败】【MQTT】" + detail);
+            Assert.Contains("AddressAlreadyInUse", original.ToString());
+            Assert.Contains("解决方案", original.ToString());
+            Assert.Contains("Get-NetTCPConnection", original.ToString());
+        }
+        [Fact]
         public void WriteLine_KeepsOnlyPlatformCriticalMessageAndNormalizesOriginalOutput()
         {
             using var original = new StringWriter();

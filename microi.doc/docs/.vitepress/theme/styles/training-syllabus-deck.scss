@@ -1680,8 +1680,7 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
 }
 
 .mci-choice-lane::after,
-.mci-start-card::after,
-.mci-case-card::after {
+.mci-start-card::after {
   content: "";
   position: absolute;
   inset: 0 auto 0 -35%;
@@ -1889,19 +1888,108 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   }
 }
 
-.mci-case-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(14px, 1.7vw, 24px); }
-.mci-case-card { position: relative; display: grid; min-height: 340px; padding: clamp(22px, 2.2vw, 34px); overflow: hidden; border: 1px solid var(--mci-deck-line); border-radius: var(--mci-deck-radius-panel); color: var(--mci-deck-text) !important; background: var(--mci-deck-surface); box-shadow: var(--mci-deck-shadow-soft); text-decoration: none !important; }
-.mci-case-card > header { display: flex; align-items: flex-start; justify-content: space-between; }
-.mci-case-card > header span { display: grid; place-items: center; width: 62px; height: 62px; border: 1px solid var(--mci-deck-line-strong); border-radius: 18px; color: var(--mci-deck-primary); background: var(--mci-deck-primary-soft); font-family: Consolas, monospace; font-size: 16px; font-weight: 900; }
-.mci-case-card > header strong { color: var(--mci-deck-primary); font-size: clamp(27px, 2.4vw, 39px); line-height: 1; }
-.mci-case-card h3 { margin: 22px 0 15px !important; color: var(--mci-deck-text) !important; font-size: clamp(23px, 1.8vw, 31px) !important; }
-.mci-case-card > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.mci-case-card > div i { padding: 10px; border: 1px solid var(--mci-deck-line); border-radius: 10px; color: var(--mci-deck-text-soft); background: var(--mci-deck-surface-soft); font-size: clamp(12px, .94vw, 15px); font-style: normal; text-align: center; }
-.mci-case-card > small { align-self: end; margin-top: 22px; color: var(--mci-deck-primary); font-size: clamp(13px, 1vw, 16px); font-weight: 780; }
-.mci-case-proof { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 12px 16px; border: 1px solid var(--mci-deck-line); border-radius: var(--mci-deck-radius-card); background: var(--mci-deck-surface-soft); }
-.mci-case-proof > span { display: flex; align-items: baseline; gap: 6px; color: var(--mci-deck-text-soft); font-size: clamp(12px, .9vw, 15px); }
-.mci-case-proof strong { color: var(--mci-deck-text); font-size: clamp(20px, 1.55vw, 26px); }
-.mci-case-proof a { margin-left: auto; color: var(--mci-deck-primary) !important; font-size: clamp(13px, 1vw, 16px); font-weight: 780; text-decoration: none !important; white-space: nowrap; }
+/* 案例页以规模和行业场景建立层次，保持连续画布；不为非交互内容添加按钮或卡片悬浮效果。 */
+.mci-case-showcase { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); align-items: center; gap: clamp(32px, 4vw, 72px); }
+.mci-case-story { min-width: 0; }
+.mci-case-kicker { display: flex; align-items: center; gap: 10px; margin: 0 0 24px !important; color: var(--mci-deck-text-soft) !important; font-size: clamp(12px, 1vw, 16px); font-weight: 700; letter-spacing: .16em; }
+.mci-case-kicker > span { width: 22px; height: 3px; border-radius: 2px; background: var(--mci-deck-primary); }
+.mci-case-kicker > i { color: var(--mci-deck-text-soft); font-style: normal; font-weight: 400; }
+.mci-training-slide__frame .mci-case-title { margin: 0 !important; padding: 0 !important; border: 0 !important; color: var(--mci-deck-text) !important; font-size: clamp(32px, 3.2vw, 68px) !important; font-weight: 860; line-height: 1.3 !important; letter-spacing: -.045em; }
+.mci-case-title::before { display: none !important; }
+.mci-case-title > strong { color: var(--mci-deck-primary); font-weight: inherit; }
+.mci-case-lead { max-width: 31em; margin: 22px 0 0 !important; color: var(--mci-deck-text-soft) !important; font-size: clamp(13px, 1.05vw, 18px); line-height: 1.9; text-wrap: pretty; }
+.mci-case-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin: clamp(28px, 3vw, 48px) 0 0 !important; }
+.mci-case-metrics > div { display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; }
+.mci-case-metrics > div + div { padding-left: 24px; border-left: 1px solid var(--mci-deck-line-strong); }
+.mci-case-metrics dt { color: var(--mci-deck-text-soft); font-size: clamp(13px, 1.05vw, 17px); }
+.mci-case-metrics dd { display: flex; align-items: baseline; margin: 0; color: var(--mci-deck-text); font-size: clamp(46px, 4.6vw, 88px); font-weight: 760; line-height: 1; letter-spacing: -.07em; font-variant-numeric: tabular-nums; }
+.mci-case-metrics dd > span { align-self: flex-start; margin: 2px 6px 0 3px; color: var(--mci-deck-primary); font-size: .45em; line-height: 1.1; letter-spacing: 0; }
+.mci-case-metrics dd > small { font-size: clamp(12px, 1vw, 16px); font-weight: 500; letter-spacing: 0; }
+.mci-case-period { margin: 24px 0 0 !important; color: var(--mci-deck-text-soft) !important; font-size: clamp(12px, .95vw, 15px); letter-spacing: .04em; }
+.mci-case-coverage { min-width: 0; padding-left: clamp(24px, 2.5vw, 44px); border-left: 1px solid var(--mci-deck-line-strong); }
+.mci-case-coverage__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 24px; }
+.mci-case-coverage__heading > h3 { margin: 0 !important; color: var(--mci-deck-text) !important; font-size: clamp(16px, 1.45vw, 25px) !important; font-weight: 740; }
+.mci-case-coverage__heading > span { color: var(--mci-deck-text-soft); font-size: clamp(12px, .9vw, 14px); white-space: nowrap; }
+.mci-case-industries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: clamp(20px, 2.3vw, 40px); }
+.mci-case-industry { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-content: start; align-items: center; gap: 10px 12px; padding: clamp(16px, 1.3vw, 24px) 0; border-top: 1px solid var(--mci-deck-line); }
+.mci-case-industry > svg { display: block; width: 28px; height: 28px; fill: none; stroke: var(--mci-deck-primary); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.mci-case-industry > h4 { margin: 0 !important; color: var(--mci-deck-text) !important; font-size: clamp(15px, 1.23vw, 22px) !important; font-weight: 730; line-height: 1.4; }
+.mci-training-slide__frame .mci-case-industry > p { grid-column: 1 / -1; max-width: 20em; margin: 0 !important; color: var(--mci-deck-text-soft) !important; font-size: clamp(12px, .95vw, 16px); line-height: 1.85; text-wrap: pretty; }
+.mci-case-footer { flex-shrink: 0; margin-top: clamp(26px, 3.1vw, 50px); padding-top: 22px; border-top: 1px solid var(--mci-deck-line-strong); }
+.mci-case-statement { margin: 0 !important; color: var(--mci-deck-text-soft) !important; font-size: clamp(15px, 1.25vw, 22px); letter-spacing: .03em; }
+.mci-case-statement > strong { color: var(--mci-deck-text); font-weight: 680; }
+.mci-case-source { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; }
+.mci-case-source > p { margin: 0 !important; color: var(--mci-deck-text-soft) !important; font-size: clamp(12px, .85vw, 14px); line-height: 1.6; }
+.mci-case-source > a { display: inline-flex; align-items: center; justify-content: center; gap: 12px; flex-shrink: 0; min-height: 40px; padding: 0 16px; border: 1px solid var(--mci-deck-line-strong); border-radius: var(--mci-deck-radius-control); color: var(--mci-deck-text) !important; background: var(--mci-deck-surface); font-size: clamp(12px, .95vw, 15px); font-weight: 650; line-height: 1; text-decoration: none !important; transition: background-color var(--mci-deck-fast), border-color var(--mci-deck-fast); }
+.mci-case-source > a:hover,
+.mci-case-source > a:focus-visible { border-color: var(--mci-deck-primary); background: var(--mci-deck-primary-soft); }
+.mci-case-source > a:focus-visible { outline: 2px solid var(--mci-deck-primary); outline-offset: 3px; }
+.mci-case-source > a:active { background: var(--mci-deck-surface-strong); }
+
+@media (min-width: 1101px) and (max-width: 1599px) {
+  .mci-case-kicker { margin-bottom: 18px !important; }
+  .mci-case-lead { margin-top: 16px !important; }
+  .mci-case-metrics { margin-top: 28px !important; }
+  .mci-case-period { margin-top: 16px !important; }
+  .mci-case-footer { margin-top: 24px; padding-top: 16px; }
+  .mci-case-source { margin-top: 8px; }
+}
+
+@media (max-width: 1100px) {
+  #mci-training-success-cases .mci-training-slide__frame { justify-content: flex-start; overflow-y: auto; }
+  .mci-case-showcase { grid-template-columns: 1fr; gap: 36px; }
+  .mci-case-coverage { padding-left: 0; border-left: 0; }
+  .mci-case-story { max-width: 650px; }
+  .mci-case-lead { max-width: 38em; }
+  .mci-case-metrics { max-width: 440px; }
+  .mci-case-footer { margin-top: 24px; }
+  .mci-case-source { align-items: flex-start; flex-direction: column; }
+}
+
+@media (max-width: 540px) {
+  .mci-case-kicker { margin-bottom: 18px !important; }
+  .mci-case-lead { margin-top: 16px !important; }
+  .mci-case-coverage__heading { padding-bottom: 18px; }
+  .mci-case-industries { grid-template-columns: 1fr; }
+  .mci-case-industry { column-gap: 16px; row-gap: 0; padding-block: 18px; }
+  .mci-case-industry > svg { grid-row: span 2; margin: 2px 0 0; }
+  .mci-case-industry > h4 { margin-bottom: 4px !important; }
+  .mci-training-slide__frame .mci-case-industry > p { grid-column: 2; max-width: none; }
+  .mci-case-source > a { min-height: 44px; }
+}
+
+/* 导出始终使用 16:9 桌面构图，不让截图宿主的视口宽度触发移动重排。 */
+@media (min-width: 2000px) {
+  .mci-case-kicker { font-size: clamp(18px, .65vw, 24px); }
+  .mci-training-slide__frame .mci-case-title { font-size: clamp(72px, 2.8vw, 112px) !important; }
+  .mci-case-lead { font-size: clamp(18px, .75vw, 30px); }
+  .mci-case-metrics dd { font-size: clamp(104px, 4.8vw, 180px); }
+  .mci-case-metrics dt,
+  .mci-case-period { font-size: clamp(18px, .7vw, 26px); }
+  .mci-case-metrics dd > small { font-size: 22px; }
+  .mci-case-coverage__heading > h3 { font-size: clamp(26px, 1.05vw, 40px) !important; }
+  .mci-case-coverage__heading > span { font-size: clamp(16px, .6vw, 22px); }
+  .mci-case-industry { grid-template-columns: 38px minmax(0, 1fr); gap: 16px; padding-block: clamp(24px, 1vw, 38px); }
+  .mci-case-industry > svg { width: 38px; height: 38px; }
+  .mci-case-industry > h4 { font-size: clamp(24px, 1vw, 36px) !important; }
+  .mci-training-slide__frame .mci-case-industry > p { font-size: clamp(18px, .66vw, 25px); }
+  .mci-case-statement { font-size: clamp(24px, .9vw, 34px); }
+  .mci-case-source > p,
+  .mci-case-source > a { font-size: clamp(16px, .6vw, 22px); }
+  .mci-case-source > a { min-height: 48px; }
+}
+
+.mci-training-deck.is-artifact-capture .mci-case-showcase { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); gap: 64px; }
+.mci-training-deck.is-artifact-capture .mci-case-title { font-size: 64px !important; }
+.mci-training-deck.is-artifact-capture .mci-case-lead { font-size: 18px; }
+.mci-training-deck.is-artifact-capture .mci-case-metrics dd { font-size: 88px; }
+.mci-training-deck.is-artifact-capture .mci-case-coverage { padding-left: 40px; border-left: 1px solid var(--mci-deck-line-strong); }
+.mci-training-deck.is-artifact-capture .mci-case-industries { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mci-training-deck.is-artifact-capture .mci-case-industry { display: block; padding: 26px 0; }
+.mci-training-deck.is-artifact-capture .mci-case-industry > svg { margin-bottom: 12px; }
+.mci-training-deck.is-artifact-capture .mci-case-industry > h4 { margin-bottom: 8px !important; font-size: 22px !important; }
+.mci-training-deck.is-artifact-capture .mci-case-industry > p { font-size: 16px; }
+.mci-training-deck.is-artifact-capture .mci-case-source { flex-direction: row; align-items: center; }
 
 @media (hover: hover) {
   .mci-atlas-domain a:hover,
@@ -1909,13 +1997,11 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-start-ai a:hover,
   .mci-device-links a:hover { border-color: var(--mci-deck-primary); color: var(--mci-deck-primary) !important; }
   .mci-start-card:hover,
-  .mci-atlas-architecture:hover,
-  .mci-case-card:hover { transform: translateY(-5px); }
+  .mci-atlas-architecture:hover { transform: translateY(-5px); }
 }
 
 .mci-training-slide.is-active .mci-choice-lane::after,
-.mci-training-slide.is-active .mci-start-card::after,
-.mci-training-slide.is-active .mci-case-card::after { animation: mciDeckCardScan 5.8s var(--mci-deck-ease) both; animation-delay: calc(var(--mci-deck-order, 0) * 130ms); }
+.mci-training-slide.is-active .mci-start-card::after { animation: mciDeckCardScan 5.8s var(--mci-deck-ease) both; animation-delay: calc(var(--mci-deck-order, 0) * 130ms); }
 .mci-training-slide.is-active .mci-choice-stack span { animation: mciDeckNodeFloat 4.4s ease-in-out infinite; animation-delay: calc(var(--mci-deck-order, 0) * 120ms); }
 .mci-training-slide.is-active .mci-why-hub__ring.is-a,
 .mci-training-slide.is-active .mci-mcp-orbit::before,
@@ -1931,8 +2017,7 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
 .mci-training-slide.is-active .mci-engine-visual > b { animation: mciDeckNodeFloat 3.8s ease-in-out infinite; }
 .mci-training-slide.is-active .mci-engine-visual > b:nth-of-type(2n) { animation-delay: .6s; }
 .mci-training-slide.is-active .mci-atlas-architecture::after { animation: mciDeckBreathe 4.6s ease-in-out infinite; }
-.mci-training-slide.is-active .mci-device-node > span,
-.mci-training-slide.is-active .mci-case-card > header > span { animation: mciDeckNodeFloat 4s ease-in-out infinite; animation-delay: calc(var(--mci-deck-order, 0) * 90ms); }
+.mci-training-slide.is-active .mci-device-node > span { animation: mciDeckNodeFloat 4s ease-in-out infinite; animation-delay: calc(var(--mci-deck-order, 0) * 90ms); }
 
 @keyframes mciDeckCardScan {
   0%, 15% { opacity: 0; transform: translateX(0) skewX(-16deg); }
@@ -1958,7 +2043,6 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-atlas-domain > header strong { font-size: clamp(17px, .56vw, 21px); }
   .mci-engine-content blockquote { font-size: clamp(27px, .92vw, 35px); }
   .mci-engine-doc-link { min-height: 54px; font-size: clamp(16px, .56vw, 20px); }
-  .mci-case-card > div i { font-size: clamp(15px, .52vw, 19px); }
   .mci-training-slide__frame .mci-engine-visual__core > small,
   .mci-training-slide__frame .mci-mcp-orbit > div small { font-size: 14px; }
   .mci-training-slide__frame .mci-engine-demo li i { width: 27px; height: 27px; font-size: 13px; }
@@ -1968,8 +2052,7 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-training-slide__frame .mci-choice-lane > header span,
   .mci-training-slide__frame .mci-start-ai > div > span,
   .mci-training-slide__frame .mci-start-ai nav a,
-  .mci-training-slide__frame .mci-choice-verdict > span,
-  .mci-training-slide__frame .mci-case-card > small { font-size: 16px; }
+  .mci-training-slide__frame .mci-choice-verdict > span { font-size: 16px; }
   .mci-training-slide__frame .mci-mcp-orbit > b { font-size: 16px; }
   .mci-training-slide__frame .mci-start-card > strong { font-size: 17px; }
 }
@@ -2030,11 +2113,6 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-device-node { min-height: 98px; }
   .mci-device-node strong { font-size: 23px; }
   .mci-device-node small { font-size: 17px; }
-  .mci-case-card { min-height: 470px; }
-  .mci-case-card h3 { font-size: 39px !important; }
-  .mci-case-card > div i { font-size: 21px; }
-  .mci-case-proof > span,
-  .mci-case-proof a { font-size: 20px; }
   .mci-training-slide__frame article p,
   .mci-training-slide__frame article small { font-size: 21px; }
   .mci-training-slide__frame .mci-choice-lane > p { font-size: 23px; }
@@ -2049,7 +2127,6 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-training-slide__frame .mci-start-ai > div > span,
   .mci-training-slide__frame .mci-start-ai nav a,
   .mci-training-slide__frame .mci-choice-verdict > span,
-  .mci-training-slide__frame .mci-case-card > small,
   .mci-training-slide__frame .mci-deck-closing__signal span,
   .mci-training-slide__frame .mci-deck-closing > small:last-child { font-size: 18px; }
   .mci-training-slide__frame .mci-mcp-orbit > div span,
@@ -2065,7 +2142,6 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-training-slide__frame .mci-mcp-flow article > span { font-size: 18px; }
   .mci-training-slide__frame .mci-atlas-domain a i,
   .mci-training-slide__frame .mci-engine-demo li i { font-size: 18px; }
-  .mci-training-slide__frame .mci-case-card > header span,
   .mci-training-slide__frame .mci-mcp-flow article > i,
   .mci-training-slide__frame .mci-mcp-proof > strong { font-size: 20px; }
   .mci-training-slide__frame .mci-device-node > span { min-width: 62px; height: 50px; font-size: 18px; }
@@ -2153,10 +2229,6 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-device-core::after { display: none; }
   .mci-device-node { position: relative !important; inset: auto !important; width: 100%; min-height: 68px; }
   .mci-device-links { flex: 0 0 auto; flex-wrap: wrap; }
-  .mci-case-grid { grid-template-columns: 1fr; }
-  .mci-case-card { min-height: 280px; }
-  .mci-case-proof { flex-wrap: wrap; }
-  .mci-case-proof a { flex-basis: 100%; margin-left: 0; }
   .mci-deck-eyebrow { font-size: 10px !important; }
   .mci-engine-visual__core > small,
   .mci-mcp-orbit > div small,
@@ -2265,12 +2337,10 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
 .mci-training-deck.is-artifact-capture .mci-device-node:nth-of-type(8) { inset: auto auto 2% 21% !important; }
 .mci-training-deck.is-artifact-capture .mci-device-node:nth-of-type(9) { inset: auto 21% 2% auto !important; }
 .mci-training-deck.is-artifact-capture .mci-device-node:nth-of-type(10) { inset: auto 1% 2% auto !important; }
-.mci-training-deck.is-artifact-capture .mci-case-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 @media print {
   .mci-choice-map { grid-template-columns: 1fr 1.45in 1fr !important; }
-  .mci-start-paths,
-  .mci-case-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .mci-start-paths { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
   .mci-atlas-layout,
   .mci-mcp-stage,
   .mci-engine-layout { grid-template-columns: .82fr 1.18fr !important; }

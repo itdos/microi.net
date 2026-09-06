@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.9.24
+ * Version: v1.9.25
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -201,6 +201,24 @@ function getFiles(appId) {
     _OrderByType: 'ASC',
     _PageSize: 5000
   });
+}
+function currentSourceFiles(rows, activePrefix) {
+  var result = [], seen = {};
+  var prefix = text(activePrefix).replace(/\\/g, '/').replace(/\/$/, '');
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i] || {}, scope = text(row.StorageScope).toLowerCase();
+    if (!isBlank(row.VersionId) || Number(row.IsDirectory || 0) === 1 || Number(row.IsDeleted || 0) === 1) continue;
+    if (scope && scope !== 'private' && scope !== 'privatesource' && scope !== 'privatesourcestaged') continue;
+    var hdfs = text(row.HdfsPath || row.FilePathName).replace(/\\/g, '/');
+    if (prefix && hdfs.indexOf(prefix + '/') !== 0) continue;
+    var path = sourceArchivePath(row.FilePath || row.FileName);
+    if (!path) continue;
+    var key = path.toLowerCase();
+    if (seen[key]) throw new Error('当前源码存在重复路径，已停止打包：' + path);
+    seen[key] = true; result.push(row);
+  }
+  result.sort(function(a, b) { var left = text(a.FilePath), right = text(b.FilePath); return left < right ? -1 : left > right ? 1 : 0; });
+  return result;
 }
 function getLatestVersion(appId) {
   return V8.FormEngine.GetTableData('mci_ai_app_version', {
@@ -2231,7 +2249,9 @@ if (isOfflineAction) {
   packageModel.ApplicationBundle.BuildAssets = buildAssets;
   if (includeSource) {
     var storedSourceFiles = getFiles(app.Id);
-    var storedSourceRows = storedSourceFiles && storedSourceFiles.Code === 1 ? toArray(storedSourceFiles.Data) : [];
+    if (!storedSourceFiles || storedSourceFiles.Code !== 1) return fail('读取当前私有源码失败，已停止制作不完整安装包。');
+    if (Number(storedSourceFiles.DataCount || 0) > 5000) return fail('当前文件清单超过单次打包上限，不能截断源码。');
+    var storedSourceRows = currentSourceFiles(toArray(storedSourceFiles.Data), app.PrivateSourcePath);
     for (var sourceIndex = 0; sourceIndex < storedSourceRows.length; sourceIndex++) {
       var storedSource = storedSourceRows[sourceIndex] || {};
       var sourcePath = sourceArchivePath(storedSource.FilePath || storedSource.FileName || ('source-' + sourceIndex));

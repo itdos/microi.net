@@ -47,6 +47,7 @@ var source = {
 | 裁剪 | `V8.Image.Crop` | `X`、`Y`、`Width`、`Height` |
 | 旋转或翻转 | `V8.Image.Rotate` / `Flip` | `Degrees`、`Expand` / `Horizontal`、`Vertical` |
 | 转换输出格式 | `V8.Image.Convert` | `OutputFormat`、`Quality` |
+| 纯色背景透明化 | `V8.Image.RemoveSolidBackground` | `ChromaKeyColor`、`EdgeConnectedOnly`、`SuppressGreenSpill`、`Tolerance`、`Feather`；绿色主体不启用去溢绿 |
 | 在现有图片上绘制 | `V8.Image.Draw` | `Elements` |
 | 添加常规图片水印 | `V8.Image.Watermark` | `BaseImage`、`Watermark`、`Position`、`Opacity` |
 | 生成二维码 | `V8.Image.CreateQRCode` | `Content`、`Size` |

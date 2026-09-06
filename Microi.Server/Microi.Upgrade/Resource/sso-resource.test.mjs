@@ -36,7 +36,7 @@ function executableBody(source) {
 test('SSO official package has stable identity and no tenant data', () => {
   assert.equal(resource.PackageInfo.Name, 'SSO 身份联邦');
   assert.equal(resource.PackageInfo.AppId, 'app.microi.sso');
-  assert.equal(resource.PackageInfo.Version, 'v7.5.9');
+  assert.equal(resource.PackageInfo.Version, 'v7.6.0');
   assert.equal(resource.PackageInfo.ApplicationType, 'Platform');
   assert.deepEqual(resource.PackageInfo.RequiredPlatformCapabilities, [
     'ApiEngine:sso_capabilities',

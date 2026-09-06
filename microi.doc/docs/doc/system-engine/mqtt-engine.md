@@ -381,6 +381,10 @@ await mqttService.PublishAsync(
 
 ## 常见问题
 
+::: details 控制台提示 MQTT 启动失败，如何直接定位原因？
+启动失败会在控制台直接列出监听端口、底层异常原因和对应处理建议，并把同一份脱敏信息写入系统日志 `Type=MQTT`。端口占用先用 Windows 的 `Get-NetTCPConnection -State Listen` 或 Linux 的 `ss -ltnp` 核对监听 PID；复用已有 Broker 或在 SaaS 引擎调整端口，避免多个 API 节点重复监听。端口被系统保留、服务账号权限不足、证书文件缺失或 PFX 密码错误会给出各自的检查项。不要为消除提示结束其它服务；只重启已经核实归属的 MQTT 节点。
+:::
+
 ::: details 子租户已经启用 MQTT，为什么仍然连不上？
 先确认主租户已启用并让 Broker 成功启动，再确认子租户有独立的完整账号密码、`MqttApiEngine` 和正确的租户前缀。子租户配置自己的 `MqttPort` 不会新开一个 Broker 端口。
 :::

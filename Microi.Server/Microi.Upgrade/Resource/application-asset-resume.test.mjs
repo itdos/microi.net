@@ -282,7 +282,8 @@ function metadataHarness({ seed = [], loseWrite = false, pathHashColumn = true, 
   };
   const quote = source.match(/var quotePhysicalIdentifier = function \([^]*?\n\};/)[0];
   const firstText = source.match(/var firstTextParam = function \([^]*?\n\};/)[0];
-  vm.runInNewContext([quote, firstText, ...[
+  const nowText = source.match(/var nowText = function \([^]*?\n\};/)[0];
+  vm.runInNewContext([quote, firstText, nowText, ...[
     'normalizeApplicationPath', 'applicationFileName', 'applicationFileType',
     'applicationFileSha256Bytes', 'applicationFileSha256Base64', 'applicationAssetCurrentPredicate',
     'readCurrentApplicationAssetRows', 'loadExistingApplicationAssets', 'persistApplicationAsset', 'reuseApplicationAsset'

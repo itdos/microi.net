@@ -5,6 +5,21 @@ namespace Microi.Tests.Common;
 public sealed class MiniMaxImageSupportTests
 {
     private const string OnePixelPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+    [Fact]
+    public void ReferenceEditingDoesNotRewriteTheUserInstruction()
+    {
+        var ok = MiniMaxImageSupport.TryNormalize(new MiniMaxImageGenerateParam
+        {
+            RequestId = "image:reference-no-expansion",
+            Operation = "erase",
+            Prompt = "移除图片中的男人",
+            ReferenceImages = new() { new() { FileName = "source.png", DataUrl = OnePixelPng } }
+        }, out var normalized, out var error);
+        Assert.True(ok, error);
+        Assert.Contains("\"prompt_optimizer\":false", normalized.RequestBody);
+        Assert.Equal("移除图片中的男人", normalized.Prompt);
+    }
     [Theory]
     [InlineData("帮我副一张美女图片")]
     [InlineData("请生成一张山水插画")]
@@ -49,9 +64,9 @@ public sealed class MiniMaxImageSupportTests
     }
 
     [Theory]
-    [InlineData("MiniMax-M3", "当前对话图片生成只允许 image-01")]
-    [InlineData("image-01-live", "当前对话图片生成只允许 image-01")]
-    public void TryNormalize_RejectsConversationOrUnapprovedImageModels(string model, string expectedError)
+    [InlineData("image model with spaces", "所选模型")]
+    [InlineData("image-01\r\nAuthorization: x", "所选模型")]
+    public void TryNormalize_RejectsInvalidModelIdentifiers(string model, string expectedError)
     {
         var ok = MiniMaxImageSupport.TryNormalize(
             new MiniMaxImageGenerateParam

@@ -50,6 +50,29 @@ SaaS 引擎官方应用继续负责租户发现、公开启动配置、语言包
 >* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internal"，`DbConn=`"Data Source=192.168.1.11;Database=microi_dev"时，代表使用了`内网IP`+`测试环境数据库`
 >* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internet"，`DbConn`="Data Source=59.110.139.95;Database=microi_dev"时，代表使用了`公网IP`+`测试环境数据库`
 
+### 租户未找到、缓存恢复与运行登记
+
+“未找到 OsClient”应先核对 API 部署的三个参数与主库登记是否一致。例如，租户只有 `Product / Internet` 登记时，`Product / Internal` 节点不能直接使用它。新版运行时在本节点和共享缓存都未找到租户时，会按当前环境、当前网络从主库重新加载一次；同一节点上的并发加载会合并，加载期间的递归调用也会被阻止。该恢复过程不切换网络，也不会启用已禁用或已删除的租户。
+
+对于历史自助开通租户缺少部署网络登记的情况，更新包含该能力的后端平台，并安装 SaaS 引擎应用 v8.1.3 或更高版本后，主租户超级管理员可调用 Managed 接口 `platform-tenant-runtime-registration`。先检查计划：
+
+```js
+{ TenantKey: 'tenant_demo', TargetNetwork: 'Internal', Apply: false }
+```
+
+确认目标节点能够连接原租户数据库后，再提交：
+
+```js
+{ TenantKey: 'tenant_demo', TargetNetwork: 'Internal', Apply: true,
+  Confirm: 'REGISTER:tenant_demo:Internal' }
+```
+
+目标网络必须已有唯一、启用的主租户登记，来源必须是同环境下唯一、启用且有所有者的自助租户。后端用分布式租约、确定的记录 Id 和写入后回读保证重复请求不重复创建；已有目标登记（包括禁用或删除记录）不会被覆盖。原数据库和数据库凭据保持不变，共享 Redis、对象存储等基础设施由目标网络主租户继承。完成后调用 `clear-saas-engine-cache` 刷新目标租户，并从实际访问域名验证系统配置与登录页面。
+
+个人中心按租户 Key 合并不同网络登记，额度也按独立租户计数。查看管理员密码仍先核验当前 DiyToken 与租户所有者关系，再解析目标租户；现代单向密码哈希不能还原原文，不能通过补登记或缓存恢复绕过这一限制。
+
+历史空库还可能带有 `admin.PwdEncode=V8`，而开通器只更新了实际为 DES 的密码密文。新版开通器会同步写入可验证的密码编码；未知自定义编码保持原规则。对于这类存量错标记录，SaaS 应用 v8.1.4 提供 `platform-tenant-admin-credential-repair`：先传 `{ TenantKey: 'tenant_demo', Apply: false }` 预检，确认 `CanRepair=true` 后再传 `Apply:true` 与 `Confirm:'REPAIR-ENCODING:tenant_demo'`。可信后端验证 DES 解密再加密的结果完全一致，并以原密文和原编码作条件，只把编码标记改为 DES；密码内容不会变化，也不会返回给修复接口。该操作仍要求主租户超级管理员与支持该能力的新版后端。真正的自定义算法、单向哈希以及并发改密后的记录不会被误修复。
+
 ## 安全、脱敏与平台级配置
 
 `sys_osclients` 包含数据库、认证、Redis、对象存储、MQ/MQTT、搜索等基础设施机密，不能通过普通 FormEngine、前端 V8 或接口返回整行数据。

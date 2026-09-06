@@ -1,0 +1,20 @@
+{
+  "id": "microi-production", "name": "吾码生产平台",
+  "platformApiBase": "https://api.example.com", "platformOsClient": "your-osclient",
+  "watchtowerName": "",
+  "allowedImageRepositories": ["registry.cn-hangzhou.aliyuncs.com/microios/microi-api", "registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev"],
+  "services": [
+    {
+      "name": "microi-api", "role": "api", "repository": "registry.cn-hangzhou.aliyuncs.com/microios/microi-api", "tag": "latest",
+      "composeProject": "microi", "composeService": "microi-api", "composeDirectory": "/microi/compose/platform",
+      "requireDockerHealth": false, "readyUrl": "https://api.example.com/apiengine/platform-ops-readiness?OsClient=your-osclient", "readyContains": "\"Ready\"",
+      "allowAutomatic": false, "imageRollbackCompatible": false, "readyTimeoutSeconds": 300
+    },
+    {
+      "name": "microi-client", "role": "web", "repository": "registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev", "tag": "latest",
+      "composeProject": "microi", "composeService": "microi-client", "composeDirectory": "/microi/compose/platform",
+      "requireDockerHealth": false, "readyUrl": "https://web.example.com/", "readyContains": "<html",
+      "allowAutomatic": true, "imageRollbackCompatible": true
+    }
+  ]
+}

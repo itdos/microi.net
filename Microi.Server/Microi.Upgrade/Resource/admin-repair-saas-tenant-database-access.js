@@ -9,6 +9,9 @@
 
 /* V8 ApiEngine | ApiEngineKey: admin_repair_saas_tenant_database_access | Version: v1.0.3 */
 
+// 普通租户扩展归 platform-runtime-custom-hook（CreateIfMissing）；本接口固定的数据库
+// 修复原子不接收 Hook 传入的连接材料，也不把连接秘密暴露给可编辑脚本。
+
 var param = V8.Param || {};
 var currentUser = V8.CurrentUser || {};
 var allowedInputKeys = {

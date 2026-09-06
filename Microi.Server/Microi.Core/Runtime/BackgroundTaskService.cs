@@ -149,7 +149,8 @@ namespace Microi.net
                    || string.Equals(
                        apiEngineKey,
                        DatabaseBackupService.WorkerApiEngineKey,
-                       StringComparison.OrdinalIgnoreCase);
+                       StringComparison.OrdinalIgnoreCase)
+                   || AiImageBackgroundTaskService.IsImageWorker(apiEngineKey);
         }
 
         public static BackgroundTaskItem StartApiEngine(
@@ -382,13 +383,12 @@ namespace Microi.net
                 LogFailure(osClient, "DatabaseTaskSummaryListFailed", "读取数据库后台任务摘要失败", ex, userKey);
             }
 
-            var all = ListLegacyCache(osClient, userKey)
+            var all = ListCachedSummaries(osClient, userKey)
                 .OrderByDescending(item => item.CreateTime)
                 .ToList();
             dataCount = all.Count;
             return all.Skip((pageIndex - 1) * pageSize)
                 .Take(pageSize)
-                .Select(ToSummary)
                 .ToList();
         }
 
@@ -407,8 +407,8 @@ namespace Microi.net
             {
                 LogFailure(osClient, "DatabaseTaskDetailFailed", "读取数据库后台任务详情失败", ex, userKey);
             }
-            item ??= ListLegacyCache(osClient, userKey)
-                .FirstOrDefault(value => string.Equals(value.Id, taskId, StringComparison.OrdinalIgnoreCase));
+            // Execution details are owner-scoped database reads. Redis only holds
+            // summaries; never scan historical full-payload task hashes here.
             if (item == null) return null;
             var detail = JObject.FromObject(ToSummary(item)).ToObject<BackgroundTaskDetail>()
                          ?? new BackgroundTaskDetail { Id = item.Id };
@@ -430,9 +430,9 @@ namespace Microi.net
             {
                 LogFailure(osClient, "DatabaseTaskStatusFailed", "读取数据库后台任务状态失败", ex, userKey);
             }
-            var item = ListLegacyCache(osClient, userKey)
+            var item = ListCachedSummaries(osClient, userKey)
                 .FirstOrDefault(value => string.Equals(value.Id, taskId, StringComparison.OrdinalIgnoreCase));
-            return item == null ? null : ToSummary(item);
+            return item;
         }
 
         public static int ClearCompleted(string osClient, string userKey)
@@ -547,7 +547,7 @@ namespace Microi.net
             }
         }
 
-        internal static bool IsCurrentExecutionOwner(string taskId, long fencingToken)
+        public static bool IsCurrentExecutionOwner(string taskId, long fencingToken)
         {
             if (taskId.DosIsNullOrWhiteSpace()
                 || !ActiveExecutions.TryGetValue(taskId, out var active)
@@ -720,10 +720,10 @@ namespace Microi.net
                             item = BackgroundTaskStore.TryClaimTenant(
                                 queueHint.OsClient,
                                 NodeId,
-                                BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
+                                AiImageBackgroundTaskService.ExcludeUnsupportedWorkers(BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
                                     queueHint.OsClient,
                                     running,
-                                    parallelism),
+                                    parallelism), MicroiEngine.TryGetService<IAiImageTaskRuntime>() != null),
                                 queueHint.IsTenantRecovery ? null : queueHint.ApiEngineKey,
                                 false,
                                 () =>
@@ -754,10 +754,10 @@ namespace Microi.net
                                 tenant =>
                                 {
                                     var excluded = new HashSet<string>(
-                                        BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
+                                        AiImageBackgroundTaskService.ExcludeUnsupportedWorkers(BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
                                             tenant,
                                             running,
-                                            parallelism),
+                                            parallelism), MicroiEngine.TryGetService<IAiImageTaskRuntime>() != null),
                                         StringComparer.OrdinalIgnoreCase);
                                     if (forceRecoveryScan
                                         && string.Equals(
@@ -1046,10 +1046,9 @@ namespace Microi.net
                 // push turned active jobs into a database polling loop. Transport the
                 // fresh projection and keep the controller List endpoint as the explicit
                 // authoritative reconciliation path.
-                var projected = ListLegacyCache(osClient, userKey)
+                var projected = ListCachedSummaries(osClient, userKey)
                     .OrderByDescending(item => item.CreateTime)
                     .Take(15)
-                    .Select(ToSummary)
                     .ToList();
                 await RealtimePushRuntime.SendAsync(
                         clientInfo.ConnectionIds,
@@ -1272,6 +1271,15 @@ namespace Microi.net
                             param["TriggerType"]?.ToString() ?? "Manual",
                             ParseInt(param["RetainCount"], 7),
                             selectedTenants);
+                    }
+                    else if (AiImageBackgroundTaskService.IsImageWorker(item.ApiEngineKey))
+                    {
+                        // 原生图片任务由持久队列提供可信身份与生命周期；不能通过租户
+                        // 创建同名接口引擎替换供应商密钥隔离和生成幂等原子。
+                        var runtime = MicroiEngine.TryGetService<IAiImageTaskRuntime>();
+                        if (runtime == null) throw new InvalidOperationException("当前节点缺少 AI 图片持久任务运行时，请完整更新平台后端。");
+                        rawResult = await runtime.RunAsync(item.Id, item.FencingToken, item.OsClient,
+                            trustedUser, param, cancellation.Token).ConfigureAwait(false);
                     }
                     else
                     {
@@ -1580,8 +1588,7 @@ namespace Microi.net
             {
                 var cache = MicroiEngine.CacheTenant.Cache(item.OsClient);
                 var scope = GetItemRuntimeScope(item);
-                cache.HashSet(GetTaskHashKey(item.OsClient, item.UserKey, scope.Type, scope.Network),
-                    item.Id, ApplyRuntimeFields(item), When.Always, CommandFlags.FireAndForget);
+                WriteSummaryProjection(cache, item, scope.Type, scope.Network);
                 // Do not leave a stale pre-scope projection behind after an upgraded
                 // node has persisted the authoritative scoped projection.
                 cache.HashDelete(
@@ -1594,6 +1601,16 @@ namespace Microi.net
             {
                 LogFailure(item.OsClient, "RedisTaskWriteFailed", "保存 Redis 后台任务投影失败", ex, item.Id);
             }
+        }
+
+        internal static void WriteSummaryProjection(
+            IMicroiCache cache, BackgroundTaskItem item, string runtimeType, string runtimeNetwork)
+        {
+            // BackgroundTaskRecord additionally carries ParamJson, ResultJson,
+            // CheckpointJson and TrustedUserJson. Never serialize its runtime type
+            // into the cache used by notification pushes and pruning.
+            cache.HashSet(GetTaskHashKey(item.OsClient, item.UserKey, runtimeType, runtimeNetwork),
+                item.Id, ToSummary(item), When.Always, CommandFlags.FireAndForget);
         }
 
         private static void QueueProjectionPrune(
@@ -1625,21 +1642,26 @@ namespace Microi.net
 
         private static List<BackgroundTaskItem> ListLegacyCache(string osClient, string userKey)
         {
+            return ListCachedSummaries(osClient, userKey)
+                .Select(summary => JObject.FromObject(summary).ToObject<BackgroundTaskItem>())
+                .Where(item => item != null)
+                .ToList();
+        }
+
+        private static List<BackgroundTaskSummary> ListCachedSummaries(string osClient, string userKey)
+        {
             try
             {
                 var cache = MicroiEngine.CacheTenant.Cache(osClient ?? "");
-                var scoped = cache.HashGetAllValues<BackgroundTaskItem>(GetTaskHashKey(
+                // Old nodes keep their old namespace during rolling upgrades.
+                // Reconcile their rows from the shared database, never HVALS their
+                // complete logs, package results and trusted execution payloads.
+                return cache.HashGetAllValues<BackgroundTaskSummary>(GetTaskHashKey(
                     osClient, userKey,
                     BackgroundTaskStore.CurrentRuntimeOsClientType(),
-                    BackgroundTaskStore.CurrentRuntimeOsClientNetwork())) ?? new List<BackgroundTaskItem>();
-                // One-way rolling-upgrade compatibility. New writes remove their
-                // corresponding legacy entry, so this fallback naturally disappears.
-                return scoped.Count > 0
-                    ? scoped
-                    : cache.HashGetAllValues<BackgroundTaskItem>(GetLegacyTaskHashKey(osClient, userKey))
-                      ?? new List<BackgroundTaskItem>();
+                    BackgroundTaskStore.CurrentRuntimeOsClientNetwork())) ?? new List<BackgroundTaskSummary>();
             }
-            catch { return new List<BackgroundTaskItem>(); }
+            catch { return new List<BackgroundTaskSummary>(); }
         }
 
         private static void RemoveLegacyCompleted(string osClient, string userKey, bool succeededOnly, string taskId)
@@ -1650,7 +1672,7 @@ namespace Microi.net
                 var key = GetTaskHashKey(osClient, userKey,
                     BackgroundTaskStore.CurrentRuntimeOsClientType(),
                     BackgroundTaskStore.CurrentRuntimeOsClientNetwork());
-                var removeIds = cache.HashGetAllValues<BackgroundTaskItem>(key)
+                var removeIds = cache.HashGetAllValues<BackgroundTaskSummary>(key)
                     ?.Where(item => item != null
                                     && (taskId.DosIsNullOrWhiteSpace() || item.Id == taskId)
                                     && (!succeededOnly || item.Status == "Succeeded"))
@@ -1686,7 +1708,7 @@ namespace Microi.net
             try
             {
                 var key = GetTaskHashKey(osClient, userKey, runtimeOsClientType, runtimeOsClientNetwork);
-                var list = cache.HashGetAllValues<BackgroundTaskItem>(key) ?? new List<BackgroundTaskItem>();
+                var list = cache.HashGetAllValues<BackgroundTaskSummary>(key) ?? new List<BackgroundTaskSummary>();
                 if (list.Count <= 100) return;
                 var removeIds = list.OrderByDescending(item => IsTerminal(item.Status))
                     .ThenBy(item => item.CreateTime)
@@ -1713,7 +1735,7 @@ namespace Microi.net
             return item;
         }
 
-        private static BackgroundTaskSummary ToSummary(BackgroundTaskItem item)
+        internal static BackgroundTaskSummary ToSummary(BackgroundTaskItem item)
         {
             item = ApplyRuntimeFields(item);
             if (item == null) return null;
@@ -1729,7 +1751,7 @@ namespace Microi.net
                 ProgressMode = item.ProgressMode,
                 Current = item.Current,
                 Total = item.Total,
-                Msg = item.Msg,
+                Msg = Limit(item.Msg, 2000),
                 CreateTime = item.CreateTime,
                 StartTime = item.StartTime,
                 EndTime = item.EndTime,
@@ -1766,7 +1788,7 @@ namespace Microi.net
             string runtimeOsClientType,
             string runtimeOsClientNetwork)
         {
-            return $"Microi:{osClient ?? ""}:BackgroundTasks:{ScopeKey(runtimeOsClientType, runtimeOsClientNetwork)}:{userKey ?? ""}";
+            return $"Microi:{osClient ?? ""}:BackgroundTaskSummaries:V2:{ScopeKey(runtimeOsClientType, runtimeOsClientNetwork)}:{userKey ?? ""}";
         }
 
         public static string GetScopedChatOnlineKey(

@@ -122,10 +122,13 @@ var result = V8.Image.GetInfo({ Bytes: response.RawBytes });
 | `V8.Image.Rotate(param)` | 旋转图片 |
 | `V8.Image.Flip(param)` | 水平或垂直翻转 |
 | `V8.Image.Convert(param)` | 转换编码格式 |
+| `V8.Image.RemoveSolidBackground(param)` | 纯色背景透明化，支持指定抠像色和边缘连通限制 |
 | `V8.Image.Draw(param)` | 在原图上绘制文字和图形 |
 | `V8.Image.Watermark(param)` | 按锚点添加图片水印 |
 | `V8.Image.CreateQRCode(param)` | 生成二维码 |
 | `V8.Image.GetInfo(param)` | 读取图片元数据，不重新编码 |
+
+`RemoveSolidBackground` 参数：内存图片来源、`Tolerance`（默认 36）、`Feather`（默认 24）、可选 `ChromaKeyColor`（如 `#00ff00`）、`EdgeConnectedOnly`（默认 false）、`SuppressGreenSpill`（默认 false）。开启边缘连通限制可保护主体内部同色区域；封闭背景孔洞可能保留，需检查输出。专门生成的纯绿幕素材可指定绿色并开启去溢绿，清除封闭绿幕孔洞及边缘混色；主体本身为绿色时不得开启。未指定抠像色时估计四角背景色。输出固定 PNG，输入上限为 20,000,000 像素，不接受任意图片 URL。
 
 ## Create 生成图片
 

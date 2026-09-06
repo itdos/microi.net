@@ -15,6 +15,7 @@ namespace Microi.net
         public string Prompt { get; set; }
         public string Model { get; set; }
         public string AspectRatio { get; set; }
+        public string Resolution { get; set; }
         public int Count { get; set; }
         public string Operation { get; set; }
         public IReadOnlyList<NormalizedMiniMaxImageReference> ReferenceImages { get; set; }
@@ -38,6 +39,16 @@ namespace Microi.net
     /// <summary>MiniMax 图片生成参数白名单与确定性语义识别。</summary>
     public static class MiniMaxImageSupport
     {
+        /// <summary>图片 API 只接受供应商官方 HTTPS 源；不能借模型配置形成任意 URL 请求。</summary>
+        public static bool IsOfficialApiOrigin(Uri uri)
+        {
+            return uri != null && uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort
+                && string.IsNullOrEmpty(uri.UserInfo)
+                && (string.Equals(uri.Host, "api.minimaxi.com", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(uri.Host, "api.minimax.cn", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(uri.Host, "api.minimax.io", StringComparison.OrdinalIgnoreCase));
+        }
+
         private static readonly HashSet<string> AllowedAspectRatios = new HashSet<string>(StringComparer.Ordinal)
         {
             "1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"
@@ -98,10 +109,10 @@ namespace Microi.net
                 error = "图片描述长度必须为 1-1500 个字符。";
                 return false;
             }
-            var model = (param.Model ?? "image-01").Trim().ToLowerInvariant();
-            if (model != "image-01")
+            var model = (param.Model ?? "image-01").Trim();
+            if (!Regex.IsMatch(model, @"^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,119}$"))
             {
-                error = "当前对话图片生成只允许 image-01。";
+                error = "所选模型尚未接入图片协议，请在 AI 引擎中选择支持图片的模型。";
                 return false;
             }
             var aspectRatio = (param.AspectRatio ?? "1:1").Trim();
@@ -111,6 +122,12 @@ namespace Microi.net
                 return false;
             }
             var count = param.Count == 0 ? 1 : param.Count;
+            var resolution = param.Resolution?.Trim().ToUpperInvariant();
+            if (!string.IsNullOrEmpty(resolution) && !new[] { "1K", "2K", "4K" }.Contains(resolution))
+            {
+                error = "图片分辨率档位只支持 1K、2K、4K。";
+                return false;
+            }
             if (count < 1 || count > 4)
             {
                 error = "单次对话只允许生成 1-4 张图片。";
@@ -190,7 +207,8 @@ namespace Microi.net
                 ["aspect_ratio"] = aspectRatio,
                 ["response_format"] = "base64",
                 ["n"] = count,
-                ["prompt_optimizer"] = true,
+                // 参考图编辑必须保留用户操作语义，避免提示词扩写器把“移除”等命令改成新场景。
+                ["prompt_optimizer"] = references.Count == 0,
                 ["aigc_watermark"] = false
             };
             if (width.HasValue)
@@ -207,13 +225,17 @@ namespace Microi.net
                 ["operation"] = operation,
                 ["post_process"] = postProcess,
                 ["reference_sha256"] = new JArray(references.Select(item => item.Sha256))
-            }.ToString(Formatting.None);
+            };
+            // 旧客户端省略该字段时保持历史指纹；显式切换路由必须成为另一份请求。
+            if (!string.IsNullOrWhiteSpace(param.AiModelId)) fingerprintSource["ai_model_id"] = param.AiModelId.Trim();
+            if (!string.IsNullOrEmpty(resolution)) fingerprintSource["resolution"] = resolution;
             normalized = new NormalizedMiniMaxImageRequest
             {
                 RequestId = requestId,
                 Prompt = prompt,
                 Model = model,
                 AspectRatio = aspectRatio,
+                Resolution = resolution,
                 Count = count,
                 Operation = operation,
                 ReferenceImages = references,
@@ -222,7 +244,7 @@ namespace Microi.net
                 Seed = param.Seed,
                 PostProcess = postProcess,
                 RequestBody = requestBody,
-                Fingerprint = Sha256(fingerprintSource)
+                Fingerprint = Sha256(fingerprintSource.ToString(Formatting.None))
             };
             return true;
         }

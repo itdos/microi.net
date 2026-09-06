@@ -102,6 +102,7 @@ public class FormEngineTenantBoundaryTests
     [Theory]
     [InlineData("sys_osclients")]
     [InlineData("sys_config")]
+    [InlineData("mci_global_function")]
     [InlineData("sys_apiengine")]
     [InlineData("diy_table")]
     [InlineData("diy_field")]
@@ -251,7 +252,7 @@ public class FormEngineTenantBoundaryTests
     [Fact]
     public void ClientFormEngine_PlatformPolicyContainsExactDistinctTableSet()
     {
-        Assert.Equal(56, PlatformResourceSecurity.PlatformTableNames.Count);
+        Assert.Equal(57, PlatformResourceSecurity.PlatformTableNames.Count);
         Assert.Equal(
             PlatformResourceSecurity.PlatformTableNames.Count,
             PlatformResourceSecurity.PlatformTableNames

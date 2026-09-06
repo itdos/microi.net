@@ -109,6 +109,15 @@ $env:MICROI_TEST_OSCLIENT = "integration-test"
 $env:MICROI_TEST_TOKEN = "<测试租户超级管理员Token>"
 $env:MICROI_TEST_FORM_ENGINE_KEY = "mci_release_gate"
 $env:MICROI_TEST_API_ENGINE_KEY = "release_gate_echo"
+$env:MICROI_TEST_CHILD_OSCLIENT = "integration-child"
+$env:MICROI_TEST_CHILD_TOKEN = "<子租户测试管理员Token>"
+$env:MICROI_TEST_FRONTEND_BASE = "http://localhost:61500"
+$env:MICROI_TEST_ACCOUNT = "<主租户测试账号>"
+$env:MICROI_TEST_PASSWORD = "<主租户测试密码>"
+$env:MICROI_TEST_CHILD_ACCOUNT = "<子租户测试账号>"
+$env:MICROI_TEST_CHILD_PASSWORD = "<子租户测试密码>"
+$env:MICROI_UPGRADE_TEST_CONN = "<127.0.0.1:62606 上 upgrade_fixture 独立 MySQL 测试库连接>"
+$env:MICROI_UPGRADE_SQLSERVER_TEST_CONN = "<127.0.0.1,62616 上 upgrade_fixture 独立 SQL Server 测试库连接>"
 $env:MICROI_TEST_ALLOW_WRITES = "YES"
 .\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Full
 ```
@@ -119,7 +128,13 @@ Full 会依次执行：
 2. FormEngine 单条、批量、按条件新增/查询/计数/修改/删除的真实 HTTP 闭环。
 3. ApiEngine 的 GET、JSON POST 调用。
 4. 以唯一前缀清理本次测试数据，并输出 TRX/覆盖率结果。
-5. NuGet 易受攻击包和弃用包审计。
+5. MySQL/SQL Server 结构升级、主租户指定子租户的平台应用维护、子租户安装/更新全部平台应用、幂等重复提交和 `Succeeded/100%` 终态；再次执行时应为 `Planned=0`。
+6. 在独立浏览器 Context 中使用真实账号密码登录，验证通知中心按钮和后台任务完成；官方 iTdos 发布源应隐藏给自身安装应用的按钮。
+7. NuGet 易受攻击包和弃用包审计。
+
+一键编译发布脚本在后端发布或前端构建之前强制执行 Full：缺少环境、凭据、零用例、失败或跳过均停止发布。测试时共享服务必须已经加载候选源码；取得发布锁后只使用现有服务，测试通过才停止服务并开始升版和发布。文档专用选项 6 不触发后端业务测试。AI 发布话术还应要求在 VS Code 扩展发布之前先运行同一门禁，话术不能替代脚本检查。
+
+主、子租户必须在同一维护控制面的有效租户目录中；必要时用 `MICROI_TEST_CONTROL_API_BASE`、`MICROI_TEST_CHILD_API_BASE` 指定各自入口。详细变量和测试边界见源码 `Microi.Server/Microi.Tests/README.md`，报告应区分本地候选与已部署远端的结果。
 
 测试表至少包含一个可写短文本字段（默认 `Name`，其它名称可通过
 `MICROI_TEST_NAME_FIELD` 指定）。`MICROI_TEST_ALLOW_WRITES=YES` 是强制保护，

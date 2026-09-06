@@ -17,6 +17,15 @@
   执行 FormEngine 单条、批量、按条件 CRUD、查询、计数，以及 ApiEngine
   GET/POST 调用，最后清理本次唯一前缀的数据；同时覆盖 API 实际启动、健康
   检查、真实 Token、匿名系统配置脱敏和数据库连接串兼容。
+  还会运行独立 MySQL/SQL Server 结构升级夹具、主租户指定子租户维护、子租户
+  安装/更新全部平台应用、重复幂等提交、任务成功终态及零更新复跑；最后通过
+  独立浏览器 Context 完成真实登录和通知中心按钮操作。官方 iTdos 是发布源，
+  测试其控制子租户的维护能力，并断言不会出现给自身安装应用的按钮。
+
+`Microi一键编译发布.sh` 在发布后端或构建前端时自动调用 `Full`：先取得发布锁，
+保持已加载候选源码的共享服务供测试使用，通过后再停止服务、改版本及发布。
+缺少变量、零用例、失败或跳过均阻止发布；文档专用选项 6 不触发后端业务门禁。
+AI 发布话术仍需要求在 VS Code 扩展发布前执行同一门禁，不能替代脚本检查。
 
 Quick：
 
@@ -32,9 +41,24 @@ $env:MICROI_TEST_OSCLIENT = "integration-test"
 $env:MICROI_TEST_TOKEN = "<super-admin-test-token>"
 $env:MICROI_TEST_FORM_ENGINE_KEY = "mci_release_gate"
 $env:MICROI_TEST_API_ENGINE_KEY = "release_gate_echo"
+$env:MICROI_TEST_CHILD_OSCLIENT = "integration-child"
+$env:MICROI_TEST_CHILD_TOKEN = "<child-admin-test-token>"
+$env:MICROI_TEST_FRONTEND_BASE = "http://localhost:61500"
+$env:MICROI_TEST_ACCOUNT = "<main-test-account>"
+$env:MICROI_TEST_PASSWORD = "<main-test-password>"
+$env:MICROI_TEST_CHILD_ACCOUNT = "<child-test-account>"
+$env:MICROI_TEST_CHILD_PASSWORD = "<child-test-password>"
+$env:MICROI_UPGRADE_TEST_CONN = "<isolated MySQL upgrade_fixture connection on 127.0.0.1:62606>"
+$env:MICROI_UPGRADE_SQLSERVER_TEST_CONN = "<isolated SQL Server upgrade_fixture connection on 127.0.0.1,62616>"
 $env:MICROI_TEST_ALLOW_WRITES = "YES"
 .\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Full
 ```
+
+主、子租户应来自同一维护控制面的有效租户目录。默认所有 HTTP 测试访问
+`MICROI_TEST_API_BASE`；本地节点与生产子租户处于不同网络分组时，可分别指定
+`MICROI_TEST_CONTROL_API_BASE`、`MICROI_TEST_CHILD_API_BASE`。应在报告中分别注明
+本地候选源码和远端已部署代码的验收范围，不能用远端成功声称本地代码已经上线。
+各 Token 的设备标识必须与 `MICROI_TEST_DID`（默认 `Microi.Tests`）一致。
 
 测试表至少要有一个可写短文本字段，默认名为 `Name`；若不同，设置
 `MICROI_TEST_NAME_FIELD`。测试会写入

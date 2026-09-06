@@ -33,7 +33,7 @@ npm run build
 
 ## SEO、AI 搜索与错误页
 
-站点沿用 `https://www.microi.net` 为规范主域，文章沿用 `.html` 地址、目录首页使用末尾 `/`。`microi.net` 和 `doc.microi.net` 在 nginx 归一到主域；省略 `.html`、多余的末尾 `/` 和 `index.html` 在目标页面存在时通过 301 归一，并保留 query。失效地址返回真实 HTTP 404，同时展示含文档、首页和常用入口的官网错误页。不要将不存在的文档统一跳转到首页。
+站点使用对外推广域名 `https://microi.net` 为规范主域，不带 www。文章沿用 `.html` 地址、目录首页使用末尾 `/`。`www.microi.net` 和 `doc.microi.net` 在 nginx 归一到主域；省略 `.html`、多余的末尾 `/` 和 `index.html` 在目标页面存在时通过 301 归一，并保留 query。失效地址返回真实 HTTP 404，同时展示含文档、首页和常用入口的官网错误页。不要将不存在的文档统一跳转到首页。
 
 `robots.txt` 允许公开脚本、样式、字体、图片及中英文文档被抓取。登录、个人资料与仅靠查询参数打开的应用详情页保留正常访问，使用 `noindex, follow`，并从 sitemap 中排除。这个指令是搜索展示策略，不是权限控制。
 
@@ -52,7 +52,7 @@ npm run check:seo:http -- --base http://127.0.0.1:61513 --check-alias-hosts
 
 ### ESA 中转到群晖：上线前必须核对
 
-1. **回源 Host**：`www.microi.net` 必须以 `Host: www.microi.net` 到达此 nginx，通常选择跟随请求 Host；群晖反向代理也须接受该主机名。若 ESA 固定将所有请求改成 `Host: microi.net`，源站会持续跳向 www，产生循环。先修正这一配置，或在 ESA 完成别名跳转并将规范请求以 www 回源。不要依赖客户端可伪造的任意转发 Header 决定可信主域。
+1. **回源 Host**：`microi.net` 必须以 `Host: microi.net` 到达此 nginx，通常选择跟随请求 Host；群晖反向代理也须接受该主机名。已有固定回源 Host 为 `microi.net` 的配置符合规范主域；若固定为 `www.microi.net`，则需先调整，以免别名跳转形成循环。别名可在 ESA 完成 301，或保留访客 Host 交由此 nginx 处理。不要依赖客户端可伪造的任意转发 Header 决定可信主域。
 2. **HTTPS 与证书**：在 ESA 访客侧强制 HTTPS；源站仍可按实际网络使用 HTTP。本文 nginx 不根据源站 `$scheme` 强制 HTTPS，以免代理后方循环；别名跳转使用固定 HTTPS 主域。
 3. **404 透传**：关闭把源站 404 改写成首页或平台错误页的规则，保留源站状态码和响应体。部署后清理旧 robots、sitemap、HTML 和历史错误页的 ESA 缓存，再实际访问失效链接，确认既有官网 UI 又是 404。
 4. **搜索引擎身份识别**：在安全分析/事件中查看 Baiduspider 是否命中 WAF、频控、JS Challenge 或验证码。结合 UA 与反向解析确认真实蜘蛛后，使用 ESA 合法搜索引擎识别能力处理误报；不要仅按任意自报 UA 放开整个站点，也不要全局关闭安全防护。[ESA Bots 说明](https://help.aliyun.com/zh/edge-security-acceleration/esa/user-guide/identify-and-handle-bots-traffic)
