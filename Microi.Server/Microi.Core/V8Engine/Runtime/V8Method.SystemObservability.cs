@@ -426,9 +426,16 @@ namespace Microi.net
                 row.OS,
                 row.RequestMethod,
                 row.Timer,
-                row.CreateTime,
-                row.OccurredAt
+                CreateTime = ObservabilityLocalTime(row.CreateTime),
+                OccurredAt = row.OccurredAt.HasValue ? ObservabilityLocalTime(row.OccurredAt.Value) : (DateTime?)null
             };
+        }
+
+        // MongoDB 返回 UTC，旧平台 JSON 日期协议输出无时区的本地时间文本；在输出边界转换，
+        // 避免 Ops 补投等带 UTC 事件在页面少显示 8 小时，不改变数据库里的真实时间点。
+        internal static DateTime ObservabilityLocalTime(DateTime value)
+        {
+            return value.Kind == DateTimeKind.Utc ? value.ToLocalTime() : value;
         }
 
         private static string SanitizeLogPayload(string value, int max)

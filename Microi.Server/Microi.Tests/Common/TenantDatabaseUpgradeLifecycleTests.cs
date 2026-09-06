@@ -1,4 +1,5 @@
 using System.Reflection;
+using Dos.Common;
 using Microi.net;
 
 namespace Microi.Tests.Common;
@@ -21,6 +22,44 @@ public sealed class TenantDatabaseUpgradeLifecycleTests
             provisioningSource.Replace("\r\n", "\n"), StringComparison.Ordinal);
         Assert.Contains("不能把未升级的租户标记为创建成功", provisioningSource, StringComparison.Ordinal);
         Assert.Contains("CompensateProvisioningFailure(", provisioningSource, StringComparison.Ordinal);
+        Assert.Contains("EnsureProvisionedTenantRuntimeAsync(\n                    upgrade, OsClientExtend.GetClient(osClient))",
+            provisioningSource.Replace("\r\n", "\n"), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(1, 1, "physical,dependencies", 1)]
+    [InlineData(0, 1, "physical", 0)]
+    [InlineData(1, 0, "physical,dependencies", 0)]
+    public async Task ProvisionedTenantRequiresCurrentRuntimeEvenWhenDatabaseVersionIsCurrent(
+        int physicalCode, int dependencyCode, string expectedCalls, int expectedCode)
+    {
+        var upgrade = new ProvisioningUpgradeProbe(physicalCode, dependencyCode);
+        var client = new OsClientSecret { OsClient = "provisioning-test" };
+        var result = await TenantProvisioningService.EnsureProvisionedTenantRuntimeAsync(upgrade, client);
+        Assert.Equal(expectedCode, result.Code);
+        Assert.Equal(expectedCalls, string.Join(",", upgrade.Calls));
+        Assert.Same(client, upgrade.Client);
+        Assert.Equal(physicalCode != 1 ? "physical" : "dependencies", result.Msg);
+    }
+
+    private sealed class ProvisioningUpgradeProbe(int physicalCode, int dependencyCode) : IMicroiUpgrade
+    {
+        public List<string> Calls { get; } = new();
+        public OsClientSecret? Client { get; private set; }
+        public Task<DosResult> EnsureRuntimePhysicalPrerequisitesAsync(OsClientSecret client, CancellationToken cancellationToken = default)
+        {
+            Client = client; Calls.Add("physical");
+            return Task.FromResult(new DosResult(physicalCode, null, "physical"));
+        }
+        public Task<DosResult> EnsureStartupDependenciesAsync(OsClientSecret client, CancellationToken cancellationToken = default)
+        {
+            Assert.Same(Client, client); Calls.Add("dependencies");
+            return Task.FromResult(new DosResult(dependencyCode, null, "dependencies"));
+        }
+        public Task<DosResult> UpgradeTenantAsync(string osClient, string backgroundTaskId = null!, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("Runtime readiness must not replay historical migrations.");
+        public Task<DosResultList<MicroiUpgradeResult>> Upgrade(string currentVersion, OsClientSecret client)
+            => throw new InvalidOperationException("Runtime readiness must not replay historical migrations.");
     }
 
     [Fact]

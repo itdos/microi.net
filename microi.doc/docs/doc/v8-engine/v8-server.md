@@ -483,6 +483,12 @@ var result = await V8.ApiEngine.RunAsync('ApiEngineKey', { Id: id });
 
 ## 常用函数 V8.Method
 
+### 全局日期与函数库
+
+`DateNow(format)`、`DateFormat(date, format)`、`DateAdd(date, unit, amount, format)` 由后端引擎初始化提供，不依赖系统设置表是否已安装。`DateAdd` 支持 `s/m/h/d/w/M/q/y`；大写 `M` 是月，小写 `m` 是分钟；月末或闰年加减会截到目标月的有效日期。
+
+“系统设置”应用的 `mci_global_function` 子表可按前端/后端维护具名函数。函数库与原有全局脚本合并后按租户缓存，不会把合并结果写回覆盖用户脚本；保存记录后在真实提交时失效。原有同名自定义函数优先，详见[系统全局函数](../more/sys-config.md#系统全局函数)。`V8.Method.ValidateGlobalFunction(name, code)` 只做语法与单函数声明校验，返回标准 DosResult，不执行代码。
+
 `V8.Method` 同时包含业务工具、管理员运维能力和平台内部能力。普通业务脚本优先使用下列稳定接口；数据库备份、清空数据库、认证缓存维护等管理方法不能作为普通业务 API 暴露。
 
 ::: details 展开查看 JavaScript 代码
@@ -794,10 +800,13 @@ var result = V8.Base64.Base64ToString('MTIzNDU2');
 | `V8.Image.Rotate(param)` | 旋转图片 |
 | `V8.Image.Flip(param)` | 水平或垂直翻转 |
 | `V8.Image.Convert(param)` | 转换图片编码格式 |
+| `V8.Image.RemoveSolidBackground(param)` | 将纯色背景透明化，输出 PNG |
 | `V8.Image.Draw(param)` | 在已有图片上绘制文字和图形 |
 | `V8.Image.Watermark(param)` | 添加图片水印 |
 | `V8.Image.CreateQRCode(param)` | 生成二维码 |
 | `V8.Image.GetInfo(param)` | 读取宽高、格式、帧数等信息 |
+
+`RemoveSolidBackground` 接收内存图片及 `Tolerance`、`Feather`，输入最多 20,000,000 像素。可用 `ChromaKeyColor: '#00ff00'` 指定抠像色，并以 `EdgeConnectedOnly: true` 只处理连接画布边缘的背景，保留主体内部同色区域。专门生成的纯绿幕素材还可开启 `SuppressGreenSpill: true`，清除手臂间封闭绿幕并压低边缘溢绿；主体本身有绿色时不应开启。省略这些参数保持四角估色与全图匹配的兼容行为。该方法是确定性颜色处理，不能替代语义分割。
 
 `Create` 的专用参数：
 

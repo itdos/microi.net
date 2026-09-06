@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeOfficialApiEnginePolicies } from './official-api-engine-notice.mjs';
 import { normalizeOfficialPackageExecutionLimits } from './resource-sync-core.mjs';
+import { compareSemanticVersions } from './application-store-replica-sync.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const baseRoot = path.join(root, '.resource-sync-base');
@@ -147,17 +148,17 @@ export const packageDefinitions = Object.freeze([
   Object.freeze({
     file: 'app.microi.ai-engine.json',
     name: 'AI助手',
-    version: 'v7.6.6',
+    version: 'v7.7.2',
     bootstrapUrl: 'https://static.itdos.com/itdos/microi-store/packages/01kggwkhpq6hw8axdaz4n94rq2/202608/app_microi_ai-engine-v6_3_4-efb7fcdf70c2f467.json',
     bootstrapSha256: 'efb7fcdf70c2f467ffd99b72581b15bcd8790ad977a3ba1f78b33cfd71069763',
     bootstrapSize: 732784,
-    history: '2026-09-04 v7.6.6 修复 AI助手自动语义识别在无附件请求中把空数组绑定到 .NET List 时触发 IConvertible 异常的问题，数据查询可正确进入安全业务数据模式。',
-    changeLogTitle: '修复 AI 语义识别空附件参数异常',
-    changeType: 'BugFix',
-    changeLogContent: '修复 AI助手自动语义识别在无附件请求中因空数组类型绑定失败而降级为普通对话的问题；同时保护空对话历史参数，数据查询可正确进入安全业务数据模式。',
-    releaseTime: '2026-09-04 07:30:00',
+    history: '2026-09-06 v7.7.2 助手接口显式允许所有已登录账号（含 OnlyGet 只读角色）调用，仍保持匿名关闭与业务数据独立授权；延续默认常规对话、模型开关、媒体过滤和分域范围校验。',
+    changeLogTitle: '所有角色默认可对话，业务数据权限独立校验',
+    changeType: 'Fix',
+    changeLogContent: '新增模型管理“所有角色可常规对话”，默认开启且存量空值兼容开启。已登录无角色、无业务数据权限和策略引用旧模型的账号可使用当前开放模型常规对话。助手接口通过平台 $authenticated 标记允许 OnlyGet 只读角色调用，不修改角色只读设置，也不放开其它接口。数据分析仍要求角色策略、数据域、模型白名单及行级范围，不把对话开放转换为全库权限；多角色范围按每个数据域与模型独立合并。普通问答不自动查询全部业务域，历史数据对话不进入无权限常规问答上下文。模型缺失和上游不可用单独报告，不再冒充角色未开通。保留租户现有策略、模型配置、密钥和会话数据。',
+    releaseTime: '2026-09-06 12:20:00',
     capabilities: [
-      'ApiEngine:mci_ai_data_assistant@v1.1.5',
+      'ApiEngine:mci_ai_data_assistant@v1.1.8',
       'ApiEngine:platform-ai-account@v1.1.0',
       'ApiEngine:platform-ai-runtime@v1.0.0',
       'ApiEngine:platform-ai-runtime@v1.1.0',
@@ -174,6 +175,10 @@ export const packageDefinitions = Object.freeze([
       'V8.Image.RemoveSolidBackground',
       'ServerField:sys_apiengine.ApiRoutes',
       'ClientFeature:AiWorkbenchDirectoryV2',
+      'ServerFeature:AiImageDurableTasksV1',
+      'ClientFeature:AiImageTaskPollingV1',
+      'ServerFeature:AiMediaModelDirectoryV1',
+      'ClientFeature:AiMediaModelSelectionV1',
     ],
     exactEngineKeys: [
       'mci_ai_data_assistant',
@@ -694,20 +699,14 @@ function configureEngine(packageModel, definition) {
 function configureAiDataAssistant(packageModel) {
   const engine = (packageModel.SysApiEngines || []).find(item => item.ApiEngineKey === 'mci_ai_data_assistant');
   if (!engine) throw new Error('app.microi.ai-engine.json 缺少 mci_ai_data_assistant。');
-  let code = String(engine.ApiV8Code || '');
-  code = code.replace(/Version:\s*v1\.1\.4/g, 'Version: v1.1.5');
-  const anchor = "  var action = String(V8.Param.Action || V8.Param.action || 'chat').toLowerCase();";
-  const hookMarker = 'AI_DATA_ASSISTANT_SAFE_TENANT_HOOK_V1';
-  if (!code.includes(hookMarker)) {
-    if (!code.includes(anchor)) throw new Error('mci_ai_data_assistant 缺少安全 Hook 注入锚点。');
-    const hook = `${anchor}\n\n  // ${hookMarker}: 只暴露动作名，不把问题、回答、数据行、模型或凭据交给租户 Hook。\n  var tenantHook = V8.ApiEngine.Run('platform-ai-custom-hook', {\n    Stage: 'BeforeDataAssistantAction',\n    SourceApiEngineKey: 'mci_ai_data_assistant',\n    Action: action\n  });\n  if (!tenantHook || tenantHook.Code !== 1) {\n    return tenantHook || { Code: 0, Msg: 'AI助手个性化 Hook 未返回结果。' };\n  }`;
-    code = code.replace(anchor, hook);
-  }
-  engine.ApiV8Code = normalizeSource(code);
-  engine.Version = 'v1.1.5';
+  engine.ApiV8Code = normalizeSource(fs.readFileSync(path.join(root, 'mci-ai-data-assistant.js'), 'utf8'));
+  engine.Version = 'v1.1.8';
+  // OnlyGet 角色也可调用此受管接口；业务读权限仍由引擎按域与模型校验。
+  engine.ApiRole = JSON.stringify(['$authenticated']);
+  engine.AllowAnonymous = 0;
   engine.ChangeHistory = prependOnce(
     engine.ChangeHistory,
-    '2026-08-25 v1.1.5 增加仅传动作名的 AI助手 CreateIfMissing Hook，不泄露问题、回答、数据、模型或凭据。',
+    '2026-09-06 v1.1.8 默认开放常规对话，按数据域与模型独立校验业务数据权限，支持无角色账号和有效对话模型动态发现；纯媒体型号不进入对话清单。',
   );
   packageModel.ResourcePolicies ||= { SchemaVersion: 1, ApiEngines: {} };
   packageModel.ResourcePolicies.ApiEngines ||= {};
@@ -715,6 +714,102 @@ function configureAiDataAssistant(packageModel) {
     Ownership: 'Platform',
     UpgradePolicy: 'Managed',
   };
+}
+
+
+// 官方母版回读后的媒体元数据；安装仅增补结构，不携带任何供应商账号或租户配置行。
+export const aiMediaModelFields = [
+  {
+    Id: '01M1TCN4MZ7QD5YCAG4MHPNBY4',
+    TableId: '88711c13-1e65-4ff1-9d40-0de85e551d81',
+    TableName: 'mic_ai', Name: 'AllowAllRolesChat', Label: '所有角色可常规对话',
+    Type: 'int', Component: 'Switch', Tab: '基础配置', Sort: 35,
+    Visible: 1, AppVisible: 1, Readonly: 0, NotEmpty: 0, DefaultValue: '1',
+    TableWidth: 140, FormWidth: null, Data: '', Config: '', NameConfirm: 1, IsLockField: 1,
+    CreateTime: '2026-09-06 11:37:08',
+    Description: '默认开启。所有已登录账号（包括未分配角色）可使用此模型常规对话；不授予业务数据、SQL、菜单或管理权限。业务数据仍按角色策略中的数据域、范围和模型白名单校验。关闭后此模型仅供显式授权角色使用；存量空值按开启兼容。'
+  },
+  {
+    "Id": "01M1SS738BPN9Q2NVM2N2E5QAY",
+    "TableId": "88711c13-1e65-4ff1-9d40-0de85e551d81",
+    "Name": "MediaModels",
+    "Label": "媒体模型目录",
+    "Type": "mediumtext",
+    "Component": "CodeEditor",
+    "Description": "JSON 数组，例如 [{\"Id\":\"image-01\",\"Name\":\"图片生成\",\"Capability\":\"image\",\"Protocol\":\"minimax-image\"}]。Capability 可为 image/music/video/speech；模型与协议分开配置，供应商密钥继续使用 ApiKey。中转站可留空并实时发现目录；只返回已实现协议，配置未知协议时明确提示。",
+    "Visible": 1,
+    "AppVisible": 1,
+    "Readonly": 0,
+    "NotEmpty": 0,
+    "Sort": 210,
+    "Tab": "高级配置",
+    "Data": "",
+    "Config": "",
+    "FormWidth": 24,
+    "TableWidth": 160,
+    "DefaultValue": "",
+    "CreateTime": "2026-09-06 05:57:25",
+    "TableName": "mic_ai",
+    "NameConfirm": 1,
+    "IsLockField": 1
+  },
+  {
+    "Id": "01M1SS72J5NWXNJEVSXXSGZNG3",
+    "TableId": "88711c13-1e65-4ff1-9d40-0de85e551d81",
+    "Name": "MediaProtocol",
+    "Label": "媒体默认协议",
+    "Type": "varchar(50)",
+    "Component": "Select",
+    "Description": "媒体模型的默认协议，可在媒体模型目录中为每个模型覆盖；未配置保持存量兼容，未知协议不会调用上游。",
+    "Visible": 1,
+    "AppVisible": 1,
+    "Readonly": 0,
+    "NotEmpty": 0,
+    "Sort": 200,
+    "Tab": "高级配置",
+    "Data": "[{\"Key\":\"auto\",\"Value\":\"按模型自动识别\"},{\"Key\":\"minimax\",\"Value\":\"MiniMax 媒体协议\"},{\"Key\":\"openai-image\",\"Value\":\"GPT Image 兼容协议\"}]",
+    "Config": "{\"DataSource\":\"KeyValue\",\"SelectLabel\":\"Value\",\"SelectSaveField\":\"Key\",\"SelectSaveFormat\":\"Text\",\"EnableSearch\":false,\"DataSourceSqlRemote\":false}",
+    "TableWidth": 130,
+    "DefaultValue": "",
+    "CreateTime": "2026-09-06 05:57:24",
+    "TableName": "mic_ai",
+    "NameConfirm": 1,
+    "IsLockField": 1
+  }
+];
+
+function configureAiMediaModelFields(model) {
+  const table = model.DiyTables.find(x => x.Name === 'mic_ai');
+  if (!table) throw new Error('AI 模型管理表缺失，不能交付媒体目录');
+  // OAuth 加密信封可能长于旧版 500 字符；扩容只调整结构，不携带或覆盖租户密钥。
+  const credentialField = model.DiyFields.find(x => x.TableId === table.Id && x.Name === 'ApiKey');
+  if (credentialField) credentialField.Type = 'mediumtext';
+  const credentialColumn = model.PhysicalColumns.find(x => x.TABLE_NAME === 'mic_ai' && x.COLUMN_NAME === 'ApiKey');
+  if (credentialColumn) Object.assign(credentialColumn, { COLUMN_TYPE: 'mediumtext', DATA_TYPE: 'mediumtext' });
+  const protocol = aiMediaModelFields.find(x => x.Name === 'MediaProtocol');
+  const protocolOptions = JSON.parse(protocol.Data);
+  if (!protocolOptions.some(x => x.Key === 'minimax-connector-image')) {
+    protocolOptions.push({ Key: 'minimax-connector-image', Value: 'MiniMax Code 图像编辑（OAuth）' });
+    protocol.Data = JSON.stringify(protocolOptions);
+  }
+  const names = new Set(aiMediaModelFields.map(x => x.Name));
+  model.DiyFields = model.DiyFields.filter(x => !(x.TableId === table.Id && names.has(x.Name)));
+  model.DiyFields.push(...aiMediaModelFields.map(x => ({ ...x, TableId: table.Id })));
+  model.PhysicalColumns = model.PhysicalColumns.filter(x => !(x.TABLE_NAME === 'mic_ai' && names.has(x.COLUMN_NAME)));
+  const last = Math.max(0, ...model.PhysicalColumns.filter(x => x.TABLE_NAME === 'mic_ai').map(x => Number(x.ORDINAL_POSITION) || 0));
+  model.PhysicalColumns.push(...aiMediaModelFields.map((x, i) => ({
+    TABLE_NAME: 'mic_ai', COLUMN_NAME: x.Name, COLUMN_TYPE: x.Type, DATA_TYPE: x.Type.split('(')[0],
+    IS_NULLABLE: 'YES', COLUMN_DEFAULT: null, COLUMN_COMMENT: x.Label, COLUMN_KEY: '', EXTRA: '', ORDINAL_POSITION: last + i + 1
+  })));
+  const ddl = model.DDLStatements.find(x => x.TableName === 'mic_ai');
+  if (!ddl) throw new Error('AI 模型管理表 DDL 缺失');
+  ddl.DDL = ddl.DDL.replace(/(`ApiKey`\s+)varchar\(500\)/i, '$1mediumtext');
+  const missing = aiMediaModelFields.filter(x => !ddl.DDL.includes('`' + x.Name + '`'));
+  if (missing.length) {
+    const end = ddl.DDL.lastIndexOf(')');
+    if (end < 0) throw new Error('AI 模型管理表 DDL 不完整');
+    ddl.DDL = ddl.DDL.slice(0, end).trimEnd() + ',\n' + missing.map(x => '  `' + x.Name + '` ' + x.Type + " NULL COMMENT '" + x.Label + "'").join(',\n') + '\n' + ddl.DDL.slice(end);
+  }
 }
 
 export function configurePackageModel(packageModel, definition) {
@@ -740,6 +835,7 @@ export function configurePackageModel(packageModel, definition) {
   if (definition.file === 'app.microi.ai-engine.json') {
     configureAiDataAssistant(packageModel);
     configureAiRuntimeSchemas(packageModel);
+    configureAiMediaModelFields(packageModel);
   }
   if (definition.file === 'app.microi.sys_user.json') {
     configureSysUserAiApiKey(packageModel);
@@ -761,7 +857,8 @@ export function configurePackageModel(packageModel, definition) {
   }
 
   const info = packageModel.PackageInfo;
-  info.Version = definition.version;
+  const preserveNewerRelease = compareSemanticVersions(info.Version, definition.version) > 0;
+  if (!preserveNewerRelease) info.Version = definition.version;
   info.ApiEngineCount = packageModel.SysApiEngines.length;
   const capabilityName = value => String(value || '').split('@')[0];
   const replacedCapabilityNames = new Set(definition.capabilities.map(capabilityName));
@@ -774,7 +871,7 @@ export function configurePackageModel(packageModel, definition) {
     ...definition.capabilities,
   ]));
   info.ChangeHistory = prependOnce(info.ChangeHistory, definition.history);
-  info.ChangeLog = {
+  if (!preserveNewerRelease) info.ChangeLog = {
     Version: definition.version,
     Title: definition.changeLogTitle || 'V8 引擎优先与租户个性化扩展',
     ChangeType: definition.changeType || 'Feature',

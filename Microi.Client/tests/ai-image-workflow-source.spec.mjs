@@ -14,10 +14,10 @@ test("unified AI page previews FileServer images and plays generated music inlin
     assert.match(source, /AI音乐/);
     assert.match(source, /mode === "image"[\s\S]*sendImageQuestion/);
     assert.match(source, /mode === "music"[\s\S]*sendMusicQuestion/);
-    assert.match(source, /\/api\/Ai\/GenerateMiniMaxImage/);
+    assert.match(source, /generateMiniMaxImage\(/);
     assert.match(source, /\/api\/Ai\/GenerateMiniMaxMusic/);
-    assert.match(source, /Model: "image-01"/);
-    assert.match(source, /Model: "music-2\.6"/);
+    assert.match(source, /AiModelId: chatImageModel\.value\.AiModelId/);
+    assert.match(source, /AiModelId: chatMusicModel\.value\.AiModelId/);
     assert.match(source, /Storage: item\?\.Storage \|\| "Microi\.HDFS"/);
     assert.match(source, /class="generated-image-card"/);
     assert.match(source, /<el-image[\s\S]*:preview-src-list="imagePreviewList\(file\)"/);

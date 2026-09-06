@@ -9,6 +9,75 @@
 
 set -e
 
+
+# Ops 写入的镜像摘要覆盖始终紧随原编排，临时修复覆盖仍拥有最后优先级。
+microi_compose() {
+  local args=("$@") effective=() base='' inserted=0 item index
+  for item in "${args[@]}"; do
+    case "$item" in *docker-compose.ops.yml) docker compose "${args[@]}"; return $? ;; esac
+  done
+  for ((index=0; index<${#args[@]}; index++)); do
+    item="${args[index]}"
+    effective+=("$item")
+    if [ "$item" = '-f' ] && [ "$inserted" = 0 ]; then
+      index=$((index+1)); base="${args[index]}"; effective+=("$base"); inserted=1
+      if [ -f "$(dirname "$base")/docker-compose.ops.yml" ]; then
+        effective+=('-f' "$(dirname "$base")/docker-compose.ops.yml")
+      fi
+    fi
+  done
+  if [ "$inserted" = 0 ] && [ -f './docker-compose.ops.yml' ]; then
+    case "${args[0]:-}" in config|up|pull|ps|stop|start|restart|down)
+      effective=('-f' './docker-compose.yml' '-f' './docker-compose.ops.yml' "${effective[@]}") ;;
+    esac
+  fi
+  docker compose "${effective[@]}"
+}
+
+microi_install_ops() {
+  local ops_image="${MICROI_INSTALL_OPS_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/microi-ops:v1.0.1}"
+  local ops_port="${OPS_HTTP_PORT:-61880}"
+  local ops_initial_mode=Notify
+  if [ "${MICROI_OPS_OFFLINE:-0}" = 1 ]; then ops_initial_mode=Manual; fi
+  if [ -f /microi/ops/config/ops.env ]; then
+    echo 'Microi：已有 Ops 配置；保留账号、原启停状态及更新策略。'
+    return 0
+  fi
+  if ! docker image inspect "$ops_image" >/dev/null 2>&1; then
+    if [ "${MICROI_OPS_OFFLINE:-0}" = 1 ]; then
+      echo 'Microi：离线包缺少 Ops 镜像，请重新准备离线包；核心平台继续运行。'
+      return 1
+    fi
+    docker pull "$ops_image" || return 1
+  fi
+  mkdir -p /microi/ops /microi/logs/ops || return 1
+  docker run --rm --name microi-ops-bootstrap --memory 256m --cpus 1 \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /microi/ops:/microi/ops -v /microi/logs/ops:/microi/logs/ops \
+    -e "OPS_BOOTSTRAP_IMAGE=$ops_image" -e "OPS_HTTP_PORT=$ops_port" \
+    -e "OPS_BOOTSTRAP_INITIAL_MODE=$ops_initial_mode" \
+    -e "OPS_PUBLIC_URL=${OPS_PUBLIC_URL:-http://localhost:$ops_port}" \
+    -e "OPS_PLATFORM_API_URL=${OPS_PLATFORM_API_URL:-}" \
+    -e "OPS_ALLOWED_FRAME_ORIGINS=${OPS_ALLOWED_FRAME_ORIGINS:-}" \
+    "$ops_image" --bootstrap || return 1
+  microi_compose -f /microi/ops/docker-compose.yml config --quiet || return 1
+  microi_compose -f /microi/ops/docker-compose.yml up -d || return 1
+  local attempt
+  for attempt in $(seq 1 30); do
+    if curl --noproxy '*' -fsS "http://127.0.0.1:$ops_port/health" >/dev/null; then
+      echo "Microi：Ops 已就绪，本机入口 http://127.0.0.1:$ops_port；初始更新模式 $ops_initial_mode。"
+      echo 'Microi：独立账号和随机密码保存在 /microi/ops/config/ops.env（仅服务器管理员可读）。'
+      echo 'Microi：请为 Ops 配置独立 HTTPS 反向代理，并同步 OPS_PUBLIC_URL、允许嵌入的域名和 SaaS MicroiOpsUrl。'
+      echo 'Microi：数据 /microi/ops/data，TXT 日志 /microi/logs/ops；旧 Watchtower 仅在明确迁移后暂停。'
+      return 0
+    fi
+    sleep 2
+  done
+  echo 'Microi：Ops 尚未就绪，请查看 docker logs microi-ops；已保留配置，不影响 API/Web。'
+  return 1
+}
+
+
 # === 修复中文显示：确保终端使用 UTF-8 编码 ===
 export LANG=en_US.UTF-8 2>/dev/null || export LANG=C.UTF-8 2>/dev/null || true
 export LC_ALL=en_US.UTF-8 2>/dev/null || export LC_ALL=C.UTF-8 2>/dev/null || true
@@ -18,7 +87,7 @@ OFFLINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo ''
 echo '=================================================================='
-echo 'Microi：Docker Compose 离线安装脚本 v2026-04-01'
+echo 'Microi：Docker Compose 离线安装脚本 v2026-09-06 15:58:58'
 echo '=================================================================='
 echo ''
 
@@ -181,7 +250,7 @@ if ! command -v docker > /dev/null 2>&1; then
 fi
 echo "Microi：Docker 已安装: $(docker --version) ✓"
 
-if docker compose version > /dev/null 2>&1; then
+if microi_compose version > /dev/null 2>&1; then
   echo "Microi：Docker Compose 版本: $(docker compose version --short 2>/dev/null || docker compose version) ✓"
 else
   echo 'Microi：错误：未检测到 Docker Compose V2 插件。'
@@ -517,14 +586,14 @@ compose_up() {
   project_name=$(basename "${project_dir}")
   echo ""
   echo "Microi：正在部署编排 [${project_name}]..."
-  if (cd "${project_dir}" && docker compose up -d); then
+  if (cd "${project_dir}" && microi_compose up -d); then
     echo "Microi：编排 [${project_name}] 部署成功 ✓"
   else
     echo "Microi：错误：编排 [${project_name}] 部署失败 ✗"
     echo "Microi：请检查以上错误日志。常见原因：端口冲突、磁盘空间不足。"
     echo '------------------------------------------------------------------'
     echo 'Microi：尝试输出相关容器日志：'
-    for cname in $(cd "${project_dir}" && docker compose ps -a --format '{{.Name}}' 2>/dev/null); do
+    for cname in $(cd "${project_dir}" && microi_compose ps -a --format '{{.Name}}' 2>/dev/null); do
       echo "--- 容器 ${cname} 日志 ---"
       docker logs "${cname}" 2>&1 | tail -30
     done
@@ -922,7 +991,7 @@ echo '[步骤9/11] MinIO 部署完成 ✓'
 
 
 # ============================================================
-# 步骤10：部署 Ollama + Qdrant + 平台应用 + Watchtower
+# 步骤10：部署 Ollama + Qdrant + 平台应用 + Microi.Ops
 # ============================================================
 echo ''
 echo '[步骤10/11] 部署 Ollama AI 服务'
@@ -1104,44 +1173,19 @@ echo '[步骤10/11] Ollama + Qdrant + 平台应用 部署完成 ✓'
 
 
 # ============================================================
-# 步骤11：部署 Watchtower 自动更新
+# 步骤11：部署独立 Microi.Ops 平台运维中心
 # ============================================================
 echo ''
-echo '[步骤11/11] 部署 Watchtower 自动更新'
-echo '------------------------------------------------------------------'
-
-WATCHTOWER_DIR="${COMPOSE_BASE_DIR}/microi-install-watchtower"
-echo "Microi：Watchtower 监控容器: microi-install-api, microi-install-client"
-
-mkdir -p "${WATCHTOWER_DIR}"
-cat > "${WATCHTOWER_DIR}/docker-compose.yml" <<'EOF'
-version: '3.8'
-services:
-  microi-install-watchtower:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest
-    container_name: microi-install-watchtower
-    restart: always
-    privileged: true
-    tty: true
-    stdin_open: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    # Keep the generated offline deployment aligned with the online installer:
-    # poll every five minutes and update monitored services one at a time.
-    command: --interval 300 --rolling-restart microi-install-api microi-install-client
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "10"
-EOF
-echo "Microi：Watchtower 编排文件已生成 ✓"
-
-compose_up "${WATCHTOWER_DIR}"
-
-echo ''
-echo '[步骤11/11] Watchtower 部署完成 ✓'
-
+echo '[步骤11/11] 部署平台运维中心（默认仅通知更新）'
+INSTALL_CURRENT_STAGE='步骤11/11 部署平台运维中心'
+MICROI_OPS_OFFLINE=1
+OPS_INSTALL_WARNING=0
+if microi_install_ops; then
+  echo '[步骤11/11] 平台运维中心配置完成 ✓'
+else
+  OPS_INSTALL_WARNING=1
+  echo 'Microi：运维中心安装未完成；核心平台保留运行，可按官网文档单独安装 Ops。'
+fi
 
 # ============================================================
 # 输出所有服务信息
@@ -1209,9 +1253,9 @@ echo "API:         容器 microi-install-api,        端口 ${API_PORT}"
 echo "Client:      容器 microi-install-client,        端口 ${VUE_PORT}"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-app/"
 echo ""
-echo "Watchtower:  容器 microi-install-watchtower"
+echo "Microi.Ops:  独立运维容器 microi-ops；编排 /microi/ops/docker-compose.yml"
 echo "             监控: microi-install-api, microi-install-client"
-echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-watchtower/"
+echo "             编排目录: /microi/ops/；TXT 日志: /microi/logs/ops/"
 echo ''
 echo '------------------------------------------------------------------'
 echo '已开放的防火墙端口（服务器内部防火墙）：'
@@ -1223,7 +1267,7 @@ echo ''
 echo '------------------------------------------------------------------'
 echo '编排项目列表：'
 echo '------------------------------------------------------------------'
-docker compose ls 2>/dev/null | grep 'microi-install' || docker compose ls 2>/dev/null || true
+microi_compose ls 2>/dev/null | grep 'microi-install' || microi_compose ls 2>/dev/null || true
 echo ''
 echo '------------------------------------------------------------------'
 echo '容器运行状态：'
@@ -1231,7 +1275,11 @@ echo '------------------------------------------------------------------'
 docker ps --filter "name=microi-install-" --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || true
 echo ''
 echo '=================================================================='
-echo 'Microi：安装完成！如需管理编排，可进入对应编排目录执行 docker compose 命令。'
+if [ "${OPS_INSTALL_WARNING:-0}" = 1 ]; then
+  echo 'Microi：核心平台安装完成；Ops 安装存在警告，请按前文处理。'
+else
+  echo 'Microi：安装完成！如需管理编排，可进入对应编排目录执行 docker compose 命令。'
+fi
 echo 'Microi：提示：请及时修改默认管理员密码（admin / demo123456）。'
-echo 'Microi：注意：Watchtower 需要联网才能实现自动更新。'
+echo 'Microi：离线镜像导入后可通过 Ops 选择本地镜像手动更新；离线不会自动访问镜像仓库。'
 echo '=================================================================='

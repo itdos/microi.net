@@ -87,11 +87,13 @@ for (const resource of resources) {
 
 if (process.argv.includes('--check-alias-hosts')) {
   check(['localhost', '127.0.0.1', '[::1]'].includes(base.hostname), 'Host 覆盖测试仅允许隔离的本机验收服务')
-  for (const host of ['microi.net', 'doc.microi.net']) {
+  for (const host of ['www.microi.net', 'doc.microi.net']) {
     const { response } = await get('/doc/index.html?source=seo', { Host: host })
-    check(response.status === 301 && response.headers.get('location') === `${SITE_URL}/doc/index.html?source=seo`, `${host}: 应归一到 www 且保留路径和参数`)
+    check(response.status === 301 && response.headers.get('location') === `${SITE_URL}/doc/index.html?source=seo`, `${host}: 应归一到 microi.net 且保留路径和参数`)
   }
-  const { response } = await get('/doc/', { Host: 'www.microi.net', 'X-Forwarded-Proto': 'https' })
-  check(response.status === 200, 'HTTPS 经 HTTP 回源时规范主域不能循环跳转')
+  for (const path of ['/', '/doc/']) {
+    const { response } = await get(path, { Host: 'microi.net', 'X-Forwarded-Proto': 'https' })
+    check(response.status === 200 && !response.headers.get('location'), `${path}: microi.net 必须直接返回内容，不能跳向 www 或循环跳转`)
+  }
 }
 console.log(`HTTP SEO audit passed: ${checks} assertions, ${urls.length} canonical pages; actual nginx status, redirects, friendly 404, robots and discovery verified.`)

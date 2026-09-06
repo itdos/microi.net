@@ -115,6 +115,101 @@ function extractAssignedFunction(sourceText, name) {
   assert.fail(`unterminated assigned function ${name}`);
 }
 
+test("new menus inherit only declared literal switch defaults without overwriting explicit values", () => {
+  const fixture = {};
+  vm.runInNewContext(`${extractAssignedFunction(source, "applyLiteralSwitchDefaults")} result = applyLiteralSwitchDefaults;`, fixture);
+  const row = { Disabled: false, Explicit: 0, Nullable: null };
+  const field = (Name, DefaultValue, Component = "Switch") => ({ Name, DefaultValue, Component });
+  fixture.result(row, [field("OpenFirstRecord", "0"), field("Enabled", "true"),
+    field("Disabled", "1"), field("Explicit", "1"), field("Nullable", "1"),
+    field("Scripted", "return 1;"), field("Missing", null), field("Text", "1", "Text")]);
+  assert.deepEqual(row, { Disabled: false, Explicit: 0, Nullable: null, OpenFirstRecord: 0, Enabled: 1 });
+  assert.match(source, /applyLiteralSwitchDefaults\(modelCopy, getNewResourceSwitchDefaults\('sys_menu'\)\)/);
+  assert.match(source, /原因=.*debugLog\['menu_add_error_'/);
+});
+
+test("menu defaults resolve fields by authoritative TableId even when redundant TableName is null", () => {
+  const calls = [];
+  const fixture = { newResourceDefaultFields: {}, V8: { FormEngine: {
+    GetFormData: () => ({ Code: 1, Data: { Id: "target-menu-table" } }),
+    GetTableData: (table, query) => { calls.push(JSON.parse(JSON.stringify({ table, query }))); return { Code: 1, Data: [{ Name: "OpenFirstRecord", TableName: null, Component: "Switch", DefaultValue: "0" }] }; }
+  } } };
+  vm.runInNewContext(`${extractAssignedFunction(source, "getNewResourceSwitchDefaults")} result = getNewResourceSwitchDefaults;`, fixture);
+  assert.equal(fixture.result('sys_menu')[0].DefaultValue, "0");
+  fixture.result('sys_menu');
+  assert.equal(calls.length, 1, "all new menus share one metadata read");
+  assert.deepEqual(calls[0].query._Where, [["TableId", "=", "target-menu-table"], ["Component", "=", "Switch"]]);
+  fixture.newResourceDefaultFields = {};
+  fixture.V8.FormEngine.GetFormData = () => ({ Code: 0, Msg: "metadata unavailable" });
+  assert.throws(() => fixture.result('sys_menu'), /metadata unavailable/);
+});
+
+test("new API engines apply the declared V8Limit default before inserting into legacy non-null columns", () => {
+  const start = source.indexOf("                applyLiteralSwitchDefaults(modelCopy, getNewResourceSwitchDefaults('sys_apiengine'));");
+  assert.notEqual(start, -1);
+  const end = source.indexOf("                if (addResult.Code == 1)", start);
+  assert.notEqual(end, -1);
+  const insert = source.slice(start, end);
+  for (const explicit of [undefined, 1, false, null]) {
+    const row = { ApiEngineKey: "fixture-content-callback" };
+    if (explicit !== undefined) row.V8Limit = explicit;
+    let persisted;
+    const fixture = { modelCopy: row, getNewResourceSwitchDefaults: table => {
+      assert.equal(table, "sys_apiengine");
+      return [{ Name: "V8Limit", Component: "Switch", DefaultValue: "0" }];
+    }, V8: { FormEngine: { AddFormData: (table, model) => {
+      assert.equal(table, "sys_apiengine");
+      assert(Object.hasOwn(model, "V8Limit"), "legacy database requires a supplied V8Limit value");
+      persisted = { ...model };
+      return { Code: 1 };
+    } } } };
+    vm.runInNewContext(extractAssignedFunction(source, "applyLiteralSwitchDefaults") + insert, fixture);
+    assert.equal(persisted.V8Limit, explicit === undefined ? 0 : explicit);
+  }
+});
+
+test("referenced physical tables retain existing defaults but still receive missing columns", () => {
+  const calls = [];
+  const fixture = {
+    Package: { DiyTables: [{ Name: "mci_vision_subject" }], PhysicalColumns: [] },
+    isSafeIdentifier: value => /^[A-Za-z_][A-Za-z0-9_]*$/.test(value),
+    groupPackagePhysicalColumns: () => ({ sys_menu: { TableName: "sys_menu", Columns: [
+      { COLUMN_NAME: "OpenFirstRecord", COLUMN_TYPE: "int", COLUMN_DEFAULT: null },
+      { COLUMN_NAME: "NewOptionalSwitch", COLUMN_TYPE: "int" }
+    ] } }),
+    getTargetPhysicalColumns: () => ({ openfirstrecord: { COLUMN_TYPE: "int", IS_NULLABLE: "YES", COLUMN_DEFAULT: "0" } }),
+    getPhysicalValue: (row, keys) => keys.map(key => row[key]).find(value => value != null),
+    buildPhysicalColumnDefinition: row => "`" + row.COLUMN_NAME + "` int NULL DEFAULT 0",
+    quotePhysicalIdentifier: name => "`" + name + "`",
+    runtimeIsSqlServer: false, debugLog: {}, mysqlOffpageTypeOverrides: {},
+    mysqlOffpageOverrideKey: (table, column) => table + "." + column,
+    V8: { Db: { FromSql: sql => ({ ExecuteNonQuery: () => { calls.push(sql); return 1; } }) } }
+  };
+  vm.runInNewContext(`${extractAssignedFunction(source, "packageOwnsPhysicalTable")}
+    ${extractAssignedFunction(source, "syncPhysicalColumnsFromPackage")}
+    result = syncPhysicalColumnsFromPackage(null); owns = packageOwnsPhysicalTable;`, fixture);
+  assert.deepEqual(JSON.parse(JSON.stringify(fixture.result)), { Added: 1, Modified: 0, Skipped: 1, Errors: 0 });
+  assert.deepEqual(calls, ["ALTER TABLE `sys_menu` ADD COLUMN `NewOptionalSwitch` int NULL DEFAULT 0"]);
+  assert.equal(fixture.owns("MCI_VISION_SUBJECT"), true);
+  assert.equal(fixture.owns("sys_menu"), false);
+});
+
+test("bulk field slices use the existing bounded capacity and honor explicit smaller batches", () => {
+  const body = source.slice(source.indexOf("var schemaFieldChunkSize ="), source.indexOf("var schemaPhysicalTableChunkSize ="));
+  function size(param, background = true) {
+    const fixture = { V8: { Param: param }, backgroundChunkingEnabled: background };
+    vm.runInNewContext(body + " result = schemaFieldChunkSize;", fixture);
+    return fixture.result;
+  }
+  assert.equal(size({ BulkTotal: 16 }), 16);
+  assert.equal(size({ BulkTotal: 16, SchemaFieldChunkSize: 4 }), 4);
+  assert.equal(size({ BulkTotal: 16, SchemaFieldChunkSize: 9999 }), 16);
+  assert.equal(size({ BulkTotal: 16, SchemaFieldChunkSize: "invalid" }), 8);
+  assert.equal(size({ BulkTotal: 16, SchemaFieldChunkSize: -1 }), 1);
+  assert.equal(size({}), 8);
+  assert.equal(size({ BulkTotal: 16 }, false), 8);
+});
+
 test("all package Managed resources overwrite local drift regardless ownership or version", () => {
   const fixture = { String };
   vm.runInNewContext(`
@@ -1041,7 +1136,7 @@ test("physical schema sync backfills all legacy application publish NULLs before
 
   assert.match(
     source,
-    /prepareNumericColumnData\([\s\S]*?prepareNotNullColumnData\([\s\S]*?ALTER TABLE `[\s\S]*?` MODIFY COLUMN/
+    /prepareNumericColumnData\([\s\S]*?prepareNotNullColumnData\([\s\S]*?var modifySql = 'ALTER TABLE '[\s\S]*?' MODIFY COLUMN '[\s\S]*?ExecuteNonQuery/
   );
 });
 
@@ -2112,6 +2207,42 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /tabbedMenus\.length\s*===\s*tabbedMenuIds\.size/);
   assert.match(refreshSource, /uploadAuditMenuValid/);
   assert.match(refreshSource, /ApplicationAssetMultipartSession/);
+});
+
+test("API-engine readback keeps the canonical Id when a retired duplicate appears first", () => {
+  for (const text of [source, packageModel.SysApiEngines.find(x => x.ApiEngineKey === "import-microi-store-package").ApiV8Code]) {
+    const rows = [
+      { Id: "retired-id", ApiEngineKey: "mqtt_event_copy", IsDeleted: 1, ApiV8Code: "old source" },
+      { Id: "package-id", ApiEngineKey: "mqtt_event_copy", IsDeleted: 0, ApiV8Code: "package source" },
+    ];
+    const cache = new Map();
+    const queries = [];
+    const fixture = { String, Number, JSON, isNaN, debugLog: {}, V8: {
+      OsClient: "child-test", Cache: { Remove: key => cache.delete(key), Set: (key, value) => cache.set(key, value) },
+      Db: { FromSql(sql) {
+        let value;
+        queries.push(sql);
+        return { AddInParameter(name, parameter) { assert.equal(name, "@p0"); value = parameter; return this; },
+          First() {
+            const row = rows.find(row => /WHERE Id=@p0/.test(sql) ? row.Id === value
+              : row.ApiEngineKey === value && (!sql.includes("IsDeleted=0") || row.IsDeleted === 0));
+            return row ? { ...row } : null;
+          } };
+      } },
+    } };
+    vm.runInNewContext(["isMissingValue", "normalizeApiEngineModel", "normalizeApiEngineFlag",
+      "removeApiEngineCacheValue", "apiEngineRouteAliases", "refreshApiEngineCache"]
+      .map(name => extractNamedFunction(text, name)).join("\n") + "\nresult = refreshApiEngineCache;", fixture);
+    const result = fixture.result("mqtt_event_copy", "package-id", "");
+    assert.equal(result.Id, "package-id");
+    assert.equal(JSON.parse(cache.get("Microi:child-test:FormData:sys_apiengine:mqtt_event_copy")).ApiV8Code, "package source");
+    assert.equal(queries.length, 1);
+    cache.clear();
+    assert.equal(fixture.result("mqtt_event_copy", "missing-id", ""), null);
+    assert.equal(cache.size, 0, "missing canonical Id must not cache a different row");
+    assert.equal(fixture.result("mqtt_event_copy", "", "").Id, "package-id", "legacy key-only readback excludes retired rows");
+    assert.equal(rows[0].ApiV8Code, "old source", "retired audit row remains intact");
+  }
 });
 
 test("API-engine readback normalizes legacy flag shapes and physically reconciles ignored switches", () => {

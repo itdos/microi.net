@@ -525,6 +525,39 @@ public class ImageHelperProcessingTests
         Assert.True(decoded.GetPixel(40, 30).Alpha > 240);
     }
 
+    [Fact]
+    public void ChromaKey_preserves_white_clothing_and_enclosed_subject_colors()
+    {
+        using var image = new SKBitmap(10, 10);
+        image.Erase(SKColors.Lime);
+        for (var y = 2; y < 8; y++) for (var x = 2; x < 8; x++) image.SetPixel(x, y, SKColors.White);
+        image.SetPixel(5, 5, SKColors.Lime);
+        using var encoded = SKImage.FromBitmap(image).Encode(SKEncodedImageFormat.Png, 100);
+        var result = ImageHelper.RemoveSolidBackground(new ImageRemoveBackgroundParam { Bytes = encoded.ToArray(),
+            ChromaKeyColor = "#00ff00", EdgeConnectedOnly = true, Tolerance = 60, Feather = 25 });
+        using var output = Decode(result.Bytes);
+        Assert.Equal(0, output.GetPixel(0, 0).Alpha);
+        Assert.Equal(255, output.GetPixel(3, 3).Alpha);
+        Assert.Equal(255, output.GetPixel(5, 5).Alpha);
+    }
+
+    [Fact]
+    public void Dedicated_green_screen_removes_enclosed_holes_and_edge_spill_without_erasing_white()
+    {
+        using var image = new SKBitmap(10, 10); image.Erase(SKColors.White);
+        image.SetPixel(0, 0, SKColors.Lime); image.SetPixel(5, 5, SKColors.Lime);
+        image.SetPixel(5, 4, new SKColor(70, 160, 55));
+        using var encoded = SKImage.FromBitmap(image).Encode(SKEncodedImageFormat.Png, 100);
+        var result = ImageHelper.RemoveSolidBackground(new ImageRemoveBackgroundParam { Bytes = encoded.ToArray(),
+            ChromaKeyColor = "#00ff00", EdgeConnectedOnly = true, SuppressGreenSpill = true });
+        using var output = Decode(result.Bytes);
+        Assert.Equal(0, output.GetPixel(5, 5).Alpha);
+        Assert.Equal(255, output.GetPixel(3, 3).Alpha);
+        var edge = output.GetPixel(5, 4);
+        Assert.InRange(edge.Alpha, 100, 160);
+        Assert.True(edge.Green <= Math.Max(edge.Red, edge.Blue) + 1);
+    }
+
     private static ImageProcessResult Solid(int width, int height, string color)
     {
         return ImageHelper.Create(new ImageCreateParam

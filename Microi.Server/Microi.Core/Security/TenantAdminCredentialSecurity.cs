@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
+using Dos.Common;
 
 namespace Microi.net
 {
@@ -18,6 +19,15 @@ namespace Microi.net
         private const string Alphabet = Lowercase + Uppercase + Digits + Symbols;
 
         public const int DefaultPasswordLength = 18;
+
+        // 旧空库可能保留 PwdEncode=V8。开通时写入新密码材料必须同时写入可证明的编码。
+        // 未知自定义编码返回 null；绝不把哈希降级成可逆密码，也不执行租户自定义解密代码。
+        internal static string DetectProvisionedPasswordEncoding(string storedPassword)
+        {
+            if (PasswordHashSecurity.IsRecognizedHash(storedPassword)) return PasswordHashSecurity.EncodingName;
+            if (string.IsNullOrWhiteSpace(storedPassword)) return null;
+            return SysUserLogic.DecodeStoredPassword(storedPassword, "DES").Code == 1 ? "DES" : null;
+        }
 
         public static string GenerateRandomPassword(int length = DefaultPasswordLength)
         {

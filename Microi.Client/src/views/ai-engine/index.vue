@@ -113,7 +113,7 @@
 
             <template v-else-if="activeWorkspace === 'video'">
                 <div class="app-sidebar-intro">
-                    <strong>MiniMax 视频中心</strong>
+                    <strong>AI 视频中心</strong>
                     <p>创建记录、任务句柄、HDFS 持久地址和人工验片状态都保存在当前租户；临时下载地址不会被当成最终资产。</p>
                 </div>
             </template>
@@ -582,6 +582,8 @@
                                             </el-tag>
                                         </el-tooltip>
                                     </div>
+                                    <AiMediaModelSelect v-model="chatImageModel" capability="image" :disabled="sending" />
+                                    <AiMediaModelSelect v-model="chatMusicModel" capability="music" :disabled="sending" />
                                 </div>
                             </el-popover>
                         </div>
@@ -655,8 +657,13 @@
                                 />
                             </el-form-item>
                             <div class="video-form-grid">
-                                <el-form-item label="模型">
-                                    <el-input v-model="videoForm.model" disabled />
+                                <AiMediaModelSelect v-model="videoMediaModel" capability="video" :disabled="videoCreateLoading" />
+                                <el-form-item label="首帧参考图（图生视频时上传）">
+                                    <div class="video-frame-input">
+                                        <input type="file" accept="image/png,image/jpeg,image/webp" :disabled="videoCreateLoading" data-testid="ai-video-first-frame" @change="readVideoFirstFrame" />
+                                        <img v-if="videoForm.firstFrameImage" :src="videoForm.firstFrameImage" alt="视频首帧参考图" style="display:block;max-width:160px;max-height:120px;margin-top:8px;border-radius:8px" />
+                                        <el-button v-if="videoForm.firstFrameImage" text :disabled="videoCreateLoading" @click="videoForm.firstFrameImage = ''">移除首帧</el-button>
+                                    </div>
                                 </el-form-item>
                                 <el-form-item label="当前订阅规格">
                                     <el-select v-model="videoForm.preset" @change="applyVideoPreset">
@@ -783,6 +790,7 @@
 import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useDiyStore } from "@/pinia";
+import { generateMiniMaxImage } from "./minimax-image-task.js";
 import {
     ArrowLeft,
     ArrowRight,
@@ -831,6 +839,11 @@ import {
 const DiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"));
 const AiImageStudio = defineAsyncComponent(() => import("./ai-image-studio.vue"));
 const AiMusicStudio = defineAsyncComponent(() => import("./ai-music-studio.vue"));
+const AiMediaModelSelect = defineAsyncComponent(() => import("./ai-media-model-select.vue"));
+import { loadMediaModels, mediaModelOptions, selectMediaModel } from './media-models.js';
+const chatImageModel = ref(null);
+const chatMusicModel = ref(null);
+const videoMediaModel = ref(null);
 const props = defineProps({
     embedded: {
         type: Boolean,
@@ -921,6 +934,7 @@ const videoPresetOptions = [
 ];
 const videoForm = reactive({
     prompt: "",
+    firstFrameImage: "",
     model: "MiniMax-Hailuo-2.3",
     preset: "quality-first",
     duration: 6,
@@ -1024,6 +1038,7 @@ const quickPrompts = computed(() => {
 
     return [...securePromptItems, ...defaultPromptItems].slice(0, 4);
 });
+watch(videoMediaModel, model => { videoForm.model = model?.Model || ''; });
 
 const filteredConversations = computed(() => {
     const keyword = historyKeyword.value.trim().toLowerCase();
@@ -1420,7 +1435,10 @@ async function loadSecureAssistantBootstrap(force = false) {
         secureAssistantScopeLabel.value = String(data.ScopeLabel || "当前角色");
         secureAssistantRoleText.value = String(data.RoleText || "已授权用户");
         const assistantEnabled = data.Enabled === true || Number(data.Enabled) === 1;
-        secureAssistantAvailable.value = assistantEnabled && secureAssistantModels.value.length > 0;
+        const dataAuthorized = data.CanQueryData === undefined
+            ? Boolean(data.AllowedDomains?.length)
+            : data.CanQueryData === true || Number(data.CanQueryData) === 1;
+        secureAssistantAvailable.value = assistantEnabled && dataAuthorized && secureAssistantModels.value.length > 0;
         if (!assistantEnabled) {
             secureAssistantFailure.value = makeMobileAiBootstrapFailure(MOBILE_AI_BOOTSTRAP_FAILURES.unauthorized);
         } else if (!secureAssistantModels.value.length) {
@@ -1947,7 +1965,31 @@ function applyVideoPreset(value) {
     videoForm.resolution = preset.resolution;
 }
 
+async function readVideoFirstFrame(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+        ElMessage.warning('请上传不超过 10MB 的 PNG、JPEG 或 WebP 图片');
+        return;
+    }
+    try {
+        videoForm.firstFrameImage = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('首帧图片读取失败'));
+            reader.readAsDataURL(file);
+        });
+    } catch (error) { ElMessage.error(error.message || '首帧图片读取失败'); }
+}
+
 async function createMiniMaxVideo() {
+    if (videoCreateLoading.value) return;
+    if (!videoMediaModel.value) { ElMessage.warning('请先选择视频模型'); return; }
+    if (/Hailuo-2\.3-Fast$/i.test(videoForm.model) && !videoForm.firstFrameImage) {
+        ElMessage.warning('所选模型需要首帧参考图，请先上传图片');
+        return;
+    }
     const prompt = String(videoForm.prompt || "").trim();
     if (prompt.length < 10) {
         ElMessage.warning("视频提示词至少需要 10 个字符");
@@ -2007,8 +2049,10 @@ async function createMiniMaxVideo() {
         if (!assetId) throw new Error("视频资产写入后回读失败");
 
         const createResult = await DiyCommon.PostAsync("/api/Ai/CreateMiniMaxVideo", {
+            AiModelId: videoMediaModel.value.AiModelId,
             RequestId: requestId,
             Prompt: prompt,
+            FirstFrameImage: videoForm.firstFrameImage || undefined,
             Model: videoForm.model,
             Duration: videoForm.duration,
             Resolution: videoForm.resolution
@@ -2607,37 +2651,34 @@ async function sendChatQuestion(text, assistantMessage, attachments = []) {
     }, assistantMessage);
 }
 
+async function ensureChatMediaModel(capability, selection) {
+    const catalog = await loadMediaModels(DiyCommon, diyStore.GetCurrentUser?.Id || '');
+    const engines = catalog.filter(engine => engine.AiModelId === selectedAiModel.value?.Id);
+    const options = mediaModelOptions(engines, capability);
+    selection.value = selectMediaModel(options, selection.value?.AiModelId === selectedAiModel.value?.Id ? selection.value : null);
+    if (!selection.value) throw new Error(engines.find(engine => engine.Error)?.Error || '当前 AI 引擎没有可用的对应媒体模型，请在对话设置中选择。');
+}
+
 async function sendImageQuestion(text, assistantMessage) {
+    await ensureChatMediaModel('image', chatImageModel);
+    if (!chatImageModel.value || chatImageModel.value.AiModelId !== selectedAiModel.value?.Id)
+        throw new Error('请在对话设置中为当前 AI 引擎选择图片模型。');
     abortController = new AbortController();
     const requestId = `image:${currentConversationId.value}:${assistantMessage.id}`
         .replace(/[^a-zA-Z0-9._:-]/g, "-")
         .slice(0, 160);
-    const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/GenerateMiniMaxImage`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            authorization: DiyCommon.getToken() ? `Bearer ${DiyCommon.getToken()}` : ""
-        },
-        body: JSON.stringify({
+    const data = await generateMiniMaxImage({
+        diy: DiyCommon,
+        request: {
             RequestId: requestId,
             Prompt: text,
-            Model: "image-01",
+            Model: chatImageModel.value.Model,
+            AiModelId: chatImageModel.value.AiModelId,
             AspectRatio: "1:1",
             Count: 1
-        }),
+        },
         signal: abortController.signal
     });
-    let result = {};
-    try {
-        result = await response.json();
-    } catch {
-        throw new Error(`图片生成服务返回了无法解析的响应（HTTP ${response.status}）。`);
-    }
-    const current = unwrapDosResult(result);
-    if (!response.ok || Number(current?.Code ?? current?.code) !== 1) {
-        throw new Error(current?.Msg || current?.msg || `图片生成失败（HTTP ${response.status}）。`);
-    }
-    const data = current?.Data || current?.data || {};
     const images = Array.isArray(data.Images) ? data.Images : [];
     const attachments = images
         .map((item) => ({
@@ -2662,6 +2703,9 @@ async function sendImageQuestion(text, assistantMessage) {
 }
 
 async function sendMusicQuestion(text, assistantMessage) {
+    await ensureChatMediaModel('music', chatMusicModel);
+    if (!chatMusicModel.value || chatMusicModel.value.AiModelId !== selectedAiModel.value?.Id)
+        throw new Error('请在对话设置中为当前 AI 引擎选择音乐模型。');
     abortController = new AbortController();
     const requestId = `music:${currentConversationId.value}:${assistantMessage.id}`
         .replace(/[^a-zA-Z0-9._:-]/g, "-")
@@ -2675,7 +2719,8 @@ async function sendMusicQuestion(text, assistantMessage) {
         body: JSON.stringify({
             RequestId: requestId,
             Prompt: text,
-            Model: "music-3.0",
+            Model: chatMusicModel.value.Model,
+            AiModelId: chatMusicModel.value.AiModelId,
             IsInstrumental: true,
             SampleRate: 44100,
             Bitrate: 256000,

@@ -2,14 +2,14 @@
     <section class="image-studio" data-testid="ai-image-studio">
         <header class="studio-hero">
             <div>
-                <span class="studio-kicker">IMAGE LAB · MiniMax image-01 + V8.Image</span>
+                <span class="studio-kicker">IMAGE LAB · 创意与精确处理</span>
                 <h1>AI 图像工作台</h1>
                 <p>生成、重绘与精确处理放在同一处。先选工具，再上传参考图和描述目标；高级参数只在需要时出现。</p>
             </div>
             <div class="studio-trust">
-                <span>参考图私有存储</span>
-                <span>结果写入 HDFS</span>
-                <span>RequestId 防重复计费</span>
+                <span>参考图安全传递</span>
+                <span>结果自动保存</span>
+                <span>支持中转与多模型</span>
             </div>
         </header>
 
@@ -35,6 +35,7 @@
                         class="tool-row"
                         :class="{ active: selectedToolId === tool.id }"
                         :data-testid="`ai-image-tool-${tool.id}`"
+                        :disabled="running"
                         @click="selectTool(tool)"
                     >
                         <span class="tool-badge">{{ tool.badge }}</span>
@@ -54,13 +55,15 @@
                         <h2>{{ selectedTool.label }}</h2>
                         <p>{{ selectedTool.description }}</p>
                     </div>
-                    <span class="engine-pill">{{ selectedTool.engineLabel }}</span>
+                    <span class="engine-pill">{{ selectedTool.engine === 'exact' ? 'V8.Image' : (mediaSelection?.Model || '选择 AI 模型') }}</span>
                 </div>
 
                 <div v-if="selectedTool.notice" class="tool-notice">
                     <el-icon><InfoFilled /></el-icon>
                     <span>{{ selectedTool.notice }}</span>
                 </div>
+
+                <AiMediaModelSelect v-if="selectedTool.engine !== 'exact'" v-model="mediaSelection" capability="image" :image-operation="selectedTool.operation" :disabled="running" />
 
                 <div v-if="selectedTool.maxFiles > 0" class="reference-section">
                     <div class="field-heading">
@@ -95,7 +98,7 @@
                             </button>
                         </figure>
                         <button
-                            v-if="sourceFiles.length < selectedTool.maxFiles"
+                            v-if="sourceFiles.length < maxSourceFiles"
                             type="button"
                             class="source-add"
                             @click="studioFileInputRef?.click()"
@@ -143,6 +146,12 @@
                             <span>生成数量</span>
                             <el-select v-model="settings.count">
                                 <el-option v-for="count in [1, 2, 3, 4]" :key="count" :label="`${count} 张`" :value="count" />
+                            </el-select>
+                        </label>
+                        <label v-if="mediaSelection?.Resolutions?.length">
+                            <span>分辨率</span>
+                            <el-select v-model="settings.resolution" data-testid="ai-image-resolution">
+                                <el-option v-for="value in mediaSelection.Resolutions" :key="value" :label="value" :value="value" />
                             </el-select>
                         </label>
                     </template>
@@ -197,10 +206,12 @@
                     <div><span>OUTPUT</span><h2>生成结果</h2></div>
                     <small>{{ resultImages.length ? `${resultImages.length} 张` : "等待创作" }}</small>
                 </div>
-                <div v-if="running" class="result-loading">
-                    <span></span><span></span><span></span>
-                    <strong>{{ selectedTool.engine === "exact" ? "正在处理并写入 HDFS" : "MiniMax 正在创作" }}</strong>
-                    <small>请勿重复提交，本次 RequestId 已锁定</small>
+                <AiGenerationLoading v-if="running" :model-name="mediaSelection?.Model" :preview="sourceFiles[0]?.previewUrl"
+                    :exact="selectedTool.engine === 'exact'" :submitted="!!imageTaskStatus" :status="imageTaskStatus" />
+                <div v-else-if="recoverableTaskId" class="result-empty">
+                    <strong>图片已生成，等待恢复下载</strong>
+                    <p>恢复供应商已保存的图片，不会重新生成。</p>
+                    <el-button type="primary" data-testid="ai-image-recover" @click="recoverImageResult">恢复原图</el-button>
                 </div>
                 <div v-else-if="resultImages.length" class="result-grid">
                     <figure v-for="image in resultImages" :key="image.FileUrl">
@@ -226,12 +237,31 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, onBeforeUnmount, reactive, ref } from "vue";
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { useDiyStore } from "@/pinia";
+import { generateMiniMaxImage } from "./minimax-image-task.js";
+import AiMediaModelSelect from './ai-media-model-select.vue';
+import AiGenerationLoading from './ai-generation-loading.vue';
 import { CircleClose, Download, InfoFilled, Lock, MagicStick, Picture, Plus, RefreshLeft, UploadFilled } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
+const diyStore = useDiyStore();
+const mediaSelection = ref(null);
+const imageTaskStatus = ref('');
+const recoverableTaskId = ref('');
+let imageWaitController;
+let pendingImageRequest;
+// 只保存本用户、本 API/租户的任务号，不把提示词、参考图或认证凭据写入浏览器缓存。
+function pendingImageKey() {
+    return `microi-image-task:${DiyCommon.GetApiBase()}:${DiyCommon.GetOsClient()}:${diyStore.GetCurrentUser?.Id || ""}`;
+}
+function rememberImageTask(data) {
+    if (data.TaskId) {
+        try { sessionStorage.setItem(pendingImageKey(), data.TaskId); } catch { /* 不让浏览器存储异常中断等待。 */ }
+    }
+}
 
 const categories = [
     { id: "create", label: "生成" },
@@ -254,7 +284,7 @@ const baseTools = [
     { id: "style-transfer", category: "edit", badge: "风", label: "风格迁移", short: "转换艺术风格", minFiles: 1, maxFiles: 2, engine: "minimax", operation: "style-transfer", description: "第一张作为主体，第二张可作为额外风格/角色参考。", placeholder: "描述目标画风、笔触、色板与媒介", promptPrefix: "保留第一张参考图的主体与构图，将视觉语言转换为：", suggestions: ["法国印象派油画，厚涂笔触，柔和高光", "日系赛璐璐动画，清晰线条，明亮色块", "黏土定格动画，微缩模型质感"] },
     { id: "colorize", category: "edit", badge: "彩", label: "AI 黑白上色", short: "老照片自然着色", minFiles: 1, maxFiles: 1, engine: "minimax", operation: "colorize", description: "依据场景语义为黑白照片生成自然、克制的颜色。", placeholder: "可说明年代、地点、服装或希望使用的色调", promptPrefix: "保留参考黑白照片的主体、构图、时代细节和面部特征，自然上色，避免过饱和，", suggestions: ["符合 1980 年代中国城市真实色彩", "自然肤色与复古胶片色调", "低饱和纪实色彩，修复轻微划痕"] },
     { id: "restore", category: "edit", badge: "修", label: "老照片修复", short: "降噪、补损与清晰化", minFiles: 1, maxFiles: 1, engine: "minimax", operation: "restore", description: "参考重绘破损、划痕、褪色与模糊区域，尽量保持人物身份。", placeholder: "说明主要问题和要保留的时代质感", promptPrefix: "高保真修复参考老照片，保持人物身份、姿态和时代特征，去除划痕、折痕、噪点并恢复自然细节，", suggestions: ["修复面部划痕和整体褪色，保留胶片颗粒", "提升清晰度但不要过度磨皮", "补全破损边角，保持原始构图"] },
-    { id: "remove-background", category: "edit", badge: "抠", label: "AI 抠图", short: "主体隔离并透明化", minFiles: 1, maxFiles: 1, engine: "hybrid", operation: "remove-background", postProcess: "remove-solid-background", description: "先由 AI 把主体隔离到纯白背景，再用 V8.Image 做透明化收尾，输出 PNG。", placeholder: "说明要保留的主体以及容易混淆的边缘（头发、透明物、细线等）", promptPrefix: "只保留参考图主要主体，完整保留轮廓和细节，移除所有背景、阴影和文字，主体居中置于绝对纯白背景，边缘清晰，", suggestions: ["保留人物及发丝边缘，移除全部背景", "保留商品和自然投影以外的主体轮廓", "保留宠物毛发细节，背景完全纯白"] },
+    { id: "remove-background", category: "edit", badge: "抠", label: "AI 抠图", short: "主体隔离并透明化", minFiles: 1, maxFiles: 1, engine: "hybrid", operation: "remove-background", postProcess: "remove-solid-background", description: "AI 隔离主体后输出透明 PNG，保留服装与细小边缘。", placeholder: "说明要保留的主体以及容易混淆的边缘（头发、透明物、细线等）", promptPrefix: "只保留参考图主要主体，完整保留轮廓、服装和细节，移除背景与阴影，边缘清晰，", suggestions: ["保留人物、白色衣服及发丝边缘，移除全部背景", "保留商品主体轮廓", "保留宠物毛发细节"] },
     { id: "id-photo", category: "portrait", badge: "证", label: "AI 证件照", short: "规范人像与底色", minFiles: 1, maxFiles: 1, engine: "minimax", operation: "id-photo", description: "保持人物身份特征，生成端正、自然、符合常见证件照构图的人像。", placeholder: "选择背景色、服装、尺寸用途；例如蓝底、深色西装、一寸构图", promptPrefix: "严格保持参考人物身份和自然五官，生成正面证件照：双肩水平、目视镜头、表情自然、均匀布光、清晰边缘，", notice: "结果适合设计预览；正式证照请按办证机构规范人工复核尺寸、背景色和真实性。", suggestions: ["浅蓝纯色背景，深色西装白衬衫，一寸构图", "纯白背景，商务休闲服，头肩居中", "红色纯色背景，衬衫整洁，自然肤色"] },
     { id: "portrait-retouch", category: "portrait", badge: "颜", label: "人像精修", short: "自然肤质与光线", minFiles: 1, maxFiles: 1, engine: "minimax", operation: "portrait-retouch", description: "改善肤色、光线和小瑕疵，同时避免塑料感和身份漂移。", placeholder: "说明希望改善的细节和保留的特征", promptPrefix: "保持参考人物身份、五官比例和真实肤质，进行克制自然的人像精修，", suggestions: ["均匀肤色、减淡黑眼圈，保留皮肤纹理", "修正偏色与逆光，保持自然轮廓", "商务头像质感，干净但不过度磨皮"] },
     { id: "avatar", category: "portrait", badge: "头", label: "AI 头像", short: "多风格个人头像", minFiles: 1, maxFiles: 1, engine: "minimax", operation: "avatar", description: "基于人物参考生成适合社交、团队或品牌使用的方形头像。", placeholder: "说明职业、背景、服装、风格和气质", promptPrefix: "保持参考人物身份，生成方形高质量头像，面部清晰、构图干净，", suggestions: ["科技公司创始人风格，深蓝背景，柔和侧光", "友好产品经理头像，浅灰背景，自然微笑", "3D 黏土风头像，简洁纯色背景"] },
@@ -281,7 +311,8 @@ const tools = baseTools.map((tool) => ({
     ...tool
 }));
 
-const ratios = ["1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"];
+const ratios = computed(() => selectedTool.value.engine === 'exact' ? ["1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"]
+    : mediaSelection.value?.AspectRatios || ["1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"]);
 const activeCategory = ref("create");
 const selectedToolId = ref("text-to-image");
 const promptText = ref("");
@@ -291,6 +322,7 @@ const resultImages = ref([]);
 const running = ref(false);
 const settings = reactive({
     aspectRatio: "1:1",
+    resolution: "2K",
     count: 1,
     width: 2048,
     height: 2048,
@@ -309,6 +341,7 @@ const settings = reactive({
 
 const visibleTools = computed(() => tools.filter((tool) => tool.category === activeCategory.value));
 const selectedTool = computed(() => tools.find((tool) => tool.id === selectedToolId.value) || tools[0]);
+const maxSourceFiles = computed(() => selectedTool.value.engine === 'exact' ? selectedTool.value.maxFiles : Math.min(selectedTool.value.maxFiles, mediaSelection.value?.MaxReferenceCount ?? selectedTool.value.maxFiles));
 const resultPreviewList = computed(() => resultImages.value.map((item) => item.FileUrl).filter(Boolean));
 
 function toolCount(categoryId) {
@@ -316,6 +349,7 @@ function toolCount(categoryId) {
 }
 
 function selectTool(toolOrId) {
+    if (running.value) return;
     const tool = typeof toolOrId === "string" ? tools.find((item) => item.id === toolOrId) : toolOrId;
     if (!tool) return;
     selectedToolId.value = tool.id;
@@ -324,6 +358,9 @@ function selectTool(toolOrId) {
     resultImages.value = [];
     trimFiles(tool.maxFiles);
 }
+
+watch(ratios, values => { if (!running.value && !values.includes(settings.aspectRatio)) settings.aspectRatio = values[0] || '1:1'; });
+watch(maxSourceFiles, value => { if (!running.value) trimFiles(value); });
 
 function trimFiles(maxFiles) {
     while (sourceFiles.value.length > maxFiles) {
@@ -335,7 +372,7 @@ function trimFiles(maxFiles) {
 function handleFiles(event) {
     const candidates = Array.from(event.target.files || []);
     event.target.value = "";
-    const remaining = selectedTool.value.maxFiles - sourceFiles.value.length;
+    const remaining = maxSourceFiles.value - sourceFiles.value.length;
     for (const file of candidates.slice(0, Math.max(0, remaining))) {
         if (!/^image\/(?:jpeg|png|webp)$/i.test(file.type)) {
             ElMessage.warning(`${file.name} 不是支持的图片格式`);
@@ -351,7 +388,7 @@ function handleFiles(event) {
             previewUrl: URL.createObjectURL(file)
         });
     }
-    if (candidates.length > remaining) ElMessage.warning(`当前工具最多上传 ${selectedTool.value.maxFiles} 张图片`);
+    if (candidates.length > remaining) ElMessage.warning(`当前工具和模型最多上传 ${maxSourceFiles.value} 张图片`);
 }
 
 function removeFile(index) {
@@ -414,6 +451,8 @@ function upscaleDimensions(ratio) {
 
 async function runSelectedTool() {
     const tool = selectedTool.value;
+    if (running.value) return;
+    if (tool.engine !== 'exact' && !mediaSelection.value) { ElMessage.warning('请先选择可用的 AI 引擎与图片模型'); return; }
     if (sourceFiles.value.length < tool.minFiles) {
         ElMessage.warning(`请先上传至少 ${tool.minFiles} 张参考图`);
         return;
@@ -423,6 +462,7 @@ async function runSelectedTool() {
         return;
     }
     running.value = true;
+    imageTaskStatus.value = '';
     resultImages.value = [];
     try {
         const images = await Promise.all(sourceFiles.value.map(async (item) => ({
@@ -432,42 +472,68 @@ async function runSelectedTool() {
         if (tool.engine === "exact") await runExactTool(tool, images);
         else await runMiniMaxTool(tool, images);
     } catch (error) {
-        ElMessage.error(error?.message || "图片处理失败");
+        if (error?.name !== "AbortError") ElMessage.error(error?.message || "图片处理失败");
     } finally {
         running.value = false;
     }
 }
 
 async function runMiniMaxTool(tool, images) {
-    const body = {
-        RequestId: makeRequestId(),
+    let body = {
         Prompt: buildPrompt(tool),
-        Model: "image-01",
+        Model: mediaSelection.value.Model,
+        AiModelId: mediaSelection.value.AiModelId,
         AspectRatio: settings.aspectRatio,
         Count: tool.id === "upscale" ? 1 : settings.count,
         Operation: tool.operation,
         ReferenceImages: images,
         PostProcess: tool.postProcess || ""
     };
-    if (tool.id === "upscale") {
+    if (mediaSelection.value.Resolutions?.length) body.Resolution = settings.resolution;
+    if (tool.id === "upscale" && mediaSelection.value.SupportsExactDimensions) {
         [body.Width, body.Height] = upscaleDimensions(settings.aspectRatio);
     }
-    const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/GenerateMiniMaxImage`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            authorization: DiyCommon.getToken() ? `Bearer ${DiyCommon.getToken()}` : ""
-        },
-        body: JSON.stringify(body)
-    });
-    let result;
-    try { result = await response.json(); } catch { throw new Error(`图片服务响应无法解析（HTTP ${response.status}）`); }
-    const current = unwrapDosResult(result);
-    if (!response.ok || Number(current?.Code ?? current?.code) !== 1) throw new Error(current?.Msg || current?.msg || "AI 图片生成失败");
-    const data = current.Data || current.data || {};
+    // 未取得提交回执时，用户再次点击相同输入仍使用同一个请求号。
+    const signature = JSON.stringify(body);
+    if (pendingImageRequest?.signature === signature) body = pendingImageRequest.body;
+    else {
+        body.RequestId = makeRequestId();
+        pendingImageRequest = { signature, body };
+    }
+    imageWaitController = new AbortController();
+    let data;
+    try {
+        data = await generateMiniMaxImage({
+            diy: DiyCommon, request: body, signal: imageWaitController.signal, onProgress: (data) => { imageTaskStatus.value = data.Status || 'Pending'; rememberImageTask(data); }
+        });
+    } catch (error) {
+        if (error.canRecoverResult) recoverableTaskId.value = error.taskId;
+        if (!error.canRecoverResult && error.imageStatus && !["Unavailable", "Generating"].includes(error.imageStatus)) {
+            sessionStorage.removeItem(pendingImageKey());
+            pendingImageRequest = null;
+        }
+        throw error;
+    }
+    pendingImageRequest = null;
+    sessionStorage.removeItem(pendingImageKey());
     resultImages.value = (Array.isArray(data.Images) ? data.Images : []).map((item) => ({ ...item, Width: data.Width, Height: data.Height }));
+    recoverableTaskId.value = '';
     if (!resultImages.value.length) throw new Error("AI 已响应，但没有返回可展示的 HDFS 图片");
     ElMessage.success(data.Replayed === true ? "已返回同一请求的既有结果" : "图片已生成并写入 HDFS");
+}
+
+async function recoverImageResult() {
+    if (!recoverableTaskId.value || running.value) return;
+    running.value = true;
+    imageWaitController = new AbortController();
+    try {
+        const data = await generateMiniMaxImage({ diy: DiyCommon, taskId: recoverableTaskId.value, recoverResult: true,
+            signal: imageWaitController.signal, onProgress: data => { imageTaskStatus.value = data.Status || 'Pending'; rememberImageTask(data); } });
+        resultImages.value = data.Images.map(item => ({ ...item, Width: data.Width, Height: data.Height }));
+        recoverableTaskId.value = '';
+        sessionStorage.removeItem(pendingImageKey());
+    } catch (error) { if (error.name !== 'AbortError') ElMessage.error(error.message); }
+    finally { running.value = false; }
 }
 
 function exactOptions(tool) {
@@ -511,7 +577,27 @@ function downloadResult(image) {
     link.remove();
 }
 
-onBeforeUnmount(() => sourceFiles.value.forEach((item) => URL.revokeObjectURL(item.previewUrl)));
+onMounted(async () => {
+    const taskId = sessionStorage.getItem(pendingImageKey());
+    if (!taskId) return;
+    running.value = true;
+    imageWaitController = new AbortController();
+    try {
+        const data = await generateMiniMaxImage({ diy: DiyCommon, taskId,
+            signal: imageWaitController.signal, onProgress: data => { imageTaskStatus.value = data.Status || 'Pending'; rememberImageTask(data); } });
+        resultImages.value = data.Images.map(item => ({ ...item, Width: data.Width, Height: data.Height }));
+        sessionStorage.removeItem(pendingImageKey());
+    } catch (error) {
+        if (error.canRecoverResult) recoverableTaskId.value = error.taskId;
+        if (!error.canRecoverResult && error.imageStatus && !["Unavailable", "Generating"].includes(error.imageStatus))
+            sessionStorage.removeItem(pendingImageKey());
+        if (error.name !== "AbortError") ElMessage.error(error.message);
+    } finally { running.value = false; }
+});
+onBeforeUnmount(() => {
+    imageWaitController?.abort();
+    sourceFiles.value.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+});
 
 defineExpose({ selectTool });
 </script>
@@ -577,16 +663,11 @@ defineExpose({ selectTool });
 .result-heading span { color: #73a7ff; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
 .result-heading h2 { margin: 3px 0 0; font-size: 18px; }
 .result-heading small { color: #8f9db1; font-size: 10px; }
-.result-empty, .result-loading { display: grid; place-items: center; flex: 1; min-height: 360px; padding: 24px; text-align: center; }
+.result-empty { display: grid; place-items: center; flex: 1; min-height: 360px; padding: 24px; text-align: center; }
 .empty-canvas { display: grid; place-items: center; width: 150px; height: 150px; border: 1px dashed #435067; border-radius: 20px; background: radial-gradient(circle at 50% 30%, rgba(73, 128, 226, .24), transparent 66%); }
 .empty-canvas .el-icon { color: #7fa5de; font-size: 36px; }
 .result-empty strong { margin-top: -30px; font-size: 13px; }
 .result-empty p { max-width: 250px; margin: -45px 0 0; color: #8f9db1; font-size: 11px; line-height: 1.65; }
-.result-loading { align-content: center; grid-template-columns: repeat(3, 7px); column-gap: 6px; }
-.result-loading > span { width: 7px; height: 7px; border-radius: 50%; background: #73a7ff; animation: studioPulse 1.2s infinite ease-in-out; }
-.result-loading > span:nth-child(2) { animation-delay: .15s; }.result-loading > span:nth-child(3) { animation-delay: .3s; }
-.result-loading strong, .result-loading small { grid-column: 1 / -1; }
-.result-loading strong { margin-top: 16px; font-size: 13px; }.result-loading small { margin-top: 7px; color: #8f9db1; font-size: 10px; }
 .result-grid { display: grid; align-content: start; gap: 12px; flex: 1; max-height: 590px; margin-top: 16px; overflow: auto; }
 .result-grid figure { margin: 0; overflow: hidden; border: 1px solid #303a49; border-radius: 12px; background: #0a0f17; }
 .result-grid :deep(.el-image) { display: block; width: 100%; min-height: 230px; max-height: 380px; background: linear-gradient(45deg, #121a26 25%, #192331 25%, #192331 50%, #121a26 50%, #121a26 75%, #192331 75%); background-size: 20px 20px; }

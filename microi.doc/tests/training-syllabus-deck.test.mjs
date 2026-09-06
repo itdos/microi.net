@@ -92,9 +92,13 @@ test('presentation covers the complete technical learning path', () => {
     '抖音小程序',
     'Android App',
     'iOS App',
-    '服装 ERP',
-    '集团制造协同',
-    '客户关系管理',
+    '跨越行业边界，让业务价值落地',
+    '工业制造',
+    '商贸与消费',
+    '组织与经营',
+    '园区与公共服务',
+    '专业服务',
+    '物流与农业',
   ]) assert.ok(component.includes(phrase), `missing syllabus topic: ${phrase}`)
 
   assert.match(component, /典型平台能力高复用场景，实际收益取决于需求与团队基线/)

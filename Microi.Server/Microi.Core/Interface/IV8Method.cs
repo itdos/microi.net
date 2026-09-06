@@ -15,6 +15,10 @@ namespace Microi.net
     /// </summary>
     public interface IV8Method
     {
+        /// <summary>仅供 platform-ops-event-ingest 使用，写入 MongoDB 成功后返回稳定事件回执。</summary>
+        DosResult IngestOpsEvent(dynamic dynamicParam);
+        /// <summary>仅解析全局函数声明，不执行函数源码。</summary>
+        DosResult ValidateGlobalFunction(string name, string code);
         /// <summary>
         /// 重新加载指定 OsClient 的 SaaS 引擎配置
         /// </summary>
@@ -194,6 +198,9 @@ namespace Microi.net
 
         /// <summary>仅供主租户超级管理员保留数据修复子租户DatabaseOnly连接。</summary>
         DosResult RepairAdminTenantDatabaseAccess(dynamic dynamicParam);
+        /// <summary>在可信主租户管理链路中检查/补齐自助租户网络登记，不暴露连接凭据。</summary>
+        DosResult EnsureOwnedTenantRuntimeRegistration(dynamic dynamicParam);
+        DosResult RepairOwnedTenantAdminPasswordEncoding(dynamic dynamicParam);
 
         /// <summary>仅供官方 Managed 后台工作器幂等升级精确选中的子租户数据库。</summary>
         DosResult UpgradeAdminTenantDatabase(dynamic dynamicParam);

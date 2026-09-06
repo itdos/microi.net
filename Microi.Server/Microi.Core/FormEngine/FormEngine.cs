@@ -124,10 +124,15 @@ namespace Microi.net
         /// </summary>
         public async Task CacheClear(string osClient, string tableId, string tableName, 
                                 FormSubmitType formSubmitType,
-                                JObject formData = null
+                                JObject formData = null,
+                                DbTrans cacheTransaction = null
                             )
         {
             var normalizedTableName = tableName.DosToLower();
+            if (normalizedTableName == GlobalFunctionRegistry.TableName || normalizedTableName == "sys_config")
+            {
+                GlobalFunctionRegistry.InvalidateAfterCommit(osClient, cacheTransaction, normalizedTableName == "sys_config");
+            }
             if (normalizedTableName == "sys_menu")
             {
                 await FormEngineAuthorizationCache.InvalidateMenuAsync(

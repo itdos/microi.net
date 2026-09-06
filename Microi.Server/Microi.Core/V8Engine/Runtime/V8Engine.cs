@@ -249,7 +249,7 @@ namespace Microi.net
             }
             createV8EngineParam.Normalize();
             var isNestedExecution = MicroiV8ExecutionScope.IsActive;
-            return new Engine(options =>
+            var engine = new Engine(options =>
             {
                 options.AllowClr();
                 if (!createV8EngineParam.UnlimitedRuntime)
@@ -330,6 +330,9 @@ namespace Microi.net
                     return true;
                 });
             });
+            // 日期函数必须早于系统设置应用和自定义全局 V8，保证旧库安装器也能启动。
+            GlobalFunctionRegistry.InstallBootstrap(engine);
+            return engine;
         }
         /// <summary>
         /// 归还Engine（实现接口方法）

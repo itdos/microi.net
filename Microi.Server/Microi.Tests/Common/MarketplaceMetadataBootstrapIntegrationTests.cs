@@ -7,6 +7,7 @@ using System.Data.Common;
 namespace Microi.Tests.Common;
 
 [Collection("TenantContextGlobal")]
+[Trait("Category", "FullStack")]
 public class MarketplaceMetadataBootstrapIntegrationTests
 {
     public static bool HasMySqlTestConnection => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN"));

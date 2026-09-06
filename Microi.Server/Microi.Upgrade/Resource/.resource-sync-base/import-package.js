@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.7.13
+ * Version: v2.8.3
  * Function:
  * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
  */
@@ -465,6 +465,11 @@ var schemaFieldPlanChunkSize = parseInt(V8.Param.SchemaFieldPlanChunkSize || 32,
 if (isNaN(schemaFieldPlanChunkSize)) schemaFieldPlanChunkSize = 32;
 schemaFieldPlanChunkSize = Math.max(1, Math.min(64, schemaFieldPlanChunkSize));
 var schemaFieldChunkSize = parseInt(V8.Param.SchemaFieldChunkSize || 8, 10);
+// 批量安装复用已有 16 字段上限，减少冷库的排队和元数据往返；每片仍独立提交、
+// 强回读并保存检查点，后台任务的跨节点租约与续跑延迟保持不变。
+if (!V8.Param.SchemaFieldChunkSize && backgroundChunkingEnabled && Number(V8.Param.BulkTotal || 0) > 0) {
+    schemaFieldChunkSize = 16;
+}
 if (isNaN(schemaFieldChunkSize)) schemaFieldChunkSize = 8;
 schemaFieldChunkSize = Math.max(1, Math.min(16, schemaFieldChunkSize));
 var schemaPhysicalTableChunkSize = parseInt(V8.Param.SchemaPhysicalTableChunkSize || 1, 10);
@@ -2407,6 +2412,41 @@ try {
             : null;
     };
 
+    // 仅为新增安装资源补充目标字段已声明的常量开关默认值，不执行 DefaultValue 脚本，
+    // 不覆盖包内显式的 0/false/null，也不改写既有资源的客户配置。
+    var applyLiteralSwitchDefaults = function (menuModel, fields) {
+        for (var defaultIndex = 0; defaultIndex < fields.length; defaultIndex++) {
+            var field = fields[defaultIndex] || {};
+            var fieldName = String(field.Name || '');
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(fieldName)
+                || String(field.Component || '').toLowerCase() != 'switch'
+                || Object.prototype.hasOwnProperty.call(menuModel, fieldName)) continue;
+            var value = String(field.DefaultValue == null ? '' : field.DefaultValue).trim().toLowerCase();
+            if (value == '0' || value == 'false') menuModel[fieldName] = 0;
+            else if (value == '1' || value == 'true') menuModel[fieldName] = 1;
+        }
+    };
+    var newResourceDefaultFields = {};
+    var getNewResourceSwitchDefaults = function (tableName) {
+        if (newResourceDefaultFields[tableName]) return newResourceDefaultFields[tableName];
+        var resourceTableResult = V8.FormEngine.GetFormData('diy_table', {
+            _Where: [['Name', '=', tableName]], _SelectFields: ['Id']
+        });
+        if (!resourceTableResult || resourceTableResult.Code != 1 || !resourceTableResult.Data || !resourceTableResult.Data.Id) {
+            throw new Error('读取安装资源表元数据失败：' + String(resourceTableResult && resourceTableResult.Msg || tableName + ' 不存在'));
+        }
+        var defaultsResult = V8.FormEngine.GetTableData('diy_field', {
+            // TableName 是可空的冗余字段；真实字段归属始终使用 TableId。
+            _Where: [['TableId', '=', resourceTableResult.Data.Id], ['Component', '=', 'Switch']],
+            _SelectFields: ['Name', 'Component', 'DefaultValue'], _PageSize: 200
+        });
+        if (!defaultsResult || defaultsResult.Code != 1 || !defaultsResult.Data) {
+            throw new Error('读取新增安装资源开关默认值失败：' + String(defaultsResult && defaultsResult.Msg || '接口无返回'));
+        }
+        newResourceDefaultFields[tableName] = defaultsResult.Data;
+        return newResourceDefaultFields[tableName];
+    };
+
     var upsertApplicationRow = function (tableName, where, row) {
         row = row || {};
         if (tableName == 'mci_ai_app_file') return persistApplicationAsset(row);
@@ -2417,6 +2457,7 @@ try {
                 return V8.FormEngine.UptFormData(tableName, row);
             }, 'app_upt_' + tableName + '_' + row.Id);
         }
+        applyLiteralSwitchDefaults(row, getNewResourceSwitchDefaults(tableName));
         return runWriteWithRetry(function () {
             return V8.FormEngine.AddFormData(tableName, row);
         }, 'app_add_' + tableName + '_' + (row.Id || 'new'));
@@ -2498,7 +2539,7 @@ try {
         var existing = existingRows.length ? existingRows[0] : null;
         var rowId = existing ? String(existing.Id) : String(V8.EncryptHelper.MD5Encrypt(
             'marketplace-file:' + String(V8.OsClient || '').toLowerCase() + ':' + appId.toLowerCase() + ':' + filePath.toLowerCase())).toLowerCase();
-        var now = DateNow('yyyy-MM-dd HH:mm:ss');
+        var now = nowText('yyyy-MM-dd HH:mm:ss');
         var data = {
             AppId: appId, AppName: row.AppName || '', FilePath: filePath,
             FileName: row.FileName || applicationFileName(filePath), FileType: row.FileType || applicationFileType(filePath),
@@ -4245,6 +4286,9 @@ try {
             return 'nvarchar(255)';
         }
 
+        // MYSQL_PHYSICAL_BIT_PRESERVATION_V1：物理 BIT 列不是未知控件类型。
+        // 误转 varchar 会重建大型日志表，并破坏旧库的布尔存储约定。
+        if (/^bit(?:\((?:[1-9]|[1-5][0-9]|6[0-4])\))?$/.test(typeStr)) return typeStr;
         if (typeStr.match(/^(varchar|int|bigint|datetime|text|longtext|decimal|double|float|tinyint|date|time|timestamp|json)\(/)) {
             return String(diyType);
         }
@@ -4270,7 +4314,11 @@ try {
     };
 
     var normalizeSqlType = function (value) {
-        return String(value || '').toLowerCase().replace(/\s+/g, '');
+        // MySQL 整数显示宽度不影响实际存储容量。
+        return String(value || '').toLowerCase().replace(/\s+/g, '')
+            .replace(/^(tinyint|smallint|mediumint|int|integer|bigint)\(\d+\)/, '$1')
+            .replace(/^integer(?=unsigned|$)/, 'int')
+            .replace(/^bit$/, 'bit(1)');
     };
 
     // 应用包只能扩宽目标库已有字段，不能为了与来源库完全一致而缩窄字段。
@@ -4311,6 +4359,11 @@ try {
     };
 
     var chooseCompatibleColumnType = function (sourceType, targetType) {
+        if (normalizeSqlType(sourceType) == normalizeSqlType(targetType)) return String(targetType);
+        // 旧 INT 可容纳 BIT(1) 全部值，不把客户已有列缩窄为来源库的布尔类型。
+        if (normalizeSqlType(sourceType) == 'bit(1)' && getIntegerTypeRank(targetType) > 0) {
+            return String(targetType);
+        }
         var sourceTextCapacity = getTextTypeCapacity(sourceType);
         var targetTextCapacity = getTextTypeCapacity(targetType);
         if (sourceTextCapacity > 0 && targetTextCapacity > sourceTextCapacity) {
@@ -4477,7 +4530,7 @@ try {
             ).AddInParameter('@p0', tableName).ToArray() || [];
         }
         return V8.Db.FromSql(
-            "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT " +
+            "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT, EXTRA, CHARACTER_SET_NAME, COLLATION_NAME " +
             "FROM INFORMATION_SCHEMA.COLUMNS " +
             "WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0)"
         ).AddInParameter('@p0', tableName).ToArray() || [];
@@ -4490,12 +4543,19 @@ try {
 
         columnType = mapToMySQLType(columnType);
         var definition = quotePhysicalIdentifier(columnName) + ' ' + String(columnType);
+        var charset = getPhysicalValue(column, ['CHARACTER_SET_NAME', 'CharacterSetName']);
+        var collation = getPhysicalValue(column, ['COLLATION_NAME', 'CollationName']);
+        if (!runtimeIsSqlServer && /char|text|enum|set/i.test(String(columnType))) {
+            if (charset && isSafeIdentifier(String(charset))) definition += ' CHARACTER SET ' + charset;
+            if (collation && isSafeIdentifier(String(collation))) definition += ' COLLATE ' + collation;
+        }
         var nullable = String(getPhysicalValue(column, ['IS_NULLABLE', 'IsNullable']) || '').toUpperCase();
         definition += nullable == 'NO' ? ' NOT NULL' : ' NULL';
 
         var extra = getPhysicalValue(column, ['EXTRA', 'Extra']);
         var columnDefault = getPhysicalValue(column, ['COLUMN_DEFAULT', 'ColumnDefault', 'Default']);
-        if (columnDefault !== null && columnDefault !== undefined && columnDefault !== '' &&
+        if (columnDefault !== null && columnDefault !== undefined &&
+            (columnDefault !== '' || /char|enum|set/i.test(String(columnType))) &&
             !/text|blob|json/i.test(String(columnType)) && !/auto_increment/i.test(String(extra || ''))) {
             var defaultText = String(columnDefault);
             if (/^current_timestamp(\(\))?$/i.test(defaultText) || /^CURRENT_TIMESTAMP/i.test(defaultText)) {
@@ -5174,6 +5234,17 @@ try {
         return grouped;
     };
 
+    // 引用表快照只用于补齐缺列。既有列的类型、默认值和约束由声明该表的包维护，
+    // 避免视觉等业务包中的旧 sys_menu 快照反向覆盖模块引擎的新结构。
+    var packageOwnsPhysicalTable = function (tableName) {
+        var expected = String(tableName || '').toLowerCase();
+        var tables = Package.DiyTables || [];
+        for (var tableIndex = 0; tableIndex < tables.length; tableIndex++) {
+            if (String(tables[tableIndex].Name || tables[tableIndex].TableName || '').toLowerCase() == expected) return true;
+        }
+        return false;
+    };
+
     var syncPhysicalColumnsFromPackage = function (tableFilterMap) {
         var columns = Package.PhysicalColumns || [];
         var grouped = groupPackagePhysicalColumns(columns, tableFilterMap);
@@ -5232,6 +5303,11 @@ try {
                         continue;
                     }
 
+                    if (!packageOwnsPhysicalTable(tableName)) {
+                        result.Skipped++;
+                        continue;
+                    }
+
                     // SQL Server 已有列可能带命名/系统默认约束，且历史空库通常使用
                     // nvarchar 与 datetime2 保存 Unicode 和高精度时间。应用包中的
                     // MySQL 逻辑类型只用于补齐缺列；不得把兼容且更宽的既有列降级，
@@ -5251,11 +5327,45 @@ try {
                     var effectiveColumnType = chooseCompatibleColumnType(sourcePhysicalType, targetColumn.COLUMN_TYPE);
                     var typeChanged = normalizeSqlType(targetColumn.COLUMN_TYPE) != normalizeSqlType(effectiveColumnType);
                     var nullChanged = sourceNullable && sourceNullable != targetNullable;
-                    var defaultChanged = !runtimeIsSqlServer && String(sourceDefault === null || sourceDefault === undefined ? '' : sourceDefault) !=
-                        String(targetDefault === null || targetDefault === undefined ? '' : targetDefault);
-                    var commentChanged = !runtimeIsSqlServer && sourceComment != targetComment;
-
-                    if (typeChanged || nullChanged || defaultChanged || commentChanged) {
+                    var comparableDefault = function (value) {
+                        if (value === null || value === undefined) return 'null:';
+                        var text = String(value);
+                        if (isNumericSqlType(effectiveColumnType) && /^b'[01]'$/i.test(text)) text = text.charAt(2);
+                        return 'value:' + text;
+                    };
+                    var defaultChanged = !runtimeIsSqlServer && comparableDefault(sourceDefault) != comparableDefault(targetDefault);
+                    // MYSQL_DEFAULT_METADATA_ONLY_V1：只改默认值不应走 MODIFY COLUMN。
+                    // 后者可能重新声明字符集/排序规则甚至重建大表；这里只改元数据，
+                    // 保留原列全部属性和历史行，并显式禁止 COPY/独占 DML 锁回退。
+                    if (!typeChanged && !nullChanged && defaultChanged
+                        && !/text|blob|json/i.test(effectiveColumnType)
+                        && !/auto_increment/i.test(String(targetColumn.EXTRA || ''))) {
+                        var defaultAction = ' DROP DEFAULT';
+                        if (sourceDefault !== null && sourceDefault !== undefined) {
+                            var defaultLiteral = String(sourceDefault);
+                            if (/^current_timestamp(?:\(\d*\))?$/i.test(defaultLiteral)) {
+                                defaultAction = ' SET DEFAULT ' + defaultLiteral;
+                            } else if (/^b'[01]+'$/i.test(defaultLiteral)) {
+                                defaultAction = ' SET DEFAULT ' + defaultLiteral;
+                            } else {
+                                defaultAction = " SET DEFAULT '" + sqlString(defaultLiteral) + "'";
+                            }
+                        }
+                        V8.Db.FromSql('ALTER TABLE ' + quotePhysicalIdentifier(tableName)
+                            + ' ALTER COLUMN ' + quotePhysicalIdentifier(columnName) + defaultAction
+                            + ', ALGORITHM=INPLACE, LOCK=NONE').ExecuteNonQuery();
+                        var defaultReadback = getTargetPhysicalColumns(tableName)[String(columnName).toLowerCase()];
+                        if (!defaultReadback
+                            || comparableDefault(defaultReadback.COLUMN_DEFAULT) != comparableDefault(sourceDefault)) {
+                            throw new Error('字段默认值变更后回读不一致，已阻止继续升级');
+                        }
+                        result.Modified++;
+                        debugLog['physical_schema_default_only_' + tableName + '_' + columnName] =
+                            '仅更新默认值元数据，未重写字段类型、字符集、排序规则或历史数据';
+                        continue;
+                    }
+                    // 说明保留在 diy_field；仅注释差异不能对线上大表加元数据锁或重建。
+                    if (typeChanged || nullChanged || defaultChanged) {
                         if (normalizeSqlType(effectiveColumnType) != normalizeSqlType(columnType)) {
                             debugLog['physical_schema_compat_' + tableName + '_' + columnName] =
                                 '保留目标库较宽类型：package=' + columnType + ', target=' + targetColumn.COLUMN_TYPE;
@@ -6699,6 +6809,12 @@ try {
             }
             // 如果只是类型或注释变化，执行修改
             else if (change.OldType != change.NewType || change.OldLabel != change.NewLabel) {
+                // 标签只保存在元数据；所有数据库都不能因此重建线上业务/日志大表。
+                if (change.OldType == change.NewType) {
+                    debugLog['modify_skipped_metadata_only_' + tableName + '_' + newName] =
+                        '仅字段标签变化，物理列无需修改';
+                    continue;
+                }
                 var modifySQL = '';
                 if (runtimeIsSqlServer) {
                     // Label 属于 diy_field 元数据，不应为了标签变化重写 SQL Server
@@ -6730,19 +6846,28 @@ try {
                         ' ALTER COLUMN ' + quotePhysicalIdentifier(newName) + ' ' + effectivePhysicalType +
                         (currentNullable == 'NO' ? ' NOT NULL' : ' NULL');
                 } else {
-                    // MySQL 修改字段类型/注释：ALTER TABLE table MODIFY COLUMN field_name type
-                    modifySQL = 'ALTER TABLE `' + tableName + '` MODIFY COLUMN `' + newName + '` ' + newType;
-
-                    if (newName == 'Id') {
-                        modifySQL += ' NOT NULL PRIMARY KEY';
-                    } else {
-                        modifySQL += ' NULL';
+                    // 包已携带权威物理列时，统一交给后续物理同步做兼容比较。
+                    // 不能先按旧 diy_field.Type 执行一次有损 MODIFY，再按 PhysicalColumns 改回。
+                    var hasPhysicalDefinition = packagePhysicalColumns.some(function (column) {
+                        return String(getPhysicalValue(column, ['TABLE_NAME', 'TableName']) || '').toLowerCase() == tableName.toLowerCase()
+                            && String(getPhysicalValue(column, ['COLUMN_NAME', 'ColumnName', 'Name']) || '').toLowerCase() == newName.toLowerCase();
+                    });
+                    if (hasPhysicalDefinition) {
+                        debugLog['modify_deferred_physical_' + tableName + '_' + newName] = '由物理列同步统一处理';
+                        continue;
                     }
-
-                    if (newLabel && newLabel !== newName) {
-                        var comment = newLabel.replace(/'/g, "''");
-                        modifySQL += " COMMENT '" + comment + "'";
+                    // 兼容无 PhysicalColumns 的老包，保留目标列默认值、可空性、字符集和附加属性。
+                    var mysqlColumn = getTargetPhysicalColumns(tableName)[String(newName).toLowerCase()];
+                    if (!mysqlColumn) continue; // 缺列由后续新增字段阶段补齐。
+                    var mysqlEffectiveType = chooseCompatibleColumnType(newType, mysqlColumn.COLUMN_TYPE);
+                    if (normalizeSqlType(mysqlEffectiveType) == normalizeSqlType(mysqlColumn.COLUMN_TYPE)) {
+                        debugLog['modify_skipped_compatible_' + tableName + '_' + newName] =
+                            '目标物理类型已兼容：' + mysqlColumn.COLUMN_TYPE;
+                        continue;
                     }
+                    prepareNumericColumnData(tableName, newName, mysqlColumn, mysqlEffectiveType, mysqlColumn.COLUMN_TYPE);
+                    modifySQL = 'ALTER TABLE ' + quotePhysicalIdentifier(tableName) + ' MODIFY COLUMN '
+                        + buildPhysicalColumnDefinition(mysqlColumn, false, mysqlEffectiveType);
                 }
 
                 try {
@@ -7223,6 +7348,7 @@ try {
                 Icon: 'fa fa-folder-open',
                 IsDeleted: 0
             };
+            applyLiteralSwitchDefaults(installContainerMenuModel, getNewResourceSwitchDefaults('sys_menu'));
             var addInstallContainerResult = runWriteWithRetry(function () {
                 return V8.FormEngine.AddFormData('sys_menu', installContainerMenuModel);
             }, 'install_parent_menu_add_' + installContainerId);
@@ -7929,6 +8055,7 @@ try {
             }
         } else {
             // 不存在则新增
+            applyLiteralSwitchDefaults(modelCopy, getNewResourceSwitchDefaults('sys_menu'));
             var recoveredDuplicateMenu = false;
             var addResult = runWriteWithRetry(function () {
                 return V8.FormEngine.AddFormData('sys_menu', modelCopy);
@@ -7977,7 +8104,9 @@ try {
         }
         if (!menuWriteSucceeded) {
             throw new Error('菜单写入失败：' + (modelCopy.Name || modelCopy.Id)
-                + '，Url=' + String(modelCopy.Url || '') + '；应用安装已回滚。');
+                + '，Url=' + String(modelCopy.Url || '')
+                + '；原因=' + String(debugLog['menu_add_error_' + menu.Id] || debugLog['menu_upt_error_' + menu.Id] || '写入未成功')
+                + '；应用安装已回滚。');
         }
 
         var menuReadbackResult = V8.FormEngine.GetFormData('sys_menu', {
@@ -8580,23 +8709,28 @@ try {
         // PACKAGE_API_ENGINE_AUTHORITATIVE_READBACK_V2：直接读取当前租户物理行，
         // 不再先经过正在被安装器修改的元数据与旧缓存，避免空投影或空引用阻断强回读。
         var recoveredPhysicalReadback = false;
+        // PACKAGE_API_ENGINE_CANONICAL_ID_READBACK_V1：重复 Key 已按稳定 Id
+        // 归并，旧记录仍保留为软删除审计。回读必须使用刚写入的 Id；按 Key 的
+        // 无序 First() 会重新选中退役记录，并把旧源码写回公共 Key 缓存。
+        // 指定 Id 不存在时直接返回空，不能用另一个同 Key 记录掩盖写入失败。
+        if (!isMissingValue(apiEngineId)) {
+            latest = V8.Db.FromSql('SELECT * FROM sys_apiengine WHERE Id=@p0')
+                .AddInParameter('@p0', apiEngineId)
+                .First();
+            recoveredPhysicalReadback = !!latest;
+            if (!latest) return null;
+        }
         if (!latest && !isMissingValue(apiEngineKey)) {
             latest = V8.Db.FromSql(
-                    'SELECT * FROM sys_apiengine WHERE LOWER(ApiEngineKey)=LOWER(@p0)'
+                    'SELECT * FROM sys_apiengine WHERE LOWER(ApiEngineKey)=LOWER(@p0) AND (IsDeleted=0 OR IsDeleted IS NULL)'
                 )
                 .AddInParameter('@p0', apiEngineKey)
                 .First();
             recoveredPhysicalReadback = !!latest;
         }
-        if (!latest && !isMissingValue(apiEngineId)) {
-            latest = V8.Db.FromSql('SELECT * FROM sys_apiengine WHERE Id=@p0')
-                .AddInParameter('@p0', apiEngineId)
-                .First();
-            recoveredPhysicalReadback = !!latest;
-        }
         if (!latest && !isMissingValue(apiAddress)) {
             latest = V8.Db.FromSql(
-                    'SELECT * FROM sys_apiengine WHERE LOWER(ApiAddress)=LOWER(@p0)'
+                    'SELECT * FROM sys_apiengine WHERE LOWER(ApiAddress)=LOWER(@p0) AND (IsDeleted=0 OR IsDeleted IS NULL)'
                 )
                 .AddInParameter('@p0', apiAddress)
                 .First();
@@ -9072,6 +9206,7 @@ try {
                 }
             } else {
                 // 不存在则新增
+                applyLiteralSwitchDefaults(modelCopy, getNewResourceSwitchDefaults('sys_apiengine'));
                 var addResult = V8.FormEngine.AddFormData('sys_apiengine', modelCopy);
                 if (addResult.Code == 1) {
                     stats.ApiEngineInserted++;
@@ -9241,6 +9376,28 @@ try {
         updateuser: true
     };
 
+    // DATASET_PARENT_BINDING_V1：配置子表种子按目标库真实父记录绑定，不能携带官方主库的记录 Id。
+    // 只解析固定表/字段与参数化相等条件，并且只读取 Id；禁止任意 SQL、V8 或动态表达式。
+    var resolveDataSetParentBinding = function (dataSet) {
+        var binding = dataSet.ParentBinding;
+        if (!binding) return null;
+        if (String(dataSet.ConflictPolicy || '') != 'InsertIfMissing'
+            || !isSafeDataTableName(binding.Field) || !isSafeDataTableName(binding.TableName)
+            || !isSafeDataTableName(binding.MatchField)
+            || ['string', 'number', 'boolean'].indexOf(typeof binding.MatchValue) < 0) {
+            throw new Error('应用数据 ParentBinding 无效：只允许 InsertIfMissing 的固定父记录绑定');
+        }
+        var parentResult = V8.FormEngine.GetTableData(binding.TableName, {
+            _Where: [[binding.MatchField, '=', binding.MatchValue]],
+            _SelectFields: ['Id'], _PageSize: 2, _PageIndex: 1
+        });
+        if (!parentResult || parentResult.Code != 1 || !parentResult.Data
+            || parentResult.Data.length != 1 || !parentResult.Data[0].Id) {
+            throw new Error('应用数据 ParentBinding 必须匹配唯一父记录：' + binding.TableName);
+        }
+        return { Field: binding.Field, Id: String(parentResult.Data[0].Id) };
+    };
+
     if (dataSets.length > 0) {
         reportProgress(96, '正在导入应用随包数据');
     }
@@ -9255,6 +9412,7 @@ try {
         if (conflictPolicy != 'UpsertById' && conflictPolicy != 'InsertIfMissing') {
             throw new Error('应用数据导入失败：表 ' + dataTableName + ' 仅支持 UpsertById 或 InsertIfMissing 冲突策略');
         }
+        var resolvedParentBinding = resolveDataSetParentBinding(dataSet);
 
         var tableDefinitionResult = V8.FormEngine.GetFormData('diy_table', {
             _Where: [['Name', '=', dataTableName]],
@@ -9281,6 +9439,7 @@ try {
                 sourceRows[dataRowIndex] || {},
                 dataRowIndex
             );
+            if (resolvedParentBinding) sourceRow[resolvedParentBinding.Field] = resolvedParentBinding.Id;
             if (!sourceRow.Id) {
                 stats.DataSkipped++;
                 throw new Error('应用数据导入失败：表 ' + dataTableName + ' 第' + (dataRowIndex + 1) + '条数据缺少Id');

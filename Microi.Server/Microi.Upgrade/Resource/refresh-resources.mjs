@@ -1224,6 +1224,7 @@ if (process.argv.includes('--synchronize-local')) {
   const allowVerifiedOffline = process.argv.includes('--allow-verified-offline');
   const repairBaseFromRemote = process.argv.includes('--repair-base-from-remote');
   const bootstrapMissing = process.argv.includes('--bootstrap-missing');
+  const requireUnchangedCandidate = process.argv.includes('--require-unchanged-candidate');
   if (repairBaseFromRemote && (initializeBase || publish || allowVerifiedOffline)) {
     throw new Error('--repair-base-from-remote 不能与 --initialize-base、--publish 或 --allow-verified-offline 同时使用');
   }
@@ -1469,6 +1470,17 @@ if (process.argv.includes('--synchronize-local')) {
     mergedResources.set(name, content);
   }
 
+  // 发布门禁后的三方合并只能发布已经验收的正文。先检查全部资源，再执行任何
+  // 本地写入或官网写入；远端新提交、版本自动提升和副本合并均要求重新验收。
+  if (requireUnchangedCandidate) {
+    const changed = resourceNames.filter(name =>
+      rawLocalResources.get(name) !== canonicalizeResource(name, mergedResources.get(name)));
+    for (const [name, resolvedSource] of resolvedEmbeddedStandaloneContents) {
+      if (canonicalizeResource(name, rawLocalStandaloneContents.get(name)) !== resolvedSource) changed.push(name);
+    }
+    if (changed.length) throw new Error(
+      `官方资源候选已变化，未写入本地或官网。请先运行不带 --publish 的资源同步，重新加载并通过 Full 门禁：${changed.join('、')}`);
+  }
   const remoteChanges = [];
   for (const name of resourceNames) {
     const content = canonicalizeResource(name, mergedResources.get(name));

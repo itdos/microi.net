@@ -130,13 +130,30 @@ function configuredFixture() {
   return configurePackageModel(createV634Fixture(), aiDefinition);
 }
 
+test('AI media model fields install as nullable metadata without copying provider configuration', () => {
+  const source = JSON.parse(fs.readFileSync(path.join(resourceRoot, aiDefinition.file), 'utf8'));
+  const regenerated = configurePackageModel(structuredClone(source), aiDefinition);
+  assert.deepEqual(regenerated, source);
+  for (const name of ['MediaProtocol', 'MediaModels']) {
+    const field = source.DiyFields.filter(x => x.TableName === 'mic_ai' && x.Name === name);
+    const column = source.PhysicalColumns.filter(x => x.TABLE_NAME === 'mic_ai' && x.COLUMN_NAME === name);
+    assert.equal(field.length, 1); assert.equal(column.length, 1);
+    assert.equal(field[0].Tab, '高级配置'); assert.equal(field[0].Visible, 1); assert.equal(column[0].IS_NULLABLE, 'YES');
+    assert.ok(source.DDLStatements.find(x => x.TableName === 'mic_ai').DDL.includes('`' + name + '`'));
+  }
+  const protocol = source.DiyFields.find(x => x.TableName === 'mic_ai' && x.Name === 'MediaProtocol');
+  assert.equal(JSON.parse(protocol.Config).SelectSaveField, 'Key');
+  assert.equal(protocol.FormWidth ?? null, null);
+  assert.equal(source.DataSets.filter(x => x.TableName === 'mic_ai').length, 0);
+});
+
 function engine(model, key) {
   return model.SysApiEngines.find(item => item.ApiEngineKey === key);
 }
 
-test('AI assistant v7.6.6 has an exact four-engine closure', () => {
+test('AI assistant v7.7.2 has an exact four-engine closure', () => {
   assert.ok(aiDefinition, 'missing app.microi.ai-engine package definition');
-  assert.equal(aiDefinition.version, 'v7.6.6');
+  assert.equal(aiDefinition.version, 'v7.7.2');
   assert.deepEqual([...aiDefinition.exactEngineKeys].sort(), [...expectedKeys].sort());
   assert.deepEqual([...aiDefinition.removeEngines].sort(), [...legacyStoreEngineKeys].sort());
 
@@ -144,7 +161,7 @@ test('AI assistant v7.6.6 has an exact four-engine closure', () => {
   const actualKeys = model.SysApiEngines.map(item => item.ApiEngineKey);
   assert.deepEqual([...actualKeys].sort(), [...expectedKeys].sort());
   assert.equal(new Set(actualKeys).size, 4);
-  assert.equal(model.PackageInfo.Version, 'v7.6.6');
+  assert.equal(model.PackageInfo.Version, 'v7.7.2');
   assert.equal(model.PackageInfo.ApiEngineCount, 4);
   assert.deepEqual(
     Object.keys(model.ResourcePolicies.ApiEngines).sort(),
@@ -252,9 +269,9 @@ test('generated AI and system-account package JSON files are idempotent with exa
       file: 'app.microi.ai-engine.json',
       counts: {
         TableCount: 17,
-        FieldCount: 247,
+        FieldCount: 250,
         DDLCount: 17,
-        PhysicalColumnCount: 593,
+        PhysicalColumnCount: 526,
         ApiEngineCount: 4,
         DataSetCount: 1,
         DataRowCount: 6,
@@ -267,7 +284,7 @@ test('generated AI and system-account package JSON files are idempotent with exa
         TableCount: 2,
         FieldCount: 80,
         DDLCount: 2,
-        PhysicalColumnCount: 411,
+        PhysicalColumnCount: 341,
         ApiEngineCount: 8,
         DataSetCount: 0,
         DataRowCount: 0,

@@ -6,6 +6,7 @@ using Jint;
 namespace Microi.Tests.Common;
 
 [Collection("TenantContextGlobal")]
+[Trait("Category", "FullStack")]
 public class MySqlIdentifierForeignKeyTests
 {
     public static bool HasConnection => MarketplaceMetadataBootstrapIntegrationTests.HasMySqlTestConnection;

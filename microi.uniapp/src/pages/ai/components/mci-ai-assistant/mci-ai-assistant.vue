@@ -30,7 +30,7 @@
 
         <view v-if="!isAuthenticated" class="ai-assistant__auth-state">
           <mci-auth-prompt
-            title="登录后使用AI数据分析"
+            title="登录后使用AI助手"
             desc="AI助手会严格按照账号角色和数据权限回答。登录前不会读取、分析或展示任何业务数据。"
             action-text="去登录"
             @action="goLogin"
@@ -46,10 +46,10 @@
 
         <view v-else-if="!enabled" class="ai-assistant__auth-state">
           <mci-auth-prompt
-            title="当前角色暂未开通AI助手"
-            desc="AI数据分析由后台按角色配置模型、业务域和数据范围，未授权账号无法查询任何数据。"
-            action-text="返回"
-            @action="closePanel"
+            :title="models.length ? 'AI助手暂时不可用' : '暂时没有可用的对话模型'"
+            desc="请稍后重试，或联系管理员检查模型连接与配置。"
+            action-text="重试"
+            @action="loadBootstrap(true)"
           />
         </view>
 
@@ -115,10 +115,10 @@
           <view class="ai-assistant__welcome">
             <view class="ai-assistant__welcome-status">
               <text class="ai-assistant__welcome-pulse"></text>
-              <text>安全分析通道已连接</text>
+              <text>对话服务已连接</text>
             </view>
-            <text class="ai-assistant__welcome-title">你好，我已准备好分析你的业务数据</text>
-            <text class="ai-assistant__welcome-copy">查询范围由当前租户、角色和数据权限共同决定。</text>
+            <text class="ai-assistant__welcome-title">{{ canQueryData ? '你好，想聊什么或了解哪些业务情况？' : '你好，今天有什么可以帮你？' }}</text>
+            <text v-if="canQueryData" class="ai-assistant__welcome-copy">业务查询仅限当前账号获准查看的数据。</text>
           </view>
 
           <view v-if="!messages.length" class="ai-assistant__prompts">
@@ -173,7 +173,7 @@
             :maxlength="500"
             :disabled="sending"
             :auto-height="true"
-            placeholder="询问客户、合同、跟进、售后或设备数据"
+            :placeholder="canQueryData ? '输入问题，或查询已授权的业务数据' : '输入你想聊的问题'"
             confirm-type="send"
             @confirm="sendQuestion"
           />
@@ -289,6 +289,8 @@ export default {
       showAiModel: false,
       isAuthenticated: false,
       scopeLabel: '',
+      canQueryData: false,
+      bootstrapGeneration: 0,
       roleText: '',
       models: [],
       relayModels: [],
@@ -353,7 +355,8 @@ export default {
     headerScopeText() {
       if (!this.isAuthenticated) return '登录后启用 · 匿名状态不读取数据'
       if (!this.ready) return '正在校验账号与数据权限'
-      if (!this.enabled) return '当前角色未授权'
+      if (!this.enabled) return '正在等待可用的对话服务'
+      if (!this.canQueryData) return '常规对话'
       return `${this.scopeLabel || '当前角色'} · 数据权限已校验`
     },
     aiHeaderStyle() {
@@ -381,10 +384,11 @@ export default {
   mounted() {
     if (uni.$on) uni.$on('mci:auth-changed', this.handleAuthChanged)
     this.resolveModelVisibility()
-    this.loadBootstrap()
+    this.loadBootstrap(true)
   },
   beforeUnmount() {
     this.clearTimers()
+    this.bootstrapGeneration += 1
     if (uni.$off) uni.$off('mci:auth-changed', this.handleAuthChanged)
   },
   methods: {
@@ -413,6 +417,8 @@ export default {
       } catch (error) {}
     },
     async loadBootstrap(force = false) {
+      const generation = ++this.bootstrapGeneration
+      this.ready = false
       const user = getUser() || {}
       const userId = String(user.Id || '')
       this.loadedUserId = userId
@@ -424,7 +430,9 @@ export default {
       }
       try {
         const data = await loadAiBootstrap(userId, force)
+        if (generation !== this.bootstrapGeneration || String((getUser() || {}).Id || '') !== userId) return
         this.enabled = data.Enabled === true || Number(data.Enabled) === 1
+        this.canQueryData = data.CanQueryData === undefined ? Boolean(data.AllowedDomains?.length) : data.CanQueryData === true || Number(data.CanQueryData) === 1
         this.scopeLabel = data.ScopeLabel || '当前角色'
         this.roleText = data.RoleText || '已授权用户'
         this.models = Array.isArray(data.Models) ? data.Models : []
@@ -433,9 +441,10 @@ export default {
         this.restoreSelections()
         if (!this.models.length) this.enabled = false
       } catch (error) {
+        if (generation !== this.bootstrapGeneration) return
         this.enabled = false
       } finally {
-        this.ready = true
+        if (generation === this.bootstrapGeneration) this.ready = true
       }
     },
     handleAuthChanged() {
@@ -531,7 +540,7 @@ export default {
       })
     },
     beginProgress(message) {
-      const steps = ['正在验证角色与数据权限', '正在应用租户和业务范围', '正在汇总授权业务数据', '正在等待所选模型生成结论']
+      const steps = ['请求已发送', '正在等待模型回复']
       let cursor = 0
       message.thinking = [steps[cursor]]
       this.progressTimer = setInterval(() => {
@@ -690,7 +699,7 @@ export default {
         this.conversationId = String(data.ConversationId || this.conversationId)
         this.conversationTitle = data.Title || this.conversationTitle || content.slice(0, 28)
         this.clearTimers()
-        this.startTypewriter(answerMessage, data.Answer || '暂未获得分析结果')
+        this.startTypewriter(answerMessage, data.Answer || '暂未获得回复')
         this.historyLoaded = false
         this.refreshHistory()
       } catch (error) {

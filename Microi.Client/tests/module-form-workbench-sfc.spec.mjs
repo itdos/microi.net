@@ -101,7 +101,8 @@ test("ViewMode=Table remains a route state without classic/workbench switch UI",
 });
 
 test("dialog and drawer record switching never replaces the host module route", function () {
-    const mixinSource = fs.readFileSync(presentationMixinFilename, "utf8");
+    // Git 在 Windows 工作区可能检出 CRLF；保留方法边界与路由断言，只统一换行。
+    const mixinSource = fs.readFileSync(presentationMixinFilename, "utf8").replace(/\r\n/g, "\n");
     const handler = mixinSource.match(/HandleWorkspaceDialogRecordChange\(recordId\)\s*\{([\s\S]*?)\n\s*\},\n\s*ResolvePresentationField/);
     assert.ok(handler, "workspace dialog record handler should remain explicit");
     assert.match(handler[1], /SyncModuleWorkbenchSelection\(current\)/);

@@ -492,7 +492,9 @@ namespace Microi.net
 
                     try
                     {
-                        await collection.BulkWriteAsync(writes, new BulkWriteOptions { IsOrdered = false }).ConfigureAwait(false);
+                        var writeResult = await collection.BulkWriteAsync(writes, new BulkWriteOptions { IsOrdered = false }).ConfigureAwait(false);
+                        if (!writeResult.IsAcknowledged)
+                            return new DosResult(0, null, "MongoDB did not acknowledge sys log persistence.");
                         await EnsureSysLogIndexesAsync(host).ConfigureAwait(false);
                         _sysLogCircuitOpenUntil.TryRemove(circuitKey, out _);
                         persisted += writes.Count;

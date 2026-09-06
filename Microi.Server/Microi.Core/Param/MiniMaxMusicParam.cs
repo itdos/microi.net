@@ -7,6 +7,7 @@ namespace Microi.net
     public sealed class MiniMaxMusicGenerateParam
     {
         public string RequestId { get; set; }
+        public string AiModelId { get; set; }
         public string Prompt { get; set; }
         public string Model { get; set; } = "music-3.0";
         public bool IsInstrumental { get; set; } = true;

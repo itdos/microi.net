@@ -15,7 +15,7 @@ sidebar: false
     <li>10×+ Token 节省、10×+ AI 开发提速与 30+ 引擎复用机制</li>
     <li>开源 AI 开发框架选型、Microi吾码优势、安装与 SaaS 快速启用</li>
     <li>MCP 智能交付与 36 个功能专题逐页培训，AI 数据分析和 AI 创作能力各有独立页面</li>
-    <li>H5、小程序、Android、iOS、微服务、Unity 全端交付与 ERP、MES、CRM 案例</li>
+    <li>H5、小程序、Android、iOS、微服务、Unity 全端交付，以及制造、商贸、组织经营、公共运营、专业服务、物流农业等行业实践</li>
   </ul>
 </section>
 

@@ -482,12 +482,59 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 仅供主租户受信 Managed 接口补齐自助租户在指定网络中的运行登记。
+        /// 配置与凭据由后端处理，不向接口引擎暴露连接串。
+        /// </summary>
+        public DosResult EnsureOwnedTenantRuntimeRegistration(object param)
+        {
+            const string engineKey = "platform-tenant-runtime-registration";
+            var denied = ResolveTrustedManagedCurrentUser(engineKey, true, DiyCommon.MaxRoleLevel,
+                out var osClient, out var currentUser);
+            if (denied != null) return denied;
+            if (!string.Equals(osClient, OsClientDefault.OsClient, StringComparison.OrdinalIgnoreCase)
+                || !PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(osClient, currentUser))
+                return new DosResult(1002, null, "仅主租户有效超级管理员可以补齐运行登记。");
+            try
+            {
+                var json = ToJObject(param);
+                return new TenantProvisioningService().EnsureOwnedTenantRuntimeRegistration(
+                    GetJsonString(json, "TenantKey"), GetJsonString(json, "TargetNetwork"), json["Apply"].Val<bool>());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Microi: tenant runtime registration failed. ErrorType=" + ex.GetType().Name);
+                return new DosResult(0, null, "租户运行登记失败，请查询系统日志并回读后重试。");
+            }
+        }
+
+        /// <summary>
         /// 供接口引擎做滚动发布能力探测。只有完整开通流程已由 Redis 分布式租约保护的
         /// 后端版本才返回 true；旧节点会因缺少此方法而继续使用原子分步兼容流程。
         /// </summary>
         public bool SupportsDistributedTenantProvisioningLease()
         {
             return true;
+        }
+
+        public DosResult RepairOwnedTenantAdminPasswordEncoding(object param)
+        {
+            var denied = ResolveTrustedManagedCurrentUser("platform-tenant-admin-credential-repair", true,
+                DiyCommon.MaxRoleLevel, out var osClient, out var currentUser);
+            if (denied != null) return denied;
+            if (!string.Equals(osClient, OsClientDefault.OsClient, StringComparison.OrdinalIgnoreCase)
+                || !PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(osClient, currentUser))
+                return new DosResult(1002, null, "仅主租户有效超级管理员可以修复历史密码编码。");
+            try
+            {
+                var json = ToJObject(param);
+                return new TenantProvisioningService().RepairOwnedTenantAdminPasswordEncoding(
+                    GetJsonString(json, "TenantKey"), json["Apply"].Val<bool>());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Microi: tenant credential encoding repair failed. ErrorType=" + ex.GetType().Name);
+                return new DosResult(0, null, "历史密码编码修复失败，请先回读后重试。");
+            }
         }
 
         public DosResult GetUserTenant(string userId)
@@ -2392,7 +2439,7 @@ namespace Microi.net
                     options);
                 return new DosResult(
                     1,
-                    item,
+                    BackgroundTaskService.ToSummary(item),
                     item.ExecutionCount > 0 || item.Status != "Pending"
                         ? "已返回相同幂等键的后台任务"
                         : "后台任务已持久化并进入队列");

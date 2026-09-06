@@ -4,3 +4,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Microi.net")]
 [assembly: InternalsVisibleTo("Microi.net.Api")]
 [assembly: InternalsVisibleTo("Microi.Upgrade")]
+[assembly: InternalsVisibleTo("Microi.AI")]

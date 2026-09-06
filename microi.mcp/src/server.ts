@@ -137,6 +137,7 @@ export interface ApplicationDirectoryStreamPublishInput {
   routeSnapshotHash?: string;
   deliveryBatchId?: string;
   publishMode?: ApplicationStreamPublishMode;
+  verificationOnly?: boolean;
   protocolVersion?: 3;
   expectedGateEpoch?: string;
   requestId?: string;
@@ -893,7 +894,7 @@ function validateApplicationAssetV3UploadEvidence(
   return evidence;
 }
 
-function validateApplicationAssetV3FinalizeEvidence(
+export function validateApplicationAssetV3FinalizeEvidence(
   result: ApiResponse,
   expected: ResolvedApplicationAssetStreamV3Contract & {
     appIdOrKey: string;
@@ -901,6 +902,8 @@ function validateApplicationAssetV3FinalizeEvidence(
     publishMode: 'stage' | 'finalize';
     entryPath: string;
     encodedEntryPath: string;
+    assetCount?: number;
+    totalSize?: number;
   },
 ): Record<string, unknown> {
   const evidence = asJsonRecord(result.Data);
@@ -929,9 +932,22 @@ function validateApplicationAssetV3FinalizeEvidence(
   }
   const state = String(evidence.PublishState || '');
   if (expected.publishMode === 'stage') {
-    requireStreamEvidenceString(evidence, 'PhaseState', 'ReleaseVerified', context);
-    if (state !== 'ReleaseVerified' || String(evidence.PointerState || '') !== 'Uncommitted' || evidence.Pending !== false) {
-      throw new Error('v3 stage 必须返回 ReleaseVerified/Uncommitted/Pending=false');
+    const verifying = state === 'Verifying';
+    requireStreamEvidenceString(evidence, 'PhaseState', verifying ? 'Verifying' : 'ReleaseVerified', context);
+    if ((!verifying && state !== 'ReleaseVerified') || String(evidence.PointerState || '') !== 'Uncommitted'
+      || evidence.Pending !== verifying || evidence.Completed === true) {
+      throw new Error('v3 stage 必须返回 Verifying/Pending=true 或 ReleaseVerified/Pending=false，且不得提交指针');
+    }
+    if (verifying) {
+      requireStreamEvidenceString(evidence, 'VerificationTaskId', versionId, context);
+      for (const [current, total] of [['VerifiedCount', 'TotalCount'], ['VerifiedBytes', 'TotalBytes']]) {
+        const done = evidence[current] as number; const all = evidence[total] as number;
+        if (!Number.isSafeInteger(done) || !Number.isSafeInteger(all) || done < 0 || all < 0 || done > all) {
+          throw new Error(`v3 stage ${current}/${total} 校验进度无效`);
+        }
+      }
+      if (expected.assetCount !== undefined) requireStreamEvidenceNumber(evidence, 'TotalCount', expected.assetCount, context);
+      if (expected.totalSize !== undefined) requireStreamEvidenceNumber(evidence, 'TotalBytes', expected.totalSize, context);
     }
     if (publishFence !== expected.expectedPublishFence
       || publishRowVersion !== expected.expectedPublishRowVersion) {
@@ -2357,7 +2373,10 @@ export async function runApplicationDirectoryStreamPublish(
 
     let uploadedCount = 0;
     let idempotentCount = 0;
-    if (publishMode !== 'finalize') {
+    if (input.verificationOnly && (!v3 || publishMode !== 'stage')) {
+      throw new Error('verificationOnly 仅用于协议 v3 stage 的冻结清单校验/回读。');
+    }
+    if (publishMode !== 'finalize' && !input.verificationOnly) {
       const requestIdByPath = new Map(assetRequests.map(item => [item.Path, item.RequestId]));
       const uploadOrder = [...manifest.assets].sort((left, right) => Number(left.isEntry) - Number(right.isEntry));
       for (const asset of uploadOrder) {
@@ -2563,6 +2582,8 @@ export async function runApplicationDirectoryStreamPublish(
             entryPath: manifest.entryPath,
             encodedEntryPath: v3EncodedRelativePaths!.get(manifest.entryPath)
               || encodeApplicationAssetStreamV3RelativePath(manifest.entryPath, 'v3 EntryPath'),
+            assetCount: manifest.assets.length,
+            totalSize: manifest.totalSize,
           })
         : validateApplicationFinalizeEvidence(finalizeResult, {
             requestId: finalizeRequestId,
@@ -2597,8 +2618,8 @@ export async function runApplicationDirectoryStreamPublish(
         runtimeManifestHash: v3.runtimeManifestHash,
         assetRequestManifestHash,
         assetCount: manifest.assets.length,
-        stagedCount: publishMode === 'stage' ? manifest.assets.length : 0,
-        uploadedCount: publishMode === 'stage' ? manifest.assets.length : 0,
+        stagedCount: publishMode === 'stage' && !input.verificationOnly ? manifest.assets.length : 0,
+        uploadedCount,
         idempotentCount,
         totalSize: manifest.totalSize,
         transport: publishMode === 'stage'
@@ -8065,6 +8086,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       runtimeManifestHash: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 requires the exact lowercase runtime-manifest SHA-256 computed during the local dry run.'),
       deliveryBatchId: z.string().min(8).max(50).optional().describe('Optional stable delivery batch id (8-50 characters, matching the API and LastBuildTaskId). When omitted MCP derives a deterministic id from app/version/manifest so retries remain stable.'),
       publishMode: z.enum(['stage', 'finalize', 'stage-and-finalize']).optional().default('stage-and-finalize').describe('stage uploads immutable assets only; finalize submits the local manifest only; stage-and-finalize preserves the original one-call behavior.'),
+      verificationOnly: z.boolean().optional().default(false).describe('Protocol v3 stage only: submit/read the same frozen verification task without uploading files again. Pending is not ReleaseVerified and never permits finalize.'),
       protocolVersion: z.literal(3).optional().describe('Explicit protocol v3 gate. When set, publishMode must be explicit stage or finalize and every v3 precondition is required.'),
       expectedGateEpoch: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 gate epoch as a canonical decimal bigint string.'),
       requestId: z.string().regex(/^[A-Za-z0-9._:-]{8,100}$/u).optional().describe('Protocol v3 stable release RequestId; stage/finalize and all Pending replays must reuse it exactly.'),
@@ -8083,7 +8105,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       allowLegacyFallback: z.boolean().optional().default(false).describe('Deprecated compatibility flag. RequestId-capable two-phase publishing fails closed on old API nodes instead of publishing through the legacy payload.'),
       confirmExecution: z.string().optional().describe('Required for real publishing and must exactly equal appIdOrKey. Omit for a local preflight manifest only.'),
     },
-    async ({ appIdOrKey, versionNo, directory, entryPath, routes, routeSnapshotJson, routeSnapshotHash, changeSummary, sourceManifestHash, runtimeManifestHash, deliveryBatchId, publishMode, protocolVersion, expectedGateEpoch, requestId, requestFingerprint, expectedCurrentVersion, expectedAppVersion, expectedPublishFence, expectedPublishRowVersion, expectedVersionRowVersion, expectedActivePublishVersionId, expectedCommittedPublishVersionId, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, allowLegacyFallback, confirmExecution }) => {
+    async ({ appIdOrKey, versionNo, directory, entryPath, routes, routeSnapshotJson, routeSnapshotHash, changeSummary, sourceManifestHash, runtimeManifestHash, deliveryBatchId, publishMode, verificationOnly, protocolVersion, expectedGateEpoch, requestId, requestFingerprint, expectedCurrentVersion, expectedAppVersion, expectedPublishFence, expectedPublishRowVersion, expectedVersionRowVersion, expectedActivePublishVersionId, expectedCommittedPublishVersionId, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, allowLegacyFallback, confirmExecution }) => {
       return runApplicationDirectoryStreamPublish(client, {
         appIdOrKey,
         versionNo,
@@ -8097,6 +8119,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         runtimeManifestHash,
         deliveryBatchId,
         publishMode,
+        verificationOnly,
         protocolVersion,
         expectedGateEpoch,
         requestId,

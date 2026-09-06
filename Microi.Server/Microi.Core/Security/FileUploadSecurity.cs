@@ -306,6 +306,8 @@ return {1, userNext, tenantNext}";
             if (param == null) return new DosResult(0, null, "上传参数不能为空！");
 
             param.Limit ??= true;
+            // 仅可信 AI 运行时对这一 DTO 实例签发，客户端复制字段不能取得此权限。
+            if (AiMediaStorageAuthorization.Allows(param)) return null;
             if (isPlatformAdmin) return null;
 
             // Limit、Path 都是客户端可篡改参数，普通用户不能以它们作为授权事实。

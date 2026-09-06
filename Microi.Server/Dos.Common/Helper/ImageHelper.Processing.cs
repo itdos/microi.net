@@ -166,6 +166,12 @@ namespace Dos.Common
         public int Tolerance { get; set; } = 36;
         /// <summary>阈值外的半透明羽化距离。</summary>
         public int Feather { get; set; } = 24;
+        /// <summary>可选显式抠像色；未设置时保持四角估色兼容行为。</summary>
+        public string ChromaKeyColor { get; set; }
+        /// <summary>仅处理与画布边缘连通的背景，保留主体内部同色区域。</summary>
+        public bool EdgeConnectedOnly { get; set; }
+        /// <summary>专用绿色抠像背景：同时清理封闭背景孔洞及半透明边缘的绿溢色。</summary>
+        public bool SuppressGreenSpill { get; set; }
     }
 
     public class ImageDrawParam : ImageConvertParam
@@ -633,14 +639,39 @@ namespace Dos.Common
                 param.FileByteBase64, param.Base64, param.DataUrl);
             using (var bitmap = Decode(source, new InputBudget(), out _))
             {
-                if ((long)bitmap.Width * bitmap.Height > 12_000_000L)
-                    throw new ArgumentOutOfRangeException(nameof(param), "抠图输入不能超过 12,000,000 像素。");
+                if ((long)bitmap.Width * bitmap.Height > 20_000_000L)
+                    throw new ArgumentOutOfRangeException(nameof(param), "抠图输入不能超过 20,000,000 像素。");
                 var tolerance = Math.Max(0, Math.Min(255, param.Tolerance));
                 var feather = Math.Max(0, Math.Min(255, param.Feather));
-                var background = EstimateCornerBackground(bitmap);
+                var background = string.IsNullOrWhiteSpace(param.ChromaKeyColor) ? EstimateCornerBackground(bitmap) : ParseColor(param.ChromaKeyColor);
                 var pixels = bitmap.Pixels;
+                var greenKey = param.SuppressGreenSpill && background.Green > 240 && background.Red < 16 && background.Blue < 16;
+                bool[] connected = null;
+                if (param.EdgeConnectedOnly)
+                {
+                    connected = new bool[pixels.Length];
+                    var queue = new Queue<int>();
+                    void Add(int index)
+                    {
+                        if (connected[index]) return;
+                        var p = pixels[index];
+                        var r = p.Red - background.Red; var g = p.Green - background.Green; var b = p.Blue - background.Blue;
+                        if (r * r + g * g + b * b > (tolerance + feather) * (tolerance + feather)) return;
+                        connected[index] = true; queue.Enqueue(index);
+                    }
+                    for (var x = 0; x < bitmap.Width; x++) { Add(x); Add((bitmap.Height - 1) * bitmap.Width + x); }
+                    for (var y = 0; y < bitmap.Height; y++) { Add(y * bitmap.Width); Add(y * bitmap.Width + bitmap.Width - 1); }
+                    while (queue.Count > 0)
+                    {
+                        var index = queue.Dequeue(); var x = index % bitmap.Width;
+                        if (x > 0) Add(index - 1); if (x + 1 < bitmap.Width) Add(index + 1);
+                        if (index >= bitmap.Width) Add(index - bitmap.Width);
+                        if (index + bitmap.Width < pixels.Length) Add(index + bitmap.Width);
+                    }
+                }
                 for (var index = 0; index < pixels.Length; index++)
                 {
+                    if (connected != null && !connected[index] && !greenKey) continue;
                     var pixel = pixels[index];
                     var dr = pixel.Red - background.Red;
                     var dg = pixel.Green - background.Green;
@@ -654,6 +685,22 @@ namespace Dos.Common
                         alpha = (byte)Math.Round(pixel.Alpha * Math.Max(0D, Math.Min(1D, ratio)));
                     }
                     else alpha = pixel.Alpha;
+                    if (greenKey)
+                    {
+                        var neutral = Math.Max(pixel.Red, pixel.Blue);
+                        if (pixel.Green > neutral + 12)
+                        {
+                            var foreground = 1D - (pixel.Green - neutral) / (255D - neutral);
+                            if (foreground < 0.03D) alpha = 0;
+                            else
+                            {
+                                alpha = Math.Min(alpha, (byte)Math.Round(pixel.Alpha * foreground));
+                                pixel = new SKColor((byte)Math.Min(255, Math.Round(pixel.Red / foreground)),
+                                    (byte)Math.Min(255, Math.Round(neutral / foreground)),
+                                    (byte)Math.Min(255, Math.Round(pixel.Blue / foreground)), pixel.Alpha);
+                            }
+                        }
+                    }
                     pixels[index] = pixel.WithAlpha(alpha);
                 }
                 bitmap.Pixels = pixels;

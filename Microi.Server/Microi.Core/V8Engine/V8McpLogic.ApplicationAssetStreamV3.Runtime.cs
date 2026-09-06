@@ -1171,6 +1171,7 @@ namespace Microi.net
                                     {
                                         "AND", "PublishState", "In", new[]
                                         {
+                                            ApplicationAssetV3PublishState.Verifying.ToString(),
                                             ApplicationAssetV3PublishState.PointerCommitted.ToString(),
                                             ApplicationAssetV3PublishState.ProjectionPending.ToString(),
                                             ApplicationAssetV3PublishState.RepairRequired.ToString()
@@ -1291,6 +1292,13 @@ namespace Microi.net
                     return;
                 }
                 var version = versions[0];
+                // 校验阶段尚未提交运行指针，独立恢复，不能进入投影的 committed proof 分支。
+                if (SafeJString(version, "PublishState") == ApplicationAssetV3PublishState.Verifying.ToString())
+                {
+                    recoveryResult = await VerifyApplicationAssetV3BatchAsync(
+                        osClient, app, version, lease, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
                 if (!string.Equals(
                         SafeJString(app, "CommittedPublishVersionId"),
                         versionId,
@@ -1348,7 +1356,8 @@ namespace Microi.net
             JObject version,
             out ApplicationAssetV3ProtocolRequest request,
             out ApplicationAssetV3PublishPlan plan,
-            out string buildLogRaw)
+            out string buildLogRaw,
+            bool beforePointerCommit = false)
         {
             request = null;
             plan = null;
@@ -1392,14 +1401,16 @@ namespace Microi.net
             if (expectedPublishRowVersion == long.MaxValue || expectedPublishFence == long.MaxValue)
                 return "BuildLog 的 publish proof 已达到 Int64 上限";
             if (SafeApplicationAssetV3Long(app, "PublishRowVersion", -1L)
-                != expectedPublishRowVersion + 1L)
+                != expectedPublishRowVersion + (beforePointerCommit ? 0L : 1L))
             {
-                return "app.PublishRowVersion 不等于 BuildLog.ExpectedPublishRowVersion+1";
+                return beforePointerCommit ? "app.PublishRowVersion 与冻结 stage 基线不一致"
+                    : "app.PublishRowVersion 不等于 BuildLog.ExpectedPublishRowVersion+1";
             }
             if (SafeApplicationAssetV3Long(app, "PublishFence", -1L)
-                != BuildApplicationAssetV3NextPublishFence(expectedPublishFence))
+                != (beforePointerCommit ? expectedPublishFence : BuildApplicationAssetV3NextPublishFence(expectedPublishFence)))
             {
-                return "app.PublishFence 不等于 BuildLog.ExpectedPublishFence+1";
+                return beforePointerCommit ? "app.PublishFence 与冻结 stage 基线不一致"
+                    : "app.PublishFence 不等于 BuildLog.ExpectedPublishFence+1";
             }
 
             var expectedCurrentVersion = SafeJInt(version, "ExpectedCurrentVersion", -1);
@@ -1462,6 +1473,8 @@ namespace Microi.net
                 .ToString(Formatting.None);
             if (!string.Equals(rebuiltBuildLog, buildLogRaw, StringComparison.Ordinal))
                 return "BuildLog 不是由持久化不可变事实重建出的 canonical JSON";
+            if (beforePointerCommit)
+                return ValidateApplicationAssetV3AppExpectedState(app, request);
             return null;
         }
 
@@ -1873,51 +1886,72 @@ namespace Microi.net
                         projectionSchemaError + "；pointer 尚未提交");
             }
 
-            var hdfs = ResolveApplicationAssetHdfs(osClient, out var clientModel);
-            var releaseVerificationError = await RunApplicationAssetBoundedParallelAsync(
-                plan.Assets,
-                async (asset, batchCancellationToken) =>
-                {
-                    batchCancellationToken.ThrowIfCancellationRequested();
-                    var objectExists = await ApplicationObjectExists(
-                        hdfs,
-                        clientModel,
-                        asset.Paths.VersionPath).ConfigureAwait(false);
-                    var markerExists = await ApplicationObjectExists(
-                        hdfs,
-                        clientModel,
-                        asset.Paths.IntegrityMarkerPath).ConfigureAwait(false);
-                    if (objectExists.Error != null || markerExists.Error != null)
-                        return objectExists.Error?.Msg ?? markerExists.Error?.Msg;
-                    if (!objectExists.Exists || !markerExists.Exists)
-                        return "v3 immutable release 或完整性 marker 不存在：" + asset.RelativePath;
-                    var markerBytes = await ReadApplicationObjectBytes(
-                        hdfs,
-                        clientModel,
-                        asset.Paths.IntegrityMarkerPath).ConfigureAwait(false);
-                    var markerError = ValidateApplicationAssetV3IntegrityMarker(
-                        markerBytes,
-                        plan.Identity,
-                        asset.RelativePath,
-                        asset.Sha256,
-                        asset.Size,
-                        request.RequestId);
-                    if (markerError != null) return markerError;
-                    var bytes = await ReadApplicationObjectBytes(
-                        hdfs,
-                        clientModel,
-                        asset.Paths.VersionPath).ConfigureAwait(false);
-                    return ValidateApplicationAssetContent(
-                        asset.RelativePath,
-                        asset.Size,
-                        asset.Sha256,
-                        bytes,
-                        asset.IsEntry);
-                },
-                cancellationToken,
-                declaredByteSize: asset => asset.Size).ConfigureAwait(false);
-            if (releaseVerificationError != null)
-                return new DosResult<object>(0, null, releaseVerificationError);
+            // stage 只持久化冻结任务并返回回执；后台按批逐字节校验，HTTP 不再承载整个发布目录。
+            if (string.Equals(request.PublishMode, "stage", StringComparison.Ordinal))
+                return await StageApplicationAssetV3VerificationAsync(
+                    osClient, app, request, plan, lease).ConfigureAwait(false);
+
+            var verifiedRows = ReadApplicationAssetV3VersionRowsStrong(
+                osClient, expectedAppId, plan.VersionNo, null, false);
+            // 未校验的 finalize 立即返回，禁止重复拉取全目录，更不能越过后台证明提交指针。
+            if (verifiedRows.Count != 1)
+                return new DosResult<object>(0, null, "v3 finalize 必须先完成唯一版本的 stage。");
+            if (SafeJString(verifiedRows[0], "PublishState") == "Verifying")
+                return new DosResult<object>(0, new { RetrySafe = true, VersionId = SafeJString(verifiedRows[0], "Id") },
+                    "后台校验尚未完成；请查询同一 stage 请求，等待 ReleaseVerified 后 finalize。");
+            var durableVerified = verifiedRows.Count == 1
+                && HasApplicationAssetV3VerificationProof(verifiedRows[0], request, plan);
+            if (ReadApplicationAssetVerificationCheckpoint(verifiedRows[0]) != null && !durableVerified)
+                return new DosResult<object>(0, null, "新版持久校验证明无效，拒绝绕过校验或切换稳定入口。");
+            if (!durableVerified)
+            {
+                // 兼容旧节点产生的 ReleaseVerified：没有新版持久证明时，仍执行原来的完整校验。
+                var hdfs = ResolveApplicationAssetHdfs(osClient, out var clientModel);
+                var releaseVerificationError = await RunApplicationAssetBoundedParallelAsync(
+                    plan.Assets,
+                    async (asset, batchCancellationToken) =>
+                    {
+                        batchCancellationToken.ThrowIfCancellationRequested();
+                        var objectExists = await ApplicationObjectExists(
+                            hdfs,
+                            clientModel,
+                            asset.Paths.VersionPath).ConfigureAwait(false);
+                        var markerExists = await ApplicationObjectExists(
+                            hdfs,
+                            clientModel,
+                            asset.Paths.IntegrityMarkerPath).ConfigureAwait(false);
+                        if (objectExists.Error != null || markerExists.Error != null)
+                            return objectExists.Error?.Msg ?? markerExists.Error?.Msg;
+                        if (!objectExists.Exists || !markerExists.Exists)
+                            return "v3 immutable release 或完整性 marker 不存在：" + asset.RelativePath;
+                        var markerBytes = await ReadApplicationObjectBytes(
+                            hdfs,
+                            clientModel,
+                            asset.Paths.IntegrityMarkerPath).ConfigureAwait(false);
+                        var markerError = ValidateApplicationAssetV3IntegrityMarker(
+                            markerBytes,
+                            plan.Identity,
+                            asset.RelativePath,
+                            asset.Sha256,
+                            asset.Size,
+                            request.RequestId);
+                        if (markerError != null) return markerError;
+                        var bytes = await ReadApplicationObjectBytes(
+                            hdfs,
+                            clientModel,
+                            asset.Paths.VersionPath).ConfigureAwait(false);
+                        return ValidateApplicationAssetContent(
+                            asset.RelativePath,
+                            asset.Size,
+                            asset.Sha256,
+                            bytes,
+                            asset.IsEntry);
+                    },
+                    cancellationToken,
+                    declaredByteSize: asset => asset.Size).ConfigureAwait(false);
+                if (releaseVerificationError != null)
+                    return new DosResult<object>(0, null, releaseVerificationError);
+            }
             await lease.EnsureHeldAsync().ConfigureAwait(false);
 
             var versionId = BuildApplicationStreamRecordId(
@@ -2078,6 +2112,8 @@ namespace Microi.net
                         }
                         trans.Commit();
                         transactionCommitted = true;
+                        if (durableVerified)
+                            return BuildApplicationAssetV3PendingResult(lockedApp, existingVersion, request, plan, true);
                         return await RollForwardApplicationAssetV3Projection(
                             osClient,
                             expectedAppId,
@@ -2211,6 +2247,15 @@ namespace Microi.net
 
                     trans.Commit();
                     transactionCommitted = true;
+                    if (durableVerified)
+                    {
+                        // 指针事务结束即返回；文件/路由投影由同一持久恢复 Worker 前滚。
+                        // 浏览器或代理断开不会取消已提交版本，也不会重复修改发布代次。
+                        var pendingApp = ReadApplicationAssetV3AppStrong(osClient, expectedAppId, null, false);
+                        var pendingVersion = ReadApplicationAssetV3VersionRowsStrong(
+                            osClient, expectedAppId, plan.VersionNo, null, false).Single();
+                        return BuildApplicationAssetV3PendingResult(pendingApp, pendingVersion, request, plan, false);
+                    }
                     return await RollForwardApplicationAssetV3Projection(
                         osClient,
                         expectedAppId,
@@ -3421,7 +3466,8 @@ namespace Microi.net
             ApplicationAssetV3PublishPlan plan,
             string buildLog,
             long fencingToken,
-            long rowVersion)
+            long rowVersion,
+            ApplicationAssetV3PublishState initialState = ApplicationAssetV3PublishState.ReleaseVerified)
         {
             var columns = new[]
             {
@@ -3451,7 +3497,7 @@ namespace Microi.net
                 .AddInParameter("@appId", SafeJString(app, "Id"))
                 .AddInParameter("@appName", SafeJString(app, "Name", SafeJString(app, "AppName")))
                 .AddInParameter("@versionNo", plan.VersionNo)
-                .AddInParameter("@state", ApplicationAssetV3PublishState.ReleaseVerified.ToString())
+                .AddInParameter("@state", initialState.ToString())
                 .AddInParameter("@fileCount", plan.FileCount)
                 .AddInParameter("@totalSize", plan.TotalSize)
                 .AddInParameter("@buildLog", buildLog)

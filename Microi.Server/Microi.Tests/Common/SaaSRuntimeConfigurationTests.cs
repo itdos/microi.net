@@ -190,9 +190,13 @@ public class SaaSRuntimeConfigurationTests
             "DOTNET_RUNNING_IN_CONTAINER"
         };
         var serverRoot = Path.Combine(root, "Microi.Server");
+        // 运维控制台是独立部署的宿主，不进入 Microi.net.Api 镜像；其启动凭据不能依赖
+        // 被维护 API 的 SaaS 可用性。只排除这个明确项目，并由下方引用隔离测试防止回流。
+        var standaloneOpsRoot = Path.Combine(serverRoot, "Microi.Ops") + Path.DirectorySeparatorChar;
         var violations = new List<string>();
         foreach (var path in Directory.GetFiles(serverRoot, "*.cs", SearchOption.AllDirectories))
         {
+            if (path.StartsWith(standaloneOpsRoot, StringComparison.OrdinalIgnoreCase)) continue;
             var segments = path.Substring(serverRoot.Length)
                 .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (segments.Any(segment =>
@@ -228,6 +232,31 @@ public class SaaSRuntimeConfigurationTests
 
         Assert.True(violations.Count == 0,
             "生产后端源码发现未授权环境变量读取：" + string.Join("；", violations));
+    }
+
+    [Fact]
+    public void StandaloneOps_HasNoPlatformRuntimeProjectOrPackageReferences()
+    {
+        var serverRoot = Path.Combine(FindRepositoryRoot(), "Microi.Server");
+        foreach (var project in Directory.GetFiles(serverRoot, "*.csproj", SearchOption.AllDirectories))
+        {
+            var segments = Path.GetRelativePath(serverRoot, project)
+                .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (segments.Any(x => x.Equals("bin", StringComparison.OrdinalIgnoreCase)
+                || x.Equals("obj", StringComparison.OrdinalIgnoreCase)
+                || x.Equals("Microi.Ops", StringComparison.OrdinalIgnoreCase)
+                || x.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase))) continue;
+
+            // 即使条件引用当前未启用，也不能让独立运维宿主成为平台 API/插件的依赖。
+            var references = System.Xml.Linq.XDocument.Load(project).Descendants()
+                .Where(x => x.Name.LocalName is "ProjectReference" or "PackageReference" or "Reference");
+            foreach (var reference in references)
+            {
+                var name = ((string?)reference.Attribute("Include") ?? "").Replace('\\', '/');
+                Assert.False(Regex.IsMatch(name, @"(^|/)Microi\.Ops(?:\.csproj|,|$)", RegexOptions.IgnoreCase),
+                    "独立运维宿主不得进入平台运行时引用链：" + Path.GetRelativePath(serverRoot, project));
+            }
+        }
     }
 
     [Fact]
@@ -269,7 +298,13 @@ public class SaaSRuntimeConfigurationTests
         Assert.Contains("AddMicroiJob(host.DatabaseConnection, host.DatabaseTypeName)", programSource);
         Assert.Contains("ConfigurePersistentStore(x, databaseType, quartzDbConn)", extensionSource);
         Assert.Contains("options.UseSqlServer(connectionString)", extensionSource);
-        Assert.Contains("Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz", extensionSource);
+        Assert.Contains("typeof(MicroiTenantSqlServerDelegate).AssemblyQualifiedName", extensionSource);
+        var sqlServerDelegate = typeof(Microi.net.MicroiJobExtension).GetMethod(
+            "GetDriverDelegateType", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(null, [Dos.ORM.DatabaseType.SqlServer]);
+        Assert.Equal(typeof(Microi.net.MicroiTenantSqlServerDelegate).AssemblyQualifiedName, sqlServerDelegate);
+        Assert.True(typeof(Quartz.Impl.AdoJobStore.SqlServerDelegate)
+            .IsAssignableFrom(typeof(Microi.net.MicroiTenantSqlServerDelegate)));
         Assert.Contains("return databaseType == DatabaseType.SqlServer ? \"SqlServer\" : \"MySql\"", extensionSource);
         Assert.Contains("GetDriverDelegateType(databaseType)", schedulerSource);
         Assert.Contains("GetProviderName(databaseType)", schedulerSource);

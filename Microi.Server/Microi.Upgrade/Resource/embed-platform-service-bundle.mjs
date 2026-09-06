@@ -501,6 +501,13 @@ if (runtimeChanged) {
 bundle.VersionNo = version;
 bundle.EntryPath = 'index.html';
 bundle.IncludeSource = false;
+// 在线应用导出的候选可能携带 PrivateHdfs 源码策略；内置发布必须显式恢复
+// 本脚本声明的运行时交付策略，不能只清空 SourceFiles 却留下相反的元数据。
+bundle.AssetStoragePolicy = {
+  ...(bundle.AssetStoragePolicy || {}),
+  Source: 'NotIncluded',
+  Build: 'DatabaseOnly',
+};
 bundle.Application.CurrentVersion = applicationVersion;
 bundle.Application.BuildVersion = version;
 if (bundle.PackageAssets !== null
