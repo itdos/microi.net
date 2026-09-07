@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Microsoft.AspNetCore.Http;
 
 namespace Microi.net
 {
@@ -9,6 +10,27 @@ namespace Microi.net
     /// </summary>
     public static class MicroiTraceContext
     {
+        private const string RequestTraceKey = "Microi.W3CTraceId";
+        public static string CurrentTraceId => Activity.Current?.IdFormat == ActivityIdFormat.W3C
+            ? Activity.Current.TraceId.ToHexString() : "";
+
+        public static string RequestTraceId(HttpContext context)
+        {
+            if (context == null) return CurrentTraceId;
+            if (context.Items.TryGetValue(RequestTraceKey, out var cached)) return cached as string ?? "";
+            var id = CurrentTraceId;
+            if (string.IsNullOrEmpty(id)) id = Guid.NewGuid().ToString("N");
+            context.Items[RequestTraceKey] = id;
+            return id;
+        }
+
+        public static Activity EnsureRequestActivity(HttpContext context)
+        {
+            if (Activity.Current?.IdFormat == ActivityIdFormat.W3C) { RequestTraceId(context); return null; }
+            var activity = StartActivity("Microi.Http", context.Request.Headers["traceparent"].ToString());
+            context.Items[RequestTraceKey] = activity.TraceId.ToHexString();
+            return activity;
+        }
         public static string CurrentTraceParent
         {
             get

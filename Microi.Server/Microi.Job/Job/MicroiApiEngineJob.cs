@@ -30,6 +30,9 @@ namespace Microi.net
                 osClient = OsClientDefault.OsClient;
             }
 
+            using var trace = MicroiTraceContext.StartActivity("Microi.Job");
+            using var observation = ExecutionObservation.Enter("Job", context.JobDetail.Key.Name, osClient, eventName: "ScheduledJob");
+            ExecutionObservation.Annotate(stage: "Run:" + context.FireInstanceId);
             try
             {
                 JObject param = JObject.FromObject(context.JobDetail.JobDataMap);
@@ -69,6 +72,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
+                observation.Failed();
                 var errorMsg = $"定时任务执行接口引擎出错（{osClient}）: {ex.Message}";
                 if (ex.InnerException != null)
                 {

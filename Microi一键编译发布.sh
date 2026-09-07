@@ -73,6 +73,13 @@ set +o posix 2>/dev/null || true
 set -e
 set -o pipefail
 
+# 同版本 Docker 热修复只发布经过完整测试的本地候选，不升版、不发布 NuGet，
+# 不同步官方数据库资源；保留常规发布的 Full、混淆后冒烟和镜像门禁。
+MICROI_DOCKER_ONLY_HOTFIX=false
+if [ "${1:-}" = "--docker-only-hotfix" ]; then
+    MICROI_DOCKER_ONLY_HOTFIX=true
+fi
+
 # Windows (Git Bash) 下：正常结束时暂停便于查看结果；关闭窗口/Ctrl+C 时立即清理，不再卡在 read。
 MICROI_SKIP_EXIT_PAUSE=false
 MICROI_ACTIVE_BUILD_PID=""
@@ -258,7 +265,7 @@ DOCKER_PLANS=(
     "后端镜像-仅测试|api|microi-api-dev|microi-api-dev:{latest}"
     "后端镜像-正式和测试|api|microi-api|microi-api:{latest},microi-api:{version},microi-api-dev:{latest}"
     "前端镜像-测试|client|microi-web-dev|microi-web-dev:{latest},microi-web-dev:{version},microi-client-dev:{latest},microi-client-dev:{version}"
-    "前端镜像-正式和测试|client|microi-web-dev|microi-web-dev:{latest},microi-web-dev:{version},microi-client-dev:{latest},microi-client-dev:{version}"
+    "前端镜像-正式和测试|client|microi-web|microi-web:{latest},microi-web:{version},microi-web-dev:{latest},microi-web-dev:{version},microi-client-dev:{latest},microi-client-dev:{version}"
 )
 #
 # 【前端 package.json 文件路径列表】（用于同步更新版本号）
@@ -439,9 +446,24 @@ sed_inplace() {
     fi
 }
 
-# 读取 JSON 字段值（简易解析器，适用于扁平JSON）
+# 读取 JSON 标量，兼容嵌套 AppSettings、数字端口、转义字符和 UTF-8 BOM。
 json_value() {
-    grep "\"$1\"" "$2" 2>/dev/null | head -1 | sed 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'
+    node - "$1" "$2" <<'MICROI_JSON_VALUE'
+const fs = require('node:fs');
+const [key, filename] = process.argv.slice(2);
+if (!fs.existsSync(filename)) process.exit(0);
+const value = JSON.parse(fs.readFileSync(filename, 'utf8').replace(/^\uFEFF/, ''));
+function find(node) {
+    if (!node || typeof node !== 'object') return undefined;
+    for (const [name, child] of Object.entries(node)) {
+        if (name === key) return child;
+        const nested = find(child);
+        if (nested !== undefined) return nested;
+    }
+}
+const result = find(value);
+if (result !== undefined && result !== null && typeof result !== 'object') process.stdout.write(String(result));
+MICROI_JSON_VALUE
 }
 
 # 自动递增版本号：patch+1，满10进位（如 4.8.9→4.9.0，4.9.9→5.0.0）
@@ -811,6 +833,16 @@ fi
 # ──────────────────────────────────────────────────────────────
 # 打印执行摘要
 # ──────────────────────────────────────────────────────────────
+if [ "$MICROI_DOCKER_ONLY_HOTFIX" = true ]; then
+    if [ "$PUBLISH_BACKEND" != true ] || [ ${#SELECTED_API_PLANS[@]} -eq 0 ] || [ "$PUBLISH_DOC" = true ]; then
+        print_fail "Docker 热修复必须选择后端镜像发布，且不能包含官网文档发布。"
+    fi
+    VERSION="$CURRENT_VERSION"
+    BUMP_VERSION=false
+    PUSH_NUGET=false
+    SKIP_NUGET_REQUESTED=true
+    print_info "同版本 Docker 热修复：版本保持 ${VERSION}，只发布 Docker，不写官方应用源。"
+fi
 _mode_names=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像" "只编译和推送官方网站文档")
 echo ""
 echo -e "  ${BOLD}════════════════════════════════════════════════════════${NC}"
@@ -883,7 +915,7 @@ if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
         print_fail "缺少 PowerShell，无法执行 Microi.Tests Full 发布门禁。"
     fi
     if ! "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
-        -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode Full -Configuration Release \
+        -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode Full -Configuration Release -SolutionPath "$SLN_FILE" \
         -ResultsDirectory "$PWD/.tmp/microi-release-gate/$(date +%Y%m%d-%H%M%S)"; then
         print_fail "全量测试未通过；已停止升版、官方应用资源写入和平台发布。请修复后重跑，禁止跳过失败用例。"
     fi
@@ -981,7 +1013,7 @@ fi
 # 后端发布产物会把 Resource 下的基础应用打入程序集，因此必须在编译前完成
 # 本地 / iTdos 官网三方合并。仅官网有更新时无需 Token；需要写回官网时由
 # MICROI_UPGRADE_RESOURCE_TOKEN 提供管理员令牌。冲突或发布后回读不一致会终止发布。
-if [ "$PUBLISH_BACKEND" = true ]; then
+if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ]; then
     print_phase "同步 iTdos 官网与后端内置升级资源"
     if ! command -v node >/dev/null 2>&1; then
         print_fail "未找到 Node.js，无法执行升级资源三方同步"

@@ -211,6 +211,10 @@ namespace Microi.net
                 if (db == null) return new DosResult(0, null, "登录壁纸读取失败。");
 
                 const string tableName = "diy_wallpaper";
+                // 壁纸是可选应用资源，历史 ZIP 可以不含该表；使用默认登录背景即可。
+                // 仅把明确不存在的表视为无壁纸，连接/查询异常继续进入错误返回。
+                if (!db.TableExists(tableName))
+                    return new DosResult(1, new List<JObject>(), null, 0);
                 var id = new Field("Id", tableName);
                 var name = new Field("Name", tableName);
                 var category = new Field("Category", tableName);
