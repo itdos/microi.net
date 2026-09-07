@@ -71,7 +71,7 @@ namespace Dos.ORM
                         [CreateTime] datetime NULL,
                         [UpdateTime] datetime NULL,
                         [UserId] varchar(36) NULL,
-                        [UserName] varchar(255) NULL,
+                        [UserName] nvarchar(255) NULL,
                         [IsDeleted] int NULL DEFAULT(0)
                     );
                     EXEC sp_addextendedproperty 'MS_Description', N'Id','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'Id';
@@ -165,6 +165,10 @@ namespace Dos.ORM
                 return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
+            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName)
+                || !IsValidIdentifier(param.NewFieldName))
+                return new DosResult(0, null, "表名或字段名不合法");
+
             param.FieldType = NormalizeFieldType(param.FieldType);
 
 
@@ -179,14 +183,25 @@ namespace Dos.ORM
 
             if (!param.FieldLabel.DosIsNullOrWhiteSpace())
             {
-                sql += $@"EXEC sp_updateextendedproperty 'MS_Description', N'{param.FieldLabel ?? ""}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.NewFieldName}';";
+                // 老库/导出脚本经常没有列说明。物理 ALTER 已成功后，无条件 update
+                // extended property 会抛错并中断整条升级链；按实际存在性新增或更新。
+                sql += $@"IF EXISTS (SELECT 1 FROM sys.extended_properties
+                    WHERE class=1 AND major_id=OBJECT_ID(N'[dbo].[{param.TableName}]')
+                      AND minor_id=COLUMNPROPERTY(OBJECT_ID(N'[dbo].[{param.TableName}]'), N'{param.NewFieldName}', 'ColumnId')
+                      AND name=N'MS_Description')
+                    EXEC sys.sp_updateextendedproperty N'MS_Description', @ColumnLabel, N'SCHEMA', N'dbo', N'TABLE', N'{param.TableName}', N'COLUMN', N'{param.NewFieldName}';
+                ELSE
+                    EXEC sys.sp_addextendedproperty N'MS_Description', @ColumnLabel, N'SCHEMA', N'dbo', N'TABLE', N'{param.TableName}', N'COLUMN', N'{param.NewFieldName}';";
             }
 
             dynamic session = (object)_trans ?? param.DbSession;
             if (session == null)
                 return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
-            session.FromSql(sql).ExecuteNonQuery();
+            var command = session.FromSql(sql);
+            if (!param.FieldLabel.DosIsNullOrWhiteSpace())
+                command.AddInParameter("ColumnLabel", param.FieldLabel);
+            command.ExecuteNonQuery();
             return new DosResult(1);
         }
 
@@ -326,6 +341,19 @@ namespace Dos.ORM
                 return fieldType;
 
             var normalized = fieldType.Trim();
+            // 表单设计器的 varchar 是跨数据库逻辑文本，不能依赖 SQL Server
+            // 默认代码页保存中文。使用和应用包一致的 Unicode 类型；现有
+            // nvarchar 仍保持原样，修改字段时也不会退回有损的 ANSI 列。
+            var logicalText = System.Text.RegularExpressions.Regex.Match(
+                normalized, @"^varchar\s*\(\s*(max|[1-9][0-9]*)\s*\)$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (logicalText.Success)
+            {
+                var length = logicalText.Groups[1].Value;
+                return string.Equals(length, "max", StringComparison.OrdinalIgnoreCase)
+                    || !int.TryParse(length, out var characters) || characters > 4000
+                    ? "nvarchar(max)" : $"nvarchar({characters})";
+            }
             switch (normalized.ToLowerInvariant())
             {
                 case "tinytext":

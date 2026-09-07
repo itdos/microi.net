@@ -11,7 +11,7 @@ namespace Microi.net
         /// <summary>
         /// 启动、新租户开通和管理员手动补跑共用的单租户升级入口。
         /// 数据库版本只在全部历史迁移成功后前向推进；已达到当前基线的租户只读一次
-        /// ServerVersion 后立即返回，不再对每个子租户重放不断增长的历史不变量。
+        /// ServerVersion 后跳过历史链；仅检查 SQL Server 文件身份索引的当前协议约束。
         /// </summary>
         public async Task<DosResult> UpgradeTenantAsync(
             string osClient,
@@ -67,12 +67,23 @@ namespace Microi.net
                 UpgradeProgress.Complete("检查租户版本");
                 if (IsVersionAtLeast(beforeVersion, targetVersion))
                 {
+                    var protocolIndexRepaired = false;
+                    if (!Upgrade25.CurrentFileIdentityIndexReady(runtimeClient))
+                    {
+                        var repair = await EnsureRuntimePhysicalPrerequisitesAsync(
+                                runtimeClient, cancellationToken)
+                            .ConfigureAwait(false);
+                        if (repair.Code != 1) throw new InvalidOperationException(repair.Msg);
+                        protocolIndexRepaired = true;
+                    }
                     return BuildAlreadyCurrentResult(
                         runtimeClient,
                         backgroundTaskId,
                         beforeVersion,
                         targetVersion,
-                        "ServerVersion已覆盖当前一次性运行时基线，已快速跳过历史升级链。");
+                        "ServerVersion已覆盖当前一次性运行时基线，已快速跳过历史升级链。",
+                        leaseAcquired: protocolIndexRepaired,
+                        protocolIndexRepaired: protocolIndexRepaired);
                 }
 
                 ThrowIfCancelled(backgroundTaskId, cancellationToken);
@@ -138,7 +149,8 @@ namespace Microi.net
                             backgroundTaskId,
                             beforeVersion,
                             targetVersion,
-                            "其它节点已推进到当前一次性运行时基线，本节点已在租约内快速跳过。");
+                            "其它节点已推进到当前一次性运行时基线，本节点已在租约内快速跳过。",
+                            leaseAcquired: true);
                     }
 
                     var pendingPrograms = GetVersionedUpgradePrograms()
@@ -285,9 +297,15 @@ namespace Microi.net
             string backgroundTaskId,
             string currentVersion,
             string targetVersion,
-            string reason)
+            string reason,
+            bool leaseAcquired = false,
+            bool protocolIndexRepaired = false)
         {
-            var message = "租户数据库版本已是当前版本；未取得升级租约、未执行历史迁移、未刷新缓存。";
+            var message = protocolIndexRepaired
+                ? "租户数据库版本已是当前版本；文件身份索引已在租约内修复、未执行历史迁移、未刷新缓存。"
+                : leaseAcquired
+                    ? "租户数据库版本已是当前版本；已在租约内确认，未执行历史迁移、未刷新缓存。"
+                    : "租户数据库版本已是当前版本；未取得升级租约、未执行历史迁移、未刷新缓存。";
             Report(backgroundTaskId, 100, message, 1, 1);
             AppendLog(backgroundTaskId,
                 $"升级快路径：当前={FormatVersionForLog(currentVersion)}，目标={FormatVersionForLog(targetVersion)}；{reason}");
@@ -299,6 +317,8 @@ namespace Microi.net
                 AfterVersion = currentVersion,
                 AlreadyCurrent = true,
                 FastPath = true,
+                LeaseAcquired = leaseAcquired,
+                ProtocolIndexRepaired = protocolIndexRepaired,
                 RuntimeInvariantsChecked = Array.Empty<string>(),
                 CacheReloaded = false,
                 CacheMessage = (string)null
@@ -422,7 +442,8 @@ namespace Microi.net
             {
                 return "数据库拒绝登录。请核对账号、密码及该账号对目标数据库的授权；原始摘要：" + safe;
             }
-            if (lower.Contains("unknown database") || lower.Contains("does not exist"))
+            if (lower.Contains("unknown database") || lower.Contains("cannot open database")
+                || System.Text.RegularExpressions.Regex.IsMatch(lower, @"database\s+['""].+?['""].*does not exist"))
             {
                 return "目标数据库不存在或库名填写错误。请核对 Database/Initial Catalog；原始摘要：" + safe;
             }

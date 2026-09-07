@@ -125,6 +125,8 @@ public sealed class ApplicationStreamSchemaUpgradeTests
 
         var fileIdentity = Upgrade25.Indexes.Single(index => index.Name == "ux_aaf_version_pathhash");
         Assert.Equal(new[] { "VersionId", "FilePathHash" }, fileIdentity.Columns);
+        Assert.EndsWith("WHERE [VersionId] IS NOT NULL",
+            Upgrade25.BuildCreateIndexSql(Upgrade25.SchemaDialect.SqlServer, fileIdentity));
         Assert.DoesNotContain("FilePath`)",
             Upgrade25.BuildCreateIndexSql(Upgrade25.SchemaDialect.MySql, fileIdentity));
 

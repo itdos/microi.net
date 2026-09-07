@@ -82,7 +82,7 @@ public sealed class PlatformPrivateFileCompatibilityTests
     public void LegacyHdfsRoutes_AreApiRoutesAndDelegateOnlyToTrustedPrivateFileAtom()
     {
         var root = FindRepositoryRoot();
-        Assert.False(File.Exists(Path.Combine(
+        Assert.DoesNotContain("/api/HDFS/GetPrivateFileUrl", File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers",
             "LegacyMobileCompatibilityController.cs")));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(

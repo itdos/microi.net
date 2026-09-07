@@ -5,13 +5,19 @@ param(
 
     [string]$Configuration = "Release",
 
-    [string]$ResultsDirectory = ""
+    [string]$ResultsDirectory = "",
+
+    [string]$SolutionPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 $testRoot = $PSScriptRoot
 $serverRoot = Split-Path -Parent $testRoot
-$solution = Join-Path $serverRoot "Microi.Anderson.sln"
+$solution = if ([string]::IsNullOrWhiteSpace($SolutionPath)) {
+    Join-Path $serverRoot "Microi.Anderson.sln"
+} else {
+    (Resolve-Path -LiteralPath $SolutionPath).Path
+}
 $project = Join-Path $testRoot "Microi.Tests.csproj"
 
 if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {

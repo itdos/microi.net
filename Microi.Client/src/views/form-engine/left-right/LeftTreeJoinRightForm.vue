@@ -20,6 +20,7 @@
                                 ref="ref_RightDiyTable"
                                 ContainerClass="left-right-diy-table"
                                 :PropsWhere="whereList"
+                                :PropsFilterReloadOnly="true"
                                 :ParentV8="clickData"
                                 :DataAppend="rightTableDataAppend"
                                 :TableChildConfig="tableChildRelation.TableChildConfig || null"
@@ -106,6 +107,7 @@ export default {
             // “全部”是左右布局的初始选中态。保持点击态与筛选态一致，
             // 避免首次点击“全部”时把已经加载好的右表数据误清空。
             LastClickNode: { _IsAllCategory: true },
+            NodeClickVersion: 0,
             MobileTreeDrawer: false,
             MobileTreeTitle: "全部项目"
         };
@@ -179,6 +181,7 @@ export default {
                 if (self.LastClickNode && self.LastClickNode._IsAllCategory === true) {
                     return;
                 }
+                ++self.NodeClickVersion;
                 self.LastClickNode = data;
                 self.ShowRightClick(true);
                 self.clickData = {
@@ -194,9 +197,10 @@ export default {
                 }
                 return;
             }
-            if(self.LastClickNode.Id == data.Id){
+            if (!data || self.LastClickNode.Id == data.Id) {
                 return;
             }
+            var clickVersion = ++self.NodeClickVersion;
             self.LastClickNode = data;
             self.MobileTreeTitle = data.TreeTitle || data.Name || data.Code || "已选项目";
             if (this.LeftTreeData.YincangBSF) {
@@ -223,6 +227,8 @@ export default {
                     
                 }
             }
+            // 用户点击了新分类时，旧节点的异步 V8 不得再覆盖右侧筛选。
+            if (clickVersion !== self.NodeClickVersion) return;
             if (this.RightViewType === "表单" || this.RightViewType === "表单/表格") {
                 var param = {
                     TableName: this.LeftTreeData.GuanlianBD,
@@ -239,12 +245,6 @@ export default {
                 });
             }
             if (this.RightViewType === "表格" || this.RightViewType === "表单/表格") {
-                // 先清空表格数据，避免重复key问题
-                if (this.$refs.ref_RightDiyTable) {
-                    this.$refs.ref_RightDiyTable.DiyTableRowList = [];
-                    this.$refs.ref_RightDiyTable.TableMultipleSelection = [];
-                }
-
                 // 更新 clickData，将选中的分类数据传递到右侧表格组件
                 this.clickData = {
                     Origin: "BomProject",
