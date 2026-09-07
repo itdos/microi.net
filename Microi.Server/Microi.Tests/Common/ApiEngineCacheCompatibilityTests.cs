@@ -117,6 +117,28 @@ public class ApiEngineCacheCompatibilityTests
         Assert.Equal("/apiengine/wx-login", aliases.ApiAddress);
     }
 
+    [Fact]
+    public void CachedEngine_MustMatchTheRequestedKeyIdOrExactRoute()
+    {
+        var row = new JObject { ["Id"] = "engine-id", ["ApiEngineKey"] = "platform-ai-runtime",
+            ["ApiAddress"] = "/api/ai/chat", ["ApiRoutes"] = "/api/ai/recognize;/api/ai/title" };
+        Assert.False(ApiEngineAuthoritativeStore.MatchesLookup(row,
+            new ApiEngineParam { ApiEngineKey = "import-microi-store-package" }));
+        Assert.False(ApiEngineAuthoritativeStore.MatchesLookup(row,
+            new ApiEngineParam { Id = "different-id" }));
+        Assert.False(ApiEngineAuthoritativeStore.MatchesLookup(row,
+            new ApiEngineParam { ApiAddress = "/api/ai/rec" }));
+        Assert.False(ApiEngineAuthoritativeStore.MatchesLookup(row, new ApiEngineParam()));
+        Assert.True(ApiEngineAuthoritativeStore.MatchesLookup(row,
+            new ApiEngineParam { ApiEngineKey = "PLATFORM-AI-RUNTIME" }));
+        Assert.True(ApiEngineAuthoritativeStore.MatchesLookup(row,
+            new ApiEngineParam { Id = "engine-id" }));
+        Assert.True(ApiEngineAuthoritativeStore.MatchesLookup(row,
+            new ApiEngineParam { ApiAddress = "/API/AI/TITLE" }));
+        Assert.False(ApiEngineAuthoritativeStore.MatchesLookup(row,
+            new ApiEngineParam { ApiEngineKey = "other", ApiAddress = "/api/ai/chat" }));
+    }
+
     [Theory]
     [InlineData("/apiengine/home_platform_stats", "home_platform_stats")]
     [InlineData("/apiengine/home_platform_stats--OsClient--iTdos--", "home_platform_stats")]

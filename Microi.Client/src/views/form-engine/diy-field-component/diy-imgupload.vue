@@ -1,7 +1,7 @@
 <template>
     <div class="diy-imgupload">
         <!-- 上传组件 - 编辑/新增模式 -->
-        <!-- 增加accept="image/*"属性，允许移动端上传图片和拍照 -->
+        <!-- 相册选择保留系统默认行为，拍摄入口通过独立的原生 input 明确请求摄像头。 -->
         <el-upload
             v-if="FormMode != 'View' && field.Visible"
             ref="uploadRef"
@@ -36,7 +36,37 @@
                 show-crop-toggle
                 v-model:crop-enabled="runtimeCropEnabled"
             />
+            <template #tip>
+                <div class="image-upload-actions">
+                    <el-button
+                        v-if="showCameraCapture"
+                        type="primary"
+                        :icon="Camera"
+                        data-testid="image-upload-camera-button"
+                        @click.stop="openImagePicker('camera')"
+                    >{{ t('Msg.ImageUploadTakePhoto') }}</el-button>
+                    <el-button
+                        :icon="Picture"
+                        data-testid="image-upload-gallery-button"
+                        @click.stop="openImagePicker('gallery')"
+                    >{{ t('Msg.ImageUploadChooseImages') }}</el-button>
+                </div>
+            </template>
         </el-upload>
+
+        <!-- capture 必须落到原生文件 input；不能只写在 el-upload 的外层组件上。
+             拍摄一次返回一张照片，多图字段可以连续拍摄；相册 input 仍保留 multiple。 -->
+        <input
+            v-if="FormMode != 'View' && field.Visible"
+            ref="cameraInputRef"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            data-testid="image-upload-camera-input"
+            @click.stop
+            @change.stop="handleCameraSelection"
+        />
 
         <!-- 单图片显示 - 编辑/新增模式 -->
         <div v-if="FormMode != 'View' && field.Visible && !getMultipleFlag && isValidSingleImgValue(modelValue)"
@@ -333,7 +363,7 @@
 <script setup>
 import { ref, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Delete, Rank, Edit, Crop } from '@element-plus/icons-vue';
+import { Delete, Rank, Edit, Crop, Camera, Picture } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import Sortable from 'sortablejs';
 import { useDiyStore } from "@/pinia";
@@ -415,6 +445,38 @@ const SysConfig = computed(() => ({
 
 // 响应式数据
 const uploadRef = ref(null);
+const cameraInputRef = ref(null);
+const showCameraCapture = computed(() => (
+    diyStore.IsPhoneView || !!instance.appContext.config.globalProperties.DosCommon?.isMobile
+));
+
+// 只查找当前字段自己的上传 input，避免同一表单多个图片字段互相串图。
+const getGalleryInput = () => uploadRef.value?.$el?.querySelector('input.el-upload__input');
+const canSelectImage = () => props.FormMode !== 'View' && !!props.field.Visible;
+const openImagePicker = (source) => {
+    if (!canSelectImage()) return;
+    const input = source === 'camera' ? cameraInputRef.value : getGalleryInput();
+    if (!input) return;
+    // 保持同步的用户手势，并清空上次选择，允许取消后重拍或再次选择同一张照片。
+    input.value = '';
+    input.click();
+};
+const handleCameraSelection = (event) => {
+    const input = event.target;
+    if (!canSelectImage() || !input?.files?.length) return;
+    const galleryInput = getGalleryInput();
+    if (!galleryInput) return;
+    try {
+        // 转交原生 FileList，复用 el-upload 的限量、V8、裁剪及单文件上传入口。
+        // 不调用 submit()：它会重新提交其它仍在等待裁剪/V8 的 ready 文件。
+        galleryInput.files = input.files;
+        galleryInput.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch {
+        DiyCommon.Tips(t('Msg.ImageUploadCaptureReadFailed'), false);
+    } finally {
+        input.value = '';
+    }
+};
 const sortableContainer = ref(null);
 let sortableInstance = null;
 
@@ -1361,6 +1423,19 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 .diy-imgupload {
     width: 100%;
+
+    .image-upload-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+
+        .el-button {
+            min-height: 44px;
+            min-width: 112px;
+            margin-left: 0;
+        }
+    }
 
     .single-img-display {
         margin-top: 8px;

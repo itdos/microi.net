@@ -1,6 +1,6 @@
 <template>
   <section class="home-overview" data-testid="platform-home-overview">
-    <div v-if="loading" class="overview-skeleton" role="status" aria-label="首页概览加载中">
+    <div v-if="loading" class="overview-skeleton" role="status" :aria-label="$pet('首页概览加载中')">
       <div class="skeleton-heading"><span></span><span></span></div>
       <div class="skeleton-metrics"><span v-for="item in 4" :key="item"></span></div>
       <div class="skeleton-body"><span></span><span></span></div>
@@ -8,23 +8,23 @@
 
     <div v-else-if="errorMessage" class="overview-error" role="alert">
       <el-icon><Warning /></el-icon>
-      <div><strong>工作概览暂时不可用</strong><span>{{ errorMessage }}</span></div>
-      <button type="button" @click="loadDashboard">重新加载</button>
+      <div><strong>{{ $pet('工作概览暂时不可用') }}</strong><span>{{ errorMessage }}</span></div>
+      <button type="button" @click="loadDashboard">{{ $pet('重新加载') }}</button>
     </div>
 
     <template v-else>
       <header class="overview-heading">
         <div>
           <span>{{ greetingLabel }}</span>
-          <h2>{{ currentUserName }}，这是你的工作概览</h2>
-          <p>趋势与常用应用均来自当前账号的真实访问记录，并按现有菜单权限过滤。</p>
+          <h2>{{ currentUserName }}{{ $pet('，这是你的工作概览') }}</h2>
+          <p>{{ $pet('趋势与常用应用均来自当前账号的真实访问记录，并按现有菜单权限过滤。') }}</p>
         </div>
         <button type="button" class="assistant-link" @click="openAssistant">
-          打开完整 AI 助手 <el-icon><Right /></el-icon>
+          {{ $pet('打开完整 AI 助手') }} <el-icon><Right /></el-icon>
         </button>
       </header>
 
-      <div class="metric-strip" aria-label="个人使用统计">
+      <div class="metric-strip" :aria-label="$pet('个人使用统计')">
         <div v-for="metric in metrics" :key="metric.key" class="metric-item">
           <span>{{ metric.label }}</span>
           <strong>{{ metric.value }}</strong>
@@ -35,7 +35,7 @@
       <div class="overview-body">
         <section class="trend-panel">
           <div class="section-heading">
-            <div><strong>近 7 日使用趋势</strong><span>菜单打开次数</span></div>
+            <div><strong>{{ $pet('近 7 日使用趋势') }}</strong><span>{{ $pet('菜单打开次数') }}</span></div>
             <em>{{ dashboard.DataAsOf || '' }}</em>
           </div>
           <div ref="chartRef" class="usage-chart" data-testid="home-usage-chart"></div>
@@ -43,7 +43,7 @@
 
         <section class="apps-panel" data-testid="home-frequent-apps">
           <div class="section-heading">
-            <div><strong>常用应用</strong><span>{{ dashboard.HasHistory ? '按实际打开频率排序' : '尚无记录，先为你展示可用入口' }}</span></div>
+            <div><strong>{{ $pet('常用应用') }}</strong><span>{{ dashboard.HasHistory ? $pet('按实际打开频率排序') : $pet('尚无记录，先为你展示可用入口') }}</span></div>
           </div>
           <div v-if="dashboard.FrequentApps?.length" class="app-grid">
             <button
@@ -58,11 +58,11 @@
                 <i v-else-if="resolveMenuIconClass(app)" :class="resolveMenuIconClass(app)" aria-hidden="true"></i>
                 <b v-else>{{ appInitial(app.Name) }}</b>
               </span>
-              <span class="app-copy"><strong>{{ app.Name }}</strong><small>{{ app.OpenCount ? `${app.OpenCount} 次访问` : '可立即打开' }}</small></span>
+              <span class="app-copy"><strong>{{ app.Name }}</strong><small>{{ app.OpenCount ? `${$pet('访问次数')}: ${app.OpenCount}` : $pet('可立即打开') }}</small></span>
               <el-icon><Right /></el-icon>
             </button>
           </div>
-          <div v-else class="apps-empty">当前账号暂无可用菜单，请联系管理员配置权限。</div>
+          <div v-else class="apps-empty">{{ $pet('当前账号暂无可用菜单，请联系管理员配置权限。') }}</div>
         </section>
       </div>
     </template>
@@ -86,6 +86,7 @@ const props = defineProps({
 })
 
 const { proxy } = getCurrentInstance()
+const pet = text => proxy.$pet(text)
 const router = useRouter()
 const diyStore = useDiyStore()
 const pageEngineStore = usePageEngineStore()
@@ -111,23 +112,23 @@ let themeObserver = null
 
 const currentUserName = computed(() => {
   const user = diyStore.GetCurrentUser || {}
-  return user.Name || user.Account || '你好'
+  return user.Name || user.Account || pet('你好')
 })
 
 const greetingLabel = computed(() => {
   const hour = new Date().getHours()
-  if (hour < 6) return '夜深了'
-  if (hour < 11) return '早上好'
-  if (hour < 14) return '中午好'
-  if (hour < 18) return '下午好'
-  return '晚上好'
+  if (hour < 6) return pet('夜深了')
+  if (hour < 11) return pet('早上好')
+  if (hour < 14) return pet('中午好')
+  if (hour < 18) return pet('下午好')
+  return pet('晚上好')
 })
 
 const metrics = computed(() => [
-  { key: 'today', label: '今日打开', value: dashboard.value.TodayOpenCount || 0, hint: '当前账号' },
-  { key: 'week', label: '近 7 日访问', value: dashboard.value.WeekOpenCount || 0, hint: '真实使用次数' },
-  { key: 'used', label: '已使用应用', value: dashboard.value.UsedAppCount || 0, hint: `共 ${dashboard.value.AccessibleAppCount || 0} 个可用` },
-  { key: 'ai', label: 'AI 图像工具', value: dashboard.value.AiToolCount || 29, hint: '生成与精确处理' },
+  { key: 'today', label: pet('今日打开'), value: dashboard.value.TodayOpenCount || 0, hint: pet('当前账号') },
+  { key: 'week', label: pet('近 7 日访问'), value: dashboard.value.WeekOpenCount || 0, hint: pet('真实使用次数') },
+  { key: 'used', label: pet('已使用应用'), value: dashboard.value.UsedAppCount || 0, hint: `${pet('可用应用')}: ${dashboard.value.AccessibleAppCount || 0}` },
+  { key: 'ai', label: pet('AI 图像工具'), value: dashboard.value.AiToolCount || 29, hint: pet('生成与精确处理') },
 ])
 
 const engineKey = computed(() => String(props.widgetObj?.widgetParams?.[0]?.value || 'platform-home-overview').trim())
@@ -142,12 +143,12 @@ async function loadDashboard() {
   errorMessage.value = ''
   try {
     const result = normalizeResult(await proxy.DiyCommon.ApiEngine.Run(engineKey.value, { Action: 'Dashboard' }))
-    if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '接口未返回有效数据')
+    if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || pet('接口未返回有效数据'))
     dashboard.value = { ...dashboard.value, ...(result.Data || {}) }
     await nextTick()
     renderChart()
   } catch (error) {
-    errorMessage.value = String(error?.message || error || '加载失败')
+    errorMessage.value = String(error?.message || error || pet('加载失败'))
   } finally {
     loading.value = false
     await nextTick()
@@ -165,7 +166,7 @@ function renderChart() {
   chartInstance.setOption({
     animationDuration: 420,
     grid: { top: 22, right: 14, bottom: 28, left: 38 },
-    tooltip: { trigger: 'axis', formatter: '{b}<br/>打开 {c} 次' },
+    tooltip: { trigger: 'axis', formatter: `{b}<br/>${pet('菜单打开次数')}: {c}` },
     xAxis: {
       type: 'category',
       boundaryGap: false,

@@ -60,6 +60,12 @@ $env:MICROI_TEST_ALLOW_WRITES = "YES"
 本地候选源码和远端已部署代码的验收范围，不能用远端成功声称本地代码已经上线。
 各 Token 的设备标识必须与 `MICROI_TEST_DID`（默认 `Microi.Tests`）一致。
 
+共享工作区可用独立编译配置及 `run-tests.ps1 -SolutionPath <隔离解决方案路径>`
+运行完整构建。隔离解决方案应保留原解决方案全部项目，仅更改输出配置和项目路径，
+不能为通过 Full 门禁排除项目。MySQL 和 SQL Server 升级集成测试只接受本机连接，
+各用例创建独立随机数据库并在结束时删除，不清空传入的 `upgrade_fixture` 数据库，
+也不要求复用其它任务占用的固定端口。
+
 测试表至少要有一个可写短文本字段，默认名为 `Name`；若不同，设置
 `MICROI_TEST_NAME_FIELD`。测试会写入
 短 `mrg<time><random>` 前缀数据并在 `finally` 中清理，兼容旧租户的

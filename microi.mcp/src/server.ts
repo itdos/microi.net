@@ -43,6 +43,7 @@ import {
   registerAdvancedTools,
 } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
+import { registerEmailTools } from './email-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
 import {
@@ -8204,6 +8205,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   registerDesignTools(server, client, context);
   registerAdvancedTools(server, client, context);
   registerBlueprintTools(server, client, context);
+  registerEmailTools(server, client, context);
 
   toolRegistry.flush(context.codexMode ? ['microi_codex'] : undefined);
   return server;

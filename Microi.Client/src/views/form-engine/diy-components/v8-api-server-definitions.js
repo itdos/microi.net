@@ -386,6 +386,25 @@ export const V8ServerApiDefinitions = {
                 }
             },
 
+            // ========== 邮箱协议原子 ==========
+            Email: {
+                label: "Email", kind: "Module", insertText: "Email",
+                documentation: "租户隔离的 IMAP/SMTP/MIME 协议原子。邮箱业务使用接口引擎 mci-email；仅接受后端密文授权码，必须 TLS，不直接暴露解密能力。",
+                methods: Object.fromEntries([
+                    ["ProtectCredential", "将授权码加密为当前租户密文；无公开解密方法。"],
+                    ["TestConnection", "检测 IMAP/SMTP 连接和认证；不回显授权码。"],
+                    ["ListFolders", "读取最多 200 个可选目录及计数。"],
+                    ["Fetch", "按 AfterUid / UidValidity 分页；Limit 最大 100，Recent 优先读取最新邮件并保留历史游标。"],
+                    ["Inspect", "核对最多 100 个 Uids 的存在性、已读、星标与删除标志。"],
+                    ["GetMessage", "按 Folder / UidValidity / Uid 读取正文和附件描述。"],
+                    ["GetAttachment", "按 AttachmentIndex 返回一个附件的名称、类型与 Base64。"],
+                    ["SetFlags", "设置单封邮件 IsRead / IsStarred。"],
+                    ["Move", "将单封邮件移动到 DestinationFolder。"],
+                    ["Send", "SMTP 投递，须先在接口引擎保存稳定草稿和防重状态；Unknown 禁止自动重发。"],
+                    ["StoreSent", "按 MessageId 查重并保存 IMAP 已发送副本，独立于真正投递。"]
+                ].map(([name, documentation]) => [name, { label: name, kind: "Method", insertText: name, documentation }]))
+            },
+
             // ========== TCP 原始字节 ==========
             Tcp: {
                 label: "Tcp",

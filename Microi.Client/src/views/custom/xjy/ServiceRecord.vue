@@ -1,5 +1,5 @@
 <template>
-    <el-card v-if="HasPayload" v-loading="loading" class="box-card">
+    <el-card v-if="HasPayload" v-mci-loading="loading" class="box-card">
         <el-empty v-if="!loading && GetformData.length === 0" description="暂无符合条件的服务记录" :image-size="72" />
         <div v-for="(item, index) in GetformData" :key="item.Id || index" class="table-container">
             <table class="service-table" border="1" cellspacing="0">

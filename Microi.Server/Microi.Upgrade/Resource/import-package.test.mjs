@@ -17,6 +17,7 @@ const basePackageModel = JSON.parse(await readFile(
   "utf8",
 ));
 const saasPackageModel = JSON.parse(await readFile(new URL("./app.microi.saas-engine.json", import.meta.url), "utf8"));
+const modulePackageModel = JSON.parse(await readFile(new URL("./app.microi.module-engine.json", import.meta.url), "utf8"));
 const refreshSource = await readCanonicalText(new URL("./refresh-resources.mjs", import.meta.url));
 const upgradeSource = await readCanonicalText(new URL("../Upgrade.cs", import.meta.url));
 const appStoreUpgradeSource = await readCanonicalText(new URL("../13-UpgradeAppStore.cs", import.meta.url));
@@ -49,6 +50,33 @@ assert.ok(pageEngineReferenceRemapSource, "PageEngine reference remap helpers sh
 const context = {};
 vm.runInNewContext(`${functionSource[0]}\nresult = countPageTabs;`, context);
 const countPageTabs = context.result;
+for (const sqlServer of [true, false]) test(`background-task bootstrap validates native ${sqlServer ? 'SQL Server' : 'MySQL'} index rows and rejects incomplete contracts`, () => {
+  const definitions = [
+    ['ux_mci_bg_task_runtime_idem', ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'IdempotencyKey'], 0],
+    ['ix_mci_bg_task_runtime_claim', ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'], 1],
+    ['ix_mci_bg_task_lane_claim', ['OsClient', 'ApiEngineKey', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'], 1],
+    ['ix_mci_background_task_user', ['OsClient', 'UserKey', 'IsDeleted', 'CreateTime'], 1],
+    ['ix_mci_background_task_concurrency', ['OsClient', 'ConcurrencyKey', 'Status', 'LeaseExpiresAt'], 1]
+  ];
+  let rows = definitions.flatMap(([name, columns, nonUnique]) => columns.map((column, index) =>
+    ({ INDEX_NAME: name, COLUMN_NAME: column, SEQ_IN_INDEX: index + 1, NON_UNIQUE: nonUnique })));
+  const fixture = { runtimeIsSqlServer: sqlServer, isBackgroundTaskBootstrapPackage: () => true,
+    getTargetPhysicalColumns: () => new Proxy({}, { get: () => ({}) }),
+    getPhysicalValue: (row, keys) => { for (const key of keys) if (row[key] !== undefined) return row[key]; },
+    V8: { Db: { FromSql(sql) {
+      if (sqlServer) { assert.match(sql, /FROM sys\.indexes/); assert.match(sql, /ic\.key_ordinal > 0/); assert.match(sql, /i\.is_disabled = 0/); assert.doesNotMatch(sql, /INFORMATION_SCHEMA\.STATISTICS|DATABASE\(\)/); }
+      else assert.match(sql, /INFORMATION_SCHEMA\.STATISTICS/);
+      return { AddInParameter(name, value) { assert.equal(name, '@p0'); assert.equal(value, 'mci_background_task'); return this; }, ToArray() { return rows; } };
+    } } }
+  };
+  vm.runInNewContext(`${extractAssignedFunction(source, 'validateBackgroundTaskBootstrapReadiness')} result = validateBackgroundTaskBootstrapReadiness;`, fixture);
+  fixture.result();
+  const original = structuredClone(rows);
+  rows = rows.slice(1); assert.throws(() => fixture.result(), /后台任务基础能力未就绪/);
+  rows = structuredClone(original); rows[0].NON_UNIQUE = 1; assert.throws(() => fixture.result(), /后台任务基础能力未就绪/);
+  rows = structuredClone(original); rows[0].SEQ_IN_INDEX = 2; rows[1].SEQ_IN_INDEX = 1; assert.throws(() => fixture.result(), /后台任务基础能力未就绪/);
+  rows = original; fixture.result();
+});
 const dataSetImportSource = source.match(
   /\/\/ DATASET_INSERT_IF_MISSING_V1[\s\S]*?(?=\n    var hasInstallErrorsBeforeVersion)/
 );
@@ -114,6 +142,25 @@ function extractAssignedFunction(sourceText, name) {
   }
   assert.fail(`unterminated assigned function ${name}`);
 }
+
+test('menu events grant actual tenant administrators, preserve buttons on partial updates, and share transactions', () => {
+  const event = modulePackageModel.DiyTables.find(t => t.Name === 'sys_menu').SubmitAfterServerV8;
+  for (const action of ['Insert', 'Update', 'Delete']) {
+    const calls = [], trans = {}, grants = [], refreshed = [];
+    const fullMenu = {Id:'new-menu',Name:'测试菜单',PageBtns:JSON.stringify([{Id:'button-id',Name:'测试按钮'}])};
+    const fixture = { DateNow: () => '2026-09-07 12:40:00', V8: {OsClient:'local-customer',FormSubmitAction:action,Form:{Id:'new-menu'},DbTrans:trans,CurrentUser:{Id:'local-admin'},Cache:{Remove:()=>{}},Method:{RefreshLoginUser:(id,tenant)=>{refreshed.push([id,tenant]);return {Code:1};}},FormEngine:{
+      GetFormData:(table,query,transaction)=>{assert.equal(transaction,trans);calls.push(table);return table==='sys_menu'?{Code:1,Data:fullMenu}:{Code:2};},
+      GetTableData:(table,query,transaction)=>{assert.equal(table,'sys_role');assert.equal(transaction,trans);assert.deepEqual(JSON.parse(JSON.stringify(query._Where)),[['Level','>=',9999]]);return {Code:1,Data:[{Id:'local-admin-role'}]};},
+      AddFormData:(table,row,transaction)=>{assert.equal(table,'sys_rolelimit');assert.equal(transaction,trans);grants.push(JSON.parse(JSON.stringify(row)));return {Code:1};},
+      DelFormDataByWhere:(table,query,transaction)=>{assert.equal(table,'sys_rolelimit');assert.equal(transaction,trans);assert.deepEqual(JSON.parse(JSON.stringify(query._Where)),[['FkId','=','new-menu'],['Type','=','Menu']]);calls.push('delete');return {Code:1};}
+    }}};
+    vm.runInNewContext('(function(){'+event+'})();',fixture);
+    assert.deepEqual(refreshed,[['local-admin','local-customer']]);
+    if(action==='Delete'){assert.deepEqual(calls,['delete']);assert.equal(grants.length,0);}
+    else{assert.equal(grants.length,1);assert.equal(grants[0].RoleId,'local-admin-role');assert.equal(grants[0].CreateTime,'2026-09-07 12:40:00');assert(JSON.parse(grants[0].Permission).includes('button-id'));}
+  }
+  assert.doesNotMatch(event,/V8\.Action\.GetDateTimeNow|5db47859-35a3-411a-a1f7-99482e057d24|c74d669c-a3d4-11e5-b60d-b870f43edd03/);
+});
 
 test("new menus inherit only declared literal switch defaults without overwriting explicit values", () => {
   const fixture = {};
@@ -192,6 +239,184 @@ test("referenced physical tables retain existing defaults but still receive miss
   assert.deepEqual(calls, ["ALTER TABLE `sys_menu` ADD COLUMN `NewOptionalSwitch` int NULL DEFAULT 0"]);
   assert.equal(fixture.owns("MCI_VISION_SUBJECT"), true);
   assert.equal(fixture.owns("sys_menu"), false);
+});
+
+test('SQL Server widens legacy text without narrowing Unicode, max, or unrelated column types', () => {
+  const fixture = { runtimeIsSqlServer: true };
+  vm.runInNewContext(['normalizeSqlType', 'getTextTypeCapacity', 'mapToMySQLType', 'chooseSqlServerTextExpansion']
+    .map(name => extractAssignedFunction(source, name)).join('\n'), fixture);
+  for (const [incoming, existing, expected] of [
+    ['varchar(255)', 'nvarchar(50)', 'nvarchar(255)'],
+    ['mediumtext', 'nvarchar(1000)', 'nvarchar(max)'],
+    ['varchar(100)', 'nvarchar(500)', 'nvarchar(500)'],
+    ['varchar(255)', 'nvarchar(max)', 'nvarchar(max)'],
+    ['varchar(200)', 'nchar(50)', 'nchar(200)'],
+    ['mediumtext', 'varchar(100)', 'varchar(max)'],
+    ['int', 'nvarchar(50)', 'nvarchar(50)'],
+    ['varchar(255)', 'datetime2(7)', 'datetime2(7)']
+  ]) assert.equal(fixture.chooseSqlServerTextExpansion(incoming, existing), expected);
+});
+
+test('SQL Server text expansion preserves tenant constraints and stops on a failed readback', () => {
+  for (const badReadback of [false, true]) {
+    const calls = [];
+    let written = false;
+    const target = { COLUMN_TYPE: 'nvarchar(50)', IS_NULLABLE: 'NO', COLUMN_DEFAULT: "(N'客户')", COLLATION_NAME: 'Latin1_General_100_BIN2' };
+    const fixture = {
+      Package: { DiyTables: [{ Name: 'sys_menu' }], PhysicalColumns: [] },
+      runtimeIsSqlServer: true, debugLog: {}, isSafeIdentifier: () => true,
+      groupPackagePhysicalColumns: () => ({sys_menu: {TableName: 'sys_menu', Columns: [{COLUMN_NAME:'SelectApi',COLUMN_TYPE:'varchar(255)'}]}}),
+      getPhysicalValue: (row, keys) => keys.map(key => row[key]).find(value => value != null),
+      getTargetPhysicalColumns: () => ({ selectapi: {...target, COLUMN_TYPE: written && !badReadback ? 'nvarchar(255)' : target.COLUMN_TYPE} }),
+      quotePhysicalIdentifier: name => '[' + name + ']', quoteSqlServerCatalogIdentifier: name => '[' + name + ']',
+      V8: {Db: {FromSql: sql => ({ExecuteNonQuery: () => { calls.push(sql); written = true; return 1; }})}}
+    };
+    vm.runInNewContext(['normalizeSqlType', 'getTextTypeCapacity', 'mapToMySQLType', 'chooseSqlServerTextExpansion', 'packageOwnsPhysicalTable', 'syncPhysicalColumnsFromPackage']
+      .map(name => extractAssignedFunction(source, name)).join('\n') + '\nresult = syncPhysicalColumnsFromPackage(null);', fixture);
+    assert.deepEqual(calls, ['ALTER TABLE [sys_menu] ALTER COLUMN [SelectApi] nvarchar(255) COLLATE Latin1_General_100_BIN2 NOT NULL']);
+    assert.equal(fixture.result.Errors, badReadback ? 1 : 0);
+    assert.equal(fixture.result.Modified, badReadback ? 0 : 1);
+    if (!badReadback) {
+      vm.runInNewContext('result = syncPhysicalColumnsFromPackage(null);', fixture);
+      assert.equal(calls.length, 1, 'a replay must not issue another ALTER');
+      assert.equal(fixture.result.Skipped, 1);
+    }
+  }
+});
+
+test('SQL Server Unicode contract preserves legacy capacity and only converts explicitly declared text', () => {
+  const fixture = { runtimeIsSqlServer: true };
+  vm.runInNewContext(['normalizeSqlType', 'getTextTypeCapacity', 'mapToMySQLType', 'chooseSqlServerTextExpansion']
+    .map(name => extractAssignedFunction(source, name)).join('\n'), fixture);
+  for (const [incoming, existing, expected] of [
+    ['varchar(2000)', 'varchar(2000)', 'nvarchar(2000)'],
+    ['varchar(100)', 'varchar(2000)', 'nvarchar(2000)'],
+    ['varchar(2000)', 'varchar(max)', 'nvarchar(max)'],
+    ['varchar(2000)', 'ntext', 'nvarchar(max)'],
+    ['varchar(50)', 'char(5000)', 'nvarchar(max)'],
+    ['varchar(50)', 'nchar(100)', 'nchar(100)'],
+    ['varchar(2000)', 'int', 'int']
+  ]) assert.equal(fixture.chooseSqlServerTextExpansion(incoming, existing, true), expected);
+  assert.equal(fixture.chooseSqlServerTextExpansion('varchar(2000)', 'varchar(2000)'), 'varchar(2000)');
+  assert.match(source, /sourceColumn\.SQLSERVER_UNICODE === true/);
+  assert.match(source, /alterSqlServerColumnPreservingIndexes\(tableName, columnName, expandedType \+ retainedCollation, retainedNullable\)/);
+});
+
+function runDefaultSync({ sourceDefault = 'CURRENT_TIMESTAMP', targetDefault = null, columnType = 'timestamp(3)', readbackDefault = sourceDefault, extra = 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP(3)', failDdl = false } = {}) {
+  const calls = [];
+  const target = { COLUMN_NAME: 'CreateTime', COLUMN_TYPE: columnType, IS_NULLABLE: 'YES', COLUMN_DEFAULT: targetDefault,
+    COLUMN_COMMENT: "tenant's comment", EXTRA: extra, CHARACTER_SET_NAME: 'utf8mb4', COLLATION_NAME: 'utf8mb4_bin' };
+  let written = false;
+  const fixture = {
+    Package: { DiyTables: [{ Name: 'sys_blueprint_history' }], PhysicalColumns: [] },
+    isSafeIdentifier: value => /^[A-Za-z_][A-Za-z0-9_]*$/.test(value),
+    groupPackagePhysicalColumns: () => ({ sys_blueprint_history: { TableName: 'sys_blueprint_history', Columns: [
+      { COLUMN_NAME: 'CreateTime', COLUMN_TYPE: columnType, IS_NULLABLE: 'YES', COLUMN_DEFAULT: sourceDefault, COLUMN_COMMENT: 'package comment' }
+    ] } }),
+    getTargetPhysicalColumns: () => ({ createtime: { ...target, COLUMN_DEFAULT: written ? readbackDefault : targetDefault } }),
+    getPhysicalValue: (row, keys) => { for (const key of keys) if (Object.hasOwn(row, key)) return row[key]; return null; },
+    mapToMySQLType: type => type,
+    normalizeSqlType: type => String(type).toLowerCase(),
+    chooseCompatibleColumnType: (source, existing) => existing,
+    isNumericSqlType: type => /int|bit|decimal/i.test(type),
+    sqlString: value => value.replace(/'/g, "''"),
+    quotePhysicalIdentifier: name => '`' + name + '`',
+    runtimeIsSqlServer: false, debugLog: {}, mysqlOffpageTypeOverrides: {},
+    V8: { Db: { FromSql: sql => ({ ExecuteNonQuery: () => {
+      calls.push(sql); if (failDdl) throw new Error('ALGORITHM=INPLACE is not supported'); written = true; return 1;
+    } }) } }
+  };
+  vm.runInNewContext(['mysqlCurrentTimestampDefault', 'buildPhysicalColumnDefinition', 'packageOwnsPhysicalTable', 'syncPhysicalColumnsFromPackage']
+    .map(name => extractAssignedFunction(source, name)).join('\n') + '\nresult = syncPhysicalColumnsFromPackage(null);', fixture);
+  return { calls, result: fixture.result, debugLog: fixture.debugLog, target };
+}
+
+test('failed package DDL stops before assets, but a concurrent completed object is accepted', () => {
+  let tableExists = false;
+  let indexExists = false;
+  const fixture = { ddlTableExists: () => tableExists, ddlIndexExists: () => indexExists };
+  vm.runInNewContext(extractAssignedFunction(source, 'requirePackageDdlObject') + '\ncheck = requirePackageDdlObject;', fixture);
+  assert.throws(() => fixture.check({Kind:'table',TableName:'sys_microiservice_page'},new Error('missing PhysicalColumns')), /sys_microiservice_page.*missing PhysicalColumns/);
+  assert.throws(() => fixture.check({Kind:'index',TableName:'orders',IndexName:'ix_orders'},null), /orders.ix_orders/);
+  tableExists = true;
+  assert.doesNotThrow(() => fixture.check({Kind:'table',TableName:'sys_microiservice_page'},new Error('concurrent create')));
+  indexExists = true;
+  assert.doesNotThrow(() => fixture.check({Kind:'index',TableName:'orders',IndexName:'ix_orders'},null));
+  assert.match(source, /requirePackageDdlObject\(ddlInfo, finalDdlError\)/);
+  assert.ok(source.indexOf('requirePackageDdlObject(ddlInfo, null)') < source.indexOf("activeImportStage = '步骤1-表定义'"));
+});
+
+test('SaaS foundation carries every declared physical column for a first SQL Server installation', () => {
+  const storeColumns = new Set(saasPackageModel.PhysicalColumns.filter(c => c.TABLE_NAME === 'sys_microistore').map(c => c.COLUMN_NAME));
+  for (const name of ['PublishProtocolVersion', 'PublishState', 'PublishFence', 'PublishRowVersion',
+    'ActivePublishVersionId', 'CommittedPublishVersionId', 'CommittedRuntimeManifestHash'])
+    assert.ok(storeColumns.has(name), `${name} is needed before the first SaaS application asset`);
+  for (const ddl of saasPackageModel.DDLStatements) {
+    if (!/^CREATE TABLE/i.test(ddl.DDL)) continue;
+    const physical = new Set(saasPackageModel.PhysicalColumns.filter(c => c.TABLE_NAME.toLowerCase() === ddl.TableName.toLowerCase()).map(c => c.COLUMN_NAME.toLowerCase()));
+    const declared = [...ddl.DDL.matchAll(/(?:^|[,\n(])\s*`([A-Za-z_][A-Za-z0-9_]*)`\s+[A-Za-z]/g)].map(m => m[1].toLowerCase());
+    for (const column of declared) assert.ok(physical.has(column), `${ddl.TableName}.${column} missing from PhysicalColumns`);
+  }
+  const saasInstall = appStoreUpgradeSource.indexOf('await InstallUpgradePackage(osClient, msgs, SaaSEnginePackageResourceName');
+  const storeInstall = appStoreUpgradeSource.indexOf('await InstallUpgradePackage(osClient, msgs, AppStorePackageResourceName');
+  assert.ok(saasInstall >= 0 && saasInstall < storeInstall, 'application storage schema must precede marketplace assets');
+  assert.doesNotMatch(upgradeSource, /FromSql\(Upgrade(?:SysConfig|Lang|ApiEngine)\.Sql\)/);
+});
+
+test('SQL Server mapped datetime2 columns retain executable timestamp defaults', () => {
+  const fixture = { runtimeIsSqlServer: true, isSafeIdentifier: () => true,
+    getPhysicalValue: (row, keys) => { for (const key of keys) if (Object.hasOwn(row, key)) return row[key]; return null; },
+    mapToMySQLType: () => 'datetime2(3)', quotePhysicalIdentifier: name => '[' + name + ']', sqlString: value => value.replace(/'/g, "''") };
+  vm.runInNewContext(['mysqlCurrentTimestampDefault', 'buildPhysicalColumnDefinition'].map(name => extractAssignedFunction(source, name)).join('\n'), fixture);
+  for (const value of ['CURRENT_TIMESTAMP', 'current_timestamp()', 'CURRENT_TIMESTAMP(3)']) {
+    assert.equal(fixture.buildPhysicalColumnDefinition({ COLUMN_NAME: 'CreateTime', COLUMN_TYPE: 'datetime(3)', IS_NULLABLE: 'YES', COLUMN_DEFAULT: value }, false), '[CreateTime] datetime2(3) NULL DEFAULT CURRENT_TIMESTAMP');
+  }
+});
+
+test('MySQL temporal defaults use compatible MODIFY while retaining target attributes', () => {
+  const result = runDefaultSync({ sourceDefault: 'current_timestamp(3)', readbackDefault: 'CURRENT_TIMESTAMP(3)' });
+  assert.equal(result.result.Errors, 0);
+  assert.equal(result.result.Modified, 1);
+  assert.deepEqual(result.calls, ["ALTER TABLE `sys_blueprint_history` MODIFY COLUMN `CreateTime` timestamp(3) NULL DEFAULT CURRENT_TIMESTAMP(3) on update CURRENT_TIMESTAMP(3) COMMENT 'tenant''s comment', ALGORITHM=INPLACE, LOCK=NONE"]);
+  assert.equal(result.target.COLUMN_DEFAULT, null, 'target metadata must not be mutated');
+});
+
+test('equivalent MySQL timestamp metadata does not cause repeat DDL', () => {
+  for (const targetDefault of ['CURRENT_TIMESTAMP', 'current_timestamp()', 'CURRENT_TIMESTAMP(0)']) {
+    const result = runDefaultSync({ columnType: 'datetime', sourceDefault: 'CURRENT_TIMESTAMP', targetDefault });
+    assert.equal(result.result.Skipped, 1);
+    assert.deepEqual(result.calls, []);
+  }
+});
+
+test('timestamp precision differences still update and verify', () => {
+  const result = runDefaultSync({ sourceDefault: 'CURRENT_TIMESTAMP(3)', targetDefault: 'current_timestamp()', readbackDefault: 'current_timestamp(3)' });
+  assert.equal(result.result.Modified, 1);
+  assert.equal(result.result.Errors, 0);
+});
+
+test('literal CURRENT_TIMESTAMP on a text column remains a quoted literal', () => {
+  const result = runDefaultSync({ columnType: 'varchar(64)', extra: '' });
+  assert.equal(result.result.Errors, 0);
+  assert.deepEqual(result.calls, ["ALTER TABLE `sys_blueprint_history` ALTER COLUMN `CreateTime` SET DEFAULT 'CURRENT_TIMESTAMP', ALGORITHM=INPLACE, LOCK=NONE"]);
+});
+
+test('ordinary numeric defaults and DROP DEFAULT retain the narrow ALTER operation', () => {
+  for (const [sourceDefault, expected] of [["b'1'", "SET DEFAULT b'1'"], [null, 'DROP DEFAULT']]) {
+    const result = runDefaultSync({ columnType: 'bit(1)', sourceDefault, targetDefault: "b'0'", extra: '' });
+    assert.equal(result.result.Errors, 0);
+    assert.equal(result.calls[0], 'ALTER TABLE `sys_blueprint_history` ALTER COLUMN `CreateTime` ' + expected + ', ALGORITHM=INPLACE, LOCK=NONE');
+  }
+});
+
+test('incompatible online DDL and mismatched readback fail without COPY fallback', () => {
+  for (const options of [{ failDdl: true }, { readbackDefault: '2000-01-01 00:00:00' }]) {
+    const result = runDefaultSync(options);
+    assert.equal(result.result.Errors, 1);
+    assert.equal(result.result.Modified, 0);
+    assert.equal(result.calls.length, 1);
+    assert.match(result.debugLog.physical_schema_sync_error_sys_blueprint_history_CreateTime, /INPLACE|回读不一致/);
+  }
 });
 
 test("bulk field slices use the existing bounded capacity and honor explicit smaller batches", () => {
@@ -2107,7 +2332,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
   assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 8\)/);
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 7, 13\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 8, 10\)/);
   assert.match(source, /SQLSERVER_PHYSICAL_SCHEMA_DIALECT_V1/);
   assert.match(source, /SQLSERVER_PHYSICAL_FIELD_CHANGE_V1/);
   assert.match(source, /FROM sys\.default_constraints dc/);

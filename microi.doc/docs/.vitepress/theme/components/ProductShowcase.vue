@@ -260,7 +260,7 @@ const copy = computed(() => isEnglish.value ? {
 const defaultBusinessCategories = [
   { label: '全部', value: 'all' },
   { label: '推荐', value: 'recommended' },
-  { label: '平台能力 / 平台应用', value: 'platform' },
+  { label: '平台应用', value: 'platform' },
   { label: '游戏', value: 'game' },
   { label: '企业应用', value: 'business' },
   { label: '办公协同', value: 'office' },
@@ -274,7 +274,7 @@ const defaultBusinessCategories = [
   { label: '其它', value: 'other' }
 ]
 const businessCategories = ref(defaultBusinessCategories)
-const categoryEnglishLabels = { all: 'All', recommended: 'Recommended', platform: 'Platform capability / app', game: 'Games', business: 'Business', office: 'Collaboration', data: 'Analytics', tools: 'Productivity', industry: 'Industry', education: 'Education', lifestyle: 'Lifestyle', creative: 'Creative', marketing: 'Marketing', other: 'Other' }
+const categoryEnglishLabels = { all: 'All', recommended: 'Recommended', platform: 'Platform apps', game: 'Games', business: 'Business', office: 'Collaboration', data: 'Analytics', tools: 'Productivity', industry: 'Industry', education: 'Education', lifestyle: 'Lifestyle', creative: 'Creative', marketing: 'Marketing', other: 'Other' }
 const sortOptions = computed(() => isEnglish.value ? [
   { label: 'Recently updated', value: 'AppUpdateTime' },
   { label: 'Recently published', value: 'AppPublishTime' },
@@ -360,7 +360,7 @@ function normalizeApp(app) {
 function keyValueOptions(value) {
   const localize = item => {
     if (isEnglish.value) return { ...item, label: categoryEnglishLabels[item.value] || item.label }
-    if (item.value === 'platform') return { ...item, label: '平台能力 / 平台应用' }
+    if (item.value === 'platform') return { ...item, label: '平台应用' }
     return item
   }
   if (!Array.isArray(value) || !value.length) return defaultBusinessCategories.map(localize)

@@ -723,14 +723,16 @@ export default {
         },
         async openMarketplaceFormWhenReady(input) {
             const tableName = String(input?.tableName || input?.TableName || "").trim();
-            if (tableName.toLowerCase() !== "sys_microistore") {
-                throw Object.assign(new Error("微服务只允许打开应用商城表单"), { code: "HOST_FORM_NOT_ALLOWED" });
+            // 宿主只接受表名和普通表单参数；读写继续经过 FormEngine 的当前用户、表、菜单与记录权限。
+            // 禁止把微服务上下文当作管理员凭证，也不接受自定义 API、Token 或执行代码。
+            if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(tableName)) {
+                throw Object.assign(new Error("请提供有效的数据表名称"), { code: "HOST_FORM_NOT_ALLOWED" });
             }
             const formModeRaw = String(input?.formMode || input?.FormMode || "View").trim().toLowerCase();
             const formMode = formModeRaw === "add" ? "Add" : formModeRaw === "edit" ? "Edit" : "View";
             const tableRowId = String(input?.id || input?.Id || input?.tableRowId || input?.TableRowId || "").trim();
             if (formMode !== "Add" && !tableRowId) {
-                throw Object.assign(new Error("查看或编辑应用时缺少记录 Id"), { code: "HOST_FORM_ID_REQUIRED" });
+                throw Object.assign(new Error("查看或编辑表单时缺少记录 Id"), { code: "HOST_FORM_ID_REQUIRED" });
             }
             this.formDialogVisible = true;
             try {
@@ -748,7 +750,7 @@ export default {
                     throw Object.assign(new Error("应用表单加载超时，请重试"), { code: "HOST_FORM_DIALOG_NOT_READY" });
                 }
                 dialog.Init({
-                    TableName: "sys_microistore",
+                    TableName: tableName,
                     TableRowId: tableRowId,
                     DialogType: "Dialog",
                     Width: "80%",
@@ -757,11 +759,11 @@ export default {
                     SubmitEvent: () => {
                         this.deliverMicroAppData({
                             type: "micro-app:form-saved",
-                            data: { tableName: "sys_microistore", id: tableRowId, formMode }
+                            data: { tableName, id: tableRowId, formMode }
                         });
                     }
                 });
-                return { accepted: true, tableName: "sys_microistore", formMode, id: tableRowId };
+                return { accepted: true, tableName, formMode, id: tableRowId };
             } catch (error) {
                 this.formDialogVisible = false;
                 await this.$nextTick();

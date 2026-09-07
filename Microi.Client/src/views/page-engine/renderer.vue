@@ -3,9 +3,9 @@
         <formRenderer v-if="remoteObj.Id" :remoteObj="remoteObj" />
         <div v-else-if="loadError" class="pe-page-error">
             <div class="pe-page-error__code">!</div>
-            <h2>首页加载失败</h2>
+            <h2>{{ $pet('首页加载失败') }}</h2>
             <p>{{ loadError }}</p>
-            <button type="button" @click="loadFormData">重新加载</button>
+            <button type="button" @click="loadFormData">{{ $pet('重新加载') }}</button>
         </div>
         <div v-else-if="isLoading" class="pe-page-skeleton">
             <div class="pe-page-skeleton__header"></div>

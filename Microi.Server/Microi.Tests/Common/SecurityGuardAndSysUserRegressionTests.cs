@@ -352,7 +352,7 @@ public class SecurityGuardAndSysUserRegressionTests
             .Single(item => item["ApiEngineKey"]?.ToString() == "platform-user-update-preferences");
 
         Assert.False(File.Exists(sysUserControllerPath));
-        Assert.False(File.Exists(compatibilityControllerPath));
+        Assert.DoesNotContain("UpdateMyDefaultIndexUrl", File.ReadAllText(compatibilityControllerPath));
         Assert.Contains(
             "/api/SysUser/UpdateMyDefaultIndexUrl",
             preferenceEngine["ApiRoutes"]?.ToString());

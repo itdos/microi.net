@@ -38,6 +38,7 @@ public sealed class ApiControllerOwnershipCatalogTests
                 "DiagnosticsController",
                 "FormEngineController",
                 "HDFSController",
+                "LegacyMobileCompatibilityController",
                 "LicenseController",
                 "MessageController",
                 "MicroAppController",
@@ -129,7 +130,7 @@ public sealed class ApiControllerOwnershipCatalogTests
     }
 
     [Fact]
-    public void MigratedLegacyRoutes_ArePackageDeliveredAndCompatibilityControllerIsDeleted()
+    public void MigratedLegacyRoutes_ArePackageDeliveredAndBootstrapCompatibilityIsRetained()
     {
         var serverRoot = FindServerRoot();
         var apiRoot = Path.Combine(serverRoot, "Microi.net.Api");
@@ -141,8 +142,9 @@ public sealed class ApiControllerOwnershipCatalogTests
             apiRoot,
             "api-ownership-catalog.json")));
 
-        Assert.False(File.Exists(compatibilityPath));
-        Assert.NotNull(catalog["MigratedControllers"]?["LegacyMobileCompatibilityController"]);
+        Assert.True(File.Exists(compatibilityPath));
+        Assert.Equal("BootstrapCompatibility", catalog["ProtocolGateways"]?["LegacyMobileCompatibilityController"]?["Disposition"]);
+        Assert.Contains("未来可能整体删除", File.ReadAllText(compatibilityPath));
 
         var routes = ((JObject)catalog["ActionOverrides"]!)
             .Properties()
@@ -206,9 +208,11 @@ public sealed class ApiControllerOwnershipCatalogTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory != null)
         {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Microi.net.Api"))
-                && Directory.Exists(Path.Combine(directory.FullName, "Microi.Core")))
+            if (File.Exists(Path.Combine(directory.FullName, "Microi.net.Api", "Microi.net.Api.csproj"))
+                && File.Exists(Path.Combine(directory.FullName, "Microi.Core", "Microi.Core.csproj")))
                 return directory.FullName;
+            if (File.Exists(Path.Combine(directory.FullName, "Microi.Server", "Microi.net.Api", "Microi.net.Api.csproj")))
+                return Path.Combine(directory.FullName, "Microi.Server");
             directory = directory.Parent;
         }
         throw new DirectoryNotFoundException("未找到 Microi.Server 根目录。");

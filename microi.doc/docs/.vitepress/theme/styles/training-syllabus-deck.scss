@@ -99,6 +99,21 @@ html.dark .mci-training-ppt-page {
   padding-left: 0 !important;
 }
 
+/* 960px 以下站点导航参与正常布局，不再为同一导航重复预留高度。 */
+@media (max-width: 959px) {
+  .mci-training-ppt-page .VPContent { padding-top: 0 !important; }
+}
+
+@media (min-width: 768px) and (max-width: 959px) {
+  .mci-training-ppt-page .VPNavBarMenu,
+  .mci-training-ppt-page .VPNavBarExtra { display: none !important; }
+  .mci-training-ppt-page .VPNavBarHamburger { display: flex !important; }
+  .mci-training-ppt-page .VPNavScreen { display: block !important; }
+  .mci-training-ppt-page .DocSearch-Button-Placeholder,
+  .mci-training-ppt-page .DocSearch-Button-Keys { display: none !important; }
+  .mci-training-ppt-page .DocSearch-Button { min-width: 44px; padding-inline: 10px !important; }
+}
+
 .mci-training-ppt-page .VPDoc,
 .mci-training-ppt-page .VPDoc .container,
 .mci-training-ppt-page .VPDoc .content,
@@ -161,7 +176,7 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   isolation: isolate;
   width: 100%;
   height: calc(100dvh - var(--vp-nav-height, 64px));
-  min-height: 560px;
+  min-height: 0;
   overflow: hidden;
   color: var(--mci-deck-text);
   background:
@@ -1287,7 +1302,7 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
 @media (max-width: 767px) {
   .mci-training-ppt-page { --mci-deck-rail: 0px; }
   .mci-training-ppt-page .VPContent { padding-top: 0 !important; }
-  .mci-training-deck { min-height: 520px; }
+  .mci-training-deck { min-height: 0; }
   .mci-training-deck__topbar { height: 58px; padding: 0 max(10px, env(safe-area-inset-left)) 0 max(10px, env(safe-area-inset-right)); background: var(--mci-deck-bg); }
   .mci-training-brand { gap: 8px; min-height: 44px; }
   .mci-training-brand img { width: 29px; height: 29px; }

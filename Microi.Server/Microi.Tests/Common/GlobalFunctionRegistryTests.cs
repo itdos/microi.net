@@ -146,6 +146,43 @@ public class GlobalFunctionRegistryTests
         Assert.DoesNotContain("Greeting", GlobalFunctionRegistry.Decode(next["GlobalV8Code"]!.ToString()));
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public async Task FormEngineCacheClear_PublishesOnlyCommittedSettings(bool commit, bool useProxy)
+    {
+        using var scope = new CacheScope();
+        const string tenant = "transaction_cache_fixture";
+        var key = $"Microi:{tenant}:SysConfig";
+        var revisionKey = GlobalFunctionRegistry.RevisionKey(tenant);
+        scope.Cache.Values[key] = "committed-settings";
+        scope.Cache.Values[revisionKey] = "before";
+        using var transaction = new DbTrans(new FakeTransaction(), null!);
+        DbTrans suppliedTransaction = useProxy ? new SafeTransactionProxy(transaction) : transaction;
+        await new FormEngineExtend().CacheClear(tenant, "config-id", "sys_config",
+            FormEngineExtend.FormSubmitType.Upt, cacheTransaction: suppliedTransaction);
+        Assert.Equal("committed-settings", scope.Cache.Values[key]);
+        Assert.Equal("before", scope.Cache.Values[revisionKey]);
+        if (commit) transaction.Commit(); else transaction.Rollback();
+        Assert.Equal(!commit, scope.Cache.Values.ContainsKey(key));
+        Assert.Equal(commit, (string)scope.Cache.Values[revisionKey] != "before");
+    }
+
+    [Fact]
+    public async Task FormEngineCacheClear_DoesNotReadUncommittedTableMetadata()
+    {
+        using var scope = new CacheScope();
+        using var transaction = new DbTrans(new FakeTransaction(), null!);
+        // 缓存代理不支持数据库读取。任何提交前的授权失效或父表查询都会立即失败，
+        // 对应 SQL Server 新增 diy_table 后新增 diy_field 的自阻塞路径。
+        await new FormEngineExtend().CacheClear("transaction_cache_fixture", "field-id", "diy_field",
+            FormEngineExtend.FormSubmitType.Add, new JObject { ["TableId"] = "uncommitted-table" }, transaction);
+        Assert.Empty(scope.Cache.Values);
+        transaction.Rollback();
+    }
+
     private sealed class CacheScope : IDisposable, IMicroiCacheTenant
     {
         private readonly FieldInfo field = typeof(MicroiEngine).GetField("_serviceProvider", BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -175,6 +212,7 @@ public class GlobalFunctionRegistryTests
                 case "Get": return Values.GetValueOrDefault(key);
                 case "Set": Values[key] = args[1]!; Sets++; return true;
                 case "Remove": return Values.Remove(key);
+                case "RemoveAsync": return Task.FromResult(Values.Remove(key));
                 default: throw new NotSupportedException(method.Name);
             }
         }

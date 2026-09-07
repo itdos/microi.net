@@ -11,15 +11,20 @@ public class MySqlIdentifierForeignKeyTests
 {
     public static bool HasConnection => MarketplaceMetadataBootstrapIntegrationTests.HasMySqlTestConnection;
 
-    [Fact(Skip = "Requires isolated upgrade_fixture on localhost:62606", SkipUnless = nameof(HasConnection))]
+    [Fact(Skip = "Requires an isolated local MySQL upgrade_fixture connection", SkipUnless = nameof(HasConnection))]
     public void WideningFromV8_PreservesForeignKeysRowsDefaultsAndCollation_AndReplaysWithoutChanges()
     {
         var connection = Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN")!;
         var options = new DbConnectionStringBuilder { ConnectionString = connection };
         Assert.Equal("upgrade_fixture", options["Database"]);
         Assert.Equal("127.0.0.1", options["Server"]);
-        Assert.Equal("62606", Convert.ToString(options["Port"]));
-        var db = MicroiORMExtensions.CreateDbSession(connection, DatabaseType.MySql);
+        Assert.InRange(Convert.ToInt32(options["Port"]), 1, 65535);
+        var databaseName = "microi_fk_fixture_" + Guid.NewGuid().ToString("N");
+        options["Database"] = "mysql";
+        var master = MicroiORMExtensions.CreateDbSession(options.ConnectionString, DatabaseType.MySql);
+        master.FromSql($"CREATE DATABASE `{databaseName}` CHARACTER SET utf8mb4").ExecuteNonQuery();
+        options["Database"] = databaseName;
+        var db = MicroiORMExtensions.CreateDbSession(options.ConnectionString, DatabaseType.MySql);
         try
         {
             db.FromSql("CREATE TABLE fk_parent (Id char(36) COLLATE utf8mb4_bin NOT NULL COMMENT 'keep,id',ParentId char(36) DEFAULT '',PRIMARY KEY(Id))").ExecuteNonQuery();
@@ -51,9 +56,8 @@ public class MySqlIdentifierForeignKeyTests
         }
         finally
         {
-            db.FromSql("DROP TABLE IF EXISTS fk_child").ExecuteNonQuery();
-            db.FromSql("DROP TABLE IF EXISTS fk_parent").ExecuteNonQuery();
-            db.FromSql("DROP TABLE IF EXISTS fk_fail").ExecuteNonQuery();
+            // Only the database created by this invocation is ever removed.
+            master.FromSql($"DROP DATABASE `{databaseName}`").ExecuteNonQuery();
         }
     }
 }
