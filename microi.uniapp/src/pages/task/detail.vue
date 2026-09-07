@@ -190,6 +190,8 @@ export default {
   onLoad(options) {
     this.id = decodeURIComponent(options.id || '')
     this.currentUser = getUser() || {}
+    // 仅进入任务页时初始化；预览返回触发 onShow 刷新时保留用户的展开状态。
+    this.expandedMetadata = {}
     this.loadAll()
   },
   onShow() { if (!this.loading && this.id) this.loadAll(true, false) },
@@ -226,7 +228,6 @@ export default {
         this.taskCapabilities = capabilities.actions || []
         this.metadataDefinition = definition || null
         this.taskMenuId = menu && menu.Id || ''
-        this.expandedMetadata = {}
         this.stale = taskResult.stale
       } catch (error) {
         this.error = error.message || '任务加载失败'

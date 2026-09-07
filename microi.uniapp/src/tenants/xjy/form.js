@@ -21,6 +21,7 @@ import {
   proposalInitialValues
 } from './proposal-calculation.js'
 import { XJY_CUSTOMER_DEFAULT_REGION } from './customer-location.mjs'
+import { casePhotoField, caseFieldDescription } from './case-form.mjs'
 import {
   CUSTOMER_FOLLOW_FIELDS,
   customerFollowScopeValues
@@ -188,6 +189,30 @@ function isCustomerAdd(context) {
 
 function isCustomerForm(context) {
   return String(context.tableName || '').toLowerCase() === CUSTOMER_TABLE
+}
+
+function isCustomerCaseForm(context) {
+  return [CUSTOMER_CASE_TABLE, CASEBOOK_CASE_TABLE].includes(String(context.tableName || '').toLowerCase())
+}
+
+async function initializeCustomerCaseMerchant(context) {
+  if (!isCustomerCaseForm(context) || context.mode !== 'Add' || context.rowId) return {}
+  // 新增页和保存共用同一次身份回源，隐藏商家 Id 也随提交传递；编辑时保留原记录归属。
+  if (!context.state.caseMerchantPromise) {
+    context.state.caseMerchantPromise = V8.ApiEngine.Run('platform-current-user', {}).then((result) => {
+      const user = result?.Data?.CurrentUser || result?.Data
+      if (Number(result?.Code) !== 1 || !user?.Id) {
+        throw new Error(result?.Msg || '当前账号的商家信息获取失败，请重试')
+      }
+      return { TenantId: user.TenantId || '', TenantName: user.TenantName || '' }
+    }).catch((error) => {
+      context.state.caseMerchantPromise = null
+      throw error
+    })
+  }
+  const values = await context.state.caseMerchantPromise
+  context.patchForm(values)
+  return values
 }
 
 function isCustomerCaseView(context) {
@@ -1547,6 +1572,7 @@ export function createState() {
 }
 
 export async function initialize(context) {
+  await initializeCustomerCaseMerchant(context)
   await initializeInstallationPositionCode(context)
   await initializeInstallationPositionLocation(context)
   // 详情、编辑、新增统一按当前单价和数量展示派生价格，修复历史记录中的不一致值。
@@ -1813,6 +1839,10 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
+  if (isCustomerCaseForm(context)) {
+    const description = caseFieldDescription(context.tableName, field?.Name)
+    if (description) return { description: field.Description || description }
+  }
   if (isVisitTargetPresentationForm(context) && field) {
     const name = String(field.Name || '').toLowerCase()
     const typeName = fieldName(context, CHECKIN_FIELDS.targetType, '拜访对象类型').toLowerCase()
@@ -1864,6 +1894,23 @@ export function getFieldPresentation(context, field) {
 
 export function getRelatedPresentation(context, field) {
   if (!field) return {}
+  if (isCustomerCaseForm(context) && field.Name === 'XuanzeZP') {
+    return {
+      beforeField: casePhotoField(context.tableName),
+      icon: 'images',
+      tone: 'primary',
+      rememberSelection: true,
+      selectionScopeFields: ['KehuID'],
+      filters: [
+        { key: 'serviceType', field: 'Leixing', label: '服务类型', type: 'select', source: 'baseData', parentKey: 'ShouhouDDLX', valueField: 'Value', labelField: 'Value' },
+        { key: 'status', field: 'Zhuangtai', label: '状态', type: 'select', source: 'baseData', parentKey: 'ShouHouDDZT', valueField: 'Value', labelField: 'Value' },
+        { key: 'staff', field: 'ShouhouRY', label: '服务人员', type: 'text', placeholder: '输入服务人员姓名' },
+        { key: 'city', field: 'Chengshi', label: '城市', type: 'text', placeholder: '输入省、市或区县' },
+        { key: 'plannedService', field: 'YujiSHSJ', label: '计划服务时间', type: 'datetime-range' }
+      ],
+      hint: context.form.KehuID ? '从当前客户的售后任务中选取' : '从有权限查看的售后任务中选取'
+    }
+  }
   if (isProposalForm(context) && isProposalInstallationChild(field)) {
     return { previewLimit: 5 }
   }
@@ -2008,6 +2055,18 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  if (isCustomerCaseForm(context) && payload?.field?.Name === 'KehuMC' && !payload.multiple) {
+    // 客户选择器已返回完整客户行；新增、编辑共用此联动，避免额外请求和旧客户信息残留。
+    const row = payload.cleared ? {} : selectedRow(payload)
+    const city = row.Chengshi ?? ''
+    context.patchForm({
+      KehuID: personValue(row, ['Id', 'id']),
+      KehuLX: row.KehuLX ?? '',
+      Chengshi: Array.isArray(city) ? [...city] : city,
+      KehuGK: row.KehuGK ?? ''
+    })
+    return { handled: true }
+  }
   // zhy：订单客户、负责人和安装人的选择联动统一在表单层处理，新增、编辑及不同入口均生效。
   if (isOrderForm(context) && payload && !payload.multiple) {
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
@@ -2284,6 +2343,12 @@ export async function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  if (isCustomerCaseForm(context)) {
+    return {
+      ...await initializeCustomerCaseMerchant(context),
+      KehuID: context.form.KehuID || ''
+    }
+  }
   if (isOrderProductForm(context)) {
     // 派生字段可能为只读或隐藏，显式随主表单保存，保证落库值与页面联动结果一致。
     return calculateOrderProductPriceBinding(context.form)
