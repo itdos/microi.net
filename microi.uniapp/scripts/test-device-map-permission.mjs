@@ -63,10 +63,13 @@ assert.match(deviceSqlWhere, /C\.KehuZHID = '\$CurrentUser\.Id\$'/,
 assert.doesNotMatch(deviceSqlWhere, /KehuGLZH\s+LIKE/,
   '设备列表不得按账号文本模糊匹配')
 
-assert.match(businessSource, /afterSalesAdd:\s*\{[\s\S]*?path:\s*'\/pages\/business\/list\?key=devices'/,
-  '我要报修必须复用我的设备列表，不能绕过设备选择直接新增售后单')
-assert.match(businessSource, /afterSalesAdd:\s*\{[\s\S]*?menuPermission:\s*\{\s*table:\s*'Diy_KehuSB'/,
-  '我要报修入口必须复用设备菜单权限')
+assert.match(businessSource, /afterSalesAdd:\s*\{[\s\S]*?path:\s*'\/pages\/native\/repair\?entry=quick'/,
+  '我要报修应直接进入报修页，由报修页选择授权设备')
+const repairPageSource = source('src/pages/native/repair.vue')
+assert.match(repairPageSource, /const base = getBusinessModule\('devices'\)/,
+  '报修设备选择必须复用设备列表配置')
+assert.match(repairPageSource, /_SysMenuId: config.menuId/,
+  '选中设备详情必须携带当前账号真实授权菜单')
 assert.doesNotMatch(repairEngineSource, /V8\.Param\._RowModel\s*=/,
   '报修接口不得向 Newtonsoft JToken 参数对象回写 JS 对象')
 assert.match(repairEngineSource, /var newId\s*=\s*V8\.Method\.NewGuid\(\)/,
