@@ -124,6 +124,28 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.Contains("DatabaseOnly", exception.InnerException!.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("{}", true)]
+    [InlineData("{\"SourceZip\":null}", true)]
+    [InlineData("{\"SourceZip\":{\"Path\":\"/source.zip\"}}", false)]
+    [InlineData("{\"SourceZip\":\"/source.zip\"}", false)]
+    public void SaasBundle_SourceZipAbsenceAndExplicitNullShareTheNoSourceContract(
+        string assetsJson, bool accepted)
+    {
+        var package = JObject.Parse(LoadBundledResources()["app.microi.saas-engine.json"]);
+        var bundle = Assert.IsType<JObject>(
+            Assert.Single(Assert.IsType<JArray>(package["ApplicationBundles"])));
+        bundle["PackageAssets"] = JObject.Parse(assetsJson);
+        var error = Assert.IsType<string>(GetPrivateStaticMethod("GetResourceContentValidationError")
+            .Invoke(null, new object[]
+            {
+                "app.microi.saas-engine.json",
+                package.ToString(Newtonsoft.Json.Formatting.None)
+            }));
+        if (accepted) Assert.Equal(string.Empty, error);
+        else Assert.Contains("DatabaseOnly", error, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void StartupDependencyGate_LoadsEveryEngineFromAllOfficialBaselinePackages()
     {

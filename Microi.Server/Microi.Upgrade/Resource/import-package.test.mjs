@@ -50,6 +50,19 @@ assert.ok(pageEngineReferenceRemapSource, "PageEngine reference remap helpers sh
 const context = {};
 vm.runInNewContext(`${functionSource[0]}\nresult = countPageTabs;`, context);
 const countPageTabs = context.result;
+test('legacy CREATE TABLE imports relax ordinary fields while preserving primary key, literals and indexes', () => {
+  const fixture = { runtimeIsSqlServer: false };
+  vm.runInNewContext(source.slice(source.indexOf('    var normalizePackageDdlNullability = function'), source.indexOf('    var executePackageDdl = function')), fixture);
+  const ddl = "CREATE TABLE `sample` (`Id` varchar(36) NOT NULL, `V8Limit` int NOT NULL, `State` enum('NOT NULL','ok') NOT NULL DEFAULT 'ok' COMMENT 'PRIMARY KEY, NOT NULL', `Note` varchar(20) NOT NULL DEFAULT 'x,y', PRIMARY KEY (`Id`), UNIQUE KEY `ux_state` (`State`)) ENGINE=InnoDB";
+  const result = fixture.normalizePackageDdlNullability(ddl);
+  assert.match(result, /`Id` varchar\(36\) NOT NULL/);
+  assert.match(result, /`V8Limit` int NULL/);
+  assert.match(result, /enum\('NOT NULL','ok'\) NULL DEFAULT 'ok' COMMENT 'PRIMARY KEY, NOT NULL'/);
+  assert.match(result, /`Note` varchar\(20\) NULL DEFAULT 'x,y'/);
+  assert.match(result, /PRIMARY KEY \(`Id`\), UNIQUE KEY `ux_state` \(`State`\)\) ENGINE=InnoDB$/);
+  assert.equal(fixture.normalizePackageDdlNullability(result), result);
+  assert.throws(() => fixture.normalizePackageDdlNullability('CREATE TABLE `bad` (`X` int NOT NULL'), /括号不完整/);
+});
 for (const sqlServer of [true, false]) test(`background-task bootstrap validates native ${sqlServer ? 'SQL Server' : 'MySQL'} index rows and rejects incomplete contracts`, () => {
   const definitions = [
     ['ux_mci_bg_task_runtime_idem', ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'IdempotencyKey'], 0],
@@ -257,7 +270,7 @@ test('SQL Server widens legacy text without narrowing Unicode, max, or unrelated
   ]) assert.equal(fixture.chooseSqlServerTextExpansion(incoming, existing), expected);
 });
 
-test('SQL Server text expansion preserves tenant constraints and stops on a failed readback', () => {
+test('SQL Server text expansion preserves defaults and collation, allows NULL and stops on a failed readback', () => {
   for (const badReadback of [false, true]) {
     const calls = [];
     let written = false;
@@ -267,13 +280,14 @@ test('SQL Server text expansion preserves tenant constraints and stops on a fail
       runtimeIsSqlServer: true, debugLog: {}, isSafeIdentifier: () => true,
       groupPackagePhysicalColumns: () => ({sys_menu: {TableName: 'sys_menu', Columns: [{COLUMN_NAME:'SelectApi',COLUMN_TYPE:'varchar(255)'}]}}),
       getPhysicalValue: (row, keys) => keys.map(key => row[key]).find(value => value != null),
-      getTargetPhysicalColumns: () => ({ selectapi: {...target, COLUMN_TYPE: written && !badReadback ? 'nvarchar(255)' : target.COLUMN_TYPE} }),
+      getTargetPhysicalColumns: () => ({ selectapi: {...target, COLUMN_TYPE: written && !badReadback ? 'nvarchar(255)' : target.COLUMN_TYPE,
+        IS_NULLABLE: written && !badReadback ? 'YES' : target.IS_NULLABLE} }),
       quotePhysicalIdentifier: name => '[' + name + ']', quoteSqlServerCatalogIdentifier: name => '[' + name + ']',
       V8: {Db: {FromSql: sql => ({ExecuteNonQuery: () => { calls.push(sql); written = true; return 1; }})}}
     };
     vm.runInNewContext(['normalizeSqlType', 'getTextTypeCapacity', 'mapToMySQLType', 'chooseSqlServerTextExpansion', 'packageOwnsPhysicalTable', 'syncPhysicalColumnsFromPackage']
       .map(name => extractAssignedFunction(source, name)).join('\n') + '\nresult = syncPhysicalColumnsFromPackage(null);', fixture);
-    assert.deepEqual(calls, ['ALTER TABLE [sys_menu] ALTER COLUMN [SelectApi] nvarchar(255) COLLATE Latin1_General_100_BIN2 NOT NULL']);
+    assert.deepEqual(calls, ['ALTER TABLE [sys_menu] ALTER COLUMN [SelectApi] nvarchar(255) COLLATE Latin1_General_100_BIN2 NULL']);
     assert.equal(fixture.result.Errors, badReadback ? 1 : 0);
     assert.equal(fixture.result.Modified, badReadback ? 0 : 1);
     if (!badReadback) {
@@ -401,8 +415,8 @@ test('literal CURRENT_TIMESTAMP on a text column remains a quoted literal', () =
   assert.deepEqual(result.calls, ["ALTER TABLE `sys_blueprint_history` ALTER COLUMN `CreateTime` SET DEFAULT 'CURRENT_TIMESTAMP', ALGORITHM=INPLACE, LOCK=NONE"]);
 });
 
-test('ordinary numeric defaults and DROP DEFAULT retain the narrow ALTER operation', () => {
-  for (const [sourceDefault, expected] of [["b'1'", "SET DEFAULT b'1'"], [null, 'DROP DEFAULT']]) {
+test('ordinary numeric defaults and nullable default removal retain the narrow ALTER operation', () => {
+  for (const [sourceDefault, expected] of [["b'1'", "SET DEFAULT b'1'"], [null, 'SET DEFAULT NULL']]) {
     const result = runDefaultSync({ columnType: 'bit(1)', sourceDefault, targetDefault: "b'0'", extra: '' });
     assert.equal(result.result.Errors, 0);
     assert.equal(result.calls[0], 'ALTER TABLE `sys_blueprint_history` ALTER COLUMN `CreateTime` ' + expected + ', ALGORITHM=INPLACE, LOCK=NONE');
@@ -879,6 +893,7 @@ function runAdminMenuPermissionFixture(options = {}) {
             },
             ToArray() {
               const values = call.parameters.map(item => item[1]);
+              if (/FROM sys_role WHERE Id =/.test(sql)) return clone(roles.filter(row => String(row.Id).toLowerCase() === values[0]));
               if (/FROM sys_role WHERE/.test(sql)) return clone(roles.filter(row => Number(row.Level) >= 9999 && Number(row.IsDeleted || 0) !== 1));
               if (/FROM sys_user WHERE/.test(sql)) return clone(options.users || []);
               return clone(roleLimits.filter(row => (
@@ -2468,6 +2483,32 @@ test("API-engine readback keeps the canonical Id when a retired duplicate appear
     assert.equal(fixture.result("mqtt_event_copy", "", "").Id, "package-id", "legacy key-only readback excludes retired rows");
     assert.equal(rows[0].ApiV8Code, "old source", "retired audit row remains intact");
   }
+});
+
+test('legacy built-in role owned only by authoritative administrator accounts receives menus without changing identities', () => {
+  const id = '5db47859-35a3-411a-a1f7-99482e057d24';
+  const role = { Id: id, Name: '旧管理员角色', Level: 9998, IsDeleted: 0 };
+  const user = { RoleIds: JSON.stringify([{ Id: id, Level: 998 }]), Level: 9999, State: 1, IsDeleted: 0 };
+  const result = runAdminMenuPermissionFixture({ roles: [role], roleLimits: [], users: [user, { ...user, Level: 9998, IsDeleted: 1 }] });
+  assert.deepEqual(result.calls.add.map(r => r.RoleId), [id]);
+  assert.equal(result.calls.roleInserts.length, 0);
+  assert.ok(result.calls.physical.every(c => !/^(UPDATE|INSERT INTO) sys_(user|role)\b/.test(c.sql)));
+  const replay = runAdminMenuPermissionFixture({ roles: [role], roleLimits: result.roleLimits, users: [user] });
+  assert.equal(replay.calls.add.length + replay.calls.update.length, 0);
+  for (const variant of [
+    { trustedOfficial: false },
+    { users: [] },
+    { users: [{ ...user, State: 0 }] },
+    { users: [{ ...user, IsDeleted: 1 }] },
+    { users: [{ ...user, RoleIds: JSON.stringify([{ Id: 'other-role', Name: id }]) }] },
+    { users: [user, { ...user, Level: 9998 }] },
+    { users: [user, { ...user, Level: 1, State: 0 }] },
+    { roles: [{ ...role, IsDeleted: 1 }] },
+    { roles: [{ ...role, Level: 1 }] },
+    { roles: [{ ...role, Id: 'custom-role' }] },
+  ]) assert.throws(() => runAdminMenuPermissionFixture({ roles: [role], roleLimits: [], users: [user], ...variant }), /未找到有效的系统管理员角色/);
+  const empty = runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [user] });
+  assert.equal(empty.calls.roleInserts[0].Id, id, 'Old object-array role bindings also support empty-tenant bootstrap');
 });
 
 test("API-engine readback normalizes legacy flag shapes and physically reconciles ignored switches", () => {

@@ -1079,6 +1079,14 @@ END";
                     StringComparison.Ordinal))
                 return false;
 
+            // 主租户启动闭包已从校验后的官方包恢复这些固定 Managed 工作器。
+            // 同版本 Docker 热修复也必须传递到子租户；目标版本、修改或软删除
+            // 不能阻止已选定 Managed 正文恢复。仅适用于已识别的固定工作器，
+            // 不扩大到 CreateIfMissing Hook 或普通租户业务接口。
+            if (IsRecognizedBootstrapEngineSource(apiEngineKey, sourceCode)
+                && (sourceCode ?? string.Empty).IndexOf("OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1", StringComparison.Ordinal) >= 0)
+                return true;
+
             if (!TryParseBootstrapVersion(targetVersion, out var targetParts)
                 && !TryParseBootstrapSourceVersion(targetCode, out targetParts)
                 || !TryParseBootstrapVersion(sourceVersion, out var sourceParts)

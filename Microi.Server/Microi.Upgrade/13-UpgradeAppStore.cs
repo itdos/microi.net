@@ -2325,6 +2325,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             {
                 // 同一租户的一轮启动闭包使用同一份物理字段快照。旧库可能一次缺少
                 // 数十个接口，逐条重复查询 information_schema 会显著拖慢容器启动。
+                RuntimeColumnNullability.EnsureUnderLease(client);
                 var physicalFields = ReadStartupDependencyPhysicalFields(client.Db, client.OsClient);
                 var dependencies = LoadBundledStartupDependencyEngines();
                 EnsureStartupDependencyVersionStorage(client.Db, physicalFields, dependencies);
@@ -3357,6 +3358,9 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
                     !HasPinnedImporterCapabilities(content, importerVersion) ||
                     !content.Contains("applicationSha256Base64") ||
+                    !content.Contains("PLATFORM_PHYSICAL_NULLABLE_V1") ||
+                    !content.Contains("PLATFORM_MYSQL_NULL_DEFAULT_V1") ||
+                    !content.Contains("ADMIN_MENU_LEGACY_ACCOUNT_ROLE_V1") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
                     !content.Contains("System.DateTime.Now.ToString") ||
@@ -3492,6 +3496,9 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
                 var buildAssets = bundle?["BuildAssets"] as JArray;
                 var packageAssets = bundle?["PackageAssets"];
                 var packageAssetsObject = packageAssets as JObject;
+                // JSON 的显式 null 是 JValue，不是 C# null；它与省略 SourceZip 都表示不分发源码。
+                // 真实对象或标量仍拒绝，避免把公开构建包混成源码发布通道。
+                var sourceZip = packageAssetsObject?["SourceZip"];
                 var buildBytes = buildAssets?.Sum(item => item?["Size"]?.Value<long?>() ?? 0L) ?? 0L;
                 if (package["PackageInfo"]?["IncludeSource"]?.Value<bool?>() != false
                     || bundle?["IncludeSource"]?.Value<bool?>() != false
@@ -3499,7 +3506,7 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
                     || (packageAssets != null
                         && packageAssets.Type != JTokenType.Null
                         && packageAssetsObject == null)
-                    || packageAssetsObject?["SourceZip"] != null
+                    || (sourceZip != null && sourceZip.Type != JTokenType.Null)
                     || !string.Equals(bundle?["MicroService"]?["StorageMode"]?.ToString(), "db", StringComparison.OrdinalIgnoreCase)
                     || !string.Equals(bundle?["AssetStoragePolicy"]?["Source"]?.ToString(), "NotIncluded", StringComparison.Ordinal)
                     || !string.Equals(bundle?["AssetStoragePolicy"]?["Build"]?.ToString(), "DatabaseOnly", StringComparison.Ordinal)

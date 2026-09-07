@@ -274,6 +274,20 @@ namespace Dos.ORM
             return ExecuteWithTiming(() => ToListInternal<TEntity>(), "ToList");
         }
 
+        /// <summary>
+        /// 最多物化 maxRows 行并关闭读取器。保留用户 SQL 的方言、CTE 和排序，
+        /// 仅限制客户端对象分配；不能据此保证数据库不扫描完整数据源。
+        /// </summary>
+        public List<TEntity> ToBoundedList<TEntity>(int maxRows)
+        {
+            if (maxRows < 1) throw new ArgumentOutOfRangeException(nameof(maxRows));
+            return ExecuteWithTiming(() =>
+            {
+                using (var reader = ToDataReaderInternal())
+                    return EntityUtils.ReaderToEnumerable<TEntity>(reader).Take(maxRows).ToList();
+            }, "ToBoundedList");
+        }
+
         private List<TEntity> ToListInternal<TEntity>()
         {
             using (IDataReader reader = ToDataReaderInternal())
