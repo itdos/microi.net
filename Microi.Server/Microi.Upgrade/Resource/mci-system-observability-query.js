@@ -10,12 +10,12 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: mci-system-observability-query
- * Version: v1.0.9
+ * Version: v1.1.1
  * Function:
- * - 系统日志/监控统一只读查询：日志统计与详情、实时/历史接口排行、跨月网络流量归因、主机和运行态快照、安全记录及平台统计。
+ * - 系统日志/监控统一只读查询：增加内存压力、执行分配和事故详情查询；诊断独立于 V8 限制。
  */
 
-// Version: v1.0.9
+// Version: v1.1.0
 // 系统日志/监控统一查询接口（Managed）。
 // 普通表统计由接口引擎编排；宿主进程、Mongo 系统日志、安全运行态等缺失能力
 // 只通过 V8.Method.GetSystemObservability 的受限原子方法读取。
@@ -417,7 +417,7 @@ if (action == "Capabilities") {
     return {
         Code: 1,
         Data: {
-            Version: "1.0.8",
+            Version: "1.1.0",
             Name: "系统日志/监控",
             QueryEngineKey: "mci-system-observability-query",
             ActionEngineKey: "mci-system-observability-action",
@@ -430,6 +430,9 @@ if (action == "Capabilities") {
             QueryActions: [
                 { Action: "Capabilities", Purpose: "读取能力目录、数据边界和 AI 调用约束" },
                 { Action: "Snapshot", Purpose: "读取请求、CPU/内存、网络、进程、主机、Docker、队列与诊断快照", Bounds: "WindowMinutes 1-15，Top 5-50" },
+                { Action: "Memory", Purpose: "当前节点内存曲线、执行分配计数、独立采样器状态和对象类型；独立于 V8 限制", Bounds: "分配不等于存活内存；需含诊断运行时的新后端" },
+                { Action: "MemoryIncidents", Purpose: "当前租户跨节点事故历史与本机持久卷降级记录", Bounds: "最近 50 条，默认 14 天" },
+                { Action: "MemoryIncident", Purpose: "压力曲线、执行链、代码哈希及分配栈", Bounds: "IncidentId 为 32 位小写十六进制；强杀窗口不承诺零丢失" },
                 { Action: "Logs", Purpose: "分页检索系统日志、错误、警告、慢 SQL、慢执行与异常", Bounds: "PageSize 1-200" },
                 { Action: "LogTypes", Purpose: "读取日志类型枚举与数量" },
                 { Action: "LogStats", Purpose: "读取日志总数及错误、警告、慢 SQL、慢执行、异常统计" },

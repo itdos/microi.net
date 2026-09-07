@@ -516,6 +516,8 @@ namespace Microi.net
                     mqttParam.OsClient = osClient;
                 }
 
+                using var trace = MicroiTraceContext.StartActivity("Microi.MQTT");
+                using var observation = ExecutionObservation.Enter("MQTT", mqttApiEngine, osClient, eventName: eventName);
                 var runResult = await MicroiEngine.ApiEngine.RunAsync(mqttApiEngine, new
                 {
                     OsClient = osClient,

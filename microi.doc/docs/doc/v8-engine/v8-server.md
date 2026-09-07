@@ -651,7 +651,9 @@ var unblocked = V8.Method.ManageSystemObservability({
 });
 ```
 
-`GetSystemObservability` 支持 `Snapshot`、`Logs`、`LogTypes`、`LogStats`、`Signal`、`Trace`、`ApiRank`、`AppLogs`。服务端会重新验证当前租户平台管理员身份，限制分页、时间窗口、排行与日志长度，并对应用日志中的密码、Token、Cookie、Secret、ApiKey 等内容脱敏。观测中间件不采集请求体、查询字符串、Authorization 或 Cookie。
+`GetSystemObservability` 支持 `Snapshot`、`Logs`、`LogTypes`、`LogStats`、`Signal`、`Trace`、`ApiRank`、`AppLogs`，以及 `Memory`、`MemoryIncidents`、`MemoryIncident`。事故详情须传 32 位十六进制 `IncidentId`；历史最多返回 50 条摘要，按可信租户隔离。服务端会重新验证当前租户平台管理员身份，限制分页、时间窗口、排行与日志长度，并对应用日志中的密码、Token、Cookie、Secret、ApiKey 等内容脱敏。观测中间件不采集请求体、查询字符串、Authorization 或 Cookie。
+
+内存诊断独立于 `V8Limit`，默认采集尚未完成的执行身份、父子链、代码哈希及有界分配样本，不对复杂脚本增加执行限制。累计分配和 CLR 分配栈不等于存活堆/RSS，也不保证 JavaScript 行号。必须部署含独立采集器的 API 并挂载持久 `logs` 卷；Mongo 不可用时先本机留证，恢复后幂等补传。完整数据边界、采集健康、重启恢复和使用步骤见[系统日志/监控：内存事故定位](../system-engine/system-observability)。
 
 `Snapshot.Scope.CurrentNodeOnly=true` 表示数据只属于当前 API 节点；多实例部署必须逐节点或在外部指标系统聚合。页面展示的请求耗时、吞吐、并发和错误率用于定位 CPU 相关热点，不等同于逐请求 CPU 采样，不能据此宣称某个请求独占了精确 CPU 百分比。`ManageSystemObservability` 仅接受 `BlockIp/UnblockIp`，拒绝本机、未指定和组播地址，封禁最长 7 天并写入用户行为审计。
 

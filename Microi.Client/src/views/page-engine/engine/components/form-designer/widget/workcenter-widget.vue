@@ -15,6 +15,8 @@
 
 <script setup name="workcenter-widget">
 import { computed, defineAsyncComponent, onBeforeUnmount, shallowRef } from 'vue'
+import { usePermissionStore } from '@/pinia/modules/permission'
+import { resolveWidgetMenuId } from './widget-menu-context'
 
 const props = defineProps({
   widgetObj: {
@@ -32,10 +34,12 @@ const currentView = computed(() => {
   return ['work', 'calendar', 'notice'].includes(value) ? value : 'work'
 })
 
-const workMenuId = computed(() => props.widgetObj.widgetParams?.[1]?.value || '')
-const flowMenuId = computed(() => props.widgetObj.widgetParams?.[2]?.value || '')
-const noticeMenuId = computed(() => props.widgetObj.widgetParams?.[3]?.value || '')
-const calendarMenuId = computed(() => props.widgetObj.widgetParams?.[4]?.value || '')
+const permissions = usePermissionStore()
+const resolveMenu = (index, table) => resolveWidgetMenuId(permissions.routes, props.widgetObj.widgetParams?.[index]?.value, table)
+const workMenuId = computed(() => resolveMenu(1, 'wf_work'))
+const flowMenuId = computed(() => resolveMenu(2, 'wf_flow'))
+const noticeMenuId = computed(() => resolveMenu(3, 'diy_notice'))
+const calendarMenuId = computed(() => resolveMenu(4, 'microi_calendar'))
 
 onBeforeUnmount(() => {
   workCenterComp.value = null
