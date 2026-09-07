@@ -96,7 +96,7 @@
 						<template v-for="relatedTab in embeddedChildRelatedForGroup(group)" :key="relatedTab.key">
 							<view v-if="embeddedRelatedMore[relatedTab.key]" class="form-section__more"
 								hover-class="form-section__more--pressed" @tap.stop="openEmbeddedRelatedMore(relatedTab)">
-								<text>查看更多</text>
+								<text>查看全部</text>
 							</view>
 						</template>
 						<text class="form-section__toggle" :class="{ expanded: isGroupExpanded(group, groupIndex) }">›</text>
@@ -125,6 +125,12 @@
 							@select="selectVisitTarget"
 							@open-change="handleVisitTargetOpen(field, $event)" />
 						<template v-else-if="tenantFieldPresentation(field).type !== 'visit-target-member'">
+							<!-- 租户仅声明目标字段，平台负责将选择入口内嵌到字段之前并保留授权上下文。 -->
+							<mci-table-selector v-for="relatedTab in openTableRelatedBeforeField(field)" :key="relatedTab.key"
+								class="form-field__selector-before" :field="relatedTab.field" :compact="true"
+								:presentation="relatedPresentation(relatedTab.field)" :parent-table="tableName"
+								:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
+								:readonly="isConfiguredReadonly(relatedTab.field)" @change="handleRelatedChange" />
 						<view class="form-field__label">
 							<view class="form-field__label-copy">
 								<text>{{ field.Label || field.Name }}</text>
@@ -196,7 +202,7 @@
 						</view>
 
 						<text v-if="field.optionError" class="form-field__option-error">选项暂未加载，可稍后重试</text>
-						<text v-if="field.Description" class="form-field__description">{{ field.Description }}</text>
+						<text v-if="tenantFieldPresentation(field).description || field.Description" class="form-field__description">{{ tenantFieldPresentation(field).description || field.Description }}</text>
 						</template>
 					</view>
 					<mci-business-related-list
@@ -487,7 +493,7 @@
 				return String(this.tableName || '').toLowerCase() === 'diy_location' ? 'checkin' : 'module'
 			},
 			standaloneRelatedTabs() {
-				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
+				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item) && !this.isInlineOpenTableRelated(item))
 			},
 			standaloneChildTab() {
 				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
@@ -736,7 +742,22 @@
 				return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
 			},
 			isEmbeddedOpenTableRelated(item) {
-				return item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey)
+				return item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey) && !this.isInlineOpenTableRelated(item)
+			},
+			isInlineOpenTableRelated(item) {
+				if (item?.type !== 'openTable') return false
+				const target = this.relatedPresentation(item.field).beforeField
+				if (!target) return false
+				// 目标字段被角色或视图隐藏时保留原入口，避免布局定制意外吞掉操作。
+				return (this.definition?.groups || []).some((group) => group.fields.some((field) =>
+					field.Name === target && field.formTabKey === item.field.formTabKey &&
+					this.tenantFieldPresentation(field).visible !== false
+				))
+			},
+			openTableRelatedBeforeField(field) {
+				if (!this.isEditableMode) return []
+				return this.activeRelatedTabs.filter((item) => this.isInlineOpenTableRelated(item) &&
+					this.relatedPresentation(item.field).beforeField === field.Name)
 			},
 			isEmbeddedRelated(item) {
 				return this.isEmbeddedChildRelated(item) || this.isEmbeddedOpenTableRelated(item)
@@ -1782,6 +1803,8 @@
 		transform: scale(.9);
 		opacity: .65;
 	}
+
+	.form-field__selector-before { display: block; margin-bottom: 24rpx; }
 
 	.tenant-field-actions {
 		display: flex;

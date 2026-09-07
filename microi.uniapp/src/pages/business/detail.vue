@@ -382,6 +382,7 @@
 		loadApprovalOpinions
 	} from './utils/xjy-row-actions.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
+	import { customerCaseChildField } from '@/tenants/xjy/native-table.js'
 
 	const icon = (path) => `/static/xjy/${path}`
 	const DETAIL_EXCLUDED_FIELDS = new Set(['Id', 'CreateUserId', 'UpdateUserId', 'OsClient'])
@@ -1434,7 +1435,7 @@
 					key: `${type}:${field.Id || field.Name}`,
 					label: field.Label || field.Name || '关联业务',
 					type,
-					field
+					field: type === 'child' ? customerCaseChildField(this.moduleConfig.table, field) : field
 				}))
 				return [
 					...toTabs(definition.childFields, 'child'),
@@ -1568,11 +1569,13 @@
 							key: 'cases',
 							field: 'KehuID',
 							value: this.detail.Id,
-							// zhy：从客户详情进入客户案例列表时，新增表单直接继承客户主键、名称和类型。
+							// zhy：兼容旧版列表入口，同样带入客户信息、城市和概况。
 							defaultValues: {
 								KehuID: this.detail.Id,
 								KehuMC: this.detail.KehuMC,
-								KehuLX: this.detail.KehuLX
+								KehuLX: this.detail.KehuLX,
+								Chengshi: this.detail.Chengshi ?? '',
+								KehuGK: this.detail.KehuGK ?? ''
 							},
 							icon: icon('business/anlice.png')
 						},
