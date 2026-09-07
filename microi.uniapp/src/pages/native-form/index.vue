@@ -92,7 +92,15 @@
 						</view>
 						<text v-if="group.showFieldCount !== false" class="form-section__count">{{ group.fields.length }} 项</text>
 					</view>
-					<text class="form-section__toggle" :class="{ expanded: isGroupExpanded(group, groupIndex) }">›</text>
+					<view class="form-section__header-actions">
+						<template v-for="relatedTab in embeddedChildRelatedForGroup(group)" :key="relatedTab.key">
+							<view v-if="embeddedRelatedMore[relatedTab.key]" class="form-section__more"
+								hover-class="form-section__more--pressed" @tap.stop="openEmbeddedRelatedMore(relatedTab)">
+								<text>查看更多</text>
+							</view>
+						</template>
+						<text class="form-section__toggle" :class="{ expanded: isGroupExpanded(group, groupIndex) }">›</text>
+					</view>
 				</view>
 
 				<!-- zhy: 折叠后按需移除字段控件，已填写值仍保存在 form 中。 -->
@@ -205,7 +213,9 @@
 						:parent-table-child-auth="tableChildAuth"
 						:parent-mode="mode"
 						display-mode="preview"
-						:preview-limit="2"
+						:preview-limit="relatedPresentation(relatedTab.field).previewLimit || 2"
+						:more-in-group-header="group.source === 'CollapseGroup'"
+						@preview-more-state="updateEmbeddedRelatedMore(relatedTab, $event)"
 						@data-count="handleRelatedCount"
 					/>
 				</view>
@@ -382,6 +392,7 @@
 				// zhy: 保存新增和编辑页已展开的字段分组。
 				expandedGroupKeys: [],
 				activeFormTabKey: '',
+				embeddedRelatedMore: {},
 				// zhy: 标识最近一次表单加载，防止编辑或重试并发时旧响应覆盖新页面。
 				formLoadId: 0,
 				relatedListViewportHeight: 0,
@@ -751,6 +762,7 @@
 					return
 				}
 				this.loading = true
+				this.embeddedRelatedMore = {}
 				this.error = ''
 				try {
 					const manifestPromise = loadModuleViewManifest({
@@ -927,6 +939,21 @@
 						icon: 'none'
 					})
 				}
+			},
+			updateEmbeddedRelatedMore(relatedTab, navigation) {
+				this.embeddedRelatedMore = { ...this.embeddedRelatedMore, [relatedTab.key]: navigation }
+			},
+			openEmbeddedRelatedMore(relatedTab) {
+				const navigation = this.embeddedRelatedMore[relatedTab.key]
+				if (!navigation) return
+				uni.navigateTo({
+					url: navigation.url,
+					success: (result) => result.eventChannel?.emit('related-list-context', {
+						...navigation.context,
+						parentForm: this.form,
+						parentMode: this.mode
+					})
+				})
 			},
 			async switchToEdit() {
 				if (!this.canEditRecord) {
@@ -1537,6 +1564,27 @@
 		font-size: 21rpx;
 		font-weight: 500;
 	}
+
+	.form-section__header-actions {
+		flex: none;
+		display: flex;
+		align-items: center;
+		gap: 24rpx;
+	}
+
+	.form-section__more {
+		display: flex;
+		align-items: center;
+		gap: 6rpx;
+		min-height: 64rpx;
+		padding: 0 8rpx;
+		color: var(--mci-color-primary, #e94b2c);
+		font-size: 24rpx;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
+	.form-section__more--pressed { opacity: .65; }
 
 	.form-section__toggle {
 		flex: none;

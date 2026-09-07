@@ -140,7 +140,7 @@
           <view class="proposal-point-card__title">
             <text>点位{{ index + 1 }}</text>
           </view>
-          <view v-for="item in proposalInstallationQuickFields" :key="`${row.Id}-${item.key}`"
+          <view v-for="item in proposalInstallationVisibleQuickFields" :key="`${row.Id}-${item.key}`"
             class="proposal-point-field">
             <text class="proposal-point-field__label">{{ item.label }}</text>
             <mci-native-field v-if="item.key === 'deviceModel'"
@@ -242,14 +242,14 @@
     <view v-if="showFloatingAdd && canAdd && !isPreview && !isCollectionCardLayout && !proposalBatchSelecting" class="floating-add" :style="floatingStyle"
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
 
-    <view v-if="previewContentVisible && isPreview && !waitingForParentSave" class="preview-actions"
+    <view v-if="previewContentVisible && isPreview && !waitingForParentSave && previewActionCount" class="preview-actions"
       :class="{ 'preview-actions--single': previewActionCount === 1, 'preview-actions--three': previewActionCount === 3 }">
       <view v-if="proposalInstallationBatchPreviewAvailable"
         class="preview-action preview-action--batch" hover-class="preview-action--pressed"
         @tap="openProposalInstallationBatch">
         <text class="preview-action__icon">▦</text><text>批量配置</text>
       </view>
-      <view v-if="!isProposalInstallationQuickMode || proposalInstallationHasMore"
+      <view v-if="showPreviewFooterMore"
         class="preview-action preview-action--more" hover-class="preview-action--pressed" @tap="openMore">
         <text class="preview-action__icon">···</text><text>查看更多</text>
       </view>
@@ -617,6 +617,7 @@ export default {
     displayMode: { type: String, default: 'full' },
     previewLimit: { type: Number, default: 2 },
     showPreviewHeader: { type: Boolean, default: false },
+    moreInGroupHeader: { type: Boolean, default: false },
     relationValueOverride: { type: [String, Number], default: '' },
     presentation: { type: Object, default: () => ({}) },
     showFloatingAdd: { type: Boolean, default: true },
@@ -625,7 +626,7 @@ export default {
     parentTableChildAuth: { type: Object, default: null },
     batchEntryMode: { type: String, default: '' }
   },
-  emits: ['floating-add-state', 'filter-open-state', 'data-count', 'title-change'],
+  emits: ['floating-add-state', 'filter-open-state', 'data-count', 'title-change', 'preview-more-state'],
   data() {
     return {
       table: null,
@@ -737,8 +738,18 @@ export default {
     },
     previewActionCount() {
       return Number(this.proposalInstallationBatchPreviewAvailable) +
-        Number(!this.isProposalInstallationQuickMode || this.proposalInstallationHasMore) +
+        Number(this.showPreviewFooterMore) +
         Number(this.canAdd)
+    },
+    previewMoreInGroupHeader() {
+      return this.moreInGroupHeader && this.isProposalInstallationQuickMode
+    },
+    previewMoreNavigation() {
+      return this.previewMoreInGroupHeader && this.proposalInstallationHasMore && !this.waitingForParentSave
+        ? this.relatedListNavigation('') : null
+    },
+    showPreviewFooterMore() {
+      return !this.previewMoreInGroupHeader && (!this.isProposalInstallationQuickMode || this.proposalInstallationHasMore)
     },
     proposalBatchSelectedRows() {
       const currentRows = new Map(this.rows.map((row) => [String(row?.Id || ''), row]))
@@ -817,6 +828,15 @@ export default {
         // resolve('deviceQuantity', '设备数量'),
         // resolve('people', '人数')
       ]
+    },
+    proposalInstallationVisibleQuickFields() {
+      // 暂时注释设备字段的卡片展示入口；完整字段定义及选择、保存联动保留，取消注释即可恢复。
+      const visibleKeys = [
+        'place',
+        // 'deviceModel',
+        // 'deviceName',
+      ]
+      return this.proposalInstallationQuickFields.filter((item) => visibleKeys.includes(item.key))
     },
     proposalInstallationFieldNames() {
       return this.proposalInstallationQuickFields.reduce((result, item) => ({
@@ -909,6 +929,11 @@ export default {
     }
   },
   watch: {
+    // 展示状态单独上报，首次加载即可显示入口，且不会触发 data-count 的业务写回。
+    previewMoreNavigation: {
+      immediate: true,
+      handler(navigation) { this.$emit('preview-more-state', navigation) }
+    },
     viewportHeight: {
       immediate: true,
       handler() {
@@ -1794,6 +1819,13 @@ export default {
       this.openRelatedList('')
     },
     openRelatedList(entryMode = '') {
+      const navigation = this.relatedListNavigation(entryMode)
+      uni.navigateTo({
+        url: navigation.url,
+        success: (result) => result.eventChannel?.emit('related-list-context', navigation.context)
+      })
+    },
+    relatedListNavigation(entryMode = '') {
       const query = [
         `fieldId=${encodeURIComponent(this.field.Id || '')}`,
         `parentId=${encodeURIComponent(this.parentId || '')}`,
@@ -1805,24 +1837,23 @@ export default {
         `title=${encodeURIComponent(this.config.title || this.sectionTitle || '关联列表')}`,
         `entryMode=${encodeURIComponent(entryMode || '')}`
       ].join('&')
-      uni.navigateTo({
+      // 折叠后预览组件会卸载，外层标题栏保留同一份导航上下文，仍可直接进入完整子表。
+      return {
         url: `/pages/business/related-list?${query}`,
-        success: (result) => {
-          result.eventChannel?.emit('related-list-context', {
-            field: this.field,
-            parentId: this.parentId,
-            parentForm: this.parentForm,
-            parentMenuId: this.parentMenuId,
-            parentTableId: this.parentTableId,
-            parentTableName: this.parentTableName,
-            parentMode: this.parentMode,
-            parentTableChildAuth: this.parentTableChildAuth,
-            relationValue: this.relationValue,
-            title: this.config.title || this.sectionTitle,
-            entryMode
-          })
+        context: {
+          field: this.field,
+          parentId: this.parentId,
+          parentForm: this.parentForm,
+          parentMenuId: this.parentMenuId,
+          parentTableId: this.parentTableId,
+          parentTableName: this.parentTableName,
+          parentMode: this.parentMode,
+          parentTableChildAuth: this.parentTableChildAuth,
+          relationValue: this.relationValue,
+          title: this.config.title || this.sectionTitle,
+          entryMode
         }
-      })
+      }
     },
     buildFilterWhere() {
       const result = []
