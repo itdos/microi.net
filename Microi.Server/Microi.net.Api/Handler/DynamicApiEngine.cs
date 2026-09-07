@@ -264,7 +264,7 @@ namespace Microi.net.Api
             return routeValues.Count > 0;
         }
 
-        private static bool TryMatchConfiguredTemplate(
+        internal static bool TryMatchConfiguredTemplate(
             object apiModel,
             string actualPath,
             out JObject routeValues)
@@ -526,6 +526,16 @@ namespace Microi.net.Api
                     }
                 }
 
+                if (apiModel == null && LegacyMobileCompatibilityController.IsBootstrapRoute(apiPathLower))
+                {
+                    // Existing explicit, multi-route and template engines all take
+                    // precedence. Recheck the authoritative store (including disabled
+                    // rows) before using any compiled bootstrap fallback.
+                    values["controller"] = "LegacyMobileCompatibility";
+                    values["action"] = "Run";
+                    return values;
+                }
+
                 if (apiModel != null)
                 {
                     JObject cachedRouteValues;
@@ -590,6 +600,14 @@ namespace Microi.net.Api
             catch (Exception ex)
             {
                 MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "ApiEngine", "RouteTransformFailed", "接口引擎动态路由转换异常", ex.ToString(), 2, false, httpContext?.Request?.Path.Value);
+                // The controller performs its own authoritative read and fails closed
+                // on database errors; a route-cache outage is not proof of absence.
+                if (LegacyMobileCompatibilityController.IsBootstrapRoute(
+                        NormalizeApiEngineRouteAddress(httpContext?.Request?.Path.Value)))
+                {
+                    values["controller"] = "LegacyMobileCompatibility";
+                    values["action"] = "Run";
+                }
             }
 
             return values;

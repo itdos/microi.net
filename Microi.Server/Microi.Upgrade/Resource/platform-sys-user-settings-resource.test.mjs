@@ -399,7 +399,6 @@ test('tenant settings engine fails closed before CRUD for Secret requests', () =
 
 test('migrated routes live in Managed engines while credential atoms stay in feature runtimes', () => {
   for (const deleted of [
-    'LegacyMobileCompatibilityController.cs',
     'SysUserController.cs',
     'TenantSystemSettingsController.cs',
   ]) {

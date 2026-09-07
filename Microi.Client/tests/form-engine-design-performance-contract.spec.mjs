@@ -162,7 +162,7 @@ test("heavy form tabs mount fields progressively and keep programmatic tab navig
     assert.match(cleanupSource, /Object\.values\(self\._tabActivationFrames\)/);
 });
 
-test("ordinary forms and the initial module tab always render every field while later module batches finish automatically", async function () {
+test("ordinary forms and the initial module tab always render every field while later module batches finish automatically", async function (context) {
     const schemaMixin = (await import(formSchemaFilename)).default;
     const methods = schemaMixin.methods;
     const fields = Array.from({ length: 10 }, (_, index) => ({
@@ -207,8 +207,21 @@ test("ordinary forms and the initial module tab always render every field while 
     assert.equal(methods.GetRenderedTabFields.call(moduleContext, "module-info").length, fields.length);
     assert.equal(methods.ShouldProgressivelyRenderTab.call(moduleContext, fields, "buttons"), true);
 
+    // Drive the queued batches deterministically; Windows timer scheduling under
+    // a solution build cannot reliably complete four separate timers in 40 ms.
+    const pendingBatches = [];
+    context.mock.method(globalThis, "setTimeout", (callback) => {
+        pendingBatches.push(callback);
+        return pendingBatches.length;
+    });
     methods.StartProgressiveTabRender.call(moduleContext, "buttons");
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    let completedBatches = 0;
+    while (pendingBatches.length && completedBatches < fields.length) {
+        pendingBatches.shift()();
+        completedBatches++;
+    }
+    assert.equal(completedBatches, 4);
+    assert.equal(pendingBatches.length, 0);
     assert.equal(moduleContext.renderedFieldCounts.buttons, fields.length);
 });
 

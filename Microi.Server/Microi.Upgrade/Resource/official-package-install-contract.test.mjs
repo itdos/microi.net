@@ -109,3 +109,22 @@ test('official package gate requires target-tenant backfill for NOT NULL OsClien
     })),
   );
 });
+
+test('Unicode overrides are limited to owned text columns and require an explicit boolean', () => {
+  const column = {TABLE_NAME:'diy_lang', COLUMN_NAME:'ZhCN', COLUMN_TYPE:'varchar(2000)', SQLSERVER_UNICODE:true};
+  const model = {DiyTables:[{Id:'lang',Name:'diy_lang'}], PhysicalColumns:[column]};
+  assert.doesNotThrow(() => validateOfficialPackageInstallContracts('app.microi.saas-engine.json', fixture(model)));
+  for (const extra of [{SQLSERVER_UNICODE:'true'}, {COLUMN_TYPE:'int'}, {TABLE_NAME:'customer'}]) {
+    assert.throws(() => validateOfficialPackageInstallContracts('app.microi.saas-engine.json', fixture({...model,PhysicalColumns:[{...column,...extra}]})), /SQLSERVER_UNICODE/);
+  }
+});
+
+test('official language and form presentation columns retain their Unicode upgrade contracts', () => {
+  for (const [name, tableName, fields] of [
+    ['saas-engine','diy_lang',['Key','Code','ZhCN','En','ZhTW','vi','My','Ja','Ko']],
+    ['form-engine','diy_table',['FormNavigationTitle','FormNavigationCountText','FormRequiredCountText','FormNavigationFooterTitle','FormRecordSelectorPlaceholder','FormSectionEyebrow','FormWorkbenchEyebrow','FormWorkbenchDescription']]
+  ]) {
+    const p=JSON.parse(fs.readFileSync(path.join(directory,'app.microi.'+name+'.json'),'utf8'));
+    for(const field of fields) assert.equal(p.PhysicalColumns.find(c=>c.TABLE_NAME.toLowerCase()===tableName&&c.COLUMN_NAME===field)?.SQLSERVER_UNICODE,true,tableName+'.'+field);
+  }
+});

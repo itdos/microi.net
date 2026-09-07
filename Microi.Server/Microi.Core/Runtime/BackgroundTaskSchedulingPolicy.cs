@@ -39,6 +39,14 @@ namespace Microi.net
             return PlatformMaintenanceApiEngineKeys.Contains((apiEngineKey ?? "").Trim());
         }
 
+        internal static string RequiredApiEngineKeyForWakeHint(string apiEngineKey)
+        {
+            // Maintenance kinds share one tenant slot. A hot install lane must
+            // not filter out an older backup/empty-database task when that slot
+            // becomes free; the durable ready-time order chooses the next kind.
+            return IsPlatformMaintenance(apiEngineKey) ? null : apiEngineKey;
+        }
+
         internal static bool CanAdmit(
             string osClient,
             string apiEngineKey,

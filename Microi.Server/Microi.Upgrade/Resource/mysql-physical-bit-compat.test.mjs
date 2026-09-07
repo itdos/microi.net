@@ -7,6 +7,11 @@ const source = fs.readFileSync(new URL('./import-package.js', import.meta.url), 
 const helpers = source.slice(source.indexOf('    var mapToMySQLType ='), source.indexOf('    var quoteSqlServerCatalogIdentifier ='));
 const context = {runtimeIsSqlServer: false};
 vm.runInNewContext(helpers, context);
+// 同步函数新依赖时间默认值规范化器。执行真实源码依赖，不能以缺失的 VM 全局
+// 误报默认值 DDL 失败，也不能用恒定返回值绕过生产逻辑。
+const timestampHelpers = source.slice(source.indexOf('    var mysqlCurrentTimestampDefault ='), source.indexOf('    var buildPhysicalColumnDefinition ='));
+assert.match(timestampHelpers, /var mysqlCurrentTimestampDefault = function/);
+vm.runInNewContext(timestampHelpers, context);
 
 test('physical BIT never falls back to varchar during package synchronization', () => {
   for (const type of ['bit', 'bit(1)', 'bit(8)', 'bit(64)']) assert.equal(context.mapToMySQLType(type), type);

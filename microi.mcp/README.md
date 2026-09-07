@@ -70,6 +70,9 @@
 | `microi_save_print_template_design` | 保存 AI 生成的打印模板，带规范化和确认 | 读写（需确认） |
 | `microi_save_workflow_package` | 一次性保存工作流设计、节点和连线 | 读写（需确认） |
 | `microi_save_job` | 创建或更新定时任务 | 读写（需确认） |
+| `microi_email_query` | 查询自己的邮箱、分页邮件、附件、连接和同步状态 | 只读或只读协议检测 |
+| `microi_email_manage` | 保存邮箱账号/草稿、同步、设置标记与移动邮件 | 读写（精确操作确认） |
+| `microi_email_send` | 发送用户已授权的保存草稿，同一草稿绑定唯一投递意图 | 外部发送（精确草稿 Id 确认） |
 | `microi_install_store_application` | 用 StoreId、可选不可变 StoreVersionId 和商城源定位信息提交可恢复应用安装后台任务 | 读写（需确认） |
 | `microi_update_store_application` | 用 StoreId、可选不可变 StoreVersionId 和商城源定位信息提交可恢复应用更新后台任务 | 读写（需确认） |
 | `microi_list_database_types` | 列出 Dos.ORM 已认证数据库类型和脱敏连接示例 | 只读 |

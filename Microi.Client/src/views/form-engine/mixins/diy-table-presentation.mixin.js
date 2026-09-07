@@ -15,7 +15,7 @@ import {
 } from "../form-view-blocks/module-presentation-runtime";
 import { resolveFormPresentationConfig } from "../form-presentation-runtime.js";
 import { migrateLegacyModuleHeroBanner } from "../form-banner-runtime.js";
-import { hasScalarRecordId } from "@/utils/record-id.js";
+import { hasScalarRecordId, ownsRecordWorkbenchRoute } from "@/utils/record-id.js";
 import { requestMenuBadge } from "@/layout/components/Sidebar/menu-badge-batch.js";
 
 function uniqueFields(fields) {
@@ -44,6 +44,7 @@ const MODULE_METRIC_VISUALS = [
 export default {
     data() {
         return {
+            ModuleWorkbenchOwnerPath: this.$route?.path || "",
             ModuleMetricValues: {},
             ModuleMetricLoading: false,
             ButtonBadgeValues: {},
@@ -114,10 +115,8 @@ export default {
             return this.FormPresentationConfig || {};
         },
         ModuleFormWorkbenchRouteActive() {
-            if (this._moduleViewDeactivated === true) return false;
-            const routeMenuId = String(this.$route?.meta?.Id || this.$route?.meta?.SysMenuId || "");
             const ownerMenuId = String(this.PageTabHostSysMenuId || this.SysMenuId || this.SysMenuModel?.Id || "");
-            return !routeMenuId || !ownerMenuId || routeMenuId === ownerMenuId;
+            return ownsRecordWorkbenchRoute(this.$route, this.ModuleWorkbenchOwnerPath, ownerMenuId, this._moduleViewDeactivated);
         },
         ModuleFormWorkbenchAvailable() {
             const preset = String(this.ModuleListView?.Layout?.Preset || "").toLowerCase();
@@ -349,6 +348,13 @@ export default {
         },
         HandleModuleWorkbenchPage(pageIndex) {
             return this.GetDiyTableRow({ _PageIndex: pageIndex });
+        },
+        HandleModuleWorkbenchRecordUnavailable(recordId) {
+            if (!this.ModuleFormWorkbenchRouteActive || this.$route?.query?.RecordId !== recordId) return;
+            const query = { ...(this.$route.query || {}), ViewMode: "Table" };
+            delete query.RecordId;
+            this.DiyCommon.Tips(this.$t("Msg.WorkbenchRecordMissing"), false);
+            this.$router.replace({ path: this.$route.path, query }).catch(() => {});
         },
         HandleModuleWorkbenchRecordChange(recordId) {
             if (!recordId || !this.ModuleFormWorkbenchRouteActive) return;

@@ -43,7 +43,7 @@ namespace Microi.net
         /// 客户端只传 ChannelKey 和 SubjectId。授权接口由服务端约定解析为
         /// realtime_{channel_key}_authorize，不能通过请求切换到任意 ApiEngineKey。
         /// </summary>
-        public async Task<ApiEngineRealtimeSubscriptionResult> SubscribeChannel(
+        public async Task<Dictionary<string, object>> SubscribeChannel(
             ApiEngineRealtimeSubscriptionRequest request)
         {
             var identity = await ResolveIdentityAsync().ConfigureAwait(false);
@@ -135,7 +135,7 @@ namespace Microi.net
                     normalized.ChannelKey,
                     normalized.SubjectId)
                 .ConfigureAwait(false);
-            return new ApiEngineRealtimeSubscriptionResult
+            return ApiEngineRealtimeRuntime.CreateSubscriptionTransportPayload(new ApiEngineRealtimeSubscriptionResult
             {
                 ChannelKey = normalized.ChannelKey,
                 SubjectId = normalized.SubjectId,
@@ -146,7 +146,7 @@ namespace Microi.net
                 LeaseExpiresAt = ApiEngineRealtimeRuntime
                     .GetSubscriptionLeaseExpiry(now)
                     .ToString("O")
-            };
+            });
         }
 
         public async Task UnsubscribeChannel(ApiEngineRealtimeSubscriptionRequest request)

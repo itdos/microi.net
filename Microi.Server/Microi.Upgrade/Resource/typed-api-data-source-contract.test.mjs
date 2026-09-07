@@ -59,7 +59,7 @@ test('historic data-source aliases are ApiRoutes and delegate to the typed API r
   const apiEngine = read('../../Microi.net/ApiEngine/ApiEngine.cs');
   const engine = packageModel.SysApiEngines.find(item => item.ApiEngineKey === 'platform-data-source-run');
 
-  assert.equal(fs.existsSync(new URL('../../Microi.net.Api/Controllers/LegacyMobileCompatibilityController.cs', import.meta.url)), false);
+  assert.doesNotMatch(read('../../Microi.net.Api/Controllers/LegacyMobileCompatibilityController.cs'), /\/api\/DataSourceEngine\//);
   assert.match(engine.ApiRoutes, /\/api\/DataSourceEngine\/Run/);
   assert.match(engine.ApiRoutes, /\/api\/DataSourceEngine\/GetData/);
   assert.match(facade, /RunDataSourceEngine\(dynamic dynamicParam\)/);

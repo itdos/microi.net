@@ -25,6 +25,12 @@ namespace Microi.net
             var denied = RequireTrustedApiEngine(PlatformOsClientByDomainEngineKey);
             if (denied != null) return denied;
 
+            return ResolveOsClientByDomainCore(domain);
+        }
+
+        internal static DosResult ResolveOsClientByDomainCore(string domain)
+        {
+
             var normalizedDomain = NormalizePublicDomain(domain);
             if (normalizedDomain.DosIsNullOrWhiteSpace())
                 return new DosResult(0, null, "Domain不能为空或格式无效。");
@@ -167,9 +173,13 @@ namespace Microi.net
         {
             var denied = RequireTrustedApiEngine(PlatformLangBundleEngineKey);
             if (denied != null) return denied;
+            return GetLangBundleCore(V8TenantContext.Current.OsClient, lang, prefix);
+        }
+
+        internal static DosResult GetLangBundleCore(string osClient, string lang, string prefix)
+        {
             try
             {
-                var osClient = V8TenantContext.Current.OsClient;
                 var normalizedPrefix = prefix ?? "Msg.";
                 if (normalizedPrefix.Length > 100)
                     return new DosResult(0, null, "Prefix长度不能超过100。");
@@ -189,9 +199,13 @@ namespace Microi.net
         {
             var denied = RequireTrustedApiEngine(PlatformLoginWallpapersEngineKey);
             if (denied != null) return denied;
+            return GetLoginWallpapersCore(V8TenantContext.Current.OsClient);
+        }
+
+        internal static DosResult GetLoginWallpapersCore(string osClient)
+        {
             try
             {
-                var osClient = V8TenantContext.Current.OsClient;
                 var client = OsClientExtend.GetClient(osClient);
                 var db = client?.DbRead ?? client?.Db;
                 if (db == null) return new DosResult(0, null, "登录壁纸读取失败。");

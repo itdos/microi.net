@@ -36,6 +36,8 @@ outline: [2, 3]
 
 ## 先用 30 秒选版本
 
+Microi吾码本身是开源平台，开源版就是 Gitee 仓库提供的平台源码。个人版和企业版均在此基础上额外包含 WebOS 源码，两者的软件功能一致，主要区别在于培训、咨询和技术支持服务。
+
 <div class="mci-edition-card-grid mci-edition-card-grid--versions">
   <article class="mci-edition-version-card mci-edition-version-card--open">
     <div class="mci-edition-version-card__top">
@@ -47,7 +49,7 @@ outline: [2, 3]
     <h3>开源版</h3>
     <p class="mci-edition-version-card__summary">有研发和运维能力，先用成熟底座完成学习、验证或自主交付。</p>
     <ul>
-      <li>PC 传统界面与移动端源码</li>
+      <li>Gitee 仓库提供的平台源码</li>
       <li>支持本地 AI 开发</li>
       <li>可修改、商用和分发部署</li>
     </ul>
@@ -64,7 +66,7 @@ outline: [2, 3]
     <h3>个人版 <small>￥999 买断</small></h3>
     <p class="mci-edition-version-card__summary">需要 WebOS 完整源码和在线 AI 能力，团队可以自行实施与交付。</p>
     <ul>
-      <li>WebOS 100% 完整源码</li>
+      <li>额外包含 WebOS 源码</li>
       <li>软件功能与企业版一致</li>
       <li>永久授权、无限商用与分发</li>
     </ul>
@@ -81,7 +83,7 @@ outline: [2, 3]
     <h3>企业版 <small>￥2.5w 买断</small></h3>
     <p class="mci-edition-version-card__summary">软件能力与个人版一致，同时需要培训、咨询和更高优先级的协作支持。</p>
     <ul>
-      <li>个人版的全部软件能力</li>
+      <li>同样额外包含 WebOS 源码</li>
       <li>更多培训与咨询服务</li>
       <li>平台升级需求优先响应</li>
     </ul>
@@ -124,13 +126,13 @@ outline: [2, 3]
 |---|---|---|---|
 | 价格与授权 | 免费，按仓库许可证使用 | **￥999，一次买断，永久有效** | **￥2.5w，一次买断，永久有效** |
 | 后续技术支持 | 以文档、社区和自主维护为主 | 可选，¥499/年 | 可选，¥1.5w/年 |
-| PC 传统界面源码 | ✅ 100% 源码 | ✅ 100% 源码 | ✅ 100% 源码 |
-| 移动端源码 | ✅ 100% 源码 | ✅ 100% 源码 | ✅ 100% 源码 |
-| 后端源码 | ✅ 99% 源码 | ✅ 99% 源码 | ✅ 99% 源码 |
-| WebOS 完整源码 | — | ✅ 100% 完整源码 | ✅ 100% 完整源码 |
+| PC 传统界面源码 | ✅ 包含 | ✅ 包含 | ✅ 包含 |
+| 移动端源码 | ✅ 包含 | ✅ 包含 | ✅ 包含 |
+| 后端源码 | ✅ 包含 | ✅ 包含 | ✅ 包含 |
+| WebOS 完整源码 | — | ✅ 包含 | ✅ 包含 |
 | 本地 AI 开发 | ✅ 支持 | ✅ 支持 | ✅ 支持 |
 | 在线 AI 相关功能 | — | ✅ 包含 | ✅ 包含 |
-| 软件功能与开源程度 | 开源范围内的完整能力 | 与企业版一致 | 与个人版一致 |
+| 软件功能 | Gitee 开源项目提供的功能 | 与企业版一致 | 与个人版一致 |
 | 用户数、表单数、数据量、数据库数 | 不限制 | 不限制 | 不限制 |
 | 修改、商用与分发部署 | 可修改、可商用、可分发部署 | 无限制、可无限商用和分发部署 | 无限制、可无限商用和分发部署 |
 | 培训、咨询与升级需求响应 | 以自主解决为主 | 以购买时约定的服务范围为准 | 更多培训、咨询等服务，升级需求优先响应 |
@@ -147,7 +149,7 @@ outline: [2, 3]
   </div>
   <div class="mci-edition-detail-panel__columns">
     <div><strong>推荐选择</strong><ul><li>学习 Microi吾码、课程实验或技术验证</li><li>用 PC 传统界面或移动端交付 ERP、CRM、OA、MES 等系统</li><li>团队能够自行完成 Docker 部署、数据库维护、升级与排障</li><li>主要使用 VS Code、Codex、Copilot、Cursor、Claude 等进行本地 AI 开发</li></ul></div>
-    <div><strong>先确认边界</strong><ul><li>不包含 WebOS 100% 完整源码</li><li>不包含在线 AI 相关功能</li><li>主要依靠文档、社区和团队自身完成交付与维护</li></ul></div>
+    <div><strong>先确认边界</strong><ul><li>不包含 WebOS 源码</li><li>不包含在线 AI 相关功能</li><li>主要依靠文档、社区和团队自身完成交付与维护</li></ul></div>
   </div>
 </div>
 
@@ -160,7 +162,7 @@ outline: [2, 3]
   </div>
   <div class="mci-edition-detail-panel__columns">
     <div><strong>推荐选择</strong><ul><li>项目需要 WebOS 桌面化交互或深度定制</li><li>需要在线 AI 相关功能，同时也使用本地 AI 开发</li><li>需要无限商用、无限分发部署，不希望按用户数或项目数计费</li><li>团队可以自行完成需求分析、实施、测试、上线和常规维护</li></ul></div>
-    <div><strong>你将获得</strong><ul><li>与企业版一致的软件功能和开源程度</li><li>￥999 一次买断、永久有效</li><li>不购买后续技术支持也可永久正常使用已有授权</li></ul></div>
+    <div><strong>你将获得</strong><ul><li>与企业版一致的软件功能，额外包含 WebOS 源码</li><li>￥999 一次买断、永久有效</li><li>不购买后续技术支持也可永久正常使用已有授权</li></ul></div>
   </div>
 </div>
 
@@ -221,7 +223,7 @@ outline: [2, 3]
   </details>
   <details>
     <summary>开源版可以商用，也可以用 AI 开发吗？</summary>
-    <p>可以。开源版允许修改、商用和分发部署，也支持本地 AI 开发；不包含的是 WebOS 100% 完整源码和在线 AI 相关功能。使用时仍需遵守仓库许可证及第三方依赖各自的许可证。</p>
+    <p>可以。开源版允许修改、商用和分发部署，也支持本地 AI 开发；不包含的是 WebOS 源码和在线 AI 相关功能。使用时仍需遵守仓库许可证及第三方依赖各自的许可证。</p>
   </details>
   <details>
     <summary>个人版和企业版功能相同，为什么还要选择企业版？</summary>

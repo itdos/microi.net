@@ -119,7 +119,7 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 <table>
 <thead><tr><th width="200">Capability</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td>♾️ <strong>Unlimited</strong></td><td>No limits on users, forms, data volume, or databases. Frontend & mobile 100% open source, backend 99% open source</td></tr>
+<tr><td>♾️ <strong>Unlimited</strong></td><td>No limits on users, forms, data volume, or databases. Platform source code is available on Gitee; Personal and Enterprise editions additionally include WebOS source code</td></tr>
 <tr><td>🌐 <strong>Cross-Platform</strong></td><td>Based on .NET10, <a href="https://www.nuget.org/packages/Microi.net#versions-body-tab">core libraries built with .NET Standard</a>, supports gRPC cross-language communication</td></tr>
 <tr><td>🗄️ <strong>Cross-Database</strong></td><td>MySQL 5.5+ / SQL Server 2016+ / Oracle 11g+, supports read-write separation / sharding</td></tr>
 <tr><td>☁️ <strong>Distributed Deployment</strong></td><td>Docker / K8S / Jenkins / Rancher / CI/CD</td></tr>
@@ -143,7 +143,7 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 <tr><td>🔐 <strong>Fine-Grained Permissions</strong></td><td>Granular control down to every table, field, menu, button, and API</td></tr>
 <tr><td>🔑 <strong>Single Sign-On</strong></td><td>Bidirectional SSO between third-party systems and the low-code platform</td></tr>
 <tr><td>💬 <strong>WeChat Platform</strong></td><td>Multi-account / multi-mini-program configuration, template messages</td></tr>
-<tr><td>📱 <strong>Mobile (UniApp)</strong></td><td>100% open source, supports mini-programs / H5 / Android / iOS</td></tr>
+<tr><td>📱 <strong>Mobile (UniApp)</strong></td><td>Open source, supports mini-programs / H5 / Android / iOS</td></tr>
 <tr><td>🧩 <strong>Microservices</strong></td><td>Vue2 via Qiankun, Vue3 via MicroApp</td></tr>
 <tr><td>⏱️ <strong><a href="/en/doc/system-engine/job">Job Scheduling</a></strong></td><td>Scheduled execution of API engines or custom DLLs</td></tr>
 <tr><td>💬 <strong>Chat System</strong></td><td>Self-developed online chat + Tencent IM integration</td></tr>
@@ -162,9 +162,9 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 <table>
 <thead><tr><th width="80">Edition</th><th width="140">Price</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><strong>Open Source</strong></td><td>Free</td><td>PC traditional UI 100% source code, mobile 100% source code, backend 99% source code; commercial use allowed, freely modify, unlimited distribution. <strong>Only online AI features unavailable; local AI is unaffected</strong></td></tr>
-<tr><td><strong>Personal</strong></td><td>¥999</td><td>Includes <strong>WebOS 100% complete source code</strong>, identical features and openness to Enterprise edition, <strong>no restrictions, unlimited distribution</strong></td></tr>
-<tr><td><strong>Enterprise</strong></td><td>¥100k (¥25k down)</td><td>Additional training, consulting, and after-sales support, <strong>priority platform upgrade requests</strong></td></tr>
+<tr><td><strong>Open Source</strong></td><td>Free</td><td>Platform source code from the Gitee repository; commercial use allowed, freely modify, unlimited distribution. <strong>Only online AI features unavailable; local AI is unaffected</strong></td></tr>
+<tr><td><strong>Personal</strong></td><td>¥999</td><td>Additionally includes <strong>WebOS source code</strong>, with the same software features as the Enterprise edition, <strong>no restrictions, unlimited distribution</strong></td></tr>
+<tr><td><strong>Enterprise</strong></td><td>¥100k (¥25k down)</td><td>Also includes WebOS source code, with additional training, consulting, and after-sales support, <strong>priority platform upgrade requests</strong></td></tr>
 </tbody>
 </table>
 
@@ -192,7 +192,7 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 
 ```
 Microi.net/
-├── Microi.Server/          # 🔧 Backend 99% source code (.NET10)
+├── Microi.Server/          # 🔧 Backend source code (.NET10)
 │   ├── Microi.net.Api/     #     Web API layer (ASP.NET Core controllers)
 │   ├── Microi.Core/        #     Core infrastructure library (interfaces/models/abstractions)
 │   ├── Microi.V8Engine/    #     V8 Engine module
@@ -211,8 +211,8 @@ Microi.net/
 │   ├── Microi.Upgrade/     #     Platform hot-update module
 │   ├── Dos.ORM/            #     Self-developed ORM library
 │   └── Dos.Common/         #     Common utility library
-├── Microi.Client/          # 🖥️ PC traditional UI 100% source (Vue3 + Element-Plus + Vite + Pinia)
-├── microi.uniapp/          # 📱 UniApp mobile 100% source (mini-programs / H5 / App)
+├── Microi.Client/          # 🖥️ PC traditional UI source (Vue3 + Element-Plus + Vite + Pinia)
+├── microi.uniapp/          # 📱 UniApp mobile source (mini-programs / H5 / App)
 ├── microi.app/             # 📱 HBuilderX APK/IPA packaging project (Wap2App)
 ├── microi.doc/             # 📝 Official documentation (VitePress)
 ├── microi.mcp/             # 🔌 MCP Server source code (AI Agent tools)

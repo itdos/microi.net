@@ -724,7 +724,8 @@ namespace Microi.net
                                     queueHint.OsClient,
                                     running,
                                     parallelism), MicroiEngine.TryGetService<IAiImageTaskRuntime>() != null),
-                                queueHint.IsTenantRecovery ? null : queueHint.ApiEngineKey,
+                                queueHint.IsTenantRecovery ? null
+                                    : BackgroundTaskSchedulingPolicy.RequiredApiEngineKeyForWakeHint(queueHint.ApiEngineKey),
                                 false,
                                 () =>
                                 {
@@ -744,6 +745,13 @@ namespace Microi.net
                             else if (queueHint.IsTenantRecovery)
                             {
                                 recoveryAttemptCompleted = true;
+                            }
+                            else if (item != null && !string.Equals(
+                                         item.ApiEngineKey, queueHint.ApiEngineKey, StringComparison.OrdinalIgnoreCase))
+                            {
+                                // A different ready maintenance kind won the fair
+                                // claim. Preserve the original hint for its next turn.
+                                SignalWorker(queueHint.OsClient, queueHint.ApiEngineKey);
                             }
                         }
                         else

@@ -58,6 +58,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/report-engine.md` | report-engine | 虚拟报表和导出 |
 | `system-engine/saas-engine.md` | v8-saas-multi-tenant | 租户识别、SaaS 配置、ZIP 开库进度与长任务租约 |
 | `system-engine/search-engine.md` | search-engine | Elasticsearch 索引和查询 |
+| `system-engine/email-engine.md` | email-engine | 邮箱系统、源码商城安装、账号维护、收发同步和邮箱 MCP |
 | `system-engine/spider-engine.md` | spider-engine | 浏览器采集和 Worker |
 | `system-engine/ocr-engine.md` | ocr-engine, v8-file-upload, v8-saas-multi-tenant, v8-security | 图片/PDF 文字识别、独立模型服务、租户配置、V8/HTTP/MCP 调用、安全边界与生产验收 |
 | `system-engine/vision-engine.md` | vision-engine, ai-engine, microi-microservice, app-store, v8-security | ONNX 视觉特征、租户样本匹配、异步 AI 回退、摄像头帧、人脸治理、微服务与商城交付 |

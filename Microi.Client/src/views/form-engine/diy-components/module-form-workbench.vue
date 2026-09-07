@@ -4,13 +4,15 @@
         :class="[`is-${presentation.toLowerCase()}`, { 'is-control-center': isControlCenter }]"
     >
         <div
-            v-if="loading && records.length === 0"
+            v-if="(loading && records.length === 0) || (selectedId && !recordReady && !recordError)"
             class="workbench-skeleton"
             :class="{ 'has-record-navigator': showRecordNavigator }"
             aria-label="数据加载中"
         >
             <aside v-if="showRecordNavigator"></aside><main><i v-for="index in 10" :key="index"></i></main>
         </div>
+
+        <el-empty v-else-if="recordError" class="workbench-empty" :description="recordError" />
 
         <el-empty
             v-else-if="recordOptions.length === 0"
@@ -52,7 +54,7 @@
 
             <main class="form-workspace">
                 <DiyFormFull
-                    v-if="selectedId && tableId"
+                    v-if="selectedId && tableId && recordReady"
                     :key="tableId"
                     ref="embeddedFormRef"
                     :EmbeddedHeader="embeddedHeader"
@@ -121,6 +123,11 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import { ArrowDown, ArrowRight, MoreFilled, Plus, Search } from "@element-plus/icons-vue";
+import { useI18n } from "vue-i18n";
+import { DiyCommon } from "@/utils/diy.common";
+import { verifyWorkbenchRecord } from "@/utils/record-id.js";
+
+const { t } = useI18n();
 
 const DiyFormFull = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
 
@@ -144,8 +151,10 @@ const props = defineProps({
     initialRecordId: { type: String, default: "" }
 });
 
-const emit = defineEmits(["refresh", "open-form", "run-action", "load-page", "record-change", "form-ready"]);
+const emit = defineEmits(["refresh", "open-form", "run-action", "load-page", "record-change", "record-unavailable", "form-ready"]);
 const selectedId = ref("");
+const recordReady = ref(false);
+const recordError = ref("");
 const keyword = ref("");
 const embeddedFormRef = ref(null);
 const currentForm = ref({});
@@ -208,8 +217,27 @@ const embeddedRecordNavigator = computed(() => ({
 watch(selectedId, (value, previous) => {
     if (!value || value === previous) return;
     currentForm.value = {};
-    emit("record-change", value);
 }, { flush: "post" });
+watch([selectedId, () => props.tableId, () => props.sysMenuId], async ([id, tableId, sysMenuId], _previous, onCleanup) => {
+    let cancelled = false;
+    onCleanup(() => { cancelled = true; });
+    recordReady.value = false;
+    recordError.value = "";
+    if (!id || !tableId) return;
+    const result = await verifyWorkbenchRecord(id, records.value, (recordId) => DiyCommon.FormEngine.GetFormData(tableId, {
+        Id: recordId, _SysMenuId: sysMenuId, _SelectFields: ["Id"]
+    }));
+    if (cancelled) return;
+    if (result.status === "found") {
+        recordReady.value = true;
+        emit("record-change", id);
+    } else if (result.status === "missing") {
+        recordError.value = t("Msg.WorkbenchRecordMissing");
+        emit("record-unavailable", id);
+    } else {
+        recordError.value = result.message || t("Msg.WorkbenchRecordLoadFailed");
+    }
+}, { immediate: true });
 watch(records, (value) => {
     const requested = String(props.initialRecordId || "").trim();
     if (requested) {
@@ -230,7 +258,7 @@ watch(() => props.initialRecordId, (value) => {
     }
 });
 watch(
-    [embeddedFormRef, selectedId, () => props.tableId, () => props.tableName, () => props.sysMenuId, formMode, presentation, () => props.config],
+    [embeddedFormRef, selectedId, recordReady, () => props.tableId, () => props.tableName, () => props.sysMenuId, formMode, presentation, () => props.config],
     initializeEmbeddedForm,
     { immediate: true, flush: "post", deep: true }
 );
@@ -315,7 +343,7 @@ function stableConfigKey() {
 async function initializeEmbeddedForm() {
     await nextTick();
     const form = embeddedFormRef.value;
-    if (!form || typeof form.Init !== "function" || !selectedId.value || !props.tableId) {
+    if (!recordReady.value || !form || typeof form.Init !== "function" || !selectedId.value || !props.tableId) {
         if (!form) {
             lastEmbeddedFormInstance = null;
             lastEmbeddedSignature.value = "";

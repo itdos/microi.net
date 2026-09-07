@@ -80,6 +80,9 @@ namespace Microi.net
             /// <summary>一次性 TCP 原始字节发送与收发</summary>
             V8ExtensionRegistry.Register("Tcp", () => new V8Tcp());
 
+            // 邮件协议只暴露有界操作；账号授权、存储、去重与调度属于 Managed 接口引擎。
+            V8ExtensionRegistry.Register("Email", () => new V8Email());
+
             // ============================================
             // 【用户自定义扩展 - 在此添加你的扩展】
             // ============================================

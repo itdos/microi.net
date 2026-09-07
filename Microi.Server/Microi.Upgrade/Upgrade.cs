@@ -61,6 +61,7 @@ namespace Microi.net
                     {
                         upgradeLease.ThrowIfLost();
                         EnsureApiEngineRuntimeColumns(osClientSecret);
+                        Upgrade25.EnsureCurrentFileIdentityIndex(osClientSecret);
                         upgradeLease.ThrowIfLost();
                         if (!RuntimePhysicalPrerequisitesReady(osClientSecret))
                         {
@@ -200,6 +201,11 @@ namespace Microi.net
             var databaseBackupRuntimeInvariantApplied = false;
             var applicationStreamV3SchemaInvariantApplied = false;
             var runtimeInvariantStage = "初始化";
+            Task<List<string>> foundationApplicationsTask = null;
+            // 2024 年导出的 SQL 含 MySQL 专用语法及固定 Id。历史资源现在由同一套
+            // 经过校验的基础应用包交付，不能在 SQL Server 上重放旧快照或覆盖租户配置。
+            Task<List<string>> EnsureFoundationApplicationsAsync() =>
+                foundationApplicationsTask ??= new UpgradeAppStore().Run(osClientSecret.OsClient);
 
             try
             {
@@ -334,7 +340,7 @@ namespace Microi.net
             {
                 try
                 {
-                    var msgs = await new UpgradeSysConfig().Run(osClientSecret.OsClient);
+                    var msgs = await EnsureFoundationApplicationsAsync();
                     if (msgs.Count > 0)
                     {
                         migrationFailed = true;
@@ -346,7 +352,6 @@ namespace Microi.net
                     }
                     else
                     {
-                        var count = osClientSecret.Db.FromSql(UpgradeSysConfig.Sql).ExecuteNonQuery();
                         UpgradeProgress.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级sys_config】成功！");
                         needUptServerVersion = true;
                         AdvanceSuccessfulVersion(ref uptVersion, UpgradeSysConfig.Version);
@@ -366,7 +371,8 @@ namespace Microi.net
             {
                 try
                 {
-                    var count = osClientSecret.Db.FromSql(UpgradeLang.Sql).ExecuteNonQuery();
+                    var msgs = await EnsureFoundationApplicationsAsync();
+                    if (msgs.Count > 0) throw new InvalidOperationException(string.Join("；", msgs));
                     UpgradeProgress.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级多语言】成功！");
                     needUptServerVersion = true;
                     AdvanceSuccessfulVersion(ref uptVersion, UpgradeLang.Version);
@@ -385,7 +391,7 @@ namespace Microi.net
             {
                 try
                 {
-                    var msgs = await new UpgradeApiEngine().Run(osClientSecret.OsClient);
+                    var msgs = await EnsureFoundationApplicationsAsync();
                     if (msgs.Count > 0)
                     {
                         migrationFailed = true;
@@ -397,7 +403,6 @@ namespace Microi.net
                     }
                     else
                     {
-                        var count = osClientSecret.Db.FromSql(UpgradeApiEngine.Sql).ExecuteNonQuery();
                         UpgradeProgress.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine】成功！");
                         needUptServerVersion = true;
                         AdvanceSuccessfulVersion(ref uptVersion, UpgradeApiEngine.Version);
@@ -605,7 +610,7 @@ namespace Microi.net
             {
                 try
                 {
-                    var msgs = await new UpgradeAppStore().Run(osClientSecret.OsClient);
+                    var msgs = await EnsureFoundationApplicationsAsync();
                     if (msgs.Count > 0)
                     {
                         migrationFailed = true;
@@ -2412,6 +2417,8 @@ if (_microiLegacyMenuConfigChanged) {
                 }
             }
 
+            if (!Upgrade25.CurrentFileIdentityIndexReady(osClientSecret)) return false;
+
             if (!physicalColumns.TryGetValue("sys_apiengine", out var apiEngineColumns)
                 || apiEngineColumns.Count == 0)
             {
@@ -2436,13 +2443,21 @@ if (_microiLegacyMenuConfigChanged) {
             {
                 ["diy_table"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
                 ["diy_field"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-                ["sys_apiengine"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                ["sys_apiengine"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                // 登录前的固定实体投影必须可读；历史升级版本号不能证明这些物理列完整。
+                // 字段仍以各自官方应用包为事实源，不在 C# 复制业务字段清单。
+                ["sys_menu"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                ["sys_user"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                ["sys_config"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             };
             var assembly = typeof(MicroiUpgrade).GetTypeInfo().Assembly;
             foreach (var resourceName in new[]
                      {
                          "Microi.Upgrade.Resource.app.microi.form-engine.json",
-                         "Microi.Upgrade.Resource.app.microi.saas-engine.json"
+                         "Microi.Upgrade.Resource.app.microi.saas-engine.json",
+                         "Microi.Upgrade.Resource.app.microi.module-engine.json",
+                         "Microi.Upgrade.Resource.app.microi.sys_user.json",
+                         "Microi.Upgrade.Resource.app.microi.sys-config.json"
                      })
             {
                 using var stream = assembly.GetManifestResourceStream(resourceName)

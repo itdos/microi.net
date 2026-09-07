@@ -288,6 +288,7 @@ namespace Microi.net
             new SchemaIndex(VersionTable, "ux_aav_app_request", new[] { "AppId", "RequestId" }, true,
                 sqlServerFilterColumn: "RequestId", requiredNonBlankColumns: new[] { "AppId" }),
             new SchemaIndex(FileTable, "ux_aaf_version_pathhash", new[] { "VersionId", "FilePathHash" }, true,
+                sqlServerFilterColumn: "VersionId",
                 requiredNonBlankColumns: new[] { "VersionId", "FilePath", "FilePathHash" }),
             new SchemaIndex(VersionTable, "ix_aav_state_time_app", new[] { "PublishState", "UpdateTime", "AppId" }, false),
             new SchemaIndex(FileTable, "ix_aaf_app_version_scope", new[] { "AppId", "VersionId", "StorageScope" }, false),
@@ -1745,12 +1746,21 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
             var equivalent = before.Data?.FirstOrDefault(index => MatchesIndex(index, definition)
                 && IsAcceptableIndex(client, dialect, index, definition));
             if (equivalent != null) return;
-            if (sameName != null)
-                throw new InvalidOperationException($"SQL Server 索引 {definition.Name} 缺少 RequestId IS NOT NULL 过滤条件。");
+            var replaceLegacyCurrentFileIndex = sameName != null
+                && dialect == SchemaDialect.SqlServer
+                && definition.TableName == FileTable
+                && definition.Name == "ux_aaf_version_pathhash"
+                && string.IsNullOrWhiteSpace(client.Db.FromSql(
+                        "SELECT filter_definition FROM sys.indexes WHERE object_id=OBJECT_ID(@p0) AND name=@p1")
+                    .AddInParameter("p0", definition.TableName)
+                    .AddInParameter("p1", definition.Name).ToScalar()?.ToString());
+            if (sameName != null && !replaceLegacyCurrentFileIndex)
+                throw new InvalidOperationException($"SQL Server 索引 {definition.Name} 缺少 {definition.SqlServerFilterColumn} IS NOT NULL 过滤条件。");
 
             try
             {
-                client.Db.FromSql(BuildCreateIndexSql(dialect, definition)).ExecuteNonQuery();
+                client.Db.FromSql(BuildCreateIndexSql(dialect, definition)
+                    + (replaceLegacyCurrentFileIndex ? " WITH (DROP_EXISTING = ON)" : string.Empty)).ExecuteNonQuery();
             }
             catch (Exception ex)
             {
@@ -1776,6 +1786,31 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
             return actual != null
                    && actual.IsUnique == expected.Unique
                    && actual.Columns.SequenceEqual(expected.Columns, StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Current source rows intentionally have no immutable VersionId. SQL
+        // Server's unfiltered UNIQUE index treats NULL as a value and therefore
+        // prevents two applications from both owning e.g. package.json. Repair
+        // only this known protocol index; custom/mismatched indexes fail closed.
+        public static bool CurrentFileIdentityIndexReady(OsClientSecret client)
+        {
+            if (ResolveDialect(client) != SchemaDialect.SqlServer || !client.Db.TableExists(FileTable)) return true;
+            var expected = Indexes.Single(index => index.Name == "ux_aaf_version_pathhash");
+            var indexes = V8McpLogic.GetTableIndexes(client.OsClient, FileTable);
+            if (indexes?.Code != 1) throw new InvalidOperationException(indexes?.Msg ?? "读取应用文件索引失败。");
+            var existing = indexes.Data?.FirstOrDefault(index =>
+                string.Equals(index.Key_name, expected.Name, StringComparison.OrdinalIgnoreCase));
+            // A missing index belongs to the normal Upgrade25 installation.
+            return existing == null || (MatchesIndex(existing, expected)
+                && IsAcceptableIndex(client, SchemaDialect.SqlServer, existing, expected));
+        }
+
+        public static void EnsureCurrentFileIdentityIndex(OsClientSecret client)
+        {
+            if (CurrentFileIdentityIndexReady(client)) return;
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            EnsureIndex(client.OsClient, client, SchemaDialect.SqlServer,
+                Indexes.Single(index => index.Name == "ux_aaf_version_pathhash"));
         }
 
         private static bool IsAcceptableIndex(

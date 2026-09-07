@@ -53,10 +53,10 @@ test("unified core preserves both conversation protocols and security boundaries
     assert.match(aiEngineSource, /renameMobileAiConversation/);
     assert.match(aiEngineSource, /setMobileAiConversationArchived/);
     assert.match(aiEngineSource, /\/api\/Ai\/ChatStream/);
-    assert.match(aiEngineSource, /\/api\/Ai\/NL2SQL/);
+    assert.match(aiEngineSource, /PostAsync\("\/apiengine\/platform-ai-runtime",\s*\{\s*Action: "NL2SQL"/);
     assert.match(aiEngineSource, /\/api\/Ai\/NL2V8Engine/);
     assert.match(aiEngineSource, /内容由人工智能生成，请注意甄别/);
-    assert.match(aiEngineSource, /数据权限已校验/);
+    assert.match(aiEngineSource, /secureAssistantAvailable \? '权限边界已就绪' : '账号隔离会话'/);
     assert.match(aiEngineSource, /secureAssistantFailure\.description/);
     assert.match(aiEngineSource, /classifyMobileAiBootstrapFailure\(error\)/);
     assert.match(aiEngineSource, /安全业务数据：\{\{ secureAssistantFailure\.description \}\}/);

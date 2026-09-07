@@ -135,6 +135,62 @@ test('official_ai_apps only returns recommended published applications when requ
   assert.equal(result.DataAppend.Categories.some(item => item.Key === 'recommended'), false)
 })
 
+test('平台应用分类兼容旧名称，筛选不混入其它业务分类或私有应用', () => {
+  const rows = [
+    { Id: 'new', AppKey: 'new-platform', Category: 'platform', ApplicationType: 'Platform', IsApprove: 1 },
+    { Id: 'legacy', AppKey: 'legacy-platform', Category: '平台能力', ApplicationType: 'Platform', IsApprove: 1 },
+    { Id: 'business', AppKey: 'business-package', Category: 'business', ApplicationType: 'Platform', IsApprove: 1 },
+    { Id: 'private', AppKey: 'private-platform', Category: 'platform', ApplicationType: 'MicroService', Status: 'Published', BuildStatus: 'Success', IsPublic: 0 }
+  ]
+  const run = Category => new Function('V8', engineSource)({
+    Param: { Category }, SysConfig: {},
+    FormEngine: { GetTableData: () => ({ Code: 1, Data: rows, DataCount: rows.length }) }
+  })
+  for (const category of ['platform', 'PLATFORM', '平台应用', '平台能力', '平台能力 / 平台应用', '平台能力/平台应用']) {
+    const result = run(category)
+    assert.deepEqual(new Set(result.Data.map(row => row.AppKey)), new Set(['new-platform', 'legacy-platform']), category)
+    assert.ok(result.Data.every(row => row.Category === 'platform'))
+    assert.equal(result.DataAppend.Categories.find(item => item.Key === 'platform').Value, '平台应用')
+  }
+  assert.equal(run('unknown-category').DataCount, 0)
+})
+
+test('历史游戏、生活、学习与行业分类进入对应列表，详情与搜索沿用同一分类', () => {
+  const fixtures = [
+    ['dice-party', 'games', 'game'],
+    ['home-inventory', 'life', 'lifestyle'],
+    ['family-calendar', 'family', 'lifestyle'],
+    ['handwriting-practice', 'learning', 'education'],
+    ['event-lottery', 'event-marketing', 'marketing'],
+    ['ai-content', 'content', 'creative'],
+    ['clinic-emr', 'health', 'industry'],
+    ['farm', 'agriculture', 'industry'],
+    ['fund', 'finance', 'industry'],
+    ['shop', 'retail', 'industry'],
+    ['dispatch', 'transport', 'industry'],
+    ['law', 'legal', 'industry'],
+    ['citizen', 'public', 'industry']
+  ]
+  const rows = fixtures.map(([AppKey, Category]) => ({
+    Id: AppKey, AppKey, AppName: AppKey, Category,
+    ApplicationType: 'Web', Status: 'Published', BuildStatus: 'Success', IsPublic: 1
+  }))
+  const run = Param => new Function('V8', engineSource)({
+    Param, SysConfig: {}, FormEngine: {
+      GetTableData: () => ({ Code: 1, Data: rows, DataCount: rows.length }),
+      GetFormData: () => ({ Code: 1, Data: rows.find(row => row.AppKey === Param.ExactAppKey) })
+    }
+  })
+  for (const [appKey, legacy, category] of fixtures) {
+    const expected = fixtures.filter(row => row[2] === category).map(row => row[0])
+    for (const filter of [category, legacy]) {
+      assert.deepEqual(new Set(run({ Category: filter }).Data.map(row => row.AppKey)), new Set(expected), filter)
+    }
+    assert.equal(run({ ExactAppKey: appKey }).Data[0].Category, category)
+    assert.ok(run({ Category: category, Keyword: appKey }).Data.some(row => row.AppKey === appKey))
+  }
+})
+
 test('official_ai_apps 精确 AppKey 走单条快速通道，不读取全量列表', () => {
   let tableReads = 0
   let formReads = 0

@@ -48,6 +48,6 @@ test('legacy credential repair is confirmed, administrative, secret-free and del
  assert.equal(execute({TenantKey:'tenant-a',Apply:true,Confirm:'REPAIR-ENCODING:tenant-a',Pwd:'must-not-forward'},9999).calls,1);
  const p=JSON.parse(fs.readFileSync(new URL('./app.microi.saas-engine.json',import.meta.url),'utf8'));
  const e=p.SysApiEngines.find(e=>e.ApiEngineKey==='platform-tenant-admin-credential-repair');
- assert.equal(e.ApiV8Code,code);assert.equal(e.AllowAnonymous,0);assert.equal(e.EnableLog,0);
+ assert.equal(e.ApiV8Code.replace(/\r\n/g,'\n').trimEnd(),code.replace(/\r\n/g,'\n'));assert.equal(e.AllowAnonymous,0);assert.equal(e.EnableLog,0);
  assert.equal(p.ResourcePolicies.ApiEngines[e.ApiEngineKey].UpgradePolicy,'Managed');
 });

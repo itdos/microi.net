@@ -53,6 +53,10 @@ ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
 
 接口缓存会同时按记录 Id、`ApiEngineKey`、主路由和全部多路由命中同一份代码。路由按完整路径、不区分大小写精确匹配；Query 不属于路由。主路由与多路由不得重复或与其它启用接口冲突，保存和启动缓存遇到冲突会失败关闭。新代码仍应使用稳定 Key 地址，多路由只用于旧客户端和已登记第三方回调兼容。
 
+若旧租户仅更新后端程序，应用自动升级尚未完成，后端保留 `LegacyMobileCompatibilityController` 作为临时启动兼容入口。`/api/SysUser/Login`、续签、Token 登录、退出、公开系统设置、语言包、登录壁纸、域名租户解析、当前用户及菜单读取，在主库确认对应地址与固定接口 Key 均缺失时复用现有可信后端能力，仍执行密码、验证码、DiyToken 和菜单权限校验。管理员登录后可进入应用商城安装或更新平台应用；资源齐备后立即优先使用接口引擎。已禁用、禁止 HTTP、权限拒绝、数据库异常及接口执行失败不会触发兜底。
+
+历史 `/api/SysUser/*` 地址固定绑定对应会话动作，不能用请求体 `Action` 改成其它操作，并支持 `--OsClient--{OsClient}--` 租户后缀。路径与 Query 同时指定租户时必须一致。兼容 Controller 随后端程序交付，商城 SaaS 应用交付接口源码与多路由；两者需要分别更新。此 Controller 仅用于兼容，未来可能整体删除，新业务继续使用接口引擎。
+
 ```javascript
 // 同步调用
 var result = V8.ApiEngine.Run('ApiEngineKey', { 
@@ -172,6 +176,8 @@ return {
 跨节点发布使用共享 Redis：同一个 `OsClient + EventId` 先取得短时 Claim，再按 `ChannelKey + SubjectId` 原子维护单调 latest。低于当前 `Version` 的事件作为过期事件拒绝广播；同版本但事件指纹不同会判为版本冲突并拒绝；完全相同的事件重放不会推进 latest。只有 SignalR 真实广播成功后，平台才写入 24 小时 EventId 完成标记。若节点在广播前退出，Claim 到期后可重试，不会形成“已经去重但从未广播”的永久窗口；故障恢复可能产生重复通知，所以客户端仍必须去重。Redis 或 SignalR 故障不能反写已经提交的业务结果，客户端通过 HTTP Snapshot 收敛。
 
 通用 Hub 固定契约：
+
+宿主将事件和订阅结果中的 `Latest.Data` 转为仅含 JSON 标量、字典和数组的独立传输副本，保留上述字段及大小写，不把 `JToken/JObject` 直接交给 SignalR。Redis backplane 会预序列化已注册的 JSON/MessagePack 协议；即使浏览器只用 JSON，MessagePack 不支持 `JToken` 也会使整次广播失败。遇到“已连接但无推送”时，必须同时检查订阅授权、真实 `RealtimeEvent` 帧及 `ApiEngineRealtime` 日志，不能只凭握手成功判断实时功能通过。此传输修复须随兼容后端部署，保存业务 V8 不能代替后端升级。
 
 | 项目 | 值 |
 |---|---|
@@ -367,6 +373,8 @@ console.log(JSON.stringify(V8.Limits));
 资源异常会在 `DataAppend.V8Limit` 返回结构化分类，例如 `V8_MEMORY_LIMIT`、`V8_CALL_TREE_MEMORY_LIMIT`、`V8_STATEMENTS_LIMIT`、`V8_RECURSION_LIMIT`、`V8_TIMEOUT`、`V8_NESTED_DEPTH_LIMIT` 或 `V8_EXECUTION_QUEUE_TIMEOUT`，同时包含限制值、调用深度和调用路径。排查时应按分类处理，不要把所有异常都归为“服务器内存不足”。
 
 后台任务仍通过接口引擎执行，所以**一个未分片的 30 分钟脚本仍会受同一套单片超时、语句和累计分配预算约束**。后台任务的总时长可以是数小时，但每片应控制在默认 600 秒以内，在提交本片事务后返回 `HasMore + Checkpoint`，由 Worker 创建新的执行片段继续；新片会获得新的超时、语句和累计分配预算。
+
+开启分布式锁的可信后台任务使用最长 60 秒的 Redis 租约，并在执行期间按持有者令牌持续续租。接口的长执行预算与锁的单次存活时间分别计算；节点退出后，未续租的锁会在该短租约到期后释放，检查点无需等待原来一小时的接口预算。正常运行的长任务仍保留最多 12 小时（显式更长的执行预算优先）的续租边界。普通 HTTP 调用继续使用原有固定租约；前端伪造后台任务参数不能开启可信续租。
 
 ### 接口引擎的“V8运行限制”
 
@@ -2318,6 +2326,36 @@ return V8.Office.SendEmail({
   Receivers : ['123446172@qq.com', '973702@qq.com']
 });
 ```
+
+## 邮箱协议 V8.Email
+
+邮箱业务通过接口引擎 `mci-email` 编排，详见 [邮箱系统](/doc/system-engine/email-engine)。
+`V8.Email` 只提供租户凭据加密、IMAP、SMTP 和 MIME 协议原子，不创建第二套 HTTP 接口。
+
+| 方法 | 用途 |
+| --- | --- |
+| `ProtectCredential(value)` | 将授权码加密为当前租户密文；没有对 V8 开放的解密方法 |
+| `TestConnection(p)` | 检测 IMAP / SMTP 的 TLS 连接与账号认证 |
+| `ListFolders(p)` | 读取目录路径、类型和服务端计数 |
+| `Fetch(p)` | 分页读取信封，支持 UID 游标、UIDVALIDITY 重置与最新邮件优先 |
+| `Inspect(p)` | 最多核对 100 个 UID 的存在、已读、星标和删除状态 |
+| `GetMessage(p)` / `GetAttachment(p)` | 按需读取正文或一个附件，不加载远程图片 |
+| `SetFlags(p)` / `Move(p)` | 修改单封邮件标记或移动到目标目录 |
+| `Send(p)` | 发送 MIME 邮件，返回 Accepted / Rejected / Unknown 投递状态 |
+| `StoreSent(p)` | 按 Message-Id 查重并保存远端已发送副本，独立于 SMTP 投递 |
+
+连接参数为 `Host, Port, Security, UserName, Credential, Timeout`。
+`Credential` 必须为当前租户密文，`Security` 仅支持 `SslOnConnect` 或 `StartTls`。
+邮件参数包括 `To, Cc, Bcc, Subject, TextBody, HtmlBody, InReplyTo, MessageId, Attachments`。
+附件为 `{ FileName, ContentType, FileByteBase64 }`，最多 10 个，总大小不超过 10MB。
+
+读取时传 `Folder, UidValidity, Uid`；分页传 `AfterUid, Limit`（最高 100）。
+`Recent=true` 先读取最新一批而保留历史游标；`GetAttachment` 另传从 0 开始的 `AttachmentIndex`。
+目录路径不可自行改写，UID 必须与 UIDVALIDITY 一起持久化。
+
+发信前由接口引擎保存稳定草稿 Id、Message-Id 与共享去重状态。
+`Accepted` 代表 SMTP 接受，不代表收件人已经阅读；`Unknown` 必须先核对远端目录，禁止自动重发。
+普通调用优先使用邮箱业务接口，避免遗漏权限、状态机和发送幂等。
 
 ## 系统设置 V8.SysConfig
 >* 后端接口引擎与后端 V8 事件访问当前租户完整系统配置；返回值是独立副本，脚本修改不会写回缓存或数据库。

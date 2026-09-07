@@ -147,6 +147,17 @@ public sealed class TenantDatabaseUpgradeLifecycleTests
         Assert.Contains("***", result, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void MissingColumnDescription_IsNotReportedAsMissingDatabase()
+    {
+        var method = typeof(MicroiUpgrade).GetMethod("BuildChineseUpgradeDiagnostic",
+            BindingFlags.Static | BindingFlags.NonPublic)!;
+        const string error = "Property cannot be updated or deleted. Property 'MS_Description' does not exist for 'dbo.diy_schedule_job.JobParam'.";
+        var result = Assert.IsType<string>(method.Invoke(null, new object[] { error }));
+        Assert.DoesNotContain("目标数据库不存在", result);
+        Assert.Contains("MS_Description", result);
+    }
+
     private static int Count(string source, string value)
     {
         var count = 0;

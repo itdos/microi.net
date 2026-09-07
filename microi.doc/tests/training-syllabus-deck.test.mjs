@@ -40,9 +40,9 @@ test('presentation covers the complete technical learning path', () => {
   const supplementalBlock = /const atlasSupplementalEntries: AtlasEntry\[\] = \[([\s\S]*?)\r?\n\]/u.exec(component)?.[1] || ''
   const supplementalCount = [...supplementalBlock.matchAll(/^\s+\{ id: '[^']+'/gmu)].length
 
-  assert.equal(engineCount, 36)
+  assert.equal(engineCount, 37)
   assert.equal(supplementalCount, 6)
-  assert.match(component, /const expectedSlideCount = 45/)
+  assert.match(component, /const expectedSlideCount = 46/)
   for (const phrase of [
     '开源 AI 开发框架',
     '10×+',
@@ -68,6 +68,10 @@ test('presentation covers the complete technical learning path', () => {
     '报表引擎',
     '查询、编辑，并联动多表多库的可写报表',
     '工作流引擎',
+    '邮箱系统',
+    '独立 Web 运行',
+    '吾码微服务运行',
+    '完整源码与业务扩展',
     'AI 引擎',
     'AI 数据分析',
     '用自然语言，把业务数据变成可执行经营结论',
@@ -193,16 +197,16 @@ test('pre-generated dark and light PDFs are published as stable high-quality dow
     const pdf = fs.readFileSync(staticPdfPath)
     assert.ok(stat.size > 250_000, 'each PDF should contain the complete high-quality vector deck')
     assert.equal(pdf.subarray(0, 5).toString('ascii'), '%PDF-')
-    assert.match(pdf.toString('latin1'), /\/Count\s+45\b/u, 'each static PDF should contain all 45 slides')
+    assert.match(pdf.toString('latin1'), /\/Count\s+46\b/u, 'each static PDF should contain all 46 slides')
   }
 })
 
 test('the preview rail publishes a complete thumbnail set for each theme', () => {
   for (const [theme, root] of Object.entries(thumbnailRoots)) {
     const files = fs.readdirSync(root).filter(name => /^slide-\d{2}\.webp$/u.test(name)).sort()
-    assert.equal(files.length, 45, `${theme} theme should contain all 45 thumbnails`)
+    assert.equal(files.length, 46, `${theme} theme should contain all 46 thumbnails`)
     assert.equal(files[0], 'slide-01.webp')
-    assert.equal(files.at(-1), 'slide-45.webp')
+    assert.equal(files.at(-1), 'slide-46.webp')
     for (const name of files) {
       const file = fs.readFileSync(path.join(root, name))
       assert.ok(file.length > 1_000, `${theme}/${name} should be a real rendered preview`)

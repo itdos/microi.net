@@ -57,7 +57,9 @@ namespace Microi.net
                 "sys_servernode", "sys_sourcedatatable", "microi_database", "wx_mp", "wx_menu",
                 "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
                 "mci_network_traffic_rollup", "mci_app_stream_gate_transition", "mci_nuget_stats_daily",
-                "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
+                "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset",
+                "mci_email_account", "mci_email_message", "mci_email_sync_log",
+                "mci_apiengine_change_history", "mci_vision_request", "mci_vision_subject", "mci_vision_sample"
             },
             StringComparer.OrdinalIgnoreCase);
         private static readonly string[] EmptyDatabaseOperationalTables =
@@ -71,7 +73,9 @@ namespace Microi.net
             "sys_servernode", "sys_sourcedatatable", "microi_database", "wx_mp", "wx_menu",
             "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
             "mci_network_traffic_rollup", "mci_app_stream_gate_transition", "mci_nuget_stats_daily",
-            "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
+            "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset",
+            "mci_email_account", "mci_email_message", "mci_email_sync_log",
+            "mci_apiengine_change_history", "mci_vision_request", "mci_vision_subject", "mci_vision_sample"
         };
 
         private readonly string _backgroundTaskId;
@@ -221,6 +225,7 @@ namespace Microi.net
                 validation.PlatformServiceCount,
                 validation.PlatformServiceRuntimeCount,
                 validation.PlatformServiceSourceFileCount,
+                validation.InstalledApplicationVersionBaselines,
                 AlreadySanitized = alreadySanitized
             }, alreadySanitized
                 ? "临时数据库已完成脱敏并通过校验，本片按持久化结果幂等续跑。"
@@ -294,6 +299,7 @@ namespace Microi.net
                     RemainingOperationalResidueRows = validation.RemainingOperationalResidueRows,
                     RemainingOperationalResidue = validation.RemainingOperationalResidue,
                     PlatformServiceCount = validation.PlatformServiceCount,
+                    InstalledApplicationVersionBaselines = validation.InstalledApplicationVersionBaselines,
                     PackageCount = packages.Count,
                     Packages = packages.Select(package => new
                     {
@@ -328,8 +334,16 @@ namespace Microi.net
             }
         }
 
-        public DosResult Cleanup(JObject currentUser, string osClient)
+        public DosResult Cleanup(JObject currentUser, string osClient, bool withdrawPublicPackages = false, long fencingToken = 0)
         {
+            if (withdrawPublicPackages)
+            {
+                if (!BackgroundTaskService.TryGetCurrentExecutionContext(
+                        _backgroundTaskId, fencingToken, WorkerApiEngineKey, out var context))
+                    return new DosResult(0, null, "撤回必须由当前有效租约下的空数据库持久后台任务执行。");
+                currentUser = context.TrustedCurrentUser;
+                osClient = context.OwnerOsClient;
+            }
             var permissionResult = ValidatePermission(currentUser, osClient);
             if (permissionResult.Code != 1)
             {
@@ -338,6 +352,15 @@ namespace Microi.net
             try
             {
                 EnsureReleaseLease();
+                if (withdrawPublicPackages)
+                {
+                    // Only the same fixed, public artifact names that Publish owns.
+                    // No caller-selected path, bucket, endpoint or credentials are accepted.
+                    var removed = WithdrawPublicReleasePackages(_backgroundTaskId, fencingToken);
+                    MicroiEngine.QueueSystemLog(osClient, "DatabaseRelease", "PublicReleaseWithdrawn",
+                        "已撤回空数据库发布文件", string.Join(",", removed), 3);
+                    return new DosResult(1, new { WithdrawnFiles = removed }, "已撤回固定的空数据库公开发布文件。");
+                }
                 TryDropTargetDatabase(BuildAndValidateSourceConnection());
                 return new DosResult(1, null, "临时空数据库已清理。");
             }
@@ -1197,6 +1220,16 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
                 : 0;
 
             var violations = new List<string>();
+            // Read the physical temporary database. A successful V8 return cannot
+            // substitute for checking the exact snapshot that will be exported.
+            validation.InstalledApplicationVersionBaselines = ReadInstalledApplicationVersionBaselines(connection);
+            foreach (var baseline in validation.InstalledApplicationVersionBaselines)
+            {
+                if (!IsInstalledApplicationVersionBaselineValid(baseline))
+                {
+                    violations.Add("平台应用安装基线未与已校验商城包同步：" + baseline["AppId"]);
+                }
+            }
             if (validation.RemainingNonTemplateUsers > 0)
             {
                 violations.Add($"sys_user 非模板账号={validation.RemainingNonTemplateUsers}");
@@ -1312,6 +1345,88 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
                     "脱敏发布门禁未通过：" + string.Join("；", violations) + "。");
             }
             return validation;
+        }
+
+        internal static IReadOnlyList<string> PublicReleaseObjectPaths()
+            => DatabaseSeedConverter.SupportedReleasePackages
+                .Select(definition => PublicObjectDirectory + definition.ZipFileName).ToArray();
+
+        private static IReadOnlyList<string> WithdrawPublicReleasePackages(string taskId, long fencingToken)
+        {
+            var clientModel = OsClientExtend.GetClient(RequiredOsClient)
+                              ?? throw new InvalidOperationException("未读取到 iTdos SaaS/HDFS 配置。");
+            var hdfsClient = clientModel.OsClientModel?["HDFS"]?.ToString() switch
+            {
+                "MinIO" => MicroiEngine.HDFSFactory(HDFSType.MinIO),
+                "S3" => MicroiEngine.HDFSFactory(HDFSType.AmazonS3),
+                _ => MicroiEngine.HDFSFactory(HDFSType.Aliyun)
+            };
+            var removed = new List<string>();
+            foreach (var objectPath in PublicReleaseObjectPaths())
+            {
+                if (!BackgroundTaskService.TryGetCurrentExecutionContext(
+                        taskId, fencingToken, WorkerApiEngineKey, out _))
+                    throw new InvalidOperationException("空数据库撤回任务租约已失效，已停止后续删除。");
+                var parameters = new HDFSParam
+                {
+                    ClientModel = clientModel, NetworkIsInternet = false,
+                    Limit = false, FileFullPath = objectPath
+                };
+                var result = hdfsClient.DeleteObject(parameters).GetAwaiter().GetResult();
+                if (result == null || result.Code != 1)
+                    throw new InvalidOperationException("撤回空数据库文件失败：" + objectPath + "；" + result?.Msg);
+                var remaining = hdfsClient.ObjectExist(parameters).GetAwaiter().GetResult();
+                if (remaining == null || remaining.Code != 1 || remaining.Data)
+                    throw new InvalidOperationException("空数据库文件撤回后回读未确认不存在：" + objectPath);
+                removed.Add(objectPath);
+            }
+            return removed;
+        }
+
+        private static List<JObject> ReadInstalledApplicationVersionBaselines(MySqlConnection connection)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+SELECT COALESCE(NULLIF(s.AppId,''),s.AppKey) AS AppId, s.AppVersion AS CatalogVersion,
+       v.AppVersion, v.AppVersionInstall, v.PackageVersion, s.PackageSha256,
+       v.InstallResult
+FROM sys_microistoreversion v
+JOIN sys_microistore s ON v.StoreId=s.Id
+ OR (COALESCE(v.StoreId,'')='' AND v.AppId=COALESCE(NULLIF(s.AppId,''),s.AppKey))
+WHERE COALESCE(v.IsDeleted,0)=0 AND COALESCE(s.IsDeleted,0)=0
+ AND (LOWER(s.AppKey)='microi-platform-service'
+  OR (LOWER(COALESCE(NULLIF(s.ApplicationType,''),s.AppType))='platform'
+   AND (LOWER(s.AppKey) LIKE 'app.microi.%' OR LOWER(s.AppKey)='microi-wechat-content-security')))
+ORDER BY AppId;";
+            using var reader = command.ExecuteReader();
+            var result = new List<JObject>();
+            while (reader.Read())
+            {
+                var row = new JObject();
+                for (var index = 0; index < reader.FieldCount; index++)
+                    row[reader.GetName(index)] = reader.IsDBNull(index) ? "" : reader.GetValue(index).ToString();
+                result.Add(row);
+            }
+            return result;
+        }
+
+        internal static bool IsInstalledApplicationVersionBaselineValid(JObject row)
+        {
+            var expectedVersion = row["CatalogVersion"]?.ToString() ?? "";
+            if (string.IsNullOrWhiteSpace(expectedVersion)
+                || new[] { "AppVersion", "AppVersionInstall", "PackageVersion" }
+                    .Any(field => row[field]?.ToString() != expectedVersion)) return false;
+            JObject proof;
+            try { proof = JObject.Parse(row["InstallResult"]?.ToString() ?? ""); }
+            catch (Newtonsoft.Json.JsonException) { return false; }
+            var packageSha = row["PackageSha256"]?.ToString() ?? "";
+            var verifiedSha = proof["PackageSha256"]?.ToString() ?? "";
+            return proof["BaselineType"]?.ToString() == "OfficialEmptyDatabaseSnapshot"
+                && proof["Version"]?.ToString() == expectedVersion
+                && Regex.IsMatch(verifiedSha, "^[a-f0-9]{64}$")
+                && (string.IsNullOrWhiteSpace(packageSha)
+                    || string.Equals(verifiedSha, packageSha, StringComparison.OrdinalIgnoreCase))
+                && long.TryParse(proof["PackageSize"]?.ToString(), out var packageSize) && packageSize > 0;
         }
 
         private static List<string> GetRemainingApplicationLanguageKeys(
@@ -2582,6 +2697,7 @@ return 0";
             public long PlatformServiceCount { get; set; }
             public long PlatformServiceRuntimeCount { get; set; }
             public long PlatformServiceSourceFileCount { get; set; }
+            public List<JObject> InstalledApplicationVersionBaselines { get; set; } = new List<JObject>();
 
             public long RemainingAppArtifacts =>
                 RemainingApplicationPhysicalTables
