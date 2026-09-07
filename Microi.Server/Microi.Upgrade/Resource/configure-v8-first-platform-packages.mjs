@@ -816,6 +816,12 @@ export function configurePackageModel(packageModel, definition) {
   if (packageModel?.PackageInfo?.Name !== definition.name) {
     throw new Error(`${definition.file} 包名不正确。`);
   }
+  // Existing published packages may append independent reference-table fields after
+  // generated fields. Regeneration must retain that order, not create false content
+  // drift by moving every regenerated field to the end. Align by natural identity.
+  const tableNames = new Map((packageModel.DiyTables || []).map(row => [row.Id, row.Name]));
+  const fieldKey = row => `${String(row.TableName || tableNames.get(row.TableId) || '').toLowerCase()}:${String(row.Name || '').toLowerCase()}`;
+  const fieldOrder = new Map((packageModel.DiyFields || []).map((row, index) => [fieldKey(row), index]));
   const removals = new Set(definition.removeEngines || []);
   const exactEngineKeys = new Set(definition.exactEngineKeys || []);
   packageModel.SysApiEngines = (packageModel.SysApiEngines || [])
@@ -841,6 +847,9 @@ export function configurePackageModel(packageModel, definition) {
     configureSysUserAiApiKey(packageModel);
     configureSysUserHomeUsageStats(packageModel);
   }
+  packageModel.DiyFields?.sort((left, right) =>
+    (fieldOrder.get(fieldKey(left)) ?? Number.MAX_SAFE_INTEGER)
+    - (fieldOrder.get(fieldKey(right)) ?? Number.MAX_SAFE_INTEGER));
 
   if (exactEngineKeys.size) {
     const actualKeys = (packageModel.SysApiEngines || [])

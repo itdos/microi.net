@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,6 +22,11 @@ namespace Microi.net
 	public class MicroiHDFSMinIO : MicroiHDFS, IMicroiHDFS
     {
         private static readonly HttpClient UploadReadbackHttpClient = CreateUploadReadbackHttpClient();
+        private static readonly HttpClient ObjectReadHttpClient = new HttpClient(new HttpClientHandler
+        {
+            // 签名仅授权当前租户的精确对象，不得把签名查询串转发给重定向目标。
+            AllowAutoRedirect = false
+        }) { Timeout = Timeout.InfiniteTimeSpan };
 
         public sealed class MinioEndpointConfiguration
         {
@@ -129,7 +135,7 @@ namespace Microi.net
                     ? internetEndPoint.DosIsNullOrWhiteSpace(internalEndPoint)
                     : internalEndPoint.DosIsNullOrWhiteSpace(internetEndPoint);
 
-                var minioClient = BuildMinioClient(
+                using var minioClient = BuildMinioClient(
                     endPoint,
                     useInternet
                         ? clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1
@@ -147,22 +153,15 @@ namespace Microi.net
                     //如果是返回byte[]
                     if (param.ReturnFileType == "Byte")
                     {
-                        GetObjectArgs getArgs = new GetObjectArgs()
-                                               .WithBucket(bucketName);
-                        //getArgs.WithFile(param.FilePathName.TrimStart('/'));
-                        getArgs.WithObject(param.FileFullPath.TrimStart('/'));
-
                         using (var memoryStream = new MemoryStream())
                         {
-                            getArgs.WithCallbackStream(stream =>
-                            {
-                                stream.CopyTo(memoryStream);
-                            });
-
-                            var byteResult = await minioClient.GetObjectAsync(getArgs);
-                            memoryStream.Position = 0;
-
-                            result = new DosResult(1, StreamHelper.StreamToBytes(memoryStream));
+                            var read = await CopySignedObjectToStreamAsync(
+                                minioClient, bucketName, param.FileFullPath.TrimStart('/'),
+                                memoryStream, param.TimeoutSeconds, param.CancellationToken,
+                                ObjectReadHttpClient).ConfigureAwait(false);
+                            result = read.Code == 1
+                                ? new DosResult(1, memoryStream.ToArray())
+                                : read;
                         }
                     }
                     else//如果是返回Url
@@ -303,9 +302,9 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// Streams an object into a caller-owned destination without allocating a
-        /// whole-object MemoryStream.  The async callback is awaited by MinIO, so
-        /// the response stays alive until the bounded pipeline has consumed it.
+        /// 使用当前租户凭据直接签名读取精确对象，避免 SDK 的 HEAD Bucket/Stat
+        /// 预检查在对象可读但桶级检查被拒绝时阻断断点恢复与数据库 ZIP 还原。
+        /// 全程有界流式传输，目标流由调用方持有；失败后不自动重试或追加第二份内容。
         /// </summary>
         public async Task<DosResult> CopyObjectToStream(HDFSParam param)
         {
@@ -318,7 +317,7 @@ namespace Microi.net
                 var endPoint = useInternet
                     ? clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>()
                     : clientModel.OsClientModel["MinIOEndPoint"].Val<string>();
-                var client = BuildMinioClient(
+                using var client = BuildMinioClient(
                     endPoint,
                     useInternet
                         ? clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1
@@ -329,19 +328,10 @@ namespace Microi.net
                 var bucketName = param.Limit == true
                     ? clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>()
                     : clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
-                var args = new GetObjectArgs()
-                    .WithBucket(bucketName)
-                    .WithObject(param.FileFullPath.DosTrimStart('/'))
-                    .WithCallbackStream(async (source, callbackToken) =>
-                    {
-                        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
-                            callbackToken,
-                            param.CancellationToken);
-                        await source.CopyToAsync(param.FileStream, 128 * 1024, linked.Token)
-                            .ConfigureAwait(false);
-                    });
-                var stat = await client.GetObjectAsync(args, param.CancellationToken).ConfigureAwait(false);
-                return new DosResult(1, new { Size = stat.Size, ETag = stat.ETag });
+                return await CopySignedObjectToStreamAsync(
+                    client, bucketName, param.FileFullPath.DosTrimStart('/'),
+                    param.FileStream, param.TimeoutSeconds, param.CancellationToken,
+                    ObjectReadHttpClient).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -349,7 +339,82 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                return new DosResult(0, null, "MinIO Stream Read Error:" + ex.Message);
+                return new DosResult(0, null, "MinIO Stream Read Error:初始化读取失败（ExceptionType="
+                    + ex.GetType().Name + "）。");
+            }
+        }
+
+        /// <summary>
+        /// 签名 URL 只在服务端内存中使用；HTTP 状态和完整长度校验通过才返回成功。
+        /// 不依赖流的 Length/Position，支持哈希流、限额流与大文件，不缓冲整个对象。
+        /// </summary>
+        private static async Task<DosResult> CopySignedObjectToStreamAsync(
+            IMinioClient client,
+            string bucketName,
+            string objectName,
+            Stream destination,
+            int? timeoutSeconds,
+            CancellationToken cancellationToken,
+            HttpClient httpClient)
+        {
+            var seconds = timeoutSeconds.GetValueOrDefault() > 0 ? timeoutSeconds.Value : 600;
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
+                timeout.Token.ThrowIfCancellationRequested();
+                var signedUrl = await client.PresignedGetObjectAsync(new PresignedGetObjectArgs()
+                    .WithBucket(bucketName).WithObject(objectName).WithExpiry(60)).ConfigureAwait(false);
+                using var request = new HttpRequestMessage(HttpMethod.Get, signedUrl);
+                using var response = await httpClient.SendAsync(
+                    request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+
+                // 不把错误 XML、重定向或非预期的部分响应写入会话/ZIP 目标流。
+                if (response.StatusCode != HttpStatusCode.OK)
+                    return new DosResult(0, null, $"MinIO Stream Read Error:对象读取返回 HTTP {(int)response.StatusCode}"
+                        + $"（Bucket={bucketName}，Object={objectName}）。请检查对象读取权限与存储代理。");
+
+                var expectedLength = response.Content.Headers.ContentLength;
+                using var source = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                var buffer = ArrayPool<byte>.Shared.Rent(128 * 1024);
+                long bytesRead = 0;
+                try
+                {
+                    int count;
+                    while ((count = await source.ReadAsync(buffer, 0, 128 * 1024, timeout.Token)
+                        .ConfigureAwait(false)) > 0)
+                    {
+                        bytesRead = checked(bytesRead + count);
+                        if (expectedLength.HasValue && bytesRead > expectedLength.Value)
+                            return new DosResult(0, null, "MinIO Stream Read Error:对象实际字节数超过响应声明长度。");
+                        await destination.WriteAsync(buffer, 0, count, timeout.Token).ConfigureAwait(false);
+                    }
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+                }
+
+                timeout.Token.ThrowIfCancellationRequested();
+                if (expectedLength.HasValue && bytesRead != expectedLength.Value)
+                    return new DosResult(0, null, $"MinIO Stream Read Error:对象读取不完整，期望 {expectedLength.Value} 字节，实际 {bytesRead} 字节。");
+                return new DosResult(1, new
+                {
+                    Size = bytesRead,
+                    ETag = response.Headers.ETag?.Tag?.Trim('"')
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                return new DosResult(0, null, cancellationToken.IsCancellationRequested
+                    ? "HDFS流式读取已取消。"
+                    : $"HDFS流式读取超时（{seconds}秒）。");
+            }
+            catch (Exception ex)
+            {
+                // 网络与 SDK 异常可能带完整签名 URL，诊断只记录类型，禁止回显临时凭据。
+                return new DosResult(0, null, "MinIO Stream Read Error:对象流式读取失败（ExceptionType="
+                    + ex.GetType().Name + "）。");
             }
         }
 

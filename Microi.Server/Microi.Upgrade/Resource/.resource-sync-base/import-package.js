@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.8.3
+ * Version: v2.8.10
  * Function:
  * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
  */
@@ -4125,11 +4125,73 @@ try {
         return idMaps.Field[key] || idMaps.Field[key.toLowerCase()] || '';
     };
 
+    // FIELD_ID_PLAN_BOUNDED_READ_BATCH_V1：仅缓存当前至多 64 个字段的规划读取，
+    // 将每字段两次往返合并为两次有界查询。重复自然键继续按旧单条查询选取，
+    // 超过行数上限时整体回退，不能把截断结果误当作字段不存在。缓存不跨写入或分片。
+    var readFieldPlanningSlice = function (fields, startIndex, endIndex) {
+        if (endIndex - startIndex < 2 || endIndex - startIndex > 64) return null;
+        var predicates = [];
+        var values = [];
+        var ids = [];
+        var seenIds = Object.create(null);
+        var naturalKey = function (tableId, name) {
+            return JSON.stringify([normalizeId(tableId).toLowerCase(), String(name || '').toLowerCase()]);
+        };
+        var includeId = function (id) {
+            id = normalizeId(id);
+            if (id && !seenIds[id.toLowerCase()]) {
+                seenIds[id.toLowerCase()] = true;
+                ids.push(id);
+            }
+        };
+        for (var index = startIndex; index < endIndex; index++) {
+            var field = fields[index] || {};
+            var sourceId = normalizeId(field.Id);
+            var tableId = normalizeId(field.TableId);
+            var name = String(field.Name || '');
+            if (!sourceId || !tableId || !name) continue;
+            var parameterIndex = values.length;
+            predicates.push('(TableId = @p' + parameterIndex + ' AND LOWER(Name) = LOWER(@p' + (parameterIndex + 1) + '))');
+            values.push(tableId, name);
+            includeId(sourceId);
+            includeId(fieldMapTarget(sourceId));
+        }
+        if (predicates.length == 0) return null;
+        var naturalQuery = V8.Db.FromSql(
+            'SELECT Id, TableId, Name FROM diy_field WHERE ' + predicates.join(' OR ') + ' ORDER BY IsDeleted ASC LIMIT 513'
+        );
+        for (var valueIndex = 0; valueIndex < values.length; valueIndex++) {
+            naturalQuery = naturalQuery.AddInParameter('@p' + valueIndex, values[valueIndex]);
+        }
+        // 保留只实现单条读取的旧宿主兼容入口。
+        if (!naturalQuery.ToArray) return null;
+        var naturalRows = naturalQuery.ToArray();
+        if (!naturalRows || naturalRows.length >= 513) return null;
+        var natural = Object.create(null);
+        for (var rowIndex = 0; rowIndex < naturalRows.length; rowIndex++) {
+            var row = naturalRows[rowIndex];
+            var key = naturalKey(row.TableId, row.Name);
+            natural[key] = natural[key] === undefined ? row : false;
+        }
+        var placeholders = [];
+        for (var idIndex = 0; idIndex < ids.length; idIndex++) placeholders.push('@p' + idIndex);
+        var idQuery = V8.Db.FromSql('SELECT Id, TableId, Name FROM diy_field WHERE Id IN (' + placeholders.join(',') + ')');
+        for (var bindIndex = 0; bindIndex < ids.length; bindIndex++) idQuery = idQuery.AddInParameter('@p' + bindIndex, ids[bindIndex]);
+        var idRows = idQuery.ToArray();
+        if (!idRows) throw new Error('字段主键批量读取未返回结果，已停止本次规划。');
+        var byId = Object.create(null);
+        for (var rawIndex = 0; rawIndex < idRows.length; rawIndex++) {
+            byId[normalizeId(idRows[rawIndex].Id).toLowerCase()] = idRows[rawIndex];
+        }
+        return { natural: natural, byId: byId, naturalKey: naturalKey };
+    };
+
     // Id 映射先规划、后写入。这样字段 A 的 JSON 即使引用稍后才处理且发生
     // 主键冲突的字段 B，A 在保存前也已经拿到 B 的最终目标 Id。随机生成的冲突
     // Id 会进入共享 CheckpointJson；重试同一分片或换节点不会再次生成新 Id。
     var planPackageFieldIdMaps = function (startIndex, endIndex) {
         var packageFields = Package.DiyFields || [];
+        var planningRead = readFieldPlanningSlice(packageFields, startIndex, endIndex);
         for (var planIndex = startIndex; planIndex < endIndex; planIndex++) {
             var packageField = packageFields[planIndex] || {};
             var sourceFieldId = normalizeId(packageField.Id);
@@ -4137,7 +4199,9 @@ try {
             var fieldName = String(packageField.Name || '');
             if (!sourceFieldId || !targetTableId || !fieldName) continue;
 
-            var naturalField = V8.Db.FromSql(
+            var naturalField = planningRead
+                ? planningRead.natural[planningRead.naturalKey(targetTableId, fieldName)] : false;
+            if (naturalField === false) naturalField = V8.Db.FromSql(
                 'SELECT Id, TableId, Name FROM diy_field WHERE TableId = @p0 AND LOWER(Name) = LOWER(@p1) ORDER BY IsDeleted ASC LIMIT 1'
             ).AddInParameter('@p0', targetTableId)
                 .AddInParameter('@p1', fieldName)
@@ -4147,7 +4211,7 @@ try {
                 continue;
             }
 
-            var rawSource = V8.Db.FromSql(
+            var rawSource = planningRead ? planningRead.byId[sourceFieldId.toLowerCase()] : V8.Db.FromSql(
                 'SELECT Id, TableId, Name FROM diy_field WHERE Id = @p0 LIMIT 1'
             ).AddInParameter('@p0', sourceFieldId).First();
             var rawSourceMatches = rawSource && rawSource.Id
@@ -4157,7 +4221,7 @@ try {
 
             var plannedTargetId = fieldMapTarget(sourceFieldId);
             if (plannedTargetId) {
-                var rawPlanned = V8.Db.FromSql(
+                var rawPlanned = planningRead ? planningRead.byId[normalizeId(plannedTargetId).toLowerCase()] : V8.Db.FromSql(
                     'SELECT Id, TableId, Name FROM diy_field WHERE Id = @p0 LIMIT 1'
                 ).AddInParameter('@p0', plannedTargetId).First();
                 var plannedTargetSafe = !rawPlanned || !rawPlanned.Id
@@ -4333,6 +4397,7 @@ try {
         if (type.indexOf('tinytext') == 0) return 255;
         if (type.indexOf('mediumtext') == 0) return 16777215;
         if (type.indexOf('longtext') == 0) return 4294967295;
+        if (type == 'ntext') return 4294967295;
         if (type == 'text' || type.indexOf('text(') == 0) return 65535;
         return 0;
     };
@@ -4524,7 +4589,7 @@ try {
                 "WHEN DATA_TYPE IN ('decimal','numeric') THEN DATA_TYPE + '(' + CAST(NUMERIC_PRECISION AS varchar(10)) + ',' + CAST(NUMERIC_SCALE AS varchar(10)) + ')' " +
                 "WHEN DATA_TYPE IN ('datetime2','datetimeoffset','time') THEN DATA_TYPE + '(' + CAST(DATETIME_PRECISION AS varchar(10)) + ')' " +
                 "ELSE DATA_TYPE END AS COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, " +
-                "CAST('' AS nvarchar(1)) AS COLUMN_COMMENT " +
+                "CAST('' AS nvarchar(1)) AS COLUMN_COMMENT, COLLATION_NAME " +
                 "FROM INFORMATION_SCHEMA.COLUMNS " +
                 "WHERE TABLE_CATALOG = DB_NAME() AND LOWER(TABLE_NAME) = LOWER(@p0)"
             ).AddInParameter('@p0', tableName).ToArray() || [];
@@ -4534,6 +4599,14 @@ try {
             "FROM INFORMATION_SCHEMA.COLUMNS " +
             "WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0)"
         ).AddInParameter('@p0', tableName).ToArray() || [];
+    };
+
+    var mysqlCurrentTimestampDefault = function (value, columnType) {
+        if (!/^(datetime|timestamp)(\(\d\))?$/i.test(String(columnType || '').trim())) return '';
+        var match = /^current_timestamp(?:\(([0-6]?)\))?$/i.exec(String(value || '').trim());
+        if (!match) return '';
+        var precision = Number(match[1] || 0);
+        return 'CURRENT_TIMESTAMP' + (precision ? '(' + precision + ')' : '');
     };
 
     var buildPhysicalColumnDefinition = function (column, includePrimaryKey, overrideColumnType) {
@@ -4558,8 +4631,12 @@ try {
             (columnDefault !== '' || /char|enum|set/i.test(String(columnType))) &&
             !/text|blob|json/i.test(String(columnType)) && !/auto_increment/i.test(String(extra || ''))) {
             var defaultText = String(columnDefault);
-            if (/^current_timestamp(\(\))?$/i.test(defaultText) || /^CURRENT_TIMESTAMP/i.test(defaultText)) {
-                definition += ' DEFAULT ' + defaultText;
+            // SQL Server 的时间类型已映射为 datetime2；继续使用其无参时间默认值。
+            var timestampDefault = runtimeIsSqlServer && /^current_timestamp(?:\([0-6]?\))?$/i.test(defaultText)
+                ? 'CURRENT_TIMESTAMP'
+                : mysqlCurrentTimestampDefault(defaultText, columnType);
+            if (timestampDefault) {
+                definition += ' DEFAULT ' + timestampDefault;
             } else if (/^b'.*'$/i.test(defaultText)) {
                 definition += runtimeIsSqlServer
                     ? ' DEFAULT ' + defaultText.substring(2, defaultText.length - 1)
@@ -4568,7 +4645,9 @@ try {
                 definition += " DEFAULT '" + sqlString(defaultText) + "'";
             }
         }
-        if (!runtimeIsSqlServer && extra && /auto_increment|on update/i.test(String(extra))) definition += ' ' + String(extra);
+        // MySQL 8 的 DEFAULT_GENERATED 仅是元数据标记，不能写回列定义。
+        var writableExtra = String(extra || '').replace(/\bDEFAULT_GENERATED\b/ig, '').trim();
+        if (!runtimeIsSqlServer && /auto_increment|on update/i.test(writableExtra)) definition += ' ' + writableExtra;
 
         var comment = getPhysicalValue(column, ['COLUMN_COMMENT', 'ColumnComment', 'Comment']);
         if (!runtimeIsSqlServer && comment) definition += " COMMENT '" + sqlString(comment) + "'";
@@ -5245,6 +5324,27 @@ try {
         return false;
     };
 
+    // SQLSERVER_EXISTING_TEXT_EXPANSION_V1：历史列不能因“已存在”跳过容量修复。
+    // 只扩宽文本，保留目标 Unicode、排序规则、可空性及默认约束，不猜测跨类型转换。
+    var chooseSqlServerTextExpansion = function (sourceType, targetType, requireUnicode) {
+        var target = normalizeSqlType(targetType);
+        // SQLSERVER_UNICODE is an explicit, owned physical-column contract.
+        // Preserve character capacity and tenant collation; never infer conversion
+        // for unrelated legacy ANSI columns or non-text columns.
+        if (requireUnicode === true && /^(?:n?(?:var)?char\((?:\d+|max)\)|n?text)$/.test(target)) {
+            var unicodeCapacity = Math.max(getTextTypeCapacity(mapToMySQLType(sourceType)), getTextTypeCapacity(target));
+            return unicodeCapacity > 4000 ? 'nvarchar(max)' :
+                (/^n?char\(/.test(target) ? 'nchar(' : 'nvarchar(') + unicodeCapacity + ')';
+        }
+        var match = /^(n?)(var)?char\((\d+)\)$/.exec(target);
+        if (!match) return String(targetType);
+        var sourceCapacity = getTextTypeCapacity(mapToMySQLType(sourceType));
+        if (sourceCapacity <= Number(match[3])) return String(targetType);
+        var limit = match[1] ? 4000 : 8000;
+        return match[1] + (sourceCapacity > limit ? 'varchar(max)' :
+            (match[2] || '') + 'char(' + sourceCapacity + ')');
+    };
+
     var syncPhysicalColumnsFromPackage = function (tableFilterMap) {
         var columns = Package.PhysicalColumns || [];
         var grouped = groupPackagePhysicalColumns(columns, tableFilterMap);
@@ -5308,12 +5408,36 @@ try {
                         continue;
                     }
 
-                    // SQL Server 已有列可能带命名/系统默认约束，且历史空库通常使用
-                    // nvarchar 与 datetime2 保存 Unicode 和高精度时间。应用包中的
-                    // MySQL 逻辑类型只用于补齐缺列；不得把兼容且更宽的既有列降级，
-                    // 关键 NOT NULL 收紧由带回填与强回读的专用版本迁移负责。
                     if (runtimeIsSqlServer) {
-                        result.Skipped++;
+                        var expandedType = chooseSqlServerTextExpansion(columnType, targetColumn.COLUMN_TYPE,
+                            sourceColumn.SQLSERVER_UNICODE === true);
+                        if (normalizeSqlType(expandedType) == normalizeSqlType(targetColumn.COLUMN_TYPE)) {
+                            result.Skipped++;
+                            continue;
+                        }
+                        if (targetColumn.COLLATION_NAME && !isSafeIdentifier(targetColumn.COLLATION_NAME))
+                            throw new Error('SQL Server 目标列排序规则名称无效');
+                        // COLLATE requires a literal collation name, not a bracket-quoted identifier.
+                        var retainedCollation = targetColumn.COLLATION_NAME
+                            ? ' COLLATE ' + targetColumn.COLLATION_NAME : '';
+                        var retainedNullable = String(targetColumn.IS_NULLABLE).toUpperCase() == 'NO' ? ' NOT NULL' : ' NULL';
+                        if (sourceColumn.SQLSERVER_UNICODE === true && !/^n/.test(normalizeSqlType(targetColumn.COLUMN_TYPE))) {
+                            alterSqlServerColumnPreservingIndexes(tableName, columnName, expandedType + retainedCollation, retainedNullable);
+                        } else {
+                            V8.Db.FromSql('ALTER TABLE ' + quotePhysicalIdentifier(tableName) + ' ALTER COLUMN '
+                                + quotePhysicalIdentifier(columnName) + ' ' + expandedType + retainedCollation + retainedNullable)
+                                .ExecuteNonQuery();
+                        }
+                        var expandedReadback = getTargetPhysicalColumns(tableName)[String(columnName).toLowerCase()];
+                        if (!expandedReadback || normalizeSqlType(expandedReadback.COLUMN_TYPE) != normalizeSqlType(expandedType)
+                            || expandedReadback.IS_NULLABLE != targetColumn.IS_NULLABLE
+                            || expandedReadback.COLUMN_DEFAULT != targetColumn.COLUMN_DEFAULT
+                            || expandedReadback.COLLATION_NAME != targetColumn.COLLATION_NAME) {
+                            throw new Error('SQL Server 文本列扩容后结构回读不一致，已阻止继续升级');
+                        }
+                        result.Modified++;
+                        debugLog['physical_schema_expanded_' + tableName + '_' + columnName] =
+                            targetColumn.COLUMN_TYPE + '->' + expandedType;
                         continue;
                     }
 
@@ -5330,29 +5454,38 @@ try {
                     var comparableDefault = function (value) {
                         if (value === null || value === undefined) return 'null:';
                         var text = String(value);
+                        var timestampDefault = mysqlCurrentTimestampDefault(text, effectiveColumnType);
+                        if (timestampDefault) return 'timestamp:' + timestampDefault;
                         if (isNumericSqlType(effectiveColumnType) && /^b'[01]'$/i.test(text)) text = text.charAt(2);
                         return 'value:' + text;
                     };
                     var defaultChanged = !runtimeIsSqlServer && comparableDefault(sourceDefault) != comparableDefault(targetDefault);
-                    // MYSQL_DEFAULT_METADATA_ONLY_V1：只改默认值不应走 MODIFY COLUMN。
-                    // 后者可能重新声明字符集/排序规则甚至重建大表；这里只改元数据，
-                    // 保留原列全部属性和历史行，并显式禁止 COPY/独占 DML 锁回退。
+                    // MYSQL_DEFAULT_METADATA_ONLY_V1：普通默认值只修改元数据。
+                    // MYSQL_TEMPORAL_DEFAULT_COMPAT_V1：MySQL 5.7 的 ALTER COLUMN
+                    // 不支持 CURRENT_TIMESTAMP；时间默认值改用原目标列完整定义，
+                    // 保留类型、精度、可空性与 ON UPDATE，并禁止 COPY/独占 DML 锁回退。
                     if (!typeChanged && !nullChanged && defaultChanged
                         && !/text|blob|json/i.test(effectiveColumnType)
                         && !/auto_increment/i.test(String(targetColumn.EXTRA || ''))) {
+                        var timestampDefault = mysqlCurrentTimestampDefault(sourceDefault, effectiveColumnType);
                         var defaultAction = ' DROP DEFAULT';
                         if (sourceDefault !== null && sourceDefault !== undefined) {
                             var defaultLiteral = String(sourceDefault);
-                            if (/^current_timestamp(?:\(\d*\))?$/i.test(defaultLiteral)) {
-                                defaultAction = ' SET DEFAULT ' + defaultLiteral;
-                            } else if (/^b'[01]+'$/i.test(defaultLiteral)) {
+                            if (/^b'[01]+'$/i.test(defaultLiteral)) {
                                 defaultAction = ' SET DEFAULT ' + defaultLiteral;
                             } else {
                                 defaultAction = " SET DEFAULT '" + sqlString(defaultLiteral) + "'";
                             }
                         }
-                        V8.Db.FromSql('ALTER TABLE ' + quotePhysicalIdentifier(tableName)
-                            + ' ALTER COLUMN ' + quotePhysicalIdentifier(columnName) + defaultAction
+                        var defaultClause = ' ALTER COLUMN ' + quotePhysicalIdentifier(columnName) + defaultAction;
+                        if (timestampDefault) {
+                            var targetDefinition = {};
+                            for (var targetAttribute in targetColumn) targetDefinition[targetAttribute] = targetColumn[targetAttribute];
+                            targetDefinition.COLUMN_NAME = columnName;
+                            targetDefinition.COLUMN_DEFAULT = timestampDefault;
+                            defaultClause = ' MODIFY COLUMN ' + buildPhysicalColumnDefinition(targetDefinition, false, targetColumn.COLUMN_TYPE);
+                        }
+                        V8.Db.FromSql('ALTER TABLE ' + quotePhysicalIdentifier(tableName) + defaultClause
                             + ', ALGORITHM=INPLACE, LOCK=NONE').ExecuteNonQuery();
                         var defaultReadback = getTargetPhysicalColumns(tableName)[String(columnName).toLowerCase()];
                         if (!defaultReadback
@@ -5620,10 +5753,16 @@ try {
             );
         }
 
-        var indexRows = V8.Db.FromSql(
-            'SELECT INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX, NON_UNIQUE FROM INFORMATION_SCHEMA.STATISTICS ' +
-            'WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0) ORDER BY INDEX_NAME, SEQ_IN_INDEX'
-        ).AddInParameter('@p0', tableName).ToArray() || [];
+        var indexReadSql = runtimeIsSqlServer
+            ? 'SELECT i.name AS INDEX_NAME, c.name AS COLUMN_NAME, ic.key_ordinal AS SEQ_IN_INDEX, '
+                + 'CASE WHEN i.is_unique = 1 THEN 0 ELSE 1 END AS NON_UNIQUE '
+                + 'FROM sys.indexes i INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id '
+                + 'INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id '
+                + 'WHERE i.object_id = OBJECT_ID(@p0) AND i.is_disabled = 0 AND i.is_hypothetical = 0 '
+                + 'AND ic.key_ordinal > 0 ORDER BY i.name, ic.key_ordinal'
+            : 'SELECT INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX, NON_UNIQUE FROM INFORMATION_SCHEMA.STATISTICS '
+                + 'WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0) ORDER BY INDEX_NAME, SEQ_IN_INDEX';
+        var indexRows = V8.Db.FromSql(indexReadSql).AddInParameter('@p0', tableName).ToArray() || [];
         var actualIndexes = {};
         for (var indexRowIndex = 0; indexRowIndex < indexRows.length; indexRowIndex++) {
             var indexRow = indexRows[indexRowIndex] || {};
@@ -5673,6 +5812,16 @@ try {
         }
 
         return { ColumnCount: requiredColumns.length, IndexCount: requiredIndexes.length };
+    };
+
+    // DDL_OBJECT_READBACK_FAIL_CLOSED_V1: do not continue to asset/data import after failed DDL.
+    var requirePackageDdlObject = function (ddlInfo, error) {
+        if (ddlInfo.Kind != 'table' && ddlInfo.Kind != 'index') return;
+        var exists = ddlInfo.Kind == 'table' ? ddlTableExists(ddlInfo.TableName)
+            : ddlIndexExists(ddlInfo.TableName, ddlInfo.IndexName);
+        if (!exists) throw new Error('应用包物理结构未就绪：' + ddlInfo.TableName
+            + (ddlInfo.IndexName ? '.' + ddlInfo.IndexName : '') + '；'
+            + (error ? String(error.message || error) : 'DDL 执行后强回读仍不存在'));
     };
 
     var executePackageDdl = function (ddlItem, ddlInfo) {
@@ -5882,12 +6031,13 @@ try {
                         debugLog['ddl_execute_error_' + ddlLogKey] = String(
                             finalDdlError && finalDdlError.message ? finalDdlError.message : finalDdlError
                         );
-                        ddlSkipped++;
+                        requirePackageDdlObject(ddlInfo, finalDdlError);
                     }
                 }
             }
         }
 
+        requirePackageDdlObject(ddlInfo, null);
         // 每张表只检查一次字段；索引语句不能重复触发相同的物理字段同步。
         var ddlTableKey = String(ddlInfo.TableName || ddlItem.TableName).toLowerCase();
         if (ddlInfo.Kind == 'index' || ddlTablesChecked[ddlTableKey]) continue;

@@ -1,9 +1,12 @@
 using System;
 using System.Globalization;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dos.Common;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -16,6 +19,96 @@ namespace Microi.net
     /// </summary>
     public static class PlatformBootstrapCompatibilityService
     {
+        /// <summary>
+        /// Fixed recovery operations for the host bootstrap controller. The caller supplies
+        /// a validated DiyToken identity; no V8 entry point exposes this dispatcher.
+        /// </summary>
+        internal static async Task<object> ExecuteAsync(string action, JObject request, JObject currentUser)
+        {
+            var osClient = request["OsClient"]?.ToString();
+            var lang = request["_Lang"]?.ToString();
+            switch (action)
+            {
+                case "Login":
+                case "RefreshToken":
+                case "TokenLogin":
+                case "Logout":
+                    if (!PlatformApiRuntimeRegistry.TryCreate("SysUserSession", out var runtime))
+                        return new DosResult(0, null, "用户会话运行时尚未注册，请检查后端安装。");
+                    return await runtime.ExecuteAsync(action, request).ConfigureAwait(false);
+                case "GetSysConfig":
+                    return await GetPublicSysConfigAsync(osClient, lang).ConfigureAwait(false);
+                case "GetOsClientByDomain":
+                    return V8Method.ResolveOsClientByDomainCore(request["Domain"]?.ToString());
+                case "GetLangBundle":
+                    return V8Method.GetLangBundleCore(osClient, lang, request["Prefix"]?.ToString());
+                case "GetLoginWallpapers":
+                    return V8Method.GetLoginWallpapersCore(osClient);
+            }
+            if (currentUser == null || string.IsNullOrWhiteSpace(currentUser["Id"]?.ToString()))
+                return new DosResult(1001, null, "登录身份已过期，请重新登录。");
+            if (action == "GetCurrentUser")
+                return new DosResult(1, currentUser.DeepClone());
+            if (action == "GetSysMenuStep" || action == "GetSysMenu" || action == "GetSysMenuModel")
+            {
+                // GetSysMenuStep performs the existing role/menu filtering. The single
+                // model/list compatibility reads reuse that authorized row set.
+                var param = request.ToObject<SysMenuParam>() ?? new SysMenuParam();
+                param.OsClient = osClient;
+                param._CurrentUser = currentUser;
+                // Preserve the existing _All contract: SysMenuLogic itself permits
+                // it only for the authenticated administrator/high-level identity.
+                if (action != "GetSysMenuStep")
+                {
+                    if (action == "GetSysMenuModel" && string.IsNullOrWhiteSpace(param.Id))
+                        return new DosResult(0, null, "Id不能为空。");
+                    if (action == "GetSysMenu" && string.IsNullOrWhiteSpace(param.ParentId))
+                        return new DosResult(0, null, "ParentId不能为空。");
+                    // Build the authorized tree before selecting a child. Filtering the
+                    // database to a child Id first discards its parents and produces an
+                    // empty root tree even when the caller has access to that child.
+                    param.Ids = null;
+                    param._ChildSystemId = null;
+                    param._PageIndex = null;
+                    param._PageSize = null;
+                    param._Top = null;
+                    param._SelectFields = null;
+                }
+                var result = await new SysMenuLogic().GetSysMenuStep(param).ConfigureAwait(false);
+                if (action == "GetSysMenuStep" || result.Code != 1) return result;
+                var rows = result.Data == null ? new JArray() : JArray.FromObject(result.Data);
+                return SelectAuthorizedMenus(action, param.Id, param.ParentId, param.Class, rows);
+            }
+            return new DosResult(0, null, "不支持的兼容启动动作。");
+        }
+
+        internal static DosResult SelectAuthorizedMenus(string action, string id, string parentId,
+            string menuClass, JArray tree)
+        {
+            IEnumerable<JObject> Flatten(JArray rows)
+            {
+                foreach (var row in rows.OfType<JObject>())
+                {
+                    var copy = (JObject)row.DeepClone();
+                    copy.Remove("_Child");
+                    yield return copy;
+                    if (row["_Child"] is JArray children)
+                        foreach (var child in Flatten(children)) yield return child;
+                }
+            }
+            var authorized = Flatten(tree);
+            if (action == "GetSysMenuModel")
+            {
+                var row = authorized.FirstOrDefault(item => string.Equals(item["Id"]?.ToString(), id,
+                    StringComparison.OrdinalIgnoreCase));
+                return row == null ? new DosResult(2, null, "菜单不存在或无权访问。") : new DosResult(1, row);
+            }
+            var list = authorized.Where(item => string.Equals(item["ParentId"]?.ToString(), parentId,
+                StringComparison.OrdinalIgnoreCase) && (string.IsNullOrWhiteSpace(menuClass)
+                || string.IsNullOrWhiteSpace(item["Class"]?.ToString()) || item["Class"]?.ToString() == menuClass)).ToList();
+            return new DosResult(1, list, "", list.Count);
+        }
+
         public static async Task<DosResult> GetPublicSysConfigAsync(
             string osClient,
             string lang = null)

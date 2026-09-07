@@ -85,8 +85,11 @@ namespace Microi.net
             try
             {
                 using var allocationScope = BeginTrustedHostAllocationScope();
-                var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
-                return request.Service.Cleanup(request.CurrentUser, request.OsClient);
+                var request = ParseEmptyDatabaseReleaseRequest((object)dynamicParam);
+                long.TryParse(request.Param["_BackgroundTaskFencingToken"]?.ToString(), out var fencingToken);
+                return request.Service.Cleanup(request.CurrentUser, request.OsClient,
+                    request.Param["WithdrawPublicPackages"]?.Type == JTokenType.Boolean
+                    && request.Param["WithdrawPublicPackages"].Value<bool>(), fencingToken);
             }
             catch (Exception ex)
             {

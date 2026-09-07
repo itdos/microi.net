@@ -1,6 +1,6 @@
 # 📝Change Log
 
-> **Since 100 of the front-end and mobile terminals are open source and 99% of the back-end are open source, and many people in the team are continuously maintaining and upgrading, the update frequency is relatively high.**
+> **Microi is an open-source platform, continuously maintained and updated by the team.**
 
 ::: tip View all update logs
 For all update logs, please refer to Gitee warehouse submission record:[https://gitee.com/ITdos/microi.net/commits/master](https://gitee.com/ITdos/microi.net/commits/master)
@@ -8,7 +8,7 @@ For all update logs, please refer to Gitee warehouse submission record:[https://
 
 ::: details Latest-Important Update -2025-08-07
 ```js
-由于前端、移动端已100%开源，后端99%开源，且由团队多人持续维护升级，导致更新频率较高，因此所有更新日志请见Gitee仓库 https://gitee.com/ITdos/microi.net/commits/master 提交日志
+平台开源源码由团队持续维护升级，所有更新日志请见Gitee仓库 https://gitee.com/ITdos/microi.net/commits/master 提交日志
 ```
 :::
 

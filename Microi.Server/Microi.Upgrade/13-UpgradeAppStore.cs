@@ -112,7 +112,9 @@ namespace Microi.net
         // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
         // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
         private const int ImporterLimitMemoryMb = 8192;
-        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 7, 13);
+        // SQL Server must receive the native background-task index reader before
+        // installing that bootstrap package, even when ServerVersion is current.
+        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 8, 10);
         private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 8);
         private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
         private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 1);
@@ -2801,7 +2803,7 @@ FROM sys.columns WHERE object_id=OBJECT_ID(N'sys_apiengine') AND name=N'Version'
         }
 
         /// <summary>
-        /// 商城恢复入口的最小自举：从受信表单/模块引擎包补缺核心自描述与菜单元数据，
+        /// 商城恢复入口的最小自举：从受信所属应用包补缺核心自描述和登录依赖元数据，
         /// 不安装业务资源、不覆盖已有字段或写成功版本。菜单物理列存在但元数据缺失时，
         /// FormEngine 会静默忽略新绑定字段，商城先于模块包安装便无法自行恢复。
         /// 调用者必须位于已有版本门及租户升级租约内；物理表/固定列仍由前置门禁负责。
@@ -2822,13 +2824,28 @@ FROM sys.columns WHERE object_id=OBJECT_ID(N'sys_apiengine') AND name=N'Version'
                 // MARKETPLACE_MENU_METADATA_BOOTSTRAP_V1: use the owning package
                 // as the schema source; only missing fields backed by physical
                 // menu columns are restored, never tenant field customizations.
-                foreach (var name in menuOnly ? new[] { "sys_menu" } : new[] { "diy_table", "diy_field" })
+                var owners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["diy_table"] = FormEnginePackageResourceName,
+                    ["diy_field"] = FormEnginePackageResourceName,
+                    ["sys_apiengine"] = SaaSEnginePackageResourceName,
+                    ["sys_menu"] = ModuleEnginePackageResourceName,
+                    ["sys_config"] = SysConfigPackageResourceName,
+                    ["sys_user"] = SysUserPackageResourceName,
+                    ["sys_osclients"] = SaaSEnginePackageResourceName
+                };
+                foreach (var name in menuOnly ? new[] { "sys_menu" } : owners.Keys.ToArray())
                 {
                     UpgradeExecutionLeaseContext.ThrowIfLost();
                     if (!database.TableExists(name))
-                        throw new InvalidOperationException($"商城自举缺少核心物理表 {name}。");
-                    var package = JObject.Parse(resources[name == "sys_menu" ? ModuleEnginePackageResourceName : FormEnginePackageResourceName]);
-                    var menuColumns = name == "sys_menu" ? ReadStartupDependencyPhysicalFields(database, client.OsClient, name) : null;
+                    {
+                        if (menuOnly || name == "diy_table" || name == "diy_field")
+                            throw new InvalidOperationException($"商城自举缺少核心物理表 {name}。");
+                        continue;
+                    }
+                    var package = JObject.Parse(resources[owners[name]]);
+                    // 只恢复已有物理列的缺失描述；物理扩展和完整应用安装各自负责其边界。
+                    var targetColumns = ReadStartupDependencyPhysicalFields(database, client.OsClient, name);
                     var source = (package["DiyTables"] as JArray)?.OfType<JObject>()
                         .SingleOrDefault(row => string.Equals(row["Name"]?.ToString(), name, StringComparison.OrdinalIgnoreCase))
                         ?? throw new InvalidOperationException($"官方所属应用包缺少商城自举元数据 {name}。");
@@ -2866,7 +2883,7 @@ FROM sys.columns WHERE object_id=OBJECT_ID(N'sys_apiengine') AND name=N'Version'
                                  ?? Enumerable.Empty<JObject>())
                     {
                         var fieldName = sourceField["Name"]?.ToString();
-                        if (existingFields.Contains(fieldName) || (menuColumns != null && !menuColumns.Contains(fieldName))) continue;
+                        if (existingFields.Contains(fieldName) || !targetColumns.Contains(fieldName)) continue;
                         var model = (JObject)sourceField.DeepClone();
                         model["Id"] = ResolveBootstrapInsertId(database, trans, "diy_field", sourceField["Id"]?.ToString());
                         model["TableId"] = tableId;
@@ -3461,6 +3478,10 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
 
             if (string.Equals(resourceName, SaaSEnginePackageResourceName, StringComparison.Ordinal))
             {
+                if (!HasPackagedFoundationSchema(package))
+                {
+                    return $"升级资源[{resourceName}]缺少 License 节点、多语言表的完整物理结构或仅补缺的基础语言词条。";
+                }
                 if (!HasPackagedPlatformRuntime(package))
                 {
                     return $"升级资源[{resourceName}]缺少 v7.7.8 平台运行时 Managed 基线、完整声明闭包、CreateIfMissing Hook、安全 microi-init、登录壁纸可信原子契约或完整资源策略。";
@@ -3761,6 +3782,58 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
             }
 
             UpgradeProgress.WriteLine($"Microi：【基础应用升级】{packageName}导入完成。");
+        }
+
+        internal static bool HasPackagedFoundationSchema(JObject package)
+        {
+            // SaaS 首次安装会先写内置微服务，不能依赖之后才执行的商城包或历史迁移。
+            var storeColumns = new HashSet<string>(package["PhysicalColumns"]?.OfType<JObject>()
+                .Where(c => string.Equals(c["TABLE_NAME"]?.ToString(), "sys_microistore", StringComparison.OrdinalIgnoreCase))
+                .Select(c => c["COLUMN_NAME"]?.ToString()) ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+            if (new[] { "PublishProtocolVersion", "PublishState", "PublishFence", "PublishRowVersion",
+                    "ActivePublishVersionId", "CommittedPublishVersionId", "CommittedRuntimeManifestHash" }
+                .Any(name => !storeColumns.Contains(name))) return false;
+            foreach (var name in new[] { "mci_license_server", "diy_lang" })
+            {
+                var table = package["DiyTables"]?.OfType<JObject>().FirstOrDefault(t =>
+                    string.Equals(t["Name"]?.ToString(), name, StringComparison.OrdinalIgnoreCase));
+                if (table == null) return false;
+                var fields = package["DiyFields"]?.OfType<JObject>().Where(f =>
+                    string.Equals(f["TableId"]?.ToString(), table["Id"]?.ToString(), StringComparison.OrdinalIgnoreCase)).ToArray();
+                if (fields == null || fields.Length == 0) return false;
+                var names = fields.Select(f => f["Name"]?.ToString()).ToArray();
+                if (names.Distinct(StringComparer.OrdinalIgnoreCase).Count() != names.Length) return false;
+                var columns = new HashSet<string>(package["PhysicalColumns"]?.OfType<JObject>()
+                    .Where(c => string.Equals(c["TABLE_NAME"]?.ToString(), name, StringComparison.OrdinalIgnoreCase))
+                    .Select(c => c["COLUMN_NAME"]?.ToString()) ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+                if (names.Any(n => !columns.Contains(n))) return false;
+                var required = new[] { "Id", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted" }
+                    .Concat(name == "diy_lang" ? new[] { "Key", "Code", "ZhCN", "En" } : new[] { "HID", "LicenseContent", "LicenseInfoJson" });
+                if (required.Any(n => !names.Contains(n, StringComparer.OrdinalIgnoreCase))) return false;
+                if (package["DDLStatements"]?.OfType<JObject>().Any(d =>
+                    string.Equals(d["TableName"]?.ToString(), name, StringComparison.OrdinalIgnoreCase)) != true) return false;
+            }
+            var apiTable = package["DiyTables"]?.OfType<JObject>().FirstOrDefault(t =>
+                string.Equals(t["Name"]?.ToString(), "sys_apiengine", StringComparison.OrdinalIgnoreCase));
+            var apiFields = package["DiyFields"]?.OfType<JObject>().Where(f =>
+                apiTable != null && f["TableId"]?.ToString() == apiTable["Id"]?.ToString())
+                .Select(f => f["Name"]?.ToString()).ToArray() ?? Array.Empty<string>();
+            if (new[] { "ApiEngineKey", "ApiV8Code", "ApiAddress", "IsEnable", "Version" }
+                .Any(name => !apiFields.Contains(name, StringComparer.OrdinalIgnoreCase))) return false;
+            var dataSets = package["DataSets"]?.OfType<JObject>().ToArray() ?? Array.Empty<JObject>();
+            if (dataSets.Any(d => string.Equals(d["TableName"]?.ToString(), "mci_license_server", StringComparison.OrdinalIgnoreCase))) return false;
+            var language = dataSets.FirstOrDefault(d => string.Equals(d["TableName"]?.ToString(), "diy_lang", StringComparison.OrdinalIgnoreCase));
+            foreach (var columnName in new[] { "Key", "Code", "ZhCN", "En", "ZhTW" })
+            {
+                if (package["PhysicalColumns"]?.OfType<JObject>().Any(c =>
+                    string.Equals(c["TABLE_NAME"]?.ToString(), "diy_lang", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(c["COLUMN_NAME"]?.ToString(), columnName, StringComparison.OrdinalIgnoreCase)
+                    && c["SQLSERVER_UNICODE"]?.Type == JTokenType.Boolean
+                    && c["SQLSERVER_UNICODE"].Value<bool>()) != true) return false;
+            }
+            return language?["ConflictPolicy"]?.ToString() == "InsertIfMissing"
+                && language["ConflictFields"]?.Values<string>().SequenceEqual(new[] { "Key" }) == true
+                && language["Rows"]?.OfType<JObject>().Any(r => r["Key"]?.ToString() == "NoExistData") == true;
         }
 
         private static bool IsPackageVersionAlreadyInstalled(
@@ -4432,6 +4505,16 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             // 应用商城是本升级的核心目标：导入器更新成功后必须优先安装商城包，
             // 表单引擎、模块引擎及可选 AI 发布器均排在其后。
             #region 应用商城 数据包
+            // 商城自身包含微服务编译资产。首次恢复历史库时，先安装拥有应用版本、
+            // 文件及微服务页面表的 SaaS 包，再让其它包写入这些运行资产。
+            await InstallUpgradePackage(osClient, msgs, SaaSEnginePackageResourceName, "SaaS引擎与身份验证数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            // 新版菜单 JSON 超出部分旧库短文本列。先让模块包按声明同步 sys_menu
+            // 的物理类型，再写入表单引擎及商城菜单，避免先写后扩列导致截断回滚。
+            await InstallUpgradePackage(osClient, msgs, ModuleEnginePackageResourceName, "模块引擎数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            await InstallUpgradePackage(osClient, msgs, FormEnginePackageResourceName, "表单引擎数据包", resources);
+            if (msgs.Count > 0) return msgs;
             await InstallUpgradePackage(osClient, msgs, AppStorePackageResourceName, "应用商城数据包", resources);
             if (msgs.Count > 0) return msgs;
             ValidateInstalledAppStoreRuntimeDependencies(osClient, msgs);
@@ -4445,22 +4528,10 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             if (msgs.Count > 0) return msgs;
             #endregion
 
-            #region 表单引擎 数据包
-            await InstallUpgradePackage(osClient, msgs, FormEnginePackageResourceName, "表单引擎数据包", resources);
-            if (msgs.Count > 0) return msgs;
-            #endregion
-
-            #region 模块引擎 数据包
-            await InstallUpgradePackage(osClient, msgs, ModuleEnginePackageResourceName, "模块引擎数据包", resources);
-            if (msgs.Count > 0) return msgs;
-            #endregion
-
             #region SaaS引擎与强身份验证基础包
             // SaaS 引擎包是官方平台资源，随升级自动安装。它通过统一应用商城导入器
             // 幂等补齐 Passkey/TOTP/严格人脸表、sys_osclients 配置字段和个人中心微服务；
             // 不在 .NET 中复制表/字段迁移逻辑，并保留租户后来显式关闭的 0 值。
-            await InstallUpgradePackage(osClient, msgs, SaaSEnginePackageResourceName, "SaaS引擎与身份验证数据包", resources);
-            if (msgs.Count > 0) return msgs;
             // The importer intentionally follows low-code field metadata. Old
             // tenants can already have newer physical sys_apiengine columns
             // without matching diy_field rows, so Managed source may update

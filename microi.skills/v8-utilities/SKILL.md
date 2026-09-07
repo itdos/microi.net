@@ -37,6 +37,11 @@ description: Microi V8 全局对象、上下文变量和通用函数索引。用
 `Microi.Client/src/views/form-engine/diy-components/v8-api-definitions.js`、
 `v8-api-server-definitions.js`、V8 宿主接口和官网中文函数列表。
 
+邮箱相关能力读取 [email-engine](../email-engine/SKILL.md)：`V8.Email` 包含
+`ProtectCredential / TestConnection / ListFolders / Fetch / Inspect / GetMessage /
+GetAttachment / SetFlags / Move / Send / StoreSent`。
+业务使用 `mci-email` 接口引擎，MCP 使用 `microi_email_query / microi_email_manage / microi_email_send`。
+
 ## 常用通用写法
 
 ```javascript

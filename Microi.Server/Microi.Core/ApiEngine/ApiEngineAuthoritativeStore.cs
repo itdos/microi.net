@@ -13,9 +13,33 @@ namespace Microi.net
     {
         private const int CommandTimeoutSeconds = 10;
 
+        public static bool MatchesLookup(object model, ApiEngineParam param)
+        {
+            if (model == null || param == null) return false;
+            var row = JsonHelper.ToJObject(model);
+            if (row == null) return false;
+            if (!param.ApiEngineKey.DosIsNullOrWhiteSpace())
+                return string.Equals(row["ApiEngineKey"]?.ToString(), param.ApiEngineKey, StringComparison.OrdinalIgnoreCase);
+            if (!param.Id.DosIsNullOrWhiteSpace())
+                return string.Equals(row["Id"]?.ToString(), param.Id, StringComparison.OrdinalIgnoreCase);
+            return !param.ApiAddress.DosIsNullOrWhiteSpace()
+                && ApiEngineRouteAliases.ContainsExactRoute(row, param.ApiAddress);
+        }
+
         public static DosResult<dynamic> GetEnabledModel(
             OsClientSecret client,
             ApiEngineParam param)
+            => GetModel(client, param, true);
+
+        // Compatibility bootstrap must distinguish missing resources from an explicit
+        // disable. A disabled engine still owns both its Key and legacy addresses.
+        public static DosResult<dynamic> GetConfiguredModel(
+            OsClientSecret client,
+            ApiEngineParam param)
+            => GetModel(client, param, false);
+
+        private static DosResult<dynamic> GetModel(
+            OsClientSecret client, ApiEngineParam param, bool enabledOnly)
         {
             if (client?.Db == null)
             {
@@ -52,7 +76,8 @@ namespace Microi.net
                 client,
                 $"{lookupField} = @lookup",
                 "@lookup",
-                lookupValue);
+                lookupValue,
+                enabledOnly);
             if (rows.Count == 0)
             {
                 return new DosResult<dynamic>(1, null);
@@ -68,6 +93,15 @@ namespace Microi.net
         public static DosResult<dynamic> GetEnabledByMultiRoute(
             OsClientSecret client,
             string apiAddress)
+            => GetByMultiRoute(client, apiAddress, true);
+
+        public static DosResult<dynamic> GetConfiguredByMultiRoute(
+            OsClientSecret client,
+            string apiAddress)
+            => GetByMultiRoute(client, apiAddress, false);
+
+        private static DosResult<dynamic> GetByMultiRoute(
+            OsClientSecret client, string apiAddress, bool enabledOnly)
         {
             if (client?.Db == null)
             {
@@ -82,7 +116,8 @@ namespace Microi.net
                 client,
                 $"{ApiEngineRouteAliases.MultiRouteFieldName} LIKE @route",
                 "@route",
-                "%" + apiAddress.Trim() + "%");
+                "%" + apiAddress.Trim() + "%",
+                enabledOnly);
             var matches = candidates
                 .Where(row => ApiEngineRouteAliases.ContainsExactRoute((object)row, apiAddress))
                 .ToList();
@@ -144,6 +179,14 @@ namespace Microi.net
                 throw new InvalidOperationException("接口引擎路由缓存初始化缺少租户主库连接。");
             }
             return ReadRows(client, null, null, null);
+        }
+
+        public static List<dynamic> GetConfiguredTemplates(OsClientSecret client)
+        {
+            if (client?.Db == null)
+                throw new InvalidOperationException("接口引擎模板路由读取缺少租户主库连接。");
+            return ReadRows(client, "(ApiAddress LIKE @template OR ApiRoutes LIKE @template)",
+                "@template", "%{%", false);
         }
 
         private static List<dynamic> ReadRows(

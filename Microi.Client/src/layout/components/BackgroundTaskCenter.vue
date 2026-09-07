@@ -145,6 +145,10 @@
                                         <span class="task-detail__label">{{ $t("Msg.BackgroundTaskEta") }}</span>
                                         <span class="task-detail__message">{{ getTaskEta(row) }}</span>
                                     </div>
+                                    <div v-if="row.Error" class="task-detail__row task-detail__row--result task-detail__row--error">
+                                        <span class="task-detail__label">{{ $t("Msg.BackgroundTaskError") }}</span>
+                                        <pre>{{ row.Error }}</pre>
+                                    </div>
                                     <div v-if="row.BusinessTable || row.BusinessId" class="task-detail__row">
                                         <span class="task-detail__label">{{ $t("Msg.BackgroundTaskBusiness") }}</span>
                                         <span class="task-detail__message">{{ [row.BusinessTable, row.BusinessId].filter(Boolean).join(" / ") }}</span>
@@ -389,6 +393,7 @@ import { isFormMaskBlurDisabled } from "@/utils/form-mask-blur.js";
 import {
     getBackgroundTaskEta,
     getBackgroundTaskProgress,
+    mergeBackgroundTaskSummaries,
     isActiveBackgroundTask,
     isTerminalBackgroundTask
 } from "@/utils/background-task-display";
@@ -1206,16 +1211,10 @@ export default {
             }
         },
         mergeTaskSummaries(rows) {
-            const existing = new Map(this.tasks.map((item) => [String(item?.Id || ""), item]));
-            return (rows || []).map((row) => {
-                const previous = existing.get(String(row?.Id || ""));
-                return previous?.DetailLoaded
-                    ? { ...row, Log: previous.Log, Result: previous.Result, Error: previous.Error, DetailLoaded: true }
-                    : row;
-            });
+            return mergeBackgroundTaskSummaries(this.tasks, rows);
         },
-        async loadTaskDetail(item) {
-            if (!item?.Id || item.DetailLoaded || item.DetailLoading) return item;
+        async loadTaskDetail(item, force = false) {
+            if (!item?.Id || (!force && item.DetailLoaded) || item.DetailLoading) return item;
             item.DetailLoading = true;
             try {
                 const result = await DiyCommon.PostAsync("/apiengine/platform-background-task", {
@@ -1231,7 +1230,7 @@ export default {
         },
         handleTaskExpand(item, expandedRows) {
             if ((expandedRows || []).some((row) => String(row?.Id) === String(item?.Id))) {
-                void this.loadTaskDetail(item).catch((error) => ElMessage.error(error?.message || String(error)));
+                void this.loadTaskDetail(item, true).catch((error) => ElMessage.error(error?.message || String(error)));
             }
         },
         changeTaskPage(page) {
@@ -1612,6 +1611,12 @@ export default {
 
 .task-detail__message {
     color: var(--mci-text-color, #303133);
+    overflow-wrap: anywhere;
+}
+
+.task-detail__row--error pre {
+    color: var(--el-color-danger);
+    white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
 

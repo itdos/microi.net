@@ -298,6 +298,45 @@ Object.assign(pageEngineLiteralEn, {
     "字体大小": "Font size", "字体颜色": "Font color", "综合评价": "Overall rating", "最大值": "Maximum", "最小值": "Minimum", "左侧表格": "Left table", "左侧宽度": "Left width"
 });
 
+Object.assign(pageEngineLiteralEn, {
+    "日历表单模块": "Calendar form module",
+    "智能首页概览": "Smart home overview",
+    "接口引擎 Key": "API engine key",
+    "公告表单模块": "Announcement form module",
+    "首页概览加载中": "Loading home overview",
+    "工作概览暂时不可用": "Work overview is temporarily unavailable",
+    "重新加载": "Reload",
+    "，这是你的工作概览": ", here is your work overview",
+    "趋势与常用应用均来自当前账号的真实访问记录，并按现有菜单权限过滤。": "Trends and frequent apps use your actual activity and respect your menu permissions.",
+    "打开完整 AI 助手": "Open the full AI assistant",
+    "个人使用统计": "Personal usage statistics",
+    "近 7 日使用趋势": "Usage over the last 7 days",
+    "菜单打开次数": "Menu opens",
+    "常用应用": "Frequent apps",
+    "按实际打开频率排序": "Sorted by actual usage",
+    "尚无记录，先为你展示可用入口": "No activity yet. Available apps are shown below.",
+    "访问次数": "Visits",
+    "可立即打开": "Ready to open",
+    "当前账号暂无可用菜单，请联系管理员配置权限。": "No menus are available. Contact an administrator to configure access.",
+    "你好": "Hello",
+    "夜深了": "Good night",
+    "早上好": "Good morning",
+    "中午好": "Good afternoon",
+    "下午好": "Good afternoon",
+    "晚上好": "Good evening",
+    "今日打开": "Opened today",
+    "当前账号": "Current account",
+    "近 7 日访问": "Visits in the last 7 days",
+    "真实使用次数": "Actual usage",
+    "已使用应用": "Apps used",
+    "可用应用": "Available apps",
+    "AI 图像工具": "AI image tools",
+    "生成与精确处理": "Generation and precise editing",
+    "接口未返回有效数据": "The API did not return valid data",
+    "加载失败": "Loading failed"
+});
+
+pageEngineLiteralEn['首页加载失败'] = 'Unable to load the home page';
 const pageEngineLiteralZhCn = Object.fromEntries(Object.keys(pageEngineLiteralEn).map(key => [key, key]));
 const pageEngineLiteralZhTw = { ...pageEngineLiteralZhCn,
     "组件": "元件", "容器": "容器", "页面": "頁面", "页面编号": "頁面編號", "页面标题": "頁面標題", "页面简介": "頁面簡介", "背景颜色": "背景顏色",

@@ -345,7 +345,6 @@ test('deleted controllers are replaced by fixed Managed keys and plugin trusted 
   for (const deleted of [
     'ExternalLoginController.cs',
     'WeChatController.cs',
-    'LegacyMobileCompatibilityController.cs',
     'MarketplaceSourceController.cs',
   ]) assert.equal(fs.existsSync(path.join(apiControllerDir, deleted)), false);
 

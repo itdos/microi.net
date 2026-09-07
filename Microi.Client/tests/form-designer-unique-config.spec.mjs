@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import { compileScript, compileTemplate, parse } from "@vue/compiler-sfc";
-import designerMixin from "../src/views/form-engine/mixins/diy-form-designer.mixin.js";
+import { loadClientModule } from "./helpers/load-client-module.mjs";
 import {
     buildDiyFieldUniqueRules,
     DIY_FIELD_UNIQUE_MODE,
@@ -10,6 +10,10 @@ import {
     getDiyFieldUniqueMode,
     isDiyFieldUniqueEnabled
 } from "../src/utils/diy-field-unique.js";
+
+const { default: designerMixin } = await loadClientModule(
+    new URL("../src/views/form-engine/mixins/diy-form-designer.mixin.js", import.meta.url)
+);
 
 function createDesignerContext(refs = {}) {
     const emitted = [];
@@ -35,15 +39,19 @@ function createDesignerContext(refs = {}) {
 }
 
 test("Switch double-click selects the field without showing a false unsupported warning", () => {
-    const { context, emitted, tips } = createDesignerContext();
+    let opened = 0;
+    const { context, emitted, tips } = createDesignerContext({
+        ref_IsEnable: { openConfig() { opened += 1; } }
+    });
     const field = { Id: "switch-1", Name: "IsEnable", Component: "Switch" };
 
-    assert.equal(context.hasComponentConfig(field), false);
+    assert.equal(context.hasComponentConfig(field), true);
     context.openComponentConfig(field);
 
     assert.equal(context.CurrentDiyFieldModel, field);
     assert.deepEqual(emitted, [["CallbackSelectField", field]]);
     assert.deepEqual(tips, []);
+    assert.equal(opened, 1);
 });
 
 test("components that expose openConfig still open their independent dialog", () => {

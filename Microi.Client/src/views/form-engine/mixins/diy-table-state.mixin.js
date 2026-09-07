@@ -391,7 +391,7 @@ export default {
     },
     watch: {
         PropsWhere(newVal, oldVal) {
-            if (!_u.isEqual(newVal, oldVal)) this.ScheduleInit();
+            if (!_u.isEqual(newVal, oldVal)) this.ScheduleFilterReload();
         },
         ParentFormLoadFinish(newVal) {
             if (newVal === true) this.ScheduleInit();
@@ -454,7 +454,7 @@ export default {
             //2022-07-13注释
             if (self.ParentFormLoadFinish !== false) {
                 //如果主表重新打开了其它的rowModel，Field-Form的TableChildTableRowId会变，这里监控到需要重新加载数据
-                self.ScheduleInit();
+                self.ScheduleFilterReload();
             }
         },
         FatherFormModel: function (newVal, oldVal) {

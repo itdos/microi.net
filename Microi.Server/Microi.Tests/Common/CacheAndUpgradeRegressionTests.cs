@@ -606,6 +606,8 @@ public class CacheAndUpgradeRegressionTests
         Assert.True(Assert.IsType<bool>(hasImporter!.Invoke(null,
             new object[] { importerCode, importerVersion })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
+            new object[] { importerCode, new System.Version(2, 8, 9) })));
+        Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
             new object[] { importerCode, new System.Version(2, 7, 4) })));
         foreach (var capability in new[] { "DATASET_TABLE_PREFLIGHT_V1", "PACKAGE_API_ENGINE_AUTHORITATIVE_READBACK_V2" })
             Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,

@@ -9,69 +9,69 @@ const webosIconContent = '将 WebOS 菜单图标升级为 320×320 真透明 Web
 const webosIconDataSetContent = `${webosIconContent} SaaS 基础包新增 99 条 microi_icon Upsert 数据，使其他吾码用户安装或更新平台后获得同一图标目录。`;
 
 export const officialPackageChangeLogDefinitions = Object.freeze({
-  'app.microi.form-engine.json': Object.freeze({
-    version: 'v7.7.0',
-    title: '表单设计器字段身份修复',
-    changeType: 'Fix',
-    content: '修复 diy_table.FormBannerEnabled 与 V8Limit 历史包内字段 Id 重复的问题，保留 FormBannerEnabled 稳定 Id，并将 V8Limit 恢复为其声明的唯一稳定 Id，避免安装器唯一性校验失败。',
-    releaseTime: '2026-09-02 15:00:00',
-  }),
-  'app.microi.module-engine.json': Object.freeze({
-    version: 'v7.6.3',
-    title: webosIconTitle,
-    changeType: 'Optimize',
-    content: webosIconContent,
-    releaseTime: webosIconReleaseTime,
-  }),
-  'app.microi.store.json': Object.freeze({
-    version: 'v7.9.25',
-    title: 'AI 应用业务失败保留登录态',
-    changeType: 'Fix',
-    content: '修复 AI 应用脚手架将 Code=-1 的普通业务失败误判为登录过期并清理 DiyToken；继续保留 401、1001、1002 的认证失效处理。保留主线导入器 v2.7.4 与 SQL Server 修复，角色权限仍由租户管理员配置。',
-    releaseTime: '2026-09-05 15:50:00',
-  }),
-  'app.microi.saas-engine.json': Object.freeze({
-    version: 'v7.8.16',
-    title: '首页可选公告引用兼容',
-    changeType: 'Fix',
-    content: '首页公告 diytable 明确声明为可选引用；目标租户未安装公告表或菜单时，导入器只移除公告组件与空容器，其余智能首页继续完整安装，数据库读取异常仍严格失败。',
-    releaseTime: '2026-09-03 22:00:00',
-  }),
-  'app.microi.sso.json': Object.freeze({
-    version: 'v7.5.10',
-    title: webosIconTitle,
-    changeType: 'Optimize',
-    content: webosIconContent,
-    releaseTime: webosIconReleaseTime,
-  }),
-  'app.microi.sys_user.json': Object.freeze({
-    version: 'v7.6.4',
-    title: webosIconTitle,
-    changeType: 'Optimize',
-    content: webosIconContent,
-    releaseTime: webosIconReleaseTime,
-  }),
-  'app.microi.sys-config.json': Object.freeze({
-    version: 'v6.3.12',
-    title: webosIconTitle,
-    changeType: 'Optimize',
-    content: webosIconContent,
-    releaseTime: webosIconReleaseTime,
-  }),
-  'app.microi.message-notification.json': Object.freeze({
-    version: 'v1.0.15',
-    title: webosIconTitle,
-    changeType: 'Optimize',
-    content: webosIconContent,
-    releaseTime: webosIconReleaseTime,
-  }),
-  'app.microi.ai-engine.json': Object.freeze({
-    version: 'v7.6.4',
-    title: 'AI 图像工作台与参考图编辑',
-    changeType: 'Feature',
-    content: '重构 AI助手能力导航，新增文生图、图生图、高清重绘、消除、扩图、去水印、证件照、多图融合、抠图、上色及精确图片处理；参考图私有存储，结果写入租户 HDFS。',
-    releaseTime: '2026-09-03 12:00:00',
-  }),
+  "app.microi.form-engine.json": Object.freeze({
+  "version": "v7.7.2",
+  "title": "旧客户端接口引擎保存兼容",
+  "changeType": "Fix",
+  "content": "接口引擎修改历史子表的空字符串占位在前后端保存事件中规范为0，避免旧版客户端将空串写入 ChangeHistoryRows 整数列；保留现有路由校验、历史明细及业务代码。",
+  "releaseTime": "2026-09-06 12:30:00"
+}),
+  "app.microi.module-engine.json": Object.freeze({
+  "version": "v7.6.4",
+  "title": "基础应用可选工作流依赖修复",
+  "changeType": "Fix",
+  "content": "修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。",
+  "releaseTime": "2026-09-05 19:16:00"
+}),
+  "app.microi.store.json": Object.freeze({
+  "version": "v8.2.5",
+  "title": "批量租户字段映射规划查询优化",
+  "changeType": "Fix",
+  "content": "导入器 v2.8.4 将当前字段映射分片的自然键和主键读取合并为两次有界参数化查询；重复自然键与超限结果回退原有单条校验，保留软删除、主键冲突、检查点复用和租户隔离，减少所有子租户安装平台应用时的重复查询。",
+  "releaseTime": "2026-09-07 03:00:00"
+}),
+  "app.microi.saas-engine.json": Object.freeze({
+  "version": "v8.2.3",
+  "title": "空数据库邮件与运行历史脱敏",
+  "changeType": "Fix",
+  "content": "主库空数据库保留邮件与视觉能力的表结构，但清空邮件账户、邮件内容、同步日志、接口代码历史及视觉请求、主体、样本等运行数据；补齐导出前零残留门禁，避免将持续新增的业务与历史数据交付到新租户。官方可在同一发布租约下撤回固定的七种空库文件。",
+  "releaseTime": "2026-09-07 04:10:00"
+}),
+  "app.microi.sso.json": Object.freeze({
+  "version": "v7.6.0",
+  "title": "恢复 SSO 完整历史更新说明",
+  "changeType": "Fix",
+  "content": "从已提交的 v7.5.10 官方源码恢复八条被错误字符串化的历史更新记录，保留 v7.5.11 的可选工作流依赖修复；本次只修复发行元数据，不改变 SSO 引擎、表、字段、菜单、权限、协议或租户配置。",
+  "releaseTime": "2026-09-06 19:50:00"
+}),
+  "app.microi.sys_user.json": Object.freeze({
+  "version": "v7.6.6",
+  "title": "基础应用可选工作流依赖修复",
+  "changeType": "Fix",
+  "content": "修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。",
+  "releaseTime": "2026-09-05 19:16:00"
+}),
+  "app.microi.sys-config.json": Object.freeze({
+  "version": "v6.4.0",
+  "title": "全局函数库与日期基础能力",
+  "changeType": "Fix",
+  "content": "新增系统设置全局函数子表及前后端 DateNow/DateFormat/DateAdd 六条幂等种子；按目标启用配置绑定外键，不覆盖已有全局代码或函数源码；运行时按租户缓存，真实提交后跨节点失效。需配套更新后端。",
+  "releaseTime": "2026-09-06 12:30:00"
+}),
+  "app.microi.message-notification.json": Object.freeze({
+  "version": "v1.0.16",
+  "title": "基础应用可选工作流依赖修复",
+  "changeType": "Fix",
+  "content": "修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。",
+  "releaseTime": "2026-09-05 19:16:00"
+}),
+  "app.microi.ai-engine.json": Object.freeze({
+  "version": "v7.7.2",
+  "title": "所有角色默认可对话，业务数据权限独立校验",
+  "changeType": "Fix",
+  "content": "新增模型管理“所有角色可常规对话”，默认开启且存量空值兼容开启。已登录无角色、无业务数据权限和策略引用旧模型的账号可使用当前开放模型常规对话。助手接口通过平台 $authenticated 标记允许 OnlyGet 只读角色调用，不修改角色只读设置，也不放开其它接口。数据分析仍要求角色策略、数据域、模型白名单及行级范围，不把对话开放转换为全库权限；多角色范围按每个数据域与模型独立合并。普通问答不自动查询全部业务域，历史数据对话不进入无权限常规问答上下文。模型缺失和上游不可用单独报告，不再冒充角色未开通。保留租户现有策略、模型配置、密钥和会话数据。",
+  "releaseTime": "2026-09-06 12:20:00"
+})
 });
 
 function historyLine(definition) {

@@ -17,7 +17,6 @@ public sealed class SqlServerFieldTypeCompatibilityTests
     }
 
     [Theory]
-    [InlineData("varchar(255)")]
     [InlineData("nvarchar(max)")]
     [InlineData("int")]
     [InlineData("decimal(18,2)")]
@@ -25,6 +24,14 @@ public sealed class SqlServerFieldTypeCompatibilityTests
     {
         Assert.Equal(fieldType, SqlServerService.NormalizeFieldType(fieldType));
     }
+
+    [Theory]
+    [InlineData("varchar(255)", "nvarchar(255)")]
+    [InlineData("VARCHAR ( 4000 )", "nvarchar(4000)")]
+    [InlineData("varchar(4001)", "nvarchar(max)")]
+    [InlineData("varchar(max)", "nvarchar(max)")]
+    public void NormalizeFieldType_UsesUnicodeForLogicalText(string input, string expected)
+        => Assert.Equal(expected, SqlServerService.NormalizeFieldType(input));
 
     [Theory]
     [InlineData("nvarchar", 20, null, null, null, "nvarchar(20)")]

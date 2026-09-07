@@ -644,7 +644,7 @@ function categoryLabel(value) {
   return {
     game: '游戏', business: '企业应用', office: '办公协同', education: '教育学习',
     tools: '效率工具', lifestyle: '生活服务', creative: '创意设计', data: '数据分析',
-    marketing: '营销运营', industry: '行业应用', platform: '平台能力', other: '其它'
+    marketing: '营销运营', industry: '行业应用', platform: '平台应用', other: '其它'
   }[value] || value || '其它'
 }
 
