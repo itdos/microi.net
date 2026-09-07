@@ -82,9 +82,9 @@ test('inline write values are normalized and allow incomplete point drafts', () 
   })
 })
 
-test('proposal preview keeps two inline cards, navigates on edit, and puts copies first', () => {
+test('proposal preview uses the configured card limit, navigates on edit, and puts copies first', () => {
   assert.match(relatedListSource, /return this\.isPreview\s*\? this\.rows\.slice/)
-  assert.match(relatedListSource, /!isProposalInstallationQuickMode \|\| proposalInstallationHasMore/)
+  assert.match(relatedListSource, /!this\.isProposalInstallationQuickMode \|\| this\.proposalInstallationHasMore/)
   assert.match(relatedListSource, /openProposalPointEdit\(row\)/)
   assert.match(relatedListSource, /mode: 'Edit'/)
   assert.match(relatedListSource, /this\.rows = \[copied, \.\.\.this\.rows\.filter/)
