@@ -727,7 +727,10 @@ export type SystemObservabilityQueryAction =
   | 'SecurityData'
   | 'TrafficHistory'
   | 'TrafficDetails'
-  | 'HistoricalDashboard';
+  | 'HistoricalDashboard'
+  | 'Memory'
+  | 'MemoryIncidents'
+  | 'MemoryIncident';
 
 export type SystemObservabilityManageAction = 'BlockIp' | 'UnblockIp';
 

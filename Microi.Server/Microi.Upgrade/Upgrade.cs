@@ -61,6 +61,7 @@ namespace Microi.net
                     {
                         upgradeLease.ThrowIfLost();
                         EnsureApiEngineRuntimeColumns(osClientSecret);
+                        RuntimeColumnNullability.EnsureUnderLease(osClientSecret);
                         Upgrade25.EnsureCurrentFileIdentityIndex(osClientSecret);
                         upgradeLease.ThrowIfLost();
                         if (!RuntimePhysicalPrerequisitesReady(osClientSecret))
@@ -2403,6 +2404,7 @@ if (_microiLegacyMenuConfigChanged) {
         private bool RuntimePhysicalPrerequisitesReady(OsClientSecret osClientSecret)
         {
             if (osClientSecret?.Db == null) return false;
+            if (!RuntimeColumnNullability.Ready(osClientSecret)) return false;
 
             var physicalColumns = new Dictionary<string, HashSet<string>>(
                 StringComparer.OrdinalIgnoreCase);

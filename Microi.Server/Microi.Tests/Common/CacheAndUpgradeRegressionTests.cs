@@ -204,7 +204,7 @@ public class CacheAndUpgradeRegressionTests
             "DiyLangRuntimeCacheDefaultCommandTimeoutSeconds",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.Equal(500, Assert.IsType<int>(pageSize!.GetRawConstantValue()));
-        Assert.Equal(10_000, Assert.IsType<int>(maxRows!.GetRawConstantValue()));
+        Assert.Equal(50_000, Assert.IsType<int>(maxRows!.GetRawConstantValue()));
         Assert.Equal(5_000_000, Assert.IsType<int>(maxCharacters!.GetRawConstantValue()));
         Assert.Equal(30, Assert.IsType<int>(commandTimeout!.GetRawConstantValue()));
     }

@@ -593,9 +593,7 @@ namespace Microi.net
         {
             var columns = GateTransitionAuditFields.Select(field =>
             {
-                var nullable = GateTransitionAuditRequiredColumns.Contains(
-                    field.Name,
-                    StringComparer.OrdinalIgnoreCase)
+                var nullable = string.Equals(field.Name, "Id", StringComparison.OrdinalIgnoreCase)
                     ? " NOT NULL"
                     : " NULL";
                 return Quote(dialect, field.Name) + " "
@@ -624,12 +622,16 @@ namespace Microi.net
             if (!GateTransitionAuditRequiredColumns.Contains(field.Name, StringComparer.OrdinalIgnoreCase))
                 throw new ArgumentException("字段允许 NULL。", nameof(field));
             var type = PhysicalType(dialect, field.LogicalType, field.SqlServerUnicode);
+            // The historical method name is retained for compatibility. Only
+            // the primary Id is physically required; audit content is validated
+            // by the trusted writer and the migration's existing data checks.
+            var nullable = string.Equals(field.Name, "Id", StringComparison.OrdinalIgnoreCase) ? "NOT NULL" : "NULL";
             return dialect switch
             {
-                SchemaDialect.MySql => $"ALTER TABLE `{GateTransitionAuditTable}` MODIFY COLUMN `{field.Name}` {type} NOT NULL",
-                SchemaDialect.SqlServer => $"ALTER TABLE [{GateTransitionAuditTable}] ALTER COLUMN [{field.Name}] {type} NOT NULL",
-                SchemaDialect.Oracle => $"ALTER TABLE {GateTransitionAuditTable} MODIFY ({field.Name} {type} NOT NULL)",
-                SchemaDialect.PostgreSql => $"ALTER TABLE \"{GateTransitionAuditTable}\" ALTER COLUMN \"{field.Name}\" SET NOT NULL",
+                SchemaDialect.MySql => $"ALTER TABLE `{GateTransitionAuditTable}` MODIFY COLUMN `{field.Name}` {type} {nullable}",
+                SchemaDialect.SqlServer => $"ALTER TABLE [{GateTransitionAuditTable}] ALTER COLUMN [{field.Name}] {type} {nullable}",
+                SchemaDialect.Oracle => $"ALTER TABLE {GateTransitionAuditTable} MODIFY ({field.Name} {type} {nullable})",
+                SchemaDialect.PostgreSql => $"ALTER TABLE \"{GateTransitionAuditTable}\" ALTER COLUMN \"{field.Name}\" " + (nullable == "NULL" ? "DROP NOT NULL" : "SET NOT NULL"),
                 _ => throw new ArgumentOutOfRangeException(nameof(dialect))
             };
         }
@@ -642,13 +644,13 @@ namespace Microi.net
             return dialect switch
             {
                 SchemaDialect.MySql =>
-                    $"ALTER TABLE `{field.TableName}` MODIFY COLUMN `{field.Name}` {type} NOT NULL DEFAULT {literal}",
+                    $"ALTER TABLE `{field.TableName}` MODIFY COLUMN `{field.Name}` {type} NULL DEFAULT {literal}",
                 SchemaDialect.SqlServer =>
-                    $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {type} NOT NULL",
+                    $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {type} NULL",
                 SchemaDialect.Oracle =>
-                    $"ALTER TABLE {field.TableName} MODIFY ({field.Name} {type} DEFAULT {literal} NOT NULL)",
+                    $"ALTER TABLE {field.TableName} MODIFY ({field.Name} {type} DEFAULT {literal} NULL)",
                 SchemaDialect.PostgreSql =>
-                    $"ALTER TABLE \"{field.TableName}\" ALTER COLUMN \"{field.Name}\" SET DEFAULT {literal}, ALTER COLUMN \"{field.Name}\" SET NOT NULL",
+                    $"ALTER TABLE \"{field.TableName}\" ALTER COLUMN \"{field.Name}\" SET DEFAULT {literal}, ALTER COLUMN \"{field.Name}\" DROP NOT NULL",
                 _ => throw new ArgumentOutOfRangeException(nameof(dialect))
             };
         }
@@ -670,7 +672,7 @@ namespace Microi.net
                     $"无法安全保留 {field.TableName}.{field.Name} 的 SQL Server 物理类型：{currentPhysicalType ?? "<null>"}。");
             }
 
-            return $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {physicalType} NOT NULL";
+            return $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {physicalType} NULL";
         }
 
         public static string BuildCreateIndexSql(SchemaDialect dialect, SchemaIndex index)
@@ -855,7 +857,9 @@ namespace Microi.net
                 if (invalid > 0)
                     throw new InvalidOperationException(
                         $"门禁转换审计列 {field.Name} 有 {invalid} 条 NULL，拒绝静默修复安全审计记录。");
-                client.Db.FromSql(BuildGateTransitionAuditNotNullSql(dialect, field)).ExecuteNonQuery();
+                var required = string.Equals(field.Name, "Id", StringComparison.OrdinalIgnoreCase);
+                if (IsColumnNotNull(client, dialect, field.TableName, field.Name) != required)
+                    client.Db.FromSql(BuildGateTransitionAuditNotNullSql(dialect, field)).ExecuteNonQuery();
             }
         }
 
@@ -972,11 +976,11 @@ WHERE c.object_id=OBJECT_ID(@p0) AND c.name=@p1")
                     $"SELECT COUNT(*) FROM {Quote(dialect, field.TableName)} WHERE {Quote(dialect, field.Name)} IS NULL")
                 .ToScalar<long>();
             if (nullCount != 0)
-                throw new InvalidOperationException($"{field.TableName}.{field.Name} 仍有 {nullCount} 条 NULL，拒绝设置 NOT NULL。");
+                throw new InvalidOperationException($"{field.TableName}.{field.Name} 仍有 {nullCount} 条未初始化的协议控制值。");
 
             var existingDefault = NormalizeDefaultExpression(
                 GetColumnDefault(client, dialect, field.TableName, field.Name));
-            if (IsColumnNotNull(client, dialect, field.TableName, field.Name)
+            if (!IsColumnNotNull(client, dialect, field.TableName, field.Name)
                 && string.Equals(existingDefault, field.DefaultValue, StringComparison.OrdinalIgnoreCase))
             {
                 return;
@@ -990,8 +994,8 @@ WHERE c.object_id=OBJECT_ID(@p0) AND c.name=@p1")
             client.Db.FromSql(alterSql).ExecuteNonQuery();
             if (dialect == SchemaDialect.SqlServer) EnsureSqlServerDefault(client, field);
 
-            if (!IsColumnNotNull(client, dialect, field.TableName, field.Name))
-                throw new InvalidOperationException($"{field.TableName}.{field.Name} 未能回读确认 NOT NULL。");
+            if (IsColumnNotNull(client, dialect, field.TableName, field.Name))
+                throw new InvalidOperationException($"{field.TableName}.{field.Name} 未能回读确认允许 NULL。");
             var actualDefault = NormalizeDefaultExpression(GetColumnDefault(client, dialect, field.TableName, field.Name));
             if (!string.Equals(actualDefault, field.DefaultValue, StringComparison.OrdinalIgnoreCase))
             {

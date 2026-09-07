@@ -252,6 +252,8 @@ namespace Microi.net
             var engine = new Engine(options =>
             {
                 options.AllowClr();
+                // ExecutionObservation records boundaries; its background publisher refreshes
+                // EventPipe identities. A custom Constraint forces Jint's per-statement path.
                 if (!createV8EngineParam.UnlimitedRuntime)
                 {
                     options.TimeoutInterval(TimeSpan.FromSeconds(createV8EngineParam.Timeout))
@@ -647,6 +649,11 @@ namespace Microi.net
         /// </summary>
         public async Task<DosResult<V8EngineParam>> Run(V8EngineParam param)
         {
+            string observationTable = "";
+            try { observationTable = DynamicHelper.GetDynamicStringValue(param?.TableModel, "Name"); } catch { }
+            using var observationActivity = MicroiTraceContext.StartActivity("Microi.V8");
+            using var observation = ExecutionObservation.Enter("V8", param?.DiagnosticResourceKey ?? param?.ApiEngineKey ?? param?.EventName,
+                param?.OsClient, observationTable, param?.EventName, param?.V8Code);
             Engine engine = null;
             bool isNewEngine = false;
             V8ExecutionLease executionLease = null;
@@ -815,6 +822,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
+                observation.Failed();
                 var javascriptException = ex as Jint.Runtime.JavaScriptException;
                 var lineNumber = javascriptException?.Location.Start.Line ?? 0;
                 var columnNumber = javascriptException?.Location.Start.Column ?? 0;

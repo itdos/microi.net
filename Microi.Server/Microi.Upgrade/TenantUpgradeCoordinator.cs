@@ -68,7 +68,8 @@ namespace Microi.net
                 if (IsVersionAtLeast(beforeVersion, targetVersion))
                 {
                     var protocolIndexRepaired = false;
-                    if (!Upgrade25.CurrentFileIdentityIndexReady(runtimeClient))
+                    if (!Upgrade25.CurrentFileIdentityIndexReady(runtimeClient)
+                        || !RuntimeColumnNullability.Ready(runtimeClient))
                     {
                         var repair = await EnsureRuntimePhysicalPrerequisitesAsync(
                                 runtimeClient, cancellationToken)
@@ -302,7 +303,7 @@ namespace Microi.net
             bool protocolIndexRepaired = false)
         {
             var message = protocolIndexRepaired
-                ? "租户数据库版本已是当前版本；文件身份索引已在租约内修复、未执行历史迁移、未刷新缓存。"
+                ? "租户数据库版本已是当前版本；启动物理兼容结构已在租约内修复、未执行历史迁移、未刷新缓存。"
                 : leaseAcquired
                     ? "租户数据库版本已是当前版本；已在租约内确认，未执行历史迁移、未刷新缓存。"
                     : "租户数据库版本已是当前版本；未取得升级租约、未执行历史迁移、未刷新缓存。";

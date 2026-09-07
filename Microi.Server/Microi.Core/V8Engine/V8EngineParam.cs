@@ -76,6 +76,9 @@ namespace Microi.net
         public Engine Engine { get; set; }
         public string EventName { get; set; }
         public string ApiEngineKey { get; set; }
+        /// <summary>Trusted host resource identity for diagnostics; never script content or parameters.</summary>
+        [JsonIgnore]
+        public string DiagnosticResourceKey { get; set; }
         /// <summary>
         /// 调用方式，Server、Client
         /// 这里之所以不使用_InvokeType是因为不用像表单引擎那里区别表单字段和系统字段

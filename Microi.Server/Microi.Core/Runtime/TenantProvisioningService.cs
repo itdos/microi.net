@@ -545,9 +545,11 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi: Admin tenant provisioning failed: " + ex.Message);
-                progress.Failure("SaaS 租户创建失败：" + ex.Message);
-                var failure = new DosResult(0, null, "SaaS租户创建失败：" + ex.Message);
+                var message = ex is TenantDatabaseProvisioningException databaseError
+                    ? databaseError.ToAdministratorMessage() : ex.Message;
+                Console.WriteLine("Microi: Admin tenant provisioning failed: " + message);
+                progress.Failure("SaaS 租户创建失败：" + message);
+                var failure = new DosResult(0, null, "SaaS租户创建失败：" + message);
                 return databaseCreated
                     ? CompensateProvisioningFailure(failure, tenantKey, dbName)
                     : failure;
@@ -2341,6 +2343,7 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
         {
             var databaseCreated = false;
             var principalCreated = false;
+            var stage = "连接管理数据库";
             DbSession masterDb = null;
             DatabaseAdministrationCommands databaseCommands = null;
             DatabasePrincipalAdministrationCommands principalCommands = null;
@@ -2357,6 +2360,7 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     databaseType, OsClientDefault.OsClientDbConn);
                 masterDb = MicroiORMExtensions.CreateDbSession(masterConnStr, databaseType);
 
+                stage = "检查数据库与账号是否已存在";
                 var databaseExists = masterDb.FromSql(databaseCommands.ExistsSql)
                     .AddInParameter("p0", dbName)
                     .ToScalar<int>();
@@ -2370,15 +2374,19 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                         "租户数据库或专属账号已存在，为避免覆盖现有资源已停止创建，请先核对并清理同名残留资源。");
                 }
 
+                stage = "创建数据库";
                 masterDb.FromSql(databaseCommands.CreateSql).ExecuteNonQuery();
                 databaseCreated = true;
 
+                stage = "创建租户独立账号";
                 masterDb.FromSql(principalCommands.CreateSql)
                     .AddSensitiveInParameter("p0", password)
                     .ExecuteNonQuery();
                 principalCreated = true;
+                stage = "授予目标数据库权限";
                 masterDb.FromSql(principalCommands.GrantSql).ExecuteNonQuery();
 
+                stage = "验证租户独立账号连接";
                 var scopedConnection = DatabaseAdministrationCompatibility.BuildScopedConnectionString(
                     databaseType,
                     OsClientDefault.OsClientDbConn,
@@ -2400,7 +2408,7 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     ConnectionString = scopedConnection
                 };
             }
-            catch
+            catch (Exception ex)
             {
                 if (masterDb != null && principalCreated && principalCommands != null)
                 {
@@ -2416,7 +2424,7 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     }
                     catch { }
                 }
-                throw;
+                throw TenantDatabaseProvisioningException.Create(ex, OsClientDefault.OsClientDbConn, stage);
             }
         }
 
