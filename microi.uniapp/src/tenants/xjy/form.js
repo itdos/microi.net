@@ -1864,6 +1864,9 @@ export function getFieldPresentation(context, field) {
 
 export function getRelatedPresentation(context, field) {
   if (!field) return {}
+  if (isProposalForm(context) && isProposalInstallationChild(field)) {
+    return { previewLimit: 5 }
+  }
   const config = field.config || {}
   const parentTable = String(context.tableName || '').toLowerCase()
   const childFkField = String(config.TableChildFkFieldName || '').toLowerCase()
