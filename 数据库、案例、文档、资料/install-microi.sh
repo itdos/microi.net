@@ -3,8 +3,8 @@
 # ============================================================
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
-# 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-09-06 16:52:23
+# 兼容 CentOS 7/8/9、Alibaba Cloud Linux 3 / Anolis、Ubuntu 20/22/24、Debian 10/11/12
+# 版本：v2026-09-08 20:55:17
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -99,7 +99,7 @@ microi_install_ops() {
 }
 
 
-SCRIPT_VERSION="v2026-09-06 16:52:23"
+SCRIPT_VERSION="v2026-09-08 20:55:17"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -796,6 +796,7 @@ repair_migrate_app_to_internal_network() {
     docker network create --driver bridge microi > /dev/null
     echo 'Microi：已创建由 Docker 自动分配网段的 microi 共享内网 ✓'
   fi
+  ensure_microi_bridge_firewalld microi || return 1
 
   repair_extract_api_block "${canonical_file}" "${api_block}"
   repair_extract_api_environment_block "${api_block}" "${environment_block}"
@@ -1285,6 +1286,124 @@ repair_microi_app() {
   echo "Microi：现场恢复点：${backup_dir}"
   echo '=================================================================='
 }
+
+# Docker 管理自己的转发/NAT 规则。这里只恢复吾码 bridge 在 Docker 官方
+# firewalld zone 中的归属，不关闭防火墙、不改全局 FORWARD、不重启 Docker。
+microi_firewalld_active() {
+  command -v firewall-cmd > /dev/null 2>&1 && sudo firewall-cmd --state > /dev/null 2>&1
+}
+
+microi_local_bridge_exists() {
+  [ -d "/sys/class/net/$1/bridge" ]
+}
+
+ensure_microi_bridge_firewalld() {
+  local network="$1" metadata network_id driver bridge icc scope target zone_state
+  case "${network}" in microi|microi-ocr) ;; *) return 1 ;; esac
+  metadata=$(docker network inspect "${network}" --format '{{.Id}}|{{.Driver}}|{{index .Options "com.docker.network.bridge.name"}}|{{index .Options "com.docker.network.bridge.enable_icc"}}') || return 1
+  IFS='|' read -r network_id driver bridge icc <<< "${metadata}"
+  if [ "${driver}" != 'bridge' ] || [ "${icc}" = 'false' ]; then
+    echo "Microi：错误：${network} 必须是允许容器互通的 bridge 网络；请检查 driver / enable_icc。" >&2
+    return 1
+  fi
+  # 没有运行 firewalld 的宿主机继续由 Docker 管理规则；不能额外插入放行规则。
+  microi_firewalld_active || return 0
+  if [ -z "${bridge}" ] || [ "${bridge}" = '<no value>' ]; then
+    [[ "${network_id}" =~ ^[a-f0-9]{64}$ ]] || return 1
+    bridge="br-${network_id:0:12}"
+  fi
+  if ! [[ "${bridge}" =~ ^[a-zA-Z0-9_.-]{1,15}$ ]] || ! microi_local_bridge_exists "${bridge}"; then
+    echo "Microi：错误：无法确认 ${network} 对应的本机 Linux bridge，未修改防火墙。" >&2
+    return 1
+  fi
+  # 先同时校验两套 zone 配置，再写入；不创建 zone 或修改管理员的 zone target。
+  for scope in runtime permanent; do
+    local -a args=()
+    [ "${scope}" != 'permanent' ] || args+=(--permanent)
+    # --get-target 在 CentOS/Alibaba Cloud Linux 常见版本只支持 --permanent。
+    zone_state=$(sudo firewall-cmd "${args[@]}" --zone=docker --list-all 2>/dev/null) || zone_state=''
+    target=$(printf '%s\n' "${zone_state}" | awk '$1 == "target:" {print $2}')
+    if [ "${target}" != 'ACCEPT' ]; then
+      echo "Microi：错误：firewalld ${scope} 的 docker zone 缺失或 target 不是 ACCEPT。" >&2
+      echo 'Microi：请检查 Docker 与 firewalld 集成；脚本不会全局放行转发、关闭防火墙或重启其它容器。' >&2
+      return 1
+    fi
+  done
+  for scope in permanent runtime; do
+    local -a args=()
+    [ "${scope}" != 'permanent' ] || args+=(--permanent)
+    if ! sudo firewall-cmd "${args[@]}" --zone=docker --query-interface="${bridge}" > /dev/null 2>&1; then
+      if ! sudo firewall-cmd "${args[@]}" --zone=docker --change-interface="${bridge}" > /dev/null; then
+        echo "Microi：错误：${network} 网桥的 ${scope} firewalld 归属修复失败。" >&2
+        return 1
+      fi
+    fi
+    if ! sudo firewall-cmd "${args[@]}" --zone=docker --query-interface="${bridge}" > /dev/null 2>&1; then
+      echo "Microi：错误：${network} 网桥的 ${scope} firewalld 归属回读失败。" >&2
+      return 1
+    fi
+  done
+  echo "Microi：${network} 网桥 ${bridge} 已归属 docker zone，运行与持久配置均已回读 ✓"
+}
+
+ensure_minio_mc_image() {
+  if docker image inspect "${MINIO_MC_IMAGE}" > /dev/null 2>&1; then
+    echo "Microi：复用本机 MinIO mc 镜像 ${MINIO_MC_IMAGE} ✓"
+  else
+    echo "Microi：拉取吾码 MinIO mc 镜像 ${MINIO_MC_IMAGE}..."
+    docker pull "${MINIO_MC_IMAGE}" || return 1
+  fi
+}
+
+# 官方 mc 镜像包含 Bash/coreutils。用同一 mc 镜像、同一 Docker 网络、同一
+# DNS/端口检查 HTTP readiness；不需要密钥，也不依赖镜像中额外安装 curl。
+probe_minio_internal_network() {
+  local network="${1:-microi}" host="${2:-microi-install-minio}" port="${3:-9000}"
+  docker run --rm --network "${network}" --entrypoint /usr/bin/timeout \
+    "${MINIO_MC_IMAGE}" 8 /usr/bin/bash -c '
+      exec 3<>"/dev/tcp/$1/$2" || exit 1
+      printf "GET /minio/health/ready HTTP/1.1\r\nHost: %s:%s\r\nConnection: close\r\n\r\n" "$1" "$2" >&3
+      IFS= read -r status <&3 || exit 1
+      [[ "$status" == HTTP/1.*" 200 "* ]]
+    ' microi-minio-probe "${host}" "${port}"
+}
+
+print_minio_network_diagnostics() {
+  echo 'Microi：MinIO 容器网络检查失败，尚未进入 Access Key / Secret Key 校验。' >&2
+  echo 'Microi：宿主机发布端口可达不代表容器之间可达；请检查 microi 网桥、firewalld 和宝塔转发规则。' >&2
+  docker network inspect microi --format 'Microi：network={{.Name}} driver={{.Driver}} id={{.Id}} options={{json .Options}}' >&2 || true
+  echo 'Microi：只读排查命令：docker network inspect microi；firewall-cmd --get-active-zones；iptables -S FORWARD；nft list ruleset' >&2
+  echo 'Microi：可用最新版脚本执行 bash install-microi.sh --repair-network 修复吾码网桥归属并复测。' >&2
+}
+
+repair_microi_network() {
+  echo "Microi：Docker 内网修复 ${SCRIPT_VERSION}"
+  if ! docker info > /dev/null 2>&1; then
+    echo 'Microi：错误：Docker daemon 不可达，未修改宿主机。' >&2
+    return 1
+  fi
+  ensure_microi_bridge_firewalld microi || return 1
+  if docker network inspect microi-ocr > /dev/null 2>&1; then
+    ensure_microi_bridge_firewalld microi-ocr || return 1
+  fi
+  if [ "$(docker inspect microi-install-minio --format '{{.State.Running}}' 2>/dev/null)" != 'true' ]; then
+    echo 'Microi：未找到运行中的 microi-install-minio；网桥配置已检查，MinIO 连通性未验证。' >&2
+    return 1
+  fi
+  ensure_minio_mc_image || return 1
+  if ! probe_minio_internal_network; then
+    print_minio_network_diagnostics
+    return 1
+  fi
+  echo 'Microi：mc 所在容器网络访问 MinIO readiness 已通过 ✓'
+  echo 'Microi：本命令只修复并检查网络，未创建 API、初始化桶或导入数据库，不代表整个平台安装完成。'
+}
+
+if [ "${1:-}" = '--repair-network' ]; then
+  ensure_privileged_execution "$@"
+  repair_microi_network
+  exit 0
+fi
 
 if [ "${1:-}" = '--privilege-check-only' ]; then
   ensure_privileged_execution "$@"
@@ -3055,7 +3174,15 @@ is_debian_based() {
 }
 
 is_rhel_based() {
-  [[ "${OS_ID}" == "centos" || "${OS_ID}" == "rhel" || "${OS_ID}" == "rocky" || "${OS_ID}" == "almalinux" || "${OS_ID}" == "fedora" || "${OS_ID}" == "openEuler" || "${OS_ID}" == "centos-stream" || "${OS_ID}" == "amzn" ]]
+  [[ "${OS_ID}" == "centos" || "${OS_ID}" == "rhel" || "${OS_ID}" == "rocky" || "${OS_ID}" == "almalinux" || "${OS_ID}" == "fedora" || "${OS_ID}" == "openEuler" || "${OS_ID}" == "centos-stream" || "${OS_ID}" == "amzn" || "${OS_ID}" == "alinux" || "${OS_ID}" == "anolis" ]]
+}
+
+prepare_docker_repository_compatibility() {
+  # 阿里云官方要求：alinux 3 使用 releasever 适配插件访问 CentOS Docker CE
+  # 仓库，不能直接把发行版本 3 当成 CentOS 3，也不改全局 DNF releasever。
+  if [ "${OS_ID:-}" = alinux ] && [[ "${OS_VERSION_ID:-}" == 3 || "${OS_VERSION_ID:-}" == 3.* ]]; then
+    sudo dnf install -y dnf-plugin-releasever-adapter --repo alinux3-plus || return 1
+  fi
 }
 
 # 校验 IPv4 地址及 Docker bridge 网络 CIDR，避免错误配置进入自动安装阶段
@@ -3456,6 +3583,7 @@ install_docker() {
     sudo apt-get update -y -qq
     sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
   elif is_rhel_based; then
+    prepare_docker_repository_compatibility || return 1
     # CentOS 7 特殊处理（注意：CentOS 7 已于2024年6月EOL，基础源可能不可用）
     if [[ "${OS_ID}" == "centos" && "${OS_VERSION_ID}" == "7" ]]; then
       sudo yum install -y yum-utils
@@ -3545,6 +3673,7 @@ else
   if is_debian_based; then
     sudo apt-get install -y -qq docker-compose-plugin 2>/dev/null
   elif is_rhel_based; then
+    prepare_docker_repository_compatibility
     if command -v dnf > /dev/null 2>&1; then
       sudo dnf install -y docker-compose-plugin 2>/dev/null
     else
@@ -3613,6 +3742,7 @@ ensure_microi_network() {
   fi
 
   # 每个独立编排都连接到同一个预先创建的外部网络
+  ensure_microi_bridge_firewalld microi || return 1
   COMPOSE_SERVICE_NETWORK=$'    networks:\n      - microi'
   COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi:\n    external: true\n    name: microi'
 }
@@ -3639,6 +3769,10 @@ ensure_ocr_runtime_network() {
     echo "Microi：OCR 内部网络 ${OCR_RUNTIME_NETWORK} 创建成功 ✓"
   fi
 
+  if ! ensure_microi_bridge_firewalld "${OCR_RUNTIME_NETWORK}"; then
+    record_optional_component_failure 'OCR/LibreTranslate 内部网络：' 'firewalld 网桥检查失败，两个附加组件将跳过。'
+    return 1
+  fi
   OPTIONAL_RUNTIME_NETWORK_READY=1
   OCR_COMPOSE_SERVICE_NETWORK=$'    networks:\n      - microi-ocr'
   OCR_COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi-ocr:\n    external: true\n    name: microi-ocr'
@@ -4069,16 +4203,24 @@ INSTALL_RECOVERY_SUMMARY_ENABLED=1
 # ============================================================
 # 防火墙端口开放函数
 # ============================================================
-# 注意：所有防火墙命令加 || true 防止 set -e 导致脚本退出（规则已存在时命令返回非0）
+# firewalld 分别维护运行和持久配置，禁止在 Docker 网络创建后全局 reload。
 firewall_open_port() {
   local port="$1"
-  # firewalld（CentOS 7/8/9, RHEL, Rocky 等）
-  if command -v firewall-cmd > /dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
-    sudo firewall-cmd --permanent --add-port=${port}/tcp > /dev/null 2>&1 || true
+  # firewalld（Alibaba Cloud Linux / Anolis、CentOS、RHEL、Rocky 等）
+  if microi_firewalld_active; then
+    local scope
+    for scope in permanent runtime; do
+      local -a args=()
+      [ "${scope}" != 'permanent' ] || args+=(--permanent)
+      if ! sudo firewall-cmd "${args[@]}" --query-port="${port}/tcp" > /dev/null 2>&1; then
+        sudo firewall-cmd "${args[@]}" --add-port="${port}/tcp" > /dev/null || return 1
+      fi
+      sudo firewall-cmd "${args[@]}" --query-port="${port}/tcp" > /dev/null 2>&1 || return 1
+    done
     return 0
   fi
   # ufw（Ubuntu, Debian）
-  if command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q "active"; then
+  if command -v ufw > /dev/null 2>&1 && LC_ALL=C sudo ufw status 2>/dev/null | grep -Eq '^Status:[[:space:]]+active$'; then
     sudo ufw allow ${port}/tcp > /dev/null 2>&1 || true
     return 0
   fi
@@ -4091,13 +4233,14 @@ firewall_open_port() {
   return 0
 }
 
-firewall_reload() {
-  if command -v firewall-cmd > /dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
-    sudo firewall-cmd --reload > /dev/null 2>&1 || true
-    echo "Microi：firewalld 防火墙规则已重新加载 ✓"
+firewall_persist_rules() {
+  if microi_firewalld_active; then
+    echo 'Microi：firewalld 端口运行与持久配置均已生效，保留 Docker 现有网络规则 ✓'
+    return 0
   fi
-  if command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q "active"; then
+  if command -v ufw > /dev/null 2>&1 && LC_ALL=C sudo ufw status 2>/dev/null | grep -Eq '^Status:[[:space:]]+active$'; then
     echo "Microi：ufw 防火墙规则已生效 ✓"
+    return 0
   fi
   # 持久化iptables规则
   if command -v iptables-save > /dev/null 2>&1; then
@@ -4180,14 +4323,17 @@ INSTALL_CURRENT_STAGE="步骤5/11 开放防火墙端口"
 
 echo 'Microi：在部署服务前，先开放需要对外访问的端口...'
 for port in ${FIREWALL_PORTS}; do
-  firewall_open_port "${port}"
+  if ! firewall_open_port "${port}"; then
+    echo "Microi：错误：端口 ${port}/tcp 的防火墙配置或回读失败。" >&2
+    exit 1
+  fi
   echo "Microi：  端口 ${port}/tcp 已开放 ✓"
 done
 echo "Microi：  OCR ${OCR_PORT}/tcp 仅绑定 127.0.0.1，未自动开放到宿主机防火墙 ✓"
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   echo "Microi：  LibreTranslate ${LIBRETRANSLATE_PORT}/tcp 仅供平台内部调用，未自动开放到宿主机防火墙 ✓"
 fi
-firewall_reload
+firewall_persist_rules
 echo ''
 echo 'Microi：提示：以上为服务器内部防火墙规则，若使用云服务器（阿里云/腾讯云等），'
 echo '        还需在云控制台的安全组中开放相同端口。'
@@ -5351,18 +5497,18 @@ EOF
   echo 'Microi：等待 MinIO API 就绪...'
   MINIO_READY=false
   for _minio_wait in $(seq 1 60); do
-    if curl -fsS --connect-timeout 2 "http://127.0.0.1:${MINIO_PORT}/minio/health/live" > /dev/null 2>&1; then
+    if curl -fsS --connect-timeout 2 --max-time 2 "http://127.0.0.1:${MINIO_PORT}/minio/health/ready" > /dev/null 2>&1; then
       MINIO_READY=true
       break
     fi
     sleep 2
   done
   if [ "${MINIO_READY}" != "true" ]; then
-    echo 'Microi：错误：MinIO 在 120 秒内未就绪，请检查容器日志。'
+    echo 'Microi：错误：MinIO 宿主机端口在限定等待内未就绪，请检查容器日志。'
     docker logs microi-install-minio 2>&1 | tail -50 || true
     exit 1
   fi
-  echo 'Microi：MinIO API 已就绪 ✓'
+  echo 'Microi：MinIO 宿主机端口已就绪，继续检查容器网络...'
   MINIO_MC_ENDPOINT='http://microi-install-minio:9000'
 else
   echo "Microi：已有 MinIO 模式不会创建 MinIO 容器、数据目录、编排、API 端口或 Console 端口。"
@@ -5372,14 +5518,22 @@ fi
 # 使用吾码阿里云镜像中的官方 mc 客户端初始化桶，避免服务器直接访问海外下载站。
 MINIO_MC_CONFIG_DIR=$(mktemp -d '/tmp/microi_minio_mc_XXXXXX')
 chmod 700 "${MINIO_MC_CONFIG_DIR}"
-if ! docker image inspect "${MINIO_MC_IMAGE}" > /dev/null 2>&1; then
-  echo "Microi：拉取吾码 MinIO mc 镜像 ${MINIO_MC_IMAGE}..."
-  if ! docker pull "${MINIO_MC_IMAGE}"; then
-    echo 'Microi：错误：吾码 MinIO mc 镜像拉取失败。'
+ensure_minio_mc_image
+if [ "${MINIO_SERVICE_MODE}" = 'managed' ]; then
+  ensure_microi_bridge_firewalld microi
+  MINIO_NETWORK_READY=false
+  for _minio_network_wait in 1 2 3; do
+    if probe_minio_internal_network; then
+      MINIO_NETWORK_READY=true
+      break
+    fi
+    [ "${_minio_network_wait}" = 3 ] || sleep 2
+  done
+  if [ "${MINIO_NETWORK_READY}" != true ]; then
+    print_minio_network_diagnostics
     exit 1
   fi
-else
-  echo "Microi：复用本机 MinIO mc 镜像 ${MINIO_MC_IMAGE} ✓"
+  echo 'Microi：mc 所在容器网络访问 MinIO readiness 已通过 ✓'
 fi
 
 run_minio_mc() {
@@ -5399,7 +5553,7 @@ run_minio_mc() {
 
 MINIO_MC_ALIAS="microi-local"
 if ! run_minio_mc alias set "${MINIO_MC_ALIAS}" "${MINIO_MC_ENDPOINT}" "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"; then
-  echo 'Microi：错误：MinIO mc 无法使用所填端点和凭据连接 MinIO 服务。'
+  echo 'Microi：错误：MinIO alias 初始化失败，请按上方 mc 原始错误区分网络、TLS 或凭据问题；网络错误不代表密钥错误。'
   exit 1
 fi
 if ! run_minio_mc mb --ignore-existing "${MINIO_MC_ALIAS}/${MINIO_PRIVATE_BUCKET}"; then
@@ -5416,6 +5570,10 @@ if ! run_minio_mc anonymous set none "${MINIO_MC_ALIAS}/${MINIO_PRIVATE_BUCKET}"
 fi
 if ! run_minio_mc anonymous set download "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
   echo "Microi：错误：MinIO 公有桶 ${MINIO_PUBLIC_BUCKET} 的 public 下载权限设置失败。"
+  exit 1
+fi
+if ! run_minio_mc anonymous get "${MINIO_MC_ALIAS}/${MINIO_PRIVATE_BUCKET}"; then
+  echo "Microi：错误：MinIO 私有桶 ${MINIO_PRIVATE_BUCKET} 的匿名权限回读失败。"
   exit 1
 fi
 if ! run_minio_mc anonymous get "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
