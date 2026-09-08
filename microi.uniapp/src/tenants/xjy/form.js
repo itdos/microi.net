@@ -27,6 +27,7 @@ import {
   validateProposalCostInputs
 } from './proposal-cost-model.mjs'
 import { XJY_CUSTOMER_DEFAULT_REGION } from './customer-location.mjs'
+import { proposalCostFieldPresentation } from './proposal-cost-presentation.mjs'
 import { casePhotoField, caseFieldDescription } from './case-form.mjs'
 import {
   CUSTOMER_FOLLOW_FIELDS,
@@ -1847,6 +1848,8 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
+  const costPresentation = proposalCostFieldPresentation(context.tableName, field)
+  if (costPresentation) return costPresentation
   if (isCustomerCaseForm(context)) {
     const description = caseFieldDescription(context.tableName, field?.Name)
     if (description) return { description: field.Description || description }
