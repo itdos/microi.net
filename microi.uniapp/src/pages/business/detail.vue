@@ -174,6 +174,7 @@
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
 						parent-mode="View" display-mode="full"
+						:show-latest-record-summary="key === 'customers'"
 						:independent-scroll="standaloneListMode"
 						:viewport-height="relatedListViewportHeight"
 						:show-floating-add="false"
@@ -382,6 +383,7 @@
 		loadApprovalOpinions
 	} from './utils/xjy-row-actions.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
+	import { customerCaseChildField } from '@/tenants/xjy/native-table.js'
 
 	const icon = (path) => `/static/xjy/${path}`
 	const DETAIL_EXCLUDED_FIELDS = new Set(['Id', 'CreateUserId', 'UpdateUserId', 'OsClient'])
@@ -1393,6 +1395,8 @@
 					: groups
 				return activeGroups.map((group, index) => {
 					const rows = (group.fields || []).filter((field) => {
+						// 客户详情保留折叠分组；分隔线不是数据字段，不能渲染成“标题 -”。
+						if (this.key === 'customers' && (field.component || field.Component) === 'Divider') return false
 						const name = String(field.Name || '')
 						return name && !DETAIL_EXCLUDED_FIELDS.has(name)
 					}).map((field) => ({
@@ -1434,7 +1438,7 @@
 					key: `${type}:${field.Id || field.Name}`,
 					label: field.Label || field.Name || '关联业务',
 					type,
-					field
+					field: type === 'child' ? customerCaseChildField(this.moduleConfig.table, field) : field
 				}))
 				return [
 					...toTabs(definition.childFields, 'child'),
@@ -1568,11 +1572,13 @@
 							key: 'cases',
 							field: 'KehuID',
 							value: this.detail.Id,
-							// zhy：从客户详情进入客户案例列表时，新增表单直接继承客户主键、名称和类型。
+							// zhy：兼容旧版列表入口，同样带入客户信息、城市和概况。
 							defaultValues: {
 								KehuID: this.detail.Id,
 								KehuMC: this.detail.KehuMC,
-								KehuLX: this.detail.KehuLX
+								KehuLX: this.detail.KehuLX,
+								Chengshi: this.detail.Chengshi ?? '',
+								KehuGK: this.detail.KehuGK ?? ''
 							},
 							icon: icon('business/anlice.png')
 						},
@@ -1883,7 +1889,15 @@
 			this.loadDetail()
 		},
 		onShow() {
-			if (!this.loading && this.id) this.loadDetail(false)
+			if (!this.loading && this.id) {
+				this.loadDetail(false).then(() => {
+					// 返回客户详情时刷新当前关联列表，也覆盖在其他页面更新方案但未发出保存事件的情况。
+					if (this.key !== 'customers') return
+					const refs = this.$refs.standaloneRelatedList
+					const lists = Array.isArray(refs) ? refs : [refs]
+					lists.forEach((list) => list?.refreshData?.())
+				})
+			}
 			this.scheduleRelatedViewportMeasure()
 		},
 		onReady() {

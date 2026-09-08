@@ -169,7 +169,8 @@ export default {
         : this.roleProfile.isSales
           ? ['scan', 'leads', 'points']
           : ['scan']
-      return available.filter((item) => allowed.includes(item.key))
+      // 报修入口面向所有角色，具体设备范围在报修页按授权菜单查询。
+      return available.filter((item) => item.key === 'afterSalesAdd' || allowed.includes(item.key))
     },
     visibleMenuItems() {
       // zhy：About 行根据全局更新状态实时显示版本或可更新提示。
@@ -315,8 +316,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.profile-page { height: 100vh; overflow: hidden; background: #f4f8fa; color: #18313d; }
-.profile-hero { position: relative; min-height: 306rpx; overflow: hidden; background: #063b5c; color: #fff; }
+.profile-page { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #f4f8fa; color: #18313d; }
+.profile-hero { position: relative; flex: none; min-height: 306rpx; overflow: hidden; background: #063b5c; color: #fff; }
 .hero-water { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-shade { position: absolute; inset: 0; background: linear-gradient(105deg, rgba(3, 39, 61, 0.94) 0%, rgba(3, 57, 82, 0.76) 54%, rgba(6, 83, 105, 0.36) 100%); }
 .hero-top { position: relative; z-index: 1; display: flex; align-items: center; height: 88rpx; padding: 0 calc(28rpx + var(--mci-capsule-right)) 0 28rpx; }
@@ -330,9 +331,10 @@ export default {
 .role-tag { flex: 0 0 auto; margin-left: 12rpx; padding: 5rpx 10rpx; border: 1rpx solid rgba(255, 255, 255, 0.32); border-radius: 8rpx; background: rgba(255, 255, 255, 0.12); font-size: 19rpx; }
 .user-org { margin-top: 9rpx; overflow: hidden; color: rgba(255, 255, 255, 0.76); font-size: 22rpx; text-overflow: ellipsis; white-space: nowrap; }
 .user-arrow { color: rgba(255, 255, 255, 0.7); font-size: 40rpx; text-align: right; }
-.profile-scroll { height: calc(100vh - 306rpx - var(--mci-safe-top)); }
-.profile-content { padding: 0 24rpx 24rpx; }
-.summary-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: -24rpx; border: 1rpx solid #e1ebef; border-radius: 16rpx; background: #fff; box-shadow: 0 8rpx 24rpx rgba(18, 73, 98, 0.08); }
+/* 统计卡片留在滚动区域内，避免负边距越过 scroll-view 边界后被小程序裁切。 */
+.profile-scroll { flex: 1; height: 0; min-height: 0; }
+.profile-content { padding: 24rpx; }
+.summary-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1rpx solid #e1ebef; border-radius: 16rpx; background: #fff; box-shadow: 0 8rpx 24rpx rgba(18, 73, 98, 0.08); }
 .summary-item { position: relative; display: flex; flex-direction: column; align-items: center; padding: 24rpx 8rpx; }
 .summary-item + .summary-item::before { position: absolute; top: 24rpx; bottom: 24rpx; left: 0; width: 1rpx; background: #e8f0f3; content: ''; }
 .summary-value { font-size: 35rpx; font-weight: 700; color: #0b86d4; }
