@@ -4,6 +4,7 @@ import vm from 'node:vm'
 import test from 'node:test'
 import { buildTableChildDefaultValues } from '../src/platform/table-child-defaults.js'
 import { casePhotoField, caseFieldDescription } from '../src/tenants/xjy/case-form.mjs'
+import { proposalCostFieldPresentation } from '../src/tenants/xjy/proposal-cost-presentation.mjs'
 
 const read = (name) => fs.readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8')
 const plain = (value) => JSON.parse(JSON.stringify(value))
@@ -14,7 +15,7 @@ function loadModule(name, scope = {}) {
     .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*/g, '')
     .replace(/export default/g, 'const exported =')
     .replace(/export (?=(?:async )?function|const)/g, '')
-  return vm.runInNewContext(`${source}; exported`, { casePhotoField, caseFieldDescription, ...scope, console, setTimeout, clearTimeout })
+  return vm.runInNewContext(`${source}; exported`, { casePhotoField, caseFieldDescription, proposalCostFieldPresentation, ...scope, console, setTimeout, clearTimeout })
 }
 
 function formContext(mode = 'Add', form = {}) {

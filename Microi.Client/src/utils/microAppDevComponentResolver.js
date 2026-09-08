@@ -69,6 +69,32 @@ export function findLegacyMicroAppPage(resultOrRows, componentPath) {
     return null;
 }
 
+// Whitelist display coordinates: form data, authentication tokens and private
+// runtime context must never reach the copyable AI modification instructions.
+export function buildMicroAppComponentSourceInfo(page = {}, service = {}, context = {}) {
+    const meta = safeJson(page.RouteMetaJson);
+    const appKey = String(page.MicroServiceKey || service.MsKey || "");
+    const sourceFile = String(page.SourceFile || meta.SourceFile || meta.sourceFile || meta.meta?.sourceFile || "").replace(/\\/g, "/").replace(/^\/+/, "");
+    const safeSourceFile = sourceFile.split("/").includes("..") ? "" : sourceFile;
+    return {
+        appKey,
+        appName: String(service.MsName || appKey),
+        pageKey: String(page.PageKey || meta.PageKey || ""),
+        title: String(page.PageTitle || meta.PageTitle || ""),
+        routePath: String(page.RoutePath || meta.RoutePath || meta.path || "/"),
+        // Form embeds use the stable committed entry. A page metadata row may
+        // still carry an older build number after a runtime-only publication.
+        version: String(service.BuildVersion || ""),
+        sourceFile: safeSourceFile,
+        sourcePath: ["AI应用", appKey, safeSourceFile].filter(Boolean).join("/"),
+        componentPath: String(context.componentPath || ""),
+        entryUrl: String(context.entryUrl || ""),
+        assetSource: String(service.StorageMode || ""),
+        osClient: String(context.osClient || ""),
+        apiBase: String(context.apiBase || "")
+    };
+}
+
 export function serializeMicroAppComponentData(value, maxDepth = 8) {
     const seen = new WeakSet();
     const visit = (current, depth) => {

@@ -1081,8 +1081,8 @@ test('both embedded platform-service bundles contain the progress route and same
   const saasBundle = findBundle(packageModel);
   const storeBundle = findBundle(storePackage);
   for (const bundle of [saasBundle, storeBundle]) {
-    assert.equal(bundle.VersionNo, 'v2.0.0');
-    assert.equal(bundle.Application.CurrentVersion, 62);
+    assert.equal(bundle.VersionNo, 'v2.0.1');
+    assert.equal(bundle.Application.CurrentVersion, 63);
     assert.ok(bundle.Routes.some(route => route.RoutePath === '/tenant-database-upgrade'));
   }
   assert.equal(saasBundle.MicroService.DistHash, storeBundle.MicroService.DistHash);

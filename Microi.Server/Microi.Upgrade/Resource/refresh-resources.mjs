@@ -1551,7 +1551,9 @@ if (process.argv.includes('--synchronize-local')) {
   await mkdir(baseDirectory, { recursive: true });
   for (const name of resourceNames) {
     const content = mergedResources.get(name);
-    await writeFile(resolve(baseDirectory, name), content, 'utf8');
+    // 所有正文已完成远端回读；相同基线无需再次写盘，避免重复同步争用 Windows 文件句柄。
+    const basePath = resolve(baseDirectory, name);
+    if (await readOptional(basePath) !== content) await writeFile(basePath, content, 'utf8');
     const localChanged = localResources.get(name) !== content;
     const remoteChanged = remoteResources.get(name).content !== content;
     const direction = localChanged && remoteChanged

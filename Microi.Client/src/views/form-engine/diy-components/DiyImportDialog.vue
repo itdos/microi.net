@@ -354,11 +354,11 @@
                 v-if="!isImportSucceeded"
                 type="primary"
                 :icon="Upload"
-                :loading="parsing || submitting || isTaskActive"
+                :loading="parsing || submitting || isTaskActive || legacyImportRunning"
                 :disabled="!canStartImport"
                 @click="startImport"
             >
-                {{ submitting || isTaskActive ? $t("Msg.ImportRunning") : $t("Msg.StartImport") }}
+                {{ submitting || isTaskActive || legacyImportRunning ? $t("Msg.ImportRunning") : $t("Msg.StartImport") }}
             </el-button>
             <el-button v-else type="primary" :icon="CircleCheckFilled" @click="finishImport">
                 {{ $t("Msg.ImportDone") }}
@@ -424,6 +424,8 @@ export default {
             backgroundTask: null,
             customSuccessEmitted: false,
             uploadSucceeded: false,
+            legacyImportRunning: false,
+            legacyProgressGeneration: 0,
             uploadResult: null,
             activeTab: "preview",
             previewPage: 1,
@@ -575,6 +577,7 @@ export default {
                 && !this.parsing
                 && !this.submitting
                 && !this.isTaskActive
+                && !this.legacyImportRunning
                 && !this.backgroundTaskId
                 && !this.uploadSucceeded
             );
@@ -691,6 +694,8 @@ export default {
             return fixedFormData;
         },
         clearImportState(clearSelectedFile = true) {
+            this.stopImportProgressPolling();
+            this.legacyImportRunning = false;
             this.stopBackgroundTaskPolling();
             if (clearSelectedFile) this.selectedFile = null;
             if (clearSelectedFile) this.importIdempotencyKey = "";
@@ -734,6 +739,9 @@ export default {
             if (Number(file.size || 0) > maxSizeMb * 1024 * 1024) throw new Error(this.$t("Msg.ImportFileTooLarge", { size: maxSizeMb }));
         },
         async handleFileChange(uploadFile) {
+            // Element Upload also emits change after success/error. Those events must
+            // not reset a running background import or re-parse the same workbook.
+            if (uploadFile && uploadFile.status && uploadFile.status !== "ready") return;
             const file = uploadFile && uploadFile.raw;
             if (!file) return;
             this.clearImportState(false);
@@ -1011,13 +1019,33 @@ export default {
         },
         handleDialogClosed() {
             this.stopBackgroundTaskPolling();
+            this.stopImportProgressPolling();
+        },
+        stopImportProgressPolling() {
+            this.legacyProgressGeneration++;
+            if (this._importStepTimer) clearTimeout(this._importStepTimer);
+            this._importStepTimer = null;
         },
         getImportProgress() {
+            if (this._importStepTimer) clearTimeout(this._importStepTimer);
+            this._importStepTimer = null;
+            const generation = ++this.legacyProgressGeneration;
             const requestParam = this.appendMenuContext({ TableId: this.tableId });
             this.DiyCommon.Post(this.importProgressApi, requestParam, (result) => {
+                if (generation !== this.legacyProgressGeneration || !this.visible) return;
                 if (this.DiyCommon.Result(result) && !this.DiyCommon.IsNull(result.Data) && Array.isArray(result.Data)) {
                     this.importStepList = result.Data;
+                    const progress = result.Data.join("\n");
+                    const succeeded = /已全部成功结束/.test(progress);
+                    const partial = /已按用户选择跳过错误行，其余成功行均已提交/.test(progress);
+                    const failed = /已失败[！!]|导入失败.*线程关闭/.test(progress);
+                    if (this.legacyImportRunning && (succeeded || partial || failed)) {
+                        this.legacyImportRunning = false;
+                        this.uploadSucceeded = succeeded || partial;
+                        if (succeeded || partial) this.$emit("import-success", this.uploadResult);
+                    }
                 }
+                if (this.legacyImportRunning) this._importStepTimer = setTimeout(() => this.getImportProgress(), 1000);
             });
         },
         delImportProgress() {
@@ -1032,13 +1060,12 @@ export default {
         handleUploadSuccess(result) {
             this.submitting = false;
             this.uploadResult = result;
-            this.getImportProgress();
-            if (this._importStepTimer) clearTimeout(this._importStepTimer);
-            this._importStepTimer = setTimeout(() => this.getImportProgress(), 800);
             if (result && Number(result.Code) === 1) {
-                this.uploadSucceeded = true;
-                this.$emit("import-success", result);
+                // Code=1 accepts the background import; completion comes from its progress.
+                this.legacyImportRunning = true;
+                this.getImportProgress();
             } else if (result) {
+                this.legacyImportRunning = false;
                 this.customError = result.Msg || result.Message || this.$t("Msg.ImportFailed");
                 this.DiyCommon.Result(result);
             }
@@ -1055,13 +1082,14 @@ export default {
                 this.DiyCommon.Tips(error.message, false);
                 return false;
             }
-            if (this._importStepTimer) clearTimeout(this._importStepTimer);
-            this._importStepTimer = setTimeout(() => this.getImportProgress(), 1000);
+            this.stopImportProgressPolling();
+            this.importStepList = [];
+            this.uploadSucceeded = false;
             return true;
         }
     },
     beforeUnmount() {
-        if (this._importStepTimer) clearTimeout(this._importStepTimer);
+        this.stopImportProgressPolling();
         this.stopBackgroundTaskPolling();
     }
 };

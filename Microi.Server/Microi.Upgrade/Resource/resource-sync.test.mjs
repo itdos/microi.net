@@ -26,6 +26,7 @@ import {
 } from './application-store-replica-sync.mjs';
 import {
   findItDosMcpServer,
+  parseSourceSha256,
   readResourcesViaConfiguredMcp,
   resolveItDosMcpLaunch,
   validateItDosMcpServer,
@@ -36,6 +37,18 @@ const refreshSource = await readFile(resolve(testDirectory, 'refresh-resources.m
 const releaseSource = await readFile(resolve(testDirectory, '../../../Microi一键编译发布.sh'), 'utf8');
 const officialEngineSource = await readFile(resolve(testDirectory, 'official-resource-api.js'), 'utf8');
 const mcpPublisherSource = await readFile(resolve(testDirectory, 'mcp-resource-publisher.mjs'), 'utf8');
+
+test('MCP source hash readback accepts the real Markdown heading and legacy plain text', () => {
+  const sha = createHash('sha256').update('return { Code: 1 };').digest('hex');
+  const result = text => ({ content: [{ type: 'text', text }] });
+  // microi_get_engine_code 的分块响应先给完整源码摘要，再给局部正文。
+  const chunk = `## API Engine: platform-sys-menu\r\n- **Source completeness**: PARTIAL CHUNK\r\n- **Full source SHA-256**: ${sha}\r\n\`\`\`javascript\r\nreturn { Code: 1 };\r\n\`\`\``;
+  assert.equal(parseSourceSha256(result(chunk), 'readback'), sha);
+  assert.equal(parseSourceSha256(result(`Full source SHA-256: ${sha.toUpperCase()}`), 'readback'), sha);
+  assert.equal(parseSourceSha256(result('Full source SHA-256: invalid'), 'readback'), null);
+  assert.equal(parseSourceSha256({ ...result('NoExistData'), isError: true }, 'readback'), null);
+  assert.throws(() => parseSourceSha256({ ...result('HTTP 524'), isError: true }, 'readback'), /HTTP 524/);
+});
 
 function engineSource(key, version, body, description = '测试接口') {
   return [

@@ -791,6 +791,7 @@ import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onBeforeU
 import { useRoute } from "vue-router";
 import { useDiyStore } from "@/pinia";
 import { generateMiniMaxImage } from "./minimax-image-task.js";
+import { generateMiniMaxMusic } from "./minimax-music-task.js";
 import {
     ArrowLeft,
     ArrowRight,
@@ -2710,40 +2711,19 @@ async function sendMusicQuestion(text, assistantMessage) {
     const requestId = `music:${currentConversationId.value}:${assistantMessage.id}`
         .replace(/[^a-zA-Z0-9._:-]/g, "-")
         .slice(0, 160);
-    const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/GenerateMiniMaxMusic`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            authorization: DiyCommon.getToken() ? `Bearer ${DiyCommon.getToken()}` : ""
-        },
-        body: JSON.stringify({
-            RequestId: requestId,
-            Prompt: text,
-            Model: chatMusicModel.value.Model,
-            AiModelId: chatMusicModel.value.AiModelId,
-            IsInstrumental: true,
-            SampleRate: 44100,
-            Bitrate: 256000,
-            Format: "mp3"
-        }),
-        signal: abortController.signal
+    const data = await generateMiniMaxMusic({
+        diy: DiyCommon,
+        signal: abortController.signal,
+        taskId: assistantMessage.musicTaskId || "",
+        request: { RequestId: requestId, Prompt: text, Model: chatMusicModel.value.Model,
+            AiModelId: chatMusicModel.value.AiModelId, IsInstrumental: true, SampleRate: 44100, Bitrate: 256000, Format: "mp3" },
+        onProgress: task => { assistantMessage.musicTaskId = task.TaskId; assistantMessage.thinking = "配乐正在后台生成，可停止等待后通过原任务继续查询。"; }
     });
-    let result = {};
-    try {
-        result = await response.json();
-    } catch {
-        throw new Error(`音乐生成服务返回了无法解析的响应（HTTP ${response.status}）。`);
-    }
-    const current = unwrapDosResult(result);
-    if (!response.ok || Number(current?.Code ?? current?.code) !== 1) {
-        throw new Error(current?.Msg || current?.msg || `音乐生成失败（HTTP ${response.status}）。`);
-    }
-    const data = current?.Data || current?.data || {};
     const attachment = {
         FileName: data.FileName || "AI 生成音乐.mp3",
         FileUrl: data.FileUrl || "",
         FilePath: data.FilePath || "",
-        ContentType: "audio/mpeg",
+        ContentType: data.Format === "wav" ? "audio/wav" : "audio/mpeg",
         Size: Number(data.FileSize || 0),
         DurationMilliseconds: Number(data.DurationMilliseconds || 0),
         SampleRate: Number(data.SampleRate || 0),

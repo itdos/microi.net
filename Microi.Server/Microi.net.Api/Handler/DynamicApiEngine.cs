@@ -394,6 +394,17 @@ namespace Microi.net.Api
                 var apiPathLower = NormalizeApiEngineRouteAddress(apiPath);
                 var canonicalApiEngineKey = ResolveCanonicalApiEngineKey(apiPathLower);
 
+                // 关键旧地址先进入兼容入口，由它读取主库决定执行已有引擎还是兜底。
+                // 升级中删除/重命名引擎后，旧缓存仍可能命中；不能因此绕过权威检查。
+                // 通用 /apiengine/{key} 仍走原有分流，保留同一引擎的其它业务动作。
+                if (apiPathLower.StartsWith("/api/", StringComparison.OrdinalIgnoreCase)
+                    && LegacyMobileCompatibilityController.IsBootstrapRoute(apiPathLower))
+                {
+                    values["controller"] = "LegacyMobileCompatibility";
+                    values["action"] = "Run";
+                    return values;
+                }
+
                 // FormEngine 特殊路由快速匹配
                 if (TryMapFormEngineRoute(apiPathLower, values))
                 {

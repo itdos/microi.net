@@ -2,7 +2,8 @@
     <div
         v-show="ShowClassicTop != 0"
         class="sidebar-logo-microi-container-microi"
-        :class="{ collapse: collapse }"
+        :class="{ collapse: collapse, 'is-image-only': !IsDisplayShortTitle() }"
+        :style="{ height: logoLayout.containerHeight }"
     >
         <router-link class="sidebar-logo-microi-link" @click="GetSysLogoLink()" to="">
             <span
@@ -54,6 +55,7 @@
 <script>
 import { computed } from "vue";
 import { useDiyStore, useSettingsStore } from "@/pinia";
+import { resolveSidebarLogoLayout } from "@/utils/sidebar-logo-layout.js";
 import {
     resolveSidebarSystemLogoUrl,
     resolveTenantBrandFallbackText
@@ -113,11 +115,13 @@ export default {
                 this.OsClient
             );
         },
+        logoLayout() {
+            return resolveSidebarLogoLayout(this.SysConfig.SysLogoHeight, !this.IsDisplayShortTitle(), this.collapse);
+        },
         logoShellStyle() {
-            const logoSize = this.GetSysLogoHeight();
             return {
-                width: logoSize,
-                height: logoSize,
+                width: this.logoLayout.width,
+                height: this.logoLayout.height,
                 backgroundImage: this.logoLoadReady && this.logoSource
                     ? `url(${JSON.stringify(this.logoSource)})`
                     : "none"
@@ -215,11 +219,7 @@ export default {
             });
         },
         GetSysLogoHeight() {
-            var self = this;
-            if (!self.DiyCommon.IsNull(self.SysConfig.SysLogoHeight)) {
-                return self.SysConfig.SysLogoHeight > 45 ? 45 : self.SysConfig.SysLogoHeight + "px";
-            }
-            return "40px";
+            return this.logoLayout.height;
         },
         IsDisplayShortTitle() {
             var self = this;
@@ -260,6 +260,7 @@ export default {
     position: relative;
     width: 100%;
     height: 63px;
+    flex: 0 0 auto;
     line-height: 63px;
     // background: #fff;
     text-align: center;
@@ -268,14 +269,18 @@ export default {
     & .sidebar-logo-microi-link {
         height: 100%;
         width: 100%;
+        box-sizing: border-box;
         display: flex;
         align-items: center;
         justify-content: left; //2025-05-08 LOGO+系统标题靠左显示 --by Anderson
         padding: 0 20px;
+        gap: 10px;
 
         & .sidebar-logo-microi-shell {
             width: 32px;
             height: 32px;
+            max-width: 100%;
+            box-sizing: border-box;
             flex: 0 0 auto;
             position: relative;
             display: grid;
@@ -328,6 +333,10 @@ export default {
                 sans-serif;
             vertical-align: middle;
         }
+    }
+
+    &.is-image-only .sidebar-logo-microi-shell:not(.is-fallback) {
+        border-radius: 0;
     }
 
     &.collapse {
