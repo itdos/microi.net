@@ -4,6 +4,22 @@ namespace Microi.Tests.Common;
 
 public sealed class UpgradeProgressTests
 {
+    [Theory]
+    [InlineData("Microi：【成功】【后台任务兼容修复】已补齐 LastError 字段", "【✅成功】")]
+    [InlineData("Microi：【✅成功】已补齐 LastError 字段", "【✅成功】")]
+    [InlineData("Microi：【失败】字段回读未成功", "【❌失败】")]
+    [InlineData("Microi：【自动升级状态】ALTER TABLE Error: denied", "【❌失败】")]
+    public void ExplicitRepairStatusSurvivesProgressDecoration_WithoutSuppressingFailures(string message, string expectedStatus)
+    {
+        using var original = new StringWriter();
+        var interceptor = new ConsoleLogInterceptor(original);
+        using (UpgradeProgress.EnterTenant("sql-server"))
+            interceptor.WriteLine(UpgradeProgress.DecorateLine(message, UpgradeProgress.Prefix()));
+        Assert.StartsWith("Microi：" + expectedStatus, original.ToString());
+        Assert.Contains("【自动升级状态】", original.ToString());
+        Assert.Contains("sql-server", original.ToString());
+    }
+
     [Fact]
     public void TenantProgressRemainsVisibleThroughProductionConsoleFilter()
     {

@@ -1,5 +1,6 @@
 // Pinia store 适配层
 import pinia from "@/pinia";
+import { isPagedSelectTree } from '@/views/form-engine/diy-field-component/select-tree-paging.js';
 import { useDiyStore, useAppStore } from "@/pinia";
 import { Base64 } from "js-base64";
 // import Cookies from 'js-cookie'
@@ -3762,6 +3763,7 @@ var DiyCommon = {
      */
     SetFieldData(field, isPostSql, apiReplace, formData) {
         var self = this;
+        if (isPagedSelectTree(field)) return; // 根节点、分支和选中项由控件按需查询。
         if (
             field.Component == "Checkbox" ||
             field.Component == "MultipleSelect" ||
@@ -4093,6 +4095,7 @@ var DiyCommon = {
         //先组装一次性查询数据库需要的参数
         var fieldList = [];
         fields.forEach((field) => {
+            if (isPagedSelectTree(field)) return;
             if (
                 field.Component == "Checkbox" ||
                 field.Component == "MultipleSelect" ||

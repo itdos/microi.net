@@ -1,6 +1,21 @@
 const RUNTIME_ENDPOINT_GLOBAL_KEY = "__MICROI_RUNTIME_ENDPOINT__";
 const RUNTIME_ENDPOINT_PROTOCOL = "microi.runtime-endpoint.v1";
 
+// Router installation starts navigation immediately. The first guard must wait
+// for domain/URL tenant discovery and SysConfig, including a failed bootstrap.
+let completeBootstrap;
+const platformBootstrapReady = new Promise(function (resolve) {
+    completeBootstrap = resolve;
+});
+
+export function waitForPlatformBootstrap() {
+    return platformBootstrapReady;
+}
+
+export function completePlatformBootstrap(succeeded) {
+    completeBootstrap(succeeded === true);
+}
+
 function getBrowserSearch(search) {
     if (typeof search === "string") return search;
     if (typeof window !== "undefined" && window.location) return window.location.search || "";

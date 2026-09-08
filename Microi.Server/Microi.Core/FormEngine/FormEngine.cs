@@ -128,6 +128,19 @@ namespace Microi.net
                                 DbTrans cacheTransaction = null
                             )
         {
+            // 元数据写入仍在共享事务中时，清缓存可能通过另一条连接重新读取刚写入的
+            // diy_table。在 SQL Server 的 ReadCommitted 下会等待本事务释放锁，导致
+            // 升级自我阻塞；其它节点也可能在提交前重新缓存旧值。统一在真实提交后失效。
+            var transaction = cacheTransaction is SafeTransactionProxy proxy
+                ? proxy.InnerTransaction : cacheTransaction;
+            if (transaction != null && !transaction.IsCommitOrRollback)
+            {
+                var committedFormData = (JObject)formData?.DeepClone();
+                transaction.RegisterAfterCommit(() => CacheClear(
+                        osClient, tableId, tableName, formSubmitType, committedFormData)
+                    .ConfigureAwait(false).GetAwaiter().GetResult());
+                return;
+            }
             var normalizedTableName = tableName.DosToLower();
             if (normalizedTableName == GlobalFunctionRegistry.TableName || normalizedTableName == "sys_config")
             {
@@ -1932,7 +1945,13 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public async Task<DosResultList<JObject>> GetDiyField(DiyFieldParam param)
+        public Task<DosResultList<JObject>> GetDiyField(DiyFieldParam param)
+        {
+            return GetDiyField(param, null);
+        }
+
+        // 仅由框架的主库元数据写入路径传入事务。扩展业务库的事务不能用于查询主库元数据。
+        protected async Task<DosResultList<JObject>> GetDiyField(DiyFieldParam param, DbTrans metadataTransaction)
         {
             #region Check
             if (param.TableId.DosIsNullOrWhiteSpace() && param.TableName.DosIsNullOrWhiteSpace())
@@ -1954,7 +1973,8 @@ namespace Microi.net
                 //缓存
                 var cache = MicroiEngine.CacheTenant.Cache(param.OsClient);
                 var cacheFieldList = BuildCacheKey(param.OsClient, ":FormData:diy_table_field_list:", tableIdOrName.DosToLower());
-                var diyTableCache = await cache.GetAsync<List<JObject>>(cacheFieldList);
+                var diyTableCache = metadataTransaction == null
+                    ? await cache.GetAsync<List<JObject>>(cacheFieldList) : null;
                 if (diyTableCache != null)
                 {
                     if (param.IsDeleted != null)
@@ -2005,12 +2025,14 @@ namespace Microi.net
                     {
                         //先看缓存有没有
                         var cacheKey = BuildCacheKey(param.OsClient, ":FormData:diy_table:", tableIdOrName.DosToLower());
-                        diyTableModel = await cache.GetAsync<dynamic>(cacheKey);
+                        diyTableModel = metadataTransaction == null
+                            ? await cache.GetAsync<dynamic>(cacheKey) : null;
                         if (diyTableModel == null)
                         {
                             // 【重要】.From<T>() 必须使用 Dos.ORM
                             var dosOrmDbRead2 = osClientModel.DbRead;
-                            diyTableModel = dosOrmDbRead2.From<DiyTable>()
+                            diyTableModel = (metadataTransaction == null
+                                    ? dosOrmDbRead2.From<DiyTable>() : metadataTransaction.From<DiyTable>())
                                 .Select(_cachedDiyTableFields)
                                 //.Where(d => d.Id == (param.TableId ?? "") || d.Name == (param.TableName ?? ""))
                                 .Where(_where)
@@ -2026,12 +2048,13 @@ namespace Microi.net
           
                     // 【重要】.From<T>() 必须使用 Dos.ORM
                     var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
-                    var fs = dosOrmDbRead.From<DiyField>()
+                    var fs = (metadataTransaction == null
+                            ? dosOrmDbRead.From<DiyField>() : metadataTransaction.From<DiyField>())
                         .Where(where);
 
 
                     fs.OrderBy(DiyField._.Sort.Asc);
-                    if (param._Cache != null)
+                    if (metadataTransaction == null && param._Cache != null)
                     {
                         fs.SetCacheTimeOut(param._Cache.Value);
                     }
@@ -2047,7 +2070,8 @@ namespace Microi.net
                     //设置缓存
                     // 缓存写入也包含跨节点失效广播，必须纳入当前异步调用链，
                     // 避免高并发首次加载字段时形成未受控的 Redis 待处理命令。
-                    await cache.SetAsync(cacheFieldList, result);
+                    if (metadataTransaction == null)
+                        await cache.SetAsync(cacheFieldList, result);
 
                     if (param.IsDeleted != null)
                     {

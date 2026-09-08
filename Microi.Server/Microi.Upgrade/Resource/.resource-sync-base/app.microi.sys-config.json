@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "系统设置",
-    "Version": "v6.4.0",
+    "Version": "v6.4.1",
     "CreateTime": "2026-08-23T02:17:37.179Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -17,7 +17,7 @@
     "DataSetCount": 1,
     "DataRowCount": 6,
     "AiApplicationCount": 0,
-    "ChangeHistory": "2026-09-06 v6.4.0 新增系统设置全局函数子表及前后端 DateNow/DateFormat/DateAdd 六条幂等种子；按目标启用配置绑定外键，不覆盖已有全局代码或函数源码；运行时按租户缓存，真实提交后跨节点失效。需配套更新后端。\n2026-09-05 v6.3.14 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-05 v6.3.13 移除系统设置旧版“显示AI助手图标”字段元数据及安装包建表声明，仅保留 DisableAiAssistant“关闭AI助手图标”负向开关；保留存量物理列兼容，不改写租户开关值。\n2026-09-02 v6.3.12 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v6.3.11 在 v6.3.10 基础上补齐官方升级资源的结构化历史、客户端能力标记和日志类型；模块底部信息继续交付支持 {{ OsVersion }} 和 {{ YYYY }} 的默认模板，不携带 Sys_Config 租户数据。\n2026-08-30 v6.3.9 将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。\n2026-08-25 v6.3.8 非敏感租户系统设置列表、保存和删除迁入 Managed V8 接口；敏感明文仍只经过可信后端。\n2026-08-23 v6.3.7 系统设置公开开关与服务端私有凭据边界完善；开发配置默认展开折叠分组，CodeEditor 使用带字数的按钮弹层模式。\n",
+    "ChangeHistory": "2026-09-07 v6.4.1 修复系统设置局部更新误判停用，兼容 Del/Delete 删除动作；保留至少一条启用设置，检查共享当前写事务。\n2026-09-06 v6.4.0 新增系统设置全局函数子表及前后端 DateNow/DateFormat/DateAdd 六条幂等种子；按目标启用配置绑定外键，不覆盖已有全局代码或函数源码；运行时按租户缓存，真实提交后跨节点失效。需配套更新后端。\n2026-09-05 v6.3.14 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-05 v6.3.13 移除系统设置旧版“显示AI助手图标”字段元数据及安装包建表声明，仅保留 DisableAiAssistant“关闭AI助手图标”负向开关；保留存量物理列兼容，不改写租户开关值。\n2026-09-02 v6.3.12 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v6.3.11 在 v6.3.10 基础上补齐官方升级资源的结构化历史、客户端能力标记和日志类型；模块底部信息继续交付支持 {{ OsVersion }} 和 {{ YYYY }} 的默认模板，不携带 Sys_Config 租户数据。\n2026-08-30 v6.3.9 将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。\n2026-08-25 v6.3.8 非敏感租户系统设置列表、保存和删除迁入 Managed V8 接口；敏感明文仍只经过可信后端。\n2026-08-23 v6.3.7 系统设置公开开关与服务端私有凭据边界完善；开发配置默认展开折叠分组，CodeEditor 使用带字数的按钮弹层模式。\n",
     "RequiredPlatformCapabilities": [
       "ClientFeature:MenuBottomContentDefaultFooter",
       "ClientFeature:CodeEditorFieldDisplayMode",
@@ -33,11 +33,11 @@
       "Importer:DataSetParentBindingV1"
     ],
     "ChangeLog": {
-      "Version": "v6.4.0",
-      "Title": "全局函数库与日期基础能力",
+      "Version": "v6.4.1",
+      "Title": "系统设置局部更新与删除校验修复",
       "ChangeType": "Fix",
-      "Content": "新增系统设置全局函数子表及前后端 DateNow/DateFormat/DateAdd 六条幂等种子；按目标启用配置绑定外键，不覆盖已有全局代码或函数源码；运行时按租户缓存，真实提交后跨节点失效。需配套更新后端。",
-      "ReleaseTime": "2026-09-06 12:30:00"
+      "Content": "修复系统设置局部更新误判停用，兼容 Del/Delete 删除动作；保留至少一条启用设置，检查共享当前写事务。",
+      "ReleaseTime": "2026-09-07 13:12:00"
     },
     "Description": "吾码系统设置、租户私密配置与安全服务接入。",
     "ServerMinVersion": "8.1.11"
@@ -5157,7 +5157,7 @@
       "EnableDataComment": 1,
       "EnableDataLog": 1,
       "SubmitAfterServerV8": "V8.Cache.Remove(`Microi:${V8.OsClient}:SysConfig`);",
-      "SubmitBeforeServerV8": "//检查如果是不启用当前设置、或是删除当前设置，则要判断若不存在其它设置项，中断提交\nif (!V8.Form.IsEnable || V8.FormSubmitAction == 'Delete') { \n  //判断是否还存在其它系统设置\n  var list = V8.FormEngine.GetTableData('sys_config', {\n    _Where: [\n      ['IsEnable', '=', 1],\n      ['Id', '!=', V8.Form.Id],\n    ]\n  });\n  if (list.Code != 1 || list.Data.length == 0) { \n    return { Code : 0, Msg : '提交失败，系统设置至少保留 1 条已启用数据！' };\n  }\n}",
+      "SubmitBeforeServerV8": "/*\n * V8 Event\n * TableKey: sys_config\n * EventType: SubmitBeforeServerV8\n * Version: v1.0.2\n * Function:\n * - 系统设置的新增、局部更新和删除均须保留至少一条启用记录；查询共享当前写事务。\n */\n\nvar form = V8.Form || {};\nvar old = V8.OldForm || {};\nvar action = String(V8.FormSubmitAction || '').toLowerCase();\nvar deleting = action === 'del' || action === 'delete';\nvar enabledValue = form.IsEnable === undefined ? old.IsEnable : form.IsEnable;\nvar enabled = enabledValue === true || String(enabledValue).toLowerCase() === 'true' || String(enabledValue) === '1';\nif (!deleting && enabled) return;\n\nvar id = form.Id || old.Id;\nvar where = [['IsEnable', '=', 1]];\nif (id) where.push(['Id', '<>', id]);\nvar result = V8.FormEngine.GetTableData('sys_config', {\n  _Where: where,\n  _SelectFields: ['Id'],\n  _PageIndex: 1,\n  _PageSize: 1\n}, V8.DbTrans);\nif (!result || result.Code !== 1) return result || { Code: 0, Msg: '读取系统设置失败。' };\nif (!result.Data || result.Data.length === 0) {\n  return { Code: 0, Msg: '提交失败，系统设置至少保留 1 条已启用数据！' };\n}\n",
       "RowAction": "[]",
       "Column": 4,
       "DataEncryptSave": 0,

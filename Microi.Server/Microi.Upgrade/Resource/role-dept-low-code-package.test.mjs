@@ -15,15 +15,17 @@ function sourceHash(value) {
 test("SaaS engine declares every changed legacy managed-engine baseline", () => {
   const fixtures = {
     admin_get_empty_database_sanitization_sql: {
-      current: "a9fdf1568db3de5401c7d8341adf241e1ffd10a47790934795f17bef37399d80",
-      base: "0630af69830abb822cdcf9657b6662b915c89119dcd3b169ab95fdf05a27d3ec",
+      current: "c4ef2957c40fc3eb3b012fb0f4dbd5c1161ff3bffe39378d0e2b2d57f3108d20",
+      base: "e4a57b281874338cea6cf7f324f4eaac766040f9f42ee56ea998f21d23d9471a",
       compatible: [
+        "a9fdf1568db3de5401c7d8341adf241e1ffd10a47790934795f17bef37399d80",
+        "0630af69830abb822cdcf9657b6662b915c89119dcd3b169ab95fdf05a27d3ec",
         "3f877b2f71deb2c553ed6d3515839e307a1e82ecbf45d7bbc865ca1380cc4df0",
         "db42fca3c905fdd1ecf42586c3cfc40bb3b292a647118ca14c416743f7dbccc6",
       ],
     },
     admin_build_sanitized_empty_database: {
-      current: "e5331c0799dfdc9413aba06f26f29f90dd62e8a23e6841aa9e1f0c20d216b4e4",
+      current: "e5ed8afbcfc01e73435197a61086d56b0c5a44b5b49479190f0c0dacf4971397",
       base: "85b761933d95ab62267a5dbd3bdd480c47b841897214dfae2f5c2ded70260508",
       compatible: [],
     },

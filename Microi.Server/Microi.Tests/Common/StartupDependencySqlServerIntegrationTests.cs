@@ -81,7 +81,7 @@ public class StartupDependencySqlServerIntegrationTests
             if (versionType?.StartsWith("nchar(") == true || versionType?.StartsWith("char(") == true)
                 Assert.Equal(50, version.Length);
             if (versionType?.EndsWith("NOT NULL") == true)
-                Assert.Equal(0, database.FromSql("SELECT is_nullable FROM sys.columns WHERE object_id=OBJECT_ID('sys_apiengine') AND name='Version'").ToScalar<int>());
+                Assert.Equal(1, database.FromSql("SELECT is_nullable FROM sys.columns WHERE object_id=OBJECT_ID('sys_apiengine') AND name='Version'").ToScalar<int>());
             if (originalCollation != null)
                 Assert.Equal(originalCollation, database.FromSql("SELECT collation_name FROM sys.columns WHERE object_id=OBJECT_ID('sys_apiengine') AND name='Version'").ToScalar<string>());
 

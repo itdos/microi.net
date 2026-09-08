@@ -11,6 +11,7 @@ import {
     hasConfiguredPageTabs
 } from "@/utils/page-tab-route-runtime.js";
 import { resolveMenuRenderSource } from "@/utils/framework-presentation.js";
+import { resolveMenuFolderRoutePath } from "@/utils/dynamic-menu-routes.js";
 import {
     PLATFORM_SYS_MENU_BOOTSTRAP_RETRY_DELAYS_MS,
     createPlatformSysMenuBootstrapError,
@@ -487,6 +488,9 @@ function MenuBuild(result, data, isFater) {
             var component = null;
             var menu = {};
             var visibleChildren = getVisibleMenuChildren(item);
+            if (visibleChildren.length > 0) {
+                item.Url = resolveMenuFolderRoutePath(item, item.Url);
+            }
 
             // 定义 component
             if (isFater) {

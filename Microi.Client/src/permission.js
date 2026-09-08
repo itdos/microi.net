@@ -13,6 +13,7 @@ import { normalizeAccessRoute } from "@/views/system/components/user-access-key-
 import { cancelRouteLoading, finishRouteLoading, startRouteLoading } from "@/utils/mci-loading";
 import { createDynamicRouteRematch, shouldStartInitialRouteLoading } from "@/router/navigation-state";
 import { getLegacySsoCapabilities, readLegacySsoCredential } from "@/utils/sso-federation.js";
+import { waitForPlatformBootstrap } from "@/utils/runtime-endpoint-query.js";
 const whiteList = ["/login", "/auth-redirect", "/access-login", "/mci-redis-manager"]; // no redirect whitelist
 
 let legacySsoCapabilityCache = { osClient: "", expiresAt: 0, data: [] };
@@ -159,6 +160,13 @@ router.beforeEach(async (to, from, next) => {
     // 安全/稳定性修复：整个守卫包一层 try/catch 兜底，
     // 避免任意 await 抛错导致 next() 不被调用而出现"白屏永久无法导航"。
     try {
+    // A fresh browser has no tenant cache. Never let the compatibility default
+    // iTdos reach SSO/auth requests before domain tenant discovery completes.
+    if (!(await waitForPlatformBootstrap())) {
+        cancelRouteLoading();
+        next(false);
+        return;
+    }
     // AI 应用主数据与管理入口已统一到应用商城。旧租户菜单、收藏夹或
     // 外部链接仍可能访问 /mci-ai-app，因此在权限和动态路由装载前做
     // 稳定兼容跳转；携带 appId 时继续进入对应应用的开发工作台。

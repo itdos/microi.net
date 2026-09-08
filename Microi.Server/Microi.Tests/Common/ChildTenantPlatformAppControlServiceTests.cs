@@ -520,6 +520,24 @@ public class ChildTenantPlatformAppControlServiceTests
     }
 
     [Theory]
+    [InlineData("v2.8.10")]
+    [InlineData("v99.0.0")]
+    [InlineData("")]
+    public void ManagedBootstrapWorkerRefresh_RestoresSelectedOfficialSourceAtSameOrDifferentTargetVersion(string targetVersion)
+    {
+        const string selected = "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1 */ /* Version: v2.8.10 */ var Package = V8.Param.Package; sys_microistore; // PLATFORM_MYSQL_NULL_DEFAULT_V1";
+        Assert.True(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
+            "import-microi-store-package", targetVersion, "return 'tenant-edited';", "v2.8.10", selected, out var error));
+        Assert.Equal(string.Empty, error);
+        Assert.False(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
+            "import-microi-store-package", "v2.8.10", selected, "v2.8.10", selected, out error));
+        Assert.Equal(string.Empty, error);
+        Assert.False(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
+            "tenant-custom-hook", "v2.8.10", "return 'hook';", "v2.8.10", selected, out error));
+        Assert.NotEmpty(error);
+    }
+
+    [Theory]
     [InlineData("v2.8.7", true)]
     [InlineData("v2.8.2", false)]
     public void BootstrapRuntimeReconciliation_KeepsCodeAndVersionTogetherAcrossRepeatedChecks(

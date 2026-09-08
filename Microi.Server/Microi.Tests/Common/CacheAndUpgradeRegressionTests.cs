@@ -204,7 +204,7 @@ public class CacheAndUpgradeRegressionTests
             "DiyLangRuntimeCacheDefaultCommandTimeoutSeconds",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.Equal(500, Assert.IsType<int>(pageSize!.GetRawConstantValue()));
-        Assert.Equal(10_000, Assert.IsType<int>(maxRows!.GetRawConstantValue()));
+        Assert.Equal(50_000, Assert.IsType<int>(maxRows!.GetRawConstantValue()));
         Assert.Equal(5_000_000, Assert.IsType<int>(maxCharacters!.GetRawConstantValue()));
         Assert.Equal(30, Assert.IsType<int>(commandTimeout!.GetRawConstantValue()));
     }
@@ -605,6 +605,8 @@ public class CacheAndUpgradeRegressionTests
         var importerVersion = new System.Version(importer["Version"]!.ToString().TrimStart('v', 'V'));
         Assert.True(Assert.IsType<bool>(hasImporter!.Invoke(null,
             new object[] { importerCode, importerVersion })));
+        Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
+            new object[] { importerCode, new System.Version(2, 8, 9) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
             new object[] { importerCode, new System.Version(2, 7, 4) })));
         foreach (var capability in new[] { "DATASET_TABLE_PREFLIGHT_V1", "PACKAGE_API_ENGINE_AUTHORITATIVE_READBACK_V2" })

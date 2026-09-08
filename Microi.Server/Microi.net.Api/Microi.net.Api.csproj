@@ -177,4 +177,35 @@
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Microi.MemoryDiagnostics/ProcessStartIdentity.cs" Link="Hosting/ProcessStartIdentity.cs" />
+  </ItemGroup>
+  <!-- 独立进程负责分配采样与栈解析，避免把重型诊断依赖装入 API 的托管堆。 -->
+  <Target Name="BuildMemoryDiagnosticsHelper" BeforeTargets="BeforeBuild">
+    <MSBuild Projects="$(MSBuildProjectDirectory)/../Microi.MemoryDiagnostics/Microi.MemoryDiagnostics.csproj"
+             Targets="Restore;Build" BuildInParallel="false"
+             Properties="Configuration=$(Configuration);UseSharedCompilation=false"
+             RemoveProperties="RuntimeIdentifier;SelfContained;PublishDir;OutputPath;BaseOutputPath" />
+  </Target>
+  <Target Name="CopyMemoryDiagnosticsHelper" AfterTargets="Build">
+    <ItemGroup>
+      <MemoryDiagnosticsFiles Include="$(MSBuildProjectDirectory)/../Microi.MemoryDiagnostics/bin/$(Configuration)/net10.0/**/*"
+                              Exclude="$(MSBuildProjectDirectory)/../Microi.MemoryDiagnostics/bin/$(Configuration)/net10.0/**/*.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(MemoryDiagnosticsFiles)"
+          DestinationFiles="@(MemoryDiagnosticsFiles->'$(TargetDir)diagnostics/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishMemoryDiagnosticsHelper" BeforeTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <MemoryDiagnosticsPublishFiles Include="$(MSBuildProjectDirectory)/../Microi.MemoryDiagnostics/bin/$(Configuration)/net10.0/**/*"
+                             Exclude="$(MSBuildProjectDirectory)/../Microi.MemoryDiagnostics/bin/$(Configuration)/net10.0/**/*.pdb" />
+      <MemoryDiagnosticsPublishFiles Update="@(MemoryDiagnosticsPublishFiles)">
+        <DiagnosticRelativePath>diagnostics/%(MemoryDiagnosticsPublishFiles.RecursiveDir)%(MemoryDiagnosticsPublishFiles.Filename)%(MemoryDiagnosticsPublishFiles.Extension)</DiagnosticRelativePath>
+      </MemoryDiagnosticsPublishFiles>
+      <ResolvedFileToPublish Include="@(MemoryDiagnosticsPublishFiles)">
+        <RelativePath>%(MemoryDiagnosticsPublishFiles.DiagnosticRelativePath)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>

@@ -11,9 +11,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>Microi,SSO,OIDC,OAuth2,SAML2,CAS,V8,接口引擎</PackageTags>
     <PackageReleaseNotes>Microi 吾码 SSO 身份联邦可信协议插件。</PackageReleaseNotes>
-    <Version>8.2.0</Version>
-    <AssemblyVersion>8.2.0</AssemblyVersion>
-    <FileVersion>8.2.0</FileVersion>
+    <Version>8.2.4</Version>
+    <AssemblyVersion>8.2.4</AssemblyVersion>
+    <FileVersion>8.2.4</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>

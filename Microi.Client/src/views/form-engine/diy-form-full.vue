@@ -1370,6 +1370,7 @@
 </template>
 
 <script>
+import { normalizeFormOpenMode } from './form-open-mode.js';
 import { defineAsyncComponent, computed } from "vue";
 import { Refresh, Search } from "@element-plus/icons-vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
@@ -1910,6 +1911,7 @@ export default {
          */
         Init(param) {
             var self = this;
+            param = { ...param, FormMode: normalizeFormOpenMode(param.FormMode, param.Id || param.TableRowId) };
             self._formFullInitRequestToken = (self._formFullInitRequestToken || 0) + 1;
             var initRequestToken = self._formFullInitRequestToken;
 

@@ -142,6 +142,23 @@ public sealed class WhereConditionPerformanceTests : IDisposable
             "Server=127.0.0.1;Database=microi_where_test;Uid=test;Pwd=test;");
     }
 
+    [Theory]
+    [InlineData("select", "and")]
+    [InlineData("UPDATE", "and")]
+    [InlineData("DELETE", "or")]
+    public async Task MissingFieldMetadata_NeverDropsARequestedPredicate(string sqlType, string andOr)
+    {
+        var fields = new List<JObject> { new() { ["Name"] = "Name", ["Type"] = "varchar" } };
+        var conditions = new List<DiyWhere>
+        {
+            new() { Name = "IsDeleted", Type = "=", Value = 0 },
+            new() { Name = "ApiEngineKey", Type = "=", Value = "import-microi-store-package", AndOr = andOr }
+        };
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => new WhereCondition().GetWhereSql(
+            conditions, fields, new List<DiyTable>(), CreateDbInfo(), new List<DbParameter>(), CreateSession(), sqlType));
+        Assert.Contains("ApiEngineKey", error.Message);
+    }
+
     private static DbInfo CreateDbInfo()
     {
         return new DbInfo

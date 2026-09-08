@@ -114,6 +114,7 @@
             @refresh="GetDiyTableRow({ _PageIndex: DiyTableRowPageIndex || 1 })"
             @load-page="HandleModuleWorkbenchPage"
             @record-change="HandleModuleWorkbenchRecordChange"
+            @record-unavailable="HandleModuleWorkbenchRecordUnavailable"
             @form-ready="HandleModuleWorkbenchFormReady"
             @open-form="HandleModuleWorkbenchOpenForm"
             @run-action="HandleModuleWorkbenchAction"
@@ -2131,7 +2132,7 @@ import DiySearch from "@/views/form-engine/diy-search.vue";
 import DiyModleSearch from "@/views/form-engine/diy-mobile-search.vue";
 import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 import { getFieldConfig, isSpecialTableField } from "@/views/form-engine/utils/table-special-field";
-import { scheduleTableInit } from "@/views/form-engine/utils/diy-table-init.js";
+import { scheduleTableInit, scheduleTableFilterReload } from "@/views/form-engine/utils/diy-table-init.js";
 import { resolveTabIcon } from "@/utils/tab-icon.js";
 import {
     buildPageTabQuery,
@@ -2199,6 +2200,7 @@ export default {
             }
         },
         PropsWhere: { type: Array, default: () => [] },
+        PropsFilterReloadOnly: { type: Boolean, default: false },
         // 自定义列表接口需要附加的请求参数（如工作流 WorkType）
         PropsRequestParams: { type: Object, default: () => ({}) },
         // 自定义列表接口地址；为空时继续使用 sys_menu.SelectApi / FormEngine 默认地址
@@ -2331,6 +2333,9 @@ export default {
     methods: {
         ScheduleInit(...args) {
             return scheduleTableInit(this, args);
+        },
+        ScheduleFilterReload() {
+            return scheduleTableFilterReload(this);
         },
         ResolveTabIcon(icon, index) {
             return resolveTabIcon(icon, index);

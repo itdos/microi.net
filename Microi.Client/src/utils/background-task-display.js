@@ -1,6 +1,22 @@
 const ACTIVE_STATUSES = new Set(["Pending", "Running", "Retrying"]);
 const TERMINAL_STATUSES = new Set(["Succeeded", "Failed", "Canceled"]);
 
+export function mergeBackgroundTaskSummaries(previousRows, incomingRows) {
+    const existing = new Map((previousRows || []).map((row) => [String(row?.Id || ""), row]));
+    return (incomingRows || []).map((row) => {
+        const previous = existing.get(String(row?.Id || ""));
+        if (!previous) return row;
+        // Detail 请求可能仍在执行；保留行对象，避免响应写入已被列表刷新移除的对象。
+        const completedNow = row.Status === "Succeeded" && previous.Status !== "Succeeded";
+        Object.assign(previous, row);
+        if (completedNow) {
+            previous.Error = row.Error || "";
+            previous.DetailLoaded = false;
+        }
+        return previous;
+    });
+}
+
 export function isActiveBackgroundTask(task) {
     return !!task && ACTIVE_STATUSES.has(task.Status);
 }

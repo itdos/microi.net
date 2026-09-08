@@ -3,6 +3,31 @@ namespace Dos.Common.Tests;
 public sealed class BackgroundTaskWorkerSupervisionTests
 {
     [Fact]
+    public void HotInstallWake_AllowsAnOlderEmptyDatabaseTaskToRecover()
+    {
+        var required = Microi.net.BackgroundTaskSchedulingPolicy.RequiredApiEngineKeyForWakeHint(
+            "bulk-import-microi-store-packages");
+        var ready = new[]
+        {
+            (Key: "admin_build_sanitized_empty_database", Ready: DateTime.Today),
+            (Key: "bulk-import-microi-store-packages", Ready: DateTime.Today.AddMinutes(10))
+        };
+        var selected = ready.Where(row => required == null || row.Key == required)
+            .OrderBy(row => row.Ready).First();
+        Assert.Equal("admin_build_sanitized_empty_database", selected.Key);
+        Assert.Equal("order-submit", Microi.net.BackgroundTaskSchedulingPolicy.RequiredApiEngineKeyForWakeHint("order-submit"));
+
+        var active = new[] { new Microi.net.BackgroundTaskLaneState
+        {
+            OsClient = "main", ApiEngineKey = selected.Key
+        } };
+        Assert.False(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "main", "bulk-import-microi-store-packages", active, 4));
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "main", "order-submit", active, 4));
+    }
+
+    [Fact]
     public void Worker_IsRegisteredSupervisedObservableAndSchemaAware()
     {
         var serverRoot = FindServerRoot();

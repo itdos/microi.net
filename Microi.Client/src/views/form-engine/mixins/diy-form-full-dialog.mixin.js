@@ -1,12 +1,14 @@
 
 import { formTrace } from "@/utils/form-engine-trace.js";
 import { getFormRecordDisplayTitle } from "../field-display-value.js";
+import { normalizeFormOpenMode } from '../form-open-mode.js';
 
 export default {
     methods: {
         // ========== 打开详情（核心方法，以diy-table.vue为准） ==========
         OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
+            formMode = normalizeFormOpenMode(formMode, tableRowModel?.Id);
             formTrace("diy-form-full:open-detail", {
                 tableId: self.TableId,
                 tableName: self.TableName,
@@ -503,7 +505,7 @@ export default {
             var effectiveMode = self.UseViewSchemaDetail
                 ? "View"
                 : (["Add", "Insert"].includes(self.FormMode) ? "Add" : self.FormMode);
-            var modeTitle = self.$t("Msg." + effectiveMode);
+            var modeTitle = self.$t("Msg." + normalizeFormOpenMode(effectiveMode, self.TableRowId));
             var recordTitle = hasRecord ? self.GetOpenRecordTitleValue() : "";
             var tableTitle = self.DiyCommon.IsNull(self.CurrentDiyTableModel)
                 || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description)

@@ -30,6 +30,7 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 - 接口引擎、表单事件、模块、字段、工作流和数据库结构：先用 `action="list_tools"` / `describe_tool`，再调用对应原始 `microi_*` 工具。写工具必须保留确认口令、审计与回读。
 - 远程执行与调试：读取 `v8-debugging/SKILL.md`。Codex 用“获取源码 → 远程执行 → 定位堆栈/日志 → 最小补丁 → 再执行”的结构化循环代替 VS Code DAP 的可视化逐行面板；不得把未执行的源码检查称为真机调试成功。
 - 性能测试：读取 `performance-testing/SKILL.md`，限制并发并输出样本、P95/P99、错误率和停止条件。
+- 系统日志、内存吃满、OOM 与接口/V8 异常分配：读取 `system-observability/SKILL.md` 及其内存事故手册，使用专用 MCP 的 `Capabilities` → `Memory` → 事故历史/详情 → `Trace`，先查采集质量再归因。
 - 微应用：读取 `microi-microservice/SKILL.md`，使用 scaffold、source sync、stream publish 和发布回读原工具；本地构建前遵守内存保护。
 - Playwright：读取 `playwright-e2e/SKILL.md`，使用当前已登录浏览器或受控 Playwright；报告必须来自实际页面执行。
 - 其他领域：从本插件同级 Skills 里选择最小相关 Skill，并完整读取后执行。
