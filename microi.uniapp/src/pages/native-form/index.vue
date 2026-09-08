@@ -115,12 +115,17 @@
 							@change="handleRelatedChange" />
 					</view>
 					<view v-for="field in group.fields" :key="field.Id || field.Name" class="form-field"
-						v-show="tenantFieldPresentation(field).visible !== false"
+						v-show="tenantFieldPresentation(field).visible !== false && isSubsectionFieldVisible(group, field)"
 						:class="{ 'form-field--divider': field.component === 'Divider', 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name, 'form-field--visit-target-member': tenantFieldPresentation(field).type === 'visit-target-member' }">
-						<view v-if="field.component === 'Divider'" class="form-subheading">
+						<view v-if="field.component === 'Divider'" class="form-subheading"
+							:class="{ 'form-subheading--collapsible': !!subsectionForField(group, field) }"
+							:hover-class="subsectionForField(group, field) ? 'form-section__header--pressed' : 'none'"
+							@tap.stop="toggleSubsection(group, field)">
 							<view class="form-subheading__bar"></view>
-							<text class="form-subheading__title">{{ field.Label }}</text>
+							<text class="form-subheading__title">{{ subsectionForField(group, field) ? subsectionForField(group, field).title : field.Label }}</text>
 							<view class="form-subheading__line"></view>
+							<text v-if="subsectionForField(group, field)" class="form-section__toggle"
+								:class="{ expanded: isSubsectionExpanded(subsectionForField(group, field)) }">›</text>
 						</view>
 						<mci-visit-target-fields v-else-if="tenantFieldPresentation(field).type === 'visit-target-fields'"
 							ref="visitTargetFields" :target-type="checkinTargetType" :target-name="checkinTargetName"
@@ -306,6 +311,7 @@
 		setUser
 	} from '@/utils/request.js'
 	import { canEditMenuRecord } from '@/platform/menu-permission.js'
+	import { buildFormSubsections } from '@/platform/form-subsections.mjs'
 	import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 	import {
 		defaultFormData,
@@ -402,6 +408,8 @@
 				customerPickerConfig: null,
 				// zhy: 保存新增和编辑页已展开的字段分组。
 				expandedGroupKeys: [],
+				// 仅记录主动收起的子分组；外层收展不重置它们，首次进入全部展开。
+				collapsedSubsectionKeys: [],
 				activeFormTabKey: '',
 				embeddedRelatedMore: {},
 				// zhy: 标识最近一次表单加载，防止编辑或重试并发时旧响应覆盖新页面。
@@ -434,7 +442,13 @@
 				const groups = this.definition ? this.definition.relatedGroups || this.definition.groups || [] : []
 				const visibleGroups = groups.filter((group) =>
 					(group.fields || []).length || this.embeddedRelatedForGroup(group).length
-				)
+				).map((group, index) => ({
+					...group,
+					subsectionByField: buildFormSubsections(
+						{ ...group, key: this.groupKey(group, index) },
+						(field) => this.tenantFieldPresentation(field)
+					)
+				}))
 				if (!this.formTabs.length) return visibleGroups
 				return visibleGroups.filter((group) => group.tabKey === this.activeFormTabKey)
 			},
@@ -853,6 +867,7 @@
 					})
 					// zhy: 核心定义和记录成功后立即结束整页骨架屏，选项数据在页面显示后补齐。
 					this.definition = definition
+					this.collapsedSubsectionKeys = []
 					// zhy: 初始化源必须与页面渲染一致。仅含 TableChild/OpenTable 等关联内容的
 					// CollapseGroup 只存在于 relatedGroups，不能因 groups 过滤普通字段而漏掉默认展开。
 					this.initializeGroupExpansion(definition.relatedGroups || definition.groups || [])
@@ -904,6 +919,27 @@
 				if (group && group.source === 'Ungrouped') return true
 				return this.expandedGroupKeys.includes(this.groupKey(group, groupIndex))
 			},
+			subsectionForField(group, field) {
+				return group.subsectionByField?.[field.Id || field.Name] || null
+			},
+			isSubsectionExpanded(section) {
+				return !section || !this.collapsedSubsectionKeys.includes(section.key)
+			},
+			isSubsectionFieldVisible(group, field) {
+				// 保留标题入口；v-show 保留控件和未保存值，收展不会中断字段联动。
+				return field.component === 'Divider' || this.isSubsectionExpanded(this.subsectionForField(group, field))
+			},
+			toggleSubsection(group, field) {
+				const section = this.subsectionForField(group, field)
+				if (field.component !== 'Divider' || !section) return
+				const expanded = this.isSubsectionExpanded(section)
+				this.collapsedSubsectionKeys = expanded
+					? [...this.collapsedSubsectionKeys, section.key]
+					: this.collapsedSubsectionKeys.filter((key) => key !== section.key)
+				if (expanded && section.fields.some((item) => item.Name === this.openSelectorField)) {
+					this.openSelectorField = ''
+				}
+			},
 			initializeGroupExpansion(groups) {
 				if (!groups.length) {
 					this.expandedGroupKeys = []
@@ -950,6 +986,11 @@
 				if (!this.expandedGroupKeys.includes(key)) {
 					this.expandedGroupKeys = [...this.expandedGroupKeys, key]
 				}
+				// 必填项可能藏在二级折叠中，校验失败时同时展开它所在的子分组。
+				const invalidField = group.fields.find((field) => Boolean(validateNativeForm(this.form, [field])))
+				const sections = buildFormSubsections({ ...group, key }, (field) => this.tenantFieldPresentation(field))
+				const section = sections[invalidField.Id || invalidField.Name]
+				if (section) this.collapsedSubsectionKeys = this.collapsedSubsectionKeys.filter((item) => item !== section.key)
 			},
 			handleRelatedChange() {
 				this.form = {
@@ -1759,6 +1800,14 @@
 		border-radius: 3rpx;
 		background: currentColor;
 		flex-shrink: 0;
+	}
+
+	.form-subheading--collapsible {
+		min-height: 80rpx;
+		padding: 0 12rpx;
+		margin: -12rpx 0 0;
+		border-radius: 8rpx;
+		background: var(--mci-bg-base, #f7fafb);
 	}
 
 	.form-subheading__title {

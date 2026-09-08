@@ -174,6 +174,7 @@
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
 						parent-mode="View" display-mode="full"
+						:show-latest-record-summary="key === 'customers'"
 						:independent-scroll="standaloneListMode"
 						:viewport-height="relatedListViewportHeight"
 						:show-floating-add="false"
@@ -1394,6 +1395,8 @@
 					: groups
 				return activeGroups.map((group, index) => {
 					const rows = (group.fields || []).filter((field) => {
+						// 客户详情保留折叠分组；分隔线不是数据字段，不能渲染成“标题 -”。
+						if (this.key === 'customers' && (field.component || field.Component) === 'Divider') return false
 						const name = String(field.Name || '')
 						return name && !DETAIL_EXCLUDED_FIELDS.has(name)
 					}).map((field) => ({
@@ -1886,7 +1889,15 @@
 			this.loadDetail()
 		},
 		onShow() {
-			if (!this.loading && this.id) this.loadDetail(false)
+			if (!this.loading && this.id) {
+				this.loadDetail(false).then(() => {
+					// 返回客户详情时刷新当前关联列表，也覆盖在其他页面更新方案但未发出保存事件的情况。
+					if (this.key !== 'customers') return
+					const refs = this.$refs.standaloneRelatedList
+					const lists = Array.isArray(refs) ? refs : [refs]
+					lists.forEach((list) => list?.refreshData?.())
+				})
+			}
 			this.scheduleRelatedViewportMeasure()
 		},
 		onReady() {
