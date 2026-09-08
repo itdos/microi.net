@@ -20,6 +20,12 @@ import {
   proposalInheritedValues,
   proposalInitialValues
 } from './proposal-calculation.js'
+import {
+  calculateInstallationPointCosts,
+  aggregateInstallationPointCosts,
+  proposalCostYears,
+  validateProposalCostInputs
+} from './proposal-cost-model.mjs'
 import { XJY_CUSTOMER_DEFAULT_REGION } from './customer-location.mjs'
 import { casePhotoField, caseFieldDescription } from './case-form.mjs'
 import {
@@ -1691,8 +1697,22 @@ export async function initialize(context) {
     context.patchForm({
       ...inherited,
       ...defaults,
-      ...calculateProposalCosts(initialForm)
+      ...calculateProposalCosts(initialForm),
+      ...aggregateInstallationPointCosts([], proposalCostYears(initialForm))
     })
+  }
+  if (isProposalForm(context) && !isProposalAdd(context)) {
+    context.patchForm(calculateProposalCosts(context.form))
+    await refreshDerivedValues(context)
+  }
+  if (isProposalInstallationPointForm(context)) {
+    const parentId = context.form.AnzhuangdianweiId || context.defaultValues?.AnzhuangdianweiId
+    if (parentId) {
+      const response = await V8.FormEngine.GetFormData(PROPOSAL_TABLE, { Id: parentId })
+      if (!response || Number(response.Code) !== 1) throw new Error(response?.Msg || '所属需求方案读取失败')
+      context.state.proposalPointYears = proposalCostYears(response.Data)
+    }
+    context.patchForm(calculateInstallationPointCosts(context.form, context.state.proposalPointYears || proposalCostYears(context.form)))
   }
 }
 
@@ -1727,20 +1747,8 @@ export async function handleRelatedCount(context, payload = {}) {
   }
 
   if (!isProposalForm(context) || !isProposalInstallationChild(payload.field)) return
-  const field = fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')
-  if (Number(context.form[field] || 0) === value) return
-  // zhy：已保存方案的子表发生变化后直接持久化派生数量；写入固定值可安全重试且不会新增主表。
-  if (context.rowId) {
-    const result = await V8.FormEngine.UptFormData(PROPOSAL_TABLE, {
-      Id: context.rowId,
-      [field]: value,
-      _InvokeType: 'Client'
-    })
-    if (!result || Number(result.Code) !== 1) {
-      throw new Error((result && result.Msg) || '场所点位数量同步失败')
-    }
-  }
-  context.patchForm({ [field]: value })
+  // 数量未变化也可能改了型号、价格；回读全部点位汇总，父表持久化由后端点位事件负责。
+  await refreshDerivedValues(context)
 }
 
 export function getPresentation(context) {
@@ -2138,7 +2146,7 @@ export async function handleFieldSelect(context, payload) {
       return { handled: true }
     }
   }
-  if (isProposalForm(context) && payload && !payload.multiple) {
+  if ((isProposalForm(context) || isProposalInstallationPointForm(context)) && payload && !payload.multiple) {
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
     if (selectedFieldName === PROPOSAL_FIELDS.deviceModel.toLowerCase()) {
       const row = payload.raw && typeof payload.raw === 'object'
@@ -2156,10 +2164,9 @@ export async function handleFieldSelect(context, payload) {
       }
       context.patchForm({
         ...updates,
-        ...calculateProposalCosts({
-          ...context.form,
-          ...updates
-        })
+        ...(isProposalInstallationPointForm(context)
+          ? calculateInstallationPointCosts({ ...context.form, ...updates }, context.state.proposalPointYears || context.form.ShisuanNS)
+          : calculateProposalCosts({ ...context.form, ...updates }))
       })
       return { handled: true }
     }
@@ -2333,12 +2340,17 @@ export async function handleFieldChange(context, payload) {
     })
     return { handled: true }
   }
+  if (isProposalInstallationPointForm(context) && payload && isProposalCalculationField(payload.field?.Name)) {
+    context.patchForm(calculateInstallationPointCosts(context.form, context.state.proposalPointYears || context.form.ShisuanNS))
+    return { handled: true }
+  }
   if (!isProposalForm(context) || !payload ||
     !isProposalCalculationField(payload.field && payload.field.Name)) {
     return { handled: false }
   }
   // zhy：普通输入、开关及选项变化统一重算，避免只在设备型号下拉时更新成本。
   context.patchForm(calculateProposalCosts(context.form))
+  if (String(payload.field?.Name).toLowerCase() === 'hesuanns') await refreshDerivedValues(context)
   return { handled: true }
 }
 
@@ -2506,15 +2518,39 @@ export async function beforeSubmit(context) {
     }
   }
   if (isProposalForm(context)) {
-    // zhy：保存前再次按最终表单值计算，确保落库金额与页面输入一致。
-    // 方案级成本字段由安装点位汇总/比价接口计算；主表不再读取已下沉的设备字段。
-    return {}
+    const error = validateProposalCostInputs(context.form, false)
+    if (error) throw new Error(error)
+    return { ...calculateProposalCosts(context.form), HesuanNS: proposalCostYears(context.form) }
   }
-  if (isProposalInstallationPointForm(context)) return {}
+  if (isProposalInstallationPointForm(context)) {
+    const error = validateProposalCostInputs(context.form, true)
+    if (error) throw new Error(error)
+    return calculateInstallationPointCosts(context.form, context.state.proposalPointYears || context.form.ShisuanNS)
+  }
   return {}
 }
 
 export async function refreshDerivedValues(context) {
+  if (isProposalForm(context)) {
+    const years = proposalCostYears(context.form)
+    if (isProposalAdd(context)) {
+      const values = aggregateInstallationPointCosts([], years)
+      context.patchForm(values)
+      return values
+    }
+    const id = context.rowId || context.form.Id
+    if (!id) return {}
+    const requestId = Number(context.state.proposalCostRequestId || 0) + 1
+    context.state.proposalCostRequestId = requestId
+    const result = await V8.ApiEngine.Run('xjy_compare_customer_proposals', { Ids: [id], Years: years })
+    if (requestId !== context.state.proposalCostRequestId) return {}
+    if (!result || Number(result.Code) !== 1 || !result.Data?.[0]?.CostFields) {
+      throw new Error(result?.Msg || '方案成本汇总读取失败')
+    }
+    const values = result.Data[0].CostFields
+    context.patchForm(values)
+    return values
+  }
   if (!isOrderForm(context)) return {}
   const orderId = context.rowId || context.form.Id || context.defaultValues?.Id || ''
   const values = await loadOrderSummaryValues(orderId)
