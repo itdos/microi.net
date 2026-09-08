@@ -730,7 +730,18 @@ namespace Microi.net
         /// </summary>
         private static void EnsureMainTenantDatabaseConfig(string osClient, JObject osClientModel)
         {
-            if (osClientModel == null || !IsConfiguredMainTenant(osClient)) return;
+            if (osClientModel == null) return;
+
+            // Redis、历史 SaaS 行和本机配置可能仍使用 SqlServer9/mssql。
+            // 每次重投影都归一运行模型，避免已建立的 SQL Server 会话与升级、查询方言分叉；
+            // 子租户只归一名称，不继承主租户的连接或数据库类型。
+            foreach (var field in new[] { "DbType", "DbReadType" })
+            {
+                string configuredType = osClientModel[field]?.Val<string>();
+                if (DatabaseTypeCompatibility.IsSqlServerConfigurationName(configuredType))
+                    osClientModel[field] = DatabaseTypeCompatibility.NormalizeConfigurationName(configuredType);
+            }
+            if (!IsConfiguredMainTenant(osClient)) return;
 
             var dbConn = GetConfiguredDbConnectionValue(OsClientDefault.OsClientDbConn);
             string currentDbConn = osClientModel["DbConn"]?.Val<string>() ?? string.Empty;
@@ -740,7 +751,8 @@ namespace Microi.net
                 currentDbConn = dbConn;
             }
 
-            var dbType = GetConfiguredDbTypeValue(OsClientDefault.OsClientDbType);
+            var dbType = DatabaseTypeCompatibility.NormalizeConfigurationName(
+                GetConfiguredDbTypeValue(OsClientDefault.OsClientDbType));
             string currentDbType = osClientModel["DbType"]?.Val<string>() ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(dbType))
             {
@@ -1154,6 +1166,8 @@ namespace Microi.net
                     return client;
                 }
 
+                // 发布前也需归一，防止直接读取 ClientList 或新节点消费缓存时拿到历史别名。
+                EnsureMainTenantDatabaseConfig(client.OsClient, client.OsClientModel);
                 // 第一步：更新本地ClientList
                 ClientList.AddOrUpdate(client.OsClient, client, (key, oldValue) => client);
                 if (!publishConfiguration)
