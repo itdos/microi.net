@@ -20,7 +20,15 @@ import {
   proposalInheritedValues,
   proposalInitialValues
 } from './proposal-calculation.js'
+import {
+  calculateInstallationPointCosts,
+  aggregateInstallationPointCosts,
+  proposalCostYears,
+  validateProposalCostInputs
+} from './proposal-cost-model.mjs'
 import { XJY_CUSTOMER_DEFAULT_REGION } from './customer-location.mjs'
+import { proposalCostFieldPresentation } from './proposal-cost-presentation.mjs'
+import { casePhotoField, caseFieldDescription } from './case-form.mjs'
 import {
   CUSTOMER_FOLLOW_FIELDS,
   customerFollowScopeValues
@@ -188,6 +196,30 @@ function isCustomerAdd(context) {
 
 function isCustomerForm(context) {
   return String(context.tableName || '').toLowerCase() === CUSTOMER_TABLE
+}
+
+function isCustomerCaseForm(context) {
+  return [CUSTOMER_CASE_TABLE, CASEBOOK_CASE_TABLE].includes(String(context.tableName || '').toLowerCase())
+}
+
+async function initializeCustomerCaseMerchant(context) {
+  if (!isCustomerCaseForm(context) || context.mode !== 'Add' || context.rowId) return {}
+  // 新增页和保存共用同一次身份回源，隐藏商家 Id 也随提交传递；编辑时保留原记录归属。
+  if (!context.state.caseMerchantPromise) {
+    context.state.caseMerchantPromise = V8.ApiEngine.Run('platform-current-user', {}).then((result) => {
+      const user = result?.Data?.CurrentUser || result?.Data
+      if (Number(result?.Code) !== 1 || !user?.Id) {
+        throw new Error(result?.Msg || '当前账号的商家信息获取失败，请重试')
+      }
+      return { TenantId: user.TenantId || '', TenantName: user.TenantName || '' }
+    }).catch((error) => {
+      context.state.caseMerchantPromise = null
+      throw error
+    })
+  }
+  const values = await context.state.caseMerchantPromise
+  context.patchForm(values)
+  return values
 }
 
 function isCustomerCaseView(context) {
@@ -1547,6 +1579,7 @@ export function createState() {
 }
 
 export async function initialize(context) {
+  await initializeCustomerCaseMerchant(context)
   await initializeInstallationPositionCode(context)
   await initializeInstallationPositionLocation(context)
   // 详情、编辑、新增统一按当前单价和数量展示派生价格，修复历史记录中的不一致值。
@@ -1665,8 +1698,22 @@ export async function initialize(context) {
     context.patchForm({
       ...inherited,
       ...defaults,
-      ...calculateProposalCosts(initialForm)
+      ...calculateProposalCosts(initialForm),
+      ...aggregateInstallationPointCosts([], proposalCostYears(initialForm))
     })
+  }
+  if (isProposalForm(context) && !isProposalAdd(context)) {
+    context.patchForm(calculateProposalCosts(context.form))
+    await refreshDerivedValues(context)
+  }
+  if (isProposalInstallationPointForm(context)) {
+    const parentId = context.form.AnzhuangdianweiId || context.defaultValues?.AnzhuangdianweiId
+    if (parentId) {
+      const response = await V8.FormEngine.GetFormData(PROPOSAL_TABLE, { Id: parentId })
+      if (!response || Number(response.Code) !== 1) throw new Error(response?.Msg || '所属需求方案读取失败')
+      context.state.proposalPointYears = proposalCostYears(response.Data)
+    }
+    context.patchForm(calculateInstallationPointCosts(context.form, context.state.proposalPointYears || proposalCostYears(context.form)))
   }
 }
 
@@ -1701,20 +1748,8 @@ export async function handleRelatedCount(context, payload = {}) {
   }
 
   if (!isProposalForm(context) || !isProposalInstallationChild(payload.field)) return
-  const field = fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')
-  if (Number(context.form[field] || 0) === value) return
-  // zhy：已保存方案的子表发生变化后直接持久化派生数量；写入固定值可安全重试且不会新增主表。
-  if (context.rowId) {
-    const result = await V8.FormEngine.UptFormData(PROPOSAL_TABLE, {
-      Id: context.rowId,
-      [field]: value,
-      _InvokeType: 'Client'
-    })
-    if (!result || Number(result.Code) !== 1) {
-      throw new Error((result && result.Msg) || '场所点位数量同步失败')
-    }
-  }
-  context.patchForm({ [field]: value })
+  // 数量未变化也可能改了型号、价格；回读全部点位汇总，父表持久化由后端点位事件负责。
+  await refreshDerivedValues(context)
 }
 
 export function getPresentation(context) {
@@ -1813,6 +1848,12 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
+  const costPresentation = proposalCostFieldPresentation(context.tableName, field)
+  if (costPresentation) return costPresentation
+  if (isCustomerCaseForm(context)) {
+    const description = caseFieldDescription(context.tableName, field?.Name)
+    if (description) return { description: field.Description || description }
+  }
   if (isVisitTargetPresentationForm(context) && field) {
     const name = String(field.Name || '').toLowerCase()
     const typeName = fieldName(context, CHECKIN_FIELDS.targetType, '拜访对象类型').toLowerCase()
@@ -1864,6 +1905,26 @@ export function getFieldPresentation(context, field) {
 
 export function getRelatedPresentation(context, field) {
   if (!field) return {}
+  if (isCustomerCaseForm(context) && field.Name === 'XuanzeZP') {
+    return {
+      beforeField: casePhotoField(context.tableName),
+      icon: 'images',
+      tone: 'primary',
+      rememberSelection: true,
+      selectionScopeFields: ['KehuID'],
+      filters: [
+        { key: 'serviceType', field: 'Leixing', label: '服务类型', type: 'select', source: 'baseData', parentKey: 'ShouhouDDLX', valueField: 'Value', labelField: 'Value' },
+        { key: 'status', field: 'Zhuangtai', label: '状态', type: 'select', source: 'baseData', parentKey: 'ShouHouDDZT', valueField: 'Value', labelField: 'Value' },
+        { key: 'staff', field: 'ShouhouRY', label: '服务人员', type: 'text', placeholder: '输入服务人员姓名' },
+        { key: 'city', field: 'Chengshi', label: '城市', type: 'text', placeholder: '输入省、市或区县' },
+        { key: 'plannedService', field: 'YujiSHSJ', label: '计划服务时间', type: 'datetime-range' }
+      ],
+      hint: context.form.KehuID ? '从当前客户的售后任务中选取' : '从有权限查看的售后任务中选取'
+    }
+  }
+  if (isProposalForm(context) && isProposalInstallationChild(field)) {
+    return { previewLimit: 5 }
+  }
   const config = field.config || {}
   const parentTable = String(context.tableName || '').toLowerCase()
   const childFkField = String(config.TableChildFkFieldName || '').toLowerCase()
@@ -2005,6 +2066,18 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  if (isCustomerCaseForm(context) && payload?.field?.Name === 'KehuMC' && !payload.multiple) {
+    // 客户选择器已返回完整客户行；新增、编辑共用此联动，避免额外请求和旧客户信息残留。
+    const row = payload.cleared ? {} : selectedRow(payload)
+    const city = row.Chengshi ?? ''
+    context.patchForm({
+      KehuID: personValue(row, ['Id', 'id']),
+      KehuLX: row.KehuLX ?? '',
+      Chengshi: Array.isArray(city) ? [...city] : city,
+      KehuGK: row.KehuGK ?? ''
+    })
+    return { handled: true }
+  }
   // zhy：订单客户、负责人和安装人的选择联动统一在表单层处理，新增、编辑及不同入口均生效。
   if (isOrderForm(context) && payload && !payload.multiple) {
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
@@ -2076,7 +2149,7 @@ export async function handleFieldSelect(context, payload) {
       return { handled: true }
     }
   }
-  if (isProposalForm(context) && payload && !payload.multiple) {
+  if ((isProposalForm(context) || isProposalInstallationPointForm(context)) && payload && !payload.multiple) {
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
     if (selectedFieldName === PROPOSAL_FIELDS.deviceModel.toLowerCase()) {
       const row = payload.raw && typeof payload.raw === 'object'
@@ -2094,10 +2167,9 @@ export async function handleFieldSelect(context, payload) {
       }
       context.patchForm({
         ...updates,
-        ...calculateProposalCosts({
-          ...context.form,
-          ...updates
-        })
+        ...(isProposalInstallationPointForm(context)
+          ? calculateInstallationPointCosts({ ...context.form, ...updates }, context.state.proposalPointYears || context.form.ShisuanNS)
+          : calculateProposalCosts({ ...context.form, ...updates }))
       })
       return { handled: true }
     }
@@ -2271,16 +2343,27 @@ export async function handleFieldChange(context, payload) {
     })
     return { handled: true }
   }
+  if (isProposalInstallationPointForm(context) && payload && isProposalCalculationField(payload.field?.Name)) {
+    context.patchForm(calculateInstallationPointCosts(context.form, context.state.proposalPointYears || context.form.ShisuanNS))
+    return { handled: true }
+  }
   if (!isProposalForm(context) || !payload ||
     !isProposalCalculationField(payload.field && payload.field.Name)) {
     return { handled: false }
   }
   // zhy：普通输入、开关及选项变化统一重算，避免只在设备型号下拉时更新成本。
   context.patchForm(calculateProposalCosts(context.form))
+  if (String(payload.field?.Name).toLowerCase() === 'hesuanns') await refreshDerivedValues(context)
   return { handled: true }
 }
 
 export async function beforeSubmit(context) {
+  if (isCustomerCaseForm(context)) {
+    return {
+      ...await initializeCustomerCaseMerchant(context),
+      KehuID: context.form.KehuID || ''
+    }
+  }
   if (isOrderProductForm(context)) {
     // 派生字段可能为只读或隐藏，显式随主表单保存，保证落库值与页面联动结果一致。
     return calculateOrderProductPriceBinding(context.form)
@@ -2438,15 +2521,39 @@ export async function beforeSubmit(context) {
     }
   }
   if (isProposalForm(context)) {
-    // zhy：保存前再次按最终表单值计算，确保落库金额与页面输入一致。
-    // 方案级成本字段由安装点位汇总/比价接口计算；主表不再读取已下沉的设备字段。
-    return {}
+    const error = validateProposalCostInputs(context.form, false)
+    if (error) throw new Error(error)
+    return { ...calculateProposalCosts(context.form), HesuanNS: proposalCostYears(context.form) }
   }
-  if (isProposalInstallationPointForm(context)) return {}
+  if (isProposalInstallationPointForm(context)) {
+    const error = validateProposalCostInputs(context.form, true)
+    if (error) throw new Error(error)
+    return calculateInstallationPointCosts(context.form, context.state.proposalPointYears || context.form.ShisuanNS)
+  }
   return {}
 }
 
 export async function refreshDerivedValues(context) {
+  if (isProposalForm(context)) {
+    const years = proposalCostYears(context.form)
+    if (isProposalAdd(context)) {
+      const values = aggregateInstallationPointCosts([], years)
+      context.patchForm(values)
+      return values
+    }
+    const id = context.rowId || context.form.Id
+    if (!id) return {}
+    const requestId = Number(context.state.proposalCostRequestId || 0) + 1
+    context.state.proposalCostRequestId = requestId
+    const result = await V8.ApiEngine.Run('xjy_compare_customer_proposals', { Ids: [id], Years: years })
+    if (requestId !== context.state.proposalCostRequestId) return {}
+    if (!result || Number(result.Code) !== 1 || !result.Data?.[0]?.CostFields) {
+      throw new Error(result?.Msg || '方案成本汇总读取失败')
+    }
+    const values = result.Data[0].CostFields
+    context.patchForm(values)
+    return values
+  }
   if (!isOrderForm(context)) return {}
   const orderId = context.rowId || context.form.Id || context.defaultValues?.Id || ''
   const values = await loadOrderSummaryValues(orderId)

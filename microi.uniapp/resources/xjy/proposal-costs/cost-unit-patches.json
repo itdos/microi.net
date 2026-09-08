@@ -1,0 +1,128 @@
+[
+  {
+    "tableId": "29727579-7deb-42c7-b883-cd393f16095a",
+    "fieldList": [
+      {
+        "id": "78489a28-8747-4a66-8c5f-a97ff7cc81b5",
+        "label": "当前用水人数（单台服务）",
+        "description": "沿用现状单台计算口径：每台设备服务人数。所有设备年成本再乘当前设备数量。"
+      },
+      {
+        "id": "ac566c23-4f12-4f78-9b11-d2314d4c2dd0",
+        "label": "当前用电成本（单台/年）",
+        "readonly": 1,
+        "v8Code": "",
+        "config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"Sql\":\"\",\"EnableSearch\":false,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"DataSourceApiEngineKey\":\"\",\"Unique\":{\"Type\":\"Alone\"}}",
+        "description": "按当前饮水方式和单台服务人数自动估算。"
+      },
+      {
+        "id": "b6ac269a-b68a-47cd-9074-08d4a2defb7c",
+        "label": "当前用水成本（单台/年）",
+        "readonly": 1,
+        "v8Code": "",
+        "config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"Sql\":\"\",\"EnableSearch\":false,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"DataSourceApiEngineKey\":\"\",\"Unique\":{\"Type\":\"Alone\"}}",
+        "description": "按当前饮水方式和单台服务人数自动估算。"
+      },
+      {
+        "id": "0a547a17-d253-4563-977e-85f46dd45f1e",
+        "description": "汇总各安装点位的单台年费用 × 该点位设备数量。"
+      },
+      {
+        "id": "6bb30535-ae85-4de1-834a-0080bad3ef70",
+        "description": "汇总各安装点位的单台年费用 × 该点位设备数量。"
+      },
+      {
+        "id": "19e4098c-5860-44d5-bab0-3b813123a755",
+        "description": "汇总各安装点位的单台年费用 × 该点位设备数量。"
+      },
+      {
+        "id": "83f1ba34-3d40-4574-b29b-5f8582aa48ae",
+        "description": "汇总各安装点位的单台年费用 × 该点位设备数量。"
+      },
+      {
+        "id": "3e42122a-3f87-4849-918f-dab9b8c27581",
+        "description": "汇总各安装点位的单台年费用 × 该点位设备数量。"
+      },
+      {
+        "id": "307fbacd-4667-4102-94ef-7a83c2c6a804",
+        "description": "汇总各安装点位的单台年费用 × 该点位设备数量。"
+      },
+      {
+        "id": "7a10fdf9-035e-46bc-9443-ed4030bb8838",
+        "description": "汇总各点位年服务费、电费和水费，不含一次性设备购置费。"
+      },
+      {
+        "id": "c43cbb9b-1bc2-4e16-a9d3-965ea2db5e5d",
+        "description": "全部点位的年饮水成本合计，不含一次性设备购置费。"
+      },
+      {
+        "id": "48cf8d41-8133-4494-8701-a84b5fa44b46",
+        "description": "全部点位设备购置费＋全部点位年饮水成本 × 统一试算年数，购置费只计一次。"
+      }
+    ]
+  },
+  {
+    "tableId": "01KWGB9WD5AEQX19GQ1NP442TT",
+    "fieldList": [
+      {
+        "id": "01KZWWHDFDGEWFZJD5CEYVNTBE",
+        "label": "本点位用水总人数",
+        "description": "本点位全部设备共用的人数；自动水电费按设备数量平均分摊到单台。"
+      },
+      {
+        "id": "01M1ZE6MK8SR5FGWJDAE3R3TXW",
+        "label": "合作后用电成本（租赁单台/年）",
+        "description": "按点位总人数 × 30 ÷ 设备数量估算。"
+      },
+      {
+        "id": "01M1ZE6MQM3933ZXXT66VTRRM2",
+        "label": "合作后用水成本（租赁单台/年）",
+        "description": "按点位总人数 × 2.4 ÷ 设备数量估算。"
+      },
+      {
+        "id": "01M1ZE6MV2ZT2W73KYK05SVRXP",
+        "label": "合作后服务成本（租赁单台/年）",
+        "description": "取设备租赁单价，按单台每年计费。"
+      },
+      {
+        "id": "01M1ZE6MYN6NA14V6P7BY6KMS9",
+        "description": "单台年服务成本＋单台年用电成本＋单台年用水成本。"
+      },
+      {
+        "id": "01M1ZE6N5NDXE5NYMJMX7EQSAR",
+        "description": "单台年饮水成本 × 本点位设备数量。"
+      },
+      {
+        "id": "01M1ZE6NQAXHG6FRE3T9CW5N6W",
+        "label": "合作后用电成本（买断单台/年）",
+        "description": "按点位总人数 × 30 ÷ 设备数量估算。"
+      },
+      {
+        "id": "01M1ZE6NTQ0M38FSBB3YBE9N21",
+        "label": "合作后用水成本（买断单台/年）",
+        "description": "按点位总人数 × 2.4 ÷ 设备数量估算。"
+      },
+      {
+        "id": "01M1ZE6NYJMBZKAB9K76WGYC44",
+        "label": "合作后服务成本（买断单台/年）",
+        "description": "取单台年度滤芯维护费用，不含设备购置款。"
+      },
+      {
+        "id": "01M1ZE6P1XCA03MF3FP86N4CPP",
+        "description": "单台年服务成本＋单台年用电成本＋单台年用水成本。"
+      },
+      {
+        "id": "01M1ZE6P8QJHQWC233BF1BJTX1",
+        "description": "单台年饮水成本 × 本点位设备数量。"
+      },
+      {
+        "id": "01M1ZE6PFGCKN8H8B938DS4WCT",
+        "description": "设备买断单价 × 数量＋本点位年饮水成本 × 试算年数；设备款只计一次。"
+      },
+      {
+        "id": "01M1ZE6NCMYEQ1HGCH4RTJ2V9W",
+        "description": "本点位年饮水成本 × 试算年数。"
+      }
+    ]
+  }
+]

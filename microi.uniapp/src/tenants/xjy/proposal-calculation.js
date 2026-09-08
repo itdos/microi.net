@@ -1,3 +1,5 @@
+import { calculateCurrentProposalCosts, PROPOSAL_AFTER_COST_FIELDS } from './proposal-cost-model.mjs'
+
 // zhy：客户方案默认值与成本计算集中在本模块，供小程序新增/编辑表单复用。
 export const PROPOSAL_DEFAULT_VALUES = Object.freeze({
   ShebeiSL: 1,
@@ -60,6 +62,7 @@ export function isProposalCalculationField(fieldName) {
 
 export function proposalInheritedValues(source = {}) {
   const excludedFields = new Set([
+    ...PROPOSAL_AFTER_COST_FIELDS,
     'Id',
     'CreateTime',
     'UpdateTime',
@@ -84,65 +87,6 @@ export function proposalInheritedValues(source = {}) {
 }
 
 export function calculateProposalCosts(form = {}) {
-  const people = numberValue(form.Renshu)
-  const currentDeviceCount = numberValue(form.ShebeiSL)
-  const currentWaterDeviceCount = numberValue(form.DangqianYSSBSL)
-  const currentYears = numberValue(form.HesuanNS)
-  const waterMethod = String(form.DangqianYSFS || '')
-  const usesBoiler = waterMethod.includes('开水机')
-  const usesDirectDrinking = waterMethod.includes('直饮机')
-  const usesKettle = waterMethod.includes('电水壶')
-  const usesBottledWater = waterMethod.includes('桶装水')
-
-  let currentWaterCost = 0
-  let currentElectricityCost = 0
-  let currentServiceCost = 0
-
-  if (usesBoiler || usesDirectDrinking || usesKettle) {
-    currentWaterCost = people * 2.4
-    currentServiceCost = usesBoiler ? currentDeviceCount * 500 : 0
-    currentElectricityCost = usesBoiler || usesKettle ? people * 90 : people * 30
-  } else if (usesBottledWater) {
-    currentWaterCost = numberValue(form.TongzhuangSDJ) * 20 * people
-    currentElectricityCost = people * 30
-  }
-
-  const currentTotal = currentWaterCost + currentElectricityCost + currentServiceCost
-  const currentAllDevicesTotal = currentTotal * currentWaterDeviceCount
-
-  const rentalElectricityCost = people * 30
-  const rentalWaterCost = people * 2.4
-  const rentalServiceCost = numberValue(form.ShebeiDJZL) * currentDeviceCount
-  const rentalTotal = rentalElectricityCost + rentalWaterCost + rentalServiceCost
-  const rentalAllDevicesTotal = rentalTotal * numberValue(form.HezuoHYSSBSL)
-
-  const buyoutYears = numberValue(form.ShisuanNSMD)
-  const buyoutEquipmentCost = numberValue(form.ShebeiDJ)
-  const buyoutFilterCost = numberValue(form.GenghuanLXJG)
-  const buyoutAnnualEquipmentCost = buyoutYears > 0 ? buyoutEquipmentCost / buyoutYears : 0
-  const buyoutTotal = buyoutAnnualEquipmentCost +
-    rentalElectricityCost + rentalWaterCost + buyoutFilterCost
-  const buyoutAllDevicesTotal = buyoutTotal * numberValue(form.HezuoHYSSBSLMD)
-
-  return {
-    DangqianYSCB: fixed(currentWaterCost),
-    DangqianFWCB: fixed(currentServiceCost),
-    DangqianYDCB: fixed(currentElectricityCost),
-    DangqianYSZCB: fixed(currentTotal),
-    DangqianYSZCBAll: fixed(currentAllDevicesTotal),
-    DuonianLJCB: fixed(currentAllDevicesTotal * currentYears),
-    HezuoHYDCB: fixed(rentalElectricityCost),
-    HezuoHYDCBMD: fixed(rentalElectricityCost),
-    HezuoHYSCB: fixed(rentalWaterCost),
-    HezuoHYSCBMD: fixed(rentalWaterCost),
-    HezuoHFWCB: fixed(rentalServiceCost),
-    HezuoHYSZCB: fixed(rentalTotal),
-    HezuoHYSZCBAll: fixed(rentalAllDevicesTotal),
-    DuonianLJCBAfter: fixed(rentalAllDevicesTotal * numberValue(form.ShisuanNS)),
-    ShebeiMDCBDT: buyoutEquipmentCost,
-    HezuoHFWCBMD: fixed(buyoutFilterCost),
-    HezuoHYSZCBMD: fixed(buyoutTotal),
-    HezuoHYSZCBAllMD: fixed(buyoutAllDevicesTotal),
-    DuonianLJCBMD: fixed(buyoutAllDevicesTotal * buyoutYears)
-  }
+  // 主表只算现状；合作后费用只能来自点位汇总，不能用历史主表设备字段覆盖。
+  return Object.fromEntries(Object.entries(calculateCurrentProposalCosts(form)).map(([key, value]) => [key, fixed(value)]))
 }

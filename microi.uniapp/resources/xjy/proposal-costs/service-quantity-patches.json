@@ -1,0 +1,62 @@
+[
+  {
+    "tableId": "29727579-7deb-42c7-b883-cd393f16095a",
+    "fieldList": [
+      {
+        "id": "34006d45-55e7-41d5-92b3-04dc5745834a",
+        "label": "当前服务成本（所有设备/年）",
+        "description": "老式开水机：500 元/台/年 × 当前饮水设备数量；其他饮水方式沿用原规则。",
+        "readonly": 1,
+        "v8Code": "",
+        "config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"Sql\":\"\",\"EnableSearch\":false,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"DataSourceApiEngineKey\":\"\",\"Unique\":{\"Type\":\"Alone\"}}"
+      },
+      {
+        "id": "9f9c7551-9d9d-4794-9e9c-a919ae45f777",
+        "description": "单台年用电成本＋单台年用水成本＋单台年服务费（老式开水机 500 元）。"
+      },
+      {
+        "id": "17e00058-ab78-4301-958c-9b07635145b1",
+        "description": "单台年水电费 × 当前设备数量＋所有设备年服务费；服务费不重复乘数量。"
+      },
+      {
+        "id": "19e4098c-5860-44d5-bab0-3b813123a755",
+        "description": "各安装点位的租赁年服务费合计直接相加，不再乘设备数量。"
+      },
+      {
+        "id": "307fbacd-4667-4102-94ef-7a83c2c6a804",
+        "description": "各安装点位的买断年服务费合计直接相加，不再乘设备数量。"
+      }
+    ]
+  },
+  {
+    "tableId": "01KWGB9WD5AEQX19GQ1NP442TT",
+    "fieldList": [
+      {
+        "id": "01M1ZE6MV2ZT2W73KYK05SVRXP",
+        "label": "合作后服务成本（租赁点位/年）",
+        "description": "设备租赁单价 × 本点位设备数量，为本点位全部设备年服务费合计。"
+      },
+      {
+        "id": "01M1ZE6NYJMBZKAB9K76WGYC44",
+        "label": "合作后服务成本（买断点位/年）",
+        "description": "更换滤芯价格 × 本点位设备数量，为本点位全部设备年服务费合计。"
+      },
+      {
+        "id": "01M1ZE6MYN6NA14V6P7BY6KMS9",
+        "description": "单台年用电成本＋单台年用水成本＋本点位年服务费合计 ÷ 设备数量。"
+      },
+      {
+        "id": "01M1ZE6N5NDXE5NYMJMX7EQSAR",
+        "description": "单台年水电费 × 本点位设备数量＋本点位年服务费合计；服务费不重复乘数量。"
+      },
+      {
+        "id": "01M1ZE6P1XCA03MF3FP86N4CPP",
+        "description": "单台年用电成本＋单台年用水成本＋本点位年服务费合计 ÷ 设备数量。"
+      },
+      {
+        "id": "01M1ZE6P8QJHQWC233BF1BJTX1",
+        "description": "单台年水电费 × 本点位设备数量＋本点位年服务费合计；服务费不重复乘数量。"
+      }
+    ]
+  }
+]

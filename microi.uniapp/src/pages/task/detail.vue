@@ -169,7 +169,7 @@ export default {
       return actions
     },
     needsFlowCapabilities() {
-      return ['待商家验收', '待客户验收', '待评价'].includes(this.task.state)
+      return ['待客服验收', '待客户验收', '待评价'].includes(this.task.state)
     },
     bottomActions() {
       const state = this.task.state
@@ -180,7 +180,7 @@ export default {
         return actions
       }
       if (state === '待服务' && (this.isOwner || this.isAdmin)) return [{ key: 'cancel', label: '撤销接单', style: 'plain' }, { key: 'finish', label: '去完成服务', style: 'primary' }]
-      if (state === '待商家验收') return [{ key: 'merchantReject', label: '退回处理', style: 'danger-plain' }, { key: 'merchantPass', label: '验收通过', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
+      if (state === '待客服验收') return [{ key: 'merchantReject', label: '退回处理', style: 'danger-plain' }, { key: 'merchantPass', label: '验收通过', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
       if (state === '待客户验收') return [{ key: 'customerReject', label: '退回处理', style: 'danger-plain' }, { key: 'customerPass', label: '确认验收', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
       if (state === '待评价' && this.canRunTaskAction('evaluate')) return [{ key: 'evaluate', label: '评价本次服务', style: 'primary', iconText: '★' }]
       if (/已结束|已完成/.test(String(state)) && this.task.Pingjia && !this.task.ZhuipingNR) return [{ key: 'followUp', label: '追加评价', style: 'plain' }]
@@ -190,6 +190,8 @@ export default {
   onLoad(options) {
     this.id = decodeURIComponent(options.id || '')
     this.currentUser = getUser() || {}
+    // 仅进入任务页时初始化；预览返回触发 onShow 刷新时保留用户的展开状态。
+    this.expandedMetadata = {}
     this.loadAll()
   },
   onShow() { if (!this.loading && this.id) this.loadAll(true, false) },
@@ -226,7 +228,6 @@ export default {
         this.taskCapabilities = capabilities.actions || []
         this.metadataDefinition = definition || null
         this.taskMenuId = menu && menu.Id || ''
-        this.expandedMetadata = {}
         this.stale = taskResult.stale
       } catch (error) {
         this.error = error.message || '任务加载失败'

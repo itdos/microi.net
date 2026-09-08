@@ -90,9 +90,17 @@
 							<text class="form-section__title">{{ group.name }}</text>
 							<text v-if="group.description" class="form-section__description">{{ group.description }}</text>
 						</view>
-						<text v-if="group.showFieldCount !== false" class="form-section__count">{{ group.fields.length }} 项</text>
+						<text v-if="group.showFieldCount !== false" class="form-section__count">{{ group.fields.filter(field => field.component !== 'Divider').length }} 项</text>
 					</view>
-					<text class="form-section__toggle" :class="{ expanded: isGroupExpanded(group, groupIndex) }">›</text>
+					<view class="form-section__header-actions">
+						<template v-for="relatedTab in embeddedChildRelatedForGroup(group)" :key="relatedTab.key">
+							<view v-if="embeddedRelatedMore[relatedTab.key]" class="form-section__more"
+								hover-class="form-section__more--pressed" @tap.stop="openEmbeddedRelatedMore(relatedTab)">
+								<text>查看全部</text>
+							</view>
+						</template>
+						<text class="form-section__toggle" :class="{ expanded: isGroupExpanded(group, groupIndex) }">›</text>
+					</view>
 				</view>
 
 				<!-- zhy: 折叠后按需移除字段控件，已填写值仍保存在 form 中。 -->
@@ -107,9 +115,19 @@
 							@change="handleRelatedChange" />
 					</view>
 					<view v-for="field in group.fields" :key="field.Id || field.Name" class="form-field"
-						v-show="tenantFieldPresentation(field).visible !== false"
-						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name, 'form-field--visit-target-member': tenantFieldPresentation(field).type === 'visit-target-member' }">
-						<mci-visit-target-fields v-if="tenantFieldPresentation(field).type === 'visit-target-fields'"
+						v-show="tenantFieldPresentation(field).visible !== false && isSubsectionFieldVisible(group, field)"
+						:class="{ 'form-field--divider': field.component === 'Divider', 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name, 'form-field--visit-target-member': tenantFieldPresentation(field).type === 'visit-target-member' }">
+						<view v-if="field.component === 'Divider'" class="form-subheading"
+							:class="{ 'form-subheading--collapsible': !!subsectionForField(group, field) }"
+							:hover-class="subsectionForField(group, field) ? 'form-section__header--pressed' : 'none'"
+							@tap.stop="toggleSubsection(group, field)">
+							<view class="form-subheading__bar"></view>
+							<text class="form-subheading__title">{{ subsectionForField(group, field) ? subsectionForField(group, field).title : field.Label }}</text>
+							<view class="form-subheading__line"></view>
+							<text v-if="subsectionForField(group, field)" class="form-section__toggle"
+								:class="{ expanded: isSubsectionExpanded(subsectionForField(group, field)) }">›</text>
+						</view>
+						<mci-visit-target-fields v-else-if="tenantFieldPresentation(field).type === 'visit-target-fields'"
 							ref="visitTargetFields" :target-type="checkinTargetType" :target-name="checkinTargetName"
 							:target-id="checkinTargetId" :readonly="mode === 'View'" :query-scope="visitTargetQueryScope"
 							:permission-menu-id="visitTargetQueryScope === 'checkin' ? menuId : ''" @update:target-type="updateCheckinTargetType"
@@ -117,6 +135,12 @@
 							@select="selectVisitTarget"
 							@open-change="handleVisitTargetOpen(field, $event)" />
 						<template v-else-if="tenantFieldPresentation(field).type !== 'visit-target-member'">
+							<!-- 租户仅声明目标字段，平台负责将选择入口内嵌到字段之前并保留授权上下文。 -->
+							<mci-table-selector v-for="relatedTab in openTableRelatedBeforeField(field)" :key="relatedTab.key"
+								class="form-field__selector-before" :field="relatedTab.field" :compact="true"
+								:presentation="relatedPresentation(relatedTab.field)" :parent-table="tableName"
+								:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
+								:readonly="isConfiguredReadonly(relatedTab.field)" @change="handleRelatedChange" />
 						<view class="form-field__label">
 							<view class="form-field__label-copy">
 								<text>{{ field.Label || field.Name }}</text>
@@ -188,7 +212,7 @@
 						</view>
 
 						<text v-if="field.optionError" class="form-field__option-error">选项暂未加载，可稍后重试</text>
-						<text v-if="field.Description" class="form-field__description">{{ field.Description }}</text>
+						<text v-if="tenantFieldPresentation(field).description || field.Description" class="form-field__description">{{ tenantFieldPresentation(field).description || field.Description }}</text>
 						</template>
 					</view>
 					<mci-business-related-list
@@ -205,7 +229,9 @@
 						:parent-table-child-auth="tableChildAuth"
 						:parent-mode="mode"
 						display-mode="preview"
-						:preview-limit="2"
+						:preview-limit="relatedPresentation(relatedTab.field).previewLimit || 2"
+						:more-in-group-header="group.source === 'CollapseGroup'"
+						@preview-more-state="updateEmbeddedRelatedMore(relatedTab, $event)"
 						@data-count="handleRelatedCount"
 					/>
 				</view>
@@ -285,6 +311,7 @@
 		setUser
 	} from '@/utils/request.js'
 	import { canEditMenuRecord } from '@/platform/menu-permission.js'
+	import { buildFormSubsections } from '@/platform/form-subsections.mjs'
 	import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 	import {
 		defaultFormData,
@@ -381,7 +408,10 @@
 				customerPickerConfig: null,
 				// zhy: 保存新增和编辑页已展开的字段分组。
 				expandedGroupKeys: [],
+				// 仅记录主动收起的子分组；外层收展不重置它们，首次进入全部展开。
+				collapsedSubsectionKeys: [],
 				activeFormTabKey: '',
+				embeddedRelatedMore: {},
 				// zhy: 标识最近一次表单加载，防止编辑或重试并发时旧响应覆盖新页面。
 				formLoadId: 0,
 				relatedListViewportHeight: 0,
@@ -412,7 +442,13 @@
 				const groups = this.definition ? this.definition.relatedGroups || this.definition.groups || [] : []
 				const visibleGroups = groups.filter((group) =>
 					(group.fields || []).length || this.embeddedRelatedForGroup(group).length
-				)
+				).map((group, index) => ({
+					...group,
+					subsectionByField: buildFormSubsections(
+						{ ...group, key: this.groupKey(group, index) },
+						(field) => this.tenantFieldPresentation(field)
+					)
+				}))
 				if (!this.formTabs.length) return visibleGroups
 				return visibleGroups.filter((group) => group.tabKey === this.activeFormTabKey)
 			},
@@ -476,7 +512,7 @@
 				return String(this.tableName || '').toLowerCase() === 'diy_location' ? 'checkin' : 'module'
 			},
 			standaloneRelatedTabs() {
-				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
+				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item) && !this.isInlineOpenTableRelated(item))
 			},
 			standaloneChildTab() {
 				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
@@ -725,7 +761,22 @@
 				return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
 			},
 			isEmbeddedOpenTableRelated(item) {
-				return item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey)
+				return item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey) && !this.isInlineOpenTableRelated(item)
+			},
+			isInlineOpenTableRelated(item) {
+				if (item?.type !== 'openTable') return false
+				const target = this.relatedPresentation(item.field).beforeField
+				if (!target) return false
+				// 目标字段被角色或视图隐藏时保留原入口，避免布局定制意外吞掉操作。
+				return (this.definition?.groups || []).some((group) => group.fields.some((field) =>
+					field.Name === target && field.formTabKey === item.field.formTabKey &&
+					this.tenantFieldPresentation(field).visible !== false
+				))
+			},
+			openTableRelatedBeforeField(field) {
+				if (!this.isEditableMode) return []
+				return this.activeRelatedTabs.filter((item) => this.isInlineOpenTableRelated(item) &&
+					this.relatedPresentation(item.field).beforeField === field.Name)
 			},
 			isEmbeddedRelated(item) {
 				return this.isEmbeddedChildRelated(item) || this.isEmbeddedOpenTableRelated(item)
@@ -751,6 +802,7 @@
 					return
 				}
 				this.loading = true
+				this.embeddedRelatedMore = {}
 				this.error = ''
 				try {
 					const manifestPromise = loadModuleViewManifest({
@@ -815,6 +867,7 @@
 					})
 					// zhy: 核心定义和记录成功后立即结束整页骨架屏，选项数据在页面显示后补齐。
 					this.definition = definition
+					this.collapsedSubsectionKeys = []
 					// zhy: 初始化源必须与页面渲染一致。仅含 TableChild/OpenTable 等关联内容的
 					// CollapseGroup 只存在于 relatedGroups，不能因 groups 过滤普通字段而漏掉默认展开。
 					this.initializeGroupExpansion(definition.relatedGroups || definition.groups || [])
@@ -866,6 +919,27 @@
 				if (group && group.source === 'Ungrouped') return true
 				return this.expandedGroupKeys.includes(this.groupKey(group, groupIndex))
 			},
+			subsectionForField(group, field) {
+				return group.subsectionByField?.[field.Id || field.Name] || null
+			},
+			isSubsectionExpanded(section) {
+				return !section || !this.collapsedSubsectionKeys.includes(section.key)
+			},
+			isSubsectionFieldVisible(group, field) {
+				// 保留标题入口；v-show 保留控件和未保存值，收展不会中断字段联动。
+				return field.component === 'Divider' || this.isSubsectionExpanded(this.subsectionForField(group, field))
+			},
+			toggleSubsection(group, field) {
+				const section = this.subsectionForField(group, field)
+				if (field.component !== 'Divider' || !section) return
+				const expanded = this.isSubsectionExpanded(section)
+				this.collapsedSubsectionKeys = expanded
+					? [...this.collapsedSubsectionKeys, section.key]
+					: this.collapsedSubsectionKeys.filter((key) => key !== section.key)
+				if (expanded && section.fields.some((item) => item.Name === this.openSelectorField)) {
+					this.openSelectorField = ''
+				}
+			},
 			initializeGroupExpansion(groups) {
 				if (!groups.length) {
 					this.expandedGroupKeys = []
@@ -912,6 +986,11 @@
 				if (!this.expandedGroupKeys.includes(key)) {
 					this.expandedGroupKeys = [...this.expandedGroupKeys, key]
 				}
+				// 必填项可能藏在二级折叠中，校验失败时同时展开它所在的子分组。
+				const invalidField = group.fields.find((field) => Boolean(validateNativeForm(this.form, [field])))
+				const sections = buildFormSubsections({ ...group, key }, (field) => this.tenantFieldPresentation(field))
+				const section = sections[invalidField.Id || invalidField.Name]
+				if (section) this.collapsedSubsectionKeys = this.collapsedSubsectionKeys.filter((item) => item !== section.key)
 			},
 			handleRelatedChange() {
 				this.form = {
@@ -927,6 +1006,21 @@
 						icon: 'none'
 					})
 				}
+			},
+			updateEmbeddedRelatedMore(relatedTab, navigation) {
+				this.embeddedRelatedMore = { ...this.embeddedRelatedMore, [relatedTab.key]: navigation }
+			},
+			openEmbeddedRelatedMore(relatedTab) {
+				const navigation = this.embeddedRelatedMore[relatedTab.key]
+				if (!navigation) return
+				uni.navigateTo({
+					url: navigation.url,
+					success: (result) => result.eventChannel?.emit('related-list-context', {
+						...navigation.context,
+						parentForm: this.form,
+						parentMode: this.mode
+					})
+				})
 			},
 			async switchToEdit() {
 				if (!this.canEditRecord) {
@@ -1538,6 +1632,27 @@
 		font-weight: 500;
 	}
 
+	.form-section__header-actions {
+		flex: none;
+		display: flex;
+		align-items: center;
+		gap: 24rpx;
+	}
+
+	.form-section__more {
+		display: flex;
+		align-items: center;
+		gap: 6rpx;
+		min-height: 64rpx;
+		padding: 0 8rpx;
+		color: var(--mci-color-primary, #e94b2c);
+		font-size: 24rpx;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
+	.form-section__more--pressed { opacity: .65; }
+
 	.form-section__toggle {
 		flex: none;
 		color: #80969e;
@@ -1667,6 +1782,47 @@
 		content: '';
 	}
 
+	.form-field.form-field--divider {
+		padding: 24rpx 0 12rpx;
+		border-bottom: 0;
+	}
+
+	.form-subheading {
+		display: flex;
+		align-items: center;
+		gap: 12rpx;
+		color: var(--mci-primary, #e7462b);
+	}
+
+	.form-subheading__bar {
+		width: 6rpx;
+		height: 28rpx;
+		border-radius: 3rpx;
+		background: currentColor;
+		flex-shrink: 0;
+	}
+
+	.form-subheading--collapsible {
+		min-height: 80rpx;
+		padding: 0 12rpx;
+		margin: -12rpx 0 0;
+		border-radius: 8rpx;
+		background: var(--mci-bg-base, #f7fafb);
+	}
+
+	.form-subheading__title {
+		font-size: 27rpx;
+		font-weight: 600;
+		line-height: 1.5;
+	}
+
+	.form-subheading__line {
+		flex: 1;
+		height: 1rpx;
+		background: currentColor;
+		opacity: .18;
+	}
+
 	/* zhy：原生表单安装位置复用任务设备“现场定位”的胶囊按钮观感。 */
 	.tenant-field-label-action--location {
 		min-height: 52rpx;
@@ -1734,6 +1890,8 @@
 		transform: scale(.9);
 		opacity: .65;
 	}
+
+	.form-field__selector-before { display: block; margin-bottom: 24rpx; }
 
 	.tenant-field-actions {
 		display: flex;

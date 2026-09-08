@@ -66,6 +66,17 @@ test('mobile entry switches are wired to both tabBar runtimes and the profile in
 
   assert.match(launcher, /getMessageTabBarEnabled/)
   assert.match(launcher, /MESSAGE_TAB_ROUTE/)
+  assert.match(launcher, /const initialEntryState = readGlobalEntryState\(\)/)
+  assert.match(launcher, /scheduleWeixinTabBarSync\(\)/)
+  assert.match(launcher, /\[0, 32, 120, 300\]/)
+  assert.match(
+    launcher,
+    /updateGlobalEntryState\(aiAssistantEnabled, messageTabBarEnabled\)[\s\S]*scheduleWeixinTabBarSync\(\)/
+  )
+  const activateMethod = launcher.match(/activate\(\) \{([\s\S]*?)\n    \},\n    restoreGlobalEntryState/)
+  assert.ok(activateMethod, 'launcher activate method must remain inspectable')
+  assert.doesNotMatch(activateMethod[1], /(?:sync|schedule)WeixinTabBarSync\(/,
+    'page activation must not push visible defaults before resolving the entry switches')
   assert.match(customTabBar, /messageTabBarEnabled/)
   assert.match(customTabBar, /MESSAGE_TAB_ROUTE/)
   assert.match(profile, /getInviteEntryEnabled/)

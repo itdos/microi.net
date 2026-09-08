@@ -73,6 +73,21 @@ runtimeTarget = 'mp-weixin'
 
 const normalizeRoute = (value) => String(value || '').replace(/^\/+/, '').split('?')[0]
 const MESSAGE_TAB_ROUTE = 'pages/message/index'
+const readGlobalEntryState = () => {
+  try {
+    const app = typeof getApp === 'function' ? getApp() : null
+    const state = app && app.globalData ? app.globalData : {}
+    return {
+      aiAssistantEnabled: state.mciAiAssistantEnabled !== false,
+      messageTabBarEnabled: state.mciMessageTabBarEnabled !== false
+    }
+  } catch (error) {
+    return {
+      aiAssistantEnabled: true,
+      messageTabBarEnabled: true
+    }
+  }
+}
 const normalizeAssetPath = (value) => {
   const path = String(value || '')
   if (!path || /^(?:https?:|data:|blob:|\/)/i.test(path)) return path
@@ -81,12 +96,13 @@ const normalizeAssetPath = (value) => {
 export default {
   name: 'MciAiLauncher',
   data() {
+    const initialEntryState = readGlobalEntryState()
     return {
       activeIndex: -1,
       opening: false,
       switching: false,
-      aiAssistantEnabled: true,
-      messageTabBarEnabled: true,
+      aiAssistantEnabled: initialEntryState.aiAssistantEnabled,
+      messageTabBarEnabled: initialEntryState.messageTabBarEnabled,
       safeTop: 0,
       safeHeaderHeight: 44,
       safeLeft: 0,
@@ -127,6 +143,7 @@ export default {
   },
   mounted() {
     this.routeSyncTimers = []
+    this.weixinTabBarSyncTimers = []
     this.activate()
     this.resizeHandler = () => this.refreshSafeArea()
     try {
@@ -141,6 +158,7 @@ export default {
   },
   beforeUnmount() {
     this.clearRouteSyncTimers()
+    this.clearWeixinTabBarSyncTimers()
     this.releaseCustomDock()
     try {
       if (this.resizeHandler && typeof uni.offWindowResize === 'function') {
@@ -150,13 +168,20 @@ export default {
   },
   methods: {
     activate() {
+      this.restoreGlobalEntryState()
       this.syncActiveRoute()
       this.scheduleActiveRouteSync()
       this.refreshSafeArea()
       if (this.isCustomDock) this.activateCustomDock()
       else if (['h5', 'app'].includes(runtimeTarget)) this.releaseCustomDock()
-      this.syncWeixinTabBar()
+      // 微信端等待后台开关解析完成后再同步，不能用组件的默认显示值
+      // 覆盖当前页面已经生效的 custom-tab-bar 状态。
       this.resolveAssistantVisibility()
+    },
+    restoreGlobalEntryState() {
+      const state = readGlobalEntryState()
+      this.aiAssistantEnabled = state.aiAssistantEnabled
+      this.messageTabBarEnabled = state.messageTabBarEnabled
     },
     refreshSafeArea() {
       const metrics = getSafeAreaMetrics()
@@ -213,6 +238,17 @@ export default {
         })
       }, 0)
     },
+    clearWeixinTabBarSyncTimers() {
+      ;(this.weixinTabBarSyncTimers || []).forEach((timer) => clearTimeout(timer))
+      this.weixinTabBarSyncTimers = []
+    },
+    scheduleWeixinTabBarSync() {
+      if (runtimeTarget !== 'mp-weixin') return
+      this.clearWeixinTabBarSyncTimers()
+      ;[0, 32, 120, 300].forEach((delay) => {
+        this.weixinTabBarSyncTimers.push(setTimeout(() => this.syncWeixinTabBar(), delay))
+      })
+    },
     async resolveAssistantVisibility() {
       const [aiAssistantEnabled, messageTabBarEnabled] = await Promise.all([
         getAiAssistantEnabled(),
@@ -222,7 +258,9 @@ export default {
       this.messageTabBarEnabled = messageTabBarEnabled
       this.syncActiveRoute()
       this.updateGlobalEntryState(aiAssistantEnabled, messageTabBarEnabled)
-      this.syncWeixinTabBar()
+      // 微信每个 Tab 页都有独立的 custom-tab-bar 实例。商城、资讯等页面首次
+      // 挂载时该实例可能晚于业务组件就绪，因此需要在配置落地后重试同步。
+      this.scheduleWeixinTabBarSync()
     },
     updateGlobalEntryState(aiAssistantEnabled, messageTabBarEnabled) {
       try {
