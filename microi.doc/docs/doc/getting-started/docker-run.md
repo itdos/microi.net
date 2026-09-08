@@ -163,7 +163,10 @@ bash install-microi.sh --repair-network
 
 #### 复用已有 MySQL / MinIO
 
-- 选择 MySQL 5.7 或 MySQL 8.0 后，可选择“使用已有 MySQL 服务”，再填写 IP/DNS、端口、帐号和密码。IP 直接按 Enter 表示本机服务，容器通过 `host.docker.internal` 的 host-gateway 访问；安装器会实测连接和服务端版本，只接受与所选项一致的 MySQL 5.7.x / 8.0.x，不接受 MariaDB，也不存在“MySQL 5.8”这个版本选项。
+- 选择 MySQL 5.7 或 MySQL 8.0 后，可选择“使用已有 MySQL 服务”，再填写 IP/DNS、端口、`root` 帐号和该帐号的真实密码。IP 直接按 Enter 表示本机服务，容器通过 `host.docker.internal` 的 host-gateway 访问；安装器会实测连接和服务端版本，只接受与所选项一致的 MySQL 5.7.x / 8.0.x，不接受 MariaDB，也不存在“MySQL 5.8”这个版本选项。
+- MySQL 主租户的安装导入、API `OsClientDbConn` 及运行时主库/读库连接统一使用 `root` 和同一密码。新装 MySQL 使用本次生成的随机 root 密码；已有 MySQL 使用输入的 root 密码，不能填写仅有单个业务库权限的普通帐号。`MICROI_EXTERNAL_MYSQL_USER` 省略或为空时默认 root，显式设置为其它帐号会在交互阶段停止。SQL Server、达梦、PostgreSQL 继续使用各自的 `sa`、`SYSDBA`、`postgres` 管理帐号。
+- root 名称本身不代表权限完整：安装器从 API 所在的 `microi` Docker 网络，以真实认证到的 `root@Host` 只读检查全部库级权限、`CREATE USER`、`GRANT OPTION`、帐号查询权限和主库可写状态，并拒绝 MySQL 8.0 的库级部分撤权。导入前先检查，导入后在启动 API 前再打开主租户库复核；已有服务权限不足时停止并提示管理员处理，不自动修改已有服务的授权。授权依据见 [MySQL 官方权限说明](https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html)。
+- 主租户数据库连接由 API 的十项启动配置提供，不把 root 密码复制到 `sys_osclients.DbConn/DbReadConn`。子租户继续使用平台为其分配的独立数据库帐号。已安装环境不会因下载新脚本而自动更换凭据：若现场 API 仍使用普通帐号，应先备份编排，把 `OsClientDbConn` 更新为可从 Docker 网络登录、授权完整的 root 连接，再按下方 `--repair-app` 流程更新应用；不要重新导入或删除已有业务数据库。
 - MySQL 连接信息确认后，仍可选择吾码官方标准空业务数据库，或指定服务器上的自定义 SQL ZIP。目标数据库不存在时会创建，已存在但为空时会导入；若已经含有表、视图、存储过程或事件，安装器为保护客户数据会停止，不覆盖、不合并、不删除。
 - 数据库初始化包选定后，可选择“使用已有 MinIO 服务”，填写 API IP/DNS、端口、HTTP/HTTPS、Access Key、Secret Key、私有桶、公有桶、浏览器可访问地址和可选 Region。安装器使用临时 `mc` 客户端验证凭据，创建或复用两个桶，并确保私有桶禁止匿名访问、公有桶允许匿名下载，然后把端点和桶配置写回当前 SaaS 主租户。
 - 本机已有 MySQL/MinIO 不能只监听 `127.0.0.1`，必须允许 Docker host-gateway 到达；远程服务还需提前放通来自安装服务器的网络和帐号权限。客户已有服务的密码/密钥不会在安装结果或失败恢复摘要中回显。

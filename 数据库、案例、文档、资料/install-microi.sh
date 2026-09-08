@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Alibaba Cloud Linux 3 / Anolis、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-09-08 20:55:17
+# 版本：v2026-09-09 00:19:11
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -99,7 +99,7 @@ microi_install_ops() {
 }
 
 
-SCRIPT_VERSION="v2026-09-08 20:55:17"
+SCRIPT_VERSION="v2026-09-09 00:19:11"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -1928,7 +1928,8 @@ configure_mysql_service_mode() {
   fi
   MYSQL_EXTERNAL_PORT=$((10#${port_input}))
 
-  echo 'Microi：请输入已有 MySQL 帐号；直接按 Enter 使用 root：'
+  echo 'Microi：主租户需要创建子租户数据库和独立帐号，已有 MySQL 必须使用 root 及其真实密码。'
+  echo 'Microi：请输入已有 MySQL 帐号 root；直接按 Enter 使用 root：'
   if [ -n "${MICROI_EXTERNAL_MYSQL_USER:-}" ]; then
     user_input="${MICROI_EXTERNAL_MYSQL_USER}"
     echo "Microi：使用环境变量 MICROI_EXTERNAL_MYSQL_USER=${user_input}"
@@ -1936,8 +1937,8 @@ configure_mysql_service_mode() {
     read -r user_input
   fi
   user_input="${user_input:-root}"
-  if [[ "${user_input}" == *$'\n'* || "${user_input}" == *$'\r'* ]]; then
-    echo 'Microi：错误：MySQL 帐号不能包含换行符。'
+  if [ "${user_input}" != 'root' ]; then
+    echo 'Microi：错误：一键安装的 MySQL 主租户管理帐号必须为 root；普通业务库帐号不能用于平台开库与授权。'
     return 1
   fi
 
@@ -1945,7 +1946,7 @@ configure_mysql_service_mode() {
     password_input="${MICROI_EXTERNAL_MYSQL_PASSWORD}"
     echo 'Microi：已有 MySQL 密码已从环境变量读取（不会回显）'
   else
-    echo 'Microi：请输入已有 MySQL 密码（输入时不会回显）：'
+    echo 'Microi：请输入已有 MySQL 的 root 密码（输入时不会回显）：'
     read -r -s password_input
     echo ''
   fi
@@ -1959,7 +1960,7 @@ configure_mysql_service_mode() {
     return 1
   fi
 
-  DATABASE_USER="${user_input}"
+  DATABASE_USER='root'
   MYSQL_EXTERNAL_PASSWORD="${password_input}"
   DATABASE_CONTAINER_NAME=""
   echo "Microi：将复用 ${MYSQL_EXTERNAL_HOST_DISPLAY}:${MYSQL_EXTERNAL_PORT}，帐号 ${DATABASE_USER}；不会安装 MySQL 服务 ✓"
@@ -4374,58 +4375,124 @@ echo "[步骤6/11] 部署或连接 ${DATABASE_DISPLAY_NAME}"
 echo '------------------------------------------------------------------'
 INSTALL_CURRENT_STAGE="步骤6/11 部署或连接 ${DATABASE_DISPLAY_NAME}"
 
+configure_mysql_admin_connection() {
+  # 安装导入、权限门禁和 API 共用同一个 root 端点/密码，防止安装能成功但平台无法开库。
+  [ "${DATABASE_TYPE}" = 'MySql' ] || return 1
+  if [ "${DATABASE_USER}" != 'root' ] || [ -z "${DATABASE_PASSWORD}" ]; then
+    echo 'Microi：错误：MySQL 主租户连接必须配置 root 及其真实密码。'
+    return 1
+  fi
+  local encoded_password=""
+  encoded_password=$(repair_encode_connection_value "${DATABASE_PASSWORD}") || return 1
+  if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
+    MYSQL_ADMIN_HOST="${MYSQL_EXTERNAL_CONNECTION_HOST}"
+    MYSQL_ADMIN_PORT="${DATABASE_PORT}"
+    MYSQL_ADMIN_SSL_MODE='PREFERRED'
+  else
+    MYSQL_ADMIN_HOST="${DATABASE_CONTAINER_NAME}"
+    MYSQL_ADMIN_PORT="${DATABASE_INTERNAL_PORT}"
+    MYSQL_ADMIN_SSL_MODE='DISABLED'
+  fi
+  local connection_ssl='None'
+  [ "${MYSQL_ADMIN_SSL_MODE}" != 'PREFERRED' ] || connection_ssl='Preferred'
+  OS_CLIENT_DB_CONN="Data Source=${MYSQL_ADMIN_HOST};Database=${DATABASE_NAME};User Id=root;Password=${encoded_password};Port=${MYSQL_ADMIN_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;SslMode=${connection_ssl};"
+}
+
 prepare_external_mysql_client_config() {
+  # 保留函数名兼容已有调用；新装模式也用此配置从 API 所在网络验证远程 root，而非只测容器内 socket。
+  configure_mysql_admin_connection || return 1
   local escaped_host=""
-  local escaped_user=""
   local escaped_password=""
-  MYSQL_CLIENT_CONFIG_FILE=$(mktemp '/tmp/microi_mysql_client_XXXXXX.cnf')
-  escaped_host="${MYSQL_EXTERNAL_CONNECTION_HOST//\\/\\\\}"
+  if [ -z "${MYSQL_CLIENT_CONFIG_FILE:-}" ]; then
+    MYSQL_CLIENT_CONFIG_FILE=$(mktemp '/tmp/microi_mysql_client_XXXXXX.cnf') || return 1
+  fi
+  escaped_host="${MYSQL_ADMIN_HOST//\\/\\\\}"
   escaped_host="${escaped_host//\"/\\\"}"
-  escaped_user="${DATABASE_USER//\\/\\\\}"
-  escaped_user="${escaped_user//\"/\\\"}"
   escaped_password="${DATABASE_PASSWORD//\\/\\\\}"
   escaped_password="${escaped_password//\"/\\\"}"
   cat > "${MYSQL_CLIENT_CONFIG_FILE}" <<EOF
 [client]
 host="${escaped_host}"
-port=${DATABASE_PORT}
-user="${escaped_user}"
+port=${MYSQL_ADMIN_PORT}
+user=root
 password="${escaped_password}"
 protocol=TCP
-ssl-mode=PREFERRED
+ssl-mode=${MYSQL_ADMIN_SSL_MODE}
+connect-timeout=10
 EOF
   chmod 600 "${MYSQL_CLIENT_CONFIG_FILE}"
+}
+
+run_mysql_api_client() {
+  local use_database="${1:-0}"
+  shift
+  local -a database_args=()
+  local -a docker_args=(run --rm -i --network microi --user '0:0')
+  if [ "${use_database}" = '1' ]; then
+    database_args+=("${DATABASE_NAME}")
+  fi
+  if [ "${DATABASE_SERVICE_MODE}" = 'external' ] && [ "${MYSQL_EXTERNAL_USE_HOST_GATEWAY:-0}" = '1' ]; then
+    docker_args+=(--add-host 'host.docker.internal:host-gateway')
+  fi
+  # 某些绑定挂载显示为可写权限，MySQL 会忽略该配置；在临时容器内复制成 600 后读取。
+  # 密码仅通过配置文件传入，不拼接进 shell、mysql 命令参数或日志。
+  docker "${docker_args[@]}" \
+    -v "${MYSQL_CLIENT_CONFIG_FILE}:/tmp/microi-client.cnf:ro,Z" \
+    --entrypoint /bin/sh "${MYSQL_CLIENT_IMAGE}" -c '
+      set -e
+      config=$(mktemp)
+      chmod 600 "$config"
+      cat /tmp/microi-client.cnf > "$config"
+      exec mysql --defaults-extra-file="$config" --default-character-set=utf8mb4 "$@"
+    ' microi-mysql-client "${database_args[@]}" "$@"
 }
 
 run_mysql_client() {
   local use_database="${1:-0}"
   shift
   local -a database_args=()
-  local -a docker_args=()
-  if [ "${use_database}" = '1' ]; then
-    database_args+=("${DATABASE_NAME}")
-  fi
+  [ "${use_database}" != '1' ] || database_args+=("${DATABASE_NAME}")
   if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
-    docker_args=(
-      run --rm -i --network microi --user '0:0'
-    )
-    if [ "${MYSQL_EXTERNAL_USE_HOST_GATEWAY}" = '1' ]; then
-      docker_args+=(--add-host 'host.docker.internal:host-gateway')
-    fi
-    docker_args+=(
-      -v "${MYSQL_CLIENT_CONFIG_FILE}:/tmp/microi-client.cnf:ro,Z"
-      --entrypoint mysql
-      "${MYSQL_CLIENT_IMAGE}"
-    )
-    docker "${docker_args[@]}" \
-      --defaults-extra-file=/tmp/microi-client.cnf \
-      --default-character-set=utf8mb4 \
-      "${database_args[@]}" "$@"
+    run_mysql_api_client "${use_database}" "$@"
   else
     docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" \
       mysql --default-character-set=utf8mb4 -u"${DATABASE_USER}" \
       "${database_args[@]}" "$@"
   fi
+}
+
+verify_mysql_admin_permissions() {
+  local use_database="${1:-0}"
+  local readback=""
+  # 只读核对实际认证到的 root@Host；检查开子租户所需的全部库级权限及 CREATE USER/GRANT OPTION。
+  # SHOW GRANTS 在 MySQL 5.7 可能含密码散列，结果只在内存中判定，绝不原样回显。
+  local sql="SELECT 'MICROI_MYSQL_ADMIN_PRIVILEGES_OK' FROM mysql.user
+WHERE CONCAT(User,'@',Host)=CURRENT_USER() AND User='root'
+AND Select_priv='Y' AND Insert_priv='Y' AND Update_priv='Y' AND Delete_priv='Y'
+AND Create_priv='Y' AND Drop_priv='Y' AND Grant_priv='Y' AND References_priv='Y'
+AND Index_priv='Y' AND Alter_priv='Y' AND Create_tmp_table_priv='Y' AND Lock_tables_priv='Y'
+AND Execute_priv='Y' AND Create_view_priv='Y' AND Show_view_priv='Y'
+AND Create_routine_priv='Y' AND Alter_routine_priv='Y' AND Event_priv='Y' AND Trigger_priv='Y'
+AND Create_user_priv='Y';
+SELECT IF(@@global.read_only=0 AND @@global.super_read_only=0,'MICROI_MYSQL_WRITABLE_OK','MICROI_MYSQL_READ_ONLY');
+SHOW GRANTS FOR CURRENT_USER();"
+  if ! readback=$(run_mysql_api_client "${use_database}" --batch --skip-column-names -e "${sql}" 2>&1); then
+    echo 'Microi：错误：无法从 API 所在的 microi 网络使用 root 完成数据库权限检查。'
+    echo 'Microi：请核对 root 密码、地址/端口、Docker 来源授权、防火墙及 mysql.user 读取权限；尚未通过主租户数据库验收。'
+    return 1
+  fi
+  readback=$(printf '%s' "${readback}" | tr -d '\r')
+  if ! printf '%s\n' "${readback}" | grep -qx 'MICROI_MYSQL_ADMIN_PRIVILEGES_OK' \
+    || printf '%s\n' "${readback}" | grep -Eiq '^[[:space:]]*REVOKE[[:space:]]'; then
+    echo 'Microi：错误：当前 root 的全局权限不完整，或存在库级部分撤权，不能保证创建子租户数据库与独立帐号。'
+    echo 'Microi：请由数据库管理员为实际 Docker 来源匹配的 root 帐号配置所需的全局建库、建用户和库级授权权限（含 GRANT OPTION），然后重试；安装器不会修改已有服务的授权。'
+    return 1
+  fi
+  if ! printf '%s\n' "${readback}" | grep -qx 'MICROI_MYSQL_WRITABLE_OK'; then
+    echo 'Microi：错误：MySQL 处于只读状态，请连接可写主库后重试。'
+    return 1
+  fi
+  echo 'Microi：MySQL root 密码、Docker 网络连接、跨库建表/建库、创建帐号及授权权限检查通过 ✓'
 }
 
 MYSQL_EXTERNAL_TARGET_DATABASE_EXISTS=0
@@ -4458,6 +4525,7 @@ if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
     exit 1
   fi
   echo "Microi：已有 MySQL 连接及版本校验通过：${MYSQL_DETECTED_SERVER_VERSION} ✓"
+  verify_mysql_admin_permissions || exit 1
 
   if ! MYSQL_SCHEMA_EXISTS=$(run_mysql_client 0 --batch --skip-column-names -e \
     "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${DATABASE_NAME}';" 2>&1); then
@@ -5087,6 +5155,12 @@ if { [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; } \
   fi
   run_mysql_client 0 -e "${MYSQL_GRANT_SQL}"
   run_mysql_client 0 -e 'FLUSH PRIVILEGES;' > /dev/null 2>&1 || true
+  if ! docker image inspect "${MYSQL_CLIENT_IMAGE}" > /dev/null 2>&1; then
+    docker pull "${MYSQL_CLIENT_IMAGE}"
+  fi
+  prepare_external_mysql_client_config
+  ensure_microi_bridge_firewalld microi || exit 1
+  verify_mysql_admin_permissions || exit 1
 fi
 
 # 获取、复核并安全展开数据库包。自定义原文件只读使用，清理时绝不删除。
@@ -6039,13 +6113,9 @@ APP_DIR="${COMPOSE_BASE_DIR}/microi-install-app"
 
 case "${DATABASE_CHOICE}" in
   1|2)
-    if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
-      MYSQL_CONNECTION_USER=$(repair_encode_connection_value "${DATABASE_USER}")
-      MYSQL_CONNECTION_PASSWORD=$(repair_encode_connection_value "${DATABASE_PASSWORD}")
-      OS_CLIENT_DB_CONN="Data Source=${MYSQL_EXTERNAL_CONNECTION_HOST};Database=${DATABASE_NAME};User Id=${MYSQL_CONNECTION_USER};Password=${MYSQL_CONNECTION_PASSWORD};Port=${DATABASE_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;SslMode=Preferred;"
-    else
-      OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME};Database=${DATABASE_NAME};User Id=root;Password=${DATABASE_PASSWORD};Port=${DATABASE_INTERNAL_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;"
-    fi
+    configure_mysql_admin_connection
+    # 导入自定义 SQL 后重新检查同一 root 连接，且本次必须能打开已初始化的主租户数据库。
+    verify_mysql_admin_permissions 1 || exit 1
     ;;
   3)
     OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME},${DATABASE_INTERNAL_PORT};Initial Catalog=${DATABASE_NAME};User ID=sa;Password=${DATABASE_PASSWORD};Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;"
