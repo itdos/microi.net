@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
+import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
 
 const resourceDir = path.dirname(fileURLToPath(import.meta.url))
@@ -17,9 +18,56 @@ function normalizeSource(value) {
   return String(value || '').replaceAll('\r\n', '\n').replace(/\s+$/, '')
 }
 
+test('system-account Jobs data source has an owned portable schema without tenant business rows', () => {
+  const pkg = readPackage('app.microi.sys_user.json')
+  const jobs = pkg.DiyFields.find(field => field.TableName?.toLowerCase() === 'sys_user' && field.Name === 'Jobs')
+  assert.match(JSON.parse(jobs.Config).Sql, /\bdiy_job\b/i)
+  const table = pkg.DiyTables.find(table => table.Name.toLowerCase() === 'diy_job')
+  assert.ok(table)
+  const fields = pkg.DiyFields.filter(field => field.TableId === table.Id)
+  for (const name of ['Id', 'JobName', 'JobLevel', 'TenantId', 'IsDeleted']) {
+    assert.ok(fields.some(field => field.Name === name), `Missing job metadata ${name}`)
+    assert.ok(pkg.PhysicalColumns.some(column => column.TABLE_NAME === 'diy_job' && column.COLUMN_NAME === name), `Missing job column ${name}`)
+  }
+  assert.ok(pkg.DDLStatements.some(row => row.TableName === 'diy_job' && /CREATE TABLE/i.test(row.DDL)))
+  assert.ok(fields.every(field => field.Data === '[]'))
+  assert.ok(!pkg.DataSets.some(row => String(row.TableName).toLowerCase() === 'diy_job'))
+})
+
 function canonicalSource(key) {
   return normalizeSource(fs.readFileSync(path.join(resourceDir, `${key}.js`), 'utf8'))
 }
+
+test('system-setting event preserves enabled state on partial updates and guards both delete actions in the write transaction', () => {
+  const pkg = readPackage('app.microi.sys-config.json')
+  const source = pkg.DiyTables.find(table => table.Name.toLowerCase() === 'sys_config').SubmitBeforeServerV8
+  function run(action, form, old, response = { Code: 1, Data: [] }) {
+    const calls = []
+    const transaction = { name: 'current-write-transaction' }
+    const result = vm.runInNewContext(`(function(){${source}\n})()`, {
+      V8: { Form: form, OldForm: old, FormSubmitAction: action, DbTrans: transaction,
+        FormEngine: { GetTableData(table, query, trans) { calls.push({ table, query, trans }); return response } } }
+    })
+    for (const call of calls) {
+      assert.equal(call.table, 'sys_config')
+      assert.equal(call.trans, transaction)
+      assert.equal(call.query._PageSize, 1)
+      assert.deepEqual(Array.from(call.query._SelectFields), ['Id'])
+    }
+    return { result, calls }
+  }
+  assert.equal(run('Upt', { Id: 'only', SysTitle: 'new title' }, { IsEnable: 1 }).result, undefined)
+  assert.equal(run('Upt', { Id: 'only', SysTitle: 'new title' }, { IsEnable: 1 }).calls.length, 0)
+  for (const action of ['Del', 'Delete']) {
+    const denied = run(action, { Id: 'only', IsEnable: 1 }, { IsEnable: 1 })
+    assert.equal(denied.result.Code, 0)
+    assert.deepEqual(Array.from(denied.calls[0].query._Where[1]), ['Id', '<>', 'only'])
+    assert.equal(run(action, { Id: 'one', IsEnable: 1 }, {}, { Code: 1, Data: [{ Id: 'other' }] }).result, undefined)
+  }
+  for (const value of [0, '0', null, false]) assert.equal(run('Upt', { Id: 'only', IsEnable: value }, { IsEnable: 1 }).result.Code, 0)
+  assert.equal(run('Add', { IsEnable: 1 }, {}).result, undefined)
+  assert.equal(run('Del', { Id: 'one' }, {}, { Code: 0, Msg: 'database read failed' }).result.Msg, 'database read failed')
+})
 
 function hasApiEngineCapability(packageModel, key) {
   const prefix = `ApiEngine:${key}`
@@ -62,7 +110,7 @@ test('system-account package exclusively owns admin, preferences, profile and it
   const packageName = 'app.microi.sys_user.json'
   const packageModel = readPackage(packageName)
   assert.equal(packageModel.PackageInfo?.Name, '系统账号')
-  assert.equal(packageModel.PackageInfo?.Version, 'v7.6.6')
+  assert.equal(packageModel.PackageInfo?.Version, 'v7.6.7')
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
     ?.includes('ApiEngine:platform-sys-user-admin@v1.0.2'))
 

@@ -17,6 +17,7 @@
     "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" }
   },
   "ProtocolGateways": {
+    "LegacyMobileCompatibilityController": { "Project": "Microi.net.Api", "Source": "Controllers/LegacyMobileCompatibilityController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "BootstrapCompatibility", "Reason": "仅兼容、禁止新增业务、未来可能整体删除；租户接口引擎明确缺失时复用可信登录和基础导航原子，已有接口始终优先。" },
     "AiController": { "Project": "Microi.net.Api", "Source": "Controllers/AiController.cs", "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ProtocolGateway" },
     "CaptchaController": { "Project": "Microi.net.Api", "Source": "Controllers/CaptchaController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
     "DiagnosticsController": { "Project": "Microi.net.Api", "Source": "Controllers/DiagnosticsController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
@@ -38,7 +39,6 @@
     "SsoProtocolGatewayController": { "Target": "app.microi.sso 24 Managed HTTP ApiEngines", "Atom": "Microi.SSO:SsoProtocolRuntime + V8.Method.RunSsoProtocol", "RemovedAt": "2026-08-30" },
     "ExternalLoginController": { "Target": "ApiEngine:platform-external-login", "Atom": "Microi.SSO:ExternalLoginRuntime", "RemovedAt": "2026-08-30" },
     "IdentityVerificationController": { "Target": "ApiEngine:platform-identity-verification", "Atom": "Hosting/IdentityVerificationRuntime WebAuthn atom", "RemovedAt": "2026-08-30" },
-    "LegacyMobileCompatibilityController": { "Target": "57 official ApiRoutes aliases", "Atom": "Managed ApiEngines plus trusted plugin atoms", "RemovedAt": "2026-08-30" },
     "MarketplaceSourceController": { "Target": "ApiEngine:platform-marketplace-source", "Atom": "Microi.net:MarketplaceSourceRuntime", "RemovedAt": "2026-08-30" },
     "SysUserAccessKeyController": { "Target": "ApiEngine:platform-user-access-key", "Atom": "V8.Method.ManageUserAccessKey", "RemovedAt": "2026-08-30" },
     "SysUserController": { "Target": "ApiEngine:platform-sys-user-session", "Atom": "Microi.net:SysUserSessionRuntime", "RemovedAt": "2026-08-30" },

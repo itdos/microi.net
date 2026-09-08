@@ -63,7 +63,7 @@ namespace Microi.net
                 ApiEngineKey = ResolveApiEngineKey(route),
                 Ip = NormalizeIp(SecurityGuardRuntimePolicy.GetConnectionIp(context)),
                 RequestedOsClient = Limit(ExtractRequestedOsClient(context), 50),
-                TraceId = Limit(context.TraceIdentifier, 100),
+                TraceId = MicroiTraceContext.RequestTraceId(context),
                 RequestContentType = NormalizeContentType(context.Request.ContentType),
                 DeclaredRequestBytes = Math.Max(0, context.Request.ContentLength ?? 0),
                 IsDiagnostic = IsDiagnosticRoute(route)

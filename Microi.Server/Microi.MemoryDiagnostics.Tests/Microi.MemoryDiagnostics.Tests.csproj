@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
+    <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
+    <ProjectReference Include="../Microi.MemoryDiagnostics/Microi.MemoryDiagnostics.csproj" />
+    <Compile Include="../Microi.net.Api/Hosting/MemoryDiagnosticsService.cs" Link="Runtime/MemoryDiagnosticsService.cs" />
+    <Compile Include="../Microi.net.Api/Hosting/MemoryDiagnosticsStore.cs" Link="Runtime/MemoryDiagnosticsStore.cs" />
+    <Compile Include="../Microi.net.Api/Hosting/MemoryDiagnosticsMetrics.cs" Link="Runtime/MemoryDiagnosticsMetrics.cs" />
+  </ItemGroup>
+</Project>

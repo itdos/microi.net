@@ -7,6 +7,11 @@ const source = fs.readFileSync(new URL('./import-package.js', import.meta.url), 
 const helpers = source.slice(source.indexOf('    var mapToMySQLType ='), source.indexOf('    var quoteSqlServerCatalogIdentifier ='));
 const context = {runtimeIsSqlServer: false};
 vm.runInNewContext(helpers, context);
+// 同步函数新依赖时间默认值规范化器。执行真实源码依赖，不能以缺失的 VM 全局
+// 误报默认值 DDL 失败，也不能用恒定返回值绕过生产逻辑。
+const timestampHelpers = source.slice(source.indexOf('    var mysqlCurrentTimestampDefault ='), source.indexOf('    var buildPhysicalColumnDefinition ='));
+assert.match(timestampHelpers, /var mysqlCurrentTimestampDefault = function/);
+vm.runInNewContext(timestampHelpers, context);
 
 test('physical BIT never falls back to varchar during package synchronization', () => {
   for (const type of ['bit', 'bit(1)', 'bit(8)', 'bit(64)']) assert.equal(context.mapToMySQLType(type), type);
@@ -32,7 +37,7 @@ function syncColumn(target, incoming, {readbackMatches = true} = {}) {
     getTargetPhysicalColumns: () => ({isdeleted: target}),
     getPhysicalValue: (row, names) => names.map(name => row[name]).find(value => value !== undefined),
     V8: {Db: {FromSql: text => {sql.push(text); return {ExecuteNonQuery: () => {
-      if (readbackMatches && text.includes(' ALTER COLUMN ')) target.COLUMN_DEFAULT = incoming.COLUMN_DEFAULT;
+      if (readbackMatches && text.includes(' ALTER COLUMN ')) { target.COLUMN_DEFAULT = incoming.COLUMN_DEFAULT; delete target.MICROI_MISSING_DEFAULT; }
       return 0;
     }};}}},
     prepareNumericColumnData: () => {throw new Error('compatible column must not scan rows');},
@@ -56,7 +61,24 @@ test('default-only changes use metadata DDL, preserve existing rows and verify r
 test('an empty string default is distinct from no default and defaults can be removed', () => {
   const source = {COLUMN_NAME:'IsDeleted',COLUMN_TYPE:'varchar(50)',IS_NULLABLE:'YES',COLUMN_DEFAULT:''};
   assert.match(syncColumn({...source,COLUMN_DEFAULT:null},source).sql[0], /SET DEFAULT ''/);
-  assert.match(syncColumn({...source},{...source,COLUMN_DEFAULT:null}).sql[0], /DROP DEFAULT/);
+  assert.match(syncColumn({...source},{...source,COLUMN_DEFAULT:null}).sql[0], /SET DEFAULT NULL/);
+});
+
+test('nullable columns with a dropped default are repaired even when information_schema reports null for both defaults', () => {
+  const incoming = {COLUMN_NAME:'IsDeleted',COLUMN_TYPE:'int',IS_NULLABLE:'YES',COLUMN_DEFAULT:null};
+  const {result,sql}=syncColumn({...incoming,MICROI_MISSING_DEFAULT:true},incoming);
+  assert.equal(result.Modified,1);
+  assert.match(sql[0],/SET DEFAULT NULL/);
+  assert.doesNotMatch(sql[0],/DROP DEFAULT|UPDATE /);
+});
+
+test('default readiness probes compile expressions without reading rows and retain both scalar and text failures', () => {
+  const rows=[{COLUMN_NAME:'Id',IS_NULLABLE:'NO',COLUMN_DEFAULT:null},{COLUMN_NAME:'Value',IS_NULLABLE:'YES',COLUMN_DEFAULT:null},{COLUMN_NAME:'Body',IS_NULLABLE:'YES',COLUMN_DEFAULT:null},{COLUMN_NAME:'Fine',IS_NULLABLE:'YES',COLUMN_DEFAULT:null}];
+  const probes=[],c={runtimeIsSqlServer:false,isSafeIdentifier:name=>/^[a-z0-9_]+$/i.test(name),readTargetPhysicalColumns:()=>rows,quotePhysicalIdentifier:name=>'`'+name+'`',V8:{Db:{FromSql(sql){probes.push(sql);return {ToScalar(){for(const name of ['Value','Body'])if(sql.includes('DEFAULT(`'+name+'`)'))throw Error("Field '"+name+"' doesn't have a default value");return null;}};}}}};
+  vm.runInNewContext(source.slice(source.indexOf('    var getTargetPhysicalColumns ='),source.indexOf('    // UNUSED_WORKFLOW_PHYSICAL_SCHEMA_V1')),c);
+  const map=c.getTargetPhysicalColumns('sample');
+  assert.equal(map.value.MICROI_MISSING_DEFAULT,true);assert.equal(map.body.MICROI_MISSING_DEFAULT,true);assert.equal(map.fine.MICROI_MISSING_DEFAULT,undefined);
+  assert.equal(probes.length,3);for(const sql of probes){assert.match(sql,/LIMIT 0$/);assert.doesNotMatch(sql,/DEFAULT\(`Id`\)|UPDATE|ALTER/);}
 });
 
 test('large log table boolean and cosmetic differences cause zero DDL and zero row scans', () => {

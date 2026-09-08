@@ -380,7 +380,15 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 >* 配置类长表单或同一 Tab 含多个代码字段时优先使用 `Dialog`，避免 Monaco 编辑器长期占满表单；代码密集型工作台可按字段显式使用 `Inline`。`CodeEditor.Height` 继续控制内联编辑器和弹层编辑区域的建议高度。
 
 ## 下拉树 SelectTree
->* 这是一个非常强大的组件
+
+数据量较大时，在【表单设计 → 选择父级等下拉树字段 → 控件配置】选择 SQL 数据源，开启“动态加载”，将“每页条数”设为 `50`。对应配置为 `Config.SelectTree.Lazy=true`、`Config.SelectTree.PageSize=50`；支持 1–200，0 保持原有行为。
+
+- 根节点点击下拉框后才请求，使用“上一页 / 下一页”翻页；展开分支只加载直接子级，超过一页时点击“加载更多子级”。
+- 开启“可搜索”后按显示字段搜索整个数据源，能找到尚未加载的分支。原有已选值按存储字段单独回填，不要求它位于当前页，也不会被插入根节点。
+- `SelectSaveField`、`SelectLabel` 分别配置存储列、显示列，`SelectTree.ParentField` 配置父级列；数据源需要返回这三列。父级空值、空 GUID、空 ULID 表示根节点。
+- 分页查询保留字段 SQL 的过滤条件、当前用户及 `$V8.Form.字段名$` 替换和元数据权限校验。SQL 应使用可作为子查询的 SELECT（需要复杂排序/CTE 时可封装为数据库视图）；分页按存储列稳定排序，不要在源 SQL 中截断全体分类。
+- 分页多选逐项选择，不自动勾选尚未加载的子级。普通静态树、自定义 `LazyLoad` 回调和未启用分页的既有字段继续使用原有逻辑。
+- SQL 字段接口继续使用 `GetDiyFieldSqlData`，支持 `_ParentValue`、`_PageIndex`、`_PageSize`、`_Keyword`，返回 `DataAppend.HasMore`；`_SelectTreeValues` 用于按存储列回填选中值，每次最多 200 项。
 
 ## JSON表格 JsonTable
 >* 支持 JSON 数据的表格展示与编辑，字段值保存为结构化 JSON。

@@ -406,6 +406,7 @@ namespace Microi.net
         public string KeysAddVModel { get; set; }
         public string Sql { get; set; }
         public string SelectLabel { get; set; }
+        public string SelectSaveField { get; set; }
         public int? AutoNumberLength { get; set; }
         public string AutoNumberFixed { get; set; }
         public List<string> AutoNumberFields { get; set; }
@@ -473,6 +474,8 @@ namespace Microi.net
     public partial class DiyFieldConfigSelectTree
     {
         public bool Lazy { get; set; }
+        /// <summary>SQL 动态加载每页条数。0 保持旧行为，1-200 开启根节点与子级分页。</summary>
+        public int PageSize { get; set; }
         public bool Filterable { get; set; }
         public bool Multiple { get; set; }
         public string Value { get; set; }

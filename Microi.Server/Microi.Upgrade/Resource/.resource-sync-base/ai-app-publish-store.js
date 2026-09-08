@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.9.25
+ * Version: v2.0.3
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -483,6 +483,15 @@ function getApplicationInfrastructure() {
   }
   return { DDLStatements: ddls, DiyTables: tables, DiyFields: toArray(fieldsResult.Data) };
 }
+function runtimeAssetContentType(path, provided) {
+  if (!isBlank(provided)) return text(provided);
+  var extension = text(path).toLowerCase().split('.').pop();
+  var types = { html: 'text/html; charset=utf-8', js: 'application/javascript; charset=utf-8',
+    css: 'text/css; charset=utf-8', json: 'application/json; charset=utf-8',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+    svg: 'image/svg+xml', ico: 'image/x-icon', woff: 'font/woff', woff2: 'font/woff2' };
+  return types[extension] || 'application/octet-stream';
+}
 function getBuildAssets(app, latestVersion, runtime) {
   var assets = [];
   if (runtime && runtime.Service && runtime.Service.AssetsJson) {
@@ -495,7 +504,7 @@ function getBuildAssets(app, latestVersion, runtime) {
       assets.push({
         Path: path,
         FileName: runtimeAsset.FileName || path.substring(path.lastIndexOf('/') + 1),
-        ContentType: runtimeAsset.ContentType || '',
+        ContentType: runtimeAssetContentType(path, runtimeAsset.ContentType),
         FileByteBase64: inlineBase64 || readRuntimeAssetBase64(runtimeAsset, path),
         Size: runtimeAsset.Size || 0,
         Sha256: runtimeAsset.Sha256 || runtimeAsset.Hash || '',
@@ -517,7 +526,7 @@ function getBuildAssets(app, latestVersion, runtime) {
       assets.push({
         Path: buildPath,
         FileName: compiledFile.FileName || buildPath.substring(buildPath.lastIndexOf('/') + 1),
-        ContentType: '',
+        ContentType: runtimeAssetContentType(buildPath, compiledFile.ContentType),
         FileByteBase64: readFileBase64(publishPath, isTextFile(buildPath), false),
         Size: compiledFile.Size || 0,
         Sha256: compiledFile.ContentHash || '',
@@ -540,6 +549,15 @@ function getBuildAssets(app, latestVersion, runtime) {
   return assets;
 }
 
+// Jint can expose byte[] as a JavaScript array (length) or a CLR wrapper
+// (Length). Never let undefined/NaN bypass the inline package byte limit.
+function runtimeAssetByteLength(bytes) {
+  var size = Number(bytes && bytes.Length !== undefined ? bytes.Length : (bytes ? bytes.length : NaN));
+  if (!isFinite(size) || size < 0 || Math.floor(size) !== size) {
+    throw new Error('编译文件字节数不可用');
+  }
+  return size;
+}
 function getExistingStore(appKey) {
   var result = V8.FormEngine.GetFormData('sys_microistore', {
     _Where: [['AppKey', '=', appKey]],
@@ -2044,7 +2062,8 @@ var packageModel = {
     AppId: app.AppKey,
     ApplicationType: appType,
     Description: text(V8.Param.AppDetail || app.Description),
-    CreateTime: nowText('yyyy-MM-dd HH:mm:ss'),
+    // A v3 replay belongs to the same release; wall-clock time must not change its package hash.
+    CreateTime: protocolV3 ? text(releaseChangeLog.ReleaseTime) : nowText('yyyy-MM-dd HH:mm:ss'),
     CreateUser: text(currentUser.Name || currentUser.Account),
     OsClient: V8.OsClient,
     DataSetCount: selectedDataSets.length,
@@ -2126,11 +2145,16 @@ if (requestedDatabaseOnlyBuild) {
       return fail('DatabaseOnlyBuild 缺少完整编译文件内容：' + (databaseOnlyPath || ('asset-' + databaseOnlyIndex)));
     }
     var databaseOnlyBytes = 0;
-    try { databaseOnlyBytes = System.Convert.FromBase64String(databaseOnlyBase64).Length; }
+    var databaseOnlyDecodedBytes;
+    try {
+      databaseOnlyDecodedBytes = System.Convert.FromBase64String(databaseOnlyBase64);
+      databaseOnlyBytes = runtimeAssetByteLength(databaseOnlyDecodedBytes);
+    }
     catch (databaseOnlyDecodeError) { return fail('DatabaseOnlyBuild 包含无效 Base64：' + databaseOnlyPath); }
     if (databaseOnlyBytes <= 0) return fail('DatabaseOnlyBuild 包含空文件：' + databaseOnlyPath);
     databaseOnlyTotalBytes += databaseOnlyBytes;
     databaseOnlyAsset.Size = databaseOnlyBytes;
+    databaseOnlyAsset.Sha256 = sha256RuntimeAssetBytes(databaseOnlyDecodedBytes);
     if (databaseOnlyPath.toLowerCase() === normalizePath(entryPath).toLowerCase()) {
       var databaseOnlyHtml = '';
       try {
@@ -2139,14 +2163,14 @@ if (requestedDatabaseOnlyBuild) {
         // RegExp.test; otherwise a byte-identical complete HTML document can
         // fail every structural check on production hosts.
         databaseOnlyHtml = text(System.Text.Encoding.UTF8.GetString(
-          System.Convert.FromBase64String(databaseOnlyBase64)
+          databaseOnlyDecodedBytes
         ));
       } catch (databaseOnlyHtmlError) { return fail('DatabaseOnlyBuild 入口不是有效 UTF-8 HTML。'); }
       var databaseOnlyHtmlLower = text(databaseOnlyHtml).toLowerCase();
       var databaseOnlyEntryChecks = {
         Path: databaseOnlyPath,
         ByteLength: databaseOnlyBytes,
-        Sha256: sha256RuntimeAssetBytes(System.Convert.FromBase64String(databaseOnlyBase64)),
+        Sha256: databaseOnlyAsset.Sha256,
         HasDoctype: databaseOnlyHtmlLower.indexOf('<!doctype html') >= 0,
         HasHtml: databaseOnlyHtmlLower.indexOf('<html') >= 0,
         HasHead: databaseOnlyHtmlLower.indexOf('<head') >= 0,
@@ -2177,6 +2201,38 @@ if (requestedDatabaseOnlyBuild) {
   databaseOnlyService.MsUrl = 'db';
   databaseOnlyService.EntryPath = entryPath;
   databaseOnlyService.AssetCount = buildAssets.length;
+  databaseOnlyService.TotalSize = databaseOnlyTotalBytes;
+  // V3 在线运行清单不能原样充当 DatabaseOnly 清单。将已验证字节转为可独立离线解析的
+  // schema 2 描述，保留提交时的源码摘要；不重新构建、不把 HDFS ZIP 变成安装前置依赖。
+  buildAssets.sort(function (left, right) { return left.Path < right.Path ? -1 : left.Path > right.Path ? 1 : 0; });
+  var databaseOnlyFingerprint = [];
+  var databaseOnlyManifestAssets = [];
+  for (var databaseOnlyManifestIndex = 0; databaseOnlyManifestIndex < buildAssets.length; databaseOnlyManifestIndex++) {
+    var databaseOnlyManifestAsset = buildAssets[databaseOnlyManifestIndex];
+    databaseOnlyFingerprint.push(databaseOnlyManifestAsset.Path + '\t' + databaseOnlyManifestAsset.Sha256 + '\t' + databaseOnlyManifestAsset.Size);
+    databaseOnlyManifestAssets.push({ Path: databaseOnlyManifestAsset.Path,
+      FilePathName: 'database://' + app.AppKey + '/' + runtimeVersionNo + '/' + databaseOnlyManifestAsset.Path,
+      StableFilePathName: 'database://' + app.AppKey + '/' + databaseOnlyManifestAsset.Path,
+      Sha256: databaseOnlyManifestAsset.Sha256, Size: databaseOnlyManifestAsset.Size,
+      IsEntry: databaseOnlyManifestAsset.Path === entryPath });
+  }
+  var databaseOnlyManifestHash = sha256Hex(databaseOnlyFingerprint.join('\n'));
+  var databaseOnlyOldManifest = parseObject(sourceMicroService.AssetManifestJson, {});
+  var databaseOnlySourceHash = text(sourceMicroService.SourceManifestHash
+    || (latestVersion && latestVersion.SourceManifestHash) || databaseOnlyOldManifest.SourceManifestHash);
+  var databaseOnlyManifest = { SchemaVersion: 2, MsKey: app.AppKey, BuildVersion: runtimeVersionNo,
+    EntryPath: entryPath, StorageMode: 'db', PublishStatus: 'Published', VerificationStatus: 'Verified',
+    RequestId: databaseOnlyManifestHash, DeliveryBatchId: 'database-' + databaseOnlyManifestHash.substring(0, 24),
+    RuntimeManifestHash: databaseOnlyManifestHash, Assets: databaseOnlyManifestAssets };
+  if (/^[a-f0-9]{64}$/i.test(databaseOnlySourceHash)) databaseOnlyManifest.SourceManifestHash = databaseOnlySourceHash.toLowerCase();
+  databaseOnlyService.DistHash = databaseOnlyManifestHash;
+  databaseOnlyService.AssetManifestJson = JSON.stringify(databaseOnlyManifest);
+  databaseOnlyService.AssetsJson = JSON.stringify(databaseOnlyManifestAssets);
+  if (!includeSource) packageModel.ApplicationBundle.SourceFiles = [];
+  if (packageModel.ApplicationBundle.PackageAssets) {
+    delete packageModel.ApplicationBundle.PackageAssets.BuildZip;
+    if (!includeSource) delete packageModel.ApplicationBundle.PackageAssets.SourceZip;
+  }
   packageModel.PackageInfo.DatabaseOnlyBuild = true;
   packageModel.ApplicationBundle.BuildAssets = buildAssets;
   packageModel.ApplicationBundle.MicroService = databaseOnlyService;

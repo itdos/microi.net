@@ -509,7 +509,7 @@ namespace Microi.net
             }
 
             // 正常情况：验证字段是否在 fieldList 或 DefaultFields 中
-            return fieldList.Any(d => string.Equals(
+            var knownField = fieldList.Any(d => string.Equals(
                        d["Name"].Val<string>(),
                        fieldWhere.Name,
                        StringComparison.OrdinalIgnoreCase))
@@ -517,6 +517,9 @@ namespace Microi.net
                        d,
                        fieldWhere.Name,
                        StringComparison.OrdinalIgnoreCase));
+            if (!knownField)
+                throw new ArgumentException($"查询字段[{fieldWhere.Name}]缺少字段元数据，请修复表结构后重试；为避免扩大查询或修改范围，已停止执行。", nameof(fieldWhere));
+            return true;
         }
 
         /// <summary>

@@ -48,9 +48,20 @@ public class BackendReleaseGateTests
             string.Equals(property.Name, "LoginRsaPublicKey", StringComparison.OrdinalIgnoreCase));
         var loginPublicKey = loginPublicKeyProperty?.Value?.ToString();
         loginPublicKeyProperty?.Remove();
+        // The external API and this test runner have different startup tenants.
+        // Validate the trusted API marker independently; the local projection
+        // deliberately recomputes it from its own process configuration.
+        var mainTenantProperty = projectionInput.Properties().FirstOrDefault(property =>
+            string.Equals(property.Name, "IsMainTenant", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(mainTenantProperty);
+        Assert.Equal(JTokenType.Boolean, mainTenantProperty.Value.Type);
+        Assert.True(mainTenantProperty.Value.Value<bool>(),
+            "The configured main-tenant API must identify itself as the main tenant.");
+        mainTenantProperty.Remove();
         var reprojected = TenantConfigurationSecurity.CreatePublicSysConfigProjection(
             projectionInput,
             settings.OsClient);
+        reprojected.Remove("IsMainTenant");
         Assert.True(
             JToken.DeepEquals(projectionInput, reprojected),
             "GetSysConfig returned a field that the public security projection would remove.");

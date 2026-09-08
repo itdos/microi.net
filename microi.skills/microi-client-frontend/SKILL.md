@@ -176,6 +176,8 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 ### 本地 ApiBase 与 OsClient 解析（强制）
 
+- `app.use(router)` 会立即触发首个路由守卫。守卫中的 SSO、认证、菜单请求必须等待 `initApp()` 完成真实租户和系统配置初始化；初始化失败时取消导航并保留启动错误界面。释放初始化等待必须早于 `router.isReady()`，避免彼此等待；禁止将缓存尚未建立时的 `GetOsClient()` 默认值 `iTdos` 发给客户服务器。
+
 - `src/config.json.ApiBaseDev` 是本地默认 API；URL 中 `#` 之前的 `ApiBase`、`OsClient` 必须同时
   高于 `index.html`、config、Pinia 与 localStorage。解析统一走
   `src/utils/runtime-endpoint-query.js`，禁止在新入口另写正则形成不同优先级。
