@@ -97,3 +97,11 @@ test("field configuration headers show both table label and physical table name"
     assert.match(designer, /表名：\{\{ CurrentDiyTableModel\.Name \}\}/);
     assert.match(simpleDialog, /表名：\{\{ physicalTableName \}\}/);
 });
+
+test("scrollable horizontal tabs reserve independent mouse targets on desktop and mobile", () => {
+    const design = read("src/styles/mci-design.scss");
+    const mobile = read("src/views/form-engine/styles/diy-table-rowlist.scss");
+    assert.match(design, /\.el-tabs__nav-wrap\.is-scrollable\s*\{\s*padding-inline:\s*36px/);
+    assert.match(design, /\.el-tabs__nav-next\s*\{[\s\S]*?width:\s*32px[\s\S]*?z-index:\s*2/);
+    assert.match(mobile, /\.is-scrollable\.el-tabs__nav-wrap\)\s*\{\s*padding:\s*0 36px/);
+});

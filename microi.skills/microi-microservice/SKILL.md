@@ -85,6 +85,8 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 同源普通窗口共享 Token、CurrentUser、ApiBase、OsClient。并行不同目标必须一组目标一个
   Playwright `browser.newContext()` 或独立浏览器 Profile；多个无痕窗口不保证彼此隔离。
 - 本地复现、主框架宿主验收、远端运行产物和生产部署分别报告；本地通过不能替代发布后回读。
+- 新租户或历史还原库可能没有 `SysConfig.ApiBase`。微服务安装不得依赖该字段才能写入运行 HTML：按目标 `OsClient` 注入上下文，运行时使用同租户宿主的 `microApp.getData()` 或绑定该租户的 API 稳定入口，保留代理路径；不得沿用发布端上下文、跨租户宿主或把 HDFS/CDN 域名当成 API。独立 Web/UniApp 仍需有效的目标 API 配置。
+- 登录用户的角色等历史字段可能返回数组、JSON 字符串或空值。列表运算前必须归一化类型，并优先使用当前接口给出的结构化字段；验收应使用真实旧格式数据验证页面渲染及导航，不能只断言接口成功或没有 `pageerror`，还应检查 Vue 捕获到的控制台异常。
 
 迁移 Vue2 定制页到独立 Vite 微服务时，不得假设宿主会提供 Tailwind/UnoCSS 等原子类；
 页面依赖的宽高、颜色、间距、响应式和打印/下载样式必须由组件自身的语义 class 明确声明，

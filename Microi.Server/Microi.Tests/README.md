@@ -21,9 +21,14 @@
   安装/更新全部平台应用、重复幂等提交、任务成功终态及零更新复跑；最后通过
   独立浏览器 Context 完成真实登录和通知中心按钮操作。官方 iTdos 是发布源，
   测试其控制子租户的维护能力，并断言不会出现给自身安装应用的按钮。
+  真实 Redis 配置即时生效、并发跳过日志去重及新旧 Quartz 共库调度测试也属于
+  Full，不属于无外部依赖的 Quick；所需配置在任何构建前检查，缺失即失败。
 
 `Microi一键编译发布.sh` 在发布后端或构建前端时自动调用 `Full`：先取得发布锁，
 保持已加载候选源码的共享服务供测试使用，通过后再停止服务、改版本及发布。
+PC/API 镜像候选仍覆盖根仓及六个闭源子仓的源码与内置资源；独立 `microi.uniapp`
+的页面、客户资源和版本号不属于这两个镜像的构建输入，不阻断其发布。
+`microi.uniapp/src/utils/` 由后端 SDK 契约测试读取，继续参与内容哈希校验。
 缺少变量、零用例、失败或跳过均阻止发布；文档专用选项 6 不触发后端业务门禁。
 AI 发布话术仍需要求在 VS Code 扩展发布前执行同一门禁，不能替代脚本检查。
 
@@ -50,6 +55,8 @@ $env:MICROI_TEST_CHILD_ACCOUNT = "<child-test-account>"
 $env:MICROI_TEST_CHILD_PASSWORD = "<child-test-password>"
 $env:MICROI_UPGRADE_TEST_CONN = "<isolated MySQL upgrade_fixture connection on 127.0.0.1:62606>"
 $env:MICROI_UPGRADE_SQLSERVER_TEST_CONN = "<isolated SQL Server upgrade_fixture connection on 127.0.0.1,62616>"
+$env:MICROI_TEST_SCHEDULE_REDIS = "127.0.0.1:62681"
+$env:MICROI_TEST_SCHEDULE_MYSQL = "<isolated schedule_gate MySQL connection on 127.0.0.1:62680>"
 $env:MICROI_TEST_ALLOW_WRITES = "YES"
 .\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Full
 ```
@@ -65,6 +72,10 @@ $env:MICROI_TEST_ALLOW_WRITES = "YES"
 不能为通过 Full 门禁排除项目。MySQL 和 SQL Server 升级集成测试只接受本机连接，
 各用例创建独立随机数据库并在结束时删除，不清空传入的 `upgrade_fixture` 数据库，
 也不要求复用其它任务占用的固定端口。
+
+调度共库夹具另使用专用 `schedule_gate` 空库（`127.0.0.1:62680`，预先初始化
+Quartz MySQL 表结构）与独立 Redis（`127.0.0.1:62681`）。只允许一次性测试实例，
+禁止指向业务库；测试结束关闭本任务创建的容器，不停止其它任务的共享依赖。
 
 测试表至少要有一个可写短文本字段，默认名为 `Name`；若不同，设置
 `MICROI_TEST_NAME_FIELD`。测试会写入

@@ -104,7 +104,8 @@ const engines = [
   {
     key: 'platform-client-log', name: '平台客户端兼容日志', file: 'platform-client-log.js',
     id: '9972dfe1-d424-4452-9a6e-8fecf60430d1', enableLog: 0,
-    history: '2026-08-24 v1.0.0 客户端兼容日志迁移至接口引擎，安全审计继续只允许后端可信执行点写入。'
+    version: 'v1.0.1', apiRoutes: '/api/SysLog/AddSysLog',
+    history: '2026-09-08 v1.0.1 补齐旧 SysLog/AddSysLog 多路由和大小写兼容字段读取，保留真实用户与客户端日志边界。'
   },
   {
     key: 'platform-tencent-im', name: '平台腾讯 IM 管理', file: 'platform-tencent-im.js',

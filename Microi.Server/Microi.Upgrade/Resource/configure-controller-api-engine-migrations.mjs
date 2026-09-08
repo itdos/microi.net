@@ -325,16 +325,7 @@ const osLegacyActions = [
   'GetOsClient', 'GetHID', 'GetDateTimeNow', 'MicroiNetInitCheck',
 ];
 
-const osLegacyCode = officialNotice('SaaS引擎', 'platform-os-legacy-compatibility', `
-/* V8 ApiEngine | ApiEngineKey: platform-os-legacy-compatibility | Version: v1.0.0 */
-var route = String(V8.Param.ApiAddress || V8.Param._RequestPath || '').replace(/\\?.*$/, '');
-var segments = route.split('/');
-var action = String(V8.Param.Action || segments[segments.length - 1] || '').trim();
-var allowed = ${JSON.stringify(osLegacyActions)};
-if(allowed.indexOf(action) < 0) return { Code:0, Msg:'不支持的旧 OS 兼容动作。' };
-return V8.Method.RunPlatformApiRuntime({
-  RuntimeKey:'LegacyOs', Action:action, Param:V8.Param || {}
-});`);
+const osLegacyCode = fs.readFileSync(path.join(resourceDir, 'platform-os-legacy-compatibility.js'), 'utf8');
 
 const packageUpdates = {
   'app.microi.sys_user.json': {
@@ -458,6 +449,8 @@ const packageUpdates = {
         code: osLegacyCode,
         allowAnonymous: 1,
         responseType: 'HTTP',
+        version: 'v1.0.2',
+        changeHistory: '2026-09-08 v1.0.2 历史 OS 地址固定动作并归一化大小写，兼容路径 OsClient 后缀。\n2026-08-30 v1.0.0 迁移旧 Controller 路由到官方 Managed 接口引擎。\n',
       }),
       baseEngine({
         id: '019d35f0-7b04-7b91-9801-000000000009',

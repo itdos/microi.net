@@ -59,7 +59,7 @@ namespace Microi.net
                 return false;
             }
             // 等待中转结果的任务不能占满 Worker，至少给真实供应商执行留一个名额。
-            if (string.Equals(apiEngineKey, AiImageBackgroundTaskService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)
+            if (IsMediaRelayWorker(apiEngineKey)
                 && IsImageRelayAtCapacity(active, workerParallelism)) return false;
             if (!IsPlatformMaintenance(apiEngineKey)) return true;
 
@@ -126,12 +126,16 @@ namespace Microi.net
             {
                 excluded.UnionWith(PlatformMaintenanceApiEngineKeys);
             }
-            if (IsImageRelayAtCapacity(active, workerParallelism)) excluded.Add(AiImageBackgroundTaskService.WorkerApiEngineKey);
+            if (IsImageRelayAtCapacity(active, workerParallelism)) { excluded.Add(AiImageBackgroundTaskService.WorkerApiEngineKey); excluded.Add(AiMusicBackgroundTaskService.WorkerApiEngineKey); }
             return excluded.ToArray();
         }
 
+        private static bool IsMediaRelayWorker(string key)
+            => string.Equals(key, AiImageBackgroundTaskService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(key, AiMusicBackgroundTaskService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase);
+
         private static bool IsImageRelayAtCapacity(IEnumerable<BackgroundTaskLaneState> active, int workerParallelism)
-            => active.Count(x => string.Equals(x.ApiEngineKey, AiImageBackgroundTaskService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase))
+            => active.Count(x => IsMediaRelayWorker(x.ApiEngineKey))
                 >= Math.Max(MinimumWorkerParallelism, workerParallelism) - 1;
 
         internal static string LaneConcurrencyKey(string apiEngineKey)

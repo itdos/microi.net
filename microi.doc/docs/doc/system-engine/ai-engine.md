@@ -155,7 +155,7 @@ microi_chat({
 |---|---|---|---|
 | 生成式图片 | `POST /api/Ai/GenerateMiniMaxImage` | `image-01`；文生图及最多 4 张主体参考图；支持图生图、重绘、扩图、消除、去水印、证件照、多图合成、上色、修复、商品场景等受控工具意图 | 参考图先进入当前租户私有 HDFS，只把短时签名地址交给供应商；结果重新下载、校验并写入当前租户公有 HDFS |
 | 精确图片处理 | `POST /apiengine/platform-ai-runtime`，`Action=ProcessImage` | 黑白、纯色背景抠除、缩放、居中裁剪、旋转、翻转、格式转换和拼图；不消耗模型额度 | `V8.Image` 在服务端处理并写入当前租户公有 HDFS，返回可回读的尺寸、格式和永久地址 |
-| 音乐 | `POST /api/Ai/GenerateMiniMaxMusic` | 当前仅管理员；托管新路由 `music-3.0`，兼容既有 `music-2.6` 配置，或明确 410 后的官方开源 `MiniMax-Music3`；无人声，开源回退时长 10～60 秒 | 托管结果为 MP3，开源结果为 32kHz 立体声 WAV；两者均校验后写入当前租户公有 HDFS并用原生播放器预览 |
+| 音乐 | `POST /api/Ai/GenerateMiniMaxMusic` | 当前仅管理员；托管新路由 `music-3.0`，兼容既有 `music-2.6` 配置，或明确 410 后的官方开源 `MiniMax-Music3`；无人声，开源回退时长 10～60 秒 | 托管结果为 MP3，开源结果为 WAV，采样率、声道、码率与时长按实际文件头回读；两者均校验后写入当前租户公有 HDFS并用原生播放器预览 |
 
 生成式“消除、扩图、去水印、抠图”等目前是参考图 + 提示词重绘，不是像素级蒙版编辑；页面必须明确提示这一边界。要求确定像素结果时，应选择右侧标记为“精确”的 `V8.Image` 工具。
 
@@ -201,6 +201,12 @@ Authorization: <当前吾码管理员登录 Token>
 ```
 
 两类请求都必须使用稳定 `RequestId`。服务端按当前 `OsClient + 用户 + RequestId` 做共享幂等；相同请求可回放，参数冲突或上游结果不确定时不能换随机 Id 盲目重试。供应商 Key、图片 Base64、音频十六进制和中转站真实密钥都不能返回浏览器。
+
+音乐入口会先创建持久后台任务，返回 `Code=2` 和 `Data.TaskId`。继续调用 `GET /api/Ai/GetMiniMaxMusicTask?taskId=<原任务号>`，直到返回 `Code=1 + Permanent=true + FileUrl`；`Failed`、`Uncertain` 是需要处理的终态，不应一直显示“正在生成”。刷新页面或停止等待只结束前端等待，后台任务继续执行；重复提交必须保留原 `RequestId` 与全部参数。
+
+若 Music3 事件流或文件下载中断，系统保存原供应商任务号及完成文件地址。状态中的 `CanRecoverResult=true` 表示可以点击“恢复原配乐结果”，或调用 `POST /api/Ai/RecoverMiniMaxMusicTask?taskId=<原任务号>`；恢复只读取既有生成结果，不再次作曲。旧请求若没有保存供应商回执，仍会保留不确定状态，不能凭超时推断已扣费或自动另开请求。
+
+吾码中转节点采用 `POST /v1/microi/music_tasks`、`GET /v1/microi/music_tasks/{taskId}` 的异步协议，使用受保护的平台 API Key 和稳定 `Idempotency-Key`。调用节点、中转节点、Core/AI/API 和前端均需更新，安装 AI 助手应用包本身不会替换平台二进制。
 
 ### 媒体预览与文件地址
 

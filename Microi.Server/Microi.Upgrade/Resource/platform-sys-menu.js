@@ -7,6 +7,14 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-sys-menu
+ * Version: v1.0.4
+ * Function:
+ * - 菜单与角色菜单授权编排由应用商城交付；旧 SysMenu 路径固定解析动作并兼容大小写和租户后缀，保留角色权限树、个性化 Hook 与可信后端授权。
+ */
+
 // Microi官方接口引擎：platform-sys-menu
 // Version: v1.0.3
 // 菜单与角色菜单授权编排由应用商城交付；角色权限树使用固定窄投影、权威缓存和线性组树。
@@ -25,6 +33,15 @@ var allowed = {
   GetSysRoleLimitByMenuId: 1,
   UpdateSysRoleLimitByMenuId: 1
 };
+// 旧客户端只发送路径，不发送 Action；路径必须固定动作，不能被请求正文改为写操作。
+var route = String((V8.Param && (V8.Param._RequestPath || V8.Param.ApiAddress)) || '')
+  .replace(/\?.*$/, '').replace(/--OsClient--.*?--$/i, '');
+if (/^\/api\/sysmenu\//i.test(route)) action = route.split('/').pop();
+var canonicalAction = '';
+for (var name in allowed) {
+  if (name.toLowerCase() === action.toLowerCase()) { canonicalAction = name; break; }
+}
+action = canonicalAction;
 if (!allowed[action]) return { Code: 0, Msg: '不支持的菜单动作。' };
 var customization = V8.ApiEngine.Run('platform-marketplace-source-hook', {
   Stage: 'BeforeSysMenuAction',

@@ -11,6 +11,10 @@ public sealed class LegacyPlatformBootstrapCompatibilityTests
     [InlineData("/API/SYSUSER/REFRESHTOKEN", "Login", "RefreshToken")]
     [InlineData("/apiengine/platform-sys-user-session", "login", "Login")]
     [InlineData("/apiengine/platform-sys-menu", "getsysmenustep", "GetSysMenuStep")]
+    [InlineData("/api/os/getDateTimeNow", "GetHID", "GetDateTimeNow")]
+    [InlineData("/api/SysLog/addSysLog", "UserLogin", "AddSysLog")]
+    [InlineData("/apiengine/platform-os-legacy-compatibility", "getdatetimenow", "GetDateTimeNow")]
+    [InlineData("/apiengine/platform-client-log", "", "AddSysLog")]
     public void RoutesPinLegacyActionsAndNormalizeCanonicalActions(string path, string input, string expected)
         => Assert.Equal(expected, LegacyMobileCompatibilityController.ResolveRoute(path, input)?.Action);
 
@@ -22,6 +26,7 @@ public sealed class LegacyPlatformBootstrapCompatibilityTests
     [InlineData("/apiengine/platform-sys-menu", "DelSysMenu")]
     [InlineData("/apiengine/platform-sys-user-session", "SetPassword")]
     [InlineData("/LegacyMobileCompatibility/Run", "Login")]
+    [InlineData("/apiengine/platform-os-legacy-compatibility", "GetHID")]
     public void RecoveryCannotBecomeAGenericBusinessOrCredentialGateway(string path, string action)
         => Assert.Null(LegacyMobileCompatibilityController.ResolveRoute(path, action));
 
@@ -140,5 +145,61 @@ public sealed class LegacyPlatformBootstrapCompatibilityTests
         foreach (var key in new[] { "ApiEngineKey", "ApiAddress", "_CurrentUser", "_TrustedServerInvocation" })
             Assert.Null(result.GetValue(key, StringComparison.OrdinalIgnoreCase));
         Assert.Equal("Logout", source["action"]);
+    }
+
+    [Fact]
+    public async Task LegacyClockRetainsAnonymousDosResultAndHistoricalFormat()
+    {
+        var result = Assert.IsType<DosResult>(await PlatformBootstrapCompatibilityService.ExecuteAsync(
+            "GetDateTimeNow", new JObject { ["OsClient"] = "tenant-a" }, null));
+        Assert.Equal(1, result.Code);
+        var value = Assert.IsType<string>(result.Data);
+        Assert.Matches(@"^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}$", value);
+        Assert.True(Math.Abs((DateTime.Now - DateTime.ParseExact(value, "yyyy/MM/dd HH:mm:ss",
+            System.Globalization.CultureInfo.InvariantCulture)).TotalSeconds) < 5);
+    }
+
+    [Fact]
+    public void LegacyLogPinsActorAndTruncatesContentWithoutAddingRoutingAction()
+    {
+        var input = new JObject { ["title"] = " Test ", ["content"] = new string('x', 21000),
+            ["UserId"] = "forged", ["UserName"] = "forged", ["OsClient"] = "other", ["Source"] = "Audit" };
+        var prepared = LegacyMobileCompatibilityController.PrepareRequest(input, "tenant-a", "AddSysLog");
+        Assert.Null(prepared["Action"]);
+        var log = PlatformBootstrapCompatibilityService.BuildLegacyClientLog(prepared, "tenant-a",
+            new JObject { ["Id"] = "real-user", ["Name"] = "Real" }, out var error);
+        Assert.Null(error);
+        Assert.Equal("tenant-a", log.OsClient);
+        Assert.Equal("real-user", log.UserId);
+        Assert.Equal("Real", log.UserName);
+        Assert.Equal("Legacy", log.Category);
+        Assert.Equal("ClientLog", log.Action);
+        Assert.Equal("LegacyClientEndpoint", log.Source);
+        Assert.Equal("Test", log.Title);
+        Assert.Equal(20001, log.Content.Length);
+        Assert.True(LegacyMobileCompatibilityController.ResolveRoute("/api/SysLog/AddSysLog", "").Authenticated);
+    }
+
+    [Theory]
+    [InlineData("Action", "Login")]
+    [InlineData("category", "Audit")]
+    [InlineData("type", "用户登录")]
+    [InlineData("Title", "")]
+    public void LegacyLogCannotForgeBehaviorEvents(string field, string value)
+    {
+        var source = new JObject { ["Title"] = "Test", [field] = value };
+        var request = LegacyMobileCompatibilityController.PrepareRequest(source, "tenant-a", "AddSysLog");
+        var log = PlatformBootstrapCompatibilityService.BuildLegacyClientLog(request, "tenant-a",
+            new JObject { ["Id"] = "user" }, out var error);
+        Assert.Null(log);
+        Assert.False(string.IsNullOrWhiteSpace(error));
+    }
+
+    [Fact]
+    public async Task AnonymousLogIsRejectedBeforeStorage()
+    {
+        var result = Assert.IsType<DosResult>(await PlatformBootstrapCompatibilityService.ExecuteAsync(
+            "AddSysLog", new JObject { ["OsClient"] = "tenant-a", ["Title"] = "Test" }, null));
+        Assert.Equal(1001, result.Code);
     }
 }

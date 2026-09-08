@@ -566,13 +566,14 @@ async function readLiveEngineMetadata(client, projections) {
   return [...rowsByKey.values()];
 }
 
-function parseSourceSha256(toolResult, operation) {
+export function parseSourceSha256(toolResult, operation) {
   const output = collectText(toolResult);
   if (toolResult?.isError) {
     if (/(?:未找到接口引擎|NoExistData|不存在的数据)/i.test(output)) return null;
     throw new Error(`通过 microi_itdos MCP ${operation}失败：${output || '未知错误'}`);
   }
-  const match = output.match(/Full source SHA-256:\s*([a-f0-9]{64})/i);
+  // MCP 的完整摘要标题使用 Markdown 加粗，旧版本为纯文本；分块源码不能代替完整摘要。
+  const match = output.match(/(?:^|\r?\n)[ \t]*(?:- )?(?:\*\*)?Full source SHA-256(?:\*\*)?:[ \t]*([a-f0-9]{64})\b/i);
   // 超时恢复审计可能正好遇到“投影尚未提交”，此时读取缺失引擎会返回
   // Code=0/NoExistData 而没有源码摘要。把它归一为未命中，交给下方完整
   // 元数据 + 源码比较报告真实的“缺少/不一致”；不能让解析器掩盖原始投影超时。

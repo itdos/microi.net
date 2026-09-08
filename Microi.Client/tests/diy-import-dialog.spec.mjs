@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { parse } from "@vue/compiler-sfc";
+import { parse as parseScript } from "@babel/parser";
+import vm from "node:vm";
 
 const dialogPath = new URL(
     "../src/views/form-engine/diy-components/DiyImportDialog.vue",
@@ -16,6 +18,84 @@ const designSource = await readFile(
     new URL("../src/styles/mci-design.scss", import.meta.url),
     "utf8"
 );
+
+function progressHarness() {
+    const script = parse(dialogSource).descriptor.script.content;
+    const exported = parseScript(script, { sourceType: "module" }).program.body.find(node => node.type === "ExportDefaultDeclaration").declaration;
+    const methods = exported.properties.find(node => node.key.name === "methods").value.properties;
+    const names = ["stopImportProgressPolling", "getImportProgress", "handleUploadSuccess", "handleDialogClosed", "handleFileChange"];
+    const callbacks = [], timers = new Map(), emitted = [];
+    let id = 0;
+    const context = vm.createContext({
+        setTimeout: callback => { timers.set(++id, callback); return id; },
+        clearTimeout: key => timers.delete(key)
+    });
+    const bound = vm.runInContext(`({${methods.filter(node => names.includes(node.key.name)).map(node => script.slice(node.start, node.end)).join(",")}})`, context);
+    const state = {
+        ...bound, visible: true, legacyImportRunning: false, legacyProgressGeneration: 0,
+        submitting: true, uploadSucceeded: false, tableId: "fixture", importProgressApi: "/progress",
+        appendMenuContext: value => value, stopBackgroundTaskPolling() {},
+        $emit: (...args) => emitted.push(args), $t: value => value,
+        DiyCommon: { Post: (_url, _params, callback) => callbacks.push(callback), Result: result => result.Code === 1, IsNull: value => value == null }
+    };
+    return { state, callbacks, timers, emitted, tick() { const [key, callback] = timers.entries().next().value; timers.delete(key); callback(); } };
+}
+
+test("accepted background imports keep polling and refresh the list only after commit", () => {
+    const h = progressHarness();
+    h.state.handleUploadSuccess({ Code: 1 });
+    assert.equal(h.state.legacyImportRunning, true);
+    assert.equal(h.state.uploadSucceeded, false);
+    assert.equal(h.emitted.length, 0);
+    h.callbacks.shift()({ Code: 1, Data: ["已处理 614/747 条", "校验通过，正在写入数据"] });
+    assert.equal(h.timers.size, 1);
+    h.tick();
+    h.callbacks.shift()({ Code: 1, Data: ["747 条数据已全部成功结束"] });
+    assert.equal(h.state.legacyImportRunning, false);
+    assert.equal(h.state.uploadSucceeded, true);
+    assert.equal(h.emitted.length, 1);
+    assert.equal(h.timers.size, 0);
+    h.state.getImportProgress();
+    h.callbacks.shift()({ Code: 1, Data: ["已全部成功结束"] });
+    assert.equal(h.emitted.length, 1);
+});
+
+test("failed imports stop without success and partial commits refresh exactly once", () => {
+    for (const [message, success] of [["导入已失败！全部回滚", false], ["已按用户选择跳过错误行，其余成功行均已提交", true]]) {
+        const h = progressHarness();
+        h.state.handleUploadSuccess({ Code: 1 });
+        h.callbacks.shift()({ Code: 1, Data: [message] });
+        assert.equal(h.state.legacyImportRunning, false);
+        assert.equal(h.state.uploadSucceeded, success);
+        assert.equal(h.emitted.length, success ? 1 : 0);
+        assert.equal(h.timers.size, 0);
+    }
+});
+
+test("closing the dialog or requesting fresher progress discards in-flight responses", () => {
+    const h = progressHarness();
+    h.state.handleUploadSuccess({ Code: 1 });
+    const stale = h.callbacks.shift();
+    h.state.getImportProgress();
+    stale({ Code: 1, Data: ["已全部成功结束"] });
+    assert.equal(h.emitted.length, 0);
+    h.state.handleDialogClosed();
+    h.callbacks.shift()({ Code: 1, Data: ["已全部成功结束"] });
+    assert.equal(h.emitted.length, 0);
+    assert.equal(h.timers.size, 0);
+});
+
+test("upload status changes do not erase the background job or parse its workbook again", async () => {
+    const h = progressHarness();
+    h.state.clearImportState = () => { throw new Error("Active import was reset"); };
+    h.state.handleUploadSuccess({ Code: 1 });
+    for (const status of ["uploading", "success", "fail"]) {
+        await h.state.handleFileChange({ status, raw: { name: "747-rows.xls" } });
+    }
+    assert.equal(h.state.legacyImportRunning, true);
+    assert.equal(h.callbacks.length, 1);
+    assert.equal(h.state.uploadResult.Code, 1);
+});
 
 test("smart import dialog remains a valid Vue SFC", () => {
     const result = parse(dialogSource, { filename: "DiyImportDialog.vue" });

@@ -44,11 +44,22 @@ namespace Microi.net
                     return V8Method.GetLangBundleCore(osClient, lang, request["Prefix"]?.ToString());
                 case "GetLoginWallpapers":
                     return V8Method.GetLoginWallpapersCore(osClient);
+                case "GetDateTimeNow":
+                    // 保留旧 OS 接口的 DosResult 和斜杠日期格式；不返回宿主配置。
+                    return new DosResult(1, DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss", CultureInfo.InvariantCulture));
             }
             if (currentUser == null || string.IsNullOrWhiteSpace(currentUser["Id"]?.ToString()))
                 return new DosResult(1001, null, "登录身份已过期，请重新登录。");
             if (action == "GetCurrentUser")
                 return new DosResult(1, currentUser.DeepClone());
+            if (action == "AddSysLog")
+            {
+                var log = BuildLegacyClientLog(request, osClient, currentUser, out var error);
+                if (log == null) return new DosResult(0, null, error);
+                if (MicroiEngine.MongoDB == null) return new DosResult(0, null, "系统日志服务未配置。");
+                // 复用既有日志队列及按租户持久化机制，不增加另一套日志存储。
+                return await MicroiEngine.MongoDB.AddSysLog(log).ConfigureAwait(false);
+            }
             if (action == "GetSysMenuStep" || action == "GetSysMenu" || action == "GetSysMenuModel")
             {
                 // GetSysMenuStep performs the existing role/menu filtering. The single
@@ -80,6 +91,36 @@ namespace Microi.net
                 return SelectAuthorizedMenus(action, param.Id, param.ParentId, param.Class, rows);
             }
             return new DosResult(0, null, "不支持的兼容启动动作。");
+        }
+
+        internal static SysLogParam BuildLegacyClientLog(JObject request, string osClient,
+            JObject currentUser, out string error)
+        {
+            string Read(string key) => request.GetValue(key, StringComparison.OrdinalIgnoreCase)?.ToString() ?? "";
+            error = null;
+            if (currentUser == null || string.IsNullOrWhiteSpace(currentUser["Id"]?.ToString()))
+            { error = "登录身份已过期，请重新登录。"; return null; }
+            var type = Read("Type").Trim();
+            // 与 platform-client-log 保持同一输入边界：普通客户端不能伪造
+            // 安全审计/用户行为事件，租户与用户标识只能来自已校验 DiyToken。
+            var reserved = new[] { "访问菜单", "点击V8按钮", "查看数据", "数据操作", "导入数据",
+                "导出数据", "用户登录", "用户退出", "登录失效", "私有附件", "登录失败" };
+            if (reserved.Contains(type) || !string.IsNullOrEmpty(Read("Category")) || !string.IsNullOrEmpty(Read("Action")))
+            { error = "平台用户行为日志只能由后端可信执行点生成。"; return null; }
+            var title = Read("Title").Trim();
+            if (title.Length == 0 || title.Length > 500)
+            { error = "日志标题不能为空且最多 500 个字符。"; return null; }
+            var content = Read("Content");
+            if (content.Length > 20000) content = content.Substring(0, 20000) + "…";
+            var userName = currentUser["Name"]?.ToString();
+            return new SysLogParam
+            {
+                OsClient = osClient, UserId = currentUser["Id"]?.ToString(),
+                UserName = string.IsNullOrWhiteSpace(userName) ? currentUser["Account"]?.ToString() : userName,
+                Type = string.IsNullOrEmpty(type) ? "Client" : type, Title = title, Content = content,
+                Level = int.TryParse(Read("Level"), out var level) && level != 0 ? level : 1,
+                Category = "Legacy", Action = "ClientLog", Source = "LegacyClientEndpoint"
+            };
         }
 
         internal static DosResult SelectAuthorizedMenus(string action, string id, string parentId,

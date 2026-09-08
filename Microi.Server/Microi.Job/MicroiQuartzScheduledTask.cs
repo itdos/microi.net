@@ -30,6 +30,7 @@ namespace Microi.net
 
         // 添加一个标志表示是否已初始化
         private bool _isInitialized = false;
+        internal IScheduler CurrentScheduler => _scheduler;
         
         // 使用 SemaphoreSlim 替代 lock，支持异步等待
         private readonly SemaphoreSlim _initLock = new SemaphoreSlim(1, 1);
@@ -143,7 +144,7 @@ namespace Microi.net
                         ["quartz.threadPool.threadCount"] = "10",
 
                         // 作业存储 - 必须配置
-                        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+                        ["quartz.jobStore.type"] = typeof(MicroiTaskSchedulingJobStore).AssemblyQualifiedName,
                         ["quartz.jobStore.driverDelegateType"] = MicroiJobExtension.GetDriverDelegateType(databaseType),
                         ["quartz.jobStore.tablePrefix"] = "microi_job_",
                         ["quartz.jobStore.dataSource"] = "default",

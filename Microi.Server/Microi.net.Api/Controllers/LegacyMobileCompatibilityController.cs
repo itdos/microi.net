@@ -11,7 +11,7 @@ namespace Microi.net.Api;
 /*
  * 【仅兼容、禁止新增业务、未来可能整体删除】
  * 下列旧接口已由官方 Managed 接口引擎实现。租户尚未完成应用升级时，本 Controller
- * 保证密码登录、DiyToken 会话及基础导航仍可用，使管理员能进入应用商城更新平台应用。
+ * 保证密码登录、DiyToken 会话、基础导航、服务器时间及客户端语义日志仍可用。
  * 已有接口引擎始终优先；只有主库确认地址和固定 Key 均缺失才调用现有可信 Core 原子。
  * 禁用、StopHttp、权限拒绝、数据库异常及接口执行失败绝不触发兜底，也不在请求中写入资源。
  */
@@ -39,6 +39,8 @@ public sealed class LegacyMobileCompatibilityController : Controller
             ["/api/FormEngine/GetLangBundle"] = new("platform-lang-bundle", "GetLangBundle"),
             ["/api/FormEngine/GetLoginWallpapers"] = new("platform-login-wallpapers", "GetLoginWallpapers"),
             ["/api/Os/GetOsClientByDomain"] = new("platform-os-client-by-domain", "GetOsClientByDomain"),
+            ["/api/Os/GetDateTimeNow"] = new("platform-os-legacy-compatibility", "GetDateTimeNow"),
+            ["/api/SysLog/AddSysLog"] = new("platform-client-log", "AddSysLog", true),
             ["/api/SysMenu/GetSysMenuStep"] = new("platform-sys-menu", "GetSysMenuStep", true),
             ["/api/SysMenu/GetSysMenuModel"] = new("platform-sys-menu", "GetSysMenuModel", true),
             ["/api/SysMenu/GetSysMenu"] = new("platform-sys-menu", "GetSysMenu", true),
@@ -48,6 +50,8 @@ public sealed class LegacyMobileCompatibilityController : Controller
             ["/apiengine/platform-login-wallpapers"] = new("platform-login-wallpapers", "GetLoginWallpapers"),
             ["/apiengine/platform-os-client-by-domain"] = new("platform-os-client-by-domain", "GetOsClientByDomain"),
             ["/apiengine/platform-sys-user-session"] = new("platform-sys-user-session", ""),
+            ["/apiengine/platform-os-legacy-compatibility"] = new("platform-os-legacy-compatibility", ""),
+            ["/apiengine/platform-client-log"] = new("platform-client-log", "AddSysLog", true),
             ["/apiengine/platform-sys-menu"] = new("platform-sys-menu", "", true)
         };
 
@@ -139,12 +143,25 @@ public sealed class LegacyMobileCompatibilityController : Controller
                 return Json(new DosResult(0, null, "接口已停用。"));
             if (DynamicHelper.GetDynamicBoolValue(model, "StopHttp"))
                 return Json(new DosResult(0, null, "接口禁止 HTTP 调用。"));
-            HttpContext.Items[DynamicRoute.ResolvedApiEngineKeyItem] =
-                DynamicHelper.GetDynamicStringValue(model, "ApiEngineKey", "");
+            var engineKey = DynamicHelper.GetDynamicStringValue(model, "ApiEngineKey", "");
+            // 升级补齐配置后，执行器的旧/半量模型也必须失效；否则真实匿名登录引擎
+            // 仍可能被缓存判为需要 Token。复用核心权威读取，刷新该引擎全部模型别名。
+            var executionModel = await MicroiEngine.ApiEngine.GetAuthoritativeApiEngineModel(
+                new ApiEngineParam { OsClient = osClient, ApiEngineKey = engineKey });
+            if (executionModel.Code != 1 || executionModel.Data == null)
+                return Json(executionModel);
+            HttpContext.Items[DynamicRoute.ResolvedApiEngineKeyItem] = engineKey;
             if (DynamicRoute.TryMatchConfiguredTemplate(model, path, out var routeValues))
                 HttpContext.Items[DynamicRoute.ResolvedApiRouteValuesItem] = routeValues;
             Response.Headers["X-Microi-Bootstrap-Route"] = "ApiEngine";
-            return await new ApiEngineController { ControllerContext = ControllerContext }.Run(request);
+            var engineController = new ApiEngineController { ControllerContext = ControllerContext };
+            // OS 旧协议使用宿主签发的 HTTP 响应，必须继续由标准出口解包，
+            // 不能把响应信封当作业务 JSON 返回给旧客户端。
+            var responseType = DynamicHelper.GetDynamicStringValue(model, "ResponseType", "");
+            if (string.Equals(responseType, "HTTP", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(responseType, "RawHttp", StringComparison.OrdinalIgnoreCase))
+                return await engineController.Run_Response_Http();
+            return await engineController.Run(request);
         }
 
         if (route.PostOnly && !HttpMethods.IsPost(Request.Method))
@@ -191,7 +208,11 @@ public sealed class LegacyMobileCompatibilityController : Controller
                      || new[] { "OsClient", "Action", "_DevBypassPwd", "_CurrentUser", "_HttpMethod", "_RequestPath", "_RouteValues" }
                          .Contains(property.Name, StringComparer.OrdinalIgnoreCase)).ToList()) property.Remove();
         request["OsClient"] = osClient;
-        request["Action"] = action;
+        // 客户端日志的 Action 属于禁止伪造的审计字段，不是路由参数。
+        // 不自动注入 AddSysLog；显式传入的值保留给同一日志校验规则拒绝。
+        if (action != "AddSysLog") request["Action"] = action;
+        else if (source?.GetValue("Action", StringComparison.OrdinalIgnoreCase) is JToken suppliedAction)
+            request["Action"] = suppliedAction.DeepClone();
         request["_DevBypassPwd"] = false;
         return request;
     }
