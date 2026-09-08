@@ -51,6 +51,7 @@ namespace Microi.net
                     {
                         x.UseClustering();
                         ConfigurePersistentStore(x, databaseType, quartzDbConn);
+                        x.SetProperty("quartz.jobStore.type", typeof(MicroiTaskSchedulingJobStore).AssemblyQualifiedName);
                         x.UseNewtonsoftJsonSerializer();
                         // x.SetProperty("quartz.jobStore.misfireThreshold", "60000");//检查失火阈值
                         // x.SetProperty("quartz.scheduler.timeZone", "Asia/Shanghai");//或 "China Standard Time"
@@ -74,6 +75,7 @@ namespace Microi.net
                     options.StartDelay = TimeSpan.FromSeconds(10); // 延迟启动
                 });
                 services.AddSingleton<IMicroiJob, MicroiQuartzScheduledTask>();
+                services.AddHostedService<MicroiDisabledScheduleObserver>();
                 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【分布式任务调度】插件成功！");
                 return services;
             }

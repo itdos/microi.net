@@ -161,6 +161,7 @@
                                         height: 100%;
                                     "
                                 >
+                                    <DiyDevComponentSourceInfo v-if="CurrentDiyFieldModel.Component === 'DevComponent'" :field="CurrentDiyFieldModel" />
                                     <DiyForm
                                         ref="diyform_diy_field"
                                         :LoadMode="''"
@@ -265,6 +266,7 @@
             </template>
 
             <div v-if="CurrentDiyFieldModel && CurrentDiyFieldModel.Id" class="diy-designer-field-dialog__body">
+                <DiyDevComponentSourceInfo v-if="CurrentDiyFieldModel.Component === 'DevComponent'" :field="CurrentDiyFieldModel" />
                 <DiyForm
                     ref="diyform_diy_field_dialog"
                     :LoadMode="''"
@@ -326,6 +328,7 @@ import _ from "underscore";
 import draggable from "vuedraggable";
 import { useDiyStore } from "@/pinia";
 import DiyChildTableCallback from "./diy-components/diy-writebackChild.vue";
+import DiyDevComponentSourceInfo from "./diy-components/DiyDevComponentSourceInfo.vue";
 import DiyV8Design from "./diy-components/diy-v8design";
 import lodash, { set } from "lodash";
 import { defineAsyncComponent } from "vue";
@@ -351,6 +354,7 @@ export default {
         draggable,
         DiyV8Design,
         DiyChildTableCallback,
+        DiyDevComponentSourceInfo,
         DiyFormDialog
     },
     setup() {

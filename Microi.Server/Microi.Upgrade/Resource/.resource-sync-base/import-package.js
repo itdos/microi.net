@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.8.11
+ * Version: v2.8.12
  * Function:
  * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
  */
@@ -2071,18 +2071,29 @@ try {
             return base64;
         }
         var apiBase = firstTextParam([V8.SysConfig && V8.SysConfig.ApiBase]).replace(/\/+$/g, '');
-        if (!apiBase && serverHostedInline !== true) throw new Error('SysConfig.ApiBase不能为空，无法写入应用运行时上下文');
+        var microserviceRuntime = /^micro-app\//i.test(String(rootPath || ''));
+        if (!apiBase && serverHostedInline !== true && !microserviceRuntime) {
+            throw new Error('SysConfig.ApiBase不能为空，无法写入独立 Web/UniApp 应用运行时上下文；请在目标租户系统设置中配置实际 API 地址后重试。');
+        }
         var contextJson = JSON.stringify({ ApiBase: apiBase, OsClient: String(V8.OsClient || '') })
             .replace(/</g, '\\u003c')
             .replace(/\u2028/g, '\\u2028')
             .replace(/\u2029/g, '\\u2029');
         var html = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(String(base64 || '')));
-        // DATABASE_INLINE_SERVING_API_CONTEXT_V1: an old tenant may predate the
-        // ApiBase field. DatabaseOnly microservices are served by this API, so
-        // their actual entry URL determines the endpoint (including /v2 proxies).
-        // Public HDFS HTML still requires an explicitly configured ApiBase.
-        var resolveServingApi = !apiBase && serverHostedInline === true
-            ? 'var u=new URL(window.__MICRO_APP_PUBLIC_PATH__||window.location.href);var p=u.pathname.indexOf("/micro-app/");if(p<0||!/^https?:$/.test(u.protocol))throw new Error("无法识别内置应用的API服务地址");c.ApiBase=u.origin+u.pathname.substring(0,p);'
+        // DATABASE_INLINE_SERVING_API_CONTEXT_V1 / MICROSERVICE_HOST_RUNTIME_CONTEXT_V1：
+        // 新租户与旧库还原可能没有 ApiBase 字段。微服务的文件无论存储在数据库
+        // 还是 HDFS，都由宿主传入当前 API/租户；独立访问使用绑定该租户的 API
+        // 稳定入口。禁止把 HDFS/CDN 域名、发布端上下文或另一租户当成目标 API。
+        var resolveServingApi = !apiBase && (serverHostedInline === true || microserviceRuntime)
+            ? 'var d=window.microApp&&typeof window.microApp.getData==="function"?window.microApp.getData():null;'
+                + 'var a=d&&(d.apiBase||d.ApiBase);var t=d&&(d.osClient||d.OsClient);'
+                + 'if(a){if(String(t||"").toLowerCase()!==c.OsClient.toLowerCase())throw new Error("微服务宿主与安装租户不一致");'
+                + 'var h=new URL(a);if(!/^https?:$/.test(h.protocol)||h.username||h.password||h.search||h.hash)throw new Error("微服务宿主API地址无效");c.ApiBase=h.href.replace(/\\/+$/,"");}'
+                + 'else{var u=new URL(window.__MICRO_APP_PUBLIC_PATH__||window.location.href);var p=u.pathname.indexOf("/micro-app/");'
+                + 'var s=p<0?[]:u.pathname.substring(p+11).split("/");var tenant=s[0]==="v3"&&s[1]==="tenants"?s[2]:s[0];'
+                + 'if(p<0||!/^https?:$/.test(u.protocol)||u.username||u.password||String(decodeURIComponent(tenant||"")).toLowerCase()!==c.OsClient.toLowerCase())'
+                + 'throw new Error("无法识别微服务的API服务地址，请从目标租户系统打开，或在系统设置中配置ApiBase后重新安装");'
+                + 'c.ApiBase=u.origin+u.pathname.substring(0,p);}'
             : '';
         var runtimeScript = '<script data-microi-runtime-context="true">(function(){var c=' + contextJson + ';' + resolveServingApi + 'window.__MICROI_APP_CONTEXT__=Object.assign({},window.__MICROI_APP_CONTEXT__||{},c);window.MICROI_API_BASE=c.ApiBase;window.MICROI_OS_CLIENT=c.OsClient;})();<\/script>';
         var existing = /<script\b[^>]*data-microi-runtime-context=["']true["'][^>]*>[\s\S]*?<\/script>/i;

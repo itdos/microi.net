@@ -51,6 +51,7 @@ const saasPackageVersionArgument = argumentValue('--saas-package-version');
 const storePackageVersionArgument = argumentValue('--store-package-version');
 const sourceManifestHashOverride = argumentValue('--source-manifest-hash');
 const runtimeManifestHashOverride = argumentValue('--runtime-manifest-hash');
+const changeSummary = argumentValue('--change-summary').trim();
 const verifyOnly = process.argv.includes('--verify-only');
 const refreshCandidate = process.argv.includes('--refresh-candidate');
 const requireCleanSource = process.argv.includes('--require-clean-source');
@@ -475,8 +476,8 @@ if (runtimeChanged) {
   const releaseDate = localTime.slice(0, 10);
   packageModel.PackageInfo.Version = saasPackageVersionArgument;
   storePackageModel.PackageInfo.Version = storePackageVersionArgument;
-  const saasChangeContent = `重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保官方在线应用与 SaaS 离线兜底产物一致。`;
-  const storeChangeContent = `重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保应用商城可独立交付当前离线兜底产物。`;
+  const saasChangeContent = `重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保官方在线应用与 SaaS 离线兜底产物一致。${changeSummary}`;
+  const storeChangeContent = `重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保应用商城可独立交付当前离线兜底产物。${changeSummary}`;
   const saasHistoryLine = `${releaseDate} ${saasPackageVersionArgument} ${saasChangeContent}`;
   const storeHistoryLine = `${releaseDate} ${storePackageVersionArgument} ${storeChangeContent}`;
   if (!String(packageModel.PackageInfo.ChangeHistory || '').includes(saasHistoryLine)) {

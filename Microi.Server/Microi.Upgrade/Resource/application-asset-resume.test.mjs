@@ -34,7 +34,7 @@ function asset(path, content) {
 }
 
 // 每片新建 VM，只有持久行/对象/检查点留到下一片，避免用同进程内存掩盖恢复问题。
-function createInstaller({ files, moveAvailable = true, appType = 'MicroService', inline = false, checkpoint = {}, resumeInstall = true, afterPersist = () => {} } = {}) {
+function createInstaller({ files, moveAvailable = true, appType = 'MicroService', inline = false, apiBase = 'https://target.example/api', checkpoint = {}, resumeInstall = true, afterPersist = () => {} } = {}) {
   const rows = {};
   const objects = new Map();
   const uploads = [];
@@ -60,7 +60,7 @@ function createInstaller({ files, moveAvailable = true, appType = 'MicroService'
       },
       reportProgress() {}, pruneApplicationAssets() {},
       V8: {
-        Param: { ApplicationAssetChunkMaxFiles: 1 }, OsClient: 'target', SysConfig: { ApiBase: 'https://target.example/api' },
+        Param: { ApplicationAssetChunkMaxFiles: 1 }, OsClient: 'target', SysConfig: { ApiBase: apiBase },
         Base64: { StringToBase64: text => Buffer.from(text).toString('base64') },
         Method: {
           Upload(options) {
@@ -151,6 +151,23 @@ for (const appType of ['Web', 'UniApp', 'MicroService']) {
     }
   });
 }
+
+test('new tenant without ApiBase completes HDFS microservice install and exact replay across worker slices', () => {
+  const files = [asset('index.html', '<html><head></head><body>workflow</body></html>'), asset('app.js', 'ready')];
+  const installer = createInstaller({ files, apiBase: '' });
+  assert.equal(installer.run().Data.BackgroundTask.Current, 1);
+  assert.equal(installer.run().Complete, true);
+  assert.equal(installer.run().Complete, true);
+  assert.equal(installer.uploads.length, 2, 'runtime context rewriting must not break idempotent asset reuse');
+  const htmlRow = installer.rows['dist/index.html'];
+  const bytes = installer.objects.get(htmlRow.HdfsPath);
+  assert.equal(htmlRow.ContentHash, sha256(bytes));
+  assert.equal(htmlRow.Size, bytes.length);
+  const window = { microApp: { getData: () => ({apiBase: 'https://runtime.example/v2', osClient: 'target'}) } };
+  vm.runInNewContext(bytes.toString().match(/<script[^>]*>([\s\S]*?)<\/script>/)[1], {window, URL});
+  assert.equal(window.MICROI_API_BASE, 'https://runtime.example/v2');
+  assert.equal(window.MICROI_OS_CLIENT, 'target');
+});
 
 test('background sharding remains resumable when an old caller explicitly disables ResumeInstall', () => {
   const installer = createInstaller({ files: [asset('a.js', 'a'), asset('b.js', 'b')], resumeInstall: false });

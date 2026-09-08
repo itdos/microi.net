@@ -68,7 +68,7 @@ test('application-store package delivers every startup endpoint and managed poli
       key: 'platform-sys-menu',
       source: 'Microi.Server/Microi.Upgrade/Resource/platform-sys-menu.js',
       address: '/apiengine/platform-sys-menu',
-      version: 'v1.0.3',
+      version: 'v1.0.4',
       capabilities: [
         'V8.Method.ManageSystemDirectory',
         'ApiEngine:platform-sys-menu@v1.0.1',

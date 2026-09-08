@@ -2769,13 +2769,14 @@ test("database-only legacy tenant runtime derives its own serving API and keeps 
   vm.runInNewContext(`${runtimeHelper}; result=rewriteApplicationRuntimeContext;`, fixture);
   const html = '<html><head><script data-microi-runtime-context="true">publisherContext()</script></head><body>app</body></html>';
   const input = Buffer.from(html).toString('base64');
-  assert.throws(() => fixture.result('micro-app/app/v1', 'index.html', input), /ApiBase/);
+  assert.throws(() => fixture.result('ai-app-publish/app/v1', 'index.html', input), /ApiBase/);
   const rewritten = Buffer.from(fixture.result('micro-app/app/v1', 'index.html', input, true), 'base64').toString();
   assert.doesNotMatch(rewritten, /publisherContext/);
   const script = rewritten.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1];
   for (const [entry, expected] of [
     ['https://tenant-api.example/micro-app/legacy-child/app/index.html', 'https://tenant-api.example'],
     ['https://tenant-api.example/v2/micro-app/legacy-child/app/', 'https://tenant-api.example/v2'],
+    ['https://tenant-api.example/v2/micro-app/v3/tenants/legacy-child/kinds/runtime/apps/app/assets/index.html', 'https://tenant-api.example/v2'],
   ]) {
     const window = { __MICRO_APP_PUBLIC_PATH__: entry, location: { href: 'about:blank' }, __MICROI_APP_CONTEXT__: { ApiBase: 'https://publisher.example', OsClient: 'publisher' } };
     vm.runInNewContext(script, { window, URL });
@@ -2789,6 +2790,35 @@ test("database-only legacy tenant runtime derives its own serving API and keeps 
   vm.runInNewContext(configured.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1], { window });
   assert.equal(window.MICROI_API_BASE, 'https://configured.example/custom');
   assert.equal(window.MICROI_OS_CLIENT, 'legacy-child');
+});
+
+test("HDFS microservices without ApiBase use matching host context and reject publisher or CDN fallback", () => {
+  const fixture = {
+    V8: { SysConfig: {}, OsClient: 'new-child' },
+    firstTextParam: values => values.find(value => value) || '',
+    System: {
+      Text: { Encoding: { UTF8: { GetString: value => value.toString('utf8'), GetBytes: value => Buffer.from(value, 'utf8') } } },
+      Convert: { FromBase64String: value => Buffer.from(value, 'base64'), ToBase64String: value => Buffer.from(value).toString('base64') },
+    },
+  };
+  const runtimeHelper = source.slice(source.indexOf('var rewriteApplicationRuntimeContext = function ('), source.indexOf('// PUBLIC_APPLICATION_ENTRY_URL_V1'));
+  vm.runInNewContext(`${runtimeHelper}; result=rewriteApplicationRuntimeContext;`, fixture);
+  const input = Buffer.from('<head><script data-microi-runtime-context="true">publisherContext()</script></head>').toString('base64');
+  const html = Buffer.from(fixture.result('micro-app/workflow/v1', 'index.html', input, false), 'base64').toString();
+  assert.doesNotMatch(html, /publisherContext/);
+  const script = html.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1];
+  const run = host => {
+    const window = { microApp: { getData: () => host }, location: { href: 'https://cdn.example/new-child/micro-app/workflow/index.html' } };
+    vm.runInNewContext(script, {window, URL});
+    return window;
+  };
+  const result = run({apiBase: 'https://actual-api.example/v2/', osClient: 'NEW-CHILD'});
+  assert.equal(result.MICROI_API_BASE, 'https://actual-api.example/v2');
+  assert.equal(result.MICROI_OS_CLIENT, 'new-child');
+  assert.throws(() => run({apiBase: 'https://publisher.example', osClient: 'publisher'}), /租户不一致/);
+  assert.throws(() => run({apiBase: 'https://user:secret@example.com', osClient: 'new-child'}), /API地址无效/);
+  assert.throws(() => run({apiBase: 'https://api.example?token=x', osClient: 'new-child'}), /API地址无效/);
+  assert.throws(() => run(null), /从目标租户系统打开/);
 });
 
 test("import failures identify the active package stage", () => {

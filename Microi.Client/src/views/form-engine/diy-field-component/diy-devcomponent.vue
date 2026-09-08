@@ -7,6 +7,7 @@
             :type="renderSourceType"
             placement="edge"
             :instance-key="field.Id || field.Name"
+            :source-info="renderSourceInfo"
         />
         <component
             v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
@@ -33,6 +34,7 @@
             @CallbackFormValueChange="CallbackFormValueChange"
             @ParentFormSet="ParentFormSet"
             @FormSet="FormSet"
+            @render-source-resolved="handleRenderSourceResolved"
         />
     </div>
 
@@ -65,7 +67,7 @@
 </template>
 
 <script setup>
-import { computed, ref, reactive, getCurrentInstance } from "vue";
+import { computed, ref, reactive, watch, getCurrentInstance } from "vue";
 import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 import { resolveDevComponentRenderSource } from "@/utils/framework-presentation.js";
 
@@ -147,6 +149,21 @@ const devComponentRef = ref(null);
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
+const resolvedSourceInfo = ref({});
+watch(() => [props.field?.Id, props.field?.Config?.DevComponentName, props.field?.Config?.DevComponentPath], () => {
+    resolvedSourceInfo.value = {};
+});
+const renderSourceInfo = computed(() => ({
+    componentName: props.field?.Config?.DevComponentName || "",
+    componentPath: props.field?.Config?.DevComponentPath || "",
+    frameworkRoute: proxy.$route?.path || "",
+    osClient: DiyCommon.GetOsClient(),
+    apiBase: DiyCommon.GetApiBase(),
+    ...resolvedSourceInfo.value
+}));
+const handleRenderSourceResolved = info => {
+    if (info?.componentPath === props.field?.Config?.DevComponentPath) resolvedSourceInfo.value = info;
+};
 const renderSourceType = computed(() => {
     const componentName = props.field?.Config?.DevComponentName;
     if (!componentName) return "";

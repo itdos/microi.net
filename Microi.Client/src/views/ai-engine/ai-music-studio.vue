@@ -65,10 +65,14 @@
                     size="large"
                     :icon="Headset"
                     :loading="loading"
-                    :disabled="!mediaSelection"
+                    :disabled="!mediaSelection && !taskState"
                     data-testid="ai-music-run"
-                    @click="generateMusic"
-                >{{ loading ? "正在作曲" : "生成 AI 配乐" }}</el-button>
+                    @click="generateMusic()"
+                >{{ loading ? "正在作曲" : taskState ? "继续查询原配乐" : "生成 AI 配乐" }}</el-button>
+                <p v-if="taskState" data-testid="ai-music-task-status">{{ taskStatusText }} · 已保留原配乐任务，离开页面不会取消生成。</p>
+                <el-button v-if="loading" @click="waitingController?.abort()">停止等待</el-button>
+                <el-button v-if="!loading && taskState?.CanRecoverResult" data-testid="ai-music-recover" @click="generateMusic(true)">恢复原配乐结果</el-button>
+                <el-button v-if="taskState && !loading && ['Failed','Canceled','Succeeded'].includes(taskState.Status)" @click="taskState = null; saveTask()">新建配乐</el-button>
                 <p class="music-rights">请勿要求模仿在世艺术家或未经授权复刻受保护作品；发布前仍需人工试听与版权复核。</p>
             </div>
         </div>
@@ -96,14 +100,26 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, ref } from "vue";
+import { computed, getCurrentInstance, ref, onBeforeUnmount, onMounted } from "vue";
 import { Download, Headset } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
+import { useDiyStore } from "@/pinia";
+import { generateMiniMaxMusic } from "./minimax-music-task.js";
 import AiMediaModelSelect from './ai-media-model-select.vue';
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
 const loading = ref(false);
+const taskState = ref(null);
+const taskStatusText = computed(() => ({Submitting: '正在提交', Pending: '等待生成', Running: '正在生成', Retrying: '正在恢复', Succeeded: '已保存', Failed: '生成失败', Canceled: '任务已取消', Uncertain: '结果待确认'}[taskState.value?.Status] || '正在查询'));
+let waitingController;
+const taskStorageKey = () => `microi-music:${DiyCommon.GetApiBase()}:${DiyCommon.GetOsClient()}:${useDiyStore().GetCurrentUser?.Id || ""}`;
+const saveTask = () => { try { sessionStorage.setItem(taskStorageKey(), JSON.stringify(taskState.value)); } catch {} };
+onBeforeUnmount(() => waitingController?.abort());
+onMounted(() => {
+    try { taskState.value = JSON.parse(sessionStorage.getItem(taskStorageKey()) || "null"); } catch {}
+    if (taskState.value?.TaskId) generateMusic();
+});
 const mediaSelection = ref(null);
 const prompt = ref("");
 const durationSeconds = ref(20);
@@ -141,43 +157,34 @@ function requestId() {
     return `music-studio:${random}`.replace(/[^a-zA-Z0-9._:-]/g, "-").slice(0, 160);
 }
 
-async function generateMusic() {
+async function generateMusic(recoverResult = false) {
     if (loading.value) return;
-    if (!mediaSelection.value) { ElMessage.warning('请先选择音乐模型'); return; }
-    if (!prompt.value.trim()) {
+    if (!taskState.value && !mediaSelection.value) { ElMessage.warning('请先选择音乐模型'); return; }
+    if (!taskState.value && !prompt.value.trim()) {
         ElMessage.warning("请先描述想要的音乐");
         return;
     }
     loading.value = true;
     result.value = null;
     try {
-        const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/GenerateMiniMaxMusic`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                authorization: DiyCommon.getToken() ? `Bearer ${DiyCommon.getToken()}` : ""
-            },
-            body: JSON.stringify({
-                RequestId: requestId(),
-                Prompt: prompt.value.trim(),
-                Model: mediaSelection.value.Model,
-                AiModelId: mediaSelection.value.AiModelId,
-                IsInstrumental: true,
-                SampleRate: 44100,
-                Bitrate: 256000,
-                Format: "mp3",
-                DurationSeconds: durationSeconds.value
-            })
-        });
-        let payload;
-        try { payload = await response.json(); } catch { throw new Error(`音乐服务响应无法解析（HTTP ${response.status}）`); }
-        const current = unwrapDosResult(payload);
-        if (!response.ok || Number(current?.Code ?? current?.code) !== 1) throw new Error(current?.Msg || current?.msg || "AI 音乐生成失败");
-        result.value = current.Data || current.data || null;
+        if (!taskState.value) {
+            taskState.value = { Status: "Submitting", Request: { RequestId: requestId(), Prompt: prompt.value.trim(),
+                Model: mediaSelection.value.Model, AiModelId: mediaSelection.value.AiModelId,
+                IsInstrumental: true, SampleRate: 44100, Bitrate: 256000, Format: "mp3", DurationSeconds: durationSeconds.value } };
+            saveTask();
+        }
+        waitingController = new AbortController();
+        result.value = await generateMiniMaxMusic({ diy: DiyCommon, signal: waitingController.signal,
+            request: taskState.value.Request, taskId: taskState.value.TaskId,
+            recoverResult: recoverResult === true,
+            onProgress: data => { taskState.value = { ...taskState.value, ...data }; saveTask(); } });
+        taskState.value.Status = "Succeeded";
+        saveTask();
         if (!result.value?.FileUrl) throw new Error("音乐已生成，但没有获得可播放的 HDFS 地址");
         ElMessage.success(result.value.Replayed === true ? "已返回同一请求的既有音轨" : "配乐已生成并写入 HDFS");
     } catch (error) {
-        ElMessage.error(error?.message || "AI 音乐生成失败");
+        if (taskState.value && error.musicStatus) { taskState.value.Status = error.musicStatus; saveTask(); }
+        if (error.name !== "AbortError") ElMessage.error(error?.message || "AI 音乐生成失败");
     } finally {
         loading.value = false;
     }
