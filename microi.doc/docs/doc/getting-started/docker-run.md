@@ -136,11 +136,30 @@ Docker Compose 官方文档说明 `cgroup_parent` 用于指定容器父 cgroup�
 页面末尾仍保留 Ollama 与 Qdrant 的手动编排，仅用于已有项目兼容、独立本地模型实验，或经过实际召回评测后确认必须使用向量库的特殊场景；它们不是新装环境的推荐依赖。
 ::::
 
-### 📦 CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装
+### 📦 CentOS 7/8/9 / Alibaba Cloud Linux 3 / Anolis / Ubuntu 20/22/24 / Debian 10/11/12 一键安装
+
+Alibaba Cloud Linux 3 会按[阿里云官方安装方式](https://help.aliyun.com/zh/ecs/user-guide/install-and-use-docker)补齐 `dnf-plugin-releasever-adapter`，使 Docker CE 仓库使用适配后的发行版本；已有 Docker 与 Compose 可用时继续复用。
+
 ```bash
 # 官方 GitHub 镜像（源码浏览）：https://github.com/itdos/microi.net
 url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh
 ```
+
+#### MinIO 报 `no route to host`（Alibaba Cloud Linux / Anolis / 宝塔）
+
+如果宿主机 MinIO 健康检查通过，但 `mc` 访问 `http://microi-install-minio:9000` 报 `no route to host`，说明容器之间的 TCP 连接尚未建立，不能据此认定 Access Key / Secret Key 错误。重点检查 `microi` 网桥的 firewalld zone、Docker 转发规则和宝塔防火墙规则。
+
+新版脚本会分别写入、回读 firewalld 的运行与持久端口配置，不再在创建 Docker 网络后执行全局 `firewall-cmd --reload`；只校正 `microi` / `microi-ocr` 对应网桥在 Docker 官方 `docker` zone 中的归属。已有 zone 的 target 必须为 `ACCEPT`，否则输出诊断并停止，不自动更改全局安全策略。脚本不会关闭 firewalld/SELinux、清空 iptables、全局放行 FORWARD 或重启 Docker。这与 [Docker 的 firewalld 集成](https://docs.docker.com/engine/network/packet-filtering-firewalls/#integration-with-firewalld)和 [firewalld 的运行/持久端口配置方式](https://firewalld.org/documentation/howto/open-a-port-or-service.html)一致。
+
+安装中断后，可先把最新版 `install-microi.sh` 放到服务器，再执行独立的网络修复：
+
+```bash
+bash install-microi.sh --repair-network
+```
+
+该入口保留现有容器、端口、凭据和数据目录，并用 `mc` 镜像在 `microi` 网络中访问 MinIO readiness。正常安装也必须通过相同网络检测，随后才验证凭据、创建或复用桶并回读公私桶权限；宿主机端口可达不会单独显示为 MinIO 验收通过。
+
+**网络修复不等于续装。** 若失败发生于步骤 9、API 和 `microi-install-app/docker-compose.yml` 还没有创建，`--repair-app` 无法补齐此次安装。保留失败汇总与已有编排，按实际配置恢复后续安装；普通安装入口仍会拒绝覆盖已有 `microi-install-*` 容器，防止重新导入数据库。仅在确认是尚未投入使用的新安装且已有备份时，才按中断安装提示停掉对应编排并重新安装，原数据目录继续保留。
 
 #### 复用已有 MySQL / MinIO
 
