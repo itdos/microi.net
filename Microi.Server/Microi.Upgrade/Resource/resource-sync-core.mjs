@@ -320,6 +320,14 @@ export function validateOfficialPackageInstallContracts(name, content) {
       throw new Error(`${name} 包含未使用的工作流物理依赖 ${tableName}，应从导出包移除，禁止要求目标租户预装可选插件`);
     }
     const columnName = String(column?.COLUMN_NAME ?? column?.ColumnName ?? column?.Name ?? '').trim();
+    if (column.SQLSERVER_UNICODE !== undefined) {
+      const type = String(column.COLUMN_TYPE ?? column.ColumnType ?? column.Type ?? '').trim();
+      const owned = (packageModel.DiyTables || []).some(table =>
+        String(table.Name || table.TableName || '').toLowerCase() === tableName);
+      if (column.SQLSERVER_UNICODE !== true || !owned || !/^(?:n?(?:var)?char|(?:tiny|medium|long|n)?text)\b/i.test(type)) {
+        throw new Error(`${name} 物理字段 ${tableName}.${columnName} 的 SQLSERVER_UNICODE 必须为 true 且仅声明包拥有的文本列`);
+      }
+    }
     const nullable = String(column?.IS_NULLABLE ?? column?.IsNullable ?? '').trim().toUpperCase();
     const backfillSource = String(
       column?.BACKFILL_VALUE_SOURCE ?? column?.BackfillValueSource ?? '',

@@ -77,6 +77,10 @@ function run(storeRows, options = {}) {
     Db: {
       FromSql(sql) {
         queries.push(sql)
+        // 安装记录与商城定义是不同读边界，模拟器不能用商城行冒充已安装应用。
+        if (/FROM\s+sys_microistoreversion\b/i.test(sql)) {
+          return { ToArray: () => options.installedRows || [] }
+        }
         if (/FROM\s+sys_apiengine/i.test(sql)) {
           return { ToArray: () => options.evidenceEngineRows || [] }
         }
@@ -244,7 +248,10 @@ test('store packages use compact MySQL JSON projection instead of loading packag
   const { result, queries } = run([])
 
   assert.equal(result.Code, 1)
-  assert.equal(queries.length, 3)
+  assert.equal(queries.filter((sql) => /FROM\s+sys_microistore\b/i.test(sql)).length, 1)
+  const installedQuery = queries.find((sql) => /FROM\s+sys_microistoreversion\b/i.test(sql))
+  assert.match(installedQuery, /SELECT StoreId, AppId FROM sys_microistoreversion/)
+  assert.doesNotMatch(installedQuery, /SELECT\s+\*|InstallResult|AppPakcet/i)
   assert.match(queries[0], /JSON_VALID\(AppPakcet\)/)
   assert.match(queries[0], /JSON_EXTRACT\(SelectTable, '\$\[\*\]\.Name'\)/)
   assert.match(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\.DiyTables\[\*\]\.Name'\)/)
@@ -323,6 +330,22 @@ test('empty database SQL clears credentials and operational residue but keeps co
   }
   assert.match(result.Data.Sql, /DELETE from sys_datasource\s+WHERE LOWER\(COALESCE\(DataSourceKey, ''\)\) <> 'virtual-table-personal-setting';/)
   assert.doesNotMatch(result.Data.Sql, /DROP TABLE IF EXISTS mci_ai_token_account/)
+})
+
+test('mail and runtime history data are removed only from present tables while schemas remain protected', () => {
+  const tables = ['mci_email_account', 'mci_email_message', 'mci_email_sync_log',
+    'mci_apiengine_change_history', 'mci_vision_request', 'mci_vision_subject', 'mci_vision_sample']
+  for (const optionalTables of [tables, []]) {
+    const { result } = run([], { optionalTables })
+    assert.equal(result.Code, 1)
+    for (const table of tables) {
+      const statement = new RegExp(`DELETE FROM ${table};`, 'i')
+      if (optionalTables.length) assert.match(result.Data.Sql, statement)
+      else assert.doesNotMatch(result.Data.Sql, statement)
+      assert.ok(result.Data.ProtectedPlatformTables.includes(table))
+      assert.doesNotMatch(result.Data.Sql, new RegExp(`DROP TABLE(?: IF EXISTS)? ${table}\\b`, 'i'))
+    }
+  }
 })
 
 test('top-level AI application menu tree is removed recursively while AI assistant stays', () => {

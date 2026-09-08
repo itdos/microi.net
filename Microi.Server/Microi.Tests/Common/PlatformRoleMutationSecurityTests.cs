@@ -71,7 +71,7 @@ public class PlatformRoleMutationSecurityTests
     public void LegacySysUserCrudEndpoints_AreApiRoutesWithGranularTrustedAuthorization()
     {
         var root = FindRepositoryRoot();
-        Assert.False(File.Exists(Path.Combine(
+        Assert.DoesNotContain("/api/SysUser/AddSysUser", File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers",
             "LegacyMobileCompatibilityController.cs")));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(

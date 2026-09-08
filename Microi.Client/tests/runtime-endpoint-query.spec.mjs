@@ -2,6 +2,43 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+test("initial navigation waits for tenant bootstrap before discovering SSO", async function () {
+    const { waitForPlatformBootstrap, completePlatformBootstrap } = await import("../src/utils/runtime-endpoint-query.js?bootstrap-success");
+    let tenant = "iTdos", requestedTenant = "";
+    const navigation = waitForPlatformBootstrap().then(function (ready) {
+        if (ready) requestedTenant = tenant;
+    });
+    await Promise.resolve();
+    assert.equal(requestedTenant, "", "No request can use the pre-bootstrap default tenant");
+    tenant = "congshi";
+    completePlatformBootstrap(true);
+    await navigation;
+    assert.equal(requestedTenant, "congshi");
+    assert.equal(await waitForPlatformBootstrap(), true, "Later navigation reuses successful initialization");
+});
+
+test("failed tenant bootstrap releases waiting navigation without authorizing requests", async function () {
+    const { waitForPlatformBootstrap, completePlatformBootstrap } = await import("../src/utils/runtime-endpoint-query.js?bootstrap-failure");
+    const navigation = waitForPlatformBootstrap();
+    completePlatformBootstrap(false);
+    assert.equal(await navigation, false);
+    completePlatformBootstrap(true);
+    assert.equal(await waitForPlatformBootstrap(), false, "Failure stays closed until a fresh page bootstrap");
+});
+
+test("main releases tenant bootstrap before awaiting the first guarded route", async function () {
+    const main = await readFile(new URL("../src/main.js", import.meta.url), "utf8");
+    const guard = await readFile(new URL("../src/permission.js", import.meta.url), "utf8");
+    const init = main.indexOf("initApp().then(async function ()");
+    const ready = main.indexOf("completePlatformBootstrap(true)", init);
+    assert.ok(ready > init && ready < main.indexOf("await router.isReady()", init));
+    assert.match(main.slice(ready), /catch\(function \(error\)\s*\{\s*completePlatformBootstrap\(false\)/);
+    const guardStart = guard.indexOf("router.beforeEach");
+    const gate = guard.indexOf("await waitForPlatformBootstrap()", guardStart);
+    assert.ok(gate > guardStart && gate < guard.indexOf("await loadLegacySsoCapabilities()", guardStart));
+    assert.match(guard.slice(gate, gate + 160), /next\(false\)/);
+});
+
 import {
     getRuntimeEndpointQuery,
     normalizeRuntimeApiBase,

@@ -727,7 +727,10 @@ export type SystemObservabilityQueryAction =
   | 'SecurityData'
   | 'TrafficHistory'
   | 'TrafficDetails'
-  | 'HistoricalDashboard';
+  | 'HistoricalDashboard'
+  | 'Memory'
+  | 'MemoryIncidents'
+  | 'MemoryIncident';
 
 export type SystemObservabilityManageAction = 'BlockIp' | 'UnblockIp';
 
@@ -3013,6 +3016,9 @@ export class MicroiClient {
     eventType: string,
     options: RequestOptions = {},
   ): Promise<ApiResponse<V8Event>> {
+    // 历史文档名 DataFilterV8 对应运行时真实字段 ServerDataV8。
+    // 直接把别名写入 diy_table 会得到成功响应，却不会执行脱敏/过滤。
+    eventType = eventType === 'DataFilterV8' ? 'ServerDataV8' : eventType;
     return this.post(API.GET_EVENT_CODE, {
       OsClient: this.config.osClient,
       FormEngineKey: formEngineKey,
@@ -3021,6 +3027,7 @@ export class MicroiClient {
   }
 
   async saveEventCode(formEngineKey: string, eventType: string, code: string, options?: { functionDescription?: string; changeSummary?: string }): Promise<ApiResponse> {
+    eventType = eventType === 'DataFilterV8' ? 'ServerDataV8' : eventType;
     assertSourceIntegrity(code, `保存 V8 事件 ${formEngineKey}/${eventType}`);
     let remote: V8Event | undefined;
     try {

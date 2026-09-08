@@ -81,6 +81,8 @@ var suggestion = V8.TranslateEngine.Suggest({
 
 `GetLang` 返回 `diy_lang` 词条文本，`GetLangData` 返回词条对象。它们不调用 LibreTranslate。
 
+`diy_lang` 运行时缓存按每页 500 行读取，默认上限为 50,000 条原始行、5,000,000 个投影字符。主租户 SaaS 引擎的“多语言缓存最大行数”为空时，后端默认值与该字段的新建默认值一致；已有显式配置仍优先。超过行数或字符预算时保留原缓存，禁止为消除提示直接删除词条或取消内存保护。
+
 ### 能力边界
 
 | LibreTranslate 业务能力 | V8 方法 | 说明 |

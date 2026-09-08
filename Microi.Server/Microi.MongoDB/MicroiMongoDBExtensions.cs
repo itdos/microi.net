@@ -10,6 +10,7 @@ namespace Microi.net
             try
             {
                 services.AddSingleton<IMongoDB, V8MongoDB>();
+                services.AddSingleton<IMemoryIncidentRepository>(provider => (V8MongoDB)provider.GetRequiredService<IMongoDB>());
                 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【MongoDB】插件成功！");
                 return services;
             }

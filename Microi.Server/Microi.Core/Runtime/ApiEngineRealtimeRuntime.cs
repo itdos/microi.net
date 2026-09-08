@@ -426,7 +426,7 @@ namespace Microi.net
                         TransportName,
                         broadcastGroupName,
                         ClientEventName,
-                        realtimeEvent)
+                        CreateTransportPayload(realtimeEvent))
                     .ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -573,6 +573,76 @@ namespace Microi.net
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Redis backplane serializes every enabled SignalR protocol, including MessagePack,
+        /// even when the recipient uses JSON. Never send Newtonsoft JToken objects on that wire.
+        /// Keep the existing public field contract and project only JSON-safe CLR containers.
+        /// </summary>
+        public static Dictionary<string, object> CreateTransportPayload(ApiEngineRealtimeEvent source)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            return new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["EventId"] = source.EventId,
+                ["ChannelKey"] = source.ChannelKey,
+                ["SubjectId"] = source.SubjectId,
+                ["Version"] = source.Version,
+                ["EventType"] = source.EventType,
+                ["Data"] = ProjectJsonTransportValue(source.Data),
+                ["OccurredAt"] = source.OccurredAt
+            };
+        }
+
+        /// <summary>Subscription completions must apply the same projection to their optional Latest event.</summary>
+        public static Dictionary<string, object> CreateSubscriptionTransportPayload(ApiEngineRealtimeSubscriptionResult source)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            return new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["ProtocolVersion"] = source.ProtocolVersion,
+                ["ChannelKey"] = source.ChannelKey,
+                ["SubjectId"] = source.SubjectId,
+                ["Version"] = source.Version,
+                ["Latest"] = source.Latest == null ? null : CreateTransportPayload(source.Latest),
+                ["RenewAfterMilliseconds"] = source.RenewAfterMilliseconds,
+                ["LeaseExpiresAt"] = source.LeaseExpiresAt
+            };
+        }
+
+        // Data has already passed the public-event whitelist and 32 KB JSON budget.
+        // This is a detached transport copy, not a mutation of the cached event/fingerprint.
+        private static object ProjectJsonTransportValue(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined) return null;
+            if (token is JObject jsonObject)
+            {
+                var result = new Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (var property in jsonObject.Properties()) result[property.Name] = ProjectJsonTransportValue(property.Value);
+                return result;
+            }
+            if (token is JArray jsonArray)
+            {
+                var result = new object[jsonArray.Count];
+                for (var index = 0; index < result.Length; index++) result[index] = ProjectJsonTransportValue(jsonArray[index]);
+                return result;
+            }
+            if (token is JValue value)
+            {
+                switch (token.Type)
+                {
+                    case JTokenType.Integer:
+                    case JTokenType.Float:
+                    case JTokenType.Boolean:
+                    case JTokenType.String:
+                        return value.Value;
+                    default:
+                        // Preserve Newtonsoft's JSON representation of dates, GUIDs and binary values.
+                        return JsonConvert.DeserializeObject<string>(token.ToString(Formatting.None));
+                }
+            }
+            throw new ArgumentException("Unsupported realtime JSON value.", nameof(token));
         }
 
         public static bool TryValidateAuthorizationResponse(

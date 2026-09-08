@@ -845,6 +845,7 @@ namespace Microi.net
                 ApplicationAssetStreamIoConcurrency,
                 ApplicationAssetStreamReadBudgetBytes,
                 ApplicationAssetReleaseVerification = "durable-batched-v1",
+                ApplicationAssetReleaseRecoveryDiscovery = "primary-db-filtered-v1",
                 ApplicationAssetReleaseVerificationBatchFiles = 32,
                 ApplicationAssetStreamLimitsApplyTo = "legacy-single-request",
                 ApplicationAssetResumableSupported,

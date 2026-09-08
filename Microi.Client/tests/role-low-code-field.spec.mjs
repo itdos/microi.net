@@ -14,7 +14,8 @@ test("low-code role permission field uses FormEngine data and emits a virtual JS
     const runtimeTemplate = devComponentSource.slice(0, devComponentSource.indexOf("<!-- 配置弹窗"));
 
     assert.match(source, /FormEngine\.GetTableData\("sys_rolelimit"/);
-    assert.match(source, /TableName:\s*"Sys_Menu"/);
+    assert.match(source, /this\.DiyApi\.GetRolePermissionTree\(\)/);
+    assert.match(source, /不支持的菜单动作\|unsupported menu action/);
     assert.match(source, /JSON\.stringify\(\{\s*Menu:/);
     assert.match(source, /flushPendingSync/);
     assert.match(source, /parent\.Permission\.includes\("Read"\)/);
@@ -50,7 +51,7 @@ test("field label alignment and left tree leaf semantics respect positive config
     assert.match(leftTree, /item\._IsLeaf\s*=\s*!item\._HasChild/);
     assert.match(leftRight, /LastClickNode:\s*\{ _IsAllCategory: true \}/);
     const allCategoryStart = leftRight.indexOf("if (data && data._IsAllCategory === true)");
-    const allCategoryEnd = leftRight.indexOf("if(self.LastClickNode.Id == data.Id)", allCategoryStart);
+    const allCategoryEnd = leftRight.indexOf("if (!data || self.LastClickNode.Id == data.Id)", allCategoryStart);
     const allCategoryBranch = allCategoryStart >= 0 && allCategoryEnd > allCategoryStart
         ? leftRight.slice(allCategoryStart, allCategoryEnd)
         : "";

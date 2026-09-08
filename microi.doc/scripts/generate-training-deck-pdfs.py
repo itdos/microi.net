@@ -22,14 +22,14 @@ from reportlab.pdfgen import canvas
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = PROJECT_ROOT.parent
-TEMP_ROOT = PROJECT_ROOT / "tmp" / "pdfs"
+TEMP_ROOT = WORKSPACE_ROOT / ".tmp" / "training-deck" / "pdfs"
 PUBLIC_ROOT = PROJECT_ROOT / "docs" / "public" / "downloads"
 THUMBNAIL_ROOTS = {
     "dark": PROJECT_ROOT / "docs" / "public" / "images" / "training-deck" / "thumbs",
     "light": PROJECT_ROOT / "docs" / "public" / "images" / "training-deck" / "thumbs-light",
 }
 OUTPUT_ROOT = WORKSPACE_ROOT / "output" / "pdf"
-SLIDE_COUNT = 45
+SLIDE_COUNT = 46
 PAGE_SIZE = (960, 540)
 CAPTURE_SIZE = (1600, 900)
 MASTER_SIZE = (3840, 2160)
@@ -146,7 +146,7 @@ def build_variant(variant: str, label: str) -> dict[str, object]:
     writer.add_metadata({
         "/Title": f"Microi吾码 AI 开发框架技术培训大纲（{label}）",
         "/Author": "Microi吾码",
-        "/Subject": "45页功能点培训：30+引擎、AI数据分析、AI创作、MCP、全端交付与企业案例",
+        "/Subject": "46页功能点培训：30+引擎、邮箱系统、AI数据分析、AI创作、MCP、全端交付与企业案例",
         "/Creator": "Microi吾码官网预生成培训课件",
     })
     with public_pdf.open("wb") as stream:

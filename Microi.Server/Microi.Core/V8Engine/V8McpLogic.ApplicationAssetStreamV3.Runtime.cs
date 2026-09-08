@@ -1109,6 +1109,54 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 发布状态是 v3 物理协议列，不能依赖 diy_field 元数据过滤。
+        /// 旧库可能尚未登记这些列；FormEngine 会忽略未知筛选字段，导致
+        /// 历史版本占满扫描预算。这里只返回有界候选，实际执行仍须主库重读及租约。
+        /// </summary>
+        private static string BuildApplicationAssetV3RecoveryCandidateSql(
+            ApplicationAssetV3SqlDialect dialect,
+            int limit)
+        {
+            if (limit <= 0 || limit > ApplicationAssetV3RecoveryPageSize * ApplicationAssetV3RecoveryMaxPagesPerTenant)
+                throw new ArgumentOutOfRangeException(nameof(limit));
+            string Q(string name) => QuoteApplicationAssetV3Identifier(dialect, name);
+            var columns = string.Join(",", new[] { "Id", "AppId", "VersionNo", "PublishState", "UpdateTime" }.Select(Q));
+            var from = $"FROM {Q("mci_ai_app_version")} WHERE {Q("PublishProtocolVersion")}=@protocol "
+                + $"AND {Q("PublishState")} IN (@verifying,@committed,@pending,@repair) "
+                + $"AND ({Q("IsDeleted")} IS NULL OR {Q("IsDeleted")}=0) "
+                + $"ORDER BY COALESCE({Q("UpdateTime")},{Q("CreateTime")}),{Q("Id")}";
+            return dialect switch
+            {
+                ApplicationAssetV3SqlDialect.MySql => $"SELECT {columns} {from} LIMIT {limit}",
+                ApplicationAssetV3SqlDialect.SqlServer => $"SELECT TOP ({limit}) {columns} {from}",
+                ApplicationAssetV3SqlDialect.Oracle => $"SELECT * FROM (SELECT {columns} {from}) WHERE ROWNUM <= {limit}",
+                _ => throw new ArgumentOutOfRangeException(nameof(dialect))
+            };
+        }
+
+        private static async Task<List<JObject>> ReadApplicationAssetV3RecoveryCandidatesStrongAsync(
+            string osClient,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var client = OsClientExtend.GetClient(osClient);
+            if (client?.Db == null) throw new InvalidOperationException("未找到租户主库连接：" + osClient);
+            var sql = BuildApplicationAssetV3RecoveryCandidateSql(ResolveApplicationAssetV3SqlDialect(osClient), limit);
+            var section = client.Db.FromSql(sql)
+                .AddInParameter("@protocol", ApplicationAssetStreamV3ProtocolVersion)
+                .AddInParameter("@verifying", ApplicationAssetV3PublishState.Verifying.ToString())
+                .AddInParameter("@committed", ApplicationAssetV3PublishState.PointerCommitted.ToString())
+                .AddInParameter("@pending", ApplicationAssetV3PublishState.ProjectionPending.ToString())
+                .AddInParameter("@repair", ApplicationAssetV3PublishState.RepairRequired.ToString());
+            section.SetCommandTimeout(15);
+            var rows = await section.ToListAsync<dynamic>().ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return (rows ?? new List<dynamic>())
+                .Select(row => row as JObject ?? JObject.FromObject((object)row)).ToList();
+        }
+
+        /// <summary>
         /// Performs one bounded, multi-tenant roll-forward pass for durable v3
         /// pointers whose classic/file projection was interrupted. Candidate
         /// discovery is only a bounded hint; every version is re-read from the
@@ -1148,55 +1196,12 @@ namespace Microi.net
                 if (scheduled >= ApplicationAssetV3RecoveryMaxCandidatesPerRound) break;
                 try
                 {
-                    var candidates = new List<JObject>();
-                    var uniqueVersionIds = new HashSet<string>(StringComparer.Ordinal);
-                    for (var pageIndex = 1;
-                         pageIndex <= ApplicationAssetV3RecoveryMaxPagesPerTenant
-                         && scheduled + candidates.Count < ApplicationAssetV3RecoveryMaxCandidatesPerRound;
-                         pageIndex++)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var pageSize = Math.Min(
-                            ApplicationAssetV3RecoveryPageSize,
-                            ApplicationAssetV3RecoveryMaxCandidatesPerRound - scheduled - candidates.Count);
-                        var query = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>(
-                            "mci_ai_app_version",
-                            new
-                            {
-                                OsClient = osClient,
-                                _Where = new List<object>
-                                {
-                                    new List<object> { "PublishProtocolVersion", "=", 3 },
-                                    new List<object>
-                                    {
-                                        "AND", "PublishState", "In", new[]
-                                        {
-                                            ApplicationAssetV3PublishState.Verifying.ToString(),
-                                            ApplicationAssetV3PublishState.PointerCommitted.ToString(),
-                                            ApplicationAssetV3PublishState.ProjectionPending.ToString(),
-                                            ApplicationAssetV3PublishState.RepairRequired.ToString()
-                                        }
-                                    }
-                                },
-                                _SelectFields = new[] { "Id", "AppId", "VersionNo", "PublishState", "UpdateTime" },
-                                _OrderBy = "UpdateTime",
-                                _OrderByType = "ASC",
-                                _PageIndex = pageIndex,
-                                _PageSize = pageSize
-                            }).ConfigureAwait(false);
-                        if (query.Code != 1) break;
-                        var rows = query.Data == null
-                            ? new JArray()
-                            : JArray.FromObject((object)query.Data);
-                        foreach (var token in rows)
-                        {
-                            var candidate = token as JObject ?? JObject.FromObject(token);
-                            var versionId = SafeJString(candidate, "Id");
-                            if (!versionId.DosIsNullOrWhiteSpace() && uniqueVersionIds.Add(versionId))
-                                candidates.Add(candidate);
-                        }
-                        if (rows.Count < pageSize) break;
-                    }
+                    // 一次主库快照等价于原来的 2 × 25 条预算，避免变动队列的 offset 漏读。
+                    var candidateLimit = Math.Min(
+                        ApplicationAssetV3RecoveryPageSize * ApplicationAssetV3RecoveryMaxPagesPerTenant,
+                        ApplicationAssetV3RecoveryMaxCandidatesPerRound - scheduled);
+                    var candidates = await ReadApplicationAssetV3RecoveryCandidatesStrongAsync(
+                        osClient, candidateLimit, cancellationToken).ConfigureAwait(false);
 
                     scheduled += candidates.Count;
                     foreach (var candidate in candidates)

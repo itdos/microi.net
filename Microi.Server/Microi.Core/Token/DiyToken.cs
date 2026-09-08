@@ -1106,6 +1106,9 @@ namespace Microi.net
         {
             if (source == null) return null;
             SysUserLogic.SanitizeLoginProjection(currentUser);
+            // 只有活动会话与权限范围验证成功后才标注租户，覆盖普通 Controller 的内存归属；
+            // 诊断不读取/持久化 Token 或用户对象，也不改变登录结果。
+            ExecutionObservation.Annotate(tenant: osClient);
             return new CurrentToken
             {
                 CurrentUser = currentUser,

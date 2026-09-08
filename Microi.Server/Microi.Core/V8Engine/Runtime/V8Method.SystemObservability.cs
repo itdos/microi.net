@@ -50,6 +50,14 @@ namespace Microi.net
                         return GetObservabilityApiRank(request, osClient);
                     case "applogs":
                         return GetObservabilityAppLogs(request);
+                    case "memory":
+                    case "memoryincidents":
+                    case "memoryincident":
+                        var diagnostics = MicroiEngine.TryGetService<IMemoryDiagnosticsRuntime>();
+                        if (diagnostics == null) return new DosResult(0, null, "当前后端未安装内存诊断运行时，请升级 API 后端。");
+                        using (var timeout = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5)))
+                            return new DosResult(1, diagnostics.QueryAsync(action.Trim().ToLowerInvariant(), osClient,
+                                GetJsonString(request, "IncidentId"), timeout.Token).GetAwaiter().GetResult());
                     default:
                         return new DosResult(0, null, "不支持的系统观测动作。");
                 }

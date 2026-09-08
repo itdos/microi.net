@@ -20,7 +20,13 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
   const fakeClient = {
     querySystemObservability: async (query: SystemObservabilityQuery) => {
       queries.push(query);
-      return { Code: 1, Msg: '', Data: { Action: query.Action, CurrentNodeOnly: true } };
+      return { Code: 1, Msg: '', Data: { Action: query.Action, CurrentNodeOnly: true,
+        ...(query.Action === 'Memory' ? {
+          Executions: { ObservationMode: 'BoundaryAccounting+BackgroundIdentity', IdentityRegistryOverflowCount: 0,
+            NativeThreadIdentityUnavailableCount: 0, IdentityRefreshFailureCount: 0 },
+          Collector: { ObservedIdentityProtocolVersion: 2, BackgroundIdentityRefreshes: 17, RejectedStaleIdentityMarkers: 1 },
+        } : {}),
+      } };
     },
     manageSystemObservability: async (command: SystemObservabilityManage) => {
       commands.push(command);
@@ -45,6 +51,15 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
     }) as CallToolResult;
     assert.match(toolText(catalog), /microi_query_system_observability/u);
     assert.match(toolText(catalog), /microi_manage_system_observability/u);
+
+    const description = await client.callTool({
+      name: 'microi_codex',
+      arguments: { action: 'describe_tool', params: { name: 'microi_query_system_observability' } },
+    }) as CallToolResult;
+    assert.equal(description.isError, undefined);
+    for (const term of ['MemoryIncidents', 'MemoryIncident', 'incidentId', 'Collector', 'retained heap']) {
+      assert.ok(toolText(description).includes(term), `AI discovery must explain ${term}`);
+    }
 
     const capabilities = await client.callTool({
       name: 'microi_codex',
@@ -91,6 +106,33 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
     assert.equal(missingTrace.isError, true);
     assert.equal(queries.length, 3);
 
+    // 事故查询始终只读；详情标识由入口校验，不能把任意文件路径送进后端。
+    for (const action of ['Memory', 'MemoryIncidents'] as const) {
+      const result = await client.callTool({ name: 'microi_codex',
+        arguments: { action: 'microi_query_system_observability', params: { action } } }) as CallToolResult;
+      assert.equal(result.isError, undefined);
+      assert.equal(queries.at(-1)?.Action, action);
+      if (action === 'Memory') {
+        for (const field of ['BoundaryAccounting+BackgroundIdentity', 'IdentityRegistryOverflowCount',
+          'NativeThreadIdentityUnavailableCount', 'IdentityRefreshFailureCount', 'ObservedIdentityProtocolVersion',
+          'BackgroundIdentityRefreshes', 'RejectedStaleIdentityMarkers'])
+          assert.ok(toolText(result).includes(field), `MCP must preserve diagnostic quality field ${field}`);
+      }
+    }
+    const incidentId = 'abcdef0123456789abcdef0123456789';
+    const detail = await client.callTool({ name: 'microi_codex',
+      arguments: { action: 'microi_query_system_observability', params: { action: 'MemoryIncident', incidentId } } }) as CallToolResult;
+    assert.equal(detail.isError, undefined);
+    assert.deepEqual(queries.at(-1), { Action: 'MemoryIncident', IncidentId: incidentId });
+    const countBeforeInvalid = queries.length;
+    for (const invalid of [{}, { incidentId: '../../secrets' }]) {
+      const result = await client.callTool({ name: 'microi_codex',
+        arguments: { action: 'microi_query_system_observability', params: { action: 'MemoryIncident', ...invalid } } }) as CallToolResult;
+      assert.equal(result.isError, true);
+    }
+    assert.equal(queries.length, countBeforeInvalid);
+    assert.equal(commands.length, 0);
+
     const dryRun = await client.callTool({
       name: 'microi_codex',
       arguments: {
@@ -120,6 +162,47 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
     });
     assert.equal(audits.length, 1);
     assert.doesNotMatch(audits[0]?.content || '', /异常流量复核/u);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
+test('memory MCP preserves incomplete evidence and backend failures without invoking writes', async () => {
+  const incidentId = 'abcdef0123456789abcdef0123456789';
+  let reply: { Code: number; Msg: string; Data: unknown } = {
+    Code: 1, Msg: '', Data: {
+      Items: [{ Id: incidentId, Stacks: { MissingStackSamples: 527, Truncated: true },
+        Evidence: { StackQuality: { MissingStackSamples: 527 } } }],
+      SharedStorage: 'Unavailable', LocalFallbackAvailable: true,
+      Evidence: { PendingUploads: 2, SharedStorageError: 'TimeoutException' },
+    },
+  };
+  let reads = 0;
+  const server = createMcpServer({
+    querySystemObservability: async () => { reads++; return reply; },
+    manageSystemObservability: async () => { assert.fail('memory reads must not invoke governance'); },
+    writeAuditLog: async () => { assert.fail('memory reads must not create a write action'); },
+  } as unknown as MicroiClient, {
+    osClient: 'tenant-a', apiBaseUrl: 'https://microi.test', label: '测试租户', codexMode: true,
+  });
+  const client = new Client({ name: 'memory-evidence-boundaries', version: '1.0.0' });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await Promise.all([client.connect(a), server.connect(b)]);
+  const read = () => client.callTool({ name: 'microi_codex', arguments: {
+    action: 'microi_query_system_observability', params: { action: 'MemoryIncident', incidentId },
+  } }) as Promise<CallToolResult>;
+  try {
+    const partial = await read();
+    assert.equal(partial.isError, undefined);
+    assert.deepEqual(JSON.parse(toolText(partial)), reply);
+    for (const Msg of ['不支持的系统观测动作。', '当前后端未安装内存诊断运行时，请升级 API 后端。', '无平台可观测性管理员权限。']) {
+      reply = { Code: 0, Msg, Data: null };
+      const failed = await read();
+      assert.equal(failed.isError, true);
+      assert.deepEqual(JSON.parse(toolText(failed)), reply);
+    }
+    assert.equal(reads, 4, 'failures must not trigger automatic retry or fallback writes');
   } finally {
     await client.close();
     await server.close();

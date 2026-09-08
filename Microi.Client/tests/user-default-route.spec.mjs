@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readPlatformServiceSource } from "./helpers/platform-service-source.mjs";
 
 const loginSource = await readFile(
   new URL("../src/views/login/index.vue", import.meta.url),
@@ -26,17 +27,22 @@ test("password login prioritizes the authorized user default route", () => {
 test("direct-token and SSO guards use the same user-route precedence", () => {
   assert.match(permissionSource, /function getUserDefaultIndexUrl/);
   assert.match(permissionSource, /async function getAuthorizedUserDefaultIndexUrl/);
-  assert.match(permissionSource, /directLoginResult\.Data/);
+  assert.match(permissionSource, /const usesDiyToken[\s\S]*?DiyApi\.TokenLogin\(\)\.toLowerCase\(\)/);
   assert.match(permissionSource, /ssoApiResult\.Data/);
-  assert.match(permissionSource, /await getAuthorizedUserDefaultIndexUrl\(directLoginResult\.Data\)/);
+  assert.match(permissionSource, /await DiyCommon\.PostAsync\(diySso\.ClientSsoApi/);
   assert.match(permissionSource, /await getAuthorizedUserDefaultIndexUrl\(ssoApiResult\.Data\)/);
   assert.match(permissionSource, /hasAccessibleRoutePath\(accessRoutes, candidatePath\)/);
 });
 
-test("every signed-in user can save a route selected from current authorized routes", () => {
+test("signed-in users save their own route through the platform service and login rechecks access", async () => {
+  const personalSettings = readPlatformServiceSource("src/PersonalSettings.vue");
+  const preferencesEngine = await readFile(new URL("../../Microi.Server/Microi.Upgrade/Resource/platform-user-update-preferences.js", import.meta.url), "utf8");
   assert.match(navbarSource, /OpenPersonalSettings/);
-  assert.match(navbarSource, /BuildDefaultRouteOptions\(this\.routes\)/);
-  assert.match(navbarSource, /\/api\/SysUser\/UpdateMyDefaultIndexUrl/);
-  assert.match(navbarSource, /DefaultIndexUrl/);
-  assert.match(navbarSource, /权限变化后若原页面不可访问，登录时会自动回退/);
+  assert.match(navbarSource, /\/micro-app\/microi-platform-service\/personal-settings/);
+  assert.match(personalSettings, /client\.ApiEngine\.Run\('platform-user-update-preferences'/);
+  assert.match(personalSettings, /DefaultIndexUrl: preference\.DefaultIndexUrl/);
+  assert.match(personalSettings, /登录时仍会按当前菜单权限检查并自动回退/);
+  assert.match(preferencesEngine, /!V8\.CurrentUser \|\| !V8\.CurrentUser\.Id/);
+  assert.match(preferencesEngine, /var updateModel = \{ Id: userId \}/);
+  assert.match(permissionSource, /hasAccessibleRoutePath\(accessRoutes, candidatePath\)/);
 });

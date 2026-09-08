@@ -543,7 +543,10 @@ namespace Microi.net
                         SqlServerFilterColumn = "RequestId"
                     },
                     new ApplicationStreamGateRequiredIndex(
-                        "mci_ai_app_file", "ux_aaf_version_pathhash", true, "VersionId", "FilePathHash"),
+                        "mci_ai_app_file", "ux_aaf_version_pathhash", true, "VersionId", "FilePathHash")
+                    {
+                        SqlServerFilterColumn = "VersionId"
+                    },
                     new ApplicationStreamGateRequiredIndex(
                         "mci_ai_app_version", "ix_aav_state_time_app", false,
                         "PublishState", "UpdateTime", "AppId"),

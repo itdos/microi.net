@@ -64,7 +64,9 @@ namespace Microi.net
         private const int DiyLangManualRepairMaxCandidateRows = 50000;
         private const int DiyLangTextColumnLength = 2000;
         private const int DiyLangRuntimeCacheDefaultPageSize = 500;
-        private const int DiyLangRuntimeCacheDefaultMaxRows = 10000;
+        // Match the existing SaaS field default. Older tenants leave this
+        // setting NULL; a valid dictionary just above 10k rows must still load.
+        private const int DiyLangRuntimeCacheDefaultMaxRows = 50000;
         private const int DiyLangRuntimeCacheDefaultMaxCharacters = 5000000;
         private const int DiyLangRuntimeCacheDefaultCommandTimeoutSeconds = 30;
         private const int DiyLangRuntimeCacheKeyLength = 500;

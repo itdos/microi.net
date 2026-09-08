@@ -260,6 +260,18 @@ const engineSlides: EngineSlide[] = [
     href: '/doc/system-engine/app-store.html', linkLabel: '打开应用商城文档',
   },
   {
+    id: 'email-engine', domain: 'experience', nav: '邮箱系统', title: '独立运行，也能作为吾码微服务',
+    summary: 'QQ、163 与自定义邮箱统一管理，支持自动 / 手动同步、收发回复转发与附件。', code: 'EMAIL', glyph: '✉', accent: '#62c9ed',
+    promise: '同一套源码，从独立邮箱门户到企业业务工作台。', orbit: ['独立运行', '吾码微服务', '多邮箱收发', '完整源码'],
+    highlights: [
+      { title: '独立 Web 运行', text: '前端可独立部署、独立登录，连接配套吾码后端，无需打开平台工作台。' },
+      { title: '吾码微服务运行', text: '通过系统引擎 /mci-email 进入，复用登录、主题与原有邮箱账号表单。' },
+      { title: '完整源码与业务扩展', text: '商城提供源码，接口引擎编排收发与同步，可与客户、流程和通知集成。' },
+    ],
+    demo: ['选择运行方式', '接入邮箱账号', '同步收发邮件', '按业务扩展'],
+    href: '/doc/system-engine/email-engine.html', linkLabel: '打开邮箱系统文档与 4K 界面',
+  },
+  {
     id: 'ai-engine', domain: 'intelligence', nav: 'AI 引擎', title: '把模型、知识、工具与业务数据接入开发链路',
     summary: '统一模型路由、流式对话、多模态、RAG、NL2SQL 与 NL2V8。', code: 'AI', glyph: '✺', accent: '#7ac7ff',
     promise: 'AI 不做外挂聊天框，而是进入设计、开发和运行。', orbit: ['模型网关', 'RAG', 'NL2SQL', 'Tool Calling'],
@@ -560,9 +572,9 @@ const introSlides: SlideMeta[] = [
 ]
 
 const outroSlides: SlideMeta[] = [
-  { id: 'multi-end', chapter: '43', kind: 'multi-end', nav: '全端兼容', title: '一套业务能力，进入企业每一个终端', summary: 'PC、WebOS、H5、小程序、Android、iOS、微服务与 Unity 共享平台能力。' },
-  { id: 'success-cases', chapter: '44', kind: 'cases', nav: '成功案例', title: '跨越行业边界，让业务价值落地', summary: '从工厂车间到商业服务，从组织管理到公共运营，Microi吾码已在多类行业的实际业务中落地应用。' },
-  { id: 'closing', chapter: '45', kind: 'closing', nav: '致辞', title: '把 AI 的速度，变成企业可持续交付力', summary: '掌握平台能力，建立可复用、可验证、可演进的 AI 研发方式。' },
+  { id: 'multi-end', chapter: '44', kind: 'multi-end', nav: '全端兼容', title: '一套业务能力，进入企业每一个终端', summary: 'PC、WebOS、H5、小程序、Android、iOS、微服务与 Unity 共享平台能力。' },
+  { id: 'success-cases', chapter: '45', kind: 'cases', nav: '成功案例', title: '跨越行业边界，让业务价值落地', summary: '从工厂车间到商业服务，从组织管理到公共运营，Microi吾码已在多类行业的实际业务中落地应用。' },
+  { id: 'closing', chapter: '46', kind: 'closing', nav: '致辞', title: '把 AI 的速度，变成企业可持续交付力', summary: '掌握平台能力，建立可复用、可验证、可演进的 AI 研发方式。' },
 ]
 
 const slideMeta: SlideMeta[] = [
@@ -579,12 +591,12 @@ const slideMeta: SlideMeta[] = [
   ...outroSlides,
 ]
 
-const expectedSlideCount = 45
+const expectedSlideCount = 46
 if (slideMeta.length !== expectedSlideCount) throw new Error(`培训 PPT 页数异常：${slideMeta.length}/${expectedSlideCount}`)
 
 const atlasGroups: AtlasGroup[] = [
   { code: '01', title: 'AI 开发与低代码', entryIds: ['form-engine', 'module-engine', 'v8-engine', 'api-engine', 'workflow-engine', 'template-engine', 'ai-dev-tools', 'mcp-server'] },
-  { code: '02', title: '界面与全端交付', entryIds: ['page-engine', 'report-engine', 'microservice-engine', 'microi-ui', 'visualization-engine', 'unity-engine', 'multi-end-client'] },
+  { code: '02', title: '界面与全端交付', entryIds: ['page-engine', 'report-engine', 'microservice-engine', 'microi-ui', 'email-engine', 'visualization-engine', 'unity-engine', 'multi-end-client'] },
   { code: '03', title: 'AI 与智能产品', entryIds: ['app-store', 'ai-engine', 'ai-data-analysis', 'ai-creative-studio', 'ai-workflow-suite', 'ai-governance', 'vision-engine', 'image-engine'] },
   { code: '04', title: '数据、文件与检索', entryIds: ['cache-engine', 'search-engine', 'database-engine', 'file-engine', 'file-manage', 'office-engine', 'translate-engine'] },
   { code: '05', title: '自动化、消息与设备', entryIds: ['print-engine', 'bluetooth-print', 'spider-engine', 'job-engine', 'mq-engine', 'mqtt-engine', 'notification-engine', 'ocr-engine'] },

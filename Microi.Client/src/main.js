@@ -38,6 +38,7 @@ import "./styles/ui-density.scss";
 import { initializeUiDensity } from "./utils/ui-density.js";
 import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
+import { completePlatformBootstrap } from "./utils/runtime-endpoint-query.js";
 import {
     primeApiServiceStatus,
     reportApiServiceFailure,
@@ -597,6 +598,9 @@ window.addEventListener("beforeunload", () => {
 });
 // 执行初始化。只有租户配置、主题和后端基础数据初始化完成，启动页才允许退出。
 initApp().then(async function () {
+    // Release the first navigation only after the real tenant is known. Do this
+    // before router.isReady(): the router guard waits on this same bootstrap.
+    completePlatformBootstrap(true);
     // 租户配置完成后仍需等待首个路由组件解析并至少完成两帧绘制。
     // 否则启动层虽然等到了后端，仍可能在异步路由尚未呈现时露出短暂白屏。
     await router.isReady();
@@ -612,6 +616,7 @@ initApp().then(async function () {
         buildTarget: window.__MICROI_APP_BUILD_TARGET__
     });
 }).catch(function (error) {
+    completePlatformBootstrap(false);
     var failedApiBase = "";
     var failedOsClient = "";
     try { failedApiBase = DiyCommon.GetApiBase(); } catch (readApiBaseError) {}

@@ -4,7 +4,9 @@ import { useData, useRoute } from 'vitepress'
 import { breadcrumbsFor } from '../../config/seo-policy.mjs'
 const { page } = useData()
 const route = useRoute()
-const items = computed(() => breadcrumbsFor(route.path, page.value.title))
+const items = computed(() => page.value.frontmatter?.breadcrumbs === false
+  ? []
+  : breadcrumbsFor(route.path, page.value.title))
 </script>
 
 <template>

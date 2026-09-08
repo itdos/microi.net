@@ -191,7 +191,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 ## ASP.NET Controller 归属与旧路由收口规范（强制）
 
 - 已由 V8 接口引擎完整实现的业务 Controller 必须物理删除，禁止为了“瘦身”再创建 `Microi.AspNetCore` 一类无业务归属的通用 .NET 项目，把原 Controller 原样搬过去。
-- 仍被旧版 PC、UniApp 或定制移动端调用的 `/api/*` 历史地址，只能集中在 `Microi.net.Api/Controllers/LegacyMobileCompatibilityController.cs`；文件顶部必须醒目标明“仅兼容、禁止新增业务、未来可能整体删除”，方法只能做参数归一化、可信租户/身份绑定和固定 Managed ApiEngine 转发。
+- 仍被旧版 PC、UniApp 或定制移动端调用的 `/api/*` 历史地址，只能集中在 `Microi.net.Api/Controllers/LegacyMobileCompatibilityController.cs`；文件顶部必须醒目标明“仅兼容、禁止新增业务、未来可能整体删除”。已配置的 Managed ApiEngine 始终优先；只有主库确认历史地址和固定 Key 都缺失时，登录、DiyToken 会话、公开启动配置、当前用户与菜单读取可复用既有可信 Core 原子兜底，让未完成升级的租户能进入商城修复。禁止仅因升级门禁已有自愈能力就删除此入口；禁用、StopHttp、权限拒绝、数据库异常及执行错误均不得触发兜底，不在请求中安装资源或覆盖租户配置。
 - 所有 ASP.NET Controller 源码必须留在 `Microi.net.Api/Controllers`。不得为了迁走 Controller 新建 `Microi.AspNetCore`、`Microi.SSO` 等中转项目，也不得把 `Microi.AI`、`Microi.net` 或其它 `netstandard` 类库改成 `net10.0`/多目标框架来承载 Controller。
 - V8 无法直接承担的 SSE/WebSocket、OIDC/SAML/CAS、第三方回调验签/解密、浏览器原生身份协议、供应商密钥隔离、文件流等最小协议边界，可以继续作为薄 Controller 留在 API 项目；Controller 只做协议解析、可信鉴权和安全归一化，可复用实现与业务原子必须进入对应功能类库，普通 CRUD、日志、通知和可升级业务编排继续由 Managed ApiEngine 承担。
 - `Microi.net.Api/Controllers` 除五个兼容内核 Controller 与统一旧客户端兼容 Controller 外，只能保留已证明接口引擎无法承担的薄协议 Controller；每个保留项必须同步登记 `api-ownership-catalog.json` 并由结构测试锁定。已完整迁入接口引擎的旧 Controller 必须继续物理删除。

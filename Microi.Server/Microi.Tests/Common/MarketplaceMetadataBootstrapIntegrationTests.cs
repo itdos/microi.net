@@ -12,15 +12,20 @@ public class MarketplaceMetadataBootstrapIntegrationTests
 {
     public static bool HasMySqlTestConnection => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN"));
 
-    [Fact(Skip = "Requires the isolated upgrade_fixture database on localhost:62606", SkipUnless = nameof(HasMySqlTestConnection))]
+    [Fact(Skip = "Requires an isolated local MySQL fixture connection", SkipUnless = nameof(HasMySqlTestConnection))]
     public async Task MissingSelfMetadata_UsesPackageSchemaRemapsOccupiedIdsAndReplaysWithoutChanges()
     {
         var connection = Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN")!;
         var connectionParts = new DbConnectionStringBuilder { ConnectionString = connection };
         Assert.Equal("upgrade_fixture", connectionParts["Database"]);
         Assert.Equal("127.0.0.1", connectionParts["Server"]);
-        Assert.Equal("62606", Convert.ToString(connectionParts["Port"]));
-        var database = MicroiORMExtensions.CreateDbSession(connection, DatabaseType.MySql);
+        Assert.InRange(Convert.ToInt32(connectionParts["Port"]), 1024, 65535);
+        var databaseName = "microi_metadata_fixture_" + Guid.NewGuid().ToString("N");
+        connectionParts["Database"] = "mysql";
+        var master = MicroiORMExtensions.CreateDbSession(connectionParts.ConnectionString, DatabaseType.MySql);
+        master.FromSql($"CREATE DATABASE `{databaseName}`").ExecuteNonQuery();
+        connectionParts["Database"] = databaseName;
+        var database = MicroiORMExtensions.CreateDbSession(connectionParts.ConnectionString, DatabaseType.MySql);
         var services = new ServiceCollection();
         services.AddMicroiORM();
         var cache = new CacheTenant();
@@ -67,9 +72,19 @@ public class MarketplaceMetadataBootstrapIntegrationTests
             var normalize = typeof(FormEngineExtend).GetMethod("NormalizeDiyTableStorageMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
             dynamic metadata = normalize.Invoke(null, new object[] { coldRow })!;
             Assert.Equal(tableId, (string)metadata.Id);
-            Assert.True(Convert.ToInt32(database.FromSql("SELECT COUNT(1) FROM diy_field WHERE TableId=@p0").AddInParameter("p0", tableId).ToScalar()) > 60);
+            // 最小自举只补实际物理列的描述；完整应用安装才负责后续扩列。
+            // 精确核对当前夹具的列，避免旧的数量阈值鼓励生成并不存在的字段。
+            var tableFieldNames = database.FromSql("SELECT Name FROM diy_field WHERE TableId=@p0")
+                .AddInParameter("p0", tableId).ToList<dynamic>()
+                .Select(row => Convert.ToString((object)row.Name)).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            Assert.Equal(new[] { "DataBaseId", "DataBaseName", "Description", "Name" }, tableFieldNames);
+            var fieldTableId = Convert.ToString(database.FromSql("SELECT Id FROM diy_table WHERE Name='diy_field'").ToScalar());
+            var fieldFieldNames = database.FromSql("SELECT Name FROM diy_field WHERE TableId=@p0")
+                .AddInParameter("p0", fieldTableId).ToList<dynamic>()
+                .Select(row => Convert.ToString((object)row.Name)).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            Assert.Equal(new[] { "Component", "Label", "Name", "TableId", "TableName", "Type" }, fieldFieldNames);
             var count = Convert.ToInt32(database.FromSql("SELECT COUNT(1) FROM diy_field").ToScalar());
-            Assert.True(count > 100);
+            Assert.Equal(2 + tableFieldNames.Length + fieldFieldNames.Length, count);
             database.FromSql("UPDATE diy_field SET Label='客户自定义名称' WHERE TableId=@p0 AND Name='Name'").AddInParameter("p0", tableId).ExecuteNonQuery();
             var clears = cache.Cleared.Count;
             await UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(client);
@@ -97,11 +112,8 @@ public class MarketplaceMetadataBootstrapIntegrationTests
         }
         finally
         {
-            database.FromSql("DROP TABLE IF EXISTS diy_field").ExecuteNonQuery();
-            database.FromSql("DROP TABLE IF EXISTS diy_table").ExecuteNonQuery();
-            database.FromSql("DROP TABLE IF EXISTS customer_orders").ExecuteNonQuery();
-            database.FromSql("DROP TABLE IF EXISTS sys_menu").ExecuteNonQuery();
             serviceField.SetValue(null, previous);
+            master.FromSql($"DROP DATABASE IF EXISTS `{databaseName}`").ExecuteNonQuery();
         }
     }
 

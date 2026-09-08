@@ -65,6 +65,7 @@
   "module-engine.md" : "模块引擎",
   "micro-app.md" : "微服务",
   "file-manage.md" : "文件柜",
+  "email-engine.md" : "邮箱系统",
   "page-engine.md" : "界面引擎",
   "visualization-engine.md" : "3D、CAD与数据大屏",
   "unity-integration.md" : "Unity 3D与WebGL集成",

@@ -286,9 +286,8 @@
                             <el-tag v-if="sourceFileInfo" type="info" effect="plain" round>{{ sourceFileInfo }}</el-tag>
                         </div>
                         <div
-                            v-loading="workbookPreviewLoading"
+                            v-mci-loading:table="{ loading: workbookPreviewLoading, label: $t('Msg.ImportRenderingWorkbook') }"
                             class="mci-import-dialog__raw-workbook"
-                            :element-loading-text="$t('Msg.ImportRenderingWorkbook')"
                         >
                             <vue-office-excel
                                 v-if="workbookPreviewSource"

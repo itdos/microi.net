@@ -43,6 +43,7 @@ import {
   registerAdvancedTools,
 } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
+import { registerEmailTools } from './email-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
 import {
@@ -5638,11 +5639,11 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_query_system_observability',
-    `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. Read actions cover logs/statistics/details, live signals, Trace timeline, hot API rank, runtime/host/Docker/queue snapshot, application logs, security records, platform statistics and network traffic attribution/history. The backend enforces platform-observability administrator permission, tenant isolation, bounded pagination and secret redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`,
+    `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. For memory exhaustion/OOM/abnormal allocations: Memory checks current-node pressure, Collector freshness/loss and Evidence storage health; MemoryIncidents returns up to 50 tenant-scoped incident summaries in Data.Items; MemoryIncident reads detail by incidentId from that list. Correlate execution/parent ids, API engine key, V8 table/event/workflow identity, script hash, allocation types/CLR stacks and Trace. Report missing stacks, lost/unattributed samples and storage gaps before assigning a cause. Allocated bytes are NOT retained heap or exclusive RSS; never sum inclusive parent and child allocations. These read actions do not enable V8 limits, create heap dumps, kill processes or write business data. They require a compatible API diagnostic runtime as well as the query engine; updating MCP alone cannot install the backend. Other read actions cover logs/statistics/details, signals, Trace, hot API rank, host/Docker/queues, application logs, security, platform statistics and traffic history. The backend enforces administrator permission, tenant isolation, bounded pagination and redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`,
     {
       action: z.enum([
         'Capabilities', 'Snapshot', 'Logs', 'LogTypes', 'LogStats', 'Signal', 'Trace',
-        'ApiRank', 'AppLogs', 'PlatformStats', 'SecurityData', 'TrafficHistory', 'TrafficDetails', 'HistoricalDashboard',
+        'ApiRank', 'AppLogs', 'PlatformStats', 'SecurityData', 'TrafficHistory', 'TrafficDetails', 'HistoricalDashboard', 'Memory', 'MemoryIncidents', 'MemoryIncident',
       ]).describe('Read action. Use Capabilities first to discover exact scope and boundaries.'),
       keyword: z.string().max(100).optional().describe('Log/signal/security keyword. The backend applies its own bounded search rules.'),
       type: z.string().max(100).optional().describe('System log Type filter.'),
@@ -5659,6 +5660,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       includeHost: z.boolean().optional().describe('Snapshot includes host/runtime overview. Default true.'),
       includeDocker: z.boolean().optional().describe('Snapshot includes heavier Docker sampling. Default false.'),
       traceId: z.string().regex(/^[0-9a-fA-F]{32}$/u).optional().describe('W3C 32-hex TraceId for Trace.'),
+      incidentId: z.string().regex(/^[0-9a-f]{32}$/u).optional().describe('Required for MemoryIncident: use an actual 32-lowercase-hex Id from MemoryIncidents Data.Items. Empty Items means not found in the visible tenant/storage scope, not proof of no incident.'),
       serviceName: z.string().max(100).optional().describe('Signal service-name filter.'),
       apiEngineKey: z.string().max(100).optional().describe('ApiRank engine-key filter.'),
       name: z.string().max(100).optional().describe('ApiRank endpoint/name filter.'),
@@ -5676,13 +5678,16 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     },
     async ({
       action, keyword, type, category, source, level, levelMin, searchMonth, pageIndex, pageSize,
-      windowMinutes, windowSeconds, top, includeHost, includeDocker, traceId, serviceName,
+      windowMinutes, windowSeconds, top, includeHost, includeDocker, traceId, incidentId, serviceName,
       apiEngineKey, name, lines, kind, status, dimensionType, rangeKey, hours, observedOsClient,
       transferAction, ip, userId, endpoint,
     }) => {
       try {
         if (action === 'Trace' && !traceId) {
           return { content: [{ type: 'text', text: 'Trace 查询必须传入 32 位十六进制 traceId。' }], isError: true };
+        }
+        if (action === 'MemoryIncident' && !incidentId) {
+          return { content: [{ type: 'text', text: '请先查询 MemoryIncidents，并传入 incidentId。' }], isError: true };
         }
         const result = await client.querySystemObservability({
           Action: action,
@@ -5701,6 +5706,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           ...(includeHost === undefined ? {} : { IncludeHost: includeHost }),
           ...(includeDocker === undefined ? {} : { IncludeDocker: includeDocker }),
           ...(traceId ? { TraceId: traceId.toLowerCase() } : {}),
+          ...(incidentId ? { IncidentId: incidentId } : {}),
           ...(serviceName ? { ServiceName: serviceName } : {}),
           ...(apiEngineKey ? { ApiEngineKey: apiEngineKey } : {}),
           ...(name ? { Name: name } : {}),
@@ -8204,6 +8210,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   registerDesignTools(server, client, context);
   registerAdvancedTools(server, client, context);
   registerBlueprintTools(server, client, context);
+  registerEmailTools(server, client, context);
 
   toolRegistry.flush(context.codexMode ? ['microi_codex'] : undefined);
   return server;

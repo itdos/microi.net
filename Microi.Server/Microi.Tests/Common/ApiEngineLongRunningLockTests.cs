@@ -28,7 +28,8 @@ public sealed class ApiEngineLongRunningLockTests
         var lockParam = Assert.IsType<MicroiLockParam>(createMethod!.Invoke(
             null,
             new object?[] { "hongdi-dev", "chongstech", 1200, trusted, CancellationToken.None }));
-        Assert.Equal(TimeSpan.FromMinutes(20), lockParam.Expiry);
+        Assert.Equal(TimeSpan.FromMinutes(1), lockParam.Expiry);
+        Assert.Equal(TimeSpan.FromMinutes(1), lockParam.AcquireTimeout);
         Assert.True(lockParam.AutoRenew);
         Assert.Equal(TimeSpan.FromHours(12), lockParam.MaxLeaseDuration);
     }
@@ -55,11 +56,12 @@ public sealed class ApiEngineLongRunningLockTests
             new object?[] { "short-api", "iTdos", 60, trusted, CancellationToken.None }));
         Assert.Equal(TimeSpan.FromMinutes(1), lockParam.Expiry);
         Assert.False(lockParam.AutoRenew);
+        Assert.Equal(TimeSpan.Zero, lockParam.AcquireTimeout);
         Assert.Equal(TimeSpan.Zero, lockParam.MaxLeaseDuration);
     }
 
     [Fact]
-    public void BackgroundLock_NeverShortensExplicitlyLongerExpiry()
+    public void BackgroundLock_PreservesLongExecutionBudgetWithShortCrashRecovery()
     {
         var createMethod = typeof(ApiEngine).GetMethod(
             "CreateExecutionLockParam",
@@ -69,8 +71,31 @@ public sealed class ApiEngineLongRunningLockTests
         var lockParam = Assert.IsType<MicroiLockParam>(createMethod!.Invoke(
             null,
             new object?[] { "long-api", "iTdos", 13 * 60 * 60, true, CancellationToken.None }));
-        Assert.Equal(TimeSpan.FromHours(13), lockParam.Expiry);
-        Assert.Equal(lockParam.Expiry, lockParam.MaxLeaseDuration);
+        Assert.Equal(TimeSpan.FromMinutes(1), lockParam.Expiry);
+        Assert.Equal(TimeSpan.FromHours(13), lockParam.MaxLeaseDuration);
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(30, 30)]
+    [InlineData(60, 60)]
+    [InlineData(3600, 60)]
+    public void BackgroundLock_AbandonedLeaseAndAcquireWaitAreBounded(
+        int executionSeconds, int recoverySeconds)
+    {
+        var createMethod = typeof(ApiEngine).GetMethod(
+            "CreateExecutionLockParam", BindingFlags.Static | BindingFlags.NonPublic)!;
+        using var cancellation = new CancellationTokenSource();
+        var lockParam = Assert.IsType<MicroiLockParam>(createMethod.Invoke(
+            null, new object?[] { "import-microi-store-package", "tenant", executionSeconds,
+                true, cancellation.Token }));
+
+        Assert.Equal(TimeSpan.FromSeconds(recoverySeconds), lockParam.Expiry);
+        Assert.Equal(lockParam.Expiry, MicroiLock.ResolveAcquireTimeout(lockParam));
+        Assert.True(MicroiLock.CalculateLeaseRenewIntervalMilliseconds(lockParam.Expiry)
+            < lockParam.Expiry.TotalMilliseconds);
+        Assert.Equal(cancellation.Token, lockParam.CancellationToken);
+        Assert.Null(MicroiLock.ValidateLeaseConfiguration(lockParam));
     }
 
     [Fact]

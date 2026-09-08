@@ -8,6 +8,61 @@ namespace Microi.Tests.Core;
 public sealed class EmptyDatabaseReleaseServiceTests
 {
     [Fact]
+    public void PublicReleaseWithdrawal_RejectsForgedUserAndTaskWithoutTrustedExecution()
+    {
+        var service = new EmptyDatabaseReleaseService("fake-task");
+        var result = service.Cleanup(new JObject { ["Id"] = "admin", ["Level"] = 9999 }, "iTdos", true, 1);
+        Assert.Equal(0, result.Code);
+        Assert.Contains("有效租约", result.Msg);
+    }
+
+    [Fact]
+    public void PublicReleaseWithdrawal_IsLimitedToTheSevenPublishedZipNames()
+    {
+        Assert.Equal(new[]
+        {
+            "/install/microi_empty_mysql57.sql.zip", "/install/microi_empty_mysql80.sql.zip",
+            "/install/microi_empty_sqlserver2022.sql.zip", "/install/microi_empty_oracle19c.sql.zip",
+            "/install/microi_empty_dm8.sql.zip", "/install/microi_empty_postgresql17.sql.zip",
+            "/install/microi_empty_kingbasees.sql.zip"
+        }, EmptyDatabaseReleaseService.PublicReleaseObjectPaths());
+    }
+
+    [Fact]
+    public void InstalledApplicationBaseline_RejectsStaleVersionsAndUnverifiedPackages()
+    {
+        var sha = new string('a', 64);
+        var proof = new JObject
+        {
+            ["BaselineType"] = "OfficialEmptyDatabaseSnapshot", ["Version"] = "v8.2.1",
+            ["PackageSha256"] = sha, ["PackageSize"] = 1234
+        };
+        var row = new JObject
+        {
+            ["CatalogVersion"] = "v8.2.1", ["AppVersion"] = "v8.2.1",
+            ["AppVersionInstall"] = "v8.2.1", ["PackageVersion"] = "v8.2.1",
+            ["PackageSha256"] = sha, ["InstallResult"] = proof.ToString()
+        };
+        bool Validate(JObject value) => (bool)InvokePrivateStatic("IsInstalledApplicationVersionBaselineValid", value)!;
+        Assert.True(Validate(row));
+        foreach (var field in new[] { "AppVersion", "AppVersionInstall", "PackageVersion" })
+        {
+            var stale = (JObject)row.DeepClone();
+            stale[field] = "v7.8.26";
+            Assert.False(Validate(stale));
+        }
+        var changedPackage = (JObject)row.DeepClone();
+        changedPackage["PackageSha256"] = new string('b', 64);
+        Assert.False(Validate(changedPackage));
+        foreach (var invalidProof in new[] { "", "{}", "not-json", "{\"PackageSize\":\"invalid\"}" })
+        {
+            var unverified = (JObject)row.DeepClone();
+            unverified["InstallResult"] = invalidProof;
+            Assert.False(Validate(unverified));
+        }
+    }
+
+    [Fact]
     public void CollectPackageTableNames_FindsNestedTablesAndRejectsUnsafeNames()
     {
         var package = JToken.Parse("""
@@ -199,7 +254,11 @@ public sealed class EmptyDatabaseReleaseServiceTests
             item => item["ApiEngineKey"]?.Value<string>() == "admin_get_empty_database_sanitization_sql");
         var code = engine["ApiV8Code"]?.Value<string>() ?? "";
 
-        Assert.Equal("v1.3.6", engine["Version"]?.Value<string>());
+        // 发布版本由官方 MCP 递增；包元数据必须与被导出的源码头版本一致。
+        var sourceVersion = System.Text.RegularExpressions.Regex.Match(
+            code, @"Version:\s*(v\d+\.\d+\.\d+)").Groups[1].Value;
+        Assert.NotEmpty(sourceVersion);
+        Assert.Equal(sourceVersion, engine["Version"]?.Value<string>());
         Assert.Contains("protectedPlatformTableNames", code, StringComparison.Ordinal);
         Assert.Contains("operationalResidueTableNames", code, StringComparison.Ordinal);
         Assert.Contains("cleanupOperationalResidueSql", code, StringComparison.Ordinal);
@@ -290,7 +349,9 @@ public sealed class EmptyDatabaseReleaseServiceTests
                      "sys_servernode", "sys_sourcedatatable", "microi_database", "wx_mp", "wx_menu",
                      "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
                      "mci_network_traffic_rollup", "mci_app_stream_gate_transition", "mci_nuget_stats_daily",
-                     "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
+                     "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset",
+                     "mci_email_account", "mci_email_message", "mci_email_sync_log",
+                     "mci_apiengine_change_history", "mci_vision_request", "mci_vision_subject", "mci_vision_sample"
                  })
         {
             Assert.Contains(table, protectedTables);

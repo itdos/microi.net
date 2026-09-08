@@ -14,7 +14,7 @@ const packagedPublisher = packageModel.SysApiEngines.find(
 
 test("publisher package metadata matches the v1.9.25 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.9.25");
+  assert.equal(packagedPublisher.Version, "v2.0.3");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -127,6 +127,76 @@ test("publisher fails closed when a deterministic install snapshot id has differ
 test("microservice packages exclude deleted and disabled historical routes", () => {
   assert.match(publisherSource, /\['AND', 'IsDeleted', '<>', 1\]/);
   assert.match(publisherSource, /\['AND', 'IsEnable', '<>', 0\]/);
+});
+
+test("v3 package creation time is fixed to the release across exact replays", () => {
+  const expression = publisherSource.match(/CreateTime: ([^\n]+),/)[1];
+  function creationTime(protocolV3, now) {
+    return vm.runInNewContext(expression, { protocolV3, text: String, releaseChangeLog: { ReleaseTime: "2026-09-08 01:00:00" }, nowText: () => now });
+  }
+  assert.equal(creationTime(true, "2026-09-08 02:00:00"), creationTime(true, "2026-09-09 03:00:00"));
+  assert.equal(creationTime(true, "later"), "2026-09-08 01:00:00");
+  assert.equal(creationTime(false, "2026-09-09 03:00:00"), "2026-09-09 03:00:00");
+});
+
+test("inline runtime sizes handle both Jint arrays and CLR wrappers and enforce the aggregate limit", () => {
+  const block = publisherSource.slice(publisherSource.indexOf("if (requestedDatabaseOnlyBuild) {"), publisherSource.indexOf("var generatedResourcePolicies ="));
+  const html = Buffer.from("<!doctype html><html><head></head><body>ok</body></html>");
+  function run(extraBytes = 0, clrWrapper = false, invalidLength = false) {
+    let decodes = 0;
+    const assets = [{ Path: "index.html", FileByteBase64: html.toString("base64") }];
+    if (extraBytes) assets.push({ Path: "extra.bin", FileByteBase64: Buffer.alloc(extraBytes).toString("base64") });
+    const context = {
+      requestedDatabaseOnlyBuild: true, app: { AppKey: 'sample' }, latestVersion: { SourceManifestHash: 'a'.repeat(64) }, runtime: { Service: {} },
+      runtimeVersionNo: 'v1.0.0',
+      packageModel: { PackageInfo: {}, ApplicationBundle: { PackageAssets: { BuildZip: { Path: 'existing.zip' }, SourceZip: null } } }, entryPath: "index.html", includeSource: false,
+      getBuildAssets: () => assets, normalizePath: String, text: String,
+      parseObject: (value, fallback) => value ? JSON.parse(value) : fallback,
+      sha256Hex: value => crypto.createHash('sha256').update(String(value)).digest('hex'),
+      fail: (Msg, Data) => ({ Code: 0, Msg, Data }),
+      sha256RuntimeAssetBytes: bytes => crypto.createHash("sha256").update(bytes).digest("hex"),
+      System: { Convert: { FromBase64String(value) {
+        decodes++;
+        if (invalidLength) return { Length: Number.NaN };
+        const bytes = Buffer.from(value, "base64");
+        if (clrWrapper) Object.defineProperty(bytes, "Length", { value: bytes.length });
+        return bytes;
+      } }, Text: { Encoding: { UTF8: { GetString: bytes => bytes.toString("utf8") } } } },
+    };
+    vm.createContext(context);
+    vm.runInContext(`${extractFunction(publisherSource, "runtimeAssetByteLength")}\nresult = (function () { ${block}\nreturn { Code: 1, Data: packageModel }; })();`, context);
+    return { result: context.result, decodes };
+  }
+  for (const clr of [false, true]) {
+    const completed = run(0, clr);
+    assert.equal(completed.result.Code, 1);
+    assert.equal(completed.result.Data.ApplicationBundle.BuildAssets[0].Size, html.length);
+    assert.equal(completed.decodes, 1, "HTML bytes are decoded once for size, content and hash");
+    const bundle = completed.result.Data.ApplicationBundle;
+    assert.equal(bundle.SourceFiles.length, 0);
+    assert.equal(bundle.PackageAssets.BuildZip, undefined);
+    assert.equal(bundle.PackageAssets.SourceZip, undefined);
+    const manifest = JSON.parse(bundle.MicroService.AssetManifestJson);
+    assert.equal(manifest.SchemaVersion, 2);
+    assert.equal(manifest.SourceManifestHash, 'a'.repeat(64));
+    assert.equal(manifest.Assets[0].FilePathName, 'database://sample/v1.0.0/index.html');
+    assert.equal(bundle.MicroService.DistHash, manifest.RuntimeManifestHash);
+  }
+  assert.equal(run(5 * 1024 * 1024 - html.length).result.Code, 1);
+  const oversized = run(5 * 1024 * 1024);
+  assert.equal(oversized.result.Code, 0);
+  assert.match(oversized.result.Msg, /总大小不能超过 5MB/);
+  assert.equal(run(0, false, true).result.Code, 0);
+});
+
+test('runtime MIME types survive missing V3 asset metadata without overriding explicit types', () => {
+  const context = { text: value => String(value || ''), isBlank: value => !String(value || '').trim() };
+  vm.createContext(context);
+  vm.runInContext(extractFunction(publisherSource, 'runtimeAssetContentType'), context);
+  assert.equal(context.runtimeAssetContentType('assets/app.js', ''), 'application/javascript; charset=utf-8');
+  assert.equal(context.runtimeAssetContentType('assets/image.jpg', null), 'image/jpeg');
+  assert.equal(context.runtimeAssetContentType('index.html', ''), 'text/html; charset=utf-8');
+  assert.equal(context.runtimeAssetContentType('file.bin', 'custom/type'), 'custom/type');
 });
 
 test("small MicroServices can publish a verified database-only runtime without losing source delivery", () => {
@@ -1003,7 +1073,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.9\.25/);
+  assert.match(publisherSource, /Version: v2\.0\.3/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

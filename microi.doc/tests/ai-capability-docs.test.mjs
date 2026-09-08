@@ -113,14 +113,14 @@ test('the creation training page mirrors all 29 current image tools and media bo
   assert.match(page, /data-fancybox="ai-creative-studio-original"/u)
 })
 
-test('the 45-slide syllabus links both independent AI training pages', () => {
+test('the 46-slide syllabus links both independent AI training pages', () => {
   const component = read('docs/.vitepress/theme/components/TrainingSyllabusDeck.vue')
   const source = read('docs/doc/about/microi-training-syllabus.md')
 
   assert.match(component, /id: 'ai-data-analysis'[\s\S]*?href: '\/doc\/system-engine\/ai-data-analysis\.html'/u)
   assert.match(component, /id: 'ai-creative-studio'[\s\S]*?href: '\/doc\/system-engine\/ai-creative-studio\.html'/u)
   assert.match(component, /entryIds: \['app-store', 'ai-engine', 'ai-data-analysis', 'ai-creative-studio', 'ai-workflow-suite'/u)
-  assert.match(component, /const expectedSlideCount = 45/u)
-  assert.match(source, /45 页交互式 HTML PPT/u)
-  assert.match(source, /36 个逐项功能页/u)
+  assert.match(component, /const expectedSlideCount = 46/u)
+  assert.match(source, /46 页交互式 HTML PPT/u)
+  assert.match(source, /37 个逐项功能页/u)
 })
