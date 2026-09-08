@@ -87,7 +87,8 @@
     "profile:run": "node scripts/run-profile.cjs",
     "profile:sync": "node scripts/sync-profile.cjs",
     "preview:h5": "node scripts/serve-h5.js",
-    "test": "npm run check:ui && npm run build:mp-weixin && npm run check:mp-quality && npm run build:h5 && npm run visual:auth-prompts && npm run visual:xjy"
+    "test": "npm run check:ui && npm run build:mp-weixin && npm run check:mp-quality && npm run build:h5 && npm run visual:auth-prompts && npm run visual:xjy",
+    "check:xjy-proposal-costs": "node --test scripts/test-proposal-point-costs.mjs"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080720251210001",

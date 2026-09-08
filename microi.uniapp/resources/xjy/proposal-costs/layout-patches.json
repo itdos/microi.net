@@ -1,0 +1,21 @@
+[
+  {
+    "tableId": "01KWGB9WD5AEQX19GQ1NP442TT",
+    "fieldList": [
+      {
+        "id": "01KZWWJ37SEQRN1MH9SJQ20S5D",
+        "label": "设备报价与成本",
+        "config": "{\"CollapseGroup\":{\"DefaultCollapsed\":false,\"ScopeMode\":\"UntilNextGroup\",\"Icon\":\"fas fa-tags\",\"ShowFieldCount\":false},\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"Sql\":\"\",\"EnableSearch\":true,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"DataSourceApiEngineKey\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"Unique\":{\"Type\":\"Alone\"}}"
+      }
+    ]
+  },
+  {
+    "tableId": "29727579-7deb-42c7-b883-cd393f16095a",
+    "fieldList": [
+      {
+        "id": "e918f04c-3349-4037-a240-2ba37d4df10b",
+        "sort": 3450
+      }
+    ]
+  }
+]

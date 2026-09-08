@@ -265,7 +265,8 @@ for (const token of [
   'handleRelatedCount(context, payload = {})',
   'isProposalInstallationChild(payload.field)',
   'handleRelatedCount,',
-  'V8.FormEngine.UptFormData(PROPOSAL_TABLE'
+  'refreshDerivedValues',
+  'xjy_compare_customer_proposals'
 ]) {
   if (!xjyTenantForm.includes(token)) fail(`xjy proposal form rule is missing: ${token}`)
 }

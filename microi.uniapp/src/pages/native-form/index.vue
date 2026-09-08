@@ -90,7 +90,7 @@
 							<text class="form-section__title">{{ group.name }}</text>
 							<text v-if="group.description" class="form-section__description">{{ group.description }}</text>
 						</view>
-						<text v-if="group.showFieldCount !== false" class="form-section__count">{{ group.fields.length }} 项</text>
+						<text v-if="group.showFieldCount !== false" class="form-section__count">{{ group.fields.filter(field => field.component !== 'Divider').length }} 项</text>
 					</view>
 					<view class="form-section__header-actions">
 						<template v-for="relatedTab in embeddedChildRelatedForGroup(group)" :key="relatedTab.key">
@@ -116,8 +116,13 @@
 					</view>
 					<view v-for="field in group.fields" :key="field.Id || field.Name" class="form-field"
 						v-show="tenantFieldPresentation(field).visible !== false"
-						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name, 'form-field--visit-target-member': tenantFieldPresentation(field).type === 'visit-target-member' }">
-						<mci-visit-target-fields v-if="tenantFieldPresentation(field).type === 'visit-target-fields'"
+						:class="{ 'form-field--divider': field.component === 'Divider', 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name, 'form-field--visit-target-member': tenantFieldPresentation(field).type === 'visit-target-member' }">
+						<view v-if="field.component === 'Divider'" class="form-subheading">
+							<view class="form-subheading__bar"></view>
+							<text class="form-subheading__title">{{ field.Label }}</text>
+							<view class="form-subheading__line"></view>
+						</view>
+						<mci-visit-target-fields v-else-if="tenantFieldPresentation(field).type === 'visit-target-fields'"
 							ref="visitTargetFields" :target-type="checkinTargetType" :target-name="checkinTargetName"
 							:target-id="checkinTargetId" :readonly="mode === 'View'" :query-scope="visitTargetQueryScope"
 							:permission-menu-id="visitTargetQueryScope === 'checkin' ? menuId : ''" @update:target-type="updateCheckinTargetType"
@@ -1734,6 +1739,39 @@
 		background: currentColor;
 		transform: rotate(45deg);
 		content: '';
+	}
+
+	.form-field.form-field--divider {
+		padding: 24rpx 0 12rpx;
+		border-bottom: 0;
+	}
+
+	.form-subheading {
+		display: flex;
+		align-items: center;
+		gap: 12rpx;
+		color: var(--mci-primary, #e7462b);
+	}
+
+	.form-subheading__bar {
+		width: 6rpx;
+		height: 28rpx;
+		border-radius: 3rpx;
+		background: currentColor;
+		flex-shrink: 0;
+	}
+
+	.form-subheading__title {
+		font-size: 27rpx;
+		font-weight: 600;
+		line-height: 1.5;
+	}
+
+	.form-subheading__line {
+		flex: 1;
+		height: 1rpx;
+		background: currentColor;
+		opacity: .18;
 	}
 
 	/* zhy：原生表单安装位置复用任务设备“现场定位”的胶囊按钮观感。 */
