@@ -283,6 +283,11 @@ export function groupFields(fields, tableModel = {}) {
         return
       }
       const active = activeGroups.get(tabKey)
+      // Divider 是当前组内的小标题，保留在渲染顺序中；不拆散外围 CollapseGroup。
+      if (field.component === 'Divider' && String(field.Label || '').trim()) {
+        const group = active?.group || looseGroups.get(tabKey) || createLooseGroup(tabKey)
+        group.fields.push(field)
+      }
       if (active && Number.isFinite(active.remaining)) {
         active.remaining -= 1
         if (active.remaining <= 0) {
