@@ -552,7 +552,7 @@ for (const token of [
 ]) {
   if (!relatedBusinessList.includes(token)) fail(`related TableChild preview section is missing: ${token}`)
 }
-if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
+if (!/v-show="tenantFieldPresentation\(field\)\.visible !== false(?:\s*&&\s*isSubsectionFieldVisible\(group, field\))?"/.test(nativeForm)) {
   fail('native form must support declarative tenant field visibility')
 }
 // zhy：客户详情应将地图主字段与 _Lat/_Lng 辅助字段合并成内嵌地图。
