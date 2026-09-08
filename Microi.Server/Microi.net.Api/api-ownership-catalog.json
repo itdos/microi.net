@@ -17,7 +17,7 @@
     "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" }
   },
   "ProtocolGateways": {
-    "LegacyMobileCompatibilityController": { "Project": "Microi.net.Api", "Source": "Controllers/LegacyMobileCompatibilityController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "BootstrapCompatibility", "Reason": "仅兼容、禁止新增业务、未来可能整体删除；租户接口引擎明确缺失时复用可信登录和基础导航原子，已有接口始终优先。" },
+    "LegacyMobileCompatibilityController": { "Project": "Microi.net.Api", "Source": "Controllers/LegacyMobileCompatibilityController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "BootstrapCompatibility", "Reason": "仅兼容、禁止新增业务、未来可能整体删除；租户接口引擎明确缺失时复用可信登录、基础导航、服务器时间和客户端语义日志原子，已有接口始终优先。" },
     "AiController": { "Project": "Microi.net.Api", "Source": "Controllers/AiController.cs", "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ProtocolGateway" },
     "CaptchaController": { "Project": "Microi.net.Api", "Source": "Controllers/CaptchaController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
     "DiagnosticsController": { "Project": "Microi.net.Api", "Source": "Controllers/DiagnosticsController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
@@ -86,6 +86,9 @@
       "Handler/V8McpRequiredBodyAttribute.cs",
       "Hosting/MicroiApiHostExtensions.cs",
       "Hosting/IdentityVerificationRuntime.cs",
+      "Hosting/MemoryDiagnosticsMetrics.cs",
+      "Hosting/MemoryDiagnosticsService.cs",
+      "Hosting/MemoryDiagnosticsStore.cs",
       "Hosting/MicroiApiRootPageEndpoint.cs",
       "Hosting/MicroiRealtimeHostingExtensions.cs",
       "Hosting/StartupDiagnostics.cs",

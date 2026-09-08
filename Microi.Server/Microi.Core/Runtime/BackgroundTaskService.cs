@@ -150,7 +150,8 @@ namespace Microi.net
                        apiEngineKey,
                        DatabaseBackupService.WorkerApiEngineKey,
                        StringComparison.OrdinalIgnoreCase)
-                   || AiImageBackgroundTaskService.IsImageWorker(apiEngineKey);
+                   || AiImageBackgroundTaskService.IsImageWorker(apiEngineKey)
+                   || AiMusicBackgroundTaskService.IsMusicWorker(apiEngineKey);
         }
 
         public static BackgroundTaskItem StartApiEngine(
@@ -720,10 +721,10 @@ namespace Microi.net
                             item = BackgroundTaskStore.TryClaimTenant(
                                 queueHint.OsClient,
                                 NodeId,
-                                AiImageBackgroundTaskService.ExcludeUnsupportedWorkers(BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
+                                AiMusicBackgroundTaskService.ExcludeUnsupportedWorkers(AiImageBackgroundTaskService.ExcludeUnsupportedWorkers(BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
                                     queueHint.OsClient,
                                     running,
-                                    parallelism), MicroiEngine.TryGetService<IAiImageTaskRuntime>() != null),
+                                    parallelism), MicroiEngine.TryGetService<IAiImageTaskRuntime>() != null), MicroiEngine.TryGetService<IAiMusicTaskRuntime>() != null),
                                 queueHint.IsTenantRecovery ? null
                                     : BackgroundTaskSchedulingPolicy.RequiredApiEngineKeyForWakeHint(queueHint.ApiEngineKey),
                                 false,
@@ -762,10 +763,10 @@ namespace Microi.net
                                 tenant =>
                                 {
                                     var excluded = new HashSet<string>(
-                                        AiImageBackgroundTaskService.ExcludeUnsupportedWorkers(BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
+                                        AiMusicBackgroundTaskService.ExcludeUnsupportedWorkers(AiImageBackgroundTaskService.ExcludeUnsupportedWorkers(BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
                                             tenant,
                                             running,
-                                            parallelism), MicroiEngine.TryGetService<IAiImageTaskRuntime>() != null),
+                                            parallelism), MicroiEngine.TryGetService<IAiImageTaskRuntime>() != null), MicroiEngine.TryGetService<IAiMusicTaskRuntime>() != null),
                                         StringComparer.OrdinalIgnoreCase);
                                     if (forceRecoveryScan
                                         && string.Equals(
@@ -1279,6 +1280,13 @@ namespace Microi.net
                             param["TriggerType"]?.ToString() ?? "Manual",
                             ParseInt(param["RetainCount"], 7),
                             selectedTenants);
+                    }
+                    else if (AiMusicBackgroundTaskService.IsMusicWorker(item.ApiEngineKey))
+                    {
+                        var runtime = MicroiEngine.TryGetService<IAiMusicTaskRuntime>();
+                        if (runtime == null) throw new InvalidOperationException("当前节点缺少 AI 音乐持久任务运行时，请完整更新平台后端。");
+                        rawResult = await runtime.RunAsync(item.Id, item.FencingToken, item.OsClient,
+                            trustedUser, param, cancellation.Token).ConfigureAwait(false);
                     }
                     else if (AiImageBackgroundTaskService.IsImageWorker(item.ApiEngineKey))
                     {

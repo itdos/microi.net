@@ -64,9 +64,12 @@ namespace Microi.net
         Task<DosResult> PersistMiniMaxVideoFile(MiniMaxVideoFileParam param);
 
         /// <summary>
-        /// 平台管理员生成 MiniMax 无人声纯音乐并直接转存当前租户公有 HDFS。
+        /// 平台管理员提交音乐持久任务；Code=2 时使用 TaskId 查询。
         /// </summary>
         Task<DosResult> GenerateMiniMaxMusic(MiniMaxMusicGenerateParam param);
+
+        Task<DosResult> GetMiniMaxMusicTask(string taskId);
+        Task<DosResult> RecoverMiniMaxMusicTask(string taskId);
 
         /// <summary>
         /// 平台管理员生成固定男女音色的 MiniMax 短对白并转存当前租户 HDFS。

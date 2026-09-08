@@ -14,6 +14,8 @@ namespace Microi.net
     {
         internal static string Apply(string sql, bool acquisition)
         {
+            var selection = MicroiTaskSchedulingPolicy.Current.Value;
+            if (selection != null) return AppendPredicate(sql, selection.Predicate(acquisition));
             var groups = OsClientExtend.ClientList
                 .Where(pair => pair.Value != null)
                 .Select(pair => MicroiQuartzScheduledTask.GetTenantGroup(pair.Key))
@@ -31,6 +33,11 @@ namespace Microi.net
             if (safe.Any(group => !Regex.IsMatch(group, "^[a-z0-9_.-]{1,100}$")))
                 throw new InvalidOperationException("Quartz 租户分组格式不合法。");
             var predicate = safe.Length == 0 ? "1 = 0" : column + " IN (" + string.Join(",", safe.Select(group => "'" + group + "'")) + ")";
+            return AppendPredicate(sql, predicate);
+        }
+
+        internal static string AppendPredicate(string sql, string predicate)
+        {
             var order = sql.IndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
             if (order < 0) return sql + " AND (" + predicate + ")";
             return sql.Insert(order, " AND (" + predicate + ") ");

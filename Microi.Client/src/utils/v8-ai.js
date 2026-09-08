@@ -197,6 +197,8 @@ export function createV8AI(options = {}) {
         GetMiniMaxVideoTask: function (param) { return request("/api/Ai/GetMiniMaxVideoTask", param); },
         GetMiniMaxVideoFile: function (param) { return request("/api/Ai/GetMiniMaxVideoFile", param); },
         PersistMiniMaxVideoFile: function (param) { return request("/api/Ai/PersistMiniMaxVideoFile", param); },
+        GetMiniMaxMusicTask: function (param) { return request("/api/Ai/GetMiniMaxMusicTask", param, "GET"); },
+        RecoverMiniMaxMusicTask: function (param) { return request("/api/Ai/RecoverMiniMaxMusicTask?taskId=" + encodeURIComponent(param?.taskId || param?.TaskId || ""), {}); },
         GenerateMiniMaxMusic: function (param) { return request("/api/Ai/GenerateMiniMaxMusic", param); },
         GenerateMiniMaxSpeech: function (param) { return request("/api/Ai/GenerateMiniMaxSpeech", param); }
     };
@@ -209,6 +211,8 @@ export function createV8AI(options = {}) {
     api.GetMiniMaxVideoTaskAsync = api.GetMiniMaxVideoTask;
     api.GetMiniMaxVideoFileAsync = api.GetMiniMaxVideoFile;
     api.PersistMiniMaxVideoFileAsync = api.PersistMiniMaxVideoFile;
+    api.GetMiniMaxMusicTaskAsync = api.GetMiniMaxMusicTask;
+    api.RecoverMiniMaxMusicTaskAsync = api.RecoverMiniMaxMusicTask;
     api.GenerateMiniMaxMusicAsync = api.GenerateMiniMaxMusic;
     api.GenerateMiniMaxSpeechAsync = api.GenerateMiniMaxSpeech;
     return api;

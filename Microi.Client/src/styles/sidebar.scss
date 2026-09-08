@@ -19,6 +19,8 @@
         left: 0;
         z-index: 1; // PC端侧边栏不需要太高的z-index，避免遮挡弹窗等
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
         // reset element-ui css
         .horizontal-collapse-transition {
             transition:
@@ -35,14 +37,10 @@
             right: 0px;
         }
 
-        .el-scrollbar {
-            height: 100%;
-        }
-
-        &.has-logo {
-            .el-scrollbar {
-                height: calc(100% - 50px);
-            }
+        > .el-scrollbar {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: auto;
         }
 
         .is-horizontal {

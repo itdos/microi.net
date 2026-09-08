@@ -31,36 +31,10 @@ import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
 import { applyMicroAppToken } from "./token-sync";
 import {
     findLegacyMicroAppPage,
+    buildMicroAppComponentSourceInfo,
     serializeMicroAppComponentData
 } from "@/utils/microAppDevComponentResolver.js";
-
-let pageRowsPromise = null;
-
-async function loadMicroAppPages() {
-    if (!pageRowsPromise) {
-        pageRowsPromise = DiyCommon.FormEngine.GetTableData("sys_microiservice_page", {
-            _Where: [["IsEnable", "=", 1]],
-            _SelectFields: [
-                "Id",
-                "MicroServiceId",
-                "MicroServiceKey",
-                "PageKey",
-                "PageTitle",
-                "RoutePath",
-                "EntryPath",
-                "IsEnable",
-                "BuildVersion",
-                "RouteMetaJson"
-            ],
-            _PageIndex: 1,
-            _PageSize: 5000
-        }).catch((error) => {
-            pageRowsPromise = null;
-            throw error;
-        });
-    }
-    return pageRowsPromise;
-}
+import { loadMicroAppComponentPages, loadMicroAppComponentSourceInfo } from "@/utils/microAppComponentSource.js";
 
 function normalizeName(value) {
     let result = String(value || "dev-component").toLowerCase()
@@ -144,7 +118,7 @@ export default {
             this.loading = true;
             this.error = "";
             try {
-                const result = await loadMicroAppPages();
+                const result = await loadMicroAppComponentPages();
                 const page = findLegacyMicroAppPage(result, this.legacyComponentPath);
                 if (!page || !page.MicroServiceKey) {
                     throw new Error(`组件未找到: ${this.legacyComponentPath}`);
@@ -172,6 +146,15 @@ export default {
                     appKey: page.MicroServiceKey,
                     version
                 });
+                const componentPath = this.legacyComponentPath;
+                const sourceContext = { componentPath, entryUrl: this.entryUrl, apiBase: DiyCommon.GetApiBase(), osClient: DiyCommon.GetOsClient() };
+                this.$emit("render-source-resolved", buildMicroAppComponentSourceInfo(this.page, {}, sourceContext));
+                // Do not delay the business component for optional source details.
+                loadMicroAppComponentSourceInfo(this.page, componentPath).then(sourceInfo => {
+                    if (this.page?.Id === page.Id && this.legacyComponentPath === componentPath) {
+                        this.$emit("render-source-resolved", { ...sourceInfo, entryUrl: this.entryUrl });
+                    }
+                }).catch(() => {});
             } catch (error) {
                 this.error = error?.message || String(error);
             } finally {

@@ -8,6 +8,10 @@ const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..
 const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.VSCode','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
 // Build products and the synchronization receipt are not executable source candidates.
 const generated=/(^|\/)(?:dist|bin|obj|node_modules|TestResults|\.resource-sync-base|\.git)(?:\/|$)|\.(?:vsix|nupkg|snupkg)$/i;
+// 此门禁用于 PC/API Docker 发布，独立 UniApp 的页面、客户资源和包版本不进入这两个镜像。
+// 但后端内容安全回归直接读取 UniApp SDK，因此仍保留整个 utils 目录作为跨端契约输入。
+// 不能排除 Microi.Client、后端源码/测试、内置应用资源或闭源子仓来绕过真正的候选漂移。
+const independentMobileSource=name=>/^microi\.uniapp\//i.test(name)&&!/^microi\.uniapp\/src\/utils\//i.test(name);
 
 export async function snapshotCandidate(root=workspace,repos=repositories){
  const files={};
@@ -16,12 +20,12 @@ export async function snapshotCandidate(root=workspace,repos=repositories){
   const names=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','-z'],{cwd,encoding:'utf8',maxBuffer:32*1024*1024}).split('\0').filter(Boolean);
   for(const name of [...new Set(names)].sort()){
    const key=path.posix.join(repository.replaceAll('\\','/'),name.replaceAll('\\','/'));
-   if(generated.test(key))continue;
+   if(generated.test(key)||independentMobileSource(key))continue;
    try{files[key]=createHash('sha256').update(await readFile(path.resolve(cwd,name))).digest('hex');}
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }
  }
- return {files};
+ return {scope:'pc-api-docker-with-mobile-sdk-contracts',files};
 }
 
 export function changedCandidate(before,after){

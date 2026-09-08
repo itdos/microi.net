@@ -193,6 +193,7 @@ const detailItems = computed(() => {
         { key: "pageKey", label: t("Msg.PageKey"), value: cleanValue(info.pageKey), code: true },
         { key: "version", label: t("Msg.Version"), value: cleanValue(info.version), code: true },
         { key: "routePath", label: t("Msg.RoutePath"), value: cleanValue(info.routePath), code: true },
+        { key: "componentPath", label: t("Msg.ComponentPath"), value: cleanValue(info.componentPath), code: true, wide: true },
         { key: "frameworkRoute", label: t("Msg.FrameworkRoute"), value: cleanValue(info.frameworkRoute), code: true, wide: true },
         { key: "sourcePath", label: t("Msg.SourcePath"), value: joinSourcePath(), code: true, wide: true },
         { key: "privateSourcePath", label: t("Msg.PrivateSourcePath"), value: cleanValue(info.privateSourcePath), code: true, wide: true },
@@ -210,11 +211,17 @@ const aiModifyPrompt = computed(() => {
     const routePath = firstValue(info.routePath, info.frameworkRoute, "/");
     const sourcePath = joinSourcePath();
     if (sourceType.value === "microservice") {
-        return t("Msg.MicroServiceAiModifyPrompt", {
+        const prompt = t("Msg.MicroServiceAiModifyPrompt", {
             appKey,
             routePath,
             sourcePath: sourcePath || t("Msg.UnknownSourcePath")
         });
+        const coordinates = [
+            [t("Msg.TenantCoordinate"), [cleanValue(info.osClient), cleanValue(info.apiBase)].filter(Boolean).join(" · ")],
+            [t("Msg.ComponentPath"), cleanValue(info.componentPath)],
+            [t("Msg.Version"), cleanValue(info.version)]
+        ].filter(([, value]) => value).map(([name, value]) => `${name}：${value}`);
+        return [prompt, ...coordinates].join("\n");
     }
     return t("Msg.CustomComponentAiModifyPrompt", {
         componentName: appKey,

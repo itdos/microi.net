@@ -120,7 +120,7 @@ function configurePackage(packagePath) {
     {
       name: 'UserExternalIdentityGroup', label: '外部身份', tab: MORE_TAB_ID, sort: 700,
       description: 'Gitee、飞书、微信与小程序身份绑定', icon: 'fas fa-link',
-      fields: [['GiteeUserId', 710], ['GiteeLogin', 720], ['GiteeStarVerified', 730], ['GiteeStarVerifiedAt', 740], ['GiteeStarRepository', 750], ['FeishuUnionId', 760], ['MiniProgramOpenId', 770], ['WxMpId', 780], ['WxAvatar', 790], ['WxNickName', 800], ['WxOpenId', 810]],
+      fields: [['GiteeUserId', 710], ['GiteeLogin', 720], ['GiteeStarVerified', 730], ['GiteeStarVerifiedAt', 740], ['GiteeStarRepository', 750], ['FeishuUnionId', 760], ['FeishuUserId', 765], ['MiniProgramOpenId', 770], ['WxMpId', 780], ['WxAvatar', 790], ['WxNickName', 800], ['WxOpenId', 810]],
     },
     {
       name: 'UserAiUsageGroup', label: 'AI 额度与记录', tab: MORE_TAB_ID, sort: 900,

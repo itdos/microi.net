@@ -2353,6 +2353,39 @@ html.dark {
         padding: 0;
     }
 
+    // Reserve real hit targets outside the translated tab strip. Otherwise
+    // the nav-scroll layer covers Element Plus's previous/next controls.
+    > .el-tabs__header .el-tabs__nav-wrap.is-scrollable {
+        padding-inline: 36px;
+    }
+
+    > .el-tabs__header .el-tabs__nav-prev,
+    > .el-tabs__header .el-tabs__nav-next {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        top: 0;
+        bottom: 0;
+        width: 32px;
+        height: auto;
+        min-height: 34px;
+        z-index: 2;
+        border-radius: var(--mci-radius-sm, 8px);
+        color: var(--el-text-color-regular);
+        background: var(--el-fill-color-light);
+        cursor: pointer;
+
+        &:hover:not(.is-disabled), &:focus-visible {
+            color: var(--el-color-primary);
+            background: var(--el-color-primary-light-9);
+        }
+
+        &.is-disabled {
+            color: var(--el-text-color-placeholder);
+            cursor: not-allowed;
+        }
+    }
+
     > .el-tabs__header .el-tabs__nav-wrap::after {
         display: block;
         height: 1px;

@@ -1,18 +1,18 @@
 {
   "PackageInfo": {
     "Name": "系统账号",
-    "Version": "v7.6.7",
+    "Version": "v7.6.8",
     "CreateTime": "2026-08-22T20:45:27.838Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
     "MenuCount": 1,
     "TableCount": 3,
-    "FieldCount": 91,
+    "FieldCount": 92,
     "FlowCount": 0,
     "NodeCount": 0,
     "LineCount": 0,
     "DDLCount": 3,
-    "PhysicalColumnCount": 352,
+    "PhysicalColumnCount": 353,
     "ApiEngineCount": 8,
     "DataSetCount": 0,
     "DataRowCount": 0,
@@ -30,13 +30,13 @@
       "ServerField:sys_user.HomeUsageStats",
       "ApiEngine:platform-home-overview@v1.0.0"
     ],
-    "ChangeHistory": "2026-09-07 v7.6.7 补齐系统账号岗位下拉数据源所需的 diy_job 表、字段元数据与跨数据库物理结构，避免旧库打开系统账号时因缺少岗位表失败；不包含官方租户的岗位或组织业务数据。\n2026-09-05 v7.6.6 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-03 v7.6.5 新增隐藏字段 HomeUsageStats 与 Managed 接口 platform-home-overview；访问记录只保存在当前账号，返回结果按实时菜单权限过滤，不采集路由参数或业务页面数据。\n2026-09-03 v7.6.5 新增个人首页菜单访问聚合与权限过滤接口，仅记录当前账号打开的菜单 Id 和按日次数，为界面引擎首页提供真实常用应用及近 7 日趋势。\n2026-09-02 v7.6.4 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.3 将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。\n2026-08-30 v7.6.2 为系统账号管理、个人偏好和个人资料接口补齐旧 SysUser 多路由，统一由官方接口引擎处理。\n2026-08-30 v7.6.1 将 SysUserAccessKeyController 四个入口迁入 platform-user-access-key；多路由保持旧客户端地址，安全原子继续一次性签发与哈希。\n2026-08-25 v7.6.0 系统账号官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.2 Managed 账号管理、可信改密预检与租户 Hook 契约。\n2026-08-25 v6.3.2 系统账号管理接口升级为 v1.0.2；可信预检通过 DataAppend.ChangesPassword 标识改密，改密跳过租户 Before Hook，仅在成功后执行安全 After Hook。\n2026-08-25 v6.3.1 系统账号新增、修改、删除、查询与登录投影刷新迁入固定 Managed V8 接口，保留可信权限、密码、内容审核和会话原子，并提供永不覆盖的租户 Hook。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口；Sys_User.AiApiKey 的物理列、低代码字段与安装 DDL 统一归属系统账号应用。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口，并提供官方升级永不覆盖的系统账号个性化 Hook。\n",
+    "ChangeHistory": "2026-09-08 v7.6.8 补齐 sys_user.FeishuUserId 的字段元数据、跨数据库物理列与建表 DDL，兼容旧飞书/ERP 入口按 user_id 或 Account 查询；不删除旧查询条件，不覆盖用户身份数据，缺失字段继续严格拒绝查询。\n2026-09-07 v7.6.7 补齐系统账号岗位下拉数据源所需的 diy_job 表、字段元数据与跨数据库物理结构，避免旧库打开系统账号时因缺少岗位表失败；不包含官方租户的岗位或组织业务数据。\n2026-09-05 v7.6.6 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-03 v7.6.5 新增隐藏字段 HomeUsageStats 与 Managed 接口 platform-home-overview；访问记录只保存在当前账号，返回结果按实时菜单权限过滤，不采集路由参数或业务页面数据。\n2026-09-03 v7.6.5 新增个人首页菜单访问聚合与权限过滤接口，仅记录当前账号打开的菜单 Id 和按日次数，为界面引擎首页提供真实常用应用及近 7 日趋势。\n2026-09-02 v7.6.4 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.3 将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。\n2026-08-30 v7.6.2 为系统账号管理、个人偏好和个人资料接口补齐旧 SysUser 多路由，统一由官方接口引擎处理。\n2026-08-30 v7.6.1 将 SysUserAccessKeyController 四个入口迁入 platform-user-access-key；多路由保持旧客户端地址，安全原子继续一次性签发与哈希。\n2026-08-25 v7.6.0 系统账号官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.2 Managed 账号管理、可信改密预检与租户 Hook 契约。\n2026-08-25 v6.3.2 系统账号管理接口升级为 v1.0.2；可信预检通过 DataAppend.ChangesPassword 标识改密，改密跳过租户 Before Hook，仅在成功后执行安全 After Hook。\n2026-08-25 v6.3.1 系统账号新增、修改、删除、查询与登录投影刷新迁入固定 Managed V8 接口，保留可信权限、密码、内容审核和会话原子，并提供永不覆盖的租户 Hook。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口；Sys_User.AiApiKey 的物理列、低代码字段与安装 DDL 统一归属系统账号应用。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口，并提供官方升级永不覆盖的系统账号个性化 Hook。\n",
     "ChangeLog": {
-      "Version": "v7.6.7",
-      "Title": "系统账号岗位数据源安装依赖修复",
+      "Version": "v7.6.8",
+      "Title": "旧飞书用户标识字段兼容修复",
       "ChangeType": "Fix",
-      "Content": "补齐系统账号岗位下拉数据源所需的 diy_job 表、字段元数据与跨数据库物理结构，避免旧库打开系统账号时因缺少岗位表失败；不包含官方租户的岗位或组织业务数据。",
-      "ReleaseTime": "2026-09-07 13:34:00"
+      "Content": "补齐 sys_user.FeishuUserId 的字段元数据、跨数据库物理列与建表 DDL，兼容旧飞书/ERP 入口按 user_id 或 Account 查询；不删除旧查询条件，不覆盖用户身份数据，缺失字段继续严格拒绝查询。",
+      "ReleaseTime": "2026-09-08 18:48:00"
     },
     "Description": "系统账号、个人偏好与访问密钥的官方低代码资源；历史 HTTP 地址由接口引擎多路由兼容。"
   },
@@ -49,7 +49,7 @@
     {
       "TableName": "sys_user",
       "TableId": "026be7b3-0634-416c-b462-789f0e8931b5",
-      "DDL": "CREATE TABLE IF NOT EXISTS `sys_user` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `PersonalDesktopGroup` varchar(255) NULL COMMENT '桌面外观',\n  `PersonalThemeGroup` varchar(255) NULL COMMENT '主题与菜单',\n  `PersonalHomeGroup` varchar(255) NULL COMMENT '语言与首页',\n  `UserAiUsageGroup` varchar(255) NULL COMMENT 'AI 额度与记录',\n  `UserExternalIdentityGroup` varchar(255) NULL COMMENT '外部身份',\n  `UserOrganizationGroup` varchar(255) NULL COMMENT '组织与权限',\n  `UserAccountSecurityGroup` varchar(255) NULL COMMENT '账号属性与状态',\n  `UserBasicProfileGroup` varchar(255) NULL COMMENT '基本资料',\n  `MenuChildExpandMode` varchar(25) NULL COMMENT '个人菜单子级展开方式',\n  `ThemeMode` varchar(25) NULL COMMENT '个人显示模式',\n  `ThemeColor` varchar(25) NULL COMMENT '个人主题色',\n  `PublicAvatar` varchar(2000) NULL COMMENT '公开头像',\n  `DefaultIndexUrl` varchar(500) NULL COMMENT '登录后首页路由',\n  `GiteeStarRepository` varchar(200) NULL COMMENT '已验证Gitee仓库',\n  `GiteeStarVerifiedAt` varchar(25) NULL COMMENT 'Gitee Star验证时间',\n  `GiteeStarVerified` int NULL COMMENT 'Gitee Star已验证',\n  `GiteeLogin` varchar(100) NULL COMMENT 'Gitee账号',\n  `GiteeUserId` varchar(50) NULL COMMENT 'Gitee用户Id',\n  `TenantDatabaseQuota` int NULL COMMENT '租户数据库额度',\n  `AiTokenRechargeRecords` varchar(255) NULL COMMENT 'Token充值记录',\n  `AiTokenUsageRecords` varchar(255) NULL COMMENT 'Token消费记录',\n  `JobLevel` int NULL COMMENT '岗位级别',\n  `Jobs` mediumtext NULL COMMENT '岗位',\n  `BtnDisplayPwd` varchar(50) NULL COMMENT '显示密码',\n  `LastLoginTime` varchar(25) NULL COMMENT '最后登录时间',\n  `LastLoginIP` varchar(50) NULL COMMENT '最后登录IP地址',\n  `LicenseType` varchar(50) NULL,\n  `WxOpenId` varchar(50) NULL COMMENT '微信公众号OpenId',\n  `WxNickName` varchar(50) NULL COMMENT '微信昵称',\n  `WxAvatar` varchar(255) NULL COMMENT '微信头像',\n  `WxMpId` varchar(50) NULL COMMENT '绑定公众号',\n  `RandomDesktopBg` int NULL COMMENT '随机壁纸',\n  `DesktopDockMenu` mediumtext NULL COMMENT '桌面任务栏 ',\n  `OpenTreeMenu` int NULL COMMENT '是否打开菜单',\n  `PageHistory` mediumtext NULL COMMENT '访问历史',\n  `DesktopBg` varchar(200) NULL COMMENT '系统背景',\n  `DesktopType` varchar(50) NULL COMMENT '桌面模式',\n  `Lang` varchar(50) NULL COMMENT '多语言',\n  `ParentId` varchar(36) NULL,\n  `TenantName` varchar(255) NULL COMMENT '所属租户',\n  `TenantId` varchar(36) NULL,\n  `MiniProgramOpenId` varchar(100) NULL COMMENT '小程序OpenId',\n  `UserType` varchar(50) NULL COMMENT '帐号类型',\n  `FeishuUnionId` varchar(50) NULL COMMENT '飞书UnionId',\n  `DeptCode` varchar(255) NULL COMMENT '所属组织机构Code',\n  `State` int(11) NULL COMMENT '状态',\n  `DeptName` varchar(255) NULL COMMENT '部门名称',\n  `Level` int(11) NULL COMMENT '角色级别',\n  `Pwd` varchar(255) NULL COMMENT '密码',\n  `RoleIds` mediumtext NULL COMMENT '角色',\n  `Remark` varchar(255) NULL COMMENT '备注',\n  `DeptId` varchar(36) NULL COMMENT '所属组织机构',\n  `No` varchar(50) NULL COMMENT '编号',\n  `Account` varchar(255) NULL COMMENT '登陆帐号',\n  `Phone` varchar(255) NULL COMMENT '手机号',\n  `Name` varchar(255) NULL COMMENT '姓名',\n  `Email` varchar(255) NULL COMMENT '邮箱',\n  `DeptIds` mediumtext NULL COMMENT '兼职组织机构',\n  `Avatar` varchar(255) NULL COMMENT '头像',\n  `Sex` varchar(50) NULL COMMENT '性别',\n  `PwdEncode` varchar(50) NULL COMMENT '密码存储形式',\n  `AiApiKey` varchar(200) NULL COMMENT 'AI API Key',\n  `HomeUsageStats` mediumtext NULL COMMENT '个人首页菜单访问聚合'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `sys_user` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `PersonalDesktopGroup` varchar(255) NULL COMMENT '桌面外观',\n  `PersonalThemeGroup` varchar(255) NULL COMMENT '主题与菜单',\n  `PersonalHomeGroup` varchar(255) NULL COMMENT '语言与首页',\n  `UserAiUsageGroup` varchar(255) NULL COMMENT 'AI 额度与记录',\n  `UserExternalIdentityGroup` varchar(255) NULL COMMENT '外部身份',\n  `UserOrganizationGroup` varchar(255) NULL COMMENT '组织与权限',\n  `UserAccountSecurityGroup` varchar(255) NULL COMMENT '账号属性与状态',\n  `UserBasicProfileGroup` varchar(255) NULL COMMENT '基本资料',\n  `MenuChildExpandMode` varchar(25) NULL COMMENT '个人菜单子级展开方式',\n  `ThemeMode` varchar(25) NULL COMMENT '个人显示模式',\n  `ThemeColor` varchar(25) NULL COMMENT '个人主题色',\n  `PublicAvatar` varchar(2000) NULL COMMENT '公开头像',\n  `DefaultIndexUrl` varchar(500) NULL COMMENT '登录后首页路由',\n  `GiteeStarRepository` varchar(200) NULL COMMENT '已验证Gitee仓库',\n  `GiteeStarVerifiedAt` varchar(25) NULL COMMENT 'Gitee Star验证时间',\n  `GiteeStarVerified` int NULL COMMENT 'Gitee Star已验证',\n  `GiteeLogin` varchar(100) NULL COMMENT 'Gitee账号',\n  `GiteeUserId` varchar(50) NULL COMMENT 'Gitee用户Id',\n  `TenantDatabaseQuota` int NULL COMMENT '租户数据库额度',\n  `AiTokenRechargeRecords` varchar(255) NULL COMMENT 'Token充值记录',\n  `AiTokenUsageRecords` varchar(255) NULL COMMENT 'Token消费记录',\n  `JobLevel` int NULL COMMENT '岗位级别',\n  `Jobs` mediumtext NULL COMMENT '岗位',\n  `BtnDisplayPwd` varchar(50) NULL COMMENT '显示密码',\n  `LastLoginTime` varchar(25) NULL COMMENT '最后登录时间',\n  `LastLoginIP` varchar(50) NULL COMMENT '最后登录IP地址',\n  `LicenseType` varchar(50) NULL,\n  `WxOpenId` varchar(50) NULL COMMENT '微信公众号OpenId',\n  `WxNickName` varchar(50) NULL COMMENT '微信昵称',\n  `WxAvatar` varchar(255) NULL COMMENT '微信头像',\n  `WxMpId` varchar(50) NULL COMMENT '绑定公众号',\n  `RandomDesktopBg` int NULL COMMENT '随机壁纸',\n  `DesktopDockMenu` mediumtext NULL COMMENT '桌面任务栏 ',\n  `OpenTreeMenu` int NULL COMMENT '是否打开菜单',\n  `PageHistory` mediumtext NULL COMMENT '访问历史',\n  `DesktopBg` varchar(200) NULL COMMENT '系统背景',\n  `DesktopType` varchar(50) NULL COMMENT '桌面模式',\n  `Lang` varchar(50) NULL COMMENT '多语言',\n  `ParentId` varchar(36) NULL,\n  `TenantName` varchar(255) NULL COMMENT '所属租户',\n  `TenantId` varchar(36) NULL,\n  `MiniProgramOpenId` varchar(100) NULL COMMENT '小程序OpenId',\n  `UserType` varchar(50) NULL COMMENT '帐号类型',\n  `FeishuUnionId` varchar(50) NULL COMMENT '飞书UnionId',\n  `FeishuUserId` varchar(100) NULL COMMENT '飞书UserId',\n  `DeptCode` varchar(255) NULL COMMENT '所属组织机构Code',\n  `State` int(11) NULL COMMENT '状态',\n  `DeptName` varchar(255) NULL COMMENT '部门名称',\n  `Level` int(11) NULL COMMENT '角色级别',\n  `Pwd` varchar(255) NULL COMMENT '密码',\n  `RoleIds` mediumtext NULL COMMENT '角色',\n  `Remark` varchar(255) NULL COMMENT '备注',\n  `DeptId` varchar(36) NULL COMMENT '所属组织机构',\n  `No` varchar(50) NULL COMMENT '编号',\n  `Account` varchar(255) NULL COMMENT '登陆帐号',\n  `Phone` varchar(255) NULL COMMENT '手机号',\n  `Name` varchar(255) NULL COMMENT '姓名',\n  `Email` varchar(255) NULL COMMENT '邮箱',\n  `DeptIds` mediumtext NULL COMMENT '兼职组织机构',\n  `Avatar` varchar(255) NULL COMMENT '头像',\n  `Sex` varchar(50) NULL COMMENT '性别',\n  `PwdEncode` varchar(50) NULL COMMENT '密码存储形式',\n  `AiApiKey` varchar(200) NULL COMMENT 'AI API Key',\n  `HomeUsageStats` mediumtext NULL COMMENT '个人首页菜单访问聚合'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     },
     {
       "TableName": "diy_job",
@@ -4281,6 +4281,18 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 11
+    },
+    {
+      "TABLE_NAME": "sys_user",
+      "COLUMN_NAME": "FeishuUserId",
+      "COLUMN_TYPE": "varchar(100)",
+      "DATA_TYPE": "varchar",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "飞书UserId",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 60
     }
   ],
   "SysMenus": [
@@ -6669,6 +6681,30 @@
       "ComponentWidth": "",
       "TableName": "diy_job",
       "V8Code": ""
+    },
+    {
+      "TableName": "sys_user",
+      "TableId": "026be7b3-0634-416c-b462-789f0e8931b5",
+      "Id": "01M209HE1SHW9YA970T1KT22MY",
+      "Name": "FeishuUserId",
+      "Label": "飞书UserId",
+      "Type": "varchar(100)",
+      "Component": "Text",
+      "Tab": "01KGFAYTX1S0KNYX09JGX71TWH",
+      "Sort": 765,
+      "Visible": 1,
+      "AppVisible": 1,
+      "Readonly": 1,
+      "NotEmpty": 0,
+      "Unique": 0,
+      "InTableEdit": 0,
+      "Encrypt": 0,
+      "FormWidth": null,
+      "TableWidth": 150,
+      "NameConfirm": 1,
+      "Config": "{}",
+      "Data": "[]",
+      "Description": "飞书租户内用户标识 user_id；用于已验证飞书身份的绑定与历史接口兼容，与飞书 UnionId 不同。仅由可信的身份绑定流程写入，不从客户端直接推断或替换。"
     }
   ],
   "DataSets": [],

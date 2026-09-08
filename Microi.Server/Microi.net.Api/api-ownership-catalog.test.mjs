@@ -89,7 +89,7 @@ test('every remaining Controller is declared and stays in Microi.net.Api', () =>
   const declared = [...Object.keys(catalog.Controllers), ...Object.keys(catalog.ProtocolGateways)].sort();
   assert.deepEqual(discovered, [
     'AiController', 'ApiEngineController', 'CaptchaController', 'DiagnosticsController',
-    'FormEngineController', 'HDFSController', 'LicenseController', 'MessageController', 'MicroAppController',
+    'FormEngineController', 'HDFSController', 'LegacyMobileCompatibilityController', 'LicenseController', 'MessageController', 'MicroAppController',
     'V8EngineController',
   ]);
   assert.deepEqual(declared, discovered);
@@ -129,7 +129,9 @@ test('every migrated Controller remains physically deleted', () => {
     assert.doesNotMatch(controllerSource, new RegExp(`\\bclass\\s+${controllerName}\\b`));
     assert.equal(fs.existsSync(path.join(controllerDirectory, `${controllerName}.cs`)), false);
   }
-  assert.equal(fs.existsSync(path.join(controllerDirectory, 'LegacyMobileCompatibilityController.cs')), false);
+  // 已迁移的业务 Controller 保持删除；统一升级恢复入口必须保留到旧租户完成升级。
+  assert.equal(fs.existsSync(path.join(controllerDirectory, 'LegacyMobileCompatibilityController.cs')), true);
+  assert.equal(catalog.ProtocolGateways.LegacyMobileCompatibilityController.Disposition, 'BootstrapCompatibility');
 });
 
 test('API support directories match the audited host-only boundary', () => {
@@ -169,6 +171,7 @@ test('all removed Controller routes are delivered through ApiRoutes', () => {
     '/api/DataSourceEngine/Run', '/api/DiyChat/SendSystemMessage',
     '/api/FormEngine/GetSysConfig', '/api/HDFS/GetPrivateFileUrl',
     '/api/Ai/NL2V8EngineSync', '/api/Os/CreateQRCodeImage',
+    '/api/Os/GetDateTimeNow', '/api/SysLog/AddSysLog',
   ];
   for (const route of required) assert.ok(routes.has(route.toLowerCase()), route);
   for (const { engine } of routes.values()) {

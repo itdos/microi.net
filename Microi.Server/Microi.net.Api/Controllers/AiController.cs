@@ -545,12 +545,61 @@ namespace Microi.net.Api
         {
             var token = await DiyToken.GetCurrentToken();
             var currentUser = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
-            return Json(await _proxyService.GenerateAuthenticatedMusicAsync(
+            return Json(await _proxyService.QueueAuthenticatedMusicAsync(
                 currentUser?["Id"]?.ToString(),
                 token?.OsClient ?? string.Empty,
                 currentUser,
-                param,
-                HttpContext.RequestAborted));
+                param));
+        }
+
+        [HttpGet]
+        [PlatformAdminOnly]
+        public async Task<JsonResult> GetMiniMaxMusicTask([FromQuery] string taskId)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            var token = await DiyToken.GetCurrentToken();
+            var user = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
+            return Json(AiMusicBackgroundTaskService.GetStatus(token?.OsClient ?? "", user?["Id"]?.ToString(), taskId));
+        }
+
+        [HttpPost]
+        [PlatformAdminOnly]
+        public async Task<JsonResult> RecoverMiniMaxMusicTask([FromQuery] string taskId)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            var token = await DiyToken.GetCurrentToken();
+            var user = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
+            return Json(AiMusicBackgroundTaskService.RecoverResult(token?.OsClient ?? "", user?["Id"]?.ToString(), taskId));
+        }
+
+        [HttpPost("/v1/microi/music_tasks")]
+        [AllowAnonymous]
+        public async Task<JsonResult> MiniMaxRelayQueueMusic([FromBody] MiniMaxMusicGenerateParam param)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            var runtime = MicroiEngine.TryGetService<IAiMusicTaskRuntime>();
+            return Json(runtime == null ? AiMusicBackgroundTaskService.RuntimeUnavailable()
+                : await runtime.QueueRelayAsync(Request.Headers["Authorization"].ToString(), Request.Headers["Idempotency-Key"].ToString(), param));
+        }
+
+        [HttpGet("/v1/microi/music_tasks/{taskId}")]
+        [AllowAnonymous]
+        public async Task<JsonResult> MiniMaxRelayGetMusicTask([FromRoute] string taskId)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            var runtime = MicroiEngine.TryGetService<IAiMusicTaskRuntime>();
+            return Json(runtime == null ? AiMusicBackgroundTaskService.RuntimeUnavailable()
+                : await runtime.GetRelayTaskAsync(Request.Headers["Authorization"].ToString(), taskId));
+        }
+
+        [HttpPost("/v1/microi/music_tasks/{taskId}/recover")]
+        [AllowAnonymous]
+        public async Task<JsonResult> MiniMaxRelayRecoverMusic([FromRoute] string taskId)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            var runtime = MicroiEngine.TryGetService<IAiMusicTaskRuntime>();
+            return Json(runtime == null ? AiMusicBackgroundTaskService.RuntimeUnavailable()
+                : await runtime.RecoverRelayTaskAsync(Request.Headers["Authorization"].ToString(), taskId));
         }
 
         /// <summary>

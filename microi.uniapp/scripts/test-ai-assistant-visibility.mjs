@@ -73,7 +73,8 @@ test('mobile entry switches are wired to both tabBar runtimes and the profile in
     launcher,
     /updateGlobalEntryState\(aiAssistantEnabled, messageTabBarEnabled\)[\s\S]*scheduleWeixinTabBarSync\(\)/
   )
-  const activateMethod = launcher.match(/activate\(\) \{([\s\S]*?)\n    \},\n    restoreGlobalEntryState/)
+  // Windows checkout 的 CRLF 不能让同一方法失去可检查性。
+  const activateMethod = launcher.match(/activate\(\) \{([\s\S]*?)\r?\n    \},\r?\n    restoreGlobalEntryState/)
   assert.ok(activateMethod, 'launcher activate method must remain inspectable')
   assert.doesNotMatch(activateMethod[1], /(?:sync|schedule)WeixinTabBarSync\(/,
     'page activation must not push visible defaults before resolving the entry switches')

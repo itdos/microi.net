@@ -87,3 +87,14 @@ test('full tests precede version edits, resource publication and platform pushes
   const offset=source.indexOf(marker);assert.ok(offset>end,`${marker} must follow the full-test gate`);
  }
 });
+
+test('real schedule stores belong to Full and their settings fail fast before builds',()=>{
+ const runner=fs.readFileSync(path.join(root,'Microi.Server/Microi.Tests/run-tests.ps1'),'utf8');
+ const preflight=runner.slice(runner.indexOf('if ($Mode -eq "Full")'),runner.indexOf('New-Item -ItemType Directory'));
+ for(const name of ['MICROI_TEST_SCHEDULE_REDIS','MICROI_TEST_SCHEDULE_MYSQL'])assert.ok(preflight.includes(name),name);
+ for(const name of ['MicroiTaskSchedulingCacheTests','MicroiTaskSchedulingSharedStoreTests']){
+  const fixture=fs.readFileSync(path.join(root,'Microi.Server/Microi.Tests/Common',name+'.cs'),'utf8');
+  assert.match(fixture,/\[Trait\("Category", "FullStack"\)\]/);
+  assert.doesNotMatch(fixture,/Assert\.Skip\(/);
+ }
+});

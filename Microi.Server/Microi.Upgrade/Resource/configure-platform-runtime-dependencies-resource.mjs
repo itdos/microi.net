@@ -66,7 +66,7 @@ const dependencies = Object.freeze([
     name: '平台系统菜单',
     source: 'platform-sys-menu.js',
     id: '9434a0ec-f360-4cb1-8adb-00f5fb879f53',
-    version: 'v1.0.3',
+    version: 'v1.0.4',
     apiAddress: '/apiengine/platform-sys-menu',
     category: '系统/平台目录',
     enableLog: 1,

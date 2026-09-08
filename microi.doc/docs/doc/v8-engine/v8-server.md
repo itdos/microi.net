@@ -57,6 +57,8 @@ ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
 
 历史 `/api/SysUser/*` 地址固定绑定对应会话动作，不能用请求体 `Action` 改成其它操作，并支持 `--OsClient--{OsClient}--` 租户后缀。路径与 Query 同时指定租户时必须一致。兼容 Controller 随后端程序交付，商城 SaaS 应用交付接口源码与多路由；两者需要分别更新。此 Controller 仅用于兼容，未来可能整体删除，新业务继续使用接口引擎。
 
+旧地址 `/api/Os/GetDateTimeNow` 和 `/api/SysLog/AddSysLog` 也纳入同一兼容入口，并分别由 SaaS 引擎应用中的 `platform-os-legacy-compatibility`、`platform-client-log` 唯一交付。路径及 OS 动作大小写不敏感，支持 `getDateTimeNow` 和租户路径后缀。时间接口允许匿名 GET/POST，保持 `{ Code:1, Data:'yyyy/MM/dd HH:mm:ss' }`；日志接口支持已登录用户 GET/POST，租户和用户由 DiyToken 确定，不能通过 `UserId/UserName/Category/Action` 伪造平台审计。日志返回成功表示进入现有异步持久化流程，查到日志记录后才代表持久化验收通过。
+
 ```javascript
 // 同步调用
 var result = V8.ApiEngine.Run('ApiEngineKey', { 
