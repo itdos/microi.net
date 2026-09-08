@@ -144,13 +144,16 @@ namespace Microi.net
                         messages.Add($"接管现有 {TableName} 物理表失败：{adopt.Msg}");
                         return messages;
                     }
-                    UpgradeProgress.WriteLine(
-                        $"Microi：【兼容修复】【{osClient}】已接管半安装的 {TableName} 物理表并补齐表单引擎元数据。");
+                    // 写入成功不代表表单查询已经可用，必须回读成功后才播报接管完成。
+                    if (table.Code == 1 && table.Data != null)
+                        UpgradeProgress.WriteLine(
+                            $"Microi：【成功】【兼容修复】【{osClient}】已接管半安装的 {TableName} 物理表并补齐表单引擎元数据。");
                 }
 
                 if (table.Code != 1 || table.Data == null)
                 {
-                    messages.Add($"{TableName} 创建或接管后仍无法读取 diy_table 元数据。");
+                    messages.Add($"{TableName} 创建或接管后仍无法读取 diy_table 元数据。"
+                        + $"回读Code={table.Code}，原因={table.Msg ?? "未返回记录"}。");
                     return messages;
                 }
 
