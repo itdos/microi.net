@@ -61,6 +61,8 @@ namespace Microi.net
                     {
                         upgradeLease.ThrowIfLost();
                         EnsureApiEngineRuntimeColumns(osClientSecret);
+                        SqlServerStringColumnCapacity.EnsureUnderLease(
+                            osClientSecret, "sys_menu", LegacyMenuConfigColumnTypes);
                         RuntimeColumnNullability.EnsureUnderLease(osClientSecret);
                         Upgrade25.EnsureCurrentFileIdentityIndex(osClientSecret);
                         upgradeLease.ThrowIfLost();
@@ -1988,6 +1990,11 @@ if (_microiLegacyMenuConfigChanged) {
                 EnsureColumn(osClientSecret, "sys_menu", column.Key, column.Value);
             }
 
+            // 旧 SQL Server 库可能已有 nvarchar(50) 列。先满足启动协议容量，
+            // 再将旧 DiyConfig 回填到物理列，不能等后面的商城包安装时才扩容。
+            SqlServerStringColumnCapacity.EnsureUnderLease(
+                osClientSecret, "sys_menu", LegacyMenuConfigColumnTypes);
+
             var selectColumns = new[] { "Id", "DiyConfig" }
                 .Concat(LegacyMenuConfigColumnTypes.Keys)
                 .Select(name => $"{quoteOpen}{name}{quoteClose}");
@@ -2405,6 +2412,8 @@ if (_microiLegacyMenuConfigChanged) {
         {
             if (osClientSecret?.Db == null) return false;
             if (!RuntimeColumnNullability.Ready(osClientSecret)) return false;
+            if (!SqlServerStringColumnCapacity.Ready(
+                osClientSecret, "sys_menu", LegacyMenuConfigColumnTypes)) return false;
 
             var physicalColumns = new Dictionary<string, HashSet<string>>(
                 StringComparer.OrdinalIgnoreCase);
