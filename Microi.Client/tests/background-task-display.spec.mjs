@@ -5,8 +5,27 @@ import {
     getBackgroundTaskEta,
     getBackgroundTaskProgress,
     isActiveBackgroundTask,
+    mergeBackgroundTaskSummaries,
     shouldPollBackgroundTasks
 } from "../src/utils/background-task-display.js";
+
+test("a detail response remains visible when a task summary arrives during loading", () => {
+    const loadingRow = { Id: "storage-task", Status: "Running", DetailLoading: true };
+    const rows = mergeBackgroundTaskSummaries([loadingRow], [{ Id: "storage-task", Status: "Running", Progress: 15 }]);
+    Object.assign(loadingRow, { Error: "OBJECT_STORAGE_UNREACHABLE", DetailLoaded: true, DetailLoading: false });
+    assert.equal(rows[0].Error, "OBJECT_STORAGE_UNREACHABLE");
+    assert.equal(rows[0].DetailLoading, false);
+    assert.equal(rows[0].Progress, 15);
+});
+
+test("stopping an errored task preserves its failure details while a successful retry clears them", () => {
+    const row = { Id: "storage-task", Status: "Running", Error: "Storage unavailable", DetailLoaded: true };
+    const stopped = mergeBackgroundTaskSummaries([row], [{ Id: "storage-task", Status: "Canceled" }])[0];
+    assert.equal(stopped.Error, "Storage unavailable");
+    const succeeded = mergeBackgroundTaskSummaries([stopped], [{ Id: "storage-task", Status: "Succeeded" }])[0];
+    assert.equal(succeeded.Error, "");
+    assert.equal(succeeded.DetailLoaded, false);
+});
 
 test("unknown work is indeterminate instead of a fake ten percent", () => {
     const view = getBackgroundTaskProgress({

@@ -280,7 +280,7 @@ test("登录方式弹层、宿主浮层收起和个人中心公开头像保持�
         readFile(new URL("../src/views/micro-app/host.vue", import.meta.url), "utf8"),
         readFile(platformServiceSourcePath("src/main.js"), "utf8"),
         readFile(platformServiceSourcePath("src/PersonalSettings.vue"), "utf8"),
-        readFile(new URL("../../Microi.Server/Microi.net.Api/Controllers/SysUserController.cs", import.meta.url), "utf8")
+        readFile(new URL("../../Microi.Server/Microi.Core/V8Engine/Runtime/V8Method.SysUserSettingsFacade.cs", import.meta.url), "utf8")
     ]);
 
     assert.match(login, /@media \(max-width: 600px\)[\s\S]*?\.login-method-bubbles\s*\{[\s\S]*?grid-template-columns: 1fr/);
@@ -299,9 +299,9 @@ test("登录方式弹层、宿主浮层收起和个人中心公开头像保持�
     assert.match(personalSettings, /item\.ConnectionId\s*\|\|\s*item\.DeviceClientId/);
     assert.doesNotMatch(personalSettings, /MICROI IDENTITY CENTER/);
     assert.doesNotMatch(personalSettings, /window\.confirm/);
-    assert.match(profileController, /public string PublicAvatar/);
-    assert.match(profileController, /member\/public-avatar\//);
-    assert.match(profileController, /if \(param\?\.Avatar != null\)/);
+    assert.match(profileController, /\["HasPublicAvatar"\] = HasJsonProperty\(request, "PublicAvatar"\)/);
+    assert.match(profileController, /"member\/public-avatar"/);
+    assert.match(profileController, /if \(data\["HasAvatar"\]\.Val<bool>\(\)\)/);
 });
 
 test("改密票据客户端具备 Passkey 优先、TOTP 与严格人脸回退", async () => {

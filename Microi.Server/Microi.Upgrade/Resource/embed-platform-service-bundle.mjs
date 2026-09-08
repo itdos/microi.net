@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensurePlatformServiceRuntimeFields } from './platform-service-runtime-fields.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../../../');
@@ -115,6 +116,7 @@ function replaceByIdentity(target, source, identity) {
 }
 
 function synchronizeStoreRuntimeSchema(storePackage, saasPackage) {
+  ensurePlatformServiceRuntimeFields(saasPackage);
   const requiredTableNames = new Set(['sys_microiservice', 'sys_microiservice_page']);
   const sourceTables = (saasPackage.DiyTables || []).filter(table => requiredTableNames.has(table?.Name));
   if (sourceTables.length !== requiredTableNames.size) {
@@ -147,6 +149,7 @@ function synchronizeStoreRuntimeSchema(storePackage, saasPackage) {
     sourceDdls,
     item => String(item?.Id || item?.TableName || item?.Name || JSON.stringify(item)).toLowerCase(),
   );
+  ensurePlatformServiceRuntimeFields(storePackage);
 }
 
 function refreshPackageCounts(packageModel) {

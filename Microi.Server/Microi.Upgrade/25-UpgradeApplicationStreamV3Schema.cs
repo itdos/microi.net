@@ -288,6 +288,7 @@ namespace Microi.net
             new SchemaIndex(VersionTable, "ux_aav_app_request", new[] { "AppId", "RequestId" }, true,
                 sqlServerFilterColumn: "RequestId", requiredNonBlankColumns: new[] { "AppId" }),
             new SchemaIndex(FileTable, "ux_aaf_version_pathhash", new[] { "VersionId", "FilePathHash" }, true,
+                sqlServerFilterColumn: "VersionId",
                 requiredNonBlankColumns: new[] { "VersionId", "FilePath", "FilePathHash" }),
             new SchemaIndex(VersionTable, "ix_aav_state_time_app", new[] { "PublishState", "UpdateTime", "AppId" }, false),
             new SchemaIndex(FileTable, "ix_aaf_app_version_scope", new[] { "AppId", "VersionId", "StorageScope" }, false),
@@ -592,9 +593,7 @@ namespace Microi.net
         {
             var columns = GateTransitionAuditFields.Select(field =>
             {
-                var nullable = GateTransitionAuditRequiredColumns.Contains(
-                    field.Name,
-                    StringComparer.OrdinalIgnoreCase)
+                var nullable = string.Equals(field.Name, "Id", StringComparison.OrdinalIgnoreCase)
                     ? " NOT NULL"
                     : " NULL";
                 return Quote(dialect, field.Name) + " "
@@ -623,12 +622,16 @@ namespace Microi.net
             if (!GateTransitionAuditRequiredColumns.Contains(field.Name, StringComparer.OrdinalIgnoreCase))
                 throw new ArgumentException("字段允许 NULL。", nameof(field));
             var type = PhysicalType(dialect, field.LogicalType, field.SqlServerUnicode);
+            // The historical method name is retained for compatibility. Only
+            // the primary Id is physically required; audit content is validated
+            // by the trusted writer and the migration's existing data checks.
+            var nullable = string.Equals(field.Name, "Id", StringComparison.OrdinalIgnoreCase) ? "NOT NULL" : "NULL";
             return dialect switch
             {
-                SchemaDialect.MySql => $"ALTER TABLE `{GateTransitionAuditTable}` MODIFY COLUMN `{field.Name}` {type} NOT NULL",
-                SchemaDialect.SqlServer => $"ALTER TABLE [{GateTransitionAuditTable}] ALTER COLUMN [{field.Name}] {type} NOT NULL",
-                SchemaDialect.Oracle => $"ALTER TABLE {GateTransitionAuditTable} MODIFY ({field.Name} {type} NOT NULL)",
-                SchemaDialect.PostgreSql => $"ALTER TABLE \"{GateTransitionAuditTable}\" ALTER COLUMN \"{field.Name}\" SET NOT NULL",
+                SchemaDialect.MySql => $"ALTER TABLE `{GateTransitionAuditTable}` MODIFY COLUMN `{field.Name}` {type} {nullable}",
+                SchemaDialect.SqlServer => $"ALTER TABLE [{GateTransitionAuditTable}] ALTER COLUMN [{field.Name}] {type} {nullable}",
+                SchemaDialect.Oracle => $"ALTER TABLE {GateTransitionAuditTable} MODIFY ({field.Name} {type} {nullable})",
+                SchemaDialect.PostgreSql => $"ALTER TABLE \"{GateTransitionAuditTable}\" ALTER COLUMN \"{field.Name}\" " + (nullable == "NULL" ? "DROP NOT NULL" : "SET NOT NULL"),
                 _ => throw new ArgumentOutOfRangeException(nameof(dialect))
             };
         }
@@ -641,13 +644,13 @@ namespace Microi.net
             return dialect switch
             {
                 SchemaDialect.MySql =>
-                    $"ALTER TABLE `{field.TableName}` MODIFY COLUMN `{field.Name}` {type} NOT NULL DEFAULT {literal}",
+                    $"ALTER TABLE `{field.TableName}` MODIFY COLUMN `{field.Name}` {type} NULL DEFAULT {literal}",
                 SchemaDialect.SqlServer =>
-                    $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {type} NOT NULL",
+                    $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {type} NULL",
                 SchemaDialect.Oracle =>
-                    $"ALTER TABLE {field.TableName} MODIFY ({field.Name} {type} DEFAULT {literal} NOT NULL)",
+                    $"ALTER TABLE {field.TableName} MODIFY ({field.Name} {type} DEFAULT {literal} NULL)",
                 SchemaDialect.PostgreSql =>
-                    $"ALTER TABLE \"{field.TableName}\" ALTER COLUMN \"{field.Name}\" SET DEFAULT {literal}, ALTER COLUMN \"{field.Name}\" SET NOT NULL",
+                    $"ALTER TABLE \"{field.TableName}\" ALTER COLUMN \"{field.Name}\" SET DEFAULT {literal}, ALTER COLUMN \"{field.Name}\" DROP NOT NULL",
                 _ => throw new ArgumentOutOfRangeException(nameof(dialect))
             };
         }
@@ -669,7 +672,7 @@ namespace Microi.net
                     $"无法安全保留 {field.TableName}.{field.Name} 的 SQL Server 物理类型：{currentPhysicalType ?? "<null>"}。");
             }
 
-            return $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {physicalType} NOT NULL";
+            return $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {physicalType} NULL";
         }
 
         public static string BuildCreateIndexSql(SchemaDialect dialect, SchemaIndex index)
@@ -854,7 +857,9 @@ namespace Microi.net
                 if (invalid > 0)
                     throw new InvalidOperationException(
                         $"门禁转换审计列 {field.Name} 有 {invalid} 条 NULL，拒绝静默修复安全审计记录。");
-                client.Db.FromSql(BuildGateTransitionAuditNotNullSql(dialect, field)).ExecuteNonQuery();
+                var required = string.Equals(field.Name, "Id", StringComparison.OrdinalIgnoreCase);
+                if (IsColumnNotNull(client, dialect, field.TableName, field.Name) != required)
+                    client.Db.FromSql(BuildGateTransitionAuditNotNullSql(dialect, field)).ExecuteNonQuery();
             }
         }
 
@@ -971,11 +976,11 @@ WHERE c.object_id=OBJECT_ID(@p0) AND c.name=@p1")
                     $"SELECT COUNT(*) FROM {Quote(dialect, field.TableName)} WHERE {Quote(dialect, field.Name)} IS NULL")
                 .ToScalar<long>();
             if (nullCount != 0)
-                throw new InvalidOperationException($"{field.TableName}.{field.Name} 仍有 {nullCount} 条 NULL，拒绝设置 NOT NULL。");
+                throw new InvalidOperationException($"{field.TableName}.{field.Name} 仍有 {nullCount} 条未初始化的协议控制值。");
 
             var existingDefault = NormalizeDefaultExpression(
                 GetColumnDefault(client, dialect, field.TableName, field.Name));
-            if (IsColumnNotNull(client, dialect, field.TableName, field.Name)
+            if (!IsColumnNotNull(client, dialect, field.TableName, field.Name)
                 && string.Equals(existingDefault, field.DefaultValue, StringComparison.OrdinalIgnoreCase))
             {
                 return;
@@ -989,8 +994,8 @@ WHERE c.object_id=OBJECT_ID(@p0) AND c.name=@p1")
             client.Db.FromSql(alterSql).ExecuteNonQuery();
             if (dialect == SchemaDialect.SqlServer) EnsureSqlServerDefault(client, field);
 
-            if (!IsColumnNotNull(client, dialect, field.TableName, field.Name))
-                throw new InvalidOperationException($"{field.TableName}.{field.Name} 未能回读确认 NOT NULL。");
+            if (IsColumnNotNull(client, dialect, field.TableName, field.Name))
+                throw new InvalidOperationException($"{field.TableName}.{field.Name} 未能回读确认允许 NULL。");
             var actualDefault = NormalizeDefaultExpression(GetColumnDefault(client, dialect, field.TableName, field.Name));
             if (!string.Equals(actualDefault, field.DefaultValue, StringComparison.OrdinalIgnoreCase))
             {
@@ -1745,12 +1750,21 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
             var equivalent = before.Data?.FirstOrDefault(index => MatchesIndex(index, definition)
                 && IsAcceptableIndex(client, dialect, index, definition));
             if (equivalent != null) return;
-            if (sameName != null)
-                throw new InvalidOperationException($"SQL Server 索引 {definition.Name} 缺少 RequestId IS NOT NULL 过滤条件。");
+            var replaceLegacyCurrentFileIndex = sameName != null
+                && dialect == SchemaDialect.SqlServer
+                && definition.TableName == FileTable
+                && definition.Name == "ux_aaf_version_pathhash"
+                && string.IsNullOrWhiteSpace(client.Db.FromSql(
+                        "SELECT filter_definition FROM sys.indexes WHERE object_id=OBJECT_ID(@p0) AND name=@p1")
+                    .AddInParameter("p0", definition.TableName)
+                    .AddInParameter("p1", definition.Name).ToScalar()?.ToString());
+            if (sameName != null && !replaceLegacyCurrentFileIndex)
+                throw new InvalidOperationException($"SQL Server 索引 {definition.Name} 缺少 {definition.SqlServerFilterColumn} IS NOT NULL 过滤条件。");
 
             try
             {
-                client.Db.FromSql(BuildCreateIndexSql(dialect, definition)).ExecuteNonQuery();
+                client.Db.FromSql(BuildCreateIndexSql(dialect, definition)
+                    + (replaceLegacyCurrentFileIndex ? " WITH (DROP_EXISTING = ON)" : string.Empty)).ExecuteNonQuery();
             }
             catch (Exception ex)
             {
@@ -1776,6 +1790,31 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
             return actual != null
                    && actual.IsUnique == expected.Unique
                    && actual.Columns.SequenceEqual(expected.Columns, StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Current source rows intentionally have no immutable VersionId. SQL
+        // Server's unfiltered UNIQUE index treats NULL as a value and therefore
+        // prevents two applications from both owning e.g. package.json. Repair
+        // only this known protocol index; custom/mismatched indexes fail closed.
+        public static bool CurrentFileIdentityIndexReady(OsClientSecret client)
+        {
+            if (ResolveDialect(client) != SchemaDialect.SqlServer || !client.Db.TableExists(FileTable)) return true;
+            var expected = Indexes.Single(index => index.Name == "ux_aaf_version_pathhash");
+            var indexes = V8McpLogic.GetTableIndexes(client.OsClient, FileTable);
+            if (indexes?.Code != 1) throw new InvalidOperationException(indexes?.Msg ?? "读取应用文件索引失败。");
+            var existing = indexes.Data?.FirstOrDefault(index =>
+                string.Equals(index.Key_name, expected.Name, StringComparison.OrdinalIgnoreCase));
+            // A missing index belongs to the normal Upgrade25 installation.
+            return existing == null || (MatchesIndex(existing, expected)
+                && IsAcceptableIndex(client, SchemaDialect.SqlServer, existing, expected));
+        }
+
+        public static void EnsureCurrentFileIdentityIndex(OsClientSecret client)
+        {
+            if (CurrentFileIdentityIndexReady(client)) return;
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            EnsureIndex(client.OsClient, client, SchemaDialect.SqlServer,
+                Indexes.Single(index => index.Name == "ux_aaf_version_pathhash"));
         }
 
         private static bool IsAcceptableIndex(

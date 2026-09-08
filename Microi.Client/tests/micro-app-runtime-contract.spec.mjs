@@ -184,7 +184,7 @@ test("hosts use authenticated resolve and one diagnostic error component", () =>
 
 test("menu, dialog and component hosts pass authenticated permission context without URL tokens", () => {
     const permission = read("src/pinia/modules/permission.js");
-    assert.match(permission, /"DiyTableId",\s*"ModuleEngineKey",\s*"MicroServiceId"/);
+    assert.match(permission, /"DiyTableId",\s*"DiyTableName",\s*"ModuleEngineKey",\s*"MicroServiceId"/);
     assert.match(permission, /meta\.ModuleEngineKey\s*=\s*item\.ModuleEngineKey/);
 
     for (const file of ["host.vue", "dialog.vue", "dev-component.vue"]) {

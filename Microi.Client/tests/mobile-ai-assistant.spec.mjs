@@ -3,8 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { loadClientModule } from "./helpers/load-client-module.mjs";
+import { platformUiMessages } from "../src/lang/platform-ui.js";
 
-import {
+const {
     MOBILE_AI_BOOTSTRAP_FAILURES,
     clearMobileAiBootstrapCache,
     classifyMobileAiBootstrapFailure,
@@ -17,7 +19,7 @@ import {
     renameMobileAiConversation,
     sendMobileAiQuestion,
     setMobileAiConversationArchived
-} from "../src/views/mobile/ai-assistant-api.js";
+} = await loadClientModule(new URL("../src/views/mobile/ai-assistant-api.js", import.meta.url));
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const pageSource = fs.readFileSync(path.resolve(testDir, "../src/views/mobile/ai-assistant.vue"), "utf8");
@@ -142,7 +144,7 @@ test("Bootstrap failures distinguish missing installation from role authorizatio
         "不存在的数据！<br>表名：sys_apiengine<br>条件：WHERE ApiEngineKey = 'mci_ai_data_assistant'"
     ));
     assert.equal(missing.kind, MOBILE_AI_BOOTSTRAP_FAILURES.serviceMissing);
-    assert.equal(missing.title, "当前租户尚未安装 AI助手");
+    assert.equal(missing.title, "当前租户尚未安装 AI 助手");
     assert.doesNotMatch(missing.description, /sys_apiengine|WHERE|mci_ai_data_assistant/);
 
     const unauthorized = classifyMobileAiBootstrapFailure(new Error("当前角色未开通 AI 数据分析权限"));
@@ -171,8 +173,10 @@ test("dedicated page exposes stable automation hooks and persistent capability c
     }
     assert.match(pageSource, /:disabled="!supportsReasoning"/);
     assert.doesNotMatch(pageSource, /v-if="supportsReasoning"/);
-    assert.match(pageSource, /内容由人工智能生成，请注意甄别/);
-    assert.match(pageSource, /const assistantName = "AI助手"/);
+    assert.match(pageSource, /\$t\("Msg\.Mobile\.ai\.disclaimer"\)/);
+    assert.equal(platformUiMessages["zh-CN"].Msg.Mobile.ai.disclaimer, "内容由人工智能生成，请注意甄别");
+    assert.equal(platformUiMessages.en.Msg.Mobile.ai.disclaimer, "AI-generated content may be inaccurate");
+    assert.match(pageSource, /const assistantName = computed\(\(\) => t\("Msg\.Mobile\.message\.aiAssistant"\)\)/);
     assert.match(pageSource, /data-testid="mobile-ai-avatar"/);
     assert.match(pageSource, /src="\/static\/mci\/ai\/assistant-robot\.png"/);
     assert.doesNotMatch(pageSource, /<Avatar\s*\/>/);

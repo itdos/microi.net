@@ -25,6 +25,12 @@ Config/Data、菜单查询列与缓存保持一致。
 
 ## 标准工作流
 
+### 物理字段允许为空（强制）
+
+除作为主键的 `Id` 外，通过 MCP、表单设计器、FormEngine、V8 或应用包新增、修改的普通字段，数据库列一律允许 `NULL`。`NotEmpty` 等业务必填要求只作用于表单/服务端校验，不能生成 `NOT NULL`。默认值和是否允许为空是两项独立属性；兼容旧列时只放宽可空约束，保留类型、有效默认值、字符集、排序规则、注释、索引和历史数据，不以补零/空串替代结构修复。
+
+MySQL 的 `ALTER COLUMN DROP DEFAULT` 会让可空列也在省略字段时报 1364；移除普通标量列的旧默认值应使用 `SET DEFAULT NULL`。`IS_NULLABLE=YES` 和 `COLUMN_DEFAULT=NULL` 不足以证明可省略字段，需要通过 `SELECT DEFAULT(列) FROM 表 LIMIT 0` 验证。TEXT/BLOB 的缺失默认标志应保留完整列定义执行 `MODIFY COLUMN` 修复，不能对它们使用 `ALTER COLUMN SET DEFAULT NULL`。
+
 1. 先通过 `microi_get_db_schema` 读取目标租户的真实表、字段和菜单。
 2. 从当前源码
    `Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json`
@@ -257,6 +263,8 @@ MCP 建模只使用：
   这样既保证路由可见，又避免扩大业务操作权限。
 
 ## 固定审计字段
+
+- 核心协议迁移也必须遵守普通物理列允许 NULL。流式发布的 SaaS 开关、协议版本、栅栏、门禁代次和审计字段不能在旧迁移补跑时重新设为 NOT NULL；默认值、状态机、身份校验和完整审计由可信程序保证，只有主键 Id 保持数据库非空约束。
 
 - `Id`、`CreateTime`、`UpdateTime`、`UserId`、`UserName`、`IsDeleted` 是 DIY 表的正常固定字段。物理列存在时必须有对应 `diy_field` 元数据，不能长期出现在“异常字段修复”列表；`diy_table.DisplayDefaultField` 只控制设计器默认是否显示这些字段，不等于删除元数据。
 - 统一通过平台修复接口或 MCP `microi_repair_audit_fields` 补齐/恢复元数据。修复必须按 `OsClient` 使用共享租约锁，可重复执行，只处理已存在的固定物理列，不借机执行 DDL，并在成功后清理字段缓存。

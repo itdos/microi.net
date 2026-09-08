@@ -123,12 +123,28 @@ namespace Microi.net
             var prefix = Prefix();
             foreach (var line in (message ?? string.Empty).Replace("\r\n", "\n").Split('\n'))
             {
-                var detail = line.TrimStart();
-                if (detail.StartsWith("Microi：", StringComparison.Ordinal)) detail = detail.Substring("Microi：".Length);
-                if (detail.StartsWith("【自动升级状态】", StringComparison.Ordinal)) detail = detail.Substring("【自动升级状态】".Length);
                 // 保留控制台关键日志标识；普通“租户数据库升级”会被现有日志路由转存而不输出终端。
-                Console.WriteLine("Microi：" + prefix + " " + detail);
+                Console.WriteLine(DecorateLine(line, prefix));
             }
+        }
+
+        internal static string DecorateLine(string line, string prefix)
+        {
+            var detail = line.TrimStart();
+            if (detail.StartsWith("Microi：", StringComparison.Ordinal)) detail = detail.Substring("Microi：".Length);
+            if (detail.StartsWith("【自动升级状态】", StringComparison.Ordinal)) detail = detail.Substring("【自动升级状态】".Length);
+            var status = string.Empty;
+            foreach (var candidate in new[] { "【成功】", "【✅成功】", "【失败】", "【❌失败】" })
+            {
+                if (!detail.StartsWith(candidate, StringComparison.Ordinal)) continue;
+                status = candidate;
+                detail = detail.Substring(candidate.Length);
+                break;
+            }
+            // Keep an explicit status at the beginning, where the production
+            // console classifier can distinguish a repaired LastError column
+            // from an actual error. Unmarked failures still use its detection.
+            return "Microi：" + status + prefix + " " + detail;
         }
 
         internal static void WriteBatchSummary(Batch batch, int total, int processed, bool cancelled)

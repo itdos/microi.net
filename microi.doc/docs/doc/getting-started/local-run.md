@@ -74,6 +74,29 @@
 
 ---
 
+### 独立端口复现历史 SQL Server 数据库
+
+多人共用工作区时，可使用独立的 `appsettings.SqlServerLocal.json`、编译配置和端口，避免修改其它进程正在使用的 `.microi-local`。该文件按现有本地配置规则忽略，数据库凭据不得提交到仓库；`AppSettings` 仍只配置上文的租户、数据库、Redis、MongoDB 十项基础连接参数。测试副本应使用独立数据库与缓存，避免与同名正式租户共享会话和升级锁。
+
+以下 PowerShell 命令在 `Microi.Server/Microi.net.Api` 目录执行，先确认端口未被占用：
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = 'SqlServerLocal'
+$env:DOTNET_ENVIRONMENT = 'SqlServerLocal'
+dotnet build -c SqlServerLocal -m:1 -p:UseSharedCompilation=false
+& './bin/SqlServerLocal/net10.0/Microi.net.Api.exe' --urls 'https://localhost:61631'
+```
+
+SQL Server 的 `15.0.2000.5` 对应 SQL Server 2019 RTM。还原脚本前应区分 `.bak` 备份与 SQL 导出脚本，并检查后者是否包含 `INSERT` 数据；只有 `CREATE TABLE/ALTER TABLE` 的脚本不能恢复客户账号、配置或业务记录。为这种脚本补入的测试账号和数据必须在验收报告中单独标明。
+
+升级时先修复登录和接口执行所需的核心物理列与自描述元数据，再通过当前基础应用包交付表、字段、接口和运行资产。SaaS 包提供应用文件、版本和微服务页面结构，必须先于商城资产安装。旧版 MySQL 专用升级 SQL 不再直接重放到 SQL Server；任何 DDL 或应用安装失败都停止并保留原 `ServerVersion`。排查时记录首个失败阶段，修复后重复执行并回读字段、应用版本和业务数据，不能通过手工提高版本号跳过错误。
+
+SQL Server 验收还应覆盖 Unicode 文本、带单引号的创建人姓名和原生日期字段清空。表单引擎参数化写入创建人身份；新建文本列使用 Unicode 类型，原生日期的空输入保存为 `NULL`。应用文件唯一索引只约束非空 `VersionId` 的发布文件，允许不同应用保留同名的当前源码；已到达当前数据库版本的租户也会在分布式租约内修复旧的未过滤索引，继续跳过历史迁移链。
+
+已有 `varchar` 列还受 SQL Server 排序规则的字符集限制。SaaS 包在 `diy_lang` 的物理文本列上声明 `SQLSERVER_UNICODE: true`，由商城导入器转换为足够宽的 Unicode 类型，保留目标排序规则、可空性、默认值和普通索引；引用表或未声明的业务列不执行这种转换。字符已经变成问号时，原文无法由类型转换恢复，需要从可靠备份或已知的系统元数据重新生成，不能猜测覆盖客户词条。原始数据库重放验收应同时检查物理类型和中文实际回读。
+
+---
+
 ### 📝 环境配置注意事项
 
 | 环境 | 影响功能 |

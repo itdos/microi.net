@@ -258,7 +258,7 @@ namespace Microi.net
                 if (messages.Count == 0 && repairedPhysicalColumns.Count > 0)
                 {
                     UpgradeProgress.WriteLine(
-                        $"Microi：【后台任务兼容修复】【{osClient}】已补齐 {TableName} 物理字段"
+                        $"Microi：【成功】【后台任务兼容修复】【{osClient}】已补齐 {TableName} 物理字段"
                         + $"{repairedPhysicalColumns.Count}个：{string.Join(",", repairedPhysicalColumns)}。");
                 }
             }

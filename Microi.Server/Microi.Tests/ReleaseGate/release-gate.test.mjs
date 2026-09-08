@@ -14,6 +14,30 @@ const gate=source.slice(begin,end);
 const gitExec=process.platform==='win32'?execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim():'';
 const bash=process.platform==='win32'?path.resolve(gitExec,'../../..','bin/bash.exe'):'bash';
 
+test('release JSON reader handles numeric ports, escaped strings, BOM and nested settings',()=>{
+ const directory=path.join(root,'.tmp','release-json-reader-fixture');fs.mkdirSync(directory,{recursive:true});
+ const filename=path.join(directory,'config.json');
+ fs.writeFileSync(filename,'\uFEFF'+JSON.stringify({AppSettings:{OsClientRedisPort:62629,Value:'a"b\\c',Nothing:null}}));
+ const helper=source.slice(source.indexOf('json_value() {'),source.indexOf('# 自动递增版本号'));
+ const quoted="'"+filename.replaceAll('\\','/').replaceAll("'","'\\''")+"'";
+ try{
+  for(const [key,expected] of [['OsClientRedisPort','62629'],['Value','a"b\\c'],['Nothing',''],['Missing','']]){
+   const run=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',input:helper+'\njson_value '+key+' '+quoted+'\n'});
+   assert.ifError(run.error);assert.equal(run.status,0,run.stderr);assert.equal(run.stdout,expected);
+  }
+ }finally{fs.unlinkSync(filename);fs.rmdirSync(directory);}
+});
+
+test('same-version Docker hotfix keeps full gates and excludes version and remote-resource publication',()=>{
+ assert.match(source,/if \[ "\$\{1:-\}" = "--docker-only-hotfix" \]/);
+ const hotfix=source.slice(source.indexOf('if [ "$MICROI_DOCKER_ONLY_HOTFIX" = true ]'),source.indexOf('if [ "$MICROI_DOCKER_ONLY_HOTFIX" = true ]')+750);
+ for(const marker of ['VERSION="$CURRENT_VERSION"','BUMP_VERSION=false','PUSH_NUGET=false']) assert.ok(hotfix.includes(marker),marker);
+ assert.match(source,/if \[ "\$PUBLISH_BACKEND" = true \] && \[ "\$MICROI_DOCKER_ONLY_HOTFIX" != true \]; then[\s\S]*?refresh-resources\.mjs --publish/);
+ assert.match(gate,/-Mode Full -Configuration Release/);
+ assert.doesNotMatch(gate,/MICROI_DOCKER_ONLY_HOTFIX/);
+ assert.ok(gate.includes('-SolutionPath "$SLN_FILE"'),'Full gate must use the detected solution in an isolated checkout');
+});
+
 for(const scenario of [
  {name:'failed full tests prevent platform publication',backend:true,client:false,exit:19,passed:false,called:true},
  {name:'successful full tests allow platform publication',backend:true,client:false,exit:0,passed:true,called:true},

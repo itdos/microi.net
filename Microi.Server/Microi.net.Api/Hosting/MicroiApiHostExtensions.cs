@@ -88,6 +88,9 @@ public static class MicroiApiHostExtensions
         var configuredAddresses = StartupDiagnostics.GetConfiguredAddresses(builder.Configuration);
         try
         {
+            builder.Services.AddSingleton<MemoryDiagnosticsService>();
+            builder.Services.AddSingleton<IMemoryDiagnosticsRuntime>(sp => sp.GetRequiredService<MemoryDiagnosticsService>());
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<MemoryDiagnosticsService>());
             var app = builder.Build();
             app.UseMicroiApiTransport();
 

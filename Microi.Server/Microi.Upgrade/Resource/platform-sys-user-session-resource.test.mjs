@@ -28,7 +28,7 @@ function execute(param) {
 test('SaaS package ships the case-insensitive user-session compatibility engine', () => {
   assert.equal(packageModel.PackageInfo.ChangeLog.Version, packageModel.PackageInfo.Version);
   assert.ok(engine);
-  assert.equal(engine.Version, 'v1.0.1');
+  assert.equal(engine.Version, 'v1.0.3');
   assert.match(engine.ApiV8Code, /actionNames\[String\(action\)\.toLowerCase\(\)\]/);
   assert.deepEqual(packageModel.ResourcePolicies.ApiEngines['platform-sys-user-session'], {
     Ownership: 'Platform',
@@ -62,6 +62,24 @@ test('unknown user-session actions remain rejected', () => {
   assert.equal(result.Code, 0);
   assert.equal(result.Msg, '不支持的用户会话动作。');
   assert.equal(calls.length, 0);
+});
+
+test('legacy login route pins its action and supports the tenant path suffix', () => {
+  const { result, calls } = execute({
+    _RequestPath: '/api/SysUser/Login--OsClient--tenant-a--',
+    _HttpMethod: 'POST', Action: 'Logout',
+  });
+  assert.equal(result.Code, 1);
+  assert.equal(calls[0].Action, 'Login');
+});
+
+test('canonical session route continues accepting an explicit action', () => {
+  const { result, calls } = execute({
+    _RequestPath: '/apiengine/platform-sys-user-session',
+    _HttpMethod: 'POST', Action: 'login',
+  });
+  assert.equal(result.Code, 1);
+  assert.equal(calls[0].Action, 'Login');
 });
 
 test('post-only actions remain post-only after normalization', () => {

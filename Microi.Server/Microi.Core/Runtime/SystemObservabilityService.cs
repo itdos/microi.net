@@ -53,7 +53,7 @@ namespace Microi.net
             var startedAtUtc = DateTime.UtcNow;
             var rawPath = Limit(context.Request.Path.Value ?? "/", 500);
             var normalizedRoute = NormalizeRoute(rawPath);
-            var traceId = Limit(context.TraceIdentifier, 100);
+            var traceId = MicroiTraceContext.RequestTraceId(context);
             var key = string.IsNullOrWhiteSpace(traceId)
                 ? Guid.NewGuid().ToString("N")
                 : traceId + ":" + Guid.NewGuid().ToString("N").Substring(0, 8);
@@ -86,6 +86,7 @@ namespace Microi.net
         {
             apiEngineKey = (apiEngineKey ?? "").Trim();
             if (!ApiEngineKeyPattern.IsMatch(apiEngineKey)) return;
+            ExecutionObservation.Annotate(apiEngineKey, osClient);
             NetworkTrafficObservabilityService.AnnotateEndpoint(
                 context,
                 "/apiengine/" + apiEngineKey,
@@ -111,6 +112,7 @@ namespace Microi.net
         /// </summary>
         public static void AnnotateFormEngine(HttpContext context, string formEngineKey, string action)
         {
+            ExecutionObservation.Annotate(table: formEngineKey, stage: action);
             NetworkTrafficObservabilityService.AnnotateEndpoint(
                 context,
                 $"/api/FormEngine/{(action ?? "Request").Trim()}::{(formEngineKey ?? "").Trim()}",
@@ -190,7 +192,8 @@ namespace Microi.net
                 }
             }
 
-            var active = Active.Values
+            var allActive = Active.Values.ToArray();
+            var active = allActive
                 .Select(item => ToActiveSnapshot(item, nowUtc))
                 .OrderByDescending(item => item.ElapsedMs)
                 .Take(100)
@@ -213,8 +216,8 @@ namespace Microi.net
                 AverageDurationMs = total.Count == 0 ? 0 : Math.Round(total.TotalElapsedMs / (double)total.Count, 2),
                 P95DurationMs = total.Percentile95(),
                 MaxDurationMs = total.MaxElapsedMs,
-                ActiveRequestCount = active.Count,
-                ActiveBusinessRequestCount = activeBusiness.Count,
+                ActiveRequestCount = allActive.Length,
+                ActiveBusinessRequestCount = allActive.Count(item => !item.IsDiagnostic),
                 SampledAtUtc = nowUtc
             };
             var recent = Recent.Reverse()
@@ -239,6 +242,7 @@ namespace Microi.net
                 TopEndpoints = topEndpoints,
                 TopIps = topIps,
                 ActiveRequests = active,
+                ActiveSampleTruncated = allActive.Length > active.Count,
                 RecentRequests = recent,
                 NetworkTraffic = NetworkTrafficObservabilityService.GetSnapshot(windowMinutes, top)
             };
@@ -246,7 +250,7 @@ namespace Microi.net
             return snapshot;
         }
 
-        internal static string NormalizeRoute(string path)
+        public static string NormalizeRoute(string path)
         {
             var raw = (path ?? "/").Trim();
             var queryIndex = raw.IndexOf('?');
@@ -798,6 +802,8 @@ namespace Microi.net
 
     public sealed class SystemObservabilitySnapshot
     {
+        public bool ActiveSampleTruncated { get; set; }
+        public int ActiveSampleCount => ActiveRequests.Count;
         public ObservabilityNodeSnapshot Node { get; set; }
         public ProcessRuntimeSnapshot Process { get; set; }
         public RequestWindowSnapshot Requests { get; set; }

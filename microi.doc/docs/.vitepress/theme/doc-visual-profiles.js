@@ -65,6 +65,7 @@ export const DOC_VISUAL_PROFILES = Object.freeze({
   'system-engine/report-engine': 'overview',
   'system-engine/saas-engine': 'policy',
   'system-engine/search-engine': 'overview',
+  'system-engine/email-engine': 'guide',
   'system-engine/spider-engine': 'guide',
   'system-engine/ocr-engine': 'guide',
   'system-engine/vision-engine': 'guide',

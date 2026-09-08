@@ -105,7 +105,7 @@
             </div>
             <div class="left-tree-actions">
             <el-button type="primary" @click="OpenPageConfig()" v-if="GetCurrentUser.Level >= 9999">页面配置 </el-button>
-            <el-button type="primary" @click="OpenAnyForm({}, '')" v-if="LeftTreeData.ShudingJXZ === 1">添加分类 </el-button>
+            <el-button type="primary" @click="OpenAnyForm({}, 'Add')" v-if="LeftTreeData.ShudingJXZ === 1">添加分类 </el-button>
             <el-button style="margin-left: 5px" @click="refreshTree" v-if="LeftTreeData.ShushuaX === 1">刷新 </el-button>
             </div>
         </div>
@@ -171,7 +171,7 @@
                         <template #default="{ node, data }">
                             <span class="custom-tree-node">
                                 <span>{{ node.label }}</span>
-                                <span class="tree-actions">
+                                <span class="tree-actions" v-if="!data.__LeftTreeLoadMore">
                                     <el-button
                                         type="text"
                                         :icon="Plus"
@@ -221,6 +221,7 @@
 import { computed, defineAsyncComponent } from "vue";
 import { useDiyStore } from "@/pinia";
 import { collectDefaultExpandedKeys } from "./left-tree-default-expand.js";
+import { treeFlag, needsDefaultTreeLoading, buildChildPage } from "./left-tree-loading.js";
 
 // 🔥 改为异步导入，避免循环依赖和初始化顺序问题
 const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
@@ -250,6 +251,9 @@ export default {
     data() {
         return {
             lazy: false,
+            DefaultTreeLazy: false,
+            DefaultTreeParentField: "",
+            LoadingChildPages: {},
             TreeLoading: false,
             TreeRequestId: 0,
             TreePage: {
@@ -281,6 +285,7 @@ export default {
         };
     },
     async created() {
+        this.lazy = treeFlag(this.LeftTreeData.LanjiaZ);
         await this.getOption();
         await this.treeData();
     },
@@ -349,7 +354,7 @@ export default {
             data.forEach(function (item) {
                 if (!item) return;
                 var hasLoadedChildren = Array.isArray(item._Child) && item._Child.length > 0;
-                item._HasChild = Boolean(item._HasChild) || hasLoadedChildren;
+                item._HasChild = treeFlag(item._HasChild) || hasLoadedChildren;
                 // Element Plus 的 isLeaf=true 表示“叶子节点”，与后端
                 // _HasChild 的语义正好相反，不能直接绑定同一个字段。
                 item._IsLeaf = !item._HasChild;
@@ -396,6 +401,22 @@ export default {
                             }
                         );
                     });
+                    if (requestId !== self.TreeRequestId) return;
+                    // 大树即使配置未开启懒加载，服务端也会自动分页；必须读取运行时
+                    // 协议，不能把只有根节点的响应交给完整树模式而隐藏展开箭头。
+                    self.DefaultTreeLazy = needsDefaultTreeLoading(res) && !treeFlag(self.LeftTreeData.LanjiaZ);
+                    self.lazy = self.DefaultTreeLazy || treeFlag(self.LeftTreeData.LanjiaZ);
+                    if (self.DefaultTreeLazy) {
+                        self.DefaultTreeParentField = res.DataAppend?.TreeParentField || self.DefaultTreeParentField;
+                        if (!self.DefaultTreeParentField) {
+                            const model = await self.DiyCommon.PostAsync(self.DiyApi.GetDiyTableModel, {
+                                Name: self.LeftTreeData.GuanlianBD,
+                                _SysMenuId: ShuxingGLCD[ShuxingGLCD.length - 1]
+                            });
+                            if (model.Code !== 1) throw new Error(model.Msg || "读取分类表配置失败");
+                            self.DefaultTreeParentField = model.Data.TreeParentField || "ParentId";
+                        }
+                    }
                     if (requestId !== self.TreeRequestId) return;
                     self.ApplyPagedTreeResult(res);
                 }
@@ -504,6 +525,10 @@ export default {
         },
         // 处理分类节点点击事件
         handleCategoryClick(data) {
+            if (data?.__LeftTreeLoadMore) {
+                this.LoadMoreChildren(data);
+                return;
+            }
             this.CurrentCategoryId = data && data.Id ? data.Id : "";
             this.$emit("LeftViewClick", data);
         },
@@ -518,12 +543,21 @@ export default {
             this.$emit("ShowRightClick", item);
         },
         // 懒加载方法
-        async loadNode(node, resolve) {
+        async loadNode(node, resolve, reject) {
             var self = this;
             if (node.level === 0) {
-                return resolve([{ name: "region" }]);
+                return resolve(self.TreeData.categories);
             }
-            if (self.LeftTreeData.LanjiaZDM) {
+            if (self.DefaultTreeLazy) {
+                const requestId = self.TreeRequestId;
+                try {
+                    const data = await self.LoadDefaultChildren(node.data.Id, 1);
+                    resolve(requestId === self.TreeRequestId ? data : []);
+                } catch (error) {
+                    self.DiyCommon.Tips(error.message || "分类加载失败", false);
+                    if (typeof reject === "function") reject(); else resolve([]);
+                }
+            } else if (self.LeftTreeData.LanjiaZDM) {
                 var V8 = {
                     Form: {
                         ...node.data,
@@ -535,15 +569,48 @@ export default {
                 try {
                     await eval("(async () => {\n " + self.LeftTreeData.LanjiaZDM + " \n})()");
                     var result = await V8.Result;
-                    resolve(result.Data);
+                    resolve(self.NormalizeTreeData(result.Data || []));
                 } catch (error) {
                     self.DiyCommon.Tips("执行懒加载V8引擎代码出现错误：" + error.message, false);
+                    if (typeof reject === "function") reject(); else resolve([]);
                 } finally {
                     
                     
                 }
             } else {
                 return resolve([]);
+            }
+        },
+
+        async LoadDefaultChildren(parentId, pageIndex) {
+            const menuIds = JSON.parse(this.LeftTreeData.ShuxingGLCD);
+            const result = await this.DiyCommon.PostAsync("/api/FormEngine/GetDiyTableRowTree", {
+                ModuleEngineKey: menuIds[menuIds.length - 1],
+                _Where: [[this.DefaultTreeParentField, "=", parentId]],
+                _TreeLazy: 1,
+                _PageIndex: pageIndex,
+                _PageSize: this.TreePage.PageSize
+            });
+            if (result.Code !== 1) throw new Error(result.Msg || "分类加载失败");
+            return this.NormalizeTreeData(buildChildPage(result, parentId, pageIndex,
+                this.TreePage.PageSize, this.TreeData.defaultProps.label));
+        },
+        async LoadMoreChildren(data) {
+            const { parentId, pageIndex } = data.__LeftTreeLoadMore;
+            if (this.LoadingChildPages[parentId]) return;
+            this.LoadingChildPages[parentId] = true;
+            const requestId = this.TreeRequestId;
+            try {
+                const next = await this.LoadDefaultChildren(parentId, pageIndex);
+                const tree = this.$refs.categoryTree;
+                const parent = tree?.getNode(parentId);
+                if (requestId !== this.TreeRequestId || !parent) return;
+                const previous = parent.childNodes.map(node => node.data).filter(row => !row.__LeftTreeLoadMore);
+                tree.updateKeyChildren(parentId, previous.concat(next));
+            } catch (error) {
+                this.DiyCommon.Tips(error.message || "分类加载失败", false);
+            } finally {
+                delete this.LoadingChildPages[parentId];
             }
         },
 

@@ -28,6 +28,52 @@ public class ApplicationAssetVerificationTests
     private static object? Call(string method, params object?[] args)
         => typeof(V8McpLogic).GetMethod(method, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, args);
 
+    private static object Dialect(string name)
+        => Enum.Parse(typeof(V8McpLogic).GetNestedType("ApplicationAssetV3SqlDialect", BindingFlags.NonPublic)!, name);
+
+    [Theory]
+    [InlineData("MySql", "LIMIT 50")]
+    [InlineData("SqlServer", "TOP (50)")]
+    [InlineData("Oracle", "ROWNUM <= 50")]
+    public void RecoveryCandidateSqlKeepsPhysicalProtocolFiltersAndBoundsInEveryDialect(string dialect, string bound)
+    {
+        var sql = (string)Call("BuildApplicationAssetV3RecoveryCandidateSql", Dialect(dialect), 50)!;
+        Assert.Contains("mci_ai_app_version", sql);
+        Assert.Contains("PublishProtocolVersion", sql);
+        Assert.Contains("=@protocol", sql);
+        Assert.Contains("PublishState", sql);
+        Assert.Contains("IN (@verifying,@committed,@pending,@repair)", sql);
+        Assert.Contains("IsDeleted", sql);
+        Assert.Contains("ORDER BY COALESCE(", sql);
+        Assert.Contains("CreateTime", sql);
+        Assert.Contains(bound, sql);
+        Assert.DoesNotContain("diy_field", sql);
+        if (dialect == "Oracle")
+            Assert.True(sql.IndexOf("ORDER BY", StringComparison.Ordinal) < sql.IndexOf("ROWNUM", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(51)]
+    [InlineData(int.MaxValue)]
+    public void RecoveryCandidateSqlRejectsUnboundedOrInvalidScan(int limit)
+    {
+        var error = Assert.Throws<TargetInvocationException>(() =>
+            Call("BuildApplicationAssetV3RecoveryCandidateSql", Dialect("MySql"), limit));
+        Assert.IsType<ArgumentOutOfRangeException>(error.InnerException);
+    }
+
+    [Fact]
+    public async Task CancelledRecoveryDoesNotResolveTenantOrOpenDatabase()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var task = (Task<List<JObject>>)Call("ReadApplicationAssetV3RecoveryCandidatesStrongAsync",
+            "missing-test-tenant", 50, cancellation.Token)!;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
+    }
+
     private static (JObject app, JObject version, object request, object plan) Frozen()
     {
         var app = new JObject { ["Id"] = "test-app", ["AppKey"] = "verify-test", ["ApplicationType"] = "Web",

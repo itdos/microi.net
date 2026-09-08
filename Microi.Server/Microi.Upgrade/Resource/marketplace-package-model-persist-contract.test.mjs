@@ -18,7 +18,7 @@ test('组合应用包只返回包模型，避免 Base64 与对象双份内存', 
 })
 
 test('应用发布器补齐稳定商城标识并在写入后强回读', () => {
-  assert.match(publisher, /Version: v1\.9\.25/)
+  assert.match(publisher, /Version: v2\.0\.3/)
   assert.match(publisher, /MARKETPLACE_STABLE_APPLICATION_IDENTITY_V1/)
   assert.match(publisher, /marketplaceIdentityReadbackMatches/)
   assert.match(publisher, /发布到应用商城后的 AppId\/AppKey 强回读不一致/)

@@ -13,9 +13,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，V8引擎注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>8.2.0</Version>
-    <AssemblyVersion>8.2.0</AssemblyVersion>
-    <FileVersion>8.2.0</FileVersion>
+    <Version>8.2.4</Version>
+    <AssemblyVersion>8.2.4</AssemblyVersion>
+    <FileVersion>8.2.4</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -34,6 +34,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- IMAP/SMTP/MIME 协议原子；邮件业务与调度仍由接口引擎编排。 -->
+    <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="AlibabaCloud.SDK.Alidns20150109" Version="4.5.0" />
     <PackageReference Include="AlibabaCloud.SDK.ESA20240910" Version="3.10.0" />
     <PackageReference Include="AlipaySDKNet.OpenAPI" Version="3.0.57" />

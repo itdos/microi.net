@@ -1,5 +1,9 @@
 <template>
+    <paged-select-tree v-if="IsPagedTree" :model-value="InnerValue" :field="field" :form-data="FormDiyTableModel"
+        :disabled="GetFieldReadOnly(field)" :placeholder="GetFieldPlaceholder(field)"
+        @change="SelectChange($event, field)" />
     <el-tree-select
+        v-else
         clearable
         :filterable="(field.Config.SelectTree && field.Config.SelectTree.Filterable) || field.Config.Filterable || field.Config.DataSourceSqlRemote === true"
         :disabled="GetFieldReadOnly(field)"
@@ -79,6 +83,10 @@
             <el-form-item label="可搜索">
                 <el-switch v-model="configForm.SelectTree.Filterable" active-color="#ff6c04" inactive-color="#ccc" />
             </el-form-item>
+            <el-form-item v-if="configForm.SelectTree.Lazy && configForm.DataSource === 'Sql'" label="每页条数">
+                <el-input-number v-model="configForm.SelectTree.PageSize" :min="0" :max="200" :step="10" />
+                <div class="form-item-tip">设为 1–200 开启根节点分页和子级分批加载，搜索覆盖未加载的分类，已选项自动回填。0 保持原有加载方式。分页模式逐项选择，不自动勾选尚未加载的子级。</div>
+            </el-form-item>
             
             <el-form-item label="是否多选">
                 <el-switch v-model="configForm.SelectTree.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
@@ -140,6 +148,8 @@
 
 <script>
 import _ from "underscore";
+import PagedSelectTree from './paged-select-tree.vue';
+import { isPagedSelectTree } from './select-tree-paging.js';
 export default {
     name: "diy-select-tree",
     inheritAttrs: false,
@@ -235,9 +245,10 @@ export default {
         }
     },
 
-    components: {},
+    components: { PagedSelectTree },
 
     computed: {
+        IsPagedTree() { return isPagedSelectTree(this.field); },
         IsTreeMultiple() {
             var cfg = this.field && this.field.Config && this.field.Config.SelectTree ? this.field.Config.SelectTree : {};
             return cfg.Multiple === true || cfg.Multiple === "true" || cfg.Multiple === 1;
@@ -273,6 +284,7 @@ export default {
     },
 
     beforeUnmount() {
+        window.clearTimeout(this._remoteSearchTimer);
         window.clearTimeout(this.sysDataSourceSearchTimer);
         window.clearTimeout(this.apiEngineSearchTimer);
     },
@@ -295,7 +307,7 @@ export default {
             handler(newData, oldData) {
                 var self = this;
                 // 当数据从空变为有数据时，或数据发生变化时，重新初始化
-                if (newData && newData.length > 0) {
+                if (!self.IsPagedTree && newData && newData.length > 0) {
                     self.$nextTick(() => {
                         self.Init();
                     });
@@ -310,6 +322,11 @@ export default {
         Init() {
             var self = this;
             var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            if (self.IsPagedTree) {
+                self.syncFromExternalValue(modelValue);
+                self.LastModelValue = modelValue;
+                return;
+            }
             var isLazy = self.field.Config && self.field.Config.SelectTree && self.field.Config.SelectTree.Lazy === true;
             // Lazy 模式：数据通过 loadTreeNode 回调按需加载，不需要预加载全量数据
             if (isLazy) {
@@ -946,6 +963,7 @@ export default {
                     ParentField: self.field.Config.SelectTree.ParentField || 'ParentId',
                     ParentFields: self.field.Config.SelectTree.ParentFields || 'ParentIds',
                     Lazy: self.field.Config.SelectTree.Lazy || false,
+                    PageSize: self.field.Config.SelectTree.PageSize || 0,
                     Filterable: self.field.Config.SelectTree.Filterable || false,
                     Multiple: self.field.Config.SelectTree.Multiple || false,
                     ParentChildLinkage: self.field.Config.SelectTree.ParentChildLinkage || false,
@@ -978,6 +996,7 @@ export default {
             self.field.Config.SelectTree.ParentField = self.configForm.SelectTree.ParentField;
             self.field.Config.SelectTree.ParentFields = self.configForm.SelectTree.ParentFields;
             self.field.Config.SelectTree.Lazy = self.configForm.SelectTree.Lazy;
+            self.field.Config.SelectTree.PageSize = self.configForm.SelectTree.PageSize || 0;
             self.field.Config.SelectTree.Filterable = self.configForm.SelectTree.Filterable;
             self.field.Config.SelectTree.Multiple = self.configForm.SelectTree.Multiple;
             self.field.Config.SelectTree.ParentChildLinkage = self.configForm.SelectTree.ParentChildLinkage;

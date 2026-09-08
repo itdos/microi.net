@@ -96,22 +96,22 @@ public sealed class ApplicationStreamSchemaUpgradeTests
             Upgrade25.BuildAddColumnSql(Upgrade25.SchemaDialect.PostgreSql, manifest));
 
         Assert.Equal(
-            "ALTER TABLE `sys_microistore` MODIFY COLUMN `PublishProtocolVersion` int NOT NULL DEFAULT 2",
+            "ALTER TABLE `sys_microistore` MODIFY COLUMN `PublishProtocolVersion` int NULL DEFAULT 2",
             Upgrade25.BuildControlAlterSql(Upgrade25.SchemaDialect.MySql, protocol));
         Assert.Equal(
-            "ALTER TABLE [sys_microistore] ALTER COLUMN [PublishProtocolVersion] int NOT NULL",
+            "ALTER TABLE [sys_microistore] ALTER COLUMN [PublishProtocolVersion] int NULL",
             Upgrade25.BuildControlAlterSql(Upgrade25.SchemaDialect.SqlServer, protocol));
         var publishMode = Control("sys_osclients", "ApplicationStreamPublishMode");
         Assert.Equal(
-            "ALTER TABLE [sys_osclients] ALTER COLUMN [ApplicationStreamPublishMode] nvarchar(20) NOT NULL",
+            "ALTER TABLE [sys_osclients] ALTER COLUMN [ApplicationStreamPublishMode] nvarchar(20) NULL",
             Upgrade25.BuildSqlServerPreservingControlAlterSql(publishMode, "nvarchar(20)"));
         Assert.Throws<InvalidOperationException>(() =>
             Upgrade25.BuildSqlServerPreservingControlAlterSql(publishMode, "nvarchar(20); DROP TABLE x"));
         Assert.Equal(
-            "ALTER TABLE sys_microistore MODIFY (PublishProtocolVersion NUMBER(10) DEFAULT 2 NOT NULL)",
+            "ALTER TABLE sys_microistore MODIFY (PublishProtocolVersion NUMBER(10) DEFAULT 2 NULL)",
             Upgrade25.BuildControlAlterSql(Upgrade25.SchemaDialect.Oracle, protocol));
         Assert.Equal(
-            "ALTER TABLE \"sys_microistore\" ALTER COLUMN \"PublishProtocolVersion\" SET DEFAULT 2, ALTER COLUMN \"PublishProtocolVersion\" SET NOT NULL",
+            "ALTER TABLE \"sys_microistore\" ALTER COLUMN \"PublishProtocolVersion\" SET DEFAULT 2, ALTER COLUMN \"PublishProtocolVersion\" DROP NOT NULL",
             Upgrade25.BuildControlAlterSql(Upgrade25.SchemaDialect.PostgreSql, protocol));
 
         var request = Upgrade25.Indexes.Single(index => index.Name == "ux_aav_app_request");
@@ -125,6 +125,8 @@ public sealed class ApplicationStreamSchemaUpgradeTests
 
         var fileIdentity = Upgrade25.Indexes.Single(index => index.Name == "ux_aaf_version_pathhash");
         Assert.Equal(new[] { "VersionId", "FilePathHash" }, fileIdentity.Columns);
+        Assert.EndsWith("WHERE [VersionId] IS NOT NULL",
+            Upgrade25.BuildCreateIndexSql(Upgrade25.SchemaDialect.SqlServer, fileIdentity));
         Assert.DoesNotContain("FilePath`)",
             Upgrade25.BuildCreateIndexSql(Upgrade25.SchemaDialect.MySql, fileIdentity));
 
@@ -369,6 +371,18 @@ public sealed class ApplicationStreamSchemaUpgradeTests
         Assert.Equal(package["PackageInfo"]!["PhysicalColumnCount"]!.Value<int>(),
             package["PhysicalColumns"]!.Count());
 
+        // TableName 是导出投影的可选字段；TableId 指向本包 DiyTables 才是字段归属。
+        // 同时存在两种表示时严格检查一致，避免跨环境 Id 或缺失投影造成误判。
+        string FieldTableName(JObject item)
+        {
+            var table = Assert.Single(package["DiyTables"]!.Children<JObject>(), candidate =>
+                candidate["Id"]?.ToString() == item["TableId"]?.ToString());
+            var tableName = table["Name"]!.ToString();
+            var projectedName = item["TableName"]?.ToString();
+            if (!string.IsNullOrWhiteSpace(projectedName)) Assert.Equal(tableName, projectedName);
+            return tableName;
+        }
+
         foreach (var field in Upgrade25.Fields.Where(field => field.TableName != "sys_osclients"))
         {
             var ddl = Assert.Single(package["DDLStatements"]!.Children<JObject>(), item =>
@@ -378,7 +392,7 @@ public sealed class ApplicationStreamSchemaUpgradeTests
                 item["TABLE_NAME"]?.ToString() == field.TableName
                 && item["COLUMN_NAME"]?.ToString() == field.Name);
             Assert.Single(package["DiyFields"]!.Children<JObject>(), item =>
-                item["TableName"]?.ToString() == field.TableName
+                FieldTableName(item) == field.TableName
                 && item["Name"]?.ToString() == field.Name);
         }
 

@@ -10,21 +10,21 @@ const engines = new Map((packageModel.SysApiEngines || []).map(engine => [engine
 const normalize = value => `${String(value || '').replace(/\r\n?/g, '\n').replace(/\n*$/g, '')}\n`;
 
 test('application-store package embeds package-aware installation and immediate menu availability', () => {
-  assert.match(packageModel.PackageInfo.Version, /^v8\.2\.4$/);
+  assert.match(packageModel.PackageInfo.Version, /^v8\.3\.2$/);
   assert.equal(packageModel.PackageInfo.ChangeLog?.Version, packageModel.PackageInfo.Version);
   assert.ok(String(packageModel.PackageInfo.ChangeLog?.Title || '').trim());
   assert.ok(String(packageModel.PackageInfo.ChangeLog?.Content || '').trim());
 
   const importerEngine = engines.get('import-microi-store-package');
   const listEngine = engines.get('get-microi-store');
-  assert.equal(importerEngine?.Version, 'v2.8.3');
+  assert.equal(importerEngine?.Version, 'v2.8.11');
   assert.equal(listEngine?.Version, 'v1.5.0');
   assert.equal(normalize(importerEngine?.ApiV8Code), normalize(importer));
   assert.equal(normalize(listEngine?.ApiV8Code), normalize(storeList));
 
   for (const fieldName of ['RequiredPlatformCapabilities', 'Capabilities']) {
     const capabilities = packageModel.PackageInfo[fieldName] || [];
-    assert.ok(capabilities.includes('ApiEngine:import-microi-store-package@v2.7.4'));
+    assert.ok(capabilities.includes('ApiEngine:import-microi-store-package@v2.8.7'));
     assert.ok(capabilities.includes('Importer:MarketplaceChangelogTenantCollisionRepairV1'));
     assert.ok(capabilities.includes('ApiEngine:get-microi-store-model@v1.4.0'));
     assert.ok(capabilities.includes('ApiEngine:get-microi-store@v1.5.0'));
@@ -43,7 +43,7 @@ test('application-store package embeds package-aware installation and immediate 
     assert.ok(capabilities.includes('Importer:PhysicalNotNullTenantBackfillV1'));
     assert.ok(capabilities.includes('Importer:PageEngineOptionalReferenceV1'));
     assert.ok(capabilities.includes('Importer:SqlServerPhysicalSchemaV1'));
-    assert.ok(!capabilities.some(item => /^ApiEngine:import-microi-store-package@(?!v2\.7\.4$)/.test(item)));
+    assert.ok(!capabilities.some(item => /^ApiEngine:import-microi-store-package@(?!v2\.8\.7$)/.test(item)));
     assert.ok(!capabilities.some(item => /^ApiEngine:get-microi-store@(?!v1\.5\.0$)/.test(item)));
   }
 });

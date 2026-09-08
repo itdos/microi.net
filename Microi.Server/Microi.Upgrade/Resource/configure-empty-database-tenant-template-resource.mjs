@@ -11,12 +11,12 @@ const canonicalSourcePath = path.resolve(
   directory,
   '../../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/接口引擎/系统/[SaaS引擎]主库空数据库脱敏SQL(admin_get_empty_database_sanitization_sql).js',
 );
-const packageVersion = 'v7.8.14';
-const previousPackageVersion = 'v7.8.13';
-const engineVersion = 'v1.3.6';
-const previousEngineVersion = 'v1.3.5';
-const releaseTime = '2026-09-03 16:20:00';
-const changeLogContent = '空数据库只保留唯一 iTdos/Product/Internal 主租户模板，并新增后端零残留门禁；一键安装器仅对官方空库原位认领模板并停用旧版包遗留空模板，自定义恢复库的子租户保持不变。';
+const packageVersion = 'v8.2.3';
+const previousPackageVersion = 'v8.2.2';
+const engineVersion = 'v1.4.0';
+const previousEngineVersion = 'v1.3.9';
+const releaseTime = '2026-09-07 04:10:00';
+const changeLogContent = '主库空数据库保留邮件与视觉能力的表结构，但清空邮件账户、邮件内容、同步日志、接口代码历史及视觉请求、主体、样本等运行数据；补齐导出前零残留门禁，避免将持续新增的业务与历史数据交付到新租户。官方可在同一发布租约下撤回固定的七种空库文件。';
 
 function normalizeSource(value) {
   return String(value || '').replace(/\r\n?/g, '\n').replace(/\n*$/, '\n');
@@ -76,17 +76,26 @@ engine.Version = engineVersion;
 engine.UpdateTime = releaseTime;
 engine.ChangeHistory = prependOnce(
   engine.ChangeHistory,
-  `${releaseTime} ${engineVersion} 只保留唯一 Product/Internal 主租户模板并纳入后端零残留门禁`,
+  `${releaseTime} ${engineVersion} 清理邮件和运行历史并保留已校验的安装版本基线`,
 );
+
+const worker = engines.find(item => item.ApiEngineKey === 'admin_build_sanitized_empty_database');
+if (!worker || !['v1.0.10', 'v1.1.0'].includes(worker.Version)) throw new Error('空库工作器版本不符合预期。');
+const workerPath = path.resolve(directory, '../../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/接口引擎/系统/[SaaS引擎]一键制作主库空数据库(admin_build_sanitized_empty_database).js');
+worker.ApiV8Code = normalizeSource(fs.readFileSync(workerPath, 'utf8'));
+if (!worker.ApiV8Code.includes('Version: v1.1.0')) throw new Error('空库工作器源码版本未更新。');
+worker.Version = 'v1.1.0';
+worker.UpdateTime = releaseTime;
+worker.ChangeHistory = prependOnce(worker.ChangeHistory, `${releaseTime} v1.1.0 官方固定空库文件撤回与强租约验证`);
 
 info.Version = packageVersion;
 info.ChangeHistory = prependOnce(
   info.ChangeHistory,
-  `2026-09-03 ${packageVersion} ${changeLogContent}`,
+  `2026-09-07 ${packageVersion} ${changeLogContent}`,
 );
 info.ChangeLog = {
   Version: packageVersion,
-  Title: '空数据库主租户模板闭环修复',
+  Title: '空数据库邮件与运行历史脱敏',
   ChangeType: 'Fix',
   Content: changeLogContent,
   ReleaseTime: releaseTime,

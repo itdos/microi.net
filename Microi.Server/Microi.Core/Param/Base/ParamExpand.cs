@@ -556,6 +556,8 @@ namespace Microi.net
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _ParentValue { get; set; }
+        /// <summary>分页下拉树按存储字段回填选中项；仍在字段已授权的数据源 SQL 范围内查询。</summary>
+        public List<string> _SelectTreeValues { get; set; }
         /// <summary>
         /// 数据日志
         /// </summary>

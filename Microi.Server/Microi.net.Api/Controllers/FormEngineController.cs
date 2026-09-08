@@ -1963,6 +1963,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetFieldsData(DiyTableRowParam param)
         {
             await DefaultDiyTableRowParam(param);
+            ExecutionObservation.Annotate(tenant: param.OsClient, stage: "GetFieldsData");
             var result = await MicroiEngine.FormEngine.GetFieldsData(param);
             return Json(result);
         }
@@ -1973,6 +1974,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetFieldsDataFromBody([FromBody] DiyTableRowParam param)
         {
             await DefaultDiyTableRowParam(param);
+            ExecutionObservation.Annotate(tenant: param.OsClient, stage: "GetFieldsData");
             var result = await MicroiEngine.FormEngine.GetFieldsData(param);
             return Json(result);
         }

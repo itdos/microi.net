@@ -201,14 +201,15 @@ const sysUserSessionCode = officialNotice('SaaS引擎', 'platform-sys-user-sessi
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-sys-user-session
- * Version: v1.0.1
+ * Version: v1.0.3
  * Function:
- * - 统一承载用户登录、Token 续签、Token 登录、退出与管理员凭据会话协议；兼容历史 SysUser 多路由，并按大小写无关方式归一化动作名。
+ * - 统一承载用户登录、Token 续签、Token 登录与退出。历史 SysUser 地址固定绑定动作，兼容路径租户后缀，保留可信后端密码、验证码及 DiyToken 验证。
  */
 
-var route = String(V8.Param._RequestPath || V8.Param.ApiAddress || '').replace(/\\?.*$/, '');
+var route = String(V8.Param._RequestPath || V8.Param.ApiAddress || '').replace(/\\?.*$/, '').replace(/--OsClient--.*?--$/i, '');
 var action = String(V8.Param.Action || '').trim();
-if(!action && route){
+// 旧地址固定对应旧动作；正文 Action 不能把登录地址切换成其它会话操作。
+if(route && (!action || /^\\/api\\/sysuser\\//i.test(route))){
   var segments = route.split('/');
   action = segments[segments.length - 1] || '';
 }
@@ -466,8 +467,8 @@ const packageUpdates = {
         routes: '/api/SysUser/Login;/api/SysUser/SetPassword;/api/SysUser/GetOwnedTenantAdminPassword;/api/SysUser/ResetOwnedTenantAdminPassword;/api/SysUser/RefreshToken;/api/SysUser/TokenLogin;/api/SysUser/Logout;/api/SysUser/GetSysUserPassword',
         code: sysUserSessionCode,
         allowAnonymous: 1,
-        version: 'v1.0.1',
-        changeHistory: '2026-08-30 v1.0.1 按大小写无关方式归一化历史 SysUser 动作，兼容 refreshToken 与 tokenlogin。\n2026-08-30 v1.0.0 迁移旧 Controller 路由到官方 Managed 接口引擎，并由多路由保持历史客户端兼容。\n',
+        version: 'v1.0.3',
+        changeHistory: '2026-09-07 v1.0.3 历史 SysUser 地址固定绑定动作，兼容路径 OsClient 后缀；未升级租户由新版后端启动兼容 Controller 兜底。\n2026-08-30 v1.0.1 按大小写无关方式归一化历史 SysUser 动作，兼容 refreshToken 与 tokenlogin。\n2026-08-30 v1.0.0 迁移旧 Controller 路由到官方 Managed 接口引擎，并由多路由保持历史客户端兼容。\n',
       }),
       baseEngine({
         id: '019d35f0-7b04-7b91-9801-00000000000a',
