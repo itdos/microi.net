@@ -2,6 +2,7 @@ import { V8, getUser } from '@/utils/request.js'
 import { callApiEngine } from '@/platform/business-runtime.js'
 import { parseJson } from '@/platform/native-form.js'
 import { addTaskDevices } from '@/utils/xjy-task.js'
+import { casePhotoField } from './case-form.mjs'
 
 const AFTER_SALES_PHOTO_MENU_ID = 'd9ed1fb9-1770-46e8-9662-31399aeece67'
 const AFTER_SALES_PHOTO_FIELDS = {
@@ -9,6 +10,24 @@ const AFTER_SALES_PHOTO_FIELDS = {
   JieguoTP: '59274024-77b5-4c6e-82f3-472947321073',
   PingjiaST: '5b372a6a-32b9-42a1-8375-be991e90d74f',
   ZhuipingT: '9f4f1382-5a2a-44ed-893f-f18fe4dbe833'
+}
+
+export function customerCaseChildField(parentTableName, field) {
+  if (String(parentTableName || '').toLowerCase() !== 'diy_kehu' || field.Name !== 'KehuAL') return field
+  const config = field.config || parseJson(field.Config, {}) || {}
+  const child = config.TableChild || {}
+  const parsedRelations = parseJson(child.FieldRelations, [])
+  const relations = Array.isArray(parsedRelations) ? parsedRelations : []
+  // 兼容现有客户案例子表配置：新增时从已加载的客户详情带入城市、概况。
+  // 只扩展页面使用的字段副本，继续由通用 FieldRelations 处理传值。
+  const extra = ['Chengshi', 'KehuGK'].filter((name) =>
+    !relations.some((relation) => Array.isArray(relation) && relation[1] === name)
+  ).map((name) => [name, name])
+  if (!extra.length) return field
+  return {
+    ...field,
+    config: { ...config, TableChild: { ...child, FieldRelations: [...relations, ...extra] } }
+  }
 }
 
 function requireParentId(parentId) {
@@ -33,7 +52,10 @@ export function appendOpenTableWhere({ field, form, where }) {
   if (fieldName === 'XuanzeGLSP') where.push({ Name: 'ShangpinLXZ', Type: '=', Value: '1' })
   if (fieldName === 'XuanzeLX') where.push({ Name: 'ShangpinLXZ', Type: '=', Value: '2' })
   if (fieldName === 'XuanzheGLPJ') where.push({ Name: 'ShangpinLX', Type: '=', Value: '耗材' })
-  if (fieldName === 'XuanzeZP') where.push({ Name: 'KehuID', Type: '=', Value: form.KehuID || '' })
+  // 未选客户时沿用照片菜单的服务端授权范围，不能附加 KehuID='' 把所有正常任务过滤掉。
+  if (fieldName === 'XuanzeZP' && String(form.KehuID || '').trim()) {
+    where.push({ Name: 'KehuID', Type: '=', Value: form.KehuID })
+  }
   return where
 }
 
@@ -91,6 +113,8 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
   }
 
   if (fieldName === 'XuanzeZP') {
+    // 同一个选择器服务客户案例及案例册快照；照片和临时预览必须落在各自的实际字段。
+    const photoField = casePhotoField(tableName) || 'Tupian'
     const images = []
     const previewTasks = []
     selected.forEach((row) => Object.entries(AFTER_SALES_PHOTO_FIELDS).forEach(([name, fieldId]) => {
@@ -107,13 +131,15 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
           fieldId,
           sysMenuId: AFTER_SALES_PHOTO_MENU_ID
         }).then((url) => {
-          if (url) form[`Tupian_${image.Id}_RealPath`] = url
+          if (url) form[`${photoField}_${image.Id}_RealPath`] = url
         }))
       })
     }))
     await Promise.all(previewTasks)
-    form.Tupian = images
-    return { matched: true, handled: true, changedField: 'Tupian' }
+    // 允许选中暂无照片的任务，但不能因此清空案例已有的上传照片。
+    if (!images.length) throw new Error('所选售后任务暂无照片，请选择其他任务')
+    form[photoField] = images
+    return { matched: true, handled: true, changedField: photoField }
   }
 
   if (parentTable === 'diy_shangpin' && fieldName === 'XuanzheGLPJ') {
@@ -138,6 +164,7 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
 }
 
 export default {
+  customerCaseChildField,
   appendOpenTableWhere,
   validateOpenTableContext,
   submitTenantOpenTableSelection

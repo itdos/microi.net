@@ -452,6 +452,15 @@ export const businessModules = {
   proposals: native({
     title: '需求方案', table: 'Diy_kehufaxx', menuAliases: ['需求方案', '客户方案', '方案管理'],
     titleField: 'FanganMC', tagFields: ['YujiHZSJ'],
+    latestRecordSummary: {
+      title: '最新需求方案',
+      fields: [
+        { field: 'DangqianYSFS', label: '当前饮水方式' },
+        { field: 'DuonianLJCB', label: '多年累计成本（当前）', format: 'money' },
+        { field: 'DuonianLJCBAfter', label: '多年累计成本（租赁）', format: 'money' },
+        { field: 'DuonianLJCBMD', label: '多年累计成本（买断）', format: 'money' }
+      ]
+    },
     relatedMetrics: [
       { key: 'positions', label: '场所点位数量合计', aggregateField: 'ChangsuoDWSL', tone: 'primary' },
       { key: 'month', label: '本月客户方案', monthField: 'YujiHZSJ', tone: 'primary' },
@@ -589,13 +598,11 @@ export const businessModules = {
   },
   // contactMap: { target: 'native-page', title: '联系人地图', path: '/pages/task/map?mode=contacts' },
   // visitMap: { target: 'native-page', title: '跟进地图', path: '/pages/task/map?mode=visit' },
-  // zhy：报修必须先从当前账号有权查看的设备中选择。这里复用“我的设备”列表，
-  // 让菜单权限、SqlWhere 行级范围、卡片详情和一键报修保持同一事实源。
+  // 首页和我的页共用直接报修入口；入口不限制角色，设备选择仍按设备列表权限查询。
   afterSalesAdd: {
     target: 'native-page',
     title: '我要报修',
-    path: '/pages/business/list?key=devices',
-    menuPermission: { table: 'Diy_KehuSB', menuAliases: ['设备列表', '客户设备', '我的设备', '设备管理'] }
+    path: '/pages/native/repair?entry=quick'
   }
 }
 

@@ -1,0 +1,248 @@
+{
+  "name": "需求方案安装点位成本计算",
+  "tables": [
+    {
+      "name": "diy_anzhuang_dw",
+      "description": "需求方案安装点位",
+      "tabs": [
+        {
+          "Id": "01KWGBD8P0PDSQ2XZY5G4ZYBNE",
+          "Name": "",
+          "Display": true
+        }
+      ],
+      "fields": [
+        {
+          "name": "HezuoHCB",
+          "label": "合作后成本（租赁）",
+          "type": "",
+          "component": "Divider",
+          "sort": 3000,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 0,
+          "formWidth": 24,
+          "config": "{\"DividerPosition\":\"left\",\"Divider\":{\"Icon\":\"fab fa-creative-commons-nc-jp\",\"Tag\":\"primary\"}}",
+          "description": "由本点位参数自动计算；未维护报价时显示待完善。"
+        },
+        {
+          "name": "HezuoHYDCB",
+          "label": "合作后用电成本(租赁)",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 3100,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "本点位人数 × 30 元/人/年；已包含本点位全部设备，不再乘数量。"
+        },
+        {
+          "name": "HezuoHYSCB",
+          "label": "合作后用水成本(租赁)",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 3200,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "本点位人数 × 2.4 元/人/年。"
+        },
+        {
+          "name": "HezuoHFWCB",
+          "label": "合作后服务成本(租赁)",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 3300,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "租赁单价 × 本点位设备数量。"
+        },
+        {
+          "name": "HezuoHYSZCB",
+          "label": "合作后饮水总成本（租赁单台）",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 3400,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "由本点位参数自动计算；未维护报价时显示待完善。"
+        },
+        {
+          "name": "HezuoHYSSBSL",
+          "label": "合作后饮水设备数量(租赁)",
+          "type": "int",
+          "component": "Text",
+          "sort": 3500,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"台\",\"TextApendPosition\":\"right\"}",
+          "description": "自动取本点位设备数量。"
+        },
+        {
+          "name": "HezuoHYSZCBAll",
+          "label": "合作后饮水总成本（租赁总设备）",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 3600,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "由本点位参数自动计算；未维护报价时显示待完善。"
+        },
+        {
+          "name": "ShisuanNS",
+          "label": "试算年数(租赁)",
+          "type": "int",
+          "component": "Text",
+          "sort": 3700,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"年\",\"TextApendPosition\":\"right\"}",
+          "description": "与需求方案试算年数一致，请在需求方案中修改。"
+        },
+        {
+          "name": "DuonianLJCBAfter",
+          "label": "多年累计成本(租赁)",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 3800,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元\",\"TextApendPosition\":\"right\"}",
+          "description": "由本点位参数自动计算；未维护报价时显示待完善。"
+        },
+        {
+          "name": "HezuoHCBMD",
+          "label": "合作后成本（买断）",
+          "type": "",
+          "component": "Divider",
+          "sort": 3900,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 0,
+          "formWidth": 24,
+          "config": "{\"DividerPosition\":\"left\",\"Divider\":{\"Icon\":\"fab fa-creative-commons-nc-jp\",\"Tag\":\"primary\"}}",
+          "description": "由本点位参数自动计算；未维护报价时显示待完善。"
+        },
+        {
+          "name": "ShebeiMDCBDT",
+          "label": "设备买断成本（单台）",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 4000,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元\",\"TextApendPosition\":\"right\"}",
+          "description": "由本点位参数自动计算；未维护报价时显示待完善。"
+        },
+        {
+          "name": "HezuoHYDCBMD",
+          "label": "合作后用电成本（买断，本点位）",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 4100,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "本点位人数 × 30 元/人/年；已包含本点位全部设备，不再乘数量。"
+        },
+        {
+          "name": "HezuoHYSCBMD",
+          "label": "合作后用水成本（买断，本点位）",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 4200,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "本点位人数 × 2.4 元/人/年。"
+        },
+        {
+          "name": "HezuoHFWCBMD",
+          "label": "合作后服务成本(买断)",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 4300,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "更换滤芯价格 × 本点位设备数量。"
+        },
+        {
+          "name": "HezuoHYSZCBMD",
+          "label": "合作后饮水总成本（买断单台）",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 4400,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "由本点位参数自动计算；未维护报价时显示待完善。"
+        },
+        {
+          "name": "HezuoHYSSBSLMD",
+          "label": "合作后饮水设备数量(买断)",
+          "type": "int",
+          "component": "Text",
+          "sort": 4500,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"台\",\"TextApendPosition\":\"right\"}",
+          "description": "自动取本点位设备数量。"
+        },
+        {
+          "name": "HezuoHYSZCBAllMD",
+          "label": "合作后饮水总成本（买断总设备）",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 4600,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元/年\",\"TextApendPosition\":\"right\"}",
+          "description": "由本点位参数自动计算；未维护报价时显示待完善。"
+        },
+        {
+          "name": "ShisuanNSMD",
+          "label": "试算年数(买断)",
+          "type": "int",
+          "component": "Text",
+          "sort": 4700,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"年\",\"TextApendPosition\":\"right\"}",
+          "description": "与需求方案试算年数一致，请在需求方案中修改。"
+        },
+        {
+          "name": "DuonianLJCBMD",
+          "label": "多年累计成本(买断)",
+          "type": "decimal(18,2)",
+          "component": "Text",
+          "sort": 4800,
+          "visible": 1,
+          "appVisible": 1,
+          "readonly": 1,
+          "config": "{\"TextApend\":\"元\",\"TextApendPosition\":\"right\"}",
+          "description": "由本点位参数自动计算；未维护报价时显示待完善。"
+        }
+      ]
+    }
+  ]
+}
