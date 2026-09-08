@@ -452,6 +452,15 @@ export const businessModules = {
   proposals: native({
     title: '需求方案', table: 'Diy_kehufaxx', menuAliases: ['需求方案', '客户方案', '方案管理'],
     titleField: 'FanganMC', tagFields: ['YujiHZSJ'],
+    latestRecordSummary: {
+      title: '最新需求方案',
+      fields: [
+        { field: 'DangqianYSFS', label: '当前饮水方式' },
+        { field: 'DuonianLJCB', label: '多年累计成本（当前）', format: 'money' },
+        { field: 'DuonianLJCBAfter', label: '多年累计成本（租赁）', format: 'money' },
+        { field: 'DuonianLJCBMD', label: '多年累计成本（买断）', format: 'money' }
+      ]
+    },
     relatedMetrics: [
       { key: 'positions', label: '场所点位数量合计', aggregateField: 'ChangsuoDWSL', tone: 'primary' },
       { key: 'month', label: '本月客户方案', monthField: 'YujiHZSJ', tone: 'primary' },
