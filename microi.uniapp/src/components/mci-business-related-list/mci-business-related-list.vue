@@ -24,14 +24,24 @@
     </view>
 
     <view v-if="latestSummaryEnabled && (latestSummaryLoading || latestSummaryError || latestSummaryRow)"
-      class="latest-record-summary">
+      class="latest-record-summary" :class="{ 'latest-record-summary--collapsed': !latestSummaryExpanded }">
       <view class="latest-record-summary__head">
         <text>{{ config.latestRecordSummary.title }}</text>
-        <button v-if="latestSummaryRow && !latestSummaryLoading" class="latest-record-summary__detail"
-          hover-class="latest-record-summary__detail--pressed" @tap="openDetail(latestSummaryRow)">
-          <text>查看详情</text><text aria-hidden="true">›</text>
-        </button>
+        <view class="latest-record-summary__actions">
+          <button v-if="latestSummaryRow && !latestSummaryLoading" class="latest-record-summary__detail"
+            hover-class="latest-record-summary__detail--pressed" @tap.stop="openDetail(latestSummaryRow)">
+            <text>查看详情</text><!-- <text aria-hidden="true">›</text> -->
+          </button>
+          <!-- 折叠与查看详情使用独立触控区，避免用户收起摘要时误开详情。 -->
+          <button class="latest-record-summary__toggle" :aria-expanded="latestSummaryExpanded"
+            :aria-label="(latestSummaryExpanded ? '收起' : '展开') + config.latestRecordSummary.title"
+            hover-class="latest-record-summary__detail--pressed" @tap.stop="toggleLatestSummary">
+            <text>{{ latestSummaryExpanded ? '收起' : '展开' }}</text>
+            <text class="latest-record-summary__arrow" :class="{ expanded: latestSummaryExpanded }" aria-hidden="true">›</text>
+          </button>
+        </view>
       </view>
+      <template v-if="latestSummaryExpanded">
       <view v-if="latestSummaryLoading" class="latest-record-summary__skeleton">
         <view v-for="index in 4" :key="index"></view>
       </view>
@@ -45,6 +55,7 @@
           <text class="latest-record-summary__value">{{ latestSummaryValue(item) }}</text>
         </view>
       </view>
+      </template>
     </view>
 
     <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
@@ -100,14 +111,7 @@
       </text>
     </view>
 
-    <scroll-view class="related-list-body" :class="{ 'related-list-body--scroll': independentScroll && !isPreview }"
-      :style="relatedListBodyStyle"
-      :scroll-y="independentScroll && !isPreview"
-      :enable-flex="independentScroll && !isPreview"
-      :show-scrollbar="false"
-      :lower-threshold="120" @scrolltolower="loadMore">
-    <view class="related-list-scroll-content">
-    <!-- zhy：客户详情“需求方案”Tab 与首页普通列表保持同一套比价入口和选择规则。 -->
+    <!-- 比价工具与搜索、统计同属固定区，只有下面的方案卡片滚动。 -->
     <view v-if="proposalCompareEnabled" class="proposal-compare-tools">
       <view class="proposal-select-all" :class="{ active: areAllProposalsSelected }"
         @tap="toggleAllProposals">
@@ -123,6 +127,13 @@
     </view>
 
 
+    <scroll-view class="related-list-body" :class="{ 'related-list-body--scroll': independentScroll && !isPreview }"
+      :style="relatedListBodyStyle"
+      :scroll-y="independentScroll && !isPreview"
+      :enable-flex="independentScroll && !isPreview"
+      :show-scrollbar="false"
+      :lower-threshold="120" @scrolltolower="loadMore">
+    <view class="related-list-scroll-content">
     <view v-if="previewContentVisible && loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
       <view v-for="item in (isPreview ? previewLimit : 3)" :key="item" class="skeleton-card">
         <view class="skeleton-line wide"></view>
@@ -694,6 +705,7 @@ export default {
       latestSummaryRow: null,
       latestSummaryLoading: false,
       latestSummaryError: '',
+      latestSummaryExpanded: true,
       metricLoading: false,
       metricValues: {},
       listBodyHeight: 0,
@@ -980,11 +992,15 @@ export default {
       }
     },
     relatedListBodyStyle() {
-      if (!this.independentScroll || this.isPreview || this.listBodyHeight < 80) return {}
+      if (!this.independentScroll || this.isPreview || this.listBodyHeight < 1) return {}
       return { height: `${this.listBodyHeight}px`, maxHeight: `${this.listBodyHeight}px` }
     }
   },
   watch: {
+    latestSummaryExpanded() {
+      // 微信 scroll-view 使用实测高度；折叠后重新测量，立即释放列表空间。
+      this.scheduleListBodyMeasure()
+    },
     // 展示状态单独上报，首次加载即可显示入口，且不会触发 data-count 的业务写回。
     previewMoreNavigation: {
       immediate: true,
@@ -1294,12 +1310,15 @@ export default {
           fail: reject
         }))
       } catch (error) {
-        uni.showToast({ title: error.message || '打开比价失败', icon: 'none' })
+        uni.showModal({ title: '打开比价失败', content: error.message || error.errMsg || '请稍后重试', showCancel: false })
       } finally {
         this.proposalComparing = false
       }
     },
     noop() {},
+    toggleLatestSummary() {
+      this.latestSummaryExpanded = !this.latestSummaryExpanded
+    },
     refreshData() {
       if (!this.relationValue || !this.config.table) return Promise.resolve()
       return Promise.all([this.loadData(true, true, false, true), this.loadRelatedMetrics(true)])
@@ -1495,8 +1514,9 @@ export default {
           const root = rects[0]
           const body = rects[1]
           if (!root || !body) return
-          const height = Math.floor(Number(root.bottom) - Number(body.top))
-          if (Number.isFinite(height) && height >= 80 && height !== this.listBodyHeight) {
+          // 小屏展开摘要后剩余空间可能不足 80px，仍须更新，不能沿用折叠前的旧高度。
+          const height = Math.max(1, Math.floor(Number(root.bottom) - Number(body.top)))
+          if (Number.isFinite(height) && height !== this.listBodyHeight) {
             this.listBodyHeight = height
           }
         })
@@ -2960,6 +2980,15 @@ export default {
 .related-metric--primary .related-metric__value { color: #1768d8; }
 .latest-record-summary { flex: none; margin-bottom: 16rpx; padding: 16rpx 20rpx 20rpx; border: 1rpx solid var(--mci-border-color, #e1eaf0); border-radius: 12rpx; background: var(--mci-bg-card, #fff); }
 .latest-record-summary__head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; min-height: 52rpx; margin-bottom: 10rpx; color: var(--mci-text-primary, #263e49); font-size: 24rpx; font-weight: 600; }
+.latest-record-summary--collapsed { padding-bottom: 16rpx; }
+.latest-record-summary--collapsed .latest-record-summary__head { margin-bottom: 0; }
+.latest-record-summary__head > text { min-width: 0; }
+.latest-record-summary__actions { display: flex; flex: none; align-items: center; gap: 24rpx; }
+.latest-record-summary__toggle { display: flex; flex: none; align-items: center; justify-content: center; gap: 10rpx; min-width: 88rpx; min-height: 80rpx; margin: 0; padding: 0 8rpx; border: none; border-radius: 6rpx; color: var(--mci-text-secondary, #6c828c); background: transparent; font-size: 22rpx; line-height: normal; }
+.latest-record-summary__toggle::after { border: none; }
+.latest-record-summary__arrow { font-size: 36rpx; line-height: 1; transform: rotate(90deg); transition: transform .18s ease; }
+.latest-record-summary__arrow.expanded { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) { .latest-record-summary__arrow { transition: none; } }
 .latest-record-summary__detail { display: flex; flex: none; align-items: center; gap: 8rpx; margin: 0; padding: 0 10rpx; min-height: 56rpx; border: none; border-radius: 6rpx; color: var(--mci-color-primary, #087fbd); background: transparent; font-size: 22rpx; line-height: 56rpx; }
 .latest-record-summary__detail::after, .latest-record-summary__error button::after { border: none; }
 .latest-record-summary__detail--pressed { opacity: .65; }
@@ -2972,6 +3001,7 @@ export default {
 .latest-record-summary__error > text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .latest-record-summary__error button { flex: none; margin: 0; padding: 0 12rpx; color: var(--mci-color-primary, #087fbd); background: transparent; font-size: 22rpx; }
 .proposal-compare-tools {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-start;
