@@ -170,6 +170,7 @@
             <text class="proposal-point-field__label">{{ item.label }}</text>
             <mci-native-field v-if="item.key === 'deviceModel'"
               class="proposal-point-field__control"
+              selector-portal
               :model-value="row[item.name]" :field="item.field"
               :readonly="!proposalPointCanEdit(row)" :table-name="config.table"
               :form-data="row" :form-data-id="row.Id" :menu-id="menuId"
@@ -663,6 +664,8 @@ export default {
       config: {},
       menuId: '',
       viewManifest: null,
+      componentDisposed: false,
+      initializeRequestId: 0,
       presentationRequestId: 0,
       rows: [],
       count: 0,
@@ -881,10 +884,10 @@ export default {
       ]
     },
     proposalInstallationVisibleQuickFields() {
-      // 暂时注释设备字段的卡片展示入口；完整字段定义及选择、保存联动保留，取消注释即可恢复。
+      // 卡片展示安装场所和设备型号，沿用完整字段定义及选择、保存联动。
       const visibleKeys = [
         'place',
-        // 'deviceModel',
+        'deviceModel',
         // 'deviceName',
       ]
       return this.proposalInstallationQuickFields.filter((item) => visibleKeys.includes(item.key))
@@ -1030,6 +1033,9 @@ export default {
     this.scheduleListBodyMeasure()
   },
   beforeUnmount() {
+    // Tab 切换会销毁列表；让迟到的初始化和查询停止追加请求、回写状态。
+    this.componentDisposed = true
+    this.initializeRequestId += 1
     this.latestSummaryRequestId += 1
     this.presentationRequestId += 1
     uni.$off('microi:data-changed', this.handleDataChanged)
@@ -1497,6 +1503,9 @@ export default {
       })
     },
     async initialize(refresh = false) {
+      if (this.componentDisposed) return
+      const requestId = ++this.initializeRequestId
+      const isCurrent = () => !this.componentDisposed && requestId === this.initializeRequestId
       this.presentationRequestId += 1
       if (!this.childTableId) {
         this.error = '关联表未配置数据表'
@@ -1505,16 +1514,20 @@ export default {
       }
       this.loading = true
       try {
-        this.table = await loadNativeTableModel(this.childTableId, {
+        const table = await loadNativeTableModel(this.childTableId, {
           menuId: this.childMenuId,
           tableChildAuth: this.tableChildAuth,
           refresh
         })
-        this.definition = await loadNativeFormDefinition(this.table.Name, refresh, {
+        if (!isCurrent()) return
+        this.table = table
+        const definition = await loadNativeFormDefinition(this.table.Name, refresh, {
           menuId: this.childMenuId,
           tableChildAuth: this.tableChildAuth,
           tableModel: this.table
         })
+        if (!isCurrent()) return
+        this.definition = definition
         const matched = this.resolveBusinessModule(this.table.Name)
         this.moduleKey = matched.key
         const menu = await findMenu(
@@ -1524,6 +1537,7 @@ export default {
           this.childMenuId,
           this.table.Id
         )
+        if (!isCurrent()) return
         this.menu = menu || null
         this.menuId = menu?.Id || this.childMenuId || ''
         const menuConfig = menu
@@ -1568,11 +1582,13 @@ export default {
         // 先用当前授权菜单的本地编译结果展示数据，不能让配置请求把页面卡在骨架屏。
         void this.loadPresentationConfig(refresh)
         await Promise.all([this.loadData(true, refresh, false, true), this.loadRelatedMetrics(refresh)])
+        if (!isCurrent()) return
         if (String(this.batchEntryMode || '').toLowerCase() === 'installation-batch' && this.proposalInstallationBatchAvailable) {
           this.startProposalInstallationBatchSelection()
         }
         this.scheduleListBodyMeasure()
       } catch (error) {
+        if (!isCurrent()) return
         this.error = error.message || error.Msg || '关联数据加载失败'
         this.loading = false
       }
@@ -1599,6 +1615,7 @@ export default {
       if (title) this.$emit('title-change', title)
     },
     async loadPresentationConfig(refresh = false) {
+      if (this.componentDisposed) return
       const requestId = ++this.presentationRequestId
       let manifestRefresh = refresh
       try {
@@ -1648,6 +1665,9 @@ export default {
       }
     },
     async loadViewConfig(refresh = false, expectedRequestId = 0) {
+      const isCurrent = () => !this.componentDisposed &&
+        (!expectedRequestId || expectedRequestId === this.presentationRequestId)
+      if (!isCurrent()) return
       try {
         let manifest = await loadModuleViewManifest(this.config, {
           scene: 'Card',
@@ -1655,6 +1675,7 @@ export default {
           user: this.currentUser,
           refresh
         })
+        if (!isCurrent()) return
         if (!manifest) {
           manifest = await loadModuleViewManifest(this.config, {
             scene: 'List',
@@ -1663,7 +1684,7 @@ export default {
             refresh
           })
         }
-        if (expectedRequestId && expectedRequestId !== this.presentationRequestId) return
+        if (!isCurrent()) return
         this.applyMenuSearchFields(manifest?.Legacy?.SearchFieldIds)
         const dynamic = compileListConfig(manifest, this.definition?.fields || [])
         if (!dynamic) return
@@ -1723,6 +1744,7 @@ export default {
       return field ? fieldDisplayValue(field, value) : formatFieldValue(value)
     },
     async loadLatestRecordSummary() {
+      if (this.componentDisposed) return
       const requestId = ++this.latestSummaryRequestId
       const relationValue = this.relationValue
       this.latestSummaryRow = null
@@ -1734,7 +1756,8 @@ export default {
       const authorization = this.tableChildAuth
         ? { _TableChildAuth: this.tableChildAuth }
         : (this.menuId ? { _SysMenuId: this.menuId } : {})
-      const isCurrent = () => requestId === this.latestSummaryRequestId && relationValue === this.relationValue
+      const isCurrent = () => !this.componentDisposed &&
+        requestId === this.latestSummaryRequestId && relationValue === this.relationValue
       try {
         const result = await V8.FormEngine.GetTableData(this.config.table, {
           ...authorization,
@@ -1767,6 +1790,7 @@ export default {
       }
     },
     async loadData(reset = false, refresh = false, notifyCount = false, refreshSummary = notifyCount) {
+      if (this.componentDisposed) return
       if (this.proposalDraftGroup) {
         this.rows = [...this.proposalDraftGroup.rows]
         this.count = this.rows.length
@@ -1777,6 +1801,8 @@ export default {
         return
       }
       if (!this.relationValue || !this.config.table || (this.loading && !reset) || (!reset && this.finished)) return
+      const relationValue = this.relationValue
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue
       // 首次进入、返回刷新和真实增删改才回读摘要；搜索、筛选、翻页沿用当前摘要。
       const latestSummaryTask = refreshSummary ? this.loadLatestRecordSummary() : null
       const requestId = ++this.loadRequestId
@@ -1830,12 +1856,16 @@ export default {
             extraWhere
           })
         }
+        if (!isCurrent()) return
         const rawIncomingRows = Array.isArray(result.rows) ? result.rows : []
         let incomingRows = this.moduleKey === 'installationPositions'
           ? await hydrateInstallationPositionRows(rawIncomingRows)
           : rawIncomingRows
+        if (!isCurrent()) return
         incomingRows = await this.hydrateProposalInstallationPointRows(incomingRows)
+        if (!isCurrent()) return
         incomingRows = await this.hydrateCollectionRows(incomingRows)
+        if (!isCurrent()) return
         // Keep the newest completed response. A later request starting must not discard every
         // usable response and leave the related tab permanently displaying its skeleton.
         if (requestId < this.appliedRequestId) return
@@ -1849,10 +1879,10 @@ export default {
         if (!this.finished) this.pageIndex += 1
         if (notifyCount) this.emitDataCount()
       } catch (error) {
-        if (requestId >= this.appliedRequestId) this.error = error.message || error.Msg || '关联数据加载失败'
+        if (isCurrent() && requestId >= this.appliedRequestId) this.error = error.message || error.Msg || '关联数据加载失败'
       } finally {
         await latestSummaryTask
-        this.loading = false
+        if (isCurrent()) this.loading = false
       }
     },
     monthRange() {
@@ -1871,9 +1901,12 @@ export default {
       return `¥${numeric.toLocaleString()}`
     },
     async loadRelatedMetrics(refresh = false) {
+      if (this.componentDisposed) return
       if (this.proposalDraftGroup) return
       const metrics = this.relatedMetricDefinitions
       if (!metrics.length || !this.relationValue || !this.config.table) return
+      const relationValue = this.relationValue
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue
       this.metricLoading = true
       const range = this.monthRange()
       const baseWhere = [
@@ -1910,12 +1943,12 @@ export default {
           if (!response || Number(response.Code) !== 1) throw new Error(response?.Msg || '统计加载失败')
           values[metric.key] = Number(response.DataCount || 0)
         }))
-        this.metricValues = values
+        if (isCurrent()) this.metricValues = values
       } catch (error) {
         // 统计失败不阻断关联列表，保留可读的零值并允许下次数据刷新重试。
-        this.metricValues = metrics.reduce((values, metric) => ({ ...values, [metric.key]: 0 }), {})
+        if (isCurrent()) this.metricValues = metrics.reduce((values, metric) => ({ ...values, [metric.key]: 0 }), {})
       } finally {
-        this.metricLoading = false
+        if (isCurrent()) this.metricLoading = false
       }
     },
     search() {

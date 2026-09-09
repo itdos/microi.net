@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import './test-native-selector-popup.mjs'
 import {
   PROPOSAL_INSTALLATION_BATCH_ENGINE,
   createProposalInstallationId,
