@@ -261,7 +261,7 @@ export const businessModules = {
     title: '售后任务', table: 'Diy_ShouhouDD', menuAliases: ['售后订单', '售后任务', '我的任务'],
     titleField: 'ShouhouFWBH', statusField: 'Zhuangtai', tagFields: ['Leixing'],
     relatedMetrics: [
-      { key: 'action', label: '进行中', where: [{ Name: 'Zhuangtai', Type: 'In', Value: ['待指派', '待接单', '待服务', '待完成', '待验收', '待评论', '待商家验收', '待客户验收'] }], tone: 'warning' },
+      { key: 'action', label: '进行中', where: [{ Name: 'Zhuangtai', Type: 'In', Value: ['待指派', '待接单', '待服务', '待完成', '待验收', '待评论', '待客服验收', '待客户验收'] }], tone: 'warning' },
       { key: 'positive', label: '已完结', where: [{ Name: 'Zhuangtai', Type: 'In', Value: ['已完结'] }], tone: 'success' },
       { key: 'amount', label: '应收金额合计', aggregateField: 'ShouhouFY', format: 'compactMoney', tone: 'primary' },
       { key: 'month', label: '本月售后任务', monthField: 'YujiSHSJ', tone: 'primary' }
@@ -272,7 +272,7 @@ export const businessModules = {
       { label: '服务人员', field: 'ShouhouRY' }
     ],
     summaryField: 'Neirong', defaultOrderBy: 'YujiSHSJ', defaultOrderType: 'ASC',
-    statusOptions: ['待接单', '待服务', '待商家验收', '待客户验收', '待评价', '已结束', '已取消']
+    statusOptions: ['待接单', '待服务', '待客服验收', '待客户验收', '待评价', '已结束', '已取消']
   },
   devices: native({
     title: '客户设备', table: 'Diy_KehuSB', menuAliases: ['设备列表', '客户设备', '我的设备', '设备管理'],

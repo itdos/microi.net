@@ -10,7 +10,7 @@ export const TASK_STATES = [
   { value: '', label: '全部', code: 0 },
   { value: '待接单', label: '待接单', code: 1 },
   { value: '待服务', label: '待服务', code: 2 },
-  { value: '待商家验收', label: '待商家验收', code: 11 },
+  { value: '待客服验收', label: '待客服验收', code: 11 },
   { value: '待客户验收', label: '待客户验收', code: 12 },
   { value: '待评价', label: '待评价', code: 3 },
   { value: '暂停', label: '暂停', code: 10 },
@@ -111,7 +111,7 @@ export function normalizeTask(row = {}) {
 export function taskStateClass(state) {
   if (/结束|完成/.test(state || '')) return 'is-success'
   if (/取消|驳回|不通过/.test(state || '')) return 'is-danger'
-  if (/待商家|待客户/.test(state || '')) return 'is-review'
+  if (/待客服|待客户/.test(state || '')) return 'is-review'
   if (/待服务|预约/.test(state || '')) return 'is-progress'
   return 'is-pending'
 }

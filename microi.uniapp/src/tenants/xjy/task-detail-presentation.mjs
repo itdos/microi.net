@@ -1,7 +1,7 @@
 export const TASK_TIMELINE_STATES = Object.freeze([
   '待接单',
   '待服务',
-  '待商家验收',
+  '待客服验收',
   '待客户验收',
   '待评价',
   '已结束'

@@ -1816,7 +1816,7 @@
 				return this.key === 'devices' && !!this.deviceActiveTask.Id
 			},
 			showMerchantAcceptance() {
-				return this.key === 'tasks' && this.roleProfile.isInternal && /待商家验收/.test(String(this.statusText)) && !
+				return this.key === 'tasks' && this.roleProfile.isInternal && /待客服验收/.test(String(this.statusText)) && !
 					this.detail.ShangjiaYSZT
 			},
 			canApproveOrder() {
