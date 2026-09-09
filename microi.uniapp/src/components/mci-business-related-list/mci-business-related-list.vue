@@ -183,7 +183,7 @@
               class="proposal-point-field__control"
               selector-portal
               :model-value="row[item.name]" :field="item.field"
-              :readonly="!proposalPointCanEdit(row)" :table-name="config.table"
+              :readonly="!proposalPointCanEdit(row) || Boolean(proposalPointSavingId)" :table-name="config.table"
               :form-data="row" :form-data-id="row.Id" :menu-id="menuId"
               :table-child-auth="tableChildAuth"
               @change="updateProposalPointValue(row, item.name, $event)"
@@ -527,6 +527,7 @@ import {
   proposalInstallationDraft,
   proposalInstallationWriteValues
 } from '@/tenants/xjy/proposal-installation-points.mjs'
+import { calculateInstallationPointCosts, proposalCostYears } from '@/tenants/xjy/proposal-cost-model.mjs'
 import {
   canAddMenuRecord,
   canEditMenuRecord,
@@ -911,7 +912,10 @@ export default {
       }), {
         deviceQuantity: this.proposalInstallationDefinitionField('deviceQuantity', '设备数量')?.Name || PROPOSAL_INSTALLATION_FIELDS.deviceQuantity,
         people: this.proposalInstallationDefinitionField('people', '人数')?.Name || PROPOSAL_INSTALLATION_FIELDS.people,
-        deviceModelId: this.proposalInstallationDefinitionField('deviceModelId', '设备型号Id')?.Name || ''
+        deviceModelId: this.proposalInstallationDefinitionField('deviceModelId', '设备型号Id')?.Name || PROPOSAL_INSTALLATION_FIELDS.deviceModelId,
+        rentalPrice: this.proposalInstallationDefinitionField('rentalPrice', '设备单价（租赁）')?.Name || PROPOSAL_INSTALLATION_FIELDS.rentalPrice,
+        buyoutPrice: this.proposalInstallationDefinitionField('buyoutPrice', '设备单价（买断）')?.Name || PROPOSAL_INSTALLATION_FIELDS.buyoutPrice,
+        filterPrice: this.proposalInstallationDefinitionField('filterPrice', '更换滤芯价格')?.Name || PROPOSAL_INSTALLATION_FIELDS.filterPrice
       })
     },
     relationValue() {
@@ -1371,13 +1375,14 @@ export default {
       if (this.proposalDraftGroup) this.syncProposalDraftRows()
     },
     async selectProposalPointDevice(row, selection = {}) {
+      if (!row?.Id || !this.proposalPointCanEdit(row) || this.proposalPointSavingId) return
       const values = proposalInstallationDeviceValues(selection)
       const names = this.proposalInstallationFieldNames
-      row[names.deviceModel] = values[PROPOSAL_INSTALLATION_FIELDS.deviceModel]
-      row[names.deviceName] = values[PROPOSAL_INSTALLATION_FIELDS.deviceName]
-      if (names.deviceModelId) {
-        row[names.deviceModelId] = values[PROPOSAL_INSTALLATION_FIELDS.deviceModelId]
+      for (const key of ['deviceModel', 'deviceName', 'deviceModelId', 'rentalPrice', 'buyoutPrice', 'filterPrice']) {
+        const name = names[key] || PROPOSAL_INSTALLATION_FIELDS[key]
+        row[name] = values[PROPOSAL_INSTALLATION_FIELDS[key]]
       }
+      Object.assign(row, calculateInstallationPointCosts(row, proposalCostYears(this.parentForm)))
       await this.saveProposalPoint(row)
     },
     saveProposalPointField(row, name, value) {
@@ -1434,6 +1439,8 @@ export default {
           _InvokeType: 'Client'
         })
         if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '安装点位保存失败')
+        // 保存包含报价的点位后，通知父方案回读全部点位汇总；数量相同也必须刷新。
+        this.emitDataCount()
       } catch (error) {
         uni.showToast({ title: error.message || error.Msg || '安装点位保存失败', icon: 'none' })
       } finally {
