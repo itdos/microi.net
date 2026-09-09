@@ -9,7 +9,7 @@
       hover-class="preview-section-header--pressed" @tap="previewExpanded = !previewExpanded">
       <view class="preview-section-header__main">
         <text class="preview-section-header__bar"></text>
-        <text class="preview-section-header__title">{{ config.title || sectionTitle }}</text>
+        <text class="preview-section-header__title">{{ sectionTitle }}</text>
         <text v-if="!loading" class="preview-section-header__count">{{ count }} 项</text>
       </view>
       <!-- zhy：关联区折叠图标与详情“基本信息”分组统一，避免使用字形不稳定的上下箭头。 -->
@@ -2749,7 +2749,7 @@ export default {
 <style scoped>
 .related-business-list { position: relative; min-height: 180rpx; padding: 18rpx 22rpx calc(118rpx + var(--mci-safe-bottom)); background: var(--mci-bg-base, #f4f8fa); }
 .related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
-.related-business-list--section { padding-top: 0; }
+.related-business-list--section { padding-top: 0; padding-bottom: 22rpx; border: 1rpx solid var(--mci-border, #e6edf0); border-radius: 16rpx; overflow: hidden; background: var(--mci-bg-card, #fff); }
 .related-business-list--independent-scroll { box-sizing: border-box; display: flex; flex-direction: column; height: 100%; padding-bottom: 0; overflow: hidden; }
 .related-business-list--collection { padding: 0 22rpx; }
 .related-business-list--collection.related-business-list--independent-scroll { padding-bottom: 0; }

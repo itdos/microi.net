@@ -34,6 +34,7 @@ import {
   customerFollowScopeValues
 } from './customer-follow-scope.mjs'
 import { followupApprovalDefaultValues } from './followup-approval-defaults.mjs'
+import { leadFollowupDefaultValues } from './lead-followup-defaults.mjs'
 import {
   calculateOrderProductCooperation,
   calculateOrderProductPriceBinding,
@@ -67,6 +68,7 @@ const CUSTOMER_ADDRESS_TABLE = 'diy_kehudz'
 const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
 const FOLLOWUP_TABLE = 'diy_genjinjl'
+const LEAD_FOLLOWUP_TABLE = 'diy_xiansuogjjl'
 const CONTACT_TABLE = 'Diy_LianxiR'
 const CUSTOMER_CARE_TABLE = 'diy_kehuguanhuai'
 // zhy：客户方案表及设备联动字段集中配置。
@@ -129,6 +131,10 @@ const FOLLOWUP_FIELDS = {
   effective: 'GuanjianJCR',
   approvalStatus: 'ShenpiZT',
   approvalStatusValue: 'ShenpiZTZ'
+}
+const LEAD_FOLLOWUP_FIELDS = {
+  user: 'GenjinR',
+  time: 'GenjinSJ'
 }
 const CONTACT_FIELDS = {
   customerId: 'KehuID',
@@ -318,6 +324,14 @@ function isCheckinEditable(context) {
 
 function isFollowupAdd(context) {
   return isFollowupForm(context) && context.mode === 'Add' && !context.rowId
+}
+
+function isLeadFollowupForm(context) {
+  return String(context.tableName || '').toLowerCase() === LEAD_FOLLOWUP_TABLE
+}
+
+function isLeadFollowupAdd(context) {
+  return isLeadFollowupForm(context) && context.mode === 'Add' && !context.rowId
 }
 
 function isPrimaryFollowupForm(context) {
@@ -1128,6 +1142,20 @@ function initializeFollowup(context) {
   })
 }
 
+function initializeLeadFollowup(context) {
+  const timeName = fieldName(context, LEAD_FOLLOWUP_FIELDS.time, '跟进时间')
+  const userName = fieldName(context, LEAD_FOLLOWUP_FIELDS.user, '跟进人')
+  context.patchForm(leadFollowupDefaultValues({
+    mode: context.mode,
+    rowId: context.rowId,
+    form: context.form,
+    currentTime: currentMinuteTimestamp(),
+    currentUser: getUser() || {},
+    timeField: timeName,
+    userField: userName
+  }))
+}
+
 function initializeFollowupTarget(context) {
   const targetTypeName = fieldName(context, FOLLOWUP_FIELDS.targetType, '拜访对象类型')
   const targetName = fieldName(context, FOLLOWUP_FIELDS.targetName, '拜访对象')
@@ -1559,6 +1587,7 @@ export function createState() {
     checkinMapTimer: null,
     currentTime: '',
     followupInitialized: false,
+    leadFollowupInitialized: false,
     followupCustomerId: '',
     followupCustomerName: '',
     openingFollowupCheckin: false,
@@ -1673,6 +1702,14 @@ export async function initialize(context) {
       })
     }
     await loadFollowupContacts(context, customer.id)
+  }
+  if (isLeadFollowupForm(context)) {
+    // zhy：线索跟进表字段与客户跟进表不同，仅复用日期时间展示并填入当前登录人员。
+    configureFollowupTimeField(context)
+    if (isLeadFollowupAdd(context) && !context.state.leadFollowupInitialized) {
+      context.state.leadFollowupInitialized = true
+      initializeLeadFollowup(context)
+    }
   }
   if (isCustomerCareForm(context)) {
     context.patchForm(customerCareTotalValues(context))
