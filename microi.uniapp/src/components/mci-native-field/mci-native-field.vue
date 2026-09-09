@@ -828,7 +828,7 @@ export default {
 .native-control__picker > text:last-child { color: #7d929a; font-size: 38rpx; }
 .placeholder { color: #9aa9af; }
 .native-select { position: relative; }
-.native-select__trigger { display: flex; align-items: center; gap: 12rpx; padding-right: 16rpx; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease; }
+.native-select__trigger { display: flex; align-items: center; gap: 12rpx; padding-right: 16rpx;height: 65rpx !important; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease; }
 .native-select__trigger.open { border-color: #087da8; background: #fff; box-shadow: 0 0 0 2rpx rgba(8,125,168,.10); }
 .native-select__content { flex: 1; min-width: 0; overflow: hidden; }
 .native-select__content > .placeholder { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
