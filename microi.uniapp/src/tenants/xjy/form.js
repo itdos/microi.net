@@ -28,6 +28,10 @@ import {
 } from './proposal-cost-model.mjs'
 import { XJY_CUSTOMER_DEFAULT_REGION } from './customer-location.mjs'
 import { proposalCostFieldPresentation } from './proposal-cost-presentation.mjs'
+import {
+  PROPOSAL_INSTALLATION_DEFAULT_PEOPLE,
+  proposalInstallationDeviceValues
+} from './proposal-installation-points.mjs'
 import { childDraftRows, findChildDraftGroup } from '@/platform/child-form-drafts.mjs'
 import { casePhotoField, caseFieldDescription } from './case-form.mjs'
 import {
@@ -1594,6 +1598,7 @@ export function createState() {
     openingFollowupCheckin: false,
     followupCheckinSucceeded: false,
     proposalInitialized: false,
+    proposalPointInitialized: false,
     customerFollowScopeValues: {},
     orderInitialized: false,
     orderValues: {},
@@ -1745,6 +1750,12 @@ export async function initialize(context) {
     await refreshDerivedValues(context)
   }
   if (isProposalInstallationPointForm(context)) {
+    const initialValues = {}
+    if (context.mode === 'Add' && !context.rowId && !context.state.proposalPointInitialized) {
+      const peopleField = fieldName(context, 'Renshu', '本点位用水总人数')
+      const explicitPeople = context.defaultValues?.[peopleField]
+      if (isEmptyFormValue(explicitPeople)) initialValues[peopleField] = PROPOSAL_INSTALLATION_DEFAULT_PEOPLE
+    }
     const parentId = context.form.AnzhuangdianweiId || context.defaultValues?.AnzhuangdianweiId
     const draftParent = findChildDraftGroup(context.draftRelation)?.parentForm
     if (draftParent) {
@@ -1754,7 +1765,11 @@ export async function initialize(context) {
       if (!response || Number(response.Code) !== 1) throw new Error(response?.Msg || '所属需求方案读取失败')
       context.state.proposalPointYears = proposalCostYears(response.Data)
     }
-    context.patchForm(calculateInstallationPointCosts(context.form, context.state.proposalPointYears || proposalCostYears(context.form)))
+    context.patchForm({
+      ...initialValues,
+      ...calculateInstallationPointCosts({ ...context.form, ...initialValues }, context.state.proposalPointYears || proposalCostYears(context.form))
+    })
+    context.state.proposalPointInitialized = true
   }
 }
 
@@ -2193,18 +2208,14 @@ export async function handleFieldSelect(context, payload) {
   if ((isProposalForm(context) || isProposalInstallationPointForm(context)) && payload && !payload.multiple) {
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
     if (selectedFieldName === PROPOSAL_FIELDS.deviceModel.toLowerCase()) {
-      const row = payload.raw && typeof payload.raw === 'object'
-        ? payload.raw
-        : payload.option && payload.option.raw && typeof payload.option.raw === 'object'
-          ? payload.option.raw
-          : {}
-      // zhy：移动端选择设备型号后复用 PC 表单的设备名称、价格及型号 Id 联动映射。
+      // 卡片、完整点位页和批量配置共用设备报价映射，清空型号也清空旧报价。
+      const values = proposalInstallationDeviceValues(payload)
       const updates = {
-        [fieldName(context, PROPOSAL_FIELDS.deviceModelId, '设备型号Id')]: personValue(row, ['Id', 'ID', 'id']),
-        [fieldName(context, PROPOSAL_FIELDS.deviceName, '设备名称')]: personValue(row, ['ShangpinMC']),
-        [fieldName(context, PROPOSAL_FIELDS.rentalPrice, '设备单价（租赁）')]: personValue(row, ['ZulinXJ']),
-        [fieldName(context, PROPOSAL_FIELDS.buyoutPrice, '设备单价（买断）')]: personValue(row, ['Xianjia']),
-        [fieldName(context, PROPOSAL_FIELDS.filterPrice, '更换滤芯价格')]: personValue(row, ['GenghuanLXJG'])
+        [fieldName(context, PROPOSAL_FIELDS.deviceModelId, '设备型号Id')]: values.ShebeiXHID,
+        [fieldName(context, PROPOSAL_FIELDS.deviceName, '设备名称')]: values.ShebeiMC,
+        [fieldName(context, PROPOSAL_FIELDS.rentalPrice, '设备单价（租赁）')]: values.ShebeiDJZL,
+        [fieldName(context, PROPOSAL_FIELDS.buyoutPrice, '设备单价（买断）')]: values.ShebeiDJ,
+        [fieldName(context, PROPOSAL_FIELDS.filterPrice, '更换滤芯价格')]: values.GenghuanLXJG
       }
       context.patchForm({
         ...updates,

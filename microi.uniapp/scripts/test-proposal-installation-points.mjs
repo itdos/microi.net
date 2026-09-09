@@ -51,7 +51,8 @@ test('device selection fills model id and device name', () => {
   }), {
     ShebeiXH: 'A100',
     ShebeiXHID: 'product-1',
-    ShebeiMC: '碧丽直饮机'
+    ShebeiMC: '碧丽直饮机',
+    ShebeiDJ: '', ShebeiDJZL: '', GenghuanLXJG: ''
   })
 })
 
@@ -95,7 +96,7 @@ test('proposal preview uses the configured card limit, navigates on edit, and pu
 test('returning from point editor refreshes child rows and preserves zero values', () => {
   assert.match(nativeFormSource, /onShow\(\)[\s\S]*this\.refreshRelatedChildLists\(\)/)
   assert.match(nativeFormSource, /ref="embeddedRelatedList"/)
-  assert.match(relatedListSource, /refreshData\(\)[\s\S]*this\.loadData\(true, true\)/)
+  assert.match(relatedListSource, /refreshData\(\)[\s\S]*this\.loadData\(true, true, false, true\)/)
   assert.match(relatedListSource, /\{ \.\.\.item, \.\.\.payload\.row, Id: changedId \}/)
   assert.match(relatedListSource, /value === undefined \|\| value === null \|\| value === ''/)
 })

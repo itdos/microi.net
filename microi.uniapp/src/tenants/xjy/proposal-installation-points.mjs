@@ -8,8 +8,13 @@ export const PROPOSAL_INSTALLATION_FIELDS = {
   deviceModelId: 'ShebeiXHID',
   deviceName: 'ShebeiMC',
   deviceQuantity: 'ShebeiSL',
-  people: 'Renshu'
+  people: 'Renshu',
+  rentalPrice: 'ShebeiDJZL',
+  buyoutPrice: 'ShebeiDJ',
+  filterPrice: 'GenghuanLXJG'
 }
+
+export const PROPOSAL_INSTALLATION_DEFAULT_PEOPLE = 10
 
 const COPY_EXCLUDED_COMPONENTS = new Set([
   'Divider', 'CollapseGroup', 'Tabs', 'Alert', 'StaticText', 'Html',
@@ -49,7 +54,7 @@ export function proposalInstallationDraft(id = createProposalInstallationId()) {
     [PROPOSAL_INSTALLATION_FIELDS.deviceModelId]: '',
     [PROPOSAL_INSTALLATION_FIELDS.deviceName]: '',
     [PROPOSAL_INSTALLATION_FIELDS.deviceQuantity]: 1,
-    [PROPOSAL_INSTALLATION_FIELDS.people]: ''
+    [PROPOSAL_INSTALLATION_FIELDS.people]: PROPOSAL_INSTALLATION_DEFAULT_PEOPLE
   }
 }
 
@@ -62,12 +67,17 @@ function firstValue(row, keys) {
 }
 
 export function proposalInstallationDeviceValues(selection = {}) {
-  const raw = selection.raw && typeof selection.raw === 'object' ? selection.raw : {}
+  const raw = selection.raw && typeof selection.raw === 'object'
+    ? selection.raw
+    : selection.option?.raw || {}
   if (selection.cleared) {
     return {
       [PROPOSAL_INSTALLATION_FIELDS.deviceModel]: '',
       [PROPOSAL_INSTALLATION_FIELDS.deviceModelId]: '',
-      [PROPOSAL_INSTALLATION_FIELDS.deviceName]: ''
+      [PROPOSAL_INSTALLATION_FIELDS.deviceName]: '',
+      ShebeiDJ: '',
+      ShebeiDJZL: '',
+      GenghuanLXJG: ''
     }
   }
   return {
@@ -75,27 +85,15 @@ export function proposalInstallationDeviceValues(selection = {}) {
     [PROPOSAL_INSTALLATION_FIELDS.deviceModelId]: firstValue(raw, ['Id', 'ID', 'id']),
     [PROPOSAL_INSTALLATION_FIELDS.deviceName]: firstValue(raw, [
       'ShangpinMC', 'ShebeiMC', 'ProductName', 'Name', 'name', 'Label', 'label'
-    ])
-  }
-}
-
-export function proposalInstallationDeviceBatchValues(selection = {}) {
-  const base = proposalInstallationDeviceValues(selection)
-  if (selection.cleared) {
-    return {
-      ...base,
-      ShebeiDJ: '',
-      ShebeiDJZL: '',
-      GenghuanLXJG: ''
-    }
-  }
-  const raw = selection.raw && typeof selection.raw === 'object' ? selection.raw : {}
-  return {
-    ...base,
+    ]),
     ShebeiDJ: firstValue(raw, ['Xianjia', 'ShebeiDJ', 'BuyoutPrice', 'Price']),
     ShebeiDJZL: firstValue(raw, ['ZulinXJ', 'ShebeiDJZL', 'RentalPrice']),
     GenghuanLXJG: firstValue(raw, ['GenghuanLXJG', 'FilterPrice'])
   }
+}
+
+export function proposalInstallationDeviceBatchValues(selection = {}) {
+  return proposalInstallationDeviceValues(selection)
 }
 
 export function isProposalInstallationBatchField(field = {}) {
@@ -134,7 +132,14 @@ export function proposalInstallationBatchPatch(form = {}, enabled = {}, dependen
 }
 
 export function proposalInstallationWriteValues(row = {}, fieldNames = PROPOSAL_INSTALLATION_FIELDS) {
+  // 只补充本次已加载/选型带出的报价，场所等局部编辑不能把未加载价格清空。
+  const prices = {}
+  for (const key of ['rentalPrice', 'buyoutPrice', 'filterPrice']) {
+    const name = fieldNames[key] || PROPOSAL_INSTALLATION_FIELDS[key]
+    if (row[name] !== undefined) prices[name] = row[name]
+  }
   return {
+    ...prices,
     [fieldNames.place]: String(row[fieldNames.place] || '').trim(),
     [fieldNames.deviceModel]: row[fieldNames.deviceModel] ?? '',
     ...(fieldNames.deviceModelId ? { [fieldNames.deviceModelId]: row[fieldNames.deviceModelId] ?? '' } : {}),
