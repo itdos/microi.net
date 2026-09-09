@@ -11,6 +11,7 @@ import {
   saveNativeForm,
   validateNativeForm
 } from '@/platform/native-form.js'
+import { readChildDraft, writeChildDraft } from '@/platform/child-form-drafts.mjs'
 
 const DEFAULT_ADAPTER = 'form-engine'
 const CURRENT_USER_ADAPTER = 'current-user'
@@ -54,6 +55,7 @@ async function attachWeChatContentSecurityLoginCode(payload) {
 
 async function loadFormEngineRecord(context) {
   if (!context.rowId) return null
+  if (context.draftRelation) return { Code: 1, Data: readChildDraft(context.draftRelation, context.tableName, context.rowId) }
   return V8.FormEngine.GetFormData(context.tableName, {
     Id: context.rowId,
     ...(context.menuId ? { _SysMenuId: context.menuId } : {}),
@@ -62,6 +64,17 @@ async function loadFormEngineRecord(context) {
 }
 
 async function saveFormEngineRecord(context) {
+  if (context.draftRelation) {
+    const error = validateNativeForm(context.form, context.fields)
+    if (error) throw new Error(error)
+    const values = { ...context.extraValues }
+    context.fields.forEach(field => {
+      if (field.editable && context.form[field.Name] !== undefined) {
+        values[field.Name] = normalizeValue(field, context.form[field.Name])
+      }
+    })
+    return { Code: 1, Data: writeChildDraft(context.draftRelation, context.tableName, context.rowId, values) }
+  }
   return saveNativeForm(
     context.tableName,
     context.rowId,

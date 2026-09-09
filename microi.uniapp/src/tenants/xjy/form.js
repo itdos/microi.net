@@ -28,6 +28,7 @@ import {
 } from './proposal-cost-model.mjs'
 import { XJY_CUSTOMER_DEFAULT_REGION } from './customer-location.mjs'
 import { proposalCostFieldPresentation } from './proposal-cost-presentation.mjs'
+import { childDraftRows, findChildDraftGroup } from '@/platform/child-form-drafts.mjs'
 import { casePhotoField, caseFieldDescription } from './case-form.mjs'
 import {
   CUSTOMER_FOLLOW_FIELDS,
@@ -1745,7 +1746,10 @@ export async function initialize(context) {
   }
   if (isProposalInstallationPointForm(context)) {
     const parentId = context.form.AnzhuangdianweiId || context.defaultValues?.AnzhuangdianweiId
-    if (parentId) {
+    const draftParent = findChildDraftGroup(context.draftRelation)?.parentForm
+    if (draftParent) {
+      context.state.proposalPointYears = proposalCostYears(draftParent)
+    } else if (parentId) {
       const response = await V8.FormEngine.GetFormData(PROPOSAL_TABLE, { Id: parentId })
       if (!response || Number(response.Code) !== 1) throw new Error(response?.Msg || '所属需求方案读取失败')
       context.state.proposalPointYears = proposalCostYears(response.Data)
@@ -2560,6 +2564,11 @@ export async function beforeSubmit(context) {
   if (isProposalForm(context)) {
     const error = validateProposalCostInputs(context.form, false)
     if (error) throw new Error(error)
+    const drafts = childDraftRows(context.form.Id || context.defaultValues?.Id, 'diy_anzhuang_dw') || []
+    drafts.forEach((row, index) => {
+      const pointError = validateProposalCostInputs(row, true)
+      if (pointError) throw new Error(`点位${index + 1}：${pointError}`)
+    })
     return { ...calculateProposalCosts(context.form), HesuanNS: proposalCostYears(context.form) }
   }
   if (isProposalInstallationPointForm(context)) {
@@ -2573,6 +2582,12 @@ export async function beforeSubmit(context) {
 export async function refreshDerivedValues(context) {
   if (isProposalForm(context)) {
     const years = proposalCostYears(context.form)
+    const drafts = childDraftRows(context.form.Id || context.defaultValues?.Id, 'diy_anzhuang_dw')
+    if (drafts !== null) {
+      const values = aggregateInstallationPointCosts(drafts, years)
+      context.patchForm(values)
+      return values
+    }
     if (isProposalAdd(context)) {
       const values = aggregateInstallationPointCosts([], years)
       context.patchForm(values)

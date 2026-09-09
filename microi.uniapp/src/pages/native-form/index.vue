@@ -315,6 +315,9 @@
 	import { canEditMenuRecord } from '@/platform/menu-permission.js'
 	import { buildFormSubsections } from '@/platform/form-subsections.mjs'
 	import { isStandaloneChildLayout } from '@/platform/related-tab-layout.mjs'
+	import { createChildDraftSession, disposeChildDraftSession, flushChildDrafts } from '@/platform/child-form-drafts.mjs'
+	import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
+	import { V8 } from '@/utils/request.js'
 	import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 	import {
 		defaultFormData,
@@ -385,6 +388,7 @@
 				fileMenuId: '',
 				rowId: '',
 				draftRowId: '',
+				draftRelation: '',
 				mode: 'View',
 				title: '',
 				definition: null,
@@ -552,6 +556,7 @@
 			this.menuId = decodeURIComponent(options.menuId || '')
 			this.fileMenuId = decodeURIComponent(options.fileMenuId || '')
 			this.rowId = decodeURIComponent(options.id || '')
+			this.draftRelation = decodeURIComponent(options.draftRelation || '')
 			this.mode = options.mode || (this.rowId ? 'View' : 'Add')
 			this.title = decodeURIComponent(options.title || '')
 			this.stayAfterAdd = String(options.stayAfterAdd || '0') === '1'
@@ -563,6 +568,7 @@
 			this.recordAdapter = normalizeFormRecordAdapter(decodeURIComponent(options.recordAdapter || 'form-engine'))
 			if (this.mode === 'Add' && !this.rowId && isFormEngineRecordAdapter(this.recordAdapter)) {
 				this.draftRowId = String(this.defaultValues.Id || this.defaultValues.id || createDraftRowId())
+				createChildDraftSession(this.draftRowId)
 				this.defaultValues = {
 					...this.defaultValues,
 					Id: this.draftRowId
@@ -589,6 +595,7 @@
 			this.scheduleRelatedViewportMeasure()
 		},
 		onUnload() {
+			disposeChildDraftSession(this.draftRowId)
 			// zhy: 页面销毁后作废仍在执行的异步加载，避免卸载后继续写入页面状态。
 			this.formLoadId += 1
 			this.clearRelatedViewportMeasureTimers()
@@ -828,6 +835,7 @@
 						adapter: this.recordAdapter,
 						tableName: this.tableName,
 						rowId: this.rowId,
+						draftRelation: this.draftRelation,
 						menuId: this.menuId,
 						moduleEngineKey: this.moduleEngineKey,
 						tableChildAuth: this.tableChildAuth,
@@ -1041,6 +1049,7 @@
 					rowId: this.rowId,
 					mode: this.mode,
 					recordAdapter: this.recordAdapter,
+					draftRelation: this.draftRelation,
 					definition: this.definition,
 					form: this.form,
 					defaultValues: this.defaultValues,
@@ -1239,6 +1248,7 @@
 						adapter: this.recordAdapter,
 						tableName: this.tableName,
 						rowId: this.rowId,
+						draftRelation: this.draftRelation,
 						form: this.form,
 						fields: submitFields,
 						extraValues: {
@@ -1255,6 +1265,12 @@
 							this.draftRowId
 					}
 					const currentUser = getUser() || {}
+					try {
+						await flushChildDrafts(this.draftRowId, this.rowId, V8.FormEngine,
+							{ ...this.form, Id: this.rowId }, buildTableChildDefaultValues)
+					} catch (error) {
+						throw new Error(`主表已保存，子表尚未全部保存：${error.message || error.Msg || '请重试'}。请再次点击保存继续提交。`)
+					}
 					if (String(this.tableName).toLowerCase() === 'sys_user' && currentUser.Id && String(currentUser
 						.Id) === String(this.rowId)) {
 						const changed = {}
@@ -1285,7 +1301,8 @@
 						id: this.rowId,
 						row: savedRow,
 						parentRowId: this.tableChildAuth?.ParentRowId || '',
-						parentValue: this.tableChildAuth?.ParentValue || ''
+						parentValue: this.tableChildAuth?.ParentValue || '',
+						draftRelation: this.draftRelation
 					}
 					uni.$emit('microi:data-changed', changedEvent)
 					await notifyTenantFormSaved(this.tenantFormContext({
