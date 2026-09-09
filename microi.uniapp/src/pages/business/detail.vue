@@ -1,7 +1,8 @@
 <template>
 	<view class="detail-page" :class="{
 		'detail-page--related-filter-open': standaloneRelatedFilterOpen,
-		'detail-page--standalone-list': standaloneListMode
+		'detail-page--standalone-list': standaloneListMode,
+		'detail-page--with-actions': hasBottomActions
 	}"
 		:style="mciTokenStyle">
 		<view class="page-nav mci-safe-top">
@@ -12,7 +13,7 @@
 			</view>
 		</view>
 
-		<!-- zhy：禁止用停用滚动的父 scroll-view 包裹子 scroll-view，微信端会吞掉子列表上滑手势。 -->
+		<!-- 普通详情由页面滚动；仅纯子表 Tab 固定高度，交给子表 scroll-view 滚动。 -->
 		<view class="detail-scroll" :class="{ 'detail-scroll--locked': standaloneListMode }">
 			<view class="detail-scroll-content">
 			<view v-if="loading" class="loading-state">
@@ -173,7 +174,9 @@
 						:field="relatedTab.field"
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
-						parent-mode="View" display-mode="full"
+						parent-mode="View" :display-mode="standaloneListMode ? 'full' : 'preview'"
+						:show-preview-header="!standaloneListMode"
+						:preview-limit="2"
 						:show-latest-record-summary="key === 'customers'"
 						:independent-scroll="standaloneListMode"
 						:viewport-height="relatedListViewportHeight"
@@ -333,6 +336,7 @@
 </template>
 
 <script>
+	import { isStandaloneChildLayout } from '@/platform/related-tab-layout.mjs'
 	import {
 		themeMixin
 	} from '@/utils/theme.js'
@@ -1458,10 +1462,10 @@
 				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
 			},
 			standaloneListMode() {
-				return !this.loading && !this.error && Boolean(this.standaloneChildTab)
+				return !this.loading && !this.error && isStandaloneChildLayout(this.visibleSections, this.standaloneRelatedTabs)
 			},
 			showStandaloneRelatedAdd() {
-				return !this.loading && !this.error && !this.standaloneRelatedFilterOpen &&
+				return this.standaloneListMode && !this.standaloneRelatedFilterOpen &&
 					this.standaloneRelatedAddAvailable &&
 					Boolean(this.standaloneChildTab && this.standaloneRelatedAddKey === this.standaloneChildTab.key)
 			},
@@ -2613,13 +2617,19 @@
 	.detail-page {
 		display: flex;
 		flex-direction: column;
-		height: 100vh;
-		overflow: hidden;
+		min-height: 100vh;
 		background: #f1f6f8;
 		color: #17333e;
 	}
 
+	.detail-page--standalone-list {
+		height: 100vh;
+		overflow: hidden;
+	}
+
 	.page-nav {
+		position: sticky;
+		top: 0;
 		flex: none;
 		background: #fff;
 		box-shadow: 0 4rpx 16rpx rgba(24, 69, 86, 0.06);
@@ -2674,8 +2684,6 @@
 	.detail-scroll {
 		flex: 1;
 		min-height: 0;
-		overflow-y: auto;
-		-webkit-overflow-scrolling: touch;
 	}
 
 	.detail-scroll--locked {
@@ -3383,7 +3391,15 @@
 		height: 30rpx;
 	}
 
+	.detail-page--with-actions .content-spacer {
+		height: calc(232rpx + var(--mci-safe-bottom));
+	}
+
 	.bottom-actions {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
 		display: flex;
 		flex-wrap: wrap;
 		flex: none;
@@ -3392,6 +3408,10 @@
 		border-top: 1rpx solid #e5edef;
 		background: #fff;
 		z-index: 5;
+	}
+
+	.detail-page--standalone-list .bottom-actions {
+		position: relative;
 	}
 
 	.action-button {
