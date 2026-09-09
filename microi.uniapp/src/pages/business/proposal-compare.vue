@@ -24,7 +24,7 @@
 
 <script>
 import { themeMixin } from '@/utils/theme.js'
-import { callApiEngine } from '@/platform/business-runtime.js'
+import { V8 } from '@/utils/request.js'
 export default {
   mixins: [themeMixin],
   data() { return { rows: [], proposalIds: [], loading: true, errorMessage: '', metrics: [
@@ -45,11 +45,12 @@ export default {
       if (this.proposalIds.length < 2) { this.loading = false; this.errorMessage = '请返回并至少选择两个方案'; return }
       this.loading = true; this.errorMessage = ''
       try {
-        const result = await callApiEngine('xjy_compare_customer_proposals', { Ids: this.proposalIds })
+        // 使用已验证的接口引擎路由，业务失败原样展示，避免旧路由重试覆盖真实原因。
+        const result = await V8.ApiEngine.Run('xjy_compare_customer_proposals', { Ids: this.proposalIds }, { checkCode: false })
         if (!result || Number(result.Code) !== 1) throw new Error(result && result.Msg || '方案比价失败')
         this.rows = result.Data || []
       } catch (error) {
-        this.errorMessage = error && error.message || '方案比价失败，请稍后重试'
+        this.errorMessage = error && (error.message || error.Msg || error.errMsg) || '方案比价失败，请稍后重试'
       } finally { this.loading = false }
     },
     display(value, metric) { if (value === null || value === undefined || value === '') return '-'; return metric.money ? `¥${Number(value || 0).toFixed(2)}` : value }
