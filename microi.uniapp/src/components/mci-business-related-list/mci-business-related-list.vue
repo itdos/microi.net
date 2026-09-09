@@ -497,6 +497,7 @@ import {
 import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
 import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
+import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
@@ -749,6 +750,7 @@ export default {
       return Boolean(this.rows.length) && this.rows.every((row) => this.isProposalSelected(row))
     },
     displayedRows() {
+      if (this.proposalDraftGroup) return this.rows
       return this.isPreview
         ? this.rows.slice(0, Math.max(1, this.previewLimit))
         : this.rows
@@ -756,17 +758,31 @@ export default {
     isProposalInstallationContext() {
       return isProposalInstallationQuickContext(this.parentTableName, this.config.table || this.table?.Name)
     },
+    proposalDraftGroup() {
+      if (!this.isProposalInstallationContext || String(this.parentMode).toLowerCase() !== 'add') return null
+      return childDraftGroup(this.parentId, this.field.Id, {
+        tableName: this.config.table || this.table?.Name,
+        fieldConfig: this.fieldConfig,
+        fkField: this.childFkField,
+        primaryField: this.childConfig.PrimaryTableFieldName || '',
+        parentForm: this.parentForm,
+        menuId: this.menuId,
+        auth: this.tableChildAuth
+      })
+    },
     isProposalInstallationQuickMode() {
       // zhy：安装点位只有嵌入需求方案详情的预览区使用快速编辑卡片；
       // “查看更多”独立列表必须回到通用子表卡片，完整遵循后台 ViewSchema/菜单字段配置。
       return this.isPreview && this.isProposalInstallationContext
     },
     proposalInstallationBatchAvailable() {
+      if (this.proposalDraftGroup) return false
       return !this.isPreview && this.isProposalInstallationContext && Boolean(this.relationValue) &&
         Number(this.count || this.rows.length) >= 2 &&
         Boolean(canEditMenuRecord(this.parentMenuId || this.menuId || this.childMenuId, this.currentUser))
     },
     proposalInstallationBatchPreviewAvailable() {
+      if (this.proposalDraftGroup) return false
       return this.isProposalInstallationQuickMode && Number(this.count || this.rows.length) >= 2 &&
         Boolean(canEditMenuRecord(this.parentMenuId || this.menuId || this.childMenuId, this.currentUser))
     },
@@ -829,6 +845,7 @@ export default {
       }
     },
     proposalInstallationHasMore() {
+      if (this.proposalDraftGroup) return false
       return this.isProposalInstallationQuickMode &&
         Number(this.count || this.rows.length) > Math.max(1, this.previewLimit)
     },
@@ -877,6 +894,8 @@ export default {
         ...result,
         [item.key]: item.name
       }), {
+        deviceQuantity: this.proposalInstallationDefinitionField('deviceQuantity', '设备数量')?.Name || PROPOSAL_INSTALLATION_FIELDS.deviceQuantity,
+        people: this.proposalInstallationDefinitionField('people', '人数')?.Name || PROPOSAL_INSTALLATION_FIELDS.people,
         deviceModelId: this.proposalInstallationDefinitionField('deviceModelId', '设备型号Id')?.Name || ''
       })
     },
@@ -1306,9 +1325,11 @@ export default {
       ) || (this.definition?.fields || []).find((item) => String(item.Label || '').trim() === label) || null
     },
     proposalPointCanEdit(row) {
+      if (this.proposalDraftGroup) return this.canAdd
       return Boolean(canEditMenuRecord(this.menuId || this.childMenuId, this.currentUser))
     },
     proposalPointCanDelete(row) {
+      if (this.proposalDraftGroup) return this.canAdd
       return Boolean(canDeleteMenuRecord(this.menuId || this.childMenuId, this.currentUser))
     },
     proposalPointValueEmpty(value) {
@@ -1322,6 +1343,7 @@ export default {
     updateProposalPointValue(row, name, value) {
       if (!row || !name) return
       row[name] = value
+      if (this.proposalDraftGroup) this.syncProposalDraftRows()
     },
     async selectProposalPointDevice(row, selection = {}) {
       const values = proposalInstallationDeviceValues(selection)
@@ -1347,7 +1369,8 @@ export default {
         menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
         tableChildAuth: this.tableChildAuth,
-        includeRelated: true
+        includeRelated: !this.proposalDraftGroup,
+        draftRelation: this.proposalDraftGroup?.key || ''
       })
     },
     proposalPointCopyValues(row) {
@@ -1370,6 +1393,10 @@ export default {
     },
     async saveProposalPoint(row) {
       if (!row?.Id || !this.proposalPointCanEdit(row)) return
+      if (this.proposalDraftGroup) {
+        this.syncProposalDraftRows()
+        return
+      }
       const id = String(row.Id)
       this.proposalPointSavingId = id
       try {
@@ -1391,6 +1418,11 @@ export default {
     async copyProposalPoint(row) {
       if (!row?.Id || this.proposalPointSavingId) return
       const id = createProposalInstallationId()
+      if (this.proposalDraftGroup) {
+        this.rows = [{ ...JSON.parse(JSON.stringify(row)), Id: id }, ...this.rows]
+        this.syncProposalDraftRows()
+        return
+      }
       this.proposalPointSavingId = id
       uni.showLoading({ title: '正在复制', mask: true })
       try {
@@ -1410,6 +1442,12 @@ export default {
     async deleteProposalPoint(row) {
       if (!row?.Id || this.proposalPointSavingId) return
       if (!(await this.confirmAction('删除后无法恢复，是否继续？'))) return
+      if (this.proposalDraftGroup) {
+        this.proposalDraftGroup.deleted.add(String(row.Id))
+        this.rows = this.rows.filter(item => String(item.Id) !== String(row.Id))
+        this.syncProposalDraftRows()
+        return
+      }
       this.proposalPointSavingId = String(row.Id)
       uni.showLoading({ title: '正在删除', mask: true })
       try {
@@ -1729,6 +1767,15 @@ export default {
       }
     },
     async loadData(reset = false, refresh = false, notifyCount = false, refreshSummary = notifyCount) {
+      if (this.proposalDraftGroup) {
+        this.rows = [...this.proposalDraftGroup.rows]
+        this.count = this.rows.length
+        this.loading = false
+        this.finished = true
+        this.error = ''
+        if (notifyCount) this.emitDataCount()
+        return
+      }
       if (!this.relationValue || !this.config.table || (this.loading && !reset) || (!reset && this.finished)) return
       // 首次进入、返回刷新和真实增删改才回读摘要；搜索、筛选、翻页沿用当前摘要。
       const latestSummaryTask = refreshSummary ? this.loadLatestRecordSummary() : null
@@ -1824,6 +1871,7 @@ export default {
       return `¥${numeric.toLocaleString()}`
     },
     async loadRelatedMetrics(refresh = false) {
+      if (this.proposalDraftGroup) return
       const metrics = this.relatedMetricDefinitions
       if (!metrics.length || !this.relationValue || !this.config.table) return
       this.metricLoading = true
@@ -2592,6 +2640,7 @@ export default {
       return result
     },
     async openAdd() {
+      if (this.proposalPointSavingId) return
       if (!this.canAdd) {
         uni.showToast({ title: '当前账号没有新增权限', icon: 'none' })
         return
@@ -2614,6 +2663,11 @@ export default {
         }
         if (names.deviceModelId) {
           draft[names.deviceModelId] = source[PROPOSAL_INSTALLATION_FIELDS.deviceModelId]
+        }
+        if (this.proposalDraftGroup) {
+          this.rows = [{ ...draft, ...this.callbackDefaults() }, ...this.rows]
+          this.syncProposalDraftRows()
+          return
         }
         this.proposalPointSavingId = id
         uni.showLoading({ title: '正在新增', mask: true })
@@ -2726,7 +2780,20 @@ export default {
       this.emitDataCount()
       return true
     },
+    syncProposalDraftRows() {
+      const group = this.proposalDraftGroup
+      if (!group) return
+      group.rows = this.rows
+      this.count = this.rows.length
+      this.loading = false
+      this.error = ''
+      this.emitDataCount()
+    },
     handleDataChanged(payload = {}) {
+      if (this.proposalDraftGroup) {
+        if (payload.draftRelation === this.proposalDraftGroup.key) this.loadData(true, false, true)
+        return
+      }
       if (String(payload.table || '').toLowerCase() === String(this.config.table || '').toLowerCase()) {
         // zhy：草稿父记录优先使用保存回传数据，避免空的远程查询覆盖刚新增的联系人。
         if (this.mergeDraftChangedRow(payload)) return

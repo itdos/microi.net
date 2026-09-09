@@ -42,7 +42,7 @@
     "check:tabbar": "node scripts/check-custom-tabbar-state.cjs",
     "check:ai-assistant-visibility": "node --test scripts/test-ai-assistant-visibility.mjs",
     "check:xjy-order-product-cooperation": "node scripts/check-xjy-order-product-cooperation.mjs",
-    "check:xjy-proposal-installation-points": "node --test scripts/test-proposal-installation-points.mjs scripts/test-form-subsections.mjs",
+    "check:xjy-proposal-installation-points": "node --test scripts/test-proposal-installation-points.mjs scripts/test-form-subsections.mjs scripts/test-child-form-drafts.mjs",
     "check:xjy-order-approval": "node scripts/check-xjy-order-approval.mjs",
     "check:xjy-followup-approval": "node --test scripts/test-xjy-followup-approval-defaults.mjs scripts/test-xjy-lead-followup-defaults.mjs",
     "check:customer-detail-actions": "node scripts/check-customer-detail-actions.mjs",
