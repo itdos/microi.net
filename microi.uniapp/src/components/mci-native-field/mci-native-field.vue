@@ -89,7 +89,19 @@
       </label>
     </radio-group>
 
-    <view v-else-if="isDropdownOption" class="native-select">
+    <template v-else-if="isDropdownOption">
+      <view v-if="selectorPortaled" class="native-select__anchor" :style="{ height: `${selectorAnchorRect.height}px` }"></view>
+      <!-- 输入框和原下拉列表一起提升到页面根层，保留原位置与样式。 -->
+      <!-- #ifdef H5 -->
+      <Teleport to="body" :disabled="!selectorPortaled">
+      <!-- #endif -->
+      <!-- #ifndef H5 -->
+      <root-portal :enable="selectorPortaled">
+      <!-- #endif -->
+      <view v-if="selectorOpen" class="native-select__backdrop" :class="{ 'native-select__backdrop--portal': selectorPortaled }"
+        @tap.stop="closeSelector" @touchmove.stop.prevent></view>
+      <view class="native-select" :class="{ 'native-select--open': selectorOpen, 'native-select--portal': selectorPortaled }"
+        :style="selectorPortaled ? selectorPortalStyle : null">
       <view class="native-control__input native-select__trigger" :class="{ open: selectorOpen }" hover-class="native-control__pressed" @tap="openSelector">
         <view class="native-select__content">
           <view v-if="selectorOpen" class="native-select__inline-search" @tap.stop>
@@ -98,7 +110,7 @@
               <text v-if="selectedExtraCount" class="native-select__more">+{{ selectedExtraCount }}</text>
             </view>
             <input v-model="searchKeyword" class="native-select__search-input" type="text" confirm-type="search"
-              :focus="selectorOpen" :placeholder="hasSelection ? '' : '输入关键词检索'" @input="scheduleSearch"
+              :focus="selectorOpen" :adjust-position="!selectorPortal" :placeholder="hasSelection ? '' : '输入关键词检索'" @input="scheduleSearch"
               @confirm="loadOptionPage(true)" />
           </view>
           <view v-else-if="selectedPreview.length" class="native-select__selection" :class="{ multiple: isMultiple }">
@@ -112,8 +124,8 @@
         <text class="native-select__chevron">›</text>
       </view>
 
-      <view v-if="selectorOpen" class="native-select__backdrop" @tap="closeSelector"></view>
-      <view v-if="selectorOpen" class="native-select__popover" :class="{ above: selectorPlacement === 'top' }" @tap.stop>
+      <view v-if="selectorOpen" class="native-select__popover"
+        :class="{ above: (selectorPortaled ? selectorPortalLayout.placement : selectorPlacement) === 'top' }" @tap.stop>
         <view class="native-select__pointer"></view>
         <scroll-view class="native-select__list" scroll-y :lower-threshold="60" @scrolltolower="loadMoreOptions">
           <view v-if="optionLoading && !selectorOptions.length" class="native-select__loading">
@@ -144,7 +156,14 @@
         </scroll-view>
 
       </view>
-    </view>
+      </view>
+      <!-- #ifndef H5 -->
+      </root-portal>
+      <!-- #endif -->
+      <!-- #ifdef H5 -->
+      </Teleport>
+      <!-- #endif -->
+    </template>
 
     <view v-else-if="isOptionComponent" class="native-control__unavailable"><text>{{ field.optionError || '暂无可选数据，请稍后重试' }}</text></view>
 
@@ -216,6 +235,8 @@ import {
 import { V8 } from '@/utils/request.js'
 import { isHtmlValue, normalizeRichTextHtml } from '@/platform/display.js'
 import { formatRegionSelection } from '@/platform/region-value.mjs'
+import { getSafeAreaMetrics } from '@/utils/safe-area.js'
+import { positionNativeSelector } from '@/platform/native-selector-position.mjs'
 import {
   createRegionPickerState,
   regionPickerSelection,
@@ -236,7 +257,8 @@ export default {
     fileAccessMenuId: { type: String, default: '' },
     moduleEngineKey: { type: String, default: '' },
     tableChildAuth: { type: Object, default: null },
-    readonlyMaxLines: { type: Number, default: 0 }
+    readonlyMaxLines: { type: Number, default: 0 },
+    selectorPortal: { type: Boolean, default: false }
   },
   // zhy: 通知表单页同步下拉框的打开状态，便于提升外层卡片层级。
   emits: ['update:modelValue', 'change', 'select', 'selector-toggle', 'upload-state'],
@@ -257,6 +279,11 @@ export default {
       optionError: '',
       clientOptionRows: [],
       selectorPlacement: 'bottom',
+      selectorAnchorRect: null,
+      selectorViewport: {},
+      selectorKeyboardHeight: 0,
+      selectorOpening: false,
+      selectorMeasureId: 0,
       draftIds: [],
       draftValues: {},
       searchTimer: null,
@@ -265,6 +292,17 @@ export default {
     }
   },
   computed: {
+    selectorPortaled() { return Boolean(this.selectorPortal && this.selectorOpen && this.selectorAnchorRect) },
+    selectorPortalLayout() {
+      return this.selectorPortaled ? positionNativeSelector(this.selectorAnchorRect, this.selectorViewport, this.selectorKeyboardHeight) : null
+    },
+    selectorPortalStyle() {
+      const layout = this.selectorPortalLayout
+      return layout ? {
+        top: `${layout.top}px`, left: `${layout.left}px`, width: `${layout.width}px`, height: `${layout.height}px`,
+        '--native-select-list-height': `${layout.listHeight}px`, '--native-select-gap': `${layout.gap}px`
+      } : {}
+    },
     component() { return String(this.field.component || 'Text') },
     isImage() { return this.component === 'ImgUpload' },
     isFile() { return this.component === 'FileUpload' },
@@ -422,6 +460,7 @@ export default {
     }
   },
   beforeUnmount() {
+    this.closeSelector()
     if (this.searchTimer) clearTimeout(this.searchTimer)
     // zhy: 分组折叠销毁控件时终止尚未完成的下拉选项请求。
     this.selectorOpen = false
@@ -479,7 +518,18 @@ export default {
       })
     },
     async openSelector() {
-      if (this.readonly || this.selectorOpen) return
+      if (this.readonly || this.selectorOpen || this.selectorOpening) return
+      if (this.selectorPortal) {
+        this.selectorOpening = true
+        const measureId = ++this.selectorMeasureId
+        const rect = await this.measureSelectorAnchor()
+        if (measureId !== this.selectorMeasureId) return
+        this.selectorOpening = false
+        if (!rect) return
+        this.selectorAnchorRect = rect
+        this.selectorViewport = getSafeAreaMetrics()
+        this.selectorKeyboardHeight = 0
+      }
       const config = this.field.config || {}
       const configuredPageSize = Number(config.SelectPageSize || config.PageSize || 20)
       this.optionPageSize = Number.isFinite(configuredPageSize)
@@ -495,10 +545,22 @@ export default {
       this.optionFinished = false
       this.optionError = ''
       this.initializeDraftSelection()
+      if (this.selectorPortal) {
+        if (uni.onKeyboardHeightChange) uni.onKeyboardHeightChange(this.handleSelectorKeyboardHeight)
+      }
       // zhy: 下拉打开后让所在表单卡片解除裁切并显示在最上层。
       this.$emit('selector-toggle', true)
-      this.$nextTick(() => this.updateSelectorPlacement())
+      if (!this.selectorPortal) this.$nextTick(() => this.updateSelectorPlacement())
       await this.loadOptionPage(true)
+    },
+    measureSelectorAnchor() {
+      return new Promise((resolve) => {
+        try {
+          uni.createSelectorQuery().in(this).select('.native-control').boundingClientRect((rect) => {
+            resolve(rect && rect.width > 0 && rect.height > 0 ? rect : null)
+          }).exec()
+        } catch (error) { resolve(null) }
+      })
     },
     updateSelectorPlacement() {
       try {
@@ -512,9 +574,19 @@ export default {
         this.selectorPlacement = 'bottom'
       }
     },
+    handleSelectorKeyboardHeight(event) {
+      if (!this.selectorOpen || !this.selectorPortal) return
+      this.selectorKeyboardHeight = Math.max(0, Number(event.height) || 0)
+    },
     closeSelector() {
+      this.selectorMeasureId += 1
+      this.selectorOpening = false
       if (!this.selectorOpen) return
       this.selectorOpen = false
+      if (this.selectorPortal) {
+        if (uni.offKeyboardHeightChange) uni.offKeyboardHeightChange(this.handleSelectorKeyboardHeight)
+        if (uni.hideKeyboard) uni.hideKeyboard()
+      }
       // zhy: 下拉关闭后恢复表单卡片原有层级。
       this.$emit('selector-toggle', false)
       this.optionRequestId += 1
@@ -774,6 +846,13 @@ export default {
 .native-select__backdrop { position: fixed; inset: 0; z-index: 1; background: transparent; }
 .native-select__popover { position: absolute; top: calc(100% + 14rpx); right: 0; left: 0; z-index: 2; overflow: visible; border: 1px solid #d9e3e7; border-radius: 8px; background: #fff; box-shadow: 0 14rpx 38rpx rgba(24,55,68,.16); animation: nativeSelectIn .16s ease both; }
 .native-select__popover.above { top: auto; bottom: calc(100% + 14rpx); }
+.native-select--open { z-index: 2; }
+.native-select__backdrop--portal { z-index: 3200; }
+.native-select--portal { position: fixed; z-index: 3201; }
+.native-select--portal .native-select__trigger { height: 100%; }
+.native-select--portal .native-select__popover { top: calc(100% + var(--native-select-gap)); }
+.native-select--portal .native-select__popover.above { top: auto; bottom: calc(100% + var(--native-select-gap)); }
+.native-select--portal .native-select__list { height: var(--native-select-list-height); }
 .native-select__pointer { position: absolute; top: -11rpx; left: 50%; width: 20rpx; height: 20rpx; border-top: 1px solid #d9e3e7; border-left: 1px solid #d9e3e7; background: #fff; transform: translateX(-50%) rotate(45deg); }
 .native-select__popover.above .native-select__pointer { top: auto; bottom: -11rpx; border: 0; border-right: 1px solid #d9e3e7; border-bottom: 1px solid #d9e3e7; }
 .native-select__list { height: 420rpx; }
