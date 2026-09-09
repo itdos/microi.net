@@ -247,7 +247,9 @@
 					:parent-table-child-auth="tableChildAuth"
 					:parent-mode="mode"
 					:presentation="relatedPresentation(relatedTab.field)"
-					display-mode="full"
+					:display-mode="standaloneListMode ? 'full' : 'preview'"
+					:show-preview-header="!standaloneListMode"
+					:preview-limit="relatedPresentation(relatedTab.field).previewLimit || 2"
 					:independent-scroll="standaloneListMode"
 					:viewport-height="relatedListViewportHeight"
 					@data-count="handleRelatedCount" />
@@ -312,6 +314,7 @@
 	} from '@/utils/request.js'
 	import { canEditMenuRecord } from '@/platform/menu-permission.js'
 	import { buildFormSubsections } from '@/platform/form-subsections.mjs'
+	import { isStandaloneChildLayout } from '@/platform/related-tab-layout.mjs'
 	import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 	import {
 		defaultFormData,
@@ -518,7 +521,7 @@
 				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
 			},
 			standaloneListMode() {
-				return !this.loading && !this.error && Boolean(this.standaloneChildTab)
+				return !this.loading && !this.error && isStandaloneChildLayout(this.groups, this.standaloneRelatedTabs)
 			},
 			tenantFormPresentation() {
 				return getTenantFormPresentation(this.tenantFormContext())
