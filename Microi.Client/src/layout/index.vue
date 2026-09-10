@@ -26,11 +26,13 @@
         <!-- 移动端底部导航栏 -->
         <mobile-tab-bar v-if="!hideShellForAnonymous" />
     </div>
+    <PlatformReminderDialog v-if="!hideShellForAnonymous && !isEmbeddedWebosWindow" />
 </template>
 
 <script>
 import RightPanel from "@/components/RightPanel";
 import MobileTabBar from "@/components/MobileTabBar";
+import PlatformReminderDialog from './components/PlatformReminderDialog.vue';
 // Settings,
 import { AppMain, Navbar, Sidebar, TagsView } from "./components";
 import ResizeMixin from "./mixin/ResizeHandler";
@@ -47,6 +49,7 @@ export default {
         Navbar,
         RightPanel,
         MobileTabBar,
+        PlatformReminderDialog,
         // Settings,
         Sidebar,
         TagsView
@@ -87,6 +90,7 @@ export default {
             permissionStore,
             WebOSAppContainer,
             isWebOS,
+            isEmbeddedWebosWindow,
             sidebar,
             device,
             showSettings,

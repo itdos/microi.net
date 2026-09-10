@@ -271,7 +271,7 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   inset: 72px auto 0 0;
   z-index: 24;
   display: grid;
-  grid-template-rows: 46px minmax(0, 1fr);
+  grid-template-rows: 46px 72px minmax(0, 1fr);
   width: var(--mci-deck-rail);
   overflow: hidden;
   border-right: 1px solid var(--mci-deck-line);
@@ -1069,7 +1069,7 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-training-deck__top-actions button,
   .mci-training-deck__top-actions a { min-height: 50px; padding-inline: 17px; }
   .mci-training-deck__top-actions span { font-size: 14px; }
-  .mci-training-deck__rail { top: 86px; grid-template-rows: 58px minmax(0, 1fr); }
+  .mci-training-deck__rail { top: 86px; grid-template-rows: 58px 72px minmax(0, 1fr); }
   .mci-training-deck__rail > header { padding-inline: 22px; }
   .mci-training-deck__rail > header span,
   .mci-training-deck__rail > header span,
@@ -1443,6 +1443,27 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
   .mci-deck-engine-group,
   .mci-deck-experience-card { min-height: 220px; }
   .mci-deck-schedule__day { min-height: 300px; }
+}
+
+.mci-training-deck.is-rail-collapsed { --mci-deck-rail: 0px; }
+.mci-training-deck__search { display: grid; gap: 4px; padding: 0 12px 8px; min-width: 0; }
+.mci-training-deck__search input { width: 100%; min-width: 0; height: 38px; padding: 8px 10px; font: inherit; font-size: 12px; border: 1px solid var(--mci-deck-line-strong); border-radius: var(--mci-deck-radius-control); color: var(--mci-deck-text); background: var(--mci-deck-surface-strong); }
+.mci-training-deck__search input:focus-visible { outline: 2px solid var(--mci-deck-primary); outline-offset: 2px; }
+.mci-training-deck__search small { color: var(--mci-deck-text-soft); font-size: 10px; line-height: 1.5; }
+.mci-training-deck__search-empty { padding: 18px 12px; color: var(--mci-deck-text-soft); font-size: 12px; line-height: 1.7; }
+@media (max-width: 767px) {
+  .mci-training-deck__rail { inset: 58px auto 58px 0; display: grid; grid-template-rows: 40px 72px minmax(0, 1fr); width: min(310px, calc(100% - 40px)); height: auto; background: var(--mci-deck-bg); box-shadow: var(--mci-deck-shadow); z-index: 12; }
+  .mci-training-deck__rail > header { display: flex; }
+  .mci-training-deck__rail nav { display: grid; align-content: start; height: auto; overflow-x: hidden; overflow-y: auto; scroll-snap-type: none; }
+  .mci-training-deck__rail button { grid-template-columns: minmax(92px, 46%) minmax(0, 1fr); gap: 8px; min-height: 72px; text-align: left; }
+  .mci-training-deck__thumbnail-copy { text-align: left; }
+  .mci-training-deck__thumbnail-copy strong { font-size: 12px; white-space: normal; line-height: 1.5; }
+  .mci-training-deck__thumbnail-copy small { display: block; font-size: 10px; }
+  .mci-training-deck__stage { inset: 58px 0 58px; }
+}
+@media (max-width: 430px) and (max-height: 700px) {
+  .mci-training-deck__rail { top: 54px; bottom: 54px; }
+  .mci-training-deck__stage { top: 54px; bottom: 54px; }
 }
 
 /* Build-only capture mode renders a deterministic 1600x900 desktop canvas even
@@ -2076,7 +2097,7 @@ html[data-mci-site-style="mainstream"] body:has(.mci-training-deck) .mci-trainin
 @media (min-width: 2200px) and (min-height: 1200px) {
   .mci-training-ppt-page { --mci-deck-rail: clamp(390px, 13vw, 500px); }
   .mci-training-deck__topbar { height: 104px; padding-inline: 76px; }
-  .mci-training-deck__rail { top: 104px; grid-template-rows: 68px minmax(0, 1fr); }
+  .mci-training-deck__rail { top: 104px; grid-template-rows: 68px 72px minmax(0, 1fr); }
   .mci-training-deck__stage { inset: 104px 0 88px var(--mci-deck-rail); }
   .mci-training-slide__frame { width: min(100%, 3000px); padding: 88px 142px; }
   .mci-training-slide__heading { margin-bottom: 58px; }

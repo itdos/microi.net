@@ -15,6 +15,8 @@ public sealed class LegacyPlatformBootstrapCompatibilityTests
     [InlineData("/api/SysLog/addSysLog", "UserLogin", "AddSysLog")]
     [InlineData("/apiengine/platform-os-legacy-compatibility", "getdatetimenow", "GetDateTimeNow")]
     [InlineData("/apiengine/platform-client-log", "", "AddSysLog")]
+    [InlineData("/api/SysDept/GetSysDeptStep", "", "GetSysDeptStep")]
+    [InlineData("/API/SYSDEPT/GETSYSDEPTSTEP", "DelSysDept", "GetSysDeptStep")]
     public void RoutesPinLegacyActionsAndNormalizeCanonicalActions(string path, string input, string expected)
         => Assert.Equal(expected, LegacyMobileCompatibilityController.ResolveRoute(path, input)?.Action);
 
@@ -27,6 +29,8 @@ public sealed class LegacyPlatformBootstrapCompatibilityTests
     [InlineData("/apiengine/platform-sys-user-session", "SetPassword")]
     [InlineData("/LegacyMobileCompatibility/Run", "Login")]
     [InlineData("/apiengine/platform-os-legacy-compatibility", "GetHID")]
+    [InlineData("/api/SysDept/DelSysDept", "")]
+    [InlineData("/apiengine/platform-sys-dept", "DelSysDept")]
     public void RecoveryCannotBecomeAGenericBusinessOrCredentialGateway(string path, string action)
         => Assert.Null(LegacyMobileCompatibilityController.ResolveRoute(path, action));
 
@@ -201,5 +205,17 @@ public sealed class LegacyPlatformBootstrapCompatibilityTests
         var result = Assert.IsType<DosResult>(await PlatformBootstrapCompatibilityService.ExecuteAsync(
             "AddSysLog", new JObject { ["OsClient"] = "tenant-a", ["Title"] = "Test" }, null));
         Assert.Equal(1001, result.Code);
+    }
+
+    [Fact]
+    public async Task DepartmentTreeRequiresIdentityAndPinsTrustedQueryContext()
+    {
+        var route = LegacyMobileCompatibilityController.ResolveRoute("/api/SysDept/GetSysDeptStep", "");
+        Assert.NotNull(route);
+        Assert.True(route.Authenticated);
+        Assert.Equal("platform-sys-dept", route.EngineKey);
+        var anonymous = Assert.IsType<DosResult>(await PlatformBootstrapCompatibilityService.ExecuteAsync(
+            "GetSysDeptStep", new JObject { ["OsClient"] = "tenant-a" }, null));
+        Assert.Equal(1001, anonymous.Code);
     }
 }

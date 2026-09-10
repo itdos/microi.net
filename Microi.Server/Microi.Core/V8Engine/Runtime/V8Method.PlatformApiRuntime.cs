@@ -10,6 +10,7 @@ namespace Microi.net
         private static readonly IReadOnlyDictionary<string, string[]> PlatformApiRuntimeEngineKeys =
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
+                ["PlatformReminders"] = new[] { "platform-reminder-runtime", "platform-reminder-official-feed", "platform-reminder-tick" },
                 ["MarketplaceSource"] = new[] { "platform-marketplace-source" },
                 ["ExternalLogin"] = new[]
                 {

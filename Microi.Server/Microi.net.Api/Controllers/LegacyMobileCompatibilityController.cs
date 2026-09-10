@@ -11,7 +11,7 @@ namespace Microi.net.Api;
 /*
  * 【仅兼容、禁止新增业务、未来可能整体删除】
  * 下列旧接口已由官方 Managed 接口引擎实现。租户尚未完成应用升级时，本 Controller
- * 保证密码登录、DiyToken 会话、基础导航、服务器时间及客户端语义日志仍可用。
+ * 保证密码登录、DiyToken 会话、基础导航、部门树、服务器时间及客户端语义日志仍可用。
  * 已有接口引擎始终优先；只有主库确认地址和固定 Key 均缺失才调用现有可信 Core 原子。
  * 禁用、StopHttp、权限拒绝、数据库异常及接口执行失败绝不触发兜底，也不在请求中写入资源。
  */
@@ -44,6 +44,8 @@ public sealed class LegacyMobileCompatibilityController : Controller
             ["/api/SysMenu/GetSysMenuStep"] = new("platform-sys-menu", "GetSysMenuStep", true),
             ["/api/SysMenu/GetSysMenuModel"] = new("platform-sys-menu", "GetSysMenuModel", true),
             ["/api/SysMenu/GetSysMenu"] = new("platform-sys-menu", "GetSysMenu", true),
+            // 仅补历史读树地址；不截获现代部门引擎的新增、修改、删除动作。
+            ["/api/SysDept/GetSysDeptStep"] = new("platform-sys-dept", "GetSysDeptStep", true),
             ["/apiengine/platform-current-user"] = new("platform-current-user", "GetCurrentUser", true),
             ["/apiengine/platform-sys-config"] = new("platform-sys-config", "GetSysConfig"),
             ["/apiengine/platform-lang-bundle"] = new("platform-lang-bundle", "GetLangBundle"),

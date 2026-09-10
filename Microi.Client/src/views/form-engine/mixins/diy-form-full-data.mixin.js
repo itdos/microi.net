@@ -201,6 +201,10 @@ export default {
         // ========== 提交评论（diy-table.vue有此功能）==========
         SubmitComment() {
             var self = this;
+            if (self.FormRelatedCounts?.DataCommentUnavailableReason) {
+                self.DiyCommon.Tips(self.FormRelatedCounts.DataCommentUnavailableMessage || "当前评论功能暂不可用。", false);
+                return;
+            }
             if (self.DiyCommon.IsNull(self.CommentContent)) {
                 self.DiyCommon.Tips(self.$t("Msg.EnterCommentContent"), false);
                 return;
@@ -484,9 +488,13 @@ export default {
                             }));
                             self.DataCommentList = result.Data;
                             self.FormRelatedCounts.DataComment = Number(result.DataCount ?? result.Data.length) || 0;
+                            self.FormRelatedCounts.DataCommentUnavailableReason = "";
+                            self.FormRelatedCounts.DataCommentUnavailableMessage = "";
                         } else {
                             self.DataCommentList = [];
-                            self.FormRelatedCounts.DataComment = 0;
+                            self.FormRelatedCounts.DataComment = null;
+                            self.FormRelatedCounts.DataCommentUnavailableReason = result?.DataAppend?.DataCommentUnavailableReason || "CommentReadUnavailable";
+                            self.FormRelatedCounts.DataCommentUnavailableMessage = result?.DataAppend?.DataCommentUnavailableMessage || result?.Msg || "评论读取失败，请稍后重试。";
                         }
                     } finally {
                         self.DataCommentListLoading = false;
@@ -496,6 +504,8 @@ export default {
         },
         ParseDataVersionData(versionItem) {
             var self = this;
+            // 元信息响应不授予历史正文操作；即使旧页面残留了 Data 也不能用于加载。
+            if (versionItem?.HistoryContentMode === "MetadataOnly") return null;
             if (!versionItem || self.DiyCommon.IsNull(versionItem.Data)) {
                 return null;
             }
