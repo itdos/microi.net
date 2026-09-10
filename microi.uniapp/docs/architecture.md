@@ -13,6 +13,19 @@ Profile 使用通用模块目录、动态列表、动态详情和动态表单；
 
 ## 四层结构
 
+### 业务主列表的筛选控件
+
+`pages/business/list` 通过 `mci-list-filter-field` 统一渲染客户、联系人、跟进、订单、设备、线索等业务主列表的筛选字段。字段来源仍为 `sys_menu.SearchFieldIds` 与 `diy_field`；本地扩展筛选遇到同名后台字段时，也按后台组件和 Config 重新编译。
+
+- Radio 的表单存储仍是单值。列表筛选兼容平台旧菜单的复选组语义：SearchFieldIds 项显式配置 `DisplaySelect: false` 时，Radio 平铺查询为多选，使用 `In` 查询多个候选值；不能因为缺少新属性 SearchMultiple 就降为单选。`SearchMultiple: true/false` 可显式覆盖查询选择方式；未配置上述查询模式的 Radio 默认单选。`DisplaySelect: true` 可改用下拉选择器。
+- Select、MultipleSelect、Checkbox 复用 `mci-native-field` 的检索、分页、勾选和标签交互。筛选选中值携带标签与原始值，发送条件前移除 UI 包装。单值使用 `=`，单值字段显式查询多选使用 `In`，JSON 数组按元素或对象标识生成分组 `Like`。配置 SelectSaveField 的 Checkbox/MultipleSelect 同时兼容字段值数组和历史整行对象数组；不以显示文字替代 Id。
+- Switch 为全部、是、否；全部不生成条件，0 保留。DateTime 读取 DateTimeType，年/月/日/小时/分钟/秒分别显示对应选择器；结束边界采用下一精度单位的开区间，物理日期列与文本日期列分别格式化。
+- Address 保留省、市、区名称数组，省、市筛选生成完整 JSON 路径前缀；“全部”只代表不限制后续层级，不发送为具体地区值。
+- Cascader/Department 遵守 Multiple 与 EmitPath；SelectTree/TreeCheckbox 保留节点值和父子关系。Children、ParentField、Disabled、Leaf、Lazy、ParentChildLinkage 按配置解释，懒加载透传 `_ParentValue`。若需限制查询可选层级，可在 SearchFieldIds 项显式添加 `SearchLeafOnly: true` 或 `SearchSelectableLevels: [2, 3]`（根为第 1 层）。它们是移动查询扩展项，不是新增物理字段。缺父级或循环数据提示错误，不能拼造路径。
+- 弹窗使用独立草稿；关闭放弃本次选择，重置清空草稿，查看结果校验后才替换生效条件。该组件不运行表单提交、必填和字段写入事件。
+
+此改动不迁移线上字段配置，不改变独立售后任务、商城或关联列表的筛选入口。
+
 ### 1. 平台层
 
 `src/platform/`、`src/components/mci-*`、`src/pages/module/` 和
