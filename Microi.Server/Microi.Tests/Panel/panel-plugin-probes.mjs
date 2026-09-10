@@ -13,7 +13,20 @@ return async function probe(plugin,item,password,mode='read'){
  if(plugin.id==='mysql'){if(write)mysqlSql(name,"CREATE TABLE panel_probe (id INT PRIMARY KEY, value VARCHAR(80)); INSERT INTO panel_probe VALUES (1,'panel-persisted');");if(change)mysqlSql(name,"UPDATE panel_probe SET value='after-backup' WHERE id=1;");assert.equal(mysqlSql(name,'SELECT value FROM panel_probe WHERE id=1;'),value);}
  else if(plugin.id==='postgresql'){if(write)pgSql(name,"CREATE TABLE panel_probe (id INT PRIMARY KEY, value VARCHAR(80)); INSERT INTO panel_probe VALUES (1,'panel-persisted');");if(change)pgSql(name,"UPDATE panel_probe SET value='after-backup' WHERE id=1;");assert.equal(pgSql(name,'SELECT value FROM panel_probe WHERE id=1;'),value);}
  else if(plugin.id==='sqlserver'){if(write)msSql(name,"CREATE TABLE master.dbo.panel_probe (id INT PRIMARY KEY, value VARCHAR(80)); INSERT INTO master.dbo.panel_probe VALUES (1,'panel-persisted');");if(change)msSql(name,"UPDATE master.dbo.panel_probe SET value='after-backup' WHERE id=1;");assert.match(msSql(name,'SET NOCOUNT ON; SELECT value FROM master.dbo.panel_probe WHERE id=1;'),new RegExp('^'+value+'$'));}
- else if(plugin.id==='oracle'){if(write)oracleSql(name,"CREATE TABLE panel_probe (id NUMBER PRIMARY KEY, value VARCHAR2(80));\nINSERT INTO panel_probe VALUES (1,'panel-persisted');\nCOMMIT;");if(change)oracleSql(name,"UPDATE panel_probe SET value='after-backup' WHERE id=1;\nCOMMIT;");assert.equal(oracleSql(name,'SELECT value FROM panel_probe WHERE id=1;'),value);}
+ else if(plugin.id==='oracle'){
+   if(write){
+     // 运行容器实际健康命令：正确凭据成功，错误凭据和 SQL 执行错误必须失败。
+     const health=JSON.parse(docker(['inspect',name]))[0].Config.Healthcheck.Test;
+     assert.deepEqual(health.slice(0,3),['CMD','/bin/bash','-lc']);
+     docker(['exec',name,...health.slice(1)]);
+     assert.throws(()=>docker(['exec','-e','ORACLE_PWD=Invalid-Health-Password-48',name,...health.slice(1)]));
+     assert(health[3].includes('SELECT 1 FROM dual;'));
+     assert.throws(()=>docker(['exec',name,...health.slice(1,3),health[3].replace('SELECT 1 FROM dual;','SELECT missing_panel_column FROM dual;')]));
+     oracleSql(name,"CREATE TABLE panel_probe (id NUMBER PRIMARY KEY, value VARCHAR2(80));\nINSERT INTO panel_probe VALUES (1,'panel-persisted');\nCOMMIT;");
+   }
+   if(change)oracleSql(name,"UPDATE panel_probe SET value='after-backup' WHERE id=1;\nCOMMIT;");
+   assert.equal(oracleSql(name,'SELECT value FROM panel_probe WHERE id=1;'),value);
+ }
  else if(plugin.id==='mongodb'){if(write||change)mongoSql(name,`db.getSiblingDB('microi').panel_probe.updateOne({_id:1},{$set:{value:'${value}'}},{upsert:true});`);assert.equal(mongoSql(name,"print(db.getSiblingDB('microi').panel_probe.findOne({_id:1}).value)"),value);}
  else if(plugin.id==='redis'){if(write||change)assert.equal(docker(['exec',name,'redis-cli','SET','panel-probe',value]),'OK');assert.equal(docker(['exec',name,'redis-cli','GET','panel-probe']),value);assert.match(docker(['exec','-e','REDISCLI_AUTH=',name,'redis-cli','GET','panel-probe']),/NOAUTH/);}
  else if(plugin.id==='minio'){if(write)await s3('PUT','/panel-test','',password);if(write||change)await s3('PUT','/panel-test/probe.txt',value,password);assert.equal(await s3('GET','/panel-test/probe.txt','',password),value);assert.equal((await fetch(`http://127.0.0.1:${servicePort}/panel-test/probe.txt`)).status,403);}
