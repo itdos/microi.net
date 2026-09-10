@@ -69,7 +69,7 @@ IMAGES=(
   "registry.cn-hangzhou.aliyuncs.com/microios/qdrant:latest"
   "registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest"
   "registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev:latest"
-  "registry.cn-hangzhou.aliyuncs.com/microios/microi-ops:v1.0.1"
+  "registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.0"
 )
 
 for img in "${IMAGES[@]}"; do

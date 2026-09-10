@@ -7,7 +7,7 @@
       { 'mci-button--block': block, 'mci-button--sheen': sheen }
     ]"
     :disabled="disabled || loading"
-    type="button"
+    :type="type"
   >
     <span v-if="loading" class="mci-button__spinner" />
     <span class="mci-button__content"><slot /></span>
@@ -17,6 +17,7 @@
 <script setup>
 defineOptions({ name: 'MciButton' });
 defineProps({
+  type: { type: String, default: 'button' },
   variant: { type: String, default: 'primary' },
   size: { type: String, default: 'md' },
   disabled: { type: Boolean, default: false },
@@ -83,8 +84,8 @@ defineProps({
 
 .mci-button--plain {
   background: var(--mci-bg-surface);
-  color: var(--mci-color-primary);
-  border-color: var(--mci-color-primary);
+  color: var(--mci-text-link, var(--mci-color-primary));
+  border-color: var(--mci-text-link, var(--mci-color-primary));
 }
 
 .mci-button--cool {

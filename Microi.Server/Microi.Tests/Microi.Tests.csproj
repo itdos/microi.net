@@ -30,9 +30,12 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <!-- 面板具有独立宿主测试项目，其生成的程序集元数据不能再次作为中央测试源码编译。 -->
+    <Compile Remove="Panel\bin\**\*;Panel\obj\**\*" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Microi.Panel\Microi.Panel.csproj" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
     <ProjectReference Include="..\Dos.ORM\Dos.ORM.csproj" />
     <ProjectReference Include="..\Microi.Core\Microi.Core.csproj" />

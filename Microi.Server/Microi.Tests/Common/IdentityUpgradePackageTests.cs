@@ -192,7 +192,7 @@ public class IdentityUpgradePackageTests
             && route["PageTitle"]?.Value<string>() == "租户系统设置");
         Assert.Contains(routes, route =>
             route["RoutePath"]?.Value<string>() == "/platform-ops"
-            && route["PageTitle"]?.Value<string>() == "平台运维中心");
+            && route["PageTitle"]?.Value<string>() == "吾码服务器运维面板");
         var buildAssets = bundle["BuildAssets"]?.Children<JObject>().ToList() ?? [];
         Assert.NotEmpty(buildAssets);
         Assert.Contains(buildAssets, asset =>
