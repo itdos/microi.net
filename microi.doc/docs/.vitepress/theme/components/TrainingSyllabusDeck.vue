@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useData } from 'vitepress'
+import { searchTrainingSlides } from '../training-syllabus-search.js'
 
 type DeckPanel = '' | 'help'
 type SlideKind = 'cover' | 'decision' | 'why' | 'start' | 'atlas' | 'mcp' | 'engine' | 'multi-end' | 'cases' | 'closing'
@@ -404,15 +405,15 @@ const engineSlides: EngineSlide[] = [
     href: '/doc/system-engine/mqtt-engine.html', linkLabel: '打开 MQTT 引擎文档',
   },
   {
-    id: 'notification-engine', domain: 'integration', nav: '消息通知', title: '把待办、站内信与外部通道统一起来',
-    summary: '模板、接收人、发送记录、重试和多通道策略形成通知中心。', code: 'NOTICE', glyph: '✉', accent: '#73d9a8',
-    promise: '业务只表达“通知什么人”，通道细节由平台治理。', orbit: ['站内消息', '待办', '邮件短信', '微信通道'],
+    id: 'notification-engine', domain: 'integration', nav: '消息通知', title: '系统公告与多渠道业务通知，一处管理',
+    summary: '在消息通知中心维护公告、邮件短信、平台聊天与微信模板，AI 通过自己的 MCP 配置。', code: 'NOTICE', glyph: '✉', accent: '#73d9a8',
+    promise: '从接收范围、触发计划到投递记录，形成可核验的通知闭环。', orbit: ['系统公告', '业务通知', '帐号范围', '投递记录'],
     highlights: [
-      { title: '模板化', text: '内容、变量、接收人和跳转地址可维护、可复用。' },
-      { title: '多通道', text: '站内、邮件、短信、微信等按租户能力组合。' },
-      { title: '可追踪', text: '发送、失败、重试和用户读取状态形成完整记录。' },
+      { title: '一个管理入口', text: '保留原通知配置与物理表，用接口引擎编排多通道发送。' },
+      { title: '精准提醒', text: '支持当前用户、子租户、官方产品版本及超级管理员范围；可定时或在后端重启后提醒。' },
+      { title: '安装即可配置', text: '应用商城统一交付，MCP 与 Skills 支持 AI 配置；SignalR 实时通知，接口轮询兜底。' },
     ],
-    demo: ['配置消息模板', '计算接收人', '发送多通道通知', '查看状态与重试'],
+    demo: ['安装消息通知应用', '用 AI 配置范围和计划', '预览并发布公告', '核对投递与关闭回执'],
     href: '/doc/system-engine/message-notification.html', linkLabel: '打开消息通知文档',
   },
   {
@@ -670,6 +671,10 @@ const isPaused = ref(false)
 const isArtifactCapture = ref(false)
 const captureScale = ref(1)
 const notice = ref('')
+const railCollapsed = ref(false)
+const searchKeyword = ref('')
+const slideSearchContent = ref<string[]>([])
+const visibleSlides = computed(() => searchTrainingSlides(slideMeta, slideSearchContent.value, searchKeyword.value))
 const currentSlide = computed(() => slideMeta[activeIndex.value])
 const progress = computed(() => ((activeIndex.value + 1) / slideMeta.length) * 100)
 
@@ -723,6 +728,7 @@ function goTo(index: number, nextDirection?: 'next' | 'prev') {
 }
 
 function scrollActiveThumbnail(moveFocus = false) {
+  if (moveFocus) { railCollapsed.value = false; searchKeyword.value = '' }
   nextTick(() => {
     const button = thumbnailRailRef.value?.querySelector<HTMLButtonElement>(`[data-slide-index="${activeIndex.value}"]`)
     button?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
@@ -765,6 +771,8 @@ function downloadPdf() {
 }
 
 function handleKeydown(event: KeyboardEvent) {
+  // 浏览器搜索、打印、F11 等组合键及输入法始终保留默认行为。
+  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return
   const key = event.key
   if (key === 'Escape' && activePanel.value) {
     event.preventDefault()
@@ -772,7 +780,7 @@ function handleKeydown(event: KeyboardEvent) {
     return
   }
   if (activePanel.value) return
-  if (isInteractiveTarget(event.target) && (key === ' ' || key === 'Enter')) return
+  if (isInteractiveTarget(event.target)) return
 
   if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(key)) {
     event.preventDefault()
@@ -792,9 +800,6 @@ function handleKeydown(event: KeyboardEvent) {
   } else if (key === '?' || key.toLowerCase() === 'h') {
     event.preventDefault()
     openPanel('help')
-  } else if (key.toLowerCase() === 'f') {
-    event.preventDefault()
-    void toggleFullscreen()
   } else if (key.toLowerCase() === 'p' && !event.ctrlKey && !event.metaKey) {
     event.preventDefault()
     downloadPdf()
@@ -863,6 +868,11 @@ function handleHashChange() {
 }
 
 onMounted(() => {
+  railCollapsed.value = window.innerWidth < 768
+  nextTick(() => {
+    // 全部幻灯片都已渲染：同时索引实际正文、演示步骤与标题，不依赖关键词短清单。
+    slideSearchContent.value = slideMeta.map(slide => deckRef.value?.querySelector(`#mci-training-${slide.id}`)?.textContent || '')
+  })
   isArtifactCapture.value = new URLSearchParams(window.location.search).has('artifact-capture')
   if (isArtifactCapture.value) captureScale.value = Math.min(window.innerWidth / 1600, window.innerHeight / 900)
   handleHashChange()
@@ -885,22 +895,26 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="deckRef" class="mci-training-deck mci-page" data-mci-ui-root="training-syllabus-deck" data-mci-shape="rounded" :data-direction="direction" :class="{ 'is-paused': isPaused, 'is-fullscreen': isFullscreen, 'is-artifact-capture': isArtifactCapture }" :style="isArtifactCapture ? { '--mci-deck-capture-scale': captureScale } : undefined" role="region" aria-label="Microi吾码 AI 开发框架技术培训幻灯片" @wheel="handleWheel" @pointerdown="handlePointerDown" @pointerup="handlePointerUp" @pointercancel="pointerStart = null">
+  <div ref="deckRef" class="mci-training-deck mci-page" data-mci-ui-root="training-syllabus-deck" data-mci-shape="rounded" :data-direction="direction" :class="{ 'is-paused': isPaused, 'is-fullscreen': isFullscreen, 'is-artifact-capture': isArtifactCapture, 'is-rail-collapsed': railCollapsed }" :style="isArtifactCapture ? { '--mci-deck-capture-scale': captureScale } : undefined" role="region" aria-label="Microi吾码 AI 开发框架技术培训幻灯片" @wheel="handleWheel" @pointerdown="handlePointerDown" @pointerup="handlePointerUp" @pointercancel="pointerStart = null">
     <div class="mci-training-deck__atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
     <a class="mci-training-deck__skip" href="#mci-training-controls">跳到演示控制</a>
 
     <header class="mci-training-deck__topbar">
       <button class="mci-training-brand" type="button" aria-label="返回第一张幻灯片" @click="goTo(0, 'prev')"><img src="/icon.png" alt="" aria-hidden="true"><span><strong>Microi吾码</strong><small>AI DEVELOPMENT FRAMEWORK</small></span></button>
       <div class="mci-training-deck__top-actions" aria-label="演示工具">
+        <button type="button" :aria-label="railCollapsed ? '展开导航' : '收起导航'" :aria-expanded="!railCollapsed" aria-controls="mci-training-navigation" :title="railCollapsed ? '展开搜索与导航' : '收起导航，扩大演示区域'" @click="railCollapsed = !railCollapsed"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M5 8h2m-2 4h2m-2 4h2"/></svg><span>导航</span></button>
         <button type="button" aria-label="查看操作帮助" aria-keyshortcuts="H" title="操作帮助（H / ?）" @click="openPanel('help')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 3.2 2.26c-.7.32-1 .76-1 1.49M12 17h.01"/></svg><span>帮助</span></button>
-        <button type="button" aria-label="切换全屏" aria-keyshortcuts="F" :title="`${isFullscreen ? '退出' : '进入'}全屏（F）`" @click="toggleFullscreen"><svg v-if="!isFullscreen" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5"/></svg><span>{{ isFullscreen ? '退出' : '全屏' }}</span></button>
+        <button type="button" aria-label="切换全屏" title="也可使用浏览器 F11 全屏" @click="toggleFullscreen"><svg v-if="!isFullscreen" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5"/></svg><span>{{ isFullscreen ? '退出' : '全屏' }}</span></button>
         <a ref="pdfDownloadRef" class="is-primary is-dark-pdf" :href="pdfDownloadPaths.dark" download aria-label="下载预生成暗色 PDF" aria-keyshortcuts="P" title="下载暗色 PDF（P）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v5h5M10 15h4M12 11v7m0 0-2-2m2 2 2-2"/></svg><span>暗色 PDF</span></a>
         <a class="is-light-pdf" :href="pdfDownloadPaths.light" download aria-label="下载预生成浅色 PDF" title="下载浅色 PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v5h5M10 15h4M12 11v7m0 0-2-2m2 2 2-2"/></svg><span>浅色 PDF</span></a>
       </div>
     </header>
 
-    <aside class="mci-training-deck__rail mci-screen-only" aria-label="幻灯片缩略图导航"><header><span>SLIDES</span><strong>{{ slideMeta.length }}</strong></header><nav ref="thumbnailRailRef">
-      <button v-for="(slide, index) in slideMeta" :key="`thumbnail-${slide.id}`" type="button" :data-slide-index="index" :class="{ 'is-active': index === activeIndex }" :aria-current="index === activeIndex ? 'page' : undefined" :aria-label="`第 ${index + 1} 页：${slide.title}`" @click="goTo(index)">
+    <aside v-show="!railCollapsed" id="mci-training-navigation" class="mci-training-deck__rail mci-screen-only" aria-label="幻灯片缩略图导航"><header><span>培训导航</span><strong>{{ visibleSlides.length }} / {{ slideMeta.length }}</strong></header>
+      <label class="mci-training-deck__search"><input v-model="searchKeyword" type="search" aria-label="搜索标题与内容" placeholder="搜索标题与内容" autocomplete="off"><small role="status">{{ searchKeyword ? `找到 ${visibleSlides.length} 页` : '可搜索正文、功能与演示步骤' }}</small></label>
+      <nav ref="thumbnailRailRef">
+      <p v-if="!visibleSlides.length" class="mci-training-deck__search-empty">没有匹配的页面，请尝试其他关键词。</p>
+      <button v-for="{ slide, index } in visibleSlides" :key="`thumbnail-${slide.id}`" type="button" :data-slide-index="index" :class="{ 'is-active': index === activeIndex }" :aria-current="index === activeIndex ? 'page' : undefined" :aria-label="`第 ${index + 1} 页：${slide.title}`" @click="goTo(index)">
         <span class="mci-training-deck__thumbnail"><img :src="thumbnailPath(index)" :alt="`${slide.title}${isDark ? '暗色' : '浅色'}预览图`" loading="lazy"><i>{{ padSlide(index) }}</i></span><span class="mci-training-deck__thumbnail-copy"><strong>{{ slide.nav }}</strong><small>{{ slide.title }}</small></span>
       </button>
     </nav></aside>
@@ -999,6 +1013,6 @@ onBeforeUnmount(() => {
     <button class="mci-training-deck__edge-nav is-next mci-screen-only" type="button" :disabled="activeIndex === slideMeta.length - 1" aria-label="下一页" title="下一页（→）" @click="nextSlide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
     <footer id="mci-training-controls" class="mci-training-deck__controls mci-screen-only"><div class="mci-training-deck__chapter"><span>{{ currentSlide.chapter }}</span><div><strong>{{ currentSlide.nav }}</strong><small>{{ currentSlide.title }}</small></div></div><div class="mci-training-deck__progress" aria-label="幻灯片进度"><i :style="{ transform: `scaleX(${progress / 100})` }"></i></div><div class="mci-training-deck__counter"><strong>{{ padSlide(activeIndex) }}</strong><span>/ {{ slideMeta.length }}</span></div></footer>
     <div class="mci-training-deck__sr-status" aria-live="polite">第 {{ activeIndex + 1 }} 页，共 {{ slideMeta.length }} 页：{{ currentSlide.title }}</div><Transition name="mci-deck-toast"><div v-if="notice" class="mci-training-deck__toast" role="status">{{ notice }}</div></Transition>
-    <div v-if="activePanel" class="mci-training-deck__overlay mci-screen-only" role="presentation" @click.self="closePanel"><section class="mci-training-deck__panel" role="dialog" aria-modal="true" aria-labelledby="mci-deck-help-title"><header><div><p>MICROI PRESENTATION</p><h2 id="mci-deck-help-title">演示操作</h2></div><button ref="panelCloseRef" type="button" aria-label="关闭" @click="closePanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div class="mci-training-deck__help"><article><kbd>←</kbd><kbd>→</kbd><span><strong>上一页 / 下一页</strong><small>也支持 ↑ ↓、PageUp / PageDown</small></span></article><article><kbd>Space</kbd><span><strong>继续演示</strong><small>空格键进入下一页</small></span></article><article><kbd>Home</kbd><kbd>End</kbd><span><strong>首尾跳转</strong><small>快速回到封面或致辞页</small></span></article><article><kbd>O</kbd><span><strong>缩略图导航</strong><small>聚焦左侧当前页预览</small></span></article><article><kbd>F</kbd><span><strong>切换全屏</strong><small>沉浸式培训演示</small></span></article><article><kbd>P</kbd><span><strong>下载暗色 PDF</strong><small>顶栏可直接选择暗色或浅色高质量版</small></span></article><article><span class="mci-training-deck__gesture">↔</span><span><strong>鼠标 / 触控</strong><small>滚轮、两侧按钮或横向拖动切页</small></span></article><article><span class="mci-training-deck__gesture">↗</span><span><strong>现场讲解</strong><small>所有功能入口均在新窗口打开官方文档</small></span></article></div></section></div>
+    <div v-if="activePanel" class="mci-training-deck__overlay mci-screen-only" role="presentation" @click.self="closePanel"><section class="mci-training-deck__panel" role="dialog" aria-modal="true" aria-labelledby="mci-deck-help-title"><header><div><p>MICROI PRESENTATION</p><h2 id="mci-deck-help-title">演示操作</h2></div><button ref="panelCloseRef" type="button" aria-label="关闭" @click="closePanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div class="mci-training-deck__help"><article><kbd>←</kbd><kbd>→</kbd><span><strong>上一页 / 下一页</strong><small>也支持 ↑ ↓、PageUp / PageDown</small></span></article><article><kbd>Space</kbd><span><strong>继续演示</strong><small>空格键进入下一页</small></span></article><article><kbd>Home</kbd><kbd>End</kbd><span><strong>首尾跳转</strong><small>快速回到封面或致辞页</small></span></article><article><kbd>O</kbd><span><strong>缩略图导航</strong><small>聚焦左侧当前页预览</small></span></article><article><kbd>F11</kbd><span><strong>浏览器全屏</strong><small>Ctrl+F / ⌘F 保留浏览器搜索；左侧可搜索标题和内容</small></span></article><article><kbd>P</kbd><span><strong>下载暗色 PDF</strong><small>顶栏可直接选择暗色或浅色高质量版</small></span></article><article><span class="mci-training-deck__gesture">↔</span><span><strong>鼠标 / 触控</strong><small>滚轮、两侧按钮或横向拖动切页</small></span></article><article><span class="mci-training-deck__gesture">↗</span><span><strong>现场讲解</strong><small>所有功能入口均在新窗口打开官方文档</small></span></article></div></section></div>
   </div>
 </template>

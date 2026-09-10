@@ -193,8 +193,8 @@ namespace Dos.ORM.Oracle
             // 处理SQL函数替换（charindex -> instr）
             ProcessCharIndexFunction(cmd);
 
-            // 处理TO_CHAR函数参数顺序
-            ProcessToCharFunction(cmd);
+            // TO_CHAR 是 Oracle 原生函数，必须保留 value、format、nlsparam 的原始顺序。
+            // 对原生 SQL 做两参数交换会把日期格式串当作数值，并破坏单参数、嵌套及字面量。
         }
 
         /// <summary>
@@ -242,41 +242,5 @@ namespace Dos.ORM.Oracle
             }
         }
 
-        /// <summary>
-        /// 处理 to_char 函数参数顺序
-        /// </summary>
-        private void ProcessToCharFunction(DbCommand cmd)
-        {
-            int toCharPos = cmd.CommandText.IndexOf("to_char(", StringComparison.OrdinalIgnoreCase);
-
-            if (toCharPos < 0)
-            {
-                return;
-            }
-
-            while (toCharPos > 0)
-            {
-                int endPos = DataUtils.GetEndIndexOfMethod(cmd.CommandText, toCharPos + "to_char(".Length);
-
-                if (endPos > 0)
-                {
-                    string[] params_arr = DataUtils.SplitTwoParamsOfMethodBody(
-                        cmd.CommandText.Substring(
-                            toCharPos + "to_char(".Length,
-                            endPos - toCharPos - "to_char(".Length));
-
-                    // 调整参数顺序：to_char(format, value) -> to_char(value, format)
-                    cmd.CommandText = cmd.CommandText.Substring(0, toCharPos)
-                        + $"to_char({params_arr[1]},{params_arr[0]})"
-                        + (cmd.CommandText.Length - 1 > endPos ? cmd.CommandText.Substring(endPos + 1) : string.Empty);
-
-                    toCharPos = cmd.CommandText.IndexOf("to_char(", endPos, StringComparison.OrdinalIgnoreCase);
-                }
-                else
-                {
-                    break;
-                }
-            }
-        }
     }
 }

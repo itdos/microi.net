@@ -796,7 +796,10 @@ public class PlatformRuntimeUpgradeGateTests
 
         Assert.True(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.message-notification.json", package })));
-        Assert.Equal("v1.0.16", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.True(System.Version.TryParse(
+            package["PackageInfo"]?["Version"]?.ToString().TrimStart('v', 'V'), out var packageVersion));
+        Assert.True(packageVersion >= new System.Version(1, 0, 16),
+            "The facade/runtime contract must retain its minimum supported package version.");
         Assert.Equal(string.Empty, expectedHook.Invoke(
             null, new object[] { "platform-chat-system-message" }));
         Assert.Equal("platform-message-notification-custom-hook", expectedHook.Invoke(

@@ -90,7 +90,10 @@ export default {
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
                             await Promise.all(result.Data.map(async (item) => {
-                                if (item.Content) {
+                                item.HistoryContentMode = result.DataAppend?.HistoryContentMode;
+                                if (item.HistoryContentMode === "MetadataOnly") {
+                                    item.Content = [];
+                                } else if (item.Content) {
                                     try { item.Content = JSON.parse(item.Content); } catch (e) { item.Content = []; }
                                 } else {
                                     item.Content = [];
@@ -142,8 +145,12 @@ export default {
                 if (!result || result.Code != 1 || !result.Data) return;
                 self.FormRelatedCounts = {
                     DataLog: Number(result.Data.DataLog) || 0,
-                    DataComment: Number(result.Data.DataComment) || 0,
-                    DataVersion: Number(result.Data.DataVersion) || 0
+                    // null 表示能力不可用，不能误报为“没有评论”。旧后端仍兼容数值计数。
+                    DataComment: result.Data.DataComment === null ? null : Number(result.Data.DataComment) || 0,
+                    DataVersion: Number(result.Data.DataVersion) || 0,
+                    DataCommentUnavailableReason: result.DataAppend?.DataCommentUnavailableReason || "",
+                    DataCommentUnavailableMessage: result.DataAppend?.DataCommentUnavailableMessage || "",
+                    HistoryContentMode: result.DataAppend?.HistoryContentMode || ""
                 };
             });
         },
@@ -177,6 +184,10 @@ export default {
                     if (token !== self._DataVersionLoadToken) return;
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
+                            result.Data.forEach(function (item) {
+                                item.HistoryContentMode = result.DataAppend?.HistoryContentMode;
+                                if (item.HistoryContentMode === "MetadataOnly") delete item.Data;
+                            });
                             self.DataVersionList = result.Data;
                             self.FormRelatedCounts.DataVersion = Number(result.DataCount ?? result.Data.length) || 0;
                         } else {

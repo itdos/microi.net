@@ -34,7 +34,7 @@
 		"test:ai-media": "node --test tests/ai-media-docs.test.mjs",
 		"test:ai-capability-docs": "node --test tests/ai-capability-docs.test.mjs",
 		"test:homepage": "node --test tests/homepage-positioning.test.mjs",
-		"test:training-deck": "node --test tests/training-syllabus-deck.test.mjs",
+		"test:training-deck": "node --test tests/training-syllabus-deck.test.mjs tests/training-syllabus-search.test.mjs",
 		"test:architecture": "node --test tests/ai-platform-architecture.test.mjs",
 		"test:marketplace": "node --test tests/marketplace-query-state.test.mjs tests/site-session.test.mjs",
 		"docs:dev": "vitepress dev docs --host",

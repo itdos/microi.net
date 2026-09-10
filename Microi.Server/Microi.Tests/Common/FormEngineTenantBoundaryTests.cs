@@ -252,12 +252,45 @@ public class FormEngineTenantBoundaryTests
     [Fact]
     public void ClientFormEngine_PlatformPolicyContainsExactDistinctTableSet()
     {
-        Assert.Equal(57, PlatformResourceSecurity.PlatformTableNames.Count);
+        var expected = new[]
+        {
+            "mic_page", "mic_print", "sys_user",
+            "wf_flowdesign", "wf_node", "wf_line", "sys_microiservice", "sys_microiservice_page",
+            "sys_microistore", "sys_microistoreversion", "sys_appinstalled", "sys_business_blueprint",
+            "sys_blueprint_relation", "sys_blueprint_history", "mic_micro_app", "mic_micro_app_asset", "mic_micro_app_version",
+            "sys_osclients", "sys_config", "mci_global_function", "sys_apiengine", "diy_table", "diy_field",
+            "sys_menu", "sys_role", "sys_rolelimit", "sys_userfk", "sys_onlineuser", "sys_datasource",
+            "diy_schedule_job", "diy_schedule_job_log", "sys_mq", "sys_mqtt", "microi_database", "diy_sso",
+            "sys_log", "sys_servernode", "mic_ai", "mic_email_server", "wx_mp", "mci_database_backup",
+            "mci_background_task", "mci_file_remote_connection", "mci_redis_connection", "mci_license_server",
+            "mci_platform_reminder", "mci_platform_reminder_batch", "mci_platform_reminder_target", "mci_platform_reminder_receipt",
+            "mci_user_access_key", "mci_security_access_log", "mci_security_attack_event", "mci_security_ip_block",
+            "mci_spider_account", "mci_spider_profile", "mci_spider_rule",
+            "mci_ai_app", "mci_ai_app_file", "mci_ai_app_version", "mci_ai_data_domain", "mci_ai_role_policy"
+        };
+        Assert.Equal(expected.OrderBy(name => name, StringComparer.OrdinalIgnoreCase),
+            PlatformResourceSecurity.PlatformTableNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
         Assert.Equal(
             PlatformResourceSecurity.PlatformTableNames.Count,
             PlatformResourceSecurity.PlatformTableNames
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count());
+    }
+
+    [Theory]
+    [InlineData("mci_platform_reminder")]
+    [InlineData("mci_platform_reminder_batch")]
+    [InlineData("mci_platform_reminder_target")]
+    [InlineData("mci_platform_reminder_receipt")]
+    public void ClientFormEngine_PlatformReminderTablesCannotReceiveOrdinaryDirectGrants(string tableName)
+    {
+        Assert.True(PlatformResourceSecurity.IsProtectedTable(tableName));
+        Assert.True(PlatformResourceSecurity.DeniesAnonymousAccess(tableName));
+        foreach (var operation in new[] { "Read", "List", "Add", "Edit", "Delete" })
+            Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator(tableName, operation));
+        foreach (var permission in new[] { "Read", "Add", "Edit", "Del" })
+            Assert.False(PlatformResourceSecurity.CanGrantDirectTablePermission(
+                tableName, permission, DiyCommon.MaxRoleLevel - 1));
     }
 
     [Fact]
@@ -1802,14 +1835,17 @@ public class FormEngineTenantBoundaryTests
     }
 
     [Theory]
-    [InlineData("Edit", "[\"Edit\"]", true)]
-    [InlineData("Delete", "[\"Del\"]", true)]
-    [InlineData("Edit", "[\"Del\"]", false)]
-    [InlineData("Delete", "[\"Edit\"]", false)]
+    [InlineData("Edit", "[\"Edit\"]", true, "ordinary-user")]
+    [InlineData("Delete", "[\"Del\"]", true, "ordinary-user")]
+    [InlineData("Edit", "[\"Del\"]", false, "ordinary-user")]
+    [InlineData("Delete", "[\"Edit\"]", false, "ordinary-user")]
+    [InlineData("Edit", "[\"Edit\"]", false, "another-user")]
+    [InlineData("Delete", "[\"Del\"]", false, "another-user")]
     public async Task ExplicitScopedMenu_WriteDependsOnlyOnExactMenuCapability(
         string operation,
         string permission,
-        bool expected)
+        bool expected,
+        string snapshotUserId)
     {
         var menu = new FormEngineAuthorizationMenuSnapshot
         {
@@ -1819,6 +1855,8 @@ public class FormEngineTenantBoundaryTests
             SqlJoin = "LEFT JOIN Sys_User B ON A.UserId=B.Id",
             JoinTables = "[{\"Name\":\"Sys_User\",\"AsName\":\"B\"}]"
         };
+        var snapshot = NewActiveAuthorizationSnapshot(menu, permission);
+        snapshot.UserId = snapshotUserId;
         var param = new DiyTableRowParam
         {
             Id = "customer-a",
@@ -1829,7 +1867,7 @@ public class FormEngineTenantBoundaryTests
                 ["Id"] = "ordinary-user",
                 ["Level"] = 0
             },
-            _AuthorizationSnapshot = NewActiveAuthorizationSnapshot(menu, permission)
+            _AuthorizationSnapshot = snapshot
         };
 
         var allowed = await InvokeClientAuthorization(
@@ -2027,6 +2065,8 @@ public class FormEngineTenantBoundaryTests
         JObject table,
         string operation)
     {
+        using var scope = V8TenantContext.Enter(string.IsNullOrWhiteSpace(param.OsClient) ? "authorization-test-tenant" : param.OsClient, "authorization-unit-fixture");
+        BindTrustedFixtureSnapshot(param);
         var operationType = typeof(FormEngine).GetNestedType(
             "ClientTableOperation",
             BindingFlags.NonPublic);
@@ -2048,6 +2088,8 @@ public class FormEngineTenantBoundaryTests
         DiyTableRowParam param,
         JObject table)
     {
+        using var scope = V8TenantContext.Enter(string.IsNullOrWhiteSpace(param.OsClient) ? "authorization-test-tenant" : param.OsClient, "authorization-unit-fixture");
+        BindTrustedFixtureSnapshot(param);
         var method = typeof(FormEngine).GetMethod(
             "AuthorizeClientTableMetadataAsync",
             BindingFlags.Instance | BindingFlags.NonPublic);
@@ -2057,6 +2099,21 @@ public class FormEngineTenantBoundaryTests
             engine,
             new object[] { param, table }));
         return await task;
+    }
+
+    // 这些用例以显式 CLR 夹具代替主库加载。同步真实 loader 的请求来源绑定，
+    // 不再用随意赋值 _AuthorizationSnapshot 隐含绕过生产完整性校验。
+    // 伪造/父身份/跨租户行为由 FormEngineSqlIdentitySnapshotTests 独立覆盖。
+    private static void BindTrustedFixtureSnapshot(DiyTableRowParam param)
+    {
+        var snapshot = param._AuthorizationSnapshot;
+        var userId = param._CurrentUser?["Id"]?.Value<string>();
+        if (snapshot == null || string.IsNullOrWhiteSpace(userId)
+            || !string.Equals(userId, snapshot.UserId, StringComparison.OrdinalIgnoreCase)) return;
+        if (string.IsNullOrWhiteSpace(param.OsClient)) param.OsClient = "authorization-test-tenant";
+        var bind = typeof(FormEngine).GetMethod("BindAuthorizationSnapshot", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(bind);
+        bind.Invoke(null, new object[] { param, snapshot });
     }
 
     private static List<string> InvokeBatchUnscopedListAuthorization(

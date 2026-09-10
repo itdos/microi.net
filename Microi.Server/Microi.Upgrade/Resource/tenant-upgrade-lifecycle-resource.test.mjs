@@ -1076,14 +1076,23 @@ test('manual engine fails closed without the task fence or trusted host atom', (
 });
 
 test('both embedded platform-service bundles contain the progress route and same runtime', () => {
+  // 发布版本来自唯一源码契约，后续正式升版仍须携带进度路由且两个嵌入包保持一致。
+  const releaseContract = JSON.parse(read('platform-service-release.json'));
+  assert.equal(releaseContract.SourceRole, 'CanonicalReleaseSource');
+  const sourcePackage = JSON.parse(fs.readFileSync(path.resolve(
+    resourceDir, '../../..', releaseContract.SourceRoot, 'package.json',
+  ), 'utf8'));
+  const sourceVersion = `v${sourcePackage.version}`;
+  assert.ok(compareSemanticVersions(sourceVersion, 'v2.0.1') >= 0);
   const findBundle = model => model.ApplicationBundles
     .find(item => item.Application?.AppKey === 'microi-platform-service');
   const saasBundle = findBundle(packageModel);
   const storeBundle = findBundle(storePackage);
   for (const bundle of [saasBundle, storeBundle]) {
-    assert.equal(bundle.VersionNo, 'v2.0.1');
-    assert.equal(bundle.Application.CurrentVersion, 63);
+    assert.equal(bundle.VersionNo, sourceVersion);
+    assert.ok(Number.isInteger(bundle.Application.CurrentVersion) && bundle.Application.CurrentVersion >= 63);
     assert.ok(bundle.Routes.some(route => route.RoutePath === '/tenant-database-upgrade'));
   }
+  assert.equal(saasBundle.Application.CurrentVersion, storeBundle.Application.CurrentVersion);
   assert.equal(saasBundle.MicroService.DistHash, storeBundle.MicroService.DistHash);
 });

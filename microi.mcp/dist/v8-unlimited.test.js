@@ -1,7 +1,21 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { z } from 'zod';
 import { buildPlan, manifestGuide } from './advanced-tools.js';
+test('创建和保存接口的实际Schema支持后端受控HTTP响应且拒绝未知模式', () => {
+    const source = fs.readFileSync(new URL('./server.ts', import.meta.url), 'utf8');
+    const matches = [...source.matchAll(/responseType:\s*z\.enum\(\[([^\]]+)\]\)/g)];
+    assert.equal(matches.length, 2);
+    for (const match of matches) {
+        const values = [...match[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
+        const schema = z.enum(values);
+        for (const mode of ['JSON', 'String', 'File', 'HTML', 'Stream', 'HTTP'])
+            assert.equal(schema.safeParse(mode).success, true, mode);
+        for (const mode of ['RawScript', 'HTTP\r\nX-Evil: 1', ''])
+            assert.equal(schema.safeParse(mode).success, false, mode);
+    }
+});
 test('manifest planning uses positive V8Limit for tables and engines', () => {
     const plan = buildPlan({
         name: 'V8 limit contract probe',

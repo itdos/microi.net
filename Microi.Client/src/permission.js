@@ -11,8 +11,8 @@ import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
 import { normalizeAccessRoute } from "@/views/system/components/user-access-key-utils";
 import { cancelRouteLoading, finishRouteLoading, startRouteLoading } from "@/utils/mci-loading";
-import { createDynamicRouteRematch, shouldStartInitialRouteLoading } from "@/router/navigation-state";
-import { getLegacySsoCapabilities, readLegacySsoCredential } from "@/utils/sso-federation.js";
+import { createDynamicRouteRematch, shouldStartInitialRouteLoading, readRouteBootstrap, createRouteBootstrapError } from "@/router/navigation-state";
+import { getLegacySsoCapabilities, readLegacySsoCredential, withoutLegacySsoCredential, legacySsoTarget, isLegacySsoDeepLink } from "@/utils/sso-federation.js";
 import { waitForPlatformBootstrap } from "@/utils/runtime-endpoint-query.js";
 const whiteList = ["/login", "/auth-redirect", "/access-login", "/mci-redis-manager"]; // no redirect whitelist
 
@@ -59,17 +59,8 @@ async function loadLegacySsoCapabilities() {
 function removeCredentialParameter(paramName) {
     if (!paramName) return;
     try {
-        const url = new URL(window.location.href);
-        url.searchParams.delete(paramName);
-        const rawHash = url.hash || "";
-        const queryIndex = rawHash.indexOf("?");
-        if (queryIndex >= 0) {
-            const hashPath = rawHash.substring(0, queryIndex);
-            const hashQuery = new URLSearchParams(rawHash.substring(queryIndex + 1));
-            hashQuery.delete(paramName);
-            url.hash = hashPath + (hashQuery.toString() ? "?" + hashQuery.toString() : "");
-        }
-        window.history.replaceState(window.history.state, document.title, url.toString());
+        const url = withoutLegacySsoCredential(window.location.href, paramName);
+        window.history.replaceState(window.history.state, document.title, url);
     } catch (_) {}
 }
 
@@ -86,6 +77,7 @@ function getAccessKeyAllowedRoutes(currentUser) {
 function isAuthenticationFailure(error) {
     if (!error) return false;
     if (error.isAuthFailure === true) return true;
+    if (Number(error.response?.status) === 401) return true;
     if ([1001, 1002].includes(Number(error.code ?? error.Code))) return true;
     var message = String(error.message || error.Msg || "").trim().toLowerCase();
     return message === "nologin"
@@ -201,12 +193,15 @@ router.beforeEach(async (to, from, next) => {
         diySsoArray = [];
     }
     var matchedLegacyCredential = false;
+    var cleanedLegacyTarget = null;
     for (let index = 0; index < diySsoArray.length; index++) {
         const diySso = diySsoArray[index];
         const token = readLegacySsoCredential(location.href, diySso.TokenName);
         if (token) {
             matchedLegacyCredential = true;
             removeCredentialParameter(diySso.TokenName);
+            cleanedLegacyTarget = legacySsoTarget(to, diySso.TokenName);
+            to = router.resolve(cleanedLegacyTarget);
         }
         if (token && (token !== lastSsoToken || !DiyCommon.getToken())) {
             const usesDiyToken = String(diySso.ClientSsoApi).toLowerCase()
@@ -239,6 +234,13 @@ router.beforeEach(async (to, from, next) => {
                 diyStore.setState("SystemStyle", "Classic");
                 diyStore.setCurrentUser(ssoApiResult.Data);
 
+                // Preserve the requested page, including its layout/query options.
+                // The next guard still resolves the authoritative user and menu permissions.
+                if (isLegacySsoDeepLink(to)) {
+                    next(cleanedLegacyTarget);
+                    return;
+                }
+
                 var ssoUserDefaultIndexUrl = await getAuthorizedUserDefaultIndexUrl(ssoApiResult.Data);
                 if (ssoUserDefaultIndexUrl) {
                     next({ path: ssoUserDefaultIndexUrl, replace: true });
@@ -255,13 +257,11 @@ router.beforeEach(async (to, from, next) => {
                     _Where: [["IsEnable", "=", 1]],
                     OsClient: DiyCommon.GetOsClient()
                 });
-                console.log("-------> SsoAutoLogin SysConfig：", sysConfigResult);
                 if (sysConfigResult.Code == 1) {
                     var sysConfig = sysConfigResult.Data;
                     if (sysConfig && sysConfig.DefaultIndexUrl) {
                         var url = String(sysConfig.DefaultIndexUrl || "");
                         url = url.replace("$V8.CurrentToken$", DiyCommon.getToken());
-                        console.log("-------> SsoAutoLogin DefaultIndexUrl：" + url);
                         if (url.startsWith("/iframe/")) {
                             url = normalizeIframeRouteUrl(url);
                         } else if (url.startsWith("http")) {
@@ -278,6 +278,13 @@ router.beforeEach(async (to, from, next) => {
     }
     if (!matchedLegacyCredential && readLegacySsoCredential(location.href, "token")) {
         removeCredentialParameter("token");
+        cleanedLegacyTarget = legacySsoTarget(to, "token");
+        to = router.resolve(cleanedLegacyTarget);
+    }
+
+    if (cleanedLegacyTarget) {
+        next(cleanedLegacyTarget);
+        return;
     }
 
     const hasToken = DiyCommon.getToken();
@@ -294,10 +301,13 @@ router.beforeEach(async (to, from, next) => {
                 // A browser cache only proves that a Token string exists. Resolve the
                 // authoritative user before any protected menu request so a revoked or
                 // expired session cannot be misreported as a menu-permission failure.
-                await userStore.getInfo();
+                await readRouteBootstrap(
+                    async () => await userStore.getInfo(),
+                    error => Boolean(DiyCommon.getToken()) && !isAuthenticationFailure(error)
+                );
             } catch (error) {
-                console.error("[permission] 登录身份初始化失败：", error);
                 if (!DiyCommon.getToken() || isAuthenticationFailure(error)) {
+                    console.warn("[permission] 登录身份已失效，转到登录页。");
                     await userStore.resetToken();
                     if (isAnonymousRoute) {
                         next(createDynamicRouteRematch(to));
@@ -305,7 +315,10 @@ router.beforeEach(async (to, from, next) => {
                         next({ path: "/login", query: { redirect: to.fullPath } });
                     }
                 } else {
-                    next(false);
+                    console.error("[permission] 登录身份初始化失败：", error);
+                    // 首次导航不能用 next(false) 吞掉真实原因，否则 isReady 只会得到
+                    // Navigation aborted，启动页也会误报后端断网。
+                    next(createRouteBootstrapError(error, "identity"));
                 }
                 return;
             }
@@ -377,7 +390,10 @@ router.beforeEach(async (to, from, next) => {
                 try {
                     const currentRoles = userStore.roles;
                     
-                    const accessRoutes = await permissionStore.generateRoutes(currentRoles);
+                    const accessRoutes = await readRouteBootstrap(
+                        () => permissionStore.generateRoutes(currentRoles),
+                        error => Boolean(DiyCommon.getToken()) && !isAuthenticationFailure(error)
+                    );
                     // Vue Router 4: addRoutes 已移除，改用 addRoute 逐个添加
                     accessRoutes.forEach((route) => {
                         try {
@@ -404,7 +420,7 @@ router.beforeEach(async (to, from, next) => {
                             next({ path: "/login", query: { redirect: to.fullPath } });
                         }
                     } else {
-                        next(false);
+                        next(createRouteBootstrapError(error, "menu"));
                     }
                 }
             }

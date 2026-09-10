@@ -33,7 +33,7 @@ namespace Dos.ORM
     /// <summary>
     /// Database
     /// </summary>
-    public sealed class Database : ILogable
+    public sealed partial class Database : ILogable
     {
         private DbProvider dbProvider;
         private static int MaxConcurrentConnectionOpens => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:MaxConcurrentConnectionOpens", 64);
@@ -172,9 +172,7 @@ namespace Dos.ORM
 
         private string GetConnectionGuardKey()
         {
-            var providerName = dbProvider?.GetType().FullName ?? string.Empty;
-            var connectionString = ConnectionString ?? string.Empty;
-            return providerName + ":" + connectionString.GetHashCode().ToString(CultureInfo.InvariantCulture);
+            return ConnectionPoolId;
         }
 
         private static bool IsConnectionPressureException(Exception ex)
@@ -222,6 +220,7 @@ namespace Dos.ORM
             var databaseNotFound = false;
             var capacityExceeded = false;
             var endpointUnreachable = false;
+            var poolExhausted = false;
 
             while (ex != null)
             {
@@ -239,6 +238,10 @@ namespace Dos.ORM
                 }
 
                 var message = ex.Message ?? string.Empty;
+                poolExhausted = poolExhausted
+                    || message.IndexOf("obtaining a connection from the pool", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("all pooled connections were in use", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("pool is exhausted", StringComparison.OrdinalIgnoreCase) >= 0;
                 hostInvalid = hostInvalid
                     || message.IndexOf("host name or IP address is invalid", StringComparison.OrdinalIgnoreCase) >= 0
                     || message.IndexOf("name or service not known", StringComparison.OrdinalIgnoreCase) >= 0
@@ -277,6 +280,7 @@ namespace Dos.ORM
             if (credentialsRejected) return "DatabaseCredentialsRejected";
             if (databaseNotFound) return "DatabaseNotFound";
             if (capacityExceeded) return "DatabaseCapacityExceeded";
+            if (poolExhausted) return "DatabasePoolExhausted";
             if (endpointUnreachable) return "DatabaseEndpointUnreachable";
             return "DatabaseConnectionUnavailable";
         }
@@ -357,6 +361,7 @@ namespace Dos.ORM
                                   || failureCode == "DatabaseCredentialsRejected"
                                   || failureCode == "DatabaseNotFound"
                                   || failureCode == "DatabaseCapacityExceeded"
+                                  || failureCode == "DatabasePoolExhausted"
                                   || failureCode == "DatabaseEndpointUnreachable"
                 ? failureCode
                 : "DatabaseConnectionUnavailable";
@@ -434,7 +439,10 @@ namespace Dos.ORM
         internal void OpenConnectionWithGuard(DbConnection connection)
         {
             Check.Require(connection, "connection", Check.NotNull);
+            if (IsolatedConnections.Value) { connection.Open(); return; }
             var guardKey = GetConnectionGuardKey();
+            var runtime = PoolRuntimes.GetOrAdd(guardKey, _ => new PoolRuntime());
+            var generation = Interlocked.Read(ref runtime.Generation);
             FailIfConnectionBackoffActive(guardKey);
             var semaphore = GetConnectionOpenSemaphore(guardKey);
             var waitSeconds = ConnectionOpenWaitSeconds;
@@ -445,6 +453,7 @@ namespace Dos.ORM
 
             try
             {
+                Interlocked.Increment(ref runtime.Opening);
                 // Another opener may have tripped the circuit while this request
                 // was queued. Re-check after entering the slot instead of starting
                 // another doomed network connection.
@@ -453,11 +462,13 @@ namespace Dos.ORM
             }
             catch (Exception ex)
             {
-                MarkConnectionBackoff(guardKey, ex);
+                lock (runtime.Gate)
+                    if (generation == runtime.Generation) MarkConnectionBackoff(guardKey, ex);
                 throw;
             }
             finally
             {
+                Interlocked.Decrement(ref runtime.Opening);
                 semaphore.Release();
             }
         }
@@ -465,7 +476,10 @@ namespace Dos.ORM
         internal async Task OpenConnectionWithGuardAsync(DbConnection connection, CancellationToken cancellationToken = default)
         {
             Check.Require(connection, "connection", Check.NotNull);
+            if (IsolatedConnections.Value) { await connection.OpenAsync(cancellationToken).ConfigureAwait(false); return; }
             var guardKey = GetConnectionGuardKey();
+            var runtime = PoolRuntimes.GetOrAdd(guardKey, _ => new PoolRuntime());
+            var generation = Interlocked.Read(ref runtime.Generation);
             await FailIfConnectionBackoffActiveAsync(guardKey, cancellationToken).ConfigureAwait(false);
             var semaphore = GetConnectionOpenSemaphore(guardKey);
             var waitSeconds = ConnectionOpenWaitSeconds;
@@ -476,17 +490,20 @@ namespace Dos.ORM
 
             try
             {
+                Interlocked.Increment(ref runtime.Opening);
                 await FailIfConnectionBackoffActiveAsync(
                     guardKey, cancellationToken).ConfigureAwait(false);
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                MarkConnectionBackoff(guardKey, ex);
+                lock (runtime.Gate)
+                    if (generation == runtime.Generation) MarkConnectionBackoff(guardKey, ex);
                 throw;
             }
             finally
             {
+                Interlocked.Decrement(ref runtime.Opening);
                 semaphore.Release();
             }
         }
@@ -587,7 +604,7 @@ namespace Dos.ORM
             command.Connection = connection;
 
             dbProvider.PrepareCommand(command);
-
+            if (IsolatedConnections.Value) command.CommandTimeout = 5;
         }
 
         private void PrepareCommand(DbCommand command, DbTransaction transaction)
@@ -660,12 +677,12 @@ namespace Dos.ORM
         /// <param name="conn">The conn.</param>
         public void CloseConnection(DbConnection conn)
         {
-            if (conn == null || conn.State == ConnectionState.Closed)
+            if (conn == null)
                 return;
 
             try
             {
-                conn.Close();
+                if (conn.State != ConnectionState.Closed) conn.Close();
             }
             catch
             {
@@ -760,9 +777,16 @@ namespace Dos.ORM
         public DbConnection CreateConnection()
         {
             DbConnection newConnection = dbProvider.DbProviderFactory.CreateConnection();
-            newConnection.ConnectionString = ConnectionString;
-
-            return newConnection;
+            try
+            {
+                newConnection.ConnectionString = EffectiveConnectionString();
+                return newConnection;
+            }
+            catch
+            {
+                CloseConnection(newConnection);
+                throw;
+            }
         }
 
         /// <summary>
@@ -789,7 +813,7 @@ namespace Dos.ORM
             catch
             {
                 // 打开失败时释放连接资源
-                connection?.Dispose();
+                CloseConnection(connection);
                 throw;
             }
         }
@@ -808,7 +832,7 @@ namespace Dos.ORM
             }
             catch
             {
-                connection?.Dispose();
+                CloseConnection(connection);
                 throw;
             }
         }
@@ -1282,22 +1306,16 @@ namespace Dos.ORM
         public IDataReader ExecuteReader(DbCommand command)
         {
             DbConnection connection = GetConnection(true);
-            PrepareCommand(command, connection);
-
             try
             {
-                return DoExecuteReader(command, CommandBehavior.CloseConnection);
+                // 准备命令也可能失败；连接所有权只有在成功返回 reader 后才交给调用方。
+                PrepareCommand(command, connection);
+                return DoExecuteReader(command, IsBatchConnection
+                    ? CommandBehavior.Default : CommandBehavior.CloseConnection);
             }
             catch
             {
-                try
-                {
-                    connection.Close();
-                }
-                catch
-                {
-                }
-
+                if (!IsBatchConnection) CloseConnection(connection);
                 throw;
             }
         }
@@ -1378,16 +1396,17 @@ namespace Dos.ORM
         /// </summary>
         public async Task<DbDataReader> ExecuteReaderAsync(DbCommand command)
         {
-            var connection = await CreateConnectionAsync().ConfigureAwait(false);
-            PrepareCommand(command, connection);
-
+            var connection = IsBatchConnection ? GetConnection(true)
+                : await CreateConnectionAsync().ConfigureAwait(false);
             try
             {
-                return await DoExecuteReaderAsync(command, CommandBehavior.CloseConnection).ConfigureAwait(false);
+                PrepareCommand(command, connection);
+                return await DoExecuteReaderAsync(command, IsBatchConnection
+                    ? CommandBehavior.Default : CommandBehavior.CloseConnection).ConfigureAwait(false);
             }
             catch
             {
-                try { connection.Close(); } catch { }
+                if (!IsBatchConnection) CloseConnection(connection);
                 throw;
             }
         }
@@ -1411,7 +1430,7 @@ namespace Dos.ORM
         /// <returns></returns>
         public DbTransaction BeginTransaction()
         {
-            return GetConnection(true).BeginTransaction();
+            return BeginOwnedTransaction(null);
         }
 
         /// <summary>
@@ -1421,7 +1440,23 @@ namespace Dos.ORM
         /// <returns></returns>
         public DbTransaction BeginTransaction(IsolationLevel il)
         {
-            return GetConnection(true).BeginTransaction(il);
+            return BeginOwnedTransaction(il);
+        }
+
+        private DbTransaction BeginOwnedTransaction(IsolationLevel? isolationLevel)
+        {
+            var connection = GetConnection(true);
+            try
+            {
+                return isolationLevel.HasValue ? connection.BeginTransaction(isolationLevel.Value)
+                    : connection.BeginTransaction();
+            }
+            catch
+            {
+                // Open 成功不等于 BeginTransaction 成功；后者异常时尚无 DbTrans 能代为释放。
+                if (!IsBatchConnection) CloseConnection(connection);
+                throw;
+            }
         }
 
         #endregion
@@ -1649,9 +1684,11 @@ namespace Dos.ORM
         /// <param name="tran">The tran.</param>
         public void BeginBatchConnection(int batchSize, DbTransaction tran)
         {
+            Check.Require(batchSize > 0, "Arguments error - batchSize should > 0.");
+            Check.Require(batchConnection == null, "A batch connection is already active.");
             batchConnection = CreateConnection(true);
-
-            batchCommander = new BatchCommander(this, batchSize, tran);
+            try { batchCommander = new BatchCommander(this, batchSize, tran); }
+            catch { CloseConnection(batchConnection); batchConnection = null; throw; }
         }
 
         /// <summary>
@@ -1661,9 +1698,11 @@ namespace Dos.ORM
         /// <param name="il">The il.</param>
         public void BeginBatchConnection(int batchSize, IsolationLevel il)
         {
+            Check.Require(batchSize > 0, "Arguments error - batchSize should > 0.");
+            Check.Require(batchConnection == null, "A batch connection is already active.");
             batchConnection = CreateConnection(true);
-
-            batchCommander = new BatchCommander(this, batchSize, il);
+            try { batchCommander = new BatchCommander(this, batchSize, il); }
+            catch { CloseConnection(batchConnection); batchConnection = null; throw; }
         }
 
         /// <summary>
@@ -1671,10 +1710,14 @@ namespace Dos.ORM
         /// </summary>
         public void EndBatchConnection()
         {
-            batchCommander.Close();
-            CloseConnection(batchConnection);
-            batchConnection = null;
-            batchCommander = null;
+            try { batchCommander?.Close(); }
+            finally
+            {
+                // 批处理执行/提交失败也结束本次拥有的连接，不能遗留为后续请求的批处理状态。
+                CloseConnection(batchConnection);
+                batchConnection = null;
+                batchCommander = null;
+            }
         }
 
         /// <summary>

@@ -4,7 +4,10 @@ import test from "node:test";
 import {
     getLegacySsoCapabilities,
     getSsoCapabilities,
-    readLegacySsoCredential
+    readLegacySsoCredential,
+    withoutLegacySsoCredential,
+    legacySsoTarget,
+    isLegacySsoDeepLink
 } from "../src/utils/sso-federation.js";
 
 test("SSO discovery is delivered by marketplace ApiEngines", async () => {
@@ -25,6 +28,21 @@ test("SSO discovery is delivered by marketplace ApiEngines", async () => {
     ]);
     assert.ok(calls.every((item) => item.payload.ApiEngineKey === undefined));
     assert.ok(calls.every((item) => item.payload.OsClient === "iTdos"));
+});
+
+test("consumed credentials never survive URL cleanup or dynamic-route rematches", () => {
+    const href = "https://microi.example/?OsClient=loctek&TOKEN=outer#/zichanxiaoydc?ShowClassicLeft=0&ShowClassicTop=0&token=inner";
+    assert.equal(withoutLegacySsoCredential(href, "token"), "https://microi.example/?OsClient=loctek#/zichanxiaoydc?ShowClassicLeft=0&ShowClassicTop=0");
+    const target = legacySsoTarget({ path: "/zichanxiaoydc", query: { token: "inner", ShowClassicLeft: "0", ShowClassicTop: "0" } }, "token");
+    assert.deepEqual(target, { path: "/zichanxiaoydc", query: { ShowClassicLeft: "0", ShowClassicTop: "0" }, hash: "", replace: true });
+    assert.equal(isLegacySsoDeepLink(target), true);
+});
+
+test("only a local explicit business page takes priority over the configured home", () => {
+    for (const path of ["/", "/login", "/auth-redirect", "/access-login", "//evil.example", "https://evil.example", ""]) {
+        assert.equal(isLegacySsoDeepLink({ path }), false, path);
+    }
+    assert.equal(isLegacySsoDeepLink({ path: "/assets/detail" }), true);
 });
 
 test("legacy SSO credential reader accepts only the configured parameter", () => {

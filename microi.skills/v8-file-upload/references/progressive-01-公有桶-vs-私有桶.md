@@ -67,7 +67,7 @@ var extractResult = V8.Method.ExtractZip({
 
 - 表单设计器的“禁止匿名访问”是服务端权威字段配置，不是管理员等级开关：未勾选即 `Limit=false`，勾选即 `Limit=true`。有当前表单新增/编辑权限的普通用户也可以按公有字段写入公有桶。
 - PC 图片、文件、富文本上传提交 `FormEngineKey + FieldId + SysMenuId`；编辑记录附加 `FormDataId`，TableChild 附加父子授权链。后端校验动作权限并回读当前租户 `diy_field.Config` 后覆盖客户端 `Limit/Path`。客户端篡改 `Limit=false`、选择其它字段或提交任意目录都不能获得公有写入。
-- 无字段上下文的普通上传保持私有；`ImgUpload/FileUpload` 老字段未保存 `Limit` 时兼容公有，`RichText` 缺失配置时默认私有。微信待审图片以及裁剪/压缩原图始终私有。
+- 无字段上下文的普通上传默认保持私有；管理员可通过普通系统设置 `HdfsUploadRules` 按真实角色授权业务目录，并显式允许公有文件。后端 v8.2.9+ 支持 `*`、`**`、`?`、字符集合/范围/排除和花括号候选，实际路径仍先做保留目录与穿越校验。`ImgUpload/FileUpload` 老字段未保存 `Limit` 时兼容公有，`RichText` 缺失配置时默认私有。微信待审图片以及裁剪/压缩原图始终私有。
 - 验收使用“普通用户 + 超级管理员 × 公有字段 + 私有字段 × 新增 + 编辑”矩阵，同时核对响应 `Limit`、实际对象桶、公有匿名读取与私有签名读取。单独用 HTTP 请求传 `Limit=false` 不能证明字段策略正确。
 
 ### 默认 MinIO 桶名与安装验收
@@ -76,7 +76,7 @@ var extractResult = V8.Method.ExtractZip({
 - `MinIOEndPointInternet` / `MinIOPrivateEndPoint` 同时兼容 `host:port` 与 `http(s)://host:port`。Provider 必须先归一化为 Host、Port、UseSsl，再调用 MinIO SDK 的 host/port 重载；不得把包含协议的整串 URL 直接作为 hostname，否则会出现 `Invalid URI: The hostname could not be parsed.`。显式 URL 的协议优先于历史 SSL 开关；端点禁止携带用户名密码、桶路径、查询或片段。
 - 安装脚本创建 `mci-public` 后必须设置匿名下载权限，并把 `HDFS=MinIO`、内外网端点、AccessKey/SecretKey、`MinIOPrivateBucketName=mci-private`、`MinIOPublicBucketName=mci-public` 同步写入当前租户的 `sys_osclients`。
 - 安装脚本还必须同步当前有效 `sys_config`：`ApiBase` 使用对外可访问的 API 端口，`FileServer` 使用 `http://<访问IP>:<MinIO API端口>/mci-public`。`ApiBase` 不能误用 Web 前端端口，因为 V8 代码会直接在其后拼接 `/api/...` 或 `/apiengine/...`。
-- 安装验收必须使用真实登录 Token 和两个权威字段分别执行一次公有、私有上传：公有字段的对象匿名访问应返回 `200`，私有字段对象匿名访问应返回 `403`，私有文件通过授权签名 URL 访问应返回 `200`，并核对下载内容与上传内容一致。超级管理员可另用直接上传验证桶初始化；普通用户只传 `Limit=false` 的裸请求应继续落入私有桶。
+- 安装验收必须使用真实登录 Token 和两个权威字段分别执行一次公有、私有上传：公有字段的对象匿名访问应返回 `200`，私有字段对象匿名访问应返回 `403`，私有文件通过授权签名 URL 访问应返回 `200`，并核对下载内容与上传内容一致。超级管理员可另用直接上传验证桶初始化；未命中管理员公有目录授权规则时，普通用户只传 `Limit=false` 的裸请求应继续落入私有桶。
 
 ### 复盘：签名 HEAD 被代理转换为 GET 导致上传后回读误报
 

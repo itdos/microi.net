@@ -35,6 +35,7 @@ import {
 } from "./auth-transition.js";
 import { isEmbeddedWebosWindowRuntime } from "./webos-embedded-runtime.js";
 import { getRuntimeEndpointQuery, getRuntimeWindowValue } from "./runtime-endpoint-query.js";
+import { withRequestTenant } from "./request-tenant-context.js";
 import { buildAppStoreMap } from "./app-store-record.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
@@ -2374,6 +2375,9 @@ var DiyCommon = {
         var currentLang = DiyCommon.GetCurrentLang();
         header.lang = currentLang;
         DiyCommon.AttachLangParam(param, currentLang);
+        header = withRequestTenant(header, {
+            url, params: param, apiBase: DiyCommon.GetApiBase(), osClient: DiyCommon.GetOsClient()
+        });
         var axiosOption = {
             url: url,
             method: method, //'post',
@@ -2506,7 +2510,9 @@ var DiyCommon = {
                 // withCredentials:true,
                 // data: qs.stringify(param.Param),
                 // headers:{'Content-Type':'application/x-www-form-urlencoded'}
-                headers: headers
+                headers: withRequestTenant(headers, {
+                    url, params: param.Param, apiBase: DiyCommon.GetApiBase(), osClient: DiyCommon.GetOsClient()
+                })
             };
             if (method == "post") {
                 axiosOption.data = param.Param;

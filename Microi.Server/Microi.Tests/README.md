@@ -24,13 +24,41 @@
   真实 Redis 配置即时生效、并发跳过日志去重及新旧 Quartz 共库调度测试也属于
   Full，不属于无外部依赖的 Quick；所需配置在任何构建前检查，缺失即失败。
 
-`Microi一键编译发布.sh` 在发布后端或构建前端时自动调用 `Full`：先取得发布锁，
+`run-node-regressions.mjs` 自动发现本测试目录、`Microi.Upgrade/Resource` 和
+`Microi.Client/tests` 的确定性 Node 测试；新增文件无需再维护手工清单。
+无法分类、零测试、失败、取消、跳过或 todo 均失败关闭。Playwright 文件由真实
+浏览器入口负责，不能混入 Node 单测冒充 E2E。
+
+`Microi一键编译发布.sh` 在发布后端、构建前端或仅推送镜像时自动调用 `Full`：先取得发布锁，
 保持已加载候选源码的共享服务供测试使用，通过后再停止服务、改版本及发布。
 PC/API 镜像候选仍覆盖根仓及六个闭源子仓的源码与内置资源；独立 `microi.uniapp`
 的页面、客户资源和版本号不属于这两个镜像的构建输入，不阻断其发布。
 `microi.uniapp/src/utils/` 由后端 SDK 契约测试读取，继续参与内容哈希校验。
 缺少变量、零用例、失败或跳过均阻止发布；文档专用选项 6 不触发后端业务门禁。
 AI 发布话术仍需要求在 VS Code 扩展发布前执行同一门禁，不能替代脚本检查。
+
+构建完成后保存候选源码与 Docker 构建上下文的 SHA-256 回执；每次推送再次回读。
+仅推送模式没有回执或产物发生漂移时拒绝发布，必须重新构建，不能用当前测试
+通过替代另一份旧产物的证明。依赖镜像通过发行机的
+`Microi一键编译发布.sh --mirror-dependencies` 同步到配置的阿里云命名空间。
+
+## 新功能与缺陷修复的测试评审
+
+| 风险 | 必须补充的测试位置/层次 |
+|---|---|
+| C# 公共能力、权限、V8、ORM、缓存、存储 | 本项目责任目录，正常/边界/拒绝/旧格式兼容 |
+| 表单/接口引擎 HTTP、事务、租户隔离 | `FullStack`，隔离租户和唯一前缀数据，最后清理回读 |
+| 应用包、V8 脚本与生成器 | `V8` 或 Resource Node 行为测试、幂等和新版本不回退 |
+| 前端登录、路由、控件与数据映射 | 前端确定性测试 + 真实浏览器路径；只测源码文本不足以验收 |
+| 发布、镜像与构建产物 | `ReleaseGate`，缺失/失败/跳过/源码与产物漂移等负向测试 |
+
+客户存量 SSO 路径可用 `FullStack/legacy-sso.e2e.mjs` 做只读专项验收；通过环境变量
+`MICROI_TEST_LEGACY_SSO_ENTRY`、`MICROI_TEST_LEGACY_SSO_TARGET`、
+`MICROI_TEST_LEGACY_SSO_EXPECT_TEXT` 提供入口/路由/目标页真实可见文案。
+`--fresh-assets` 仅用于把旧网关缓存与真实资源响应隔离诊断，不修改响应或关闭 CORS；
+报告必须披露此项，修复部署后的最终验收应不带该参数。
+不在源码保存真实客户帐号或 Token，报告不记录重定向中的凭据。这类专项验收
+不能代替 Full，也不能据此宣称所有客户业务均已覆盖。
 
 Quick：
 
@@ -42,6 +70,7 @@ Full 必须使用专用测试租户、专用测试表和可安全调用的测试
 
 ```powershell
 $env:MICROI_TEST_API_BASE = "http://127.0.0.1:1052/"
+$env:MICROI_TEST_PEER_API_BASE = "http://127.0.0.1:1053/"
 $env:MICROI_TEST_OSCLIENT = "integration-test"
 $env:MICROI_TEST_TOKEN = "<super-admin-test-token>"
 $env:MICROI_TEST_FORM_ENGINE_KEY = "mci_release_gate"
@@ -67,6 +96,8 @@ $env:MICROI_TEST_ALLOW_WRITES = "YES"
 本地候选源码和远端已部署代码的验收范围，不能用远端成功声称本地代码已经上线。
 各 Token 的设备标识必须与 `MICROI_TEST_DID`（默认 `Microi.Tests`）一致。
 
+`MICROI_TEST_PEER_API_BASE` 必须是加载同一候选源码的第二个独立 API 节点，和主测试节点使用相同主租户、运行分区、数据库及 Redis。消息通知双节点用例会核对启动批次一致、并发领取唯一、原会话重试恢复、重新登录不重复及关闭回执，通知只发给当前隔离测试帐号，结束后撤回。不同版本、不同分区或指向同一节点均不是有效的双节点验收。
+
 共享工作区可用独立编译配置及 `run-tests.ps1 -SolutionPath <隔离解决方案路径>`
 运行完整构建。隔离解决方案应保留原解决方案全部项目，仅更改输出配置和项目路径，
 不能为通过 Full 门禁排除项目。MySQL 和 SQL Server 升级集成测试只接受本机连接，
@@ -76,6 +107,13 @@ $env:MICROI_TEST_ALLOW_WRITES = "YES"
 调度共库夹具另使用专用 `schedule_gate` 空库（`127.0.0.1:62680`，预先初始化
 Quartz MySQL 表结构）与独立 Redis（`127.0.0.1:62681`）。只允许一次性测试实例，
 禁止指向业务库；测试结束关闭本任务创建的容器，不停止其它任务的共享依赖。
+
+并行任务可为上述两个环境变量指定自己的回环地址高位端口，数据库仍必须为
+`schedule_gate`。使用非默认端口时，必须设置 16–80 位字母、数字、下划线或连字符组成的
+`MICROI_TEST_SCHEDULE_FIXTURE_ID`，并在自己的 MySQL 中准备
+`microi_schedule_fixture (Id int PRIMARY KEY, FixtureId varchar(100) NOT NULL)` 的 `Id=1`
+记录、在自己的 Redis 中设置 `Microi:Full:ScheduleFixture`，两者的值均为该夹具 Id。
+测试在任何调度写入前核验归属；标记缺失或不匹配会失败，调度业务断言和 Full 门禁保持不变。
 
 测试表至少要有一个可写短文本字段，默认名为 `Name`；若不同，设置
 `MICROI_TEST_NAME_FIELD`。测试会写入
