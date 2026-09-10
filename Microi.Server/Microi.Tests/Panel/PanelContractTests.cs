@@ -112,6 +112,19 @@ public sealed class PanelContractTests
     }
 
     [Fact]
+    public void OracleReadinessRequiresTheInstalledCredentialAndApplicationDatabase()
+    {
+        var plan = PanelCatalog.Prepare(new() { Name = "oracle", PluginId = "oracle", Version = "23.26.3.0-lite", Password = "Private-Oracle-Password-48", AcceptLicense = true }, "panel-a");
+        var config = PanelDockerConfig.Create(plan, "sha256:" + new string('d', 64));
+        var health = config["Healthcheck"]?["Test"]?.ToJsonString();
+        Assert.NotNull(health);
+        Assert.Contains("ORACLE_PWD", health);
+        Assert.Contains("FREEPDB1", health);
+        Assert.Contains("WHENEVER SQLERROR EXIT FAILURE", health);
+        Assert.DoesNotContain("Private-Oracle-Password-48", health);
+    }
+
+    [Fact]
     public void CapacityIncludesOtherRunningPluginsAndCurrentFreeMemory()
     {
         const long GiB=1024L*1024*1024;
