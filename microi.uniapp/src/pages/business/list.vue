@@ -193,73 +193,8 @@
           <view v-else>
             <view v-for="field in filterFields" :key="field.key" class="filter-field">
               <view class="filter-field__head"><text>{{ field.label }}</text><text v-if="field.hint">{{ field.hint }}</text></view>
-              <input
-                v-if="field.type === 'text'"
-                v-model="filterValues[field.key]"
-                class="filter-input"
-                :placeholder="field.placeholder || `请输入${field.label}`"
-                confirm-type="done"
-              />
-              <view v-else-if="field.type === 'range'" class="filter-range">
-                <input :value="rangeFilterValue(field, 'min')" type="digit" :placeholder="field.minPlaceholder || '最小值'" @input="setRangeFilter(field, 'min', $event.detail.value)" />
-                <text>至</text>
-                <input :value="rangeFilterValue(field, 'max')" type="digit" :placeholder="field.maxPlaceholder || '最大值'" @input="setRangeFilter(field, 'max', $event.detail.value)" />
-              </view>
-              <view v-else-if="field.type === 'date-range'" class="filter-date-range">
-                <picker mode="date" :value="dateFilterValue(field, 'start')" @change="setDateFilter(field, 'start', $event.detail.value)">
-                  <view :class="{ placeholder: !dateFilterValue(field, 'start') }">{{ dateFilterValue(field, 'start') || '开始日期' }}</view>
-                </picker>
-                <text>至</text>
-                <picker mode="date" :value="dateFilterValue(field, 'end')" @change="setDateFilter(field, 'end', $event.detail.value)">
-                  <view :class="{ placeholder: !dateFilterValue(field, 'end') }">{{ dateFilterValue(field, 'end') || '结束日期' }}</view>
-                </picker>
-              </view>
-              <view v-else-if="field.type === 'toggle'" class="filter-toggle">
-                <text>{{ field.description || field.label }}</text>
-                <switch :checked="Boolean(filterValues[field.key])" color="#0b86d4" @change="setToggleFilter(field, $event.detail.value)" />
-              </view>
-              <view v-else-if="isDropdownFilter(field)" class="filter-select">
-                <view
-                  class="filter-select__trigger"
-                  :class="{ open: expandedFilterKey === field.key }"
-                  hover-class="filter-select__trigger--pressed"
-                  @tap="toggleFilterDropdown(field)"
-                >
-                  <text :class="{ placeholder: !hasFilterValue(filterValues[field.key]) }">{{ filterSelectionLabel(field) }}</text>
-                  <view class="filter-select__arrow"></view>
-                </view>
-                <scroll-view
-                  v-if="expandedFilterKey === field.key"
-                  class="filter-select__menu"
-                  scroll-y
-                  :show-scrollbar="false"
-                  :style="{ height: filterDropdownHeight(field) }"
-                >
-                  <view
-                    v-for="option in filterOptionsFor(field)"
-                    :key="`${field.key}-dropdown-${option.value}`"
-                    class="filter-select__option"
-                    :class="{ active: isFilterOptionSelected(field, option) }"
-                    hover-class="filter-select__option--pressed"
-                    @tap="selectDropdownOption(field, option)"
-                  >
-                    <text>{{ option.label }}</text>
-                    <view class="filter-select__check" :class="{ multiple: field.multiple }"><text>✓</text></view>
-                  </view>
-                  <view v-if="!filterOptionsFor(field).length" class="filter-select__empty"><text>暂无可选项</text></view>
-                </scroll-view>
-              </view>
-              <view v-else class="filter-options" :class="{ 'filter-options--scrollable': filterOptionsFor(field).length > 8 }">
-                <view
-                  v-for="option in filterOptionsFor(field)"
-                  :key="`${field.key}-${option.value}`"
-                  class="filter-option"
-                  :class="{ active: isFilterOptionSelected(field, option) }"
-                  hover-class="filter-option--pressed"
-                  @tap="selectFilterOption(field, option)"
-                ><text>{{ option.label }}</text></view>
-                <text v-if="!filterOptionsFor(field).length" class="filter-no-options">暂无可选项</text>
-              </view>
+              <mci-list-filter-field :field="field" :model-value="filterDraft[field.key]" :menu-id="menuId"
+                :module-engine-key="config.key || config.moduleEngineKey || config.table" @update:model-value="filterDraft[field.key] = $event" />
             </view>
           </view>
           <view class="filter-sheet__safe"></view>
@@ -322,16 +257,18 @@ import {
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { loadListMetricValues } from '@/platform/view-metrics.js'
 import { appendStandardDeleteAction } from '@/platform/module-delete.js'
-import { fieldDisplayValue, loadNativeFieldOptionPage, parseJson } from '@/platform/native-form.js'
+import { fieldDisplayValue, parseJson } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
 import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
 import { requiresAuthorizedMenuContext } from '@/platform/menu-resolution.mjs'
 import {
   buildListFilterWhere,
   hasListFilterValue,
+  validateListFilters,
   mergeModuleFilterFields
 } from '@/platform/list-filter-fields.mjs'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
+import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 import MciRestrictedRecordCard from '@/components/mci-restricted-record-card/mci-restricted-record-card.vue'
 import {
   formatDateTime,
@@ -380,7 +317,7 @@ function formatMetricValue(value, metric = {}) {
 }
 
 export default {
-  components: { MciBusinessCard, MciRestrictedRecordCard },
+  components: { MciBusinessCard, MciRestrictedRecordCard, MciListFilterField },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {
@@ -419,6 +356,7 @@ export default {
       expandedFilterKey: '',
       filterLoading: false,
       filterValues: {},
+      filterDraft: {},
       filterOptions: {},
       viewManifest: null,
       loadRequestId: 0,
@@ -461,7 +399,7 @@ export default {
     },
     activeFilterCount() {
       return this.filterFields.reduce((count, field) => {
-        return count + (hasListFilterValue(this.filterValues[field.key]) ? 1 : 0)
+        return count + (hasListFilterValue((this.filterOpen ? this.filterDraft : this.filterValues)[field.key]) ? 1 : 0)
       }, 0)
     },
     displayStatisticsMetrics() {
@@ -691,7 +629,7 @@ export default {
             // 旧版菜单“卡片数据”没有摘要字段；移动显示列应完整进入内容行，
             // 不应继续被租户本地的 summaryField 改造成无标签摘要。
             merged = { ...merged, ...menuConfig, summaryField: '' }
-            merged.filterFields = mergeModuleFilterFields(menuConfig.filterFields, localFilterFields)
+            merged.filterFields = mergeModuleFilterFields(menuConfig.filterFields, localFilterFields, menuConfig.definition?.fields || [])
           } catch (error) {}
         }
         let manifest = await loadModuleViewManifest(merged, {
@@ -1000,135 +938,18 @@ export default {
       const option = this.filterOptionsFor(field).find((item) => String(item.value) === String(this.filterValues[field.key] || ''))
       return option ? { field: option.field || '', order: option.order || '' } : { field: '', order: '' }
     },
-    async openAdvancedFilters() {
+    openAdvancedFilters() {
+      this.filterDraft = JSON.parse(JSON.stringify(this.filterValues))
       this.filterOpen = true
-      this.expandedFilterKey = ''
-      const pending = this.filterFields.filter((field) => field.source && !this.filterOptions[field.key])
-      if (!pending.length) return
-      this.filterLoading = true
-      try {
-        await Promise.all(pending.map(async (field) => {
-          let rows = []
-          if (field.source === 'native-field') {
-            const nativeField = this.field(field.field)
-            if (!nativeField) return
-            const page = await loadNativeFieldOptionPage(nativeField, {}, {
-              menuId: this.menuId,
-              moduleEngineKey: this.config.key || this.config.moduleEngineKey || this.config.table,
-              pageIndex: 1,
-              pageSize: field.pageSize || 200,
-              timeoutMs: 15000
-            })
-            this.filterOptions[field.key] = page.options || []
-            return
-          } else if (field.source === 'baseData') {
-            const result = await post('/apiengine/platform-sys-base-data?Action=GetSysBaseData', { ParentKey: field.parentKey }, true)
-            if (result && Number(result.Code) === 1) rows = result.Data || []
-          } else if (field.source === 'table') {
-            const result = await V8.FormEngine.GetTableData(field.table, {
-              _PageIndex: 1,
-              _PageSize: field.pageSize || 200,
-              _OrderBy: field.orderBy || 'CreateTime',
-              _OrderByType: field.orderType || 'DESC',
-              _SelectFields: ['Id', field.valueField || 'Id', field.labelField || 'Name']
-            })
-            if (result && Number(result.Code) === 1) rows = result.Data || []
-          } else if (field.source === 'api-engine' && field.apiEngineKey) {
-            const result = await V8.ApiEngine.Run(field.apiEngineKey, {
-              _PageIndex: 1,
-              _PageSize: field.pageSize || 500
-            }, { checkCode: false })
-            if (result && Number(result.Code) === 1) rows = result.Data || []
-          }
-          this.filterOptions[field.key] = rows.map((row) => ({
-            value: row[field.valueField || (field.source === 'baseData' ? 'Key' : 'Id')],
-            label: row[field.labelField || (field.source === 'baseData' ? 'Value' : 'Name')]
-          })).filter((item) => item.label !== undefined && item.label !== null && item.label !== '')
-        }))
-      } catch (error) {
-        uni.showToast({ title: '部分筛选项加载失败', icon: 'none' })
-      } finally {
-        this.filterLoading = false
-      }
     },
-    closeAdvancedFilters() {
-      this.filterOpen = false
-      this.expandedFilterKey = ''
-    },
-    filterOptionsFor(field) {
-      const loaded = this.filterOptions[field.key]
-      return Array.isArray(loaded) ? loaded : (field.options || [])
-    },
-    isDropdownFilter(field) {
-      if (!field || field.type !== 'options') return false
-      if (field.presentation === 'dropdown' || field.displaySelect === true) return true
-      return ['Select', 'MultipleSelect', 'Autocomplete', 'Cascader', 'SelectTree', 'TreeCheckbox', 'Department', 'Transfer'].includes(field.component)
-    },
-    toggleFilterDropdown(field) {
-      this.expandedFilterKey = this.expandedFilterKey === field.key ? '' : field.key
-    },
-    filterDropdownHeight(field) {
-      return `${Math.min(Math.max(this.filterOptionsFor(field).length, 1), 6) * 64 + 12}rpx`
-    },
-    filterSelectionLabel(field) {
-      const selected = this.filterOptionsFor(field)
-        .filter((option) => this.isFilterOptionSelected(field, option))
-        .map((option) => option.label)
-      if (!selected.length) return `请选择${field.label}`
-      if (!field.multiple || selected.length <= 2) return selected.join('、')
-      return `已选择 ${selected.length} 项`
-    },
-    isFilterOptionSelected(field, option) {
-      const value = this.filterValues[field.key]
-      if (field.multiple) return Array.isArray(value) && value.some((item) => String(item) === String(option.value))
-      return value !== undefined && value !== null && value !== '' && String(value) === String(option.value)
-    },
-    selectFilterOption(field, option) {
-      if (field.multiple) {
-        const values = Array.isArray(this.filterValues[field.key]) ? [...this.filterValues[field.key]] : []
-        const index = values.findIndex((item) => String(item) === String(option.value))
-        if (index >= 0) values.splice(index, 1)
-        else values.push(option.value)
-        this.filterValues[field.key] = values
-      } else {
-        this.filterValues[field.key] = this.isFilterOptionSelected(field, option) ? '' : option.value
-      }
-    },
-    selectDropdownOption(field, option) {
-      this.selectFilterOption(field, option)
-      if (!field.multiple) this.expandedFilterKey = ''
-    },
-    setToggleFilter(field, value) { this.filterValues[field.key] = value },
-    rangeFilterValue(field, side) {
-      const value = this.filterValues[field.key]
-      return value && typeof value === 'object' ? value[side] : ''
-    },
-    setRangeFilter(field, side, value) {
-      this.filterValues[field.key] = { ...(this.filterValues[field.key] || { min: '', max: '' }), [side]: value }
-    },
-    dateFilterValue(field, side) {
-      const value = this.filterValues[field.key]
-      return value && typeof value === 'object' ? value[side] || '' : ''
-    },
-    setDateFilter(field, side, value) {
-      this.filterValues[field.key] = { ...(this.filterValues[field.key] || { start: '', end: '' }), [side]: value }
-    },
-    resetAdvancedFilters() {
-      this.filterValues = {}
-      this.expandedFilterKey = ''
-    },
+    closeAdvancedFilters() { this.filterOpen = false },
+    filterOptionsFor(field) { return field.options || [] },
+    resetAdvancedFilters() { this.filterDraft = {} },
     applyAdvancedFilters() {
-      const invalidDate = this.filterFields.find((field) => {
-        if (field.type !== 'date-range') return false
-        const value = this.filterValues[field.key]
-        return value && value.start && value.end && value.start > value.end
-      })
-      if (invalidDate) {
-        uni.showToast({ title: `${invalidDate.label}开始日期不能晚于结束日期`, icon: 'none' })
-        return
-      }
+      const message = validateListFilters(this.filterFields, this.filterDraft)
+      if (message) { uni.showToast({ title: message, icon: 'none' }); return }
+      this.filterValues = JSON.parse(JSON.stringify(this.filterDraft))
       this.filterOpen = false
-      this.expandedFilterKey = ''
       this.loadData(true, true)
     },
     getTitle(row) {

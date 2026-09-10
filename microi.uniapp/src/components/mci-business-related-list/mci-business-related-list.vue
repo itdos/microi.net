@@ -348,7 +348,12 @@
     </root-portal>
 
     <!-- zhy：筛选弹窗必须脱离详情页 scroll-view，否则微信端上滑时 fixed 遮罩会被滚动容器裁剪。 -->
+    <!-- #ifdef H5 -->
+    <Teleport to="body" v-if="filterOpen && !isPreview">
+    <!-- #endif -->
+    <!-- #ifndef H5 -->
     <root-portal v-if="filterOpen && !isPreview">
+    <!-- #endif -->
       <view class="filter-mask" @tap="closeAdvancedFilters" @touchmove.stop.prevent="noop">
       <view class="filter-sheet" @tap.stop @touchmove.stop>
         <view class="filter-sheet__head">
@@ -356,40 +361,14 @@
           <view class="filter-sheet__close" @tap="closeAdvancedFilters"><text>×</text></view>
         </view>
         <scroll-view class="filter-sheet__scroll" scroll-y>
-          <view v-if="filterLoading" class="filter-loading">
-            <view v-for="item in 4" :key="item"><view></view><view></view></view>
-          </view>
-          <view v-else>
+          <view>
             <view v-for="filterField in filterFields" :key="filterField.key" class="filter-field">
               <view class="filter-field__head">
                 <text>{{ filterField.label }}</text><text v-if="filterField.hint">{{ filterField.hint }}</text>
               </view>
-              <input v-if="filterField.type === 'text'" v-model="filterValues[filterField.key]"
-                class="filter-input" :placeholder="filterField.placeholder || `请输入${filterField.label}`"
-                confirm-type="done" />
-              <view v-else-if="filterField.type === 'range'" class="filter-range">
-                <input :value="rangeFilterValue(filterField, 'min')" type="digit"
-                  :placeholder="filterField.minPlaceholder || '最小值'"
-                  @input="setRangeFilter(filterField, 'min', $event.detail.value)" />
-                <text>至</text>
-                <input :value="rangeFilterValue(filterField, 'max')" type="digit"
-                  :placeholder="filterField.maxPlaceholder || '最大值'"
-                  @input="setRangeFilter(filterField, 'max', $event.detail.value)" />
-              </view>
-              <view v-else-if="filterField.type === 'toggle'" class="filter-toggle">
-                <text>{{ filterField.description || filterField.label }}</text>
-                <switch :checked="Boolean(filterValues[filterField.key])" color="#0b86d4"
-                  @change="setToggleFilter(filterField, $event.detail.value)" />
-              </view>
-              <view v-else class="filter-options">
-                <view v-for="option in filterOptionsFor(filterField)"
-                  :key="`${filterField.key}-${option.value}`" class="filter-option"
-                  :class="{ active: isFilterOptionSelected(filterField, option) }"
-                  hover-class="filter-option--pressed" @tap="selectFilterOption(filterField, option)">
-                  <text>{{ option.label }}</text>
-                </view>
-                <text v-if="!filterOptionsFor(filterField).length" class="filter-no-options">暂无可选项</text>
-              </view>
+              <mci-list-filter-field :field="filterField" v-model="filterDraft[filterField.key]"
+                :menu-id="menuId" :module-engine-key="config.moduleEngineKey"
+                :table-child-auth="tableChildAuth" :form-data="filterFormData" />
             </view>
           </view>
           <view class="filter-sheet__safe"></view>
@@ -400,7 +379,12 @@
         </view>
       </view>
       </view>
+    <!-- #ifndef H5 -->
     </root-portal>
+    <!-- #endif -->
+    <!-- #ifdef H5 -->
+    </Teleport>
+    <!-- #endif -->
 
     <root-portal v-if="proposalBatchEditorOpen">
       <view class="proposal-batch-mask" @tap="closeProposalInstallationBatchEditor" @touchmove.stop.prevent="noop">
@@ -507,13 +491,15 @@ import {
   parseJson
 } from '@/platform/native-form.js'
 import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
-import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
+import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
+import { buildListFilterWhere, compileModuleFilterFields, hasListFilterValue, mergeModuleFilterFields, validateListFilters } from '@/platform/list-filter-fields.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
 import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
-import { V8, getUser, post } from '@/utils/request.js'
+import { V8, getUser } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
 import MciNativeField from '@/components/mci-native-field/mci-native-field.vue'
+import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 import {
   PROPOSAL_INSTALLATION_FIELDS,
   PROPOSAL_INSTALLATION_BATCH_ENGINE,
@@ -560,45 +546,6 @@ function relationshipId() {
   })
 }
 
-// zhy：把后台菜单 SearchFieldIds 转换为小程序通用筛选字段，并兼容旧版纯 Id 配置。
-function resolveMenuSearchFields(value, definitionFields = []) {
-  const source = parseJson(value, value)
-  const items = Array.isArray(source) ? source : []
-  return items.map((item, index) => {
-    const config = item && typeof item === 'object' ? item : { Id: item }
-    // zhy：PC 的 Out 仅表示字段展示在外部搜索区；小程序统一收进筛选面板，不能因此丢失按钮。
-    if (config.Hide === true) return null
-    const field = definitionFields.find((candidate) =>
-      String(candidate.Id || '') === String(config.Id || '') ||
-      (config.Name && String(candidate.Name || '').toLowerCase() === String(config.Name).toLowerCase())
-    )
-    if (!field || !field.Name || LAYOUT_COMPONENTS.has(field.component)) return null
-    const options = (Array.isArray(field.options) ? field.options : []).map((option) => ({
-      label: option.label ?? option.Label ?? option.Name ?? option.Value ?? option.value,
-      value: option.value ?? option.Value ?? option.Id ?? option.Key ?? option.label
-    })).filter((option) => option.label !== undefined && option.label !== null && option.label !== '')
-    const isRange = RANGE_COMPONENTS.has(field.component) || RANGE_FIELD_TYPES.test(String(field.Type || ''))
-    return {
-      key: `menu-search-${field.Id || field.Name || index}`,
-      label: config.Label || field.Label || field.Name,
-      field: field.Name,
-      type: isRange ? 'range' : (options.length ? 'options' : 'text'),
-      multiple: options.length > 0,
-      options,
-      component: field.component || '',
-      fieldType: field.Type || ''
-    }
-  }).filter(Boolean)
-}
-
-function mergeFilterFields(existing = [], configured = []) {
-  const result = [...existing]
-  configured.forEach((field) => {
-    const index = result.findIndex((item) => String(item.field || '').toLowerCase() === String(field.field).toLowerCase())
-    if (index < 0) result.push(field)
-  })
-  return result
-}
 
 // zhy：菜单 SqlJoin 可能因一对多子表返回重复主记录，关联卡片必须按主表 Id 去重。
 function uniqueRowsById(rows = []) {
@@ -627,8 +574,8 @@ function buildKeywordWhere(fields = [], keyword = '') {
   if (!value) return []
   const searchable = fields.filter((field) =>
     field.field &&
-    !['range', 'sort', 'toggle'].includes(field.type) &&
-    !RANGE_FIELD_TYPES.test(String(field.fieldType || '')) &&
+    !['range', 'sort', 'toggle', 'date-range', 'address'].includes(field.type) &&
+    !RANGE_FIELD_TYPES.test(String(field.columnType || field.fieldType || '')) &&
     !RANGE_COMPONENTS.has(field.component) &&
     !KEYWORD_EXCLUDED_COMPONENTS.has(field.component)
   )
@@ -644,7 +591,7 @@ function buildKeywordWhere(fields = [], keyword = '') {
 
 export default {
   name: 'MciBusinessRelatedList',
-  components: { MciBusinessCard, MciTaskCard, MciNativeField },
+  components: { MciBusinessCard, MciTaskCard, MciNativeField, MciListFilterField },
   props: {
     field: { type: Object, required: true },
     parentId: { type: [String, Number], default: '' },
@@ -688,9 +635,9 @@ export default {
       error: '',
       keyword: '',
       filterOpen: false,
-      filterLoading: false,
       filterValues: {},
-      filterOptions: {},
+      filterDraft: {},
+      localFilterFields: [],
       keywordSearchFields: [],
       currentUser: getUser() || {},
       activeAction: null,
@@ -953,6 +900,7 @@ export default {
       )
     },
     filterFields() { return this.config.filterFields || [] },
+    filterFormData() { return this.childFkField ? { [this.childFkField]: this.relationValue } : {} },
     relatedMetricDefinitions() {
       if (this.config.relatedMetrics?.length) return this.config.relatedMetrics
       return [{ key: 'total', label: `${this.config.title || this.sectionTitle}总量`, tone: 'neutral' }]
@@ -969,15 +917,9 @@ export default {
       })
     },
     activeFilterCount() {
+      const values = this.filterOpen ? this.filterDraft : this.filterValues
       return this.filterFields.reduce((count, field) => {
-        const value = this.filterValues[field.key]
-        if (Array.isArray(value)) return count + (value.length ? 1 : 0)
-        if (value && typeof value === 'object') {
-          return count + ([value.min, value.max].some((item) =>
-            item !== undefined && item !== null && item !== ''
-          ) ? 1 : 0)
-        }
-        return count + (value !== undefined && value !== null && value !== '' && value !== false ? 1 : 0)
+        return count + (hasListFilterValue(values[field.key]) ? 1 : 0)
       }, 0)
     },
     floatingStyle() {
@@ -1556,6 +1498,7 @@ export default {
         if (!isCurrent()) return
         this.definition = definition
         const matched = this.resolveBusinessModule(this.table.Name)
+        this.localFilterFields = matched.config.filterFields || []
         this.moduleKey = matched.key
         const menu = await findMenu(
           matched.config.menuAliases || [],
@@ -1597,7 +1540,7 @@ export default {
           moduleEngineKey: menu?.ModuleEngineKey || ''
         }
         this.emitTitleChange()
-        this.applyMenuSearchFields(menu?.SearchFieldIds)
+        this.applyMenuSearchFields(menu?.SearchFieldIds || [])
         if (this.waitingForParentSave) {
           this.rows = []
           this.count = 0
@@ -1738,12 +1681,14 @@ export default {
       } catch (error) {}
     },
     applyMenuSearchFields(value) {
-      const configured = resolveMenuSearchFields(value, this.definition?.fields || [])
-      if (!configured.length) return
+      if (value === undefined || value === null) return
+      const fields = appendSystemAuditFields(this.definition?.fields || [])
+      // 详情关联列表没有 PC 的行内/外部筛选区，所有可见查询字段统一进入弹窗。
+      const configured = compileModuleFilterFields(value, fields, { includeInline: true })
       this.keywordSearchFields = configured
       this.config = {
         ...this.config,
-        filterFields: mergeFilterFields(this.config.filterFields || [], configured)
+        filterFields: mergeModuleFilterFields(configured, this.localFilterFields, fields)
       }
     },
     relatedSelectFields() {
@@ -1992,6 +1937,7 @@ export default {
       clearTimeout(this.searchTimer)
       this.keyword = ''
       this.filterValues = {}
+      this.filterDraft = {}
       this.filterOpen = false
       this.loadData(true, true)
     },
@@ -2057,106 +2003,21 @@ export default {
       }
     },
     buildFilterWhere() {
-      const result = []
-      this.filterFields.forEach((field) => {
-        if (field.type === 'sort') return
-        const value = this.filterValues[field.key]
-        if (field.type === 'range') {
-          if (value && value.min !== undefined && value.min !== '') {
-            result.push({ Name: field.field, Type: '>=', Value: Number(value.min) })
-          }
-          if (value && value.max !== undefined && value.max !== '') {
-            result.push({ Name: field.field, Type: '<=', Value: Number(value.max) })
-          }
-          return
-        }
-        if (field.type === 'toggle') {
-          if (!value) return
-          const resolved = field.currentUserField ? this.currentUser[field.currentUserField] : field.value
-          if (resolved !== undefined && resolved !== null && resolved !== '') {
-            result.push({ Name: field.field, Type: field.operation || '=', Value: resolved })
-          }
-          return
-        }
-        if (Array.isArray(value)) {
-          if (value.length) result.push({ Name: field.field, Type: field.operation || 'In', Value: value })
-          return
-        }
-        if (value !== undefined && value !== null && String(value).trim() !== '') {
-          result.push({
-            Name: field.field,
-            Type: field.operation || (field.type === 'text' ? 'Like' : '='),
-            Value: typeof value === 'string' ? value.trim() : value
-          })
-        }
-      })
-      return result
+      return buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser)
     },
-    async openAdvancedFilters() {
+    openAdvancedFilters() {
+      this.filterDraft = JSON.parse(JSON.stringify(this.filterValues || {}))
       this.filterOpen = true
-      const pending = this.filterFields.filter((field) => field.source && !this.filterOptions[field.key])
-      if (!pending.length) return
-      this.filterLoading = true
-      try {
-        await Promise.all(pending.map(async (field) => {
-          let rows = []
-          if (field.source === 'baseData') {
-            const result = await post('/apiengine/platform-sys-base-data?Action=GetSysBaseData', { ParentKey: field.parentKey }, true)
-            if (result && Number(result.Code) === 1) rows = result.Data || []
-          } else if (field.source === 'table') {
-            const result = await V8.FormEngine.GetTableData(field.table, {
-              _PageIndex: 1,
-              _PageSize: field.pageSize || 200,
-              _OrderBy: field.orderBy || 'CreateTime',
-              _OrderByType: field.orderType || 'DESC',
-              _SelectFields: ['Id', field.valueField || 'Id', field.labelField || 'Name']
-            })
-            if (result && Number(result.Code) === 1) rows = result.Data || []
-          }
-          this.filterOptions[field.key] = rows.map((row) => ({
-            value: row[field.valueField || (field.source === 'baseData' ? 'Key' : 'Id')],
-            label: row[field.labelField || (field.source === 'baseData' ? 'Value' : 'Name')]
-          })).filter((item) => item.label !== undefined && item.label !== null && item.label !== '')
-        }))
-      } catch (error) {
-        uni.showToast({ title: '部分筛选项加载失败', icon: 'none' })
-      } finally {
-        this.filterLoading = false
-      }
     },
     closeAdvancedFilters() { this.filterOpen = false },
-    filterOptionsFor(field) { return field.options || this.filterOptions[field.key] || [] },
-    isFilterOptionSelected(field, option) {
-      const value = this.filterValues[field.key]
-      if (field.multiple) {
-        return Array.isArray(value) && value.some((item) => String(item) === String(option.value))
-      }
-      return value !== undefined && value !== null && value !== '' && String(value) === String(option.value)
-    },
-    selectFilterOption(field, option) {
-      if (field.multiple) {
-        const values = Array.isArray(this.filterValues[field.key]) ? [...this.filterValues[field.key]] : []
-        const index = values.findIndex((item) => String(item) === String(option.value))
-        if (index >= 0) values.splice(index, 1)
-        else values.push(option.value)
-        this.filterValues[field.key] = values
-      } else {
-        this.filterValues[field.key] = this.isFilterOptionSelected(field, option) ? '' : option.value
-      }
-    },
-    setToggleFilter(field, value) { this.filterValues[field.key] = value },
-    rangeFilterValue(field, side) {
-      const value = this.filterValues[field.key]
-      return value && typeof value === 'object' ? value[side] : ''
-    },
-    setRangeFilter(field, side, value) {
-      this.filterValues[field.key] = {
-        ...(this.filterValues[field.key] || { min: '', max: '' }),
-        [side]: value
-      }
-    },
-    resetAdvancedFilters() { this.filterValues = {} },
+    resetAdvancedFilters() { this.filterDraft = {} },
     applyAdvancedFilters() {
+      const error = validateListFilters(this.filterFields, this.filterDraft)
+      if (error) {
+        uni.showToast({ title: error, icon: 'none' })
+        return
+      }
+      this.filterValues = JSON.parse(JSON.stringify(this.filterDraft))
       this.filterOpen = false
       this.loadData(true, true)
     },
@@ -3239,30 +3100,14 @@ export default {
 .filter-sheet__close { flex: 0 0 auto; width: 58rpx; height: 58rpx; border-radius: 50%; color: #69818b; background: #eff5f7; font-size: 34rpx; line-height: 56rpx; text-align: center; }
 .filter-sheet__scroll { height: 100%; }
 .filter-field { padding: 22rpx 26rpx; border-bottom: 1rpx solid #edf2f4; }
-.filter-field__head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.filter-field__head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-bottom: 14rpx; }
 .filter-field__head text:first-child { color: #365864; font-size: 24rpx; font-weight: 650; }
-.filter-field__head text:last-child { color: #94a5ab; font-size: 19rpx; }
-.filter-input { box-sizing: border-box; width: 100%; height: 68rpx; margin-top: 14rpx; padding: 0 18rpx; border: 1rpx solid #dce8ed; border-radius: 8rpx; color: #294b57; background: #f7fafb; font-size: 23rpx; }
-.filter-range { display: grid; grid-template-columns: minmax(0, 1fr) 38rpx minmax(0, 1fr); gap: 8rpx; align-items: center; margin-top: 14rpx; }
-.filter-range input { box-sizing: border-box; width: 100%; height: 68rpx; padding: 0 16rpx; border: 1rpx solid #dce8ed; border-radius: 8rpx; color: #294b57; background: #f7fafb; font-size: 23rpx; text-align: center; }
-.filter-range text { color: #8b9da4; font-size: 21rpx; text-align: center; }
-.filter-options { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 14rpx; }
-.filter-option { min-width: 132rpx; height: 58rpx; padding: 0 16rpx; border: 1rpx solid #dce8ed; border-radius: 8rpx; color: #607a85; background: #f8fbfc; font-size: 21rpx; line-height: 58rpx; text-align: center; transition: transform 140ms ease, background 140ms ease; }
-.filter-option.active { border-color: rgba(11, 134, 212, .38); color: #087dad; background: #e9f6fa; font-weight: 650; }
+.filter-field__head text + text { color: #94a5ab; font-size: 19rpx; }
 .filter-option--pressed { transform: scale(.96); }
-.filter-no-options { color: #94a5ab; font-size: 21rpx; }
-.filter-toggle { min-height: 72rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-top: 8rpx; }
-.filter-toggle > text { color: #6a828c; font-size: 22rpx; }
-.filter-toggle switch { transform: scale(.78); transform-origin: right center; }
 .filter-sheet__safe { height: 22rpx; }
 .filter-sheet__footer { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 14rpx; padding: 16rpx max(26rpx, var(--mci-safe-right)) calc(16rpx + var(--mci-safe-bottom)) max(26rpx, var(--mci-safe-left)); border-top: 1rpx solid #e8eff2; background: #fff; }
 .filter-sheet__footer view { height: 76rpx; border-radius: 8rpx; color: #536e79; background: #edf3f5; font-size: 25rpx; font-weight: 650; line-height: 76rpx; text-align: center; }
 .filter-sheet__footer view:last-child { color: #fff; background: #0b86d4; }
-.filter-loading { padding: 22rpx 26rpx; }
-.filter-loading > view { padding: 18rpx 0; }
-.filter-loading > view > view { height: 22rpx; margin-bottom: 14rpx; border-radius: 5rpx; background: linear-gradient(90deg, #eef3f5 25%, #f7fafb 50%, #eef3f5 75%); background-size: 300% 100%; animation: shimmer 1.4s infinite; }
-.filter-loading > view > view:first-child { width: 28%; }
-.filter-loading > view > view:last-child { width: 72%; height: 54rpx; }
 .proposal-batch-mask { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: flex-end; overflow: hidden; background: rgba(13, 37, 48, .48); }
 .proposal-batch-sheet { box-sizing: border-box; width: 100%; height: min(92vh, 1420rpx); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border-radius: 20rpx 20rpx 0 0; overflow: hidden; background: #f5f8f9; }
 .proposal-batch-sheet__head { min-height: 104rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 0 26rpx; border-bottom: 1rpx solid #e5ecef; background: #fff; }

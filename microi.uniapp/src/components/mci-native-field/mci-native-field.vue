@@ -99,6 +99,7 @@
       <root-portal :enable="selectorPortaled">
       <!-- #endif -->
       <view v-if="selectorOpen" class="native-select__backdrop" :class="{ 'native-select__backdrop--portal': selectorPortaled }"
+        :style="selectorPortaled ? { zIndex: selectorZIndex } : null"
         @tap.stop="closeSelector" @touchmove.stop.prevent></view>
       <view class="native-select" :class="{ 'native-select--open': selectorOpen, 'native-select--portal': selectorPortaled }"
         :style="selectorPortaled ? selectorPortalStyle : null">
@@ -140,17 +141,20 @@
             <text v-if="!optionFinished" class="native-select__retry" @tap="loadMoreOptions">继续检索后续数据</text>
           </view>
           <view v-else>
-            <view v-for="option in selectorOptions" :key="String(option.value)" class="native-select__option"
-              :class="{ selected: isDraftSelected(option), multiple: isMultiple }" hover-class="native-select__option--pressed"
+            <view v-for="option in visibleSelectorOptions" :key="String(option.value)" class="native-select__option"
+              :style="option.treeAncestors ? { paddingLeft: `${24 + option.treeAncestors.length * 24}rpx` } : null"
+              :class="{ selected: isDraftSelected(option), multiple: isMultiple, tree: !!option.treeAncestors, disabled: option.treeDisabled }" hover-class="native-select__option--pressed"
               @tap="selectDropdownOption(option)">
+              <text v-if="option.treeAncestors" class="native-select__expand" @tap.stop="option.treeChildren && toggleTreeOption(option)">{{ !option.treeChildren ? '' : treeLoadingKey === option.value ? '…' : expandedTreeKeys.includes(option.value) ? '⌄' : '›' }}</text>
               <view v-if="isMultiple" class="native-select__checkbox" :class="{ checked: isDraftSelected(option) }">
                 <text>{{ isDraftSelected(option) ? '✓' : '' }}</text>
               </view>
-              <text class="native-select__option-label">{{ option.label }}</text>
+              <text class="native-select__option-label">{{ searchKeyword ? option.label : option.treeLabel || option.label }}</text>
               <text v-if="!isMultiple && isDraftSelected(option)" class="native-select__check">✓</text>
             </view>
-            <view class="native-select__footer">
+            <view class="native-select__footer" @tap="loadMoreOptions">
               <text>{{ optionLoading ? '正在加载…' : optionFinished ? `共 ${optionTotal || selectorOptions.length} 项` : '上拉加载更多' }}</text>
+              <text v-if="optionError" class="native-select__retry" @tap="loadOptionPage()">加载失败，点击重试</text>
             </view>
           </view>
         </scroll-view>
@@ -258,7 +262,11 @@ export default {
     moduleEngineKey: { type: String, default: '' },
     tableChildAuth: { type: Object, default: null },
     readonlyMaxLines: { type: Number, default: 0 },
-    selectorPortal: { type: Boolean, default: false }
+    selectorPortal: { type: Boolean, default: false },
+    selectorZIndex: { type: Number, default: 3200 },
+    optionLoader: { type: Function, default: null },
+    treeLoader: { type: Function, default: null },
+    treeLinkage: { type: Boolean, default: false }
   },
   // zhy: 通知表单页同步下拉框的打开状态，便于提升外层卡片层级。
   emits: ['update:modelValue', 'change', 'select', 'selector-toggle', 'upload-state'],
@@ -288,10 +296,15 @@ export default {
       draftValues: {},
       searchTimer: null,
       optionRequestId: 0,
+      expandedTreeKeys: [],
+      treeLoadingKey: '',
       regionPicker: createRegionPickerState([])
     }
   },
   computed: {
+    visibleSelectorOptions() {
+      return this.selectorOptions.filter((option) => !option.treeAncestors || this.searchKeyword || option.treeAncestors.every((key) => this.expandedTreeKeys.includes(key)))
+    },
     selectorPortaled() { return Boolean(this.selectorPortal && this.selectorOpen && this.selectorAnchorRect) },
     selectorPortalLayout() {
       return this.selectorPortaled ? positionNativeSelector(this.selectorAnchorRect, this.selectorViewport, this.selectorKeyboardHeight) : null
@@ -299,7 +312,7 @@ export default {
     selectorPortalStyle() {
       const layout = this.selectorPortalLayout
       return layout ? {
-        top: `${layout.top}px`, left: `${layout.left}px`, width: `${layout.width}px`, height: `${layout.height}px`,
+        top: `${layout.top}px`, left: `${layout.left}px`, width: `${layout.width}px`, height: `${layout.height}px`, zIndex: this.selectorZIndex + 1,
         '--native-select-list-height': `${layout.listHeight}px`, '--native-select-gap': `${layout.gap}px`
       } : {}
     },
@@ -321,7 +334,7 @@ export default {
     },
     isOptionComponent() { return OPTION_COMPONENTS.has(this.component) },
     isDropdownOption() { return this.isOptionComponent && this.component !== 'Radio' },
-    hasRemoteOptions() { return isRemoteNativeFieldOptions(this.field) },
+    hasRemoteOptions() { return !!this.optionLoader || isRemoteNativeFieldOptions(this.field) },
     isRichDisplay() { return !!this.modelValue && (['RichText', 'Html'].includes(this.component) || isHtmlValue(this.modelValue)) },
     readonlyScrollable() { return this.readonly && Number(this.readonlyMaxLines) > 0 },
     readonlyScrollStyle() {
@@ -544,6 +557,7 @@ export default {
       this.optionTotal = 0
       this.optionFinished = false
       this.optionError = ''
+      this.expandedTreeKeys = []
       this.initializeDraftSelection()
       if (this.selectorPortal) {
         if (uni.onKeyboardHeightChange) uni.onKeyboardHeightChange(this.handleSelectorKeyboardHeight)
@@ -598,6 +612,9 @@ export default {
     },
     scheduleSearch() {
       if (this.searchTimer) clearTimeout(this.searchTimer)
+      // 输入变更即使旧请求失效，避免防抖窗口内旧响应覆盖新关键词。
+      this.optionRequestId += 1
+      this.optionLoading = false
       this.searchTimer = setTimeout(() => {
         this.searchTimer = null
         this.loadOptionPage(true)
@@ -677,7 +694,7 @@ export default {
       this.optionLoading = true
       this.optionError = ''
       try {
-        const page = await loadNativeFieldOptionPage(this.field, this.formData, {
+        const page = await this.requestOptionPage({
           keyword: this.searchKeyword,
           pageIndex: this.optionPageIndex,
           pageSize: this.optionPageSize,
@@ -693,8 +710,8 @@ export default {
           const before = this.selectorOptions.length
           this.appendSelectorOptions(page.options, reset)
           this.optionTotal = page.totalKnown ? Number(page.total || 0) : this.selectorOptions.length
-          this.optionFinished = !page.hasMore || (!reset && this.selectorOptions.length === before)
-          if (this.searchKeyword && !this.selectorOptions.length && !this.optionFinished) {
+          this.optionFinished = !page.hasMore || (!reset && page.options.length > 0 && this.selectorOptions.length === before)
+          if (this.searchKeyword && this.selectorOptions.length === before && !this.optionFinished) {
             await this.scanFollowingOptionPages(requestId, 4)
           }
         }
@@ -707,14 +724,16 @@ export default {
     },
     loadMoreOptions() {
       if (this.optionLoading || this.optionFinished) return
+      if (this.optionError) { this.loadOptionPage(); return }
       this.optionPageIndex += 1
       if (this.clientOptionRows.length || !this.hasRemoteOptions) this.loadClientOptionPage()
       else this.loadOptionPage()
     },
     async scanFollowingOptionPages(requestId, remaining) {
-      while (remaining > 0 && this.selectorOpen && requestId === this.optionRequestId && !this.optionFinished && !this.selectorOptions.length) {
+      const initialCount = this.selectorOptions.length
+      while (remaining > 0 && this.selectorOpen && requestId === this.optionRequestId && !this.optionFinished && this.selectorOptions.length === initialCount) {
         this.optionPageIndex += 1
-        const page = await loadNativeFieldOptionPage(this.field, this.formData, {
+        const page = await this.requestOptionPage({
           keyword: this.searchKeyword,
           pageIndex: this.optionPageIndex,
           pageSize: this.optionPageSize,
@@ -735,8 +754,47 @@ export default {
         remaining -= 1
       }
     },
+    requestOptionPage(options) {
+      return this.optionLoader ? this.optionLoader(options) : loadNativeFieldOptionPage(this.field, this.formData, options)
+    },
+    async toggleTreeOption(option) {
+      if (this.expandedTreeKeys.includes(option.value)) {
+        this.expandedTreeKeys = this.expandedTreeKeys.filter((key) => key !== option.value)
+        return
+      }
+      if (option.treeLazy && this.treeLoader) {
+        if (this.treeLoadingKey) return
+        this.treeLoadingKey = option.value
+        const requestId = this.optionRequestId
+        try {
+          const children = await this.treeLoader(option)
+          if (!this.selectorOpen || requestId !== this.optionRequestId) return
+          const index = this.selectorOptions.findIndex((item) => item.value === option.value)
+          this.selectorOptions.splice(index + 1, 0, ...children)
+          option.treeLazy = false
+          option.treeChildren = children.length > 0
+          if (!children.length) option.treeDisabled = !option.treeLeafSelectable
+          this.rememberOptions(children)
+        } catch (error) { uni.showToast({ title: error.message || '子级加载失败', icon: 'none' }); return }
+        finally { this.treeLoadingKey = '' }
+      }
+      this.expandedTreeKeys = [...this.expandedTreeKeys, option.value]
+    },
     isDraftSelected(option) { return this.draftIds.includes(String(option.value)) },
     selectDropdownOption(option) {
+      if (option.treeDisabled) return
+      if (this.treeLinkage && this.isMultiple && option.treeChildren) {
+        const descendants = this.selectorOptions.filter((item) => item.treeAncestors?.includes(option.value))
+        if (option.treeLazy || descendants.some((item) => item.treeLazy)) {
+          uni.showToast({ title: '请先展开子级后选择', icon: 'none' })
+          this.toggleTreeOption(option)
+          return
+        }
+        const leaves = descendants.filter((item) => !item.treeChildren && !item.treeDisabled)
+        const remove = leaves.every((item) => this.isDraftSelected(item))
+        leaves.forEach((item) => { if (this.isDraftSelected(item) === remove) this.selectDropdownOption(item) })
+        return
+      }
       const key = String(option.value)
       this.rememberOptions([option])
       if (!this.isMultiple) {
@@ -849,6 +907,8 @@ export default {
 .native-select--open { z-index: 2; }
 .native-select__backdrop--portal { z-index: 3200; }
 .native-select--portal { position: fixed; z-index: 3201; }
+.native-select__option.disabled { color: #9caeb7; background: #f7f9fa; }
+.native-select__expand { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 56rpx; height: 60rpx; color: #087da8; font-size: 34rpx; }
 .native-select--portal .native-select__trigger { height: 100%; }
 .native-select--portal .native-select__popover { top: calc(100% + var(--native-select-gap)); }
 .native-select--portal .native-select__popover.above { top: auto; bottom: calc(100% + var(--native-select-gap)); }
@@ -858,6 +918,8 @@ export default {
 .native-select__list { height: 420rpx; }
 .native-select__option { min-height: 78rpx; display: grid; grid-template-columns: minmax(0,1fr) 44rpx; align-items: center; gap: 12rpx; padding: 0 22rpx; border-bottom: 1px solid #edf2f4; color: #405a64; background: #fff; font-size: 25rpx; transition: background-color .14s ease; box-sizing: border-box; }
 .native-select__option.multiple { grid-template-columns: 48rpx minmax(0,1fr); }
+.native-select__option.tree { grid-template-columns: 44rpx minmax(0,1fr) 44rpx; }
+.native-select__option.tree.multiple { grid-template-columns: 44rpx 48rpx minmax(0,1fr); }
 .native-select__option.selected { color: #1b566c; background: #f0f6f9; }
 .native-select__option--pressed { background: #eaf3f7; }
 .native-select__option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
