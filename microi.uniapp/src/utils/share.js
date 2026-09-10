@@ -37,6 +37,7 @@ const INTERNAL_POLICIES = {
   'pages/business/list': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/list', allowedQuery: ['key'] },
   'pages/business/catalog': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/catalog' },
   'pages/business/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/detail', allowedQuery: ['key', 'id', 'menuId'], timeline: true, pageSnapshot: true },
+  'pages/business/proposal-compare': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/proposal-compare', allowedQuery: ['ids'], timeline: true, pageSnapshot: true },
   'pages/business/related-list': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/list', allowedQuery: ['key'] },
   'pages/business/stats': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
   'pages/module/catalog': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/module/catalog' },

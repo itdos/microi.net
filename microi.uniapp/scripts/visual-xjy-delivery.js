@@ -1167,7 +1167,8 @@ async function inspectLayout(cdp, target, viewport) {
       const scroll = document.querySelector('.detail-scroll');
       const bottomRect = bottom ? bottom.getBoundingClientRect() : null;
       const scrollRect = scroll ? scroll.getBoundingClientRect() : null;
-      const bottomOverlap = bottomRect && scrollRect ? Math.max(0, scrollRect.bottom - bottomRect.top) : 0;
+      // Only viewport-bound child tabs must end above the action bar; normal detail pages scroll behind it with bottom spacing.
+      const bottomOverlap = bottomRect && scrollRect && document.querySelector('.detail-page--standalone-list') ? Math.max(0, scrollRect.bottom - bottomRect.top) : 0;
       const rootStyle = root ? getComputedStyle(root) : null;
       const safe = {
         top: rootStyle ? parseFloat(rootStyle.getPropertyValue('--mci-safe-top')) || 0 : 0,
