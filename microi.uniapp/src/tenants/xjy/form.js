@@ -251,9 +251,7 @@ function customerCasePoster(context) {
     merchantField: 'TenantName',
     metaFields: [
       { label: '客户名称', field: 'KehuMC' },
-      { label: '客户类型', field: isCasebookCase ? 'Select178' : 'KehuLX' },
-      { label: '设备型号', field: isCasebookCase ? 'Select224' : 'ShebeiXH' },
-      { label: '设备数量', field: isCasebookCase ? 'Text727' : 'ShebeiSL' }
+      { label: '所属城市', field: 'Chengshi' }
     ],
     rows: [
       { label: '合作时间', field: isCasebookCase ? 'DateTime340' : 'HezuoSJ', badge: { image: '/static/xjy/anli/oen_energy.png', icon: 'energy', text: '1级', subtext: '能效', tone: 'teal' } },
@@ -263,7 +261,6 @@ function customerCasePoster(context) {
     ],
     footerNote: '一站式商用饮水解决方案服务商',
     footerTagField: isCasebookCase ? 'Select178' : 'KehuLX',
-    footerTag: '客户案例',
     photoEmptyText: '暂未上传客户案例照片'
   }
 }
