@@ -53,7 +53,7 @@
     "check:checkin-target-picker": "node scripts/check-checkin-target-picker.mjs",
     "check:checkin-current-user": "node scripts/check-checkin-current-user.mjs",
     "check:message-role-filter": "node --test scripts/test-message-role-filter.mjs",
-    "check:module-search-filters": "node --test scripts/test-module-search-filters.mjs scripts/test-list-filter-selector.mjs",
+    "check:module-search-filters": "node --test scripts/test-module-search-filters.mjs scripts/test-list-filter-selector.mjs scripts/test-related-list-filters.mjs",
     "check:list-api-engine": "node scripts/test-list-api-engine.mjs",
     "check:platform-api-engine-migration": "node --test scripts/test-platform-api-engine-migration.mjs",
     "check:casebook-case-detail": "node --test scripts/test-casebook-case-detail.mjs",

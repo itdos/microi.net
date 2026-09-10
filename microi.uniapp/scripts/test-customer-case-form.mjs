@@ -41,7 +41,7 @@ test('客户详情案例 Tab 新增直接带入城市、概况，保留父子表
   })
   const opened = []
   const related = loadVue('components/mci-business-related-list/mci-business-related-list.vue', {
-    MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {},
+    MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     buildTableChildDefaultValues, openForm: (args) => opened.push(args)
   })
   const field = {

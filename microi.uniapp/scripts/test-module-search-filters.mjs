@@ -31,7 +31,7 @@ const fields = [
   { Id: 'tenant-id', Name: 'TenantName', Label: '所属租户', component: 'Text', Type: 'varchar(255)', visible: true }
 ]
 
-test('后台 SearchFieldIds 编译为移动端高级筛选，排除 Line/Out 字段', () => {
+test('后台 SearchFieldIds 编译为移动端高级筛选，Out 保留查询配置，Line 留在行内', () => {
   const searchFieldIds = JSON.stringify([
     { Id: 'account-id', Name: 'Account', DisplayType: 'Line' },
     { Id: 'phone-id', Name: 'Phone', Label: '联系电话', DisplayType: 'In' },
@@ -42,7 +42,7 @@ test('后台 SearchFieldIds 编译为移动端高级筛选，排除 Line/Out 字
   ])
 
   const compiled = compileModuleFilterFields(searchFieldIds, fields)
-  assert.deepEqual(compiled.map((field) => field.field), ['Phone', 'RoleIds', 'Level', 'CreateTime'])
+  assert.deepEqual(compiled.map((field) => field.field), ['Phone', 'RoleIds', 'Level', 'CreateTime', 'TenantName'])
   assert.equal(compiled[0].type, 'text')
   assert.equal(compiled[1].type, 'options')
   assert.equal(compiled[1].presentation, 'dropdown')
@@ -119,10 +119,12 @@ test('数字列中的 Switch 和 Select 保留组件；Radio 查询多选必须�
   assert.equal(hasListFilterValue(0), true)
 })
 
-test('租户旧预设不能把 Radio 改多选、Address 改文本', () => {
+test('本地显式查询多选保留，Address 仍按后台组件，后台查询配置优先', () => {
   const merged = mergeModuleFilterFields([], [{ key: 'radio', field: 'Value', multiple: true, type: 'options' }, { key: 'region', field: 'Region', type: 'text' }], [{ Id: 'r', Name: 'Value', component: 'Radio' }, { Id: 'a', Name: 'Region', component: 'Address' }])
-  assert.equal(merged[0].multiple, false)
+  assert.equal(merged[0].multiple, true)
   assert.equal(merged[1].type, 'address')
+  const backend = compileModuleFilterFields([{ Id: 'r', DisplayType: 'Out', SearchMultiple: false }], [{ Id: 'r', Name: 'Value', component: 'Radio' }])
+  assert.equal(mergeModuleFilterFields(backend, [{ key: 'radio', field: 'Value', multiple: true }])[0].multiple, false)
 })
 
 test('客户平台真实查询配置：客户类型与合作状态兼容复选组，不改变单值存储', () => {
@@ -141,8 +143,44 @@ test('客户平台真实查询配置：客户类型与合作状态兼容复选�
 test('旧版查询复选组兼容布尔字符串，未配置的 Radio 保留单选', () => {
   assert.equal(compile('Radio', {}, {}, { DisplaySelect: 'false' }).multiple, true)
   assert.equal(compile('Radio', {}, {}, { displaySelect: 0 }).multiple, true)
-  assert.equal(compile('Radio', {}, {}, { DisplaySelect: true }).multiple, false)
+  assert.equal(compile('Radio', {}, {}, { DisplaySelect: true }).multiple, true)
   assert.equal(compile('Radio').multiple, false)
+  assert.equal(compile('Select').multiple, false)
+  assert.equal(compile('Select', {}, {}, { DisplayType: 'In', SearchMultiple: false }).multiple, false)
+})
+
+// 2026-09-10 只读回读真实菜单/字段，剔除 SQL 和业务行；覆盖 In/Out 及缺省 DisplaySelect。
+const businessFixtures = JSON.parse(fs.readFileSync(new URL('./fixtures/business-option-search.json', import.meta.url), 'utf8'))
+for (const fixture of businessFixtures) test(`${fixture.name}：后台选项查询支持多选，条件遵守实际存储`, () => {
+  const compiled = compileModuleFilterFields(fixture.search, fixture.fields)
+  assert.equal(compiled.length, fixture.fields.length)
+  for (const field of compiled) {
+    assert.equal(field.multiple, true, `${field.label} 不能降为单选`)
+    assert.equal(field.presentation, field.component === 'Radio' ? 'chips' : 'dropdown')
+    const options = ['a', 'b'].map((value) => ({ value, label: `显示 ${value}`, raw: { Id: value, [field.config.SelectSaveField || 'Name']: value } }))
+    const values = filterOptionRows(field, options).map((option) => option.raw)
+    const where = buildListFilterWhere([field], { [field.key]: values })
+    if (field.component === 'MultipleSelect') {
+      assert.equal(field.storage, 'array')
+      assert.ok(where.every((condition) => condition.Type === 'Like'))
+      assert.equal(where[0].GroupStart, true)
+      assert.equal(where.at(-1).GroupEnd, true)
+    } else {
+      assert.equal(field.storedMultiple, false, '查询多选不能修改表单存储类型')
+      assert.deepEqual(where, [{ Name: field.field, Type: 'In', Value: ['a', 'b'] }])
+    }
+    assert.deepEqual(buildListFilterWhere([field], { [field.key]: [] }), [])
+  }
+})
+
+test('设备 Out 状态在主列表合并后只有一个多选控件，隐藏/角色限制不被放开', () => {
+  const fixture = businessFixtures.find((item) => item.name === '设备列表')
+  const compiled = compileModuleFilterFields(fixture.search, fixture.fields)
+  const merged = mergeModuleFilterFields(compiled, [{ key: 'state', field: 'ShebeiZT', type: 'options', multiple: true }], fixture.fields)
+  assert.equal(merged.length, 1)
+  assert.deepEqual(buildListFilterWhere(merged, { ShebeiZT: ['待安装', '使用中'] }), [{ Name: 'ShebeiZT', Type: 'In', Value: ['待安装', '使用中'] }])
+  assert.deepEqual(compileModuleFilterFields(fixture.search.map((item) => ({ ...item, Hide: true })), fixture.fields), [])
+  assert.deepEqual(compileModuleFilterFields(fixture.search, fixture.fields.map((field) => ({ ...field, bindRoleIds: ['restricted'], visible: false }))), [])
 })
 
 test('多选对象按稳定 Id 查询，保存字段值数组同时兼容历史对象，KeyValue 保留 Key', () => {
