@@ -49,7 +49,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/micro-app.md` | microi-microservice, microi-ai-application | 微服务/AI 前端应用的工程架构与交付 |
 | `system-engine/multi-end-client.md` | microi-client-frontend, microi-mobile-app-quality, microi-uniapp-frontend | PC、WebOS、移动自适应、UniApp 与 App 边界 |
 | `system-engine/microi-ui.md` | microi-ui | Microi.UI 组件和主题 |
-| `system-engine/message-notification.md` | message-notification | 平台内部消息、SignalR 与多通道通知 |
+| `system-engine/message-notification.md` | message-notification | 统一消息通知微服务、原 mic_msgset 多通道配置、MCP/Skills、租户/产品版本与帐号范围、后端重启领取、居中弹窗与 SignalR/轮询恢复 |
 | `system-engine/module-engine.md` | module-engine, v8-menu-buttons, v8-template-engine, microi-mobile-app-quality | 菜单统计、模块指标、复合列、移动卡片、按钮角标和页面入口 |
 | `system-engine/mq.md` | v8-mq-mqtt | RabbitMQ 租户连接、队列规范化、事务发布、消费确认、有限重试、幂等与多节点运行 |
 | `system-engine/mqtt-engine.md` | v8-mq-mqtt | MQTT Broker、SaaS 认证、Topic ACL、V8 事件、设备路由、下行与生产部署 |
@@ -70,7 +70,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `v8-engine/ai-apiengine.md` | ai-engine, v8-api-config | AI 辅助接口引擎开发 |
 | `v8-engine/api-engine.md` | v8-api-config, v8-utilities | 接口上下文、配置、分布式锁续租和调用 |
 | `v8-engine/apiengine-index.md` | v8-crud-api, v8-api-config | 接口引擎实战和规范 |
-| `v8-engine/form-engine.md` | v8-crud-api, v8-formengine-http | FormEngine API 与 HTTP |
+| `v8-engine/form-engine.md` | v8-crud-api, v8-formengine-http, module-engine, microi-form-engine | FormEngine API、HTTP、原生查询身份/统计范围与按表主库策略 |
 | `v8-engine/mcp-server.md` | microi-system-delivery, microi-codex-installer, v8-security | MCP 工具、确认、审计、文件、日志、备份与访问密钥 |
 | `v8-engine/v8-client.md` | v8-utilities, v8-frontend-events, v8-http-integration, v8-security, ai-engine, print-engine | 全部前端 V8、平台 AI、强身份验证、扫码和蓝牙打印 |
 | `v8-engine/v8-server.md` | v8-utilities, v8-api-config, v8-http-integration, v8-security, ai-engine | 全部后端 V8、强身份票据、平台 AI 和专项路由 |

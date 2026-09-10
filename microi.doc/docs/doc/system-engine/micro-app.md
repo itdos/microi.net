@@ -376,6 +376,9 @@ http://localhost:61500/?OsClient={编码后的租户}&ApiBase={编码后的API�
 | `microi_create_microservice` | `microService`、`confirmExecution?` | 创建或更新 `sys_microiservice` 元数据，不上传源码或构建文件。 |
 | `microi_sync_microservice_source` | `microService`、`directory?`、`sourceFiles?`、`replace?`、`confirmExecution?` | **本地工程首选 `directory`**。MCP 在进程内扫描、哈希和读取源码，模型不接触文件字节；`sourceFiles` 仅保留旧调用兼容。 |
 | `microi_publish_microservice` | `microService`、`assets`、`routes?`、`confirmExecution?` | 上传构建产物，更新运行时并同步 `sys_microiservice_page`。 |
+| `microi_publish_application_directory_stream` | `appIdOrKey`、`directory`、`versionNo`、`changeSummary`、v3 冻结参数 | 正式编译目录使用二进制流；分别执行 `stage` 与 `finalize` 并回读完成状态。 |
+
+发布前为应用精确版本写入商城更新日志，并显式传入含义一致的 `changeSummary`（最多 2000 字符的文本）。支持摘要持久化的 v3 后端在首次 stage 创建版本时保存 `mci_ai_app_version.ChangeSummary`，重试和恢复不会覆盖原说明，也不会因此改变既有发布指纹。旧节点若显示发布完成但摘要为空，仍需升级后端并核对日志；编译文件验证通过不能代替版本说明验收。
 
 三个写入工具在未传 `confirmExecution` 时只返回 dry-run，不会真正写入。AI 应先展示将要创建的 AppKey、文件数、路由和版本，确认无误后再传入任意非空确认文本执行。
 

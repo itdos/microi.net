@@ -901,7 +901,11 @@ sleep 1
 # ══════════════════════════════════════════════════════════════
 
 # 测试构建也使用共享输出，先取得独占权；服务保持运行供业务回归使用。
-if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ]; then
+PLATFORM_DOCKER_SELECTED=false
+if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then
+    PLATFORM_DOCKER_SELECTED=true
+fi
+if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ] || [ "$PLATFORM_DOCKER_SELECTED" = true ]; then
     print_phase "取得工作区发布独占权"
     acquire_workspace_lock
 fi
@@ -909,7 +913,7 @@ fi
 # 在升版、官方资源写入、NuGet/Docker 推送之前执行完整业务回归。
 # 此处需要仍在运行的已加载候选源码的测试 API，因此必须早于 PrepareRelease。
 # 缺少隔离测试租户/凭据、测试失败或跳过均停止发布；不能靠 AI 提示词代替门禁。
-if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
+if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "${PLATFORM_DOCKER_SELECTED:-false}" = true ]; then
     print_phase "发布前全量自动化测试（失败即停止）"
     MICROI_RELEASE_CANDIDATE="$PWD/.tmp/microi-release-gate/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
     if ! node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
@@ -1593,6 +1597,15 @@ docker_push_plan() {
         print_fail "构建目录不存在: $build_dir"
     fi
 
+    local receipt="$PWD/.tmp/microi-release-gate/${plan_type}-artifact.json"
+    local receipt_mode=verify
+    if { [ "$plan_type" = api ] && [ "$PUBLISH_BACKEND" = true ]; } || { [ "$plan_type" = client ] && [ "$BUILD_CLIENT" = true ]; }; then
+        receipt_mode=capture
+    fi
+    if ! node Microi.Server/tools/release-artifact.mjs "$receipt_mode" "$plan_type" "$MICROI_RELEASE_CANDIDATE" "$receipt"; then
+        print_fail "构建产物没有与 Full 测试通过的源码绑定；请重新编译，禁止仅凭加密指纹发布旧产物。"
+    fi
+
     # 使用 Docker 内容摘要缓存；publish/dist 内容变化会自动使 COPY 层失效。
     # 优先检查基础镜像更新；远端 Registry 短暂不可达时重试，最终只允许回退到
     # Docker 已缓存且能被本地解析的基础镜像，避免一次 TLS 超时中断整轮发布。
@@ -1622,6 +1635,9 @@ docker_push_plan() {
     # 推送每个远程镜像
     IFS=',' read -ra _images <<< "$remote_images"
     for _img_tag in "${_images[@]}"; do
+        if ! node Microi.Server/tools/release-artifact.mjs verify "$plan_type" "$MICROI_RELEASE_CANDIDATE" "$receipt"; then
+            print_fail "镜像推送前源码或产物发生漂移；已停止推送。"
+        fi
         # 替换占位符
         _img_tag=$(echo "$_img_tag" | sed "s/{latest}/latest/g" | sed "s/{version}/v${version}/g")
         local full_tag="${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${_img_tag}"

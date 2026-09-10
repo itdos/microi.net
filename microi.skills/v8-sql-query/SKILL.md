@@ -81,6 +81,8 @@ V8.FormEngine.GetTableData('Table', { _Where: newWhere });
 
 > **⚠️ FromSql 调用规则：** `V8.Db.FromSql` 在 V8 中只传 SQL 字符串，不要把动态值作为第二个或后续参数传给 `FromSql`。动态值必须用链式 `.AddInParameter('@p0', value)` 绑定；否则会生成平台不支持的调用签名。
 
+> **共享事务：** `V8.Db` 是主库会话，`V8.Db.FromSql` 不会自动加入接口引擎事务。需要与表单、其它 SQL 或流程共同提交/回滚的操作，必须使用 `V8.DbTrans.FromSql`；依赖本事务尚未提交结果的查询也一样。`V8.FormEngine`、`V8.ApiEngine.Run` 继续显式传第三参数 `V8.DbTrans`。禁止从安全代理取内部事务并自行提交。
+
 ```javascript
 // ❌ 错误形态：不要把动态值作为 FromSql 的第二个参数传入
 
@@ -88,7 +90,7 @@ V8.FormEngine.GetTableData('Table', { _Where: newWhere });
 V8.FormEngine.UptFormData('t', { Id: id, A: val1, B: val2 });
 
 // ✅ 必须用原生 SQL 时：FromSql 只传 SQL，参数用 AddInParameter
-V8.Db.FromSql("UPDATE t SET A=@p0, B=@p1 WHERE Id=@p2")
+V8.DbTrans.FromSql("UPDATE t SET A=@p0, B=@p1 WHERE Id=@p2")
      .AddInParameter("@p0", val1)
      .AddInParameter("@p1", val2)
      .AddInParameter("@p2", id)
@@ -118,7 +120,7 @@ var count = V8.Db.FromSql(
  .ToScalar();
 
 // 非查询（UPDATE / INSERT / DELETE）
-V8.Db.FromSql(
+V8.DbTrans.FromSql(
   'UPDATE SysUser SET LastLoginTime = @p0 WHERE Id = @p1'
 ).AddInParameter("@p0", DateNow('yyyy-MM-dd HH:mm:ss'))
  .AddInParameter("@p1", V8.CurrentUser.Id)
@@ -174,15 +176,15 @@ MCP 结构发现使用 `microi_inspect_external_database`，安全抽样默认�
 ### 接口引擎事务（自动管理）
 
 ```javascript
-// 接口引擎中 V8.Db 自动开启事务：
+// 接口引擎创建 V8.DbTrans；V8.Db 是独立主库会话，不自动加入它：
 // 返回 Code=1 → 自动提交事务
 // 返回 Code≠1 → 自动回滚事务
 // 手动调用 V8.DbTrans.Commit() 或 V8.DbTrans.Rollback() 均无效
-V8.Db.FromSql('UPDATE Account SET Balance = Balance - @p0 WHERE Id = @p1')
+V8.DbTrans.FromSql('UPDATE Account SET Balance = Balance - @p0 WHERE Id = @p1')
   .AddInParameter("@p0", 100)
   .AddInParameter("@p1", fromId)
   .ExecuteNonQuery();
-V8.Db.FromSql('UPDATE Account SET Balance = Balance + @p0 WHERE Id = @p1')
+V8.DbTrans.FromSql('UPDATE Account SET Balance = Balance + @p0 WHERE Id = @p1')
   .AddInParameter("@p0", 100)
   .AddInParameter("@p1", toId)
   .ExecuteNonQuery();

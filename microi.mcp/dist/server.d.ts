@@ -60,6 +60,7 @@ export interface ApplicationDirectoryStreamPublishInput {
     routeSnapshotHash?: string;
     deliveryBatchId?: string;
     publishMode?: ApplicationStreamPublishMode;
+    verificationOnly?: boolean;
     protocolVersion?: 3;
     expectedGateEpoch?: string;
     requestId?: string;
@@ -196,6 +197,15 @@ export declare function buildConservativeApplicationAssetStreamV3ImmutablePath(i
     encodedRelativePath: string;
     immutablePath: string;
 };
+export declare function validateApplicationAssetV3FinalizeEvidence(result: ApiResponse, expected: ResolvedApplicationAssetStreamV3Contract & {
+    appIdOrKey: string;
+    versionNo: string;
+    publishMode: 'stage' | 'finalize';
+    entryPath: string;
+    encodedEntryPath: string;
+    assetCount?: number;
+    totalSize?: number;
+}): Record<string, unknown>;
 /**
  * Inspect and hash a built directory without loading any file wholly into RAM.
  * The hard caps also stop accidental node_modules/.git/trash-directory loops.

@@ -15,7 +15,10 @@ test("unified AI page previews FileServer images and plays generated music inlin
     assert.match(source, /mode === "image"[\s\S]*sendImageQuestion/);
     assert.match(source, /mode === "music"[\s\S]*sendMusicQuestion/);
     assert.match(source, /generateMiniMaxImage\(/);
-    assert.match(source, /\/api\/Ai\/GenerateMiniMaxMusic/);
+    assert.match(source, /generateMiniMaxMusic\(/);
+    const musicTransport = await readFile(new URL('../src/views/ai-engine/minimax-music-task.js', import.meta.url), 'utf8');
+    assert.match(musicTransport, /\/api\/Ai\/GenerateMiniMaxMusic/);
+    assert.match(musicTransport, /\/api\/Ai\/GetMiniMaxMusicTask/);
     assert.match(source, /AiModelId: chatImageModel\.value\.AiModelId/);
     assert.match(source, /AiModelId: chatMusicModel\.value\.AiModelId/);
     assert.match(source, /Storage: item\?\.Storage \|\| "Microi\.HDFS"/);

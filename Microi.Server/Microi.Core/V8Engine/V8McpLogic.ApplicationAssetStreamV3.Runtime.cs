@@ -531,6 +531,7 @@ namespace Microi.net
             public string RequestId { get; set; }
             public string RequestFingerprint { get; set; }
             public string DeliveryBatchId { get; set; }
+            public string ChangeSummary { get; set; }
             public string SourceManifestHash { get; set; }
             public string RuntimeManifestHash { get; set; }
             public string RouteSnapshotJson { get; set; }
@@ -1435,6 +1436,7 @@ namespace Microi.net
                 RequestId = SafeJString(buildLog, "RequestId"),
                 RequestFingerprint = SafeJString(buildLog, "RequestFingerprint"),
                 DeliveryBatchId = SafeJString(buildLog, "DeliveryBatchId"),
+                ChangeSummary = SafeJString(version, "ChangeSummary"),
                 SourceManifestHash = SafeJString(buildLog, "SourceManifestHash"),
                 RuntimeManifestHash = SafeJString(buildLog, "RuntimeManifestHash"),
                 RouteSnapshotJson = SafeJString(buildLog, "RouteSnapshotJson"),
@@ -3477,7 +3479,7 @@ namespace Microi.net
             var columns = new[]
             {
                 "Id", "AppId", "AppName", "VersionNo", "VersionName", "Status", "FileCount", "TotalSize",
-                "BuildLog", "BuildTaskId", "PreviewUrl", "PublishPath", "PublishProtocolVersion", "PublishState",
+                "BuildLog", "BuildTaskId", "ChangeSummary", "PreviewUrl", "PublishPath", "PublishProtocolVersion", "PublishState",
                 "RequestId", "DeliveryBatchId", "RequestFingerprint", "SourceManifestHash", "RuntimeManifestHash",
                 "ExpectedCurrentVersion", "ExpectedAppVersion", "EntryPath", "ReleasePrefix", "AssetManifestJson",
                 "RouteSnapshotJson", "RouteSnapshotHash",
@@ -3487,7 +3489,7 @@ namespace Microi.net
             var values = new[]
             {
                 "@id", "@appId", "@appName", "@versionNo", "@versionNo", "@state", "@fileCount", "@totalSize",
-                "@buildLog", "@batchId", "@preview", "@publishPath", "3", "@state", "@requestId", "@batchId",
+                "@buildLog", "@batchId", "@changeSummary", "@preview", "@publishPath", "3", "@state", "@requestId", "@batchId",
                 "@fingerprint", "@sourceHash", "@runtimeHash", "@expectedCurrent", "@expectedAppVersion",
                 "@entryPath", "@releasePrefix", "@manifest", "@routeSnapshotJson", "@routeSnapshotHash",
                 "@fence", "@rowVersion", "NULL", "NULL", "NULL",
@@ -3507,6 +3509,8 @@ namespace Microi.net
                 .AddInParameter("@totalSize", plan.TotalSize)
                 .AddInParameter("@buildLog", buildLog)
                 .AddInParameter("@batchId", request.DeliveryBatchId)
+                // 摘要是已鉴权发布者的展示文本；只在首次INSERT保存，重放不覆盖既有版本说明。
+                .AddInParameter("@changeSummary", request.ChangeSummary)
                 .AddInParameter("@preview", plan.StableResolverPath)
                 .AddInParameter("@publishPath", plan.ReleaseEntryPath)
                 .AddInParameter("@requestId", request.RequestId)
@@ -3541,6 +3545,7 @@ namespace Microi.net
                 ["Id"] = versionId,
                 ["AppId"] = appId,
                 ["VersionNo"] = plan.VersionNo,
+                ["ChangeSummary"] = request.ChangeSummary,
                 ["Status"] = state.ToString(),
                 ["PublishProtocolVersion"] = 3,
                 ["PublishState"] = state.ToString(),
@@ -3715,6 +3720,16 @@ namespace Microi.net
         {
             request = null;
             if (param == null) return "v3 请求不能为空";
+            // 只读取单一可选文本，禁止把对象/状态/指针等请求结构当成版本元数据透传。
+            // 不将展示摘要加入既有不可变指纹，保证升级前冻结的发布仍可恢复。
+            var summaryToken = param["ChangeSummary"];
+            if (summaryToken != null && summaryToken.Type != JTokenType.Null
+                && summaryToken.Type != JTokenType.String)
+                return "ChangeSummary 必须是字符串或 null";
+            var changeSummary = summaryToken?.Value<string>();
+            if (changeSummary != null && changeSummary.Length > 2000)
+                return "ChangeSummary 最多 2000 个字符";
+            if (string.IsNullOrWhiteSpace(changeSummary)) changeSummary = "二进制流式发布";
             var protocol = ReadRequiredApplicationAssetV3Long(param, "ProtocolVersion", out var protocolError);
             if (protocolError != null || protocol != 3) return protocolError ?? "ProtocolVersion 必须为 3";
             var publishModeProperty = param.Property("PublishMode");
@@ -3824,6 +3839,7 @@ namespace Microi.net
                 RequestId = requestId,
                 RequestFingerprint = fingerprint,
                 DeliveryBatchId = deliveryBatchId,
+                ChangeSummary = changeSummary,
                 SourceManifestHash = sourceHash,
                 RuntimeManifestHash = runtimeHash,
                 RouteSnapshotJson = routeSnapshotJson,
