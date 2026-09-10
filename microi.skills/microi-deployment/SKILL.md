@@ -1,6 +1,6 @@
 ---
 name: microi-deployment
-description: Microi 安装、部署、升级和本地运行指南。用于 Docker Compose、离线安装、Windows IIS、源码运行、本地 ApiBase/OsClient 切换与浏览器隔离、MySQL、Redis、MongoDB、MinIO、反向代理、滚动发布、健康检查、备份恢复和生产部署验收。
+description: Microi 安装、部署、升级和本地运行指南。用于吾码服务器运维面板 Microi.Panel、Docker Compose、离线安装、Windows IIS、源码运行、本地 ApiBase/OsClient 切换与浏览器隔离、数据库、MinIO、反向代理、滚动发布、健康检查、备份恢复和生产部署验收。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -21,6 +21,23 @@ description: Microi 安装、部署、升级和本地运行指南。用于 Docke
 - 数据库模型：`../microi-db-schema/SKILL.md`
 
 ## 先确认部署类型
+
+### 吾码服务器运维面板 Microi.Panel
+
+- 项目由 `Microi.Ops` 更名为 `Microi.Panel`；独立 .NET + Vue + Microi.UI 宿主使用自己的管理员账号、SQLite 和 Docker 权限，业务 API/Web 停止时仍可操作。只安装面板时使用 `install-microi-panel.sh`，不要求先安装吾码业务平台、宝塔或 1Panel。具体命令与能力边界见中文官网 `server-panel/overview.md`。
+- 先确认主机内存、Docker Engine 身份、活动任务、已有 Ops/Panel 控制器、端口、编排和数据目录。每台 Docker 主机只运行一个吾码控制器。与宝塔/1Panel 共存时使用独立安装目录、容器名、卷、网络和端口；80/443 等监听端口不能被两个入口同时占用，不得重置 Docker 或接管第三方面板资源。
+- 插件市场只安装目录内明确版本与 SHA-256 的镜像；检查架构、许可、健康检查、持久卷和真实业务读写。Oracle 等原厂许可渠道不擅自镜像；MinIO 社区归档后的源码构建必须保留对应源码、许可与摘要。跨数据库大版本升级仍需专用迁移方案。
+- 网站和反向代理由受管 Docker Nginx 执行；配置先 `nginx -t`，再原子发布与回读。HTTP-01 需真实 DNS 和公网 80 端口的挑战路由，不能用跳过验证冒充签发成功；通配符使用外部 DNS 验证后导入证书。证书续期必须验证新的序列号/指纹、服务重启后的调度和暂停行为。
+- 网站文件仅管理受管卷；文本编辑使用内容哈希拒绝覆盖并发修改。冷备份须明确服务中断，检查正常退出与归档哈希；恢复写入新卷并保留原卷，重试继续原操作 Id。卸载保留业务卷，重新安装沿用记录的原镜像、凭据和数据卷。
+- 新面板默认独立 HTTPS 端口 61890，管理员密码与 PFX 密码存于服务器权限受限文件；不要把它们复制进业务 SaaS、V8、MCP 参数或日志。旧 Ops 保留原 `OPS_*`、目录、账号、端口、数据保护密钥及 `MicroiOpsUrl`，用原 Compose 替换为 Panel 镜像，不能重新初始化。
+- 业务 MCP 继续通过 `microi_get_administrative_capabilities`、`microi_admin_table_data`、`microi_update_module` 和应用发布工具维护平台入口；DiyToken 不授予主机 Docker 权限，不增加能从租户会话执行任意宿主机命令的工具。主机安装与恢复使用授权的 SSH/终端和独立面板会话。
+- 真实验收归入 `Microi.Tests/Panel` 专项，包含全部目录版本、数据库/对象存储写读与冷恢复、SSL/续期、文件、任务重启、独立安装升级回退，以及真实宝塔/1Panel 两种安装顺序。普通外部容器只能证明资源归属保护，不能替代第三方面板共存结论。
+
+### 依赖镜像统一镜像源
+
+- 安装器、Dockerfile、发布与测试夹具的依赖镜像统一使用 `Microi一键编译发布配置.json` 中 Region/Namespace 对应的阿里云仓库。源镜像清单维护在 `Microi.Server/tools/dependency-images.json`，禁止客户每次安装直接拉 Docker Hub/MCR。
+- 联网发行机执行 `Microi一键编译发布.sh --mirror-dependencies`，由 `dependency-images.mjs` 读取同一配置的账号密码并用 stdin 登录；禁止将凭据写进命令、日志、镜像或仓库。完成后用 `verify` 回读摘要和多架构清单。
+- 上游固定 SHA-256；国内加速只能作为传输通道，不能修改版本、替换不明镜像或丢失 CPU 架构。上游和阿里云目标摘要不一致立即停止。Oracle/达梦/金仓等受许可限制的镜像只在具备再分发权后镜像，不用无授权镜像代替。
 
 用户明确要求同版本仅发布 Docker 热修复时，运行 `Microi一键编译发布.sh --docker-only-hotfix` 并选择后端镜像方案。该入口保持当前版本，禁止 NuGet、文档和官方资源数据库发布，同时保留 Full、候选源码一致性、混淆后冒烟和镜像门禁。修复应进入本地源码及捆绑资源，由目标程序启动升级；不得通过直接改生产表结构代替源码修复。
 

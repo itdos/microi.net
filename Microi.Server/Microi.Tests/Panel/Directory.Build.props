@@ -1,0 +1,4 @@
+<Project>
+  <!-- 独立主机面板的测试不能依赖业务平台启动或闭源程序集。 -->
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+</Project>
