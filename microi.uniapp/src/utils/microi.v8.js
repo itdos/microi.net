@@ -429,7 +429,7 @@ function createQueue(maxConcurrent) {
   function release() {
     if (waiting.length) {
       const next = waiting.shift();
-      active += 1;
+      // Transfer the completed request's slot to the next task; active stays unchanged.
       next();
     } else {
       active = Math.max(0, active - 1);
