@@ -55,7 +55,7 @@ Microi 吾码从 `v7.5.0` 起提供双向 SSO 身份联邦：既可以让企业�
 | `sso_user_runtime` | 协议网关读取启用用户最小投影 | Managed / StopHttp |
 | `sso_http_*`（24 个） | `/api/Sso/Begin`、授权完成与回调，OIDC/SAML/CAS 标准公开地址 | Managed / ResponseType=HTTP |
 
-官方核心被租户修改时升级失败关闭，不自动合并可执行代码。`sso_event_hook` 首次安装后归租户所有，后续官方升级永不覆盖；需要官方新增行为时发布新的 Hook Key，不能把现有租户 Hook 改回 Managed。
+官方核心声明为 Managed，由本次已校验的官方应用包恢复；包括目标端的源码改动、版本漂移和软删除，不要求客户手动处理核心代码冲突。`sso_event_hook` 首次安装后归租户所有，后续官方升级永不覆盖；需要官方新增行为时发布新的 Hook Key，不能把现有租户 Hook 改回 Managed。
 
 吾码官方 `iTdos` 租户是商城发布源，服务端会拒绝在发布源上再次安装商城应用。发布源通过 MCP 更新真实资源并发布；普通目标租户才执行商城安装/更新任务，并轮询到 `Succeeded` 后回读资源。
 
@@ -72,6 +72,12 @@ Microi 吾码从 `v7.5.0` 起提供双向 SSO 身份联邦：既可以让企业�
 | 账号与权限映射 | Subject/Account/Name/Email/Role Claim、Claim/Role Mapping、开户模式、默认角色 | 外部角色只能映射到明确授权的吾码 RoleId |
 | 安全与生命周期 | Secret/证书设置 Key、签名/加密、PKCE/nonce、issuer/audience、私网端点、Token 有效期 | 高风险开关默认关闭或强校验 |
 | 兼容模式 | `ServerSsoApi`、`ClientSsoApi`、`TokenName`、`GetTokenType` | 只为旧 URL Token 系统迁移保留 |
+
+### 旧系统的 Token 自动登录
+
+`app.microi.sso v7.6.1` 恢复已启用的存量 `ClientSsoApi=/api/SysUser/TokenLogin` 配置投影：这条路径验证吾码原生 DiyToken，与外部身份源的 `sso_legacy_token_login` 分开处理。没有启用连接、配置了其它任意地址或 Token 无效时，不会因此放开登录。
+
+新前端在验证成功后保留指定站内页面及 `ShowClassicLeft/ShowClassicTop` 等参数，不再无条件跳默认首页；URL 中的 Token 同时从地址栏和路由对象清除，避免刷新/动态路由匹配重新带回。验收应使用完整旧链接，确认真实目标页显示、权限正常、地址栏无 Token；仅看到 302 或 TokenLogin 成功还不够。新接入仍推荐标准 OIDC/SAML2/CAS，不建议扩展长期 URL Token。
 
 ### 账号开通策略
 

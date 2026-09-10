@@ -61,7 +61,7 @@
 | **datasource-engine** | SQL/V8/JSON 数据源设计、租户与权限、字段供数和验收 | `datasource-engine/SKILL.md` |
 | **job-engine** | 定时/后台任务、多节点租约、幂等、恢复和进度 | `job-engine/SKILL.md` |
 | **email-engine** | 多账号邮箱、IMAP/SMTP、自动同步、草稿、附件、发送防重和邮箱 MCP | `email-engine/SKILL.md` |
-| **message-notification** | 公众号/服务号、短信、邮件、平台内部通知、SignalR、幂等与商城交付 | `message-notification/SKILL.md` |
+| **message-notification** | 统一消息通知中心、系统公告、邮件短信/微信/平台内部通知、MCP 配置、重启提醒与商城交付 | `message-notification/SKILL.md` |
 | **search-engine** | Elasticsearch 索引、同步、查询、租户/数据范围和重建 | `search-engine/SKILL.md` |
 | **report-engine** | Rpt_Report 虚拟报表、数据源、聚合、写接口和导出 | `report-engine/SKILL.md` |
 | **translate-engine** | 多语言词条、翻译供应商、租户隔离、缓存和批量翻译 | `translate-engine/SKILL.md` |

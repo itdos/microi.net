@@ -44,7 +44,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=ca442fa8a4990040aa7172dd37b49437bc6de0c9b1f88d889a30f5e936321aa1 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=9fae6ea3c3b238d5d830f308599d7512d1ed6364cb495d432278ada8680f769e -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -171,18 +171,24 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=5c5669acf2040f87491abe1f8c85f89e9707a128508ca00f82d8f6a73c3ba7bc -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=53d475c7c494a5b6e9e2436c986c458ee539807426978fd99a27a1d7eb967881 -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）
 
 - `app.use(router)` 会立即触发首个路由守卫。守卫中的 SSO、认证、菜单请求必须等待 `initApp()` 完成真实租户和系统配置初始化；初始化失败时取消导航并保留启动错误界面。释放初始化等待必须早于 `router.isReady()`，避免彼此等待；禁止将缓存尚未建立时的 `GetOsClient()` 默认值 `iTdos` 发给客户服务器。
 
+- 身份和菜单只读初始化的短暂失败最多读取三次，间隔 300/1000ms；认证失效立即回登录页并保留原深链接，HTTP 403 和已耗尽的菜单依赖重试不得继续重试。重试期间退出登录应停止后续读取，不得用清空 Token、伪造角色或放行保护路由掩盖错误。持续失败用 `next(error)` 保留身份/菜单阶段和原始原因，禁止用 `next(false)` 把它替换为 `Navigation aborted`；启动界面不能据此断言后端断网。当前用户请求的传输失败必须 reject，不能留下永久 pending 的 Promise。修改这条链路时运行 `route-bootstrap-recovery.spec.mjs`，并用真实路由验证健康登录、短暂失败恢复、持续失败提示和过期会话跳转。
+
+- `ApiServiceUnavailable` 确认连接故障后，每轮探测结束 5 秒后继续请求固定匿名健康接口；单次请求超时 5 秒，自动与手动检测共用在途请求。后端返回有效健康正文后停止轮询，启动失败的页面只重载一次原 URL，已经就绪的业务页面原地撤掉异常层并保留输入，禁止重放失败的业务写入。旧版健康接口也必须返回有效的 Healthy 正文，不能把反向代理 HTML/404 当作恢复。安全拦截继续按后端解除时间检查，不用连接故障轮询缩短封禁。定向回归使用 `api-service-recovery.spec.mjs` 与 `api-service-status.spec.mjs`，浏览器必须验证断连到自动恢复全过程。
+
 - `src/config.json.ApiBaseDev` 是本地默认 API；URL 中 `#` 之前的 `ApiBase`、`OsClient` 必须同时
   高于 `index.html`、config、Pinia 与 localStorage。解析统一走
   `src/utils/runtime-endpoint-query.js`，禁止在新入口另写正则形成不同优先级。
 - URL 只允许有效的 HTTP(S) ApiBase 和安全 OsClient。页面初始化后通过不含 Token 的
   `window.__MICROI_RUNTIME_ENDPOINT__` 暴露实际值，便于 AI/自动化确认没有误连配置文件中的服务器。
+- 页面已解析的租户必须进入真实 HTTP 请求。`DiyCommon.UseAxios/UseAxiosAll` 与共享 axios 请求层统一通过 `request-tenant-context.js` 补当前 API 的 `osclient` 请求头；保留调用者显式的路径、Query、参数或 Header 租户，不给其它服务器或相邻 API 子路径自动添加页面租户。JSON 正文在动态路由阶段可能尚未读取，不能只依赖正文或旧 Token 选择租户。验收必须增加同源旧 Token 指向其它/不存在租户的真实后端场景：`platform-current-user` 应走页面租户并返回登录失效，保留原深链接进入登录页，不得显示“无法确认接口配置”或让 SSO 发现返回错误租户的 404；定向回归为 `request-tenant-context.spec.mjs`。
+- 首次身份读取的业务/传输失败交给路由守卫处理，`getInfo` 不调用带全局通知副作用的 `DiyCommon.Result`，同时抑制请求层通知和抢先登录跳转；`App.PageInit` 等待首次导航成功后再启动续签/用户刷新，导航失败时结束。既要验证干净会话，也要验证旧登录缓存和失败后重复刷新，不能以隔离浏览器成功代替用户当前会话验收。
 - 同源浏览器窗口仍共享 Token、CurrentUser 等持久化状态。不同 `ApiBase + OsClient` 并行测试必须
   使用独立 browser context/profile；URL 最高优先级不等于登录态隔离。
 - 修改该链路时运行 `node --test tests/runtime-endpoint-query.spec.mjs`，再使用两个独立

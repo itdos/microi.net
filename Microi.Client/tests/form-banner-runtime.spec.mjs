@@ -34,6 +34,40 @@ test("legacy tables show Banner and infer business fields", () => {
     assert.deepEqual(banner.Metrics.map((item) => item.Field), ["Amount"]);
 });
 
+for (const key of ["TitleField", "SubtitleField", "ImageField"]) {
+    test(`Banner 显式空 ${key} 禁止运行时重推断`, () => {
+        for (const value of ["", "  "]) assert.equal(normalizeFormBannerConfig({ [key]: value }, fields)[key], "");
+    });
+}
+
+test("Banner 显式空不被历史字段别名覆盖", () => {
+    const banner = normalizeFormBannerConfig({ TitleField: "", FallbackTitleField: "OrderNo", SubtitleField: "", MetaField: "CustomerName" }, fields);
+    assert.equal(banner.TitleField, ""); assert.equal(banner.SubtitleField, "");
+    const legacy = normalizeFormBannerConfig({ FallbackTitleField: "CustomerName", MetaField: "OrderNo" }, fields);
+    assert.equal(legacy.TitleField, "CustomerName"); assert.equal(legacy.SubtitleField, "OrderNo");
+});
+
+test("物理 Banner 空字符串经展示合同保留，null 存量列仍推断", () => {
+    for (const value of ["", null]) {
+        const config = resolveFormPresentationConfig({ FormBannerTitleField: value, FormBannerSubtitleField: value, FormBannerImageField: value, FormBannerBackgroundField: value });
+        const banner = normalizeFormBannerConfig(config.Banner, fields);
+        assert.deepEqual([banner.TitleField, banner.SubtitleField, banner.ImageField, banner.BackgroundField], value === "" ? ["", "", "", ""] : ["OrderNo", "CustomerName", "Cover", ""]);
+    }
+});
+
+test("Banner null 未选择配置仍兼容推断，显式非空字段保持", () => {
+    const nullable = normalizeFormBannerConfig({ TitleField: null, SubtitleField: null, ImageField: undefined }, fields);
+    assert.deepEqual([nullable.TitleField, nullable.SubtitleField, nullable.ImageField], ["OrderNo", "CustomerName", "Cover"]);
+    const explicit = normalizeFormBannerConfig({ TitleField: "CustomerName", SubtitleField: "OrderNo", ImageField: "Cover" }, fields);
+    assert.deepEqual([explicit.TitleField, explicit.SubtitleField, explicit.ImageField], ["CustomerName", "OrderNo", "Cover"]);
+});
+
+test("Banner 背景字段无推断且空值保留，不关闭必要图标回退", () => {
+    const banner = normalizeFormBannerConfig({ BackgroundField: "", Icon: "" }, fields);
+    assert.equal(banner.BackgroundField, ""); assert.equal(banner.Icon, "far fa-file-alt");
+    assert.equal(normalizeFormBannerConfig({ BackgroundField: "Cover" }, fields).BackgroundField, "Cover");
+});
+
 test("explicit disable and empty lists override smart defaults", () => {
     assert.equal(hasFormBannerConfig({ Enabled: 0 }), false);
     const banner = normalizeFormBannerConfig({ Enabled: 0, Tags: [], Metrics: [] }, fields);

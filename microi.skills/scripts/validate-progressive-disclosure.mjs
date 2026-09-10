@@ -8,8 +8,14 @@ const manifest = JSON.parse(fs.readFileSync(path.join(skillsRoot, '.progressive-
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex')
 const lineCount = (value) => value.length === 0 ? 0 : value.split(/\r?\n/).length
 
+// 可只验证显式修改的 Skill；默认仍检查全库，不能为并行工作区的历史漂移改写共同基线。
+const requested = process.argv.slice(2)
+for (const name of requested) {
+  if (!Object.hasOwn(manifest.skills, name)) throw new Error(`Unknown progressive-disclosure skill: ${name}`)
+}
+const selected = Object.entries(manifest.skills).filter(([name]) => requested.length === 0 || requested.includes(name))
 let checkedChunks = 0
-for (const [skillName, skill] of Object.entries(manifest.skills)) {
+for (const [skillName, skill] of selected) {
   const entryPath = path.join(skillsRoot, skillName, 'SKILL.md')
   const entry = fs.readFileSync(entryPath, 'utf8')
   const begin = entry.indexOf('<!-- microi-progressive:begin -->')
@@ -48,5 +54,4 @@ for (const [skillName, skill] of Object.entries(manifest.skills)) {
   }
 }
 
-console.log(`Validated ${Object.keys(manifest.skills).length} skills and ${checkedChunks} lossless chunks.`)
-
+console.log(`Validated ${selected.length} skills and ${checkedChunks} lossless chunks${requested.length ? ' (explicit scope)' : ''}.`)

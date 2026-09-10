@@ -10,8 +10,7 @@ export function isRetiredMiniMaxMusicApi(result) {
     const message = String(result?.Msg || '');
     return result?.Code !== 1
         && /\b410\b/u.test(message)
-        && /Music API is no longer available to new users/iu.test(message)
-        && /MiniMax-Music3/iu.test(message);
+        && /Music API is no longer available to new users/iu.test(message);
 }
 export function buildMiniMaxMusic3StudioState(prompt) {
     const cleanPrompt = String(prompt || '').trim();
@@ -157,9 +156,9 @@ export async function generateMiniMaxMusic3Fallback(client, input) {
         const result = {
             RequestId: input.requestId,
             Model: MINIMAX_MUSIC3_MODEL,
-            RequestedModel: 'music-2.6',
+            RequestedModel: 'music-3.0',
             ModelFallbackUsed: true,
-            ModelFallbackReason: 'MiniMax 官方旧 Music API 对新账号返回 410，按官方指引切换 MiniMax-Music3。',
+            ModelFallbackReason: 'MiniMax 托管 Music API 返回明确 410，按官方指引切换开源 MiniMax-Music3。',
             Route: 'MiniMax-Official-HuggingFace-Space',
             DurationMilliseconds: durationSeconds * 1000,
             SampleRate: 44100,

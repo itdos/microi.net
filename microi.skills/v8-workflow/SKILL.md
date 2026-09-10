@@ -58,14 +58,14 @@ description: Microi V8 工作流事件指南。用于编写审批流条件、节
 ```javascript
 // 我的待办
 var todo = V8.Db.FromSql(
-  'SELECT * FROM wf_work WHERE TodoUserId = @p0 AND Status = @p1 ORDER BY CreateTime DESC'
+  'SELECT Id, FlowId, NodeId, FlowTitle, WorkState, ReceiverId, TableRowId FROM wf_work WHERE ReceiverId = @p0 AND WorkState = @p1 ORDER BY CreateTime DESC'
 ).AddInParameter("@p0", V8.CurrentUser.Id)
- .AddInParameter("@p1", 'Pending')
+ .AddInParameter("@p1", 'Todo')
  .ToArray();
 
 // 我发起的
 var mine = V8.Db.FromSql(
-  'SELECT * FROM wf_flow WHERE CreateUserId = @p0 ORDER BY CreateTime DESC'
+  'SELECT Id, FlowTitle, FlowState, SenderId, TableRowId FROM wf_flow WHERE SenderId = @p0 ORDER BY CreateTime DESC'
 ).AddInParameter("@p0", V8.CurrentUser.Id)
  .ToArray();
 
@@ -79,6 +79,15 @@ var history = V8.Db.FromSql(
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=v8-workflow-002 sha256=1f94d40c041929aafc45ec975f42bcbbc50c3ba424ed499c7bdf65fa73a41041 -->
 ## 流程 V8 事件执行顺序
+
+工作流合并提交请求的 `_FormSubmitAction` 可使用 `Add/Edit`；表单后端事件中的
+`V8.FormSubmitAction` 实际为 `Insert/Update/Delete`，两者不能混淆。删除事件把服务端
+读取的待删除行放在 `V8.Form`，`V8.OldForm` 为空；校验删除归属、状态或引用时应以
+`V8.Form.Id` 在共享事务中重新读取并锁定原行，不应假定 `OldForm` 与修改事件相同。
+
+节点开始事件成功继续流转时保持 `V8.Result` 为空或设为布尔 `true`；不要用
+`V8.Result={Code:1}`，非布尔结果会提前结束当前流转。节点校验失败应抛出异常，
+尤其节点结束事件不可依赖 `return {Code:0}` 阻止事务提交。
 
 1. 用户点击发起流程或处理工作
 2. **表单进入 V8 事件（前端 FormIn）**

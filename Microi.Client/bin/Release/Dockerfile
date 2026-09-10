@@ -1,7 +1,8 @@
 # 使用稳定的官方 Nginx 镜像
 # FROM nginx:stable-alpine
 # 阿里云镜像备用
-FROM registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx
+ARG MICROI_NGINX_IMAGE=registry.cn-hangzhou.aliyuncs.com/microios/nginx:acs-sample-20260909
+FROM ${MICROI_NGINX_IMAGE}
 
 # 复制构建产物到 Nginx 目录
 COPY dist/  /usr/share/nginx/html/

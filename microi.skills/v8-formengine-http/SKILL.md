@@ -90,6 +90,24 @@ URL 中的表名小写最稳，平台不区分大小写。匿名版本目前**�
 - 客户端新增、修改、删除分别校验真实菜单的 `Add`、`Edit`、`Del` 权限。`SqlWhere` / `SqlJoin` 是模块查询过滤，不是行级写权限：不得把它们追加到写入 SQL，也不得因查询包含 Join 拒绝已获授权的主表写入。
 - 进入 `SubmitBeforeServerV8` / `SubmitAfterServerV8` 后，事件内 FormEngine/数据库调用与接口引擎一样属于可信服务器执行，可实现当前租户内的跨表事务。需要“只能修改本人数据”等业务约束以及归属字段写入时，应在这里或专用接口引擎中完成。
 
+## 原生详情关联数据
+
+- `POST /api/FormEngine/GetFormRelatedData` 接收父表 `ParentFormEngineKey`、父记录
+  `ParentTableRowId`、真实 `_SysMenuId`，以及固定 `RelatedType`：
+  `Counts/DataLog/DataComment/DataVersion`。身份、租户来自 DiyToken，不能透传请求的可信标记。
+- `AuthorizeClientTableOperationAsync(..., 'Read')` 仅完成表/菜单授权，不证明父行可读。
+  必须再执行 Client `GetFormDataAsync`，让父记录不存在或 `ServerDataV8` 拒绝阻断关联查询。
+- 固定辅助表查询使用服务端新构造的 CLR 参数与可信来源；`JObject` 中写
+  `_InvokeType:'Server'` 仍是非可信参数。不得通过给普通角色开放辅助表权限来修复此类拒绝。
+- 日志和版本返回固定元信息，`DataAppend.HistoryContentMode='MetadataOnly'`；
+  当前行脱敏不授予历史 `Content/Data` 原文。客户端不能据元信息开放预览、对比、加载。
+- 评论必须同时按真实 `TableId + TableRowId` 过滤。缺少 `TableId` 时，Counts 返回
+  `DataComment=null`，以 `DataAppend.DataCommentUnavailableReason/Message` 显式说明；
+  评论详情失败。不能按单键兼容、猜旧数据归属、假报零条或承诺不存在的可用升级包。
+- 回归须区分实际 HTTP 与替身组件测试：普通角色父行可读、同菜单另一归属被 DataFilter
+  拒绝、父 Id 不存在、同 Id 不同表、伪造租户/类型/可信标记、历史敏感原文不返回都需验收。
+  安全评论绑定写入及旧数据处理须独立交付后才能宣称评论完整可用。
+
 ## Body 结构（POST JSON）
 
 ```jsonc

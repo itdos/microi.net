@@ -117,30 +117,31 @@ namespace Dos.ORM
         /// </summary>
         public virtual void Commit()
         {
-            trans.Commit();
-
-            IsCommitOrRollback = true;
+            if (isClose || IsCommitOrRollback) throw new InvalidOperationException("事务已经结束。");
+            Action[] callbacks = Array.Empty<Action>();
             try
             {
-                Action[] callbacks;
+                trans.Commit();
+                IsCommitOrRollback = true;
                 lock (afterCommitLock)
                 {
                     callbacks = afterCommitCallbacks.ToArray();
                     afterCommitCallbacks.Clear();
                 }
-                foreach (var callback in callbacks)
-                {
-                    try { callback(); }
-                    catch (Exception ex)
-                    {
-                        // 数据库事务已经提交，提交后通知失败不能把已提交业务伪装成回滚。
-                        RuntimeDiagnostics.Write("Dos.ORM", "AfterCommitCallbackFailed", "事务提交后回调执行失败", ex.ToString(), 3);
-                    }
-                }
             }
             finally
             {
+                // 提交异常也必须释放；提交后外部通知不能继续占用数据库连接。
                 Close();
+            }
+            foreach (var callback in callbacks)
+            {
+                try { callback(); }
+                catch (Exception ex)
+                {
+                    // 提交已成功，不重放写入，也不把通知失败报告成事务回滚。
+                    RuntimeDiagnostics.Write("Dos.ORM", "AfterCommitCallbackFailed", "事务提交后回调执行失败", ex.ToString(), 3);
+                }
             }
         }
 
@@ -165,16 +166,17 @@ namespace Dos.ORM
         /// </summary>
         public virtual void Rollback()
         {
-            trans.Rollback();
-
-            IsCommitOrRollback = true;
-
-            lock (afterCommitLock)
+            if (isClose || IsCommitOrRollback) return;
+            try
             {
-                afterCommitCallbacks.Clear();
+                trans.Rollback();
             }
-
-            Close();
+            finally
+            {
+                IsCommitOrRollback = true;
+                lock (afterCommitLock) afterCommitCallbacks.Clear();
+                Close();
+            }
         }
 
 
@@ -221,6 +223,7 @@ namespace Dos.ORM
                 catch { }
 
                 try { trans.Dispose(); } catch { }
+                try { conn.Dispose(); } catch { }
             }
         }
 

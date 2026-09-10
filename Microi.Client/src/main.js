@@ -621,7 +621,8 @@ initApp().then(async function () {
     var failedOsClient = "";
     try { failedApiBase = DiyCommon.GetApiBase(); } catch (readApiBaseError) {}
     try { failedOsClient = DiyCommon.GetOsClient(); } catch (readOsClientError) {}
-    reportApiServiceFailure(error, {
+    // 身份/菜单读取已由请求层报告实际连接状态；不要把路由初始化失败改报为配置接口断网。
+    if (!error?.bootstrapStage) reportApiServiceFailure(error, {
         apiBase: failedApiBase,
         osClient: failedOsClient,
         url: error?.config?.url || (failedApiBase ? failedApiBase + "/apiengine/platform-sys-config" : "")
@@ -629,6 +630,7 @@ initApp().then(async function () {
     window.__MICROI_APP_BOOT_ERROR__ = error?.message || String(error || "应用初始化失败");
     dispatchMicroiBootEvent("microi:app-boot-failed", {
         message: window.__MICROI_APP_BOOT_ERROR__,
+        kind: error?.bootstrapStage ? "route" : "service",
         apiBase: failedApiBase,
         osClient: failedOsClient
     });

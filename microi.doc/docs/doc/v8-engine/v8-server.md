@@ -59,6 +59,10 @@ ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
 
 旧地址 `/api/Os/GetDateTimeNow` 和 `/api/SysLog/AddSysLog` 也纳入同一兼容入口，并分别由 SaaS 引擎应用中的 `platform-os-legacy-compatibility`、`platform-client-log` 唯一交付。路径及 OS 动作大小写不敏感，支持 `getDateTimeNow` 和租户路径后缀。时间接口允许匿名 GET/POST，保持 `{ Code:1, Data:'yyyy/MM/dd HH:mm:ss' }`；日志接口支持已登录用户 GET/POST，租户和用户由 DiyToken 确定，不能通过 `UserId/UserName/Category/Action` 伪造平台审计。日志返回成功表示进入现有异步持久化流程，查到日志记录后才代表持久化验收通过。
 
+旧部门树地址 `/api/SysDept/GetSysDeptStep` 由 SaaS 引擎应用的 `platform-sys-dept` 通过 `ApiRoutes` 交付，支持已登录用户 GET/POST、大小写和租户路径后缀。旧 JSON 请求 `{ "FormEngineKey":"Sys_Dept" }` 不必补 `Action`，返回原有 `{ Code, Data }` 及递归 `_Child` 结构，排序和组织范围仍使用既有部门逻辑。该历史地址固定为读树，即使传入 `Action:"DelSysDept"` 也不会删除；用户与租户来自 DiyToken，不信任请求的 `_CurrentUser`。新客户端使用 `/apiengine/platform-sys-dept` 并传 `{ "Action":"GetSysDeptStep" }`。
+
+若部门引擎尚未安装，更新后的兼容 Controller 仅为此历史读树地址复用既有 Core 原子；不会为新增、修改、删除部门提供缺引擎兜底。引擎已配置但停用、禁止 HTTP、拒绝权限或执行失败时照常失败。要同时覆盖正常引擎与未完成应用升级的租户，需分别更新后端镜像和“SaaS引擎”应用，不能只保存一份 V8 源码就宣称 Controller 已更新。
+
 ```javascript
 // 同步调用
 var result = V8.ApiEngine.Run('ApiEngineKey', { 
@@ -72,6 +76,11 @@ var result2 = V8.ApiEngine.Run('ApiEngineKey', {
 ```
 
 接口引擎返回值与事务语义：
+
+新代码推荐 `return { Code:1, Data:... }`。历史 `V8.Result = { Code:1, Data:... }`
+继续兼容，包括脚本末尾或裸 `return;`；两种写法用于同步和异步引擎都保留结果。
+若两种写法同时使用，以明确返回的非 `undefined` 值优先；失败的 `Code=0` 不能被
+静默改成成功。重定向等响应配置与结果写法独立，迁移不需要把所有旧脚本批量重写。
 
 - 返回 `DosResult` 或带 `Code` 的对象：`Code === 1` 提交，其它值回滚。
 - 返回对象但没有 `Code`：回滚，避免“忘记返回状态”时误提交。
@@ -112,6 +121,8 @@ return { Code: 1, Data: { Count: 5 } };
 ### 接口引擎受控 HTTP 响应
 
 将“响应类型”设为 `HTTP` 后，接口引擎可返回标准协议需要的状态码、Content-Type、正文和安全响应头，不必创建 Controller：
+
+通过 MCP 创建或保存时，分别在 `microi_create_engine`、`microi_save_engine_code` 中传 `responseType: "HTTP"`。工具枚举和目标后端必须同时支持该模式；保存后以真实 HTTP 请求检查状态码、响应头和正文，内部运行成功不能替代协议验收。
 
 ```javascript
 return {
@@ -427,6 +438,8 @@ var result = V8.Notification.Send({
 后端接口引擎和后端表单 V8 事件在活跃 V8 上下文中调用 FormEngine 时，由服务端写入不可被外部 JSON 构造的可信标记，因此不要求 `_SysMenuId`。租户边界、平台保护表和脚本自身的业务校验仍然生效。浏览器或其它外部 HTTP 请求不能通过伪造 `_InvokeType: 'Server'` 获得该信任；`_InvokeType` 只控制是否触发表单事件，不是身份或授权标记。
 
 这里要区分“进入事件前”和“事件内部”：浏览器调用 `AddFormData` 仍要先通过目标菜单的 `Add` 权限，菜单 `SqlWhere` / `SqlJoin` 只约束已有记录的查询、修改和删除，不用于拒绝一条尚不存在的新增记录；进入 `SubmitBeforeServerV8` / `SubmitAfterServerV8` 后，事件代码与接口引擎具有相同的服务器 FormEngine/数据库执行能力，可在当前租户内完成跨表事务、复杂 SQL 及归属字段写入。
+
+原生新增管线独立确定实际主键，`SubmitBeforeServerV8` 的 `V8.Form.Id` 可能为空；在事件里自行补 GUID 不等于改变实际插入主键。条码、明细或审计等需要主表 Id 的写入，应在 `SubmitAfterServerV8` 核验 `V8.Form.Id` 并通过同一 `V8.DbTrans` 回读主记录后执行。After 仍在事务提交前，附属记录失败应返回 `Code=0`，主表与附属记录一起回滚。验收同时比较新增响应 Id、主表 Id、附属外键和审计 RowId，避免成功响应掩盖孤立引用。
 
 前端/外部 HTTP 的菜单授权、历史无 `_SysMenuId` 推断、TableChild 委托和行级权限规则详见 [FormEngine 安全授权](./form-engine.md#安全授权模型)。
 
@@ -1158,6 +1171,12 @@ var count = V8.Db.FromSql("select count(1) from sys_user where Status = @p0")
 
 安装或更新应用商城中的“数据库扩展”后，`microi_database` 的后端提交后事件会调用 `V8.Method.RefreshExtensionDatabases()`。事件在事务提交后递增按 `OsClient` 隔离的 Redis 版本，因此新增、修改、停用或删除连接后，各 API 节点下一次访问 `V8.Dbs` 即可看到新配置，无需重启；短 TTL 仅作为旧版本节点的兼容兜底。
 
+Oracle 原生日期格式化使用 `TO_CHAR(日期值, 'YYYY-MM-DD')`，不要交换值与格式的顺序。
+`ToArray()` / `ToList()` 才会执行并读取查询，因此错误堆栈停在该方法不等于集合转换失败。
+若出现 `ORA-01722`，应核对最终 SQL、参数类型及账号筛选条件，分别验证计数和列表查询，
+不要用重复执行掩盖确定性的转换错误。旧版 Oracle Provider 曾错误交换 `TO_CHAR` 参数，
+应升级包含原生 SQL 保留修复的后端；无需修改数据库列或将业务查询改为无条件查询。
+
 ```js
 var dataList = V8.Dbs.OracleDB1
     .FromSql('SELECT ID, NAME FROM CUSTOMER WHERE STATUS = @p0')
@@ -1195,6 +1214,8 @@ try {
 新增或修改保存连接后会递增共享 Redis 版本，各节点在下一次访问时立即回源，不需要重启 API。默认兜底 TTL 为 60 秒，需要调整时修改 SaaS 引擎主租户的 `ExtensionDatabaseCacheSeconds`。连接串、密码和鉴权参数不得出现在日志、前端代码或接口返回中。
 
 ## 数据库事务 V8.DbTrans
+`V8.Db` 是主库会话，`V8.Db.FromSql` 不会自动加入当前接口引擎事务。需要共同提交或回滚的 SQL 必须使用 `V8.DbTrans.FromSql`；依赖本事务尚未提交的数据时，查询也使用该入口。`FormEngine` 和嵌套 `ApiEngine.Run` 显式传入 `V8.DbTrans` 共享事务。不要读取安全代理的内部事务来手动提交。
+
 >* 数据库事务对象，可以像V8.Db一样使用，如：
 ```js
 var array = V8.DbTrans.FromSql('...').ToArray();
@@ -2395,6 +2416,8 @@ var storageType = V8.ClientModel.HDFS; // ClientModel 是兼容别名
 
 ## V8.OldForm
 >* 在修改数据时，后端V8事件可访问到V8.OldForm修改前的数据值
+
+原生删除事件中，平台将删除前的数据库记录放入 `V8.Form`，`V8.OldForm` 可能为空。删除审计或关联清理应使用 `V8.Form`；修改事件继续使用 `V8.OldForm`。删除上下文中的版本字段是数据库当前快照，不能据此声称已校验客户端期望版本。业务要求防止过期删除时，应由受控接口接收期望版本、锁定并校验主库记录，然后在同一事务删除。
 
 ## V8.FormSubmitAction
 >* 表单提交类型：可能的值：`Insert` `Delete` `Update`（string类型）

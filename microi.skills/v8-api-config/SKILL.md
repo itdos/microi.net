@@ -43,6 +43,8 @@ ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
 - 主路由与多路由不得重复，也不得与其它启用接口的主路由/多路由冲突；保存、启动闭包和缓存初始化都必须失败关闭并指出冲突 Key，禁止后写覆盖先写。
 - 新客户端仍使用 `/apiengine/{ApiEngineKey}` 或主 `ApiAddress`。多路由用于 Controller 迁移、旧移动端和第三方已登记回调的兼容，不得拿它复制多份相同接口代码。
 - MCP 创建接口时传 `apiRoutes: ['/api/Old/A', '/api/Old/B']`；更新时省略表示保留，传空字符串/空数组表示清空。官方应用包必须同时携带 `ApiRoutes`、醒目 Managed 提示与 `ResourcePolicies.ApiEngines`。
+- 迁移旧 Controller 不能只迁方法名：同时核对历史 GET/POST、JSON/Form/Query、无需 `Action` 的调用和原始返回结构。按服务端 `_RequestPath` 精确识别兼容动作，历史只读地址不得被请求 `Action` 改为写操作；现代稳定 Key 的其它合法动作仍须可用。
+- 部门树旧地址 `/api/SysDept/GetSysDeptStep` 由 `platform-sys-dept` 的多路由交付，保留 DiyToken、组织范围及 `_Child`。缺引擎兜底仅登记该历史读地址，不能把整个现代引擎地址截获为只读分发器。验收需对比引擎存在、缺失再恢复的同一用户树结构，并验证匿名、伪造身份、停用/StopHttp 不绕过。
 
 ### 资源预算与嵌套调用（强制理解）
 
@@ -73,6 +75,8 @@ return { Code: 1, Data: { Count: rows.length } };
 ### 受控原始 HTTP 响应（ResponseType=HTTP）
 
 标准协议需要非 200 状态、重定向、XML/纯文本或指定 Content-Type 时，不要新建 Controller。设置 `ResponseType=HTTP`，并返回统一契约：
+
+MCP 的 `microi_create_engine` 与 `microi_save_engine_code` 使用 `responseType: "HTTP"`。若工具枚举仍拒绝该值，说明当前 MCP 尚未加载支持版本；使用同源新版 MCP 新进程，不把响应降级为 JSON，也不通过 SQL 改写接口配置。更新 MCP 不代表目标后端已经支持此协议，仍需验证真实 HTTP 状态、响应头和正文。
 
 ```javascript
 return {

@@ -44,6 +44,23 @@ MySQL 的 `ALTER COLUMN DROP DEFAULT` 会让可空列也在省略字段时报 13
 6. 绑定菜单后补齐/允许平台推断列表列、搜索列、隐藏列、排序列、移动端列和默认排序。
 7. 回读 `diy_field`、刷新 schema 缓存，再在真实新增/编辑/查看表单中验收。
 
+## 原生查询主库策略
+
+- 对不能接受副本延迟的权限关系等表，显式配置 `diy_table.ReadPrimary=1`；普通表保持
+  `NULL/0`。只能从可信表元数据选择连接，禁止让查询请求的 `ReadPrimary`、`TableModel`
+  或 `DataBaseId` 控制主库/副本。此配置不扩大菜单、表、记录或字段权限。
+- 原生 Get、List、Count/CountBatch、SUM 批量与回退、Tree 子计数和 Export 必须共用
+  目标表所属数据库的 writer 选择；扩展库不得误回租户基础库。主库不可用或配置非法必须
+  失败，不能以副本或0计数伪装成功。直接调用 `V8.DbRead` 的语义不变。
+- 显式 `DbTrans` 保留，不为主库策略跳出事务；父事务旧 RR 快照仍可能看见旧授权关系，
+  不能声称仅开启本字段就实现与撤权原子串行。需要实时授权时采用独立受控主库身份读取。
+- 标准 `microi_create_table`、`microi_update_table` 和 Manifest `tables[].readPrimary`
+  支持 `null/0/1`，省略保持已有配置，显式 `null` 清回缺省。先升级后端并安装正式表单
+  引擎字段，再配置；不通过定制 `.NET` 启动迁移或原始 SQL 补字段。
+- 元数据冷回源使用主库，写后清表缓存并回读。验收分别证明字段定义、可空物理列、配置值、
+  普通身份真实 Rows/Count/SUM/Tree/Export 与撤权边界；离线会话选择测试不能冒充复制延迟
+  或七种数据库实机测试。所有新普通表字段保持可空，不把已有表批量设为主库。
+
 ## 上传字段配置（AI 生成时强制）
 
 - 图片使用 `Config.ImgUpload`，至少明确 `Limit`、`Multiple`、`MaxCount`、`Preview`、
@@ -102,8 +119,15 @@ Drawer 只服务超长复杂表单，不能作为所有 CRUD 模块的模板默�
   授权 `TableChild` 的语义统计。
 - 未配置的存量表由运行时按字段类型智能推断，不能因为物理字段为空而隐藏或展示空壳。
   只有 `FormBannerEnabled=0` 才隐藏。
+- 字段绑定须区分省略/`NULL` 与显式空字符串：`titleField/subtitleField/imageField/backgroundField`
+  省略或 `NULL` 表示未选择，允许兼容推断；显式 `""` 表示不绑定该字段，不能被推断值或旧别名
+  覆盖。取消标题/图片字段后仍保留表单名称/默认图标回退。完整验收须同时使用包含该语义的 MCP
+  与平台前端，逐项回读空字符串并验证实际表单；不能只看到写入 `Code=1` 就宣称生效。
 - 完整系统 Manifest 使用 `tables[].formBanner`；未提供时 `microi_generate_system` 仍须写入
   类型感知的默认值。逐步创建字段后调用 `microi_configure_form_banner` 并回读验证。
+- `microi_generate_system` 的最终验收与 `microi_validate_system` 必须逐表回读 Banner 语义字段；
+  写入返回成功、结构验收 `Code=1` 都不能代替已持久化配置，`Data.Passed=false` 仍视为失败。
+  旧库缺少 Banner 物理列时先完成平台正式升级，再配置和重新验收，不直接执行 SQL 补列。
 - 表单设计器验收必须覆盖有/无图片、有/无统计、子表完整聚合、接口失败回退、浅色、深色、
   PC 和窄屏，并检查文字对比度以及不存在技术字段伪统计。
 

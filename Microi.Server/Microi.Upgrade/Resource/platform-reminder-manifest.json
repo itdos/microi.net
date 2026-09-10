@@ -1,0 +1,371 @@
+{
+  "name": "吾码平台提醒",
+  "tables": [
+    {
+      "name": "mci_platform_reminder",
+      "description": "平台提醒",
+      "v8Limit": false,
+      "formBanner": {
+        "enabled": true,
+        "titleField": "Title",
+        "icon": "fas fa-bell",
+        "tagFields": [],
+        "metrics": []
+      },
+      "fields": [
+        {
+          "name": "Title",
+          "label": "标题",
+          "type": "varchar(200)",
+          "component": "Text",
+          "sort": 1,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "ReminderType",
+          "label": "提醒类型",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 2,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "ScopeType",
+          "label": "接收范围",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 3,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "Revision",
+          "label": "草稿版本",
+          "type": "int",
+          "component": "NumberText",
+          "sort": 4,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "Status",
+          "label": "发布状态",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 5,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "RuleJson",
+          "label": "规则内容",
+          "type": "mediumtext",
+          "component": "Textarea",
+          "sort": 6,
+          "formWidth": 24,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "PublishedBatchId",
+          "label": "当前发布记录",
+          "type": "varchar(32)",
+          "component": "Text",
+          "sort": 7,
+          "visible": 1,
+          "appVisible": 1
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_reminder_scope_status",
+          "columns": [
+            "ScopeType",
+            "Status"
+          ],
+          "purpose": "提醒管理筛选"
+        }
+      ]
+    },
+    {
+      "name": "mci_platform_reminder_batch",
+      "description": "平台提醒发布记录",
+      "v8Limit": false,
+      "formBanner": {
+        "enabled": true,
+        "titleField": "RuleId",
+        "icon": "fas fa-bell",
+        "tagFields": [],
+        "metrics": []
+      },
+      "fields": [
+        {
+          "name": "RuleId",
+          "label": "提醒规则",
+          "type": "varchar(32)",
+          "component": "Text",
+          "sort": 1,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "Revision",
+          "label": "发布版本",
+          "type": "int",
+          "component": "NumberText",
+          "sort": 2,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "Title",
+          "label": "标题",
+          "type": "varchar(200)",
+          "component": "Text",
+          "sort": 3,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "State",
+          "label": "投递状态",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 4,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "ScopeType",
+          "label": "接收范围",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 5,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "SnapshotJson",
+          "label": "发布内容",
+          "type": "mediumtext",
+          "component": "Textarea",
+          "sort": 6,
+          "formWidth": 24,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "StartsAt",
+          "label": "开始时间 UTC",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 7,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "EndsAt",
+          "label": "结束时间 UTC",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 8,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "PublishRequestId",
+          "label": "发布请求标识",
+          "type": "varchar(80)",
+          "component": "Text",
+          "sort": 9,
+          "visible": 1,
+          "appVisible": 1
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_reminder_batch_state_end",
+          "columns": [
+            "State",
+            "EndsAt"
+          ],
+          "purpose": "查询有效提醒"
+        },
+        {
+          "name": "ix_reminder_batch_rule",
+          "columns": [
+            "RuleId"
+          ],
+          "purpose": "查询发布历史"
+        }
+      ]
+    },
+    {
+      "name": "mci_platform_reminder_target",
+      "description": "平台提醒接收对象",
+      "v8Limit": false,
+      "formBanner": {
+        "enabled": true,
+        "titleField": "BatchId",
+        "icon": "fas fa-bell",
+        "tagFields": [],
+        "metrics": []
+      },
+      "fields": [
+        {
+          "name": "BatchId",
+          "label": "发布记录",
+          "type": "varchar(32)",
+          "component": "Text",
+          "sort": 1,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "TargetKey",
+          "label": "接收对象",
+          "type": "varchar(100)",
+          "component": "Text",
+          "sort": 2,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "ScopeType",
+          "label": "接收范围",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 3,
+          "visible": 1,
+          "appVisible": 1
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ux_reminder_target_batch_key",
+          "columns": [
+            "BatchId",
+            "TargetKey"
+          ],
+          "unique": true,
+          "purpose": "防止重复接收对象"
+        },
+        {
+          "name": "ix_reminder_target_key_batch",
+          "columns": [
+            "TargetKey",
+            "BatchId"
+          ],
+          "purpose": "子租户读取父提醒"
+        }
+      ]
+    },
+    {
+      "name": "mci_platform_reminder_receipt",
+      "description": "平台提醒领取与关闭记录",
+      "v8Limit": false,
+      "formBanner": {
+        "enabled": true,
+        "titleField": "BatchId",
+        "icon": "fas fa-bell",
+        "tagFields": [],
+        "metrics": []
+      },
+      "fields": [
+        {
+          "name": "BatchId",
+          "label": "发布记录",
+          "type": "varchar(32)",
+          "component": "Text",
+          "sort": 1,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "OccurrenceKey",
+          "label": "提醒实例",
+          "type": "varchar(150)",
+          "component": "Text",
+          "sort": 2,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "ReceiverUserId",
+          "label": "接收用户",
+          "type": "varchar(36)",
+          "component": "Text",
+          "sort": 3,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "EntryId",
+          "label": "页面会话",
+          "type": "varchar(80)",
+          "component": "Text",
+          "sort": 4,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "SourceType",
+          "label": "提醒来源",
+          "type": "varchar(20)",
+          "component": "Text",
+          "sort": 5,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "ClosedAt",
+          "label": "关闭时间 UTC",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 6,
+          "visible": 1,
+          "appVisible": 1
+        },
+        {
+          "name": "ShownAt",
+          "label": "领取时间 UTC",
+          "type": "varchar(30)",
+          "component": "Text",
+          "sort": 7,
+          "visible": 1,
+          "appVisible": 1
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_reminder_receipt_user",
+          "columns": [
+            "ReceiverUserId",
+            "OccurrenceKey"
+          ],
+          "purpose": "当前用户回执对账"
+        }
+      ]
+    },
+    {
+      "name": "mic_msgset",
+      "description": "消息通知配置，保留既有物理表与业务数据",
+      "fields": [
+        {
+          "name": "ConfigRevision",
+          "label": "配置版本",
+          "type": "int",
+          "component": "NumberText",
+          "sort": 999,
+          "visible": 0,
+          "appVisible": 0,
+          "readonly": 1,
+          "defaultValue": "0",
+          "description": "统一通知配置接口并发校验；存量空值按 0 处理。"
+        }
+      ]
+    }
+  ]
+}

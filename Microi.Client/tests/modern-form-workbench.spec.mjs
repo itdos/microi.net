@@ -33,7 +33,11 @@ test("startup screen distinguishes mount, readiness, slow service and recoverabl
     assert.match(loading, /startupRetry/);
     assert.match(html, /id="startupStatus"/);
     assert.match(loading, /系统初始化尚未完成，请检查服务后重新加载/);
-    assert.match(html, /microi\.loading\.js\?d=2026081703/);
+    // Cache versions advance when startup diagnostics change. Require a real,
+    // cache-busted script reference without rejecting a newer valid version.
+    const loadingScripts = [...html.matchAll(/<script\b[^>]*\bsrc=["']\/static\/js\/microi\.loading\.js\?d=(\d{10})["'][^>]*>/g)];
+    assert.equal(loadingScripts.length, 1, "load the startup runtime exactly once");
+    assert.ok(Number(loadingScripts[0][1]) >= 2026091001, "do not restore a stale startup runtime cache key");
     assert.match(osClient, /MICROI_SYSCONFIG_UNAVAILABLE/);
     assert.match(osClient, /throw sysConfigError/);
 });

@@ -8,6 +8,8 @@ import { buildMcpOcrResult, decodeMcpTranslatedFile, OCR_MAX_BASE64_CHARACTERS, 
 export { buildMcpOcrResult, decodeMcpTranslatedFile, prepareMcpOcrInput, prepareMcpTranslateFileInput, } from './document-inputs.js';
 import { buildDefaultFormBanner, buildDefaultModulePresentation, inferTableColumnWidth, normalizeAllMenuJson, normalizeViewSchemaJson, registerAdvancedTools, } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
+import { registerEmailTools } from './email-tools.js';
+import { registerMessageNotificationTools } from './message-notification-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
 import { generateMiniMaxMusic3Fallback, isRetiredMiniMaxMusicApi, } from './minimax-music3-fallback.js';
@@ -632,7 +634,7 @@ function validateApplicationAssetV3UploadEvidence(result, expected) {
     }
     return evidence;
 }
-function validateApplicationAssetV3FinalizeEvidence(result, expected) {
+export function validateApplicationAssetV3FinalizeEvidence(result, expected) {
     const evidence = asJsonRecord(result.Data);
     const context = `v3 ${expected.publishMode}`;
     requireStreamEvidenceNumber(evidence, 'ProtocolVersion', 3, context);
@@ -661,9 +663,25 @@ function validateApplicationAssetV3FinalizeEvidence(result, expected) {
     }
     const state = String(evidence.PublishState || '');
     if (expected.publishMode === 'stage') {
-        requireStreamEvidenceString(evidence, 'PhaseState', 'ReleaseVerified', context);
-        if (state !== 'ReleaseVerified' || String(evidence.PointerState || '') !== 'Uncommitted' || evidence.Pending !== false) {
-            throw new Error('v3 stage 必须返回 ReleaseVerified/Uncommitted/Pending=false');
+        const verifying = state === 'Verifying';
+        requireStreamEvidenceString(evidence, 'PhaseState', verifying ? 'Verifying' : 'ReleaseVerified', context);
+        if ((!verifying && state !== 'ReleaseVerified') || String(evidence.PointerState || '') !== 'Uncommitted'
+            || evidence.Pending !== verifying || evidence.Completed === true) {
+            throw new Error('v3 stage 必须返回 Verifying/Pending=true 或 ReleaseVerified/Pending=false，且不得提交指针');
+        }
+        if (verifying) {
+            requireStreamEvidenceString(evidence, 'VerificationTaskId', versionId, context);
+            for (const [current, total] of [['VerifiedCount', 'TotalCount'], ['VerifiedBytes', 'TotalBytes']]) {
+                const done = evidence[current];
+                const all = evidence[total];
+                if (!Number.isSafeInteger(done) || !Number.isSafeInteger(all) || done < 0 || all < 0 || done > all) {
+                    throw new Error(`v3 stage ${current}/${total} 校验进度无效`);
+                }
+            }
+            if (expected.assetCount !== undefined)
+                requireStreamEvidenceNumber(evidence, 'TotalCount', expected.assetCount, context);
+            if (expected.totalSize !== undefined)
+                requireStreamEvidenceNumber(evidence, 'TotalBytes', expected.totalSize, context);
         }
         if (publishFence !== expected.expectedPublishFence
             || publishRowVersion !== expected.expectedPublishRowVersion) {
@@ -1894,7 +1912,10 @@ export async function runApplicationDirectoryStreamPublish(client, input) {
         }
         let uploadedCount = 0;
         let idempotentCount = 0;
-        if (publishMode !== 'finalize') {
+        if (input.verificationOnly && (!v3 || publishMode !== 'stage')) {
+            throw new Error('verificationOnly 仅用于协议 v3 stage 的冻结清单校验/回读。');
+        }
+        if (publishMode !== 'finalize' && !input.verificationOnly) {
             const requestIdByPath = new Map(assetRequests.map(item => [item.Path, item.RequestId]));
             const uploadOrder = [...manifest.assets].sort((left, right) => Number(left.isEntry) - Number(right.isEntry));
             for (const asset of uploadOrder) {
@@ -2103,6 +2124,8 @@ export async function runApplicationDirectoryStreamPublish(client, input) {
                     entryPath: manifest.entryPath,
                     encodedEntryPath: v3EncodedRelativePaths.get(manifest.entryPath)
                         || encodeApplicationAssetStreamV3RelativePath(manifest.entryPath, 'v3 EntryPath'),
+                    assetCount: manifest.assets.length,
+                    totalSize: manifest.totalSize,
                 })
                 : validateApplicationFinalizeEvidence(finalizeResult, {
                     requestId: finalizeRequestId,
@@ -2137,8 +2160,8 @@ export async function runApplicationDirectoryStreamPublish(client, input) {
                 runtimeManifestHash: v3.runtimeManifestHash,
                 assetRequestManifestHash,
                 assetCount: manifest.assets.length,
-                stagedCount: publishMode === 'stage' ? manifest.assets.length : 0,
-                uploadedCount: publishMode === 'stage' ? manifest.assets.length : 0,
+                stagedCount: publishMode === 'stage' && !input.verificationOnly ? manifest.assets.length : 0,
+                uploadedCount,
                 idempotentCount,
                 totalSize: manifest.totalSize,
                 transport: publishMode === 'stage'
@@ -3178,7 +3201,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tools: MiniMax 原创音乐与短对白
     // ========================
-    server.tool('microi_generate_minimax_music', `Generate one original instrumental game-music asset through the authenticated Microi AI engine for OsClient "${osClient}". The server fixes MiniMax music-2.6, 44.1kHz, 256kbps MP3, keeps provider credentials private, persists the result to tenant HDFS, and uses RequestId for idempotency. This consumes an external AI quota, so confirmExecution must exactly equal requestId.`, {
+    server.tool('microi_generate_minimax_music', `Generate one original instrumental music asset through the authenticated Microi AI engine for OsClient "${osClient}". The server prefers MiniMax music-3.0 and safely falls back to the official open-source MiniMax-Music3 Space only after an explicit 410 retirement response. It keeps provider credentials private, persists the result to tenant HDFS, and uses RequestId for idempotency. This may consume external AI quota, so confirmExecution must exactly equal requestId.`, {
         requestId: z.string().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/u).describe('Stable idempotency key. Reuse it for retries of the same prompt.'),
         prompt: z.string().min(1).max(2000).describe('Original instrumental music brief. Do not request imitation of a living artist or copyrighted recording.'),
         durationSeconds: z.number().int().min(10).max(60).optional().describe('MiniMax-Music3 fallback duration. Default 20 seconds.'),
@@ -3187,11 +3210,12 @@ export function createMcpServer(client, context) {
         const payload = {
             RequestId: requestId,
             Prompt: prompt,
-            Model: 'music-2.6',
+            Model: 'music-3.0',
             IsInstrumental: true,
             SampleRate: 44100,
             Bitrate: 256000,
             Format: 'mp3',
+            DurationSeconds: durationSeconds || 20,
         };
         if (confirmExecution !== requestId) {
             return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, payload, requiredConfirmation: requestId }, null, 2) }] };
@@ -4516,7 +4540,7 @@ export function createMcpServer(client, context) {
         functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
         changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
         v8Limit: z.boolean().optional().describe('Positive switch. false/default means unrestricted Jint execution budgets; true applies this engine\'s configured timeout/statement/recursion/allocation limits. Omit to preserve the current value.'),
-        responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream']).optional().describe('HTTP response mode. Use Stream for SSE/NDJSON and emit chunks with V8.Stream.Write or WriteAsync. Omit to preserve the current value.'),
+        responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream', 'HTTP']).optional().describe('HTTP response mode. HTTP returns validated DataAppend.HttpResponse status/headers/body; Stream emits SSE/NDJSON. Omit to preserve the current value.'),
         apiRoutes: z.union([z.string(), z.array(z.string())]).optional().describe('多路由 compatibility aliases. Use a semicolon-separated string or an array of absolute paths. Omit to preserve; pass an empty string/array to clear.'),
         v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
         confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
@@ -4556,7 +4580,7 @@ export function createMcpServer(client, context) {
         changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
         apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
         apiRoutes: z.union([z.string(), z.array(z.string())]).optional().describe('多路由 compatibility aliases for the same engine. Supply absolute paths separated by English semicolons or as an array.'),
-        responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream']).optional().describe('HTTP response mode. Default JSON; choose Stream for SSE/NDJSON incremental output.'),
+        responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream', 'HTTP']).optional().describe('HTTP response mode. Default JSON; HTTP returns validated DataAppend.HttpResponse status/headers/body; Stream emits SSE/NDJSON.'),
         v8Limit: z.boolean().optional().describe('Default false. false means no Jint per-execution budget; true applies the configured runtime limits. Process resident-memory guard always remains active.'),
         v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
     }, async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, apiRoutes, responseType, v8Limit, v8Unlimited }) => {
@@ -4756,10 +4780,10 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 统一查询系统日志/监控
     // ========================
-    server.tool('microi_query_system_observability', `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. Read actions cover logs/statistics/details, live signals, Trace timeline, hot API rank, runtime/host/Docker/queue snapshot, application logs, security records, platform statistics and network traffic attribution/history. The backend enforces platform-observability administrator permission, tenant isolation, bounded pagination and secret redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`, {
+    server.tool('microi_query_system_observability', `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. For memory exhaustion/OOM/abnormal allocations: Memory checks current-node pressure, Collector freshness/loss and Evidence storage health; MemoryIncidents returns up to 50 tenant-scoped incident summaries in Data.Items; MemoryIncident reads detail by incidentId from that list. Correlate execution/parent ids, API engine key, V8 table/event/workflow identity, script hash, allocation types/CLR stacks and Trace. Report missing stacks, lost/unattributed samples and storage gaps before assigning a cause. Allocated bytes are NOT retained heap or exclusive RSS; never sum inclusive parent and child allocations. These read actions do not enable V8 limits, create heap dumps, kill processes or write business data. They require a compatible API diagnostic runtime as well as the query engine; updating MCP alone cannot install the backend. Other read actions cover logs/statistics/details, signals, Trace, hot API rank, host/Docker/queues, application logs, security, platform statistics and traffic history. The backend enforces administrator permission, tenant isolation, bounded pagination and redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`, {
         action: z.enum([
             'Capabilities', 'Snapshot', 'Logs', 'LogTypes', 'LogStats', 'Signal', 'Trace',
-            'ApiRank', 'AppLogs', 'PlatformStats', 'SecurityData', 'TrafficHistory', 'TrafficDetails', 'HistoricalDashboard',
+            'ApiRank', 'AppLogs', 'PlatformStats', 'SecurityData', 'TrafficHistory', 'TrafficDetails', 'HistoricalDashboard', 'Memory', 'MemoryIncidents', 'MemoryIncident', 'DatabasePools', 'DatabasePoolRecovery',
         ]).describe('Read action. Use Capabilities first to discover exact scope and boundaries.'),
         keyword: z.string().max(100).optional().describe('Log/signal/security keyword. The backend applies its own bounded search rules.'),
         type: z.string().max(100).optional().describe('System log Type filter.'),
@@ -4776,6 +4800,7 @@ export function createMcpServer(client, context) {
         includeHost: z.boolean().optional().describe('Snapshot includes host/runtime overview. Default true.'),
         includeDocker: z.boolean().optional().describe('Snapshot includes heavier Docker sampling. Default false.'),
         traceId: z.string().regex(/^[0-9a-fA-F]{32}$/u).optional().describe('W3C 32-hex TraceId for Trace.'),
+        incidentId: z.string().regex(/^[0-9a-f]{32}$/u).optional().describe('Required for MemoryIncident: use an actual 32-lowercase-hex Id from MemoryIncidents Data.Items. Empty Items means not found in the visible tenant/storage scope, not proof of no incident.'),
         serviceName: z.string().max(100).optional().describe('Signal service-name filter.'),
         apiEngineKey: z.string().max(100).optional().describe('ApiRank engine-key filter.'),
         name: z.string().max(100).optional().describe('ApiRank endpoint/name filter.'),
@@ -4790,13 +4815,23 @@ export function createMcpServer(client, context) {
         ip: z.string().max(100).optional().describe('TrafficDetails client IP filter.'),
         userId: z.string().max(100).optional().describe('TrafficDetails authenticated user-id filter.'),
         endpoint: z.string().max(500).optional().describe('TrafficDetails normalized endpoint or /apiengine/{key} filter.'),
-    }, async ({ action, keyword, type, category, source, level, levelMin, searchMonth, pageIndex, pageSize, windowMinutes, windowSeconds, top, includeHost, includeDocker, traceId, serviceName, apiEngineKey, name, lines, kind, status, dimensionType, rangeKey, hours, observedOsClient, transferAction, ip, userId, endpoint, }) => {
+        poolTarget: z.enum(['Both', 'Write', 'Read']).optional().describe('DatabasePools: 当前租户主/读池，默认 Both；独立应急鉴权，不依赖业务池。需要支持 database-pools/v1 的 API。'),
+        operationId: z.string().regex(/^[0-9a-f]{32}$/u).optional().describe('DatabasePoolRecovery: 恢复操作编号，回读各节点状态；Pending/Incomplete 不代表已恢复。'),
+    }, async ({ action, keyword, type, category, source, level, levelMin, searchMonth, pageIndex, pageSize, windowMinutes, windowSeconds, top, includeHost, includeDocker, traceId, incidentId, serviceName, apiEngineKey, name, lines, kind, status, dimensionType, rangeKey, hours, observedOsClient, transferAction, ip, userId, endpoint, poolTarget, operationId, }) => {
         try {
+            if (action === 'DatabasePoolRecovery' && !operationId) {
+                return { content: [{ type: 'text', text: '连接池恢复回读必须传入原 operationId；请求超时不能换编号重试。' }], isError: true };
+            }
             if (action === 'Trace' && !traceId) {
                 return { content: [{ type: 'text', text: 'Trace 查询必须传入 32 位十六进制 traceId。' }], isError: true };
             }
+            if (action === 'MemoryIncident' && !incidentId) {
+                return { content: [{ type: 'text', text: '请先查询 MemoryIncidents，并传入 incidentId。' }], isError: true };
+            }
             const result = await client.querySystemObservability({
                 Action: action,
+                ...(poolTarget ? { Target: poolTarget } : {}),
+                ...(operationId ? { OperationId: operationId } : {}),
                 ...(keyword ? { Keyword: keyword, _Keyword: keyword } : {}),
                 ...(type ? { Type: type } : {}),
                 ...(category ? { Category: category } : {}),
@@ -4812,6 +4847,7 @@ export function createMcpServer(client, context) {
                 ...(includeHost === undefined ? {} : { IncludeHost: includeHost }),
                 ...(includeDocker === undefined ? {} : { IncludeDocker: includeDocker }),
                 ...(traceId ? { TraceId: traceId.toLowerCase() } : {}),
+                ...(incidentId ? { IncidentId: incidentId } : {}),
                 ...(serviceName ? { ServiceName: serviceName } : {}),
                 ...(apiEngineKey ? { ApiEngineKey: apiEngineKey } : {}),
                 ...(name ? { Name: name } : {}),
@@ -4845,15 +4881,34 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 系统日志/监控 IP 治理
     // ========================
-    server.tool('microi_manage_system_observability', `Safely manage an IP block through Microi 系统日志/监控 for OsClient ${osClient}. Supported actions are BlockIp and UnblockIp only. The first call without the exact confirmation returns a dry-run preview and performs no write. The backend revalidates platform-admin permission, IP safety, tenant scope and writes an audit record.`, {
-        action: z.enum(['BlockIp', 'UnblockIp']).describe('Security governance action.'),
-        ip: z.string().min(3).max(64).describe('IPv4 or IPv6 address. Host/local/unspecified/multicast targets are rejected again by the backend.'),
+    server.tool('microi_manage_system_observability', `Manage Microi 系统日志/监控 for OsClient ${osClient}. BlockIp/UnblockIp manage IP blocks. ResetDatabasePools 在线轮换当前租户 MySQL/SQL Server 主/读连接池，无需重启数据库/API。先调用无 confirmExecution 的预览，使用返回的 operationId、poolIds、poolTarget 和 requiredConfirmation 执行，再通过查询工具 action=DatabasePoolRecovery 回读各节点；超时沿用原编号。应急入口仍复核 DiyToken、主库管理员及 mcp:admin，要求兼容 database-pools/v1 的 API，MCP 更新不能安装后端。共享池/扩展库/不支持驱动不清理。只轮换指定池并探测 SELECT 1，不杀事务、不重放 SQL、不保证修复持续泄漏/容量/网络故障。随后验证原故障业务接口。`, {
+        action: z.enum(['BlockIp', 'UnblockIp', 'ResetDatabasePools']).describe('IP 治理或在线连接池恢复。'),
+        ip: z.string().min(3).max(64).optional().describe('IP 操作必填，IPv4/IPv6；连接池操作不传。'),
+        poolTarget: z.enum(['Both', 'Write', 'Read']).optional().describe('当前租户主/读池，默认 Both。使用预览中的 Target。'),
+        operationId: z.string().regex(/^[0-9a-f]{32}$/u).optional().describe('使用预览返回的 OperationId，所有重试保持相同编号。'),
+        poolIds: z.array(z.string().regex(/^[0-9a-f]{64}$/u)).min(1).max(2).optional().describe('预览返回的 PoolIds 原数组；配置变化时后端拒绝执行。'),
         blockMinutes: z.number().int().min(1).max(10080).optional().describe('Block duration in minutes, 1-10080. Default 30 for BlockIp.'),
         reason: z.string().max(300).optional().describe('Bounded operator reason. Do not include tokens, passwords or request bodies.'),
-        confirmExecution: z.string().optional().describe('Exact confirmation: BlockIp:<ip> or UnblockIp:<ip>.'),
-    }, async ({ action, ip, blockMinutes, reason, confirmExecution }) => {
+        confirmExecution: z.string().optional().describe('预览返回的精确确认值：BlockIp:<ip>、UnblockIp:<ip> 或 ResetDatabasePools:<operationId>。'),
+    }, async ({ action, ip, blockMinutes, reason, confirmExecution, poolTarget, operationId, poolIds }) => {
         try {
-            const normalizedIp = ip.trim();
+            if (action === 'ResetDatabasePools') {
+                if (!confirmExecution) {
+                    const preview = await client.querySystemObservability({ Action: 'DatabasePools', Target: poolTarget || 'Both' });
+                    const data = preview.Data;
+                    return { content: [{ type: 'text', text: JSON.stringify({ ...preview, dryRun: true,
+                                    requiredConfirmation: data?.OperationId ? `ResetDatabasePools:${data.OperationId}` : undefined }, null, 2) }],
+                        ...(preview.Code === 1 ? {} : { isError: true }) };
+                }
+                if (!operationId || !poolIds || confirmExecution !== `ResetDatabasePools:${operationId}`) {
+                    return { content: [{ type: 'text', text: '必须使用同一次预览的 operationId、poolIds 和 requiredConfirmation。' }], isError: true };
+                }
+                // 应急审计由独立控制面保存；不要先调用依赖坏池的普通审计接口。
+                const result = await client.manageSystemObservability({ Action: action, Target: poolTarget || 'Both',
+                    OperationId: operationId, PoolIds: poolIds, Confirm: confirmExecution });
+                return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], ...(result.Code === 1 ? {} : { isError: true }) };
+            }
+            const normalizedIp = (ip || '').trim();
             if (isIP(normalizedIp) === 0) {
                 return { content: [{ type: 'text', text: 'IP 地址格式无效。' }], isError: true };
             }
@@ -4943,16 +4998,17 @@ export function createMcpServer(client, context) {
         description: z.string().optional().describe('Chinese description of the table (e.g. "客户信息", "订单主表")'),
         tabs: z.string().optional().describe('Form tab layout JSON (e.g. \'[{"Id":"basic","Name":"基本信息","Sort":10},{"Id":"business","Name":"业务信息","Sort":20}]\'). Groups fields into diy_table.Tabs. When using microi_generate_system, many-field tables can be auto-tabbed.'),
         isTree: z.number().optional().describe('Enable tree structure (1=tree table with ParentId self-referencing, 0=flat). Default: 0'),
+        readPrimary: z.union([z.literal(0), z.literal(1)]).nullable().optional().describe('Trusted table configuration: 1 uses its database writer for native rows/count/sum/tree/export. null/0 uses the existing default; omit preserves existing configuration. Does not change explicit transaction isolation.'),
         column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 2 (双列，更紧凑现代)'),
         formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
         formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "80%"). Default: 80%'),
         v8Limit: z.boolean().optional().describe('Default false for new tables; omit to preserve an existing table. true enables Jint per-execution timeout, statement, recursion and allocation budgets for this table\'s backend V8 events.'),
         v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
-    }, async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth, v8Limit, v8Unlimited }) => {
+    }, async ({ name, description, tabs, isTree, readPrimary, column, formOpenType, formOpenWidth, v8Limit, v8Unlimited }) => {
         try {
             const requestedV8Limit = v8Limit ?? (v8Unlimited === undefined ? undefined : !v8Unlimited);
             const result = await client.createTable(name, description, {
-                Tabs: tabs, IsTree: isTree, Column: column ?? 2,
+                Tabs: tabs, IsTree: isTree, ReadPrimary: readPrimary, Column: column ?? 2,
                 FormOpenType: formOpenType || 'Dialog', FormOpenWidth: formOpenWidth || '80%',
                 V8Limit: requestedV8Limit === undefined ? undefined : (requestedV8Limit ? 1 : 0),
             });
@@ -5799,6 +5855,7 @@ export function createMcpServer(client, context) {
         column: z.number().optional().describe('Form columns: 1, 2 or 3'),
         description: z.string().optional(),
         isTree: z.number().optional(),
+        readPrimary: z.union([z.literal(0), z.literal(1)]).nullable().optional().describe('Set trusted diy_table.ReadPrimary: 1=target database writer, 0/null=default read source. Omit preserves it. Requires upgraded backend and official form-engine metadata; explicit DbTrans is preserved.'),
         tabs: z.string().optional(),
         formOpenType: z.string().optional(),
         formOpenWidth: z.string().optional(),
@@ -5830,6 +5887,8 @@ export function createMcpServer(client, context) {
                 patch.Description = args.description;
             if (args.isTree !== undefined)
                 patch.IsTree = args.isTree;
+            if (args.readPrimary !== undefined)
+                patch.ReadPrimary = args.readPrimary;
             if (args.tabs !== undefined)
                 patch.Tabs = args.tabs;
             if (args.formOpenType !== undefined)
@@ -7043,11 +7102,12 @@ export function createMcpServer(client, context) {
         routes: z.array(jsonRecordSchema).optional().default([]).describe('Canonical v3 route snapshot input; missing routes are frozen explicitly as [].'),
         routeSnapshotJson: z.string().max(1024 * 1024).optional().describe('Protocol v3 requires the exact recursive-key-sorted, array-order-preserving UTF-8 canonical JSON for routes.'),
         routeSnapshotHash: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 requires the lowercase SHA-256 of RouteSnapshotJson.'),
-        changeSummary: z.string().optional().describe('Version change summary stored in mci_ai_app_version.'),
+        changeSummary: z.string().max(2000).optional().describe('Version change summary stored in mci_ai_app_version on first stage insert. Maximum 2000 characters; retries preserve the original summary.'),
         sourceManifestHash: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Optional source-manifest SHA-256 returned by microi_sync_microservice_source, tying source and runtime to one delivery.'),
         runtimeManifestHash: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 requires the exact lowercase runtime-manifest SHA-256 computed during the local dry run.'),
         deliveryBatchId: z.string().min(8).max(50).optional().describe('Optional stable delivery batch id (8-50 characters, matching the API and LastBuildTaskId). When omitted MCP derives a deterministic id from app/version/manifest so retries remain stable.'),
         publishMode: z.enum(['stage', 'finalize', 'stage-and-finalize']).optional().default('stage-and-finalize').describe('stage uploads immutable assets only; finalize submits the local manifest only; stage-and-finalize preserves the original one-call behavior.'),
+        verificationOnly: z.boolean().optional().default(false).describe('Protocol v3 stage only: submit/read the same frozen verification task without uploading files again. Pending is not ReleaseVerified and never permits finalize.'),
         protocolVersion: z.literal(3).optional().describe('Explicit protocol v3 gate. When set, publishMode must be explicit stage or finalize and every v3 precondition is required.'),
         expectedGateEpoch: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 gate epoch as a canonical decimal bigint string.'),
         requestId: z.string().regex(/^[A-Za-z0-9._:-]{8,100}$/u).optional().describe('Protocol v3 stable release RequestId; stage/finalize and all Pending replays must reuse it exactly.'),
@@ -7065,7 +7125,7 @@ export function createMcpServer(client, context) {
         timeoutMsPerFile: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes.'),
         allowLegacyFallback: z.boolean().optional().default(false).describe('Deprecated compatibility flag. RequestId-capable two-phase publishing fails closed on old API nodes instead of publishing through the legacy payload.'),
         confirmExecution: z.string().optional().describe('Required for real publishing and must exactly equal appIdOrKey. Omit for a local preflight manifest only.'),
-    }, async ({ appIdOrKey, versionNo, directory, entryPath, routes, routeSnapshotJson, routeSnapshotHash, changeSummary, sourceManifestHash, runtimeManifestHash, deliveryBatchId, publishMode, protocolVersion, expectedGateEpoch, requestId, requestFingerprint, expectedCurrentVersion, expectedAppVersion, expectedPublishFence, expectedPublishRowVersion, expectedVersionRowVersion, expectedActivePublishVersionId, expectedCommittedPublishVersionId, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, allowLegacyFallback, confirmExecution }) => {
+    }, async ({ appIdOrKey, versionNo, directory, entryPath, routes, routeSnapshotJson, routeSnapshotHash, changeSummary, sourceManifestHash, runtimeManifestHash, deliveryBatchId, publishMode, verificationOnly, protocolVersion, expectedGateEpoch, requestId, requestFingerprint, expectedCurrentVersion, expectedAppVersion, expectedPublishFence, expectedPublishRowVersion, expectedVersionRowVersion, expectedActivePublishVersionId, expectedCommittedPublishVersionId, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, allowLegacyFallback, confirmExecution }) => {
         return runApplicationDirectoryStreamPublish(client, {
             appIdOrKey,
             versionNo,
@@ -7079,6 +7139,7 @@ export function createMcpServer(client, context) {
             runtimeManifestHash,
             deliveryBatchId,
             publishMode,
+            verificationOnly,
             protocolVersion,
             expectedGateEpoch,
             requestId,
@@ -7157,6 +7218,9 @@ export function createMcpServer(client, context) {
     registerDesignTools(server, client, context);
     registerAdvancedTools(server, client, context);
     registerBlueprintTools(server, client, context);
+    registerEmailTools(server, client, context);
+    // 统一通知工具只通过当前租户固定接口维护配置，保存与实际发布分别授权并回读。
+    registerMessageNotificationTools(server, client, context);
     toolRegistry.flush(context.codexMode ? ['microi_codex'] : undefined);
     return server;
 }

@@ -10,10 +10,96 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.8.12
+ * Version: v2.9.4
  * Function:
  * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
  */
+
+// INSTALLED_RUNTIME_SUMMARY_V1：入口按目标租户改写后，以实际安装资产的哈希和大小
+// 生成本租户运行摘要；禁止沿用发布方摘要或已有微服务的旧 DistHash。
+function summarizeInstalledRuntimeAssets(assets) {
+    if (!assets || !assets.length || assets.length > 256) throw new Error('数据库运行包资产数量无效');
+    var rows = [], seen = {}, total = 0;
+    for (var i = 0; i < assets.length; i++) {
+        var asset = assets[i] || {}, path = String(asset.Path || '').replace(/\\/g, '/');
+        var hash = String(asset.Hash || '').toLowerCase(), size = Number(asset.Size);
+        var identity = '$' + path.toLowerCase();
+        if (!path || seen[identity] || !/^[a-f0-9]{64}$/.test(hash)
+            || !isFinite(size) || size <= 0 || Math.floor(size) !== size) {
+            throw new Error('数据库运行包路径、摘要或大小无效：' + path);
+        }
+        seen[identity] = true;total += size;
+        rows.push({ Path: path, Fingerprint: path + '\t' + hash + '\t' + size });
+    }
+    if (total > 5 * 1024 * 1024) throw new Error('数据库运行包实际字节超过 5MB');
+    rows.sort(function(a, b) { return a.Path < b.Path ? -1 : a.Path > b.Path ? 1 : 0; });
+    var lines = [];for (var j = 0; j < rows.length; j++) lines.push(rows[j].Fingerprint);
+    return { DistHash: String(V8.EncryptHelper.Sha256Hex(lines.join('\n'))).toLowerCase(), TotalSize: total };
+}
+
+// PACKAGE_LAYOUT_FIELD_RETIREMENTS_V1：显式退役包拥有的旧布局入口，仅软删元数据，
+// 保留物理列和全部业务数据；按目标表名/字段名定位，不依赖发布方 Id。
+// 先校验整个声明和目标组件配置，避免把同名客户组件或核心字段当作废弃入口。
+function retirePackageLayoutFields(packageModel, formEngine, cache, osClient) {
+    var declarations = packageModel.DiyFieldRetirements || [];
+    if (!declarations || declarations.length === undefined || declarations.length > 100)
+        throw new Error('DiyFieldRetirements 必须是最多 100 项的数组');
+    var tables = packageModel.DiyTables || [], fields = packageModel.DiyFields || [];
+    var allowed = { DevComponent: true, Divider: true, Tabs: true, CollapseGroup: true };
+    var reserved = { id: true, createtime: true, updatetime: true, userid: true, username: true, isdeleted: true, osclient: true };
+    var plans = [], seen = {};
+    for (var i = 0; i < declarations.length; i++) {
+        var item = declarations[i] || {}, tableName = String(item.TableName || ''), name = String(item.Name || '');
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tableName) || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
+            || reserved[name.toLowerCase()] || !allowed[item.ExpectedComponent])
+            throw new Error('仅允许退役明确声明的非系统布局字段');
+        var sourceTable = null;
+        for (var ti = 0; ti < tables.length; ti++)
+            if (String(tables[ti].Name || '').toLowerCase() == tableName.toLowerCase()) sourceTable = tables[ti];
+        if (!sourceTable) throw new Error('退役字段的表必须由当前包声明：' + tableName);
+        for (var fi = 0; fi < fields.length; fi++)
+            if (String(fields[fi].Name || '').toLowerCase() == name.toLowerCase()
+                && (String(fields[fi].TableId || '').toLowerCase() == String(sourceTable.Id || '').toLowerCase()
+                    || String(fields[fi].TableName || '').toLowerCase() == tableName.toLowerCase()))
+                throw new Error('同一字段不能同时声明安装与退役：' + tableName + '.' + name);
+        var identity = tableName.toLowerCase() + '.' + name.toLowerCase();
+        if (seen[identity]) continue;
+        seen[identity] = true;
+        var table = formEngine.GetFormData('diy_table', { _Where: [['Name', '=', tableName]], _SelectFields: ['Id', 'Name'] });
+        if (!table || Number(table.Code) != 1 || !table.Data || !table.Data.Id)
+            throw new Error('无法读取退役字段所属表：' + tableName);
+        var query = { _Where: [['TableId', '=', table.Data.Id], ['Name', '=', name]],
+            _SelectFields: ['Id', 'TableId', 'Name', 'Component', 'Config', 'IsDeleted'] };
+        var found = formEngine.GetFormData('diy_field', query);
+        if (found && (Number(found.Code) == 2 || (Number(found.Code) == 1 && found.Data && Number(found.Data.IsDeleted) == 1))) continue;
+        if (!found || Number(found.Code) != 1 || !found.Data || !found.Data.Id)
+            throw new Error('读取旧布局字段失败：' + identity);
+        if (String(found.Data.Component || '') != String(item.ExpectedComponent))
+            throw new Error('旧字段组件已变更，不能自动退役：' + identity);
+        var expected = item.ExpectedConfig || {}, actual = found.Data.Config || {};
+        if (typeof actual == 'string') {
+            try { actual = JSON.parse(actual || '{}'); }
+            catch (_) { throw new Error('旧字段配置无效：' + identity); }
+        }
+        for (var configKey in expected)
+            if (Object.prototype.hasOwnProperty.call(expected, configKey) && actual[configKey] !== expected[configKey])
+                throw new Error('旧字段配置已变更，不能自动退役：' + identity);
+        plans.push({ Id: found.Data.Id, TableId: table.Data.Id, TableName: tableName, Query: query });
+    }
+    for (var pi = 0; pi < plans.length; pi++) {
+        var plan = plans[pi], result = formEngine.DelFormData('diy_field', { Id: plan.Id });
+        var readback = formEngine.GetFormData('diy_field', plan.Query);
+        var missing = readback && (Number(readback.Code) == 2
+            || (Number(readback.Code) == 1 && readback.Data && Number(readback.Data.IsDeleted) == 1));
+        if (!missing || !result || (Number(result.Code) != 1 && Number(result.Code) != 2))
+            throw new Error('旧布局字段退役回读失败：' + plan.TableName + '，' + String(result && result.Msg || ''));
+        cache.Remove('Microi:' + osClient + ':FormData:diy_field:' + String(plan.Id).toLowerCase());
+        cache.Remove('Microi:' + osClient + ':FormData:diy_table_field_list:' + plan.TableId);
+        cache.Remove('Microi:' + osClient + ':FormData:diy_table_field_list:' + String(plan.TableId).toLowerCase());
+        cache.Remove('Microi:' + osClient + ':FormData:diy_table_field_list:' + plan.TableName.toLowerCase());
+    }
+    return { Retired: plans.length };
+}
 
 // ==================== 参数接收与校验 ====================
 
@@ -2107,6 +2193,20 @@ try {
         return System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(html));
     };
 
+    // SHARED_PUBLIC_RUNTIME_TENANT_LAUNCH_V1：共享不可变字节不能改写发布端 HTML。
+    // 仅启动 URL 绑定目标配置，不改对象路径/摘要，也不把登录凭证写入 URL。
+    var buildSharedApplicationLaunchUrl = function (entryUrl) {
+        var apiBase = firstTextParam([V8.SysConfig && V8.SysConfig.ApiBase]).replace(/\/+$/g, '');
+        var tenant = String(V8.OsClient || '').trim();
+        if (!/^https?:\/\/[^\s\/?#@]+(?:\/[^\s?#]*)?$/i.test(apiBase)) {
+            throw new Error('共享运行应用需要目标租户配置有效的 SysConfig.ApiBase；不能使用发布端或 CDN 地址作为业务 API。');
+        }
+        if (!/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(tenant)) {
+            throw new Error('共享运行应用缺少有效的目标租户标识。');
+        }
+        return entryUrl + '?apiBase=' + encodeURIComponent(apiBase) + '&OsClient=' + encodeURIComponent(tenant);
+    };
+
     // PUBLIC_APPLICATION_ENTRY_URL_V1：公有运行文件不得持久化 OSS/S3 内网域名、
     // 临时签名或仅有目录的地址。对象 Key 才是事实源，浏览地址统一由当前租户
     // FileServer + 真实 Key 组成；这也让不同存储供应商的安装结果保持一致。
@@ -3192,7 +3292,7 @@ try {
         }
         if (!entryHdfsPath && uploadedBuild.length) entryHdfsPath = uploadedBuild[0].HdfsPath;
         var previewUrl = useSharedPublicBuild
-            ? sharedEntryUrl
+            ? buildSharedApplicationLaunchUrl(sharedEntryUrl)
             : buildPublicApplicationAssetUrl(V8.SysConfig && V8.SysConfig.FileServer, entryHdfsPath);
         if (useDatabaseOnlyBuild && inlineRuntimeBuild) {
             previewUrl = '/micro-app/' + encodeURIComponent(String(V8.OsClient || ''))
@@ -3349,6 +3449,15 @@ try {
                 }),
                 PublishTime: nowText('yyyy-MM-dd HH:mm:ss')
             };
+            var installedRuntimeSummary = inlineRuntimeBuild ? summarizeInstalledRuntimeAssets(runtimeDbAssets) : null;
+            if (installedRuntimeSummary) {
+                serviceRow.DistHash = installedRuntimeSummary.DistHash;
+                serviceRow.TotalSize = installedRuntimeSummary.TotalSize;
+                var installedRuntimeManifest = JSON.parse(serviceRow.AssetManifestJson);
+                installedRuntimeManifest.RuntimeManifestHash = installedRuntimeSummary.DistHash;
+                installedRuntimeManifest.TotalSize = installedRuntimeSummary.TotalSize;
+                serviceRow.AssetManifestJson = JSON.stringify(installedRuntimeManifest);
+            }
             if (existingService && existingService.Id) {
                 serviceRow.Id = existingService.Id;
             } else if (ms.Id) {
@@ -3358,7 +3467,7 @@ try {
             if (!serviceResult || serviceResult.Code != 1) throw new Error('写入微服务运行元数据失败：' + ((serviceResult && serviceResult.Msg) || ''));
             var serviceData = V8.FormEngine.GetFormData('sys_microiservice', {
                 _Where: [['MsKey', '=', appKey]],
-                _SelectFields: ['Id', 'MsKey', 'StorageMode', 'MsUrl', 'EntryPath', 'BuildVersion', 'AssetCount', 'AssetsJson']
+                _SelectFields: ['Id', 'MsKey', 'StorageMode', 'MsUrl', 'EntryPath', 'BuildVersion', 'AssetCount', 'AssetsJson', 'DistHash', 'TotalSize']
             });
             if (!serviceData || serviceData.Code != 1 || !serviceData.Data || !serviceData.Data.Id) {
                 throw new Error('微服务运行元数据写后回读失败：' + appKey);
@@ -3370,6 +3479,10 @@ try {
                 throw new Error('微服务运行元数据写后回读不一致：' + appKey);
             }
             if (inlineRuntimeBuild) {
+                if (String(installedService.DistHash || '').toLowerCase() !== installedRuntimeSummary.DistHash
+                    || Number(installedService.TotalSize) !== installedRuntimeSummary.TotalSize) {
+                    throw new Error('数据库内置微服务运行摘要写后回读不一致：' + appKey);
+                }
                 if (!/^(db|database)$/i.test(String(installedService.StorageMode || ''))
                     || !/^(db|database)$/i.test(String(installedService.MsUrl || ''))) {
                     throw new Error('数据库内置微服务写后回读未保持 StorageMode=db、MsUrl=db：' + appKey);
@@ -4935,13 +5048,17 @@ try {
     // 空字符串在平台旧数据中表示“未填写”，可安全规范为 NULL；Switch 字段还兼容
     // 老版本写入的 True/False 文本。其它非数字内容必须阻止迁移，不能静默转成 0。
     var prepareNumericColumnData = function (tableName, columnName, sourceColumn, sourceType, targetType) {
-        var normalized = { BlankCount: 0, LegacyBooleanCount: 0, LegacySwitchNumericCount: 0 };
+        var normalized = { BlankCount: 0, LegacyBooleanCount: 0, LegacySwitchNumericCount: 0, LegacySwitchBinaryCount: 0 };
         if (!isNumericSqlType(sourceType) || isNumericSqlType(targetType)) return normalized;
 
         var regexp = isIntegerSqlType(sourceType)
             ? '^[+-]?[0-9]+$'
             : '^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$';
         var isSwitchColumn = isPackageSwitchColumn(tableName, columnName);
+        // LEGACY_SWITCH_BINARY_TEXT_V1：历史 BIT 经旧导入器错误转成 varchar
+        // 后会留下单个 00/01 字节。仅双重声明的 Switch 允许恢复这两个布尔值；
+        // 不把任意二进制、普通文本或多字节掩码静默转为零。
+        var switchBinaryPredicate = "OCTET_LENGTH(`" + columnName + "`) = 1 AND HEX(`" + columnName + "`) IN ('00','01')";
         var rawTextExpression = "TRIM(CAST(`" + columnName + "` AS CHAR))";
         // JSON_SWITCH_LITERAL_UNQUOTE_V1：旧 ORM 可能把 bool/0/1 作为 JSON
         // 字面量或 JSON 字符串写入 varchar。只对白名单 Switch 使用 MySQL JSON
@@ -4961,7 +5078,8 @@ try {
             // 可跨旧运行时稳定工作，同时继续只对白名单 Switch 字段生效。
             invalidWhere +=
                 " AND " + normalizedTextExpression + " <> 'true'" +
-                " AND " + normalizedTextExpression + " <> 'false'";
+                " AND " + normalizedTextExpression + " <> 'false'" +
+                " AND NOT (" + switchBinaryPredicate + ")";
         }
         var invalidSql =
             "SELECT COUNT(1) AS InvalidCount FROM `" + tableName + "` " + invalidWhere;
@@ -4989,12 +5107,21 @@ try {
             }
             throw new Error(
                 '字段存在' + invalidCount + '条非数字数据，已阻止转换为' + sourceType +
-                '，请先清理数据；导入器=v1.9.8，Switch双重声明=' +
+                '，请先清理数据；规则=NumericColumnV2，Switch双重声明=' +
                 (isSwitchColumn ? '已命中' : '未命中') + invalidHex
             );
         }
 
         if (isSwitchColumn) {
+            var binaryCountRows = V8.Db.FromSql(
+                "SELECT COUNT(1) AS LegacySwitchBinaryCount FROM `" + tableName + "` WHERE " + switchBinaryPredicate
+            ).ToArray();
+            var binaryCount = binaryCountRows && binaryCountRows.length
+                ? getScalarCount(binaryCountRows[0], ['LegacySwitchBinaryCount', 'LEGACYSWITCHBINARYCOUNT', 'legacyswitchbinarycount']) : 0;
+            if (binaryCount > 0) {
+                V8.Db.FromSql("UPDATE `" + tableName + "` SET `" + columnName + "` = CASE HEX(`" + columnName + "`) WHEN '01' THEN 1 ELSE 0 END WHERE " + switchBinaryPredicate).ExecuteNonQuery();
+                normalized.LegacySwitchBinaryCount = binaryCount;
+            }
             var normalizeSwitchLiteral = function (literal, numericValue) {
                 if (literal != 'true' && literal != 'false' && literal != '1' && literal != '0') {
                     throw new Error('不支持的Switch历史字面量');
@@ -5561,6 +5688,10 @@ try {
                         if (normalizedNumericData.LegacyBooleanCount > 0) {
                             debugLog['physical_schema_normalized_boolean_' + tableName + '_' + columnName] =
                                 '已将' + normalizedNumericData.LegacyBooleanCount + '条历史True/False开关值规范为1/0';
+                        }
+                        if (normalizedNumericData.LegacySwitchBinaryCount > 0) {
+                            debugLog['physical_schema_normalized_binary_switch_' + tableName + '_' + columnName] =
+                                '已将' + normalizedNumericData.LegacySwitchBinaryCount + '条历史单字节00/01开关值规范为0/1';
                         }
                         if (normalizedNumericData.BlankCount > 0) {
                             debugLog['physical_schema_normalized_' + tableName + '_' + columnName] =
@@ -9803,6 +9934,11 @@ try {
         stats.DataSetCount++;
     }
     debugLog.step8Result = '随包数据处理完成：数据集' + stats.DataSetCount + '，新增' + stats.DataInserted + '，修改' + stats.DataUpdated;
+
+    if (!backgroundChunkingEnabled || backgroundCheckpointPhase == 'PostSchema') {
+        var layoutRetirements = retirePackageLayoutFields(Package, V8.FormEngine, V8.Cache, V8.OsClient);
+        debugLog.layout_field_retirements = layoutRetirements.Retired;
+    }
 
     if (backgroundChunkingEnabled
         && backgroundCheckpointPhase == 'PostSchema'

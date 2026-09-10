@@ -181,7 +181,7 @@ if (V8.Form.Phone) {
 
 | 变量 | 说明 | 可用事件 |
 |------|------|---------|
-| `V8.Form` | 当前表单数据（新增时也有 Id） | 全部 |
+| `V8.Form` | 当前表单数据；原生新增提交前可能没有 Id，依赖真实主键的跨表写入在提交后事件执行 | 全部 |
 | `V8.OldForm` | 已加载的修改前旧数据 | 普通表单；提交前/后 |
 | `V8.FormMode` | `'Add'` / `'Edit'` / `'View'` | 全部 |
 | `V8.FormOutAction` | `'Insert'`/`'Update'`/`'Close'`/`'Delete'` | FormOut |

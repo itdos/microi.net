@@ -18,6 +18,8 @@ import {
   selectOfficialPackageMergeBase,
   validateOfficialPackageInstallContracts,
   validateOfficialPackageChangeLog,
+  validateOfficialResourceEngineCandidate,
+  getMessageNotificationContractKeys,
   validateReadableOfficialResource,
   verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
@@ -51,8 +53,10 @@ const resourceNames = [
   'app.microi.sys-config.json',
   'app.microi.message-notification.json',
   'app.microi.ai-engine.json',
+  'app.microi.sys-log.json',
 ];
-const officialApplicationResourceNames = resourceNames.filter(name => name.endsWith('.json'));
+// 系统日志为独立商城应用；启动接口投影仍由既有九个基础包拥有，不能扩大启动写库范围。
+const officialApplicationResourceNames = resourceNames.filter(name => name.endsWith('.json') && name !== 'app.microi.sys-log.json');
 const publishedApplicationStoreReplicaNames = new Set(
   publishedApplicationStoreReplicaMappings.map(mapping => mapping.resourceName),
 );
@@ -194,25 +198,7 @@ function validateReleaseCandidate(name, content) {
     }
   }
   if (name === 'official-resource-api.js') {
-    if (!content.includes('ApiEngineKey: get-microi-upgrade-resource')
-      || !content.includes('Version: v1.3.7')
-      || !content.includes('V8.Method.AuthorizeOfficialResourcePublish()')
-      || !content.includes('ExpectedRemoteSha256')
-      || !content.includes('function lockPublishRows()')
-      || (content.match(/FOR UPDATE/g) || []).length !== 3
-      || !content.includes('ReconcilePublishedApiEngines')
-      || !content.includes('function reconcilePublishedApiEngines()')
-      || !content.includes('发布升级资源[')
-      || !content.includes('后回读内容哈希不一致')
-      || !content.includes('OFFICIAL_RESOURCE_EXACT_SELECTION_V1')
-      || !content.includes('platform-home-overview')
-      || !content.includes('HomeUsageStats')
-      || !content.includes('storedSelectionEquals')
-      || !content.includes('存储接口 Code=1 但缺少 Data')
-      || !content.includes('SelectApiEngine: selectionJson(exactSelections.SelectApiEngine)')
-      || !content.includes('SelectTable: selectionJson(exactSelections.SelectTable)')) {
-      throw new Error(`${name} 缺少固定白名单、SHA 乐观锁、事务行锁、精确选择元数据或发布后回读保护`);
-    }
+    validateOfficialResourceEngineCandidate(content);
   }
   if (name.endsWith('.json')) {
     const packageModel = JSON.parse(content);
@@ -226,6 +212,7 @@ function validateReleaseCandidate(name, content) {
       'app.microi.sys-config.json': '系统设置',
       'app.microi.message-notification.json': '消息通知',
       'app.microi.ai-engine.json': 'AI助手',
+      'app.microi.sys-log.json': '系统日志/监控',
     };
     if (packageModel?.PackageInfo?.Name !== expectedNames[name]) {
       throw new Error(`${name} 的 PackageInfo.Name 不正确`);
@@ -252,7 +239,7 @@ function validateReleaseCandidate(name, content) {
       },
       'app.microi.message-notification.json': {
         minimumVersion: 1_000_011,
-        exactKeys: ['msg_event', 'msg_internal_list', 'msg_internal_mark_read', 'platform-chat-system-message', 'platform-chat-runtime', 'platform-message-notification-custom-hook', 'wechat_send_tpl_msg'],
+        exactKeys: getMessageNotificationContractKeys(packageModel),
         tenantHooks: ['platform-message-notification-custom-hook'],
       },
       'app.microi.ai-engine.json': {
@@ -1202,7 +1189,17 @@ async function readCurrentReleaseVersion() {
 }
 
 await mkdir(outputDirectory, { recursive: true });
-if (process.argv.includes('--synchronize-local')) {
+if (process.argv.includes('--validate-only')) {
+  if (process.argv.some(arg => ['--publish', '--synchronize-local', '--initialize-base', '--repair-base-from-remote', '--bootstrap-missing'].includes(arg))) {
+    throw new Error('--validate-only 不能与写入或同步参数同时使用');
+  }
+  // 与真实发布共用全部候选契约；不请求远端、不改写资源或共同基线。
+  for (const name of resourceNames) {
+    const content = normalizeOfficialPackageExecutionLimits(name, await readFile(resolve(outputDirectory, name), 'utf8'));
+    validateReleaseCandidate(name, content);
+  }
+  process.stdout.write(`Local release candidate contracts passed: ${resourceNames.length} resources; read-only.\n`);
+} else if (process.argv.includes('--synchronize-local')) {
   const packagePath = resolve(outputDirectory, 'app.microi.store.json');
   const packageContent = await readFile(packagePath, 'utf8');
   const standaloneContents = new Map(await Promise.all(
@@ -1512,6 +1509,8 @@ if (process.argv.includes('--synchronize-local')) {
     const changedPlatformServicePackages = [
       'app.microi.saas-engine.json',
       'app.microi.store.json',
+      'app.microi.message-notification.json',
+      'app.microi.sys-log.json',
     ].filter(name => hasPlatformServiceBundleChanged(
       name,
       remoteResources.get(name).content,

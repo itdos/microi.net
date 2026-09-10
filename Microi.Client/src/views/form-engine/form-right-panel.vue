@@ -61,7 +61,8 @@
                                     <el-avatar :size="28" :src="item.Avatar"></el-avatar>
                                 </template>
                                 <div class="log-card">
-                                    <div class="log-title">{{ item.Title }}</div>
+                                    <div class="log-title">{{ item.Title || GetVersionActionText(item.Type) }}</div>
+                                    <div v-if="item.HistoryContentMode === 'MetadataOnly'" class="history-availability-note">仅显示操作记录，历史字段原文未开放。</div>
                                     <div
                                         v-for="log in item.Content"
                                         :key="'datalog_content_' + log.Name"
@@ -126,7 +127,8 @@
                             </el-button>
                         </el-tooltip>
                     </div>
-                    <div class="comment-input-wrapper">
+                    <el-alert v-if="CommentUnavailableMessage" :title="CommentUnavailableMessage" type="info" :closable="false" show-icon />
+                    <div v-if="!CommentUnavailableMessage" class="comment-input-wrapper">
                         <div v-if="replyComment" class="comment-reply-target">
                             <div class="comment-reply-head">
                                 <span>{{ $t ? $t('Msg.Replying') : '正在回复' }}</span>
@@ -168,7 +170,7 @@
                         </div>
                     </div>
 
-                    <div class="datalog-timeline" v-mci-loading:list="dataCommentListLoading">
+                    <div v-if="!CommentUnavailableMessage" class="datalog-timeline" v-mci-loading:list="dataCommentListLoading">
                         <el-timeline v-if="dataCommentList && dataCommentList.length > 0">
                             <el-timeline-item
                                 v-for="item in dataCommentList"
@@ -254,7 +256,7 @@
                                         <span>{{ item.UserName || item.CreateUser || item.UserId }}</span>
                                     </div>
                                 </div>
-                                <div class="version-actions">
+                                <div class="version-actions" v-if="CanReadVersionContent(item)">
                                     <el-button size="small" type="primary" plain @click="$emit('preview-data-version', item)">
                                         <el-icon><View /></el-icon>
                                         {{ $t ? $t('Msg.Preview') : '预览' }}
@@ -268,6 +270,7 @@
                                         {{ $t ? $t('Msg.Load') : '加载' }}
                                     </el-button>
                                 </div>
+                                <div v-else class="history-availability-note">仅显示版本记录，历史原文及恢复操作未开放。</div>
                             </div>
                         </div>
                         <div v-else-if="!dataVersionListLoading" class="panel-empty">
@@ -354,6 +357,9 @@ export default {
         };
     },
     computed: {
+        CommentUnavailableMessage() {
+            return this.relatedCounts?.DataCommentUnavailableMessage || "";
+        },
         availableTabs() {
             var tabs = [];
             if (this.openDiyFormWorkFlow) tabs.push("WorkFlow");
@@ -394,8 +400,12 @@ export default {
     },
     methods: {
         GetRelatedCount(type) {
+            if (this.relatedCounts?.[type] === null) return "—";
             var value = Number(this.relatedCounts && this.relatedCounts[type]);
             return Number.isFinite(value) && value > 0 ? value : 0;
+        },
+        CanReadVersionContent(item) {
+            return !!item && item.HistoryContentMode !== "MetadataOnly" && !!item.Data;
         },
         GetFirstAvailableTab() {
             return this.availableTabs.length > 0 ? this.availableTabs[0] : "";
@@ -580,6 +590,14 @@ export default {
 <style lang="scss" scoped>
 .form-right-panel {
     padding: 0px 0;
+
+    .history-availability-note {
+        margin-top: 6px;
+        color: var(--el-text-color-regular);
+        font-size: 12px;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+    }
 
     :deep(.form-right-tabs) {
         .el-tabs__header {

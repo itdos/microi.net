@@ -59,6 +59,8 @@ public static class MicroiRealtimeHostingExtensions
         var chatHub = app.Services.GetRequiredService<IHubContext<DiyWebSocket>>();
         RealtimePushRuntime.Configure((connectionIds, eventName, payload) =>
             chatHub.Clients.Clients(connectionIds.ToList()).SendAsync(eventName, payload));
+        RealtimePushRuntime.ConfigureGroups(PlatformReminderTransport.TransportName,
+            (groupName, eventName, payload) => chatHub.Clients.Group(groupName).SendAsync(eventName, payload));
 
         var gameHub = app.Services.GetRequiredService<IHubContext<GameRealtimeHub>>();
         RealtimePushRuntime.ConfigureGroups((groupName, eventName, payload) =>

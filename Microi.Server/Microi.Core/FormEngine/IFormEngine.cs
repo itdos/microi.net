@@ -13,6 +13,11 @@ namespace Microi.net
     public interface IFormEngine
     {
         /// <summary>
+        /// 仅供可信平台能力复用：通过表单引擎的租户/版本缓存回查用户与真实角色，
+        /// 不新增可由客户端指定身份的 HTTP 入口。
+        /// </summary>
+        Task<FormEngineAuthorizationSnapshot> GetUserAuthorizationSnapshotAsync(string osClient, JObject currentUser);
+        /// <summary>
         /// Authorize a trusted server-selected client table operation such as
         /// Import or Export. The operation must not be taken from request payload.
         /// </summary>

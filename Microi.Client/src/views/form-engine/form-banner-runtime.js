@@ -305,11 +305,15 @@ export function inferFormBannerConfig(fields, table = {}) {
     };
 }
 
-/**
- * Return the effective table-level Banner contract. Explicit empty lists are
- * preserved so a designer can intentionally hide tags or metrics; only truly
- * missing fields use type-aware legacy defaults.
- */
+/** 显式空字符串表示不绑定字段；省略/null 兼容旧库推断，空值不能被旧字段别名覆盖。 */
+function configuredBannerField(source, keys, fallback = "") {
+    for (const key of keys) {
+        if (own(source, key) && typeof source[key] === "string") return stringValue(source[key]);
+    }
+    return fallback;
+}
+
+/** 保留设计者选择的空字段、空标签和空指标；未选择的配置仍使用类型感知的存量默认。 */
 export function normalizeFormBannerConfig(config, fields, table = {}) {
     const source = isRecord(config) ? config : {};
     const inferred = inferFormBannerConfig(fields, table);
@@ -320,10 +324,10 @@ export function normalizeFormBannerConfig(config, fields, table = {}) {
         ...inferred,
         ...source,
         Enabled: normalizeEnabled(enabledValue, true),
-        TitleField: stringValue(source.TitleField || source.FallbackTitleField || inferred.TitleField),
-        SubtitleField: stringValue(source.SubtitleField || source.MetaField || inferred.SubtitleField),
-        ImageField: stringValue(source.ImageField || inferred.ImageField),
-        BackgroundField: stringValue(source.BackgroundField),
+        TitleField: configuredBannerField(source, ["TitleField", "FallbackTitleField"], inferred.TitleField),
+        SubtitleField: configuredBannerField(source, ["SubtitleField", "MetaField"], inferred.SubtitleField),
+        ImageField: configuredBannerField(source, ["ImageField"], inferred.ImageField),
+        BackgroundField: configuredBannerField(source, ["BackgroundField"]),
         Icon: stringValue(source.Icon || inferred.Icon),
         Tags: tagsConfigured
             ? normalizeTagDescriptors(own(source, "Tags") ? source.Tags : source.TagFields)

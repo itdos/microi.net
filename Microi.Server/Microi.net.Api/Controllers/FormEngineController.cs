@@ -762,88 +762,114 @@ namespace Microi.net.Api
                     ?? new DosResult(0, null, DiyMessage.GetLang(osClient, "NoAuth", lang)));
             }
 
-            var relatedParam = new JObject
+            // 菜单/表授权不代表当前父记录可读。必须走真实 Client Get，执行父表
+            // ServerDataV8 的行授权；不能用只选 Id 或 Count 探针跳过它。
+            var parentResult = await MicroiEngine.FormEngine.GetFormDataAsync(parentParam);
+            if (parentResult == null || parentResult.Code != 1 || parentResult.Data == null)
             {
-                ["OsClient"] = osClient,
-                ["_Lang"] = lang,
-                ["_InvokeType"] = InvokeType.Server.ToString(),
-                ["_IsAnonymous"] = false,
-                ["IsDeleted"] = 0,
-                ["_PageIndex"] = 1,
-                ["_PageSize"] = 200,
-                ["_OrderBy"] = "CreateTime",
-                ["_OrderByType"] = "DESC"
-            };
-            if (param["_CurrentUser"] != null)
-            {
-                relatedParam["_CurrentUser"] = param["_CurrentUser"].DeepClone();
+                return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "NoAuth", lang)));
             }
 
-            if (string.Equals(relatedType, "Counts", StringComparison.OrdinalIgnoreCase))
+            var normalizedType = relatedType?.ToLowerInvariant();
+            if (normalizedType != "counts" && normalizedType != "datalog"
+                && normalizedType != "datacomment" && normalizedType != "dataversion")
             {
-                JObject BuildCountParam(string formEngineKey, JArray conditions)
+                return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "ParamError", lang)));
+            }
+
+            // JObject 即使写 _InvokeType=Server 也不是可信来源。只在父记录完整授权后，
+            // 从白名单构造新的 CLR 参数；请求不能覆盖表、条件、字段、分页或可信标记。
+            DiyTableRowParam BuildRelatedParam(string key, string rowField, List<string> fields)
+            {
+                return new DiyTableRowParam
                 {
-                    var countParam = (JObject)relatedParam.DeepClone();
-                    countParam["FormEngineKey"] = formEngineKey;
-                    countParam["_Where"] = conditions;
-                    countParam["_PageSize"] = 1;
-                    return countParam;
+                    FormEngineKey = key,
+                    OsClient = osClient,
+                    _Lang = lang,
+                    _CurrentUser = (JObject)parentParam._CurrentUser.DeepClone(),
+                    _InvokeType = InvokeType.Server.ToString(),
+                    _TrustedServerInvocation = true,
+                    _IsAnonymous = false,
+                    IsDeleted = 0,
+                    _PageIndex = 1,
+                    _PageSize = 200,
+                    _OrderBy = "CreateTime",
+                    _OrderByType = "DESC",
+                    _SelectFields = fields,
+                    _Where = new JArray
+                    {
+                        new JArray(rowField, "=", parentTableRowId),
+                        new JArray("TableId", "=", parentParam.TableId)
+                    }
+                };
+            }
+
+            var commentAvailable = true;
+            const string commentUnavailableReason = "CommentParentTableBindingUnavailable";
+            const string commentUnavailableMessage = "评论暂不可用：当前版本缺少评论父表绑定及可信写入。旧评论不能仅按记录 Id 推断归属。";
+            if (normalizedType == "counts" || normalizedType == "datacomment")
+            {
+                var commentFields = await MicroiEngine.FormEngine.GetDiyField(new DiyFieldParam
+                {
+                    TableName = "diy_comment", OsClient = osClient, _Lang = lang,
+                    _OnlyRealField = true, _InvokeType = InvokeType.Server.ToString(),
+                    _TrustedServerInvocation = true
+                });
+                if (commentFields == null || commentFields.Code != 1)
+                {
+                    return Json(new DosResult(0, null, "无法核验评论父表绑定，请稍后重试。"));
                 }
-
-                var dataLogTask = MicroiEngine.FormEngine.GetTableDataCountAsync(BuildCountParam(
-                    "microi_datalog",
-                    new JArray
-                    {
-                        new JArray("DataId", "=", parentTableRowId),
-                        new JArray("TableId", "=", parentParam.TableId)
-                    }));
-                var dataCommentTask = MicroiEngine.FormEngine.GetTableDataCountAsync(BuildCountParam(
-                    "diy_comment",
-                    new JArray { new JArray("TableRowId", "=", parentTableRowId) }));
-                var dataVersionTask = MicroiEngine.FormEngine.GetTableDataCountAsync(BuildCountParam(
-                    "mic_data_version",
-                    new JArray
-                    {
-                        new JArray("TableRowId", "=", parentTableRowId),
-                        new JArray("TableId", "=", parentParam.TableId)
-                    }));
-
-                await Task.WhenAll(dataLogTask, dataCommentTask, dataVersionTask);
-                if (dataLogTask.Result.Code != 1) return Json(dataLogTask.Result);
-                if (dataCommentTask.Result.Code != 1) return Json(dataCommentTask.Result);
-                if (dataVersionTask.Result.Code != 1) return Json(dataVersionTask.Result);
-
-                return Json(new DosResult(1, new
-                {
-                    DataLog = dataLogTask.Result.DataCount,
-                    DataComment = dataCommentTask.Result.DataCount,
-                    DataVersion = dataVersionTask.Result.DataCount
-                }));
+                commentAvailable = commentFields.Data != null
+                    && commentFields.Data.Any(field => string.Equals(field["Name"].Val<string>(), "TableId", StringComparison.OrdinalIgnoreCase));
             }
-
-            var where = new JArray();
-            switch (relatedType?.ToLowerInvariant())
+            var append = new JObject
             {
-                case "datalog":
-                    relatedParam["FormEngineKey"] = "microi_datalog";
-                    where.Add(new JArray("DataId", "=", parentTableRowId));
-                    where.Add(new JArray("TableId", "=", parentParam.TableId));
-                    break;
-                case "datacomment":
-                    relatedParam["FormEngineKey"] = "diy_comment";
-                    where.Add(new JArray("TableRowId", "=", parentTableRowId));
-                    break;
-                case "dataversion":
-                    relatedParam["FormEngineKey"] = "mic_data_version";
-                    where.Add(new JArray("TableRowId", "=", parentTableRowId));
-                    where.Add(new JArray("TableId", "=", parentParam.TableId));
-                    break;
-                default:
-                    return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "ParamError", lang)));
+                ["HistoryContentMode"] = "MetadataOnly",
+                ["DataCommentUnavailableReason"] = commentAvailable ? null : commentUnavailableReason,
+                ["DataCommentUnavailableMessage"] = commentAvailable ? null : commentUnavailableMessage
+            };
+            if (normalizedType == "datacomment" && !commentAvailable)
+            {
+                return Json(new DosResult(0, null, commentUnavailableMessage, 0, append));
             }
 
-            relatedParam["_Where"] = where;
+            // 父记录 DataFilter 只证明当前行的投影可读，不授予历史原始 Content/Data。
+            // 查询阶段即排除历史正文、自由文本标题/备注和人员信息，避免在返回前才脱敏。
+            var logParam = BuildRelatedParam("microi_datalog", "DataId", new List<string> { "Id", "Type", "CreateTime" });
+            var versionParam = BuildRelatedParam("mic_data_version", "TableRowId", new List<string> { "Id", "Action", "Version", "CreateTime" });
+            var commentParam = BuildRelatedParam("diy_comment", "TableRowId", new List<string>
+            {
+                "Id", "TableId", "TableRowId", "Content", "ParentCommentId", "CreateTime", "UserId", "CreateUser"
+            });
+            if (normalizedType == "counts")
+            {
+                // 顺序读取有界三表，某项真实失败不可伪装为成功空列表；旧评论缺绑定单独标明不可用。
+                var logCount = await MicroiEngine.FormEngine.GetTableDataCountAsync(logParam);
+                if (logCount == null) return Json(new DosResult(0, null, "关联日志查询未返回结果。"));
+                if (logCount.Code != 1) return Json(logCount);
+                DosResultList<dynamic> commentCount = null;
+                if (commentAvailable)
+                {
+                    commentCount = await MicroiEngine.FormEngine.GetTableDataCountAsync(commentParam);
+                    if (commentCount == null) return Json(new DosResult(0, null, "关联评论查询未返回结果。"));
+                    if (commentCount.Code != 1) return Json(commentCount);
+                }
+                var versionCount = await MicroiEngine.FormEngine.GetTableDataCountAsync(versionParam);
+                if (versionCount == null) return Json(new DosResult(0, null, "关联版本查询未返回结果。"));
+                if (versionCount.Code != 1) return Json(versionCount);
+                return Json(new DosResult(1, new JObject
+                {
+                    ["DataLog"] = logCount.DataCount,
+                    ["DataComment"] = commentAvailable ? JToken.FromObject(commentCount.DataCount) : JValue.CreateNull(),
+                    ["DataVersion"] = versionCount.DataCount
+                }, "", 0, append));
+            }
+
+            var relatedParam = normalizedType == "datalog" ? logParam
+                : normalizedType == "dataversion" ? versionParam : commentParam;
             var result = await MicroiEngine.FormEngine.GetTableDataAsync(relatedParam);
+            if (result == null) return Json(new DosResult(0, null, "关联数据查询未返回结果。"));
+            if (result?.Code == 1) result.DataAppend = append;
             return Json(result);
         }
         /// <summary>

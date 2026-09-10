@@ -91,6 +91,7 @@ public static class MicroiApiHostExtensions
             builder.Services.AddSingleton<MemoryDiagnosticsService>();
             builder.Services.AddSingleton<IMemoryDiagnosticsRuntime>(sp => sp.GetRequiredService<MemoryDiagnosticsService>());
             builder.Services.AddHostedService(sp => sp.GetRequiredService<MemoryDiagnosticsService>());
+            builder.Services.AddHostedService<DatabasePoolRecoveryHostedService>();
             var app = builder.Build();
             app.UseMicroiApiTransport();
 
@@ -293,6 +294,14 @@ public static class MicroiApiHostExtensions
             await next();
         });
         app.UseRouting();
+        // 路由元数据只在 ASP.NET 宿主解析；旧 netstandard 压力中间件消费可信 Items 标记，
+        // 不能仅凭客户端提交的 URL 前缀或 Header 绕过业务请求槽。
+        app.Use(async (context, next) =>
+        {
+            var recovery = context.GetEndpoint()?.Metadata.GetMetadata<DatabasePoolRecoveryEndpointAttribute>();
+            if (recovery != null) context.Items[typeof(DatabasePoolRecoveryEndpointAttribute)] = recovery;
+            await next();
+        });
         app.UseCors("any");
         app.UseSystemObservability();
         app.UseResponseCompression();

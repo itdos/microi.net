@@ -44,6 +44,12 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 
 ## 标准工作流
 
+### 存量 TokenLogin 与深链接兼容
+
+- 已启用且精确配置 `ClientSsoApi=/api/SysUser/TokenLogin` 的旧连接使用平台原生 DiyToken 验证；不能错误过滤掉，也不能改走外部身份源的 `sso_legacy_token_login`。未配置、已停用、任意 URL 或非法 Token 必须继续拒绝。
+- SSO 成功后优先保留用户指定的站内深链接及业务参数（如 `ShowClassicLeft/ShowClassicTop`）；只有没有指定目标页才采用用户/系统默认首页。菜单/数据权限仍由正常路由守卫与后端校验。
+- URL Token 使用后从地址栏和下一次 Router 导航对象同时清除，包括 hash query；单独 `history.replaceState` 不够，动态路由重匹配会把旧 query 带回。验收必须检查 TokenLogin 成功、目标页真实可见、URL 无凭据、布局参数保留；不能仅断言 HTTP 302 或 Code=1。
+
 1. 识别方向、协议、租户、身份伙伴、用户生命周期、退出和密钥/证书责任人。
 2. 读取当前 `diy_sso` Schema、菜单、真实连接和已部署 Server/Client 版本；不要从旧截图猜测。
 3. 先选标准协议和安全 profile，再配置字段、Secret/证书 Key、Claim/角色映射。

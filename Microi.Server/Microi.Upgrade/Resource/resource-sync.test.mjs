@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
@@ -16,6 +17,8 @@ import {
   planOfficialResourcePublishBatches,
   selectOfficialPackageMergeBase,
   validateReadableOfficialResource,
+  validateOfficialResourceEngineCandidate,
+  getMessageNotificationContractKeys,
   verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
 import {
@@ -37,6 +40,52 @@ const refreshSource = await readFile(resolve(testDirectory, 'refresh-resources.m
 const releaseSource = await readFile(resolve(testDirectory, '../../../Microi一键编译发布.sh'), 'utf8');
 const officialEngineSource = await readFile(resolve(testDirectory, 'official-resource-api.js'), 'utf8');
 const mcpPublisherSource = await readFile(resolve(testDirectory, 'mcp-resource-publisher.mjs'), 'utf8');
+
+test('官方资源发布器允许不降级的补丁版本且保留每项安全保护', () => {
+  for (const version of ['v1.3.7', 'v1.3.8', 'v1.4.0', 'v2.0.0']) {
+    assert.doesNotThrow(() => validateOfficialResourceEngineCandidate(officialEngineSource.replace(/Version:\s*v\d+\.\d+\.\d+/, `Version: ${version}`)));
+  }
+  for (const version of ['v1.3.6', 'v1.2.999', 'v0.99.99', 'v1.3.7broken', 'invalid']) {
+    assert.throws(() => validateOfficialResourceEngineCandidate(officialEngineSource.replace(/Version:\s*v\d+\.\d+\.\d+/, `Version: ${version}`)), /版本低于|缺少/);
+  }
+  for (const marker of [
+    'ApiEngineKey: get-microi-upgrade-resource', 'V8.Method.AuthorizeOfficialResourcePublish()',
+    'ExpectedRemoteSha256', 'function lockPublishRows()', 'ReconcilePublishedApiEngines',
+    'function reconcilePublishedApiEngines()', '发布升级资源[', '后回读内容哈希不一致',
+    'OFFICIAL_RESOURCE_EXACT_SELECTION_V1', 'platform-home-overview', 'HomeUsageStats',
+    'storedSelectionEquals', '存储接口 Code=1 但缺少 Data',
+    'SelectApiEngine: selectionJson(exactSelections.SelectApiEngine)',
+    'SelectTable: selectionJson(exactSelections.SelectTable)',
+  ]) {
+    assert.throws(() => validateOfficialResourceEngineCandidate(officialEngineSource.replaceAll(marker, 'removed')), /缺少/, marker);
+  }
+  assert.throws(() => validateOfficialResourceEngineCandidate(officialEngineSource.replace('FOR UPDATE', 'removed')), /缺少/);
+  assert.throws(() => validateOfficialResourceEngineCandidate(officialEngineSource + '\n// FOR UPDATE'), /缺少/);
+});
+
+test('真实发布候选契约必须在统一 Node 门禁中提前只读通过', () => {
+  const result = spawnSync(process.execPath, [resolve(testDirectory, 'refresh-resources.mjs'), '--validate-only'], {encoding:'utf8', windowsHide:true, timeout:30000});
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Local release candidate contracts passed: 13 resources; read-only/);
+  const denied = spawnSync(process.execPath, [resolve(testDirectory, 'refresh-resources.mjs'), '--validate-only', '--publish'], {encoding:'utf8', windowsHide:true, timeout:30000});
+  assert.notEqual(denied.status, 0);
+  assert.match(denied.stderr, /不能与写入或同步参数同时使用/);
+});
+
+test('通知包声明提醒表或任一提醒接口时必须匹配完整三个接口', () => {
+  const legacy = getMessageNotificationContractKeys({});
+  assert.equal(legacy.length, 7);
+  const reminderKeys = ['platform-reminder-runtime', 'platform-reminder-official-feed', 'platform-reminder-tick'];
+  for (const partial of [
+    {DiyTables:[{Name:'mci_platform_reminder'}]},
+    ...reminderKeys.map(ApiEngineKey => ({SysApiEngines:[{ApiEngineKey}]})),
+  ]) {
+    assert.deepEqual(getMessageNotificationContractKeys(partial), legacy.concat(reminderKeys));
+  }
+  assert.deepEqual(getMessageNotificationContractKeys({SysApiEngines:[{ApiEngineKey:'unknown'}]}),legacy);
+  assert.match(refreshSource, /exactKeys: getMessageNotificationContractKeys\(packageModel\)/);
+  assert.match(refreshSource, /JSON\.stringify\(actualKeys\) !== JSON\.stringify\(expectedKeys\)/);
+});
 
 test('MCP source hash readback accepts the real Markdown heading and legacy plain text', () => {
   const sha = createHash('sha256').update('return { Code: 1 };').digest('hex');
@@ -1168,7 +1217,7 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
 });
 
 test('官网发布接口以固定白名单、事务行锁和哈希保护多节点写入', () => {
-  assert.match(officialEngineSource, /Version: v1\.3\.7/);
+  assert.match(officialEngineSource, /Version: v1\.4\.0/);
   assert.match(officialEngineSource, /V8\.Method\.AuthorizeOfficialResourcePublish\(\)/);
   assert.doesNotMatch(officialEngineSource, /Number\(currentUser\.Level/);
   assert.match(officialEngineSource, /function lockPublishRows\(\)/);
@@ -1301,8 +1350,10 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 157);
-  assert.equal(managedCount, 147);
+  assert.equal(seenKeys.size, 162);
+  assert.equal(managedCount, 152);
+  for (const key of ['platform-reminder-runtime','platform-reminder-official-feed','platform-reminder-tick','platform-message-notification-config']) assert.ok(seenKeys.has(key));
+  assert.ok(seenKeys.has('send-sms-reg'), '注册短信公开派发入口必须纳入官方投影闭包');
   assert.equal(createIfMissingCount, 10);
 
   assert.match(officialEngineSource, /action === "reconcilepublishedapiengines"/);
@@ -1403,7 +1454,7 @@ test('官网发布选择元数据精确来自已验证包并拒绝旧 Key 或旧
   ]), expected.SelectTable), false);
 });
 
-test('官网发布接口接受当前九个官方应用包并拒绝 AI 与首页资源闭包缺口', async () => {
+test('官网发布接口接受十个官方应用包并拒绝 AI 与首页资源闭包缺口', async () => {
   const executablePrefix = officialEngineSource.slice(0, officialEngineSource.indexOf('var action ='));
   const validatePublishResource = new Function(
     'V8',
@@ -1413,6 +1464,7 @@ test('官网发布接口接受当前九个官方应用包并拒绝 AI 与首页�
     'app.microi.form-engine.json', 'app.microi.module-engine.json', 'app.microi.saas-engine.json',
     'app.microi.sso.json', 'app.microi.store.json', 'app.microi.sys_user.json',
     'app.microi.sys-config.json', 'app.microi.message-notification.json', 'app.microi.ai-engine.json',
+    'app.microi.sys-log.json',
   ];
   for (const packageName of packageNames) {
     const content = await readFile(resolve(testDirectory, packageName), 'utf8');

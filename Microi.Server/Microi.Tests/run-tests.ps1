@@ -60,6 +60,7 @@ if ($freeBytes -lt $reserveBytes) {
 if ($Mode -eq "Full") {
     $required = @(
         "MICROI_TEST_API_BASE",
+        "MICROI_TEST_PEER_API_BASE",
         "MICROI_TEST_OSCLIENT",
         "MICROI_TEST_TOKEN",
         "MICROI_TEST_FORM_ENGINE_KEY",
@@ -89,15 +90,10 @@ if ($Mode -eq "Full") {
 
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 
-# 应用包中的 V8 编排与后端运行时共同交付，必须覆盖真实包副本和主子租户行为。
-$resourceTests = @('background-task-api-engine-contract.test.mjs', 'child-tenant-platform-app-resource.test.mjs',
-    'official-package-install-contract.test.mjs', 'official-package-changelog-contract.test.mjs',
-    'import-package.test.mjs', 'mysql-physical-bit-compat.test.mjs') |
-    ForEach-Object { Join-Path $serverRoot "Microi.Upgrade\Resource\$_" }
-node --test --test-concurrency=1 @resourceTests
-if ($LASTEXITCODE -ne 0) { throw "Platform application resource regression gate failed with exit code $LASTEXITCODE." }
-node --test (Join-Path $testRoot 'ReleaseGate\release-gate.test.mjs') (Join-Path $testRoot 'ReleaseGate\release-candidate.test.mjs')
-if ($LASTEXITCODE -ne 0) { throw "Release script fail-closed regression failed with exit code $LASTEXITCODE." }
+# 自动发现统一入口、应用包和 PC 端所有 node:test 回归；新增测试不得依赖手工补清单。
+# 真正浏览器/数据库测试仍由下方 Full 环境入口执行，不能伪装成离线单元测试。
+node (Join-Path $testRoot 'run-node-regressions.mjs') $ResultsDirectory
+if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with exit code $LASTEXITCODE." }
 
 $v8Test = Join-Path $testRoot "V8\empty-database-sanitization.test.mjs"
 $v8Repository = Join-Path (Split-Path -Parent $serverRoot) "Microi-V8-Engine"
@@ -185,6 +181,10 @@ if ($Mode -eq "Full") {
     Write-Host "Validating real login and notification-center maintenance in isolated browser contexts..."
     node (Join-Path $testRoot 'FullStack\notification-center.e2e.mjs') $ResultsDirectory
     if ($LASTEXITCODE -ne 0) { throw "Notification-center browser release gate failed with exit code $LASTEXITCODE." }
+
+    Write-Host "Validating platform reminders with real login, receipts, withdrawal and polling fallback..."
+    node (Join-Path $testRoot 'FullStack\platform-reminders.e2e.mjs') $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw "Platform-reminder browser release gate failed with exit code $LASTEXITCODE." }
 
     Write-Host "Auditing vulnerable and deprecated NuGet dependencies..."
     $vulnerabilityJson = dotnet list $solution package `

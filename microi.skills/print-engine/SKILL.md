@@ -106,6 +106,14 @@ ZICOX CC4、BLE/SPP 或
 }
 ```
 
+文本 `text` 与长文本 `longText` 的 `options.formatter` 接收
+`function(title, value, options, templateData)`；文本控件还可能传第五个 `target`。
+第一参数是标题，绑定数据在第二参数。不要直接传入 `function(value)` 编码器，否则会把
+标题当业务值打印。表格单元格的 `formatter2(title, field, row, index, options)` 是另一合同。
+金额应由后端精确计算后作为字符串输出，不能在打印页转换为 `Number` 再求和。
+业务文本经过 formatter 进入 HTML 时必须编码 `& < > " '`，并用含标签的值与大额金额
+调用真实函数签名做回归。模板保存成功只证明存储，仍须用实际数据预览分页、合计与长条款。
+
 ### table — 表格元素
 
 ```json

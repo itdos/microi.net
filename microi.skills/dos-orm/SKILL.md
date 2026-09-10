@@ -29,6 +29,15 @@ Dos.ORM 是 Microi.Server 底层 C# ORM。它不是接口引擎里的 `V8.Db`：
 
 ## 安全规则
 
+### 连接生命周期与在线恢复
+
+- 创建事务、准备读取器、打开连接、提交/回滚及批处理任一路径抛异常，都必须释放本层拥有的连接；借用外部事务或批处理连接时不能擅自关闭。保留原始异常，不因 Dispose 失败遮盖原始错误。
+- `DbTrans` 提交成功后先归还连接，再执行提交后通知。通知失败不能把已提交事务报告为回滚，也不能自动重放业务 SQL。调用者仍必须使用 `using`，防止业务异常绕过 Commit/Rollback。
+- `DatabasePoolExhausted`、`DatabaseCapacityExceeded`、`DatabaseEndpointUnreachable` 是不同故障；不要把应用池等待、数据库全局连接限制和慢 SQL 混为一谈。
+- 可信 C# 宿主通过 `Database.GetConnectionPoolSnapshot()` 读取脱敏状态，`ResetConnectionPool()` 只轮换准确匹配的 MySQL/SQL Server 池，`ProbeConnectionPoolAsync` 用原池执行固定 `SELECT 1`。不使用 `ClearAllPools`，不杀借出的事务，不重放 SQL。
+- `BeginIsolatedConnections()` 仅用于有并发限制的可信应急鉴权作用域，设置无池连接与 5 秒连接/命令超时；未知驱动拒绝。不能给普通业务或 V8 增加绕过限流的开关，不能在此作用域内执行清池或把无池探测冒充原池恢复。
+- AI 在线恢复使用 `microi_manage_system_observability(action=ResetDatabasePools)` 的预览、确认和回读协议，详细决策见 [系统日志/监控](../system-observability/SKILL.md)。需要升级含 `database-pools/v1` 的后端和 MCP；事故恢复本身不要求重启数据库/API。
+
 - 数据值全程参数化；`FromSql` 的动态值用 `AddInParameter`。
 - 表名、字段名、排序名不能来自未经白名单验证的用户输入。
 - 保留 `{0}Name{1}` 标识符延迟绑定机制，不能改成字符串替换。
@@ -72,6 +81,12 @@ Dispose 幂等，未 Commit 时自动回滚。事务内异步操作串行执行�
 - 分片使用稳定 Hash；不能使用进程随机化的 `string.GetHashCode()`。
 
 ## 验收
+
+- Oracle 原生 `TO_CHAR(value, format[, nlsparam])` 必须保留参数顺序；Provider 不得用
+  字符串扫描交换参数。单参数、嵌套函数、格式串中的逗号、注释与字面量也要原样保留。
+- `ToArray/ToList` 是查询执行与读取边界，堆栈停在这里不能证明对象转换出错。
+  遇到 `ORA-01722`，先用同一账号条件拆分计数/列表，核对最终命令文本与参数类型，
+  再执行最小原生 SQL 对照；确定性的转换/语法错误不得用盲目重试或更改业务过滤掩盖。
 
 - 至少在目标数据库 Provider 运行定向测试，不用 MySQL 结果宣称 Oracle/达梦通过。
 - 覆盖 NULL、DateTime、decimal、Guid、enum、byte[] 和分页边界。

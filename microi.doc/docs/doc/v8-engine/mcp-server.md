@@ -85,6 +85,8 @@ action=microi_get_db_schema, params={...}
 
 Manifest 支持角色、表、索引、数据源、接口引擎、事件、菜单、权限、页面、打印模板、工作流和任务。常规表单字段不要默认写 `FormWidth=24`；整行控件才使用整行宽度。绑定表的菜单应同时补齐 PC/移动列、搜索列、隐藏列、排序、统计与卡片字段。
 
+`TableChild` 的回查索引必须对应真实物理列。默认独立租户库不自动创建 `OsClient` 列，例如子表外键为 `OrderId` 时使用 `columns:["OrderId"]`；只有显式声明了 `OsClient` 物理列的共享表，才使用 `columns:["OsClient","OrderId"]`。平台固定物理列是 `Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted`；`CreateUser` 不是默认字段，`TableChild` 与布局控件本身也不能建索引。新版计划检查在远端写入前拒绝这些无效索引，存量工具出现错误的租户列要求时应更新 MCP，不应为通过计划而虚构字段。
+
 ## 读取、写入与高风险操作
 
 | 级别 | 示例 | 要求 |

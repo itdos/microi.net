@@ -49,6 +49,38 @@ export function readLegacySsoCredential(href, tokenName) {
     return credential === "$V8.CurrentToken$" ? "" : credential;
 }
 
+// Strip the credential from both the address bar and the router's pending target.
+// Otherwise a dynamic-route rematch can put a consumed token back into history.
+export function withoutLegacySsoCredential(href, tokenName) {
+    if (!safeLegacyTokenName.test(String(tokenName || ""))) return href;
+    const url = new URL(href);
+    const remove = (query) => {
+        for (const key of [...query.keys()]) {
+            if (key.toLowerCase() === tokenName.toLowerCase()) query.delete(key);
+        }
+    };
+    remove(url.searchParams);
+    const index = url.hash.indexOf("?");
+    if (index >= 0) {
+        const query = new URLSearchParams(url.hash.slice(index + 1));
+        remove(query);
+        url.hash = url.hash.slice(0, index) + (query.size ? `?${query}` : "");
+    }
+    return url.toString();
+}
+
+export function legacySsoTarget(to, tokenName) {
+    const query = Object.fromEntries(Object.entries(to.query || {})
+        .filter(([key]) => key.toLowerCase() !== String(tokenName).toLowerCase()));
+    return { path: to.path, query, hash: to.hash || "", replace: true };
+}
+
+export function isLegacySsoDeepLink(to) {
+    const path = String(to?.path || "");
+    return path.startsWith("/") && !path.startsWith("//")
+        && !["/", "/login", "/auth-redirect", "/access-login"].includes(path);
+}
+
 function popupFeatures(width, height) {
     const safeWidth = Math.max(520, Math.min(980, Number(width) || 740));
     const safeHeight = Math.max(640, Math.min(940, Number(height) || 780));

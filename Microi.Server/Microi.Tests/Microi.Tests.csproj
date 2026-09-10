@@ -32,6 +32,9 @@
     <Using Include="Xunit" />
     <!-- 面板具有独立宿主测试项目，其生成的程序集元数据不能再次作为中央测试源码编译。 -->
     <Compile Remove="Panel\bin\**\*;Panel\obj\**\*" />
+    <!-- 独立连接池故障节点是可执行测试夹具，不并入 xUnit 入口。 -->
+    <Compile Remove="Fixtures\DatabasePoolNode\**\*.cs" />
+    <ProjectReference Include="Fixtures\DatabasePoolNode\DatabasePoolNode.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -73,11 +76,14 @@
 
   <ItemGroup Condition="'$(MicroiNetExists)' != 'true'">
     <Compile Remove="Common\FormEngineTenantBoundaryTests.cs" />
+    <Compile Remove="Common\FormEngineSqlIdentitySnapshotTests.cs" />
+    <Compile Remove="Common\FormEngineReadPrimaryTests.cs" />
     <Compile Remove="Common\TokenRotationSecurityTests.cs" />
     <Compile Remove="Common\DataSourceEngineAuthorizationTests.cs" />
     <Compile Remove="Common\TenantEngineIsolationTests.cs" />
     <Compile Remove="Common\SpiderSecurityBoundaryTests.cs" />
     <Compile Remove="Common\LicenseKeyTrustTests.cs" />
+    <Compile Remove="Common\PlatformReminderBoundaryTests.cs" />
   </ItemGroup>
 
 </Project>

@@ -66,6 +66,8 @@ export default {
             page: null,
             entryUrl: "",
             frameHeight: 120,
+            themePayload: {},
+            themeObserver: null,
             instanceId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         };
     },
@@ -89,6 +91,7 @@ export default {
                 diyTableId: this.$attrs.DiyTableId || this.$attrs.diyTableId || this.$route?.meta?.DiyTableId || ""
             };
             return {
+                ...this.themePayload,
                 apiBase: DiyCommon.GetApiBase(),
                 osClient: DiyCommon.GetOsClient(),
                 token: DiyCommon.getToken(),
@@ -113,7 +116,23 @@ export default {
     created() {
         this.resolvePage();
     },
+    mounted() {
+        this.syncEmbedTheme();
+        this.themeObserver = new MutationObserver(() => this.syncEmbedTheme());
+        this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-mci-palette'] });
+    },
+    beforeUnmount() { this.themeObserver?.disconnect(); },
     methods: {
+        syncEmbedTheme() {
+            const styles = getComputedStyle(document.documentElement);
+            const read = key => styles.getPropertyValue(key).trim();
+            this.themePayload = {
+                themeMode: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+                themeColor: read('--el-color-primary') || '#409eff',
+                themeOnPrimary: read('--mci-color-on-primary') || '#ffffff',
+                themePrimaryText: read('--mci-color-primary-readable') || read('--el-color-primary') || '#409eff'
+            };
+        },
         async resolvePage() {
             this.loading = true;
             this.error = "";
@@ -166,7 +185,7 @@ export default {
             if (applyMicroAppToken(payload)) return;
             const type = String(payload?.type || payload?.Type || "");
             if (type === "dev-component:resize") {
-                const height = Number(payload.height || payload.Height || 0);
+                const height = Number(payload.height || payload.Height || payload.data?.height || 0);
                 if (height > 0) this.frameHeight = Math.max(80, Math.min(height, 1600));
                 return;
             }

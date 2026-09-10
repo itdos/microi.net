@@ -1,0 +1,1 @@
+{"version":3,"file":"email-tools.d.ts","sourceRoot":"","sources":["../src/email-tools.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,MAAM,yCAAyC,CAAC;AAEpE,OAAO,KAAK,EAAE,YAAY,EAAe,MAAM,oBAAoB,CAAC;AACpE,OAAO,KAAK,EAAE,gBAAgB,EAAE,MAAM,aAAa,CAAC;AA0BpD,wBAAgB,kBAAkB,CAAC,MAAM,EAAC,SAAS,EAAC,MAAM,EAAC,YAAY,EAAC,OAAO,EAAC,gBAAgB,GAAE,IAAI,CAqCrG"}

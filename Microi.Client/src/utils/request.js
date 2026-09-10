@@ -8,6 +8,7 @@ import { useUserStore } from "@/pinia";
 // import { getToken } from '@/utils/auth.js'
 import { DiyCommon, DosCommon } from "@/utils/microi.net.import";
 import { reportApiServiceFailure, reportApiServiceRecovered } from "@/utils/api-service-status.js";
+import { withRequestTenant } from "@/utils/request-tenant-context.js";
 
 // 辅助函数：获取 UserStore
 const getUserStore = () => useUserStore(pinia);
@@ -22,6 +23,10 @@ const service = axios.create({
 // request interceptor
 service.interceptors.request.use(
     (config) => {
+        config.headers = withRequestTenant(config.headers, {
+            url: config.url, params: config.data, query: config.params,
+            apiBase: DiyCommon.GetApiBase(), osClient: DiyCommon.GetOsClient()
+        });
         // do something before request is sent
         const requestToken = DiyCommon.getToken();
         config.__microiRequestToken = requestToken;
