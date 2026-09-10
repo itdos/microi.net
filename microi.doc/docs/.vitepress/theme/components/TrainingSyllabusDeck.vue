@@ -524,6 +524,18 @@ const engineSlides: EngineSlide[] = [
     href: '/doc/more/security.html', linkLabel: '打开平台安全文档',
   },
   {
+    id: 'server-panel', domain: 'integration', nav: '服务器运维面板', title: '从服务器环境到网站入口，统一在独立面板维护',
+    summary: 'Microi.Panel 提供 Docker 插件市场、Nginx、HTTPS、网站文件、备份恢复和持久运维任务。', code: 'PANEL', glyph: '▤', accent: '#68bce8',
+    promise: '业务平台更新或停机时，仍能打开自己的运维入口。', orbit: ['Docker 插件', 'Nginx / HTTPS', '备份恢复', '独立登录'],
+    highlights: [
+      { title: '独立安装与版本选择', text: '面板直接提供 HTTPS，按需安装数据库、MinIO、翻译与 OCR，各实例保留独立数据卷。' },
+      { title: '网站与恢复', text: '可视化代理与静态站点，证书申请续期、配置校验、冷备份及新卷恢复统一记录结果。' },
+      { title: '共存与权限', text: '与已有面板使用不同端口；主机管理员独立登录，业务 DiyToken 不授予 Docker 权限。' },
+    ],
+    demo: ['一键安装独立面板', '选择插件和版本', '配置网站与证书', '演练备份和任务恢复'],
+    href: '/doc/server-panel/overview.html', linkLabel: '打开服务器运维面板文档',
+  },
+  {
     id: 'visualization-engine', domain: 'experience', nav: '3D / CAD / 大屏', title: '从经营驾驶舱到工程可视化',
     summary: 'go-view 数据大屏、3D 场景与 CAD 预览按交互复杂度选择。', code: 'VIS', glyph: '⬡', accent: '#9b8cff',
     promise: '用合适的可视化技术回答不同业务问题。', orbit: ['go-view', '3D', 'CAD', '数据大屏'],
@@ -572,9 +584,9 @@ const introSlides: SlideMeta[] = [
 ]
 
 const outroSlides: SlideMeta[] = [
-  { id: 'multi-end', chapter: '44', kind: 'multi-end', nav: '全端兼容', title: '一套业务能力，进入企业每一个终端', summary: 'PC、WebOS、H5、小程序、Android、iOS、微服务与 Unity 共享平台能力。' },
-  { id: 'success-cases', chapter: '45', kind: 'cases', nav: '成功案例', title: '跨越行业边界，让业务价值落地', summary: '从工厂车间到商业服务，从组织管理到公共运营，Microi吾码已在多类行业的实际业务中落地应用。' },
-  { id: 'closing', chapter: '46', kind: 'closing', nav: '致辞', title: '把 AI 的速度，变成企业可持续交付力', summary: '掌握平台能力，建立可复用、可验证、可演进的 AI 研发方式。' },
+  { id: 'multi-end', chapter: '45', kind: 'multi-end', nav: '全端兼容', title: '一套业务能力，进入企业每一个终端', summary: 'PC、WebOS、H5、小程序、Android、iOS、微服务与 Unity 共享平台能力。' },
+  { id: 'success-cases', chapter: '46', kind: 'cases', nav: '成功案例', title: '跨越行业边界，让业务价值落地', summary: '从工厂车间到商业服务，从组织管理到公共运营，Microi吾码已在多类行业的实际业务中落地应用。' },
+  { id: 'closing', chapter: '47', kind: 'closing', nav: '致辞', title: '把 AI 的速度，变成企业可持续交付力', summary: '掌握平台能力，建立可复用、可验证、可演进的 AI 研发方式。' },
 ]
 
 const slideMeta: SlideMeta[] = [
@@ -591,7 +603,7 @@ const slideMeta: SlideMeta[] = [
   ...outroSlides,
 ]
 
-const expectedSlideCount = 46
+const expectedSlideCount = 47
 if (slideMeta.length !== expectedSlideCount) throw new Error(`培训 PPT 页数异常：${slideMeta.length}/${expectedSlideCount}`)
 
 const atlasGroups: AtlasGroup[] = [
@@ -600,7 +612,7 @@ const atlasGroups: AtlasGroup[] = [
   { code: '03', title: 'AI 与智能产品', entryIds: ['app-store', 'ai-engine', 'ai-data-analysis', 'ai-creative-studio', 'ai-workflow-suite', 'ai-governance', 'vision-engine', 'image-engine'] },
   { code: '04', title: '数据、文件与检索', entryIds: ['cache-engine', 'search-engine', 'database-engine', 'file-engine', 'file-manage', 'office-engine', 'translate-engine'] },
   { code: '05', title: '自动化、消息与设备', entryIds: ['print-engine', 'bluetooth-print', 'spider-engine', 'job-engine', 'mq-engine', 'mqtt-engine', 'notification-engine', 'ocr-engine'] },
-  { code: '06', title: '租户、安全与观测', entryIds: ['saas-engine', 'system-settings', 'security-engine', 'observability-engine'] },
+  { code: '06', title: '租户、安全与运维', entryIds: ['saas-engine', 'system-settings', 'security-engine', 'observability-engine', 'server-panel'] },
 ]
 
 const atlasEntryIds = atlasGroups.flatMap(group => group.entryIds)

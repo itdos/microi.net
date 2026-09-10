@@ -40,9 +40,9 @@ test('presentation covers the complete technical learning path', () => {
   const supplementalBlock = /const atlasSupplementalEntries: AtlasEntry\[\] = \[([\s\S]*?)\r?\n\]/u.exec(component)?.[1] || ''
   const supplementalCount = [...supplementalBlock.matchAll(/^\s+\{ id: '[^']+'/gmu)].length
 
-  assert.equal(engineCount, 37)
+  assert.equal(engineCount, 38)
   assert.equal(supplementalCount, 6)
-  assert.match(component, /const expectedSlideCount = 46/)
+  assert.match(component, /const expectedSlideCount = 47/)
   for (const phrase of [
     '开源 AI 开发框架',
     '10×+',
@@ -197,16 +197,16 @@ test('pre-generated dark and light PDFs are published as stable high-quality dow
     const pdf = fs.readFileSync(staticPdfPath)
     assert.ok(stat.size > 250_000, 'each PDF should contain the complete high-quality vector deck')
     assert.equal(pdf.subarray(0, 5).toString('ascii'), '%PDF-')
-    assert.match(pdf.toString('latin1'), /\/Count\s+46\b/u, 'each static PDF should contain all 46 slides')
+    assert.match(pdf.toString('latin1'), /\/Count\s+47\b/u, 'each static PDF should contain all 47 slides')
   }
 })
 
 test('the preview rail publishes a complete thumbnail set for each theme', () => {
   for (const [theme, root] of Object.entries(thumbnailRoots)) {
     const files = fs.readdirSync(root).filter(name => /^slide-\d{2}\.webp$/u.test(name)).sort()
-    assert.equal(files.length, 46, `${theme} theme should contain all 46 thumbnails`)
+    assert.equal(files.length, 47, `${theme} theme should contain all 47 thumbnails`)
     assert.equal(files[0], 'slide-01.webp')
-    assert.equal(files.at(-1), 'slide-46.webp')
+    assert.equal(files.at(-1), 'slide-47.webp')
     for (const name of files) {
       const file = fs.readFileSync(path.join(root, name))
       assert.ok(file.length > 1_000, `${theme}/${name} should be a real rendered preview`)

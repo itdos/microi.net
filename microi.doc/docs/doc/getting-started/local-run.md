@@ -116,7 +116,7 @@ SQL Server 验收还应覆盖 Unicode 文本、带单引号的创建人姓名和
 
 ---
 
-### 🧪 后端自动化测试与发布门禁
+## 🧪 后端自动化测试与发布门禁
 
 后端测试统一位于 `/Microi.Server/Microi.Tests`。它合并了历史
 `Dos.Common.Tests`、`Dos.ORM.Tests`，并在私有源码存在时条件纳入 AI、
