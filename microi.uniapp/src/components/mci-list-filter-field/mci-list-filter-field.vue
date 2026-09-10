@@ -29,7 +29,7 @@
     </view>
     <template v-else-if="isDropdown">
       <mci-native-field :field="selectorField" :model-value="modelValue" :option-loader="loadOptions" :tree-loader="loadTreeChildren" :tree-linkage="!!field.tree?.ParentChildLinkage"
-        :selector-portal="true" :selector-z-index="10100" :menu-id="menuId" :module-engine-key="moduleEngineKey" @update:model-value="emit" />
+        :selector-portal="true" :selector-z-index="10100" :menu-id="menuId" :module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth" :form-data="formData" @update:model-value="emit" />
       <view v-if="selectionLabels.length" class="selected-tags">
         <view v-for="(item, index) in selectionLabels" :key="index" class="selected-tag" @tap="removeSelection(index)"><text>{{ item }}</text><text>×</text></view>
       </view>
@@ -60,7 +60,7 @@ import { V8, post } from '@/utils/request.js'
 export default {
   name: 'MciListFilterField',
   components: { MciNativeField },
-  props: { field: { type: Object, required: true }, modelValue: { default: '' }, menuId: { type: String, default: '' }, moduleEngineKey: { type: String, default: '' } },
+  props: { field: { type: Object, required: true }, modelValue: { default: '' }, menuId: { type: String, default: '' }, moduleEngineKey: { type: String, default: '' }, tableChildAuth: { type: Object, default: null }, formData: { type: Object, default: () => ({}) } },
   emits: ['update:modelValue'],
   data() { return { region: createRegionPickerState([]), chipOptions: [], chipPage: 1, chipHasMore: false, chipLoading: false, chipError: '', treeCache: null, sourceCache: null } },
   computed: {
@@ -101,7 +101,7 @@ export default {
     async sourcePage(options) {
       const field = this.field
       const native = field.nativeField
-      if (native && (field.source === 'native-field' || isRemoteNativeFieldOptions(native))) return loadNativeFieldOptionPage(native, {}, { ...options, menuId: this.menuId, moduleEngineKey: this.moduleEngineKey, preserveTree: !!field.tree, timeoutMs: 15000 })
+      if (native && (field.source === 'native-field' || isRemoteNativeFieldOptions(native))) return loadNativeFieldOptionPage(native, this.formData, { ...options, menuId: this.menuId, moduleEngineKey: this.moduleEngineKey, tableChildAuth: this.tableChildAuth, preserveTree: !!field.tree, timeoutMs: 15000 })
       if (native || !field.source) {
         const rows = filterNativeFieldOptions(field.options || [], options.keyword || '')
         const start = (options.pageIndex - 1) * options.pageSize

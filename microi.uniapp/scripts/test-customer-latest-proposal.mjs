@@ -13,7 +13,7 @@ function createContext(api = {}, runtime = {}) {
   const sandbox = {
     uni: runtime,
     V8: { FormEngine: api }, getUser: () => ({}),
-    MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {},
+    MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     openForm: (options) => openedForms.push(options),
     formatFieldValue: (value, format) => format === 'money' ? `¥${value}` : String(value),
     fieldDisplayValue: (field, value) => field.options.find((item) => item.value === value)?.label || String(value)
