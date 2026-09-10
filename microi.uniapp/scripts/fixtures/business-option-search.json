@@ -1,0 +1,401 @@
+[
+  {
+    "name": "设备列表",
+    "fields": [
+      {
+        "Id": "7a94db71-2346-481d-8380-3d681b91bfba",
+        "Name": "ShebeiZT",
+        "Label": "设备状态",
+        "Component": "Radio",
+        "Type": "varchar(50)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "Value",
+          "SelectLabel": "Value",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      }
+    ],
+    "search": [
+      {
+        "Id": "7a94db71-2346-481d-8380-3d681b91bfba",
+        "Name": "ShebeiZT",
+        "Label": "设备状态",
+        "DisplayType": "Out",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      }
+    ]
+  },
+  {
+    "name": "线索",
+    "fields": [
+      {
+        "Id": "657bb16c-2aed-446a-b4f6-fe867d7f0de2",
+        "Name": "Zhuangtai",
+        "Label": "状态",
+        "Component": "Radio",
+        "Type": "varchar(50)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "Value",
+          "SelectLabel": "Value",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      },
+      {
+        "Id": "6e62c698-a427-45eb-ad48-aa8ed876c641",
+        "Name": "FuzeR",
+        "Label": "负责人",
+        "Component": "Select",
+        "Type": "varchar(100)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "Name",
+          "SelectLabel": "Name",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      },
+      {
+        "Id": "38951fab-aac5-4259-8ad0-bdab7321843d",
+        "Name": "XiezuoR",
+        "Label": "协作人",
+        "Component": "MultipleSelect",
+        "Type": "mediumtext",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "",
+          "SelectLabel": "Name",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      }
+    ],
+    "search": [
+      {
+        "Id": "6e62c698-a427-45eb-ad48-aa8ed876c641",
+        "Name": "FuzeR",
+        "Label": "负责人",
+        "DisplayType": "Out",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "38951fab-aac5-4259-8ad0-bdab7321843d",
+        "Name": "XiezuoR",
+        "Label": "协作人",
+        "DisplayType": "In",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "657bb16c-2aed-446a-b4f6-fe867d7f0de2",
+        "Name": "Zhuangtai",
+        "Label": "状态",
+        "DisplayType": "Out",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      }
+    ]
+  },
+  {
+    "name": "跟进记录",
+    "fields": [
+      {
+        "Id": "01M06SAHDN47ECEBDS6NCVPVPY",
+        "Name": "BaifangDXLX",
+        "Label": "拜访对象类型",
+        "Component": "Select",
+        "Type": "varchar(100)",
+        "optionsRemote": false,
+        "config": {
+          "SelectSaveField": "",
+          "SelectLabel": "",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Data"
+        }
+      },
+      {
+        "Id": "78f29663-c493-44ed-8269-ee97787a1a42",
+        "Name": "KehuMC",
+        "Label": "拜访对象",
+        "Component": "Select",
+        "Type": "varchar(100)",
+        "optionsRemote": false,
+        "config": {
+          "SelectSaveField": "KehuMC",
+          "SelectLabel": "KehuMC",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Data"
+        }
+      },
+      {
+        "Id": "12f9f4c1-d6a6-4503-b48e-3a9ac13b69e9",
+        "Name": "GenjinFS",
+        "Label": "跟进方式",
+        "Component": "Radio",
+        "Type": "varchar(50)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "Value",
+          "SelectLabel": "Value",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      },
+      {
+        "Id": "d4a88a7e-c23a-4d1c-b70d-c8dfac063ab2",
+        "Name": "BaifangR",
+        "Label": "跟进人",
+        "Component": "MultipleSelect",
+        "Type": "mediumtext",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "",
+          "SelectLabel": "Name",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      }
+    ],
+    "search": [
+      {
+        "Id": "78f29663-c493-44ed-8269-ee97787a1a42",
+        "Name": "KehuMC",
+        "Label": "拜访对象",
+        "DisplayType": "In",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "01M06SAHDN47ECEBDS6NCVPVPY",
+        "Name": "BaifangDXLX",
+        "Label": "拜访对象类型",
+        "DisplayType": "In",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "12f9f4c1-d6a6-4503-b48e-3a9ac13b69e9",
+        "Name": "GenjinFS",
+        "Label": "跟进方式",
+        "DisplayType": "In",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "d4a88a7e-c23a-4d1c-b70d-c8dfac063ab2",
+        "Name": "BaifangR",
+        "Label": "跟进人",
+        "DisplayType": "In",
+        "DisplaySelect": true,
+        "Hide": false,
+        "IsVisible": true
+      }
+    ]
+  },
+  {
+    "name": "联系人",
+    "fields": [
+      {
+        "Id": "c760afcc-c23a-4759-adac-dd98865a577f",
+        "Name": "SuoshuKH",
+        "Label": "所属客户",
+        "Component": "Select",
+        "Type": "varchar(100)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "KehuMC",
+          "SelectLabel": "KehuMC",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      }
+    ],
+    "search": [
+      {
+        "Id": "c760afcc-c23a-4759-adac-dd98865a577f",
+        "Name": "SuoshuKH",
+        "Label": "所属客户",
+        "DisplayType": "In",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      }
+    ]
+  },
+  {
+    "name": "合同订单",
+    "fields": [
+      {
+        "Id": "ec925c3b-fdeb-417c-93a9-145319a0b762",
+        "Name": "DingdanZT",
+        "Label": "订单状态",
+        "Component": "Radio",
+        "Type": "varchar(100)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "Value",
+          "SelectLabel": "Value",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      },
+      {
+        "Id": "882ec0b5-0163-475e-ba58-4285ab57e48c",
+        "Name": "KehuMC",
+        "Label": "客户名称",
+        "Component": "Select",
+        "Type": "varchar(100)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "KehuMC",
+          "SelectLabel": "KehuMC",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      },
+      {
+        "Id": "fb6245a5-350a-4fcd-8b47-e6cd977c51ee",
+        "Name": "YewuY",
+        "Label": "负责人",
+        "Component": "Select",
+        "Type": "varchar(50)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "Name",
+          "SelectLabel": "Name",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      },
+      {
+        "Id": "e44fdc82-3dea-42df-aeda-266235522c8f",
+        "Name": "XinLDD",
+        "Label": "订单类型",
+        "Component": "Select",
+        "Type": "varchar(100)",
+        "optionsRemote": false,
+        "config": {
+          "SelectSaveField": "",
+          "SelectLabel": "",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Data"
+        }
+      },
+      {
+        "Id": "b89151bc-350c-4fb4-a388-872196aa723b",
+        "Name": "DingdanHZFS",
+        "Label": "订单合作方式",
+        "Component": "Radio",
+        "Type": "varchar(50)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "Value",
+          "SelectLabel": "Value",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      },
+      {
+        "Id": "01KRJPSZFX0284GXFYA2XT8S8G",
+        "Name": "IsDingdanHT",
+        "Label": "合同是否上传",
+        "Component": "Radio",
+        "Type": "varchar(50)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "Value",
+          "SelectLabel": "Value",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      },
+      {
+        "Id": "01KT196WWQC0ZJE18T7Q0SW2K7",
+        "Name": "HetongZT",
+        "Label": "合同状态",
+        "Component": "Radio",
+        "Type": "varchar(50)",
+        "optionsRemote": true,
+        "config": {
+          "SelectSaveField": "Value",
+          "SelectLabel": "Value",
+          "SelectSaveFormat": "Text",
+          "DataSource": "Sql"
+        }
+      }
+    ],
+    "search": [
+      {
+        "Id": "ec925c3b-fdeb-417c-93a9-145319a0b762",
+        "Name": "DingdanZT",
+        "Label": "订单状态",
+        "DisplayType": "Out",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "fb6245a5-350a-4fcd-8b47-e6cd977c51ee",
+        "Name": "YewuY",
+        "Label": "负责人",
+        "DisplayType": "In",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "882ec0b5-0163-475e-ba58-4285ab57e48c",
+        "Name": "KehuMC",
+        "Label": "客户名称",
+        "DisplayType": "Out",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "e44fdc82-3dea-42df-aeda-266235522c8f",
+        "Name": "XinLDD",
+        "Label": "订单类型",
+        "DisplayType": "In",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "b89151bc-350c-4fb4-a388-872196aa723b",
+        "Name": "DingdanHZFS",
+        "Label": "订单合作方式",
+        "DisplayType": "Out",
+        "DisplaySelect": false,
+        "Hide": false,
+        "IsVisible": true
+      },
+      {
+        "Id": "01KRJPSZFX0284GXFYA2XT8S8G",
+        "Name": "IsDingdanHT",
+        "Label": "合同是否上传",
+        "DisplayType": "Out",
+        "Hide": ""
+      },
+      {
+        "Id": "01KT196WWQC0ZJE18T7Q0SW2K7",
+        "Name": "HetongZT",
+        "Label": "合同状态",
+        "DisplayType": "",
+        "Hide": ""
+      }
+    ]
+  }
+]

@@ -613,6 +613,7 @@ async function requestFieldOptions(field, form, options = {}) {
   if (options.menuId) common._SysMenuId = options.menuId
   if (options.moduleEngineKey) common.ModuleEngineKey = options.moduleEngineKey
   if (options.tableChildAuth) common._TableChildAuth = options.tableChildAuth
+  if (options.parentValue !== undefined) common._ParentValue = options.parentValue
   if (dataSource === 'Sql' && config.Sql) {
     return post('/api/FormEngine/GetDiyFieldSqlData', common, true)
   }
@@ -644,14 +645,14 @@ function flattenOptionTree(rows, output = []) {
   return output
 }
 
-function optionResponseRows(field, result) {
+function optionResponseRows(field, result, preserveTree = false) {
   const payload = result && result.Data
   const rows = Array.isArray(payload)
     ? payload
     : payload && typeof payload === 'object'
       ? (payload.Data || payload.Rows || payload.List || [])
       : []
-  return field.component === 'Department' ? flattenOptionTree(rows) : (Array.isArray(rows) ? rows : [])
+  return field.component === 'Department' && !preserveTree ? flattenOptionTree(rows) : (Array.isArray(rows) ? rows : [])
 }
 
 function optionResponseTotal(result) {
@@ -680,24 +681,26 @@ export async function loadNativeFieldOptionPage(field, form = {}, options = {}) 
       keyword: remoteSearch ? keyword : '',
       menuId: options.menuId,
       moduleEngineKey: options.moduleEngineKey,
-      tableChildAuth: options.tableChildAuth
+      tableChildAuth: options.tableChildAuth,
+      parentValue: options.parentValue
     }),
     options.timeoutMs,
     `${field.Label || field.Name || '选项'}加载超时，请稍后重试`
   )
   if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '选项加载失败')
 
-  let rows = optionResponseRows(field, result)
+  let rows = optionResponseRows(field, result, options.preserveTree)
   const total = optionResponseTotal(result)
   let normalized = normalizeOptions({ ...field, Data: rows, Config: field.config || {} })
   const rawCount = normalized.length
-  const backendReturnedUnpaged = total === null && rawCount > pageSize
+  const backendReturnedUnpaged = rawCount > pageSize
 
   // Microi 仅在 DataSourceSqlRemote=true 时保证服务端处理 _Keyword。
   // 对当前返回页再做本地过滤，兼容旧数据源，并支持姓名、电话、账号检索。
   if (keyword) normalized = filterNativeFieldOptions(normalized, keyword)
 
   return {
+    ...(options.preserveTree ? { treeRows: rows } : {}),
     options: normalized,
     total: total === null ? (backendReturnedUnpaged ? normalized.length : 0) : total,
     totalKnown: (remoteSearch && total !== null) || backendReturnedUnpaged,

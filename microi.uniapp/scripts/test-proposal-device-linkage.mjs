@@ -38,7 +38,7 @@ function runtime({ draft = false, failure = false } = {}) {
     .replace(/export default/g, 'const hooks =').replace(/export (?=(?:async )?function|const)/g, '') + '\nhooks', scope)
   const component = vm.runInNewContext(stripImports(read('components/mci-business-related-list/mci-business-related-list.vue')
     .match(/<script>([\s\S]*?)<\/script>/)[1]).replace('export default', 'const component =') + '\ncomponent', {
-    ...scope, MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {},
+    ...scope, MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     uni: { showToast: (value) => notices.push(value) }
   })
   const pending = []

@@ -63,7 +63,7 @@
          <!-- <text>{{ merchantName }}</text>
           <text>{{ presentation.footerNote || '专业服务，长期陪伴' }}</text> -->
         </view>
-        <text>{{ footerTag }}</text>
+        <text v-if="footerTag">{{ footerTag }}</text>
       </view>
     </view>
   </view>
@@ -115,7 +115,7 @@ export default {
       return this.presentation.brandImage || this.brandLogo || ''
     },
     footerTag() {
-      return this.display(this.presentation.footerTagField) || this.presentation.footerTag || '客户案例'
+      return String(this.display(this.presentation.footerTagField) || this.presentation.footerTag || '').trim()
     },
     metaItems() {
       return (this.presentation.metaFields || []).map((item) => ({
