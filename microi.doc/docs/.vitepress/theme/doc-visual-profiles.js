@@ -40,6 +40,7 @@ export const DOC_VISUAL_PROFILES = Object.freeze({
   'more/security': 'policy',
   'more/sso': 'policy',
   'more/sys-config': 'reference',
+  'server-panel/overview': 'overview',
   'system-engine/ai-engine': 'overview',
   'system-engine/ai-data-analysis': 'showcase',
   'system-engine/ai-creative-studio': 'showcase',
