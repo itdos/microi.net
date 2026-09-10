@@ -1,0 +1,59 @@
+{
+  "fields": [
+    {
+      "Id": "e9fbff26-98dd-42ee-a278-2ddc250832f9",
+      "Name": "KehuLX",
+      "Label": "客户类型",
+      "Component": "Radio",
+      "Type": "varchar(50)",
+      "Data": "[]",
+      "config": {
+        "DataSource": "Sql",
+        "SelectSaveField": "Value",
+        "SelectLabel": "Value",
+        "SelectSaveFormat": "Text"
+      }
+    },
+    {
+      "Id": "7199da72-c888-4b10-8850-c27d8c06385b",
+      "Name": "Zhuangtai",
+      "Label": "客户合作状态",
+      "Component": "Radio",
+      "Type": "varchar(50)",
+      "Data": "[]",
+      "config": {
+        "DataSource": "Sql",
+        "SelectSaveField": "Value",
+        "SelectLabel": "Value",
+        "SelectSaveFormat": "Text"
+      }
+    }
+  ],
+  "search": [
+    {
+      "Id": "e9fbff26-98dd-42ee-a278-2ddc250832f9",
+      "AsName": "",
+      "Name": "KehuLX",
+      "Label": "客户类型",
+      "TableId": "9c5e803b-1906-4368-bca1-0dc9823b5510",
+      "TableName": "Diy_Kehu",
+      "TableDescription": "客户",
+      "DisplayType": "In",
+      "DisplaySelect": false,
+      "IsVisible": true
+    },
+    {
+      "Id": "7199da72-c888-4b10-8850-c27d8c06385b",
+      "AsName": "",
+      "Name": "Zhuangtai",
+      "Label": "客户合作状态",
+      "TableId": "9c5e803b-1906-4368-bca1-0dc9823b5510",
+      "TableName": "Diy_Kehu",
+      "TableDescription": "客户",
+      "DisplayType": "In",
+      "DisplaySelect": false,
+      "IsVisible": true,
+      "Equal": true
+    }
+  ]
+}
