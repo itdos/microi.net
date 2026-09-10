@@ -151,7 +151,7 @@ import {
 } from '@/utils/xjy-task.js'
 
 const STATE_COUNT_KEYS = {
-  '待接单': 'pending', '待服务': 'TodoCount', '待商家验收': 'acceptance',
+  '待接单': 'pending', '待服务': 'TodoCount', '待客服验收': 'acceptance',
   '待客户验收': 'cacceptance', '待评价': 'evaluated', '暂停': 'suspend', '已结束': 'FinishCount', '已取消': 'cancel'
 }
 
