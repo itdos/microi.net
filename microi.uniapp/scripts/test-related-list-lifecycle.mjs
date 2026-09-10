@@ -17,7 +17,7 @@ function deferred() {
 
 function setup(overrides = {}) {
   const sandbox = {
-    getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {},
+    getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     uni: { $off() {} }, clearTimeout,
     loadNativeTableModel: async () => ({ Id: 'table-1', Name: 'Related' }),
     loadNativeFormDefinition: async () => ({ fields: [] }),

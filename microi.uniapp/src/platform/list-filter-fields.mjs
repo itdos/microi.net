@@ -63,11 +63,12 @@ function findConfiguredField(item, fields) {
     .find(Boolean)
 }
 
-function shouldShowInAdvancedFilter(item) {
+function shouldShowInAdvancedFilter(item, includeInline = false) {
   if (!item || typeof item !== 'object') return true
   if (normalizedBoolean(item.Hide, false) || item.IsVisible === false) return false
   const displayType = String(item.DisplayType || '').trim().toLowerCase()
-  return displayType !== 'line' && displayType !== 'out'
+  // Out 是 PC 搜索区的位置，不是隐藏或单选配置；移动端统一收进筛选弹窗。
+  return includeInline || displayType !== 'line'
 }
 
 function fieldCanBeSearched(field) {
@@ -117,13 +118,13 @@ function compileField(item, field) {
   if (OPTION_COMPONENTS.has(component)) {
     const storedMultiple = tree ? normalizedBoolean(treeConfig.Multiple, MULTI_VALUE_COMPONENTS.has(component))
       : component === 'Radio' ? false : normalizedBoolean(config.MultipleSelect, field.multiple === true || MULTI_VALUE_COMPONENTS.has(component))
-    // 平台旧版 SearchFieldIds 的 Radio 平铺查询实际渲染为 checkbox-group。
-    // DisplaySelect=false 是既有查询配置，不能要求旧菜单补写新的 SearchMultiple 才能多选。
-    // 表单仍保存单值；显式 SearchMultiple 优先，其余未配置的 Radio 继续默认单选。
-    const configuredChipQuery = component === 'Radio' &&
-      (source.DisplaySelect !== undefined || source.displaySelect !== undefined) &&
-      !normalizedBoolean(source.DisplaySelect ?? source.displaySelect, true)
-    const multiple = normalizedBoolean(source.SearchMultiple, storedMultiple || configuredChipQuery)
+    // 平台查询区的 Radio 使用复选组，Select 使用多选下拉，和表单单值存储独立。
+    // 兼容既有 In/Out 查询配置，包括未填写 DisplaySelect 的菜单；它只决定呈现方式。
+    // 显式 SearchMultiple 优先，纯字段 Id / 未配置查询模式的控件仍按表单默认值。
+    const configuredOptionQuery = ['Radio', 'Select'].includes(component) &&
+      (source.DisplayType !== undefined || source.displayType !== undefined ||
+        source.DisplaySelect !== undefined || source.displaySelect !== undefined)
+    const multiple = normalizedBoolean(source.SearchMultiple, storedMultiple || configuredOptionQuery)
     const displaySelect = normalizedBoolean(source.DisplaySelect ?? source.displaySelect, false)
     const objectStorage = String(config.SelectSaveFormat).toLowerCase() === 'json' ||
       (component === 'Select' && config.DataSource === 'KeyValue') ||
@@ -149,11 +150,11 @@ function compileField(item, field) {
   return { ...base, type: 'text', operation: normalizedBoolean(source.Equal, false) ? '=' : 'Like' }
 }
 
-export function compileModuleFilterFields(searchFieldIds, fields = []) {
+export function compileModuleFilterFields(searchFieldIds, fields = [], { includeInline = false } = {}) {
   const available = Array.isArray(fields) ? fields : []
   const seen = new Set()
   return parseRows(searchFieldIds).map((item) => {
-    if (!shouldShowInAdvancedFilter(item)) return null
+    if (!shouldShowInAdvancedFilter(item, includeInline)) return null
     const field = findConfiguredField(item, available)
     if (!fieldCanBeSearched(field)) return null
     const key = String(field.Name).toLowerCase()
@@ -171,7 +172,7 @@ export function mergeModuleFilterFields(configured = [], local = [], nativeField
     const native = nativeFields.find((field) => String(field.Name).toLowerCase() === String(item.field).toLowerCase())
     if (!native) return item
     if (!fieldCanBeSearched(native)) return null
-    return { ...compileField({ Label: item.label, SearchMultiple: item.SearchMultiple }, native), key: item.key }
+    return { ...compileField({ Label: item.label, SearchMultiple: item.SearchMultiple ?? item.multiple }, native), key: item.key }
   })
   ;[...(configured || []), ...normalizedLocal].forEach((field) => {
     if (!field) return
