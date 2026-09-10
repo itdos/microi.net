@@ -28,12 +28,18 @@ import {
 } from './proposal-cost-model.mjs'
 import { XJY_CUSTOMER_DEFAULT_REGION } from './customer-location.mjs'
 import { proposalCostFieldPresentation } from './proposal-cost-presentation.mjs'
+import {
+  PROPOSAL_INSTALLATION_DEFAULT_PEOPLE,
+  proposalInstallationDeviceValues
+} from './proposal-installation-points.mjs'
+import { childDraftRows, findChildDraftGroup } from '@/platform/child-form-drafts.mjs'
 import { casePhotoField, caseFieldDescription } from './case-form.mjs'
 import {
   CUSTOMER_FOLLOW_FIELDS,
   customerFollowScopeValues
 } from './customer-follow-scope.mjs'
 import { followupApprovalDefaultValues } from './followup-approval-defaults.mjs'
+import { leadFollowupDefaultValues } from './lead-followup-defaults.mjs'
 import {
   calculateOrderProductCooperation,
   calculateOrderProductPriceBinding,
@@ -67,6 +73,7 @@ const CUSTOMER_ADDRESS_TABLE = 'diy_kehudz'
 const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
 const FOLLOWUP_TABLE = 'diy_genjinjl'
+const LEAD_FOLLOWUP_TABLE = 'diy_xiansuogjjl'
 const CONTACT_TABLE = 'Diy_LianxiR'
 const CUSTOMER_CARE_TABLE = 'diy_kehuguanhuai'
 // zhy：客户方案表及设备联动字段集中配置。
@@ -129,6 +136,10 @@ const FOLLOWUP_FIELDS = {
   effective: 'GuanjianJCR',
   approvalStatus: 'ShenpiZT',
   approvalStatusValue: 'ShenpiZTZ'
+}
+const LEAD_FOLLOWUP_FIELDS = {
+  user: 'GenjinR',
+  time: 'GenjinSJ'
 }
 const CONTACT_FIELDS = {
   customerId: 'KehuID',
@@ -318,6 +329,14 @@ function isCheckinEditable(context) {
 
 function isFollowupAdd(context) {
   return isFollowupForm(context) && context.mode === 'Add' && !context.rowId
+}
+
+function isLeadFollowupForm(context) {
+  return String(context.tableName || '').toLowerCase() === LEAD_FOLLOWUP_TABLE
+}
+
+function isLeadFollowupAdd(context) {
+  return isLeadFollowupForm(context) && context.mode === 'Add' && !context.rowId
 }
 
 function isPrimaryFollowupForm(context) {
@@ -1128,6 +1147,20 @@ function initializeFollowup(context) {
   })
 }
 
+function initializeLeadFollowup(context) {
+  const timeName = fieldName(context, LEAD_FOLLOWUP_FIELDS.time, '跟进时间')
+  const userName = fieldName(context, LEAD_FOLLOWUP_FIELDS.user, '跟进人')
+  context.patchForm(leadFollowupDefaultValues({
+    mode: context.mode,
+    rowId: context.rowId,
+    form: context.form,
+    currentTime: currentMinuteTimestamp(),
+    currentUser: getUser() || {},
+    timeField: timeName,
+    userField: userName
+  }))
+}
+
 function initializeFollowupTarget(context) {
   const targetTypeName = fieldName(context, FOLLOWUP_FIELDS.targetType, '拜访对象类型')
   const targetName = fieldName(context, FOLLOWUP_FIELDS.targetName, '拜访对象')
@@ -1559,11 +1592,13 @@ export function createState() {
     checkinMapTimer: null,
     currentTime: '',
     followupInitialized: false,
+    leadFollowupInitialized: false,
     followupCustomerId: '',
     followupCustomerName: '',
     openingFollowupCheckin: false,
     followupCheckinSucceeded: false,
     proposalInitialized: false,
+    proposalPointInitialized: false,
     customerFollowScopeValues: {},
     orderInitialized: false,
     orderValues: {},
@@ -1674,6 +1709,14 @@ export async function initialize(context) {
     }
     await loadFollowupContacts(context, customer.id)
   }
+  if (isLeadFollowupForm(context)) {
+    // zhy：线索跟进表字段与客户跟进表不同，仅复用日期时间展示并填入当前登录人员。
+    configureFollowupTimeField(context)
+    if (isLeadFollowupAdd(context) && !context.state.leadFollowupInitialized) {
+      context.state.leadFollowupInitialized = true
+      initializeLeadFollowup(context)
+    }
+  }
   if (isCustomerCareForm(context)) {
     context.patchForm(customerCareTotalValues(context))
     await loadCustomerCareContacts(context)
@@ -1707,13 +1750,26 @@ export async function initialize(context) {
     await refreshDerivedValues(context)
   }
   if (isProposalInstallationPointForm(context)) {
+    const initialValues = {}
+    if (context.mode === 'Add' && !context.rowId && !context.state.proposalPointInitialized) {
+      const peopleField = fieldName(context, 'Renshu', '本点位用水总人数')
+      const explicitPeople = context.defaultValues?.[peopleField]
+      if (isEmptyFormValue(explicitPeople)) initialValues[peopleField] = PROPOSAL_INSTALLATION_DEFAULT_PEOPLE
+    }
     const parentId = context.form.AnzhuangdianweiId || context.defaultValues?.AnzhuangdianweiId
-    if (parentId) {
+    const draftParent = findChildDraftGroup(context.draftRelation)?.parentForm
+    if (draftParent) {
+      context.state.proposalPointYears = proposalCostYears(draftParent)
+    } else if (parentId) {
       const response = await V8.FormEngine.GetFormData(PROPOSAL_TABLE, { Id: parentId })
       if (!response || Number(response.Code) !== 1) throw new Error(response?.Msg || '所属需求方案读取失败')
       context.state.proposalPointYears = proposalCostYears(response.Data)
     }
-    context.patchForm(calculateInstallationPointCosts(context.form, context.state.proposalPointYears || proposalCostYears(context.form)))
+    context.patchForm({
+      ...initialValues,
+      ...calculateInstallationPointCosts({ ...context.form, ...initialValues }, context.state.proposalPointYears || proposalCostYears(context.form))
+    })
+    context.state.proposalPointInitialized = true
   }
 }
 
@@ -2152,18 +2208,14 @@ export async function handleFieldSelect(context, payload) {
   if ((isProposalForm(context) || isProposalInstallationPointForm(context)) && payload && !payload.multiple) {
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
     if (selectedFieldName === PROPOSAL_FIELDS.deviceModel.toLowerCase()) {
-      const row = payload.raw && typeof payload.raw === 'object'
-        ? payload.raw
-        : payload.option && payload.option.raw && typeof payload.option.raw === 'object'
-          ? payload.option.raw
-          : {}
-      // zhy：移动端选择设备型号后复用 PC 表单的设备名称、价格及型号 Id 联动映射。
+      // 卡片、完整点位页和批量配置共用设备报价映射，清空型号也清空旧报价。
+      const values = proposalInstallationDeviceValues(payload)
       const updates = {
-        [fieldName(context, PROPOSAL_FIELDS.deviceModelId, '设备型号Id')]: personValue(row, ['Id', 'ID', 'id']),
-        [fieldName(context, PROPOSAL_FIELDS.deviceName, '设备名称')]: personValue(row, ['ShangpinMC']),
-        [fieldName(context, PROPOSAL_FIELDS.rentalPrice, '设备单价（租赁）')]: personValue(row, ['ZulinXJ']),
-        [fieldName(context, PROPOSAL_FIELDS.buyoutPrice, '设备单价（买断）')]: personValue(row, ['Xianjia']),
-        [fieldName(context, PROPOSAL_FIELDS.filterPrice, '更换滤芯价格')]: personValue(row, ['GenghuanLXJG'])
+        [fieldName(context, PROPOSAL_FIELDS.deviceModelId, '设备型号Id')]: values.ShebeiXHID,
+        [fieldName(context, PROPOSAL_FIELDS.deviceName, '设备名称')]: values.ShebeiMC,
+        [fieldName(context, PROPOSAL_FIELDS.rentalPrice, '设备单价（租赁）')]: values.ShebeiDJZL,
+        [fieldName(context, PROPOSAL_FIELDS.buyoutPrice, '设备单价（买断）')]: values.ShebeiDJ,
+        [fieldName(context, PROPOSAL_FIELDS.filterPrice, '更换滤芯价格')]: values.GenghuanLXJG
       }
       context.patchForm({
         ...updates,
@@ -2523,6 +2575,11 @@ export async function beforeSubmit(context) {
   if (isProposalForm(context)) {
     const error = validateProposalCostInputs(context.form, false)
     if (error) throw new Error(error)
+    const drafts = childDraftRows(context.form.Id || context.defaultValues?.Id, 'diy_anzhuang_dw') || []
+    drafts.forEach((row, index) => {
+      const pointError = validateProposalCostInputs(row, true)
+      if (pointError) throw new Error(`点位${index + 1}：${pointError}`)
+    })
     return { ...calculateProposalCosts(context.form), HesuanNS: proposalCostYears(context.form) }
   }
   if (isProposalInstallationPointForm(context)) {
@@ -2536,6 +2593,12 @@ export async function beforeSubmit(context) {
 export async function refreshDerivedValues(context) {
   if (isProposalForm(context)) {
     const years = proposalCostYears(context.form)
+    const drafts = childDraftRows(context.form.Id || context.defaultValues?.Id, 'diy_anzhuang_dw')
+    if (drafts !== null) {
+      const values = aggregateInstallationPointCosts(drafts, years)
+      context.patchForm(values)
+      return values
+    }
     if (isProposalAdd(context)) {
       const values = aggregateInstallationPointCosts([], years)
       context.patchForm(values)

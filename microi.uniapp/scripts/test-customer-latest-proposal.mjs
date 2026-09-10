@@ -8,9 +8,10 @@ const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
   .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*;?\r?$/gm, '')
   .replace('export default {', 'globalThis.component = {')
 
-function createContext(api = {}) {
+function createContext(api = {}, runtime = {}) {
   const openedForms = []
   const sandbox = {
+    uni: runtime,
     V8: { FormEngine: api }, getUser: () => ({}),
     MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {},
     openForm: (options) => openedForms.push(options),
@@ -161,4 +162,38 @@ test('查看详情打开摘要对应的最新记录，保留菜单和父子授�
   assert.equal(openedForms[0].mode, 'View')
   assert.equal(openedForms[0].menuId, context.menuId)
   assert.equal(openedForms[0].tableChildAuth, context.tableChildAuth)
+})
+
+test('比价按钮跳转目标必须注册在默认租户分包，且源码真实存在', async () => {
+  const { context } = createContext()
+  let navigation
+  const sandbox = { uni: { navigateTo(options) { navigation = options; options.success() } } }
+  const compare = vm.runInNewContext(`(async function ${context.compareProposals.toString().replace(/^async\s+/, '')})`, sandbox)
+  context.proposalSelection = [{ Id: 'plan-a' }, { Id: 'plan-b' }]
+  await compare.call(context)
+  const [route, query] = navigation.url.slice(1).split('?')
+  const profile = JSON.parse(fs.readFileSync(new URL('../profiles/xjy/pages.json', import.meta.url), 'utf8'))
+  const routes = [...profile.pages.map((page) => page.path), ...profile.subPackages.flatMap((pkg) => pkg.pages.map((page) => `${pkg.root}/${page.path}`))]
+  assert.ok(routes.includes(route), `比价跳转页未注册：${route}`)
+  assert.ok(fs.existsSync(new URL(`../src/${route}.vue`, import.meta.url)))
+  assert.equal(new URLSearchParams(query).get('ids'), 'plan-a,plan-b')
+  assert.equal(context.proposalComparing, false)
+})
+
+test('摘要展开后剩余高度不足 80px 仍更新滚动区，收起后恢复可用高度', () => {
+  let bodyTop = 540
+  const query = {
+    in() { return this }, select() { return this }, boundingClientRect() { return this },
+    exec(callback) { callback([{ bottom: 574 }, { top: bodyTop }]) }
+  }
+  const { context } = createContext({}, { createSelectorQuery: () => query })
+  Object.assign(context, { independentScroll: true, $nextTick: (callback) => callback(), listBodyHeight: 200 })
+  context.measureListBody()
+  assert.equal(context.listBodyHeight, 34)
+  bodyTop = 580
+  context.measureListBody()
+  assert.equal(context.listBodyHeight, 1)
+  bodyTop = 400
+  context.measureListBody()
+  assert.equal(context.listBodyHeight, 174)
 })

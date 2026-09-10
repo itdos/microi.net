@@ -58,7 +58,7 @@ export default {
     attentionRows(){return[
       {label:'待接单任务',desc:'及时领取，避免客户等待',value:Number(this.taskStates.pending||0),tone:'orange',route:'tasks',state:'待接单'},
       {label:'待服务任务',desc:'关注计划时间与上门进度',value:Number(this.taskStates.TodoCount||0),tone:'blue',route:'tasks',state:'待服务'},
-      {label:'待商家验收',desc:'核对照片、设备与服务结果',value:Number(this.taskStates.acceptance||0),tone:'violet',route:'tasks',state:'待商家验收'},
+      {label:'待客服验收',desc:'核对照片、设备与服务结果',value:Number(this.taskStates.acceptance||0),tone:'violet',route:'tasks',state:'待客服验收'},
       {label:'待客户验收',desc:'主动提醒客户确认服务',value:Number(this.taskStates.cacceptance||0),tone:'green',route:'tasks',state:'待客户验收'}]},
   },
   onLoad(){this.loadStats()},

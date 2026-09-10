@@ -16,12 +16,14 @@ for (const [name, source] of [
   ['通用表单查看/编辑页', nativeForm],
   ['模块详情页', moduleDetail]
 ]) {
-  assert.match(source, /v-for="relatedTab in standaloneRelatedTabs"[\s\S]*?display-mode="full"/,
-    `${name}的独立子表 Tab 必须直接使用完整列表`)
+  assert.match(source, /v-for="relatedTab in standaloneRelatedTabs"[\s\S]*?:display-mode="standaloneListMode \? 'full' : 'preview'"/,
+    `${name}只在纯子表 Tab 使用完整列表，混合表单使用预览`)
+  assert.match(source, /:show-preview-header="!standaloneListMode"/,
+    `${name}的混合表单子表必须显示折叠标题`)
 }
 
 assert.doesNotMatch(businessDetail,
-  /v-for="relatedTab in standaloneRelatedTabs"[\s\S]{0,900}?show-preview-header/,
+  /v-for="relatedTab in standaloneRelatedTabs"[\s\S]{0,900}?\s+show-preview-header(?:\s|\/|>)/,
   '客户详情独立子表 Tab 不应再显示折叠标题')
 assert.match(businessDetail, /:independent-scroll="standaloneListMode"/,
 	'客户详情独立子表 Tab 必须启用组件内滚动')
@@ -45,6 +47,8 @@ assert.match(relatedList, /:enable-flex="independentScroll && !isPreview"/,
 	'客户详情子表必须启用微信原生 flex 内容布局')
 assert.match(relatedList, /:show-scrollbar="false"/,
 	'客户详情子表滚动时必须隐藏原生滚动条')
+assert.match(relatedList, /preview-section-header__title">\{\{ sectionTitle \}\}/,
+  '混合表单子表标题必须沿用字段配置名称')
 assert.match(relatedList, /related-list-body--scroll::\-webkit-scrollbar[\s\S]*?display:\s*none/,
 	'客户详情子表必须通过样式隐藏开发者工具和 WebView 滚动指示条')
 assert.doesNotMatch(businessDetail, /<scroll-view class="detail-scroll"/,
