@@ -45,5 +45,5 @@ test('提交接口和统一完成接口都在服务端失败关闭', () => {
   assert.match(scanSubmitSource, /V8\.ApiEngine\.Run\('shouhoudd_finish', \{ Id: taskId \}, V8\.DbTrans\)/)
   assert.doesNotMatch(scanSubmitSource, /\.forEach\(/)
   assert.match(finishTaskSource, /FuwuZT IS NULL OR FuwuZT <> @completedState/)
-  assert.ok(finishTaskSource.indexOf('pendingTaskDevice') < finishTaskSource.indexOf("Zhuangtai : '待商家验收'"))
+  assert.ok(finishTaskSource.indexOf('pendingTaskDevice') < finishTaskSource.indexOf("Zhuangtai : '待客服验收'"))
 })

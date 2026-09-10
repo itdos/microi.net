@@ -435,7 +435,7 @@ export async function canOpenBusinessEntry(key, refresh = false) {
   return Boolean(menu && menu.Id)
 }
 
-export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null }) {
+export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null, draftRelation = '' }) {
   if (!requireLogin()) return
   if (!table) {
     uni.showToast({ title: '未配置业务表单', icon: 'none' })
@@ -467,6 +467,7 @@ export async function openForm({ table, rowId = '', mode = 'View', title = '', m
     } catch (error) {}
   }
   if (moduleEngineKey) params.push(`moduleEngineKey=${encodeURIComponent(moduleEngineKey)}`)
+  if (draftRelation) params.push(`draftRelation=${encodeURIComponent(draftRelation)}`)
   if (tableChildAuth) params.push(`tableChildAuth=${encodeURIComponent(JSON.stringify(tableChildAuth))}`)
   if (defaultValues && Object.keys(defaultValues).length) params.push(`defaults=${encodeURIComponent(JSON.stringify(defaultValues))}`)
   if (fieldNames && fieldNames.length) params.push(`fields=${encodeURIComponent(JSON.stringify(fieldNames))}`)

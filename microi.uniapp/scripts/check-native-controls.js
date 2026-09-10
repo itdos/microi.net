@@ -491,8 +491,9 @@ for (const [source, name] of [
   ]) {
     if (!source.includes(token)) fail(`${name} embedded child rendering is missing: ${token}`)
   }
-  if (!source.includes('display-mode="full"')) {
-    fail(`${name} standalone TableChild must use the paged full-list presentation`)
+  if (!source.includes(":display-mode=\"standaloneListMode ? 'full' : 'preview'\"") ||
+    !source.includes(':show-preview-header="!standaloneListMode"')) {
+    fail(`${name} TableChild must use full-list mode for a standalone tab and preview mode for mixed form content`)
   }
 }
 if (businessDetail.includes('display-mode="preview" show-preview-header') ||
