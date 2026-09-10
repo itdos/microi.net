@@ -2,11 +2,25 @@
 
 > **通过 Docker 编排部署 Microi吾码低代码平台全套环境**
 
+## 独立安装吾码服务器运维面板
+
+需要先准备服务器环境时，可直接安装 **Microi.Panel / 吾码服务器运维面板**，再在插件市场安装 Nginx、数据库、MinIO、翻译和 OCR 等服务。面板使用独立账号和 HTTPS 入口，可以与宝塔、1Panel 使用不同端口共存。完整说明见 [服务器运维面板](/doc/server-panel/overview.html)。
+
+在 Linux SSH 终端复制下面一行，按提示填写域名或服务器 IPv4。已有 Docker 会直接复用；没有 Docker 时会询问安装。默认入口端口 `61890`、目录 `/microi/panel`，账号 `paneladmin`，随机密码保存于 `/microi/panel/config/admin-password`。
+
+```bash
+panel_url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh; (if command -v curl >/dev/null 2>&1; then curl -fSL -o install-microi-panel.sh "$panel_url"; else wget -O install-microi-panel.sh "$panel_url"; fi) && sed -i 's/\r$//' install-microi-panel.sh && bash install-microi-panel.sh
+```
+
+安装脚本也提供 [GitHub 备用下载](https://github.com/itdos/microi.net/raw/refs/heads/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh)。
+
+面板与业务服务分别安装。现有 Microi.Ops 使用原 Compose 迁移为 Microi.Panel，保留原账号、目录、端口及任务账本，具体步骤见 [Ops 迁移](/doc/server-panel/overview.html#从-microi-ops-迁移)。同一主机只运行一个吾码 Ops/Panel 控制器。
+
 ## 🚀 一键安装（零门槛部署）
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
 
-默认安装 **主数据库 + Redis + MinIO + MongoDB + 低代码平台程序（API + Web）**，并默认尝试安装 **Microi.Ops 平台运维中心 + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）** 附加能力。已有 MySQL 或 MinIO 的客户也可在交互中选择复用，安装器会跳过对应容器、数据目录、编排和宿主机端口。附加组件镜像、网络、容器健康检查或对应配置失败时，只会跳过对应附加能力并输出警告，不会回滚或中断已经通过 liveness/readiness 的核心平台；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
+默认安装 **主数据库 + Redis + MinIO + MongoDB + 低代码平台程序（API + Web）**，并默认尝试安装 **Microi.Panel 服务器运维面板 + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）** 附加能力。已有 MySQL 或 MinIO 的客户也可在交互中选择复用，安装器会跳过对应容器、数据目录、编排和宿主机端口。附加组件镜像、网络、容器健康检查或对应配置失败时，只会跳过对应附加能力并输出警告，不会回滚或中断已经通过 liveness/readiness 的核心平台；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
 
 > **权限说明：** 一键安装和一键更新/修复需要创建 `/microi`、数据目录、防火墙规则及宿主机资源限制。下面两条脚本命令可保持原样复制：root 帐号会直接执行；普通帐号会在步骤 1 之前请求一次 `sudo` 并以 root 重新执行，不会再到步骤 5 创建 `/microi/compose` 时才报 `mkdir: Permission denied`。精简系统没有 `sudo` 时，脚本会在任何宿主机变更前明确停止，请先执行 `su -` 切换到 root 后重试。
 
@@ -54,7 +68,7 @@ Docker 的 `cpus`、`mem_limit` 是**单容器**上限。如果给 API 和数据
 - 当前一键安装只支持由宿主机 systemd 管理的 rootful Docker；检测到 rootless Docker 或不具备 CPU/内存 cgroup 控制器时，会在写入 Slice 和启动新容器前停止。
 - cgroup v2 会设置父级 `MemoryMax`、`CPUQuota` 和 `MemorySwapMax=0`；cgroup v1 会设置 `MemoryLimit`、`CPUQuota`，内核启用 swap accounting 时再把父级内存与 Swap 合计限制为同一数值。
 - Redis、MongoDB、Web、MinIO、OCR、LibreTranslate、Ollama、Qdrant 以及临时工具容器都不加入这个共享池，也不由本方案新增 Docker CPU/内存硬限制。
-- Microi.Ops 使用独立编排和独立资源限制（默认 512 MiB / 1 CPU），不加入 API/主数据库共享池，避免平台升级或该池耗尽时连带中断运维入口。
+- Microi.Panel（兼容原 Microi.Ops）使用独立编排和独立资源限制（默认 512 MiB / 1 CPU），不加入 API/主数据库共享池，避免平台升级或该池耗尽时连带中断运维入口。
 - 复用已有 MySQL 时，外部数据库不在安装器管理的本机父 cgroup 内，因此本机共享池实际只约束吾码 API；外部数据库必须在它自己的宿主机或服务平台单独保护。
 - 安装器在启动容器前回读父级 CPU、内存和 Swap 控制文件，启动每个编排前执行 `docker compose config`，启动后再用 `docker inspect` 确认 API 与本脚本创建的主数据库已进入同一 `CgroupParent`。
 
@@ -108,7 +122,7 @@ services:
     cgroup_parent: microi.slice # 与 API 完全相同
 ```
 
-API 和主数据库必须使用完全相同的 `cgroup_parent`，也不要再分别写固定 `cpus` / `mem_limit`。Redis、MongoDB、MinIO、OCR、LibreTranslate、Web、Microi.Ops 以及可选 Ollama/Qdrant 不写这个属性。修改后按顺序验收：
+API 和主数据库必须使用完全相同的 `cgroup_parent`，也不要再分别写固定 `cpus` / `mem_limit`。Redis、MongoDB、MinIO、OCR、LibreTranslate、Web、Microi.Panel 以及可选 Ollama/Qdrant 不写这个属性。修改后按顺序验收：
 
 ```bash
 # 1. 装载并启动共享父级
@@ -232,7 +246,7 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 
 1. 回读现有 API/Web 容器的 Compose project、配置文件和镜像，静态校验 API 十项启动配置及数据库连接串结构；先把 Compose、容器元数据和旧镜像恢复点保存到应用编排目录的 `.repair-backups/<时间>/`。
 2. 创建/复用 `microi` 共享 bridge 网络，将脚本新装的数据库、Redis、MongoDB、MinIO 容器接入该网络；通过安装标签识别已有 MySQL/MinIO，保留外部连接串、host-gateway 和 SaaS 存储配置，不查找或重建对应容器。如果脚本管理的数据库连接串缺少用户、密码或端口，修复器会从唯一匹配的现有数据库容器安装环境中恢复完整连接串，全程不输出密码；无法精确匹配容器或凭据时会在删除应用容器前停止。
-3. 检测运行中的 Microi.Ops，存在时拒绝并行修复；先在 Ops 确认无活动任务并切为手动，再明确停止 Ops 才能使用命令行救援。按现场 Compose 与 `docker-compose.ops.yml` 镜像覆盖拉取镜像，临时停止原本正在运行的旧 Watchtower，只删除并重建 `microi-install-api`、`microi-install-client` 两个无状态应用容器，从而接管丢失标签或归属漂移造成的同名容器冲突。
+3. 检测运行中的 Microi.Panel 或旧 Microi.Ops，存在时拒绝并行修复；先在面板确认无活动任务并切为手动，再明确停止 Ops 才能使用命令行救援。按现场 Compose 与 `docker-compose.ops.yml` 镜像覆盖拉取镜像，临时停止原本正在运行的旧 Watchtower，只删除并重建 `microi-install-api`、`microi-install-client` 两个无状态应用容器，从而接管丢失标签或归属漂移造成的同名容器冲突。
 4. 重建后回读十项启动配置和 `microi` 网络，依次验证 API liveness、readiness；失败时自动尝试用修复前镜像恢复。最后只恢复原本正在运行的旧 Watchtower；本来关闭的自动更新器保持关闭。
 
 > 该命令不会删除或重建主数据库、Redis、MongoDB、MinIO 容器，不会删除它们的数据目录或 Docker volume，也不会改动客户已有 MySQL/MinIO 服务，更不会执行 `docker compose down -v`。API、Web 前端重建时会有短暂中断。宝塔标准编排目录存在而应用编排仅位于 `/microi/compose` 时，修复器会把已经完整解析的应用配置恢复到宝塔目录后再重建，使编排重新可管理。
@@ -292,7 +306,7 @@ bash install-microi-offline.sh
 ::: warning 离线脚本版本边界
 - 离线安装器独立维护，不能再假定与当前在线脚本功能完全一致；制作包前必须确认三个脚本版本相同。
 - 当前 OCR 默认安装、Upgrade29 字段等待和 SaaS 配置回读以本页在线安装脚本为准。完全离线环境需要额外把固定 OCR 镜像执行 `docker save`/`docker load`，再按下方 OCR 手动编排部署并在健康后配置 SaaS 引擎。
-- 离线镜像清单包含 Microi.Ops，首次安装默认为「仅手动」。先通过 `docker load` 导入镜像，再在 Ops 勾选「仅使用本地镜像」并选择目标标签；不会定时访问镜像仓库。缺失 Ops 镜像时报告警告，不转为联网拉取，也不回滚核心平台。
+- 离线镜像清单包含 Microi.Panel，已有 Panel/Ops 时保留并复用；首次安装默认为「仅手动」。先通过 `docker load` 导入镜像，再在面板勾选「仅使用本地镜像」并选择目标标签；不会定时访问镜像仓库。缺失面板镜像时报告警告，不转为联网拉取，也不回滚核心平台。
 :::
 
 ---
@@ -1319,15 +1333,15 @@ services:
 :::
 
 
-### 平台运维中心 Microi.Ops：独立升级入口
+### 服务器运维面板：平台更新兼容入口 {#平台运维中心-microi-ops-独立升级入口}
 
-[Watchtower 上游](https://github.com/containrrr/watchtower) 已于 **2025 年 12 月 17 日**归档，并声明不再维护。新安装不再部署 Watchtower，改由 **Microi.Ops / 吾码平台运维中心**提供 API/Web 的手动更新、定时检查、下载、维护窗口更新、状态与日志。现有 Watchtower 保留现场和启停选择，完成受管范围核对后再迁移；不能同时让两个更新器改同一个 API/Web。
+[Watchtower 上游](https://github.com/containrrr/watchtower) 已于 **2025 年 12 月 17 日**归档，并声明不再维护。新安装不再部署 Watchtower，改由 **Microi.Panel / 吾码服务器运维面板**提供 API/Web 的手动更新、定时检查、下载、维护窗口更新、状态与日志。现有 Watchtower 保留现场和启停选择，完成受管范围核对后再迁移；不能同时让两个更新器改同一个 API/Web。
 
-Ops 是独立 .NET 10 容器，页面使用吾码 UI。即使 API/Web 正在更新或已经停止，独立登录、任务进度、本地日志仍可使用。系统引擎菜单通过 iframe 打开它，同时展示访问 URL、复制地址和新窗口链接。请将地址加入书签，反向代理也必须独立于被更新的 API/Web 容器。
+Microi.Panel 是独立 .NET 10 容器，页面使用吾码 UI。本节说明继承自 Microi.Ops 的平台更新兼容模式，因此保留旧 `OPS_*` 参数、日志来源和 `/microi/ops` 目录；独立安装面板使用本文开头的新安装命令。即使 API/Web 正在更新或已经停止，独立登录、任务进度、本地日志仍可使用。系统引擎菜单通过 iframe 打开它，同时展示访问 URL、复制地址和新窗口链接。请将地址加入书签，反向代理也必须独立于被更新的 API/Web 容器。
 
 #### 安装与两套登录
 
-新版一键安装在核心平台就绪后尝试部署 Ops；安装失败会报告警告，核心平台继续运行。编排位于 `/microi/ops/docker-compose.yml`，账号和随机密码保存在 `/microi/ops/config/ops.env`（权限 600），不输出到安装日志。Ops 帐号默认名为 `opsadmin`，密码无通用默认值。已有配置不会被再次安装覆盖。
+新版一键安装检测到已有 Panel 或旧 Ops 时会保留并复用；尚未安装时，才在核心平台就绪后尝试部署 Microi.Panel 的兼容编排。面板安装失败会报告警告，核心平台继续运行。编排位于 `/microi/ops/docker-compose.yml`，账号和随机密码保存在 `/microi/ops/config/ops.env`（权限 600），不输出到安装日志。Ops 帐号默认名为 `opsadmin`，密码无通用默认值。已有配置不会被再次安装覆盖。
 
 已有平台可用一次性引导生成独立编排，下面容器名适用于一键安装；手工部署须改为实际 `microi-api`、`microi-client`。API/Web 应共享用户自建 Docker 网络，域名须改为自己的实际地址。
 
@@ -1340,7 +1354,7 @@ docker run --rm --name microi-ops-bootstrap --memory 256m --cpus 1 \
   -e OPS_PUBLIC_URL=https://ops.example.com \
   -e OPS_PLATFORM_API_URL=https://api.example.com \
   -e OPS_ALLOWED_FRAME_ORIGINS=https://web.example.com \
-  registry.cn-hangzhou.aliyuncs.com/microios/microi-ops:v1.0.1 --bootstrap
+  registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.0 --bootstrap
 docker compose -f /microi/ops/docker-compose.yml config --quiet
 docker compose -f /microi/ops/docker-compose.yml up -d
 ```
@@ -1356,9 +1370,9 @@ location / {
 }
 ```
 
-在「SaaS 引擎 → 后端运行配置」填写 `MicroiOpsUrl`，更新「SaaS引擎」「系统日志/监控」「应用商城」后，从「系统引擎 → 平台运维中心」进入。入口和平台连接信息都不包含运维密码。允许嵌入的 Web Origin 填入 `OPS_ALLOWED_FRAME_ORIGINS`，以分号分隔；推荐平台与 Ops 使用同站点的不同 HTTPS 子域名。浏览器阻止跨站 iframe Cookie 时使用新窗口入口。
+在「SaaS 引擎 → 后端运行配置」填写 `MicroiOpsUrl`，更新「SaaS引擎」「系统日志/监控」「应用商城」后，从「系统引擎 → 服务器运维面板」进入；配置项显示为「服务器运维面板地址」，兼容字段仍为 `MicroiOpsUrl`。入口和平台连接信息都不包含运维密码。允许嵌入的 Web Origin 填入 `OPS_ALLOWED_FRAME_ORIGINS`，以分号分隔；推荐平台与 Ops 使用同站点的不同 HTTPS 子域名。浏览器阻止跨站 iframe Cookie 时使用新窗口入口。
 
-独立 Ops 登录成功后，可在「平台连接」再次登录吾码平台。该登录读取当前系统设置、RSA 密码公钥、`EnableCaptcha` 和隐私协议；开启验证码时显示验证码，设置读取失败时不会绕过验证。平台账号只用于必要日志回传，不取代独立运维权限。平台密码不持久保存，DiyToken 在 Ops 本地加密，解除连接后移除。
+独立面板登录成功后，可在「平台连接」再次登录吾码平台。该登录读取当前系统设置、RSA 密码公钥、`EnableCaptcha` 和隐私协议；开启验证码时显示验证码，设置读取失败时不会绕过验证。平台账号只用于必要日志回传，不取代独立运维权限。平台密码不持久保存，DiyToken 在 Ops 本地加密，解除连接后移除。
 
 #### 目录、日志与保留策略
 

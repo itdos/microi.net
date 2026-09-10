@@ -1,7 +1,7 @@
 <template>
   <label class="mci-web-form-field" :class="{ 'is-error': error, 'is-disabled': disabled }">
     <span v-if="label" class="mci-web-form-field__label">
-      {{ label }}<em v-if="required">*</em>
+      {{ label }}<em v-if="required" aria-hidden="true">*</em>
     </span>
     <slot>
       <textarea
@@ -11,6 +11,8 @@
         :placeholder="placeholder"
         :disabled="disabled"
         :rows="rows"
+        :required="required"
+        :aria-invalid="error ? 'true' : undefined"
         @input="emitValue"
       />
       <input
@@ -20,6 +22,8 @@
         :type="type"
         :placeholder="placeholder"
         :disabled="disabled"
+        :required="required"
+        :aria-invalid="error ? 'true' : undefined"
         @input="emitValue"
       />
     </slot>
