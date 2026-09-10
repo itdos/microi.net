@@ -82,7 +82,8 @@
         <mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
           :parent-id="rowId" :parent-form="row" :parent-menu-id="config.menuId"
           :parent-table-id="config.definition && config.definition.table ? config.definition.table.Id : ''"
-          parent-mode="View" display-mode="full" />
+          parent-mode="View" :display-mode="standaloneListMode ? 'full' : 'preview'"
+          :show-preview-header="!standaloneListMode" :preview-limit="2" />
         <mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
           :parent-form="row" parent-mode="View" readonly />
         <mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
@@ -104,6 +105,7 @@ import { V8, getUser } from '@/utils/request.js'
 import { formatFieldValue, openForm } from '@/platform/business-runtime.js'
 import { normalizeUploadItems, publicAssetUrl } from '@/platform/display.js'
 import { fieldDisplayValue } from '@/platform/native-form.js'
+import { isStandaloneChildLayout } from '@/platform/related-tab-layout.mjs'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
 import { compileDetailPreset, loadModuleViewManifest } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
@@ -212,6 +214,9 @@ export default {
     },
     standaloneRelatedTabs() {
       return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
+    },
+    standaloneListMode() {
+      return !this.loading && !this.error && isStandaloneChildLayout(this.groups, this.standaloneRelatedTabs)
     }
   },
   onLoad(options) {

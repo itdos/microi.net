@@ -20,7 +20,7 @@ export async function loadHomeSummary(context, options = {}) {
     return summary
   }
 
-  const pendingStates = ['待接单', '待服务', '待商家验收', '待客户验收', '待评价', '暂停']
+  const pendingStates = ['待接单', '待服务', '待客服验收', '待客户验收', '待评价', '暂停']
   const taskWhere = [{ Name: 'Zhuangtai', Type: 'In', Value: pendingStates }]
   if (role.isService && !role.isAdmin && user.Id) {
     taskWhere.push({ Name: 'ShouhouRYID', Type: '=', Value: user.Id })
