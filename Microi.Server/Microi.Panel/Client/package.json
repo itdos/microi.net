@@ -1,0 +1,6 @@
+{
+  "name": "microi-panel-ui", "private": true, "version": "2.0.0", "type": "module",
+  "scripts": { "build": "vite build", "test": "node --test ../../Microi.Tests/Panel/*.test.mjs" },
+  "dependencies": { "@microi/mci-ui": "file:../../../Microi.UI", "vue": "3.5.27" },
+  "devDependencies": { "@vitejs/plugin-vue": "6.0.3", "vite": "7.3.1" }
+}

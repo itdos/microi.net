@@ -833,8 +833,8 @@
       ]
     },
     "microi-ui": {
-      "originalSha256": "ca465631dae6a04d31790b07c0099c02eb0a9094122ef7bda0fe69356ceedf0b",
-      "originalLines": 337,
+      "originalSha256": "6abf6ae300c7f4b825cf73b8193a48f271d27df44f9a165ef051be2b0f54f3ff",
+      "originalLines": 342,
       "prefixSha256": "612e566beaf54af5c250762e7d7540b6da8288d8c16fada43f48439facb0bb66",
       "prefixBytes": 1484,
       "entryLines": 187,
@@ -867,7 +867,7 @@
           "id": "microi-ui-003",
           "ordinal": 3,
           "destination": "microi-ui/SKILL.md",
-          "sha256": "d23efbe5ef40f9352057534fac4aa7cd7808ae2fdb7857d05cb8b57e4a7a9c95",
+          "sha256": "29586a620e8e76e0d08fa6cf48c1275154d009b734f341da455c802426cc315b",
           "lines": 17,
           "heading": "默认要求"
         },
@@ -1610,8 +1610,8 @@
       ]
     },
     "ui-design": {
-      "originalSha256": "f4c2d975c1fe1332cb419be8cf036effc29393a809868015b6602a25bc318f8e",
-      "originalLines": 1639,
+      "originalSha256": "1e51573da5f9f79c6685235643dc541b9de186686b8946dc19b4ff9b8940dc5f",
+      "originalLines": 1641,
       "prefixSha256": "d537abb190e152d01a556e7fb730fc15304e14a28ba6853e76056e883c79097f",
       "prefixBytes": 1101,
       "entryLines": 213,
@@ -1620,7 +1620,7 @@
           "id": "ui-design-000",
           "ordinal": 0,
           "destination": "ui-design/SKILL.md",
-          "sha256": "205676798890adacffba77fa7ffb48f044b5d4443f11620831f361d2edf97a81",
+          "sha256": "ba3ee4e932e517b3ad893abb399b2d64322434e0581c06a31ec2032e47abb427",
           "lines": 33,
           "heading": "整体风格定义"
         },

@@ -9,7 +9,9 @@ one master per PDF page.
 from __future__ import annotations
 
 import gc
+import argparse
 import hashlib
+import re
 import shutil
 import time
 from pathlib import Path
@@ -22,14 +24,18 @@ from reportlab.pdfgen import canvas
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = PROJECT_ROOT.parent
-TEMP_ROOT = WORKSPACE_ROOT / ".tmp" / "training-deck" / "pdfs"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--capture-root", type=Path, default=WORKSPACE_ROOT / ".tmp" / "training-deck" / "pdfs")
+parser.add_argument("--output-root", type=Path, default=WORKSPACE_ROOT / "output" / "pdf")
+arguments = parser.parse_args()
+TEMP_ROOT = arguments.capture_root.resolve()
 PUBLIC_ROOT = PROJECT_ROOT / "docs" / "public" / "downloads"
 THUMBNAIL_ROOTS = {
     "dark": PROJECT_ROOT / "docs" / "public" / "images" / "training-deck" / "thumbs",
     "light": PROJECT_ROOT / "docs" / "public" / "images" / "training-deck" / "thumbs-light",
 }
-OUTPUT_ROOT = WORKSPACE_ROOT / "output" / "pdf"
-SLIDE_COUNT = 46
+OUTPUT_ROOT = arguments.output_root.resolve()
+SLIDE_COUNT = int(re.search(r"const expectedSlideCount = (\d+)", (PROJECT_ROOT / "docs/.vitepress/theme/components/TrainingSyllabusDeck.vue").read_text(encoding="utf-8")).group(1))
 PAGE_SIZE = (960, 540)
 CAPTURE_SIZE = (1600, 900)
 MASTER_SIZE = (3840, 2160)
@@ -146,7 +152,7 @@ def build_variant(variant: str, label: str) -> dict[str, object]:
     writer.add_metadata({
         "/Title": f"Microi吾码 AI 开发框架技术培训大纲（{label}）",
         "/Author": "Microi吾码",
-        "/Subject": "46页功能点培训：30+引擎、邮箱系统、AI数据分析、AI创作、MCP、全端交付与企业案例",
+        "/Subject": f"{SLIDE_COUNT}页功能点培训：30+引擎、邮箱系统、AI数据分析、AI创作、服务器运维面板、MCP、全端交付与企业案例",
         "/Creator": "Microi吾码官网预生成培训课件",
     })
     with public_pdf.open("wb") as stream:

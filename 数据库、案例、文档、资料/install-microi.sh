@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Alibaba Cloud Linux 3 / Anolis、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-09-09 00:19:11
+# 版本：v2026-09-10 05:04:35
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -56,10 +56,23 @@ microi_compose() {
 }
 
 microi_install_ops() {
-  local ops_image="${MICROI_INSTALL_OPS_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/microi-ops:v1.0.1}"
+  local ops_image="${MICROI_INSTALL_OPS_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.0}"
   local ops_port="${OPS_HTTP_PORT:-61880}"
   local ops_initial_mode=Notify
   if [ "${MICROI_OPS_OFFLINE:-0}" = 1 ]; then ops_initial_mode=Manual; fi
+  # 先安装独立面板的主机必须复用既有控制器；停止状态也不能被新初始化覆盖。
+  local existing_panel existing_ops
+  existing_panel=$(docker ps -aq --filter label=io.microi.panel.controller=true) || return 1
+  existing_ops=$(docker ps -aq --filter label=io.microi.ops.controller=true) || return 1
+  if [ -n "$existing_panel$existing_ops" ]; then
+    echo 'Microi：检测到既有吾码服务器运维面板；保留原账号、证书、配置和启停状态，不创建第二个控制器。'
+    echo 'Microi：需要接入本次 API/Web 更新时，请按服务器面板文档登记原平台部署清单。'
+    return 0
+  fi
+  if [ -f /microi/panel/config/panel.env ]; then
+    echo 'Microi：已有独立面板配置；请从 /microi/panel 原编排继续，保留账号和数据。'
+    return 0
+  fi
   if [ -f /microi/ops/config/ops.env ]; then
     echo 'Microi：已有 Ops 配置；保留账号、原启停状态及更新策略。'
     return 0
@@ -99,7 +112,7 @@ microi_install_ops() {
 }
 
 
-SCRIPT_VERSION="v2026-09-09 00:19:11"
+SCRIPT_VERSION="v2026-09-10 05:04:35"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -1751,7 +1764,7 @@ configure_database_profile() {
       DATABASE_PORT_NAME="SQL Server"
       SQL_ZIP_FILE_NAME="microi_empty_sqlserver2022.sql.zip"
       SQL_FILE_NAME="microi_empty_sqlserver2022.sql"
-      DATABASE_IMAGE="${MICROI_SQLSERVER_IMAGE_REF:-mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04@sha256:7c29dfbac885ad7519e219c7fe4aee0e67283e21a10e9c252d13b0fbde1866f8}"
+      DATABASE_IMAGE="${MICROI_SQLSERVER_IMAGE_REF:-registry.cn-hangzhou.aliyuncs.com/microios/mssql-server:2022-CU20-ubuntu-22.04@sha256:7c29dfbac885ad7519e219c7fe4aee0e67283e21a10e9c252d13b0fbde1866f8}"
       DATABASE_INTERNAL_PORT="1433"
       DATABASE_CONTAINER_NAME="microi-install-sqlserver2022"
       DATABASE_USER="sa"
@@ -1790,7 +1803,7 @@ configure_database_profile() {
       DATABASE_PORT_NAME="PostgreSQL"
       SQL_ZIP_FILE_NAME="microi_empty_postgresql17.sql.zip"
       SQL_FILE_NAME="microi_empty_postgresql17.sql"
-      DATABASE_IMAGE="${MICROI_POSTGRES_IMAGE_REF:-postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929}"
+      DATABASE_IMAGE="${MICROI_POSTGRES_IMAGE_REF:-registry.cn-hangzhou.aliyuncs.com/microios/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929}"
       DATABASE_INTERNAL_PORT="5432"
       DATABASE_CONTAINER_NAME="microi-install-postgresql17"
       DATABASE_USER="postgres"
