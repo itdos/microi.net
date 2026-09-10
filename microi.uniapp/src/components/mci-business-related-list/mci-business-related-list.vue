@@ -9,7 +9,7 @@
       hover-class="preview-section-header--pressed" @tap="previewExpanded = !previewExpanded">
       <view class="preview-section-header__main">
         <text class="preview-section-header__bar"></text>
-        <text class="preview-section-header__title">{{ config.title || sectionTitle }}</text>
+        <text class="preview-section-header__title">{{ sectionTitle }}</text>
         <text v-if="!loading" class="preview-section-header__count">{{ count }} 项</text>
       </view>
       <!-- zhy：关联区折叠图标与详情“基本信息”分组统一，避免使用字形不稳定的上下箭头。 -->
@@ -24,14 +24,24 @@
     </view>
 
     <view v-if="latestSummaryEnabled && (latestSummaryLoading || latestSummaryError || latestSummaryRow)"
-      class="latest-record-summary">
+      class="latest-record-summary" :class="{ 'latest-record-summary--collapsed': !latestSummaryExpanded }">
       <view class="latest-record-summary__head">
         <text>{{ config.latestRecordSummary.title }}</text>
-        <button v-if="latestSummaryRow && !latestSummaryLoading" class="latest-record-summary__detail"
-          hover-class="latest-record-summary__detail--pressed" @tap="openDetail(latestSummaryRow)">
-          <text>查看详情</text><text aria-hidden="true">›</text>
-        </button>
+        <view class="latest-record-summary__actions">
+          <button v-if="latestSummaryRow && !latestSummaryLoading" class="latest-record-summary__detail"
+            hover-class="latest-record-summary__detail--pressed" @tap.stop="openDetail(latestSummaryRow)">
+            <text>查看详情</text><!-- <text aria-hidden="true">›</text> -->
+          </button>
+          <!-- 折叠与查看详情使用独立触控区，避免用户收起摘要时误开详情。 -->
+          <button class="latest-record-summary__toggle" :aria-expanded="latestSummaryExpanded"
+            :aria-label="(latestSummaryExpanded ? '收起' : '展开') + config.latestRecordSummary.title"
+            hover-class="latest-record-summary__detail--pressed" @tap.stop="toggleLatestSummary">
+            <text>{{ latestSummaryExpanded ? '收起' : '展开' }}</text>
+            <text class="latest-record-summary__arrow" :class="{ expanded: latestSummaryExpanded }" aria-hidden="true">›</text>
+          </button>
+        </view>
       </view>
+      <template v-if="latestSummaryExpanded">
       <view v-if="latestSummaryLoading" class="latest-record-summary__skeleton">
         <view v-for="index in 4" :key="index"></view>
       </view>
@@ -45,6 +55,7 @@
           <text class="latest-record-summary__value">{{ latestSummaryValue(item) }}</text>
         </view>
       </view>
+      </template>
     </view>
 
     <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
@@ -100,14 +111,7 @@
       </text>
     </view>
 
-    <scroll-view class="related-list-body" :class="{ 'related-list-body--scroll': independentScroll && !isPreview }"
-      :style="relatedListBodyStyle"
-      :scroll-y="independentScroll && !isPreview"
-      :enable-flex="independentScroll && !isPreview"
-      :show-scrollbar="false"
-      :lower-threshold="120" @scrolltolower="loadMore">
-    <view class="related-list-scroll-content">
-    <!-- zhy：客户详情“需求方案”Tab 与首页普通列表保持同一套比价入口和选择规则。 -->
+    <!-- 比价工具与搜索、统计同属固定区，只有下面的方案卡片滚动。 -->
     <view v-if="proposalCompareEnabled" class="proposal-compare-tools">
       <view class="proposal-select-all" :class="{ active: areAllProposalsSelected }"
         @tap="toggleAllProposals">
@@ -123,6 +127,13 @@
     </view>
 
 
+    <scroll-view class="related-list-body" :class="{ 'related-list-body--scroll': independentScroll && !isPreview }"
+      :style="relatedListBodyStyle"
+      :scroll-y="independentScroll && !isPreview"
+      :enable-flex="independentScroll && !isPreview"
+      :show-scrollbar="false"
+      :lower-threshold="120" @scrolltolower="loadMore">
+    <view class="related-list-scroll-content">
     <view v-if="previewContentVisible && loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
       <view v-for="item in (isPreview ? previewLimit : 3)" :key="item" class="skeleton-card">
         <view class="skeleton-line wide"></view>
@@ -170,8 +181,9 @@
             <text class="proposal-point-field__label">{{ item.label }}</text>
             <mci-native-field v-if="item.key === 'deviceModel'"
               class="proposal-point-field__control"
+              selector-portal
               :model-value="row[item.name]" :field="item.field"
-              :readonly="!proposalPointCanEdit(row)" :table-name="config.table"
+              :readonly="!proposalPointCanEdit(row) || Boolean(proposalPointSavingId)" :table-name="config.table"
               :form-data="row" :form-data-id="row.Id" :menu-id="menuId"
               :table-child-auth="tableChildAuth"
               @change="updateProposalPointValue(row, item.name, $event)"
@@ -497,6 +509,7 @@ import {
 import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
 import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
+import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
@@ -514,6 +527,7 @@ import {
   proposalInstallationDraft,
   proposalInstallationWriteValues
 } from '@/tenants/xjy/proposal-installation-points.mjs'
+import { calculateInstallationPointCosts, proposalCostYears } from '@/tenants/xjy/proposal-cost-model.mjs'
 import {
   canAddMenuRecord,
   canEditMenuRecord,
@@ -662,6 +676,8 @@ export default {
       config: {},
       menuId: '',
       viewManifest: null,
+      componentDisposed: false,
+      initializeRequestId: 0,
       presentationRequestId: 0,
       rows: [],
       count: 0,
@@ -690,6 +706,7 @@ export default {
       latestSummaryRow: null,
       latestSummaryLoading: false,
       latestSummaryError: '',
+      latestSummaryExpanded: true,
       metricLoading: false,
       metricValues: {},
       listBodyHeight: 0,
@@ -749,6 +766,7 @@ export default {
       return Boolean(this.rows.length) && this.rows.every((row) => this.isProposalSelected(row))
     },
     displayedRows() {
+      if (this.proposalDraftGroup) return this.rows
       return this.isPreview
         ? this.rows.slice(0, Math.max(1, this.previewLimit))
         : this.rows
@@ -756,17 +774,31 @@ export default {
     isProposalInstallationContext() {
       return isProposalInstallationQuickContext(this.parentTableName, this.config.table || this.table?.Name)
     },
+    proposalDraftGroup() {
+      if (!this.isProposalInstallationContext || String(this.parentMode).toLowerCase() !== 'add') return null
+      return childDraftGroup(this.parentId, this.field.Id, {
+        tableName: this.config.table || this.table?.Name,
+        fieldConfig: this.fieldConfig,
+        fkField: this.childFkField,
+        primaryField: this.childConfig.PrimaryTableFieldName || '',
+        parentForm: this.parentForm,
+        menuId: this.menuId,
+        auth: this.tableChildAuth
+      })
+    },
     isProposalInstallationQuickMode() {
       // zhy：安装点位只有嵌入需求方案详情的预览区使用快速编辑卡片；
       // “查看更多”独立列表必须回到通用子表卡片，完整遵循后台 ViewSchema/菜单字段配置。
       return this.isPreview && this.isProposalInstallationContext
     },
     proposalInstallationBatchAvailable() {
+      if (this.proposalDraftGroup) return false
       return !this.isPreview && this.isProposalInstallationContext && Boolean(this.relationValue) &&
         Number(this.count || this.rows.length) >= 2 &&
         Boolean(canEditMenuRecord(this.parentMenuId || this.menuId || this.childMenuId, this.currentUser))
     },
     proposalInstallationBatchPreviewAvailable() {
+      if (this.proposalDraftGroup) return false
       return this.isProposalInstallationQuickMode && Number(this.count || this.rows.length) >= 2 &&
         Boolean(canEditMenuRecord(this.parentMenuId || this.menuId || this.childMenuId, this.currentUser))
     },
@@ -829,6 +861,7 @@ export default {
       }
     },
     proposalInstallationHasMore() {
+      if (this.proposalDraftGroup) return false
       return this.isProposalInstallationQuickMode &&
         Number(this.count || this.rows.length) > Math.max(1, this.previewLimit)
     },
@@ -864,10 +897,10 @@ export default {
       ]
     },
     proposalInstallationVisibleQuickFields() {
-      // 暂时注释设备字段的卡片展示入口；完整字段定义及选择、保存联动保留，取消注释即可恢复。
+      // 卡片展示安装场所和设备型号，沿用完整字段定义及选择、保存联动。
       const visibleKeys = [
         'place',
-        // 'deviceModel',
+        'deviceModel',
         // 'deviceName',
       ]
       return this.proposalInstallationQuickFields.filter((item) => visibleKeys.includes(item.key))
@@ -877,7 +910,12 @@ export default {
         ...result,
         [item.key]: item.name
       }), {
-        deviceModelId: this.proposalInstallationDefinitionField('deviceModelId', '设备型号Id')?.Name || ''
+        deviceQuantity: this.proposalInstallationDefinitionField('deviceQuantity', '设备数量')?.Name || PROPOSAL_INSTALLATION_FIELDS.deviceQuantity,
+        people: this.proposalInstallationDefinitionField('people', '人数')?.Name || PROPOSAL_INSTALLATION_FIELDS.people,
+        deviceModelId: this.proposalInstallationDefinitionField('deviceModelId', '设备型号Id')?.Name || PROPOSAL_INSTALLATION_FIELDS.deviceModelId,
+        rentalPrice: this.proposalInstallationDefinitionField('rentalPrice', '设备单价（租赁）')?.Name || PROPOSAL_INSTALLATION_FIELDS.rentalPrice,
+        buyoutPrice: this.proposalInstallationDefinitionField('buyoutPrice', '设备单价（买断）')?.Name || PROPOSAL_INSTALLATION_FIELDS.buyoutPrice,
+        filterPrice: this.proposalInstallationDefinitionField('filterPrice', '更换滤芯价格')?.Name || PROPOSAL_INSTALLATION_FIELDS.filterPrice
       })
     },
     relationValue() {
@@ -958,11 +996,15 @@ export default {
       }
     },
     relatedListBodyStyle() {
-      if (!this.independentScroll || this.isPreview || this.listBodyHeight < 80) return {}
+      if (!this.independentScroll || this.isPreview || this.listBodyHeight < 1) return {}
       return { height: `${this.listBodyHeight}px`, maxHeight: `${this.listBodyHeight}px` }
     }
   },
   watch: {
+    latestSummaryExpanded() {
+      // 微信 scroll-view 使用实测高度；折叠后重新测量，立即释放列表空间。
+      this.scheduleListBodyMeasure()
+    },
     // 展示状态单独上报，首次加载即可显示入口，且不会触发 data-count 的业务写回。
     previewMoreNavigation: {
       immediate: true,
@@ -1011,6 +1053,9 @@ export default {
     this.scheduleListBodyMeasure()
   },
   beforeUnmount() {
+    // Tab 切换会销毁列表；让迟到的初始化和查询停止追加请求、回写状态。
+    this.componentDisposed = true
+    this.initializeRequestId += 1
     this.latestSummaryRequestId += 1
     this.presentationRequestId += 1
     uni.$off('microi:data-changed', this.handleDataChanged)
@@ -1269,12 +1314,15 @@ export default {
           fail: reject
         }))
       } catch (error) {
-        uni.showToast({ title: error.message || '打开比价失败', icon: 'none' })
+        uni.showModal({ title: '打开比价失败', content: error.message || error.errMsg || '请稍后重试', showCancel: false })
       } finally {
         this.proposalComparing = false
       }
     },
     noop() {},
+    toggleLatestSummary() {
+      this.latestSummaryExpanded = !this.latestSummaryExpanded
+    },
     refreshData() {
       if (!this.relationValue || !this.config.table) return Promise.resolve()
       return Promise.all([this.loadData(true, true, false, true), this.loadRelatedMetrics(true)])
@@ -1306,9 +1354,11 @@ export default {
       ) || (this.definition?.fields || []).find((item) => String(item.Label || '').trim() === label) || null
     },
     proposalPointCanEdit(row) {
+      if (this.proposalDraftGroup) return this.canAdd
       return Boolean(canEditMenuRecord(this.menuId || this.childMenuId, this.currentUser))
     },
     proposalPointCanDelete(row) {
+      if (this.proposalDraftGroup) return this.canAdd
       return Boolean(canDeleteMenuRecord(this.menuId || this.childMenuId, this.currentUser))
     },
     proposalPointValueEmpty(value) {
@@ -1322,15 +1372,17 @@ export default {
     updateProposalPointValue(row, name, value) {
       if (!row || !name) return
       row[name] = value
+      if (this.proposalDraftGroup) this.syncProposalDraftRows()
     },
     async selectProposalPointDevice(row, selection = {}) {
+      if (!row?.Id || !this.proposalPointCanEdit(row) || this.proposalPointSavingId) return
       const values = proposalInstallationDeviceValues(selection)
       const names = this.proposalInstallationFieldNames
-      row[names.deviceModel] = values[PROPOSAL_INSTALLATION_FIELDS.deviceModel]
-      row[names.deviceName] = values[PROPOSAL_INSTALLATION_FIELDS.deviceName]
-      if (names.deviceModelId) {
-        row[names.deviceModelId] = values[PROPOSAL_INSTALLATION_FIELDS.deviceModelId]
+      for (const key of ['deviceModel', 'deviceName', 'deviceModelId', 'rentalPrice', 'buyoutPrice', 'filterPrice']) {
+        const name = names[key] || PROPOSAL_INSTALLATION_FIELDS[key]
+        row[name] = values[PROPOSAL_INSTALLATION_FIELDS[key]]
       }
+      Object.assign(row, calculateInstallationPointCosts(row, proposalCostYears(this.parentForm)))
       await this.saveProposalPoint(row)
     },
     saveProposalPointField(row, name, value) {
@@ -1347,7 +1399,8 @@ export default {
         menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
         tableChildAuth: this.tableChildAuth,
-        includeRelated: true
+        includeRelated: !this.proposalDraftGroup,
+        draftRelation: this.proposalDraftGroup?.key || ''
       })
     },
     proposalPointCopyValues(row) {
@@ -1370,6 +1423,10 @@ export default {
     },
     async saveProposalPoint(row) {
       if (!row?.Id || !this.proposalPointCanEdit(row)) return
+      if (this.proposalDraftGroup) {
+        this.syncProposalDraftRows()
+        return
+      }
       const id = String(row.Id)
       this.proposalPointSavingId = id
       try {
@@ -1382,6 +1439,8 @@ export default {
           _InvokeType: 'Client'
         })
         if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '安装点位保存失败')
+        // 保存包含报价的点位后，通知父方案回读全部点位汇总；数量相同也必须刷新。
+        this.emitDataCount()
       } catch (error) {
         uni.showToast({ title: error.message || error.Msg || '安装点位保存失败', icon: 'none' })
       } finally {
@@ -1391,6 +1450,11 @@ export default {
     async copyProposalPoint(row) {
       if (!row?.Id || this.proposalPointSavingId) return
       const id = createProposalInstallationId()
+      if (this.proposalDraftGroup) {
+        this.rows = [{ ...JSON.parse(JSON.stringify(row)), Id: id }, ...this.rows]
+        this.syncProposalDraftRows()
+        return
+      }
       this.proposalPointSavingId = id
       uni.showLoading({ title: '正在复制', mask: true })
       try {
@@ -1410,6 +1474,12 @@ export default {
     async deleteProposalPoint(row) {
       if (!row?.Id || this.proposalPointSavingId) return
       if (!(await this.confirmAction('删除后无法恢复，是否继续？'))) return
+      if (this.proposalDraftGroup) {
+        this.proposalDraftGroup.deleted.add(String(row.Id))
+        this.rows = this.rows.filter(item => String(item.Id) !== String(row.Id))
+        this.syncProposalDraftRows()
+        return
+      }
       this.proposalPointSavingId = String(row.Id)
       uni.showLoading({ title: '正在删除', mask: true })
       try {
@@ -1451,14 +1521,18 @@ export default {
           const root = rects[0]
           const body = rects[1]
           if (!root || !body) return
-          const height = Math.floor(Number(root.bottom) - Number(body.top))
-          if (Number.isFinite(height) && height >= 80 && height !== this.listBodyHeight) {
+          // 小屏展开摘要后剩余空间可能不足 80px，仍须更新，不能沿用折叠前的旧高度。
+          const height = Math.max(1, Math.floor(Number(root.bottom) - Number(body.top)))
+          if (Number.isFinite(height) && height !== this.listBodyHeight) {
             this.listBodyHeight = height
           }
         })
       })
     },
     async initialize(refresh = false) {
+      if (this.componentDisposed) return
+      const requestId = ++this.initializeRequestId
+      const isCurrent = () => !this.componentDisposed && requestId === this.initializeRequestId
       this.presentationRequestId += 1
       if (!this.childTableId) {
         this.error = '关联表未配置数据表'
@@ -1467,16 +1541,20 @@ export default {
       }
       this.loading = true
       try {
-        this.table = await loadNativeTableModel(this.childTableId, {
+        const table = await loadNativeTableModel(this.childTableId, {
           menuId: this.childMenuId,
           tableChildAuth: this.tableChildAuth,
           refresh
         })
-        this.definition = await loadNativeFormDefinition(this.table.Name, refresh, {
+        if (!isCurrent()) return
+        this.table = table
+        const definition = await loadNativeFormDefinition(this.table.Name, refresh, {
           menuId: this.childMenuId,
           tableChildAuth: this.tableChildAuth,
           tableModel: this.table
         })
+        if (!isCurrent()) return
+        this.definition = definition
         const matched = this.resolveBusinessModule(this.table.Name)
         this.moduleKey = matched.key
         const menu = await findMenu(
@@ -1486,6 +1564,7 @@ export default {
           this.childMenuId,
           this.table.Id
         )
+        if (!isCurrent()) return
         this.menu = menu || null
         this.menuId = menu?.Id || this.childMenuId || ''
         const menuConfig = menu
@@ -1530,11 +1609,13 @@ export default {
         // 先用当前授权菜单的本地编译结果展示数据，不能让配置请求把页面卡在骨架屏。
         void this.loadPresentationConfig(refresh)
         await Promise.all([this.loadData(true, refresh, false, true), this.loadRelatedMetrics(refresh)])
+        if (!isCurrent()) return
         if (String(this.batchEntryMode || '').toLowerCase() === 'installation-batch' && this.proposalInstallationBatchAvailable) {
           this.startProposalInstallationBatchSelection()
         }
         this.scheduleListBodyMeasure()
       } catch (error) {
+        if (!isCurrent()) return
         this.error = error.message || error.Msg || '关联数据加载失败'
         this.loading = false
       }
@@ -1561,6 +1642,7 @@ export default {
       if (title) this.$emit('title-change', title)
     },
     async loadPresentationConfig(refresh = false) {
+      if (this.componentDisposed) return
       const requestId = ++this.presentationRequestId
       let manifestRefresh = refresh
       try {
@@ -1610,6 +1692,9 @@ export default {
       }
     },
     async loadViewConfig(refresh = false, expectedRequestId = 0) {
+      const isCurrent = () => !this.componentDisposed &&
+        (!expectedRequestId || expectedRequestId === this.presentationRequestId)
+      if (!isCurrent()) return
       try {
         let manifest = await loadModuleViewManifest(this.config, {
           scene: 'Card',
@@ -1617,6 +1702,7 @@ export default {
           user: this.currentUser,
           refresh
         })
+        if (!isCurrent()) return
         if (!manifest) {
           manifest = await loadModuleViewManifest(this.config, {
             scene: 'List',
@@ -1625,7 +1711,7 @@ export default {
             refresh
           })
         }
-        if (expectedRequestId && expectedRequestId !== this.presentationRequestId) return
+        if (!isCurrent()) return
         this.applyMenuSearchFields(manifest?.Legacy?.SearchFieldIds)
         const dynamic = compileListConfig(manifest, this.definition?.fields || [])
         if (!dynamic) return
@@ -1685,6 +1771,7 @@ export default {
       return field ? fieldDisplayValue(field, value) : formatFieldValue(value)
     },
     async loadLatestRecordSummary() {
+      if (this.componentDisposed) return
       const requestId = ++this.latestSummaryRequestId
       const relationValue = this.relationValue
       this.latestSummaryRow = null
@@ -1696,7 +1783,8 @@ export default {
       const authorization = this.tableChildAuth
         ? { _TableChildAuth: this.tableChildAuth }
         : (this.menuId ? { _SysMenuId: this.menuId } : {})
-      const isCurrent = () => requestId === this.latestSummaryRequestId && relationValue === this.relationValue
+      const isCurrent = () => !this.componentDisposed &&
+        requestId === this.latestSummaryRequestId && relationValue === this.relationValue
       try {
         const result = await V8.FormEngine.GetTableData(this.config.table, {
           ...authorization,
@@ -1729,7 +1817,19 @@ export default {
       }
     },
     async loadData(reset = false, refresh = false, notifyCount = false, refreshSummary = notifyCount) {
+      if (this.componentDisposed) return
+      if (this.proposalDraftGroup) {
+        this.rows = [...this.proposalDraftGroup.rows]
+        this.count = this.rows.length
+        this.loading = false
+        this.finished = true
+        this.error = ''
+        if (notifyCount) this.emitDataCount()
+        return
+      }
       if (!this.relationValue || !this.config.table || (this.loading && !reset) || (!reset && this.finished)) return
+      const relationValue = this.relationValue
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue
       // 首次进入、返回刷新和真实增删改才回读摘要；搜索、筛选、翻页沿用当前摘要。
       const latestSummaryTask = refreshSummary ? this.loadLatestRecordSummary() : null
       const requestId = ++this.loadRequestId
@@ -1783,12 +1883,16 @@ export default {
             extraWhere
           })
         }
+        if (!isCurrent()) return
         const rawIncomingRows = Array.isArray(result.rows) ? result.rows : []
         let incomingRows = this.moduleKey === 'installationPositions'
           ? await hydrateInstallationPositionRows(rawIncomingRows)
           : rawIncomingRows
+        if (!isCurrent()) return
         incomingRows = await this.hydrateProposalInstallationPointRows(incomingRows)
+        if (!isCurrent()) return
         incomingRows = await this.hydrateCollectionRows(incomingRows)
+        if (!isCurrent()) return
         // Keep the newest completed response. A later request starting must not discard every
         // usable response and leave the related tab permanently displaying its skeleton.
         if (requestId < this.appliedRequestId) return
@@ -1802,10 +1906,10 @@ export default {
         if (!this.finished) this.pageIndex += 1
         if (notifyCount) this.emitDataCount()
       } catch (error) {
-        if (requestId >= this.appliedRequestId) this.error = error.message || error.Msg || '关联数据加载失败'
+        if (isCurrent() && requestId >= this.appliedRequestId) this.error = error.message || error.Msg || '关联数据加载失败'
       } finally {
         await latestSummaryTask
-        this.loading = false
+        if (isCurrent()) this.loading = false
       }
     },
     monthRange() {
@@ -1824,8 +1928,12 @@ export default {
       return `¥${numeric.toLocaleString()}`
     },
     async loadRelatedMetrics(refresh = false) {
+      if (this.componentDisposed) return
+      if (this.proposalDraftGroup) return
       const metrics = this.relatedMetricDefinitions
       if (!metrics.length || !this.relationValue || !this.config.table) return
+      const relationValue = this.relationValue
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue
       this.metricLoading = true
       const range = this.monthRange()
       const baseWhere = [
@@ -1862,12 +1970,12 @@ export default {
           if (!response || Number(response.Code) !== 1) throw new Error(response?.Msg || '统计加载失败')
           values[metric.key] = Number(response.DataCount || 0)
         }))
-        this.metricValues = values
+        if (isCurrent()) this.metricValues = values
       } catch (error) {
         // 统计失败不阻断关联列表，保留可读的零值并允许下次数据刷新重试。
-        this.metricValues = metrics.reduce((values, metric) => ({ ...values, [metric.key]: 0 }), {})
+        if (isCurrent()) this.metricValues = metrics.reduce((values, metric) => ({ ...values, [metric.key]: 0 }), {})
       } finally {
-        this.metricLoading = false
+        if (isCurrent()) this.metricLoading = false
       }
     },
     search() {
@@ -2592,6 +2700,7 @@ export default {
       return result
     },
     async openAdd() {
+      if (this.proposalPointSavingId) return
       if (!this.canAdd) {
         uni.showToast({ title: '当前账号没有新增权限', icon: 'none' })
         return
@@ -2614,6 +2723,11 @@ export default {
         }
         if (names.deviceModelId) {
           draft[names.deviceModelId] = source[PROPOSAL_INSTALLATION_FIELDS.deviceModelId]
+        }
+        if (this.proposalDraftGroup) {
+          this.rows = [{ ...draft, ...this.callbackDefaults() }, ...this.rows]
+          this.syncProposalDraftRows()
+          return
         }
         this.proposalPointSavingId = id
         uni.showLoading({ title: '正在新增', mask: true })
@@ -2726,7 +2840,20 @@ export default {
       this.emitDataCount()
       return true
     },
+    syncProposalDraftRows() {
+      const group = this.proposalDraftGroup
+      if (!group) return
+      group.rows = this.rows
+      this.count = this.rows.length
+      this.loading = false
+      this.error = ''
+      this.emitDataCount()
+    },
     handleDataChanged(payload = {}) {
+      if (this.proposalDraftGroup) {
+        if (payload.draftRelation === this.proposalDraftGroup.key) this.loadData(true, false, true)
+        return
+      }
       if (String(payload.table || '').toLowerCase() === String(this.config.table || '').toLowerCase()) {
         // zhy：草稿父记录优先使用保存回传数据，避免空的远程查询覆盖刚新增的联系人。
         if (this.mergeDraftChangedRow(payload)) return
@@ -2749,7 +2876,7 @@ export default {
 <style scoped>
 .related-business-list { position: relative; min-height: 180rpx; padding: 18rpx 22rpx calc(118rpx + var(--mci-safe-bottom)); background: var(--mci-bg-base, #f4f8fa); }
 .related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
-.related-business-list--section { padding-top: 0; }
+.related-business-list--section { padding-top: 0; padding-bottom: 22rpx; border: 1rpx solid var(--mci-border, #e6edf0); border-radius: 16rpx; overflow: hidden; background: var(--mci-bg-card, #fff); }
 .related-business-list--independent-scroll { box-sizing: border-box; display: flex; flex-direction: column; height: 100%; padding-bottom: 0; overflow: hidden; }
 .related-business-list--collection { padding: 0 22rpx; }
 .related-business-list--collection.related-business-list--independent-scroll { padding-bottom: 0; }
@@ -2860,6 +2987,15 @@ export default {
 .related-metric--primary .related-metric__value { color: #1768d8; }
 .latest-record-summary { flex: none; margin-bottom: 16rpx; padding: 16rpx 20rpx 20rpx; border: 1rpx solid var(--mci-border-color, #e1eaf0); border-radius: 12rpx; background: var(--mci-bg-card, #fff); }
 .latest-record-summary__head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; min-height: 52rpx; margin-bottom: 10rpx; color: var(--mci-text-primary, #263e49); font-size: 24rpx; font-weight: 600; }
+.latest-record-summary--collapsed { padding-bottom: 16rpx; }
+.latest-record-summary--collapsed .latest-record-summary__head { margin-bottom: 0; }
+.latest-record-summary__head > text { min-width: 0; }
+.latest-record-summary__actions { display: flex; flex: none; align-items: center; gap: 24rpx; }
+.latest-record-summary__toggle { display: flex; flex: none; align-items: center; justify-content: center; gap: 10rpx; min-width: 88rpx; min-height: 80rpx; margin: 0; padding: 0 8rpx; border: none; border-radius: 6rpx; color: var(--mci-text-secondary, #6c828c); background: transparent; font-size: 22rpx; line-height: normal; }
+.latest-record-summary__toggle::after { border: none; }
+.latest-record-summary__arrow { font-size: 36rpx; line-height: 1; transform: rotate(90deg); transition: transform .18s ease; }
+.latest-record-summary__arrow.expanded { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) { .latest-record-summary__arrow { transition: none; } }
 .latest-record-summary__detail { display: flex; flex: none; align-items: center; gap: 8rpx; margin: 0; padding: 0 10rpx; min-height: 56rpx; border: none; border-radius: 6rpx; color: var(--mci-color-primary, #087fbd); background: transparent; font-size: 22rpx; line-height: 56rpx; }
 .latest-record-summary__detail::after, .latest-record-summary__error button::after { border: none; }
 .latest-record-summary__detail--pressed { opacity: .65; }
@@ -2872,6 +3008,7 @@ export default {
 .latest-record-summary__error > text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .latest-record-summary__error button { flex: none; margin: 0; padding: 0 12rpx; color: var(--mci-color-primary, #087fbd); background: transparent; font-size: 22rpx; }
 .proposal-compare-tools {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-start;
