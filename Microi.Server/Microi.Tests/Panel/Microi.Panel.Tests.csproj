@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <Using Include="Xunit" />
+    <Compile Include="PanelContractTests.cs" />
+    <Compile Include="NginxContractTests.cs" />
+    <Compile Include="PanelFileTests.cs" />
+    <Compile Include="HostOperationGateTests.cs" />
+    <Compile Include="PanelHostMonitorTests.cs" />
+    <Compile Include="PanelArchiveTests.cs" />
+    <Compile Include="PanelScheduleTests.cs" />
+    <Compile Include="PanelAcmeTests.cs" />
+    <Compile Include="PanelBootstrapTests.cs" />
+    <ProjectReference Include="../../Microi.Panel/Microi.Panel.csproj" />
+  </ItemGroup>
+</Project>

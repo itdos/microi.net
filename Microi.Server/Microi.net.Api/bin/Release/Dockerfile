@@ -1,4 +1,5 @@
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+ARG MICROI_ASPNET_IMAGE=registry.cn-hangzhou.aliyuncs.com/microios/dotnet-aspnet:10.0
+FROM ${MICROI_ASPNET_IMAGE} AS base
 MAINTAINER iTdos
 LABEL description="iTdos"
 COPY publish/ /app

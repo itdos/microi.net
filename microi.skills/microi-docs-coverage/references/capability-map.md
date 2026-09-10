@@ -17,6 +17,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `form-engine/form-field-info.md` | microi-form-engine, v8-table-event | 表单/字段属性与事件 |
 | `form-engine/model-engine.md` | v8-template-engine | 表格/表单模板 |
 | `getting-started/docker-run.md` | microi-deployment | Docker 部署与验收 |
+| `server-panel/overview.md` | microi-deployment, microi-ui | 独立服务器面板、Docker 插件版本、Nginx/SSL、冷备份恢复、共存与 Ops 迁移 |
 | `getting-started/local-run.md` | microi-deployment, microi-client-frontend, playwright-e2e | 源码本地运行、URL 切换 ApiBase/OsClient 与并行浏览器隔离 |
 | `getting-started/source-code-architecture.md` | workspace-conventions, microi-system-delivery | 多仓源码边界、模块地图和修改路由 |
 | `getting-started/start-use.md` | microi-system-delivery, module-engine | 快速使用和首个模块 |

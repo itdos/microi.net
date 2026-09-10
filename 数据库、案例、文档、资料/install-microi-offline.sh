@@ -35,10 +35,23 @@ microi_compose() {
 }
 
 microi_install_ops() {
-  local ops_image="${MICROI_INSTALL_OPS_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/microi-ops:v1.0.1}"
+  local ops_image="${MICROI_INSTALL_OPS_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.0}"
   local ops_port="${OPS_HTTP_PORT:-61880}"
   local ops_initial_mode=Notify
   if [ "${MICROI_OPS_OFFLINE:-0}" = 1 ]; then ops_initial_mode=Manual; fi
+  # 先安装独立面板的主机必须复用既有控制器；停止状态也不能被新初始化覆盖。
+  local existing_panel existing_ops
+  existing_panel=$(docker ps -aq --filter label=io.microi.panel.controller=true) || return 1
+  existing_ops=$(docker ps -aq --filter label=io.microi.ops.controller=true) || return 1
+  if [ -n "$existing_panel$existing_ops" ]; then
+    echo 'Microi：检测到既有吾码服务器运维面板；保留原账号、证书、配置和启停状态，不创建第二个控制器。'
+    echo 'Microi：需要接入本次 API/Web 更新时，请按服务器面板文档登记原平台部署清单。'
+    return 0
+  fi
+  if [ -f /microi/panel/config/panel.env ]; then
+    echo 'Microi：已有独立面板配置；请从 /microi/panel 原编排继续，保留账号和数据。'
+    return 0
+  fi
   if [ -f /microi/ops/config/ops.env ]; then
     echo 'Microi：已有 Ops 配置；保留账号、原启停状态及更新策略。'
     return 0
