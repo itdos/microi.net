@@ -25,6 +25,8 @@
   "other" : "其它",
   "other-case1.md" : "迈巴赫物性",
 
+  "server-panel" : "服务器运维面板",
+  "overview.md" : "吾码面板：安装与使用",
   "getting-started" : "入门部署",
   "start-use.md" : "快速开始使用",
   "docker-run.md" : "Docker部署（一键安装）",

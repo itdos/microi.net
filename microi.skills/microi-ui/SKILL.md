@@ -63,8 +63,13 @@ Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
 - `Microi.UI/src/uniapp`：uni-app Vue 3 组件。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-003 sha256=d23efbe5ef40f9352057534fac4aa7cd7808ae2fdb7857d05cb8b57e4a7a9c95 -->
+<!-- microi-progressive:chunk id=microi-ui-003 sha256=29586a620e8e76e0d08fa6cf48c1275154d009b734f341da455c802426cc315b -->
 ## 默认要求
+
+- **禁止弧形包边**：Tab、卡片、导航、提示条不使用随容器圆角弯曲的强调色侧边框。默认无侧框；需要选中侧标时使用独立的直竖线，与上下边缘留白，不能沿圆角包住上下边缘。中性容器边框与直线端点小圆角不受影响；完整规则见 `../ui-design/SKILL.md`。
+- Web `MciModal` 默认将焦点移入弹窗、约束 Tab、支持 Esc、关闭恢复原焦点并隔离背后页面；多层弹窗只允许最上层交互。桌面标题栏默认可拖动且不能拖出视口，使用 `draggable=false` 可关闭；`closeOnEscape=false` 只用于确需保持的受控状态，必须保留明确关闭路径。
+- 表单提交按钮使用 `MciButton type="submit"`（可配原生 `form` 属性）；`MciFormField required` 必须真实触发原生必填验证。自定义 `select`/控件插槽需提供与可见标签一致的 `aria-label` 或 `aria-labelledby`，不能将全部选项文字混入控件名称。
+- 链接、描边按钮和强调文字使用 `--mci-text-link`；品牌填充使用 `--mci-color-primary` 与 `--mci-text-on-primary`。暗色卡片必须使用暗色语义渐变，逐配色核对背景与文字的组合；普通文字和按钮文字对比度至少 4.5:1。
 
 - 应用启动时调用 `initMciDesign()`，或提供等效的项目级主题服务。
 - 支持 `theme: light | dark`、`palette: black | white | red | orange | yellow | green | cyan | blue | purple`、`shape: rounded | flat`、`motion: full | reduced`。

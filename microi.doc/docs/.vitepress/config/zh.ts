@@ -69,6 +69,7 @@ function nav(): DefaultTheme.NavItem[] {
 		{ text: "首页", link: "/" },
 		{ text: "🤖 AI应用", link: "/apps" },
     { text: "文档", link: "/doc/index" },//🪧
+    { text: "服务器面板", link: "/doc/server-panel/overview" },
 		{ text: "成功案例", link: "/case/case-index" },
 		{
 			text: "相关链接 🔗",

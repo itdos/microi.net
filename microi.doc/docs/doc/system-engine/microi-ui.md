@@ -376,7 +376,7 @@ toggleMciTheme();</code></pre>
       </section>
     </div>
     <strong>MciModal</strong>
-    <p>弹窗组件，支持遮罩、标题、内容区和底部操作。</p>
+    <p>弹窗组件，支持遮罩、键盘焦点管理、Esc 关闭、桌面拖动、标题、内容区和底部操作。</p>
   </article>
 
   <article class="mci-ui-preview-card">
@@ -713,6 +713,12 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 - 截图验收覆盖有图/无图、长标题、多个按钮、选中、加载、空态、明亮/暗黑，以及 1366/1440/1920 桌面和 390 移动宽度。
 
 ## AI 开发规则
+
+Web `MciModal` 打开时将焦点移入弹窗，Tab 保持在当前弹窗内，Esc 关闭后恢复原控件焦点。多层弹窗只允许最上层交互，桌面标题栏默认可拖动且保持在视口内；可通过 `draggable=false`、`closeOnEscape=false` 按实际流程关闭相应行为。内容过长时只滚动内容区，保留标题与操作按钮。
+
+表单使用 `MciButton type="submit"` 提交，跨表单布局可配原生 `form="表单id"`。`MciFormField required` 会启用原生必填验证；自定义控件插槽应给 `select` 等元素设置与可见标签一致的 `aria-label`。
+
+强调文字、链接和描边按钮使用 `--mci-text-link`，填充按钮使用 `--mci-color-primary` 与 `--mci-text-on-primary`。卡片渐变随亮暗模式切换，普通文字和按钮文字应达到 4.5:1 对比度。Tab、卡片、导航与提示条禁止出现沿圆角弯曲的彩色侧框；需要侧标时使用与上下边缘保持间距的独立直竖线，横向 Tabs 使用选中表面。
 
 <section class="mci-ui-ai-panel">
   <div class="mci-ui-ai-panel__copy">

@@ -1,18 +1,39 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidateSet("Quick", "Full")]
+    [ValidateSet("Quick", "Full", "Panel")]
     [string]$Mode = "Quick",
 
     [string]$Configuration = "Release",
 
     [string]$ResultsDirectory = "",
 
-    [string]$SolutionPath = ""
+    [string]$SolutionPath = "",
+
+    [ValidateSet("Bind", "Unit", "Core", "Acme", "Plugins", "Legacy", "Linux", "Verify")]
+    [string]$PanelStage = "Verify",
+
+    [string]$PanelImage = "",
+    [string]$PanelPlugins = "",
+    [string]$PanelLinuxEvidence = ""
 )
 
 $ErrorActionPreference = "Stop"
 $testRoot = $PSScriptRoot
 $serverRoot = Split-Path -Parent $testRoot
+# 服务器面板独立于业务 API；真实 Docker、ACME、旧协议和两个 Linux 安装顺序走专项门禁。
+# 不把这种有主机副作用的验收混进 Quick，也不让缺少任一专项的回执变成 Full 成功。
+if ($Mode -eq "Panel") {
+    if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
+        $ResultsDirectory = Join-Path (Split-Path -Parent $serverRoot) '.tmp/panel-acceptance/gate'
+    }
+    $panelArguments = @((Join-Path $testRoot 'Panel/run-panel-gate.mjs'), '--stage', $PanelStage, '--results', $ResultsDirectory)
+    if ($PanelImage) { $panelArguments += @('--image', $PanelImage) }
+    if ($PanelPlugins) { $panelArguments += @('--plugins', $PanelPlugins) }
+    if ($PanelLinuxEvidence) { $panelArguments += @('--linux-evidence', $PanelLinuxEvidence) }
+    node @panelArguments
+    if ($LASTEXITCODE -ne 0) { throw "Panel $PanelStage gate failed with exit code $LASTEXITCODE." }
+    return
+}
 $solution = if ([string]::IsNullOrWhiteSpace($SolutionPath)) {
     Join-Path $serverRoot "Microi.Anderson.sln"
 } else {

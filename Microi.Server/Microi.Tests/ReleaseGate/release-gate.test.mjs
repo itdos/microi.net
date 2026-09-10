@@ -77,9 +77,9 @@ printf 'PUBLICATION_REACHED\\n'
  assert.ifError(result.error);assert.equal(result.status,1);assert.equal(result.stdout.includes('PUBLICATION_REACHED'),false);
 });
 
-test('publication refuses resource merge drift and preserves the independent Ops version',()=>{
+test('publication refuses resource merge drift and preserves the independent Panel version',()=>{
  assert.match(source,/refresh-resources\.mjs --publish[^\n]*--require-unchanged-candidate/);
- assert.match(source,/find Microi\.Server[^\n]*-not -path "\*\/Microi\.Ops\/\*"/);
+ assert.match(source,/find Microi\.Server[^\n]*-not -path "\*\/Microi\.Panel\/\*"/);
 });
 
 test('full tests precede version edits, resource publication and platform pushes',()=>{

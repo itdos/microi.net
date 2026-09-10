@@ -73,6 +73,14 @@ set +o posix 2>/dev/null || true
 set -e
 set -o pipefail
 
+# 依赖镜像同步不编译/发布平台业务代码；凭据仅由工具读取配置，经 stdin 登录。
+if [ "${1:-}" = "--mirror-dependencies" ]; then
+    cd "$(dirname "$0")"
+    shift
+    node Microi.Server/tools/dependency-images.mjs copy "$@"
+    exit $?
+fi
+
 # 同版本 Docker 热修复只发布经过完整测试的本地候选，不升版、不发布 NuGet，
 # 不同步官方数据库资源；保留常规发布的 Full、混淆后冒烟和镜像门禁。
 MICROI_DOCKER_ONLY_HOTFIX=false
@@ -971,7 +979,7 @@ if [ "$BUMP_VERSION" = true ]; then
         ((update_count++)) || true
     done < <(
         {
-            find Microi.Server -maxdepth 2 -name "*.csproj" -not -path "*/obj/*" -not -path "*/bin/*" -not -path "*/Microi.Ops/*" 2>/dev/null
+            find Microi.Server -maxdepth 2 -name "*.csproj" -not -path "*/obj/*" -not -path "*/bin/*" -not -path "*/Microi.Panel/*" 2>/dev/null
             # Windows 目录联接可以被 dotnet 正常编译，但 MSYS find 不会穿越联接枚举子仓项目。
             # 闭源包必须与平台版本同步，否则 pack 会生成上一版并被发布门禁拒绝。
             for closed_source_project in \
@@ -1592,7 +1600,7 @@ docker_push_plan() {
     local _docker_build_ok=false
     local _docker_build_attempt=1
     while [ "$_docker_build_attempt" -le 3 ]; do
-        if (cd "$build_dir" && docker build --pull -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             _docker_build_ok=true
             break
         fi
@@ -1604,7 +1612,7 @@ docker_push_plan() {
     done
     if [ "$_docker_build_ok" != true ]; then
         print_warning "远端基础镜像连续拉取失败，尝试使用 Docker 本地缓存完成本次构建..."
-        if (cd "$build_dir" && docker build --pull=false -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             print_warning "已使用本地缓存的基础镜像完成构建；发布后请关注远端 Registry 连通性。"
         else
             print_fail "Docker 镜像构建失败，远端拉取和本地缓存均不可用: $local_image"
