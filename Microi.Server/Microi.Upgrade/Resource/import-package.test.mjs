@@ -1181,7 +1181,9 @@ function runDataSetImportFixture(options = {}) {
     Object,
     String,
   };
-  vm.runInNewContext(`(function () { ${dataSetImportSource[0]} }).call(this);`, fixtureContext);
+  // 数据集片段也包含安装末尾的布局退役阶段，加载真实实现以覆盖无退役声明的旧包兼容。
+  const retirementSource = source.slice(source.indexOf('// PACKAGE_LAYOUT_FIELD_RETIREMENTS_V1'), source.indexOf('// ==================== 参数接收与校验'));
+  vm.runInNewContext(`${retirementSource}\n(function () { ${dataSetImportSource[0]} }).call(this);`, fixtureContext);
   return { calls, stats: fixtureContext.stats, debugLog: fixtureContext.debugLog };
 }
 

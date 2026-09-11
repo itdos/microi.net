@@ -58,3 +58,12 @@ test("serializes component props while dropping callbacks and circular runtime o
         DataAppend: { id: "1" }
     });
 });
+test("shared form data aliases remain available to embedded components", () => {
+    const form = { Id: "tenant-row", OsClient: "tenant-a" };
+    const value = { DataAppend: { Form: form }, FormData: form, FormMode: "View", FieldReadonly: true };
+    form.self = form;
+    const result = serializeMicroAppComponentData(value);
+    assert.deepEqual(result.FormData, { Id: "tenant-row", OsClient: "tenant-a" });
+    assert.deepEqual(result.DataAppend.Form, result.FormData);
+    assert.equal(result.FieldReadonly, true);
+});

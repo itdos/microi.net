@@ -6,7 +6,7 @@ import { normalizeOfficialApiEnginePolicies } from './official-api-engine-notice
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const resourcePath = path.join(directory, 'app.microi.sso.json');
 const pkg = JSON.parse(fs.readFileSync(resourcePath, 'utf8'));
-const minimumPackageVersion = 'v7.5.9';
+const minimumPackageVersion = 'v7.6.1';
 
 function semanticVersionParts(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/i.exec(String(value || '').trim());
@@ -32,6 +32,7 @@ function mergeChangeHistory(existingHistory) {
     if (item?.Version) history.set(String(item.Version), item);
   }
   const requiredHistory = [
+    { Version: 'v7.6.1', Date: '2026-09-09', Description: '恢复已启用的存量 TokenLogin 配置投影，区分平台 DiyToken 验证与外部身份源；保持禁用连接、未配置 URL Token 和非白名单地址拒绝。' },
     { Version: 'v7.5.9', Date: '2026-08-30', Description: '将原 SsoProtocolGatewayController 的 24 个 OIDC、SAML2、CAS 与登录编排路由全部迁入官方 Managed 接口引擎；新增受控 HTTP 响应与 {OsClient} 路径模板能力，C# 仅保留不可由租户覆盖的协议、安全和票据原子，CreateIfMissing 个性化 Hook 继续归租户维护。' },
     { Version: 'v7.5.8', Date: '2026-08-26', Description: '将所有官方 Managed SSO 接口归一为 Platform 所有权，避免 Upgrade13 重放内置包时被误判为从平台资源降级到普通应用资源。' },
     { Version: 'v7.5.6', Date: '2026-08-25', Description: '统一官方 Managed 接口醒目恢复提示；SSO 安全事件经脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 仅返回成功。' },
@@ -302,6 +303,7 @@ Object.assign(pkg.PackageInfo, {
     'ClientFeature:SsoFederationV1'
   ],
   ChangeHistory: mergeChangeHistory(pkg.PackageInfo.ChangeHistory),
+  ...(packageVersion === 'v7.6.1' ? { ChangeLog: { Version: 'v7.6.1', Title: '恢复存量平台 Token 自动登录', ChangeType: 'Fix', Content: '恢复已启用的存量 TokenLogin 配置投影，区分平台 DiyToken 验证与外部身份源；保持禁用连接、未配置 URL Token 和非白名单地址拒绝。', ReleaseTime: '2026-09-09 16:30:00' } } : {}),
   FieldCount: pkg.DiyFields.length, PhysicalColumnCount: pkg.PhysicalColumns.length,
   ApiEngineCount: (pkg.SysApiEngines || []).length, DataSetCount: (pkg.DataSets || []).length,
   DataRowCount: 0
@@ -356,9 +358,10 @@ for (const [, key, name, fileName, , , apiAddress, operation] of engineSpecs) {
 // 协议路由闭包同步升级，避免出现“包版本已更新、源码仍宣称旧契约”的半升级状态。
 for (const [, key, , fileName] of engineSpecs) {
   const sourcePath = path.join(engineSourceDirectory, fileName);
+  const version = key === 'sso_legacy_capabilities' ? 'v1.0.4' : 'v1.0.3';
   const source = fs.readFileSync(sourcePath, 'utf8')
-    .replace(/Version:\s*v?\d+\.\d+\.\d+/i, 'Version: v1.0.3');
-  if (!/Version:\s*v1\.0\.3/i.test(source)) {
+    .replace(/Version:\s*v?\d+\.\d+\.\d+/i, `Version: ${version}`);
+  if (!source.includes(`Version: ${version}`)) {
     throw new Error(`SSO 接口引擎源码缺少可升级的版本声明：${key} (${fileName})`);
   }
   fs.writeFileSync(sourcePath, source.replace(/\r\n?/g, '\n').replace(/\n*$/, '\n'), 'utf8');
@@ -370,8 +373,8 @@ pkg.SysApiEngines = engineSpecs.map(([id, key, name, fileName, allowAnonymous, s
   UserId: 'c74d669c-a3d4-11e5-b60d-b870f43edd03',
   CreateTime: '2026-08-21 12:00:00',
   Id: id,
-  ChangeHistory: `2026-08-30 00:00:00 v1.0.3 将 SSO 公开协议路由全部迁入接口引擎并支持受控 HTTP 响应\n2026-08-25 00:00:00 v1.0.2 增加官方资源策略提示与 SSO 租户 Hook 安全合同\n2026-08-21 12:00:00 v1.0.1 创建接口引擎 ${key}\n`,
-  Version: 'v1.0.3',
+  ChangeHistory: (key === 'sso_legacy_capabilities' ? '2026-09-09 16:30:00 v1.0.4 恢复原生 TokenLogin 配置投影并保留安全白名单\n' : '') + `2026-08-30 00:00:00 v1.0.3 将 SSO 公开协议路由全部迁入接口引擎并支持受控 HTTP 响应\n2026-08-25 00:00:00 v1.0.2 增加官方资源策略提示与 SSO 租户 Hook 安全合同\n2026-08-21 12:00:00 v1.0.1 创建接口引擎 ${key}\n`,
+  Version: key === 'sso_legacy_capabilities' ? 'v1.0.4' : 'v1.0.3',
   LimitRecursion: 5000,
   LimitMemory: 2048,
   MaxStatements: 100000000,
@@ -404,6 +407,11 @@ for (const engine of pkg.SysApiEngines) {
   engine.ApiV8Code = String(engine.ApiV8Code || '')
     .replace(/\r\n?/g, '\n')
     .replace(/\n*$/, '\n');
+  const spec = engineSpecs.find(([, key]) => key === engine.ApiEngineKey);
+  const sourcePath = path.join(engineSourceDirectory, spec[3]);
+  if (fs.readFileSync(sourcePath, 'utf8') !== engine.ApiV8Code) {
+    fs.writeFileSync(sourcePath, engine.ApiV8Code, 'utf8');
+  }
 }
 
 fs.writeFileSync(resourcePath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');

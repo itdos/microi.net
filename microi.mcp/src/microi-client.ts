@@ -730,9 +730,11 @@ export type SystemObservabilityQueryAction =
   | 'HistoricalDashboard'
   | 'Memory'
   | 'MemoryIncidents'
-  | 'MemoryIncident';
+  | 'MemoryIncident'
+  | 'DatabasePools'
+  | 'DatabasePoolRecovery';
 
-export type SystemObservabilityManageAction = 'BlockIp' | 'UnblockIp';
+export type SystemObservabilityManageAction = 'BlockIp' | 'UnblockIp' | 'ResetDatabasePools';
 
 export interface SystemObservabilityQuery extends Record<string, unknown> {
   Action: SystemObservabilityQueryAction;
@@ -740,7 +742,7 @@ export interface SystemObservabilityQuery extends Record<string, unknown> {
 
 export interface SystemObservabilityManage extends Record<string, unknown> {
   Action: SystemObservabilityManageAction;
-  Ip: string;
+  Ip?: string;
 }
 
 export interface UserAccessKeyRecord {
@@ -2250,7 +2252,7 @@ export class MicroiClient {
     changeSummary?: string;
     confirmLargeReduction?: boolean;
     v8Limit?: boolean;
-    responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
+    responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP';
     apiRoutes?: string | string[];
     /** @deprecated Compatibility alias. true maps to v8Limit=false. */
     v8Unlimited?: boolean;
@@ -2420,7 +2422,7 @@ export class MicroiClient {
     Code?: string;
     ApiAddress?: string;
     ApiRoutes?: string | string[];
-    ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
+    ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP';
     V8Limit?: number;
     /** @deprecated Compatibility alias. true maps to V8Limit=0. */
     V8Unlimited?: number;
@@ -3144,7 +3146,7 @@ export class MicroiClient {
   // ---------- 低代码系统设计 API 方法 ----------
 
   async createTable(name: string, description?: string, options?: {
-    Tabs?: string; IsTree?: number; Column?: number;
+      Tabs?: string; IsTree?: number; ReadPrimary?: number | null; Column?: number;
     FormOpenType?: string; FormOpenWidth?: string;
     V8Limit?: number;
     /** @deprecated Compatibility alias. Prefer V8Limit; 1 maps to V8Limit=0. */
@@ -3155,12 +3157,24 @@ export class MicroiClient {
       payload.V8Limit = Number(payload.V8Unlimited) === 1 ? 0 : 1;
     }
     delete payload.V8Unlimited;
-    return this.post(API.CREATE_TABLE, {
+    const readPrimary = payload.ReadPrimary;
+    if (readPrimary !== undefined && readPrimary !== null && readPrimary !== 0 && readPrimary !== 1)
+      throw new Error('ReadPrimary 只允许 null、0 或 1');
+    delete payload.ReadPrimary;
+    const created = await this.post(API.CREATE_TABLE, {
       OsClient: this.config.osClient,
       Name: name,
       Description: description || '',
       ...payload,
     });
+    // 复用标准更新协议及后端主库回读；旧 create_table 路由不会静默丢弃新配置。
+    if (created.Code !== 1 || readPrimary === undefined) return created;
+    const tableId = (created.Data as { TableId?: string; Id?: string })?.TableId
+      || (created.Data as { Id?: string })?.Id;
+    if (!tableId) return { Code: 0, Data: null, Msg: '表创建后缺少 TableId，未配置 ReadPrimary' };
+    const configured = await this.updateTable({ Id: tableId, ReadPrimary: readPrimary });
+    if (configured.Code !== 1) return configured;
+    return { ...created, Data: { ...(created.Data as object), ReadPrimary: readPrimary } };
   }
 
   async repairFixedAuditFields(input: { tableId?: string; tableName?: string }): Promise<ApiResponse> {
@@ -3604,10 +3618,22 @@ export class MicroiClient {
   }
 
   async querySystemObservability(query: SystemObservabilityQuery): Promise<ApiResponse> {
+    // 池故障时 Managed 引擎查找和普通 MCP 鉴权也会阻塞，走同一 DiyToken 的可信应急协议。
+    if (query.Action === 'DatabasePools' || query.Action === 'DatabasePoolRecovery') {
+      return this.post('/api/Diagnostics/database-pools', { ...query, OsClient: this.config.osClient }, {
+        allowNativeFallback: false, timeoutMs: 30000,
+      });
+    }
     return this.executeEngine('mci-system-observability-query', query);
   }
 
   async manageSystemObservability(command: SystemObservabilityManage): Promise<ApiResponse> {
+    if (command.Action === 'ResetDatabasePools') {
+      // 传输结果不确定时只能用同一 OperationId 回读，禁止自动换传输重放管理请求。
+      return this.post('/api/Diagnostics/database-pools', { ...command, OsClient: this.config.osClient }, {
+        allowNativeFallback: false, timeoutMs: 30000,
+      });
+    }
     return this.executeEngine('mci-system-observability-action', command);
   }
 

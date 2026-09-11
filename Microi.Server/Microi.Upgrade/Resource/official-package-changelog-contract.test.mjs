@@ -20,6 +20,7 @@ const expectedPackageNames = [
   'app.microi.sso.json',
   'app.microi.store.json',
   'app.microi.sys-config.json',
+  'app.microi.sys-log.json',
   'app.microi.sys_user.json',
 ];
 
@@ -37,7 +38,7 @@ function changeHistoryCoversVersion(changeHistory, version) {
   return false;
 }
 
-test('九个官方应用包的当前版本必须包含完整且一致的 ChangeLog', async t => {
+test('十个官方应用包的当前版本必须包含完整且一致的 ChangeLog', async t => {
   const actualPackageNames = (await readdir(resourceDirectory))
     .filter(name => /^app\.microi\..+\.json$/.test(name))
     .sort();

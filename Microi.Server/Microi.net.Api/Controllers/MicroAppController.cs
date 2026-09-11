@@ -3,10 +3,12 @@ using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -24,6 +26,19 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class MicroAppController : Controller
     {
+        public override void OnActionExecuting(ActionExecutingContext context)
+        {
+            // A HEAD/GET probe without Origin can populate a CDN/proxy cache before
+            // a browser. Always vary, including that first response; otherwise its
+            // missing CORS headers are replayed to allowed cross-origin clients.
+            // This does not grant an origin: the tenant CORS policy still owns it.
+            var vary = Response.Headers["Vary"].ToString().Split(',')
+                .Select(value => value.Trim()).Where(value => value.Length > 0)
+                .Append("Origin").Distinct(StringComparer.OrdinalIgnoreCase);
+            Response.Headers["Vary"] = string.Join(", ", vary);
+            base.OnActionExecuting(context);
+        }
+
         private const string ServiceTable = "sys_microiservice";
         private const string StoreTable = "sys_microistore";
         private const string DefaultVersion = "current";
