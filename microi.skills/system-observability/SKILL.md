@@ -16,6 +16,7 @@ description: Microi 系统日志/监控查询、诊断与治理规范。用于�
 | 人工排查、看趋势、打开日志详情 | 平台菜单【系统日志/监控】 |
 | AI 查询、自动诊断、验收 | MCP `microi_query_system_observability` |
 | AI 封禁或解封 IP | MCP `microi_manage_system_observability` |
+| 连接池耗尽时在线诊断/恢复 | 查询 `DatabasePools / DatabasePoolRecovery`，治理 `ResetDatabasePools` |
 | 应用页面读取 | Managed 接口引擎 `mci-system-observability-query` |
 | 应用页面治理 | Managed 接口引擎 `mci-system-observability-action` |
 | 扩展宿主、进程、Mongo 或安全底层原子能力 | `V8.Method.GetSystemObservability` / `V8.Method.ManageSystemObservability` |
@@ -23,6 +24,17 @@ description: Microi 系统日志/监控查询、诊断与治理规范。用于�
 AI 第一次使用时先查询 `action=Capabilities`，再按返回的动作、权限和边界选择查询。优先使用专用工具，它已经限制动作、参数、分页、确认和审计。旧进程缺少新 Memory 动作时，仅允许通过标准 `microi_run_engine` 临时只读执行固定查询引擎；完整版本排查与降级边界见 [内存事故排查手册](references/memory-incident-triage.md)。不得创建临时维护引擎或绕过后端权限。
 
 ## 查询动作
+
+### 连接池故障应急入口
+
+- 收到 `obtaining a connection from the pool` 时，直接用 `microi_query_system_observability(action=DatabasePools,poolTarget=Both)`；故障池可能阻塞普通 `Capabilities` 或 Managed 引擎，此动作走固定 `/api/Diagnostics/database-pools` 应急协议。要求后端支持 `database-pools/v1`，只更新 MCP 不能安装后端。
+- `microi_manage_system_observability(action=ResetDatabasePools,poolTarget=Both)` 无确认值时只预览。执行必须带同一预览的 `operationId`、`poolIds`、`poolTarget` 和 `confirmExecution=ResetDatabasePools:<operationId>`。预览票据 2 分钟有效；执行前仍复核配置摘要。
+- 请求超时或响应未知，使用查询动作 `DatabasePoolRecovery` 与原 `operationId` 回读，禁止换编号重试。每租户 60 秒冷却；命令期限 90 秒；回执保留 10 分钟，过期编号不能重新执行。
+- 回执逐节点区分 `Pending / Incomplete / PartialFailure / CompletedForRegisteredNodes`。只有最后一项证明已注册节点完成；未升级节点不在覆盖范围，最后还需验证原故障只读接口。不得把当前节点探测成功说成全站恢复。
+- 支持当前租户 MySQL/SQL Server 主、读池；`Both / Write / Read`，相同池去重。已加载的其它租户共享池时拒绝；扩展库和其它驱动明确不支持。池上限、驱动版本、退避和失败码可读，`Opening` 不等于驱动借出数。
+- 服务继续验证 DiyToken、Redis 有效会话和主库管理员；访问密钥需要 `mcp:admin`。仅鉴权使用有界无池连接，每节点应急请求最多 2 个、连接和命令超时各 5 秒；修复后的探测使用原业务池。不得创建匿名维护引擎或另设万能密码。
+- 不杀事务、不全局清池、不重放 SQL、不自动放大池上限，不以重启数据库/API 作为默认恢复。无有效会话、Redis/主库不可用或内存保护触发时不能绕过防护。持续泄漏、慢 SQL、容量与网络故障仍需定位根因。
+- 此功能属框架运行时应急协议，不新增表/菜单/引擎，不需要发布商城资源；责任同步为 Core/Dos.ORM、MCP、本文档与内嵌知识。验收必须覆盖真实池耗尽、HTTP 撤权/失效会话、两个独立进程、幂等重试、配置漂移与事务存活。
 
 `microi_query_system_observability` 支持：
 

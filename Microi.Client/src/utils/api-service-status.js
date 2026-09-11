@@ -6,6 +6,7 @@ const HEALTH_CHECK_PATH = "/apiengine/platform-service-health";
 const LEGACY_HEALTH_CHECK_PATH = "/api/Diagnostics/health";
 const HEALTH_CHECK_DELAY = 800;
 const HEALTH_CHECK_RETRY_DELAY = 1200;
+const OUTAGE_RECOVERY_CHECK_DELAY = 5000;
 const HEALTH_CHECK_TIMEOUT = 5000;
 const REQUIRED_HEALTH_FAILURES = 2;
 const MIN_OUTAGE_DURATION = 1800;
@@ -182,6 +183,16 @@ function resetOutageEvidence(options = {}) {
     }
 }
 
+function recoverFromOutage() {
+    // 冷启动已经失败时仅隐藏诊断层仍会露出失败的启动页，需重载原 URL。
+    // 已就绪的页面只撤掉异常层，保留未提交表单；绝不重放触发故障的业务请求。
+    const reloadStartup = (apiServiceState.active || pendingFailure)
+        && window.__MICROI_APP_READY__ !== true
+        && Boolean(window.__MICROI_APP_BOOT_ERROR__);
+    resetOutageEvidence();
+    if (reloadStartup) window.location.reload();
+}
+
 function scheduleSecurityExpiryCheck(expiresAtUtc) {
     clearSecurityCheckTimer();
     const expiresAt = Date.parse(expiresAtUtc || "");
@@ -319,7 +330,10 @@ async function probeApiService(apiBase, osClient) {
         const legacy = await fetchHealthResponse(legacyHealthUrl);
         const legacyStatus = Number(legacy.response?.status || 0);
         return {
-            reachable: NETWORK_STATUS_CODES.indexOf(legacyStatus) === -1,
+            // 自动恢复必须有健康正文，不能把反向代理的 HTML、404 或登录页当成恢复。
+            reachable: legacyStatus >= 200 && legacyStatus < 300
+                && String(legacy.responseData?.Data?.Status || legacy.responseData?.Status
+                    || legacy.responseData?.status || '').toLowerCase() === 'healthy',
             securityInfo: legacy.securityInfo,
             healthCheckUrl: displayHealthUrl,
             healthCheckMode: "legacy",
@@ -352,13 +366,13 @@ async function runHealthCheck(version) {
     const currentProbe = probeApiService(apiBase, apiServiceState.osClient);
     healthCheckPromise = currentProbe;
     const probeResult = await currentProbe;
-    updateHealthMetadata(probeResult);
     const reachable = probeResult.reachable;
     if (healthCheckPromise === currentProbe) {
         healthCheckPromise = null;
     }
 
-    if (version !== evidenceVersion) return reachable;
+    if (version !== evidenceVersion) return false;
+    updateHealthMetadata(probeResult);
 
     if (probeResult.securityInfo) {
         activateSecurityBlock(probeResult.securityInfo, {
@@ -370,7 +384,7 @@ async function runHealthCheck(version) {
     }
 
     if (reachable) {
-        resetOutageEvidence();
+        recoverFromOutage();
         return true;
     }
 
@@ -382,6 +396,8 @@ async function runHealthCheck(version) {
     ) {
         apiServiceState.active = true;
         apiServiceState.checking = false;
+        // 故障确认后继续串行检查，每轮结束五秒后再请求；慢响应不会堆积并发探测。
+        scheduleHealthCheck(OUTAGE_RECOVERY_CHECK_DELAY);
         return false;
     }
 
@@ -421,6 +437,7 @@ export function reportApiServiceFailure(error, context = {}) {
     evidenceApiBase = resolvedApiBase;
     pendingFailure = { error, context };
     updateDiagnostic(error, context, resolvedApiBase, requestUrl, statusCode);
+    apiServiceState.healthCheckUrl = buildHealthUrl(resolvedApiBase, HEALTH_CHECK_PATH, apiServiceState.osClient, false);
     scheduleHealthCheck();
     return true;
 }
@@ -485,12 +502,21 @@ export function reportApiServiceRecovered(context = {}) {
             healthCheckUrl: buildHealthUrl(apiBase, HEALTH_CHECK_PATH, apiServiceState.osClient, false),
             healthCheckMode: "fixed"
         });
-        resetOutageEvidence();
+        recoverFromOutage();
     }
 }
 
 export async function checkApiServiceNow() {
     if (typeof window === "undefined") return false;
+    if (apiServiceState.mode === 'connection' && pendingFailure) {
+        // 手动“重新连接”与自动检测共用在途请求，防止重复探测及恢复时重复重载。
+        clearHealthCheckTimer();
+        if (healthCheckPromise) {
+            const result = await healthCheckPromise;
+            return result.reachable && !apiServiceState.active;
+        }
+        return runHealthCheck(evidenceVersion);
+    }
     apiServiceState.checking = true;
     const probeBase = apiServiceState.mode === "security"
         ? (apiServiceState.requestOrigin || apiServiceState.apiBase)
@@ -507,7 +533,7 @@ export async function checkApiServiceNow() {
         return false;
     }
     if (probeResult.reachable) {
-        resetOutageEvidence();
+        recoverFromOutage();
         return true;
     }
     apiServiceState.checking = false;

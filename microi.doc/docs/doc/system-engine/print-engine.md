@@ -42,6 +42,27 @@
 }
 ```
 ## npm组件集成方式
+### 绑定文本与格式化函数
+
+`text`、`longText` 的 `options.formatter` 使用
+`function(title, value, options, templateData)`：第一参数是标题，第二参数才是
+`field` 绑定的数据；文本控件还可能传第五个 `target`。表格单元格使用
+`formatter2(title, field, row, index, options)`，值取 `row[field]`，不要混用这两种签名。
+
+```javascript
+// 放入 options.formatter 的函数源码；业务文本必须编码后再进入打印 HTML。
+const formatter = function (title, value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
+```
+
+金额由业务后端计算并作为字符串传入，打印层不要转为 JavaScript `Number` 求和。
+更新已有模板时保留模板 `Id`，保存后回读 `PageObj`、`PrintObj`，再验证实际数据预览。
+多页表格需检查明细完整、续页表头、末页合计及条款；独立 PDF 正确不能代替平台宿主的
+真实打印预览验收。这是现有渲染器的调用合同，修正模板即可，无需后端协议升级。
+
 >超简单,一个Vue页面搞定,实在掏不出页面连路由都没有用App页面也行 通过组件方式集成到项目内,不会污染项目,而且升级扩展都是独立的,主打一个互不干扰,距离产生美.
 
 >npm i microi-printengine@latest

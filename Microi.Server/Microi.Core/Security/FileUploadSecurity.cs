@@ -296,7 +296,7 @@ return {1, userNext, tenantNext}";
         }
 
         /// <summary>
-        /// 没有可验证表单字段上下文的交互式上传采用兼容安全策略：
+        /// 没有可验证表单字段上下文，且没有动态目录授权时的兜底安全策略：
         /// 普通用户只能上传私有文件，并只能使用平台预定义的一级目录；
         /// 超级管理员仍可显式选择公有桶和自定义安全子目录。
         /// 表单字段上传必须改走 ApplyInteractivePolicyAsync，由服务端字段配置决定公私桶。
@@ -322,7 +322,7 @@ return {1, userNext, tenantNext}";
             if (requestedPath.Contains("/")
                 || !OrdinaryUploadRoots.Contains(requestedPath))
             {
-                return new DosResult(0, null, "普通用户只能上传到平台预定义的文件目录！");
+                return HdfsUploadDirectoryPolicy.Denied("当前角色未获准上传到此目录，请联系管理员在系统设置的“文件上传权限”中配置授权规则。");
             }
 
             param.Path = requestedPath.ToLowerInvariant();
@@ -333,7 +333,7 @@ return {1, userNext, tenantNext}";
         /// 交互式上传的统一入口。标准表单上传携带 FormEngineKey + FieldId 后，
         /// 服务端先校验当前用户对表/菜单的新增或编辑权限，再重新读取
         /// diy_field.Config；客户端 Limit 和 Path 仅是请求提示，不能作为授权事实。
-        /// 没有字段上下文的旧上传继续执行私有桶兼容策略。
+        /// 没有字段上下文的旧上传读取当前租户的目录/角色规则；未授权时继续私有安全目录兜底。
         /// </summary>
         public static async Task<DosResult> ApplyInteractivePolicyAsync(
             DiyUploadParam param,
@@ -347,6 +347,30 @@ return {1, userNext, tenantNext}";
                                      || param._TableChildAuth != null;
             if (!hasAnyFieldContext)
             {
+                // 仅当前租户的管理员配置可扩展旧客户端目录；身份角色取共享权限快照，
+                // 不信任客户端上传的角色值，也不绕过标准表单字段的授权链路。
+                if (!isPlatformAdmin && !AiMediaStorageAuthorization.Allows(param))
+                {
+                    try
+                    {
+                        var configResult = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient)
+                            .ConfigureAwait(false);
+                        var config = configResult?.Code == 1 ? ToJObject((object)configResult.Data) : null;
+                        var rules = HdfsUploadDirectoryPolicy.Parse(config?[HdfsUploadDirectoryPolicy.ConfigField]);
+                        if (rules.Count > 0)
+                        {
+                            var identity = await MicroiEngine.FormEngine
+                                .GetUserAuthorizationSnapshotAsync(param.OsClient, param._CurrentUser)
+                                .ConfigureAwait(false);
+                            var decision = HdfsUploadDirectoryPolicy.Apply(param, rules, identity);
+                            if (decision != null) return decision.Code == 1 ? null : decision;
+                        }
+                    }
+                    catch
+                    {
+                        return HdfsUploadDirectoryPolicy.Denied("上传目录权限配置或身份校验失败，请联系管理员检查文件上传权限配置。");
+                    }
+                }
                 return ApplyInteractivePolicy(param, isPlatformAdmin);
             }
 

@@ -48,6 +48,8 @@ namespace Microi.net
             try
             {
                 var databaseUser = dbSession.From<SysUser>()
+                    // 权限复核只读必要列，尤其不加载密码、头像等无关数据。
+                    .Select(SysUser._.Id, SysUser._.Account, SysUser._.State, SysUser._.IsDeleted, SysUser._.Level, SysUser._.RoleIds)
                     .Where(d => d.Id == userId
                                 && d.State == 1
                                 && d.IsDeleted != 1)
@@ -61,6 +63,7 @@ namespace Microi.net
                 var databaseRoles = roleIds.Count == 0
                     ? new List<SysRole>()
                     : dbSession.From<SysRole>()
+                        .Select(SysRole._.Id, SysRole._.IsDeleted, SysRole._.Level)
                         .Where(d => d.Id.In(roleIds) && d.IsDeleted != 1)
                         .ToList();
 

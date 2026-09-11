@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import {fileURLToPath} from 'node:url';
 
 import { createContextMenuController } from '../src/views/webos/utils/context-menu-controller.js';
 import {
@@ -14,7 +15,8 @@ import {
     openWebosPersonalCenter,
 } from '../src/views/webos/utils/navigation.js';
 
-const read = relativePath => fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
+const projectRoot = fileURLToPath(new URL('../', import.meta.url));
+const read = relativePath => fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
 
 test('context menus remain single-instance and a second right-click reopens at the new point', () => {
     const opened = [];
@@ -118,7 +120,7 @@ test('WebOS widget static backgrounds are present and theme variables are wired'
         'public/static/img/22831288_700x700.jpeg',
         'public/static/img/logo.svg',
     ]) {
-        assert.equal(fs.existsSync(path.join(process.cwd(), asset)), true, asset);
+        assert.equal(fs.existsSync(path.join(projectRoot, asset)), true, asset);
     }
     const styles = read('src/views/webos/styles/webos.scss');
     assert.match(styles, /--webos-folder-bg/);

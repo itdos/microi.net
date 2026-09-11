@@ -412,6 +412,33 @@ IP 治理必须两步执行。第一次不传 `confirmExecution` 只返回 dry-r
 
 ## 安装与升级
 
+### 连接池耗尽时通过 MCP 在线恢复
+
+`obtaining a connection from the pool` 表示应用进程没有及时借到驱动连接。MySQL 的 `max_connections`、应用池的 `MaximumPoolSize`、正在执行 SQL 的数量是不同指标；少量 `Sleep`、低 CPU 或数据库重启都不能证明应用池已经恢复。
+
+包含 `database-pools/v1` 协议的新后端与配套 MCP 支持以下操作。首次使用需要正常升级后端与 MCP；已经运行该协议的节点发生故障时，恢复过程无需重启数据库或 API。此应急协议由框架提供，不依赖商城查询引擎，不需要为它重装【系统日志/监控】应用。
+
+1. 对当前 MCP 连接调用 `microi_manage_system_observability`，参数为 `{"action":"ResetDatabasePools","poolTarget":"Both"}`，获取预览。也可用查询工具 `action=DatabasePools` 查看当前节点的驱动版本、池上限、申请中数量、失败码和退避时间。
+2. 使用同一次预览的 `OperationId`、`PoolIds`、`Target` 和 `requiredConfirmation` 调用执行：
+
+   ```json
+   {
+     "action": "ResetDatabasePools",
+     "poolTarget": "Both",
+     "operationId": "预览中的32位编号",
+     "poolIds": ["预览中的64位池摘要"],
+     "confirmExecution": "ResetDatabasePools:预览中的32位编号"
+   }
+   ```
+
+3. 调用 `microi_query_system_observability`，传 `{"action":"DatabasePoolRecovery","operationId":"原操作编号"}` 回读。`Pending` 继续等待；`Incomplete` 表示存在未回执节点；`PartialFailure` 表示节点轮换或探测失败。`CompletedForRegisteredNodes` 只表示已注册协议的节点完成，不能代表未升级节点。随后重试原报错的只读业务接口。
+
+恢复只支持当前租户 MySQL、SQL Server 的主库/读库连接池，`Write / Read / Both` 指向相应角色，重复池自动合并。已加载的其它租户共用该池时拒绝；扩展库与其它驱动不在此入口范围内。不会调用全局清池，不杀死借出的事务，不重放业务 SQL，也不自动增大池上限。旧事务归还时由驱动丢弃旧连接；数据库不可达、凭据失效、数据库容量不足或持续泄漏，需要继续处理原始原因。
+
+应急鉴权仍验证 DiyToken、Redis 中的有效会话以及当前主库管理员权限；访问密钥还必须具备 `mcp:admin`。鉴权连接使用 `Pooling=false`、5 秒连接/命令超时，每节点最多 2 个应急请求。它有独立请求槽，但保留内存和安全防护。Redis 或主库本身不可用、无有效管理员会话时会明确失败，不绕过权限。
+
+预览票据有效 2 分钟；同租户每 60 秒最多接受一次恢复；命令处理期限 90 秒，回执保留 10 分钟。HTTP 超时后必须用原编号查询，不能生成新编号自动重试；过期编号不会重新执行。多节点通过共享 Redis 传递命令并回读各节点回执，节点自动注册，无需新增环境变量。`Opening` 是连接申请数，不是驱动内部已借出连接数；`SELECT 1` 成功也不是完整业务验收。
+
 【系统日志/监控】由框架底层能力和应用商城资源共同组成：
 
 1. 先升级 Microi 框架到兼容版本（最低 v7.5.8，推荐当前最新版）。

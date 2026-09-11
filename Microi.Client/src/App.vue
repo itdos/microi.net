@@ -365,6 +365,10 @@ export default {
         async PageInit() {
             var self = this;
             if (isEmbeddedWebosWindowRuntime()) return;
+            // 首次登录身份与菜单由路由守卫确认；App 的续签/用户刷新等到导航成功后再启动，
+            // 避免旧 Token 同时触发两条初始化链、重复通知或相互覆盖登录状态。
+            try { await self.$router.isReady(); }
+            catch (_) { return; }
             // 匿名路由由页面组件自行做静默登录态校验。这里不能调用全局
             // GetCurrentUser，否则无 Token 的公有 OnlyOffice 预览会弹出“请重新登录”。
             // 首次打开根地址时 Hash 路由可能尚未完成匹配，因此无 Token 本身也必须

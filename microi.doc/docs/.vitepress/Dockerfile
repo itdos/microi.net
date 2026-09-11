@@ -1,5 +1,6 @@
 # 使用阿里云镜像加速
-FROM registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx
+ARG MICROI_NGINX_IMAGE=registry.cn-hangzhou.aliyuncs.com/microios/nginx:acs-sample-20260909
+FROM ${MICROI_NGINX_IMAGE}
 
 # 复制构建产物到 nginx 目录
 COPY dist/ /usr/share/nginx/html/

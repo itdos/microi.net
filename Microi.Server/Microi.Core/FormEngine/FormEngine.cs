@@ -2462,29 +2462,31 @@ namespace Microi.net
                 return new DosResult<dynamic>(1, TranslateDiyTableForReturn(diyTableCache, osClient, _Lang));
             }
 
-            var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(new
+            // 表配置是查询路由的可信输入。清缓存后必须从主库重建，不能让副本旧值
+            // 把刚启用的 ReadPrimary 恢复成 NULL；只读取固定元数据表，不改变业务默认读库。
+            var client = OsClientExtend.GetClient(osClient);
+            if (client?.Db == null)
+                return new DosResult<dynamic>(0, null, "表配置主库连接不可用。");
+            DosResult<dynamic> result;
+            try
             {
-                FormEngineKey = "diy_table",
-                _Where = new List<DiyWhere>() { new DiyWhere() {
-                                    Name = "Id", Value = idOrName, Type = "="
-                                },new DiyWhere() {
-                                    Name = "Name", Value = idOrName, Type = "=", AndOr = "Or"
-                                } },
-                //Id = param.TableId,
-                //Name = param.TableName,
-                //IsDeleted = 0,
-                OsClient = osClient,
-                // _CurrentUser = param._CurrentUser,
-                // 
-            });
+                object row = client.Db.From<DiyTable>()
+                    .Where(d => d.IsDeleted != 1 && (d.Id == idOrName || d.Name == idOrName))
+                    .First<dynamic>();
+                result = new DosResult<dynamic>(row == null ? 2 : 1, row);
+            }
+            catch (Exception ex)
+            {
+                // 保留旧 FormEngine 查询的 Code=0 失败契约及下方 PostgreSQL 名称回退。
+                result = new DosResult<dynamic>(0, null, ex.Message + "[GetDiyTable]");
+            }
 
             if (result.Code != 1)
             {
-                var client = OsClientExtend.GetClient(osClient);
-                var databaseType = client?.DbRead?.Db?.DbProvider?.DatabaseType;
+                var databaseType = client.Db.Db.DbProvider.DatabaseType;
                 if (databaseType == DatabaseType.PostgreSql || databaseType == DatabaseType.KingBase)
                 {
-                    var fallback = client.DbRead.FromSql(@"SELECT * FROM ""diy_table""
+                    var fallback = client.Db.FromSql(@"SELECT * FROM ""diy_table""
 WHERE ""IsDeleted"" <> 1
   AND (""Id"" = @p0 OR LOWER(""Name"") = LOWER(@p0))
 LIMIT 1")

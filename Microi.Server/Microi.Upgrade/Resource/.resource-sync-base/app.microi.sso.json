@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "SSO 身份联邦",
-    "Version": "v7.6.0",
+    "Version": "v7.6.1",
     "CreateTime": "2026-08-21T12:00:00.000Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -19,6 +19,11 @@
     "AiApplicationCount": 0,
     "Description": "Microi 吾码官方双向 SSO 应用：OIDC、SAML2、CAS 与存量 Token 兼容。全部公开 HTTP 路由、连接投影、JIT/绑定、角色映射、审计与租户 Hook 均由应用接口引擎交付；Microi.net 只保留签名验签、协议编解码、一次性票据和 DiyToken 等不可覆盖的可信原子。",
     "ChangeHistory": [
+      {
+        "Version": "v7.6.1",
+        "Date": "2026-09-09",
+        "Description": "恢复已启用的存量 TokenLogin 配置投影，区分平台 DiyToken 验证与外部身份源；保持禁用连接、未配置 URL Token 和非白名单地址拒绝。"
+      },
       {
         "Version": "v7.6.0",
         "Date": "2026-09-06",
@@ -89,11 +94,11 @@
     ],
     "ApplicationType": "Platform",
     "ChangeLog": {
-      "Version": "v7.6.0",
-      "Title": "恢复 SSO 完整历史更新说明",
+      "Version": "v7.6.1",
+      "Title": "恢复存量平台 Token 自动登录",
       "ChangeType": "Fix",
-      "Content": "从已提交的 v7.5.10 官方源码恢复八条被错误字符串化的历史更新记录，保留 v7.5.11 的可选工作流依赖修复；本次只修复发行元数据，不改变 SSO 引擎、表、字段、菜单、权限、协议或租户配置。",
-      "ReleaseTime": "2026-09-06 19:50:00"
+      "Content": "恢复已启用的存量 TokenLogin 配置投影，区分平台 DiyToken 验证与外部身份源；保持禁用连接、未配置 URL Token 和非白名单地址拒绝。",
+      "ReleaseTime": "2026-09-09 16:30:00"
     }
   },
   "DDLStatements": [
@@ -5745,8 +5750,8 @@
       "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
       "CreateTime": "2026-08-21 12:00:00",
       "Id": "75000000-1000-4000-8000-000000000002",
-      "ChangeHistory": "2026-08-30 00:00:00 v1.0.3 将 SSO 公开协议路由全部迁入接口引擎并支持受控 HTTP 响应\n2026-08-25 00:00:00 v1.0.2 增加官方资源策略提示与 SSO 租户 Hook 安全合同\n2026-08-21 12:00:00 v1.0.1 创建接口引擎 sso_legacy_capabilities\n",
-      "Version": "v1.0.3",
+      "ChangeHistory": "2026-09-09 16:30:00 v1.0.4 恢复原生 TokenLogin 配置投影并保留安全白名单\n2026-08-30 00:00:00 v1.0.3 将 SSO 公开协议路由全部迁入接口引擎并支持受控 HTTP 响应\n2026-08-25 00:00:00 v1.0.2 增加官方资源策略提示与 SSO 租户 Hook 安全合同\n2026-08-21 12:00:00 v1.0.1 创建接口引擎 sso_legacy_capabilities\n",
+      "Version": "v1.0.4",
       "LimitRecursion": 5000,
       "LimitMemory": 2048,
       "MaxStatements": 100000000,
@@ -5758,7 +5763,7 @@
       "AllowAnonymous": 1,
       "ApiAddress": "/apiengine/sso_legacy_capabilities",
       "Lock": 0,
-      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：SSO 身份联邦\n * ApiEngineKey：sso_legacy_capabilities\n * 从可信吾码官方应用源安装、更新或重新安装“SSO 身份联邦”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: sso_legacy_capabilities\n * Version: v1.0.3\n * Function:\n * - 为存量 URL Token 客户端返回最小兼容投影；不暴露服务端校验地址、Token 或其它 SSO 配置。\n */\n\nfunction text(value) {\n  return value === null || value === undefined ? '' : String(value).trim();\n}\n\nfunction enabled(value) {\n  var normalized = text(value).toLowerCase();\n  return value === true || value === 1 || normalized === '1' || normalized === 'true';\n}\n\nfunction safeClientApi(value) {\n  var route = text(value);\n  return /^\\/api\\/SysUser\\/SsoPengrui$/i.test(route)\n    || /^\\/api\\/Sso\\/Legacy$/i.test(route)\n    || /^\\/apiengine\\/sso_legacy_token_login$/i.test(route);\n}\n\nvar query = V8.FormEngine.GetTableData('diy_sso', {\n  _Where: [['IsEnable', '=', 1]],\n  _SelectFields: ['Id', 'SsoKey', 'Protocol', 'Direction', 'ClientSsoApi', 'ServerSsoApi', 'TokenName', 'GetTokenType', 'Sort', 'IsEnable'],\n  _OrderBy: 'Sort',\n  _OrderByType: 'ASC',\n  _PageIndex: 1,\n  _PageSize: 500\n});\n\nif (!query || query.Code !== 1) {\n  return { Code: 0, Msg: query && query.Msg ? query.Msg : 'SSO 应用尚未正确安装。' };\n}\n\nvar output = [];\nvar rows = query.Data || [];\nfor (var index = 0; index < rows.length; index++) {\n  var row = rows[index] || {};\n  var isLegacy = !text(row.SsoKey)\n    && (text(row.ServerSsoApi) || text(row.ClientSsoApi) || text(row.TokenName));\n  if (!enabled(row.IsEnable) || !isLegacy) continue;\n  var tokenName = text(row.TokenName) || 'token';\n  var clientApi = text(row.ClientSsoApi);\n  if (!/^[A-Za-z0-9._~-]{1,64}$/.test(tokenName) || !safeClientApi(clientApi)) continue;\n  output.push({\n    Id: text(row.Id),\n    IsEnable: true,\n    ClientSsoApi: '/apiengine/sso_legacy_token_login',\n    TokenName: tokenName,\n    GetTokenType: text(row.GetTokenType) || 'Url'\n  });\n}\n\nreturn { Code: 1, Data: output };\n",
+      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：SSO 身份联邦\n * ApiEngineKey：sso_legacy_capabilities\n * 从可信吾码官方应用源安装、更新或重新安装“SSO 身份联邦”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: sso_legacy_capabilities\n * Version: v1.0.4\n * Function:\n * - 为存量 URL Token 客户端返回最小兼容投影；不暴露服务端校验地址、Token 或其它 SSO 配置。\n */\n\nfunction text(value) {\n  return value === null || value === undefined ? '' : String(value).trim();\n}\n\nfunction enabled(value) {\n  var normalized = text(value).toLowerCase();\n  return value === true || value === 1 || normalized === '1' || normalized === 'true';\n}\n\nfunction safeClientApi(value) {\n  var route = text(value);\n  return /^\\/api\\/SysUser\\/SsoPengrui$/i.test(route)\n    || /^\\/api\\/SysUser\\/TokenLogin$/i.test(route)\n    || /^\\/api\\/Sso\\/Legacy$/i.test(route)\n    || /^\\/apiengine\\/sso_legacy_token_login$/i.test(route);\n}\n\nvar query = V8.FormEngine.GetTableData('diy_sso', {\n  _Where: [['IsEnable', '=', 1]],\n  _SelectFields: ['Id', 'SsoKey', 'Protocol', 'Direction', 'ClientSsoApi', 'ServerSsoApi', 'TokenName', 'GetTokenType', 'Sort', 'IsEnable'],\n  _OrderBy: 'Sort',\n  _OrderByType: 'ASC',\n  _PageIndex: 1,\n  _PageSize: 500\n});\n\nif (!query || query.Code !== 1) {\n  return { Code: 0, Msg: query && query.Msg ? query.Msg : 'SSO 应用尚未正确安装。' };\n}\n\nvar output = [];\nvar rows = query.Data || [];\nfor (var index = 0; index < rows.length; index++) {\n  var row = rows[index] || {};\n  var isLegacy = !text(row.SsoKey)\n    && (text(row.ServerSsoApi) || text(row.ClientSsoApi) || text(row.TokenName));\n  if (!enabled(row.IsEnable) || !isLegacy) continue;\n  var tokenName = text(row.TokenName) || 'token';\n  var clientApi = text(row.ClientSsoApi);\n  if (!/^[A-Za-z0-9._~-]{1,64}$/.test(tokenName) || !safeClientApi(clientApi)) continue;\n  output.push({\n    Id: text(row.Id),\n    IsEnable: true,\n    // Platform DiyToken must use its own signature/session/tenant validation;\n    // never forward it to a configured external identity provider.\n    ClientSsoApi: /^\\/api\\/SysUser\\/TokenLogin$/i.test(clientApi)\n      ? '/api/SysUser/TokenLogin'\n      : '/apiengine/sso_legacy_token_login',\n    TokenName: tokenName,\n    GetTokenType: text(row.GetTokenType) || 'Url'\n  });\n}\n\nreturn { Code: 1, Data: output };\n",
       "ApiRole": "[]",
       "IsEnable": 1,
       "ApiEngineKey": "sso_legacy_capabilities",
