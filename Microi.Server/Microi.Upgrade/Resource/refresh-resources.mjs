@@ -233,9 +233,9 @@ function validateReleaseCandidate(name, content) {
         tenantHooks: ['platform-user-custom-hook'],
       },
       'app.microi.sys-config.json': {
-        minimumVersion: 6_003_008,
-        exactKeys: ['platform-tenant-system-settings', 'platform-system-settings-custom-hook'],
-        tenantHooks: ['platform-system-settings-custom-hook'],
+        minimumVersion: 6_004_005,
+        exactKeys: ['platform-tenant-system-settings', 'platform-system-settings-custom-hook', 'platform-hdfs-upload', 'platform-hdfs-upload-hook'],
+        tenantHooks: ['platform-system-settings-custom-hook', 'platform-hdfs-upload-hook'],
       },
       'app.microi.message-notification.json': {
         minimumVersion: 1_000_011,

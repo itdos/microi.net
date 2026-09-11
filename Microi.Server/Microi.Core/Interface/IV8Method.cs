@@ -15,6 +15,10 @@ namespace Microi.net
     /// </summary>
     public interface IV8Method
     {
+        /// <summary>当前 HTTP 上传请求的可信文件流入口，不接受可覆盖身份或桶策略的参数。</summary>
+        Task<DosResult> UploadCurrentRequestAsync();
+        /// <summary>读取当前上传请求的租户兼容开关。</summary>
+        bool IsLegacyUploadCompatibilityEnabled();
         /// <summary>仅供 platform-ops-event-ingest 使用，写入 MongoDB 成功后返回稳定事件回执。</summary>
         DosResult IngestOpsEvent(dynamic dynamicParam);
         /// <summary>仅解析全局函数声明，不执行函数源码。</summary>

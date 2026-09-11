@@ -13,6 +13,23 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 ## 表单字段的公有桶与私有桶（强制）
 
+### 旧上传返回与接口引擎扩展
+
+- 系统设置 `CompatiblePlatformOldVersion` 默认关闭，空值/缺字段也关闭；开启时旧 HTTP 上传
+  保留 `Code/Data`，单文件也统一返回数组（包括 `Multiple=false`），补 `url/type/size/duration/uploading/progress/path/name/id`。
+  图片 `type=image`，名称去掉最后一个扩展名；`url` 必须沿用实际 `Url`，不能把私有文件改拼公有地址。
+- `/api/HDFS/upload`、`/api/Upload`、`/apiengine/platform-hdfs-upload` 使用当前租户上传引擎。
+  只有主库确认完整地址、别名及固定 Key 缺失才执行编译兜底；禁用、StopHttp、拒绝或异常不兜底。
+- `V8.Method.UploadCurrentRequestAsync()` 复用已验证的当前请求文件流，重复调用只上传一次；
+  `V8.Method.IsLegacyUploadCompatibilityEnabled()` 读取宿主取得的开关，二者均不接受参数。
+  它们绑定当前租户与选定引擎，普通脚本或嵌套其它引擎不能借用；无请求时使用原有 `V8.Method.Upload`。
+- 返回编排由系统设置应用拥有的 Managed `platform-hdfs-upload` 实现；持久定制使用
+  CreateIfMissing `platform-hdfs-upload-hook`，返回 `{Code:1, UploadResult:完整结果}`。
+  先用 `JSON.parse(JSON.stringify(V8.Param.Result))` 转为普通 JS 对象，再判断 `Data` 数组并遍历追加字段；不能直接对 CLR 包装对象使用 `Array.isArray` 或 `length` 分支。
+  系统设置及基础空库包都交付可空字段，但上传引擎只由系统设置包拥有；不携带租户开关值。
+- MCP 复用 `microi_add_field`、`microi_update_field`、`microi_create_engine`、
+  `microi_save_engine_code` 和管理员回读；验收分别覆盖真实上传、配置缓存、引擎优先、缺失及错误分支。
+
 - `ImgUpload`、`FileUpload`、`RichText` 的“禁止匿名访问”是字段权威策略：`Limit=false` 写公有桶，`Limit=true` 写私有桶。普通用户只要通过当前菜单/表的新增或编辑动作授权，也必须按该字段配置执行；不得按用户等级把全部非超级管理员上传统一改成私有桶。
 - 浏览器上传必须携带 `FormEngineKey + FieldId + SysMenuId`，编辑已有记录再带 `FormDataId`，TableChild 再带父子授权上下文。后端先用 FormEngine 校验动作权限，再从当前租户回读 `diy_field.Component/Config`，用权威 `Limit` 覆盖请求值，并把目录固定为 `ImgUpload→img`、`FileUpload→file`、`RichText→editor`。
 - 客户端 `Limit`、`Path`、字段 Id 和菜单 Id 都只是待验证线索。没有可验证字段上下文的普通交互式上传默认私有并限制到安全一级目录；不能为了恢复公有字段语义而重新信任裸 `Limit=false`。
@@ -79,7 +96,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 可信后端 V8 可用 `V8.Http.GetResponse({ Url: url }).RawBytes` 下载，再用 `System.Convert.ToBase64String` 和 `V8.Method.Upload` 上传。该路径同样必须校验域名、大小、Content-Type、后缀和最终重定向目标。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=ed7e727c51bd2416ae1f38cf3c4bd09491e616df08473a610372e0ca648e1298 -->
+<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=d55c1a7fce715bf15224a74a2ae3006f38bab04bfe876ad88d9cc064fbe7cb9a -->
 ## 接收前端上传的文件
 
 前端发起文件上传时，平台自动把文件以 base64 形式注入到 `V8.FilesByteBase64`：

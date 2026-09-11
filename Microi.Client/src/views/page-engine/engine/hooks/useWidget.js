@@ -8,6 +8,9 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
   // 必须在组件 setup 调用期间取 store，才能命中嵌套页面 provide 的独立实例。
   const pageEngineStore = usePageEngineStore()
   const { formData } = storeToRefs(pageEngineStore)
+  // 页面刷新、周期切换和分页可能在同一时间触发多个请求。
+  // 只有最后一次请求可以提交结果，避免旧响应把新页面覆盖成空表或第一页。
+  let remoteRequestId = 0
   const readMaybeRef = value =>
     value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value')
       ? value.value
@@ -153,6 +156,7 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
   }
 
   const loadRemoteData = async () => {
+    const requestId = ++remoteRequestId
     let params = {}
     if (
       Array.isArray(dateRange.value) &&
@@ -195,13 +199,15 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
       console.log('请求地址', widgetObj.widgetParams[0].value)
       console.log('请求参数', params)
       loading.value = true
-      const response = await get(widgetObj.widgetParams[0].value, params)
       try {
+        const response = await get(widgetObj.widgetParams[0].value, params)
+        // get() 将网络错误转换为 null；保留现有数据，避免一次瞬时故障把表格清空。
+        if (requestId !== remoteRequestId || response === null || response === undefined) return
         setResponse(response)
-        loading.value = false
       } catch (error) {
-        loading.value = false
         console.log(error)
+      } finally {
+        if (requestId === remoteRequestId) loading.value = false
       }
     }
     else {

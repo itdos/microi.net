@@ -245,7 +245,7 @@ const pageEngineLiteralEn = {
     "默认": "Default", "卡片": "Card", "边框卡片": "Bordered card", "选项卡位置": "Tab position", "顶部": "Top", "右侧": "Right", "底部": "Bottom", "左侧": "Left",
     "标签页列表": "Tab list", "标签名称": "Tab name", "添加标签页": "Add tab", "放大(+)": "Zoom in (+)", "缩小(-)": "Zoom out (-)", "搜索任务名称...": "Search task names...",
     "保存修改": "Save changes", "初始化地图": "Initialize map", "你的浏览器不支持iframe标签": "Your browser does not support iframe.", "DIY表单 - 请配置表ID": "DIY Form — configure a table ID",
-    "DIY表格 - 请配置模块ID": "DIY Table — configure a module ID", "未配置预览文件": "No preview file configured", "文档加载中...": "Loading document...", "界面设计": "Page design",
+    "DIY表格 - 请配置模块ID": "DIY Table — configure a module ID", "未配置预览文件": "No preview file configured", "文档加载中...": "Loading document...", "加载中...": "Loading...", "暂无数据": "No data", "界面设计": "Page design",
     "请选择要嵌入的界面引擎": "Select a Page Engine to embed", "正在加载界面引擎...": "Loading Page Engine...", "打印预览": "Print preview", "关闭预览": "Close preview",
     "AI引擎": "AI Engine", "DIY表单": "DIY Form", "DIY表格": "DIY Table", "DIY日历": "DIY Calendar", "Office/PDF预览": "Office/PDF Preview", "表格": "Table", "饼图": "Pie chart",
     "柱状图": "Bar chart", "折线图": "Line chart", "折柱混合": "Line/bar chart", "漏斗图": "Funnel chart", "甘特图": "Gantt chart", "日历": "Calendar", "日历看板": "Calendar board",

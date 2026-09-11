@@ -29,8 +29,14 @@ export function withRequestTenant(headers, { url, apiBase, osClient, params, que
         if (target.origin !== base.origin
             || (prefix && target.pathname !== prefix && !target.pathname.startsWith(prefix + '/'))) return result;
         const suffix = /--OsClient--(.*?)--$/i.exec(target.pathname);
-        const tenant = (suffix ? decodeURIComponent(suffix[1]) : '')
-            || readTenant(target.searchParams) || readTenant(query) || readTenant(params) || osClient;
+        const explicitTenant = (suffix ? decodeURIComponent(suffix[1]) : '')
+            || readTenant(target.searchParams) || readTenant(query) || readTenant(params);
+        // 域名发现发生在租户确定之前，应由当前 API 的主租户解析域名。
+        // 自动注入 iTdos 或旧缓存会先选错数据库；仅这两个发现地址不补默认值。
+        const relativePath = target.pathname.slice(prefix.length).replace(/\/+$/, '').toLowerCase();
+        const domainDiscovery = relativePath === '/apiengine/platform-os-client-by-domain'
+            || relativePath === '/api/os/getosclientbydomain';
+        const tenant = explicitTenant || (domainDiscovery ? '' : osClient);
         if (tenant) result.osclient = tenant;
     } catch (_) {
         // 无效地址仍交给原请求链处理，不猜测其它服务或租户。

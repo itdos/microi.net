@@ -171,10 +171,13 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=53d475c7c494a5b6e9e2436c986c458ee539807426978fd99a27a1d7eb967881 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=174028eca01dc0987236803041ab5ac1bf18705a6609a4ba640df0c553533c1e -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）
+
+- 域名发现先于租户确定，固定 `platform-os-client-by-domain` 请求不能自动注入默认或缓存租户，也不能携带旧 Token；显式调用租户仍保持。没有 URL/index.html 租户时，每次冷启动重新发现域名，成功后更新缓存，失败立即停止，不写入 `iTdos` 继续请求配置。配置业务失败不是连接故障，健康检查成功不能触发循环重载；只有确认连接故障后的恢复才重载失败启动页。回归覆盖无缓存、错误缓存、显式租户及失败不重载，使用 `domain-tenant-bootstrap.spec.mjs`。
+- 登录回跳使用 Vue Router 解析完整深链接后合并 query/hash；对象式 `push({path, query})` 的 query 会覆盖 path 中原有参数，不能直接传空对象导致记录 Id 丢失。使用 `login-deep-link-query.spec.mjs` 验证编号、编码参数、重复参数和锚点。
 
 - `app.use(router)` 会立即触发首个路由守卫。守卫中的 SSO、认证、菜单请求必须等待 `initApp()` 完成真实租户和系统配置初始化；初始化失败时取消导航并保留启动错误界面。释放初始化等待必须早于 `router.isReady()`，避免彼此等待；禁止将缓存尚未建立时的 `GetOsClient()` 默认值 `iTdos` 发给客户服务器。
 

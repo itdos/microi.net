@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.4.0
+ * Version: v1.4.1
  * Function:
  * - 为吾码官方应用提供固定资源白名单的读取、发布、SHA 乐观锁、事务行锁、不可变版本与发布回读；验证各应用接口、物理结构和微服务产物完整交付。
  */
@@ -429,9 +429,20 @@ function validateV8FirstPackage(name, packageModel) {
   }
 
   if (name === "app.microi.sys-config.json") {
-    assertExactEngineKeys(packageModel, [
+    var settingsKeys = [
       "platform-tenant-system-settings", "platform-system-settings-custom-hook"
-    ], name);
+    ];
+    var uploadEngine = findEngine(packageModel, "platform-hdfs-upload");
+    var hasUploadField = countRows(packageModel.DiyFields, "Name", "CompatiblePlatformOldVersion") === 1;
+    if (hasUploadField || uploadEngine || findEngine(packageModel, "platform-hdfs-upload-hook")) {
+      settingsKeys.push("platform-hdfs-upload", "platform-hdfs-upload-hook");
+      if (!hasUploadField || compareVersions(info.Version, "v6.4.5") < 0
+          || text(uploadEngine && uploadEngine.ApiV8Code).indexOf("V8.Method.UploadCurrentRequestAsync") < 0
+          || text(uploadEngine && uploadEngine.ApiV8Code).indexOf("V8.Method.IsLegacyUploadCompatibilityEnabled") < 0) {
+        throw new Error("升级资源[" + name + "]缺少完整旧版上传兼容契约");
+      }
+    }
+    assertExactEngineKeys(packageModel, settingsKeys, name);
   }
   if (name === "app.microi.message-notification.json") {
     var notificationKeys = [

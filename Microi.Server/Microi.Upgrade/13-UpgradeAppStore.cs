@@ -884,7 +884,9 @@ namespace Microi.net
                     var isTenantHook = string.Equals(
                         pair.Key,
                         tenantHookKey,
-                        StringComparison.Ordinal);
+                        StringComparison.Ordinal)
+                        || (string.Equals(resourceName, SysConfigPackageResourceName, StringComparison.Ordinal)
+                            && string.Equals(pair.Key, "platform-hdfs-upload-hook", StringComparison.Ordinal));
                     if (!HasExpectedOfficialEnginePolicy(package, pair.Value, isTenantHook))
                     {
                         return false;
@@ -1020,7 +1022,24 @@ namespace Microi.net
             }
             if (string.Equals(resourceName, SysConfigPackageResourceName, StringComparison.Ordinal))
             {
-                return (byKey["platform-tenant-system-settings"].Value<string>("ApiV8Code") ?? string.Empty).Contains("platform-system-settings-custom-hook");
+                if (!(byKey["platform-tenant-system-settings"].Value<string>("ApiV8Code") ?? string.Empty)
+                    .Contains("platform-system-settings-custom-hook")) return false;
+                var uploadFields = (package["DiyFields"] as JArray ?? new JArray()).Children<JObject>()
+                    .Where(row => string.Equals(row.Value<string>("Name"), "CompatiblePlatformOldVersion", StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                if (uploadFields.Length == 0 && !byKey.ContainsKey("platform-hdfs-upload")
+                    && !byKey.ContainsKey("platform-hdfs-upload-hook")) return true;
+                if (packageVersion < new System.Version(6, 4, 5) || uploadFields.Length != 1
+                    || uploadFields[0].Value<string>("Component") != "Switch"
+                    || uploadFields[0].Value<string>("DefaultValue") != "0"
+                    || !byKey.TryGetValue("platform-hdfs-upload", out var uploadEngine)
+                    || !byKey.ContainsKey("platform-hdfs-upload-hook")) return false;
+                var uploadCode = uploadEngine.Value<string>("ApiV8Code") ?? string.Empty;
+                return uploadEngine.Value<int?>("StopHttp") == 0
+                    && uploadEngine.Value<int?>("AllowAnonymous") == 0
+                    && uploadCode.Contains("V8.Method.UploadCurrentRequestAsync")
+                    && uploadCode.Contains("V8.Method.IsLegacyUploadCompatibilityEnabled")
+                    && uploadCode.Contains("platform-hdfs-upload-hook");
             }
             if (string.Equals(resourceName, MessageNotificationPackageResourceName, StringComparison.Ordinal))
             {

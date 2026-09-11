@@ -89,7 +89,10 @@
   <el-table
     ref="tableRef"
     class="page-engine-tabel-widget"
+    v-mci-loading:table="loading"
+    :aria-busy="loading ? 'true' : 'false'"
     :data="widgetObj.widgetParams[0].typeOptions.dataJson.bodyData || []"
+    :empty-text="loading ? $pet('加载中...') : $pet('暂无数据')"
     :height="tableHeight"
     :stripe="widgetObj.widgetParams[2]?.value"
     :border="widgetObj.widgetParams[3]?.value"
@@ -411,7 +414,12 @@ const handleSizeChange = async (val) => {
 }
 // 当前页变更事件
 const handleCurrentChange = async (val) => {
-  if (runtimePageChanging) return
+  // 普通分页允许打断初始化请求；否则用户在首屏加载期间点击第 2 页
+  // 会被初始化锁吞掉，页码变化但数据仍停留在第一页。
+  if (isAutoScroll.value && runtimePageChanging) return
+  if (runtimeDisposed) return
+  const nextPage = Number(val)
+  if (Number.isFinite(nextPage) && nextPage > 0) currentPage.value = Math.floor(nextPage)
   await reloadRoadRemoteData()
   await restartRuntimeTasks(false)
 }

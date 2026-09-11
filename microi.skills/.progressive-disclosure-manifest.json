@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-10T05:27:45.745Z",
+  "generatedAt": "2026-09-11T06:51:33.842Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,11 +169,11 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "2e1ec87d7b959340805edf023e3a8ef9b1ddec4a9c74344475731bb66c2c9fa3",
-      "originalLines": 678,
+      "originalSha256": "341cd39dbe7904e65bc9b37362c7e22da9fc6f66093cea74a2399f12e5ce4291",
+      "originalLines": 681,
       "prefixSha256": "87ada6841f976552d9f5b88477fa91a92e4cd9cd040a8a725267d9fa2e4635c2",
       "prefixBytes": 782,
-      "entryLines": 220,
+      "entryLines": 223,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
@@ -211,8 +211,8 @@
           "id": "microi-client-frontend-004",
           "ordinal": 7,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "53d475c7c494a5b6e9e2436c986c458ee539807426978fd99a27a1d7eb967881",
-          "lines": 37,
+          "sha256": "174028eca01dc0987236803041ab5ac1bf18705a6609a4ba640df0c553533c1e",
+          "lines": 40,
           "heading": "7. 验证建议"
         },
         {
@@ -2221,11 +2221,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "acc9619e305fbb555253598d0904a2c3da5a71e4faf23941f18ee9cca2f343ae",
-      "originalLines": 574,
-      "prefixSha256": "796e8308ae21c36dde1b9268ae71ccb8c2afe9f393d7f9865b6648d2f7f0f22e",
-      "prefixBytes": 8923,
-      "entryLines": 229,
+      "originalSha256": "23adfa4920e71ae3648a151a1f9691836665c3e5a9420d154e4bcdbdb4396926",
+      "originalLines": 594,
+      "prefixSha256": "9dfdf2f5b8d3b9f28c5e32276b0d6911fbd0470eb2115351f0e2179875608edd",
+      "prefixBytes": 12461,
+      "entryLines": 249,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -2247,7 +2247,7 @@
           "id": "v8-file-upload-002",
           "ordinal": 2,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "ed7e727c51bd2416ae1f38cf3c4bd09491e616df08473a610372e0ca648e1298",
+          "sha256": "d55c1a7fce715bf15224a74a2ae3006f38bab04bfe876ad88d9cc064fbe7cb9a",
           "lines": 101,
           "heading": "接收前端上传的文件"
         },
@@ -2271,7 +2271,7 @@
           "id": "v8-file-upload-005",
           "ordinal": 3,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "b09a96f25aef20eb8cbb204bd785cce370dcd2c9a28563c6f6d720fbdaa5218f",
+          "sha256": "9efd186d8af26854bbed4d675b31fff57202a0139094798d9a41c3e4769fd092",
           "lines": 150,
           "heading": "公有桶 vs 私有桶"
         },
@@ -2295,7 +2295,7 @@
           "id": "v8-file-upload-008",
           "ordinal": 8,
           "destination": "v8-file-upload/references/progressive-02-office-文件在线编辑版本号规则.md",
-          "sha256": "5e3b59486745d3c54bd8ad25c43cbe2396e6d614394340b93d93794b6df56292",
+          "sha256": "7cda0fe7bb978e7219cb3c1ba30813e1a5e777f1272410f85d4c7ecc1882cc3d",
           "lines": 36,
           "heading": "Office 文件在线编辑版本号规则"
         },
@@ -2303,7 +2303,7 @@
           "id": "v8-file-upload-009",
           "ordinal": 9,
           "destination": "v8-file-upload/references/progressive-02-office-文件在线编辑版本号规则.md",
-          "sha256": "50fba71370f45de3dd677f5731f3956c328a8d3b1ca2125b853128067f9af40a",
+          "sha256": "e01219d4f1a8f8c535e0b5aa5620120c37bd5e79af27dbbd63babda8d887cd13",
           "lines": 80,
           "heading": "ImgUpload / FileUpload 字段值兼容规则"
         },
@@ -2311,7 +2311,7 @@
           "id": "v8-file-upload-010",
           "ordinal": 10,
           "destination": "v8-file-upload/references/progressive-02-office-文件在线编辑版本号规则.md",
-          "sha256": "f34d476435c3a8321df017b481771d757f580c8d75f7648fdd54ee1c624d116c",
+          "sha256": "229294a07a8db953219c35292db5558430addb576505695b9ce88a275eb46232",
           "lines": 26,
           "heading": "安全注意"
         }
