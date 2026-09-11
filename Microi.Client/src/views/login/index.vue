@@ -2103,9 +2103,13 @@ export default {
                 if (!isRegisteredRoute(targetPath) && fallbackUrl) {
                     targetPath = fallbackUrl;
                 }
+                // Router 的对象式跳转中 query 会覆盖 path 内的查询参数；先解析完整
+                // 深链接，再合并参数，避免首次登录后丢失记录 Id、编号和锚点。
+                var resolvedTarget = self.$router.resolve(targetPath);
                 const navigationFailure = await self.$router.push({
-                    path: targetPath,
-                    query: self.otherQuery,
+                    path: resolvedTarget.path,
+                    query: { ...self.otherQuery, ...resolvedTarget.query },
+                    hash: resolvedTarget.hash,
                     replace: true
                 });
                 if (navigationFailure) throw navigationFailure;

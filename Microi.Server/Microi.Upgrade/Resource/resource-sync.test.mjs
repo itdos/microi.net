@@ -1217,7 +1217,7 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
 });
 
 test('官网发布接口以固定白名单、事务行锁和哈希保护多节点写入', () => {
-  assert.match(officialEngineSource, /Version: v1\.4\.0/);
+  assert.match(officialEngineSource, /Version: v1\.4\.1/);
   assert.match(officialEngineSource, /V8\.Method\.AuthorizeOfficialResourcePublish\(\)/);
   assert.doesNotMatch(officialEngineSource, /Number\(currentUser\.Level/);
   assert.match(officialEngineSource, /function lockPublishRows\(\)/);
@@ -1350,11 +1350,13 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 162);
-  assert.equal(managedCount, 152);
+  assert.equal(seenKeys.size, 164);
+  assert.equal(managedCount, 153);
+  assert.ok(seenKeys.has('platform-hdfs-upload'));
+  assert.ok(seenKeys.has('platform-hdfs-upload-hook'));
   for (const key of ['platform-reminder-runtime','platform-reminder-official-feed','platform-reminder-tick','platform-message-notification-config']) assert.ok(seenKeys.has(key));
   assert.ok(seenKeys.has('send-sms-reg'), '注册短信公开派发入口必须纳入官方投影闭包');
-  assert.equal(createIfMissingCount, 10);
+  assert.equal(createIfMissingCount, 11);
 
   assert.match(officialEngineSource, /action === "reconcilepublishedapiengines"/);
   assert.match(officialEngineSource, /function preparePublishedApiEngineProjection\(\)/);
@@ -1469,6 +1471,14 @@ test('官网发布接口接受十个官方应用包并拒绝 AI 与首页资源�
   for (const packageName of packageNames) {
     const content = await readFile(resolve(testDirectory, packageName), 'utf8');
     assert.doesNotThrow(() => validatePublishResource(packageName, content), packageName);
+  }
+
+  const settings = JSON.parse(await readFile(resolve(testDirectory, 'app.microi.sys-config.json'), 'utf8'));
+  for (const key of ['platform-hdfs-upload', 'platform-hdfs-upload-hook']) {
+    const partial = structuredClone(settings);
+    partial.SysApiEngines = partial.SysApiEngines.filter(row => row.ApiEngineKey !== key);
+    partial.PackageInfo.ApiEngineCount = partial.SysApiEngines.length;
+    assert.throws(() => validatePublishResource('app.microi.sys-config.json', JSON.stringify(partial)), /上传兼容契约|接口引擎数量/);
   }
 
   const ai = JSON.parse(await readFile(resolve(testDirectory, 'app.microi.ai-engine.json'), 'utf8'));

@@ -16,6 +16,13 @@
     "HDFSController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" }
   },
+  "UploadProtocol": {
+    "OwnerId": "app.microi.sys-config",
+    "EngineKey": "platform-hdfs-upload",
+    "TenantHook": "platform-hdfs-upload-hook",
+    "Disposition": "ProtocolGateway",
+    "Reason": "HDFSController只保留当前请求文件流及既有鉴权、裁剪和内容安全边界。返回编排由接口引擎执行；主库确认地址与固定Key缺失才使用编译兜底，禁用或执行失败不兜底。"
+  },
   "ProtocolGateways": {
     "LegacyMobileCompatibilityController": { "Project": "Microi.net.Api", "Source": "Controllers/LegacyMobileCompatibilityController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "BootstrapCompatibility", "Reason": "仅兼容、禁止新增业务、未来可能整体删除；租户接口引擎明确缺失时复用可信登录、基础导航、服务器时间和客户端语义日志原子，已有接口始终优先。" },
     "AiController": { "Project": "Microi.net.Api", "Source": "Controllers/AiController.cs", "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ProtocolGateway" },

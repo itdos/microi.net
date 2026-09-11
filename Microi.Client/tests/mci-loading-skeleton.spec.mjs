@@ -35,6 +35,7 @@ const mobileProfile = read("src/views/mobile/profile.vue");
 const sysUserManage = read("src/views/system/sysuser-manage.vue");
 const diyImgUpload = read("src/views/form-engine/diy-field-component/diy-imgupload.vue");
 const diyTableSpecialCell = read("src/views/form-engine/diy-components/DiyTableSpecialCell.vue");
+const pageEngineTable = read("src/views/page-engine/engine/components/form-designer/widget/tabel-widget.vue");
 const themeColor = read("src/utils/theme-color.js");
 const uiSkill = fs.readFileSync(path.join(workspaceRoot, "microi.skills/ui-design/references/progressive-02-字体.md"), "utf8");
 const frontendSkill = fs.readFileSync(path.join(workspaceRoot, "microi.skills/microi-client-frontend/references/progressive-02-8-运行时高频坑复盘.md"), "utf8");
@@ -83,6 +84,13 @@ test("table, form and menu navigation expose skeletons before empty content", ()
     assert.match(appMain, /v-mci-loading:page="routeLoading"/);
     assert.match(tagsView, /mci-route-view-host[^>]*v-mci-loading:page="routeLoading"/);
     assert.doesNotMatch(appMain, /mode="out-in"/);
+});
+
+test("Page Engine remote tables expose loading state and do not drop stale responses", () => {
+    assert.match(pageEngineTable, /v-mci-loading:table="loading"/);
+    assert.match(pageEngineTable, /:aria-busy="loading \? 'true' : 'false'"/);
+    assert.match(pageEngineTable, /:empty-text="loading \? \$pet\('加载中\.\.\.'\) : \$pet\('暂无数据'\)"/);
+    assert.match(pageEngineTable, /if \(isAutoScroll\.value && runtimePageChanging\) return/);
 });
 
 test("light, dark and custom palettes drive skeleton tokens without black loading masks", () => {
