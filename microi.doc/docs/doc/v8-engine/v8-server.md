@@ -718,6 +718,17 @@ var textUploadResult = V8.Method.UploadText({
 
 `UploadText` 只接受 `Content` 和一个安全的 `FileName`，禁止同时传 `FilesByteBase64/FilesByte/Files`。它避免字符串先转 Base64 再还原字节产生的额外内存和错误文本编码，但不会替调用方完成内容哈希：商城等可信发布流程仍须对上传结果回读，并核对 UTF-8 字节数与 SHA-256 后才能提交数据库指针。
 
+#### 上传 HTTP 请求的接口引擎扩展
+
+`V8.Method.UploadCurrentRequestAsync()` 执行当前上传 HTTP 请求的可信文件流操作；
+`V8.Method.IsLegacyUploadCompatibilityEnabled()` 读取当前租户“兼容平台旧版本”开关。
+两者不接受身份、租户、桶或文件载荷参数，只能在宿主选定的上传接口引擎作用域中使用。
+文件字节不进入 Jint，同一请求重复调用复用同一个上传任务，失败也不自动重试。
+
+`platform-hdfs-upload` 负责返回编排，`platform-hdfs-upload-hook` 可扩展成功结果。
+普通后端脚本上传继续使用 `V8.Method.Upload`；离开上传请求的脚本不能调用上述请求原子。
+接口字段、开关和升级步骤见 [旧移动端上传返回兼容](../more/hdfs.md#旧移动端上传返回兼容)。
+
 #### 私有文件访问与审计
 
 普通 HTTP 上传只允许平台规定的目录并默认按私有文件处理；可信后端 V8 可进行租户内受控文件操作，但不能把 `GetPrivateFileByte`、对象列举或删除等管理能力直接暴露给普通用户。浏览器访问私有文件时还必须证明菜单、记录、字段与附件绑定关系，详见 [文件上传与私有文件](../more/hdfs.md)。

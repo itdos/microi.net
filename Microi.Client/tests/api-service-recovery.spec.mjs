@@ -48,6 +48,26 @@ async function outage(h) {
     assert.equal(h.apiServiceState.active, true);
 }
 
+test('配置和租户业务错误不触发健康探测或重新加载', async () => {
+    for (const code of ['MICROI_SYSCONFIG_UNAVAILABLE', 'MICROI_OSCLIENT_UNAVAILABLE']) {
+        const h = harness();
+        h.setRespond(async () => health());
+        const error = Object.assign(new Error('无法确认接口配置'), { code });
+        assert.equal(h.reportApiServiceFailure(error, h.context), false);
+        await h.tick(60000);
+        assert.equal(h.calls.length, 0);
+        assert.equal(h.reloads(), 0);
+    }
+});
+
+test('单接口失败但服务器健康不能触发启动重载', async () => {
+    const h = harness();
+    h.setRespond(async () => health());
+    h.reportApiServiceFailure(new Error('Network Error'), h.context);
+    await h.tick(60000);
+    assert.equal(h.reloads(), 0);
+});
+
 test('异常页面每五秒串行探测，后端恢复时重载失败的启动页且只执行一次', async () => {
     const h = harness();
     await outage(h);

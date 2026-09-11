@@ -15,6 +15,45 @@
 
 ---
 
+## 旧移动端上传返回兼容
+
+更新支持此功能的后端 Docker 镜像（8.3.4 及以上）并安装新版“系统设置”应用后，在
+**系统设置 → 开发配置 → 接口、文件与运行环境** 开启“兼容平台旧版本”。
+字段为 `CompatiblePlatformOldVersion`，默认关闭；空值与缺失字段也按关闭处理。
+
+`POST /api/HDFS/upload` 保留 `Code/Data` 信封。关闭兼容时，单文件返回对象，
+`Multiple=true` 返回数组；开启后，单文件（包括 `Multiple=false`）也统一返回一项数组。
+每个文件对象仍保留新版属性，并额外补充以下旧属性：
+
+| 旧属性 | 来源或含义 |
+|---|---|
+| `url`、`path`、`id` | 对应本次上传的 `Url`、`Path`、`Id` |
+| `name` | 不含最后一个扩展名的文件名，例如 `前.jpg` 返回 `前` |
+| `size` | 实际展示文件的 `Size`，不是压缩前体积 |
+| `type` | 图片 `image`、视频 `video`、音频 `audio`、其它 `file` |
+| `duration` | 已有时长，未提供时为 `0` |
+| `uploading`、`progress` | 上传成功后分别为 `false`、`100` |
+
+旧地址优先执行 `platform-hdfs-upload` 接口引擎；只有当前租户主库确认地址、别名及固定
+Key 均不存在时，才执行编译的安全上传兜底。引擎被禁用、禁止 HTTP、无权限、数据库异常
+或执行失败都会直接返回错误，不会再次上传。`/api/Upload` 与
+`/apiengine/platform-hdfs-upload` 复用同一入口。
+
+长期定制返回请编辑 `platform-hdfs-upload-hook`。该 Hook 只在首次缺失时创建，应用更新
+保留租户代码；主接口是 Managed 资源，重新安装会恢复官方正文。Hook 示例：
+
+```javascript
+var result = JSON.parse(JSON.stringify(V8.Param.Result));
+var rows = Array.isArray(result.Data) ? result.Data : [result.Data];
+for (var i = 0; i < rows.length; i++) rows[i].BusinessTag = 'custom';
+return { Code: 1, UploadResult: result };
+```
+
+先做 JSON 转换，避免 Jint 将 .NET 包装对象误判为数组或普通对象，导致自定义属性没有写入每个文件。
+
+兼容开关只改变成功返回的字段，不改变公私桶、目录授权、裁剪、配额或内容安全策略。
+私有文件的 `url` 沿用本次短期授权地址；需要长期匿名访问时，仍须按下文配置公有上传权限。
+
 ## 🔐 上传与私有文件安全
 
 ::: warning 登录不等于文件授权
