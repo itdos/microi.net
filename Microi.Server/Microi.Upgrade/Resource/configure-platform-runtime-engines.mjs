@@ -120,7 +120,8 @@ const engines = [
   {
     key: 'platform-sys-dept', name: '平台组织机构目录', file: 'platform-sys-dept.js',
     id: 'bc09475f-4c33-4fe9-9229-4b627cc9418b', enableLog: 1,
-    history: '2026-08-24 v1.0.0 组织机构兼容接口迁移至接口引擎，写操作固定为当前租户超级管理员。'
+    version: 'v1.0.2', apiRoutes: '/api/SysDept/GetSysDeptStep',
+    history: '2026-09-10 v1.0.2 恢复旧 GetSysDeptStep 地址及无 Action 调用，保留登录、租户和组织范围边界。'
   },
   {
     key: 'platform-sys-role', name: '平台角色目录', file: 'platform-sys-role.js',

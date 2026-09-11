@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-005 sha256=0ffafbd99fc0ee478db91200bfc3645c288f20d45120cd7413fb00ac3fbd8952 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-005 sha256=2c4c3f197bcd921d147b892cb64ccd1b77461f67c0219cfc3107ec6c7c268d88 -->
 ## 3. 动态按钮系统
 
 按钮配置来自 `sys_menu`：
@@ -45,7 +45,7 @@ V8.Result = V8.Form.Status == '待审核';
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-006 sha256=f2cb2548a184ceb086733d032e16d9a6870cb037c661671eb8c8a6cf2e694e60 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-006 sha256=e92ec7faad68c55a2175580e301c0b2b6a63b90e8e7edba48b8b0073ae53c807 -->
 ## 5. 路由与打开方式
 
 登录首页支持“用户 > 系统 > 首个可访问菜单”的三级优先级：

@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-011 sha256=7f8680e6afd7cae492a0d938e1efc95d0d20b04d0a33b0b956f2d0edb26d25cb -->
+<!-- microi-progressive:chunk id=microi-client-frontend-011 sha256=850ba16e253014a9d022582155cd3e18bf04dff375e82dd2947ea527bac4342a -->
 ## Vue3 前端微服务宿主规则
 
 `sys_menu.OpenType=MicroService` 时，动态路由必须把 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath` 和真实入口 `MicroAppUrl` 写入 route meta；浏览器侧菜单路由使用 `/#/micro-app/{MsKey}/{RoutePath}`，不要再生成 `/micro-app-host/{menuId}`，否则地址过长且刷新或直接访问菜单路由容易加载空白页。
@@ -149,7 +149,7 @@ Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`�
 - 同一份 ApiKey/Token 摘要在 Overview 与 AI 页面复用同一个组件；Token 额度统一展示“总量/Total”，不要把总量写成“赠送”。复制密钥必须有明确成功或失败提示，并提供 Clipboard API 不可用时的兼容复制。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-013 sha256=8f876b46e20dce5020e17f87ac6f9acfb37c908ab27f7c9568d59e9e7a00d3b2 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-013 sha256=c4054f900b1f6af15ae9ffb483e7571570f9d2aa99a0e674ee0bb9a956f06172 -->
 ## 浏览器访问密钥路由
 
 - 固定看板免登录使用常量匿名路由 `/access-login`，密钥使用 `microi_ak_` 前缀，完整链接格式为 `{Microi.Client前端WebBase}/?OsClient={当前租户}#/access-login?access_key={密钥}&redirect={encodeURIComponent后的站内Hash路由}`。例如目标路由 `/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX` 必须生成 `redirect=%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX`。生成器只复制当前 `OsClient`，不能把其它页面查询参数带进凭据链接，也不能把 API Server 当成前端 WebBase。

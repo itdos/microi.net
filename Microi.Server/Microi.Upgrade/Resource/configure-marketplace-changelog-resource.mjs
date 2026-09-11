@@ -430,6 +430,8 @@ function configureParentForm(packageModel) {
 }
 
 function configureSchema(packageModel) {
+  // 物理可空与业务必填分离：保留旧日志的真实缺失值；发布门禁继续要求完整日志。
+  // Id 主键、索引和默认值保持，普通字段不能因生成器重跑被收紧为 NOT NULL。
   const ddl = [
     'CREATE TABLE IF NOT EXISTS sys_microistore_changelog (',
     '  Id varchar(36) NOT NULL PRIMARY KEY,',
@@ -438,13 +440,13 @@ function configureSchema(packageModel) {
     "  UserId varchar(36) NULL COMMENT '创建人Id',",
     "  UserName varchar(255) NULL COMMENT '创建人',",
     "  IsDeleted int NULL DEFAULT 0 COMMENT '是否已删除',",
-    "  OsClient varchar(50) NOT NULL COMMENT '租户标识',",
-    "  StoreId varchar(50) NOT NULL COMMENT '应用商城记录Id',",
-    "  Version varchar(50) NOT NULL COMMENT '版本号',",
-    "  Title varchar(200) NOT NULL COMMENT '更新标题',",
-    "  ChangeType varchar(50) NOT NULL DEFAULT 'Feature' COMMENT '更新类型',",
-    "  Content mediumtext NOT NULL COMMENT '更新内容',",
-    "  ReleaseTime varchar(25) NOT NULL COMMENT '发布时间',",
+    "  OsClient varchar(50) NULL COMMENT '租户标识',",
+    "  StoreId varchar(50) NULL COMMENT '应用商城记录Id',",
+    "  Version varchar(50) NULL COMMENT '版本号',",
+    "  Title varchar(200) NULL COMMENT '更新标题',",
+    "  ChangeType varchar(50) NULL DEFAULT 'Feature' COMMENT '更新类型',",
+    "  Content mediumtext NULL COMMENT '更新内容',",
+    "  ReleaseTime varchar(25) NULL COMMENT '发布时间',",
     "  Sort int NULL DEFAULT 100 COMMENT '排序',",
     '  UNIQUE KEY ux_microistore_changelog_store_version (OsClient, StoreId, Version),',
     '  KEY ix_microistore_changelog_store_release (OsClient, StoreId, ReleaseTime)',
@@ -463,13 +465,13 @@ function configureSchema(packageModel) {
     ['UserId', 'varchar(36)', 'varchar', 'YES', null, '创建人Id', '', 4],
     ['UserName', 'varchar(255)', 'varchar', 'YES', null, '创建人', '', 5],
     ['IsDeleted', 'int(11)', 'int', 'YES', '0', '是否已删除', '', 6],
-    ['OsClient', 'varchar(50)', 'varchar', 'NO', null, '租户标识', 'MUL', 7],
-    ['StoreId', 'varchar(50)', 'varchar', 'NO', null, '应用商城记录Id', 'MUL', 8],
-    ['Version', 'varchar(50)', 'varchar', 'NO', null, '版本号', '', 9],
-    ['Title', 'varchar(200)', 'varchar', 'NO', null, '更新标题', '', 10],
-    ['ChangeType', 'varchar(50)', 'varchar', 'NO', 'Feature', '更新类型', '', 11],
-    ['Content', 'mediumtext', 'mediumtext', 'NO', null, '更新内容', '', 12],
-    ['ReleaseTime', 'varchar(25)', 'varchar', 'NO', null, '发布时间', '', 13],
+    ['OsClient', 'varchar(50)', 'varchar', 'YES', null, '租户标识', 'MUL', 7],
+    ['StoreId', 'varchar(50)', 'varchar', 'YES', null, '应用商城记录Id', 'MUL', 8],
+    ['Version', 'varchar(50)', 'varchar', 'YES', null, '版本号', '', 9],
+    ['Title', 'varchar(200)', 'varchar', 'YES', null, '更新标题', '', 10],
+    ['ChangeType', 'varchar(50)', 'varchar', 'YES', 'Feature', '更新类型', '', 11],
+    ['Content', 'mediumtext', 'mediumtext', 'YES', null, '更新内容', '', 12],
+    ['ReleaseTime', 'varchar(25)', 'varchar', 'YES', null, '发布时间', '', 13],
     ['Sort', 'int(11)', 'int', 'YES', '100', '排序', '', 14],
   ].map(([name, columnType, dataType, nullable, defaultValue, comment, key, ordinal]) => {
     const column = {
@@ -484,9 +486,7 @@ function configureSchema(packageModel) {
       EXTRA: '',
       ORDINAL_POSITION: ordinal,
     };
-    // 旧租户的历史日志在引入 OsClient 前可能保留 NULL。发布端租户值不能作为
-    // 固定默认值进入客户库，必须由新导入器使用可信目标租户上下文参数化回填。
-    if (name === 'OsClient') column.BACKFILL_VALUE_SOURCE = 'TargetOsClient';
+    // 可空列不声明仅供 NOT NULL 迁移使用的回填来源，避免改写旧日志或携带发布端租户值。
     return column;
   });
   packageModel.PhysicalColumns = packageModel.PhysicalColumns.filter(

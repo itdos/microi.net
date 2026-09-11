@@ -16,7 +16,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 模块引擎或 `sys_menu`。逐步建模在字段完成后调用 `microi_configure_form_banner` 回读验收。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=088aaa73360be7d63b64ca476e884371140c7807d118c05f04d87a12de0c7701 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=acb3a22e04ba26f9fda584956e1eff38c9deebaeb827a7fc3a947abdac4214a6 -->
 ## 交付总原则
 
 1. **先事实源，后建模**：先读需求文档、截图、现有蓝图、数据库结构和菜单结构，形成业务蓝图；不要边猜边建表、边猜边写接口。
@@ -27,6 +27,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 6. **生产数据谨慎优先**：涉及真实会员、余额、积分、订单、库存、卡券、收益、佣金、分润等资金/资产数据时，先确认服务器、租户、目标表、筛选条件和影响范围，再执行 MCP、接口引擎或 SQL 写操作。除用户明确要求清理/重置或必须修复错误数据外，不得擅自批量改真实数据。
 7. **默认按分布式交付**：任何后端能力都假设会有至少两个节点连接同一数据库和 Redis，并经历滚动升级、重复投递与节点硬重启。定时任务/消费者使用分布式租约且业务本身幂等；会话、票据和任务状态使用共享存储；新旧版本并存时采用“先扩展、后迁移、再收缩”。只在单节点验证通过不能视为完整交付。
 8. **业务逻辑默认接口引擎、元数据升级默认应用商城**：先用低代码 CRUD/事件，再用接口引擎；只缺底层原子能力时先扩展 V8，只有协议/鉴权/密钥隔离/运行时内核才进入 C#。表、字段、Tab、菜单、权限、引擎、页面和任务等可打包资源不得新增 `Microi.Upgrade` 定制类；官方开发者通过 `microi_itdos` 发布官方应用后再由目标租户 MCP 更新，无官方权限时只升级自己的租户。
+9. **平台能力四项同步**：按 `workspace-conventions/SKILL.md` 首部识别创始人源码工作区；每项平台新增、增强或修复都逐项判断应用商城、官方中文文档、Skills、MCP 是否需要完善，交付时列出证据或无需修改的依据。复用已有 MCP 能力，不机械新增工具；镜像发布不等于客户部署，客户手动更新边界必须保留。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=174d99145946baf94a5eee934fc1453921fa7eed544b853f86be515582dc1343 -->
@@ -45,7 +46,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 最终回复必须按原始编号逐项汇总：哪些已实现、哪些未实现、是否通过全自动化测试、是否通过截图验证。不能只给总括性“都完成了”。如果某项没有测试或没有截图，必须明说“未覆盖/未截图”，并说明原因。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=5b929c8ab1cf588601fb0e27149ef05893bc5000eecf05e58961c4f785251e31 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=65a36ed6c448bbfb0226acedaaa334046be68278b2e89eb301cd99b4e141da3e -->
 ## 平台安全与存量兼容验收（强制）
 
 AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉及 FormEngine、菜单、角色、子表、文件、SaaS 或登录协议的交付，都必须按以下服务端边界设计和验收：
@@ -70,7 +71,7 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 ### 上传、私有文件与 SaaS
 
 - 上传业务默认值为 100 MB/文件、200 MB/次、10 文件、2 GB/帐号/日、20 GB/租户/日。有效值只按当前租户 `sys_osclients` → 代码安全默认值解析，租户可以提高或降低业务默认值；不得为上传开关、额度或硬上限新增 API 环境变量或 `appsettings` 节点。最终仍受代码内不可突破的灾难保护、HTTP/Multipart/Form 和反向代理上限约束。共享 Redis 原子预留，Redis 故障失败关闭。
-- 普通交互式上传强制私有桶，一级目录只能是 `file`、`img`、`avatar`、`editor`。可信后端 V8 仍受全局文件大小硬上限。
+- 无字段上下文的普通交互式上传默认私有桶，一级安全目录为 `file`、`img`、`avatar`、`editor`；可由管理员在普通 `sys_config.HdfsUploadRules` 按真实角色授权业务目录与公有权限。通配符必须有界并先校验实际路径，保留目录与跨租户不能放行。标准表单仍按权威字段配置执行。可信后端 V8 仍受全局文件大小硬上限。
 - 普通客户端私有文件签名必须提交 `FormEngineKey`、`FormDataId`、`FieldId`、`SysMenuId` 并验证记录字段真实引用；不能把后端 `V8.Method.GetPrivateFileUrl({FilePathName})` 的可信调用方式照搬到浏览器。
 - Upgrade16 六个上传字段全部可空，空值保持老租户兼容；升级后回读字段元数据、租户值并刷新 SaaS 缓存。
 - `V8.OsClientModel` / `V8.SysConfig` 只使用脱敏副本，不返回整个对象。新租户不能复制主租户整条 `sys_osclients`；数据库、认证、Redis、存储、MQ/MQTT、搜索凭据必须独立创建或由服务端托管。

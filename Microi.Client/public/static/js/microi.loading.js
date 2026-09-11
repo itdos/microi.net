@@ -1,7 +1,7 @@
 /*
     * Microi Loading Animation Script
     注意：修改此文件一定要去【Microi.Client\index.html】修改
-    【/static/js/microi.loading.js?d=2026081703】时间戳，防止浏览器缓存不更新
+    【/static/js/microi.loading.js?d=2026091001】时间戳，防止浏览器缓存不更新
 */
 var isApkEnv = !!(window.plus || navigator.userAgent.indexOf('Html5Plus') > -1);
 var loadingRate = window.__microi_apk_start || 0;
@@ -151,17 +151,22 @@ function showStartupFailure(kind) {
     var retryEl = document.getElementById('startupRetry');
     if (loadEl) loadEl.classList.add('startup-failed');
     var isServiceFailure = kind === 'service';
+    var isRouteFailure = kind === 'route';
     var isDatabaseFailure = isServiceFailure && /数据库连接失败|Database connection is temporarily unavailable|DatabaseHostInvalid|DatabaseEndpointUnreachable/i.test(appBootError || '');
-    if (subtitleEl) subtitleEl.textContent = isDatabaseFailure
+    if (subtitleEl) subtitleEl.textContent = isRouteFailure
+        ? '登录状态或菜单加载失败'
+        : isDatabaseFailure
         ? '租户数据库连接失败'
         : (isServiceFailure ? '后端服务暂时不可用' : '页面脚本未能启动');
-    if (statusEl) statusEl.textContent = isServiceFailure
+    if (statusEl) statusEl.textContent = isRouteFailure
+        ? '登录身份或菜单初始化未完成，请查看具体错误后重试。'
+        : isServiceFailure
         ? (isDatabaseFailure
             ? '系统无法读取当前租户配置，请按下方指引修复数据库连接。'
             : '系统初始化尚未完成，请检查服务后重新加载。')
         : '页面脚本未能完成挂载，请刷新或更换浏览器后重试。';
     if (rateEl) {
-        rateEl.textContent = isDatabaseFailure ? '数据库连接失败' : '连接失败';
+        rateEl.textContent = isRouteFailure ? '加载失败' : (isDatabaseFailure ? '数据库连接失败' : '连接失败');
         rateEl.classList.add('is-status');
     }
     if (barEl) {
@@ -170,7 +175,9 @@ function showStartupFailure(kind) {
     }
     if (messageEl) {
         var detail = appBootError ? '错误信息：' + appBootError + ' ' : '';
-        messageEl.textContent = isServiceFailure
+        messageEl.textContent = isRouteFailure
+            ? detail + '请刷新重试；若持续出现，请根据错误信息检查登录状态、用户权限或菜单配置。'
+            : isServiceFailure
             ? (isDatabaseFailure
                 ? detail + '修复租户数据库配置后点击“刷新重试”。'
                 : detail + '请检查后端服务与网络连接后重试。页面不会再停留在无提示的空白状态。')
@@ -240,7 +247,7 @@ window.addEventListener('microi:app-ready', function () {
 window.addEventListener('microi:app-boot-failed', function (event) {
     var detail = event && event.detail;
     appBootError = (detail && detail.message) || window.__MICROI_APP_BOOT_ERROR__ || appBootError;
-    showStartupFailure('service');
+    showStartupFailure(detail && detail.kind === 'route' ? 'route' : 'service');
 });
 window.addEventListener('error', function (event) {
     if (isMicroiAppReady()) return;

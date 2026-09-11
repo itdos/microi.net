@@ -20,9 +20,10 @@ public class MicroiTaskSchedulingCacheTests
         var address = Environment.GetEnvironmentVariable("MICROI_TEST_SCHEDULE_REDIS");
         // 真实缓存验证属于 Full；配置缺失必须失败，不能让发布以跳过用例收尾。
         Assert.False(string.IsNullOrWhiteSpace(address), "需显式配置本任务隔离 Redis。");
-        Assert.Equal("127.0.0.1:62681", address);
+        ScheduleFixtureGuard.ValidateRedisEndpoint(address!);
         using var redis = await ConnectionMultiplexer.ConnectAsync(address);
         var db = redis.GetDatabase();
+        await ScheduleFixtureGuard.VerifyRedisOwnerAsync(address!, db);
         var tenant = "schedule-test-" + Guid.NewGuid().ToString("N");
         var cache = DispatchProxy.Create<IMicroiCache, CacheProxy>();
         ((CacheProxy)cache).Database = db;

@@ -395,16 +395,18 @@ function Get-LockedReleaseFiles {
     if (-not (Test-Path -LiteralPath $releaseOutput -PathType Container)) { return @() }
     $locked = @()
     Get-ChildItem -LiteralPath $releaseOutput -Filter '*.dll' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+        # catch 中的 $_ 会变为 ErrorRecord，提前保留文件路径才能报告真正的占用原因。
+        $releaseFilePath = $_.FullName
         $stream = $null
         try {
             $stream = [System.IO.File]::Open(
-                $_.FullName,
+                $releaseFilePath,
                 [System.IO.FileMode]::Open,
                 [System.IO.FileAccess]::ReadWrite,
                 [System.IO.FileShare]::None)
         }
         catch {
-            $locked += [PSCustomObject]@{ Path = $_.FullName; Error = $_.Exception.Message }
+            $locked += [PSCustomObject]@{ Path = $releaseFilePath; Error = $_.Exception.Message }
         }
         finally {
             if ($null -ne $stream) { $stream.Dispose() }

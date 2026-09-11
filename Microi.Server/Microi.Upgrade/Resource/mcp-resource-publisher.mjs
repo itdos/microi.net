@@ -33,6 +33,7 @@ const officialResourceNames = new Set([
   'app.microi.sys-config.json',
   'app.microi.message-notification.json',
   'app.microi.ai-engine.json',
+  'app.microi.sys-log.json',
 ]);
 
 function normalizeApiBaseUrl(value) {
@@ -915,6 +916,23 @@ export async function readResourcesViaConfiguredMcp(resourceNames, options = {})
       resources.set(name, data);
     }
     return { configPath, resources };
+  });
+}
+
+// Export the selected official mother metadata through the same audited MCP transport.
+// This keeps large package JSON off the AI context and never reads business rows by default.
+export async function exportOfficialPackageViaConfiguredMcp(selection, options = {}) {
+  if (!selection || !['MenuIds', 'TableIds', 'ApiEngineKeys'].some(key => Array.isArray(selection[key]) && selection[key].length)) {
+    throw new Error('官方母版导出需要明确选择菜单、表或接口引擎。');
+  }
+  if (selection.DataSelections?.length || selection.AiAppIds?.length) throw new Error('此元数据导出不包含业务数据或应用源码。');
+  return withConfiguredItDosMcp(options, async client => {
+    const engine = 'export-microi-store-package';
+    const result = await client.request('tools/call', { name: 'microi_codex', arguments: {
+      action: 'microi_run_engine', params: { apiEngineKey: engine,
+        params: { ...selection, ExactMenuIds: true, DataSelections: [] }, confirmExecution: engine }
+    } }, 180_000);
+    return parseCodexExecutionResult(result, '导出选定的官方母版元数据').Data;
   });
 }
 

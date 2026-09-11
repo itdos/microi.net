@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.3.7
+ * Version: v1.4.0
  * Function:
- * - 匿名读取固定白名单中的吾码升级资源；超级管理员可通过 SHA 乐观锁原子发布升级资源，新版应用包写入 HDFS 并仅持久化可校验指针。
+ * - 为吾码官方应用提供固定资源白名单的读取、发布、SHA 乐观锁、事务行锁、不可变版本与发布回读；验证各应用接口、物理结构和微服务产物完整交付。
  */
 
 var PARAM = V8.Param || {};
@@ -51,6 +51,7 @@ function getStoreAppId(name) {
   if (name === "app.microi.sys-config.json") return "app.microi.sys-config";
   if (name === "app.microi.message-notification.json") return "app.microi.message-notification";
   if (name === "app.microi.ai-engine.json") return "app.microi.ai-engine";
+  if (name === "app.microi.sys-log.json") return "app.microi.sys-log";
   return "";
 }
 
@@ -433,11 +434,23 @@ function validateV8FirstPackage(name, packageModel) {
     ], name);
   }
   if (name === "app.microi.message-notification.json") {
-    assertExactEngineKeys(packageModel, [
+    var notificationKeys = [
       "msg_event", "msg_internal_list", "msg_internal_mark_read",
       "platform-chat-system-message", "platform-chat-runtime",
       "platform-message-notification-custom-hook", "wechat_send_tpl_msg"
-    ], name);
+    ];
+    // 历史提醒包保留原三个接口闭包；合并中心的新版本必须同时包含原表配置接口。
+    var reminderKeys = ["platform-reminder-runtime", "platform-reminder-official-feed", "platform-reminder-tick"];
+    var declaresUnifiedNotification = compareVersions(info.Version, "v1.0.19") >= 0 || !!findEngine(packageModel, "platform-message-notification-config");
+    if (declaresUnifiedNotification) {
+      reminderKeys.push("platform-message-notification-config");
+    }
+    var declaresReminders = declaresUnifiedNotification || countRows(packageModel.DiyTables, "Name", "mci_platform_reminder") > 0;
+    for (var reminderIndex = 0; reminderIndex < reminderKeys.length; reminderIndex++) {
+      if (findEngine(packageModel, reminderKeys[reminderIndex])) declaresReminders = true;
+    }
+    if (declaresReminders) notificationKeys = notificationKeys.concat(reminderKeys);
+    assertExactEngineKeys(packageModel, notificationKeys, name);
   }
   if (name === "app.microi.ai-engine.json") {
     assertExactEngineKeys(packageModel, [
@@ -570,7 +583,8 @@ function validatePublishResource(name, content) {
     "app.microi.sys_user.json": "系统账号",
     "app.microi.sys-config.json": "系统设置",
     "app.microi.message-notification.json": "消息通知",
-    "app.microi.ai-engine.json": "AI助手"
+    "app.microi.ai-engine.json": "AI助手",
+    "app.microi.sys-log.json": "系统日志/监控"
   };
   if (!packageModel.PackageInfo
       || text(packageModel.PackageInfo.Name) !== expectedNames[name]
@@ -1113,7 +1127,7 @@ function parsePublishItems() {
 }
 
 function lockPublishRows() {
-  // 多节点可能同时发布。固定顺序锁住全部 12 个白名单资源行，使
+  // 多节点可能同时发布。固定顺序锁住全部白名单资源行，使
   // “校验 ExpectedRemoteSha256 + 写入”在同一数据库事务内保持原子。
   V8.Db.FromSql(
     "SELECT Id FROM sys_apiengine "
@@ -1122,7 +1136,7 @@ function lockPublishRows() {
   ).ToArray();
   V8.Db.FromSql(
     "SELECT Id FROM sys_microistore "
-    + "WHERE AppId IN ('app.microi.ai-engine','app.microi.form-engine','app.microi.message-notification','app.microi.module-engine','app.microi.saas-engine','app.microi.sso','app.microi.store','app.microi.sys-config','app.microi.sys_user') "
+    + "WHERE AppId IN ('app.microi.ai-engine','app.microi.form-engine','app.microi.message-notification','app.microi.module-engine','app.microi.saas-engine','app.microi.sso','app.microi.store','app.microi.sys-config','app.microi.sys_user','app.microi.sys-log') "
     + "ORDER BY Id FOR UPDATE"
   ).ToArray();
 }

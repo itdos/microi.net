@@ -259,6 +259,7 @@ test('workspace Skills and the packaged Codex plugin carry the same rules', () =
     'workspace-conventions/SKILL.md',
     'workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md',
     'microi-microservice/SKILL.md',
+    'message-notification/SKILL.md',
     'microi-microservice/references/runtime-delivery.md',
     'print-engine/SKILL.md',
     'v8-frontend-events/references/bluetooth-print.md',

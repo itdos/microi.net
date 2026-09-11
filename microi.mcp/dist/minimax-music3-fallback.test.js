@@ -5,7 +5,7 @@ test('MiniMax Music3 fallback only matches the explicit official retirement resp
     assert.equal(isRetiredMiniMaxMusicApi({
         Code: 0,
         Data: null,
-        Msg: 'MiniMax 音乐生成失败：410 - This Music API is no longer available to new users. Try MiniMax-Music3.',
+        Msg: 'MiniMax 音乐生成失败：410 - This Music API is no longer available to new users.',
     }), true);
     assert.equal(isRetiredMiniMaxMusicApi({ Code: 0, Data: null, Msg: '410 quota exceeded' }), false);
     assert.equal(isRetiredMiniMaxMusicApi({ Code: 0, Data: null, Msg: '500 MiniMax-Music3 unavailable' }), false);

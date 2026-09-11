@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
 const clientRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -27,7 +28,7 @@ function assertOrdered(source, markers) {
 test("the user store repairs authorization before roles and protected routes are initialized", async () => {
     const userSource = await readSource("src/pinia/modules/user.js");
     const permissionSource = await readSource("src/permission.js");
-    const getInfo = sourceSection(userSource, "        getInfo() {", "        // user logout");
+    const getInfo = sourceSection(userSource, "        async getInfo() {", "        // user logout");
     const changeRolesStart = userSource.indexOf("        async changeRoles(role) {");
     assert.ok(changeRolesStart >= 0, "changeRoles action was not found");
     const changeRoles = userSource.slice(changeRolesStart);
@@ -92,21 +93,31 @@ test("a bad authorization projection cannot mark roles as initialized", async ()
         "        async ensureAuthorizationSnapshot(candidateUser) {",
         "        // get user info"
     );
-    const getInfo = sourceSection(userSource, "        getInfo() {", "        // user logout");
+    const getInfo = sourceSection(userSource, "        async getInfo() {", "        // user logout");
     const repairAwait = getInfo.indexOf("await this.ensureAuthorizationSnapshot(result.Data || {})");
     const roleAssignment = getInfo.indexOf("this.setRoles(");
-    const repairFailure = getInfo.indexOf("} catch (error) {", roleAssignment);
-    const rejection = getInfo.indexOf("reject(error)", repairFailure);
 
     assert.match(ensureAuthorization, /hasCurrentUserAuthorizationSnapshot\(repairResult\.Data\)/);
     assert.match(ensureAuthorization, /throw error;/, "an invalid repair result must reject initialization");
     assert.ok(repairAwait >= 0, "authorization repair await was not found");
     assert.ok(roleAssignment > repairAwait, "roles must only be assigned after a valid authorization snapshot");
-    assert.ok(repairFailure > roleAssignment && rejection > repairFailure, "repair failure must reject getInfo");
     assert.equal(
         (getInfo.match(/this\.setRoles\(/g) || []).length,
         1,
         "getInfo must not have a fallback branch that initializes roles after repair failure"
     );
-    assert.doesNotMatch(getInfo.slice(repairFailure), /this\.setRoles\(/);
+    // async getInfo 通过 await 直接传播修复失败；实际执行而非要求特定 catch/reject 写法。
+    const repairError = new Error('authorization repair failed');
+    let assignedRoles = 0;
+    const options = vm.runInNewContext(userSource.replace(/^import\s[\s\S]*?;\s*/gm, '')
+        .replace(/^export /gm, '') + '\nuseUserStore;', {
+        defineStore: (_, value) => value,
+        DiyApi: { GetCurrentUser: () => '/apiengine/platform-current-user' },
+        DiyCommon: { PostAsync: async () => ({ Code: 1, Data: { Id: 'user' } }) }
+    });
+    await assert.rejects(options.actions.getInfo.call({
+        ensureAuthorizationSnapshot: async () => { throw repairError; },
+        setRoles: () => { assignedRoles++; }
+    }), error => error === repairError);
+    assert.equal(assignedRoles, 0, 'repair failure must reject getInfo without initializing roles');
 });

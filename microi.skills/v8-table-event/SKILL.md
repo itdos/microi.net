@@ -101,6 +101,13 @@ V8.ApiEngine.Run('other-engine', { Form: V8.Form }, V8.DbTrans);
 - 数据**加工**（计算字段、脱敏、查关联表名）→ 用 `DataFilterV8`（后端，每行执行，可用 `V8.CacheData` 防 N+1）
 - 数据**渲染**（颜色徽章、HTML、图片）→ 用【表格 V8 模板引擎】，详见 `v8-template-engine/SKILL.md`
 
+### 6. 新增主键与跨表引用
+
+- 原生新增管线先独立确定真实主键；`SubmitBeforeServerV8` 中的 `V8.Form.Id` 可能尚未提供。不得自行给 `V8.Form.Id` 补一个 GUID，并把它当作最终插入主键去创建条码、明细、关系或审计。
+- 依赖最终主键的附属记录放在 `SubmitAfterServerV8`，核验 `V8.Form.Id` 后在同一 `V8.DbTrans` 中回读主记录，再创建附属记录。After 仍在提交前，任一附属写入失败必须返回失败并回滚主表；外部消息仍走 outbox。
+- 原生删除事件的权威删除前记录由 `V8.Form` 提供，`V8.OldForm` 可能为空；删除审计、关系清理应按 `FormSubmitAction` 选择上下文。原生删除的 `Form.Version` 来自数据库快照，不能把它当作客户端最后看到的版本。需要拒绝过期删除时，通过受控接口接收期望版本、锁定主库记录并验证，再在同一事务执行删除。
+- 回归必须比较“新增接口返回 Id、主表实际 Id、附属外键、审计 RowId”四者一致，并覆盖唯一冲突时主表及附属记录同时回滚，不能只断言新增接口 `Code=1`。
+
 ---
 
 <!-- /microi-progressive:chunk -->

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureMinimumPackageVersion } from './resource-sync-core.mjs';
+import {normalizeOfficialApiEnginePolicies} from './official-api-engine-notice.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const resourcePath = path.join(directory, 'app.microi.saas-engine.json');
@@ -68,7 +69,7 @@ const specs = [
     policy: 'Managed',
     createTime: '2024-11-25 11:36:39',
     updateTime: '2026-08-21 15:00:00',
-    version: 'v1.0.1',
+    version: 'v1.0.2',
     timeout: 600,
     category: '未分类',
     lockKey: '',
@@ -77,7 +78,16 @@ const specs = [
     v8Unlimited: 1,
     apiRemark: '需要输入正确的图形验证码后才能发送短信验证码，防止短信验证码接口被肉鸡。\n第三方短信验证码文档见附件。\n必传Phone（手机号）、_CaptchaId（验证码Id）、_CaptchaValue（验证码值）\nV8引擎代码中要用到的短信帐号密码均从系统设置中读取，而非超级管理员查看系统设置信息时无法查看到真实的短信帐号密码。',
     testParam: '{ "Phone" : "13967896935" }',
-    changeHistory: '2026-08-21 15:00:00 v1.0.1 优先读取租户后端私有短信配置，旧 SaaS 凭据仅作成对兼容回退且响应不再回显 AccessKey。\n2026-07-06 16:45:45 短信发送结果按阿里云业务 Code 判断，流控等错误返回 Code=0\n'
+    changeHistory: '2026-09-09 v1.0.2 旧公开地址统一校验图形验证码，内部发送只接受单次派发证明。\n2026-08-21 15:00:00 v1.0.1 优先读取租户后端私有短信配置，旧 SaaS 凭据仅作成对兼容回退且响应不再回显 AccessKey。\n2026-07-06 16:45:45 短信发送结果按阿里云业务 Code 判断，流控等错误返回 Code=0\n'
+  },
+  {
+    id: '76000000-1000-4000-8000-000000000004',
+    key: 'send-sms-reg', name: '平台图形校验后发送注册短信',
+    file: '[官网]注册发送短信(send-sms-reg).js', sourceDirectory: path.resolve(sourceDirectory, '..'),
+    allowAnonymous: 1, stopHttp: 0, ownership: 'Platform', policy: 'Managed',
+    version: 'v1.0.3', lock: 1, lockKey: '', timeout: 120,
+    category: '系统/身份与登录', testParam: '{}',
+    changeHistory: '2026-09-09 v1.0.3 Managed 注册入口；租户/命名空间校验、原子消费、分布式限流与单次派发证明。\n'
   }
 ];
 pkg.SysApiEngines ||= [];
@@ -104,7 +114,7 @@ for (const spec of specs) {
     Files: '[]',
     AllowAnonymous: spec.allowAnonymous,
     ApiAddress: `/apiengine/${spec.key}`,
-    Lock: 0,
+    Lock: spec.lock || 0,
     ...(spec.lockKey !== undefined ? { LockKey: spec.lockKey } : {}),
     ApiV8Code: source,
     ApiRole: '[]',
@@ -156,6 +166,7 @@ Object.assign(pkg.PackageInfo, {
   ApiEngineCount: pkg.SysApiEngines.length
 });
 
+normalizeOfficialApiEnginePolicies(pkg, 'app.microi.saas-engine.json');
 fs.writeFileSync(resourcePath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify({
   version: pkg.PackageInfo.Version,

@@ -421,6 +421,8 @@ namespace Microi.net
 
             var sysUser = identity.CurrentUser;
             var osClient = identity.OsClient;
+            // 群组仅来自核验后的当前租户；群组事件不含提醒正文，正文仍由本人接口裁剪。
+            await Groups.AddToGroupAsync(connid, PlatformReminderTransport.Group(osClient)).ConfigureAwait(false);
             var userId = identity.UserId;
             var userName = identity.UserName;
             var userAccount = identity.UserAccount;

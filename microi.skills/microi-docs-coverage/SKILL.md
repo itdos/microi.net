@@ -10,6 +10,10 @@ description: Microi 中文官网文档与 Skills 能力覆盖审计。用于全�
 当任务涉及“官网有但 AI 不知道”“全面同步官方文档到 Skills”“核对所有
 V8 函数”或新增、调整官方中文文档时，使用本 Skill。
 
+创始人源码工作区中的平台功能还必须执行 [工作区基础规范](../workspace-conventions/SKILL.md)
+的“平台功能四项同步检查”：本 Skill 负责文档与 AI 知识覆盖，不能替代官方应用包发布
+或 MCP 能力验收。既有页面、Skill 或 MCP 已完整覆盖时记录依据，不重复创建同义内容。
+
 ## 范围与事实源
 
 - 能力映射扫描 `microi.doc/docs/doc/**/*.md`，但排除受发版规则保护的
@@ -44,6 +48,12 @@ V8 函数”或新增、调整官方中文文档时，使用本 Skill。
 5. 更新 `references/capability-map.md`，重新运行审计，直到严格检查通过。
 6. 对每个新增或改动的 Skill 运行 `skill-creator` 的 `quick_validate.py`，
    再执行 `git diff --check` 和相对链接检查。
+7. 修改已注册的后端内嵌知识时，运行
+   `node microi.skills/scripts/sync-embedded-skills.mjs <skill-name...>`，再带 `--check`
+   回读一致性；它只更新已在 `Microi.AI.csproj` 注册的快照，正文仍来自 canonical Skills。
+   修改渐进内容后先显式刷新本次 Skill 的校验清单，再按名称验证；全库检查发现历史漂移时
+   单独记录，禁止修改无关 Skill 的哈希来掩盖漏项。插件/CLI 使用现有构建器同步分发副本，
+   打包成功不等于已发布到用户安装渠道。
 
 ## 中文文档视觉与可读性契约（强制）
 

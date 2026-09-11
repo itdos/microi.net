@@ -85,3 +85,30 @@ test('manifest plan validates Banner field references and includes configuration
   assert.equal(plan.plan.includes('configure_form_banner Biz_Order'), true);
   assert.equal(plan.errors.some((error) => error.includes('MissingTitle')), true);
 });
+
+for (const key of ['titleField', 'subtitleField', 'imageField']) {
+  test(`Banner 显式空 ${key} 不重新推断业务字段`, () => {
+    const physical = `FormBanner${key[0].toUpperCase()}${key.slice(1)}`;
+    for (const value of ['', '  ']) {
+      assert.equal(buildDefaultFormBanner({ fields, formBanner: { [key]: value } })[physical], '');
+    }
+  });
+}
+
+test('Banner 小写显式空优先于历史大写别名，背景字段也保持该语义', () => {
+  const banner = buildDefaultFormBanner({ fields, formBanner: {
+    titleField: '', TitleField: 'CustomerName', subtitleField: '', SubtitleField: 'OrderNo',
+    imageField: '', ImageField: 'Cover', backgroundField: '', BackgroundField: 'Cover',
+  } });
+  for (const key of ['TitleField', 'SubtitleField', 'ImageField', 'BackgroundField']) {
+    assert.equal(banner[`FormBanner${key}`], '');
+  }
+});
+
+test('Banner 省略及存量 null 保持推断，非空显式字段保持不变', () => {
+  const omitted = buildDefaultFormBanner({ fields });
+  const nullable = buildDefaultFormBanner({ fields, formBanner: { titleField: null, subtitleField: null, imageField: undefined } });
+  for (const key of ['TitleField', 'SubtitleField', 'ImageField']) assert.equal(nullable[`FormBanner${key}`], omitted[`FormBanner${key}`]);
+  const explicit = buildDefaultFormBanner({ fields, formBanner: { titleField: 'CustomerName', subtitleField: 'OrderNo', imageField: 'Cover', backgroundField: 'Cover' } });
+  assert.deepEqual([explicit.FormBannerTitleField, explicit.FormBannerSubtitleField, explicit.FormBannerImageField, explicit.FormBannerBackgroundField], ['CustomerName', 'OrderNo', 'Cover', 'Cover']);
+});

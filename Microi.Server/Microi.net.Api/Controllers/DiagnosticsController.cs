@@ -7,9 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Microi.net.Api;
 
 /// <summary>
-/// Fixed host-level health endpoints. These routes deliberately avoid tenant
-/// configuration, databases, Redis, ApiEngine and V8 so they remain available
-/// while child-tenant application upgrades are still running.
+/// 宿主诊断协议。健康动作避开租户与外部依赖；连接池应急动作独立鉴权并调用 Core 控制面。
 /// </summary>
 [ApiController]
 [AllowAnonymous]
@@ -17,6 +15,19 @@ namespace Microi.net.Api;
 [Route("api/[controller]")]
 public sealed class DiagnosticsController : ControllerBase
 {
+    /// <summary>
+    /// 可信应急协议边界：内部强制 DiyToken 与无池主库管理员复核，不能套用依赖故障池的 MCP 过滤器。
+    /// AllowAnonymous 只跳过 ASP.NET 默认认证，不代表本动作允许匿名操作。
+    /// </summary>
+    [HttpPost("database-pools")]
+    [DatabasePoolRecoveryEndpoint]
+    [RequestSizeLimit(4096)]
+    public Task<DosResult> DatabasePools([FromBody] Newtonsoft.Json.Linq.JObject request)
+    {
+        DisableCaching();
+        return DatabasePoolRecoveryService.ExecuteAsync(request);
+    }
+
     [HttpGet("liveness")]
     public DosResult Liveness()
     {

@@ -18,10 +18,29 @@ public sealed class LegacyBootstrapRecoveryTests
         var device = "LegacyBootstrapRecovery-" + Guid.NewGuid().ToString("N");
         using var admin = Client(Required("MICROI_TEST_DID"), Required("MICROI_TEST_TOKEN"));
         using var anonymous = Client(device);
-        var keys = new[] { "platform-sys-user-session", "platform-os-legacy-compatibility", "platform-client-log", "platform-sys-menu" };
+        var keys = new[] { "platform-sys-user-session", "platform-os-legacy-compatibility", "platform-client-log", "platform-sys-menu", "platform-sys-dept" };
         var fields = new[] { "Id", "ApiEngineKey", "ApiAddress", "ApiRoutes" };
         var restoredRows = new List<JsonObject>();
         string? loginToken = null;
+        JsonNode? departmentTree = null;
+
+        async Task AssertDepartmentTree(HttpClient user, bool fallback)
+        {
+            foreach (var get in new[] { false, true })
+            {
+                // 原移动端不提供 Action；还要证明伪造写动作/用户不会改变可信部门树查询。
+                var result = await Send(user, "api/SysDept/GetSysDeptStep", new JsonObject
+                {
+                    ["FormEngineKey"] = "Sys_Dept", ["Action"] = "DelSysDept", ["IsDeleted"] = 1,
+                    ["_CurrentUser"] = new JsonObject { ["Id"] = "forged-user", ["Level"] = 9999 }
+                }, get);
+                Success(result.Body);
+                Assert.Equal(fallback, result.Route == "CompiledFallback");
+                Assert.IsType<JsonArray>(result.Body["Data"]);
+                Assert.True(JsonNode.DeepEquals(departmentTree, result.Body["Data"]),
+                    "Managed 与缺引擎兜底必须返回同一可信用户的原始 _Child 部门树。");
+            }
+        }
 
         async Task<JsonNode?> Form(string action, JsonObject data)
         {
@@ -58,8 +77,39 @@ public sealed class LegacyBootstrapRecoveryTests
             Success(initial.Body);
             loginToken = initial.Token;
             Assert.NotEqual("CompiledFallback", initial.Route);
+            var engineCode = await Send(admin, "api/V8Engine/GetApiEngineCode",
+                new JsonObject { ["ApiEngineKey"] = "platform-sys-dept" });
+            Success(engineCode.Body);
+            Assert.Contains("/api/SysDept/GetSysDeptStep", engineCode.Body["Data"]?["ApiRoutes"]?.ToString() ?? "");
+            using (var initialUser = Client(device, loginToken))
+            {
+                var baseline = await Send(initialUser, "apiengine/platform-sys-dept", new JsonObject { ["Action"] = "GetSysDeptStep" });
+                Success(baseline.Body);
+                departmentTree = baseline.Body["Data"]?.DeepClone();
+                Assert.NotEmpty(Assert.IsType<JsonArray>(departmentTree));
+                await AssertDepartmentTree(initialUser, fallback: false);
+            }
+            var anonymousDept = await Send(anonymous, "api/SysDept/GetSysDeptStep", new JsonObject());
+            Assert.NotEqual(1, anonymousDept.Body["Code"]!.GetValue<int>());
             var rows = Assert.IsType<JsonArray>(await Form("GetTableData", KeyQuery()));
             Assert.Equal(keys.Length, rows.Count);
+            var departmentId = rows.OfType<JsonObject>().Single(x => x["ApiEngineKey"]!.ToString() == "platform-sys-dept")["Id"]!.ToString();
+            // 配置存在但主动停用/禁 HTTP 必须失败，不能当作缺资源而降级绕过。
+            foreach (var control in new[] { "IsEnable", "StopHttp" })
+            {
+                var original = Assert.IsType<JsonObject>(await Form("GetFormData", new JsonObject
+                {
+                    ["Id"] = departmentId, ["_SelectFields"] = new JsonArray("Id", control)
+                }));
+                try
+                {
+                    await Form("UptFormData", new JsonObject { ["Id"] = departmentId, [control] = control == "IsEnable" ? 0 : 1 });
+                    var blocked = await Send(admin, "api/SysDept/GetSysDeptStep", new JsonObject());
+                    Assert.NotEqual(1, blocked.Body["Code"]!.GetValue<int>());
+                    Assert.NotEqual("CompiledFallback", blocked.Route);
+                }
+                finally { await Form("UptFormData", (JsonObject)original.DeepClone()); }
+            }
             foreach (var row in rows.OfType<JsonObject>())
             {
                 var original = (JsonObject)row.DeepClone();
@@ -83,6 +133,9 @@ public sealed class LegacyBootstrapRecoveryTests
             Assert.False(string.IsNullOrWhiteSpace(recovered.Token));
             loginToken = recovered.Token;
             using var recoveredUser = Client(device, loginToken);
+            await AssertDepartmentTree(recoveredUser, fallback: true);
+            var deniedDept = await Send(anonymous, "api/SysDept/GetSysDeptStep", new JsonObject());
+            Assert.NotEqual(1, deniedDept.Body["Code"]!.GetValue<int>());
             foreach (var route in new[] { "api/os/getDateTimeNow", "api/SysMenu/getSysMenuStep" })
             {
                 foreach (var get in new[] { false, true })
@@ -121,6 +174,8 @@ public sealed class LegacyBootstrapRecoveryTests
                 Success(managed.Body);
                 Assert.NotEqual("CompiledFallback", managed.Route);
                 loginToken = managed.Token;
+                using var restoredUser = Client(device, loginToken);
+                await AssertDepartmentTree(restoredUser, fallback: false);
             }
             if (!string.IsNullOrWhiteSpace(loginToken))
             {
@@ -139,6 +194,7 @@ public sealed class LegacyBootstrapRecoveryTests
         }) { BaseAddress = new Uri(Required("MICROI_TEST_API_BASE")), Timeout = TimeSpan.FromSeconds(90) };
         client.DefaultRequestHeaders.Add("osclient", Required("MICROI_TEST_OSCLIENT"));
         client.DefaultRequestHeaders.Add("did", device);
+        client.DefaultRequestHeaders.Add("apiengine", "0");
         if (!string.IsNullOrWhiteSpace(token)) client.DefaultRequestHeaders.Add("authorization", token);
         return client;
     }

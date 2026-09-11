@@ -11,6 +11,8 @@
   },
   "PackageTargets": [
     "Microi.Server/Microi.Upgrade/Resource/app.microi.saas-engine.json",
-    "Microi.Server/Microi.Upgrade/Resource/app.microi.store.json"
+    "Microi.Server/Microi.Upgrade/Resource/app.microi.store.json",
+    "Microi.Server/Microi.Upgrade/Resource/app.microi.message-notification.json",
+    "Microi.Server/Microi.Upgrade/Resource/app.microi.sys-log.json"
   ]
 }

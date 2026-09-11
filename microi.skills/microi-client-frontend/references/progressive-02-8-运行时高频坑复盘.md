@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-008 sha256=4824b3271515717979847b142c1cad88e468c5904d93b23950c59cc90b90c5a4 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-008 sha256=8c69ef00a2d46086848ea96273bb0d172fa1a2611be6bc5d5d5fe5721abdccaf -->
 ## 8. 运行时高频坑复盘
 
 ### 前端 V8.Http 与后端同构契约
@@ -147,7 +147,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - 修改后运行静态门禁，确认源码不存在内容型 `v-loading`、`ElLoading.service`、硬编码黑色 Loading mask 或加载期空态；再用真实浏览器验证菜单、首页、表格、表单详情在亮色、暗色、自定义主题和移动端下的骨架几何、对比度、`aria-busy`、reduced-motion 及请求失败收口。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-009 sha256=11a3c4fd1667c1309832387d79dd98ca14b64d8c60b5a54c0b8ac4237e22d0e4 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-009 sha256=aec6ac1daf1566f4893c86ab0b12a17dcd156b0f46fa81a7ca387ca59f13fe17 -->
 ## 7.1 登录验证码与 Sys_Config
 
 修改 `Microi.Client/src/views/login/index.vue` 或任何 PC 端登录扩展时，必须遵守平台登录验证码契约：

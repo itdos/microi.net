@@ -1,11 +1,21 @@
 ---
 name: message-notification
-description: 设计、实现、迁移和验收 Microi 多通道消息通知。用于涉及 wx_tpl_msg、mic_msgset、mic_msg_event_log、微信公众号或服务号模板消息、小程序跳转、短信、邮件、平台内部通知、V8.Notification、通知中心 SignalR、msg_event、消息幂等或通知应用商城交付的任务。
+description: 设计、实现、迁移和验收 Microi 多通道消息通知与平台提醒。用于平台提醒、SaaS 系统提醒、试用到期、维护公告、定时弹窗、官方版本提醒、wx_tpl_msg、mic_msgset、mic_msg_event_log、公众号模板消息、短信、邮件、V8.Notification、SignalR、msg_event、消息幂等或通知应用商城交付。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi 消息通知
+
+## 统一配置入口与 MCP
+
+- 安装同一个 `app.microi.message-notification` 应用后，统一从“系统引擎 → 消息通知”进入系统公告、业务通知与投递记录。禁止再建独立“系统提醒”应用或向 SaaS 表单添加入口。旧 `/xiaoxitongzhisz` 配置并入业务通知，原 `mic_msgset` 和历史数据保留。
+- 先用当前用户自己的 MCP 调用 `microi_get_notification_context`，读取 `Capabilities / BusinessRules / BusinessRule / Reminders / Reminder / Recipients / Templates / Adapters / Logs / History`。`Adapters` 按关键词分页发现本租户已启用的接口 Key，不读取源码或密钥。用户和角色只在当前租户读取，跨租户/产品版本仅选择 `AllAccounts / SuperAdmins`，不得读取其它服务器角色。
+- `microi_configure_business_notification` 的 `Validate` 不写入、不发送；`Save` 写原通知表，通过固定 `platform-message-notification-config` 接口编排。确认串为 `Save:<id或Key>`；修改必须传 `expectedRevision`，不能把密钥写进 `ChannelApiEngineMap`。
+- `microi_manage_system_reminder` 提供 `Validate / Save / Publish / Withdraw`，确认串为 `<action>:<id或requestId>`。保存仅草稿；发布前核对用户已经授权的具体内容、范围与时间。保存/发布使用稳定 `requestId`，编辑/发布/撤回传最新 `expectedRevision`，超时先按原 Id/Key 回读，禁止换请求标识盲目新建。
+- `AccountScope` 在本租户 `Users` 默认 `AllAccounts`，在 `Tenants / Editions` 默认 `SuperAdmins`；不要让已指定的普通帐号被默认管理员筛选误排除。用户显式指定的帐号范围优先。
+- 配置接口只管理原表、校验引用和读取脱敏投递记录；实际发送继续调用 `msg_event`。`ConfigRevision` 缺省按 0 兼容旧记录，更新使用同事务条件写，失败不能覆盖别人修改。停用旧配置允许保留失效引用，再启用时重新核验。
+- MCP 缺少上述工具时优先更新本机插件/CLI；当前宿主未重载可复用已有 `microi_run_engine` 调用同一固定接口，不另建临时维护引擎或绕过授权。明确区分本机工具打包成功与用户渠道已发布。
 
 ## 目标
 
@@ -114,6 +124,23 @@ await V8.Notification.MarkRead({ All: true });
 `platform-chat-runtime` 必须保持 `StopHttp=1`、`AllowAnonymous=0`。SignalR Hub 在 DiyToken 与租户核验后，通过宿主一次性可信协议作用域调用，并携带宿主生成的权威当前用户快照；V8 对 `_InvokeType=Client` 的调用必须先执行 `V8.Method.RequireManagedProtocolContext()` 原子消费。不得为修复 Hub 误报“禁止 HTTP 调用”而开放 `StopHttp`，也不得接受 Param 中的信任布尔值、用户或租户覆盖；接口引擎内部 `Server` 嵌套调用保持原有语义。
 
 租户个性化仅写入 `platform-message-notification-custom-hook`（`CreateIfMissing`），默认正文必须精确为 `return { Code : 1 };`。运行时在 `BeforeChatRuntime / AfterChatRuntime` 调用 Hook：Before 失败在 Mongo 写前阻断，After 失败只告警。Hook 只接收 `Stage`、`SourceApiEngineKey`、`Action`、`ActorUserId`、`PeerUserId`、`MessageId`、`MessageType`；正文、头像、OpenId、Token 与其它秘密不得进入租户扩展。三项接口的源码顶部都要保留官方恢复/租户不覆盖提示，并在包合同测试中逐字核对独立源码、包内副本、所有权策略和 HTTP/匿名开关。
+
+## 平台提醒的使用与交付
+
+- 居中可关闭的公告、试用到期与定时提醒统一从“系统引擎 → 消息通知 → 系统公告”配置，使用 `platform-reminder-runtime` 和内置 `microi-platform-service` 的 `/platform-reminders` 页面。在同一页面选择单个、多个或全部租户及用户；不得再向 SaaS 引擎添加提醒按钮、提醒 Tab 或嵌入组件，也不得改为 `TableChild` 或在 V8 中拼接复杂 HTML。
+- 四张表分别是 `mci_platform_reminder` 草稿、`mci_platform_reminder_batch` 发布快照、`mci_platform_reminder_target` 接收映射和 `mci_platform_reminder_receipt` 关闭回执。普通客户端不能直接写表。保存草稿不发送；版本条件更新、批次稳定主键、接收映射与状态修改必须共享 `V8.DbTrans`，不要混用独立 `V8.Db.FromSql` 写入。
+- `Users` 面向当前租户用户，`Tenants` 仅允许主租户选择当前环境和网络的启用子租户，`Editions` 仅由宿主现有 License 发放判断确定官方身份。官方选项需明确选择 `OpenSource / Personal / Enterprise`，不得默认给全部版本发送。请求中的用户、租户、官方标志和产品版本不构成授权。
+- 试用提醒只绑定一个子租户，配置到期时间和提前分钟数，不改 License。所有提醒都必须有有效结束时间，支持 `Once / EveryEntry / AfterServerRestart`；定时支持一次、每日、每周和分钟间隔。每日/每周是固定时间间隔；时间传 UTC，界面显示浏览器时区；恢复上线不补弹所有历史周期。
+- 后端三个 Managed Key 为 `platform-reminder-runtime / platform-reminder-official-feed / platform-reminder-tick`。运行时动作包括 `Capabilities / Recipients / List / Get / Validate / Save / Publish / Withdraw / History / Inbox / Presented / Acknowledge`。发布需草稿 Id、`ExpectedRevision` 和稳定 `RequestId`；每次进入模式的收件箱和回执需稳定的本页面 `EntryId`。
+- `AccountScope=SuperAdmins` 由接收服务的真实 DiyToken、数据库用户和有效本地角色核验；`AllAccounts` 面向全部帐号。缺省字段保留旧公告的全部帐号语义；新 UI 和 MCP 的跨租户/版本默认范围为超级管理员。普通服务器不能伪造官方 License 发放身份。
+- `AfterServerRestart` 用可信后端进程启动标识和主租户当前运行分区的共享 Redis 最新批次计算 occurrence，`Presented` 按数据库稳定回执主键抢占领取资格；同帐号多页面只有一个领取，刷新和重新登录不再次弹出。展示成功前回执应已持久化；响应丢失以同一个页面 `EntryId` 恢复，不以 localStorage 作为事实源。`ShownAt` 与 `ClosedAt` 分离，当前已领取弹窗需保留到关闭、撤回或过期。
+- 超级管理员范围和重启频率的最低接收协议为 2；官方 feed 必须对协议 1 隐去此类公告，接收端出缓存后再次按当前身份裁剪。未知范围、异常协议或无法核验的启动批次失败关闭。重启频率不能再叠加周期计划；多节点滚动发布采用共享最新启动批次，验证负载切换不回退、不重复。
+- 定时任务 `platform-reminder-tick` 每分钟只发送唤醒信号；权威计划与回执保存在数据库。前端监听 `ReceivePlatformReminder` 后回读，SignalR 正常约 60 秒对账、断线约 15 秒轮询并对错误退避；关闭失败重试、撤回和过期收回，禁止使用本机定时器或 localStorage 作为已读事实源。
+- 跨服务器官方源由 `Microi.net` 固定请求 `api.itdos.com`，不允许任意 URL/重定向、不发送用户或密钥，按真实本地 License 筛选并缓存；官方源降级不得阻断本地提醒。匿名 feed 只暴露已发布的版本公告，不可读草稿、租户目标或回执。
+- 官方“消息通知”包单一拥有配置接口 `platform-message-notification-config`、三个提醒接口、四表六索引、统一菜单、每分钟任务与当前内置微服务产物；SaaS 包同步统一菜单、基础空库结构和旧布局退役声明。先更新支持 `DiyFieldRetirements` 的商城，再安装新版 SaaS 包，清理旧入口且保留业务数据。商城包的内置微服务版本需同步。导出母版可能不带物理索引，按已验证 Manifest 补独立 `CREATE INDEX`，由安装器幂等检查；禁止发布测试提醒、真实接收人或回执数据。
+- 共享微服务发布闭包还包含独立“系统日志/监控”包，不能只核对 SaaS、商城和消息通知。先读取相关商城选择清单与实际包，确认 `microi-platform-service` 的所有携带者；按 `platform-service-release.json` 校验同一版本、构建字节与路由。监控包从 `system-observability-package-source.json` 和当前共享运行包经 `configure-system-observability-package.mjs` 再生成，元数据变化要先合并官方母版并升独立包版本。发布前验证各包，安装全部平台应用后再验消息通知页面，避免后安装的旧运行包覆盖新页面；不能通过修改安装器的 Managed 覆盖语义规避。
+- MCP 复用 `microi_get_db_schema / microi_generate_system / microi_admin_table_data / microi_save_engine_code / microi_run_engine`，以及在线应用发现、源码同步和流式发布工具；入口调整使用 `microi_update_module / microi_update_table / microi_delete_field`，写后回读确认不存在旧入口。
+- 源码升级与应用安装缺一不可。验收覆盖正式 SDK 的 JSON 字符串响应、居中/拖动/关闭、每次刷新、单/多/全租户入口、权限隔离、重复发布、事务失败、到点/过期、断线轮询；多节点与实际其它服务器需要独立集成证据，不能由单机或模型测试替代。
 
 ## 最低验收
 

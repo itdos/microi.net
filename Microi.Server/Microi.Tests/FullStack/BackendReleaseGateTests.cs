@@ -17,6 +17,26 @@ public sealed class BackendReleaseGateCollection
 [Trait("Category", "FullStack")]
 public class BackendReleaseGateTests
 {
+    [Theory]
+    [InlineData("GET")]
+    [InlineData("HEAD")]
+    [Trait("Suite", "MicroAppProtocol")]
+    public async Task MicroAppOriginlessProbe_PreservesCorsCachePartition(string method)
+    {
+        var settings = ReleaseGateSettings.FromEnvironment();
+        using var client = settings.CreateClient();
+        // A missing resource exercises the real MVC/tenant pipeline without
+        // creating an application or relying on a particular fixture package.
+        // Error responses can be cached too and must use the same Origin key.
+        using var request = new HttpRequestMessage(new HttpMethod(method),
+            $"micro-app/{Uri.EscapeDataString(settings.OsClient)}/release-gate-missing-{Guid.NewGuid():N}/index.html");
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Contains(response.Headers.Vary, value => value.Equals("Origin", StringComparison.OrdinalIgnoreCase));
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Credentials"));
+    }
+
     [Fact]
     [Trait("Suite", "TenantSmoke")]
     public async Task AuthenticatedTenantSmoke_ValidatesHealthConfigurationAndFormEngineReads()

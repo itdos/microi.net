@@ -42,6 +42,7 @@ for(const scenario of [
  {name:'failed full tests prevent platform publication',backend:true,client:false,exit:19,passed:false,called:true},
  {name:'successful full tests allow platform publication',backend:true,client:false,exit:0,passed:true,called:true},
  {name:'frontend publication also requires full tests',backend:false,client:true,exit:19,passed:false,called:true},
+ {name:'prebuilt Docker push cannot bypass failed tests',backend:false,client:false,docker:true,exit:19,passed:false,called:true},
  {name:'documentation-only work avoids the backend gate',backend:false,client:false,exit:19,passed:true,called:false}
 ])test(scenario.name,()=>{
  const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',input:`
@@ -52,6 +53,7 @@ pwsh(){ printf 'TEST_ARGUMENTS=%s\\n' "$*"; return ${scenario.exit}; }
 node(){ printf 'CANDIDATE_ARGUMENTS=%s\\n' "$*"; return 0; }
 PUBLISH_BACKEND=${scenario.backend}
 BUILD_CLIENT=${scenario.client}
+PLATFORM_DOCKER_SELECTED=${scenario.docker||false}
 ${gate}
 printf 'PUBLICATION_REACHED\\n'
 `});
@@ -60,6 +62,16 @@ printf 'PUBLICATION_REACHED\\n'
  assert.equal(result.stdout.includes('PUBLICATION_REACHED'),scenario.passed);
  assert.equal(result.stdout.includes('TEST_ARGUMENTS='),scenario.called);
  if(scenario.called)assert.match(result.stdout,/-Mode Full -Configuration Release/);
+});
+
+test('prebuilt artifacts require Full source provenance and are rechecked before every push',()=>{
+ assert.match(source,/PLATFORM_DOCKER_SELECTED=true/);
+ const start=source.indexOf('docker_push_plan() {'),end=source.indexOf('if [ ${#SELECTED_API_PLANS',start);
+ const push=source.slice(start,end);
+ assert.match(push,/local receipt_mode=verify/);
+ assert.match(push,/release-artifact\.mjs "\$receipt_mode"/);
+ assert.ok(push.lastIndexOf('release-artifact.mjs verify')<push.lastIndexOf('docker push'));
+ assert.match(push,/release-artifact\.mjs verify[\s\S]*?print_fail/);
 });
 
 for(const mode of ['capture','verify'])test(`candidate ${mode} failure prevents publication`,()=>{

@@ -586,7 +586,7 @@ export function buildGenerateSystemValidationPayload(
   validation: ApiResponse,
 ): JsonRecord {
   return {
-    ok: validation.Code === 1,
+    ok: validation.Code === 1 && asRecord(validation.Data).Passed !== false,
     results,
     validation: {
       Code: validation.Code,
@@ -1509,6 +1509,12 @@ export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: strin
     const name = getString(table, 'name', 'Name');
     if (!name) errors.push(`tables[${tableIndex}].name 不能为空`);
     validateTableV8Limit(table, `tables[${tableIndex}]`, errors, warnings);
+    const readPrimary = getValue(table, 'readPrimary', 'ReadPrimary');
+    if (readPrimary !== undefined && readPrimary !== null && readPrimary !== 0 && readPrimary !== 1)
+      errors.push(`tables[${tableIndex}].readPrimary 必须是 null、0 或 1`);
+    if (Object.hasOwn(table, 'readPrimary') && Object.hasOwn(table, 'ReadPrimary')
+        && table.readPrimary !== table.ReadPrimary)
+      errors.push(`tables[${tableIndex}].readPrimary 与 ReadPrimary 不一致`);
     plan.push(`create_table ${name || `(index ${tableIndex})`}`);
     const layout = buildDefaultTableLayout(table);
     if (layout.tabs?.length) {
@@ -1553,10 +1559,21 @@ export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: strin
     });
     const indexableFields = new Set(
       getArray(table, 'fields', 'Fields')
+        // TableChild/布局控件只有元数据。DevComponent显式绑定物理类型时例外，
+        // 与后端IsNotRealDataField的兼容语义保持一致。
+        .filter((field) => {
+          const component = tableFieldComponent(field);
+          const virtual = ['opentable', 'phonesms', 'tablechild', 'button', 'divider',
+            'collapsegroup', 'tabs', 'alert', 'statictext', 'html'];
+          return !virtual.includes(component)
+            && (component !== 'devcomponent' || !!getString(field, 'type', 'Type'));
+        })
         .map((field) => getString(field, 'name', 'Name').toLowerCase())
         .filter(Boolean),
     );
-    ['id', 'createtime', 'updatetime', 'createuser', 'osclient'].forEach((field) => indexableFields.add(field));
+    // 固定物理列必须与后端 DiyCommon.FixedDiyField 一致。独立租户库不自动
+    // 创建 OsClient；把路由参数当物理列会使本地计划通过、远端建索引失败。
+    ['id', 'createtime', 'updatetime', 'userid', 'username', 'isdeleted'].forEach((field) => indexableFields.add(field));
     getArray(table, 'indexes', 'Indexes').forEach((index, indexPosition) => {
       const columns = getStringArray(index, 'columns', 'Columns');
       if (!columns.length) {
@@ -2076,11 +2093,17 @@ function bannerDescriptorArray(value: unknown): unknown[] {
   return jsonArrayOrSplit(value);
 }
 
-/**
- * Build the semantic diy_table Banner patch used by Manifest generation.
- * Explicit arrays win (including []); otherwise business field types supply a
- * stable, useful first rendering for new modules and old databases alike.
- */
+/** 字符串空值是设计者明确关闭字段；省略/null 才允许兼容推断，不能被旧大小写别名覆盖。 */
+function configuredBannerField(source: JsonRecord, keys: string[], fallback: () => string): string {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(source, key) && typeof source[key] === 'string') {
+      return String(source[key]).trim();
+    }
+  }
+  return fallback();
+}
+
+/** 生成 diy_table 的 Banner 语义配置；保留显式空字段与空数组，只有未选择时按真实字段推断。 */
 export function buildDefaultFormBanner(table: JsonRecord): JsonRecord {
   const fields = getArray(table, 'fields', 'Fields').filter((field) => {
     const name = getString(field, 'name', 'Name');
@@ -2098,23 +2121,23 @@ export function buildDefaultFormBanner(table: JsonRecord): JsonRecord {
     .sort((left, right) => right.score - left.score || left.index - right.index)
     .map((item) => item.field);
 
-  const titleField = getString(explicit, 'titleField', 'TitleField') || getString(ranked((field, index) => {
+  const titleField = configuredBannerField(explicit, ['titleField', 'TitleField'], () => getString(ranked((field, index) => {
     let score = bannerFieldScore(field, ['title', 'name', 'subject', 'code', 'no', 'number', '标题', '名称', '主题', '编号', '单号', '编码'], 20 - index);
     if (tableFieldComponent(field) === 'autonumber') score += 50;
     else if (tableFieldComponent(field) === 'text') score += 20;
     if (FORM_BANNER_TAG_COMPONENTS.has(tableFieldComponent(field)) || isBannerNumericField(field)) score -= 80;
     return score;
-  })[0] || {}, 'name', 'Name');
-  const subtitleField = getString(explicit, 'subtitleField', 'SubtitleField') || getString(ranked((field, index) => {
+  })[0] || {}, 'name', 'Name'));
+  const subtitleField = configuredBannerField(explicit, ['subtitleField', 'SubtitleField'], () => getString(ranked((field, index) => {
     const name = getString(field, 'name', 'Name');
     if (name === titleField || isBannerNumericField(field) || tableFieldComponent(field) === 'imgupload') return 0;
     return bannerFieldScore(field, [
       'subtitle', 'customer', 'client', 'project', 'company', 'category', 'type', 'date', 'contact',
       '副标题', '客户', '项目', '公司', '单位', '分类', '类型', '日期', '联系人', '说明',
     ], 12 - index) + (['text', 'select', 'radio', 'datetime', 'department', 'selecttree'].includes(tableFieldComponent(field)) ? 18 : 0);
-  })[0] || {}, 'name', 'Name');
-  const imageField = getString(explicit, 'imageField', 'ImageField')
-    || getString(fields.find((field) => ['imgupload', 'imageupload'].includes(tableFieldComponent(field))) || {}, 'name', 'Name');
+  })[0] || {}, 'name', 'Name'));
+  const imageField = configuredBannerField(explicit, ['imageField', 'ImageField'], () =>
+    getString(fields.find((field) => ['imgupload', 'imageupload'].includes(tableFieldComponent(field))) || {}, 'name', 'Name'));
 
   const tagValue = getValue(explicit, 'tagFields', 'TagFields', 'tags', 'Tags');
   const tags = tagValue !== undefined
@@ -2153,7 +2176,7 @@ export function buildDefaultFormBanner(table: JsonRecord): JsonRecord {
     FormBannerSubtitleField: subtitleField,
     FormBannerImageField: imageField,
     FormBannerIcon: getString(explicit, 'icon', 'Icon') || 'far fa-file-alt',
-    FormBannerBackgroundField: getString(explicit, 'backgroundField', 'BackgroundField'),
+    FormBannerBackgroundField: configuredBannerField(explicit, ['backgroundField', 'BackgroundField'], () => ''),
     FormBannerTagFields: JSON.stringify(tags),
   };
   const hasChildRelation = fields.some((field) => tableFieldComponent(field) === 'tablechild'
@@ -2164,6 +2187,57 @@ export function buildDefaultFormBanner(table: JsonRecord): JsonRecord {
     result.FormBannerMetrics = JSON.stringify(metrics);
   }
   return result;
+}
+
+/**
+ * 旧后端可能忽略尚未升级的 Banner 物理列，而基础结构验收仍返回 Passed。
+ * 只读核对生成器实际写入的语义字段，不安装、不改数据库，也不掩盖服务端原错误。
+ */
+async function validateSystemWithBanner(client: MicroiClient, manifest: JsonRecord): Promise<ApiResponse> {
+  const validation = await client.validateLowCodeSystem(manifest);
+  if (validation.Code !== 1) return validation;
+  const data = asRecord(validation.Data);
+  const errors: unknown[] = Array.isArray(data.Errors) ? [...data.Errors] : [];
+  const tables = getArray(manifest, 'tables', 'Tables');
+  // 每批有界，使用实际表名条件；不能以未筛选或分页截断的回读证明配置存在。
+  for (let offset = 0; offset < tables.length; offset += 100) {
+    const batch = tables.slice(offset, offset + 100).map(table => ({
+      name: getString(table, 'name', 'Name'), patch: {
+        ...buildDefaultFormBanner(table),
+        ...(getValue(table, 'readPrimary', 'ReadPrimary') !== undefined
+          ? { ReadPrimary: getValue(table, 'readPrimary', 'ReadPrimary') } : {}),
+      },
+    }));
+    const fields = [...new Set(batch.flatMap(item => Object.keys(item.patch)))];
+    let rows: JsonRecord[];
+    try {
+      const readback = await client.getTableData('diy_table', {
+        _Where: [['Name', 'In', batch.map(item => item.name)]],
+        _SelectFields: ['Id', 'Name', ...fields], _PageIndex: 1, _PageSize: batch.length + 1,
+      });
+      if (readback.Code !== 1) throw new Error('readback');
+      rows = unwrapList(readback.Data);
+    } catch {
+      errors.push('表单 Banner 回读失败；请检查平台升级与元数据读取权限，再重新验收。');
+      continue;
+    }
+    for (const item of batch) {
+      const matched = rows.filter(row => getString(row, 'Name').toLowerCase() === item.name.toLowerCase());
+      if (matched.length !== 1) {
+        errors.push(`表 ${item.name} 的 Banner 元数据应唯一，回读数量为 ${matched.length}。`);
+        continue;
+      }
+      const saved = matched[0];
+      const mismatch = Object.entries(item.patch).filter(([key, value]) =>
+        !Object.hasOwn(saved, key) || String(saved[key] ?? '') !== String(value ?? ''));
+      if (mismatch.length) errors.push(`表 ${item.name} 的 Banner 配置回读不一致：${mismatch.map(([key]) => key).join(', ')}；缺少物理字段时需先完成平台升级，再配置和验收。`);
+    }
+  }
+  if (errors.length || data.Passed === false) return {
+    ...validation, Code: 0, Msg: validation.Msg || '低代码系统配置验收未通过',
+    Data: { ...data, Passed: false, Errors: errors },
+  };
+  return validation;
 }
 
 function parseConfigRecord(value: unknown): JsonRecord {
@@ -2272,12 +2346,19 @@ export function validateManifestFieldRelations(manifest: JsonRecord): { errors: 
           }
         }
       }
+      // 索引匹配真实隔离方式：显式声明租户列的共享表使用租户+外键，
+      // 默认独立租户库使用外键。不能为了满足计划要求让应用虚构租户列。
+      const childIndexPrefix = targetFieldNames.has('osclient')
+        ? ['osclient', normalizeKey(relation.childForeignKey)]
+        : [normalizeKey(relation.childForeignKey)];
       const indexMatches = getArray(targetTable, 'indexes', 'Indexes').some((index) => {
         const columns = getStringArray(index, 'columns', 'Columns').map(normalizeKey);
-        return columns.length >= 2 && columns[0] === 'osclient' && columns[1] === normalizeKey(relation.childForeignKey);
+        return childIndexPrefix.every((column, position) => columns[position] === column);
       });
       if (relation.childForeignKey && !indexMatches) {
-        errors.push(`${path} 的子表 ${relation.targetTable} 必须声明以 (OsClient, ${relation.childForeignKey}) 开头的组合索引`);
+        const displayPrefix = targetFieldNames.has('osclient')
+          ? `OsClient, ${relation.childForeignKey}` : relation.childForeignKey;
+        errors.push(`${path} 的子表 ${relation.targetTable} 必须声明以 (${displayPrefix}) 开头的索引`);
       }
     });
   });
@@ -2552,6 +2633,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
         name: 'Biz_Order',
         description: 'Order main table',
         v8Limit: false,
+        readPrimary: null,
         tabs: [{ Id: 'basic', Name: 'Basic Info', Sort: 10 }, { Id: 'business', Name: 'Business Info', Sort: 20 }],
         formBanner: {
           enabled: true,
@@ -2574,8 +2656,8 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
           { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', tab: 'business', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, tableWidth: 130, sort: 50 },
         ],
         indexes: [
-          { name: 'uk_biz_order_osclient_orderno', columns: ['OsClient', 'OrderNo'], unique: true, purpose: 'Tenant-scoped order number invariant' },
-          { name: 'idx_biz_order_osclient_status_createtime', columns: ['OsClient', 'Status', 'CreateTime'], unique: false, purpose: 'Status list ordered by creation time' },
+          { name: 'uk_biz_order_no', columns: ['OrderNo'], unique: true, purpose: '独立租户库内订单号唯一；共享表须显式声明并校验租户物理列' },
+          { name: 'ix_biz_order_status_time', columns: ['Status', 'CreateTime'], unique: false, purpose: '按状态及创建时间查询' },
         ],
       }],
       engines: [
@@ -2721,19 +2803,20 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
           relation: { cardinality: '1:N', targetTable: 'Biz_OrderItem', childForeignKey: 'OrderId', childModule: 'Order Items (hidden)', primaryTableFieldName: 'Id' },
         },
         childForeignKeyField: { name: 'OrderId', label: 'Order Id', type: 'varchar(50)', component: 'Text', visible: 0, appVisible: 0 },
-        childIndex: { name: 'idx_biz_orderitem_osclient_orderid', columns: ['OsClient', 'OrderId'], unique: false },
+        childIndex: { name: 'ix_biz_orderitem_order', columns: ['OrderId'], unique: false },
         hiddenChildModule: { name: 'Order Items (hidden)', table: 'Biz_OrderItem', display: 0, appDisplay: 0, hasChild: 0 },
       },
     },
     naturalFieldKeys: {
       tables: {
         tabs: 'diy_table.Tabs form groups. When omitted and the table has more than 12 business fields, generator creates Basic/Contact/Business/Attachment/Extra tabs and assigns empty field tab values.',
-        formBanner: 'Semantic diy_table Banner configuration. Configure enabled/titleField/subtitleField/imageField/icon/backgroundField/tagFields/metrics here, never in sys_menu. The default Banner uses a compact theme-colored dark gradient. When omitted, generator writes useful type-aware defaults: title/name/code, customer/project subtitle, first ImgUpload, up to 3 option tags and up to 3 business-semantic metrics. Id/sort/enabled/status/version/page-load numbers are never metrics. A TableChild form may leave metrics unset so runtime performs authorized full-child count/SUM inference. Metrics may also use ApiEngineKey + ValuePath + ParamMap + RefreshSeconds.',
+        formBanner: 'diy_table 的 Banner 语义配置，使用 enabled/titleField/subtitleField/imageField/icon/backgroundField/tagFields/metrics，不写 sys_menu。省略时按真实类型推断业务标题、客户或项目副标题、首个图片、最多3个标签和3个业务指标。字段绑定显式空字符串表示不绑定，省略/null 才允许推断；空字符串优先于旧大小写别名。Id/排序/启用/状态/版本/本页数量不得充当指标。TableChild 可省略 metrics，由运行时按完整授权子表统计；显式 [] 关闭推断。跨表指标支持 ApiEngineKey + ValuePath + ParamMap + RefreshSeconds。',
         column: 'Form column count. Omit to use 2 columns for generated systems unless the user asks for a single-column form.',
         formOpenType: 'Default Dialog. Use Drawer only for extremely large forms (roughly 36+ business fields, 2+ child tables, or similarly heavy content).',
         formOpenWidth: 'Default 80% for generated Dialog forms. Preserve an explicit business-specific width.',
-        indexes: 'Physical database indexes. Declare ordered columns and unique. Required indexes must be created by microi_create_table_index or manifest generation, never by ad-hoc SQL. Tenant tables should usually lead with OsClient.',
+        indexes: '物理索引按columns顺序及unique声明，通过microi_create_table_index或Manifest创建。独立租户库不自动创建OsClient列，子表索引以真实外键开头；只有显式声明OsClient物理列的共享表才以OsClient+外键开头。固定列为Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted，TableChild与布局控件不能索引。',
         v8Limit: 'Default false. Missing/null/false means no per-execution Jint budgets; true enables timeout, statement, recursion and allocation limits for this table\'s backend V8 events. Legacy v8Unlimited is accepted only as an inverted compatibility alias.',
+        readPrimary: 'null/0 keeps the existing read replica default; 1 routes native rows/count/sum/tree/export to this table database writer. Omit to preserve existing metadata. Explicit DbTrans remains unchanged and may retain an older RR snapshot. Requires the backend capability and official form-engine ReadPrimary field.',
       },
       engines: {
         v8Limit: 'Default false. false means no Jint per-execution budget; true applies this engine\'s configured timeout, statement, allocation and recursion limits. Omit to preserve an existing engine setting during upsert.',
@@ -2768,7 +2851,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
     rules: [
       'Use table and field names in manifests; do not ask the user for diy_field ids.',
       'Every generated business table must have a useful compact theme-colored dark-gradient form Banner. Put its configuration in tables[].formBanner/diy_table, not in modules/sys_menu. Prefer a business number/name title, a customer/project subtitle, real option tags and at most 3 business-semantic current-record or authorized full-child metrics; exclude technical numbers and never fabricate statistics.',
-      'JoinForm is only for 1:1/N:1 and must target a different table through a real parent Id field. Use TableChild for every 1:N collection; declare its child table, child foreign key, hidden child module and (OsClient, foreignKey) index. The generator rejects raw or unresolved relation Config.',
+      'JoinForm只用于1:1/N:1，通过真实父表Id字段引用不同表。1:N使用TableChild，声明子表、真实外键、隐藏子菜单及外键索引；共享表显式含OsClient物理列时改为(OsClient,foreignKey)索引。不得虚构租户列或传未解析的Config。',
       'Put business logic in API engines and call them from menu button V8Code.',
       'For workflow manifests, include exactly one start node, at least one end node, valid FromNodeId/ToNodeId lines, and stable LineName values in the form "{from node} 到 {to node}".',
       'For multi-route workflow nodes, generate LineValueV8 with the visual condition marker and prefer assigning V8.NextNodeId; then call microi_check_workflow_package and microi_test_workflow_condition before microi_save_workflow_package.',
@@ -2879,7 +2962,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
             warnings: plan.warnings,
           }, null, 2), true);
         }
-        const result = await client.validateLowCodeSystem(manifest);
+        const result = await validateSystemWithBanner(client, manifest);
         return apiText('Low-Code System Validation', result);
       } catch (error) {
         return textResult(`Error: ${error instanceof Error ? error.message : String(error)}`, true);
@@ -2957,6 +3040,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
           const response = await client.createTable(tableName, getString(table, 'description', 'Description'), {
             Tabs: stringifyConfig(table.tabs ?? table.Tabs ?? tableLayout.tabs),
             IsTree: getNumber(table, 'isTree', 'IsTree'),
+            ReadPrimary: getValue(table, 'readPrimary', 'ReadPrimary') as number | null | undefined,
             Column: getNumber(table, 'column', 'Column') ?? tableLayout.column ?? 2,
             FormOpenType: formOpen.type,
             FormOpenWidth: formOpen.width,
@@ -3236,7 +3320,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
           if (response.Code !== 1) return textResult(JSON.stringify({ ok: false, failedAt: 'saveJob', job: payload, response, results }, null, 2), true);
         }
 
-        const validation = await client.validateLowCodeSystem(manifest);
+        const validation = await validateSystemWithBanner(client, manifest);
         await audit(client, 'microi_generate_system:finish', getString(manifest, 'name', 'Name') || 'manifest', { results, validation });
         // Keep the complete validation envelope. Persisted rollout recovery
         // evidence must retain Code/Msg so a validator-only compatibility path

@@ -59,11 +59,7 @@ export declare function buildPlan(manifest: JsonRecord): {
     errors: string[];
     warnings: string[];
 };
-/**
- * Build the semantic diy_table Banner patch used by Manifest generation.
- * Explicit arrays win (including []); otherwise business field types supply a
- * stable, useful first rendering for new modules and old databases alike.
- */
+/** 生成 diy_table 的 Banner 语义配置；保留显式空字段与空数组，只有未选择时按真实字段推断。 */
 export declare function buildDefaultFormBanner(table: JsonRecord): JsonRecord;
 /**
  * Validate the portable relation contract before any Manifest write occurs.

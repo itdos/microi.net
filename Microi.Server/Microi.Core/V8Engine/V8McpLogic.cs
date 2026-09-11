@@ -1018,12 +1018,15 @@ namespace Microi.net
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 var hasResponseTypeColumn = SysApiEngineHasColumn(osClient, "ResponseType");
+                var hasApiRoutesColumn = SysApiEngineHasColumn(osClient, ApiEngineRouteAliases.MultiRouteFieldName);
                 var selectFields = new List<string> { "ApiEngineKey", "ApiV8Code", "UpdateTime" };
                 if (hasVersionColumn) selectFields.Add("Version");
                 if (hasChangeHistoryColumn) selectFields.Add("ChangeHistory");
                 if (hasV8LimitColumn) selectFields.Add("V8Limit");
                 if (hasV8UnlimitedColumn) selectFields.Add("V8Unlimited");
                 if (hasResponseTypeColumn) selectFields.Add("ResponseType");
+                // MCP 保存多路由后依赖同一读接口校验，不能只写入而在源码回读中丢弃别名。
+                if (hasApiRoutesColumn) selectFields.Add(ApiEngineRouteAliases.MultiRouteFieldName);
                 var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
@@ -1052,6 +1055,7 @@ namespace Microi.net
                         V8Limit = v8Limit,
                         V8Unlimited = v8Limit == 0 ? 1 : 0,
                         ResponseType = hasResponseTypeColumn ? SafeJString(row, "ResponseType") : "JSON",
+                        ApiRoutes = hasApiRoutesColumn ? SafeJString(row, ApiEngineRouteAliases.MultiRouteFieldName) : "",
                         ApiV8Code = apiV8Code,
                         Version = hasVersionColumn ? SafeJString(row, "Version") : "",
                         ChangeHistory = hasChangeHistoryColumn ? SafeJString(row, "ChangeHistory") : "",
@@ -7841,6 +7845,29 @@ namespace Microi.net
             {
                 if (patch == null) return new DosResult<object>(0, null, "patch 不能为空");
                 patch = (JObject)patch.DeepClone();
+                var readPrimaryProperties = patch.Properties().Where(p =>
+                    string.Equals(p.Name, "ReadPrimary", StringComparison.OrdinalIgnoreCase)).ToList();
+                if (readPrimaryProperties.Count > 1)
+                    return new DosResult<object>(0, null, "ReadPrimary 不能重复提供不同大小写的字段。");
+                var readPrimaryProperty = readPrimaryProperties.FirstOrDefault();
+                int? requestedReadPrimary = null;
+                if (readPrimaryProperty != null)
+                {
+                    requestedReadPrimary = FormEngineReadPolicy.ParseReadPrimary(readPrimaryProperty.Value);
+                    if (!DiyTableHasColumn(osClient, "ReadPrimary"))
+                        return new DosResult<object>(0, null,
+                            "当前平台尚未安装 diy_table.ReadPrimary 字段，请先升级后端与表单引擎应用。");
+                    // 只写物理列而缺少 diy_field 会被普通表单保存忽略，必须先验证正式包元数据。
+                    var metadataDb = OsClientExtend.GetClient(osClient)?.Db;
+                    var tableMetadata = metadataDb?.From<DiyTable>()
+                        .Where(t => t.Name == "diy_table" && t.IsDeleted != 1).First();
+                    if (tableMetadata == null || metadataDb.From<DiyField>()
+                        .Where(f => f.TableId == tableMetadata.Id && f.Name == "ReadPrimary" && f.IsDeleted != 1).Count() != 1)
+                        return new DosResult<object>(0, null, "表单引擎 ReadPrimary 字段定义缺失或不唯一，请更新正式应用。");
+                    readPrimaryProperty.Remove();
+                    patch["ReadPrimary"] = requestedReadPrimary.HasValue
+                        ? new JValue(requestedReadPrimary.Value) : JValue.CreateNull();
+                }
                 var requestedV8Limit = patch["V8Limit"] ?? patch["v8Limit"];
                 var legacyV8Unlimited = patch["V8Unlimited"] ?? patch["v8Unlimited"];
                 if (requestedV8Limit != null || legacyV8Unlimited != null)
@@ -7904,6 +7931,19 @@ namespace Microi.net
                 if (!string.IsNullOrEmpty(tid)) await cache.RemoveAsync($"Microi:{osClient}:FormData:diy_table_field_list:{tid}");
                 if (!string.IsNullOrEmpty(tname)) await cache.RemoveAsync($"Microi:{osClient}:FormData:diy_table_field_list:{tname}");
 
+                if (r.Code == 1 && readPrimaryProperty != null)
+                {
+                    // 标准工具只在真实主库回读一致时报告成功，不把静默过滤当作已配置。
+                    string persistedTableId = (string)tableRow.Id;
+                    object persisted = OsClientExtend.GetClient(osClient).Db.From<DiyTable>()
+                        .Where(t => t.Id == persistedTableId && t.IsDeleted != 1).First<dynamic>();
+                    JObject persistedRow = persisted == null ? null : JObject.FromObject(persisted);
+                    JToken persistedToken = persistedRow?.GetValue("ReadPrimary", StringComparison.OrdinalIgnoreCase);
+                    if (persistedRow == null || persistedToken == null
+                        || FormEngineReadPolicy.ParseReadPrimary(persistedToken) != requestedReadPrimary)
+                        return new DosResult<object>(0, null, "ReadPrimary 写入后主库回读不一致。");
+                    return new DosResult<object>(1, new { Id = (string)tableRow.Id, ReadPrimary = requestedReadPrimary }, r.Msg);
+                }
                 return new DosResult<object>(r.Code, r.Data, r.Msg);
             }
             catch (Exception ex)

@@ -1,12 +1,12 @@
 {
   "PackageInfo": {
     "Name": "表单引擎",
-    "Version": "v7.7.3",
+    "Version": "v7.7.4",
     "CreateTime": "2026-08-08T18:11:58.929Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
     "Description": "表单引擎基础资源。工作台、分组与紧凑主题化 Banner 均使用 diy_table 物理属性；Banner 支持字段图片、动态标签、接口引擎统计及旧表智能默认。",
-    "ChangeHistory": "2026-09-07 v7.7.3 表单分组、数量说明、页脚和记录选择器等界面文字列显式声明 SQL Server Unicode 契约，升级历史 ANSI 列并保留容量和约束，避免西文排序规则下中文变成问号。\n2026-09-06 v7.7.2 接口引擎修改历史子表的空字符串占位在前后端保存事件中规范为0，避免旧版客户端将空串写入 ChangeHistoryRows 整数列；保留现有路由校验、历史明细及业务代码。\n2026-09-05 v7.7.1 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-02 v7.7.0 修复 diy_table.FormBannerEnabled 与 V8Limit 历史包内字段 Id 重复的问题，保留 FormBannerEnabled 稳定 Id，并将 V8Limit 恢复为其声明的唯一稳定 Id，避免安装器唯一性校验失败。\n2026-08-26 v7.6.7 将 diy_field.TableName 从 varchar(50) 扩容为 varchar(255)，兼容历史长表名并避免租户升级复制表名时中断。\n2026-09-02 v7.6.9 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.8 新增 sys_apiengine.ApiRoutes“多路由”物理列与字段元数据；英文分号分隔的旧地址与主路由共同参与精确匹配、冲突检查和缓存。\n2026-08-26 v7.6.7 将 diy_field.TableName 的新装结构、物理字段元数据和表单字段元数据统一扩容为 varchar(255)，兼容历史长表名并避免升级复制 diy_table.Name 时中断。\n2026-08-25 v7.6.6 表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，并为当前应用版本补齐结构化更新日志与发布硬门禁。\n2026-08-25 v7.6.5 表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，应用更新时恢复官方源码，租户个性化逻辑继续放在独立扩展接口。\n2026-08-24 v7.6.4 表单设计器的 ES 结构/数据同步改为调用 Managed 接口引擎 platform-search-engine，移除对 SearchEngineController 的依赖。\n2026-08-23 v7.6.3 导入界面新增“整批回滚/跳过错误行继续”用户策略；展示当前表单单字段与组合唯一规则，服务端按权威规则安全定位同一 Id 后修改、未命中则新增，并拒绝跨规则冲突或宽泛多行更新；接口引擎同步获得 v2.2 策略与规则元数据。\n2026-08-23 v7.6.2 修复低匹配模板预览为空及首条数据误判；数据预览始终保留全部源列源行，未匹配列红色提示；新增完整原始工作簿预览及 UTF-8/GBK CSV 自动识别与服务端复核。\n2026-08-23 v7.6.1 通用与接口引擎自定义 Excel 导入统一升级：80% 宽弹层，自动识别工作表、单行/多级表头及数据起止行，低可信度人工校正、逐列映射、每页 15 条预览，确认后服务端按同一范围复核原文件。\n2026-08-23 v7.6.0 RichText 新增公有/私有桶、图片压缩、视频与文件附件配置；私有正文只保存稳定对象标识，每次打开按菜单、记录、字段权限换取短效审计地址，临时 Token 不落库。\n2026-08-23 v7.5.9 图片与文件上传合并拖放区和配置摘要，紧凑显示公有/私有桶、单多文件与最大数量、压缩状态、最大体积；ImgUpload 裁剪开关合并到同一面板。\n2026-08-23 v7.5.8 修复 ImgUpload 多图裁剪上传在接口返回数组时不回显；新增表单用户“上传前裁剪”开关与“不裁剪直接上传”；裁剪弹层及平台弹窗遮罩统一服从 FormMaskBlur，默认关闭毛玻璃。\n2026-08-23 v7.5.7 新增 ImgUpload 专业裁剪配置，支持自由、固定、运行时可选和自定义比例；裁剪图与未改动原图同请求上传，后端强制先将原图写入 HDFS 私有桶。\n2026-08-22 v7.5.6 修复表单分组统计接口引擎下拉的数据源字段代理，避免设计器把 BadgeApiEngineKey 当作不存在的 DiyField Id。\n2026-08-22 v7.5.5 新增表单 Banner 属性 Tab 与 8 个 diy_table 物理字段，支持标题/副标题/图片/背景/标签/接口统计配置；旧表无配置时按字段类型智能显示。\n2026-08-21 v7.5.4 将接口引擎修改历史改为 TableChild 子表；旧 ChangeHistory 按非空行幂等迁移，新版 MCP 与 VS Code 写入独立版本记录。\n2026-08-21 v7.5.1 将表单工作台配置迁移为 diy_table 物理属性并新增两个属性 Tab；TabsPosition 默认 top；新增正向 V8Limit，隐藏旧 FormPresentation/V8Unlimited 兼容字段。\n2026-08-21 v7.5.0 新增 diy_table.FormPresentation 与扩展 Tabs 配置，支持默认现代分组工作台、动态统计、必填计数、HTML 标题/说明、记录切换和移动端适配；弹层与直达页统一复用 DiyForm。\n2026-08-18 v6.9.10 新增 diy_table.DisableFormMaskBlur（关闭表单遮罩毛玻璃），默认 0；安装或升级后继续默认显示毛玻璃，仅显式开启该负向开关时关闭。\n",
+    "ChangeHistory": "2026-09-10 v7.7.4 新增按表主库读取配置：原生行、计数、汇总、树及导出共用目标表主库策略；NULL/0保留默认，显式事务不变。必须同步部署支持该策略的后端，不能仅凭字段存在声明即时授权。\n2026-09-07 v7.7.3 表单分组、数量说明、页脚和记录选择器等界面文字列显式声明 SQL Server Unicode 契约，升级历史 ANSI 列并保留容量和约束，避免西文排序规则下中文变成问号。\n2026-09-06 v7.7.2 接口引擎修改历史子表的空字符串占位在前后端保存事件中规范为0，避免旧版客户端将空串写入 ChangeHistoryRows 整数列；保留现有路由校验、历史明细及业务代码。\n2026-09-05 v7.7.1 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-02 v7.7.0 修复 diy_table.FormBannerEnabled 与 V8Limit 历史包内字段 Id 重复的问题，保留 FormBannerEnabled 稳定 Id，并将 V8Limit 恢复为其声明的唯一稳定 Id，避免安装器唯一性校验失败。\n2026-08-26 v7.6.7 将 diy_field.TableName 从 varchar(50) 扩容为 varchar(255)，兼容历史长表名并避免租户升级复制表名时中断。\n2026-09-02 v7.6.9 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.8 新增 sys_apiengine.ApiRoutes“多路由”物理列与字段元数据；英文分号分隔的旧地址与主路由共同参与精确匹配、冲突检查和缓存。\n2026-08-26 v7.6.7 将 diy_field.TableName 的新装结构、物理字段元数据和表单字段元数据统一扩容为 varchar(255)，兼容历史长表名并避免升级复制 diy_table.Name 时中断。\n2026-08-25 v7.6.6 表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，并为当前应用版本补齐结构化更新日志与发布硬门禁。\n2026-08-25 v7.6.5 表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，应用更新时恢复官方源码，租户个性化逻辑继续放在独立扩展接口。\n2026-08-24 v7.6.4 表单设计器的 ES 结构/数据同步改为调用 Managed 接口引擎 platform-search-engine，移除对 SearchEngineController 的依赖。\n2026-08-23 v7.6.3 导入界面新增“整批回滚/跳过错误行继续”用户策略；展示当前表单单字段与组合唯一规则，服务端按权威规则安全定位同一 Id 后修改、未命中则新增，并拒绝跨规则冲突或宽泛多行更新；接口引擎同步获得 v2.2 策略与规则元数据。\n2026-08-23 v7.6.2 修复低匹配模板预览为空及首条数据误判；数据预览始终保留全部源列源行，未匹配列红色提示；新增完整原始工作簿预览及 UTF-8/GBK CSV 自动识别与服务端复核。\n2026-08-23 v7.6.1 通用与接口引擎自定义 Excel 导入统一升级：80% 宽弹层，自动识别工作表、单行/多级表头及数据起止行，低可信度人工校正、逐列映射、每页 15 条预览，确认后服务端按同一范围复核原文件。\n2026-08-23 v7.6.0 RichText 新增公有/私有桶、图片压缩、视频与文件附件配置；私有正文只保存稳定对象标识，每次打开按菜单、记录、字段权限换取短效审计地址，临时 Token 不落库。\n2026-08-23 v7.5.9 图片与文件上传合并拖放区和配置摘要，紧凑显示公有/私有桶、单多文件与最大数量、压缩状态、最大体积；ImgUpload 裁剪开关合并到同一面板。\n2026-08-23 v7.5.8 修复 ImgUpload 多图裁剪上传在接口返回数组时不回显；新增表单用户“上传前裁剪”开关与“不裁剪直接上传”；裁剪弹层及平台弹窗遮罩统一服从 FormMaskBlur，默认关闭毛玻璃。\n2026-08-23 v7.5.7 新增 ImgUpload 专业裁剪配置，支持自由、固定、运行时可选和自定义比例；裁剪图与未改动原图同请求上传，后端强制先将原图写入 HDFS 私有桶。\n2026-08-22 v7.5.6 修复表单分组统计接口引擎下拉的数据源字段代理，避免设计器把 BadgeApiEngineKey 当作不存在的 DiyField Id。\n2026-08-22 v7.5.5 新增表单 Banner 属性 Tab 与 8 个 diy_table 物理字段，支持标题/副标题/图片/背景/标签/接口统计配置；旧表无配置时按字段类型智能显示。\n2026-08-21 v7.5.4 将接口引擎修改历史改为 TableChild 子表；旧 ChangeHistory 按非空行幂等迁移，新版 MCP 与 VS Code 写入独立版本记录。\n2026-08-21 v7.5.1 将表单工作台配置迁移为 diy_table 物理属性并新增两个属性 Tab；TabsPosition 默认 top；新增正向 V8Limit，隐藏旧 FormPresentation/V8Unlimited 兼容字段。\n2026-08-21 v7.5.0 新增 diy_table.FormPresentation 与扩展 Tabs 配置，支持默认现代分组工作台、动态统计、必填计数、HTML 标题/说明、记录切换和移动端适配；弹层与直达页统一复用 DiyForm。\n2026-08-18 v6.9.10 新增 diy_table.DisableFormMaskBlur（关闭表单遮罩毛玻璃），默认 0；安装或升级后继续默认显示毛玻璃，仅显式开启该负向开关时关闭。\n",
     "RequiredPlatformCapabilities": [
       "ClientFeature:FormPresentation",
       "ServerField:DiyTable.FormPresentation",
@@ -32,26 +32,27 @@
       "ApiEngine:platform-search-engine",
       "DatabaseColumn:diy_field.TableName@varchar(255)",
       "ServerField:SysApiEngine.ApiRoutes",
-      "ServerFeature:ApiEngineMultiRouteV1"
+      "ServerFeature:ApiEngineMultiRouteV1",
+      "ServerFeature:FormEngineReadPrimaryV1"
     ],
     "MenuCount": 4,
     "TableCount": 9,
-    "FieldCount": 163,
+    "FieldCount": 164,
     "FlowCount": 0,
     "NodeCount": 0,
     "LineCount": 0,
     "DDLCount": 9,
-    "PhysicalColumnCount": 353,
+    "PhysicalColumnCount": 354,
     "ApiEngineCount": 1,
     "DataSetCount": 0,
     "DataRowCount": 0,
     "AiApplicationCount": 0,
     "ChangeLog": {
-      "Version": "v7.7.3",
-      "Title": "SQL Server 表单界面文字 Unicode 兼容",
-      "ChangeType": "Fix",
-      "Content": "表单分组、数量说明、页脚和记录选择器等界面文字列显式声明 SQL Server Unicode 契约，升级历史 ANSI 列并保留容量和约束，避免西文排序规则下中文变成问号。",
-      "ReleaseTime": "2026-09-07 15:05:00"
+      "Version": "v7.7.4",
+      "Title": "表单主库读取策略",
+      "ChangeType": "Feature",
+      "Content": "新增按表主库读取配置：原生行、计数、汇总、树及导出共用目标表主库策略；NULL/0保留默认，显式事务不变。必须同步部署支持该策略的后端，不能仅凭字段存在声明即时授权。",
+      "ReleaseTime": "2026-09-10 14:00:00"
     }
   },
   "DDLStatements": [
@@ -83,7 +84,7 @@
     {
       "TableName": "diy_table",
       "TableId": "39bc4abe-98ee-46a7-b9d1-a7d649691193",
-      "DDL": "CREATE TABLE IF NOT EXISTS `diy_table` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `V8Unlimited` int NULL COMMENT 'V8无运行限制',\n  `Remark` mediumtext NULL COMMENT '表说明/备注',\n  `EnableTrash` int NULL COMMENT '启用回收站',\n  `EnableDataVersion` int NULL COMMENT '启用数据版本',\n  `DataLogRole` mediumtext NULL COMMENT '数据日志权限',\n  `DisplayDefaultField` int NULL COMMENT '显示默认字段',\n  `EnableDataComment` int NULL COMMENT '启用数据评论',\n  `DataSourceId` varchar(36) NULL,\n  `ReportId` varchar(36) NULL COMMENT '报表引擎Id',\n  `ReportName` varchar(100) NULL COMMENT '报表引擎',\n  `EnableDataLog` int NULL COMMENT '启用数据日志',\n  `DataBaseName` varchar(100) NULL COMMENT '所属数据库',\n  `DataBaseId` varchar(36) NULL,\n  `SubmitAfterServerV8` mediumtext NULL COMMENT '后端表单提交后V8事件',\n  `SubmitBeforeServerV8` mediumtext NULL COMMENT '后端表单提交前V8事件',\n  `RowAction` mediumtext NULL,\n  `OutFormV8` mediumtext NULL COMMENT '前端表单提交后V8事件',\n  `Column` int(11) NULL COMMENT '电脑端布局',\n  `InputBorderStyle` varchar(255) NULL COMMENT '输入框样式',\n  `DataEncryptSave` int NULL COMMENT '数据加密存储',\n  `TableTabs` mediumtext NULL COMMENT '表单分组',\n  `ApiReplace` mediumtext NULL COMMENT '接口替换',\n  `IsAnonymousRead` int NULL COMMENT '允许匿名读取',\n  `FieldBorder` varchar(255) NULL,\n  `Description` mediumtext NULL COMMENT '表中文名',\n  `Tabs` mediumtext NULL COMMENT '表单分组',\n  `BindRole` mediumtext NULL COMMENT '访问权限',\n  `TableTabsPosition` varchar(255) NULL,\n  `TabsPosition` varchar(255) NULL COMMENT '分组标签位置',\n  `Name` varchar(255) NULL COMMENT '表名',\n  `TreeParentFields` mediumtext NULL COMMENT '完整父级列',\n  `TreeHasChildren` varchar(50) NULL COMMENT '是否有子级列',\n  `ServerDataV8` mediumtext NULL COMMENT '后端数据处理V8事件',\n  `IsTree` int NULL COMMENT '树形结构',\n  `FormOpenWidth` varchar(255) NULL COMMENT '弹窗/抽屉宽度',\n  `DisableFormMaskBlur` int NULL COMMENT '关闭表单遮罩毛玻璃',\n  `TableArticle` mediumtext NULL,\n  `DataEncryptTransfer` int NULL,\n  `InFormV8` mediumtext NULL COMMENT '前端表单进入V8事件',\n  `TreeParentField` varchar(50) NULL COMMENT '父级列',\n  `TreeLazy` int NULL COMMENT '树形懒加载',\n  `FormArticle` mediumtext NULL,\n  `EnableCache` int NULL,\n  `IsAnonymousAdd` int NULL COMMENT '允许匿名新增',\n  `CacheParentKey` varchar(255) NULL,\n  `FormOpenType` varchar(255) NULL COMMENT '表单打开方式',\n  `SubmitFormV8` mediumtext NULL COMMENT '前端表单提交前V8事件',\n  `FormLabelPosition` varchar(255) NULL COMMENT '标签对齐方式',\n  `FormPresentation` mediumtext NULL COMMENT '表单工作台展示配置',\n  `V8Limit` int NULL COMMENT 'V8运行限制',\n  `FormPresentationMode` varchar(50) NULL COMMENT '表单呈现模式',\n  `FormPresentationDensity` varchar(50) NULL COMMENT '表单信息密度',\n  `FormNavigationTitle` varchar(255) NULL COMMENT '分组导航标题',\n  `FormNavigationCountText` varchar(255) NULL COMMENT '分组数量文案',\n  `FormSectionNavigation` varchar(50) NULL COMMENT '分组导航方式',\n  `FormSectionEyebrow` varchar(255) NULL COMMENT '分组眉题',\n  `FormRequiredCountText` varchar(255) NULL COMMENT '必填数量文案',\n  `FormWorkbenchEyebrow` varchar(255) NULL COMMENT '工作台眉题',\n  `FormWorkbenchDescription` mediumtext NULL COMMENT '工作台说明',\n  `FormNavigationFooterTitle` varchar(255) NULL COMMENT '导航底部标题',\n  `FormNavigationFooterHtml` mediumtext NULL COMMENT '导航底部说明',\n  `FormRecordSelectorPlaceholder` varchar(255) NULL COMMENT '记录选择器占位文字',\n  `FormRecordSelectorLabelFields` mediumtext NULL COMMENT '记录选择器显示字段',\n  `FormBannerEnabled` int NULL COMMENT '显示表单Banner',\n  `FormBannerTitleField` varchar(100) NULL COMMENT 'Banner标题字段',\n  `FormBannerSubtitleField` varchar(100) NULL COMMENT 'Banner副标题字段',\n  `FormBannerImageField` varchar(100) NULL COMMENT 'Banner图片字段',\n  `FormBannerIcon` varchar(100) NULL COMMENT 'Banner图标',\n  `FormBannerBackgroundField` varchar(100) NULL COMMENT 'Banner背景字段',\n  `FormBannerTagFields` mediumtext NULL COMMENT 'Banner标签字段',\n  `FormBannerMetrics` mediumtext NULL COMMENT 'Banner统计项'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `diy_table` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `V8Unlimited` int NULL COMMENT 'V8无运行限制',\n  `Remark` mediumtext NULL COMMENT '表说明/备注',\n  `EnableTrash` int NULL COMMENT '启用回收站',\n  `EnableDataVersion` int NULL COMMENT '启用数据版本',\n  `DataLogRole` mediumtext NULL COMMENT '数据日志权限',\n  `DisplayDefaultField` int NULL COMMENT '显示默认字段',\n  `EnableDataComment` int NULL COMMENT '启用数据评论',\n  `DataSourceId` varchar(36) NULL,\n  `ReportId` varchar(36) NULL COMMENT '报表引擎Id',\n  `ReportName` varchar(100) NULL COMMENT '报表引擎',\n  `EnableDataLog` int NULL COMMENT '启用数据日志',\n  `DataBaseName` varchar(100) NULL COMMENT '所属数据库',\n  `DataBaseId` varchar(36) NULL,\n  `SubmitAfterServerV8` mediumtext NULL COMMENT '后端表单提交后V8事件',\n  `SubmitBeforeServerV8` mediumtext NULL COMMENT '后端表单提交前V8事件',\n  `RowAction` mediumtext NULL,\n  `OutFormV8` mediumtext NULL COMMENT '前端表单提交后V8事件',\n  `Column` int(11) NULL COMMENT '电脑端布局',\n  `InputBorderStyle` varchar(255) NULL COMMENT '输入框样式',\n  `DataEncryptSave` int NULL COMMENT '数据加密存储',\n  `TableTabs` mediumtext NULL COMMENT '表单分组',\n  `ApiReplace` mediumtext NULL COMMENT '接口替换',\n  `IsAnonymousRead` int NULL COMMENT '允许匿名读取',\n  `FieldBorder` varchar(255) NULL,\n  `Description` mediumtext NULL COMMENT '表中文名',\n  `Tabs` mediumtext NULL COMMENT '表单分组',\n  `BindRole` mediumtext NULL COMMENT '访问权限',\n  `TableTabsPosition` varchar(255) NULL,\n  `TabsPosition` varchar(255) NULL COMMENT '分组标签位置',\n  `Name` varchar(255) NULL COMMENT '表名',\n  `TreeParentFields` mediumtext NULL COMMENT '完整父级列',\n  `TreeHasChildren` varchar(50) NULL COMMENT '是否有子级列',\n  `ServerDataV8` mediumtext NULL COMMENT '后端数据处理V8事件',\n  `IsTree` int NULL COMMENT '树形结构',\n  `FormOpenWidth` varchar(255) NULL COMMENT '弹窗/抽屉宽度',\n  `DisableFormMaskBlur` int NULL COMMENT '关闭表单遮罩毛玻璃',\n  `TableArticle` mediumtext NULL,\n  `DataEncryptTransfer` int NULL,\n  `InFormV8` mediumtext NULL COMMENT '前端表单进入V8事件',\n  `TreeParentField` varchar(50) NULL COMMENT '父级列',\n  `TreeLazy` int NULL COMMENT '树形懒加载',\n  `FormArticle` mediumtext NULL,\n  `EnableCache` int NULL,\n  `IsAnonymousAdd` int NULL COMMENT '允许匿名新增',\n  `CacheParentKey` varchar(255) NULL,\n  `FormOpenType` varchar(255) NULL COMMENT '表单打开方式',\n  `SubmitFormV8` mediumtext NULL COMMENT '前端表单提交前V8事件',\n  `FormLabelPosition` varchar(255) NULL COMMENT '标签对齐方式',\n  `FormPresentation` mediumtext NULL COMMENT '表单工作台展示配置',\n  `V8Limit` int NULL COMMENT 'V8运行限制',\n  `FormPresentationMode` varchar(50) NULL COMMENT '表单呈现模式',\n  `FormPresentationDensity` varchar(50) NULL COMMENT '表单信息密度',\n  `FormNavigationTitle` varchar(255) NULL COMMENT '分组导航标题',\n  `FormNavigationCountText` varchar(255) NULL COMMENT '分组数量文案',\n  `FormSectionNavigation` varchar(50) NULL COMMENT '分组导航方式',\n  `FormSectionEyebrow` varchar(255) NULL COMMENT '分组眉题',\n  `FormRequiredCountText` varchar(255) NULL COMMENT '必填数量文案',\n  `FormWorkbenchEyebrow` varchar(255) NULL COMMENT '工作台眉题',\n  `FormWorkbenchDescription` mediumtext NULL COMMENT '工作台说明',\n  `FormNavigationFooterTitle` varchar(255) NULL COMMENT '导航底部标题',\n  `FormNavigationFooterHtml` mediumtext NULL COMMENT '导航底部说明',\n  `FormRecordSelectorPlaceholder` varchar(255) NULL COMMENT '记录选择器占位文字',\n  `FormRecordSelectorLabelFields` mediumtext NULL COMMENT '记录选择器显示字段',\n  `FormBannerEnabled` int NULL COMMENT '显示表单Banner',\n  `FormBannerTitleField` varchar(100) NULL COMMENT 'Banner标题字段',\n  `FormBannerSubtitleField` varchar(100) NULL COMMENT 'Banner副标题字段',\n  `FormBannerImageField` varchar(100) NULL COMMENT 'Banner图片字段',\n  `FormBannerIcon` varchar(100) NULL COMMENT 'Banner图标',\n  `FormBannerBackgroundField` varchar(100) NULL COMMENT 'Banner背景字段',\n  `FormBannerTagFields` mediumtext NULL COMMENT 'Banner标签字段',\n  `FormBannerMetrics` mediumtext NULL COMMENT 'Banner统计项',\n  `ReadPrimary` int NULL COMMENT '主库读取'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     },
     {
       "TableName": "diy_component",
@@ -4345,6 +4346,18 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 34
+    },
+    {
+      "TABLE_NAME": "diy_table",
+      "COLUMN_NAME": "ReadPrimary",
+      "ORDINAL_POSITION": 83,
+      "COLUMN_TYPE": "int",
+      "DATA_TYPE": "int",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "主库读取",
+      "COLUMN_KEY": "",
+      "EXTRA": ""
     }
   ],
   "SysMenus": [
@@ -8730,6 +8743,30 @@
       "Data": "[]",
       "Encrypt": 0,
       "Description": "同一接口引擎的兼容路由，多个地址使用英文分号 ; 分隔。可用于保留旧移动端 /api/* 地址；主路由继续填写 ApiAddress。"
+    },
+    {
+      "Id": "f04a8b57-9d9a-44b2-9f13-b491290c5101",
+      "TableId": "39bc4abe-98ee-46a7-b9d1-a7d649691193",
+      "TableName": "diy_table",
+      "Name": "ReadPrimary",
+      "Label": "主库读取",
+      "Type": "int",
+      "Component": "Switch",
+      "Description": "开启后，原生列表、计数、汇总、树和导出读取本表所属主库。保留显式事务；不能修复旧事务快照。",
+      "Tab": "06399e92-a775-4ae8-9a55-9a755c1fe8fb",
+      "Sort": 750,
+      "Visible": 1,
+      "AppVisible": 1,
+      "Readonly": 0,
+      "NotEmpty": 0,
+      "NameConfirm": 1,
+      "InTableEdit": 0,
+      "Unique": 0,
+      "IsLockField": 0,
+      "Data": "[]",
+      "Config": "{}",
+      "FormWidth": null,
+      "TableWidth": 120
     }
   ],
   "DataSets": [],

@@ -159,7 +159,7 @@
                         <span v-if="isSecurity">
                             {{ state.unblockAdvice || "到期后会自动解除；需立即解除时请联系平台超级管理员。" }}
                         </span>
-                        <span v-else>服务恢复后刷新页面即可继续使用，当前页面不会提交任何业务数据。</span>
+                        <span v-else>每 5 秒自动检测连接，服务恢复后自动恢复页面；不会重复提交之前的业务请求。</span>
                     </div>
                 </div>
             </div>
@@ -222,7 +222,7 @@ function formatRetryAfter(value) {
 async function retry() {
     const reachable = await checkApiServiceNow();
     if (reachable) {
-        window.location.reload();
+        // 健康状态模块统一恢复页面；已打开的表单保留输入，启动失败时才重载。
         return;
     }
     ElMessage.warning(isSecurity.value

@@ -104,32 +104,29 @@ export const useUserStore = defineStore("user", {
         },
 
         // get user info
-        getInfo() {
-            return new Promise((resolve, reject) => {
-                DiyCommon.Post(DiyApi.GetCurrentUser(), {}, async (result) => {
-                    if (DiyCommon.Result(result)) {
-                        try {
-                            const currentUser = await this.ensureAuthorizationSnapshot(result.Data || {});
-                            this.setRoles(currentUser._AccessKeySession === true ? ["access-key"] : ["admin"]);
-                            this.setName("");
-                            this.setAvatar("");
-                            this.setIntroduction("");
-                            useDiyStore().setCurrentUser(currentUser);
-                            resolve(currentUser);
-                        } catch (error) {
-                            reject(error);
-                        }
-                    } else {
-                        const error = new Error(result?.Msg || result?.Message || "获取当前登录身份失败。");
-                        error.code = result?.Code;
-                        error.Code = result?.Code;
-                        error.Msg = result?.Msg || result?.Message || error.message;
-                        error.DataAppend = result?.DataAppend;
-                        error.isAuthFailure = [1001, 1002].includes(Number(result?.Code));
-                        reject(error);
-                    }
-                });
+        async getInfo() {
+            // 首次身份确认由守卫统一处理失败和登录跳转，重试不能每次都弹全局通知。
+            // PostAsync 同时传播业务和传输错误，不留下永久 pending 的初始化 Promise。
+            const result = await DiyCommon.PostAsync(DiyApi.GetCurrentUser(), {}, null, null, "json", {
+                suppressAuthFailure: true,
+                suppressErrorNotification: true
             });
+            if (Number(result?.Code) === 1 || result?.Success || result?.IsSuccess) {
+                const currentUser = await this.ensureAuthorizationSnapshot(result.Data || {});
+                this.setRoles(currentUser._AccessKeySession === true ? ["access-key"] : ["admin"]);
+                this.setName("");
+                this.setAvatar("");
+                this.setIntroduction("");
+                useDiyStore().setCurrentUser(currentUser);
+                return currentUser;
+            }
+            const error = new Error(result?.Msg || result?.Message || "获取当前登录身份失败。");
+            error.code = result?.Code;
+            error.Code = result?.Code;
+            error.Msg = result?.Msg || result?.Message || error.message;
+            error.DataAppend = result?.DataAppend;
+            error.isAuthFailure = [1001, 1002].includes(Number(result?.Code));
+            throw error;
         },
 
         // user logout

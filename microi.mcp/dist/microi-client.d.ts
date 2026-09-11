@@ -386,14 +386,14 @@ export interface MongodbLogWrite {
     result?: string;
     appId?: string;
 }
-export type SystemObservabilityQueryAction = 'Capabilities' | 'Snapshot' | 'Logs' | 'LogTypes' | 'LogStats' | 'Signal' | 'Trace' | 'ApiRank' | 'AppLogs' | 'PlatformStats' | 'SecurityData' | 'TrafficHistory' | 'TrafficDetails' | 'HistoricalDashboard';
-export type SystemObservabilityManageAction = 'BlockIp' | 'UnblockIp';
+export type SystemObservabilityQueryAction = 'Capabilities' | 'Snapshot' | 'Logs' | 'LogTypes' | 'LogStats' | 'Signal' | 'Trace' | 'ApiRank' | 'AppLogs' | 'PlatformStats' | 'SecurityData' | 'TrafficHistory' | 'TrafficDetails' | 'HistoricalDashboard' | 'Memory' | 'MemoryIncidents' | 'MemoryIncident' | 'DatabasePools' | 'DatabasePoolRecovery';
+export type SystemObservabilityManageAction = 'BlockIp' | 'UnblockIp' | 'ResetDatabasePools';
 export interface SystemObservabilityQuery extends Record<string, unknown> {
     Action: SystemObservabilityQueryAction;
 }
 export interface SystemObservabilityManage extends Record<string, unknown> {
     Action: SystemObservabilityManageAction;
-    Ip: string;
+    Ip?: string;
 }
 export interface UserAccessKeyRecord {
     Id: string;
@@ -620,7 +620,7 @@ export declare class MicroiClient {
         changeSummary?: string;
         confirmLargeReduction?: boolean;
         v8Limit?: boolean;
-        responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
+        responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP';
         apiRoutes?: string | string[];
         /** @deprecated Compatibility alias. true maps to v8Limit=false. */
         v8Unlimited?: boolean;
@@ -635,7 +635,7 @@ export declare class MicroiClient {
         Code?: string;
         ApiAddress?: string;
         ApiRoutes?: string | string[];
-        ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
+        ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP';
         V8Limit?: number;
         /** @deprecated Compatibility alias. true maps to V8Limit=0. */
         V8Unlimited?: number;
@@ -702,6 +702,7 @@ export declare class MicroiClient {
     createTable(name: string, description?: string, options?: {
         Tabs?: string;
         IsTree?: number;
+        ReadPrimary?: number | null;
         Column?: number;
         FormOpenType?: string;
         FormOpenWidth?: string;

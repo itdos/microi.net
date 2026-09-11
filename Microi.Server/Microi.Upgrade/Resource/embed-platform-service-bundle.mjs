@@ -11,6 +11,8 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../../../');
 const packagePath = resolve(scriptDirectory, 'app.microi.saas-engine.json');
 const storePackagePath = resolve(scriptDirectory, 'app.microi.store.json');
+const messagePackagePath = resolve(scriptDirectory, 'app.microi.message-notification.json');
+const observabilityPackagePath = resolve(scriptDirectory, 'app.microi.sys-log.json');
 const releaseContractPath = resolve(scriptDirectory, 'platform-service-release.json');
 const releaseContract = JSON.parse(await readFile(releaseContractPath, 'utf8'));
 if (releaseContract?.SchemaVersion !== 1 || releaseContract?.AppKey !== 'microi-platform-service') {
@@ -49,6 +51,7 @@ const version = argumentValue('--version', `v${sourcePackageVersion}`);
 const applicationVersionArgument = argumentValue('--application-version');
 const saasPackageVersionArgument = argumentValue('--saas-package-version');
 const storePackageVersionArgument = argumentValue('--store-package-version');
+const messagePackageVersionArgument = argumentValue('--message-package-version');
 const sourceManifestHashOverride = argumentValue('--source-manifest-hash');
 const runtimeManifestHashOverride = argumentValue('--runtime-manifest-hash');
 const changeSummary = argumentValue('--change-summary').trim();
@@ -60,6 +63,7 @@ if (!/^v\d+\.\d+\.\d+$/.test(version)) throw new Error(`无效微服务版本：
 for (const [label, value] of [
   ['SaaS 引擎包版本', saasPackageVersionArgument],
   ['应用商城包版本', storePackageVersionArgument],
+  ['消息通知包版本', messagePackageVersionArgument],
 ]) {
   if (value && !/^v\d+\.\d+\.\d+$/.test(value)) throw new Error(`${label}无效：${value}`);
 }
@@ -213,6 +217,7 @@ function contentType(path) {
 
 const packageModel = JSON.parse(await readFile(packagePath, 'utf8'));
 const storePackageModel = JSON.parse(await readFile(storePackagePath, 'utf8'));
+const messagePackageModel = JSON.parse(await readFile(messagePackagePath, 'utf8'));
 let databaseBackupDialogCount = 0;
 for (const menu of packageModel.SysMenus || []) {
   if (!menu.PageBtns) continue;
@@ -293,6 +298,7 @@ const localTime = new Intl.DateTimeFormat('sv-SE', {
 }).format(timestamp);
 const currentSaasPackageVersion = String(packageModel?.PackageInfo?.Version || '');
 const currentStorePackageVersion = String(storePackageModel?.PackageInfo?.Version || '');
+const currentMessagePackageVersion = String(messagePackageModel?.PackageInfo?.Version || '');
 const runtimeChanged = (
   version !== embeddedVersion
   || localRuntimeManifestHash !== String(bundle?.MicroService?.DistHash || '')
@@ -304,17 +310,18 @@ if (!verifyOnly && runtimeChanged) {
       + '必须显式传 --application-version=<递增整数>',
     );
   }
-  if (!saasPackageVersionArgument || !storePackageVersionArgument) {
+  if (!saasPackageVersionArgument || !storePackageVersionArgument || !messagePackageVersionArgument) {
     throw new Error(
       '平台内置微服务运行时变化时，必须同时显式传 '
-      + '--saas-package-version=<递增版本> 与 --store-package-version=<递增版本>',
+      + '--saas-package-version、--store-package-version 与 --message-package-version=<递增版本>',
     );
   }
   if (refreshCandidate) {
     if (version !== embeddedVersion
         || applicationVersion !== embeddedApplicationVersion
         || saasPackageVersionArgument !== currentSaasPackageVersion
-        || storePackageVersionArgument !== currentStorePackageVersion) {
+        || storePackageVersionArgument !== currentStorePackageVersion
+        || messagePackageVersionArgument !== currentMessagePackageVersion) {
       throw new Error('刷新未发布候选包时，微服务版本、应用整数版本和两个官方包版本必须全部保持不变');
     }
   } else {
@@ -327,9 +334,12 @@ if (!verifyOnly && runtimeChanged) {
     if (compareSemanticVersion(storePackageVersionArgument, currentStorePackageVersion) <= 0) {
       throw new Error(`应用商城包版本必须大于 ${currentStorePackageVersion || '(empty)'}`);
     }
+    if (compareSemanticVersion(messagePackageVersionArgument, currentMessagePackageVersion) <= 0) {
+      throw new Error(`消息通知包版本必须大于 ${currentMessagePackageVersion}`);
+    }
   }
 }
-if (!verifyOnly && !runtimeChanged && (saasPackageVersionArgument || storePackageVersionArgument)) {
+if (!verifyOnly && !runtimeChanged && (saasPackageVersionArgument || storePackageVersionArgument || messagePackageVersionArgument)) {
   throw new Error('平台内置微服务运行时未变化，不应通过嵌入脚本递增官方应用包版本');
 }
 const manifestAssets = buildAssets.map(asset => ({
@@ -433,7 +443,7 @@ function validateEmbeddedBundle(candidate, label) {
 
 function validateReleaseTargets() {
   const configuredTargets = (releaseContract.PackageTargets || []).map(normalizePath);
-  const actualTargets = [packagePath, storePackagePath].map(path => normalizePath(relative(repositoryRoot, path)));
+  const actualTargets = [packagePath, storePackagePath, messagePackagePath, observabilityPackagePath].map(path => normalizePath(relative(repositoryRoot, path)));
   assertRelease(JSON.stringify(configuredTargets) === JSON.stringify(actualTargets), '发布契约的数据包目标与脚本不一致');
 
   validateEmbeddedBundle(bundle, 'SaaS 引擎包');
@@ -441,6 +451,9 @@ function validateReleaseTargets() {
     .filter(item => item?.Application?.AppKey === releaseContract.AppKey);
   assertRelease(storeBundles.length === 1, `应用商城包平台微服务数量异常：${storeBundles.length}`);
   validateEmbeddedBundle(storeBundles[0], '应用商城包');
+  const messageBundles = (messagePackageModel.ApplicationBundles || []).filter(item => item?.Application?.AppKey === releaseContract.AppKey);
+  assertRelease(messageBundles.length === 1, '消息通知包必须包含一份平台微服务运行时');
+  validateEmbeddedBundle(messageBundles[0], '消息通知包');
 
   const marketplaceMenus = (storePackageModel.SysMenus || []).filter(menu => menu?.Url === '/microi-store');
   assertRelease(marketplaceMenus.length === 1, `应用商城主菜单数量异常：${marketplaceMenus.length}`);
@@ -453,6 +466,12 @@ function validateReleaseTargets() {
 
 if (verifyOnly) {
   validateReleaseTargets();
+  // 独立商城应用也会覆盖同一个运行时；不能只校验启动基础包。
+  const observabilityPackage = JSON.parse(await readFile(observabilityPackagePath, 'utf8'));
+  const observabilityBundles = (observabilityPackage.ApplicationBundles || []).filter(item => item?.Application?.AppKey === releaseContract.AppKey);
+  assertRelease(observabilityBundles.length === 1, '系统日志/监控必须携带唯一共享运行包');
+  validateEmbeddedBundle(observabilityBundles[0], '系统日志/监控');
+  execFileSync(process.execPath, [resolve(scriptDirectory, 'configure-system-observability-package.mjs'), '--verify-only'], { windowsHide: true, stdio: 'pipe' });
   process.stdout.write(JSON.stringify({
     verified: true,
     releaseContractPath,
@@ -476,6 +495,7 @@ if (runtimeChanged) {
   const releaseDate = localTime.slice(0, 10);
   packageModel.PackageInfo.Version = saasPackageVersionArgument;
   storePackageModel.PackageInfo.Version = storePackageVersionArgument;
+  messagePackageModel.PackageInfo.Version = messagePackageVersionArgument;
   const saasChangeContent = `重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保官方在线应用与 SaaS 离线兜底产物一致。${changeSummary}`;
   const storeChangeContent = `重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保应用商城可独立交付当前离线兜底产物。${changeSummary}`;
   const saasHistoryLine = `${releaseDate} ${saasPackageVersionArgument} ${saasChangeContent}`;
@@ -500,6 +520,13 @@ if (runtimeChanged) {
     Content: storeChangeContent,
     ReleaseTime: localTime,
   };
+  const messageContent = `平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。${changeSummary}`;
+  const messageLine = `${releaseDate} ${messagePackageVersionArgument} ${messageContent}`;
+  if (!String(messagePackageModel.PackageInfo.ChangeHistory || '').includes(messageLine)) {
+    messagePackageModel.PackageInfo.ChangeHistory = `${messageLine}\n${messagePackageModel.PackageInfo.ChangeHistory || ''}`;
+  }
+  messagePackageModel.PackageInfo.ChangeLog = { Version: messagePackageVersionArgument,
+    Title: '通用平台提醒与 SaaS 系统提醒', ChangeType: 'Feature', Content: messageContent, ReleaseTime: localTime };
 }
 
 bundle.VersionNo = version;
@@ -603,6 +630,16 @@ observabilityRouteMeta.RetireLegacyMenus = true;
 observabilityRoute.LegacyMenuUrls = legacyObservabilityUrls;
 observabilityRoute.RetireLegacyMenus = true;
 observabilityRoute.RouteMetaJson = JSON.stringify(observabilityRouteMeta);
+// 原消息设置入口并入同一消息通知页面；只退役已声明旧菜单，不删除通知物理表与日志。
+const notificationRoute = bundle.Routes.find(route => route.RoutePath === '/platform-reminders');
+if (!notificationRoute) throw new Error('平台微服务缺少统一消息通知路由');
+const notificationMeta = JSON.parse(notificationRoute.RouteMetaJson || '{}');
+notificationMeta.LegacyMenuUrls = [...new Set([...(notificationMeta.LegacyMenuUrls || []), '/xiaoxitongzhisz'])];
+notificationMeta.RetireLegacyMenus = true;
+notificationRoute.LegacyMenuUrls = notificationMeta.LegacyMenuUrls;
+notificationRoute.RetireLegacyMenus = true;
+notificationRoute.PageTitle = '消息通知';
+notificationRoute.RouteMetaJson = JSON.stringify(notificationMeta);
 for (const route of bundle.Routes) {
   route.UpdateTime = localTime;
   route.BuildVersion = version;
@@ -630,10 +667,16 @@ storePackageModel.ApplicationBundles = (storePackageModel.ApplicationBundles || 
 storePackageModel.ApplicationBundles.push(deepClone(bundle));
 synchronizeStoreRuntimeSchema(storePackageModel, packageModel);
 refreshPackageCounts(storePackageModel);
+// 消息通知必须独立安装即可得到提醒管理页，不能依赖客户先安装另一个包的新运行时。
+messagePackageModel.ApplicationBundles = (messagePackageModel.ApplicationBundles || []).filter(item => item?.Application?.AppKey !== releaseContract.AppKey);
+messagePackageModel.ApplicationBundles.push(deepClone(bundle));
+synchronizeStoreRuntimeSchema(messagePackageModel, packageModel);
+refreshPackageCounts(messagePackageModel);
 
 validateReleaseTargets();
 await writeFile(packagePath, `${JSON.stringify(packageModel, null, 2)}\n`, 'utf8');
 await writeFile(storePackagePath, `${JSON.stringify(storePackageModel, null, 2)}\n`, 'utf8');
+await writeFile(messagePackagePath, `${JSON.stringify(messagePackageModel, null, 2)}\n`, 'utf8');
 process.stdout.write(JSON.stringify({
   releaseContractPath,
   applicationRoot,

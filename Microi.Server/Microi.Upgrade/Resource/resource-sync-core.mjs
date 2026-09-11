@@ -33,6 +33,7 @@ const readablePackageNames = {
   'app.microi.sys-config.json': '系统设置',
   'app.microi.message-notification.json': '消息通知',
   'app.microi.ai-engine.json': 'AI助手',
+  'app.microi.sys-log.json': '系统日志/监控',
 };
 
 const exactCurrentHistoryPackageNames = new Set([
@@ -45,6 +46,8 @@ const exactCurrentHistoryPackageNames = new Set([
 const platformServicePackageNames = new Set([
   'app.microi.saas-engine.json',
   'app.microi.store.json',
+  'app.microi.message-notification.json',
+  'app.microi.sys-log.json',
 ]);
 
 export function normalizeText(content) {
@@ -62,6 +65,41 @@ export function hasExactResourceContentDrift(content, reportedSha256) {
   if (!expected) return false;
   const actual = createHash('sha256').update(String(content ?? ''), 'utf8').digest('hex');
   return actual !== expected;
+}
+
+// 发布器升级补丁版本后仍须接受，但所有并发写入/鉴权/强回读保护必须继续逐项存在。
+// 独立为无 I/O 校验，使统一 Node 门禁可以直接覆盖真实候选和每项保护的缺失负例。
+export function validateOfficialResourceEngineCandidate(content) {
+  const version = String(content).match(/Version\s*:\s*(v?\d+\.\d+\.\d+)(?=\s|$)/i)?.[1];
+  const required = [
+    'ApiEngineKey: get-microi-upgrade-resource',
+    'V8.Method.AuthorizeOfficialResourcePublish()',
+    'ExpectedRemoteSha256', 'function lockPublishRows()',
+    'ReconcilePublishedApiEngines', 'function reconcilePublishedApiEngines()',
+    '发布升级资源[', '后回读内容哈希不一致', 'OFFICIAL_RESOURCE_EXACT_SELECTION_V1',
+    'platform-home-overview', 'HomeUsageStats', 'storedSelectionEquals',
+    '存储接口 Code=1 但缺少 Data',
+    'SelectApiEngine: selectionJson(exactSelections.SelectApiEngine)',
+    'SelectTable: selectionJson(exactSelections.SelectTable)',
+  ];
+  if (!version || compareSemanticVersionParts(semanticVersionParts(version, '官方资源接口版本'), [1, 3, 7]) < 0
+    || required.some(marker => !content.includes(marker))
+    || (content.match(/FOR UPDATE/g) || []).length !== 3) {
+    throw new Error('official-resource-api.js 版本低于 v1.3.7 或缺少固定白名单、SHA 乐观锁、事务行锁、精确选择元数据或发布后回读保护');
+  }
+}
+
+export function getMessageNotificationContractKeys(packageModel) {
+  const keys = ['msg_event', 'msg_internal_list', 'msg_internal_mark_read', 'platform-chat-system-message', 'platform-chat-runtime', 'platform-message-notification-custom-hook', 'wechat_send_tpl_msg'];
+  const reminderKeys = ['platform-reminder-runtime', 'platform-reminder-official-feed', 'platform-reminder-tick'];
+  const unifiedKey = 'platform-message-notification-config';
+  const unified = compareSemanticVersionParts(semanticVersionParts(packageModel.PackageInfo?.Version, '消息通知版本', true), [1, 0, 19]) >= 0
+    || (packageModel.SysApiEngines || []).some(engine => engine.ApiEngineKey === unifiedKey);
+  if (unified) reminderKeys.push(unifiedKey);
+  // 旧包仍兼容；统一中心版本必须完整交付四个接口，不能通过同时漏掉表和接口绕过闭包。
+  const hasReminder = unified || (packageModel.DiyTables || []).some(table => table.Name === 'mci_platform_reminder')
+    || (packageModel.SysApiEngines || []).some(engine => reminderKeys.includes(engine.ApiEngineKey));
+  return hasReminder ? keys.concat(reminderKeys) : keys;
 }
 
 function semanticVersionParts(value, label, allowEmpty = false) {

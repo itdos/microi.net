@@ -8,6 +8,12 @@ import {
 export const applicationStorePackageName = 'app.microi.store.json';
 
 export const applicationStoreReplicaMappings = Object.freeze([
+  // 控制面本身也有独立源码；和导入/发布接口一起规范字节，避免 live 投影的 SHA 校验失败。
+  Object.freeze({
+    resourceName: 'official-resource-api.js',
+    apiEngineKey: 'get-microi-upgrade-resource',
+    publishedStandalone: true,
+  }),
   Object.freeze({
     resourceName: 'import-package.js',
     apiEngineKey: 'import-microi-store-package',
