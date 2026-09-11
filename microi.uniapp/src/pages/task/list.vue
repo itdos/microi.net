@@ -138,6 +138,7 @@ import { canAddMenuRecord } from '@/platform/menu-permission.js'
 import { listReturnMixin } from '@/platform/list-return.js'
 import { getUser } from '@/utils/request.js'
 import { getRoleProfile } from '@/tenants/xjy/business.js'
+import { readListEntryPeriod } from '@/platform/list-entry-period.mjs'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
 import {
   TASK_DATE_FIELDS,
@@ -227,6 +228,11 @@ export default {
     canAddTask() { return this.taskPermissionReady && canAddMenuRecord(this.taskMenuId, this.currentUser) }
   },
   onLoad(options = {}) {
+    const entryPeriod = readListEntryPeriod(options, 'month')
+    this.period = entryPeriod.period
+    this.customStart = entryPeriod.customStart
+    this.customEnd = entryPeriod.customEnd
+    if (this.dateFields.some((item) => item.value === options.dateField)) this.dateField = options.dateField
     if (options.customerId) this.customerId = decodeURIComponent(options.customerId)
     if (options.state) this.state = decodeURIComponent(options.state)
     const user = getUser() || {}
@@ -238,14 +244,18 @@ export default {
       this.period = 'all'
     }
     this.loadTaskCreatePermission()
-    this.taskListSessionKey = [
+    const taskListSessionParts = [
       'task-list:v3',
       user.Id || user.Account || 'guest',
       this.customerId || 'all-customers',
       options.state ? `entry-state:${this.state}` : 'default-state',
       this.isCustomerAccount ? 'customer-scope' : (this.mineOnly ? 'assigned-scope' : 'all-authorized-scope')
-    ].join('|')
-    const restored = this.focusTaskId ? null : this.restoreTaskListSession()
+    ]
+    if (entryPeriod.forceFresh) {
+      taskListSessionParts.push(`performance:${this.period}:${this.customStart || '-'}:${this.customEnd || '-'}`)
+    }
+    this.taskListSessionKey = taskListSessionParts.join('|')
+    const restored = (this.focusTaskId || entryPeriod.forceFresh) ? null : this.restoreTaskListSession()
     if (!restored) this.loadData(true, true)
     else setTimeout(() => this.refreshRestoredTaskList(restored), 0)
     this.changedListener = () => { this.taskDataChanged = true }
