@@ -89,6 +89,15 @@
                   <input v-model="draftFilterValues[filter.key]" class="selector-filter__input" :placeholder="filter.placeholder || '请输入'" confirm-type="done" @confirm="applyFilters" />
                   <text v-if="hasFilterValue(filter, draftFilterValues)" class="selector-search__clear" @tap="clearFilter(filter)">×</text>
                 </view>
+                <view v-else-if="filter.type === 'address'" class="selector-filter__region">
+                  <mci-region-picker class="selector-filter__select" :model-value="draftFilterValues[filter.key] || []"
+                    @update:model-value="draftFilterValues[filter.key] = $event">
+                    <view class="selector-filter__picker" :class="{ placeholder: !hasFilterValue(filter, draftFilterValues) }">
+                      <text>{{ hasFilterValue(filter, draftFilterValues) ? draftFilterValues[filter.key].join(' / ') : '请选择省 / 市 / 区' }}</text><view class="selector-filter__arrow"></view>
+                    </view>
+                  </mci-region-picker>
+                  <text v-if="hasFilterValue(filter, draftFilterValues)" class="selector-search__clear" @tap="clearFilter(filter)">×</text>
+                </view>
                 <view v-else-if="filter.type === 'datetime-range'" class="selector-filter__range">
                   <view v-for="bound in ['start', 'end']" :key="bound" class="selector-filter__range-bound">
                     <text class="selector-filter__range-label">{{ bound === 'start' ? '开始' : '结束' }}</text>
@@ -124,6 +133,7 @@
 import { V8, post } from '@/utils/request.js'
 import { fieldDisplayValue, loadNativeFormDefinition, loadNativeTableModel } from '@/platform/native-form.js'
 import { loadGrantedMenuDefinition } from '@/platform/module-registry.js'
+import { buildListFilterWhere } from '@/platform/list-filter-fields.mjs'
 import {
   getOpenTableWhere,
   submitOpenTableSelection,
@@ -191,11 +201,13 @@ export default {
     tableLabel() { return (this.table && (this.table.Description || this.table.Name)) || this.config.SysMenuName || '' },
     finished() { return this.rows.length >= this.total && this.total > 0 },
     filterFields() {
-      return (this.presentation.filters || []).filter((item) => item.key && item.field && ['select', 'text', 'datetime-range'].includes(item.type))
+      return (this.presentation.filters || []).filter((item) => item.key && item.field && ['select', 'text', 'address', 'datetime-range'].includes(item.type))
     },
     filterWhere() {
       return this.filterFields.filter((field) => this.hasFilterValue(field)).flatMap((field) => {
         const value = this.filterValues[field.key]
+        // 复用列表的地区路径前缀过滤，选择“全部”时不把字面值作为查询条件。
+        if (field.type === 'address') return buildListFilterWhere([field], { [field.key]: value })
         if (field.type === 'datetime-range') {
           const conditions = []
           if (value.start) conditions.push({ Name: field.field, Type: '>=', Value: value.start })
@@ -338,6 +350,7 @@ export default {
     resetDraftFilters() { this.draftFilterValues = {} },
     hasFilterValue(field, values = this.filterValues) {
       const value = values[field.key]
+      if (field.type === 'address') return Array.isArray(value) && value.some((part) => part && part !== '全部')
       if (field.type === 'datetime-range') return Boolean(value && (value.start || value.end))
       return value !== undefined && value !== null && String(value).trim() !== ''
     },
@@ -390,7 +403,7 @@ export default {
       this.draftFilterValues[field.key] = option.value
     },
     clearFilter(field) {
-      this.draftFilterValues[field.key] = ''
+      this.draftFilterValues[field.key] = field.type === 'address' ? [] : ''
     },
     resetSearch() {
       this.keyword = ''
@@ -540,6 +553,8 @@ export default {
 .selector-filter--active .selector-filter__picker, .selector-filter--active .selector-filter__input-wrap { border-color: #8bbdd3; background: #e4f2fa; }
 .selector-filter__label { display: block; color: #405b65; font-size: 26rpx; font-weight: 500; line-height: 1.5; white-space: nowrap; }
 .selector-filter__select { min-width: 0; }
+.selector-filter__region { display: flex; align-items: center; gap: 10rpx; min-width: 0; }
+.selector-filter__region .selector-filter__select { flex: 1; }
 .selector-filter__picker, .selector-filter__input-wrap { box-sizing: border-box; min-width: 0; min-height: 84rpx; padding: 0 20rpx; border: 1px solid #d4e2ea; border-radius: 8px; background: #edf4f8; }
 .selector-filter__picker { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; color: #25434d; font-size: 26rpx; }
 .selector-filter__picker text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
