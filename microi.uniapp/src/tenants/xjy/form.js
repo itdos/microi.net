@@ -138,6 +138,8 @@ const FOLLOWUP_FIELDS = {
   approvalStatusValue: 'ShenpiZTZ'
 }
 const LEAD_FOLLOWUP_FIELDS = {
+  leadName: 'XiansuoMC',
+  leadId: 'XiansuoID',
   user: 'GenjinR',
   time: 'GenjinSJ'
 }
@@ -2121,6 +2123,18 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  if (isLeadFollowupForm(context) && payload && !payload.multiple &&
+    String(payload.field?.Name || '').toLowerCase() === LEAD_FOLLOWUP_FIELDS.leadName.toLowerCase()) {
+    // 名称字段保存文本，子表却按隐藏外键查询；必须取实际选中行的 Id，不能按名称猜测关联。
+    const row = payload.cleared ? {} : selectedRow(payload)
+    context.patchForm({
+      [fieldName(context, LEAD_FOLLOWUP_FIELDS.leadId)]: personValue(row, ['Id', 'ID', 'id']),
+      [fieldName(context, LEAD_FOLLOWUP_FIELDS.leadName)]: payload.cleared
+        ? ''
+        : personValue(row, ['XiansuoMC']) || payload.value || ''
+    })
+    return { handled: true }
+  }
   if (isCustomerCaseForm(context) && payload?.field?.Name === 'KehuMC' && !payload.multiple) {
     // 客户选择器已返回完整客户行；新增、编辑共用此联动，避免额外请求和旧客户信息残留。
     const row = payload.cleared ? {} : selectedRow(payload)
@@ -2307,6 +2321,12 @@ export async function handleFieldSelect(context, payload) {
 }
 
 export async function handleFieldChange(context, payload) {
+  if (isLeadFollowupForm(context) &&
+    String(payload?.field?.Name || '').toLowerCase() === LEAD_FOLLOWUP_FIELDS.leadName.toLowerCase()) {
+    // 原生选择器先 change 再 select：先解除旧关联，再由选中行回填，清空也不会残留旧 Id。
+    context.patchForm({ [fieldName(context, LEAD_FOLLOWUP_FIELDS.leadId)]: '' })
+    return { handled: true }
+  }
   if (isCheckinEditable(context) && payload &&
     String(payload.field && payload.field.Name || '').toLowerCase() ===
       visitTargetNameField(context).toLowerCase()) {
@@ -2409,6 +2429,16 @@ export async function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  if (isLeadFollowupForm(context)) {
+    const idField = fieldName(context, LEAD_FOLLOWUP_FIELDS.leadId)
+    const nameField = fieldName(context, LEAD_FOLLOWUP_FIELDS.leadName)
+    const leadId = String(context.form[idField] || '').trim()
+    if (String(context.form[nameField] || '').trim() && !leadId) {
+      throw new Error('请重新选择对应线索后保存')
+    }
+    // 隐藏字段不在通用表单的提交集合中；独立新增、编辑与子表入口均显式提交最终关联。
+    return { [idField]: leadId }
+  }
   if (isCustomerCaseForm(context)) {
     return {
       ...await initializeCustomerCaseMerchant(context),
