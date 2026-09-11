@@ -19,9 +19,9 @@
       </view>
     </view>
     <view v-else-if="field.type === 'address'" class="region-row">
-      <picker mode="multiSelector" :range="region.columns" range-key="name" :value="region.indexes" @columnchange="changeRegionColumn" @change="emit(regionPickerSelection(region, $event.detail.value))">
+      <mci-region-picker class="region-picker" :model-value="Array.isArray(modelValue) ? modelValue : []" @update:model-value="emit">
         <view class="date-input" :class="{ placeholder: !Array.isArray(modelValue) || !modelValue.length }">{{ Array.isArray(modelValue) && modelValue.length ? modelValue.join(' / ') : '请选择省 / 市 / 区' }}</view>
-      </picker>
+      </mci-region-picker>
       <text class="clear" @tap="emit([])">×</text>
     </view>
     <view v-else-if="field.type === 'toggle'" class="toggle-row">
@@ -54,7 +54,6 @@ import MciNativeField from '@/components/mci-native-field/mci-native-field.vue'
 import { loadNativeFieldOptionPage, isRemoteNativeFieldOptions, filterNativeFieldOptions } from '@/platform/native-form.js'
 import { dateFilterSpec } from '@/platform/list-filter-date.mjs'
 import { filterOptionRows, filterTreeOptions } from '@/platform/list-filter-options.mjs'
-import { createRegionPickerState, updateRegionPickerState, regionPickerSelection } from '@/platform/region-picker.mjs'
 import { V8, post } from '@/utils/request.js'
 
 export default {
@@ -62,7 +61,7 @@ export default {
   components: { MciNativeField },
   props: { field: { type: Object, required: true }, modelValue: { default: '' }, menuId: { type: String, default: '' }, moduleEngineKey: { type: String, default: '' }, tableChildAuth: { type: Object, default: null }, formData: { type: Object, default: () => ({}) } },
   emits: ['update:modelValue'],
-  data() { return { region: createRegionPickerState([]), chipOptions: [], chipPage: 1, chipHasMore: false, chipLoading: false, chipError: '', treeCache: null, sourceCache: null } },
+  data() { return { chipOptions: [], chipPage: 1, chipHasMore: false, chipLoading: false, chipError: '', treeCache: null, sourceCache: null } },
   computed: {
     isDropdown() { return this.field.type === 'options' && (this.field.presentation === 'dropdown' || ['Select', 'MultipleSelect', 'Checkbox', 'Autocomplete', 'Cascader', 'SelectTree', 'TreeCheckbox', 'Department', 'Transfer'].includes(this.field.component)) },
     selectorField() { return { ...this.field.nativeField, Name: this.field.field, Label: this.field.label, component: 'Select', placeholder: `请选择${this.field.label}`, options: [], config: { MultipleSelect: !!this.field.multiple, SelectSaveFormat: 'Json', SelectSaveField: '_filterKey', SelectLabel: '_filterLabel' } } },
@@ -72,10 +71,8 @@ export default {
     timeColumns() { return Array.from({ length: this.dateSpec.timeColumns }, (_, index) => Array.from({ length: index ? 60 : 24 }, (_, value) => `${String(value).padStart(2, '0')}${['时', '分', '秒'][index]}`)) },
     selectionLabels() { return (this.field.multiple ? (Array.isArray(this.modelValue) ? this.modelValue : []) : this.modelValue === '' || this.modelValue == null ? [] : [this.modelValue]).map((item) => item?._filterLabel ?? String(item)) }
   },
-  watch: { modelValue: { immediate: true, handler(value) { if (this.field.type === 'address') this.region = createRegionPickerState(Array.isArray(value) ? value : []) } } },
   mounted() { if (!this.isDropdown && ['options', 'sort'].includes(this.field.type)) this.loadChips() },
   methods: {
-    regionPickerSelection,
     emit(value) { this.$emit('update:modelValue', value) },
     part(key) { return this.modelValue?.[key] ?? '' },
     setPart(key, value) { this.emit({ ...(this.modelValue || {}), [key]: value }) },
@@ -91,7 +88,6 @@ export default {
       const time = kind === 'time' ? value : this.timePart(side) || Array(spec.timeColumns).fill('00').join(':')
       this.setPart(side, [spec.dateFields ? date : '', spec.timeColumns ? time : ''].filter(Boolean).join(' '))
     },
-    changeRegionColumn(event) { this.region = updateRegionPickerState(this.region, event.detail.column, event.detail.value) },
     removeSelection(index) { this.emit(this.field.multiple ? this.modelValue.filter((_, position) => position !== index) : '') },
     chipValue(option) { return this.field.storage === 'object' ? filterOptionRows(this.field, [option])[0].raw : option.value },
     chipKey(value) { return String(value?._filterKey ?? value ?? '') },
@@ -165,7 +161,7 @@ export default {
 .filter-range input { flex: 1; width: 0; }
 .date-range { display: flex; flex-direction: column; gap: 14rpx; }
 .date-label { color: #67808b; font-size: 23rpx; flex-shrink: 0; }
-.date-row picker, .region-row picker { flex: 1; min-width: 0; }
+.date-row picker, .region-picker { flex: 1; min-width: 0; }
 .date-input { display: flex; align-items: center; font-size: 23rpx; }
 .clear { display: flex; align-items: center; justify-content: center; min-width: 48rpx; min-height: 64rpx; color: #7e949e; font-size: 34rpx; }
 .placeholder { color: #8fa1a9; }
