@@ -49,7 +49,7 @@
     "check:customer-detail-actions": "node scripts/check-customer-detail-actions.mjs",
     "check:list-detail-action-placement": "node scripts/check-list-detail-action-placement.mjs",
     "check:list-card-delete": "node scripts/check-list-card-delete.mjs",
-    "check:region-location": "node --test scripts/test-region-and-location.mjs",
+    "check:region-location": "node --test scripts/test-region-and-location.mjs scripts/test-region-picker-defaults.mjs scripts/test-customer-address-map.mjs",
     "check:checkin-statistics": "node --test scripts/test-checkin-statistics.mjs",
     "check:checkin-target-picker": "node scripts/check-checkin-target-picker.mjs",
     "check:checkin-current-user": "node scripts/check-checkin-current-user.mjs",

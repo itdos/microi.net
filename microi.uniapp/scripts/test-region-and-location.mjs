@@ -92,17 +92,16 @@ test('地区全部值按字面值展示', () => {
   assert.equal(formatRegionSelection(['浙江省', '宁波市', '鄞州区']), '浙江省宁波市鄞州区')
 })
 
-test('xjy 客户城市默认选中浙江省宁波市鄞州区', () => {
-  assert.deepEqual(XJY_CUSTOMER_DEFAULT_REGION, ['浙江省', '宁波市', '鄞州区'])
+test('xjy 客户城市默认选中浙江省全部全部', () => {
+  assert.deepEqual(XJY_CUSTOMER_DEFAULT_REGION, ['浙江省', '全部', '全部'])
   assert.deepEqual(
     regionPickerSelection(createRegionPickerState(XJY_CUSTOMER_DEFAULT_REGION)),
-    ['浙江省', '宁波市', '鄞州区']
+    ['浙江省', '全部', '全部']
   )
 })
 
-test('地址控件监听异步赋值并同步地区选择器索引', () => {
-  assert.equal((nativeFieldSource.match(/\n  watch: \{/g) || []).length, 1)
-  assert.match(nativeFieldSource, /modelValue:\s*\{[\s\S]*?createRegionPickerState\(this\.regionValue\)/)
+test('地址控件将异步业务值传入共用地区选择器', () => {
+  assert.match(nativeFieldSource, /<mci-region-picker[^>]*:model-value="regionValue"/)
 })
 
 test('直辖市保留市级和区县级选择', () => {
