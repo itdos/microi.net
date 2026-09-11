@@ -1839,6 +1839,8 @@ export function getPresentation(context) {
         actionKey: editable ? 'xjy-customer-address-location' : '',
         actionLabel: context.state.locating ? '定位中…' : '重新定位',
         locating: Boolean(context.state.locating),
+        // 地址坐标已随表单回读，无需等待打卡定位计时器即可挂载地图。
+        mapReady: validCoordinatePair(context.form[latitudeName], context.form[longitudeName]),
         latitude: Number(context.form[latitudeName] || 0),
         longitude: Number(context.form[longitudeName] || 0),
         address: String(context.form[addressName] || ''),
@@ -1969,7 +1971,7 @@ export function getRelatedPresentation(context, field) {
         { key: 'serviceType', field: 'Leixing', label: '服务类型', type: 'select', source: 'baseData', parentKey: 'ShouhouDDLX', valueField: 'Value', labelField: 'Value' },
         { key: 'status', field: 'Zhuangtai', label: '状态', type: 'select', source: 'baseData', parentKey: 'ShouHouDDZT', valueField: 'Value', labelField: 'Value' },
         { key: 'staff', field: 'ShouhouRY', label: '服务人员', type: 'text', placeholder: '输入服务人员姓名' },
-        { key: 'city', field: 'Chengshi', label: '城市', type: 'text', placeholder: '输入省、市或区县' },
+        { key: 'city', field: 'Chengshi', label: '城市', type: 'address' },
         { key: 'plannedService', field: 'YujiSHSJ', label: '计划服务时间', type: 'datetime-range' }
       ],
       hint: context.form.KehuID ? '从当前客户的售后任务中选取' : '从有权限查看的售后任务中选取'

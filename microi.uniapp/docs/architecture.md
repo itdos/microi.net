@@ -22,6 +22,7 @@ Profile 使用通用模块目录、动态列表、动态详情和动态表单；
 - Select、MultipleSelect、Checkbox 复用 `mci-native-field` 的检索、分页、勾选和标签交互。筛选选中值携带标签与原始值，发送条件前移除 UI 包装。单值使用 `=`，单值字段显式查询多选使用 `In`，JSON 数组按元素或对象标识生成分组 `Like`。配置 SelectSaveField 的 Checkbox/MultipleSelect 同时兼容字段值数组和历史整行对象数组；不以显示文字替代 Id。
 - Switch 为全部、是、否；全部不生成条件，0 保留。DateTime 读取 DateTimeType，年/月/日/小时/分钟/秒分别显示对应选择器；结束边界采用下一精度单位的开区间，物理日期列与文本日期列分别格式化。
 - Address 保留省、市、区名称数组，省、市筛选生成完整 JSON 路径前缀；“全部”只代表不限制后续层级，不发送为具体地区值。
+- 地区滚轮统一使用 `mci-region-picker`，动态表单、列表、关联记录选择弹窗及原生页面共用同一行为。`profiles/<id>/profile.cjs` 的 `config.defaultRegion` 可配置空值首次打开的位置；确认前不写入业务值，取消重开恢复已选值，异步回填和已有数据优先。关联记录选择器的 `presentation.filters` 使用 `type: 'address'` 即可接入同样的省市区查询。
 - Cascader/Department 遵守 Multiple 与 EmitPath；SelectTree/TreeCheckbox 保留节点值和父子关系。Children、ParentField、Disabled、Leaf、Lazy、ParentChildLinkage 按配置解释，懒加载透传 `_ParentValue`。若需限制查询可选层级，可在 SearchFieldIds 项显式添加 `SearchLeafOnly: true` 或 `SearchSelectableLevels: [2, 3]`（根为第 1 层）。它们是移动查询扩展项，不是新增物理字段。缺父级或循环数据提示错误，不能拼造路径。
 - 弹窗使用独立草稿；关闭放弃本次选择，重置清空草稿，查看结果校验后才替换生效条件。该组件不运行表单提交、必填和字段写入事件。
 

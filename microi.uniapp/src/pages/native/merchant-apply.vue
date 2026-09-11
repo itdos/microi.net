@@ -10,7 +10,7 @@
         <view class="section-title"><text>基本资料</text></view>
         <view class="form-panel">
           <view class="field-row"><text class="field-label">商家名称</text><input v-model="form.TenantName" class="field-input" placeholder="请输入商家名称" maxlength="80" @blur="checkTenantName" /></view>
-          <picker mode="region" :value="region" @change="region = $event.detail.value"><view class="field-row"><text class="field-label">省市区</text><text class="field-select" :class="{ placeholder: !region.length }">{{ region.length ? region.join(' / ') : '请选择省市区' }} ›</text></view></picker>
+          <mci-region-picker v-model="region"><view class="field-row"><text class="field-label">省市区</text><text class="field-select" :class="{ placeholder: !region.length }">{{ region.length ? region.join(' / ') : '请选择省市区' }} ›</text></view></mci-region-picker>
           <view class="field-row"><text class="field-label">详细地址</text><input v-model="form.Dizhi" class="field-input" placeholder="请输入详细地址" maxlength="120" /></view>
           <view class="field-row"><text class="field-label">联系人</text><input v-model="form.LianxiR" class="field-input" placeholder="请输入联系人" maxlength="30" /></view>
           <view class="field-row"><text class="field-label">联系人电话</text><input v-model="form.LianxiRDH" class="field-input" type="number" placeholder="请输入联系电话" maxlength="11" /></view>
