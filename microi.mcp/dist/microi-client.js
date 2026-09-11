@@ -2071,6 +2071,9 @@ export class MicroiClient {
         });
     }
     async getEventCode(formEngineKey, eventType, options = {}) {
+        // 历史文档名 DataFilterV8 对应运行时真实字段 ServerDataV8。
+        // 直接把别名写入 diy_table 会得到成功响应，却不会执行脱敏/过滤。
+        eventType = eventType === 'DataFilterV8' ? 'ServerDataV8' : eventType;
         return this.post(API.GET_EVENT_CODE, {
             OsClient: this.config.osClient,
             FormEngineKey: formEngineKey,
@@ -2078,6 +2081,7 @@ export class MicroiClient {
         }, options);
     }
     async saveEventCode(formEngineKey, eventType, code, options) {
+        eventType = eventType === 'DataFilterV8' ? 'ServerDataV8' : eventType;
         assertSourceIntegrity(code, `保存 V8 事件 ${formEngineKey}/${eventType}`);
         let remote;
         try {
@@ -2191,12 +2195,27 @@ export class MicroiClient {
             payload.V8Limit = Number(payload.V8Unlimited) === 1 ? 0 : 1;
         }
         delete payload.V8Unlimited;
-        return this.post(API.CREATE_TABLE, {
+        const readPrimary = payload.ReadPrimary;
+        if (readPrimary !== undefined && readPrimary !== null && readPrimary !== 0 && readPrimary !== 1)
+            throw new Error('ReadPrimary 只允许 null、0 或 1');
+        delete payload.ReadPrimary;
+        const created = await this.post(API.CREATE_TABLE, {
             OsClient: this.config.osClient,
             Name: name,
             Description: description || '',
             ...payload,
         });
+        // 复用标准更新协议及后端主库回读；旧 create_table 路由不会静默丢弃新配置。
+        if (created.Code !== 1 || readPrimary === undefined)
+            return created;
+        const tableId = created.Data?.TableId
+            || created.Data?.Id;
+        if (!tableId)
+            return { Code: 0, Data: null, Msg: '表创建后缺少 TableId，未配置 ReadPrimary' };
+        const configured = await this.updateTable({ Id: tableId, ReadPrimary: readPrimary });
+        if (configured.Code !== 1)
+            return configured;
+        return { ...created, Data: { ...created.Data, ReadPrimary: readPrimary } };
     }
     async repairFixedAuditFields(input) {
         return this.post(API.REPAIR_FIXED_AUDIT_FIELDS, {
@@ -2554,9 +2573,21 @@ export class MicroiClient {
         });
     }
     async querySystemObservability(query) {
+        // 池故障时 Managed 引擎查找和普通 MCP 鉴权也会阻塞，走同一 DiyToken 的可信应急协议。
+        if (query.Action === 'DatabasePools' || query.Action === 'DatabasePoolRecovery') {
+            return this.post('/api/Diagnostics/database-pools', { ...query, OsClient: this.config.osClient }, {
+                allowNativeFallback: false, timeoutMs: 30000,
+            });
+        }
         return this.executeEngine('mci-system-observability-query', query);
     }
     async manageSystemObservability(command) {
+        if (command.Action === 'ResetDatabasePools') {
+            // 传输结果不确定时只能用同一 OperationId 回读，禁止自动换传输重放管理请求。
+            return this.post('/api/Diagnostics/database-pools', { ...command, OsClient: this.config.osClient }, {
+                allowNativeFallback: false, timeoutMs: 30000,
+            });
+        }
         return this.executeEngine('mci-system-observability-action', command);
     }
     async getRedisStatistics(database = 0, connectionId) {

@@ -109,7 +109,9 @@ export function serializeMicroAppComponentData(value, maxDepth = 8) {
         if (seen.has(current)) return undefined;
         seen.add(current);
         if (Array.isArray(current)) {
-            return current.map((item) => visit(item, depth + 1)).filter((item) => item !== undefined);
+            const output = current.map((item) => visit(item, depth + 1)).filter((item) => item !== undefined);
+            seen.delete(current);
+            return output;
         }
         const output = {};
         Object.keys(current).forEach((key) => {
@@ -118,6 +120,9 @@ export function serializeMicroAppComponentData(value, maxDepth = 8) {
             const next = visit(current[key], depth + 1);
             if (next !== undefined) output[key] = next;
         });
+        // Only ancestors are cycles. The same FormData object can legitimately
+        // also occur in DataAppend; dropping the second reference loses tenant binding.
+        seen.delete(current);
         return output;
     };
     return visit(value, 0) || {};

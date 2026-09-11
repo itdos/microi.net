@@ -58,11 +58,12 @@ test('game delivery tools gate paid generation and role writes while exposing so
             payload: {
                 RequestId: musicRequestId,
                 Prompt: '原创国风策略配乐',
-                Model: 'music-2.6',
+                Model: 'music-3.0',
                 IsInstrumental: true,
                 SampleRate: 44100,
                 Bitrate: 256000,
                 Format: 'mp3',
+                DurationSeconds: 20,
             },
         });
         const roleDryRun = await client.callTool({

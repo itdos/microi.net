@@ -5,6 +5,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { createMcpServer } from './server.js';
 import type { MicroiClient, SystemObservabilityManage, SystemObservabilityQuery } from './microi-client.js';
+import { MicroiClient as HttpMicroiClient } from './microi-client.js';
 
 function toolText(result: CallToolResult): string {
   return result.content
@@ -12,6 +13,68 @@ function toolText(result: CallToolResult): string {
     .map(item => item.type === 'text' ? item.text : '')
     .join('\n');
 }
+
+test('pool recovery MCP previews, confirms, preserves idempotency and reads node receipts without ordinary audit calls', async () => {
+  const id = 'a'.repeat(32);
+  const pools = ['b'.repeat(64)];
+  const writes: SystemObservabilityManage[] = [];
+  const queries: SystemObservabilityQuery[] = [];
+  const fakeClient = {
+    querySystemObservability: async (query: SystemObservabilityQuery) => {
+      queries.push(query);
+      return { Code: 1, Data: { OperationId: id, PoolIds: pools, Target: 'Read', State: 'Pending' } };
+    },
+    manageSystemObservability: async (command: SystemObservabilityManage) => {
+      writes.push(command); return { Code: 1, Data: { OperationId: id, State: 'Pending' } };
+    },
+    writeAuditLog: async () => { throw new Error('ordinary audit depends on exhausted pool'); },
+  } as unknown as MicroiClient;
+  const server = createMcpServer(fakeClient, { osClient: 'tenant-pool', apiBaseUrl: 'https://microi.test', label: '连接池测试', codexMode: true });
+  const client = new Client({ name: 'pool-recovery', version: '1' });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.connect(b), client.connect(a)]);
+  const call = async (name: string, args: Record<string, unknown>) => await client.callTool({
+    name: 'microi_codex', arguments: { action: name, params: args },
+  }) as CallToolResult;
+  try {
+    const preview = await call('microi_manage_system_observability', { action: 'ResetDatabasePools', poolTarget: 'Read' });
+    assert.equal(preview.isError, undefined);
+    assert.match(toolText(preview), new RegExp(`ResetDatabasePools:${id}`));
+    assert.equal(writes.length, 0);
+    const invalid = await call('microi_manage_system_observability', { action: 'ResetDatabasePools', confirmExecution: 'wrong' });
+    assert.equal(invalid.isError, true); assert.equal(writes.length, 0);
+    const command = { action: 'ResetDatabasePools', poolTarget: 'Read', operationId: id, poolIds: pools, confirmExecution: `ResetDatabasePools:${id}` };
+    const accepted = await call('microi_manage_system_observability', command);
+    assert.equal(accepted.isError, undefined);
+    assert.deepEqual(writes[0], { Action: 'ResetDatabasePools', Target: 'Read', OperationId: id, PoolIds: pools, Confirm: `ResetDatabasePools:${id}` });
+    const state = await call('microi_query_system_observability', { action: 'DatabasePoolRecovery', operationId: id });
+    assert.equal(state.isError, undefined); assert.match(toolText(state), /Pending/u);
+    assert.equal(queries.at(-1)?.OperationId, id);
+  } finally { await client.close(); await server.close(); }
+});
+
+test('pool emergency HTTP client uses bound tenant and direct protocol, never native transport replay on uncertain reset', async () => {
+  const previous = globalThis.fetch;
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const client = new HttpMicroiClient({ apiBaseUrl: 'https://microi.test', osClient: 'bound-tenant', token: 'pool-test-token', username: '', password: '' });
+  try {
+    globalThis.fetch = async (url, options) => {
+      requests.push({ url: String(url), body: JSON.parse(String(options?.body)) });
+      return new Response(JSON.stringify({ Code: 1, Data: { State: 'Pending' } }), { headers: { 'Content-Type': 'application/json' } });
+    };
+    await client.querySystemObservability({ Action: 'DatabasePools', OsClient: 'forged-tenant' });
+    await client.manageSystemObservability({ Action: 'ResetDatabasePools', OperationId: 'a'.repeat(32) });
+    assert.equal(requests.length, 2);
+    for (const request of requests) {
+      assert.equal(request.url, 'https://microi.test/api/Diagnostics/database-pools');
+      assert.equal(request.body.OsClient, 'bound-tenant');
+    }
+    let calls = 0;
+    globalThis.fetch = async () => { calls++; throw new Error('connection reset after accept'); };
+    await assert.rejects(() => client.manageSystemObservability({ Action: 'ResetDatabasePools', OperationId: 'a'.repeat(32) }), /禁用非幂等传输重放/u);
+    assert.equal(calls, 1);
+  } finally { globalThis.fetch = previous; }
+});
 
 test('system observability MCP exposes bounded read catalog and confirmed IP governance', async () => {
   const queries: SystemObservabilityQuery[] = [];

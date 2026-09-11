@@ -52,6 +52,16 @@ namespace Microi.net
                 return new DosResult(1001, null, "登录身份已过期，请重新登录。");
             if (action == "GetCurrentUser")
                 return new DosResult(1, currentUser.DeepClone());
+            if (action == "GetSysDeptStep")
+            {
+                // 仅复用历史部门树读取原子，保留 _Child、排序及组织范围；
+                // 身份和租户由已验证 DiyToken 固定，不接受请求伪造 _CurrentUser/IsDeleted。
+                var param = request.ToObject<SysDeptParam>() ?? new SysDeptParam();
+                param.OsClient = osClient;
+                param._CurrentUser = currentUser;
+                param.IsDeleted = 0;
+                return await new SysDeptLogic().GetSysDeptStep(param).ConfigureAwait(false);
+            }
             if (action == "AddSysLog")
             {
                 var log = BuildLegacyClientLog(request, osClient, currentUser, out var error);

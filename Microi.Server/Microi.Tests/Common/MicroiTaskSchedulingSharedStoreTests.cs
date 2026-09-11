@@ -23,9 +23,7 @@ public class MicroiTaskSchedulingSharedStoreTests
         // 依赖隔离数据库的场景不能归入 Quick，也不能在 Full 中静默跳过。
         Assert.False(string.IsNullOrWhiteSpace(connection), "需显式配置本任务的一次性 schedule_gate MySQL，禁止使用业务数据库。");
         var builder = new MySqlConnectionStringBuilder(connection);
-        Assert.Equal("127.0.0.1", builder.Server);
-        Assert.Equal("schedule_gate", builder.Database);
-        Assert.Equal(62680u, builder.Port);
+        await ScheduleFixtureGuard.VerifyMySqlOwnerAsync(builder);
         var previous = OsClientExtend.ClientList;
         OsClientExtend.ClientList = new ConcurrentDictionary<string, OsClientSecret>();
         OsClientExtend.ClientList["stopped"] = new OsClientSecret();

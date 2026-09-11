@@ -264,6 +264,26 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 该命令不主动删除 `/microi` 数据目录或 Docker volume，但会立即中断服务；执行前仍必须备份并核对目标容器。
 :::
 
+### 发行机的依赖镜像同步
+
+安装器与平台构建使用同一阿里云 `microios` 镜像源，包括 SQL Server、PostgreSQL、
+MySQL、Redis、MongoDB、MinIO、.NET 和 Nginx。上游版本与摘要统一维护在源码
+`Microi.Server/tools/dependency-images.json`，不要求客户逐次从 Docker Hub/MCR 下载。
+
+有发布权限的联网发行机执行：
+
+```bash
+bash Microi一键编译发布.sh --mirror-dependencies
+node Microi.Server/tools/dependency-images.mjs verify
+```
+
+脚本读取本机私有 `Microi一键编译发布配置.json` 的 Region、Namespace、Username、Password，
+以标准输入登录，不把密码写入命令或日志。需先安装官方 `regctl`；Windows 可通过
+`MICROI_RELEASE_REGCTL` 指向已核验的工具路径。只同步一类可用 `--scope=build|test|install`。
+网络受限时可设置发行脚本进程变量 `MICROI_RELEASE_SOURCE_MIRROR=daocloud`，但仍固定并验证
+原始 SHA-256，不接受不同版本替代；复制保留源镜像支持的全部 CPU 架构。
+回执保存在 `.tmp/dependency-images/`。商业数据库镜像仍需相应许可和再分发授权。
+
 ### 🔌 离线安装（无互联网环境）
 
 适用于**无法访问互联网**的 Linux 服务器，需要在一台有网络的机器上提前制作离线安装包。

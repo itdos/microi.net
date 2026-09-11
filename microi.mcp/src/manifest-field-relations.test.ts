@@ -40,6 +40,7 @@ const validManifest = {
     {
       name: 'Biz_OrderItem',
       fields: [
+        { name: 'OsClient', label: '租户', component: 'Text', type: 'varchar(50)' },
         { name: 'OrderId', label: '订单Id', component: 'Text', type: 'varchar(50)' },
         { name: 'ProductName', label: '商品', component: 'Text', type: 'varchar(200)' },
       ],
@@ -122,4 +123,39 @@ test('Manifest schema teaches the portable relation contract and no JoinForm Nam
   assert.match(natural.fields.relation, /1:N/u);
   assert.ok(examples.joinForm);
   assert.ok(examples.tableChild);
+});
+
+test('独立租户库的子表以真实外键索引通过计划，不要求不存在的OsClient列', () => {
+  const manifest = structuredClone(validManifest);
+  manifest.tables[2].fields = manifest.tables[2].fields.filter((field) => field.name !== 'OsClient');
+  manifest.tables[2].indexes = [{ name: 'ix_orderitem_order', columns: ['OrderId'], unique: false }];
+  assert.deepEqual(buildPlan(manifest).errors, []);
+});
+
+test('共享行隔离子表仍必须以已声明的租户列和外键组成索引', () => {
+  const manifest = structuredClone(validManifest);
+  manifest.tables[2].indexes = [{ name: 'ix_orderitem_order', columns: ['OrderId'], unique: false }];
+  assert.ok(buildPlan(manifest).errors.some((error) => error.includes('(OsClient, OrderId)')));
+});
+
+test('计划拒绝把OsClient或CreateUser当作平台自动创建的物理列', () => {
+  const manifest = structuredClone(validManifest);
+  manifest.tables[2].fields = manifest.tables[2].fields.filter((field) => field.name !== 'OsClient');
+  manifest.tables[2].indexes = [
+    { name: 'ix_fake_tenant', columns: ['OsClient', 'OrderId'], unique: false },
+    { name: 'ix_fake_user', columns: ['CreateUser'], unique: false },
+  ];
+  const errors = buildPlan(manifest).errors;
+  assert.ok(errors.some((error) => error.includes('unknown physical field "OsClient"')));
+  assert.ok(errors.some((error) => error.includes('unknown physical field "CreateUser"')));
+});
+
+test('真实固定审计字段可用于索引，非物理控件仍不可用于索引', () => {
+  const manifest = structuredClone(validManifest);
+  manifest.tables[0].indexes = [
+    { name: 'ix_fixed_owner', columns: ['UserId', 'CreateTime', 'IsDeleted'], unique: false },
+  ];
+  assert.deepEqual(buildPlan(manifest).errors, []);
+  manifest.tables[0].indexes.push({ name: 'ix_fake_children', columns: ['Items'], unique: false });
+  assert.ok(buildPlan(manifest).errors.some((error) => error.includes('unknown physical field "Items"')));
 });

@@ -100,7 +100,7 @@ AI 为 Microi 平台新增或修改任何业务逻辑、后台工具、数据维
 - 平台级强制安全校验不能为了“全部低代码化”放进租户可编辑脚本而被绕过；可以留在 C#，但必须是通用、失败关闭的安全边界，不得夹带某个项目的业务文案、字段组合或状态机。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=b5ed99d715e5fc5a62d5a9618397f0e40899b400f377dc3fedc41d18d6db73dd -->
+<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=9364579ba944874dcdcc71c44066e285e2a3e88140255531e03deb2ec2cab598 -->
 ## 应用商城优先于 Microi.Upgrade（强制）
 
 能由应用包声明、差异安装和回读验收完成的升级，不得在 `Microi.Server/Microi.Upgrade/` 新增定制 .NET 升级类。表、字段、Tab、菜单、角色权限、接口引擎、表单事件、数据源、页面、打印、工作流、任务及可幂等安装的种子数据，默认都属于应用商城资源。
@@ -185,7 +185,7 @@ if (string.IsNullOrWhiteSpace(tableName)) { return; }
 如果方法内部只通过 `DynamicHelper` 读取对象字段，方法参数优先声明为 `object`，不要声明为 `dynamic`。这样可以减少 C# 运行时动态绑定进入普通字符串工具链的机会。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=91feb164525de8824674bd62eae72fc549d64ad253b0551d3504ecb7aba5bf51 -->
+<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=3ebfed66fbaabf345188326688f195186d6f33f72252e2ce19041b33a5eef403 -->
 ## 根目录保留文件说明
 
 根目录只允许存在以下类型的文件和目录：
