@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-file-upload-008 sha256=5e3b59486745d3c54bd8ad25c43cbe2396e6d614394340b93d93794b6df56292 -->
+<!-- microi-progressive:chunk id=v8-file-upload-008 sha256=7cda0fe7bb978e7219cb3c1ba30813e1a5e777f1272410f85d4c7ecc1882cc3d -->
 ## Office 文件在线编辑版本号规则
 
 当文件上传控件开启【Office 在线预览】、【允许在线编辑】和【开启 Office 文件版本号】时，前后端必须遵循统一版本规则：
@@ -39,7 +39,7 @@
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-009 sha256=50fba71370f45de3dd677f5731f3956c328a8d3b1ca2125b853128067f9af40a -->
+<!-- microi-progressive:chunk id=v8-file-upload-009 sha256=e01219d4f1a8f8c535e0b5aa5620120c37bd5e79af27dbbd63babda8d887cd13 -->
 ## ImgUpload / FileUpload 字段值兼容规则
 
 `ImgUpload` 不能假设只是一种值结构。PC 表单、移动端、旧数据、单图/多图、公开/私有桶会混合出现以下格式：
@@ -120,7 +120,7 @@ function publicUploadUrl(path) {
 私有桶（`Limit === true`）不要拼 `FileServer`，必须把归一化后的 `Path` 传给 `V8.Method.GetPrivateFileUrl({ FilePathName: path })` 或后端签名接口换临时 URL。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-010 sha256=f34d476435c3a8321df017b481771d757f580c8d75f7648fdd54ee1c624d116c -->
+<!-- microi-progressive:chunk id=v8-file-upload-010 sha256=229294a07a8db953219c35292db5558430addb576505695b9ce88a275eb46232 -->
 ## 安全注意
 
 - ❌ 不要让前端任意指定 `Path`（路径穿越风险），只允许后端固定路径

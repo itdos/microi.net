@@ -186,7 +186,7 @@ function resetOutageEvidence(options = {}) {
 function recoverFromOutage() {
     // 冷启动已经失败时仅隐藏诊断层仍会露出失败的启动页，需重载原 URL。
     // 已就绪的页面只撤掉异常层，保留未提交表单；绝不重放触发故障的业务请求。
-    const reloadStartup = (apiServiceState.active || pendingFailure)
+    const reloadStartup = apiServiceState.active
         && window.__MICROI_APP_READY__ !== true
         && Boolean(window.__MICROI_APP_BOOT_ERROR__);
     resetOutageEvidence();
@@ -407,6 +407,10 @@ async function runHealthCheck(version) {
 
 export function reportApiServiceFailure(error, context = {}) {
     if (typeof window === "undefined" || !error || isCanceledRequest(error)) return false;
+    // 已收到业务失败正文说明请求完成；不能把主动抛出的启动错误当成断网，
+    // 否则 Healthy 探测会反复重载仍然失败的配置页。路由失败同样保留原始提示。
+    if (error.bootstrapStage || error.code === 'MICROI_SYSCONFIG_UNAVAILABLE'
+        || error.code === 'MICROI_OSCLIENT_UNAVAILABLE') return false;
 
     const apiBase = trimSlash(context.apiBase);
     const requestUrl = getRequestUrl(context);

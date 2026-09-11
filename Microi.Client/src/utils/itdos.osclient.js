@@ -62,7 +62,7 @@ var DiyOsClient = {
      * 初始化os时，首先知道是哪个osclient，才能获取到ApiBase
      * 运行目标权重：
      * ApiBase：URL > index.html > config.json > localStorage/Pinia > 当前站点同源
-     * OsClient：URL > index.html > localStorage/Pinia > 域名解析 > 默认租户
+     * OsClient：URL > index.html > 域名解析；缓存由当前域名的权威结果校正
      * @param {*} init
      */
     OsClientInit: async function (init) {
@@ -75,8 +75,8 @@ var DiyOsClient = {
         });
         DiyCommon.SetApiBase(apiBase);
 
-        //预获取OsClient
-        if (DiyOsClient.GetOsClientNotDomain() == "") {
+        // 未显式部署/指定租户时，以域名发现为准，不能复用上次失败写入的默认租户。
+        if (!getRuntimeEndpointQuery().osClient.present && !getRuntimeWindowValue("OsClient")) {
             var getOsClientByDomainResult = await DiyCommon.PostAsync({
                 url: "/apiengine/platform-os-client-by-domain",
                 data: {
@@ -88,10 +88,13 @@ var DiyOsClient = {
                 suppressAuthFailure: true,
                 suppressErrorNotification: true
             });
-            if (getOsClientByDomainResult.Code == 1 && getOsClientByDomainResult.Data) {
-                var osClient = getOsClientByDomainResult.Data.OsClient || getOsClientByDomainResult.Data.OSCLIENT;
-                DiyCommon.SetOsClient(osClient);
+            var discoveredOsClient = getOsClientByDomainResult?.Data?.OsClient || getOsClientByDomainResult?.Data?.OSCLIENT;
+            if (getOsClientByDomainResult?.Code != 1 || DiyCommon.IsNull(discoveredOsClient)) {
+                var tenantError = new Error("获取站点租户失败：" + (getOsClientByDomainResult?.Msg || "当前域名未返回有效租户，请检查站点域名配置。"));
+                tenantError.code = "MICROI_OSCLIENT_UNAVAILABLE";
+                throw tenantError;
             }
+            DiyCommon.SetOsClient(discoveredOsClient);
         }
 
         var osClient = DiyOsClient.GetOsClient();

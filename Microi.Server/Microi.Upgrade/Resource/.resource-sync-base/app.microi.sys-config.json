@@ -1,23 +1,23 @@
 {
   "PackageInfo": {
     "Name": "系统设置",
-    "Version": "v6.4.4",
+    "Version": "v6.4.7",
     "CreateTime": "2026-08-23T02:17:37.179Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
     "MenuCount": 2,
     "TableCount": 2,
-    "FieldCount": 147,
+    "FieldCount": 148,
     "FlowCount": 0,
     "NodeCount": 0,
     "LineCount": 0,
     "DDLCount": 3,
-    "PhysicalColumnCount": 417,
-    "ApiEngineCount": 2,
+    "PhysicalColumnCount": 418,
+    "ApiEngineCount": 4,
     "DataSetCount": 1,
     "DataRowCount": 6,
     "AiApplicationCount": 0,
-    "ChangeHistory": "2026-09-09 v6.4.4 文件上传权限增加目录通配符说明与配置示例，支持*、**、?、字符集合/范围和花括号候选组合，减少旧移动端和微服务目录逐条授权。后端继续校验实际路径、有效角色、公私桶与平台保留目录；不覆盖任何租户既有授权。通配符需后端v8.2.9+。\n2026-09-09 v6.4.3 新增普通系统设置“文件上传权限”，按目录与真实角色兼容旧移动端/定制上传；公有访问和子目录均须显式授权，保留租户隔离、字段授权、类型及配额检查。保存后共享缓存生效，更新应用不覆盖租户授权值。需后端 v8.2.8 或更高版本。\n2026-09-08 v6.4.2 新增系统设置“停用任务调度”开关，默认关闭；配套新版后端在 Quartz 领取和失火处理前按租户过滤，触发前再次复核，停用不修改共享任务状态及执行时间；按计划时间写新版未执行日志并跨节点去重。保留旧版调度与租户现有配置，开关保存后无需重启，已开始的业务不强行中断。\n2026-09-07 v6.4.1 修复系统设置局部更新误判停用，兼容 Del/Delete 删除动作；保留至少一条启用设置，检查共享当前写事务。\n2026-09-06 v6.4.0 新增系统设置全局函数子表及前后端 DateNow/DateFormat/DateAdd 六条幂等种子；按目标启用配置绑定外键，不覆盖已有全局代码或函数源码；运行时按租户缓存，真实提交后跨节点失效。需配套更新后端。\n2026-09-05 v6.3.14 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-05 v6.3.13 移除系统设置旧版“显示AI助手图标”字段元数据及安装包建表声明，仅保留 DisableAiAssistant“关闭AI助手图标”负向开关；保留存量物理列兼容，不改写租户开关值。\n2026-09-02 v6.3.12 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v6.3.11 在 v6.3.10 基础上补齐官方升级资源的结构化历史、客户端能力标记和日志类型；模块底部信息继续交付支持 {{ OsVersion }} 和 {{ YYYY }} 的默认模板，不携带 Sys_Config 租户数据。\n2026-08-30 v6.3.9 将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。\n2026-08-25 v6.3.8 非敏感租户系统设置列表、保存和删除迁入 Managed V8 接口；敏感明文仍只经过可信后端。\n2026-08-23 v6.3.7 系统设置公开开关与服务端私有凭据边界完善；开发配置默认展开折叠分组，CodeEditor 使用带字数的按钮弹层模式。\n",
+    "ChangeHistory": "2026-09-11 v6.4.7 修正上传返回扩展示例：先将 V8.Param.Result 转为普通 JS 对象，再兼容单文件对象与多文件数组，确保自定义字段写入每个文件。\n2026-09-11 v6.4.6 开启兼容平台旧版本时，单文件（包括Multiple=false）也统一恢复旧版数组，保留新版文件字段并补齐旧版小写属性；关闭时保持新版单文件对象和多文件数组。要求后端8.3.4及以上版本，避免旧后端调用缺失的上传请求原子方法。兼容开关仍默认关闭，保留租户开关值和既有上传返回扩展Hook。\n2026-09-11 v6.4.5 系统设置新增“兼容平台旧版本”，默认关闭；开启后上传保留新版字段并补充旧移动端小写字段。系统设置应用独立交付上传主接口及只补缺的返回扩展Hook；旧URL优先执行接口引擎，明确缺失时复用安全上传兜底。公私桶、鉴权、裁剪、配额与内容安全不变，安装不覆盖租户开关。需配套支持此功能的后端8.3.3 Docker更新。\n2026-09-09 v6.4.4 文件上传权限增加目录通配符说明与配置示例，支持*、**、?、字符集合/范围和花括号候选组合，减少旧移动端和微服务目录逐条授权。后端继续校验实际路径、有效角色、公私桶与平台保留目录；不覆盖任何租户既有授权。通配符需后端v8.2.9+。\n2026-09-09 v6.4.3 新增普通系统设置“文件上传权限”，按目录与真实角色兼容旧移动端/定制上传；公有访问和子目录均须显式授权，保留租户隔离、字段授权、类型及配额检查。保存后共享缓存生效，更新应用不覆盖租户授权值。需后端 v8.2.8 或更高版本。\n2026-09-08 v6.4.2 新增系统设置“停用任务调度”开关，默认关闭；配套新版后端在 Quartz 领取和失火处理前按租户过滤，触发前再次复核，停用不修改共享任务状态及执行时间；按计划时间写新版未执行日志并跨节点去重。保留旧版调度与租户现有配置，开关保存后无需重启，已开始的业务不强行中断。\n2026-09-07 v6.4.1 修复系统设置局部更新误判停用，兼容 Del/Delete 删除动作；保留至少一条启用设置，检查共享当前写事务。\n2026-09-06 v6.4.0 新增系统设置全局函数子表及前后端 DateNow/DateFormat/DateAdd 六条幂等种子；按目标启用配置绑定外键，不覆盖已有全局代码或函数源码；运行时按租户缓存，真实提交后跨节点失效。需配套更新后端。\n2026-09-05 v6.3.14 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-05 v6.3.13 移除系统设置旧版“显示AI助手图标”字段元数据及安装包建表声明，仅保留 DisableAiAssistant“关闭AI助手图标”负向开关；保留存量物理列兼容，不改写租户开关值。\n2026-09-02 v6.3.12 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v6.3.11 在 v6.3.10 基础上补齐官方升级资源的结构化历史、客户端能力标记和日志类型；模块底部信息继续交付支持 {{ OsVersion }} 和 {{ YYYY }} 的默认模板，不携带 Sys_Config 租户数据。\n2026-08-30 v6.3.9 将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。\n2026-08-25 v6.3.8 非敏感租户系统设置列表、保存和删除迁入 Managed V8 接口；敏感明文仍只经过可信后端。\n2026-08-23 v6.3.7 系统设置公开开关与服务端私有凭据边界完善；开发配置默认展开折叠分组，CodeEditor 使用带字数的按钮弹层模式。\n",
     "RequiredPlatformCapabilities": [
       "ClientFeature:MenuBottomContentDefaultFooter",
       "ClientFeature:CodeEditorFieldDisplayMode",
@@ -30,23 +30,25 @@
       "V8.Method.RunPlatformApiRuntime:TenantSystemSettings",
       "V8.Method.ValidateGlobalFunction",
       "ServerFeature:SystemGlobalFunctionsV1",
-      "Importer:DataSetParentBindingV1"
+      "Importer:DataSetParentBindingV1",
+      "V8.Method.UploadCurrentRequestAsync",
+      "V8.Method.IsLegacyUploadCompatibilityEnabled"
     ],
     "ChangeLog": {
-      "Version": "v6.4.4",
-      "Title": "文件上传目录通配符授权",
-      "ChangeType": "Feature",
-      "Content": "文件上传权限增加目录通配符说明与配置示例，支持*、**、?、字符集合/范围和花括号候选组合，减少旧移动端和微服务目录逐条授权。后端继续校验实际路径、有效角色、公私桶与平台保留目录；不覆盖任何租户既有授权。通配符需后端v8.2.9+。",
-      "ReleaseTime": "2026-09-09 13:00:00"
+      "Version": "v6.4.7",
+      "Title": "上传返回扩展示例兼容 Jint 包装对象",
+      "ChangeType": "Fix",
+      "Content": "修正 platform-hdfs-upload-hook 官方示例：先把 V8.Param.Result 转为普通 JS 对象，再处理单文件和数组，避免 Jint CLR 包装对象导致自定义返回字段没有写入。上传主接口、兼容开关、租户 Hook 所有权和文件授权行为保持不变。",
+      "ReleaseTime": "2026-09-11 13:05:00"
     },
     "Description": "吾码系统设置、租户私密配置与安全服务接入。",
-    "ServerMinVersion": "8.1.11"
+    "ServerMinVersion": "8.3.4"
   },
   "DDLStatements": [
     {
       "TableName": "Sys_Config",
       "TableId": "c8570fa6-c10f-4014-8cb4-4b046e7ba69c",
-      "DDL": "CREATE TABLE IF NOT EXISTS `Sys_Config` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `DevelopmentTemplateCodeGroup` varchar(255) NULL COMMENT '页面模板与组件配置',\n  `DevelopmentGlobalCodeGroup` varchar(255) NULL COMMENT '全局脚本与登录事件',\n  `DevelopmentV8GovernanceGroup` varchar(255) NULL COMMENT 'V8 资源与执行边界',\n  `DevelopmentAccessRuntimeGroup` varchar(255) NULL COMMENT '接口、文件与运行环境',\n  `GitHubLoginEnabled` int NULL COMMENT '启用 GitHub 登录',\n  `WeChatLoginEnabled` int NULL COMMENT '启用微信扫码登录',\n  `GiteeLoginEnabled` int NULL COMMENT '启用 Gitee 登录',\n  `FaceVerificationEnabled` int NULL COMMENT '启用严格人脸与活体核验',\n  `ExternalLoginEnabled` int NULL COMMENT '启用外部平台登录',\n  `RequirePasswordChangeStepUp` int NULL COMMENT '修改密码要求二次验证',\n  `AuthenticatorTotpEnabled` int NULL COMMENT '启用 Authenticator 动态口令',\n  `PasskeyEnabled` int NULL COMMENT '启用 Passkey 生物登录',\n  `IdentityVerificationEnabled` int NULL COMMENT '启用统一身份验证能力',\n  `FrameworkPresentationGroup` varchar(255) NULL COMMENT 'AI 与框架水印',\n  `InterfaceLoginExperienceGroup` varchar(255) NULL COMMENT '登录界面与入口',\n  `InterfaceThemeNavigationGroup` varchar(255) NULL COMMENT '主题与导航',\n  `FrameworkWatermarkFontSize` int NULL COMMENT '水印字号',\n  `FrameworkWatermarkDensity` varchar(25) NULL COMMENT '水印密度',\n  `FrameworkWatermarkOpacity` int NULL COMMENT '水印透明度',\n  `FrameworkWatermarkDirection` varchar(25) NULL COMMENT '水印方向',\n  `FrameworkWatermarkContent` varchar(255) NULL COMMENT '框架水印内容',\n  `FrameworkWatermarkEnabled` int NULL COMMENT '开启框架水印',\n  `MenuChildExpandMode` varchar(25) NULL COMMENT '菜单子级展开方式',\n  `DisableLoginGitHub` int NULL COMMENT '关闭GitHub登录入口',\n  `DisableLoginWeChat` int NULL COMMENT '关闭微信登录入口',\n  `DisableLoginGitee` int NULL COMMENT '关闭Gitee登录入口',\n  `DisableLoginAuthenticator` int NULL COMMENT '关闭Authenticator登录入口',\n  `DisableLoginPasskey` int NULL COMMENT '关闭生物登录入口',\n  `FormMaskBlur` int NULL COMMENT '开启遮罩毛玻璃',\n  `LoginGitHubDisplay` int NULL COMMENT '显示GitHub登录入口',\n  `LoginWeChatDisplay` int NULL COMMENT '显示微信登录入口',\n  `LoginGiteeDisplay` int NULL COMMENT '显示Gitee登录入口',\n  `LoginAuthenticatorDisplay` int NULL COMMENT '显示Authenticator登录入口',\n  `LoginPasskeyDisplay` int NULL COMMENT '显示生物登录入口',\n  `DisableFormMaskBlur` int NULL COMMENT '关闭表单遮罩毛玻璃',\n  `DisableAiAssistant` int NULL COMMENT '关闭AI助手图标',\n  `TenantId` varchar(50) NULL,\n  `V8IsolateNestedApiMemory` int NULL COMMENT '隔离嵌套分配计数',\n  `V8MaxNestedApiDepth` int NULL COMMENT 'V8接口嵌套最大深度',\n  `V8NestedApiDepth` int NULL COMMENT 'V8接口嵌套深度',\n  `V8MaxCallTreeLimitMemoryMB` int NULL COMMENT 'V8调用树最大预算(MB)',\n  `V8CallTreeLimitMemoryMB` int NULL COMMENT 'V8调用树分配预算(MB)',\n  `AutoTestSkipCaptcha` int NULL COMMENT '允许自动化测试登录时绕开验证码',\n  `V8TenantMaxExecutions` int NULL COMMENT 'V8租户并发执行数',\n  `V8ExecutionWaitMilliseconds` int NULL COMMENT 'V8执行排队等待(ms)',\n  `V8KeyMaxConcurrentExecutions` int NULL COMMENT 'V8单Key并发执行数',\n  `V8MaxConcurrentExecutions` int NULL COMMENT 'V8全局并发执行数',\n  `V8MaxLimitRecursion` int NULL COMMENT 'V8最大递归深度',\n  `V8DefaultLimitRecursion` int NULL COMMENT 'V8默认递归深度',\n  `V8MaxLimitMemoryMB` int NULL COMMENT 'V8单层最大预算(MB)',\n  `V8DefaultLimitMemoryMB` int NULL COMMENT 'V8单层分配预算(MB)',\n  `V8MaxStatements` int NULL COMMENT 'V8最大语句上限',\n  `V8DefaultMaxStatements` int NULL COMMENT 'V8默认语句上限',\n  `V8MaxTimeoutSeconds` int NULL COMMENT 'V8最大超时(秒)',\n  `V8DefaultTimeoutSeconds` int NULL COMMENT 'V8默认超时(秒)',\n  `SysLangs` varchar(500) NULL COMMENT '多语言',\n  `FormEventTimeout` varchar(50) NULL COMMENT '表单V8事件分布式锁超时时间',\n  `LoginEndV8Code` mediumtext NULL COMMENT '用户登录成功后V8事件',\n  `AMapKey` varchar(50) NULL COMMENT '高德地址Key',\n  `PageSizes` varchar(50) NULL COMMENT '分页配置',\n  `EnableSystemStyle` int NULL COMMENT '登录显示界面切换',\n  `Remark` mediumtext NULL COMMENT '备注',\n  `EnableUserClickLog` int NULL COMMENT '记录用户操作日志',\n  `OnlyOfficeApiBase` varchar(50) NULL,\n  `MenuBoxShadow` varchar(50) NULL COMMENT '菜单阴影',\n  `DesktopBgImgRandom` int NULL COMMENT '桌面背景图随机',\n  `LoginBgImgRandom` int NULL COMMENT '登陆背景图随机',\n  `ParentId` varchar(36) NULL,\n  `DesktopDockMenu` mediumtext NULL COMMENT '桌面默认任务栏',\n  `IndexCodeApi` mediumtext NULL COMMENT 'Api首页HTML代码',\n  `EnableSwagger` int NULL COMMENT '开启Swagger',\n  `ClientVersion` varchar(50) NULL COMMENT '客户器端版本号',\n  `ServerVersion` varchar(50) NULL COMMENT '服务器端版本号',\n  `LoginBottomContent` mediumtext NULL COMMENT '登录框底部信息',\n  `AnonymousDesktop` int NULL COMMENT '允许匿名进入桌面',\n  `ApiBase` varchar(50) NULL,\n  `PrintSqlToPage` int NULL COMMENT '返回sql到前端',\n  `AppWorkSlideshow` mediumtext NULL COMMENT '工作台轮播图',\n  `AppLoginBgImg` mediumtext NULL COMMENT '登陆背景图',\n  `AppIndexSlideshow` mediumtext NULL COMMENT '首页轮播图',\n  `CaptchaConfig` mediumtext NULL COMMENT '验证码配置',\n  `UEditorConfig` mediumtext NULL COMMENT '富文本配置',\n  `DesktopBgImg` varchar(255) NULL COMMENT '桌面默认背景图',\n  `MacScreenCount` int NULL COMMENT 'mac桌面屏幕数量',\n  `EnableCaptcha` int NULL COMMENT '开启验证码',\n  `HDFS` varchar(50) NULL,\n  `PwdV8` mediumtext NULL COMMENT '密码V8加解密',\n  `DefaultIndexUrl` varchar(500) NULL COMMENT '默认首页路由',\n  `EnableChat` varchar(25) NULL COMMENT '微聊系统',\n  `PwdEncode` varchar(50) NULL COMMENT '密码存储形式',\n  `GlobalServerV8Code` mediumtext NULL COMMENT '服务器端全局V8引擎',\n  `PwdAllowMultiLogin` int NULL COMMENT '允许多处登陆',\n  `PwdErrorLockTime` int NULL COMMENT '封锁时间',\n  `PwdAllowErrorCount` int NULL COMMENT '允许错误次数',\n  `PwdContainUpperLower` int NULL COMMENT '包含混合大小写',\n  `PwdContainSpecial` int NULL COMMENT '包含特殊字符',\n  `PwdContainNumber` int NULL COMMENT '包含数字',\n  `PwdShortestLength` int NULL COMMENT '最短密码长度',\n  `PageBottomTpl` mediumtext NULL COMMENT '页面底部信息',\n  `MenuWordColor` varchar(25) NULL COMMENT '文字颜色',\n  `MenuBackgroundColor` varchar(25) NULL COMMENT '背景颜色',\n  `MenuBg` varchar(50) NULL COMMENT '模块背景',\n  `MenuBottomContent` mediumtext NULL COMMENT '模块底部信息',\n  `MenuWidth` varchar(50) NULL COMMENT '菜单宽度',\n  `ActiveMenuColor` varchar(50) NULL COMMENT '选中文字 ',\n  `SysTitleColor` varchar(50) NULL COMMENT '系统标题颜色',\n  `TopWidthFull` int NULL COMMENT '顶部宽度铺满',\n  `MediaServer` varchar(50) NULL,\n  `FileServer` varchar(50) NULL COMMENT '文件服务器',\n  `GlobalV8Code` mediumtext NULL COMMENT '前端全局V8引擎',\n  `ActiveMenuBg` varchar(50) NULL COMMENT '选中背景',\n  `SysLogoLink` varchar(50) NULL COMMENT 'Logo超链接',\n  `SysLogoHeight` varchar(50) NULL COMMENT 'Logo高度',\n  `SysLogoType` varchar(50) NULL COMMENT 'Logo形式',\n  `ThemeColor` varchar(25) NULL COMMENT '主题色',\n  `IsAeroLogin` int NULL COMMENT '登陆背景虚化',\n  `SysLang` varchar(50) NULL COMMENT '默认语言',\n  `LoginBgImg` varchar(255) NULL COMMENT '登陆背景图',\n  `IsEnable` int NULL COMMENT '是否启用',\n  `PeizhiMC` varchar(50) NULL COMMENT '配置名称',\n  `SysLogo` mediumtext NULL COMMENT '系统Logo',\n  `FaviconIco` varchar(255) NULL,\n  `CompanyName` varchar(50) NULL COMMENT '公司名称',\n  `SysShortTitle` varchar(50) NULL COMMENT '系统短标题',\n  `SysTitle` varchar(50) NULL COMMENT '系统标题',\n  `GlobalFunctions` varchar(50) NULL COMMENT '全局函数',\n  `DisableTaskScheduling` int NULL COMMENT '停用任务调度'\n  `HdfsUploadRules` mediumtext NULL COMMENT '文件上传权限',\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `Sys_Config` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `DevelopmentTemplateCodeGroup` varchar(255) NULL COMMENT '页面模板与组件配置',\n  `DevelopmentGlobalCodeGroup` varchar(255) NULL COMMENT '全局脚本与登录事件',\n  `DevelopmentV8GovernanceGroup` varchar(255) NULL COMMENT 'V8 资源与执行边界',\n  `DevelopmentAccessRuntimeGroup` varchar(255) NULL COMMENT '接口、文件与运行环境',\n  `GitHubLoginEnabled` int NULL COMMENT '启用 GitHub 登录',\n  `WeChatLoginEnabled` int NULL COMMENT '启用微信扫码登录',\n  `GiteeLoginEnabled` int NULL COMMENT '启用 Gitee 登录',\n  `FaceVerificationEnabled` int NULL COMMENT '启用严格人脸与活体核验',\n  `ExternalLoginEnabled` int NULL COMMENT '启用外部平台登录',\n  `RequirePasswordChangeStepUp` int NULL COMMENT '修改密码要求二次验证',\n  `AuthenticatorTotpEnabled` int NULL COMMENT '启用 Authenticator 动态口令',\n  `PasskeyEnabled` int NULL COMMENT '启用 Passkey 生物登录',\n  `IdentityVerificationEnabled` int NULL COMMENT '启用统一身份验证能力',\n  `FrameworkPresentationGroup` varchar(255) NULL COMMENT 'AI 与框架水印',\n  `InterfaceLoginExperienceGroup` varchar(255) NULL COMMENT '登录界面与入口',\n  `InterfaceThemeNavigationGroup` varchar(255) NULL COMMENT '主题与导航',\n  `FrameworkWatermarkFontSize` int NULL COMMENT '水印字号',\n  `FrameworkWatermarkDensity` varchar(25) NULL COMMENT '水印密度',\n  `FrameworkWatermarkOpacity` int NULL COMMENT '水印透明度',\n  `FrameworkWatermarkDirection` varchar(25) NULL COMMENT '水印方向',\n  `FrameworkWatermarkContent` varchar(255) NULL COMMENT '框架水印内容',\n  `FrameworkWatermarkEnabled` int NULL COMMENT '开启框架水印',\n  `MenuChildExpandMode` varchar(25) NULL COMMENT '菜单子级展开方式',\n  `DisableLoginGitHub` int NULL COMMENT '关闭GitHub登录入口',\n  `DisableLoginWeChat` int NULL COMMENT '关闭微信登录入口',\n  `DisableLoginGitee` int NULL COMMENT '关闭Gitee登录入口',\n  `DisableLoginAuthenticator` int NULL COMMENT '关闭Authenticator登录入口',\n  `DisableLoginPasskey` int NULL COMMENT '关闭生物登录入口',\n  `FormMaskBlur` int NULL COMMENT '开启遮罩毛玻璃',\n  `LoginGitHubDisplay` int NULL COMMENT '显示GitHub登录入口',\n  `LoginWeChatDisplay` int NULL COMMENT '显示微信登录入口',\n  `LoginGiteeDisplay` int NULL COMMENT '显示Gitee登录入口',\n  `LoginAuthenticatorDisplay` int NULL COMMENT '显示Authenticator登录入口',\n  `LoginPasskeyDisplay` int NULL COMMENT '显示生物登录入口',\n  `DisableFormMaskBlur` int NULL COMMENT '关闭表单遮罩毛玻璃',\n  `DisableAiAssistant` int NULL COMMENT '关闭AI助手图标',\n  `TenantId` varchar(50) NULL,\n  `V8IsolateNestedApiMemory` int NULL COMMENT '隔离嵌套分配计数',\n  `V8MaxNestedApiDepth` int NULL COMMENT 'V8接口嵌套最大深度',\n  `V8NestedApiDepth` int NULL COMMENT 'V8接口嵌套深度',\n  `V8MaxCallTreeLimitMemoryMB` int NULL COMMENT 'V8调用树最大预算(MB)',\n  `V8CallTreeLimitMemoryMB` int NULL COMMENT 'V8调用树分配预算(MB)',\n  `AutoTestSkipCaptcha` int NULL COMMENT '允许自动化测试登录时绕开验证码',\n  `V8TenantMaxExecutions` int NULL COMMENT 'V8租户并发执行数',\n  `V8ExecutionWaitMilliseconds` int NULL COMMENT 'V8执行排队等待(ms)',\n  `V8KeyMaxConcurrentExecutions` int NULL COMMENT 'V8单Key并发执行数',\n  `V8MaxConcurrentExecutions` int NULL COMMENT 'V8全局并发执行数',\n  `V8MaxLimitRecursion` int NULL COMMENT 'V8最大递归深度',\n  `V8DefaultLimitRecursion` int NULL COMMENT 'V8默认递归深度',\n  `V8MaxLimitMemoryMB` int NULL COMMENT 'V8单层最大预算(MB)',\n  `V8DefaultLimitMemoryMB` int NULL COMMENT 'V8单层分配预算(MB)',\n  `V8MaxStatements` int NULL COMMENT 'V8最大语句上限',\n  `V8DefaultMaxStatements` int NULL COMMENT 'V8默认语句上限',\n  `V8MaxTimeoutSeconds` int NULL COMMENT 'V8最大超时(秒)',\n  `V8DefaultTimeoutSeconds` int NULL COMMENT 'V8默认超时(秒)',\n  `SysLangs` varchar(500) NULL COMMENT '多语言',\n  `FormEventTimeout` varchar(50) NULL COMMENT '表单V8事件分布式锁超时时间',\n  `LoginEndV8Code` mediumtext NULL COMMENT '用户登录成功后V8事件',\n  `AMapKey` varchar(50) NULL COMMENT '高德地址Key',\n  `PageSizes` varchar(50) NULL COMMENT '分页配置',\n  `EnableSystemStyle` int NULL COMMENT '登录显示界面切换',\n  `Remark` mediumtext NULL COMMENT '备注',\n  `EnableUserClickLog` int NULL COMMENT '记录用户操作日志',\n  `OnlyOfficeApiBase` varchar(50) NULL,\n  `MenuBoxShadow` varchar(50) NULL COMMENT '菜单阴影',\n  `DesktopBgImgRandom` int NULL COMMENT '桌面背景图随机',\n  `LoginBgImgRandom` int NULL COMMENT '登陆背景图随机',\n  `ParentId` varchar(36) NULL,\n  `DesktopDockMenu` mediumtext NULL COMMENT '桌面默认任务栏',\n  `IndexCodeApi` mediumtext NULL COMMENT 'Api首页HTML代码',\n  `EnableSwagger` int NULL COMMENT '开启Swagger',\n  `ClientVersion` varchar(50) NULL COMMENT '客户器端版本号',\n  `ServerVersion` varchar(50) NULL COMMENT '服务器端版本号',\n  `LoginBottomContent` mediumtext NULL COMMENT '登录框底部信息',\n  `AnonymousDesktop` int NULL COMMENT '允许匿名进入桌面',\n  `ApiBase` varchar(50) NULL,\n  `PrintSqlToPage` int NULL COMMENT '返回sql到前端',\n  `AppWorkSlideshow` mediumtext NULL COMMENT '工作台轮播图',\n  `AppLoginBgImg` mediumtext NULL COMMENT '登陆背景图',\n  `AppIndexSlideshow` mediumtext NULL COMMENT '首页轮播图',\n  `CaptchaConfig` mediumtext NULL COMMENT '验证码配置',\n  `UEditorConfig` mediumtext NULL COMMENT '富文本配置',\n  `DesktopBgImg` varchar(255) NULL COMMENT '桌面默认背景图',\n  `MacScreenCount` int NULL COMMENT 'mac桌面屏幕数量',\n  `EnableCaptcha` int NULL COMMENT '开启验证码',\n  `HDFS` varchar(50) NULL,\n  `PwdV8` mediumtext NULL COMMENT '密码V8加解密',\n  `DefaultIndexUrl` varchar(500) NULL COMMENT '默认首页路由',\n  `EnableChat` varchar(25) NULL COMMENT '微聊系统',\n  `PwdEncode` varchar(50) NULL COMMENT '密码存储形式',\n  `GlobalServerV8Code` mediumtext NULL COMMENT '服务器端全局V8引擎',\n  `PwdAllowMultiLogin` int NULL COMMENT '允许多处登陆',\n  `PwdErrorLockTime` int NULL COMMENT '封锁时间',\n  `PwdAllowErrorCount` int NULL COMMENT '允许错误次数',\n  `PwdContainUpperLower` int NULL COMMENT '包含混合大小写',\n  `PwdContainSpecial` int NULL COMMENT '包含特殊字符',\n  `PwdContainNumber` int NULL COMMENT '包含数字',\n  `PwdShortestLength` int NULL COMMENT '最短密码长度',\n  `PageBottomTpl` mediumtext NULL COMMENT '页面底部信息',\n  `MenuWordColor` varchar(25) NULL COMMENT '文字颜色',\n  `MenuBackgroundColor` varchar(25) NULL COMMENT '背景颜色',\n  `MenuBg` varchar(50) NULL COMMENT '模块背景',\n  `MenuBottomContent` mediumtext NULL COMMENT '模块底部信息',\n  `MenuWidth` varchar(50) NULL COMMENT '菜单宽度',\n  `ActiveMenuColor` varchar(50) NULL COMMENT '选中文字 ',\n  `SysTitleColor` varchar(50) NULL COMMENT '系统标题颜色',\n  `TopWidthFull` int NULL COMMENT '顶部宽度铺满',\n  `MediaServer` varchar(50) NULL,\n  `FileServer` varchar(50) NULL COMMENT '文件服务器',\n  `GlobalV8Code` mediumtext NULL COMMENT '前端全局V8引擎',\n  `ActiveMenuBg` varchar(50) NULL COMMENT '选中背景',\n  `SysLogoLink` varchar(50) NULL COMMENT 'Logo超链接',\n  `SysLogoHeight` varchar(50) NULL COMMENT 'Logo高度',\n  `SysLogoType` varchar(50) NULL COMMENT 'Logo形式',\n  `ThemeColor` varchar(25) NULL COMMENT '主题色',\n  `IsAeroLogin` int NULL COMMENT '登陆背景虚化',\n  `SysLang` varchar(50) NULL COMMENT '默认语言',\n  `LoginBgImg` varchar(255) NULL COMMENT '登陆背景图',\n  `IsEnable` int NULL COMMENT '是否启用',\n  `PeizhiMC` varchar(50) NULL COMMENT '配置名称',\n  `SysLogo` mediumtext NULL COMMENT '系统Logo',\n  `FaviconIco` varchar(255) NULL,\n  `CompanyName` varchar(50) NULL COMMENT '公司名称',\n  `SysShortTitle` varchar(50) NULL COMMENT '系统短标题',\n  `SysTitle` varchar(50) NULL COMMENT '系统标题',\n  `GlobalFunctions` varchar(50) NULL COMMENT '全局函数',\n  `DisableTaskScheduling` int NULL COMMENT '停用任务调度'\n  `HdfsUploadRules` mediumtext NULL COMMENT '文件上传权限',\n  `CompatiblePlatformOldVersion` int NULL COMMENT '兼容平台旧版本',\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     },
     {
       "TableName": "mci_global_function",
@@ -5063,6 +5065,18 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 134
+    },
+    {
+      "TABLE_NAME": "sys_config",
+      "COLUMN_NAME": "CompatiblePlatformOldVersion",
+      "COLUMN_TYPE": "int",
+      "DATA_TYPE": "int",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "兼容平台旧版本",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 135
     }
   ],
   "SysMenus": [
@@ -8899,6 +8913,28 @@
       "IsLockField": 0,
       "Config": "{\"JsonTable\":{\"Columns\":[{\"Key\":\"Path\",\"Label\":\"允许目录\",\"Component\":\"Text\",\"Width\":280,\"Placeholder\":\"files/{inspection,quality}/**\"},{\"Key\":\"RoleIds\",\"Label\":\"授权角色Id数组\",\"Component\":\"Text\",\"Width\":260,\"Placeholder\":\"[\\\"角色Id\\\"]\"},{\"Key\":\"AllAuthenticated\",\"Label\":\"所有登录用户\",\"Component\":\"Switch\",\"Width\":130},{\"Key\":\"IncludeSubdirectories\",\"Label\":\"包含子目录\",\"Component\":\"Switch\",\"Width\":130},{\"Key\":\"AllowPublic\",\"Label\":\"允许公有文件\",\"Component\":\"Switch\",\"Width\":130}]}}",
       "Description": "目录支持*（单层）、**（多层）、?（单字符）、[a-z]/[!0-9]及{目录A,目录B}，可组合且区分大小写；**须独占一层。角色填Id数组或开启所有登录用户，公有上传须单独允许。仅授权业务目录，不授予读取或平台保留目录权限。保存后缓存生效；通配符需后端v8.2.9+。"
+    },
+    {
+      "Id": "01M26ZWKXFYHXV8NC825DBFJCW",
+      "TableId": "c8570fa6-c10f-4014-8cb4-4b046e7ba69c",
+      "Name": "CompatiblePlatformOldVersion",
+      "Label": "兼容平台旧版本",
+      "Type": "int",
+      "Component": "Switch",
+      "Tab": "cfa27918-6245-4893-a77b-887c1a1e37f6",
+      "Sort": 1845,
+      "DefaultValue": "0",
+      "Visible": 1,
+      "AppVisible": 1,
+      "Readonly": 0,
+      "NotEmpty": 0,
+      "Unique": 0,
+      "InTableEdit": 0,
+      "Encrypt": 0,
+      "TableWidth": 140,
+      "Config": "",
+      "Description": "默认关闭，需后端8.3.4及以上。开启后，上传结果Data统一为数组（单文件、Multiple=false也一样），保留新版字段并补充url、type、size、duration、uploading、progress、path、name、id；图片type为image。关闭时保持新版单文件对象、多文件数组。公私桶、鉴权、配额及内容安全不变。",
+      "TableName": "Sys_Config"
     }
   ],
   "DataSets": [
@@ -9075,6 +9111,74 @@
       "IsEnable": 1,
       "ApiEngineKey": "platform-system-settings-custom-hook",
       "ApiName": "系统设置个性化扩展"
+    },
+    {
+      "Id": "01M270698Z5Y767KGBSMQ37RH4",
+      "CreateTime": "2026-09-11 09:09:25",
+      "UpdateTime": "2026-09-11 11:43:51",
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "UserName": "管理员",
+      "IsDeleted": 0,
+      "ApiName": "平台文件上传",
+      "ApiEngineKey": "platform-hdfs-upload",
+      "IsEnable": 1,
+      "ApiRole": "[\"$authenticated\"]",
+      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：系统设置；ApiEngineKey：platform-hdfs-upload。\n * 安装、更新或重新安装应用会恢复本接口。长期个性化返回请修改\n * CreateIfMissing 接口 platform-hdfs-upload-hook，避免升级覆盖。\n */\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: platform-hdfs-upload\n * Version: v1.0.4\n * Function:\n * - 在可信上传请求内调用平台流式上传原子方法；开启旧版兼容时补齐旧字段并统一返回文件数组，关闭时保持新版形态；调用租户扩展接口，保留上传鉴权、公私桶、配额、裁剪和内容安全。\n */\n\nif (!V8.CurrentUser || !V8.CurrentUser.Id) return { Code: 1001, Msg: '登录身份已过期，请重新登录。' };\n\n// 流、用户、租户、公私桶、裁剪和配额由可信宿主验证；文件字节不进入 Jint。\nvar result = await V8.Method.UploadCurrentRequestAsync();\nif (!result || result.Code !== 1) return result || { Code: 0, Msg: '上传未返回结果。' };\n// 显式转成普通 JS 对象，避免 Jint 的 CLR 动态对象与数组判断差异。\nresult = JSON.parse(JSON.stringify(result));\nif (V8.Method.IsLegacyUploadCompatibilityEnabled() && result.Data) {\n  var rows = Array.isArray(result.Data) ? result.Data : [result.Data];\n  for (var i = 0; i < rows.length; i++) {\n    var row = rows[i];\n    if (!row || typeof row !== 'object') continue;\n    var name = String(row.Name || row.name || '');\n    var dot = name.lastIndexOf('.');\n    var extension = dot < 0 ? '' : name.slice(dot + 1).toLowerCase();\n    // 私有文件沿用本次授权地址，不能按 FileServer + Path 拼出公开地址。\n    row.url = row.Url || row.url || '';\n    row.type = ['jpg','jpeg','png','gif','webp','bmp','svg','ico','avif','heic'].indexOf(extension) >= 0 ? 'image'\n      : ['mp4','mov','m4v','webm','avi','mkv','3gp'].indexOf(extension) >= 0 ? 'video'\n      : ['mp3','wav','ogg','m4a','aac','flac','amr'].indexOf(extension) >= 0 ? 'audio' : 'file';\n    row.size = row.Size == null ? (row.size || 0) : row.Size;\n    row.duration = row.Duration == null ? (row.duration || 0) : row.Duration;\n    row.uploading = false;\n    row.progress = 100;\n    row.path = row.Path || row.path || '';\n    row.name = dot > 0 ? name.slice(0, dot) : name;\n    row.id = row.Id || row.id || '';\n  }\n  // 旧移动端固定按数组读取；包括 Multiple=false 的单文件结果。\n  result.Data = rows;\n}\n// 租户可在 Hook 中返回 {Code:1, UploadResult:修改后的完整结果} 增加业务属性。\nvar hook = V8.ApiEngine.Run('platform-hdfs-upload-hook', { Stage: 'AfterUpload', Result: result });\nif (!hook || hook.Code !== 1) return hook || { Code: 0, Msg: '上传返回扩展未返回结果。' };\nreturn hook.UploadResult || result;",
+      "Lock": 0,
+      "LockKey": null,
+      "ApiRemark": "",
+      "ApiAddress": "/apiengine/platform-hdfs-upload",
+      "AllowAnonymous": 0,
+      "Files": "[]",
+      "ResponseFile": null,
+      "Category": "平台核心",
+      "EnableLog": 0,
+      "StopHttp": 0,
+      "ResponseType": "JSON",
+      "Timeout": 600,
+      "MaxStatements": 50000000,
+      "LimitMemory": 2048,
+      "LimitRecursion": 2000,
+      "Version": "v1.0.4",
+      "ChangeHistory": null,
+      "V8Unlimited": 1,
+      "V8Limit": 0,
+      "DataSourceType": null,
+      "ApiRoutes": "/api/HDFS/upload;/api/Upload"
+    },
+    {
+      "Id": "01M27066M8G9AMGY4B4AF8P1X5",
+      "CreateTime": "2026-09-11 09:09:22",
+      "UpdateTime": "2026-09-11 13:01:51",
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "UserName": "管理员",
+      "IsDeleted": 0,
+      "ApiName": "平台上传返回自定义扩展",
+      "ApiEngineKey": "platform-hdfs-upload-hook",
+      "IsEnable": 1,
+      "ApiRole": "[]",
+      "ApiV8Code": "/* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1\n * 租户上传返回扩展：仅首次安装创建，官方升级不会覆盖本接口。\n * 在此扩展返回属性；文件访问权限与租户隔离仍由平台校验。\n * 示例：var result = JSON.parse(JSON.stringify(V8.Param.Result));\n * var rows = Array.isArray(result.Data) ? result.Data : [result.Data];\n * rows.forEach(function (row) { row.BusinessTag = 'example'; });\n * return { Code: 1, UploadResult: result };\n */\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: platform-hdfs-upload-hook\n * Version: v1.0.7\n * Function:\n * - 上传成功后扩展返回值，当前租户的自定义代码在应用升级时保留。示例先将CLR包装结果转为普通JS对象，正确处理单文件对象与数组。\n */\n\nreturn { Code : 1 };",
+      "Lock": 0,
+      "LockKey": null,
+      "ApiRemark": "",
+      "ApiAddress": "/apiengine/platform-hdfs-upload-hook",
+      "AllowAnonymous": 0,
+      "Files": "[]",
+      "ResponseFile": null,
+      "Category": "平台核心",
+      "EnableLog": 0,
+      "StopHttp": 1,
+      "ResponseType": "JSON",
+      "Timeout": 600,
+      "MaxStatements": 50000000,
+      "LimitMemory": 2048,
+      "LimitRecursion": 2000,
+      "Version": "v1.0.7",
+      "ChangeHistory": null,
+      "V8Unlimited": 1,
+      "V8Limit": 0,
+      "DataSourceType": null,
+      "ApiRoutes": ""
     }
   ],
   "ResourcePolicies": {
@@ -9085,6 +9189,14 @@
         "UpgradePolicy": "Managed"
       },
       "platform-system-settings-custom-hook": {
+        "Ownership": "Tenant",
+        "UpgradePolicy": "CreateIfMissing"
+      },
+      "platform-hdfs-upload": {
+        "Ownership": "Platform",
+        "UpgradePolicy": "Managed"
+      },
+      "platform-hdfs-upload-hook": {
         "Ownership": "Tenant",
         "UpgradePolicy": "CreateIfMissing"
       }

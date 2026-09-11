@@ -27,6 +27,12 @@ test("platform bootstrap uses Managed routes with one isolated SysConfig compati
     const files = await readSourceFiles(sourceRoot);
     const legacyRoutes = /\/api\/(?:Os\/GetOsClientByDomain|(?:FormEngine|DiyTable)\/GetSysConfig|FormEngine\/GetLangBundle|FormEngine\/GetLoginWallpapers|SysUser\/(?:GetCurrentUser|GetSysUserPublicInfo|AddSysUser|UptSysUser|DelSysUser|GetSysUser|RefreshLoginUser)(?![A-Za-z0-9_])|HDFS\/GetPrivateFileUrl|sms\/send|SysUser\/reg)/i;
     for (const file of files) {
+        if (file.path.endsWith(path.join("utils", "request-tenant-context.js"))) {
+            // 兼容地址仅作租户请求头分类，不是新增旧接口调用。
+            assert.match(file.source, /relativePath === '\/api\/os\/getosclientbydomain'/);
+            assert.doesNotMatch(file.source.replace("'/api/os/getosclientbydomain'", "''"), legacyRoutes, file.path);
+            continue;
+        }
         if (file.path.endsWith(path.join("utils", "platform-sys-config.js"))) {
             assert.match(file.source, /const LEGACY_SYS_CONFIG_URL = "\/api\/FormEngine\/GetSysConfig"/);
             const withoutApprovedFallback = file.source.replace("/api/FormEngine/GetSysConfig", "");

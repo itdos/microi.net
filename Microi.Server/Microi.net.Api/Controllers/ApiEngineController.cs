@@ -86,7 +86,7 @@ namespace Microi.net.Api
             try
             {
                 var request = DiyHttpContext.Current?.Request;
-                if (request?.Body != null)
+                if (request?.Body != null && !HdfsUploadRequestContext.HasCurrentRequest)
                 {
                     request.EnableBuffering();
                     if (request.Body.CanSeek)
@@ -252,6 +252,8 @@ namespace Microi.net.Api
 
         private void AttachFormFilesAndAnnotateTransfer(JObject param)
         {
+            // HDFS 协议桥已验证文件流并建立请求作用域，禁止再复制原图/展示图为 Base64。
+            if (HdfsUploadRequestContext.HasCurrentRequest) return;
             if (!HttpContext.Request.HasFormContentType
                 || HttpContext.Request.Form?.Files == null
                 || HttpContext.Request.Form.Files.Count == 0) return;

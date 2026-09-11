@@ -712,6 +712,32 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void UploadPackageGate_RequiresCompleteUploadPairAndSafeTenantHook()
+    {
+        var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");
+        const string name = "app.microi.sys-config.json";
+        var package = JObject.Parse(LoadBundledResources()[name]);
+        bool Accepts(JObject candidate) => Assert.IsType<bool>(validate.Invoke(null, new object[] { name, candidate }));
+        Assert.True(Accepts(package));
+        foreach (var key in new[] { "platform-hdfs-upload", "platform-hdfs-upload-hook" })
+        {
+            var broken = (JObject)package.DeepClone();
+            broken["SysApiEngines"]!.First(x => x["ApiEngineKey"]?.ToString() == key).Remove();
+            Assert.False(Accepts(broken));
+        }
+        var missingField = (JObject)package.DeepClone();
+        missingField["DiyFields"]!.First(x => x["Name"]?.ToString() == "CompatiblePlatformOldVersion").Remove();
+        Assert.False(Accepts(missingField));
+        var unsafeHook = (JObject)package.DeepClone();
+        unsafeHook["SysApiEngines"]!.First(x => x["ApiEngineKey"]?.ToString() == "platform-hdfs-upload-hook")["ApiV8Code"] =
+            "/* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1 */ return { Code : 0 };";
+        Assert.False(Accepts(unsafeHook));
+        var wrongDefault = (JObject)package.DeepClone();
+        wrongDefault["DiyFields"]!.First(x => x["Name"]?.ToString() == "CompatiblePlatformOldVersion")["DefaultValue"] = "1";
+        Assert.False(Accepts(wrongDefault));
+    }
+
+    [Fact]
     public void V8FirstApplicationGate_AllowsNewManagedEngineAndRejectsUnownedExtension()
     {
         var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");

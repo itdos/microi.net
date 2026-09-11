@@ -597,7 +597,8 @@ namespace Microi.net.Api
         [HttpPost]
         // 仅兼容最早期移动端的 POST /api/Upload；实现仍只有这一份 HDFS 安全链路。
         [HttpPost("~/api/Upload")]
-        public async Task<JsonResult> Upload(DiyUploadParam param)
+        [HttpPost("~/apiengine/platform-hdfs-upload")]
+        public async Task<IActionResult> Upload(DiyUploadParam param)
         {
             var accessError = await DefaultParam(param);
             if (accessError != null) return Json(accessError);
@@ -614,11 +615,7 @@ namespace Microi.net.Api
             // 待审图片必须留在私有桶。ContentSecurityRequired 只能收紧存储范围，
             // 不能由客户端通过 Limit=false 把尚未审核的图片暴露到公有桶。
             if (RequiresWeChatContentSecurity(param)) param.Limit = true;
-            //HttpContext为可选参数，在Controller层调用DiyCommon.Upload可以不用传入HttpContext，内部可以自动获取，也可以直接传入文件流。
-            //var result = await DiyCommon.Upload(param);//, HttpContext
-            var result = await MicroiEngine.HDFS.Upload(param);//, HttpContext
-            // 小程序图片先进入私有存储并提交检测，通过后才能写入业务字段。
-            return Json(await ApplyWeChatContentSecurityAsync(result, param));
+            return await DispatchUploadAsync(param);
         }
         /// <summary>
         /// Uniapp上传，移除Consumes。
@@ -627,7 +624,7 @@ namespace Microi.net.Api
         /// <returns></returns>
         [HttpPost]
         [AllowAnonymous]
-        public async Task<JsonResult> UniappUpload(DiyUploadParam param)
+        public async Task<IActionResult> UniappUpload(DiyUploadParam param)
         {
             var currentToken = await DiyToken.GetCurrentToken();
             if (currentToken?.CurrentUser != null)
