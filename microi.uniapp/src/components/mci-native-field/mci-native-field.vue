@@ -62,10 +62,9 @@
       @change="emitValue($event.detail.value)"
     />
 
-    <picker v-else-if="component === 'Address'" mode="multiSelector" :range="regionPicker.columns"
-      range-key="name" :value="regionPicker.indexes" @columnchange="changeRegionColumn" @change="changeRegion">
+    <mci-region-picker v-else-if="component === 'Address'" :model-value="regionValue" @change="changeRegion">
       <view class="native-control__input native-control__picker"><text :class="{ placeholder: !regionText }">{{ regionText || field.placeholder }}</text><text>›</text></view>
-    </picker>
+    </mci-region-picker>
 
     <view v-else-if="['Map', 'MapArea'].includes(component)" class="native-control__map" hover-class="native-control__pressed" @tap="chooseLocation">
       <view class="native-control__map-mark"><text>⌖</text></view>
@@ -103,7 +102,8 @@
         @tap.stop="closeSelector" @touchmove.stop.prevent></view>
       <view class="native-select" :class="{ 'native-select--open': selectorOpen, 'native-select--portal': selectorPortaled }"
         :style="selectorPortaled ? selectorPortalStyle : null">
-      <view class="native-control__input native-select__trigger" :class="{ open: selectorOpen }" hover-class="native-control__pressed" @tap="openSelector">
+      <!-- 阻止打开事件冒泡到页面的关闭处理器，否则外层分组会立即恢复 overflow 裁切。 -->
+      <view class="native-control__input native-select__trigger" :class="{ open: selectorOpen }" hover-class="native-control__pressed" @tap.stop="openSelector">
         <view class="native-select__content">
           <view v-if="selectorOpen" class="native-select__inline-search" @tap.stop>
             <view v-if="isMultiple && selectedPreview.length" class="native-select__selection multiple">
@@ -241,11 +241,6 @@ import { isHtmlValue, normalizeRichTextHtml } from '@/platform/display.js'
 import { formatRegionSelection } from '@/platform/region-value.mjs'
 import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 import { positionNativeSelector } from '@/platform/native-selector-position.mjs'
-import {
-  createRegionPickerState,
-  regionPickerSelection,
-  updateRegionPickerState
-} from '@/platform/region-picker.mjs'
 
 const OPTION_COMPONENTS = new Set(['Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Autocomplete', 'Cascader', 'SelectTree', 'TreeCheckbox', 'Department', 'Transfer'])
 export default {
@@ -297,8 +292,7 @@ export default {
       searchTimer: null,
       optionRequestId: 0,
       expandedTreeKeys: [],
-      treeLoadingKey: '',
-      regionPicker: createRegionPickerState([])
+      treeLoadingKey: ''
     }
   },
   computed: {
@@ -457,15 +451,6 @@ export default {
     sliderMax() { return Number((this.field.config && this.field.config.Max) || 100) }
   },
   watch: {
-    modelValue: {
-      immediate: true,
-      deep: true,
-      handler() {
-        if (this.component === 'Address') {
-          this.regionPicker = createRegionPickerState(this.regionValue)
-        }
-      }
-    },
     'field.options': {
       immediate: true,
       deep: true,
@@ -833,13 +818,8 @@ export default {
         multiple: true
       })
     },
-    changeRegionColumn(event) {
-      this.regionPicker = updateRegionPickerState(this.regionPicker, event.detail.column, event.detail.value)
-    },
     changeRegion(event) {
-      const indexes = Array.isArray(event.detail.value) ? event.detail.value : this.regionPicker.indexes
-      this.regionPicker = updateRegionPickerState({ ...this.regionPicker, indexes }, 2, indexes[2])
-      this.emitValue(JSON.stringify(regionPickerSelection(this.regionPicker)))
+      this.emitValue(JSON.stringify(event.detail.value))
     },
     chooseLocation() {
       uni.chooseLocation({ success: (location) => this.emitValue(JSON.stringify({ address: location.address || location.name, name: location.name, latitude: location.latitude, longitude: location.longitude })) })

@@ -395,6 +395,10 @@
 				form: {},
 				loading: true,
 				saving: false,
+				openingEdit: false,
+				refreshAfterEdit: false,
+				saveReturnTimer: null,
+				pageDisposed: false,
 				stale: false,
 				error: '',
 				defaultValues: {},
@@ -581,6 +585,13 @@
 			this.loadForm()
 		},
 		onShow() {
+			this.openingEdit = false
+			// 编辑页只在落库后通知来源详情；取消保留详情原数据、Tab 和滚动位置。
+			if (this.mode === 'View' && this.refreshAfterEdit) {
+				this.refreshAfterEdit = false
+				this.loadForm(true)
+				return
+			}
 			if (this.loading || !this.definition) return
 			this.refreshTenantFloatingActionMetrics()
 			this.scheduleRelatedViewportMeasure()
@@ -595,6 +606,9 @@
 			this.scheduleRelatedViewportMeasure()
 		},
 		onUnload() {
+			this.pageDisposed = true
+			clearTimeout(this.saveReturnTimer)
+			this.saveReturnTimer = null
 			disposeChildDraftSession(this.draftRowId)
 			// zhy: 页面销毁后作废仍在执行的异步加载，避免卸载后继续写入页面状态。
 			this.formLoadId += 1
@@ -1034,13 +1048,41 @@
 				})
 			},
 			async switchToEdit() {
+				if (this.openingEdit || this.loading || this.mode !== 'View' || !this.rowId) return
 				if (!this.canEditRecord) {
 					uni.showToast({ title: '当前账号没有编辑权限', icon: 'none' })
 					return
 				}
-				this.mode = 'Edit'
-				this.ensureTenantFloatingActionPosition()
-				await this.loadForm()
+				// 使用真实页面栈，兼容取消、导航栏返回及小程序原生返回；详情表单不共享编辑草稿。
+				// 只透传表单入口支持的上下文，保留关联授权和字段限制，不复制用户正在查看的记录。
+				const options = {
+					table: this.tableName, id: this.rowId, mode: 'Edit', title: this.title,
+					menuId: this.menuId, fileMenuId: this.fileMenuId,
+					recordAdapter: this.recordAdapter, moduleEngineKey: this.moduleEngineKey,
+					draftRelation: this.draftRelation, related: this.showRelated ? '1' : '0',
+					stayAfterAdd: this.stayAfterAdd ? '1' : '0',
+					defaults: JSON.stringify(this.defaultValues), fields: JSON.stringify(this.includeNames),
+					excludeFields: JSON.stringify(this.excludeNames), readonlyFields: JSON.stringify(this.readonlyNames),
+					tableChildAuth: JSON.stringify(this.tableChildAuth)
+				}
+				const query = Object.entries(options).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&')
+				this.openingEdit = true
+				uni.navigateTo({
+					url: `/pages/native-form/index?${query}`,
+					events: { 'native-form:record-saved': () => {
+						if (this.pageDisposed) return
+						this.refreshAfterEdit = true
+						// 保存响应可能晚于用户返回；详情已显示时立即回读，不等待下一次 onShow。
+						if (!this.openingEdit) {
+							this.refreshAfterEdit = false
+							this.loadForm(true)
+						}
+					} },
+					fail: (error) => {
+						this.openingEdit = false
+						uni.showToast({ title: error.errMsg || '打开编辑页失败，请重试', icon: 'none' })
+					}
+				})
 			},
 			tenantFormContext(extra = {}) {
 				return {
@@ -1209,7 +1251,7 @@
 				return group.fields.some((field) => field.Name === this.openSelectorField)
 			},
 			async submit() {
-				if (this.saving) return
+				if (this.saving || this.saveReturnTimer) return
 				const uploadStateList = Object.values(this.uploadStates || {})
 				const pendingUploadCount = uploadStateList.reduce((total, item) => total + Number(item.pendingCount || 0), 0)
 				const failedUploadCount = uploadStateList.reduce((total, item) => total + Number(item.failedCount || 0), 0)
@@ -1265,6 +1307,8 @@
 							this.draftRowId
 					}
 					const currentUser = getUser() || {}
+					// 主表落库即标记来源详情失效；即使后续子表或租户钩子失败，返回也要显示真实数据。
+					this.getOpenerEventChannel?.()?.emit?.('native-form:record-saved')
 					try {
 						await flushChildDrafts(this.draftRowId, this.rowId, V8.FormEngine,
 							{ ...this.form, Id: this.rowId }, buildTableChildDefaultValues)
@@ -1314,7 +1358,7 @@
 						await this.loadForm(true)
 						return
 					}
-					setTimeout(() => this.goBack(), 450)
+					if (!this.pageDisposed) this.saveReturnTimer = setTimeout(() => this.goBack(), 450)
 				} catch (error) {
 					uni.showToast({
 						title: error.message || error.Msg || '保存失败',
@@ -1325,6 +1369,9 @@
 				}
 			},
 			goBack() {
+				// 用户可能在保存提示期间提前返回，必须取消延迟返回，避免随后多退出一层。
+				clearTimeout(this.saveReturnTimer)
+				this.saveReturnTimer = null
 				uni.navigateBack({
 					fail: () => uni.switchTab({
 						url: '/pages/workspace/index'

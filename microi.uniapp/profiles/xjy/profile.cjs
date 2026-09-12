@@ -5,6 +5,8 @@ module.exports = {
   config: {
     profileId: 'xjy',
     tenantKey: 'xjy',
+    // 仅初始化尚未选择地区的滚轮位置，不提前写入表单或筛选条件。
+    defaultRegion: ['浙江省', '全部', '全部'],
     osClient: 'xjy',
     apiBase: 'https://api.jifulii.com',
     fileServer: 'https://static.jifulii.com',
