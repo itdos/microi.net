@@ -2,6 +2,11 @@
 export default {
   "profileId": "xjy",
   "tenantKey": "xjy",
+  "defaultRegion": [
+    "浙江省",
+    "全部",
+    "全部"
+  ],
   "osClient": "xjy",
   "apiBase": "https://api.jifulii.com",
   "fileServer": "https://static.jifulii.com",

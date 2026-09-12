@@ -261,6 +261,7 @@ import { fieldDisplayValue, parseJson } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
 import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
 import { requiresAuthorizedMenuContext } from '@/platform/menu-resolution.mjs'
+import { readListEntryPeriod } from '@/platform/list-entry-period.mjs'
 import {
   buildListFilterWhere,
   hasListFilterValue,
@@ -344,7 +345,9 @@ export default {
       refreshing: false,
       finished: false,
       whereField: '',
+      whereType: '=',
       whereValue: '',
+      entrySnapshotScope: '',
       defaultValues: {},
       currentUser: {},
       activeAction: null,
@@ -464,8 +467,16 @@ export default {
       try { this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0 } catch (error) {}
     }
     this.key = options.key || 'customers'
+    const entryPeriod = readListEntryPeriod(options, 'all')
+    this.period = entryPeriod.period
+    this.customStart = entryPeriod.customStart
+    this.customEnd = entryPeriod.customEnd
     this.whereField = options.whereField ? decodeURIComponent(options.whereField) : ''
+    this.whereType = decodeURIComponent(options.whereType || '') === 'Like' ? 'Like' : '='
     this.whereValue = options.whereValue ? decodeURIComponent(options.whereValue) : ''
+    this.entrySnapshotScope = entryPeriod.forceFresh
+      ? `performance:${this.period}:${this.customStart || '-'}:${this.customEnd || '-'}`
+      : ''
     // zhy: 接收客户详情透传的客户Id、客户名称等新增联系人默认值。
     this.defaultValues = parseJson(decodeURIComponent(options.defaults || ''), {}) || {}
     this.baseConfig = getBusinessModule(this.key) || getBusinessModule('customers')
@@ -473,7 +484,7 @@ export default {
     this.entry = getBusinessEntry(this.key) || { icon: '/static/xjy/business/kehu.png', accent: '#0B86D4' }
     this.currentUser = getUser() || {}
     this.authTokenSnapshot = getToken()
-    const restored = this.restoreMciListSnapshot()
+    const restored = entryPeriod.forceFresh ? false : this.restoreMciListSnapshot()
     this.initializeList(restored)
   },
   onShow() {
@@ -588,7 +599,10 @@ export default {
       if (restored && this.keyword.trim()) await this.loadRestrictedRows(refresh)
     },
     getMciListSnapshotKey() {
-      return [this.key, this.whereField, this.whereValue].join('|')
+      const parts = [this.key, this.whereField, this.whereValue]
+      if (this.whereType !== '=') parts.push(this.whereType)
+      if (this.entrySnapshotScope) parts.push(this.entrySnapshotScope)
+      return parts.join('|')
     },
     getMciListSnapshot() {
       return {
@@ -928,7 +942,7 @@ export default {
     },
     buildFilterWhere() {
       const initial = this.whereField && this.whereValue
-        ? [{ Name: this.whereField, Type: '=', Value: this.whereValue }]
+        ? [{ Name: this.whereField, Type: this.whereType, Value: this.whereValue }]
         : []
       return buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser, initial)
     },

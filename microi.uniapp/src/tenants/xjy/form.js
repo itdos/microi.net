@@ -138,6 +138,8 @@ const FOLLOWUP_FIELDS = {
   approvalStatusValue: 'ShenpiZTZ'
 }
 const LEAD_FOLLOWUP_FIELDS = {
+  leadName: 'XiansuoMC',
+  leadId: 'XiansuoID',
   user: 'GenjinR',
   time: 'GenjinSJ'
 }
@@ -1839,6 +1841,8 @@ export function getPresentation(context) {
         actionKey: editable ? 'xjy-customer-address-location' : '',
         actionLabel: context.state.locating ? '定位中…' : '重新定位',
         locating: Boolean(context.state.locating),
+        // 地址坐标已随表单回读，无需等待打卡定位计时器即可挂载地图。
+        mapReady: validCoordinatePair(context.form[latitudeName], context.form[longitudeName]),
         latitude: Number(context.form[latitudeName] || 0),
         longitude: Number(context.form[longitudeName] || 0),
         address: String(context.form[addressName] || ''),
@@ -1969,7 +1973,7 @@ export function getRelatedPresentation(context, field) {
         { key: 'serviceType', field: 'Leixing', label: '服务类型', type: 'select', source: 'baseData', parentKey: 'ShouhouDDLX', valueField: 'Value', labelField: 'Value' },
         { key: 'status', field: 'Zhuangtai', label: '状态', type: 'select', source: 'baseData', parentKey: 'ShouHouDDZT', valueField: 'Value', labelField: 'Value' },
         { key: 'staff', field: 'ShouhouRY', label: '服务人员', type: 'text', placeholder: '输入服务人员姓名' },
-        { key: 'city', field: 'Chengshi', label: '城市', type: 'text', placeholder: '输入省、市或区县' },
+        { key: 'city', field: 'Chengshi', label: '城市', type: 'address' },
         { key: 'plannedService', field: 'YujiSHSJ', label: '计划服务时间', type: 'datetime-range' }
       ],
       hint: context.form.KehuID ? '从当前客户的售后任务中选取' : '从有权限查看的售后任务中选取'
@@ -2119,6 +2123,18 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  if (isLeadFollowupForm(context) && payload && !payload.multiple &&
+    String(payload.field?.Name || '').toLowerCase() === LEAD_FOLLOWUP_FIELDS.leadName.toLowerCase()) {
+    // 名称字段保存文本，子表却按隐藏外键查询；必须取实际选中行的 Id，不能按名称猜测关联。
+    const row = payload.cleared ? {} : selectedRow(payload)
+    context.patchForm({
+      [fieldName(context, LEAD_FOLLOWUP_FIELDS.leadId)]: personValue(row, ['Id', 'ID', 'id']),
+      [fieldName(context, LEAD_FOLLOWUP_FIELDS.leadName)]: payload.cleared
+        ? ''
+        : personValue(row, ['XiansuoMC']) || payload.value || ''
+    })
+    return { handled: true }
+  }
   if (isCustomerCaseForm(context) && payload?.field?.Name === 'KehuMC' && !payload.multiple) {
     // 客户选择器已返回完整客户行；新增、编辑共用此联动，避免额外请求和旧客户信息残留。
     const row = payload.cleared ? {} : selectedRow(payload)
@@ -2305,6 +2321,12 @@ export async function handleFieldSelect(context, payload) {
 }
 
 export async function handleFieldChange(context, payload) {
+  if (isLeadFollowupForm(context) &&
+    String(payload?.field?.Name || '').toLowerCase() === LEAD_FOLLOWUP_FIELDS.leadName.toLowerCase()) {
+    // 原生选择器先 change 再 select：先解除旧关联，再由选中行回填，清空也不会残留旧 Id。
+    context.patchForm({ [fieldName(context, LEAD_FOLLOWUP_FIELDS.leadId)]: '' })
+    return { handled: true }
+  }
   if (isCheckinEditable(context) && payload &&
     String(payload.field && payload.field.Name || '').toLowerCase() ===
       visitTargetNameField(context).toLowerCase()) {
@@ -2407,6 +2429,16 @@ export async function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  if (isLeadFollowupForm(context)) {
+    const idField = fieldName(context, LEAD_FOLLOWUP_FIELDS.leadId)
+    const nameField = fieldName(context, LEAD_FOLLOWUP_FIELDS.leadName)
+    const leadId = String(context.form[idField] || '').trim()
+    if (String(context.form[nameField] || '').trim() && !leadId) {
+      throw new Error('请重新选择对应线索后保存')
+    }
+    // 隐藏字段不在通用表单的提交集合中；独立新增、编辑与子表入口均显式提交最终关联。
+    return { [idField]: leadId }
+  }
   if (isCustomerCaseForm(context)) {
     return {
       ...await initializeCustomerCaseMerchant(context),

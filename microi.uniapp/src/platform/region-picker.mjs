@@ -56,8 +56,9 @@ function areasFor(city) {
   return [ALL_OPTION, ...(AREAS_BY_CITY[city.code.slice(0, 4)] || [])]
 }
 
-export function createRegionPickerState(value = []) {
-  const [provinceName, cityName, districtName] = normalizeRegionSelection(value)
+export function createRegionPickerState(value = [], defaultValue = []) {
+  const selection = normalizeRegionSelection(value)
+  const [provinceName, cityName, districtName] = selection.length ? selection : normalizeRegionSelection(defaultValue)
   const provinceIndex = indexByName(PROVINCES, provinceName)
   const province = PROVINCES[provinceIndex]
   const cities = citiesFor(province)
