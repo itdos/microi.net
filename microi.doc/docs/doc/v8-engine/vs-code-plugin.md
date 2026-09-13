@@ -1,10 +1,10 @@
-<!-- DOC-SYNC: 核心定位、能力矩阵、安装命令和发布流程需与 Microi.VSCode/README.md 保持一致。 -->
+<!-- DOC-SYNC: 核心定位、能力矩阵、安装命令和发布流程需与 Microi.Code/README.md 保持一致。 -->
 
 <p align="center">
   <img src="https://static.itdos.com/upload/img/microi-red-256.png" width="112" alt="Microi吾码">
 </p>
 
-<h1 align="center">Microi吾码 AI 开发工具：VS Code + CLI + 多宿主 AI Plugin</h1>
+<h1 align="center">Microi吾码 AI 开发工具：Microi Code + VS Code + CLI + AI Plugin</h1>
 
 <p align="center">
   <strong>用自然语言开发完整的复杂业务系统，让低代码从“拖拉拽”进入“AI 直接交付”。</strong>
@@ -22,15 +22,32 @@
 
 ---
 
-## 同一套 AI 能力，三种使用入口
+## Microi Code
 
-传统低代码把开发从“写大量代码”变成了“手动建表、逐个添加字段、拖拽控件、配置菜单、拼界面 JSON、设计打印模板和工作流”。Microi吾码进一步把这些操作变成自然语言，并提供三个互补入口：
+Microi Code 是吾码独立桌面 AI 开发工作台，基于 **DeepSeek Harness**，与 VS Code 扩展、`@microi.net/cli`、MCP 和 Skills 共享同一套能力。安装后使用吾码官方平台账号密码登录，即可使用当前用户的 AI 中转额度；官方登录地址固定为 `https://api.itdos.com`，无需另行准备其他 Agent 的 API Key。业务租户在「服务器连接」中单独添加和登录。
 
+默认采用浅色玻璃与水纹主题，支持深色和主题色切换。打开项目后，可使用自然语言开发、吾码 MCP 工具、V8 / 表单 / 菜单 / 工作流资源拉取、编辑、推送和同步检查。原 VS Code 扩展及逐行调试入口继续保留。
+
+首个预览版本为 **0.1.0**。Windows x64 已完成原生安装、官方账号登录、真实 AI 与 MCP 验收；当前为未签名预览包。macOS 已提供原生构建脚本，下载包将在 Mac 验收后补充。
+
+<!-- MICROI-CODE-DOWNLOADS: verified release links are maintained here. -->
+
+- [下载 Microi Code 0.1.0 · Windows x64（184.8 MiB）](https://static.itdos.com/itdos/microi-code/0.1.0/53701654f7bd/202609/Microi-Code-0_1_0-win-x64.exe)
+- SHA256：`53701654f7bd1a324f875898a0228ab074d5df7b1723a1b5fc273156aa9dbf9c`
+- macOS 源码构建：内部仓库根目录执行 `bash ./一键打包Mac.sh`，自动生成本机架构 DMG。
+
+安装后依次「打开项目 → 登录吾码账号 → 添加业务服务器 → 初始化项目 / 拉取资源」，即可开始开发。AI 使用的是你的官方中转额度，实际可用模型与额度以账号页面为准。停止任务或退出后保留历史记录，后续可在新任务中引用历史继续。
+
+## 同一套 AI 能力，四种使用入口
+
+传统低代码把开发从“写大量代码”变成了“手动建表、逐个添加字段、拖拽控件、配置菜单、拼界面 JSON、设计打印模板和工作流”。Microi吾码进一步把这些操作变成自然语言，并提供四个互补入口：
+
+- **Microi Code 桌面工作台**：内置 DeepSeek Harness，用吾码官方账号直接开始 AI 开发，支持 Windows / macOS 的原生安装包。
 - **VS Code 插件**：适合需要资源树、编辑器按钮、Diff、可视化状态、远程执行和逐行调试的用户。
 - **`@microi.net/cli`**：产品展示名为 `microi.net/cli`，适合 Codex、DeepSeek Harness、WorkBuddy、CodeBuddy、Qoder、Comate、Claude Code、Trae 或普通终端用户。
 - **多宿主 AI Plugin**：同样来自 `@microi.net/cli`；包根同时携带 Codex/WorkBuddy/CodeBuddy 清单、DeepSeek Harness 原生 bundle、同源 MCP、CLI 和全套 Microi Skills。
 
-三者不是三套实现。它们位于同一个 `Microi.VSCode` 仓库，复用相同的连接、认证、同步、MCP 和 AI 知识注入代码，并共用工作区配置、Token 与同步基线。可以只安装一种，也可以同时使用。
+四个入口位于同一个独立的 `Microi.Code` 仓库，复用连接、认证、同步、MCP 和 AI 知识注入代码。业务项目共用连接配置、Token 与同步基线；桌面的官方 AI 账号单独管理。可以只安装一种，也可以同时使用。
 
 > 你描述业务目标，AI 通过插件内置的 Microi MCP、平台知识库和 Skills，完成业务蓝图、数据模型、表单字段、菜单权限、接口引擎、V8 事件、数据源、界面引擎、打印引擎、工作流、定时任务、前端微服务以及自动化测试。
 
@@ -230,10 +247,10 @@ MCP 配置、Token 文件、Windows DPAPI 凭据保险库、数据库快照和�
 npm install -g @microi.net/cli
 ```
 
-CLI 首次发布前，从 `Microi.VSCode` 源码目录本地安装也能完成同样验证：
+CLI 首次发布前，从 `Microi.Code` 源码目录本地安装也能完成同样验证：
 
 ```bash
-npm install -g ./Microi.VSCode/plugins/microi
+npm install -g ./Microi.Code/plugins/microi
 ```
 
 进入准备作为 AI 工作区的目录并运行：
@@ -290,7 +307,7 @@ microi update --background --workspace "<工作区绝对路径>" --json
 
 断网、权限不足、Windows `EBUSY` 文件占用或宿主暂不支持热更新时，状态写入 `~/.microi/updater/status.json` 并在后台延后重试。界面可以非模态提示“立即重试/查看日志”，但用户不处理也不影响当前、正在进行或新建工作。设置 `microi.automaticUpdates=false` 可显式关闭 VS Code 端自动检查，已有功能仍照常使用。
 
-开发仓库先运行 `npm run codex:build`，再用 `microi codex install --yes --source ./Microi.VSCode` 验收仓库 marketplace；重启 ChatGPT/Codex 桌面端后，来源显示为 **Microi.Net**。npm 安装器生成用户本地 marketplace 所使用的模板见 `codex/marketplace.npm.json`。
+开发仓库先运行 `npm run codex:build`，再用 `microi codex install --yes --source ./Microi.Code` 验收仓库 marketplace；重启 ChatGPT/Codex 桌面端后，来源显示为 **Microi.Net**。npm 安装器生成用户本地 marketplace 所使用的模板见 `codex/marketplace.npm.json`。
 
 安装后在新 Codex 任务中先调用 `microi_codex` 的 `profiles` 动作。它会读取 `Microi-V8-Engine/.microi-config.json`；未初始化时，使用插件内置 `scripts/microi-cli.js init --workspace <工作区>`。多连接时把 `profiles` 返回的稳定 `name` 传给后续工具调用。
 
@@ -306,7 +323,7 @@ npx --yes @microi.net/cli@latest dsh install
 
 这不是把 `.mcp.json` 复制给 DSH：`@microi.net/cli` 自身声明 `"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }`，安装器按官方命令 `dsh plugin --profile <name> add <package>` 将同一 npm 包加入 profile。默认同时覆盖官方 `web`、`headless` profile；只安装一个自定义 profile 时使用 `microi dsh install --profile <名称>`。
 
-安装后运行 `microi dsh status --json`，必须同时回读依赖、已安装版本、bundle patch 文件和 `dsh.profile.bundles` 激活状态。新增 bundle 需要新建 DSH 会话；安装器不会终止当前会话或伪称旧会话已经热加载。开发仓库使用 `microi dsh install --source ./Microi.VSCode --force` 验收本地包，公开用户则要等包含 `cordis.patch.yml` 的新版 `@microi.net/cli` 正式发布。
+安装后运行 `microi dsh status --json`，必须同时回读依赖、已安装版本、bundle patch 文件和 `dsh.profile.bundles` 激活状态。新增 bundle 需要新建 DSH 会话；安装器不会终止当前会话或伪称旧会话已经热加载。开发仓库使用 `microi dsh install --source ./Microi.Code --force` 验收本地包，公开用户则要等包含 `cordis.patch.yml` 的新版 `@microi.net/cli` 正式发布。
 
 ### 方案 E：WorkBuddy / CodeBuddy 原生 Plugin（可选）
 
@@ -602,7 +619,7 @@ CLI 与多宿主 Plugin 的目标是让用户**无需先安装 IDE，也能完�
 
 唯一 AI/npm 包名为 **`@microi.net/cli`**，安装后暴露命令 **`microi`**，包根同时包含 `.codex-plugin/plugin.json`、`.codebuddy-plugin/plugin.json`、`.workbuddy-plugin/plugin.json`、DeepSeek Harness 的 `dsh.bundle` / `cordis.patch.yml`、对应 marketplace、MCP、路由器与全套 Skills。现有未带 scope 的 **`microi.net`** 是另一项已发布的前端库，继续保持原用途，不能在兼容版本中改造成 CLI。
 
-一套 `Microi.VSCode` 输出两个发布产品、多个使用端、三个分发目标：VS Code 扩展发布到 Visual Studio Marketplace 与 Open VSX；`@microi.net/cli` 只向 npm 发布一次，同时服务 CLI、Codex、DeepSeek Harness、WorkBuddy、CodeBuddy、Qoder、Comate 等宿主。`bump-version.js` 同时更新扩展、单一 npm 包、各宿主 manifest/marketplace 和 bundled Skills；任一版本不一致都会在外部写入前停止。
+一套 `Microi.Code` 输出桌面工作台、VS Code 扩展和 CLI / AI Plugin。Microi Code 安装包使用独立桌面版本，由吾码 HDFS 公有桶分发；其余产品沿用现有发布链路：VS Code 扩展发布到 Visual Studio Marketplace 与 Open VSX；`@microi.net/cli` 只向 npm 发布一次，同时服务 CLI、Codex、DeepSeek Harness、WorkBuddy、CodeBuddy、Qoder、Comate 等宿主。`bump-version.js` 同时更新扩展、单一 npm 包、各宿主 manifest/marketplace 和 bundled Skills；任一版本不一致都会在外部写入前停止。
 
 ### 发布顺序与失败边界
 
@@ -617,7 +634,7 @@ CLI 与多宿主 Plugin 的目标是让用户**无需先安装 IDE，也能完�
 ### 本地构建与安装验收
 
 ```bash
-cd Microi.VSCode
+cd Microi.Code
 npm install
 npm run cli:typecheck
 npm run build
@@ -644,7 +661,7 @@ node publish.js --package-only --no-bump
 2. 推荐在 npmjs.com 的 **Access Tokens** 中生成 Granular Access Token：Packages and scopes 只选择 `@microi.net/cli`（或最小必要的 `@microi.net` scope）、权限设为 **Read and write**，开启 **Bypass 2FA** 并设置有效期。包的 Publishing access 必须允许“2FA 或启用 Bypass 2FA 的 Granular Token”；若设为 disallow tokens，则只能交互发布。把 Token 放入环境变量 `NPM_TOKEN`，或填写到已忽略的 `publish-tokens.local.json` 的 `npm` 字段，禁止写入被 Git 跟踪的文件。脚本只把 Token 传给 npm 子进程，临时 npmrc 只保存 `${NPM_TOKEN}` 占位符，不落盘明文。
 3. 为两个插件市场准备 PAT。本机可设置环境变量 `VSCE_PAT` / `OVSX_PAT`，或把 `publish-tokens.example.json` 复制为已被 Git 忽略的 `publish-tokens.local.json`。没有可用 npm Token 或登录会话时，默认发布会在流程最前面执行一次 `npm login --registry=https://registry.npmjs.org/`，完成后全自动继续。不要再使用 `publish-tokens.json`。
 4. 如果仓库曾跟踪过 `publish-tokens.json`，应把其中的 PAT 视为已泄露：先在两个平台废弃并重新生成，把新 PAT 放入环境变量或 `publish-tokens.local.json`，再删除旧文件并执行 `git rm --cached publish-tokens.json`。发布脚本遇到该旧路径会主动停止。
-5. 回到 `Microi.VSCode` 执行 `npm run publish:preflight`。脚本会检查 `@microi.net/cli` 的 registry/scope 权限，并调用 `vsce verify-pat` 与 `ovsx verify-pat`；仅缺 npm 登录时不会阻断两个扩展市场。要求全部目标在版本递增前通过时，执行 `npm run publish:preflight:all`。
+5. 回到 `Microi.Code` 执行 `npm run publish:preflight`。脚本会检查 `@microi.net/cli` 的 registry/scope 权限，并调用 `vsce verify-pat` 与 `ovsx verify-pat`；仅缺 npm 登录时不会阻断两个扩展市场。要求全部目标在版本递增前通过时，执行 `npm run publish:preflight:all`。
 6. 先运行 `npm run package` 检查本地产物；确认后执行 `npm run publish`。
 7. 正常上传命令成功返回后不做公开 registry/市场回读。看到 `npm 发布完成`、`Visual Studio Marketplace 发布完成` 或 `Open VSX Registry 发布完成` 即结束对应目标；只有上传命令报错或执行补发时才精确确认该版本是否已存在。如需主动诊断全部公开状态，执行 `npm run publish:verify`，或手工复核：
 
@@ -713,7 +730,7 @@ npm run publish:cli:resume
 
 ### `npm install -g @microi.net/cli` 提示包不存在
 
-说明 npm 首次公开发布尚未完成，或当前 registry 不是 npm 官方源。开发阶段可在仓库根目录执行 `npm install -g ./Microi.VSCode/plugins/microi`；发布后用 `npm view @microi.net/cli version` 回读确认。
+说明 npm 首次公开发布尚未完成，或当前 registry 不是 npm 官方源。开发阶段可在仓库根目录执行 `npm install -g ./Microi.Code/plugins/microi`；发布后用 `npm view @microi.net/cli version` 回读确认。
 
 ### 远程执行与调试不可用
 

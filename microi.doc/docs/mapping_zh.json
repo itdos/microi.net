@@ -36,7 +36,7 @@
 
   "v8-engine":"V8引擎",
   "ai-apiengine.md" : "AI 编程",
-  "vs-code-plugin.md":"AI开发工具（VS Code + CLI）",
+  "vs-code-plugin.md":"Microi Code / VS Code / CLI",
   "mcp-server.md":"MCP Server 完整指南",
   "api-engine.md" : "API 接口引擎",
   "v8-server.md" : "V8函数-后端",

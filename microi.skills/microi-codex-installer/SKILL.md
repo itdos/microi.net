@@ -7,7 +7,16 @@ description: 当用户在 Codex、DeepSeek Harness、WorkBuddy、CodeBuddy、Qod
 
 本技能负责发现、安装、初始化、升级和诊断 Microi吾码 AI 开发能力。唯一 npm 包为 `@microi.net/cli`；该包同时提供 `microi` CLI、Codex Plugin、DeepSeek Harness 原生 profile bundle、WorkBuddy/CodeBuddy 兼容插件清单、完整 Skills 与同源 MCP。Codex marketplace 名称固定为 `microi-net`，插件选择器固定为 `microi@microi-net`，禁止新建 `microi-official` 或第二个 npm 包。
 
-只要本技能已经由 Microi.VSCode、工作区 `microi.skills` 或已安装插件提供，用户说“帮我初始化 Microi吾码插件”时就必须识别该意图，用户不需要再次说出 npm 包名。全新 Codex 与空目录尚未加载任何吾码 Skill 时，用户只需在首次请求中明确 `@microi.net/cli`，例如“通过 `@microi.net/cli` 安装吾码 Codex 插件”；具备终端与网络权限的 AI 必须直接执行本技能中的确定性安装命令。安装完成后，更短的“初始化吾码”“添加服务器/MCP”“拉取全部 V8”均由插件 Skill 自动识别。
+只要本技能已经由 Microi.Code、工作区 `microi.skills` 或已安装插件提供，用户说“帮我初始化 Microi吾码插件”时就必须识别该意图，用户不需要再次说出 npm 包名。全新 Codex 与空目录尚未加载任何吾码 Skill 时，用户只需在首次请求中明确 `@microi.net/cli`，例如“通过 `@microi.net/cli` 安装吾码 Codex 插件”；具备终端与网络权限的 AI 必须直接执行本技能中的确定性安装命令。安装完成后，更短的“初始化吾码”“添加服务器/MCP”“拉取全部 V8”均由插件 Skill 自动识别。
+
+## Microi Code 桌面宿主
+
+- Microi Code 是同仓独立桌面发行物，内置固定版本的 DeepSeek Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
+- 官方 AI 登录只走桌面账号窗口，固定 `https://api.itdos.com`、`OsClient=iTdos`，使用当前用户的中转 Key 和额度。不要让用户把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
+- 业务连接在「服务器连接」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
+- macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
+- 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
+- 首次为浅色玻璃水纹，支持深色和自选主题色。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
 
 ## 非阻塞自动更新（强制）
 
@@ -122,7 +131,7 @@ microi dsh status --json
 开发者从可信本地源码验收时，可以显式指定 marketplace 源：
 
 ```bash
-microi codex install --yes --source <Microi.VSCode目录>
+microi codex install --yes --source <Microi.Code目录>
 ```
 
 普通用户不得被引导到来历不明的 Git、本地目录或第三方 registry。不得通过 VPN、伪造地区/企业身份或共享账号绕过 OpenAI 地区与身份政策。
@@ -138,7 +147,7 @@ microi dsh status --json
 
 安装器必须调用 DSH 官方 `dsh plugin --profile <name> add <package>` 协议。唯一包 `@microi.net/cli` 通过 `dsh.bundle.patch=./cordis.patch.yml` 贡献 `@deepseek-ai/dsh-mcp-client` 配置，禁止另建 npm 包，也禁止把 `.mcp.json` 写给 DSH 后声称已安装。默认安装官方 `web` 与 `headless` profile；指定单个 profile 使用 `--profile <名称>`。
 
-`status` 验收必须回读 `$DSH_HOME/profiles/<profile>/package.json`、安装包版本、bundle patch 与激活列表；工具入口应为 `mcp__microi__microi_codex`。安装后只说明“新 DSH 会话将加载”，不得终止或冒充热更新当前会话。开发者从可信源码验收使用 `microi dsh install --source <Microi.VSCode目录> --force`；普通用户只允许 npm 官方 registry 的精确版本。
+`status` 验收必须回读 `$DSH_HOME/profiles/<profile>/package.json`、安装包版本、bundle patch 与激活列表；工具入口应为 `mcp__microi__microi_codex`。安装后只说明“新 DSH 会话将加载”，不得终止或冒充热更新当前会话。开发者从可信源码验收使用 `microi dsh install --source <Microi.Code目录> --force`；普通用户只允许 npm 官方 registry 的精确版本。
 
 ## 空工作区与多宿主初始化
 

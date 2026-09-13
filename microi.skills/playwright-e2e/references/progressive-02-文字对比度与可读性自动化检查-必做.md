@@ -72,7 +72,7 @@ expect(lowContrast, '低对比度文字: ' + JSON.stringify(lowContrast.slice(0,
 5. 价格区间、状态、筛选这类**导航/筛选元素出现在列表中部作为标题**——必须移到顶部 sticky 工具栏，并与正文形成色彩区隔。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-014 sha256=e5858cce6f743573d699ed7d2d07f958d15be96c28028a91163e841f6d3c016a -->
+<!-- microi-progressive:chunk id=playwright-e2e-014 sha256=3eea01cf70e67d545fede1724b049ed852da60cf0a4ea0bda6b2e1d6de84400d -->
 ## 安装
 
 ```bash
@@ -122,7 +122,7 @@ npx playwright test
 手写 Playwright 脚本时读取 `PW_CHROMIUM_EXECUTABLE` / `PW_BROWSER_EXECUTABLE` 并传给 `chromium.launch({ executablePath })`；Playwright Test 配置中通过 `use.launchOptions.executablePath` 读取该环境变量。只有 CDN、系统浏览器和本地缓存都不可用时，才报告浏览器不可用。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-015 sha256=b9adf7af700e045fd919bdfde321b10df89660561dd8ab476a12cba310855875 -->
+<!-- microi-progressive:chunk id=playwright-e2e-015 sha256=9b937381fb4cda1a8a010c5a0f803d48861c9dbcf503774a4b1dba4c0d33985a -->
 ## playwright.config.js 模板
 
 ```js

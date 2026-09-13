@@ -28,7 +28,7 @@ jobs:
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-024 sha256=b939c97eef28fab71caa54d134ea524d7ed7c8381deec09e38a7d694b15f53c0 -->
+<!-- microi-progressive:chunk id=playwright-e2e-024 sha256=a2897a35d5fd0c4bd944fae8bf15e8d52648e916a5453d0bb6012574f97af12a -->
 ## 常见问题
 
 | 现象 | 原因 | 处理 |
@@ -90,7 +90,7 @@ OsClient 仍为空时调用目标站点域名租户解析接口或从成功请�
 Profile 或独立 `--user-data-dir`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-025 sha256=be071153d695081b7c20d34cb5e9563480e3f09d9cd0292f2ca4b0245438787b -->
+<!-- microi-progressive:chunk id=playwright-e2e-025 sha256=fb26231352e397437331ab5255b908ecaa100129bd365779dad7aaf944062584 -->
 ## 前端微服务 E2E 必测点
 
 测试 Vue3 MicroApp 微服务时，不能只验证 `/micro-app/{OsClient}/{appKey}/index.html` 或带 token 的临时 URL。必须先建立真实登录态，再访问用户实际使用的不带 token 菜单路由，例如 `/#/micro-app/{MsKey}/{RoutePath}`，并确认地址栏没有退回旧的 `micro-app-host` 长地址。
@@ -102,7 +102,7 @@ Profile 或独立 `--user-data-dir`。
 如果页面内提供 Microi SDK 调用按钮，必须点击并断言返回 `Code=1`，同时确认没有 `登录身份已过期`、`1001`、`1002`。只看到标题文本不代表鉴权链路通过。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-026 sha256=3c8a1e8bbe281064f30f406703230d8df213f1f1e1d124edb8f9fc8a1df782ea -->
+<!-- microi-progressive:chunk id=playwright-e2e-026 sha256=591700cfd4b78c63d7f69db5c5d4a5f57c48d85c8508112d2bccbaae06b24192 -->
 ## 动态模块按钮验收
 
 修复或新增 `MoreBtns/FormBtns/PageBtns/PageTabs` 时，运行页看到按钮只证明“最终渲染结果”，不能证明入口确实可由模块引擎维护。至少同时保留三类证据：

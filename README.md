@@ -83,7 +83,7 @@
 > 图片负责展示整体关系；下面的同步索引由同一份架构能力数据自动生成，便于新用户、搜索引擎和 AI 完整识别平台边界。
 
 <!-- MICROI_ARCHITECTURE_CAPABILITIES:START -->
-<!-- capability-source-sha256:22658bafc091427ad63131407d374059cec4c68be21bdd8f542a3af7c2034683 -->
+<!-- capability-source-sha256:31face37f5ef8596844cbb72ac8be971d799c132c7e42fc25f3e1365021bea19 -->
 | 架构层 | 核心职责 | 关键能力 |
 |---|---|---|
 | **AI 开发与智能引擎** | 理解需求、设计系统、生成并校验变更 | AI 引擎、多模型网关、RAG、NL2SQL / NL2V8、Agent / Tool Calling、MCP / Skills、业务架构蓝图、AI 工作流、Preview / Diff |
@@ -91,7 +91,7 @@
 | **V8 运行与集成核心** | 在线运行可信业务逻辑并连接平台原子能力 | 接口引擎、FormEngine、V8 / SQL / JSON、Dos.ORM、HTTP、Redis、MongoDB、MQ / MQTT、Office / OCR、Webhook / SignalR |
 | **数据、集成与自动化引擎** | 连接数据库、服务、文件、设备与消息通道 | 缓存、扩展数据库、搜索、采集、任务调度、MQ / MQTT、通知、翻译引擎（多语言）、OCR / 视觉 / 图片、分布式存储 / HDFS、文件柜 |
 | **平台治理、安全与可靠运行** | 统一设置、身份、权限、观测、升级与恢复 | AI 平台治理、系统设置、系统日志/监控、OsClient、DiyToken、SSO、分布式租约、幂等、Trace / 告警、Docker / K8s |
-| **工程与全端交付生态** | 交付 PC、WebOS、移动端、微服务与 Unity 应用 | Microi.VSCode、Codex / OpenClaw、MCP、Skills、Microi.UI、前端微服务、UniApp / App、Unity / WebGL、自动化测试、浏览器回读 |
+| **工程与全端交付生态** | 交付 PC、WebOS、移动端、微服务与 Unity 应用 | Microi.Code、Codex / OpenClaw、MCP、Skills、Microi.UI、前端微服务、UniApp / App、Unity / WebGL、自动化测试、浏览器回读 |
 
 **AI 交付链路：** 自然语言 → 业务蓝图 → Manifest → DryRun → 确认执行 → 自动校验 → 真实回读 → 安全回滚
 
@@ -99,9 +99,9 @@
 <summary>查看架构图完整功能索引（226 个唯一标签）</summary>
 
 - **平台价值：** 10×+、Token 更省、10×+、典型交付更快、30+、成熟引擎复用、在线生效、V8 无需编译发布
-- **全端入口：** PC 管理端、Vue 3、WebOS、桌面多任务、移动自适应、H5 / 触控、UniApp / App、Android / iOS、微信小程序、多端复用、AI 应用 / Agent、Web / UniApp、前端微服务、多页路由、Microi.VSCode、资源树 / 调试、MCP / Skills、Codex / OpenClaw、OpenAPI / SDK、HTTP / JS
+- **全端入口：** PC 管理端、Vue 3、WebOS、桌面多任务、移动自适应、H5 / 触控、UniApp / App、Android / iOS、微信小程序、多端复用、AI 应用 / Agent、Web / UniApp、前端微服务、多页路由、Microi.Code、资源树 / 调试、MCP / Skills、Codex / OpenClaw、OpenAPI / SDK、HTTP / JS
 - **系统引擎总览：** AI 引擎、V8引擎、表单引擎、模块引擎、接口引擎、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、缓存引擎、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎（多语言）、OCR 引擎、视觉引擎、图片处理引擎、分布式存储 / HDFS、文件柜、模板引擎、Office 引擎、前端微服务、Microi.UI、多端客户端、3D / CAD / 数据大屏、Unity / WebGL、应用商城、系统设置、系统日志 / 监控、扩展数据库、蓝牙打印、AI 平台治理、AI 工作流 / 蓝图
-- **AI 开发与智能引擎：** AI 引擎、多模型网关、智能模型路由、密钥隔离、流式对话、多模态、AI 助手、AI 数据分析、知识库 RAG、向量检索、NL2SQL、NL2V8、Agent、Tool Calling、Prompt 模板、上下文记忆、AI 应用工作台、AI 在线编程、AI 本地编程、Microi.VSCode、MCP、Skills、CLI / Plugins、OpenClaw、业务架构蓝图、系统关系图谱、AI 工作流 / 蓝图、状态机、Automation Flow、流程挖掘、Manifest 建模、Preview / Diff
+- **AI 开发与智能引擎：** AI 引擎、多模型网关、智能模型路由、密钥隔离、流式对话、多模态、AI 助手、AI 数据分析、知识库 RAG、向量检索、NL2SQL、NL2V8、Agent、Tool Calling、Prompt 模板、上下文记忆、AI 应用工作台、AI 在线编程、AI 本地编程、Microi.Code、MCP、Skills、CLI / Plugins、OpenClaw、业务架构蓝图、系统关系图谱、AI 工作流 / 蓝图、状态机、Automation Flow、流程挖掘、Manifest 建模、Preview / Diff
 - **低代码核心业务引擎：** 表单引擎、模块引擎、接口引擎、接口数据源、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、应用商城、模板引擎、Microi.UI、40+ 表单控件、主子表 / 关联表、字段 / 表单 V8、可写报表 CRUD、权限 / 数据范围、左右树表、移动卡片、ECharts / 地图、Office 引擎、蓝牙打印、多表 / 多库编排、定制组件、前端微服务、多端客户端、PC / WebOS、UniApp / App、微信小程序、Unity / WebGL、3D / CAD / 数据大屏、goView 数据大屏
 - **集成、数据与自动化引擎：** 缓存引擎、扩展数据库、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎（多语言）、OCR 引擎、视觉引擎、图片处理引擎、Redis / MongoDB、Elasticsearch、Dos.ORM、多数据库、MySQL / SQL Server、Oracle / PostgreSQL、达梦 / 人大金仓、MinIO / OSS / S3、HTTP 集成、TCP 原始字节、Webhook / 回调、SignalR 实时、L1 / L2 多级缓存、Excel / CSV 导入、Word / PPT 导出、邮件 / 短信 / 微信、分布式存储 / HDFS、文件柜、公众号 / 小程序、OpenAPI / SDK、gRPC / 多语言
 - **平台治理、安全与可靠运行：** AI 平台治理、系统设置、系统日志 / 监控、服务健康、SaaS / OsClient、DiyToken、角色 / 部门、菜单 / 表权限、行 / 字段权限、Passkey / TOTP、SSO / OAuth、OIDC / SAML / CAS、租户 Secret、审计 / Trace、多节点 API、Worker 集群、分布式租约、Fencing Token、幂等 / 唯一约束、Outbox / Inbox、优雅排空、重启恢复、限流 / 熔断 / 重试、日志 / 告警、健康检查、Docker / K8s、Managed Core、CreateIfMissing Hook、Version / Hash、DryRun / Readback、自动化测试、浏览器验收
@@ -110,7 +110,7 @@
 - **数据与存储底座：** MySQL、SQL Server、Oracle、PostgreSQL、达梦、金仓、Redis、MongoDB、Elasticsearch、MinIO / HDFS
 - **身份、安全与多租户：** SaaS / OsClient、DiyToken、角色 / 部门、菜单 / 表权限、行 / 字段权限、Access Key、Passkey / TOTP、SSO / OAuth、强身份票据、认证加密
 - **分布式运行底座：** 多节点 API、Worker 集群、分布式租约、Fencing Token、幂等 / 唯一约束、Outbox / Inbox、WAL / Spool、重启恢复、健康检查、Docker / K8s
-- **工程、生态与交付：** 应用商城、Managed、CreateIfMissing、MCP、Microi.VSCode、CLI / Plugins、Skills、官方文档、自动化测试、浏览器回读
+- **工程、生态与交付：** 应用商城、Managed、CreateIfMissing、MCP、Microi.Code、CLI / Plugins、Skills、官方文档、自动化测试、浏览器回读
 - **AI 交付流水线：** 自然语言、业务蓝图、Manifest、DryRun、确认执行、自动校验、真实回读、安全回滚
 
 </details>
@@ -324,7 +324,7 @@ Microi.net/
 ├── Microi.UI/              # 🎨 Web / UniApp 统一设计系统
 ├── microi.uniapp/          # 📱 UniApp 移动端 100% 源码（小程序 / H5 / App）
 ├── microi.app/             # 📱 HBuilderX APK/IPA 套壳打包工程（Wap2App）
-├── Microi.VSCode/          # 🧩 VS Code 插件与 Microi CLI
+├── Microi.Code/          # 🧩 VS Code 插件与 Microi CLI
 ├── microi.mcp/             # 🔌 MCP Server 源码（AI Agent 工具）
 ├── microi.openclaw/        # 🦞 OpenClaw 远程 Agent 接入
 ├── Microi.Unity/           # 🌸 Unity UPM SDK 与 WebGL 集成

@@ -11,7 +11,7 @@ export const valueCards = [
 
 export const channels = [
   ['PC 管理端', 'Vue 3'], ['WebOS', '桌面多任务'], ['移动自适应', 'H5 / 触控'], ['UniApp / App', 'Android / iOS'],
-  ['微信小程序', '多端复用'], ['AI 应用 / Agent', 'Web / UniApp'], ['前端微服务', '多页路由'], ['Microi.VSCode', '资源树 / 调试'],
+  ['微信小程序', '多端复用'], ['AI 应用 / Agent', 'Web / UniApp'], ['前端微服务', '多页路由'], ['Microi.Code', '资源树 / 调试'],
   ['MCP / Skills', 'Codex / OpenClaw'], ['OpenAPI / SDK', 'HTTP / JS']
 ]
 
@@ -33,7 +33,7 @@ export const panels = [
       '流式对话', '多模态', 'AI 助手', 'AI 数据分析',
       '知识库 RAG', '向量检索', 'NL2SQL', 'NL2V8',
       'Agent', 'Tool Calling', 'Prompt 模板', '上下文记忆',
-      'AI 应用工作台', 'AI 在线编程', 'AI 本地编程', 'Microi.VSCode',
+      'AI 应用工作台', 'AI 在线编程', 'AI 本地编程', 'Microi.Code',
       'MCP', 'Skills', 'CLI / Plugins', 'OpenClaw',
       '业务架构蓝图', '系统关系图谱', 'AI 工作流 / 蓝图', '状态机',
       'Automation Flow', '流程挖掘', 'Manifest 建模', 'Preview / Diff'
@@ -111,7 +111,7 @@ export const foundations = [
   },
   {
     title: '工程、生态与交付', accent: '#ffbd59',
-    items: ['应用商城', 'Managed', 'CreateIfMissing', 'MCP', 'Microi.VSCode', 'CLI / Plugins', 'Skills', '官方文档', '自动化测试', '浏览器回读']
+    items: ['应用商城', 'Managed', 'CreateIfMissing', 'MCP', 'Microi.Code', 'CLI / Plugins', 'Skills', '官方文档', '自动化测试', '浏览器回读']
   }
 ]
 
@@ -146,7 +146,7 @@ export const architectureLayers = [
   {
     name: '工程与全端交付生态',
     responsibility: '交付 PC、WebOS、移动端、微服务与 Unity 应用',
-    capabilities: ['Microi.VSCode', 'Codex / OpenClaw', 'MCP', 'Skills', 'Microi.UI', '前端微服务', 'UniApp / App', 'Unity / WebGL', '自动化测试', '浏览器回读']
+    capabilities: ['Microi.Code', 'Codex / OpenClaw', 'MCP', 'Skills', 'Microi.UI', '前端微服务', 'UniApp / App', 'Unity / WebGL', '自动化测试', '浏览器回读']
   }
 ]
 

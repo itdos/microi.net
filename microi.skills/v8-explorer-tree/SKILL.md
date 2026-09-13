@@ -1,13 +1,13 @@
 ---
 name: v8-explorer-tree
-description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 / 字段V8事件 / 模块引擎按钮）。覆盖 diy_table V8 事件、diy_field V8 事件、sys_menu 按钮 JSON 拆分回写，含 7 条安全不变量。用于实现 VSCode V8 事件树、重构目录布局或处理 sys_menu 按钮 JSON 序列化。
+description: Microi.Code 插件 V8 资源管理器目录规范（表单引擎 / 字段V8事件 / 模块引擎按钮）。覆盖 diy_table V8 事件、diy_field V8 事件、sys_menu 按钮 JSON 拆分回写，含 7 条安全不变量。用于实现 VSCode V8 事件树、重构目录布局或处理 sys_menu 按钮 JSON 序列化。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # v8-explorer-tree — V8 资源管理器目录规范 v2（2026-05）
 
-> 涉及文件：[Microi.VSCode/src/explorer/engineTreeProvider.ts](Microi.VSCode/src/explorer/engineTreeProvider.ts)、[Microi.VSCode/src/sync/syncManager.ts](Microi.VSCode/src/sync/syncManager.ts)、[Microi.VSCode/src/constants.ts](Microi.VSCode/src/constants.ts)、[Microi.VSCode/src/utils.ts](Microi.VSCode/src/utils.ts)、[Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs](Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs)
+> 涉及文件：[Microi.Code/src/explorer/engineTreeProvider.ts](Microi.Code/src/explorer/engineTreeProvider.ts)、[Microi.Code/src/sync/syncManager.ts](Microi.Code/src/sync/syncManager.ts)、[Microi.Code/src/constants.ts](Microi.Code/src/constants.ts)、[Microi.Code/src/utils.ts](Microi.Code/src/utils.ts)、[Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs](Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs)
 
 ---
 
