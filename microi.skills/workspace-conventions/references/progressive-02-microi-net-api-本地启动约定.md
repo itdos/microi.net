@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=workspace-conventions-024 sha256=4e97c278d0a813e23c2c56b11aec8b157b2b100ed6f46ea07d45dbe9954ca5aa -->
+<!-- microi-progressive:chunk id=workspace-conventions-024 sha256=be9b3561d67f0b5489ce4b9f8c8775b563707adb9b75214807bd9c4d4fe226d4 -->
 ## Microi.net.Api 本地启动约定
 
 默认本地后端项目是 `Microi.Server/Microi.net.Api/Microi.net.Api.csproj`。AI 需要启动后端、验证接口、跑 Playwright、回读接口引擎或排查前后端联调问题时，优先使用下面的 PowerShell 命令：
@@ -20,7 +20,7 @@ Pop-Location
 **本地后端自动重启要求（强制）**：本地联调需要启动或重启 `Microi.net.Api` 时，先检查 `.tmp/microi-process-state/release.lock`；发布锁存在时禁止启动或重启。无发布时先回读标准端口和 `/api/Diagnostics/liveness`，健康服务默认复用；只有本任务修改了需重载的后端代码、服务不健康或用户明确要求重启时，才可精确停止当前工作区的后端进程，然后在 `Microi.Server/Microi.net.Api` 目录执行 `dotnet run --launch-profile Microi.net.Api`。优先使用用户能在 VS Code 中看到和停止的终端（包含 VS Code 集成终端、VS Code 任务终端、用户明确允许的 VS Code 可追踪隐藏终端）；如果当前工具没有 VS Code 终端能力，允许使用本机可见的 `cmd`/PowerShell 窗口启动，禁止使用脱离用户可见窗口的后台服务或守护进程。不要误杀数据库、Redis、Node 前端或其它业务进程。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-025 sha256=07c3d729c8f1e9a2bf93ff00937e5d6eae4602d346e4f9254b03a33211ac4848 -->
+<!-- microi-progressive:chunk id=workspace-conventions-025 sha256=f9b654a451871b2759c42dc0cfe532f41d71f1e57a7ebe566abe4b0eafec50a9 -->
 ## 多 AI 对话共享本地服务与发布互斥（强制）
 
 同一工作区的 4、5 个 AI 对话共用同一份源码和固定端口时，`61500/61501` 是工作区级单例共享服务，不属于某个对话。端口相同意味着无法让每个对话拥有一套独立进程；正确模型是“复用健康服务 + 需要重载时串行重启 + 发布时独占”，不能让每个对话都无条件先杀再启动。
@@ -52,7 +52,7 @@ OsClient 等状态；同一 Profile/Context 内切换租户会污染其它窗口
   分层报告。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-026 sha256=73207c0cfcc442a177c47c36503dd6145fc826e23e79df3913861f65d8d16df3 -->
+<!-- microi-progressive:chunk id=workspace-conventions-026 sha256=7886b082424673965ce27622424be52d392a3868ebedff8c949b5d8d5e6c4caa -->
 ## 本地租户与测试凭据读取约定
 
 AI 在本地启动后端、跑 Playwright、做登录态页面截图或调用需要登录的接口前，必须先尝试从本地配置判断租户和测试账号，不要直接以“未登录无法测试”结束：
@@ -64,13 +64,13 @@ AI 在本地启动后端、跑 Playwright、做登录态页面截图或调用需
 5. `.microi-local`、Token、数据库连接串、Redis 密码和测试凭据都视为本地敏感配置。最终回复、日志摘要和测试报告中不得输出真实值，只能写 `<redacted>`、`本地配置账号` 或 `本地配置凭据`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-027 sha256=84988eac9cf7543a192b3e829b879afb7b35ef92798dc9ea69243f173a8ab674 -->
+<!-- microi-progressive:chunk id=workspace-conventions-027 sha256=5ab58f345dcff9caea31d07d7598792ddaa8a301f3527d4121a7548d32107df3 -->
 ## 自动化登录约定
 
 本地和远端 E2E 统一传真实 `Account` / `Pwd`。需要跳过图形验证码时，只能在目标租户 `sys_config.AutoTestSkipCaptcha=true` 后传 `_AutomationTestLogin=true`；它只跳过验证码，绝不能绕过密码校验。禁止恢复 `DevLoginBypass`、`X-Microi-Dev-Key`、`_DEV_BYPASS_` 或让脚本自动改写后端 `appsettings`。测试完成后不持久化账号密码。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-028 sha256=544ab4d52c661e65fb2b0364a3a2107815af366d719f0b1d1cde7b4837226458 -->
+<!-- microi-progressive:chunk id=workspace-conventions-028 sha256=5b3ff231c7fd6266c7cff45b48707bf9053da596eaf574fc0490fe6a6fe1fca6 -->
 ## V8 远端/本地同步收尾约定
 
 AI 通过 MCP、接口引擎、数据库脚本或平台 API 修改任何远端 V8 代码后，任务结束前必须把远端当前生效代码同步回本地 `Microi-V8-Engine/<server>/<osClient>/` 目录，并做一次同步状态复核。
@@ -86,22 +86,22 @@ AI 通过 MCP、接口引擎、数据库脚本或平台 API 修改任何远端 V
 收尾流程：
 - 若远端是通过 MCP 写入的，以远端当前生效代码为准回写本地文件。
 - 若本地文件是先手工修改的，先推送到远端，再重新拉取/复核，确保本地与远端一致。
-- 优先使用 Microi.VSCode 插件的同步/查看同步状态能力；没有可调用插件时，可在 `.tmp/` 写一次性同步脚本，但脚本必须先 dry-run 输出差异摘要，再 apply。
+- 优先使用 Microi.Code 插件的同步/查看同步状态能力；没有可调用插件时，可在 `.tmp/` 写一次性同步脚本，但脚本必须先 dry-run 输出差异摘要，再 apply。
 - 复核结果应确认 touched 范围内 `Changed=0`、`Created=0`、`LocalOnly=0` 或说明剩余差异原因。
 - 空 V8 代码不生成本地 `.js` 文件；若已有空 `.js` 文件，收尾同步时应删除，避免被误判为本地未推送。
-- AI 收尾不能只看自写脚本的 dry-run；只要工作区安装了 Microi.VSCode 插件，就必须按插件“查看同步状态”的口径再复核一次。最终回复中要明确说明插件口径是否为 0；若仍有本地未推送/远端差异，必须列出具体资源类型、Key 和本地文件路径，不能只报数量。
+- AI 收尾不能只看自写脚本的 dry-run；只要工作区安装了 Microi.Code 插件，就必须按插件“查看同步状态”的口径再复核一次。最终回复中要明确说明插件口径是否为 0；若仍有本地未推送/远端差异，必须列出具体资源类型、Key 和本地文件路径，不能只报数量。
 - 当远端代码与本地代码完全一致但插件仍提示“本地未推送”时，优先校准 `.microi-meta.json` 的 `updateTime/filePath` 与本地文件 `mtime`，并再次执行插件口径同步检查；不要让时间戳误差遗留给用户。
 - AI 通过 MCP/API 直接写远端 V8 后，必须立即回读远端当前生效代码到本地并校准 `.microi-meta.json` 与文件 `mtime`。这不是可选清理动作，而是交付完成条件；否则 VS Code 插件会按时间戳继续提示“本地未推送”。
 - 若同步状态非 0，必须先列出具体文件并分类处理：正文一致仅校准 meta/mtime，远端较新则拉回，本地较新则推送，双方都改过则人工合并。生产资金/资产系统不能为清状态盲目覆盖远端。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-029 sha256=e90e532f9448b67f98f28a68fd4ea45b79868cf25fc14c5283b9074e91559f27 -->
+<!-- microi-progressive:chunk id=workspace-conventions-029 sha256=d18db7dd385b3e691a2fdfce5cc7c32ea09f30beb6ebe19ea2193d2e98b8f7ac -->
 ## V8 缓存刷新约定
 
 如果 AI 绕过平台表单提交事件，直接通过 MCP、数据库脚本或自写同步工具更新 `sys_apiengine`、`diy_table`、`diy_field`、`sys_menu`、`wf_node` 等远端 V8 代码，收尾时除了同步本地文件，还必须刷新运行中服务的缓存。至少清理当前 `<OsClient>` 下对应资源的 `Microi:<OsClient>:FormData:<table>:<key>`、`Id` 和地址形式缓存；若可用，优先调用平台缓存接口或插件内置同步流程。清缓存后要重新调用受影响接口做一次真实验证，避免本地/远端代码已一致但 API 仍执行旧缓存代码。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-030 sha256=c25d0aaffec64d8a66cda36acd9ec337eda99a4411fddb0e966e45247ba574de -->
+<!-- microi-progressive:chunk id=workspace-conventions-030 sha256=cb93afa9d5cddef627d561b4b46c56715486ebad8be78dc13b72e1065ff89bb5 -->
 ## MCP 元数据更新验收约定
 
 AI 通过 MCP 修改 `diy_field`、`diy_table`、`sys_menu`、`sys_osclients`、`sys_config` 等平台元数据后，不能只看写入返回成功，必须按前端真实消费方式回读验证：
@@ -111,7 +111,7 @@ AI 通过 MCP 修改 `diy_field`、`diy_table`、`sys_menu`、`sys_osclients`、
 3. 最终交付说明必须写清楚：改了哪个表/字段，回读值是什么，刷新了哪些缓存，验证入口是什么。若某个缓存刷新接口失败或只能部分成功，需要把失败消息原样摘要出来，不能把“写入成功”当作“页面一定生效”。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-031 sha256=3c25a4f5f2571612f6b441e88f4865f916aab0aed3cfe5d06a3be51a736dde0f -->
+<!-- microi-progressive:chunk id=workspace-conventions-031 sha256=51e7e4c9e28a6547613068b7758411b934c30c8d19ebfdf64569c079d05346ed -->
 ## MCP 可用性排查约定
 
 VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”，不代表当前 AI 会话一定已经成功加载了对应工具。AI 在声称“可以通过 MCP 操作”之前，必须完成一次真实可调用性验证：
@@ -124,10 +124,10 @@ VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”
 - MCP 的初始化说明必须使用真实 `MICROI_OS_CLIENT` 作为租户边界。中文显示名通过 ASCII 的 `MICROI_LABEL_BASE64` 传输并在 MCP 内解码，旧版 `MICROI_LABEL` 只作兼容；显示名不能当成租户 Key 写入“只能管理某租户”的安全提示。
 - 遇到 `ByteString`、`greater than 255` 或“第 N 个字符无法写入 Header”时，必须先检查实际异常索引和所有 HTTP Header 来源。Microi MCP 的设备标识来自 `did` / `MICROI_MCP_DID`；默认值若直接拼接中文 Windows 主机名，会在 `MCP:` 后第 4 个字符报错。`MICROI_LABEL_BASE64` 只用于显示，不会作为业务 HTTP Header 发送，禁止在未核对调用链前把错误归因于中文 Label。插件和 MCP 必须把 DID 规范化为稳定的可打印 ASCII。
 - MCP 连接失败时，AI 在完成配置、进程、Header、`initialize`、`tools/list` 和只读状态调用的证据链之前，不得修改 Token、租户、服务器地址或执行远端写入。连接恢复后先完成只读基线盘点，再按用户授权开始写入。
-- 修复 Microi.VSCode 插件的 MCP 生成逻辑后，必须重新生成配置、重启对应 MCP server，并在当前 AI 会话中再次验证工具发现与一次只读工具调用。
+- 修复 Microi.Code 插件的 MCP 生成逻辑后，必须重新生成配置、重启对应 MCP server，并在当前 AI 会话中再次验证工具发现与一次只读工具调用。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-032 sha256=230c8683389d2b1ee4f5ba88dc4e51cb4dc4eb6a89b76a142b07f479ff5be1c8 -->
+<!-- microi-progressive:chunk id=workspace-conventions-032 sha256=147cbc7a3870a1bc41c6e0b5ec317cf27e0e99e51eb71a1c540ebffde9507f10 -->
 ## MCP 写入超时与降级约定
 
 - 写请求超时后的远端回读必须使用独立的短超时，不能继续沿用普通查询的长超时。否则一次 60 秒写超时后，每次回读还可能等待 120 秒，AI 会长期停留在“等待远端回读”，用户误以为菜单按钮或接口引擎完全写不进去。
@@ -143,7 +143,7 @@ VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”
 - 发生连续写入超时时，要先停止并发写入，记录具体工具、资源 Key、耗时和回读结果；禁止用“服务器整体不可用”“缓存锁死”等没有日志证据的结论代替诊断。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-033 sha256=b642bb516a42b50e8b459e5237588e85d71c9715970779e155b88d7c0e8c6536 -->
+<!-- microi-progressive:chunk id=workspace-conventions-033 sha256=dfa4fbba6af537dfc5b4128f15652474dbbd492cdf8be1b4397cc293953b71f1 -->
 ## Codex MCP 单入口约定
 
 - Codex 对普通 MCP 大工具集可能无法稳定注入时，使用插件生成的 `microi_codex` 单入口，不要据此判断服务器或帐号不可用。
@@ -154,7 +154,7 @@ VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”
 - VS Code/Copilot、Cursor、Claude Code 仍使用完整 MCP 工具集；不要把 Codex 的 `enabled_tools = ["microi_codex"]` 复制到其他客户端配置。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-034 sha256=6ffac2793dea9b1d5953d624103d7aea7800b12deaaf71b3b0f5e3cb5b39ac06 -->
+<!-- microi-progressive:chunk id=workspace-conventions-034 sha256=c47c938ab74b167fbaa6947adf58ac17d538b6736224132933328cd53b1283cc -->
 ## .venv Python 环境说明
 
 工作区根目录的 `.venv/` 是 Python 虚拟环境，**保留，不要删除**。已安装：
@@ -165,7 +165,7 @@ VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”
 
 AI 执行 Python 脚本时应使用 `.venv\Scripts\python.exe`（Windows）而非系统 Python。
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-035 sha256=c114dffea6978f289601a8f71aa83a0466f3d934e96e45bb871af179d319a1e3 -->
+<!-- microi-progressive:chunk id=workspace-conventions-035 sha256=811550d457030f1571c957b9d38ed706610467752d03cc1498f52bb9a8656c17 -->
 ## 后端代码改动后的重启验收
 
 AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果的后端源码、配置、控制器、服务、依赖项目或接口行为，任务收尾前必须完成一次“编译 + 重启本地后端 + 健康验证”，不要只用隔离输出目录 build 后结束。
@@ -185,24 +185,24 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
 这条规则优先于“避免打断正在运行服务”的默认谨慎策略；本地开发联调场景下，用户通常需要 launch profile 当前端口上的后端加载最新代码。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-036 sha256=db96c39a15f4b5637ce37555797858320256dda22daf7ac5cdaae2a436fd214c -->
+<!-- microi-progressive:chunk id=workspace-conventions-036 sha256=90694dd1a4df791de2965274c56791d4d06d131a91b472e8765dfc8a2f8f263a -->
 ## MCP 可调用性诊断补充
 
 当用户反馈“Codex/VS Code 设置中能看到 MCP，但当前 AI 会话不能调用对应工具”时，不能只回答“当前会话没有注入”。必须按层排查：
 
 1. 先确认 `.vscode/mcp.json`、`.cursor/mcp.json`、工作区根 `.mcp.json` 和 `~/.codex/config.toml` 都能解析，且目标 server key 为稳定 ASCII 格式，例如 `microi_itdos`，不要使用中文名或横杠。
-2. 再用 Microi.VSCode 插件的“诊断 MCP 可调用性”命令，或等价脚本直接启动对应 `mcp-server.js` / `mcp-codex-stdio-adapter.js`，执行 `initialize` 和 `tools/list`，确认 `microi_get_db_schema`、`microi_get_field_list`、`microi_add_field`、`microi_update_field`、`microi_refresh_schema_cache` 等核心工具真实返回。
-3. 如果当前 AI 客户端支持工具发现或延迟加载，AI 必须先主动执行工具发现/热加载流程，例如 `tool_search`、客户端 MCP refresh、Microi.VSCode 的启动/诊断命令；不要先让用户手动重启、重载或重新生成 MCP。
+2. 再用 Microi.Code 插件的“诊断 MCP 可调用性”命令，或等价脚本直接启动对应 `mcp-server.js` / `mcp-codex-stdio-adapter.js`，执行 `initialize` 和 `tools/list`，确认 `microi_get_db_schema`、`microi_get_field_list`、`microi_add_field`、`microi_update_field`、`microi_refresh_schema_cache` 等核心工具真实返回。
+3. 如果当前 AI 客户端支持工具发现或延迟加载，AI 必须先主动执行工具发现/热加载流程，例如 `tool_search`、客户端 MCP refresh、Microi.Code 的启动/诊断命令；不要先让用户手动重启、重载或重新生成 MCP。
 4. 如果真实握手成功但 Codex 当前对话仍没有注入 `mcp__...` 工具，AI 仍应优先使用等价的 MCP stdio JSON-RPC 直连 fallback 完成当前任务：读取对应 MCP 配置、启动 adapter/server、执行 `initialize`、`tools/list`、`tools/call`，并严格遵守该 MCP 绑定的 API Server 和 OsClient 边界。直连脚本必须放在 `.tmp/` 或使用一次性 stdin，不得散落到项目目录。
 5. 只有在客户端不支持热加载、直连 fallback 也无法完成任务，或写操作边界无法确认时，才告知用户需要新开对话、重载 Codex 或检查 MCP 配置。说明必须写清楚：MCP 配置和进程是否可用、当前会话为什么没有注入工具、已经尝试过哪些自动恢复动作。
 6. 如果握手失败，要把失败层级说清楚：配置文件解析失败、路径不存在、token 文件缺失、MCP 进程启动失败、`initialize` 失败、`tools/list` 缺核心工具，不能把这些问题混成“用户没启用 MCP”。
-7. Microi.VSCode 生成 MCP 配置时应清理旧的中文/横杠 Microi MCP key，只保留 `microi_<osClient>` 或 `microi_<osClient>_<host>` 形式，避免不同 AI 客户端因 namespace 不稳定而无法注入工具。
+7. Microi.Code 生成 MCP 配置时应清理旧的中文/横杠 Microi MCP key，只保留 `microi_<osClient>` 或 `microi_<osClient>_<host>` 形式，避免不同 AI 客户端因 namespace 不稳定而无法注入工具。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-037 sha256=e8ddd5ad53787087f8e50a13618ee5626686cc72b0b21c1b12b0dc60ea515713 -->
+<!-- microi-progressive:chunk id=workspace-conventions-037 sha256=8906aca9ab0a621ffc8f50c4909e6a858543acd803e427880dbdf5932a52ec8f -->
 ## Windows MCP 控制台闪窗复盘
 
-当用户反馈“打开 Microi.VSCode、添加服务器或初始化 MCP 后连续弹出并立即关闭多个 cmd 窗口”时，应按进程风暴排查，不能只给已有 `spawn` 补 `windowsHide`：
+当用户反馈“打开 Microi.Code、添加服务器或初始化 MCP 后连续弹出并立即关闭多个 cmd 窗口”时，应按进程风暴排查，不能只给已有 `spawn` 补 `windowsHide`：
 
 1. MCP 配置文件是各客户端的事实源。内容未变化时必须使用 write-if-changed，禁止仅为“同步”而反复改写文件并触发监听器重启。
 2. 生成 `~/.codex/config.toml` 后，禁止再隐式循环执行 `codex mcp list/remove/add`；服务器数量越多，这类逐项 CLI 同步越会放大成几十个瞬时控制台进程。

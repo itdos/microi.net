@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
-const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.VSCode','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
+const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Code','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
 // Build products and the synchronization receipt are not executable source candidates.
 const generated=/(^|\/)(?:dist|bin|obj|node_modules|TestResults|\.resource-sync-base|\.git)(?:\/|$)|\.(?:vsix|nupkg|snupkg)$/i;
 // 此门禁用于 PC/API Docker 发布，独立 UniApp 的页面、客户资源和包版本不进入这两个镜像。

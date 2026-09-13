@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "architectureVersion": "2026.09.04.1",
   "platformVersion": "v7.9.0",
-  "capabilitySourceHash": "22658bafc091427ad63131407d374059cec4c68be21bdd8f542a3af7c2034683",
+  "capabilitySourceHash": "31face37f5ef8596844cbb72ac8be971d799c132c7e42fc25f3e1365021bea19",
   "uniqueFeatureLabels": 226,
   "outputs": [
     {
@@ -10,48 +10,48 @@
       "format": "svg",
       "width": 1920,
       "height": 1080,
-      "bytes": 81641,
-      "sha256": "2629f1c262ab3af2a37e7baf5465d5a29c6d0aeab5fee5ccd6e0e4c96eb24331"
+      "bytes": 81631,
+      "sha256": "ee5088588fc28c8b0ca680741947f50b4d3a1cf961eb1d263edb48faba4b7bf2"
     },
     {
       "file": "microi-ai-platform-architecture-2026.09.04.1-1920x1080.png",
       "format": "png",
       "width": 1920,
       "height": 1080,
-      "bytes": 260728,
-      "sha256": "5ceca956fedc912c70b555c0033c059fdeabd88f375ab6a5b491226aca7b1310"
+      "bytes": 260690,
+      "sha256": "c41d46ad2782665d3e2ced8aa5e4c71cca1ec800b36e0a2fec581e877b271d48"
     },
     {
       "file": "microi-ai-platform-architecture-2026.09.04.1-3840x2160.png",
       "format": "png",
       "width": 3840,
       "height": 2160,
-      "bytes": 1516315,
-      "sha256": "0610d33887144182315054855a00cb24894e5fe3df7a852fd374de67391fa755"
+      "bytes": 1513478,
+      "sha256": "d6463354d48c35020dd5b43677cd069bfec12aedc02caf2892f5474cc48daa5b"
     },
     {
       "file": "microi-ai-platform-architecture.svg",
       "format": "svg",
       "width": 1920,
       "height": 1080,
-      "bytes": 81641,
-      "sha256": "2629f1c262ab3af2a37e7baf5465d5a29c6d0aeab5fee5ccd6e0e4c96eb24331"
+      "bytes": 81631,
+      "sha256": "ee5088588fc28c8b0ca680741947f50b4d3a1cf961eb1d263edb48faba4b7bf2"
     },
     {
       "file": "microi-ai-platform-architecture-1920x1080.png",
       "format": "png",
       "width": 1920,
       "height": 1080,
-      "bytes": 260728,
-      "sha256": "5ceca956fedc912c70b555c0033c059fdeabd88f375ab6a5b491226aca7b1310"
+      "bytes": 260690,
+      "sha256": "c41d46ad2782665d3e2ced8aa5e4c71cca1ec800b36e0a2fec581e877b271d48"
     },
     {
       "file": "microi-ai-platform-architecture-3840x2160.png",
       "format": "png",
       "width": 3840,
       "height": 2160,
-      "bytes": 1516315,
-      "sha256": "0610d33887144182315054855a00cb24894e5fe3df7a852fd374de67391fa755"
+      "bytes": 1513478,
+      "sha256": "d6463354d48c35020dd5b43677cd069bfec12aedc02caf2892f5474cc48daa5b"
     }
   ]
 }

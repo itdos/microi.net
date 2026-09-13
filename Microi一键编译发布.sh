@@ -34,7 +34,7 @@ exit /b 1
 echo.
 echo   ^> Bash: !BASH_EXE!
 echo.
-"!BASH_EXE!" "%~f0"
+"!BASH_EXE!" "%~f0" %*
 set EC=!ERRORLEVEL!
 echo.
 pause
@@ -44,7 +44,7 @@ echo.
 echo   ^> WSL: 执行中...
 echo.
 for /f "delims=" %%p in ('wsl wslpath -u "%~f0"') do set "WSLP=%%p"
-wsl bash "!WSLP!"
+wsl bash "!WSLP!" %*
 set EC=!ERRORLEVEL!
 echo.
 pause
@@ -72,6 +72,19 @@ set +o posix 2>/dev/null || true
 # ════════════════════════════════════════════════════════════════
 set -e
 set -o pipefail
+
+# Microi Code 使用独立内部 GitLab 仓库；桌面构建不进入平台 Docker/NuGet 发布流程。
+# bash Microi一键编译发布.sh --microi-code [--win|--mac] [--arm64|--x64]
+if [ "${1:-}" = "--microi-code" ]; then
+    cd "$(dirname "$0")"
+    shift
+    if [ ! -f "Microi.Code/apps/microi-code/scripts/release.cjs" ]; then
+        printf '%s\n' '缺少内部 Microi.Code 仓库。请从公司 GitLab 克隆；禁止加入根公开仓库。' >&2
+        exit 1
+    fi
+    node Microi.Code/apps/microi-code/scripts/release.cjs "$@"
+    exit $?
+fi
 
 # 依赖镜像同步不编译/发布平台业务代码；凭据仅由工具读取配置，经 stdin 登录。
 if [ "${1:-}" = "--mirror-dependencies" ]; then

@@ -11,7 +11,7 @@ tests/**/coverage/
 tests/e2e/reports
 selenium-debug.log
 
-# Microi.VSCode：Playwright E2E（自动追加）
+# Microi.Code：Playwright E2E（自动追加）
 .microi-e2e/report/
 .microi-e2e/test-results/
 .microi-e2e/playwright-report/

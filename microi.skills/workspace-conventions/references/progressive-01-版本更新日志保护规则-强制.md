@@ -139,10 +139,10 @@ AI 开始处理定制页面、弹窗、Web、UniApp、微服务或应用商城�
 如果 MCP 返回登录过期，必须先修复或刷新目标 MCP 身份，再继续把 MCP 读取结果当作当前事实；不能因为读取失败就假设在线应用不存在并重复创建。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-020 sha256=4d3aef6042f7e43be7c2bf61430ce461bfb75bfb853b1ca000b0f5c5836eff7f -->
+<!-- microi-progressive:chunk id=workspace-conventions-020 sha256=64ab3dbde08488e8cf9f320bf74d97c938507170723022efeb6ab4f96380f9ca -->
 ## VS Code 插件空目录生成规则
 
-Microi.VSCode 面向普通用户时，用户本地可能只是一个空工作区。插件生成 AI 指令文件时不能假设用户已经有 `microi.skills/`、`Microi-V8-Engine/`、`AI-Project/` 或某个固定前端项目目录。
+Microi.Code 面向普通用户时，用户本地可能只是一个空工作区。插件生成 AI 指令文件时不能假设用户已经有 `microi.skills/`、`Microi-V8-Engine/`、`AI-Project/` 或某个固定前端项目目录。
 
 强制要求：
 - 插件的“初始化AI配置”必须能在空目录生成 `microi.skills/`、`.github/copilot-instructions.md`、`AGENTS.md`、`CLAUDE.md`、`.cursorrules`、`.cursor/rules/microi-skills.mdc`、类型提示、`jsconfig.json` 和 MCP 配置。
@@ -151,14 +151,14 @@ Microi.VSCode 面向普通用户时，用户本地可能只是一个空工作区
 - 插件升级时应继续保护用户本地修改过的 skill 文件，只覆盖插件曾生成且用户未改过的文件。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-021 sha256=d6da1a47b1f8ed4b1ea863b052c5e1fa7767e2809c39abe4813ea000d9a30db6 -->
+<!-- microi-progressive:chunk id=workspace-conventions-021 sha256=cee19f2fffffce3b4bcd9347a50ecf27add4be0c919e1cf5d00df98d487d29b8 -->
 ## Microi 版本号规则
 
 Microi 通用版本号采用 `主版本.次版本.修订版本` 三段数字格式，从 `1.0.0` 开始。每次发布时最后一位加 1；当某一位超过 `9` 时向前一位进位并将当前位归 `0`，例如 `1.0.9 -> 1.1.0`、`1.9.9 -> 2.0.0`、`9.9.9 -> 10.0.0`。
 
 接口引擎代码头、表单/工作流 V8 事件代码头、前端微服务 `sys_microiservice.BuildVersion` 与 `sys_microiservice_page.BuildVersion` 这类业务发布版本统一使用带 `v` 前缀的格式：`v1.0.0 -> v1.0.1 -> v1.0.9 -> v1.1.0 -> v1.9.9 -> v2.0.0 -> v9.9.9 -> v10.0.0`。禁止使用时间戳、随机串或日期作为 BuildVersion；前端微服务上传到分布式存储的目录也必须使用同一个 BuildVersion 分段，便于回溯与 CDN 缓存隔离。
 
-`Microi.VSCode` 发布时会通过 `bump-version.js` 自动自增插件版本，并把 `microi.skills/.microi-skills-version.json` 中的 skills 发布版本写成同一个插件版本号；skills 不再独立自增。`.microi-skills-version.json` 只用于记录 skills 包版本和提示用户当前来源，不能单独作为覆盖依据。
+`Microi.Code` 发布时会通过 `bump-version.js` 自动自增插件版本，并把 `microi.skills/.microi-skills-version.json` 中的 skills 发布版本写成同一个插件版本号；skills 不再独立自增。`.microi-skills-version.json` 只用于记录 skills 包版本和提示用户当前来源，不能单独作为覆盖依据。
 
 插件初始化或升级同步 `microi.skills/` 时，必须以 `.microi-skills-manifest.json` 的逐文件 hash 判断是否可覆盖：本地文件不存在则写入；本地文件与旧 manifest hash 一致说明用户未改，可自动升级；本地文件已被用户修改、或本地版本比插件捆绑版本更新时，必须保留用户版本并提示差异。不能因为插件版本号更高或更低，就粗暴覆盖本地 skills。创始人本地随时修改 skills 的工作区尤其要保护；普通用户未修改过的旧 skills 才应该被最新插件覆盖升级。
 
@@ -185,7 +185,7 @@ if (string.IsNullOrWhiteSpace(tableName)) { return; }
 如果方法内部只通过 `DynamicHelper` 读取对象字段，方法参数优先声明为 `object`，不要声明为 `dynamic`。这样可以减少 C# 运行时动态绑定进入普通字符串工具链的机会。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=3ebfed66fbaabf345188326688f195186d6f33f72252e2ce19041b33a5eef403 -->
+<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=1dfe4286cfee04571a3d24a32af15365b9da6abffe9acfd92a75539e6160f2bd -->
 ## 根目录保留文件说明
 
 根目录只允许存在以下类型的文件和目录：
@@ -202,7 +202,7 @@ if (string.IsNullOrWhiteSpace(tableName)) { return; }
 | `AI-Project/` | 各租户/项目 | 否 |
 | `switch-env.ps1` | 本地环境切换工具 | 否（有用） |
 | `.tmp/` | AI 临时文件（gitignored） | 可删整个目录 |
-| `.microi-e2e/` | Microi.VSCode 插件 E2E 产物 | 可定期清理 |
+| `.microi-e2e/` | Microi.Code 插件 E2E 产物 | 可定期清理 |
 | `.microi-performance/` | 性能测试报告 | 可定期清理 |
 
 <!-- /microi-progressive:chunk -->

@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=workspace-conventions-038 sha256=57098466d31d0636bf330fde545daff8cb8e4116ac6ea2efff8abc729fdcef77 -->
+<!-- microi-progressive:chunk id=workspace-conventions-038 sha256=0f36b907aab83c32be0403ce9152d1cf6ce3da23c31d6ec337643236212e77fb -->
 ## CLI 与 IDE 插件错版共存约定
 
 - CLI 与 IDE 插件共用配置、Token、MCP、Skills 或生成文件时，所有持久化协议必须按“新字段可选、旧字段保留、未知字段不删除”设计。不得将 JSON 解析到旧类型后只序列化已知字段。
