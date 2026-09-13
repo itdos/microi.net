@@ -167,7 +167,7 @@ function workspaceMcpCandidates(configPath) {
   const candidates = [];
   let current = dirname(configPath);
   while (true) {
-    candidates.push(resolve(current, 'Microi.VSCode', 'dist', 'mcp-server.js'));
+    candidates.push(resolve(current, 'Microi.Code', 'dist', 'mcp-server.js'));
     const parent = dirname(current);
     if (parent === current || current === parse(current).root) break;
     current = parent;

@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=playwright-e2e-008 sha256=353b1e7ec1d3e93d1fac92c8e9d6e520bf77b628a4141524a09404814f7affb7 -->
+<!-- microi-progressive:chunk id=playwright-e2e-008 sha256=cd1cc086cbbabd4083f7037e64b4f1951b284f70392e6fc5d729b322a161c39d -->
 ## 全自动登录（免验证码，但不免密码）——必读
 
 E2E 自动化最容易卡在「登录页有图形验证码」。Microi 后端允许自动化跳过验证码，但账号和密码必须始终走真实校验；如果密码配置错了，登录接口必须返回账号或密码错误。源码见 `Microi.Server/Microi.net.Api/Controllers/SysUserController.cs`（`Login` 方法开头）。
@@ -66,7 +66,7 @@ export async function automationLogin(page, {
 > 直连接口验收（不进页面）使用自动化标记拿 Token；历史 `_DEV_BYPASS_`、Dev Key 和 `DevLoginBypass` 均不得继续使用。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-009 sha256=f864be2aee2ce2490d2a8e241e5852fbd0777590f771397fd3c7973017889ae7 -->
+<!-- microi-progressive:chunk id=playwright-e2e-009 sha256=bd153761389635cb99ac6d3e2809f1e49ca78926176a05ad555dc83702837790 -->
 ## 表单引擎卡死/递归更新全自动化诊断
 
 当用户反馈“新增抽屉卡死”“设计页卡死”“点击控件无响应”“Maximum recursive updates exceeded”等表单引擎问题时，优先做可复现的 Playwright 诊断，而不是只靠猜测改代码。
@@ -145,7 +145,7 @@ uni-app H5、移动商城、分享海报、首页改版这类任务不能只跑�
 - 如果某项属于后台元数据或数据库配置，仍需通过接口/数据库回读给出证据；前端截图只能证明展示，不等价于后台配置已改。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-012 sha256=1fcd0a28af8226af4f1e4608645c74bf2fe503ce195f05ffd115c590fafabd06 -->
+<!-- microi-progressive:chunk id=playwright-e2e-012 sha256=a6ed859419114f601d611534e3d07bbfce0055ea6b7809daea9200da962391b6 -->
 ## 移动端/H5 回归纪律
 
 处理 uni-app H5 移动商城的交易、资产、登录、购物车、抢购、充值、分享或图片相关问题时，不能只改代码后让用户手工发现问题。完成实现后必须至少执行（以下变量按项目实际情况替换）：

@@ -53,7 +53,7 @@ Microi吾码不是单一的后台管理模板。完整工程由低代码运行�
 
 以下目录常在完整开发工作区中出现，但用途与主仓库源码不同：
 
-- `Microi.VSCode/` 是 VS Code 插件与 `@microi.net/cli` 的伴随源码仓库，包含同步、远程执行、调试、MCP 打包和 AI 配置生成。详见 [AI 开发工具](/doc/v8-engine/vs-code-plugin)。
+- `Microi.Code/` 是 VS Code 插件与 `@microi.net/cli` 的伴随源码仓库，包含同步、远程执行、调试、MCP 打包和 AI 配置生成。详见 [AI 开发工具](/doc/v8-engine/vs-code-plugin)。
 - `Microi-V8-Engine/` 通常由插件或 CLI 在本机生成，按服务器与 OsClient 保存接口引擎、事件、数据库快照和同步基线。普通 Web、UniApp、MicroService 及无前端 AI 应用默认以对应租户的 `AI应用/{appKey}` 作为唯一可编辑源码根；它可能包含本机 Token 或租户代码，不应整体提交到公开产品仓库。
 - `AI-Project/` 可以是单独版本管理的官方或客户项目源码仓库，不属于主产品仓库。只有发布契约明确指向其中某个应用时，该目录才是该应用的正式源码根；同名 `Microi-V8-Engine` 目录此时只是在线租户同步镜像，不能再参与构建或测试取源。禁止同时把两处都当作可编辑事实源。
 

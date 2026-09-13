@@ -9,7 +9,7 @@ description: Microi 后端 V8 TCP 原始字节集成规范。用于通过 V8.Tcp
 
 使用后端 `V8.Tcp` 完成一次性 TCP 连接、原始字节写入和可选的有界响应读取。典型场景是 RAW/JetDirect 9100 网络小票机、串口服务器和 PLC；具体协议帧、校验码与打印业务仍由接口引擎编排。
 
-文档维护时，只在 `microi.doc/docs/doc/v8-engine/v8-server.md` 原位更新后端 API；不要新建重复页面，也不要手工维护英文文档。改变公共契约时同步后端源码/测试、Microi.Client Monaco 定义、Microi.VSCode 类型与生成知识、AI Skill 镜像。
+文档维护时，只在 `microi.doc/docs/doc/v8-engine/v8-server.md` 原位更新后端 API；不要新建重复页面，也不要手工维护英文文档。改变公共契约时同步后端源码/测试、Microi.Client Monaco 定义、Microi.Code 类型与生成知识、AI Skill 镜像。
 
 ## 先判断是否适用
 
@@ -142,6 +142,6 @@ var hex = result.Data.Hex;
 
 - 源码：`Microi.Server/Microi.V8Engine/Extend/Tcp/V8Tcp.cs` 与 `V8Extend.cs`。
 - 测试：真实 Jint 注入、Byte/Base64/Hex/Text、回环收发、超时/上限/非法参数。
-- 编辑器：`Microi.Client/.../v8-api-server-definitions.js` 与 `Microi.VSCode/src/editor/typingsManager.ts`。
+- 编辑器：`Microi.Client/.../v8-api-server-definitions.js` 与 `Microi.Code/src/editor/typingsManager.ts`。
 - 文档与知识：官网中文后端 V8 页面、`microi.skills/README.md`、`v8-utilities` 索引、`Microi.AI/Resource` 镜像和向量资源列表。
 - 验收：目标测试、后端构建、精确重启与健康检查、独立 TCP 回环；真实打印机出纸必须单独报告，不能用回环测试替代。
