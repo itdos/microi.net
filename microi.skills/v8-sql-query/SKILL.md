@@ -68,12 +68,20 @@ var result = V8.FormEngine.GetTableData('SysUser', {
 
 ### 旧版 _Where 兼容（V8.Method.ParseWhere）
 
-老版本前端可能传旧格式（`{Name, Value, Type, AndOr, Group}`），转换成新格式：
+老版本前端可能传对象格式（`{Name, Value, Type, AndOr, GroupStart, GroupEnd}`）。
+`V8.Method.ParseWhere` 返回统一的 `DiyWhere` 对象集合；它不是“对象转数组”函数。
 
 ```javascript
-var newWhere = V8.Method.ParseWhere(V8.Param._Where);
-V8.FormEngine.GetTableData('Table', { _Where: newWhere });
+var objectWhere = V8.Method.ParseWhere(V8.Param._Where);
+V8.FormEngine.GetTableData('Table', { _Where: objectWhere });
 ```
+
+合并客户端筛选与接口固定条件时，必须先统一格式，禁止直接把数组条件追加到对象条件集合。
+部分部署按首项类型解析整个集合，混合格式会触发转换失败并退化为空条件，导致统计返回未筛选总数。
+需要兼容混合输入时，逐条调用 `ParseWhere(JSON.stringify([condition]))`，确认每条恰好解析出一个有效条件后，
+再合并为同一种格式；非空输入解析为空、非法操作符或括号不平衡必须返回失败，不能继续执行统计。
+存在顶层 OR 时，还须保证语义为“整个客户端筛选 AND 固定条件”，不能仅在原表达式末尾追加 AND。
+回归至少比较纯数组、纯对象、混合条件、OR/分组、零结果和非法输入。
 
 ## 次选：V8.Db.FromSql（仅 SQL 字符串 + AddInParameter）
 

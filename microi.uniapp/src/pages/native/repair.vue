@@ -30,9 +30,9 @@
         <view class="section-head"><text>联系信息</text><text>用于售后人员上门联系</text></view>
         <view class="form-row"><text><text class="required">*</text>联系人</text><input v-model="form.contact" placeholder="请输入联系人" /></view>
         <view class="form-row"><text>手机号码</text><input v-model="form.phone" type="number" maxlength="11" placeholder="请输入手机号码" /></view>
-        <picker mode="region" :value="form.region" @change="changeRegion">
+        <mci-region-picker v-model="form.region">
           <view class="form-row form-row--picker"><text><text class="required">*</text>省市区</text><text :class="{ placeholder: !form.region.length }">{{ regionText || '请选择所在省市区' }}</text><text>›</text></view>
-        </picker>
+        </mci-region-picker>
         <view class="form-row"><text><text class="required">*</text>详细地址</text><input v-model="form.address" placeholder="请输入详细地址" /></view>
       </view>
 
@@ -307,7 +307,6 @@ export default {
         this.loading = false
       }
     },
-    changeRegion(event) { this.form.region = Array.isArray(event.detail.value) ? event.detail.value : [] },
     toggleType(name) {
       const index = this.form.types.indexOf(name)
       if (index >= 0) this.form.types.splice(index, 1)
