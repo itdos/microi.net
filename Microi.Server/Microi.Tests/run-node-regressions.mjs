@@ -5,11 +5,14 @@ import {spawn} from 'node:child_process';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 export const roots=['Microi.Server/Microi.Tests','Microi.Server/Microi.Upgrade/Resource','Microi.Client/tests'];
+// 创始人工作区存在内部桌面仓时，将其确定性回归纳入相同门禁；公开仓不携带私有源码。
+const desktopTests='Microi.Code/apps/microi-code/tests';
+if(fs.existsSync(path.join(workspace,desktopTests)))roots.push(desktopTests);
 export function discoverTests(directory){
  return fs.readdirSync(directory,{withFileTypes:true}).flatMap(entry=>{
   const file=path.join(directory,entry.name);
   if(entry.isDirectory())return /^(node_modules|bin|obj|TestResults|\.git)$/.test(entry.name)?[]:discoverTests(file);
-  if(!/\.(?:test|spec)\.m?js$/.test(entry.name))return [];
+  if(!/\.(?:test|spec)\.[cm]?js$/.test(entry.name))return [];
   const source=fs.readFileSync(file,'utf8');
   if(/(?:from\s*|require\(\s*)['"](?:@playwright\/test|playwright\/test)['"]/.test(source))return [];
   // Playwright test-server specs have their own real-environment runner; never
