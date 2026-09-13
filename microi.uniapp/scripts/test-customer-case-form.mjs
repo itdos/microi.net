@@ -5,6 +5,7 @@ import test from 'node:test'
 import { buildTableChildDefaultValues } from '../src/platform/table-child-defaults.js'
 import { casePhotoField, caseFieldDescription } from '../src/tenants/xjy/case-form.mjs'
 import { proposalCostFieldPresentation } from '../src/tenants/xjy/proposal-cost-presentation.mjs'
+import { buildListFilterWhere } from '../src/platform/list-filter-fields.mjs'
 
 const read = (name) => fs.readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8')
 const plain = (value) => JSON.parse(JSON.stringify(value))
@@ -308,10 +309,11 @@ test('案例册照片弹窗支持筛选、确认回显、取消草稿及切换�
   await state.openSelector()
   state.toggleRow({ Id: 'task-1' })
   await state.openFilters()
-  state.draftFilterValues.city = '杭州市'
+  state.draftFilterValues.city = ['浙江省', '杭州市', '全部']
   await state.applyFilters()
   assert.equal(calls.queries.at(-1)._SysMenuId, 'photo-menu')
-  assert.ok(calls.queries.at(-1)._Where.some((item) => item.Name === 'Chengshi' && item.Value === '杭州市'))
+  assert.deepEqual(calls.queries.at(-1)._Where.filter((item) => item.Name === 'Chengshi'),
+    buildListFilterWhere([{ key: 'city', field: 'Chengshi', type: 'address' }], { city: ['浙江省', '杭州市', '全部'] }))
   await state.confirmSelection()
   assert.equal(calls.submitted[0].tableName, 'Diy_Anlice_Child')
   await state.openSelector()
@@ -392,6 +394,7 @@ function createPhotoSelector(overrides = {}, tableName = 'Diy_Anli') {
     .replace('export default', 'const component =')
   const component = vm.runInNewContext(`${source}; component`, {
     setTimeout, clearTimeout,
+    buildListFilterWhere,
     uni: { showToast: (message) => calls.toasts.push(message) },
     validateOpenTableContext: () => '',
     getOpenTableWhere: (field, form) => tenant.appendOpenTableWhere({ field, form, where: [] }),
@@ -635,7 +638,8 @@ test('城市与计划服务时间区间组合查询，时间范围按一个条�
   const range = state.filterFields.find((field) => field.key === 'plannedService')
   assert.equal(city.field, 'Chengshi')
   assert.equal(range.field, 'YujiSHSJ')
-  state.draftFilterValues.city = ' 杭州市 '
+  assert.equal(city.type, 'address')
+  state.draftFilterValues.city = ['浙江省', '杭州市', '全部']
   state.changeDateTimeRange(range, 'start', 'date', { detail: { value: '2026-09-01' } })
   state.changeDateTimeRange(range, 'start', 'time', { detail: { value: '08:30' } })
   state.changeDateTimeRange(range, 'end', 'date', { detail: { value: '2026-09-07' } })
@@ -644,7 +648,7 @@ test('城市与计划服务时间区间组合查询，时间范围按一个条�
   await state.applyFilters()
   assert.deepEqual(calls.queries.at(-1)._Where, [
     { Name: 'KehuID', Type: '=', Value: 'customer-1' },
-    { Name: 'Chengshi', Type: 'Like', Value: '杭州市' },
+    ...buildListFilterWhere([city], { city: ['浙江省', '杭州市', '全部'] }),
     { Name: 'YujiSHSJ', Type: '>=', Value: '2026-09-01 08:30' },
     { Name: 'YujiSHSJ', Type: '<', Value: '2026-09-07 18:16' }
   ])
