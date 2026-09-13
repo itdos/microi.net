@@ -7912,7 +7912,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       appKey: z.string().regex(/^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/u).describe('Stable lowercase application key and local directory name.'),
       name: z.string().min(1).max(120).describe('Human-readable MicroService name.'),
       description: z.string().optional().describe('Optional application description.'),
-      aiApplicationsDirectory: z.string().optional().describe('Absolute tenant AI应用 directory. Defaults to MICROI_AI_APPLICATIONS_DIR injected by Microi.VSCode.'),
+      aiApplicationsDirectory: z.string().optional().describe('Absolute tenant AI应用 directory. Defaults to MICROI_AI_APPLICATIONS_DIR injected by Microi.Code.'),
       buildVersion: z.string().regex(/^v\d+\.\d+\.\d+$/u).optional().default('v0.1.0').describe('Initial semantic build version. Default v0.1.0.'),
       routes: z.array(z.object({
         path: z.string().describe('Internal route path such as /context-test.'),
@@ -7928,7 +7928,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         const targetRoot = String(aiApplicationsDirectory || process.env.MICROI_AI_APPLICATIONS_DIR || '').trim();
         if (!targetRoot) {
           return {
-            content: [{ type: 'text', text: 'Error: 缺少 AI 应用目录。请由 Microi.VSCode 注入 MICROI_AI_APPLICATIONS_DIR，或显式传入 aiApplicationsDirectory。' }],
+            content: [{ type: 'text', text: 'Error: 缺少 AI 应用目录。请由 Microi.Code 注入 MICROI_AI_APPLICATIONS_DIR，或显式传入 aiApplicationsDirectory。' }],
             isError: true,
           };
         }

@@ -1,13 +1,22 @@
 ---
 name: microi-codex
-description: 在 Codex 或 DeepSeek Harness 中完成 Microi吾码 VS Code 扩展的等价工作流，包括连接与登录、AI/MCP 初始化、V8/表单/模块/工作流同步、远程执行与诊断、性能测试、微应用、Playwright 和发布回读。用户提到吾码、Microi、V8引擎、Microi-V8-Engine 或要求使用吾码 AI 插件时使用。
+description: 在 Microi Code、Codex 或 DeepSeek Harness 中完成 Microi吾码 VS Code 扩展的等价工作流，包括连接与登录、AI/MCP 初始化、V8/表单/模块/工作流同步、远程执行与诊断、性能测试、微应用、Playwright 和发布回读。用户提到吾码、Microi、V8引擎、Microi-V8-Engine 或要求使用吾码 AI 插件时使用。
 ---
 
 # Microi吾码 Codex / DeepSeek Harness Plugin
 
-本插件与 `Microi.VSCode`、`@microi.net/cli` 共用配置、Token、MCP Server 和 Microi Skills。不要另写原生 HTTP、SQL 或第二套认证实现。
+本插件与 `Microi.Code`、`@microi.net/cli` 共用配置、Token、MCP Server 和 Microi Skills。不要另写原生 HTTP、SQL 或第二套认证实现。
 
 每次 Microi 对话先完整读取工作区 `microi.skills/workspace-conventions/SKILL.md`；工作区尚未初始化时读取本插件同级 `../workspace-conventions/SKILL.md`。按其中首部完成创始人身份识别及平台功能四项同步检查，再进入专项流程；完整规则只维护该基础入口，不复制到本路由。
+
+## Microi Code 桌面宿主
+
+- Microi Code 是同仓独立桌面发行物，内置固定版本的 DeepSeek Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
+- 官方 AI 登录只走桌面账号窗口，固定 `https://api.itdos.com`、`OsClient=iTdos`，使用当前用户的中转 Key 和额度。不要让用户把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
+- 业务连接在「服务器连接」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
+- macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
+- 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
+- 首次为浅色玻璃水纹，支持深色和自选主题色。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
 
 ## 非阻塞自动更新（强制）
 

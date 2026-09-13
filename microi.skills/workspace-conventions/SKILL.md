@@ -106,7 +106,7 @@ AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker
 - 本规则只约束 `Microi.Client/` 吾码框架前端源码。独立 MicroService、Web、UniApp 等应用源码仍按其交付 Skill 在发布前执行自身必要的构建；不得因为本规则跳过微服务正式产物生成。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-004 sha256=aec3b6a1666c1f57d8fb208eb29c3d3f91bef5d4d502ed08aee9040168a7e9ec -->
+<!-- microi-progressive:chunk id=workspace-conventions-004 sha256=533d4a6d674f5980fdf6e9ae376b240af20e3191126a20eae3d6235897f45a88 -->
 ## 临时文件与 AI 产物放置规则（强制）
 
 AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、测试截图、临时报告**，**严禁放在工作区根目录（`<workspace-root>/`）**，必须放在指定位置：
@@ -115,7 +115,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 |------|---------|
 | 一次性脚本（.py / .mjs / .ps1 / .sh） | `.tmp/` |
 | 诊断截图、调试图片 | `.tmp/screenshots/` |
-| E2E 测试产物（Microi.VSCode 插件生成） | `.microi-e2e/` |
+| E2E 测试产物（Microi.Code 插件生成） | `.microi-e2e/` |
 | AI 一次性 E2E 脚本、截图、日志、报告 | `.tmp/`、`.tmp/screenshots/`、`.tmp/reports/` |
 | 性能测试 HTML 报告 | `.microi-performance/` |
 | 项目专属临时文件 | `<对应子项目目录>/` 内，不要写到根目录 |
@@ -129,10 +129,10 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 
 `.tmp/` 已在 `.gitignore` 中排除，可以随意创建临时文件。任务完成后如无保留价值可以不清理。
 
-**2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.VSCode 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
+**2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.Code 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=ac8e3c7085af4cbde3a5784f65ecb3f8cafa961a2a0e13f5103fa259852773e7 -->
+<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=75f5c21918cd9d271676fa8ad1313880862fe4bc655c2b651179e3cb3ff66a8a -->
 ## Microi 源码路径速查（工作区根相对路径）
 
 当用户提到“吾码后端源码”“吾码前端源码”“表单引擎源码”“官网源码”等简称时，默认按下列路径定位；如果当前工作区缺少对应目录，再用 `rg --files` 或目录搜索确认实际位置。
@@ -142,7 +142,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 吾码 MCP 前端源码 | `microi.mcp/` |
 | 吾码 MCP 后端源码 | `Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs` |
 | 吾码 skills / 知识库 | `microi.skills/` |
-| 吾码 VS Code 插件项目 | `Microi.VSCode/` |
+| 吾码 VS Code 插件项目 | `Microi.Code/` |
 | 吾码低代码平台后台系统前端源码 | `Microi.Client/` |
 | 吾码后台系统前端移动端自适应源码 | `Microi.Client/src/views/mobile/` |
 | 吾码低代码后端源码 | `Microi.Server/` |

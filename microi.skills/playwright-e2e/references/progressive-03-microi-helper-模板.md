@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=playwright-e2e-016 sha256=63d4ded296636335a96cbdd5a9ada0ec8b42ad9cc616b621c88bd6e45904f7fa -->
+<!-- microi-progressive:chunk id=playwright-e2e-016 sha256=9fa2a956427cf2c1c6a6f37cc2c960e58ac09ab43aff037ab762d447eadf912a -->
 ## Microi helper 模板
 
 ```js
@@ -134,7 +134,7 @@ test('公开接口引擎返回标准 DosResult', async ({ request }) => {
 6. 退出登录能清理 Token 并回到登录页。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-020 sha256=3ae1a183eefdcdcbc5924d3205802eb7594da02074cadfbdfb85d88b2005f192 -->
+<!-- microi-progressive:chunk id=playwright-e2e-020 sha256=7c8cc732cd5d460b6bde2c7e151d55f51aa0f853995492946aedbe781da01a9a -->
 ## 完整业务验收门槛
 
 当用户要求“完整测试”“全面测试”“不要让我手工测出接口 null/404/权限漏洞”时，不能只生成浅冒烟。至少补齐以下测试文件：
@@ -183,7 +183,7 @@ tests/e2e/
 - 首页运营 banner 推荐从公告或配置表驱动；E2E 要同时断言接口返回、图片真实加载、点击进入详情页。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-021 sha256=48af1507276053c301e489b5b261b92657ce79ed2045933d4a462d7c71eb96a8 -->
+<!-- microi-progressive:chunk id=playwright-e2e-021 sha256=50a36935911be6a6201c9406e89b5e8470b65d87f6d8cd0a57effedf146082b2 -->
 ## 与 MCP 的配合
 
 - `microi_get_db_schema`：写测试前确认表和字段。

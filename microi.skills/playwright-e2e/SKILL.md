@@ -7,7 +7,7 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 
 # Microi 吾码 Playwright E2E 自动化测试
 
-> **2026-05 更新（重要）**：Microi.VSCode 插件生成的所有 E2E 产物现已统一隔离到 `<projectRoot>/.microi-e2e/` 目录，**不再**写入 `tests/e2e/`、根目录 `playwright.config.js` 或 `.env.e2e.example`。
+> **2026-05 更新（重要）**：Microi.Code 插件生成的所有 E2E 产物现已统一隔离到 `<projectRoot>/.microi-e2e/` 目录，**不再**写入 `tests/e2e/`、根目录 `playwright.config.js` 或 `.env.e2e.example`。
 > - `playwright.config.js` 位于 `.microi-e2e/playwright.config.js`，`testDir` 为 `./` （即 `.microi-e2e/specs/`）
 > - 报告路径 `.microi-e2e/report/`，截图 `.microi-e2e/screenshots/`
 > - 上下文 `.microi-e2e/.microi-playwright-context.json`
@@ -38,7 +38,7 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 不适合把 Playwright 用来替代 V8 单函数调试。单个接口引擎的入参输出优先用 VS Code 插件远程执行、MCP `microi_run_engine` 或后端单元测试。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-002 sha256=a2524636727c51268a2daefdd617e5b90e105e245143b652bc095ac857ad4995 -->
+<!-- microi-progressive:chunk id=playwright-e2e-002 sha256=639b5a0f2a7ced30cf682c71b260cbdeac2628bd939a33ea372e6834b7990874 -->
 ## 临时文件与产物放置规则（必须遵守）
 
 AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测试报告**等，**绝对不能放在工作区根目录**，必须放在以下指定位置：
@@ -47,7 +47,7 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 |------|---------|
 | 一次性 Python/JS/PS1 脚本 | `<workspace-root>/.tmp/` |
 | 诊断截图、调试输出 | `<workspace-root>/.tmp/screenshots/` 或子目录 |
-| E2E 测试产物（Microi.VSCode 插件生成） | `<workspace-root>/.microi-e2e/` |
+| E2E 测试产物（Microi.Code 插件生成） | `<workspace-root>/.microi-e2e/` |
 | AI 一次性 Playwright 脚本、截图、日志、报告 | `<workspace-root>/.tmp/`、`<workspace-root>/.tmp/screenshots/`、`<workspace-root>/.tmp/reports/` |
 | 性能测试报告 | `<workspace-root>/.microi-performance/`（仅限此目录） |
 
@@ -55,7 +55,7 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 
 `.tmp/` 目录已在 `.gitignore` 中排除，AI 可以在此自由创建临时文件。任务完成后如无价值可以不清理，也可以整体删除该目录。
 
-**2026-06 强制补充**：AI 手写的一次性 Playwright 验证脚本、运行日志、截图和报告只能写到工作区根目录 `.tmp/`。不要写到 `Microi.Client/`、`Microi.Server/`、`microi.doc/` 或其它子项目目录，即使这些目录已有 `tests/` 目录也不例外。只有 Microi.VSCode 插件正式初始化的可复用 E2E 工程，才使用 `.microi-e2e/`。
+**2026-06 强制补充**：AI 手写的一次性 Playwright 验证脚本、运行日志、截图和报告只能写到工作区根目录 `.tmp/`。不要写到 `Microi.Client/`、`Microi.Server/`、`microi.doc/` 或其它子项目目录，即使这些目录已有 `tests/` 目录也不例外。只有 Microi.Code 插件正式初始化的可复用 E2E 工程，才使用 `.microi-e2e/`。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=playwright-e2e-003 sha256=69b8842a221a0de60f8605c5059deee391be0f16f0b6cbc5ddfb3cfd210268db -->
@@ -79,7 +79,7 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-004 sha256=2f145cd29044043fb84cefd07fde14c86a4d0f4757443d56e75f5494516453cb -->
+<!-- microi-progressive:chunk id=playwright-e2e-004 sha256=4f5e11baf4651c11b5f9819a0b4f33ce2590db1733d4db72814bd1a25daf56ff -->
 ## 必备环境变量
 
 ```bash
@@ -101,7 +101,7 @@ PW_HOME_PATH=/#/pages/index/index
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-005 sha256=a66696c3263f060d0b7be309a527fca6a9bad95dd534eabbe84f1b6539770d8e -->
+<!-- microi-progressive:chunk id=playwright-e2e-005 sha256=51567cea5fca434f9b031fef0871454100cf4715dfb65695dc1722bd275399be -->
 ## 本地测试账号自动发现
 
 当没有显式传入 `PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD` / `MICROI_OSCLIENT` 时，AI 不要把账号密码写入后端配置来制造旁路：
@@ -126,7 +126,7 @@ PW_HOME_PATH=/#/pages/index/index
    Profile/`--user-data-dir`。自动化收尾只关闭自己创建的 context/browser。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-006 sha256=6aeefebda3a9e598564c53c2f8028a4ccefe2291c4c7c7ae4781ca15fb5d0697 -->
+<!-- microi-progressive:chunk id=playwright-e2e-006 sha256=88e1002cae934acd2de5af2f77f371a9ea152a525eecf11b49fe182b16a56044 -->
 ## 后端改动后的 E2E 前置动作
 
 如果本轮任务修改过 `Microi.Server/**` 后端源码、配置、控制器、服务、依赖项目或接口行为，跑 Playwright、页面截图、接口验收或前后端联调前，必须先按 `workspace-conventions` 的“后端代码改动后的重启验收”完成：
@@ -139,7 +139,7 @@ PW_HOME_PATH=/#/pages/index/index
 不要只说“代码已编译”或“需要用户自己重启后端”；除非用户明确要求不要中断当前服务，否则 AI 要主动完成重启。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=8776ce89491f11cbf6c6e6e9ef0cd430aa21efc60c1dbe1559ec9e905c5d0a9e -->
+<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=73298ff43e319b3e1a86a7d369c284595383f5d0b1e5fbc7e0d483d8fd68003a -->
 ## 服务自启动纪律（必做）
 
 执行自动化测试、截图巡检、接口引擎回读、`/apiengine/{key}` 验收时，如果本地后端或前端不可达，不能把 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听当作任务终点。必须先自动启动所需服务，再继续完整验证。

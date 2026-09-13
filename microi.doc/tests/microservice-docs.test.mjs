@@ -172,7 +172,7 @@ test('future AI delivery rules prohibit manual chunks and require standalone aut
   const docsSkill = readSkill('microi-docs-coverage');
   const sdkSkill = readSkill('microi-frontend-sdk');
   const uiSkill = readSkill('ui-design');
-  const aiInstructions = read('Microi.VSCode/src/editor/typingsManager.ts');
+  const aiInstructions = read('Microi.Code/src/editor/typingsManager.ts');
   const mcp = read('microi.mcp/src/server.ts');
   const scaffold = read('microi.mcp/src/microservice-scaffold.ts');
   const host = read('Microi.Client/src/views/micro-app/host.vue');
@@ -278,7 +278,7 @@ test('workspace Skills and the packaged Codex plugin carry the same rules', () =
   for (const file of files) {
     assert.equal(
       sha256(`microi.skills/${file}`),
-      sha256(`Microi.VSCode/plugins/microi/skills/${file}`),
+      sha256(`Microi.Code/plugins/microi/skills/${file}`),
       `${file} must be synchronized into the packaged plugin`,
     );
   }

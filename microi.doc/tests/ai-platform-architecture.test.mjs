@@ -38,7 +38,7 @@ test('架构图以 V8引擎为唯一运行核心并覆盖平台关键能力', as
   for (const text of [
     'Microi吾码 AI平台 架构图', platformVersion, 'V8引擎', '10×+', 'Token 更省', '典型交付更快', '30+', '成熟引擎复用', '在线生效', 'V8 无需编译发布',
     '表单引擎', '模块引擎', '界面引擎', '打印引擎', '报表引擎', '工作流引擎 v4', '业务架构蓝图', '系统设置',
-    '系统日志 / 监控', '采集引擎', '缓存引擎', '消息通知', '翻译引擎（多语言）', 'OCR 引擎', '视觉引擎', '应用商城', 'Microi.VSCode', 'MCP / Skills',
+    '系统日志 / 监控', '采集引擎', '缓存引擎', '消息通知', '翻译引擎（多语言）', 'OCR 引擎', '视觉引擎', '应用商城', 'Microi.Code', 'MCP / Skills',
     'Codex / OpenClaw', 'Microi.UI', 'Unity / WebGL', 'Office 引擎', '前端微服务', '多端客户端', '分布式存储 / HDFS', '文件柜'
   ]) assert.ok(svg.includes(text), text)
   for (const engine of officialSystemEngines) assert.ok(svg.includes(engine), `架构图缺少系统引擎：${engine}`)
