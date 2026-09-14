@@ -9,6 +9,16 @@ description: 生成和审查 Microi 界面引擎 Page Engine 页面 JSON。用�
 
 MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_page_design`；版本治理入口见下文。保存工具写入后仍需回读 `mic_page`，不能把生成成功当作持久化成功。
 
+## 紧凑报表与平台主题
+
+需要“主指标 + 多行次指标 + 图表 + 排行表 + 资讯”布局时，可读取 [examples/compact-dashboard.json](examples/compact-dashboard.json) 作为原生组件示例。示例数值仅用于视觉排版，交付业务报表前必须替换为当前租户的真实数据源。
+
+默认使用 `formConfig.themeMode="system"`、`density="compact"`，卡片背景使用 `var(--el-bg-color)`、页面背景使用 `var(--el-bg-color-page)`，正文使用平台文字变量。不要因为“驾驶舱/大屏”字样就强制深色。显式指定浅色或深色时才使用 `light/dark`。
+
+运行容器默认 `wrapperOption.heightMode="content"`，`height` 只保留设计器布局尺寸。仅需固定图形画布时设为 `fixed`；图表自身可以设置 240–320px 高度。不要为一行指标、标题、三行表格预留 200–400px 空容器。紧凑布局的卡片间距建议 10–16px，面板内边距 8–16px；统计组件 `widgetParams[24].value` 支持 `summary`（图标和大数字）、`detail`（多行小指标）及兼容的 `cards`。
+
+用户提供参考截图时，先拆出面板行列比例、指标主次、图表与表格高度、标题/筛选位置，再用原生 pannel/statistic/chart/tabel/list 组合配置。不能把所有指标替换成一排大色块，也不能用模板假数据声称已接通客户业务。必须用同一视口截图检查浅色和平台深色，检查页面缩放后的断行与纵向空白；布局接近度和真实数据绑定分别验收。
+
 你正在为 Microi 吾码平台生成界面引擎页面的 JSON 数据。界面引擎页面由 `formData` 对象描述，用户导入 JSON 即可使用。
 
 <!-- microi-progressive:begin -->

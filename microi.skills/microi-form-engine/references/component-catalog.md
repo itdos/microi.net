@@ -144,7 +144,7 @@ if (V8.LoadMode !== 'Design') {
 | JoinForm | `JoinForm.TableId`、`JoinForm.TableName`、`JoinForm.JoinFieldName`、`JoinForm.FormMode`、`JoinForm.Id`、`JoinForm._SearchEqual` |
 | TableChild | Config 根节点的 `TableChildTableId`、`TableChildSysMenuId`、`TableChildFkFieldName`；`TableChild.PrimaryTableFieldName`（默认 `Id`）及分页/导入选项 |
 | ImgUpload | `ImgUpload.Limit/Multiple/MaxCount/Tips/Preview/MaxSize/SaveFullPath`；`ImgUpload.Crop.Enabled` 仅表示默认开启，另有 `Mode=free/fixed/select`、`Ratio`、`CustomWidth/CustomHeight`、`AllowZoom/AllowRotate/AllowFlip`；运行时在上传面板内提供裁剪开关，裁剪弹层提供“不裁剪直接上传”；导出时会按最大图片数展开列 |
-| FileUpload | `FileUpload.Limit/Multiple/MaxCount/Tips/MaxSize/SaveFullPath`，以及 Office 预览/编辑/版本配置；文件不使用 `ImgUpload.Preview/Crop` |
+| FileUpload | `FileUpload.Limit/Multiple/MaxCount/Tips/MaxSize/SaveFullPath`，Office 预览/编辑/版本，以及 `EnableRolePermission/HideUnauthorizedFiles/ShowUnauthorizedFileName/DisableRoleInheritance`（boolean，默认 false）；开启角色权限强制私有存储，附件 `VisibleRoleIds` 多选真实角色 Id；文件不使用 `ImgUpload.Preview/Crop` |
 | RichText | `RichText.Limit`；`Image.Enabled/MaxSize/MaxCount/Preview/CompressMaxSize/CompressMaxWidth`；`Video.Enabled/MaxSize/MaxCount`；`File.Enabled/MaxSize/MaxCount/Accept`；私有正文存稳定标识而不是临时 URL |
 | Qrcode | `Qrcode.DisplayWidth`、`Qrcode.ShowDownload`、`Qrcode.DownloadText`；扫码内容使用运行态 `DataAppend.Code` |
 

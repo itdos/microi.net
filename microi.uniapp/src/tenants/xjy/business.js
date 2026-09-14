@@ -291,7 +291,12 @@ export const businessModules = {
     statusOptions: ['待安装', '使用中', '库存中', '已退机', '已报废', '已报废换新'],
     filterFields: [
       { key: 'state', label: '设备状态', field: 'ShebeiZT', type: 'options', multiple: true, source: 'baseData', parentKey: 'ShenbeiZT', valueField: 'Value', labelField: 'Value' },
-      { key: 'model', label: '设备型号', field: 'ShebeiXH', type: 'text' },
+      {
+        key: 'model', label: '设备型号', field: 'ShebeiXH', type: 'options', component: 'Select',
+        presentation: 'dropdown', multiple: true, storage: 'scalar', queryValue: 'label', overrideConfigured: true,
+        source: 'module', moduleEngineKey: 'Diy_KehuSB', valueField: 'ShebeiXH', labelField: 'ShebeiXH',
+        orderBy: 'ShebeiXH', orderType: 'ASC', pageSize: 50
+      },
       { key: 'position', label: '安装位置', field: 'AnzhuangWZ', type: 'text' },
       { key: 'brand', label: '设备品牌', field: 'ShangpinMC', type: 'text' },
       { key: 'customer', label: '客户名称', field: 'KehuMC', type: 'text' },
