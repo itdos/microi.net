@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
+import { buildTaskDeviceServiceStatusWhere } from '../src/tenants/xjy/task-device-filters.mjs'
 
 const detailSource = fs.readFileSync(new URL('../src/pages/task/device.vue', import.meta.url), 'utf8')
 const feedbackSource = fs.readFileSync(new URL('../src/pages/native/task-feedback.vue', import.meta.url), 'utf8')
@@ -45,11 +46,32 @@ test('任务设备列表可按名称型号编号和安装位置检索', () => {
   assert.match(taskSource, /GroupEnd: true/)
 })
 
-test('任务设备地图跟随列表关键词并分页加载全部匹配设备', () => {
-  assert.match(listSource, /const filters = \{ keyword: String\(this\.keyword \|\| ''\)\.trim\(\) \}/)
+test('任务设备列表复用后台子表筛选并将服务状态作为顶部独立筛选', () => {
+  assert.match(listSource, /<mci-list-filter-field/)
+  assert.match(listSource, /loadTaskDeviceFilterConfig/)
+  assert.match(listSource, /:class="\{ active: serviceStatus === 'completed' \}"/)
+  assert.match(listSource, /changeServiceStatus\('unfinished'\)/)
+  assert.match(listSource, /extraWhere: this\.buildFilterWhere\(\)/)
+  assert.match(listSource, /serviceStatus: this\.serviceStatus/)
+  assert.match(taskSource, /buildTaskDeviceServiceStatusWhere\(serviceStatus\)/)
+  assert.match(taskSource, /String\(field\.field \|\| ''\)\.toLowerCase\(\) === 'shebeixh'[\s\S]*queryValue: 'label'/)
+  assert.match(taskSource, /\.\.\.extraWhere/)
+  assert.match(taskSource, /_TableChildAuth: tableChildAuth/)
+  assert.deepEqual(buildTaskDeviceServiceStatusWhere('completed'), [
+    { Name: 'FuwuZTZ', Type: '=', Value: '1' }
+  ])
+  assert.deepEqual(buildTaskDeviceServiceStatusWhere('unfinished'), [
+    { GroupStart: true, Name: 'FuwuZTZ', Type: '<>', Value: '1' },
+    { AndOr: 'OR', Name: 'FuwuZTZ', Type: '=', Value: null, GroupEnd: true }
+  ])
+  assert.deepEqual(buildTaskDeviceServiceStatusWhere('all'), [])
+})
+
+test('任务设备地图跟随列表关键词与服务状态并分页加载全部匹配设备', () => {
+  assert.match(listSource, /const filters = \{[\s\S]*keyword: String\(this\.keyword \|\| ''\)\.trim\(\),[\s\S]*serviceStatus: this\.serviceStatus/)
   assert.match(listSource, /filters=\$\{encodeURIComponent\(JSON\.stringify\(filters\)\)\}/)
   assert.match(mapSource, /deviceFilters: \{\}/)
-  assert.match(mapSource, /loadAllTaskDevices\(this\.taskId, \{ refresh: true, keyword: this\.deviceFilters\.keyword \|\| '' \}\)/)
+  assert.match(mapSource, /loadAllTaskDevices\(this\.taskId, \{[\s\S]*keyword: this\.deviceFilters\.keyword \|\| '',[\s\S]*serviceStatus:/)
   assert.match(taskSource, /keyword: config\.keyword \|\| ''/)
 })
 

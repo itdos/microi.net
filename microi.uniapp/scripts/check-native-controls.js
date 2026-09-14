@@ -200,7 +200,7 @@ if (!relatedBusinessList.includes('!waitingForParentSave') ||
   fail('new parent forms must not leave related lists in a permanent skeleton state')
 }
 if (!taskList.includes('<mci-task-card') ||
-  !taskList.includes('components: { MciTaskCard }') ||
+  !/components:\s*\{[^}]*\bMciTaskCard\b[^}]*\}/.test(taskList) ||
   !relatedBusinessList.includes('<mci-task-card') ||
   !taskCard.includes('task-card__bottom')) {
   fail('standalone and related task lists must share the task card presentation')

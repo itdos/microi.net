@@ -71,11 +71,13 @@ function shouldShowInAdvancedFilter(item, includeInline = false) {
   return includeInline || displayType !== 'line'
 }
 
-function fieldCanBeSearched(field) {
+function fieldCanBeSearched(field, { allowAppHidden = false } = {}) {
   if (!field || !field.Name) return false
   if (/password|passwd|pwd|secret|token|openid|unionid|密码|密钥|令牌/i.test(`${field.Name || ''} ${field.Label || ''}`)) return false
   if (Array.isArray(field.bindRoleIds) && field.bindRoleIds.length && field.visible === false) return false
-  if (Number(field.AppVisible ?? field.Visible ?? 1) === 0) return false
+  // Visible/AppVisible 只控制表单呈现。菜单已明确配置到 SearchFieldIds 时，
+  // 隐藏的计算字段、只读字段仍可作为查询条件；角色限制和敏感字段限制继续生效。
+  if (!allowAppHidden && Number(field.AppVisible ?? field.Visible ?? 1) === 0) return false
   return true
 }
 
@@ -150,13 +152,13 @@ function compileField(item, field) {
   return { ...base, type: 'text', operation: normalizedBoolean(source.Equal, false) ? '=' : 'Like' }
 }
 
-export function compileModuleFilterFields(searchFieldIds, fields = [], { includeInline = false } = {}) {
+export function compileModuleFilterFields(searchFieldIds, fields = [], { includeInline = false, allowAppHidden = false } = {}) {
   const available = Array.isArray(fields) ? fields : []
   const seen = new Set()
   return parseRows(searchFieldIds).map((item) => {
     if (!shouldShowInAdvancedFilter(item, includeInline)) return null
     const field = findConfiguredField(item, available)
-    if (!fieldCanBeSearched(field)) return null
+    if (!fieldCanBeSearched(field, { allowAppHidden })) return null
     const key = String(field.Name).toLowerCase()
     if (seen.has(key)) return null
     seen.add(key)
@@ -166,9 +168,10 @@ export function compileModuleFilterFields(searchFieldIds, fields = [], { include
 
 export function mergeModuleFilterFields(configured = [], local = [], nativeFields = []) {
   const result = []
-  const seen = new Set()
+  const indexes = new Map()
   const normalizedLocal = (local || []).map((item) => {
     if (!item || ['sort', 'toggle'].includes(item.type)) return item
+    if (item.overrideConfigured === true) return { ...item }
     const native = nativeFields.find((field) => String(field.Name).toLowerCase() === String(item.field).toLowerCase())
     if (!native) return item
     if (!fieldCanBeSearched(native)) return null
@@ -177,9 +180,45 @@ export function mergeModuleFilterFields(configured = [], local = [], nativeField
   ;[...(configured || []), ...normalizedLocal].forEach((field) => {
     if (!field) return
     const key = String(field.field || field.key || '').trim().toLowerCase()
-    if (!key || seen.has(key)) return
-    seen.add(key)
+    if (!key) return
+    if (indexes.has(key)) {
+      if (field.overrideConfigured === true) {
+        const index = indexes.get(key)
+        result[index] = { ...result[index], ...field }
+      }
+      return
+    }
+    indexes.set(key, result.length)
     result.push(field)
+  })
+  return result
+}
+
+const TABLE_SELECTOR_FILTER_TYPES = new Set([
+  'text',
+  'options',
+  'range',
+  'date-range',
+  'address',
+  // 兼容已经发布的租户弹窗配置；新后台配置统一使用 options/date-range。
+  'select',
+  'datetime-range'
+])
+
+export function mergeTableSelectorFilterFields(configured = [], presentation = []) {
+  const valid = (field) => field && field.key && field.field && TABLE_SELECTOR_FILTER_TYPES.has(field.type)
+  const result = (Array.isArray(configured) ? configured : []).filter(valid).map((field) => ({ ...field }))
+  const indexes = new Map(result.map((field, index) => [String(field.field || field.key).trim().toLowerCase(), index]))
+
+  ;(Array.isArray(presentation) ? presentation : []).filter(valid).forEach((field) => {
+    const identity = String(field.field || field.key).trim().toLowerCase()
+    const index = indexes.get(identity)
+    // presentation.filters 是特殊业务的完整声明：同字段替换后台配置，新字段按声明顺序追加。
+    if (index !== undefined) result[index] = { ...field }
+    else {
+      indexes.set(identity, result.length)
+      result.push({ ...field })
+    }
   })
   return result
 }
