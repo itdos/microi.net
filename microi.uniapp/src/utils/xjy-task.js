@@ -1,10 +1,16 @@
 import { V8, getUser, post } from '@/utils/request.js'
 import { PERIOD_OPTIONS, buildPeriodRange, callApiEngine, findMenu, formatFieldValue, formatRegion } from '@/platform/business-runtime.js'
 import { cachedRequest, readPageState, removeCachePrefix, writePageState } from '@/platform/cache.js'
+import { loadNativeFormDefinition } from '@/platform/native-form.js'
+import { compileModuleFilterFields } from '@/platform/list-filter-fields.mjs'
 import { normalizeTaskFlowCapabilities } from '@/tenants/xjy/task-flow-capability.mjs'
 import {
   resolveCustomerDeviceReference
 } from '@/tenants/xjy/task-device-reference.mjs'
+import {
+  TASK_DEVICE_FALLBACK_SEARCH_FIELDS,
+  buildTaskDeviceServiceStatusWhere
+} from '@/tenants/xjy/task-device-filters.mjs'
 
 export const TASK_STATES = [
   { value: '', label: '全部', code: 0 },
@@ -48,6 +54,8 @@ const TASK_MAP_SELECT_FIELDS = [
 ]
 
 const TASK_PERMISSION_ID = 'aab7df97-4009-4d9f-89f7-ed30e5eba3fb'
+const TASK_TABLE = 'Diy_ShouhouDD'
+const TASK_DEVICE_TABLE = 'diy_shouhousp'
 let taskMenuPromise = null
 
 function taskIdentity() {
@@ -135,7 +143,9 @@ export async function loadTasks(options = {}) {
   ]
   if (options.state) where.push({ Name: 'Zhuangtai', Type: 'Like', Value: options.state })
   if (options.type) where.push({ Name: 'Leixing', Type: '=', Value: options.type })
-  if (options.city) where.push({ Name: 'Chengshi', Type: 'Like', Value: options.city })
+  if (options.city && !where.some((item) => String(item && item.Name || '').toLowerCase() === 'chengshi')) {
+    where.push({ Name: 'Chengshi', Type: 'Like', Value: options.city })
+  }
   if (options.customerId) where.push({ Name: 'KehuID', Type: '=', Value: options.customerId })
   if (options.mineOnly && user.Id) where.push({ Name: 'ShouhouRYID', Type: '=', Value: user.Id })
   const payload = {
@@ -287,12 +297,99 @@ function normalizeTaskDevice(row = {}) {
   }
 }
 
+export async function loadTaskFilterConfig(refresh = false) {
+  const menu = await findMenu(['售后订单', '售后任务'], TASK_TABLE, refresh)
+  if (!menu || !menu.Id) throw new Error('未找到售后任务菜单权限')
+  const definition = await loadNativeFormDefinition(TASK_TABLE, refresh, { menuId: menu.Id })
+  const fields = definition.layoutFields?.length ? definition.layoutFields : (definition.fields || [])
+  const configured = compileModuleFilterFields(menu.SearchFieldIds || [], fields, { includeInline: true, allowAppHidden: true })
+  const configuredCity = configured.find((field) => String(field.field || '').toLowerCase() === 'chengshi')
+  const nativeCity = compileModuleFilterFields(
+    [{ Name: 'Chengshi', Label: '所在城市', DisplayType: 'Out' }],
+    fields,
+    { includeInline: true, allowAppHidden: true }
+  )[0]
+  return {
+    filterFields: configured.filter((field) => String(field.field || '').toLowerCase() !== 'chengshi'),
+    // 城市在 XJY 表中统一保存省/市/区名称数组；即使旧元数据仍是 Text，移动端也按区域选择器查询。
+    cityFilterField: {
+      ...(nativeCity || {}),
+      ...(configuredCity || {}),
+      key: 'Chengshi',
+      field: 'Chengshi',
+      label: (configuredCity && configuredCity.label) || (nativeCity && nativeCity.label) || '所在城市',
+      type: 'address',
+      storage: 'region'
+    },
+    menuId: String(menu.Id),
+    moduleEngineKey: menu.ModuleEngineKey || TASK_TABLE
+  }
+}
+
+export async function loadTaskDeviceFilterConfig(taskId, refresh = false) {
+  const parentMenu = await findMenu(['售后任务', '售后订单'], TASK_TABLE, refresh)
+  if (!parentMenu || !parentMenu.Id) throw new Error('未找到售后任务菜单权限')
+  const parentDefinition = await loadNativeFormDefinition(TASK_TABLE, refresh, { menuId: parentMenu.Id })
+  const childField = (parentDefinition.fields || []).find((field) => {
+    const config = field.config || {}
+    return field.component === 'TableChild' &&
+      (config.TableChildFkFieldName === 'ShouhouDDID' || config.TableChildSysMenuName === '售后订单设备列表')
+  })
+  if (!childField || !childField.Id) throw new Error('售后任务设备子表配置不完整')
+  const childConfig = childField.config || {}
+  const menuId = String(childConfig.TableChildSysMenuId || '').trim()
+  if (!menuId) throw new Error('售后任务设备菜单配置不完整')
+  const tableChildAuth = {
+    ParentFieldId: childField.Id,
+    ParentTableId: parentDefinition.table && parentDefinition.table.Id || '',
+    ParentSysMenuId: parentMenu.Id,
+    ParentRowId: taskId,
+    ParentValue: taskId,
+    ParentFormMode: 'View'
+  }
+  const [childDefinition, childMenu] = await Promise.all([
+    loadNativeFormDefinition(TASK_DEVICE_TABLE, refresh, { menuId, tableChildAuth }),
+    findMenu([], TASK_DEVICE_TABLE, refresh, menuId, childConfig.TableChildTableId || '')
+  ])
+  const fields = childDefinition.layoutFields?.length ? childDefinition.layoutFields : (childDefinition.fields || [])
+  const configured = compileModuleFilterFields(childMenu && childMenu.SearchFieldIds || [], fields, { includeInline: true, allowAppHidden: true })
+  const fallback = compileModuleFilterFields(TASK_DEVICE_FALLBACK_SEARCH_FIELDS, fields, { includeInline: true, allowAppHidden: true })
+  const serviceFields = new Set(['fuwuzt', 'fuwuztz'])
+  const filterFields = (configured.length ? configured : fallback)
+    .filter((field) => !serviceFields.has(String(field.field || '').toLowerCase()))
+    .map((field) => String(field.field || '').toLowerCase() === 'shebeixh'
+      ? {
+          ...field,
+          presentation: 'dropdown',
+          multiple: true,
+          storage: 'scalar',
+          multiValueLike: false,
+          queryValue: 'label'
+        }
+      : field)
+  return {
+    // 服务完成状态由页面顶部统计卡片独立承担，避免与后台高级筛选重复出现。
+    filterFields,
+    menuId,
+    moduleEngineKey: childMenu && childMenu.ModuleEngineKey || '',
+    tableChildAuth
+  }
+}
+
 export async function loadTaskDevicesPage(taskId, options = {}) {
   const pageIndex = Math.max(1, Number(options.pageIndex || 1))
   const pageSize = Math.min(300, Math.max(1, Number(options.pageSize || 20)))
   const refresh = options.refresh === true
   const keyword = String(options.keyword || '').trim()
-  const where = [{ Name: 'ShouhouDDID', Type: '=', Value: taskId }]
+  const extraWhere = Array.isArray(options.extraWhere) ? options.extraWhere : []
+  const serviceStatus = String(options.serviceStatus || 'all')
+  const tableChildAuth = options.tableChildAuth || null
+  const menuId = String(options.menuId || '').trim()
+  const where = [
+    { Name: 'ShouhouDDID', Type: '=', Value: taskId },
+    ...buildTaskDeviceServiceStatusWhere(serviceStatus),
+    ...extraWhere
+  ]
   if (keyword) {
     where.push(
       { GroupStart: true, Name: 'ShebeiMC', Type: 'Like', Value: keyword },
@@ -303,9 +400,10 @@ export async function loadTaskDevicesPage(taskId, options = {}) {
       { AndOr: 'OR', Name: 'AnzhuangWZ', Type: 'Like', Value: keyword, GroupEnd: true }
     )
   }
-  const cacheKey = `task:devices:${taskIdentity()}:${taskId}:${pageIndex}:${pageSize}:${keyword}`
-  const cached = await cachedRequest(cacheKey, () => V8.FormEngine.GetTableData('diy_shouhousp', {
+  const cacheKey = `task:devices:${taskIdentity()}:${taskId}:${pageIndex}:${pageSize}:${JSON.stringify(where)}`
+  const cached = await cachedRequest(cacheKey, () => V8.FormEngine.GetTableData(TASK_DEVICE_TABLE, {
     _Where: where,
+    ...(tableChildAuth ? { _TableChildAuth: tableChildAuth } : menuId ? { _SysMenuId: menuId } : {}),
     _OrderBys: { FuwuZTZ: 'DESC', CreateTime: 'ASC', Id: 'ASC' },
     _PageIndex: pageIndex,
     _PageSize: pageSize
@@ -315,19 +413,37 @@ export async function loadTaskDevicesPage(taskId, options = {}) {
   return { rows, count: Number(result.DataCount ?? rows.length), stale: cached.stale === true }
 }
 
-export async function loadTaskDeviceSummary(taskId, refresh = false) {
+export async function loadTaskDeviceSummary(taskId, options = false) {
+  const config = typeof options === 'boolean' ? { refresh: options } : (options || {})
+  const refresh = config.refresh === true
+  const authorization = config.tableChildAuth
+    ? { _TableChildAuth: config.tableChildAuth }
+    : config.menuId ? { _SysMenuId: config.menuId } : {}
   const cacheKey = `task:device-summary:${taskIdentity()}:${taskId}`
-  const cached = await cachedRequest(cacheKey, () => V8.FormEngine.GetTableData('diy_shouhousp', {
-    _Where: [
-      { Name: 'ShouhouDDID', Type: '=', Value: taskId },
-      { Name: 'FuwuZTZ', Type: '=', Value: '1' }
-    ],
-    _SelectFields: ['Id'],
-    _PageIndex: 1,
-    _PageSize: 1
-  }), { maxAge: 20 * 1000, refresh, allowStale: true })
+  const cached = await cachedRequest(cacheKey, async () => {
+    const query = (statusWhere = []) => V8.FormEngine.GetTableData(TASK_DEVICE_TABLE, {
+      ...authorization,
+      _Where: [{ Name: 'ShouhouDDID', Type: '=', Value: taskId }, ...statusWhere],
+      _SelectFields: ['Id'],
+      _PageIndex: 1,
+      _PageSize: 1
+    })
+    const [totalResult, completedResult] = await Promise.all([
+      query(),
+      query(buildTaskDeviceServiceStatusWhere('completed'))
+    ])
+    ensureSuccess(totalResult, '任务设备总数加载失败')
+    ensureSuccess(completedResult, '已完成设备统计加载失败')
+    return {
+      Code: 1,
+      Data: {
+        total: Number(totalResult.DataCount ?? (totalResult.Data || []).length),
+        completed: Number(completedResult.DataCount ?? (completedResult.Data || []).length)
+      }
+    }
+  }, { maxAge: 20 * 1000, refresh, allowStale: true })
   const result = ensureSuccess(cached.data, '任务设备统计加载失败')
-  return { completed: Number(result.DataCount ?? (result.Data || []).length), stale: cached.stale === true }
+  return { ...result.Data, stale: cached.stale === true }
 }
 
 export async function loadTaskDevices(taskId, refresh = false) {
@@ -345,6 +461,10 @@ export async function loadAllTaskDevices(taskId, options = false) {
       pageIndex,
       pageSize: 300,
       keyword: config.keyword || '',
+      extraWhere: config.extraWhere || [],
+      serviceStatus: config.serviceStatus || 'all',
+      menuId: config.menuId || '',
+      tableChildAuth: config.tableChildAuth || null,
       refresh: config.refresh === true
     })
     rows.push(...page.rows)
@@ -596,6 +716,8 @@ export default {
   loadTaskDevices,
   loadTaskDevicesPage,
   loadTaskDeviceSummary,
+  loadTaskFilterConfig,
+  loadTaskDeviceFilterConfig,
   loadAllTaskDevices,
   loadTaskDeviceDetail,
   loadTaskEquipmentPackage,

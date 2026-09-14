@@ -65,6 +65,14 @@
       @refresherrefresh="refresh"
       @scrolltolower="loadMore"
     >
+      <view v-if="hasActiveListFilters" class="task-filter-feedback">
+        <text>当前条件找到 {{ count }} 个任务</text>
+        <view class="task-filter-reset" hover-class="task-filter-reset--pressed" @tap="resetFilters">
+          <view class="task-filter-reset__icon" aria-hidden="true"></view>
+          <text>重置筛选</text>
+        </view>
+      </view>
+
       <mci-skeleton v-if="loading && pageIndex === 1" type="list" :rows="6" />
 
       <view v-else-if="displayRows.length" class="task-list">
@@ -98,14 +106,7 @@
     <view v-if="filterVisible" class="sheet-mask" @tap="filterVisible = false">
       <view class="filter-sheet" @tap.stop>
         <view class="sheet-handle"></view>
-        <view class="sheet-heading"><view><text class="sheet-title">更多筛选</text><text class="sheet-subtitle">筛选条件会自动保留</text></view><view class="sheet-close" @tap="filterVisible = false"><text>×</text></view></view>
-
-        <view class="filter-group">
-          <text class="filter-label">时间口径</text>
-          <picker :range="dateFields" range-key="label" :value="dateFieldIndex" @change="dateField = dateFields[$event.detail.value].value">
-            <view class="picker-control"><text>{{ selectedDateFieldLabel }}</text><text>›</text></view>
-          </picker>
-        </view>
+        <view class="sheet-heading"><view><text class="sheet-title">更多筛选</text><text class="sheet-subtitle">筛选字段与后台配置同步，条件会自动保留</text></view><view class="sheet-close" @tap="filterVisible = false"><text>×</text></view></view>
 
         <view v-if="period === 'custom'" class="filter-group">
           <text class="filter-label">自定义时间范围</text>
@@ -117,7 +118,24 @@
 
         <view class="filter-group">
           <text class="filter-label">所在城市</text>
-          <input v-model="city" class="filter-input" placeholder="输入省、市或区县" />
+          <mci-list-filter-field
+            :field="cityFilterField"
+            v-model="city"
+            :menu-id="taskMenuId"
+            :module-engine-key="taskModuleEngineKey"
+            :form-data="filterFormData"
+          />
+        </view>
+
+        <view v-for="field in taskFilterFields" :key="field.key" class="filter-group">
+          <text class="filter-label">{{ field.label }}</text>
+          <mci-list-filter-field
+            :field="field"
+            v-model="filterValues[field.key]"
+            :menu-id="taskMenuId"
+            :module-engine-key="taskModuleEngineKey"
+            :form-data="filterFormData"
+          />
         </view>
 
         <view class="filter-group">
@@ -139,11 +157,14 @@ import { listReturnMixin } from '@/platform/list-return.js'
 import { getUser } from '@/utils/request.js'
 import { getRoleProfile } from '@/tenants/xjy/business.js'
 import { readListEntryPeriod } from '@/platform/list-entry-period.mjs'
+import { buildListFilterWhere, hasListFilterValue, validateListFilters } from '@/platform/list-filter-fields.mjs'
+import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
 import {
   TASK_DATE_FIELDS,
   TASK_PERIODS,
   TASK_STATES,
+  loadTaskFilterConfig,
   loadTaskPeriodCounts,
   loadTaskSummaryCounts,
   loadTaskStateCounts,
@@ -157,7 +178,7 @@ const STATE_COUNT_KEYS = {
 }
 
 export default {
-  components: { MciTaskCard },
+  components: { MciListFilterField, MciTaskCard },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {
@@ -179,7 +200,11 @@ export default {
       dateField: 'YujiSHSJ',
       customStart: '',
       customEnd: '',
-      city: '',
+      city: [],
+      cityFilterField: { key: 'Chengshi', field: 'Chengshi', label: '所在城市', type: 'address', storage: 'region' },
+      taskFilterFields: [],
+      filterValues: {},
+      taskModuleEngineKey: 'Diy_ShouhouDD',
       mineOnly: true,
       orderType: 'ASC',
       loading: true,
@@ -203,12 +228,26 @@ export default {
     customRange() {
       return this.customStart && this.customEnd ? [`${this.customStart} 00:00:00`, `${this.customEnd} 23:59:59`] : null
     },
-    dateFieldIndex() { return Math.max(0, this.dateFields.findIndex((item) => item.value === this.dateField)) },
-    selectedDateFieldLabel() { return (this.dateFields[this.dateFieldIndex] || {}).label || '计划服务时间' },
     typeOptions() { return Object.keys(this.typeCounts).map((name) => ({ name, count: this.typeCounts[name] })).filter((item) => item.name !== '换芯') },
     activeFilterCount() {
-      return Number(Boolean(this.city)) + Number(this.dateField !== 'YujiSHSJ') + Number(this.orderType !== 'ASC') + Number(this.period === 'custom')
+      const configured = this.taskFilterFields.reduce((count, field) => count + Number(hasListFilterValue(this.filterValues[field.key])), 0)
+      return Number(hasListFilterValue(this.city)) + configured + Number(this.orderType !== 'ASC') + Number(this.period === 'custom')
     },
+    hasActiveListFilters() {
+      const defaultMineOnly = !this.isCustomerAccount
+      return Boolean(
+        String(this.keyword || '').trim()
+        || this.state
+        || this.type
+        || this.period !== 'month'
+        || this.dateField !== 'YujiSHSJ'
+        || hasListFilterValue(this.city)
+        || Object.values(this.filterValues || {}).some((value) => hasListFilterValue(value))
+        || this.orderType !== 'ASC'
+        || this.mineOnly !== defaultMineOnly
+      )
+    },
+    filterFormData() { return {} },
     roleProfile() { return getRoleProfile(this.currentUser) },
     isCustomerAccount() { return this.roleProfile.isCustomer === true },
     showMineSwitch() { return !this.isCustomerAccount },
@@ -243,9 +282,8 @@ export default {
       this.state = ''
       this.period = 'all'
     }
-    this.loadTaskCreatePermission()
     const taskListSessionParts = [
-      'task-list:v3',
+      'task-list:v4',
       user.Id || user.Account || 'guest',
       this.customerId || 'all-customers',
       options.state ? `entry-state:${this.state}` : 'default-state',
@@ -256,8 +294,7 @@ export default {
     }
     this.taskListSessionKey = taskListSessionParts.join('|')
     const restored = (this.focusTaskId || entryPeriod.forceFresh) ? null : this.restoreTaskListSession()
-    if (!restored) this.loadData(true, true)
-    else setTimeout(() => this.refreshRestoredTaskList(restored), 0)
+    this.bootstrap(restored)
     this.changedListener = () => { this.taskDataChanged = true }
     uni.$on('xjy:task-changed', this.changedListener)
   },
@@ -267,6 +304,27 @@ export default {
   },
   methods: {
     taskStateClass,
+    async bootstrap(restored) {
+      // 先确定当前任务菜单，再读取同一菜单的筛选定义，避免并发失败分支覆盖有效菜单上下文。
+      await this.loadTaskCreatePermission()
+      await this.loadFilterConfig(false)
+      if (!restored) await this.loadData(true, true)
+      else await this.refreshRestoredTaskList(restored)
+    },
+    async loadFilterConfig(refresh = false) {
+      try {
+        const config = await loadTaskFilterConfig(refresh)
+        this.taskFilterFields = config.filterFields || []
+        this.cityFilterField = config.cityFilterField || this.cityFilterField
+        this.taskMenuId = config.menuId || this.taskMenuId
+        this.taskModuleEngineKey = config.moduleEngineKey || 'Diy_ShouhouDD'
+        const availableKeys = new Set(this.taskFilterFields.map((field) => field.key))
+        this.filterValues = Object.fromEntries(Object.entries(this.filterValues || {}).filter(([key]) => availableKeys.has(key)))
+      } catch (error) {
+        // 菜单元数据暂时不可用时保留城市区域筛选，任务列表本身仍按既有权限加载。
+        this.taskFilterFields = []
+      }
+    },
     async loadTaskCreatePermission(refresh = false) {
       this.taskPermissionReady = false
       this.currentUser = getUser() || {}
@@ -301,6 +359,7 @@ export default {
         customStart: this.customStart,
         customEnd: this.customEnd,
         city: this.city,
+        filterValues: JSON.parse(JSON.stringify(this.filterValues || {})),
         mineOnly: this.isCustomerAccount ? false : this.mineOnly,
         orderType: this.orderType,
         finished: this.finished,
@@ -314,7 +373,7 @@ export default {
       const fields = [
         'rows', 'count', 'stateCounts', 'typeCounts', 'periodCounts', 'pageIndex', 'keyword',
         'customerId', 'state', 'type', 'period', 'dateField', 'customStart', 'customEnd',
-        'city', 'mineOnly', 'orderType', 'finished', 'stale'
+        'city', 'filterValues', 'mineOnly', 'orderType', 'finished', 'stale'
       ]
       fields.forEach((field) => {
         if (Object.prototype.hasOwnProperty.call(payload, field)) this[field] = payload[field]
@@ -334,13 +393,25 @@ export default {
         period: this.period,
         customRange: this.customRange,
         dateField: this.dateField,
-        city: this.city.trim(),
+        city: this.taskCityStatisticValue(),
+        extraWhere: this.buildTaskFilterWhere(),
         mineOnly: this.isCustomerAccount ? false : this.mineOnly,
         orderBy: this.dateField,
         orderType: this.orderType,
         customerId: this.customerId || '',
         ...overrides
       }
+    },
+    taskCityStatisticValue() {
+      if (!Array.isArray(this.city)) return String(this.city || '').trim()
+      const parts = this.city.filter((part) => part && part !== '全部')
+      return parts[parts.length - 1] || ''
+    },
+    buildTaskFilterWhere() {
+      return [
+        ...buildListFilterWhere([this.cityFilterField], { Chengshi: this.city }, this.currentUser),
+        ...buildListFilterWhere(this.taskFilterFields, this.filterValues, this.currentUser)
+      ]
     },
     async refreshRestoredTaskList(snapshot) {
       if (!this.rows.length) return this.loadData(true, true)
@@ -470,16 +541,18 @@ export default {
     applyFilters() {
       if (this.period === 'custom' && !this.customRange) { uni.showToast({ title: '请选择完整时间范围', icon: 'none' }); return }
       if (this.customStart && this.customEnd && this.customStart > this.customEnd) { uni.showToast({ title: '开始日期不能晚于结束日期', icon: 'none' }); return }
+      const validation = validateListFilters(this.taskFilterFields, this.filterValues)
+      if (validation) { uni.showToast({ title: validation, icon: 'none' }); return }
       this.filterVisible = false
       this.loadData(true, true)
     },
     resetFilters(load = true) {
       this.keyword = ''; this.state = ''; this.type = ''; this.period = 'month'; this.dateField = 'YujiSHSJ'
-      this.customStart = ''; this.customEnd = ''; this.city = ''; this.mineOnly = !this.isCustomerAccount; this.orderType = 'ASC'
+      this.customStart = ''; this.customEnd = ''; this.city = []; this.filterValues = {}; this.mineOnly = !this.isCustomerAccount; this.orderType = 'ASC'
       this.filterVisible = false
       if (load) this.loadData(true, true)
     },
-    async refresh() { this.refreshing = true; try { await this.loadData(true, true) } finally { this.refreshing = false } },
+    async refresh() { this.refreshing = true; try { await this.loadFilterConfig(true); await this.loadData(true, true) } finally { this.refreshing = false } },
     loadMore() { this.loadData(false, false) },
     async onMciListDetailReturned(scrollTop) {
       if (!this.taskDataChanged || !this.rows.length) return
@@ -506,7 +579,8 @@ export default {
     openTaskMap() {
       const filters = {
         keyword: this.keyword.trim(), state: this.state, type: this.type, period: this.period,
-        customRange: this.customRange, dateField: this.dateField, city: this.city.trim(),
+        customRange: this.customRange, dateField: this.dateField, city: this.taskCityStatisticValue(),
+        extraWhere: this.buildTaskFilterWhere(),
         mineOnly: this.isCustomerAccount ? false : this.mineOnly, orderBy: this.dateField, orderType: this.orderType,
         customerId: this.customerId || ''
       }
@@ -574,6 +648,11 @@ export default {
 .type-chip text { margin-left: 7rpx; opacity: .72; }
 .offline-tip { padding: 12rpx 22rpx; color: #7c5b1c; background: #fff8e6; font-size: 21rpx; }
 .task-scroll { height: calc(100vh - var(--mci-safe-top) - 448rpx); }
+.task-filter-feedback { min-height: 58rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; padding: 8rpx 24rpx 0; color: #83969d; font-size: 20rpx; box-sizing: border-box; }
+.task-filter-reset { min-width: 138rpx; min-height: 56rpx; display: flex; align-items: center; justify-content: flex-end; gap: 8rpx; color: #087da8; font-weight: 600; transition: transform .16s ease, opacity .16s ease; }
+.task-filter-reset--pressed { opacity: .68; transform: scale(.96); }
+.task-filter-reset__icon { position: relative; width: 22rpx; height: 22rpx; flex: none; border: 3rpx solid currentColor; border-left-color: transparent; border-radius: 50%; box-sizing: border-box; }
+.task-filter-reset__icon::after { content: ''; position: absolute; left: -5rpx; top: -5rpx; width: 8rpx; height: 8rpx; border-left: 3rpx solid currentColor; border-top: 3rpx solid currentColor; transform: rotate(-18deg); }
 .task-list { padding: 18rpx 20rpx 0; }
 .task-list-session-item { position: relative; border-radius: 9px; }
 .task-list-session-item--focused { padding: 4rpx; background: linear-gradient(135deg,rgba(229,70,37,.2),rgba(8,125,168,.16)); box-shadow: 0 0 0 2rpx rgba(229,70,37,.5),0 10rpx 26rpx rgba(28,76,94,.13); }

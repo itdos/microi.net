@@ -33,17 +33,23 @@
         <view class="search-button" @tap="resetSearch">重置</view>
       </view>
 
-      <scroll-view class="period-tabs" scroll-x :show-scrollbar="false">
-        <view class="period-tabs__inner">
-        <view
-          v-for="item in periods"
-          :key="item.value"
-          class="period-item"
-          :class="{ active: period === item.value }"
-          @tap="changePeriod(item.value)"
-        ><text>{{ item.label }}</text><text class="period-item__count">{{ periodCount(item) }}</text></view>
+      <view class="period-filter-row">
+        <scroll-view class="period-tabs" scroll-x :show-scrollbar="false">
+          <view class="period-tabs__inner">
+            <view
+              v-for="item in periods"
+              :key="item.value"
+              class="period-item"
+              :class="{ active: period === item.value }"
+              @tap="changePeriod(item.value)"
+            ><text>{{ item.label }}</text><text class="period-item__count">{{ periodCount(item) }}</text></view>
+          </view>
+        </scroll-view>
+        <view v-if="showMineSwitch" class="mine-switch" @tap="toggleMine">
+          <view class="mine-switch__track" :class="{ active: mineOnly }"><view class="mine-switch__thumb"></view></view>
+          <text>只看我的</text>
         </view>
-      </scroll-view>
+      </view>
 
       <view v-if="period === 'custom'" class="custom-range">
         <picker mode="date" :value="customStart" @change="customStart = $event.detail.value"><view>{{ customStart || '开始日期' }}</view></picker>
@@ -330,6 +336,7 @@ export default {
       entry: {},
       keyword: '',
       period: 'all',
+      mineOnly: true,
       status: '',
       periods: PERIOD_OPTIONS,
       periodCounts: {},
@@ -378,6 +385,12 @@ export default {
   computed: {
     canAddRecord() {
       return canAddMenuRecord(this.menuId, this.currentUser)
+    },
+    isPersonnelLocationList() {
+      return String(this.config.table || this.baseConfig.table || '').trim().toLowerCase() === 'diy_location'
+    },
+    showMineSwitch() {
+      return this.isPersonnelLocationList
     },
     restrictedLookupConfig() {
       return this.config.restrictedLookup || this.baseConfig.restrictedLookup || {}
@@ -467,6 +480,7 @@ export default {
       try { this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0 } catch (error) {}
     }
     this.key = options.key || 'customers'
+    this.mineOnly = options.scope !== 'all'
     const entryPeriod = readListEntryPeriod(options, 'all')
     this.period = entryPeriod.period
     this.customStart = entryPeriod.customStart
@@ -599,7 +613,8 @@ export default {
       if (restored && this.keyword.trim()) await this.loadRestrictedRows(refresh)
     },
     getMciListSnapshotKey() {
-      const parts = [this.key, this.whereField, this.whereValue]
+      const userKey = this.currentUser.Id || this.currentUser.id || this.currentUser.Account || 'guest'
+      const parts = ['business-list:v2', userKey, this.key, this.whereField, this.whereValue]
       if (this.whereType !== '=') parts.push(this.whereType)
       if (this.entrySnapshotScope) parts.push(this.entrySnapshotScope)
       return parts.join('|')
@@ -608,6 +623,7 @@ export default {
       return {
         keyword: this.keyword,
         period: this.period,
+        mineOnly: this.mineOnly,
         status: this.status,
         periodCounts: { ...this.periodCounts },
         customStart: this.customStart,
@@ -892,6 +908,7 @@ export default {
       this.filterOpen = false
       this.expandedFilterKey = ''
       this.period = 'all'
+      if (this.showMineSwitch) this.mineOnly = true
       this.status = ''
       this.customStart = ''
       this.customEnd = ''
@@ -909,6 +926,11 @@ export default {
       if (this.period === value) return
       this.period = value
       if (value !== 'custom') this.loadData(true, true)
+    },
+    toggleMine() {
+      if (!this.showMineSwitch) return
+      this.mineOnly = !this.mineOnly
+      this.loadData(true, true)
     },
     applyCustomRange() {
       if (!this.customStart || !this.customEnd) {
@@ -944,6 +966,11 @@ export default {
       const initial = this.whereField && this.whereValue
         ? [{ Name: this.whereField, Type: this.whereType, Value: this.whereValue }]
         : []
+      if (this.showMineSwitch && this.mineOnly) {
+        const currentUserId = String(this.currentUser.Id || this.currentUser.id || '').trim()
+        // “查看全部”只移除这条前端收窄条件；服务端仍依据 _SysMenuId 执行平台配置的数据权限。
+        initial.push({ Name: 'UserId', Type: '=', Value: currentUserId || '__mci_missing_current_user__' })
+      }
       return buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser, initial)
     },
     selectedSort() {
@@ -1473,14 +1500,22 @@ export default {
   font-weight: 600;
 }
 
-.period-tabs {
+.period-filter-row {
+  display: flex;
+  align-items: stretch;
   width: calc(100% - 48rpx);
   margin: 0 24rpx;
   border: 1rpx solid #dce8ed;
   border-radius: 12rpx;
   overflow: hidden;
-  white-space: nowrap;
+  background: #fff;
   box-sizing: border-box;
+}
+
+.period-tabs {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .period-tabs__inner {
@@ -1536,6 +1571,43 @@ export default {
   color: #fff;
   font-weight: 600;
 }
+
+.mine-switch {
+  flex: none;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 0 16rpx 0 14rpx;
+  border-left: 1rpx solid #dce8ed;
+  color: #405e69;
+  background: #fff;
+  font-size: 20rpx;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.mine-switch__track {
+  width: 54rpx;
+  height: 30rpx;
+  padding: 3rpx;
+  border-radius: 18rpx;
+  background: #cbd7dc;
+  box-sizing: border-box;
+  transition: background .18s ease;
+}
+
+.mine-switch__thumb {
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(25, 57, 68, .22);
+  transition: transform .18s ease;
+}
+
+.mine-switch__track.active { background: #0b86d4; }
+.mine-switch__track.active .mine-switch__thumb { transform: translateX(24rpx); }
 
 .status-scroll {
   width: 100%;

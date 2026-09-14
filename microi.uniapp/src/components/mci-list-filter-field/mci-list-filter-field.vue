@@ -64,7 +64,7 @@ export default {
   data() { return { chipOptions: [], chipPage: 1, chipHasMore: false, chipLoading: false, chipError: '', treeCache: null, sourceCache: null } },
   computed: {
     isDropdown() { return this.field.type === 'options' && (this.field.presentation === 'dropdown' || ['Select', 'MultipleSelect', 'Checkbox', 'Autocomplete', 'Cascader', 'SelectTree', 'TreeCheckbox', 'Department', 'Transfer'].includes(this.field.component)) },
-    selectorField() { return { ...this.field.nativeField, Name: this.field.field, Label: this.field.label, component: 'Select', placeholder: `请选择${this.field.label}`, options: [], config: { MultipleSelect: !!this.field.multiple, SelectSaveFormat: 'Json', SelectSaveField: '_filterKey', SelectLabel: '_filterLabel' } } },
+    selectorField() { return { ...this.field.nativeField, Name: this.field.field, Label: this.field.label, component: 'Select', placeholder: `请选择${this.field.label}`, options: [], config: { MultipleSelect: !!this.field.multiple, SelectSaveFormat: 'Json', SelectSaveField: '_filterKey', SelectLabel: '_filterLabel', SelectPageSize: this.field.pageSize || 20 } } },
     dateSpec() { return this.field.date || dateFilterSpec() },
     datePlaceholder() { return this.dateSpec.dateFields === 'year' ? '选择年份' : this.dateSpec.dateFields === 'month' ? '选择年月' : '选择日期' },
     timePlaceholder() { return ['选择小时', '选择时分', '选择时分秒'][this.dateSpec.timeColumns - 1] },
@@ -97,8 +97,9 @@ export default {
     async sourcePage(options) {
       const field = this.field
       const native = field.nativeField
-      if (native && (field.source === 'native-field' || isRemoteNativeFieldOptions(native))) return loadNativeFieldOptionPage(native, this.formData, { ...options, menuId: this.menuId, moduleEngineKey: this.moduleEngineKey, tableChildAuth: this.tableChildAuth, preserveTree: !!field.tree, timeoutMs: 15000 })
-      if (native || !field.source) {
+      // 租户/模块显式声明的选项来源必须优先；nativeField 只补充控件元数据，不能截断 module/table 等供数。
+      if (native && (field.source === 'native-field' || (!field.source && isRemoteNativeFieldOptions(native)))) return loadNativeFieldOptionPage(native, this.formData, { ...options, menuId: this.menuId, moduleEngineKey: this.moduleEngineKey, tableChildAuth: this.tableChildAuth, preserveTree: !!field.tree, timeoutMs: 15000 })
+      if (!field.source) {
         const rows = filterNativeFieldOptions(field.options || [], options.keyword || '')
         const start = (options.pageIndex - 1) * options.pageSize
         return { options: rows.slice(start, start + options.pageSize), treeRows: (field.options || []).map((option) => option.raw), total: rows.length, totalKnown: true, hasMore: !field.tree && start + options.pageSize < rows.length }
@@ -107,7 +108,31 @@ export default {
       if (field.source === 'baseData') {
         if (!this.sourceCache) this.sourceCache = await post('/apiengine/platform-sys-base-data?Action=GetSysBaseData', { ParentKey: field.parentKey }, true)
         result = this.sourceCache
-      } else if (field.source === 'table') result = await V8.FormEngine.GetTableData(field.table, { _PageIndex: options.pageIndex, _PageSize: options.pageSize, _OrderBy: field.orderBy || 'CreateTime', _OrderByType: field.orderType || 'DESC', _Where: options.keyword ? [[field.labelField || 'Name', 'Like', options.keyword]] : [] })
+      } else if (field.source === 'table') result = await V8.FormEngine.GetTableData(field.table, {
+        ...(field.menuId || this.menuId ? { _SysMenuId: field.menuId || this.menuId } : {}),
+        _PageIndex: options.pageIndex,
+        _PageSize: options.pageSize,
+        _OrderBy: field.orderBy || 'CreateTime',
+        _OrderByType: field.orderType || 'DESC',
+        _SelectFields: [...new Set(['Id', field.valueField || 'Id', field.labelField || 'Name'])],
+        _Where: options.keyword ? [[field.labelField || 'Name', 'Like', options.keyword]] : []
+      })
+      else if (field.source === 'module') {
+        const moduleEngineKey = String(field.moduleEngineKey || field.table || this.moduleEngineKey || '').trim()
+        if (!moduleEngineKey) throw new Error('选项未配置模块标识')
+        // 列表派生选项复用模块引擎与真实菜单权限，避免主列表有权访问而 FormEngine 直查返回空集。
+        result = await post('/apiengine/platform-module-data', {
+          Action: 'GetTableData',
+          ModuleEngineKey: moduleEngineKey,
+          ...(field.menuId || this.menuId ? { _SysMenuId: field.menuId || this.menuId } : {}),
+          _PageIndex: options.pageIndex,
+          _PageSize: options.pageSize,
+          _OrderBy: field.orderBy || 'CreateTime',
+          _OrderByType: field.orderType || 'DESC',
+          _SelectFields: [...new Set(['Id', field.valueField || 'Id', field.labelField || 'Name'])],
+          _Where: options.keyword ? [{ Name: field.labelField || 'Name', Type: 'Like', Value: options.keyword }] : []
+        }, true)
+      }
       else if (field.source === 'api-engine') result = await V8.ApiEngine.Run(field.apiEngineKey, { _PageIndex: options.pageIndex, _PageSize: options.pageSize, _Keyword: options.keyword || '' }, { checkCode: false })
       if (!result || Number(result.Code) !== 1) { this.sourceCache = null; throw new Error(result?.Msg || '选项加载失败') }
       const rows = (Array.isArray(result.Data) ? result.Data : []).map((raw) => ({ value: raw[field.valueField || (field.source === 'baseData' ? 'Key' : 'Id')], label: String(raw[field.labelField || (field.source === 'baseData' ? 'Value' : 'Name')] ?? ''), raw })).filter((row) => row.value != null)

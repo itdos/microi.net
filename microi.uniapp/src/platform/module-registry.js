@@ -182,6 +182,9 @@ export async function loadAccessibleModuleGroups(refresh = false) {
 
 function createModuleDefinition(module, definition) {
   const fields = definition.fields || []
+  // SearchFieldIds 是列表查询配置，不等同于移动表单字段显隐。使用完整字段元数据，
+  // 让后台明确配置的隐藏/计算字段仍能生成筛选控件，同时由编译器保留权限与敏感字段保护。
+  const searchMetadataFields = definition.layoutFields?.length ? definition.layoutFields : fields
   const configuredMobileFields = configuredFields(module.menu.MobileListFields, fields)
   const configuredMobile = configuredMobileFields.map((item) => item.queryField)
   const configuredList = configuredFieldNames(module.menu.SelectFields, fields)
@@ -189,8 +192,12 @@ function createModuleDefinition(module, definition) {
   const configuredTags = configuredTagFields.map((item) => item.field)
   const configuredBottomFields = configuredFields(module.menu.CardBottomTagFields, fields)
   const configuredBottom = configuredBottomFields.map((item) => item.field)
-  const configuredSearch = configuredFieldNames(module.menu.SearchFieldIds, fields)
-  const filterFields = compileModuleFilterFields(module.menu.SearchFieldIds, appendSystemAuditFields(fields))
+  const configuredSearch = configuredFieldNames(module.menu.SearchFieldIds, searchMetadataFields)
+  const filterFields = compileModuleFilterFields(
+    module.menu.SearchFieldIds,
+    appendSystemAuditFields(searchMetadataFields),
+    { allowAppHidden: true }
+  )
   const configuredStatistics = configuredFields(module.menu.StatisticsFields, fields)
   // 后台已配置“移动端/卡片显示列”时必须严格使用该顺序；
   // SelectFields 只在未配置移动端列时作为兼容回退，不能混入卡片造成展示漂移。
