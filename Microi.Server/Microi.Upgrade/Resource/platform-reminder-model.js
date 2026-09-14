@@ -1,4 +1,3 @@
-// 平台提醒的纯业务规则；生成器将此文件原样嵌入 Managed 运行时，Node 回归执行同一份代码。
 function createPlatformReminderModel() {
   // 参数只用于业务规则，身份、租户、官方授权必须来自宿主可信 Context。
   function text(value) { return String(value == null ? '' : value).trim(); }
@@ -102,7 +101,8 @@ function createPlatformReminderModel() {
     if ((scope === 'SuperAdmins' || rule.DisplayMode === 'AfterServerRestart') && receiverProtocol < 2) return false;
     if (['AllAccounts', 'SuperAdmins'].indexOf(scope) < 0) return false;
     if (scope === 'SuperAdmins' && context.Administrator !== true) return false;
-    if (['Once', 'EveryEntry', 'AfterServerRestart'].indexOf(rule.DisplayMode) < 0) return false;
+    if (['Once', 'EveryEntry', 'EveryLogin', 'AfterServerRestart'].indexOf(rule.DisplayMode) < 0) return false;
+    if (rule.DisplayMode === 'EveryLogin' && !/^[a-f0-9]{32,64}$/.test(String(context.LoginId || ''))) return false;
     return rule.DisplayMode !== 'AfterServerRestart' || /^[A-Za-z0-9-]{16,80}$/.test(text(context.RestartEpoch));
   }
   function project(batch, source, now, context) {
@@ -119,3 +119,4 @@ function createPlatformReminderModel() {
   }
   return { normalize: normalize, occurrence: occurrence, matches: matches, acceptsAccount: acceptsAccount, project: project, list: list };
 }
+

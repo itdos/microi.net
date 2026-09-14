@@ -275,6 +275,13 @@ namespace Microi.net
                     param.IsDeleted = 0;
                     return roleLogic.GetSysRoleStep(param).ConfigureAwait(false).GetAwaiter().GetResult();
                 case "getsysrole":
+                    if (payload["FieldId"] != null && payload["FormEngineKey"] != null)
+                    {
+                        var fileContext = payload.ToObject<DiyUploadParam>();
+                        fileContext.OsClient = osClient;
+                        fileContext._CurrentUser = currentUser;
+                        return FileRolePermission.RoleOptionsAsync(fileContext).ConfigureAwait(false).GetAwaiter().GetResult();
+                    }
                     if (PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(osClient, currentUser))
                     {
                         param.IsDeleted = 0;
@@ -483,7 +490,8 @@ namespace Microi.net
                 var userId = GetJsonString(request, "UserId", "Identifier").Trim();
                 var expire = request["Expire"].Val<int>();
                 if (expire <= 0) expire = 86400;
-                if (!System.Text.RegularExpressions.Regex.IsMatch(userId, "^[A-Za-z0-9_.@-]{1,64}$"))
+                var useAdministrator = request["UseAdministrator"].Val<bool>();
+                if (!useAdministrator && !System.Text.RegularExpressions.Regex.IsMatch(userId, "^[A-Za-z0-9_.@-]{1,64}$"))
                     return new DosResult(0, null, "腾讯 IM UserId 格式不合法。");
                 if (expire < 60 || expire > 604800)
                     return new DosResult(0, null, "腾讯 IM UserSig 有效期只能为 60 至 604800 秒。");
@@ -507,6 +515,10 @@ namespace Microi.net
                     true);
                 if (!uint.TryParse(sdkText, out var sdkAppId) || sdkAppId == 0 || secret.DosIsNullOrWhiteSpace())
                     return new DosResult(0, null, "当前租户尚未配置 TencentImSdkAppId/TencentImSecretKey。");
+
+                if (useAdministrator) userId = administrator;
+                if (!System.Text.RegularExpressions.Regex.IsMatch(userId ?? "", "^[A-Za-z0-9_.@-]{1,64}$"))
+                    return new DosResult(0, null, "当前租户腾讯 IM 签名身份未配置或格式无效。");
 
                 var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 var raw = "TLS.identifier:" + userId + "\n"

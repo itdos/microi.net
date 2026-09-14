@@ -8,10 +8,11 @@ const base=path.join(root,'Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.P
 const sources={
  'send-sms-reg':fs.readFileSync(path.join(base,'系统/[官网]注册发送短信(send-sms-reg).js'),'utf8'),
  send_sms_reg:fs.readFileSync(path.join(base,'未分类/[系统]发送阿里云短信(send_sms_reg).js'),'utf8'),
+ official_password_reset_send_sms:fs.readFileSync(path.join(base,'系统/[官网]找回密码发送短信(official_password_reset_send_sms).js'),'utf8'),
 };
 function fixture(){
  const hashes=new Map(),values=new Map(),expires=new Map();let serial=0,clock=Date.now();
- const state={calls:0,ip:'192.0.2.8',providerOk:true,loseConsume:false,lastCode:null};
+ const state={calls:0,ip:'192.0.2.8',providerOk:true,loseConsume:false,lastCode:null,userExists:true,userError:false};
  const key=k=>{assert.ok(k.startsWith('Microi:lxwb:'),'tenant namespace');if(expires.get(k)<=clock){hashes.delete(k);values.delete(k);}return k;};
  const Cache={
   Get:k=>values.get(key(k)),Set:(k,v)=>{values.set(key(k),v);return true;},
@@ -27,7 +28,7 @@ function fixture(){
  function run(name,Param){
   assert.ok(sources[name]);
   return vm.runInNewContext('(function(){'+sources[name]+'})()',{
-   V8:{Param,OsClient:'lxwb',Cache,Method,SysConfig,OsClientModel:{},ApiEngine:{Run:run},Sms:{Send:p=>{
+   V8:{Param,OsClient:'lxwb',Cache,Method,SysConfig,OsClientModel:{},FormEngine:{GetFormData:()=>state.userError?{Code:0}:state.userExists?{Code:1,Data:{Id:'u'}}:{Code:2}},ApiEngine:{Run:run},Sms:{Send:p=>{
     state.calls++;state.lastCode=JSON.parse(p.TemplateParam).code;
     return {Code:state.providerOk?1:0,Data:{Body:{Code:state.providerOk?'OK':'isv.BUSINESS_LIMIT_CONTROL',Message:'provider fixture'}}};
    }}},Date:class extends Date{constructor(...a){super(...(a.length?a:[clock]));}static now(){return clock;}}
@@ -89,4 +90,27 @@ test('official package includes both canonical senders with Managed policies and
   const row=pkg.SysApiEngines.find(x=>x.ApiEngineKey===key);assert.ok(row);assert.equal(row.ApiV8Code.trim(),sources[key].trim());
   assert.equal(row.AllowAnonymous,1);assert.equal(row.StopHttp,0);assert.equal(pkg.ResourcePolicies.ApiEngines[key].UpgradePolicy,'Managed');
  }const gate=pkg.SysApiEngines.find(x=>x.ApiEngineKey==='send-sms-reg');assert.equal(gate.Lock,1);assert.equal(gate.LockKey,'');
+});
+
+test('password reset consumes the image once and reaches the SMS provider once',()=>{
+ const f=fixture(),id=f.captcha();
+ const p={Phone:'13812345678',OsClient:'lxwb',_CaptchaId:id,_CaptchaValue:'TEST'};
+ const r=f.run('official_password_reset_send_sms',p);
+ assert.equal(r.Code,1,r.Msg);assert.equal(f.state.calls,1);
+ assert.notEqual(f.run('official_password_reset_send_sms',p).Code,1);assert.equal(f.state.calls,1);
+});
+test('password reset denies cross-tenant and failed image consumption; unknown users have the same success response',()=>{
+ for(const mode of ['crossTenant','loseConsume']){
+  const f=fixture();f.state.loseConsume=mode==='loseConsume';
+  const r=f.run('official_password_reset_send_sms',{Phone:'13812345678',OsClient:mode==='crossTenant'?'other':'lxwb',_CaptchaId:f.captcha(),_CaptchaValue:'TEST'});
+  assert.notEqual(r.Code,1);assert.equal(f.state.calls,0);
+ }
+ const responses=[];
+ for(const exists of [true,false]){
+  const f=fixture();f.state.userExists=exists;
+  const r=f.run('official_password_reset_send_sms',{Phone:'13812345678',_CaptchaId:f.captcha(),_CaptchaValue:'TEST'});
+  responses.push(JSON.stringify(r));assert.equal(f.state.calls,exists?1:0);
+ }assert.equal(responses[0],responses[1]);
+ const f=fixture();f.state.userError=true;
+ assert.notEqual(f.run('official_password_reset_send_sms',{Phone:'13812345678',_CaptchaId:f.captcha(),_CaptchaValue:'TEST'}).Code,1);
 });

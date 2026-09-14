@@ -1,7 +1,7 @@
 <template>
     <div class="diy-fileupload">
         <el-upload
-            v-if="FormMode != 'View' && field.Visible"
+            v-if="FormMode != 'View' && field.Visible && !FieldReadonly && (getMultipleFlag || canReadFile(singleFileMeta))"
             ref="uploadRef"
             class="mci-compact-upload"
             drag
@@ -10,7 +10,7 @@
             :action="GetUploadUrl(field)"
             :data="{
                 Path: '/file',
-                Limit: field.Config.FileUpload.Limit,
+                Limit: rolePermissionEnabled || field.Config.FileUpload.Limit,
                 Preview: false,
                 ...getFormFieldUploadContext()
             }"
@@ -24,7 +24,7 @@
         >
             <DiyUploadCompactSummary
                 kind="file"
-                :private-storage="field.Config.FileUpload.Limit"
+                :private-storage="rolePermissionEnabled || field.Config.FileUpload.Limit"
                 :multiple="field.Config.FileUpload.Multiple === true"
                 :max-count="field.Config.FileUpload.MaxCount"
                 :max-size="field.Config.FileUpload.MaxSize"
@@ -33,7 +33,7 @@
         </el-upload>
 
         <!-- 单文件显示 - 编辑/新增模式 -->
-        <div v-if="FormMode != 'View' && field.Visible && !field.Config.FileUpload.Multiple && !DiyCommon.IsNull(modelValue) && modelValue != '正在上传中...'"
+        <div v-if="FormMode != 'View' && field.Visible && !field.Config.FileUpload.Multiple && singleFileVisible && !DiyCommon.IsNull(modelValue) && modelValue != '正在上传中...'"
             class="single-file-display">
             <div class="file-info">
                 <el-icon class="file-icon" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], getSingleFileMeta())" style="cursor: pointer;">
@@ -41,7 +41,7 @@
                 </el-icon>
                 <div class="file-detail">
                     <el-input 
-                        v-if="FormMode == 'Edit' || FormMode == 'Add'"
+                        v-if="isFileEditable(singleFileMeta)"
                         v-model="singleFileName" 
                         size="small"
                         class="file-name-input"
@@ -52,18 +52,19 @@
                         class="file-name" 
                         @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], getSingleFileMeta())"
                     >
-                        {{ GetFileName(modelValue) }}
+                        {{ displayFileName(singleFileMeta) }}
                     </span>
-                    <span class="file-size">{{ getSingleFileSize() }}</span>
-                    <el-button v-if="isCadFile(GetFileName(modelValue))" @click="openCadPreview(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], GetFileName(modelValue), null)" type="primary" size="small" :icon="View" link>在线预览</el-button>
-                    <el-button @click="ConfirmDelSingleUpload()" type="danger" size="small" :icon="Delete" link>删除</el-button>
+                    <span v-if="canReadFile(singleFileMeta)" class="file-size">{{ getSingleFileSize() }}</span>
+                    <el-button v-if="canReadFile(singleFileMeta) && isCadFile(GetFileName(modelValue))" @click="openCadPreview(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], GetFileName(modelValue), null)" type="primary" size="small" :icon="View" link>在线预览</el-button>
+                    <el-button v-if="isFileEditable(singleFileMeta)" @click="ConfirmDelSingleUpload()" type="danger" size="small" :icon="Delete" link>删除</el-button>
+                    <DiyFileRoleTags v-if="rolePermissionEnabled" :file="singleFileMeta" :roles="roleOptions" :editable="isFileEditable(singleFileMeta)" @configure="openRoleDialog" />
                 </div>
             </div>
             
         </div>
 
         <!-- 查看模式 - 单文件 -->
-        <div v-if="FormMode == 'View' && !field.Config.FileUpload.Multiple && !DiyCommon.IsNull(modelValue) && modelValue != '正在上传中...'"
+        <div v-if="FormMode == 'View' && !field.Config.FileUpload.Multiple && singleFileVisible && !DiyCommon.IsNull(modelValue) && modelValue != '正在上传中...'"
             class="single-file-display view-mode">
             <div class="file-info">
                 <el-icon class="file-icon">
@@ -71,10 +72,11 @@
                 </el-icon>
                 <div class="file-detail">
                     <span class="file-name" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], getSingleFileMeta())">
-                        {{ GetFileName(modelValue) }}
+                        {{ displayFileName(singleFileMeta) }}
                     </span>
-                    <span class="file-size">{{ getSingleFileSize() }}</span>
-                    <el-button v-if="isCadFile(GetFileName(modelValue))" @click="openCadPreview(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], GetFileName(modelValue), null)" type="primary" size="small" :icon="View" link>在线预览</el-button>
+                    <span v-if="canReadFile(singleFileMeta)" class="file-size">{{ getSingleFileSize() }}</span>
+                    <el-button v-if="canReadFile(singleFileMeta) && isCadFile(GetFileName(modelValue))" @click="openCadPreview(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], GetFileName(modelValue), null)" type="primary" size="small" :icon="View" link>在线预览</el-button>
+                    <DiyFileRoleTags v-if="rolePermissionEnabled" :file="singleFileMeta" :roles="roleOptions" />
                 </div>
             </div>
         </div>
@@ -85,9 +87,9 @@
             ref="sortableContainer"
             class="multiple-files-list"
         >
-            <div v-for="(file, index) in fileListComputed" :key="file.Id" class="file-item" :data-id="file.Id">
+            <div v-for="(file, index) in fileListComputed" :key="file.Id" class="file-item" :class="{ 'is-restricted': !canReadFile(file) }" :data-id="file.Id">
                 <div class="file-item-content">
-                    <el-icon class="drag-handle"><Rank /></el-icon>
+                    <el-icon v-if="isFileEditable(file) && !hasDeniedFiles" class="drag-handle"><Rank /></el-icon>
                     <el-icon 
                         class="file-icon" 
                         @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'], file)"
@@ -98,7 +100,7 @@
                     <div class="file-details">
                         <div class="file-name-wrapper">
                             <el-input 
-                                v-if="FormMode == 'Edit' || FormMode == 'Add'" 
+                                v-if="isFileEditable(file)"
                                 v-model="file.Name" 
                                 size="small"
                                 class="file-name-input"
@@ -108,19 +110,20 @@
                                 class="file-name" 
                                 @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'], file)"
                             >
-                                {{ file.Name }}
+                                {{ displayFileName(file) }}
                             </span>
                         </div>
-                        <span class="file-size">{{ formatFileSize(file.Size) }}</span>
+                        <DiyFileRoleTags v-if="rolePermissionEnabled" :file="file" :roles="roleOptions" :editable="isFileEditable(file) && file.State !== 0" @configure="openRoleDialog" />
+                        <span v-if="canReadFile(file)" class="file-size">{{ formatFileSize(file.Size) }}</span>
                         <el-tag 
-                            v-if="file.State == 0" 
+                            v-if="canReadFile(file) && file.State == 0"
                             type="info" 
                             size="small"
                         >
                             待上传
                         </el-tag>
                         <el-tag 
-                            v-else-if="file.State == 1" 
+                            v-else-if="canReadFile(file) && file.State == 1"
                             type="success" 
                             size="small"
                             style="cursor: pointer;"
@@ -128,9 +131,9 @@
                         >
                             已上传
                         </el-tag>
-                        <el-tag v-else type="danger" size="small">失败</el-tag>
+                        <el-tag v-else-if="canReadFile(file)" type="danger" size="small">失败</el-tag>
                         <el-button 
-                            v-if="isCadFile(file.Name)" 
+                            v-if="canReadFile(file) && isCadFile(file.Name)"
                             size="small" 
                             type="primary" 
                             :icon="View" 
@@ -138,7 +141,7 @@
                             link
                         >在线预览</el-button>
                         <el-button 
-                            v-if="FormMode != 'View'" 
+                            v-if="isFileEditable(file)"
                             size="small" 
                             type="danger" 
                             :icon="Delete" 
@@ -149,6 +152,15 @@
                 </div>
             </div>
         </div>
+
+        <el-dialog v-model="roleDialogVisible" title="设置附件可见角色" width="min(520px, 92vw)" append-to-body destroy-on-close>
+            <p class="file-role-dialog-name">{{ roleEditingFile?.Name }}</p>
+            <el-select v-model="selectedRoleIds" multiple filterable clearable :loading="rolesLoading" placeholder="请选择角色，留空跟随表单权限" style="width: 100%">
+                <el-option v-for="role in roleOptions" :key="role.Id" :label="role.Name" :value="role.Id" />
+            </el-select>
+            <p class="form-item-tip">{{ field.Config.FileUpload.DisableRoleInheritance ? '仅所选角色可访问；仍须具备当前表单权限。' : '所选角色及角色 Level 更高的用户可访问；仍须具备当前表单权限。' }} 保存表单后生效。</p>
+            <template #footer><el-button @click="roleDialogVisible = false">取消</el-button><el-button type="primary" :disabled="rolesLoading || !rolesLoaded" @click="saveFileRoles">确定</el-button></template>
+        </el-dialog>
 
         <!-- 配置弹窗 - 设计模式下可用 -->
         <el-dialog
@@ -162,9 +174,18 @@
         >
             <el-form label-width="140px" label-position="left" size="small">
                 <el-form-item label="禁止匿名访问">
-                    <el-switch v-model="configForm.Limit" active-color="#ff6c04" inactive-color="#ccc" />
+                    <el-switch v-model="configForm.Limit" :disabled="configForm.EnableRolePermission" active-color="#ff6c04" inactive-color="#ccc" />
                     <div class="form-item-tip">开启后文件将通过私有链接访问</div>
                 </el-form-item>
+
+                <el-divider content-position="left">附件角色权限</el-divider>
+                <el-form-item label="启用附件角色权限">
+                    <el-switch v-model="configForm.EnableRolePermission" @change="value => { if (value) configForm.Limit = true; }" />
+                    <div class="form-item-tip">为每个附件多选可见角色，自动使用私有存储。历史公有文件需重新上传后设置。</div>
+                </el-form-item>
+                <el-form-item label="隐藏无权限文件列表"><el-switch v-model="configForm.HideUnauthorizedFiles" /><div class="form-item-tip">默认关闭；开启后不显示无权限附件行，保存仍保留原附件。</div></el-form-item>
+                <el-form-item label="显示无权限文件名称"><el-switch v-model="configForm.ShowUnauthorizedFileName" /><div class="form-item-tip">默认关闭；开启后只展示名称，仍不可预览、下载或修改。</div></el-form-item>
+                <el-form-item label="关闭角色继承"><el-switch v-model="configForm.DisableRoleInheritance" /><div class="form-item-tip">默认关闭；更高 Level 的角色继承较低 Level 角色的附件访问权，同级不同角色不继承。</div></el-form-item>
                 
                 <el-form-item label="多文件上传">
                     <el-switch v-model="configForm.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
@@ -293,6 +314,8 @@ import { getUploadErrorMessage } from "@/utils/upload-error";
 import { getUploadPreviewUrl, resolveUploadLimit, sanitizeUploadMeta } from "@/utils/upload-response";
 import { buildFormFieldUploadContext } from "@/utils/form-field-upload-context";
 import DiyUploadCompactSummary from './diy-upload-compact-summary.vue';
+import DiyFileRoleTags from './diy-file-role-tags.vue';
+import { fileRoleConfig, canReadFile, canEditFile, visibleFiles } from '@/utils/file-role-permission';
 
 // 禁用属性继承
 defineOptions({
@@ -336,7 +359,9 @@ const props = defineProps({
     TableChildAuth: {
         type: Object,
         default: null
-    }
+    },
+    FieldReadonly: { type: Boolean, default: false },
+    ReadonlyFields: { type: Array, default: () => [] }
 });
 
 // Emits定义
@@ -368,6 +393,48 @@ let sortableInstance = null;
 
 // 单文件文件名编辑
 const singleFileName = ref('');
+const rolePermissionEnabled = computed(() => props.field.Config?.FileUpload?.EnableRolePermission === true);
+const singleFileMeta = computed(() => normalizeValue(props.modelValue) || {});
+const singleFileVisible = computed(() => !props.field.Config?.FileUpload?.HideUnauthorizedFiles || canReadFile(singleFileMeta.value));
+const hasDeniedFiles = computed(() => Array.isArray(props.modelValue) && props.modelValue.some(file => !canReadFile(file)));
+const isFileEditable = file => !props.FieldReadonly && !props.ReadonlyFields.includes(props.field.Name) && canEditFile(file, props.FormMode);
+const displayFileName = file => canReadFile(file) ? (file?.Name || '附件') : (file?.Name || '无权限附件');
+const roleDialogVisible = ref(false);
+const roleEditingFile = ref(null);
+const selectedRoleIds = ref([]);
+const roleOptions = ref([]);
+const rolesLoading = ref(false);
+const rolesLoaded = ref(false);
+const openRoleDialog = file => {
+    if (!isFileEditable(file)) return;
+    if (file.Limit !== true) {
+        DiyCommon.Tips('历史公有文件请先重新上传为私有文件，再设置可见角色。', false);
+        return;
+    }
+    roleEditingFile.value = file;
+    selectedRoleIds.value = [...(file.VisibleRoleIds || [])];
+    roleDialogVisible.value = true;
+    rolesLoading.value = true;
+    rolesLoaded.value = false;
+    // 复用平台已授权的角色目录，不通过普通 FormEngine 读取受保护的 sys_role 表。
+    DiyCommon.Post(DiyApi.GetSysRole(), { IsDeleted: 0, ...getFormFieldUploadContext() }, result => {
+        rolesLoading.value = false;
+        if (!DiyCommon.Result(result)) return;
+        roleOptions.value = (result.Data || []).map(role => ({ Id: role.Id, Name: role.Name, Level: role.Level }));
+        rolesLoaded.value = true;
+    }, () => { rolesLoading.value = false; });
+};
+const saveFileRoles = () => {
+    if (!rolesLoaded.value || !isFileEditable(roleEditingFile.value)) return;
+    const updated = { ...roleEditingFile.value, VisibleRoleIds: [...selectedRoleIds.value] };
+    updated.VisibleRoleNames = selectedRoleIds.value.map(id => roleOptions.value.find(role => role.Id === id)?.Name || '已删除角色');
+    const value = getMultipleFlag.value
+        ? props.modelValue.map(file => String(file.Id) === String(updated.Id) ? updated : file)
+        : (typeof props.modelValue === 'string' ? JSON.stringify(updated) : updated);
+    props.FormDiyTableModel[props.field.Name] = value;
+    emit('update:modelValue', value);
+    roleDialogVisible.value = false;
+};
 
 // 图片预览相关
 const imagePreviewVisible = ref(false);
@@ -435,6 +502,7 @@ const configForm = ref({
     EnableOfficePreview: true,
     AllowOfficeEdit: false,
     EnableOfficeVersion: false,
+    ...fileRoleConfig(),
     BeforeUploadV8: '',
     UploadSuccessV8: ''
 });
@@ -464,6 +532,7 @@ const openConfig = () => {
         EnableOfficePreview: props.field.Config.FileUpload.EnableOfficePreview !== false,
         AllowOfficeEdit: props.field.Config.FileUpload.AllowOfficeEdit === true,
         EnableOfficeVersion: props.field.Config.FileUpload.EnableOfficeVersion === true,
+        ...fileRoleConfig(props.field.Config.FileUpload),
         BeforeUploadV8: props.field.Config.Upload?.BeforeUploadV8 || '',
         UploadSuccessV8: props.field.Config.Upload?.UploadSuccessV8 || ''
     };
@@ -476,7 +545,8 @@ const saveConfig = () => {
     if (!props.field.Config.FileUpload) {
         props.field.Config.FileUpload = {};
     }
-    props.field.Config.FileUpload.Limit = configForm.value.Limit;
+    props.field.Config.FileUpload.Limit = configForm.value.EnableRolePermission || configForm.value.Limit;
+    Object.assign(props.field.Config.FileUpload, fileRoleConfig(configForm.value));
     props.field.Config.FileUpload.Multiple = configForm.value.Multiple;
     props.field.Config.FileUpload.MaxCount = configForm.value.MaxCount;
     props.field.Config.FileUpload.Tips = configForm.value.Tips;
@@ -582,7 +652,7 @@ const showMultipleFileList = computed(() => {
 // 文件列表计算属性 - 用于响应式更新
 const fileListComputed = computed(() => {
     if (!Array.isArray(props.modelValue)) return [];
-    return props.modelValue.filter(file => file && file.Id);
+    return visibleFiles(props.modelValue, props.field.Config.FileUpload).filter(file => file.Id);
 });
 
 // 根据文件扩展名获取图标组件
@@ -645,6 +715,7 @@ const getFileStoragePath = (fileObj) => {
 
 // 打开CAD文件预览（在新浏览器标签页中打开）
 const openCadPreview = (url, fileName, fileObj) => {
+    if (!canReadFile(fileObj || singleFileMeta.value)) return;
     // 优先用存储路径来计算预览文件路径
     const storagePath = fileObj ? (fileObj.Path || '') : getFileStoragePath();
     const previewStoragePath = getCadPreviewStoragePath(storagePath || url);
@@ -699,6 +770,9 @@ const openCadPreview = (url, fileName, fileObj) => {
 
 // 初始化拖动排序
 const initSortable = () => {
+    // 隐藏行导致 DOM 索引与原数组不一致时禁止排序；无权限行也不能被间接移动。
+    if (sortableInstance) { sortableInstance.destroy(); sortableInstance = null; }
+    if (props.FieldReadonly || props.FormMode === 'View' || hasDeniedFiles.value) return;
     if (sortableContainer.value && props.FormMode != 'View') {
         sortableInstance = Sortable.create(sortableContainer.value, {
             animation: 150,
@@ -758,6 +832,7 @@ const setupBeforeFileUpload = (file) => {
 
 // 上传前的钩子
 const BeforeFileUpload = (file) => {
+    if (props.FieldReadonly || (!getMultipleFlag.value && !canReadFile(singleFileMeta.value))) return false;
     // 上传前V8事件
     if (props.field.Config && props.field.Config.Upload && props.field.Config.Upload.BeforeUploadV8) {
         return new Promise((resolve, reject) => {
@@ -834,13 +909,14 @@ const FileUploadSuccess = (result, file, fileList) => {
     
     if (isSuccess) {
         // 关键修复：使用 file.response.Data 而不是 result.Data
-        const responseData = file.response?.Data || result.Data;
+        const responsePayload = file.response?.Data || result.Data;
+        const responseData = Array.isArray(responsePayload) ? responsePayload[0] : responsePayload;
         const uploadedFileId = responseData.Id || file.uid;
         const uploadedFilePath = responseData.Path;
         // zhy：以服务端实际 Limit 为准，并复用本次上传返回的短期地址，避免未保存记录二次鉴权失败。
         const uploadedPreviewUrl = getUploadPreviewUrl(responseData);
         const effectiveLimit = resolveUploadLimit(responseData, props.field.Config.FileUpload.Limit);
-        // zhy：业务字段只保存稳定路径和文件元数据，不保存短期 URL、完整地址或 Limit。
+        // 业务字段只保存稳定对象标识；Limit 记录实际存储类型，不能代替后端的字段与对象授权。
         const uploadedFileMeta = withInitialOfficeVersion({
             ...sanitizeUploadMeta(responseData),
             Id: uploadedFileId,
@@ -848,6 +924,7 @@ const FileUploadSuccess = (result, file, fileList) => {
             Size: responseData.Size,
             CreateTime: responseData.CreateTime,
             Path: uploadedFilePath,
+            Limit: effectiveLimit,
             State: 1
         });
         
@@ -887,11 +964,13 @@ const FileUploadSuccess = (result, file, fileList) => {
             // 单文件模式 - 存储为JSON字符串
             console.log('【单文件】上传成功，Path:', uploadedFilePath);
             const singleFileObject = withInitialOfficeVersion({
+                _UploadProof: responseData._UploadProof,
                 Id: uploadedFileId,
                 Name: responseData.Name || file.name,
                 Size: responseData.Size,
                 CreateTime: responseData.CreateTime,
                 Path: uploadedFilePath,
+                Limit: effectiveLimit,
                 State: 1
             });
             // 存储为JSON字符串
@@ -983,6 +1062,7 @@ const setRealPath = (fileId, filePath, isLimit, uploadedPreviewUrl = '') => {
 
 // 确认删除上传的文件
 const ConfirmDelUploadFiles = (file) => {
+    if (!isFileEditable(file)) return;
     ElMessageBox.confirm(
         `确定要删除文件 "${file.Name}" 吗？`,
         '删除确认',
@@ -998,6 +1078,7 @@ const ConfirmDelUploadFiles = (file) => {
 
 // 删除上传的文件
 const DelUploadFiles = (file) => {
+    if (!isFileEditable(file)) return;
     const files = props.FormDiyTableModel[props.field.Name].filter(f => f.Id !== file.Id);
     props.FormDiyTableModel[props.field.Name] = files;
     emit('update:modelValue', files);
@@ -1005,6 +1086,7 @@ const DelUploadFiles = (file) => {
 
 // 确认删除单文件
 const ConfirmDelSingleUpload = () => {
+    if (!isFileEditable(singleFileMeta.value)) return;
     const fileName = GetFileName(props.modelValue);
     ElMessageBox.confirm(
         `确定要删除文件 "${fileName}" 吗？`,
@@ -1021,6 +1103,7 @@ const ConfirmDelSingleUpload = () => {
 
 // 删除单文件上传
 const DelSingleUpload = () => {
+    if (!isFileEditable(singleFileMeta.value)) return;
     delete props.FormDiyTableModel[props.field.Name];
     delete props.FormDiyTableModel[props.field.Name + '_' + props.field.Name + '_RealPath'];
     
@@ -1039,6 +1122,7 @@ const DelSingleUpload = () => {
 
 // 更新单文件文件名
 const updateSingleFileName = () => {
+    if (!isFileEditable(singleFileMeta.value)) return;
     const normalized = normalizeValue(props.modelValue);
     if (typeof normalized === 'object' && normalized !== null) {
         // 更新对象中的Name字段
@@ -1116,6 +1200,7 @@ const JsonToFileList = (arr) => {
 
 // 打开URL
 const GoUrl = (url, fileMeta = null) => {
+    if (!canReadFile(fileMeta || singleFileMeta.value)) return;
     console.log('GoUrl called with:', url);
     if (DiyCommon.IsNull(url) || url === './static/img/loading.gif' || url === './static/img/img-load-fail.jpg') {
         console.warn('Invalid URL:', url);
@@ -1220,6 +1305,7 @@ const getSingleFileMeta = () => {
 
 // 获取上传后的下载地址（用于View模式）
 const GetUploadPath = (field, file) => {
+    if (!canReadFile(file || singleFileMeta.value)) return;
     // 获取文件路径：如果是单文件对象，从Path字段获取；否则使用原值或file.Path
     var filePathName;
     if (DiyCommon.IsNull(file)) {
@@ -1362,6 +1448,15 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 .diy-fileupload {
     width: 100%;
+
+    .is-restricted {
+        background: var(--el-fill-color-light);
+        .file-icon, .file-name { color: var(--el-text-color-secondary) !important; cursor: default !important; text-decoration: none !important; }
+    }
+    :deep(.file-role-tags) { flex-basis: 100%; padding: 3px 0 5px; }
+    .multiple-files-list .file-item .file-item-content .file-details { flex-wrap: wrap; padding: 5px 8px 5px 0; }
+    .single-file-display .file-info .file-detail { flex-wrap: wrap; padding: 5px; }
+    :deep(.file-role-tags) { order: 10; }
 
     .single-file-display {
         display: flex;
@@ -1539,6 +1634,15 @@ onBeforeUnmount(() => {
     color: #909399;
     line-height: 1.5;
     margin-top: 4px;
+}
+</style>
+
+<style lang="scss">
+.file-role-dialog-name { margin: 0 0 12px; color: var(--el-text-color-primary); overflow-wrap: anywhere; }
+html.dark .diy-fileupload {
+    .single-file-display, .single-file-display.view-mode, .multiple-files-list { background: var(--el-bg-color); border-color: var(--el-border-color); }
+    .multiple-files-list .file-item { border-color: var(--el-border-color); }
+    .single-file-display:hover, .multiple-files-list .file-item:hover, .is-restricted { background: var(--el-fill-color-light); }
 }
 </style>
 

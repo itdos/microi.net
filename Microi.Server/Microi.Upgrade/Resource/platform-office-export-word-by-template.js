@@ -7,6 +7,24 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-office-export-word-by-template
+ * Version: v1.0.2
+ * Function:
+ * - 按授权模板导出 Word，兼容历史 Office 接口地址。
+ */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/office/exportwordbytpl": "ExportWordByTemplate"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 /* V8 ApiEngine | ApiEngineKey: platform-office-export-word-by-template | Version: v1.0.0 */
 var beforeHook = V8.ApiEngine.Run("platform-runtime-custom-hook", {
     Stage: "BeforeOfficeTemplateExport",

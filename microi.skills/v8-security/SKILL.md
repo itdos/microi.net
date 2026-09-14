@@ -14,8 +14,10 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 官方升级资源属于独立控制面。`get-microi-upgrade-resource` 可以匿名读取固定白名单，但 `Publish/PublishBatch` 必须调用仅绑定该 Managed ApiEngineKey 的 `V8.Method.AuthorizeOfficialResourcePublish()`：固定 `iTdos` 官方租户、拒绝访问密钥会话，并从主库复核当前用户、状态和平台管理员角色。禁止只相信 `V8.CurrentUser.Level`，也禁止把这个可信原子复用于普通接口、租户 Hook 或表单事件；资源校验、SHA 乐观锁、事务行锁、写入及回读仍由 Managed V8 编排。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-security-000 sha256=d03ee34e72925db55f9022de26dfc251c0d3d69fac52ae6a910d42ddfc142ae7 -->
+<!-- microi-progressive:chunk id=v8-security-000 sha256=2e81552d91b61d9d7f96cba1502306e186f0a288d5db8d443c4e524fce748bc9 -->
 ## 0. 租户动态系统设置与密钥边界
+
+**AI 默认处理路径：** 用户交付第三方 Secret 并授权配置时，优先调用 `microi_manage_server_private_secret`：List 只确认 Key/HasSecret；Save 使用 `confirmExecution=SAVE:<ConfigKey>`，固定 `IsSecret=true / IsPublic=false` 并自动脱敏回读。例如畅捷通使用 `Integration.Changjet.AppSecret`，后端从 `V8.SysConfig.ServerPrivateSettings` 使用。不要仅拒绝硬编码后停止，也不要因为 `OsClientModel` 不暴露密钥而误判服务端 V8 无法调用第三方。工具不提供原文揭示；更换已有 Key 前回读现状，超时只回读、不盲目重写。
 
 第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。公开的租户配置必须建成当前租户 `sys_config` 的实体字段；敏感或仅供后端使用的租户业务配置保存到 `mci_system_setting`。数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。
 
@@ -65,7 +67,7 @@ Secret 只通过租户管理员专用端点写入租户绑定的认证密文。�
 - 多节点保存连接使用按 `OsClient + DbKey` 隔离的分布式锁，并由数据库唯一索引兜底；同步数据和附件仍必须使用业务幂等键，锁不能替代唯一约束、状态机或 inbox/outbox。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-001 sha256=bcb95a6c33b3abb6bfce13589e21ce56ff2aea8578d05180f2f2538cc5117fb8 -->
+<!-- microi-progressive:chunk id=v8-security-001 sha256=ccec93b880295123923b2375dbc616c5ab02aaf43af9a79f26b7ac953609866d -->
 ## 0.5 接口引擎配置安全
 
 代码以外，接口本身的配置项也是安全防线（详见 `v8-api-config/SKILL.md`）：

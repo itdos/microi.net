@@ -168,6 +168,47 @@ AI/MCP 创建图片字段时应写入 `diy_field.Config.ImgUpload`，推荐完�
 >* V8事件同`图片上传 ImgUpload`
 >* 与图片上传共用紧凑的拖放/配置二合一面板，显示公有/私有桶、单文件/多文件与最大数量、保留原文件、最大体积。常用配置为 `FileUpload.Limit/Multiple/MaxCount/Tips/MaxSize/SaveFullPath`；文件上传不使用图片压缩或裁剪配置。
 
+### 每个附件的可见角色
+
+在文件上传组件配置中开启【启用附件角色权限】后，每个附件可通过【设置可见角色】多选角色，
+角色名称显示在文件名下方的标签中，保存表单后生效。未选择角色的附件继续跟随表单权限。
+附件权限叠加在菜单、表单和记录权限之上，不会授予用户原本没有的表单访问权。
+
+| 组件配置（`Config.FileUpload`） | 默认值 | 行为 |
+| --- | --- | --- |
+| `EnableRolePermission` 启用附件角色权限 | `false` | 开启逐附件角色设置，并强制上传至私有桶 |
+| `HideUnauthorizedFiles` 隐藏无权限文件列表 | `false` | 默认显示带锁的无权限占位行；开启后隐藏这些行 |
+| `ShowUnauthorizedFileName` 显示无权限文件名称 | `false` | 默认名称为“无权限附件”；开启后仅显示名称，仍不可访问或修改 |
+| `DisableRoleInheritance` 关闭角色继承 | `false` | 默认允许更高 `Level` 的角色继承较低角色的附件权限；开启后只匹配所选角色 |
+
+例如三个文件配置一级角色（`Level=300`），两个配置二级角色（`Level=200`）：
+二级用户默认看到两个可操作附件和三个锁定占位；一级用户可操作五个附件。
+三级角色可设置为 `Level=100`。同级不同角色不会互相继承，多角色命中任一角色即可。
+管理员保留管理权限；普通用户仍须拥有该表单的编辑权限才能更名、删除和设置角色。
+
+```json
+{
+  "FileUpload": {
+    "Limit": true, "Multiple": true, "MaxCount": 10,
+    "EnableRolePermission": true,
+    "HideUnauthorizedFiles": false,
+    "ShowUnauthorizedFileName": false,
+    "DisableRoleInheritance": false
+  }
+}
+```
+
+**升级与安全：** 先更新后端和前端，再开启配置。后端按当前租户主库中的角色和等级判定权限，
+无权限附件不返回路径、版本路径或下载地址。省略无权限附件时后端保留原值，篡改其名称、角色或路径会被拒绝，
+记录包含无权限附件时也不能通过删除整条记录绕过。条件批量修改附件或条件批量删除必须改为逐条操作。
+新附件必须来自该用户在当前字段、当前记录上的私有上传，不能复制另一条记录的路径。
+历史公有附件不会自动搬迁，设置角色前需重新上传到私有桶；未设置角色的历史附件保持原权限语义。
+
+AI 可用 `microi_build_field_config` 的 `sourceType="FileUpload"` 构造配置，
+使用 `microi_get_field_list` 读取并合并原配置后，通过 `microi_update_field` 保存、回读并刷新字段缓存。
+角色使用 `microi_list_roles` / `microi_save_role`；附件 JSON 的 `VisibleRoleIds` 保存角色 Id 数组，
+`VisibleRoleNames` 和 `_FileAccess` 是服务端返回的展示信息，不是授权凭据。
+
 ## 评分 Rate
 >* 评分组件，默认int类型，数据库存储为int类型
 

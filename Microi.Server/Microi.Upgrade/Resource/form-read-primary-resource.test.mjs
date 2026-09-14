@@ -35,3 +35,15 @@ test('ReadPrimary生成器拒绝未知版本和字段Id占用', () => {
   conflict.DiyFields = conflict.DiyFields.filter(x => x.Name !== 'ReadPrimary');
   assert.throws(() => configureReadPrimary(conflict), /占用/);
 });
+test('ReadPrimary后续同代包保留版本和新功能日志且缺少既有能力时拒绝', () => {
+  const successor = structuredClone(pkg);
+  successor.PackageInfo.Version = 'v7.8.0';
+  successor.PackageInfo.ChangeLog = { ...successor.PackageInfo.ChangeLog, Version: 'v7.8.0', Title: '后续功能' };
+  const result = configureReadPrimary(successor);
+  assert.equal(result.PackageInfo.Version, 'v7.8.0');
+  assert.deepEqual(result.PackageInfo.ChangeLog, successor.PackageInfo.ChangeLog);
+  assert.equal(result.PackageInfo.ChangeHistory, successor.PackageInfo.ChangeHistory);
+  assert.deepEqual(configureReadPrimary(result), result);
+  successor.PackageInfo.RequiredPlatformCapabilities = [];
+  assert.throws(() => configureReadPrimary(successor), /能力/);
+});

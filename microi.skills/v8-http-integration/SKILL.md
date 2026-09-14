@@ -7,6 +7,8 @@ description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/Patch�
 
 # Microi V8 HTTP 外部接口集成
 
+第三方集成一旦需要 App Secret、ClientSecret、API Key（例如畅捷通 T+），先发现现有“系统设置 → 安全与服务接入”，调用 `microi_manage_server_private_secret` 的 List/Save，将 Secret 存为当前租户 `mci_system_setting` 的加密私密项。后端通过 `V8.SysConfig.ServerPrivateSettings['Integration.Changjet.AppSecret']` 使用。不要因为 `V8.OsClientModel` 已脱敏就判断平台无法存储或读取 Secret，也不要要求新增服务器配置/C# 端点。已有用户授权即可执行保存与脱敏回读；缺少工具时先读取 `../v8-security/SKILL.md` 的现有能力与实际连接版本。
+
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要调用外部 HTTP API（微信、支付宝、短信、ERP 等第三方系统）。
 
 文档维护时，前端用法更新现有 `microi.doc/docs/doc/v8-engine/v8-client.md`，后端用法更新现有 `microi.doc/docs/doc/v8-engine/v8-server.md`；不要新建重复的 V8.Http 文档页面或路由。只维护中文 `docs/doc/`，英文 `docs/en/` 由官网统一翻译生成。

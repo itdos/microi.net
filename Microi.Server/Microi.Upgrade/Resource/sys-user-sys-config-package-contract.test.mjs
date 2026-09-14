@@ -110,7 +110,7 @@ test('system-account package exclusively owns admin, preferences, profile and it
   const packageName = 'app.microi.sys_user.json'
   const packageModel = readPackage(packageName)
   assert.equal(packageModel.PackageInfo?.Name, '系统账号')
-  assert.equal(packageModel.PackageInfo?.Version, 'v7.6.9')
+  assert.equal(packageModel.PackageInfo?.Version, 'v8.3.5')
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
     ?.includes('ApiEngine:platform-sys-user-admin@v1.0.2'))
 
@@ -125,7 +125,7 @@ test('system-account package exclusively owns admin, preferences, profile and it
   }
 
   const admin = packageModel.SysApiEngines.find(item => item.ApiEngineKey === 'platform-sys-user-admin')
-  assert.equal(admin.Version, 'v1.0.2')
+  assert.equal(admin.Version, 'v1.0.4')
   assert.match(admin.ApiV8Code, /V8\.Method\.ManageSysUserAdmin/)
   const authorizationOffset = admin.ApiV8Code.indexOf('AuthorizeOnly: true')
   const beforeHookOffset = admin.ApiV8Code.indexOf('runHook("Before"')

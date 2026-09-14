@@ -618,7 +618,7 @@ namespace Microi.net
                 if (context != null)
                 {
                     var headerDid = context.Request.Headers["did"].ToString();
-                    if (!headerDid.DosIsNullOrWhiteSpace())
+                    if (!headerDid.DosIsNullOrWhiteSpace() && string.IsNullOrWhiteSpace(param.IndependentSessionSourceToken))
                     {
                         did = headerDid;
                     }
@@ -640,6 +640,16 @@ namespace Microi.net
                     var clientType = param._ClientType.DosIsNullOrWhiteSpace() ? "Empty" : param._ClientType;
                     var dateTimeNow = DateTime.Now;
                     claims.Add(new Claim("UserId", userId));
+                    // 秒级签发时间不能保证两次真实登录的 Token 不同。
+                    claims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")));
+                    var loginSessionId = Guid.NewGuid().ToString("N");
+                    if (!string.IsNullOrWhiteSpace(param.RotateFromToken))
+                    {
+                        try { loginSessionId = new JwtSecurityTokenHandler().ReadJwtToken(NormalizeBearerToken(param.RotateFromToken))
+                            .Claims.FirstOrDefault(c => c.Type == "MicroiSessionId")?.Value ?? loginSessionId; }
+                        catch { /* 旧 Token 有效性仍由下方锁内会话核验决定。 */ }
+                    }
+                    claims.Add(new Claim("MicroiSessionId", loginSessionId));
                     claims.Add(new Claim("OsClient", osClient));
                     claims.Add(new Claim("ClientType", clientType));
                     claims.Add(new Claim("Did", did));
@@ -687,7 +697,7 @@ namespace Microi.net
 
                     //不能用.Result，否则 redis 会超时 timeout 5000
                     var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
-                    var userTokenCacheKey = $"Microi:{osClient}:LoginTokenSysUser:{userId}";
+                    var userTokenCacheKey = LoginSessionCacheKeys.User(osClient, userId);
 
                     CurrentToken tokenModel = null;
                     var rotateFromToken = NormalizeBearerToken(param.RotateFromToken);
@@ -711,6 +721,13 @@ namespace Microi.net
                         }
 
                         // 自动续签只能替换锁内仍然有效的旧 Token。数据库投影查询
+                        if (!string.IsNullOrWhiteSpace(param.IndependentSessionSourceToken)
+                            && (tokenModel == null || !IsActiveCachedToken(tokenModel, param.IndependentSessionSourceToken)))
+                        {
+                            rotationFailureMessage = "来源登录已失效，请重新登录后创建开发工具连接。";
+                            tokenModel = null;
+                            return;
+                        }
                         // 期间若用户已注销、被吊销或由其它终端清除了会话，绝不能
                         // 因 tokenModel == null 而重建缓存、复活已结束的登录态。
                         if (!rotateFromToken.DosIsNullOrWhiteSpace()
@@ -824,7 +841,8 @@ namespace Microi.net
                                     ? "Token续签繁忙，请稍后重试。"
                                     : lockResult.Msg));
                     }
-                    if (context != null && !context.Response.Headers.Any(d => d.Key.ToLower() == "authorization"))
+                    if (context != null && string.IsNullOrWhiteSpace(param.IndependentSessionSourceToken)
+                        && !context.Response.Headers.Any(d => d.Key.ToLower() == "authorization"))
                     {
                         try
                         {
@@ -969,7 +987,7 @@ namespace Microi.net
 
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
-                var userTokenCacheKey = $"Microi:{osClient}:LoginTokenSysUser:{userId}";
+                var userTokenCacheKey = LoginSessionCacheKeys.User(osClient, userId);
                 var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>(userTokenCacheKey);
                 if (tokenModel == null || tokenModel.CurrentUser == null)
                 {
@@ -1064,7 +1082,7 @@ namespace Microi.net
                     if (!userId.DosIsNullOrWhiteSpace() && !thisOsClient.DosIsNullOrWhiteSpace())
                     {
                         var DiyCacheBase = MicroiEngine.CacheTenant.Cache(thisOsClient);
-                        var userTokenCacheKey = $"Microi:{thisOsClient}:LoginTokenSysUser:{userId}";
+                        var userTokenCacheKey = LoginSessionCacheKeys.User(thisOsClient, userId);
                         var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>(userTokenCacheKey);
                         if (tokenModel != null && tokenModel.CurrentUser != null && IsActiveCachedToken(tokenModel, token))
                         {
@@ -1203,7 +1221,7 @@ namespace Microi.net
                 try
                 {
                     var cache = MicroiEngine.CacheTenant.Cache(tokenOsClient);
-                    tokenModel = await cache.GetAsync<CurrentToken>($"Microi:{tokenOsClient}:LoginTokenSysUser:{userId}");
+                    tokenModel = await cache.GetAsync<CurrentToken>(LoginSessionCacheKeys.User(tokenOsClient, userId));
                 }
                 catch
                 {

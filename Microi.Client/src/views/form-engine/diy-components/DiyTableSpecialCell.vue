@@ -1,9 +1,12 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { DiyCommon } from "@/utils/diy.common";
+import { canReadFile, visibleFiles as filterVisibleFiles } from '@/utils/file-role-permission';
+import DiyFileRoleTags from '../diy-field-component/diy-file-role-tags.vue';
 import {
     formatFileSize,
     getFieldValue,
+    getUploadConfig,
     getFileIcon,
     isPrivateUploadField,
     normalizePercentage,
@@ -30,7 +33,7 @@ let qrVersion = 0;
 
 const component = computed(() => props.field.Component || "");
 const rawValue = computed(() => getFieldValue(props.row, props.field));
-const uploadItems = computed(() => normalizeUploadItems(rawValue.value));
+const uploadItems = computed(() => filterVisibleFiles(normalizeUploadItems(rawValue.value), getUploadConfig(props.field)));
 const privateUpload = computed(() => isPrivateUploadField(props.field));
 const visibleImages = computed(() => uploadItems.value.slice(0, props.compact ? 2 : 3));
 const visibleFiles = computed(() => uploadItems.value.slice(0, props.compact ? 1 : 2));
@@ -151,8 +154,9 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
         <template v-else-if="component === 'FileUpload'">
             <div v-if="uploadItems.length" class="diy-special-files">
                 <template v-for="(item, index) in visibleFiles" :key="`${item.Path}-${index}`">
+                    <span v-if="!canReadFile(item)" class="diy-special-file"><i class="fa fa-lock" /> {{ item.Name || '无权限附件' }}<DiyFileRoleTags :file="item" /></span>
                     <span
-                        v-if="!resolvedUrls[index]"
+                        v-else-if="!resolvedUrls[index]"
                         class="mci-inline-value-skeleton diy-special-file-loading"
                         role="status"
                         aria-label="文件链接加载中"
@@ -169,6 +173,7 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
                         <fa-icon :icon="getFileIcon(item)" />
                         <span class="diy-special-file-name">{{ item.Name }}</span>
                         <span v-if="formatFileSize(item.Size)" class="diy-special-file-size">{{ formatFileSize(item.Size) }}</span>
+                        <DiyFileRoleTags v-if="getUploadConfig(field).EnableRolePermission" :file="item" />
                     </a>
                 </template>
                 <el-popover
@@ -185,8 +190,9 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
                     </template>
                     <div class="diy-special-file-list" :aria-label="`${uploadItems.length} 个文件`">
                         <template v-for="(item, index) in uploadItems" :key="`all-${item.Path}-${index}`">
+                            <span v-if="!canReadFile(item)" class="diy-special-file"><i class="fa fa-lock" /> {{ item.Name || '无权限附件' }}<DiyFileRoleTags :file="item" /></span>
                             <span
-                                v-if="!resolvedUrls[index]"
+                                v-else-if="!resolvedUrls[index]"
                                 class="mci-inline-value-skeleton diy-special-file-loading"
                                 role="status"
                                 aria-label="文件链接加载中"
@@ -203,6 +209,7 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
                                 <fa-icon :icon="getFileIcon(item)" />
                                 <span class="diy-special-file-name">{{ item.Name }}</span>
                                 <span v-if="formatFileSize(item.Size)" class="diy-special-file-size">{{ formatFileSize(item.Size) }}</span>
+                                <DiyFileRoleTags v-if="getUploadConfig(field).EnableRolePermission" :file="item" />
                             </a>
                         </template>
                     </div>

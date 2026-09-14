@@ -22,6 +22,7 @@ namespace Microi.net
                 "UptSysUser",
                 "DelSysUser",
                 "GetSysUser",
+                "GetSysUserModel",
                 "RefreshLoginUser"
             };
 
@@ -74,6 +75,19 @@ namespace Microi.net
                         break;
                     case "GetSysUser":
                         operationResult = GetSysUserTrusted(param, currentUser, osClient, authorizeOnly);
+                        break;
+                    case "GetSysUserModel":
+                        if (string.IsNullOrWhiteSpace(param.Id) && string.IsNullOrWhiteSpace(param.Account))
+                            return new DosResult(0, null, "Id 或 Account 不能为空。");
+                        param._PageIndex = 1;
+                        param._PageSize = 1;
+                        var userResult = JObject.FromObject(GetSysUserTrusted(param, currentUser, osClient, authorizeOnly));
+                        if (!authorizeOnly && userResult["Code"].Val<int>() == 1)
+                        {
+                            userResult["Data"] = (userResult["Data"] as JArray)?.FirstOrDefault()?.DeepClone();
+                            if (userResult["Data"] == null || userResult["Data"].Type == JTokenType.Null) userResult["Code"] = 2;
+                        }
+                        operationResult = userResult;
                         break;
                     default:
                         operationResult = RefreshLoginUserTrusted(

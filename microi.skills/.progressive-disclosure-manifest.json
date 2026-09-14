@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-13T06:14:49.229Z",
+  "generatedAt": "2026-09-14T07:24:52.477Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,11 +169,11 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "341cd39dbe7904e65bc9b37362c7e22da9fc6f66093cea74a2399f12e5ce4291",
-      "originalLines": 681,
+      "originalSha256": "741f264b78764e37e7aa8c410f350573af1294c2edcc9d1ddb620f6ddcc7b378",
+      "originalLines": 689,
       "prefixSha256": "87ada6841f976552d9f5b88477fa91a92e4cd9cd040a8a725267d9fa2e4635c2",
       "prefixBytes": 782,
-      "entryLines": 223,
+      "entryLines": 231,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
@@ -187,8 +187,8 @@
           "id": "microi-client-frontend-001",
           "ordinal": 1,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "c17e7292fa264d10c6d21a2d634b60f40e12bb7168e69a46a85f351f5ed48f2f",
-          "lines": 22,
+          "sha256": "e9667a3a534e09b964c4a11796c003b48edc4093c66ed0c8777aefd4188a4ba8",
+          "lines": 30,
           "heading": "1. 技术栈和源码入口"
         },
         {
@@ -2221,11 +2221,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "23adfa4920e71ae3648a151a1f9691836665c3e5a9420d154e4bcdbdb4396926",
-      "originalLines": 594,
-      "prefixSha256": "9dfdf2f5b8d3b9f28c5e32276b0d6911fbd0470eb2115351f0e2179875608edd",
-      "prefixBytes": 12461,
-      "entryLines": 249,
+      "originalSha256": "6e5cb8613552e485a6552539daf61cbc3fccb0da30393ebb16ff9bdd31544885",
+      "originalLines": 602,
+      "prefixSha256": "761e74738e41d472349122770c59a31a86ca8900d9a4470b5aa912b9863382a1",
+      "prefixBytes": 13304,
+      "entryLines": 257,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -2786,26 +2786,26 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "f3624718dfa642f4c3ab5d48a33022014aa467af1be756fdbc78c4bae2231d1c",
-      "originalLines": 503,
+      "originalSha256": "ef779c0c6eb788f3c78c4e77ce5774f3e290e36fad344316368b0ee26e1f49e9",
+      "originalLines": 511,
       "prefixSha256": "c3b2ae10a39461ee69fda3c7e994d072ca6d8c9dc6f2338742bc8f07e0dcffd0",
       "prefixBytes": 1648,
-      "entryLines": 190,
+      "entryLines": 197,
       "chunks": [
         {
           "id": "v8-security-000",
           "ordinal": 0,
           "destination": "v8-security/SKILL.md",
-          "sha256": "d03ee34e72925db55f9022de26dfc251c0d3d69fac52ae6a910d42ddfc142ae7",
-          "lines": 50,
+          "sha256": "2e81552d91b61d9d7f96cba1502306e186f0a288d5db8d443c4e524fce748bc9",
+          "lines": 52,
           "heading": "0. 租户动态系统设置与密钥边界"
         },
         {
           "id": "v8-security-001",
           "ordinal": 1,
           "destination": "v8-security/SKILL.md",
-          "sha256": "aad35b2c3e1876d98ead7e604307bcb7d39fe8c480d72f102ae956972580a35b",
-          "lines": 19,
+          "sha256": "ccec93b880295123923b2375dbc616c5ab02aaf43af9a79f26b7ac953609866d",
+          "lines": 24,
           "heading": "0.5 接口引擎配置安全"
         },
         {
@@ -2836,15 +2836,15 @@
           "id": "v8-security-005",
           "ordinal": 3,
           "destination": "v8-security/references/progressive-01-2-权限校验.md",
-          "sha256": "c2bc7b1ec3ad6240b05537e1ffada3ef2e07e7a10e15102d9e3c8f777ae7ee31",
-          "lines": 100,
+          "sha256": "0a0f4864a315285b0ed3824e31d1f62d83077a389628f4eae6a0b3550ca50237",
+          "lines": 101,
           "heading": "2. 权限校验"
         },
         {
           "id": "v8-security-006",
           "ordinal": 6,
           "destination": "v8-security/references/progressive-01-2-权限校验.md",
-          "sha256": "ba49a1e5ea27c6cca4c78c6ee3e95a5e41032bb08f6813753bc8aa855ddfc832",
+          "sha256": "3a40db54a44c9c76bd3dd7255d1a6b15dcf8b8b90c2d032b7eda80532f023d7d",
           "lines": 21,
           "heading": "5. 防重复提交"
         },
@@ -2852,7 +2852,7 @@
           "id": "v8-security-007",
           "ordinal": 7,
           "destination": "v8-security/references/progressive-01-2-权限校验.md",
-          "sha256": "60297c515c7c7b6e35cd871ab2fd7c772f8b227dfcefa0419868943213556c06",
+          "sha256": "35706b9a254fb5788b64535947261f66fd8c06e17103b2169f8be02fce05fa65",
           "lines": 71,
           "heading": "6. 敏感数据"
         },

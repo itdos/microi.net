@@ -16,6 +16,7 @@
 <script setup name="line-widget">
 import { ref, shallowRef, watch, onMounted, nextTick, onBeforeUnmount, computed } from 'vue'
 import * as echarts from 'echarts'
+import { pageChartTheme } from '../../../utils/runtimePresentation.js'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import { storeToRefs } from 'pinia'
 import CommonSearch from '../../CommonSearch/CommonSearch.vue'
@@ -87,8 +88,8 @@ chartSet.value = {
     show: false,
     left: '10%',
     right: '4%',
-    bottom: '30px',
-    containLabel: false,
+    bottom: 44,
+    containLabel: true,
   },
 
   toolbox: {
@@ -148,7 +149,7 @@ const resetData = () => {
 }
 //重置
 const resetChartSource = () => {
-  chartInstance.setOption(chartSet.value)
+  chartInstance.setOption(pageChartTheme(chartSet.value, dark.value, pageEngineStore.formData.JsonObj?.formConfig?.density !== 'comfortable'))
 }
 
 //组装数据
@@ -180,7 +181,7 @@ const setData = () => {
         type: 'line',
         name: series.name,
         data: series.data,
-        smooth: props.widgetObj.widgetParams[3]?.value,
+        smooth: props.widgetObj.widgetParams[3]?.value === true || props.widgetObj.widgetParams[3]?.value === 'true',
         label: {
           show: props.widgetObj.widgetParams[13]?.value,
           position: props.widgetObj.widgetParams[14]?.value,

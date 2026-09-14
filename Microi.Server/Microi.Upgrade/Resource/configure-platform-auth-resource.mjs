@@ -28,8 +28,16 @@ const legacySmsSourceDirectory = path.resolve(
 const pkg = JSON.parse(fs.readFileSync(resourcePath, 'utf8'));
 const specs = [
   {
+    id: '01KXNQJGRK4H5WGWPMYP4AH3EP', key: 'official_password_reset_send_sms',
+    name: '[官网]找回密码发送短信', file: '[官网]找回密码发送短信(official_password_reset_send_sms).js',
+    sourceDirectory: path.resolve(sourceDirectory, '..'), allowAnonymous: 1, stopHttp: 0,
+    ownership: 'Platform', policy: 'Managed', version: 'v1.0.5', lock: 1, timeout: 120,
+    changeHistory: '2026-09-14 v1.0.3 复用注册短信图形校验入口，验证码仅原子消费一次，修复找回密码循环。\n'
+  },
+  {
     id: '76000000-1000-4000-8000-000000000001',
     key: 'platform_auth_sms_login',
+    version: 'v1.0.3',
     name: '平台短信登录注册',
     file: '[系统]短信登录注册(platform_auth_sms_login).js',
     allowAnonymous: 1,
@@ -85,7 +93,7 @@ const specs = [
     key: 'send-sms-reg', name: '平台图形校验后发送注册短信',
     file: '[官网]注册发送短信(send-sms-reg).js', sourceDirectory: path.resolve(sourceDirectory, '..'),
     allowAnonymous: 1, stopHttp: 0, ownership: 'Platform', policy: 'Managed',
-    version: 'v1.0.3', lock: 1, lockKey: '', timeout: 120,
+    version: 'v1.0.4', lock: 1, lockKey: '', timeout: 120,
     category: '系统/身份与登录', testParam: '{}',
     changeHistory: '2026-09-09 v1.0.3 Managed 注册入口；租户/命名空间校验、原子消费、分布式限流与单次派发证明。\n'
   }
@@ -114,6 +122,7 @@ for (const spec of specs) {
     Files: '[]',
     AllowAnonymous: spec.allowAnonymous,
     ApiAddress: `/apiengine/${spec.key}`,
+    ApiRoutes: pkg.SysApiEngines.find(item => item.ApiEngineKey === spec.key)?.ApiRoutes || (spec.key === 'platform_auth_sms_login' ? '/api/SysUser/SmsLogin' : ''),
     Lock: spec.lock || 0,
     ...(spec.lockKey !== undefined ? { LockKey: spec.lockKey } : {}),
     ApiV8Code: source,
@@ -167,6 +176,10 @@ Object.assign(pkg.PackageInfo, {
 });
 
 normalizeOfficialApiEnginePolicies(pkg, 'app.microi.saas-engine.json');
+for (const spec of specs) {
+  const engine = pkg.SysApiEngines.find(item => item.ApiEngineKey === spec.key);
+  fs.writeFileSync(path.join(spec.sourceDirectory || sourceDirectory, spec.file), engine.ApiV8Code, 'utf8');
+}
 fs.writeFileSync(resourcePath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify({
   version: pkg.PackageInfo.Version,

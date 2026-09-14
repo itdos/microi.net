@@ -7,6 +7,37 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-cache-manager
+ * Version: v1.0.2
+ * Function:
+ * - 管理员缓存维护入口，固定旧地址对应动作，限制到授权租户。
+ */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/cache/statistics": "Statistics",
+  "/api/cache/invalidate": "Invalidate",
+  "/api/cache/invalidate-pattern": "InvalidatePattern",
+  "/api/cache/redis/connections": "Connections",
+  "/api/cache/redis/connections/save": "SaveConnection",
+  "/api/cache/redis/connections/delete": "DeleteConnection",
+  "/api/cache/redis/test": "TestConnection",
+  "/api/cache/redis/statistics": "RedisStatistics",
+  "/api/cache/redis/keys": "Keys",
+  "/api/cache/redis/key": "Key",
+  "/api/cache/redis/keys/delete": "DeleteKeys",
+  "/api/cache/redis/key/replace": "ReplaceValue",
+  "/api/cache/redis/key/rename": "RenameKey",
+  "/api/cache/redis/key/ttl": "SetTtl"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 // Microi官方接口引擎：platform-cache-manager
 // Version: v1.0.0
 // 缓存管理器的动作编排入口；租户、超级管理员、访问密钥、连接密钥和审计均由

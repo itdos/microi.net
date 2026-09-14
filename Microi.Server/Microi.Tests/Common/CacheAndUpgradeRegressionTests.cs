@@ -772,7 +772,7 @@ public class CacheAndUpgradeRegressionTests
         Assert.Contains("app.microi.sso.json", resources.Keys);
         var package = JObject.Parse(resources["app.microi.sso.json"]);
         Assert.True(Assert.IsType<bool>(hasPackagedSsoRuntime!.Invoke(null, new object[] { package })));
-        Assert.Equal("v7.6.1", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("v8.3.5", package["PackageInfo"]?["Version"]?.ToString());
         Assert.Equal("Platform", package["PackageInfo"]?["ApplicationType"]?.ToString());
         Assert.Equal(35, package["SysApiEngines"]?.Children<JObject>().Count());
 

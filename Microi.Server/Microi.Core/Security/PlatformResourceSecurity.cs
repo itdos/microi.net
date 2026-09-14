@@ -46,6 +46,10 @@ namespace Microi.net
 
         private static readonly string[] ReadOnlyTableNameValues =
         {
+            // 表/字段定义可由管理员明确委托查询，供目录和字段选择等场景使用。
+            // 只读授权包含配置及事件源码；写入会改变结构或执行代码，仍须管理员。
+            "diy_table",
+            "diy_field",
             // Runtime workflow and application/catalog metadata. Reading requires an
             // explicit role grant; generic writes remain platform-administrator-only.
             "wf_flowdesign",
@@ -72,8 +76,6 @@ namespace Microi.net
             // 全局可执行代码只能由管理员维护，普通角色误授表权限也不能修改。
             "mci_global_function",
             "sys_apiengine",
-            "diy_table",
-            "diy_field",
             "sys_menu",
             "sys_role",
             "sys_rolelimit",

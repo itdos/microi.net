@@ -13,6 +13,14 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 ## 表单字段的公有桶与私有桶（强制）
 
+- `Config.FileUpload.EnableRolePermission=true` 的字段强制私有上传，优先级高于字段和请求 `Limit`。
+  每个附件 `VisibleRoleIds` 多选真实角色，三个默认关闭的开关为 `HideUnauthorizedFiles`、
+  `ShowUnauthorizedFileName`、`DisableRoleInheritance`。无权限时后端仅返回脱敏占位，不含 Path、
+  Versions 或签名地址；普通保存必须保留无权附件，不能改角色、改名、删除或通过复制路径重新授权。
+  上传响应的 `_UploadProof` 绑定当前租户、用户、字段、记录、私有路径及有效期，只用于首次保存校验，
+  持久化时移除；新文件须携带当前记录/字段上下文上传。历史公有附件需重新私有上传后才能设置角色。
+  完整配置、继承与 MCP 流程见 `../microi-form-engine/SKILL.md`。
+
 ### 旧上传返回与接口引擎扩展
 
 - 系统设置 `CompatiblePlatformOldVersion` 默认关闭，空值/缺字段也关闭；开启时旧 HTTP 上传

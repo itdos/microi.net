@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { MicroiClient, ApiResponse } from './microi-client.js';
 import type { McpServerContext } from './server.js';
 import { normalizePageJsonObj, normalizePrintObj, normalizePrintPageObj } from './design-engine.js';
+import { buildFileUploadConfig } from './file-upload-config.js';
 
 type JsonRecord = Record<string, unknown>;
 type ToolContent = { type: 'text'; text: string };
@@ -796,6 +797,7 @@ export function normalizeViewSchemaJson(raw: unknown): {
 function buildFieldConfig(sourceType: string, options: JsonRecord): { data?: string; config: JsonRecord; warnings: string[] } {
   const warnings: string[] = [];
   const type = sourceType.toLowerCase();
+  if (type === 'fileupload') return { config: buildFileUploadConfig(options), warnings };
   if (type === 'keyvalue') {
     const raw = getString(options, 'data', 'options');
     const rows = raw
@@ -2868,6 +2870,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
       'Open generated forms in an 80% Dialog by default. Use Drawer only for extremely large forms with many fields, multiple TableChild controls, or comparable heavy content; never make Drawer the blanket module default.',
       'Use dryRun=true until the user explicitly asks to write.',
       'For Page Engine pages, save only the JsonObj layer to mic_page.JsonObj: {formConfig, wrapperList}. Do not wrap it in formData.',
+      'Page Engine defaults: formConfig.themeMode=system, density=compact, wrapperOption.heightMode=content; reserve fixed only for explicit fixed canvases. Use platform colour variables and statistic widgetParams[24].value=summary/detail for compact reference dashboards. Verify light/dark visuals and real data separately.',
       'For Print Engine templates, PageObj must be a hiprint object with panels[].printElements; PrintObj is sample/runtime data.',
       'For natural-language UI or print design, prefer microi_build_page_design or microi_build_print_template_design, then save after confirmation.',
     ],
@@ -2906,7 +2909,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     'microi_build_field_config',
     `Build and validate Microi diy_field Data/Config JSON for option controls, SQL/APIEngine/DataSource sources, JoinForm, AutoNumber and DateTime. OsClient: ${osClient}`,
     {
-      sourceType: z.enum(['Data', 'KeyValue', 'Sql', 'ApiEngine', 'DataSource', 'AutoNumber', 'JoinForm', 'DateTime']).describe('Config source type'),
+      sourceType: z.enum(['Data', 'KeyValue', 'Sql', 'ApiEngine', 'DataSource', 'AutoNumber', 'JoinForm', 'DateTime', 'FileUpload']).describe('Config source type. FileUpload 的 options 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance，均为 boolean，默认 false；启用角色权限自动 Limit=true。'),
       options: jsonRecordSchema.optional().describe('Source options, such as data/options, sql, apiEngineKey, dataSourceId, tableId, prefix, length'),
     },
     async ({ sourceType, options }) => {

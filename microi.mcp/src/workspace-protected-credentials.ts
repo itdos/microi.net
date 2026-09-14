@@ -32,6 +32,10 @@ const DPAPI_UNPROTECT_SCRIPT = [
 ].join(' ');
 
 export function unprotectWithWindowsDpapi(ciphertext: Buffer): Buffer {
+  return transformWindowsDpapi(ciphertext, DPAPI_UNPROTECT_SCRIPT);
+}
+
+function transformWindowsDpapi(input: Buffer, script: string): Buffer {
   if (process.platform !== 'win32') {
     throw new Error('Windows DPAPI is unavailable on this platform');
   }
@@ -39,9 +43,9 @@ export function unprotectWithWindowsDpapi(ciphertext: Buffer): Buffer {
   const powershell = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
   const result = childProcess.spawnSync(
     powershell,
-    ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', DPAPI_UNPROTECT_SCRIPT],
+    ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
     {
-      input: ciphertext.toString('base64'),
+      input: input.toString('base64'),
       encoding: 'utf8',
       windowsHide: true,
       maxBuffer: 4 * 1024 * 1024,
@@ -52,6 +56,26 @@ export function unprotectWithWindowsDpapi(ciphertext: Buffer): Buffer {
     throw new Error('Windows DPAPI unprotect failed');
   }
   return Buffer.from(String(result.stdout).trim(), 'base64');
+}
+
+const SESSION_TOKEN_PREFIX = 'dpapi-session-v1:';
+const tokenCache = new Map<string, string>();
+export function isProtectedSessionToken(value: unknown): boolean {
+  return typeof value === 'string' && value.startsWith(SESSION_TOKEN_PREFIX);
+}
+export function unprotectSessionToken(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  if (!isProtectedSessionToken(value)) return value;
+  if (!tokenCache.has(value)) {
+    if (tokenCache.size > 256) tokenCache.clear();
+    tokenCache.set(value, unprotectWithWindowsDpapi(Buffer.from(value.slice(SESSION_TOKEN_PREFIX.length), 'base64')).toString('utf8'));
+  }
+  return tokenCache.get(value)!;
+}
+export function protectSessionToken(value: string): string {
+  if (!value || isProtectedSessionToken(value)) return value;
+  const script = DPAPI_UNPROTECT_SCRIPT.replace('::Unprotect(', '::Protect(');
+  return SESSION_TOKEN_PREFIX + transformWindowsDpapi(Buffer.from(value, 'utf8'), script).toString('base64');
 }
 
 /**

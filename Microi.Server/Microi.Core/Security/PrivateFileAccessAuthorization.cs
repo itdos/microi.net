@@ -251,6 +251,14 @@ namespace Microi.net
                 var row = ToJObject((object)rowResult.Data);
                 stage = "VerifyFieldReference";
                 var fieldValue = row?[fieldName];
+                if (FileRolePermission.Enabled(fieldModel))
+                {
+                    var permission = FileRolePermission.Load(param.OsClient, param._CurrentUser);
+                    var config = FileRolePermission.Config(fieldModel);
+                    var paths = derivedCadPreview ? new List<string> { param.OriginalFilePathName } : RequestedPaths(param);
+                    if (paths.Any(path => !permission.CanReadPath(fieldValue, path, config)))
+                        return new DosResult(0, null, "当前角色无权读取该附件！");
+                }
                 if (derivedCadPreview)
                 {
                     string derivedPath;
@@ -699,6 +707,7 @@ namespace Microi.net
                     d.TableId,
                     d.Name,
                     d.Component,
+                    d.Config,
                     d.IsDeleted
                 })
                 .Where(d => d.IsDeleted == 0
@@ -716,6 +725,7 @@ namespace Microi.net
                     d.TableId,
                     d.Name,
                     d.Component,
+                    d.Config,
                     d.IsDeleted
                 })
                 .Where(d => d.IsDeleted == 0

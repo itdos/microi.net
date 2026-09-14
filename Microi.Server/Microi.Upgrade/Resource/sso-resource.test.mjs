@@ -36,7 +36,7 @@ function executableBody(source) {
 test('SSO official package has stable identity and no tenant data', () => {
   assert.equal(resource.PackageInfo.Name, 'SSO 身份联邦');
   assert.equal(resource.PackageInfo.AppId, 'app.microi.sso');
-  assert.equal(resource.PackageInfo.Version, 'v7.6.1');
+  assert.equal(resource.PackageInfo.Version, 'v8.3.5');
   assert.equal(resource.PackageInfo.ApplicationType, 'Platform');
   assert.deepEqual(resource.PackageInfo.RequiredPlatformCapabilities, [
     'ApiEngine:sso_capabilities',
@@ -125,7 +125,7 @@ test('SSO business orchestration is packaged as canonical ApiEngines', () => {
       `${engine.ApiEngineKey} package code drifted`
     );
     assert.match(engine.ApiV8Code.replace(/\r\n?/g, '\n'), /[^\n]\n$/);
-    assert.equal(engine.Version, engine.ApiEngineKey === 'sso_legacy_capabilities' ? 'v1.0.4' : 'v1.0.3');
+    assert.equal(engine.Version, engine.ApiEngineKey === 'sso_legacy_token_login' ? 'v1.0.5' : engine.ApiEngineKey === 'sso_legacy_capabilities' ? 'v1.0.4' : 'v1.0.3');
     const policy = resource.ResourcePolicies.ApiEngines[engine.ApiEngineKey];
     if (engine.ApiEngineKey === 'sso_event_hook') {
       assert.deepEqual(policy, { Ownership: 'Tenant', UpgradePolicy: 'CreateIfMissing' });

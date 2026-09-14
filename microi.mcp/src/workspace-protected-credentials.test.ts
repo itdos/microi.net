@@ -3,7 +3,21 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { readWorkspaceCredentials } from './workspace-protected-credentials.js';
+import { readWorkspaceCredentials, protectSessionToken, unprotectSessionToken } from './workspace-protected-credentials.js';
+
+test('imported developer session encrypts for the current OS user and never silently downgrades', () => {
+  const token = 'fixture.session.signature';
+  if (process.platform !== 'win32') {
+    assert.throws(() => protectSessionToken(token));
+    return;
+  }
+  const encrypted = protectSessionToken(token);
+  assert.ok(encrypted.startsWith('dpapi-session-v1:'));
+  assert.ok(!encrypted.includes(token));
+  assert.equal(unprotectSessionToken(encrypted), token);
+  assert.equal(unprotectSessionToken('legacy-token'), 'legacy-token');
+  assert.throws(() => unprotectSessionToken('dpapi-session-v1:corrupt'));
+});
 
 test('workspace credential vault returns only the requested encrypted profile keys', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-vault-test-'));

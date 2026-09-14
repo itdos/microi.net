@@ -278,7 +278,7 @@ export const tabel = {
         step: 1,
       }
     },
-
-
+    { sort: 21, label: '显示表头', type: 'switch', value: true },
+    { sort: 22, label: '行高(0为自适应)', type: 'number', value: 0, typeOptions: { min: 0, max: 200, step: 1 } },
   ],
 }

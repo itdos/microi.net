@@ -7,6 +7,30 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-ai-workflow
+ * Version: v1.0.2
+ * Function:
+ * - AI 工作流查询、保存和运行的接口编排入口，复用可信后端权限。
+ */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/aiworkflow/getoverview": "Overview",
+  "/api/aiworkflow/generatefromprompt": "GenerateFromPrompt",
+  "/api/aiworkflow/getnodedetail": "NodeDetail",
+  "/api/aiworkflow/listaiworkflows": "List",
+  "/api/aiworkflow/getaiworkflow": "Get",
+  "/api/aiworkflow/saveaiworkflow": "Save",
+  "/api/aiworkflow/deleteaiworkflow": "Delete"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 // Microi官方接口引擎：platform-ai-workflow
 // Version: v1.0.0
 // AI 图谱构建由插件原子能力处理；HTTP 路由和动作编排由应用商城资源交付。

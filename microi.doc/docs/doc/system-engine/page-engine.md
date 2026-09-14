@@ -13,6 +13,12 @@
 >* 实际项目开发中，往往【**表单引擎表格**】并不能满足客户领导的需求，因此诞生了Microi吾码界面引擎
 >* 所有控件均支持数据源配置，可通过[**接口引擎**](https://microi.blog.csdn.net/article/details/143968454)来提供数据源
 
+### 紧凑布局与深色模式
+
+运行页面默认跟随平台主题，使用 `formConfig.themeMode="system"`；需要固定风格时可选 `light` 或 `dark`。`density="compact"` 使用紧凑卡片与筛选栏。卡片采用平台颜色变量，历史白色、浅灰色面板会在深色模式下转换为深色表面，业务指标颜色、图片及透明背景仍保留。
+
+`wrapperOption.heightMode="content"` 让容器随内容撑开，避免标题或少量指标留下大块空白；明确需要固定画布时选择 `fixed`。图表自身仍可设置高度。统计组件新增“摘要”和“明细指标”外观，可组合主指标、次指标、图表、表格来还原紧凑报表。配置和真实数据接口保持分离；升级平台前端后，已有页面即可获得主题适配与内容高度处理。
+
 ## 试用地址
 >Microi吾码界面引擎：[https://microi.net/page-engine](https://microi.net/page-engine)
 ## npm组件集成方式

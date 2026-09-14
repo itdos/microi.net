@@ -21,8 +21,16 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=c17e7292fa264d10c6d21a2d634b60f40e12bb7168e69a46a85f351f5ed48f2f -->
+<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=e9667a3a534e09b964c4a11796c003b48edc4093c66ed0c8777aefd4188a4ba8 -->
 ## 1. 技术栈和源码入口
+
+### 详情评论与代码版本的按需读取
+
+- 评论用 `/api/FormEngine/AddFormComment`，只传 `ParentFormEngineKey/ParentTableRowId/_SysMenuId/Content/ParentCommentId/RequestId`。服务端固定作者、父表及回复上下文；同一提交重试必须复用 RequestId，兼容 GUID 与平台 `DiyCommon.NewGuid()` 实际生成的 ULID。
+- 评论归属为 `diy_comment.ParentTableId + TableRowId`，新表字段与复合索引通过表单引擎应用交付，主库回读保证写后可见。已有 TableId 绑定兼容，空归属历史评论禁止仅按记录 Id 自动猜测或后台回填。
+- `/api/FormEngine/GetFormRelatedData` 的版本列表只含元信息；`HistoryContentMode=OnDemand` 时，点击动作再传 `VersionId` 读取一条，并要求返回 `Authorized`。不要把 Data 缓存到列表，不要并发预取全部正文。
+- 代码历史只向当前有效的平台管理员开放代码字段白名单；当前行可读不等于历史秘密可读。局部版本比较/加载只涉及快照中的字段，保存继续走正常表单鉴权和事件。
+- 不得为了修复右栏恢复调度器通用 FormEngine 状态写回、启动历史回填或无变化版本写入。必须同时运行评论归属/去重、按需读取以及 ScheduleRuntimeTimeWriter、V8CodeVersionService 的性能回归。
 
 - Vue 3 + Options API + mixins，构建工具是 Vite。
 - UI 主要使用 Element Plus、FontAwesome、项目内 `dynamic-icon`。

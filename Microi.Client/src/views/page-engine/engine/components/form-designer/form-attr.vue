@@ -45,8 +45,18 @@
     <el-form-item :label="$pet('移动模式')">
       <el-switch v-model="formConfig.mobile"></el-switch>
     </el-form-item>
-    <el-form-item :label="$pet('暗黑模式')">
-      <el-switch v-model="formConfig.dark"></el-switch>
+    <el-form-item :label="$pet('运行主题')">
+      <el-select v-model="formConfig.themeMode" size="small" :placeholder="$pet('跟随平台')">
+        <el-option :label="$pet('跟随平台')" value="system" />
+        <el-option :label="$pet('浅色')" value="light" />
+        <el-option :label="$pet('深色')" value="dark" />
+      </el-select>
+    </el-form-item>
+    <el-form-item :label="$pet('显示密度')">
+      <el-select v-model="formConfig.density" size="small" :placeholder="$pet('紧凑')">
+        <el-option :label="$pet('紧凑')" value="compact" />
+        <el-option :label="$pet('宽松')" value="comfortable" />
+      </el-select>
     </el-form-item>
     <el-form-item :label="$pet('内边距值')">
       <el-input

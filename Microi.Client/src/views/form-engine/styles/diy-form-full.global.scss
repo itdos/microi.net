@@ -215,6 +215,20 @@
 }
 
 .data-version-preview-dialog {
+    .data-version-code-preview {
+        h4 { margin: 12px 0; }
+        pre {
+            margin: 0 0 20px;
+            padding: 16px;
+            overflow: auto;
+            border: 1px solid var(--el-border-color-lighter);
+            border-radius: 6px;
+            background: var(--el-fill-color-blank);
+            font: 13px/1.6 Consolas, Monaco, "Courier New", monospace;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+    }
     .el-dialog__body {
         padding-top: 8px;
         max-height: 72vh;

@@ -24,13 +24,18 @@ public sealed class LegacyMobileCompatibilityController : Controller
         @"--OsClient--(.*?)--$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     internal sealed record BootstrapRoute(string EngineKey, string Action, bool Authenticated = false,
-        bool PostOnly = false);
+        bool PostOnly = false, LegacyApiRoute Legacy = null);
 
-    private static readonly IReadOnlyDictionary<string, BootstrapRoute> Routes =
-        new Dictionary<string, BootstrapRoute>(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<string, BootstrapRoute> Routes = CreateRoutes();
+
+    private static IReadOnlyDictionary<string, BootstrapRoute> CreateRoutes()
+    {
+        var routes = new Dictionary<string, BootstrapRoute>(StringComparer.OrdinalIgnoreCase)
         {
             ["/api/SysUser/Login"] = new("platform-sys-user-session", "Login", PostOnly: true),
             ["/api/SysUser/RefreshToken"] = new("platform-sys-user-session", "RefreshToken", true, true),
+            ["/api/SysUser/CreateCliSession"] = new("platform-sys-user-session", "CreateCliSession", true, true),
+            ["/api/SysUser/GetConnectionInfo"] = new("platform-sys-user-session", "GetConnectionInfo", true),
             ["/api/SysUser/TokenLogin"] = new("platform-sys-user-session", "TokenLogin", true),
             ["/api/SysUser/Logout"] = new("platform-sys-user-session", "Logout", true, true),
             ["/api/SysUser/GetCurrentUser"] = new("platform-current-user", "GetCurrentUser", true),
@@ -44,7 +49,7 @@ public sealed class LegacyMobileCompatibilityController : Controller
             ["/api/SysMenu/GetSysMenuStep"] = new("platform-sys-menu", "GetSysMenuStep", true),
             ["/api/SysMenu/GetSysMenuModel"] = new("platform-sys-menu", "GetSysMenuModel", true),
             ["/api/SysMenu/GetSysMenu"] = new("platform-sys-menu", "GetSysMenu", true),
-            // 仅补历史读树地址；不截获现代部门引擎的新增、修改、删除动作。
+            // 基础部门树也用于空包租户的首次启动。
             ["/api/SysDept/GetSysDeptStep"] = new("platform-sys-dept", "GetSysDeptStep", true),
             ["/apiengine/platform-current-user"] = new("platform-current-user", "GetCurrentUser", true),
             ["/apiengine/platform-sys-config"] = new("platform-sys-config", "GetSysConfig"),
@@ -56,6 +61,12 @@ public sealed class LegacyMobileCompatibilityController : Controller
             ["/apiengine/platform-client-log"] = new("platform-client-log", "AddSysLog", true),
             ["/apiengine/platform-sys-menu"] = new("platform-sys-menu", "", true)
         };
+        // 与应用包共用已审计历史地址，不开放通配符、任意方法或任意业务 Controller。
+        foreach (var route in LegacyApiRouteCatalog.Routes)
+            if (!routes.ContainsKey(route.Path)) routes.Add(route.Path,
+                new BootstrapRoute(route.EngineKey, route.Action, route.Authenticated, route.PostOnly, route));
+        return routes;
+    }
 
     internal static bool IsBootstrapRoute(string path) => Routes.ContainsKey(path ?? "");
 
@@ -115,7 +126,11 @@ public sealed class LegacyMobileCompatibilityController : Controller
         try { osClient = ResolveTenant(Request.Path.Value, Request.Query["OsClient"], request,
             Request.Headers["osclient"], DiyToken.GetCurrentOsClient()); }
         catch (ArgumentException) { return Json(new DosResult(1002, null, "请求租户参数无效或路径与查询租户不一致。")); }
+        var suppliedSignalAction = route.Legacy?.Fallback == "UserBehavior"
+            ? request.GetValue("Action", StringComparison.OrdinalIgnoreCase)?.DeepClone() : null;
         request = PrepareRequest(request, osClient, route.Action);
+        // 该历史方法的 Action 是用户行为信号，保留给原子自己的白名单校验。
+        if (route.Legacy?.Fallback == "UserBehavior") request["Action"] = suppliedSignalAction;
         Request.Headers["osclient"] = osClient;
 
         DosResult<dynamic> configured;
@@ -185,7 +200,19 @@ public sealed class LegacyMobileCompatibilityController : Controller
             return Json(new DosResult(1002, null, "访问密钥会话不允许使用启动兼容入口。"));
         Response.Headers["Cache-Control"] = "no-store";
         Response.Headers["X-Microi-Bootstrap-Route"] = "CompiledFallback";
-        return Json(await PlatformBootstrapCompatibilityService.ExecuteAsync(route.Action, request, user));
+        var fallback = route.Legacy == null
+            ? await PlatformBootstrapCompatibilityService.ExecuteAsync(route.Action, request, user)
+            : await LegacyApiFallbackService.ExecuteAsync(route.Legacy, request, user);
+        if (route.Legacy?.Fallback == "LegacyOs")
+        {
+            if (!ApiEngineHttpResponseContract.TryRead(fallback, osClient, route.EngineKey, out var response, out var error))
+                return StatusCode(500, new DosResult(0, null, error));
+            foreach (var header in response.Headers)
+                foreach (var value in header.Value) Response.Headers.Append(header.Key, value);
+            if (response.BodyBytes != null) return File(response.BodyBytes, response.ContentType);
+            return new ContentResult { StatusCode = response.StatusCode, ContentType = response.ContentType, Content = response.Body };
+        }
+        return Json(fallback);
     }
 
     internal static string ResolveTenant(string path, string queryTenant, JObject request,
@@ -231,7 +258,15 @@ public sealed class LegacyMobileCompatibilityController : Controller
             Request.EnableBuffering();
             using var reader = new StreamReader(Request.Body, Encoding.UTF8, true, 1024, leaveOpen: true);
             var body = await reader.ReadToEndAsync();
-            if (!string.IsNullOrWhiteSpace(body)) result = JObject.Parse(body);
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                var parsed = JToken.Parse(body);
+                if (parsed is JObject json) result = json;
+                else if (parsed.Type == JTokenType.String && string.Equals(
+                    TenantSuffix.Replace(Request.Path.Value ?? "", ""), "/api/Mqtt/SendCommand/send-command", StringComparison.OrdinalIgnoreCase))
+                    result["Payload"] = parsed.ToString();
+                else throw new InvalidDataException("Expected JSON object.");
+            }
             Request.Body.Position = 0;
         }
         foreach (var query in Request.Query)

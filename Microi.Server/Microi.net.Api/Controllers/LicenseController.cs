@@ -180,7 +180,7 @@ namespace Microi.net.Api
                 var result = await LicenseService.IssueAsync(
                     request?.HID, request?.Company, request?.Name, request?.Phone,
                     request?.IP, request?.ProductType, request?.ExpirationDate,
-                    request?.UpdateExpirationDate);
+                    request?.UpdateExpirationDate, currentUser["Account"]?.ToString(), currentUser["Name"]?.ToString());
                 return Json(result);
             }
             catch (Exception ex)
@@ -444,6 +444,8 @@ namespace Microi.net.Api
             var aiLicense = _microiAi.GetOnlineAiLicenseState();
 
             data["Name"] = licenseInfo?.Name ?? "";
+            data["Account"] = licenseInfo?.Account ?? "";
+            data["AccountName"] = licenseInfo?.AccountName ?? "";
             data["Phone"] = licenseInfo?.Phone ?? "";
             data["UpdateExpirationDate"] = licenseInfo != null
                 ? licenseInfo.UpdateExpirationDate.ToString("yyyy-MM-dd HH:mm:ss")

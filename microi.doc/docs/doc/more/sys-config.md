@@ -46,6 +46,8 @@
 
 ## 系统设置官方应用与 Secret 边界
 
+AI 接入畅捷通等第三方服务时，应先使用 `microi_manage_server_private_secret` 列出已配置的 Key，再把 App Secret 保存到“安全与服务接入”，并按 Key 回读 `HasSecret/IsSecret/IsEnabled` 确认。工具复用平台已有私密配置，不返回明文或密文；写入确认格式为 `SAVE:<Key>`。服务端接口引擎按受限私密配置能力读取，浏览器、表单代码和公开配置不得取得 Secret。不要因凭据尚未配置就让用户新增生产环境变量、硬编码到源码或另建凭据库。
+
 独立官方应用 `app.microi.sys-config` 唯一交付以下接口引擎：
 
 - `platform-tenant-system-settings` 是 Managed 核心，只编排管理员列表、删除和非 Secret 保存；

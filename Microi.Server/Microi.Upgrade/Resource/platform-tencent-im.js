@@ -7,6 +7,26 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-tencent-im
+ * Version: v1.0.2
+ * Function:
+ * - 腾讯 IM 用户签名入口，凭据从可信租户配置读取并校验管理员操作。
+ */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/im/getusersig": "GetUserSig",
+  "/api/im/multiaccountimport": "MultiAccountImport",
+  "/api/im/multiaccountdelete": "MultiAccountDelete"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 // Microi官方接口引擎：platform-tencent-im
 // Version: v1.0.0
 // 腾讯 IM Secret 只在后端私有设置与签名原子能力中使用，浏览器不得提交 SecretKey。
@@ -14,6 +34,7 @@ var action = String((V8.Param && V8.Param.Action) || '').trim();
 var userId = String(V8.Param.UserId || V8.Param.Identifier || '').trim();
 var signature = V8.Method.GenerateTencentImUserSig({
   UserId: userId,
+  UseAdministrator: action !== 'GetUserSig',
   Expire: Number(V8.Param.Expire || 86400)
 });
 if (!signature || signature.Code != 1) return signature || { Code:0, Msg:'生成腾讯 IM UserSig 失败。' };

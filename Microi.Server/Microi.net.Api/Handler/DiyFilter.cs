@@ -952,7 +952,7 @@ namespace Microi.net.Api
                     try
                     {
                         var DiyCacheBase = MicroiEngine.CacheTenant.Cache(tokenOsClient);
-                        tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{tokenOsClient}:LoginTokenSysUser:{userId}");
+                        tokenModel = await DiyCacheBase.GetAsync<CurrentToken>(LoginSessionCacheKeys.User(tokenOsClient, userId));
                     }
                     catch (Exception ex)
                     {
@@ -997,7 +997,7 @@ namespace Microi.net.Api
                         if (SysUserLogic.SanitizeLoginProjection(sysUser))
                         {
                             await MicroiEngine.CacheTenant.Cache(tokenOsClient).SetAsync(
-                                $"Microi:{tokenOsClient}:LoginTokenSysUser:{userId}", tokenModel);
+                                LoginSessionCacheKeys.User(tokenOsClient, userId), tokenModel);
                         }
                     }
                 }

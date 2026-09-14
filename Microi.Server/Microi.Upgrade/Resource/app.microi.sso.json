@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "SSO 身份联邦",
-    "Version": "v7.6.1",
+    "Version": "v8.3.5",
     "CreateTime": "2026-08-21T12:00:00.000Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -19,6 +19,11 @@
     "AiApplicationCount": 0,
     "Description": "Microi 吾码官方双向 SSO 应用：OIDC、SAML2、CAS 与存量 Token 兼容。全部公开 HTTP 路由、连接投影、JIT/绑定、角色映射、审计与租户 Hook 均由应用接口引擎交付；Microi.net 只保留签名验签、协议编解码、一次性票据和 DiyToken 等不可覆盖的可信原子。",
     "ChangeHistory": [
+      {
+        "Version": "v8.3.5",
+        "Date": "2026-09-14",
+        "Description": "为旧 SsoPengrui 地址补齐多路由，复用租户已有 SSO 配置和可信 Token 签发，保留当前租户身份与权限边界。"
+      },
       {
         "Version": "v7.6.1",
         "Date": "2026-09-09",
@@ -94,11 +99,11 @@
     ],
     "ApplicationType": "Platform",
     "ChangeLog": {
-      "Version": "v7.6.1",
-      "Title": "恢复存量平台 Token 自动登录",
+      "Version": "v8.3.5",
+      "Title": "补齐历史单点登录入口",
       "ChangeType": "Fix",
-      "Content": "恢复已启用的存量 TokenLogin 配置投影，区分平台 DiyToken 验证与外部身份源；保持禁用连接、未配置 URL Token 和非白名单地址拒绝。",
-      "ReleaseTime": "2026-09-09 16:30:00"
+      "Content": "为旧 SsoPengrui 地址补齐多路由，复用租户已有 SSO 配置和可信 Token 签发，保留当前租户身份与权限边界。",
+      "ReleaseTime": "2026-09-14 13:29:53"
     }
   },
   "DDLStatements": [
@@ -5951,7 +5956,7 @@
       "CreateTime": "2026-08-21 12:00:00",
       "Id": "75000000-1000-4000-8000-000000000010",
       "ChangeHistory": "2026-08-30 00:00:00 v1.0.3 将 SSO 公开协议路由全部迁入接口引擎并支持受控 HTTP 响应\n2026-08-25 00:00:00 v1.0.2 增加官方资源策略提示与 SSO 租户 Hook 安全合同\n2026-08-21 12:00:00 v1.0.1 创建接口引擎 sso_legacy_token_login\n",
-      "Version": "v1.0.3",
+      "Version": "v1.0.5",
       "LimitRecursion": 5000,
       "LimitMemory": 2048,
       "MaxStatements": 100000000,
@@ -5963,11 +5968,13 @@
       "AllowAnonymous": 1,
       "ApiAddress": "/apiengine/sso_legacy_token_login",
       "Lock": 0,
-      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：SSO 身份联邦\n * ApiEngineKey：sso_legacy_token_login\n * 从可信吾码官方应用源安装、更新或重新安装“SSO 身份联邦”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: sso_legacy_token_login\n * Version: v1.0.3\n * Function:\n * - 兼容存量 Bearer Token 身份源；服务地址只取 diy_sso，外部身份解析复用 SSO Managed 核心引擎。\n */\n\nfunction text(value) {\n  return value === null || value === undefined ? '' : String(value).trim();\n}\n\nvar tokenName = text(V8.Param && (V8.Param.TokenName || V8.Param.ConnectionKey));\nvar credential = text(V8.Param && (V8.Param.Token || V8.Param._token || V8.Param.Credential));\nif (!tokenName || tokenName.length > 100 || !credential || credential.length > 8192) {\n  return { Code: 0, Msg: 'SSO TokenName 或凭据无效。' };\n}\n\nvar connectionResult = V8.FormEngine.GetFormData('diy_sso', {\n  _Where: [['TokenName', '=', tokenName], ['IsEnable', '=', 1]],\n  _SelectFields: [\n    'Id', 'SsoKey', 'Name', 'ServerSsoApi', 'TokenName', 'ProvisioningMode', 'JitDefaultRoleIds',\n    'AccountClaim', 'NameClaim', 'EmailClaim', 'SubjectClaim', 'RoleClaim', 'ClaimMappings', 'RoleMappings'\n  ]\n});\nif (!connectionResult || connectionResult.Code !== 1 || !connectionResult.Data) {\n  return { Code: 0, Msg: 'SSO 兼容配置不存在或未启用。' };\n}\nvar row = connectionResult.Data;\nvar endpoint = text(row.ServerSsoApi);\nif (!/^https:\\/\\//i.test(endpoint) || /https:\\/\\/[^/]*@/i.test(endpoint)) {\n  return { Code: 0, Msg: 'SSO 服务地址必须使用 HTTPS 且不能包含用户凭据。' };\n}\n\nvar responseText;\ntry {\n  responseText = V8.Http.Get({\n    Url: endpoint,\n    Headers: { Authorization: 'Bearer ' + credential },\n    Timeout: 30\n  });\n} catch (ex) {\n  return { Code: 0, Msg: 'SSO 身份源调用失败。' };\n}\nvar external;\ntry { external = typeof responseText === 'string' ? JSON.parse(responseText) : responseText; }\ncatch (ex) { return { Code: 0, Msg: 'SSO 身份源返回格式无效。' }; }\nvar account = text(external && (external.username || external.account || external.preferred_username));\nif (!account) return { Code: 0, Msg: 'SSO 身份验证失败。' };\n\nvar id = text(row.Id);\nvar connectionKey = text(row.SsoKey).toLowerCase();\nif (!connectionKey) connectionKey = 'legacy-' + (id.length >= 8 ? id.substring(0, 8) : id);\nvar resolved = V8.ApiEngine.Run('sso_resolve_federated_identity', {\n  _TrustedSsoProtocol: true,\n  Connection: {\n    Key: connectionKey,\n    ProvisioningMode: text(row.ProvisioningMode) || 'JitCreate',\n    JitDefaultRoleIds: row.JitDefaultRoleIds || '[]',\n    AccountClaim: text(row.AccountClaim) || 'preferred_username',\n    NameClaim: text(row.NameClaim) || 'name',\n    EmailClaim: text(row.EmailClaim) || 'email',\n    SubjectClaim: text(row.SubjectClaim) || 'sub',\n    RoleClaim: text(row.RoleClaim) || 'roles',\n    ClaimMappings: row.ClaimMappings || '{}',\n    RoleMappings: row.RoleMappings || '{}'\n  },\n  Profile: {\n    Subject: account,\n    Account: account,\n    Name: text(external.name || external.displayName) || account,\n    Email: text(external.email),\n    Claims: {\n      sub: account,\n      preferred_username: account,\n      name: text(external.name || external.displayName) || account,\n      email: text(external.email),\n      roles: external.roles || []\n    }\n  }\n});\nif (!resolved || resolved.Code !== 1 || !resolved.Data || !text(resolved.Data.Id)) {\n  return resolved || { Code: 0, Msg: 'SSO 用户解析失败。' };\n}\n\nvar ticket = V8.Method.CreateSsoLoginTicket({\n  UserId: text(resolved.Data.Id),\n  ConnectionKey: connectionKey,\n  Protocol: 'LEGACYTOKEN'\n});\nif (!ticket || ticket.Code !== 1 || !ticket.Data) return ticket || { Code: 0, Msg: 'SSO 登录票据创建失败。' };\n\nvar loginResult = V8.Method.CompleteSsoLogin({\n  Ticket: ticket.Data,\n  Did: V8.Param.Did || '',\n  ClientType: V8.Param._ClientType || V8.Param.ClientType || 'PC'\n});\nif (!loginResult || loginResult.Code !== 1) return loginResult || { Code: 0, Msg: 'SSO 登录失败。' };\ntry {\n  V8.ApiEngine.Run('sso_protocol_event', {\n    _TrustedSsoProtocol: true,\n    Action: 'LegacySsoLogin',\n    UserId: text(resolved.Data.Id),\n    ConnectionKey: connectionKey,\n    Protocol: 'LEGACYTOKEN',\n    Success: true,\n    Reason: '',\n    OccurredAt: DateNow('yyyy-MM-dd HH:mm:ss')\n  });\n} catch (ex) {\n}\nreturn loginResult;\n",
+      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：SSO 身份联邦\n * ApiEngineKey：sso_legacy_token_login\n * 从可信吾码官方应用源安装、更新或重新安装“SSO 身份联邦”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: sso_legacy_token_login\n * Version: v1.0.5\n * Function:\n * - 兼容存量 Bearer Token 身份源和 SsoPengrui 地址；可信连接配置、外部身份解析与一次性登录票据复用 SSO 能力。\n */\n\n/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */\n// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。\nvar legacyRouteActions = {\n  \"/api/sysuser/ssopengrui\": \"Login\"\n};\nvar legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();\nif (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {\n  V8.Param.Action = legacyRouteActions[legacyRequestPath];\n}\n/* LEGACY_ROUTE_ACTIONS_V1:END */\n\nfunction text(value) {\n  return value === null || value === undefined ? '' : String(value).trim();\n}\n\nvar tokenName = text(V8.Param && (V8.Param.TokenName || V8.Param.ConnectionKey));\nvar credential = text(V8.Param && (V8.Param.Token || V8.Param._token || V8.Param.Credential));\nif (!tokenName || tokenName.length > 100 || !credential || credential.length > 8192) {\n  return { Code: 0, Msg: 'SSO TokenName 或凭据无效。' };\n}\n\nvar connectionResult = V8.FormEngine.GetFormData('diy_sso', {\n  _Where: [['TokenName', '=', tokenName], ['IsEnable', '=', 1]],\n  _SelectFields: [\n    'Id', 'SsoKey', 'Name', 'ServerSsoApi', 'TokenName', 'ProvisioningMode', 'JitDefaultRoleIds',\n    'AccountClaim', 'NameClaim', 'EmailClaim', 'SubjectClaim', 'RoleClaim', 'ClaimMappings', 'RoleMappings'\n  ]\n});\nif (!connectionResult || connectionResult.Code !== 1 || !connectionResult.Data) {\n  return { Code: 0, Msg: 'SSO 兼容配置不存在或未启用。' };\n}\nvar row = connectionResult.Data;\nvar endpoint = text(row.ServerSsoApi);\nif (!/^https:\\/\\//i.test(endpoint) || /https:\\/\\/[^/]*@/i.test(endpoint)) {\n  return { Code: 0, Msg: 'SSO 服务地址必须使用 HTTPS 且不能包含用户凭据。' };\n}\n\nvar responseText;\ntry {\n  responseText = V8.Http.Get({\n    Url: endpoint,\n    Headers: { Authorization: 'Bearer ' + credential },\n    Timeout: 30\n  });\n} catch (ex) {\n  return { Code: 0, Msg: 'SSO 身份源调用失败。' };\n}\nvar external;\ntry { external = typeof responseText === 'string' ? JSON.parse(responseText) : responseText; }\ncatch (ex) { return { Code: 0, Msg: 'SSO 身份源返回格式无效。' }; }\nvar account = text(external && (external.username || external.account || external.preferred_username));\nif (!account) return { Code: 0, Msg: 'SSO 身份验证失败。' };\n\nvar id = text(row.Id);\nvar connectionKey = text(row.SsoKey).toLowerCase();\nif (!connectionKey) connectionKey = 'legacy-' + (id.length >= 8 ? id.substring(0, 8) : id);\nvar resolved = V8.ApiEngine.Run('sso_resolve_federated_identity', {\n  _TrustedSsoProtocol: true,\n  Connection: {\n    Key: connectionKey,\n    ProvisioningMode: text(row.ProvisioningMode) || 'JitCreate',\n    JitDefaultRoleIds: row.JitDefaultRoleIds || '[]',\n    AccountClaim: text(row.AccountClaim) || 'preferred_username',\n    NameClaim: text(row.NameClaim) || 'name',\n    EmailClaim: text(row.EmailClaim) || 'email',\n    SubjectClaim: text(row.SubjectClaim) || 'sub',\n    RoleClaim: text(row.RoleClaim) || 'roles',\n    ClaimMappings: row.ClaimMappings || '{}',\n    RoleMappings: row.RoleMappings || '{}'\n  },\n  Profile: {\n    Subject: account,\n    Account: account,\n    Name: text(external.name || external.displayName) || account,\n    Email: text(external.email),\n    Claims: {\n      sub: account,\n      preferred_username: account,\n      name: text(external.name || external.displayName) || account,\n      email: text(external.email),\n      roles: external.roles || []\n    }\n  }\n});\nif (!resolved || resolved.Code !== 1 || !resolved.Data || !text(resolved.Data.Id)) {\n  return resolved || { Code: 0, Msg: 'SSO 用户解析失败。' };\n}\n\nvar ticket = V8.Method.CreateSsoLoginTicket({\n  UserId: text(resolved.Data.Id),\n  ConnectionKey: connectionKey,\n  Protocol: 'LEGACYTOKEN'\n});\nif (!ticket || ticket.Code !== 1 || !ticket.Data) return ticket || { Code: 0, Msg: 'SSO 登录票据创建失败。' };\n\nvar loginResult = V8.Method.CompleteSsoLogin({\n  Ticket: ticket.Data,\n  Did: V8.Param.Did || '',\n  ClientType: V8.Param._ClientType || V8.Param.ClientType || 'PC'\n});\nif (!loginResult || loginResult.Code !== 1) return loginResult || { Code: 0, Msg: 'SSO 登录失败。' };\ntry {\n  V8.ApiEngine.Run('sso_protocol_event', {\n    _TrustedSsoProtocol: true,\n    Action: 'LegacySsoLogin',\n    UserId: text(resolved.Data.Id),\n    ConnectionKey: connectionKey,\n    Protocol: 'LEGACYTOKEN',\n    Success: true,\n    Reason: '',\n    OccurredAt: DateNow('yyyy-MM-dd HH:mm:ss')\n  });\n} catch (ex) {\n}\nreturn loginResult;\n",
       "ApiRole": "[]",
       "IsEnable": 1,
       "ApiEngineKey": "sso_legacy_token_login",
-      "ApiName": "SSO 存量 Token 登录"
+      "ApiName": "SSO 存量 Token 登录",
+      "ApiRoutes": "/api/SysUser/SsoPengrui",
+      "UpdateTime": "2026-09-14 13:33:54"
     },
     {
       "IsDeleted": 0,

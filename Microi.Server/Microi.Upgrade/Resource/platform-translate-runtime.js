@@ -7,6 +7,29 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-translate-runtime
+ * Version: v1.0.2
+ * Function:
+ * - 翻译文本、检测语言、语言列表、文件翻译与服务健康检查的统一编排入口。
+ */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/translate/translatetext": "TranslateText",
+  "/api/translate/detect": "Detect",
+  "/api/translate/languages": "Languages",
+  "/api/translate/translatefile": "TranslateFile",
+  "/api/translate/suggest": "Suggest",
+  "/api/translate/health": "Health"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 /* V8 ApiEngine | ApiEngineKey: platform-translate-runtime | Version: v1.0.0 */
 var p = V8.Param || {};
 var action = String(p.Action || "TranslateText").substring(0, 50);
