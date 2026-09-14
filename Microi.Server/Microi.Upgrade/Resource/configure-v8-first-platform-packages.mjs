@@ -77,7 +77,7 @@ export const packageDefinitions = Object.freeze([
       { key: 'platform-sys-user-admin', name: '系统账号管理', source: 'platform-sys-user-admin.js', id: '019d2a01-9d63-7f91-8c02-000000000009', version: 'v1.0.2', enableLog: 1 },
       { key: 'platform-user-custom-hook', name: '系统账号个性化扩展', source: 'platform-user-custom-hook.js', id: '019d2a01-9d63-7f91-8c02-000000000002', version: 'v1.0.0', enableLog: 1, stopHttp: 1, ownership: 'Tenant', upgradePolicy: 'CreateIfMissing' },
       { key: 'platform-user-access-key', name: '用户访问密钥可信管理', source: 'platform-user-access-key.js', id: '019d35f0-7b04-7b91-9801-000000000001', version: 'v1.0.0', allowAnonymous: 1, apiRoutes: '/api/SysUserAccessKey/Create;/api/SysUserAccessKey/List;/api/SysUserAccessKey/Revoke;/api/SysUserAccessKey/Exchange' },
-      { key: 'platform-home-overview', name: '个人首页概览与常用应用', source: 'platform-home-overview.js', id: '019d3af0-9003-7b91-9801-000000000001', version: 'v1.0.0', enableLog: 0, history: '2026-09-03 v1.0.0 按当前用户菜单权限统计首页常用应用与近 7 日访问趋势。' },
+      { key: 'platform-home-overview', name: '个人首页概览与常用应用', source: 'platform-home-overview.js', id: '019d3af0-9003-7b91-9801-000000000001', version: 'v1.0.1', enableLog: 0, history: '2026-09-03 v1.0.0 按当前用户菜单权限统计首页常用应用与近 7 日访问趋势。' },
     ],
   }),
   Object.freeze({

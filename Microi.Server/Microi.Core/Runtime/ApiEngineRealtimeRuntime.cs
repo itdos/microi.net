@@ -111,14 +111,14 @@ namespace Microi.net
             JObject root;
             try
             {
-                root = result as JObject ?? JObject.FromObject(result);
+                root = RealtimeResultMetadata.Read(result);
             }
             catch
             {
                 return false;
             }
 
-            if (!TryReadInt64(root["Code"], out var code) || code != 1) return false;
+            if (root == null || !TryReadInt64(root["Code"], out var code) || code != 1) return false;
             var dataAppend = AsObject(root["DataAppend"]);
             if (dataAppend == null) return false;
             var source = AsObject(dataAppend[DataAppendPropertyName]);

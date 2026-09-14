@@ -24,7 +24,7 @@ namespace Microi.net
                 }
         }
 
-        /// <summary>缺省/NULL 保持旧语义；只有整数 0/1 是有效配置，历史数值字符串可兼容。</summary>
+        /// <summary>缺省/NULL 保持旧语义；仅接受数值精确等于 0/1，兼容 V8 浮点表示及历史字符串。</summary>
         public static int? ParseReadPrimary(JToken value)
         {
             if (value == null || value.Type == JTokenType.Null || value.Type == JTokenType.Undefined)
@@ -32,6 +32,14 @@ namespace Microi.net
             if ((value.Type == JTokenType.Integer || value.Type == JTokenType.String)
                 && (value.ToString() == "0" || value.ToString() == "1"))
                 return value.ToString() == "1" ? 1 : 0;
+            // JavaScript Number 经 Jint 的对象边界成为 Double。不得先转 Int32/Decimal
+            // 再判断，否则截断或舍入会把 1.5、1.0000000000000002 等非法值变成 1。
+            if (value.Type == JTokenType.Float && value is JValue scalar)
+            {
+                if (scalar.Value is double d && (d == 0d || d == 1d)) return d == 1d ? 1 : 0;
+                if (scalar.Value is float f && (f == 0f || f == 1f)) return f == 1f ? 1 : 0;
+                if (scalar.Value is decimal m && (m == 0m || m == 1m)) return m == 1m ? 1 : 0;
+            }
             throw new InvalidOperationException("diy_table.ReadPrimary 只允许 NULL、0 或 1。");
         }
 

@@ -79,7 +79,13 @@ public class MicroiJobRuntimeTests
             ["quartz.jobStore.type"] = "Quartz.Simpl.RAMJobStore, Quartz"
         });
         var scheduler = await factory.GetScheduler(TestContext.Current.CancellationToken);
-        var service = new MicroiQuartzScheduledTask(factory);
+        var runtimeWrites = new List<JObject>();
+        var service = new MicroiQuartzScheduledTask(factory, (tenant, row, lastTime, nextTime) =>
+        {
+            runtimeWrites.Add(new JObject { ["OsClient"] = tenant, ["Id"] = row["Id"],
+                ["LastTime"] = lastTime, ["NextTime"] = nextTime });
+            return Task.FromResult(1);
+        });
         var formEngine = DispatchProxy.Create<IFormEngine, RecordingScheduleFormEngine>();
         var recording = (RecordingScheduleFormEngine)formEngine;
         var services = new ServiceCollection();
@@ -103,11 +109,15 @@ public class MicroiJobRuntimeTests
                 await (Task)sync.Invoke(service, new object[] { tenant })!;
             }
             Assert.Equal(new[] { "tenantA", "tenantB" }, recording.ReadTenants);
-            Assert.Equal(2, recording.Updates.Count);
-            Assert.Equal("tenantA", recording.Updates[0]["OsClient"]?.ToString());
-            Assert.Equal("tenantB", recording.Updates[1]["OsClient"]?.ToString());
-            Assert.Contains("2099-01-01", recording.Updates[0]["_RowModel"]?["NextTime"]?.ToString());
-            Assert.Contains("2099-01-02", recording.Updates[1]["_RowModel"]?["NextTime"]?.ToString());
+            // 普通表单写入会产生配置版本；定时运行态同步必须完全避开这条链路。
+            Assert.Empty(recording.Updates);
+            Assert.Equal(2, runtimeWrites.Count);
+            Assert.Equal("tenantA", runtimeWrites[0]["OsClient"]?.ToString());
+            Assert.Equal("tenantB", runtimeWrites[1]["OsClient"]?.ToString());
+            Assert.Equal("tenantA-row", runtimeWrites[0]["Id"]?.ToString());
+            Assert.Equal("tenantB-row", runtimeWrites[1]["Id"]?.ToString());
+            Assert.Contains("2099-01-01", runtimeWrites[0]["NextTime"]?.ToString());
+            Assert.Contains("2099-01-02", runtimeWrites[1]["NextTime"]?.ToString());
         }
         finally
         {

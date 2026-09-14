@@ -60,9 +60,7 @@ public class PageEngineVersioningTests
     [Fact]
     public void VersionStoreSql_Uses_Tenant_Selected_DbSession_Without_Nonexistent_OsClient_Column()
     {
-        var sourcePath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..", "..", "..", "..", "Microi.Core", "V8Engine", "V8McpLogic.PageVersioning.cs"));
+        var sourcePath = Microi.Tests.Common.McpSourceLocation.File("Microi.MCP/V8Engine/V8McpLogic.PageVersioning.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("BpDbRead(osClient)", source, StringComparison.Ordinal);

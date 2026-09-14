@@ -1817,12 +1817,18 @@ namespace Dos.ORM
                 from.dbProvider.LeftToken,
                 from.dbProvider.RightToken,
                 from.dbProvider.DatabaseType);
-            List<Parameter> listPara = from.Parameters;
-            foreach (Parameter p in listPara)
+            // 缓存键同样不能逐参数复制整条 SQL：权限快照的大型 IN 查询会产生二次方分配。
+            // 仅替换原 SQL 中的绑定参数；沿用历史值文本，不改实际执行参数或页面 SQL 输出。
+            var parameters = new List<System.Data.Common.DbParameter>();
+            foreach (Parameter p in from.Parameters)
             {
-                tempSql = tempSql.Replace(p.ParameterName, p.ParameterValue == null ? string.Empty : p.ParameterValue.ToString());
+                var parameter = from.dbProvider.DbProviderFactory.CreateParameter();
+                parameter.ParameterName = p.ParameterName;
+                parameter.Value = p.ParameterValue;
+                parameters.Add(parameter);
             }
-            return tempSql;
+            return SqlParameterText.Rewrite(tempSql, parameters,
+                p => p.Value == null ? string.Empty : p.Value.ToString());
         }
 
         #endregion

@@ -1737,7 +1737,8 @@ namespace Microi.net
                 {
                     TraceId = traceId,
                     SpanCount = rows.Count,
-                    Spans = rows
+                    Spans = rows,
+                    RuntimeRequests = SystemObservabilityService.GetTraceRequests(traceId, osClient)
                 });
             }
             catch (Exception ex)

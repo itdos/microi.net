@@ -6,6 +6,8 @@ public sealed class SolutionReferenceTopologyTests
     [
         @"Microi.net\Microi.net.csproj",
         @"Microi.AI\Microi.AI.csproj",
+        @"Microi.MCP\Microi.MCP.csproj",
+        @"Microi.Vision\Microi.Vision.csproj",
         @"Microi.WorkFlow\Microi.WorkFlow.csproj"
     ];
 

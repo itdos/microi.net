@@ -11,6 +11,8 @@ description: Microi.Code 插件 V8 资源管理器目录规范（表单引擎 / 
 
 ---
 
+MCP 后端实现位于 `Microi.Server/Microi.MCP/`：`V8Engine/V8McpLogic*.cs` 维护业务操作，`Http/V8McpEndpointService.cs` 维护参数归一化与调用，HTTP/调试权限和 WebSocket 会话也由该独立库承载。API 的 `V8EngineController.cs` 只声明原有路由、HTTP 特性与转发，继续兼容 `/api/V8Engine/*`、`/api/V8Debug/*` 和 `/api/V8Debug/ws`。
+
 ## 0. 命名规范（强制）
 
 **所有目录与文件**统一使用 **中文（英文）** 形式，使用**全角括号 `（）`**：
@@ -173,7 +175,7 @@ description: Microi.Code 插件 V8 资源管理器目录规范（表单引擎 / 
 
 **修改状态**：接口引擎、表单V8事件、字段V8事件、模块按钮、模块 SqlJoin/SqlWhere 文件都必须写入 `.microi-meta.json` 的 `updateTime/filePath`；本地 `mtime > updateTime + 1s` 时树节点显示 `已修改`，推送成功后同步更新 meta 并将文件 mtime 设置为远端更新时间以清除标记。
 
-**Controller OsClient 规则**：`CheckPermission()` 返回的 `token` 是 `dynamic`。调用 `V8McpLogic.ResolveOsClient` 时必须传 `(object)token`，并让 `ResolveOsClient(string osClient, object currentToken)` 返回真正的 `string`；Controller 中 OsClient 空判断用 `string.IsNullOrWhiteSpace(osClient)`，不要对 `osClient` 调 `DosIsNullOrWhiteSpace()`。
+**MCP 请求服务 OsClient 规则**：`CheckPermission()` 返回的 `token` 是 `dynamic`。调用 `V8McpLogic.ResolveOsClient` 时必须传 `(object)token`，并让 `ResolveOsClient(string osClient, object currentToken)` 返回真正的 `string`；`Microi.MCP/Http/V8McpEndpointService.cs` 中 OsClient 空判断用 `string.IsNullOrWhiteSpace(osClient)`，不要对 `osClient` 调 `DosIsNullOrWhiteSpace()`。
 
 ---
 

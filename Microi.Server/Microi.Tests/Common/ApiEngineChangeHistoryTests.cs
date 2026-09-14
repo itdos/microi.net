@@ -25,9 +25,9 @@ public class ApiEngineChangeHistoryTests
     {
         var serverRoot = FindServerRoot();
         var mcpSource = File.ReadAllText(Path.Combine(
-            serverRoot, "Microi.Core", "V8Engine", "V8McpLogic.cs"));
+            serverRoot, "Microi.MCP", "V8Engine", "V8McpLogic.cs"));
         var controllerSource = File.ReadAllText(Path.Combine(
-            serverRoot, "Microi.net.Api", "Controllers", "V8EngineController.cs"));
+            serverRoot, "Microi.MCP", "Http", "V8McpEndpointService.cs"));
 
         Assert.Contains("mci_apiengine_change_history", mcpSource, StringComparison.Ordinal);
         Assert.Contains("ChangeHistoryStorage", mcpSource, StringComparison.Ordinal);
@@ -52,7 +52,7 @@ public class ApiEngineChangeHistoryTests
                      })
             {
                 if (File.Exists(Path.Combine(
-                        candidate, "Microi.Core", "V8Engine", "V8McpLogic.cs"))
+                        candidate, "Microi.MCP", "V8Engine", "V8McpLogic.cs"))
                     && File.Exists(Path.Combine(
                         candidate, "Microi.net.Api", "Controllers", "V8EngineController.cs")))
                 {

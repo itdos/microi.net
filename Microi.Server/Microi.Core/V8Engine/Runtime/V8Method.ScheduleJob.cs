@@ -156,7 +156,7 @@ namespace Microi.net
                 // 表单事件只同步 Quartz，避免在提交前另开事务再次写当前任务行。
                 var runtimeOnly = request["RuntimeOnly"]?.Type == JTokenType.Boolean
                     && request["RuntimeOnly"].Value<bool>();
-                var result = V8McpLogic.SaveJob(osClient, request, persistMetadata: !runtimeOnly)
+                var result = ScheduleJobService.SaveAsync(osClient, request, persistMetadata: !runtimeOnly)
                     .ConfigureAwait(false).GetAwaiter().GetResult();
                 return result == null
                     ? new DosResult(0, null, "保存定时任务没有返回结果。")

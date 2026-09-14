@@ -35,6 +35,7 @@ Thumbs.db
 # 根公开仓必须保持零跟踪；提交与推送钩子还会阻止强制暂存和底层索引绕过。
 /Microi.Server/Microi.net/
 /Microi.Server/Microi.AI/
+/Microi.Server/Microi.MCP/
 /Microi.VSCode/
 /Microi.Code/
 /Microi.Client/src/views/webos/

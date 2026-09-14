@@ -145,6 +145,8 @@ Token 只证明“当前请求是谁、属于哪个 `OsClient`”，不能据此
 或通过 `microi_update_table` 设置 `readPrimary: 1`。这是可信 `diy_table.ReadPrimary`
 元数据，普通查询请求中的同名参数、`TableModel` 或 `DataBaseId` 不能覆盖它。
 
+V8 和应用包导入中的 JavaScript 数值 `0/1` 可在 .NET 边界表现为浮点类型，后端按数值精确匹配处理；小数、NaN、Infinity、布尔值仍不合法，不会通过取整或舍入转成有效配置。
+
 | 配置 | 原生查询行为 |
 | --- | --- |
 | `NULL`、`0` 或旧库缺少配置 | 保留原有只读连接选择 |

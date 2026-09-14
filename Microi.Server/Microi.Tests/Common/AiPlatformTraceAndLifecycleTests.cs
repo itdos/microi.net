@@ -185,7 +185,7 @@ public sealed class AiPlatformTraceAndLifecycleTests
         var host = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.Core", "V8Engine", "Runtime", "V8Method.ScheduleJob.cs"));
         var mcp = File.ReadAllText(Path.Combine(
-            serverRoot, "Microi.Core", "V8Engine", "V8McpLogic.cs"));
+            serverRoot, "Microi.MCP", "V8Engine", "V8McpLogic.cs"));
         var publisher = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.Upgrade", "Resource", "ai-app-publish-store.js"));
         var importer = File.ReadAllText(Path.Combine(
@@ -197,7 +197,8 @@ public sealed class AiPlatformTraceAndLifecycleTests
         Assert.Contains("request[\"OsClient\"] = osClient", host);
         Assert.Contains("request[\"JobType\"] = \"1\"", host);
         Assert.Contains("request.Remove(\"DllName\")", host);
-        Assert.Contains("already exists", mcp);
+        Assert.Contains("ScheduleJobService.SaveAsync", mcp);
+        Assert.Contains("already exists", File.ReadAllText(Path.Combine(serverRoot, "Microi.Core", "Services", "ScheduleJobService.cs")));
         Assert.Contains("ScheduleJobs: selectedScheduleJobs", publisher);
         Assert.Contains("backgroundCheckpointPhase == 'ScheduleJobs'", importer);
         Assert.Contains("资源事务提交后幂等调度", importer);

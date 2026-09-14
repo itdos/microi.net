@@ -715,7 +715,11 @@ function validateReleaseCandidate(name, content) {
         || Number(backgroundTaskEngine?.IsEnable) !== 1
         || Number(backgroundTaskEngine?.StopHttp) !== 0
         || Number(backgroundTaskEngine?.AllowAnonymous) !== 0
-        || !String(backgroundTaskEngine?.ApiV8Code || '').includes('V8.Method.ManageBackgroundTask(V8.Param)')
+        // 与后端启动校验一致：兼容旧直接传参及新业务投影，仍要求完整可信原子调用。
+        || !((String(backgroundTaskEngine?.ApiV8Code || '').includes('V8.Method.ManageBackgroundTask(V8.Param)'))
+          || (String(backgroundTaskEngine?.ApiV8Code || '').includes('var backgroundTaskParam = Object.create(null);')
+            && String(backgroundTaskEngine?.ApiV8Code || '').includes("if (backgroundTaskKey !== '_CurrentUser') backgroundTaskParam[backgroundTaskKey] = V8.Param[backgroundTaskKey];")
+            && String(backgroundTaskEngine?.ApiV8Code || '').includes('V8.Method.ManageBackgroundTask(backgroundTaskParam)')))
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-background-task']?.UpgradePolicy !== 'Managed'
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('ServerFeature:V8.ManageBackgroundTask')

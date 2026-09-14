@@ -153,6 +153,7 @@ namespace Microi.net.Api
         /// <param name="context"></param>
         public virtual void OnActionExecuted(ActionExecutedContext context)
         {
+            Dos.Common.RequestLatencyObservation.MarkActionEnd();
             var timer = context.HttpContext.Items[TimerKey] as Stopwatch;
             timer?.Stop();
             if (timer != null && timer.ElapsedMilliseconds >= DiyCommon.SlowExecutionThresholdMs)
@@ -528,6 +529,7 @@ namespace Microi.net.Api
         /// <param name="context"></param>
         public virtual void OnActionExecuting(ActionExecutingContext context)
         {
+            Dos.Common.RequestLatencyObservation.MarkActionStart();
             try
             {
                 var timer = new Stopwatch();
@@ -711,6 +713,7 @@ namespace Microi.net.Api
         }
         public virtual async Task OnAuthorizationAsync(AuthorizationFilterContext context)//
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.Authorization);
             // 【优化】提前验证 OsClient，避免调试时异常中断
             // 步骤1：获取请求中的 OsClient（不使用默认值）
             var requestOsClient = DiyToken.GetCurrentOsClient(false);
@@ -768,7 +771,12 @@ namespace Microi.net.Api
                 return;
             }
 
-            var currentToken = await DiyToken.GetCurrentToken();
+            // Explicit bearer requests are fully validated below, including the
+            // current Redis token list and access-key scope. Resolving the whole
+            // detached identity here would read and copy it a second time.
+            var currentToken = requestToken.DosIsNullOrWhiteSpace()
+                ? await DiyToken.GetCurrentToken()
+                : new CurrentToken { OsClient = DiyToken.GetCurrentOsClient(), Token = requestToken };
             var osClient = currentToken.OsClient;
             //--end
             if (!(context.ActionDescriptor is ControllerActionDescriptor))
@@ -793,7 +801,7 @@ namespace Microi.net.Api
                 JObject sysUser = new JObject();
                 CurrentToken tokenModel = null;
 
-                if (currentToken.CurrentUser == null)
+                if (requestToken.DosIsNullOrWhiteSpace() && currentToken.CurrentUser == null)
                 {
                     context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
                         requestOsClient.DosIsNullOrWhiteSpace() ? osClient : requestOsClient,
@@ -984,6 +992,13 @@ namespace Microi.net.Api
                     else
                     {
                         sysUser = tokenModel.CurrentUser;
+                        // Retain repair of historical login projections even
+                        // when the redundant GetCurrentToken call is skipped.
+                        if (SysUserLogic.SanitizeLoginProjection(sysUser))
+                        {
+                            await MicroiEngine.CacheTenant.Cache(tokenOsClient).SetAsync(
+                                $"Microi:{tokenOsClient}:LoginTokenSysUser:{userId}", tokenModel);
+                        }
                     }
                 }
                 var clientModel = OsClient.GetClient(tokenOsClient);
@@ -1007,7 +1022,7 @@ namespace Microi.net.Api
                 if (!accessKeyId.DosIsNullOrWhiteSpace())
                 {
                     var scopedUserResult = await UserAccessKeyService.ApplySessionScopeAsync(
-                            JObject.FromObject(sysUser),
+                            sysUser,
                             accessKeyId,
                             tokenOsClient)
                         .ConfigureAwait(false);
@@ -1145,7 +1160,7 @@ namespace Microi.net.Api
                 {
                     try
                     {
-                        var sysUserObj = JObject.FromObject(sysUser);
+                        var sysUserObj = sysUser;
                         NetworkTrafficObservabilityService.AnnotateIdentity(
                             context.HttpContext,
                             sysUserObj["Id"]?.ToString(),
@@ -1154,19 +1169,7 @@ namespace Microi.net.Api
                             tokenOsClient,
                             clientType);
                         //获取该用户的所有角色的所有基础权限
-                        var baseLimit = new List<string>();
-                        var roles = sysUserObj["_Roles"].Val<JArray>();
-                        if (roles != null)
-                        {
-                            foreach (var sysRole in roles)
-                            {
-                                if (!sysRole["BaseLimit"].Val<string>().DosIsNullOrWhiteSpace())
-                                {
-                                    var baseLimits = JsonHelper.Deserialize<List<string>>(sysRole["BaseLimit"].Val<string>());
-                                    baseLimit.AddRange(baseLimits);
-                                }
-                            }
-                        }
+                        var baseLimit = GetUserBaseLimits(sysUserObj);
                         try
                         {
                             if (baseLimit.Any())
@@ -1194,6 +1197,22 @@ namespace Microi.net.Api
                     }
                 }
             }
+        }
+
+        private static List<string> GetUserBaseLimits(JObject sysUser)
+        {
+            var baseLimits = new List<string>();
+            // This inspection is read-only; unrelated table/menu permissions
+            // must not be cloned merely to check a role's BaseLimit flags.
+            var roles = sysUser["_Roles"].Val<JArray>();
+            if (roles == null) return baseLimits;
+            foreach (var role in roles)
+            {
+                var value = role["BaseLimit"].Val<string>();
+                if (!value.DosIsNullOrWhiteSpace())
+                    baseLimits.AddRange(JsonHelper.Deserialize<List<string>>(value));
+            }
+            return baseLimits;
         }
 
         public static bool HasValidJwtSignature(string tokenString, string jwtKey)

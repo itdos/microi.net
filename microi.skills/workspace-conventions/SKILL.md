@@ -132,7 +132,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 **2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.Code 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=75f5c21918cd9d271676fa8ad1313880862fe4bc655c2b651179e3cb3ff66a8a -->
+<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=c48d857c8e3086b29f99ab14d362f99c60d7dd00f9617709ea4f4dcad370611e -->
 ## Microi 源码路径速查（工作区根相对路径）
 
 当用户提到“吾码后端源码”“吾码前端源码”“表单引擎源码”“官网源码”等简称时，默认按下列路径定位；如果当前工作区缺少对应目录，再用 `rg --files` 或目录搜索确认实际位置。
@@ -140,7 +140,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 用户常用说法 | 默认路径 |
 |--------------|----------|
 | 吾码 MCP 前端源码 | `microi.mcp/` |
-| 吾码 MCP 后端源码 | `Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs` |
+| 吾码 MCP 后端源码 | `Microi.Server/Microi.MCP/`；HTTP 接口声明保留在 `Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs` |
 | 吾码 skills / 知识库 | `microi.skills/` |
 | 吾码 VS Code 插件项目 | `Microi.Code/` |
 | 吾码低代码平台后台系统前端源码 | `Microi.Client/` |
@@ -157,6 +157,8 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 吾码 UniApp 源码 | `microi.uniapp/` |
 | 吾码官方网站 / 文档源码 | `microi.doc/` |
 | 吾码 AI 应用及应用商城发行源码 | 默认位于 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}/`；受审计的独立源码仓库必须由发布契约显式指定 |
+
+`Microi.MCP` 与 `Microi.AI` 一样使用独立内部 Git 仓库和统一 DLL 混淆流程。`Microi.Anderson.sln` 加载源码，`Microi.net.sln` 消费同平台版本 NuGet；MCP 实现不得放回 Core 或 Controller，Core 仅保留非 MCP 入口也需要的通用原子。根公开仓必须排除 `Microi.Server/Microi.MCP/` 的普通文件和 gitlink，发布源码指纹须覆盖该独立仓库。
 
 以上路径只作为通用工作区相对路径规范，不写入具体本机盘符。跨仓库、空工作区或普通用户项目中，如果路径不存在，以插件生成的 `AGENTS.md`、MCP 配置和实际文件树为准。
 

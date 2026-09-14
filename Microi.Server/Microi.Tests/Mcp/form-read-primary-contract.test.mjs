@@ -37,7 +37,7 @@ test('ReadPrimary 在可信扩展数据库解析后决策且不硬加入旧结�
 test('ReadPrimary 三个原生配置写入口校验真实表名，MCP 同时验证物理列、字段定义与主库值', () => {
   assert.match(read('Microi.Server/Microi.net/FormEngine/FormEngineAdd.cs'), /FormEngineReadPolicy\.ValidateConfigurationWrite\(\(string\)diyTableModel\.Name, param\._FormData\)/);
   assert.equal((read('Microi.Server/Microi.net/FormEngine/FormEngineUpt.cs').match(/FormEngineReadPolicy\.ValidateConfigurationWrite\(\(string\)diyTableModel\.Name, param\._RowModel\)/g) || []).length, 2);
-  const code = read('Microi.Server/Microi.Core/V8Engine/V8McpLogic.cs');
+  const code = read('Microi.Server/Microi.MCP/V8Engine/V8McpLogic.cs');
   const method = code.slice(code.indexOf('public static async Task<DosResult<object>> UpdateTable('), code.indexOf('#region RefreshSchemaCache'));
   assert.match(method, /patch = \(JObject\)patch\.DeepClone\(\)/);
   assert.match(method, /DiyTableHasColumn\(osClient, "ReadPrimary"\)/);

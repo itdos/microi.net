@@ -281,6 +281,19 @@
             border-radius: 16px;
             filter: drop-shadow(0 6px 20px rgba(0,0,0,0.22)) drop-shadow(0 2px 6px rgba(0,0,0,0.14));
         }
+        /* 默认品牌插画需要完整展示面板与代码括号；租户 Logo 继续使用原尺寸。 */
+        .mci-logo-ring.has-default-logo,
+        .mci-logo-core.has-default-logo { width: 192px; height: 192px; }
+        .mci-logo-ring.has-default-logo { margin-bottom: 20px; }
+        .mci-logo-ring.has-default-logo::before,
+        .mci-logo-ring.has-default-logo::after { display: none; }
+        .mci-logo-core.has-default-logo { background: transparent; box-shadow: none; }
+        .mci-logo-core.has-default-logo img { width: 100%; height: 100%; border-radius: 24px; object-fit: contain; }
+        .mci-logo-core img[hidden] { display: none; }
+        @media (max-height: 600px) {
+            .mci-logo-ring.has-default-logo,
+            .mci-logo-core.has-default-logo { width: 144px; height: 144px; }
+        }
 
         /* === 文字区 === */
         .mci-app-title {
@@ -557,9 +570,10 @@
 
         <div class="mci-splash">
             <!-- Logo 脉冲圆环 -->
-            <div class="mci-logo-ring">
-                <div class="mci-logo-core" id="logoCore">
-                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <div class="mci-logo-ring has-default-logo" id="startupLogoRing">
+                <div class="mci-logo-core has-default-logo" id="logoCore">
+                    <img id="startupDefaultLogo" src="/static/img/microi-startup-brand.png" alt="Microi" width="192" height="192" fetchpriority="high">
+                    <img id="startupTenantLogo" alt="Logo" hidden>
                 </div>
             </div>
 
@@ -591,6 +605,7 @@
 
         <div class="mci-watermark" id="watermark">Powered by Loading...</div>
     </div>
+    <script src="/static/js/microi.startup-logo.js?d=2026091301"></script>
     <script>
       (function() {
         try {
@@ -614,6 +629,7 @@
           // 读取 SysConfig 缓存，更新标题和公司名
           var data = JSON.parse(localStorage.getItem('microi.net') || '{}');
           var cfg = data.SysConfig;
+          if (window.MicroiSetStartupLogo) window.MicroiSetStartupLogo(cfg);
           if (cfg) {
             if (cfg.SysTitle) {
               document.title = cfg.SysTitle;
@@ -650,12 +666,6 @@
                 }
               } catch (e) { logoUrl = ''; }
               if (logoUrl) {
-                // 替换 Loading 界面中心 Logo
-                var lc = document.getElementById('logoCore');
-                if (lc) {
-                  lc.innerHTML = '<img src="' + logoUrl + '" alt="Logo">';
-                  lc.classList.add('has-custom-logo');
-                }
                 // 更新 iOS 添加到主屏幕的图标
                 var ati = document.getElementById('appleTouchIcon');
                 if (ati) ati.setAttribute('href', logoUrl);

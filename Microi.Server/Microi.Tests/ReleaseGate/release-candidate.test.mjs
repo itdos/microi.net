@@ -6,6 +6,26 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {snapshotCandidate,changedCandidate} from '../../tools/release-candidate.mjs';
 
+test('only documented plugin build timestamps are ignored; versions, hashes and executable source stay guarded',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'microi-release-candidate-'));
+ const name='Microi.Code/plugins/microi/assets/build-meta.json';
+ try{
+  execFileSync('git',['init','--quiet'],{cwd:root});
+  await mkdir(path.dirname(path.join(root,name)),{recursive:true});
+  const meta={builtAt:'2026-09-14T00:00:00.000Z',version:'5.6.3',hashes:{mcpServer:'before'},nested:{builtAt:'behavior'}};
+  await writeFile(path.join(root,name),JSON.stringify(meta));
+  const before=await snapshotCandidate(root,['.']);
+  meta.builtAt='2026-09-14T00:01:00.000Z';
+  await writeFile(path.join(root,name),JSON.stringify(meta));
+  assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[]);
+  for(const mutate of [m=>m.version='5.6.4',m=>m.hashes.mcpServer='after',m=>m.nested.builtAt='changed']){
+   const changed=structuredClone(meta);mutate(changed);
+   await writeFile(path.join(root,name),JSON.stringify(changed));
+   assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[name]);
+  }
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
 test('candidate detects edited, newly added and deleted source across repository boundaries',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'microi-release-candidate-'));
  try{

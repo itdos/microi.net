@@ -46,15 +46,13 @@ public class ApplicationAssetMultipartTests
     [Fact]
     public void Completion_IsNotCancelledWhenTheCallingTransportDisconnects()
     {
-        var sourcePath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "../../../../Microi.net.Api/Controllers/V8EngineController.cs"));
+        var sourcePath = Microi.Tests.Common.McpSourceLocation.File("Microi.MCP/Http/V8McpEndpointService.cs");
         var source = File.ReadAllText(sourcePath);
         var actionIndex = source.IndexOf(
-            "CompleteApplicationAssetMultipart([FromBody] JObject param)",
+            "CompleteApplicationAssetMultipart(JObject param)",
             StringComparison.Ordinal);
         var nextActionIndex = source.IndexOf(
-            "AbortApplicationAssetMultipart([FromBody] JObject param)",
+            "AbortApplicationAssetMultipart(JObject param)",
             actionIndex,
             StringComparison.Ordinal);
 
@@ -67,9 +65,7 @@ public class ApplicationAssetMultipartTests
     [Fact]
     public void LargeApplicationObjects_UseTheExistingLongHdfsTimeoutCeiling()
     {
-        var sourcePath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "../../../../Microi.Core/V8Engine/V8McpLogic.ApplicationAssetStream.cs"));
+        var sourcePath = Microi.Tests.Common.McpSourceLocation.File("Microi.MCP/V8Engine/V8McpLogic.ApplicationAssetStream.cs");
         var source = File.ReadAllText(sourcePath);
         var methodIndex = source.IndexOf(
             "private static async Task<DosResult> PutApplicationObject(",
@@ -92,9 +88,7 @@ public class ApplicationAssetMultipartTests
     [Fact]
     public void FinalObjectComposition_UsesVerifiedSeekableTemporaryFileInsteadOfAnonymousPipe()
     {
-        var sourcePath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "../../../../Microi.Core/V8Engine/V8McpLogic.ApplicationAssetMultipart.Runtime.cs"));
+        var sourcePath = Microi.Tests.Common.McpSourceLocation.File("Microi.MCP/V8Engine/V8McpLogic.ApplicationAssetMultipart.Runtime.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.DoesNotContain("AnonymousPipe", source, StringComparison.Ordinal);

@@ -7,14 +7,29 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-private-file-url
+ * Version: v1.0.2
+ * Function:
+ * - 为当前可信用户生成已授权的私有文件地址，兼容历史 HDFS 路由，并保留租户、文件、表、行、字段授权和前后个性化 Hook。
+ */
+
 /* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
+// 身份由可信原子独立获取；跨 CLR 边界前排除内部大身份，保留全部业务参数和兼容路由。
+var privateFileParam = Object.create(null);
+var privateFileKeys = Object.keys(V8.Param || {});
+for (var privateFileIndex = 0; privateFileIndex < privateFileKeys.length; privateFileIndex++) {
+  var privateFileKey = privateFileKeys[privateFileIndex];
+  if (privateFileKey !== '_CurrentUser') privateFileParam[privateFileKey] = V8.Param[privateFileKey];
+}
 var privateFileRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '').toLowerCase();
 if(privateFileRoute === '/api/hdfs/getprivatefileurl' || privateFileRoute === '/api/hdfs/mallfileurl'){
   // 历史移动会员 Token 只在后端固定缓存键中解析，原始 Token 永不进入 V8。
-  return V8.Method.GetAuthorizedPrivateFileUrl(V8.Param || {});
+  return V8.Method.GetAuthorizedPrivateFileUrl(privateFileParam);
 }
 
-/* V8 ApiEngine | ApiEngineKey: platform-private-file-url | Version: v1.0.0 */
+/* V8 ApiEngine | ApiEngineKey: platform-private-file-url | Version: v1.0.1 */
 
 if (!V8.CurrentUser || !V8.CurrentUser.Id) return { Code: 1001, Msg: '登录身份已过期，请重新登录。' };
 var beforeHook = V8.ApiEngine.Run('platform-runtime-custom-hook', {
@@ -24,7 +39,7 @@ var beforeHook = V8.ApiEngine.Run('platform-runtime-custom-hook', {
 });
 if (!beforeHook || beforeHook.Code !== 1) return beforeHook || { Code: 0, Msg: '平台运行时个性化 Hook 未返回结果。' };
 
-var result = V8.Method.GetAuthorizedPrivateFileUrl(V8.Param || {});
+var result = V8.Method.GetAuthorizedPrivateFileUrl(privateFileParam);
 if (result && result.Code === 1) {
   var afterHook = V8.ApiEngine.Run('platform-runtime-custom-hook', {
     Stage: 'AfterGetPrivateFileUrl',

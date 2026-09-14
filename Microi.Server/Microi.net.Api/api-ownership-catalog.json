@@ -14,7 +14,7 @@
     "ApiEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "FormEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "HDFSController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" }
+    "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.mcp", "Disposition": "KernelRuntime", "ImplementationProject": "Microi.MCP", "Implementation": "Http/V8McpEndpointService.cs" }
   },
   "UploadProtocol": {
     "OwnerId": "app.microi.sys-config",
@@ -105,7 +105,7 @@
     "Reason": "所有 ASP.NET Controller 与宿主传输代码统一留在 Microi.net.Api；V8 已完整接管的业务 Controller 物理删除，无法由 V8 承担的协议 Controller 只做薄适配，可复用实现进入对应功能类库。禁止为承载 Controller 新建中转项目或把 netstandard 类库改成 net10.0/多目标框架。"
   },
   "MigratedSupportCode": {
-    "Services/ApplicationAssetAliasReconciliationWorkerService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/ApplicationAssetAliasReconciliationWorkerService.cs", "RemovedAt": "2026-08-26" },
+    "Services/ApplicationAssetAliasReconciliationWorkerService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.MCP/Runtime/ApplicationAssetAliasReconciliationWorkerService.cs", "RemovedAt": "2026-08-26" },
     "Services/BackgroundTaskWorkerService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/BackgroundTaskWorkerService.cs", "RemovedAt": "2026-08-26" },
     "Services/ProcessMemoryGuardService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/ProcessMemoryGuardService.cs", "RemovedAt": "2026-08-26" },
     "Services/SysLogQueueService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/SysLogQueueService.cs", "RemovedAt": "2026-08-26" },

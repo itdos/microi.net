@@ -162,6 +162,7 @@ namespace Microi.net
             IEnumerable<Claim> claims,
             string requestToken)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.OnlineTerminal);
             if (osClient.DosIsNullOrWhiteSpace() || tokenModel?.CurrentUser == null)
             {
                 return;

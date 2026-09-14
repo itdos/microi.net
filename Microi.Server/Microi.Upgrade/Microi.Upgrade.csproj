@@ -1,5 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- 历史资产流升级与恢复调用 MCP 运行时，跟随解决方案选择源码或同版本包。 -->
+  <ItemGroup Condition="'$(MicroiMCPExists)' == 'true'">
+    <ProjectReference Include="..\Microi.MCP\Microi.MCP.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MicroiMCPExists)' != 'true'">
+    <PackageReference Include="Microi.MCP" Version="$(MicroiNetVersion)" />
+  </ItemGroup>
   <PropertyGroup>
     <!-- dotnet build -c Release -->
     <TargetFramework>netstandard2.1</TargetFramework>
@@ -13,9 +20,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，服务器端自动升级程序。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>8.3.4</Version>
-    <AssemblyVersion>8.3.4</AssemblyVersion>
-    <FileVersion>8.3.4</FileVersion>
+    <Version>8.3.5</Version>
+    <AssemblyVersion>8.3.5</AssemblyVersion>
+    <FileVersion>8.3.5</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>

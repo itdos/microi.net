@@ -38,6 +38,25 @@ test('same-version Docker hotfix keeps full gates and excludes version and remot
  assert.ok(gate.includes('-SolutionPath "$SLN_FILE"'),'Full gate must use the detected solution in an isolated checkout');
 });
 
+test('isolated release targets its own service ports and retains shared defaults',()=>{
+ const preparation=source.slice(source.indexOf('prepare_release_workspace() {'),source.indexOf('handle_session_interrupt() {'));
+ for(const ports of [null,{backend:63681,frontend:63683}]){
+  const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:root,encoding:'utf8',input:`
+is_windows_shell(){ return 0; }
+print_info(){ :; }
+powershell.exe(){ printf '%s\\n' "$*"; }
+unset MICROI_RELEASE_BACKEND_PORT MICROI_RELEASE_FRONTEND_PORT
+${ports?`MICROI_RELEASE_BACKEND_PORT=${ports.backend}\nMICROI_RELEASE_FRONTEND_PORT=${ports.frontend}`:''}
+${preparation}
+prepare_release_workspace
+`});
+  assert.ifError(run.error);assert.equal(run.status,0,run.stderr);
+  assert.ok(run.stdout.includes(`-BackendPort ${ports?.backend||61501}`),run.stdout);
+  assert.ok(run.stdout.includes(`-FrontendPort ${ports?.frontend||61500}`),run.stdout);
+  assert.match(run.stdout,/-Action PrepareRelease/);
+ }
+});
+
 for(const scenario of [
  {name:'failed full tests prevent platform publication',backend:true,client:false,exit:19,passed:false,called:true},
  {name:'successful full tests allow platform publication',backend:true,client:false,exit:0,passed:true,called:true},

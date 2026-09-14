@@ -25,9 +25,7 @@ public class McpTableCreationTrustTests
     [Fact]
     public void CreateTable_ForwardsTrustedServerProvenanceWithStrongType()
     {
-        var sourcePath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..", "..", "..", "..", "Microi.Core", "V8Engine", "V8McpLogic.cs"));
+        var sourcePath = Microi.Tests.Common.McpSourceLocation.File("Microi.MCP/V8Engine/V8McpLogic.cs");
         var source = File.ReadAllText(sourcePath);
         var createTableStart = source.IndexOf("public static async Task<DosResult<object>> CreateTable", StringComparison.Ordinal);
         Assert.True(createTableStart >= 0);
