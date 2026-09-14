@@ -20,8 +20,6 @@ namespace Microi.net
         private static DateTime _lastCheckTime = DateTime.MinValue;
         private static long _lastRxBytes = 0;
         private static long _lastTxBytes = 0;
-        private static long _lastDiskReadBytes = 0;
-        private static long _lastDiskWriteBytes = 0;
         private static readonly object _lock = new object();
 
         // ======== macOS 后台缓存：避免 top/iostat 阻塞请求线程 ========
@@ -178,6 +176,7 @@ namespace Microi.net
                     ["Disk"] = GetDiskInfo(),
                     ["Network"] = GetNetworkTraffic(),
                     ["DiskIO"] = GetDiskIO(),
+                    ["Processes"] = ProcessResourceSampler.GetSnapshot(),
                     ["Timestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 };
                 return data;
@@ -330,7 +329,13 @@ namespace Microi.net
                     var stat2 = ReadCpuStat();
                     var totalDiff = stat2.Total - stat1.Total;
                     var idleDiff = stat2.Idle - stat1.Idle;
-                    info["CpuUsagePercent"] = totalDiff > 0 ? Math.Round((1.0 - (double)idleDiff / totalDiff) * 100.0, 2) : 0;
+                    // I/O 等待不是 CPU 执行时间；旧公式把磁盘等待也显示成 CPU 忙碌。
+                    var ioWaitDiff = stat2.IoWait - stat1.IoWait;
+                    var stealDiff = stat2.Steal - stat1.Steal;
+                    var validCpuSample = totalDiff > 0 && idleDiff >= 0 && ioWaitDiff >= 0 && stealDiff >= 0;
+                    info["CpuUsagePercent"] = validCpuSample ? new JValue(Math.Round(Math.Max(0, totalDiff - idleDiff - ioWaitDiff - stealDiff) * 100d / totalDiff, 2)) : JValue.CreateNull();
+                    info["IoWaitPercent"] = validCpuSample ? new JValue(Math.Round(ioWaitDiff * 100d / totalDiff, 2)) : JValue.CreateNull();
+                    info["CpuStealPercent"] = validCpuSample ? new JValue(Math.Round(stealDiff * 100d / totalDiff, 2)) : JValue.CreateNull();
 
                     // 内存
                     var memDict = new Dictionary<string, long>();
@@ -578,39 +583,7 @@ namespace Microi.net
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && File.Exists("/proc/diskstats"))
                 {
-                    long totalRead = 0, totalWrite = 0;
-                    foreach (var line in File.ReadAllLines("/proc/diskstats"))
-                    {
-                        var parts = line.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length >= 14)
-                        {
-                            var dev = parts[2];
-                            if (dev.Contains("loop") || char.IsDigit(dev[dev.Length - 1])) continue;
-                            if (long.TryParse(parts[5], out long sr) && long.TryParse(parts[9], out long sw))
-                            {
-                                totalRead += sr * 512;
-                                totalWrite += sw * 512;
-                            }
-                        }
-                    }
-
-                    info["ReadMBTotal"] = Math.Round(totalRead / 1024.0 / 1024.0, 2);
-                    info["WriteMBTotal"] = Math.Round(totalWrite / 1024.0 / 1024.0, 2);
-
-                    lock (_lock)
-                    {
-                        if (_lastDiskReadBytes > 0)
-                        {
-                            var elapsed = (DateTime.Now - _lastCheckTime).TotalSeconds;
-                            if (elapsed > 0)
-                            {
-                                info["ReadSpeedKBps"] = Math.Round((totalRead - _lastDiskReadBytes) / elapsed / 1024.0, 2);
-                                info["WriteSpeedKBps"] = Math.Round((totalWrite - _lastDiskWriteBytes) / elapsed / 1024.0, 2);
-                            }
-                        }
-                        _lastDiskReadBytes = totalRead;
-                        _lastDiskWriteBytes = totalWrite;
-                    }
+                    return DiskIoObservation.Capture();
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
@@ -640,7 +613,8 @@ namespace Microi.net
                 if (string.IsNullOrWhiteSpace(versionOutput) || versionOutput.Contains("error") || versionOutput.Contains("Cannot connect"))
                 {
                     info["Available"] = false;
-                    info["Msg"] = "Docker未安装或未运行";
+                    info["Msg"] = "当前 API 无法访问 Docker CLI 或守护进程；这不代表 NAS 没有运行 Docker。";
+                    info["Reason"] = "CliOrDaemonUnavailable";
                     return info;
                 }
 
@@ -847,18 +821,19 @@ namespace Microi.net
             return (0, procMem, 0, 0);
         }
 
-        private static (long Total, long Idle) ReadCpuStat()
+        private static (long Total, long Idle, long IoWait, long Steal) ReadCpuStat()
         {
-            if (!File.Exists("/proc/stat")) return (0, 0);
+            if (!File.Exists("/proc/stat")) return (0, 0, 0, 0);
             var cpuLine = File.ReadAllLines("/proc/stat").FirstOrDefault(l => l.StartsWith("cpu "));
-            if (cpuLine == null) return (0, 0);
+            if (cpuLine == null) return (0, 0, 0, 0);
             var p = cpuLine.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (p.Length < 5) return (0, 0);
+            if (p.Length < 5) return (0, 0, 0, 0);
             long user = long.Parse(p[1]), nice = long.Parse(p[2]), sys = long.Parse(p[3]), idle = long.Parse(p[4]);
             long iow = p.Length > 5 ? long.Parse(p[5]) : 0;
             long irq = p.Length > 6 ? long.Parse(p[6]) : 0;
             long sirq = p.Length > 7 ? long.Parse(p[7]) : 0;
-            return (user + nice + sys + idle + iow + irq + sirq, idle);
+            long steal = p.Length > 8 ? long.Parse(p[8]) : 0;
+            return (user + nice + sys + idle + iow + irq + sirq + steal, idle, iow, steal);
         }
 
         private static string ExecuteCommand(string command, string arguments = "")

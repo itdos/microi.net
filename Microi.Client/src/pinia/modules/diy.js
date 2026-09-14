@@ -167,6 +167,10 @@ export const useDiyStore = defineStore("diy", {
         setSysConfig(val) {
             this.SysConfig = val;
             LocalStorageManager.set("SysConfig", val);
+            // 首次读取到真实系统设置后同步启动 Logo，不能只依赖上一次缓存。
+            if (typeof window !== 'undefined' && window.MicroiSetStartupLogo) {
+                window.MicroiSetStartupLogo(val);
+            }
 
             // 从SysConfig同步PageSizes和DefaultPageSize
             let hasValidPageSizes = false;

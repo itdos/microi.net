@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-sys-menu
- * Version: v1.0.4
+ * Version: v1.0.5
  * Function:
- * - 菜单与角色菜单授权编排由应用商城交付；旧 SysMenu 路径固定解析动作并兼容大小写和租户后缀，保留角色权限树、个性化 Hook 与可信后端授权。
+ * - 菜单与角色菜单授权编排；兼容旧路由和角色权限树，保留个性化 Hook、实时身份及可信后端授权，传入业务参数前排除不会用于授权的身份副本。
  */
 
 // Microi官方接口引擎：platform-sys-menu
@@ -51,8 +51,16 @@ var customization = V8.ApiEngine.Run('platform-marketplace-source-hook', {
 if (!customization || customization.Code !== 1) {
   return customization || { Code: 0, Msg: '应用商城个性化 Hook 未返回结果。' };
 }
+// 可信原子会重新取得身份；传参时不复制随后必定丢弃的完整身份树。
+// 保留业务参数及其值，既不修改 V8.Param，也不影响独立的 V8.CurrentUser。
+var businessParam = Object.create(null);
+var parameterKeys = Object.keys(V8.Param || {});
+for (var parameterIndex = 0; parameterIndex < parameterKeys.length; parameterIndex++) {
+  var parameterKey = parameterKeys[parameterIndex];
+  if (parameterKey !== '_CurrentUser') businessParam[parameterKey] = V8.Param[parameterKey];
+}
 return V8.Method.ManageSystemDirectory({
   Domain: 'SysMenu',
   Action: action,
-  Param: V8.Param
+  Param: businessParam
 });

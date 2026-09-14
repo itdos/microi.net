@@ -438,6 +438,7 @@ namespace Dos.ORM
 
         internal void OpenConnectionWithGuard(DbConnection connection)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.DatabaseOpen);
             Check.Require(connection, "connection", Check.NotNull);
             if (IsolatedConnections.Value) { connection.Open(); return; }
             var guardKey = GetConnectionGuardKey();
@@ -475,6 +476,7 @@ namespace Dos.ORM
 
         internal async Task OpenConnectionWithGuardAsync(DbConnection connection, CancellationToken cancellationToken = default)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.DatabaseOpen);
             Check.Require(connection, "connection", Check.NotNull);
             if (IsolatedConnections.Value) { await connection.OpenAsync(cancellationToken).ConfigureAwait(false); return; }
             var guardKey = GetConnectionGuardKey();
@@ -509,6 +511,7 @@ namespace Dos.ORM
         }
         private void DoLoadDataSet(DbCommand command, DataSet dataSet, string[] tableNames)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.DatabaseCommand);
             Check.Require(tableNames != null && tableNames.Length > 0, "tableNames could not be null or empty.");
             Check.Require(dataSet != null, "dataSet could not be null.");
 
@@ -535,6 +538,7 @@ namespace Dos.ORM
         }
         private object DoExecuteScalar(DbCommand command)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.DatabaseCommand);
 
             WriteLog(command);
 
@@ -544,6 +548,7 @@ namespace Dos.ORM
 
         private int DoExecuteNonQuery(DbCommand command)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.DatabaseCommand);
             if (IsBatchConnection)
             {
                 batchCommander.Process(command);
@@ -558,6 +563,7 @@ namespace Dos.ORM
         }
         private IDataReader DoExecuteReader(DbCommand command, CommandBehavior cmdBehavior)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.DatabaseCommand);
 
             WriteLog(command);
 
@@ -567,12 +573,14 @@ namespace Dos.ORM
 
         private async Task<object> DoExecuteScalarAsync(DbCommand command)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.DatabaseCommand);
             WriteLog(command);
             return await command.ExecuteScalarAsync().ConfigureAwait(false);
         }
 
         private async Task<int> DoExecuteNonQueryAsync(DbCommand command)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.DatabaseCommand);
             if (IsBatchConnection)
             {
                 batchCommander.Process(command);
@@ -584,6 +592,7 @@ namespace Dos.ORM
 
         private async Task<DbDataReader> DoExecuteReaderAsync(DbCommand command, CommandBehavior cmdBehavior)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.DatabaseCommand);
             WriteLog(command);
             return await command.ExecuteReaderAsync(cmdBehavior).ConfigureAwait(false);
         }

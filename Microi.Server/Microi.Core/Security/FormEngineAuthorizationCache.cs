@@ -92,6 +92,7 @@ namespace Microi.net
         /// </summary>
         public static async Task<string> GetCurrentVersionAsync(string osClient)
         {
+            using var latency = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.AuthorizationVersion);
             if (string.IsNullOrWhiteSpace(osClient))
             {
                 return null;

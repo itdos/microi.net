@@ -5658,7 +5658,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       windowMinutes: z.number().int().min(1).max(15).optional().describe('Snapshot request window, 1-15 minutes.'),
       windowSeconds: z.number().int().min(60).max(86400).optional().describe('Signal window, 60-86400 seconds.'),
       top: z.number().int().min(1).max(100).optional().describe('Top N for Snapshot or ApiRank. Snapshot backend clamps to 5-50.'),
-      includeHost: z.boolean().optional().describe('Snapshot includes host/runtime overview. Default true.'),
+      includeHost: z.boolean().optional().describe('Snapshot includes host/runtime overview. Default true. Host.Processes (process-resources/v1) provides 5-second CPU/RSS/Swap/I/O top lists and 12 recent samples; inspect Fresh, Scope, HostProcessesVisible and unavailable counts. CPU 100% means one core. A container PID view is not all NAS processes; host visibility needs a deployment-provided read-only /proc:/host/proc:ro mount. Host.DiskIO.Devices includes numeric device names, IOPS/busy/await; aggregate physical disks only. Requires compatible backend; unavailable metrics remain null.'),
       includeDocker: z.boolean().optional().describe('Snapshot includes heavier Docker sampling. Default false.'),
       traceId: z.string().regex(/^[0-9a-fA-F]{32}$/u).optional().describe('W3C 32-hex TraceId for Trace.'),
       incidentId: z.string().regex(/^[0-9a-f]{32}$/u).optional().describe('Required for MemoryIncident: use an actual 32-lowercase-hex Id from MemoryIncidents Data.Items. Empty Items means not found in the visible tenant/storage scope, not proof of no incident.'),

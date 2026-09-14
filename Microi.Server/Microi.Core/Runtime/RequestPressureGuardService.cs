@@ -26,6 +26,7 @@ namespace Microi.net
             RequestPressureGuardOptions options,
             CancellationToken cancellationToken)
         {
+            using var latencyMeasurement = RequestLatencyObservation.Measure(RequestLatencyObservation.Part.PressureWait);
             if (options == null)
             {
                 throw new ArgumentNullException(nameof(options));

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <!-- 本地发布项目：先完成 Release build，再让 publish 复用已编译且已还原的产物输出到 bin/Release/publish。 -->
     <!-- 本地运行编译后的项目：dotnet Microi.net.Api.dll __urls=http://0.0.0.0:8080 【需替换__urls】 -->
@@ -103,12 +103,19 @@
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
   </ItemGroup>
   
-  <!-- 四个闭源库的引用模式由 Directory.Build.props 按解决方案统一决定。 -->
+  <!-- 五个闭源库的引用模式由 Directory.Build.props 按解决方案统一决定。 -->
   <ItemGroup Condition="'$(MicroiAIExists)' == 'true'">
     <ProjectReference Include="..\Microi.AI\Microi.AI.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(MicroiAIExists)' != 'true'">
     <PackageReference Include="Microi.AI" Version="$(MicroiNetVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MicroiMCPExists)' == 'true'">
+    <ProjectReference Include="..\Microi.MCP\Microi.MCP.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MicroiMCPExists)' != 'true'">
+    <PackageReference Include="Microi.MCP" Version="$(MicroiNetVersion)" />
   </ItemGroup>
 
   <!-- 智能引用独立 SSO 插件。 -->

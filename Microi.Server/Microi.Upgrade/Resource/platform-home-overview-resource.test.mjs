@@ -30,6 +30,22 @@ function run(param, state, currentUser = {
   const V8 = {
     Param: param,
     CurrentUser: currentUser,
+    DbTrans: {
+      FromSql(sql) {
+        assert.equal(sql, 'UPDATE sys_user SET HomeUsageStats = @stats WHERE Id = @userId AND IsDeleted = 0');
+        const values = new Map();
+        return {
+          AddInParameter(key, value) { values.set(key, value); return this; },
+          ExecuteNonQuery() {
+            assert.equal(values.get('@userId'), currentUser.Id);
+            assert.equal(values.size, 2);
+            update = { Id: values.get('@userId'), HomeUsageStats: values.get('@stats') };
+            state.HomeUsageStats = update.HomeUsageStats;
+            return 1;
+          }
+        };
+      }
+    },
     FormEngine: {
       GetTableData(table) {
         assert.equal(table, 'sys_menu');
@@ -45,12 +61,7 @@ function run(param, state, currentUser = {
         return { Code: 1, Data: { Id: currentUser.Id, HomeUsageStats: state.HomeUsageStats || '' } };
       },
       UptFormData(table, model) {
-        assert.equal(table, 'sys_user');
-        assert.equal(model.Id, currentUser.Id);
-        assert.deepEqual(Object.keys(model).sort(), ['HomeUsageStats', 'Id']);
-        update = model;
-        state.HomeUsageStats = model.HomeUsageStats;
-        return { Code: 1 };
+        assert.fail('Usage statistics must not invalidate all tenant authorization caches');
       },
     },
   };
@@ -62,7 +73,7 @@ test('system-account package owns the Managed overview engine and hidden aggrega
   const packageModel = JSON.parse(fs.readFileSync(path.join(directory, 'app.microi.sys_user.json'), 'utf8'));
   const engines = packageModel.SysApiEngines.filter(item => item.ApiEngineKey === 'platform-home-overview');
   assert.equal(engines.length, 1);
-  assert.equal(engines[0].Version, 'v1.0.0');
+  assert.equal(engines[0].Version, 'v1.0.1');
   assert.equal(engines[0].ApiV8Code.replaceAll('\r\n', '\n'), `${source.trimEnd()}\n`);
   assert.deepEqual(packageModel.ResourcePolicies.ApiEngines['platform-home-overview'], {
     Ownership: 'Platform',
@@ -112,4 +123,32 @@ test('dashboard ranks actual use and filters removed permissions from metrics an
   assert.ok(result.Data.FrequentApps.every(item => item.Id !== 'menu-secret'));
   assert.equal(result.Data.Dates.length, 7);
   assert.equal(result.Data.Counts.length, 7);
+});
+
+test('menu usage writes must not invalidate the tenant-wide authorization cache', () => {
+  const state = {};
+  let invalidations = 0;
+  const parameters = new Map();
+  const query = { AddInParameter(key, value) { parameters.set(key, value); return this; }, ExecuteNonQuery() { return 1; } };
+  const result = execute({
+    Param: { Action: 'RecordMenuOpen', MenuId: 'menu-a', Id: 'attacker' },
+    CurrentUser: { Id: 'user-1', Level: 100, _RoleLimits: [{ Type: 'Menu', FkId: 'menu-a' }] },
+    DbTrans: { FromSql(sql) { assert.equal(sql, 'UPDATE sys_user SET HomeUsageStats = @stats WHERE Id = @userId AND IsDeleted = 0'); return query; } },
+    FormEngine: {
+      GetFormData(table) { return { Code: 1, Data: table === 'sys_menu' ? menus[0] : { Id: 'user-1', HomeUsageStats: '' } }; },
+      UptFormData() { invalidations++; return { Code: 1 }; }
+    }
+  }, (_date, _unit, offset) => makeDate(offset), () => '2026-09-03 18:00:00');
+  assert.equal(result.Code, 1);
+  assert.equal(invalidations, 0, 'Usage-only writes must keep all users menu/permission cache versions intact');
+  assert.equal(parameters.get('@userId'), 'user-1');
+  assert.equal(JSON.parse(parameters.get('@stats')).Menus['menu-a'].Count, 1);
+});
+
+test('administrator overview does not enumerate an unused permission tree', () => {
+  const user = { Id: 'user-1', Level: 9999 };
+  Object.defineProperty(user, '_RoleLimits', { get() { throw Error('Unused 7403-row permission scan'); } });
+  const { result } = run({ Action: 'Dashboard' }, {}, user);
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.AccessibleAppCount, 3);
 });

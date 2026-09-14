@@ -85,6 +85,10 @@ function run(storeRows, options = {}) {
           return { ToArray: () => options.evidenceEngineRows || [] }
         }
         if (/FROM\s+information_schema\.tables/i.test(sql)) {
+          if (/EMPTY_DATABASE_STANDARD_SUITE_V1/.test(sql)) {
+            if (options.suiteDiscoveryFailure) throw new Error('catalog unavailable')
+            return { ToArray: () => (options.suitePhysicalTables || []).map((TableName) => ({ TableName })) }
+          }
           const optionalTables = options.optionalTables || [
             'microi_job_cron_triggers',
             'microi_job_triggers',
@@ -127,7 +131,8 @@ function run(storeRows, options = {}) {
             'wx_tpl_msg',
             'mic_msgset'
           ]
-          return { ToArray: () => optionalTables.map((TableName) => ({ TableName })) }
+          // 模拟真实IN筛选，不能让未列入发现SQL的表也凭测试夹具返回。
+          return { ToArray: () => optionalTables.filter((name) => sql.includes("'" + name + "'")).map((TableName) => ({ TableName })) }
         }
         return { ToArray: () => projectStoreRows(storeRows) }
       }
@@ -348,6 +353,32 @@ test('mail and runtime history data are removed only from present tables while s
   }
 })
 
+test('unpackaged standard suite tables, orphan batch roots and source roots enter empty database cleanup', () => {
+  const tables = ['mci_crm_customer', 'mci_cms_content', 'mci_oa_claim', 'mci_inv_doc', 'mci_cat_sku', 'mci_pt_party']
+  const { result } = run([], {
+    suitePhysicalTables: [...tables, 'sys_user', 'mci_inventory_other'],
+    evidenceEngineRows: [{ ApiEngineKey: 'mci-inv-business' }, { ApiEngineKey: 'mci-catalog-access' }],
+    menuPages: [[
+      { Id: 'old-child', ParentId: 'batch', Name: '业务数据' },
+      { Id: 'batch', ParentId: '', Name: 'AI应用后台·industry250' },
+      { Id: 'std-child', ParentId: 'inv', Name: '仓库' },
+      { Id: 'inv', ParentId: '', Name: '吾码进销存' },
+      { Id: 'assistant', ParentId: '', Name: 'AI助手' }
+    ]]
+  })
+  assert.equal(result.Code, 1)
+  assert.deepEqual(result.Data.ApplicationOwnedTables, tables.sort())
+  assert.deepEqual(result.Data.AiApplicationMenuIds, ['batch', 'inv', 'old-child', 'std-child'])
+  assert.ok(result.Data.ApplicationOwnedEngineKeys.includes('mci-inv-business'))
+  assert.doesNotMatch(result.Data.Sql, /temp_app_owned_tables \(Name\) VALUES[^;]*\('sys_user'\)/)
+})
+
+test('standard suite physical discovery failure prevents incomplete cleanup SQL', () => {
+  const { result } = run([], { suiteDiscoveryFailure: true })
+  assert.equal(result.Code, 0)
+  assert.match(result.Msg, /标准应用.*停止/)
+})
+
 test('top-level AI application menu tree is removed recursively while AI assistant stays', () => {
   const { result } = run([], {
     menuPages: [[
@@ -386,4 +417,50 @@ test('unsafe package table names never enter generated SQL', () => {
   assert.equal(result.Code, 1)
   assert.equal(result.Data.ApplicationOwnedTableCount, 0)
   assert.doesNotMatch(result.Data.Sql, /DROP TABLE sys_user/i)
+})
+
+test('owned flow topology is removed before its forms while unrelated workflow definitions remain', () => {
+  const { result } = run([])
+  assert.equal(result.Code, 1)
+  const sql = result.Data.Sql
+  assert.match(sql, /SELECT d.Id FROM wf_flowdesign d JOIN temp_app_diy_table_ids t ON d.TableId = t.Id/)
+  assert.match(sql, /DELETE l FROM wf_line l JOIN temp_app_flow_ids f ON l.FlowDesignId = f.Id/)
+  assert.match(sql, /DELETE n FROM wf_node n JOIN temp_app_flow_ids f ON n.FlowDesignId = f.Id/)
+  assert.match(sql, /DELETE d FROM wf_flowdesign d JOIN temp_app_flow_ids f ON d.Id = f.Id/)
+  assert.ok(sql.indexOf('DELETE l FROM wf_line l JOIN temp_app_flow_ids') < sql.indexOf('DELETE d FROM wf_flowdesign d JOIN temp_app_flow_ids'))
+  assert.ok(sql.indexOf('DELETE d FROM wf_flowdesign d JOIN temp_app_flow_ids') < sql.indexOf('DELETE t FROM diy_table t'))
+  assert.doesNotMatch(sql, /DELETE FROM wf_flowdesign;/i)
+  assert.match(sql, /DROP TEMPORARY TABLE temp_app_flow_ids;/)
+})
+
+test('owned print API references and standard page routes are cleaned without removing platform templates', () => {
+  const { result } = run([])
+  const sql = result.Data.Sql
+  assert.match(sql, /DELETE p FROM mic_print p[\s\S]*p.DataApi = a.Id[\s\S]*temp_app_owned_engines/)
+  assert.ok(sql.indexOf('DELETE p FROM mic_print p') < sql.indexOf('DELETE FROM sys_apiengine'))
+  assert.match(sql, /p.Title = '吾码CRM销售报价'/)
+  assert.match(sql, /DELETE p FROM mic_page p[\s\S]*'\/mci-cms\/'/)
+  assert.doesNotMatch(sql, /DELETE FROM mic_page;|DELETE FROM mic_print;/i)
+})
+
+test('ordinary application declarations cannot claim physical page print or workflow engine tables', () => {
+  const names = ['mic_page', 'mic_print', 'wf_flowdesign', 'wf_node', 'wf_line', 'sys_microistore_package']
+  const { result } = run([{ Id: 'business', AppKey: 'business', ApplicationType: 'Regular', AppPakcet: JSON.stringify({ DiyTables: names.map(Name => ({ Name })) }) }], { menuPages: [[]] })
+  assert.equal(result.Code, 1)
+  assert.deepEqual(result.Data.ApplicationOwnedTables, [])
+  for (const name of names) {
+    assert.ok(result.Data.ProtectedPlatformTables.includes(name), name)
+    assert.ok(result.Data.Sql.includes("'" + name + "'"))
+  }
+})
+
+test('application HDFS package indices are removed before stores without purging platform indices or older schemas', () => {
+  const present = run([], { optionalTables: ['sys_microistore_package'] }).result
+  assert.equal(present.Code, 1)
+  assert.match(present.Data.Sql, /DELETE p FROM sys_microistore_package p\s+JOIN temp_ai_apps a ON p.StoreId = a.Id;/)
+  assert.ok(present.Data.Sql.indexOf('DELETE p FROM sys_microistore_package p') < present.Data.Sql.indexOf('DELETE s FROM sys_microistore s'))
+  assert.doesNotMatch(present.Data.Sql, /DELETE FROM sys_microistore_package;/i)
+  const absent = run([], { optionalTables: [] }).result
+  assert.equal(absent.Code, 1)
+  assert.doesNotMatch(absent.Data.Sql, /DELETE p FROM sys_microistore_package p/)
 })

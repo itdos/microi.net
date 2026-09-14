@@ -9,6 +9,40 @@ description: Microi 系统日志/监控查询、诊断与治理规范。用于�
 
 本 Skill 用于读取、解释、扩展和验收 Microi 的统一【系统日志/监控】能力。它不授权查看其它租户、绕过菜单/平台管理员权限，或把当前节点样本扩写成全局结论。
 
+## 大权限对象与 SQL 参数处理回归
+- 浏览器 Pinia 持久化应按已选字段独立深度监听，缓存序列化片段；非持久化的时钟/加载状态不得触发完整权限遍历，主题变化不得重新序列化用户。权限嵌套修改、登录退出、显式保存、恢复钩子、失败恢复和 dispose 必须回归，嵌入 WebOS 窗口保持只读存储边界。前端镜像验收与后端分开记录。
+待办的多项只读计数由内部 `IFormEngineReadOnlyCountRuntime` 在一个批次中拥有一份独立身份；业务参数不能提供非空 `_CurrentUser`，每项仍经过原表单查询与租户/角色/数据范围检查，事务内顺序执行。抄送分页及可能执行行 V8 的 CRUD 保留独立身份。私有文件 HTTP 原子可接收本次 DiyToken 验证后独占的身份，后台可信上下文仍复制；资源引用、权限、审计和 `Limit=true` 不变。上述优化需要更新后端镜像，不能靠修改 V8 参数来启用或跳过鉴权。
+
+- `FromSection.formatSql` 是 ORM 结果缓存键处理，独立于页面 SQL 展示。大型 IN 权限快照需测试这条真实路径的分配量、参数前缀、字面量、替换值含参数文本、空值和缓存键稳定性；禁止用逐参数 `String.Replace`。单对象 HTTP 表单仅可转交本次 DiyToken 验证后独立身份，批量行与已有 JSON 持有者必须保留副本，不能推广为共享可变身份缓存。
+
+- 保持用户需要的 `PrintSqlToPage` 开启。参数准备、页面可执行 SQL 与慢日志不得逐参数扫描和复制整条 SQL；使用单次扫描，并测试字符串、注释、参数名前缀、替换值含参数文本及完整页面输出。
+- 动态 FormEngine 参数不得把 `_CurrentUser` 复制进业务行数据；一轮转换只拥有一份独立身份树，不能为性能共享可变用户缓存或修改调用方对象。用接近实际规模的权限树测量分配，并验证租户、访问密钥、角色和可变子对象隔离。
+- 接口引擎正常、异常与慢日志使用 `ApiEngineLogParameters.Serialize`，在序列化前排除顶层内部 `_CurrentUser`，用户仍由独立 UserId/UserName 字段记录；业务嵌套同名字段、类型和空值保留，不修改原参数。不允许先深复制/序列化权限树再截断。托管文件 URL、后台任务和菜单接口向可信原子只投影业务参数，后端仍独立验证身份、租户和资源权限。
+
+登录身份权限异常膨胀时，先比对 sys_rolelimit 的有效行与 IsDeleted=1 历史行。原生权限快照与菜单授权编辑只加载有效权限，IsDeleted 为 NULL 的存量记录仍有效；没有该列的旧表保持兼容，新增列后立即采用过滤，元数据或查询异常不回退为全量授权。该修复需要更新后端镜像；已有登录缓存通过正常重新登录或 RefreshToken 刷新，不删除权限历史，不改变 DiyToken、角色/数据范围或 PrintSqlToPage。用真实数据库回归旧表、新列、撤销权限、无权限角色、注入参数和查询失败，不能仅凭身份体积下降宣称请求耗时已经恢复。
+
+接口引擎构造脚本参数时，顶层 `_CurrentUser` 属于宿主保留身份，不再复制到 `V8.Param`；脚本读取已认证身份应使用 `V8.CurrentUser`。权限树仍保留完整内容，身份验证、令牌撤销、访问密钥范围、跨租户检查和独立脚本快照保持执行；嵌套业务对象中同名字段仍保留。实时通知检测只读取成功结果的 Code 与 DataAppend，避免为了检查不存在的事件而序列化整份用户/列表/文件 Data；事件字段白名单、大小限制、提交后发送和订阅权限不变。两项优化都需要更新后端镜像。
+- 公共鉴权的角色基础权限读取只检查 `_Roles`，不得复制整份用户的表/菜单权限树；显式 Bearer 请求在同一过滤器中只加载一次有效会话。优化必须保留签名、过期、安全版本、租户一致性、Redis 活动令牌、历史敏感字段清理及访问密钥撤销/范围检查；不得用跨请求身份缓存或共享可变 V8 用户对象换取速度。
+- 分层归因同时核对 `FormAuthorization` 与其内部 `AuthorizationVersion`；原生 Redis 授权版本读取不经过通用 `RedisRead`，不能只用后者排除缓存等待。
+- HTTP Controller 到首个接口引擎可单次交接已经实时验证的身份；交接必须绑定原始参数对象和同一 HttpContext，不能放入 JSON/可复制注解。参数克隆、租户或身份投影变化、重复消费、后续请求及嵌套调用均回到原验证路径。脱敏须继续覆盖全部嵌套字段，优化临时分配不能跳过大权限树。
+- V8 AI 代理在创建时固定不可变身份，首次调用 AI 才构造可变 JSON；普通 V8 不应为未使用的 AI 复制完整权限树。必须测试脚本修改后的身份隔离、全部权限保留、JSON 类型/注解和二进制值隔离，不能延迟读取仍由脚本持有的身份对象。
+- 原生统计失败时不自动重跑全部兼容查询。兼容回退只处理能力确实缺失的旧后端，避免故障放大。
+- 用相同测试记录修复前失败、修复后通过；实际请求需区分冷启动、稳定调用、页面并发、数据库执行与 HTTP 总耗时。镜像、应用包和线上节点分别验收。
+
+## 请求等待分层归因
+
+- 用唯一 TraceId 对齐浏览器计时与 `RecentRequests[].Latency`，分别解释发出前排队、首字节等待、响应接收和服务端顺序阶段；不能将总耗时减 TTFB 当作下载时间。
+- `Latency.Parts` 是含子调用、可能并行的累计墙钟时间，不可相加或等同 CPU。连接打开/连接池等待与 SQL 命令分开；Reader 后续读行不计入 DatabaseCommand。
+- `RuntimeIntervals` 是当前节点最近 30 个约 1 秒同窗样本。分别核对 CPU 执行、I/O wait、steal、GC 暂停、线程池积压、采样唤醒延迟和 cgroup 节流；缺值按不可用处理。旧 Linux CPU 百分比包含 I/O wait，不能直接判定计算饱和。
+- `Memory.HelperProcesses.Collector/RecoveryAnalyzer` 是当前 API 管理的诊断采集/恢复子进程。两次查询间的 CPU 结合 PID、启动时间和 RSS 判断监控成本；首次、重建、不可用时 CPU 为 null。它不是 NAS 全部进程清单，不能将剩余主机负载直接归给某个服务。
+- `Snapshot(includeHost:true)` 的 `Host.Processes`（`process-resources/v1`）每 5 秒持续采样，CPU/RSS/Swap/I/O 前 10 名及最近 12 次样本；核对 Fresh、Scope、HostProcessesVisible、不可读/缺项计数。CPU 100% 是一核；首次、PID 重用、计数重置为 null，RSS 不能累加作独占内存。不采命令行/环境变量。Linux 无固定只读 `/proc:/host/proc:ro` 挂载时只声明当前 PID 命名空间，不能声称看到了全部宿主进程；镜像更新不能新增挂载，不能为诊断开放 Docker socket 或特权容器。
+- `Host.DiskIO.Devices` 包含 SATA/NVMe/RAID/映射设备的速率、IOPS、BusyPercent、AwaitMs 和 InFlight；分区按 sysfs 标记识别，名称以数字结尾不能排除。汇总只累加物理整盘，避免与 RAID/dm 双计；独立时间窗，首次/重置速率为 null。Docker 不可访问不等于宿主没有 Docker。
+- 宿主进程排名的 CPU/IO 速率分别使用每个进程计数器的实际读取时间窗 `CpuWindowSeconds / IoWindowSeconds`，顶层 `WindowSeconds` 只是扫描周期。GC 或调度暂停导致扫描耗时变长时，不能继续用扫描开始时间作为计数分母；单次计数读取超过 250 ms 则该次时间无效，速率为 null。旧后端长扫描的 CPU 尖峰不能直接用来证明宿主饱和。
+- `Trace.RuntimeRequests` 只从当前租户、当前节点最近 500 个请求中返回最多 20 个匹配记录；淘汰和重启导致缺证，不代表快。协议为 `request-latency/v1`，现有 MCP 查询参数不变；本次底层指标没有新增商城声明式资源，后端升级即可读取。
+
+- 批量角标/计数变慢时核对 Identity 次数是否随项数增长。只读 `GetTableDataCountBatch` 允许批内复用一份脱离缓存的可信身份；保留逐项表权限/数据范围、跨批次实时校验及普通 CRUD 的可变身份隔离，不能把该优化扩展为跨请求缓存权限或共享脚本可修改身份。
+- `RoutingMs` 包含在 `BeforeActionMs` 中；路由阶段也可能访问缓存和数据库，不可只看 Controller/表单内部计时。
+
 ## 先选入口
 
 | 目标 | 推荐入口 |
@@ -144,6 +178,13 @@ UnblockIp:<ip>
 
 ## AI 诊断顺序
 
+### 宿主数据库进程高 CPU
+
+- `Host.Processes` 确认 `mysqld` 高 CPU 后，继续用 `microi_query_external_database` 对已授权实例只读查询实际 `performance_schema`/`information_schema`。先核对数据库版本与可用列；使用规范化 `DIGEST_TEXT`，不回传连接串或含业务值的 SQL 正文。
+- 至少间隔一个业务周期采集两次 `events_statements_summary_by_digest`，计算 `COUNT_STAR/SUM_TIMER_WAIT/SUM_ROWS_EXAMINED/SUM_SELECT_SCAN` 差值；累计总耗时与并发墙钟时间不等于 CPU。当前页面 SQL 很快不能排除后台任务在同库扫描。
+- 核对实际索引与锁/事务状态。典型例子是 `mic_data_version` 缺少 `(TableId,TableRowId,CreateTime)`，定时任务运行时间刷新又不断生成版本，形成越来越重的历史扫描。索引由所属应用声明，新旧库都应交付；在线修复后必须回读并观察后续 digest 和同窗宿主进程。
+- 原生建索引工具若不能表达生产所需的在线算法、锁等待上限，应通过受控管理员数据库工具预览固定语句，再按已有明确修复授权执行并回读；不得因响应超时重复建索引，不做表重建或删除历史来掩盖问题。
+
 1. 先查 `Capabilities`，确认当前版本和边界。
 2. 查 `Snapshot`，记录节点、窗口、请求率、活动请求、CPU/内存、队列、HTTP 流量与未归因残差。
    内存问题同时查 `Memory`、`MemoryIncidents`、`MemoryIncident`，先确定采集健康，再关联接口/V8 事件、表/工作流节点、代码哈希和 Trace。
@@ -155,6 +196,19 @@ UnblockIp:<ip>
 8. 优化后用相同窗口与负载复测 P50/P95/P99、RPS、错误率、CPU、内存、分配率和网络字节，不能只凭单次页面刷新下结论。
 
 ## 扩展与商城交付
+
+### CDN 模块
+
+- 现有 `microi-platform-service` 的系统日志页增加 CDN Tab；不另建同名应用。固定管理员入口为 `mci-cdn-manager`，内部 `mci-cdn-core / mci-cdn-aliyun / mci-cdn-worker` 均 `StopHttp=1`，四个引擎归 `app.microi.sys-log` 的 Managed 资源。
+- 通过当前租户 MCP 的 `microi_run_engine` 先查 `Capabilities`，再使用 `Domains / Trend / ReportList / Reports / Sls / Configs / Config / Rules / Operations`。现有执行、源码、元数据及发布工具已覆盖此模块，不为 CDN 新增旁路鉴权或通用 HTTP 代理。
+- 凭据优先级为当前租户 `Integration.Cdn.Aliyun.*` 完整私密组 → `Integration.Dns.Aliyun.*` 私密组 → 当前租户 SaaS 的兼容 DNS 字段。半组配置必须失败，不能混组或回退主租户。新增密钥写 `mci_system_setting` Secret，由可信后端解密到后端 `ServerPrivateSettings`；不返回原文。
+- Aliyun 运营报表 ID：1/3 URL 请求/流量、5/7 Referer 请求/流量、9/11 回源 URL 请求/流量、13/15 IP 请求/流量、17 域名、19 PV/UV、21 地区、23 运营商。未订阅不能伪造成零流量，也不能将历史 TOP 当作分钟级规则数据；未知流量单位保持原始值。
+- 报表参数按类型分开：只有 13/15 传非空 Area，1/3/9/11 传非空 HttpCode，21/23 传 IsOverseas；17 不传 DomainName。不得统一附加无关或空筛选项，否则阿里云返回 InvalidParameter。内嵌调用的 V8.Param 可能是 CLR JObject，不向它写入配置对象，创建独立 JS 请求并从服务端读取接入配置。
+- SLS 只用固定查询模板与已校验域名/项目/地域/Logstore；自动判断基于 `remote_ip`、`response_size` 字节以及完整窗口、采集延迟、连续命中、白名单、冷却与限额。私网/环回/链路本地/组播和与保护 CIDR 重叠的地址不封禁。动态阈值须满足历史样本数，默认观察。
+- 云端变更先 `Preview` 再 `Submit`，请求号幂等、配置快照比较、独立持久化状态和租约不可省略。超时/崩溃记 Unknown 并 `Reconcile`，不能自动重发不确定写入。到期只删除本应用新增条目，重叠封禁延后回收。
+- 单域名 IP 黑名单与全账号海量封禁必须分开；后者需阿里云开通，须明确 `ALL_CDN_DOMAINS`，不在验收时自动开通付费服务。`limit_rate` 是至少 100 KB/s 的下载速率，不是 QPS；日志规则也不等于实时边缘 WAF。
+- `mci-cdn-security-tick` 回收到期封禁；每条启用规则通过 `V8.Method.SaveScheduleJob` 创建错峰任务并使用独立数据库租约。安装包包含基础调度及三张表的结构，不带云密钥、规则实例、白名单或任何测试 IP。
+- 验收分开记录 Node 行为测试、真实管理员/云端只读、文档保留 IP 的受控封禁/到期恢复、真实宿主页面、包正文 SHA 与安装。日志未投递或海量服务未开通时，如实标为待配置，不伪造云端通过。
 
 - 普通查询和汇总优先在 `mci-system-observability-query` 接口引擎编排。
 - 只有接口引擎缺少宿主进程、Docker、Mongo 聚合、安全运行态等可复用底层能力时，才扩展最小 V8 原子方法；Controller 不承载业务编排。

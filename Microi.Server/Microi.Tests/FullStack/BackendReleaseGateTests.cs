@@ -17,6 +17,43 @@ public sealed class BackendReleaseGateCollection
 [Trait("Category", "FullStack")]
 public class BackendReleaseGateTests
 {
+    [Fact]
+    [Trait("Suite", "SystemObservability")]
+    public async Task ProcessSnapshot_ProvidesBoundedSamplesThroughAuthenticatedHttpOnly()
+    {
+        var settings = ReleaseGateSettings.FromEnvironment();
+        using var client = settings.CreateClient();
+        var route = $"apiengine/mci-system-observability-query--OsClient--{Uri.EscapeDataString(settings.OsClient)}--";
+        var body = new JsonObject { ["Action"] = "Snapshot", ["IncludeHost"] = true, ["IncludeDocker"] = false, ["WindowMinutes"] = 1 };
+        var result = await PostAndRequireSuccessAsync(client, route, body);
+        var samples = JObject.Parse(result.ToJsonString())["Data"]?["Host"]?["Processes"];
+        Assert.NotNull(samples);
+        Assert.Equal("process-resources/v1", samples["Protocol"]?.Value<string>());
+        // 首次启动可以预热；等待一个实际采样周期后必须提供结果，不能用零值假装采样成功。
+        if (samples["Status"]?.Value<string>() == "WarmingUp")
+        {
+            await Task.Delay(TimeSpan.FromSeconds(6), TestContext.Current.CancellationToken);
+            result = await PostAndRequireSuccessAsync(client, route, body);
+            samples = JObject.Parse(result.ToJsonString())["Data"]?["Host"]?["Processes"];
+        }
+        Assert.Equal("Available", samples?["Status"]?.Value<string>());
+        Assert.True(samples?["Fresh"]?.Value<bool>());
+        Assert.InRange(samples!["Recent"]!.Count(), 1, 12);
+        foreach (var top in new[] { "TopCpu", "TopMemory", "TopIo" })
+        {
+            var rows = Assert.IsType<JArray>(samples["Current"]![top]);
+            Assert.InRange(rows.Count, 1, 10);
+            Assert.All(rows, row => { Assert.NotNull(row["Pid"]); Assert.NotNull(row["Name"]); Assert.Null(row["CommandLine"]); Assert.Null(row["Environment"]); });
+        }
+        Assert.NotNull(samples["Current"]!["Scope"]);
+        // 同一公网业务入口不应向无会话请求泄露进程清单；不引入诊断专用旁路鉴权。
+        using var anonymous = settings.CreateClient();
+        anonymous.DefaultRequestHeaders.Remove("Authorization");
+        using var denied = await anonymous.PostAsJsonAsync(route, body, TestContext.Current.CancellationToken);
+        var deniedText = await denied.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("process-resources/v1", deniedText, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("GET")]
     [InlineData("HEAD")]

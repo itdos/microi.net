@@ -52,6 +52,8 @@ MySQL 的 `ALTER COLUMN DROP DEFAULT` 会让可空列也在省略字段时报 13
 - 原生 Get、List、Count/CountBatch、SUM 批量与回退、Tree 子计数和 Export 必须共用
   目标表所属数据库的 writer 选择；扩展库不得误回租户基础库。主库不可用或配置非法必须
   失败，不能以副本或0计数伪装成功。直接调用 `V8.DbRead` 的语义不变。
+- V8 的 JavaScript Number 经 .NET 互操作可能成为浮点类型；配置解析接受数值精确等于
+  `0/1` 的表示，仍拒绝小数、NaN、Infinity、布尔值及其它非法值，禁止通过截断或舍入放宽值域。
 - 显式 `DbTrans` 保留，不为主库策略跳出事务；父事务旧 RR 快照仍可能看见旧授权关系，
   不能声称仅开启本字段就实现与撤权原子串行。需要实时授权时采用独立受控主库身份读取。
 - 标准 `microi_create_table`、`microi_update_table` 和 Manifest `tables[].readPrimary`

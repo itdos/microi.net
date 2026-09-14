@@ -1222,6 +1222,7 @@ namespace Microi.net
             string accessKeyId,
             string osClient)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.IdentityScope);
             if (accessKeyId.DosIsNullOrWhiteSpace())
             {
                 return new DosResult<JObject>(1, UserAccessKeySecurity.StripSessionFields(sharedCurrentUser));

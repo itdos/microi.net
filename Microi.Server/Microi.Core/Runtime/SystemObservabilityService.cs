@@ -60,6 +60,7 @@ namespace Microi.net
             var state = new ActiveRequestState
             {
                 Key = key,
+                LatencySession = Dos.Common.RequestLatencyObservation.Current,
                 TraceId = traceId,
                 StartedAtUtc = startedAtUtc,
                 Method = Limit(context.Request.Method, 16),
@@ -238,6 +239,7 @@ namespace Microi.net
                     SampledAtUtc = nowUtc
                 },
                 Process = process,
+                RuntimeIntervals = RuntimeLatencySampler.GetRecent(),
                 Requests = requests,
                 TopEndpoints = topEndpoints,
                 TopIps = topIps,
@@ -248,6 +250,14 @@ namespace Microi.net
             };
             snapshot.Diagnosis = Diagnose(snapshot);
             return snapshot;
+        }
+
+        /// <summary>沿用管理员 Trace 入口，仅返回当前租户最近 500 个请求中匹配的短计量。</summary>
+        public static List<CompletedRequestSnapshot> GetTraceRequests(string traceId, string osClient)
+        {
+            return Recent.Where(item => string.Equals(item.TraceId, traceId, StringComparison.Ordinal)
+                && string.Equals(item.RequestedOsClient, osClient, StringComparison.OrdinalIgnoreCase))
+                .Take(20).Select(ToCompletedSnapshot).ToList();
         }
 
         public static string NormalizeRoute(string path)
@@ -315,6 +325,7 @@ namespace Microi.net
             Recent.Enqueue(new CompletedRequestState
             {
                 CompletedAtUtc = completedAtUtc,
+                Latency = state.LatencySession?.Capture(),
                 Method = state.Method,
                 Path = state.Path,
                 Route = state.Route,
@@ -558,6 +569,7 @@ namespace Microi.net
             return new CompletedRequestSnapshot
             {
                 CompletedAtUtc = item.CompletedAtUtc,
+                Latency = item.Latency,
                 Method = item.Method,
                 Path = item.Path,
                 Route = item.Route,
@@ -769,6 +781,7 @@ namespace Microi.net
 
         internal sealed class ActiveRequestState
         {
+            public Dos.Common.RequestLatencyObservation.Session LatencySession { get; set; }
             public string Key { get; set; }
             public string TraceId { get; set; }
             public DateTime StartedAtUtc { get; set; }
@@ -785,6 +798,7 @@ namespace Microi.net
 
         private sealed class CompletedRequestState
         {
+            public Dos.Common.RequestLatencyObservation.Snapshot Latency { get; set; }
             public DateTime CompletedAtUtc { get; set; }
             public string Method { get; set; }
             public string Path { get; set; }
@@ -806,6 +820,7 @@ namespace Microi.net
         public int ActiveSampleCount => ActiveRequests.Count;
         public ObservabilityNodeSnapshot Node { get; set; }
         public ProcessRuntimeSnapshot Process { get; set; }
+        public RuntimeLatencySample[] RuntimeIntervals { get; set; } = Array.Empty<RuntimeLatencySample>();
         public RequestWindowSnapshot Requests { get; set; }
         public List<TopRequestMetric> TopEndpoints { get; set; } = new List<TopRequestMetric>();
         public List<TopRequestMetric> TopIps { get; set; } = new List<TopRequestMetric>();
@@ -906,6 +921,7 @@ namespace Microi.net
 
     public sealed class CompletedRequestSnapshot
     {
+        public Dos.Common.RequestLatencyObservation.Snapshot Latency { get; set; }
         public DateTime CompletedAtUtc { get; set; }
         public string Method { get; set; }
         public string Path { get; set; }
