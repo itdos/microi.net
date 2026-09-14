@@ -83,6 +83,7 @@
     <Compile Remove="Common\TenantEngineIsolationTests.cs" />
     <Compile Remove="Common\SpiderSecurityBoundaryTests.cs" />
     <Compile Remove="Common\LicenseKeyTrustTests.cs" />
+    <Compile Remove="Common\LicenseAccountEntitlementTests.cs" />
     <Compile Remove="Common\PlatformReminderBoundaryTests.cs" />
   </ItemGroup>
 

@@ -10,10 +10,26 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-sys-dept
- * Version: v1.0.2
+ * Version: v1.0.4
  * Function:
- * - 当前租户组织机构目录。现代接口通过 Action 调用既有查询或管理员写入原子；旧 /api/SysDept/GetSysDeptStep 支持无需 Action 的 GET/POST，只返回保留组织范围和 _Child 的部门树。身份来自 DiyToken，历史路径不能被请求参数改为写操作。
+ * - 系统部门树与部门维护，兼容历史地址并保持当前租户权限。
  */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/sysdept/addsysdept": "AddSysDept",
+  "/api/sysdept/delsysdept": "DelSysDept",
+  "/api/sysdept/uptsysdept": "UptSysDept",
+  "/api/sysdept/getsysdept": "GetSysDept",
+  "/api/sysdept/getsysdeptmodel": "GetSysDeptModel",
+  "/api/sysdept/getsysdeptstep": "GetSysDeptStep"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 
 // Microi官方接口引擎：platform-sys-dept
 // Version: v1.0.1

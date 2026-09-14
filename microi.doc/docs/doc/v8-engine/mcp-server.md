@@ -33,6 +33,14 @@ Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 A
 
 ## 推荐接入方式
 
+### 从已登录平台复制连接说明
+
+点击右上角 Api/Web 版本可查看 ApiBase、OsClient 和版本类型，并一键复制给 Codex、WorkBuddy 等工具。复制时服务器生成一个独立的开发工具 DiyToken，权限继承当前用户且可在在线终端单独撤销，不影响浏览器会话。无需把平台密码提供给 AI；访问密钥适用于已授权接口的窄权限调用，不替代需要建模、保存和发布的完整开发会话。
+
+新版 CLI 支持 `microi auth import --session-stdin`，从标准输入读取连接 JSON 并向服务器验证，再用系统加密存储保存。Token 不应进入命令参数、项目源码或日志。接着运行 `microi ai init` 和 `microi doctor`，验证 MCP 的初始化、工具清单与当前租户状态。模型服务的登录与计费独立于平台 Token，保留 AI 工具既有模型配置；未配置时由用户通过 AI 工具自身的授权流程完成登录。Windows 导入连接的 Token 和 MCP 共享 Token 均由当前系统用户的 DPAPI 加密保护，使用支持该格式的新版 CLI/MCP 读取，不能复制保险库到另一台机器直接使用。
+
+需要新版平台、SaaS 引擎应用和包含该导入命令的 CLI 配合使用。
+
 ### VS Code 插件
 
 安装 Microi吾码插件后执行：

@@ -1,0 +1,727 @@
+{
+  "SchemaVersion": 1,
+  "SourceRevisions": [
+    "696e0f653",
+    "9c0c0a892",
+    "297cddeb0"
+  ],
+  "Routes": [
+    {
+      "Path": "/api/SysBaseData/AddSysBaseData",
+      "EngineKey": "platform-sys-base-data",
+      "Action": "AddSysBaseData",
+      "Fallback": "Directory:SysBaseData",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysBaseData/DelSysBaseData",
+      "EngineKey": "platform-sys-base-data",
+      "Action": "DelSysBaseData",
+      "Fallback": "Directory:SysBaseData",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysBaseData/UptSysBaseData",
+      "EngineKey": "platform-sys-base-data",
+      "Action": "UptSysBaseData",
+      "Fallback": "Directory:SysBaseData",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysBaseData/GetSysBaseData",
+      "EngineKey": "platform-sys-base-data",
+      "Action": "GetSysBaseData",
+      "Fallback": "Directory:SysBaseData",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysBaseData/GetSysBaseData_Biz",
+      "EngineKey": "platform-sys-base-data",
+      "Action": "GetSysBaseData_Biz",
+      "Fallback": "Directory:SysBaseData",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysBaseData/GetSysBaseDataStep",
+      "EngineKey": "platform-sys-base-data",
+      "Action": "GetSysBaseDataStep",
+      "Fallback": "Directory:SysBaseData",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysBaseData/GetSysBaseDataPa",
+      "EngineKey": "platform-sys-base-data",
+      "Action": "GetSysBaseDataPa",
+      "Fallback": "Directory:SysBaseData",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysDept/AddSysDept",
+      "EngineKey": "platform-sys-dept",
+      "Action": "AddSysDept",
+      "Fallback": "Directory:SysDept",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysDept/DelSysDept",
+      "EngineKey": "platform-sys-dept",
+      "Action": "DelSysDept",
+      "Fallback": "Directory:SysDept",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysDept/UptSysDept",
+      "EngineKey": "platform-sys-dept",
+      "Action": "UptSysDept",
+      "Fallback": "Directory:SysDept",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysDept/GetSysDept",
+      "EngineKey": "platform-sys-dept",
+      "Action": "GetSysDept",
+      "Fallback": "Directory:SysDept",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysDept/GetSysDeptModel",
+      "EngineKey": "platform-sys-dept",
+      "Action": "GetSysDeptModel",
+      "Fallback": "Directory:SysDept",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysDept/GetSysDeptStep",
+      "EngineKey": "platform-sys-dept",
+      "Action": "GetSysDeptStep",
+      "Fallback": "Directory:SysDept",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysRole/AddSysRole",
+      "EngineKey": "platform-sys-role",
+      "Action": "AddSysRole",
+      "Fallback": "Directory:SysRole",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysRole/AddSysRoleFromBody",
+      "EngineKey": "platform-sys-role",
+      "Action": "AddSysRole",
+      "Fallback": "Directory:SysRole",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysRole/DelSysRole",
+      "EngineKey": "platform-sys-role",
+      "Action": "DelSysRole",
+      "Fallback": "Directory:SysRole",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysRole/UptSysRole",
+      "EngineKey": "platform-sys-role",
+      "Action": "UptSysRole",
+      "Fallback": "Directory:SysRole",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysRole/UptSysRoleFromBody",
+      "EngineKey": "platform-sys-role",
+      "Action": "UptSysRole",
+      "Fallback": "Directory:SysRole",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysRole/GetSysRoleModel",
+      "EngineKey": "platform-sys-role",
+      "Action": "GetSysRoleModel",
+      "Fallback": "Directory:SysRole",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysRole/GetSysRole",
+      "EngineKey": "platform-sys-role",
+      "Action": "GetSysRole",
+      "Fallback": "Directory:SysRole",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysRole/GetSysRoleStep",
+      "EngineKey": "platform-sys-role",
+      "Action": "GetSysRoleStep",
+      "Fallback": "Directory:SysRole",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysRole/GetDirectTableGrantPolicies",
+      "EngineKey": "platform-sys-role",
+      "Action": "GetDirectTableGrantPolicies",
+      "Fallback": "Directory:SysRole",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/ModuleEngine/GetTableData",
+      "EngineKey": "platform-module-data",
+      "Action": "GetTableData",
+      "Fallback": "Module",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/ModuleEngine/GetTableDataCount",
+      "EngineKey": "platform-module-data",
+      "Action": "GetTableDataCount",
+      "Fallback": "Module",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/ModuleEngine/GetTableTree",
+      "EngineKey": "platform-module-data",
+      "Action": "GetTableTree",
+      "Fallback": "Module",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/ModuleEngine/GetTableDataTree",
+      "EngineKey": "platform-module-data",
+      "Action": "GetTableDataTree",
+      "Fallback": "Module",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SearchEngine/AsyncIndex",
+      "EngineKey": "platform-search-engine",
+      "Action": "AsyncIndex",
+      "Fallback": "Search",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SearchEngine/AddDocument",
+      "EngineKey": "platform-search-engine",
+      "Action": "AddDocument",
+      "Fallback": "Search",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SearchEngine/UpdateDocument",
+      "EngineKey": "platform-search-engine",
+      "Action": "UpdateDocument",
+      "Fallback": "Search",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SearchEngine/DeleteDocument",
+      "EngineKey": "platform-search-engine",
+      "Action": "DeleteDocument",
+      "Fallback": "Search",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SearchEngine/AddField",
+      "EngineKey": "platform-search-engine",
+      "Action": "AddField",
+      "Fallback": "Search",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SearchEngine/SearchByPage",
+      "EngineKey": "platform-search-engine",
+      "Action": "SearchByPage",
+      "Fallback": "Search",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SearchEngine/SearchBySearchAfter",
+      "EngineKey": "platform-search-engine",
+      "Action": "SearchBySearchAfter",
+      "Fallback": "Search",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SearchEngine/AsyncTableDataToIndex",
+      "EngineKey": "platform-search-engine",
+      "Action": "AsyncTableDataToIndex",
+      "Fallback": "Search",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/AIWorkFlow/GetOverview",
+      "EngineKey": "platform-ai-workflow",
+      "Action": "Overview",
+      "Fallback": "AiWorkflow",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/AIWorkFlow/GenerateFromPrompt",
+      "EngineKey": "platform-ai-workflow",
+      "Action": "GenerateFromPrompt",
+      "Fallback": "AiWorkflow",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/AIWorkFlow/GetNodeDetail",
+      "EngineKey": "platform-ai-workflow",
+      "Action": "NodeDetail",
+      "Fallback": "AiWorkflow",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/AIWorkFlow/ListAIWorkFlows",
+      "EngineKey": "platform-ai-workflow",
+      "Action": "List",
+      "Fallback": "AiWorkflow",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/AIWorkFlow/GetAIWorkFlow",
+      "EngineKey": "platform-ai-workflow",
+      "Action": "Get",
+      "Fallback": "AiWorkflow",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/AIWorkFlow/SaveAIWorkFlow",
+      "EngineKey": "platform-ai-workflow",
+      "Action": "Save",
+      "Fallback": "AiWorkflow",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/AIWorkFlow/DeleteAIWorkFlow",
+      "EngineKey": "platform-ai-workflow",
+      "Action": "Delete",
+      "Fallback": "AiWorkflow",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/BackgroundTask/List",
+      "EngineKey": "platform-background-task",
+      "Action": "List",
+      "Fallback": "Embedded",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/BackgroundTask/Detail",
+      "EngineKey": "platform-background-task",
+      "Action": "Detail",
+      "Fallback": "Embedded",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/BackgroundTask/Status",
+      "EngineKey": "platform-background-task",
+      "Action": "Status",
+      "Fallback": "Embedded",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/BackgroundTask/WorkerStatus",
+      "EngineKey": "platform-background-task",
+      "Action": "WorkerStatus",
+      "Fallback": "Embedded",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/BackgroundTask/ClearCompleted",
+      "EngineKey": "platform-background-task",
+      "Action": "ClearCompleted",
+      "Fallback": "Embedded",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/BackgroundTask/Remove",
+      "EngineKey": "platform-background-task",
+      "Action": "Remove",
+      "Fallback": "Embedded",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/BackgroundTask/Cancel",
+      "EngineKey": "platform-background-task",
+      "Action": "Cancel",
+      "Fallback": "Embedded",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/BackgroundTask/RunApiEngine",
+      "EngineKey": "platform-background-task",
+      "Action": "RunApiEngine",
+      "Fallback": "Embedded",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/OnlineTerminal/Mine",
+      "EngineKey": "platform-online-terminal",
+      "Action": "Mine",
+      "Fallback": "OnlineTerminal",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/OnlineTerminal/List",
+      "EngineKey": "platform-online-terminal",
+      "Action": "List",
+      "Fallback": "OnlineTerminal",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/OnlineTerminal/Kick",
+      "EngineKey": "platform-online-terminal",
+      "Action": "Kick",
+      "Fallback": "OnlineTerminal",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Translate/TranslateText",
+      "EngineKey": "platform-translate-runtime",
+      "Action": "TranslateText",
+      "Fallback": "Translate",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Translate/Detect",
+      "EngineKey": "platform-translate-runtime",
+      "Action": "Detect",
+      "Fallback": "Translate",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Translate/Languages",
+      "EngineKey": "platform-translate-runtime",
+      "Action": "Languages",
+      "Fallback": "Translate",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Translate/TranslateFile",
+      "EngineKey": "platform-translate-runtime",
+      "Action": "TranslateFile",
+      "Fallback": "Translate",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Translate/Suggest",
+      "EngineKey": "platform-translate-runtime",
+      "Action": "Suggest",
+      "Fallback": "Translate",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Translate/Health",
+      "EngineKey": "platform-translate-runtime",
+      "Action": "Health",
+      "Fallback": "Translate",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Office/ExportWordByTpl",
+      "EngineKey": "platform-office-export-word-by-template",
+      "Action": "ExportWordByTemplate",
+      "Fallback": "Office",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Ocr/Recognize",
+      "EngineKey": "platform-ocr-recognize",
+      "Action": "Recognize",
+      "Fallback": "Ocr",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/UserBehavior/Signal",
+      "EngineKey": "platform-user-behavior-signal",
+      "Action": "Signal",
+      "Fallback": "UserBehavior",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/statistics",
+      "EngineKey": "platform-cache-manager",
+      "Action": "Statistics",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/invalidate",
+      "EngineKey": "platform-cache-manager",
+      "Action": "Invalidate",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/invalidate-pattern",
+      "EngineKey": "platform-cache-manager",
+      "Action": "InvalidatePattern",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/connections",
+      "EngineKey": "platform-cache-manager",
+      "Action": "Connections",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/connections/save",
+      "EngineKey": "platform-cache-manager",
+      "Action": "SaveConnection",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/connections/delete",
+      "EngineKey": "platform-cache-manager",
+      "Action": "DeleteConnection",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/test",
+      "EngineKey": "platform-cache-manager",
+      "Action": "TestConnection",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/statistics",
+      "EngineKey": "platform-cache-manager",
+      "Action": "RedisStatistics",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/keys",
+      "EngineKey": "platform-cache-manager",
+      "Action": "Keys",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/key",
+      "EngineKey": "platform-cache-manager",
+      "Action": "Key",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/keys/delete",
+      "EngineKey": "platform-cache-manager",
+      "Action": "DeleteKeys",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/key/replace",
+      "EngineKey": "platform-cache-manager",
+      "Action": "ReplaceValue",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/key/rename",
+      "EngineKey": "platform-cache-manager",
+      "Action": "RenameKey",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/Cache/redis/key/ttl",
+      "EngineKey": "platform-cache-manager",
+      "Action": "SetTtl",
+      "Fallback": "Cache",
+      "Authenticated": true
+    },
+    {
+      "Path": "/api/SysUser/DiyLogin",
+      "EngineKey": "platform-sys-user-session",
+      "Action": "Login",
+      "Fallback": "Bootstrap",
+      "Authenticated": false,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/Mq/SendMsg",
+      "EngineKey": "platform-mq",
+      "Action": "Send",
+      "Fallback": "Mq",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/SysLog/GetSysLog",
+      "EngineKey": "mci-system-observability-query",
+      "Action": "Logs",
+      "Fallback": "Observability",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/SysLog/GetLogTypes",
+      "EngineKey": "mci-system-observability-query",
+      "Action": "LogTypes",
+      "Fallback": "Observability",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/SysLog/GetSysLogStats",
+      "EngineKey": "mci-system-observability-query",
+      "Action": "LogStats",
+      "Fallback": "Observability",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/SysLog/GetDockerLogs",
+      "EngineKey": "mci-system-observability-query",
+      "Action": "AppLogs",
+      "Fallback": "Observability",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/SysLog/GetQueueHealth",
+      "EngineKey": "mci-system-observability-query",
+      "Action": "LegacyQueueHealth",
+      "Fallback": "Observability",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/SecurityGuard/ListBlocked",
+      "EngineKey": "mci-system-observability-query",
+      "Action": "ListBlocked",
+      "Fallback": "Observability",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/SecurityGuard/ListRecentAccess",
+      "EngineKey": "mci-system-observability-query",
+      "Action": "ListRecentAccess",
+      "Fallback": "Observability",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/SecurityGuard/BlockIp",
+      "EngineKey": "mci-system-observability-action",
+      "Action": "BlockIp",
+      "Fallback": "ObservabilityAction",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/SecurityGuard/UnblockIp",
+      "EngineKey": "mci-system-observability-action",
+      "Action": "UnblockIp",
+      "Fallback": "ObservabilityAction",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/Im/GetUserSig",
+      "EngineKey": "platform-tencent-im",
+      "Action": "GetUserSig",
+      "Fallback": "Embedded",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/Im/MultiAccountImport",
+      "EngineKey": "platform-tencent-im",
+      "Action": "MultiAccountImport",
+      "Fallback": "Embedded",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/Im/MultiAccountDelete",
+      "EngineKey": "platform-tencent-im",
+      "Action": "MultiAccountDelete",
+      "Fallback": "Embedded",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/Mqtt/GetStatus/status",
+      "EngineKey": "platform-mqtt",
+      "Action": "Status",
+      "Fallback": "Embedded",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/Mqtt/SendCommand/send-command",
+      "EngineKey": "platform-mqtt",
+      "Action": "Publish",
+      "Fallback": "Embedded",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/Os/DiyUpdate",
+      "EngineKey": "platform-os-legacy-compatibility",
+      "Action": "DiyUpdate",
+      "Fallback": "LegacyOs",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/Os/CheckServer",
+      "EngineKey": "platform-os-legacy-compatibility",
+      "Action": "CheckServer",
+      "Fallback": "LegacyOs",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/Os/OsClientInit",
+      "EngineKey": "platform-os-legacy-compatibility",
+      "Action": "OsClientInit",
+      "Fallback": "LegacyOs",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/Os/DynamicApiEngineInit",
+      "EngineKey": "platform-os-legacy-compatibility",
+      "Action": "DynamicApiEngineInit",
+      "Fallback": "LegacyOs",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/Os/GetDesktop",
+      "EngineKey": "platform-sys-menu",
+      "Action": "GetSysMenuStep",
+      "Fallback": "Bootstrap",
+      "Authenticated": true,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/SysUser/GetSysUserModel",
+      "EngineKey": "platform-sys-user-admin",
+      "Action": "GetSysUserModel",
+      "Fallback": "UserAdmin",
+      "Authenticated": true,
+      "PostOnly": false
+    },
+    {
+      "Path": "/api/SysUser/SmsLogin",
+      "EngineKey": "platform_auth_sms_login",
+      "Action": "Login",
+      "Fallback": "Embedded",
+      "Authenticated": false,
+      "PostOnly": true
+    },
+    {
+      "Path": "/api/SysUser/SsoPengrui",
+      "EngineKey": "sso_legacy_token_login",
+      "Action": "Login",
+      "Fallback": "Embedded",
+      "Authenticated": false,
+      "PostOnly": false
+    }
+  ]
+}

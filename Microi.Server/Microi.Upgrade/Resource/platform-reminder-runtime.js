@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-reminder-runtime
- * Version: v1.0.6
+ * Version: v1.0.7
  * Function:
  * - 统一系统公告的草稿、校验、发布快照、计划和回执；支持可信帐号范围及每次后端重启后的首次登录展示，采用稳定请求与数据库唯一领取，事务失败不重复发布。
  */
@@ -119,7 +119,8 @@ function createPlatformReminderModel() {
     if ((scope === 'SuperAdmins' || rule.DisplayMode === 'AfterServerRestart') && receiverProtocol < 2) return false;
     if (['AllAccounts', 'SuperAdmins'].indexOf(scope) < 0) return false;
     if (scope === 'SuperAdmins' && context.Administrator !== true) return false;
-    if (['Once', 'EveryEntry', 'AfterServerRestart'].indexOf(rule.DisplayMode) < 0) return false;
+    if (['Once', 'EveryEntry', 'EveryLogin', 'AfterServerRestart'].indexOf(rule.DisplayMode) < 0) return false;
+    if (rule.DisplayMode === 'EveryLogin' && !/^[a-f0-9]{32,64}$/.test(String(context.LoginId || ''))) return false;
     return rule.DisplayMode !== 'AfterServerRestart' || /^[A-Za-z0-9-]{16,80}$/.test(text(context.RestartEpoch));
   }
   function project(batch, source, now, context) {
@@ -166,6 +167,7 @@ function safeId(value) { var valueText = String(value || ''); if (!/^[a-f0-9]{32
 function parse(value) { return typeof value === 'string' ? JSON.parse(value) : value; }
 function requireAdmin(context) { if (!context.Administrator) throw new Error('只有当前租户的平台管理员可以维护提醒。'); }
 function receiptId(item, context) {
+  if (item.DisplayMode === 'EveryLogin') return stable(String(V8.OsClient).toLowerCase() + '|' + context.UserId + '|' + item.Id + '|' + context.LoginId);
   var entry = item.DisplayMode === 'EveryEntry' ? String(p.EntryId || '') : 'once';
   if (entry !== 'once' && !/^[A-Za-z0-9-]{16,80}$/.test(entry)) throw new Error('页面会话标识无效。');
   return stable(String(V8.OsClient).toLowerCase() + '|' + context.UserId + '|' + item.Id + '|' + entry);
@@ -185,6 +187,19 @@ function validateTargets(rule) {
 }
 function collect(context) {
   var items = [], warnings = [], nextAt = now + 60000;
+  // 签名 License 是到期事实源；关闭状态仍走系统提醒的持久化回执，每次真实登录重新提示。
+  var licenseEnd = Date.parse(context.LicenseExpirationDate || '');
+  if (context.Administrator && context.LoginId && isFinite(licenseEnd) && licenseEnd - now <= 7 * 86400000) {
+    var licenseBatchId = stable('LicenseExpiry|' + context.LicenseExpirationDate);
+    var expiryText = new Date(licenseEnd).toISOString().replace('T', ' ').replace('.000Z', ' UTC');
+    items.push({ Id: 'SystemLicense:' + stable(licenseBatchId + '|' + context.LoginId), BatchId: licenseBatchId, Source: 'SystemLicense',
+      Slot: 0, DueAt: new Date(licenseEnd - 7 * 86400000).toISOString(), NextAt: nextAt,
+      Title: licenseEnd <= now ? '系统授权已到期' : '系统授权即将到期',
+      Content: '当前系统授权到期时间为 ' + expiryText + '。请及时联系授权账号持有人续期，并在授权管理中重新部署有效授权。',
+      Icon: 'Warning', Severity: licenseEnd <= now ? 'error' : 'warning', Priority: 100,
+      DisplayMode: 'EveryLogin', EndsAt: new Date(Math.max(now, licenseEnd) + 86400000).toISOString(),
+      LinkUrl: '/#/license', LinkText: '查看授权' });
+  }
   var own = query('mci_platform_reminder_batch', [['State','=','Published'],['EndsAt','>',isoNow]], batchFields).Data || [];
   function append(rows, source, scope, key) {
     for (var i = 0; rows && i < rows.length; i++) {
@@ -346,4 +361,3 @@ try {
   }
   throw new Error('不支持的提醒动作。');
 } catch (error) { return { Code: 0, Msg: String(error.message || error) }; }
-

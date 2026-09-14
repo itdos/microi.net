@@ -270,7 +270,7 @@
                                         {{ $t ? $t('Msg.Load') : '加载' }}
                                     </el-button>
                                 </div>
-                                <div v-else class="history-availability-note">仅显示版本记录，历史原文及恢复操作未开放。</div>
+                                <div v-else class="history-availability-note">当前权限可查看版本记录，原文需代码管理权限。</div>
                             </div>
                         </div>
                         <div v-else-if="!dataVersionListLoading" class="panel-empty">
@@ -405,7 +405,7 @@ export default {
             return Number.isFinite(value) && value > 0 ? value : 0;
         },
         CanReadVersionContent(item) {
-            return !!item && item.HistoryContentMode !== "MetadataOnly" && !!item.Data;
+            return !!item && item.HistoryContentMode !== "MetadataOnly" && (item.HistoryContentMode === "OnDemand" || !!item.Data);
         },
         GetFirstAvailableTab() {
             return this.availableTabs.length > 0 ? this.availableTabs[0] : "";

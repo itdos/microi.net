@@ -719,160 +719,20 @@ namespace Microi.net.Api
             return false;
         }
 
-        /// <summary>
-        /// 获取表单详情的关联系统数据（数据日志、数据评论、数据版本）。
-        ///
-        /// 这些数据不能按 microi_datalog / diy_comment / mic_data_version
-        /// 的独立表权限直接开放，否则普通用户可能枚举其它业务表的日志或版本。
-        /// 本接口先校验调用者对父菜单、父表和父记录的读取权限，再由服务端
-        /// 固定辅助表及筛选条件执行查询。
-        /// </summary>
+        /// <summary>按可信父表权限读取日志、评论及版本；正文按需单条读取。</summary>
         [HttpPost]
         public async Task<JsonResult> GetFormRelatedData([FromBody] JObject param)
         {
             param = await DefaultParam(param ?? new JObject());
+            return Json(await FormRelatedDataService.GetAsync(param));
+        }
 
-            var osClient = param["OsClient"].Val<string>();
-            var lang = param["_Lang"].Val<string>();
-            var relatedType = param["RelatedType"].Val<string>()?.Trim();
-            var parentFormEngineKey = param["ParentFormEngineKey"].Val<string>()?.Trim();
-            var parentTableRowId = param["ParentTableRowId"].Val<string>()?.Trim();
-            var sysMenuId = param["_SysMenuId"].Val<string>()?.Trim();
-            if (parentFormEngineKey.DosIsNullOrWhiteSpace()
-                || parentTableRowId.DosIsNullOrWhiteSpace()
-                || sysMenuId.DosIsNullOrWhiteSpace())
-            {
-                return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "ParamError", lang)));
-            }
-
-            var parentParam = new DiyTableRowParam
-            {
-                FormEngineKey = parentFormEngineKey,
-                Id = parentTableRowId,
-                _SysMenuId = sysMenuId,
-                _InvokeType = InvokeType.Client.ToString(),
-                _IsAnonymous = false,
-                _CurrentUser = param["_CurrentUser"] as JObject,
-                OsClient = osClient,
-                _Lang = lang
-            };
-            var authResult = await MicroiEngine.FormEngine
-                .AuthorizeClientTableOperationAsync(parentParam, "Read");
-            if (authResult == null || authResult.Code != 1)
-            {
-                return Json(authResult
-                    ?? new DosResult(0, null, DiyMessage.GetLang(osClient, "NoAuth", lang)));
-            }
-
-            // 菜单/表授权不代表当前父记录可读。必须走真实 Client Get，执行父表
-            // ServerDataV8 的行授权；不能用只选 Id 或 Count 探针跳过它。
-            var parentResult = await MicroiEngine.FormEngine.GetFormDataAsync(parentParam);
-            if (parentResult == null || parentResult.Code != 1 || parentResult.Data == null)
-            {
-                return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "NoAuth", lang)));
-            }
-
-            var normalizedType = relatedType?.ToLowerInvariant();
-            if (normalizedType != "counts" && normalizedType != "datalog"
-                && normalizedType != "datacomment" && normalizedType != "dataversion")
-            {
-                return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "ParamError", lang)));
-            }
-
-            // JObject 即使写 _InvokeType=Server 也不是可信来源。只在父记录完整授权后，
-            // 从白名单构造新的 CLR 参数；请求不能覆盖表、条件、字段、分页或可信标记。
-            DiyTableRowParam BuildRelatedParam(string key, string rowField, List<string> fields)
-            {
-                return new DiyTableRowParam
-                {
-                    FormEngineKey = key,
-                    OsClient = osClient,
-                    _Lang = lang,
-                    _CurrentUser = (JObject)parentParam._CurrentUser.DeepClone(),
-                    _InvokeType = InvokeType.Server.ToString(),
-                    _TrustedServerInvocation = true,
-                    _IsAnonymous = false,
-                    IsDeleted = 0,
-                    _PageIndex = 1,
-                    _PageSize = 200,
-                    _OrderBy = "CreateTime",
-                    _OrderByType = "DESC",
-                    _SelectFields = fields,
-                    _Where = new JArray
-                    {
-                        new JArray(rowField, "=", parentTableRowId),
-                        new JArray("TableId", "=", parentParam.TableId)
-                    }
-                };
-            }
-
-            var commentAvailable = true;
-            const string commentUnavailableReason = "CommentParentTableBindingUnavailable";
-            const string commentUnavailableMessage = "评论暂不可用：当前版本缺少评论父表绑定及可信写入。旧评论不能仅按记录 Id 推断归属。";
-            if (normalizedType == "counts" || normalizedType == "datacomment")
-            {
-                var commentFields = await MicroiEngine.FormEngine.GetDiyField(new DiyFieldParam
-                {
-                    TableName = "diy_comment", OsClient = osClient, _Lang = lang,
-                    _OnlyRealField = true, _InvokeType = InvokeType.Server.ToString(),
-                    _TrustedServerInvocation = true
-                });
-                if (commentFields == null || commentFields.Code != 1)
-                {
-                    return Json(new DosResult(0, null, "无法核验评论父表绑定，请稍后重试。"));
-                }
-                commentAvailable = commentFields.Data != null
-                    && commentFields.Data.Any(field => string.Equals(field["Name"].Val<string>(), "TableId", StringComparison.OrdinalIgnoreCase));
-            }
-            var append = new JObject
-            {
-                ["HistoryContentMode"] = "MetadataOnly",
-                ["DataCommentUnavailableReason"] = commentAvailable ? null : commentUnavailableReason,
-                ["DataCommentUnavailableMessage"] = commentAvailable ? null : commentUnavailableMessage
-            };
-            if (normalizedType == "datacomment" && !commentAvailable)
-            {
-                return Json(new DosResult(0, null, commentUnavailableMessage, 0, append));
-            }
-
-            // 父记录 DataFilter 只证明当前行的投影可读，不授予历史原始 Content/Data。
-            // 查询阶段即排除历史正文、自由文本标题/备注和人员信息，避免在返回前才脱敏。
-            var logParam = BuildRelatedParam("microi_datalog", "DataId", new List<string> { "Id", "Type", "CreateTime" });
-            var versionParam = BuildRelatedParam("mic_data_version", "TableRowId", new List<string> { "Id", "Action", "Version", "CreateTime" });
-            var commentParam = BuildRelatedParam("diy_comment", "TableRowId", new List<string>
-            {
-                "Id", "TableId", "TableRowId", "Content", "ParentCommentId", "CreateTime", "UserId", "CreateUser"
-            });
-            if (normalizedType == "counts")
-            {
-                // 顺序读取有界三表，某项真实失败不可伪装为成功空列表；旧评论缺绑定单独标明不可用。
-                var logCount = await MicroiEngine.FormEngine.GetTableDataCountAsync(logParam);
-                if (logCount == null) return Json(new DosResult(0, null, "关联日志查询未返回结果。"));
-                if (logCount.Code != 1) return Json(logCount);
-                DosResultList<dynamic> commentCount = null;
-                if (commentAvailable)
-                {
-                    commentCount = await MicroiEngine.FormEngine.GetTableDataCountAsync(commentParam);
-                    if (commentCount == null) return Json(new DosResult(0, null, "关联评论查询未返回结果。"));
-                    if (commentCount.Code != 1) return Json(commentCount);
-                }
-                var versionCount = await MicroiEngine.FormEngine.GetTableDataCountAsync(versionParam);
-                if (versionCount == null) return Json(new DosResult(0, null, "关联版本查询未返回结果。"));
-                if (versionCount.Code != 1) return Json(versionCount);
-                return Json(new DosResult(1, new JObject
-                {
-                    ["DataLog"] = logCount.DataCount,
-                    ["DataComment"] = commentAvailable ? JToken.FromObject(commentCount.DataCount) : JValue.CreateNull(),
-                    ["DataVersion"] = versionCount.DataCount
-                }, "", 0, append));
-            }
-
-            var relatedParam = normalizedType == "datalog" ? logParam
-                : normalizedType == "dataversion" ? versionParam : commentParam;
-            var result = await MicroiEngine.FormEngine.GetTableDataAsync(relatedParam);
-            if (result == null) return Json(new DosResult(0, null, "关联数据查询未返回结果。"));
-            if (result?.Code == 1) result.DataAppend = append;
-            return Json(result);
+        /// <summary>认证会话提交评论，父表归属、作者及回复上下文由可信内核生成。</summary>
+        [HttpPost]
+        public async Task<JsonResult> AddFormComment([FromBody] JObject param)
+        {
+            param = await DefaultParam(param ?? new JObject());
+            return Json(await FormRelatedDataService.AddCommentAsync(param));
         }
         /// <summary>
         /// 匿名获取数据，必传：OsClient、TableId或Name

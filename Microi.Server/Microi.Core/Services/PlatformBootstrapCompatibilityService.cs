@@ -29,6 +29,15 @@ namespace Microi.net
             var lang = request["_Lang"]?.ToString();
             switch (action)
             {
+                case "CreateCliSession":
+                case "GetConnectionInfo":
+                    using (V8TenantContext.Enter(osClient, "platform-sys-user-session"))
+                    using (V8TrustedExecutionContext.EnterForTenant(currentUser, osClient))
+                    {
+                        if (!PlatformApiRuntimeRegistry.TryCreate("SysUserSession", out var sessionRuntime))
+                            return new DosResult(0, null, "用户会话运行时尚未注册。");
+                        return await sessionRuntime.ExecuteAsync(action, request).ConfigureAwait(false);
+                    }
                 case "Login":
                 case "RefreshToken":
                 case "TokenLogin":

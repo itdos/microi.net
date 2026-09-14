@@ -117,7 +117,7 @@ export default {
                 }
             );
         },
-        GetFormRelatedData(relatedType, callback) {
+        GetFormRelatedData(relatedType, callback, extra = {}) {
             var self = this;
             var parentFormEngineKey = (self.CurrentDiyTableModel && (self.CurrentDiyTableModel.Id || self.CurrentDiyTableModel.Name))
                 || self.TableId
@@ -125,6 +125,7 @@ export default {
             self.DiyCommon.Post(
                 "/api/FormEngine/GetFormRelatedData",
                 {
+                    ...extra,
                     RelatedType: relatedType,
                     ParentFormEngineKey: parentFormEngineKey,
                     ParentTableRowId: self.TableRowId,

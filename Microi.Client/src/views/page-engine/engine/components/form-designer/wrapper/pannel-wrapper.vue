@@ -26,9 +26,9 @@
   >
     <el-card
       style="position: relative"
-      :style="[{ backgroundColor: wrapperObj.wrapperOption.pannelColor }]"
+      :style="surface({ backgroundColor: wrapperObj.wrapperOption.pannelColor })"
       :shadow="formData.JsonObj.formConfig.shadow == true ? 'always' : 'never'"
-      :body-style="wrapperObj.wrapperOption.dynamicStyle"
+      :body-style="surface(wrapperObj.wrapperOption.dynamicStyle)"
       class="box-card"
       :class="[isShowBorder, { 'is-ai-engine-panel': hasAiEngineWidget }]"
       @drop="handleDrop"
@@ -71,7 +71,7 @@
 
       <template #header v-if="showWrapperTitle">
         <div
-          :style="wrapperObj.wrapperOption.titleOption.dynamicStyle"
+          :style="surface(wrapperObj.wrapperOption.titleOption.dynamicStyle)"
           class="clearfix"
         >
           <span class="wrapper-title">{{ displayWrapperTitle }}</span>
@@ -205,6 +205,7 @@ import { ElMessageBox, ElNotification, ElMessage } from 'element-plus'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import useResizable from '../../../hooks/useResizable'
 import { peT } from '../../../i18n.js'
+import { runtimePanelHeight, runtimeSurfaceStyle } from '../../../utils/runtimePresentation.js'
 import vueCustomScrollbar from 'vue-custom-scrollbar/src/vue-scrollbar.vue'
 import 'vue-custom-scrollbar/dist/vueScrollbar.css'
 import {
@@ -257,14 +258,9 @@ const toPositiveHeight = (value, fallback) => {
     : fallback
 }
 
+const surface = style => runtimeSurfaceStyle(style, pageEngineStore.dark, isDesignMode.value)
 const autoHeight = computed(() => {
-  if (formData.value.JsonObj.formConfig?.mobile) {
-    return 'auto'
-  }
-  if (!isDesignMode.value && isAutoHeightValue(wrapperHeightValue.value)) {
-    return 'auto'
-  }
-  return toPositiveHeight(wrapperHeightValue.value, 'auto')
+  return runtimePanelHeight(props.wrapperObj.wrapperOption, isDesignMode.value, formData.value.JsonObj.formConfig?.mobile)
 })
 
 const designScrollHeight = computed(() => {

@@ -10,10 +10,24 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-os-legacy-compatibility
- * Version: v1.0.2
+ * Version: v1.0.4
  * Function:
- * - 兼容旧 OS 地址的服务器版本、二维码和时间协议；旧地址固定动作并归一化大小写，兼容路径租户后缀，宿主敏感动作保留原鉴权。
+ * - 旧 OS 地址兼容、当前租户健康诊断与初始化；版本、二维码、授权硬件信息由可信后端原子提供。
  */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/os/diyupdate": "DiyUpdate",
+  "/api/os/checkserver": "CheckServer",
+  "/api/os/osclientinit": "OsClientInit",
+  "/api/os/dynamicapiengineinit": "DynamicApiEngineInit"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 
 // 旧地址固定对应动作，兼容 getDateTimeNow 等大小写及 --OsClient--租户-- 后缀。
 var route = String(V8.Param._RequestPath || V8.Param.ApiAddress || '').replace(/\?.*$/, '').replace(/--OsClient--.*?--$/i, '');
@@ -21,7 +35,7 @@ var segments = route.split('/');
 var action = String(V8.Param.Action || '').trim();
 if (!action || /^\/api\/os\//i.test(route)) action = segments[segments.length - 1] || '';
 var names = {
-  getosversion:'GetOsVersion', createqrcode:'CreateQRCode', createqrcodeimage:'CreateQRCodeImage',
+  diyupdate:'DiyUpdate', checkserver:'CheckServer', osclientinit:'OsClientInit', dynamicapiengineinit:'DynamicApiEngineInit', getosversion:'GetOsVersion', createqrcode:'CreateQRCode', createqrcodeimage:'CreateQRCodeImage',
   getmicroinetversion:'GetMicroiNetVersion', getosclient:'GetOsClient', gethid:'GetHID',
   getdatetimenow:'GetDateTimeNow', microinetinitcheck:'MicroiNetInitCheck'
 };

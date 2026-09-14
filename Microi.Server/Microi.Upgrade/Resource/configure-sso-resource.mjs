@@ -358,7 +358,7 @@ for (const [, key, name, fileName, , , apiAddress, operation] of engineSpecs) {
 // 协议路由闭包同步升级，避免出现“包版本已更新、源码仍宣称旧契约”的半升级状态。
 for (const [, key, , fileName] of engineSpecs) {
   const sourcePath = path.join(engineSourceDirectory, fileName);
-  const version = key === 'sso_legacy_capabilities' ? 'v1.0.4' : 'v1.0.3';
+  const version = key === 'sso_legacy_token_login' ? 'v1.0.5' : key === 'sso_legacy_capabilities' ? 'v1.0.4' : 'v1.0.3';
   const source = fs.readFileSync(sourcePath, 'utf8')
     .replace(/Version:\s*v?\d+\.\d+\.\d+/i, `Version: ${version}`);
   if (!source.includes(`Version: ${version}`)) {
@@ -374,7 +374,7 @@ pkg.SysApiEngines = engineSpecs.map(([id, key, name, fileName, allowAnonymous, s
   CreateTime: '2026-08-21 12:00:00',
   Id: id,
   ChangeHistory: (key === 'sso_legacy_capabilities' ? '2026-09-09 16:30:00 v1.0.4 恢复原生 TokenLogin 配置投影并保留安全白名单\n' : '') + `2026-08-30 00:00:00 v1.0.3 将 SSO 公开协议路由全部迁入接口引擎并支持受控 HTTP 响应\n2026-08-25 00:00:00 v1.0.2 增加官方资源策略提示与 SSO 租户 Hook 安全合同\n2026-08-21 12:00:00 v1.0.1 创建接口引擎 ${key}\n`,
-  Version: key === 'sso_legacy_capabilities' ? 'v1.0.4' : 'v1.0.3',
+  Version: key === 'sso_legacy_token_login' ? 'v1.0.5' : key === 'sso_legacy_capabilities' ? 'v1.0.4' : 'v1.0.3',
   LimitRecursion: 5000,
   LimitMemory: 2048,
   MaxStatements: 100000000,
@@ -385,6 +385,7 @@ pkg.SysApiEngines = engineSpecs.map(([id, key, name, fileName, allowAnonymous, s
   Files: '[]',
   AllowAnonymous: allowAnonymous,
   ApiAddress: apiAddress || `/apiengine/${key}`,
+  ...(key === 'sso_legacy_token_login' ? { ApiRoutes: '/api/SysUser/SsoPengrui' } : {}),
   ...(operation ? { ResponseType: 'HTTP' } : {}),
   Lock: 0,
   ApiV8Code: fs.readFileSync(path.join(engineSourceDirectory, fileName), 'utf8').replace(/\r\n?/g, '\n').replace(/\n*$/, '\n'),

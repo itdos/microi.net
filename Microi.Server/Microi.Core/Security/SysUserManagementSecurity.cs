@@ -59,6 +59,7 @@ namespace Microi.net
                 "LastLoginIP",
                 "PwdErrorCount",
                 "LicenseType",
+                "LicenseExpirationDate",
                 "TenantId",
                 "TenantName",
                 "TenantDatabaseQuota",

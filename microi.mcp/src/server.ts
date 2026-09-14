@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { isIP } from 'node:net';
 import path from 'node:path';
 import { z } from 'zod';
+import { registerServerPrivateSettingsTools } from './server-private-settings-tools.js';
 import type {
   ApiResponse,
   MicroiClient,
@@ -3257,6 +3258,8 @@ function buildInstructions(ctx: McpServerContext): string {
 - OsClient (tenant): ${ctx.osClient}
 
 IMPORTANT: This server ONLY manages OsClient tenant "${ctx.osClient}". "${ctx.label || ctx.osClient}" is only a display name. When the user specifies a different tenant name, do NOT use this server.
+THIRD-PARTY SECRETS: For App Secret, client_secret, API keys or credentials such as Chanjet, FIRST inspect microi_manage_server_private_secret (List) and reuse System Settings > Security and Service Access. Save through that tool only when authorized, then read back HasSecret/IsSecret/IsEnabled. Backend V8 uses the existing protected settings capability. Do not invent environment variables, hardcode secrets, or block integration merely because the existing protected setting has not yet been populated. Never return plaintext or ciphertext values.
+PAGE DESIGN: Dashboards default to themeMode=system, density=compact and wrapper heightMode=content. Use native summary/detail statistic appearances and platform colour variables. Match reference panel proportions and verify light/dark screenshots; do not turn one-line metrics into large fixed-height colour blocks.
 BOUNDARY RULES:
 - Bound API Server: ${ctx.apiBaseUrl}
 - Bound OsClient: ${ctx.osClient || '(default)'}
@@ -6607,7 +6610,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       defaultValue: z.string().optional(),
       tab: z.string().optional(),
       data: z.string().optional(),
-      config: z.string().optional(),
+      config: z.string().optional().describe('完整组件 Config JSON，先读取原 Config 并合并。FileUpload 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance（boolean，默认 false）；启用角色权限应同时 Limit=true。用 microi_list_roles/microi_save_role 管理角色，附件 VisibleRoleIds 保存真实角色 Id 数组。'),
       description: z.string().optional(),
       inTableEdit: z.number().optional(),
       // zhy: expose field V8 source properties so Config.V8Code and runtime V8Code can be updated together.
@@ -8243,6 +8246,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   registerEmailTools(server, client, context);
   // 统一通知工具只通过当前租户固定接口维护配置，保存与实际发布分别授权并回读。
   registerMessageNotificationTools(server, client, context);
+  registerServerPrivateSettingsTools(server, client);
 
   toolRegistry.flush(context.codexMode ? ['microi_codex'] : undefined);
   return server;

@@ -1263,8 +1263,14 @@
             destroy-on-close
             @opened="ApplyDataVersionPreviewData"
         >
+            <div v-if="CodeVersionPreviewFields.length" class="data-version-code-preview">
+                <section v-for="field in CodeVersionPreviewFields" :key="field.Name">
+                    <h4>{{ field.Label }}</h4>
+                    <pre>{{ field.Code || $t('Msg.EmptyValue') }}</pre>
+                </section>
+            </div>
             <DiyForm
-                v-if="ShowDataVersionPreviewDialog && TableId"
+                v-else-if="ShowDataVersionPreviewDialog && TableId"
                 :key="'data_version_preview_' + PreviewDataVersionKey"
                 ref="fieldFormDataVersionPreview"
                 :CodeEditorMini="UseMiniCodeEditor"
@@ -1407,6 +1413,17 @@ export default {
         FormViewRenderer: defineAsyncComponent(() => import("./form-view-blocks/form-view-renderer.vue"))
     },
     computed: {
+        CodeVersionPreviewFields() {
+            // 按需接口只返回已授权的代码字段；局部快照不渲染为空白的整张配置表单。
+            if (this.PreviewDataVersionItem?.HistoryContentMode !== "Authorized") return [];
+            return Object.entries(this.PreviewDataVersionData || {})
+                .filter(([name]) => name !== "Id" && !name.startsWith("__"))
+                .map(([name, code]) => ({
+                    Name: name,
+                    Label: (this.DiyFieldList || []).find(field => field.Name === name)?.Label || name,
+                    Code: code
+                }));
+        },
         UseMiniCodeEditor() {
             return String(this.TableName || "").toLowerCase() === "sys_menu";
         },

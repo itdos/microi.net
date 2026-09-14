@@ -1066,7 +1066,8 @@ public class SaaSRuntimeConfigurationTests
         Assert.Equal(0, authSecret.Value<int>("AppVisible"));
         Assert.Equal(1, authSecret.Value<int>("Readonly"));
         Assert.Equal(1, authSecret.Value<int>("IsLockField"));
-        Assert.Equal("varchar(100)", authSecret.Value<string>("Type"));
+        // 配置文本改为行外存储，避免 MySQL 8 空库建表超过行长上限；密钥仍须隐藏并锁定。
+        Assert.Equal("mediumtext", authSecret.Value<string>("Type"));
     }
 
     [Fact]

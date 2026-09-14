@@ -1817,7 +1817,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             var normalizedUserId = (userId ?? string.Empty).Trim();
             if (normalizedUserId.DosIsNullOrWhiteSpace())
                 throw new ArgumentException("刷新用户标识不能为空。", nameof(userId));
-            return $"Microi:{canonicalTenant}:LoginTokenSysUser:{normalizedUserId}";
+            return LoginSessionCacheKeys.User(canonicalTenant, normalizedUserId);
         }
 
         /// <summary>

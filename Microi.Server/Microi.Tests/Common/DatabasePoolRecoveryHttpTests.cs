@@ -76,7 +76,7 @@ public sealed class DatabasePoolRecoveryHttpTests
             var jwt = new JwtSecurityToken(claims: new[] { new Claim("UserId", "admin-id"), new Claim("OsClient", tenant),
                 new Claim(DiyToken.AuthVersionClaimType, DiyToken.CurrentAuthVersion) }, expires: DateTime.UtcNow.AddMinutes(5));
             var token = new JwtSecurityTokenHandler().WriteToken(jwt);
-            var cacheKey = $"Microi:{tenant}:LoginTokenSysUser:admin-id";
+            var cacheKey = LoginSessionCacheKeys.User(tenant, "admin-id");
             var tokenModel = new CurrentToken { OsClient = tenant, Token = token, AuthVersion = DiyToken.CurrentAuthVersion,
                 CurrentUser = JObject.FromObject(new { Id = "admin-id", Account = "admin", Level = 9999, _IsAdmin = true }) };
             await cache.StringSetAsync(cacheKey, JsonConvert.SerializeObject(tokenModel));

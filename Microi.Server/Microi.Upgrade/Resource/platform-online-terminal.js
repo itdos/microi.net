@@ -7,6 +7,26 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-online-terminal
+ * Version: v1.0.2
+ * Function:
+ * - 当前租户在线终端、会话列表与终端管理入口。
+ */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/onlineterminal/mine": "Mine",
+  "/api/onlineterminal/list": "List",
+  "/api/onlineterminal/kick": "Kick"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 // Microi官方接口引擎：platform-online-terminal
 // Version: v1.0.0
 // SignalR/令牌终端运行时由 V8 最小原子能力提供；接口引擎保留可商城升级的动作编排。

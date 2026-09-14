@@ -1,9 +1,11 @@
 <template>
   <div class="container">
     <img
+      v-if="widgetObj.widgetParams[0].typeOptions.dataJson.icon && !imageFailed"
       :src="widgetObj.widgetParams[0].typeOptions.dataJson.icon"
       alt="头像"
       class="avatar"
+      @error="imageFailed = true"
     />
     <div class="content">
       <div class="title">
@@ -17,7 +19,7 @@
 </template>
 
 <script setup name="workbench-widget">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useWidget } from '../../../hooks/useWidget'
 
 const props = defineProps({
@@ -26,6 +28,8 @@ const props = defineProps({
     required: true,
   },
 })
+const imageFailed = ref(false)
+watch(() => props.widgetObj.widgetParams[0].typeOptions.dataJson.icon, () => { imageFailed.value = false })
 //日期区间
 const dateRange = ref()
 //是否加载中
@@ -47,14 +51,14 @@ await loadRemoteData()
 .container {
   display: flex;
   align-items: center;
-  padding: 20px;
+  padding: 8px 4px;
   // background-color: #fff;
 }
 .avatar {
-  width: 64px;
-  height: 64px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  margin-right: 20px;
+  margin-right: 12px;
 }
 .content {
   display: flex;

@@ -62,6 +62,13 @@
             ></el-input-number>
           </el-form-item>
 
+          <el-form-item :label="$pet('运行高度')">
+            <el-select v-model="curWrapper.wrapperOption.heightMode" size="small" :placeholder="$pet('随内容展开')">
+              <el-option :label="$pet('随内容展开')" value="content" />
+              <el-option :label="$pet('保留固定最小高度')" value="fixed" />
+            </el-select>
+          </el-form-item>
+
           <!-- <el-form-item label="" style="width: 90%">
         <el-slider
           :min="0"

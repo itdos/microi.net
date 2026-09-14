@@ -564,6 +564,9 @@ namespace Microi.net.Api
                         item["Url"] = Convert.ToString(urlResult.Data);
                     }
                     item["Limit"] = param.Limit != false;
+                    // 仅可信上传成功响应签发，表单保存验证后移除；它不是持久下载凭证。
+                    var uploadProof = FileUploadProvenance.Issue(param, path);
+                    if (uploadProof != null) item["_UploadProof"] = uploadProof;
                 }
 
                 result.Data = dataToken;

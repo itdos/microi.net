@@ -10,10 +10,21 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-sys-menu
- * Version: v1.0.5
+ * Version: v1.0.7
  * Function:
- * - 菜单与角色菜单授权编排；兼容旧路由和角色权限树，保留个性化 Hook、实时身份及可信后端授权，传入业务参数前排除不会用于授权的身份副本。
+ * - 系统菜单、桌面导航与授权目录维护入口，兼容旧路由并保持权限校验。
  */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/os/getdesktop": "GetSysMenuStep"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 
 // Microi官方接口引擎：platform-sys-menu
 // Version: v1.0.3

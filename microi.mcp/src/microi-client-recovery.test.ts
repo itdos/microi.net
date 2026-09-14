@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { protectSessionToken, unprotectSessionToken } from './workspace-protected-credentials.js';
 import {
   buildMicroAppEntryUrl,
   buildTokenFileLookupKeys,
@@ -11,6 +12,29 @@ import {
   isTenantConfigurationFailureResponse,
   MicroiClient,
 } from './microi-client.js';
+
+test('token rotation preserves each connection format independently in a mixed token file', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-mixed-session-'));
+  const file = path.join(dir, 'tokens.json');
+  const [own] = buildTokenFileLookupKeys('http://127.0.0.1:8888', 'fixture', '', '');
+  const unrelated = 'http://127.0.0.1:9999|other';
+  try {
+    const otherCipher = protectSessionToken('other-session');
+    fs.writeFileSync(file, JSON.stringify({ [own]: 'legacy-session', [unrelated]: otherCipher }));
+    const client = new MicroiClient({ apiBaseUrl: 'http://127.0.0.1:8888', osClient: 'fixture', username: '', password: '', token: 'rotated-session', tokenFilePath: file });
+    (client as unknown as { writeTokenToFile(): void }).writeTokenToFile();
+    let result = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(result[own], 'rotated-session');
+    assert.equal(result[unrelated], otherCipher);
+    result[own] = protectSessionToken('previous-session');
+    fs.writeFileSync(file, JSON.stringify(result));
+    (client as unknown as { writeTokenToFile(): void }).writeTokenToFile();
+    result = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(unprotectSessionToken(result[own]), 'rotated-session');
+    assert.equal(result[unrelated], otherCipher);
+    client.destroy();
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
 
 test('micro-app entry URL preserves tenant binding and escapes path segments', () => {
   assert.equal(
