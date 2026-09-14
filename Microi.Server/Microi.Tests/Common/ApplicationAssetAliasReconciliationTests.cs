@@ -72,11 +72,12 @@ public class ApplicationAssetAliasReconciliationTests
         var serverRoot = FindServerRoot();
         var source = File.ReadAllText(Path.Combine(
             serverRoot,
-            "Microi.Core",
+            "Microi.MCP",
             "V8Engine",
             "V8McpLogic.ApplicationAliasReconciliation.cs"));
         var program = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Program.cs"));
-        var startup = File.ReadAllText(Path.Combine(serverRoot, "Microi.net", "Common", "DiyStartup.cs"));
+        var startup = File.ReadAllText(Path.Combine(serverRoot, "Microi.MCP", "MicroiMcpExtensions.cs"));
+        var hosting = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Hosting", "MicroiApiHostExtensions.cs"));
 
         Assert.Contains("Key = BuildApplicationAssetPublishLockKey(osClient, appId)", source);
         Assert.Contains("new List<object> { \"AND\", \"BuildLog\", \"=\", oldBuildLog }", source);
@@ -88,10 +89,11 @@ public class ApplicationAssetAliasReconciliationTests
         Assert.Contains("services.AddMicroi()", program, StringComparison.Ordinal);
         Assert.Contains("services.AddMicroiHDFS()", program, StringComparison.Ordinal);
         Assert.Contains(
-            "services.AddHostedService<ApplicationAssetAliasReconciliationWorkerService>()",
+            "services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ApplicationAssetAliasReconciliationWorkerService>())",
             startup,
             StringComparison.Ordinal);
         Assert.DoesNotContain("AddHostedService<ApplicationAssetAliasReconciliationWorkerService>", program);
+        Assert.Contains("services.AddMicroiMcp()", hosting, StringComparison.Ordinal);
     }
 
     private static (JObject App, JObject Version, JObject BuildLog) BuildState()
@@ -159,17 +161,5 @@ public class ApplicationAssetAliasReconciliationTests
     }
 
     private static string FindServerRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current != null)
-        {
-            if (Directory.Exists(Path.Combine(current.FullName, "Microi.net.Api"))
-                && Directory.Exists(Path.Combine(current.FullName, "Microi.Core")))
-            {
-                return current.FullName;
-            }
-            current = current.Parent;
-        }
-        throw new DirectoryNotFoundException("未找到 Microi.Server 根目录。");
-    }
+        => Path.GetDirectoryName(Microi.Tests.Common.McpSourceLocation.File("Directory.Build.props"))!;
 }

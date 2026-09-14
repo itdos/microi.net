@@ -17,9 +17,34 @@ async function runtime(page,Action,params={}) {
  },{Action,params});
 }
 async function ready(page){await page.waitForFunction(()=>window.__VUE_APP__?.config.globalProperties.DiyCommon?.getToken()&&window.__MICROI_REMINDER_ENTRY_ID__);}
+async function acknowledgeExistingReminders(page) {
+ // 真实租户可能已有官方启动提醒。按真实用户操作确认测试账号当前队列，
+ // 不能让它挡住新建测试提醒，也不能关闭功能、改优先级或跳过新提醒断言。
+ const isAction=(response,action)=>response.url().includes('/apiengine/platform-reminder-runtime')
+  && response.request().postData()?.includes(action);
+ const inbox=page.waitForResponse(response=>isAction(response,'Inbox'));
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+ const result=await(await inbox).json();assert.equal(result.Code,1,result.Msg);
+ const visible=page.locator('.mci-platform-reminder:visible');
+ if(result.Data?.length)await visible.first().waitFor({state:'visible',timeout:15000});
+ const acknowledged=[];
+ for(let i=0;i<10&&await visible.count();i++) {
+  const title=await visible.first().locator('.el-dialog__title').innerText();
+  assert.ok(!title.startsWith('平台提醒自动回归'),'发现其它尚未收尾的回归提醒，不能代为确认');
+  const receipt=page.waitForResponse(response=>isAction(response,'Acknowledge'));
+  await visible.first().getByRole('button',{name:'我知道了'}).click();
+  const response=await(await receipt).json();assert.equal(response.Code,1,response.Msg);acknowledged.push(title);
+  await page.locator('.mci-platform-reminder').evaluateAll(async elements=>{
+   await Promise.all(elements.flatMap(element=>element.getAnimations({subtree:true})).map(animation=>animation.finished.catch(()=>{})));
+  });
+ }
+ assert.equal(await visible.count(),0,'已有提醒队列必须先由测试账号确认');
+ return acknowledged;
+}
 export async function verifyPlatformReminders(page,directory) {
  await fs.mkdir(directory,{recursive:true});await ready(page);
  const context=await runtime(page,'Capabilities');assert.equal(context.Code,1,context.Msg);assert.equal(context.Data.Administrator,true);
+ const baselineAcknowledged=await acknowledgeExistingReminders(page);
  const created=[],checks=[];
  const dialog=title=>page.locator('.mci-platform-reminder:visible').filter({hasText:title});
  const withdraw=async saved=>{const result=await runtime(page,'Withdraw',{Id:saved.Id,ExpectedRevision:saved.Revision});assert.equal(result.Code,1,result.Msg);};
@@ -80,7 +105,7 @@ export async function verifyPlatformReminders(page,directory) {
   assert.equal(await dialog(restart.title).count(),0);await withdraw(restart);checks.push('重启公告展示即领取、未关闭刷新不重复、版本链接新开页面');
  } finally {
   for(const row of created)await withdraw(row);
-  await fs.writeFile(path.join(directory,'reminder-results.json'),JSON.stringify({checks,created,allWithdrawn:true},null,2));
+  await fs.writeFile(path.join(directory,'reminder-results.json'),JSON.stringify({checks,created,baselineAcknowledged,allWithdrawn:true},null,2));
   // 刷新页面会重建并连接 Hub；只恢复仍断开的连接，避免清理异常覆盖真实断言结果。
   if(stopped)await page.evaluate(async()=>{const socket=window.__VUE_APP__.config.globalProperties.$websocket;if(socket?.state==='Disconnected')await socket.start();window.dispatchEvent(new Event('online'));});
  }

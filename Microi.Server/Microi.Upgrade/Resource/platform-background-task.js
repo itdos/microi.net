@@ -7,8 +7,16 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-background-task
+ * Version: v1.1.3
+ * Function:
+ * - 按当前可信用户查询、提交和管理持久后台任务，保留动作白名单、任务所有权、取消权限及最小结果摘要。
+ */
+
 // Microi官方接口引擎：platform-background-task
-// Version: v1.1.1
+// Version: v1.1.2
 // 说明：后台任务的动作白名单与参数编排位于接口引擎；V8.Method 只提供无法由
 // FormEngine/Db 安全实现的持久任务运行时原子能力。
 
@@ -28,7 +36,14 @@ if (!allowedActions[action]) {
   return { Code: 0, Msg: '不支持的后台任务动作。' };
 }
 
-var result = V8.Method.ManageBackgroundTask(V8.Param);
+// 当前用户由可信后台任务原子确定；请求参数无需再次投影整份内部身份。
+var backgroundTaskParam = Object.create(null);
+var backgroundTaskKeys = Object.keys(V8.Param || {});
+for (var backgroundTaskIndex = 0; backgroundTaskIndex < backgroundTaskKeys.length; backgroundTaskIndex++) {
+  var backgroundTaskKey = backgroundTaskKeys[backgroundTaskIndex];
+  if (backgroundTaskKey !== '_CurrentUser') backgroundTaskParam[backgroundTaskKey] = V8.Param[backgroundTaskKey];
+}
+var result = V8.Method.ManageBackgroundTask(backgroundTaskParam);
 if (action != 'RunApiEngine' || !result || result.Code != 1 || !result.Data) {
   return result;
 }

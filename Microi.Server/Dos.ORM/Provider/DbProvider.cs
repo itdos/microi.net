@@ -17,6 +17,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Data;
 using System.Data.Common;
@@ -417,34 +418,12 @@ namespace Dos.ORM
                     leftToken,
                     rightToken,
                     DatabaseType);
+                cmd.CommandText = SqlParameterText.Rewrite(cmd.CommandText,
+                    cmd.Parameters.Cast<DbParameter>(), parameter => parameter.ParameterName);
             }
 
             foreach (DbParameter p in cmd.Parameters)
             {
-
-                if (!isStoredProcedure)
-                {
-                    //if (cmd.CommandText.IndexOf(p.ParameterName, StringComparison.Ordinal) == -1)
-                    //if (Regex.IsMatch(cmd.CommandText, p.ParameterName + @"(?=[^\d])")) //2018-06-21 修复bug
-                    //2019-05-30，感谢群友【帅虎】发现此Bug："update xxx set xxx=@ID1"，此时正则无法正确匹配。
-                    if (Regex.IsMatch(cmd.CommandText + " ", @"(@|\?|:)" + p.ParameterName.Substring(1) + @"(?=[^\d])")) //2018-07-31 修复bug
-                    {
-                        //2018-06-21
-                        cmd.CommandText = Regex.Replace(cmd.CommandText + " ", @"(@|\?|:)" + p.ParameterName.Substring(1) + @"(?=[^\d])", p.ParameterName);
-
-                        ////2015-08-11修改
-                        //cmd.CommandText = cmd.CommandText.Replace("@" + p.ParameterName.Substring(1), p.ParameterName);
-                        //cmd.CommandText = cmd.CommandText.Replace("?" + p.ParameterName.Substring(1), p.ParameterName);
-                        //cmd.CommandText = cmd.CommandText.Replace(":" + p.ParameterName.Substring(1), p.ParameterName);
-
-
-                        //if (p.ParameterName.Substring(0, 1) == "?" || p.ParameterName.Substring(0, 1) == ":"
-                        //        || p.ParameterName.Substring(0, 1) == "@")
-                        //    cmd.CommandText = cmd.CommandText.Replace(paramPrefixToken + p.ParameterName.Substring(1), p.ParameterName);
-                        //else
-                        //    cmd.CommandText = cmd.CommandText.Replace(p.ParameterName.Substring(1), p.ParameterName);
-                    }
-                }
 
                 if (p.Direction == ParameterDirection.Output || p.Direction == ParameterDirection.ReturnValue)
                 {

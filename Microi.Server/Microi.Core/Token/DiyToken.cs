@@ -888,6 +888,7 @@ namespace Microi.net
         /// <returns></returns>
         public static async Task<CurrentToken> GetCurrentToken(bool returnDefaultOsClient = true)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.Identity);
             var osClient = GetCurrentOsClient(returnDefaultOsClient);
             var token  = "";
             try
@@ -1020,6 +1021,7 @@ namespace Microi.net
         /// </summary>
         public static async Task<CurrentToken> GetCurrentToken(string token, string osClient = "")
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.Identity);
             try
             {
                 token = token.DosTrim().DosReplace("Bearer ", "");
@@ -1105,7 +1107,9 @@ namespace Microi.net
             string requestToken)
         {
             if (source == null) return null;
-            SysUserLogic.SanitizeLoginProjection(currentUser);
+            // 两个私有调用点已清理完整缓存投影，再由 ApplySessionScopeAsync 克隆并
+            // 写入固定的访问密钥字段（字符串/字符串数组）。此处不再次扫描整份权限树。
+            // 不允许将未清理的用户对象或业务参数直接传入这个私有构造步骤。
             // 只有活动会话与权限范围验证成功后才标注租户，覆盖普通 Controller 的内存归属；
             // 诊断不读取/持久化 Token 或用户对象，也不改变登录结果。
             ExecutionObservation.Annotate(tenant: osClient);

@@ -1827,6 +1827,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
         /// </summary>
         internal static bool SanitizeLoginProjection(JObject projection)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.IdentitySanitize);
             return RemoveSensitiveLoginProjectionFields(projection);
         }
 
@@ -1836,15 +1837,18 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             var changed = false;
             if (token is JObject obj)
             {
-                foreach (var property in obj.Properties().ToList())
+                // 先保存相邻属性，再删除当前秘密字段；避免为每条权限记录分配临时 List。
+                // 仍遍历全部嵌套内容，不能因为权限列表较大而跳过敏感字段清理。
+                for (var property = obj.First as JProperty; property != null;)
                 {
+                    var next = property.Next as JProperty;
                     if (LoginProjectionSensitiveFields.Contains(property.Name))
                     {
                         property.Remove();
                         changed = true;
-                        continue;
                     }
-                    changed = RemoveSensitiveLoginProjectionFields(property.Value) || changed;
+                    else changed = RemoveSensitiveLoginProjectionFields(property.Value) || changed;
+                    property = next;
                 }
             }
             else if (token is JArray array)

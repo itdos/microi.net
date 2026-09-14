@@ -120,7 +120,7 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
       arguments: { action: 'describe_tool', params: { name: 'microi_query_system_observability' } },
     }) as CallToolResult;
     assert.equal(description.isError, undefined);
-    for (const term of ['MemoryIncidents', 'MemoryIncident', 'incidentId', 'Collector', 'retained heap']) {
+    for (const term of ['MemoryIncidents', 'MemoryIncident', 'incidentId', 'Collector', 'retained heap', 'Host.Processes', 'HostProcessesVisible', 'Host.DiskIO.Devices']) {
       assert.ok(toolText(description).includes(term), `AI discovery must explain ${term}`);
     }
 

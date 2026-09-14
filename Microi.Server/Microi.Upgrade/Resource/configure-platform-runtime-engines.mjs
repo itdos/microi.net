@@ -212,7 +212,7 @@ const engines = [
     history: '2026-08-25 v1.0.0 将当前用户自省迁移为鉴权 Managed 接口引擎，直接返回可信 V8.CurrentUser。'
   },
   {
-    key: 'platform-private-file-url', name: '平台私有文件授权地址', file: 'platform-private-file-url.js',
+    key: 'platform-private-file-url', name: '平台私有文件授权地址', file: 'platform-private-file-url.js', version: 'v1.0.2',
     // 历史移动会员 Token 入口必须先匿名到达可信后端再完成身份验证；
     // 与现有正式包保持一致，避免生成器把 AllowAnonymous 从 1 意外归零。
     id: '019d2a01-9d63-7f91-8c01-000000000006', enableLog: 1, allowAnonymous: 1,

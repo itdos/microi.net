@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
-const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Code','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
+const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Code','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
 // Build products and the synchronization receipt are not executable source candidates.
 const generated=/(^|\/)(?:dist|bin|obj|node_modules|TestResults|\.resource-sync-base|\.git)(?:\/|$)|\.(?:vsix|nupkg|snupkg)$/i;
 // 此门禁用于 PC/API Docker 发布，独立 UniApp 的页面、客户资源和包版本不进入这两个镜像。
@@ -14,6 +14,20 @@ const generated=/(^|\/)(?:dist|bin|obj|node_modules|TestResults|\.resource-sync-
 const independentMobileSource=name=>/^microi\.uniapp\//i.test(name)
  &&!/^microi\.uniapp\/src\/utils\//i.test(name)
  &&name!=='microi.uniapp/scripts/test-request-queue.mjs';
+
+// 插件打包重复生成这两份已跟踪元数据。仅顶层 builtAt 是非行为时间；
+// 版本、依赖、文件数量与源码摘要仍全部进入候选，未知字段和其它文件不得排除。
+const timestampMetadata=new Set([
+ 'Microi.Code/plugins/microi/assets/build-meta.json',
+ 'Microi.Code/plugins/microi/scripts/microi-skills.meta.json',
+]);
+function candidateBytes(key,bytes){
+ if(!timestampMetadata.has(key))return bytes;
+ const metadata=JSON.parse(bytes.toString('utf8'));
+ if(typeof metadata.builtAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(metadata.builtAt))throw Error(`Invalid known build timestamp: ${key}`);
+ delete metadata.builtAt;
+ return JSON.stringify(metadata);
+}
 
 export async function snapshotCandidate(root=workspace,repos=repositories){
  const files={};
@@ -24,7 +38,7 @@ export async function snapshotCandidate(root=workspace,repos=repositories){
    const key=path.posix.join(repository.replaceAll('\\','/'),name.replaceAll('\\','/'));
    const buildRecipe=/\/bin\/Release\/(?:Dockerfile|default\.conf)$/.test(key);
    if((generated.test(key)&&!buildRecipe)||independentMobileSource(key))continue;
-   try{files[key]=createHash('sha256').update(await readFile(path.resolve(cwd,name))).digest('hex');}
+   try{files[key]=createHash('sha256').update(candidateBytes(key,await readFile(path.resolve(cwd,name)))).digest('hex');}
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }
  }
@@ -42,7 +56,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  if(mode==='capture'){
   await mkdir(path.dirname(path.resolve(manifest)),{recursive:true});
   await writeFile(manifest,JSON.stringify({...current,capturedAt:new Date().toISOString()},null,2));
-  console.log(`Recorded ${Object.keys(current.files).length} candidate source files across seven repositories.`);
+  console.log(`Recorded ${Object.keys(current.files).length} candidate source files across ${repositories.length} repositories.`);
  }else{
   const previous=JSON.parse(await readFile(manifest,'utf8'));
   const changed=changedCandidate(previous,current);

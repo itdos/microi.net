@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-13T05:07:01.952Z",
+  "generatedAt": "2026-09-13T06:14:49.229Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -3196,11 +3196,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "e6c296b50a6ac96343e6c7aa34e92dce4ca9c1d7dcd2dc2a0affeebf06350aea",
-      "originalLines": 592,
+      "originalSha256": "c0277de2fba08cdf2d265855032e058e37431b5b80be89920de01373c228324a",
+      "originalLines": 594,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
-      "entryLines": 260,
+      "entryLines": 262,
       "chunks": [
         {
           "id": "workspace-conventions-000",
@@ -3246,8 +3246,8 @@
           "id": "workspace-conventions-005",
           "ordinal": 5,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "75f5c21918cd9d271676fa8ad1313880862fe4bc655c2b651179e3cb3ff66a8a",
-          "lines": 30,
+          "sha256": "c48d857c8e3086b29f99ab14d362f99c60d7dd00f9617709ea4f4dcad370611e",
+          "lines": 32,
           "heading": "Microi 源码路径速查（工作区根相对路径）"
         },
         {

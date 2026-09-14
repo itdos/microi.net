@@ -33,6 +33,7 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
     private string _collectorError = "Starting", _storageError = "", _sharedError = "NotYetSynced";
     private int _pending, _replayCursor;
     private long _replayed;
+    private readonly Dictionary<string, (int Pid, DateTime Started, long SampleTick, double CpuMs)> _helperSamples = new();
 
     public MemoryDiagnosticsService(IHostEnvironment environment, IServiceProvider services)
     {
@@ -330,6 +331,12 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
             result["BootId"] = _boot; result["NodeId"] = _node; result["BuildVersion"] = _version; result["CurrentNodeOnly"] = true;
             result["Executions"] = JObject.FromObject(ExecutionObservation.Snapshot(tenant, 100));
             result["Collector"] = CollectorHealth(collector);
+            lock (_gate) result["HelperProcesses"] = new JObject
+            {
+                ["Scope"] = "仅当前 API 管理的诊断子进程，不是 NAS 全部进程；CPU 为两次 Memory 查询之间的区间值，首次或进程变化时为空。",
+                ["Collector"] = HelperProcessUsage("collector", _collector),
+                ["RecoveryAnalyzer"] = HelperProcessUsage("recovery", _recoveryAnalyzer)
+            };
             result["AllocationTop"] = MemoryDiagnosticsStore.FilterAllocations(AllocationTop(collector), tenant);
             result["Evidence"] = Evidence();
             result["MongoDB"] = _database.DeepClone();
@@ -358,6 +365,42 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
             ["SharedStorage"] = shared, ["LocalFallbackAvailable"] = local.Count > 0,
             ["Scope"] = "Tenant shared history plus current node persistent WAL; other nodes' unuploaded WAL is not visible.", ["Evidence"] = Evidence()
         };
+    }
+
+    private JObject HelperProcessUsage(string role, Process? process)
+    {
+        try
+        {
+            if (process == null || process.HasExited)
+            {
+                _helperSamples.Remove(role);
+                return new JObject { ["Status"] = "NotRunning", ["CpuPercentRaw"] = null };
+            }
+            process.Refresh();
+            var pid = process.Id;
+            var started = process.StartTime.ToUniversalTime();
+            var tick = Stopwatch.GetTimestamp();
+            var cpu = process.TotalProcessorTime.TotalMilliseconds;
+            double? windowMs = null, percent = null;
+            if (_helperSamples.TryGetValue(role, out var previous)
+                && previous.Pid == pid && previous.Started == started && tick > previous.SampleTick)
+            {
+                windowMs = (tick - previous.SampleTick) * 1000d / Stopwatch.Frequency;
+                percent = Math.Round(Math.Max(0, cpu - previous.CpuMs) / windowMs.Value * 100, 2);
+            }
+            _helperSamples[role] = (pid, started, tick, cpu);
+            return new JObject
+            {
+                ["Status"] = "Running", ["ProcessId"] = pid, ["StartedAtUtc"] = started,
+                ["TotalCpuMs"] = cpu, ["WorkingSetBytes"] = process.WorkingSet64,
+                ["SampleWindowMs"] = windowMs, ["CpuPercentRaw"] = percent
+            };
+        }
+        catch (Exception ex)
+        {
+            _helperSamples.Remove(role);
+            return new JObject { ["Status"] = "Unavailable", ["CpuPercentRaw"] = null, ["Error"] = ex.GetType().Name };
+        }
     }
 
     private JObject Evidence() => new()

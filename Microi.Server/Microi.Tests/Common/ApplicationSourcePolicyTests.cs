@@ -18,9 +18,7 @@ public class ApplicationSourcePolicyTests
     [Fact]
     public void EngineRolePolicyUsesTenantDbWriteAndAuthoritativeReadback()
     {
-        var sourcePath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "../../../../Microi.Core/V8Engine/V8McpLogic.ApplicationSourcePolicy.cs"));
+        var sourcePath = Microi.Tests.Common.McpSourceLocation.File("Microi.MCP/V8Engine/V8McpLogic.ApplicationSourcePolicy.cs");
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("PersistApiEngineRolesAuthoritatively", source);

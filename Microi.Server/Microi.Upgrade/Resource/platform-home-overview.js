@@ -7,7 +7,15 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
-// platform-home-overview v1.0.0
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-home-overview
+ * Version: v1.0.1
+ * Function:
+ * - 当前用户首页概览与访问次数聚合；访问统计通过当前事务仅更新本人 HomeUsageStats，保留菜单权限和可见性校验，不触发全租户授权缓存失效。
+ */
+
+// platform-home-overview v1.0.1
 // 当前用户首页概览：只保存菜单 Id 与按日聚合次数，不记录参数、表单内容或页面数据。
 var currentUser = V8.CurrentUser || {};
 if (!currentUser.Id) {
@@ -48,7 +56,8 @@ function permittedMenuIds() {
 }
 
 var superAdmin = isSuperAdmin();
-var permittedIds = permittedMenuIds();
+// 已有超级管理员语义直接允许菜单，无需再扫描一份不会参与判断的权限树。
+var permittedIds = superAdmin ? {} : permittedMenuIds();
 
 function hasMenuPermission(menuId) {
   return superAdmin || permittedIds[String(menuId || '').toLowerCase()] === true;
@@ -151,11 +160,15 @@ function recordMenuOpen() {
   stats.Menus[menuId] = item;
   stats = pruneStats(stats);
 
-  var update = V8.FormEngine.UptFormData('sys_user', {
-    Id: currentUser.Id,
-    HomeUsageStats: JSON.stringify(stats)
-  });
-  if (!update || update.Code !== 1) return update || { Code: 0, Msg: '保存访问统计失败。' };
+  // 此字段只是当前用户的访问次数，不影响身份或授权。通用 sys_user 更新会使
+  // 整个租户的菜单/权限缓存失效，不能让每次打开菜单都迫使所有用户重新加载。
+  // 固定表和列、可信当前用户 Id、参数绑定及既有事务共同限定写入边界；上面的
+  // 菜单权限/可见性校验仍执行，账号/角色/权限变更继续走原有失效流程。
+  var affected = V8.DbTrans.FromSql('UPDATE sys_user SET HomeUsageStats = @stats WHERE Id = @userId AND IsDeleted = 0')
+    .AddInParameter('@stats', JSON.stringify(stats))
+    .AddInParameter('@userId', String(currentUser.Id))
+    .ExecuteNonQuery();
+  if (Number(affected) !== 1) return { Code: 0, Msg: '保存访问统计失败。' };
   return { Code: 1, Data: { MenuId: menuId, Recorded: true } };
 }
 

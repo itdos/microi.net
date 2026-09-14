@@ -150,7 +150,11 @@ namespace Microi.net.Api
             // the core engine strips identity when it differs from the token tenant.
             if (currentUser != null)
             {
-                param["_CurrentUser"] = JTokenEx.FromObject(currentUser);
+                // GetCurrentToken returns a new, scoped identity detached from the
+                // shared login cache. This private controller request takes that
+                // snapshot; the core still creates its independent script user.
+                // Serializing it here copied every role limit a second time.
+                param["_CurrentUser"] = currentUser;
                 if (param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
                 {
                     param["OsClient"] = currentTokenDynamic.OsClient;
@@ -238,6 +242,8 @@ namespace Microi.net.Api
             }
             //调用方式 Server、Client
             param["_InvokeType"] = InvokeType.Client.ToString();
+            // 已在本方法入口实时验证。只交接给此 HTTP 请求的首个引擎执行，JSON 无法携带该授权。
+            HttpApiTokenHandoff.Bind(param, DiyHttpContext.Current, currentTokenDynamic);
             return param;
         }
 

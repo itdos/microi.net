@@ -244,6 +244,54 @@ MCP 的 `Memory` 动作保持不变。排查优化版时可补查 `Executions.Ob
 
 需要规范压测时参阅项目内 `microi.skills/performance-testing/SKILL.md`。
 
+
+### 按同一请求拆分等待时间
+
+支持 `request-latency/v1` 的后端在 MCP `Snapshot` 的 `RequestRuntime.RecentRequests[].Latency` 返回顺序阶段 `BeforeActionMs / ActionMs / AfterActionMs`，并提供鉴权、身份读取/清理/隔离、在线终端、Redis 读取/解码、数据库打开/执行的次数与累计耗时。`Trace` 的 `RuntimeRequests` 返回当前租户、当前节点最近 500 个请求中匹配的最多 20 条记录；记录被淘汰或节点重启后不可用，不能把空结果当作零耗时。
+
+- 顺序阶段覆盖进入观测中间件后至响应处理返回；不含此前的代理、浏览器连接排队或网络时间。
+- `Parts` 是包含子调用的累计墙钟耗时，可能嵌套或并行，不能相加，也不是 CPU。`DatabaseOpen` 含连接打开保护与驱动连接池等待；`DatabaseCommand` 含命令执行/日志、但 Reader 模式不含后续行读取。
+- `FormAuthorization` 记录表权限检查；其内部 `AuthorizationVersion` 单独记录从租户 Redis 读取授权版本的时间。后者使用原生 Redis 连接，不应因为通用 `RedisRead` 很小就认定所有授权缓存访问都很快。
+- 浏览器必须分别记录 `requestStart`（请求发出前时间）、`responseStart-requestStart`（首字节等待）、`responseEnd-responseStart`（接收响应）。总耗时减首字节等待不能直接称作下载耗时。用每次唯一的 W3C TraceId 对齐服务端，不能只凭相近时间配对。
+- `RequestRuntime.RuntimeIntervals` 保留最近 30 个约 1 秒的同窗样本：进程原始 CPU、主机 CPU 执行/I/O wait/steal、GC 暂停、线程池积压、采样线程唤醒延迟和可读取的 cgroup CPU 节流时间。缺字段或 null 表示不可用；唤醒延迟可能同时包含 GC 和调度停顿，不能据此宣称宿主机故障。
+- Linux 的 `CpuUsagePercent` 按真正执行时间计算；I/O 等待另列 `IoWaitPercent`，虚拟化资源等待另列 `CpuStealPercent`。旧版本把 I/O 等待计入 CPU，不能用旧百分比直接证明 CPU 计算饱和。I/O wait 是内核估计，仍需结合实际 SQL、连接等待和同窗请求阶段判断。
+
+这些指标通过现有管理员查询协议追加返回，不新增配置、表、菜单或接口引擎。升级后端即可由现有 MCP 读取；不需要重装商城数据库资源。计量不保存请求/响应正文、SQL、缓存 Key 或登录凭据。
+
+后端会将 HTTP Controller 已验证的身份一次性交给同次接口引擎，减少重复读取、复制与扫描大型权限对象。交接不进入 JSON，不跨请求缓存；参数复制、切换租户、身份投影变化和重复调用仍走原验证流程。历史登录数据的嵌套敏感字段仍完整清理，`PrintSqlToPage` 可继续开启。验收应对齐 Trace 中的 Identity 次数、分配率及 GC 暂停，而不能只比较重启前后的单次耗时。
+
+V8 的 AI 代理在创建时立即保存不可变身份快照，首次调用 AI 时才构造完整可变 JSON 树。没有调用 AI 的普通接口和事件不再为代理预先深复制整份权限树；脚本修改 `V8.CurrentUser` 不会改变此前固定的身份。快照保留全部权限、JSON 数值/日期等类型及注解，二进制值独立复制。
+
+`Memory.HelperProcesses` 分别返回当前 API 管理的 `Collector`（采集器）和 `RecoveryAnalyzer`（事故恢复解析器）的 PID、启动时间、RSS、累计 CPU 及两次查询间的 CPU 使用率。它用于区分 API 与诊断子进程的成本，不是 NAS 的完整进程列表。首次查询、进程重建或指标不可用时 CPU 为 `null`；不能解释成零开销。
+
+管理员通过 `POST /apiengine/mci-system-observability-query` 传入 `{ "Action": "Snapshot", "IncludeHost": true, "IncludeDocker": false }`，或通过 MCP `microi_query_system_observability` 传入 `{ "action": "Snapshot", "includeHost": true }`，可读取 `Data.Host.Processes`（`process-resources/v1`）。后端每 5 秒采样，返回 CPU、RSS/Swap 和磁盘读写速率三组前 10 名，并保留最近 12 次样本。请求只读缓存，不执行 `top/ps`；不返回命令行、环境变量或凭据。需升级包含此协议的后端；已有查询引擎和 MCP 参数兼容。
+
+进程 CPU 的 100% 表示一个核心，多核进程可以超过 100%。首次采样、PID 重用、计数重置或无权读取均返回 `null`，结合 `Fresh`、`ObservedCount`、`UnreadableOrExitedCount` 和各项 `UnavailableCount` 判断缺口。RSS 含共享页，不能把所有进程 RSS 相加当作独占内存。
+
+CPU 与 I/O 分别按每个进程实际读取计数器的时间计算，返回 `CpuWindowSeconds / IoWindowSeconds`；顶层 `WindowSeconds` 表示扫描周期。若扫描被 GC 或调度延迟，不能用扫描开始时刻计算后面才读到的计数，否则会夸大占用率。单次读取被超过 250 ms 的长暂停打断时返回缺值。此修复随后端升级生效，旧后端长扫描的异常 CPU 尖峰需要重新采样核验。
+
+Linux 默认只声明当前 PID 命名空间。`HostProcessesVisible=false/null` 时不能把排行称作 NAS 全部进程；只有部署方提供固定只读挂载 `/proc:/host/proc:ro` 后，API 才从该视图采样并标注 `HostProcMount`。镜像自动更新不会自动增加挂载；无需为了这个只读功能开放 SSH、Docker socket 或特权容器。Docker 查询不可用仅表示当前 API 无法访问 CLI/守护进程，不表示宿主没有 Docker。
+
+`Data.Host.DiskIO.Devices` 按真实 sysfs 分区标记区分整盘，保留 `sata1`、`nvme0n1`、`md0`、`dm-0` 等数字结尾设备。每个设备返回读写速率、IOPS、BusyPercent、AwaitMs 和未完成 I/O 数；磁盘采样使用独立时间窗。汇总只累加物理整盘，不能再与 RAID/映射层相加；首次采样或重置的速率为 `null`。
+
+菜单访问统计只更新已授权菜单对应的当前用户 `HomeUsageStats`，不再通过通用用户更新流程使整个租户的权限/菜单缓存失效。真实权限变更继续失效缓存。菜单接口向可信原子传递业务参数时也不再重复投影内部 `_CurrentUser`；可信身份仍由后端独立验证。对应托管接口随所属官方应用升级。
+
+文件私有 URL 和后台任务接口同样只向可信原子投影业务参数，保留文件、任务权限以及个性化 Hook；分别随【SaaS 引擎】和【应用商城】应用升级。后端接口日志在序列化前排除顶层内部 `_CurrentUser`，使用日志本身的 UserId/UserName 记录调用人；业务参数、嵌套字段、异常与慢日志继续保留。这样可避免每次日志先展开数千条内部权限再截断，`PrintSqlToPage` 保持原功能。日志优化需升级后端镜像。
+
+登录身份权限异常膨胀时，先比对 sys_rolelimit 的有效行与 IsDeleted=1 历史行。原生权限快照与菜单授权编辑只加载有效权限，IsDeleted 为 NULL 的存量记录仍有效；没有该列的旧表保持兼容，新增列后立即采用过滤，元数据或查询异常不回退为全量授权。该修复需要更新后端镜像；已有登录缓存通过正常重新登录或 RefreshToken 刷新，不删除权限历史，不改变 DiyToken、角色/数据范围或 PrintSqlToPage。用真实数据库回归旧表、新列、撤销权限、无权限角色、注入参数和查询失败，不能仅凭身份体积下降宣称请求耗时已经恢复。
+
+接口引擎构造脚本参数时，顶层 `_CurrentUser` 属于宿主保留身份，不再复制到 `V8.Param`；脚本读取已认证身份应使用 `V8.CurrentUser`。权限树仍保留完整内容，身份验证、令牌撤销、访问密钥范围、跨租户检查和独立脚本快照保持执行；嵌套业务对象中同名字段仍保留。实时通知检测只读取成功结果的 Code 与 DataAppend，避免为了检查不存在的事件而序列化整份用户/列表/文件 Data；事件字段白名单、大小限制、提交后发送和订阅权限不变。两项优化都需要更新后端镜像。
+
+批量计数的性能排查应同时看 Identity 的次数：`GetTableDataCountBatch` 在一次批次内复用一份已经验证且脱离共享缓存的只读身份，避免每个计数项都深复制完整权限树。每项仍独立执行表权限和数据范围检查；跨批次重新验证令牌/访问密钥，普通增删改的逐项身份隔离保持原语义。该优化不关闭角标或 `PrintSqlToPage`。
+
+`RoutingMs` 是 `BeforeActionMs` 内的路由阶段，不应再次相加；观测中间件位于路由解析之前，包含动态路由的缓存与查询等待。
+
+### 从宿主进程继续定位数据库负载
+
+当宿主排行显示 `mysqld` 持续占用多个核心时，继续使用已授权的 MCP 数据库只读查询，核对 `performance_schema.events_statements_summary_by_digest` 两次采样的执行次数、累计耗时和扫描行数差值，并检查真实索引与事务/锁等待。用规范化 SQL 摘要即可定位查询形状，避免输出业务参数。累计查询耗时允许因并行而超过采样窗口，它不是 CPU 核时间。
+
+页面 Trace 中的几条 SQL 很快，不能排除后台任务把同一数据库或 NAS 压满。例如定时任务运行时间刷新若产生大量 `mic_data_version` 快照，且旧库缺少 `(TableId,TableRowId,CreateTime)`，读取最新版本和计数会重复扫描历史。应同时修复索引和运行态写入路径，保留配置版本与用户需要的 SQL 展示；修复后再对比同窗宿主 CPU、查询摘要及实际页面。
+
 ### 热点榜时间范围
 
 右上角“5 分钟”表示实时诊断采样窗口，不是系统只保存 5 分钟。全局时间范围支持：实时 5 分钟、今天、昨天、近 3 天、近 7 天、近 15 天、近 30 天、近 3 个月、近 6 个月和近 1 年。选择历史范围后，热点接口、流量趋势、来源 IP、帐号、租户和内容类型使用同一时间边界，避免不同卡片口径不一致。
@@ -324,6 +372,37 @@ HTTP 热路径
 - Windows 宿主机网卡计数可能包含同机其它进程；Linux 容器网络命名空间更接近容器边界，但仍包含全部协议和依赖通信。
 
 ## AI / MCP 调用
+
+### CDN 监控 / 分析 / 安全
+
+在同一个【系统日志/监控】微服务中打开【CDN监控/分析/安全】。首期对接阿里云，包含加速域名同步、带宽趋势、12 类运营报表、SLS 的 IP / URL / Referer / IP 与资源交叉排行、CSV 导出、域名 IP 封禁与解封、下载限速、Referer 黑名单、规则与操作回执。
+
+在当前租户【系统设置 → 安全与服务接入】保存私密项 `Integration.Cdn.Aliyun.AccessKeyId`、`Integration.Cdn.Aliyun.AccessKeySecret`。后端依次选择完整的 CDN 专用凭据、租户 DNS 私密凭据、当前租户 SaaS 的兼容 DNS 凭据；半组配置报错，不能混用不同来源。密钥不会返回浏览器、写入审计或进入安装包。SLS 可独立配置 `Integration.Cdn.Aliyun.Sls.AccessKeyId`、`Integration.Cdn.Aliyun.Sls.AccessKeySecret`。
+
+- **历史 TOP**：先定制运营报表，再按时间范围查询。未订阅与无流量是不同状态；未开通时不能用空列表证明过去没有流量。报表流量列保留云端原始单位。参见[运营报表 API](https://help.aliyun.com/zh/cdn/developer-reference/api-cdn-2018-05-10-createcdnsubtask)。
+- **报表范围**：IP 排行可按地区筛选，区域和运营商分布支持中国内地/境外选择；域名排行按云账号统计。各类报表仅传入其支持的参数，不统一附加空 Area、HttpCode 或无关域名筛选。
+- **日志分析**：配置域名对应的 SLS 地域、Project、Logstore，完成实时日志投递和 `domain`、`remote_ip`、`uri`、`refer_domain`、`response_size`、`return_code` 字段索引。流量使用字节，IP 使用 TCP 连接来源 `remote_ip`，URL 不带查询参数。SLS 查询可能计费。
+- **安全操作**：先预览当前云端配置和作用范围，再确认提交。请求号幂等，云端配置变化时要求重新预览；超时或结果不明先回读，不能盲目重试。分钟、小时、天、自定义秒数和永久封禁均可用。限速指每个请求的下载速度，至少 `100k`，不是边缘 QPS 限制。
+- **全账号封禁**：海量 IP 服务须向阿里云申请开通，影响账号下全部 CDN 域名，界面单独确认作用范围；它不是单域名黑名单的替代名称。参见[海量封禁接口](https://help.aliyun.com/zh/cdn/developer-reference/api-cdn-2018-05-10-setcdnfulldomainsblockip)。
+- **自动规则**：默认停用、观察模式；开启自动执行还需要域名总开关。支持流量/请求次数、固定阈值，或历史窗口 P95 × 倍数并叠加绝对下限，以及连续命中、冷却时间、单轮 IP 上限、小时操作上限与白名单。仅使用 SLS 完整窗口；日志滞后、流量字段缺失或动态基线不足时不封禁。每条规则有错峰调度和独立租约。
+- **到期回收**：`mci-cdn-security-tick` 每分钟处理持久化操作和到期解封；只回收应用新增的 IP，保留原有黑名单，有重叠封禁时延长持有期。停用规则不会停用已提交封禁的到期回收。调度停止会推迟解封，需在任务引擎核对状态和最近运行时间。
+
+管理员通过现有 MCP `microi_run_engine` 调用 `mci-cdn-manager`，无需第二套 Token。例如：
+
+```json
+{
+  "action": "microi_run_engine",
+  "params": {
+    "apiEngineKey": "mci-cdn-manager",
+    "params": { "Action": "Capabilities" },
+    "confirmExecution": "mci-cdn-manager"
+  }
+}
+```
+
+只读动作有 `Domains`、`Trend`、`Reports`、`ReportList`、`Sls`、`Configs`、`Config`、`Rules`、`Operations`；写入流程为 `Preview` → `Submit`，保留返回的 `Command/BeforeHash/ExpiresAt/PreviewToken` 并提供稳定 `RequestKey`，结果不明使用 `Reconcile`。后台 `mci-cdn-core`、`mci-cdn-aliyun`、`mci-cdn-worker` 禁止 HTTP 直调。业务资源由【系统日志/监控】包托管，微服务沿用统一平台应用，不新增重复商城条目。
+
+安装包不包含任何云密钥、客户规则、SLS 项目或测试封禁。高访问 IP 可能是共享出口、合法下载或升级程序重复请求；应结合 IP 与资源交叉排行确认原因，不能仅依据 TOP 名次判定攻击。
 
 连接 Microi MCP 后，先发现能力：
 
@@ -448,6 +527,21 @@ IP 治理必须两步执行。第一次不传 `confirmExecution` 只返回 dry-r
 5. 通过 MCP 查询 `Capabilities` 和 `Snapshot`，确认 AI 工具、权限和目标租户均正确。
 
 只更新框架不会自动替代租户已安装的商城应用；只更新应用也不能补齐旧后端缺失的可信原子能力。
+
+## 大权限菜单与 SQL 参数处理的性能诊断
+
+若浏览器长任务落在 Pinia 深度遍历或 `JSON.stringify`，同时观察请求发出前的排队时间。核心状态持久化按已选字段独立监听和复用序列化片段；时钟、加载状态等非持久化变化不再扫描权限树，主题更新也不重新序列化用户。权限对象的嵌套修改、登录/退出、显式保存与存储恢复仍同步到原 `microi.net` 格式；需要更新前端镜像。嵌入式 WebOS 窗口继续只保留内存态。
+待办的多项只读计数由内部 `IFormEngineReadOnlyCountRuntime` 在一个批次中拥有一份独立身份；业务参数不能提供非空 `_CurrentUser`，每项仍经过原表单查询与租户/角色/数据范围检查，事务内顺序执行。抄送分页及可能执行行 V8 的 CRUD 保留独立身份。私有文件 HTTP 原子可接收本次 DiyToken 验证后独占的身份，后台可信上下文仍复制；资源引用、权限、审计和 `Limit=true` 不变。上述优化需要更新后端镜像，不能靠修改 V8 参数来启用或跳过鉴权。
+
+若分配栈落在 `FromSection.formatSql → String.Replace`，还需检查 ORM 结果缓存键：这条路径独立于 `PrintSqlToPage`，即使页面 SQL 很短，也可能因内部权限快照的大型 IN 查询产生大量临时字符串。缓存键现已复用单次参数扫描，保留普通值文本及查询参数，不重复替换参数前缀、字面量或替换值中的参数文本。普通 HTTP 表单请求只转交本次验证后独立身份的所有权；批量行和有其它 JSON 持有者的身份仍复制，业务 V8 与跨请求隔离不变。
+
+菜单或待办接口突然变慢时，先关联 Trace 与内存事故中的实际分配栈。`DbProvider.PrepareCommand`、SQL 展示中的反复正则替换和 `DynamicToDiyTableRowParam` 中的权限树复制，属于应用处理开销；不能把它们直接归为数据库执行慢。累计分配也不能当成驻留内存或泄漏量。
+
+后端的 SQL 参数替换使用单次扫描，保留参数边界、字符串与注释；`PrintSqlToPage` 继续展示完整可执行 SQL，慢日志使用同一处理器并在生成时限制长度。表单参数转换只保留一份独立身份树，不把 `_CurrentUser` 混入业务 `_RowModel/_FormData`，也不修改调用方对象。修复需更新包含这些改动的后端 Docker 镜像；只更新商城应用不会替换后端程序集。
+
+如果 SQL 执行只有几毫秒而多种接口仍一起变慢，还应检查公共鉴权的用户投影分配。角色基础权限读取现在直接检查 `_Roles`，不再为 `OnlyGet` 检查复制整份表/菜单权限树；显式 Bearer 请求也避免在同一过滤器里重复加载并复制有效身份。签名、有效期、安全版本、租户一致性、Redis 活动令牌、历史敏感字段清理及访问密钥撤销和范围检查全部保留。7,403 条权限的回归样本中，旧角色检查单独分配约 8.2 MB；该样本不是整机内存降幅，也不能代替部署后的真实页面复测。
+
+SaaS 引擎应用同时提供工作角标的失败处理：原生统计已经失败时直接返回错误，不继续重跑一整套兼容查询；旧后端缺少原生方法或工作流插件时仍使用兼容实现。验收应保持 `PrintSqlToPage` 开启，分别对比冷启动、稳定调用和真实页面并发请求的耗时与分配，确认菜单、列表、五类工作统计和权限隔离均正确。
 
 ## 验收清单
 

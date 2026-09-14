@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
-const source=fs.readFileSync(path.join(repo,'Microi.Server/Microi.Core/V8Engine/V8McpLogic.ApplicationAssetStreamV3.Runtime.cs'),'utf8');
+const source=fs.readFileSync(path.join(repo,'Microi.Server/Microi.MCP/V8Engine/V8McpLogic.ApplicationAssetStreamV3.Runtime.cs'),'utf8');
 function method(name){const start=source.search(new RegExp('private static [^\\r\\n]+ '+name+'\\('));assert.ok(start>=0,name);const end=source.indexOf('\n        private static ',start+1);return source.slice(start,end<0?source.length:end);}
 test('v3版本INSERT中摘要列和值同位，所有字段数一致且参数化',()=>{
  const body=method('InsertApplicationAssetV3Version'),array=name=>[...body.match(new RegExp('var '+name+' = new\\[\\]\\s*\\{([\\s\\S]*?)\\};'))[1].matchAll(/"([^"\r\n]+)"/g)].map(m=>m[1]);

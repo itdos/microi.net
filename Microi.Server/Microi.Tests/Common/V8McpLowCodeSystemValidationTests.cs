@@ -31,7 +31,7 @@ public class V8McpLowCodeSystemValidationTests
     {
         var sourcePath = Path.Combine(
             FindServerRoot(),
-            "Microi.Core/V8Engine/V8McpLogic.cs");
+            "Microi.MCP/V8Engine/V8McpLogic.cs");
         var source = File.ReadAllText(sourcePath);
         var start = source.IndexOf(
             "public static async Task<DosResult<object>> ValidateLowCodeSystem",
@@ -61,10 +61,10 @@ public class V8McpLowCodeSystemValidationTests
              current != null;
              current = current.Parent)
         {
-            var direct = Path.Combine(current.FullName, "Microi.Core", "V8Engine", "V8McpLogic.cs");
+            var direct = Path.Combine(current.FullName, "Microi.MCP", "V8Engine", "V8McpLogic.cs");
             if (File.Exists(direct)) return current.FullName;
 
-            var nested = Path.Combine(current.FullName, "Microi.Server", "Microi.Core", "V8Engine", "V8McpLogic.cs");
+            var nested = Path.Combine(current.FullName, "Microi.Server", "Microi.MCP", "V8Engine", "V8McpLogic.cs");
             if (File.Exists(nested)) return Path.Combine(current.FullName, "Microi.Server");
         }
 

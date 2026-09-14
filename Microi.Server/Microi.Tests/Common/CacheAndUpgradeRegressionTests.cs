@@ -11,6 +11,27 @@ namespace Microi.Tests.Common;
 
 public class CacheAndUpgradeRegressionTests
 {
+    [Fact]
+    public void BackgroundTaskStartupContractAcceptsBusinessProjectionAndKeepsLegacyAndSafetyChecks()
+    {
+        var load = typeof(UpgradeAppStore).GetMethod("LoadBundledResources", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var check = typeof(UpgradeAppStore).GetMethod("HasPlatformBackgroundTaskCapabilities", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(load.Invoke(null, null));
+        var package = JObject.Parse(resources["app.microi.store.json"]);
+        var engine = Assert.Single(package["SysApiEngines"]!.Children<JObject>(), e => e["ApiEngineKey"]?.ToString() == "platform-background-task");
+        var code = engine["ApiV8Code"]!.ToString();
+        var version = new System.Version(engine["Version"]!.ToString().TrimStart('v', 'V'));
+        bool Accepts(string input, System.Version? v = null) => Assert.IsType<bool>(check.Invoke(null, new object[] { input, v ?? version }));
+        Assert.True(Accepts(code));
+        Assert.True(Accepts(code.Replace("ManageBackgroundTask(backgroundTaskParam)", "ManageBackgroundTask(V8.Param)")));
+        Assert.False(Accepts(code, new System.Version(1, 0, 0)));
+        Assert.False(Accepts(code.Replace("WorkerStatus", "MissingWorkerCapability")));
+        Assert.False(Accepts(code.Replace("ManageBackgroundTask(backgroundTaskParam)", "MissingTaskRuntime(backgroundTaskParam)")));
+        Assert.False(Accepts(code.Replace("var backgroundTaskParam = Object.create(null);", "var backgroundTaskParam = {};")));
+        Assert.False(Accepts(code.Replace("if (backgroundTaskKey !== '_CurrentUser')", "if (true)")));
+        Assert.False(Accepts(code + "\nV8.Db.FromSql('SELECT 1');"));
+    }
+
     [Theory]
     [InlineData("v7.6.0", "7.6.0", true)]
     [InlineData("7.6.0.0", "v7.6.0", true)]
@@ -540,7 +561,7 @@ public class CacheAndUpgradeRegressionTests
         Assert.Equal(0, backgroundTaskEngine["AllowAnonymous"]?.Value<int>());
         AssertEngineVersionAtLeast(backgroundTaskEngine, new System.Version(1, 1, 0));
         Assert.Contains(
-            "V8.Method.ManageBackgroundTask(V8.Param)",
+            "V8.Method.ManageBackgroundTask(backgroundTaskParam)",
             backgroundTaskEngine["ApiV8Code"]?.ToString());
         Assert.Equal(
             "Managed",

@@ -269,7 +269,9 @@ namespace Microi.net
         /// </summary>
         public T Get<T>(string key)
         {
-            var result = _redisDb.StringGet(key);
+            RedisValue result;
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisRead))
+                result = _redisDb.StringGet(key);
             return result == RedisValue.Null ? default : Deserialize<T>(result);
         }
 
@@ -278,7 +280,9 @@ namespace Microi.net
         /// </summary>
         public object Get(string key)
         {
-            var result = _redisDb.StringGet(key);
+            RedisValue result;
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisRead))
+                result = _redisDb.StringGet(key);
             return result == RedisValue.Null ? null : result.ToString();
         }
 
@@ -287,6 +291,7 @@ namespace Microi.net
         /// </summary>
         public bool Set<T>(string key, T value)
         {
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return _redisDb.StringSet(key, Serialize(value));
         }
 
@@ -295,6 +300,7 @@ namespace Microi.net
         /// </summary>
         public bool Set(string key, string value, TimeSpan expiresIn)
         {
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return _redisDb.StringSet(key, value, expiresIn);
         }
 
@@ -308,8 +314,10 @@ namespace Microi.net
         {
             if (TimeSpan.TryParse(expiresIn, out var timeSpan))
             {
+                using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
                 return _redisDb.StringSet(key, value, timeSpan);
             }
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return _redisDb.StringSet(key, value);
         }
 
@@ -318,14 +326,17 @@ namespace Microi.net
         /// </summary>
         public bool Set<T>(string key, T value, TimeSpan expiresIn)
         {
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return _redisDb.StringSet(key, Serialize(value), expiresIn);
         }
         public bool Set<T>(string key, T value, string expiresIn)
         {
             if (TimeSpan.TryParse(expiresIn, out var timeSpan))
             {
+                using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
                 return _redisDb.StringSet(key, Serialize(value), timeSpan);
             }
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return _redisDb.StringSet(key, Serialize(value));
         }
 
@@ -334,6 +345,7 @@ namespace Microi.net
         /// </summary>
         public bool Set(string key, string value)
         {
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return _redisDb.StringSet(key, value);
         }
         /// <summary>
@@ -373,7 +385,9 @@ namespace Microi.net
         /// </summary>
         public async Task<T> GetAsync<T>(string key)
         {
-            var result = await _redisDb.StringGetAsync(key).ConfigureAwait(false);
+            RedisValue result;
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisRead))
+                result = await _redisDb.StringGetAsync(key).ConfigureAwait(false);
             return result == RedisValue.Null ? default : Deserialize<T>(result);
         }
 
@@ -382,7 +396,9 @@ namespace Microi.net
         /// </summary>
         public async Task<object> GetAsync(string key)
         {
-            var result = await _redisDb.StringGetAsync(key).ConfigureAwait(false);
+            RedisValue result;
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisRead))
+                result = await _redisDb.StringGetAsync(key).ConfigureAwait(false);
             return result == RedisValue.Null ? null : result.ToString();
         }
 
@@ -391,6 +407,7 @@ namespace Microi.net
         /// </summary>
         public async Task<bool> SetAsync<T>(string key, T value)
         {
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return await _redisDb.StringSetAsync(key, Serialize(value)).ConfigureAwait(false);
         }
 
@@ -399,6 +416,7 @@ namespace Microi.net
         /// </summary>
         public async Task<bool> SetAsync(string key, string value)
         {
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return await _redisDb.StringSetAsync(key, value).ConfigureAwait(false);
         }
 
@@ -409,8 +427,10 @@ namespace Microi.net
         {
             if (expiresIn == null)
             {
+                using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
                 return await _redisDb.StringSetAsync(key, value, null, when).ConfigureAwait(false);
             }
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return await _redisDb.StringSetAsync(key, value, expiresIn.Value, when).ConfigureAwait(false);
         }
 
@@ -421,8 +441,10 @@ namespace Microi.net
         {
             if (expiresIn == null)
             {
+                using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
                 return await _redisDb.StringSetAsync(key, Serialize(value), null, when).ConfigureAwait(false);
             }
+            using (Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisWrite))
             return await _redisDb.StringSetAsync(key, Serialize(value), expiresIn.Value, when).ConfigureAwait(false);
         }
 
@@ -619,6 +641,7 @@ namespace Microi.net
         /// </summary>
         private static string Serialize<T>(T value)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisEncode);
             return JsonHelper.Serialize(value);
         }
 
@@ -628,6 +651,7 @@ namespace Microi.net
         /// </summary>
         private static T Deserialize<T>(RedisValue value)
         {
+            using var latencyMeasurement = Dos.Common.RequestLatencyObservation.Measure(Dos.Common.RequestLatencyObservation.Part.RedisDecode);
             if (value.IsNullOrEmpty)
                 return default;
 
