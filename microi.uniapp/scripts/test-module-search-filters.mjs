@@ -8,6 +8,7 @@ import {
   compileModuleFilterFields,
   hasListFilterValue,
   mergeModuleFilterFields,
+  mergeTableSelectorFilterFields,
   validateListFilters
 } from '../src/platform/list-filter-fields.mjs'
 
@@ -268,4 +269,34 @@ test('后台筛选优先，保留租户专用排序等扩展筛选', () => {
     ]
   )
   assert.deepEqual(merged.map((field) => field.key), ['Phone', 'sort'])
+})
+
+test('开表选择器以菜单筛选为基础，特殊展示配置同字段覆盖、新字段追加', () => {
+  const menuFilters = [
+    { key: 'Name', field: 'Name', label: '名称', type: 'text' },
+    { key: 'Status', field: 'Status', label: '后台状态', type: 'options', options: [{ value: 1, label: '启用' }] }
+  ]
+  const presentationFilters = [
+    { key: 'specialStatus', field: 'Status', label: '业务状态', type: 'select', source: 'baseData', parentKey: 'STATUS' },
+    { key: 'city', field: 'City', label: '城市', type: 'address' }
+  ]
+
+  const merged = mergeTableSelectorFilterFields(menuFilters, presentationFilters)
+  assert.deepEqual(merged.map((field) => [field.key, field.field, field.type]), [
+    ['Name', 'Name', 'text'],
+    ['specialStatus', 'Status', 'select'],
+    ['city', 'City', 'address']
+  ])
+  assert.equal(merged[1].label, '业务状态')
+  assert.equal(merged[1].parentKey, 'STATUS')
+  assert.equal(merged[1].options, undefined, '特殊业务覆盖不能残留后台控件的选项语义')
+  assert.notEqual(merged[0], menuFilters[0], '合并结果不能修改菜单定义')
+})
+
+test('开表选择器忽略不完整或不支持的特殊筛选，不会覆盖有效菜单配置', () => {
+  const menu = [{ key: 'Status', field: 'Status', label: '状态', type: 'options' }]
+  assert.deepEqual(mergeTableSelectorFilterFields(menu, [
+    { key: 'bad', field: 'Status', type: 'sort' },
+    { key: 'missing-type', field: 'Other' }
+  ]), menu)
 })
