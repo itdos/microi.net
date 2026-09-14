@@ -76,6 +76,28 @@ public sealed class FormEngineReadPrimaryTests
         (string)Invoke(Production.Value.GetMethod("Run" + entry)!, null,
             new object?[] { table, writer, replica, transaction, requestPrimary })!;
 
+    [Fact]
+    public void ActualV8MetadataNumbersRetainPrimaryRoutingWithoutRelaxingTheValueDomain()
+    {
+        var method = Production.Value.Assembly.GetType("Microi.net.FormEngineReadPolicy")!.GetMethod("ValidateConfigurationWrite")!;
+        using var engine = new Jint.Engine();
+        foreach (var expected in new[] { 0, 1 })
+        {
+            var table = JObject.FromObject(engine.Evaluate($"({{ ReadPrimary: {expected} }})").ToObject()!);
+            Assert.Equal(JTokenType.Float, table["ReadPrimary"]!.Type);
+            Invoke(method, null, new object[] { "diy_table", table });
+            for (var entry = 0; entry < 7; entry++)
+            {
+                Assert.Equal(expected == 1 ? "writer" : "replica", Run(entry, table, "writer", "replica", false));
+                Assert.Equal("parent-transaction", Run(entry, table, "writer", "replica", true));
+            }
+        }
+        foreach (var invalid in new JToken[] { new JValue(1.5), new JValue(1.0000000000000002), new JValue(0.9999999999999999),
+            new JValue(0.9999999999999999999999999999m), new JValue(double.NaN), new JValue(double.PositiveInfinity),
+            new JValue(double.NegativeInfinity), new JValue("1.0"), new JValue(true) })
+            Assert.Throws<InvalidOperationException>(() => Invoke(method, null, new object[] { "diy_table", new JObject { ["ReadPrimary"] = invalid } }));
+    }
+
     private static object? Invoke(MethodInfo method, object? target, object?[] args)
     {
         try { return method.Invoke(target, args); }

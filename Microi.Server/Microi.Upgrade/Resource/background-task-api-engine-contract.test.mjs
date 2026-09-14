@@ -25,7 +25,10 @@ test('queue response projects old runtime records without exposing persisted pay
       ResultJson:'large result', Log:'large log', Result:{Package:'large package'}};
     let calls=0;
     const output=vm.runInNewContext(`(function(){${source}\n})()`,{V8:{OsClient:tenant,Param:param,Method:{ManageBackgroundTask(input){
-      assert.equal(input,param); calls++; return {Code:1,Data:record,Msg:'queued'};
+      assert.notEqual(input,param);
+      assert.deepEqual(JSON.parse(JSON.stringify(input)),param);
+      assert.equal(input.Options,param.Options);
+      calls++; return {Code:1,Data:record,Msg:'queued'};
     }}}});
     assert.equal(calls,1);
     assert.equal(output.Code,1);
@@ -47,7 +50,7 @@ test('official background task engine owns action routing and calls one trusted 
   ]) {
     assert.match(source, new RegExp(`\\b${action}\\b`));
   }
-  assert.match(source, /V8\.Method\.ManageBackgroundTask\(V8\.Param\)/);
+  assert.match(source, /V8\.Method\.ManageBackgroundTask\(backgroundTaskParam\)/);
   assert.doesNotMatch(source, /V8\.Db\.(?:FromSql|FromSqlAsync)/);
 });
 
@@ -58,7 +61,7 @@ test('application-store package delivers every startup endpoint and managed poli
       key: 'platform-background-task',
       source: 'Microi.Server/Microi.Upgrade/Resource/platform-background-task.js',
       address: '/apiengine/platform-background-task',
-      version: 'v1.1.1',
+      version: 'v1.1.3',
       capabilities: [
         'ServerFeature:V8.ManageBackgroundTask',
         'ApiEngine:platform-background-task@v1.1.0',
@@ -68,7 +71,7 @@ test('application-store package delivers every startup endpoint and managed poli
       key: 'platform-sys-menu',
       source: 'Microi.Server/Microi.Upgrade/Resource/platform-sys-menu.js',
       address: '/apiengine/platform-sys-menu',
-      version: 'v1.0.4',
+      version: 'v1.0.5',
       capabilities: [
         'V8.Method.ManageSystemDirectory',
         'ApiEngine:platform-sys-menu@v1.0.1',

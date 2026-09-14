@@ -110,6 +110,8 @@ Preferences / TestConnection / Sync / SyncStatus / SaveDraft / Send / Flags / Mo
 `mci-email-auto-sync` 定时入口协作。后三个接口禁止直接 HTTP 调用。
 账号配置在原表；`mci_email_folder` 保存目录游标，`mci_email_message` 保存邮件缓存与草稿。
 
+v1.0.5 起，状态核对与近期邮件刷新只更新实际变化的标记或摘要。没有变化的邮件不会重复写入；每批仍最多 100 条并推进 UID 游标，保留远端删除识别、软删除恢复与后台自动同步，正文继续按需读取。
+
 协议原子 `V8.Email` 处理 IMAP、SMTP、MIME 和租户凭据加密；业务编排仍使用接口引擎。
 完整参数参见 [后端 V8 → 邮箱协议](/doc/v8-engine/v8-server#邮箱协议-v8-email)。
 

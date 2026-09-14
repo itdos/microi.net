@@ -80,9 +80,10 @@ platform-service-release.json 指定的独立 Git 源码根
 
 | 项目 | 主要职责 | 对应文档 |
 |---|---|---|
-| `Microi.net.Api` | ASP.NET Core HTTP 入口、Controller、中间件、后台 Worker、健康与运行诊断；`V8EngineController.cs` 承担 MCP/V8 HTTP 网关，`MicroAppController.cs` 解析并输出前端微服务运行资产 | [安全基线](/doc/more/security) |
+| `Microi.net.Api` | ASP.NET Core HTTP 入口、Controller、中间件、后台 Worker、健康与运行诊断；`V8EngineController.cs` 只声明 MCP/V8 HTTP 路由并转发至 `Microi.MCP`，`MicroAppController.cs` 解析并输出前端微服务运行资产 | [安全基线](/doc/more/security) |
 | `Microi.net` | 表单、接口、模块、工作流、数据源、应用商城等核心业务运行时 | [系统引擎](/doc/index#核心引擎) |
 | `Microi.Core` | 公共接口、模型、租户上下文、FormEngine 基础实现、V8/MCP 领域逻辑 | [表单引擎](/doc/form-engine/form-engine-info) |
+| `Microi.MCP` | MCP 参数处理、权限过滤器、资产流、V8 代码同步与 WebSocket 调试；独立闭源类库 | [源码本地运行](/doc/getting-started/local-run) |
 | `Microi.AI` | AI 代理、模型订阅、Schema/V8 文档上下文、NL2V8 与系统级 AI 工作流 | [AI 引擎](/doc/system-engine/ai-engine) |
 | `Microi.AI/Microi.AI.Tests` | AI 授权门禁、NL2SQL 安全、租户向量隔离、知识上下文与恢复行为测试 | [AI 引擎](/doc/system-engine/ai-engine) |
 | `Microi.V8Engine` | V8 扩展注册表以及图片、微信、支付、系统信息等可信扩展 | [后端 V8 函数](/doc/v8-engine/v8-server) |
@@ -105,6 +106,22 @@ platform-service-release.json 指定的独立 Git 源码根
 | `Microi.Tests` | 后端安全、兼容、升级、分布式与全栈发布门禁测试 | [源码本地运行](/doc/getting-started/local-run#后端自动化测试与发布门禁) |
 | `tools/Microi.DatabaseSeedConverter` | 多数据库种子与资源转换工具 | [数据库扩展](/doc/system-engine/databases) |
 | `tools/SysLogQueueLoadTest` | 系统日志异步队列的受控压力测试工具 | [源码本地运行](/doc/getting-started/local-run) |
+
+### MCP 类库与引用方式
+
+`microi.mcp/` 继续提供 MCP 客户端工具。后端实现集中在 `Microi.Server/Microi.MCP/`，
+保留 `/api/V8Engine/*`、`/api/V8Debug/*` 和 `/api/V8Debug/ws` 的现有协议。
+
+| 构建入口 | MCP 引用方式 |
+|---|---|
+| `Microi.Anderson.sln` | 加载独立内部 Git 仓库中的 `Microi.MCP.csproj` 源码 |
+| `Microi.net.sln` | 引用与平台版本一致的 `Microi.MCP` NuGet 包 |
+| 单项目构建 | 默认按本地源码是否存在自动选择，也可设置 `MicroiClosedSourceReferenceMode` |
+
+一键发布将 `Microi.MCP.dll` 纳入与 `Microi.AI.dll` 相同的 Obfuscar 处理、包内 DLL
+替换和发布验收。升级时须配套更新 `Microi.Core`、`Microi.MCP` 与 API，不能只替换其中
+一个 DLL。`Microi.MCP` 源码禁止进入根公开仓；通用管理员复核和任务调度原子仍归 Core，
+避免 Core 反向依赖 MCP。
 
 ## `Microi.Client` 功能入口
 

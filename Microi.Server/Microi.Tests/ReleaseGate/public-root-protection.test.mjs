@@ -9,7 +9,7 @@ test('公开仓门禁同时拒绝旧 Microi.VSCode、新 Microi.Code 和其余�
  for(const [file,key] of [['pre-commit','preCommitOid'],['pre-push','prePushOid']])git(['config',`microi.publicGuard.${key}`,git(['hash-object',`.githooks/${file}`]).stdout.trim()]);
  fs.writeFileSync(path.join(repo,'public.txt'),'public fixture');git(['add','--','.githooks','.public-repo-protected-paths','public.txt']);git(['commit','-qm','public fixture baseline']);
  const protectedPaths=fs.readFileSync(path.join(repo,'.public-repo-protected-paths'),'utf8').split(/\r?\n/).filter(s=>s&&!s.startsWith('#'));
- assert.ok(protectedPaths.includes('Microi.VSCode'));assert.ok(protectedPaths.includes('Microi.Code'));assert.equal(protectedPaths.length,7);
+ assert.ok(protectedPaths.includes('Microi.VSCode'));assert.ok(protectedPaths.includes('Microi.Code'));assert.ok(protectedPaths.includes('Microi.Server/Microi.MCP'));assert.equal(protectedPaths.length,8);
  for(const dir of protectedPaths){const rel=dir+'/fixture.txt';fs.mkdirSync(path.dirname(path.join(repo,rel)),{recursive:true});fs.writeFileSync(path.join(repo,rel),'synthetic test data only');git(['add','--',rel]);const attempt=git(['commit','-qm','must reject private path'],false);assert.notEqual(attempt.status,0,dir);assert.match(attempt.stderr,/拒绝提交/);git(['rm','--cached','--',rel]);}
  const actual=spawnSync('git',['ls-files','--',...protectedPaths],{cwd:workspace,encoding:'utf8',windowsHide:true});assert.equal(actual.status,0);assert.equal(actual.stdout.trim(),'','Actual public root index must remain empty for private paths');
 });

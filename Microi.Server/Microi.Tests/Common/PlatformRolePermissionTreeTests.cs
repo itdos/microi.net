@@ -44,8 +44,8 @@ public class PlatformRolePermissionTreeTests
             package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "platform-sys-menu");
 
-        // v1.0.4 保留角色权限树，并增加旧客户端菜单入口兼容；锁定实际发行契约。
-        Assert.Equal("v1.0.4", engine["Version"]?.ToString());
+        // v1.0.5 保留角色权限树和旧菜单入口，在业务投影前移除内部身份副本；锁定实际发行契约。
+        Assert.Equal("v1.0.5", engine["Version"]?.ToString());
         Assert.Equal(source.TrimEnd(), engine["ApiV8Code"]?.ToString().Replace("\r\n", "\n").TrimEnd());
         Assert.Contains("GetRolePermissionTree", engine["ApiRoutes"]?.ToString());
         Assert.Contains("GetRolePermissionTree", source, StringComparison.Ordinal);

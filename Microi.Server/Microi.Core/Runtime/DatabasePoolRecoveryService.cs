@@ -83,7 +83,7 @@ namespace Microi.net
                 using (Database.BeginIsolatedConnections())
                 {
                     // 不复用普通 MCP 过滤器的池连接；保留完全相同的会话与主库权限事实源。
-                    var permission = await V8McpLogic.CheckPermission().ConfigureAwait(false);
+                    var permission = await PlatformAdministratorRequestAuthorization.CheckCurrentRequestAsync().ConfigureAwait(false);
                     token = (object)permission.token as CurrentToken;
                     if (!permission.ok || token?.CurrentUser == null) return new DosResult(0, null, "PoolRecoveryAuthorizationFailed");
                     if (UserAccessKeySecurity.IsSession(token.CurrentUser) && !UserAccessKeySecurity.HasScope(token.CurrentUser, "mcp:admin"))

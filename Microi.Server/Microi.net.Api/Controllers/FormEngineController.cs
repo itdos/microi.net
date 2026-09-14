@@ -53,7 +53,7 @@ namespace Microi.net.Api
             SystemObservabilityService.AnnotateFormEngine(HttpContext, formEngineKey, action);
         }
 
-        private void SetCurrentUserParam(JObject param, object currentUser)
+        private void SetCurrentUserParam(JObject param, object currentUser, bool transferOwnedUser = false)
         {
             if (param == null || currentUser == null)
             {
@@ -61,7 +61,7 @@ namespace Microi.net.Api
             }
             try
             {
-                param["_CurrentUser"] = currentUser is JToken token ? token.DeepClone() : JToken.FromObject(currentUser);
+                param["_CurrentUser"] = HttpOwnedIdentityTransfer.ToRequestValue(currentUser, transferOwnedUser);
             }
             catch
             {
@@ -242,7 +242,9 @@ namespace Microi.net.Api
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             if (currentTokenDynamic != null)
             {
-                SetCurrentUserParam(param, currentTokenDynamic.CurrentUser);
+                // GetCurrentToken 已校验活动会话并复制出本次身份；单对象请求转交所有权，
+                // 批量 DefaultParamList 仍为每一行创建独立副本，不能扩张到共享缓存。
+                SetCurrentUserParam(param, currentTokenDynamic.CurrentUser, transferOwnedUser: true);
                 var tokenOsClient = currentTokenDynamic.OsClient?.ToString();
                 if (!tokenOsClient.DosIsNullOrWhiteSpace())
                 {

@@ -365,7 +365,9 @@ namespace Microi.net
                     {
                         if (!string.Equals(currentToken.OsClient, osClient, StringComparison.OrdinalIgnoreCase))
                             return new DosResult(0, null, "请求租户与当前登录租户不一致！");
-                        currentUser = currentToken.CurrentUser.DeepClone() as JObject;
+                        // DiyToken 已返回本次验证独占的身份；无需再次复制数千条权限。
+                        // 上面的后台可信快照仍保留副本，不能把共享上下文转交可变参数。
+                        currentUser = HttpOwnedIdentityTransfer.ToRequestValue(currentToken.CurrentUser, true) as JObject;
                     }
                     else
                     {

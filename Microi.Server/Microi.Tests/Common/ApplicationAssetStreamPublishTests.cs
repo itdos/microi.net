@@ -1719,12 +1719,12 @@ public class ApplicationAssetStreamPublishTests
 
         var publisherSource = File.ReadAllText(Path.Combine(
             serverRoot,
-            "Microi.Core",
+            "Microi.MCP",
             "V8Engine",
             "V8McpLogic.ApplicationAssetStream.cs"));
         var runtimeSource = File.ReadAllText(Path.Combine(
             serverRoot,
-            "Microi.Core",
+            "Microi.MCP",
             "V8Engine",
             "V8McpLogic.ApplicationAssetStreamV3.Runtime.cs"));
         Assert.Equal(2, CountOccurrences(publisherSource, "}, async lease =>"));
@@ -1894,15 +1894,17 @@ public class ApplicationAssetStreamPublishTests
             "V8EngineController.cs"));
         Assert.Contains("RequestSizeLimit(136314880L)", controllerSource);
         Assert.Contains("MultipartBodyLengthLimit = 136314880L", controllerSource);
-        Assert.Contains("form[\"ContentEncoding\"]", controllerSource);
-        Assert.Contains("new GZipStream(transportStream, CompressionMode.Decompress, true)", controllerSource);
-        Assert.Contains("decodedLength > V8McpLogic.ApplicationAssetStreamMaxFileBytes", controllerSource);
-        Assert.Contains("FileOptions.DeleteOnClose", controllerSource);
-        Assert.Contains("stream.Length", controllerSource);
-        Assert.Contains("NumberStyles.None", controllerSource);
-        Assert.Contains("CultureInfo.InvariantCulture", controllerSource);
-        Assert.Contains("out var expectedCurrentVersion", controllerSource);
-        Assert.Contains("protocolParam[fieldName] = expectedCurrentVersion", controllerSource);
+        var endpointSource = File.ReadAllText(Path.Combine(
+            serverRoot, "Microi.MCP", "Http", "V8McpEndpointService.cs"));
+        Assert.Contains("form[\"ContentEncoding\"]", endpointSource);
+        Assert.Contains("new GZipStream(transportStream, CompressionMode.Decompress, true)", endpointSource);
+        Assert.Contains("decodedLength > V8McpLogic.ApplicationAssetStreamMaxFileBytes", endpointSource);
+        Assert.Contains("FileOptions.DeleteOnClose", endpointSource);
+        Assert.Contains("stream.Length", endpointSource);
+        Assert.Contains("NumberStyles.None", endpointSource);
+        Assert.Contains("CultureInfo.InvariantCulture", endpointSource);
+        Assert.Contains("out var expectedCurrentVersion", endpointSource);
+        Assert.Contains("protocolParam[fieldName] = expectedCurrentVersion", endpointSource);
         Assert.Contains("RouteSnapshotJson = request.RouteSnapshotJson", runtimeSource);
         Assert.Equal(
             2,
@@ -1954,17 +1956,5 @@ public class ApplicationAssetStreamPublishTests
     }
 
     private static string FindServerRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current != null)
-        {
-            if (Directory.Exists(Path.Combine(current.FullName, "Microi.net.Api"))
-                && Directory.Exists(Path.Combine(current.FullName, "Microi.Core")))
-            {
-                return current.FullName;
-            }
-            current = current.Parent;
-        }
-        throw new DirectoryNotFoundException("未找到 Microi.Server 根目录。");
-    }
+        => Path.GetDirectoryName(Microi.Tests.Common.McpSourceLocation.File("Directory.Build.props"))!;
 }

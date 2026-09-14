@@ -179,6 +179,8 @@ public static class MicroiApiHostExtensions
         string serverVersion)
     {
         services.TryAddSingleton(typeof(DiyFilter<>));
+        // MCP 插件统一注册资产恢复后台任务；启动后复用原租户隔离、持久检查点与重试节奏。
+        services.AddMicroiMcp();
         services.AddSingleton<DynamicRoute>();
         services.AddSingleton<IConfigureOptions<JwtBearerOptions>, JwtBearerOptionsConfigurator>();
         services.AddSingleton<IConfigureOptions<CorsOptions>, CorsOptionsConfigurator>();
@@ -293,17 +295,19 @@ public static class MicroiApiHostExtensions
             }
             await next();
         });
+        // 动态路由会访问缓存/数据库；观测必须在路由前进入，否则慢请求会漏算这段时间。
+        app.UseSystemObservability();
         app.UseRouting();
         // 路由元数据只在 ASP.NET 宿主解析；旧 netstandard 压力中间件消费可信 Items 标记，
         // 不能仅凭客户端提交的 URL 前缀或 Header 绕过业务请求槽。
         app.Use(async (context, next) =>
         {
+            Dos.Common.RequestLatencyObservation.MarkRoutingEnd();
             var recovery = context.GetEndpoint()?.Metadata.GetMetadata<DatabasePoolRecoveryEndpointAttribute>();
             if (recovery != null) context.Items[typeof(DatabasePoolRecoveryEndpointAttribute)] = recovery;
             await next();
         });
         app.UseCors("any");
-        app.UseSystemObservability();
         app.UseResponseCompression();
         app.UseSecurityGuard();
         app.UseRequestPressureGuard();

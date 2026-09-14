@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: mic_home_work_todo_badge
- * Version: v1.0.4
+ * Version: v1.0.5
  * Function:
  * - 按真实“我的工作”口径返回五类统计；新后端通过租户级版本门主动失效并使用 30 秒用户缓存，旧后端保持 3 秒缓存，优先调用并行统计原子能力。
  */
@@ -32,14 +32,22 @@ if (workflowCached) {
     if (workflowCachedResult && Number(workflowCachedResult.Code) === 1) return workflowCachedResult;
   } catch (ignoreCache) {}
 }
-try {
+// 只在旧后端缺少原子方法时使用兼容查询。数据库已超时/失败时，不能
+// 立即重跑四类计数与抄送列表，否则一次轮询会继续放大服务器负载。
+var nativeStatsAvailable = typeof V8.Method.GetCurrentUserWorkflowStats === 'function';
+if (nativeStatsAvailable) try {
   var nativeStatsResult = V8.Method.GetCurrentUserWorkflowStats();
   if (nativeStatsResult && Number(nativeStatsResult.Code) === 1) {
     var nativeResponse = { Code: 1, Data: nativeStatsResult.Data, Msg: nativeStatsResult.Msg || '' };
     V8.Cache.Set(workflowCacheKey, JSON.stringify(nativeResponse), workflowCacheTtlSeconds);
     return nativeResponse;
   }
-} catch (ignoreLegacyBackend) {}
+  if (!nativeStatsResult || nativeStatsResult.Msg !== 'Microi.WorkFlow 插件尚未注册。') {
+    return nativeStatsResult || { Code: 0, Msg: '工作流统计未返回有效结果。' };
+  }
+} catch (nativeStatsError) {
+  return { Code: 0, Msg: '读取工作流统计失败，请查看系统日志。' };
+}
 
 var countRows = function (tableName, where) {
   var result = V8.FormEngine.GetTableDataCount(tableName, { _Where: where });

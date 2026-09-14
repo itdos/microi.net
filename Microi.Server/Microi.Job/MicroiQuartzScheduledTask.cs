@@ -20,6 +20,7 @@ using System.Threading;
 using Dos.Common;
 using Dos.ORM;
 using Microi.net;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -27,6 +28,7 @@ namespace Microi.net
     {
         private IScheduler _scheduler;
         private ISchedulerFactory _schedulerFactory;
+        private readonly Func<string, JObject, string, string, Task<int>> _writeRuntimeTimes;
 
         // 添加一个标志表示是否已初始化
         private bool _isInitialized = false;
@@ -95,8 +97,15 @@ namespace Microi.net
         }
 
         public MicroiQuartzScheduledTask(ISchedulerFactory schedulerFactory)
+            : this(schedulerFactory, ScheduleRuntimeTimeWriter.WriteAsync)
+        {
+        }
+
+        internal MicroiQuartzScheduledTask(ISchedulerFactory schedulerFactory,
+            Func<string, JObject, string, string, Task<int>> writeRuntimeTimes)
         {
             _schedulerFactory = schedulerFactory;
+            _writeRuntimeTimes = writeRuntimeTimes ?? throw new ArgumentNullException(nameof(writeRuntimeTimes));
             // 2026-01-03：不在这里立即创建scheduler --延迟启动未实验成功
             _scheduler = schedulerFactory.GetScheduler().GetAwaiter().GetResult();
         }
@@ -835,6 +844,8 @@ namespace Microi.net
             {
                 FormEngineKey = MicroiJobConst.dataTable,
                 OsClient = osClient,
+                // 时间同步不需要任务代码、参数等大字段。
+                _SelectFields = new[] { "Id", "JobName", "LastTime", "NextTime" },
                 _Where = new List<DiyWhere>() {
                     new DiyWhere(){ Name = "Status", Value = "正常", Type = "=" }
                 },
@@ -857,16 +868,11 @@ namespace Microi.net
                         {
                             string str = JsonHelper.Serialize(detailResult.Data);
                             MicroiJobModel jobModel = JsonHelper.Deserialize<MicroiJobModel>(str);
-                            await MicroiEngine.FormEngine.UptFormDataAsync(new
-                            {
-                                FormEngineKey = MicroiJobConst.dataTable,
-                                Id = data.Id,
-                                _RowModel = new Dictionary<string, string>() {
-                                    { "LastTime",jobModel.LastTime},
-                                    { "NextTime",jobModel.NextTime}
-                                },
-                                OsClient = osClient
-                            });
+                            // 保留用户配置的版本追溯；运行时间用主库 CAS 独立写回，
+                            // 避免每分钟为未变化的任务生成版本及触发配置更新副作用。
+                            var observed = data as JObject ?? JObject.FromObject((object)data);
+                            if (ScheduleRuntimeTimeWriter.HasChanged(observed, jobModel.LastTime, jobModel.NextTime))
+                                await _writeRuntimeTimes(osClient, observed, jobModel.LastTime, jobModel.NextTime);
                         }
                         else
                         {

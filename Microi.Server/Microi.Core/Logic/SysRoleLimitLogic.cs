@@ -44,6 +44,13 @@ namespace Microi.net
             var dbInfo = DiyCommon.GetDbInfo(clientModel.OsClientModel["DbType"].Val<string>());
             var tDbSession = dbSessionParam == null ? dbSession : dbSessionParam;
 
+            // 旧库可能没有软删除列；元数据查询失败必须向上传播，不能回退为加载已撤销权限。
+            // 只在重建权限快照时检查，不缓存“列不存在”，以便应用升级新增列后立即生效。
+            if (tDbSession.ColumnExists("sys_rolelimit", "IsDeleted"))
+            {
+                whereSql += " and (A.IsDeleted is null or A.IsDeleted <> 1) ";
+            }
+
             if (param.RoleId != null)
             {
                 where.And(d => d.RoleId == param.RoleId);
@@ -318,18 +325,20 @@ namespace Microi.net
         /// 1) 原 SQL 把 rl.FkId 过滤条件写在 WHERE，使 LEFT JOIN 退化为 INNER JOIN，
         ///    导致还没有为该菜单分配过权限记录的角色全部丢失（前端列表为空）。
         ///    现把 rl.FkId 过滤迁入 ON 子句，保证返回所有未删除的角色。
-        /// 2) sys_rolelimit 表无 IsDeleted 字段，原 SQL 的 rl.IsDeleted 过滤会在
-        ///    严格数据库（如 PostgreSQL/Oracle）报错；移除之。
+        /// 2) sys_rolelimit 的旧库可能没有 IsDeleted；有该列时只连接有效权限，
+        ///    过滤放在 ON 内，已撤销或未分配权限的角色仍可显示并重新授权。
         /// 3) sys_role.IsDeleted 为 int 列，使用 = 0 替代 = false 提高跨库兼容。
         /// 4) 额外回传 rl.FkId，便于前端在保存时进行 upsert（无记录则 insert）。
         /// </summary>
         public async Task<DosResult<List<MenuRolelimitDto>>> GetSysRoleLimitByMenuId(SysRoleLimitParam param)
         {
             DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
-            var sql = @"SELECT rl.Id, r.Id as RoleId, r.Name as RoleName, rl.FkId, rl.Permission
+            var activeGrant = dbSession.ColumnExists("sys_rolelimit", "IsDeleted")
+                ? " AND (rl.IsDeleted is null or rl.IsDeleted <> 1)" : "";
+            var sql = $@"SELECT rl.Id, r.Id as RoleId, r.Name as RoleName, rl.FkId, rl.Permission
                           FROM sys_role as r
                      LEFT JOIN sys_rolelimit rl
-                            ON r.Id = rl.RoleId AND rl.FkId = @pFkId
+                            ON r.Id = rl.RoleId AND rl.FkId = @pFkId{activeGrant}
                          WHERE r.IsDeleted <> 1
                       ORDER BY r.Sort ASC";
             var list = dbSession.FromSql(sql)

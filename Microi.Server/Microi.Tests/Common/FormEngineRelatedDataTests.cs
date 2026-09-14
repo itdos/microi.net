@@ -209,8 +209,12 @@ public class FormEngineRelatedDataTests
                 typeof(DosResult).Assembly.Location, typeof(JObject).Assembly.Location, typeof(Controller).Assembly.Location,
                 typeof(Microsoft.CSharp.RuntimeBinder.Binder).Assembly.Location })
             .Distinct(StringComparer.OrdinalIgnoreCase).Select(p => MetadataReference.CreateFromFile(p));
+        // Controller 依赖内部身份转交原子；一并编译真实源码，保留可访问边界和全部安全断言，
+        // 不将内部生产 API 改成 public，也不在测试里手写替代身份处理实现。
+        var identityHelper = File.ReadAllText(Path.Combine(root,
+            "Microi.Server/Microi.Core/Runtime/HttpOwnedIdentityTransfer.cs"));
         var compilation = CSharpCompilation.Create("RelatedDataProbe_" + Guid.NewGuid().ToString("N"),
-            new[] { CSharpSyntaxTree.ParseText(source) }, refs,
+            new[] { CSharpSyntaxTree.ParseText(source), CSharpSyntaxTree.ParseText(identityHelper) }, refs,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream(); var emitted = compilation.Emit(stream);
         Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));

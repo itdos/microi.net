@@ -361,7 +361,12 @@ namespace Microi.net
             return version != null
                 && version >= MinimumPlatformBackgroundTaskVersion
                 && !code.DosIsNullOrWhiteSpace()
-                && code.Contains("V8.Method.ManageBackgroundTask(V8.Param)")
+                // 旧包直接传 V8.Param；新包先排除内部身份再调用同一可信原子。
+                // 同时要求完整投影和固定调用，不能因为参数变量名变化误拒绝有效启动依赖。
+                && (code.Contains("V8.Method.ManageBackgroundTask(V8.Param)")
+                    || (code.Contains("var backgroundTaskParam = Object.create(null);")
+                        && code.Contains("if (backgroundTaskKey !== '_CurrentUser') backgroundTaskParam[backgroundTaskKey] = V8.Param[backgroundTaskKey];")
+                        && code.Contains("V8.Method.ManageBackgroundTask(backgroundTaskParam)")))
                 && code.Contains("WorkerStatus")
                 && code.Contains("RunApiEngine")
                 && !code.Contains("V8.Db.FromSql");

@@ -31,7 +31,21 @@ test('embedded runtime gates duplicate websocket, chat polling and behavior sign
     const diyCommon = read('src/utils/diy.common.js');
     const lang = read('src/lang/index.js');
     const layout = read('src/layout/index.vue');
-    assert.match(pinia, /if \(!isEmbeddedWebosWindowRuntime\(\)\) pinia\.use\(piniaPluginPersistedstate\)/);
+    // 执行真实注册入口，验证嵌入窗口不安装任何持久化逻辑；不能把某个插件调用写法当作隔离保证。
+    const entry = new Function('createPinia', 'piniaPluginPersistedstate', 'installPickedPersistence', 'isEmbeddedWebosWindowRuntime',
+        pinia.replace(/^import .*;\r?$/gm, '').replace(/^export .*;\r?$/gm, '') + '\nreturn pinia;');
+    for (const embedded of [true, false]) {
+        const plugins = [], picked = [], fallback = [];
+        const instance = { use(plugin) { plugins.push(plugin); return this; } };
+        assert.equal(entry(() => instance, context => fallback.push(context), context => {
+            picked.push(context); return context.handled;
+        }, () => embedded), instance);
+        assert.equal(plugins.length, embedded ? 0 : 1);
+        for (const context of [{ handled: true }, { handled: false }]) for (const plugin of plugins) plugin(context);
+        assert.equal(picked.length, embedded ? 0 : 2);
+        assert.equal(fallback.length, embedded ? 0 : 1);
+        if (!embedded) assert.equal(fallback[0], picked[1], 'unsupported persistence must use the original plugin');
+    }
     assert.match(main, /const snapshot = LocalStorageManager\.getAll\(\)/);
     assert.match(main, /FileServer: snapshot\.FileServer \|\| snapshot\.SysConfig\?\.FileServer/);
     assert.ok(main.indexOf('const snapshot = LocalStorageManager.getAll()') < main.indexOf('app.use(router)'));
