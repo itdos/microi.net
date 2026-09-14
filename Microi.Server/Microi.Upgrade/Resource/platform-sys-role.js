@@ -7,6 +7,32 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-sys-role
+ * Version: v1.0.2
+ * Function:
+ * - 系统角色查询与维护，旧地址固定动作并复用目录权限校验。
+ */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/sysrole/addsysrole": "AddSysRole",
+  "/api/sysrole/addsysrolefrombody": "AddSysRole",
+  "/api/sysrole/delsysrole": "DelSysRole",
+  "/api/sysrole/uptsysrole": "UptSysRole",
+  "/api/sysrole/uptsysrolefrombody": "UptSysRole",
+  "/api/sysrole/getsysrolemodel": "GetSysRoleModel",
+  "/api/sysrole/getsysrole": "GetSysRole",
+  "/api/sysrole/getsysrolestep": "GetSysRoleStep",
+  "/api/sysrole/getdirecttablegrantpolicies": "GetDirectTableGrantPolicies"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 // Microi官方接口引擎：platform-sys-role
 // Version: v1.0.0
 // 角色目录业务编排由应用商城交付；非管理员列表仍服从 sys_user 表权限与可分配角色范围。

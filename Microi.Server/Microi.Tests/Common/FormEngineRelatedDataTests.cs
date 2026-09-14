@@ -159,12 +159,86 @@ public class FormEngineRelatedDataTests
         ["ParentTableRowId"] = "same-row-id", ["_SysMenuId"] = "menu-a", ["_Lang"] = "zh-CN"
     };
 
+    [Fact]
+    public async Task AdministratorVersionListNeverReadsBodyAndDetailReadsOnlySelectedVersion()
+    {
+        var f = new RelatedDataFixture { IsAdministrator = true, ParentTableName = "sys_apiengine" };
+        var list = await Run(f, "DataVersion");
+        Assert.Equal("OnDemand", list["DataAppend"]!["HistoryContentMode"]!.Value<string>());
+        Assert.DoesNotContain("Data", f.AuxiliaryArguments[0]._SelectFields);
+        Assert.Empty(f.WrittenComments);
+        var request = Request("DataVersion"); request["VersionId"] = "owned";
+        var detail = await Run(f, request);
+        Assert.Equal("Authorized", detail["DataAppend"]!["HistoryContentMode"]!.Value<string>());
+        Assert.Equal(1, f.AuxiliaryArguments[^1]._PageSize);
+        Assert.Contains("return 1", detail.ToString());
+        Assert.DoesNotContain("HISTORICAL-PRIVATE-PHONE", detail.ToString());
+        Assert.Empty(f.WrittenComments);
+    }
+
+    [Theory]
+    [InlineData(false, "sys_apiengine", "owned")]
+    [InlineData(true, "sys_osclients", "owned")]
+    [InlineData(true, "sys_apiengine", "other-table")]
+    public async Task VersionBodyRequiresLiveAdministratorCodeTableAndExactParent(bool admin, string table, string id)
+    {
+        var f = new RelatedDataFixture { IsAdministrator = admin, ParentTableName = table };
+        var request = Request("DataVersion"); request["VersionId"] = id;
+        var result = await Run(f, request);
+        Assert.NotEqual(1, result["Code"]!.Value<int>());
+        Assert.DoesNotContain("return 1", result.ToString());
+    }
+
+    [Theory]
+    [InlineData("647b78a5-ae91-4b4a-8d49-abd98405c5dc")]
+    [InlineData("01M2FC0G2XBTD08V5PBPVYV63X")]
+    public async Task CommentWriteBindsParentAuthorAndReplyAndReusesRequestId(string requestId)
+    {
+        var f = new RelatedDataFixture();
+        var request = Request("DataComment");
+        request["RequestId"] = requestId; request["Content"] = "测试评论";
+        request["ParentCommentId"] = "owned"; request["TableId"] = "forged-table";
+        request["UserId"] = "forged-user"; request["ReplyToContent"] = "forged-content";
+        var first = await Run(f, request, "AddFormComment");
+        Assert.Equal(1, first["Code"]!.Value<int>());
+        var row = Assert.Single(f.WrittenComments);
+        Assert.Equal("canonical-table-a", row["ParentTableId"]!.Value<string>());
+        Assert.Equal("actor", row["UserId"]!.Value<string>());
+        Assert.Equal("original-author", row["ReplyToUserId"]!.Value<string>());
+        Assert.Equal("RAW-CHANGE-CONTENT", row["ReplyToContent"]!.Value<string>());
+        var second = await Run(f, request, "AddFormComment");
+        Assert.Equal(1, second["Code"]!.Value<int>()); Assert.Single(f.WrittenComments);
+    }
+
+    [Theory]
+    [InlineData("not-an-id")]
+    [InlineData("01M2FC0G2XBTD08V5PBPVYV63X-extra")]
+    public async Task InvalidCommentSubmissionIdDoesNotWrite(string id)
+    {
+        var fixture = new RelatedDataFixture();
+        var request = Request("DataComment"); request["RequestId"] = id; request["Content"] = "测试";
+        Assert.NotEqual(1, (await Run(fixture, request, "AddFormComment"))["Code"]!.Value<int>());
+        Assert.Empty(fixture.WrittenComments);
+    }
+
+    [Theory]
+    [InlineData("other-table", true)]
+    [InlineData("owned", false)]
+    public async Task UnauthorizedReplyOrParentCannotWriteComment(string reply, bool readable)
+    {
+        var f = new RelatedDataFixture { ParentExists = readable };
+        var request = Request("DataComment"); request["ParentCommentId"] = reply;
+        request["RequestId"] = Guid.NewGuid().ToString(); request["Content"] = "测试";
+        var result = await Run(f, request, "AddFormComment");
+        Assert.NotEqual(1, result["Code"]!.Value<int>()); Assert.Empty(f.WrittenComments);
+    }
+
     private static Task<JObject> Run(RelatedDataFixture fixture, string type) => Run(fixture, Request(type));
-    private static async Task<JObject> Run(RelatedDataFixture fixture, JObject request)
+    private static async Task<JObject> Run(RelatedDataFixture fixture, JObject request, string method = "GetFormRelatedData")
     {
         var probe = Activator.CreateInstance(ProbeType.Value, fixture)!;
         fixture.IsTrusted = argument => (bool)ProbeType.Value.GetMethod("CheckTrust")!.Invoke(probe, new[] { argument })!;
-        var task = (Task<JsonResult>)ProbeType.Value.GetMethod("GetFormRelatedData")!.Invoke(probe, new object[] { request })!;
+        var task = (Task<JsonResult>)ProbeType.Value.GetMethod(method)!.Invoke(probe, new object[] { request })!;
         return JObject.FromObject((await task).Value!);
     }
 
@@ -174,7 +248,7 @@ public class FormEngineRelatedDataTests
         var path = Environment.GetEnvironmentVariable("TEST_RELATED_CONTROLLER_SOURCE")
             ?? Path.Combine(root, "Microi.Server/Microi.net.Api/Controllers/FormEngineController.cs");
         var syntax = CSharpSyntaxTree.ParseText(File.ReadAllText(path)).GetRoot();
-        var names = new[] { "GetFormRelatedData", "DefaultParam", "SetCurrentUserParam", "EnsureLang", "GetRequestLang" };
+        var names = new[] { "GetFormRelatedData", "AddFormComment", "DefaultParam", "SetCurrentUserParam", "EnsureLang", "GetRequestLang" };
         var methods = names.Select(name => syntax.DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(m => m.Identifier.Text == name).ToFullString());
         var formPath = Path.Combine(root, "Microi.Server/Microi.net/FormEngine/FormEngine.cs");
@@ -196,8 +270,10 @@ public class FormEngineRelatedDataTests
             using Dos.Common; using Microi.net; using Newtonsoft.Json.Linq;
             using Microsoft.AspNetCore.Mvc; using Microsoft.AspNetCore.Http;
             using Microi.Tests.Common;
+            using Microi.Tests.Generated;
             public class RelatedDataProbe : Controller {
                 public RelatedDataFixture MicroiEngine {get;}
+                private FormRelatedDataRuntime FormRelatedDataService => new(MicroiEngine);
                 public RelatedDataFixture.TokenSource DiyToken => MicroiEngine.Token;
                 public RelatedDataProbe(RelatedDataFixture fixture) { MicroiEngine=fixture; ControllerContext=new ControllerContext {HttpContext=new DefaultHttpContext()}; }
                 private Task<JObject> MergeRequestParam(JObject param) => Task.FromResult(param);
@@ -213,8 +289,16 @@ public class FormEngineRelatedDataTests
         // 不将内部生产 API 改成 public，也不在测试里手写替代身份处理实现。
         var identityHelper = File.ReadAllText(Path.Combine(root,
             "Microi.Server/Microi.Core/Runtime/HttpOwnedIdentityTransfer.cs"));
+        // 执行完整生产服务，仅替换数据库与主库身份复核边界；不在测试里重写业务逻辑。
+        var service = File.ReadAllText(Path.Combine(root,"Microi.Server/Microi.Core/FormEngine/FormRelatedDataService.cs"))
+            .Replace("namespace Microi.net", "namespace Microi.Tests.Generated")
+            .Replace("public static class FormRelatedDataService", "public class FormRelatedDataRuntime")
+            .Replace("public static Task<object>", "public Task<object>")
+            .Replace("private static async Task<object>", "private async Task<object>")
+            .Replace("public Task<object> GetAsync", "public RelatedDataFixture MicroiEngine {get;} public RelatedDataFixture PlatformAdministratorSecurity => MicroiEngine; public FormRelatedDataRuntime(RelatedDataFixture f) {MicroiEngine=f;} public Task<object> GetAsync");
+        service = "using Microi.net; using Microi.Tests.Common;\n" + service;
         var compilation = CSharpCompilation.Create("RelatedDataProbe_" + Guid.NewGuid().ToString("N"),
-            new[] { CSharpSyntaxTree.ParseText(source), CSharpSyntaxTree.ParseText(identityHelper) }, refs,
+            new[] { CSharpSyntaxTree.ParseText(source), CSharpSyntaxTree.ParseText(identityHelper), CSharpSyntaxTree.ParseText(service) }, refs,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream(); var emitted = compilation.Emit(stream);
         Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -244,6 +328,20 @@ public class RelatedDataFixture
     public int ParentReads { get; private set; }
     public string? FailAuxiliaryTable { get; set; }
     public bool CommentTableBound { get; set; } = true;
+    public string CommentBindingField { get; set; } = "ParentTableId";
+    public bool IsAdministrator { get; set; }
+    public string ParentTableName { get; set; } = "ordinary_table";
+    public List<JObject> WrittenComments { get; } = new();
+    public bool IsCurrentPlatformAdministrator(string osClient, JObject user) => IsAdministrator;
+    public Task<DosResult<dynamic>> GetDiyTable(string id, string osClient, string lang) =>
+        Task.FromResult(new DosResult<dynamic>(1, new JObject { ["Id"] = id, ["Name"] = ParentTableName }));
+    public Task<DosResult> AddFormDataAsync(DiyTableRowParam p)
+    {
+        Assert.Equal("diy_comment", p.FormEngineKey); Assert.True(IsTrusted(p));
+        Assert.Equal(p._RowModel["Id"]!.Value<string>(), p.Id);
+        WrittenComments.Add((JObject)p._RowModel.DeepClone());
+        return Task.FromResult(new DosResult(1));
+    }
 
     public class TokenSource
     {
@@ -285,7 +383,7 @@ public class RelatedDataFixture
         Assert.True(ParentReads > 0);
         Assert.Equal("diy_comment",p.TableName); Assert.Equal("tenant-a",p.OsClient);
         return Task.FromResult(new DosResultList<JObject>{Code=1,Data=CommentTableBound
-            ? new List<JObject>{new(){["Name"]="TableId",["Type"]="varchar(50)"}}
+            ? new List<JObject>{new(){["Name"]=CommentBindingField,["Type"]="varchar(36)"}}
             : new List<JObject>{new(){["Name"]="TableRowId",["Type"]="varchar(50)"}}});
     }
     private Task<DosResultList<dynamic>> Query(object argument, bool count)
@@ -299,10 +397,12 @@ public class RelatedDataFixture
         var rows = new[] { "canonical-table-a", "canonical-table-b" }.Select((table,index) => new JObject
         {
             ["Id"]=index==0?"owned":"other-table", ["DataId"]="same-row-id", ["TableRowId"]="same-row-id",
-            ["TableId"]=table, ["CreateTime"]="2026-09-10 00:00:00", ["CreateUserName"]="用户",
+            ["TableId"]=table, ["ParentTableId"]=table, ["CreateTime"]="2026-09-10 00:00:00", ["CreateUserName"]="用户",
             ["Type"]="Update", ["Action"]="Update", ["Version"]=1,
-            ["Data"]="{\"Phone\":\"HISTORICAL-PRIVATE-PHONE\"}", ["Content"]="RAW-CHANGE-CONTENT"
+            ["Data"]="{\"Id\":\"same-row-id\",\"ApiV8Code\":\"return 1;\",\"Phone\":\"HISTORICAL-PRIVATE-PHONE\"}",
+            ["Content"]="RAW-CHANGE-CONTENT", ["UserId"]="original-author", ["UserName"]="原作者", ["ParentCommentId"]=""
         }).ToList();
+        if (p.FormEngineKey == "diy_comment") rows.AddRange(WrittenComments);
         foreach (JArray condition in JArray.FromObject(p._Where))
         {
             Assert.Equal("=",condition[1]!.Value<string>());

@@ -1350,8 +1350,9 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 164);
-  assert.equal(managedCount, 153);
+  assert.equal(seenKeys.size, 165);
+  assert.equal(managedCount, 154);
+  assert.ok(seenKeys.has('official_password_reset_send_sms'), '找回密码入口必须随官方包投影');
   assert.ok(seenKeys.has('platform-hdfs-upload'));
   assert.ok(seenKeys.has('platform-hdfs-upload-hook'));
   for (const key of ['platform-reminder-runtime','platform-reminder-official-feed','platform-reminder-tick','platform-message-notification-config']) assert.ok(seenKeys.has(key));

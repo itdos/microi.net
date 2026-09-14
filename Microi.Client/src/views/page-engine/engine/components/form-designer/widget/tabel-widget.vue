@@ -97,10 +97,13 @@
     :stripe="widgetObj.widgetParams[2]?.value"
     :border="widgetObj.widgetParams[3]?.value"
     :size="widgetObj.widgetParams[4]?.value"
+    :show-header="widgetObj.widgetParams[21]?.value !== false"
     :span-method="objectSpanMethod"
     :show-summary="widgetObj.widgetParams[8]?.value"
     :style="{
-      '--el-table-border-color': widgetObj.widgetParams[9]?.value,
+      '--el-table-border-color': pageEngineStore.dark ? 'var(--el-border-color-light)' : widgetObj.widgetParams[9]?.value,
+      '--pe-table-header-background': tableHeaderStyle.background,
+      '--pe-table-header-color': tableHeaderStyle.color,
     }"
     :header-cell-style="{
       background: widgetObj.widgetParams[10]?.value,
@@ -108,6 +111,7 @@
     }"
     :cell-style="{
       color: widgetObj.widgetParams[12]?.value,
+      height: Number(widgetObj.widgetParams[22]?.value) > 0 ? Math.min(200, Math.max(20, Number(widgetObj.widgetParams[22].value))) + 'px' : undefined,
     }"
   >
     <template #default>
@@ -144,6 +148,8 @@
 import { ref, computed, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { useWidget } from '../../../hooks/useWidget'
+import { usePageEngineStore } from '../../../stores/pageEngine'
+import { runtimeSurfaceStyle } from '../../../utils/runtimePresentation.js'
 import RecursiveTableColumn from '../../RecursiveTableColum/RecursiveTableColumn.vue'
 import { get } from '../../../utils/axiosInstance'
 import {
@@ -158,6 +164,12 @@ const props = defineProps({
     required: true,
   },
 })
+
+const pageEngineStore = usePageEngineStore()
+const tableHeaderStyle = computed(() => runtimeSurfaceStyle({
+  background: props.widgetObj.widgetParams[10]?.value || 'var(--el-fill-color-light)',
+  color: props.widgetObj.widgetParams[11]?.value || 'var(--el-text-color-primary)',
+}, pageEngineStore.dark))
 
 //是否开启搜索
 const selLoading = ref(false)
@@ -1193,6 +1205,10 @@ const objectSpanMethod = ({ row, column, rowIndex, columnIndex }) => {
 </script>
 
 <style lang="scss" scoped>
+.page-engine-tabel-widget :deep(th.el-table__cell) {
+  background-color: var(--pe-table-header-background) !important;
+  color: var(--pe-table-header-color) !important;
+}
 .page-engine-search-bar {
   margin-bottom: 8px;
   display: flex;

@@ -1242,9 +1242,9 @@ namespace Microi.net
 
         private static string GetChatOnlineKey(string osClient, string userId) => $"Microi:{osClient}:ChatOnline:{userId}";
 
-        private static string GetLoginTokenKeyPrefix(string osClient) => $"Microi:{osClient}:LoginTokenSysUser:";
+        private static string GetLoginTokenKeyPrefix(string osClient) => LoginSessionCacheKeys.UserPrefix(osClient);
 
-        private static string GetLoginTokenKey(string osClient, string userId) => $"{GetLoginTokenKeyPrefix(osClient)}{userId}";
+        private static string GetLoginTokenKey(string osClient, string userId) => LoginSessionCacheKeys.User(osClient, userId);
 
         private static string GetTokenConnectionId(string tokenHash) => $"{TokenConnectionPrefix}{tokenHash}";
 

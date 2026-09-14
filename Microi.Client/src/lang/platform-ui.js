@@ -224,6 +224,11 @@ const printEngineZhTw = { ...printEngineZhCn, title: "列印引擎", print: "列
 // compatibility. Static designer text and known built-in labels are translated
 // at render time through this locale-owned literal table.
 const pageEngineLiteralEn = {
+    "运行主题": "Runtime theme", "跟随平台": "Follow platform", "浅色": "Light", "深色": "Dark",
+    "显示密度": "Display density", "紧凑": "Compact", "宽松": "Comfortable", "运行高度": "Runtime height",
+    "随内容展开": "Fit content", "保留固定最小高度": "Keep fixed minimum height",
+    "统计样式": "Statistics style", "彩色卡片": "Colored cards", "概要指标": "Summary metrics", "明细指标": "Detail metrics",
+    "概要/明细列数(0为自动)": "Summary/detail columns (0 for auto)", "显示表头": "Show table header", "行高(0为自适应)": "Row height (0 for auto)",
     "更多": "More", "组件": "Components", "容器": "Containers", "子元素": "Child elements", "选项卡容器": "Tab container", "页面": "Page", "通用配置": "General", "组件JSON": "Component JSON", "容器JSON": "Container JSON",
     "开始日期": "Start date", "结束日期": "End date", "重置": "Reset", "查询": "Search", "容器编号": "Container ID", "容器高度": "Container height", "容器上移": "Move container up",
     "查看数据格式": "View data format", "查看Html代码": "View HTML", "请选择界面引擎": "Select a Page Engine", "搜索菜单": "Search menus", "动态数据格式": "Dynamic data format",

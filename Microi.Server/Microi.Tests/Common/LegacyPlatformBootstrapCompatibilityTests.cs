@@ -17,6 +17,7 @@ public sealed class LegacyPlatformBootstrapCompatibilityTests
     [InlineData("/apiengine/platform-client-log", "", "AddSysLog")]
     [InlineData("/api/SysDept/GetSysDeptStep", "", "GetSysDeptStep")]
     [InlineData("/API/SYSDEPT/GETSYSDEPTSTEP", "DelSysDept", "GetSysDeptStep")]
+    [InlineData("/api/SysDept/DelSysDept", "GetSysDept", "DelSysDept")]
     public void RoutesPinLegacyActionsAndNormalizeCanonicalActions(string path, string input, string expected)
         => Assert.Equal(expected, LegacyMobileCompatibilityController.ResolveRoute(path, input)?.Action);
 
@@ -29,7 +30,6 @@ public sealed class LegacyPlatformBootstrapCompatibilityTests
     [InlineData("/apiengine/platform-sys-user-session", "SetPassword")]
     [InlineData("/LegacyMobileCompatibility/Run", "Login")]
     [InlineData("/apiengine/platform-os-legacy-compatibility", "GetHID")]
-    [InlineData("/api/SysDept/DelSysDept", "")]
     [InlineData("/apiengine/platform-sys-dept", "DelSysDept")]
     public void RecoveryCannotBecomeAGenericBusinessOrCredentialGateway(string path, string action)
         => Assert.Null(LegacyMobileCompatibilityController.ResolveRoute(path, action));

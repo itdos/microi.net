@@ -297,5 +297,14 @@ export const statistic = {
       type: 'input',
       value: 0,
     },
+    {
+      sort: 24, label: '统计样式', type: 'select', value: 'cards',
+      typeOptions: { options: [
+        { label: '彩色卡片', value: 'cards' },
+        { label: '概要指标', value: 'summary' },
+        { label: '明细指标', value: 'detail' },
+      ] },
+    },
+    { sort: 25, label: '概要/明细列数(0为自动)', type: 'number', value: 0, typeOptions: { min: 0, max: 6, step: 1 } },
   ],
 }

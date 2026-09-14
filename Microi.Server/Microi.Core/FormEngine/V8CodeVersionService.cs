@@ -87,6 +87,42 @@ namespace Microi.net
             return !tableName.DosIsNullOrWhiteSpace() && CodeFields.ContainsKey(tableName);
         }
 
+        /// <summary>管理员按需读取的代码快照白名单，禁止旧整行快照夹带身份、密钥或基础设施字段。</summary>
+        public static JObject ProjectReadableCodeSnapshot(string tableName, JToken storedData, string rowId)
+        {
+            if (!IsSupportedTable(tableName) || storedData == null) return null;
+            JObject snapshot;
+            try
+            {
+                if (storedData.Type == JTokenType.String)
+                {
+                    var text = storedData.Value<string>();
+                    if (string.IsNullOrWhiteSpace(text) || text.Length > 2 * 1024 * 1024) return null;
+                    snapshot = JObject.Parse(text);
+                }
+                else snapshot = storedData as JObject;
+            }
+            catch (JsonException) { return null; }
+            if (snapshot == null || (snapshot["Id"] != null && snapshot["Id"].Value<string>() != rowId)) return null;
+            var result = new JObject { ["Id"] = rowId };
+            foreach (var field in CodeFields[tableName])
+            {
+                if (!snapshot.TryGetValue(field.Key, StringComparison.OrdinalIgnoreCase, out var code)) continue;
+                if (code.Type != JTokenType.String && code.Type != JTokenType.Null) return null;
+                result[field.Key] = code.DeepClone();
+            }
+            if (result.Count == 1) return null;
+            var fieldName = snapshot["__CodeEditorFieldName"]?.Value<string>();
+            if (fieldName != null && CodeFields[tableName].ContainsKey(fieldName) && result[fieldName] != null)
+            {
+                result["__CodeEditorFieldName"] = fieldName;
+                result["__CodeEditorCode"] = result[fieldName].DeepClone();
+                result["__CodeEditorFieldLabel"] = CodeFields[tableName][fieldName];
+                result["__CodeEditorLanguage"] = "javascript";
+            }
+            return result;
+        }
+
         public static async Task<DosResult> SaveChangedVersionsAsync(
             string osClient,
             string tableName,

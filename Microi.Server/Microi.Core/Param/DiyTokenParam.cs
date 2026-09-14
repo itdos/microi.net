@@ -25,5 +25,8 @@ namespace Microi.net
         /// 登录、手工换号等主动签发场景不要传入。
         /// </summary>
         public string RotateFromToken { get; set; }
+        // 仅可信会话协议可创建独立开发终端；JSON/V8 调用不能设置这些控制位。
+        [Newtonsoft.Json.JsonIgnore]
+        internal string IndependentSessionSourceToken { get; set; }
     }
 }

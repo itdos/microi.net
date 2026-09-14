@@ -308,9 +308,15 @@ export default {
 html.pe-embedded-document,
 body.pe-embedded-document,
 body.pe-embedded-document #app {
+    background: var(--el-bg-color-page, #f5f7fa);
     height: auto !important;
     min-height: 0 !important;
     overflow: hidden !important;
+}
+html.dark.pe-embedded-document,
+html.dark body.pe-embedded-document,
+html.dark body.pe-embedded-document #app {
+    background: #111b2b;
 }
 </style>
 

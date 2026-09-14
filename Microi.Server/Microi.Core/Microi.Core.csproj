@@ -2,6 +2,12 @@
 
   <ItemGroup>
     <EmbeddedResource Include="V8Engine/Runtime/GlobalDateFunctions.js" LogicalName="Microi.GlobalDateFunctions.js" />
+    <EmbeddedResource Include="ApiEngine/legacy-api-routes.json" LogicalName="Microi.LegacyApiRoutes.json" />
+    <EmbeddedResource Include="../Microi.Upgrade/Resource/platform-tencent-im.js" LogicalName="Microi.Legacy.platform-tencent-im.js" />
+    <EmbeddedResource Include="../Microi.Upgrade/Resource/platform-mqtt.js" LogicalName="Microi.Legacy.platform-mqtt.js" />
+    <EmbeddedResource Include="../Microi.Upgrade/Resource/platform-background-task.js" LogicalName="Microi.Legacy.platform-background-task.js" />
+    <EmbeddedResource Include="../Microi.Upgrade/Resource/platform_auth_sms_login.js" LogicalName="Microi.Legacy.platform_auth_sms_login.js" />
+    <EmbeddedResource Include="../Microi.Upgrade/Resource/sso_legacy_token_login.js" LogicalName="Microi.Legacy.sso_legacy_token_login.js" />
   </ItemGroup>
   <PropertyGroup>
     <!-- dotnet build -c Release -->
@@ -16,9 +22,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，核心库。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>8.3.5</Version>
-    <AssemblyVersion>8.3.5</AssemblyVersion>
-    <FileVersion>8.3.5</FileVersion>
+    <Version>8.3.6</Version>
+    <AssemblyVersion>8.3.6</AssemblyVersion>
+    <FileVersion>8.3.6</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>

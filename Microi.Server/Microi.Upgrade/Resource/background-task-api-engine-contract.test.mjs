@@ -61,7 +61,7 @@ test('application-store package delivers every startup endpoint and managed poli
       key: 'platform-background-task',
       source: 'Microi.Server/Microi.Upgrade/Resource/platform-background-task.js',
       address: '/apiengine/platform-background-task',
-      version: 'v1.1.3',
+      version: 'v1.1.5',
       capabilities: [
         'ServerFeature:V8.ManageBackgroundTask',
         'ApiEngine:platform-background-task@v1.1.0',
@@ -71,7 +71,7 @@ test('application-store package delivers every startup endpoint and managed poli
       key: 'platform-sys-menu',
       source: 'Microi.Server/Microi.Upgrade/Resource/platform-sys-menu.js',
       address: '/apiengine/platform-sys-menu',
-      version: 'v1.0.5',
+      version: 'v1.0.7',
       capabilities: [
         'V8.Method.ManageSystemDirectory',
         'ApiEngine:platform-sys-menu@v1.0.1',

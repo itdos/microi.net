@@ -1,5 +1,5 @@
 <template>
-  <div class="microi-page-engine pageengine">
+  <div class="microi-page-engine pageengine pe-runtime" :class="{ 'pe-compact': formData.JsonObj.formConfig.density !== 'comfortable', 'pe-dark': pageEngineStore.dark, 'pe-light': formData.JsonObj.formConfig.themeMode === 'light' }">
     <!-- 移动端顶部导航 -->
     <div v-if="isPhoneView" class="pe-mobile-header">
       <div class="pe-header-bg">
@@ -26,7 +26,7 @@
         <!-- 主面板 -->
         <el-row
           style="min-height: 100%; width: 100%"
-          :style="formData.JsonObj.formConfig.dynamicStyle"
+          :style="runtimeSurfaceStyle(formData.JsonObj.formConfig.dynamicStyle, pageEngineStore.dark)"
           :gutter="formData.JsonObj.formConfig.gutter"
         >
           <!-- 渲染页面组件 -->
@@ -44,7 +44,7 @@
       <!-- 主面板 -->
       <el-row
         style="min-height: 100%; width: 100%"
-        :style="formData.JsonObj.formConfig.dynamicStyle"
+        :style="runtimeSurfaceStyle(formData.JsonObj.formConfig.dynamicStyle, pageEngineStore.dark)"
         :gutter="formData.JsonObj.formConfig.gutter"
       >
         <!-- 渲染页面组件 -->
@@ -63,7 +63,8 @@
 <script setup name="from-renderer">
 import pannelWrapper from '../form-designer/wrapper/pannel-wrapper.vue'
 import pannelTabs from '../form-designer/wrapper/pannel-tabs.vue'
-import { computed, inject, onMounted, onBeforeUnmount, onActivated, provide } from 'vue'
+import { computed, inject, onMounted, onBeforeUnmount, onActivated, provide, watch } from 'vue'
+import { runtimeSurfaceStyle } from '../../utils/runtimePresentation.js'
 import { useI18n } from 'vue-i18n'
 import loadComponentsFromFolder from '../../utils/dynamicComponents'
 import { storeToRefs } from 'pinia'
@@ -83,6 +84,18 @@ const pageEngineStore = usePageEngineStore()
 const { formData } = storeToRefs(pageEngineStore)
 
 const diyStore = useDiyStore()
+
+// Platform theme changes must also refresh ECharts; do not persist a runtime
+// preference into the page design or the global localStorage setting.
+let themeObserver
+const syncRuntimeTheme = () => {
+  const mode = formData.value?.JsonObj?.formConfig?.themeMode || 'system'
+  const root = document.documentElement
+  const platformDark = root.dataset.theme === 'dark' || root.classList.contains('dark')
+    || document.getElementById('app-microi')?.dataset.theme === 'openclaw-dark'
+  pageEngineStore.dark = mode === 'dark' || (mode === 'system' && platformDark)
+}
+watch(() => formData.value?.JsonObj?.formConfig?.themeMode, syncRuntimeTheme)
 
 // 移动端判断及顶部信息
 const isPhoneView = computed(() => diyStore.IsPhoneView)
@@ -211,6 +224,11 @@ onActivated(() => {
 })
 
 onMounted(() => {
+  syncRuntimeTheme()
+  themeObserver = new MutationObserver(syncRuntimeTheme)
+  for (const element of [document.documentElement, document.getElementById('app-microi')]) {
+    if (element) themeObserver.observe(element, { attributes: true, attributeFilter: ['class', 'data-theme'] })
+  }
   window.addEventListener('resize', syncRuntimeMobileMode, { passive: true })
   // 使用提取的函数设置定时刷新
   setupRefreshInterval()
@@ -290,6 +308,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  themeObserver?.disconnect()
   window.removeEventListener('resize', syncRuntimeMobileMode)
   // 取消监听事件
   window.removeEventListener('message', messageHandler)
@@ -325,6 +344,45 @@ if (!props.isPrivew) {
 </script>
 
 <style lang="scss">
+.pe-runtime.pe-compact {
+  .page-engine-wrapper-col > .box-card {
+    border-radius: 10px;
+    box-shadow: none;
+    border-color: var(--el-border-color-extra-light);
+  }
+  .page-engine-wrapper-col > .box-card > .el-card__header { padding: 12px 16px; }
+  .wrapper-title { font-size: 16px; font-weight: 600; }
+  .page-engine-search-bar { margin-bottom: 8px; min-height: 24px; }
+}
+.pe-runtime.pe-dark {
+  min-height: 100%;
+  background: var(--el-bg-color-page);
+  color-scheme: dark;
+  color: var(--el-text-color-primary);
+  --el-bg-color: #1b283b;
+  --el-bg-color-page: #111b2b;
+  --el-bg-color-overlay: #1b283b;
+  --el-fill-color-light: #223248;
+  --el-fill-color-lighter: #1d2b40;
+  --el-border-color-light: #334258;
+  --el-border-color: #334258;
+  --el-border-color-lighter: #334258;
+  --el-text-color-primary: #d8e1ee;
+  --el-text-color-regular: #bcc9db;
+  --el-text-color-secondary: #aab8cc;
+  --el-border-color-extra-light: #334258;
+}
+.pe-runtime.pe-light {
+  color-scheme: light;
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f5f7fa;
+  --el-text-color-primary: #303133;
+  --el-text-color-regular: #606266;
+  --el-text-color-secondary: #909399;
+  --el-border-color-extra-light: #f2f6fc;
+  --el-fill-color-light: #f5f7fa;
+  color: var(--el-text-color-primary);
+}
 .microi-page-engine.pageengine{
   padding-top: var(--status-bar-height, 0px);
 }

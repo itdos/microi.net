@@ -52,3 +52,18 @@ test('撤回、过期或可信启动批次缺失不再投递，也不制造回�
  f.batch.State='Published';const snapshot=JSON.parse(f.batch.SnapshotJson);snapshot.EndsAt=new Date(Date.now()-1000).toISOString();f.batch.SnapshotJson=JSON.stringify(snapshot);assert.equal(f.run({Action:'Inbox'}).Data.length,0);
  snapshot.EndsAt=new Date(Date.now()+60000).toISOString();f.batch.SnapshotJson=JSON.stringify(snapshot);f.identity({RestartEpoch:''});assert.equal(f.run({Action:'Inbox'}).Data.length,0);
 });
+
+test('signed license at seven days warns once per trusted login, including expired licenses',()=>{
+ const f=fixture(); f.batch.State='Withdrawn';
+ const end=new Date(Date.now()+7*86400000).toISOString();
+ f.identity({LoginId:'c'.repeat(32),LicenseExpirationDate:end});
+ const first=f.run({Action:'Inbox'}).Data[0]; assert.equal(first.Source,'SystemLicense'); assert.equal(first.Severity,'warning');
+ f.run({Action:'Acknowledge',Id:first.Id}); assert.equal(f.run({Action:'Inbox'}).Data.length,0);
+ // Refresh and a second page keep the trusted login id; a new sign-in gets a new occurrence.
+ assert.equal(f.run({Action:'Inbox',LoginId:'forged',EntryId:'new-document-00001'}).Data.length,0);
+ f.identity({LoginId:'d'.repeat(32)}); const next=f.run({Action:'Inbox'}).Data[0]; assert.notEqual(next.Id,first.Id);
+ f.identity({LicenseExpirationDate:new Date(Date.now()-86400000).toISOString()}); assert.equal(f.run({Action:'Inbox'}).Data[0].Severity,'error');
+ f.identity({LicenseExpirationDate:new Date(Date.now()+8*86400000).toISOString()}); assert.equal(f.run({Action:'Inbox'}).Data.length,0);
+ f.identity({LicenseExpirationDate:end,Administrator:false}); assert.equal(f.run({Action:'Inbox',Administrator:true}).Data.length,0);
+ f.identity({Administrator:true,LoginId:''}); assert.equal(f.run({Action:'Inbox'}).Data.length,0);
+});

@@ -10,10 +10,28 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-background-task
- * Version: v1.1.3
+ * Version: v1.1.5
  * Function:
- * - 按当前可信用户查询、提交和管理持久后台任务，保留动作白名单、任务所有权、取消权限及最小结果摘要。
+ * - 可靠后台任务提交、状态轮询、日志与控制入口；返回紧凑任务投影并支持旧地址。
  */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/backgroundtask/list": "List",
+  "/api/backgroundtask/detail": "Detail",
+  "/api/backgroundtask/status": "Status",
+  "/api/backgroundtask/workerstatus": "WorkerStatus",
+  "/api/backgroundtask/clearcompleted": "ClearCompleted",
+  "/api/backgroundtask/remove": "Remove",
+  "/api/backgroundtask/cancel": "Cancel",
+  "/api/backgroundtask/runapiengine": "RunApiEngine"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 
 // Microi官方接口引擎：platform-background-task
 // Version: v1.1.2

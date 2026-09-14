@@ -7,6 +7,24 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-sys-user-admin
+ * Version: v1.0.4
+ * Function:
+ * - 系统账号新增、修改、删除、查询与登录投影刷新；可信权限校验后调用租户扩展 Hook。
+ */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/sysuser/getsysusermodel": "GetSysUserModel"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 /* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
 var sysUserAdminRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '');
 if(!V8.Param.Action && sysUserAdminRoute){
@@ -14,21 +32,13 @@ if(!V8.Param.Action && sysUserAdminRoute){
   V8.Param.Action = sysUserAdminSegments[sysUserAdminSegments.length - 1] || '';
 }
 
-
-
-/*
- * V8 ApiEngine
- * ApiEngineKey: platform-sys-user-admin
- * Version: v1.0.2
- * Function: 系统账号新增、修改、删除、查询与登录投影刷新的官方编排入口。
- */
-
 var PARAM = V8.Param || {};
 var ACTIONS = {
   AddSysUser: true,
   UptSysUser: true,
   DelSysUser: true,
   GetSysUser: true,
+  GetSysUserModel: true,
   RefreshLoginUser: true
 };
 

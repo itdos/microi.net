@@ -6,6 +6,7 @@ import { buildTokenFileLookupKeys, MicroiClient, type MicroiConfig } from './mic
 import { createMcpServer, type McpServerContext } from './server.js';
 import { resolveMcpLabel } from './mcp-label.js';
 import { selectPreferredAuthorizationTokenFromCandidates } from './token-utils.js';
+import { unprotectSessionToken } from './workspace-protected-credentials.js';
 
 interface SseSession {
   transport: SSEServerTransport;
@@ -31,11 +32,11 @@ function readTokenFromFile(
     );
     const tenantKeys = osClient ? lookupKeys.filter(key => key !== apiKey) : lookupKeys;
     const tenantToken = selectPreferredAuthorizationTokenFromCandidates(
-      tenantKeys.map(key => tokens[key]),
+      tenantKeys.map(key => unprotectSessionToken(tokens[key])),
     );
     // The API-wide legacy token can belong to another tenant. Keep it only as
     // a last-resort fallback when no tenant-scoped alias exists.
-    return tenantToken || tokens[apiKey];
+    return tenantToken || unprotectSessionToken(tokens[apiKey]);
   } catch {
     return undefined;
   }

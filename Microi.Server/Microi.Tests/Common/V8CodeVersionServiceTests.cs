@@ -6,6 +6,16 @@ namespace Microi.Tests.Common;
 public sealed class V8CodeVersionServiceTests
 {
     [Fact]
+    public void HistoricalCodeProjectionRejectsSecretsOtherParentsAndMalformedSnapshots()
+    {
+        var source = JObject.Parse("{\"Id\":\"row\",\"ApiV8Code\":\"return 1;\",\"Token\":\"secret\",\"ApiName\":\"do not restore\"}");
+        var snapshot = V8CodeVersionService.ProjectReadableCodeSnapshot("sys_apiengine", source, "row");
+        Assert.Equal(new[] { "Id", "ApiV8Code" }, snapshot!.Properties().Select(p => p.Name));
+        Assert.Null(V8CodeVersionService.ProjectReadableCodeSnapshot("sys_osclients", source, "row"));
+        Assert.Null(V8CodeVersionService.ProjectReadableCodeSnapshot("sys_apiengine", source, "other"));
+        Assert.Null(V8CodeVersionService.ProjectReadableCodeSnapshot("sys_apiengine", "invalid json", "row"));
+    }
+    [Fact]
     public void LayoutOnlyBatch_DoesNotProduceVersionLookups()
     {
         var oldRows = new List<JObject>();

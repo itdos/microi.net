@@ -21,7 +21,7 @@ const useDefaultPageEngineStore = defineStore('pageEngine', {
     //token
     token: localStorage.getItem('page_token') || '',  // 初始化时从 localStorage 读取 token
     //是否开启暗黑模式
-    dark: localStorage.getItem('page_dark') || false, // 初始化时从 localStorage 读取 isDark
+    dark: localStorage.getItem('page_dark') === 'true', // 初始化时从 localStorage 读取 isDark
     // 当前服务端内容哈希与历史能力状态，用于多人协作的乐观并发保护。
     currentHash: '',
     historyAvailable: false,

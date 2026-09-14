@@ -507,6 +507,9 @@ return {1, userNext, tenantNext}";
             param.Path = uploadRoot;
             param.Limit = authoritativeLimit;
 
+            // 附件角色权限必须使用私有桶，字段或请求的 Limit=false 都不能生成公有直链。
+            if (FileRolePermission.Enabled(fieldModel)) param.Limit = true;
+
             // 微信内容安全审核中的图片必须先进入私有隔离区；字段公有配置不能放宽此边界。
             if (param.ContentSecurityRequired == true
                 || string.Equals(

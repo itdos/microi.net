@@ -10,8 +10,16 @@ const description = '新增按表主库读取配置：原生行、计数、汇�
 /** 精确追加表配置声明；不修改其它字段、租户数据或已经发布的同步基线。 */
 export function configureReadPrimary(input) {
   const pkg = structuredClone(input);
-  if (!['v7.7.3', version].includes(pkg.PackageInfo?.Version))
-    throw new Error(`ReadPrimary 配置只接受 v7.7.3 或 ${version} 候选`);
+  const inputVersion = pkg.PackageInfo?.Version;
+  const parts = /^v7\.(\d+)\.(\d+)$/.exec(inputVersion || '');
+  const successor = parts && (Number(parts[1]) > 7 || Number(parts[1]) === 7 && Number(parts[2]) > 4);
+  if (!['v7.7.3', version].includes(inputVersion) && !successor)
+    throw new Error(`ReadPrimary 配置只接受 v7.7.3、${version} 或同代后续候选`);
+  // 后续包已经完成该迁移时只验证/保持声明，不能降版或覆盖后来功能的发布日志。
+  // 跨主版本需要另行确认包协议，缺少能力标识的后续包不能冒充已迁移候选。
+  if (successor && (!pkg.PackageInfo.RequiredPlatformCapabilities?.includes(readPrimaryCapability)
+    || pkg.PackageInfo.ChangeLog?.Version !== inputVersion))
+    throw new Error('ReadPrimary 后续候选缺少既有能力或对应版本日志');
   const table = pkg.DiyTables.find(x => x.Name === 'diy_table');
   const ddl = pkg.DDLStatements.find(x => x.TableName === 'diy_table');
   if (!table || !ddl) throw new Error('缺少 diy_table 声明');
@@ -45,12 +53,12 @@ export function configureReadPrimary(input) {
     ddl.DDL = ddl.DDL.slice(0, at).replace(/,?\s*$/, '') + ",\n  `ReadPrimary` int NULL COMMENT '主库读取'" + ddl.DDL.slice(at);
   }
   // 不把所有表批量设为1，也不为现有租户数据写入发布方的默认值。
-  pkg.PackageInfo.Version = version;
+  pkg.PackageInfo.Version = successor ? inputVersion : version;
   pkg.PackageInfo.RequiredPlatformCapabilities = [...new Set([...(pkg.PackageInfo.RequiredPlatformCapabilities || []), readPrimaryCapability])];
   const log = { Version: version, Title: '表单主库读取策略', ChangeType: 'Feature', Content: description, ReleaseTime: '2026-09-10 14:00:00' };
-  pkg.PackageInfo.ChangeLog = log;
+  if (!successor) pkg.PackageInfo.ChangeLog = log;
   const history = `2026-09-10 ${version} ${description}`;
-  if (!String(pkg.PackageInfo.ChangeHistory).includes(history)) pkg.PackageInfo.ChangeHistory = history + '\n' + (pkg.PackageInfo.ChangeHistory || '');
+  if (!successor && !String(pkg.PackageInfo.ChangeHistory).includes(history)) pkg.PackageInfo.ChangeHistory = history + '\n' + (pkg.PackageInfo.ChangeHistory || '');
   pkg.PackageInfo.FieldCount = pkg.DiyFields.length;
   pkg.PackageInfo.PhysicalColumnCount = pkg.PhysicalColumns.length;
   return pkg;

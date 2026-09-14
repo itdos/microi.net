@@ -58,6 +58,8 @@ function normalizeUploadItem(item) {
     }
     if (typeof item !== "object") return null;
 
+    if (item._FileAccess?.CanRead === false) return { ...item, Path: '', Name: item.Name || '无权限附件' };
+
     const path = item.Path || item.FilePathName || item.FullPath || item.Url || item.url || item.src || "";
     if (!path) return null;
     return {
@@ -104,6 +106,7 @@ export function getUploadConfig(field) {
 }
 
 export function isPrivateUploadField(field) {
+    if (getUploadConfig(field).EnableRolePermission === true) return true;
     const limit = getUploadConfig(field).Limit;
     return limit === true || limit === 1 || String(limit).toLowerCase() === "true";
 }

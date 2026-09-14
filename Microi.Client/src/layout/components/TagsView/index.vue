@@ -10,9 +10,7 @@
                 </el-tab-pane>
             </el-tabs>
 
-            <div class="tags-view-runtime-version" data-testid="runtime-version">
-                {{ runtimeVersionText }}
-            </div>
+            <MciAiConnectionDialog :text="runtimeVersionText" />
         </div>
 
         <!-- 🔥 使用 keep-alive 保持页面状态，支持通过 meta.keepAlive 配置是否缓存 -->
@@ -171,6 +169,7 @@ import { resolveTabIcon } from "@/utils/tab-icon.js";
 import { getPageTabRouteViewKey } from "@/utils/page-tab-route-runtime.js";
 import { apiServiceState } from "@/utils/api-service-status.js";
 import { buildRuntimeVersionText } from "@/utils/runtime-version-text.js";
+import MciAiConnectionDialog from '@/components/MciAiConnectionDialog/index.vue';
 import {
     getBoundWorkflowDesignId,
     getWorkflowDesignPath
@@ -186,6 +185,7 @@ import { AppMain } from "../../components";
 export default {
     components: {
         ScrollPane,
+        MciAiConnectionDialog,
         Item,
         AppMain,
         DiyFormFull: defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"))

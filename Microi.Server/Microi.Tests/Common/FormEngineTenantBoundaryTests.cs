@@ -104,8 +104,6 @@ public class FormEngineTenantBoundaryTests
     [InlineData("sys_config")]
     [InlineData("mci_global_function")]
     [InlineData("sys_apiengine")]
-    [InlineData("diy_table")]
-    [InlineData("diy_field")]
     [InlineData("sys_menu")]
     [InlineData("sys_role")]
     [InlineData("sys_rolelimit")]
@@ -214,6 +212,8 @@ public class FormEngineTenantBoundaryTests
     }
 
     [Theory]
+    [InlineData("diy_table")]
+    [InlineData("diy_field")]
     [InlineData("wf_flowdesign")]
     [InlineData("wf_node")]
     [InlineData("wf_line")]
@@ -431,8 +431,11 @@ public class FormEngineTenantBoundaryTests
             "Edit"));
     }
 
-    [Fact]
-    public async Task ReadOnlyPlatformMetadata_RejectsWriteEvenWhenPayloadContainsEditGrant()
+    [Theory]
+    [InlineData("sys_microiservice")]
+    [InlineData("diy_table")]
+    [InlineData("diy_field")]
+    public async Task ReadOnlyPlatformMetadata_RejectsWriteEvenWhenPayloadContainsEditGrant(string tableName)
     {
         var engine = new FormEngine();
         var tableId = "service-table-id";
@@ -465,13 +468,25 @@ public class FormEngineTenantBoundaryTests
         Assert.True(await InvokeClientAuthorization(
             engine,
             param,
-            new JObject { ["Id"] = tableId, ["Name"] = "sys_microiservice" },
+            new JObject { ["Id"] = tableId, ["Name"] = tableName },
             "Read"));
+        Assert.True(await InvokeClientAuthorization(
+            engine, param, new JObject { ["Id"] = tableId, ["Name"] = tableName }, "List"));
+        foreach (var operation in new[] { "Add", "Edit", "Delete", "Import", "Export" })
+        {
+            Assert.False(await InvokeClientAuthorization(
+                engine, param, new JObject { ["Id"] = tableId, ["Name"] = tableName }, operation));
+        }
+
+        // 同名表不能借用其它 Table Id 的授权，实际授权撤销后立即拒绝。
         Assert.False(await InvokeClientAuthorization(
-            engine,
-            param,
-            new JObject { ["Id"] = tableId, ["Name"] = "sys_microiservice" },
-            "Edit"));
+            engine, param, new JObject { ["Id"] = "other-table-id", ["Name"] = tableName }, "Read"));
+        param._AuthorizationSnapshot.RoleLimits.Clear();
+        Assert.False(await InvokeClientAuthorization(
+            engine, param, new JObject { ["Id"] = tableId, ["Name"] = tableName }, "Read"));
+        param._IsAnonymous = true;
+        Assert.False(await InvokeClientAuthorization(
+            engine, param, new JObject { ["Id"] = tableId, ["Name"] = tableName }, "Read"));
     }
 
     [Fact]
