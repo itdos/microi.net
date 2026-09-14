@@ -5,7 +5,12 @@ import test from 'node:test'
 import { buildTableChildDefaultValues } from '../src/platform/table-child-defaults.js'
 import { casePhotoField, caseFieldDescription } from '../src/tenants/xjy/case-form.mjs'
 import { proposalCostFieldPresentation } from '../src/tenants/xjy/proposal-cost-presentation.mjs'
-import { buildListFilterWhere } from '../src/platform/list-filter-fields.mjs'
+import {
+  buildListFilterWhere,
+  hasListFilterValue,
+  mergeTableSelectorFilterFields,
+  validateListFilters
+} from '../src/platform/list-filter-fields.mjs'
 
 const read = (name) => fs.readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8')
 const plain = (value) => JSON.parse(JSON.stringify(value))
@@ -364,6 +369,10 @@ test('选择器查询继续携带原照片菜单权限，接口拒绝时展示�
   let response = { Code: 1, Data: [{ Id: 'task-1' }], DataCount: 1 }
   const tenant = loadModule('tenants/xjy/native-table.js')
   const component = vm.runInNewContext(`${source}; component`, {
+    MciListFilterField: {},
+    hasListFilterValue,
+    mergeTableSelectorFilterFields,
+    validateListFilters,
     V8: { FormEngine: { GetTableData: async (table, query) => { calls.push({ table, query }); return response } } },
     getOpenTableWhere: (field, form) => tenant.appendOpenTableWhere({ field, form, where: [] })
   })
@@ -395,6 +404,10 @@ function createPhotoSelector(overrides = {}, tableName = 'Diy_Anli') {
   const component = vm.runInNewContext(`${source}; component`, {
     setTimeout, clearTimeout,
     buildListFilterWhere,
+    hasListFilterValue,
+    mergeTableSelectorFilterFields,
+    validateListFilters,
+    MciListFilterField: {},
     uni: { showToast: (message) => calls.toasts.push(message) },
     validateOpenTableContext: () => '',
     getOpenTableWhere: (field, form) => tenant.appendOpenTableWhere({ field, form, where: [] }),
@@ -552,6 +565,34 @@ test('普通开表选择器维持原有单次选择行为，不读取照片筛�
   assert.equal(state.selectedIds.length, 0)
   assert.equal(state.filterFields.length, 0)
   assert.equal(calls.dictionaries.length, 0)
+})
+
+test('普通开表选择器读取目标菜单筛选，并生成选项与数值区间条件', async () => {
+  const { state, calls } = createPhotoSelector()
+  state.presentation = {}
+  state.parentForm = {}
+  state.menuDefinition = {
+    key: 'Diy_Shangpin',
+    filterFields: [
+      { key: 'ShangpinLX', field: 'ShangpinLX', label: '商品类型', type: 'options', storage: 'scalar', multiple: false },
+      { key: 'Jiage', field: 'Jiage', label: '价格', type: 'range' }
+    ]
+  }
+
+  await state.openSelector()
+  assert.deepEqual(state.filterFields.map((field) => field.field), ['ShangpinLX', 'Jiage'])
+  assert.equal(calls.dictionaries.length, 0, '菜单字段选项由通用字段筛选器加载，不能误读照片字典')
+  await state.openFilters()
+  state.draftFilterValues.ShangpinLX = '设备'
+  state.draftFilterValues.Jiage = { min: '100', max: '2000' }
+  await state.applyFilters()
+
+  assert.deepEqual(calls.queries.at(-1)._Where, [
+    { Name: 'ShangpinLX', Type: '=', Value: '设备' },
+    { Name: 'Jiage', Type: '>=', Value: 100 },
+    { Name: 'Jiage', Type: '<=', Value: 2000 }
+  ])
+  assert.equal(state.activeFilterCount, 2)
 })
 
 test('迟到的旧搜索响应不能覆盖当前筛选列表或选中状态', async () => {
