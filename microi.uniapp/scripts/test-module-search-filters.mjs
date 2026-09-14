@@ -8,6 +8,7 @@ import {
   compileModuleFilterFields,
   hasListFilterValue,
   mergeModuleFilterFields,
+  mergeTableSelectorFilterFields,
   validateListFilters
 } from '../src/platform/list-filter-fields.mjs'
 
@@ -30,6 +31,9 @@ const fields = [
   { Id: 'created-id', Name: 'CreateTime', Label: '创建时间', component: 'DateTime', Type: 'datetime', Visible: 1, AppVisible: 1, visible: false },
   { Id: 'tenant-id', Name: 'TenantName', Label: '所属租户', component: 'Text', Type: 'varchar(255)', visible: true }
 ]
+const businessSource = fs.readFileSync(new URL('../src/tenants/xjy/business.js', import.meta.url), 'utf8')
+const moduleRegistrySource = fs.readFileSync(new URL('../src/platform/module-registry.js', import.meta.url), 'utf8')
+const listFilterFieldSource = fs.readFileSync(new URL('../src/components/mci-list-filter-field/mci-list-filter-field.vue', import.meta.url), 'utf8')
 
 test('后台 SearchFieldIds 编译为移动端高级筛选，Out 保留查询配置，Line 留在行内', () => {
   const searchFieldIds = JSON.stringify([
@@ -52,6 +56,40 @@ test('后台 SearchFieldIds 编译为移动端高级筛选，Out 保留查询配
   assert.equal(compiled[1].multiValueLike, true)
   assert.equal(compiled[2].type, 'range')
   assert.equal(compiled[3].type, 'date-range')
+})
+
+test('后台明确配置的查询字段不受移动表单显隐影响，但仍遵守角色字段权限', () => {
+  const searchFieldIds = [
+    { Id: 'contract-status-id', Name: 'HetongZT', Label: '合同状态', DisplayType: 'In' },
+    { Id: 'contract-upload-id', Name: 'IsDingdanHT', Label: '合同是否上传', DisplayType: 'Out' }
+  ]
+  const hiddenFormFields = [
+    { Id: 'contract-status-id', Name: 'HetongZT', Label: '合同状态', component: 'Radio', Visible: 0, AppVisible: 0, visible: false, bindRoleIds: [], options: [] },
+    { Id: 'contract-upload-id', Name: 'IsDingdanHT', Label: '合同是否上传', component: 'Radio', Visible: 0, AppVisible: 0, visible: false, bindRoleIds: [], options: [] }
+  ]
+
+  assert.deepEqual(compileModuleFilterFields(searchFieldIds, hiddenFormFields), [])
+  assert.deepEqual(
+    compileModuleFilterFields(searchFieldIds, hiddenFormFields, { allowAppHidden: true }).map((field) => field.field),
+    ['HetongZT', 'IsDingdanHT']
+  )
+
+  const roleRestricted = hiddenFormFields.map((field) => ({
+    ...field,
+    bindRoleIds: ['restricted-role']
+  }))
+  assert.deepEqual(compileModuleFilterFields(searchFieldIds, roleRestricted, { allowAppHidden: true }), [])
+})
+
+test('模块定义使用完整字段元数据编译后台筛选，而不是只读取移动表单可见字段', () => {
+  assert.match(
+    moduleRegistrySource,
+    /const searchMetadataFields = definition\.layoutFields\?\.length \? definition\.layoutFields : fields/
+  )
+  assert.match(
+    moduleRegistrySource,
+    /module\.menu\.SearchFieldIds,\s*appendSystemAuditFields\(searchMetadataFields\),\s*\{ allowAppHidden: true \}/
+  )
 })
 
 test('选项字段按后台组件类型决定下拉或平铺呈现', () => {
@@ -209,6 +247,29 @@ test('多选对象按稳定 Id 查询，保存字段值数组同时兼容历史�
   assert.ok(!where.some((item) => '{"Key":01,"Value":"待处理"}'.includes(item.Value)))
 })
 
+test('标量下拉可显式按显示业务值查询，不能把数据源主键误传给服务端', () => {
+  const field = {
+    key: 'ShebeiXH',
+    field: 'ShebeiXH',
+    type: 'options',
+    component: 'Select',
+    multiple: true,
+    storage: 'scalar',
+    queryValue: 'label',
+    config: { SelectSaveField: 'Id', SelectLabel: 'ShebeiXH' }
+  }
+  const options = [
+    { value: '34ca5566-52a9-4936-997d-555b6ca1c09e', label: 'FY-150K', raw: { Id: '34ca5566-52a9-4936-997d-555b6ca1c09e', ShebeiXH: 'FY-150K' } }
+  ]
+  const selected = filterOptionRows(field, options)[0].raw
+
+  assert.equal(selected._filterKey, '34ca5566-52a9-4936-997d-555b6ca1c09e')
+  assert.equal(selected._filterValue, 'FY-150K')
+  assert.deepEqual(buildListFilterWhere([field], { ShebeiXH: [selected] }), [
+    { Name: 'ShebeiXH', Type: 'In', Value: ['FY-150K'] }
+  ])
+})
+
 for (const [type, start, end, upper] of [
   ['year', '2024', '2024', '2025'], ['month', '2024-12', '2024-12', '2025-01'],
   ['date', '2024-02-29', '2024-02-29', '2024-03-01'],
@@ -268,4 +329,61 @@ test('后台筛选优先，保留租户专用排序等扩展筛选', () => {
     ]
   )
   assert.deepEqual(merged.map((field) => field.key), ['Phone', 'sort'])
+})
+
+test('租户可显式覆盖同字段的呈现与查询值协议', () => {
+  const merged = mergeModuleFilterFields(
+    [{ key: 'ShebeiXH', field: 'ShebeiXH', label: '设备型号', type: 'text' }],
+    [{
+      key: 'model', field: 'ShebeiXH', label: '设备型号', type: 'options', component: 'Select',
+      presentation: 'dropdown', multiple: true, storage: 'scalar', queryValue: 'label', overrideConfigured: true
+    }],
+    [{ Id: 'model-id', Name: 'ShebeiXH', Label: '设备型号', component: 'Text', visible: true }]
+  )
+
+  assert.equal(merged.length, 1)
+  assert.equal(merged[0].type, 'options')
+  assert.equal(merged[0].presentation, 'dropdown')
+  assert.equal(merged[0].queryValue, 'label')
+})
+
+test('我的设备将设备型号声明为按业务值查询的多选下拉', () => {
+  assert.match(businessSource, /key: 'model', label: '设备型号', field: 'ShebeiXH', type: 'options'/)
+  assert.match(businessSource, /presentation: 'dropdown', multiple: true, storage: 'scalar', queryValue: 'label', overrideConfigured: true/)
+  assert.match(businessSource, /source: 'module', moduleEngineKey: 'Diy_KehuSB', valueField: 'ShebeiXH', labelField: 'ShebeiXH'/)
+  assert.match(listFilterFieldSource, /field\.source === 'module'/)
+  assert.match(listFilterFieldSource, /!field\.source && isRemoteNativeFieldOptions\(native\)/)
+  assert.match(listFilterFieldSource, /if \(!field\.source\)/)
+  assert.match(listFilterFieldSource, /'\/apiengine\/platform-module-data'/)
+  assert.match(listFilterFieldSource, /ModuleEngineKey: moduleEngineKey/)
+})
+
+test('开表选择器以菜单筛选为基础，特殊展示配置同字段覆盖、新字段追加', () => {
+  const menuFilters = [
+    { key: 'Name', field: 'Name', label: '名称', type: 'text' },
+    { key: 'Status', field: 'Status', label: '后台状态', type: 'options', options: [{ value: 1, label: '启用' }] }
+  ]
+  const presentationFilters = [
+    { key: 'specialStatus', field: 'Status', label: '业务状态', type: 'select', source: 'baseData', parentKey: 'STATUS' },
+    { key: 'city', field: 'City', label: '城市', type: 'address' }
+  ]
+
+  const merged = mergeTableSelectorFilterFields(menuFilters, presentationFilters)
+  assert.deepEqual(merged.map((field) => [field.key, field.field, field.type]), [
+    ['Name', 'Name', 'text'],
+    ['specialStatus', 'Status', 'select'],
+    ['city', 'City', 'address']
+  ])
+  assert.equal(merged[1].label, '业务状态')
+  assert.equal(merged[1].parentKey, 'STATUS')
+  assert.equal(merged[1].options, undefined, '特殊业务覆盖不能残留后台控件的选项语义')
+  assert.notEqual(merged[0], menuFilters[0], '合并结果不能修改菜单定义')
+})
+
+test('开表选择器忽略不完整或不支持的特殊筛选，不会覆盖有效菜单配置', () => {
+  const menu = [{ key: 'Status', field: 'Status', label: '状态', type: 'options' }]
+  assert.deepEqual(mergeTableSelectorFilterFields(menu, [
+    { key: 'bad', field: 'Status', type: 'sort' },
+    { key: 'missing-type', field: 'Other' }
+  ]), menu)
 })

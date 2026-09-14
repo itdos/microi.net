@@ -7,7 +7,13 @@ export function filterOptionRows(field, options) {
   return (options || []).map((option) => {
     const saveField = field.config?.SelectSaveField
     const saveScalar = saveField && ['Checkbox', 'MultipleSelect'].includes(field.component) && field.config?.DataSource !== 'KeyValue'
-    const actual = ['array', 'object'].includes(field.storage) && !saveScalar ? (option.raw ?? option.value) : (option.raw?.[saveField] ?? option.value)
+    const stored = ['array', 'object'].includes(field.storage) && !saveScalar ? (option.raw ?? option.value) : (option.raw?.[saveField] ?? option.value)
+    // 部分业务字段由数据源 Id 定位选项、但物理列保存显示业务值；筛选值必须与物理列协议一致。
+    const actual = field.queryValue === 'label'
+      ? option.label
+      : field.queryValueField && option.raw && typeof option.raw === 'object'
+        ? (option.raw[field.queryValueField] ?? stored)
+        : stored
     return wrapFilterOption(option, actual)
   })
 }

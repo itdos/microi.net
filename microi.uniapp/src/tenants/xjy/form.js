@@ -50,6 +50,10 @@ import {
   orderSummarySubmitValues,
   orderSummaryValues
 } from './order-summary.mjs'
+import {
+  contractStateByEndDate,
+  orderCustomerSourceValues
+} from './order-contract.mjs'
 
 const CUSTOMER_TABLE = 'diy_kehu'
 const CUSTOMER_CASE_TABLE = 'diy_anli'
@@ -182,20 +186,37 @@ const CUSTOMER_PERSONNEL_LINKS = [
 const ORDER_FIELDS = {
   customerId: 'KehuID',
   customerName: 'KehuMC',
+  contact: 'LianxiR',
+  contactPhone: 'LianxiDH',
+  city: 'Chengshi',
+  address: 'XiangxiDZ',
   owner: 'YewuY',
   ownerId: 'YewuYID',
   ownerPhone: 'YewuYDH',
+  serviceAgent: 'ZhaunshuKF',
+  serviceAgentId: 'ZhaunshuKFID',
+  serviceAgentPhone: 'ZhuanshuKFDH',
+  afterSales: 'ShouhouRY',
+  afterSalesId: 'ShouhouRYID',
+  afterSalesPhone: 'ShouhouRYDH',
   orderType: 'XinLDD',
   orderDate: 'XiadanRQ',
   renewalOrderNumber: 'XQDingdanBH',
   renewalState: 'DingdanSFXQ',
   contractAttachment: 'HetongFJ',
   contractUploadState: 'IsDingdanHT',
+  contractEnd: 'HetongJSSJ',
   contractState: 'HetongZT',
   installer: 'AnzhuangR',
   installerId: 'AnzhuangRID',
   installerPhone: 'AnzhuangRDH'
 }
+const ORDER_CUSTOMER_SELECT_FIELDS = [
+  'Id', 'KehuMC', 'LianxiR', 'LianxiDH', 'Chengshi', 'XiangxiDZ',
+  'FuzeR', 'FuzeRID', 'FuzeRDH',
+  'ZhuanshuKF', 'ZhuanshuKFID', 'ZhuanshuKFDH',
+  'ShouhouRY', 'ShouhouRYID', 'ShouhouRYDH'
+]
 const PERSON_ID_KEYS = ['Id', 'ID', 'id', 'UserId', 'UserID', 'userId', 'Value', 'value']
 const PERSON_PHONE_KEYS = [
   'Phone', 'phone', 'Mobile', 'mobile', 'MobilePhone', 'mobilePhone',
@@ -548,22 +569,29 @@ function orderFieldName(context, key, label = '') {
 }
 
 function orderCustomerValues(context, row = {}, cleared = false) {
-  // zhy：客户表保存 FuzeR 系列字段，订单表保存 YewuY 系列字段，在此统一完成字段映射。
-  const values = {
-    [orderFieldName(context, 'customerId', '客户Id')]: cleared
-      ? ''
-      : personValue(row, ['Id', 'ID', 'id', 'KehuID', 'KehuId']),
-    [orderFieldName(context, 'owner', '负责人')]: cleared
-      ? ''
-      : personValue(row, ['FuzeR', 'YewuY']),
-    [orderFieldName(context, 'ownerId', '负责人ID')]: cleared
-      ? ''
-      : personValue(row, ['FuzeRID', 'YewuYID']),
-    [orderFieldName(context, 'ownerPhone', '负责人电话')]: cleared
-      ? ''
-      : personValue(row, ['FuzeRDH', 'YewuYDH'])
+  // 切换客户时整组覆盖（包括空值），防止新客户缺少某项时遗留上一客户的联系人或服务人员。
+  const sourceValues = orderCustomerSourceValues(row, cleared)
+  const labels = {
+    customerId: '客户Id',
+    customerName: '客户名称',
+    contact: '联系人',
+    contactPhone: '联系电话',
+    city: '城市',
+    address: '详细地址',
+    owner: '负责人',
+    ownerId: '负责人ID',
+    ownerPhone: '负责人电话',
+    serviceAgent: '专属客服',
+    serviceAgentId: '专属客服ID',
+    serviceAgentPhone: '专属客服电话',
+    afterSales: '售后人员',
+    afterSalesId: '售后人员Id',
+    afterSalesPhone: '售后人员电话'
   }
-  return values
+  return Object.fromEntries(Object.entries(sourceValues).map(([key, value]) => [
+    orderFieldName(context, key, labels[key]),
+    value
+  ]))
 }
 
 function applyOrderValues(context, values = {}) {
@@ -592,13 +620,11 @@ async function initializeOrder(context) {
   // 从客户/合作客户的订单 Tab 进入时只有客户 Id、名称，没有触发客户选择事件。
   // 新增页仅在负责人信息仍为空时补查一次客户，避免覆盖路由明确传入的值。
   const customerId = context.form[orderFieldName(context, 'customerId', '客户Id')]
-  const owner = context.form[orderFieldName(context, 'owner', '负责人')]
-  const ownerPhone = context.form[orderFieldName(context, 'ownerPhone', '负责人电话')]
-  if (!customerId || (!isEmptyFormValue(owner) && !isEmptyFormValue(ownerPhone))) return
+  if (!customerId) return
   try {
     const result = await V8.FormEngine.GetFormData(CUSTOMER_TABLE, {
       Id: customerId,
-      _SelectFields: ['Id', 'KehuMC', 'FuzeR', 'FuzeRID', 'FuzeRDH']
+      _SelectFields: ORDER_CUSTOMER_SELECT_FIELDS
     })
     if (result && Number(result.Code) === 1 && result.Data) {
       applyOrderValues(context, orderCustomerValues(context, result.Data))
@@ -1625,7 +1651,15 @@ export async function initialize(context) {
     context.state.orderInitialized = true
     await initializeOrder(context)
   }
-  if (isOrderForm(context)) await refreshDerivedValues(context)
+  if (isOrderForm(context)) {
+    // 新增、编辑和查看首次打开时都按今天校准显示，避免等待用户再次修改日期才更新状态。
+    applyOrderValues(context, {
+      [orderFieldName(context, 'contractState', '合同状态')]: contractStateByEndDate(
+        context.form[orderFieldName(context, 'contractEnd', '合同结束时间')]
+      )
+    })
+    await refreshDerivedValues(context)
+  }
   if (isProposalAdd(context) &&
     isEmptyFormValue(context.form[fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')])) {
     context.patchForm({
@@ -2150,12 +2184,22 @@ export async function handleFieldSelect(context, payload) {
   // zhy：订单客户、负责人和安装人的选择联动统一在表单层处理，新增、编辑及不同入口均生效。
   if (isOrderForm(context) && payload && !payload.multiple) {
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
-    const row = selectedRow(payload)
+    let row = selectedRow(payload)
     if (selectedFieldName === ORDER_FIELDS.customerName.toLowerCase()) {
+      const selectedCustomerId = payload.cleared ? '' : personValue(row, ['Id', 'ID', 'id', 'KehuID', 'KehuId'])
+      if (selectedCustomerId) {
+        // 选择器数据源可能只返回 Id/名称；立即回读客户完整行，保证页面当场带出全部快照字段。
+        try {
+          const result = await V8.FormEngine.GetFormData(CUSTOMER_TABLE, {
+            Id: selectedCustomerId,
+            _SelectFields: ORDER_CUSTOMER_SELECT_FIELDS
+          })
+          if (result && Number(result.Code) === 1 && result.Data) row = result.Data
+        } catch (error) {
+          // 仍使用选择器已有行；保存时后端会再次权威回读并在失败时阻止提交。
+        }
+      }
       const updates = orderCustomerValues(context, row, payload.cleared)
-      updates[orderFieldName(context, 'customerName', '客户名称')] = payload.cleared
-        ? ''
-        : personValue(row, ['KehuMC', 'CustomerName', 'Name']) || payload.value || ''
       applyOrderValues(context, updates)
       return { handled: true }
     }
@@ -2418,6 +2462,14 @@ export async function handleFieldChange(context, payload) {
     context.patchForm(calculateInstallationPointCosts(context.form, context.state.proposalPointYears || context.form.ShisuanNS))
     return { handled: true }
   }
+  if (isOrderForm(context) && payload &&
+    String(payload.field && payload.field.Name || '').toLowerCase() === ORDER_FIELDS.contractEnd.toLowerCase()) {
+    // 页面即时展示与服务端保存、每日任务使用同一口径：结束日当天有效，次日转为已断约。
+    applyOrderValues(context, {
+      [orderFieldName(context, 'contractState', '合同状态')]: contractStateByEndDate(payload.value)
+    })
+    return { handled: true }
+  }
   if (!isProposalForm(context) || !payload ||
     !isProposalCalculationField(payload.field && payload.field.Name)) {
     return { handled: false }
@@ -2478,13 +2530,15 @@ export async function beforeSubmit(context) {
     values[uploadStateName] = normalizeUploadItems(context.form[attachmentName]).length
       ? '已上传'
       : '未上传'
+    values[orderFieldName(context, 'contractState', '合同状态')] = contractStateByEndDate(
+      context.form[orderFieldName(context, 'contractEnd', '合同结束时间')]
+    )
     if (isOrderAdd(context)) {
       // 新增订单的商品尚未落入子表，金额必须从 0 开始；后端事件会在存在商品时重新权威汇总。
       Object.assign(values, emptyOrderAmountValues())
       const defaults = {
         [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
         [orderFieldName(context, 'orderDate', '下单日期')]: currentDate(),
-        [orderFieldName(context, 'contractState', '合同状态')]: '未断约',
         [orderFieldName(context, 'renewalState', '订单是否续签')]: '未续签'
       }
       Object.entries(defaults).forEach(([name, value]) => {
