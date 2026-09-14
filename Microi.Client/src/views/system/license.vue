@@ -47,6 +47,8 @@
                     <el-descriptions :column="2" border class="license-desc" :label-style="{ width: '140px', fontWeight: 600 }">
                         <el-descriptions-item label="授权公司">{{ licenseInfo.Company }}</el-descriptions-item>
                         <el-descriptions-item label="授权联系人">{{ licenseInfo.Name || '-' }}</el-descriptions-item>
+                        <el-descriptions-item label="激活账号">{{ licenseInfo.Account || '旧版授权未记录，请重新申请签发' }}</el-descriptions-item>
+                        <el-descriptions-item label="账号姓名">{{ licenseInfo.AccountName || '-' }}</el-descriptions-item>
                         <el-descriptions-item label="联系电话">{{ licenseInfo.Phone || '-' }}</el-descriptions-item>
                         <el-descriptions-item label="产品版本">
                             {{ licenseInfo.ProductType === 'Enterprise' ? '企业版 Enterprise' : '个人版 Personal' }}
@@ -70,21 +72,19 @@
                         <el-descriptions-item label="授权组件版本">
                             {{ licenseInfo.LicenseProviderAssemblyVersion || '-' }}
                         </el-descriptions-item>
-                        <el-descriptions-item label="Microi.AI版本">
-                            {{ licenseInfo.MicroiAiAssemblyVersion || '-' }}
-                        </el-descriptions-item>
                     </el-descriptions>
                     <div v-if="isMainTenant" class="card-actions">
                         <el-button type="primary" :loading="verifying" @click="refreshLicense">
                             <el-icon><Refresh /></el-icon> 重新验证
                         </el-button>
+                        <el-button @click="showApply = true; activeTab = 'apply'; loadCaptcha()">续期或重新申请</el-button>
                     </div>
                 </el-card>
 
                 <!-- ========== 未授权状态 ========== -->
-                <template v-else>
+                <template v-if="!isLicensed || showApply">
                     <!-- 状态提示 -->
-                    <el-card class="status-card status-unlicensed" shadow="hover">
+                    <el-card v-if="!isLicensed" class="status-card status-unlicensed" shadow="hover">
                         <div class="status-row">
                             <div class="status-badge warning">
                                 <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
@@ -191,6 +191,10 @@
                                             </el-form-item>
                                         </el-col>
                                     </el-row>
+                                    <el-form-item label="系统授权到期">
+                                        <el-date-picker v-model="applyForm.ExpirationDate" type="datetime" value-format="YYYY-MM-DDTHH:mm:ssZ" placeholder="留空使用账号授权到期时间" />
+                                        <span class="inline-info">可选择更短期限；服务端会校验不能超过账号权益到期时间。</span>
+                                    </el-form-item>
                                     <el-row v-if="captchaPolicyResolved && captchaRequired" :gutter="20">
                                         <el-col :span="12" :xs="24">
                                             <el-form-item label="验证码" required>
@@ -330,6 +334,7 @@ export default {
             // 授权信息
             hid: "",
             isLicensed: false,
+            showApply: false,
             licenseInfo: {},
             isMainTenant: false,
             currentOsClient: "",
@@ -344,6 +349,7 @@ export default {
                 Phone: "",
                 CaptchaValue: "",
                 Remark: "",
+                ExpirationDate: "",
             },
             // 验证码
             captchaId: "",
@@ -414,6 +420,8 @@ export default {
                         ProductType: d.ProductType || "",
                         Company: d.Company || "",
                         Name: d.Name || "",
+                        Account: d.Account || "",
+                        AccountName: d.AccountName || "",
                         Phone: d.Phone || "",
                         ExpirationDate: d.ExpirationDate || "",
                         UpdateExpirationDate: d.UpdateExpirationDate || "",
@@ -422,7 +430,6 @@ export default {
                         OnlineAiLicensed: d.OnlineAiLicensed === true,
                         AiProductType: d.AiProductType || "OpenSource",
                         LicenseProviderAssemblyVersion: d.LicenseProviderAssemblyVersion || "",
-                        MicroiAiAssemblyVersion: d.MicroiAiAssemblyVersion || "",
                     };
                     self.hid = d.HID || self.hid;
                 } else {
@@ -619,6 +626,7 @@ export default {
                 Name: self.applyForm.Name.trim(),
                 Phone: self.applyForm.Phone.trim(),
                 Remark: self.applyForm.Remark.trim(),
+                ExpirationDate: self.applyForm.ExpirationDate || null,
             };
             if (self.captchaRequired) {
                 param.CaptchaId = self.captchaId;

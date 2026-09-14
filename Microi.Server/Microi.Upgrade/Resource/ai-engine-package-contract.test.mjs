@@ -282,9 +282,9 @@ test('generated AI and system-account package JSON files are idempotent with exa
       file: 'app.microi.sys_user.json',
       counts: {
         TableCount: 3,
-        FieldCount: 92, // FeishuUserId 同时进入字段元数据和物理列契约。
+        FieldCount: 93, // 授权账号到期时间同时进入字段与物理列契约。
         DDLCount: 3,
-        PhysicalColumnCount: 353,
+        PhysicalColumnCount: 354,
         ApiEngineCount: 8,
         DataSetCount: 0,
         DataRowCount: 0,

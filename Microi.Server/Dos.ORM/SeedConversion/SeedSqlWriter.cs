@@ -954,9 +954,9 @@ namespace Dos.ORM.SeedConversion
             {
                 Output.Write("COMMENT ON TABLE ");
                 Output.Write(QuoteIdentifier(table.Name));
-                Output.Write(" IS '");
-                Output.Write(EscapeSqlString(table.Comment));
-                Output.WriteLine("';");
+                Output.Write(" IS ");
+                WriteStringLiteral(table.Comment, false);
+                Output.WriteLine(";");
             }
             foreach (var column in table.Columns)
             {
@@ -965,9 +965,9 @@ namespace Dos.ORM.SeedConversion
                 Output.Write(QuoteIdentifier(table.Name));
                 Output.Write('.');
                 Output.Write(QuoteIdentifier(column.Name));
-                Output.Write(" IS '");
-                Output.Write(EscapeSqlString(column.Comment));
-                Output.WriteLine("';");
+                Output.Write(" IS ");
+                WriteStringLiteral(column.Comment, false);
+                Output.WriteLine(";");
             }
             if (table.Comment != null || table.Columns.Exists(column => column.Comment != null))
             {
@@ -1048,8 +1048,31 @@ namespace Dos.ORM.SeedConversion
 
         protected override void WriteStringLiteral(string value, bool isLargeText)
         {
-            Output.Write('\'');
-            Output.Write(EscapeSqlString(value));
+            // V8 正则、反斜杠尾随引号及多行注释会被部分 SQL 客户端按转义字符串拆句。
+            // 显式 E 字符串同时固定服务端语义，避免依赖脚本头的会话 SET；换行只在入库时还原。
+            var escaped = EscapeSqlString(value);
+            Output.Write("E'");
+            foreach (var character in escaped)
+            {
+                switch (character)
+                {
+                    case '\\': Output.Write("\\\\"); break;
+                    case '\r': Output.Write("\\r"); break;
+                    case '\n': Output.Write("\\n"); break;
+                    case '\t': Output.Write("\\t"); break;
+                    case '\b': Output.Write("\\b"); break;
+                    case '\f': Output.Write("\\f"); break;
+                    default:
+                        // 其它 ASCII 控制字符也不直接进入 SQL 文件，固定三位八进制防止吞并后续数字。
+                        if (character < ' ' || character == '\u007f')
+                        {
+                            Output.Write('\\');
+                            Output.Write(Convert.ToString(character, 8).PadLeft(3, '0'));
+                        }
+                        else Output.Write(character);
+                        break;
+                }
+            }
             Output.Write('\'');
         }
 

@@ -68,54 +68,9 @@
             <p class="login-desc">{{ descText }}</p>
           </div>
 
-          <div v-if="tenantReady" class="tenant-ready-panel">
-            <div class="tenant-badge">{{ tenantOsClient }}</div>
-            <p>{{ tenantName || tenantOsClient }} 已创建完成，可以进入后台开始配置系统。</p>
-            <div class="tenant-admin-tip">
-              默认管理员账号 <strong>admin</strong>，初始密码 <strong>{{ tenantOsClient }}</strong>，请登录后及时修改。
-            </div>
-            <a v-if="adminUrl" class="tenant-url" :href="adminUrl" target="_blank" rel="noopener">{{ adminUrl }}</a>
-            <div class="tenant-actions">
-              <a class="login-btn tenant-action" :href="adminUrl" target="_blank" rel="noopener">进入后台</a>
-              <a class="login-btn tenant-action secondary" href="/profile.html">进入个人中心</a>
-            </div>
-            <button class="link-btn" type="button" @click="resetSession">切换账号</button>
+          <div v-if="isRestoring || isAuthed" class="session-redirect" role="status">
+            正在进入个人中心…
           </div>
-
-          <form v-else-if="isAuthed" class="tenant-form" @submit.prevent="createTenant">
-            <div class="input-group">
-              <div class="input-icon">K</div>
-              <input v-model.trim="tenantKey" class="login-input" placeholder="租户 Key，例如 microi-demo" autocomplete="off" />
-            </div>
-            <div class="input-group">
-              <div class="input-icon">T</div>
-              <input v-model.trim="systemName" class="login-input" placeholder="系统名称，例如 我的吾码系统" autocomplete="organization" />
-            </div>
-            <p class="login-tip">Key 必须以英文字母开头，仅支持英文字母、数字、- 和 _。</p>
-            <div v-if="visibleTenantSteps" class="tenant-progress-panel">
-              <div class="tenant-step-summary">{{ tenantProgress || tenantStepSummary }}</div>
-              <div class="tenant-step-list">
-                <div
-                  v-for="(step, index) in tenantSteps"
-                  :key="step.Key"
-                  class="tenant-step"
-                  :class="step.Status"
-                >
-                  <span class="step-index">{{ index + 1 }}</span>
-                  <div class="step-content">
-                    <strong>{{ step.Title }}</strong>
-                    <em>{{ stepElapsedText(step) }}</em>
-                    <b v-if="step.Key === 'import-template'" class="tenant-step-wait">预计耗费30-60秒，请耐心等待</b>
-                    <small>{{ step.Detail }}</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <button class="login-btn" type="submit" :class="{ loading: isCreating }" :disabled="isCreating">
-              {{ isCreating ? '正在创建...' : '创建我的免费租户' }}
-            </button>
-            <button class="link-btn" type="button" @click="resetSession">退出登录</button>
-          </form>
 
           <div v-else-if="forgotOpen" class="forgot-panel">
             <button class="forgot-back" type="button" @click="closeForgotPassword">
@@ -157,7 +112,7 @@
                   </svg>
                 </div>
                 <input v-model.trim="resetSmsCode" type="text" placeholder="短信验证码" maxlength="6" class="login-input sms-input" autocomplete="one-time-code" />
-                <button class="sms-btn" type="button" :disabled="resetSmsCooldown > 0 || !resetPhone" @click="sendResetSmsCode">
+                <button class="sms-btn" type="button" :disabled="resetSmsCooldown > 0 || !resetPhone || !captchaId || isCaptchaLoading" @click="sendResetSmsCode">
                   {{ resetSmsCooldown > 0 ? resetSmsCooldown + 's' : '获取验证码' }}
                 </button>
               </div>
@@ -256,7 +211,7 @@
                   </svg>
                 </div>
                 <input v-model.trim="registerSmsCode" type="text" placeholder="短信验证码" maxlength="6" class="login-input sms-input" autocomplete="one-time-code" />
-                <button class="sms-btn" type="button" :disabled="smsCooldown > 0 || !registerPhone" @click="sendRegisterSmsCode">
+                <button class="sms-btn" type="button" :disabled="smsCooldown > 0 || !registerPhone || !captchaId || isCaptchaLoading" @click="sendRegisterSmsCode">
                   {{ smsCooldown > 0 ? smsCooldown + 's' : '获取验证码' }}
                 </button>
               </div>
@@ -305,11 +260,15 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createOpenClawAuthBridge } from '../openclaw-auth-bridge'
 import { siteStyle } from '../site-style'
 import { buildSiteApiEngineUrl, resolveSiteApiBase } from '../utils/site-api-base.js'
-import { buildSiteSessionHeaders, getOrCreateSiteDid } from '../utils/site-session.js'
+import { siteLoginRedirect } from '../utils/site-login.js'
+import { buildSiteSessionHeaders, getOrCreateSiteDid, isSiteSessionExpired, readRotatedSiteToken } from '../utils/site-session.js'
 
 const API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_API_BASE)
 const OS_CLIENT = 'iTdos'
 
+const isRestoring = ref(true)
+const isCaptchaLoading = ref(false)
+let captchaGeneration = 0
 const authTab = ref('login')
 const loginAccount = ref('')
 const loginPassword = ref('')
@@ -386,13 +345,11 @@ const devSmsBypass = computed(() => {
 })
 const adminUrl = computed(() => tenantUrl.value || (tenantOsClient.value ? `https://${tenantOsClient.value}.microi.net` : ''))
 const titleText = computed(() => {
-  if (tenantReady.value) return '租户已就绪'
-  if (isAuthed.value) return '创建 SaaS 租户'
+  if (isRestoring.value || isAuthed.value) return '进入个人中心'
   return authTab.value === 'register' ? '注册 Microi吾码账号' : '登录 Microi吾码'
 })
 const descText = computed(() => {
-  if (tenantReady.value) return '你的独立低代码工作台已经准备好'
-  if (isAuthed.value) return '填写系统信息，一键生成全新租户数据库'
+  if (isRestoring.value || isAuthed.value) return '正在恢复登录状态'
   if (forgotOpen.value) return '验证绑定手机号后设置新的登录密码'
   return authTab.value === 'register' ? '手机号验证后设置登录密码' : '使用账号和密码安全登录'
 })
@@ -496,15 +453,26 @@ function switchAuthTab(tab) {
 }
 
 async function refreshCaptcha() {
+  const generation = ++captchaGeneration
+  isCaptchaLoading.value = true
+  captchaId.value = ''
+  captchaValue.value = ''
   try {
-    const resp = await fetch(`${API_BASE}/api/Captcha/GetCaptcha?OsClient=${OS_CLIENT}&t=${Date.now()}`)
-    if (!resp.ok) throw new Error('captcha failed')
+    const resp = await fetch(`${API_BASE}/api/Captcha/GetCaptcha?OsClient=${OS_CLIENT}&t=${Date.now()}`, { cache: 'no-store' })
     const cid = resp.headers.get('captchaid') || ''
+    if (!resp.ok || !cid) throw new Error('captcha unavailable')
+    const blob = await resp.blob()
+    if (generation !== captchaGeneration) return
+    if (captchaImgSrc.value) URL.revokeObjectURL(captchaImgSrc.value)
+    captchaImgSrc.value = URL.createObjectURL(blob)
     captchaId.value = cid
-    captchaImgSrc.value = URL.createObjectURL(await resp.blob())
   } catch {
+    if (generation !== captchaGeneration) return
+    if (captchaImgSrc.value) URL.revokeObjectURL(captchaImgSrc.value)
     captchaImgSrc.value = ''
-    showToast('验证码加载失败，请稍后重试。', 'error')
+    showToast('验证码加载失败，请点击图片重试。', 'error')
+  } finally {
+    if (generation === captchaGeneration) isCaptchaLoading.value = false
   }
 }
 
@@ -783,11 +751,7 @@ function handleLoginSuccess(resp, result) {
 }
 
 function getRedirectTarget() {
-  if (typeof window === 'undefined') return ''
-  const redirect = new URLSearchParams(window.location.search).get('redirect')
-  if (!redirect || /^https?:\/\//i.test(redirect)) return ''
-  const safeRedirect = redirect.startsWith('/') ? redirect : '/' + redirect
-  return safeRedirect === '/profile.html' ? '/profile.html#/overview' : safeRedirect
+  return siteLoginRedirect(window.location.search, window.location.origin)
 }
 
 async function createTenant() {
@@ -946,24 +910,25 @@ function mergeTenantSteps(serverSteps) {
   })
 }
 
-function restoreSession() {
+async function restoreSession() {
   const token = normalizeToken(localStorage.getItem('microi_doc_token'))
-  const userRaw = localStorage.getItem('microi_doc_user')
-  const tenant = localStorage.getItem('microi_doc_tenant')
-  const savedTenantUrl = localStorage.getItem('microi_doc_tenant_url')
-  if (token && userRaw) {
-    authToken.value = token
-    try {
-      currentUser.value = JSON.parse(userRaw)
-    } catch {
-      currentUser.value = {}
-    }
-  }
-  if (tenant) {
-    tenantOsClient.value = tenant
-    tenantName.value = tenant
-    tenantUrl.value = savedTenantUrl || `https://${tenant}.microi.net`
-  }
+  if (!token) { isRestoring.value = false; return }
+  try {
+    const response = await fetch(apiEngineUrl('platform-current-user'), {
+      method: 'POST', headers: buildSiteSessionHeaders({ token, osClient: OS_CLIENT, did: getOrCreateSiteDid() }),
+      body: JSON.stringify({ OsClient: OS_CLIENT }), cache: 'no-store'
+    })
+    const result = await response.json()
+    if (isSiteSessionExpired(result, response.status)) { resetSession(); return }
+    if (result.Code !== 1 || !result.Data?.Id) throw new Error('session unavailable')
+    authToken.value = readRotatedSiteToken(response) || token
+    currentUser.value = result.Data
+    localStorage.setItem('microi_doc_token', authToken.value)
+    localStorage.setItem('microi_doc_user', JSON.stringify(result.Data))
+    window.location.replace(getRedirectTarget())
+  } catch {
+    showToast('暂时无法恢复登录，请重试登录。', 'error')
+  } finally { isRestoring.value = false }
 }
 
 function resetSession() {
@@ -1091,8 +1056,9 @@ watch(siteStyle, (value) => {
   else destroyParticles()
 })
 
-onMounted(() => {
-  restoreSession()
+onMounted(async () => {
+  await restoreSession()
+  if (isAuthed.value) return
   const query = new URLSearchParams(window.location.search)
   if (query.get('tab') === 'register') authTab.value = 'register'
   rememberPassword.value = localStorage.getItem('microi_doc_remember_login') === '1'
@@ -1108,7 +1074,7 @@ onMounted(() => {
   }))
   openClawAuthBridge.notify()
   if (isAuthed.value) {
-    window.location.href = getRedirectTarget() || '/profile.html#/overview'
+    window.location.replace(getRedirectTarget())
     return
   }
   nextTick(() => {
@@ -1120,6 +1086,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  captchaGeneration++
+  if (captchaImgSrc.value) URL.revokeObjectURL(captchaImgSrc.value)
   openClawAuthBridge?.destroy()
   openClawAuthBridge = null
   if (smsTimer) clearInterval(smsTimer)

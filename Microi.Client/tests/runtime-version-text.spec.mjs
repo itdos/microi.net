@@ -37,7 +37,10 @@ test("TagsView subscribes to the shared health state and preserves the shell rig
 
     assert.match(source, /apiServiceState\.backendVersion/);
     assert.match(source, /apiServiceState\.frontendVersion/);
-    assert.match(source, /data-testid="runtime-version"/);
+    assert.match(source, /<MciAiConnectionDialog :text="runtimeVersionText"/);
+    const dialog = await readFile(new URL("../src/components/MciAiConnectionDialog/index.vue", import.meta.url), "utf8");
+    assert.match(dialog, /data-testid="runtime-version"/);
+    assert.match(dialog, /cursor:\s*pointer/);
     assert.match(source, /--mci-shell-version-right:\s*18px/);
     assert.match(source, /align-items:\s*center/);
     assert.match(source, /margin:\s*0 var\(--mci-shell-version-right\)/);

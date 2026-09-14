@@ -16,6 +16,7 @@
 <script setup name="pie-widget">
 import { ref, shallowRef, watch, onMounted, nextTick, onBeforeUnmount, computed } from 'vue'
 import * as echarts from 'echarts'
+import { pageChartTheme } from '../../../utils/runtimePresentation.js'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import { storeToRefs } from 'pinia'
 import CommonSearch from '../../CommonSearch/CommonSearch.vue'
@@ -121,7 +122,7 @@ const resetData = () => {
 }
 //重置
 const resetChartSource = () => {
-  chartInstance.setOption(chartSet.value)
+  chartInstance.setOption(pageChartTheme(chartSet.value, dark.value, pageEngineStore.formData.JsonObj?.formConfig?.density !== 'comfortable'))
 }
 
 //组装数据

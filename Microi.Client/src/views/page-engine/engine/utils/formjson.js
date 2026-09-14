@@ -27,6 +27,8 @@ export const formConfig = {
   watermark: false, //是否开启水印
   mobile: false, //是否移动端视图
   dark: false, // 暗黑模式
+  themeMode: 'system', // 运行态跟随平台
+  density: 'compact',
   autoRefresh: 0,//自动刷新间隔，0秒不刷新
   lastRefreshTime: '',//最后刷新时间
   watermarkStyle: {
@@ -85,6 +87,7 @@ export const wrapperOption = {
   push: 0, //栅格向右移动格数
   pull: 0, //栅格向左移动格数
   height: 300, //高度
+  heightMode: 'content', // fixed 才保留运行态最小画布高度
   marginTop: 0, //上移
   margin: '0px 10px 10px 0px', //外边距(实际是应用的内边距,外边距会使el-row塌陷)
   pannelColor: '',//面板背景色

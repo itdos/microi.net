@@ -10,10 +10,27 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: mci-system-observability-query
- * Version: v1.1.1
+ * Version: v1.1.3
  * Function:
- * - 系统日志/监控统一只读查询：增加内存压力、执行分配和事故详情查询；诊断独立于 V8 限制。
+ * - 系统日志、运行快照、安全访问与队列健康查询的授权入口。
  */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/syslog/getsyslog": "Logs",
+  "/api/syslog/getlogtypes": "LogTypes",
+  "/api/syslog/getsyslogstats": "LogStats",
+  "/api/syslog/getdockerlogs": "AppLogs",
+  "/api/syslog/getqueuehealth": "LegacyQueueHealth",
+  "/api/securityguard/listblocked": "ListBlocked",
+  "/api/securityguard/listrecentaccess": "ListRecentAccess"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 
 // Version: v1.1.0
 // 系统日志/监控统一查询接口（Managed）。
@@ -555,4 +572,10 @@ if (action == "HistoricalDashboard") {
     return getHistoricalDashboard(p);
 }
 
+if (action === 'LegacyQueueHealth' || action === 'ListBlocked' || action === 'ListRecentAccess') {
+    var legacySnapshot = getObservability({ Action: 'Snapshot', IncludeHost: false, IncludeDocker: false });
+    if (!legacySnapshot || legacySnapshot.Code !== 1) return legacySnapshot;
+    var field = action === 'LegacyQueueHealth' ? 'Queue' : (action === 'ListBlocked' ? 'ActiveBlocks' : 'RecentSecurityAccess');
+    return { Code: 1, Data: legacySnapshot.Data[field] };
+}
 return getObservability(p);

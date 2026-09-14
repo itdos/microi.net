@@ -15,7 +15,7 @@ import {
 } from './token-utils.js';
 import { assertPayloadSourceIntegrity, assertSourceIntegrity } from './source-integrity.js';
 import { prepareV8VersionedCode } from './v8-version.js';
-import { readWorkspaceCredentials } from './workspace-protected-credentials.js';
+import { readWorkspaceCredentials, unprotectSessionToken, protectSessionToken, isProtectedSessionToken } from './workspace-protected-credentials.js';
 
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
 const AUTH_FAILURE_CODES = new Set([1001, 1002]);
@@ -1025,8 +1025,8 @@ export class MicroiClient {
         ? lookupKeys.filter(key => key !== apiKey)
         : lookupKeys;
       const fileToken = selectPreferredAuthorizationTokenFromCandidates(
-        tenantKeys.map(key => tokens[key]),
-      ) || tokens[apiKey];
+        tenantKeys.map(key => unprotectSessionToken(tokens[key])),
+      ) || unprotectSessionToken(tokens[apiKey]);
       const normalizedFileToken = normalizeAuthorizationToken(fileToken);
       if (normalizedFileToken && normalizedFileToken !== this.token) {
         this.token = normalizedFileToken;
@@ -1045,14 +1045,15 @@ export class MicroiClient {
       try {
         tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, string>;
       } catch { /* file may not exist yet */ }
-      const [tokenKey] = buildTokenFileLookupKeys(
+      const tokenKeys = buildTokenFileLookupKeys(
         this.config.apiBaseUrl,
         this.config.osClient,
         this.config.osClientType,
         this.config.osClientNetwork,
       );
+      const tokenKey = tokenKeys[0];
       if (!tokenKey) return;
-      tokens[tokenKey] = this.token;
+      tokens[tokenKey] = tokenKeys.some(key => isProtectedSessionToken(tokens[key])) ? protectSessionToken(this.token) : this.token;
       const dir = path.dirname(filePath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(filePath, JSON.stringify(tokens, null, 2), { encoding: 'utf-8', mode: 0o600 });
@@ -1955,6 +1956,17 @@ export class MicroiClient {
     // Deliberately omit TargetUserId: the backend binds the operation to the
     // authenticated user and prevents an access-key session from managing keys.
     return this.post<UserAccessKeyRecord[]>(API.LIST_USER_ACCESS_KEYS, {});
+  }
+
+  async listServerPrivateSettings(): Promise<ApiResponse<Record<string, unknown>[]>> {
+    return this.post('/apiengine/platform-tenant-system-settings', { Action: 'List' });
+  }
+
+  async saveServerPrivateSecret(input: { configKey: string; value: string; category?: string; description?: string }): Promise<ApiResponse> {
+    return this.post('/api/TenantSystemSettings/Save', {
+      ConfigKey: input.configKey, Value: input.value, Category: input.category || '第三方服务',
+      Description: input.description || '', IsSecret: true, IsPublic: false, IsEnabled: true, ValueType: 'String',
+    }, { timeoutMs: this.writeRequestTimeoutMs, operationName: '保存租户后端 Secret' });
   }
 
   async createMyUserAccessKey(

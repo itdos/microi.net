@@ -18,7 +18,7 @@
         : widgetObj.widgetOption.pull
     "
     :style="[
-      widgetObj.widgetOption.dynamicStyle,
+      runtimeSurfaceStyle(widgetObj.widgetOption.dynamicStyle, pageEngineStore.dark, isDesignMode),
       {
         marginTop: dynamicMarginTop + 'px',
       },
@@ -165,6 +165,7 @@ const { formData, curWidget, curWrapper, components } =
   storeToRefs(pageEngineStore)
 import useResizable from '../../../hooks/useResizable'
 import { peT } from '../../../i18n.js'
+import { runtimeSurfaceStyle } from '../../../utils/runtimePresentation.js'
 import MciRenderSourceBadge from '@/components/MciRenderSourceBadge/index.vue'
 
 const componentRaw = toRaw(components.value)
@@ -219,6 +220,8 @@ const autoContentWidgetTypes = new Set([
   'diytable',
   'diycalendar',
   'homeoverview',
+  'workbench',
+  'tabel',
 ])
 
 const chartWidgetTypes = new Set(['bar', 'line', 'linebar', 'pie', 'funnel', 'map', 'areamap', 'homeoverview'])

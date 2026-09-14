@@ -7,7 +7,14 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
-/* V8 ApiEngine | ApiEngineKey: platform-user-behavior-signal | Version: v1.0.0 */
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-user-behavior-signal
+ * Version: v1.0.2
+ * Function:
+ * - 记录当前用户授权范围内的界面访问行为，供个人首页统计使用。
+ */
+
 var p = V8.Param || {};
 var action = String(p.Action || "").substring(0, 50);
 var beforeHook = V8.ApiEngine.Run("platform-runtime-custom-hook", {

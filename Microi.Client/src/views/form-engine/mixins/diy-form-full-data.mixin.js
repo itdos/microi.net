@@ -201,6 +201,7 @@ export default {
         // ========== 提交评论（diy-table.vue有此功能）==========
         SubmitComment() {
             var self = this;
+            if (self.BtnLoading) return;
             if (self.FormRelatedCounts?.DataCommentUnavailableReason) {
                 self.DiyCommon.Tips(self.FormRelatedCounts.DataCommentUnavailableMessage || "当前评论功能暂不可用。", false);
                 return;
@@ -209,27 +210,32 @@ export default {
                 self.DiyCommon.Tips(self.$t("Msg.EnterCommentContent"), false);
                 return;
             }
+            var identity = JSON.stringify([self.TableId, self.TableRowId, self.CommentContent, self.ReplyComment?.Id || ""]);
+            // 网络失败保留同一提交标识，由数据库主键去重；用户改内容后才产生新标识。
+            if (self._CommentSubmission?.identity !== identity) {
+                self._CommentSubmission = { identity, id: self.DiyCommon.NewGuid() };
+            }
             var submitData = {
-                TableRowId: self.TableRowId,
+                ParentFormEngineKey: self.CurrentDiyTableModel?.Id || self.TableId || self.TableName,
+                ParentTableRowId: self.TableRowId,
+                _SysMenuId: self.SysMenuId || self.SysMenuModel?.Id || "",
                 Content: self.CommentContent,
-                TableId: self.TableId
+                RequestId: self._CommentSubmission.id
             };
             if (self.ReplyComment && self.ReplyComment.Id) {
                 submitData.ParentCommentId = self.ReplyComment.Id;
-                submitData.ReplyToUserId = self.ReplyComment.CreateUser || self.ReplyComment.UserId || "";
-                submitData.ReplyToUserName = self.GetCommentAuthor(self.ReplyComment);
-                submitData.ReplyToContent = self.GetCommentPlainText(self.ReplyComment.Content);
             }
             self.BtnLoading = true;
-            self.DiyCommon.FormEngine.AddFormData(
-                "diy_comment",
+            self.DiyCommon.Post(
+                "/api/FormEngine/AddFormComment",
                 submitData,
                 function (result) {
                     if (result.Code == 1) {
+                        self._CommentSubmission = null;
                         self.CommentContent = "";
                         self.ReplyComment = null;
                         self.GetCommentList();
-                    }
+                    } else self.DiyCommon.Tips(result.Msg || "评论提交失败，请稍后重试。", false);
                     self.BtnLoading = false;
                 }
             );
@@ -519,6 +525,20 @@ export default {
                 return null;
             }
         },
+        async EnsureDataVersionContent(versionItem) {
+            if (!versionItem || versionItem.HistoryContentMode === "MetadataOnly") return null;
+            if (versionItem.HistoryContentMode !== "OnDemand") return versionItem;
+            var rowId = this.TableRowId;
+            var tableId = this.TableId;
+            // 每次用户点击都重新鉴权读取一条；不把历史正文装入列表或长期缓存。
+            var result = await new Promise(resolve => this.GetFormRelatedData("DataVersion", resolve, { VersionId: versionItem.Id }));
+            if (rowId !== this.TableRowId || tableId !== this.TableId) return null;
+            if (result?.Code !== 1 || result.DataAppend?.HistoryContentMode !== "Authorized" || result.Data?.length !== 1) {
+                this.DiyCommon.Tips(result?.Msg || "版本内容读取失败，请稍后重试。", false);
+                return null;
+            }
+            return { ...result.Data[0], HistoryContentMode: "Authorized" };
+        },
         GetDataVersionPreviewFormRef() {
             var self = this;
             var fieldForm = self.$refs && self.$refs.fieldFormDataVersionPreview;
@@ -541,8 +561,9 @@ export default {
                 self.ApplyDataVersionPreviewData();
             });
         },
-        PreviewDataVersion(versionItem) {
+        async PreviewDataVersion(versionItem) {
             var self = this;
+            if (versionItem?.HistoryContentMode === "OnDemand") versionItem = await self.EnsureDataVersionContent(versionItem);
             var data = self.ParseDataVersionData(versionItem);
             if (!data) return;
             data.Id = self.TableRowId || data.Id;
@@ -557,13 +578,14 @@ export default {
         GetCurrentDataVersionFormData() {
             var self = this;
             var fieldForm = self._getFieldFormRef ? self._getFieldFormRef() : null;
-            if (fieldForm && fieldForm.FormDiyTableModel) {
-                return JSON.parse(JSON.stringify(fieldForm.FormDiyTableModel));
-            }
-            if (self.WfFormData) {
-                return JSON.parse(JSON.stringify(self.WfFormData));
-            }
-            return {};
+            var current = fieldForm?.FormDiyTableModel || self.WfFormData || {};
+            var fields = fieldForm?.DiyFieldList || self.DiyFieldList || [];
+            var data = {};
+            // 运行时 _V8.Form 会指回自身；只复制真实表单字段，避免预览差异时序列化整棵 V8 上下文。
+            ["Id", ...fields.map(field => field.Name)].forEach(function (name) {
+                if (Object.prototype.hasOwnProperty.call(current, name)) data[name] = current[name];
+            });
+            return JSON.parse(JSON.stringify(data));
         },
         StableDataVersionStringify(value) {
             var self = this;
@@ -619,6 +641,8 @@ export default {
             });
 
             return fieldNames.map(function (fieldName) {
+                // 代码版本是局部快照，未包含的名称、路由等配置保持当前值，不应显示为被删除。
+                if (!Object.prototype.hasOwnProperty.call(versionData || {}, fieldName)) return null;
                 var currentValue = currentData ? currentData[fieldName] : undefined;
                 var versionValue = versionData ? versionData[fieldName] : undefined;
                 var same = self.StableDataVersionStringify(currentValue) === self.StableDataVersionStringify(versionValue);
@@ -633,8 +657,9 @@ export default {
                 };
             }).filter(Boolean);
         },
-        DiffDataVersion(versionItem) {
+        async DiffDataVersion(versionItem) {
             var self = this;
+            if (versionItem?.HistoryContentMode === "OnDemand") versionItem = await self.EnsureDataVersionContent(versionItem);
             var versionData = self.ParseDataVersionData(versionItem);
             if (!versionData) return;
             var currentData = self.GetCurrentDataVersionFormData();
@@ -642,8 +667,9 @@ export default {
             self.DataVersionDiffRows = self.BuildDataVersionDiffRows(currentData, versionData);
             self.ShowDataVersionDiffDialog = true;
         },
-        LoadDataVersionToForm(versionItem) {
+        async LoadDataVersionToForm(versionItem) {
             var self = this;
+            if (versionItem?.HistoryContentMode === "OnDemand") versionItem = await self.EnsureDataVersionContent(versionItem);
             var data = self.ParseDataVersionData(versionItem);
             if (!data) return false;
             data.Id = self.TableRowId || data.Id;
@@ -661,9 +687,9 @@ export default {
             self.DiyCommon.Tips("已加载数据版本 " + (versionItem.Version || ""));
             return true;
         },
-        SaveDataVersionAsCurrent(versionItem) {
+        async SaveDataVersionAsCurrent(versionItem) {
             var self = this;
-            if (!self.LoadDataVersionToForm(versionItem)) {
+            if (!await self.LoadDataVersionToForm(versionItem)) {
                 return;
             }
             self.$nextTick(function () {

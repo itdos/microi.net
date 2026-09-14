@@ -257,7 +257,7 @@ public sealed class LoginProjectionRefreshSecurityTests
         var cacheKey = SysUserLogic.BuildLoginProjectionCacheKey("tenant-a", "user-a");
         var query = SysUserLogic.BuildLoginProjectionUserQuery("tenant-a", "user-a");
 
-        Assert.Equal("Microi:tenant-a:LoginTokenSysUser:user-a", cacheKey);
+        Assert.Equal("Microi:tenant-a:LoginSessions:V2:SysUser:user-a", cacheKey);
         Assert.Equal("tenant-a", query.OsClient);
         Assert.Equal("user-a", query.Id);
         Assert.Equal("sys_user", query.FormEngineKey);

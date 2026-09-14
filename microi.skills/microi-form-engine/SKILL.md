@@ -65,6 +65,22 @@ MySQL 的 `ALTER COLUMN DROP DEFAULT` 会让可空列也在省略字段时报 13
 
 ## 上传字段配置（AI 生成时强制）
 
+- 需要逐附件角色权限时，在 `Config.FileUpload` 设置 `EnableRolePermission:true` 和 `Limit:true`；
+  `HideUnauthorizedFiles`（隐藏无权行）、`ShowUnauthorizedFileName`（显示无权名称）、
+  `DisableRoleInheritance`（关闭角色继承）均为 boolean，默认 false。未启用的旧字段保持兼容。
+- 每个文件的 `VisibleRoleIds` 是真实角色 Id 数组；空数组跟随表单权限。标签名称及 `_FileAccess`
+  由后端投影，不能作为客户端授权事实。默认真实持有角色的 Level 严格更高即可继承，
+  同级不同角色不继承；多选任一角色命中即可，仍须有菜单/表单/记录访问与编辑权限。
+- 无权限附件默认只显示锁定占位、不显示名称；开启隐藏只改变展示，保存时服务端保留原附件，
+  篡改无权元数据、复制他人路径及删除含无权附件的整条记录均应失败。条件批量写附件/删除应改为逐条。
+- 新附件必须通过当前记录/字段的私有上传取得短期 `_UploadProof`，保存后由服务端移除。
+  不能手工拼接他人路径；历史公有文件设置角色前重新私有上传。先部署前后端，再启用字段配置。
+- MCP 可复用 `microi_get_field_list`、`microi_update_field`、`microi_refresh_schema_cache`、
+  `microi_list_roles` 和 `microi_save_role`，先完整回读并合并 Config，禁止覆盖原上传大小、数量和 V8。
+  新版 `microi_build_field_config` 支持 `sourceType:"FileUpload"`，自动强制私有存储并校验布尔值；
+  旧 MCP 直接传同等 Config JSON 即可，无需另建业务接口。回归必须使用高/中/低角色和直接 HTTP 篡改，
+  同时覆盖名称开关、隐藏开关、继承开关、单文件、列表、私有/版本预览和保存后重开。
+
 - 图片使用 `Config.ImgUpload`，至少明确 `Limit`、`Multiple`、`MaxCount`、`Preview`、
   `MaxSize` 和 `Crop`；文件使用 `Config.FileUpload`，至少明确 `Limit`、`Multiple`、
   `MaxCount`、`MaxSize`。完整键和值域读取 `references/component-catalog.md`。

@@ -7,6 +7,25 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: mci-system-observability-action
+ * Version: v1.0.2
+ * Function:
+ * - 系统日志与运行监控的授权管理操作入口。
+ */
+
+/* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
+// 宿主提供的实际路径固定旧动作；正文 Action 不能把读接口变成写接口。
+var legacyRouteActions = {
+  "/api/securityguard/blockip": "BlockIp",
+  "/api/securityguard/unblockip": "UnblockIp"
+};
+var legacyRequestPath = String((V8.Param || {})._RequestPath || '').split('?')[0].replace(/--OsClient--[^/]*--$/i, '').toLowerCase();
+if (Object.prototype.hasOwnProperty.call(legacyRouteActions, legacyRequestPath)) {
+  V8.Param.Action = legacyRouteActions[legacyRequestPath];
+}
+/* LEGACY_ROUTE_ACTIONS_V1:END */
 /* V8 ApiEngine | ApiEngineKey: mci-system-observability-action | Version: v1.0.0 */
 var p = V8.Param || {};
 var action = String(p.Action || "").substring(0, 50);

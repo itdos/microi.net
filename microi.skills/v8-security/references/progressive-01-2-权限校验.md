@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-security-005 sha256=c2bc7b1ec3ad6240b05537e1ffada3ef2e07e7a10e15102d9e3c8f777ae7ee31 -->
+<!-- microi-progressive:chunk id=v8-security-005 sha256=0a0f4864a315285b0ed3824e31d1f62d83077a389628f4eae6a0b3550ca50237 -->
 ## 2. 权限校验
 
 ### DiyToken 是平台会话与权限入口，不替换为 ASP.NET Identity
@@ -29,7 +29,8 @@ DiyToken 与 `sys_user`、`OsClient`、终端 `did`、共享 Redis 登录态、�
 - 菜单 `SqlWhere`、`SqlJoin` / `JoinTables` 数据范围必须在服务端形成的**真实列表、计数和导出查询**中执行，不能只用于界面展示或查询后过滤。单行详情只校验同表菜单访问权，不应用这些模块列表过滤；它们也不是行级写权限。
 - 主表新增、修改、删除分别由当前角色的 `Add`、`Edit`、`Del` 权限控制；不得把查询 SqlWhere 追加到写入 SQL，也不得因为查询包含跨表 Join 拒绝已获授权的写入。需要“仅可修改本人数据”等业务限制时，在 `SubmitBeforeServerV8` 或专用接口引擎中以可信服务器代码校验，并统一写入 `TenantId`、负责人、创建人等归属字段。
 - 导入、导出必须携带真实菜单上下文，并分别拥有 `Import`、`Export`；不能用 Table 级直接授权绕过。
-- 平台表必须按后端 `PlatformResourceSecurity` 分级：账号/角色/权限、SaaS 配置、接口引擎、表字段元数据、任务、数据源、密钥和基础设施等管理员专用表，对 `Level < 9999` 的通用客户端 FormEngine 全操作硬拒绝；工作流、微服务/商店、蓝图和微应用运行元数据只允许显式授权后的 `Read/List`，写入仍硬拒绝；`mic_page/mic_print` 按真实菜单或 Table 的 `Read/Add/Edit/Del` 权限管理。
+- 平台表必须按后端 `PlatformResourceSecurity` 分级：角色/权限、SaaS 配置、接口引擎、任务、数据源、密钥和基础设施等管理员专用表，对 `Level < 9999` 的通用客户端 FormEngine 全操作硬拒绝；`diy_table/diy_field`、工作流、微服务/商店、蓝图和微应用运行元数据只允许显式授权后的 `Read/List`，增删改及导入导出仍硬拒绝；`mic_page/mic_print/sys_user` 按真实菜单或 Table 的 `Read/Add/Edit/Del` 权限管理，账号管理另外执行层级校验和密码脱敏。
+- 需要角色查询表/字段目录时，在 `/#/system/role` 的【表直连权限】选择 `diy_table/diy_field` 并仅授予【查】，不必强制改用接口引擎。授权包含配置与事件源码，仅授予可信角色；选列参数不构成字段权限，需限制返回字段时仍用固定投影的接口引擎。此策略由后端发布，前端读取 `GetDirectTableGrantPolicies`，不维护第二份表名白名单；不得自动给存量角色补授权。
 - 匿名读取/新增仅适用于 `diy_table` 明确开启匿名能力的普通业务表；上述三类平台表必须先于匿名开关拒绝。
 - 角色增删改接口不能只相信 Token 缓存或前端禁用状态，必须覆盖请求中的 `_CurrentUser/OsClient`，并从租户主库复核活动用户、数据库 Level 与有效角色 Level。角色降级要先同步受影响用户 Level，再提升共享授权 `epoch`，避免旧令牌窗口；Postman 伪造 `_IsAdmin/Level/RoleIds` 必须失败。
 - 权限 JSON、角色 Id 或菜单上下文解析失败时必须失败关闭；角色 Id 使用精确集合匹配，禁止 `Contains` 子串判断。
@@ -103,7 +104,7 @@ var result = V8.FormEngine.GetTableData('Order', {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-006 sha256=ba49a1e5ea27c6cca4c78c6ee3e95a5e41032bb08f6813753bc8aa855ddfc832 -->
+<!-- microi-progressive:chunk id=v8-security-006 sha256=3a40db54a44c9c76bd3dd7255d1a6b15dcf8b8b90c2d032b7eda80532f023d7d -->
 ## 5. 防重复提交
 
 前端禁用按钮或普通 Cache 的 `Exists → Set` 只能改善体验，不能保证业务只执行一次。写操作必须接收稳定幂等键，并通过数据库唯一约束、条件更新或状态机原子落库；接口引擎可再配置 `LockKey` 降低并发，但锁不能代替业务幂等。
@@ -125,7 +126,7 @@ if (old.Code === 1 && old.Data) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-007 sha256=60297c515c7c7b6e35cd871ab2fd7c772f8b227dfcefa0419868943213556c06 -->
+<!-- microi-progressive:chunk id=v8-security-007 sha256=35706b9a254fb5788b64535947261f66fd8c06e17103b2169f8be02fce05fa65 -->
 ## 6. 敏感数据
 
 ### 密码与认证

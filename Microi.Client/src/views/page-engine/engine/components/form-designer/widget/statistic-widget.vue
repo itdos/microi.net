@@ -5,7 +5,19 @@
     :pickerIndex="19"
     :key="widgetObj.widgetOption.number"
   ></CommonSearch>
-  <el-row style="width: 100%">
+  <div v-if="appearance !== 'cards'" class="pe-summary" :class="{ 'pe-summary--detail': appearance === 'detail' }" :style="{ '--pe-metric-columns': summaryColumns }">
+    <div v-for="(item, index) in contentData" :key="index" class="pe-summary-metric">
+      <div v-if="appearance === 'summary' && item.icon" class="pe-summary-icon" :style="{ color: item.iconColor || 'var(--el-color-primary)' }">
+        <el-icon><component :is="item.icon" /></el-icon>
+      </div>
+      <div class="pe-summary-copy">
+        <strong>{{ formatStatisticValue(item.value, normalizeStatisticValue(item.value)) }}</strong>
+        <a v-if="item.linkUrl" class="pe-summary-label" href="#" @click.prevent="handleMoreClick(item.linkUrl)">{{ displayStatisticTitle(item.name) }}</a>
+        <span v-else class="pe-summary-label">{{ displayStatisticTitle(item.name) }}</span>
+      </div>
+    </div>
+  </div>
+  <el-row v-else style="width: 100%">
     <template v-for="(item, index) in contentData" :key="index">
       <el-col
         :xs="24"
@@ -122,6 +134,9 @@ const contentData = computed(() => {
   return Array.isArray(rawData) ? rawData : []
 })
 
+const appearance = computed(() => props.widgetObj.widgetParams[24]?.value || 'cards')
+const summaryColumns = computed(() => Math.max(1, Math.min(6, Math.floor(Number(props.widgetObj.widgetParams[25]?.value) || 24 / (Number(props.widgetObj.widgetParams[1]?.value) || 8)))))
+
 const activePeriod = computed(() =>
   getDataJsonPeriod(props.widgetObj.widgetParams[0].typeOptions.dataJson)
 )
@@ -153,6 +168,18 @@ const handleMoreClick = (linkUrl) => {
 </script>
 
 <style lang="scss" scoped>
+.pe-summary { display: grid; grid-template-columns: repeat(var(--pe-metric-columns), minmax(0, 1fr)); gap: 20px 0; padding: 16px 0; }
+.pe-summary-metric { display: flex; align-items: center; gap: 12px; padding: 0 18px; min-width: 0; border-inline-end: 1px solid var(--el-border-color-extra-light); }
+.pe-summary-metric:last-child { border-inline-end: 0; }
+.pe-summary-icon { flex: 0 0 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 25px; background: var(--el-fill-color-light); }
+.pe-summary-copy { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.pe-summary-copy strong { font-size: 27px; font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--el-text-color-primary); overflow-wrap: anywhere; }
+.pe-summary-label { font-size: 14px; color: var(--el-text-color-secondary); line-height: 1.4; }
+.pe-summary--detail { gap: 24px 0; border-top: 1px solid var(--el-border-color-extra-light); padding-top: 24px; }
+.pe-summary--detail .pe-summary-metric { border: 0; padding: 0 10px; }
+.pe-summary--detail .pe-summary-copy { gap: 4px; }
+.pe-summary--detail strong { font-size: 18px; }
+@media (max-width: 767px) { .pe-summary { grid-template-columns: repeat(2,minmax(0,1fr)); } .pe-summary-metric { padding: 0 8px; border: 0; } .pe-summary-copy strong { font-size: 22px; } }
 .el-statistic {
   background-size: cover;
   background-position: center; /* 可选，确保图片居中 */
