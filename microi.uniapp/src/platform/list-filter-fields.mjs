@@ -184,6 +184,35 @@ export function mergeModuleFilterFields(configured = [], local = [], nativeField
   return result
 }
 
+const TABLE_SELECTOR_FILTER_TYPES = new Set([
+  'text',
+  'options',
+  'range',
+  'date-range',
+  'address',
+  // 兼容已经发布的租户弹窗配置；新后台配置统一使用 options/date-range。
+  'select',
+  'datetime-range'
+])
+
+export function mergeTableSelectorFilterFields(configured = [], presentation = []) {
+  const valid = (field) => field && field.key && field.field && TABLE_SELECTOR_FILTER_TYPES.has(field.type)
+  const result = (Array.isArray(configured) ? configured : []).filter(valid).map((field) => ({ ...field }))
+  const indexes = new Map(result.map((field, index) => [String(field.field || field.key).trim().toLowerCase(), index]))
+
+  ;(Array.isArray(presentation) ? presentation : []).filter(valid).forEach((field) => {
+    const identity = String(field.field || field.key).trim().toLowerCase()
+    const index = indexes.get(identity)
+    // presentation.filters 是特殊业务的完整声明：同字段替换后台配置，新字段按声明顺序追加。
+    if (index !== undefined) result[index] = { ...field }
+    else {
+      indexes.set(identity, result.length)
+      result.push({ ...field })
+    }
+  })
+  return result
+}
+
 export function hasListFilterValue(value) {
   if (Array.isArray(value)) return value.length > 0
   if (value && typeof value === 'object') {

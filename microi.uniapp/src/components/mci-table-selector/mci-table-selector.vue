@@ -112,9 +112,12 @@
                     </view>
                   </view>
                 </view>
-                <picker v-else class="selector-filter__select" mode="selector" :range="filterOptionsFor(filter)" range-key="label" :value="filterOptionIndex(filter, draftFilterValues)" :disabled="filterLoading" @change="changeFilter(filter, $event)">
+                <picker v-else-if="filter.type === 'select'" class="selector-filter__select" mode="selector" :range="filterOptionsFor(filter)" range-key="label" :value="filterOptionIndex(filter, draftFilterValues)" :disabled="filterLoading" @change="changeFilter(filter, $event)">
                   <view class="selector-filter__picker"><text>{{ filterLoading ? '加载中…' : filterOptionsFor(filter)[filterOptionIndex(filter, draftFilterValues)].label }}</text><view class="selector-filter__arrow"></view></view>
                 </picker>
+                <mci-list-filter-field v-else :field="filter" :model-value="draftFilterValues[filter.key]" :menu-id="targetMenuId"
+                  :module-engine-key="menuDefinition && menuDefinition.key || table && table.Name || ''" :form-data="parentForm"
+                  @update:model-value="draftFilterValues[filter.key] = $event" />
               </view>
               <text v-if="filterError" class="selector-filters__error" @tap="loadFilterOptions">{{ filterError }}，点击重试</text>
             </view>
@@ -133,7 +136,13 @@
 import { V8, post } from '@/utils/request.js'
 import { fieldDisplayValue, loadNativeFormDefinition, loadNativeTableModel } from '@/platform/native-form.js'
 import { loadGrantedMenuDefinition } from '@/platform/module-registry.js'
-import { buildListFilterWhere } from '@/platform/list-filter-fields.mjs'
+import {
+  buildListFilterWhere,
+  hasListFilterValue,
+  mergeTableSelectorFilterFields,
+  validateListFilters
+} from '@/platform/list-filter-fields.mjs'
+import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 import {
   getOpenTableWhere,
   submitOpenTableSelection,
@@ -154,6 +163,7 @@ function filterDateTimeMillis(value) {
 
 export default {
   name: 'MciTableSelector',
+  components: { MciListFilterField },
   props: {
     field: { type: Object, required: true },
     parentTable: { type: String, default: '' },
@@ -201,13 +211,15 @@ export default {
     tableLabel() { return (this.table && (this.table.Description || this.table.Name)) || this.config.SysMenuName || '' },
     finished() { return this.rows.length >= this.total && this.total > 0 },
     filterFields() {
-      return (this.presentation.filters || []).filter((item) => item.key && item.field && ['select', 'text', 'address', 'datetime-range'].includes(item.type))
+      return mergeTableSelectorFilterFields(
+        this.menuDefinition && this.menuDefinition.filterFields,
+        this.presentation.filters
+      )
     },
     filterWhere() {
       return this.filterFields.filter((field) => this.hasFilterValue(field)).flatMap((field) => {
         const value = this.filterValues[field.key]
-        // 复用列表的地区路径前缀过滤，选择“全部”时不把字面值作为查询条件。
-        if (field.type === 'address') return buildListFilterWhere([field], { [field.key]: value })
+        // 历史租户配置精确到分钟；后台菜单字段统一复用列表筛选条件生成器。
         if (field.type === 'datetime-range') {
           const conditions = []
           if (value.start) conditions.push({ Name: field.field, Type: '>=', Value: value.start })
@@ -215,7 +227,7 @@ export default {
           if (value.end) conditions.push({ Name: field.field, Type: '<', Value: new Date(filterDateTimeMillis(value.end) + 60000).toISOString().slice(0, 16).replace('T', ' ') })
           return conditions
         }
-        return [{ Name: field.field, Type: field.operation || (field.type === 'text' ? 'Like' : '='), Value: typeof value === 'string' ? value.trim() : value }]
+        return buildListFilterWhere([field], { [field.key]: value })
       })
     },
     activeFilterCount() { return this.filterFields.filter((field) => this.hasFilterValue(field)).length },
@@ -343,6 +355,11 @@ export default {
           return
         }
       }
+      const validationMessage = validateListFilters(this.filterFields, this.draftFilterValues)
+      if (validationMessage) {
+        uni.showToast({ title: validationMessage, icon: 'none' })
+        return
+      }
       this.filterValues = JSON.parse(JSON.stringify(this.draftFilterValues))
       this.closeFilters()
       return this.search()
@@ -352,7 +369,8 @@ export default {
       const value = values[field.key]
       if (field.type === 'address') return Array.isArray(value) && value.some((part) => part && part !== '全部')
       if (field.type === 'datetime-range') return Boolean(value && (value.start || value.end))
-      return value !== undefined && value !== null && String(value).trim() !== ''
+      if (typeof value === 'string') return value.trim() !== ''
+      return hasListFilterValue(value)
     },
     dateTimeRangePart(field, bound, part) {
       const value = String((this.draftFilterValues[field.key] || {})[bound] || '')
