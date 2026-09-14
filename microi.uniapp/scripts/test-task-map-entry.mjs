@@ -19,6 +19,34 @@ test('售后任务列表在搜索框左侧展示任务地图入口', () => {
   }
 })
 
+test('售后任务筛选读取后台配置，城市使用省市区选择器并提交统一条件', () => {
+  assert.match(listSource, /loadTaskFilterConfig/)
+  assert.match(listSource, /<mci-list-filter-field/)
+  assert.match(listSource, /cityFilterField/)
+  assert.doesNotMatch(listSource, /时间口径/)
+  assert.doesNotMatch(listSource, /selectedDateFieldLabel/)
+  assert.match(listSource, /buildListFilterWhere\(this\.taskFilterFields/)
+  assert.match(listSource, /extraWhere:/)
+  assert.doesNotMatch(listSource, /<input v-model="city"/)
+  assert.match(taskSource, /definition\.layoutFields\?\.length \? definition\.layoutFields/)
+  assert.match(taskSource, /compileModuleFilterFields\(menu\.SearchFieldIds[\s\S]*allowAppHidden: true/)
+})
+
+test('售后任务存在筛选条件时在列表上方显示重置入口', () => {
+  assert.match(listSource, /v-if="hasActiveListFilters" class="task-filter-feedback"/)
+  assert.match(listSource, /class="task-filter-reset"[\s\S]*?@tap="resetFilters"/)
+  assert.match(listSource, /class="task-filter-reset__icon"/)
+  const activeFilterSource = listSource.match(/hasActiveListFilters\(\) \{[\s\S]*?(?=\n    filterFormData\()/)?.[0] || ''
+  assert.match(activeFilterSource, /String\(this\.keyword/)
+  assert.match(activeFilterSource, /this\.state/)
+  assert.match(activeFilterSource, /this\.type/)
+  assert.match(activeFilterSource, /this\.period !== 'month'/)
+  assert.match(activeFilterSource, /hasListFilterValue\(this\.city\)/)
+  assert.match(activeFilterSource, /Object\.values\(this\.filterValues/)
+  assert.match(activeFilterSource, /this\.orderType !== 'ASC'/)
+  assert.match(activeFilterSource, /this\.mineOnly !== defaultMineOnly/)
+})
+
 test('任务地图按当前筛选条件、权限和范围分页加载任务坐标', () => {
   const loadTaskMapSource = mapSource.match(/async loadTaskMap\(\) \{[\s\S]*?(?=\n    async loadFilteredCustomers\(\))/)?.[0] || ''
   assert.match(mapSource, /task:\s*\{ title: '任务地图'/)
