@@ -406,7 +406,11 @@ export default {
     async loadTaskDevices() {
       this.loading = true
       try {
-        const taskDevices = await loadAllTaskDevices(this.taskId, { refresh: true, keyword: this.deviceFilters.keyword || '' })
+        const taskDevices = await loadAllTaskDevices(this.taskId, {
+          refresh: true,
+          keyword: this.deviceFilters.keyword || '',
+          serviceStatus: this.deviceFilters.serviceStatus || 'all'
+        })
         let equipmentWithDefaults = []
         let fallbackFailed = false
         try {
