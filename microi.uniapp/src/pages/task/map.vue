@@ -71,6 +71,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 import { callApiEngine, canOpenBusinessEntry, findMenu, loadModuleRows, openForm } from '@/platform/business-runtime.js'
@@ -149,6 +150,8 @@ function parseTaskFilters(value) {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/task/map') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/task/map') },
   mixins: [themeMixin],
   data() {
     return {

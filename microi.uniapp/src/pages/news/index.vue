@@ -114,6 +114,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { getNewsList, getBannerList, parseImages, getImageUrl } from '@/utils/api.js'
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
@@ -121,6 +122,8 @@ import { listReturnMixin } from '@/platform/list-return.js'
 import { loadNewsSnapshot, readNewsSnapshot } from '@/platform/preload.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/news/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/news/index') },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {

@@ -68,6 +68,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import appConfig from '@/config.js'
 import { getUser, post } from '@/utils/request.js'
 import { callApiEngine } from '@/platform/business-runtime.js'
@@ -91,6 +92,8 @@ function utf8Base64(value) {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/password') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/password') },
   mixins: [themeMixin],
   data() {
     return {

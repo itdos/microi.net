@@ -67,10 +67,13 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/privacy/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/privacy/index') },
   mixins: [themeMixin],
   data() {
     return {

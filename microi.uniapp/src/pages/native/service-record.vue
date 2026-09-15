@@ -9,16 +9,54 @@
     <mci-skeleton v-if="loading" type="form" :rows="6" />
     <scroll-view v-else class="page-scroll" :class="{ 'page-scroll--readonly': readOnly, 'page-scroll--with-actions': readOnly && canEditArchive }" scroll-y>
       <view class="page-content">
-        <template v-if="readOnly">
-          <view class="archive-summary">
-            <view class="archive-summary__mark"><text>档</text></view>
-            <view class="archive-summary__copy">
-              <text class="archive-summary__name">{{ customer.KehuMC || '客户服务档案' }}</text>
-              <text class="archive-summary__range">{{ form.KaishiSJ || '—' }} 至 {{ form.JieshuSJ || '—' }}</text>
+        <!-- 档案详情与生成表单共用同一组来源字段，不能因切换为只读视图而丢失后台表字段。 -->
+        <view class="section-title">统计范围</view>
+        <view class="form-panel">
+          <view class="field-row" :class="{ 'field-row--tap': !readOnly }" :hover-class="readOnly ? '' : 'field-row--pressed'" @tap="!readOnly && openCustomerPicker()">
+            <text class="field-label">客户名称</text>
+            <view class="field-value-line">
+              <text class="field-value" :class="{ placeholder: !customer.Id }">{{ customer.KehuMC || (readOnly ? '—' : '请选择合作客户') }}</text>
+              <text v-if="!readOnly" class="field-arrow">›</text>
             </view>
-            <view class="archive-summary__count"><text>{{ generatedCount || 0 }}</text><text>条记录</text></view>
           </view>
+          <view class="date-grid">
+            <picker mode="date" :disabled="readOnly" :value="form.KaishiSJ" :end="form.JieshuSJ || '9999-12-31'" @change="form.KaishiSJ = $event.detail.value">
+              <view class="field-row" :class="{ 'field-row--tap': !readOnly }">
+                <text class="field-label">开始时间</text>
+                <text class="field-value" :class="{ placeholder: !form.KaishiSJ }">{{ form.KaishiSJ || (readOnly ? '—' : '请选择') }}</text>
+              </view>
+            </picker>
+            <picker mode="date" :disabled="readOnly" :value="form.JieshuSJ" :start="form.KaishiSJ || '1950-01-01'" @change="form.JieshuSJ = $event.detail.value">
+              <view class="field-row" :class="{ 'field-row--tap': !readOnly }">
+                <text class="field-label">结束时间</text>
+                <text class="field-value" :class="{ placeholder: !form.JieshuSJ }">{{ form.JieshuSJ || (readOnly ? '—' : '请选择') }}</text>
+              </view>
+            </picker>
+          </view>
+        </view>
 
+        <view class="section-heading">
+          <text class="section-title">服务项目</text>
+          <button v-if="!readOnly" class="select-all" @tap="toggleAll">{{ allSelected ? '取消全选' : '全选' }}</button>
+        </view>
+        <view class="service-panel">
+          <view v-if="!displayServiceTypes.length" class="empty-text">暂无服务项目</view>
+          <view v-else class="service-grid">
+            <button v-for="item in displayServiceTypes" :key="item.value" class="service-chip"
+              :class="{ 'service-chip--active': selectedServices.includes(item.value), 'service-chip--readonly': readOnly }"
+              :disabled="readOnly" @tap="toggleService(item.value)">
+              <text class="chip-check">{{ selectedServices.includes(item.value) ? '✓' : '' }}</text>
+              <text>{{ item.label }}</text>
+            </button>
+          </view>
+        </view>
+
+        <view v-if="generatedCount !== null" class="result-band">
+          <view><text class="result-number">{{ generatedCount }}</text><text class="result-unit"> 条</text></view>
+          <text class="result-label">当前记录表包含的售后服务记录</text>
+        </view>
+
+        <template v-if="readOnly">
           <view v-if="archiveEditing" class="archive-edit-panel">
             <view class="archive-edit-panel__title"><view class="edit-pencil" /><text>档案统计范围</text></view>
             <view class="archive-edit-dates">
@@ -94,59 +132,7 @@
           </view>
           <view class="bottom-space" />
         </template>
-
-        <template v-else>
-        <view class="section-title">统计范围</view>
-        <view class="form-panel">
-          <view class="field-row field-row--tap" hover-class="field-row--pressed" @tap="openCustomerPicker">
-            <text class="field-label">客户名称</text>
-            <view class="field-value-line">
-              <text class="field-value" :class="{ placeholder: !customer.Id }">{{ customer.KehuMC || '请选择合作客户' }}</text>
-              <text class="field-arrow">›</text>
-            </view>
-          </view>
-          <view class="date-grid">
-            <picker mode="date" :value="form.KaishiSJ" :end="form.JieshuSJ || '9999-12-31'" @change="form.KaishiSJ = $event.detail.value">
-              <view class="field-row field-row--tap">
-                <text class="field-label">开始时间</text>
-                <text class="field-value" :class="{ placeholder: !form.KaishiSJ }">{{ form.KaishiSJ || '请选择' }}</text>
-              </view>
-            </picker>
-            <picker mode="date" :value="form.JieshuSJ" :start="form.KaishiSJ || '1950-01-01'" @change="form.JieshuSJ = $event.detail.value">
-              <view class="field-row field-row--tap">
-                <text class="field-label">结束时间</text>
-                <text class="field-value" :class="{ placeholder: !form.JieshuSJ }">{{ form.JieshuSJ || '请选择' }}</text>
-              </view>
-            </picker>
-          </view>
-        </view>
-
-        <view class="section-heading">
-          <text class="section-title">服务项目</text>
-          <button class="select-all" @tap="toggleAll">{{ allSelected ? '取消全选' : '全选' }}</button>
-        </view>
-        <view class="service-panel">
-          <view v-if="!serviceTypes.length" class="empty-text">暂无可选服务项目</view>
-          <view v-else class="service-grid">
-            <button
-              v-for="item in serviceTypes"
-              :key="item.value"
-              class="service-chip"
-              :class="{ 'service-chip--active': selectedServices.includes(item.value) }"
-              @tap="toggleService(item.value)"
-            >
-              <text class="chip-check">{{ selectedServices.includes(item.value) ? '✓' : '' }}</text>
-              <text>{{ item.label }}</text>
-            </button>
-          </view>
-        </view>
-
-        <view v-if="generatedCount !== null" class="result-band">
-          <view><text class="result-number">{{ generatedCount }}</text><text class="result-unit"> 条</text></view>
-          <text class="result-label">当前记录表包含的售后服务记录</text>
-        </view>
-        <view class="bottom-space" />
-        </template>
+        <view v-else class="bottom-space" />
       </view>
     </scroll-view>
 
@@ -190,6 +176,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser, post, V8 } from '@/utils/request.js'
 import { callApiEngine, formatFieldValue, formatRegion, requireLogin } from '@/platform/business-runtime.js'
@@ -218,6 +205,8 @@ function parseArray(value) {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/service-record') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/service-record') },
   mixins: [themeMixin],
   data() {
     return {
@@ -257,6 +246,14 @@ export default {
     allSelected() {
       return this.serviceTypes.length > 0 && this.selectedServices.length === this.serviceTypes.length
     },
+    displayServiceTypes() {
+      // 历史档案可能含已下架的选项，仍应显示实际保存的服务项目。
+      const items = this.serviceTypes.slice()
+      this.selectedServices.forEach((value) => {
+        if (!items.some((item) => item.value === value)) items.push({ label: value, value })
+      })
+      return items
+    },
     archivePhotoUploadBlocked() {
       return Object.values(this.archivePhotoUploadStates).some((state) => Number(state && state.pendingCount || 0) > 0 || Number(state && state.failedCount || 0) > 0)
     }
@@ -281,7 +278,13 @@ export default {
     },
     async initialize() {
       try {
-        if (!this.readOnly) await this.loadServiceTypes()
+        try {
+          await this.loadServiceTypes()
+        } catch (error) {
+          // 服务字典暂时不可用时，档案仍用 FuwuXM 的保存值展示，不能连服务明细一起丢失。
+          if (!this.readOnly) throw error
+          this.serviceTypes = []
+        }
         if (this.recordId) {
           await this.loadRecord()
           if (this.readOnly) {
@@ -482,11 +485,13 @@ export default {
       } catch (error) {}
     },
     toggleService(value) {
+      if (this.readOnly) return
       const index = this.selectedServices.indexOf(value)
       if (index >= 0) this.selectedServices.splice(index, 1)
       else this.selectedServices.push(value)
     },
     toggleAll() {
+      if (this.readOnly) return
       this.selectedServices = this.allSelected ? [] : this.serviceTypes.map((item) => item.value)
     },
     validate() {
@@ -570,6 +575,7 @@ export default {
 .service-panel { padding: 22rpx; }.service-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; }
 .service-chip { display: flex; align-items: center; min-width: 0; height: 72rpx; margin: 0; padding: 0 16rpx; border: 1rpx solid #dce8ec; border-radius: 8rpx; background: #f7fafb; color: #42606b; font-size: 23rpx; line-height: 72rpx; text-align: left; transition: background-color .16s ease, border-color .16s ease; }
 .service-chip::after { border: none; }.service-chip--active { border-color: #48a9c9; background: #eaf7fb; color: #0876a8; }.chip-check { display: inline-flex; align-items: center; justify-content: center; width: 28rpx; height: 28rpx; margin-right: 11rpx; border: 1rpx solid #aac0c8; border-radius: 4rpx; color: #087fbd; font-size: 20rpx; line-height: 28rpx; }
+.service-chip--readonly { opacity: 1; }
 .result-band { display: flex; align-items: center; justify-content: space-between; margin-top: 20rpx; padding: 22rpx 24rpx; border-left: 5rpx solid #19a486; border-radius: 6rpx; background: #fff; }.result-number { color: #16866e; font-size: 40rpx; font-weight: 750; }.result-unit, .result-label { color: #69818b; font-size: 21rpx; }.result-label { max-width: 390rpx; text-align: right; }
 .archive-summary { display: grid; grid-template-columns: 72rpx minmax(0,1fr) auto; gap: 18rpx; align-items: center; padding: 26rpx 24rpx; border: 1rpx solid #dce8ec; border-radius: 10rpx; background: #fff; box-shadow: 0 8rpx 24rpx rgba(28,72,88,.06); }
 .archive-summary__mark { display: flex; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; border-radius: 9rpx; background: #e8f6fa; color: #087fbd; font-size: 26rpx; font-weight: 750; }.archive-summary__copy { min-width: 0; }.archive-summary__name, .archive-summary__range { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.archive-summary__name { color: #183640; font-size: 28rpx; font-weight: 750; }.archive-summary__range { margin-top: 8rpx; color: #526b75; font-size: 21rpx; }.archive-summary__count { text-align: right; }.archive-summary__count text { display: block; }.archive-summary__count text:first-child { color: #0f6c59; font-size: 38rpx; font-weight: 750; line-height: 1; }.archive-summary__count text:last-child { margin-top: 7rpx; color: #526b75; font-size: 21rpx; }

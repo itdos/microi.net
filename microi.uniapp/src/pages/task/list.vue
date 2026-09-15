@@ -150,6 +150,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { findMenu, formatDateTime, openForm, scanDevice } from '@/platform/business-runtime.js'
 import { canAddMenuRecord } from '@/platform/menu-permission.js'
@@ -178,6 +179,8 @@ const STATE_COUNT_KEYS = {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/task/list') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/task/list') },
   components: { MciListFilterField, MciTaskCard },
   mixins: [themeMixin, listReturnMixin],
   data() {

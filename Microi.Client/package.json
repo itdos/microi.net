@@ -29,6 +29,7 @@
     "test:ai-app-version-history": "node --test tests/ai-app-version-history.spec.mjs",
     "test:api-service-status": "node --test tests/api-service-status.spec.mjs",
     "test:upload-error": "node --test tests/upload-error.spec.mjs",
+    "test:relative-days-search": "node --test tests/diy-relative-days-search.spec.mjs",
     "test:build-output-mode": "node --test tests/build-output-mode.spec.mjs",
     "test:background-task": "node --test tests/background-task-display.spec.mjs tests/official-app-notice.spec.mjs",
     "test:view-schema": "node --test tests/view-schema-runtime.spec.mjs tests/module-presentation-runtime.spec.mjs tests/module-presentation-designer-sfc.spec.mjs tests/module-form-workbench-sfc.spec.mjs",

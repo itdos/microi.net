@@ -35,6 +35,7 @@
     "check:auth-session": "node scripts/check-auth-session-race.mjs && node --test scripts/test-login-navigation.mjs scripts/test-auth-expired-policy.mjs && npm run check:app-runtime",
     "check:update": "node --test scripts/test-mini-program-update.mjs && node scripts/check-mini-program-update.mjs",
     "check:share": "node scripts/check-share-policy.js",
+    "check:share:build": "node scripts/check-built-share-hooks.cjs",
     "check:view-schema": "node scripts/check-view-schema.mjs",
     "check:field-roles": "node scripts/check-native-field-role-visibility.mjs",
     "check:menu-resolution": "node scripts/check-menu-resolution.mjs",
