@@ -41,7 +41,7 @@ description: Microi V8 工作流事件指南。用于编写审批流条件、节
 生成工作流 V8 代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；路线选择、审批人计算、状态回写、撤回/驳回处理、跨表联动等复杂代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。若工作流存储表支持 `Version`/`ChangeHistory`，历史说明也必须最新在前并保留旧记录。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-001 sha256=013233bfa935a24b668691318ea79c2f0a95787d05d0b033b82859a5999878ba -->
+<!-- microi-progressive:chunk id=v8-workflow-001 sha256=53550786c531c347cfe9d92247b07d127c348210f07e302a1b68f278136c3e77 -->
 ## 工作流物理表
 
 | 表名 | 说明 |
@@ -85,7 +85,7 @@ var history = V8.Db.FromSql(
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-002 sha256=1f94d40c041929aafc45ec975f42bcbbc50c3ba424ed499c7bdf65fa73a41041 -->
+<!-- microi-progressive:chunk id=v8-workflow-002 sha256=377698ecb64266fb74399ea664010e0a46156d13c3e047de1b2cbae3dbba15c7 -->
 ## 流程 V8 事件执行顺序
 
 工作流合并提交请求的 `_FormSubmitAction` 可使用 `Add/Edit`；表单后端事件中的

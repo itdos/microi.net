@@ -14,11 +14,12 @@ description: Microi 前端 V8 事件与客户端能力指南。用于编写浏�
 > 本文重点是 **字段事件、按钮事件、列表事件、模板引擎、其它前端钩子**。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-frontend-events-000 sha256=df2662a9a006d35d989d7ff7316890ffff2c08e422d0e88033f44cdd40210c88 -->
+<!-- microi-progressive:chunk id=v8-frontend-events-000 sha256=e7cc5d33eef91f6d930d9e7788204eab3148e997ec24546142a13c77523bc127 -->
 ## 能力路由
 
 - 查询前端 V8 全部上下文、导航、表单、列表、网络、引擎与工具入口时，读取 `../v8-utilities/references/client-api-index.md`。
 - 需求包含“蓝牙打印、标签打印、TSC/TSPL、CPCL、ESC/POS、小票打印、佳博/GP-M322、ZICOX/芝柯/CC4、BLE/SPP”时，必须先读取 `references/bluetooth-print.md`；需要完整指令签名、型号转换范围、编码或位图参数时，再读取 `references/bluetooth-print-api.md`。
+- `microi.app` 是 5+ 在线壳，不能假设存在 `uni` 或 Web Bluetooth。Android 佳博确认写入逐包等待原生回调，不再追加 20ms；5+ `V8.Print.getConnectionState()` 的 `mtu/maxWriteBytes/recommendedPacketSize/writeType/packetIntervalMs` 描述本次连接能力。空 MTU 成功、失败、超时或旧壳只用 20 字节；自定义微服务按实际能力选档，不得只允许浏览器加速。详见蓝牙参考。
 - 浏览器模板打印、PDF/纸张模板、`mic_print`、`PageObj`、`PrintObj` 使用 `print-engine/SKILL.md`，不要与直接蓝牙指令混为一套 API。
 - 扫码使用 `V8.Method.ScanCode`，结果从 Promise/回调取得；`V8.ScanCodeRes` 只作兼容结果槽，详见客户端 API 索引。
 - 登录后的敏感操作使用 `V8.Identity.Verify` 完成 Passkey/严格人脸交互；前端只取得一次性 Ticket，后端接口引擎必须重算 `ActionHash` 并原子消费，不能把前端成功当作授权。
@@ -110,7 +111,7 @@ V8.OpenAnyTable({
 `ReadOnlyButton` 的产品文案是【禁用插槽按钮】：只控制按钮是否可点击，不等同于字段只读，应保留用于权限和状态控制。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-002 sha256=986a67e78b0274941c6f2ab6589b06b8545f8f3261d4972dc56d4061b019d799 -->
+<!-- microi-progressive:chunk id=v8-frontend-events-002 sha256=332a6ed2c90fe8ff23f04d7fd1c3a24df263b2692f2c292337a468a0423b409f -->
 ## 按钮事件
 
 ### V8BtnRun — 按钮点击执行（菜单按钮、表单按钮）

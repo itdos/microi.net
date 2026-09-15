@@ -36,7 +36,7 @@
 | `StaticText` | 静态文本 | 不承载业务状态 |
 | `Html` | 可信 HTML 展示 | 必须净化，不拼接不可信内容 |
 | `RichText` | 富文本 | `mediumtext`；输出需净化 |
-| `CodeEditor` | 代码/JSON/SQL 编辑 | `mediumtext`；通常 `FormWidth=24`；长配置表单使用 `Config.CodeEditor.DisplayMode=Dialog`，默认只渲染“编辑代码（N字）”按钮；代码工作台可用 `Inline` |
+| `CodeEditor` | 代码/JSON/SQL 编辑 | `mediumtext`；通常 `FormWidth=24`；未配置 `DisplayMode` 默认 `Inline`，长配置表单显式用 `Dialog`。`CodeEditor.ButtonText` 默认 `编辑代码（{{charCount}}字）`，支持 `{{charCount}}` 字符数、`{{lineCount}}` 行数 |
 | `JsonTable` | JSON 表格 | `mediumtext`；定义结构与大小上限 |
 
 ## 文件与高级输入

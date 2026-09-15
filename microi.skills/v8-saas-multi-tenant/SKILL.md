@@ -67,6 +67,7 @@ V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
 - 类似 MQTT 端口、PressureGuard、V8Limits、OrmLimits、StartupLimits、SecurityGuard 这类影响整进程资源的配置，不能让每个子租户各自抬高全局上限。子租户同名隔离字段只能降低自己的并发、等待时间或资源额度，用于隔离弱租户、试用租户或异常租户。
 - 修改 `sys_osclients` 的表、字段、数据源或配置值后，必须刷新 SaaS 引擎运行缓存，并回读验证字段 `Component`、`Data`、`Config`、实际数据值和前端真实消费结果。不要只看 MCP 写入成功。
 - SaaS 配置只在启动、管理员保存 `sys_osclients` 或显式租户刷新时发布到共享 Redis。初始化数据库会话、创建 `V8.Dbs` 运行态对象、普通 FormEngine 请求和表单设计器保存不得冒充配置变更反复发布。
+- JWT Key 由可信后端生成并持久化；SaaS 表单只读显示配置状态，不允许普通表单或 V8 写入 `AuthSecret`。手动接入旧库的 NULL/空白值必须支持原子写回，多节点竞争后回读持久胜者；重复刷新不能轮换有效 Key。只读状态查询不得初始化目标租户数据库。验收只记录是否已配置、是否稳定，不输出密钥原文。
 - 扩展库缓存必须区分“尚未加载”和“已加载但为 0 条”；后者是有效结果。没有配置 `microi_database` 的租户不能在每次 V8 执行时重复查询、调用 `AddOrUptClient` 或打印“缓存 OsClient 配置到 Redis”。
 - 多节点的缓存失效订阅只做本节点失效与数据库回源，禁止收到消息后再次发布形成回声。进程内初始化标记仅是可丢失优化，真正租户配置仍以共享数据库/Redis 为准。
 - 新增平台级字段时，字段名建议保持英文稳定，例如 `PressureGlobalMaxConcurrentRequests`、`PressureV8MaxConcurrentExecutions`、`PressureOrmMaxConcurrentConnectionOpens`；字段标签和说明必须中文，说明中写清楚“主租户有效/子租户仅可降低”。
@@ -191,6 +192,8 @@ SELECT * FROM Contact WHERE OwnerId = $CurrentUser.Id$ AND Spouse = $CurrentUser
 ```
 
 ## 常见错误
+
+- 旧库升级的内置应用包包含定时任务时，升级内核按“资源独立提交 → 幂等保存并回读 Quartz/任务元数据 → 确认安装版本”执行。仅程序集白名单包及不可伪造的宿主授权可进入该兼容流程；普通应用安装仍必须使用持久后台任务分片。任一阶段失败不推进 ServerVersion，修复后从原升级入口重试，不手动抬高版本或伪造任务信封。
 
 ❌ 绕开 `V8.Cache` 使用底层 Redis → 租户数据串号（V8 已不再暴露底层句柄）
 ❌ MongoDB DbName 不带 OsClient → 数据混淆  

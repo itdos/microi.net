@@ -1358,7 +1358,7 @@ SPP 则检查实时 RFCOMM Socket 与输出流；写入期间仍可能物理断�
 | `V8.Print.setPrinterProfile(mode)` | 型号选择 | `auto` 或三个内置 profile；设备名无法识别时使用 |
 | `V8.Print.prepareSend(bytes)` | `Promise<void>` | 自动恢复连接，进入应用级队列后分包串行写入；必须 `await` |
 | `V8.Print.Send(bytes)` | 内部状态机入口 | 依赖 `prepareSend` 设置的共享游标，业务代码不要直接调用 |
-| `V8.Print.setOneTimeData(bytes)` | 设置 BLE 包长 | 只接受 1–512 整数；默认 20，连接页候选 20–190 |
+| `V8.Print.setOneTimeData(bytes)` | 设置 BLE 包长 | 只接受 1–512 整数；默认 20，5+ BLE 实际发送还受本次连接 `maxWriteBytes` 限制 |
 | `V8.Print.setPrinterNum(num)` | 同一缓冲区重复发送 | 只接受 1–99 整数；连接页候选 1–9 |
 | `V8.Print.disconnect()` | 主动断开并忘记设备 | 停止自动重连；下次需要重新选择设备 |
 | `V8.Print.BLEInformation` | 设备、通道与特征元数据 | 只作诊断，不是连接状态或打印回执 |
@@ -1501,8 +1501,13 @@ async function printBatch(rows, startIndex) {
   运行时会把所有 V8 上下文的 `prepareSend` 放进同一队列，但业务仍应逐条 `await` 保持结果顺序。
 - 大批次分段保存 `NextIndex`；断连后从失败位置人工确认再恢复。
 - `setPrinterNum(n)` 只适合同一缓冲区重复发送，不适合每张内容不同的批次。
-- `prepareSend` 默认每包 20 字节、包间约 20ms，多份之间约 100ms；这些只是
-  BLE 写节奏，不是纸张完成时间。
+- `prepareSend` 默认每包 20 字节；Android 5+ 佳博 GP-M322 的确认写入逐包等待原生回调，
+  再保留约 8ms 的 GATT 队列保护窗口，避免真实设备连续写入中断。其它路径保留约 20ms，
+  多份之间约 100ms；这不是物理走纸确认。
+- 5+ 连接快照还包含 `mtu`、`maxWriteBytes`、`recommendedPacketSize`、`writeType`、
+  `packetIntervalMs`。佳博在服务发现后尝试 MTU 协商，只采纳回调中的实际值；空成功、失败、
+  超时或旧运行时没有 API 时保留 20 字节。能力不跨连接缓存。自定义微服务应读取实际能力，
+  不能只允许浏览器加速。详见[蓝牙打印机](/doc/system-engine/bluetooth-printer)。
 
 ### 当前实现限制与安全边界
 

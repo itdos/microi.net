@@ -74,8 +74,14 @@ namespace Microi.net
             if (field.Code != 1 || !Enabled(field.Data) || (string)field.Data["TableId"] != (string)table.Data.Id)
                 return new DosResult(0, null, "字段未启用附件角色权限或不属于该表单。");
             var policy = Load(param.OsClient, param._CurrentUser);
-            return new DosResult(1, policy.roles.Values.OrderByDescending(r => r["Level"].Val<int>())
+            return new DosResult(1, policy.ConfigurableRoles(Config((JObject)field.Data)).OrderByDescending(r => r["Level"].Val<int>())
                 .Select(r => new { Id = (string)r["Id"], Name = (string)r["Name"], Level = r["Level"].Val<int>() }).ToList());
+        }
+        /// <summary>空白名单兼容全部角色；非空白名单即使只剩已删除角色也不能退回全部。</summary>
+        public IEnumerable<JObject> ConfigurableRoles(JObject config)
+        {
+            var allowed = ReadIds(config?["ConfigurableRoleIds"]);
+            return roles.Values.Where(role => allowed.Count == 0 || allowed.Contains((string)role["Id"], StringComparer.OrdinalIgnoreCase));
         }
         public static bool Flag(JObject config, string key) => config?.GetValue(key, StringComparison.OrdinalIgnoreCase)?.Type == JTokenType.Boolean
             && config.GetValue(key, StringComparison.OrdinalIgnoreCase).Value<bool>();
@@ -140,6 +146,12 @@ namespace Microi.net
                 copy.Remove("_UploadProof");
                 var roleIds = ReadIds(copy["VisibleRoleIds"]);
                 if (roleIds.Any(role => !roles.ContainsKey(role))) throw new InvalidOperationException("所选附件角色不存在或已删除，请重新选择。");
+                var allowedRoles = ReadIds(config?["ConfigurableRoleIds"]);
+                var originalRoles = ReadIds(original?["VisibleRoleIds"]);
+                // 以主库字段配置约束新增授权，不信任客户端过滤；缩小范围不静默撤销原附件已有授权。
+                if (allowedRoles.Count > 0 && roleIds.Any(role => !allowedRoles.Contains(role, StringComparer.OrdinalIgnoreCase)
+                    && !originalRoles.Contains(role, StringComparer.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("所选附件角色不在可配置角色列表中。");
                 if (roleIds.Count > 0 && copy["Limit"]?.Type != JTokenType.Boolean)
                     throw new InvalidOperationException("设置附件角色权限前请将历史文件重新上传到私有存储。");
                 if (roleIds.Count > 0 && copy["Limit"]?.Value<bool>() != true)

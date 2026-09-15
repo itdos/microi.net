@@ -1148,9 +1148,11 @@ if [ "$PUSH_NUGET" = true ] || [ "$HAS_ENCRYPT" = true ]; then
     _PACK_LOG="$(mktemp /tmp/microi-pack.XXXXXX.log)"
     _PACK_FAILED=0
     if [ -f "${_MICROI_NET_PROJECT:-}" ]; then
-        dotnet pack "$_MICROI_NET_PROJECT" -c Release --no-build $_BUILD_EXTRA_ARGS 2>&1 | tee "$_PACK_LOG" || _PACK_FAILED=1
+        dotnet pack "$_MICROI_NET_PROJECT" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee "$_PACK_LOG" || _PACK_FAILED=1
     fi
-    dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
+    # Solution-level Pack asks output-group targets to resolve project references. Keep that
+    # traversal read-only so it cannot re-enter Build while --no-build is active.
+    dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
     if [ "$_PACK_FAILED" -ne 0 ]; then
         echo ""
         echo -e "  ${RED}───── Pack 错误摘要─────${NC}"

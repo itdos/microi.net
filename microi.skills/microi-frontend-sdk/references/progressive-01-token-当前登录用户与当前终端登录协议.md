@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-frontend-sdk-006 sha256=a834ee9855361ec5ed3f466de8d8fef53de89e40a6882b563694471d060a0dfe -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-006 sha256=85694df371b7b889b5bf4aea5bc98d604232eb5c7b88b8a0eae8a26d70877009 -->
 ## Token、当前登录用户与当前终端登录协议
 
 Microi 后端不是只保存一个全局 Token。每个租户、每个 `sys_user` 在 Redis 中维护一份 `CurrentToken`，其中 `CurrentUser` 表示平台当前登录用户，`Tokens` 表示该用户的多个当前终端登录。每个终端项至少包含 `Token`、`ClientType`、`Did`、`IP`、`CreateTime`、`UpdateTime`；退出、管理员清除登录信息、同终端重新登录或 Token 轮换都会影响该列表。
@@ -83,13 +83,13 @@ const result = await V8.refreshToken();
 - 管理员调用 `ClearUserLoginInfo` 后，旧 Token 返回 `SessionMissing` 或等价明确原因，前端不再循环续签。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-007 sha256=32ff522b3d30d94eb6cc1747b1f1238e35c1c3d43091f3ce308067e320ecb2a4 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-007 sha256=936e2f5619bb4aecfea4e42f46e297a78b816782d648b19d4b9a60ced710c974 -->
 ## 仅支持 Vue 3
 
 新的 Microi 前端工作只支持 Vue 3。不要把 Vue2、Vuex、`Vue.prototype` 或 Vue2/uni-app 条件编译加入 `microi.v8.js`。状态管理属于项目本身，通常使用 Pinia 或本地组合函数；SDK 只负责平台访问、请求、鉴权、上传、资源 URL 和小工具。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-008 sha256=0c59d00b2e54dd61d194d6246dd787a456ab8f12d4abe6dc330b002f41d7ee26 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-008 sha256=70275fb9b5183647c002b5a14841a0dced68e211ccd43d95c2df53bc72938aa6 -->
 ## Key-Value 枚举的跨端约定（强制）
 
 - PC、UniApp、小程序和 Web 页面遇到简单枚举时，应从字段元数据或业务接口返回的公开 `{Key,Value}` 选项获取数据源；`Value` 只负责展示，`Key` 才能进入表单值、URL、缓存键和接口筛选参数。
@@ -98,7 +98,7 @@ const result = await V8.refreshToken();
 - 兼容历史数据时，客户端可以短期识别旧 Value，但提交和新 URL 必须立即归一为 Key；长期迁移由服务端完成并回读验证。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-009 sha256=2e428f404342ad21af261e5f5876e34e2b9fc9455791bf0ad73ff4ad5b3e2ed0 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-009 sha256=c1737089a40664006a83fea85d08aca1362ab447ad614c46202df9e165fea62f -->
 ## 界面层独立
 
 SDK 不得导入 Element Plus、uni-ui、uView、TDesign、FirstUI、Pinia、Vue Router 或 axios。界面反馈通过可配置适配器提供：
@@ -111,7 +111,7 @@ SDK 不得导入 Element Plus、uni-ui、uView、TDesign、FirstUI、Pinia、Vue
 这样同一个 SDK 才能同时用于 uni-app、PC 网站、后台扩展页面和文档演示。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-010 sha256=ee237c45899f7204d3da1a2d589a89268c2db2a9b765f68fc7097eadf8da7104 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-010 sha256=e70dbff2f66a986a699fc5ac778b61cc5fb0a49e1a376d955956a87bb0c4d39c -->
 ## 验证
 
 将项目改为使用 SDK 后：
@@ -130,7 +130,7 @@ SDK 不得导入 Element Plus、uni-ui、uView、TDesign、FirstUI、Pinia、Vue
 - 自动化检查：生产构建后扫描 JS 产物不得包含本地 ApiBase，并在正式域名上下文断言接口请求 origin 等于配置的生产 API；本地 `npm run dev` 仍应命中开发 API。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-011 sha256=81ac75e383ea5a32ae45aeff1276fc2b8f56141961e70cc3956ae818aaf2fa1d -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-011 sha256=49b3d764342f0d9c70c93b1462ce65d29f910770c0e0f10c8a8e79f0dc94453e -->
 ## 搭配 MCI-UI
 
 SDK 负责平台能力，MCI-UI 负责产品界面。新的 Microi Vue3 项目应同时使用：
@@ -143,7 +143,7 @@ SDK 负责平台能力，MCI-UI 负责产品界面。新的 Microi Vue3 项目�
 不要在 SDK 内解决界面状态、骨架屏、富文本间距或安全区布局。这一层应使用 MCI-UI 组件处理。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-012 sha256=d869adb0abd87d9ba03b58faa84944a61895773a6c3642f5c20c8a03e315a2ce -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-012 sha256=bfbc732893154d636aeea6d9a28ade3ecb0ab5e717ca19b0dff9bbd45ccc17d9 -->
 ## MicroApp 宿主 Token 同步
 
 Vue3 前端微服务通过 `window.microApp.getData()` 接收主平台上下文时，不能只把 `token` 放进普通配置对象后假设请求会自动携带。标准 `microi.v8.js` 必须支持 `config.token`，且 `getToken()` 要优先读取运行时 token，再回退到 `storage[tokenKey]`。微服务必须复用同一个 V8 客户端实例，不能在每次按钮点击时重新 `createMicroiV8()`。

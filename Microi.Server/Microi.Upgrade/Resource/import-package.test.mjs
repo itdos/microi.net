@@ -129,6 +129,8 @@ function extractNamedFunction(sourceText, name) {
 }
 
 function extractAssignedFunction(sourceText, name) {
+  const dependencies = ['buildPhysicalColumnDefinition', 'syncPhysicalColumnsFromPackage'].includes(name)
+    ? extractAssignedFunction(sourceText, 'physicalColumnRequiresNotNull') + '\n' : '';
   const start = sourceText.indexOf(`var ${name} = function (`);
   assert.notEqual(start, -1, `missing assigned function ${name}`);
   const brace = sourceText.indexOf("{", start);
@@ -150,7 +152,7 @@ function extractAssignedFunction(sourceText, name) {
     if (char === "{") depth += 1;
     if (char === "}") {
       depth -= 1;
-      if (depth === 0) return sourceText.slice(start, index + 2);
+      if (depth === 0) return dependencies + sourceText.slice(start, index + 2);
     }
   }
   assert.fail(`unterminated assigned function ${name}`);
@@ -1176,6 +1178,8 @@ function runDataSetImportFixture(options = {}) {
     reportProgress() {},
     backgroundChunkingEnabled: false,
     backgroundCheckpointPhase: "PostSchema",
+    trustedEmbeddedOfficialPackage: false,
+    embeddedUpgradeStage: '',
     scheduleJobContract: { Jobs: [] },
     JSON,
     Object,
@@ -3781,6 +3785,44 @@ test("schedule job package contract is bounded and excludes custom runtime types
   assert.match(source, /包含定时任务的应用必须通过持久后台任务安装/);
   assert.match(publishSource, /应用包只允许发布接口引擎任务/);
   assert.match(publishSource, /定时任务引用的接口引擎未包含在当前应用包/);
+});
+
+test('embedded legacy upgrade admits jobs only with a consumed host grant and an explicit phase', () => {
+  const guard = source.match(/if \(scheduleJobContract\.Jobs\.length > 0 && !backgroundChunkingEnabled[\s\S]*?\n    \}/)[0];
+  const check = (trusted, phase, background = false) => vm.runInNewContext(guard, {
+    scheduleJobContract: {Jobs: [{}]}, backgroundChunkingEnabled: background,
+    trustedEmbeddedOfficialPackage: trusted, embeddedUpgradeStage: phase
+  });
+  assert.throws(() => check(false, 'Resources'), /持久后台任务/);
+  assert.throws(() => check(true, ''), /持久后台任务/);
+  assert.doesNotThrow(() => check(true, 'Resources'));
+  assert.doesNotThrow(() => check(false, '', true));
+});
+
+test('embedded upgrade resource phase returns before the version and job stage', () => {
+  const start = source.indexOf("    if (trustedEmbeddedOfficialPackage && embeddedUpgradeStage == 'Resources'");
+  const end = source.indexOf("    if (backgroundChunkingEnabled\n", start);
+  assert.ok(start > 0 && end > start);
+  const fixture = { trustedEmbeddedOfficialPackage: true, embeddedUpgradeStage: 'Resources',
+    scheduleJobContract: {Jobs: [{}]}, checked: 0,
+    assertSchemaChunkSucceeded: () => { fixture.checked++; } };
+  const result = vm.runInNewContext(`(function(){${source.slice(start,end)} throw new Error('fell through to version');})()`, fixture);
+  assert.equal(result.Code, 1); assert.equal(result.Data.EmbeddedUpgrade.Stage, 'ScheduleJobs');
+  assert.equal(fixture.checked, 1);
+  fixture.assertSchemaChunkSucceeded = () => { throw new Error('resource rollback'); };
+  assert.throws(() => vm.runInNewContext(`(function(){${source.slice(start,end)}})()`, fixture), /resource rollback/);
+});
+
+test('native finalization only records the version while durable queue stage still saves jobs', () => {
+  const start = source.indexOf("    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'ScheduleJobs')");
+  const end = source.indexOf("    reportProgress(70", start);
+  for (const phase of ['Finalize', '']) {
+    const calls = [], fixture = { backgroundChunkingEnabled: true, backgroundCheckpointPhase: 'ScheduleJobs',
+      embeddedUpgradeStage: phase, reportProgress: () => {}, savePackageScheduleJobs: () => calls.push('jobs'),
+      upsertMicroiStoreVersionRecord: () => calls.push('version'), Package: {PackageInfo: {Name:'sample'}}, stats: {ScheduleJobSaved:1} };
+    const result = vm.runInNewContext(`(function(){${source.slice(start,end)}})()`, fixture);
+    assert.equal(result.Code, 1); assert.deepEqual(calls, phase ? ['version'] : ['jobs','version']);
+  }
 });
 
 test("shared public runtime is immutable, HDFS-free, and does not weaken ordinary packages", () => {

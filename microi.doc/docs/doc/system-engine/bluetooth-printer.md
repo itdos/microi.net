@@ -208,8 +208,28 @@ V8.Print.setPrinterProfile('auto');
 | `profileMode` | 自动或手工选择值 |
 | `profileId` / `profileName` | 最终生效的型号配置 |
 | `commandLanguage` | 当前标签指令 `tspl` 或 `cpcl` |
+| `mtu` / `maxWriteBytes` | 5+ BLE 本次连接确认的 MTU / 有效载荷上限；未确认时为 `0` / `20`，不跨连接缓存 |
+| `recommendedPacketSize` | 5+ 佳博按已确认能力推荐 `20` / `100` / `180`；旧宿主可能没有此字段 |
+| `writeType` / `packetIntervalMs` | 5+ 当前写方式与确认后附加等待；Android 佳博 `write` 为约 `8ms` 的 GATT 保护窗口，其它路径保留 `20ms` |
 
 打印前仍以 `isConnected()` 和 `prepareSend()` 为准，不以已保存的 `deviceId` 或状态快照代替实时连接判断。
+
+### 5+App 位图发送速度
+
+`microi.app` 是加载远程 H5 的 5+ 壳，原生蓝牙代码位于 `Microi.Client/src/utils/v8-print.js`。
+浏览器同一张标签快、App 慢时，先对比包长和原生回调耗时，不应直接归因于生产 API。
+约 9KB 的位图按 20 字节会产生约 461 次写入，原先每次回调后再等待 20ms 会额外增加约 9 秒。
+Android 佳博 GP-M322 的确认写入现在逐包等待原生回调，并保留约 8ms 的 GATT 保护窗口；不并发写入。
+
+连接时在服务发现后尝试协商 MTU，最多等 1.5 秒，仅采用回调中返回的实际 `mtu`。
+能力明确时应用可用 `recommendedPacketSize` 选择包长；发送端还会按 `maxWriteBytes` 限包。
+缺少 API、失败、超时或空成功回调均保留 20 字节，不能把请求的 183 当作实际协商结果。
+旧壳即使无法协商大包，佳博确认写入也会去掉额外等待。iOS、其它型号、无响应写与 CC4 SPP 保留原有节奏。
+
+升级远程前端镜像后完全退出并重开在线模式 App，再重新连接打印机；本修复不要求重新打 APK。
+自定义微服务若写死“仅 `engine === 'web'` 才加速”，还需按连接能力更新其策略。
+不能在不支持 Web Bluetooth 的 WebView 中通过增加切换选项启用浏览器蓝牙。
+回归须同时记录未知 MTU 的旧壳和已确认大包两条路径；模拟字节测试不等于真机速度或物理出纸验收。
 
 ## CC4 自动转换范围
 

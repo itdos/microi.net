@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-menu-buttons-008 sha256=495161c95d321f2937486db3fecc4e27d2e38c6d7a21587b5028d04ea6491b90 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-008 sha256=8109ed4c7386f8cd1c89db1a8629962b26a448f68082abbb81c75277d5aa1843 -->
 ## 8. 模式 F：后台任务按钮（长任务）
 
 应用安装、初始化多语言、批量导入、批量修复、跨系统同步等可能超过浏览器或网关等待时间的操作，必须优先设计为后台任务。判断阈值：预计超过 2 分钟、500 条以上、1000 个以上扇出子操作、100 次以上外部调用，或总量未知且可能持续运行。前端按钮只负责提交任务，后台任务列表通过 WebSocket/SignalR 推送并以轮询兜底。
@@ -114,7 +114,7 @@ reportProgress(2, 5, '正在写入表结构');
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-009 sha256=8cb7f4d399068549be662cc47bd4add8b3d3bbdb6e7a74832e4c63b7768e136b -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-009 sha256=dc4cda219daf751e6943d1bc518776b67c15963cf7a9a5ebdfecaf6884aa89a0 -->
 ## 9. 通过 MCP 创建菜单 + 按钮（一次到位）
 
 > AI 在 `microi_create_module` 调用时，把按钮 JSON **作为字符串** 传入对应字段。
@@ -157,7 +157,7 @@ var modulePayload = {
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-010 sha256=0398a9fc35520d4b17b990efc565ba1d9f6050303e122dc128207adf08434aee -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-010 sha256=fd43cbb167733a5a722938f7c8c412b52999aa61ffe7b3016efc09a0e383dd41 -->
 ## 前端 FormEngine 权限与兼容
 
 - 当前按钮所在菜单绑定表会由 scoped facade 自动补真实 `_SysMenuId`，历史按钮不需要逐个修改。
@@ -171,7 +171,7 @@ var modulePayload = {
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-011 sha256=16414969be47116a51bab1c6a7e1482bb987b278430e0fb8daaf7d6ecf41bf94 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-011 sha256=3e7e5f9faac605ca1c8e8eeb3d5aa8a2a5aabeb4716179955942bd243302c521 -->
 ## 10. 与接口引擎配套的工作流
 
 业务按钮通常与接口引擎配套：
@@ -186,7 +186,7 @@ var modulePayload = {
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-012 sha256=086e02210a949cc0a2c343e7f50c54c48079667999e9264ea5282c9caa951222 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-012 sha256=4236db974612bd9eeeb35200c7e583a93e3dd17c72736e1674c9fb757698a550 -->
 ## 10.1 后台直充/调账类行按钮
 
 会员积分、余额、库存、额度等会改动资产的后台行按钮，必须采用“前端按钮只收参数，后端接口负责事务”的模式。

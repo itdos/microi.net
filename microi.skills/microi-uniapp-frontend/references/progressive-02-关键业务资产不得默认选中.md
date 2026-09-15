@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-017 sha256=00ea6a7366491ea10138bd298a5dd727c6a9bb66b6f9ab4f294b8a3fb89bd900 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-017 sha256=9ef6eaa852b4b29ee01b51a4353685ee97ee219ff5d6da881f3de6371654861f -->
 ## 关键业务资产不得默认选中
 
 凡是会扣减、消耗、转移、提交审批或触发财务后果的业务资产，都不能默认选中第一条。例如资产卡、余额账户、积分账户、优惠券、库存批次、付款账户、审批对象、设备工单等。
@@ -15,7 +15,7 @@
 - 规则同时写在 UI 状态和提交前校验中。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-018 sha256=35f9826cc82000f9cedd3ccaffd8e7718b0efbec75cf12665145f1de4f8a6d23 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-018 sha256=c55461eba07b7763cb7810818574d4660fbaeed65f95e894e0f859aa96b4bbd2 -->
 ## 账号角色与会话状态
 
 - Microi 企业移动端默认要从 `sys_user.RoleIds`、`_Roles`、`Roles`、`RoleName`、`Level` 解析内部账号角色，不要只用“是否登录”控制界面。
@@ -31,7 +31,7 @@
 - 收到 `Code=1001/1002` 时用可完整阅读的模态框展示后端 `Msg`，包括过期分钟/小时/天或租户不匹配信息，确认后再跳登录；不能先覆盖成固定 Toast。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-019 sha256=72621b385229c3308cbe98dbfa0fb29de95e88d675dad31d9fbe4543b441fdbb -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-019 sha256=7a258af0c36dd3e82d7f9444043d3b0b9d3bc99f329ff85a167b91594b1a54b1 -->
 ## 数字、主题、上传与消息
 
 - 资产金额、积分、余额、库存值、累计充值、收益等数字要按空间自适应格式化。金额很大时显示为 `1.23万`、`123万`、`1.2亿` 等，不能撑破卡片。
@@ -46,7 +46,7 @@
 - 私有图片、身份证照片、支付凭证等禁止匿名访问的文件，前端必须先换取临时 URL；不能直接把私有路径给 `<image>`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-020 sha256=6f5c05a725b3325feb889fbb4c97621e247ca9d6eb89970bf9f8602a81177524 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-020 sha256=2ae732a49279cc7604169a302987d5428ab3b9e8a108ec442813bbd0aea735a0 -->
 ## 图片上传必须支持替换与预览
 
 头像、支付凭证、实名认证、收款码、证照、商品图、富文本图片等移动端图片上传场景，选择图片后不能把入口锁死。所有上传入口必须统一做到：
@@ -60,7 +60,7 @@
 - 自动化或手工验收至少覆盖支付凭证、头像/实名认证/收款码中一个私有图场景，确认可替换、可预览、不会丢表单字段。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-021 sha256=ad8b543f8e0cd7a20464adb88d456bc21e0451e3f216b1419fa572631543cd49 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-021 sha256=68367fcd8e3fae5c2e7da8a956fd803b712ea7bdddbc5a595b16c35b4f7c9fd8 -->
 ## 组件复用与页面去重
 
 同一类 UniApp/H5 UI 在两个及以上页面出现时，必须抽成 `Mci*` 或项目级 `mci-*` 组件，不要复制模板和 scoped 样式到多个业务页面。常见必须复用的结构包括：未登录/授权提示、空态、错误态、骨架屏、列表卡片、商品卡、消息卡、筛选栏、Tab、底部操作栏、按钮组、头像/角标。
@@ -73,7 +73,7 @@
 - 对复用组件补充自动化检查：静态检查至少确认业务页使用同一个组件；视觉检查至少覆盖两个不同业务页实例。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-022 sha256=79b92cb4a1e0b37d786b148a98848fbae3f4424b4d07febc96adbf62ef389431 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-022 sha256=bf2b295c18b0e848bffb9dd16a3c8fa2c1d022e7f9a344dd100a2305c5e14de1 -->
 ## 验收要求
 
 每次改动 UniApp/H5 前端后，至少做以下验证：
@@ -90,7 +90,7 @@
 - 未登录/未授权态必须额外截图确认：提示卡片位于 header 与 tabBar/底栏之间的可用区域中心，不能只横向居中但纵向贴顶。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-023 sha256=a9b83516949b57786e8b88bfb13c513af967867a0052d8e6d5475da10da34621 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-023 sha256=07c9a59b5b1c165d75648a618039d9627560398a4849da78ea6d1cfa71c4c0de -->
 ## Microi 前端 SDK 必须接入
 
 任何 Microi UniApp/H5 Vue3 项目都必须优先使用 `microi.skills/microi.v8.js` 作为统一前端 SDK，并参考 `microi.skills/microi-frontend-sdk/SKILL.md`。新项目不得再手写分散的 `uni.request`、Token 存储、上传、私有文件 URL、头像解析、`ApiEngine` 或 `FormEngine` 包装。
@@ -103,7 +103,7 @@
 - SDK 不绑定任何 UI 库；页面 UI 仍遵守本 Skill 的骨架屏、安全区、移动端富文本和资源展示规范。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-024 sha256=b2b9b1ea707ab4bd114db5838eda185b7b7e375435cdca21effd7be24f996a27 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-024 sha256=c206d390961681ac6dec722beb96c598efa97a97112744c9fabc6f7eee79e43c -->
 ## MCI-UI Mobile 必须优先使用
 
 新的 Microi UniApp/H5 Vue3 项目必须默认基于 `Microi.UI/src/uniapp` 建立页面基础组件，至少包括页面壳、导航栏、按钮、卡片、分段标签、指标卡、底部安全区操作栏、头像、商品卡、骨架屏、数据状态、富文本。用户未主动指定 UI 风格时，AI 必须自动采用 Microi吾码UI。项目可以使用 `uni-ui`、`uView`、`FirstUI` 等第三方组件，但应封装在 MCI-UI 或项目级 `mci-*` 组件后面，不要让业务页面直接散落多套视觉风格。
@@ -117,7 +117,7 @@
 5. 商品详情、公告、协议等富文本使用 `MciRichText` 或遵循同等结构。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-025 sha256=c472359f2f16b287398c0781cb66cbfb98fea99accddbfa078e9f1e9356aa30d -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-025 sha256=88463d70885f5a2e0718cbd08acfcbe0fa6f60dc4101f9016af575f9932f3783 -->
 ## 登录、图标与主题补充规范
 
 - 登录页不要同时铺开两套完整登录系统。H5/App 默认只做一个“账号/手机号 + 密码”表单；微信小程序默认展示 `<button open-type="getPhoneNumber">` 手机号授权登录，账号密码只能作为次级折叠/备用入口。
@@ -136,7 +136,7 @@
 - 列表进入详情必须保持身份路径：员工列表点报告详情走员工 token/FormEngine 权限，客户列表点报告详情走 CustomerToken，分享链接走 ShareToken；禁止员工点击可见报告后因为传空 CustomerToken 被跳回登录。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-026 sha256=67c8816c77d24e6aef77f1706a72330c7a103b58c623178c056a71203e2b43d3 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-026 sha256=12cab2ca3839d0eee4bebc69648f63b172a793ddeade2c6b0a1108fcad0adc4a -->
 ## UniApp 上传路径与 Header 规则
 
 任何移动端图片、头像、身份认证、付款凭证、富文本图片、收款码上传，都必须走项目统一的 `uploadFile` 包装，并最终委托 `microi.v8.js` 的 `V8.uploadFile`。页面里不得直接调用 `/api/HDFS/UniappUpload`，不得临时手写 `uni.uploadFile`。

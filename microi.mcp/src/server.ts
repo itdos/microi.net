@@ -3293,6 +3293,7 @@ BOUNDARY RULES:
 - **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；同步写入 Version，并将本次说明追加到接口引擎修改历史子表（旧库由后端兼容旧 ChangeHistory 字段）；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖类型化接口引擎数据源、打印、工作流、定时任务的系统级建模
+- **microi_query_job_runtime** — 当前租户 Quartz 只读诊断，以及 MongoDB / 历史关系库任务日志的按月游标查询；不能用已启动代替执行证据。
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 - **microi_chat** — 使用当前 MCP 登录身份、绑定租户与服务器本机有效 License 调用 Microi.AI；工具不接受 OsClient、用户、Endpoint、ApiKey 或 Authorization 覆盖
 - **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
@@ -6610,7 +6611,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       defaultValue: z.string().optional(),
       tab: z.string().optional(),
       data: z.string().optional(),
-      config: z.string().optional().describe('完整组件 Config JSON，先读取原 Config 并合并。FileUpload 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance（boolean，默认 false）；启用角色权限应同时 Limit=true。用 microi_list_roles/microi_save_role 管理角色，附件 VisibleRoleIds 保存真实角色 Id 数组。'),
+      config: z.string().optional().describe('完整组件 Config JSON，先读取原 Config 并合并。FileUpload 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance（boolean，默认 false）；ConfigurableRoleIds 为可配置角色 Id 数组，空数组允许全部角色，非空时后端限制新授予的角色，保留已有附件历史授权；启用角色权限应同时 Limit=true。用 microi_list_roles/microi_save_role 管理角色。CodeEditor.DisplayMode 默认 Inline，Dialog 显示编辑按钮；ButtonText 默认编辑代码（{{charCount}}字），可使用 {{charCount}} 字符数和 {{lineCount}} 行数。'),
       description: z.string().optional(),
       inTableEdit: z.number().optional(),
       // zhy: expose field V8 source properties so Config.V8Code and runtime V8Code can be updated together.

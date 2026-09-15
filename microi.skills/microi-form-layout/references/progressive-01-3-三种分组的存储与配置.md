@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-form-layout-006 sha256=a78b000a9fee46d8394b0b6cb186702e520ab513f7eff098f2226f1158e46970 -->
+<!-- microi-progressive:chunk id=microi-form-layout-006 sha256=483f58dcfce758809aed7ba010c3d3e402ae9c2701b1cadb5d49b5d1f80a3880 -->
 ## 3. 三种分组的存储与配置
 
 ### 3.1 diy_table.Tabs（表级 Tab）
@@ -114,7 +114,7 @@
 | 适合"互斥分组" | ✅ | ❌ |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-007 sha256=5944a965b1ac9a5c87a0e066af7f6489d2b5cd09e55fff7dc4e43d8d3a029fd6 -->
+<!-- microi-progressive:chunk id=microi-form-layout-007 sha256=a54b3e56d39abb37261adc1d2f0ad92ecde35b70c4594f94fd2e830b8b4fa6e1 -->
 ## 7. 反例参考（必须避免）
 
 ### 反例 1：MRP 运算 3 字段单独建 Tab
@@ -172,7 +172,7 @@ diy_table.Tabs = [
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-008 sha256=1d93c83d865ef941f62c4e8e0dd6238489645bf53367b61e6e397543447dcdbd -->
+<!-- microi-progressive:chunk id=microi-form-layout-008 sha256=72af1ae1c77f1acef09e4741141d2aa97beaa7124b4ac824f24535c7f1ca2468 -->
 ## 8. 快速参考代码片段
 
 ### 8.1 MCP 创建表级 Tab
