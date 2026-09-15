@@ -43,11 +43,14 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 import { callApiEngine, formatFieldValue, formatRegion } from '@/platform/business-runtime.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/customer-share') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/customer-share') },
   mixins: [themeMixin],
   data() {
     return {
