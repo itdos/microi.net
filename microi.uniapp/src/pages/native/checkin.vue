@@ -106,6 +106,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8, getVerifiedCurrentUser } from '@/utils/request.js'
 import { callApiEngine, openForm, openLowCodeMenu } from '@/platform/business-runtime.js'
@@ -120,6 +121,8 @@ import MciVisitTargetFields from '@/components/mci-visit-target-fields/mci-visit
 
 const AMAP_REVERSE_GEOCODE_ENGINE = 'xjy-amap-regeo'
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/checkin') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/checkin') },
   components: { MciVisitTargetFields },
   mixins: [themeMixin],
   data() {

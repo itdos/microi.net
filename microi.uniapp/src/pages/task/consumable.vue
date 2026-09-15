@@ -29,12 +29,15 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 import { callApiEngine, openForm } from '@/platform/business-runtime.js'
 import { loadTaskEquipmentPackage } from '@/utils/xjy-task.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/task/consumable') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/task/consumable') },
   mixins: [themeMixin],
   data() { return { deviceId: '', taskId: '', source: 'task', equipment: {}, consumables: [], editing: null, form: {}, loading: true, saving: false, error: '' } },
   computed: {

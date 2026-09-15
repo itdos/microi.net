@@ -61,6 +61,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { V8 } from '@/utils/request.js'
 import { loadReminders, saveReminder, toggleReminder, removeReminder } from '@/platform/reminders.js'
 import { themeMixin } from '@/utils/theme.js'
@@ -71,6 +72,8 @@ function localDateText(date = new Date()) { return `${date.getFullYear()}-${pad(
 function startOfWeek(date = new Date()) { const value = new Date(date); const day = value.getDay() || 7; value.setHours(0,0,0,0); value.setDate(value.getDate() - day + 1); return value }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/reminders') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/reminders') },
   mixins: [themeMixin],
   data() {
     return {

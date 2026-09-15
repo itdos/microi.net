@@ -67,6 +67,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser, V8 } from '@/utils/request.js'
 import { exportCasebookPdf } from '@/utils/api.js'
@@ -106,6 +107,8 @@ function caseChildSnapshot(item, bookId, currentUser) {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/casebook') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/casebook') },
   mixins: [themeMixin],
   data() {
     return {

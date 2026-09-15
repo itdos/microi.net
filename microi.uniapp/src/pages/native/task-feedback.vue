@@ -43,6 +43,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 import { findMenu, openForm } from '@/platform/business-runtime.js'
@@ -54,6 +55,8 @@ const TASK_FILE_FIELDS = ['JieguoTP', 'ShipinSC']
 const EMPTY_PRIVATE_FILE_CONTEXT = Object.freeze({ private: true, failClosed: true })
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/task-feedback') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/task-feedback') },
   mixins:[themeMixin],
   data(){return{taskId:'',taskNo:'',customer:'',taskType:'',task:{},devices:[],form:{amount:'',result:'',photos:'[]',videos:'[]',followType:''},loading:true,submitting:false,draftRestored:false,draftSavedAt:0,fileContexts:{},fileContextError:''}},
   computed:{completedDeviceCount(){return this.devices.filter((item)=>item.status==='已完成').length},devicesCompleted(){return this.devices.length===0||this.completedDeviceCount===this.devices.length},draftTime(){return this.draftSavedAt?new Date(this.draftSavedAt).toLocaleString():''}},

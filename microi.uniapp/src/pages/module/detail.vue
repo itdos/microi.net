@@ -100,6 +100,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8, getUser } from '@/utils/request.js'
 import { formatFieldValue, openForm } from '@/platform/business-runtime.js'
@@ -113,6 +114,8 @@ import { loadViewMetricValues } from '@/platform/view-metrics.js'
 import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/module/detail') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/module/detail') },
   components: { MciBusinessRelatedList },
   mixins: [themeMixin],
   data() {
