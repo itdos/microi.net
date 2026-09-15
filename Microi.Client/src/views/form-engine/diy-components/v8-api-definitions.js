@@ -834,7 +834,7 @@ export const V8ApiDefinitions = {
                     },
                     getConnectionState: {
                         label: "getConnectionState()",
-                        documentation: '获取连接状态快照\n\n返回 engine、supported、status、connected、remembered、deviceId、deviceName、transport、profileMode、profileId、profileName、commandLanguage、autoReconnect、error、changedAt 等字段。用于展示状态；打印前仍以 isConnected() 和 prepareSend() 为准。',
+                        documentation: '获取连接状态快照\n\n返回 engine、supported、status、connected、remembered、deviceId、deviceName、transport、profileMode、profileId、profileName、commandLanguage、autoReconnect、error、changedAt 等字段。5+ 还返回本次连接的 mtu、maxWriteBytes、recommendedPacketSize、writeType、packetIntervalMs；未知 MTU 为 0，上限 20 字节，不跨连接缓存。Android 佳博确认写入约保留 8ms 的 GATT 保护窗口。用于展示状态；打印前仍以 isConnected() 和 prepareSend() 为准。',
                         snippet: 'getConnectionState()'
                     },
                     subscribeConnection: {
@@ -859,7 +859,7 @@ export const V8ApiDefinitions = {
                     },
                     setOneTimeData: {
                         label: "setOneTimeData(bytes)",
-                        documentation: '设置每次发送的字节数\n\n参数：bytes — 1-512 的整数；默认20，连接页内置候选20-190（步长10）。目标打印机真正支持的包长仍需实机验证。非法值会抛出异常。\n\n示例:\nV8.Print.setOneTimeData(100);',
+                        documentation: '设置每次发送的字节数\n\n参数：bytes — 1-512 的整数；默认20，连接页内置候选20-190（步长10）。5+ BLE 实际发送还受本次连接 maxWriteBytes 限制；未知 MTU 时为20，不能把请求包长当作设备协商能力。目标打印机仍需实机验证。非法值会抛出异常。\n\n示例:\nV8.Print.setOneTimeData(100);',
                         snippet: 'setOneTimeData(${1:100})'
                     },
                     setPrinterNum: {

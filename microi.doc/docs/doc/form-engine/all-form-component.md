@@ -178,6 +178,7 @@ AI/MCP 创建图片字段时应写入 `diy_field.Config.ImgUpload`，推荐完�
 | --- | --- | --- |
 | `EnableRolePermission` 启用附件角色权限 | `false` | 开启逐附件角色设置，并强制上传至私有桶 |
 | `HideUnauthorizedFiles` 隐藏无权限文件列表 | `false` | 默认显示带锁的无权限占位行；开启后隐藏这些行 |
+| `ConfigurableRoleIds` 可配置角色列表 | `[]` | 空数组可选全部角色；非空时只能选指定角色。后端校验新增授权，已有范围外角色保留，可移除但不可再添加 |
 | `ShowUnauthorizedFileName` 显示无权限文件名称 | `false` | 默认名称为“无权限附件”；开启后仅显示名称，仍不可访问或修改 |
 | `DisableRoleInheritance` 关闭角色继承 | `false` | 默认允许更高 `Level` 的角色继承较低角色的附件权限；开启后只匹配所选角色 |
 
@@ -418,6 +419,7 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 ## 代码编辑器 CodeEditor
 >* 支持代码联想、代码缩进、语法高亮、代码折叠等等
 >* `Config.CodeEditor.DisplayMode` 支持 `Inline`（表单内直接显示编辑器，默认兼容模式）和 `Dialog`（只显示 `编辑代码（N字）` 按钮，点击后打开平台统一大圆角代码弹层）。配置入口为【表单设计 → 控件配置 → 默认显示方式】。
+>* 字段未配置时默认 `Inline`，模块设计也遵循同一配置。按钮模式可配置 `Config.CodeEditor.ButtonText`，默认为 `编辑代码（{{charCount}}字）`；例如 `当前{{charCount}}字代码、{{lineCount}}行代码`。字符数按 Unicode 字符计数，空代码为 0 行，CRLF 换行计作一次；文本只替换这两个变量，不执行表达式或 HTML。
 >* 配置类长表单或同一 Tab 含多个代码字段时优先使用 `Dialog`，避免 Monaco 编辑器长期占满表单；代码密集型工作台可按字段显式使用 `Inline`。`CodeEditor.Height` 继续控制内联编辑器和弹层编辑区域的建议高度。
 
 ## 下拉树 SelectTree

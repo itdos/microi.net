@@ -1047,7 +1047,7 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
-    public void SaaSMarketplacePackage_HidesAndLocksTheJwtSigningRoot()
+    public void SaaSMarketplacePackage_ShowsReadonlySigningKeyStatus()
     {
         var root = FindRepositoryRoot();
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
@@ -1062,11 +1062,13 @@ public class SaaSRuntimeConfigurationTests
                 string.Equals(field.Value<string>("TableName"), "sys_osclients", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(field.Value<string>("Name"), "AuthSecret", StringComparison.OrdinalIgnoreCase));
 
-        Assert.Equal(0, authSecret.Value<int>("Visible"));
-        Assert.Equal(0, authSecret.Value<int>("AppVisible"));
+        Assert.Equal(1, authSecret.Value<int>("Visible"));
+        Assert.Equal(1, authSecret.Value<int>("AppVisible"));
         Assert.Equal(1, authSecret.Value<int>("Readonly"));
         Assert.Equal(1, authSecret.Value<int>("IsLockField"));
-        // 配置文本改为行外存储，避免 MySQL 8 空库建表超过行长上限；密钥仍须隐藏并锁定。
+        Assert.Equal("JWT密钥状态", authSecret.Value<string>("Label"));
+        Assert.False(JObject.Parse(authSecret.Value<string>("Config")!).Value<bool>("TextShowPassword"));
+        // 物理字段保持行外存储；页面值由后端投影，普通表单不得写回。
         Assert.Equal("mediumtext", authSecret.Value<string>("Type"));
     }
 

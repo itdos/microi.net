@@ -3786,25 +3786,31 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
                 UpgradeProgress.WriteLine($"Microi：【基础应用升级】【{osClient}】{packageName}已安装同版本[{installedVersion}]，执行覆盖式重放以修复资源漂移。");
             }
             UpgradeProgress.WriteLine($"Microi：【基础应用升级】开始导入{packageName}：{resourceName}");
-            object installResult;
             // Upgrade13 is the only caller allowed to mark a package as the
             // validated embedded official baseline. The authorization lives in
             // an AsyncLocal host scope bound to this fixed importer and tenant;
             // V8.Param alone cannot forge it. The importer consumes it once and
             // may then restore Platform/Managed code while still preserving every
             // Tenant/CreateIfMissing hook.
-            using (V8TrustedExecutionContext.EnterManagedProtocol(
-                       "import-microi-store-package",
-                       osClient))
-            {
-                installResult = await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
+            object installResult;
+            installResult = await EmbeddedUpgradePackageInstaller.RunAsync(
+                packageContent,
+                async stage =>
                 {
-                    OsClient = osClient,
-                    Package = packageContent,
-                    TrustedEmbeddedOfficialPackage = true,
-                    EmbeddedOfficialPackageResourceName = resourceName
-                });
-            }
+                    using (V8TrustedExecutionContext.EnterManagedProtocol("import-microi-store-package", osClient))
+                    {
+                        return (object)await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
+                        {
+                            OsClient = osClient,
+                            Package = packageContent,
+                            TrustedEmbeddedOfficialPackage = true,
+                            EmbeddedOfficialPackageResourceName = resourceName,
+                            EmbeddedUpgradeStage = stage
+                        });
+                    }
+                },
+                job => ScheduleJobService.SaveAsync(osClient, job),
+                UpgradeExecutionLeaseContext.ConfirmOwnership);
             var installFailure = GetInstallFailureMessage(installResult);
             if (installFailure != null)
             {

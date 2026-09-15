@@ -615,6 +615,7 @@ import { getStoredLanguage, resolveSysLocale } from "@/lang";
 import { resolveLoginResourceUrl, resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
 import { normalizeLoginWallpapers, pickNextLoginWallpaper } from "@/utils/login-wallpaper.js";
 import { getPlatformSysConfig } from "@/utils/platform-sys-config.js";
+import { mergeLoginSysConfig } from "@/utils/platform-edition.js";
 import {
     DEFAULT_LOGIN_METHOD_KEYS,
     isLoginMethodDisplayEnabled
@@ -2128,7 +2129,7 @@ export default {
 
             self.$nextTick(async function () {
                 if (self.LoginResult.DataAppend.SysConfig) {
-                    self.diyStore.setSysConfig(self.LoginResult.DataAppend.SysConfig);
+                    self.diyStore.setSysConfig(mergeLoginSysConfig(self.diyStore.SysConfig, self.LoginResult.DataAppend.SysConfig));
                     if (!self.DiyCommon.IsNull(self.LoginResult.DataAppend.SysConfig.LoginEndV8Code)) {
                         var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
                         if (!V8.CurrentUser) {

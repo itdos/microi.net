@@ -1425,7 +1425,8 @@ export default {
                 }));
         },
         UseMiniCodeEditor() {
-            return String(this.TableName || "").toLowerCase() === "sys_menu";
+            // 普通表单只采用字段的 DisplayMode，不再按表名覆盖设计器配置。
+            return false;
         },
         UseViewSchemaDetail() {
             // 统一由 DiyForm 承载 Detail/Edit/View。历史 ViewSchema 继续保留在

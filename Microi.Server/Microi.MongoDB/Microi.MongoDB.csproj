@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <!-- dotnet build -c Release -->
     <TargetFramework>netstandard2.1</TargetFramework>
@@ -12,9 +12,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：MongoDB扩展。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>8.3.6</Version>
-    <AssemblyVersion>8.3.6</AssemblyVersion>
-    <FileVersion>8.3.6</FileVersion>
+    <Version>8.3.7</Version>
+    <AssemblyVersion>8.3.7</AssemblyVersion>
+    <FileVersion>8.3.7</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -31,6 +31,8 @@
       <Pack>True</Pack>
       <PackagePath></PackagePath>
     </None>
+    <None Include="../ThirdParty/MongoDB.Driver/LICENSE.md" Pack="true" PackagePath="licenses/MongoDB.Driver.LICENSE.md" />
+    <None Include="../ThirdParty/MongoDB.Driver/provenance.json" Pack="true" PackagePath="licenses/MongoDB.Driver.provenance.json" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Resource\" />
@@ -45,12 +47,29 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="MongoDB.Bson" Version="3.10.0" />
-    <PackageReference Include="MongoDB.Driver" Version="3.10.0" />
+    <PackageReference Include="MongoDB.Bson" Version="3.11.2" />
+    <ProjectReference Include="../ThirdParty/MongoDB.Driver/MongoDB.Driver.Compatibility.csproj" PrivateAssets="all" />
+    <!-- 兼容程序集随 Microi.MongoDB 发布，不能声明一个并不存在的官方预发布 NuGet。
+         保留其真实外部依赖，让以后正式 NuGet 消费者同样能还原完整运行闭包。 -->
+    <PackageReference Include="DnsClient" Version="1.6.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageReference Include="SharpCompress" Version="0.48.1" />
+    <PackageReference Include="Snappier" Version="1.3.1" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.6" />
+    <PackageReference Include="System.Buffers" Version="4.6.1" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="10.0.10" />
   </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
     <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
   </ItemGroup>
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeMongoCompatibilityAssembly</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+  <Target Name="IncludeMongoCompatibilityAssembly" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Filename)' == 'MongoDB.Driver'" />
+    </ItemGroup>
+  </Target>
 </Project>

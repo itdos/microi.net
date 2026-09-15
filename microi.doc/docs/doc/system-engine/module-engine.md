@@ -5,6 +5,14 @@
 ![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## 模块配置
 
+### 导入与导出按钮显示条件
+
+更新“模块引擎”应用后，在模块设计的【按钮】分组配置 `ImportCodeShowV8`、`ExportCodeShowV8`。
+例如 `V8.Result = false;` 隐藏对应按钮，`V8.Result = V8.CurrentUser.Account === 'admin';`
+按当前用户控制显示。角色原有导入、导出权限仍然生效，显示条件不能赋予后端权限。
+代码字段可在表单设计器中选 `DisplayMode=Inline/Dialog`；默认内联，按钮文案支持
+`ButtonText="当前{{charCount}}字代码、{{lineCount}}行代码"`。
+
 ### 用户级登录后首页
 
 每个系统账号都可在 PC 右上角头像菜单的【个人设置】中选择“登录后首页”。设置保存在 `sys_user.DefaultIndexUrl`，而系统级默认首页仍保存在 `sys_config.DefaultIndexUrl`。

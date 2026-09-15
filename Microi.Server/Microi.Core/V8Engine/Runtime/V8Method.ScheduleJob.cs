@@ -25,7 +25,10 @@ namespace Microi.net
                 {
                     case "capabilities":
                         // 老节点会对未知动作返回失败，接口引擎据此在产生调度副作用前提示升级。
-                        return new DosResult(1, new { RuntimeOnly = true });
+                        return new DosResult(1, new { RuntimeOnly = true, ExecutionLogs = "mongo-cursor-v1", HistoryLogs = true });
+                    case "logs":
+                    case "historylogs":
+                        return ReadScheduleExecutionLogs(osClient, request, action.Equals("historylogs", StringComparison.OrdinalIgnoreCase));
                     case "getbynames":
                     {
                         var names = (request["Names"] as JArray ?? new JArray())
@@ -87,6 +90,69 @@ namespace Microi.net
             {
                 DataAppend = result.DataAppend,
                 DataCount = result.DataCount
+            };
+        }
+
+        private static DosResult ReadScheduleExecutionLogs(string tenant, JObject request, bool history)
+        {
+            var name = GetJsonString(request, "JobName").Trim();
+            var month = GetJsonString(request, "SearchMonth");
+            if (string.IsNullOrWhiteSpace(name) || name.Length > 100
+                || !DateTime.TryParseExact(month, "yyyyMM", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var start))
+                return new DosResult(0, null, "请选择任务和查询月份。");
+            var size = Math.Clamp((int?)request["PageSize"] ?? 20, 1, 100);
+            DateTime? before = null;
+            var beforeText = GetJsonString(request, "BeforeLogTime");
+            var beforeId = GetJsonString(request, "BeforeLogId");
+            if (string.IsNullOrWhiteSpace(beforeText) != string.IsNullOrWhiteSpace(beforeId))
+                return new DosResult(0, null, "日志翻页游标不合法。");
+            if (!string.IsNullOrWhiteSpace(beforeText))
+            {
+                if (!DateTime.TryParse(beforeText, System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)
+                    || string.IsNullOrWhiteSpace(beforeId) || beforeId.Length > 100)
+                    return new DosResult(0, null, "日志翻页游标不合法。");
+                before = parsed;
+            }
+            if (!history)
+            {
+                var result = MicroiEngine.MongoDB.GetSysLog(new SysLogParam
+                {
+                    OsClient = tenant, TargetType = ScheduleExecutionLog.TargetType, TargetId = name,
+                    _SearchMonth = month, _PageSize = size, BeforeLogTime = before, BeforeLogId = beforeId
+                }).ConfigureAwait(false).GetAwaiter().GetResult();
+                return new DosResult(result.Code, result.Data, result.Msg)
+                { DataAppend = result.DataAppend, DataCount = result.DataCount };
+            }
+            // 历史表仅保留查询，不删除、不搬迁、不再写入；固定投影和参数化范围。
+            // 不走 TableChild 的全量 Count，避免打开任务表单时扫描多年历史。
+            var client = OsClientExtend.GetClient(tenant);
+            if (client?.Db == null || !string.Equals(client.OsClient, tenant, StringComparison.OrdinalIgnoreCase))
+                return new DosResult(0, null, "历史日志租户数据库不可用。");
+            const string table = "diy_schedule_job_log";
+            var id = new Dos.ORM.Field("Id", table);
+            var job = new Dos.ORM.Field("JobName", table);
+            var time = new Dos.ORM.Field("CreateTime", table);
+            var deleted = new Dos.ORM.Field("IsDeleted", table);
+            var where = job == name & time >= start & time < start.AddMonths(1) & (deleted == 0 | deleted == null);
+            if (before.HasValue) where &= time < before.Value | (time == before.Value & id < beforeId);
+            var query = client.Db.From(table).Select(id, job, time,
+                    new Dos.ORM.Field("Message", table))
+                .Where(where).OrderBy(time.Desc, id.Desc);
+            var bounded = client.Db.Db.DbProvider.CreatePageFromSection(query, 1, size + 1);
+            var command = client.Db.FromSql(bounded.SqlString);
+            foreach (var parameter in bounded.Parameters)
+                command.AddInParameter(parameter.ParameterName, parameter.ParameterValue);
+            var data = command.SetCommandTimeout(10).ToDataTable();
+            var more = data.Rows.Count > size;
+            if (more) data.Rows.RemoveAt(data.Rows.Count - 1);
+            var rows = JArray.FromObject(data);
+            var last = rows.LastOrDefault();
+            return new DosResult(1, rows)
+            {
+                DataCount = rows.Count,
+                DataAppend = new { HasMore = more, BeforeLogTime = last?["CreateTime"], BeforeLogId = last?["Id"], ExactTotal = false }
             };
         }
 

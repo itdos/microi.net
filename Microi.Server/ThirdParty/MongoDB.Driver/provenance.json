@@ -1,0 +1,8 @@
+{
+  "upstream": "https://github.com/mongodb/mongo-csharp-driver/tree/v3.11.2",
+  "upstreamArchiveSha256": "34fcecb4ec053c310a4ead12857e4915112054bafe1e1dacb8ae10e4f375e24d",
+  "sourceArchiveSha256": "2612f9503528513ba639209185c5bc22cd1d3242353f828745366a98d9e9718c",
+  "sourceFiles": 1490,
+  "patch": "Core/Misc/WireVersion.cs: minimum server 4.4 -> 3.6; no feature guards or security patches removed",
+  "compatibility": "Microi platform CRUD and observability compatibility, not an upstream support claim"
+}

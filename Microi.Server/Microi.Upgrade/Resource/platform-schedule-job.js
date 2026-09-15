@@ -10,13 +10,13 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-schedule-job
- * Version: v1.0.2
+ * Version: v1.1.1
  * Function:
  * - 管理当前租户任务列表、运行态、保存、暂停、恢复和删除；兼容旧Job路由，表单保存先检查RuntimeOnly能力后只同步Quartz。
  */
 
 // Microi官方接口引擎：platform-schedule-job
-// Version: v1.0.2
+// Version: v1.1.0
 // 表数据、状态合并与动作编排在接口引擎；七条旧 /api/Job/* 路由按可信请求路径兼容。
 
 var param = V8.Param || {};
@@ -44,6 +44,64 @@ if (legacyAction) {
   action = legacyAction;
 }
 var tableName = 'diy_schedule_job';
+
+if (action === 'logs' || action === 'historylogs') {
+  return V8.Method.ManageScheduleJob({
+    Action: action, JobName: String(param.JobName || ''), SearchMonth: String(param.SearchMonth || ''),
+    PageSize: Math.max(1, Math.min(100, Number(param.PageSize || 20))),
+    BeforeLogTime: param.BeforeLogTime || '', BeforeLogId: param.BeforeLogId || ''
+  });
+}
+
+// 只读诊断保留调度器原始失败和节点状态，不能用元数据的“正常”掩盖未执行。
+if (action === 'diagnostics') {
+  var diagnosticNames = param.JobName ? [String(param.JobName)] : [];
+  var diagnostic = V8.Method.ManageScheduleJob({ Action: 'GetByNames', Names: diagnosticNames });
+  if (!diagnostic || diagnostic.Code !== 1) return diagnostic;
+  diagnostic = JSON.parse(JSON.stringify(diagnostic));
+  // 只查询运行态已经验证归属的单个 JobKey；不得按客户端传入的 Group 查询其它租户。
+  diagnostic.DataAppend = diagnostic.DataAppend || {};
+  if (diagnostic.Data && diagnostic.Data.length === 1) {
+    try {
+      diagnostic.DataAppend.StoreTriggers = V8.Db.FromSql(
+        'SELECT SCHED_NAME,TRIGGER_NAME,TRIGGER_STATE,NEXT_FIRE_TIME,PREV_FIRE_TIME,MISFIRE_INSTR '
+        + 'FROM microi_job_triggers WHERE JOB_NAME=@jobName AND JOB_GROUP=@jobGroup'
+      ).AddInParameter('@jobName', diagnostic.Data[0].JobName)
+        .AddInParameter('@jobGroup', diagnostic.Data[0].Group).ToArray();
+      diagnostic.DataAppend.StoreTriggerCount = V8.Db.FromSql(
+        'SELECT COUNT(*) AS TriggerCount FROM microi_job_triggers WHERE JOB_GROUP=@jobGroup'
+      ).AddInParameter('@jobGroup', diagnostic.Data[0].Group).ToArray();
+      diagnostic.DataAppend.StoreHeartbeat = V8.Db.FromSql(
+        'SELECT SCHED_NAME,MAX(LAST_CHECKIN_TIME) AS LastCheckinTime,COUNT(*) AS Nodes '
+        + 'FROM microi_job_scheduler_state GROUP BY SCHED_NAME'
+      ).ToArray();
+      // MySQL 元数据仅返回体积/估算行数，不对多年日志执行 COUNT(*)。
+      try {
+        diagnostic.DataAppend.HistoryStorage = V8.Db.FromSql(
+          'SELECT ENGINE,TABLE_ROWS,DATA_LENGTH,INDEX_LENGTH FROM INFORMATION_SCHEMA.TABLES '
+          + 'WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=@tableName'
+        ).AddInParameter('@tableName', 'diy_schedule_job_log').ToArray();
+        diagnostic.DataAppend.HistoryQueryPlan = V8.Db.FromSql(
+          'EXPLAIN SELECT Id,JobName,CreateTime FROM diy_schedule_job_log '
+          + 'WHERE JobName=@jobName AND (IsDeleted=0 OR IsDeleted IS NULL) ORDER BY LogTime DESC LIMIT 15'
+        ).AddInParameter('@jobName', diagnostic.Data[0].JobName).ToArray();
+        diagnostic.DataAppend.HistoryIndexes = V8.Db.FromSql(
+          'SELECT INDEX_NAME,SEQ_IN_INDEX,COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS '
+          + 'WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=@tableName ORDER BY INDEX_NAME,SEQ_IN_INDEX'
+        ).AddInParameter('@tableName', 'diy_schedule_job_log').ToArray();
+        diagnostic.DataAppend.DatabaseWaits = V8.Db.FromSql(
+          'SELECT TIME,STATE,COMMAND FROM INFORMATION_SCHEMA.PROCESSLIST '
+          + 'WHERE DB=DATABASE() AND COMMAND<>@idle AND TIME>@seconds'
+        ).AddInParameter('@idle', 'Sleep').AddInParameter('@seconds', 10).ToArray();
+      } catch (metadataError) {
+        diagnostic.DataAppend.StorageMetadataUnavailable = true;
+      }
+    } catch (storeError) {
+      diagnostic.DataAppend.StoreReadError = String(storeError.message || storeError);
+    }
+  }
+  return diagnostic;
+}
 
 if (action === 'list') {
   var pageIndex = Math.max(1, Number(param._PageIndex || param.PageIndex || 1));

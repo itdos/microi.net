@@ -2909,7 +2909,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     'microi_build_field_config',
     `Build and validate Microi diy_field Data/Config JSON for option controls, SQL/APIEngine/DataSource sources, JoinForm, AutoNumber and DateTime. OsClient: ${osClient}`,
     {
-      sourceType: z.enum(['Data', 'KeyValue', 'Sql', 'ApiEngine', 'DataSource', 'AutoNumber', 'JoinForm', 'DateTime', 'FileUpload']).describe('Config source type. FileUpload 的 options 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance，均为 boolean，默认 false；启用角色权限自动 Limit=true。'),
+      sourceType: z.enum(['Data', 'KeyValue', 'Sql', 'ApiEngine', 'DataSource', 'AutoNumber', 'JoinForm', 'DateTime', 'FileUpload']).describe('Config source type. FileUpload 的 options 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance，均为 boolean，默认 false；ConfigurableRoleIds 是最多 100 个真实角色 Id 的数组，默认 [] 允许所有角色，非空时仅可新增其中角色的附件授权。启用角色权限自动 Limit=true。'),
       options: jsonRecordSchema.optional().describe('Source options, such as data/options, sql, apiEngineKey, dataSourceId, tableId, prefix, length'),
     },
     async ({ sourceType, options }) => {
@@ -3403,6 +3403,22 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     if (confirmExecution !== name && confirmExecution !== 'EXECUTE') return textResult(`写入已拦截：请传 confirmExecution="${name}" 或 "EXECUTE"。`, true);
     await audit(client, 'microi_save_job', name, payload);
     return apiText('Save Job', await client.saveJob(payload));
+  });
+
+  server.tool('microi_query_job_runtime', `Read current-node Quartz diagnostics or monthly execution logs for the authenticated tenant ${osClient}. Diagnostics never triggers or re-registers a job. Logs use MongoDB; HistoryLogs retains relational history. Cursor pagination returns HasMore, not an exact total. Backend administrator checks remain mandatory; a running scheduler is not proof of execution.`, {
+    action: z.enum(['Diagnostics', 'Logs', 'HistoryLogs']),
+    jobName: z.string().min(1).max(100),
+    searchMonth: z.string().regex(/^\d{4}(0[1-9]|1[0-2])$/).optional(),
+    pageSize: z.number().int().min(1).max(100).optional(),
+    beforeLogTime: z.string().max(50).optional(),
+    beforeLogId: z.string().max(100).optional(),
+  }, async ({ action, jobName, searchMonth, pageSize, beforeLogTime, beforeLogId }) => {
+    if (action !== 'Diagnostics' && !searchMonth) return textResult('日志查询必须指定 searchMonth（yyyyMM）。', true);
+    if (Boolean(beforeLogTime) !== Boolean(beforeLogId)) return textResult('翻页必须同时提供 beforeLogTime 和 beforeLogId。', true);
+    return apiText('Job Runtime', await client.executeEngine('platform-schedule-job', {
+      Action: action, JobName: jobName, SearchMonth: searchMonth, PageSize: pageSize ?? 20,
+      BeforeLogTime: beforeLogTime, BeforeLogId: beforeLogId,
+    }));
   });
 
   server.tool('microi_list_database_backup_tenants', `List the enabled MySQL tenants eligible for database backup on the current backend runtime. The server strictly filters sys_osclients by its own OsClientType and OsClientNetwork and never returns connection strings. OsClient ${osClient}.`, {}, async () => (

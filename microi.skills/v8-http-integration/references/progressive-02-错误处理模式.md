@@ -28,7 +28,7 @@ try {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-012 sha256=5be87e89ec429dd9b79e89014485b7745c2a400f2066d0d989f71c9779de32fc -->
+<!-- microi-progressive:chunk id=v8-http-integration-012 sha256=321e3eee95847088ca6c48ee0dba2b926e834fa492cfd97d1a347ae6cbb843d5 -->
 ## 注意事项
 
 - `V8.Http.Post` 的 `PostParam` 不支持多级嵌套对象，嵌套需用 `PostParamString`

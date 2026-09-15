@@ -12,9 +12,9 @@ const packageModel = JSON.parse(fs.readFileSync(
 
 test('module engine package advertises the NotShowFields runtime contract', () => {
   const packageInfo = packageModel.PackageInfo;
-  assert.equal(packageInfo.Version, 'v7.6.5');
+  assert.equal(packageInfo.Version, 'v7.6.6');
   assert.equal(packageInfo.ChangeLog.Version, packageInfo.Version);
-  assert.equal(packageInfo.ChangeLog.ChangeType, 'Fix');
+  assert.equal(packageInfo.ChangeLog.ChangeType, 'Enhancement');
   assert.match(String(packageInfo.ChangeHistory), /v7\.6\.2[^\n]*NotShowFields/);
   assert.ok(packageInfo.RequiredPlatformCapabilities.includes(
     'ClientFeature:NotShowFieldsNullSafeV1',

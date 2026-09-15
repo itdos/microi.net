@@ -197,6 +197,12 @@ namespace Microi.net
                     : TenantConfigurationSecurity.CreatePublicSysConfigProjection(
                         source.Data,
                         osClient);
+                if (projection != null)
+                {
+                    // 授权版本属于公开运行态信息，随启动配置返回，避免依赖尚未升级的会话接口。
+                    // 每次从授权内核读取，不采信可编辑的 sys_config 字段，也不返回授权主体或证书。
+                    projection["PlatformEdition"] = MicroiEngine.TryGetService<IPlatformProductEditionProvider>()?.GetProductEdition() ?? "开源版";
+                }
                 var loginPublicKey = ConfigHelper.GetRuntimeConfigurationValue(
                     "Security:LoginRsaPublicKey");
                 if (projection != null && !loginPublicKey.DosIsNullOrWhiteSpace())

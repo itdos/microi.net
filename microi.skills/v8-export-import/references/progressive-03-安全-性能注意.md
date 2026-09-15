@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-export-import-011 sha256=63cfa4a963d5c37e81c63f5c2b6b47a4709d1a0896d76e9feba4566d118cfe6b -->
+<!-- microi-progressive:chunk id=v8-export-import-011 sha256=a98c3b7c70f039fdd37128c3254acebd6fb527e78900f8fb38294e03baca083e -->
 ## 安全 / 性能注意
 
 - ❌ 不要在循环中逐条 `AddFormData` 而不传 `V8.DbTrans`：每条独立事务，性能差且部分失败会留脏数据

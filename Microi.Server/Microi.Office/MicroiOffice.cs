@@ -2751,7 +2751,7 @@ namespace Microi.net
                         importIdempotencyCacheKey,
                         "Running",
                         "后台导入任务正在执行。");
-                    if (!OfficeDocumentSecurity.HasExpectedFileSignature(fileSuffix, fileByte))
+                    if (!OfficeDocumentSecurity.HasExpectedSpreadsheetImportSignature(fileSuffix, fileByte))
                     {
                         throw new ArgumentException($"上传内容与文件类型{fileSuffix}不一致或文件已损坏。");
                     }

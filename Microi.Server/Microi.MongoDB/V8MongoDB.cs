@@ -560,6 +560,8 @@ namespace Microi.net
 
         private async Task<DosResultList<SysLog>> GetSysLogCore(SysLogParam param)
         {
+            if (param.TargetType == ScheduleExecutionLog.TargetType)
+                return await GetScheduleLogs(param).ConfigureAwait(false);
             //如果传入了时间
             var tableName = "log_";
             if (param._SearchMonth.DosIsNullOrWhiteSpace())
@@ -731,6 +733,39 @@ namespace Microi.net
             //fs.OrderBy(orderBy);
             //var list = fs.ToList();
             return new DosResultList<SysLog>(1, result, "", int.Parse(dataCount.ToString()));
+        }
+
+        private async Task<DosResultList<SysLog>> GetScheduleLogs(SysLogParam param)
+        {
+            if (string.IsNullOrWhiteSpace(param.OsClient) || string.IsNullOrWhiteSpace(param.TargetId)
+                || param.TargetId.Length > 100
+                || !DateTime.TryParseExact(param._SearchMonth, "yyyyMM", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out _))
+                return new DosResultList<SysLog>(0, null, "任务名和查询月份不合法。");
+            var host = CreateTenantMongoHost(param.OsClient, "log_" + param._SearchMonth);
+            await EnsureSysLogIndexesAsync(host).ConfigureAwait(false);
+            var f = Builders<SysLog>.Filter;
+            var filter = f.Eq(x => x.TargetType, ScheduleExecutionLog.TargetType) & f.Eq(x => x.TargetId, param.TargetId);
+            if (param.BeforeLogTime.HasValue)
+            {
+                if (string.IsNullOrWhiteSpace(param.BeforeLogId) || param.BeforeLogId.Length > 100)
+                    return new DosResultList<SysLog>(0, null, "日志翻页游标不完整。");
+                filter &= f.Lt(x => x.CreateTime, param.BeforeLogTime.Value)
+                    | (f.Eq(x => x.CreateTime, param.BeforeLogTime.Value) & f.Lt(x => x.EventId, param.BeforeLogId));
+            }
+            var size = Math.Max(1, Math.Min(100, param._PageSize ?? 20));
+            // 精确任务范围 + 稳定游标 + 多取一条，千万级日志也不执行 Count/Skip。
+            var rows = await MongodbClient<SysLog>.MongodbInfoClient(host)
+                .Find(filter, new FindOptions { MaxTime = TimeSpan.FromSeconds(10), Hint = new BsonString("idx_Job_Target_Time_Event") })
+                .Sort(Builders<SysLog>.Sort.Descending(x => x.CreateTime).Descending(x => x.EventId))
+                .Limit(size + 1).ToListAsync().ConfigureAwait(false);
+            var more = rows.Count > size;
+            if (more) rows.RemoveAt(rows.Count - 1);
+            var last = rows.LastOrDefault();
+            return new DosResultList<SysLog>(1, rows, "", rows.Count)
+            {
+                DataAppend = new { HasMore = more, BeforeLogTime = last?.CreateTime, BeforeLogId = last?.EventId, ExactTotal = false }
+            };
         }
 
         public async Task<DosResultList<SysLog>> GetTraceTimeline(SysLogTraceQueryParam param)
@@ -1586,6 +1621,11 @@ namespace Microi.net
 
                 stage = "生成缺失索引";
                 var toCreate = new System.Collections.Generic.List<CreateIndexModel<SysLog>>();
+                if (!existingIndexNames.Contains("idx_Job_Target_Time_Event"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.TargetType).Ascending(d => d.TargetId)
+                            .Descending(d => d.CreateTime).Descending(d => d.EventId),
+                        new CreateIndexOptions { Name = "idx_Job_Target_Time_Event" }));
                 if (!existingIndexNames.Contains("idx_CreateTime_desc"))
                     toCreate.Add(new CreateIndexModel<SysLog>(
                         Builders<SysLog>.IndexKeys.Descending(d => d.CreateTime),

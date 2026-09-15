@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-export-import-007 sha256=d2958751b32d5143693cbdb6fb72aeca97f450c80c360aa7d826d4f6595c0ab1 -->
+<!-- microi-progressive:chunk id=v8-export-import-007 sha256=33d817757174d42d2833f2ce3bbca6d8da341938f242d48bdad3891d6ab25230 -->
 ## PowerPoint 导出
 
 PowerPoint 的幻灯片尺寸、图片/表格位置与宽高单位均为英寸，默认画布为 16:9（13.333 × 7.5）。
@@ -139,7 +139,7 @@ return { Code: 1, Data: stepStr ? JSON.parse(stepStr) : [] };
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-009 sha256=76d08b493419719094a95a5b760a83ae09b136bd54d66d2362efd428dea03ff8 -->
+<!-- microi-progressive:chunk id=v8-export-import-009 sha256=ba923bb2b464910d063e94a6f88dbb9b3229739cb5e39611c8cf275bc77b743c -->
 ## 接收并下载文件（HTTP 链接转 Excel）
 
 ```javascript
@@ -152,7 +152,7 @@ var base64 = System.Convert.ToBase64String(bytes);
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-010 sha256=0df463f76ba60100c087364b48dab1886d1315b093577ea9485471b34a7a3f6c -->
+<!-- microi-progressive:chunk id=v8-export-import-010 sha256=372a60e928fe1b46d20ed8a7b8bd3736b2bc96465d6e6645c4ae849ca71ce987 -->
 ## 子表导入自动关联主表
 
 当单独导入 `TableChild` 子表时，Excel 经常没有主表 Id，只带项目编号、客户名称等业务字段。默认导入引擎支持通过子表控件配置批量反查主表，并自动补齐子表外键。

@@ -11,6 +11,12 @@ description: Microi 模块引擎与 sys_menu 配置指南。用于创建或修�
 配置实体是 `sys_menu`，不是 `sys_module`；表结构与字段仍属于
 `diy_table/diy_field`。
 
+导入、导出按钮显示条件分别使用 `sys_menu.ImportCodeShowV8`、`ExportCodeShowV8`，
+与新增、编辑、删除条件一样用 `V8.Result=true/false`。通过模块设计“按钮”分组维护，
+或使用 `microi_update_module`；旧后端需先升级模块引擎应用。它们只控制按钮显示，不能代替后端权限。
+代码字段是否显示按钮由各字段 `Config.CodeEditor.DisplayMode` 决定，禁止按 `sys_menu` 表名强制覆盖；
+未配置时默认 `Inline`，需要紧凑按钮的字段显式保存 `Dialog`。
+
 ## 必读参考
 
 - 字段、打开方式、查询配置、ViewSchema 和接口替换：

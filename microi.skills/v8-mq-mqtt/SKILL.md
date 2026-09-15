@@ -10,7 +10,7 @@ description: Microi V8 消息队列与 MQTT 生产指南。用于 V8.MQ.SendMsg�
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 RabbitMQ 消息队列或 MQTT 物联网协议。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-mq-mqtt-000 sha256=4a6559aed1af036591a04002c6e3311d9f0957fbbabbcafdc4a6bad95dabd843 -->
+<!-- microi-progressive:chunk id=v8-mq-mqtt-000 sha256=bc9ac85a8a0b6af88602e0d5419f6d61b192b5262193f6cb8c8ebd26af7bef25 -->
 ## V8.MQ — RabbitMQ 消息队列
 
 ### 生产消息（后端）
@@ -151,7 +151,7 @@ try {
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-mq-mqtt-001 sha256=f65fe365f1adca83c0eabe95f73a658d6d79f33b3d9a8d34c5b35ede841e7d73 -->
+<!-- microi-progressive:chunk id=v8-mq-mqtt-001 sha256=e38b5b491e061fc87f7e1f1446f5c4a7eb6d5f9616d18ca63632a566810c98d9 -->
 ## 注意事项
 
 - MQ 消费者接口引擎通过 `V8.Param.Message` 获取消息，包含 `EventId`、兼容 `Id`、`OsClient`、`Message`、`CurrentUserId`

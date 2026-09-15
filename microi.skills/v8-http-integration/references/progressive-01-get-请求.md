@@ -17,7 +17,7 @@ var data = JSON.parse(result);
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-005 sha256=ae05f44b4857a7244fdeafab994ef41217252694228569a9701988a3857b5438 -->
+<!-- microi-progressive:chunk id=v8-http-integration-005 sha256=055100b212469d8ebd7e42fa9220fbb25b89b5ba10413d8867d2ba4f2c014c94 -->
 ## 获取完整响应（含状态码和响应头）
 
 ```javascript
@@ -58,7 +58,7 @@ var resp = V8.Http.PatchResponse({
 - DNS 校验不能代替网络层出站 ACL。生产环境还应在容器、主机或网关阻断云元数据和非必要私网段。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-006 sha256=b5e8b317857ac4d81818ba230dadd927d12ef9cddb989921bdbeffe8e96527a3 -->
+<!-- microi-progressive:chunk id=v8-http-integration-006 sha256=6e787d9b46d5ba82ef5d2394525d8a36649b1d722a6a59eacf8dd54884e14b3b -->
 ## 前端 V8 行为与兼容性
 
 - 前端新代码应优先使用 `await V8.Http.Get/Post/Patch`，参数与后端一致；不要再把 `V8.Post/Get` 作为新功能首选。旧 `V8.Post/Get` 仅作为兼容 API 保留，其回调和 Promise 写法保持不变。

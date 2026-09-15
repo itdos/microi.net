@@ -23,6 +23,35 @@ public class FileRolePermissionTests
     }
 
     [Fact]
+    public void ConfigurableRoleListFiltersOptionsAndRejectsForgedAssignmentsEvenForAdministrator()
+    {
+        var policy = new FileRolePermission(Roles, ["r1"], true);
+        var config = (JObject)Config.DeepClone(); config["ConfigurableRoleIds"] = new JArray("r2");
+        Assert.Equal(["r2"], policy.ConfigurableRoles(config).Select(r => (string)r["Id"]));
+        Assert.Equal(Roles.Length, policy.ConfigurableRoles(Config).Count());
+        Assert.Throws<InvalidOperationException>(() => policy.Merge(null, new JArray(File("a", "r1")), config));
+        Assert.Single((JArray)policy.Merge(null, new JArray(File("a", "r2")), config));
+        config["ConfigurableRoleIds"] = new JArray("deleted");
+        Assert.Empty(policy.ConfigurableRoles(config));
+        Assert.Throws<InvalidOperationException>(() => policy.Merge(null, new JArray(File("a", "r2")), config));
+    }
+
+    [Fact]
+    public void NarrowedRoleListPreservesOriginalAssignmentsButCannotCopyThemToAnotherFile()
+    {
+        var policy = new FileRolePermission(Roles, ["r1"], true);
+        var config = (JObject)Config.DeepClone(); config["ConfigurableRoleIds"] = new JArray("r2");
+        var old = new JArray(File("a", "r1"));
+        var unchanged = (JArray)policy.Merge(old, old, config);
+        Assert.Equal("r1", unchanged[0]["VisibleRoleIds"][0].Value<string>());
+        var updated = File("a", "r1"); updated["VisibleRoleIds"] = new JArray("r1", "r2");
+        Assert.Equal(2, ((JArray)policy.Merge(old, new JArray(updated), config))[0]["VisibleRoleIds"].Count());
+        Assert.Throws<InvalidOperationException>(() => policy.Merge(old, new JArray(File("b", "r1")), config));
+        var removed = File("a", "r1"); removed["VisibleRoleIds"] = new JArray();
+        Assert.Empty(((JArray)policy.Merge(old, new JArray(removed), config))[0]["VisibleRoleIds"]);
+    }
+
+    [Fact]
     public void InheritanceOffStillAllowsDirectMultiRoleMembership()
     {
         var config = (JObject)Config.DeepClone(); config["DisableRoleInheritance"] = true;
