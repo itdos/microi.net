@@ -648,6 +648,8 @@ export default {
     async loadViewConfig(refresh = false) {
       try {
         let merged = { ...this.baseConfig, menuId: this.menuId }
+        // ViewSchema/菜单元数据可能只返回部分状态；保留租户声明，避免业务终态被运行时覆盖。
+        const localStatusOptions = Array.isArray(merged.statusOptions) ? merged.statusOptions : []
         if (this.baseConfig.skipModuleMetadata) {
           this.config = merged
           return
@@ -659,6 +661,10 @@ export default {
             // 旧版菜单“卡片数据”没有摘要字段；移动显示列应完整进入内容行，
             // 不应继续被租户本地的 summaryField 改造成无标签摘要。
             merged = { ...merged, ...menuConfig, summaryField: '' }
+            merged.statusOptions = [...new Set([
+              ...localStatusOptions,
+              ...(Array.isArray(merged.statusOptions) ? merged.statusOptions : [])
+            ])]
             merged.filterFields = mergeModuleFilterFields(menuConfig.filterFields, localFilterFields, menuConfig.definition?.fields || [])
           } catch (error) {}
         }
@@ -741,7 +747,10 @@ export default {
         })
         if (dynamic.statusFromViewSchema) {
           merged.statusField = dynamic.statusField || ''
-          merged.statusOptions = dynamic.statusOptions || []
+          merged.statusOptions = [...new Set([
+            ...(Array.isArray(dynamic.statusOptions) ? dynamic.statusOptions : []),
+            ...localStatusOptions
+          ])]
         }
         merged.selectFields = [...new Set([
           ...(merged.selectFields || []),
@@ -1260,7 +1269,8 @@ export default {
     openDetail(row) {
       if (!row.Id) return
       if (this.key === 'serviceForms') {
-        this.mciNavigateToDetail(`/pages/native/service-record?id=${encodeURIComponent(row.Id)}`)
+        // 列表行对应后台“查看”动作；查看模式才会加载 FuwuJLBSJ 档案明细及私有照片地址。
+        this.mciNavigateToDetail(`/pages/native/service-record?id=${encodeURIComponent(row.Id)}&mode=view`)
         return
       }
       if (this.key === 'casebooks') {
