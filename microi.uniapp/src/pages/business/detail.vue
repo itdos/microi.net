@@ -2257,6 +2257,7 @@
 					const menu = await findMenu(config.menuAliases || [], config.table)
 					return loadModuleRows({
 						...config,
+						fixedWhere: config.summaryFixedWhere || config.fixedWhere || [],
 						menuId: menu?.Id || '',
 						moduleEngineKey: menu?.ModuleEngineKey || config.moduleEngineKey || config.table
 					}, {

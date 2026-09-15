@@ -2639,7 +2639,8 @@ export default {
         return
       }
       if (this.moduleKey === 'serviceForms') {
-        uni.navigateTo({ url: `/pages/native/service-record?id=${encodeURIComponent(row.Id)}` })
+        // 关联列表与主列表保持同一查看语义，避免落入“重新生成”页面而隐藏已归档明细。
+        uni.navigateTo({ url: `/pages/native/service-record?id=${encodeURIComponent(row.Id)}&mode=view` })
         return
       }
       if (this.moduleKey === 'casebooks') {
