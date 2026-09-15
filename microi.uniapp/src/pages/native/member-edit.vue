@@ -25,11 +25,14 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { getUser, post } from '@/utils/request.js'
 import { callApiEngine } from '@/platform/business-runtime.js'
 import { themeMixin } from '@/utils/theme.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/member-edit') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/member-edit') },
   mixins: [themeMixin],
   data() {
     return { loading: true, submitting: false, currentUser: {}, roles: [], selectedRoleIds: [], form: { name: '', phone: '', password: '123456' } }

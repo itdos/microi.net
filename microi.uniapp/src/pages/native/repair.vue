@@ -108,6 +108,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8, getUser, post } from '@/utils/request.js'
 import { callApiEngine, findMenu, loadModuleRows, requireLogin } from '@/platform/business-runtime.js'
@@ -128,6 +129,8 @@ function parseRegion(value) {
 const UNCOMMITTED_PRIVATE_FILE_CONTEXT = Object.freeze({ private: true, failClosed: true })
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/repair') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/repair') },
   mixins: [themeMixin],
   data() {
     return {

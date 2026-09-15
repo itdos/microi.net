@@ -307,6 +307,11 @@ import { debounce } from "lodash";
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
 import {
+    createRelativeDaysFilter,
+    isRelativeDaysSearch,
+    resolveRelativeDaysFilters
+} from "@/views/form-engine/utils/diy-relative-days-search";
+import {
     useDiyStore
   } from "@/pinia";
 export default {
@@ -521,6 +526,9 @@ export default {
     },
 
     methods: {
+        IsRelativeDaysSearch(field) {
+            return isRelativeDaysSearch(field);
+        },
 
         //移动端清除筛选
          callParentMethod() {
@@ -613,6 +621,7 @@ export default {
             // console.log("查询区域uid", self._uid);
 
             self.SearchWhere = [];
+            const relativeDaysFilters = [];
             const param = {
                 SearchCheckbox: self.SearchCheckbox,
                 SearchNumber: self.SearchNumber,
@@ -630,6 +639,16 @@ export default {
 
                 const fieldModel = self.findFieldModel(key);
                 if (!fieldModel) continue;
+
+                if (self.IsRelativeDaysSearch(fieldModel)) {
+                    const relativeResult = createRelativeDaysFilter(fieldModel, value, self.GetTableName(fieldModel));
+                    if (relativeResult.error) {
+                        self.DiyCommon.Tips(relativeResult.error, false);
+                        return;
+                    }
+                    relativeDaysFilters.push(relativeResult.filter);
+                    continue;
+                }
 
                 let searchType = "Like";
                 const searchFieldModel = self.SearchFieldIds.find((d) => d.Id === fieldModel.Id);
@@ -788,7 +807,7 @@ export default {
             }
 
             // 会话缓存搜索条件
-            self.handleSearchWhereCache(param);
+            self.handleSearchWhereCache(param, relativeDaysFilters);
 
             self.$emit("CallbackGetDiyTableRow", param);
         }, 500),
@@ -796,7 +815,7 @@ export default {
         /**
          * 处理搜索条件缓存
          */
-        handleSearchWhereCache(param) {
+        handleSearchWhereCache(param, relativeDaysFilters = []) {
             const search_where = this.getSearchCacheKey();
 
             try {
@@ -809,18 +828,24 @@ export default {
                     cachedWhere.splice(currentIndex, 1);
                 }
 
-                if (param._Where.length > 0) {
-                    cachedWhere.push({ uid: this._uid, where: param._Where });
+                if (param._Where.length > 0 || relativeDaysFilters.length > 0) {
+                    cachedWhere.push({ uid: this._uid, where: param._Where, relativeDaysFilters });
                 }
 
                 sessionStorage.setItem(search_where, JSON.stringify(cachedWhere));
 
                 // 合并所有组件的搜索条件
-                const allWhere = cachedWhere.flatMap((item) => (Array.isArray(item.where) ? item.where : []));
+                const allWhere = cachedWhere.flatMap((item) => [
+                    ...(Array.isArray(item.where) ? item.where : []),
+                    ...resolveRelativeDaysFilters(item.relativeDaysFilters)
+                ]);
                 param._Where = allWhere;
             } catch (e) {
                 console.error("搜索条件缓存处理错误:", e);
-                sessionStorage.setItem(search_where, JSON.stringify([{ uid: this._uid, where: param._Where }]));
+                const baseWhere = [...param._Where];
+                const ownWhere = [...baseWhere, ...resolveRelativeDaysFilters(relativeDaysFilters)];
+                param._Where = ownWhere;
+                sessionStorage.setItem(search_where, JSON.stringify([{ uid: this._uid, where: baseWhere, relativeDaysFilters }]));
             }
         },
 

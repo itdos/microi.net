@@ -81,6 +81,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getMyComplaintDetail, getPublicComplaintDetail, runComplaintAction } from '@/tenants/xjy/complaint.js'
 
@@ -90,6 +91,8 @@ const SEVERITY_LABELS={General:'一般',Major:'重大',Urgent:'紧急'}
 const UNCOMMITTED_PRIVATE_FILE_CONTEXT=Object.freeze({private:true,failClosed:true})
 
 export default{
+  onShareAppMessage() { return buildFriendShare(this, 'pages/complaint/detail') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/complaint/detail') },
   mixins:[themeMixin],
   data(){return{id:'',isPublic:false,loading:true,error:'',complaint:{},actions:[],actionMode:'',actionContent:'',actionAttachments:'[]',actionSubmitting:false,uploadState:{},uncommittedFileContext:UNCOMMITTED_PRIVATE_FILE_CONTEXT}},
   computed:{

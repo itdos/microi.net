@@ -66,11 +66,14 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { getNewsDetail, getImageUrl, parseImages } from '@/utils/api.js'
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/news/detail') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/news/detail') },
   mixins: [themeMixin],
   data() {
     return {

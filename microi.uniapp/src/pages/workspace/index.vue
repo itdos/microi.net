@@ -115,6 +115,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import appConfig from '@/config.js'
 import { getToken, getUser, removeToken } from '@/utils/request.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
@@ -132,6 +133,8 @@ import { hasFeature, getProfileRoute } from '@/platform/profile/index.js'
 import { captureInvitation } from '@/platform/invitation.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/workspace/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/workspace/index') },
   mixins: [themeMixin],
   data() {
     return {

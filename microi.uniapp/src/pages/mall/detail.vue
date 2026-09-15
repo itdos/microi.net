@@ -267,6 +267,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { getProductDetail, getProductDynamicInfo, parseImages, getImageUrl, checkFavorite, toggleFavorite, reserveProduct, getPointsBalance, redeemPointsProduct } from '@/utils/api.js'
 import { getToken, getUser } from '@/utils/request.js'
 import appConfig from '@/config.js'
@@ -274,6 +275,8 @@ import { themeMixin } from '@/utils/theme.js'
 import { filterProductParameterFields, formatProductParameterValue } from './product-params.mjs'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/mall/detail') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/mall/detail') },
   mixins: [themeMixin],
   data() {
     return {

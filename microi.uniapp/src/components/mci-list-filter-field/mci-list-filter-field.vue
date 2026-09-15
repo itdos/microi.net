@@ -1,6 +1,14 @@
 <template>
   <view class="list-filter-control">
     <input v-if="field.type === 'text'" class="filter-input" :value="modelValue || ''" :placeholder="field.placeholder || `请输入${field.label}`" @input="emit($event.detail.value)" />
+    <view v-else-if="field.type === 'relative-days'" class="relative-days-control">
+      <view class="relative-days-input">
+        <input :value="modelValue ?? ''" type="number" :min="field.relativeDays?.min" :max="field.relativeDays?.max" :placeholder="field.placeholder" @input="emit($event.detail.value)" />
+        <text class="relative-days-unit">{{ field.relativeDays?.unit || '天' }}</text>
+        <text v-if="modelValue !== '' && modelValue != null" class="clear" @tap="emit('')">×</text>
+      </view>
+      <text class="relative-days-help">{{ field.description || '0 表示仅今天到期；输入 N 表示未来 N 天内到期（含今天）' }}</text>
+    </view>
     <view v-else-if="field.type === 'range'" class="filter-range">
       <input :value="part('min')" type="digit" placeholder="最小值" @input="setPart('min', $event.detail.value)" />
       <text>至</text><input :value="part('max')" type="digit" placeholder="最大值" @input="setPart('max', $event.detail.value)" />
@@ -181,7 +189,12 @@ export default {
 
 <style scoped>
 .list-filter-control { font-size: 25rpx; color: #284957; }
-.filter-input, .filter-range, .date-input { min-height: 72rpx; box-sizing: border-box; border: 1px solid #dce6eb; border-radius: 12rpx; background: #fff; padding: 16rpx; }
+.filter-input, .filter-range, .date-input, .relative-days-input { min-height: 72rpx; box-sizing: border-box; border: 1px solid #dce6eb; border-radius: 12rpx; background: #fff; padding: 16rpx; }
+.relative-days-control { display: flex; flex-direction: column; gap: 10rpx; }
+.relative-days-input { display: flex; align-items: center; gap: 8rpx; }
+.relative-days-input input { flex: 1; width: 0; }
+.relative-days-unit { flex-shrink: 0; color: #4d6975; font-size: 23rpx; }
+.relative-days-help { color: #718791; font-size: 21rpx; line-height: 1.5; }
 .filter-range, .date-row, .region-row, .toggle-row { display: flex; align-items: center; gap: 14rpx; }
 .filter-range input { flex: 1; width: 0; }
 .date-range { display: flex; flex-direction: column; gap: 14rpx; }

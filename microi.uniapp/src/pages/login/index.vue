@@ -261,6 +261,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import {
@@ -328,6 +329,8 @@ function isValidLoginSession(user, token) {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/login/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/login/index') },
   mixins: [themeMixin],
   data() {
     const runtimeEndpoint = splitRuntimeApiBase(appConfig.apiBase)

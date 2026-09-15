@@ -35,6 +35,15 @@ try {
     })
     exitCode = typeof finalize.status === 'number' ? finalize.status : 1
     if (finalize.error) throw finalize.error
+    if (exitCode === 0) {
+      const shareCheck = spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'check-built-share-hooks.cjs')], {
+        cwd: projectRoot,
+        env,
+        stdio: 'inherit'
+      })
+      exitCode = typeof shareCheck.status === 'number' ? shareCheck.status : 1
+      if (shareCheck.error) throw shareCheck.error
+    }
   }
 } finally {
   restore()
