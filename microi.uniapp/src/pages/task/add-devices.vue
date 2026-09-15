@@ -17,11 +17,14 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 import { addTaskDevices, loadTaskDevices } from '@/utils/xjy-task.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/task/add-devices') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/task/add-devices') },
   mixins: [themeMixin],
   data() { return { taskId: '', customerId: '', keyword: '', rows: [], existingIds: [], selected: {}, count: 0, pageIndex: 1, pageSize: 20, loading: true, refreshing: false, finished: false, submitting: false, loadRequestId: 0, searchTimer: null } },
   computed: {

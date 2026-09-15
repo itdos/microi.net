@@ -336,6 +336,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import { isStandaloneChildLayout } from '@/platform/related-tab-layout.mjs'
 	import {
 		themeMixin
@@ -1221,6 +1222,8 @@
 	}
 
 	export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/business/detail') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/business/detail') },
 		components: { MciBusinessRelatedList },
 		mixins: [themeMixin],
 		data() {
@@ -2257,6 +2260,7 @@
 					const menu = await findMenu(config.menuAliases || [], config.table)
 					return loadModuleRows({
 						...config,
+						fixedWhere: config.summaryFixedWhere || config.fixedWhere || [],
 						menuId: menu?.Id || '',
 						moduleEngineKey: menu?.ModuleEngineKey || config.moduleEngineKey || config.table
 					}, {

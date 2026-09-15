@@ -34,6 +34,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getBusinessModule } from '@/platform/business.js'
 import { formatMoney, loadModuleRows } from '@/platform/business-runtime.js'
@@ -46,6 +47,8 @@ import {
 } from '@/tenants/xjy/performance-stats.mjs'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/business/stats') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/business/stats') },
   mixins:[themeMixin],
   data(){return{period:'month',customStart:'',customEnd:'',loading:true,metrics:{customers:0,orders:0,orderAmount:0,visits:0,tasks:0,devices:0,opportunities:0},taskTypes:{},taskStates:{},periods:TASK_PERIODS,chartColors:['#087DA8','#18A6B8','#E54625','#1C8B65','#7556C8','#D99B1F','#4D6F7C']}},
   computed:{

@@ -78,6 +78,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 import { normalizeChosenLocation, reverseGeocode, stripRegionFromAddress } from '@/platform/location.js'
@@ -120,6 +121,8 @@ function validCoordinatePair(latitude, longitude) {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/task/device') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/task/device') },
   mixins: [themeMixin],
   data() {
     return {

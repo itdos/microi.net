@@ -84,6 +84,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
 import {
@@ -104,6 +105,8 @@ import { showRowActionSheet } from '@/platform/row-action-sheet.js'
 import { listReturnMixin } from '@/platform/list-return.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/module/list') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/module/list') },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {

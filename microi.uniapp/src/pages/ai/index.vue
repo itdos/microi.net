@@ -34,12 +34,15 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import MciAiAssistant from './components/mci-ai-assistant/mci-ai-assistant.vue'
 import shareMixin from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getAiAssistantEnabled } from '@/utils/sysconfig.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/ai/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/ai/index') },
   name: 'AiAssistantPage',
   components: { MciAiAssistant },
   mixins: [themeMixin, shareMixin],
