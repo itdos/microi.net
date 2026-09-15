@@ -9,6 +9,7 @@ import {
   hasListFilterValue,
   mergeModuleFilterFields,
   mergeTableSelectorFilterFields,
+  relativeDaysFilterBounds,
   validateListFilters
 } from '../src/platform/list-filter-fields.mjs'
 
@@ -29,6 +30,7 @@ const fields = [
   },
   { Id: 'level-id', Name: 'Level', Label: '角色级别', component: 'NumberText', Type: 'int(11)', visible: true },
   { Id: 'created-id', Name: 'CreateTime', Label: '创建时间', component: 'DateTime', Type: 'datetime', Visible: 1, AppVisible: 1, visible: false },
+  { Id: 'contract-days-id', Name: 'HetongDQSJ', Label: '距合同到期天数', component: 'Text', Type: 'varchar(50)', Visible: 0, AppVisible: 0, visible: false, config: { RelativeDaysSearch: { Enabled: true, TargetField: 'HetongJSSJ', Mode: 'FutureWithin', Min: 0, Max: 3650, TimeZone: 'Asia/Shanghai', Unit: '天' } } },
   { Id: 'tenant-id', Name: 'TenantName', Label: '所属租户', component: 'Text', Type: 'varchar(255)', visible: true }
 ]
 const businessSource = fs.readFileSync(new URL('../src/tenants/xjy/business.js', import.meta.url), 'utf8')
@@ -138,6 +140,37 @@ test('日期和数值区间生成边界条件，筛选计数识别对象值', ()
   ])
   assert.equal(hasListFilterValue({ start: '', end: '' }), false)
   assert.equal(hasListFilterValue({ start: '2026-08-01', end: '' }), true)
+})
+
+test('合同到期天数编译为受限输入，并查询真实合同结束日期', () => {
+  const compiled = compileModuleFilterFields(
+    [{ Id: 'contract-days-id', DisplayType: 'In' }],
+    fields,
+    { allowAppHidden: true }
+  )[0]
+  assert.equal(compiled.type, 'relative-days')
+  assert.equal(compiled.relativeDays.min, 0)
+  assert.equal(compiled.relativeDays.max, 3650)
+  assert.match(compiled.description, /0 表示仅今天到期/)
+  assert.deepEqual(relativeDaysFilterBounds(compiled, '30', new Date('2026-09-14T16:30:00.000Z')), [
+    { Name: 'HetongJSSJ', Type: '>=', Value: '2026-09-15' },
+    { Name: 'HetongJSSJ', Type: '<', Value: '2026-10-16' }
+  ])
+  assert.deepEqual(relativeDaysFilterBounds(compiled, 0, new Date('2026-09-15T03:00:00.000Z')), [
+    { Name: 'HetongJSSJ', Type: '>=', Value: '2026-09-15' },
+    { Name: 'HetongJSSJ', Type: '<', Value: '2026-09-16' }
+  ])
+  assert.deepEqual(buildListFilterWhere([compiled], { HetongDQSJ: '30' }).map(({ Name, Type }) => ({ Name, Type })), [
+    { Name: 'HetongJSSJ', Type: '>=' },
+    { Name: 'HetongJSSJ', Type: '<' }
+  ])
+  assert.match(validateListFilters([compiled], { HetongDQSJ: '-10' }), /0 至 3650/)
+  assert.match(validateListFilters([compiled], { HetongDQSJ: '1.5' }), /整数/)
+  assert.match(validateListFilters([compiled], { HetongDQSJ: '3651' }), /0 至 3650/)
+  assert.equal(validateListFilters([compiled], { HetongDQSJ: '30' }), '')
+  assert.match(listFilterFieldSource, /field\.type === 'relative-days'/)
+  assert.match(listFilterFieldSource, /type="number"/)
+  assert.match(listFilterFieldSource, /0 表示仅今天到期；输入 N 表示未来 N 天内到期（含今天）/)
 })
 
 function compile(component, config = {}, extra = {}, search = {}) {

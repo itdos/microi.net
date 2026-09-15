@@ -85,6 +85,71 @@ function isNumberField(field) {
   return field.component === 'NumberText' || /(^|\W)(tinyint|smallint|mediumint|int|bigint|decimal|double|float|number)(\W|$)/i.test(String(field.Type || ''))
 }
 
+function integerLimit(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback
+  const parsed = Number(value)
+  return Number.isInteger(parsed) ? parsed : fallback
+}
+
+function relativeDaysSearchConfig(config = {}) {
+  const source = config.RelativeDaysSearch
+  if (!source || typeof source !== 'object' || !normalizedBoolean(source.Enabled)) return null
+  return {
+    targetField: String(source.TargetField || '').trim(),
+    mode: String(source.Mode || 'FutureWithin').trim(),
+    min: integerLimit(source.Min, 0),
+    max: integerLimit(source.Max, 3650),
+    timeZone: String(source.TimeZone || 'Asia/Shanghai').trim(),
+    unit: String(source.Unit || '天').trim() || '天'
+  }
+}
+
+function safeFilterFieldName(value) {
+  return String(value || '').split('.').every((part) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(part))
+}
+
+function dateTextInTimeZone(now, timeZone) {
+  const date = now instanceof Date ? now : new Date(now)
+  if (Number.isNaN(date.getTime())) throw new Error('当前日期无效')
+  // 微信较旧 JSCore 的 Intl 时区实现不完整；中国业务时区使用固定 UTC+8 可稳定跨端计算。
+  if (timeZone === 'Asia/Shanghai') {
+    const shifted = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+    return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}-${String(shifted.getUTCDate()).padStart(2, '0')}`
+  }
+  if (typeof Intl === 'undefined' || typeof Intl.DateTimeFormat !== 'function') throw new Error(`当前环境不支持时区 ${timeZone}`)
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
+  const values = {}
+  parts.forEach((part) => { if (part.type !== 'literal') values[part.type] = part.value })
+  return `${values.year}-${values.month}-${values.day}`
+}
+
+function addCalendarDays(dateText, days) {
+  const [year, month, day] = String(dateText).split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day + days))
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
+}
+
+function relativeDaysValue(field, value) {
+  const text = String(value ?? '').trim()
+  const days = Number(text)
+  if (!text || !Number.isFinite(days) || !Number.isInteger(days)) throw new Error('请输入整数')
+  const config = field.relativeDays || {}
+  if (days < config.min || days > config.max) throw new Error(`请输入 ${config.min} 至 ${config.max} 的整数`)
+  if (config.mode !== 'FutureWithin') throw new Error(`暂不支持 ${config.mode} 模式`)
+  if (!safeFilterFieldName(config.targetField)) throw new Error('未配置有效的目标日期字段')
+  return days
+}
+
+export function relativeDaysFilterBounds(field, value, now = new Date()) {
+  const days = relativeDaysValue(field, value)
+  const config = field.relativeDays
+  const today = dateTextInTimeZone(now, config.timeZone || 'Asia/Shanghai')
+  return [
+    { Name: config.targetField, Type: '>=', Value: today },
+    { Name: config.targetField, Type: '<', Value: addCalendarDays(today, days + 1) }
+  ]
+}
+
 function compileField(item, field) {
   const source = item && typeof item === 'object' ? item : {}
   const component = String(field.component || field.Component || 'Text')
@@ -101,6 +166,18 @@ function compileField(item, field) {
     nativeField: { ...field, component, config },
     config,
     columnType: field.Type || ''
+  }
+
+  const relativeDays = relativeDaysSearchConfig(config)
+  if (relativeDays) {
+    return {
+      ...base,
+      type: 'relative-days',
+      relativeDays,
+      placeholder: `请输入 ${relativeDays.min} 至 ${relativeDays.max} 的整数`,
+      hint: `${relativeDays.min}～${relativeDays.max}${relativeDays.unit}，含今天`,
+      description: `0 表示仅今天到期；输入 N 表示未来 N 天内到期（含今天）`
+    }
   }
 
   if (component === 'DateTime') {
@@ -198,6 +275,7 @@ const TABLE_SELECTOR_FILTER_TYPES = new Set([
   'text',
   'options',
   'range',
+  'relative-days',
   'date-range',
   'address',
   // 兼容已经发布的租户弹窗配置；新后台配置统一使用 options/date-range。
@@ -281,6 +359,9 @@ export function validateListFilters(fields, values) {
       if ([min, max].some((number) => number !== undefined && number !== '' && !Number.isFinite(Number(number)))) return `${field.label}请输入有效数值`
       if (min !== undefined && min !== '' && max !== undefined && max !== '' && Number(min) > Number(max)) return `${field.label}最小值不能大于最大值`
     }
+    if (field.type === 'relative-days' && hasListFilterValue(value)) {
+      try { relativeDaysValue(field, value) } catch (error) { return `${field.label}：${error.message}` }
+    }
   }
   return ''
 }
@@ -290,6 +371,10 @@ export function buildListFilterWhere(filterFields = [], filterValues = {}, curre
   ;(filterFields || []).forEach((field) => {
     if (!field || field.type === 'sort') return
     const value = filterValues[field.key]
+    if (field.type === 'relative-days') {
+      if (hasListFilterValue(value)) relativeDaysFilterBounds(field, value).forEach((bound) => result.push(bound))
+      return
+    }
     if (field.type === 'range') {
       if (value && value.min !== undefined && value.min !== '') result.push({ Name: field.field, Type: '>=', Value: Number(value.min) })
       if (value && value.max !== undefined && value.max !== '') result.push({ Name: field.field, Type: '<=', Value: Number(value.max) })
