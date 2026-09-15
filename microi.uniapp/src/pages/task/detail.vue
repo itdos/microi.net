@@ -92,6 +92,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
 import { callApiEngine, findMenu, formatDateTime, openForm } from '@/platform/business-runtime.js'
@@ -116,6 +117,8 @@ const CUSTOM_DETAIL_FIELDS = new Set([
 ])
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/task/detail') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/task/detail') },
   mixins: [themeMixin],
   data() {
     return {

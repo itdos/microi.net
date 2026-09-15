@@ -67,6 +67,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
@@ -80,6 +81,8 @@ import {
 } from '@/platform/mini-program-update.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/about/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/about/index') },
   mixins: [themeMixin],
   data() {
     return {

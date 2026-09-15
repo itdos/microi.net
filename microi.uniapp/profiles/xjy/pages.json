@@ -38,11 +38,11 @@
     },
     {
       "path": "pages/privacy/index",
-      "style": { "navigationBarTitleText": "隐私政策", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" }
+      "style": { "navigationBarTitleText": "隐私政策", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black", "backgroundColor": "#ffffff" }
     },
     {
       "path": "pages/about/index",
-      "style": { "navigationBarTitleText": "关于小程序", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" }
+      "style": { "navigationBarTitleText": "关于小程序", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black", "backgroundColor": "#ffffff" }
     }
   ],
   "subPackages": [
@@ -118,7 +118,8 @@
         { "path": "casebook", "style": { "navigationBarTitleText": "案例册", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
         { "path": "watermark-camera", "style": { "navigationBarTitleText": "现场水印相机", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#07161d" } },
         { "path": "task-feedback", "style": { "navigationBarTitleText": "服务反馈", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
-        { "path": "task-follow-up", "style": { "navigationBarTitleText": "追加评价", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
+        { "path": "task-follow-up", "style": { "navigationBarTitleText": "追加评价", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "official-account", "style": { "navigationBarTitleText": "关注公众号", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
       ]
     }
   ],

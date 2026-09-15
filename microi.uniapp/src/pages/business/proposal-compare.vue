@@ -25,9 +25,12 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/business/proposal-compare') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/business/proposal-compare') },
   mixins: [themeMixin],
   data() { return { rows: [], proposalIds: [], loading: true, errorMessage: '', metrics: [
     { key: 'YujiHZSJ', label: '预计合作时间' }, { key: 'PointCount', label: '点位数量' },

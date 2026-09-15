@@ -52,6 +52,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { businessGroups } from '@/platform/business.js'
 import { openBusiness } from '@/platform/business-runtime.js'
@@ -74,6 +75,8 @@ const descriptions = {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/business/catalog') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/business/catalog') },
   mixins: [themeMixin],
   data() {
     return { statusBarHeight: 0, keyword: '', businessGroups }

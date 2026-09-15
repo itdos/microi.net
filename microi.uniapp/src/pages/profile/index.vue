@@ -93,6 +93,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { getToken, getUser, removeToken, V8 } from '@/utils/request.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getRoleProfile } from '@/platform/business.js'
@@ -109,6 +110,7 @@ import {
 } from '@/platform/mini-program-update.js'
 
 export default {
+  onShareTimeline() { return buildTimelineShare(this, 'pages/profile/index') },
   mixins: [themeMixin],
   data() {
     return {
@@ -309,8 +311,12 @@ export default {
     }
   },
   onShareAppMessage(event) {
-    const targetType = event && event.target && event.target.dataset ? event.target.dataset.inviteType : ''
-    return buildInviteSharePayload(targetType || this.inviteType, this.currentUser)
+    // 右上角菜单分享个人中心；只有用户主动点击邀请按钮才分享邀请链接。
+    if (event && event.from === 'button') {
+      const targetType = event.target && event.target.dataset ? event.target.dataset.inviteType : ''
+      return buildInviteSharePayload(targetType || this.inviteType, this.currentUser)
+    }
+    return buildFriendShare(this, 'pages/profile/index')
   }
 }
 </script>

@@ -244,6 +244,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8, getToken, getUser, post } from '@/utils/request.js'
 import { getBusinessEntry, getBusinessModule } from '@/platform/business.js'
@@ -324,6 +325,8 @@ function formatMetricValue(value, metric = {}) {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/business/list') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/business/list') },
   components: { MciBusinessCard, MciRestrictedRecordCard, MciListFilterField },
   mixins: [themeMixin, listReturnMixin],
   data() {

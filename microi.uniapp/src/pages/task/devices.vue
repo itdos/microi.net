@@ -97,6 +97,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
 import { listReturnMixin } from '@/platform/list-return.js'
@@ -106,6 +107,8 @@ import { loadTask, loadTaskDeviceFilterConfig, loadTaskDeviceSummary, loadTaskDe
 import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/task/devices') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/task/devices') },
   components: { MciListFilterField },
   mixins: [themeMixin, listReturnMixin],
   data() {

@@ -305,6 +305,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import {
 		themeMixin
 	} from '@/utils/theme.js'
@@ -378,7 +379,24 @@
 	const TENANT_FLOATING_ACTION_EDGE_MARGIN = 12
 	const TENANT_FLOATING_ACTION_POSITION_VERSION = 1
 
+	function decodeOption(value) {
+		let text = value === undefined || value === null ? '' : String(value)
+		for (let index = 0; index < 3; index += 1) {
+			if (!/%[0-9a-f]{2}/i.test(text)) break
+			try {
+				const decoded = decodeURIComponent(text)
+				if (decoded === text) break
+				text = decoded
+			} catch (error) {
+				break
+			}
+		}
+		return text
+	}
+
 	export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native-form/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native-form/index') },
 		components: { MciBusinessRelatedList, MciCustomerPicker, MciPosterDetail, MciVisitTargetFields },
 		mixins: [themeMixin],
 		data() {
@@ -562,7 +580,7 @@
 			this.rowId = decodeURIComponent(options.id || '')
 			this.draftRelation = decodeURIComponent(options.draftRelation || '')
 			this.mode = options.mode || (this.rowId ? 'View' : 'Add')
-			this.title = decodeURIComponent(options.title || '')
+			this.title = decodeOption(options.title)
 			this.stayAfterAdd = String(options.stayAfterAdd || '0') === '1'
 			this.showRelated = String(options.related ?? '1') !== '0'
 			this.defaultValues = parseJson(decodeURIComponent(options.defaults || ''), {}) || {}

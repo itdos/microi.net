@@ -35,11 +35,14 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { requireLogin } from '@/platform/business-runtime.js'
 import { loadAccessibleModuleGroups } from '@/platform/module-registry.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/module/catalog') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/module/catalog') },
   mixins: [themeMixin],
   data() {
     return {

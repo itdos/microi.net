@@ -64,6 +64,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
 import { callApiEngine, formatDateTime, parseDeviceId } from '@/platform/business-runtime.js'
@@ -71,6 +72,8 @@ import { taskStateClass } from '@/utils/xjy-task.js'
 import { taskScanProcessAccess, taskScanSubmitAccess } from '@/tenants/xjy/task-scan-permission.mjs'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/task/scan') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/task/scan') },
   mixins:[themeMixin],
   data(){return{deviceId:'',tasks:[],loading:false,submitting:false,currentUser:{},searchTimer:null,loadRequestId:0}},
   onLoad(options){this.currentUser=getUser()||{};this.deviceId=decodeURIComponent(options.deviceId||'')},

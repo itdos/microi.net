@@ -39,6 +39,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getToken, getUser, V8 } from '@/utils/request.js'
 import { captureInvitation, getInvitation, clearInvitation } from '@/platform/invitation.js'
@@ -48,6 +49,8 @@ import { captureInvitation, getInvitation, clearInvitation } from '@/platform/in
 const UNCOMMITTED_PRIVATE_FILE_CONTEXT = Object.freeze({ private: true, failClosed: true })
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/merchant-apply') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/merchant-apply') },
   mixins: [themeMixin],
   data() {
     return {

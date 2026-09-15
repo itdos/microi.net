@@ -176,6 +176,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser, post, V8 } from '@/utils/request.js'
 import { callApiEngine, formatFieldValue, formatRegion, requireLogin } from '@/platform/business-runtime.js'
@@ -204,6 +205,8 @@ function parseArray(value) {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/service-record') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/service-record') },
   mixins: [themeMixin],
   data() {
     return {
