@@ -207,6 +207,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { getProductList, getProductCategories, getProductTypes, parseImages, getImageUrl } from '@/utils/api.js'
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
@@ -215,6 +216,8 @@ import { listReturnMixin } from '@/platform/list-return.js'
 import { loadMallSnapshot, readMallSnapshot } from '@/platform/preload.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/mall/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/mall/index') },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {

@@ -3,119 +3,122 @@ const path = require('path')
 const vm = require('vm')
 
 const root = path.resolve(__dirname, '..')
-const pagesJson = JSON.parse(fs.readFileSync(path.join(root, 'src', 'pages.json'), 'utf8'))
-const shareSource = fs.readFileSync(path.join(root, 'src', 'utils', 'share.js'), 'utf8')
-const { loadProfile } = require('./lib/profile-manager.cjs')
-const xjyProfile = loadProfile('xjy')
+const pagesJson = JSON.parse(fs.readFileSync(path.join(root, 'src/pages.json'), 'utf8'))
+const routes = [
+  ...pagesJson.pages.map((page) => page.path),
+  ...pagesJson.subPackages.flatMap((pkg) => pkg.pages.map((page) => `${pkg.root}/${page.path}`))
+]
+for (const page of [...pagesJson.pages, ...pagesJson.subPackages.flatMap((pkg) => pkg.pages)]) {
+  assert(page.style && /^#[0-9a-f]{6}$/i.test(page.style.backgroundColor || ''), `Missing explicit page background: ${page.path}`)
+}
+const shareSource = fs.readFileSync(path.join(root, 'src/utils/share.js'), 'utf8')
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
 }
 
-function walk(dir, result = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const fullPath = path.join(dir, entry.name)
-    if (entry.isDirectory()) walk(fullPath, result)
-    else if (entry.isFile() && entry.name.endsWith('.vue')) result.push(fullPath)
+// 回归旧故障：全局 mixin 的分享回调没有进入微信页面 JS，因此逐页核对显式生命周期。
+for (const route of routes) {
+  const source = fs.readFileSync(path.join(root, `src/${route}.vue`), 'utf8')
+  assert(source.includes('onShareAppMessage('), `Missing friend-share hook: ${route}`)
+  assert(source.includes('onShareTimeline('), `Missing timeline hook: ${route}`)
+  assert(source.includes(`buildTimelineShare(this, '${route}')`), `Timeline must target the current page: ${route}`)
+  if (route !== 'pages/profile/index') {
+    assert(source.includes(`buildFriendShare(this, '${route}')`), `Friend share must target the current page: ${route}`)
   }
-  return result
-}
-
-const pagePaths = [
-  ...(pagesJson.pages || []).map((item) => item.path),
-  ...(pagesJson.subPackages || []).flatMap((pkg) => (pkg.pages || []).map((item) => `${pkg.root}/${item.path}`))
-]
-
-const missingPolicies = pagePaths.filter((pagePath) => !shareSource.includes(`'${pagePath}'`))
-assert(missingPolicies.length === 0, `Missing share policies: ${missingPolicies.join(', ')}`)
-assert(!shareSource.includes('microi-blue-256.png'), 'Generic Microi logo must not be used as a share image')
-assert(!/vm\.(shareTitle|pageTitle|title)/.test(shareSource), 'Share title must not read runtime page or record titles')
-assert(!/encodeQuery\(route\.query\)/.test(shareSource), 'Raw page query must not be serialized into a share path')
-
-const coverKeys = ['platform', 'business', 'service', 'mall', 'news', 'invite']
-for (const key of coverKeys) {
-  const coverUrl = xjyProfile.config?.cdnAssets?.share?.[key] || ''
-  assert(coverUrl.endsWith(`jifuli-share-${key}.jpg`), `Missing CDN share cover: ${key}`)
+  const policyLine = shareSource.split('\n').find((line) => line.includes(`'${route}':`))
+  assert(policyLine, `Missing route policy: ${route}`)
   assert(
-    coverUrl.startsWith('https://static.jifulii.com/xjy/miniapp/share/'),
-    `Share cover must use the xjy HDFS/CDN host: ${key}`
+    policyLine.includes(`sharePath: '/${route}'`) || (route === 'pages/workspace/index' && policyLine.includes('sharePath: HOME_PATH')),
+    `Policy must preserve the current route: ${route}`
   )
 }
 
-const localHooks = walk(path.join(root, 'src', 'pages'))
-  .filter((file) => fs.readFileSync(file, 'utf8').includes('onShareAppMessage'))
-  .map((file) => path.relative(root, file).replace(/\\/g, '/'))
 assert(
-  localHooks.length === 1 && localHooks[0] === 'src/pages/profile/index.vue',
-  `Only the invitation page may override the global share hook. Found: ${localHooks.join(', ') || 'none'}`
+  fs.readFileSync(path.join(root, 'src/pages/profile/index.vue'), 'utf8').includes("event && event.from === 'button'"),
+  'Profile invitation must be limited to its explicit share buttons'
 )
+assert(shareSource.includes("cancelText: '继续查看'"), 'Follow prompt must allow immediate access')
+assert(shareSource.includes('wx.openOfficialAccountProfile'), 'Follow action must support the direct official-account profile API when configured')
 
-const profileSource = fs.readFileSync(path.join(root, 'src', 'pages', 'profile', 'index.vue'), 'utf8')
-assert(profileSource.includes('buildInviteSharePayload'), 'Profile invitation must use the centralized safe share builder')
-assert(
-  shareSource.includes("'pages/task/detail': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/detail', allowedQuery: ['id'], timeline: true, pageSnapshot: true }"),
-  'Task details must share the current detail page with its record id'
-)
-assert(
-  shareSource.includes("'pages/business/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/detail', allowedQuery: ['key', 'id', 'menuId'], timeline: true, pageSnapshot: true }"),
-  'Business details must share the current detail page with its module, record and menu context'
-)
-assert(
-  shareSource.includes("'pages/module/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/module/detail', allowedQuery: ['id', 'menuId'], timeline: true, pageSnapshot: true }"),
-  'Generic module details must share the current detail page with its record and menu context'
-)
-assert(shareSource.includes("allowedQuery: ['id']"), 'Public detail pages must explicitly allow only their public id')
-assert(shareSource.includes("uni.hideShareMenu({ menus: ['shareTimeline'] })"), 'Sensitive pages must hide timeline sharing')
+const xjyProfile = require('./lib/profile-manager.cjs').loadProfile('xjy')
+for (const key of ['platform', 'business', 'service', 'mall', 'news', 'invite']) {
+  const cover = xjyProfile.config?.cdnAssets?.share?.[key] || ''
+  assert(cover.startsWith('https://static.jifulii.com/xjy/miniapp/share/'), `Missing private-safe cover: ${key}`)
+}
 
 let currentPage = null
-const executableShareSource = shareSource
-  .replace(
-    "import appConfig from '@/config.js'",
-    "const appConfig = { platformName: 'Microi', appName: 'Microi', workspaceSubTitle: 'Workspace', cdnAssets: {} }"
-  )
-  .replace(/\bexport const PAGE_POLICIES\b/, 'const PAGE_POLICIES')
-  .replace(/\bexport function buildSharePayload\b/, 'function buildSharePayload')
-  .replace(/\bexport function buildInviteSharePayload\b/, 'function buildInviteSharePayload')
+const queuedTimers = []
+const modals = []
+const navigations = []
+const executable = shareSource
+  .replace("import appConfig from '@/config.js'", "const appConfig = { appName: '集福鲤', platformName: '集福鲤平台', workspaceSubTitle: '业务协同中心', cdnAssets: { share: { platform: 'platform.jpg', business: 'business.jpg', service: 'service.jpg', news: 'news.jpg' } } }")
+  .replace("import { getToken, getUser, V8 } from '@/utils/request.js'", "function getToken() { return globalThis.testToken }; function getUser() { return globalThis.testUser }; const V8 = { GetSysConfigSync() { return {} } }")
   .replace(/\bexport default\s*\{/, 'const shareMixin = {')
-
-const shareSandbox = {
+  .replace(/\bexport (const|function)\b/g, '$1')
+const sandbox = {
   getCurrentPages: () => currentPage ? [currentPage] : [],
-  uni: {},
+  uni: {
+    showShareMenu() {},
+    showModal(options) { modals.push(options) },
+    navigateTo(options) { navigations.push(options.url); if (options.complete) options.complete() }
+  },
+  setTimeout(callback) { queuedTimers.push(callback); return queuedTimers.length },
+  testToken: '',
+  testUser: {},
   globalThis: null
 }
-shareSandbox.globalThis = shareSandbox
-vm.runInNewContext(
-  `${executableShareSource}\nglobalThis.__shareTest = { buildSharePayload, shareMixin };`,
-  shareSandbox,
-  { filename: 'src/utils/share.js' }
-)
+sandbox.globalThis = sandbox
+vm.runInNewContext(`${executable}\nglobalThis.shareTest = { buildFriendShare, buildTimelineShare, maybePromptFollow, maybeRedirectSharedReceiver };`, sandbox)
 
-function assertSharePath(route, options, expectedPath) {
+function verify(route, options, expectedQuery) {
   currentPage = { route, options }
-  const payload = shareSandbox.__shareTest.buildSharePayload()
-  assert(payload.path === expectedPath, `Unexpected friend-share path for ${route}: ${payload.path}`)
-  assert(payload.query === expectedPath.split('?')[1], `Unexpected timeline query for ${route}: ${payload.query}`)
-  assert(!Object.prototype.hasOwnProperty.call(payload, 'imageUrl'), `Detail page ${route} must use WeChat's current-page thumbnail`)
-  const friendShare = shareSandbox.__shareTest.shareMixin.onShareAppMessage()
-  const timelineShare = shareSandbox.__shareTest.shareMixin.onShareTimeline()
-  assert(!Object.prototype.hasOwnProperty.call(friendShare, 'imageUrl'), `Friend share for ${route} must omit a fixed imageUrl`)
-  assert(!Object.prototype.hasOwnProperty.call(timelineShare, 'imageUrl'), `Timeline share for ${route} must omit a fixed imageUrl`)
+  const friend = sandbox.shareTest.buildFriendShare(null, route)
+  const timeline = sandbox.shareTest.buildTimelineShare(null, route)
+  assert(friend.path === `/${route}?${expectedQuery}`, `Incorrect current-page path: ${route} -> ${friend.path}`)
+  assert(timeline.query === expectedQuery, `Incorrect timeline query: ${route} -> ${timeline.query}`)
+  assert(!Object.prototype.hasOwnProperty.call(friend, 'imageUrl'), `Page share must use the current-page screenshot: ${route}`)
+  assert(!Object.prototype.hasOwnProperty.call(timeline, 'imageUrl'), `Timeline share must use the current-page screenshot: ${route}`)
+  assert(!friend.path.includes('Authorization') && !friend.path.includes('secret'), `Leaked sensitive parameter: ${route}`)
 }
 
-assertSharePath(
-  'pages/business/detail',
-  { key: 'customers', id: 'customer 001', menuId: 'menu/001', Authorization: 'secret' },
-  '/pages/business/detail?key=customers&id=customer%20001&menuId=menu%2F001'
-)
-assertSharePath(
-  'pages/module/detail',
-  { id: 'row-001', menuId: 'menu-001', AccessToken: 'secret' },
-  '/pages/module/detail?id=row-001&menuId=menu-001'
-)
-assertSharePath(
-  'pages/task/detail',
-  { id: 'task-001', CustomerToken: 'secret' },
-  '/pages/task/detail?id=task-001'
-)
+verify('pages/news/detail', { id: 'news 1', Authorization: 'secret' }, 'id=news%201&fromShare=1')
+verify('pages/business/detail', { key: 'customers', id: 'customer 1', menuId: 'menu/1', Authorization: 'secret' }, 'key=customers&id=customer%201&menuId=menu%2F1&fromShare=1')
+verify('pages/native-form/index', { table: 'Diy_Order', id: 'row-1', mode: 'Edit', defaults: '{"secret":"x"}' }, 'table=Diy_Order&id=row-1&mode=View&fromShare=1')
+verify('pages/native-form/index', { table: 'Diy_Order', mode: 'Add' }, 'table=Diy_Order&mode=Add&fromShare=1')
+verify('pages/native-form/index', { table: 'Diy_Order', id: 'row-1', title: '%E8%B7%9F%E8%BF%9B%E8%AE%B0%E5%BD%95' }, 'table=Diy_Order&id=row-1&title=%E8%B7%9F%E8%BF%9B%E8%AE%B0%E5%BD%95&mode=View&fromShare=1')
+verify('pages/native/service-record', { id: 'record-1', mode: 'edit', customerId: 'customer-1' }, 'id=record-1&customerId=customer-1&mode=view&fromShare=1')
+verify('pages/complaint/detail', { id: 'case-1', public: '0', AccessToken: 'secret' }, 'id=case-1&public=0&fromShare=1')
+verify('pages/message/chat', { id: 'chat-1', name: 'Private User', type: 'private' }, 'id=chat-1&type=private&fromShare=1')
+verify('pages/message/index', {}, 'fromShare=1')
 
-process.stdout.write(`Share policy check passed: ${pagePaths.length}/${pagePaths.length} pages, ${coverKeys.length} branded covers, runtime titles disabled.\n`)
+currentPage = { route: 'pages/business/detail', options: {} }
+sandbox.shareTest.maybePromptFollow()
+assert(queuedTimers.length === 0, 'Normal page entry must not show a follow prompt')
+currentPage = { route: 'pages/business/detail', options: { fromShare: '1' } }
+sandbox.shareTest.maybePromptFollow()
+assert(queuedTimers.length === 1, 'Shared page entry must schedule one follow prompt')
+queuedTimers.shift()()
+assert(modals.length === 1 && modals[0].cancelText === '继续查看', 'Shared receiver must be able to continue immediately')
+assert(modals[0].confirmText === '一键关注', 'Shared receiver must get a one-click follow action')
+modals[0].success({ confirm: true })
+assert(navigations.includes('/pages/native/official-account'), 'Follow action must open the official-account component page')
+sandbox.shareTest.maybePromptFollow()
+assert(modals.length === 1, 'Follow prompt must not repeat during the same session')
+
+const navigationCountAfterFollow = navigations.length
+
+currentPage = { route: 'pages/news/detail', options: { id: 'news-1', fromShare: '1' } }
+sandbox.shareTest.maybeRedirectSharedReceiver()
+assert(navigations.length === navigationCountAfterFollow, 'Public shared pages must remain accessible without login')
+currentPage = { route: 'pages/business/detail', options: { key: 'customers', id: 'customer-1', fromShare: '1' } }
+sandbox.shareTest.maybeRedirectSharedReceiver()
+assert(navigations.length === navigationCountAfterFollow + 1, 'Private shared pages must route a guest to login')
+assert(decodeURIComponent(navigations[navigationCountAfterFollow]).includes('/pages/business/detail?key=customers&id=customer-1&fromShare=1'), 'Login must retain the original shared route')
+queuedTimers.shift()()
+sandbox.testToken = 'valid-token'
+sandbox.testUser = { Id: 'user-1' }
+sandbox.shareTest.maybeRedirectSharedReceiver()
+assert(navigations.length === navigationCountAfterFollow + 1, 'An authenticated receiver must remain on the shared page')
+
+process.stdout.write(`Share policy check passed: ${routes.length} direct page hooks, current routes, current-page screenshots, and sensitive-query filtering.\n`)
