@@ -44,6 +44,7 @@ function syncColumn(target, incoming, {readbackMatches = true} = {}) {
     prepareNotNullColumnData: () => {throw new Error('compatible column must not backfill rows');}
   };
   const body = source.slice(source.indexOf('    var packageOwnsPhysicalTable ='), source.indexOf('    var buildPhysicalTableFilter ='));
+  vm.runInNewContext(timestampHelpers, c);
   vm.runInNewContext(body, c);
   const result = c.syncPhysicalColumnsFromPackage(null);
   assert.equal(result.Errors, 0, JSON.stringify(c.debugLog));

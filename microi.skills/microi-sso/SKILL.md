@@ -76,6 +76,7 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 - `sso_outbound_claims`、`sso_protocol_event`、`sso_event_hook`；
 - `sso_complete_login`、`sso_rotate_client_secret`、`sso_legacy_token_login` 的业务编排。
 - 24 个 `sso_http_*` Managed 端点：`/api/Sso/Begin`、`/api/Sso/CompleteAuthorization`、OIDC 回调/Discovery/JWKS/Authorize/Token/UserInfo/Introspect/Revoke/Logout、CAS 回调/Login/Validate/Logout、SAML Begin/ACS/Login/Complete/Metadata/Logout。
+- 历史兼容路由 `/api/Sso/CompleteLogin`、`/api/Sso/LegacyCapabilities`、`/api/Sso/RotateClientSecret` 和 `/api/Sso/SamlBegin` 只用于识别旧客户端并返回受控兼容结果；新宿主优先使用上面的接口引擎地址，不能因旧路由存在而恢复通用 SSO Controller。
 
 C# 只保留：
 

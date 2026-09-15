@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-crud-api-007 sha256=9b2d8de72a10d57a8c969f8b176ebd9892c5810d66ed977d856f294fe4743e0b -->
+<!-- microi-progressive:chunk id=v8-crud-api-007 sha256=0c2f3755beaa958d4642f98835743cc37063725746a256db7c18e1e0628a0e90 -->
 ## 查询列表（分页）
 
 ```javascript
@@ -156,7 +156,7 @@ V8.FormEngine.DelFormDataByWhere('SysUser', {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-011 sha256=26127cc70449e261cd49bf5925419f637dae200e7a1ef01bb2385d3197d2e2a9 -->
+<!-- microi-progressive:chunk id=v8-crud-api-011 sha256=e3fac807511be04f71971c32cfce5c4b87f7a5a349d171624e5c598452dc1def -->
 ## 事务处理
 
 ```javascript
@@ -175,7 +175,7 @@ V8.ApiEngine.Run('other-engine-key', { Id: 'xxx' }, V8.DbTrans);
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-012 sha256=ea59e9c92b84986701a412f53a907fb2243bc7698422c1361d82280d1e4a3e4f -->
+<!-- microi-progressive:chunk id=v8-crud-api-012 sha256=c8fe5dc10f0a971d3763b51f54cd77e4f23aed816206edf019db56dd37f603ce -->
 ## 请求内异步与后台处理
 
 ```javascript
@@ -193,7 +193,7 @@ return resp.StatusCode >= 200 && resp.StatusCode < 300
 禁止用 `setTimeout` / `Task.Run` 实现“立即返回、后台继续”：接口返回后 Jint Engine、租户上下文、事务和执行租约会释放。脱离请求的任务使用后台任务、Job、MQ 或 outbox，并按 `EventId` 幂等处理与恢复。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-013 sha256=d4d96c1d82d1fba71100919ff7b0d48441610fdef4602097723cffdcdaaeebf4 -->
+<!-- microi-progressive:chunk id=v8-crud-api-013 sha256=2bc08bec5b03ec51679c79db4b654c5c4f66179d8258de61d949d3e3affa379d -->
 ## 动态加字段（运行时改表结构）
 
 ```javascript

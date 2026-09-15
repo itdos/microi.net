@@ -283,7 +283,7 @@ namespace Microi.net
                     DataCount = jobs.Count,
                     // 元数据中的执行时间不证明调度线程在运行；一并提供当前节点诊断，
                     // 供可信任务管理入口区分“任务已保存”和“实际调度器已启动”。
-                    DataAppend = await GetSchedulerDiagnostics()
+                    DataAppend = await GetSchedulerDiagnostics(osClient)
                 };
             }
             catch (Exception ex)
@@ -292,6 +292,7 @@ namespace Microi.net
                 return new MicroiJobResult()
                 {
                     Code = 0,
+                    Msg = MicroiSchedulingDiagnostics.SafeError(ex),
                     DataCount = 0
                 };
             }
@@ -749,7 +750,7 @@ namespace Microi.net
             return model;
         }
 
-        private async Task<object> GetSchedulerDiagnostics()
+        private async Task<object> GetSchedulerDiagnostics(string osClient)
         {
             var metadata = await _scheduler.GetMetaData();
             using var hash = SHA256.Create();
@@ -757,8 +758,10 @@ namespace Microi.net
                 .Replace("-", "").Substring(0, 16).ToLowerInvariant();
             return new
             {
+                Acquisition = MicroiSchedulingDiagnostics.Read(NormalizeJobTenant(osClient)),
                 Scheduler = new
                 {
+                    _scheduler.SchedulerName,
                     _scheduler.IsStarted,
                     _scheduler.InStandbyMode,
                     _scheduler.IsShutdown,

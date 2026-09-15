@@ -28,8 +28,9 @@ public class MicroiTaskSchedulingCacheTests
         var cache = DispatchProxy.Create<IMicroiCache, CacheProxy>();
         ((CacheProxy)cache).Database = db;
         var form = DispatchProxy.Create<IFormEngine, FormProxy>();
-        var recorder = (FormProxy)form;
-        using var provider = new ServiceCollection().AddSingleton<IMicroiCacheTenant>(new CacheTenant(cache)).AddSingleton(form).BuildServiceProvider();
+        var recorder = new QueueRecorder();
+        using var provider = new ServiceCollection().AddSingleton<IMicroiCacheTenant>(new CacheTenant(cache))
+            .AddSingleton(form).AddSingleton<ISysLogQueue>(recorder).BuildServiceProvider();
         var locator = typeof(MicroiEngine).GetField("_serviceProvider", BindingFlags.NonPublic | BindingFlags.Static)!;
         var previous = locator.GetValue(null);
         locator.SetValue(null, provider);
@@ -52,7 +53,7 @@ public class MicroiTaskSchedulingCacheTests
             await Task.WhenAll(Enumerable.Range(0, 24).Select(i => MicroiDisabledScheduleObserver.WriteSkip(tenant, job, trigger, time, "node-" + i)));
             var row = Assert.Single(recorder.Rows).Value;
             Assert.Equal(1, recorder.AddAttempts);
-            var message = JObject.Parse(row["_RowModel"]!["Message"]!.ToString());
+            var message = JObject.Parse(row["Content"]!.ToString());
             Assert.Equal("Skipped", message["Status"]);
             Assert.False((bool)message["Executed"]!);
             Assert.Equal("SystemTaskSchedulingDisabled", message["Reason"]);
@@ -69,6 +70,20 @@ public class MicroiTaskSchedulingCacheTests
             await db.KeyDeleteAsync(dedupKey);
         }
         finally { locator.SetValue(null, previous); }
+    }
+
+    private sealed class QueueRecorder : ISysLogQueue
+    {
+        public ConcurrentDictionary<string, JObject> Rows = new();
+        public int AddAttempts;
+        public bool Enqueue(SysLogParam param)
+        {
+            Interlocked.Increment(ref AddAttempts);
+            Rows.TryAdd(param.EventId, JObject.FromObject(param));
+            return true;
+        }
+        public SysLogQueueHealth GetHealth() => new();
+        public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class CacheTenant(IMicroiCache cache) : IMicroiCacheTenant
@@ -93,20 +108,9 @@ public class MicroiTaskSchedulingCacheTests
     }
     public class FormProxy : DispatchProxy
     {
-        public ConcurrentDictionary<string, JObject> Rows = new();
-        public int AddAttempts;
         protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
             if (method!.Name == nameof(IFormEngine.GetSysConfig)) return Task.FromResult(new DosResult<dynamic> { Code = 0, Msg = "test config unavailable" });
-            var request = JObject.FromObject(args![0]!);
-            var id = request["Id"]!.ToString();
-            if (method.Name == nameof(IFormEngine.AddFormDataAsync))
-            {
-                Interlocked.Increment(ref AddAttempts);
-                return Task.FromResult(new DosResult(Rows.TryAdd(id, request) ? 1 : 0));
-            }
-            if (method.Name == nameof(IFormEngine.GetFormDataAsync))
-                return Task.FromResult(new DosResult<dynamic> { Code = Rows.ContainsKey(id) ? 1 : 2, Data = Rows.GetValueOrDefault(id) });
             throw new InvalidOperationException("Unexpected FormEngine operation: " + method.Name);
         }
     }

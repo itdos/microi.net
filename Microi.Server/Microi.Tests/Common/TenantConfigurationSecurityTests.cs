@@ -559,6 +559,27 @@ public class TenantConfigurationSecurityTests
         Assert.Contains("AuthSecretRotateVersion", param._NotSaveField);
     }
 
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData(" \t ", false)]
+    [InlineData("short", false)]
+    [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef", true)]
+    public void SigningKeyStatusProjection_ExposesOnlyStatusAndCannotReplaceTheRoot(string? secret, bool configured)
+    {
+        var stored = new JObject { ["authsecret"] = secret, ["AUTHSECRETROTATEVERSION"] = "private-marker", ["OsClient"] = "fixture", ["ClientName"] = "Tenant" };
+        var projection = TenantConfigurationSecurity.CreateSigningKeyStatusProjection(stored);
+        Assert.Equal(configured ? "已配置（后端自动管理）" : "待自动生成（保存或刷新租户配置后生效）", projection["AuthSecret"]?.ToString());
+        Assert.Null(projection["authsecret"]);
+        Assert.Null(projection["AUTHSECRETROTATEVERSION"]);
+        Assert.Equal(secret, stored["authsecret"]?.Value<string>());
+        Assert.Equal("private-marker", stored["AUTHSECRETROTATEVERSION"]?.ToString());
+        var write = new DiyTableRowParam { _RowModel = projection };
+        TenantConfigurationSecurity.ProtectStableSigningKeyWrite(write, "sys_osclients");
+        Assert.Null(write._RowModel["AuthSecret"]);
+        Assert.Equal("Tenant", write._RowModel["ClientName"]?.ToString());
+    }
+
     [Fact]
     public void StableSigningKeyWrite_DoesNotAlterOtherTables()
     {
@@ -574,5 +595,22 @@ public class TenantConfigurationSecurityTests
         Assert.False(removed);
         Assert.Equal("ordinary-business-value", param._RowModel["AuthSecret"]?.ToString());
         Assert.Null(param._NotSaveField);
+    }
+
+    [Fact]
+    public void SigningKeyFormRead_ProtectsSelectedColumnsWithoutChangingBusinessTables()
+    {
+        var fields = new List<string>();
+        var row = new JObject { ["AuthSecret"] = new string('a', 48), ["AuthSecretRotateVersion"] = "marker", ["OsClient"] = "fixture" };
+        var safe = TenantConfigurationSecurity.ProjectSigningKeyForFormRead(row, "Sys-OsClients", fields);
+        Assert.Equal("已配置（后端自动管理）", safe["AuthSecret"]?.ToString());
+        Assert.Null(safe["AuthSecretRotateVersion"]);
+        Assert.Equal(2, fields.Count);
+        Assert.Same(row, TenantConfigurationSecurity.ProjectSigningKeyForFormRead(row, "business_settings", fields));
+        var selected = new JObject { ["Id"] = "target" };
+        Assert.Same(selected, TenantConfigurationSecurity.ProjectSigningKeyForFormRead(selected, "sys_osclients", fields));
+        var markerOnly = new JObject { ["AuthSecretRotateVersion"] = "marker" };
+        var markerSafe = TenantConfigurationSecurity.ProjectSigningKeyForFormRead(markerOnly, "sys_osclients", fields);
+        Assert.Empty(markerSafe.Properties());
     }
 }

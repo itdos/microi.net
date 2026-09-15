@@ -10,7 +10,7 @@ description: Microi V8 CRUD 接口引擎开发。用于编写服务端 JavaScrip
 你正在开发 Microi 吾码平台的 V8 接口引擎。接口引擎是运行在服务端的 JavaScript 函数，通过 `V8.FormEngine` 操作数据库，通过 `V8.Result` 或 `return` 返回结果。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-crud-api-000 sha256=6b43119f4eae78fb6b185d48c5c289878ba86093ae62ce44ad0bdaa48093f605 -->
+<!-- microi-progressive:chunk id=v8-crud-api-000 sha256=d385cc7f9c0048ae1e2263e922ec33a97e8a321bcb88df4dc72a07c269fe1829 -->
 ## 本地优先与版本头（必做）
 
 AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目>/接口引擎/.../*.js` 本地文件，再通过 MCP 或 VS Code 插件同步到数据库。插件提示“本地和远端不一致”时，必须先读取本地与远端代码并合并有效差异，不能盲目用任一侧覆盖另一侧。
@@ -38,7 +38,7 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 生成接口引擎代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；跨表事务、权限校验、状态机、金额/库存计算、复杂 `_Where` 条件等代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-001 sha256=86768d106f68593e51beb29bcff1ee0291c483706431181da34984b22228ff21 -->
+<!-- microi-progressive:chunk id=v8-crud-api-001 sha256=38155b3a9dedd994309b15913a160a6647ca4c4a7200546268fe0f5e321c4575 -->
 ## 核心规则
 
 - 接口引擎文件是纯 JavaScript（Jint 引擎，非 Node.js）
@@ -51,7 +51,7 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 - 接口内 `return Code=1` 自动提交事务、`Code≠1` 自动回滚事务，**禁止**手动 Commit/Rollback
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-002 sha256=9f10ab278468f292b5e26679b7a7ab2ea91bb6d4094e2bff8adb7cb15e39adce -->
+<!-- microi-progressive:chunk id=v8-crud-api-002 sha256=b1ec527e9a5e97b93ed9d59fdd9cd1dfae74149ab438d1a4a9e3b198976bb6a6 -->
 ## 性能底线（必须自检）
 
 - 写接口引擎前必须先做数据访问计划：需要哪些表、哪些字段、预计数据量、是否分页、是否需要缓存。

@@ -8,7 +8,7 @@ description: Microi吾码 AI 平台治理中心设计、调用、扩展、应用
 # Microi吾码 AI 平台治理中心
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=ai-platform-governance-000 sha256=48b82af9f11388d6872cf90aa2c74a1d35c1db948483f30615ce054989ef0d77 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-000 sha256=db3f5112eb1f1fbf530fc846f27b062df2a0aca481a4488b3cd31ad2562a3571 -->
 ## 何时使用
 
 以下任一需求都应使用本 Skill：
@@ -24,7 +24,7 @@ description: Microi吾码 AI 平台治理中心设计、调用、扩展、应用
 - 发布或安装官方应用 `ai-platform-studio`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-001 sha256=47197af80919be7e08ef051884e70900714bdf53f551fad16e119a86d6efb63c -->
+<!-- microi-progressive:chunk id=ai-platform-governance-001 sha256=854b349825066903060e0012a61c2e496e5241829ccb2ae743c17bc5ad716411 -->
 ## 不可破坏的边界
 
 - DiyToken 是唯一会话入口；继续复用现有用户、角色、部门、菜单、表权限和数据范围，禁止建立第二套 Token/RBAC。
@@ -36,7 +36,7 @@ description: Microi吾码 AI 平台治理中心设计、调用、扩展、应用
 - Secret 只保存引用；列表、Diff、错误、日志、截图、导出和运行台账不得出现密码、Token、私钥或连接串原文。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-002 sha256=527f1cda978f88d0d1507d90aac71089f7585699f0ad7d5266dc7e40ba026b7c -->
+<!-- microi-progressive:chunk id=ai-platform-governance-002 sha256=f67f0ed08ec5b5d42a1bb2cc8b73db373c297d2ad78b646bd16a9ed08fe2d158 -->
 ## 官方应用事实
 
 应用 Key：`ai-platform-studio`，当前资源合同版本：`v2.0.9`。
@@ -63,7 +63,7 @@ mci-release-execute-extension
 Hook 首次创建后归租户维护，升级永不覆盖，也不得把同 Key 改回 `Managed`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-003 sha256=3d43295846e19e8b5cb526442ff8aff8f0317db88f5be803b5798e63118546e2 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-003 sha256=620f19f67eae2f6c6b0888240423594df96c3c0fa96b9df0fe60327438b9209a -->
 ## 菜单层级与语义
 
 应用安装或升级后只保留一个可见入口，禁止把历史工作台或 40 个数据菜单继续暴露到导航：
@@ -90,7 +90,7 @@ Hook 首次创建后归租户维护，升级永不覆盖，也不得把同 Key �
 向用户解释时必须区分页面类型：`配置` 是日常维护入口，`审批/处置` 在有待办或异常时使用，`运行` 用于观察和恢复任务，`台账` 主要供审计与排错。不得把台账页描述成需要人工逐项维护的业务模块。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-004 sha256=f4fbda7d2522d95e4aaa6f010637b6dfe652a7871614177ce489df7830b9c911 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-004 sha256=b112a5de375c999e536f5c216132db83d11d024a766b9a4deab71963a5a017f6 -->
 ## 通用调用规则
 
 1. 通过 MCP 回读当前表结构、菜单、接口、应用和微服务事实。
@@ -103,7 +103,7 @@ Hook 首次创建后归租户维护，升级永不覆盖，也不得把同 Key �
 旧 Hash、旧 RowVersion、旧 fencing token、未知状态、未知步骤或未知字段一律失败关闭。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-005 sha256=6298a32cb0b0c2f226485697bba306936265dab62248bb48a1709e36f73241e9 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-005 sha256=0c1db1cd39cbe0878388da8871c4094d3853179815d0ede9ce99cbfa5fa849d0 -->
 ## 门户与资源版本
 
 调用顺序：
@@ -121,7 +121,7 @@ mci-portal-publish-plan
 - `mci-resource-rollback` 校验 `ExpectedCurrentHash` 并创建新回滚版本，不能删除历史。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-006 sha256=ec5c949ac0615c9917ce1910a397f5ab1e7878fb56a35cb761cd5ebbdf96c714 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-006 sha256=32b79f58d3ef41a3d7c550c50db8ce6bb4d00717282e9aa3fbaa35ea9ac9a33e -->
 ## 身份与访问治理
 
 ### 身份同步
@@ -148,7 +148,7 @@ mci-identity-sync-plan → 人工处置冲突 → mci-identity-sync-apply
 `mci-permission-explain` 必须调用 `V8.Method.ExplainAuthorizationDecision` 复用真实 FormEngine 授权逻辑；禁止从菜单/角色表重新拼近似结论。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-007 sha256=64f2699d58860ed29782136673b51bdb1488b87cd17b24b761e9d22479902ae5 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-007 sha256=ad22d6e14c7ccdc2f6de6cf9285b9c94a949425f30be39e52949fedc60fd7d6a -->
 ## 配置模板与漂移
 
 `mci-configuration-publish` 输入要点：
