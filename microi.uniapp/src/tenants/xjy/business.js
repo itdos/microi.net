@@ -223,7 +223,6 @@ export const businessModules = {
   orders: native({
     title: '合同订单', table: 'Diy_Dingdan', menuAliases: ['合同订单', '订单管理', '我的订单'],
     titleField: 'KehuMC', statusField: 'DingdanZT', tagFields: ['XinLDD', 'DingdanHZFS'],
-    fixedWhere: [{ Name: 'DingdanZT', Type: '!=', Value: '已作废' }],
     relatedMetrics: [
       { key: 'pending', label: '待审批', where: [{ Name: 'DingdanZT', Type: '=', Value: '待审批' }], tone: 'warning' },
       { key: 'approved', label: '已审批', where: [{ Name: 'DingdanZT', Type: '=', Value: '已审批' }], tone: 'success' },
@@ -236,7 +235,10 @@ export const businessModules = {
       { label: '创建人', field: 'UserName' }
     ],
     statisticsField: 'DingdanJE', statisticsLabel: '订单金额',
-    statusOptions: ['待审批', '已审批', '已驳回', '待审批作废'],
+    // “全部状态”需要包含合同生命周期终态；具体可见数据仍由真实菜单上下文在服务端裁剪。
+    statusOptions: ['待审批', '已审批', '已驳回', '待审批作废', '已作废', '已到期'],
+    // 客户详情的有效订单数量/金额继续排除作废订单，不能反向限制“我的订单”主列表。
+    summaryFixedWhere: [{ Name: 'DingdanZT', Type: '!=', Value: '已作废' }],
     filterFields: [
       { key: 'customerType', label: '新老客户订单', field: 'XinLDD', type: 'options', multiple: true, options: [
         { label: '老客户续签订单', value: '老客户续签订单' }, { label: '老客户新增订单', value: '老客户新增订单' },
@@ -309,7 +311,9 @@ export const businessModules = {
     ]
   }),
   serviceRecords: native({
-    title: '服务记录', table: 'Diy_ShouhouDD', menuAliases: ['服务记录表', '服务记录', '售后订单'],
+    // 该入口是已完成售后任务视图，不是 diy_ServiceRecord 汇总档案；禁止复用“服务记录表”别名，
+    // 避免菜单树只返回 DiyTableId 时误绑到 /fuwujilub，导致两个入口请求同一个模块。
+    title: '服务记录', table: 'Diy_ShouhouDD', menuAliases: ['售后任务', '售后订单', '我的任务'],
     titleField: 'ShouhouFWBH', statusField: 'Zhuangtai', tagFields: ['Leixing'],
     lines: [
       { label: '客户名称', field: 'KehuMC' },

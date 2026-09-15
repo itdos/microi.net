@@ -7,8 +7,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const detail = fs.readFileSync(path.join(root, 'src/pages/business/detail.vue'), 'utf8')
 const business = fs.readFileSync(path.join(root, 'src/tenants/xjy/business.js'), 'utf8')
 
-assert.match(business, /orders:\s*native\(\{[\s\S]*?table:\s*'Diy_Dingdan'[\s\S]*?fixedWhere:\s*\[\{ Name: 'DingdanZT', Type: '!=', Value: '已作废' \}\][\s\S]*?statisticsField:\s*'DingdanJE'/,
-  '订单模块必须以 DingdanJE 汇总并排除已作废订单')
+assert.match(business, /orders:\s*native\(\{[\s\S]*?table:\s*'Diy_Dingdan'[\s\S]*?statisticsField:\s*'DingdanJE'[\s\S]*?summaryFixedWhere:\s*\[\{ Name: 'DingdanZT', Type: '!=', Value: '已作废' \}\]/,
+  '客户详情的订单汇总必须以 DingdanJE 统计并排除已作废订单')
+assert.match(detail, /fixedWhere:\s*config\.summaryFixedWhere \|\| config\.fixedWhere \|\| \[\]/,
+  '客户详情汇总必须优先使用独立条件，不能把排除已作废条件放回主列表')
 assert.match(detail, /label:\s*'订单'[\s\S]{0,260}?key:\s*'customer-order-amount'[\s\S]{0,260}?label:\s*'综合评价'/,
   '金额指标必须位于订单与综合评价之间')
 assert.match(detail, /loadCustomerRelationMetrics\(\)[\s\S]*?extraWhere:\s*\[\{ Name: 'KehuID', Type: '=', Value: customerId \}\]/,
