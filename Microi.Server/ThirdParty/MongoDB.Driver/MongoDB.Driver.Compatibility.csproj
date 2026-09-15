@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>12</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>MongoDB.Driver</AssemblyName>
+    <UpstreamDriverVersion>3.11.2</UpstreamDriverVersion>
+    <Version>$(UpstreamDriverVersion)-microi-legacy1</Version>
+    <AssemblyVersion>$(UpstreamDriverVersion).0</AssemblyVersion>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>MongoDB.Driver.snk</AssemblyOriginatorKeyFile>
+    <IsPackable>false</IsPackable>
+    <Description>Microi MongoDB 平台兼容构建；上游安全版本与源码摘要见 provenance.json。</Description>
+    <UpstreamSource>$(BaseIntermediateOutputPath)upstream</UpstreamSource>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Bson" Version="3.11.2" />
+    <PackageReference Include="DnsClient" Version="1.6.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="2.0.0" />
+    <PackageReference Include="SharpCompress" Version="0.48.1" />
+    <PackageReference Include="Snappier" Version="1.3.1" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.7.3" />
+    <PackageReference Include="System.Buffers" Version="4.6.1" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="6.0.1" />
+    <Compile Include="WireVersion.Compatibility.cs" />
+    <None Include="LICENSE.md" CopyToOutputDirectory="PreserveNewest" TargetPath="licenses/MongoDB.Driver.LICENSE.md" />
+    <None Include="provenance.json" CopyToOutputDirectory="PreserveNewest" TargetPath="licenses/MongoDB.Driver.provenance.json" />
+  </ItemGroup>
+  <!-- 源码随仓库提供，构建不从网络下载可变内容；每次编译校验不可变来源摘要。
+       保留上游 3.11.2 的完整安全修复，只替换有真实旧版本数据库回归覆盖的兼容门槛。 -->
+  <Target Name="PrepareVerifiedMongoDriverSource" BeforeTargets="CoreCompile">
+    <GetFileHash Files="upstream-3.11.2.source.zip" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="VerifiedMongoSource" />
+    </GetFileHash>
+    <Error Condition="'%(VerifiedMongoSource.FileHash)' != '2612F9503528513BA639209185C5BC22CD1D3242353F828745366A98D9E9718C'" Text="MongoDB 兼容驱动上游源码摘要不一致，拒绝构建。" />
+    <Unzip SourceFiles="upstream-3.11.2.source.zip" DestinationFolder="$(UpstreamSource)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Compile Include="$(UpstreamSource)/MongoDB.Driver/**/*.cs" Exclude="$(UpstreamSource)/MongoDB.Driver/Core/Misc/WireVersion.cs" />
+      <Compile Include="$(UpstreamSource)/MongoDB.Shared/*.cs" />
+    </ItemGroup>
+  </Target>
+</Project>

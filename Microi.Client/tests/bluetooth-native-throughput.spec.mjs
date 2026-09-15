@@ -1,0 +1,163 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createV8Print } from '../src/utils/v8-print.js';
+
+// Each fixture replaces process-wide browser/5+ globals; keep these cases serial.
+const serialTest = (name, fn) => test(name, { concurrency: false }, fn);
+
+// 真实 5+ 壳没有 uni；用回调边界和字节流验证调度，不把模拟耗时当作真机出纸时间。
+async function nativePrinter(t, options = {}) {
+    const install = (key, value) => {
+        const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
+        Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+        t.after(() => { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; });
+    };
+    const values = new Map();
+    const storage = { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
+    storage.setItem('microi_ble_info', JSON.stringify({ deviceId: 'native-printer', deviceName: options.name || 'GP-M322' }));
+    const writes = [], delays = [], calls = [];
+    const originalTimeout = globalThis.setTimeout;
+    t.mock.method(globalThis, 'setTimeout', (callback, ms, ...args) => {
+        delays.push(ms);
+        if (ms === 8) options.onDelay?.(ms);
+        return originalTimeout(callback, ms === 1500 ? 10 : 0, ...args);
+    });
+    install('localStorage', storage);
+    install('sessionStorage', storage);
+    install('navigator', { platform: 'Android' });
+    install('uni', undefined);
+    const bluetooth = {
+        onBLEConnectionStateChange() {}, onBluetoothDeviceFound() {},
+        openBluetoothAdapter({ success }) { success({}); },
+        createBLEConnection({ success }) { calls.push('connect'); success({}); },
+        closeBLEConnection() {},
+        getBLEDeviceServices({ success }) { calls.push('services'); success({ services: [{ uuid: 'service' }] }); },
+        getBLEDeviceCharacteristics({ success }) {
+            calls.push('characteristics');
+            success({ characteristics: [{ uuid: 'write', properties: { write: true } }] });
+        },
+        writeBLECharacteristicValue(payload) {
+            writes.push([...new Uint8Array(payload.value)]);
+            if (options.write) options.write(payload, writes.length);
+            else payload.success({});
+        },
+    };
+    if (options.mtu !== 'missing') bluetooth.setBLEMTU = payload => {
+        calls.push('mtu');
+        assert.equal(payload.mtu, 183);
+        if (options.mtu === 'failure') payload.fail({ code: 10008 });
+        else if (options.mtu === 'timeout') options.onMtu?.(payload);
+        else payload.success(options.mtu === 'empty' ? {} : { mtu: options.mtu ?? 183 });
+    };
+    install('window', { plus: { os: { name: options.os || 'Android' }, bluetooth }, addEventListener() {} });
+    const print = createV8Print();
+    t.after(() => print.disconnect());
+    assert.equal(await print.initializeConnection(), true);
+    return { print, writes, delays, calls, storage };
+}
+
+serialTest('纯 5+ Android 在服务发现后协商 MTU，佳博 9KB 标签可按 180 字节完整发送', async t => {
+    const { print, calls, writes, delays, storage } = await nativePrinter(t);
+    const state = print.getConnectionState();
+    assert.deepEqual(calls, ['connect', 'services', 'characteristics', 'mtu']);
+    assert.equal(state.mtu, 183);
+    assert.equal(state.maxWriteBytes, 180);
+    assert.equal(state.recommendedPacketSize, 180);
+    assert.equal(state.packetIntervalMs, 8);
+    assert.equal(JSON.parse(storage.getItem('microi_ble_info')).mtu, undefined, 'MTU 不能随设备记录跨连接缓存');
+    const bytes = Uint8Array.from({ length: 9207 }, (_, i) => i % 256);
+    print.setOneTimeData(state.recommendedPacketSize);
+    delays.length = 0;
+    await print.prepareSend(bytes);
+    assert.equal(writes.length, 52);
+    assert.deepEqual(writes.flat(), [...bytes]);
+    assert.equal(delays.filter(ms => ms === 8).length, 51, '确认写入使用短保护窗口，不再追加 20ms 长等待');
+});
+
+serialTest('佳博原生写入在设备队列有最小间隔要求时不会发送中断', async t => {
+    let guardWindows = 0;
+    const { print, writes, delays } = await nativePrinter(t, {
+        onDelay: ms => { if (ms === 8) guardWindows++; },
+        write(payload) {
+            // 设备队列在没有保护窗口时模拟 10008；不允许用重发掩盖已经开始的任务。
+            if (writes.length > 1 && guardWindows < writes.length - 1) {
+                payload.fail({ code: 10008 });
+                return;
+            }
+            payload.success({});
+        },
+    });
+    print.setOneTimeData(180);
+    await print.prepareSend(new Uint8Array(361).fill(7));
+    assert.equal(writes.length, 3);
+    assert.equal(delays.filter(ms => ms === 8).length, 2);
+});
+
+for (const mtu of ['missing', 'empty', 'failure', 'timeout', 23, 64, 102, 103, 182, 183, 517, 22, 'invalid']) {
+    serialTest(`MTU=${mtu} 时按实际能力限包，不把设置请求成功当作协商结果`, async t => {
+        let late;
+        const { print, writes } = await nativePrinter(t, { mtu, onMtu: p => { late = p; } });
+        const valid = Number.isInteger(mtu) && mtu >= 23 && mtu <= 517;
+        const maxBytes = valid ? Math.min(180, mtu - 3) : 20;
+        const state = print.getConnectionState();
+        assert.equal(state.maxWriteBytes, maxBytes);
+        assert.equal(state.recommendedPacketSize, maxBytes >= 180 ? 180 : maxBytes >= 100 ? 100 : 20);
+        print.setOneTimeData(180);
+        await print.prepareSend(new Uint8Array(201).fill(42));
+        assert.ok(writes.every(bytes => bytes.length <= maxBytes));
+        assert.equal(writes.flat().length, 201);
+        if (late) {
+            late.success({ mtu: 183 });
+            assert.equal(print.getConnectionState().maxWriteBytes, 20, '超时后的迟到回调不能提升当前会话包长');
+        }
+    });
+}
+
+serialTest('旧 5+ 佳博即使只能 20 字节，也消除原生确认后的固定等待', async t => {
+    const { print, writes, delays } = await nativePrinter(t, { mtu: 'missing' });
+    delays.length = 0;
+    await print.prepareSend(new Uint8Array(100));
+    assert.equal(writes.length, 5);
+    assert.equal(delays.filter(ms => ms === 20).length, 0);
+});
+
+for (const options of [{ name: '旧款打印机' }, { os: 'iOS' }]) {
+    serialTest(`${options.name || options.os} 保留 20 字节及原有节流`, async t => {
+        const { print, calls, writes, delays } = await nativePrinter(t, options);
+        assert.equal(calls.includes('mtu'), false);
+        delays.length = 0;
+        await print.prepareSend(new Uint8Array(40));
+        assert.deepEqual(writes.map(bytes => bytes.length), [20, 20]);
+        assert.deepEqual(delays, [20]);
+    });
+}
+
+serialTest('原生回调未完成时不发下一包，并发任务保持整份顺序', async t => {
+    const pending = [];
+    const { print, writes } = await nativePrinter(t, { write: p => pending.push(p) });
+    print.setOneTimeData(180);
+    const first = print.prepareSend(new Uint8Array(181).fill(1));
+    const second = print.prepareSend(new Uint8Array(181).fill(2));
+    for (let i = 0; i < 4; i++) {
+        for (let spin = 0; spin < 20 && writes.length < i + 1; spin++) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        assert.equal(writes.length, i + 1);
+        pending.shift().success({});
+    }
+    await Promise.all([first, second]);
+    assert.deepEqual(writes.map(bytes => bytes[0]), [1, 1, 2, 2]);
+});
+
+serialTest('部分发送后错误不降档重发，断开后清除 MTU 能力', async t => {
+    const { print, writes } = await nativePrinter(t, { write(p, count) {
+        if (count === 2) p.fail({ code: 10007 }); else p.success({});
+    } });
+    print.setOneTimeData(180);
+    await assert.rejects(print.prepareSend(new Uint8Array(400)), /特征值不支持/);
+    assert.equal(writes.length, 2);
+    assert.deepEqual(writes.map(bytes => bytes.length), [180, 180]);
+    print.disconnect();
+    assert.equal(print.getConnectionState().maxWriteBytes, 20);
+    assert.equal(print.getConnectionState().mtu, 0);
+});

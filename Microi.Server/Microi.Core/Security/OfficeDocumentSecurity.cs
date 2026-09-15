@@ -43,6 +43,15 @@ namespace Microi.net
                    || downloadUri.AbsolutePath.StartsWith(basePath + "/", StringComparison.Ordinal);
         }
 
+        /// <summary>仅用于表格导入；历史平台曾将 XLSX 内容下载为 .xls，文件回源仍保持严格类型校验。</summary>
+        public static bool HasExpectedSpreadsheetImportSignature(string extension, byte[] bytes)
+        {
+            // 只兼容已知的历史 XLSX -> .xls 命名错误；不能把任意 ZIP、HTML 或其它 Office 文件放行。
+            return HasExpectedFileSignature(extension, bytes)
+                || (string.Equals(extension, ".xls", StringComparison.OrdinalIgnoreCase)
+                    && HasExpectedOpenXmlPackage(".xlsx", bytes ?? Array.Empty<byte>()));
+        }
+
         public static bool HasExpectedFileSignature(string extension, byte[] bytes)
         {
             if (string.IsNullOrWhiteSpace(extension) || bytes == null || bytes.Length == 0)

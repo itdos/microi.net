@@ -94,7 +94,7 @@ var voted = await V8.Vision.Stabilize({
 });
 ```
 
-主流流水线方法：`V8.Vision.Analyze`、`V8.Vision.Search`、`V8.Vision.Stabilize`；兼容原子方法：`Extract`、`ExtractBatch`、`Compare`、`CompareBatch`、`GetCapabilities`。业务入口优先使用 `V8.ApiEngine.Run('platform-vision-runtime', ...)`，不要把向量返回给普通浏览器或日志。
+主流流水线方法：`V8.Vision.Analyze`、`V8.Vision.Search`、`V8.Vision.Stabilize`；兼容原子方法：`V8.Vision.Extract`、`V8.Vision.ExtractBatch`、`V8.Vision.Compare`、`V8.Vision.CompareBatch`、`V8.Vision.GetCapabilities`。业务入口优先使用 `V8.ApiEngine.Run('platform-vision-runtime', ...)`，不要把向量返回给普通浏览器或日志。
 
 ## 模型与准确率门禁
 

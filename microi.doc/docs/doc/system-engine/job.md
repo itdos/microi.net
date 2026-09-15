@@ -23,6 +23,14 @@
 
 任务表单的服务器提交前事件直接调用 `V8.Method.SaveScheduleJob`，传入 `RuntimeOnly:true`，只同步并回读 Quartz，由原表单事务保存任务元数据。这样既避免再次写当前表造成锁等待，也避免把业务 `ApiEngineKey` 作为另一个接口引擎的路由参数传递时被覆盖。事件先检查 `ManageScheduleJob({Action:'Capabilities'})`；旧后端不具备该能力时立即提示升级，不产生调度副作用。普通 MCP/商城保存仍负责 Quartz 与任务元数据两部分。
 
+## 按月查看运行日志
+
+新版任务表单通过“运行日志 / 历史日志”两个页签查看记录。运行日志写入 MongoDB 的租户月度集合，历史关系库 `diy_schedule_job_log` 保留查询；请选择月份，使用上一页/下一页浏览，不再统计多年日志总数。只有显示的页签会加载数据。Mongo 连接失败会明确报错，不能据此判断任务没有执行。
+
+日志通过后台队列写入，日志存储故障不会使已完成的业务变成失败。为 spool 配置持久卷；API 镜像更新不会自动升级 MongoDB。新版镜像基于驱动 3.11.2 的安全修复提供平台 MongoDB 3.6 协议兼容构建，避免直接降级旧驱动；这不等于修复旧数据库服务端自身的问题。升级任务调度应用可取得双页签和历史表 `(JobName,CreateTime,Id)` 索引声明，存量大表安装后仍应回读索引和查询耗时。
+
+管理员可通过 MCP `microi_query_job_runtime` 查询 `Diagnostics`、`Logs`、`HistoryLogs`，或调用 `platform-schedule-job` 对应动作。日志查询传 `JobName`、`SearchMonth=yyyyMM`；返回的 `HasMore/BeforeLogTime/BeforeLogId` 用于继续翻页。诊断同时显示当前节点启动状态、执行数、领取进展和设置读取失败，不能把元数据“正常”或 Quartz 已启动当作任务执行成功。
+
 ## 运行时间刷新不生成配置版本
 
 更新包含此修复的后端后，Quartz 每分钟刷新 `LastTime/NextTime` 时，只在时间确实变化时向当前租户主库条件更新这两列。并行节点或暂停、删除、重命名后的旧观测不会覆盖新状态。运行时间刷新不再触发通用表单更新、配置版本和数据日志；用户修改任务配置时，原有事件和版本追溯继续生效，历史版本也不会被删除。

@@ -208,6 +208,46 @@ namespace Microi.net
             TenantServiceCredentialFieldSet.ToArray();
 
         /// <summary>
+        /// SaaS 控制面详情只展示持久密钥状态。不得将展示文本写回签名根，
+        /// 也不得为读取状态初始化子租户或生成/轮换密钥。
+        /// </summary>
+        public static JObject CreateSigningKeyStatusProjection(JObject storedModel)
+        {
+            if (storedModel == null) throw new ArgumentNullException(nameof(storedModel));
+            var projection = (JObject)storedModel.DeepClone();
+            var secret = storedModel.GetValue("AuthSecret", StringComparison.OrdinalIgnoreCase)?.Value<string>();
+            var tenant = storedModel.GetValue("OsClient", StringComparison.OrdinalIgnoreCase)?.Value<string>();
+            foreach (var property in projection.Properties()
+                         .Where(property => StableSigningKeyFields.Contains(property.Name, StringComparer.OrdinalIgnoreCase))
+                         .ToList())
+            {
+                property.Remove();
+            }
+            projection["AuthSecret"] = DiyToken.IsWeakJwtSecret(secret, tenant)
+                ? "待自动生成（保存或刷新租户配置后生效）"
+                : "已配置（后端自动管理）";
+            return projection;
+        }
+
+        /// <summary>FormEngine 的详情、列表、树和导出统一在 V8 之前去除签名材料。</summary>
+        public static T ProjectSigningKeyForFormRead<T>(T row, string resolvedTableName, IList<string> notSaveFields)
+        {
+            if (row == null || !string.Equals((resolvedTableName ?? string.Empty).Trim().Replace('-', '_'),
+                    "sys_osclients", StringComparison.OrdinalIgnoreCase)) return row;
+            var stored = row as JObject ?? JObject.FromObject(row);
+            if (!stored.Properties().Any(property => StableSigningKeyFields.Contains(property.Name, StringComparer.OrdinalIgnoreCase)))
+                return row;
+            foreach (var field in StableSigningKeyFields)
+            {
+                if (!notSaveFields.Contains(field, StringComparer.OrdinalIgnoreCase)) notSaveFields.Add(field);
+            }
+            var projection = CreateSigningKeyStatusProjection(stored);
+            // 不为未请求的列补入状态列。
+            if (stored.GetValue("AuthSecret", StringComparison.OrdinalIgnoreCase) == null) projection.Remove("AuthSecret");
+            return projection.ToObject<T>();
+        }
+
+        /// <summary>
         /// Prevents ordinary FormEngine writes from replacing the durable JWT
         /// signing root or its applied rotation marker. Rotation is requested via
         /// BackendAuthSecretRotateVer and persisted by the trusted SaaS runtime;
