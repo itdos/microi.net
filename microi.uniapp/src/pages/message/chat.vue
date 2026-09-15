@@ -176,6 +176,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { getToken, getUser, V8 } from '@/utils/request.js'
 import { post } from '@/utils/request.js'
 import appConfig from '@/config.js'
@@ -184,6 +185,8 @@ import { getSignalR, connectSignalR } from '@/utils/signalr.js'
 import { getAiAssistantEnabled } from '@/utils/sysconfig.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/message/chat') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/message/chat') },
   mixins: [themeMixin],
   data() {
     return {

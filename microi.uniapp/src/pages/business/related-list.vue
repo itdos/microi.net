@@ -39,6 +39,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import { themeMixin } from '@/utils/theme.js'
 	import { loadNativeFormDefinition, loadNativeTableModel } from '@/platform/native-form.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
@@ -52,6 +53,8 @@
 	}
 
 	export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/business/related-list') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/business/related-list') },
 		name: 'BusinessRelatedListPage',
 		components: { MciBusinessRelatedList },
 		mixins: [themeMixin],

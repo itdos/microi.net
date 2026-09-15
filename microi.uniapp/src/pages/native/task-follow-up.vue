@@ -17,6 +17,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 import { findMenu, requireLogin } from '@/platform/business-runtime.js'
@@ -27,6 +28,8 @@ const FOLLOW_UP_PHOTO_FIELD = 'ZhuipingT'
 const EMPTY_PRIVATE_FILE_CONTEXT = Object.freeze({ private: true, failClosed: true })
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/task-follow-up') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/task-follow-up') },
   mixins: [themeMixin],
   data() { return { id: '', task: {}, photos: '[]', content: '', loading: true, submitting: false, photoFileContext: EMPTY_PRIVATE_FILE_CONTEXT, fileContextError: '' } },
   async onLoad(options) {

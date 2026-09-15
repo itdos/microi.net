@@ -93,6 +93,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getToken, getUser } from '@/utils/request.js'
 import { getProfileRoute } from '@/platform/profile/index.js'
@@ -108,6 +109,8 @@ function newIdempotencyKey() {
 }
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/complaint/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/complaint/index') },
   mixins: [themeMixin],
   data() {
     return {

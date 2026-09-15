@@ -84,9 +84,12 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 
 export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/native/watermark-camera') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/native/watermark-camera') },
   mixins: [themeMixin],
   data() {
     return {

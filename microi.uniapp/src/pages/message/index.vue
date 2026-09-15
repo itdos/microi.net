@@ -204,6 +204,7 @@
 </template>
 
 <script>
+import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import {
 		getToken,
 		getUser
@@ -230,6 +231,8 @@
 	} from './contact-role-filter.mjs'
 
 	export default {
+  onShareAppMessage() { return buildFriendShare(this, 'pages/message/index') },
+  onShareTimeline() { return buildTimelineShare(this, 'pages/message/index') },
 		components: {
 			MciAuthPrompt
 		},
