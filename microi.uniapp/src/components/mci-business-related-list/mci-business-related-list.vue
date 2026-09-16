@@ -172,12 +172,13 @@
         </view>
       </template>
       <template v-else-if="isProposalInstallationQuickMode">
-        <view v-for="(row, index) in displayedRows" :key="row.Id" class="proposal-point-card">
+        <view v-for="(row, index) in displayedRows" :key="row.Id" class="proposal-point-card"
+          hover-class="proposal-point-card--pressed" @tap="openDetail(row)">
           <view class="proposal-point-card__title">
             <text>点位{{ index + 1 }}</text>
           </view>
           <view v-for="item in proposalInstallationVisibleQuickFields" :key="`${row.Id}-${item.key}`"
-            class="proposal-point-field">
+            class="proposal-point-field" @tap.stop>
             <text class="proposal-point-field__label">{{ item.label }}</text>
             <mci-native-field v-if="item.key === 'deviceModel'"
               class="proposal-point-field__control"
@@ -3011,7 +3012,9 @@ export default {
   border-radius: 18rpx;
   background: #fff;
   box-shadow: 0 5rpx 18rpx rgba(32, 67, 81, .05);
+  transition: transform 150ms ease, opacity 150ms ease;
 }
+.proposal-point-card--pressed { transform: scale(.995); opacity: .92; }
 .proposal-point-card__title {
   min-height: 54rpx;
   display: flex;

@@ -113,7 +113,7 @@ export default {
 .card-bottom__links { flex: 0 0 auto; gap: 8rpx; }
 .detail-link { color: #0b86d4; }
 .detail-link, .more-link { padding: 12rpx 8rpx; }
-.more-link { min-width: 92rpx; height: 52rpx; justify-content: center; gap: 8rpx; border-radius: 8rpx; color: #526d78; }
+.more-link { min-width: 92rpx;  justify-content: center; gap: 8rpx; border-radius: 8rpx; color: #526d78; }
 .more-link--pressed { background: #edf5f8; }
 .more-icon { gap: 4rpx; }
 .more-icon > view { width: 6rpx; height: 6rpx; border-radius: 50%; background: currentColor; }
