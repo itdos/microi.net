@@ -47,7 +47,7 @@ const SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
 const PLUS_PRINT_MTU = 183; // ATT 头占 3 字节；与已验证的佳博 180 字节档一致。
 // 5+ 的确认回调不等同于 Android GATT 队列完全空闲；给下一包留出一个很短的保护窗口，
 // 避免连续调用在真实设备上触发 10008/“发送中断”，同时不回到原先每包 20ms 的长尾。
-const PLUS_GATT_GUARD_INTERVAL_MS = 8;
+const PLUS_GATT_GUARD_INTERVAL_MS = 15;
 const EMPTY_BLE_INFO = Object.freeze({
     platform: "", deviceId: "", deviceName: "",
     transport: "ble", profileMode: "auto", profileId: "generic-tspl", commandLanguage: "tspl",
@@ -77,24 +77,11 @@ function isKnownPrinterService(serviceId) {
     });
 }
 
-function canUseUniWriteNoResponse() {
-    return typeof globalThis !== "undefined"
-        && globalThis.uni
-        && typeof globalThis.uni.writeBLECharacteristicValue === "function";
-}
-
-function shouldPreferUniWriteNoResponse() {
-    if (!canUseUniWriteNoResponse() || typeof window === "undefined" || !window.plus) return false;
-    var osName = window.plus.os && window.plus.os.name;
-    return String(osName || "").toLowerCase() === "android" || (!osName && !!window.plus.android);
-}
-
 function sortPlusWriteCandidates(candidates) {
-    var preferNoResponse = shouldPreferUniWriteNoResponse();
     return normalizeWriteCandidates(candidates).sort(function (left, right) {
         function score(candidate) {
             return (isKnownPrinterService(candidate.serviceId) ? 1000 : 0)
-                + (candidate.writeType === (preferNoResponse ? "writeNoResponse" : "write") ? 100 : 0);
+                + (candidate.writeType === "write" ? 100 : 0);
         }
         return score(right) - score(left);
     });
@@ -233,8 +220,9 @@ function plusTransportCapabilities(Print) {
     return {
         mtu: mtu,
         maxWriteBytes: maxBytes,
-        recommendedPacketSize: optimized && maxBytes >= 180 ? 180 : optimized && maxBytes >= 100 ? 100 : 20,
-        // 5+ 的 write 已等待 GATT 确认，但 Android 队列仍需要极短保护窗口；无响应写及其它型号保留节流。
+        // MTU 只证明协议上限；GP-M322 在 Android 原生壳默认使用 100 字节稳定档。
+        recommendedPacketSize: optimized && maxBytes >= 100 ? 100 : 20,
+        // 5+ 的 write 已等待 GATT 确认，但 Android 队列仍需要保护窗口；无响应写及其它型号保留节流。
         packetIntervalMs: optimized && Print.BLEInformation.writeType === "write" ? PLUS_GATT_GUARD_INTERVAL_MS : 20,
         writeType: live ? Print.BLEInformation.writeType : "",
     };
@@ -739,22 +727,15 @@ function writePlusBleChunk(Print, chunk) {
         characteristicId: Print.BLEInformation.writeCharaterId,
         writeType: Print.BLEInformation.writeType || "write",
     };
-    var writer = window.plus.bluetooth.writeBLECharacteristicValue.bind(window.plus.bluetooth);
     var payload = {
         deviceId: Print.BLEInformation.deviceId,
         serviceId: candidate.serviceId,
         characteristicId: candidate.characteristicId,
         value: chunk.buffer,
     };
-    if (candidate.writeType === "writeNoResponse") {
-        if (!canUseUniWriteNoResponse()) {
-            return Promise.reject(new Error("该打印机只暴露无响应写入特征；当前 5+ 蓝牙运行时不支持，请选择已配对的 SPP 设备或升级客户端"));
-        }
-        writer = globalThis.uni.writeBLECharacteristicValue.bind(globalThis.uni);
-        payload.writeType = "writeNoResponse";
-    }
     return new Promise(function (resolve, reject) {
-        writer(Object.assign(payload, {
+        // 连接、服务发现和写入必须使用同一个 5+ BLE 栈。
+        window.plus.bluetooth.writeBLECharacteristicValue(Object.assign(payload, {
             success: resolve,
             fail: function (error) { reject(createPlusWriteError(error)); },
         }));
@@ -857,7 +838,7 @@ async function connectPlusDevice(Print, device, options) {
                         writeType: "write",
                     });
                 }
-                if ((properties.writeNoResponse || properties.writeWithoutResponse) && canUseUniWriteNoResponse()) {
+                if (properties.writeNoResponse || properties.writeWithoutResponse) {
                     writeCandidates.push({
                         serviceId: serviceId,
                         characteristicId: characteristic.uuid,
