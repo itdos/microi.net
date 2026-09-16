@@ -193,6 +193,8 @@ return { Code: 1, Data: dataList, DataCount: dataList.length };
 - 结果与进度必须分别统计 `Added/Updated/Failed/Errors`；整批回滚后成功、新增、修改数必须归零，不能把已回滚行计作成功。
 - 用 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报真实校验/写入工作量；未知总量保持不确定进度，不伪造百分比。
 - 业务幂等键使用后台任务 Id 或明确的导入操作 Id；重试前回读批次，避免重复写入。
+- 平台审计字段（`Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted/OsClient/TenantId/TenantName`）由导入事务统一生成或由 `_CurrentUser` 归属填充，不参与写入。导出的表格天然包含这些列，服务端必须把映射到的保护字段从 INSERT/UPDATE 列清单里剔除，否则会出现 `Column 'CreateTime' specified twice`，或把旧记录的创建时间、租户归属改成 Excel 里的快照值。导入钩子（ImportV8）返回的 `FixedValues` 也不能回填这些字段，命中时按未授权字段拒绝。
+- 写回策略是“新增保护、更新不覆盖”：同一批导入既能安全新增，也不会改写既有记录的平台审计字段；需要保留 Excel 里的原始时间时，另建业务时间字段，不要复用 `CreateTime`。
 
 完整前端参数见 `microi.doc/docs/doc/v8-engine/v8-client.md#v8openimportdialog`。
 

@@ -12,6 +12,9 @@ export declare const API: {
     readonly GET_ADMINISTRATIVE_CAPABILITIES: "/api/V8Engine/GetAdministrativeCapabilities";
     readonly ADMINISTER_TABLE_DATA: "/api/V8Engine/AdministerTableData";
     readonly AI_CHAT: "/api/Ai/Chat";
+    readonly GENERATE_MINIMAX_IMAGE: "/api/Ai/GenerateMiniMaxImage";
+    readonly GET_MINIMAX_IMAGE_TASK: "/api/Ai/GetMiniMaxImageTask";
+    readonly RECOVER_MINIMAX_IMAGE_TASK: "/api/Ai/RecoverMiniMaxImageTask";
     readonly GENERATE_MINIMAX_MUSIC: "/api/Ai/GenerateMiniMaxMusic";
     readonly GENERATE_MINIMAX_SPEECH: "/api/Ai/GenerateMiniMaxSpeech";
     readonly OCR_RECOGNIZE: "/apiengine/platform-ocr-recognize";
