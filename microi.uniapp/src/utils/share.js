@@ -1,5 +1,5 @@
 import appConfig from '@/config.js'
-import { getToken, getUser, V8 } from '@/utils/request.js'
+import { getToken, getUser, post } from '@/utils/request.js'
 
 const HOME_PATH = '/pages/workspace/index'
 const OFFICIAL_ACCOUNT_PATH = '/pages/native/official-account'
@@ -156,30 +156,122 @@ function getShareImage(imageKey) {
   return (images && images[imageKey]) || (images && images.platform) || (appConfig.cdnAssets && appConfig.cdnAssets.logo) || appConfig.logoUrl
 }
 
-function openOfficialAccount() {
+let officialAccountUsername = ''
+let officialAccountFollowStatus = 'unknown'
+let officialAccountRequest = null
+let officialAccountRequestAction = ''
+
+/** The ID comes only from the current tenant's wx_mp.GongzhonghaoID projection. */
+export function getOfficialAccountUsername() {
+  return officialAccountUsername
+}
+
+function getWechatLoginCode() {
+  return new Promise((resolve) => {
+    if (typeof wx === 'undefined' || typeof wx.login !== 'function') return resolve('')
+    try {
+      wx.login({
+        success: (result) => resolve(cleanQueryValue(result && result.code)),
+        fail: () => resolve('')
+      })
+    } catch (error) { resolve('') }
+  })
+}
+
+/** Request the public ID and the server-verified follow status before prompting. */
+export function warmOfficialAccountConfig(forceStatusCheck = false) {
   // #ifdef MP-WEIXIN
-  // wx.openOfficialAccountProfile works from a user click and is not limited
-  // to the official-account component's QR-code entry scenes. The username is
-  // intentionally tenant configuration; never guess or hard-code an account.
-  let runtimeConfig = {}
+  const apiEngineKey = cleanQueryValue(appConfig.shareOfficialAccountApiEngineKey)
+  if (!/^[a-z0-9-]{3,100}$/.test(apiEngineKey)) return Promise.resolve('unknown')
+  if (officialAccountRequest) {
+    return forceStatusCheck && officialAccountRequestAction === 'Config'
+      ? officialAccountRequest.then(() => warmOfficialAccountConfig(true))
+      : officialAccountRequest
+  }
+  if (!forceStatusCheck && officialAccountUsername) {
+    return Promise.resolve(officialAccountFollowStatus)
+  }
+  officialAccountRequestAction = forceStatusCheck ? 'Status' : 'Config'
+  officialAccountRequest = (forceStatusCheck ? getWechatLoginCode() : Promise.resolve('')).then((loginCode) => {
+    return post(`/apiengine/${apiEngineKey}`, {
+      Action: officialAccountRequestAction,
+      ...(loginCode ? { LoginCode: loginCode } : {})
+    }, Boolean(getToken()))
+  }).then((result) => {
+    const data = result && result.Code === 1 ? (result.Data || {}) : {}
+    const username = cleanQueryValue(data.Username)
+    officialAccountUsername = /^gh_[a-zA-Z0-9]{6,40}$/.test(username) ? username : ''
+    officialAccountFollowStatus = data.FollowStatus === 'followed' || data.FollowStatus === 'not_followed'
+      ? data.FollowStatus : 'unknown'
+    return officialAccountFollowStatus
+  }).catch(() => {
+    officialAccountUsername = ''
+    officialAccountFollowStatus = 'unknown'
+    return officialAccountFollowStatus
+  }).finally(() => { officialAccountRequest = null; officialAccountRequestAction = '' })
+  return officialAccountRequest
+  // #endif
+  return Promise.resolve('unknown')
+}
+
+function showFollowError(title, content) {
   try {
-    runtimeConfig = V8 && typeof V8.GetSysConfigSync === 'function' ? (V8.GetSysConfigSync() || {}) : {}
+    uni.showModal({
+      title,
+      content,
+      showCancel: false
+    })
   } catch (error) {}
-  const username = cleanQueryValue(
-    appConfig.officialAccountUsername ||
-    runtimeConfig.OfficialAccountUsername ||
-    runtimeConfig.WechatOfficialAccountUsername ||
-    runtimeConfig.WeixinOfficialAccountUsername
-  )
-  if (username && typeof wx !== 'undefined' && typeof wx.openOfficialAccountProfile === 'function') {
+}
+
+function canUseOfficialAccountComponent() {
+  // The native component is only populated for these documented entry scenes.
+  // Keep it as a fallback there; a chat/card share must use the direct API.
+  try {
+    const launch = typeof wx !== 'undefined' && typeof wx.getLaunchOptionsSync === 'function'
+      ? wx.getLaunchOptionsSync()
+      : null
+    return [1038, 1047, 1089].includes(Number(launch && launch.scene))
+  } catch (error) {
+    return false
+  }
+}
+
+export function openOfficialAccountProfile() {
+  // #ifdef MP-WEIXIN
+  // This API is intentionally called only from the modal/button click handler.
+  // Unlike <official-account>, it is not restricted to a small set of entry
+  // scenes such as scan-code or recent-use entries.
+  const username = getOfficialAccountUsername()
+  if (!username) {
+    if (canUseOfficialAccountComponent()) {
+      try {
+        uni.navigateTo({ url: OFFICIAL_ACCOUNT_PATH })
+        return true
+      } catch (error) {}
+    }
+    showFollowError('暂时无法关注公众号', '后台公众号配置尚未加载，请稍后重试。')
+    return false
+  }
+  if (typeof wx === 'undefined' || typeof wx.openOfficialAccountProfile !== 'function') {
+    showFollowError('微信版本不支持', '当前微信版本不支持一键关注，请升级微信后重试。')
+    return false
+  }
+  try {
     wx.openOfficialAccountProfile({
       username,
-      fail: () => { uni.navigateTo({ url: OFFICIAL_ACCOUNT_PATH }) }
+      fail: (error) => {
+        const message = error && error.errMsg ? String(error.errMsg) : '请稍后重试。'
+        showFollowError('打开公众号失败', message.length > 120 ? `${message.slice(0, 120)}…` : message)
+      }
     })
-    return
+    return true
+  } catch (error) {
+    showFollowError('打开公众号失败', '请稍后重试。')
+    return false
   }
   // #endif
-  uni.navigateTo({ url: OFFICIAL_ACCOUNT_PATH })
+  return false
 }
 
 export function buildSharePayload(vm, pagePath) {
@@ -283,20 +375,23 @@ export function maybePromptFollow() {
   if (/^pages\/(login|privacy|about)\//.test(current.route || '') || current.route === 'pages/native/official-account') return
 
   followPromptTimer = setTimeout(() => {
-    followPromptTimer = null
-    const activePages = getCurrentPages()
-    const active = activePages && activePages.length ? activePages[activePages.length - 1] : null
-    if (!active || active.route !== current.route || String(active.options && active.options.fromShare || '') !== '1') return
-    followPromptShown = true
-    uni.showModal({
-      title: '欢迎查看分享内容',
-      content: '你可以继续查看此页面。如希望接收平台资讯，也可自愿了解关联公众号。',
-      cancelText: '继续查看',
-      confirmText: '一键关注',
-      success: (result) => {
-        if (!result.confirm) return
-        openOfficialAccount()
-      }
+    warmOfficialAccountConfig(true).then((status) => {
+      followPromptTimer = null
+      const activePages = getCurrentPages()
+      const active = activePages && activePages.length ? activePages[activePages.length - 1] : null
+      if (!active || active.route !== current.route || String(active.options && active.options.fromShare || '') !== '1') return
+      // An unknown identity or failed WeChat check must never be treated as unfollowed.
+      if (status !== 'not_followed' || !getOfficialAccountUsername()) return
+      followPromptShown = true
+      uni.showModal({
+        title: '欢迎查看分享内容',
+        content: '你可以继续查看此页面。点击“一键关注”将打开关联公众号主页，关注后可接收平台资讯。',
+        cancelText: '继续查看',
+        confirmText: '一键关注',
+        success: (result) => {
+          if (result.confirm) openOfficialAccountProfile()
+        }
+      })
     })
   }, 1200)
   // #endif
