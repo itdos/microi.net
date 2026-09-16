@@ -82,6 +82,8 @@ return { Code: 1, Data: { IdempotencyKey: idempotencyKey } };
 
 ## 失败、重试与停机
 
+- 先证明任务真的在执行：读 `Scheduler.IsStarted`、`Scheduler.NumberOfJobsExecuted` 和 `Acquisition.LastAcquisitionError`，参考 `microi.doc/docs/doc/system-engine/job.md` 的“任务不执行”。`diy_schedule_job.Status=正常`、`diy_schedule_job.NextTime` 和“插件启动成功”都不能证明触发成功；列表/详情页的 `LastTime/NextTime` 来自运行时，直接查表看到的是库内快照。
+- 领取错误含 `Key 'IDX_microi_job_T_NFT_ST' doesn't exist` 时，是 Quartz 3.19 MySQL 方言依赖 `USE INDEX (IDX_{tablePrefix}T_NFT_ST)` 与 `IDX_{tablePrefix}T_NFT_ST_MISFIRE`，而触发器表缺少这两个索引（常见于历史租户库仍是旧 `QRTZ_` 前缀索引名）。平台调度器初始化会按前缀幂等补齐；人工抢修可直接执行文档中的两条 `CREATE INDEX`，索引名大小写不敏感，补完后无需重建任务或 Cron。
 - 失败记录错误分类、重试次数和 `NextRetryTime`，采用有上限退避；永久错误进入人工处理。
 - 外部调用设置超时；无法确认对方是否成功时用业务幂等号查询，不盲目重发。
 - 服务停机先停止接单，再在有限宽限期排空或持久化；重启扫描未完成任务。
