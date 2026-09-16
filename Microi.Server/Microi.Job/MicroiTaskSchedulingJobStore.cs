@@ -5,8 +5,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Quartz;
 using Quartz.Impl.AdoJobStore;
+using Quartz.Impl.AdoJobStore.Common;
 using Quartz.Impl.Matchers;
 using Quartz.Spi;
+using Quartz.Util;
 
 namespace Microi.net
 {
@@ -23,6 +25,38 @@ namespace Microi.net
         protected virtual Task<bool> IsSchedulingDisabled(string tenant) => MicroiTaskSchedulingPolicy.IsDisabledAsync(tenant);
         protected virtual Task WriteSchedulingSkip(string tenant, IOperableTrigger trigger) => MicroiDisabledScheduleObserver.WriteSkip(
             tenant, trigger.JobKey, trigger.Key, trigger.GetNextFireTimeUtc() ?? DateTimeOffset.UtcNow, InstanceId);
+
+        /// <summary>
+        /// 调度器就绪前再补一次 MySQL 触发器领取索引。应用启动入口已显式执行过一次，
+        /// 这里作为第二道保险：只有 Quartz 确实把委托/数据源注入到本存储时才生效，
+        /// 因此不能把自愈只挂在存储初始化上。重复执行幂等。
+        /// </summary>
+        protected virtual Task<int> RepairSchedulingSchemaAsync(CancellationToken cancellationToken)
+        {
+            if (!MicroiQuartzSchemaRepair.RequiresRepair(DriverDelegateType)) return Task.FromResult(0);
+            var connectionString = "";
+            try
+            {
+                using var connection = DBConnectionManager.Instance.GetConnection(DataSource);
+                connectionString = connection?.ConnectionString ?? "";
+            }
+            catch
+            {
+                // 连接提供者尚未注册时交由 Quartz 自身报错，索引修复保持静默。
+                return Task.FromResult(0);
+            }
+            var tablePrefix = string.IsNullOrWhiteSpace(TablePrefix)
+                ? MicroiQuartzSchemaRepair.DefaultTablePrefix
+                : TablePrefix;
+            return MicroiQuartzSchemaRepair.EnsureWithinBudgetAsync(connectionString, tablePrefix);
+        }
+
+        public override async Task Initialize(
+            ITypeLoadHelper loadHelper, ISchedulerSignaler signaler, CancellationToken cancellationToken = default)
+        {
+            await RepairSchedulingSchemaAsync(cancellationToken).ConfigureAwait(false);
+            await base.Initialize(loadHelper, signaler, cancellationToken).ConfigureAwait(false);
+        }
 
         private async Task<MicroiTaskSchedulingSelection> ReadSelection(ConnectionAndTransactionHolder conn, CancellationToken cancellationToken)
         {

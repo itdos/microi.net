@@ -4,11 +4,13 @@ const defaultPageFormConfig = {
     drag: false,
     left: false,
     hover: false,
-    shadow: true,
+    shadow: false,
     link: true,
     watermark: false,
     mobile: false,
     dark: false,
+    themeMode: 'system',
+    density: 'compact',
     autoRefresh: 0,
     lastRefreshTime: '',
     watermarkStyle: {
@@ -221,6 +223,7 @@ function statParams(data, dark) {
         param(21, 'Value padding', 'input', '0'),
         param(22, 'Value margin', 'input', '0'),
         param(23, 'Icon margin', 'input', '0'),
+        param(24, 'Appearance', 'select', 'summary', { options: [{ label: '摘要', value: 'summary' }, { label: '明细指标', value: 'detail' }, { label: '彩色卡片', value: 'cards' }] }),
     ];
 }
 function chartParams(type, dataJson, title, unit = '') {
@@ -254,7 +257,7 @@ function chartParams(type, dataJson, title, unit = '') {
         param(0, 'Data source', 'textarea', '', { rows: 3, dataJson: chartDataJson }),
         param(1, 'Show search', 'switch', true),
         param(2, 'Boundary gap', 'switch', type === 'bar'),
-        param(3, 'Bar effect', 'select', 'shadow'),
+        type === 'line' ? param(3, 'Smooth line', 'switch', false) : param(3, 'Bar effect', 'select', 'shadow'),
         param(4, 'Unit', 'input', unit),
         param(5, 'Title', 'input', title),
         param(6, 'Subtitle', 'input', ''),
@@ -320,12 +323,13 @@ function makeWrapper(title, span, height, widgetListFactory, dark) {
             push: 0,
             pull: 0,
             height,
+            heightMode: 'content',
             marginTop: 0,
             margin: '0px 10px 10px 0px',
-            pannelColor: dark ? '#111827' : '#ffffff',
+            pannelColor: 'var(--el-bg-color)',
             dynamicStyle: {
-                padding: '12px',
-                backgroundColor: dark ? '#111827' : '#ffffff',
+                padding: '8px',
+                backgroundColor: 'var(--el-bg-color)',
             },
             titleOption: {
                 hidden: true,
@@ -336,7 +340,7 @@ function makeWrapper(title, span, height, widgetListFactory, dark) {
                     height: '22px',
                     lineHeight: '22px',
                     fontSize: '14px',
-                    color: dark ? '#e5e7eb' : '#111827',
+                    color: 'var(--el-text-color-primary)',
                 },
                 moreOption: {
                     hidden: false,
@@ -489,15 +493,18 @@ function scenarioData(scenario) {
 export function buildPageDesign(input) {
     const prompt = input.prompt || '';
     const scenario = scenarioFromPrompt(prompt, input.theme);
-    const dark = /dark|深色|黑色|大屏|驾驶舱/.test(`${prompt} ${input.style || ''}`.toLowerCase());
+    const style = `${prompt} ${input.style || ''}`.toLowerCase();
+    const dark = /dark|深色|黑色/.test(style);
+    const themeMode = dark ? 'dark' : /light|浅色|亮色/.test(style) ? 'light' : 'system';
     const data = scenarioData(scenario);
     const title = input.title || data.title;
     const desc = input.desc || data.subtitle;
-    const background = dark ? '#0f172a' : '#f3f4f6';
+    const background = 'var(--el-bg-color-page)';
     return {
         formConfig: {
             ...defaultPageFormConfig,
             dark,
+            themeMode,
             title,
             dynamicStyle: {
                 padding: '12px 0 0 0',
@@ -506,8 +513,8 @@ export function buildPageDesign(input) {
             },
         },
         wrapperList: [
-            makeWrapper(title, 24, 120, (wrapperNumber) => [
-                makeWidget('workbench', 'Workbench', wrapperNumber, 24, 90, [
+            makeWrapper(title, 24, 76, (wrapperNumber) => [
+                makeWidget('workbench', 'Workbench', wrapperNumber, 24, 48, [
                     param(0, 'Data source', 'textarea', '', {
                         rows: 3,
                         dataJson: {
@@ -518,8 +525,8 @@ export function buildPageDesign(input) {
                     }),
                 ]),
             ], dark),
-            makeWrapper('核心指标', 24, 220, (wrapperNumber) => [
-                makeWidget('statistic', 'Statistic', wrapperNumber, 24, 190, statParams(data.stats, dark)),
+            makeWrapper('核心指标', 24, 112, (wrapperNumber) => [
+                makeWidget('statistic', 'Statistic', wrapperNumber, 24, 84, statParams(data.stats, dark)),
             ], dark),
             makeWrapper('趋势分析', 12, 340, (wrapperNumber) => [
                 makeWidget('bar', 'Bar Chart', wrapperNumber, 24, 300, chartParams('bar', {
