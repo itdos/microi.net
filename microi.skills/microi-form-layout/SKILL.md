@@ -137,7 +137,7 @@ Q1: 核心可见字段数、子表和强任务域？
 V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.ClickFormTab('tabId')` 动态控制 Tab 显隐和默认选中。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-003 sha256=02934831afff7bd9065406b074f5780cb5686ccdb63fcb350b8c409dad315c74 -->
+<!-- microi-progressive:chunk id=microi-form-layout-003 sha256=64c443ebb86b5bdc72003016065bd02f358ab62fcd9f35b945c4ddc60ee5de56 -->
 ## 5. 必填与禁止
 
 ### 5.1 必填

@@ -101,6 +101,8 @@
     <ProjectReference Include="../Dos.ORM/Dos.ORM.csproj" />
     <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
+    <!-- 源码宿主显式使用与日志组件相同的兼容驱动，禁止由其它包还原回官方不兼容版本。 -->
+    <ProjectReference Include="../ThirdParty/MongoDB.Driver/MongoDB.Driver.Compatibility.csproj" />
   </ItemGroup>
   
   <!-- 五个闭源库的引用模式由 Directory.Build.props 按解决方案统一决定。 -->

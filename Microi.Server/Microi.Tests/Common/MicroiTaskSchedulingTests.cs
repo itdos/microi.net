@@ -64,6 +64,56 @@ public class MicroiTaskSchedulingTests
     }
 
     [Fact]
+    public async Task HungTenant_IsBounded_DoesNotStarveHealthyTenant_AndDoesNotAccumulateReads()
+    {
+        var previous = OsClientExtend.ClientList;
+        var tenant = "hung-" + Guid.NewGuid().ToString("N");
+        var healthy = "healthy-" + Guid.NewGuid().ToString("N");
+        OsClientExtend.ClientList = new ConcurrentDictionary<string, OsClientSecret>();
+        OsClientExtend.ClientList[tenant] = new OsClientSecret();
+        OsClientExtend.ClientList[healthy] = new OsClientSecret();
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        Task<bool> Read(string name)
+        {
+            if (name != tenant) return Task.FromResult(false);
+            Interlocked.Increment(ref calls);
+            return release.Task;
+        }
+        try
+        {
+            var results = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => MicroiTaskSchedulingPolicy.ReadTenantsAsync(Read)))
+                .WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            Assert.All(results, result => { Assert.True(result[tenant]); Assert.False(result[healthy]); });
+            var next = await MicroiTaskSchedulingPolicy.ReadTenantsAsync(Read);
+            Assert.True(next[tenant]);
+            Assert.False(next[healthy]);
+            Assert.Equal(1, calls);
+        }
+        finally { release.TrySetResult(false); OsClientExtend.ClientList = previous; }
+    }
+
+    [Fact]
+    public async Task SynchronousCacheInitialization_IsAlsoBounded()
+    {
+        var previous = OsClientExtend.ClientList;
+        var tenant = "sync-hung-" + Guid.NewGuid().ToString("N");
+        using var unblock = new ManualResetEventSlim(false);
+        using var finished = new ManualResetEventSlim(false);
+        OsClientExtend.ClientList = new ConcurrentDictionary<string, OsClientSecret>();
+        OsClientExtend.ClientList[tenant] = new OsClientSecret();
+        try
+        {
+            Task<bool> Read(string _) { unblock.Wait(); finished.Set(); return Task.FromResult(false); }
+            var result = await Task.Run(() => MicroiTaskSchedulingPolicy.ReadTenantsAsync(Read))
+                .WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            Assert.True(result[tenant]);
+            Assert.Contains("1 秒", MicroiTaskSchedulingPolicy.ReadFailure(tenant));
+        }
+        finally { unblock.Set(); Assert.True(finished.Wait(3000)); OsClientExtend.ClientList = previous; }
+    }
+
+    [Fact]
     public void AllAcquisitionAndMisfireVariants_FilterBeforeLimit_AndScopeIsRestored()
     {
         var selection = new MicroiTaskSchedulingSelection(new Dictionary<string, bool> { ["off"] = true, ["on"] = false }, new[] { "legacy'allowed" });

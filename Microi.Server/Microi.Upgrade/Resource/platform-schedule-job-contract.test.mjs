@@ -68,7 +68,7 @@ test('SaaS 官方包包含 Managed 定时任务接口引擎', () => {
   const engine = packageData.SysApiEngines.find(item => item.ApiEngineKey === 'platform-schedule-job');
   assert.ok(engine);
   assert.equal(engine.ApiV8Code.replace(/\r\n/g, '\n').trim(), engineCode.replace(/\r\n/g, '\n'));
-  assert.equal(engine.Version, 'v1.0.2');
+  assert.equal(engine.Version, 'v1.1.1');
   assert.equal(engine.ApiRoutes, legacyRoutes.join(';'));
   assert.deepEqual(packageData.ResourcePolicies.ApiEngines['platform-schedule-job'], {
     Ownership: 'Platform',
@@ -282,4 +282,35 @@ test('旧版后端在同步调度前明确要求升级，避免重新进入元�
   const currentBackend = runEngine(param);
   assert.equal(currentBackend.result.Code, 1);
   assert.equal(currentBackend.calls.filter(item => item.type === 'save').length, 1);
+});
+
+test('日志动作保留错误和游标且不接收外部租户，诊断不触发保存', () => {
+  for (const Action of ['logs', 'historylogs']) {
+    const requests = [];
+    const failure = { Code: 0, Msg: 'MongoDB unavailable' };
+    const V8 = { Param: { Action, JobName: 'minute', SearchMonth: '202609', PageSize: 21, BeforeLogTime: '2026-09-15', BeforeLogId: 'event', OsClient: 'foreign' },
+      Method: { ManageScheduleJob: request => { requests.push(request); return failure; } } };
+    assert.equal(vm.runInNewContext(`(function(){${engineCode}})()`, { V8 }), failure);
+    assert.equal(requests.length, 1); assert.equal(requests[0].OsClient, undefined);
+    assert.equal(requests[0].BeforeLogId, 'event'); assert.equal(requests[0].Action, Action);
+  }
+  const diagnostic = runEngine({ Action: 'Diagnostics', JobName: 'minute' });
+  assert.equal(diagnostic.result.Code, 1);
+  assert.deepEqual(diagnostic.calls.map(item => item.type), ['manage']);
+});
+
+test('两个包均保留历史日志，字段 Tabs 只包含新旧两个只读日志组件', () => {
+  for (const model of [packageData, standaloneJobPackage]) {
+    const fields = model.DiyFields.filter(item => item.TableId === '0234e89e-2e80-4ae0-b86a-f53635e29460');
+    const group = fields.find(item => item.Name === 'RenwuZHRZ');
+    assert.equal(group.Component, 'Tabs');
+    assert.deepEqual(JSON.parse(group.Config).FieldTabs.Tabs.map(tab => tab.Key), ['mongo', 'history']);
+    const logs = fields.filter(item => ['RizhiLB', 'MongoRunLogs'].includes(item.Name));
+    assert.equal(logs.length, 2);
+    assert.deepEqual(logs.map(item => JSON.parse(item.Config).ScheduleLogSource).sort(), ['History', 'MongoDB']);
+    assert.ok(logs.every(item => item.Component === 'DevComponent' && !item.Type));
+    assert.ok(model.DDLStatements.some(item => /idx_schedule_job_history_cursor.*JobName,CreateTime,Id/.test(item.DDL)));
+    assert.ok(model.DiyTables.some(item => item.Name.toLowerCase() === 'diy_schedule_job_log'));
+    assert.equal(model.ScheduleJobs?.length || 0, 0);
+  }
 });

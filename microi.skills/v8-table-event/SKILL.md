@@ -61,7 +61,7 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 - `diy_table.V8Limit` 是表后端提交前、提交后和数据处理 V8 的正向开关：缺失、`null`、`0/false` 均不设置 Jint 单次超时、语句、函数递归和累计分配预算，只有 `1/true` 才启用这些限制。旧 `V8Unlimited` 仅在新字段不存在时反向推断，新的 MCP、Manifest 和应用资源只写 `V8Limit`。进程常驻内存、取消、并发、接口嵌套深度、权限和数据库保护始终生效。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-003 sha256=65a1e728982d4e534d06dc2440eac111fe53a08f0a3012c6a9f8b1de45b4b81f -->
+<!-- microi-progressive:chunk id=v8-table-event-003 sha256=5140cd224fd5ac044715f0b3ac79d18f8816d4ce36b6c05cc04e044dbf956214 -->
 ## ⚠️ 关键陷阱（必读）
 
 ### 1. 设计模式保护（前端事件必加）

@@ -210,8 +210,14 @@ async function printBatch(rows, startIndex) {
   当前没有公开的自定义服务配置，并选择枚举到的第一个可写特征；其它型号可能需要扩展源码。
   CC4 固件若只开放 SPP 或使用其它私有 UUID，Web 端不可连接；Android 5+App 使用已配对 SPP，
   或先取得厂家准确 BLE UUID 再扩展源码，禁止猜 UUID。
-- `prepareSend` 默认每包 20 字节、包间约 20ms；同一缓冲区多份打印间约 100ms。这只是
-  BLE 写节奏，不是打印完成等待时间。包长必须是已实测的正整数，空缓冲区不得发送。
+- `prepareSend` 默认每包 20 字节；Android 5+ 的佳博 GP-M322 确认写入逐包 await 原生回调，
+  不再追加 20ms。其它型号、iOS、Web、无响应写与 SPP 保留约 20ms，同一缓冲区多份间约 100ms。
+  这是写节奏，不是物理走纸确认。5+ BLE 限制为本次连接的 `maxWriteBytes`；未知 MTU 为 20。
+- 5+ 佳博在服务发现后协商 MTU，最多等待 1.5 秒，`getConnectionState()` 返回 `mtu`、
+  `maxWriteBytes`、`recommendedPacketSize`（20/100/180）、`writeType`、`packetIntervalMs`。
+  必须读取真实回调的 `mtu`；空成功、失败、超时或缺 API 不可按请求值升档，迟到回调不得提升能力，
+  断开时清除能力。自定义微服务需按这些字段判断，不能只允许 `engine === 'web'`。
+  `microi.app` 在线壳更新远程前端即可获取本修复；WebView 缺少 Web Bluetooth 时不增加无效切换选项。
 - 当前分包公式使用 `Math.ceil(length / packetSize)`，长度恰好整除时不会产生 0 字节末包；
   空数据、非法包长和非法份数会直接抛错。合法数值仍须按目标打印机实测。
 - TSC 与 ESC 文本使用仓库内置 `encoding.js` + `encoding-indexes.js` 转为 GB18030，运行时

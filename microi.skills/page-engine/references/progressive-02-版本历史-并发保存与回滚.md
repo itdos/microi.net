@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=page-engine-011 sha256=44c991a664b2379ed0d88b8f307e8cfbff27e4c349270cd9872f856f0d0b570b -->
+<!-- microi-progressive:chunk id=page-engine-011 sha256=12fce12290d6d23fd2fc80ef04861383da21a68ccceeaa4d63baacae3abd2b09 -->
 ## 版本历史、并发保存与回滚
 
 修改现有页面时必须先读取页面详情中的 `CurrentHash`，保存时把它作为 `expectedHash` 传入，并填写简短 `changeSummary`。不要仅凭本地旧 JSON 覆盖远端页面。
@@ -22,7 +22,7 @@
 - 页面历史属于当前租户数据库；不要假定业务表有物理 `OsClient` 列。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-012 sha256=61a83f536eede477a85d7d49cadf516e705d7d67510c189f9fb6ab0e72ba63db -->
+<!-- microi-progressive:chunk id=page-engine-012 sha256=3b4d714b8c18fe21dca53f666b702bd2fd8a4fb12e2b0068aa7654eaed7ea847 -->
 ## 本地撤销、Vue 源码桥与资产包
 
 - 设计器本地历史最多 50 步、总计最多 20MB；连续编辑允许合并，但保存前必须刷新当前 `CurrentHash`。
@@ -36,7 +36,7 @@
 - 复杂页面需要完整工程能力时提升为前端微服务；不要承诺任意 Vue 源码无损反编译回界面引擎。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-013 sha256=d78e797960620f983fc73f8485c0e928937474340efe6c2ec8923cfd5f4a28f2 -->
+<!-- microi-progressive:chunk id=page-engine-013 sha256=c24083380909395251b816bf0beb96e99b6e1941baf5031a0ae13d947b23c4c0 -->
 ## 生成 JSON 注意事项
 
 1. **编号唯一**：`wrapperOption.number` 和 `widgetOption.number` 页面内唯一（随机5位整数）
@@ -48,7 +48,7 @@
 7. **formConfig 完整**：所有字段都应包含，不能省略
 8. **选项卡容器**：组件放在 `tabWidgetMap[tabKey][]` 中，不放在 `widgetList` 中
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-014 sha256=18fecb3e402daeb1f95e8f501c4456455a4c1a3b9de83208d03676f5cbf1cf84 -->
+<!-- microi-progressive:chunk id=page-engine-014 sha256=e1abcb185d1df147ce4631d185ac8cb231f9cfd92fda91bc0e0d72667c837072 -->
 ## 经营看板周期筛选与布局规则
 
 - 老板驾驶舱、经营看板、CRM/订单/售后统计页面，所有统计类组件默认都要提供统一周期筛选：本日、本周、本月、本季、本年、去年，以及“更多”里的自定义时间范围和业务条件。

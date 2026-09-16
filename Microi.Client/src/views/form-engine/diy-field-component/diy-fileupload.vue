@@ -156,7 +156,12 @@
         <el-dialog v-model="roleDialogVisible" title="设置附件可见角色" width="min(520px, 92vw)" append-to-body destroy-on-close>
             <p class="file-role-dialog-name">{{ roleEditingFile?.Name }}</p>
             <el-select v-model="selectedRoleIds" multiple filterable clearable :loading="rolesLoading" placeholder="请选择角色，留空跟随表单权限" style="width: 100%">
-                <el-option v-for="role in roleOptions" :key="role.Id" :label="role.Name" :value="role.Id" />
+                <template #tag>
+                    <el-tag v-for="id in selectedRoleIds" :key="id" :closable="!rolesLoading" @close="selectedRoleIds = selectedRoleIds.filter(value => value !== id)">
+                        {{ roleOptions.find(role => role.Id === id)?.Name || '已删除角色' }}
+                    </el-tag>
+                </template>
+                <el-option v-for="role in roleOptions" :key="role.Id" :label="role.Name" :value="role.Id" :disabled="role.Disabled" />
             </el-select>
             <p class="form-item-tip">{{ field.Config.FileUpload.DisableRoleInheritance ? '仅所选角色可访问；仍须具备当前表单权限。' : '所选角色及角色 Level 更高的用户可访问；仍须具备当前表单权限。' }} 保存表单后生效。</p>
             <template #footer><el-button @click="roleDialogVisible = false">取消</el-button><el-button type="primary" :disabled="rolesLoading || !rolesLoaded" @click="saveFileRoles">确定</el-button></template>
@@ -182,6 +187,12 @@
                 <el-form-item label="启用附件角色权限">
                     <el-switch v-model="configForm.EnableRolePermission" @change="value => { if (value) configForm.Limit = true; }" />
                     <div class="form-item-tip">为每个附件多选可见角色，自动使用私有存储。历史公有文件需重新上传后设置。</div>
+                </el-form-item>
+                <el-form-item label="可配置角色列表">
+                    <el-select v-model="configForm.ConfigurableRoleIds" multiple filterable clearable :loading="configRolesLoading" placeholder="留空可选择全部角色" style="width: 100%">
+                        <el-option v-for="role in configRoleOptions" :key="role.Id" :label="role.Name" :value="role.Id" />
+                    </el-select>
+                    <div class="form-item-tip">指定每个附件可选择的角色范围。已有附件的角色仍保留；范围外角色可移除，不可新增。</div>
                 </el-form-item>
                 <el-form-item label="隐藏无权限文件列表"><el-switch v-model="configForm.HideUnauthorizedFiles" /><div class="form-item-tip">默认关闭；开启后不显示无权限附件行，保存仍保留原附件。</div></el-form-item>
                 <el-form-item label="显示无权限文件名称"><el-switch v-model="configForm.ShowUnauthorizedFileName" /><div class="form-item-tip">默认关闭；开启后只展示名称，仍不可预览、下载或修改。</div></el-form-item>
@@ -315,7 +326,7 @@ import { getUploadPreviewUrl, resolveUploadLimit, sanitizeUploadMeta } from "@/u
 import { buildFormFieldUploadContext } from "@/utils/form-field-upload-context";
 import DiyUploadCompactSummary from './diy-upload-compact-summary.vue';
 import DiyFileRoleTags from './diy-file-role-tags.vue';
-import { fileRoleConfig, canReadFile, canEditFile, visibleFiles } from '@/utils/file-role-permission';
+import { fileRoleConfig, configurableFileRoles, canReadFile, canEditFile, visibleFiles } from '@/utils/file-role-permission';
 
 // 禁用属性继承
 defineOptions({
@@ -403,6 +414,8 @@ const roleDialogVisible = ref(false);
 const roleEditingFile = ref(null);
 const selectedRoleIds = ref([]);
 const roleOptions = ref([]);
+const configRoleOptions = ref([]);
+const configRolesLoading = ref(false);
 const rolesLoading = ref(false);
 const rolesLoaded = ref(false);
 const openRoleDialog = file => {
@@ -420,7 +433,7 @@ const openRoleDialog = file => {
     DiyCommon.Post(DiyApi.GetSysRole(), { IsDeleted: 0, ...getFormFieldUploadContext() }, result => {
         rolesLoading.value = false;
         if (!DiyCommon.Result(result)) return;
-        roleOptions.value = (result.Data || []).map(role => ({ Id: role.Id, Name: role.Name, Level: role.Level }));
+        roleOptions.value = configurableFileRoles(result.Data || [], props.field.Config.FileUpload, file);
         rolesLoaded.value = true;
     }, () => { rolesLoading.value = false; });
 };
@@ -537,6 +550,12 @@ const openConfig = () => {
         UploadSuccessV8: props.field.Config.Upload?.UploadSuccessV8 || ''
     };
     configDialogVisible.value = true;
+    configRolesLoading.value = true;
+    // 设计器使用已有管理员角色目录；运行态按字段上下文获取的目录由后端白名单过滤。
+    DiyCommon.Post(DiyApi.GetSysRole(), { IsDeleted: 0 }, result => {
+        configRolesLoading.value = false;
+        if (DiyCommon.Result(result)) configRoleOptions.value = result.Data || [];
+    }, () => { configRolesLoading.value = false; });
 };
 
 // 保存配置

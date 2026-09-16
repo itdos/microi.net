@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-008 sha256=765335189d85b558ad29ba73c04d1cf078101ee94819f969195b50440a82106f -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-008 sha256=8cc961b2ba44763893f3cc09fbfca36668061b6bd75fc8f066904a04622948ff -->
 ## 4. 重要按钮必须带图标
 
 醒目的主操作必须使用打磨过的图标加文字按钮。
@@ -23,7 +23,7 @@
 - 确认主操作有图标、合适的加载文案和按下反馈。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-009 sha256=e3c66bd92ca059235a7a3b0ece2fdfa598a41eaa149d0ee3a0d24d0d822a9f58 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-009 sha256=47248f77c0a41a7fd64f6a255d8c9af356b6768e5167c73a48d60b86f1ab9899 -->
 ## 4.1 模块列表优先使用声明式业务卡片
 
 Microi.Client 的标准模块移动端不应把 PC 表格字段机械纵向堆叠。优先在
@@ -53,7 +53,7 @@ Microi.Client 的标准模块移动端不应把 PC 表格字段机械纵向堆�
 - 批量选择后出现底部操作条；取消选择、执行按钮、更多菜单均可单手点击。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-010 sha256=2ddd560cf3620f8fb7f3cf64d62566206430ee14e6ac380a3023c5b9047b4f46 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-010 sha256=979733873bd74cd95b0c84988a8d3709f673a813dc212076e4f02e8b376fb492 -->
 ## 5. 首屏文字和浮层不得重叠
 
 移动端首屏常组合大首屏区域和悬浮快捷面板。这个布局必须视觉检查，因为过大的中文标题和激进的负边距容易造成难看的换行或遮挡主按钮。
@@ -74,7 +74,7 @@ Microi.Client 的标准模块移动端不应把 PC 表格字段机械纵向堆�
 - 检查首屏标题、主/次按钮和后续悬浮面板是否裁切或重叠。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-011 sha256=b599e047e6b7a3688e4264a4d4b334e220e9798cbc13326e85a06f52bf20ce12 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-011 sha256=47a21d62bc04740ed19eea3f7c2c816e4c73b9054de63beb16df12468c6a4363 -->
 ## 5.1 未登录/授权提示必须在可用内容区居中
 
 未登录、未授权、无权限等提示模块不能贴在页面顶部。页面上方有 hero/header，下方有 tabBar 或固定底栏时，提示卡片和“立即登录/去授权”按钮必须在剩余可用内容区上下左右居中。
@@ -94,7 +94,7 @@ Microi.Client 的标准模块移动端不应把 PC 表格字段机械纵向堆�
 - 375px、430px、iOS 刘海屏/灵动岛和 Android 状态栏场景均不得出现贴顶或按钮文字偏移。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-012 sha256=a363aaead9b632f3533e2f046f39cf7b579a91b92ef4e33d42f848d5a7538515 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-012 sha256=22c9781f49c49419f30df95fac1694cbd1b94bdec99215bb7446ad655b111053 -->
 ## 5.2 自定义导航页面必须通过安全区与微信胶囊门禁
 
 `navigationStyle: custom` 代表应用接管了系统导航区域，页面壳必须同时负责状态栏、刘海/灵动岛、微信右上角胶囊和底部手势区，不能把这一责任留给业务页面自行估算。
@@ -113,7 +113,7 @@ Microi.Client 的标准模块移动端不应把 PC 表格字段机械纵向堆�
 - 发现任意页面被遮挡时，必须修复共享页面壳并重跑全路由；禁止只给当前截图页面增加固定 padding。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-013 sha256=207765d0398738f24566763a2481469f4fc63e8a0b5f00abd292fe8a1cdd225a -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-013 sha256=f4e1f01f3dde22120ecba9131b5c738118c0e4aa8131ea83978f3e1d6b4db289 -->
 ## 5.3 全屏工具页必须遵守返回状态栈
 
 - AI 助手、扫码工作台、全屏预览等独占视口功能需要手机侧滑返回时，优先使用独立路由承载；普通 `position:fixed` 蒙层不能冒充页面历史。
@@ -122,7 +122,7 @@ Microi.Client 的标准模块移动端不应把 PC 表格字段机械纵向堆�
 - 自动化至少覆盖关闭按钮、Android 返回键/`onBackPress`、微信侧滑返回三条路径，并验证返回后原页面和滚动状态仍然可用。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-014 sha256=1451e6ffbb0c0d29d8362e400540e3fa4f9f38a2402a9faf93de4cce7b1c9b4c -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-014 sha256=eaf8ac0e9edadf382a08951d6c43b9ab561dd2a8ee02fc80048fc843e4656033 -->
 ## 5.4 微信浮动入口必须通过真实事件桥门禁
 
 - UniApp 自定义组件中的浮动按钮、拖拽助手和悬浮客服不得只做 H5 点击测试。必须在微信运行时找到真实组件节点，派发 `touchstart/touchend`，并断言页面栈、弹层状态或业务动作确实变化。
@@ -131,7 +131,7 @@ Microi.Client 的标准模块移动端不应把 PC 表格字段机械纵向堆�
 - 自动化需增加对照按钮：同页普通按钮可点击、浮动入口也可点击，才能确认不是自动化连接或页面整体失效。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-015 sha256=8377f92a7456bd68e83867e893f1c9e8eec9edf0bba2a3f434c5bce75a9e2d00 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-015 sha256=3a65e2da022d493b7d950450a10186d33652ec4225c359d9b3800ef431458525 -->
 ## 6. 后台菜单必须规划为至少两级
 
 真实业务系统的后台菜单不能简单堆成一批一级菜单。
@@ -159,7 +159,7 @@ Microi.Client 的标准模块移动端不应把 PC 表格字段机械纵向堆�
 - 最终回复必须说明通过 MCP 写入的真实菜单树，以及执行过的权限刷新。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-016 sha256=0c1632d28f986156f8d70b2710dc0219de4643b4b9c61771ac544a18f4c355ac -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-016 sha256=808d3a4d3e7736566e1dd23c287a9316ea851c3ca212ffe283f49e565a7e0a3d -->
 ## 7. 移动端页面需要动效，但动效必须有用
 
 移动端产品不应像静态后台表单。
@@ -181,7 +181,7 @@ Microi.Client 的标准模块移动端不应把 PC 表格字段机械纵向堆�
 - 没有动画导致横向溢出、文字裁切或固定栏抖动。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-017 sha256=2dcca5305da25f543181ae23550547cb3e3761aebae2843c5fc60e7848153176 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-017 sha256=15d415351b8e3a7700d56cab2b39079494b06265b7d648636d1e511db1892161 -->
 ## 8. 登录页必须是直接登录界面
 
 登录页不能强迫用户先在两个身份标签之间切换才能登录。
