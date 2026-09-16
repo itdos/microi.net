@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <EmbeddedResource Include="V8Engine/Runtime/GlobalDateFunctions.js" LogicalName="Microi.GlobalDateFunctions.js" />
@@ -22,9 +22,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，核心库。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>8.3.6</Version>
-    <AssemblyVersion>8.3.6</AssemblyVersion>
-    <FileVersion>8.3.6</FileVersion>
+    <Version>8.3.7</Version>
+    <AssemblyVersion>8.3.7</AssemblyVersion>
+    <FileVersion>8.3.7</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -48,7 +48,7 @@
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.21.0" />
     <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="10.0.10" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.21.0" />
-    <PackageReference Include="MongoDB.Bson" Version="3.10.0" />
+    <PackageReference Include="MongoDB.Bson" Version="3.11.2" />
     <!-- Pin the fixed XML signature implementation for legacy ASP.NET Core 2.x transitive dependencies. -->
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
     <!-- MQTTnet 5.x only targets net8.0+; 4.3.7 is the latest netstandard2.1-compatible release. -->

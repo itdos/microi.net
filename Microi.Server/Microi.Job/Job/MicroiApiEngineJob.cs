@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace Microi.net
 {
@@ -33,6 +34,9 @@ namespace Microi.net
             using var trace = MicroiTraceContext.StartActivity("Microi.Job");
             using var observation = ExecutionObservation.Enter("Job", context.JobDetail.Key.Name, osClient, eventName: "ScheduledJob");
             ExecutionObservation.Annotate(stage: "Run:" + context.FireInstanceId);
+            var startedAt = DateTime.Now;
+            var elapsed = Stopwatch.StartNew();
+            var logId = Guid.NewGuid().ToString("N");
             try
             {
                 JObject param = JObject.FromObject(context.JobDetail.JobDataMap);
@@ -52,23 +56,11 @@ namespace Microi.net
                         StringComparison.Ordinal)
                     ? DatabaseBackupControlService.QueueScheduledBackup(param)
                     : await MicroiEngine.ApiEngine.RunAsync(param);
-                if (result != null)
-                {
-                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(new
-                    {
-                        FormEngineKey = MicroiJobConst.logTable,
-                        _RowModel = new Dictionary<string, string>()
-                        {
-                            { "JobName", context.JobDetail.Key.Name},
-                            { "Message", JsonHelper.Serialize(result)}
-                        },
-                        OsClient = osClient
-                    });
-                    if (addResult.Code != 1)
-                    {
-                        MicroiEngine.QueueSystemLog(osClient, "Job", "ExecutionLogWriteFailed", "定时任务执行记录写入失败", addResult.Msg, 2, false, context.JobDetail.Key.Name);
-                    }
-                }
+                // 引擎 Code!=1 同样是执行失败；不能把未抛异常误报为业务成功。
+                var success = ScheduleExecutionLog.Success((object)result);
+                if (success == false) observation.Failed();
+                ScheduleExecutionLog.Write(osClient, context.JobDetail.Key.Name, logId,
+                    success == false ? "Failed" : "Completed", (object)result, success, elapsed.Elapsed.TotalMilliseconds, startedAt);
             }
             catch (Exception ex)
             {
@@ -82,23 +74,8 @@ namespace Microi.net
                 
                 MicroiEngine.QueueSystemLog(osClient, "Job", "ApiEngineJobFailed", "定时任务执行接口引擎失败", errorMsg, 2, false, context.JobDetail.Key.Name);
                 
-                try
-                {
-                    await MicroiEngine.FormEngine.AddFormDataAsync(new
-                    {
-                        FormEngineKey = MicroiJobConst.logTable,
-                        _RowModel = new Dictionary<string, string>()
-                        {
-                            { "JobName", context.JobDetail.Key.Name},
-                            { "Message", errorMsg}
-                        },
-                        OsClient = osClient
-                    });
-                }
-                catch (Exception logEx)
-                {
-                    MicroiEngine.QueueSystemLog(osClient, "Job", "FailureLogWriteFailed", "定时任务失败记录写入失败", logEx.ToString(), 2, false, context.JobDetail.Key.Name);
-                }
+                ScheduleExecutionLog.Write(osClient, context.JobDetail.Key.Name, logId,
+                    "Failed", errorMsg, false, elapsed.Elapsed.TotalMilliseconds, startedAt);
                 // 2026-05-01 健壮性加固：以 JobExecutionException 包装并向 Quartz 抛出，
                 // 让调度器感知失败状态、生成 misfire 记录，并支持 @DisallowConcurrentExecution 的串行控制。
                 // refireImmediately=false：不立即重试，等待下一次正常调度，避免错误风暴。

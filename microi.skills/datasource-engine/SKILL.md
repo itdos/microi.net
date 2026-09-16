@@ -13,6 +13,8 @@ description: Microi 数据源引擎设计、调用与安全规范。用于配置
 
 数据源定义保存在 `sys_datasource`，属于平台控制面：创建、修改、删除、匿名开关和角色配置只允许 `Level >= 9999` 的可信管理链路。普通角色只能调用已经授权的数据源。
 
+兼容 HTTP 入口为 `POST /api/DataSourceEngine/GetData` 与 `POST /api/DataSourceEngine/Run`；新代码优先使用前后端类型化的 `V8.DataSourceEngine.Run/RunAsync`，兼容路由仍必须执行当前租户、角色和数据源权限校验。
+
 ## 标准调用
 
 前端 V8：

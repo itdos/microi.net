@@ -7,6 +7,12 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 # Microi.Client 前台源码架构说明
 
+表单设计保存请求必须使用 `DiyCommon.GetOsClient()`，不能将导入表定义残留的 `OsClient`
+作为传输租户；元数据来源与当前会话租户是不同概念。回归应覆盖从另一租户迁入的表定义，
+验证表和字段保存成功且会话保持有效，不通过放宽后端租户鉴权修复。
+右上角授权类型优先读取公开启动配置 `SysConfig.PlatformEdition`，兼容旧版会话查询；
+`SysConfig.HideSystemLicenseVersion` 缺省关闭，标签可点击跳转 `/license`，不能因一次请求失败永久消失。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=microi-client-frontend-000 sha256=9b949c68b0867fc1ecf2e6cb1fd1bec45d22c01ad3be63485e0376d0183d1795 -->
 ## 单行文本插槽按钮约定

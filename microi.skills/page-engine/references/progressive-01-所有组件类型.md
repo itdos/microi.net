@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=page-engine-008 sha256=91bce1411def87c7382ab3759f5fdd9c8d139af3687f8bfb8e000a9c812681a2 -->
+<!-- microi-progressive:chunk id=page-engine-008 sha256=da3cbca3455f750d2635713e3b5f273bc28ce3a696de2108b697aac6632bc8b0 -->
 ## 所有组件类型
 
 ### statistic — 统计面板
@@ -124,7 +124,7 @@
 首页编排可以组合 `aiengine`、`workcenter`、`diycalendar`、`diytable` 和一个占大区域的 `pageengine`。公告应优先通过绑定 `diy_notice` 的 `diytable` 渲染，使增删改权限继续由 `sys_menu + _RoleLimits` 控制；统计子页面由客户独立替换时，只需修改被嵌入的 `mic_page`，无需重做首页布局。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-009 sha256=f54168759ae63e6a89d5ccc50ba569915f7e04485b5cb721ff279fff83c9efe0 -->
+<!-- microi-progressive:chunk id=page-engine-009 sha256=7fb5fc82fb49da16a8aa97c449885b920b193f95993c4b87ffea6fac91430f3e -->
 ## Office/PDF 在线预览自然语言生成规则
 
 当用户用自然语言要求“界面引擎预览 PDF/Word/Excel/PPT”“接口引擎返回 PDF 文件”“打开时跳到第 N 页”“按角色显示不同页码”“每 5 秒/10 秒轮询，但只有文件变化才刷新”时，优先生成 `office` 组件，而不是 `iframe/html/browser` 拼接。
@@ -196,7 +196,7 @@ return { Code: 1, Data: { NotModified: true, FileKey: currentFileKey } };
 生成示例接口时必须写清楚中文注释：每个参数的含义、Redis/缓存 Key 的作用、什么情况下返回 `NeedRefresh:false`、什么情况下返回新的 `FileByteBase64/FileUrl` 和 `PageNumber`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-010 sha256=98256e1f8068f29e3e7cb2096fb8290966a58d47390371bec965001a9e706ddd -->
+<!-- microi-progressive:chunk id=page-engine-010 sha256=ad7541cce15739a1af83e459d49895f018d9f7c8d3b9ddc50651194bb66e9d28 -->
 ## searchData 查询条件通用结构
 
 ```json

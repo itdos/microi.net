@@ -14,6 +14,19 @@ APK 启动后，通过 WebView 直接导航（`location.replace`）到远程服�
 - ✅ 支持所有 `plus` API（蓝牙、扫码、定位等）
 - ✅ 远程页面运行在 launcher webview 中，`window.plus` 及返回键事件完全可用
 
+### 蓝牙位图打印变慢的排查
+
+App 的原生发送由远程 `Microi.Client/src/utils/v8-print.js` 负责，浏览器使用 Web Bluetooth。
+本壳不是 uni-app，不能假设存在 `uni.writeBLECharacteristicValue`；WebView 缺少 Web Bluetooth
+时也不能靠 UI 切换到 Chrome 的蓝牙路径。
+
+Android 佳博 GP-M322 的 `write` 通道现在等待每包原生确认后立即继续，去掉重复的 20ms 等待。
+连接时尝试 MTU 协商，仅实际返回值可用于大包；旧壳不返回 MTU 时继续 20 字节并保留上述调度优化。
+运行页面可通过 `V8.Print.getConnectionState()` 查看 `mtu`、`maxWriteBytes`、
+`recommendedPacketSize`、`writeType`、`packetIntervalMs`。业务页不能写死 App 总用小包。
+更新远程前端镜像及相应微服务后，完全退出 App、重新打开并连接打印机即可；无需为此重打 APK。
+仍须用目标手机和打印机确认实际速度、标签完整性及连续多张打印结果。
+
 ### 手机与平板安全区
 
 `manifest.json` 中的 `plus.statusbar.immersed` 保持为 `supportedDevice`，手机端继续使用沉浸式状态栏。
