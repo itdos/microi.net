@@ -19,6 +19,8 @@ module.exports = {
     releaseNotes: ['修复客户、订单、跟进记录等列表请求 404', '模块列表请求切换至新版接口引擎'],
     appSubTitle: '让每一次服务都有迹可循',
     workspaceSubTitle: '客户与服务工作台',
+    // 公众号原始 ID 由此接口从当前租户 wx_mp.GongzhonghaoID 读取。
+    shareOfficialAccountApiEngineKey: 'xjy-share-official-account',
     guestWelcomeText: '欢迎使用集福鲤',
     promiseTitle: '清水常伴，服务有迹',
     promiseText: '客户、设备、合同与售后数据由集福鲤智能数据引擎实时驱动',
