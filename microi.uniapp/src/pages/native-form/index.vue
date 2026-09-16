@@ -1873,6 +1873,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	}
 
 	.form-subheading {
+		padding: 0 24rpx;
 		display: flex;
 		align-items: center;
 		gap: 12rpx;
@@ -1889,7 +1890,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 
 	.form-subheading--collapsible {
 		min-height: 80rpx;
-		padding: 0 12rpx;
+		padding: 0 24rpx;
 		margin: -12rpx 0 0;
 		border-radius: 8rpx;
 		background: var(--mci-bg-base, #f7fafb);
