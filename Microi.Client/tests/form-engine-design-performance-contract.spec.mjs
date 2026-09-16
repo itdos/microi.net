@@ -120,16 +120,16 @@ test("button controls keep the top-label spacer and titled DevComponents keep th
     assert.equal(formUtilsMixin.methods.shouldShowLabel({ Component: "DevComponent", Label: "", Config: { DevComponentName: "Dashboard" } }), false);
 });
 
-test("sys_menu module design uses mini code editors throughout DiyForm", function () {
+test("module design preserves explicit field display modes throughout DiyForm", function () {
     const fullSource = read(formFullFilename);
     const formSource = read(formFilename);
     const useMiniBody = extractBalancedBlock(fullSource, "UseMiniCodeEditor()");
 
-    assert.match(useMiniBody, /TableName/);
-    assert.match(useMiniBody, /sys_menu/i);
+    assert.equal(new Function(useMiniBody).call({ TableName: "sys_menu" }), false);
+    assert.equal(new Function(useMiniBody).call({ TableName: "customer" }), false);
     assert.ok(
         (fullSource.match(/:CodeEditorMini=["']UseMiniCodeEditor["']/g) || []).length >= 4,
-        "every DiyForm opening mode must receive the sys_menu mini-editor flag"
+        "every DiyForm opening mode must receive the same field-driven display policy"
     );
     assert.ok(
         (formSource.match(/:CodeEditorMini=["']CodeEditorMini["']/g) || []).length >= 2,

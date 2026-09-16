@@ -44,6 +44,10 @@ const BLE_STORAGE_KEY = "microi_ble_info";
 const LOG_PREFIX = "Microi：【蓝牙打印】";
 const RECONNECT_DELAYS = [0, 1000, 2500, 5000, 10000, 30000];
 const SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
+const PLUS_PRINT_MTU = 183; // ATT 头占 3 字节；与已验证的佳博 180 字节档一致。
+// 5+ 的确认回调不等同于 Android GATT 队列完全空闲；给下一包留出一个很短的保护窗口，
+// 避免连续调用在真实设备上触发 10008/“发送中断”，同时不回到原先每包 20ms 的长尾。
+const PLUS_GATT_GUARD_INTERVAL_MS = 8;
 const EMPTY_BLE_INFO = Object.freeze({
     platform: "", deviceId: "", deviceName: "",
     transport: "ble", profileMode: "auto", profileId: "generic-tspl", commandLanguage: "tspl",
@@ -213,6 +217,51 @@ function currentPrinterProfile(Print, info) {
     return resolvePrinterProfile(current.deviceName, current.profileMode || Print._profileMode || "auto");
 }
 
+function isPlusAndroidGprinter(Print, info) {
+    if (!isPlusApp()) return false;
+    var osName = window.plus.os && window.plus.os.name;
+    return (String(osName || "").toLowerCase() === "android" || (!osName && !!window.plus.android))
+        && currentPrinterProfile(Print, info).id === "gprinter-gp-m322";
+}
+
+// MTU 是连接能力，不能从 localStorage 恢复，也不能把 setBLEMTU 的请求值当成协商值。
+function plusTransportCapabilities(Print) {
+    var live = isPlusApp() && Print.isConnected() && Print.BLEInformation.transport === "ble";
+    var mtu = live && Print._plusMtuDeviceId === Print.BLEInformation.deviceId ? Print._plusMtu : 0;
+    var maxBytes = mtu ? Math.min(180, mtu - 3) : 20;
+    var optimized = live && isPlusAndroidGprinter(Print);
+    return {
+        mtu: mtu,
+        maxWriteBytes: maxBytes,
+        recommendedPacketSize: optimized && maxBytes >= 180 ? 180 : optimized && maxBytes >= 100 ? 100 : 20,
+        // 5+ 的 write 已等待 GATT 确认，但 Android 队列仍需要极短保护窗口；无响应写及其它型号保留节流。
+        packetIntervalMs: optimized && Print.BLEInformation.writeType === "write" ? PLUS_GATT_GUARD_INTERVAL_MS : 20,
+        writeType: live ? Print.BLEInformation.writeType : "",
+    };
+}
+
+function negotiatePlusPrintMtu(Print, info) {
+    if (!isPlusAndroidGprinter(Print, info) || typeof window.plus.bluetooth.setBLEMTU !== "function") {
+        return Promise.resolve(0);
+    }
+    return new Promise(function (resolve) {
+        var settled = false;
+        function finish(result) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            var mtu = Number(result && result.mtu);
+            // Android 14 可协商到 517；发送端仍限制为 180。旧 5+ 的空 success 一律保留 20 字节。
+            resolve(Number.isInteger(mtu) && mtu >= 23 && mtu <= 517 ? mtu : 0);
+        }
+        var timer = setTimeout(function () { finish(null); }, 1500);
+        try {
+            window.plus.bluetooth.setBLEMTU({ deviceId: info.deviceId, mtu: PLUS_PRINT_MTU,
+                success: finish, fail: function () { finish(null); } });
+        } catch (error) { finish(null); }
+    });
+}
+
 // ====================== plus 蓝牙错误提示 ======================
 
 function bleErrorTip(code) {
@@ -256,6 +305,7 @@ function updateConnectionState(Print, status, detail) {
         error: Object.prototype.hasOwnProperty.call(detail, "error") ? String(detail.error || "") : "",
         changedAt: Date.now(),
     };
+    if (engine === "plus") Object.assign(next, plusTransportCapabilities(Print));
     Print._connectionState = next;
     (Print._connectionListeners || []).forEach(function (listener) {
         try { listener(Object.assign({}, next)); } catch (error) { console.error(LOG_PREFIX + " 状态监听失败:", error); }
@@ -285,6 +335,9 @@ function applyConnectedInfo(Print, info, options) {
 }
 
 function clearLiveConnection(Print) {
+    Print._plusConnectionGeneration++;
+    Print._plusMtu = 0;
+    Print._plusMtuDeviceId = "";
     Print._plusConnected = false;
     Print._plusWriteCandidates = [];
     Print._plusWriteCandidateIndex = -1;
@@ -711,6 +764,10 @@ async function connectPlusDevice(Print, device, options) {
         clearLiveConnection(Print);
     }
 
+    var connectionGeneration = ++Print._plusConnectionGeneration;
+    Print._plusMtu = 0;
+    Print._plusMtuDeviceId = "";
+
     try {
         await createPlusConnection(deviceId);
         await delay(800);
@@ -774,6 +831,12 @@ async function connectPlusDevice(Print, device, options) {
         info.writeCharaterId = writeCandidates[0].characteristicId;
         info.writeType = writeCandidates[0].writeType;
 
+        // 放在服务/特征发现之后串行协商，避免与 GATT 发现并发；只在连接阶段等待一次。
+        var mtu = await negotiatePlusPrintMtu(Print, info);
+        if (connectionGeneration !== Print._plusConnectionGeneration) throw new Error("蓝牙连接已变化，请重新连接");
+        Print._plusMtu = mtu;
+        Print._plusMtuDeviceId = deviceId;
+
         Print._plusConnected = true;
         Print._plusWriteCandidates = writeCandidates;
         Print._plusWriteCandidateIndex = 0;
@@ -783,6 +846,7 @@ async function connectPlusDevice(Print, device, options) {
         console.log(LOG_PREFIX + " [plus] 蓝牙连接成功");
         return true;
     } catch (error) {
+        if (connectionGeneration !== Print._plusConnectionGeneration) throw error;
         Print._suppressDisconnectUntil = Date.now() + 1500;
         try { window.plus.bluetooth.closeBLEConnection({ deviceId: deviceId }); } catch (e) { }
         clearLiveConnection(Print);
@@ -1416,6 +1480,9 @@ function createV8Print(V8) {
         _plusDeviceFoundListeners: new Set(),
         _plusBridgeRegistered: false,
         _plusConnected: false,
+        _plusConnectionGeneration: 0,
+        _plusMtu: 0,
+        _plusMtuDeviceId: "",
         _plusWriteCandidates: [],
         _plusWriteCandidateIndex: -1,
         _plusWriteCandidateValidated: false,
@@ -1638,6 +1705,10 @@ function createV8Print(V8) {
             buff = adaptPrintPayload(buff, currentPrinterProfile(Print));
             var packetSize = Number(Print.oneTimeData);
             if (!Number.isInteger(packetSize) || packetSize <= 0) throw new Error("蓝牙分包字节数必须是正整数");
+            // 即使旧业务直接配置 180/512，也不得超过本次原生 BLE 连接确认的有效载荷上限。
+            if (isPlusApp() && Print.BLEInformation.transport === "ble") {
+                packetSize = Math.min(packetSize, plusTransportCapabilities(Print).maxWriteBytes);
+            }
             var packetCount = Math.ceil(buff.length / packetSize);
             Print.looptime = packetCount;
             Print.lastData = buff.length % packetSize;
@@ -1670,7 +1741,10 @@ function createV8Print(V8) {
                                 await Print._webWriteChar.writeValue(chunk.buffer);
                             }
                         }
-                        if (packetIndex + 1 < packetCount) await delay(20);
+                        if (packetIndex + 1 < packetCount) {
+                            var interval = isPlusApp() ? plusTransportCapabilities(Print).packetIntervalMs : 20;
+                            if (interval > 0) await delay(interval);
+                        }
                     }
                     if (copyIndex + 1 < Print.printerNum) await delay(100);
                 }

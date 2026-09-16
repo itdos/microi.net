@@ -211,6 +211,7 @@ UnblockIp:<ip>
 - 验收分开记录 Node 行为测试、真实管理员/云端只读、文档保留 IP 的受控封禁/到期恢复、真实宿主页面、包正文 SHA 与安装。日志未投递或海量服务未开通时，如实标为待配置，不伪造云端通过。
 
 - 普通查询和汇总优先在 `mci-system-observability-query` 接口引擎编排。
+- 历史日志兼容入口为 `POST/GET /api/SysLog/AddSysLog`；它只接受当前 DiyToken 用户和租户上下文，返回进入异步持久化流程不等于日志已经落库，必须以后续记录回读作为验收事实。
 - 只有接口引擎缺少宿主进程、Docker、Mongo 聚合、安全运行态等可复用底层能力时，才扩展最小 V8 原子方法；Controller 不承载业务编排。
 - 官方引擎声明 `ResourcePolicies.ApiEngines=Managed`，由本次已校验包正文覆盖其拥有的资源；客户扩展使用独立 Key 或 `CreateIfMissing`，既有扩展不被覆盖。不得把 Managed 的旧本地改动当作拒绝应用升级的理由，也不得扩大到无关资源。
 - 按应用发布契约交付表、字段、索引/DDL、接口引擎、菜单、版本日志和微服务运行产物；私有源码由源码同步链交付。`DatabaseOnly/SourceNotIncluded` 必须如实标识，不能声称商城包包含全部源码。安装后回读固定版本快照并在真实页面验收。

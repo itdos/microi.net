@@ -12,8 +12,10 @@ description: Microi V8 Office 导入导出指南。用于使用 V8.Office 导出
 文档维护必须优先更新既有后端 V8 主文档 `microi.doc/docs/doc/v8-engine/v8-server.md`，再按需补充已有专题页；不得为同一组 `V8.Office` API 新建重复 Markdown 页面或文档路由。只维护 `microi.doc/docs/doc/` 中文文档，`docs/en/` 由官网统一翻译生成，不手工同步英文版。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-export-import-000 sha256=d3bb04ceec66bdf6b74a5bcce03be9239400497426bee7d827b25ae71bb8d840 -->
+<!-- microi-progressive:chunk id=v8-export-import-000 sha256=e4f13e7292335a4ea683c34ae13c3f794bdc297079a61c4099e3f547eb5e07ac -->
 ## 核心 API
+
+标准表格导出使用 `.xlsx` 文件名及对应 OpenXML MIME。历史平台生成的“XLSX 内容但扩展名为 .xls”仅在 Excel 导入入口兼容：必须验证 OpenXML 工作簿包结构，再由 NPOI 解析；真正的 `.xls` 继续支持。禁止取消文件签名检查或把此兼容扩张到 OnlyOffice 回源、任意 ZIP、HTML/可执行文件。
 
 | 方法 | 说明 |
 |------|------|
@@ -25,7 +27,7 @@ description: Microi V8 Office 导入导出指南。用于使用 V8.Office 导出
 | `V8.Office.SendEmail({...})` | 发送邮件（HTML 内容） |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-001 sha256=05aa0294a3ac75fb841f129fe8c76b26d7391efa7ce67b86f18d6a9e60157722 -->
+<!-- microi-progressive:chunk id=v8-export-import-001 sha256=9e166678e0cbc3b96814e9945a66c93426dd5ffb6a3c98bfbfe8dcb9e92ea5f9 -->
 ## 自定义导出 Excel（接口引擎）
 
 平台默认导出仅支持表格已展示的字段。如需自定义（如列重排、合并、计算列、图片），用接口引擎替换【导出接口】。
@@ -130,7 +132,7 @@ return {
 优先级：列级样式覆盖全局样式；`Width` 覆盖 `DefaultColumnWidth`；开启 `AutoSize` 后以自动宽度为准，再应用 `MinWidth/MaxWidth`。不传这些新参数时保持旧版导出行为。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-002 sha256=c0a4d4c30ecbb2da52a02aab3442cb4e4c76720f19c0001fb8c1d500ba432902 -->
+<!-- microi-progressive:chunk id=v8-export-import-002 sha256=8a1bdefc16e306ae30a5764760b98af05cc0c804409afb6e86a7440674750413 -->
 ## 文件响应与前端调用约定
 
 - 接口引擎必须开启【响应文件】，并返回正确的 `FileName`、`ContentType`、`FileByteBase64`。
@@ -150,7 +152,7 @@ return {
 | `NumberFormat/HeaderStyle/Style` | 数字格式与列级样式 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-003 sha256=51a6c3e7a44ca35dc17b5536545ac7a1d47a8915045283841d304a04c04cd219 -->
+<!-- microi-progressive:chunk id=v8-export-import-003 sha256=3391b00657d2cb9a6b3db530c43258ac2b7d69f940add48327618348226ad37e -->
 ## 解析上传的 Excel / CSV（导入）
 
 ```javascript

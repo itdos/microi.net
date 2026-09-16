@@ -147,17 +147,9 @@ namespace Microi.net
                     Msg = MicroiTaskSchedulingPolicy.SkipMessage, ScheduledFireTime = time.UtcDateTime.ToString("O"),
                     Trigger = trigger.ToString(), NodeId = node
                 });
-                var result = await MicroiEngine.FormEngine.AddFormDataAsync(new
-                {
-                    FormEngineKey = MicroiJobConst.logTable, OsClient = tenant, Id = id,
-                    _RowModel = new { Id = id, JobName = job.Name, Message = message }
-                }).ConfigureAwait(false);
-                if (result.Code != 1)
-                {
-                    // 节点在“日志已提交、去重键尚未确认”之间退出后，重试必须回读同一 Id。
-                    var existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(new { FormEngineKey = MicroiJobConst.logTable, OsClient = tenant, Id = id }).ConfigureAwait(false);
-                    if (existing.Code != 1 || existing.Data == null) throw new InvalidOperationException(result.Msg);
-                }
+                // 队列接受后由持久化重放负责落库，确定性 EventId 在 MongoDB 最终去重。
+                if (!ScheduleExecutionLog.Write(tenant, job.Name, id, "Skipped", message, null, 0, time.LocalDateTime))
+                    throw new InvalidOperationException("跳过记录未被日志队列接受。");
                 await db.ScriptEvaluateAsync("if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('set',KEYS[1],'done','EX',604800) end return 0",
                     new RedisKey[] { key }, new RedisValue[] { owner }).ConfigureAwait(false);
             }

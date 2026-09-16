@@ -2,7 +2,7 @@
     <!-- Mini模式：只显示一个按钮，点击弹出编辑器 -->
     <div v-if="UseMiniMode" class="code-editor-mini">
         <el-button type="primary" :icon="Edit" @click="openMiniEditor">
-            编辑代码{{ miniCodeLength }}
+            {{ miniButtonText }}
         </el-button>
         <pre class="diy-code-editor-print-source" aria-label="代码内容">{{ ModelValue || '（无代码）' }}</pre>
 
@@ -212,7 +212,9 @@
             </div>
         </el-dialog>
 
-        <!-- 配置弹窗 - 设计模式下可用 -->
+    </div>
+
+        <!-- 组件配置独立于显示模式，按钮模式也必须能够再次打开配置。 -->
         <el-dialog
             v-if="configDialogVisible"
             v-model="configDialogVisible"
@@ -240,6 +242,10 @@
                     </el-radio-group>
                     <small class="code-editor-config-tip">按钮模式只在点击后加载 Monaco，适合系统设置等代码字段较多的表单。</small>
                 </el-form-item>
+                <el-form-item v-if="configForm.DisplayMode === 'Dialog'" label="按钮文字">
+                    <el-input v-model="configForm.ButtonText" :placeholder="DEFAULT_CODE_BUTTON_TEXT" />
+                    <small class="code-editor-config-tip" v-pre>支持 {{charCount}} 字符数、{{lineCount}} 行数，留空使用默认文字。</small>
+                </el-form-item>
                 <el-form-item label="默认语言">
                     <el-select v-model="configForm.Language" placeholder="javascript">
                         <el-option label="JavaScript" value="javascript"></el-option>
@@ -260,7 +266,6 @@
                 <el-button type="primary" @click="saveConfig">确定</el-button>
             </template>
         </el-dialog>
-    </div>
 
     <el-dialog
         v-model="codeVersionDialogVisible"
@@ -357,6 +362,7 @@
 <script setup>
 import { onMounted, ref, reactive, computed, watch, onBeforeUnmount, nextTick, getCurrentInstance } from 'vue';
 import { loadMonaco } from '@/utils/monaco-loader';
+import { DEFAULT_CODE_BUTTON_TEXT, isCodeEditorDialog, codeEditorButtonText } from '@/utils/code-editor-display.js';
 
 // 动态导入 Monaco Editor（延迟加载，减少首屏体积）
 // 使用全局缓存，避免多个组件实例之间的 worker 引用冲突
@@ -465,11 +471,7 @@ const props = defineProps({
     }
 });
 
-const UseMiniMode = computed(() => {
-    if (props.CodeEditorMini) return true;
-    const configured = String(props.field?.Config?.CodeEditor?.DisplayMode || '').trim().toLowerCase();
-    return configured === 'dialog' || configured === 'button' || configured === 'mini';
-});
+const UseMiniMode = computed(() => isCodeEditorDialog(props.field?.Config?.CodeEditor, props.CodeEditorMini));
 
 // 监听表单模式变化
 const stopFormModeWatch = watch(() => props.FormMode, () => {
@@ -1153,7 +1155,8 @@ const configForm = ref({
     Height: '500',
     Language: 'javascript',
     V8CodeType: 'client',
-    DisplayMode: 'Inline'
+    DisplayMode: 'Inline',
+    ButtonText: DEFAULT_CODE_BUTTON_TEXT
 });
 
 const openConfig = () => {
@@ -1167,7 +1170,8 @@ const openConfig = () => {
         Height: props.field.Config.CodeEditor.Height || '500',
         Language: props.field.Config.CodeEditor.Language || 'javascript',
         V8CodeType: props.field.Config.CodeEditor.V8CodeType || props.v8CodeType || 'client',
-        DisplayMode: props.field.Config.CodeEditor.DisplayMode || 'Inline'
+        DisplayMode: isCodeEditorDialog(props.field.Config.CodeEditor) ? 'Dialog' : 'Inline',
+        ButtonText: props.field.Config.CodeEditor.ButtonText ?? DEFAULT_CODE_BUTTON_TEXT
     };
     configDialogVisible.value = true;
 };
@@ -1400,6 +1404,7 @@ const saveConfig = () => {
     props.field.Config.CodeEditor.Language = configForm.value.Language;
     props.field.Config.CodeEditor.V8CodeType = configForm.value.V8CodeType;
     props.field.Config.CodeEditor.DisplayMode = configForm.value.DisplayMode || 'Inline';
+    props.field.Config.CodeEditor.ButtonText = configForm.value.ButtonText;
     configDialogVisible.value = false;
     // 更新编辑器高度
     EditorHeight.value = configForm.value.Height + 'px';
@@ -1936,10 +1941,7 @@ const startAiPanelResize = (e) => {
 const miniEditorVisible = ref(false);
 let miniEditorBackup = ''; // 打开弹窗时备份的值，用于取消恢复
 
-const miniCodeLength = computed(() => {
-    const len = Array.from(String(ModelValue.value || '')).length;
-    return `（${len}字）`;
-});
+const miniButtonText = computed(() => codeEditorButtonText(ModelValue.value, props.field?.Config?.CodeEditor?.ButtonText));
 
 // 销毁当前编辑器实例（Mini模式弹窗关闭时调用）
 const disposeEditor = () => {

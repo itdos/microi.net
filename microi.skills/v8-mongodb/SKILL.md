@@ -11,6 +11,13 @@ description: Microi V8 MongoDB 指南。用于使用 V8.MongoDb AddFormData、Up
 
 ## V8.MongoDb API
 
+### 存量 MongoDB 兼容诊断
+
+- `reports wire version 6 ... requires at least 9` 是驱动与服务端不兼容，不是日志为空，也不是 Token 失效。先记录原始错误和服务端真实协议，不能把 wire version 6 推断成 MongoDB 4.2。
+- 平台兼容镜像以含安全修复的驱动 3.11.2 构建，恢复平台 CRUD/日志所需的 MongoDB 3.6 协议路径；不是降级至 2.30，也不声明上游继续维护 3.6。来源、单文件补丁和摘要维护在 `Microi.Server/ThirdParty/MongoDB.Driver/`。
+- 修改该兼容层必须通过真实 3.6 与当前 7.x 的认证、BSON、读写、索引、幂等重放、游标和租户隔离矩阵。不得只验证编译或 ping，也不得把驱动兼容当作修复旧数据库服务端自身漏洞。
+- C# 驱动改动需要更新后端镜像才生效。镜像更新后通过 `microi_query_system_observability` 回读日志、队列持久化和错误状态；查询失败应原样报错，禁止返回成功空表。
+
 | 方法 | 说明 |
 |------|------|
 | `V8.MongoDb.AddFormData({...})` | 新增文档 |

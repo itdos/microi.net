@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-export-import-004 sha256=828669707ddc19320767ac4b787383136ec820deb6ad1dc861b42b5d39097677 -->
+<!-- microi-progressive:chunk id=v8-export-import-004 sha256=db7feb545a95cfb37daca76a8bd25c386f508be3d26914d8dcbdda860c8d2b05 -->
 ## `ExcelLayout` 高级自由布局
 
 审批单、套打表、主子表、多级表头和复杂合并单元格不要硬塞入 `ExcelData + ExcelHeader`。改用 `ExcelLayout`：
@@ -94,7 +94,7 @@ V8.Result = exportResult;
 预览 URL 形式：`/?OsClient=tenant_demo#/online-office?fileUrl=<URL编码后的接口地址>&fileName=示例.xlsx&fileType=xlsx&canEdit=0`。`canEdit` 只是编辑申请，不是授权依据；未登录时即使传 `canEdit=1` 也必须强制只读，并隐藏左侧菜单、顶部导航和页签。公网匿名文件接口应配置频率限制或让导出逻辑足够轻量，不能依赖进程内变量控制并发。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-005 sha256=401c2cd0a4b9ea45b1709d14277cf71d74ab29dcda72d404f452a0e67b56eddc -->
+<!-- microi-progressive:chunk id=v8-export-import-005 sha256=28d8f6a66069fa5774f090cab74c5231228f48425caa0145729c86a8405e535e -->
 ## 多 Sheet Excel 导出
 
 `ExcelSheets` 中每项是一张独立工作表，可以使用 `ExcelLayout` 高级布局，也可以传 `ExcelData + ExcelHeader` 标准表格；标准表格还可传 `FormEngineKey`、查询条件等让后端自行查询。两种模式可以在同一工作簿混用。`Sheets` 是兼容别名；新代码统一使用 `ExcelSheets`。
@@ -145,7 +145,7 @@ return {
 图片列：`ImgUpload.Multiple=1` 会按最大图片数展开为多列并合并表头；列上的 `Width` 会应用到每个展开列，`DataRowHeight/RowHeight` 控制图片行高。自动列宽会遍历单元格，大批量导出不要对所有列盲目开启。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-006 sha256=1a74f8359e67ca4b270de414000f8416a7564c1595189c091281d0fea6dd4a45 -->
+<!-- microi-progressive:chunk id=v8-export-import-006 sha256=fd97ce1f87c32cad8539f3307bfdf679b0abc9e747281f6aaf06e7d322046c8f -->
 ## Word 导出
 
 新代码使用对象参数的 `ExportWord`；`ExportWordText` 继续保留，只用于兼容旧版纯文本场景。Word 的页面边距、图片宽高单位为厘米，字体大小单位为磅。

@@ -71,7 +71,7 @@ export function createApp() {
 `Microi.Client` 主后台运行时已内置前后端同构的 `V8.Http.Get/Post/Patch` 及对应 Response 方法；表单事件、按钮 V8 等宿主前端新代码必须优先使用 `V8.Http`，旧 `V8.Post/Get` 仅作兼容保留，其参数和兼容规则以 `v8-http-integration/SKILL.md` 为准。独立项目使用本 SDK、且不在主后台 V8 宿主中时，才使用 SDK 自身的小写 `V8.get/post`、`ApiEngine`、`FormEngine`；不要把它们与宿主旧版大写 `V8.Post/Get` 混为一谈，也不要假设浏览器可以绕过第三方接口的 CORS。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-002 sha256=b71205548e4701f8bf53e2bed3da914da4ca0f49e0cce952a1c938fc77218ed8 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-002 sha256=c514dbf966c96102ea04cdf6f967814f2babe74fceaaee6c1f771d351bfdb8eb -->
 ## 登录与验证码封装
 
 SDK 或项目请求模块必须提供登录所需的系统配置和验证码薄封装，不要让页面散落手写。
@@ -132,7 +132,7 @@ SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业
 - 验收时检查真实网络请求：不得出现 `osclient: demo, demo`、`Authorization: Bearer xxx, Bearer xxx` 这类逗号合并值。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-004 sha256=1ecb73f5b1246c7157d782b62cba59850389858baeefdc5351a255d4d04b11b6 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-004 sha256=bdb3bd646b06d4fb03c4fb62c8e76a22850e79b4ad230fe19b3feabc6f0578a0 -->
 ## 上传规则
 
 `V8.uploadFile` 是 Microi 前端唯一允许的上传入口。SDK 实现必须：

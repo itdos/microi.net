@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.9.4
+ * Version: v2.9.7
  * Function:
- * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
+ * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时、旧库内置包提交后注册任务，以及安装后资源和字节完整性强回读。
  */
 
 // INSTALLED_RUNTIME_SUMMARY_V1：入口按目标租户改写后，以实际安装资产的哈希和大小
@@ -1150,6 +1150,20 @@ if (embeddedOfficialPackageRequested) {
     trustedEmbeddedOfficialPackage = true;
 }
 
+// EMBEDDED_UPGRADE_POST_COMMIT_SCHEDULE_V1：仅已消费宿主授权的内置旧库升级
+// 使用两次独立调用。第一阶段提交资源但不确认版本；宿主在提交后幂等注册任务，
+// 全部回读成功才调用 Finalize。普通 HTTP/V8 不能靠参数取得这个入口。
+var embeddedUpgradeStage = trustedEmbeddedOfficialPackage
+    ? String(V8.Param.EmbeddedUpgradeStage || '') : '';
+if (embeddedUpgradeStage && embeddedUpgradeStage != 'Resources' && embeddedUpgradeStage != 'Finalize') {
+    return { Code: 0, Msg: '内置升级阶段无效。' };
+}
+if (embeddedUpgradeStage == 'Finalize') {
+    // 复用已提交资源后的最终分支，不伪造任务 Id、栅栏令牌或队列检查点。
+    backgroundChunkingEnabled = true;
+    backgroundCheckpointPhase = 'ScheduleJobs';
+}
+
 // TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1：旧版官方平台应用包的资源策略都写成
 // Ownership=Application。只有从固定 iTdos 商城实时回读、且商城元数据明确为
 // 官方/平台应用时，才把它迁移为 Platform；直接传入的离线包或自定义商城源
@@ -1572,7 +1586,8 @@ try {
     if (scheduleJobContract.Errors.length > 0) {
         throw new Error('定时任务资源校验失败：' + scheduleJobContract.Errors.join('；'));
     }
-    if (scheduleJobContract.Jobs.length > 0 && !backgroundChunkingEnabled) {
+    if (scheduleJobContract.Jobs.length > 0 && !backgroundChunkingEnabled
+        && !(trustedEmbeddedOfficialPackage && embeddedUpgradeStage == 'Resources')) {
         throw new Error('包含定时任务的应用必须通过持久后台任务安装，以便在资源事务提交后幂等调度。');
     }
     debugLog.startTime = new Date().toISOString();
@@ -2893,6 +2908,20 @@ try {
         return normalizedFiles;
     };
 
+    // 包内地址属于来源租户；受托管资产安装后必须绑定当前租户，不能复制来源入口。
+    // 显式外部运行时仍使用其外部地址，数据库运行时继续使用 db 哨兵。
+    var resolveInstalledMicroServiceUrl = function (storageMode, sourceUrl, appKey, entryPath) {
+        var mode = String(storageMode || '').toLowerCase();
+        if (/^(db|database)$/.test(mode)) return 'db';
+        if (/^(file|hdfs|oss|cdn|object|objectstorage)$/.test(mode)) {
+            return '/micro-app/' + encodeURIComponent(V8.OsClient) + '/' + encodeURIComponent(appKey)
+                + '/' + String(entryPath || 'index.html').split('/').map(function (part) {
+                    return encodeURIComponent(part);
+                }).join('/');
+        }
+        return String(sourceUrl || 'file');
+    };
+
     var installApplicationBundle = function (bundle, bundleIndex) {
         if (!bundle) return;
 
@@ -3433,7 +3462,7 @@ try {
                 MsType: firstTextParam([ms.MsType, '前端']),
                 Runtime: firstTextParam([ms.Runtime, 'micro-app']),
                 StorageMode: runtimeStorageMode,
-                MsUrl: inlineRuntimeBuild ? 'db' : firstTextParam([ms.MsUrl, 'file']),
+                MsUrl: resolveInstalledMicroServiceUrl(runtimeStorageMode, ms.MsUrl, appKey, entryPath),
                 IsEnable: ms.IsEnable === 0 ? 0 : 1,
                 SourceDirName: firstTextParam([ms.SourceDirName, appKey]),
                 EntryPath: entryPath,
@@ -4713,13 +4742,17 @@ try {
                 "WHEN DATA_TYPE IN ('decimal','numeric') THEN DATA_TYPE + '(' + CAST(NUMERIC_PRECISION AS varchar(10)) + ',' + CAST(NUMERIC_SCALE AS varchar(10)) + ')' " +
                 "WHEN DATA_TYPE IN ('datetime2','datetimeoffset','time') THEN DATA_TYPE + '(' + CAST(DATETIME_PRECISION AS varchar(10)) + ')' " +
                 "ELSE DATA_TYPE END AS COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, " +
-                "CAST('' AS nvarchar(1)) AS COLUMN_COMMENT, COLLATION_NAME " +
-                "FROM INFORMATION_SCHEMA.COLUMNS " +
+                "CAST('' AS nvarchar(1)) AS COLUMN_COMMENT, COLLATION_NAME, " +
+                "CASE WHEN EXISTS (SELECT 1 FROM sys.indexes i JOIN sys.index_columns ic ON i.object_id=ic.object_id AND i.index_id=ic.index_id " +
+                "WHERE i.is_primary_key=1 AND i.object_id=OBJECT_ID(QUOTENAME(c.TABLE_SCHEMA)+'.'+QUOTENAME(c.TABLE_NAME)) " +
+                "AND COL_NAME(ic.object_id,ic.column_id)=c.COLUMN_NAME) THEN 'PRI' ELSE '' END AS COLUMN_KEY, " +
+                "COLUMNPROPERTY(OBJECT_ID(QUOTENAME(c.TABLE_SCHEMA)+'.'+QUOTENAME(c.TABLE_NAME)),c.COLUMN_NAME,'IsIdentity') AS IS_IDENTITY " +
+                "FROM INFORMATION_SCHEMA.COLUMNS c " +
                 "WHERE TABLE_CATALOG = DB_NAME() AND LOWER(TABLE_NAME) = LOWER(@p0)"
             ).AddInParameter('@p0', tableName).ToArray() || [];
         }
         return V8.Db.FromSql(
-            "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT, EXTRA, CHARACTER_SET_NAME, COLLATION_NAME " +
+            "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT, COLUMN_KEY, EXTRA, CHARACTER_SET_NAME, COLLATION_NAME " +
             "FROM INFORMATION_SCHEMA.COLUMNS " +
             "WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0)"
         ).AddInParameter('@p0', tableName).ToArray() || [];
@@ -4733,7 +4766,22 @@ try {
         return 'CURRENT_TIMESTAMP' + (precision ? '(' + precision + ')' : '');
     };
 
-    var buildPhysicalColumnDefinition = function (column, includePrimaryKey, overrideColumnType) {
+    // 主键/自增是物理结构约束，不能按字段名称或表单 NotEmpty 推断。
+    // 包和目标任一方声明主键时都保留 NOT NULL；普通业务字段仍按平台策略允许 NULL。
+    var physicalColumnRequiresNotNull = function (column, targetColumn) {
+        var rows = [column || {}, targetColumn || {}];
+        for (var index = 0; index < rows.length; index++) {
+            var row = rows[index];
+            if (String(getPhysicalValue(row, ['COLUMN_NAME', 'ColumnName', 'Name']) || '').toLowerCase() == 'id'
+                || String(getPhysicalValue(row, ['COLUMN_KEY', 'ColumnKey']) || '').toUpperCase() == 'PRI'
+                || /\bauto_increment\b/i.test(String(getPhysicalValue(row, ['EXTRA', 'Extra']) || ''))
+                || String(getPhysicalValue(row, ['IS_IDENTITY', 'IsIdentity']) || '').toLowerCase() == 'true'
+                || Number(getPhysicalValue(row, ['IS_IDENTITY', 'IsIdentity'])) == 1) return true;
+        }
+        return false;
+    };
+
+    var buildPhysicalColumnDefinition = function (column, includePrimaryKey, overrideColumnType, targetColumn) {
         var columnName = getPhysicalValue(column, ['COLUMN_NAME', 'ColumnName', 'Name']);
         var columnType = overrideColumnType || getPhysicalValue(column, ['COLUMN_TYPE', 'ColumnType', 'Type']);
         if (!columnName || !columnType || !isSafeIdentifier(columnName)) return '';
@@ -4747,11 +4795,13 @@ try {
             if (collation && isSafeIdentifier(String(collation))) definition += ' COLLATE ' + collation;
         }
         // PLATFORM_PHYSICAL_NULLABLE_V1：包里的历史 NOT NULL 不能代替表单必填校验。
-        // 除平台主键 Id 外，所有新增/同步的普通字段均允许 NULL，默认值继续独立保留。
-        var nullable = String(columnName).toLowerCase() == 'id' ? 'NO' : 'YES';
+        // 保留所有主键和自增列的非空约束，默认值继续独立保留。
+        var nullable = physicalColumnRequiresNotNull(column, targetColumn) ? 'NO' : 'YES';
         definition += nullable == 'NO' ? ' NOT NULL' : ' NULL';
 
         var extra = getPhysicalValue(column, ['EXTRA', 'Extra']);
+        if (targetColumn && /\bauto_increment\b/i.test(String(getPhysicalValue(targetColumn, ['EXTRA', 'Extra']) || ''))
+            && !/\bauto_increment\b/i.test(String(extra || ''))) extra = 'auto_increment ' + String(extra || '');
         var columnDefault = getPhysicalValue(column, ['COLUMN_DEFAULT', 'ColumnDefault', 'Default']);
         if (columnDefault !== null && columnDefault !== undefined &&
             (columnDefault !== '' || /char|enum|set/i.test(String(columnType))) &&
@@ -5580,7 +5630,7 @@ try {
                     if (runtimeIsSqlServer) {
                         var expandedType = chooseSqlServerTextExpansion(columnType, targetColumn.COLUMN_TYPE,
                             sourceColumn.SQLSERVER_UNICODE === true);
-                        var retainedNullable = String(columnName).toLowerCase() == 'id'
+                        var retainedNullable = physicalColumnRequiresNotNull(sourceColumn, targetColumn)
                             ? ' NOT NULL' : ' NULL';
                         if (normalizeSqlType(expandedType) == normalizeSqlType(targetColumn.COLUMN_TYPE)
                             && (String(targetColumn.IS_NULLABLE).toUpperCase() == 'NO' ? ' NOT NULL' : ' NULL') == retainedNullable) {
@@ -5612,7 +5662,7 @@ try {
                         continue;
                     }
 
-                    var sourceNullable = String(columnName).toLowerCase() == 'id' ? 'NO' : 'YES';
+                    var sourceNullable = physicalColumnRequiresNotNull(sourceColumn, targetColumn) ? 'NO' : 'YES';
                     var targetNullable = String(targetColumn.IS_NULLABLE || '').toUpperCase();
                     var sourceDefault = getPhysicalValue(sourceColumn, ['COLUMN_DEFAULT', 'ColumnDefault', 'Default']);
                     var targetDefault = targetColumn.COLUMN_DEFAULT;
@@ -5642,7 +5692,7 @@ try {
                         var timestampDefault = mysqlCurrentTimestampDefault(sourceDefault, effectiveColumnType);
                         // PLATFORM_MYSQL_NULL_DEFAULT_V1：DROP DEFAULT 即使对允许 NULL
                         // 的列也会留下 NO_DEFAULT_VALUE_FLAG，使省略字段的 INSERT 报 1364。
-                        var defaultAction = columnName.toLowerCase() == 'id' ? ' DROP DEFAULT' : ' SET DEFAULT NULL';
+                        var defaultAction = sourceNullable == 'NO' ? ' DROP DEFAULT' : ' SET DEFAULT NULL';
                         if (sourceDefault !== null && sourceDefault !== undefined) {
                             var defaultLiteral = String(sourceDefault);
                             if (/^b'[01]+'$/i.test(defaultLiteral)) {
@@ -5718,7 +5768,7 @@ try {
                         var definition = runtimeIsSqlServer
                             ? quotePhysicalIdentifier(columnName) + ' ' + mapToMySQLType(effectiveColumnType)
                                 + (sourceNullable == 'NO' ? ' NOT NULL' : ' NULL')
-                            : buildPhysicalColumnDefinition(sourceColumn, false, effectiveColumnType);
+                            : buildPhysicalColumnDefinition(sourceColumn, false, effectiveColumnType, targetColumn);
                         if (!definition) continue;
                         var modifySql = 'ALTER TABLE ' + quotePhysicalIdentifier(tableName)
                             + (runtimeIsSqlServer ? ' ALTER COLUMN ' : ' MODIFY COLUMN ') + definition;
@@ -6010,11 +6060,12 @@ try {
         // NOT NULL 文本、默认值及表级索引，不能用全局替换破坏注释和主键。
         var start = ddl.indexOf('('), depth = 1, quote = '', partStart = start + 1;
         if (start < 0) return ddl;
-        var parts = [], end = -1;
+        var parts = [], end = -1, primaryColumns = {};
         var makeNullable = function (part) {
             var field = /^\s*`((?:``|[^`])+)`\s+/i.exec(part);
             var constraints = part.replace(/`(?:``|[^`])*`|'(?:\\.|''|[^'\\])*'|"(?:\\.|""|[^"\\])*"/g, '');
-            if (!field || field[1].toLowerCase() == 'id' || /\b(?:PRIMARY\s+KEY|AUTO_INCREMENT|GENERATED)\b/i.test(constraints)) return part;
+            if (!field || field[1].toLowerCase() == 'id' || primaryColumns[field[1].toLowerCase()]
+                || /\b(?:PRIMARY\s+KEY|AUTO_INCREMENT|GENERATED)\b/i.test(constraints)) return part;
             return part.replace(/`(?:``|[^`])*`|'(?:\\.|''|[^'\\])*'|"(?:\\.|""|[^"\\])*"|(\bNOT\s+NULL\b)/ig,
                 function (token, constraint) { return constraint ? 'NULL' : token; });
         };
@@ -6032,11 +6083,21 @@ try {
             if (char == '(') depth++;
             if (char == ')') {
                 depth--;
-                if (depth == 0) { parts.push(makeNullable(ddl.substring(partStart, index))); end = index; break; }
+                if (depth == 0) { parts.push(ddl.substring(partStart, index)); end = index; break; }
             }
-            if (char == ',' && depth == 1) { parts.push(makeNullable(ddl.substring(partStart, index))); partStart = index + 1; }
+            if (char == ',' && depth == 1) { parts.push(ddl.substring(partStart, index)); partStart = index + 1; }
         }
         if (end < 0) throw new Error('应用包 CREATE TABLE 括号不完整，拒绝执行');
+        for (var partIndex = 0; partIndex < parts.length; partIndex++) {
+            var primary = /^\s*(?:CONSTRAINT\s+(?:`(?:``|[^`])+`|[A-Za-z_][A-Za-z0-9_]*)\s+)?PRIMARY\s+KEY\s*\(([^)]+)\)/i.exec(parts[partIndex]);
+            if (!primary) continue;
+            var keyColumns = primary[1].split(',');
+            for (var keyIndex = 0; keyIndex < keyColumns.length; keyIndex++) {
+                var keyName = /^\s*(?:`((?:``|[^`])+)`|([A-Za-z_][A-Za-z0-9_]*))/.exec(keyColumns[keyIndex]);
+                if (keyName) primaryColumns[String(keyName[1] || keyName[2]).toLowerCase()] = true;
+            }
+        }
+        parts = parts.map(makeNullable);
         return ddl.substring(0, start + 1) + parts.join(',') + ddl.substring(end);
     };
 
@@ -7618,7 +7679,7 @@ try {
 
     if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'ScheduleJobs') {
         reportProgress(98, '正在幂等安装定时任务');
-        savePackageScheduleJobs();
+        if (embeddedUpgradeStage != 'Finalize') savePackageScheduleJobs();
         upsertMicroiStoreVersionRecord();
         return {
             Code: 1,
@@ -9938,6 +9999,16 @@ try {
     if (!backgroundChunkingEnabled || backgroundCheckpointPhase == 'PostSchema') {
         var layoutRetirements = retirePackageLayoutFields(Package, V8.FormEngine, V8.Cache, V8.OsClient);
         debugLog.layout_field_retirements = layoutRetirements.Retired;
+    }
+
+    if (trustedEmbeddedOfficialPackage && embeddedUpgradeStage == 'Resources'
+        && scheduleJobContract.Jobs.length > 0) {
+        assertSchemaChunkSucceeded('任务前置资源');
+        return {
+            Code: 1,
+            Data: { EmbeddedUpgrade: { Stage: 'ScheduleJobs' } },
+            Msg: '资源已提交，等待宿主注册任务并确认安装版本'
+        };
     }
 
     if (backgroundChunkingEnabled

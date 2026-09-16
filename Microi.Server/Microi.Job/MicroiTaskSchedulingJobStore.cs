@@ -27,6 +27,7 @@ namespace Microi.net
         private async Task<MicroiTaskSchedulingSelection> ReadSelection(ConnectionAndTransactionHolder conn, CancellationToken cancellationToken)
         {
             var tenants = await ReadSchedulingSettings().ConfigureAwait(false);
+            MicroiSchedulingDiagnostics.Selected(tenants);
             var legacyAllowed = new List<string>();
             // 混合租户按历史 JobDataMap 的实际 OsClient 划分，不能连带停用其它租户。
             // 全开/全关不扫描历史 Job，普通租户无需额外数据库查询。
@@ -62,8 +63,21 @@ namespace Microi.net
             ConnectionAndTransactionHolder conn, DateTimeOffset noLaterThan, int maxCount, TimeSpan timeWindow,
             Dictionary<string, int?> executionLimits, CancellationToken cancellationToken = default)
         {
-            using (MicroiTaskSchedulingPolicy.Enter(await ReadSelection(conn, cancellationToken).ConfigureAwait(false)))
-                return await base.AcquireNextTrigger(conn, noLaterThan, maxCount, timeWindow, executionLimits, cancellationToken).ConfigureAwait(false);
+            MicroiSchedulingDiagnostics.Begin();
+            try
+            {
+                using (MicroiTaskSchedulingPolicy.Enter(await ReadSelection(conn, cancellationToken).ConfigureAwait(false)))
+                {
+                    var triggers = await base.AcquireNextTrigger(conn, noLaterThan, maxCount, timeWindow, executionLimits, cancellationToken).ConfigureAwait(false);
+                    MicroiSchedulingDiagnostics.End(triggers.Count);
+                    return triggers;
+                }
+            }
+            catch (Exception ex)
+            {
+                MicroiSchedulingDiagnostics.End(0, ex);
+                throw;
+            }
         }
 
         public override async Task<RecoverMisfiredJobsResult> RecoverMisfiredJobs(

@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-018 sha256=b6e3138b7f398fad5b03253d07c1eb30e26da5c3df8ff1975117e5a3a282fd58 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-018 sha256=28b7c339cbf546a91f4f35fce2bc146f052283fad2b6c54d7a8971acde21740a -->
 ## 9. 主题切换必须真实且全局生效
 
 当客户要求增加另一种视觉风格时，除非用户明确要求删除，否则要把当前已认可设计保留为一个命名主题，而不是直接覆盖。
@@ -39,7 +39,7 @@
 - 报告详情页必须逐主题截图，检查 `INSPECTION REPORT`、状态胶囊、封面标题、摘要卡、报告正文和富文本在当前主题下都有足够对比度。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-019 sha256=f2ca99aebb70273d991f5142e88bd1e02ff42782df5a8e7e180de297fba0faac -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-019 sha256=406cf4edff553e80567a6462a68b872d98275358b89ff196df0873f78a2c30a9 -->
 ## 10. 报告/列表详情必须保留用户身份
 
 从列表进入详情时必须保留调用者身份模型。即使打开的是同一个视觉报告详情页，员工、客户和公开/分享路线也可能需要不同接口。
@@ -60,7 +60,7 @@
 - 确认点击可见卡片后不会发生意外登录跳转。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-020 sha256=95487284aa5f9b1b3a0fb557845b3400af0355e4b2ebf6abebbef461e8ec8485 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-020 sha256=c11ddf69390b21893b0bbb7de62592b8af6e9ecee5eb046bbeff99f3782e7493 -->
 ## 11. 角色与权限必须基于 sys_user.RoleIds 建模
 
 移动端和后台不能只区分“已登录/未登录”。企业应用通常至少有内部员工、售后师傅、客服、客户账号等角色，必须在建模阶段明确角色、菜单权限和数据权限。
@@ -93,7 +93,7 @@
 - 用未绑定的小程序手机号账号登录，截图确认“我的”页出现申请绑定身份入口；提交申请后后台能看到待审核记录；通过审核前数据权限不提前开放，通过审核后对应客户数据或内部工作台能力才出现。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-021 sha256=13405c8ce231e9db8920cd8e1c4e0db26a32c1b5ac967113abee1391985ebfcd -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-021 sha256=e177d9cc3a9c28603129f42b598d2af72ecf305e934a982ed9801ca0d5a9e73c -->
 ## 审核后的会话与角色同步（强制）
 
 - 审核通过后的数据库角色、服务端 DiyToken 身份投影、SDK 用户缓存、页面 capability 和申请状态必须一致，禁止以“退出重登后正常”作为验收成功。
