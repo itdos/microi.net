@@ -169,6 +169,13 @@ namespace Microi.net
                         ["quartz.dataSource.default.provider"] = MicroiJobExtension.GetProviderName(databaseType)
                     };
 
+                    // 与 DI 宿主入口保持同一自愈动作：Quartz 3.19 的 MySQL 方言依赖
+                    // IDX_microi_job_T_NFT_ST / ..._MISFIRE，缺失时所有任务都领不到触发器。
+                    if (databaseType == DatabaseType.MySql)
+                    {
+                        MicroiJobExtension.RepairQuartzTriggerIndexesBeforeSchedulerStart(normalizedConnectionString);
+                    }
+
                     // 创建新的 SchedulerFactory
                     var newFactory = new StdSchedulerFactory(properties);
                     _scheduler = await newFactory.GetScheduler();

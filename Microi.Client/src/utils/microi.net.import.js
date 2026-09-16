@@ -62,6 +62,7 @@ const DiyColorPicker = defineAsyncComponent(() => import("@/views/form-engine/di
 const DiyAutoNumber = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-autonumber.vue"));
 const DiyButton = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-button.vue"));
 const DiyFileUpload = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-fileupload.vue"));
+const DiyFileDownloadDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-file-download-dialog.vue"));
 const DiyImgUpload = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-imgupload.vue"));
 const DiyDivider = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-divider.vue"));
 const DiyCollapseGroup = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-collapse-group.vue"));
@@ -175,6 +176,7 @@ function RegMicroiComponents(app) {
     app.component("DiyAutoNumber", DiyAutoNumber);
     app.component("DiyButton", DiyButton);
     app.component("DiyFileUpload", DiyFileUpload);
+    app.component("DiyFileDownloadDialog", DiyFileDownloadDialog);
     app.component("DiyImgUpload", DiyImgUpload);
     app.component('DiyDivider', DiyDivider);
     app.component('DiyCollapseGroup', DiyCollapseGroup);

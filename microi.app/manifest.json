@@ -1,11 +1,11 @@
 {
     "@platforms" : [ "android", "iPhone", "iPad" ],
     "id" : "H5310781F",
-    "name" : "宁波鸿地",
+    "name" : "宁波鸿地dev",
     "description" : "microi.net",
     "version" : {
-        "name" : "v7.0.8",
-        "code" : 708
+        "name" : "v1.0.0",
+        "code" : 100
     },
     "launch_path" : "index.html",
     "plus" : {

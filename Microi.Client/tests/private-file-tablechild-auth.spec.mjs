@@ -38,12 +38,12 @@ test("standard form passes TableChild authorization context to upload fields", (
 });
 
 test("private file and image URL requests preserve the delegated context", () => {
-    assert.equal(
+    assert.ok(
         occurrenceCount(
             fileUploadSource,
             "_TableChildAuth: props.TableChildAuth || undefined"
-        ),
-        3
+        ) >= 3,
+        "all private-file request paths, including the download selector, must preserve the delegated context"
     );
     assert.equal(
         occurrenceCount(

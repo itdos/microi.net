@@ -65,6 +65,35 @@ public class OfficeImportPolicyTests
         Assert.Null(emptyNumber);
     }
 
+    [Theory]
+    [InlineData("Id")]
+    [InlineData("CreateTime")]
+    [InlineData("UpdateTime")]
+    [InlineData("UserId")]
+    [InlineData("UserName")]
+    [InlineData("IsDeleted")]
+    [InlineData("TenantId")]
+    [InlineData("TenantName")]
+    public void Exported_platform_fields_are_never_written_back(string fieldName)
+    {
+        var result = PrivateStatic("ImportIsProtectedFixedField")
+            .Invoke(null, new object?[] { fieldName });
+
+        Assert.Equal(true, result);
+    }
+
+    [Theory]
+    [InlineData("Name", false)]
+    [InlineData("CreateTime", true)]
+    [InlineData("TenantName", true)]
+    public void Business_field_filter_keeps_only_importable_columns(string fieldName, bool expected)
+    {
+        var result = PrivateStatic("ImportIsProtectedFixedField")
+            .Invoke(null, new object?[] { fieldName });
+
+        Assert.Equal(expected, result);
+    }
+
     [Fact]
     public void Every_standalone_unique_field_is_a_rule_and_all_composite_fields_share_one_rule()
     {
