@@ -43,6 +43,17 @@
                     <span>下载文件</span>
                 </el-button>
 
+                <el-button
+                    v-if="canOpenInBrowser"
+                    class="open-browser-btn"
+                    :disabled="!filePath || previewLoading"
+                    :loading="openInBrowserLoading"
+                    @click="openInBrowser"
+                >
+                    <el-icon><View /></el-icon>
+                    <span>使用浏览器打开</span>
+                </el-button>
+
                 <el-button v-if="canSaveOffice" class="save-btn" type="success" :disabled="previewLoading" :loading="saveLoading" @click="saveOfficeFile">
                     <el-icon><Document /></el-icon>
                     <span>{{ saveButtonText }}</span>
@@ -70,13 +81,14 @@
 import DynamicOnlyOfficeEditor from "../diy-components/onlyoffice-base.vue";
 import { computed, getCurrentInstance } from "vue";
 import { useDiyStore } from "@/pinia";
-import { Document, Download, WarningFilled } from "@element-plus/icons-vue";
+import { Document, Download, View, WarningFilled } from "@element-plus/icons-vue";
 
 export default {
     components: {
         DynamicOnlyOfficeEditor,
         Document,
         Download,
+        View,
         WarningFilled
     },
     setup() {
@@ -94,6 +106,7 @@ export default {
             DiyCommon,
             Document,
             Download,
+            View,
             WarningFilled
         };
     },
@@ -128,6 +141,7 @@ export default {
             previewLoading: false,
             previewError: "",
             downloadLoading: false,
+            openInBrowserLoading: false,
             saveLoading: false,
             pendingDownloadAs: null
         };
@@ -139,6 +153,9 @@ export default {
         },
         fileSizeText() {
             return this.formatFileSize(this.fileSize);
+        },
+        canOpenInBrowser() {
+            return String(this.fileType || "").toLowerCase() === "pdf";
         },
         canSaveOffice() {
             return this.canEdit && this.filePath && this.Load && this.getDocumentType(this.fileType) !== "pdf";
@@ -743,6 +760,46 @@ export default {
                 this.downloadLoading = false;
             }
         },
+        async openInBrowser() {
+            if (!this.filePath || this.openInBrowserLoading || this.previewLoading) return;
+            this.openInBrowserLoading = true;
+            let blobUrl = "";
+            try {
+                if (this.shouldRefreshPrivateUrl()) {
+                    this.filePath = await this.getFreshPrivateFileUrl(this.sourceFilePath);
+                }
+                const response = await fetch(this.filePath);
+                if (!response.ok) throw new Error("open failed");
+                let blob = await response.blob();
+                const type = String(blob.type || "").toLowerCase();
+                if (!type || type === "application/octet-stream") {
+                    blob = new Blob([blob], { type: "application/pdf" });
+                }
+                blobUrl = URL.createObjectURL(blob);
+                const win = window.open(blobUrl, "_blank");
+                if (!win) {
+                    URL.revokeObjectURL(blobUrl);
+                    blobUrl = "";
+                    this.DiyCommon?.Tips?.("浏览器拦截了新窗口，请允许弹窗后重试", false);
+                    return;
+                }
+                window.setTimeout(() => {
+                    URL.revokeObjectURL(blobUrl);
+                    blobUrl = "";
+                }, 120000);
+            } catch (error) {
+                if (blobUrl) {
+                    URL.revokeObjectURL(blobUrl);
+                    blobUrl = "";
+                }
+                const win = window.open(this.filePath, "_blank");
+                if (!win) {
+                    this.DiyCommon?.Tips?.(error?.message || "无法在浏览器中打开文件", false);
+                }
+            } finally {
+                this.openInBrowserLoading = false;
+            }
+        },
         async saveOfficeFile() {
             if (!this.canSaveOffice || this.saveLoading) return;
             this.saveLoading = true;
@@ -1013,6 +1070,7 @@ export default {
 }
 
 .download-btn,
+.open-browser-btn,
 .save-btn {
     height: 38px;
     padding: 0 16px;
@@ -1026,6 +1084,10 @@ export default {
 
 .download-btn {
     box-shadow: 0 8px 18px rgba(36, 81, 214, 0.18);
+}
+
+.open-browser-btn {
+    box-shadow: 0 8px 18px rgba(75, 85, 99, 0.12);
 }
 
 .save-btn {
@@ -1100,6 +1162,7 @@ export default {
 
     .version-select,
     .download-btn,
+    .open-browser-btn,
     .save-btn {
         width: 100%;
     }
