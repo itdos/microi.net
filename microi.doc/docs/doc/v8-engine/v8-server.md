@@ -1290,6 +1290,8 @@ if (V8.EventName === 'MessageReceived') {
 完整的 Broker 配置、SaaS 凭据、Topic 隔离、设备级接口引擎、TLS、数据落库、服务端下行与集群边界见 [MQTT 引擎（IoT 物联网）](/doc/system-engine/mqtt-engine)。
 
 ## V8.MongoDb
+
+平台兼容镜像基于驱动 3.11.2 的安全修复维护 MongoDB 3.6 及当前服务端的 CRUD、日志路径，保留 BSON、认证和逐项特性版本检查。遇到 `wire version 6 ... requires at least 9` 时，需要更新包含兼容构建的后端镜像；该错误不表示日志为空或 Token 失效。驱动兼容不会自动更新数据库，也不修复旧服务端自身的缺陷。
 ### 介绍
 >* 本篇介绍如何在接口引擎、后端V8事件中对MongoDB进行相关操作
 >* 对MongoDB的新增操作会自动生成对应数据库名和表名，因此可自定义分库、分表规则
@@ -1839,6 +1841,8 @@ var stable = await V8.Vision.Stabilize({
 ## V8.Office
 
 `V8.Office` 可在接口引擎中生成 Excel、Word、PowerPoint 文件。导出方法返回 `DosResult<byte[]>`，接口引擎需要开启【响应文件】，并把 `Data` 转成 Base64 返回。
+
+标准表格导出的下载扩展名为 `.xlsx`。以前下载为 `.xls`、实际内容却为 XLSX 的平台文件，Excel 导入入口会在验证真实工作簿结构后兼容读取；真正的 `.xls` 也继续支持。任意 ZIP、HTML 和损坏文件仍会被拒绝，OnlyOffice 文件回源继续严格校验扩展名与格式。
 
 | 方法 | 说明 |
 |---|---|

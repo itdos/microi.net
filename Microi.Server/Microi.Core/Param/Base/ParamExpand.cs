@@ -97,6 +97,9 @@ namespace Microi.net
         public string OtherInfo { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _SearchMonth { get; set; }
+        /// <summary>任务日志游标；按时间和事件Id降序翻页，不执行全量计数或深分页。</summary>
+        public DateTime? BeforeLogTime { get; set; }
+        public string BeforeLogId { get; set; }
         public int? Timer { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Result { get; set; }

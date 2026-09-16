@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-010 sha256=2820c6dbc7641b03cb2d3af98f80ca654162fdac7995993be5cb7e25b8e5bdea -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-010 sha256=00d4113a82b130df18ac91de3569dc45663f3cfefce829eb626c5e08086505e1 -->
 ## 移动端分类/双栏列表独立滚动
 
 商品分类、知识库分类、通讯录分组、资产分类等“左侧分类 + 右侧列表”的移动端页面，根节点必须固定在一个视口内，不能让整页和内部列表同时滚动。
@@ -34,7 +34,7 @@
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-011 sha256=a28fba298274b738ef9039c6bd6a1707468687e2ae9644a819736374586749e9 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-011 sha256=fcf60104a95a27645f4b519b19bde6aab55d41f38388c442179533dd4ed8a35a -->
 ## 数据页必须使用骨架屏 Loading
 
 任何依赖接口/数据库返回数据的移动端页面，都必须区分 `loading`、`data`、`empty`，并且首屏加载态必须使用骨架屏（Skeleton Screen）。接口请求结束前不能提前显示“暂无数据/暂无明细/空空如也”，也不能只用“图标 + 数据加载中...”或单独 spinner 作为页面级 loading。
@@ -72,7 +72,7 @@ async function load() {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-012 sha256=5554c817702cc491937fb2b32f5ba2ce76554a35ef0a2189979ff1d60789ab30 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-012 sha256=5e117837b6cff4db5b22a25c6607a0b1d7d35d27a16285cd44731d2b14db7b4b -->
 ## 移动端安全区必须兼容 iOS 与 Android
 
 任何 UniApp/H5 移动端页面都必须同时适配 iPhone 刘海屏/Dynamic Island/Home Indicator、Android 状态栏/虚拟导航栏/手势条、微信/浏览器/WebView 容器差异。不要用固定 `20px/44px/64px` 直接硬编码顶部或底部间距。
@@ -92,7 +92,7 @@ async function load() {
 - 独占屏幕且需要支持手机侧滑返回的功能应使用独立页面路由。`onBackPress`/页面返回先消费当前页内部的键盘、对话框和抽屉状态；内部状态清空后才弹出当前页，不能让一次返回直接退出小程序或越过底层业务页。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-013 sha256=591a8e5a3e33cfcdb102abf56ebc6eeb5c5896d621442c30e734f455d625842c -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-013 sha256=b6074ef264327e9cc630a9c4136989d6355ed33ba4902098e8ae025661a207ed -->
 ## 微信自定义组件的点击与拖动事件必须真机链路验收
 
 - UniApp 可拖动浮动入口等自定义组件，不要给 `touchstart/touchmove/touchend/tap` 整组无差别添加 `.stop/.prevent`。这些修饰符会生成微信 `catchtouch* / catchtap`，部分 UniApp 自定义组件中可能吞掉事件桥，出现节点可见但点击和触摸方法完全不执行。
@@ -121,7 +121,7 @@ async function load() {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-014 sha256=62f20b920f2365d9f2f5062218b10b17aa181ccb3ae5d2260f795e086355f678 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-014 sha256=201c7dd1b1e923a62319f1402088fa696bb96aa8ca58a8c7f9817a6ecce36e12 -->
 ## 列表型资料页必须提供完整管理动作
 
 地址、联系人、收款方式、发票抬头、车辆、设备、证照、银行卡等用户维护型资料页，不能只展示简略列表。除非业务明确只读，移动端必须提供：
@@ -135,7 +135,7 @@ async function load() {
 - 空态行动：没有数据时给出新增入口，但仍要遵守上面的加载态规则。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-015 sha256=d8e9280b5127d7dafd4dcb83b22bdb379fef39eac1e2e1b2e37f1c064cfe7fc6 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-015 sha256=287d085d3651e0eb20b97fadf0ba616e9f4aea9447efda6824612b64309efd27 -->
 ## 移动端资产/奖励流水展示
 
 收益明细、积分明细、奖励明细、充值记录、订单流水等页面要面向用户展示“发生了什么”和“是否到账”，不要直接暴露后台调试字段。
@@ -147,7 +147,7 @@ async function load() {
 - 后端接口应先把 `TypeLabel`、`SettleStatusLabel`、`DisplayTime`、`ContributorName`、`CardNo` 等字段整理好，前端只做轻展示，避免多个页面各自拼接导致重复或口径不一致。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-016 sha256=552ab6a76e3bcd22678259727a3de0308dd429f390bea3de367b0196049890c3 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-016 sha256=db7ea9ce03c26880b560aa8c1759179c2a75cfd329320923c771e682f1d33020 -->
 ## H5 在 PC 浏览器必须自动模拟移动端
 
 移动端 UniApp H5 被 PC 浏览器访问时，不能按桌面宽屏铺满。必须在全局样式里用媒体查询生成手机预览壳。

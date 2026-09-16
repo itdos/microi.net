@@ -2004,12 +2004,12 @@ namespace Microi.net.Api
                 return new ContentResult() { Content = "不存在的diy_table数据，TableId：" + (param.TableId ?? "") };
             var result = await MicroiEngine.Office.ExportExcelAsync(param);
             if (result.Code != 1) return new ContentResult() { Content = result.Msg };
-            return File(result.Data, "application/vnd.ms-excel", "导出"
+            return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "导出"
                     + (diyTableModelStart.Description.DosIsNullOrWhiteSpace()
                         ? diyTableModelStart.Name.Replace("diy_", "")
                         : diyTableModelStart.Description)
                     + " - "
-                    + DateTime.Now.ToString("yyyyMMddHHmmss") + ".xls");
+                    + DateTime.Now.ToString("yyyyMMddHHmmss") + ".xlsx");
         }
 
         /// <summary>

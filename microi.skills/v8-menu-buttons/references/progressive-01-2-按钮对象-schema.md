@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-menu-buttons-004 sha256=9550f2e3a75583bb6f2ab940d423931511f39b6ad8a11fc982c6b24bca6416d1 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-004 sha256=c936a3246ce8148f77f98dfb5d8d0f0be4b87de63310dfd7ac84c2725707d3ea -->
 ## 2. 按钮对象 Schema
 
 ```jsonc
@@ -159,7 +159,7 @@ V8.OpenAnyTable({
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-005 sha256=1dddbfaac5cd9a350686ff72c47f1cd5ed022bcdc425a7d54b790537df445cd5 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-005 sha256=ca6d6eb9f75e80f2f0a420ed4b959ed2da879d44b8eedb2bc7a013e13561e1a2 -->
 ## 5. 模式 C：状态机推进（无需弹窗）
 
 ```js
@@ -182,7 +182,7 @@ if (next) {
 状态机必须由接口引擎校验当前状态、目标状态、权限和并发版本；不要在前端直接更新状态字段。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-006 sha256=86eb74f9e150eb398b010f2cc0a00920669e12f2e6f2729f2443250659e5c0bd -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-006 sha256=661e9eda504167d3eaca091ae759d49b8ddae64f5b1b3b7aab20ed31da33750a -->
 ## 6. 模式 D：批量操作（BatchSelectMoreBtns）
 
 ```js
@@ -200,7 +200,7 @@ V8.ConfirmTips('确认删除选中的 ' + ids.length + ' 条？', function () {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-007 sha256=cb0ccac7faf880e55f33a510fdf43b024ace93d5c80618ddd6a40ca3efbcbb1b -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-007 sha256=03346fa906eccc815f6f5be4ed9c5c0ef8c1cdce22e8aba47576ea258c6113a1 -->
 ## 7. 模式 E：PageTabs 切换筛选
 
 ```js

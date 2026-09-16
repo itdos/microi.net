@@ -60,6 +60,7 @@ namespace Microi.net
                         x.SetProperty("quartz.jobStore.performSchemaValidation", "false");
                     });
                     q.AddJobListener<MicroiJobListener>();
+                    q.AddSchedulerListener<MicroiSchedulerListener>();
                     // 设置线程池（默认是10）
                     q.UseDefaultThreadPool(tp =>
                     {

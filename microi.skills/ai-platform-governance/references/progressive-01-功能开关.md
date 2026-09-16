@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=ai-platform-governance-008 sha256=e3927151358f0c9e801c1027edb877332c8e148f245d58eade2eaae53ddb7948 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-008 sha256=9e2dfb6ca71a12bc39c54aca498a6f0eafdb700716db2a9bd0f9dc6f14194e85 -->
 ## 功能开关
 
 发布调用 `mci-feature-flag-publish`，求值调用 `mci-feature-flag-evaluate`。
@@ -14,7 +14,7 @@
 - 功能开关不能代替任何权限、状态机、幂等或审计。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-009 sha256=ca73d439788b802c1b999c0a7973e735caf8b4149d4be116511e470ca93d728e -->
+<!-- microi-progressive:chunk id=ai-platform-governance-009 sha256=0ef9057b5d6a346f09931a7aac5007f6f0760096990b142931814b16043423c4 -->
 ## 发布状态机
 
 ### 固定计划
@@ -73,7 +73,7 @@ Submit / Approve / Reject / Cancel / Reopen
 - 变更子步骤使用独立事务；成功后台账中断时用 `StepIdempotencyKey` 重试。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-010 sha256=cb8f46acd05462f4fb99d52517b34f9f9a7ae785f44d6ea0c0f1e79f050068d0 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-010 sha256=09cf92ff56f8dfd4bb95872741da05e462d06b8027e934a3282b265c48203a40 -->
 ## 服务治理
 
 ### 实例协议
@@ -93,7 +93,7 @@ Submit / Approve / Reject / Cancel / Reopen
 V8 业务只能使用租户隔离的 `SetIfNotExists/Expire/HashIncrement` 原子能力，不能获得原始 Redis 客户端或自定义 Key 前缀逃逸租户边界。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-011 sha256=db964d7f412ce56112c7a8173a10a6a1f33c762761747b6db780463a0e07f79d -->
+<!-- microi-progressive:chunk id=ai-platform-governance-011 sha256=9f62550921dccdb4f550a093183c44b0523822a2e75e9de3bfc3255406cecfe2 -->
 ## Trace、告警与日志
 
 ### 可信原子能力
@@ -122,7 +122,7 @@ V8 业务只能使用租户隔离的 `SetIfNotExists/Expire/HashIncrement` 原�
 - `Extension` 模式由 `mci-log-archive-extension` 处理；法律保留不能删除。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-012 sha256=82e059f90494a679d4073693b83904826841a7c87e0ed1e5ab0e28575eedffac -->
+<!-- microi-progressive:chunk id=ai-platform-governance-012 sha256=05f16e1c9370170a8bf20152439b3ebde4e85aa1bf360a6375c7c344380d2ace -->
 ## 资产、协作和变更集
 
 - `mci-asset-publish` 使用 `microi.asset.v1`，声明 Component、Props、Setters、DataAdapters、Platforms、DependencyPackages。
@@ -133,7 +133,7 @@ V8 业务只能使用租户隔离的 `SetIfNotExists/Expire/HashIncrement` 原�
 - Page JSON ↔ Vue SFC 只处理平台生成的受控标记，不执行任意 Vue/JavaScript，也不承诺任意源码无损反编译。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-013 sha256=b286f47071ac64e9e7d75929134123e8a3ef65a05ddb86007554ae05099e1445 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-013 sha256=17cce66f24e666271abc143a77319c9ecb43c476d4d9523f2da1dc3df2649d87 -->
 ## 可恢复导入
 
 - `mci-import-plan`：JSON/CSV/Excel 解析、字段元数据校验、文件/计划/行 Hash、公式注入与敏感字段拒绝。
@@ -145,7 +145,7 @@ V8 业务只能使用租户隔离的 `SetIfNotExists/Expire/HashIncrement` 原�
 单批最多 2,000 行。更大数据应拆批或使用专用迁移作业，不提高内存上限硬顶。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-014 sha256=9c5387dccbc2ff092470edc70b9600416700ac734f15df2c2e775bae0adf00c4 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-014 sha256=1f931b62b510316d8e2b9e034b1348c7dc63e307166bee107e9e3430b1be5a2c -->
 ## 页面与蓝图版本
 
 页面工具：
@@ -161,7 +161,7 @@ microi_rollback_page_design
 蓝图提供对应的历史、读取、比较、导出和回滚工具。修改前读取 CurrentHash，保存传 ExpectedHash，写后回读新 Hash 与不可变历史。回滚创建新版本，不删除旧历史。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-015 sha256=6fafd84efd63a1607c4c98c4a173d755b2ba22fb7a251a21ed4d4699556656a7 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-015 sha256=763421b1b0bbf719255cfeee093fdd33517d4ead38ddd1c0043a5ba5ec3fe86a -->
 ## 应用商城发布
 
 - 官方发布使用绑定 `https://api.itdos.com`、`OsClient=iTdos` 的 `microi_itdos`。
@@ -175,7 +175,7 @@ microi_rollback_page_design
 - 商城发布不等于生产 API/Web 容器部署。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-016 sha256=76dab40556ce9a5a732c398d2f534c16478a1a88d4c1efdcdeaa6ba76d4339df -->
+<!-- microi-progressive:chunk id=ai-platform-governance-016 sha256=195d1af8151cf8c8c846799418e822f3c9f17310fac91a0442af8944f3c39899 -->
 ## 双节点与浏览器验收
 
 至少覆盖：

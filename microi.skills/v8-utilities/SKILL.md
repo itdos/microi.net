@@ -69,6 +69,10 @@ var clientDecoded = V8.Base64.decode(clientEncoded);
 - 原有前后端全局 V8 必须保留，合并顺序为内置日期、函数库、租户原有代码；同名原有函数优先。不得用官方全局脚本整段覆盖客户脚本。函数库种子 `InsertIfMissing`，不得升级覆盖客户已改源码。
 - 列表和合并代码走 L1/Redis，表单引擎真实提交后更新租户版本并通知其它节点；回滚不变更版本。禁止通过直接 SQL 修改函数库规避失效。前端已打开页面需要刷新。
 
+## 平台兼容入口索引
+
+下列旧 HTTP 地址仍由受控兼容链路识别，不能据此绕过 DiyToken、租户或权限校验：`/api/FormEngine/GetSysConfig`、`/api/Os/GetDateTimeNow`、`/api/SysLog/AddSysLog`、`/api/SysUser/`。畅捷通 V2 回调在接口引擎中编排，可信后端只提供当前租户绑定的 `V8.Method.DecodeChanjetCallbackV2` 原子。
+
 | 需求 | 专项 Skill |
 |---|---|
 | 表单 CRUD、`_Where` | `v8-crud-api`、`v8-sql-query` |

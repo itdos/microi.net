@@ -1,12 +1,12 @@
 {
   "PackageInfo": {
     "Name": "模块引擎",
-    "Version": "v7.6.5",
+    "Version": "v7.6.6",
     "CreateTime": "2026-08-08T06:31:30.327Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
     "Description": "模块引擎基础资源。NotShowFields 损坏配置由新版客户端和服务端共同清洗，null、空字符串及非法对象不再中断列表或子表渲染；顶栏标签、菜单角标、记录直达与表单展示继续使用物理配置。",
-    "ChangeHistory": "2026-09-07 v7.6.5 修复新增菜单时调用前端时间函数导致的服务端异常；按当前租户实际管理员角色在共享事务内授权，更新菜单保留完整按钮权限，删除时清理授权。官网个人版规则限定官网租户，当前登录权限在提交后刷新。\n2026-09-05 v7.6.4 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-02 v7.6.3 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v7.6.2 声明 NotShowFields 前后端规范化能力：新版平台会在菜单通用读写、缓存与 SysMenuLogic 边界过滤 null、空字符串和非法对象，客户端同时保留空值防护，避免列表或子表因单条损坏配置停止渲染。\n2026-08-25 v7.6.1 补齐模块引擎官方包的 ResourcePolicies 结构并与 V8 优先应用所有权契约对齐；菜单、展示和子租户维护继续由低代码资源交付，同时增加结构化更新日志与发布硬门禁。\n2026-08-25 v7.6.0 补齐模块引擎官方包的 ResourcePolicies 结构并与 V8 优先应用所有权契约对齐；菜单、展示和子租户维护继续由低代码资源与接口引擎交付，不新增 Controller 业务。\n2026-08-23 v7.5.5 顶栏标签右键新增表单设计入口，优先读取路由 DiyTableId，缺失时按当前 sys_menu.Id 回查绑定表单并缓存结果。\n2026-08-22 v7.5.2 新增 sys_menu.MenuBadgeTooltip，左侧菜单数字角标可显示自定义悬停说明，旧菜单未配置时保持原有标题提示。\n2026-08-21 v7.5.1 将“进入模块默认打开第一条记录”迁移为 sys_menu.OpenFirstRecord 物理字段；模块设置与表单设置各归其所属引擎，旧 ViewSchema 配置继续兼容读取。\n2026-08-21 v7.5.0 移除模块侧独立表单工作台配置入口，统一使用 diy_table.FormPresentation；记录直达、表格弹层和跨模块记录页复用同一 DiyForm。\n",
+    "ChangeHistory": "2026-09-15 v7.6.6 补齐导入、导出按钮显示条件；新增、编辑、删除和详情代码字段显式采用按钮模式，字段默认显示方式与实际一致。\n2026-09-07 v7.6.5 修复新增菜单时调用前端时间函数导致的服务端异常；按当前租户实际管理员角色在共享事务内授权，更新菜单保留完整按钮权限，删除时清理授权。官网个人版规则限定官网租户，当前登录权限在提交后刷新。\n2026-09-05 v7.6.4 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-02 v7.6.3 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v7.6.2 声明 NotShowFields 前后端规范化能力：新版平台会在菜单通用读写、缓存与 SysMenuLogic 边界过滤 null、空字符串和非法对象，客户端同时保留空值防护，避免列表或子表因单条损坏配置停止渲染。\n2026-08-25 v7.6.1 补齐模块引擎官方包的 ResourcePolicies 结构并与 V8 优先应用所有权契约对齐；菜单、展示和子租户维护继续由低代码资源交付，同时增加结构化更新日志与发布硬门禁。\n2026-08-25 v7.6.0 补齐模块引擎官方包的 ResourcePolicies 结构并与 V8 优先应用所有权契约对齐；菜单、展示和子租户维护继续由低代码资源与接口引擎交付，不新增 Controller 业务。\n2026-08-23 v7.5.5 顶栏标签右键新增表单设计入口，优先读取路由 DiyTableId，缺失时按当前 sys_menu.Id 回查绑定表单并缓存结果。\n2026-08-22 v7.5.2 新增 sys_menu.MenuBadgeTooltip，左侧菜单数字角标可显示自定义悬停说明，旧菜单未配置时保持原有标题提示。\n2026-08-21 v7.5.1 将“进入模块默认打开第一条记录”迁移为 sys_menu.OpenFirstRecord 物理字段；模块设置与表单设置各归其所属引擎，旧 ViewSchema 配置继续兼容读取。\n2026-08-21 v7.5.0 移除模块侧独立表单工作台配置入口，统一使用 diy_table.FormPresentation；记录直达、表格弹层和跨模块记录页复用同一 DiyForm。\n",
     "RequiredPlatformCapabilities": [
       "ClientFeature:FormPresentation",
       "ServerField:DiyTable.FormPresentation",
@@ -18,29 +18,29 @@
     ],
     "MenuCount": 1,
     "TableCount": 1,
-    "FieldCount": 111,
+    "FieldCount": 113,
     "FlowCount": 0,
     "NodeCount": 0,
     "LineCount": 0,
     "DDLCount": 1,
-    "PhysicalColumnCount": 247,
+    "PhysicalColumnCount": 249,
     "ApiEngineCount": 0,
     "DataSetCount": 0,
     "DataRowCount": 0,
     "AiApplicationCount": 0,
     "ChangeLog": {
-      "Version": "v7.6.5",
-      "Title": "菜单服务端事件与租户权限修复",
-      "ChangeType": "Fix",
-      "Content": "修复新增菜单时调用前端时间函数导致的服务端异常；按当前租户实际管理员角色在共享事务内授权，更新菜单保留完整按钮权限，删除时清理授权。官网个人版规则限定官网租户，当前登录权限在提交后刷新。",
-      "ReleaseTime": "2026-09-07 12:38:00"
+      "Version": "v7.6.6",
+      "Title": "模块按钮显隐与代码编辑器配置",
+      "ChangeType": "Enhancement",
+      "Content": "补齐导入、导出按钮显示条件；新增、编辑、删除和详情代码字段显式采用按钮模式，字段默认显示方式与实际一致。",
+      "ReleaseTime": "2026-09-15 12:00:00"
     }
   },
   "DDLStatements": [
     {
       "TableName": "sys_menu",
       "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
-      "DDL": "CREATE TABLE IF NOT EXISTS `sys_menu` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `MenuBadgeApiEngineKey` varchar(100) NULL COMMENT '菜单统计接口引擎',\n  `MenuBadgeTooltip` varchar(500) NULL COMMENT '菜单角标悬停说明',\n  `MenuBadgeEnabled` int NULL COMMENT '显示菜单统计',\n  `DataSourceFieldTabs` varchar(50) NULL COMMENT '数据源配置',\n  `ViewSchema` mediumtext NULL COMMENT '模块展示设计器',\n  `ViewSchemaVersion` varchar(25) NULL COMMENT '视图协议版本',\n  `EnableViewSchema` int NULL COMMENT '启用跨端视图',\n  `ViewConfigVersion` int NULL COMMENT '视图配置版本',\n  `MicroServiceRoutePath` varchar(200) NULL COMMENT '微服务路由',\n  `MicroServicePageId` varchar(50) NULL COMMENT '选择微服务页面',\n  `MicroServiceId` varchar(50) NULL COMMENT '选择微服务',\n  `EnableDrafts` int NULL COMMENT '启用草稿箱',\n  `TableCellWrap` int NULL COMMENT '表格单元格自动换行',\n  `FlowDesignId` varchar(100) NULL COMMENT '关联流程引擎',\n  `CardBottomTagFields` mediumtext NULL COMMENT '卡片底部标签字段',\n  `CardTitleTagFields` mediumtext NULL COMMENT '卡片标题标签字段',\n  `DiyTableName` varchar(50) NULL COMMENT '关联表单的表名',\n  `TableCardImgPosition` varchar(50) NULL COMMENT '卡片预览图位置',\n  `ExportApi` varchar(255) NULL COMMENT '导出接口替换',\n  `ImportProgressApi` varchar(255) NULL COMMENT '导入进度接口替换',\n  `ImportApi` varchar(255) NULL COMMENT '导入接口替换',\n  `SaveType` varchar(50) NULL COMMENT '[表内编辑]保存方式',\n  `HiddenIndex` int NULL COMMENT '隐藏通用搜索',\n  `GeneralSeaarch` int NULL COMMENT '隐藏列表序号',\n  `AddBtnType` varchar(50) NULL COMMENT '[新增]模式',\n  `SaveBtnText` varchar(25) NULL COMMENT '[保存]文字替换',\n  `AddBtnText` varchar(25) NULL COMMENT '[新增]文字替换',\n  `SelectApi` varchar(255) NULL COMMENT '查询接口替换',\n  `FixedFields` mediumtext NULL COMMENT '固定列',\n  `MobileListFields` mediumtext NULL COMMENT '移动端/卡片显示列',\n  `UrlApiEngineId` varchar(50) NULL COMMENT 'Url地址接口引擎',\n  `DelCodeShowV8` mediumtext NULL COMMENT '[删除]按钮显示条件',\n  `EditCodeShowV8` mediumtext NULL COMMENT '[编辑]按钮显示条件',\n  `AddCodeShowV8` mediumtext NULL COMMENT '[新增]按钮显示条件',\n  `IsChildSystem` int NULL COMMENT '是否子系统',\n  `ModuleEngineKey` varchar(50) NULL COMMENT '模块引擎Key',\n  `TableCardImgStyle` varchar(500) NULL COMMENT '卡片图片样式',\n  `TableCardImgField` varchar(50) NULL COMMENT '卡片图片字段',\n  `TableCardCol` int NULL COMMENT '卡片每行几列',\n  `SecondMenuRow` int NULL COMMENT '二级目录缩略行',\n  `SecondMenuColumn` int NULL COMMENT '二级目录缩略列',\n  `IconComponent` varchar(50) NULL COMMENT '图标组件',\n  `DefaultPageSize` int NULL COMMENT '默认每页数量',\n  `SecondMenuLineCount` int NULL COMMENT '二级目录每行几个',\n  `SecondMenuHeight` varchar(50) NULL COMMENT '二级目录高度',\n  `SecondMenuWidth` varchar(50) NULL COMMENT '二级目录宽度',\n  `MacScreenIndex` int NULL COMMENT '所属mac第几屏幕',\n  `HasChild` int NULL COMMENT '是否有子集',\n  `SizeHeightMac` varchar(50) NULL COMMENT '图标高（mac）',\n  `SizeWidthMac` varchar(50) NULL COMMENT '图标宽（mac）',\n  `DisplayMac` int NULL COMMENT '显示[mac]',\n  `AppDisplay` int NULL COMMENT '移动端是否显示',\n  `ReportId` varchar(36) NULL,\n  `ReportName` varchar(100) NULL COMMENT '选择报表',\n  `OpenType` varchar(500) NULL COMMENT '打开方式',\n  `ImportV8` mediumtext NULL,\n  `Icon` varchar(500) NULL COMMENT '菜单图片',\n  `TableDiyFieldIds` mediumtext NULL COMMENT '查询列[废弃]',\n  `PageTemplate` varchar(255) NULL COMMENT '界面模板',\n  `PageBtns` mediumtext NULL COMMENT '[页面]更多按钮',\n  `DiyTableId` varchar(36) NULL COMMENT '选择表单',\n  `NotShowFields` mediumtext NULL COMMENT '不显示列',\n  `SqlWhere` mediumtext NULL COMMENT '数据权限',\n  `StatisticsFields` mediumtext NULL COMMENT '统计列',\n  `IsMicroiService` int NULL COMMENT '微服务',\n  `ImportTemplateName` varchar(255) NULL COMMENT '导入模板名称',\n  `EnName` varchar(500) NULL,\n  `MultRun` int NULL,\n  `Code` varchar(500) NULL,\n  `TableHeaders` mediumtext NULL COMMENT '多级表头数据',\n  `JquerySelector` varchar(500) NULL,\n  `ExportV8` mediumtext NULL,\n  `DefaultOrderBy` varchar(255) NULL COMMENT '默认排序字段',\n  `Sort` int(11) NULL COMMENT '排序',\n  `InTableEdit` int NULL COMMENT '开启表内编辑',\n  `Class` varchar(500) NULL COMMENT '就是Customer',\n  `SearchFieldIds` mediumtext NULL COMMENT '可搜索的字段',\n  `ComponentPath` varchar(500) NULL COMMENT '组件路径',\n  `Description` varchar(500) NULL COMMENT '菜单描述',\n  `ExportMoreBtns` mediumtext NULL COMMENT '[导出]更多按钮',\n  `IconClass` varchar(500) NULL COMMENT '图标',\n  `Url` varchar(500) NULL COMMENT 'Url地址',\n  `DiyConfig` mediumtext NULL COMMENT '模块配置（已废弃）',\n  `SortFieldIds` mediumtext NULL COMMENT '可排序字段',\n  `Link` varchar(500) NULL,\n  `SqlJoin` mediumtext NULL COMMENT 'Join关联',\n  `BatchSelectMoreBtns` mediumtext NULL COMMENT '[批量选择]更多按钮',\n  `StoreId` varchar(36) NULL,\n  `ImportTemplate` varchar(255) NULL COMMENT '导入模板',\n  `Name` varchar(500) NULL COMMENT '名称',\n  `EnDescription` varchar(500) NULL,\n  `MoreBtns` mediumtext NULL COMMENT '[行]更多按钮',\n  `ComponentName` varchar(500) NULL COMMENT '界面模板',\n  `PageTabs` mediumtext NULL COMMENT '页面多Tab',\n  `InTableEditFields` mediumtext NULL COMMENT '表内可编辑字段',\n  `Display` int NULL COMMENT '是否显示',\n  `DetailPageV8` mediumtext NULL COMMENT '详情按钮V8',\n  `RoleGroup` mediumtext NULL,\n  `SelectFields` mediumtext NULL COMMENT '查询列',\n  `FormBtns` mediumtext NULL COMMENT '[表单]更多按钮',\n  `JoinTables` mediumtext NULL COMMENT '关联表',\n  `DisplayWin` int NULL COMMENT '显示[win]',\n  `ParentId` varchar(50) NULL COMMENT '上级',\n  `ParentIds` mediumtext NULL,\n  `OpenFirstRecord` int NULL DEFAULT 0 COMMENT '进入模块默认打开第一条记录'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `sys_menu` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `MenuBadgeApiEngineKey` varchar(100) NULL COMMENT '菜单统计接口引擎',\n  `MenuBadgeTooltip` varchar(500) NULL COMMENT '菜单角标悬停说明',\n  `MenuBadgeEnabled` int NULL COMMENT '显示菜单统计',\n  `DataSourceFieldTabs` varchar(50) NULL COMMENT '数据源配置',\n  `ViewSchema` mediumtext NULL COMMENT '模块展示设计器',\n  `ViewSchemaVersion` varchar(25) NULL COMMENT '视图协议版本',\n  `EnableViewSchema` int NULL COMMENT '启用跨端视图',\n  `ViewConfigVersion` int NULL COMMENT '视图配置版本',\n  `MicroServiceRoutePath` varchar(200) NULL COMMENT '微服务路由',\n  `MicroServicePageId` varchar(50) NULL COMMENT '选择微服务页面',\n  `MicroServiceId` varchar(50) NULL COMMENT '选择微服务',\n  `EnableDrafts` int NULL COMMENT '启用草稿箱',\n  `TableCellWrap` int NULL COMMENT '表格单元格自动换行',\n  `FlowDesignId` varchar(100) NULL COMMENT '关联流程引擎',\n  `CardBottomTagFields` mediumtext NULL COMMENT '卡片底部标签字段',\n  `CardTitleTagFields` mediumtext NULL COMMENT '卡片标题标签字段',\n  `DiyTableName` varchar(50) NULL COMMENT '关联表单的表名',\n  `TableCardImgPosition` varchar(50) NULL COMMENT '卡片预览图位置',\n  `ExportApi` varchar(255) NULL COMMENT '导出接口替换',\n  `ImportProgressApi` varchar(255) NULL COMMENT '导入进度接口替换',\n  `ImportApi` varchar(255) NULL COMMENT '导入接口替换',\n  `SaveType` varchar(50) NULL COMMENT '[表内编辑]保存方式',\n  `HiddenIndex` int NULL COMMENT '隐藏通用搜索',\n  `GeneralSeaarch` int NULL COMMENT '隐藏列表序号',\n  `AddBtnType` varchar(50) NULL COMMENT '[新增]模式',\n  `SaveBtnText` varchar(25) NULL COMMENT '[保存]文字替换',\n  `AddBtnText` varchar(25) NULL COMMENT '[新增]文字替换',\n  `SelectApi` varchar(255) NULL COMMENT '查询接口替换',\n  `FixedFields` mediumtext NULL COMMENT '固定列',\n  `MobileListFields` mediumtext NULL COMMENT '移动端/卡片显示列',\n  `UrlApiEngineId` varchar(50) NULL COMMENT 'Url地址接口引擎',\n  `DelCodeShowV8` mediumtext NULL COMMENT '[删除]按钮显示条件',\n  `EditCodeShowV8` mediumtext NULL COMMENT '[编辑]按钮显示条件',\n  `AddCodeShowV8` mediumtext NULL COMMENT '[新增]按钮显示条件',\n  `IsChildSystem` int NULL COMMENT '是否子系统',\n  `ModuleEngineKey` varchar(50) NULL COMMENT '模块引擎Key',\n  `TableCardImgStyle` varchar(500) NULL COMMENT '卡片图片样式',\n  `TableCardImgField` varchar(50) NULL COMMENT '卡片图片字段',\n  `TableCardCol` int NULL COMMENT '卡片每行几列',\n  `SecondMenuRow` int NULL COMMENT '二级目录缩略行',\n  `SecondMenuColumn` int NULL COMMENT '二级目录缩略列',\n  `IconComponent` varchar(50) NULL COMMENT '图标组件',\n  `DefaultPageSize` int NULL COMMENT '默认每页数量',\n  `SecondMenuLineCount` int NULL COMMENT '二级目录每行几个',\n  `SecondMenuHeight` varchar(50) NULL COMMENT '二级目录高度',\n  `SecondMenuWidth` varchar(50) NULL COMMENT '二级目录宽度',\n  `MacScreenIndex` int NULL COMMENT '所属mac第几屏幕',\n  `HasChild` int NULL COMMENT '是否有子集',\n  `SizeHeightMac` varchar(50) NULL COMMENT '图标高（mac）',\n  `SizeWidthMac` varchar(50) NULL COMMENT '图标宽（mac）',\n  `DisplayMac` int NULL COMMENT '显示[mac]',\n  `AppDisplay` int NULL COMMENT '移动端是否显示',\n  `ReportId` varchar(36) NULL,\n  `ReportName` varchar(100) NULL COMMENT '选择报表',\n  `OpenType` varchar(500) NULL COMMENT '打开方式',\n  `ImportV8` mediumtext NULL,\n  `Icon` varchar(500) NULL COMMENT '菜单图片',\n  `TableDiyFieldIds` mediumtext NULL COMMENT '查询列[废弃]',\n  `PageTemplate` varchar(255) NULL COMMENT '界面模板',\n  `PageBtns` mediumtext NULL COMMENT '[页面]更多按钮',\n  `DiyTableId` varchar(36) NULL COMMENT '选择表单',\n  `NotShowFields` mediumtext NULL COMMENT '不显示列',\n  `SqlWhere` mediumtext NULL COMMENT '数据权限',\n  `StatisticsFields` mediumtext NULL COMMENT '统计列',\n  `IsMicroiService` int NULL COMMENT '微服务',\n  `ImportTemplateName` varchar(255) NULL COMMENT '导入模板名称',\n  `EnName` varchar(500) NULL,\n  `MultRun` int NULL,\n  `Code` varchar(500) NULL,\n  `TableHeaders` mediumtext NULL COMMENT '多级表头数据',\n  `JquerySelector` varchar(500) NULL,\n  `ExportV8` mediumtext NULL,\n  `DefaultOrderBy` varchar(255) NULL COMMENT '默认排序字段',\n  `Sort` int(11) NULL COMMENT '排序',\n  `InTableEdit` int NULL COMMENT '开启表内编辑',\n  `Class` varchar(500) NULL COMMENT '就是Customer',\n  `SearchFieldIds` mediumtext NULL COMMENT '可搜索的字段',\n  `ComponentPath` varchar(500) NULL COMMENT '组件路径',\n  `Description` varchar(500) NULL COMMENT '菜单描述',\n  `ExportMoreBtns` mediumtext NULL COMMENT '[导出]更多按钮',\n  `IconClass` varchar(500) NULL COMMENT '图标',\n  `Url` varchar(500) NULL COMMENT 'Url地址',\n  `DiyConfig` mediumtext NULL COMMENT '模块配置（已废弃）',\n  `SortFieldIds` mediumtext NULL COMMENT '可排序字段',\n  `Link` varchar(500) NULL,\n  `SqlJoin` mediumtext NULL COMMENT 'Join关联',\n  `BatchSelectMoreBtns` mediumtext NULL COMMENT '[批量选择]更多按钮',\n  `StoreId` varchar(36) NULL,\n  `ImportTemplate` varchar(255) NULL COMMENT '导入模板',\n  `Name` varchar(500) NULL COMMENT '名称',\n  `EnDescription` varchar(500) NULL,\n  `MoreBtns` mediumtext NULL COMMENT '[行]更多按钮',\n  `ComponentName` varchar(500) NULL COMMENT '界面模板',\n  `PageTabs` mediumtext NULL COMMENT '页面多Tab',\n  `InTableEditFields` mediumtext NULL COMMENT '表内可编辑字段',\n  `Display` int NULL COMMENT '是否显示',\n  `DetailPageV8` mediumtext NULL COMMENT '详情按钮V8',\n  `RoleGroup` mediumtext NULL,\n  `SelectFields` mediumtext NULL COMMENT '查询列',\n  `FormBtns` mediumtext NULL COMMENT '[表单]更多按钮',\n  `JoinTables` mediumtext NULL COMMENT '关联表',\n  `DisplayWin` int NULL COMMENT '显示[win]',\n  `ParentId` varchar(50) NULL COMMENT '上级',\n  `ParentIds` mediumtext NULL,\n  `OpenFirstRecord` int NULL DEFAULT 0 COMMENT '进入模块默认打开第一条记录',\n  `ImportCodeShowV8` mediumtext NULL COMMENT '[导入]按钮显示条件',\n  `ExportCodeShowV8` mediumtext NULL COMMENT '[导出]按钮显示条件'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     }
   ],
   "PhysicalColumns": [
@@ -3007,6 +3007,30 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 113
+    },
+    {
+      "TABLE_NAME": "sys_menu",
+      "COLUMN_NAME": "ImportCodeShowV8",
+      "COLUMN_TYPE": "mediumtext",
+      "DATA_TYPE": "mediumtext",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "[导入]按钮显示条件",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 112
+    },
+    {
+      "TABLE_NAME": "sys_menu",
+      "COLUMN_NAME": "ExportCodeShowV8",
+      "COLUMN_TYPE": "mediumtext",
+      "DATA_TYPE": "mediumtext",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "[导出]按钮显示条件",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 113
     }
   ],
   "SysMenus": [
@@ -4037,7 +4061,7 @@
       "Unique": 0,
       "NameConfirm": 1,
       "TableWidth": 120,
-      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"CodeEditor\":{\"Height\":\"100\"},\"Sql\":\"\",\"EnableSearch\":true,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"DataSourceApiEngineKey\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\"}",
+      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"CodeEditor\":{\"Height\":\"100\",\"DisplayMode\":\"Dialog\"},\"Sql\":\"\",\"EnableSearch\":true,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"DataSourceApiEngineKey\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"Unique\":{\"Type\":\"Alone\"}}",
       "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
       "Readonly": 0,
       "Encrypt": 0,
@@ -4063,7 +4087,7 @@
       "Unique": 0,
       "NameConfirm": 1,
       "TableWidth": 120,
-      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"CodeEditor\":{\"Height\":\"100\"},\"Sql\":\"\",\"EnableSearch\":true,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"DataSourceApiEngineKey\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\"}",
+      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"CodeEditor\":{\"Height\":\"100\",\"DisplayMode\":\"Dialog\"},\"Sql\":\"\",\"EnableSearch\":true,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"DataSourceApiEngineKey\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"Unique\":{\"Type\":\"Alone\"}}",
       "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
       "Readonly": 0,
       "Encrypt": 0,
@@ -4089,7 +4113,7 @@
       "Unique": 0,
       "NameConfirm": 1,
       "TableWidth": 120,
-      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"CodeEditor\":{\"Height\":\"100\"},\"Sql\":\"\",\"EnableSearch\":true,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"DataSourceApiEngineKey\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\"}",
+      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"CodeEditor\":{\"Height\":\"100\",\"DisplayMode\":\"Dialog\"},\"Sql\":\"\",\"EnableSearch\":true,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"DataSourceApiEngineKey\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"Unique\":{\"Type\":\"Alone\"}}",
       "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
       "Readonly": 0,
       "Encrypt": 0,
@@ -5702,7 +5726,7 @@
       "Unique": 0,
       "NameConfirm": 1,
       "TableWidth": 50,
-      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"CodeEditor\":{\"Height\":\"100\"},\"Sql\":\"\",\"EnableSearch\":true,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"DataSourceApiEngineKey\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\"}",
+      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"CodeEditor\":{\"Height\":\"100\",\"DisplayMode\":\"Dialog\"},\"Sql\":\"\",\"EnableSearch\":true,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"DataSourceApiEngineKey\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"Unique\":{\"Type\":\"Alone\"}}",
       "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
       "Readonly": 0,
       "Encrypt": 0,
@@ -5910,6 +5934,52 @@
       "NameConfirm": 1,
       "IsDeleted": 0,
       "Tab": "8b6677d2-164c-4e34-a6fb-30eb7f10d1ef"
+    },
+    {
+      "AppVisible": 1,
+      "FormWidth": 24,
+      "Tab": "01KGA478B18MCNQRBDWGX548DE",
+      "Type": "mediumtext",
+      "Name": "ExportCodeShowV8",
+      "InTableEdit": 0,
+      "Unique": 0,
+      "NameConfirm": 0,
+      "TableWidth": 160,
+      "Config": "{\"CodeEditor\":{\"Height\":\"100\",\"Language\":\"javascript\",\"V8CodeType\":\"client\",\"DisplayMode\":\"Dialog\"}}",
+      "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
+      "Readonly": 0,
+      "Encrypt": 0,
+      "Component": "CodeEditor",
+      "Description": "通过 V8.Result=true/false 控制按钮显示；不代替角色导入、导出权限。",
+      "Visible": 1,
+      "Sort": 10860,
+      "NotEmpty": 0,
+      "Label": "[导出]按钮显示条件",
+      "Id": "01M2HJV85H9V7BMM66M854DHJT",
+      "CreateTime": "2026-09-15 11:47:51"
+    },
+    {
+      "AppVisible": 1,
+      "FormWidth": 24,
+      "Tab": "01KGA478B18MCNQRBDWGX548DE",
+      "Type": "mediumtext",
+      "Name": "ImportCodeShowV8",
+      "InTableEdit": 0,
+      "Unique": 0,
+      "NameConfirm": 0,
+      "TableWidth": 160,
+      "Config": "{\"CodeEditor\":{\"Height\":\"100\",\"Language\":\"javascript\",\"V8CodeType\":\"client\",\"DisplayMode\":\"Dialog\"}}",
+      "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
+      "Readonly": 0,
+      "Encrypt": 0,
+      "Component": "CodeEditor",
+      "Description": "通过 V8.Result=true/false 控制按钮显示；不代替角色导入、导出权限。",
+      "Visible": 1,
+      "Sort": 10830,
+      "NotEmpty": 0,
+      "Label": "[导入]按钮显示条件",
+      "Id": "01M2HJV4AC3XWY996V5WYPH8GT",
+      "CreateTime": "2026-09-15 11:47:47"
     }
   ],
   "DataSets": [],

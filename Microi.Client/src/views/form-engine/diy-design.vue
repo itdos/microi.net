@@ -1599,7 +1599,8 @@ export default {
             var param = lodash.cloneDeep(self.CurrentDiyTableModel);
             //Sql、V8代码全部转为Base64
             self.DiyCommon.Base64EncodeDiyTable(param);
-            // param.OsClient = self.OsClient
+            // 迁移的表定义可能保留来源租户；保存请求必须绑定当前页面租户，不能用元数据路由会话。
+            param.OsClient = self.DiyCommon.GetOsClient();
             self.DiyTableJsonToStr(param);
             param.FormEngineKey = "Diy_Table";
             // self.DiyCommon.Post(DiyApi.UptDiyTable, param, function (result) {
@@ -1631,7 +1632,8 @@ export default {
                 //Sql、V8代码全部转为Base64
                 self.DiyCommon.Base64EncodeDiyTable(param);
 
-                // param.OsClient = self.OsClient
+                // 表定义中的 OsClient 是历史元数据，不能覆盖当前登录租户。
+                param.OsClient = self.DiyCommon.GetOsClient();
                 self.DiyTableJsonToStr(param);
                 param.FormEngineKey = "Diy_Table";
                 // self.DiyCommon.Post(DiyApi.UptDiyTable, param, function (result) {

@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-frontend-events-006 sha256=f9b273e42b9bf94893ecef53797876a373ad92d46f421c90c603c52259bbd2d2 -->
+<!-- microi-progressive:chunk id=v8-frontend-events-006 sha256=7ef892121df52256c6d8c4e9da546c3f60d365f2a3cab0cb315da0b8d1fe68cd -->
 ## 列表事件
 
 ### TableRowClick — 行点击
@@ -40,7 +40,7 @@ V8.RefreshTable({ _PageIndex: 1 });
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-007 sha256=3a8ad420eed127357a6b5e799792325bc5c152ff8607722a7dc96c252fae0da2 -->
+<!-- microi-progressive:chunk id=v8-frontend-events-007 sha256=3f634f1942bdd72c87a68a2a6c4883eb2bf1e95b64bc9dc895646484f9d77a9d -->
 ## 常用前端 API
 
 | API | 说明 |

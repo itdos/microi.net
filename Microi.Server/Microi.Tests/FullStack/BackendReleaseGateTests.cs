@@ -18,6 +18,47 @@ public sealed class BackendReleaseGateCollection
 public class BackendReleaseGateTests
 {
     [Fact]
+    [Trait("Suite", "TenantSmoke")]
+    public async Task SaaSDetail_ShowsDurableSigningKeyStatusWithoutSigningMaterial()
+    {
+        var settings = ReleaseGateSettings.FromEnvironment();
+        using var client = settings.CreateClient();
+        var childOsClient = Environment.GetEnvironmentVariable("MICROI_TEST_CHILD_OSCLIENT");
+        Assert.False(string.IsNullOrWhiteSpace(childOsClient));
+        foreach (var tenant in new[] { settings.OsClient, childOsClient })
+        {
+            var detail = await PostAndRequireSuccessAsync(client, "api/FormEngine/GetFormData", new JsonObject
+            {
+                ["OsClient"] = settings.OsClient,
+                ["FormEngineKey"] = "sys_osclients",
+                ["_Where"] = new JsonArray(new JsonArray("OsClient", "=", tenant)),
+                ["_SelectFields"] = new JsonArray("Id", "OsClient", "AuthSecret", "AuthSecretRotateVersion")
+            });
+            var data = Assert.IsType<JsonObject>(ReadProperty(detail, "Data"));
+            Assert.Equal("已配置（后端自动管理）", ReadProperty(data, "AuthSecret")?.GetValue<string>());
+            Assert.Null(ReadProperty(data, "AuthSecretRotateVersion"));
+            var appended = Assert.IsType<JsonObject>(ReadProperty(detail, "DataAppend"));
+            var excluded = ReadProperty(appended, "NotSaveField")!.AsArray();
+            Assert.Contains(excluded, value => value?.GetValue<string>() == "AuthSecret");
+            Assert.Contains(excluded, value => value?.GetValue<string>() == "AuthSecretRotateVersion");
+            var listing = await PostAndRequireSuccessAsync(client, "api/FormEngine/GetTableData", new JsonObject
+            {
+                ["OsClient"] = settings.OsClient, ["FormEngineKey"] = "sys_osclients",
+                ["_Where"] = new JsonArray(new JsonArray("OsClient", "=", tenant)),
+                ["_SelectFields"] = new JsonArray("Id", "OsClient", "AuthSecret", "AuthSecretRotateVersion"),
+                ["_PageSize"] = 10
+            });
+            var rows = ReadProperty(listing, "Data")!.AsArray();
+            Assert.NotEmpty(rows);
+            foreach (var row in rows)
+            {
+                Assert.Equal("已配置（后端自动管理）", row!["AuthSecret"]?.GetValue<string>());
+                Assert.Null(row["AuthSecretRotateVersion"]);
+            }
+        }
+    }
+
+    [Fact]
     [Trait("Suite", "SystemObservability")]
     public async Task ProcessSnapshot_ProvidesBoundedSamplesThroughAuthenticatedHttpOnly()
     {
@@ -100,6 +141,9 @@ public class BackendReleaseGateTests
             new JsonObject { ["OsClient"] = settings.OsClient });
         var publicConfigNode = Assert.IsType<JsonObject>(ReadProperty(sysConfig, "Data"));
         var publicConfig = JObject.Parse(publicConfigNode.ToJsonString());
+        // 授权标签在会话管理接口尚未升级时，也必须从公开启动配置得到可信版本。
+        Assert.Contains(publicConfig["PlatformEdition"]?.Value<string>(),
+            new[] { "开源版", "个人版", "企业版" });
         var projectionInput = (JObject)publicConfig.DeepClone();
         var loginPublicKeyProperty = projectionInput.Properties().FirstOrDefault(property =>
             string.Equals(property.Name, "LoginRsaPublicKey", StringComparison.OrdinalIgnoreCase));

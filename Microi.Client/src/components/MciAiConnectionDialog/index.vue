@@ -1,7 +1,7 @@
 <template>
     <div class="ai-connection-entry">
         <button type="button" class="runtime-version-button" data-testid="runtime-version" @click="visible = true">{{ text }}</button>
-        <el-tag v-if="edition" size="small" effect="plain" data-testid="platform-edition">{{ edition }}</el-tag>
+        <button v-if="!hideEdition" type="button" class="runtime-version-button platform-edition-button" data-testid="platform-edition" @click="router.push('/license')">{{ edition || '授权版本' }}</button>
     </div>
     <el-dialog v-model="visible" title="开发工具连接" width="min(760px, 92vw)" class="ai-connection-dialog" append-to-body draggable destroy-on-close>
         <div class="ai-connection-details">
@@ -19,12 +19,19 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { useDiyStore } from '@/pinia/modules/diy';
 import { ElMessage } from 'element-plus';
 import { DiyCommon } from '@/utils/diy.common';
 import { buildAiConnectionPrompt, copyConnectionText } from '@/utils/ai-connection.js';
+import { platformEditionLabel, hideSystemLicenseVersion } from '@/utils/platform-edition.js';
 defineProps({ text: { type: String, required: true } });
-const visible = ref(false), copying = ref(false), edition = ref('');
+const visible = ref(false), copying = ref(false), sessionEdition = ref('');
+const diyStore = useDiyStore(), router = useRouter();
+const edition = computed(() => platformEditionLabel(diyStore.SysConfig?.PlatformEdition) || sessionEdition.value);
+const hideEdition = computed(() => hideSystemLicenseVersion(diyStore.SysConfig));
+let editionRetry, editionAttempts = 0, disposed = false;
 const apiBase = computed(() => DiyCommon.GetApiBase());
 const osClient = computed(() => DiyCommon.GetOsClient());
 const promptPreview = computed(() => buildAiConnectionPrompt({ ApiBase: apiBase.value, OsClient: osClient.value, Token: '<复制时生成的独立 Token>' }));
@@ -33,12 +40,18 @@ async function sessionAction(Action) {
     if (typeof response !== 'string') return response;
     try { return JSON.parse(response); } catch { throw new Error('平台返回格式无效，请重试。'); }
 }
-onMounted(async () => {
+async function loadEdition() {
+    if (disposed || platformEditionLabel(diyStore.SysConfig?.PlatformEdition)) return;
+    editionAttempts++;
     try {
         const result = await sessionAction('GetConnectionInfo');
-        if (result?.Code === 1 && result.Data && Object.hasOwn(result.Data, 'ProductType')) edition.value = ({ enterprise: '企业版', personal: '个人版', '': '开源版', opensource: '开源版' })[String(result.Data.ProductType || '').toLowerCase()] || '';
+        if (!disposed && result?.Code === 1 && result.Data) sessionEdition.value = platformEditionLabel(result.Data.ProductType);
     } catch { /* 版本查询失败不影响业务页面。 */ }
-});
+    // 旧后端短暂失败时有界重试，不能永久消失或把未知授权冒充开源版。
+    if (!disposed && !edition.value && editionAttempts < 3) editionRetry = setTimeout(loadEdition, editionAttempts * 3000);
+}
+onMounted(loadEdition);
+onBeforeUnmount(() => { disposed = true; clearTimeout(editionRetry); });
 async function copyConnection() {
     if (copying.value) return;
     copying.value = true;

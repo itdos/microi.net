@@ -14,7 +14,7 @@ description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/Patch�
 文档维护时，前端用法更新现有 `microi.doc/docs/doc/v8-engine/v8-client.md`，后端用法更新现有 `microi.doc/docs/doc/v8-engine/v8-server.md`；不要新建重复的 V8.Http 文档页面或路由。只维护中文 `docs/doc/`，英文 `docs/en/` 由官网统一翻译生成。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-http-integration-000 sha256=c5600510764ba7a160557ef9acd34719d1ab8c65acf635f3d4183ed5ab2e2e1f -->
+<!-- microi-progressive:chunk id=v8-http-integration-000 sha256=0a2600eb1fc1308232c8b23aa9e6859a4927df69b20f043537df305628d46c89 -->
 ## V8.Http API
 
 | 方法 | 说明 | 返回值 |
@@ -71,7 +71,7 @@ if (resp.StatusCode < 200 || resp.StatusCode >= 300) {
 `GetResponse/PostResponse/PatchResponse` 返回 `Content`、`Headers`、`RawBytes`、`StatusCode`、`ErrorMessage`。后端 `RawBytes` 是 `.NET byte[]`，前端是 `Uint8Array`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-001 sha256=4cbbdd385e24d19413b7534665333c07f2516067e9f34aa40e6adabe9e0506f4 -->
+<!-- microi-progressive:chunk id=v8-http-integration-001 sha256=3ea3068fc215afae5c0f36ac54f277542a218e7a2aa2a953be8403e77b31f947 -->
 ## V8.AI 与底层 HTTP
 
 - 前端 V8 的平台 AI 普通调用优先 `await V8.AI.Chat(...)`。它自动使用当前 ApiBase 和平台登录头、接收响应 Token 轮换，并清除调用参数中的租户、身份、Endpoint、ApiKey 和认证头覆盖；只有确认问题适合进入 URL 日志时才用 `V8.AI.ChatGet(...)`。
@@ -94,7 +94,7 @@ else V8.Result = result.Data;
 完整授权矩阵、SSE、后端安全边界与 MCP 示例维护在官网现有 `system-engine/ai-engine.md`，不要新建重复文档。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-002 sha256=14439c586d3379c6976513df7b3c0b2f9d586ceb4d845d6f6a1abdcb1d58705a -->
+<!-- microi-progressive:chunk id=v8-http-integration-002 sha256=bf9d4f5162ff81798521f69a82e41db50c95f4a0b3d1338d35983c1b161d6192 -->
 ## POST 请求（对象参数格式）
 
 > V8 接口引擎中必须使用对象参数格式。尤其禁止 `V8.Http.Get(url)`：当前 .NET 同名重载包含 `Task<string> Get(string)`，Jint 可能把字符串调用解析为异步重载，脚本最终拿到 `[object Promise]`。GET 必须写成 `V8.Http.Get({ Url: url })`；第三方登录、微信 `jscode2session`、AccessToken 等链路保存后必须用无效 code 烟测，确认返回的是第三方明确错误而不是 Promise。
@@ -114,7 +114,7 @@ var data = JSON.parse(result);
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-003 sha256=4c7c1346ea1e17b2c2ff096f1cc9b6502ae95b73087f62bc6b3531d01297eddf -->
+<!-- microi-progressive:chunk id=v8-http-integration-003 sha256=4c7e61dfc8a2539f65ea18d068c13d0168f84d0227ea93f17c8073a2a1cc8643 -->
 ## PATCH 请求
 
 PATCH 与 POST 的参数完全对称，只需把请求体参数改为 `PatchParam` / `PatchParamString`：

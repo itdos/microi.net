@@ -22,7 +22,7 @@ MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_pag
 你正在为 Microi 吾码平台生成界面引擎页面的 JSON 数据。界面引擎页面由 `formData` 对象描述，用户导入 JSON 即可使用。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=page-engine-000 sha256=5b79a31a8484bf0a618c2810e66c0ab542fd86ceeb76e7a5cd07a86284c4f6ac -->
+<!-- microi-progressive:chunk id=page-engine-000 sha256=e9ccd20e2c3504afc0a91f5dbe93ed755aed4e83e9ffec13af5b9d60528986e0 -->
 ## 设计器源码事件
 
 只有在扩展界面引擎设计器源码时才使用全局事件总线。用
@@ -31,7 +31,7 @@ MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_pag
 触发多次；普通页面 JSON 生成不需要注册事件总线。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-001 sha256=fa60ff07b50f0d1fdbbf8c3838e94f5de8333a9072c8a5b7e86c4cc91038dfd9 -->
+<!-- microi-progressive:chunk id=page-engine-001 sha256=57717991f9c7de557b524ec36fc9bdd716080b71b682439f1b6662b0b9b2f45c -->
 ## 核心数据结构
 
 ```
@@ -159,7 +159,7 @@ formData（页面）
 | `radio` | 单选组 | `string` |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-006 sha256=f50da72e63e62c2e1ea2d47ad2294deba20d6ca1ed732835eeab1e794407306e -->
+<!-- microi-progressive:chunk id=page-engine-006 sha256=2c021e43f4f0d730da1f5a5cf6a2d314589435e2bb9ff573148c787538a8cc86 -->
 ## 数据来源（widgetParams[0]）
 
 大多数组件的第一个参数（sort=0）是"数据来源"：
@@ -172,7 +172,7 @@ $ApiBase$/apiengine/{ApiEngineKey}
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-007 sha256=bf6b4a76b11f27e62fe55e91258e3edb547aeb8456efde9d1ff787136533bf70 -->
+<!-- microi-progressive:chunk id=page-engine-007 sha256=9d5fced79d01857e14e83888681b44f06c69fcc79abf6551dcec312d96c1c02b -->
 ## 运行态布局与滚动规范
 
 - 页面只保留一个主滚动容器：仪表盘、首页和嵌套界面优先继承最外层页面滚动；单个 `pannel`、`workcenter`、`diytable`、`diycalendar`、嵌套 `pageengine` 在运行态默认使用内容自适应高度和 `overflow: visible`，不得无条件设置 `overflow: auto`。
