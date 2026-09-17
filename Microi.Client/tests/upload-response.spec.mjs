@@ -1,4 +1,4 @@
-// zhy：回归覆盖私有上传即时预览、服务端 Limit 优先级及临时 URL 不入库约束。
+// 回归覆盖私有上传即时预览、持久化实际 Limit 及临时 URL 不入库约束。
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -59,6 +59,7 @@ test("upload preview URL is read without persisting transient response fields", 
         Id: "file-1",
         Name: "contract.pdf",
         Path: "/tenant/contract.pdf",
+        Limit: true,
         Version: "v1.0.0"
     });
     assert.equal(responseData.Url, "/api/HDFS/PrivateFile?id=temporary");

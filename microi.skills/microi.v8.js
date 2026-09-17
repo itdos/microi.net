@@ -245,6 +245,13 @@ function hasPublicUploadFlag(value) {
     raw.IsPrivate === false || raw.Private === false || raw.Public === true;
 }
 
+function hasPrivateUploadFlag(value) {
+  if (!value || typeof value !== 'object') return false;
+  const raw = Array.isArray(value) ? (value[0] || {}) : value;
+  return [raw.Limit, raw.IsPrivate, raw.Private].some(flag =>
+    flag === true || flag === 1 || /^(true|1)$/i.test(String(flag))) || raw.Public === false;
+}
+
 function isKnownPublicUploadPath(path) {
   // Ordinary form uploads such as /xjy/img and /xjy/file are private by default.
   // They must use the Managed signer instead of being mistaken for CDN assets.
@@ -991,7 +998,9 @@ export function createMicroiV8(options = {}) {
     const path = extractUploadPath(filePathName);
     if (!path || isBlockedAsset(path)) return '';
     if (/^(https?:|blob:|data:|file:)/i.test(path)) return assetUrl(path);
-    if (isLocalPackagedAsset(path) || options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)) {
+    // 文件实际私有标记和私有字段上下文优先，禁止因字段曾改为公有而错误降级 CDN。
+    const privateAccess = options.private === true || hasPrivateUploadFlag(filePathName);
+    if (isLocalPackagedAsset(path) || (!privateAccess && (options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)))) {
       return assetUrl(path);
     }
     // 私有对象没有权威资源上下文时直接失败关闭，禁止以裸路径换取签名。

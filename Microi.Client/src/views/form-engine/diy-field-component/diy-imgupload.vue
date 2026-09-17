@@ -649,7 +649,9 @@ const normalizeValue = (value) => {
 
     // zhy：数组中的每一项都需要补齐 Path/Id/State。
     if (Array.isArray(value)) {
-        return value.map((item, index) => normalizeUploadItem(item, index)).filter(Boolean);
+        const items = value.map((item, index) => normalizeUploadItem(item, index)).filter(Boolean);
+        // 历史小程序把单图存为数组，读取时按字段形态归一化，不修改原始业务字段。
+        return [true, 1, '1', 'true'].includes(props.field.Config.ImgUpload.Multiple) ? items : (items[0] || '');
     }
 
     // zhy：如果已经是对象，补齐跨端兼容字段。
@@ -681,7 +683,7 @@ const normalizeValue = (value) => {
 
 // 计算属性
 const getMultipleFlag = computed(() => {
-    return props.field.Config.ImgUpload.Multiple === true || props.field.Config.ImgUpload.Multiple === 'true';
+    return [true, 1, '1', 'true'].includes(props.field.Config.ImgUpload.Multiple);
 });
 
 // zhy：使用跨端归一化后的数据判断是否显示多图片列表。
@@ -1007,7 +1009,7 @@ const ImgUploadSuccess = (result, file, fileList) => {
         // zhy：以服务端实际 Limit 为准，并复用本次上传返回的短期地址，避免未保存记录二次鉴权失败。
         const uploadedPreviewUrl = getUploadPreviewUrl(responseData);
         const effectiveLimit = resolveUploadLimit(responseData, props.field.Config.ImgUpload.Limit);
-        // zhy：业务字段只保存稳定路径和文件元数据，不保存短期 URL、完整地址或 Limit。
+        // 保存稳定路径、实际桶属性与文件元数据，短期 URL 仅用于本次运行态预览。
         const uploadedImgMeta = {
             ...sanitizeUploadMeta(responseData),
             Id: uploadedImgId,
@@ -1015,6 +1017,7 @@ const ImgUploadSuccess = (result, file, fileList) => {
             Size: responseData.Size,
             CreateTime: responseData.CreateTime,
             Path: uploadedImgPath,
+            Limit: effectiveLimit,
             State: 1
         };
 
@@ -1030,12 +1033,7 @@ const ImgUploadSuccess = (result, file, fileList) => {
             imgsJson.forEach((element) => {
                 if (element.Id == file.uid) {
                     console.log('【多图片】✓ 找到匹配图片，更新State为1');
-                    element.Id = uploadedImgId;
-                    element.Size = responseData.Size;
-                    element.CreateTime = responseData.CreateTime;
-                    element.Path = uploadedImgPath;
-                    element.State = 1;
-                    element.Name = responseData.Name || file.name;
+                    Object.assign(element, uploadedImgMeta);
                     isHave = true;
                 }
             });
@@ -1054,14 +1052,7 @@ const ImgUploadSuccess = (result, file, fileList) => {
         } else {
             // 单图片模式 - 存储为JSON字符串
             console.log('【单图片】上传成功，Path:', uploadedImgPath);
-            const singleImgObject = {
-                Id: uploadedImgId,
-                Name: responseData.Name || file.name,
-                Size: responseData.Size,
-                CreateTime: responseData.CreateTime,
-                Path: uploadedImgPath,
-                State: 1
-            };
+            const singleImgObject = uploadedImgMeta;
             // 存储为JSON字符串
             const jsonString = JSON.stringify(singleImgObject);
             // zhy：单图片同样先注入本次上传的短期地址，再触发表单值更新。
@@ -1281,10 +1272,12 @@ const GetImgUploadImgs = () => {
 const GetUploadPath = (img) => {
     // 获取图片路径：如果是单图片对象，从Path字段获取；否则使用原值或img.Path
     let imgPathName;
+    let fileMetadata;
     if (DiyCommon.IsNull(img)) {
         const fieldValue = props.FormDiyTableModel[props.field.Name];
         // 先规范化数据
         const normalized = normalizeValue(fieldValue);
+        fileMetadata = normalized;
         // 如果是对象（单图片JSON格式），取Path字段
         if (typeof normalized === 'object' && normalized !== null && normalized.Path) {
             imgPathName = normalized.Path;
@@ -1293,6 +1286,7 @@ const GetUploadPath = (img) => {
         }
     } else {
         imgPathName = img.Path;
+        fileMetadata = img;
     }
 
     if (DiyCommon.IsNull(imgPathName) || Array.isArray(imgPathName)) {
@@ -1303,7 +1297,8 @@ const GetUploadPath = (img) => {
         return;
     }
 
-    const limit = props.field.Config.ImgUpload.Limit;
+    // 已有照片可能与字段当前配置位于不同桶，优先按保存的实际 Limit 访问。
+    const limit = resolveUploadLimit(fileMetadata, props.field.Config.ImgUpload.Limit);
     const imgId = props.field.Name;
 
     if (limit !== true) {
@@ -1376,7 +1371,7 @@ watch(
                         // 只在 RealPath 未设置或为 loading.gif 时才设置
                         if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) ||
                             props.FormDiyTableModel[pathKey] === './static/img/loading.gif') {
-                            setRealPath(img.Id, img.Path, props.field.Config.ImgUpload.Limit);
+                            setRealPath(img.Id, img.Path, resolveUploadLimit(img, props.field.Config.ImgUpload.Limit));
                         }
                     }
                 });
@@ -1402,7 +1397,7 @@ onMounted(() => {
                 // 只在 RealPath 未设置或为 loading.gif 时才设置
                 if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) ||
                     props.FormDiyTableModel[pathKey] === './static/img/loading.gif') {
-                    setRealPath(img.Id, img.Path, props.field.Config.ImgUpload.Limit);
+                    setRealPath(img.Id, img.Path, resolveUploadLimit(img, props.field.Config.ImgUpload.Limit));
                 }
             }
         });
