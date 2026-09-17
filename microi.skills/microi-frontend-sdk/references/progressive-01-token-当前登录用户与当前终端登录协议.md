@@ -57,6 +57,7 @@ const result = await V8.refreshToken();
 - UniApp/App/小程序在 `App.onShow` 调用 `resumeAuthSession(false)`。
 - VS Code 在扩展激活后维护 Token，并在 `vscode.window.onDidChangeWindowState` 恢复焦点时立即检查。
 - 多请求、多 Tab 续签必须 single-flight。PC 后台可使用 Web Locks；收到响应时，如果本地 Token 已被其它 Tab 更新，旧请求不得把旧 Token 覆盖回来或清掉新登录态。
+- 续签请求即使以 `auth:false` 调用，也必须绑定发起时的会话（SDK 内部使用 `sessionBound:true`）；退出或重新登录后的旧续签响应不得恢复旧会话。UniApp 登录缓存写入后须回读确认 Token 与用户都已保存，失败时清理半登录态并留在登录页，禁止继续欢迎提示和导航。
 - 调用 `/api/SysUser/RefreshToken` 时同时传旧 `authorization`、当前 `OsClient`、原终端 `_ClientType`，请求头继续传稳定 `did`。不要频繁无条件换新。
 
 ### 失效提示与租户边界

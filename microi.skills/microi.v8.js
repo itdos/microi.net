@@ -777,7 +777,7 @@ export function createMicroiV8(options = {}) {
     const method = String(options.method || 'POST').toUpperCase();
     let fullUrl = buildUrl(options.url || options.path || '');
     const authEnabled = options.auth !== false;
-    const requestToken = authEnabled ? getToken() : '';
+    const requestToken = authEnabled || options.sessionBound === true ? getToken() : '';
     const headers = buildHeaders(options);
     const data = options.data === undefined ? {} : options.data;
     const timeout = options.timeout || config.timeout;
@@ -838,7 +838,7 @@ export function createMicroiV8(options = {}) {
         throw body || new Error('登录已过期');
       }
 
-      handleReturnedToken(headersReturned, requestToken, authEnabled);
+      handleReturnedToken(headersReturned, requestToken, authEnabled || options.sessionBound === true);
 
       if (statusCode >= 400) {
         const error = body || new Error(`请求失败: ${statusCode}`);
@@ -895,6 +895,8 @@ export function createMicroiV8(options = {}) {
       url: '/api/SysUser/refreshToken',
       method: 'POST',
       auth: false,
+      // 续签只能更新发起时的会话，避免慢响应覆盖主动登录或恢复已退出的会话。
+      sessionBound: true,
       checkCode: false,
       silentError: true,
       headers: {
