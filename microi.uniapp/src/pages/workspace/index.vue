@@ -31,12 +31,20 @@
         <view v-if="!isLoggedIn" class="login-button" @tap="goLogin">登录</view>
       </view>
 
-      <view v-if="featureEnabled('business')" class="metrics" :class="{ 'is-loading': summaryLoading }">
+      <view v-if="featureEnabled('business')" class="metrics" :class="{ 'is-loading': summaryLoading || homeMenuLoading }">
+        <template v-if="homeMenuLoading">
+          <view v-for="index in 4" :key="`loading-${index}`" class="metric" aria-hidden="true">
+            <view class="metric-value metric-skeleton"></view>
+            <view class="metric-label metric-label-skeleton"></view>
+          </view>
+        </template>
+        <template v-else>
         <view v-for="metric in metrics" :key="metric.key" class="metric" @tap="openModule(metric.key)">
           <view v-if="summaryLoading" class="metric-value metric-skeleton"></view>
           <text v-else class="metric-value">{{ compactNumber(metric.value) }}</text>
           <text class="metric-label">{{ metric.label }}</text>
         </view>
+        </template>
       </view>
     </view>
 
@@ -48,6 +56,31 @@
       @refresherrefresh="refreshAll"
     >
       <view class="home-content">
+        <!-- 权限未确定时只展示不可点击的结构占位，不泄露未授权菜单或借用上一账号内容。 -->
+        <view v-if="homeMenuLoading" class="home-loading" aria-label="工作台加载中">
+          <view class="section-heading home-loading__heading">
+            <view><view class="home-skeleton home-skeleton--heading"></view><view class="home-skeleton home-skeleton--subtitle"></view></view>
+          </view>
+          <view class="quick-grid">
+            <view v-for="index in 8" :key="index" class="quick-item">
+              <view class="home-skeleton home-skeleton--icon"></view>
+              <view class="home-skeleton home-skeleton--name"></view>
+            </view>
+          </view>
+          <view v-for="groupIndex in 2" :key="groupIndex" class="business-section home-loading__section">
+            <view class="group-heading"><view class="home-skeleton home-skeleton--heading"></view></view>
+            <view class="module-grid">
+              <view v-for="index in 8" :key="index" class="module-item">
+                <view class="home-skeleton home-skeleton--icon"></view>
+                <view class="home-skeleton home-skeleton--name"></view>
+              </view>
+            </view>
+          </view>
+        </view>
+        <template v-else>
+        <view v-if="homeMenuError && (quickEntries.length || visibleBusinessGroups.length)" class="home-permission-note" @tap="refreshAll">
+          <text>部分功能暂未加载</text><text>↻ 重试</text>
+        </view>
         <view v-if="quickEntries.length" class="section-heading">
           <view>
             <text class="section-title">快捷处理</text>
@@ -102,11 +135,18 @@
           </view>
         </view>
 
-        <view class="service-promise">
+        <view v-if="isLoggedIn && !quickEntries.length && !visibleBusinessGroups.length" class="home-empty">
+          <view class="home-empty__icon"><text>▤</text></view>
+          <text class="home-empty__title">{{ homeMenuError ? '工作台暂未加载' : '暂无可用功能' }}</text>
+          <text class="home-empty__note">{{ homeMenuError ? '请检查网络后重试' : '请联系管理员配置菜单权限' }}</text>
+          <view v-if="homeMenuError" class="home-empty__retry" hover-class="home-empty__retry--pressed" @tap="refreshAll"><text>↻ 重新加载</text></view>
+        </view>
+        <view v-else class="service-promise">
           <view class="promise-line"></view>
           <text class="promise-title">{{ appConfig.promiseTitle }}</text>
           <text class="promise-text">{{ appConfig.promiseText }}</text>
         </view>
+        </template>
         <view class="mci-tabbar-spacer" aria-hidden="true" />
       </view>
     </scroll-view>
@@ -147,6 +187,13 @@ export default {
       runtimeBusinessGroups: [],
       businessEntryVisibility: {},
       businessPermissionRequestId: 0,
+      businessPermissionIdentity: '',
+      businessPermissionsReady: false,
+      businessPermissionsLoading: false,
+      businessPermissionsError: '',
+      runtimeModuleRequestId: 0,
+      runtimeModulesReady: false,
+      runtimeModulesError: '',
       summary: { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 },
       summaryLoading: false,
       refreshing: false,
@@ -154,6 +201,13 @@ export default {
     }
   },
   computed: {
+    homeMenuLoading() {
+      return this.isLoggedIn && (!this.businessPermissionsReady ||
+        (this.featureEnabled('dynamicModules') && !this.runtimeModulesReady))
+    },
+    homeMenuError() {
+      return this.businessPermissionsError || this.runtimeModulesError
+    },
     roleProfile() {
       return getRoleProfile(this.currentUser)
     },
@@ -207,11 +261,8 @@ export default {
       return items.filter((item) => this.isHomeEntryVisible(item.key))
     },
     visibleBusinessGroups() {
-      const allowed = new Set(this.roleProfile.allowedGroupKeys || [])
-      const configured = allowed.size
-        ? this.businessGroups.filter((group) => allowed.has(group.key))
-        : this.businessGroups
-      return configured
+      // 板块由其授权菜单汇总，不再按角色名称提前排除整个板块。
+      return this.businessGroups
         .map((group) => ({
           ...group,
           items: (group.items || []).filter((item) => this.isHomeEntryVisible(item.key))
@@ -247,6 +298,18 @@ export default {
     const currentUser = getUser() || {}
     this.isLoggedIn = !!token && !!currentUser.Id
     this.currentUser = this.isLoggedIn ? currentUser : {}
+    const identity = this.isLoggedIn ? String(currentUser.Id) : ''
+    if (identity !== this.businessPermissionIdentity) {
+      this.businessPermissionIdentity = identity
+      this.businessPermissionRequestId += 1
+      this.runtimeModuleRequestId += 1
+      this.businessPermissionsReady = false
+      this.runtimeModulesReady = false
+      this.businessPermissionsError = ''
+      this.runtimeModulesError = ''
+      this.businessEntryVisibility = {}
+      this.runtimeBusinessGroups = []
+    }
     if (!this.isLoggedIn) {
       if (token) removeToken()
       // Tab 页面退出登录后不会销毁；主动失效旧请求并清空仍留在实例内的登录态数据。
@@ -256,6 +319,11 @@ export default {
       this.runtimeBusinessGroups = []
       this.businessPermissionRequestId += 1
       this.businessEntryVisibility = {}
+      this.businessPermissionsReady = false
+      this.businessPermissionsLoading = false
+      this.runtimeModuleRequestId += 1
+      this.runtimeModulesReady = false
+      this.runtimeModulesError = ''
       return
     }
     if (this.featureEnabled('business')) this.loadSummary()
@@ -268,25 +336,38 @@ export default {
     },
     isHomeEntryVisible(key) {
       if (!this.isLoggedIn) return true
-      return this.businessEntryVisibility[key] !== false
+      return this.businessEntryVisibility[key] === true
     },
     async loadBusinessEntryVisibility(refresh = false) {
       const requestId = ++this.businessPermissionRequestId
+      this.businessPermissionsLoading = true
+      this.businessPermissionsError = ''
       const entries = [...new Set(this.businessGroups.flatMap((group) =>
         (group.items || []).map((item) => item.key)
       ))]
       const visibility = {}
-      // 首个检查先完成菜单树加载，避免多个入口在冷启动时并发请求同一份权限数据。
-      for (let index = 0; index < entries.length; index += 1) {
-        const key = entries[index]
+      let failures = 0
+      const checkEntry = async (key, forceRefresh = false) => {
         try {
-          visibility[key] = await canOpenBusinessEntry(key, refresh && index === 0)
+          visibility[key] = await canOpenBusinessEntry(key, forceRefresh)
         } catch (error) {
           visibility[key] = false
+          failures += 1
         }
       }
-      if (requestId !== this.businessPermissionRequestId) return
+      // 先预热菜单树，再以最多四个并发检查入口，缩短首屏等待且不制造冷启动请求风暴。
+      if (entries.length) await checkEntry(entries[0], refresh)
+      let cursor = 1
+      await Promise.all(Array.from({ length: Math.min(4, Math.max(0, entries.length - 1)) }, async () => {
+        while (cursor < entries.length && requestId === this.businessPermissionRequestId) {
+          await checkEntry(entries[cursor++])
+        }
+      }))
+      if (requestId !== this.businessPermissionRequestId || !this.isLoggedIn) return
       this.businessEntryVisibility = visibility
+      this.businessPermissionsReady = true
+      this.businessPermissionsLoading = false
+      this.businessPermissionsError = failures ? '菜单权限加载失败' : ''
     },
     async loadBrand() {
       try {
@@ -324,10 +405,18 @@ export default {
       openBusiness(key)
     },
     async loadRuntimeModules(refresh = false) {
+      const requestId = ++this.runtimeModuleRequestId
+      this.runtimeModulesError = ''
       try {
-        this.runtimeBusinessGroups = await loadAccessibleModuleGroups(refresh)
+        const groups = await loadAccessibleModuleGroups(refresh)
+        if (requestId !== this.runtimeModuleRequestId || !this.isLoggedIn) return
+        this.runtimeBusinessGroups = groups
       } catch (error) {
+        if (requestId !== this.runtimeModuleRequestId || !this.isLoggedIn) return
         this.runtimeBusinessGroups = []
+        this.runtimeModulesError = '业务模块加载失败'
+      } finally {
+        if (requestId === this.runtimeModuleRequestId && this.isLoggedIn) this.runtimeModulesReady = true
       }
     },
     handleScan() {
@@ -578,6 +667,22 @@ export default {
   opacity: 0.62;
 }
 .metric-skeleton { width: 58rpx; height: 34rpx; margin: 0 auto; border-radius: 6rpx; background: linear-gradient(90deg, rgba(255,255,255,.14) 25%, rgba(255,255,255,.38) 45%, rgba(255,255,255,.14) 65%); background-size: 300% 100%; animation: homeMetricShimmer 1.2s ease-in-out infinite; }
+.metric-label-skeleton { width: 74rpx; height: 18rpx; margin: 10rpx auto 0; border-radius: 4rpx; background: rgba(255,255,255,.12); }
+.home-skeleton { border-radius: 6rpx; background: linear-gradient(90deg, #e9f0f3 25%, #f8fafb 45%, #e9f0f3 65%); background-size: 300% 100%; animation: homeMetricShimmer 1.4s ease-in-out infinite; }
+.home-skeleton--heading { width: 150rpx; height: 30rpx; }
+.home-skeleton--subtitle { width: 250rpx; height: 18rpx; margin-top: 12rpx; }
+.home-skeleton--icon { width: 64rpx; height: 64rpx; border-radius: 16rpx; margin: 10rpx 0 14rpx; }
+.home-skeleton--name { width: 82rpx; height: 20rpx; }
+.home-loading__section { animation: none; }
+.home-loading__section .group-heading { padding-bottom: 22rpx; border-bottom: 1rpx solid #edf3f5; }
+.home-permission-note { display: flex; justify-content: space-between; gap: 16rpx; margin-bottom: 20rpx; padding: 20rpx 24rpx; border-radius: 12rpx; background: #eaf4fa; color: #39758f; font-size: 24rpx; }
+.home-empty { display: flex; flex-direction: column; align-items: center; padding: 64rpx 28rpx; border-radius: 16rpx; border: 1rpx solid #e5eef2; background: #fff; text-align: center; }
+.home-empty__icon { display: flex; align-items: center; justify-content: center; width: 96rpx; height: 96rpx; margin-bottom: 24rpx; border-radius: 24rpx; background: #edf5f8; color: #548598; font-size: 48rpx; }
+.home-empty__title { font-size: 30rpx; font-weight: 600; }
+.home-empty__note { margin-top: 14rpx; color: #75909c; font-size: 24rpx; line-height: 36rpx; }
+.home-empty__retry { margin-top: 32rpx; padding: 18rpx 36rpx; border-radius: 12rpx; background: linear-gradient(135deg, #0b86d4, #16aaa4); color: #fff; font-size: 26rpx; }
+.home-empty__retry--pressed { opacity: .75; }
+@media (prefers-reduced-motion: reduce) { .home-skeleton, .metric-skeleton { animation: none; } }
 @keyframes homeMetricShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
 .home-scroll {

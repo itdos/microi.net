@@ -114,7 +114,14 @@
 						<view class="field-row"
 							:class="{ 'field-row--map': tenantDetailFieldPresentation(field).type === 'map' }"
 							v-for="field in section.fields" :key="`${section.key}:${field.name}`">
-							<text class="field-label">{{ field.label }}</text>
+							<view class="field-label">
+								<text>{{ field.label }}</text>
+								<view v-for="action in tenantDetailFieldActions(field)" :key="action.key"
+									class="detail-field-action" hover-class="detail-field-action--pressed"
+									@tap.stop="runTenantDetailFieldAction(field, action)">
+									<text>{{ action.icon }} {{ action.label }}</text>
+								</view>
+							</view>
 							<view class="field-value-wrap"
 								:class="{ 'field-value-wrap--scroll': isScrollableDetailField(field) }">
 								<view v-if="tenantDetailFieldPresentation(field).type === 'map'"
@@ -369,6 +376,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	} from '@/platform/native-form.js'
 	import {
 		getTenantFormFieldPresentation,
+		getTenantFormFieldActions,
+		runTenantFormFieldAction,
 		refreshTenantFormDerivedValues
 	} from '@/platform/form-extension.js'
 	import {
@@ -2367,6 +2376,17 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				this.detail = { ...this.detail, ShebeiGZZT: '正常' }
 				await this.loadDetail(false)
 			},
+			tenantDetailFieldActions(field) {
+				return field.nativeField ? getTenantFormFieldActions(this.tenantDetailFormContext(), field.nativeField) : []
+			},
+			async runTenantDetailFieldAction(field, action) {
+				if (action.disabled) return
+				try {
+					await runTenantFormFieldAction(this.tenantDetailFormContext(), field.nativeField, action)
+				} catch (error) {
+					uni.showToast({ title: error.message || '打开表单失败', icon: 'none' })
+				}
+			},
 			openOrderApproval(mode) {
 				if (!this.canApproveOrder) {
 					uni.showToast({
@@ -2618,6 +2638,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 </script>
 
 <style lang="scss" scoped>
+	.detail-field-action { display: inline-flex; align-items: center; min-height: 56rpx; margin-top: 8rpx; padding: 0 12rpx; border-radius: 6px; color: #fff; background: linear-gradient(135deg, #0b86d4, #16aaa4); font-size: 22rpx; transition: opacity .18s ease; }
+	.detail-field-action--pressed { opacity: .75; }
 	.detail-page {
 		display: flex;
 		flex-direction: column;

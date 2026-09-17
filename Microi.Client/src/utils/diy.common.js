@@ -3516,7 +3516,8 @@ var DiyCommon = {
                 }
                 var imgValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
                     ? "" : formData[field.Name];
-                if (!imgValue || imgValue === '[]' || imgValue === '[ ]' || Array.isArray(imgValue)) {
+                // 历史单图数组由图片组件归一化，不能在组件取址之前清空有效数据。
+                if (!imgValue || imgValue === '[]' || imgValue === '[ ]') {
                     imgValue = "";
                 }
                 return imgValue;

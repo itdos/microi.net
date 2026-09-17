@@ -245,6 +245,13 @@ function hasPublicUploadFlag(value) {
     raw.IsPrivate === false || raw.Private === false || raw.Public === true;
 }
 
+function hasPrivateUploadFlag(value) {
+  if (!value || typeof value !== 'object') return false;
+  const raw = Array.isArray(value) ? (value[0] || {}) : value;
+  return [raw.Limit, raw.IsPrivate, raw.Private].some(flag =>
+    flag === true || flag === 1 || /^(true|1)$/i.test(String(flag))) || raw.Public === false;
+}
+
 function isKnownPublicUploadPath(path) {
   // Ordinary form uploads such as /xjy/img and /xjy/file are private by default.
   // They must use the Managed signer instead of being mistaken for CDN assets.
@@ -770,7 +777,7 @@ export function createMicroiV8(options = {}) {
     const method = String(options.method || 'POST').toUpperCase();
     let fullUrl = buildUrl(options.url || options.path || '');
     const authEnabled = options.auth !== false;
-    const requestToken = authEnabled ? getToken() : '';
+    const requestToken = authEnabled || options.sessionBound === true ? getToken() : '';
     const headers = buildHeaders(options);
     const data = options.data === undefined ? {} : options.data;
     const timeout = options.timeout || config.timeout;
@@ -831,7 +838,7 @@ export function createMicroiV8(options = {}) {
         throw body || new Error('登录已过期');
       }
 
-      handleReturnedToken(headersReturned, requestToken, authEnabled);
+      handleReturnedToken(headersReturned, requestToken, authEnabled || options.sessionBound === true);
 
       if (statusCode >= 400) {
         const error = body || new Error(`请求失败: ${statusCode}`);
@@ -888,6 +895,8 @@ export function createMicroiV8(options = {}) {
       url: '/api/SysUser/refreshToken',
       method: 'POST',
       auth: false,
+      // 续签只能更新发起时的会话，避免慢响应覆盖主动登录或恢复已退出的会话。
+      sessionBound: true,
       checkCode: false,
       silentError: true,
       headers: {
@@ -991,7 +1000,9 @@ export function createMicroiV8(options = {}) {
     const path = extractUploadPath(filePathName);
     if (!path || isBlockedAsset(path)) return '';
     if (/^(https?:|blob:|data:|file:)/i.test(path)) return assetUrl(path);
-    if (isLocalPackagedAsset(path) || options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)) {
+    // 文件实际私有标记和私有字段上下文优先，禁止因字段曾改为公有而错误降级 CDN。
+    const privateAccess = options.private === true || hasPrivateUploadFlag(filePathName);
+    if (isLocalPackagedAsset(path) || (!privateAccess && (options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)))) {
       return assetUrl(path);
     }
     // 私有对象没有权威资源上下文时直接失败关闭，禁止以裸路径换取签名。

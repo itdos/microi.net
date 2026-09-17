@@ -312,7 +312,9 @@ export function groupFields(fields, tableModel = {}) {
       }
       return
     }
-    if (GUARDED_COMPONENTS.has(field.component)) return
+    // 仅显示已有受控原生动作适配的按钮；不执行后台 V8，也不开放任意自定义控件。
+    if (GUARDED_COMPONENTS.has(field.component) &&
+      !(field.component === 'Button' && field.nativeAction === true)) return
 
     const active = activeGroups.get(tabKey)
     if (active && active.remaining > 0) {
@@ -421,6 +423,8 @@ function definitionFingerprint(table, fields) {
 }
 
 function definitionAuthorizationScope(options = {}) {
+  // 同一子菜单可能从不同主表/嵌套关系打开，缓存不能把独立菜单授权与父子授权混用。
+  if (options.tableChildAuth) return JSON.stringify(options.tableChildAuth)
   const tableChildAuth = options.tableChildAuth || {}
   const childScope = [
     tableChildAuth.ParentSysMenuId,
@@ -445,6 +449,9 @@ function definitionKeys(tableName, options = {}) {
 }
 
 function metadataAuthorizationParams(options = {}) {
+  // 子表权限由后端逐层验证父记录和关系字段；子菜单只提供展示配置，
+  // 不能同时作为独立菜单授权入口，否则只读表权限会被不存在/未授权菜单阻断。
+  if (options.tableChildAuth) return { _TableChildAuth: options.tableChildAuth }
   const result = {}
   if (options.menuId) result._SysMenuId = options.menuId
   if (options.moduleEngineKey) result.ModuleEngineKey = options.moduleEngineKey
@@ -524,6 +531,7 @@ export function scopeNativeFormDefinition(definition, options = {}) {
   const include = new Set((options.includeNames || []).map((name) => String(name).toLowerCase()))
   const exclude = new Set((options.excludeNames || []).map((name) => String(name).toLowerCase()))
   const readonly = new Set((options.readonlyNames || []).map((name) => String(name).toLowerCase()))
+  const actionFields = new Set((options.actionFieldNames || []).map((name) => String(name).toLowerCase()))
   const fields = (definition.fields || []).filter((field) => {
     const name = String(field.Name || '').toLowerCase()
     if (exclude.has(name)) return false
@@ -531,6 +539,7 @@ export function scopeNativeFormDefinition(definition, options = {}) {
     return !include.size || include.has(name)
   }).map((field) => ({
     ...field,
+    nativeAction: field.component === 'Button' && actionFields.has(String(field.Name || '').toLowerCase()),
     editable: readonly.has(String(field.Name || '').toLowerCase()) ? false : field.editable
   }))
   return buildDefinition(definition.table || {}, fields, definition.layoutFields || definition.fields || [])
