@@ -493,8 +493,9 @@ export const businessModules = {
   orderGoods: native({
     title: '订单商品', table: 'Diy_DingdanSP', menuAliases: ['订单商品列表', '订单商品', '合同商品'],
     requireAuthorizedMenu: true,
-    titleField: 'ShangpinMC', statusField: 'HezuoZT', tagFields: ['HezuoFS', 'ShebeiBH'],
-    lines: [{ label: '设备编号', field: 'ShebeiBH' }, { label: '数量', field: 'Shuliang' }, { label: '实际价格', field: 'ShijiJG', format: 'money' }]
+    // 子菜单展示配置暂不可用时也保持商品卡片层级，角色只影响操作权限。
+    titleField: 'ShangpinMC', statusField: 'HezuoZT', tagFields: [], bottomFields: ['HezuoFS'],
+    lines: [{ label: '设备型号', field: 'ShebeiBH' }, { label: '设备数量', field: 'Shuliang' }, { label: '实际价格', field: 'ShijiJG', format: 'money' }]
   }),
   installationPositions: native({
     title: '安装位置', table: 'diy_shebeiwz', menuAliases: ['安装位置', '订单商品安装位置'],
