@@ -352,6 +352,13 @@ export default {
       return this.isImage ? 'img' : 'file'
     },
     fileAccessContext() {
+      const config = this.field.config || {}
+      const uploadConfig = this.isImage ? config.ImgUpload : config.FileUpload
+      const limit = uploadConfig && uploadConfig.Limit
+      // 字段策略作为历史文件的缺省取址依据；单个文件的实际私有属性仍由 SDK 优先保留。
+      const privateAccess = [true, 1, '1', 'true'].includes(uploadConfig && uploadConfig.EnableRolePermission)
+        ? true
+        : (limit === undefined || limit === null ? undefined : [true, 1, '1', 'true'].includes(limit))
       const runtimeUrls = {}
       const uploadValue = parseJson(this.modelValue, this.modelValue)
       const uploadItems = Array.isArray(uploadValue) ? uploadValue : (uploadValue ? [uploadValue] : [])
@@ -367,6 +374,7 @@ export default {
         fieldId: this.field.Id || this.field.id || '',
         sysMenuId: this.fileAccessMenuId || this.menuId,
         tableChildAuth: this.tableChildAuth,
+        private: privateAccess,
         // zhy：跨表选择的私有照片在目标草稿保存前使用来源记录签发的运行态 URL。
         runtimeUrls
       }
@@ -374,6 +382,12 @@ export default {
     mediaMaxCount() {
       if (this.isAvatar) return 1
       const config = this.field.config || {}
+      const uploadConfig = this.isImage ? config.ImgUpload : config.FileUpload
+      // MaxCount 是多图数量上限，不能把单图字段误当成默认九图控件。
+      if (uploadConfig) {
+        if (![true, 1, '1', 'true'].includes(uploadConfig.Multiple)) return 1
+        return Math.max(1, Number(uploadConfig.MaxCount || 9))
+      }
       return Math.max(1, Number(config.UploadLimit || config.ImgUploadLimit || config.FileUploadLimit || 9))
     },
     regionValue() {

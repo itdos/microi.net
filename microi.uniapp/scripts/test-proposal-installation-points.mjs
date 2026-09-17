@@ -93,6 +93,12 @@ test('proposal preview uses the configured card limit, navigates on edit, and pu
   assert.doesNotMatch(relatedListSource, /isProposalPointEditing/)
 })
 
+test('installation point card blank area opens detail without hijacking field controls', () => {
+  assert.match(relatedListSource, /class="proposal-point-card"[\s\S]*?@tap="openDetail\(row\)"/)
+  assert.match(relatedListSource, /class="proposal-point-field" @tap\.stop/)
+  assert.match(relatedListSource, /@tap\.stop="openProposalPointEdit\(row\)"/)
+})
+
 test('returning from point editor refreshes child rows and preserves zero values', () => {
   assert.match(nativeFormSource, /onShow\(\)[\s\S]*this\.refreshRelatedChildLists\(\)/)
   assert.match(nativeFormSource, /ref="embeddedRelatedList"/)

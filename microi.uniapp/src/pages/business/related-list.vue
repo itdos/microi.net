@@ -45,11 +45,18 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 
 	function decodeOption(value) {
-		try {
-			return decodeURIComponent(String(value || ''))
-		} catch (error) {
-			return String(value || '')
+		let text = value === undefined || value === null ? '' : String(value)
+		for (let index = 0; index < 3; index += 1) {
+			if (!/%[0-9a-f]{2}/i.test(text)) break
+			try {
+				const decoded = decodeURIComponent(text)
+				if (decoded === text) break
+				text = decoded
+			} catch (error) {
+				break
+			}
 		}
+		return text
 	}
 
 	export default {

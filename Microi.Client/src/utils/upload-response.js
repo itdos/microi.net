@@ -4,17 +4,17 @@ const TRANSIENT_UPLOAD_FIELDS = [
     'url',
     'FileUrl',
     'PreviewUrl',
-    'FullPath',
-    'Limit'
+    'FullPath'
 ];
 
 // zhy：兼容接口和历史配置中的布尔值及字符串布尔值。
 function parseBoolean(value) {
     if (value === true || value === false) return value;
+    if (value === 1 || value === 0) return value === 1;
     if (typeof value === 'string') {
         const normalized = value.trim().toLowerCase();
-        if (normalized === 'true') return true;
-        if (normalized === 'false') return false;
+        if (normalized === 'true' || normalized === '1') return true;
+        if (normalized === 'false' || normalized === '0') return false;
     }
     return undefined;
 }
@@ -44,7 +44,7 @@ export function getUploadPreviewUrl(responseData) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
-// zhy：复制并清理上传元数据，确保调用方不会修改响应对象或保存临时能力字段。
+// 复制并清理临时能力字段；Limit 是实际桶属性，必须保留以便跨端重新取址。
 export function sanitizeUploadMeta(responseData) {
     const metadata = responseData && typeof responseData === 'object'
         ? { ...responseData }

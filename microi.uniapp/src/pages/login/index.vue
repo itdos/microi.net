@@ -837,7 +837,7 @@ export default {
         }
       } catch (e) {
         console.error('授权登录异常:', e)
-        uni.showToast({ title: '网络异常，请稍后再试', icon: 'none' })
+        this.showLoginError(e)
       } finally {
         this.wxLoginLoading = false
       }
@@ -910,7 +910,7 @@ export default {
         }
       } catch (e) {
         console.error('手机号授权登录异常:', e)
-        uni.showToast({ title: '网络异常，请稍后再试', icon: 'none' })
+        this.showLoginError(e)
       } finally {
         this.phoneAuthLoading = false
       }
@@ -1005,10 +1005,24 @@ export default {
         }
       } catch (e) {
         console.error('登录异常:', e)
-        uni.showToast({ title: '网络异常，请稍后再试', icon: 'none' })
+        this.showLoginError(e)
       } finally {
         this.accountLoginLoading = false
       }
+    },
+
+    showLoginError(error) {
+      if (error && error.Code === 'AUTH_STORAGE_FAILED') {
+        // 用户与 Token 必须成对保存；失败时清理半登录态，留在登录页便于重试。
+        removeToken()
+        uni.showModal({
+          title: '登录状态保存失败',
+          content: '无法保存登录状态，请重启小程序后重试。若仍失败，请检查微信存储空间。',
+          showCancel: false
+        })
+        return
+      }
+      uni.showToast({ title: '网络异常，请稍后再试', icon: 'none' })
     },
 
     /**

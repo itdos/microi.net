@@ -320,6 +320,13 @@ function hasPublicUploadFlag(value) {
     raw.IsPrivate === false || raw.Private === false || raw.Public === true;
 }
 
+function hasPrivateUploadFlag(value) {
+  if (!value || typeof value !== 'object') return false;
+  const raw = Array.isArray(value) ? (value[0] || {}) : value;
+  return [raw.Limit, raw.IsPrivate, raw.Private].some(flag =>
+    flag === true || flag === 1 || /^(true|1)$/i.test(String(flag))) || raw.Public === false;
+}
+
 function isKnownPublicUploadPath(path) {
   // 表单字段的公私桶由服务端字段配置决定，不能仅凭 /tenant/img 等路径猜测。
   // 这里只识别平台明确约定为公有资源的目录；其它路径结合响应 Limit 或签名上下文处理。
@@ -720,7 +727,12 @@ export function createMicroiV8(options = {}) {
   }
 
   function setToken(token) {
-    storage.set(config.tokenKey, token || '');
+    const value = token || '';
+    // 存储适配器可能吞掉写入异常；回读防止沿用旧 Token 却宣称登录成功。
+    try {
+      storage.set(config.tokenKey, value);
+      if (getToken() !== value) throw authStorageError('Token');
+    } catch (e) { throw authStorageError('Token'); }
   }
 
   function clearToken() {
@@ -729,7 +741,18 @@ export function createMicroiV8(options = {}) {
   }
 
   function setUser(user) {
-    storage.set(config.userKey, serializeUser(user));
+    const value = serializeUser(user);
+    try {
+      storage.set(config.userKey, value);
+      if (serializeUser(storage.get(config.userKey)) !== value) throw authStorageError('User');
+    } catch (e) { throw authStorageError('User'); }
+  }
+
+  function authStorageError(stage) {
+    const error = new Error('无法保存登录状态，请重启小程序后重试。');
+    error.Code = 'AUTH_STORAGE_FAILED';
+    error.Stage = stage;
+    return error;
   }
 
   function getUser() {
@@ -839,7 +862,7 @@ export function createMicroiV8(options = {}) {
     const method = String(options.method || 'POST').toUpperCase();
     let fullUrl = buildUrl(options.url || options.path || '');
     const authEnabled = options.auth !== false;
-    const requestToken = authEnabled ? getToken() : '';
+    const requestToken = authEnabled || options.sessionBound === true ? getToken() : '';
     const requestEndpointGeneration = runtimeEndpointGeneration;
     const headers = buildHeaders(options);
     const data = options.data === undefined ? {} : options.data;
@@ -908,7 +931,7 @@ export function createMicroiV8(options = {}) {
         throw body || new Error('登录已过期');
       }
 
-      handleReturnedToken(headersReturned, requestToken, authEnabled);
+      handleReturnedToken(headersReturned, requestToken, authEnabled || options.sessionBound === true);
 
       if (statusCode >= 400) {
         const error = body || new Error(`请求失败: ${statusCode}`);
@@ -944,6 +967,8 @@ export function createMicroiV8(options = {}) {
       url: '/api/SysUser/refreshToken',
       method: 'POST',
       auth: false,
+      // 续签只能更新发起时的会话，避免慢响应覆盖主动登录或恢复已退出的会话。
+      sessionBound: true,
       checkCode: false,
       silentError: true,
       headers: {
@@ -1047,7 +1072,9 @@ export function createMicroiV8(options = {}) {
     const path = extractUploadPath(filePathName);
     if (!path || isBlockedAsset(path)) return '';
     if (/^(https?:|blob:|data:|file:)/i.test(path)) return assetUrl(path);
-    if (isLocalPackagedAsset(path) || options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)) {
+    // 文件实际私有标记和私有字段上下文优先，禁止因字段曾改为公有而错误降级 CDN。
+    const privateAccess = options.private === true || hasPrivateUploadFlag(filePathName);
+    if (isLocalPackagedAsset(path) || (!privateAccess && (options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)))) {
       return assetUrl(path);
     }
     // 私有对象没有权威资源上下文时在客户端直接失败关闭，避免向签名接口发送
