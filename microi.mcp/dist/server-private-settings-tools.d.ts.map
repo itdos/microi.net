@@ -1,0 +1,1 @@
+{"version":3,"file":"server-private-settings-tools.d.ts","sourceRoot":"","sources":["../src/server-private-settings-tools.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,SAAS,EAAE,MAAM,yCAAyC,CAAC;AAEzE,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,oBAAoB,CAAC;AAEvD,wBAAgB,kCAAkC,CAAC,MAAM,EAAE,SAAS,EAAE,MAAM,EAAE,YAAY,GAAG,IAAI,CAiChG"}

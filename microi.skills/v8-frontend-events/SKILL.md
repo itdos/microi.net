@@ -19,7 +19,7 @@ description: Microi 前端 V8 事件与客户端能力指南。用于编写浏�
 
 - 查询前端 V8 全部上下文、导航、表单、列表、网络、引擎与工具入口时，读取 `../v8-utilities/references/client-api-index.md`。
 - 需求包含“蓝牙打印、标签打印、TSC/TSPL、CPCL、ESC/POS、小票打印、佳博/GP-M322、ZICOX/芝柯/CC4、BLE/SPP”时，必须先读取 `references/bluetooth-print.md`；需要完整指令签名、型号转换范围、编码或位图参数时，再读取 `references/bluetooth-print-api.md`。
-- `microi.app` 是 5+ 在线壳，不能假设存在 `uni` 或 Web Bluetooth。Android 佳博确认写入逐包等待原生回调，不再追加 20ms；5+ `V8.Print.getConnectionState()` 的 `mtu/maxWriteBytes/recommendedPacketSize/writeType/packetIntervalMs` 描述本次连接能力。空 MTU 成功、失败、超时或旧壳只用 20 字节；自定义微服务按实际能力选档，不得只允许浏览器加速。详见蓝牙参考。
+- `microi.app` 是 5+ 在线壳，不能假设存在 `uni` 或 Web Bluetooth。BLE 连接、发现和写入必须统一使用 `plus.bluetooth`，禁止用 `uni.writeBLECharacteristicValue` 写入由 `plus.bluetooth` 建立的连接。Android 佳博确认写入逐包等待原生回调并保留约 15ms GATT 保护窗口；5+ `V8.Print.getConnectionState()` 的 `mtu/maxWriteBytes/recommendedPacketSize/writeType/packetIntervalMs` 描述本次连接能力。GP-M322 原生默认采用 100 字节稳定档，180 字节仅是协商上限；空 MTU 成功、失败、超时或旧壳只用 20 字节。详见蓝牙参考。
 - 浏览器模板打印、PDF/纸张模板、`mic_print`、`PageObj`、`PrintObj` 使用 `print-engine/SKILL.md`，不要与直接蓝牙指令混为一套 API。
 - 扫码使用 `V8.Method.ScanCode`，结果从 Promise/回调取得；`V8.ScanCodeRes` 只作兼容结果槽，详见客户端 API 索引。
 - 登录后的敏感操作使用 `V8.Identity.Verify` 完成 Passkey/严格人脸交互；前端只取得一次性 Ticket，后端接口引擎必须重算 `ActionHash` 并原子消费，不能把前端成功当作授权。

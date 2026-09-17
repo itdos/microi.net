@@ -350,7 +350,7 @@ test("5+App 只选择真实 write 特征，并在首包 10007 时安全切换候
     delete globalThis.window;
 });
 
-test("Android 双属性特征同时保留两种写法，并优先验证 uni 无响应写入后才持久化", async () => {
+test("Android 双属性特征优先使用同一 plus 连接栈的确认写入", async () => {
     localStorage.clear();
     sessionStorage.clear();
     localStorage.setItem("microi_ble_info", JSON.stringify({
@@ -359,7 +359,6 @@ test("Android 双属性特征同时保留两种写法，并优先验证 uni 无�
     }));
 
     const plusAttempts = [];
-    const uniAttempts = [];
     const plusBluetooth = {
         onBLEConnectionStateChange() {},
         onBluetoothDeviceFound() {},
@@ -384,16 +383,11 @@ test("Android 双属性特征同时保留两种写法，并优先验证 uni 无�
         plus: { os: { name: "Android" }, android: {}, bluetooth: plusBluetooth },
         addEventListener() {}
     };
-    globalThis.uni = {
-        writeBLECharacteristicValue({ characteristicId, writeType, success }) {
-            uniAttempts.push([characteristicId, writeType]);
-            success({});
-        }
-    };
+    globalThis.uni = { writeBLECharacteristicValue() { throw new Error("不得混用 uni 蓝牙连接栈"); } };
 
     const printer = createV8Print();
     assert.equal(await printer.initializeConnection(), true);
-    assert.equal(printer.BLEInformation.writeType, "writeNoResponse");
+    assert.equal(printer.BLEInformation.writeType, "write");
     assert.deepEqual(
         printer.BLEInformation.writeCandidates.map((candidate) => candidate.writeType).sort(),
         ["write", "writeNoResponse"]
@@ -407,17 +401,16 @@ test("Android 双属性特征同时保留两种写法，并优先验证 uni 无�
 
     await printer.prepareSend(Uint8Array.from([1, 2, 3]));
 
-    assert.deepEqual(uniAttempts, [["dual-write", "writeNoResponse"]]);
-    assert.deepEqual(plusAttempts, []);
+    assert.deepEqual(plusAttempts, ["dual-write"]);
     const remembered = JSON.parse(localStorage.getItem("microi_ble_info"));
     assert.equal(remembered.writeCharaterId, "dual-write");
-    assert.equal(remembered.writeType, "writeNoResponse");
+    assert.equal(remembered.writeType, "write");
     printer.disconnect();
     delete globalThis.uni;
     delete globalThis.window;
 });
 
-test("iOS 双属性特征优先 write，10007 后才回退 uni writeNoResponse", async () => {
+test("iOS 双属性特征优先 write，10007 后仍由 plus 回退 writeNoResponse", async () => {
     localStorage.clear();
     sessionStorage.clear();
     localStorage.setItem("microi_ble_info", JSON.stringify({
@@ -441,20 +434,16 @@ test("iOS 双属性特征优先 write，10007 后才回退 uni writeNoResponse",
             }] });
         },
         closeBLEConnection() {},
-        writeBLECharacteristicValue({ characteristicId, fail }) {
-            attempts.push(["plus", characteristicId, "write"]);
-            fail({ errCode: 10007, errMsg: "property not support" });
+        writeBLECharacteristicValue({ characteristicId, success, fail }) {
+            const writeType = attempts.length === 0 ? "write" : "writeNoResponse";
+            attempts.push(["plus", characteristicId, writeType]);
+            if (writeType === "write") fail({ errCode: 10007, errMsg: "property not support" });
+            else success({});
         }
     };
     globalThis.window = {
         plus: { os: { name: "iOS" }, bluetooth: plusBluetooth },
         addEventListener() {}
-    };
-    globalThis.uni = {
-        writeBLECharacteristicValue({ characteristicId, writeType, success }) {
-            attempts.push(["uni", characteristicId, writeType]);
-            success({});
-        }
     };
 
     const printer = createV8Print();
@@ -464,11 +453,10 @@ test("iOS 双属性特征优先 write，10007 后才回退 uni writeNoResponse",
 
     assert.deepEqual(attempts, [
         ["plus", "ios-dual-write", "write"],
-        ["uni", "ios-dual-write", "writeNoResponse"]
+        ["plus", "ios-dual-write", "writeNoResponse"]
     ]);
     assert.equal(JSON.parse(localStorage.getItem("microi_ble_info")).writeType, "writeNoResponse");
     printer.disconnect();
-    delete globalThis.uni;
     delete globalThis.window;
 });
 
