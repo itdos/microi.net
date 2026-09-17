@@ -26,7 +26,7 @@
     "optimize:mp-assets": "node scripts/optimize-wechat-assets.js",
     "check:controls": "node scripts/check-native-controls.js && npm run check:native-form-return",
     "check:native-form-return": "node --test scripts/test-native-form-return.mjs",
-    "check:file-urls": "node scripts/check-file-url-resolution.mjs",
+    "check:file-urls": "node scripts/check-file-url-resolution.mjs && node --test scripts/test-upload-cross-client.mjs",
     "check:formengine-writes": "node scripts/check-formengine-write-contract.mjs",
     "check:upload-paths": "node scripts/check-upload-path-policy.mjs && node --test scripts/test-upload-default-compression.mjs scripts/test-upload-field-context.mjs",
     "check:complaint-evidence": "node --test scripts/test-complaint-evidence-contract.mjs",
