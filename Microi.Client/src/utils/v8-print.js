@@ -47,7 +47,7 @@ const SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
 const PLUS_PRINT_MTU = 183; // ATT 头占 3 字节；与已验证的佳博 180 字节档一致。
 // 5+ 的确认回调不等同于 Android GATT 队列完全空闲；给下一包留出一个很短的保护窗口，
 // 避免连续调用在真实设备上触发 10008/“发送中断”，同时不回到原先每包 20ms 的长尾。
-const PLUS_GATT_GUARD_INTERVAL_MS = 15;
+const PLUS_GATT_GUARD_INTERVAL_MS = 0;
 const EMPTY_BLE_INFO = Object.freeze({
     platform: "", deviceId: "", deviceName: "",
     transport: "ble", profileMode: "auto", profileId: "generic-tspl", commandLanguage: "tspl",
@@ -220,9 +220,9 @@ function plusTransportCapabilities(Print) {
     return {
         mtu: mtu,
         maxWriteBytes: maxBytes,
-        // MTU 只证明协议上限；GP-M322 在 Android 原生壳默认使用 100 字节稳定档。
-        recommendedPacketSize: optimized && maxBytes >= 100 ? 100 : 20,
-        // 5+ 的 write 已等待 GATT 确认，但 Android 队列仍需要保护窗口；无响应写及其它型号保留节流。
+        // GP-M322 已由同一 5+ BLE 栈串行等待 write 成功回调，可直接使用协商后的 180 字节档。
+        recommendedPacketSize: optimized && maxBytes >= 180 ? 180 : optimized && maxBytes >= 100 ? 100 : 20,
+        // write 成功回调本身就是串行背压，不再逐包追加人工等待；无响应写及其它型号保留节流。
         packetIntervalMs: optimized && Print.BLEInformation.writeType === "write" ? PLUS_GATT_GUARD_INTERVAL_MS : 20,
         writeType: live ? Print.BLEInformation.writeType : "",
     };
