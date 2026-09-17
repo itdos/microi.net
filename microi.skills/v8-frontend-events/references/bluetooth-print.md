@@ -210,8 +210,10 @@ async function printBatch(rows, startIndex) {
   当前没有公开的自定义服务配置，并选择枚举到的第一个可写特征；其它型号可能需要扩展源码。
   CC4 固件若只开放 SPP 或使用其它私有 UUID，Web 端不可连接；Android 5+App 使用已配对 SPP，
   或先取得厂家准确 BLE UUID 再扩展源码，禁止猜 UUID。
-- `prepareSend` 默认每包 20 字节；Android 5+ 的佳博 GP-M322 确认写入逐包 await 原生回调，
-  不再追加 20ms。其它型号、iOS、Web、无响应写与 SPP 保留约 20ms，同一缓冲区多份间约 100ms。
+- `prepareSend` 默认每包 20 字节；Android 5+ 的佳博 GP-M322 在确认写入逐包 await 原生回调后
+  保留约 15ms GATT 保护窗口，原生业务默认采用 100 字节稳定档。其它型号、iOS、Web、无响应写与 SPP
+  保留约 20ms，同一缓冲区多份间约 100ms。5+ BLE 的连接、服务发现和写入统一使用 `plus.bluetooth`，
+  禁止用 `uni.writeBLECharacteristicValue` 写入由 `plus.bluetooth` 建立的连接。
   这是写节奏，不是物理走纸确认。5+ BLE 限制为本次连接的 `maxWriteBytes`；未知 MTU 为 20。
 - 5+ 佳博在服务发现后协商 MTU，最多等待 1.5 秒，`getConnectionState()` 返回 `mtu`、
   `maxWriteBytes`、`recommendedPacketSize`（20/100/180）、`writeType`、`packetIntervalMs`。
@@ -238,6 +240,7 @@ async function printBatch(rows, startIndex) {
 - 金额、数量、坐标、纸张尺寸、包长和份数先做类型/范围校验，避免无限循环或超大缓冲区。
 - 打印内容含个人信息、票据或密钥时，不写控制台、系统日志或异常上报正文。
 - 浏览器权限拒绝、用户取消、GATT 断开、找不到服务/特征和写包失败都必须可理解地提示。
+- 搜索不到设备的头号原因是残留 GATT 连接：BLE 外设在已连接期间停止广播，上一次连接被并发流程打断或 App 重启后系统仍保留旧链路时，打印机“没在用”但也搜不到。平台在开始发现前会先 `getConnectedBluetoothDevices` 并关闭应用未持有的连接，被断开/重连事件接管时也会显式关闭自己建立的链路；排查顺序据此固定为“清理残留连接 → 打印机重新上电 → 系统蓝牙忽略设备 → 再搜索”，不要先去改包长、MTU 或指令集。
 
 ## 实机验收
 

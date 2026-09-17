@@ -16,7 +16,8 @@ const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
 function isBlank(value) {
     return value === undefined || value === null || value === "" ||
-        (Array.isArray(value) && value.length === 0);
+        (Array.isArray(value) && value.length === 0) ||
+        (value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
 }
 
 function parseObject(value) {

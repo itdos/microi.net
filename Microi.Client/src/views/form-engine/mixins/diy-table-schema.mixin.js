@@ -371,7 +371,9 @@ export default {
             return field.Config || {};
         },
         _IsBlankDisplayValue(value) {
-            return value === undefined || value === null || value === "";
+            return value === undefined || value === null || value === ""
+                || (Array.isArray(value) && value.length === 0)
+                || (value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
         },
         _ParseMaybeJsonForDisplay(value) {
             if (typeof value !== "string") return value;
@@ -399,6 +401,7 @@ export default {
             if (typeof value === "object") {
                 var fallback = self._GetObjectDisplayValue(value, {}, ["Label", "label", "Name", "name", "Text", "text", "Value", "value", "Key", "key", "Id", "id"]);
                 if (!self._IsBlankDisplayValue(fallback)) return String(fallback);
+                if (Object.keys(value).length === 0) return "";
                 try {
                     return JSON.stringify(value);
                 } catch (error) {

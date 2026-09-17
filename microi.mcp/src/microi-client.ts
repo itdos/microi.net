@@ -3281,6 +3281,53 @@ export class MicroiClient {
     });
   }
 
+  /**
+   * 图片生成只负责以稳定 RequestId 创建持久任务。Code=2 表示已排队，
+   * 调用方必须继续查询同一个 TaskId，不能因超时更换 RequestId 重复消费额度。
+   */
+  async generateMiniMaxImage(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.GENERATE_MINIMAX_IMAGE, data, {
+      timeoutMs: 30_000,
+      operationName: 'queue MiniMax image task',
+      allowNativeFallback: false,
+    });
+  }
+
+  async getMiniMaxImageTask(taskId: string): Promise<ApiResponse> {
+    return this.get(API.GET_MINIMAX_IMAGE_TASK, { taskId }, {
+      timeoutMs: 30_000,
+      operationName: 'read MiniMax image task',
+    });
+  }
+
+  /** 恢复仅重新下载既有供应商结果；后端保证不会重新发起图片生成。 */
+  async recoverMiniMaxImageTask(taskId: string): Promise<ApiResponse> {
+    return this.post(`${API.RECOVER_MINIMAX_IMAGE_TASK}?taskId=${encodeURIComponent(taskId)}`, {}, {
+      timeoutMs: 30_000,
+      operationName: 'recover MiniMax image result',
+      allowNativeFallback: false,
+    });
+  }
+
+  /** 只读：当前租户实时可用的图像/视频/音乐/配音模型目录（含安全投影，不含密钥）。 */
+  async getMediaModels(): Promise<ApiResponse> {
+    return this.get(API.GET_MEDIA_MODELS, {}, {
+      timeoutMs: 30_000,
+      operationName: 'read live media model catalog',
+    });
+  }
+
+  /**
+   * 只读：MiniMax Token Plan 官方额度回读。生成前先预检可避免多路并发把
+   * 图片/视频窗口额度打满后再盲目排队。
+   */
+  async getMiniMaxTokenPlanRemains(): Promise<ApiResponse> {
+    return this.get(API.GET_MINIMAX_TOKEN_PLAN_REMAINS, {}, {
+      timeoutMs: 30_000,
+      operationName: 'read MiniMax token plan remains',
+    });
+  }
+
   async generateMiniMaxSpeech(data: Record<string, unknown>): Promise<ApiResponse> {
     return this.post(API.GENERATE_MINIMAX_SPEECH, data, {
       timeoutMs: 10 * 60_000,

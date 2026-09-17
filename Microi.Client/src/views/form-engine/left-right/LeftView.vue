@@ -49,6 +49,7 @@
                     :PropsModuleEngineKey="OpenAnyTableParam.ModuleEngineKey"
                     :EnableMultipleSelect="OpenAnyTableParam.MultipleSelect"
                     :PropsWhere="OpenAnyTableParam.PropsWhere"
+                    :FormDefaultValues="OpenAnyTableParam.FormDefaultValues || OpenAnyTableParam.DefaultValues || {}"
                 />
             </div>
         </el-dialog>
@@ -94,6 +95,7 @@
                     :PropsModuleEngineKey="OpenAnyTableParam.ModuleEngineKey"
                     :EnableMultipleSelect="OpenAnyTableParam.MultipleSelect"
                     :PropsWhere="OpenAnyTableParam.PropsWhere"
+                    :FormDefaultValues="OpenAnyTableParam.FormDefaultValues || OpenAnyTableParam.DefaultValues || {}"
                 />
             </div>
         </el-drawer>

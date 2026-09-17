@@ -25,6 +25,9 @@
 | Tool | 功能 | 读/写 |
 |------|------|-------|
 | `microi_get_status` | 检查 Microi 后端连接状态 | 只读 |
+| `microi_generate_minimax_image` | 创建受保护的 MiniMax 异步图片任务；正式生成需 `confirmExecution=requestId` | 外部 AI 任务（需确认） |
+| `microi_get_minimax_image_task` | 查询当前用户所属的 MiniMax 图片任务；`Code=1 + Images` 才表示已落 HDFS | 只读 |
+| `microi_recover_minimax_image_task` | 恢复已有供应商图片结果并重新落盘，不重新生成 | 恢复既有任务 |
 | `microi_get_db_schema` | 获取数据库表结构（表名、字段、类型、描述） | 只读 |
 | `microi_get_table_indexes` | 获取一张物理表的标准化索引（有序字段、唯一性、主键标识） | 只读 |
 | `microi_create_table_index` | 校验物理字段、幂等创建索引并回读 | 读写（需确认） |

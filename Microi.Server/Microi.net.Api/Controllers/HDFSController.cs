@@ -13,6 +13,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Security;
 using System.IO;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -528,7 +529,9 @@ namespace Microi.net.Api
                 requestedPath);
         }
 
-        // 上传成功后为当前上传请求补充短期预览地址，业务字段仍只持久化 Path。
+        // 上传成功后为当前上传请求补充短期预览地址和上传责任链元数据；业务字段
+        // 持久化稳定 Path、文件信息及 Uploader(Id/Name/Account/UploadTime)，短期
+        // Url/Limit 等能力字段仍由客户端清理。
         /// <summary>
         /// 上传成功后为本次响应补充可立即预览的地址。该地址只作为短期能力返回给
         /// 当前上传请求，业务字段仍只保存 Path；后续读取继续走记录级权限校验。
@@ -564,6 +567,26 @@ namespace Microi.net.Api
                         item["Url"] = Convert.ToString(urlResult.Data);
                     }
                     item["Limit"] = param.Limit != false;
+                    // 上传人信息由当前认证会话和服务端生成时间补齐，不能让浏览器在
+                    // 保存前后自行伪造；字段值随附件元数据持久化，列表和下载选择器
+                    // 因此可以明确展示“谁在什么时候上传”的责任链。
+                    var uploaderId = TokenString(param._CurrentUser?["Id"]);
+                    var uploaderAccount = TokenString(param._CurrentUser?["Account"]);
+                    var uploaderName = TokenString(param._CurrentUser?["Name"]);
+                    if (uploaderName.DosIsNullOrWhiteSpace()) uploaderName = uploaderAccount;
+                    var uploadTime = TokenString(item["CreateTime"]);
+                    if (uploadTime.DosIsNullOrWhiteSpace()) uploadTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    item["UploaderId"] = uploaderId;
+                    item["UploaderName"] = uploaderName;
+                    item["UploaderAccount"] = uploaderAccount;
+                    item["UploadTime"] = uploadTime;
+                    item["Uploader"] = new JObject
+                    {
+                        ["Id"] = uploaderId,
+                        ["Name"] = uploaderName,
+                        ["Account"] = uploaderAccount,
+                        ["UploadTime"] = uploadTime
+                    };
                     // 仅可信上传成功响应签发，表单保存验证后移除；它不是持久下载凭证。
                     var uploadProof = FileUploadProvenance.Issue(param, path);
                     if (uploadProof != null) item["_UploadProof"] = uploadProof;
@@ -576,6 +599,158 @@ namespace Microi.net.Api
                 // 文件已经上传成功时不因预览地址生成异常改变上传结果。
             }
             return result;
+        }
+
+        private const int MaxZipFileCount = 100;
+        private const long MaxZipBytes = 512L * 1024L * 1024L;
+
+        /// <summary>
+        /// 将用户可读的下载文件名收敛为单个安全的 zip 文件名，避免路径穿越和
+        /// Content-Disposition 注入；扩展名由服务端统一补齐。
+        /// </summary>
+        private static string NormalizeZipArchiveName(string requestedName)
+        {
+            var name = Path.GetFileName((requestedName ?? string.Empty).Trim().Replace('\\', '/'));
+            name = Regex.Replace(name, @"[\x00-\x1F<>:""/\\|?*]", "_");
+            if (name.DosIsNullOrWhiteSpace()) name = "files-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".zip";
+            if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) name += ".zip";
+            if (name.Length > 160)
+            {
+                name = name[..160];
+                if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                    name = name[..Math.Max(1, 156)] + ".zip";
+            }
+            return name;
+        }
+
+        /// <summary>
+        /// zip 条目只使用文件名并保证同名附件可共存；目录和控制字符来自存储
+        /// 路径，不能直接进入归档，避免解压端覆盖或写出目标目录。
+        /// </summary>
+        private static string BuildZipEntryName(string path, int index, ISet<string> usedNames)
+        {
+            var name = Path.GetFileName((path ?? string.Empty).Replace('\\', '/'));
+            name = Regex.Replace(name ?? string.Empty, @"[\x00-\x1F<>:""/\\|?*]", "_").Trim();
+            if (name.DosIsNullOrWhiteSpace()) name = "file-" + index;
+            if (name.Length > 180) name = name[..180];
+
+            var candidate = name;
+            var suffix = 1;
+            while (!usedNames.Add(candidate))
+            {
+                var extension = Path.GetExtension(name);
+                var stem = Path.GetFileNameWithoutExtension(name);
+                var suffixText = " (" + suffix++ + ")";
+                var maxStemLength = Math.Max(1, 180 - suffixText.Length - extension.Length);
+                candidate = stem[..Math.Min(stem.Length, maxStemLength)] + suffixText + extension;
+            }
+            return candidate;
+        }
+
+        private static bool TryGetZipBytes(DosResult result, out byte[] bytes)
+        {
+            bytes = result?.Data as byte[];
+            if (bytes != null) return true;
+            if (result?.Data is Stream stream)
+            {
+                using var buffer = new MemoryStream();
+                stream.CopyTo(buffer);
+                bytes = buffer.ToArray();
+                return true;
+            }
+            if (result?.Data is JToken token && token.Type == JTokenType.Bytes)
+            {
+                bytes = token.ToObject<byte[]>();
+                return bytes != null;
+            }
+            return false;
+        }
+
+        private async Task<DosResult> GetZipFileBytesAsync(DiyUploadParam baseParam, string path)
+        {
+            var fileParam = new DiyUploadParam
+            {
+                OsClient = baseParam.OsClient,
+                FilePathName = path,
+                HDFS = baseParam.HDFS,
+                Limit = true,
+                ReturnFileType = "Byte",
+                _CurrentUser = baseParam._CurrentUser,
+                _InvokeType = baseParam._InvokeType
+            };
+            var result = await MicroiEngine.HDFS.GetPrivateFileByte(fileParam).ConfigureAwait(false);
+            if (result?.Code == 1) return result;
+
+            // 公开字段历史上可能存放在公有桶。授权仍已按记录/字段/角色完成，
+            // 这里只在私有桶找不到对象时尝试公有桶，兼容存量数据而不放宽路径校验。
+            fileParam.Limit = false;
+            return await MicroiEngine.HDFS.GetPrivateFileByte(fileParam).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 在当前表单记录权限范围内打包所选附件。请求中的路径只作为候选，
+        /// AuthorizePrivateFileRead 会重新读取菜单、记录和字段值，任何未授权路径
+        /// 都在读取对象前失败；服务端再按数量和总字节数限制防止压缩接口耗尽内存。
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> DownloadFilesZip([FromBody] JObject body)
+        {
+            if (body == null) return Json(new DosResult(0, null, "请求参数不能为空！"));
+
+            DiyUploadParam param;
+            try
+            {
+                param = body.ToObject<DiyUploadParam>() ?? new DiyUploadParam();
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, "请求参数格式错误：" + ex.Message));
+            }
+
+            var accessError = await DefaultParam(param).ConfigureAwait(false);
+            if (accessError != null) return Json(accessError);
+            var pathError = NormalizeFilePaths(param);
+            if (pathError != null) return Json(pathError);
+
+            var requestedPaths = new List<string>();
+            if (!param.FilePathName.DosIsNullOrWhiteSpace()) requestedPaths.Add(param.FilePathName);
+            if (param.FilePathNames != null) requestedPaths.AddRange(param.FilePathNames);
+            requestedPaths = requestedPaths
+                .Where(path => !path.DosIsNullOrWhiteSpace())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (requestedPaths.Count == 0 || requestedPaths.Count > MaxZipFileCount)
+                return Json(new DosResult(0, null, $"一次最多下载{MaxZipFileCount}个文件！"));
+
+            // 多文件请求统一走 FilePathNames，避免授权内核把同一条路径重复计算。
+            param.FilePathName = null;
+            param.FilePathNames = requestedPaths;
+            var authorizationError = await AuthorizePrivateFileRead(param).ConfigureAwait(false);
+            if (authorizationError != null) return Json(authorizationError);
+
+            var archiveName = NormalizeZipArchiveName(TokenString(body["ArchiveName"]));
+            using var output = new MemoryStream();
+            using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                long totalBytes = 0;
+                for (var index = 0; index < requestedPaths.Count; index++)
+                {
+                    var path = requestedPaths[index];
+                    var byteResult = await GetZipFileBytesAsync(param, path).ConfigureAwait(false);
+                    if (!TryGetZipBytes(byteResult, out var bytes))
+                        return Json(new DosResult(0, null, $"文件[{Path.GetFileName(path)}]读取失败，未生成压缩包！"));
+                    totalBytes += bytes.LongLength;
+                    if (totalBytes > MaxZipBytes)
+                        return Json(new DosResult(0, null, "所选文件总大小超过512MB，请分批下载！"));
+
+                    var entry = archive.CreateEntry(BuildZipEntryName(path, index + 1, usedNames), CompressionLevel.Fastest);
+                    await using var entryStream = entry.Open();
+                    await entryStream.WriteAsync(bytes, HttpContext.RequestAborted).ConfigureAwait(false);
+                }
+            }
+
+            return File(output.ToArray(), "application/zip", archiveName);
         }
 
         // 为私有上传结果生成微信可访问的短期地址，并统一提交小程序图片内容安全检测。

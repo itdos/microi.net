@@ -565,6 +565,13 @@ export declare class MicroiClient {
     }): Promise<ApiResponse>;
     transitionApplicationStreamGate(data: ApplicationStreamGateTransitionRequest): Promise<ApiResponse>;
     listMyUserAccessKeys(): Promise<ApiResponse<UserAccessKeyRecord[]>>;
+    listServerPrivateSettings(): Promise<ApiResponse<Record<string, unknown>[]>>;
+    saveServerPrivateSecret(input: {
+        configKey: string;
+        value: string;
+        category?: string;
+        description?: string;
+    }): Promise<ApiResponse>;
     createMyUserAccessKey(input: CreateUserAccessKeyInput): Promise<ApiResponse<CreateUserAccessKeyResult>>;
     revokeMyUserAccessKey(id: string): Promise<ApiResponse<UserAccessKeyRecord>>;
     getDbSchema(): Promise<ApiResponse<{
@@ -751,6 +758,14 @@ export declare class MicroiClient {
     setEngineAnonymous(apiEngineKeys: string[], allowAnonymous?: number): Promise<ApiResponse>;
     setEngineRoles(data: Record<string, unknown>): Promise<ApiResponse>;
     generateMiniMaxMusic(data: Record<string, unknown>): Promise<ApiResponse>;
+    /**
+     * 图片生成只负责以稳定 RequestId 创建持久任务。Code=2 表示已排队，
+     * 调用方必须继续查询同一个 TaskId，不能因超时更换 RequestId 重复消费额度。
+     */
+    generateMiniMaxImage(data: Record<string, unknown>): Promise<ApiResponse>;
+    getMiniMaxImageTask(taskId: string): Promise<ApiResponse>;
+    /** 恢复仅重新下载既有供应商结果；后端保证不会重新发起图片生成。 */
+    recoverMiniMaxImageTask(taskId: string): Promise<ApiResponse>;
     generateMiniMaxSpeech(data: Record<string, unknown>): Promise<ApiResponse>;
     createModule(data: {
         Name: string;

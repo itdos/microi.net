@@ -55,7 +55,9 @@
                         {{ displayFileName(singleFileMeta) }}
                     </span>
                     <span v-if="canReadFile(singleFileMeta)" class="file-size">{{ getSingleFileSize() }}</span>
+                    <span v-if="getUploaderName(singleFileMeta) || getUploadTime(singleFileMeta)" class="file-meta">上传人：{{ getUploaderName(singleFileMeta) || '—' }}<span v-if="getUploadTime(singleFileMeta)"> · {{ getUploadTime(singleFileMeta) }}</span></span>
                     <el-button v-if="canReadFile(singleFileMeta) && isCadFile(GetFileName(modelValue))" @click="openCadPreview(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], GetFileName(modelValue), null)" type="primary" size="small" :icon="View" link>在线预览</el-button>
+                    <el-button v-if="canReadFile(singleFileMeta)" @click="openDownloadDialog" type="primary" size="small" link>下载zip包</el-button>
                     <el-button v-if="isFileEditable(singleFileMeta)" @click="ConfirmDelSingleUpload()" type="danger" size="small" :icon="Delete" link>删除</el-button>
                     <DiyFileRoleTags v-if="rolePermissionEnabled" :file="singleFileMeta" :roles="roleOptions" :editable="isFileEditable(singleFileMeta)" @configure="openRoleDialog" />
                 </div>
@@ -75,7 +77,9 @@
                         {{ displayFileName(singleFileMeta) }}
                     </span>
                     <span v-if="canReadFile(singleFileMeta)" class="file-size">{{ getSingleFileSize() }}</span>
+                    <span v-if="getUploaderName(singleFileMeta) || getUploadTime(singleFileMeta)" class="file-meta">上传人：{{ getUploaderName(singleFileMeta) || '—' }}<span v-if="getUploadTime(singleFileMeta)"> · {{ getUploadTime(singleFileMeta) }}</span></span>
                     <el-button v-if="canReadFile(singleFileMeta) && isCadFile(GetFileName(modelValue))" @click="openCadPreview(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], GetFileName(modelValue), null)" type="primary" size="small" :icon="View" link>在线预览</el-button>
+                    <el-button v-if="canReadFile(singleFileMeta)" @click="openDownloadDialog" type="primary" size="small" link>下载zip包</el-button>
                     <DiyFileRoleTags v-if="rolePermissionEnabled" :file="singleFileMeta" :roles="roleOptions" />
                 </div>
             </div>
@@ -115,6 +119,7 @@
                         </div>
                         <DiyFileRoleTags v-if="rolePermissionEnabled" :file="file" :roles="roleOptions" :editable="isFileEditable(file) && file.State !== 0" @configure="openRoleDialog" />
                         <span v-if="canReadFile(file)" class="file-size">{{ formatFileSize(file.Size) }}</span>
+                        <span v-if="getUploaderName(file) || getUploadTime(file)" class="file-meta">上传人：{{ getUploaderName(file) || '—' }}<span v-if="getUploadTime(file)"> · {{ getUploadTime(file) }}</span></span>
                         <el-tag 
                             v-if="canReadFile(file) && file.State == 0"
                             type="info" 
@@ -151,7 +156,14 @@
                     </div>
                 </div>
             </div>
+            <div v-if="fileListComputed.length > 0" class="multiple-files-actions">
+                <el-button type="primary" size="small" @click="openDownloadDialog">下载zip包</el-button>
+            </div>
         </div>
+
+        <el-dialog v-model="downloadDialogVisible" title="附件下载" width="min(920px, 94vw)" append-to-body destroy-on-close>
+            <DiyFileDownloadDialog v-if="downloadDialogVisible" :DataAppend="downloadDialogAppend" />
+        </el-dialog>
 
         <el-dialog v-model="roleDialogVisible" title="设置附件可见角色" width="min(520px, 92vw)" append-to-body destroy-on-close>
             <p class="file-role-dialog-name">{{ roleEditingFile?.Name }}</p>
@@ -326,6 +338,7 @@ import { getUploadPreviewUrl, resolveUploadLimit, sanitizeUploadMeta } from "@/u
 import { buildFormFieldUploadContext } from "@/utils/form-field-upload-context";
 import DiyUploadCompactSummary from './diy-upload-compact-summary.vue';
 import DiyFileRoleTags from './diy-file-role-tags.vue';
+import DiyFileDownloadDialog from './diy-file-download-dialog.vue';
 import { fileRoleConfig, configurableFileRoles, canReadFile, canEditFile, visibleFiles } from '@/utils/file-role-permission';
 
 // 禁用属性继承
@@ -413,6 +426,8 @@ const displayFileName = file => canReadFile(file) ? (file?.Name || '附件') : (
 const roleDialogVisible = ref(false);
 const roleEditingFile = ref(null);
 const selectedRoleIds = ref([]);
+const downloadDialogVisible = ref(false);
+const downloadDialogAppend = ref({});
 const roleOptions = ref([]);
 const configRoleOptions = ref([]);
 const configRolesLoading = ref(false);
@@ -436,6 +451,33 @@ const openRoleDialog = file => {
         roleOptions.value = configurableFileRoles(result.Data || [], props.field.Config.FileUpload, file);
         rolesLoaded.value = true;
     }, () => { rolesLoading.value = false; });
+};
+
+// 上传接口返回的责任链字段优先于兼容旧数据；历史附件至少继续显示 CreateTime。
+const getUploaderName = file => file?.UploaderName || file?.Uploader?.Name || file?.UploaderAccount || file?.Uploader?.Account || file?.UploadUserName || file?.UserName || file?.Account || '';
+const getUploadTime = file => file?.UploadTime || file?.Uploader?.UploadTime || file?.CreateTime || file?.createTime || '';
+const openDownloadDialog = () => {
+    const normalized = normalizeValue(props.modelValue);
+    const files = getMultipleFlag.value
+        ? (Array.isArray(normalized) ? normalized : [])
+        : (normalized && typeof normalized === 'object' ? [normalized] : []);
+    if (files.length === 0) {
+        DiyCommon.Tips('暂无可下载附件', false);
+        return;
+    }
+    downloadDialogAppend.value = {
+        Files: files,
+        ArchiveName: (props.field.Label || props.field.Name || '附件') + '下载.zip',
+        Context: {
+            FormEngineKey: props.DiyTableModel?.Name || props.field.TableId,
+            FormDataId: props.TableRowId || props.FormDiyTableModel?.Id || '',
+            FieldId: props.field.Id,
+            SysMenuId: props.SysMenuId,
+            HDFS: SysConfig.value.HDFS || 'Aliyun',
+            _TableChildAuth: props.TableChildAuth || undefined
+        }
+    };
+    downloadDialogVisible.value = true;
 };
 const saveFileRoles = () => {
     if (!rolesLoaded.value || !isFileEditable(roleEditingFile.value)) return;
@@ -629,7 +671,7 @@ const normalizeValue = (value) => {
     // 如果是字符串
     if (typeof value === 'string') {
         // 如果以{开头，说明是JSON字符串，解析它
-        if (value.startsWith('{')) {
+        if (value.startsWith('{') || value.startsWith('[')) {
             try {
                 return JSON.parse(value);
             } catch (e) {
@@ -983,7 +1025,7 @@ const FileUploadSuccess = (result, file, fileList) => {
             // 单文件模式 - 存储为JSON字符串
             console.log('【单文件】上传成功，Path:', uploadedFilePath);
             const singleFileObject = withInitialOfficeVersion({
-                _UploadProof: responseData._UploadProof,
+                ...sanitizeUploadMeta(responseData),
                 Id: uploadedFileId,
                 Name: responseData.Name || file.name,
                 Size: responseData.Size,
@@ -1553,6 +1595,12 @@ onBeforeUnmount(() => {
                     font-size: 12px;
                     flex-shrink: 0;
                 }
+
+                .file-meta {
+                    color: #909399;
+                    font-size: 12px;
+                    flex-shrink: 0;
+                }
             }
         }
     }
@@ -1639,11 +1687,24 @@ onBeforeUnmount(() => {
                         flex-shrink: 0;
                     }
 
+                    .file-meta {
+                        color: #909399;
+                        font-size: 12px;
+                        flex-shrink: 0;
+                    }
+
                     .el-tag {
                         flex-shrink: 0;
                     }
                 }
             }
+        }
+
+        .multiple-files-actions {
+            display: flex;
+            justify-content: flex-end;
+            padding: 8px 10px;
+            border-top: 1px solid #e4e7ed;
         }
     }
 }

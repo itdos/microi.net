@@ -110,6 +110,13 @@ namespace Microi.net
         {
             var allowed = CanAccess(file, config);
             var result = allowed ? (JObject)file.DeepClone() : new JObject { ["Id"] = file["Id"]?.DeepClone() };
+            // 无权限时仍保留非路径性的责任链元数据，便于“全部附件”列表说明
+            // 上传人和时间；路径、版本、大小及下载凭证继续完全脱敏。
+            if (!allowed)
+            {
+                foreach (var key in new[] { "UploaderId", "UploaderName", "UploaderAccount", "UploadTime", "Uploader" })
+                    if (file[key] != null) result[key] = file[key].DeepClone();
+            }
             if (!allowed && Flag(config, "ShowUnauthorizedFileName")) result["Name"] = file["Name"]?.DeepClone();
             result["VisibleRoleIds"] = new JArray(ReadIds(file["VisibleRoleIds"]));
             result["VisibleRoleNames"] = new JArray(ReadIds(file["VisibleRoleIds"]).Select(id => roles.TryGetValue(id, out var role) ? (string)role["Name"] : "已删除角色"));
