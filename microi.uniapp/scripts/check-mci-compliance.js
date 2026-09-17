@@ -193,8 +193,8 @@ for (const check of dynamicPages) {
 
 assert(workspacePage.includes('summaryLoading'), 'workspace page must expose a stable summary loading state.');
 assert(workspacePage.includes('metric-skeleton'), 'workspace summary must use a visible skeleton state.');
-assert(workspacePage.includes('v-for="(group, groupIndex) in visibleBusinessGroups"'), 'workspace page must render the role-filtered business catalog.');
-assert(workspacePage.includes('allowedGroupKeys'), 'workspace business catalog must be filtered by the current role profile.');
+assert(workspacePage.includes('v-for="(group, groupIndex) in visibleBusinessGroups"'), 'workspace page must render the menu-authorized business catalog.');
+assert(!workspacePage.includes('allowedGroupKeys') && workspacePage.includes('this.isHomeEntryVisible(item.key)'), 'workspace business catalog must filter menus by backend grants before hiding empty groups.');
 
 const remotePages = [
   'src/pages/about/index.vue',

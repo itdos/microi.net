@@ -8,6 +8,12 @@ import {
   parseJson
 } from '@/platform/native-form.js'
 import { formatRegion } from '@/platform/business-runtime.js'
+import { findMenu, openForm } from '@/platform/business-runtime.js'
+import { canAddMenuRecord } from '@/platform/menu-permission.js'
+import {
+  TERMINATION_TABLE, TERMINATION_MENU_ID, terminationFromOrder,
+  terminationOrderValues, bindTerminationOrder
+} from './contract-termination.mjs'
 import { normalizeUploadItems } from '@/platform/display.js'
 import {
   V8,
@@ -61,6 +67,9 @@ const CASEBOOK_TABLE = 'diy_anlice'
 const CASEBOOK_CASE_TABLE = 'diy_anlice_child'
 // zhy：合同订单在所有移动端入口共用同一表单钩子，避免“我的订单”和客户订单 Tab 行为不一致。
 const ORDER_TABLE = 'diy_dingdan'
+function isTerminationForm(context) {
+  return String(context.tableName || '').toLowerCase() === 'diy_duanyueshenqing'
+}
 const ORDER_PRODUCT_TABLE = 'diy_dingdansp'
 const PRODUCT_TABLE = 'diy_shangpin'
 const ORDER_PRODUCT_CONSUMABLE_TABLE = 'diy_dingdansphc'
@@ -1639,6 +1648,22 @@ export function createState() {
 }
 
 export async function initialize(context) {
+  if (isTerminationForm(context) && context.mode === 'Add' && !context.state.terminationInitialized) {
+    context.state.terminationInitialized = true
+    const goodsMenu = await findMenu(['订单商品'], ORDER_PRODUCT_TABLE)
+    context.state.terminationGoodsMenuId = goodsMenu?.Id || ''
+    context.patchForm({ ShenqingKF: getUser()?.Name || '' })
+    if (terminationFromOrder(context)) {
+      const orderMenu = await findMenu(['合同订单'], ORDER_TABLE)
+      if (!orderMenu?.Id) throw new Error('当前账号没有订单查看权限')
+      const result = await V8.FormEngine.GetFormData(ORDER_TABLE, {
+        Id: context.defaultValues.DingdanID, _SysMenuId: orderMenu.Id
+      })
+      if (Number(result?.Code) !== 1) throw new Error(result?.Msg || '订单读取失败')
+      await bindTerminationOrder(context, result.Data, V8)
+    }
+    return
+  }
   await initializeCustomerCaseMerchant(context)
   await initializeInstallationPositionCode(context)
   await initializeInstallationPositionLocation(context)
@@ -1939,6 +1964,12 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
+  if (isTerminationForm(context)) {
+    if (String(field?.Name || '').toLowerCase() === 'dingdanxq') {
+      return { type: 'action', hideLabel: true, visible: true }
+    }
+    if (field?.Name === 'DingdanBH' && terminationFromOrder(context)) return { readonly: true }
+  }
   const costPresentation = proposalCostFieldPresentation(context.tableName, field)
   if (costPresentation) return costPresentation
   if (isCustomerCaseForm(context)) {
@@ -2090,6 +2121,14 @@ export function getFieldActions(context, field) {
   if (!field) return []
   const name = String(field.Name || '').toLowerCase()
   const label = String(field.Label || '').trim()
+  if (isTerminationForm(context) && name === 'dingdanxq') {
+    return [{ key: 'xjy-termination-order-detail', label: field.Label || '查看订单详情', icon: '▤',
+      disabled: !context.form.DingdanID }]
+  }
+  if (isOrderForm(context) && context.mode === 'View' && name === 'dingdanbh' &&
+    canAddMenuRecord(TERMINATION_MENU_ID, getUser() || {})) {
+    return [{ key: 'xjy-order-termination', label: '断约申请', icon: '▤', position: 'label' }]
+  }
   if (isCheckinEditable(context) &&
     (name === visitTargetNameField(context).toLowerCase() || label === '拜访对象')) {
     return [{
@@ -2132,6 +2171,21 @@ export function getFieldActions(context, field) {
 }
 
 export async function runFieldAction(context, field, action) {
+  if (action?.key === 'xjy-termination-order-detail' && context.form.DingdanID) {
+    const menu = await findMenu(['合同订单'], ORDER_TABLE)
+    if (!menu?.Id) throw new Error('当前账号没有订单查看权限')
+    await openForm({ table: ORDER_TABLE, rowId: context.form.DingdanID, mode: 'View', title: '订单详情',
+      menuId: menu.Id,
+      menuAliases: ['合同订单'], fileMenuAliases: ['合同订单'] })
+    return { handled: true }
+  }
+  if (action?.key === 'xjy-order-termination') {
+    const menu = await findMenu(['断约申请'], TERMINATION_TABLE)
+    if (!menu?.Id || !canAddMenuRecord(menu.Id, getUser() || {})) throw new Error('当前账号没有断约申请新增权限')
+    await openForm({ table: TERMINATION_TABLE, mode: 'Add', title: '新增断约申请', menuId: menu.Id,
+      defaultValues: terminationOrderValues(context.form), readonlyFieldNames: ['DingdanBH'] })
+    return { handled: true }
+  }
   if (action && action.key === 'xjy-checkin-customer') {
     return {
       handled: true,
@@ -2157,6 +2211,12 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  if (isTerminationForm(context) && payload?.field?.Name === 'DingdanBH' && !payload.multiple) {
+    const menu = await findMenu(['订单商品'], ORDER_PRODUCT_TABLE)
+    context.state.terminationGoodsMenuId = menu?.Id || ''
+    await bindTerminationOrder(context, payload.cleared ? {} : selectedRow(payload), V8)
+    return { handled: true }
+  }
   if (isLeadFollowupForm(context) && payload && !payload.multiple &&
     String(payload.field?.Name || '').toLowerCase() === LEAD_FOLLOWUP_FIELDS.leadName.toLowerCase()) {
     // 名称字段保存文本，子表却按隐藏外键查询；必须取实际选中行的 Id，不能按名称猜测关联。
@@ -2365,6 +2425,10 @@ export async function handleFieldSelect(context, payload) {
 }
 
 export async function handleFieldChange(context, payload) {
+  if (isTerminationForm(context) && payload?.field?.Name === 'DingdanBH' && !payload.value) {
+    await bindTerminationOrder(context, {}, V8)
+    return { handled: true }
+  }
   if (isLeadFollowupForm(context) &&
     String(payload?.field?.Name || '').toLowerCase() === LEAD_FOLLOWUP_FIELDS.leadName.toLowerCase()) {
     // 原生选择器先 change 再 select：先解除旧关联，再由选中行回填，清空也不会残留旧 Id。
@@ -2481,6 +2545,13 @@ export async function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  if (isTerminationForm(context)) {
+    if (!context.form.DingdanID) throw new Error('请重新选择有效订单')
+    if (context.state.terminationGoodsReady === false) throw new Error('请确认订单商品已完整加载')
+    // 后台只读的快照字段也必须保存最新联动值，避免通用提交器忽略它们而保留初始 defaults。
+    return Object.fromEntries(['DingdanID', 'DingdanBH', 'KehuID', 'KehuMC', 'HezuoFS',
+      'ShangpinMC', 'Shuliang', 'ShijiJG', 'ShenqingKF'].map((name) => [name, context.form[name] ?? '']))
+  }
   if (isLeadFollowupForm(context)) {
     const idField = fieldName(context, LEAD_FOLLOWUP_FIELDS.leadId)
     const nameField = fieldName(context, LEAD_FOLLOWUP_FIELDS.leadName)
