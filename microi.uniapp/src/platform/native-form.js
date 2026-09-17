@@ -423,6 +423,8 @@ function definitionFingerprint(table, fields) {
 }
 
 function definitionAuthorizationScope(options = {}) {
+  // 同一子菜单可能从不同主表/嵌套关系打开，缓存不能把独立菜单授权与父子授权混用。
+  if (options.tableChildAuth) return JSON.stringify(options.tableChildAuth)
   const tableChildAuth = options.tableChildAuth || {}
   const childScope = [
     tableChildAuth.ParentSysMenuId,
@@ -447,6 +449,9 @@ function definitionKeys(tableName, options = {}) {
 }
 
 function metadataAuthorizationParams(options = {}) {
+  // 子表权限由后端逐层验证父记录和关系字段；子菜单只提供展示配置，
+  // 不能同时作为独立菜单授权入口，否则只读表权限会被不存在/未授权菜单阻断。
+  if (options.tableChildAuth) return { _TableChildAuth: options.tableChildAuth }
   const result = {}
   if (options.menuId) result._SysMenuId = options.menuId
   if (options.moduleEngineKey) result.ModuleEngineKey = options.moduleEngineKey

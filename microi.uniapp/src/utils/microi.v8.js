@@ -727,7 +727,12 @@ export function createMicroiV8(options = {}) {
   }
 
   function setToken(token) {
-    storage.set(config.tokenKey, token || '');
+    const value = token || '';
+    // 存储适配器可能吞掉写入异常；回读防止沿用旧 Token 却宣称登录成功。
+    try {
+      storage.set(config.tokenKey, value);
+      if (getToken() !== value) throw authStorageError('Token');
+    } catch (e) { throw authStorageError('Token'); }
   }
 
   function clearToken() {
@@ -736,7 +741,18 @@ export function createMicroiV8(options = {}) {
   }
 
   function setUser(user) {
-    storage.set(config.userKey, serializeUser(user));
+    const value = serializeUser(user);
+    try {
+      storage.set(config.userKey, value);
+      if (serializeUser(storage.get(config.userKey)) !== value) throw authStorageError('User');
+    } catch (e) { throw authStorageError('User'); }
+  }
+
+  function authStorageError(stage) {
+    const error = new Error('无法保存登录状态，请重启小程序后重试。');
+    error.Code = 'AUTH_STORAGE_FAILED';
+    error.Stage = stage;
+    return error;
   }
 
   function getUser() {
@@ -846,7 +862,7 @@ export function createMicroiV8(options = {}) {
     const method = String(options.method || 'POST').toUpperCase();
     let fullUrl = buildUrl(options.url || options.path || '');
     const authEnabled = options.auth !== false;
-    const requestToken = authEnabled ? getToken() : '';
+    const requestToken = authEnabled || options.sessionBound === true ? getToken() : '';
     const requestEndpointGeneration = runtimeEndpointGeneration;
     const headers = buildHeaders(options);
     const data = options.data === undefined ? {} : options.data;
@@ -915,7 +931,7 @@ export function createMicroiV8(options = {}) {
         throw body || new Error('登录已过期');
       }
 
-      handleReturnedToken(headersReturned, requestToken, authEnabled);
+      handleReturnedToken(headersReturned, requestToken, authEnabled || options.sessionBound === true);
 
       if (statusCode >= 400) {
         const error = body || new Error(`请求失败: ${statusCode}`);
@@ -951,6 +967,8 @@ export function createMicroiV8(options = {}) {
       url: '/api/SysUser/refreshToken',
       method: 'POST',
       auth: false,
+      // 续签只能更新发起时的会话，避免慢响应覆盖主动登录或恢复已退出的会话。
+      sessionBound: true,
       checkCode: false,
       silentError: true,
       headers: {

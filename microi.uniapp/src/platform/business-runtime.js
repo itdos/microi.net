@@ -447,6 +447,9 @@ export async function openForm({ table, rowId = '', mode = 'View', title = '', m
     try {
       menu = await findMenu(menuAliases, table, false, menuId)
     } catch (error) {}
+    // 子表菜单不一定出现在当前角色的导航树中。保留关系组件已取得的上下文，
+    // 后续请求仍携带完整父子授权链，由服务端重新验证，不能在导航时丢掉它。
+    if (!menu && menuId && tableChildAuth) menu = { Id: menuId }
   } else if (menuId) {
     menu = { Id: menuId }
   }
