@@ -204,6 +204,16 @@ Authorization: <当前吾码管理员登录 Token>
 
 音乐入口会先创建持久后台任务，返回 `Code=2` 和 `Data.TaskId`。继续调用 `GET /api/Ai/GetMiniMaxMusicTask?taskId=<原任务号>`，直到返回 `Code=1 + Permanent=true + FileUrl`；`Failed`、`Uncertain` 是需要处理的终态，不应一直显示“正在生成”。刷新页面或停止等待只结束前端等待，后台任务继续执行；重复提交必须保留原 `RequestId` 与全部参数。
 
+### MCP 图片工具
+
+MCP 暴露三步图片任务链：
+
+1. `microi_generate_minimax_image`：先不传确认值获取 dry-run；正式调用必须让 `confirmExecution` 精确等于 `requestId`。通常返回 `Code=2 + Data.TaskId`，这只代表任务已持久入队，不代表图片已生成。
+2. `microi_get_minimax_image_task`：使用同一个 `TaskId` 查询。只有 `Code=1 + Data.Images` 才能进入文章素材或后续 HDFS 校验；超时、刷新页面和 MCP 连接断开都不能换新的 `requestId` 重试。
+3. `microi_recover_minimax_image_task`：仅在状态含 `CanRecoverResult=true` 时调用，用于重新下载已有供应商结果并写入当前租户 HDFS，不会重新消耗图片生成额度。
+
+工具只接收业务提示词和已配置的图片模型选择，不接收 Endpoint、ApiKey、Authorization 或租户覆盖。`width` 与 `height` 必须同时提供；参考图编辑、图片数量、比例和分辨率仍以服务端 `mic_ai.MediaProtocol / MediaModels` 实时目录为准。MCP 返回的临时供应商地址不能直接作为公开文章素材，必须等服务端返回当前租户 HDFS 结果后再做 SHA-256、尺寸和公开托管验收。
+
 若 Music3 事件流或文件下载中断，系统保存原供应商任务号及完成文件地址。状态中的 `CanRecoverResult=true` 表示可以点击“恢复原配乐结果”，或调用 `POST /api/Ai/RecoverMiniMaxMusicTask?taskId=<原任务号>`；恢复只读取既有生成结果，不再次作曲。旧请求若没有保存供应商回执，仍会保留不确定状态，不能凭超时推断已扣费或自动另开请求。
 
 吾码中转节点采用 `POST /v1/microi/music_tasks`、`GET /v1/microi/music_tasks/{taskId}` 的异步协议，使用受保护的平台 API Key 和稳定 `Idempotency-Key`。调用节点、中转节点、Core/AI/API 和前端均需更新，安装 AI 助手应用包本身不会替换平台二进制。

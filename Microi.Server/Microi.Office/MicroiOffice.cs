@@ -47,6 +47,14 @@ namespace Microi.net
             },
             StringComparer.OrdinalIgnoreCase);
 
+        // 导出的表格会包含平台审计字段。它们由导入事务统一生成，不能再次拼进
+        // INSERT/UPDATE；否则“导出后原样导入”会把 CreateTime 等字段写入两次。
+        private static bool ImportIsProtectedFixedField(string fieldName)
+        {
+            return !fieldName.DosIsNullOrWhiteSpace()
+                && ImportPreflightProtectedFixedFields.Contains(fieldName.Trim());
+        }
+
         /// <summary>
         /// 通用的 dynamic 参数转换方法
         /// </summary>
@@ -1595,13 +1603,8 @@ namespace Microi.net
                 {
                     var fieldName = field?["Name"].Val<string>();
                     if (fieldName.DosIsNullOrWhiteSpace()
-                        || string.Equals(fieldName, "Id", StringComparison.OrdinalIgnoreCase)
+                        || ImportIsProtectedFixedField(fieldName)
                         || !ImportTryGetFieldValue(source, fixedField, field, out var value))
-                    {
-                        continue;
-                    }
-                    if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true
-                        && string.Equals(fieldName, "TenantId", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
@@ -1952,13 +1955,8 @@ namespace Microi.net
                 foreach (var colModel in importFieldList)
                 {
                     var fieldName = colModel["Name"].Val<string>();
-                    if (string.Equals(fieldName, "Id", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (ImportIsProtectedFixedField(fieldName)) continue;
                     if (!ImportTryGetFieldValue(row, fixedField, colModel, out var valueObj)) continue;
-                    if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true
-                        && string.Equals(fieldName, "TenantId", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
                     var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(fieldName);
                     var parameterName = $"@value{updateParameters.Count}";
                     assignments.Add($"{sqlFieldName}={parameterName}");
@@ -1990,13 +1988,8 @@ namespace Microi.net
             foreach (var colModel in importFieldList)
             {
                 var fieldName = colModel["Name"].Val<string>();
-                if (string.Equals(fieldName, "Id", StringComparison.OrdinalIgnoreCase)) continue;
+                if (ImportIsProtectedFixedField(fieldName)) continue;
                 if (!ImportTryGetFieldValue(row, fixedField, colModel, out var value)) continue;
-                if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true
-                    && string.Equals(fieldName, "TenantId", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
                 var parameterName = $"@value{insertParameters.Count}";
                 columnNames.Add(MicroiEngine.ORM(dbInfo.DbType).GetFieldName(fieldName));
                 valueParameters.Add(parameterName);

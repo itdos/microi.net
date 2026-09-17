@@ -6,6 +6,7 @@ import { buildTokenFileLookupKeys, MicroiClient } from './microi-client.js';
 import { createMcpServer } from './server.js';
 import { resolveMcpLabel } from './mcp-label.js';
 import { selectPreferredAuthorizationTokenFromCandidates } from './token-utils.js';
+import { unprotectSessionToken } from './workspace-protected-credentials.js';
 /** 从 VS Code 扩展写入的 token 文件中读取指定服务器的 token */
 function readTokenFromFile(filePath, apiUrl, osClient, osClientType = '', osClientNetwork = '') {
     try {
@@ -13,10 +14,10 @@ function readTokenFromFile(filePath, apiUrl, osClient, osClientType = '', osClie
         const apiKey = String(apiUrl || '').replace(/\/+$/, '');
         const lookupKeys = buildTokenFileLookupKeys(apiUrl, osClient, osClientType, osClientNetwork);
         const tenantKeys = osClient ? lookupKeys.filter(key => key !== apiKey) : lookupKeys;
-        const tenantToken = selectPreferredAuthorizationTokenFromCandidates(tenantKeys.map(key => tokens[key]));
+        const tenantToken = selectPreferredAuthorizationTokenFromCandidates(tenantKeys.map(key => unprotectSessionToken(tokens[key])));
         // The API-wide legacy token can belong to another tenant. Keep it only as
         // a last-resort fallback when no tenant-scoped alias exists.
-        return tenantToken || tokens[apiKey];
+        return tenantToken || unprotectSessionToken(tokens[apiKey]);
     }
     catch {
         return undefined;

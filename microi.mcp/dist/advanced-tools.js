@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { normalizePageJsonObj, normalizePrintObj, normalizePrintPageObj } from './design-engine.js';
+import { buildFileUploadConfig } from './file-upload-config.js';
 const WF_MARKER_BEGIN = '/* MICROI_WF_LINE_CONDITION_JSON';
 const WF_MARKER_END = 'MICROI_WF_LINE_CONDITION_JSON */';
 const jsonRecordSchema = z.record(z.unknown());
@@ -713,6 +714,8 @@ export function normalizeViewSchemaJson(raw) {
 function buildFieldConfig(sourceType, options) {
     const warnings = [];
     const type = sourceType.toLowerCase();
+    if (type === 'fileupload')
+        return { config: buildFileUploadConfig(options), warnings };
     if (type === 'keyvalue') {
         const raw = getString(options, 'data', 'options');
         const rows = raw
@@ -2787,6 +2790,7 @@ export function manifestGuide(osClient) {
             'Open generated forms in an 80% Dialog by default. Use Drawer only for extremely large forms with many fields, multiple TableChild controls, or comparable heavy content; never make Drawer the blanket module default.',
             'Use dryRun=true until the user explicitly asks to write.',
             'For Page Engine pages, save only the JsonObj layer to mic_page.JsonObj: {formConfig, wrapperList}. Do not wrap it in formData.',
+            'Page Engine defaults: formConfig.themeMode=system, density=compact, wrapperOption.heightMode=content; reserve fixed only for explicit fixed canvases. Use platform colour variables and statistic widgetParams[24].value=summary/detail for compact reference dashboards. Verify light/dark visuals and real data separately.',
             'For Print Engine templates, PageObj must be a hiprint object with panels[].printElements; PrintObj is sample/runtime data.',
             'For natural-language UI or print design, prefer microi_build_page_design or microi_build_print_template_design, then save after confirmation.',
         ],
@@ -2808,7 +2812,7 @@ export function registerAdvancedTools(server, client, context) {
         return textResult(JSON.stringify({ ok: normalized.errors.length === 0, ...normalized }, null, 2), normalized.errors.length > 0);
     });
     server.tool('microi_build_field_config', `Build and validate Microi diy_field Data/Config JSON for option controls, SQL/APIEngine/DataSource sources, JoinForm, AutoNumber and DateTime. OsClient: ${osClient}`, {
-        sourceType: z.enum(['Data', 'KeyValue', 'Sql', 'ApiEngine', 'DataSource', 'AutoNumber', 'JoinForm', 'DateTime']).describe('Config source type'),
+        sourceType: z.enum(['Data', 'KeyValue', 'Sql', 'ApiEngine', 'DataSource', 'AutoNumber', 'JoinForm', 'DateTime', 'FileUpload']).describe('Config source type. FileUpload 的 options 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance，均为 boolean，默认 false；ConfigurableRoleIds 是最多 100 个真实角色 Id 的数组，默认 [] 允许所有角色，非空时仅可新增其中角色的附件授权。启用角色权限自动 Limit=true。'),
         options: jsonRecordSchema.optional().describe('Source options, such as data/options, sql, apiEngineKey, dataSourceId, tableId, prefix, length'),
     }, async ({ sourceType, options }) => {
         const built = buildFieldConfig(sourceType, options || {});
@@ -3254,6 +3258,23 @@ export function registerAdvancedTools(server, client, context) {
             return textResult(`写入已拦截：请传 confirmExecution="${name}" 或 "EXECUTE"。`, true);
         await audit(client, 'microi_save_job', name, payload);
         return apiText('Save Job', await client.saveJob(payload));
+    });
+    server.tool('microi_query_job_runtime', `Read current-node Quartz diagnostics or monthly execution logs for the authenticated tenant ${osClient}. Diagnostics never triggers or re-registers a job. Logs use MongoDB; HistoryLogs retains relational history. Cursor pagination returns HasMore, not an exact total. Backend administrator checks remain mandatory; a running scheduler is not proof of execution.`, {
+        action: z.enum(['Diagnostics', 'Logs', 'HistoryLogs']),
+        jobName: z.string().min(1).max(100),
+        searchMonth: z.string().regex(/^\d{4}(0[1-9]|1[0-2])$/).optional(),
+        pageSize: z.number().int().min(1).max(100).optional(),
+        beforeLogTime: z.string().max(50).optional(),
+        beforeLogId: z.string().max(100).optional(),
+    }, async ({ action, jobName, searchMonth, pageSize, beforeLogTime, beforeLogId }) => {
+        if (action !== 'Diagnostics' && !searchMonth)
+            return textResult('日志查询必须指定 searchMonth（yyyyMM）。', true);
+        if (Boolean(beforeLogTime) !== Boolean(beforeLogId))
+            return textResult('翻页必须同时提供 beforeLogTime 和 beforeLogId。', true);
+        return apiText('Job Runtime', await client.executeEngine('platform-schedule-job', {
+            Action: action, JobName: jobName, SearchMonth: searchMonth, PageSize: pageSize ?? 20,
+            BeforeLogTime: beforeLogTime, BeforeLogId: beforeLogId,
+        }));
     });
     server.tool('microi_list_database_backup_tenants', `List the enabled MySQL tenants eligible for database backup on the current backend runtime. The server strictly filters sys_osclients by its own OsClientType and OsClientNetwork and never returns connection strings. OsClient ${osClient}.`, {}, async () => (apiText('Database Backup Tenants', await client.listDatabaseBackupTenants())));
     server.tool('microi_run_database_backup', `Queue a durable database backup task for the current backend runtime. Omit tenantOsClients to back up every eligible tenant; when provided, every key must be in microi_list_database_backup_tenants. idempotencyKey is caller-generated and must be reused after timeout or any uncertain response. The server serializes execution with a renewable Redis lease and uploads only to the main tenant private HDFS. OsClient ${osClient}.`, {

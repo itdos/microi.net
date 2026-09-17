@@ -209,8 +209,8 @@ V8.Print.setPrinterProfile('auto');
 | `profileId` / `profileName` | 最终生效的型号配置 |
 | `commandLanguage` | 当前标签指令 `tspl` 或 `cpcl` |
 | `mtu` / `maxWriteBytes` | 5+ BLE 本次连接确认的 MTU / 有效载荷上限；未确认时为 `0` / `20`，不跨连接缓存 |
-| `recommendedPacketSize` | 5+ 佳博按已确认能力推荐 `20` / `100` / `180`；旧宿主可能没有此字段 |
-| `writeType` / `packetIntervalMs` | 5+ 当前写方式与确认后附加等待；Android 佳博 `write` 为约 `8ms` 的 GATT 保护窗口，其它路径保留 `20ms` |
+| `recommendedPacketSize` | 5+ 佳博按已确认能力推荐 `20` / `100`；`180` 仅作为协商后的写入上限，旧宿主可能没有此字段 |
+| `writeType` / `packetIntervalMs` | 5+ 当前写方式与确认后附加等待；Android 佳博 `write` 为约 `15ms` 的 GATT 保护窗口，其它路径保留 `20ms` |
 
 打印前仍以 `isConnected()` 和 `prepareSend()` 为准，不以已保存的 `deviceId` 或状态快照代替实时连接判断。
 
@@ -219,17 +219,28 @@ V8.Print.setPrinterProfile('auto');
 `microi.app` 是加载远程 H5 的 5+ 壳，原生蓝牙代码位于 `Microi.Client/src/utils/v8-print.js`。
 浏览器同一张标签快、App 慢时，先对比包长和原生回调耗时，不应直接归因于生产 API。
 约 9KB 的位图按 20 字节会产生约 461 次写入，原先每次回调后再等待 20ms 会额外增加约 9 秒。
-Android 佳博 GP-M322 的确认写入现在逐包等待原生回调，并保留约 8ms 的 GATT 保护窗口；不并发写入。
+Android 佳博 GP-M322 的确认写入逐包等待原生回调，并保留约 15ms 的 GATT 保护窗口；不并发写入。
+5+ BLE 的连接、服务发现和写入统一使用 `plus.bluetooth`，不能用 `uni.writeBLECharacteristicValue`
+写入由 `plus.bluetooth` 建立的连接，否则首包可能因两套运行时连接状态不一致而中断。
 
 连接时在服务发现后尝试协商 MTU，最多等 1.5 秒，仅采用回调中返回的实际 `mtu`。
 能力明确时应用可用 `recommendedPacketSize` 选择包长；发送端还会按 `maxWriteBytes` 限包。
 缺少 API、失败、超时或空成功回调均保留 20 字节，不能把请求的 183 当作实际协商结果。
-旧壳即使无法协商大包，佳博确认写入也会去掉额外等待。iOS、其它型号、无响应写与 CC4 SPP 保留原有节奏。
+旧壳即使无法协商大包，佳博确认写入也使用同一串行发送路径。iOS、其它型号、无响应写与 CC4 SPP 保留原有节奏。
 
 升级远程前端镜像后完全退出并重开在线模式 App，再重新连接打印机；本修复不要求重新打 APK。
 自定义微服务若写死“仅 `engine === 'web'` 才加速”，还需按连接能力更新其策略。
 不能在不支持 Web Bluetooth 的 WebView 中通过增加切换选项启用浏览器蓝牙。
 回归须同时记录未知 MTU 的旧壳和已确认大包两条路径；模拟字节测试不等于真机速度或物理出纸验收。
+
+### 搜索不到之前的设备
+
+BLE 外设在 GATT 已连接期间会停止广播。如果上一次连接被并发流程打断、或 App 重启后系统仍保留旧链路，打印机虽然“不在使用中”，却仍连接着手机，标准 BLE 搜索自然找不到它。
+
+- 平台在每次点击“开始搜索蓝牙”后、启动发现前，会先调用 `getConnectedBluetoothDevices`，关闭应用当前未持有的连接，再开始扫描；正在使用的连接不会被关闭。
+- 连接期间被断开/重连事件接管时，平台会显式关闭本流程已经建立的 GATT 链路，不再把“能连上但未登记”的连接留在系统里。
+- 以上修复位于远程前端 `Microi.Client/src/utils/v8-print.js`，升级远程前端镜像后完全退出并重开 App 即可生效，不需要重新打 APK。
+- 若仍搜不到：先在系统蓝牙设置里忽略/忘记该打印机，关闭再打开打印机电源与手机蓝牙后重试；也可以直接用“停止搜索 → 开始搜索”触发一次残留连接清理。
 
 ## CC4 自动转换范围
 

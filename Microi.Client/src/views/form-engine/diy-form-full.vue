@@ -1977,9 +1977,17 @@ export default {
                 self.OpenDiyFormWorkFlowType = {};
             }
 
-            // 设置表单相关参数，优先使用 param 传入的值，其次使用 props，最后使用默认值
+            // 设置表单相关参数。默认值支持 FormDefaultValues/Init/FixedFields
+            // 兼容别名，并统一与组件 props 合并，保证 OpenAnyTable 的新增入口
+            // 可以把当前行上下文带入而不覆盖表单自身默认值。
             self.FieldFormSelectFields = param.SelectFields || self.SelectFields || [];
-            self.FieldFormDefaultValues = param.DefaultValues || self.DefaultValues || {};
+            self.FieldFormDefaultValues = {
+                ...(self.DefaultValues || {}),
+                ...(param.FormDefaultValues || {}),
+                ...(param.DefaultValues || {}),
+                ...(param.Init && typeof param.Init === "object" ? param.Init : {}),
+                ...(param.FixedFields && typeof param.FixedFields === "object" ? param.FixedFields : {})
+            };
             self.FieldFormFixedTabs = param.FixedTabs || self.FixedTabs || [];
             self.FieldFormHideFields = param.HideFields || self.HideFields || [];
 
