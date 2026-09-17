@@ -30,6 +30,7 @@ export const businessGroups = [
     accent: '#E94B2C',
     items: [
       { key: 'orders', title: '我的订单', icon: asset('business/dingdan.png') },
+      { key: 'contractTerminations', title: '断约申请', icon: asset('business/shenqing.png') },
       { key: 'tasks', title: '我的任务', icon: asset('repair/renwu.png'), badgeKey: 'task' },
       { key: 'devices', title: '我的设备', icon: asset('business/shebei.png') },
       { key: 'filters', title: '滤芯统计', icon: asset('business/lvxin.png') },
@@ -220,6 +221,12 @@ export const businessModules = {
     // zhy：列表最多 3 行并显示省略号，详情最多 11 行后纵向滚动。
     summaryField: 'GenjinJL', summaryLines: 3, detailSummaryLines: 11, periodField: 'GenjinSJ', filterFields: visitFilterFields
   }),
+  contractTerminations: native({
+    title: '断约申请', table: 'diy_duanyueshenqing', menuAliases: ['断约申请'],
+    titleField: 'KehuMC', statusField: 'ShifouSP', tagFields: ['HezuoFS'],
+    lines: [{ label: '订单编号', field: 'DingdanBH' }, { label: '申请人', field: 'ShenqingKF' }],
+    filterFields: [{ key: 'order', label: '订单编号', field: 'DingdanBH', type: 'text' }]
+  }),
   orders: native({
     title: '合同订单', table: 'Diy_Dingdan', menuAliases: ['合同订单', '订单管理', '我的订单'],
     titleField: 'KehuMC', statusField: 'DingdanZT', tagFields: ['XinLDD', 'DingdanHZFS'],
@@ -260,6 +267,7 @@ export const businessModules = {
   }),
   tasks: {
     target: 'task-list',
+    menuPermission: { table: 'Diy_ShouhouDD', menuAliases: ['售后订单', '售后任务', '我的任务'] },
     title: '售后任务', table: 'Diy_ShouhouDD', menuAliases: ['售后订单', '售后任务', '我的任务'],
     titleField: 'ShouhouFWBH', statusField: 'Zhuangtai', tagFields: ['Leixing'],
     relatedMetrics: [
@@ -543,7 +551,10 @@ export const businessModules = {
     title: '需求响应', table: 'diy_NeedReleaseRes', menuAliases: ['需求响应', '需求结果'], titleField: 'Shangjia', statusField: 'Zhuangtai',
     lines: [{ label: '商家编号', field: 'ShangjiaID' }, { label: '创建时间', field: 'CreateTime', format: 'datetime' }]
   }),
-  performance: { target: 'native-page', title: '业绩统计', path: '/pages/business/stats' },
+  performance: {
+    target: 'native-page', title: '业绩统计', path: '/pages/business/stats',
+    menuPermission: { table: 'Diy_Dingdan', menuAliases: ['合同订单', '订单管理', '我的订单'] }
+  },
   cases: native({
     title: '客户案例', table: 'Diy_Anli', menuAliases: ['客户案例', '案例管理'],
     titleField: 'Biaoti', summaryField: 'KehuGK',
@@ -556,6 +567,7 @@ export const businessModules = {
   }),
   directory: native({
     title: '通讯录', table: 'Sys_User', menuAliases: ['通讯录', '组织通讯录', '系统账号', '系统用户'],
+    menuPermission: { table: 'Sys_User', menuAliases: ['通讯录', '组织通讯录', '系统账号', '系统用户'] },
     listApiEngineKey: 'get-sysUser-list', skipModuleMetadata: true,
     titleField: 'Name', statusField: 'State', tagFields: ['RoleName', 'DeptName'], phoneField: 'Phone',
     lines: [{ label: '帐号', field: 'Account' }, { label: '部门', field: 'DeptName' }, { label: '联系电话', field: 'Phone', format: 'phone' }],
@@ -595,7 +607,10 @@ export const businessModules = {
     target: 'native-page', title: '拜访打卡', path: '/pages/native/checkin',
     menuPermission: { table: 'Diy_location', menuAliases: ['拜访打卡', '人员定位', '打卡记录'] }
   },
-  taskScan: { target: 'native-page', title: '扫码做任务', path: '/pages/task/scan' },
+  taskScan: {
+    target: 'native-page', title: '扫码做任务', path: '/pages/task/scan',
+    menuPermission: { table: 'Diy_ShouhouDD', menuAliases: ['售后订单', '售后任务', '我的任务'] }
+  },
   // 首页地图入口必须由实际的、已授权业务菜单驱动。这样权限配置变更后无需重新发布小程序。
   deviceMap: {
     target: 'native-page', title: '设备地图', path: '/pages/task/map?mode=device',
@@ -607,11 +622,12 @@ export const businessModules = {
   },
   // contactMap: { target: 'native-page', title: '联系人地图', path: '/pages/task/map?mode=contacts' },
   // visitMap: { target: 'native-page', title: '跟进地图', path: '/pages/task/map?mode=visit' },
-  // 首页和我的页共用直接报修入口；入口不限制角色，设备选择仍按设备列表权限查询。
+  // 原生页面也绑定实际表单权限，防止没有授权菜单时仍使整个板块保持可见。
   afterSalesAdd: {
     target: 'native-page',
     title: '我要报修',
-    path: '/pages/native/repair?entry=quick'
+    path: '/pages/native/repair?entry=quick',
+    menuPermission: { table: 'Diy_KehuSB', menuAliases: ['设备列表', '客户设备', '我的设备', '设备管理'] }
   }
 }
 
@@ -680,17 +696,6 @@ export function getRoleProfile(user = {}) {
     positionName,
     organizationText: organization.join(' · '),
     identityText: [...organization, roleText].filter(Boolean).join(' · '),
-    allowedGroupKeys: isAdmin
-      ? ['customer', 'service', 'oa', 'opportunity']
-      : isCustomer
-        ? ['service']
-        : isSales
-          ? ['customer', 'opportunity', 'oa']
-          : isSupport
-            ? ['customer', 'service', 'oa']
-            : isService
-              ? ['customer', 'service', 'oa']
-              : ['customer', 'service', 'oa', 'opportunity'],
     primaryActions: isAdmin
       ? ['tasks', 'customers', 'orders', 'devices']
       : isCustomer

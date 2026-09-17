@@ -312,7 +312,9 @@ export function groupFields(fields, tableModel = {}) {
       }
       return
     }
-    if (GUARDED_COMPONENTS.has(field.component)) return
+    // 仅显示已有受控原生动作适配的按钮；不执行后台 V8，也不开放任意自定义控件。
+    if (GUARDED_COMPONENTS.has(field.component) &&
+      !(field.component === 'Button' && field.nativeAction === true)) return
 
     const active = activeGroups.get(tabKey)
     if (active && active.remaining > 0) {
@@ -524,6 +526,7 @@ export function scopeNativeFormDefinition(definition, options = {}) {
   const include = new Set((options.includeNames || []).map((name) => String(name).toLowerCase()))
   const exclude = new Set((options.excludeNames || []).map((name) => String(name).toLowerCase()))
   const readonly = new Set((options.readonlyNames || []).map((name) => String(name).toLowerCase()))
+  const actionFields = new Set((options.actionFieldNames || []).map((name) => String(name).toLowerCase()))
   const fields = (definition.fields || []).filter((field) => {
     const name = String(field.Name || '').toLowerCase()
     if (exclude.has(name)) return false
@@ -531,6 +534,7 @@ export function scopeNativeFormDefinition(definition, options = {}) {
     return !include.size || include.has(name)
   }).map((field) => ({
     ...field,
+    nativeAction: field.component === 'Button' && actionFields.has(String(field.Name || '').toLowerCase()),
     editable: readonly.has(String(field.Name || '').toLowerCase()) ? false : field.editable
   }))
   return buildDefinition(definition.table || {}, fields, definition.layoutFields || definition.fields || [])
