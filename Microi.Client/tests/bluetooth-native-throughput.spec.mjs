@@ -19,7 +19,7 @@ async function nativePrinter(t, options = {}) {
     const originalTimeout = globalThis.setTimeout;
     t.mock.method(globalThis, 'setTimeout', (callback, ms, ...args) => {
         delays.push(ms);
-        if (ms === 15) options.onDelay?.(ms);
+        if (ms === 0) options.onDelay?.(ms);
         return originalTimeout(callback, ms === 1500 ? 10 : 0, ...args);
     });
     install('localStorage', storage);
@@ -56,41 +56,43 @@ async function nativePrinter(t, options = {}) {
     return { print, writes, delays, calls, storage };
 }
 
-serialTest('纯 5+ Android 在服务发现后协商 MTU，佳博 9KB 标签默认按 100 字节稳定发送', async t => {
+serialTest('纯 5+ Android 在服务发现后协商 MTU，佳博 9KB 标签按 180 字节确认写入', async t => {
     const { print, calls, writes, delays, storage } = await nativePrinter(t);
     const state = print.getConnectionState();
     assert.deepEqual(calls, ['connect', 'services', 'characteristics', 'mtu']);
     assert.equal(state.mtu, 183);
     assert.equal(state.maxWriteBytes, 180);
-    assert.equal(state.recommendedPacketSize, 100);
-    assert.equal(state.packetIntervalMs, 15);
+    assert.equal(state.recommendedPacketSize, 180);
+    assert.equal(state.packetIntervalMs, 0);
     assert.equal(JSON.parse(storage.getItem('microi_ble_info')).mtu, undefined, 'MTU 不能随设备记录跨连接缓存');
     const bytes = Uint8Array.from({ length: 9207 }, (_, i) => i % 256);
     print.setOneTimeData(state.recommendedPacketSize);
     delays.length = 0;
     await print.prepareSend(bytes);
-    assert.equal(writes.length, 93);
+    assert.equal(writes.length, 52);
     assert.deepEqual(writes.flat(), [...bytes]);
-    assert.equal(delays.filter(ms => ms === 15).length, 92, '确认写入使用稳定保护窗口，不再追加旧版逐 20 字节长等待');
+    assert.equal(delays.filter(ms => ms === 0).length, 0, '确认写入不再追加人工等待');
 });
 
-serialTest('佳博原生写入在设备队列有最小间隔要求时不会发送中断', async t => {
-    let guardWindows = 0;
+serialTest('佳博原生写入严格等待上一包成功回调，不并发占用 GATT 队列', async t => {
+    let writing = false;
     const { print, writes, delays } = await nativePrinter(t, {
-        onDelay: ms => { if (ms === 15) guardWindows++; },
         write(payload) {
-            // 设备队列在没有保护窗口时模拟 10008；不允许用重发掩盖已经开始的任务。
-            if (writes.length > 1 && guardWindows < writes.length - 1) {
+            if (writing) {
                 payload.fail({ code: 10008 });
                 return;
             }
-            payload.success({});
+            writing = true;
+            queueMicrotask(() => {
+                writing = false;
+                payload.success({});
+            });
         },
     });
     print.setOneTimeData(180);
     await print.prepareSend(new Uint8Array(361).fill(7));
     assert.equal(writes.length, 3);
-    assert.equal(delays.filter(ms => ms === 15).length, 2);
+    assert.equal(delays.filter(ms => ms === 0).length, 0);
 });
 
 for (const mtu of ['missing', 'empty', 'failure', 'timeout', 23, 64, 102, 103, 182, 183, 517, 22, 'invalid']) {
@@ -101,7 +103,7 @@ for (const mtu of ['missing', 'empty', 'failure', 'timeout', 23, 64, 102, 103, 1
         const maxBytes = valid ? Math.min(180, mtu - 3) : 20;
         const state = print.getConnectionState();
         assert.equal(state.maxWriteBytes, maxBytes);
-        assert.equal(state.recommendedPacketSize, maxBytes >= 100 ? 100 : 20);
+        assert.equal(state.recommendedPacketSize, maxBytes >= 180 ? 180 : maxBytes >= 100 ? 100 : 20);
         print.setOneTimeData(180);
         await print.prepareSend(new Uint8Array(201).fill(42));
         assert.ok(writes.every(bytes => bytes.length <= maxBytes));
