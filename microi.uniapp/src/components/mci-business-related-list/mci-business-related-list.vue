@@ -172,12 +172,13 @@
         </view>
       </template>
       <template v-else-if="isProposalInstallationQuickMode">
-        <view v-for="(row, index) in displayedRows" :key="row.Id" class="proposal-point-card">
+        <view v-for="(row, index) in displayedRows" :key="row.Id" class="proposal-point-card"
+          hover-class="proposal-point-card--pressed" @tap="openDetail(row)">
           <view class="proposal-point-card__title">
             <text>点位{{ index + 1 }}</text>
           </view>
           <view v-for="item in proposalInstallationVisibleQuickFields" :key="`${row.Id}-${item.key}`"
-            class="proposal-point-field">
+            class="proposal-point-field" @tap.stop>
             <text class="proposal-point-field__label">{{ item.label }}</text>
             <mci-native-field v-if="item.key === 'deviceModel'"
               class="proposal-point-field__control"
@@ -495,7 +496,7 @@ import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines } from '@
 import { buildListFilterWhere, compileModuleFilterFields, hasListFilterValue, mergeModuleFilterFields, validateListFilters } from '@/platform/list-filter-fields.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
 import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
-import { V8, getUser } from '@/utils/request.js'
+import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
 import MciNativeField from '@/components/mci-native-field/mci-native-field.vue'
@@ -876,11 +877,13 @@ export default {
       return String(this.parentMode || '').toLowerCase() === 'add' && !this.relationValue
     },
     tableChildAuth() {
-      if (!this.field.Id || !this.parentTableId || !this.parentMenuId || !this.parentId || !this.relationValue) return null
+      // 父记录本身由上一级子表授权时，不要求该角色另有父表的独立导航菜单。
+      // 缺少独立菜单和上级授权两者时仍失败关闭，不能退为全表查询。
+      if (!this.field.Id || !this.parentTableId || (!this.parentMenuId && !this.parentTableChildAuth) || !this.parentId || !this.relationValue) return null
       const result = {
         ParentFieldId: this.field.Id,
         ParentTableId: this.parentTableId,
-        ParentSysMenuId: this.parentMenuId,
+        ParentSysMenuId: this.parentMenuId || '',
         ParentRowId: String(this.parentId),
         ParentValue: String(this.relationValue),
         ParentFormMode: this.parentMode || 'View'
@@ -1500,13 +1503,14 @@ export default {
         const matched = this.resolveBusinessModule(this.table.Name)
         this.localFilterFields = matched.config.filterFields || []
         this.moduleKey = matched.key
-        const menu = await findMenu(
+        let menu = await findMenu(
           matched.config.menuAliases || [],
           this.table.Name,
           refresh,
           this.childMenuId,
           this.table.Id
         )
+        if (!menu && this.tableChildAuth) menu = await this.loadChildPresentationMenu()
         if (!isCurrent()) return
         this.menu = menu || null
         this.menuId = menu?.Id || this.childMenuId || ''
@@ -1527,6 +1531,7 @@ export default {
               hasConfiguredTagFields: menuConfig.hasConfiguredTagFields,
               hasConfiguredBottomFields: menuConfig.hasConfiguredBottomFields,
               cardFields: menuConfig.cardFields,
+              selectFields: menuConfig.selectFields,
               lines: menuConfig.lines
             }
           : {}
@@ -1584,6 +1589,22 @@ export default {
       const title = String(this.config?.title || this.menu?.Name || this.sectionTitle || '').trim()
       if (title) this.$emit('title-change', title)
     },
+    async loadChildPresentationMenu() {
+      if (!this.childMenuId || !this.tableChildAuth) return null
+      try {
+        // 导航树只反映可进入的菜单，不代表子表展示配置不存在。
+        // 使用专用缓存入口和父子授权链读取，禁止通过普通 CRUD 直查 sys_menu。
+        const result = await post('/api/FormEngine/GetSysMenuModel', {
+          Id: this.childMenuId,
+          _TableChildAuth: this.tableChildAuth
+        }, true)
+        const menu = Number(result?.Code) === 1 ? result.Data : null
+        if (!menu?.Id || String(menu.DiyTableId || '').toLowerCase() !== String(this.table?.Id || '').toLowerCase()) return null
+        return menu
+      } catch (error) {
+        return null
+      }
+    },
     async loadPresentationConfig(refresh = false) {
       if (this.componentDisposed) return
       const requestId = ++this.presentationRequestId
@@ -1592,7 +1613,10 @@ export default {
         if (this.menuId) {
           // 客户详情可能在后台配置更新前已打开，展示配置必须主动刷新；
           // 数据查询仍并行执行，因此刷新元数据不会让列表停留在骨架屏。
-          const menuConfig = await loadModuleDefinition(this.menuId, true, { includeHidden: true })
+          const childMenu = this.tableChildAuth ? await this.loadChildPresentationMenu() : null
+          const menuConfig = this.tableChildAuth
+            ? (childMenu ? createMenuModuleDefinition(childMenu, this.definition, this.table) : null)
+            : await loadModuleDefinition(this.menuId, true, { includeHidden: true })
           if (requestId !== this.presentationRequestId) return
           this.applyCardPresentationConfig(menuConfig)
           manifestRefresh = true
@@ -1696,6 +1720,14 @@ export default {
       // 卡片实际引用的字段，避免服务端按 SelectFields 裁剪掉 MobileListFields 中的列。
       return [...new Set([
         ...(this.config.selectFields || []),
+        // 首次数据请求早于展示配置刷新；无独立子菜单时也要查询回退卡片引用列，
+        // 不能只取 Id/外键/时间，导致正文缺值或返回详情后布局看似漂移。
+        this.config.titleField,
+        this.config.statusField,
+        this.config.summaryField,
+        ...(this.config.lines || []).map((item) => item.queryField || item.field),
+        ...(this.config.tagFields || []).map((item) => item.queryField || item.field || item),
+        ...(this.config.bottomFields || []).map((item) => item.queryField || item.field || item),
         ...(this.isCollectionCardLayout ? [
           this.presentation.titleField,
           this.presentation.subtitleField,
@@ -3011,7 +3043,9 @@ export default {
   border-radius: 18rpx;
   background: #fff;
   box-shadow: 0 5rpx 18rpx rgba(32, 67, 81, .05);
+  transition: transform 150ms ease, opacity 150ms ease;
 }
+.proposal-point-card--pressed { transform: scale(.995); opacity: .92; }
 .proposal-point-card__title {
   min-height: 54rpx;
   display: flex;

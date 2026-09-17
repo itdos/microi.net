@@ -21,6 +21,7 @@ export default {
   ],
   "appSubTitle": "让每一次服务都有迹可循",
   "workspaceSubTitle": "客户与服务工作台",
+  "shareOfficialAccountApiEngineKey": "xjy-share-official-account",
   "guestWelcomeText": "欢迎使用集福鲤",
   "promiseTitle": "清水常伴，服务有迹",
   "promiseText": "客户、设备、合同与售后数据由集福鲤智能数据引擎实时驱动",
