@@ -37,6 +37,19 @@
 
 旧库还应通过索引管理确认 `mic_data_version` 存在 `(TableId,TableRowId,CreateTime)` 联合索引。【表单引擎】应用已同时声明新装和存量库的索引；仅看到商城包中有索引，不代表当前数据库已经安装。缺索引时，每次版本号读取都可能扫描全部历史，拖慢同机其它服务。可通过吾码 MCP 的索引查询与系统监控核验，无需 NAS SSH。
 
+## 任务不执行（领取不到触发器）
+
+调度器“已启动”不代表任务在运行。用 MCP `microi_query_system_observability` 或 `platform-schedule-job` 的 `action=diagnostics` 读取 `Scheduler.IsStarted`、`Scheduler.NumberOfJobsExecuted` 与 `Acquisition.LastAcquisitionError`，不要用 `diy_schedule_job.Status=正常` 或 Quartz 已启动推断任务成功执行。
+
+`NumberOfJobsExecuted` 长时间为 `0` 且领取错误包含 `Key 'IDX_...\' doesn't exist` 时，是 Quartz 3.19 的 MySQL 方言在领取语句里使用了索引提示，而触发器表缺少对应索引：
+
+```sql
+CREATE INDEX IDX_microi_job_T_NFT_ST ON microi_job_triggers (SCHED_NAME, NEXT_FIRE_TIME, TRIGGER_STATE);
+CREATE INDEX IDX_microi_job_T_NFT_ST_MISFIRE ON microi_job_triggers (SCHED_NAME, NEXT_FIRE_TIME, MISFIRE_INSTR, TRIGGER_STATE);
+```
+
+索引名大小写不敏感；官方空库模板已包含这两个索引，历史租户库仍可能只有旧 `QRTZ_` 前缀的索引名。包含本次修复的后端会在调度器存储初始化时按实际表前缀幂等补齐（多节点并发启动不会报错，失败只告警不阻断启动），完成后无需重启任务或重建 Cron。
+
 ## 平台自动升级进度
 
 启动门禁和后台租户升级的每条升级日志都会显示百分比、当前租户/租户总数、当前升级点/升级点总数、已完成点数、耗时及剩余时间估算。进度按实际完成或版本已覆盖的检查点计算；正在执行、等待租约或失败不会自动推进。剩余时间按已完成点的平均耗时估算，步骤耗时不均时可能变化。

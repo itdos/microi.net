@@ -34,6 +34,15 @@ namespace Microi.net
                     100,
                     120,
                     600);
+                // Quartz 3.19 的 MySQL 方言在“领取下一个到期触发器”时固化
+                // USE INDEX (IDX_{tablePrefix}T_NFT_ST / ..._MISFIRE)。历史租户库只有
+                // 旧 QRTZ_ 前缀索引名时索引缺失，调度器将永远领不到触发器（任务静默不执行）。
+                // 自愈必须挂在应用启动入口：Quartz 存储初始化时委托与数据源属性是否已注入
+                // 不可依赖，不能把修复只放在 JobStore.Initialize 上。
+                if (databaseType == DatabaseType.MySql)
+                {
+                    RepairQuartzTriggerIndexesBeforeSchedulerStart(quartzDbConn);
+                }
                 services.AddQuartz(q =>
                 {
                     // 集群节点必须拥有不同的 InstanceId；默认 NON_CLUSTERED 会让共享库中的
@@ -84,6 +93,30 @@ namespace Microi.net
             {
                 Console.WriteLine("Microi：【Error异常】注入【分布式任务调度】插件失败：" + ex.Message);
                 return services;
+            }
+        }
+
+        /// <summary>
+        /// DI 宿主启动入口：注册调度器之前显式补齐触发器领取索引。
+        /// 失败或超时只告警，不阻断宿主启动；Quartz 自身的持久化错误仍会照常上报。
+        /// </summary>
+        internal static void RepairQuartzTriggerIndexesBeforeSchedulerStart(string connectionString)
+        {
+            if (!MicroiQuartzSchemaRepair.RequiresMySqlRepair(connectionString, MicroiQuartzSchemaRepair.DefaultTablePrefix))
+            {
+                return;
+            }
+            try
+            {
+                MicroiQuartzSchemaRepair
+                    .EnsureWithinBudgetAsync(connectionString, MicroiQuartzSchemaRepair.DefaultTablePrefix)
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Microi：【Error异常】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【分布式任务调度】补齐 Quartz 触发器领取索引异常（不影响启动）：{ex.Message}");
             }
         }
 

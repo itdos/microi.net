@@ -2769,6 +2769,11 @@ const CORE_TOOL_REGISTRATION_ORDER = [
   'microi_get_status',
   'microi_get_administrative_capabilities',
   'microi_chat',
+  'microi_generate_minimax_image',
+  'microi_get_minimax_image_task',
+  'microi_recover_minimax_image_task',
+  'microi_list_media_models',
+  'microi_get_minimax_token_plan_remains',
   'microi_generate_minimax_music',
   'microi_generate_minimax_speech',
   'microi_translate',
@@ -3782,8 +3787,130 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   );
 
   // ========================
-  // Tools: MiniMax 原创音乐与短对白
+  // Tools: MiniMax 图片、原创音乐与短对白
   // ========================
+  server.tool(
+    'microi_generate_minimax_image',
+    `Queue one persistent MiniMax text-to-image task through the authenticated Microi AI engine for OsClient "${osClient}". Provider credentials stay on the server and completed originals are persisted to the current tenant HDFS. The first successful response is normally Code=2 with Data.TaskId; continue with microi_get_minimax_image_task using that exact TaskId. Call microi_list_media_models first to pick a live image model and microi_get_minimax_token_plan_remains to preflight the provider quota before queuing. This may consume external AI quota, so confirmExecution must exactly equal requestId. Never change RequestId after a timeout or uncertain response.`,
+    {
+      requestId: z.string().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/u).describe('Stable idempotency key. Reuse it for the same prompt and parameters.'),
+      prompt: z.string().min(1).max(1500).describe('Original image brief. The backend collapses control characters and validates the final request.'),
+      model: z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/u).optional().describe('Configured image model Id from microi_list_media_models. Default image-01; the catalog may include an independent provider-tool image channel that does not consume the Token Plan image quota.'),
+      aiModelId: z.string().min(1).max(160).optional().describe('Optional current-tenant mic_ai record Id selected from the live media model catalog.'),
+      aspectRatio: z.enum(['1:1', '16:9', '4:3', '3:2', '2:3', '3:4', '9:16', '21:9']).optional(),
+      resolution: z.enum(['1K', '2K', '4K']).optional().describe('Only for a live protocol that declares resolution support.'),
+      count: z.number().int().min(1).max(4).optional(),
+      width: z.number().int().min(512).max(2048).multipleOf(8).optional().describe('Custom width; width and height must be supplied together.'),
+      height: z.number().int().min(512).max(2048).multipleOf(8).optional().describe('Custom height; width and height must be supplied together.'),
+      seed: z.number().int().safe().optional(),
+      postProcess: z.enum(['remove-solid-background']).optional(),
+      confirmExecution: z.string().optional().describe('Required for generation and must exactly equal requestId; omit for a no-cost dry run.'),
+    },
+    async ({ requestId, prompt, model, aiModelId, aspectRatio, resolution, count, width, height, seed, postProcess, confirmExecution }) => {
+      if ((width === undefined) !== (height === undefined)) {
+        return { content: [{ type: 'text', text: 'Custom width and height must be supplied together.' }], isError: true };
+      }
+      const payload = {
+        RequestId: requestId,
+        Prompt: prompt,
+        Model: model || 'image-01',
+        AspectRatio: aspectRatio || '1:1',
+        Count: count || 1,
+        Operation: 'text-to-image',
+        ...(aiModelId ? { AiModelId: aiModelId } : {}),
+        ...(resolution ? { Resolution: resolution } : {}),
+        ...(width !== undefined && height !== undefined ? { Width: width, Height: height } : {}),
+        ...(seed !== undefined ? { Seed: seed } : {}),
+        ...(postProcess ? { PostProcess: postProcess } : {}),
+      };
+      if (confirmExecution !== requestId) {
+        return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, payload, requiredConfirmation: requestId }, null, 2) }] };
+      }
+      try {
+        const result = await client.generateMiniMaxImage(payload);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+          ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `MiniMax image task creation failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_get_minimax_image_task',
+    `Read one persistent MiniMax image task owned by the current authenticated user on OsClient "${osClient}". This is read-only and never generates another image. Code=2 means the same task is still pending; Code=1 with Data.Images means the originals are persisted and ready.`,
+    { taskId: z.string().min(1).max(160).describe('TaskId returned by microi_generate_minimax_image.') },
+    async ({ taskId }) => {
+      try {
+        const result = await client.getMiniMaxImageTask(taskId);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+          ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `MiniMax image task readback failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_recover_minimax_image_task',
+    `Recover already-generated MiniMax image bytes for one task owned by the current authenticated user on OsClient "${osClient}". The backend reuses the existing provider node/result and does not start a new generation. Use only when task readback reports CanRecoverResult=true.`,
+    { taskId: z.string().min(1).max(160).describe('Existing TaskId whose provider result needs HDFS recovery.') },
+    async ({ taskId }) => {
+      try {
+        const result = await client.recoverMiniMaxImageTask(taskId);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+          ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `MiniMax image result recovery failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_list_media_models',
+    `List the live media model catalog (image, video, music, speech) for OsClient "${osClient}" as a safe projection without provider credentials. Read-only and free. Call it before image or video generation to discover which models are currently available and which protocol each one uses.`,
+    {},
+    async () => {
+      try {
+        const result = await client.getMediaModels();
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+          ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Media model catalog read failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_get_minimax_token_plan_remains',
+    `Read the live MiniMax Token Plan usage windows for OsClient "${osClient}" (model_name "general" = image pool, "video" = video pool). Read-only and free. Call it before any image or video generation: current_interval_remaining_percent=0 with current_interval_status=2 means the window is exhausted and new queued tasks are rejected upstream until end_time.`,
+    {},
+    async () => {
+      try {
+        const result = await client.getMiniMaxTokenPlanRemains();
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+          ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `MiniMax token plan readback failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
   server.tool(
     'microi_generate_minimax_music',
     `Generate one original instrumental music asset through the authenticated Microi AI engine for OsClient "${osClient}". The server prefers MiniMax music-3.0 and safely falls back to the official open-source MiniMax-Music3 Space only after an explicit 410 retirement response. It keeps provider credentials private, persists the result to tenant HDFS, and uses RequestId for idempotency. This may consume external AI quota, so confirmExecution must exactly equal requestId.`,

@@ -75,6 +75,27 @@ public class FileRolePermissionTests
     }
 
     [Fact]
+    public void Denied_projection_keeps_only_safe_uploader_metadata()
+    {
+        var config = (JObject)Config.DeepClone();
+        var file = File("secret", "r1");
+        file["UploaderId"] = "u1";
+        file["UploaderName"] = "上传人";
+        file["UploaderAccount"] = "uploader";
+        file["UploadTime"] = "2026-09-16 02:12:48";
+        file["Uploader"] = new JObject { ["Id"] = "u1", ["Name"] = "上传人", ["Account"] = "uploader", ["UploadTime"] = "2026-09-16 02:12:48" };
+
+        var output = (JObject)new FileRolePermission(Roles, ["r2"]).Project(file, config);
+
+        Assert.Equal("u1", (string)output["UploaderId"]!);
+        Assert.Equal("上传人", (string)output["UploaderName"]!);
+        Assert.Equal("uploader", (string)output["UploaderAccount"]!);
+        Assert.Equal("2026-09-16 02:12:48", (string)output["UploadTime"]!);
+        Assert.Null(output["Path"]);
+        Assert.Null(output["Size"]);
+    }
+
+    [Fact]
     public void EditingFiveFilesPreservesThreeDeniedAndAllowsDeletingTwoOwned()
     {
         var policy = new FileRolePermission(Roles, ["r2"]);

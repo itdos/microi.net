@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createV8Print } from '../src/utils/v8-print.js';
+import { createV8Print, releaseStalePlusBleConnections } from '../src/utils/v8-print.js';
 
 // Each fixture replaces process-wide browser/5+ globals; keep these cases serial.
 const serialTest = (name, fn) => test(name, { concurrency: false }, fn);
@@ -19,7 +19,7 @@ async function nativePrinter(t, options = {}) {
     const originalTimeout = globalThis.setTimeout;
     t.mock.method(globalThis, 'setTimeout', (callback, ms, ...args) => {
         delays.push(ms);
-        if (ms === 8) options.onDelay?.(ms);
+        if (ms === 15) options.onDelay?.(ms);
         return originalTimeout(callback, ms === 1500 ? 10 : 0, ...args);
     });
     install('localStorage', storage);
@@ -56,28 +56,28 @@ async function nativePrinter(t, options = {}) {
     return { print, writes, delays, calls, storage };
 }
 
-serialTest('纯 5+ Android 在服务发现后协商 MTU，佳博 9KB 标签可按 180 字节完整发送', async t => {
+serialTest('纯 5+ Android 在服务发现后协商 MTU，佳博 9KB 标签默认按 100 字节稳定发送', async t => {
     const { print, calls, writes, delays, storage } = await nativePrinter(t);
     const state = print.getConnectionState();
     assert.deepEqual(calls, ['connect', 'services', 'characteristics', 'mtu']);
     assert.equal(state.mtu, 183);
     assert.equal(state.maxWriteBytes, 180);
-    assert.equal(state.recommendedPacketSize, 180);
-    assert.equal(state.packetIntervalMs, 8);
+    assert.equal(state.recommendedPacketSize, 100);
+    assert.equal(state.packetIntervalMs, 15);
     assert.equal(JSON.parse(storage.getItem('microi_ble_info')).mtu, undefined, 'MTU 不能随设备记录跨连接缓存');
     const bytes = Uint8Array.from({ length: 9207 }, (_, i) => i % 256);
     print.setOneTimeData(state.recommendedPacketSize);
     delays.length = 0;
     await print.prepareSend(bytes);
-    assert.equal(writes.length, 52);
+    assert.equal(writes.length, 93);
     assert.deepEqual(writes.flat(), [...bytes]);
-    assert.equal(delays.filter(ms => ms === 8).length, 51, '确认写入使用短保护窗口，不再追加 20ms 长等待');
+    assert.equal(delays.filter(ms => ms === 15).length, 92, '确认写入使用稳定保护窗口，不再追加旧版逐 20 字节长等待');
 });
 
 serialTest('佳博原生写入在设备队列有最小间隔要求时不会发送中断', async t => {
     let guardWindows = 0;
     const { print, writes, delays } = await nativePrinter(t, {
-        onDelay: ms => { if (ms === 8) guardWindows++; },
+        onDelay: ms => { if (ms === 15) guardWindows++; },
         write(payload) {
             // 设备队列在没有保护窗口时模拟 10008；不允许用重发掩盖已经开始的任务。
             if (writes.length > 1 && guardWindows < writes.length - 1) {
@@ -90,7 +90,7 @@ serialTest('佳博原生写入在设备队列有最小间隔要求时不会发�
     print.setOneTimeData(180);
     await print.prepareSend(new Uint8Array(361).fill(7));
     assert.equal(writes.length, 3);
-    assert.equal(delays.filter(ms => ms === 8).length, 2);
+    assert.equal(delays.filter(ms => ms === 15).length, 2);
 });
 
 for (const mtu of ['missing', 'empty', 'failure', 'timeout', 23, 64, 102, 103, 182, 183, 517, 22, 'invalid']) {
@@ -101,7 +101,7 @@ for (const mtu of ['missing', 'empty', 'failure', 'timeout', 23, 64, 102, 103, 1
         const maxBytes = valid ? Math.min(180, mtu - 3) : 20;
         const state = print.getConnectionState();
         assert.equal(state.maxWriteBytes, maxBytes);
-        assert.equal(state.recommendedPacketSize, maxBytes >= 180 ? 180 : maxBytes >= 100 ? 100 : 20);
+        assert.equal(state.recommendedPacketSize, maxBytes >= 100 ? 100 : 20);
         print.setOneTimeData(180);
         await print.prepareSend(new Uint8Array(201).fill(42));
         assert.ok(writes.every(bytes => bytes.length <= maxBytes));
@@ -160,4 +160,78 @@ serialTest('部分发送后错误不降档重发，断开后清除 MTU 能力', 
     print.disconnect();
     assert.equal(print.getConnectionState().maxWriteBytes, 20);
     assert.equal(print.getConnectionState().mtu, 0);
+});
+
+// 安装一个只服务于“残留链路”场景的 5+ 全局，返回可断言的关闭记录。
+function staleLinkFixture(t, connectedDevices) {
+    const install = (key, value) => {
+        const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
+        Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+        t.after(() => { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; });
+    };
+    const closed = [];
+    install('window', {
+        plus: {
+            os: { name: 'Android' },
+            bluetooth: {
+                getConnectedBluetoothDevices({ success }) { success({ devices: connectedDevices }); },
+                closeBLEConnection({ deviceId, complete }) { closed.push(deviceId); complete?.({}); },
+            },
+        },
+        addEventListener() {},
+    });
+    return { closed };
+}
+
+serialTest('扫描前释放应用未持有的残留 GATT 链路，避免打印机保持连接而不广播', async t => {
+    const { closed } = staleLinkFixture(t, [{ deviceId: 'stale-printer', name: 'GP-M322' }]);
+    const released = await releaseStalePlusBleConnections({ _plusConnected: false, BLEInformation: {} });
+    assert.equal(released, 1);
+    assert.deepEqual(closed, ['stale-printer']);
+});
+
+serialTest('扫描前不释放应用当前正在使用的连接', async t => {
+    const { closed } = staleLinkFixture(t, [
+        { deviceId: 'current-printer', name: 'GP-M322' },
+        { deviceId: 'other-printer', name: 'CC4' },
+    ]);
+    const print = { _plusConnected: true, BLEInformation: { deviceId: 'current-printer', transport: 'ble' } };
+    const released = await releaseStalePlusBleConnections(print);
+    assert.equal(released, 1);
+    assert.deepEqual(closed, ['other-printer']);
+});
+
+serialTest('连接期间被断开事件接管时关闭已建立的 GATT 链路，不遗留占用广播的连接', async t => {
+    const install = (key, value) => {
+        const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
+        Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+        t.after(() => { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; });
+    };
+    const values = new Map();
+    const storage = { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
+    storage.setItem('microi_ble_info', JSON.stringify({ deviceId: 'native-printer', deviceName: 'GP-M322' }));
+    const closed = [];
+    let connectionHandler = null;
+    const bluetooth = {
+        onBLEConnectionStateChange(handler) { connectionHandler = handler; },
+        onBluetoothDeviceFound() {},
+        openBluetoothAdapter({ success }) { success({}); },
+        createBLEConnection({ success }) { success({}); },
+        closeBLEConnection({ deviceId, complete }) { closed.push(deviceId); complete?.({}); },
+        getBLEDeviceServices({ success }) {
+            // 旧链路的断开事件在发现服务阶段到达：新流程必须关闭自己建立的连接。
+            connectionHandler?.({ deviceId: 'native-printer', connected: false });
+            success({ services: [{ uuid: 'service' }] });
+        },
+        getBLEDeviceCharacteristics({ success }) { success({ characteristics: [{ uuid: 'write', properties: { write: true } }] }); },
+    };
+    install('localStorage', storage);
+    install('sessionStorage', storage);
+    install('navigator', { platform: 'Android' });
+    install('window', { plus: { os: { name: 'Android' }, bluetooth }, addEventListener() {} });
+    const print = createV8Print();
+    t.after(() => print.disconnect());
+    assert.equal(await print.reconnect({ silent: true }), false);
+    assert.equal(print.isConnected(), false);
+    assert.deepEqual(closed, ['native-printer'], '被接管时不能把 GATT 链路留在系统里');
 });

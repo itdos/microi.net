@@ -11,7 +11,7 @@ import { resolveMcpDid } from './mcp-did.js';
 import { normalizeAuthorizationToken, selectPreferredAuthorizationTokenFromCandidates, shouldRefreshAuthorizationToken, } from './token-utils.js';
 import { assertPayloadSourceIntegrity, assertSourceIntegrity } from './source-integrity.js';
 import { prepareV8VersionedCode } from './v8-version.js';
-import { readWorkspaceCredentials } from './workspace-protected-credentials.js';
+import { readWorkspaceCredentials, unprotectSessionToken, protectSessionToken, isProtectedSessionToken } from './workspace-protected-credentials.js';
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
 const AUTH_FAILURE_CODES = new Set([1001, 1002]);
 const DEFAULT_LOGIN_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
@@ -441,7 +441,7 @@ export class MicroiClient {
             const tenantKeys = this.config.osClient
                 ? lookupKeys.filter(key => key !== apiKey)
                 : lookupKeys;
-            const fileToken = selectPreferredAuthorizationTokenFromCandidates(tenantKeys.map(key => tokens[key])) || tokens[apiKey];
+            const fileToken = selectPreferredAuthorizationTokenFromCandidates(tenantKeys.map(key => unprotectSessionToken(tokens[key]))) || unprotectSessionToken(tokens[apiKey]);
             const normalizedFileToken = normalizeAuthorizationToken(fileToken);
             if (normalizedFileToken && normalizedFileToken !== this.token) {
                 this.token = normalizedFileToken;
@@ -462,10 +462,11 @@ export class MicroiClient {
                 tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
             }
             catch { /* file may not exist yet */ }
-            const [tokenKey] = buildTokenFileLookupKeys(this.config.apiBaseUrl, this.config.osClient, this.config.osClientType, this.config.osClientNetwork);
+            const tokenKeys = buildTokenFileLookupKeys(this.config.apiBaseUrl, this.config.osClient, this.config.osClientType, this.config.osClientNetwork);
+            const tokenKey = tokenKeys[0];
             if (!tokenKey)
                 return;
-            tokens[tokenKey] = this.token;
+            tokens[tokenKey] = tokenKeys.some(key => isProtectedSessionToken(tokens[key])) ? protectSessionToken(this.token) : this.token;
             const dir = path.dirname(filePath);
             if (!fs.existsSync(dir))
                 fs.mkdirSync(dir, { recursive: true });
@@ -1200,6 +1201,15 @@ export class MicroiClient {
         // Deliberately omit TargetUserId: the backend binds the operation to the
         // authenticated user and prevents an access-key session from managing keys.
         return this.post(API.LIST_USER_ACCESS_KEYS, {});
+    }
+    async listServerPrivateSettings() {
+        return this.post('/apiengine/platform-tenant-system-settings', { Action: 'List' });
+    }
+    async saveServerPrivateSecret(input) {
+        return this.post('/api/TenantSystemSettings/Save', {
+            ConfigKey: input.configKey, Value: input.value, Category: input.category || '第三方服务',
+            Description: input.description || '', IsSecret: true, IsPublic: false, IsEnabled: true, ValueType: 'String',
+        }, { timeoutMs: this.writeRequestTimeoutMs, operationName: '保存租户后端 Secret' });
     }
     async createMyUserAccessKey(input) {
         // Permanent keys are intentionally not exposed through MCP. The backend
@@ -2286,6 +2296,31 @@ export class MicroiClient {
         return this.post(API.GENERATE_MINIMAX_MUSIC, data, {
             timeoutMs: 10 * 60_000,
             operationName: 'generate MiniMax music',
+        });
+    }
+    /**
+     * 图片生成只负责以稳定 RequestId 创建持久任务。Code=2 表示已排队，
+     * 调用方必须继续查询同一个 TaskId，不能因超时更换 RequestId 重复消费额度。
+     */
+    async generateMiniMaxImage(data) {
+        return this.post(API.GENERATE_MINIMAX_IMAGE, data, {
+            timeoutMs: 30_000,
+            operationName: 'queue MiniMax image task',
+            allowNativeFallback: false,
+        });
+    }
+    async getMiniMaxImageTask(taskId) {
+        return this.get(API.GET_MINIMAX_IMAGE_TASK, { taskId }, {
+            timeoutMs: 30_000,
+            operationName: 'read MiniMax image task',
+        });
+    }
+    /** 恢复仅重新下载既有供应商结果；后端保证不会重新发起图片生成。 */
+    async recoverMiniMaxImageTask(taskId) {
+        return this.post(`${API.RECOVER_MINIMAX_IMAGE_TASK}?taskId=${encodeURIComponent(taskId)}`, {}, {
+            timeoutMs: 30_000,
+            operationName: 'recover MiniMax image result',
+            allowNativeFallback: false,
         });
     }
     async generateMiniMaxSpeech(data) {

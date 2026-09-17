@@ -51,10 +51,36 @@ namespace Microi.net
         private static MongoClient CreateClient(string connection)
         {
             var settings = MongoClientSettings.FromConnectionString(connection);
-            settings.ServerSelectionTimeout = TimeSpan.FromSeconds(2);
-            settings.ConnectTimeout = TimeSpan.FromSeconds(2);
-            settings.SocketTimeout = TimeSpan.FromSeconds(2);
+            // 连接字符串是租户自己的超时事实源：运维为慢速/老旧 MongoDB 在
+            // “SaaS引擎 → MongoDB连接字符串”里显式配置的 socketTimeoutMS 等必须优先，
+            // 平台只补齐缺省值，避免 2 秒默认值把已配置的调大值覆盖回小值。
+            if (!HasExplicitTimeoutOption(connection, "serverSelectionTimeoutMS"))
+                settings.ServerSelectionTimeout = TimeSpan.FromSeconds(2);
+            if (!HasExplicitTimeoutOption(connection, "connectTimeoutMS"))
+                settings.ConnectTimeout = TimeSpan.FromSeconds(2);
+            // MongoDB 3.6/4.0/4.2 等旧版服务端上，索引读取、关键字正则扫描和分页游标
+            // 的单次往返经常超过 2 秒；2 秒 socket 超时会直接抛
+            // MongoConnectionException/TimeoutException，让日志索引初始化与日志检索永久失败。
+            // 默认放宽到 15 秒，仍保留上限；真正的不可用端点仍由 2 秒 ServerSelection 快速失败。
+            if (!HasExplicitTimeoutOption(connection, "socketTimeoutMS"))
+                settings.SocketTimeout = TimeSpan.FromSeconds(15);
             return new MongoClient(settings);
+        }
+
+        /// <summary>连接串查询参数中是否显式配置了指定超时项（MongoDB 选项名不区分大小写）。</summary>
+        private static bool HasExplicitTimeoutOption(string connection, string optionName)
+        {
+            if (string.IsNullOrWhiteSpace(connection)) return false;
+            var queryIndex = connection.IndexOf('?');
+            if (queryIndex < 0 || queryIndex == connection.Length - 1) return false;
+            var query = connection.Substring(queryIndex + 1);
+            foreach (var pair in query.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var separator = pair.IndexOf('=');
+                var key = (separator < 0 ? pair : pair.Substring(0, separator)).Trim();
+                if (key.Equals(optionName, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
         }
         #endregion
     }

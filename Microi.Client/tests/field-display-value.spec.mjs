@@ -92,3 +92,22 @@ test("full form title consumes the shared readable-record resolver", async funct
     assert.match(dialogMixin, /recordTitle\s*\|\|\s*tableTitle/u);
     assert.match(titleStyles, /\.diy-form-dialog-title__heading\s*>\s*span\s*\{[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/u);
 });
+
+test("empty option objects are rendered as empty text", function () {
+    const field = { Name: "Category", Component: "Select", Config: {} };
+    assert.equal(getFormFieldDisplayValue({ Category: {} }, field, { emptyText: "" }), "");
+    assert.equal(getFormFieldDisplayValue({ Category: "{}" }, field, { emptyText: "" }), "");
+});
+
+test("option objects still expose their user-facing label", function () {
+    const field = { Name: "Category", Component: "Select", Config: {} };
+    assert.equal(getFormFieldDisplayValue({ Category: { Value: "A", Label: "分类A" } }, field, { emptyText: "" }), "分类A");
+});
+
+test("empty option objects cannot leak into a form title", function () {
+    const fields = [
+        { Name: "Category", Component: "Select", Config: {} },
+        { Name: "Name", Component: "Text", Config: {} }
+    ];
+    assert.equal(getFormRecordDisplayTitle({ Category: {}, Name: "文档1" }, fields, fields), "文档1");
+});

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { isIP } from 'node:net';
 import path from 'node:path';
 import { z } from 'zod';
+import { registerServerPrivateSettingsTools } from './server-private-settings-tools.js';
 import { buildMcpOcrResult, decodeMcpTranslatedFile, OCR_MAX_BASE64_CHARACTERS, prepareMcpOcrInput, prepareMcpTranslateFileInput, saveMcpTranslatedFile, TRANSLATE_INLINE_RESULT_BYTES, TRANSLATE_MAX_BASE64_CHARACTERS, } from './document-inputs.js';
 export { buildMcpOcrResult, decodeMcpTranslatedFile, prepareMcpOcrInput, prepareMcpTranslateFileInput, } from './document-inputs.js';
 import { buildDefaultFormBanner, buildDefaultModulePresentation, inferTableColumnWidth, normalizeAllMenuJson, normalizeViewSchemaJson, registerAdvancedTools, } from './advanced-tools.js';
@@ -2285,6 +2286,9 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_get_status',
     'microi_get_administrative_capabilities',
     'microi_chat',
+    'microi_generate_minimax_image',
+    'microi_get_minimax_image_task',
+    'microi_recover_minimax_image_task',
     'microi_generate_minimax_music',
     'microi_generate_minimax_speech',
     'microi_translate',
@@ -2729,6 +2733,8 @@ function buildInstructions(ctx) {
 - OsClient (tenant): ${ctx.osClient}
 
 IMPORTANT: This server ONLY manages OsClient tenant "${ctx.osClient}". "${ctx.label || ctx.osClient}" is only a display name. When the user specifies a different tenant name, do NOT use this server.
+THIRD-PARTY SECRETS: For App Secret, client_secret, API keys or credentials such as Chanjet, FIRST inspect microi_manage_server_private_secret (List) and reuse System Settings > Security and Service Access. Save through that tool only when authorized, then read back HasSecret/IsSecret/IsEnabled. Backend V8 uses the existing protected settings capability. Do not invent environment variables, hardcode secrets, or block integration merely because the existing protected setting has not yet been populated. Never return plaintext or ciphertext values.
+PAGE DESIGN: Dashboards default to themeMode=system, density=compact and wrapper heightMode=content. Use native summary/detail statistic appearances and platform colour variables. Match reference panel proportions and verify light/dark screenshots; do not turn one-line metrics into large fixed-height colour blocks.
 BOUNDARY RULES:
 - Bound API Server: ${ctx.apiBaseUrl}
 - Bound OsClient: ${ctx.osClient || '(default)'}
@@ -2762,6 +2768,7 @@ BOUNDARY RULES:
 - **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；同步写入 Version，并将本次说明追加到接口引擎修改历史子表（旧库由后端兼容旧 ChangeHistory 字段）；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖类型化接口引擎数据源、打印、工作流、定时任务的系统级建模
+- **microi_query_job_runtime** — 当前租户 Quartz 只读诊断，以及 MongoDB / 历史关系库任务日志的按月游标查询；不能用已启动代替执行证据。
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 - **microi_chat** — 使用当前 MCP 登录身份、绑定租户与服务器本机有效 License 调用 Microi.AI；工具不接受 OsClient、用户、Endpoint、ApiKey 或 Authorization 覆盖
 - **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
@@ -3199,8 +3206,79 @@ export function createMcpServer(client, context) {
         }
     });
     // ========================
-    // Tools: MiniMax 原创音乐与短对白
+    // Tools: MiniMax 图片、原创音乐与短对白
     // ========================
+    server.tool('microi_generate_minimax_image', `Queue one persistent MiniMax text-to-image task through the authenticated Microi AI engine for OsClient "${osClient}". Provider credentials stay on the server and completed originals are persisted to the current tenant HDFS. The first successful response is normally Code=2 with Data.TaskId; continue with microi_get_minimax_image_task using that exact TaskId. This may consume external AI quota, so confirmExecution must exactly equal requestId. Never change RequestId after a timeout or uncertain response.`, {
+        requestId: z.string().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/u).describe('Stable idempotency key. Reuse it for the same prompt and parameters.'),
+        prompt: z.string().min(1).max(1500).describe('Original image brief. The backend collapses control characters and validates the final request.'),
+        model: z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/u).optional().describe('Configured image model. Default image-01.'),
+        aiModelId: z.string().min(1).max(160).optional().describe('Optional current-tenant mic_ai record Id selected from the live media model catalog.'),
+        aspectRatio: z.enum(['1:1', '16:9', '4:3', '3:2', '2:3', '3:4', '9:16', '21:9']).optional(),
+        resolution: z.enum(['1K', '2K', '4K']).optional().describe('Only for a live protocol that declares resolution support.'),
+        count: z.number().int().min(1).max(4).optional(),
+        width: z.number().int().min(512).max(2048).multipleOf(8).optional().describe('Custom width; width and height must be supplied together.'),
+        height: z.number().int().min(512).max(2048).multipleOf(8).optional().describe('Custom height; width and height must be supplied together.'),
+        seed: z.number().int().safe().optional(),
+        postProcess: z.enum(['remove-solid-background']).optional(),
+        confirmExecution: z.string().optional().describe('Required for generation and must exactly equal requestId; omit for a no-cost dry run.'),
+    }, async ({ requestId, prompt, model, aiModelId, aspectRatio, resolution, count, width, height, seed, postProcess, confirmExecution }) => {
+        if ((width === undefined) !== (height === undefined)) {
+            return { content: [{ type: 'text', text: 'Custom width and height must be supplied together.' }], isError: true };
+        }
+        const payload = {
+            RequestId: requestId,
+            Prompt: prompt,
+            Model: model || 'image-01',
+            AspectRatio: aspectRatio || '1:1',
+            Count: count || 1,
+            Operation: 'text-to-image',
+            ...(aiModelId ? { AiModelId: aiModelId } : {}),
+            ...(resolution ? { Resolution: resolution } : {}),
+            ...(width !== undefined && height !== undefined ? { Width: width, Height: height } : {}),
+            ...(seed !== undefined ? { Seed: seed } : {}),
+            ...(postProcess ? { PostProcess: postProcess } : {}),
+        };
+        if (confirmExecution !== requestId) {
+            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, payload, requiredConfirmation: requestId }, null, 2) }] };
+        }
+        try {
+            const result = await client.generateMiniMaxImage(payload);
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                structuredContent: result,
+                ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `MiniMax image task creation failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_get_minimax_image_task', `Read one persistent MiniMax image task owned by the current authenticated user on OsClient "${osClient}". This is read-only and never generates another image. Code=2 means the same task is still pending; Code=1 with Data.Images means the originals are persisted and ready.`, { taskId: z.string().min(1).max(160).describe('TaskId returned by microi_generate_minimax_image.') }, async ({ taskId }) => {
+        try {
+            const result = await client.getMiniMaxImageTask(taskId);
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                structuredContent: result,
+                ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `MiniMax image task readback failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_recover_minimax_image_task', `Recover already-generated MiniMax image bytes for one task owned by the current authenticated user on OsClient "${osClient}". The backend reuses the existing provider node/result and does not start a new generation. Use only when task readback reports CanRecoverResult=true.`, { taskId: z.string().min(1).max(160).describe('Existing TaskId whose provider result needs HDFS recovery.') }, async ({ taskId }) => {
+        try {
+            const result = await client.recoverMiniMaxImageTask(taskId);
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                structuredContent: result,
+                ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `MiniMax image result recovery failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
     server.tool('microi_generate_minimax_music', `Generate one original instrumental music asset through the authenticated Microi AI engine for OsClient "${osClient}". The server prefers MiniMax music-3.0 and safely falls back to the official open-source MiniMax-Music3 Space only after an explicit 410 retirement response. It keeps provider credentials private, persists the result to tenant HDFS, and uses RequestId for idempotency. This may consume external AI quota, so confirmExecution must exactly equal requestId.`, {
         requestId: z.string().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/u).describe('Stable idempotency key. Reuse it for retries of the same prompt.'),
         prompt: z.string().min(1).max(2000).describe('Original instrumental music brief. Do not request imitation of a living artist or copyrighted recording.'),
@@ -4797,7 +4875,7 @@ export function createMcpServer(client, context) {
         windowMinutes: z.number().int().min(1).max(15).optional().describe('Snapshot request window, 1-15 minutes.'),
         windowSeconds: z.number().int().min(60).max(86400).optional().describe('Signal window, 60-86400 seconds.'),
         top: z.number().int().min(1).max(100).optional().describe('Top N for Snapshot or ApiRank. Snapshot backend clamps to 5-50.'),
-        includeHost: z.boolean().optional().describe('Snapshot includes host/runtime overview. Default true.'),
+        includeHost: z.boolean().optional().describe('Snapshot includes host/runtime overview. Default true. Host.Processes (process-resources/v1) provides 5-second CPU/RSS/Swap/I/O top lists and 12 recent samples; inspect Fresh, Scope, HostProcessesVisible and unavailable counts. CPU 100% means one core. A container PID view is not all NAS processes; host visibility needs a deployment-provided read-only /proc:/host/proc:ro mount. Host.DiskIO.Devices includes numeric device names, IOPS/busy/await; aggregate physical disks only. Requires compatible backend; unavailable metrics remain null.'),
         includeDocker: z.boolean().optional().describe('Snapshot includes heavier Docker sampling. Default false.'),
         traceId: z.string().regex(/^[0-9a-fA-F]{32}$/u).optional().describe('W3C 32-hex TraceId for Trace.'),
         incidentId: z.string().regex(/^[0-9a-f]{32}$/u).optional().describe('Required for MemoryIncident: use an actual 32-lowercase-hex Id from MemoryIncidents Data.Items. Empty Items means not found in the visible tenant/storage scope, not proof of no incident.'),
@@ -5691,7 +5769,7 @@ export function createMcpServer(client, context) {
         defaultValue: z.string().optional(),
         tab: z.string().optional(),
         data: z.string().optional(),
-        config: z.string().optional(),
+        config: z.string().optional().describe('完整组件 Config JSON，先读取原 Config 并合并。FileUpload 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance（boolean，默认 false）；ConfigurableRoleIds 为可配置角色 Id 数组，空数组允许全部角色，非空时后端限制新授予的角色，保留已有附件历史授权；启用角色权限应同时 Limit=true。用 microi_list_roles/microi_save_role 管理角色。CodeEditor.DisplayMode 默认 Inline，Dialog 显示编辑按钮；ButtonText 默认编辑代码（{{charCount}}字），可使用 {{charCount}} 字符数和 {{lineCount}} 行数。'),
         description: z.string().optional(),
         inTableEdit: z.number().optional(),
         // zhy: expose field V8 source properties so Config.V8Code and runtime V8Code can be updated together.
@@ -7221,6 +7299,7 @@ export function createMcpServer(client, context) {
     registerEmailTools(server, client, context);
     // 统一通知工具只通过当前租户固定接口维护配置，保存与实际发布分别授权并回读。
     registerMessageNotificationTools(server, client, context);
+    registerServerPrivateSettingsTools(server, client);
     toolRegistry.flush(context.codexMode ? ['microi_codex'] : undefined);
     return server;
 }

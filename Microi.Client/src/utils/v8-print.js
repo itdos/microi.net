@@ -47,7 +47,7 @@ const SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
 const PLUS_PRINT_MTU = 183; // ATT 头占 3 字节；与已验证的佳博 180 字节档一致。
 // 5+ 的确认回调不等同于 Android GATT 队列完全空闲；给下一包留出一个很短的保护窗口，
 // 避免连续调用在真实设备上触发 10008/“发送中断”，同时不回到原先每包 20ms 的长尾。
-const PLUS_GATT_GUARD_INTERVAL_MS = 8;
+const PLUS_GATT_GUARD_INTERVAL_MS = 15;
 const EMPTY_BLE_INFO = Object.freeze({
     platform: "", deviceId: "", deviceName: "",
     transport: "ble", profileMode: "auto", profileId: "generic-tspl", commandLanguage: "tspl",
@@ -77,24 +77,11 @@ function isKnownPrinterService(serviceId) {
     });
 }
 
-function canUseUniWriteNoResponse() {
-    return typeof globalThis !== "undefined"
-        && globalThis.uni
-        && typeof globalThis.uni.writeBLECharacteristicValue === "function";
-}
-
-function shouldPreferUniWriteNoResponse() {
-    if (!canUseUniWriteNoResponse() || typeof window === "undefined" || !window.plus) return false;
-    var osName = window.plus.os && window.plus.os.name;
-    return String(osName || "").toLowerCase() === "android" || (!osName && !!window.plus.android);
-}
-
 function sortPlusWriteCandidates(candidates) {
-    var preferNoResponse = shouldPreferUniWriteNoResponse();
     return normalizeWriteCandidates(candidates).sort(function (left, right) {
         function score(candidate) {
             return (isKnownPrinterService(candidate.serviceId) ? 1000 : 0)
-                + (candidate.writeType === (preferNoResponse ? "writeNoResponse" : "write") ? 100 : 0);
+                + (candidate.writeType === "write" ? 100 : 0);
         }
         return score(right) - score(left);
     });
@@ -233,8 +220,9 @@ function plusTransportCapabilities(Print) {
     return {
         mtu: mtu,
         maxWriteBytes: maxBytes,
-        recommendedPacketSize: optimized && maxBytes >= 180 ? 180 : optimized && maxBytes >= 100 ? 100 : 20,
-        // 5+ 的 write 已等待 GATT 确认，但 Android 队列仍需要极短保护窗口；无响应写及其它型号保留节流。
+        // MTU 只证明协议上限；GP-M322 在 Android 原生壳默认使用 100 字节稳定档。
+        recommendedPacketSize: optimized && maxBytes >= 100 ? 100 : 20,
+        // 5+ 的 write 已等待 GATT 确认，但 Android 队列仍需要保护窗口；无响应写及其它型号保留节流。
         packetIntervalMs: optimized && Print.BLEInformation.writeType === "write" ? PLUS_GATT_GUARD_INTERVAL_MS : 20,
         writeType: live ? Print.BLEInformation.writeType : "",
     };
@@ -396,6 +384,53 @@ function requestPlusAndroidBluetoothPermissions() {
             reject(new Error("申请蓝牙权限失败: " + ((error && (error.message || error.errMsg)) || "未知错误")));
         });
     });
+}
+
+// BLE 外设在 GATT 已连接期间会停止广播；只要应用没有再持有该连接（例如上一次连接流程
+// 被并发断开/重连流程打断，或 App 重启后系统仍保留旧链路），搜索就会一直“找不到设备”。
+// 因此扫描前主动释放应用未持有的连接，而不是要求用户先去系统设置里手动断开。
+function releaseStalePlusBleConnections(Print) {
+    if (!isPlusApp() || !window.plus.bluetooth
+        || typeof window.plus.bluetooth.getConnectedBluetoothDevices !== "function") {
+        return Promise.resolve(0);
+    }
+    return new Promise(function (resolve) {
+        var settled = false;
+        var timer = setTimeout(function () { finish([]); }, 1500);
+        function finish(devices) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            var activeId = Print && Print._plusConnected ? (Print.BLEInformation.deviceId || "") : "";
+            var stale = (devices || []).filter(function (device) {
+                return device && device.deviceId && device.deviceId !== activeId;
+            });
+            if (stale.length === 0) { resolve(0); return; }
+            var pending = stale.length;
+            var done = function () { pending--; if (pending <= 0) resolve(stale.length); };
+            stale.forEach(function (device) {
+                try {
+                    window.plus.bluetooth.closeBLEConnection({ deviceId: device.deviceId, complete: done, fail: done, success: done });
+                } catch (error) { done(); }
+            });
+        }
+        try {
+            window.plus.bluetooth.getConnectedBluetoothDevices({
+                success: function (result) { finish(result && result.devices); },
+                fail: function () { finish([]); }
+            });
+        } catch (error) { finish([]); }
+    });
+}
+
+function closeSupersededPlusConnection(Print, deviceId, connectionGeneration) {
+    // 仅当没有更新的连接尝试接管时才关闭：否则会误断新流程正在建立的链路。
+    if (Print._plusConnectAttemptGeneration !== connectionGeneration) return;
+    // 同一代连接只关闭一次：协商失败与异常分支都会走到这里，重复关闭会打断新链路。
+    if (Print._plusSupersededCloseGeneration === connectionGeneration) return;
+    Print._plusSupersededCloseGeneration = connectionGeneration;
+    Print._suppressDisconnectUntil = Date.now() + 1500;
+    try { window.plus.bluetooth.closeBLEConnection({ deviceId: deviceId }); } catch (e) { }
 }
 
 function closePlusSppConnection(Print) {
@@ -692,22 +727,15 @@ function writePlusBleChunk(Print, chunk) {
         characteristicId: Print.BLEInformation.writeCharaterId,
         writeType: Print.BLEInformation.writeType || "write",
     };
-    var writer = window.plus.bluetooth.writeBLECharacteristicValue.bind(window.plus.bluetooth);
     var payload = {
         deviceId: Print.BLEInformation.deviceId,
         serviceId: candidate.serviceId,
         characteristicId: candidate.characteristicId,
         value: chunk.buffer,
     };
-    if (candidate.writeType === "writeNoResponse") {
-        if (!canUseUniWriteNoResponse()) {
-            return Promise.reject(new Error("该打印机只暴露无响应写入特征；当前 5+ 蓝牙运行时不支持，请选择已配对的 SPP 设备或升级客户端"));
-        }
-        writer = globalThis.uni.writeBLECharacteristicValue.bind(globalThis.uni);
-        payload.writeType = "writeNoResponse";
-    }
     return new Promise(function (resolve, reject) {
-        writer(Object.assign(payload, {
+        // 连接、服务发现和写入必须使用同一个 5+ BLE 栈。
+        window.plus.bluetooth.writeBLECharacteristicValue(Object.assign(payload, {
             success: resolve,
             fail: function (error) { reject(createPlusWriteError(error)); },
         }));
@@ -765,6 +793,7 @@ async function connectPlusDevice(Print, device, options) {
     }
 
     var connectionGeneration = ++Print._plusConnectionGeneration;
+    Print._plusConnectAttemptGeneration = connectionGeneration;
     Print._plusMtu = 0;
     Print._plusMtuDeviceId = "";
 
@@ -809,7 +838,7 @@ async function connectPlusDevice(Print, device, options) {
                         writeType: "write",
                     });
                 }
-                if ((properties.writeNoResponse || properties.writeWithoutResponse) && canUseUniWriteNoResponse()) {
+                if (properties.writeNoResponse || properties.writeWithoutResponse) {
                     writeCandidates.push({
                         serviceId: serviceId,
                         characteristicId: characteristic.uuid,
@@ -833,7 +862,11 @@ async function connectPlusDevice(Print, device, options) {
 
         // 放在服务/特征发现之后串行协商，避免与 GATT 发现并发；只在连接阶段等待一次。
         var mtu = await negotiatePlusPrintMtu(Print, info);
-        if (connectionGeneration !== Print._plusConnectionGeneration) throw new Error("蓝牙连接已变化，请重新连接");
+        if (connectionGeneration !== Print._plusConnectionGeneration) {
+            // 被其它流程接管：必须显式关闭本流程建立的链路，否则打印机会保持连接并停止广播。
+            closeSupersededPlusConnection(Print, deviceId, connectionGeneration);
+            throw new Error("蓝牙连接已变化，请重新连接");
+        }
         Print._plusMtu = mtu;
         Print._plusMtuDeviceId = deviceId;
 
@@ -846,7 +879,10 @@ async function connectPlusDevice(Print, device, options) {
         console.log(LOG_PREFIX + " [plus] 蓝牙连接成功");
         return true;
     } catch (error) {
-        if (connectionGeneration !== Print._plusConnectionGeneration) throw error;
+        if (connectionGeneration !== Print._plusConnectionGeneration) {
+            closeSupersededPlusConnection(Print, deviceId, connectionGeneration);
+            throw error;
+        }
         Print._suppressDisconnectUntil = Date.now() + 1500;
         try { window.plus.bluetooth.closeBLEConnection({ deviceId: deviceId }); } catch (e) { }
         clearLiveConnection(Print);
@@ -1208,24 +1244,28 @@ function showPlusBluetoothDialog(Print) {
                             }
                             setStatus("正在搜索蓝牙设备...", "searching");
 
-                            plus.bluetooth.startBluetoothDevicesDiscovery({
-                                success: function () {
-                                    searchRefreshTimer = setTimeout(function () {
-                                        plus.bluetooth.getBluetoothDevices({
-                                            success: function (res2) {
-                                                onDevicesFound(res2);
-                                                if (discoveredDevices.length === 0) setStatus("未发现蓝牙设备，请确认打印机已开机", "searching");
-                                                else setStatus("发现 " + discoveredDevices.length + " 个设备，点击连接", "searching");
-                                            }
-                                        });
-                                    }, 3000);
-                                },
-                                fail: function (e) {
-                                    isSearching = false;
-                                    searchBtn.style.display = "";
-                                    stopBtn.style.display = "none";
-                                    setStatus("搜索失败: " + (e.errMsg || e.message || JSON.stringify(e)), "error");
-                                }
+                            // 先释放应用未持有的残留 GATT 链路：打印机在已连接期间不广播，
+                            // 不释放就会表现成“搜索不到之前的设备”。
+                            releaseStalePlusBleConnections(Print).then(function () {
+                                plus.bluetooth.startBluetoothDevicesDiscovery({
+                                    success: function () {
+                                        searchRefreshTimer = setTimeout(function () {
+                                            plus.bluetooth.getBluetoothDevices({
+                                                success: function (res2) {
+                                                    onDevicesFound(res2);
+                                                    if (discoveredDevices.length === 0) setStatus("未发现蓝牙设备，请确认打印机已开机", "searching");
+                                                    else setStatus("发现 " + discoveredDevices.length + " 个设备，点击连接", "searching");
+                                                }
+                                            });
+                                        }, 3000);
+                                    },
+                                    fail: function (e) {
+                                        isSearching = false;
+                                        searchBtn.style.display = "";
+                                        stopBtn.style.display = "none";
+                                        setStatus("搜索失败: " + (e.errMsg || e.message || JSON.stringify(e)), "error");
+                                    }
+                                });
                             });
                         }
                     });
@@ -1481,6 +1521,8 @@ function createV8Print(V8) {
         _plusBridgeRegistered: false,
         _plusConnected: false,
         _plusConnectionGeneration: 0,
+        _plusConnectAttemptGeneration: 0,
+        _plusSupersededCloseGeneration: -1,
         _plusMtu: 0,
         _plusMtuDeviceId: "",
         _plusWriteCandidates: [],
@@ -1841,4 +1883,4 @@ export function initV8Print(V8) {
     V8.Print = getV8Print(V8);
 }
 
-export { createV8Print, tsc, esc, isPlusApp, isWebBluetoothSupported, getBLEEngine };
+export { createV8Print, tsc, esc, isPlusApp, isWebBluetoothSupported, getBLEEngine, releaseStalePlusBleConnections };
