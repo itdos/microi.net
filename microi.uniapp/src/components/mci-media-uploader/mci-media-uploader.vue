@@ -198,6 +198,8 @@ export default {
         const outcomes = await V8.uploadFiles(batch, {
           path: this.uploadPath || (this.mediaType === 'image' ? 'img' : 'file'),
           formFieldContext: this.effectiveUploadContext,
+          // 兼容旧上传入口，同时保留字段上下文供新版后端独立校验真实桶策略。
+          limit: this.effectiveUploadContext?.private !== false,
           preview: this.mediaType === 'image',
           multiple: this.maxCount > 1,
           concurrency: 3,

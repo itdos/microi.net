@@ -141,7 +141,7 @@
 								:presentation="relatedPresentation(relatedTab.field)" :parent-table="tableName"
 								:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 								:readonly="isConfiguredReadonly(relatedTab.field)" @change="handleRelatedChange" />
-						<view class="form-field__label">
+						<view class="form-field__label" v-if="!tenantFieldPresentation(field).hideLabel">
 							<view class="form-field__label-copy">
 								<text>{{ field.Label || field.Name }}</text>
 								<text v-if="field.required && !isReadonly(field)" class="form-field__required">*</text>
@@ -184,7 +184,7 @@
 
 						<!-- zhy: 接收下拉开关状态并同步外层层叠样式。 -->
 						<!-- zhy：详情模式下给租户配置的长文本字段传入最大可视行数。 -->
-						<view v-else class="tenant-field-control-wrap"
+						<view v-else-if="tenantFieldPresentation(field).type !== 'action'" class="tenant-field-control-wrap"
 							:class="{ 'tenant-field-control-wrap--clearable': tenantFieldPresentation(field).clearable }">
 							<mci-native-field v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
 								:readonly-max-lines="readonlyMaxLines(field)"
@@ -898,7 +898,11 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					const scopedDefinition = scopeNativeFormDefinition(rawDefinition, {
 						includeNames: this.includeNames,
 						excludeNames: this.excludeNames,
-						readonlyNames: this.readonlyNames
+						readonlyNames: this.readonlyNames,
+						// 按钮仍受后台字段权限过滤；有编译期原生适配才能进入表单渲染分组。
+						actionFieldNames: (rawDefinition.fields || [])
+							.filter((field) => field.component === 'Button' && this.tenantFieldActions(field).length)
+							.map((field) => field.Name)
 					})
 					const definition = applyNativeFormViewDefinition(
 						scopedDefinition,
@@ -939,7 +943,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				}
 			},
 			isReadonly(field) {
-				return this.mode === 'View' || !field.editable
+				return this.mode === 'View' || !field.editable || this.tenantFieldPresentation(field).readonly === true
 			},
 			readonlyMaxLines(field) {
 				// zhy：按当前物理表匹配租户业务模块，仅限制其 summaryField，普通字段保持原展示方式。
@@ -1151,7 +1155,13 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			},
 			async runTenantFieldAction(field, action) {
 				if (!action || action.disabled) return
-				const result = await runTenantFormFieldAction(this.tenantFormContext(), field, action)
+				let result
+				try {
+					result = await runTenantFormFieldAction(this.tenantFormContext(), field, action)
+				} catch (error) {
+					uni.showToast({ title: error.message || '打开表单失败', icon: 'none' })
+					return
+				}
 				if (result && result.customerPicker) {
 					this.customerPickerConfig = result.customerPicker
 					this.customerPickerVisible = true
@@ -1873,6 +1883,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	}
 
 	.form-subheading {
+		padding: 0 24rpx;
 		display: flex;
 		align-items: center;
 		gap: 12rpx;
@@ -1889,7 +1900,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 
 	.form-subheading--collapsible {
 		min-height: 80rpx;
-		padding: 0 12rpx;
+		padding: 0 24rpx;
 		margin: -12rpx 0 0;
 		border-radius: 8rpx;
 		background: var(--mci-bg-base, #f7fafb);
