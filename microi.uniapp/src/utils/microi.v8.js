@@ -320,6 +320,13 @@ function hasPublicUploadFlag(value) {
     raw.IsPrivate === false || raw.Private === false || raw.Public === true;
 }
 
+function hasPrivateUploadFlag(value) {
+  if (!value || typeof value !== 'object') return false;
+  const raw = Array.isArray(value) ? (value[0] || {}) : value;
+  return [raw.Limit, raw.IsPrivate, raw.Private].some(flag =>
+    flag === true || flag === 1 || /^(true|1)$/i.test(String(flag))) || raw.Public === false;
+}
+
 function isKnownPublicUploadPath(path) {
   // 表单字段的公私桶由服务端字段配置决定，不能仅凭 /tenant/img 等路径猜测。
   // 这里只识别平台明确约定为公有资源的目录；其它路径结合响应 Limit 或签名上下文处理。
@@ -1047,7 +1054,9 @@ export function createMicroiV8(options = {}) {
     const path = extractUploadPath(filePathName);
     if (!path || isBlockedAsset(path)) return '';
     if (/^(https?:|blob:|data:|file:)/i.test(path)) return assetUrl(path);
-    if (isLocalPackagedAsset(path) || options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)) {
+    // 文件实际私有标记和私有字段上下文优先，禁止因字段曾改为公有而错误降级 CDN。
+    const privateAccess = options.private === true || hasPrivateUploadFlag(filePathName);
+    if (isLocalPackagedAsset(path) || (!privateAccess && (options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)))) {
       return assetUrl(path);
     }
     // 私有对象没有权威资源上下文时在客户端直接失败关闭，避免向签名接口发送

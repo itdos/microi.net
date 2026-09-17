@@ -119,6 +119,8 @@ function publicUploadUrl(path) {
 
 私有桶（`Limit === true`）不要拼 `FileServer`，必须把归一化后的 `Path` 传给 `V8.Method.GetPrivateFileUrl({ FilePathName: path })` 或后端签名接口换临时 URL。
 
+跨端保存时保留上传响应的实际 `Limit`（兼容布尔值、`1/0` 与对应字符串），只删除临时签名地址和本地预览状态。历史对象缺少该标记时按字段配置取址；已有私有标记优先于公有字段缺省值。单图字段兼容历史单元素数组，不应在字段值预处理阶段把数组直接清空。
+
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=v8-file-upload-010 sha256=229294a07a8db953219c35292db5558430addb576505695b9ce88a275eb46232 -->
 ## 安全注意
