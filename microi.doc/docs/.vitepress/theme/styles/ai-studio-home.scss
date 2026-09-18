@@ -196,7 +196,7 @@ html.microi-ai-studio-page .VPPage .content-container {
 }
 
 .mci-home-action {
-  min-height: 48px;
+  min-height: 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -233,6 +233,25 @@ html.microi-ai-studio-page .VPPage .content-container {
   background: var(--mci-ai-surface);
   color: var(--mci-ai-text);
   box-shadow: var(--mci-ai-shadow-soft);
+}
+
+.mci-home-action__copy {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  line-height: 1;
+}
+
+.mci-home-action__copy strong {
+  font: inherit;
+}
+
+.mci-home-action__copy small {
+  color: var(--mci-ai-text-muted);
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: .02em;
 }
 
 .mci-home-action:hover,
