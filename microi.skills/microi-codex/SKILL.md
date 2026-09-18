@@ -19,6 +19,8 @@ description: 在 Microi Code、Codex 或 DeepSeek Harness 中完成 Microi吾码
 - macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
 - 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
 - 桌面 UI 沿用 dsh-desktop 的设计系统；首页和独立菜单显示吾码 AI 能力，并可打开完整 `/#/mic-ai-engine` 工作台。AI 数据分析明确使用 `microi_run_engine` 调用 `mci_ai_data_assistant`，不能改成绕过 MCP 的直接数据库访问。
+- Microi Code 左侧「功能区」动态读取 dsh 的 `settings.section` 注册表，并在主界面 `main` 面板中渲染原设置组件；吾码账号、服务器连接、吾码 AI 是三个独立 section。底部入口显示「关于 v版本号」，连接手机入口必须保留。品牌显示 `Microi Code` 与 `HARNESS` 标签，新安装默认深色，用户仍可切换浅色/深色。
+- 桌面安装包版本从 `1.0.0` 开始，使用吾码三段十进制进位规则。Windows/macOS 的公开打包命令必须先执行仓库 `version:bump`，不能复用同版本覆盖已有产物；测试、类型检查和普通 Web 构建不升版。
 - dsh-desktop 升级必须遵循 `Microi.Code/同步dsh-desktop上游.md` 的三方同步流程；关于页、NOTICE、MIT License、DataElement 版权与两个上游仓库链接不得删除。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
 
 ## 非阻塞自动更新（强制）
