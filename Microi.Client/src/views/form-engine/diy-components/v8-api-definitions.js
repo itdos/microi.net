@@ -834,7 +834,7 @@ export const V8ApiDefinitions = {
                     },
                     getConnectionState: {
                         label: "getConnectionState()",
-                        documentation: '获取连接状态快照\n\n返回 engine、supported、status、connected、remembered、deviceId、deviceName、transport、profileMode、profileId、profileName、commandLanguage、autoReconnect、error、changedAt 等字段。5+ 还返回本次连接的 mtu、maxWriteBytes、recommendedPacketSize、writeType、packetIntervalMs；未知 MTU 为 0，上限 20 字节，不跨连接缓存。Android 佳博确认写入约保留 8ms 的 GATT 保护窗口。用于展示状态；打印前仍以 isConnected() 和 prepareSend() 为准。',
+                        documentation: '获取连接状态快照\n\n返回 engine、supported、status、connected、remembered、deviceId、deviceName、transport、profileMode、profileId、profileName、commandLanguage、autoReconnect、error、changedAt 等字段。5+ 还返回本次连接的 mtu、maxWriteBytes、recommendedPacketSize、writeType、packetIntervalMs；未知 MTU 为 0，上限 20 字节，不跨连接缓存。Android 佳博在特征支持时优先 writeNoResponse，连续发送使用 100 字节稳定档，并保留约 8ms 的 GATT 保护窗口；不支持无响应写时保留 write 兼容路径。用于展示状态；打印前仍以 isConnected() 和 prepareSend() 为准。',
                         snippet: 'getConnectionState()'
                     },
                     subscribeConnection: {

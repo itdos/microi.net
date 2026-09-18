@@ -44,10 +44,10 @@ const BLE_STORAGE_KEY = "microi_ble_info";
 const LOG_PREFIX = "Microi：【蓝牙打印】";
 const RECONNECT_DELAYS = [0, 1000, 2500, 5000, 10000, 30000];
 const SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
-const PLUS_PRINT_MTU = 183; // ATT 头占 3 字节；与已验证的佳博 180 字节档一致。
+const PLUS_PRINT_MTU = 183; // 继续协商 183 MTU 供诊断；佳博实际发送使用已验证的 100 字节稳定档。
 // 5+ 的确认回调不等同于 Android GATT 队列完全空闲；给下一包留出一个很短的保护窗口，
 // 避免连续调用在真实设备上触发 10008/“发送中断”，同时不回到原先每包 20ms 的长尾。
-const PLUS_GATT_GUARD_INTERVAL_MS = 0;
+const PLUS_GATT_GUARD_INTERVAL_MS = 8;
 const EMPTY_BLE_INFO = Object.freeze({
     platform: "", deviceId: "", deviceName: "",
     transport: "ble", profileMode: "auto", profileId: "generic-tspl", commandLanguage: "tspl",
@@ -77,11 +77,11 @@ function isKnownPrinterService(serviceId) {
     });
 }
 
-function sortPlusWriteCandidates(candidates) {
+function sortPlusWriteCandidates(candidates, preferWriteNoResponse) {
     return normalizeWriteCandidates(candidates).sort(function (left, right) {
         function score(candidate) {
             return (isKnownPrinterService(candidate.serviceId) ? 1000 : 0)
-                + (candidate.writeType === "write" ? 100 : 0);
+                + (candidate.writeType === (preferWriteNoResponse ? "writeNoResponse" : "write") ? 100 : 0);
         }
         return score(right) - score(left);
     });
@@ -220,10 +220,10 @@ function plusTransportCapabilities(Print) {
     return {
         mtu: mtu,
         maxWriteBytes: maxBytes,
-        // GP-M322 已由同一 5+ BLE 栈串行等待 write 成功回调，可直接使用协商后的 180 字节档。
-        recommendedPacketSize: optimized && maxBytes >= 180 ? 180 : optimized && maxBytes >= 100 ? 100 : 20,
-        // write 成功回调本身就是串行背压，不再逐包追加人工等待；无响应写及其它型号保留节流。
-        packetIntervalMs: optimized && Print.BLEInformation.writeType === "write" ? PLUS_GATT_GUARD_INTERVAL_MS : 20,
+        // 183 MTU 仅证明协议载荷上限；GP-M322 实机连续 180 字节写入会触发 10008，稳定档固定为 100。
+        recommendedPacketSize: optimized && maxBytes >= 100 ? 100 : 20,
+        // 佳博优先无响应写，并在两包之间保留短保护窗口；其它型号及平台保留原节流。
+        packetIntervalMs: optimized ? PLUS_GATT_GUARD_INTERVAL_MS : 20,
         writeType: live ? Print.BLEInformation.writeType : "",
     };
 }
@@ -731,6 +731,8 @@ function writePlusBleChunk(Print, chunk) {
         deviceId: Print.BLEInformation.deviceId,
         serviceId: candidate.serviceId,
         characteristicId: candidate.characteristicId,
+        // 新版 Android 5+ 与 uni BLE 使用同一写模式名；旧壳忽略未知字段并保持兼容。
+        writeType: candidate.writeType,
         value: chunk.buffer,
     };
     return new Promise(function (resolve, reject) {
@@ -851,7 +853,9 @@ async function connectPlusDevice(Print, device, options) {
                 }
             }
         }
-        writeCandidates = sortPlusWriteCandidates(writeCandidates);
+        // 浏览器已优先 writeWithoutResponse。Android 佳博若继续走确认写，每包原生回调会把
+        // 约 9KB 标签拖到十几秒；显式选择同一 plus 栈的无响应写，避免混用 uni 连接。
+        writeCandidates = sortPlusWriteCandidates(writeCandidates, isPlusAndroidGprinter(Print, info));
         if (writeCandidates.length === 0) {
             throw new Error("未找到 5+ 运行时可用的打印写入特征；请确认选择的是打印机，或使用已配对的 SPP 通道");
         }
@@ -1747,9 +1751,9 @@ function createV8Print(V8) {
             buff = adaptPrintPayload(buff, currentPrinterProfile(Print));
             var packetSize = Number(Print.oneTimeData);
             if (!Number.isInteger(packetSize) || packetSize <= 0) throw new Error("蓝牙分包字节数必须是正整数");
-            // 即使旧业务直接配置 180/512，也不得超过本次原生 BLE 连接确认的有效载荷上限。
+            // 协商 MTU 是协议上限，不等于打印机可持续吞吐能力；旧业务请求 180/512 时也降到稳定档。
             if (isPlusApp() && Print.BLEInformation.transport === "ble") {
-                packetSize = Math.min(packetSize, plusTransportCapabilities(Print).maxWriteBytes);
+                packetSize = Math.min(packetSize, plusTransportCapabilities(Print).recommendedPacketSize);
             }
             var packetCount = Math.ceil(buff.length / packetSize);
             Print.looptime = packetCount;

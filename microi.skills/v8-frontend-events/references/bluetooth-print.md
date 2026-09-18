@@ -210,13 +210,15 @@ async function printBatch(rows, startIndex) {
   当前没有公开的自定义服务配置，并选择枚举到的第一个可写特征；其它型号可能需要扩展源码。
   CC4 固件若只开放 SPP 或使用其它私有 UUID，Web 端不可连接；Android 5+App 使用已配对 SPP，
   或先取得厂家准确 BLE UUID 再扩展源码，禁止猜 UUID。
-- `prepareSend` 默认每包 20 字节；Android 5+ 的佳博 GP-M322 在确认写入逐包 await 原生回调后
-  不再追加人工 GATT 等待，原生业务在 MTU 允许时采用 180 字节档。其它型号、iOS、Web、无响应写与 SPP
+- `prepareSend` 默认每包 20 字节；Android 5+ 的佳博 GP-M322 在特征支持时优先使用同一
+  `plus.bluetooth` 连接的 `writeNoResponse`，逐包 await API 回调并保留约 8ms 的 GATT 保护窗口；
+  即使协商出 180 字节有效载荷也只采用 100 字节稳定档。不支持无响应写时保留 `write` 兼容路径。其它型号、iOS、Web 与 SPP
   保留约 20ms，同一缓冲区多份间约 100ms。5+ BLE 的连接、服务发现和写入统一使用 `plus.bluetooth`，
   禁止用 `uni.writeBLECharacteristicValue` 写入由 `plus.bluetooth` 建立的连接。
-  这是写节奏，不是物理走纸确认。5+ BLE 限制为本次连接的 `maxWriteBytes`；未知 MTU 为 20。
+  这是写节奏，不是物理走纸确认。5+ BLE 同时受本次连接的 `maxWriteBytes` 和更保守的
+  `recommendedPacketSize` 限制；未知 MTU 为 20。
 - 5+ 佳博在服务发现后协商 MTU，最多等待 1.5 秒，`getConnectionState()` 返回 `mtu`、
-  `maxWriteBytes`、`recommendedPacketSize`（20/100/180）、`writeType`、`packetIntervalMs`。
+  `maxWriteBytes`、`recommendedPacketSize`（20/100）、`writeType`、`packetIntervalMs`。
   必须读取真实回调的 `mtu`；空成功、失败、超时或缺 API 不可按请求值升档，迟到回调不得提升能力，
   断开时清除能力。自定义微服务需按这些字段判断，不能只允许 `engine === 'web'`。
   `microi.app` 在线壳更新远程前端即可获取本修复；WebView 缺少 Web Bluetooth 时不增加无效切换选项。

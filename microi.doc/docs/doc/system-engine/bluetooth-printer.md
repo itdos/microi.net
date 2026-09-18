@@ -210,7 +210,7 @@ V8.Print.setPrinterProfile('auto');
 | `commandLanguage` | 当前标签指令 `tspl` 或 `cpcl` |
 | `mtu` / `maxWriteBytes` | 5+ BLE 本次连接确认的 MTU / 有效载荷上限；未确认时为 `0` / `20`，不跨连接缓存 |
 | `recommendedPacketSize` | 5+ 佳博按已确认能力推荐 `20` / `100`；`180` 仅作为协商后的写入上限，旧宿主可能没有此字段 |
-| `writeType` / `packetIntervalMs` | 5+ 当前写方式与确认后附加等待；Android 佳博确认写为 `0ms`，其它路径保留 `20ms` |
+| `writeType` / `packetIntervalMs` | 5+ 当前写方式与包间等待；Android 佳博优先 `writeNoResponse + 8ms`，不支持时兼容 `write`，其它路径保留 `20ms` |
 
 打印前仍以 `isConnected()` 和 `prepareSend()` 为准，不以已保存的 `deviceId` 或状态快照代替实时连接判断。
 
@@ -219,12 +219,14 @@ V8.Print.setPrinterProfile('auto');
 `microi.app` 是加载远程 H5 的 5+ 壳，原生蓝牙代码位于 `Microi.Client/src/utils/v8-print.js`。
 浏览器同一张标签快、App 慢时，先对比包长和原生回调耗时，不应直接归因于生产 API。
 约 9KB 的位图按 20 字节会产生约 461 次写入，原先每次回调后再等待 20ms 会额外增加约 9 秒。
-Android 佳博 GP-M322 的确认写入逐包等待同一 5+ BLE 栈的原生成功回调，不再追加人工等待；不并发写入。
+Android 佳博 GP-M322 在特征支持时优先使用同一 5+ BLE 栈的 `writeNoResponse`，每包仍等待 API 成功回调并保留约 8ms 的短保护窗口；不并发写入。
+这消除了确认写回调在部分 Android 设备上每包约百毫秒造成的十几秒发送等待；若特征不支持无响应写，则保留 `write` 兼容路径。
 5+ BLE 的连接、服务发现和写入统一使用 `plus.bluetooth`，不能用 `uni.writeBLECharacteristicValue`
 写入由 `plus.bluetooth` 建立的连接，否则首包可能因两套运行时连接状态不一致而中断。
 
 连接时在服务发现后尝试协商 MTU，最多等 1.5 秒，仅采用回调中返回的实际 `mtu`。
-能力明确时应用可用 `recommendedPacketSize` 选择包长；发送端还会按 `maxWriteBytes` 限包。
+能力明确时应用必须用 `recommendedPacketSize` 选择包长；发送端同时按它与 `maxWriteBytes` 限包。
+即使协商得到 183 MTU（180 字节有效载荷），GP-M322 连续发送仍限制为 100 字节稳定档，避免 10008“发送中断”。
 缺少 API、失败、超时或空成功回调均保留 20 字节，不能把请求的 183 当作实际协商结果。
 旧壳即使无法协商大包，佳博确认写入也使用同一串行发送路径。iOS、其它型号、无响应写与 CC4 SPP 保留原有节奏。
 

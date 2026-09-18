@@ -15,7 +15,7 @@ async function nativePrinter(t, options = {}) {
     const values = new Map();
     const storage = { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
     storage.setItem('microi_ble_info', JSON.stringify({ deviceId: 'native-printer', deviceName: options.name || 'GP-M322' }));
-    const writes = [], delays = [], calls = [];
+    const writes = [], writeTypes = [], delays = [], calls = [];
     const originalTimeout = globalThis.setTimeout;
     t.mock.method(globalThis, 'setTimeout', (callback, ms, ...args) => {
         delays.push(ms);
@@ -34,10 +34,11 @@ async function nativePrinter(t, options = {}) {
         getBLEDeviceServices({ success }) { calls.push('services'); success({ services: [{ uuid: 'service' }] }); },
         getBLEDeviceCharacteristics({ success }) {
             calls.push('characteristics');
-            success({ characteristics: [{ uuid: 'write', properties: { write: true } }] });
+            success({ characteristics: [{ uuid: 'write', properties: options.properties || { write: true, writeNoResponse: true } }] });
         },
         writeBLECharacteristicValue(payload) {
             writes.push([...new Uint8Array(payload.value)]);
+            writeTypes.push(payload.writeType);
             if (options.write) options.write(payload, writes.length);
             else payload.success({});
         },
@@ -53,25 +54,28 @@ async function nativePrinter(t, options = {}) {
     const print = createV8Print();
     t.after(() => print.disconnect());
     assert.equal(await print.initializeConnection(), true);
-    return { print, writes, delays, calls, storage };
+    return { print, writes, writeTypes, delays, calls, storage };
 }
 
-serialTest('纯 5+ Android 在服务发现后协商 MTU，佳博 9KB 标签按 180 字节确认写入', async t => {
-    const { print, calls, writes, delays, storage } = await nativePrinter(t);
+serialTest('纯 5+ Android 佳博使用无响应写并把连续写入限制在 100 字节稳定档', async t => {
+    const { print, calls, writes, writeTypes, delays, storage } = await nativePrinter(t);
     const state = print.getConnectionState();
     assert.deepEqual(calls, ['connect', 'services', 'characteristics', 'mtu']);
     assert.equal(state.mtu, 183);
     assert.equal(state.maxWriteBytes, 180);
-    assert.equal(state.recommendedPacketSize, 180);
-    assert.equal(state.packetIntervalMs, 0);
+    assert.equal(state.recommendedPacketSize, 100);
+    assert.equal(state.packetIntervalMs, 8);
+    assert.equal(state.writeType, 'writeNoResponse');
     assert.equal(JSON.parse(storage.getItem('microi_ble_info')).mtu, undefined, 'MTU 不能随设备记录跨连接缓存');
     const bytes = Uint8Array.from({ length: 9207 }, (_, i) => i % 256);
-    print.setOneTimeData(state.recommendedPacketSize);
+    print.setOneTimeData(180);
     delays.length = 0;
     await print.prepareSend(bytes);
-    assert.equal(writes.length, 52);
+    assert.equal(writes.length, 93);
+    assert.ok(writes.every(bytes => bytes.length <= 100), '调用方请求 180 时也不能突破佳博稳定档');
+    assert.ok(writeTypes.every(type => type === 'writeNoResponse'), '每包都必须把无响应写模式传给 5+');
     assert.deepEqual(writes.flat(), [...bytes]);
-    assert.equal(delays.filter(ms => ms === 0).length, 0, '确认写入不再追加人工等待');
+    assert.equal(delays.filter(ms => ms === 8).length, 92, '相邻分包保留短 GATT 保护窗口');
 });
 
 serialTest('佳博原生写入严格等待上一包成功回调，不并发占用 GATT 队列', async t => {
@@ -91,8 +95,8 @@ serialTest('佳博原生写入严格等待上一包成功回调，不并发占�
     });
     print.setOneTimeData(180);
     await print.prepareSend(new Uint8Array(361).fill(7));
-    assert.equal(writes.length, 3);
-    assert.equal(delays.filter(ms => ms === 0).length, 0);
+    assert.equal(writes.length, 4);
+    assert.equal(delays.filter(ms => ms === 8).length, 3);
 });
 
 for (const mtu of ['missing', 'empty', 'failure', 'timeout', 23, 64, 102, 103, 182, 183, 517, 22, 'invalid']) {
@@ -103,10 +107,11 @@ for (const mtu of ['missing', 'empty', 'failure', 'timeout', 23, 64, 102, 103, 1
         const maxBytes = valid ? Math.min(180, mtu - 3) : 20;
         const state = print.getConnectionState();
         assert.equal(state.maxWriteBytes, maxBytes);
-        assert.equal(state.recommendedPacketSize, maxBytes >= 180 ? 180 : maxBytes >= 100 ? 100 : 20);
+        const stableBytes = maxBytes >= 100 ? 100 : 20;
+        assert.equal(state.recommendedPacketSize, stableBytes);
         print.setOneTimeData(180);
         await print.prepareSend(new Uint8Array(201).fill(42));
-        assert.ok(writes.every(bytes => bytes.length <= maxBytes));
+        assert.ok(writes.every(bytes => bytes.length <= stableBytes));
         assert.equal(writes.flat().length, 201);
         if (late) {
             late.success({ mtu: 183 });
@@ -115,12 +120,12 @@ for (const mtu of ['missing', 'empty', 'failure', 'timeout', 23, 64, 102, 103, 1
     });
 }
 
-serialTest('旧 5+ 佳博即使只能 20 字节，也消除原生确认后的固定等待', async t => {
+serialTest('旧 5+ 佳博只能 20 字节时仍保留短 GATT 保护窗口', async t => {
     const { print, writes, delays } = await nativePrinter(t, { mtu: 'missing' });
     delays.length = 0;
     await print.prepareSend(new Uint8Array(100));
     assert.equal(writes.length, 5);
-    assert.equal(delays.filter(ms => ms === 20).length, 0);
+    assert.equal(delays.filter(ms => ms === 8).length, 4);
 });
 
 for (const options of [{ name: '旧款打印机' }, { os: 'iOS' }]) {
@@ -133,6 +138,13 @@ for (const options of [{ name: '旧款打印机' }, { os: 'iOS' }]) {
         assert.deepEqual(delays, [20]);
     });
 }
+
+serialTest('佳博特征不支持无响应写时保留确认写兼容路径', async t => {
+    const { print, writeTypes } = await nativePrinter(t, { properties: { write: true } });
+    assert.equal(print.getConnectionState().writeType, 'write');
+    await print.prepareSend(new Uint8Array(40));
+    assert.deepEqual(writeTypes, ['write', 'write']);
+});
 
 serialTest('原生回调未完成时不发下一包，并发任务保持整份顺序', async t => {
     const pending = [];
@@ -158,7 +170,7 @@ serialTest('部分发送后错误不降档重发，断开后清除 MTU 能力', 
     print.setOneTimeData(180);
     await assert.rejects(print.prepareSend(new Uint8Array(400)), /特征值不支持/);
     assert.equal(writes.length, 2);
-    assert.deepEqual(writes.map(bytes => bytes.length), [180, 180]);
+    assert.deepEqual(writes.map(bytes => bytes.length), [100, 100]);
     print.disconnect();
     assert.equal(print.getConnectionState().maxWriteBytes, 20);
     assert.equal(print.getConnectionState().mtu, 0);
