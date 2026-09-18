@@ -78,11 +78,15 @@ set -o pipefail
 if [ "${1:-}" = "--microi-code" ]; then
     cd "$(dirname "$0")"
     shift
-    if [ ! -f "Microi.Code/apps/microi-code/scripts/release.cjs" ]; then
+    if [ ! -f "Microi.Code/apps/microi-code/package.json" ]; then
         printf '%s\n' '缺少内部 Microi.Code 仓库。请从公司 GitLab 克隆；禁止加入根公开仓库。' >&2
         exit 1
     fi
-    node Microi.Code/apps/microi-code/scripts/release.cjs "$@"
+    case "${1:-}" in
+      --mac) exec bash Microi.Code/一键打包Mac.sh "${@:2}" ;;
+      --win|'') cd Microi.Code/apps/microi-code && npm ci && npm run typecheck && npm test && npm run package:win ;;
+      *) printf '%s\n' 'Microi Code 仅支持 --win 或 --mac。' >&2; exit 1 ;;
+    esac
     exit $?
 fi
 
