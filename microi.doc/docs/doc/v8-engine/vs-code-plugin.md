@@ -24,16 +24,17 @@
 
 ## Microi Code
 
-Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement/dsh-desktop](https://github.com/dataelement/dsh-desktop) 和 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 二次开发，并与 VS Code 扩展、`@microi.net/cli`、MCP 和 Skills 共享吾码平台能力。安装后使用吾码官方平台账号密码登录，即可使用当前用户的 AI 中转额度；官方登录地址固定为 `https://api.itdos.com`，无需另行准备其他 Agent 的 API Key。业务租户在「服务器连接」中单独添加和登录。
+Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement/dsh-desktop](https://github.com/dataelement/dsh-desktop) 和 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 二次开发，并与 VS Code 扩展、`@microi.net/cli`、MCP 和 Skills 共享吾码平台能力。安装后使用吾码官方平台账号密码登录，即可使用当前用户的 AI 中转额度；官方登录地址固定为 `https://api.itdos.com`，无需另行准备其他 Agent 的 API Key。业务租户在「服务器连接（MCP）」中单独添加和登录。
 
-桌面端沿用 dsh-desktop 的完整 UI、窗口宿主、移动端连接、安全模式、插件恢复、版本更新和 DeepSeek Harness 会话能力。吾码差异层提供官方账号注册/登录、AI 中转站、服务器连接、首页与独立菜单的吾码 AI 能力列表、`/#/mic-ai-engine` 完整工作台，以及通过 `microi_run_engine → mci_ai_data_assistant` 执行的 AI 数据分析。原 VS Code 扩展、CLI、资源树和逐行调试入口继续保留。
+桌面端沿用 dsh-desktop 的完整 UI、窗口宿主、移动端连接、安全模式、插件恢复、版本更新和 DeepSeek Harness 会话能力。吾码差异层提供官方账号注册/登录、AI 中转站、服务器连接（MCP）、「Microi吾码」中的 AI 能力列表、`/#/mic-ai-engine` 完整工作台，以及通过 `microi_run_engine → mci_ai_data_assistant` 执行的 AI 数据分析。首页不再重复放置吾码快捷入口或“预览版”。原 VS Code 扩展、CLI、资源树和逐行调试入口继续保留。
 
-首个正式编号版本为 **1.0.0**。默认使用深色主题，左侧显示 `Microi Code HARNESS`；「工作区」下方新增同级「功能区」，动态列出 dsh 的通用设置、模型、插件、Agent 预设、插件市场，以及吾码账号、服务器连接和吾码 AI，点击后直接在主界面右侧打开。左下角显示「关于 v版本号」，手机连接入口继续保留。Windows x64 已完成全量测试、类型检查、生产构建、真实 Electron/Harness 界面验收、安装包内容、HDFS 对象和 CDN 全字节 SHA256 回读；当前仍是未签名预览包。macOS DMG 需在对应 Mac 架构完成原生验收、签名状态核对与 HDFS 回读后再补充，不用本地构建成功代替已发布结论。
+首个正式编号版本为 **1.0.0**，当前 Windows 版本为 **1.0.1**。默认使用深色主题，左侧显示垂直居中的 `Microi Code HARNESS`；「工作区」下方新增同级「功能区」，第一项「Microi吾码」合并官方账号与吾码 AI，第二项是「服务器连接（MCP）」，之后动态列出 dsh 的通用设置、模型、插件、Agent 预设和插件市场，点击后直接在主界面右侧打开。功能区分隔线可拖动调高，默认刚好容纳菜单且不显示滚动条；首页/聊天页不显示虚假选中态。左下角「关于 v版本号」显示当前账号的开源版、个人版、企业版或未登录标签，并与手机连接入口保持同一行。Windows x64 已完成全量测试、类型检查、生产构建、真实 Electron/Harness 界面验收、安装包内容、HDFS 对象、CDN 全字节 SHA256 回读和打包版「检查更新」验收；当前仍是未签名包。macOS DMG 需在对应 Mac 架构完成原生验收、签名状态核对与 HDFS 回读后再补充，不用本地构建成功代替已发布结论。
 
 <!-- MICROI-CODE-DOWNLOADS: verified release links are maintained here. -->
 
-- [下载 Microi Code 1.0.0 · Windows x64 未签名预览版（164.1 MiB）](https://static.itdos.com/itdos/microi-code/1.0.0/dd0f2e79e80b/202609/Microi-Code-1_0_0-windows-x64-setup.exe)
-- SHA256：`dd0f2e79e80b6245f00f564e7bf9ab9bb3eb6e74438d3fed99e1adc263694496`
+- [下载 Microi Code 1.0.1 · Windows x64 未签名版（177.0 MiB）](https://static.itdos.com/itdos/microi-code/1.0.1/d381cf4fec34/202609/Microi-Code-1_0_1-windows-x64-setup.exe)
+- SHA256：`d381cf4fec3443eb941a44ec3bac3e7b693b77129e13f89773d4f420c8c07b00`
+- [历史版本：Microi Code 1.0.0 · Windows x64](https://static.itdos.com/itdos/microi-code/1.0.0/dd0f2e79e80b/202609/Microi-Code-1_0_0-windows-x64-setup.exe)
 - [历史版本：Microi Code 0.2.0 · Windows x64](https://static.itdos.com/itdos/microi-code/0.2.0/e991814b16a1/202609/Microi-Code-0_2_0-windows-x64-setup.exe)
 - macOS 源码构建：内部仓库根目录执行 `bash ./一键打包Mac.sh`，自动生成本机架构 DMG。
 
@@ -41,7 +42,9 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 ### 开源基础、版权与后续同步
 
-Microi Code 没有重新实现 dsh-desktop。内部源码仓库使用四层结构：`upstream/dsh-desktop/` 保存未修改的上游快照；`apps/microi-code/packages/microi-code-*` 与 `src/main/microi-*` 保存受保护的吾码功能；`patches/` 只记录侧栏插槽、设置席位、标题和默认主题等最小差异；同步脚本再对“旧上游、新上游、当前产品”做三方比较。上游未触及的吾码文件继续保留，吾码未修改的上游文件可以自动升级，双方同时修改的文件必须报告冲突并人工合并。补丁无法重放、测试失败或界面验收不通过时都不会推进上游基线。每次同步都要重新验证登录、AI 中转、服务器连接、AI 列表、数据分析、功能区、关于页、Windows/macOS 构建和更新源。
+Microi Code 没有重新实现 dsh-desktop。内部源码仓库使用四层结构：`upstream/dsh-desktop/` 保存未修改的上游快照；`apps/microi-code/packages/microi-code-*`、`microi/` 与 `src/main/microi-*` 保存永久保护的吾码功能；`patches/` 只记录侧栏插槽、设置席位、首页徽标、品牌文案和默认主题等最小差异；同步脚本再对“旧上游、新上游、当前产品”做三方比较。上游未触及的吾码文件继续保留，吾码未修改的上游文件可以自动升级，双方同时修改的文件必须报告冲突并人工合并。补丁无法重放、测试失败或界面验收不通过时都不会推进上游基线。每次同步都要按补丁意图清单重新验证登录、AI 中转、LicenseType、服务器连接、AI 列表、数据分析、插件安装、功能区、关于页、移动连接、Windows/macOS 构建和更新源。
+
+吾码桌面业务优先通过 `microi_itdos` 接口引擎实现，接口引擎实在缺少所需底层原子能力时才修改后端源码。当前账号版本直接读取现有 `platform-current-user` 返回的 `sys_user.LicenseType`；更新目录由 `https://api.itdos.com/microi-code/updates/` 下的匿名接口引擎提供，安装包二进制由 HDFS 流式上传。Windows/macOS 安装包内置固定版本并校验过 SHA-256 的 cloudflared，互联网连接不再在首次使用时从 GitHub 临时下载约 50 MB 可执行文件。
 
 “关于”页面、安装包和源码长期保留以下声明：Microi Code 基于 dsh-desktop 与 DeepSeek Harness 二次开发；dsh-desktop `Copyright (c) 2026 DataElement`，按 MIT License 使用，并保留 [dsh-desktop 仓库链接](https://github.com/dataelement/dsh-desktop) 与 [DeepSeek Harness 仓库链接](https://github.com/deepseek-ai/deepseek-harness)。吾码新增的账号、AI 中转站、服务器连接、MCP、Skills、AI 能力和数据分析属于 Microi Code 的差异层。
 
