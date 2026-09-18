@@ -350,12 +350,12 @@ test("5+App 只选择真实 write 特征，并在首包 10007 时安全切换候
     delete globalThis.window;
 });
 
-test("Android 双属性特征优先使用同一 plus 连接栈的确认写入", async () => {
+test("Android 佳博双属性特征优先使用同一 plus 连接栈的无响应写", async () => {
     localStorage.clear();
     sessionStorage.clear();
     localStorage.setItem("microi_ble_info", JSON.stringify({
         deviceId: "plus-printer-dual-write",
-        deviceName: "Android 标签打印机"
+        deviceName: "GP-M322"
     }));
 
     const plusAttempts = [];
@@ -374,8 +374,8 @@ test("Android 双属性特征优先使用同一 plus 连接栈的确认写入", 
             }] });
         },
         closeBLEConnection() {},
-        writeBLECharacteristicValue({ characteristicId, success }) {
-            plusAttempts.push(characteristicId);
+        writeBLECharacteristicValue({ characteristicId, writeType, success }) {
+            plusAttempts.push([characteristicId, writeType]);
             success({});
         }
     };
@@ -387,7 +387,7 @@ test("Android 双属性特征优先使用同一 plus 连接栈的确认写入", 
 
     const printer = createV8Print();
     assert.equal(await printer.initializeConnection(), true);
-    assert.equal(printer.BLEInformation.writeType, "write");
+    assert.equal(printer.BLEInformation.writeType, "writeNoResponse");
     assert.deepEqual(
         printer.BLEInformation.writeCandidates.map((candidate) => candidate.writeType).sort(),
         ["write", "writeNoResponse"]
@@ -401,10 +401,10 @@ test("Android 双属性特征优先使用同一 plus 连接栈的确认写入", 
 
     await printer.prepareSend(Uint8Array.from([1, 2, 3]));
 
-    assert.deepEqual(plusAttempts, ["dual-write"]);
+    assert.deepEqual(plusAttempts, [["dual-write", "writeNoResponse"]]);
     const remembered = JSON.parse(localStorage.getItem("microi_ble_info"));
     assert.equal(remembered.writeCharaterId, "dual-write");
-    assert.equal(remembered.writeType, "write");
+    assert.equal(remembered.writeType, "writeNoResponse");
     printer.disconnect();
     delete globalThis.uni;
     delete globalThis.window;
@@ -434,8 +434,7 @@ test("iOS 双属性特征优先 write，10007 后仍由 plus 回退 writeNoRespo
             }] });
         },
         closeBLEConnection() {},
-        writeBLECharacteristicValue({ characteristicId, success, fail }) {
-            const writeType = attempts.length === 0 ? "write" : "writeNoResponse";
+        writeBLECharacteristicValue({ characteristicId, writeType, success, fail }) {
             attempts.push(["plus", characteristicId, writeType]);
             if (writeType === "write") fail({ errCode: 10007, errMsg: "property not support" });
             else success({});

@@ -97,6 +97,27 @@ New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 node (Join-Path $testRoot 'run-node-regressions.mjs') $ResultsDirectory
 if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with exit code $LASTEXITCODE." }
 
+# 创始人工作区中的 Microi Code 桌面应用以自身 package.json 的 Vitest 入口为
+# 单一事实源。公开仓不带该闭源目录，因此只在应用存在时纳入统一门禁；Vitest
+# 默认对零用例和失败用例返回非零，禁止把空的历史 tests/ 目录视作通过。
+$workspaceRoot = Split-Path -Parent $serverRoot
+$desktopRoot = Join-Path $workspaceRoot 'Microi.Code/apps/microi-code'
+$desktopPackage = Join-Path $desktopRoot 'package.json'
+if (Test-Path -LiteralPath $desktopPackage) {
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        throw 'npm is required for the Microi Code desktop regression gate.'
+    }
+    Write-Host 'Running Microi Code desktop Vitest regression tests...'
+    Push-Location $desktopRoot
+    try {
+        npm test
+        if ($LASTEXITCODE -ne 0) { throw "Microi Code desktop regression tests failed with exit code $LASTEXITCODE." }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
 $v8Test = Join-Path $testRoot "V8\empty-database-sanitization.test.mjs"
 $v8Repository = Join-Path (Split-Path -Parent $serverRoot) "Microi-V8-Engine"
 if (Test-Path -LiteralPath $v8Repository) {
