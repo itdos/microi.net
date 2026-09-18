@@ -339,6 +339,11 @@ function periodCount(body, fallback) {
 
 const targets = [
   {
+    name: 'home-header', route: '/#/pages/workspace/index', selector: '.home-page',
+    required: ['.home-header', '.brand-logo', '.brand-name', '.topbar-actions'],
+    requireCapsuleAvoidance: true
+  },
+  {
     name: 'directory', route: '/#/pages/business/list?key=directory', selector: '.list-page',
     required: ['.summary-strip', '.data-card', '.period-tabs'],
     expectedText: ['张服务', '登录账号', '手机号', '性别', '部门名称', '角色', '所属组织机构', '业务部', '销售'],
@@ -1224,6 +1229,51 @@ async function testDirectoryFilters(cdp, viewport) {
   console.log(`PASS directory-filters ${viewport.name} -> status labels, disabled request/cards, two organization multiselect controls and grouped query.`);
 }
 
+async function testHomeHeaderRecovery(cdp, viewport) {
+  const apply = async capsuleRight => {
+    await cdp.send('Runtime.evaluate', { expression: `(async () => {
+      globalThis.__XJY_VISUAL_SAFE_AREA__ = ${JSON.stringify({ ...viewport.safe, statusBarHeight: viewport.safe.top, windowWidth: viewport.width, windowHeight: viewport.height, capsuleTop: viewport.safe.top + 4, capsuleHeight: 32 })};
+      globalThis.__XJY_VISUAL_SAFE_AREA__.capsuleRight = ${capsuleRight};
+      let component = document.querySelector('.home-page').__vueParentComponent;
+      while (component && !component.proxy?.refreshSafeArea) component = component.parent;
+      component.proxy.refreshSafeArea();
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    })()`, awaitPromise: true });
+  };
+  const measure = async () => (await cdp.send('Runtime.evaluate', { expression: `(() => {
+    const logo = document.querySelector('.brand-logo').getBoundingClientRect();
+    const name = document.querySelector('.brand-name'); const style = getComputedStyle(name);
+    const copy = document.querySelector('.brand-copy').getBoundingClientRect();
+    const actions = document.querySelector('.topbar-actions').getBoundingClientRect();
+    const topbar = document.querySelector('.topbar').getBoundingClientRect();
+    const rootStyle = getComputedStyle(document.querySelector('.home-page'));
+    const capsuleTop = parseFloat(rootStyle.getPropertyValue('--mci-capsule-top')) || 0;
+    const capsuleHeight = parseFloat(rootStyle.getPropertyValue('--mci-capsule-height')) || 0;
+    const capsuleRight = parseFloat(rootStyle.getPropertyValue('--mci-capsule-right')) || 0;
+    return { logo: logo.toJSON(), nameHeight: name.getBoundingClientRect().height, lineHeight: parseFloat(style.lineHeight),
+      nameWidth: name.getBoundingClientRect().width, nameClipped: name.scrollWidth > name.clientWidth + 1,
+      whiteSpace: style.whiteSpace, copyRight: copy.right, actionsLeft: actions.left, actionsRight: actions.right,
+      capsuleCenter: capsuleTop + capsuleHeight / 2, capsuleRight,
+      topbarRight: topbar.right, viewportWidth: innerWidth };
+  })()`, returnByValue: true })).result.value;
+  for (const [stage, footprint] of [['transient', Math.min(240, viewport.width - 60)], ['recovered', Number(viewport.safe.capsuleRight || 96)]]) {
+    await apply(footprint);
+    const dimensions = await measure();
+    if (Math.abs(dimensions.logo.width - dimensions.logo.height) > 1 || dimensions.logo.width < viewport.width * 74 / 750 - 1 ||
+      dimensions.nameHeight > dimensions.lineHeight + 1 || dimensions.copyRight > dimensions.actionsLeft + 1 || dimensions.topbarRight > viewport.width + 1) {
+      fail(`Home header compressed at ${stage}: ${JSON.stringify(dimensions)}`);
+    }
+    if (dimensions.nameClipped || Math.abs(dimensions.logo.y + dimensions.logo.height / 2 - dimensions.capsuleCenter) > 8 ||
+      dimensions.actionsRight > viewport.width - dimensions.capsuleRight + 1 || dimensions.capsuleRight > 160) {
+      fail(`Home header must share one row with the capsule: ${JSON.stringify(dimensions)}`);
+    }
+  }
+  const shot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  fs.writeFileSync(path.join(outputRoot, `home-header-recovered-${viewport.name}.png`), Buffer.from(shot.data, 'base64'));
+  await cdp.send('Runtime.evaluate', { expression: `delete globalThis.__XJY_VISUAL_SAFE_AREA__` });
+  console.log(`PASS home-header-recovery ${viewport.name} -> transient capsule measurement, reactive refresh, square logo and one-line brand.`);
+}
+
 async function inspectLayout(cdp, target, viewport) {
   const result = await cdp.send('Runtime.evaluate', {
     returnByValue: true,
@@ -1300,7 +1350,7 @@ async function inspectLayout(cdp, target, viewport) {
         top: Number(expectedSafe.capsuleTop || 0),
         bottom: Number(expectedSafe.capsuleTop || 0) + Number(expectedSafe.capsuleHeight || 0)
       };
-      const capsuleTargets = [...document.querySelectorAll('.ai-assistant__identity, .ai-assistant__header-actions .ai-assistant__icon-button, .ai-assistant__drawer-close')];
+      const capsuleTargets = [...document.querySelectorAll('.ai-assistant__identity, .ai-assistant__header-actions .ai-assistant__icon-button, .ai-assistant__drawer-close, .home-page .brand, .home-page .topbar-actions .icon-button')];
       const requireCapsuleAvoidance = ${JSON.stringify(Boolean(target.requireCapsuleAvoidance))};
       const collidingCapsuleTargets = !requireCapsuleAvoidance ? [] : capsuleTargets.filter((element) => {
         const rect = element.getBoundingClientRect();
@@ -1517,6 +1567,7 @@ async function main() {
         if (unexpectedBrowserErrors.length) fail(`Browser error for ${target.name} at ${viewport.name}: ${JSON.stringify(unexpectedBrowserErrors)}`);
         if (fileSize < 12000 || layout.bodyTextLength < 20) fail(`Screenshot appears blank for ${target.name} at ${viewport.name}.`);
         console.log(`PASS ${target.name} ${viewport.name} -> ${screenshotPath}`);
+        if (target.name === 'home-header') await testHomeHeaderRecovery(cdp, viewport);
         if (target.name === 'directory') {
           await testDirectoryFilters(cdp, viewport);
           await testDirectoryCardRefresh(cdp);
