@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-15T10:58:52.014Z",
+  "generatedAt": "2026-09-17T09:22:11.386Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2336,7 +2336,7 @@
       ]
     },
     "v8-frontend-events": {
-      "originalSha256": "4baf9ca1f6143f345570e8eaec56e778703728f94cb450b3cecc0773be5a7fbd",
+      "originalSha256": "006580300b3644c5e11da67299d1a2a6f1e92ca229a1bd09924fbaa68b9f28ec",
       "originalLines": 367,
       "prefixSha256": "12a22c8b8b351b3e272a38ff1c5260cf136e625e8d2ae3c5a515b0d173cb5174",
       "prefixBytes": 1263,
@@ -2346,7 +2346,7 @@
           "id": "v8-frontend-events-000",
           "ordinal": 0,
           "destination": "v8-frontend-events/SKILL.md",
-          "sha256": "e7cc5d33eef91f6d930d9e7788204eab3148e997ec24546142a13c77523bc127",
+          "sha256": "70e28f65232cb781fcf3dadd2e1896bd1534b15876545170e81667aa6322724d",
           "lines": 10,
           "heading": "能力路由"
         },
