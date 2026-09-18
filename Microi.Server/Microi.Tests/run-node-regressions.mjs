@@ -5,9 +5,9 @@ import {spawn} from 'node:child_process';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 export const roots=['Microi.Server/Microi.Tests','Microi.Server/Microi.Upgrade/Resource','Microi.Client/tests'];
-// 创始人工作区存在内部桌面仓时，将其确定性回归纳入相同门禁；公开仓不携带私有源码。
-const desktopTests='Microi.Code/apps/microi-code/tests';
-if(fs.existsSync(path.join(workspace,desktopTests)))roots.push(desktopTests);
+// Microi Code 桌面仓的当前测试使用 Vitest + TypeScript，由 run-tests.ps1 通过
+// 该应用自己的 npm test 入口执行。不要把它误交给 node --test，也不要因为旧的
+// 空 tests/ 目录存在就把零用例当作一个有效回归根。
 export function discoverTests(directory){
  return fs.readdirSync(directory,{withFileTypes:true}).flatMap(entry=>{
   const file=path.join(directory,entry.name);

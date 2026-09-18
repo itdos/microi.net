@@ -20,7 +20,9 @@ App 的原生发送由远程 `Microi.Client/src/utils/v8-print.js` 负责，浏�
 本壳不是 uni-app，不能假设存在 `uni.writeBLECharacteristicValue`；WebView 缺少 Web Bluetooth
 时也不能靠 UI 切换到 Chrome 的蓝牙路径。
 
-Android 佳博 GP-M322 的 `write` 通道现在等待每包原生确认后立即继续，去掉重复的 20ms 等待。
+Android 佳博 GP-M322 在特征支持时优先使用 `plus.bluetooth` 的 `writeNoResponse`，
+避免确认写回调把约 9KB 标签拖到十几秒；不支持时保留 `write` 兼容路径。
+两种路径都使用 100 字节稳定档和约 8ms 包间保护，不回到曾导致 10008 中断的 180 字节零间隔发送。
 连接时尝试 MTU 协商，仅实际返回值可用于大包；旧壳不返回 MTU 时继续 20 字节并保留上述调度优化。
 运行页面可通过 `V8.Print.getConnectionState()` 查看 `mtu`、`maxWriteBytes`、
 `recommendedPacketSize`、`writeType`、`packetIntervalMs`。业务页不能写死 App 总用小包。
