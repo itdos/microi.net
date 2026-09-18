@@ -9,7 +9,7 @@ import {
   resolveBusinessMenuPermission,
   selectAuthorizedMenu
 } from '@/platform/menu-resolution.mjs'
-import { buildListApiEnginePayload, normalizeListApiEngineResponse } from '@/platform/list-api-engine.mjs'
+import { buildListApiEnginePayload, listApiEnginePresentationKey, normalizeListApiEngineResponse } from '@/platform/list-api-engine.mjs'
 import tenantRuntime from '@/generated/tenant-runtime.js'
 
 const TABLE_CACHE_KEY = 'microi_diy_table_ids_v2'
@@ -165,7 +165,7 @@ export function buildModuleFilterPayload(moduleConfig, options = {}) {
     _Keyword: options.keyword || '',
     _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
   }
-  if (options.status && moduleConfig.statusField) {
+  if (options.status !== undefined && options.status !== null && options.status !== '' && moduleConfig.statusField) {
     payload._Where.push({ Name: moduleConfig.statusField, Type: '=', Value: options.status })
   }
   const range = buildPeriodRange(options.period, options.customRange)
@@ -182,6 +182,7 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     const payload = buildListApiEnginePayload(moduleConfig, { ...options, pageIndex, pageSize }, periodRange)
     const requestKey = [
       'api-engine-list', currentIdentityKey(), listApiEngineKey,
+      listApiEnginePresentationKey(moduleConfig, payload),
       pageIndex, pageSize, payload.Keyword,
       payload._OrderBy, payload._OrderByType,
       JSON.stringify(payload._SearchDateTime || {}),
@@ -233,7 +234,7 @@ export async function loadModuleRows(moduleConfig, options = {}) {
   if (options.tableChildAuth) payload._TableChildAuth = options.tableChildAuth
   const requestKey = [
     'module', currentIdentityKey(), moduleEngineKey, moduleConfig.menuId || '', moduleConfig.table,
-    pageIndex, pageSize, options.keyword || '', options.status || '',
+    pageIndex, pageSize, options.keyword || '', options.status ?? '',
     options.period || 'all', options.orderBy || '', options.orderType || '',
     JSON.stringify(moduleConfig.selectFields || []),
     JSON.stringify(options.customRange || []), JSON.stringify(payload._Where),

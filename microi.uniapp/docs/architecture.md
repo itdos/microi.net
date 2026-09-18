@@ -32,6 +32,7 @@ Profile 使用通用模块目录、动态列表、动态详情和动态表单；
 - `DisplayType: Out` 只表示 PC 外部搜索区的位置，移动端收进弹窗并保留原查询配置，不能丢弃后用本地预设补回。主列表继续单独处理 Line；详情关联列表没有外部或行内筛选区，In/Out/Line 都使用同一弹窗，Hide、IsVisible、字段可见性和角色限制仍生效。
 - Radio/Select 的表单存储与查询选择方式独立。既有 SearchFieldIds 项配置 DisplayType 或 DisplaySelect 时，兼容平台查询区的复选组/多选下拉语义；`DisplaySelect` 仅决定呈现，缺省也不丢失已配置的查询模式。`SearchMultiple: true/false` 可显式覆盖。纯字段 Id 或没有查询模式配置的 Radio/Select 保留表单默认单选；本地扩展的 SearchMultiple/multiple 可显式配置查询多选。单值字段查询多个候选值生成 `In`，不会改变表单保存结构。
 - Select、MultipleSelect、Checkbox 复用 `mci-native-field` 的检索、分页、勾选和标签交互。筛选选中值携带标签与原始值，发送条件前移除 UI 包装。单值使用 `=`，单值字段显式查询多选使用 `In`，JSON 数组按元素或对象标识生成分组 `Like`。配置 SelectSaveField 的 Checkbox/MultipleSelect 同时兼容字段值数组和历史整行对象数组；不以显示文字替代 Id。
+- 本地扩展声明 `overrideSearchMultiple: true` 时，只覆盖同名后台筛选的多选属性，保留后台控件、存储方式、数据源和显隐限制。顶部状态按钮用字段选项文字展示，查询继续传原始值；数值 `0` 是有效条件，不能当作“全部状态”。
 - Switch 为全部、是、否；全部不生成条件，0 保留。DateTime 读取 DateTimeType，年/月/日/小时/分钟/秒分别显示对应选择器；结束边界采用下一精度单位的开区间，物理日期列与文本日期列分别格式化。
 - Address 保留省、市、区名称数组，省、市筛选生成完整 JSON 路径前缀；“全部”只代表不限制后续层级，不发送为具体地区值。
 - 地区滚轮统一使用 `mci-region-picker`，动态表单、列表、关联记录选择弹窗及原生页面共用同一行为。`profiles/<id>/profile.cjs` 的 `config.defaultRegion` 可配置空值首次打开的位置；确认前不写入业务值，取消重开恢复已选值，异步回填和已有数据优先。关联记录选择器的 `presentation.filters` 使用 `type: 'address'` 即可接入同样的省市区查询。
@@ -121,6 +122,17 @@ src/tenants/<tenant>/
 只有新增原生能力、专属页面或客户端动作类型时才需要发版。
 
 ## 特殊记录适配器
+
+只读目录可以声明 `metadataApiEngineKey`，由安全接口返回 `{ Menu, Table, Fields }`
+展示投影。`configuredModuleEngineKey` 或 `configuredMenuId` 必须精确匹配当前用户
+的授权模块，避免同名菜单被错误采用。接口只返回可公开的字段元数据和静态选项，
+不返回设计 SQL、V8 或秘密字段；人员数据仍由接口控制范围。
+
+通用列表据此编译 `MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields`
+和安全的 `Card-Mobile` 视图，并将真实 `_SysMenuId`、`_SelectFields` 传回列表接口。
+角色/部门等关联显示可以使用行内 `_CardDisplay` 名称映射，同时保留原始 Id。
+每次进入和下拉刷新回读配置，列表缓存按菜单版本、字段定义和字段集隔离；
+授权或配置读取失败时清空旧列表并提供重试入口。
 
 `src/platform/form-record-adapter.js` 负责少数不能直接复用普通菜单 CRUD 的
 安全域。默认 `form-engine` 适配器继续携带真实菜单上下文；`current-user`

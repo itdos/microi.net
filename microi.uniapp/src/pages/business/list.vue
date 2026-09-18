@@ -60,19 +60,20 @@
 
       <scroll-view v-if="statusOptions.length" class="status-scroll" scroll-x :show-scrollbar="false">
         <view class="status-tabs">
-          <view class="status-item" :class="{ active: !status }" @tap="changeStatus('')">全部状态</view>
+          <view class="status-item" :class="{ active: status === '' }" @tap="changeStatus('')">全部状态</view>
           <view
             v-for="item in statusOptions"
             :key="item"
             class="status-item"
-            :class="{ active: status === item }"
+            :class="{ active: String(status) === String(item) }"
             @tap="changeStatus(item)"
-          >{{ item }}</view>
+          >{{ statusOptionLabel(item) }}</view>
         </view>
       </scroll-view>
     </view>
 
-    <view class="summary-strip">
+    <view v-if="metadataError" class="metadata-error" @tap="initializeList(false, true)">{{ metadataError }}，点击重试</view>
+    <view v-else class="summary-strip">
       <image class="summary-icon" :src="entry.icon" mode="aspectFit" />
       <view
         class="summary-metrics"
@@ -178,7 +179,7 @@
         </view>
       </view>
 
-      <view v-else class="empty-state">
+      <view v-else-if="!metadataError" class="empty-state">
         <image :src="entry.icon" mode="aspectFit" />
         <text class="empty-title">暂无{{ config.title }}数据</text>
         <text class="empty-text">{{ canAddRecord ? '可调整搜索条件，或使用右下角新增' : '可调整搜索条件后重试' }}</text>
@@ -265,7 +266,7 @@ import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { loadListMetricValues } from '@/platform/view-metrics.js'
 import { appendStandardDeleteAction } from '@/platform/module-delete.js'
 import { fieldDisplayValue, parseJson } from '@/platform/native-form.js'
-import { loadModuleDefinition } from '@/platform/module-registry.js'
+import { loadApiModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
 import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
 import { requiresAuthorizedMenuContext } from '@/platform/menu-resolution.mjs'
 import { readListEntryPeriod } from '@/platform/list-entry-period.mjs'
@@ -372,6 +373,7 @@ export default {
       filterDraft: {},
       filterOptions: {},
       viewManifest: null,
+      metadataError: '',
       loadRequestId: 0,
       searchTimer: null,
       restrictedRows: [],
@@ -578,7 +580,7 @@ export default {
       }
     },
     async initializeList(restored = false, refresh = false) {
-      if (!this.baseConfig.skipModuleMetadata) {
+      if (!this.baseConfig.skipModuleMetadata && !this.baseConfig.metadataApiEngineKey) {
         try {
           const menu = await findMenu(
             this.baseConfig.menuAliases || [],
@@ -596,7 +598,7 @@ export default {
           }
         } catch (error) {}
       }
-      if (requiresAuthorizedMenuContext(this.baseConfig) && !this.menuId) {
+      if (requiresAuthorizedMenuContext(this.baseConfig) && !this.menuId && !this.baseConfig.metadataApiEngineKey) {
         // 权限菜单解析失败时清掉可能由旧页面快照恢复的数据，并在任何模块请求前失败关闭。
         this.rows = []
         this.count = 0
@@ -607,8 +609,8 @@ export default {
       }
       this.baseConfig = { ...this.baseConfig, menuId: this.menuId }
       this.config = { ...this.config, menuId: this.menuId }
-      await this.loadViewConfig(refresh)
-      if (!restored || !this.rowsContainConfiguredCardFields()) {
+      if (await this.loadViewConfig(refresh) === false) return
+      if (!restored || !this.rowsContainConfiguredCardFields() || this.baseConfig.metadataApiEngineKey) {
         await this.loadData(true, refresh)
       } else {
         this.loadPlatformStatistics(this.buildCurrentListOptions(refresh), this.loadRequestId)
@@ -650,6 +652,7 @@ export default {
     },
     async loadViewConfig(refresh = false) {
       try {
+        this.metadataError = ''
         let merged = { ...this.baseConfig, menuId: this.menuId }
         // ViewSchema/菜单元数据可能只返回部分状态；保留租户声明，避免业务终态被运行时覆盖。
         const localStatusOptions = Array.isArray(merged.statusOptions) ? merged.statusOptions : []
@@ -657,9 +660,12 @@ export default {
           this.config = merged
           return
         }
-        if (this.menuId) {
+        if (this.menuId || this.baseConfig.metadataApiEngineKey) {
           try {
-            const menuConfig = await loadModuleDefinition(this.menuId, refresh)
+            const menuConfig = this.baseConfig.metadataApiEngineKey
+              ? await loadApiModuleDefinition(this.baseConfig, refresh)
+              : await loadModuleDefinition(this.menuId, refresh)
+            this.menuId = menuConfig.menuId
             const localFilterFields = merged.filterFields || []
             // 旧版菜单“卡片数据”没有摘要字段；移动显示列应完整进入内容行，
             // 不应继续被租户本地的 summaryField 改造成无标签摘要。
@@ -669,7 +675,9 @@ export default {
               ...(Array.isArray(merged.statusOptions) ? merged.statusOptions : [])
             ])]
             merged.filterFields = mergeModuleFilterFields(menuConfig.filterFields, localFilterFields, menuConfig.definition?.fields || [])
-          } catch (error) {}
+          } catch (error) {
+            if (this.baseConfig.metadataApiEngineKey) throw error
+          }
         }
         let manifest = await loadModuleViewManifest(merged, {
           scene: 'Card',
@@ -761,7 +769,22 @@ export default {
         ].filter(Boolean))]
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
         this.config = merged
-      } catch (error) {}
+      } catch (error) {
+        if (this.baseConfig.metadataApiEngineKey) {
+          // 授权或配置失败时不继续展示旧快照，也不悄悄回退到前端写死的保护表字段。
+          this.metadataError = error.message || '卡片配置加载失败'
+          this.loadRequestId += 1
+          this.loading = false
+          this.rows = []
+          this.menuId = ''
+          this.dataAppend = {}
+          this.periodCounts = {}
+          this.metricValues = {}
+          this.count = 0
+          this.finished = true
+          return false
+        }
+      }
     },
     buildCurrentListOptions(refresh = false) {
       const sort = this.selectedSort()
@@ -809,6 +832,7 @@ export default {
       }
     },
     async loadData(reset = false, refresh = false) {
+      if (this.metadataError) return
       if (this.loading && !reset) return
       if (!reset && this.finished) return
       const requestId = ++this.loadRequestId
@@ -960,6 +984,11 @@ export default {
       this.status = value
       this.loadData(true)
     },
+    statusOptionLabel(value) {
+      const field = this.field(this.config.statusField)
+      const option = (field?.options || []).find((item) => String(item.value) === String(value))
+      return option?.label ?? String(value ?? '')
+    },
     async refresh() {
       this.refreshing = true
       try {
@@ -1029,6 +1058,9 @@ export default {
       return (this.config.definition?.fields || []).find((field) => field.Name === name)
     },
     configuredFieldValue(row, name, format = '') {
+      if (row._CardDisplay && Object.prototype.hasOwnProperty.call(row._CardDisplay, name)) {
+        return formatFieldValue(row._CardDisplay[name], format)
+      }
       const field = this.field(name)
       return field
         ? fieldDisplayValue(field, row[name])
@@ -1653,6 +1685,8 @@ export default {
   color: #0b86d4;
   font-weight: 600;
 }
+
+.metadata-error { margin: 20rpx 0; padding: 28rpx; border-radius: 16rpx; background: #fff; color: #b54708; font-size: 26rpx; }
 
 .summary-strip {
   position: relative;
