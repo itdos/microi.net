@@ -28,6 +28,12 @@ export function hasMenuPermission(menuId, name, user = getUser() || {}) {
     })
 }
 
+// 后台权限以按钮 Id 为准；撤销授权后残留的按钮名称不能继续授予审核能力。
+const ORDER_APPROVAL_BUTTON_IDS = [
+  '8dc40e8e-9ab5-49f9-b3bd-de525bd9e056',
+  '3107624f-58a2-441d-878b-99b9637c00c0'
+]
+
 function permissionNames(permission) {
   if (Array.isArray(permission)) return permission.map((item) => String(item && item.Name || item || '').trim())
   if (typeof permission === 'string') {
@@ -69,7 +75,7 @@ export function canApproveOrder(row = {}, user = getUser() || {}) {
   const state = String(row.DingdanZT || '').trim()
   const stateCode = Number(row.DingdanZTZ)
   const pendingApproval = state === '待审批' || stateCode === 1
-  return pendingApproval && sameTenant(row, user) && hasMenuPermission(MENU_IDS.orders, '审批', user)
+  return pendingApproval && sameTenant(row, user) && hasExactMenuPermission(MENU_IDS.orders, ORDER_APPROVAL_BUTTON_IDS, user)
 }
 
 export function canViewOrderDevice(row = {}) {
