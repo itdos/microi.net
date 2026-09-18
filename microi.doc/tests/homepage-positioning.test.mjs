@@ -18,6 +18,7 @@ function readWorkspace(relativePath) {
 test('homepage presents Microi as an open-source AI development framework', () => {
   const component = read('docs/.vitepress/theme/components/AiStudioHome.vue')
   const frontmatter = read('docs/index.md')
+  const microiCodeDocs = read('docs/doc/v8-engine/vs-code-plugin.md')
   const studioIndex = component.indexOf('<section class="ai-studio-stage')
   const positioningIndex = component.indexOf('<section class="mci-home-hero')
 
@@ -44,13 +45,21 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(actions, /mci-home-action--primary[^>]*microi-training-syllabus/)
   assert.equal((actions.match(/microi-training-syllabus/g) || []).length, 2)
   assert.doesNotMatch(component, /href="\/doc\/getting-started\/start-use"/)
-  assert.match(component, /href="\/doc\/getting-started\/source-code-architecture"/)
+  assert.doesNotMatch(actions, /source-code-architecture/)
+  assert.match(actions, /:href="MICROI_CODE_DOWNLOAD_URL"/)
+  assert.match(component, /secondaryAction: '下载 Microi Code'/)
+  assert.match(component, /secondaryAction: 'Download Microi Code'/)
+  assert.match(component, /downloadMeta: 'Windows x64 · v1\.0\.1'/)
+  assert.match(component, /aiTools: \['Microi Code', 'Codex'/)
+  const currentDownload = microiCodeDocs.match(/\[\u4e0b\u8f7d Microi Code ([^\]]+)\]\((https:\/\/static\.itdos\.com\/itdos\/microi-code\/[^)]+)\)/)
+  assert.ok(currentDownload, 'the Microi Code documentation should expose the current verified download')
+  assert.ok(component.includes(`const MICROI_CODE_DOWNLOAD_URL = '${currentDownload[2]}'`))
   assert.match(component, /primaryAction: '查看培训大纲'/)
   assert.match(component, /primaryAction: 'Training syllabus'/)
   assert.doesNotMatch(component, /trainingAction:/)
   assert.ok(
-    actions.indexOf('microi-training-syllabus') < actions.indexOf('href="/doc/getting-started/source-code-architecture"'),
-    'the primary training syllabus action should render before the source architecture action'
+    actions.indexOf('microi-training-syllabus') < actions.indexOf(':href="MICROI_CODE_DOWNLOAD_URL"'),
+    'the primary training syllabus action should render before the Microi Code download action'
   )
   assert.match(frontmatter, /titleTemplate: 开源 AI 开发框架/)
   assert.match(frontmatter, /30\+ 成熟引擎、AI 低代码、微服务与 V8 引擎/)
