@@ -13,6 +13,18 @@ Profile 使用通用模块目录、动态列表、动态详情和动态表单；
 
 ## 四层结构
 
+### 动态表单的组织与树形选择
+
+`mci-native-field` 通过 `src/platform/native-tree-options.mjs` 将 `Department`、`Cascader`、`SelectTree`、`TreeCheckbox` 的嵌套或平铺数据接入公用树形下拉，支持展开、检索、单选、多选、清空和只读回显。树控件优先读取对应 `Config.<Component>.Multiple`，不使用普通下拉的 `MultipleSelect` 覆盖。
+
+`Department` 固定使用 `Id/Name/_Child`，从当前授权的组织树读取数据，不依赖字段中的旧模板组织。`EmitPath=false` 保存节点 Id（多选为 Id 数组）；`EmitPath=true` 保存完整路径（多选为路径数组）。数组统一序列化为 JSON，保持 PC 后台契约。打开时展开已有选择的祖先，搜索保留完整路径；加载失败可重试，缺少父级或循环关系拒绝生成错误路径。表单使用真实数据值，筛选区仍使用独立的筛选包装值。
+
+客户的部门名称、编码和公司信息联动维护在租户 `form.js` 与 `user-organization.mjs` 中，不执行任意前端 V8。回归测试通过 `npm run check:controls` 执行。
+
+表单多选字段在关闭下拉时，于输入框下方显示全部已选标签。每项提供独立移除按钮，点击不打开下拉，立即同步表单值、勾选草稿和 `select` 事件；其余完整对象或组织路径保持原样。只读字段不提供移除入口，筛选区保留已有标签列表，避免重复渲染。浮层仅以输入框自身作为定位锚点，不把下方标签高度计入。
+
+集福鲤员工信息的角色联动由租户扩展 `user-role-level.mjs` 显式实现，遵循后台 RoleIds 值变更规则：Level 取完整已选角色集合的最大非负级别，空选择为 0。勾选、取消勾选、独立标签删除和清空共用 `handleFieldSelect`，仅回填当前表单实际存在的 Level 字段；不执行后台任意前端 V8，也不额外查询受保护角色表。
+
 ### 业务主列表与详情关联列表的筛选控件
 
 `pages/business/list` 与 `mci-business-related-list` 通过 `mci-list-filter-field` 统一渲染业务主列表、客户/订单详情关联列表及“查看更多”列表的筛选字段。字段来源为 `sys_menu.SearchFieldIds` 与 `diy_field`；后台查询配置优先，本地扩展筛选遇到同名后台字段时按后台组件和 Config 重新编译。
