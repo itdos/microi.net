@@ -29,6 +29,8 @@ UniApp/H5/小程序必须通过项目统一 `microi.v8.js` 的 `V8.uploadFile` /
 <!-- microi-progressive:chunk id=microi-uniapp-frontend-001 sha256=8096a337726080dadd3ce98b935e8fc5f77b62cd68f9fb3418ff737dfef97a4b -->
 ## 标准产品、视图协议与租户扩展
 
+动态表单的组织/树字段优先复用原生 `mci-native-field` 树形下拉与 `native-tree-options.mjs`，无需为小程序把后台 `Department` 改为普通 Select。读取 `Config.<Component>.Multiple/EmitPath`：组织单选叶值保存 Id，多选叶值保存 Id 数组，路径模式保存完整路径/路径数组，数组统一 JSON 序列化。支持祖先展开、搜索、清空、禁用、重试和只读回显；数据源旧模板不能代替当前授权组织树。业务字段联动放租户扩展，不执行任意前端 V8；验收覆盖保存格式、旧数据回显、失败/迟到响应及最近公司祖先联动。
+
 Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile + 租户插件”架构，不能把某个交付项目直接写死成平台产品：
 
 - `src/platform/`、通用 `mci-*` 组件、动态模块页和动态表单页只实现平台能力，不得出现租户表名、字段名、品牌文案、素材或客户路由。

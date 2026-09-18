@@ -7,6 +7,7 @@ import {
 } from '@/platform/cache.js'
 import nativeControls from '@/config/mci-native-controls.json'
 import { formatRegionValue, formatStructuredValue } from '@/platform/display.js'
+import { nativeTreeConfig, serializeNativeTreeValue } from './native-tree-options.mjs'
 import {
   filterFieldsByHiddenCollapseScope,
   nativeFieldRoleVisibility,
@@ -90,6 +91,8 @@ function configBoolean(value, fallback = false) {
 }
 
 export function isNativeFieldMultiple(field = {}) {
+  const tree = nativeTreeConfig(field)
+  if (tree) return tree.Multiple
   const config = field.config || parseJson(field.Config, {}) || {}
   if (Object.prototype.hasOwnProperty.call(config, 'MultipleSelect')) {
     return configBoolean(config.MultipleSelect, MULTIPLE_COMPONENTS.has(String(field.component || field.Component || '')))
@@ -839,6 +842,7 @@ export async function saveNativeForm(tableName, rowId, form, fields, extraValues
     let value = form[field.Name]
     if (field.component === 'Switch') value = value ? 1 : 0
     if (isNativeFieldMultiple(field) && Array.isArray(value)) value = JSON.stringify(value)
+    value = serializeNativeTreeValue(field, value)
     payload[field.Name] = value
   })
   Object.keys(extraValues || {}).forEach((name) => {
