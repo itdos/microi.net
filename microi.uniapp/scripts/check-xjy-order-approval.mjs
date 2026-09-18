@@ -43,8 +43,8 @@ assert.match(actionsSource, /export function canApproveOrder/,
   '订单列表与详情必须共享订单审批权限函数')
 assert.match(actionsSource, /state === '待审批' \|\| stateCode === 1/,
   '普通审批必须使用精确状态，不能误匹配待审批作废')
-assert.match(actionsSource, /sameTenant\(row, user\).*hasMenuPermission\(MENU_IDS\.orders, '审批', user\)/s,
-  '订单审批必须同时校验同租户和合同订单审批按钮权限')
+assert.match(actionsSource, /sameTenant\(row, user\).*hasExactMenuPermission\(MENU_IDS\.orders, ORDER_APPROVAL_BUTTON_IDS, user\)/s,
+  '订单审批必须同时校验同租户和合同订单审批按钮 Id 权限')
 assert.match(detailSource, /hasOrderApprovalPermission\(this\.detail, this\.currentUser\)/,
   '订单详情必须复用列表页审批权限函数')
 assert.doesNotMatch(detailSource, /showOrderApprovalDialog[^\n]*@tap\.self/,
