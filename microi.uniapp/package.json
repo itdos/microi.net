@@ -39,7 +39,7 @@
     "check:view-schema": "node scripts/check-view-schema.mjs",
     "check:field-roles": "node scripts/check-native-field-role-visibility.mjs && node --test scripts/test-home-and-form-actions.mjs",
     "check:menu-resolution": "node scripts/check-menu-resolution.mjs",
-    "check:card-fields": "node scripts/test-card-field-display.mjs && node --test scripts/test-directory-card-config.mjs",
+    "check:card-fields": "node scripts/test-card-field-display.mjs && node --test scripts/test-directory-card-config.mjs scripts/test-home-header-safe-area.mjs",
     "check:mall-product-params": "node --test scripts/test-mall-product-params.mjs",
     "check:tabbar": "node scripts/check-custom-tabbar-state.cjs",
     "check:ai-assistant-visibility": "node --test scripts/test-ai-assistant-visibility.mjs",
