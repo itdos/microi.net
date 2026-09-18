@@ -498,17 +498,21 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 104rpx;
-  padding: 10rpx calc(28rpx + var(--mci-capsule-right)) 0 28rpx;
+  min-height: var(--mci-nav-height, 44px);
+  // 胶囊占位已包含安全间距，不再额外叠加右边距；品牌、按钮与胶囊保持同一行。
+  padding: 0 max(28rpx, var(--mci-capsule-right, 0px)) 0 28rpx;
+  column-gap: 20rpx;
 }
 
 .brand {
+  flex: 1;
   display: flex;
   align-items: center;
   min-width: 0;
 }
 
 .brand-logo {
+  flex: none;
   width: 74rpx;
   height: 74rpx;
   border: 3rpx solid rgba(255, 255, 255, 0.72);
@@ -517,6 +521,7 @@ export default {
 }
 
 .brand-copy {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -524,6 +529,10 @@ export default {
 }
 
 .brand-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #fff;
   font-size: 34rpx;
   line-height: 42rpx;
@@ -531,17 +540,23 @@ export default {
 }
 
 .brand-subtitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin-top: 2rpx;
   color: rgba(255, 255, 255, 0.76);
   font-size: 22rpx;
 }
 
 .topbar-actions {
+  flex: none;
   display: flex;
   gap: 14rpx;
 }
 
 .icon-button {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
