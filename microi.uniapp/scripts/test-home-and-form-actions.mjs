@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import test from 'node:test'
 import * as fieldVisibility from '../src/platform/native-field-visibility.mjs'
+import * as nativeTreeOptions from '../src/platform/native-tree-options.mjs'
 import { resolveBusinessMenuPermission } from '../src/platform/menu-resolution.mjs'
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
@@ -11,7 +12,7 @@ const controls = JSON.parse(read('src/config/mci-native-controls.json'))
 const nativeSource = stripImports(read('src/platform/native-form.js'))
   .replace(/export default/g, 'const exported =').replace(/export (?=(?:async )?function|const)/g, '')
 const native = vm.runInNewContext(`${nativeSource}; exported`, {
-  ...fieldVisibility, nativeControls: controls, getUser: () => ({})
+  ...fieldVisibility, ...nativeTreeOptions, nativeControls: controls, getUser: () => ({})
 })
 const homeSource = stripImports(read('src/pages/workspace/index.vue').match(/<script>([\s\S]*?)<\/script>/)[1])
   .replace('export default', 'const page =')

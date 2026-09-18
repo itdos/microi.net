@@ -7,7 +7,12 @@ export function buildListApiEnginePayload(moduleConfig = {}, options = {}, perio
     _OrderByType: options.orderType || moduleConfig.defaultOrderType || '',
     _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
   }
-  if (options.status && moduleConfig.statusField) {
+  if (moduleConfig.menuId) payload._SysMenuId = moduleConfig.menuId
+  if (moduleConfig.configuredModuleEngineKey) payload.ModuleEngineKey = moduleConfig.configuredModuleEngineKey
+  if (Array.isArray(moduleConfig.selectFields) && moduleConfig.selectFields.length) {
+    payload._SelectFields = [...moduleConfig.selectFields]
+  }
+  if (options.status !== undefined && options.status !== null && options.status !== '' && moduleConfig.statusField) {
     payload._Where.push({ Name: moduleConfig.statusField, Type: '=', Value: options.status })
   }
   if (periodRange) {
@@ -16,6 +21,15 @@ export function buildListApiEnginePayload(moduleConfig = {}, options = {}, perio
     }
   }
   return payload
+}
+
+// 列表缓存必须随授权菜单、卡片版本和字段集变化，避免更新布局后仍返回缺列的旧数据。
+export function listApiEnginePresentationKey(moduleConfig = {}, payload = {}) {
+  return JSON.stringify([
+    payload._SysMenuId || '', payload.ModuleEngineKey || '',
+    moduleConfig.menu?.ViewConfigVersion || '', moduleConfig.menu?.UpdateTime || '',
+    moduleConfig.definition?.schemaFingerprint || '', payload._SelectFields || []
+  ])
 }
 
 export function normalizeListApiEngineResponse(response) {
