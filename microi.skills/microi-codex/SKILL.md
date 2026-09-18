@@ -15,13 +15,15 @@ description: 在 Microi Code、Codex 或 DeepSeek Harness 中完成 Microi吾码
 
 - Microi Code 是内部仓库中的独立桌面发行物，直接基于 DataElement/dsh-desktop 与 DeepSeek Harness 二次开发，内置固定版本的 Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
 - 官方 AI 登录只走桌面账号窗口，固定 `https://api.itdos.com`、`OsClient=iTdos`，使用当前用户的中转 Key 和额度。不要让用户把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
-- 业务连接在「服务器连接」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
+- 业务连接在「服务器连接（MCP）」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
 - macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
 - 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
-- 桌面 UI 沿用 dsh-desktop 的设计系统；首页和独立菜单显示吾码 AI 能力，并可打开完整 `/#/mic-ai-engine` 工作台。AI 数据分析明确使用 `microi_run_engine` 调用 `mci_ai_data_assistant`，不能改成绕过 MCP 的直接数据库访问。
-- Microi Code 左侧「功能区」动态读取 dsh 的 `settings.section` 注册表，并在主界面 `main` 面板中渲染原设置组件；吾码账号、服务器连接、吾码 AI 是三个独立 section。底部入口显示「关于 v版本号」，连接手机入口必须保留。品牌显示 `Microi Code` 与 `HARNESS` 标签，新安装默认深色，用户仍可切换浅色/深色。
+- 桌面 UI 沿用 dsh-desktop 的设计系统；首页不重复放置吾码 AI、服务器连接或“预览版”，相关能力集中在左侧功能区。「Microi吾码」可打开完整 `/#/mic-ai-engine` 工作台。AI 数据分析明确使用 `microi_run_engine` 调用 `mci_ai_data_assistant`，不能改成绕过 MCP 的直接数据库访问。
+- Microi Code 左侧「功能区」动态读取 dsh 的 `settings.section` 注册表，并在主界面 `main` 面板中渲染原设置组件；第一项「Microi吾码」合并官方账号和吾码 AI，第二项为「服务器连接（MCP）」，之后是 dsh 原生设置。功能区与工作区可拖动调高，默认无滚动条；首页/聊天页不显示虚假选中态。底部入口显示「关于 v版本号」及 `LicenseType` 版本标签，连接手机入口保持同一行。品牌显示 `Microi Code` 与 `HARNESS` 标签，新安装默认深色，用户仍可切换浅色/深色。
 - 桌面安装包版本从 `1.0.0` 开始，使用吾码三段十进制进位规则。Windows/macOS 的公开打包命令必须先执行仓库 `version:bump`，不能复用同版本覆盖已有产物；测试、类型检查和普通 Web 构建不升版。
-- dsh-desktop 升级必须遵循 `Microi.Code/同步dsh-desktop上游.md` 的三方同步流程；关于页、NOTICE、MIT License、DataElement 版权与两个上游仓库链接不得删除。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
+- 官方账号页和关于标签通过 `platform-current-user` 接口引擎读取当前 `sys_user.LicenseType`。桌面相关平台业务逻辑优先通过 `microi_itdos` 接口引擎实现；只有接口引擎缺少必需底层原子能力时才能改后端源码，并说明原因。
+- 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.itdos.com/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。
+- dsh-desktop 升级必须遵循 `Microi.Code/同步dsh-desktop上游.md` 的三方同步流程和补丁意图清单；`microi/`、`packages/microi-code-*` 与桥接代码是永久保护区，普通上游文件使用三方比较，补丁必须经 `npm ci` 重放。关于页、NOTICE、MIT License、DataElement 版权与两个上游仓库链接不得删除。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
 
 ## 非阻塞自动更新（强制）
 
