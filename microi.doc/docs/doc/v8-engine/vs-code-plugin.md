@@ -1,14 +1,20 @@
 <!-- DOC-SYNC: 核心定位、能力矩阵、安装命令和发布流程需与 Microi.Code/README.md 保持一致。 -->
 
-<p align="center">
-  <img src="https://static.itdos.com/upload/img/microi-red-256.png" width="112" alt="Microi吾码">
-</p>
-
-<h1 align="center">Microi吾码 AI 开发工具：Microi Code + VS Code + CLI + AI Plugin</h1>
-
-<p align="center">
-  <strong>用自然语言开发完整的复杂业务系统，让低代码从“拖拉拽”进入“AI 直接交付”。</strong>
-</p>
+<div class="mci-doc-card" style="margin:0 auto 28px;padding:32px 34px;border:1px solid var(--vp-c-divider);border-radius:24px;background:linear-gradient(135deg, color-mix(in srgb, var(--vp-c-brand-1) 8%, var(--vp-c-bg-soft)), var(--vp-c-bg));box-shadow:0 18px 55px rgba(15,23,42,.08);">
+<p style="margin:0 0 10px;color:var(--vp-c-brand-1);font-size:12px;font-weight:700;letter-spacing:.12em;">MICROI CODE · DESKTOP AI WORKBENCH</p>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:22px;">
+  <img src="https://static.itdos.com/upload/img/microi-red-256.png" width="82" height="82" alt="Microi吾码">
+  <div style="min-width:240px;flex:1;">
+    <h1 style="margin:0 0 9px;line-height:1.18;">Microi Code：吾码 AI 开发工作台</h1>
+    <p style="margin:0;color:var(--vp-c-text-2);font-size:16px;line-height:1.7;">用自然语言开发完整的复杂业务系统，让低代码从“拖拉拽”进入“AI 直接交付”。</p>
+  </div>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:24px;">
+  <a class="mci-doc-chip" href="https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe" style="display:inline-flex;align-items:center;min-height:42px;padding:0 18px;border-radius:999px;background:var(--vp-c-brand-1);color:#fff;font-weight:700;text-decoration:none;">下载最新版 Windows x64</a>
+  <a class="mci-doc-chip" href="#下载与历史版本" style="display:inline-flex;align-items:center;min-height:42px;padding:0 18px;border:1px solid var(--vp-c-divider);border-radius:999px;color:var(--vp-c-text-1);font-weight:600;text-decoration:none;">查看历史版本</a>
+  <span style="color:var(--vp-c-text-2);font-size:13px;">当前版本 v1.0.2 · latest 固定地址</span>
+</div>
+</div>
 
 <p align="center" style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;">
   <a href="https://microi.net/"><img src="https://img.shields.io/badge/官网-microi.net-2563eb" alt="Microi 官网"></a>
@@ -32,13 +38,16 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 <!-- MICROI-CODE-DOWNLOADS: verified release links are maintained here. -->
 
-- [下载 Microi Code 1.0.2 · Windows x64 未签名版（176.9 MiB）](https://static.itdos.com/itdos/microi-code/1.0.2/7b9b9dbaaa9f/202609/Microi-Code-1_0_2-windows-x64-setup.exe)
-- SHA256：`7b9b9dbaaa9f86e31713d5b7b36f97fa0ffae22a16b2c5743442bba27e925f88`；检查更新元数据：[latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)
-- v1.0.2：修复关于版本显示、折叠侧栏移动连接入口、服务器连接自适应和 AI 工作台跳转；新增连接/登录弹窗、吾码个人中心、租户品牌应用/还原，并按 dsh 上游同步规则保留所有差异层功能。
-- [历史版本：Microi Code 1.0.1 · Windows x64](https://static.itdos.com/itdos/microi-code/1.0.1/d381cf4fec34/202609/Microi-Code-1_0_1-windows-x64-setup.exe)
-- [历史版本：Microi Code 1.0.0 · Windows x64](https://static.itdos.com/itdos/microi-code/1.0.0/dd0f2e79e80b/202609/Microi-Code-1_0_0-windows-x64-setup.exe)
-- [历史版本：Microi Code 0.2.0 · Windows x64](https://static.itdos.com/itdos/microi-code/0.2.0/e991814b16a1/202609/Microi-Code-0_2_0-windows-x64-setup.exe)
-- macOS 源码构建：内部仓库根目录执行 `bash ./一键打包Mac.sh`，自动生成本机架构 DMG。
+## 下载与历史版本
+
+| 版本 | Windows x64 | 校验与说明 |
+|---|---|---|
+| **v1.0.2（当前）** | [下载 latest 固定文件名](https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe) · [下载不可变归档](https://static.itdos.com/itdos/microi-code/1.0.2/7b9b9dbaaa9f/202609/Microi-Code-1_0_2-windows-x64-setup.exe) | SHA256 `7b9b9dbaaa9f86e31713d5b7b36f97fa0ffae22a16b2c5743442bba27e925f88` · 未签名 · 176.9 MiB |
+| v1.0.1 | [下载归档](https://static.itdos.com/itdos/microi-code/1.0.1/d381cf4fec34/202609/Microi-Code-1_0_1-windows-x64-setup.exe) | 历史版本 |
+| v1.0.0 | [下载归档](https://static.itdos.com/itdos/microi-code/1.0.0/dd0f2e79e80b/202609/Microi-Code-1_0_0-windows-x64-setup.exe) | 历史版本 |
+| v0.2.0 | [下载归档](https://static.itdos.com/itdos/microi-code/0.2.0/e991814b16a1/202609/Microi-Code-0_2_0-windows-x64-setup.exe) | 历史版本 |
+
+最新版检查元数据：[latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml) · [版本目录](https://api.itdos.com/microi-code/updates/versions.json)。latest 对象的文件名固定为 `Microi-Code-latest-windows-x64-setup.exe`，HDFS 会在 URL 中增加当前年月分区；每次发布脚本会覆盖同一 latest 文件名并回读字节和 SHA256。macOS 请在内部仓库根目录执行 `bash ./一键打包Mac.sh`，生成本机架构 DMG；签名与公证状态以 Mac 构建机回读为准。
 
 安装后依次「打开项目 → 登录吾码账号 → 添加业务服务器 → 初始化项目 / 拉取资源」，即可开始开发。AI 使用的是你的官方中转额度，实际可用模型与额度以账号页面为准。停止任务或退出后保留历史记录，后续可在新任务中引用历史继续。
 

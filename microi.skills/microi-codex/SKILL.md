@@ -25,6 +25,12 @@ description: 在 Microi Code、Codex 或 DeepSeek Harness 中完成 Microi吾码
 - 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.itdos.com/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。
 - dsh-desktop 升级必须遵循 `Microi.Code/同步dsh-desktop上游.md` 的三方同步流程和补丁意图清单；`microi/`、`packages/microi-code-*` 与桥接代码是永久保护区，普通上游文件使用三方比较，补丁必须经 `npm ci` 重放。关于页、NOTICE、MIT License、DataElement 版权与两个上游仓库链接不得删除。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
 
+### 默认中文输出
+
+- 面向用户的回答、计划、工具说明、错误解释和可见进度默认使用简体中文；代码、协议字段、命令、模型名称和路径保留原文。
+- 这条规则通过 Microi Skills 同步到 Microi Code、Codex、DeepSeek Harness、WorkBuddy、CodeBuddy 和 OpenCode 的工作区指令；宿主或模型支持自定义系统提示时，也应将同一条规则放在最高优先级的用户可见输出约束中。
+- 中文规则只能约束可见回答、计划和工具摘要；模型服务内部隐藏思考的语言由模型决定，客户端不能保证每一个内部 token 都是中文，也不应把内部思考当成可导出内容。
+
 ## 非阻塞自动更新（强制）
 
 Codex Router 启动后会异步调用 bundled CLI 的 `microi update --background`。需要了解完整安装/诊断机制时读取同级 `microi-codex-installer/SKILL.md`；更新检查不得发生在用户工作之前，也不得让任务等待。
