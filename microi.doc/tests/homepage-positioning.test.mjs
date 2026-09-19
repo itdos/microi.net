@@ -49,7 +49,7 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(actions, /:href="MICROI_CODE_DOWNLOAD_URL"/)
   assert.match(component, /secondaryAction: '下载 Microi Code'/)
   assert.match(component, /secondaryAction: 'Download Microi Code'/)
-  assert.match(component, /downloadMeta: 'Windows x64 · v1\.0\.1'/)
+  assert.match(component, /downloadMeta: 'Windows x64 · v1\.0\.2'/)
   assert.match(component, /aiTools: \['Microi Code', 'Codex'/)
   const currentDownload = microiCodeDocs.match(/\[\u4e0b\u8f7d Microi Code ([^\]]+)\]\((https:\/\/static\.itdos\.com\/itdos\/microi-code\/[^)]+)\)/)
   assert.ok(currentDownload, 'the Microi Code documentation should expose the current verified download')
