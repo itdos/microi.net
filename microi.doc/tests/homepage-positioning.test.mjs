@@ -75,6 +75,7 @@ test('the related-links menu exposes the training syllabus immediately before th
   assert.ok(trainingIndex >= 0)
   assert.match(config, /吾码培训大纲[\s\S]*\/doc\/about\/microi-training-syllabus/u)
   assert.ok(trainingIndex < updateLogIndex, 'the training syllabus should appear above the update log')
+  assert.doesNotMatch(config, /text: \"服务器面板\"/, '服务器面板不应出现在官网顶部导航')
 })
 
 test('current Chinese brand surfaces use one canonical positioning and keep the legacy term only as an SEO keyword', () => {
