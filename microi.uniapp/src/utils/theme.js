@@ -226,6 +226,10 @@ export const themeMixin = {
   onLoad() {
     this.refreshSafeArea()
   },
+  onReady() {
+    // 小程序启动时胶囊测量可能尚未稳定，首次布局完成后再校正页面安全区。
+    this.refreshSafeArea()
+  },
   onShow() {
     this._currentLang = getLang()
     this.refreshSafeArea()
