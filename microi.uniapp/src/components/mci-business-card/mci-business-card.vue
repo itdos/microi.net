@@ -102,7 +102,7 @@ export default {
 .field-list { margin-top: 16rpx; padding-top: 12rpx; border-top: 1rpx solid #edf3f5; }
 .field-row { min-height: 48rpx; line-height: 34rpx; }
 .field-row--multiline { align-items: flex-start; }
-.field-label { flex: 0 0 138rpx; color: #8197a0; font-size: 23rpx; }
+.field-label { flex: 0 0 138rpx; margin-right: 16rpx; word-break: break-all; color: #8197a0; font-size: 23rpx; }
 .field-value { flex: 1; min-width: 0; overflow: hidden; color: #365663; font-size: 24rpx; text-overflow: ellipsis; white-space: nowrap; }
 /* zhy：微信小程序端使用静态三行规则兜底，避免动态 line-clamp 样式被编译器忽略。 */
 .field-value--multiline { display: -webkit-box; max-height: 102rpx; white-space: pre-wrap; word-break: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }

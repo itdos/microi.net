@@ -252,7 +252,7 @@ export function mergeModuleFilterFields(configured = [], local = [], nativeField
     const native = nativeFields.find((field) => String(field.Name).toLowerCase() === String(item.field).toLowerCase())
     if (!native) return item
     if (!fieldCanBeSearched(native)) return null
-    return { ...compileField({ Label: item.label, SearchMultiple: item.SearchMultiple ?? item.multiple }, native), key: item.key }
+    return { ...compileField({ Label: item.label, SearchMultiple: item.SearchMultiple ?? item.multiple }, native), key: item.key, overrideSearchMultiple: item.overrideSearchMultiple === true }
   })
   ;[...(configured || []), ...normalizedLocal].forEach((field) => {
     if (!field) return
@@ -262,6 +262,9 @@ export function mergeModuleFilterFields(configured = [], local = [], nativeField
       if (field.overrideConfigured === true) {
         const index = indexes.get(key)
         result[index] = { ...result[index], ...field }
+      } else if (field.overrideSearchMultiple === true) {
+        const index = indexes.get(key)
+        result[index] = { ...result[index], multiple: field.multiple }
       }
       return
     }
