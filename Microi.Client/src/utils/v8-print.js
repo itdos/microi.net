@@ -2,7 +2,7 @@
  * V8.Print 蓝牙打印模块（双引擎版）
  * ================================================
  * 自动检测运行环境，在不同平台使用对应的蓝牙 API：
- *   - 5+App (APK/IPA): 使用 plus.bluetooth BLE；Android 的 CC4 可回退到经典蓝牙 SPP
+ *   - 5+App (APK/IPA): 使用 plus.bluetooth BLE；Android 的 GP-M322/CC4 优先使用已配对的经典蓝牙 SPP
  *   - PC/H5 浏览器:    使用 Web Bluetooth API（Chrome/Edge）
  *
  * 功能特性：
@@ -208,23 +208,49 @@ function isPlusAndroidGprinter(Print, info) {
     if (!isPlusApp()) return false;
     var osName = window.plus.os && window.plus.os.name;
     return (String(osName || "").toLowerCase() === "android" || (!osName && !!window.plus.android))
-        && currentPrinterProfile(Print, info).id === "gprinter-gp-m322";
+        && (currentPrinterProfile(Print, info).id === "gprinter-gp-m322"
+            || isLikelyGprinterSppName(info && info.deviceName || (Print.BLEInformation && Print.BLEInformation.deviceName)));
+}
+
+function isAndroidSppPrinterProfile(profileId) {
+    return profileId === "gprinter-gp-m322" || profileId === "zicox-cc4";
+}
+
+function normalizeBluetoothPairName(name) {
+    return String(name || "")
+        .toLowerCase()
+        .replace(/(?:[_\-\s]*(?:ble|ios|spp))$/i, "")
+        .replace(/[^a-z0-9]+/g, "");
+}
+
+function isLikelyGprinterSppName(name) {
+    return /(?:gprinter|gp[-_\s]?m322|printer[_\-\s])/i.test(String(name || ""));
+}
+
+function shouldDeferAutomaticPlusBleReconnect(info) {
+    if (!isPlusApp() || !info || info.transport !== "ble" || !isPlusAndroidSppSupported()) return false;
+    var profile = resolvePrinterProfile(info.deviceName, info.profileMode || "auto");
+    return isAndroidSppPrinterProfile(profile.id) || isLikelyGprinterSppName(info.deviceName);
 }
 
 // MTU 是连接能力，不能从 localStorage 恢复，也不能把 setBLEMTU 的请求值当成协商值。
 function plusTransportCapabilities(Print) {
-    var live = isPlusApp() && Print.isConnected() && Print.BLEInformation.transport === "ble";
+    var livePlus = isPlusApp() && Print.isConnected();
+    var liveSpp = livePlus && Print.BLEInformation.transport === "spp";
+    var live = livePlus && Print.BLEInformation.transport === "ble";
     var mtu = live && Print._plusMtuDeviceId === Print.BLEInformation.deviceId ? Print._plusMtu : 0;
     var maxBytes = mtu ? Math.min(180, mtu - 3) : 20;
     var optimized = live && isPlusAndroidGprinter(Print);
     return {
-        mtu: mtu,
-        maxWriteBytes: maxBytes,
+        // SPP 是连续字节流，不使用 BLE MTU；给上层打印适配器一个可用的大包能力，
+        // 避免它把经典蓝牙错误地降回 20 字节分包。
+        mtu: liveSpp ? 183 : mtu,
+        maxWriteBytes: liveSpp ? 180 : maxBytes,
         // 183 MTU 仅证明协议载荷上限；GP-M322 实机连续 180 字节写入会触发 10008，稳定档固定为 100。
-        recommendedPacketSize: optimized && maxBytes >= 100 ? 100 : 20,
+        recommendedPacketSize: liveSpp ? 180 : (optimized && maxBytes >= 100 ? 100 : 20),
         // 佳博优先无响应写，并在两包之间保留短保护窗口；其它型号及平台保留原节流。
-        packetIntervalMs: optimized ? PLUS_GATT_GUARD_INTERVAL_MS : 20,
-        writeType: live ? Print.BLEInformation.writeType : "",
+        packetIntervalMs: liveSpp ? 0 : (optimized ? PLUS_GATT_GUARD_INTERVAL_MS : 20),
+        writeType: livePlus ? (liveSpp ? "spp" : Print.BLEInformation.writeType) : "",
     };
 }
 
@@ -415,7 +441,10 @@ function releaseStalePlusBleConnections(Print) {
             });
         }
         try {
+            // 5+ 文档要求传入主服务 UUID；省略 services 时部分 Android 基座会直接
+            // 返回失败，残留 GATT 因此一直占着打印机而导致后续 10012。
             window.plus.bluetooth.getConnectedBluetoothDevices({
+                services: PRINTER_SERVICE_UUIDS,
                 success: function (result) { finish(result && result.devices); },
                 fail: function () { finish([]); }
             });
@@ -450,7 +479,7 @@ function isPlusSppConnected(Print) {
 function getPairedPlusSppDevices(profileMode) {
     if (!isPlusAndroidSppSupported()) return [];
     var mode = normalizeProfileMode(profileMode || "auto");
-    if (mode !== "auto" && mode !== "zicox-cc4") return [];
+    if (mode !== "auto" && !isAndroidSppPrinterProfile(mode)) return [];
     try {
         var android = window.plus.android;
         var BluetoothAdapter = android.importClass("android.bluetooth.BluetoothAdapter");
@@ -469,8 +498,18 @@ function getPairedPlusSppDevices(profileMode) {
             var name = String(device.getName() || "");
             var deviceId = String(device.getAddress() || "");
             var isAutoDetectedCc4 = resolvePrinterProfile(name, "auto").id === "zicox-cc4";
-            if (name && deviceId && (mode === "zicox-cc4" || isAutoDetectedCc4)) {
-                devices.push({ name: name, deviceId: deviceId, transportHint: "spp" });
+            var isAutoDetectedGprinter = resolvePrinterProfile(name, "auto").id === "gprinter-gp-m322"
+                || isLikelyGprinterSppName(name);
+            if (name && deviceId && (mode === "zicox-cc4" || mode === "gprinter-gp-m322"
+                || isAutoDetectedCc4 || isAutoDetectedGprinter)) {
+                devices.push({
+                    name: name,
+                    deviceId: deviceId,
+                    transportHint: "spp",
+                    profileMode: mode === "auto"
+                        ? (isAutoDetectedCc4 ? "zicox-cc4" : (isAutoDetectedGprinter ? "gprinter-gp-m322" : "auto"))
+                        : mode,
+                });
             }
         }
         return devices;
@@ -478,6 +517,18 @@ function getPairedPlusSppDevices(profileMode) {
         console.log(LOG_PREFIX + " [spp] 无法读取已配对的经典蓝牙设备:", error);
         return [];
     }
+}
+
+function findPairedPlusSppDevice(device, profileMode) {
+    var candidates = getPairedPlusSppDevices(profileMode);
+    if (!candidates.length) return null;
+    var deviceId = String(device && device.deviceId || "");
+    var deviceName = normalizeBluetoothPairName(device && device.name);
+    return candidates.find(function (candidate) {
+        return deviceId && candidate.deviceId === deviceId;
+    }) || candidates.find(function (candidate) {
+        return deviceName && normalizeBluetoothPairName(candidate.name) === deviceName;
+    }) || null;
 }
 
 function connectPlusSppSocket(android, nativeDevice, uuid) {
@@ -527,7 +578,9 @@ async function connectPlusSppDevice(Print, device, options) {
     var deviceName = String(device && device.name || (Print._rememberedInfo && Print._rememberedInfo.deviceName) || "蓝牙打印机");
     var profileMode = normalizeProfileMode(options.profileMode || device.profileMode || Print._profileMode || "auto");
     var profile = resolvePrinterProfile(deviceName, profileMode);
-    if (profile.id !== "zicox-cc4") throw new Error("经典蓝牙 SPP 兜底当前仅对 ZICOX CC4 开放");
+    if (!isAndroidSppPrinterProfile(profile.id)) {
+        throw new Error("经典蓝牙 SPP 当前仅对 GP-M322 或 ZICOX CC4 开放");
+    }
     if (Print.isConnected() && Print.BLEInformation.transport === "spp" && Print.BLEInformation.deviceId === deviceId) return true;
 
     updateConnectionState(Print, options.reconnecting ? "reconnecting" : "connecting", { error: "" });
@@ -629,19 +682,69 @@ function openPlusBluetoothAdapter() {
     });
 }
 
+function stopPlusBluetoothDiscovery() {
+    try {
+        if (isPlusApp() && typeof window.plus.bluetooth.stopBluetoothDevicesDiscovery === "function") {
+            window.plus.bluetooth.stopBluetoothDevicesDiscovery({});
+        }
+    } catch (error) { }
+}
+
+function closePlusBleConnectionAndWait(deviceId, waitMs) {
+    if (!isPlusApp() || !deviceId || !window.plus.bluetooth
+        || typeof window.plus.bluetooth.closeBLEConnection !== "function") {
+        return Promise.resolve();
+    }
+    return new Promise(function (resolve) {
+        var settled = false;
+        var timer = setTimeout(finish, Number(waitMs) || 1200);
+        function finish() {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+        }
+        try {
+            window.plus.bluetooth.closeBLEConnection({
+                deviceId: deviceId,
+                success: finish,
+                fail: finish,
+                complete: finish,
+            });
+        } catch (error) { finish(); }
+    });
+}
+
 function createPlusConnection(deviceId) {
     return new Promise(function (resolve, reject) {
         window.plus.bluetooth.createBLEConnection({
             deviceId: deviceId,
-            timeout: 12000,
+            timeout: 7000,
             success: resolve,
             fail: function (error) {
                 var code = error && (error.errCode || error.code);
-                if (Number(code) === 10010) resolve(error);
-                else reject(new Error(bleErrorTip(code)));
+                var normalized = new Error(bleErrorTip(code));
+                if (Number.isFinite(Number(code))) normalized.code = Number(code);
+                reject(normalized);
             }
         });
     });
+}
+
+async function createPlusConnectionWithRecovery(Print, deviceId) {
+    try {
+        return await createPlusConnection(deviceId);
+    } catch (error) {
+        var code = Number(error && error.code);
+        if (code !== 10012 && code !== 10006 && code !== 10010) throw error;
+        // 10012/10010 常见于上一次 GATT 实例仍被 Android 保留；先释放再只重试一次，
+        // 不把同一份打印数据盲目重发。
+        Print._suppressDisconnectUntil = Date.now() + 1500;
+        await closePlusBleConnectionAndWait(deviceId, 1200);
+        await delay(350);
+        await openPlusBluetoothAdapter();
+        return await createPlusConnection(deviceId);
+    }
 }
 
 function selectPlusWriteCandidate(Print, index) {
@@ -688,22 +791,20 @@ function plusWriteFailureSummary(error) {
 async function fallbackFirstPlusChunkToCc4Spp(Print, chunk, bleError) {
     var info = normalizeBLEInfo(Print.BLEInformation);
     var profile = currentPrinterProfile(Print, info);
-    if (!info || profile.id !== "zicox-cc4" || !isPlusAndroidSppSupported()) return false;
+    if (!info || !isAndroidSppPrinterProfile(profile.id) || !isPlusAndroidSppSupported()) return false;
+
+    var sppDevice = findPairedPlusSppDevice({ deviceId: info.deviceId, name: info.deviceName }, info.profileMode);
+    if (!sppDevice) return false;
 
     try {
-        await connectPlusSppDevice(Print, {
-            deviceId: info.deviceId,
-            name: info.deviceName,
-            transportHint: "spp",
-            profileMode: info.profileMode,
-        }, { profileMode: info.profileMode });
+        await connectPlusSppDevice(Print, sppDevice, { profileMode: info.profileMode });
         await writePlusSppChunk(Print, chunk);
-        console.warn(LOG_PREFIX + " CC4 的 BLE 写入通道不受支持，首包已安全切换到经典蓝牙 SPP");
+        console.warn(LOG_PREFIX + " " + profile.name + " 的 BLE 写入通道不可用，首包已安全切换到经典蓝牙 SPP");
         return true;
     } catch (sppError) {
-        invalidatePlusBleConnection(Print, "CC4 的 BLE 与经典蓝牙 SPP 通道均不可用");
+        invalidatePlusBleConnection(Print, profile.name + " 的 BLE 与经典蓝牙 SPP 通道均不可用");
         var combined = new Error(
-            "CC4 BLE 写入失败（" + plusWriteFailureSummary(bleError)
+            profile.name + " BLE 写入失败（" + plusWriteFailureSummary(bleError)
             + "）；SPP 连接或写入也失败（" + plusWriteFailureSummary(sppError)
             + "）。请确认打印机已在 Android 系统蓝牙中配对后重新连接"
         );
@@ -800,7 +901,13 @@ async function connectPlusDevice(Print, device, options) {
     Print._plusMtuDeviceId = "";
 
     try {
-        await createPlusConnection(deviceId);
+        // 搜索状态会占用 Android GATT；任何新连接前都先停止搜索并释放同设备的
+        // 残留连接，避免 5+ 返回 10012 operate time out。
+        stopPlusBluetoothDiscovery();
+        Print._suppressDisconnectUntil = Date.now() + 1500;
+        await closePlusBleConnectionAndWait(deviceId, 1200);
+        await delay(250);
+        await createPlusConnectionWithRecovery(Print, deviceId);
         await delay(800);
         var services = await new Promise(function (resolve, reject) {
             window.plus.bluetooth.getBLEDeviceServices({
@@ -895,23 +1002,55 @@ async function connectPlusDevice(Print, device, options) {
     }
 }
 
-async function connectPlusPrinter(Print, device, options) {
+async function connectPlusPrinterUnsafe(Print, device, options) {
     options = options || {};
     var profileMode = normalizeProfileMode(options.profileMode || (device && device.profileMode) || Print._profileMode || "auto");
     var profile = resolvePrinterProfile(device && device.name, profileMode);
+    var isGprinterProfile = profile.id === "gprinter-gp-m322" || isLikelyGprinterSppName(device && device.name);
     if (device && device.transportHint === "spp") {
         return connectPlusSppDevice(Print, device, Object.assign({}, options, { profileMode: profileMode }));
     }
+
+    // GP-M322 同时暴露 BLE 与经典 SPP。5+ 的 plus.bluetooth 只有确认写，
+    // Android 上会把一张标签拖到十几秒；自动恢复时优先使用已配对的 SPP，
+    // 手工在连接页选择 BLE 时仍尊重用户选择（preferSpp=false）。
+    if (options.preferSpp !== false && isPlusAndroidSppSupported()
+        && (isAndroidSppPrinterProfile(profile.id) || isGprinterProfile)) {
+        var preferredSpp = findPairedPlusSppDevice(device, profileMode);
+        if (preferredSpp) {
+            return connectPlusSppDevice(Print, preferredSpp, Object.assign({}, options, {
+                profileMode: profileMode,
+            }));
+        }
+    }
+
     try {
         return await connectPlusDevice(Print, device, Object.assign({}, options, { profileMode: profileMode }));
     } catch (bleError) {
-        if (profile.id !== "zicox-cc4" || !isPlusAndroidSppSupported()) throw bleError;
-        if (typeof options.onStatus === "function") options.onStatus("CC4 的 BLE 通道不可用，正在尝试经典蓝牙 SPP...", "searching");
+        if ((!isAndroidSppPrinterProfile(profile.id) && !isGprinterProfile) || !isPlusAndroidSppSupported()) throw bleError;
+        var fallbackSpp = findPairedPlusSppDevice(device, profileMode);
+        if (!fallbackSpp) throw bleError;
+        if (typeof options.onStatus === "function") options.onStatus(profile.name + " 的 BLE 通道不可用，正在尝试经典蓝牙 SPP...", "searching");
         try {
-            return await connectPlusSppDevice(Print, device, Object.assign({}, options, { profileMode: profileMode }));
+            return await connectPlusSppDevice(Print, fallbackSpp, Object.assign({}, options, { profileMode: profileMode }));
         } catch (sppError) {
-            throw new Error("CC4 BLE 连接失败（" + bleError.message + "）；SPP 连接也失败（" + sppError.message + "）");
+            throw new Error(profile.name + " BLE 连接失败（" + bleError.message + "）；SPP 连接也失败（" + sppError.message + "）");
         }
+    }
+}
+
+async function connectPlusPrinter(Print, device, options) {
+    // 自动重连、连接页点击和打印前恢复可能在同一毫秒进入；5+ 原生层不允许
+    // 同一个 deviceId 并行 create/close GATT，否则会把后续请求变成 10012。
+    var previous = Print._plusConnectionPromise || Promise.resolve();
+    var current = previous.catch(function () { }).then(function () {
+        return connectPlusPrinterUnsafe(Print, device, options);
+    });
+    Print._plusConnectionPromise = current;
+    try {
+        return await current;
+    } finally {
+        if (Print._plusConnectionPromise === current) Print._plusConnectionPromise = null;
     }
 }
 
@@ -1293,7 +1432,14 @@ function showPlusBluetoothDialog(Print) {
             if (isSearching) { try { plus.bluetooth.stopBluetoothDevicesDiscovery(); } catch (e) { } isSearching = false; }
             stopBtn.style.display = "none"; searchBtn.style.display = "none";
             try {
-                await connectPlusPrinter(Print, Object.assign({}, device, { profileMode: profileSelect.value }), { onStatus: setStatus, profileMode: profileSelect.value });
+                await connectPlusPrinter(Print, Object.assign({}, device, {
+                    profileMode: profileSelect.value === "auto" ? (device.profileMode || "auto") : profileSelect.value,
+                }), {
+                    onStatus: setStatus,
+                    profileMode: profileSelect.value === "auto" ? (device.profileMode || "auto") : profileSelect.value,
+                    // 连接页已经让用户点选了具体的 BLE 或 SPP 项，不再偷偷替换通道。
+                    preferSpp: false,
+                });
                 _showConnectedDevice(deviceListEl, Print.BLEInformation.deviceName, Print.BLEInformation.deviceId);
             } catch (err) {
                 setStatus("连接失败: " + err.message, "error");
@@ -1526,6 +1672,7 @@ function createV8Print(V8) {
         _plusConnected: false,
         _plusConnectionGeneration: 0,
         _plusConnectAttemptGeneration: 0,
+        _plusConnectionPromise: null,
         _plusSupersededCloseGeneration: -1,
         _plusMtu: 0,
         _plusMtuDeviceId: "",
@@ -1657,7 +1804,9 @@ function createV8Print(V8) {
                     return false;
                 }
                 var connected = await Print.reconnect({ silent: true });
-                if (!connected) Print._scheduleReconnect("恢复上次连接的蓝牙打印机失败");
+                if (!connected && !shouldDeferAutomaticPlusBleReconnect(Print._rememberedInfo)) {
+                    Print._scheduleReconnect("恢复上次连接的蓝牙打印机失败");
+                }
                 return connected;
             })().finally(function () { Print._initializePromise = null; });
             return Print._initializePromise;
@@ -1671,6 +1820,16 @@ function createV8Print(V8) {
             var remembered = normalizeBLEInfo(Print._rememberedInfo);
             if (!remembered) {
                 updateConnectionState(Print, getBLEEngine() === "none" ? "unsupported" : "disconnected", { error: "未记住蓝牙打印机，请点击蓝牙图标连接" });
+                return Promise.resolve(false);
+            }
+
+            // Android 的 GP-M322/CC4 如果上次记住的是 BLE，不在页面后台静默重连。
+            // 5+ BLE 的残留 GATT 很容易返回 10012；用户打开连接页后可明确选择
+            // 已配对的 SPP（高速稳定）或重新选择 BLE。
+            if (options.silent && shouldDeferAutomaticPlusBleReconnect(remembered)) {
+                updateConnectionState(Print, "disconnected", {
+                    error: "Android 蓝牙打印机请在连接页重新选择 SPP 或 BLE 通道",
+                });
                 return Promise.resolve(false);
             }
 
@@ -1706,6 +1865,7 @@ function createV8Print(V8) {
 
         _scheduleReconnect: function (reason) {
             if (Print._manualDisconnect || !Print._rememberedInfo || Print.isConnected()) return;
+            if (shouldDeferAutomaticPlusBleReconnect(Print._rememberedInfo)) return;
             if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
             if (Print._reconnectTimer || Print._reconnectPromise) return;
             if (Print._reconnectAttempt >= RECONNECT_DELAYS.length) {
