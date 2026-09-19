@@ -15,6 +15,8 @@ import {
   terminationOrderValues, bindTerminationOrder
 } from './contract-termination.mjs'
 import { normalizeUploadItems } from '@/platform/display.js'
+import { userOrganizationValues } from './user-organization.mjs'
+import { userRoleLevel } from './user-role-level.mjs'
 import {
   V8,
   getUser,
@@ -2211,6 +2213,22 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  if (String(context.tableName || '').toLowerCase() === 'sys_user' &&
+    String(payload?.field?.Name || '').toLowerCase() === 'roleids' && payload.multiple) {
+    const levelField = (context.definition?.fields || []).find((field) => String(field.Name || '').toLowerCase() === 'level')
+    if (levelField) context.patchForm({ [levelField.Name]: userRoleLevel(payload) })
+    return { handled: true }
+  }
+  if (String(context.tableName || '').toLowerCase() === 'sys_user' &&
+    String(payload?.field?.Name || '').toLowerCase() === 'deptid' && !payload.multiple) {
+    const values = userOrganizationValues(payload)
+    // 只回填当前真实表单已有字段，避免新增未授权的业务字段。
+    const fields = context.definition?.fields || []
+    const patch = {}
+    fields.forEach((field) => { if (Object.prototype.hasOwnProperty.call(values, field.Name)) patch[field.Name] = values[field.Name] })
+    context.patchForm(patch)
+    return { handled: true }
+  }
   if (isTerminationForm(context) && payload?.field?.Name === 'DingdanBH' && !payload.multiple) {
     const menu = await findMenu(['订单商品'], ORDER_PRODUCT_TABLE)
     context.state.terminationGoodsMenuId = menu?.Id || ''

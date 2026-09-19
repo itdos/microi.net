@@ -1,4 +1,4 @@
-import { getMenuButtonRect } from './platform.js'
+import { getMenuButtonRect, getPlatform } from './platform.js'
 
 const EMPTY_METRICS = {
   top: 0,
@@ -15,6 +15,26 @@ const EMPTY_METRICS = {
   capsuleHeight: 0,
   windowWidth: 0,
   windowHeight: 0
+}
+
+let lastValidCapsule = null
+
+function normalizeCapsule(rect, windowWidth, statusBarHeight) {
+  if (!rect || !windowWidth) return { capsuleRight: 0, capsuleTop: 0, capsuleHeight: 0 }
+  const width = positiveNumber(rect.width) || Math.max(0, Number(rect.right) - Number(rect.left))
+  const height = positiveNumber(rect.height)
+  const top = positiveNumber(rect.top)
+  const edgeGap = windowWidth - Number(rect.right)
+  // left 在启动/恢复时可能与当前窗口坐标不同步，横向占位以实际宽度和右边缘为准。
+  const valid = width > 0 && width <= Math.min(144, windowWidth / 2) && height > 0 && height <= 64 &&
+    Number.isFinite(edgeGap) && edgeGap >= 0 && edgeGap <= 32 && top >= statusBarHeight && top - statusBarHeight <= 32
+  if (valid) {
+    lastValidCapsule = { windowWidth, statusBarHeight, capsuleRight: width + edgeGap + 8, capsuleTop: top, capsuleHeight: height }
+    return lastValidCapsule
+  }
+  // 只复用当前窗口测量；异常值不能变成大块 padding，也不能污染方向切换后的布局。
+  if (lastValidCapsule?.windowWidth === windowWidth && lastValidCapsule.statusBarHeight === statusBarHeight) return lastValidCapsule
+  return { capsuleRight: 104, capsuleTop: statusBarHeight + 4, capsuleHeight: 32 }
 }
 
 function readWindowInfo() {
@@ -97,18 +117,15 @@ export function getSafeAreaMetrics() {
   )
 
   const menuRect = injected
-    ? {
+    ? positiveNumber(info.capsuleRight) ? {
         top: positiveNumber(info.capsuleTop),
         height: positiveNumber(info.capsuleHeight),
-        left: windowWidth ? windowWidth - positiveNumber(info.capsuleRight) : 0
-      }
-    : getMenuButtonRect()
-  const capsuleTop = positiveNumber(menuRect && menuRect.top)
-  const capsuleHeight = positiveNumber(menuRect && menuRect.height)
-  let capsuleRight = positiveNumber(info.capsuleRight)
-  if (!capsuleRight && menuRect && windowWidth && capsuleHeight > 0 && positiveNumber(menuRect.left) > 0) {
-    capsuleRight = Math.max(0, windowWidth - Number(menuRect.left || windowWidth) + 8)
-  }
+        width: Math.max(0, positiveNumber(info.capsuleRight) - 16),
+        right: windowWidth - 8,
+        left: windowWidth - positiveNumber(info.capsuleRight) + 8
+      } : null
+    : getMenuButtonRect() || (getPlatform() === 'mp-weixin' ? {} : null)
+  const { capsuleTop, capsuleHeight, capsuleRight } = normalizeCapsule(menuRect, windowWidth, statusBarHeight)
   const capsuleGap = capsuleTop > statusBarHeight ? capsuleTop - statusBarHeight : 0
   const navHeight = Math.max(
     44,
