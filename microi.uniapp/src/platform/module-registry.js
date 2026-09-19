@@ -1,7 +1,7 @@
 import { getUser, V8 } from '@/utils/request.js'
 import { cachedRequest } from '@/platform/cache.js'
 import { findMenu, loadMenuTree } from '@/platform/business-runtime.js'
-import { loadNativeFormDefinition, parseJson } from '@/platform/native-form.js'
+import { createNativeFormDefinition, loadNativeFormDefinition, parseJson } from '@/platform/native-form.js'
 import { normalizeStringList } from '@/platform/view-schema-core.mjs'
 import { appendSystemAuditFields, resolveConfiguredFieldNames, resolveConfiguredFields } from '@/platform/card-field-policy.mjs'
 import { compileModuleFilterFields } from '@/platform/list-filter-fields.mjs'
@@ -291,6 +291,29 @@ export function createMenuModuleDefinition(menu, definition, table = null) {
   const module = baseModule(menu, null, table || definition.table || null)
   if (!module.table) return null
   return createModuleDefinition(module, definition)
+}
+
+// 保护表的公开目录只接受安全接口的窄展示投影，不通过普通 CRUD 读取系统设计数据。
+export async function loadApiModuleDefinition(config, refresh = false) {
+  const response = await V8.ApiEngine.Run(config.metadataApiEngineKey, {
+    Action: 'GetCardDefinition',
+    ModuleEngineKey: config.configuredModuleEngineKey || '',
+    _SysMenuId: config.configuredMenuId || ''
+  }, { checkCode: false })
+  if (!response || Number(response.Code) !== 1 || !response.Data?.Menu || !response.Data?.Table) {
+    throw new Error(response?.Msg || '卡片配置加载失败')
+  }
+  const { Menu: menu, Table: table, Fields: fields } = response.Data
+  if (!menu.Id || String(menu.DiyTableId) !== String(table.Id) ||
+      String(table.Name || '').toLowerCase() !== String(config.table || '').toLowerCase() ||
+      (config.configuredModuleEngineKey && String(menu.ModuleEngineKey).toLowerCase() !== String(config.configuredModuleEngineKey).toLowerCase()) ||
+      (config.configuredMenuId && String(menu.Id) !== String(config.configuredMenuId))) {
+    throw new Error('卡片配置与授权模块不一致')
+  }
+  const definition = createNativeFormDefinition(table, fields || [])
+  // 每次进入/下拉刷新回读小型投影；后端仍使用 FormEngine 缓存，字段变化不等待本地旧定义过期。
+  definition.schemaFingerprint = JSON.stringify([menu.UpdateTime, menu.ViewConfigVersion, fields])
+  return createMenuModuleDefinition(menu, definition, table)
 }
 
 export async function loadModuleDefinition(menuId, refresh = false, options = {}) {

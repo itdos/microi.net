@@ -1,6 +1,5 @@
 const fs = require('fs');
 const http = require('http');
-const os = require('os');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const WebSocketClient = globalThis.WebSocket || require('ws');
@@ -61,6 +60,26 @@ const sysUserRow = {
   ServiceContacts: '[{"Id":"contact-001","CreateTime":"2026-07-20 11:02:12","UserName":"管理员","Xingming":"赵经理","ShoujiH":"13800000001"}]',
   Biography: '<p><strong>负责宁波片区售后服务</strong></p>'
 };
+
+let directoryCardRevision = 1;
+const directoryFields = [...sysUserFields, ...['DeptName', 'RoleIds', 'DeptId', 'DeptIds'].map(Name => ({
+  Id: `field-${Name}`, Name, Label: Name === 'RoleIds' ? '角色' : Name === 'DeptId' ? '所属组织机构' : Name === 'DeptIds' ? '兼职组织机构' : '部门名称',
+  Component: Name.startsWith('DeptId') ? 'Department' : 'Text', AppVisible: 1, Visible: 1,
+  Config: JSON.stringify(Name.startsWith('DeptId') ? { Department: { Multiple: Name === 'DeptIds', EmitPath: Name === 'DeptIds' } } : {})
+})), { Id: 'field-State', Name: 'State', Label: '状态', Component: 'Radio', AppVisible: 1, Visible: 1,
+  Config: '{"SelectSaveField":"Key","SelectLabel":"Value","DataSource":"Data"}', Data: '[{"Key":"1","Value":"启用"},{"Key":"0","Value":"禁用"}]' }];
+function directoryCardDefinition() {
+  if (directoryCardRevision === 3) return { Code: 0, Msg: '当前账号无权查看通讯录' };
+  const names = directoryCardRevision === 1 ? ['Name', 'Account', 'Phone', 'Sex', 'DeptName', 'RoleIds', 'DeptId'] : ['Phone', 'Name', 'Sex'];
+  return { Code: 1, Data: { Table: sysUserTable, Fields: directoryFields, Menu: {
+    Id: 'directory-card-menu', Name: '通讯录', DiyTableId: sysUserTable.Id, DiyTableName: 'Sys_User', ModuleEngineKey: 'Sys_User',
+    ViewConfigVersion: directoryCardRevision,
+    SearchFieldIds: ['DeptId', 'DeptIds', 'State'],
+    MobileListFields: names.map(Name => ({ Name, Label: directoryFields.find(f => f.Name === Name).Label })),
+    CardTitleTagFields: directoryCardRevision === 2 ? ['RoleIds'] : [],
+    CardBottomTagFields: directoryCardRevision === 2 ? ['DeptId'] : []
+  } } };
+}
 
 const merchantDetail = {
   Id: 'merchant-001', TenantName: '新纪源测试商家', Zhuangtai: '通过', LianxiR: '12345', LianxiRDH: '12345',
@@ -319,6 +338,17 @@ function periodCount(body, fallback) {
 }
 
 const targets = [
+  {
+    name: 'home-header', route: '/#/pages/workspace/index', selector: '.home-page',
+    required: ['.home-header', '.brand-logo', '.brand-name', '.topbar-actions'],
+    requireCapsuleAvoidance: true
+  },
+  {
+    name: 'directory', route: '/#/pages/business/list?key=directory', selector: '.list-page',
+    required: ['.summary-strip', '.data-card', '.period-tabs'],
+    expectedText: ['张服务', '登录账号', '手机号', '性别', '部门名称', '角色', '所属组织机构', '业务部', '销售'],
+    forbiddenText: ['role-sales', 'dept-sales', '客户（用户）']
+  },
   {
     name: 'home', route: '/#/pages/workspace/index', selector: '.home-page',
     required: ['.home-header', '.mci-water-motion__video', '.quick-grid', '.business-section'],
@@ -706,6 +736,16 @@ function buildMockResponse(request) {
   mockRequestLog.push({ url, body, table, time: Date.now() });
 
   if (request.method === 'OPTIONS') return { status: 204, body: '' };
+  if (lowerUrl.includes('gettabledatatree') && String(table).toLowerCase() === 'sys_dept') return {
+    Code: 1, Data: [{ Id: 'dept-sales', Name: '业务部' }, { Id: 'dept-service', Name: '服务部' }], DataCount: 2
+  };
+  if (apiEngineKey === 'get-sysuser-list') {
+    if (body.Action === 'GetCardDefinition') return directoryCardDefinition();
+    const status = (body._Where || []).find(item => item.Name === 'State')?.Value;
+    return { Code: 1, Data: [{ ...sysUserRow, State: status == null ? 1 : Number(status), Name: String(status) === '0' ? '禁用测试人员' : sysUserRow.Name,
+      DeptName: '业务部', DeptId: 'dept-sales', DeptIds: '[["dept-sales"]]', RoleIds: '["role-sales"]',
+      _CardDisplay: { RoleIds: '销售', DeptId: '业务部' }, CreateTime: '2026-09-01 09:00:00', UpdateTime: '2026-09-02 09:00:00' }], DataCount: periodCount(body, 1) };
+  }
   if (lowerUrl.includes('getsysconfig') || lowerUrl.includes('microi-init')) {
     return { Code: 1, Data: { SysTitle: '集福鲤', SysShortTitle: '集福鲤', CompanyName: '新纪源水科技', DisableAiAssistant: 0 } };
   }
@@ -1119,6 +1159,121 @@ async function setLoggedInState(cdp) {
   });
 }
 
+async function testDirectoryCardRefresh(cdp) {
+  const refresh = async () => {
+    const state = await cdp.send('Runtime.evaluate', {
+      expression: `(async () => {
+        let component = document.querySelector('.list-page').__vueParentComponent;
+        while (component && !(component.proxy && typeof component.proxy.refresh === 'function')) component = component.parent;
+        if (!component || !component.proxy) return { found: false };
+        await component.proxy.refresh();
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        return { found: true, refreshing: component.proxy.refreshing, loading: component.proxy.loading };
+      })()`, awaitPromise: true, returnByValue: true
+    });
+    if (!state.result.value?.found || state.result.value.refreshing || state.result.value.loading) fail('Directory refresh did not finish');
+  };
+  const initial = await cdp.send('Runtime.evaluate', { expression: `Array.from(document.querySelectorAll('.data-card .field-label'), e => e.innerText)`, returnByValue: true });
+  if (JSON.stringify(initial.result.value) !== JSON.stringify(['登录账号', '手机号', '性别', '部门名称', '角色', '所属组织机构'])) fail(`Directory field order drifted: ${JSON.stringify(initial.result.value)}`);
+  directoryCardRevision = 2;
+  await refresh();
+  await waitForExpression(cdp, `document.querySelector('.card-title')?.innerText === '13900001234' && document.querySelector('.data-tag')?.innerText === '销售'`);
+  const changed = await cdp.send('Runtime.evaluate', { expression: `Array.from(document.querySelectorAll('.data-card .field-label'), e => e.innerText)`, returnByValue: true });
+  if (JSON.stringify(changed.result.value) !== JSON.stringify(['姓名', '性别'])) fail('Directory refresh retained the previous fields');
+  // 列表 refresh 不阻塞异步时间统计；先等待上一轮合法的统计请求结束。
+  await delay(700);
+  directoryCardRevision = 3;
+  const listRequestsBefore = mockRequestLog.filter(item => /get-sysuser-list/i.test(item.url) && item.body._PageIndex).length;
+  await refresh();
+  await waitForExpression(cdp, `document.querySelector('.metadata-error')?.innerText.includes('当前账号无权查看通讯录') && !document.querySelector('.data-card')`);
+  const listRequestsAfter = mockRequestLog.filter(item => /get-sysuser-list/i.test(item.url) && item.body._PageIndex).length;
+  if (listRequestsBefore !== listRequestsAfter) fail('Denied directory metadata still queried personnel');
+  directoryCardRevision = 1;
+  console.log('PASS directory-card-refresh -> new title/columns/tags, then authorization failure clears old cards without a personnel request.');
+}
+
+async function testDirectoryFilters(cdp, viewport) {
+  const evaluate = async expression => (await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result.value;
+  const pageProxy = `let component = document.querySelector('.list-page').__vueParentComponent; while (component && !component.proxy?.openAdvancedFilters) component = component.parent; const page = component.proxy;`;
+  const capture = async name => {
+    await delay(220);
+    const shot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    fs.writeFileSync(path.join(outputRoot, `${name}-${viewport.name}.png`), Buffer.from(shot.data, 'base64'));
+  };
+  const labels = await evaluate(`Array.from(document.querySelectorAll('.status-item'), e => e.innerText)`);
+  if (JSON.stringify(labels) !== JSON.stringify(['全部状态', '启用', '禁用'])) fail(`Directory status labels: ${JSON.stringify(labels)}`);
+  await evaluate(`Array.from(document.querySelectorAll('.status-item')).find(e => e.innerText === '禁用').click()`);
+  await waitForExpression(cdp, `document.querySelector('.card-title')?.innerText === '禁用测试人员' && document.querySelector('.status-chip')?.innerText === '禁用'`);
+  const request = mockRequestLog.filter(item => /get-sysuser-list/i.test(item.url) && item.body._PageIndex && item.body._Where?.some(w => w.Name === 'State' && String(w.Value) === '0')).at(-1);
+  const currentStatus = await evaluate(`(() => { ${pageProxy} return { selected: page.status, states: page.rows.map(row => row.State) }; })()`);
+  if (!request || String(currentStatus.selected) !== '0' || currentStatus.states.some(state => state !== 0)) fail('Disabled status lost its query value or returned enabled personnel');
+  await capture('directory-disabled');
+  await evaluate(`Array.from(document.querySelectorAll('.status-item')).find(e => e.innerText === '全部状态').click()`);
+  await waitForExpression(cdp, `document.querySelector('.card-title')?.innerText === '张服务'`);
+  await evaluate(`(() => { ${pageProxy} page.openAdvancedFilters(); })()`);
+  for (const label of ['所属组织机构', '兼职组织机构']) {
+    await evaluate(`Array.from(document.querySelectorAll('.filter-field')).find(e => e.querySelector('.filter-field__head')?.innerText === ${JSON.stringify(label)}).querySelector('.native-select__trigger').click()`);
+    await waitForExpression(cdp, `document.querySelectorAll('.native-select__popover .native-select__option.multiple').length === 2`);
+    await evaluate(`document.querySelectorAll('.native-select__popover .native-select__option')[0].click()`);
+    await evaluate(`document.querySelectorAll('.native-select__popover .native-select__option')[1].click()`);
+    await waitForExpression(cdp, `document.querySelectorAll('.native-select__popover .native-select__checkbox.checked').length === 2`);
+    await evaluate(`document.querySelector('.native-select__backdrop').click()`);
+  }
+  await waitForExpression(cdp, `document.querySelectorAll('.filter-sheet .selected-tag').length === 4`);
+  await capture('directory-organizations');
+  await evaluate(`(() => { ${pageProxy} page.applyAdvancedFilters(); })()`);
+  await waitForExpression(cdp, `!document.querySelector('.filter-sheet') && !document.querySelector('.skeleton-card')`);
+  const selected = await evaluate(`(() => { ${pageProxy} return page.buildFilterWhere(); })()`);
+  if (!selected.some(item => item.Name === 'DeptId' && item.Type === 'In' && item.Value.length === 2) || selected.filter(item => item.Name === 'DeptIds').length < 2) fail(`Organization request was not multiple: ${JSON.stringify(selected)}`);
+  await evaluate(`(async () => { ${pageProxy} page.filterValues = {}; await page.loadData(true, true); })()`);
+  console.log(`PASS directory-filters ${viewport.name} -> status labels, disabled request/cards, two organization multiselect controls and grouped query.`);
+}
+
+async function testHomeHeaderRecovery(cdp, viewport) {
+  const apply = async capsuleRight => {
+    await cdp.send('Runtime.evaluate', { expression: `(async () => {
+      globalThis.__XJY_VISUAL_SAFE_AREA__ = ${JSON.stringify({ ...viewport.safe, statusBarHeight: viewport.safe.top, windowWidth: viewport.width, windowHeight: viewport.height, capsuleTop: viewport.safe.top + 4, capsuleHeight: 32 })};
+      globalThis.__XJY_VISUAL_SAFE_AREA__.capsuleRight = ${capsuleRight};
+      let component = document.querySelector('.home-page').__vueParentComponent;
+      while (component && !component.proxy?.refreshSafeArea) component = component.parent;
+      component.proxy.refreshSafeArea();
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    })()`, awaitPromise: true });
+  };
+  const measure = async () => (await cdp.send('Runtime.evaluate', { expression: `(() => {
+    const logo = document.querySelector('.brand-logo').getBoundingClientRect();
+    const name = document.querySelector('.brand-name'); const style = getComputedStyle(name);
+    const copy = document.querySelector('.brand-copy').getBoundingClientRect();
+    const actions = document.querySelector('.topbar-actions').getBoundingClientRect();
+    const topbar = document.querySelector('.topbar').getBoundingClientRect();
+    const rootStyle = getComputedStyle(document.querySelector('.home-page'));
+    const capsuleTop = parseFloat(rootStyle.getPropertyValue('--mci-capsule-top')) || 0;
+    const capsuleHeight = parseFloat(rootStyle.getPropertyValue('--mci-capsule-height')) || 0;
+    const capsuleRight = parseFloat(rootStyle.getPropertyValue('--mci-capsule-right')) || 0;
+    return { logo: logo.toJSON(), nameHeight: name.getBoundingClientRect().height, lineHeight: parseFloat(style.lineHeight),
+      nameWidth: name.getBoundingClientRect().width, nameClipped: name.scrollWidth > name.clientWidth + 1,
+      whiteSpace: style.whiteSpace, copyRight: copy.right, actionsLeft: actions.left, actionsRight: actions.right,
+      capsuleCenter: capsuleTop + capsuleHeight / 2, capsuleRight,
+      topbarRight: topbar.right, viewportWidth: innerWidth };
+  })()`, returnByValue: true })).result.value;
+  for (const [stage, footprint] of [['transient', Math.min(240, viewport.width - 60)], ['recovered', Number(viewport.safe.capsuleRight || 96)]]) {
+    await apply(footprint);
+    const dimensions = await measure();
+    if (Math.abs(dimensions.logo.width - dimensions.logo.height) > 1 || dimensions.logo.width < viewport.width * 74 / 750 - 1 ||
+      dimensions.nameHeight > dimensions.lineHeight + 1 || dimensions.copyRight > dimensions.actionsLeft + 1 || dimensions.topbarRight > viewport.width + 1) {
+      fail(`Home header compressed at ${stage}: ${JSON.stringify(dimensions)}`);
+    }
+    if (dimensions.nameClipped || Math.abs(dimensions.logo.y + dimensions.logo.height / 2 - dimensions.capsuleCenter) > 8 ||
+      dimensions.actionsRight > viewport.width - dimensions.capsuleRight + 1 || dimensions.capsuleRight > 160) {
+      fail(`Home header must share one row with the capsule: ${JSON.stringify(dimensions)}`);
+    }
+  }
+  const shot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  fs.writeFileSync(path.join(outputRoot, `home-header-recovered-${viewport.name}.png`), Buffer.from(shot.data, 'base64'));
+  await cdp.send('Runtime.evaluate', { expression: `delete globalThis.__XJY_VISUAL_SAFE_AREA__` });
+  console.log(`PASS home-header-recovery ${viewport.name} -> transient capsule measurement, reactive refresh, square logo and one-line brand.`);
+}
+
 async function inspectLayout(cdp, target, viewport) {
   const result = await cdp.send('Runtime.evaluate', {
     returnByValue: true,
@@ -1195,7 +1350,7 @@ async function inspectLayout(cdp, target, viewport) {
         top: Number(expectedSafe.capsuleTop || 0),
         bottom: Number(expectedSafe.capsuleTop || 0) + Number(expectedSafe.capsuleHeight || 0)
       };
-      const capsuleTargets = [...document.querySelectorAll('.ai-assistant__identity, .ai-assistant__header-actions .ai-assistant__icon-button, .ai-assistant__drawer-close')];
+      const capsuleTargets = [...document.querySelectorAll('.ai-assistant__identity, .ai-assistant__header-actions .ai-assistant__icon-button, .ai-assistant__drawer-close, .home-page .brand, .home-page .topbar-actions .icon-button')];
       const requireCapsuleAvoidance = ${JSON.stringify(Boolean(target.requireCapsuleAvoidance))};
       const collidingCapsuleTargets = !requireCapsuleAvoidance ? [] : capsuleTargets.filter((element) => {
         const rect = element.getBoundingClientRect();
@@ -1268,7 +1423,7 @@ async function main() {
   const appPort = await getFreePort();
   const debugPort = await getFreePort();
   const server = createStaticServer();
-  const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xjy-uniapp-visual-'));
+  const profileDir = fs.mkdtempSync(path.join(outputRoot, 'browser-profile-'));
   let browser;
   let cdp;
   const report = [];
@@ -1312,6 +1467,7 @@ async function main() {
         color: { r: 244, g: 248, b: 250, a: 1 }
       });
       for (const target of activeTargets) {
+        if (target.name === 'directory') directoryCardRevision = 1;
         currentContext = `${target.name}/${viewport.name}`;
         const errorStart = browserErrors.length;
         if (target.name === 'login' || target.anonymous) {
@@ -1411,6 +1567,11 @@ async function main() {
         if (unexpectedBrowserErrors.length) fail(`Browser error for ${target.name} at ${viewport.name}: ${JSON.stringify(unexpectedBrowserErrors)}`);
         if (fileSize < 12000 || layout.bodyTextLength < 20) fail(`Screenshot appears blank for ${target.name} at ${viewport.name}.`);
         console.log(`PASS ${target.name} ${viewport.name} -> ${screenshotPath}`);
+        if (target.name === 'home-header') await testHomeHeaderRecovery(cdp, viewport);
+        if (target.name === 'directory') {
+          await testDirectoryFilters(cdp, viewport);
+          await testDirectoryCardRefresh(cdp);
+        }
       }
     }
 
@@ -1431,7 +1592,12 @@ async function main() {
     if (browser && !browser.killed) browser.kill();
     await waitForProcessExit(browser);
     server.close();
-    try { fs.rmSync(profileDir, { recursive: true, force: true }); } catch (error) {}
+    try {
+      const relativeProfilePath = path.relative(outputRoot, path.resolve(profileDir));
+      if (relativeProfilePath && !relativeProfilePath.startsWith('..') && !path.isAbsolute(relativeProfilePath)) {
+        fs.rmSync(profileDir, { recursive: true, force: true });
+      }
+    } catch (error) {}
   }
 }
 

@@ -150,7 +150,9 @@ statusOverrideSources.forEach((file) => {
   )
   assert.match(
     source,
-    /merged\.statusOptions = dynamic\.statusOptions \|\| \[\]/,
+    file === '../src/pages/business/list.vue'
+      ? /merged\.statusOptions = \[\.\.\.new Set\(\[[\s\S]{0,200}dynamic\.statusOptions/
+      : /merged\.statusOptions = dynamic\.statusOptions \|\| \[\]/,
     `${file} 状态筛选项应同步跟随跨端状态字段`
   )
   assert.match(

@@ -167,6 +167,14 @@
       <!-- #ifdef H5 -->
       </Teleport>
       <!-- #endif -->
+      <!-- 完整已选列表放在输入框下方，避免折叠预览使第三项之后的选项无法直接移除。筛选区已有标签列表。 -->
+      <view v-if="isMultiple && !optionLoader && !selectorOpen && selectionItems.length" class="native-select__selected-tags">
+        <view v-for="item in selectionItems" :key="item.key" class="native-select__selected-tag">
+          <text class="native-select__selected-tag-label">{{ item.label }}</text>
+          <view class="native-select__remove" role="button" :aria-label="`移除${item.label}`" hover-class="native-select__remove--pressed"
+            @tap.stop="removeSelectedItem(item)"><text>×</text></view>
+        </view>
+      </view>
     </template>
 
     <view v-else-if="isOptionComponent" class="native-control__unavailable"><text>{{ field.optionError || '暂无可选数据，请稍后重试' }}</text></view>
@@ -241,6 +249,7 @@ import { isHtmlValue, normalizeRichTextHtml } from '@/platform/display.js'
 import { formatRegionSelection } from '@/platform/region-value.mjs'
 import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 import { positionNativeSelector } from '@/platform/native-selector-position.mjs'
+import { nativeTreeConfig, nativeTreeOptions, nativeTreeSelectionValues, nativeTreeSelectionKey, collectNativeTreeRows } from '@/platform/native-tree-options.mjs'
 
 const OPTION_COMPONENTS = new Set(['Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Autocomplete', 'Cascader', 'SelectTree', 'TreeCheckbox', 'Department', 'Transfer'])
 export default {
@@ -311,6 +320,7 @@ export default {
       } : {}
     },
     component() { return String(this.field.component || 'Text') },
+    nativeTree() { return this.optionLoader ? null : nativeTreeConfig(this.field) },
     isImage() { return this.component === 'ImgUpload' },
     isFile() { return this.component === 'FileUpload' },
     hasModelValue() {
@@ -338,7 +348,7 @@ export default {
     },
     richHtml() { return normalizeRichTextHtml(this.modelValue) },
     qrcodeUrl() { return this.component === 'Qrcode' ? V8.assetUrl(this.modelValue) : '' },
-    displayText() { return fieldDisplayValue(this.field, this.modelValue) },
+    displayText() { return this.nativeTree ? this.selectionItems.map((item) => item.label).join('、') || '-' : fieldDisplayValue(this.field, this.modelValue) },
     editableText() {
       if (this.component !== 'JsonTable') return String(this.modelValue || '')
       const parsed = parseJson(this.modelValue, this.modelValue)
@@ -430,6 +440,11 @@ export default {
       return (Array.isArray(value) ? value : value ? [value] : []).map((item) => String(item && typeof item === 'object' ? (item[config.SelectSaveField] ?? item.Id ?? item.Key ?? item.value) : item))
     },
     selectionItems() {
+      if (this.nativeTree) return this.currentSelectionValues().map((value, index) => {
+        const key = this.selectionKey(value)
+        const option = this.knownOptions.find((item) => String(item.value) === key)
+        return { key: `${key}:${index}`, selectionIndex: index, value: key, label: option?.label || (value && !Array.isArray(value) && typeof value === 'object' ? value[this.nativeTree.labelKey] || key : key) }
+      }).filter((item) => item.value)
       const parsed = parseJson(this.modelValue, this.modelValue)
       const values = this.isMultiple
         ? (Array.isArray(parsed) ? parsed : parsed ? [parsed] : [])
@@ -448,6 +463,7 @@ export default {
           : raw
         return {
           key: `${String(key)}:${index}`,
+          selectionIndex: index,
           value: String(key),
           label: option ? option.label : String(fallback ?? '')
         }
@@ -471,6 +487,10 @@ export default {
       handler(options) { this.rememberOptions(Array.isArray(options) ? options : []) }
     }
   },
+  mounted() {
+    // 组织字段的 Data 可能是旧租户模板；回显从当前授权数据源获取，不能用模板机构名代替真实组织。
+    if (this.nativeTree && this.hasSelection) this.loadTreeDisplayOptions()
+  },
   beforeUnmount() {
     this.closeSelector()
     if (this.searchTimer) clearTimeout(this.searchTimer)
@@ -481,6 +501,7 @@ export default {
   methods: {
     emitValue(value) { this.$emit('update:modelValue', value); this.$emit('change', value) },
     optionValue(option) {
+      if (this.nativeTree) return option.treeValue
       const config = this.field.config || {}
       const raw = option.raw
       // zhy：多选与平台保持一致，保存数据源返回的完整行对象，不按 SelectSaveField 裁剪。
@@ -502,19 +523,20 @@ export default {
       this.knownOptions = [...map.values()]
     },
     currentSelectionValues() {
+      if (this.nativeTree) return nativeTreeSelectionValues(this.field, this.modelValue)
       const parsed = parseJson(this.modelValue, this.modelValue)
       return this.isMultiple
         ? (Array.isArray(parsed) ? parsed : parsed ? [parsed] : [])
         : (parsed === null || parsed === undefined || parsed === '' ? [] : [parsed])
     },
     selectionKey(value) {
+      if (this.nativeTree) return nativeTreeSelectionKey(this.field, value)
       const config = this.field.config || {}
       return String(value && typeof value === 'object'
         ? (value[config.SelectSaveField] ?? value.Id ?? value.Key ?? value.value ?? value.Value)
         : value)
     },
-    initializeDraftSelection() {
-      const values = this.currentSelectionValues()
+    initializeDraftSelection(values = this.currentSelectionValues()) {
       this.draftIds = []
       this.draftValues = {}
       values.forEach((value) => {
@@ -565,11 +587,12 @@ export default {
       this.$emit('selector-toggle', true)
       if (!this.selectorPortal) this.$nextTick(() => this.updateSelectorPlacement())
       await this.loadOptionPage(true)
+      if (this.nativeTree) this.expandedTreeKeys = [...new Set(this.selectorOptions.filter((option) => this.isDraftSelected(option)).flatMap((option) => option.treeAncestors))]
     },
     measureSelectorAnchor() {
       return new Promise((resolve) => {
         try {
-          uni.createSelectorQuery().in(this).select('.native-control').boundingClientRect((rect) => {
+          uni.createSelectorQuery().in(this).select('.native-select__trigger').boundingClientRect((rect) => {
             resolve(rect && rect.width > 0 && rect.height > 0 ? rect : null)
           }).exec()
         } catch (error) { resolve(null) }
@@ -639,6 +662,28 @@ export default {
       })
       this.clearSearch()
     },
+    removeSelectedItem(item) {
+      if (this.readonly || !this.isMultiple) return
+      // 从原值删除对应项，保留其余完整对象/树路径；无需重新加载选项即可移除历史或已失效选项。
+      const values = this.currentSelectionValues()
+      const selected = this.selectionItems.find((selected) => selected.key === item.key)
+      if (!selected) return
+      const index = selected.selectionIndex
+      const remaining = values.filter((value, position) => position !== index)
+      this.emitValue(remaining)
+      // Vue 父组件回写 prop 要等下一轮更新，草稿先使用本次剩余值，避免仍保留刚移除的勾选。
+      this.initializeDraftSelection(remaining)
+      const options = this.draftIds.map((key) => this.knownOptions.find((option) => String(option.value) === key)).filter(Boolean)
+      this.$emit('select', {
+        field: this.field,
+        value: remaining,
+        options,
+        raw: options.map((option) => option.raw),
+        multiple: true,
+        cleared: remaining.length === 0,
+        removed: values[index]
+      })
+    },
     filterLocalOptions(options) {
       return filterNativeFieldOptions(options, this.searchKeyword)
     },
@@ -659,7 +704,7 @@ export default {
         ;(Array.isArray(options) ? options : []).forEach((option) => {
           const key = String(option && option.value)
           if (this.draftIds.includes(key) && option.raw && typeof option.raw === 'object') {
-            values[key] = option.raw
+            values[key] = this.nativeTree ? this.optionValue(option) : option.raw
           }
         })
         this.draftValues = values
@@ -684,7 +729,7 @@ export default {
         this.optionTotal = 0
         this.optionFinished = false
       }
-      if (!this.hasRemoteOptions) {
+      if (!this.hasRemoteOptions && !this.nativeTree) {
         this.loadClientOptionPage(reset)
         return
       }
@@ -754,19 +799,36 @@ export default {
       }
     },
     requestOptionPage(options) {
+      if (this.nativeTree) return this.loadNativeTreePage(options)
       return this.optionLoader ? this.optionLoader(options) : loadNativeFieldOptionPage(this.field, this.formData, options)
+    },
+    async getNativeTreeRows(parent = null) {
+      return collectNativeTreeRows(this.field, (options) => this.hasRemoteOptions
+        ? loadNativeFieldOptionPage(this.field, this.formData, { ...options, menuId: this.menuId, moduleEngineKey: this.moduleEngineKey, tableChildAuth: this.tableChildAuth })
+        : Promise.resolve({ treeRows: parseJson(this.field.Data, []) || [], hasMore: false }), parent)
+    },
+    async loadNativeTreePage(options) {
+      const rows = nativeTreeOptions(this.field, await this.getNativeTreeRows())
+      const filtered = filterNativeFieldOptions(rows, options.keyword)
+      return { options: filtered, total: filtered.length, totalKnown: true, hasMore: false }
+    },
+    async loadTreeDisplayOptions() {
+      try {
+        const page = await this.loadNativeTreePage({ keyword: '' })
+        this.rememberOptions(page.options)
+      } catch (error) { /* 回显失败保留已有值；打开选择器时显示错误并允许重试。 */ }
     },
     async toggleTreeOption(option) {
       if (this.expandedTreeKeys.includes(option.value)) {
         this.expandedTreeKeys = this.expandedTreeKeys.filter((key) => key !== option.value)
         return
       }
-      if (option.treeLazy && this.treeLoader) {
+      if (option.treeLazy && (this.treeLoader || this.nativeTree)) {
         if (this.treeLoadingKey) return
         this.treeLoadingKey = option.value
         const requestId = this.optionRequestId
         try {
-          const children = await this.treeLoader(option)
+          const children = this.treeLoader ? await this.treeLoader(option) : nativeTreeOptions(this.field, await this.getNativeTreeRows(option), option)
           if (!this.selectorOpen || requestId !== this.optionRequestId) return
           const index = this.selectorOptions.findIndex((item) => item.value === option.value)
           this.selectorOptions.splice(index + 1, 0, ...children)
@@ -782,7 +844,7 @@ export default {
     isDraftSelected(option) { return this.draftIds.includes(String(option.value)) },
     selectDropdownOption(option) {
       if (option.treeDisabled) return
-      if (this.treeLinkage && this.isMultiple && option.treeChildren) {
+      if ((this.treeLinkage || this.nativeTree?.ParentChildLinkage) && this.isMultiple && option.treeChildren) {
         const descendants = this.selectorOptions.filter((item) => item.treeAncestors?.includes(option.value))
         if (option.treeLazy || descendants.some((item) => item.treeLazy)) {
           uni.showToast({ title: '请先展开子级后选择', icon: 'none' })
@@ -888,6 +950,11 @@ export default {
 .native-select__selection > text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .native-select__selection.multiple > text:first-child,.native-select__selection.multiple > text:nth-child(2) { flex: 0 1 auto; }
 .native-select__chip { max-width: 42%; padding: 8rpx 12rpx; border-radius: 6px; color: #365864; background: #edf3f6; font-size: 22rpx; line-height: 30rpx; }
+.native-select__selected-tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 12rpx; }
+.native-select__selected-tag { display: flex; align-items: center; max-width: 100%; min-width: 0; box-sizing: border-box; padding-left: 16rpx; border-radius: 6px; color: #087da8; background: #eaf5f8; font-size: 23rpx; }
+.native-select__selected-tag-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.native-select__remove { display: flex; flex: none; align-items: center; justify-content: center; width: 64rpx; height: 64rpx; font-size: 30rpx; }
+.native-select__remove--pressed { color: #045578; background: #d8edf3; border-radius: 6px; }
 .native-select__more { flex: none; color: #087da8; font-size: 23rpx; font-weight: 650; }
 .native-select__inline-search { width: 100%; min-width: 0; display: flex; align-items: center; gap: 9rpx; }
 .native-select__inline-search .native-select__selection { width: auto; flex: none; max-width: 68%; }

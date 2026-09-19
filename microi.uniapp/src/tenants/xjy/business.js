@@ -90,6 +90,8 @@ const directoryFilterFields = [
   { key: 'Phone', label: '手机号', field: 'Phone', type: 'text' },
   { key: 'Email', label: '邮箱', field: 'Email', type: 'text' },
   { key: 'DeptName', label: '组织机构', field: 'DeptName', type: 'text' },
+  { key: 'DeptId', label: '所属组织机构', field: 'DeptId', multiple: true, overrideSearchMultiple: true },
+  { key: 'DeptIds', label: '兼职组织机构', field: 'DeptIds', multiple: true, overrideSearchMultiple: true },
   {
     key: 'RoleIds', label: '角色', field: 'RoleIds', type: 'options', component: 'MultipleSelect', presentation: 'dropdown', multiple: true, multiValueLike: true,
     source: 'api-engine', apiEngineKey: 'get-sys-user-roles', valueField: 'Id', labelField: 'Name', pageSize: 500
@@ -569,7 +571,9 @@ export const businessModules = {
   directory: native({
     title: '通讯录', table: 'Sys_User', menuAliases: ['通讯录', '组织通讯录', '系统账号', '系统用户'],
     menuPermission: { table: 'Sys_User', menuAliases: ['通讯录', '组织通讯录', '系统账号', '系统用户'] },
-    listApiEngineKey: 'get-sysUser-list', skipModuleMetadata: true,
+    // 通讯录通过安全接口读取授权菜单和展示字段，避免同名系统菜单与保护表元数据混用。
+    listApiEngineKey: 'get-sysUser-list', metadataApiEngineKey: 'get-sysUser-list',
+    configuredModuleEngineKey: 'Sys_User', requireAuthorizedMenu: true,
     titleField: 'Name', statusField: 'State', tagFields: ['RoleName', 'DeptName'], phoneField: 'Phone',
     lines: [{ label: '帐号', field: 'Account' }, { label: '部门', field: 'DeptName' }, { label: '联系电话', field: 'Phone', format: 'phone' }],
     filterFields: directoryFilterFields
