@@ -46,19 +46,19 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.equal((actions.match(/microi-training-syllabus/g) || []).length, 2)
   assert.doesNotMatch(component, /href="\/doc\/getting-started\/start-use"/)
   assert.doesNotMatch(actions, /source-code-architecture/)
-  assert.match(actions, /:href="MICROI_CODE_DOWNLOAD_URL"/)
+  assert.match(actions, /:href="MICROI_CODE_DOC_URL"/)
+  assert.match(component, /\/doc\/v8-engine\/vs-code-plugin\.html/)
   assert.match(component, /secondaryAction: '下载 Microi Code'/)
   assert.match(component, /secondaryAction: 'Download Microi Code'/)
   assert.match(component, /downloadMeta: 'Windows x64 · v1\.0\.2'/)
   assert.match(component, /aiTools: \['Microi Code', 'Codex'/)
-  const currentDownload = microiCodeDocs.match(/\[\u4e0b\u8f7d Microi Code ([^\]]+)\]\((https:\/\/static\.itdos\.com\/itdos\/microi-code\/[^)]+)\)/)
-  assert.ok(currentDownload, 'the Microi Code documentation should expose the current verified download')
-  assert.ok(component.includes(`const MICROI_CODE_DOWNLOAD_URL = '${currentDownload[2]}'`))
+  assert.match(microiCodeDocs, /https:\/\/static\.itdos\.com\/itdos\/microi-code\/latest\/\d{6}\/Microi-Code-latest-windows-x64-setup\.exe/)
+  assert.match(microiCodeDocs, /https:\/\/static\.itdos\.com\/itdos\/microi-code\/1\.0\.2\//)
   assert.match(component, /primaryAction: '查看培训大纲'/)
   assert.match(component, /primaryAction: 'Training syllabus'/)
   assert.doesNotMatch(component, /trainingAction:/)
   assert.ok(
-    actions.indexOf('microi-training-syllabus') < actions.indexOf(':href="MICROI_CODE_DOWNLOAD_URL"'),
+    actions.indexOf('microi-training-syllabus') < actions.indexOf(':href="MICROI_CODE_DOC_URL"'),
     'the primary training syllabus action should render before the Microi Code download action'
   )
   assert.match(frontmatter, /titleTemplate: 开源 AI 开发框架/)

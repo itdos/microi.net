@@ -71,7 +71,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
             {{ copy.primaryAction }}
           </a>
-          <a class="mci-home-action mci-home-action--secondary" :href="MICROI_CODE_DOWNLOAD_URL" :aria-label="`${copy.secondaryAction} · ${copy.downloadMeta}`">
+          <a class="mci-home-action mci-home-action--secondary" :href="MICROI_CODE_DOC_URL" :aria-label="`${copy.secondaryAction} · ${copy.downloadMeta}`">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
             <span class="mci-home-action__copy"><strong>{{ copy.secondaryAction }}</strong><small>{{ copy.downloadMeta }}</small></span>
           </a>
@@ -161,7 +161,9 @@ const authToken = ref('')
 const currentUser = ref(null)
 const chatError = ref('')
 const PROFILE_AI_PREFILL_KEY = 'microi_profile_ai_prefill'
-const MICROI_CODE_DOWNLOAD_URL = 'https://static.itdos.com/itdos/microi-code/1.0.2/7b9b9dbaaa9f/202609/Microi-Code-1_0_2-windows-x64-setup.exe'
+const MICROI_CODE_DOC_URL = computed(() => locale.value === 'en-US'
+  ? '/en/doc/v8-engine/vs-code-plugin.html'
+  : '/doc/v8-engine/vs-code-plugin.html')
 
 const isAuthed = computed(() => Boolean(authToken.value && currentUser.value?.Id))
 const loginUrl = computed(() => `/login.html?redirect=${encodeURIComponent(route.path || '/')}`)
