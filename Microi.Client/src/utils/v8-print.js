@@ -791,20 +791,24 @@ function plusWriteFailureSummary(error) {
 async function fallbackFirstPlusChunkToCc4Spp(Print, chunk, bleError) {
     var info = normalizeBLEInfo(Print.BLEInformation);
     var profile = currentPrinterProfile(Print, info);
-    if (!info || !isAndroidSppPrinterProfile(profile.id) || !isPlusAndroidSppSupported()) return false;
+    var isGprinterProfile = !!info && (profile.id === "gprinter-gp-m322" || isLikelyGprinterSppName(info.deviceName));
+    if (!info || (!isAndroidSppPrinterProfile(profile.id) && !isGprinterProfile) || !isPlusAndroidSppSupported()) return false;
 
     var sppDevice = findPairedPlusSppDevice({ deviceId: info.deviceId, name: info.deviceName }, info.profileMode);
     if (!sppDevice) return false;
+    var sppProfileMode = normalizeProfileMode(sppDevice.profileMode
+        || (isGprinterProfile ? "gprinter-gp-m322" : info.profileMode));
+    var profileName = isGprinterProfile ? PRINTER_PROFILES["gprinter-gp-m322"].name : profile.name;
 
     try {
-        await connectPlusSppDevice(Print, sppDevice, { profileMode: info.profileMode });
+        await connectPlusSppDevice(Print, sppDevice, { profileMode: sppProfileMode });
         await writePlusSppChunk(Print, chunk);
-        console.warn(LOG_PREFIX + " " + profile.name + " 的 BLE 写入通道不可用，首包已安全切换到经典蓝牙 SPP");
+        console.warn(LOG_PREFIX + " " + profileName + " 的 BLE 写入通道不可用，首包已安全切换到经典蓝牙 SPP");
         return true;
     } catch (sppError) {
-        invalidatePlusBleConnection(Print, profile.name + " 的 BLE 与经典蓝牙 SPP 通道均不可用");
+        invalidatePlusBleConnection(Print, profileName + " 的 BLE 与经典蓝牙 SPP 通道均不可用");
         var combined = new Error(
-            profile.name + " BLE 写入失败（" + plusWriteFailureSummary(bleError)
+            profileName + " BLE 写入失败（" + plusWriteFailureSummary(bleError)
             + "）；SPP 连接或写入也失败（" + plusWriteFailureSummary(sppError)
             + "）。请确认打印机已在 Android 系统蓝牙中配对后重新连接"
         );
@@ -1007,6 +1011,7 @@ async function connectPlusPrinterUnsafe(Print, device, options) {
     var profileMode = normalizeProfileMode(options.profileMode || (device && device.profileMode) || Print._profileMode || "auto");
     var profile = resolvePrinterProfile(device && device.name, profileMode);
     var isGprinterProfile = profile.id === "gprinter-gp-m322" || isLikelyGprinterSppName(device && device.name);
+    var profileName = isGprinterProfile ? PRINTER_PROFILES["gprinter-gp-m322"].name : profile.name;
     if (device && device.transportHint === "spp") {
         return connectPlusSppDevice(Print, device, Object.assign({}, options, { profileMode: profileMode }));
     }
@@ -1018,8 +1023,10 @@ async function connectPlusPrinterUnsafe(Print, device, options) {
         && (isAndroidSppPrinterProfile(profile.id) || isGprinterProfile)) {
         var preferredSpp = findPairedPlusSppDevice(device, profileMode);
         if (preferredSpp) {
+            var preferredSppProfileMode = normalizeProfileMode(preferredSpp.profileMode
+                || (isGprinterProfile ? "gprinter-gp-m322" : profileMode));
             return connectPlusSppDevice(Print, preferredSpp, Object.assign({}, options, {
-                profileMode: profileMode,
+                profileMode: preferredSppProfileMode,
             }));
         }
     }
@@ -1030,11 +1037,13 @@ async function connectPlusPrinterUnsafe(Print, device, options) {
         if ((!isAndroidSppPrinterProfile(profile.id) && !isGprinterProfile) || !isPlusAndroidSppSupported()) throw bleError;
         var fallbackSpp = findPairedPlusSppDevice(device, profileMode);
         if (!fallbackSpp) throw bleError;
-        if (typeof options.onStatus === "function") options.onStatus(profile.name + " 的 BLE 通道不可用，正在尝试经典蓝牙 SPP...", "searching");
+        var fallbackSppProfileMode = normalizeProfileMode(fallbackSpp.profileMode
+            || (isGprinterProfile ? "gprinter-gp-m322" : profileMode));
+        if (typeof options.onStatus === "function") options.onStatus(profileName + " 的 BLE 通道不可用，正在尝试经典蓝牙 SPP...", "searching");
         try {
-            return await connectPlusSppDevice(Print, fallbackSpp, Object.assign({}, options, { profileMode: profileMode }));
+            return await connectPlusSppDevice(Print, fallbackSpp, Object.assign({}, options, { profileMode: fallbackSppProfileMode }));
         } catch (sppError) {
-            throw new Error(profile.name + " BLE 连接失败（" + bleError.message + "）；SPP 连接也失败（" + sppError.message + "）");
+            throw new Error(profileName + " BLE 连接失败（" + bleError.message + "）；SPP 连接也失败（" + sppError.message + "）");
         }
     }
 }
