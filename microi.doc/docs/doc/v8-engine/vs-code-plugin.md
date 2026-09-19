@@ -50,6 +50,12 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 最新版检查元数据：[latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml) · [版本目录](https://api.itdos.com/microi-code/updates/versions.json)。latest 对象的文件名固定为 `Microi-Code-latest-windows-x64-setup.exe`，HDFS 会在 URL 中增加当前年月分区；每次发布脚本会将新包移入同一 latest 文件名并用带版本查询参数的 CDN 地址回读字节和 SHA256，下载页使用 `?v=版本号` 穿透旧 CDN 缓存。macOS 请在内部仓库根目录执行 `bash ./一键打包Mac.sh`，生成本机架构 DMG；签名与公证状态以 Mac 构建机回读为准。
 
+### 签名、应用商店与移动端
+
+- 当前 Windows v1.0.3 为未签名包；SHA256 证明文件完整性，不证明发布者身份。正式 Windows 包应在签名安装器及内部可执行文件后再计算 SHA256 和上传，使用 Microsoft Artifact Signing 或受信任 CA 的 OV/EV 证书，并独立记录 Authenticode 验签结果。
+- Mac 官网分发使用 Developer ID Application。首次在 Mac 钥匙串配置证书和 `notarytool` 凭据后，内部源码根目录执行 `bash ./一键打包Mac.sh --signed`，脚本会完成 `.app`/DMG 签名、公证、票据装订以及 `codesign`、Gatekeeper、`stapler` 验证；缺少任何凭据会直接失败。
+- 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 还要求 App Sandbox，并限制下载执行改变功能的代码；现有本地 Node/Harness、Shell、工作区和插件能力不能原样上架。后续移动端和 MAS 版应作为独立受限客户端，复用吾码账号、AI 中转、会话、MCP 与桌面配对协议，把 Agent 执行放到配对桌面或远端，再分别完成 Apple/Google 商店签名与审核。
+
 安装后依次「打开项目 → 登录吾码账号 → 添加业务服务器 → 初始化项目 / 拉取资源」，即可开始开发。AI 使用的是你的官方中转额度，实际可用模型与额度以账号页面为准。停止任务或退出后保留历史记录，后续可在新任务中引用历史继续。
 
 ### 开源基础、版权与后续同步
