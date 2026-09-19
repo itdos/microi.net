@@ -18,10 +18,10 @@ description: 在 Microi Code、Codex 或 DeepSeek Harness 中完成 Microi吾码
 - 业务连接在「服务器连接（MCP）」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
 - macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
 - 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
-- 桌面 UI 沿用 dsh-desktop 的设计系统；首页不重复放置吾码 AI、服务器连接或“预览版”，相关能力集中在左侧功能区。「Microi吾码」可打开完整 `/#/mic-ai-engine` 工作台。AI 数据分析明确使用 `microi_run_engine` 调用 `mci_ai_data_assistant`，不能改成绕过 MCP 的直接数据库访问。
+- 桌面 UI 沿用 dsh-desktop 的设计系统；首页保留 dsh 原生会话区，并在下方用无外层卡片边框、无整块背景的差异层完整展示吾码 AI 大类与 29 项图像工具。工具 Id、名称和分类以 `Microi.Client/src/views/ai-engine/ai-image-tool-directory.js` 为事实源，点击时把 `workspace/tool` 路由参数带入 `/#/mic-ai-engine`；模型来源可选当前对话模型、吾码官方中转站或已登录服务器连接。服务器连接入口和“预览版”不重复放进首页。AI 数据分析明确使用 `microi_run_engine` 调用 `mci_ai_data_assistant`，不能改成绕过 MCP 的直接数据库访问。
 - Microi Code 左侧「功能区」动态读取 dsh 的 `settings.section` 注册表，并在主界面 `main` 面板中渲染原设置组件；第一项「Microi吾码」合并官方账号和吾码 AI，第二项为「服务器连接（MCP）」，之后是 dsh 原生设置。功能区与工作区可拖动调高，默认无滚动条；首页/聊天页不显示虚假选中态。底部入口显示「关于 v版本号」及 `LicenseType` 版本标签，连接手机入口保持同一行。品牌显示 `Microi Code` 与 `HARNESS` 标签，新安装默认深色，用户仍可切换浅色/深色。
 - 桌面安装包版本从 `1.0.0` 开始，使用吾码三段十进制进位规则。Windows/macOS 的公开打包命令必须先执行仓库 `version:bump`，不能复用同版本覆盖已有产物；测试、类型检查和普通 Web 构建不升版。
-- Windows 安装包的构建成功、Authenticode 签名、SmartScreen/商店信任、HDFS 上传与 CDN 回读是不同证据；签名必须先覆盖安装器及独立执行文件，再计算发布 SHA256。macOS 官网包使用 Developer ID Application 签名、公证和 stapling；`bash ./一键打包Mac.sh --signed` 必须在缺少证书或公证钥匙串时失败，并通过 `codesign`、`spctl`、`stapler validate` 后才标记已签名公证。
+- Windows 安装包的构建成功、Authenticode 签名、SmartScreen/商店信任、HDFS 上传与 CDN 回读是不同证据；双击 `一键打包Windows.cmd` 时自动探测 Microsoft Artifact Signing 或本机可信证书，没有凭据则继续生成明确标记的未签名包，显式 `-Signing Signed` 才失败关闭。签名必须先覆盖安装器及独立执行文件，再计算发布 SHA256。macOS 默认 `bash ./一键打包Mac.sh` 同样自动探测并在无凭据时生成未签名包；`--signed` 是正式门禁，必须在缺少证书或公证钥匙串时失败，并通过 `codesign`、`spctl`、`stapler validate` 后才标记已签名公证。
 - 当前 Electron 桌面运行时不能直接打包 iOS/Android，也不能把现有 DMG 原样提交 Mac App Store。移动端和 MAS 版应作为受限客户端，复用账号、模型、会话、MCP 与桌面配对协议，把 Node/Harness/Shell/插件执行放到配对桌面或合规远端；分别完成 Apple/Google 签名和商店审核。
 - 官方账号页和关于标签通过 `platform-current-user` 接口引擎读取当前 `sys_user.LicenseType`。桌面相关平台业务逻辑优先通过 `microi_itdos` 接口引擎实现；只有接口引擎缺少必需底层原子能力时才能改后端源码，并说明原因。
 - 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.itdos.com/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。
