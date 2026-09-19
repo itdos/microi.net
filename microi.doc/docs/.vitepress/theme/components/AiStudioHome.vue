@@ -161,9 +161,7 @@ const authToken = ref('')
 const currentUser = ref(null)
 const chatError = ref('')
 const PROFILE_AI_PREFILL_KEY = 'microi_profile_ai_prefill'
-const MICROI_CODE_DOC_URL = computed(() => locale.value === 'en-US'
-  ? '/en/doc/v8-engine/vs-code-plugin.html'
-  : '/doc/v8-engine/vs-code-plugin.html')
+const MICROI_CODE_DOC_URL = '/doc/v8-engine/vs-code-plugin.html'
 
 const isAuthed = computed(() => Boolean(authToken.value && currentUser.value?.Id))
 const loginUrl = computed(() => `/login.html?redirect=${encodeURIComponent(route.path || '/')}`)
