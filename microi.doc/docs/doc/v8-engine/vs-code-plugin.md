@@ -53,7 +53,7 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 ### 签名、应用商店与移动端
 
-- 当前 Windows v1.0.4 为未签名包；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Mode Signed` 才会在缺少凭据时失败。
+- 当前 Windows v1.0.4 为未签名包；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。
 - Mac 官网分发正式包使用 Developer ID Application。内部源码根目录执行 `bash ./一键打包Mac.sh` 时，Auto 模式会在证书与 `notarytool` 凭据齐全时自动签名、公证和装订；前期没有凭据时会明确提示并继续生成可手工信任安装的未签名 DMG。`--unsigned` 强制未签名，`--signed` 要求正式签名且缺少凭据时失败。
 - 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 还要求 App Sandbox，并限制下载执行改变功能的代码；现有本地 Node/Harness、Shell、工作区和插件能力不能原样上架。后续移动端和 MAS 版应作为独立受限客户端，复用吾码账号、AI 中转、会话、MCP 与桌面配对协议，把 Agent 执行放到配对桌面或远端，再分别完成 Apple/Google 商店签名与审核。
 
