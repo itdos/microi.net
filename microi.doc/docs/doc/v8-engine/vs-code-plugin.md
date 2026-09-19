@@ -28,12 +28,14 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 桌面端沿用 dsh-desktop 的完整 UI、窗口宿主、移动端连接、安全模式、插件恢复、版本更新和 DeepSeek Harness 会话能力。吾码差异层提供官方账号注册/登录、AI 中转站、服务器连接（MCP）、「Microi吾码」中的 AI 能力列表、`/#/mic-ai-engine` 完整工作台，以及通过 `microi_run_engine → mci_ai_data_assistant` 执行的 AI 数据分析。首页不再重复放置吾码快捷入口或“预览版”。原 VS Code 扩展、CLI、资源树和逐行调试入口继续保留。
 
-首个正式编号版本为 **1.0.0**，当前 Windows 版本为 **1.0.1**。默认使用深色主题，左侧显示垂直居中的 `Microi Code HARNESS`；「工作区」下方新增同级「功能区」，第一项「Microi吾码」合并官方账号与吾码 AI，第二项是「服务器连接（MCP）」，之后动态列出 dsh 的通用设置、模型、插件、Agent 预设和插件市场，点击后直接在主界面右侧打开。功能区分隔线可拖动调高，默认刚好容纳菜单且不显示滚动条；首页/聊天页不显示虚假选中态。左下角「关于 v版本号」显示当前账号的开源版、个人版、企业版或未登录标签，并与手机连接入口保持同一行。Windows x64 已完成全量测试、类型检查、生产构建、真实 Electron/Harness 界面验收、安装包内容、HDFS 对象、CDN 全字节 SHA256 回读和打包版「检查更新」验收；当前仍是未签名包。macOS DMG 需在对应 Mac 架构完成原生验收、签名状态核对与 HDFS 回读后再补充，不用本地构建成功代替已发布结论。
+首个正式编号版本为 **1.0.0**，当前 Windows 版本为 **1.0.2**。默认使用深色主题，左侧显示垂直居中的 `Microi Code HARNESS`；「工作区」下方新增同级「功能区」，第一项「Microi吾码」合并官方账号与吾码 AI，第二项是「服务器连接（MCP）」，之后动态列出 dsh 的通用设置、模型、插件、Agent 预设和插件市场，点击后直接在主界面右侧打开。功能区分隔线可拖动调高，默认刚好容纳菜单且不显示滚动条；首页/聊天页不显示虚假选中态。左下角「关于 v版本号」显示当前账号的开源版、个人版、企业版或未登录标签，并与手机连接入口保持同一行。Windows x64 已完成全量测试、类型检查、生产构建、真实 Electron/Harness 界面验收、安装包内容、HDFS 对象、CDN 全字节 SHA256 回读和打包版「检查更新」验收；当前仍是未签名包。macOS DMG 需在对应 Mac 架构完成原生验收、签名状态核对与 HDFS 回读后再补充，不用本地构建成功代替已发布结论。
 
 <!-- MICROI-CODE-DOWNLOADS: verified release links are maintained here. -->
 
-- [下载 Microi Code 1.0.1 · Windows x64 未签名版（177.0 MiB）](https://static.itdos.com/itdos/microi-code/1.0.1/d381cf4fec34/202609/Microi-Code-1_0_1-windows-x64-setup.exe)
-- SHA256：`d381cf4fec3443eb941a44ec3bac3e7b693b77129e13f89773d4f420c8c07b00`
+- [下载 Microi Code 1.0.2 · Windows x64 未签名版（176.9 MiB）](https://static.itdos.com/itdos/microi-code/1.0.2/7b9b9dbaaa9f/202609/Microi-Code-1_0_2-windows-x64-setup.exe)
+- SHA256：`7b9b9dbaaa9f86e31713d5b7b36f97fa0ffae22a16b2c5743442bba27e925f88`；检查更新元数据：[latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)
+- v1.0.2：修复关于版本显示、折叠侧栏移动连接入口、服务器连接自适应和 AI 工作台跳转；新增连接/登录弹窗、吾码个人中心、租户品牌应用/还原，并按 dsh 上游同步规则保留所有差异层功能。
+- [历史版本：Microi Code 1.0.1 · Windows x64](https://static.itdos.com/itdos/microi-code/1.0.1/d381cf4fec34/202609/Microi-Code-1_0_1-windows-x64-setup.exe)
 - [历史版本：Microi Code 1.0.0 · Windows x64](https://static.itdos.com/itdos/microi-code/1.0.0/dd0f2e79e80b/202609/Microi-Code-1_0_0-windows-x64-setup.exe)
 - [历史版本：Microi Code 0.2.0 · Windows x64](https://static.itdos.com/itdos/microi-code/0.2.0/e991814b16a1/202609/Microi-Code-0_2_0-windows-x64-setup.exe)
 - macOS 源码构建：内部仓库根目录执行 `bash ./一键打包Mac.sh`，自动生成本机架构 DMG。
