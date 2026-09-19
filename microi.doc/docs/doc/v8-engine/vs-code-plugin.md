@@ -10,9 +10,9 @@
   </div>
 </div>
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:24px;">
-  <a class="mci-doc-chip" href="https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe" style="display:inline-flex;align-items:center;min-height:42px;padding:0 18px;border-radius:999px;background:var(--vp-c-brand-1);color:#fff;font-weight:700;text-decoration:none;">下载最新版 Windows x64</a>
+  <a class="mci-doc-chip" href="https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.0.3" style="display:inline-flex;align-items:center;min-height:42px;padding:0 18px;border-radius:999px;background:var(--vp-c-brand-1);color:#fff;font-weight:700;text-decoration:none;">下载最新版 Windows x64</a>
   <a class="mci-doc-chip" href="#下载与历史版本" style="display:inline-flex;align-items:center;min-height:42px;padding:0 18px;border:1px solid var(--vp-c-divider);border-radius:999px;color:var(--vp-c-text-1);font-weight:600;text-decoration:none;">查看历史版本</a>
-  <span style="color:var(--vp-c-text-2);font-size:13px;">当前版本 v1.0.2 · latest 固定地址</span>
+  <span style="color:var(--vp-c-text-2);font-size:13px;">当前版本 v1.0.3 · latest 固定地址</span>
 </div>
 </div>
 
@@ -34,7 +34,7 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 桌面端沿用 dsh-desktop 的完整 UI、窗口宿主、移动端连接、安全模式、插件恢复、版本更新和 DeepSeek Harness 会话能力。吾码差异层提供官方账号注册/登录、AI 中转站、服务器连接（MCP）、「Microi吾码」中的 AI 能力列表、`/#/mic-ai-engine` 完整工作台，以及通过 `microi_run_engine → mci_ai_data_assistant` 执行的 AI 数据分析。首页不再重复放置吾码快捷入口或“预览版”。原 VS Code 扩展、CLI、资源树和逐行调试入口继续保留。
 
-首个正式编号版本为 **1.0.0**，当前 Windows 版本为 **1.0.2**。默认使用深色主题，左侧显示垂直居中的 `Microi Code HARNESS`；「工作区」下方新增同级「功能区」，第一项「Microi吾码」合并官方账号与吾码 AI，第二项是「服务器连接（MCP）」，之后动态列出 dsh 的通用设置、模型、插件、Agent 预设和插件市场，点击后直接在主界面右侧打开。功能区分隔线可拖动调高，默认刚好容纳菜单且不显示滚动条；首页/聊天页不显示虚假选中态。左下角「关于 v版本号」显示当前账号的开源版、个人版、企业版或未登录标签，并与手机连接入口保持同一行。Windows x64 已完成全量测试、类型检查、生产构建、真实 Electron/Harness 界面验收、安装包内容、HDFS 对象、CDN 全字节 SHA256 回读和打包版「检查更新」验收；当前仍是未签名包。macOS DMG 需在对应 Mac 架构完成原生验收、签名状态核对与 HDFS 回读后再补充，不用本地构建成功代替已发布结论。
+首个正式编号版本为 **1.0.0**，当前 Windows 版本为 **1.0.3**。默认使用深色主题，左侧显示垂直居中的 `Microi Code HARNESS`；「工作区」下方新增同级「功能区」，第一项「Microi吾码」合并官方账号与吾码 AI，第二项是「服务器连接（MCP）」，之后动态列出 dsh 的通用设置、模型、插件、Agent 预设和插件市场，点击后直接在主界面右侧打开。功能区分隔线可拖动调高，默认刚好容纳菜单且不显示滚动条；首页/聊天页不显示虚假选中态。左下角「关于 v版本号」显示当前账号的开源版、个人版、企业版或未登录标签，并与手机连接入口保持同一行。Windows x64 v1.0.3 已完成全量测试、类型检查、生产构建、真实 Electron/Harness 界面验收、安装包内容、HDFS 对象、CDN 全字节 SHA256 回读和打包版「检查更新」验收；当前仍是未签名包。macOS DMG 需在对应 Mac 架构完成原生验收、签名状态核对与 HDFS 回读后再补充，不用本地构建成功代替已发布结论。
 
 <!-- MICROI-CODE-DOWNLOADS: verified release links are maintained here. -->
 
@@ -42,12 +42,13 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 | 版本 | Windows x64 | 校验与说明 |
 |---|---|---|
-| **v1.0.2（当前）** | [下载 latest 固定文件名](https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe) · [下载不可变归档](https://static.itdos.com/itdos/microi-code/1.0.2/7b9b9dbaaa9f/202609/Microi-Code-1_0_2-windows-x64-setup.exe) | SHA256 `7b9b9dbaaa9f86e31713d5b7b36f97fa0ffae22a16b2c5743442bba27e925f88` · 未签名 · 176.9 MiB |
+| **v1.0.3（当前）** | [下载 latest 固定文件名](https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.0.3) · [下载不可变归档](https://static.itdos.com/itdos/microi-code/1.0.3/af3c3f50bdbe/202609/Microi-Code-1_0_3-windows-x64-setup.exe) | SHA256 `af3c3f50bdbe7f2fb5815f46a05d01616a892a4408187aca1f8f461256c9cd10` · 未签名 · 176.9 MiB |
+| v1.0.2 | [下载归档](https://static.itdos.com/itdos/microi-code/1.0.2/7b9b9dbaaa9f/202609/Microi-Code-1_0_2-windows-x64-setup.exe) | 历史版本 |
 | v1.0.1 | [下载归档](https://static.itdos.com/itdos/microi-code/1.0.1/d381cf4fec34/202609/Microi-Code-1_0_1-windows-x64-setup.exe) | 历史版本 |
 | v1.0.0 | [下载归档](https://static.itdos.com/itdos/microi-code/1.0.0/dd0f2e79e80b/202609/Microi-Code-1_0_0-windows-x64-setup.exe) | 历史版本 |
 | v0.2.0 | [下载归档](https://static.itdos.com/itdos/microi-code/0.2.0/e991814b16a1/202609/Microi-Code-0_2_0-windows-x64-setup.exe) | 历史版本 |
 
-最新版检查元数据：[latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml) · [版本目录](https://api.itdos.com/microi-code/updates/versions.json)。latest 对象的文件名固定为 `Microi-Code-latest-windows-x64-setup.exe`，HDFS 会在 URL 中增加当前年月分区；每次发布脚本会覆盖同一 latest 文件名并回读字节和 SHA256。macOS 请在内部仓库根目录执行 `bash ./一键打包Mac.sh`，生成本机架构 DMG；签名与公证状态以 Mac 构建机回读为准。
+最新版检查元数据：[latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml) · [版本目录](https://api.itdos.com/microi-code/updates/versions.json)。latest 对象的文件名固定为 `Microi-Code-latest-windows-x64-setup.exe`，HDFS 会在 URL 中增加当前年月分区；每次发布脚本会将新包移入同一 latest 文件名并用带版本查询参数的 CDN 地址回读字节和 SHA256，下载页使用 `?v=版本号` 穿透旧 CDN 缓存。macOS 请在内部仓库根目录执行 `bash ./一键打包Mac.sh`，生成本机架构 DMG；签名与公证状态以 Mac 构建机回读为准。
 
 安装后依次「打开项目 → 登录吾码账号 → 添加业务服务器 → 初始化项目 / 拉取资源」，即可开始开发。AI 使用的是你的官方中转额度，实际可用模型与额度以账号页面为准。停止任务或退出后保留历史记录，后续可在新任务中引用历史继续。
 
