@@ -71,9 +71,9 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
             {{ copy.primaryAction }}
           </a>
-          <a class="mci-home-action mci-home-action--secondary" :href="MICROI_CODE_DOC_URL" :aria-label="`${copy.secondaryAction} · ${copy.downloadMeta}`">
+          <a class="mci-home-action mci-home-action--secondary" :href="MICROI_CODE_DOC_URL" :aria-label="copy.secondaryAction">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
-            <span class="mci-home-action__copy"><strong>{{ copy.secondaryAction }}</strong><small>{{ copy.downloadMeta }}</small></span>
+            <span class="mci-home-action__copy"><strong>{{ copy.secondaryAction }}</strong></span>
           </a>
         </div>
 
@@ -171,7 +171,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   titleLeadParts: ['Open-source AI', 'development framework'],
   titleEmphasisLines: ['30+ mature engines'],
   lead: 'AI low-code, microservices, and the V8 engine share one delivery path. In high-reuse business scenarios, AI development can use 10×+ fewer tokens and move 10×+ faster.',
-  primaryAction: 'Training syllabus', secondaryAction: 'Download Microi Code', downloadMeta: 'Windows x64 · v1.0.2',
+  primaryAction: 'Training syllabus', secondaryAction: 'Download Microi Code',
   proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
   proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '30+ mature engines'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
@@ -205,7 +205,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   titleLeadParts: ['开源 AI', '开发框架'],
   titleEmphasisLines: ['30+ 成熟引擎'],
   lead: '融合 AI 低代码、微服务与 V8 引擎；在平台能力高度复用的典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，更快交付企业应用。',
-  primaryAction: '查看培训大纲', secondaryAction: '下载 Microi Code', downloadMeta: 'Windows x64 · v1.0.2',
+  primaryAction: '查看培训大纲', secondaryAction: '下载 Microi Code',
   proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
   proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '30+ 成熟引擎'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',

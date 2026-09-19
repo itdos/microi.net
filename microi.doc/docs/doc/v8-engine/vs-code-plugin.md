@@ -10,9 +10,9 @@
   </div>
 </div>
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:24px;">
-  <a class="mci-doc-chip" href="https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.0.3" style="display:inline-flex;align-items:center;min-height:42px;padding:0 18px;border-radius:999px;background:var(--vp-c-brand-1);color:#fff;font-weight:700;text-decoration:none;">下载最新版 Windows x64</a>
+  <a class="mci-doc-chip" href="https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.0.4" style="display:inline-flex;align-items:center;min-height:42px;padding:0 18px;border-radius:999px;background:var(--vp-c-brand-1);color:#fff;font-weight:700;text-decoration:none;">下载最新版 Windows x64</a>
   <a class="mci-doc-chip" href="#下载与历史版本" style="display:inline-flex;align-items:center;min-height:42px;padding:0 18px;border:1px solid var(--vp-c-divider);border-radius:999px;color:var(--vp-c-text-1);font-weight:600;text-decoration:none;">查看历史版本</a>
-  <span style="color:var(--vp-c-text-2);font-size:13px;">当前版本 v1.0.3 · latest 固定地址</span>
+  <span style="color:var(--vp-c-text-2);font-size:13px;">当前版本 v1.0.4 · latest 固定地址</span>
 </div>
 </div>
 
@@ -34,7 +34,7 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 桌面端沿用 dsh-desktop 的完整 UI、窗口宿主、移动端连接、安全模式、插件恢复、版本更新和 DeepSeek Harness 会话能力。吾码差异层提供官方账号注册/登录、AI 中转站、服务器连接（MCP）、「Microi吾码」中的 AI 能力列表、`/#/mic-ai-engine` 完整工作台，以及通过 `microi_run_engine → mci_ai_data_assistant` 执行的 AI 数据分析。首页不再重复放置吾码快捷入口或“预览版”。原 VS Code 扩展、CLI、资源树和逐行调试入口继续保留。
 
-首个正式编号版本为 **1.0.0**，当前 Windows 版本为 **1.0.3**。默认使用深色主题，左侧显示垂直居中的 `Microi Code HARNESS`；「工作区」下方新增同级「功能区」，第一项「Microi吾码」合并官方账号与吾码 AI，第二项是「服务器连接（MCP）」，之后动态列出 dsh 的通用设置、模型、插件、Agent 预设和插件市场，点击后直接在主界面右侧打开。功能区分隔线可拖动调高，默认刚好容纳菜单且不显示滚动条；首页/聊天页不显示虚假选中态。左下角「关于 v版本号」显示当前账号的开源版、个人版、企业版或未登录标签，并与手机连接入口保持同一行。Windows x64 v1.0.3 已完成全量测试、类型检查、生产构建、真实 Electron/Harness 界面验收、安装包内容、HDFS 对象、CDN 全字节 SHA256 回读和打包版「检查更新」验收；当前仍是未签名包。macOS DMG 需在对应 Mac 架构完成原生验收、签名状态核对与 HDFS 回读后再补充，不用本地构建成功代替已发布结论。
+首个正式编号版本为 **1.0.0**，当前 Windows 版本为 **1.0.4**。默认使用深色主题，左侧显示垂直居中的 `Microi Code HARNESS`；「工作区」下方新增同级「功能区」，第一项「Microi吾码」合并官方账号与吾码 AI，第二项是「服务器连接（MCP）」，之后动态列出 dsh 的通用设置、模型、插件、Agent 预设和插件市场，点击后直接在主界面右侧打开。功能区分隔线可拖动调高，默认刚好容纳菜单且不显示滚动条；首页/聊天页不显示虚假选中态。左下角「关于 v版本号」显示当前账号的开源版、个人版、企业版或未登录标签，并与手机连接入口保持同一行。Windows x64 v1.0.4 已完成全量测试、类型检查、生产构建、真实安装、真实 Electron/Harness 界面验收、安装包内容、HDFS 对象与 CDN 全字节 SHA256 回读；当前仍是未签名包。macOS DMG 需在对应 Mac 架构完成原生验收、签名状态核对与 HDFS 回读后再补充，不用本地构建成功代替已发布结论。
 
 <!-- MICROI-CODE-DOWNLOADS: verified release links are maintained here. -->
 
@@ -42,7 +42,8 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 | 版本 | Windows x64 | 校验与说明 |
 |---|---|---|
-| **v1.0.3（当前）** | [下载 latest 固定文件名](https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.0.3) · [下载不可变归档](https://static.itdos.com/itdos/microi-code/1.0.3/af3c3f50bdbe/202609/Microi-Code-1_0_3-windows-x64-setup.exe) | SHA256 `af3c3f50bdbe7f2fb5815f46a05d01616a892a4408187aca1f8f461256c9cd10` · 未签名 · 176.9 MiB |
+| **v1.0.4（当前）** | [下载 latest 固定文件名](https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.0.4) · [下载不可变归档](https://static.itdos.com/itdos/microi-code/1.0.4/2c96b8beeffd/202609/Microi-Code-1_0_4-windows-x64-setup.exe) | SHA256 `2c96b8beeffdb4cf8e35a8d16a74cf93bdf0d6fdb924d52843e386d246d208f4` · 未签名 · 177.0 MiB |
+| v1.0.3 | [下载归档](https://static.itdos.com/itdos/microi-code/1.0.3/af3c3f50bdbe/202609/Microi-Code-1_0_3-windows-x64-setup.exe) | SHA256 `af3c3f50bdbe7f2fb5815f46a05d01616a892a4408187aca1f8f461256c9cd10` · 未签名 · 176.9 MiB |
 | v1.0.2 | [下载归档](https://static.itdos.com/itdos/microi-code/1.0.2/7b9b9dbaaa9f/202609/Microi-Code-1_0_2-windows-x64-setup.exe) | 历史版本 |
 | v1.0.1 | [下载归档](https://static.itdos.com/itdos/microi-code/1.0.1/d381cf4fec34/202609/Microi-Code-1_0_1-windows-x64-setup.exe) | 历史版本 |
 | v1.0.0 | [下载归档](https://static.itdos.com/itdos/microi-code/1.0.0/dd0f2e79e80b/202609/Microi-Code-1_0_0-windows-x64-setup.exe) | 历史版本 |
@@ -52,8 +53,8 @@ Microi Code 是吾码独立桌面 AI 开发工作台，直接基于 [DataElement
 
 ### 签名、应用商店与移动端
 
-- 当前 Windows v1.0.3 为未签名包；SHA256 证明文件完整性，不证明发布者身份。正式 Windows 包应在签名安装器及内部可执行文件后再计算 SHA256 和上传，使用 Microsoft Artifact Signing 或受信任 CA 的 OV/EV 证书，并独立记录 Authenticode 验签结果。
-- Mac 官网分发使用 Developer ID Application。首次在 Mac 钥匙串配置证书和 `notarytool` 凭据后，内部源码根目录执行 `bash ./一键打包Mac.sh --signed`，脚本会完成 `.app`/DMG 签名、公证、票据装订以及 `codesign`、Gatekeeper、`stapler` 验证；缺少任何凭据会直接失败。
+- 当前 Windows v1.0.4 为未签名包；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Mode Signed` 才会在缺少凭据时失败。
+- Mac 官网分发正式包使用 Developer ID Application。内部源码根目录执行 `bash ./一键打包Mac.sh` 时，Auto 模式会在证书与 `notarytool` 凭据齐全时自动签名、公证和装订；前期没有凭据时会明确提示并继续生成可手工信任安装的未签名 DMG。`--unsigned` 强制未签名，`--signed` 要求正式签名且缺少凭据时失败。
 - 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 还要求 App Sandbox，并限制下载执行改变功能的代码；现有本地 Node/Harness、Shell、工作区和插件能力不能原样上架。后续移动端和 MAS 版应作为独立受限客户端，复用吾码账号、AI 中转、会话、MCP 与桌面配对协议，把 Agent 执行放到配对桌面或远端，再分别完成 Apple/Google 商店签名与审核。
 
 安装后依次「打开项目 → 登录吾码账号 → 添加业务服务器 → 初始化项目 / 拉取资源」，即可开始开发。AI 使用的是你的官方中转额度，实际可用模型与额度以账号页面为准。停止任务或退出后保留历史记录，后续可在新任务中引用历史继续。
