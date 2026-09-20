@@ -4,6 +4,13 @@ import { createRequire } from 'node:module'
 import vm from 'node:vm'
 import test from 'node:test'
 import { positionNativeSelector } from '../src/platform/native-selector-position.mjs'
+import {
+  collectNativeTreeRows,
+  nativeTreeConfig,
+  nativeTreeOptions,
+  nativeTreeSelectionKey,
+  nativeTreeSelectionValues
+} from '../src/platform/native-tree-options.mjs'
 
 const require = createRequire(import.meta.url)
 const Vue = require('vue')
@@ -35,6 +42,11 @@ function fixture({ count = 1, portal = true, remote = false, load = async () => 
     isNativeFieldMultiple: () => false,
     isRemoteNativeFieldOptions: () => remote,
     filterNativeFieldOptions: (options, keyword) => options.filter(option => option.label.includes(keyword)),
+    collectNativeTreeRows,
+    nativeTreeConfig,
+    nativeTreeOptions,
+    nativeTreeSelectionKey,
+    nativeTreeSelectionValues,
     getSafeAreaMetrics: () => ({ windowWidth: 390, windowHeight: 844, top: 47, bottom: 34, capsuleTop: 51, capsuleHeight: 32 }),
     positionNativeSelector,
     loadNativeFieldOptionPage: (...args) => { calls.push(args); return load(...args) }
