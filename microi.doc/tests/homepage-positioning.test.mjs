@@ -17,12 +17,15 @@ function readWorkspace(relativePath) {
 
 test('homepage presents Microi as an open-source AI development framework', () => {
   const component = read('docs/.vitepress/theme/components/AiStudioHome.vue')
+  const microiCodeShowcase = read('docs/.vitepress/theme/components/MicroiCodeShowcase.vue')
   const frontmatter = read('docs/index.md')
   const microiCodeDocs = read('docs/doc/v8-engine/vs-code-plugin.md')
   const studioIndex = component.indexOf('<section class="ai-studio-stage')
-  const positioningIndex = component.indexOf('<section class="mci-home-hero')
+  const positioningIndex = component.indexOf('<div class="ai-studio-summary"')
 
-  assert.ok(studioIndex >= 0 && studioIndex < positioningIndex, 'AI Studio should appear before the platform-positioning hero')
+  assert.ok(studioIndex >= 0 && studioIndex < positioningIndex, 'platform positioning should be merged into the AI Studio stage')
+  assert.doesNotMatch(component, /<section class="mci-home-hero"/)
+  assert.doesNotMatch(component, /<section class="mci-home-values"/)
   assert.match(component, /class="ai-studio-brand"/)
   assert.match(component, />Microi AI Studio<\/p>/)
   assert.match(component, /eyebrow: '开源 AI 开发框架'/)
@@ -40,9 +43,9 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(component, /MCP \+ Skills/)
   assert.match(component, /chatTitle: '让 AI 站在 30\+ 成熟引擎上，更快交付'/)
   assert.match(component, /开箱即可进入业务开发/)
-  const actions = component.match(/<div class="mci-home-actions">([\s\S]*?)<\/div>/)?.[1] || ''
+  const actions = component.match(/<div class="ai-studio-summary__actions">([\s\S]*?)<\/div>/)?.[1] || ''
   assert.equal((actions.match(/<a\b/g) || []).length, 2)
-  assert.match(actions, /mci-home-action--primary[^>]*microi-training-syllabus/)
+  assert.match(actions, /is-primary[^>]*microi-training-syllabus/)
   assert.equal((actions.match(/microi-training-syllabus/g) || []).length, 2)
   assert.doesNotMatch(component, /href="\/doc\/getting-started\/start-use"/)
   assert.doesNotMatch(actions, /source-code-architecture/)
@@ -53,8 +56,11 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.doesNotMatch(component, /downloadMeta:/)
   assert.doesNotMatch(component, /Windows x64 · v1\.0\.2/)
   assert.match(component, /aiTools: \['Microi Code', 'Codex'/)
-  assert.match(microiCodeDocs, /https:\/\/static\.itdos\.com\/itdos\/microi-code\/latest\/\d{6}\/Microi-Code-latest-windows-x64-setup\.exe/)
-  assert.match(microiCodeDocs, /https:\/\/static\.itdos\.com\/itdos\/microi-code\/1\.0\.2\//)
+  assert.match(microiCodeShowcase, /https:\/\/static\.itdos\.com\/itdos\/microi-code\/latest\/\d{6}\/Microi-Code-latest-windows-x64-setup\.exe/)
+  assert.match(microiCodeShowcase, /https:\/\/static\.itdos\.com\/itdos\/microi-code\/latest\/\d{6}\/Microi-Code-latest-mac-x64\.dmg/)
+  assert.match(microiCodeShowcase, /https:\/\/static\.itdos\.com\/itdos\/microi-code\/1\.0\.8\/61546bc443f2\//)
+  assert.match(microiCodeShowcase, /https:\/\/static\.itdos\.com\/itdos\/microi-code\/1\.0\.2\//)
+  assert.match(microiCodeDocs, /<MicroiCodeShowcase\s*\/>/)
   assert.match(component, /primaryAction: '查看培训大纲'/)
   assert.match(component, /primaryAction: 'Training syllabus'/)
   assert.doesNotMatch(component, /trainingAction:/)
