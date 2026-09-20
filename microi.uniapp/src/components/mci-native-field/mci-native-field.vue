@@ -377,14 +377,20 @@ export default {
         const url = this.formData && this.formData[`${this.field.Name}_${item.Id}_RealPath`]
         if (url) runtimeUrls[String(item.Id)] = url
       })
+      const formDataId = this.formDataId || (this.formData && (this.formData.Id || this.formData.id)) || ''
+      const userAvatarAccess = this.isAvatar && /^sys_user$/i.test(String(this.tableName || '')) && !!formDataId
       return {
         formEngineKey: this.tableName,
         // 详情页的 Id 可能未包含在可见字段返回值中，优先使用路由中已经完成权限校验的记录 Id。
-        formDataId: this.formDataId || (this.formData && (this.formData.Id || this.formData.id)) || '',
+        formDataId,
         fieldId: this.field.Id || this.field.id || '',
         sysMenuId: this.fileAccessMenuId || this.menuId,
         tableChildAuth: this.tableChildAuth,
         private: privateAccess,
+        // Sys_User 头像由用户资源授权，而不是普通表单字段授权。个人资料适配器没有真实
+        // SysMenuId/diy_field.Id，若沿用 FormField 上下文会被私有文件解析器安全拒绝。
+        resourceKind: userAvatarAccess ? 'UserAvatar' : 'FormField',
+        resourceId: userAvatarAccess ? formDataId : '',
         // zhy：跨表选择的私有照片在目标草稿保存前使用来源记录签发的运行态 URL。
         runtimeUrls
       }
