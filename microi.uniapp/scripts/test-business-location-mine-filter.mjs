@@ -22,7 +22,7 @@ test('人员定位列表默认只看我的，并可切换到平台授权的全�
 
 test('只看我的使用 UserId 收窄查询，查看全部不在前端授予角色权限', () => {
   assert.match(listSource, /toLowerCase\(\) === 'diy_location'/)
-  const filterMethod = listSource.match(/buildFilterWhere\(\) \{[\s\S]*?\n    \},\n    selectedSort/)
+  const filterMethod = listSource.match(/buildFilterWhere\(\) \{[\s\S]*?\r?\n    \},\r?\n    selectedSort/)
   assert.ok(filterMethod, '未找到业务列表筛选方法')
   assert.match(filterMethod[0], /this\.showMineSwitch && this\.mineOnly/)
   assert.match(filterMethod[0], /initial\.push\(\{ Name: 'UserId', Type: '=', Value:/)

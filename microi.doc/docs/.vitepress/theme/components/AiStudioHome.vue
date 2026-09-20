@@ -64,8 +64,14 @@
             </article>
           </div>
           <div class="ai-studio-summary__actions">
-            <a class="is-primary" :href="locale === 'en-US' ? '/en/doc/about/microi-training-syllabus' : '/doc/about/microi-training-syllabus'">{{ copy.primaryAction }}</a>
-            <a :href="MICROI_CODE_DOC_URL">{{ copy.secondaryAction }}</a>
+            <a class="is-primary" :href="locale === 'en-US' ? '/en/doc/about/microi-training-syllabus' : '/doc/about/microi-training-syllabus'">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h10.5A2.5 2.5 0 0 1 18 7v12.5H7.5A2.5 2.5 0 0 1 5 17V4.5Z"/><path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H18M9 8h5"/></svg>
+              {{ copy.primaryAction }}
+            </a>
+            <a :href="MICROI_CODE_DOC_URL">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="12" rx="2"/><path d="M8 20h8M12 16v4m0-13v6m0 0 2.7-2.7M12 13l-2.7-2.7"/></svg>
+              {{ copy.secondaryAction }}
+            </a>
           </div>
         </div>
 
@@ -122,7 +128,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
   proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '30+ mature engines'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
-  mapDesc: 'Let 30+ mature engines handle standard capabilities, use the V8 engine for differentiated logic, and deliver deep customization through microservices — all on one AI-ready foundation.',
+  mapDesc: 'Low-code, V8, and microservices share one AI-ready foundation.',
   aiLayer: 'AI collaboration', aiTools: ['Microi Code', 'Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
   developmentModes: [
     { level: '01', label: 'Standard workflows', title: 'AI low-code development', description: '30+ engines · forms · modules · workflows · reports', note: 'READY' },
@@ -137,8 +143,8 @@ const copy = computed(() => locale.value === 'en-US' ? {
     { kicker: 'Use 10×+ fewer tokens', title: 'Let AI focus on business change', description: 'MCP, Skills, schemas, and V8 reduce repeated framework and boilerplate generation.' },
     { kicker: 'Develop 10×+ faster', title: 'Deliver working applications sooner', description: 'Visual modeling, V8, microservices, and source extensions form one continuous delivery path.' }
   ],
-  chatTitle: 'Let AI build on 30+ mature engines and deliver faster',
-  chatDesc: 'Microi combines AI low-code, microservices, and the V8 engine. In high-reuse business scenarios, it can use 10×+ fewer tokens and move 10×+ faster than building from scratch.',
+  chatTitle: 'Open-source AI development framework, built on 30+ mature engines',
+  chatDesc: 'AI low-code, V8, and microservices share one delivery foundation, so teams can focus on real business change.',
   placeholder: 'Describe what you want to create, understand, analyze, or accomplish...',
   chatLabel: 'Chat with Microi AI', quickLabel: 'Quick questions', sendLabel: 'Send',
   aboutTitle: 'About Microi', aboutPrompt: 'What enterprise applications is Microi best suited for?',
@@ -156,7 +162,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
   proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '30+ 成熟引擎'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',
-  mapDesc: '30+ 成熟引擎承接标准能力，V8 引擎处理差异逻辑，微服务完成深度定制；让 AI 始终站在可复用底座上开发。',
+  mapDesc: '低代码、V8 与微服务共用一套可复用的 AI 开发底座。',
   aiLayer: 'AI 协作层', aiTools: ['Microi Code', 'Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
   developmentModes: [
     { level: '01', label: '标准业务', title: 'AI 低代码开发', description: '30+ 引擎 · 表单 · 模块 · 流程 · 报表', note: '开箱即用' },
@@ -171,8 +177,8 @@ const copy = computed(() => locale.value === 'en-US' ? {
     { kicker: 'Token 更省 10 倍+', title: '让 AI 聚焦业务增量', description: 'MCP、Skills、实时 Schema 与 V8 减少框架解释、胶水代码和重复生成。' },
     { kicker: '速度提升 10 倍+', title: '更快交付可运行应用', description: '可视化建模、V8、微服务与源码扩展贯通一条连续开发和验收链。' }
   ],
-  chatTitle: '让 AI 站在 30+ 成熟引擎上，更快交付',
-  chatDesc: 'Microi吾码融合 AI 低代码、微服务与 V8 引擎；典型业务场景下，相比从零定制开发，Token 更省 10 倍+、开发速度提升 10 倍+，开箱即可进入业务开发。',
+  chatTitle: '开源 AI 开发框架，让 AI 站在 30+ 成熟引擎上，更快交付',
+  chatDesc: 'AI 低代码、V8 与微服务共用一套成熟底座，减少重复生成，直接进入业务交付。',
   placeholder: '描述你想创造、了解、分析或完成的任何事情...',
   chatLabel: '与 Microi AI 对话', quickLabel: '快捷问题', sendLabel: '发送',
   aboutTitle: '了解 Microi吾码', aboutPrompt: 'Microi吾码适合开发哪些企业应用？',

@@ -110,7 +110,9 @@ if (Test-Path -LiteralPath $desktopPackage) {
     Write-Host 'Running Microi Code desktop Vitest regression tests...'
     Push-Location $desktopRoot
     try {
-        npm test
+        # 正式门禁与数据库、浏览器和双 API 同机运行；串行 Vitest worker 保留全部
+        # 用例，同时避免 Windows 提交额度紧张时并发 worker 产生伪失败或争用插件目录。
+        npm test -- --maxWorkers=1 --no-file-parallelism
         if ($LASTEXITCODE -ne 0) { throw "Microi Code desktop regression tests failed with exit code $LASTEXITCODE." }
     }
     finally {
@@ -189,6 +191,17 @@ if ($Mode -eq "Full") {
         -p:UseSharedCompilation=false `
         -v:minimal
     if ($LASTEXITCODE -ne 0) { throw "Solution build failed with exit code $LASTEXITCODE." }
+
+    # 低提交额度的正式发布机可在重型构建完成后再启动双 API 与前端。
+    # 未设置该变量时保持原有行为；设置时必须由受控发布包装器写入就绪文件。
+    if ($env:MICROI_TEST_RUNTIME_READY_FILE) {
+        Write-Host "Waiting for staged Full runtime: $env:MICROI_TEST_RUNTIME_READY_FILE"
+        $runtimeDeadline = (Get-Date).AddMinutes(3)
+        while (-not (Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_READY_FILE)) {
+            if ((Get-Date) -ge $runtimeDeadline) { throw 'Timed out waiting for the staged Full runtime.' }
+            Start-Sleep -Milliseconds 500
+        }
+    }
 
     Write-Host "Running isolated-tenant FormEngine and ApiEngine full-stack tests..."
     dotnet test $project `
