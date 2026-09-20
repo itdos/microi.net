@@ -55,91 +55,38 @@
         </div>
       </div>
       <p v-if="chatError" class="ai-studio-error" role="alert">{{ chatError }}</p>
-    </section>
-
-    <section class="mci-home-hero" aria-labelledby="mci-home-title">
-      <div class="mci-home-hero__copy">
-        <p class="mci-home-eyebrow"><span aria-hidden="true"></span>{{ copy.eyebrow }}</p>
-        <h1 id="mci-home-title">
-          <span class="mci-home-title-lead"><span v-for="part in copy.titleLeadParts" :key="part">{{ part }}</span></span>
-          <strong><span v-for="line in copy.titleEmphasisLines" :key="line">{{ line }}</span></strong>
-        </h1>
-        <p class="mci-home-hero__lead">{{ copy.lead }}</p>
-
-        <div class="mci-home-actions">
-          <a class="mci-home-action mci-home-action--primary" :href="locale === 'en-US' ? '/en/doc/about/microi-training-syllabus' : '/doc/about/microi-training-syllabus'">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
-            {{ copy.primaryAction }}
-          </a>
-          <a class="mci-home-action mci-home-action--secondary" :href="MICROI_CODE_DOC_URL" :aria-label="copy.secondaryAction">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
-            <span class="mci-home-action__copy"><strong>{{ copy.secondaryAction }}</strong></span>
-          </a>
-        </div>
-
-        <a
-          v-if="locale === 'zh-CN'"
-          class="mci-home-proof-link"
-          href="https://blog.csdn.net/qq973702/article/details/163763831"
-          target="_blank"
-          rel="noopener noreferrer"
-        >{{ copy.proofAction }} <span aria-hidden="true">↗</span></a>
-
-        <ul class="mci-home-proof-points" :aria-label="copy.proofLabel">
-          <li v-for="item in copy.proofPoints" :key="item"><span aria-hidden="true"></span>{{ item }}</li>
-        </ul>
-      </div>
-
-      <div class="mci-home-map" role="group" aria-labelledby="mci-home-map-title">
-        <div class="mci-home-map__header">
-          <div>
-            <span>{{ copy.mapEyebrow }}</span>
-            <h2 id="mci-home-map-title">{{ copy.mapTitle }}</h2>
+      <div class="ai-studio-summary" aria-label="Microi 平台价值与开发路径">
+        <div class="ai-studio-summary__top">
+          <div class="ai-studio-summary__values">
+            <article v-for="item in copy.values" :key="item.kicker">
+              <strong>{{ item.kicker }}</strong>
+              <span>{{ item.title }}</span>
+            </article>
           </div>
-          <p>{{ copy.mapDesc }}</p>
+          <div class="ai-studio-summary__actions">
+            <a class="is-primary" :href="locale === 'en-US' ? '/en/doc/about/microi-training-syllabus' : '/doc/about/microi-training-syllabus'">{{ copy.primaryAction }}</a>
+            <a :href="MICROI_CODE_DOC_URL">{{ copy.secondaryAction }}</a>
+          </div>
         </div>
 
-        <div class="mci-home-map__ai">
-          <span>{{ copy.aiLayer }}</span>
-          <ul>
-            <li v-for="tool in copy.aiTools" :key="tool">{{ tool }}</li>
-          </ul>
-        </div>
-
-        <div class="mci-home-map__flow" aria-hidden="true"><i></i><i></i><i></i></div>
-
-        <div class="mci-home-modes">
-          <article v-for="mode in copy.developmentModes" :key="mode.level" :class="{ 'is-featured': mode.featured }">
-            <div class="mci-home-mode__top"><span>{{ mode.level }}</span><em>{{ mode.label }}</em></div>
-            <h3>{{ mode.title }}</h3>
-            <p>{{ mode.description }}</p>
-            <strong>{{ mode.note }}</strong>
-          </article>
-        </div>
-
-        <div class="mci-home-map__flow mci-home-map__flow--down" aria-hidden="true"><i></i><i></i><i></i></div>
-
-        <div class="mci-home-foundation">
-          <span>{{ copy.foundationTitle }}</span>
-          <ul><li v-for="item in copy.foundations" :key="item">{{ item }}</li></ul>
-        </div>
-
-        <div class="mci-home-outputs">
-          <span>{{ copy.outputTitle }}</span>
-          <ul><li v-for="item in copy.outputs" :key="item">{{ item }}</li></ul>
+        <div class="ai-studio-summary__path">
+          <header>
+            <div><span>{{ copy.mapEyebrow }}</span><h2>{{ copy.mapTitle }}</h2></div>
+            <p>{{ copy.mapDesc }}</p>
+          </header>
+          <div class="ai-studio-summary__modes">
+            <article v-for="mode in copy.developmentModes" :key="mode.level">
+              <span>{{ mode.level }} · {{ mode.label }}</span>
+              <h3>{{ mode.title }}</h3>
+              <p>{{ mode.description }}</p>
+            </article>
+          </div>
+          <footer>
+            <p><strong>{{ copy.foundationTitle }}</strong><span v-for="item in copy.foundations" :key="item">{{ item }}</span></p>
+            <p><strong>{{ copy.outputTitle }}</strong><span v-for="item in copy.outputs" :key="item">{{ item }}</span></p>
+          </footer>
         </div>
       </div>
-    </section>
-
-    <section class="mci-home-values" :aria-label="copy.valueLabel">
-      <article v-for="(item, index) in copy.values" :key="item.kicker">
-        <span>0{{ index + 1 }}</span>
-        <div>
-          <p>{{ item.kicker }}</p>
-          <h2>{{ item.title }}</h2>
-          <small>{{ item.description }}</small>
-        </div>
-      </article>
     </section>
 
     <MciNugetStats variant="home" :locale="locale" />

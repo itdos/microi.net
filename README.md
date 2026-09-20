@@ -20,6 +20,8 @@
 
 [在线体验](https://microi.net/) · [快速开始](https://microi.net/doc/getting-started/start-use.html) · [完整文档](https://microi.net/doc/index.html) · [Docker 部署](https://microi.net/doc/getting-started/docker-run.html) · [Gitee](https://gitee.com/ITdos/microi.net) · [GitHub](https://github.com/itdos/microi.net)
 
+<p><a href="https://microi.net/doc/about/microi-training-syllabus.html"><strong>📚 查看培训大纲 →</strong></a></p>
+
 **[查看 ITdos 名下 NuGet 包的官方实时下载数据 →](https://www.nuget.org/profiles/ITdos)**<br>
 下载量以 NuGet 官方档案的实时数据为准；Microi吾码官网通过 NuGet V3 官方 API 自动汇总展示，避免 README 中的静态数字过期。
 
@@ -38,6 +40,11 @@
 <table>
   <tr>
     <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%"/></td>
+  </tr>
+  <tr>
+    <td><img src="./microi.doc/docs/public/images/product-screenshots/microi-code-ai-center-dark.jpg" alt="Microi Code 深色 AI 能力中心"/></td>
+    <td><img src="./microi.doc/docs/public/images/product-screenshots/microi-code-home-light.jpg" alt="Microi Code 浅色首页"/></td>
+    <td><img src="./microi.doc/docs/public/images/product-screenshots/microi-code-task-workspace.png" alt="Microi Code 真实任务工作区"/></td>
   </tr>
   <tr>
     <td><img src="./microi.doc/docs/public/images/product-screenshots/webos-api-engine-workspace.jpg" alt="Microi WebOS 接口引擎与主题设置界面"/></td>

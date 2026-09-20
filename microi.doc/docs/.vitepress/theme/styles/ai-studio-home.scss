@@ -1255,3 +1255,91 @@ html:not(.dark) .ai-studio-brand {
   html.microi-ai-studio-page .VPNavBar,
   html.microi-ai-studio-page .VPNavScreen { background: #202020 !important; backdrop-filter: none; }
 }
+
+/* Homepage positioning: the former standalone hero and value sections now live inside the AI stage. */
+.ai-studio-stage {
+  width: min(1180px, calc(100% - 48px));
+  padding-bottom: 64px;
+}
+
+.ai-studio-summary {
+  margin-top: 34px;
+  text-align: left;
+}
+
+.ai-studio-summary__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 0;
+  border-block: 1px solid var(--mci-ai-line);
+}
+
+.ai-studio-summary__values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ai-studio-summary__values article {
+  min-width: 0;
+  padding: 2px 22px;
+}
+
+.ai-studio-summary__values article:first-child { padding-left: 0; }
+.ai-studio-summary__values article + article { border-left: 1px solid var(--mci-ai-line); }
+.ai-studio-summary__values strong,
+.ai-studio-summary__values span { display: block; }
+.ai-studio-summary__values strong { color: var(--mci-ai-primary-strong); font-size: 13px; font-weight: 720; }
+.ai-studio-summary__values span { margin-top: 4px; color: var(--mci-ai-text-muted); font-size: 11px; }
+
+.ai-studio-summary__actions { display: flex; gap: 8px; }
+.ai-studio-summary__actions a {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 15px;
+  border: 1px solid var(--mci-ai-line-strong);
+  border-radius: 10px;
+  color: var(--mci-ai-text);
+  font-size: 12px;
+  font-weight: 680;
+  text-decoration: none;
+}
+.ai-studio-summary__actions a.is-primary { border-color: var(--mci-ai-primary); background: var(--mci-ai-primary); color: #fff; }
+
+.ai-studio-summary__path { padding-top: 30px; }
+.ai-studio-summary__path > header { display: grid; grid-template-columns: minmax(260px, .7fr) minmax(0, 1.3fr); gap: 32px; align-items: end; }
+.ai-studio-summary__path > header span { color: var(--mci-ai-primary-strong); font-size: 10px; font-weight: 750; letter-spacing: .13em; }
+.ai-studio-summary__path > header h2 { margin: 6px 0 0; color: var(--mci-ai-text); font-size: 24px; font-weight: 650; letter-spacing: -.025em; }
+.ai-studio-summary__path > header p { margin: 0; color: var(--mci-ai-text-muted); font-size: 12px; line-height: 1.7; }
+.ai-studio-summary__modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 20px; border-block: 1px solid var(--mci-ai-line); }
+.ai-studio-summary__modes article { min-height: 122px; padding: 20px 22px; }
+.ai-studio-summary__modes article:first-child { padding-left: 0; }
+.ai-studio-summary__modes article + article { border-left: 1px solid var(--mci-ai-line); }
+.ai-studio-summary__modes span { color: var(--mci-ai-text-muted); font-size: 10px; letter-spacing: .06em; }
+.ai-studio-summary__modes h3 { margin: 12px 0 7px; color: var(--mci-ai-text); font-size: 16px; font-weight: 650; }
+.ai-studio-summary__modes p { margin: 0; color: var(--mci-ai-text-muted); font-size: 11px; line-height: 1.55; }
+.ai-studio-summary__path footer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding-top: 15px; }
+.ai-studio-summary__path footer p { display: flex; flex-wrap: wrap; gap: 6px 13px; margin: 0; color: var(--mci-ai-text-muted); font-size: 10px; }
+.ai-studio-summary__path footer strong { color: var(--mci-ai-text-soft); font-weight: 650; }
+
+@media (max-width: 900px) {
+  .ai-studio-summary__top,
+  .ai-studio-summary__path > header { grid-template-columns: 1fr; }
+  .ai-studio-summary__actions { justify-content: center; }
+}
+
+@media (max-width: 767px) {
+  .ai-studio-summary { margin-top: 26px; }
+  .ai-studio-summary__top { padding: 14px 0; }
+  .ai-studio-summary__values,
+  .ai-studio-summary__modes,
+  .ai-studio-summary__path footer { grid-template-columns: 1fr; }
+  .ai-studio-summary__values article { padding: 10px 0; }
+  .ai-studio-summary__values article + article,
+  .ai-studio-summary__modes article + article { border-top: 1px solid var(--mci-ai-line); border-left: 0; }
+  .ai-studio-summary__modes article { min-height: 0; padding: 17px 0; }
+  .ai-studio-summary__actions { display: grid; grid-template-columns: 1fr; }
+}
