@@ -130,6 +130,9 @@ test('current Chinese brand surfaces use one canonical positioning and keep the 
 
 test('homepage visual contract covers responsive, focus, and reduced-motion states', () => {
   const styles = read('docs/.vitepress/theme/styles/ai-studio-home.scss')
+  const nugetStyles = read('docs/.vitepress/theme/styles/nuget-downloads.scss')
+  const microiCodeShowcase = read('docs/.vitepress/theme/components/MicroiCodeShowcase.vue')
+  const component = read('docs/.vitepress/theme/components/AiStudioHome.vue')
   const contract = read('MCI-DESIGN.md')
 
   assert.match(styles, /\.mci-home-hero\s*\{/)
@@ -141,6 +144,13 @@ test('homepage visual contract covers responsive, focus, and reduced-motion stat
   assert.match(styles, /@media \(min-width: 768px\) and \(max-width: 900px\)/)
   assert.match(styles, /@media \(max-width: 767px\)/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
+  assert.match(styles, /animation:\s*mciHomePrimaryPulse[^;]*infinite/)
+  assert.match(styles, /animation:\s*mciHomeSecondaryPulse[^;]*infinite/)
+  assert.match(styles, /--mci-home-pointer-x/)
+  assert.match(component, /@pointermove="trackPointer"/)
+  assert.match(component, /prefers-reduced-motion: reduce/)
+  assert.match(nugetStyles, /\.mci-nuget-stats--home\s*\{[^}]*margin:\s*22px auto 42px/s)
+  assert.match(microiCodeShowcase, /\.microi-code-actions a\.is-primary[^}]*-webkit-text-fill-color:#fff!important/s)
   assert.match(styles, /padding: 150px 0 36px/)
   assert.match(styles, /margin: 0 auto 80px/)
   assert.match(styles, /margin-bottom: 56px/)

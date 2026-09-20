@@ -85,6 +85,9 @@ html.microi-ai-studio-page .VPPage .content-container {
 }
 
 .microi-ai-studio-home {
+  --mci-home-pointer-x: 50%;
+  --mci-home-pointer-y: 260px;
+  --mci-home-pointer-opacity: .28;
   position: relative;
   min-height: 100vh;
   overflow: hidden;
@@ -105,8 +108,11 @@ html.microi-ai-studio-page .VPPage .content-container {
   inset: 0 0 auto;
   height: 760px;
   background:
+    radial-gradient(560px circle at var(--mci-home-pointer-x) var(--mci-home-pointer-y), color-mix(in srgb, var(--mci-ai-primary) 12%, transparent), transparent 68%),
     linear-gradient(128deg, var(--mci-ai-primary-soft), transparent 34%),
     linear-gradient(232deg, var(--mci-ai-cool-soft), transparent 30%);
+  opacity: var(--mci-home-pointer-opacity);
+  transition: opacity .28s ease;
   pointer-events: none;
 }
 
@@ -1307,9 +1313,35 @@ html:not(.dark) .ai-studio-brand {
   font-size: 12px;
   font-weight: 680;
   text-decoration: none;
+  color: var(--mci-ai-text) !important;
+  -webkit-text-fill-color: var(--mci-ai-text) !important;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
 }
-.ai-studio-summary__actions a.is-primary { border-color: var(--mci-ai-primary); background: var(--mci-ai-primary); color: #fff; }
+.ai-studio-summary__actions a:hover { transform: translateY(-2px); box-shadow: 0 10px 28px color-mix(in srgb, var(--mci-ai-primary) 20%, transparent); }
+.ai-studio-summary__actions a.is-primary {
+  border-color: var(--mci-ai-primary);
+  background: var(--mci-ai-primary);
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  animation: mciHomePrimaryPulse 2.6s ease-in-out infinite;
+}
+.ai-studio-summary__actions a:not(.is-primary) { animation: mciHomeSecondaryPulse 2.6s ease-in-out infinite .32s; }
 .ai-studio-summary__actions svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+@keyframes mciHomePrimaryPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--mci-ai-primary) 0%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--mci-ai-primary) 13%, transparent), 0 12px 30px color-mix(in srgb, var(--mci-ai-primary) 20%, transparent); }
+}
+
+@keyframes mciHomeSecondaryPulse {
+  0%, 100% { border-color: var(--mci-ai-line-strong); }
+  50% { border-color: color-mix(in srgb, var(--mci-ai-primary) 54%, var(--mci-ai-line-strong)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-studio-summary__actions a { animation: none !important; transition: none !important; }
+  .microi-ai-studio-home::before { transition: none; }
+}
 
 .ai-studio-summary__path { padding-top: 20px; }
 .ai-studio-summary__path > header { display: grid; grid-template-columns: minmax(260px, .7fr) minmax(0, 1.3fr); gap: 32px; align-items: end; }
