@@ -24,7 +24,7 @@ test('platform introduction raw HTML cases join one Fancybox gallery', () => {
 
   assert.ok(galleryMatch, 'platform preview table is missing')
   const images = galleryMatch[1].match(/<img\b[^>]*>/g) || []
-  assert.equal(images.length, 22)
+  assert.equal(images.length, 25)
   for (const image of images) {
     assert.match(image, /data-fancybox="platform-preview"/)
     assert.match(image, /alt="[^"]+"/)
@@ -142,6 +142,10 @@ test('copied product screenshots preserve the exact original bytes supplied for 
     ['file-manage-sync-dialog.jpg', '0559d12ec7b6a679d7fee17492e8587da04f92d4c9e507f23715927370851267'],
     ['app-store-marketplace.jpg', '05e5376bd878b6029a55a6b23fe394531c14364e9dee033a06019e70c1e7ea3a'],
     ['visualization-engine-unity-dashboard.jpg', '1843f6986d6a275fb12e1213e5c31740dbfe874a186e1d00d46cd77abfa11679']
+    ,['microi-code-ai-remove-light.png', '7438d971a1fd01845ce23d23e5681ca7a3870d6a6d9811b382f333d292f6b435']
+    ,['microi-code-ai-center-dark.jpg', '4183113555b18a3931e1be86465361d261a5b61de0a7e91bda6d37ade58318be']
+    ,['microi-code-home-light.jpg', '6db16fb52a020e31ab520211cd3bbf446dc335abeaab4677921ef7acd16310b8']
+    ,['microi-code-task-workspace.png', '8fe962bbfd025ac068db1b9fcac003eaa7e2d3f670da191981f380b005f744cb']
   ])
   for (const [file, digest] of expected) {
     const image = fs.readFileSync(path.join(projectRoot, 'docs/public/images/product-screenshots', file))
@@ -196,5 +200,28 @@ test('platform preview keeps the requested three-image row and removes supersede
     assert.match(content, /mobile-bluetooth-print-specification\.jpg/)
     assert.match(content, /mobile-ai-assistant\.jpg/)
     assert.match(content, /mobile-workbench\.jpg/)
+  }
+})
+
+test('Microi Code previews and training syllabus are prominent in docs and root README', () => {
+  const index = read('docs/doc/index.md')
+  const readme = fs.readFileSync(path.resolve(projectRoot, '..', 'README.md'), 'utf8')
+  const expectedOrder = [
+    'microi-code-ai-center-dark.jpg',
+    'microi-code-home-light.jpg',
+    'microi-code-task-workspace.png'
+  ]
+
+  for (const content of [index, readme]) {
+    assert.match(content, /查看培训大纲/)
+    assert.match(content, /https:\/\/microi\.net\/doc\/about\/microi-training-syllabus\.html|href="\/doc\/about\/microi-training-syllabus\.html"/)
+    const row = (content.match(/<tr>\s*<td><img[^>]*microi-code-ai-center-dark\.jpg[\s\S]*?<\/tr>/) || [])[0] || ''
+    assert.equal((row.match(/<td>/g) || []).length, 3)
+    let previous = -1
+    for (const file of expectedOrder) {
+      const position = row.indexOf(file)
+      assert.ok(position > previous, `${file} should keep the requested gallery order`)
+      previous = position
+    }
   }
 })
