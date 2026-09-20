@@ -82,6 +82,10 @@ test('任务设备地图将完全相同坐标聚合并允许选择具体设备',
   assert.match(mapSource, /this\.selectedGroup = group \? group\.rows : \[\]/)
 })
 
+test('设备地图坐标弹窗展示设备型号', () => {
+  assert.match(mapSource, /<template v-if="mode === 'device'">[\s\S]*?<text>客户名称<\/text>[\s\S]*?<text>设备型号<\/text><text>\{\{ selected\.ShebeiXH \|\| selected\.ShangpinXH \|\| '-' \}\}<\/text>[\s\S]*?<text>安装位置<\/text>/)
+})
+
 test('任务设备列表在默认配置和 xjy Profile 中均已注册', () => {
   for (const config of pageConfigs) {
     const taskPackage = config.subPackages.find((item) => item.root === 'pages/task')
