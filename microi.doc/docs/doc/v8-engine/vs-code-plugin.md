@@ -6,7 +6,7 @@ description: 下载 Microi Code Windows 与 macOS 安装包，了解吾码账号
 
 # Microi Code
 
-Microi Code 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌面 AI 工作台；它把代码、吾码账号、AI 中转站、MCP、Skills 与 30+ 成熟引擎放进同一个入口。选择下方对应平台的安装包，安装后登录吾码账号并连接业务服务器，即可用自然语言完成开发、调试与交付。
+Microi Code 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌面 AI 工作台。下载安装后登录吾码账号，即可使用 AI 中转站、MCP、Skills 与 30+ 成熟引擎完成开发和交付。
 
 <MicroiCodeShowcase />
 
@@ -14,7 +14,7 @@ Microi Code 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌�
 
 Windows 与 macOS 的 latest、不可变归档、SHA-256 和历史版本已经集中在页面顶部。latest 只覆盖对应平台的固定文件名；带版本与内容哈希的归档地址永久保留。Windows 自动更新元数据继续由 [latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供；macOS 当前仅发布人工下载安装的 Intel DMG，自动更新所需 ZIP 与 `latest-mac.yml` 要在 Mac 构建机补齐后再启用。
 
-- 当前 Windows v1.0.7 为未签名包；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。
+- 当前 Windows v1.0.9 为未签名包；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。
 - 当前 macOS Intel v1.0.8 为未签名、未公证包。官网正式分发包使用 Developer ID Application。内部源码根目录执行 `bash ./一键打包Mac.sh` 时，Auto 模式会在证书与 `notarytool` 凭据齐全时自动签名、公证和装订；前期没有凭据时会明确提示并继续生成可手工信任安装的未签名 DMG。`--unsigned` 强制未签名，`--signed` 要求正式签名且缺少凭据时失败。
 - 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 还要求 App Sandbox，并限制下载执行改变功能的代码；现有本地 Node/Harness、Shell、工作区和插件能力不能原样上架。后续移动端和 MAS 版应作为独立受限客户端，复用吾码账号、AI 中转、会话、MCP 与桌面配对协议，把 Agent 执行放到配对桌面或远端，再分别完成 Apple/Google 商店签名与审核。
 

@@ -386,7 +386,7 @@ test("Android 佳博双属性特征优先使用同一 plus 连接栈的无响应
     globalThis.uni = { writeBLECharacteristicValue() { throw new Error("不得混用 uni 蓝牙连接栈"); } };
 
     const printer = createV8Print();
-    assert.equal(await printer.initializeConnection(), true);
+    assert.equal(await printer.reconnect({ silent: false }), true);
     assert.equal(printer.BLEInformation.writeType, "writeNoResponse");
     assert.deepEqual(
         printer.BLEInformation.writeCandidates.map((candidate) => candidate.writeType).sort(),
@@ -544,10 +544,20 @@ test("CC4 首包 BLE 候选返回 10007 时安全切到同设备 SPP 且首包�
         getOutputStream() { return output; },
         close() { this.connected = false; }
     };
-    const nativeDevice = { createInsecureRfcommSocketToServiceRecord() { return socket; } };
+    const nativeDevice = {
+        getName() { return "ZICOX CC4"; },
+        getAddress() { return "00:11:22:33:44:55"; },
+        createInsecureRfcommSocketToServiceRecord() { return socket; }
+    };
     const adapter = {
         isEnabled() { return true; },
         cancelDiscovery() {},
+        getBondedDevices() {
+            return { iterator() { let pending = true; return {
+                hasNext() { return pending; },
+                next() { pending = false; return nativeDevice; }
+            }; } };
+        },
         getRemoteDevice(deviceId) {
             assert.equal(deviceId, "00:11:22:33:44:55");
             return nativeDevice;
@@ -598,7 +608,7 @@ test("CC4 首包 BLE 候选返回 10007 时安全切到同设备 SPP 且首包�
     };
 
     const printer = createV8Print();
-    assert.equal(await printer.initializeConnection(), true);
+    assert.equal(await printer.reconnect({ silent: false }), true);
     printer.setOneTimeData(16);
     printer.setPrinterNum(2);
     const command = printer.createNew();
@@ -651,11 +661,19 @@ test("CC4 首包 BLE 与 SPP 均失败时保持断开并返回两段可操作错
         close() {}
     };
     const nativeDevice = {
+        getName() { return "ZICOX CC4"; },
+        getAddress() { return "00:11:22:33:44:66"; },
         createInsecureRfcommSocketToServiceRecord() { return failedSocket; }
     };
     const adapter = {
         isEnabled() { return true; },
         cancelDiscovery() {},
+        getBondedDevices() {
+            return { iterator() { let pending = true; return {
+                hasNext() { return pending; },
+                next() { pending = false; return nativeDevice; }
+            }; } };
+        },
         getRemoteDevice() { return nativeDevice; }
     };
     const BluetoothAdapter = { getDefaultAdapter() { return adapter; } };
@@ -695,7 +713,7 @@ test("CC4 首包 BLE 与 SPP 均失败时保持断开并返回两段可操作错
     };
 
     const printer = createV8Print();
-    assert.equal(await printer.initializeConnection(), true);
+    assert.equal(await printer.reconnect({ silent: false }), true);
     await assert.rejects(
         printer.prepareSend(Uint8Array.from([1, 2, 3])),
         /CC4 BLE 写入失败（property not support）；SPP 连接或写入也失败（经典蓝牙连接失败.*系统蓝牙中配对/
@@ -758,7 +776,7 @@ test("后续分包返回 10007 时禁止切换写入特征，避免在另一通�
     };
 
     const printer = createV8Print();
-    assert.equal(await printer.initializeConnection(), true);
+    assert.equal(await printer.reconnect({ silent: false }), true);
     printer.setOneTimeData(2);
     await assert.rejects(
         printer.prepareSend(Uint8Array.from([1, 2, 3, 4])),

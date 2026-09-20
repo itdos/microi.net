@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import test from 'node:test'
+import { nativeTreeConfig, serializeNativeTreeValue } from '../src/platform/native-tree-options.mjs'
 
 const read = (name) => fs.readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8')
 const plain = (value) => JSON.parse(JSON.stringify(value))
@@ -24,7 +25,11 @@ function harness(mode = 'Add', form = {}) {
   }])) }
   const hooks = loadModule('tenants/xjy/form.js')
   const platform = loadModule('platform/native-form.js', {
-    V8, nativeControls: JSON.parse(read('config/mci-native-controls.json')), removeCachePrefix: () => {}
+    V8,
+    nativeControls: JSON.parse(read('config/mci-native-controls.json')),
+    nativeTreeConfig,
+    serializeNativeTreeValue,
+    removeCachePrefix: () => {}
   })
   const context = { tableName: 'Diy_XiansuoGJJL', mode, rowId: mode === 'Edit' ? 'followup-1' : '',
     form: { ...form }, state: {}, definition: { fields: [field] } }
