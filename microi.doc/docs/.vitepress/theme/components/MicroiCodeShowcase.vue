@@ -97,10 +97,10 @@ function resetPointer(event) {
 }
 
 const windows = {
-  version: '1.0.9',
-  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.0.9',
-  archive: 'https://static.itdos.com/itdos/microi-code/1.0.9/0f95ebfb898d/202609/Microi-Code-1_0_9-windows-x64-setup.exe',
-  sha256: '0f95ebfb898db04c313bc4b022cff2b8c78ea59806cc35e9e9fb0de963cacaad'
+  version: '1.1.0',
+  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.1.0',
+  archive: 'https://static.itdos.com/itdos/microi-code/1.1.0/514bef357d0e/202609/Microi-Code-1_1_0-windows-x64-setup.exe',
+  sha256: '514bef357d0e955c072ef05f097e4b8bba1c2cf1560a224bad6e0d3e440aaf34'
 }
 
 const mac = {
@@ -118,7 +118,8 @@ const screenshots = [
 ]
 
 const releases = [
-  { version: '1.0.9', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: windows.archive },
+  { version: '1.1.0', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: windows.archive },
+  { version: '1.0.9', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.0.9/0f95ebfb898d/202609/Microi-Code-1_0_9-windows-x64-setup.exe' },
   { version: '1.0.8', platform: 'macOS Intel', note: 'x64 DMG · 197.4 MiB · 未签名', url: mac.archive },
   { version: '1.0.7', platform: 'Windows x64', note: '历史版本', url: 'https://static.itdos.com/itdos/microi-code/1.0.7/297c04b0934c/202609/Microi-Code-1_0_7-windows-x64-setup.exe' },
   { version: '1.0.6', platform: 'Windows x64', note: '历史版本', url: 'https://static.itdos.com/itdos/microi-code/1.0.6/1bca07dfbeb2/202609/Microi-Code-1_0_6-windows-x64-setup.exe' },
@@ -137,7 +138,7 @@ const releases = [
 .microi-code-showcase *{box-sizing:border-box}.microi-code-showcase a{text-decoration:none}.microi-code-hero{display:grid;grid-template-columns:minmax(0,.82fr) minmax(480px,1.18fr);align-items:center;gap:48px;padding:54px 0 48px;border-bottom:1px solid var(--vp-c-divider)}
 .microi-code-kicker,.microi-code-section-head p{margin:0;color:var(--vp-c-brand-1);font-size:11px;font-weight:700;letter-spacing:.14em}.microi-code-kicker{display:flex;align-items:center;gap:9px}.microi-code-kicker span{width:8px;height:8px;border-radius:50%;background:var(--vp-c-brand-1);box-shadow:0 0 0 5px color-mix(in srgb,var(--vp-c-brand-1) 13%,transparent)}
 .microi-code-hero h2{margin:18px 0 0;border:0;font-size:clamp(38px,3.2vw,54px);font-weight:620;line-height:1.08;letter-spacing:-.05em}.microi-code-hero h2 strong{color:var(--vp-c-brand-1);font-weight:680}.microi-code-lead{max-width:570px;margin:22px 0 0;color:var(--vp-c-text-2);font-size:16px;line-height:1.8}
-.microi-code-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:28px}.microi-code-actions a,.platform-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 17px;border:1px solid var(--vp-c-divider);border-radius:10px;color:var(--vp-c-text-1);font-size:13px;font-weight:650}.microi-code-actions a.is-primary,.platform-actions a:first-child{border-color:var(--vp-c-brand-1);background:var(--vp-c-brand-1);color:#fff}
+.microi-code-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:28px}.microi-code-actions a,.platform-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 17px;border:1px solid var(--vp-c-divider);border-radius:10px;color:var(--vp-c-text-1);font-size:13px;font-weight:650}.microi-code-actions a.is-primary,.platform-actions a:first-child{border-color:var(--vp-c-brand-1);background:var(--vp-c-brand-1);color:#fff!important;-webkit-text-fill-color:#fff!important}.microi-code-actions a.is-primary *,.platform-actions a:first-child *{color:#fff!important;-webkit-text-fill-color:#fff!important}
 .microi-code-facts{display:flex;flex-wrap:wrap;gap:8px 18px;margin:22px 0 0;padding:0;list-style:none;color:var(--vp-c-text-2);font-size:12px}.microi-code-facts li::before{content:"";display:inline-block;width:5px;height:5px;margin:0 7px 2px 0;border-radius:50%;background:#24a148}
 .microi-code-hero__visual{position:relative;display:block;overflow:hidden;border:1px solid var(--vp-c-divider);border-radius:18px;background:var(--vp-c-bg-soft);box-shadow:0 24px 70px rgba(15,23,42,.13)}.microi-code-hero__visual img{display:block;width:100%;aspect-ratio:1.515;object-fit:cover}.microi-code-hero__visual>span,.microi-code-gallery a>span{position:absolute;inset:auto 12px 12px;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding:12px 14px;border:1px solid rgba(255,255,255,.2);border-radius:11px;background:rgba(13,17,23,.78);color:#fff;backdrop-filter:blur(12px)}.microi-code-hero__visual strong,.microi-code-gallery strong{font-size:13px}.microi-code-hero__visual small,.microi-code-gallery small{color:rgba(255,255,255,.72);font-size:11px}
 .microi-code-platforms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:34px}.microi-code-platforms article{padding:24px;border:1px solid var(--vp-c-divider);border-radius:16px;background:var(--vp-c-bg-soft)}.microi-code-platforms header{display:flex;align-items:center;gap:13px}.platform-mark{width:42px;height:42px;display:grid;place-items:center;border-radius:11px;background:var(--vp-c-bg);color:var(--vp-c-brand-1);font-size:20px}.microi-code-platforms header div{min-width:0}.microi-code-platforms header p{margin:0;color:var(--vp-c-text-3);font-size:10px;letter-spacing:.13em}.microi-code-platforms h2{margin:2px 0 0;border:0;font-size:19px;font-weight:650;line-height:1.2}.microi-code-platforms em{margin-left:auto;padding:4px 8px;border:1px solid var(--vp-c-divider);border-radius:999px;color:var(--vp-c-text-2);font-size:11px;font-style:normal}.microi-code-platforms article>p{min-height:48px;margin:16px 0;color:var(--vp-c-text-2);font-size:13px;line-height:1.65}.platform-actions{display:flex;gap:8px}.platform-actions a{min-height:38px}.microi-code-platforms code{display:block;overflow:hidden;margin-top:15px;color:var(--vp-c-text-3);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
