@@ -1,5 +1,5 @@
 <template>
-  <main class="microi-ai-studio-home" data-mci-ui-root>
+  <main class="microi-ai-studio-home" data-mci-ui-root @pointermove="trackPointer" @pointerleave="resetPointer">
     <section class="ai-studio-stage ai-studio-stage--lead" aria-labelledby="ai-studio-chat-title">
       <div class="mci-home-section-heading">
         <p class="ai-studio-brand"><span aria-hidden="true"></span>Microi AI Studio</p>
@@ -228,6 +228,19 @@ function syncHomeClass() {
 
 function handleAuthChange() {
   syncAuth()
+}
+
+function trackPointer(event) {
+  if (event.pointerType === 'touch' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const root = event.currentTarget
+  const rect = root.getBoundingClientRect()
+  root.style.setProperty('--mci-home-pointer-x', `${event.clientX - rect.left}px`)
+  root.style.setProperty('--mci-home-pointer-y', `${event.clientY - rect.top}px`)
+  root.style.setProperty('--mci-home-pointer-opacity', '.72')
+}
+
+function resetPointer(event) {
+  event.currentTarget.style.setProperty('--mci-home-pointer-opacity', '.28')
 }
 
 if (typeof document !== 'undefined') syncHomeClass()
