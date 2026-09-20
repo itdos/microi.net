@@ -542,3 +542,46 @@ html:lang(zh) {
     }
   }
 }
+
+.mci-doc-home-actions {
+  display: flex;
+  justify-content: center;
+  margin: 22px 0 10px;
+}
+
+.mci-doc-home-action {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 22px;
+  border-radius: 12px;
+  background: var(--vp-c-brand-1);
+  color: #fff !important;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none !important;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--vp-c-brand-1) 24%, transparent);
+}
+
+.mci-doc-home-action:hover {
+  background: var(--vp-c-brand-2);
+  transform: translateY(-1px);
+}
+
+.mci-doc-preview-gallery td {
+  width: 33.333%;
+  vertical-align: middle;
+}
+
+.mci-doc-preview-gallery img {
+  width: 100%;
+  aspect-ratio: 1.48;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.mci-doc-preview-gallery td[colspan="3"] img {
+  aspect-ratio: auto;
+}

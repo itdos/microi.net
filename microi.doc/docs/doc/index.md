@@ -14,6 +14,8 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 <p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
 
+<p class="mci-doc-home-actions"><a class="mci-doc-home-action" href="/doc/about/microi-training-syllabus.html">查看培训大纲 <span aria-hidden="true">→</span></a></p>
+
 <p style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;">
   <img src="https://static.itdos.com/upload/img/NET-10.svg" alt=".NET 10" />
   <img src="https://static.itdos.com/upload/img/Vue-2_3-4FC08D.svg" alt="Vue 2 与 Vue 3" />
@@ -43,6 +45,11 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 <table class="mci-doc-preview-gallery">
   <tr>
     <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%" data-fancybox="platform-preview"/></td>
+  </tr>
+  <tr>
+    <td><img src="/images/product-screenshots/microi-code-ai-center-dark.jpg" alt="Microi Code 深色 AI 能力中心" data-fancybox="platform-preview"/></td>
+    <td><img src="/images/product-screenshots/microi-code-home-light.jpg" alt="Microi Code 浅色首页" data-fancybox="platform-preview"/></td>
+    <td><img src="/images/product-screenshots/microi-code-task-workspace.png" alt="Microi Code 真实任务工作区" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
     <td><img src="/images/product-screenshots/webos-api-engine-workspace.jpg" alt="Microi WebOS 接口引擎与主题设置界面" data-fancybox="platform-preview"/></td>
