@@ -12,6 +12,7 @@ import ProfilePage from "./components/ProfilePage.vue";
 import ProfileLocaleSwitch from "./components/ProfileLocaleSwitch.vue";
 import MciNugetStats from "./components/MciNugetStats.vue";
 import TrainingSyllabusDeck from "./components/TrainingSyllabusDeck.vue";
+import MicroiCodeShowcase from "./components/MicroiCodeShowcase.vue";
 import NotFoundPage from './components/NotFoundPage.vue';
 import DocBreadcrumbs from './components/DocBreadcrumbs.vue';
 import { usePageSeo } from './use-page-seo.mjs';
@@ -101,5 +102,6 @@ export default {
         ctx.app.component('AppDetail', AppDetail);
         ctx.app.component('MciNugetStats', MciNugetStats);
         ctx.app.component('TrainingSyllabusDeck', TrainingSyllabusDeck);
+        ctx.app.component('MicroiCodeShowcase', MicroiCodeShowcase);
     }
 };
