@@ -2,11 +2,12 @@
 title: Microi Code
 titleTemplate: 吾码桌面 AI 开发工作台
 description: 下载 Microi Code Windows 与 macOS 安装包，了解吾码账号、AI 中转站、MCP、Skills、DeepSeek Harness 与 dsh-desktop 的完整集成方式。
+pageClass: mci-microi-code-page
 ---
 
 # Microi Code
 
-Microi Code 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌面 AI 工作台。下载安装后登录吾码账号，即可使用 AI 中转站、MCP、Skills 与 30+ 成熟引擎完成开发和交付。
+Microi Code 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌面 AI 工作台，提供 Windows 与 macOS 下载、版本校验和完整使用说明。
 
 <MicroiCodeShowcase />
 
