@@ -120,6 +120,18 @@ namespace Microi.net
             if (jArray == null || jArray.Count == 0)
                 return result;
 
+            // zhy：混合的新旧 _Where 必须逐项解析，避免由第一项格式决定分支后静默丢掉父子外键或关联筛选。
+            var hasLegacyFormat = jArray.Any(item => item.Type == Newtonsoft.Json.Linq.JTokenType.Object);
+            var hasNewFormat = jArray.Any(item => item.Type == Newtonsoft.Json.Linq.JTokenType.Array);
+            if (hasLegacyFormat && hasNewFormat)
+            {
+                foreach (var item in jArray)
+                {
+                    result.AddRange(ParseJArray(new Newtonsoft.Json.Linq.JArray(item.DeepClone())));
+                }
+                return result;
+            }
+
             // 判断是旧格式还是新格式
             if (jArray[0].Type == Newtonsoft.Json.Linq.JTokenType.Object)
             {
