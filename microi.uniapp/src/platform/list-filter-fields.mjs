@@ -49,17 +49,47 @@ function normalizedBoolean(value, fallback = false) {
   return fallback
 }
 
+function normalizedIdentity(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function splitFieldReference(value) {
+  const parts = String(value || '').trim().split('.')
+  if (parts.length !== 2 || !parts.every((part) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(part))) {
+    return { table: '', name: String(value || '').trim() }
+  }
+  return { table: parts[0], name: parts[1] }
+}
+
 function findConfiguredField(item, fields) {
   const byId = new Map(fields.map((field) => [String(field.Id || '').toLowerCase(), field]))
   const byName = new Map(fields.map((field) => [String(field.Name || '').toLowerCase(), field]))
   const source = item && typeof item === 'object' ? item : {}
+  const sourceReference = splitFieldReference(source.Name || source.name || source.Field || source.field)
+  const sourceTable = normalizedIdentity(
+    source.FormEngineKey || source.formEngineKey || source.TableName || source.tableName ||
+    source.TableId || source.tableId || sourceReference.table
+  )
+  const sourceName = normalizedIdentity(sourceReference.name)
+  const tableMatched = sourceTable && sourceName
+    ? fields.find((field) => {
+        const fieldTable = [field.TableName, field.tableName, field.TableId, field.tableId]
+          .map(normalizedIdentity)
+          .filter(Boolean)
+        return fieldTable.includes(sourceTable) && normalizedIdentity(field.Name) === sourceName
+      })
+    : null
   const candidates = item && typeof item === 'object'
     ? [source.Id, source.id, source.FieldId, source.fieldId, source.Name, source.name, source.Field, source.field]
     : [item]
-  return candidates
+  return candidates.slice(0, 4)
     .map((candidate) => String(candidate || '').toLowerCase())
     .filter(Boolean)
-    .map((candidate) => byId.get(candidate) || byName.get(candidate))
+    .map((candidate) => byId.get(candidate))
+    .find(Boolean) || tableMatched || candidates
+    .map((candidate) => splitFieldReference(candidate).name.toLowerCase())
+    .filter(Boolean)
+    .map((candidate) => byName.get(candidate))
     .find(Boolean)
 }
 
@@ -150,16 +180,28 @@ export function relativeDaysFilterBounds(field, value, now = new Date()) {
   ]
 }
 
-function compileField(item, field) {
+function compileField(item, field, options = {}) {
   const source = item && typeof item === 'object' ? item : {}
+  const sourceReference = splitFieldReference(source.Name || source.name || source.Field || source.field)
+  const tableName = String(source.TableName || source.tableName || field.TableName || field.tableName || sourceReference.table || '').trim()
+  const tableId = String(source.TableId || source.tableId || field.TableId || field.tableId || '').trim()
+  const explicitFormEngineKey = String(source.FormEngineKey || source.formEngineKey || sourceReference.table || '').trim()
+  const primaryTableName = normalizedIdentity(options.primaryTableName)
+  const primaryTableId = normalizedIdentity(options.primaryTableId)
+  const hasPrimaryTable = Boolean(primaryTableName || primaryTableId)
+  const isPrimaryTable = (primaryTableName && normalizedIdentity(tableName) === primaryTableName) ||
+    (primaryTableId && normalizedIdentity(tableId) === primaryTableId)
+  const formEngineKey = explicitFormEngineKey || (hasPrimaryTable && !isPrimaryTable ? (tableName || tableId) : '')
   const component = String(field.component || field.Component || 'Text')
   const config = field.config || (typeof field.Config === 'string' ? JSON.parse(field.Config || '{}') : field.Config) || {}
   const tree = ['Cascader', 'SelectTree', 'TreeCheckbox', 'Department'].includes(component)
   const treeConfig = config[component] || (component === 'TreeCheckbox' ? config.SelectTree : {}) || {}
   const label = String(source.Label || source.label || field.Label || field.Name || '').trim()
+  const fieldName = String(field.Name || sourceReference.name || '').trim()
   const base = {
-    key: String(field.Name || field.Id || '').trim(),
-    field: String(field.Name || '').trim(),
+    key: formEngineKey ? `${formEngineKey}.${fieldName}` : String(fieldName || field.Id || '').trim(),
+    field: fieldName,
+    ...(formEngineKey ? { formEngineKey } : {}),
     label,
     placeholder: String(field.placeholder || `请输入${label}`).trim(),
     component,
@@ -229,18 +271,29 @@ function compileField(item, field) {
   return { ...base, type: 'text', operation: normalizedBoolean(source.Equal, false) ? '=' : 'Like' }
 }
 
-export function compileModuleFilterFields(searchFieldIds, fields = [], { includeInline = false, allowAppHidden = false } = {}) {
+export function compileModuleFilterFields(searchFieldIds, fields = [], {
+  includeInline = false,
+  allowAppHidden = false,
+  primaryTableId = '',
+  primaryTableName = ''
+} = {}) {
   const available = Array.isArray(fields) ? fields : []
   const seen = new Set()
   return parseRows(searchFieldIds).map((item) => {
     if (!shouldShowInAdvancedFilter(item, includeInline)) return null
     const field = findConfiguredField(item, available)
     if (!fieldCanBeSearched(field, { allowAppHidden })) return null
-    const key = String(field.Name).toLowerCase()
+    const compiled = compileField(item, field, { primaryTableId, primaryTableName })
+    const key = `${normalizedIdentity(compiled.formEngineKey)}:${normalizedIdentity(compiled.field)}`
     if (seen.has(key)) return null
     seen.add(key)
-    return compileField(item, field)
+    return compiled
   }).filter(Boolean)
+}
+
+function filterIdentity(field) {
+  const name = normalizedIdentity(field?.field || field?.key)
+  return name ? `${normalizedIdentity(field?.formEngineKey)}:${name}` : ''
 }
 
 export function mergeModuleFilterFields(configured = [], local = [], nativeFields = []) {
@@ -256,7 +309,7 @@ export function mergeModuleFilterFields(configured = [], local = [], nativeField
   })
   ;[...(configured || []), ...normalizedLocal].forEach((field) => {
     if (!field) return
-    const key = String(field.field || field.key || '').trim().toLowerCase()
+    const key = filterIdentity(field)
     if (!key) return
     if (indexes.has(key)) {
       if (field.overrideConfigured === true) {
@@ -289,10 +342,10 @@ const TABLE_SELECTOR_FILTER_TYPES = new Set([
 export function mergeTableSelectorFilterFields(configured = [], presentation = []) {
   const valid = (field) => field && field.key && field.field && TABLE_SELECTOR_FILTER_TYPES.has(field.type)
   const result = (Array.isArray(configured) ? configured : []).filter(valid).map((field) => ({ ...field }))
-  const indexes = new Map(result.map((field, index) => [String(field.field || field.key).trim().toLowerCase(), index]))
+  const indexes = new Map(result.map((field, index) => [filterIdentity(field), index]))
 
   ;(Array.isArray(presentation) ? presentation : []).filter(valid).forEach((field) => {
-    const identity = String(field.field || field.key).trim().toLowerCase()
+    const identity = filterIdentity(field)
     const index = indexes.get(identity)
     // presentation.filters 是特殊业务的完整声明：同字段替换后台配置，新字段按声明顺序追加。
     if (index !== undefined) result[index] = { ...field }
@@ -312,12 +365,19 @@ export function hasListFilterValue(value) {
   return value !== undefined && value !== null && value !== '' && value !== false
 }
 
+function whereTarget(field, name = field.field) {
+  return {
+    ...(field.formEngineKey ? { FormEngineKey: field.formEngineKey } : {}),
+    Name: name
+  }
+}
+
 function appendMultiValueLike(result, field, values) {
   values.forEach((value, index) => {
     result.push({
+      ...whereTarget(field),
       AndOr: index === 0 ? 'AND' : 'OR',
       GroupStart: index === 0,
-      Name: field.field,
       Type: 'Like',
       Value: value,
       GroupEnd: index === values.length - 1
@@ -375,23 +435,27 @@ export function buildListFilterWhere(filterFields = [], filterValues = {}, curre
     if (!field || field.type === 'sort') return
     const value = filterValues[field.key]
     if (field.type === 'relative-days') {
-      if (hasListFilterValue(value)) relativeDaysFilterBounds(field, value).forEach((bound) => result.push(bound))
+      if (hasListFilterValue(value)) relativeDaysFilterBounds(field, value).forEach((bound) => result.push({
+        ...whereTarget(field, bound.Name),
+        Type: bound.Type,
+        Value: bound.Value
+      }))
       return
     }
     if (field.type === 'range') {
-      if (value && value.min !== undefined && value.min !== '') result.push({ Name: field.field, Type: '>=', Value: Number(value.min) })
-      if (value && value.max !== undefined && value.max !== '') result.push({ Name: field.field, Type: '<=', Value: Number(value.max) })
+      if (value && value.min !== undefined && value.min !== '') result.push({ ...whereTarget(field), Type: '>=', Value: Number(value.min) })
+      if (value && value.max !== undefined && value.max !== '') result.push({ ...whereTarget(field), Type: '<=', Value: Number(value.max) })
       return
     }
     if (field.type === 'date-range') {
-      dateFilterBounds(field, value || {}).forEach((bound) => result.push({ Name: field.field, ...bound }))
+      dateFilterBounds(field, value || {}).forEach((bound) => result.push({ ...whereTarget(field), ...bound }))
       return
     }
     if (field.type === 'toggle') {
       if (!value) return
       const resolved = field.currentUserField ? currentUser[field.currentUserField] : field.value
       if (resolved !== undefined && resolved !== null && resolved !== '') {
-        result.push({ Name: field.field, Type: field.operation || '=', Value: resolved })
+        result.push({ ...whereTarget(field), Type: field.operation || '=', Value: resolved })
       }
       return
     }
@@ -401,7 +465,7 @@ export function buildListFilterWhere(filterFields = [], filterValues = {}, curre
         const prefix = JSON.stringify(region).slice(0, -1)
         // Address 写入省市区名称 JSON 数组；省、市筛选是完整路径前缀。
         const patterns = [prefix + ']', prefix + ',', prefix.replace(/,/g, ', ') + ']', prefix.replace(/,/g, ', ') + ',']
-        patterns.forEach((pattern, index) => result.push({ Name: field.field, Type: 'StartLike', Value: pattern, AndOr: index ? 'OR' : 'AND', GroupStart: index === 0, GroupEnd: index === patterns.length - 1 }))
+        patterns.forEach((pattern, index) => result.push({ ...whereTarget(field), Type: 'StartLike', Value: pattern, AndOr: index ? 'OR' : 'AND', GroupStart: index === 0, GroupEnd: index === patterns.length - 1 }))
       }
       return
     }
@@ -411,7 +475,7 @@ export function buildListFilterWhere(filterFields = [], filterValues = {}, curre
       const selections = field.multiple && Array.isArray(value) ? value : [value]
       const values = selections.map(unwrapFilterSelection)
       const storage = field.storage || (field.multiValueLike ? 'array' : 'scalar')
-      if (storage === 'scalar') result.push({ Name: field.field, Type: field.multiple ? 'In' : '=', Value: field.multiple ? values : values[0] })
+      if (storage === 'scalar') result.push({ ...whereTarget(field), Type: field.multiple ? 'In' : '=', Value: field.multiple ? values : values[0] })
       else {
         const patterns = values.flatMap((item, index) => {
           const legacy = selections[index]?._filterRaw
@@ -426,12 +490,12 @@ export function buildListFilterWhere(filterFields = [], filterValues = {}, curre
     if (Array.isArray(value)) {
       if (!value.length) return
       if (field.multiValueLike) appendMultiValueLike(result, field, value)
-      else result.push({ Name: field.field, Type: field.operation || 'In', Value: value })
+      else result.push({ ...whereTarget(field), Type: field.operation || 'In', Value: value })
       return
     }
     if (value !== undefined && value !== null && String(value).trim() !== '') {
       result.push({
-        Name: field.field,
+        ...whereTarget(field),
         Type: field.operation || (field.type === 'text' ? 'Like' : '='),
         Value: typeof value === 'string' ? value.trim() : value
       })
