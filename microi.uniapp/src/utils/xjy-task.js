@@ -81,7 +81,11 @@ export function hasTaskPermission(name, user = getUser() || {}) {
 }
 
 function ensureSuccess(result, fallback = '操作失败') {
-  if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || fallback)
+  if (!result || Number(result.Code) !== 1) {
+    const error = new Error((result && result.Msg) || fallback)
+    error.code = result ? Number(result.Code) : 0
+    throw error
+  }
   return result
 }
 

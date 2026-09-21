@@ -492,9 +492,10 @@ import {
   parseJson
 } from '@/platform/native-form.js'
 import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
-import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
+import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines, moduleProjectionFields } from '@/platform/card-field-policy.mjs'
 import { buildListFilterWhere, compileModuleFilterFields, hasListFilterValue, mergeModuleFilterFields, validateListFilters } from '@/platform/list-filter-fields.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
+import { tableChildRequiresModuleQuery } from '@/platform/table-child-query-target.mjs'
 import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
@@ -581,6 +582,7 @@ function buildKeywordWhere(fields = [], keyword = '') {
     !KEYWORD_EXCLUDED_COMPONENTS.has(field.component)
   )
   return searchable.map((field, index) => ({
+    ...(field.formEngineKey ? { FormEngineKey: field.formEngineKey } : {}),
     Name: field.field,
     Type: 'Like',
     Value: value,
@@ -1521,6 +1523,7 @@ export default {
           ? {
               title: menuConfig.title,
               definition: menuConfig.definition,
+              displayFields: menuConfig.displayFields,
               titleField: menuConfig.titleField,
               statusField: menuConfig.statusField,
               statusOptions: menuConfig.statusOptions,
@@ -1542,7 +1545,7 @@ export default {
           table: this.table.Name,
           tableId: this.table.Id,
           menuId: this.menuId,
-          moduleEngineKey: menu?.ModuleEngineKey || ''
+          moduleEngineKey: menu?.ModuleEngineKey || menu?.Id || ''
         }
         this.emitTitleChange()
         this.applyMenuSearchFields(menu?.SearchFieldIds || [])
@@ -1574,7 +1577,7 @@ export default {
         'menu', 'definition', 'titleField', 'title', 'statusField', 'statusOptions', 'tagFields',
         'bottomFields', 'hasConfiguredCardFields', 'hasConfiguredMobileFields',
         'hasConfiguredTagFields', 'hasConfiguredBottomFields', 'cardFields', 'lines',
-        'selectFields', 'summaryField', 'imageField', 'periodField'
+        'selectFields', 'displayFields', 'summaryField', 'imageField', 'periodField'
       ]
       const next = { ...this.config }
       presentationFields.forEach((name) => {
@@ -1680,7 +1683,7 @@ export default {
         }
         if (!isCurrent()) return
         this.applyMenuSearchFields(manifest?.Legacy?.SearchFieldIds)
-        const dynamic = compileListConfig(manifest, this.definition?.fields || [])
+        const dynamic = compileListConfig(manifest, this.config.displayFields || this.definition?.fields || [])
         if (!dynamic) return
         this.viewManifest = manifest
         const merged = { ...this.config }
@@ -1706,9 +1709,21 @@ export default {
     },
     applyMenuSearchFields(value) {
       if (value === undefined || value === null) return
-      const fields = appendSystemAuditFields(this.definition?.fields || [])
+      const rawSearchFields = parseJson(value, value)
+      const fields = [
+        ...moduleProjectionFields(Array.isArray(rawSearchFields) ? rawSearchFields : []),
+        ...appendSystemAuditFields(
+          this.config.displayFields?.length
+            ? this.config.displayFields
+            : (this.definition?.fields || [])
+        )
+      ]
       // 详情关联列表没有 PC 的行内/外部筛选区，所有可见查询字段统一进入弹窗。
-      const configured = compileModuleFilterFields(value, fields, { includeInline: true })
+      const configured = compileModuleFilterFields(value, fields, {
+        includeInline: true,
+        primaryTableId: this.table?.Id || this.config.tableId,
+        primaryTableName: this.table?.Name || this.config.table
+      })
       this.keywordSearchFields = configured
       this.config = {
         ...this.config,
@@ -1739,6 +1754,14 @@ export default {
         'CreateTime',
         'UpdateTime'
       ].filter(Boolean))]
+    },
+    requiresModuleAssociationQuery() {
+      const menu = this.config.menu || this.menu || {}
+      return Boolean(
+        this.tableChildAuth &&
+        this.config.moduleEngineKey &&
+        tableChildRequiresModuleQuery(menu, this.table?.Id || this.config.tableId)
+      )
     },
     latestSummaryValue(item) {
       const value = this.latestSummaryRow?.[item.field]
@@ -1829,7 +1852,23 @@ export default {
           ...keywordWhere
         ]
         let result
-        if (this.tableChildAuth) {
+        if (this.requiresModuleAssociationQuery()) {
+          // 关联字段必须由模块引擎执行 SqlJoin/SelectFields；授权仍只依赖完整
+          // _TableChildAuth，并保留父子外键条件，不重新附加子菜单数据范围。
+          result = await loadModuleRows({
+            ...this.config,
+            selectFields: this.relatedSelectFields()
+          }, {
+            pageIndex: this.pageIndex,
+            pageSize,
+            keyword: keywordWhere.length ? '' : this.keyword.trim(),
+            refresh,
+            cacheAge: 0,
+            extraWhere,
+            tableChildAuth: this.tableChildAuth,
+            tableChildModuleQuery: true
+          })
+        } else if (this.tableChildAuth) {
           // zhy：TableChild 列表必须通过表单引擎携带完整父子授权链查询。
           // ModuleEngine 的子菜单数据范围会把已经正确绑定的孙表记录过滤成 0 条；
           // 此处不传子菜单 Id，由后端按 _TableChildAuth 逐层校验并用外键条件限定数据。
@@ -2117,19 +2156,29 @@ export default {
       ])
     },
     fieldDefinition(name) {
-      return (this.config.definition?.fields || []).find((field) => field.Name === name)
+      const target = String(name || '').toLowerCase()
+      return (this.config.displayFields || this.config.definition?.fields || []).find((field) =>
+        [field?.Name, field?.AsName].some((candidate) => String(candidate || '').toLowerCase() === target)
+      )
+    },
+    configuredRawFieldValue(row, name) {
+      const field = this.fieldDefinition(name)
+      const candidates = [name, field?.AsName, field?.Name].filter(Boolean)
+      const key = candidates.find((candidate) => Object.prototype.hasOwnProperty.call(row || {}, candidate))
+      return key ? row[key] : undefined
     },
     configuredFieldValue(row, name, format = '') {
       const field = this.fieldDefinition(name)
+      const value = this.configuredRawFieldValue(row, name)
       return field
-        ? fieldDisplayValue(field, row[name])
-        : formatFieldValue(row[name], format, { empty: '' })
+        ? fieldDisplayValue(field, value)
+        : formatFieldValue(value, format, { empty: '' })
     },
     cardLines(row) {
       return this.visibleLines(row).map((line) => ({
         ...line,
         value: this.configuredFieldValue(row, line.field, line.format),
-        rawValue: row[line.field],
+        rawValue: this.configuredRawFieldValue(row, line.field),
         // zhy：动态清单把摘要字段作为普通行返回时，限制为配置的最大行数。
         maxLines: String(line.field || '').toLowerCase() === String(this.config.summaryField || '').toLowerCase()
           ? (Number(this.config.summaryLines) || 3)

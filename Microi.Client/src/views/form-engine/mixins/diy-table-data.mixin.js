@@ -9,8 +9,14 @@ import {
     composeTableWhere,
     hasSearchFilterValue,
     mergeWhereList,
+    normalizeMixedWhereList,
     whereListHasField
 } from "../utils/diy-table-where.js";
+// zhy：TableChild 查询目标按模块关联配置选择，兼容关联字段与历史数据权限行为。
+import {
+    resolveTableQueryTarget,
+    tableChildRequiresModuleQuery
+} from "../utils/diy-table-query-target.js";
 
 export default {
     methods: {
@@ -781,25 +787,14 @@ export default {
                 param._Keyword = self.Keyword;
             }
 
-            // if(!param.TableName){
-            //先设置模块引擎Key
-            if (!param.ModuleEngineKey) {
-                param.ModuleEngineKey = self.SysMenuId;
-            }
-            //如果仍然不存在模块引擎Key，设置表单引擎Key
-            if (!param.ModuleEngineKey) {
-                param.FormEngineKey = self.CurrentDiyTableModel.Name;
-            }
-            if (!param.ModuleEngineKey && !param.FormEngineKey) {
-                param.FormEngineKey = self.TableId;
-            }
-            if (self.IsTableChild() && self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name) {
-                // zhy：TableChild 必须以物理表名配合 _TableChildAuth 查询。
-                // zhy：使用子菜单 ModuleEngineKey 会再次套用子菜单数据范围，导致已经按外键
-                // zhy：正确绑定的数据被过滤成 0 条；后端仍会逐层校验 TableChild 授权链。
-                delete param.ModuleEngineKey;
-                param.FormEngineKey = self.CurrentDiyTableModel.Name;
-            }
+            // zhy：有关联配置的子表保留模块查询；普通子表继续走物理表，同时保留授权链和父子外键条件。
+            resolveTableQueryTarget(param, {
+                sysMenuId: self.SysMenuId,
+                formEngineKey: self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name,
+                tableId: self.TableId,
+                isTableChild: self.IsTableChild(),
+                tableChildRequiresModuleQuery: tableChildRequiresModuleQuery(self.SysMenuModel, self.TableId)
+            });
 
             //注意：这个是由主表传过来的主表行Id，需要在这里子表加入条件：where 外键Id=TableChildFkFieldName
             if (self.IsTrashMode) {
@@ -916,6 +911,10 @@ export default {
                         param[key] = self.PropsRequestParams[key];
                     }
                 });
+            }
+            // zhy：所有查询条件组装完成后再统一格式，避免数组条件与父子外键对象条件混用时服务端漏掉其中一类。
+            if (Array.isArray(param._Where) && param._Where.length > 0) {
+                param._Where = normalizeMixedWhereList(param._Where);
             }
             self.DiyCommon.Post(
                 url,
