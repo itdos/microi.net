@@ -202,13 +202,16 @@ export async function loadModuleRows(moduleConfig, options = {}) {
       stale: cached.stale === true
     }
   }
-  let menuId = String(moduleConfig.menuId || '').trim()
+  // TableChild 的模块关联查询由完整授权链和父子外键共同限定；此分支不再附加
+  // 子菜单 _SysMenuId，避免菜单数据范围把已正确绑定的子表记录再次过滤掉。
+  const delegatedTableChildModuleQuery = options.tableChildModuleQuery === true && Boolean(options.tableChildAuth)
+  let menuId = delegatedTableChildModuleQuery ? '' : String(moduleConfig.menuId || '').trim()
   let authorizedMenu = null
-  if (!menuId && requiresAuthorizedMenuContext(moduleConfig)) {
+  if (!delegatedTableChildModuleQuery && !menuId && requiresAuthorizedMenuContext(moduleConfig)) {
     authorizedMenu = await findMenu(moduleConfig.menuAliases || [], moduleConfig.table || '')
     menuId = String(authorizedMenu && authorizedMenu.Id || '').trim()
   }
-  if (requiresAuthorizedMenuContext(moduleConfig) && !menuId) {
+  if (!delegatedTableChildModuleQuery && requiresAuthorizedMenuContext(moduleConfig) && !menuId) {
     throw new Error('当前账号无权查看该业务数据')
   }
   const moduleEngineKey = String(
@@ -233,7 +236,7 @@ export async function loadModuleRows(moduleConfig, options = {}) {
   }
   if (options.tableChildAuth) payload._TableChildAuth = options.tableChildAuth
   const requestKey = [
-    'module', currentIdentityKey(), moduleEngineKey, moduleConfig.menuId || '', moduleConfig.table,
+    'module', currentIdentityKey(), moduleEngineKey, menuId, delegatedTableChildModuleQuery ? 'table-child' : '', moduleConfig.table,
     pageIndex, pageSize, options.keyword || '', options.status ?? '',
     options.period || 'all', options.orderBy || '', options.orderType || '',
     JSON.stringify(moduleConfig.selectFields || []),

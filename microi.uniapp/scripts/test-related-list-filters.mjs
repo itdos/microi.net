@@ -4,6 +4,7 @@ import vm from 'node:vm'
 import test from 'node:test'
 import * as filters from '../src/platform/list-filter-fields.mjs'
 import { appendSystemAuditFields } from '../src/platform/card-field-policy.mjs'
+import { tableChildRequiresModuleQuery } from '../src/platform/table-child-query-target.mjs'
 
 const read = (name) => fs.readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8')
 const source = read('components/mci-business-related-list/mci-business-related-list.vue')
@@ -17,11 +18,15 @@ function component(source, dependencies) {
   return scope.component
 }
 function related() {
-  const requests = [], toasts = []
+  const requests = [], moduleRequests = [], toasts = []
   const definition = component(source, {
-    ...filters, appendSystemAuditFields, getUser: () => ({}), clearTimeout,
+    ...filters, appendSystemAuditFields, tableChildRequiresModuleQuery, getUser: () => ({}), clearTimeout,
     MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     uni: { showToast: (value) => toasts.push(value.title) },
+    loadModuleRows: async (config, options) => {
+      moduleRequests.push({ config, options })
+      return { rows: [], count: 0 }
+    },
     V8: { FormEngine: { GetTableData: async (table, params) => { requests.push({ table, params }); return { Code: 1, Data: [], DataCount: 0 } } } }
   })
   const state = {
@@ -33,7 +38,7 @@ function related() {
   for (const key of ['filterFields', 'filterFormData', 'activeFilterCount']) {
     Object.defineProperty(state, key, { get: () => definition.computed[key].call(state) })
   }
-  return { state, requests, toasts }
+  return { state, requests, moduleRequests, toasts }
 }
 const nativeFields = [
   { Id: 'status', Name: 'Status', component: 'Radio', Type: 'varchar(50)', config: { SelectSaveField: 'Value' } },
@@ -100,6 +105,41 @@ for (const parent of ['customer', 'order']) test(`${parent} 关联查询始终�
   assert.ok(query._Where.some((item) => item.Name === 'Time' && item.Value === '2026-09-10 12:30:03'))
   assert.ok(query._Where.filter((item) => item.Name === 'Region').every((item) => item.Type === 'StartLike' && !item.Value.includes('全部')))
   assert.equal(query.SysMenuId, undefined)
+})
+
+test('配置联表的 TableChild 走模块查询并保留授权链、父子外键与卡片字段', async () => {
+  const { state, requests, moduleRequests } = related()
+  state.table = { Id: 'service-goods-table', Name: 'diy_shouhousp' }
+  state.menu = {
+    Id: 'service-goods-menu',
+    DiyTableId: state.table.Id,
+    ModuleEngineKey: 'service-goods-module',
+    SqlJoin: 'LEFT JOIN Diy_ShouhouDD B ON A.ShouhouDDID = B.Id'
+  }
+  state.config = {
+    table: state.table.Name,
+    tableId: state.table.Id,
+    menuId: state.menu.Id,
+    menu: state.menu,
+    moduleEngineKey: state.menu.ModuleEngineKey,
+    pageSize: 15,
+    selectFields: ['Id', 'ShebeiMC', 'Leixing', 'FuwuZT'],
+    bottomFields: [{ field: 'Leixing', queryField: 'Leixing' }]
+  }
+  state.childFkField = 'ShebeiBH'
+  state.relationValue = 'device-1'
+  state.tableChildAuth = { ParentRowId: 'device-1', Parent: { ParentRowId: 'customer-1' } }
+
+  await state.loadData(true, true)
+
+  assert.equal(requests.length, 0)
+  assert.equal(moduleRequests.length, 1)
+  const call = moduleRequests[0]
+  assert.equal(call.config.moduleEngineKey, 'service-goods-module')
+  for (const field of ['Leixing', 'FuwuZT', 'ShebeiBH']) assert.ok(call.config.selectFields.includes(field), field)
+  assert.equal(call.options.tableChildModuleQuery, true)
+  assert.deepEqual(plain(call.options.tableChildAuth), plain(state.tableChildAuth))
+  assert.deepEqual(plain(call.options.extraWhere), [{ Name: 'ShebeiBH', Type: '=', Value: 'device-1' }])
 })
 
 test('关联选择器分页和树懒加载携带菜单、父子授权和子表外键，主列表仍可省略上下文', async () => {
