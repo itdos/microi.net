@@ -189,12 +189,18 @@ function createModuleDefinition(module, definition) {
   const fields = definition.fields || []
   const rawSelectFields = parseJson(module.menu.SelectFields, module.menu.SelectFields)
   const projectionFields = moduleProjectionFields(Array.isArray(rawSelectFields) ? rawSelectFields : [])
+  const rawSearchFields = parseJson(module.menu.SearchFieldIds, module.menu.SearchFieldIds)
+  const searchProjectionFields = moduleProjectionFields(Array.isArray(rawSearchFields) ? rawSearchFields : [])
   // 物理字段放在最后，使仅按名称配置的历史字段仍优先命中当前表；
   // 关联字段通过稳定 Id 命中投影元数据，并保留 AsName 作为返回值键。
   const displayFields = [...projectionFields, ...fields]
   // SearchFieldIds 是列表查询配置，不等同于移动表单字段显隐。使用完整字段元数据，
   // 让后台明确配置的隐藏/计算字段仍能生成筛选控件，同时由编译器保留权限与敏感字段保护。
-  const searchMetadataFields = definition.layoutFields?.length ? definition.layoutFields : fields
+  const searchMetadataFields = [
+    ...searchProjectionFields,
+    ...projectionFields,
+    ...appendSystemAuditFields(definition.layoutFields?.length ? definition.layoutFields : fields)
+  ]
   const configuredMobileFields = configuredFields(module.menu.MobileListFields, displayFields)
   const configuredMobile = configuredMobileFields.map((item) => item.queryField)
   const configuredListFields = configuredFields(module.menu.SelectFields, displayFields)
@@ -206,8 +212,12 @@ function createModuleDefinition(module, definition) {
   const configuredSearch = configuredFieldNames(module.menu.SearchFieldIds, searchMetadataFields)
   const filterFields = compileModuleFilterFields(
     module.menu.SearchFieldIds,
-    appendSystemAuditFields(searchMetadataFields),
-    { allowAppHidden: true }
+    searchMetadataFields,
+    {
+      allowAppHidden: true,
+      primaryTableId: module.tableId,
+      primaryTableName: module.table
+    }
   )
   const configuredStatistics = configuredFields(module.menu.StatisticsFields, displayFields)
   // 后台已配置“移动端/卡片显示列”时必须严格使用该顺序；
