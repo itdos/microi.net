@@ -9,6 +9,7 @@ import {
     composeTableWhere,
     hasSearchFilterValue,
     mergeWhereList,
+    normalizeMixedWhereList,
     whereListHasField
 } from "../utils/diy-table-where.js";
 // zhy：TableChild 查询目标按模块关联配置选择，兼容关联字段与历史数据权限行为。
@@ -910,6 +911,10 @@ export default {
                         param[key] = self.PropsRequestParams[key];
                     }
                 });
+            }
+            // zhy：所有查询条件组装完成后再统一格式，避免数组条件与父子外键对象条件混用时服务端漏掉其中一类。
+            if (Array.isArray(param._Where) && param._Where.length > 0) {
+                param._Where = normalizeMixedWhereList(param._Where);
             }
             self.DiyCommon.Post(
                 url,
