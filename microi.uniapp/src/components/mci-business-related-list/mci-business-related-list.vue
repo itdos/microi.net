@@ -492,7 +492,7 @@ import {
   parseJson
 } from '@/platform/native-form.js'
 import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
-import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
+import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines, moduleProjectionFields } from '@/platform/card-field-policy.mjs'
 import { buildListFilterWhere, compileModuleFilterFields, hasListFilterValue, mergeModuleFilterFields, validateListFilters } from '@/platform/list-filter-fields.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
 import { tableChildRequiresModuleQuery } from '@/platform/table-child-query-target.mjs'
@@ -582,6 +582,7 @@ function buildKeywordWhere(fields = [], keyword = '') {
     !KEYWORD_EXCLUDED_COMPONENTS.has(field.component)
   )
   return searchable.map((field, index) => ({
+    ...(field.formEngineKey ? { FormEngineKey: field.formEngineKey } : {}),
     Name: field.field,
     Type: 'Like',
     Value: value,
@@ -1708,9 +1709,21 @@ export default {
     },
     applyMenuSearchFields(value) {
       if (value === undefined || value === null) return
-      const fields = appendSystemAuditFields(this.definition?.fields || [])
+      const rawSearchFields = parseJson(value, value)
+      const fields = [
+        ...moduleProjectionFields(Array.isArray(rawSearchFields) ? rawSearchFields : []),
+        ...appendSystemAuditFields(
+          this.config.displayFields?.length
+            ? this.config.displayFields
+            : (this.definition?.fields || [])
+        )
+      ]
       // 详情关联列表没有 PC 的行内/外部筛选区，所有可见查询字段统一进入弹窗。
-      const configured = compileModuleFilterFields(value, fields, { includeInline: true })
+      const configured = compileModuleFilterFields(value, fields, {
+        includeInline: true,
+        primaryTableId: this.table?.Id || this.config.tableId,
+        primaryTableName: this.table?.Name || this.config.table
+      })
       this.keywordSearchFields = configured
       this.config = {
         ...this.config,
