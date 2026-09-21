@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import test from 'node:test'
-import { appendSystemAuditFields, resolveConfiguredFields, resolveConfiguredFieldNames } from '../src/platform/card-field-policy.mjs'
+import { appendSystemAuditFields, moduleProjectionFields, resolveConfiguredFields, resolveConfiguredFieldNames } from '../src/platform/card-field-policy.mjs'
+import { tableChildRequiresModuleQuery } from '../src/platform/table-child-query-target.mjs'
 
 const read = file => readFileSync(new URL(file, import.meta.url), 'utf8')
 const stripImports = source => source.replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*;?\r?$/gm, '')
@@ -60,7 +61,7 @@ test('打开已授权子表详情时保留子菜单上下文，即使导航树�
 })
 
 test('项目合伙人与销售编译相同商品正文和底部字段，权限只影响动作', async () => {
-  const registry = { appendSystemAuditFields, resolveConfiguredFields, resolveConfiguredFieldNames,
+  const registry = { appendSystemAuditFields, moduleProjectionFields, resolveConfiguredFields, resolveConfiguredFieldNames,
     parseJson: (value, fallback) => { if (typeof value !== 'string') return value ?? fallback; try { return JSON.parse(value) } catch { return fallback } },
     normalizeStringList: value => Array.isArray(value) ? value : [], compileModuleFilterFields: () => [] }
   vm.runInNewContext(stripImports(read('../src/platform/module-registry.js')).replace(/export default[\s\S]*$/, '').replace(/export /g, ''), registry)
@@ -91,6 +92,36 @@ test('项目合伙人与销售编译相同商品正文和底部字段，权限�
   assert.deepEqual(layouts[0], { title: 'Name', tags: [], lines: ['Model', 'Quantity'], bottom: ['Cooperation'] })
 })
 
+test('关联表投影字段按 Id 和 AsName 进入小程序卡片配置', () => {
+  const registry = { appendSystemAuditFields, moduleProjectionFields, resolveConfiguredFields, resolveConfiguredFieldNames,
+    parseJson: (value, fallback) => { if (typeof value !== 'string') return value ?? fallback; try { return JSON.parse(value) } catch { return fallback } },
+    normalizeStringList: value => Array.isArray(value) ? value : [], compileModuleFilterFields: () => [] }
+  vm.runInNewContext(stripImports(read('../src/platform/module-registry.js')).replace(/export default[\s\S]*$/, '').replace(/export /g, ''), registry)
+  const table = { Id: 'service-goods-table', Name: 'diy_shouhousp' }
+  const fields = [
+    { Id: 'device-name', Name: 'ShebeiMC', Label: '设备名称', component: 'Text', visible: true },
+    { Id: 'child-status', Name: 'FuwuZT', Label: '子表状态', component: 'Text', visible: true }
+  ]
+  const joinedType = { Id: 'order-type', TableId: 'service-order-table', Name: 'Leixing', AsName: 'OrderServiceType', Label: '服务类型', Component: 'Text' }
+  const joinedStatus = { Id: 'order-status', TableId: 'service-order-table', Name: 'FuwuZT', AsName: 'OrderServiceStatus', Label: '服务状态', Component: 'Text' }
+  const menu = {
+    Id: 'service-goods-menu', Name: '售后商品', DiyTableId: table.Id, ModuleEngineKey: 'service-goods-module',
+    SqlJoin: 'LEFT JOIN Diy_ShouhouDD B ON A.ShouhouDDID = B.Id',
+    SelectFields: [fields[0], joinedType, joinedStatus],
+    MobileListFields: [fields[0]], CardBottomTagFields: [joinedType, joinedStatus]
+  }
+  const config = registry.createMenuModuleDefinition(menu, { fields }, table)
+
+  assert.equal(tableChildRequiresModuleQuery(menu, table.Id), true)
+  assert.deepEqual(plain(config.bottomFields.map((item) => [item.field, item.queryField, item.label])), [
+    ['OrderServiceType', 'Leixing', '服务类型'],
+    ['OrderServiceStatus', 'FuwuZT', '服务状态']
+  ])
+  assert.ok(config.selectFields.includes('Leixing'))
+  assert.ok(config.selectFields.includes('FuwuZT'))
+  assert.ok(config.displayFields.some((field) => field.Id === 'order-type' && field.AsName === 'OrderServiceType'))
+})
+
 test('独立菜单元数据继续使用真实菜单，授权链缓存按完整关系隔离', async () => {
   const calls = []
   const sandbox = { nativeControls: { layout: [], related: [], readonly: [], guarded: [] },
@@ -111,4 +142,16 @@ test('首屏子表查询包含实际卡片正文和底部字段，兼容菜单�
   })
   for (const field of ['Name', 'Model', 'Quantity', 'Cooperation', 'OrderId', 'Id']) assert.ok(fields.includes(field))
   assert.equal(fields.includes('CooperationText'), false)
+})
+
+test('关联字段按 AsName 展示，并兼容后端回退源字段名', () => {
+  const component = related({ fieldDisplayValue: (field, value) => value, formatFieldValue: (value) => value || '' })
+  const context = {
+    ...component.methods,
+    config: {
+      displayFields: [{ Name: 'Leixing', AsName: 'OrderServiceType', Label: '服务类型' }]
+    }
+  }
+  assert.equal(context.configuredFieldValue({ OrderServiceType: '巡检' }, 'OrderServiceType'), '巡检')
+  assert.equal(context.configuredFieldValue({ Leixing: '维修' }, 'OrderServiceType'), '维修')
 })
