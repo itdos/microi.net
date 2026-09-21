@@ -97,10 +97,10 @@ function resetPointer(event) {
 }
 
 const windows = {
-  version: '1.1.0',
-  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.1.0',
-  archive: 'https://static.itdos.com/itdos/microi-code/1.1.0/514bef357d0e/202609/Microi-Code-1_1_0-windows-x64-setup.exe',
-  sha256: '514bef357d0e955c072ef05f097e4b8bba1c2cf1560a224bad6e0d3e440aaf34'
+  version: '1.1.1',
+  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.1.1',
+  archive: 'https://static.itdos.com/itdos/microi-code/1.1.1/8d6730cec534/202609/Microi-Code-1_1_1-windows-x64-setup.exe',
+  sha256: '8d6730cec534326fd67565b81b48283d9c5f6d049bea2f7a3592e3931223a888'
 }
 
 const mac = {
@@ -118,7 +118,8 @@ const screenshots = [
 ]
 
 const releases = [
-  { version: '1.1.0', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: windows.archive },
+  { version: '1.1.1', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: windows.archive },
+  { version: '1.1.0', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.1.0/514bef357d0e/202609/Microi-Code-1_1_0-windows-x64-setup.exe' },
   { version: '1.0.9', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.0.9/0f95ebfb898d/202609/Microi-Code-1_0_9-windows-x64-setup.exe' },
   { version: '1.0.8', platform: 'macOS Intel', note: 'x64 DMG · 197.4 MiB · 未签名', url: mac.archive },
   { version: '1.0.7', platform: 'Windows x64', note: '历史版本', url: 'https://static.itdos.com/itdos/microi-code/1.0.7/297c04b0934c/202609/Microi-Code-1_0_7-windows-x64-setup.exe' },
