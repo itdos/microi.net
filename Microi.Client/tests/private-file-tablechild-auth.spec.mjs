@@ -80,6 +80,7 @@ test("TableChild module query preserves join engine, delegated auth and parent r
     assert.match(tableDataSource, /self\.ApplyTableChildAuthContext\(param\)/);
     assert.match(tableDataSource, /self\.SearchEqual\[self\.TableChildFkFieldName\] = relationValue/);
     assert.match(tableDataSource, /param\._Where = appendWhereList\(param\._Where, exactSearchWhere\)/);
+    assert.match(tableDataSource, /param\._Where = normalizeMixedWhereList\(param\._Where\)/);
     assert.match(
         tableDataSource,
         /GetTableData-" \+ \(param\.ModuleEngineKey \|\| param\.FormEngineKey\)/
