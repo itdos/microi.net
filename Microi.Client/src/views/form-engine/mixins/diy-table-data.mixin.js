@@ -11,6 +11,10 @@ import {
     mergeWhereList,
     whereListHasField
 } from "../utils/diy-table-where.js";
+import {
+    resolveTableQueryTarget,
+    tableChildRequiresModuleQuery
+} from "../utils/diy-table-query-target.js";
 
 export default {
     methods: {
@@ -781,25 +785,13 @@ export default {
                 param._Keyword = self.Keyword;
             }
 
-            // if(!param.TableName){
-            //先设置模块引擎Key
-            if (!param.ModuleEngineKey) {
-                param.ModuleEngineKey = self.SysMenuId;
-            }
-            //如果仍然不存在模块引擎Key，设置表单引擎Key
-            if (!param.ModuleEngineKey) {
-                param.FormEngineKey = self.CurrentDiyTableModel.Name;
-            }
-            if (!param.ModuleEngineKey && !param.FormEngineKey) {
-                param.FormEngineKey = self.TableId;
-            }
-            if (self.IsTableChild() && self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name) {
-                // zhy：TableChild 必须以物理表名配合 _TableChildAuth 查询。
-                // zhy：使用子菜单 ModuleEngineKey 会再次套用子菜单数据范围，导致已经按外键
-                // zhy：正确绑定的数据被过滤成 0 条；后端仍会逐层校验 TableChild 授权链。
-                delete param.ModuleEngineKey;
-                param.FormEngineKey = self.CurrentDiyTableModel.Name;
-            }
+            resolveTableQueryTarget(param, {
+                sysMenuId: self.SysMenuId,
+                formEngineKey: self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name,
+                tableId: self.TableId,
+                isTableChild: self.IsTableChild(),
+                tableChildRequiresModuleQuery: tableChildRequiresModuleQuery(self.SysMenuModel, self.TableId)
+            });
 
             //注意：这个是由主表传过来的主表行Id，需要在这里子表加入条件：where 外键Id=TableChildFkFieldName
             if (self.IsTrashMode) {
