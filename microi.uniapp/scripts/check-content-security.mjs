@@ -26,12 +26,15 @@ assert.match(sdk, /waitForContentSecurityBatch/)
 assert.match(sdk, /contentSecurityPollAttempts \|\| 8/)
 assert.match(sdk, /contentSecurityTimeout \|\| 25000/)
 assert.match(sdk, /contentSecurityBatchAvailable = false/)
-assert.match(adapter, /await attachWeChatContentSecurityLoginCode\(payload\)/)
+assert.match(adapter, /await attachWeChatContentSecurityLoginCode\(requestPayload\)/)
 assert.ok(
-  adapter.indexOf('await attachWeChatContentSecurityLoginCode(payload)') <
-    adapter.indexOf("await post('/apiengine/platform-sys-user-admin?Action=UptSysUser'"),
+  adapter.indexOf('await attachWeChatContentSecurityLoginCode(requestPayload)') <
+    adapter.indexOf("await post('/apiengine/platform-user-update-profile'"),
   'profile text check login code must be attached before the save request'
 )
+assert.match(adapter, /\},\s*\[\s*\{\s*Name:\s*'Avatar'/)
+assert.doesNotMatch(adapter, /platform-sys-user-admin\?Action=UptSysUser/)
+assert.match(adapter, /V8\.extractUploadPath\(value\)/)
 assert.match(uploader, /await V8\.uploadFiles\(batch,/)
 assert.match(uploader, /concurrency: 3/)
 assert.ok(

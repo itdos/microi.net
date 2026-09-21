@@ -7,18 +7,13 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
-/* V8 ApiEngine | ApiEngineKey: platform-user-update-profile | Version: v1.0.0 */
+/* V8 ApiEngine | ApiEngineKey: platform-user-update-profile | Version: v1.0.1 */
 
 if (!V8.CurrentUser || !V8.CurrentUser.Id) {
   return { Code: 1001, Msg: '登录身份已过期，请重新登录。' };
 }
 
 var param = V8.Param || {};
-var security = V8.Method.PrepareCurrentUserProfileUpdate(param);
-if (!security || security.Code !== 1 || !security.Data) {
-  return security || { Code: 0, Msg: '账户资料安全校验失败。' };
-}
-
 function hasValue(name) {
   return typeof param[name] !== 'undefined' && param[name] !== null;
 }
@@ -30,6 +25,45 @@ function hasControl(value) {
 }
 function fail(message) {
   return { Code: 0, Msg: message };
+}
+
+// 小程序个人资料头像先通过现有 HDFS avatar 私有目录上传并完成微信图片检测。
+// 此处只接受当前租户的头像目录，随后固定更新 V8.CurrentUser.Id，客户端不能指定用户。
+function normalizeAvatarPath(value, osClient) {
+  var path = text(value);
+  if (!path) return { Code: 1, Path: '' };
+  if (path.length > 255 || hasControl(path)
+      || /^(?:https?:|data:|blob:|file:)/i.test(path)
+      || path.indexOf('\\') >= 0 || path.indexOf('..') >= 0
+      || path.indexOf('?') >= 0 || path.indexOf('#') >= 0
+      || path.indexOf('//') >= 0 || path.indexOf(':') >= 0) {
+    return fail('私有头像路径不合法。');
+  }
+  if (path.charAt(0) !== '/') path = '/' + path;
+  var lower = path.toLowerCase();
+  var tenant = text(osClient).toLowerCase();
+  var avatarPrefix = '/' + tenant + '/avatar/';
+  var legacyPrefix = '/' + tenant + '/member/avatar/';
+  if (lower.indexOf(avatarPrefix) !== 0 && lower.indexOf(legacyPrefix) !== 0) {
+    return fail('私有头像必须来自当前租户的头像上传目录。');
+  }
+  if (!/\.(?:jpe?g|png|gif|webp|bmp|avif|heic)$/i.test(path)) {
+    return fail('头像文件格式不正确。');
+  }
+  return { Code: 1, Path: path };
+}
+
+// 继续复用平台可信原子校验身份、租户及公开头像；私有 Avatar 使用上面的
+// V8 路径白名单校验，避免个人资料页借用系统账号管理菜单权限。
+var securityParam = {};
+var trustedFields = ['Name', 'Email', 'Sex', 'Lang', 'PublicAvatar'];
+for (var trustedIndex = 0; trustedIndex < trustedFields.length; trustedIndex++) {
+  var trustedName = trustedFields[trustedIndex];
+  if (hasValue(trustedName)) securityParam[trustedName] = param[trustedName];
+}
+var security = V8.Method.PrepareCurrentUserProfileUpdate(securityParam);
+if (!security || security.Code !== 1 || !security.Data) {
+  return security || { Code: 0, Msg: '账户资料安全校验失败。' };
 }
 
 var userId = text(security.Data.UserId);
@@ -63,7 +97,11 @@ if (hasValue('Lang')) {
   }
   updateModel.Lang = lang;
 }
-if (security.Data.HasAvatar) updateModel.Avatar = text(security.Data.Avatar);
+if (hasValue('Avatar')) {
+  var avatarResult = normalizeAvatarPath(param.Avatar, osClient);
+  if (!avatarResult || avatarResult.Code !== 1) return avatarResult || fail('私有头像路径校验失败。');
+  updateModel.Avatar = avatarResult.Path;
+}
 if (security.Data.HasPublicAvatar) updateModel.PublicAvatar = text(security.Data.PublicAvatar);
 
 var changedModel = { Id: userId };
