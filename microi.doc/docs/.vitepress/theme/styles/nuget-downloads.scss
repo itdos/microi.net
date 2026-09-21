@@ -452,7 +452,8 @@
 
   .mci-nuget-stats--home {
     width: min(100% - 28px, 1120px);
-    margin-bottom: 42px;
+    margin: 22px auto 42px;
+    box-sizing: border-box;
   }
 
   .mci-nuget-stats__card {

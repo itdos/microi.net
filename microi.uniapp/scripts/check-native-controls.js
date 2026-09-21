@@ -252,11 +252,11 @@ for (const token of [
 }
 for (const token of [
   'PROPOSAL_FIELDS',
-  "['ShangpinMC']",
-  "['ZulinXJ']",
-  "['Xianjia']",
-  "['GenghuanLXJG']",
-  "['Id', 'ID', 'id']",
+  'proposalInstallationDeviceValues(payload)',
+  'values.ShebeiMC',
+  'values.ShebeiDJZL',
+  'values.ShebeiDJ',
+  'values.GenghuanLXJG',
   'proposalDefaults(context)',
   'latestProposalValues(context)',
   'calculateProposalCosts(context.form)',
