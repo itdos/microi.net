@@ -106,12 +106,32 @@ test('后台明确配置的查询字段不受移动表单显隐影响，但仍�
 test('模块定义使用完整字段元数据编译后台筛选，而不是只读取移动表单可见字段', () => {
   assert.match(
     moduleRegistrySource,
-    /const searchMetadataFields = definition\.layoutFields\?\.length \? definition\.layoutFields : fields/
+    /const searchMetadataFields = \[\s*\.\.\.searchProjectionFields,\s*\.\.\.projectionFields,\s*\.\.\.appendSystemAuditFields\(definition\.layoutFields\?\.length \? definition\.layoutFields : fields\)\s*\]/
   )
   assert.match(
     moduleRegistrySource,
-    /module\.menu\.SearchFieldIds,\s*appendSystemAuditFields\(searchMetadataFields\),\s*\{ allowAppHidden: true \}/
+    /module\.menu\.SearchFieldIds,\s*searchMetadataFields,\s*\{[\s\S]*?allowAppHidden: true,[\s\S]*?primaryTableId: module\.tableId,[\s\S]*?primaryTableName: module\.table[\s\S]*?\}/
   )
+})
+
+test('主表与 Join 表同名查询字段按表身份区分，并生成后台对象条件', () => {
+  const sameNameFields = [
+    { Id: 'main-status', Name: 'Status', Label: '商品状态', TableId: 'goods-table', TableName: 'diy_shouhousp', component: 'Text', visible: true },
+    { Id: 'order-status', Name: 'Status', Label: '订单状态', TableId: 'order-table', TableName: 'Diy_ShouhouDD', component: 'Text', visible: true }
+  ]
+  const compiled = compileModuleFilterFields([
+    { Id: 'main-status', Name: 'Status', TableId: 'goods-table', TableName: 'diy_shouhousp', DisplayType: 'In' },
+    { Id: 'order-status', Name: 'Status', TableId: 'order-table', TableName: 'Diy_ShouhouDD', DisplayType: 'In' }
+  ], sameNameFields, { primaryTableId: 'goods-table', primaryTableName: 'diy_shouhousp' })
+
+  assert.deepEqual(compiled.map((field) => field.key), ['Status', 'Diy_ShouhouDD.Status'])
+  assert.deepEqual(buildListFilterWhere(compiled, {
+    Status: '正常',
+    'Diy_ShouhouDD.Status': '已结束'
+  }), [
+    { Name: 'Status', Type: 'Like', Value: '正常' },
+    { FormEngineKey: 'Diy_ShouhouDD', Name: 'Status', Type: 'Like', Value: '已结束' }
+  ])
 })
 
 test('选项字段按后台组件类型决定下拉或平铺呈现', () => {

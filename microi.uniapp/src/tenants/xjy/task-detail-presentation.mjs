@@ -7,6 +7,13 @@ export const TASK_TIMELINE_STATES = Object.freeze([
   '已结束'
 ])
 
+export function formatTaskLoadError(error) {
+  const detail = String(error && error.message || '任务加载失败').trim()
+  const taskMissing = Number(error && error.code) === 2 || /NoExistData/i.test(detail)
+  if (!taskMissing) return detail
+  return `该售后任务已不存在，可能已被删除或归档\n${detail}`
+}
+
 export function buildTaskTimeline(task = {}, formatTime = (value) => value || '') {
   const currentIndex = TASK_TIMELINE_STATES.indexOf(String(task.state || ''))
   // 完结日期只认真实评价时间，避免用通用 UpdateTime 把未评价任务误画成“已结束”。

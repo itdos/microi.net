@@ -8,7 +8,7 @@
         <text class="hero-brand">{{ appConfig.platformName }}</text>
       </view>
       <view class="user-info" @tap="openProfile">
-        <view class="avatar">
+        <view class="avatar" :class="{ 'avatar--image': avatarUrl }">
           <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" @error="handleAvatarError" />
           <text v-else>{{ avatarChar }}</text>
         </view>
@@ -283,7 +283,7 @@ export default {
         title: '个人资料',
         recordAdapter: 'current-user',
         fieldNames: [
-          'Avatar', // 个人资料页暂时隐藏头像，保留配置便于后续恢复。
+          'Avatar',
           'No', 'Account', 'Name', 'Email', 'Phone', 'Sex', 'Remark'
         ],
         readonlyFieldNames: ['No', 'Account', 'Phone'],
@@ -330,7 +330,8 @@ export default {
 .hero-brand { color: #fff; font-size: 31rpx; font-weight: 700; }
 .user-info { position: relative; z-index: 1; display: grid; grid-template-columns: 112rpx minmax(0, 1fr) 36rpx; align-items: center; padding: 16rpx 30rpx 42rpx; }
 .avatar { display: flex; align-items: center; justify-content: center; width: 96rpx; height: 96rpx; border: 4rpx solid rgba(255, 255, 255, 0.7); border-radius: 50%; overflow: hidden; background: #e94b2c; color: #fff; font-size: 38rpx; font-weight: 700; box-shadow: 0 8rpx 24rpx rgba(3, 53, 82, 0.2); }
-.avatar image { width: 100%; height: 100%; }
+.avatar--image { background: transparent; }
+.avatar image { display: block; width: 100%; height: 100%; }
 .user-copy { display: flex; flex-direction: column; min-width: 0; }
 .user-name-row { display: flex; align-items: center; min-width: 0; }
 .user-name { max-width: 320rpx; overflow: hidden; color: #fff !important; font-size: 32rpx; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
