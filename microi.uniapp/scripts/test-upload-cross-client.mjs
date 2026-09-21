@@ -36,8 +36,8 @@ test('平台历史公有单图直接取 CDN，不误签私有地址', async () =
 test('字段取址上下文包含真实公私策略和记录授权信息', () => {
   const field = component('../src/components/mci-native-field/mci-native-field.vue', { parseJson: (raw, fallback) => { try { return JSON.parse(raw) } catch { return fallback } } })
   const access = config => field.computed.fileAccessContext.call({
-    field: { Id: 'photo', config }, isImage: true, modelValue: '', tableName: 'partners',
-    formDataId: 'row', menuId: 'menu', formData: {}
+    field: { Id: 'photo', config }, isImage: true, isAvatar: false, modelValue: '', tableName: 'partners',
+    currentFormDataId: 'row', isCurrentUserAvatar: false, menuId: 'menu', formData: {}
   })
   assert.equal(access({ ImgUpload: { Limit: false } }).private, false)
   assert.equal(access({ ImgUpload: { Limit: '1' } }).private, true)
@@ -46,6 +46,44 @@ test('字段取址上下文包含真实公私策略和记录授权信息', () =>
   assert.equal(access({}).private, undefined)
   assert.equal(access({ ImgUpload: { Limit: false } }).sysMenuId, 'menu')
   assert.equal(access({ ImgUpload: { Limit: false } }).formDataId, 'row')
+})
+
+test('Sys_User 头像使用用户资源上下文签发私有短链', async () => {
+  const field = component('../src/components/mci-native-field/mci-native-field.vue', { parseJson: (raw, fallback) => { try { return JSON.parse(raw) } catch { return fallback } } })
+  const access = field.computed.fileAccessContext.call({
+    field: { Name: 'Avatar', config: { ImgUpload: { Limit: true } } },
+    isImage: true,
+    isAvatar: true,
+    isCurrentUserAvatar: true,
+    modelValue: JSON.stringify({ Path: '/tenant/avatar/private.jpg', Limit: true }),
+    tableName: 'Sys_User',
+    currentFormDataId: 'user-157',
+    menuId: '',
+    formData: {}
+  })
+  assert.equal(access.fieldId, '')
+  assert.equal(access.resourceKind, 'UserAvatar')
+  assert.equal(access.resourceId, 'user-157')
+
+  const upload = field.computed.fileUploadContext.call({
+    isCurrentUserAvatar: true,
+    fileAccessContext: access
+  })
+  assert.equal(upload.private, true)
+  assert.equal(Object.keys(upload).length, 1)
+
+  let request
+  const client = createMicroiV8({
+    apiBase: 'https://api.example.test',
+    requestAdapter: async (options) => {
+      request = options
+      return { data: { Code: 1, Data: 'https://signed.example.test/avatar.jpg' } }
+    }
+  })
+  const url = await client.resolveAvatarUrl({ Path: '/tenant/avatar/private.jpg', Limit: true }, access)
+  assert.equal(url, 'https://signed.example.test/avatar.jpg')
+  assert.equal(request.data.ResourceKind, 'UserAvatar')
+  assert.equal(request.data.ResourceId, 'user-157')
 })
 
 test('历史私有照片优先于公有字段配置，签发失败不降级公有', async () => {

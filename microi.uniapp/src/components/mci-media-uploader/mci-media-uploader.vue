@@ -238,8 +238,11 @@ export default {
         const failed = outcomes.filter((item) => item && Number(item.Code) !== 1 && !(item.Error && item.Error.Cancelled))
         if (failed.length) {
           const rejected = failed.filter((item) => item.Error && item.Error.Status === 'Rejected').length
+          const firstMessage = failed.map((item) => item.Error && (item.Error.Msg || item.Error.message)).find(Boolean)
           uni.showToast({
-            title: rejected > 0 ? `${rejected} 张图片未通过安全检测` : `${failed.length} 张文件处理未完成`,
+            title: rejected > 0
+              ? `${rejected} 张图片未通过安全检测`
+              : (firstMessage || `${failed.length} 张文件处理未完成`),
             icon: 'none'
           })
         }

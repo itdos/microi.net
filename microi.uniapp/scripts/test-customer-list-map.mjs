@@ -6,9 +6,17 @@ const listSource = fs.readFileSync(new URL('../src/pages/business/list.vue', imp
 const mapSource = fs.readFileSync(new URL('../src/pages/task/map.vue', import.meta.url), 'utf8')
 
 test('客户列表搜索栏左侧提供客户地图入口', () => {
-  assert.match(listSource, /v-if="key === 'customers'" class="customer-map-entry"/)
+  assert.match(listSource, /v-if="key === 'customers'" class="list-map-entry"/)
   assert.match(listSource, /src="\/static\/xjy\/business\/customerMap\.png"/)
   assert.match(listSource, /@tap="openCustomerMap"/)
+})
+
+test('设备列表搜索栏左侧复用首页设备地图入口', () => {
+  assert.match(listSource, /'search-row--map': key === 'customers' \|\| key === 'devices'/)
+  assert.match(listSource, /v-else-if="key === 'devices'" class="list-map-entry"/)
+  assert.match(listSource, /src="\/static\/xjy\/business\/eqpMap\.png"/)
+  assert.match(listSource, /@tap="openDeviceMap"/)
+  assert.match(listSource, /openDeviceMap\(\)\s*\{[\s\S]*?\/pages\/task\/map\?mode=device/)
 })
 
 test('客户地图携带当前列表全部筛选条件', () => {

@@ -12,9 +12,12 @@ import {
   validateNativeForm
 } from '@/platform/native-form.js'
 import { readChildDraft, writeChildDraft } from '@/platform/child-form-drafts.mjs'
+import { mergeCurrentUserAfterProfileSave } from '@/platform/current-user-profile.mjs'
 
 const DEFAULT_ADAPTER = 'form-engine'
 const CURRENT_USER_ADAPTER = 'current-user'
+// 个人资料是 current-user 能力投影，不绑定某个租户的 diy_field.Id。
+// 字段名 Avatar 是保存接口契约；头像取址使用 UserAvatar + 当前用户 Id 完成授权。
 const CURRENT_USER_EDITABLE_FIELDS = new Set([
   'avatar',
   'name',
@@ -35,6 +38,12 @@ function normalizeValue(field, value) {
   if (field.component === 'Switch') return value ? 1 : 0
   if (isNativeFieldMultiple(field) && Array.isArray(value)) return JSON.stringify(value)
   return value
+}
+
+function normalizeCurrentUserValue(field, value) {
+  const name = String(field && field.Name || '').toLowerCase()
+  if (name === 'avatar' || name === 'publicavatar') return V8.extractUploadPath(value)
+  return normalizeValue(field, value)
 }
 
 async function attachWeChatContentSecurityLoginCode(payload) {
@@ -106,16 +115,24 @@ function currentUserDefinition() {
     Name: 'Sys_User',
     Description: '员工信息'
   }, [
-    // 个人资料页暂时隐藏头像；保留字段定义，后续需要时可直接恢复。
     {
-      Id: 'current-user-avatar',
       Name: 'Avatar',
       Label: '头像',
       Component: 'ImgUpload',
       Visible: 1,
       AppVisible: 1,
       Sort: 10,
-      Config: JSON.stringify({ ImgUpload: { Multiple: false, Limit: 1 } })
+      Config: JSON.stringify({
+        ImgUpload: {
+          Limit: true,
+          Multiple: false,
+          MaxCount: 1,
+          ShowFileList: false,
+          Preview: true,
+          MaxSize: 10,
+          SaveFullPath: false
+        }
+      })
     },
     {
       Id: 'current-user-no',
@@ -209,27 +226,25 @@ async function saveCurrentUserRecord(context) {
   const currentUser = getUser() || {}
   if (!currentUser.Id) throw new Error('登录身份已失效，请重新登录')
 
-  const payload = { Id: currentUser.Id }
+  const profileChanges = {}
   ;(context.fields || []).forEach((field) => {
     const name = String(field.Name || '')
     if (!name || !field.editable || context.form[name] === undefined) return
     if (!CURRENT_USER_EDITABLE_FIELDS.has(name.toLowerCase())) return
-    payload[name] = normalizeValue(field, context.form[name])
+    profileChanges[name] = normalizeCurrentUserValue(field, context.form[name])
   })
-  await attachWeChatContentSecurityLoginCode(payload)
+  const requestPayload = { ...profileChanges }
+  await attachWeChatContentSecurityLoginCode(requestPayload)
 
   const updateResult = ensureSuccess(
-    await post('/apiengine/platform-sys-user-admin?Action=UptSysUser', payload),
+    await post('/apiengine/platform-user-update-profile', requestPayload),
     '个人资料保存失败'
   )
-  const refreshResult = ensureSuccess(
-    await post('/apiengine/platform-sys-user-admin?Action=RefreshLoginUser', {}),
-    '个人资料已保存，但登录信息刷新失败'
+  const refreshedUser = mergeCurrentUserAfterProfileSave(
+    currentUser,
+    profileChanges,
+    updateResult.Data
   )
-  const refreshedUser = refreshResult.Data || updateResult.Data || {
-    ...currentUser,
-    ...payload
-  }
   setUser(refreshedUser)
   return {
     ...updateResult,

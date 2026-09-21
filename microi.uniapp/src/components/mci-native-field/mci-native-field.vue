@@ -204,6 +204,7 @@
       :shape="isAvatar ? 'circle' : 'square'"
       :upload-path="uploadPath"
       :file-context="fileAccessContext"
+      :upload-context="fileUploadContext"
       @update:model-value="emitValue"
       @upload-state="$emit('upload-state', $event)"
     />
@@ -244,7 +245,7 @@ import {
   loadNativeFieldOptionPage,
   parseJson
 } from '@/platform/native-form.js'
-import { V8 } from '@/utils/request.js'
+import { V8, getUser } from '@/utils/request.js'
 import { isHtmlValue, normalizeRichTextHtml } from '@/platform/display.js'
 import { formatRegionSelection } from '@/platform/region-value.mjs'
 import { getSafeAreaMetrics } from '@/utils/safe-area.js'
@@ -330,6 +331,16 @@ export default {
       return true
     },
     isAvatar() { return /avatar|headimg|touxiang/i.test(String(this.field.Name || '')) || /头像/.test(String(this.field.Label || '')) },
+    currentFormDataId() {
+      return this.formDataId || (this.formData && (this.formData.Id || this.formData.id)) || ''
+    },
+    isCurrentUserAvatar() {
+      const currentUserId = String((getUser() || {}).Id || '')
+      return /^sys_user$/i.test(String(this.tableName || '')) &&
+        /^avatar$/i.test(String(this.field.Name || '')) &&
+        !!currentUserId &&
+        String(this.currentFormDataId).toLowerCase() === currentUserId.toLowerCase()
+    },
     isMultiple() { return isNativeFieldMultiple(this.field) },
     isPhoneField() { return this.field.inputMode === 'tel' },
     callablePhone() {
@@ -377,17 +388,30 @@ export default {
         const url = this.formData && this.formData[`${this.field.Name}_${item.Id}_RealPath`]
         if (url) runtimeUrls[String(item.Id)] = url
       })
+      const formDataId = this.currentFormDataId
+      const userAvatarAccess = this.isCurrentUserAvatar
       return {
         formEngineKey: this.tableName,
         // 详情页的 Id 可能未包含在可见字段返回值中，优先使用路由中已经完成权限校验的记录 Id。
-        formDataId: this.formDataId || (this.formData && (this.formData.Id || this.formData.id)) || '',
+        formDataId,
         fieldId: this.field.Id || this.field.id || '',
         sysMenuId: this.fileAccessMenuId || this.menuId,
         tableChildAuth: this.tableChildAuth,
         private: privateAccess,
+        // 当前用户头像使用独立资源授权，不依赖租户可变的 diy_field.Id。
+        // 私有取址只绑定 UserAvatar 资源语义与当前登录用户记录。
+        resourceKind: userAvatarAccess ? 'UserAvatar' : 'FormField',
+        resourceId: userAvatarAccess ? formDataId : '',
         // zhy：跨表选择的私有照片在目标草稿保存前使用来源记录签发的运行态 URL。
         runtimeUrls
       }
+    },
+    fileUploadContext() {
+      // 个人资料头像不借用“系统账号”管理菜单做字段上传授权；现有 HDFS 会把
+      // 普通用户的 avatar 一级目录强制为私有桶并执行微信图片内容检测。
+      // 保存阶段再由 platform-user-update-profile V8 接口绑定当前登录用户。
+      if (this.isCurrentUserAvatar) return { private: true }
+      return this.fileAccessContext
     },
     mediaMaxCount() {
       if (this.isAvatar) return 1

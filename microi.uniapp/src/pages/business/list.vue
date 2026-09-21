@@ -7,10 +7,14 @@
         <view class="nav-icon nav-icon--placeholder" aria-hidden="true"></view>
       </view>
 
-      <view class="search-row" :class="{ 'search-row--simple': !filterFields.length, 'search-row--map': key === 'customers' }">
-        <view v-if="key === 'customers'" class="customer-map-entry" hover-class="customer-map-entry--pressed" @tap="openCustomerMap">
+      <view class="search-row" :class="{ 'search-row--simple': !filterFields.length, 'search-row--map': key === 'customers' || key === 'devices' }">
+        <view v-if="key === 'customers'" class="list-map-entry" hover-class="list-map-entry--pressed" @tap="openCustomerMap">
           <image src="/static/xjy/business/customerMap.png" mode="aspectFit" />
           <text>客户地图</text>
+        </view>
+        <view v-else-if="key === 'devices'" class="list-map-entry" hover-class="list-map-entry--pressed" @tap="openDeviceMap">
+          <image src="/static/xjy/business/eqpMap.png" mode="aspectFit" />
+          <text>设备地图</text>
         </view>
         <view class="search-input-wrap">
           <input
@@ -538,6 +542,9 @@ export default {
         extraWhere: this.buildFilterWhere()
       }
       uni.navigateTo({ url: `/pages/task/map?mode=customer&filters=${encodeURIComponent(JSON.stringify(filters))}` })
+    },
+    openDeviceMap() {
+      uni.navigateTo({ url: '/pages/task/map?mode=device' })
     },
     isProposalSelected(row) {
       return this.proposalSelection.some((item) => String(item.Id) === String(row.Id))
@@ -1468,7 +1475,7 @@ export default {
 .search-row--simple.search-row--map { grid-template-columns: 72rpx minmax(0, 1fr) auto; }
 .search-input-wrap { position: relative; min-width: 0; }
 
-.customer-map-entry {
+.list-map-entry {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1481,9 +1488,9 @@ export default {
   background: #fff;
   transition: transform 150ms ease, background-color 150ms ease;
 }
-.customer-map-entry image { width: 34rpx; height: 34rpx; }
-.customer-map-entry text { margin-top: 1rpx; color: #087da8; font-size: 16rpx; font-weight: 650; line-height: 19rpx; white-space: nowrap; }
-.customer-map-entry--pressed { transform: scale(.94); background: #eef8fb; }
+.list-map-entry image { width: 34rpx; height: 34rpx; }
+.list-map-entry text { margin-top: 1rpx; color: #087da8; font-size: 16rpx; font-weight: 650; line-height: 19rpx; white-space: nowrap; }
+.list-map-entry--pressed { transform: scale(.94); background: #eef8fb; }
 
 .filter-button {
   position: relative;

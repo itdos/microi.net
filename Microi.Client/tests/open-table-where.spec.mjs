@@ -5,6 +5,7 @@ import {
     buildSearchWhere,
     cloneWhereList,
     composeTableWhere,
+    normalizeMixedWhereList,
     whereListHasField
 } from '../src/views/form-engine/utils/diy-table-where.js';
 import { scheduleTableInit } from '../src/views/form-engine/utils/diy-table-init.js';
@@ -106,6 +107,32 @@ test('an explicit relation in _Where suppresses the redundant exact relation fil
     assert.equal(whereListHasField([{ Name: 'ProjectId', Value: 'P1', Type: '=' }], 'ProjectId'), true);
     assert.equal(whereListHasField([['DeptIds', 'Like', 'D1']], 'DeptIds'), true);
     assert.equal(whereListHasField([], 'ProjectId'), false);
+});
+
+// zhy：PC 关联表筛选转换为旧格式时必须保留表标识，并只把真实字段名交给元数据校验。
+test('qualified join fields split into FormEngineKey and field name', () => {
+    assert.deepEqual(
+        arrayWhereToLegacy(['Diy_ShouhouDD.Leixing', 'In', ['安装']]),
+        {
+            FormEngineKey: 'Diy_ShouhouDD',
+            Name: 'Leixing',
+            Type: 'In',
+            Value: ['安装']
+        }
+    );
+});
+
+// zhy：关联字段筛选与 TableChild 父子外键同时存在时，两项都必须进入最终请求。
+test('final where normalization preserves joined filters and the TableChild relation', () => {
+    const result = normalizeMixedWhereList([
+        ['B.Leixing', '=', '维修'],
+        { Name: 'KehuSBID', Value: 'device-1', Type: '=' }
+    ]);
+
+    assert.deepEqual(result, [
+        { FormEngineKey: 'B', Name: 'Leixing', Type: '=', Value: '维修' },
+        { Name: 'KehuSBID', Value: 'device-1', Type: '=' }
+    ]);
 });
 
 test('same-tick table prop changes coalesce into one initialization', async () => {

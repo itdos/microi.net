@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+// zhy：回归锁定 TableChild 模块关联查询与物理表兼容分支。
+import {
+    resolveTableQueryTarget,
+    tableChildRequiresModuleQuery
+} from "../src/views/form-engine/utils/diy-table-query-target.js";
 
 const formSource = await readFile(
     new URL("../src/views/form-engine/diy-form.vue", import.meta.url),
@@ -18,12 +23,10 @@ const onlyOfficeSource = await readFile(
     new URL("../src/views/form-engine/diy-components/onlyoffice.vue", import.meta.url),
     "utf8"
 );
-// zhy：加载 TableChild 数据查询源码，用于锁定物理表查询和授权链回归。
 const tableDataSource = await readFile(
     new URL("../src/views/form-engine/mixins/diy-table-data.mixin.js", import.meta.url),
     "utf8"
 );
-
 function occurrenceCount(source, value) {
     return source.split(value).length - 1;
 }
@@ -54,15 +57,109 @@ test("private file and image URL requests preserve the delegated context", () =>
     );
 });
 
-// zhy：验证 PC TableChild 不再被子菜单数据范围误过滤。
-test("TableChild rows query the physical table without child-menu data-scope filtering", () => {
+// zhy：TableChild 必须同时保留模块关联查询、授权链和父子外键范围。
+test("TableChild module query preserves join engine, delegated auth and parent relation", () => {
+    const auth = { ParentRowId: "parent-row" };
+    const where = [{ Name: "ParentId", Value: "parent-row", Type: "=" }];
+    const request = resolveTableQueryTarget(
+        { ModuleEngineKey: "child-module", _TableChildAuth: auth, _Where: where },
+        {
+            sysMenuId: "child-menu",
+            formEngineKey: "child_table",
+            tableId: "child-table",
+            isTableChild: true,
+            tableChildRequiresModuleQuery: true
+        }
+    );
+
+    assert.equal(request.ModuleEngineKey, "child-module");
+    assert.equal(request.FormEngineKey, undefined);
+    assert.strictEqual(request._TableChildAuth, auth);
+    assert.strictEqual(request._Where, where);
+    assert.doesNotMatch(tableDataSource, /delete param\.ModuleEngineKey/);
+    assert.match(tableDataSource, /self\.ApplyTableChildAuthContext\(param\)/);
+    assert.match(tableDataSource, /self\.SearchEqual\[self\.TableChildFkFieldName\] = relationValue/);
+    assert.match(tableDataSource, /param\._Where = appendWhereList\(param\._Where, exactSearchWhere\)/);
+    assert.match(tableDataSource, /param\._Where = normalizeMixedWhereList\(param\._Where\)/);
     assert.match(
         tableDataSource,
-        /if \(self\.IsTableChild\(\) && self\.CurrentDiyTableModel && self\.CurrentDiyTableModel\.Name\)/
+        /GetTableData-" \+ \(param\.ModuleEngineKey \|\| param\.FormEngineKey\)/
     );
-    assert.match(tableDataSource, /delete param\.ModuleEngineKey/);
-    assert.match(tableDataSource, /param\.FormEngineKey = self\.CurrentDiyTableModel\.Name/);
-    assert.match(tableDataSource, /self\.ApplyTableChildAuthContext\(param\)/);
+    assert.ok(
+        tableDataSource.indexOf("self.ApplyTableChildAuthContext(param)")
+            < tableDataSource.indexOf("resolveTableQueryTarget(param")
+    );
+    assert.ok(
+        tableDataSource.indexOf("resolveTableQueryTarget(param")
+            < tableDataSource.indexOf("self.SearchEqual[self.TableChildFkFieldName] = relationValue")
+    );
+});
+
+// zhy：模块 Key 为空时仍应使用当前子菜单进入关联查询。
+test("TableChild uses SysMenuId as the module query key when ModuleEngineKey is empty", () => {
+    const request = resolveTableQueryTarget(
+        { ModuleEngineKey: "", _TableChildAuth: { ParentRowId: "parent-row" } },
+        {
+            sysMenuId: "child-menu",
+            formEngineKey: "child_table",
+            tableId: "child-table",
+            isTableChild: true,
+            tableChildRequiresModuleQuery: true
+        }
+    );
+
+    assert.equal(request.ModuleEngineKey, "child-menu");
+    assert.equal(request.FormEngineKey, undefined);
+});
+
+// zhy：无关联配置的普通 TableChild 保持原物理表路径，防止子菜单数据范围过滤为零条。
+test("ordinary TableChild keeps the physical-table path that avoids child-menu data scope", () => {
+    const auth = { ParentRowId: "parent-row" };
+    const where = [{ Name: "ParentId", Value: "parent-row", Type: "=" }];
+    const request = resolveTableQueryTarget(
+        { ModuleEngineKey: "child-module", _TableChildAuth: auth, _Where: where },
+        {
+            sysMenuId: "child-menu",
+            formEngineKey: "child_table",
+            tableId: "child-table",
+            isTableChild: true,
+            tableChildRequiresModuleQuery: false
+        }
+    );
+
+    assert.equal(request.ModuleEngineKey, undefined);
+    assert.equal(request.FormEngineKey, "child_table");
+    assert.strictEqual(request._TableChildAuth, auth);
+    assert.strictEqual(request._Where, where);
+});
+
+// zhy：覆盖 SQL、关联表、序列化配置和跨表字段四种模块关联判定来源。
+test("TableChild detects module joins from current and serialized menu configuration", () => {
+    assert.equal(tableChildRequiresModuleQuery({ SqlJoin: "LEFT JOIN child B ON A.Id=B.Id" }, "main"), true);
+    assert.equal(tableChildRequiresModuleQuery({ JoinTables: [{ Id: "joined" }] }, "main"), true);
+    assert.equal(tableChildRequiresModuleQuery({ JoinTables: '[{"Id":"joined"}]' }, "main"), true);
+    assert.equal(
+        tableChildRequiresModuleQuery({ SelectFields: [{ TableId: "joined", Name: "Name" }] }, "main"),
+        true
+    );
+    assert.equal(tableChildRequiresModuleQuery({ SelectFields: [{ TableId: "main" }] }, "main"), false);
+});
+
+// zhy：非 TableChild 模块列表不受兼容分支影响，继续使用原 ModuleEngineKey。
+test("ordinary module lists keep their existing ModuleEngineKey behavior", () => {
+    const request = resolveTableQueryTarget(
+        { ModuleEngineKey: "normal-module" },
+        {
+            sysMenuId: "normal-menu",
+            formEngineKey: "normal_table",
+            tableId: "normal-table",
+            isTableChild: false,
+            tableChildRequiresModuleQuery: false
+        }
+    );
+
+    assert.equal(request.ModuleEngineKey, "normal-module");
+    assert.equal(request.FormEngineKey, undefined);
 });
 
 // zhy：验证小程序图片缺少 State 时，PC 仍识别为已上传。
