@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+// zhy：回归锁定 TableChild 模块关联查询与物理表兼容分支。
 import {
     resolveTableQueryTarget,
     tableChildRequiresModuleQuery
@@ -93,6 +94,7 @@ test("TableChild module query preserves join engine, delegated auth and parent r
     );
 });
 
+// zhy：模块 Key 为空时仍应使用当前子菜单进入关联查询。
 test("TableChild uses SysMenuId as the module query key when ModuleEngineKey is empty", () => {
     const request = resolveTableQueryTarget(
         { ModuleEngineKey: "", _TableChildAuth: { ParentRowId: "parent-row" } },
@@ -109,6 +111,7 @@ test("TableChild uses SysMenuId as the module query key when ModuleEngineKey is 
     assert.equal(request.FormEngineKey, undefined);
 });
 
+// zhy：无关联配置的普通 TableChild 保持原物理表路径，防止子菜单数据范围过滤为零条。
 test("ordinary TableChild keeps the physical-table path that avoids child-menu data scope", () => {
     const auth = { ParentRowId: "parent-row" };
     const where = [{ Name: "ParentId", Value: "parent-row", Type: "=" }];
@@ -129,6 +132,7 @@ test("ordinary TableChild keeps the physical-table path that avoids child-menu d
     assert.strictEqual(request._Where, where);
 });
 
+// zhy：覆盖 SQL、关联表、序列化配置和跨表字段四种模块关联判定来源。
 test("TableChild detects module joins from current and serialized menu configuration", () => {
     assert.equal(tableChildRequiresModuleQuery({ SqlJoin: "LEFT JOIN child B ON A.Id=B.Id" }, "main"), true);
     assert.equal(tableChildRequiresModuleQuery({ JoinTables: [{ Id: "joined" }] }, "main"), true);
@@ -140,6 +144,7 @@ test("TableChild detects module joins from current and serialized menu configura
     assert.equal(tableChildRequiresModuleQuery({ SelectFields: [{ TableId: "main" }] }, "main"), false);
 });
 
+// zhy：非 TableChild 模块列表不受兼容分支影响，继续使用原 ModuleEngineKey。
 test("ordinary module lists keep their existing ModuleEngineKey behavior", () => {
     const request = resolveTableQueryTarget(
         { ModuleEngineKey: "normal-module" },
