@@ -107,7 +107,15 @@ export function arrayWhereToLegacy(item) {
         result.GroupStart = true;
         cursor += 1;
     }
-    result.Name = item[cursor];
+    // zhy：旧格式必须把“关联表.字段”拆成表标识和字段名，否则服务端会把完整限定名误判为缺失字段。
+    var qualifiedName = item[cursor];
+    if (typeof qualifiedName === "string" && qualifiedName.indexOf(".") > 0) {
+        var qualifiedParts = qualifiedName.split(".");
+        result.FormEngineKey = qualifiedParts[0];
+        result.Name = qualifiedParts[1];
+    } else {
+        result.Name = qualifiedName;
+    }
     result.Type = item[cursor + 1];
     result.Value = item[cursor + 2];
     if (item[item.length - 1] === ")") {
