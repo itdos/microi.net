@@ -78,7 +78,7 @@ assert.doesNotMatch(actionsSource, /actionKey === 'position-copy'[^\n]*add_datac
   '安装位置不能继续使用会复制原设备编号的通用复制接口')
 assert.match(tenantFormSource, /isOrderProductForm\(context\) && isOrderProductInstallationChild\(payload\.field\)/,
   '订单商品必须识别安装位置关联列表的完整总数')
-assert.match(tenantFormSource, /UptFormData\(ORDER_PRODUCT_TABLE,[\s\S]*?\[field\]: value/,
+assert.match(tenantFormSource, /const quantityValues = \{ \[field\]: value \}[\s\S]*?UptFormData\(ORDER_PRODUCT_TABLE,[\s\S]*?\.\.\.quantityValues/,
   '安装位置总数变化后必须回写订单商品设备数量')
 
 console.log('集福鲤业务增改、订单审批权限与弹窗交互检查通过')

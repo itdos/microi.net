@@ -660,6 +660,9 @@ function ensurePlusEventBridge(Print) {
                 return;
             }
             if (Date.now() < Print._suppressDisconnectUntil) return;
+            // 断开事件也必须使尚未完成的服务发现/MTU 协商失效；否则旧链路的迟到事件
+            // 会先清空状态，连接协程随后又把同一 GATT 误标为成功。
+            Print._plusConnectionGeneration++;
             markUnexpectedDisconnect(Print, "蓝牙打印机连接已断开");
         });
     }
@@ -912,6 +915,9 @@ async function connectPlusDevice(Print, device, options) {
         await closePlusBleConnectionAndWait(deviceId, 1200);
         await delay(250);
         await createPlusConnectionWithRecovery(Print, deviceId);
+        // 主动清理旧链路的抑制窗口只覆盖 create 之前；新连接建立后收到的断开事件
+        // 必须按真实断线处理并接管当前连接代次。
+        Print._suppressDisconnectUntil = 0;
         await delay(800);
         var services = await new Promise(function (resolve, reject) {
             window.plus.bluetooth.getBLEDeviceServices({
@@ -1851,7 +1857,13 @@ function createV8Print(V8) {
                             name: remembered.deviceName,
                             transportHint: remembered.transport,
                             profileMode: remembered.profileMode,
-                        }, { reconnecting: true, profileMode: remembered.profileMode });
+                        }, {
+                            reconnecting: true,
+                            profileMode: remembered.profileMode,
+                            // 静默恢复已在上方对 Android SPP 型号单独延后；显式恢复时尊重
+                            // 用户上次选定的 BLE，不应在发起 BLE 前又偷偷改走已配对 SPP。
+                            preferSpp: remembered.transport !== "ble",
+                        });
                     }
                     if (!isWebBluetoothSupported()) {
                         throw new Error("当前浏览器不支持 Web Bluetooth，无法自动重连");

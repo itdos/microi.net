@@ -247,5 +247,6 @@ serialTest('连接期间被断开事件接管时关闭已建立的 GATT 链路�
     t.after(() => print.disconnect());
     assert.equal(await print.reconnect({ silent: true }), false);
     assert.equal(print.isConnected(), false);
-    assert.deepEqual(closed, ['native-printer'], '被接管时不能把 GATT 链路留在系统里');
+    assert.deepEqual(closed, ['native-printer', 'native-printer'],
+        '先清理残留旧链路，断开事件接管后还必须关闭本次新建的 GATT 链路');
 });

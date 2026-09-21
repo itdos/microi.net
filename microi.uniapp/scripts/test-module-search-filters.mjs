@@ -54,7 +54,7 @@ test('我的订单不排除终态，并提供已作废和已到期状态筛选',
   assert.match(businessListSource, /const localStatusOptions = Array\.isArray\(merged\.statusOptions\) \? merged\.statusOptions : \[\]/)
   assert.match(businessListSource, /merged\.statusOptions = \[\.\.\.new Set\(\[/)
   assert.match(businessListSource, /\.\.\.\(Array\.isArray\(dynamic\.statusOptions\) \? dynamic\.statusOptions : \[\]\)/)
-  assert.match(businessListSource, /\.\.\.localStatusOptions\n\s*\]\)\]/)
+  assert.match(businessListSource, /\.\.\.localStatusOptions\r?\n\s*\]\)\]/)
 })
 
 test('后台 SearchFieldIds 编译为移动端高级筛选，Out 保留查询配置，Line 留在行内', () => {
