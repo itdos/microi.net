@@ -59,11 +59,54 @@ export function resolveConfiguredFields(items = [], fields = []) {
     if (!field || !field.Name) return null
     const source = item && typeof item === 'object' ? item : {}
     const asName = String(source.AsName || source.asName || field.AsName || '').trim()
-    return {
+    const result = {
       field: asName || field.Name,
       queryField: field.Name,
       label: String(source.Label || source.label || field.Label || field.Name).trim(),
       format: String(source.Format || source.format || '').trim()
+    }
+    Object.defineProperty(result, 'definition', { value: field, enumerable: false })
+    return result
+  }).filter(Boolean)
+}
+
+function safeProjectionName(value) {
+  const name = String(value || '').trim()
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : ''
+}
+
+function parseFieldConfig(value) {
+  if (!value) return {}
+  if (typeof value === 'object' && !Array.isArray(value)) return value
+  if (typeof value !== 'string') return {}
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch (error) {
+    return {}
+  }
+}
+
+// 模块 SelectFields 可能包含关联表字段；这些字段不属于主表 diy_field，
+// 但移动卡片仍需要它们的 Id、别名和显示元数据来编译查询与渲染配置。
+export function moduleProjectionFields(items = []) {
+  return items.map((item) => {
+    if (!item || typeof item !== 'object') return null
+    const nested = item.Field && typeof item.Field === 'object' ? item.Field : {}
+    const source = { ...nested, ...item }
+    const name = safeProjectionName(source.Name || source.FieldName || source.name)
+    if (!name) return null
+    const asName = safeProjectionName(source.AsName || source.asName)
+    return {
+      ...source,
+      Id: source.Id || source.FieldId || source.DiyFieldId || '',
+      Name: name,
+      AsName: asName,
+      Label: String(source.Label || source.FieldLabel || source.label || name).trim(),
+      component: source.component || source.Component || 'Text',
+      config: parseFieldConfig(source.config || source.Config),
+      options: Array.isArray(source.options) ? source.options : (Array.isArray(source.Options) ? source.Options : []),
+      visible: true
     }
   }).filter(Boolean)
 }
