@@ -11,6 +11,7 @@ import {
     mergeWhereList,
     whereListHasField
 } from "../utils/diy-table-where.js";
+// zhy：TableChild 查询目标按模块关联配置选择，兼容关联字段与历史数据权限行为。
 import {
     resolveTableQueryTarget,
     tableChildRequiresModuleQuery
@@ -785,6 +786,7 @@ export default {
                 param._Keyword = self.Keyword;
             }
 
+            // zhy：有关联配置的子表保留模块查询；普通子表继续走物理表，同时保留授权链和父子外键条件。
             resolveTableQueryTarget(param, {
                 sysMenuId: self.SysMenuId,
                 formEngineKey: self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name,
