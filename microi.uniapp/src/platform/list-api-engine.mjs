@@ -1,4 +1,5 @@
 export function buildListApiEnginePayload(moduleConfig = {}, options = {}, periodRange = null) {
+  const delegatedTableChildModuleQuery = options.tableChildModuleQuery === true && Boolean(options.tableChildAuth)
   const payload = {
     _PageIndex: Number(options.pageIndex || 1),
     _PageSize: Number(options.pageSize || moduleConfig.pageSize || 15),
@@ -7,8 +8,9 @@ export function buildListApiEnginePayload(moduleConfig = {}, options = {}, perio
     _OrderByType: options.orderType || moduleConfig.defaultOrderType || '',
     _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
   }
-  if (moduleConfig.menuId) payload._SysMenuId = moduleConfig.menuId
+  if (moduleConfig.menuId && !delegatedTableChildModuleQuery) payload._SysMenuId = moduleConfig.menuId
   if (moduleConfig.configuredModuleEngineKey) payload.ModuleEngineKey = moduleConfig.configuredModuleEngineKey
+  if (options.tableChildAuth) payload._TableChildAuth = options.tableChildAuth
   if (Array.isArray(moduleConfig.selectFields) && moduleConfig.selectFields.length) {
     payload._SelectFields = [...moduleConfig.selectFields]
   }
@@ -27,6 +29,7 @@ export function buildListApiEnginePayload(moduleConfig = {}, options = {}, perio
 export function listApiEnginePresentationKey(moduleConfig = {}, payload = {}) {
   return JSON.stringify([
     payload._SysMenuId || '', payload.ModuleEngineKey || '',
+    payload._TableChildAuth || null,
     moduleConfig.menu?.ViewConfigVersion || '', moduleConfig.menu?.UpdateTime || '',
     moduleConfig.definition?.schemaFingerprint || '', payload._SelectFields || []
   ])
