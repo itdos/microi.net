@@ -14,7 +14,7 @@ description: 当用户在 Codex、DeepSeek Harness、WorkBuddy、CodeBuddy、Qod
 - Microi Code 是同仓独立桌面发行物，内置固定版本的 DeepSeek Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
 - 官方 AI 登录只走桌面账号窗口，固定 `https://api.itdos.com`、`OsClient=iTdos`，使用当前用户的中转 Key 和额度。不要让用户把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
 - 业务连接在「服务器连接」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
-- macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
+- macOS CLI 登录、`auth import --session-stdin` 与 MCP Token 恢复使用系统 Keychain；Windows 使用 DPAPI。只使用包含原生 Keychain 支持的正式 CLI，旧版或用户目录临时兼容补丁不能代替发布包。不要手改 Token 文件；导入后用 `doctor`、MCP `initialize`、`tools/list`、`microi_get_status` 回读。
 - 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
 - 首次为浅色玻璃水纹，支持深色和自选主题色。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
 
@@ -165,7 +165,7 @@ microi init --workspace <工作区> --pull
 
 `init` 必须能够在干净空目录中依次添加服务器连接、交互登录、生成 `microi.skills/`、`AGENTS.md`、`CLAUDE.md`、Copilot/Cursor/CodeBuddy 规则、CodeBuddy/Qoder/Comate 项目 Skill、typings、`jsconfig.json`，并配置 Codex、VS Code、Cursor、Trae、Claude Code、WorkBuddy、CodeBuddy、Qoder、Comate MCP。密码只允许隐式输入，禁止放入命令参数、对话记录或明文生成文件。Windows 需要静默恢复时，只能写入当前工作区 `Microi-V8-Engine/.microi-workspace-secrets.dpapi.json` 的 DPAPI CurrentUser 密文保险库；MCP 环境只保存该路径和 Key 名，保险库与同目录 Token 文件必须 Git-ignore。
 
-安装/升级后若 `microi doctor` 返回“Token 签名验证失败”，先区分验签密钥变化与 20 天到期。新版 MCP 会从工作区 DPAPI 保险库重载精确 Profile 的帐号密码并自动续登、更新 Token/MCP；不得删除全部 Profile、清空 Token 文件或要求用户反复手工输入。同一 `OsClient` 的多条 SaaS 运行记录必须由后端在 JWT 初始化前收敛到同一个 `AuthSecret`，否则更新后仍会反复失效。
+安装/升级后若 `microi doctor` 返回“Token 签名验证失败”，先区分验签密钥变化与 20 天到期。新版 MCP 会从 Windows 工作区 DPAPI 保险库或 macOS Keychain 重载精确 Profile 的帐号密码并自动续登、更新 Token/MCP；不得删除全部 Profile、清空 Token 文件或要求用户反复手工输入。同一 `OsClient` 的多条 SaaS 运行记录必须由后端在 JWT 初始化前收敛到同一个 `AuthSecret`，否则更新后仍会反复失效。
 
 原生配置对应关系：
 
