@@ -73,7 +73,7 @@ genericFiles.forEach((file) => {
 })
 
 const v8Source = read('src/utils/microi.v8.js')
-;['GetDiyTableModel', 'GetDiyFieldList', 'formEngineMetadata']
+;['GetDiyTableModel', 'GetDiyFieldList', 'GetDiyFieldByDiyTables', 'formEngineMetadata']
   .forEach((keyword) => check(v8Source.includes(keyword), `MicroiV8 缺少统一元数据封装：${keyword}`))
 
 const profileIds = fs.readdirSync(path.join(root, 'profiles'))
