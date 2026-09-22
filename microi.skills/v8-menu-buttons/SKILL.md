@@ -112,6 +112,8 @@ V8.OpenAppDialog({
 | `RoutePath` | 否 | `/` | 子应用内部路由；`MicroRoute` 是兼容别名，优先取 `RoutePath`。 |
 | `Version` | 否 | 当前 `BuildVersion` | 固定加载某个发布版本；通常省略以使用当前版本。 |
 | `Title` | 否 | `应用` | Dialog/Drawer 标题。 |
+| `Header` | 否 | - | 初始外层标题栏 `{ title, tags, actions }`；仅可序列化文本和动作标识。 |
+| `OnHeaderAction(actionId, V8)` | 否 | - | 可选调用方前端 V8 动作；不设置时由子应用处理按钮点击。 |
 | `TitleIcon` | 否 | `fas fa-window-maximize` | 标题图标 class。 |
 | `Width` | 否 | `min(920px, calc(100vw - 32px))` | CSS 宽度值，推荐带移动端安全边距。 |
 | `OpenType` | 否 | `Dialog` | `Dialog` 或 `Drawer`。 |
@@ -121,6 +123,8 @@ V8.OpenAppDialog({
 | `OnError(error)` | 否 | - | 加载或执行错误回调，不自动关闭。 |
 
 宿主还会自动传入 `apiBase`、`osClient`、`token`、`appKey`、`version`、`microRoute`、`dialog:true`。子应用返回协议：
+
+宿主支持 `dialogHeaderBridge:true` 时，子应用可隐藏内部工具栏，使用 `window.microApp.forceDispatch({ type:'app-dialog:header', data:{ title:'单据号', tags:[{text:'待审核',tone:'warning'}], actions:[{id:'approve',text:'审核',tone:'success'}] } })` 更新外层标题栏。若未传 `OnHeaderAction`，宿主会把按钮点击作为 `host:dialog-action` 数据消息回传 `actionId/requestId`，子应用仍需向后端重新核验权限；旧宿主继续显示子应用自己的工具栏。
 
 ```js
 window.microApp.dispatch({ type: 'app-dialog:success', data: { message: '已提交' } });
