@@ -91,6 +91,16 @@ function optionIdentity(option, saveField, labelField) {
 }
 
 /**
+ * zhy：Text 存储格式必须使用实际入库的 SelectSaveField 作为 Element Plus value-key。
+ * zhy：禁止根据异步加载的选项从 SelectSaveField 动态切换到 Id，避免首次回显已有值时显示为空。
+ */
+export function resolveTextSelectValueKey(config) {
+    const cfg = config || {};
+    if (cfg.SelectSaveFormat === "Json") return "";
+    return cfg.SelectSaveField || cfg.SelectLabel || "";
+}
+
+/**
  * zhy：远程搜索替换选项列表时仅保留表单当前已选值，
  * zhy：避免查看、编辑历史记录时已保存的关联值显示为空，同时不扩大远程接口返回的可选范围。
  */
