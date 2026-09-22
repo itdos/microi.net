@@ -1323,7 +1323,7 @@
                                                 || (CardBottomFieldList.length === 0 && item.UpdateTime && (!PresentationCardConfig || PresentationCardConfig.ShowUpdateTime))
                                                 || (item.CreateTime && (!PresentationCardConfig || PresentationCardConfig.ShowCreateTime))
                                                 || (diyStore.IsPhoneView && HasAnyPresentationFieldValue(item, CardTopFieldList.slice(1)))
-                                                || (diyStore.IsPhoneView && ((PropsTableType !== 'OpenTable' && IsPermission('NoDetail')) || ShouldShowMobileCardMoreAction(item)))"
+                                                || (diyStore.IsPhoneView && (ShouldShowRowDetailAction(item) || ShouldShowMobileCardMoreAction(item)))"
                                             class="card-bottom-row"
                                             @click.stop
                                         >
@@ -1386,7 +1386,7 @@
                                                     <el-icon><MoreFilled /></el-icon><span>更多</span>
                                                 </button>
                                                 <button
-                                                    v-if="PropsTableType !== 'OpenTable' && IsPermission('NoDetail')"
+                                                    v-if="PropsTableType !== 'OpenTable' && ShouldShowRowDetailAction(item)"
                                                     type="button"
                                                     class="card-mobile-detail"
                                                     aria-label="查看详情"

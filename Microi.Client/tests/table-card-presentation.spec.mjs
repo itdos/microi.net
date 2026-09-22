@@ -131,6 +131,21 @@ test("mobile card more menu remains available for outside, inside, edit, workflo
     assert.equal(shouldShow({ _IsInTableAdd: false }), true);
 });
 
+test("mobile card detail respects row-level V8 visibility without suppressing row-click actions", function () {
+    const calls = [];
+    const context = {
+        PropsTableType: "Table",
+        DiyTableRowClick(row) { calls.push(`row:${row.Id}`); },
+        ShouldShowRowDetailAction(row) { return row.IsVisibleDetail === true; },
+        OpenDetail(row, mode) { calls.push(`detail:${row.Id}:${mode}`); }
+    };
+    const click = diyTableUiMixin.methods.CardItemClick.bind(context);
+    click({ Id: "hidden", IsVisibleDetail: false });
+    assert.deepEqual(calls, ["row:hidden"]);
+    click({ Id: "visible", IsVisibleDetail: true });
+    assert.deepEqual(calls, ["row:hidden", "row:visible", "detail:visible:View"]);
+});
+
 test("card template and styles keep visible surfaces and no longer index rows by field Id", function () {
     const component = readFileSync(new URL("../src/views/form-engine/diy-table.vue", import.meta.url), "utf8");
     const presentation = readFileSync(new URL("../src/views/form-engine/mixins/diy-table-presentation.mixin.js", import.meta.url), "utf8");
@@ -151,7 +166,7 @@ test("card template and styles keep visible surfaces and no longer index rows by
     assert.match(component, /class="card-mobile-detail"[\s\S]*?<ArrowRight\s*\/>/);
     assert.match(component, /class="mobile-list-summary"[\s\S]*?MobileSummaryItems/);
     assert.match(component, /class="card-mobile-footer-meta__item"/);
-    assert.match(component, /PropsTableType !== 'OpenTable' && IsPermission\('NoDetail'\)/);
+    assert.match(component, /PropsTableType !== 'OpenTable' && ShouldShowRowDetailAction\(item\)/);
     assert.match(component, /_moreMenuRow\._RowMoreBtnsOut[\s\S]*?handleMoreMenuAction\('custom', btn\)/);
     assert.match(component, /_moreMenuRow\._RowMoreBtnsIn[\s\S]*?handleMoreMenuAction\('custom', btn\)/);
     assert.match(component, /handleMoreMenuAction\('workflow'\)/);

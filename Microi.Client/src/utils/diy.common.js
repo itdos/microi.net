@@ -4643,90 +4643,208 @@ var DiyCommon = {
             });
         }
     },
-    FormExportFileV2(url, param, callback, fileName, paramType) {
-        param.authorization = "Bearer " + DiyCommon.getToken();
-        //responseType: "json",
-        var option = {
-            url: url, // 替换为你的文件下载链接
-            method: "POST",
-            // params: param,
-            data: qs.stringify(param),
-            responseType: "blob" // 告诉Axios返回的数据类型是二进制数据
+    async FormExportFileV2(url, param, callback, fileName, paramType) {
+        var result = null;
+        var requestToken = DiyCommon.getToken();
+        var requestParam = Object.assign({}, param || {});
+
+        var getHeader = function (headers, name) {
+            if (!headers) return "";
+            if (typeof headers.get === "function") {
+                return headers.get(name) || "";
+            }
+            return headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()] || "";
         };
-        if (paramType == "json") {
-            option.data = param;
-        }
-        axios(option)
-            .then((response) => {
-                console.log("返回格式", response.data.type);
-                if (response.data.type == "application/json") {
-                    // Step 1: 将 Blob 转换为文本
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        try {
-                            const jsonResponse = JSON.parse(reader.result); // 解析为 JSON 对象
-
-                            // Step 2: 获取 Base64 字符串
-                            const base64String = jsonResponse.Data?.FileByteBase64;
-                            if (!base64String) {
-                                throw new Error("FileByteBase64 不存在");
-                            }
-
-                            // Step 3: 解码 Base64 为 Uint8Array
-                            const binaryString = atob(base64String);
-                            const len = binaryString.length;
-                            const bytes = new Uint8Array(len);
-                            for (let i = 0; i < len; i++) {
-                                bytes[i] = binaryString.charCodeAt(i);
-                            }
-
-                            // Step 4: 创建 Blob 并生成下载链接
-                            const blob = new Blob([bytes], { type: "application/vnd.ms-excel" });
-                            const urlBlob = window.URL.createObjectURL(blob);
-
-                            // Step 5: 创建 a 标签并触发下载
-                            const link = document.createElement("a");
-                            link.href = urlBlob;
-                            link.setAttribute("download", `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`);
-                            document.body.appendChild(link);
-                            link.click();
-
-                            // Step 6: 清理资源
-                            window.URL.revokeObjectURL(urlBlob);
-                            document.body.removeChild(link);
-
-                            if (callback) {
-                                callback();
-                            }
-                        } catch (e) {
-                            console.error("解析响应失败：", e);
-                            DiyCommon.Tips("文件解析失败，请稍后重试。", false);
-                        }
-                    };
-                    reader.readAsText(response.data); // 使用 readAsText 处理 Blob
-                } else {
-                    const url = window.URL.createObjectURL(new Blob([response.data]));
-                    const link = document.createElement("a");
-                    link.href = url;
-                    link.setAttribute("download", `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`); // 替换为你想要的文件名和扩展名
-                    document.body.appendChild(link);
-                    link.click();
-                    // 修复内存泄漏：释放 Blob URL 与 DOM 节点
-                    setTimeout(() => {
-                        try { document.body.removeChild(link); } catch (e) {}
-                        try { window.URL.revokeObjectURL(url); } catch (e) {}
-                    }, 0);
-                    if (callback) {
-                        callback();
-                    }
-                }
-            })
-            .catch((error) => {
-                console.error(error);
-                if (callback) {
-                    callback();
-                }
+        var readResponseText = async function (data) {
+            if (typeof data === "string") return data;
+            if (data && typeof data.text === "function") return await data.text();
+            return await new Promise(function (resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function () { resolve(String(reader.result || "")); };
+                reader.onerror = function () { reject(new Error("读取导出响应失败。")); };
+                reader.readAsText(data);
             });
+        };
+        var normalizeFileName = function (value) {
+            var normalized = String(value || "").trim().replace(/^['"]|['"]$/g, "");
+            normalized = normalized.split(/[\\/]/).pop() || "";
+            return normalized.replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "_").trim();
+        };
+        var getDispositionFileName = function (contentDisposition) {
+            var source = String(contentDisposition || "");
+            var match = source.match(/filename\*\s*=\s*([^;]+)/i);
+            if (match) {
+                var encoded = String(match[1] || "").trim().replace(/^['"]|['"]$/g, "");
+                encoded = encoded.replace(/^UTF-8''/i, "");
+                try { return normalizeFileName(decodeURIComponent(encoded)); } catch (e) {}
+                return normalizeFileName(encoded);
+            }
+            match = source.match(/filename\s*=\s*("[^"]*"|[^;]+)/i);
+            return match ? normalizeFileName(match[1]) : "";
+        };
+        var getDefaultExtension = function (contentType) {
+            var type = String(contentType || "").toLowerCase();
+            if (type.includes("spreadsheetml")) return ".xlsx";
+            if (type.includes("ms-excel")) return ".xls";
+            if (type.includes("pdf")) return ".pdf";
+            if (type.includes("wordprocessingml")) return ".docx";
+            if (type.includes("presentationml")) return ".pptx";
+            if (type.includes("csv")) return ".csv";
+            return ".xlsx";
+        };
+        var getFallbackFileName = function (contentType) {
+            var now = new Date();
+            var pad = function (value) { return String(value).padStart(2, "0"); };
+            var time = now.getFullYear()
+                + pad(now.getMonth() + 1)
+                + pad(now.getDate())
+                + pad(now.getHours())
+                + pad(now.getMinutes())
+                + pad(now.getSeconds());
+            return normalizeFileName(`导出${fileName || ""}-${time}${getDefaultExtension(contentType)}`);
+        };
+        var downloadBlob = function (blob, downloadName) {
+            var blobUrl = window.URL.createObjectURL(blob);
+            var link = document.createElement("a");
+            link.href = blobUrl;
+            link.setAttribute("download", downloadName);
+            document.body.appendChild(link);
+            link.click();
+            // 下载触发后再释放资源，兼容仍会异步读取 object URL 的浏览器。
+            setTimeout(function () {
+                try { document.body.removeChild(link); } catch (e) {}
+                try { window.URL.revokeObjectURL(blobUrl); } catch (e) {}
+            }, 0);
+        };
+        var readErrorMessage = async function (error) {
+            var message = error && error.message ? error.message : "导出失败，请稍后重试。";
+            try {
+                var errorResponse = error && error.response;
+                if (!errorResponse || errorResponse.data == null) return message;
+                var errorText = await readResponseText(errorResponse.data);
+                var errorType = String(
+                    getHeader(errorResponse.headers, "content-type")
+                    || errorResponse.data?.type
+                    || ""
+                ).toLowerCase();
+                if (errorType.includes("json")) {
+                    var errorJson = JSON.parse(errorText);
+                    return errorJson?.Msg || errorJson?.msg || message;
+                }
+                return String(errorText || "").trim() || message;
+            } catch (e) {
+                return message;
+            }
+        };
+
+        try {
+            var currentLang = DiyCommon.GetCurrentLang();
+            DiyCommon.AttachLangParam(requestParam, currentLang);
+            var headers = {
+                did: DiyCommon.GetDid(),
+                macaddress: LocalStorageManager.get("MacAddress") || "",
+                lang: currentLang
+            };
+            if (!DiyCommon.IsNull(requestToken)) {
+                headers.authorization = "Bearer " + requestToken;
+            }
+            headers = withRequestTenant(headers, {
+                url: url,
+                params: requestParam,
+                apiBase: DiyCommon.GetApiBase(),
+                osClient: DiyCommon.GetOsClient()
+            });
+
+            var normalizedUrl = String(url || "").split(/[?#]/)[0].replace(/\/+$/, "").toLowerCase();
+            var isLegacyStandardExport = /\/api\/(?:formengine\/exportdiytablerow|diytable\/exportdiytablerow(?:frombody)?)$/.test(normalizedUrl);
+            // 旧版标准 Controller 只从参数读取 Token；自定义接口只接收 Header，避免 Token 进入 V8.Param。
+            if (isLegacyStandardExport && !DiyCommon.IsNull(requestToken)) {
+                requestParam.authorization = "Bearer " + requestToken;
+            }
+
+            var isJsonRequest = String(paramType || "").toLowerCase() === "json";
+            headers["Content-Type"] = isJsonRequest
+                ? "application/json"
+                : "application/x-www-form-urlencoded;charset=UTF-8";
+            var response = await axios({
+                url: url,
+                method: "POST",
+                data: isJsonRequest ? requestParam : qs.stringify(requestParam),
+                headers: headers,
+                responseType: "blob",
+                changeOrigin: true
+            });
+
+            var refreshedToken = getHeader(response.headers, "authorization") || getHeader(response.headers, "token");
+            if (!DiyCommon.IsNull(refreshedToken)) {
+                DiyCommon.ApplyAuthorizationToken(refreshedToken, requestToken);
+            }
+            var responseType = String(
+                getHeader(response.headers, "content-type")
+                || response.data?.type
+                || ""
+            ).toLowerCase();
+
+            if (responseType.includes("json")) {
+                var responseText = await readResponseText(response.data);
+                var jsonResponse = JSON.parse(responseText);
+                DiyCommon.MarkAuthRequestToken(jsonResponse, requestToken);
+                if (Number(jsonResponse?.Code) !== 1) {
+                    var businessMessage = jsonResponse?.Msg || jsonResponse?.msg || "导出失败。";
+                    DiyCommon.Tips(businessMessage, false);
+                    result = jsonResponse || { Code: 0, Msg: businessMessage };
+                    return result;
+                }
+
+                var fileData = jsonResponse.Data || {};
+                if (!fileData.FileByteBase64) {
+                    throw new Error("导出接口成功响应缺少 FileByteBase64。");
+                }
+                var binaryString = atob(fileData.FileByteBase64);
+                var bytes = new Uint8Array(binaryString.length);
+                for (var i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                var jsonContentType = fileData.ContentType || "application/octet-stream";
+                var jsonFileName = normalizeFileName(fileData.FileName) || getFallbackFileName(jsonContentType);
+                downloadBlob(new Blob([bytes], { type: jsonContentType }), jsonFileName);
+                result = {
+                    Code: 1,
+                    Data: { FileName: jsonFileName, ContentType: jsonContentType }
+                };
+                return result;
+            }
+
+            if (responseType.includes("text/plain")) {
+                var plainError = String(await readResponseText(response.data) || "").trim() || "导出失败。";
+                DiyCommon.Tips(plainError, false);
+                result = { Code: 0, Msg: plainError };
+                return result;
+            }
+
+            var binaryContentType = responseType || response.data?.type || "application/octet-stream";
+            var binaryFileName = getDispositionFileName(getHeader(response.headers, "content-disposition"))
+                || getFallbackFileName(binaryContentType);
+            var binaryBlob = response.data instanceof Blob && response.data.type
+                ? response.data
+                : new Blob([response.data], { type: binaryContentType });
+            downloadBlob(binaryBlob, binaryFileName);
+            result = {
+                Code: 1,
+                Data: { FileName: binaryFileName, ContentType: binaryContentType }
+            };
+            return result;
+        } catch (error) {
+            console.error("导出失败：", error);
+            var errorMessage = await readErrorMessage(error);
+            result = { Code: 0, Msg: errorMessage };
+            DiyCommon.Tips(errorMessage, false);
+            return result;
+        } finally {
+            if (callback) {
+                try { callback(result); } catch (callbackError) { console.error("导出完成回调失败：", callbackError); }
+            }
+        }
     },
     FormExportFile(url, param, callback) {
         var form = $("<form>");

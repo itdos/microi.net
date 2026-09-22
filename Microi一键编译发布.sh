@@ -462,13 +462,43 @@ validate_publish_artifacts() {
     print_info "发布产物守卫通过：必需运行文件完整，logs/PDB 均为 0"
 }
 
-# 跨平台 sed -i
+# 保留原文件换行字节；GNU sed -i 在 Git Bash 中会把 CRLF 改成 LF，
+# 即使版本号相同也会使刚通过 Full 的候选摘要失效。
 sed_inplace() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "$@"
-    else
-        sed -i "$@"
-    fi
+    node - "$1" "$2" <<'MICROI_PRESERVE_VERSION_EOL'
+const fs = require('node:fs');
+const [expression, file] = process.argv.slice(2);
+const before = fs.readFileSync(file);
+
+function readPart(source, start, delimiter) {
+  let value = '';
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '\\' && source[index + 1] === delimiter) {
+      value += delimiter;
+      index += 1;
+      continue;
+    }
+    if (char === delimiter) return { value, next: index + 1 };
+    value += char;
+  }
+  throw new Error(`unterminated sed expression: ${source}`);
+}
+
+if (!expression.startsWith('s') || expression.length < 4) {
+  throw new Error(`unsupported sed expression: ${expression}`);
+}
+const delimiter = expression[1];
+const patternPart = readPart(expression, 2, delimiter);
+const replacementPart = readPart(expression, patternPart.next, delimiter);
+const flags = expression.slice(replacementPart.next);
+if (!/^g?$/.test(flags)) throw new Error(`unsupported sed flags: ${flags}`);
+
+const text = before.toString('utf8');
+const afterText = text.replace(new RegExp(patternPart.value, flags.includes('g') ? 'g' : ''), replacementPart.value);
+const after = Buffer.from(afterText, 'utf8');
+if (!before.equals(after)) fs.writeFileSync(file, after);
+MICROI_PRESERVE_VERSION_EOL
 }
 
 # 读取 JSON 标量，兼容嵌套 AppSettings、数字端口、转义字符和 UTF-8 BOM。
@@ -931,6 +961,14 @@ fi
 # 此处需要仍在运行的已加载候选源码的测试 API，因此必须早于 PrepareRelease。
 # 缺少隔离测试租户/凭据、测试失败或跳过均停止发布；不能靠 AI 提示词代替门禁。
 if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "${PLATFORM_DOCKER_SELECTED:-false}" = true ]; then
+    # bin/Release/Dockerfile 是已跟踪的 Docker 构建配方投影。必须在冻结候选前
+    # 从单一事实源同步，否则 Docker 阶段再复制会导致 Full 后候选漂移。
+    if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] && [ -f "Microi.Server/Microi.net.Api/Dockerfile.runtime" ]; then
+        if ! cmp -s "Microi.Server/Microi.net.Api/Dockerfile.runtime" "Microi.Server/Microi.net.Api/bin/Release/Dockerfile"; then
+            cp "Microi.Server/Microi.net.Api/Dockerfile.runtime" "Microi.Server/Microi.net.Api/bin/Release/Dockerfile"
+            print_info "已在冻结候选前同步后端 Docker 构建配方。"
+        fi
+    fi
     print_phase "发布前全量自动化测试（失败即停止）"
     MICROI_RELEASE_CANDIDATE="$PWD/.tmp/microi-release-gate/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
     if ! node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
@@ -1139,6 +1177,10 @@ if ! dotnet publish -c Release --no-build --no-restore $_BUILD_EXTRA_ARGS \
 fi
 cd ../..
 echo ""
+print_step "打包在线 AI 使用的同版 Microi MCP 运行时..."
+if ! node Microi.Server/tools/pack-online-ai-mcp.mjs "$PUBLISH_DIR"; then
+    print_fail "在线 AI MCP 运行时打包失败，禁止发布只有 AI 对话而没有 MCP 工具的后端。"
+fi
 cleanup_publish_artifacts "$PUBLISH_DIR"
 validate_publish_artifacts "$PUBLISH_DIR"
 print_success "Microi.net.Api 发布成功"
@@ -1559,6 +1601,10 @@ prepare_docker_context() {
         build_dir="Microi.Server/Microi.net.Api/bin/Release"
         cleanup_publish_artifacts "$PUBLISH_DIR"
         validate_publish_artifacts "$PUBLISH_DIR"
+        if [ ! -f "$PUBLISH_DIR/ai-mcp/dist/index.js" ]; then
+            print_fail "后端产物缺少在线 AI MCP 运行包。"
+        fi
+        cp Microi.Server/Microi.net.Api/Dockerfile.runtime "$build_dir/Dockerfile"
         cat > "$build_dir/.dockerignore" <<'EOF'
 *
 !Dockerfile
@@ -1633,7 +1679,7 @@ docker_push_plan() {
     local _docker_build_ok=false
     local _docker_build_attempt=1
     while [ "$_docker_build_attempt" -le 3 ]; do
-        if (cd "$build_dir" && docker build --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             _docker_build_ok=true
             break
         fi
@@ -1645,7 +1691,7 @@ docker_push_plan() {
     done
     if [ "$_docker_build_ok" != true ]; then
         print_warning "远端基础镜像连续拉取失败，尝试使用 Docker 本地缓存完成本次构建..."
-        if (cd "$build_dir" && docker build --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             print_warning "已使用本地缓存的基础镜像完成构建；发布后请关注远端 Registry 连通性。"
         else
             print_fail "Docker 镜像构建失败，远端拉取和本地缓存均不可用: $local_image"
