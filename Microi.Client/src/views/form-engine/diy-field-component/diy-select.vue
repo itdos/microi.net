@@ -91,7 +91,7 @@ import _ from "underscore";
 import { ArrowDown } from "@element-plus/icons-vue";
 import { markRaw } from "vue";
 import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
-import { mergeCurrentSelectOptions } from "@/utils/select-option-merge";
+import { mergeCurrentSelectOptions, resolveTextSelectValueKey } from "@/utils/select-option-merge";
 import { ensureFieldDataLoaded } from "./field-data-load-fallback.js";
 
 export default {
@@ -1083,6 +1083,12 @@ export default {
                 return undefined;
             }
             // zhy：对象选项优先使用稳定 Id 比较，联系人改名后仍能匹配同一条记录，不再把可变姓名当唯一键。
+            // zhy：Text 格式实际保存的是 SelectSaveField，不是完整选项对象。
+            // zhy：远程选项加载前后保持 value-key 稳定，避免从保存字段切换成 Id 后首次只读回显为空。
+            var textValueKey = resolveTextSelectValueKey(field.Config);
+            if (!self.DiyCommon.IsNull(textValueKey)) {
+                return textValueKey;
+            }
             if (self._isObjectDataSource && self._isObjectDataSource()) {
                 var objectOptions = self._normalizeSelectOptionList(field.Data || []);
                 if (objectOptions.some(function (item) {
