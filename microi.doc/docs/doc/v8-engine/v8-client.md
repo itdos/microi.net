@@ -804,6 +804,8 @@ V8.OpenAppDialog({
 | `MicroRoute` | `string` | 否 | `/` | `RoutePath` 的兼容别名；两者同时传入时优先使用 `RoutePath`。 |
 | `Version` | `string` | 否 | 当前发布版本 | 缓存版本标识，例如 `v1.0.2`。宿主始终访问固定的 `/{AppKey}/index.html?v={Version}` 入口；不传时自动读取 `sys_microiservice.BuildVersion`。 |
 | `Title` | `string` | 否 | `应用` | 弹窗或抽屉标题。 |
+| `Header` | `object` | 否 | - | 初始外层标题栏 `{ title, tags, actions }`。标签最多 6 个，按钮最多 8 个；只传可序列化文本、标识和状态。 |
+| `OnHeaderAction` | `function(actionId, V8)` | 否 | - | 可选的调用方前端 V8 按钮逻辑。若未提供，点击动作会传给子微服务处理。 |
 | `TitleIcon` | `string` | 否 | `fas fa-window-maximize` | 标题左侧图标 class。 |
 | `Width` | `string` | 否 | `min(920px, calc(100vw - 32px))` | 弹窗/抽屉宽度，支持 `px`、`%`、`vw`、`min(...)` 等 CSS 宽度值。 |
 | `OpenType` | `string` | 否 | `Dialog` | 打开方式：`Dialog` 或 `Drawer`。 |
@@ -833,6 +835,7 @@ console.log(hostData.appKey);
 console.log(hostData.version);
 console.log(hostData.microRoute);
 console.log(hostData.dialog);       // true
+console.log(hostData.dialogHeaderBridge); // true，宿主支持外层标题栏动态控制
 console.log(hostData.dialogData);   // 即宿主传入的 Data
 ```
 
@@ -849,10 +852,29 @@ console.log(hostData.dialogData);   // 即宿主传入的 Data
 | `version` | 实际加载的构建版本。 |
 | `microRoute` | 实际打开的微服务内部路由。 |
 | `dialog` | 固定为 `true`，用于让应用识别弹窗运行模式。 |
+| `dialogHeaderBridge` | 为 `true` 时，子应用可隐藏内部工具标题栏，将标题、状态标签和操作按钮派发给外层弹窗。 |
 | `dialogData` | `V8.OpenAppDialog` 的 `Data` 参数。 |
 | `route` | 路由兼容对象，包含 `microRoute`、`microRoutePath`。 |
 
 ### 子应用返回结果
+
+子应用可动态更新外层标题栏；按钮点击由宿主以 `host:dialog-action` 数据消息回传，包含 `actionId` 和唯一 `requestId`。子应用需依据当前数据和权限重新判定可执行性，不能把按钮显隐当成授权。旧版宿主未提供 `dialogHeaderBridge` 时，应继续显示自身工具栏。
+
+```js
+window.microApp.forceDispatch({
+    type: 'app-dialog:header',
+    data: {
+        title: '加工任务单-2026-001',
+        tags: [{ text: '待审核', tone: 'warning' }],
+        actions: [{ id: 'approve', text: '审核', tone: 'success', disabled: false }]
+    }
+});
+window.microApp.addDataListener(function (data) {
+    if (data.type === 'host:dialog-action' && data.actionId === 'approve') {
+        // 在此执行子应用动作，并再次向可信后端核验权限。
+    }
+});
+```
 
 微服务通过 micro-app 的数据通信协议向宿主派发结果：
 

@@ -458,15 +458,21 @@ Redis 不可用或无法取得版本时，服务端直接回源当前租户数�
 - `NL2SQL` 默认使用大模型关键词扩展和权限感知 Schema 搜索；启用 `EnableVectorDatabase` 后叠加 Schema 向量召回。
 - `NL2V8` 默认使用官方 Skill 精确/关键词检索和当前租户 Schema 关键词检索；启用向量数据库后才叠加 Skill 与 Schema 向量召回。
 
-当前 `Microi.Server/Microi.AI` 没有注册 MCP Tools，也没有处理模型 `tool_calls` 的代理循环，因此不会因为平台已经提供 MCP Server 就自动调用 MCP。Prompt 中写“优先使用 MCP”只是一条文字说明，不能赋予模型工具能力。
+普通聊天不调用 MCP。选择 `/#/mic-ai-engine` 的“低代码建模”模式后，`Microi.AI` 在服务端启动随 API 发布的 `microi.mcp` 运行包，以当前登录用户的 DiyToken 和租户建立独立 MCP 会话，并向所选模型提供 `microi_codex` 工具。模型通过 `list_tools`、`describe_tool` 发现完整工具目录，再调用原 MCP 工具；模型的 `tool_calls` 与工具结果在服务端循环处理。
+
+`Level >= 9999` 且主库账号/角色仍有效的管理员，在对话中明确要求创建、修改或删除时，模型可以使用与本地 Microi.Code 相同的 MCP 工具目录，不需要网页“执行”按钮。仅要求规划时只调用读取工具。权限在进入建模及每次工具调用前复核；工具本身仍执行原有参数验证、确认值、审计和回读。浏览器传入的 `_IsAdmin`、`Level`、`OsClient`、Token 或模型参数不能代替授权；普通账号不能进入 MCP 建模模式。
+
+建模对话使用 `/api/Ai/Chat` 返回完整结果和本次 MCP 工具名称/状态；常规对话继续使用流式入口。模型工具参数交给同版 `microi.mcp` 的原始 Schema 和处理器验证。完整系统优先按 `get_db_schema → get_manifest_schema → plan_system → generate_system(dryRun=true) → generate_system(dryRun=false) → validate_system` 执行。工具传输异常或超时后停止，不自动重放可能成功的写入；先回读目标资源再继续。
+
+API 发布包必须包含 `ai-mcp/dist`、生产依赖和 Node 22 运行时；只有升级应用商城资源而没有部署匹配的前后端程序，线上页面仍不会获得新工具循环。在线 MCP 的文件路径指向 API 节点，处理用户文件时需经受控上传工具传入文件内容，不能把浏览器本地路径当作服务器路径。
 
 流式取消也要区分入口：OpenAI 代理流式接口会传递 HTTP 请求取消信号；普通 `ChatStream` 和 `NL2V8` 当前主要依赖内部超时 Token，不能宣称浏览器断开后一定立即终止上游调用或计费。
 
 当前中转计量记录除问题摘要外还可能保存完整 `Question` 和 `Answer`，部分诊断日志也会输出问题内容或摘要。它们必须按敏感业务数据保护、限制访问和设置留存策略；在统一脱敏与可配置留存真正实现前，不得宣称 Prompt/Answer 已全面脱敏或不落日志。
 
-Microi MCP 当前服务于 Codex、GitHub Copilot、Cursor、Claude Code 等具备 MCP Host 能力的外部 AI 客户端；读写仍经过平台 Token、租户边界、权限、确认与审计。
+Microi MCP 同时服务于在线低代码建模模式，以及 Codex、GitHub Copilot、Cursor、Claude Code 等外部客户端；读写仍经过平台 Token、租户边界、权限、确认与审计。
 
-未来若让平台在线 AI 调用工具，推荐在 `Microi.AI` 内实现受限 Tool Gateway，复用 FormEngine、V8McpLogic 等后端授权入口，而不是让后端拿超级管理员 Token 再调用自己的 MCP。每次调用必须继承当前用户、`OsClient`、Token/权限快照和审计上下文；模型只负责提出调用，服务端继续执行参数白名单、写操作确认、幂等、步数/时长/结果大小限制和结果回读。工具返回内容仍是不可信数据，不能修改系统规则。
+在线 MCP 网关在 `Microi.AI` 内运行，只转发当前请求真实 DiyToken 和租户给同版 `microi.mcp`，不使用平台服务账号或另行签发超级管理员 Token。环境变量只传必要的进程参数，不继承宿主密钥；调用有步数、时长和返回长度上限。工具返回内容仍是不可信数据，不能修改系统规则。
 
 MCP 与向量库解决不同问题：
 
@@ -474,7 +480,7 @@ MCP 与向量库解决不同问题：
 - Skill 文档向量库用于从稳定知识中低成本召回相关规范，减少 Prompt 长度；它不是事实源，也不能授权或执行。
 - Schema 向量库用于从大量表中语义预选少量候选表；真正读取和执行仍回到当前租户的权威接口。
 
-当前在线 AI 的 Schema 搜索直接复用服务端实时元数据、授权缓存和 SQL 安全执行链，不需要为了读取自己数据库的 Schema 再经过一次外部 MCP 网络调用；它与 MCP Schema 工具共享“实时事实、权限校验、精确回读”的原则。未来若在线 AI 增加通用工具循环，再通过受限 Tool Gateway 暴露 MCP 等能力。
+普通在线 AI 的 NL2SQL Schema 搜索仍直接复用服务端实时元数据、授权缓存和 SQL 安全执行链。超级管理员的“低代码建模”模式另经同版 `microi.mcp` 工具循环读取 Schema 与执行受控建模；两条路径均以当前租户的实时事实、权限校验和写后回读为准。
 
 推荐默认采用关键词 Schema 检索；向量检索只负责补充高度模糊的候选表，不能替代实时元数据、权限和执行校验。关闭向量数据库不会删除 NL2SQL 所需的 Schema 检索能力，也不会影响普通 Chat。
 
