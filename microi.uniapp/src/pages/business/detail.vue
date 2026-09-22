@@ -149,7 +149,7 @@
 									</text>
 								</view>
 								<mci-native-field v-else-if="usesNativeDisplay(field)"
-									class="field-value field-value--native" :field="field.nativeField"
+									class="field-value field-value--native" :field="tenantDetailNativeField(field)"
 									:model-value="detail[field.name]" :table-name="moduleConfig.table"
 									:form-data="detail" :menu-id="menuId" readonly />
 								<rich-text v-else-if="isFieldRich(field)" class="field-value field-value--rich"
@@ -157,6 +157,27 @@
 								<text v-else class="field-value">{{ displayField(field) }}</text>
 								<view v-if="field.format === 'phone' && detail[field.name]" class="inline-action"
 									@tap="callPhone(detail[field.name])">拨打</view>
+							</view>
+							</view>
+						<view v-if="section.key === deviceActionSectionKey" class="device-section-actions">
+							<view class="device-section-action device-section-action--preview" role="button"
+								:class="{ 'device-section-action--loading': deviceActionKey === 'product' }"
+								:aria-disabled="Boolean(deviceActionKey)" hover-class="device-section-action--pressed"
+								@tap.stop="previewDeviceProduct">
+								<view class="device-section-action__icon device-section-action__icon--product" aria-hidden="true">
+									<view></view>
+								</view>
+								<text>{{ deviceActionKey === 'product' ? '正在打开...' : '预览商品详情' }}</text>
+							</view>
+							<view v-if="canGenerateDeviceQrCodeAction" role="button"
+								class="device-section-action device-section-action--qrcode"
+								:class="{ 'device-section-action--loading': deviceActionKey === 'qrcode' }"
+								:aria-disabled="Boolean(deviceActionKey)" hover-class="device-section-action--pressed"
+								@tap.stop="generateDeviceQrCode">
+								<view class="device-section-action__icon device-section-action__icon--qrcode" aria-hidden="true">
+									<view></view><view></view><view></view>
+								</view>
+								<text>{{ deviceActionKey === 'qrcode' ? '生成中...' : '生成设备二维码' }}</text>
 							</view>
 						</view>
 						<mci-business-related-list
@@ -394,10 +415,16 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import {
 		canApproveOrder as hasOrderApprovalPermission,
 		canEditMenuRecord,
+		executeBusinessRowAction,
 		loadApprovalOpinions
 	} from './utils/xjy-row-actions.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 	import { customerCaseChildField } from '@/tenants/xjy/native-table.js'
+	import {
+		canGenerateDeviceQrCode,
+		resolveDeviceProductId,
+		withDeviceActionTimeout
+	} from '@/tenants/xjy/device-detail-actions.mjs'
 
 	const icon = (path) => `/static/xjy/${path}`
 	const DETAIL_EXCLUDED_FIELDS = new Set(['Id', 'CreateUserId', 'UpdateUserId', 'OsClient'])
@@ -406,6 +433,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		'Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Switch', 'Department', 'SelectTree',
 		'TreeCheckbox', 'Cascader', 'ColorPicker', 'Progress', 'Rate', 'Qrcode', 'Alert'
 	])
+	const DETAIL_NATIVE_FIELD_CACHE = new WeakMap()
 
 	function detailFieldFormat(field) {
 		const component = String(field.component || field.Component || '')
@@ -1256,6 +1284,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				currentUser: {},
 				roleProfile: {},
 				deviceActiveTask: {},
+				deviceActionKey: '',
 				definition: null,
 				viewManifest: null,
 				metricValues: {},
@@ -1441,6 +1470,15 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					}
 				})
 				.filter((section) => section.fields.length || section.relatedTabs.length || section.selectorTabs.length)
+			},
+			deviceActionSectionKey() {
+				if (this.key !== 'devices' || !this.visibleSections.length) return ''
+				const exact = this.visibleSections.find((section) => String(section.title || '').trim() === '设备信息')
+				const matching = exact || this.visibleSections.find((section) => /设备.*信息/.test(String(section.title || '')))
+				return (matching || this.visibleSections[0]).key
+			},
+			canGenerateDeviceQrCodeAction() {
+				return this.key === 'devices' && canGenerateDeviceQrCode(this.currentUser)
 			},
 			formTabs() {
 				return (this.definition?.formTabs || []).map((tab) => ({
@@ -1905,6 +1943,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			this.loadDetail()
 		},
 		onShow() {
+			// 页面切换或系统中断不能遗留动作锁，返回详情时始终恢复可交互状态。
+			this.deviceActionKey = ''
 			if (!this.loading && this.id) {
 				this.loadDetail(false).then(() => {
 					// 返回客户详情时刷新当前关联列表，也覆盖在其他页面更新方案但未发出保存事件的情况。
@@ -1968,10 +2008,16 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				try {
 					await this.loadViewManifest(refreshManifest)
 					const [result, definitionResult] = await Promise.all([
-						V8.FormEngine.GetFormData(this.moduleConfig.table, {
+						(this.key === 'devices' ? V8.FormEngine.Request('getformdata', this.moduleConfig.table, {
 							Id: this.id,
 							...(this.menuId ? { _SysMenuId: this.menuId } : {})
-						}),
+						}, {
+							// 设备二维码是持久字段；重新进入详情时绕过查询引擎缓存，直接读取最新落库值。
+							readUseQueryEngine: false
+						}) : V8.FormEngine.GetFormData(this.moduleConfig.table, {
+							Id: this.id,
+							...(this.menuId ? { _SysMenuId: this.menuId } : {})
+						})),
 						loadNativeFormDefinition(this.moduleConfig.table).catch(() => null)
 					])
 					if (!result || result.Code !== 1 || !result.Data) throw new Error((result && result.Msg) ||
@@ -2113,8 +2159,29 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				return String(field?.name || '').toLowerCase() === String(this.moduleConfig.summaryField || '').toLowerCase()
 			},
 			usesNativeDisplay(field) {
-				return Boolean(field.nativeField && DETAIL_NATIVE_COMPONENTS.has(String(field.nativeField.component ||
-					field.nativeField.Component || '')))
+				const nativeField = this.tenantDetailNativeField(field)
+				return Boolean(nativeField && DETAIL_NATIVE_COMPONENTS.has(String(nativeField.component ||
+					nativeField.Component || '')))
+			},
+			tenantDetailNativeField(field) {
+				if (!field || !field.nativeField) return null
+				const presentation = this.tenantDetailFieldPresentation(field)
+				if (!presentation.nativeComponent) return field.nativeField
+				const cached = DETAIL_NATIVE_FIELD_CACHE.get(field)
+				if (cached && cached.source === field.nativeField && cached.component === presentation.nativeComponent) {
+					return cached.value
+				}
+				const value = {
+					...field.nativeField,
+					component: presentation.nativeComponent,
+					Component: presentation.nativeComponent
+				}
+				DETAIL_NATIVE_FIELD_CACHE.set(field, {
+					source: field.nativeField,
+					component: presentation.nativeComponent,
+					value
+				})
+				return value
 			},
 			tenantDetailFieldPresentation(field) {
 				if (!field || !field.nativeField) return {}
@@ -2231,6 +2298,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			},
 			selectFormTab(tab) {
 				if (!tab || !tab.key) return
+				this.deviceActionKey = ''
 				this.standaloneRelatedAddAvailable = false
 				this.standaloneRelatedAddKey = ''
 				this.standaloneRelatedFilterOpen = false
@@ -2362,6 +2430,50 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				uni.navigateTo({
 					url: `/pages/native/repair?deviceId=${encodeURIComponent(this.detail.Id || this.id)}`
 				})
+			},
+			async previewDeviceProduct() {
+				if (this.deviceActionKey) return
+				this.deviceActionKey = 'product'
+				try {
+					const productId = await withDeviceActionTimeout(resolveDeviceProductId(this.detail, (orderProductId) =>
+						V8.FormEngine.Request('getformdata', 'Diy_DingdanSP', {
+							Id: orderProductId,
+							_SelectFields: ['Id', 'ShangpinID']
+						}, {
+							checkCode: false,
+							timeout: 8000
+						})
+					), 10000, '商品信息读取超时，请重试')
+					this.deviceActionKey = ''
+					uni.navigateTo({ url: `/pages/mall/detail?id=${encodeURIComponent(productId)}` })
+				} catch (error) {
+					uni.showToast({ title: error.message || '商品详情打开失败', icon: 'none', duration: 2600 })
+				} finally {
+					if (this.deviceActionKey === 'product') this.deviceActionKey = ''
+				}
+			},
+			async generateDeviceQrCode() {
+				if (this.deviceActionKey) return
+				if (!this.canGenerateDeviceQrCodeAction) {
+					uni.showToast({ title: '当前账号没有生成设备二维码的权限', icon: 'none' })
+					return
+				}
+				this.deviceActionKey = 'qrcode'
+				try {
+					const result = await withDeviceActionTimeout(
+						executeBusinessRowAction('device-qrcode', this.detail, '', this.currentUser, {
+							menuId: this.menuId
+						}),
+						15000,
+						'二维码生成超时，请稍后重试'
+					)
+					if (result && result.rowPatch) this.detail = { ...this.detail, ...result.rowPatch }
+					uni.showToast({ title: '设备二维码已生成', icon: 'success' })
+				} catch (error) {
+					uni.showToast({ title: error.message || '设备二维码生成失败', icon: 'none', duration: 2600 })
+				} finally {
+					if (this.deviceActionKey === 'qrcode') this.deviceActionKey = ''
+				}
 			},
 			async cancelDeviceRepair() {
 				if (!this.deviceActiveTask.Id) return
@@ -3308,6 +3420,104 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		text-align: right;
 	}
 
+	.device-section-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: flex-start;
+		gap: 12rpx;
+		padding: 16rpx 0 8rpx;
+	}
+
+	.device-section-action {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8rpx;
+		min-width: 0;
+		height: 62rpx;
+		margin: 0;
+		padding: 0 18rpx;
+		border-radius: 10rpx;
+		font-size: 22rpx;
+		font-weight: 600;
+		line-height: 1;
+		transition: transform .16s ease, opacity .16s ease, box-shadow .16s ease;
+	}
+
+	.device-section-action--preview {
+		border: 1rpx solid var(--mci-border, #dce7eb);
+		background: var(--mci-bg-muted, #f4f8fa);
+		color: #3f6270;
+		box-shadow: none;
+	}
+
+	.device-section-action--qrcode {
+		border: 1rpx solid #f0d4cc;
+		background: #fff6f2;
+		color: #c64b35;
+		box-shadow: none;
+	}
+
+	.device-section-action--pressed { transform: scale(.97); opacity: .9; }
+	.device-section-action--loading { opacity: .58; }
+
+	.device-section-action__icon {
+		position: relative;
+		flex: none;
+		width: 24rpx;
+		height: 24rpx;
+		box-sizing: border-box;
+		color: currentColor;
+	}
+
+	.device-section-action__icon--product {
+		border: 2rpx solid currentColor;
+		border-radius: 4rpx;
+	}
+
+	.device-section-action__icon--product::before {
+		position: absolute;
+		top: -2rpx;
+		right: -2rpx;
+		width: 8rpx;
+		height: 8rpx;
+		border-left: 2rpx solid currentColor;
+		border-bottom: 2rpx solid currentColor;
+		background: inherit;
+		content: '';
+	}
+
+	.device-section-action__icon--product>view,
+	.device-section-action__icon--product::after {
+		position: absolute;
+		left: 5rpx;
+		width: 14rpx;
+		height: 3rpx;
+		border-radius: 2rpx;
+		background: currentColor;
+		content: '';
+	}
+
+	.device-section-action__icon--product>view { top: 10rpx; }
+	.device-section-action__icon--product::after { top: 17rpx; }
+
+	.device-section-action__icon--qrcode {
+		display: grid;
+		grid-template-columns: repeat(2, 9rpx);
+		grid-template-rows: repeat(2, 9rpx);
+		gap: 6rpx;
+	}
+
+	.device-section-action__icon--qrcode>view {
+		width: 9rpx;
+		height: 9rpx;
+		border: 2rpx solid currentColor;
+		box-sizing: border-box;
+	}
+
+	.device-section-action__icon--qrcode>view:nth-child(3) { grid-column: 2; grid-row: 2; }
+
 	.inline-action {
 		flex: none;
 		min-width: 74rpx;
@@ -3668,6 +3878,10 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		}
 
 		.section-toggle {
+			transition: none;
+		}
+
+		.device-section-action {
 			transition: none;
 		}
 	}

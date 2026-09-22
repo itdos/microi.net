@@ -18,7 +18,8 @@
       <rich-text v-else-if="isRichDisplay" class="native-control__richtext" :nodes="richHtml" />
       <view v-else-if="component === 'Progress'" class="native-control__progress"><progress :percent="numberValue" activeColor="#087da8" /><text>{{ numberValue }}%</text></view>
       <view v-else-if="component === 'ColorPicker'" class="native-control__color-readonly"><view :style="{ backgroundColor: String(modelValue || '#ffffff') }"></view><text>{{ displayText }}</text></view>
-      <image v-else-if="component === 'Qrcode' && qrcodeUrl" class="native-control__qrcode" :src="qrcodeUrl" mode="aspectFit" />
+      <image v-else-if="component === 'Qrcode' && qrcodeUrl" class="native-control__qrcode" :src="qrcodeUrl"
+        mode="aspectFit" @tap.stop="previewQrCode" />
       <view v-else-if="component === 'Alert'" class="native-control__alert"><text>{{ displayText }}</text></view>
       <text v-else class="native-control__value">{{ displayText }}</text>
     </template>
@@ -222,7 +223,12 @@
 
     <rich-text v-else-if="component === 'Html' && modelValue" class="native-control__richtext" :nodes="richHtml" />
 
-    <view v-else-if="['StaticText', 'Alert', 'Qrcode', 'FontAwesome'].includes(component)" class="native-control__alert"><text>{{ displayText }}</text></view>
+    <image v-else-if="component === 'Qrcode' && qrcodeUrl" class="native-control__qrcode" :src="qrcodeUrl"
+      mode="aspectFit" @tap.stop="previewQrCode" />
+
+    <text v-else-if="component === 'Qrcode'" class="native-control__value">-</text>
+
+    <view v-else-if="['StaticText', 'Alert', 'FontAwesome'].includes(component)" class="native-control__alert"><text>{{ displayText }}</text></view>
 
     <input
       v-else
@@ -251,8 +257,40 @@ import { formatRegionSelection } from '@/platform/region-value.mjs'
 import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 import { positionNativeSelector } from '@/platform/native-selector-position.mjs'
 import { nativeTreeConfig, nativeTreeOptions, nativeTreeSelectionValues, nativeTreeSelectionKey, collectNativeTreeRows } from '@/platform/native-tree-options.mjs'
+import { materializeQrCodeImageSource } from '@/platform/qrcode-value.mjs'
 
 const OPTION_COMPONENTS = new Set(['Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Autocomplete', 'Cascader', 'SelectTree', 'TreeCheckbox', 'Department', 'Transfer'])
+const QR_CODE_FILE_CACHE = new Map()
+
+function qrCodeFileKey(base64) {
+  let hash = 0
+  for (let index = 0; index < base64.length; index += 1) {
+    hash = ((hash * 31) + base64.charCodeAt(index)) >>> 0
+  }
+  return `${(hash >>> 0).toString(16)}-${base64.length}`
+}
+
+function writeWeixinQrCodeFile(base64) {
+  if (typeof wx === 'undefined' || !wx.env?.USER_DATA_PATH) return Promise.reject(new Error('二维码图片写入不可用'))
+  const cacheKey = qrCodeFileKey(base64)
+  if (QR_CODE_FILE_CACHE.has(cacheKey)) return QR_CODE_FILE_CACHE.get(cacheKey)
+  const filePath = `${wx.env.USER_DATA_PATH}/microi-qrcode-${cacheKey}.png`
+  const pending = new Promise((resolve, reject) => {
+    wx.getFileSystemManager().writeFile({
+      filePath,
+      data: base64,
+      encoding: 'base64',
+      success: () => resolve(filePath),
+      fail: (error) => reject(new Error(error?.errMsg || '二维码图片写入失败'))
+    })
+  }).catch((error) => {
+    QR_CODE_FILE_CACHE.delete(cacheKey)
+    throw error
+  })
+  QR_CODE_FILE_CACHE.set(cacheKey, pending)
+  return pending
+}
+
 export default {
   name: 'MciNativeField',
   props: {
@@ -302,7 +340,9 @@ export default {
       searchTimer: null,
       optionRequestId: 0,
       expandedTreeKeys: [],
-      treeLoadingKey: ''
+      treeLoadingKey: '',
+      qrcodeUrl: '',
+      qrcodeRequestId: 0
     }
   },
   computed: {
@@ -358,7 +398,6 @@ export default {
       return { maxHeight: `${lines * 45}rpx` }
     },
     richHtml() { return normalizeRichTextHtml(this.modelValue) },
-    qrcodeUrl() { return this.component === 'Qrcode' ? V8.assetUrl(this.modelValue) : '' },
     displayText() { return this.nativeTree ? this.selectionItems.map((item) => item.label).join('、') || '-' : fieldDisplayValue(this.field, this.modelValue) },
     editableText() {
       if (this.component !== 'JsonTable') return String(this.modelValue || '')
@@ -509,6 +548,14 @@ export default {
       immediate: true,
       deep: true,
       handler(options) { this.rememberOptions(Array.isArray(options) ? options : []) }
+    },
+    component: {
+      immediate: true,
+      handler() { this.refreshQrCodeImage() }
+    },
+    modelValue: {
+      deep: true,
+      handler() { this.refreshQrCodeImage() }
     }
   },
   mounted() {
@@ -521,8 +568,38 @@ export default {
     // zhy: 分组折叠销毁控件时终止尚未完成的下拉选项请求。
     this.selectorOpen = false
     this.optionRequestId += 1
+    this.qrcodeRequestId += 1
   },
   methods: {
+    previewQrCode() {
+      if (!this.qrcodeUrl) return
+      uni.previewImage({
+        current: this.qrcodeUrl,
+        urls: [this.qrcodeUrl],
+        fail: () => uni.showToast({ title: '二维码预览失败，请重试', icon: 'none' })
+      })
+    },
+    async refreshQrCodeImage() {
+      const requestId = ++this.qrcodeRequestId
+      if (this.component !== 'Qrcode' || !this.modelValue) {
+        this.qrcodeUrl = ''
+        return
+      }
+      try {
+        const options = { resolveAssetUrl: (value) => V8.assetUrl(value) }
+        // 微信小程序的 image 不稳定支持大段 data URL，必须异步写入用户目录后再展示。
+        // #ifdef MP-WEIXIN
+        options.writeBase64File = writeWeixinQrCodeFile
+        // #endif
+        const source = await materializeQrCodeImageSource(this.modelValue, options)
+        if (requestId !== this.qrcodeRequestId) return
+        this.qrcodeUrl = source
+      } catch (error) {
+        if (requestId !== this.qrcodeRequestId) return
+        this.qrcodeUrl = ''
+        console.warn('二维码图片加载失败', error)
+      }
+    },
     emitValue(value) { this.$emit('update:modelValue', value); this.$emit('change', value) },
     optionValue(option) {
       if (this.nativeTree) return option.treeValue
