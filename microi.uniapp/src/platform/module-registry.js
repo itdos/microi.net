@@ -1,7 +1,7 @@
 import { getUser, V8 } from '@/utils/request.js'
 import { cachedRequest } from '@/platform/cache.js'
 import { findMenu, loadMenuTree } from '@/platform/business-runtime.js'
-import { createNativeFormDefinition, loadNativeFormDefinition, parseJson } from '@/platform/native-form.js'
+import { createNativeFormDefinition, loadNativeFormDefinition, loadNativeModuleFields, parseJson } from '@/platform/native-form.js'
 import { normalizeStringList } from '@/platform/view-schema-core.mjs'
 import {
   appendSystemAuditFields,
@@ -185,7 +185,7 @@ export async function loadAccessibleModuleGroups(refresh = false) {
   return [...groups.values()]
 }
 
-function createModuleDefinition(module, definition) {
+function createModuleDefinition(module, definition, metadataFields = []) {
   const fields = definition.fields || []
   const rawSelectFields = parseJson(module.menu.SelectFields, module.menu.SelectFields)
   const projectionFields = moduleProjectionFields(Array.isArray(rawSelectFields) ? rawSelectFields : [])
@@ -193,12 +193,13 @@ function createModuleDefinition(module, definition) {
   const searchProjectionFields = moduleProjectionFields(Array.isArray(rawSearchFields) ? rawSearchFields : [])
   // 物理字段放在最后，使仅按名称配置的历史字段仍优先命中当前表；
   // 关联字段通过稳定 Id 命中投影元数据，并保留 AsName 作为返回值键。
-  const displayFields = [...projectionFields, ...fields]
+  const displayFields = [...projectionFields, ...metadataFields, ...fields]
   // SearchFieldIds 是列表查询配置，不等同于移动表单字段显隐。使用完整字段元数据，
   // 让后台明确配置的隐藏/计算字段仍能生成筛选控件，同时由编译器保留权限与敏感字段保护。
   const searchMetadataFields = [
     ...searchProjectionFields,
     ...projectionFields,
+    ...metadataFields,
     ...appendSystemAuditFields(definition.layoutFields?.length ? definition.layoutFields : fields)
   ]
   const configuredMobileFields = configuredFields(module.menu.MobileListFields, displayFields)
@@ -307,11 +308,11 @@ function createModuleDefinition(module, definition) {
 
 // Related tabs already own the authorized menu, table and field definition. Compile those
 // objects locally so they share list-page card configuration without another metadata request.
-export function createMenuModuleDefinition(menu, definition, table = null) {
+export function createMenuModuleDefinition(menu, definition, table = null, metadataFields = []) {
   if (!menu || !definition) return null
   const module = baseModule(menu, null, table || definition.table || null)
   if (!module.table) return null
-  return createModuleDefinition(module, definition)
+  return createModuleDefinition(module, definition, metadataFields)
 }
 
 // 保护表的公开目录只接受安全接口的窄展示投影，不通过普通 CRUD 读取系统设计数据。
@@ -357,7 +358,17 @@ export async function loadModuleDefinition(menuId, refresh = false, options = {}
     menuId: module.menuId,
     moduleEngineKey: module.key
   })
-  return createModuleDefinition(module, definition)
+  let metadataFields = []
+  try {
+    metadataFields = await loadNativeModuleFields(module.menu, {
+      menuId: module.menuId,
+      moduleEngineKey: module.key,
+      refresh
+    })
+  } catch (error) {
+    // Older servers can still render projection fields as text while keeping the list available.
+  }
+  return createModuleDefinition(module, definition, metadataFields)
 }
 
 // OpenTable 通常绑定不在工作台展示的隐藏 CRUD 菜单。它仍然必须从
@@ -373,7 +384,17 @@ export async function loadGrantedMenuDefinition(menuId, refresh = false) {
     menuId: module.menuId,
     moduleEngineKey: module.key
   })
-  return createModuleDefinition(module, definition)
+  let metadataFields = []
+  try {
+    metadataFields = await loadNativeModuleFields(menu, {
+      menuId: module.menuId,
+      moduleEngineKey: module.key,
+      refresh
+    })
+  } catch (error) {
+    // Keep OpenTable usable against an older compatible server.
+  }
+  return createModuleDefinition(module, definition, metadataFields)
 }
 
 export default {
