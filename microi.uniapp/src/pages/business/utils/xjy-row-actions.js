@@ -2,6 +2,10 @@ import { callApiEngine, openForm } from '@/platform/business-runtime.js'
 import { V8, getUser } from '@/utils/request.js'
 import { removeCachePrefix } from '@/platform/cache.js'
 import { canDeleteMenuRecord } from '@/platform/menu-permission.js'
+import {
+  createDeviceQrCodeAdapters,
+  generateDeviceQrCode
+} from '@/tenants/xjy/device-detail-actions.mjs'
 
 const MENU_IDS = {
   orders: 'fc56123e-cfa1-4690-a6a4-929f202a817b',
@@ -282,8 +286,10 @@ export async function executeBusinessRowAction(actionKey, row = {}, input = '', 
   }), '客户方案删除失败')
   if (actionKey === 'member-remove') ensure(await callApiEngine('remove_menber', { Id: id }), '成员移出失败')
   if (actionKey === 'device-qrcode') {
-    const result = ensure(await callApiEngine('AddSBCode', { Id: id }), '二维码生成失败')
-    ensure(await V8.FormEngine.UptFormData('Diy_KehuSB', { Id: id, ShebeiEWM: result.Data, _InvokeType: 'Client' }), '二维码保存失败')
+    const qrCode = await generateDeviceQrCode(id, createDeviceQrCodeAdapters(V8, {
+      menuId: context.menuId || ''
+    }))
+    rowPatch = { ShebeiEWM: qrCode }
   }
   if (actionKey === 'visit-approve' || actionKey === 'visit-reject') {
     const approved = actionKey === 'visit-approve'
