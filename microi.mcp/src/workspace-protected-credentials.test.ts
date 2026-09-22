@@ -7,12 +7,12 @@ import { readWorkspaceCredentials, protectSessionToken, unprotectSessionToken } 
 
 test('imported developer session encrypts for the current OS user and never silently downgrades', () => {
   const token = 'fixture.session.signature';
-  if (process.platform !== 'win32') {
+  if (process.platform !== 'win32' && process.platform !== 'darwin') {
     assert.throws(() => protectSessionToken(token));
     return;
   }
   const encrypted = protectSessionToken(token);
-  assert.ok(encrypted.startsWith('dpapi-session-v1:'));
+  assert.ok(encrypted.startsWith(process.platform === 'darwin' ? 'keychain-session-v1:' : 'dpapi-session-v1:'));
   assert.ok(!encrypted.includes(token));
   assert.equal(unprotectSessionToken(encrypted), token);
   assert.equal(unprotectSessionToken('legacy-token'), 'legacy-token');

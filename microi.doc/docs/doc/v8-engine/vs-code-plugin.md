@@ -13,10 +13,10 @@ Microi Code 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌�
 
 ## 安装、签名与平台兼容
 
-Windows 与 macOS 的 latest、不可变归档、SHA-256 和历史版本已经集中在页面顶部。latest 只覆盖对应平台的固定文件名；带版本与内容哈希的归档地址永久保留。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS Intel v1.0.8 当前发布 DMG 供人工下载安装；后续版本要实现应用内下载安装，还需在 Mac 构建机同时发布 ZIP。
+Windows 与 macOS 的 latest、不可变归档、SHA-256 和历史版本已经集中在页面顶部。latest 只覆盖对应平台的固定文件名；带版本与内容哈希的归档地址永久保留。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS 当前公开下载版本以页面顶部为准；新版本必须在 Mac 构建机同时生成 DMG 和 ZIP，ZIP 上传后才支持应用内自动更新。
 
-- 当前 Windows v1.1.0 为未签名包；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。
-- 当前 macOS Intel v1.0.8 为未签名、未公证包。官网正式分发包使用 Developer ID Application。内部源码根目录执行 `bash ./一键打包Mac.sh` 时，Auto 模式会在证书与 `notarytool` 凭据齐全时自动签名、公证和装订；前期没有凭据时会明确提示并继续生成可手工信任安装的未签名 DMG。`--unsigned` 强制未签名，`--signed` 要求正式签名且缺少凭据时失败。
+- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。
+- macOS 已公开的 Intel 版本为未签名、未公证包；以后以页面顶部实际下载状态为准。内部源码根目录执行 `bash ./一键打包Mac.sh --unsigned --current` 可以按已发布的同一版本号生成 Mac DMG/ZIP，待上传 CDN 后再更新下载入口。Dock 图标在 Mac 构建时自动生成合适留白。具备证书与 `notarytool` 凭据时也可选择签名、公证；`--signed` 在缺少凭据时失败。
 - 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 还要求 App Sandbox，并限制下载执行改变功能的代码；现有本地 Node/Harness、Shell、工作区和插件能力不能原样上架。后续移动端和 MAS 版应作为独立受限客户端，复用吾码账号、AI 中转、会话、MCP 与桌面配对协议，把 Agent 执行放到配对桌面或远端，再分别完成 Apple/Google 商店签名与审核。
 
 安装后依次「打开项目 → 登录吾码账号 → 添加业务服务器 → 初始化项目 / 拉取资源」，即可开始开发。AI 使用的是你的官方中转额度，实际可用模型与额度以账号页面为准。停止任务或退出后保留历史记录，后续可在新任务中引用历史继续。
@@ -374,7 +374,7 @@ CLI 与多宿主 Plugin 的目标是让用户**无需先安装 IDE，也能完�
 
 - 两者共用 `Microi-V8-Engine/.microi-config.json`、`.microi-mcp-tokens.json` 和各服务器 `.microi-meta.json`。
 - MCP 配置采用幂等合并，只替换 Microi 管理的 server，保留用户已有的其他 MCP；内容未变化时不重写。
-- Windows 下 CLI、插件和 MCP 通过当前工作区 DPAPI 密文保险库共享静默续登凭据；VS Code `SecretStorage` 仍是插件主存储。非 Windows 不允许退化为明文或伪加密文件；三者继续共用最新 Token 文件。
+- Windows 下 CLI、插件和 MCP 通过当前工作区 DPAPI 密文保险库共享静默续登凭据；macOS 使用系统 Keychain，并在 Token 文件内保存不含明文的引用。VS Code `SecretStorage` 仍是插件主存储。其它平台不允许退化为明文或伪加密文件；三者继续共用最新 Token 文件。
 - 本地 V8 文件和同步基线是共同事实源。切换工具前先执行差异检查，任何一端都不要在冲突未处理时强行拉取或推送。
 - 多个终端或编辑器同时操作同一工作区时，不要并发推送同一个资源。
 
