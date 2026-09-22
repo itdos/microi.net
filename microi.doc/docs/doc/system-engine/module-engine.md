@@ -13,6 +13,10 @@
 代码字段可在表单设计器中选 `DisplayMode=Inline/Dialog`；默认内联，按钮文案支持
 `ButtonText="当前{{charCount}}字代码、{{lineCount}}行代码"`。
 
+### 详情与删除按钮显示条件
+
+模块的 `DetailCodeShowV8`、`DelCodeShowV8` 分别控制平台内置【详情】与【删除】行按钮。例如定制微服务已承担查看入口时，可设 `DetailCodeShowV8` 为 `V8.Result = false;`，再在 `MoreBtns` 添加【打开普通表单】按钮，用 `V8.OpenAnyForm({ TableName: '表名', Id: V8.Form.Id, FormMode: 'View', DialogType: 'Dialog' })` 保留原生表单入口。删除按钮可按业务状态设 `V8.Result = ['Draft', 'Rejected'].includes(String(V8.Form.ApprovalStatus || 'Draft'));`。前端显隐不能代替服务端删除权限和状态校验。
+
 ### 用户级登录后首页
 
 每个系统账号都可在 PC 右上角头像菜单的【个人设置】中选择“登录后首页”。设置保存在 `sys_user.DefaultIndexUrl`，而系统级默认首页仍保存在 `sys_config.DefaultIndexUrl`。
@@ -378,6 +382,8 @@ return { Code : 0, Data : resultObj, Msg : result };
 
 ### **SecondMenu**
 >* 含子菜单的上级菜单
+
+后台侧栏会自动给有可见子菜单的父级图标加一层轻微的圆形背景（`50%` 圆角）；叶子菜单图标保持无背景。该效果随当前侧栏文字色适配租户主题色及浅色／深色模式，无需增加菜单字段或单独配置。使用新版 `Microi.Client` 前端即可看到，单独安装或更新应用商城资源不会替换旧版前端样式。
 
 ### **Report**
 >* 虚拟报表

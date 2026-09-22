@@ -23,7 +23,8 @@
                 <div class="diy-custom-dialog__header">
                     <div class="diy-custom-dialog__title">
                         <i :class="TitleIcon" />
-                        <span class="diy-custom-dialog__title-text">{{ title }}</span>
+                        <span class="diy-custom-dialog__title-text">{{ dialogHeader.title || title }}</span>
+                        <span v-for="(tag, index) in dialogHeader.tags" :key="'tag-' + index" class="diy-custom-dialog__tag" :data-tone="tag.tone">{{ tag.text }}</span>
                         <MciRenderSourceBadge
                             v-if="renderSourceType"
                             :type="renderSourceType"
@@ -33,13 +34,14 @@
                         />
                     </div>
                     <div class="diy-custom-dialog__actions">
+                        <el-button v-for="action in dialogHeader.actions" :key="action.id" :type="action.tone === 'default' ? '' : action.tone" :disabled="action.disabled" @click="RunMicroAppHeaderAction(action)">{{ action.text }}</el-button>
                         <el-button :icon="Close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
                     </div>
                 </div>
             </template>
             <div class="clear diy-custom-dialog__body" :class="{ 'diy-custom-dialog__body--micro-app': isMicroAppDialog }" :style="dialogBodyStyle">
                 <Suspense v-if="!DiyCommon.IsNull(ComponentName)">
-                    <component :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
+                    <component ref="refDialogContent" :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" @header-change="SetMicroAppHeader" :pageLifetimes="pageLifetimes" />
                     <template #fallback>
                         <MicroAppLoadingSkeleton v-if="isMicroAppDialog" />
                     </template>
@@ -64,7 +66,8 @@
                 <div class="diy-custom-dialog__header">
                     <div class="diy-custom-dialog__title">
                         <i :class="TitleIcon" />
-                        <span class="diy-custom-dialog__title-text">{{ title }}</span>
+                        <span class="diy-custom-dialog__title-text">{{ dialogHeader.title || title }}</span>
+                        <span v-for="(tag, index) in dialogHeader.tags" :key="'drawer-tag-' + index" class="diy-custom-dialog__tag" :data-tone="tag.tone">{{ tag.text }}</span>
                         <MciRenderSourceBadge
                             v-if="renderSourceType"
                             :type="renderSourceType"
@@ -74,6 +77,7 @@
                         />
                     </div>
                     <div class="diy-custom-dialog__actions">
+                        <el-button v-for="action in dialogHeader.actions" :key="action.id" :type="action.tone === 'default' ? '' : action.tone" :disabled="action.disabled" @click="RunMicroAppHeaderAction(action)">{{ action.text }}</el-button>
                         <el-button :icon="Close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
                     </div>
                 </div>
@@ -83,7 +87,7 @@
                 <!-- && !DiyCommon.IsNull(ComponentPath) -->
                 <!-- :DataAppend="GetDataAppend(field)" -->
                 <Suspense v-if="!DiyCommon.IsNull(ComponentName)">
-                    <component :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
+                    <component ref="refDialogContent" :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" @header-change="SetMicroAppHeader" :pageLifetimes="pageLifetimes" />
                     <template #fallback>
                         <MicroAppLoadingSkeleton v-if="isMicroAppDialog" />
                     </template>
@@ -99,6 +103,7 @@ import { useDiyStore } from "@/pinia";
 import { isFormMaskBlurDisabled } from "@/utils/form-mask-blur.js";
 import MicroAppLoadingSkeleton from "@/views/micro-app/loading-skeleton.vue";
 import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
+import { normalizeDialogHeader } from "@/views/micro-app/dialog-header-contract.js";
 export default {
     name: "DiyCustomDialog",
     directives: {},
@@ -186,6 +191,7 @@ export default {
     data() {
         return {
             ShowDialog: false,
+            dialogHeader: normalizeDialogHeader(null),
             //生命周期
             pageLifetimes: {
                 show: function (e) {}
@@ -221,7 +227,25 @@ export default {
         FormSet() {
             var self = this;
         },
+        SetMicroAppHeader(value) {
+            if (this.isMicroAppDialog) this.dialogHeader = normalizeDialogHeader(value);
+        },
+        RunMicroAppHeaderAction(action) {
+            if (!this.isMicroAppDialog || action.disabled) return;
+            const handler = this.DataAppend?.OnHeaderAction;
+            if (typeof handler === "function") {
+                try { handler(action.id, this.DataAppend?.V8); } catch (error) { console.error("[MicroAppDialog] header action failed", error); }
+                return;
+            }
+            const child = this.$refs.refDialogContent;
+            if (typeof child?.dispatchHeaderAction !== "function") {
+                console.error("[MicroAppDialog] dialog header action receiver is unavailable", action.id);
+                return;
+            }
+            child.dispatchHeaderAction(action.id);
+        },
         Show() {
+            this.dialogHeader = normalizeDialogHeader(this.isMicroAppDialog ? this.DataAppend?.Header : null);
             this.ShowDialog = true;
         },
         CloseDialog() {
@@ -256,10 +280,33 @@ export default {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.diy-custom-dialog__tag {
+    border-radius: 999px;
+    padding: 2px 8px;
+    color: var(--el-text-color-regular);
+    background: var(--el-fill-color-light);
+    font-size: 12px;
+    white-space: nowrap;
+}
+.diy-custom-dialog__tag[data-tone="success"] { color: var(--el-color-success); background: var(--el-color-success-light-9); }
+.diy-custom-dialog__tag[data-tone="warning"] { color: var(--el-color-warning); background: var(--el-color-warning-light-9); }
+.diy-custom-dialog__tag[data-tone="danger"] { color: var(--el-color-danger); background: var(--el-color-danger-light-9); }
 
 .diy-custom-dialog__actions {
     flex: 0 0 auto;
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.diy-custom-dialog__actions :deep(.el-button + .el-button) { margin-left: 0; }
+
+@media (max-width: 640px) {
+    .diy-custom-dialog__header { flex-wrap: wrap; gap: 8px; }
+    .diy-custom-dialog__title { flex-basis: 100%; }
+    .diy-custom-dialog__actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+    .diy-custom-dialog__actions :deep(.el-button) { min-height: 40px; }
 }
 
 .diy-custom-dialog__body--micro-app {

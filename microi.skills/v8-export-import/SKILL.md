@@ -132,10 +132,12 @@ return {
 优先级：列级样式覆盖全局样式；`Width` 覆盖 `DefaultColumnWidth`；开启 `AutoSize` 后以自动宽度为准，再应用 `MinWidth/MaxWidth`。不传这些新参数时保持旧版导出行为。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-002 sha256=8a1bdefc16e306ae30a5764760b98af05cc0c804409afb6e86a7440674750413 -->
+<!-- microi-progressive:chunk id=v8-export-import-002 sha256=c18ba2c06baf3e7fb2cea79fe46637d3223d1f6b6454aa46057cfb80addd352a -->
 ## 文件响应与前端调用约定
 
 - 接口引擎必须开启【响应文件】，并返回正确的 `FileName`、`ContentType`、`FileByteBase64`。
+- 后台菜单的【导出接口替换】默认仍是登录态调用，不要为了消除“请求未携带 Token”而开启【允许匿名调用】。平台会把当前 DiyToken 放入 `Authorization: Bearer ...` 请求头；接口引擎保持【允许匿名调用】关闭即可使用 `V8.CurrentUser` 和既有权限边界。
+- 自定义导出无论收到业务错误、无法解析的文件响应还是网络异常，都必须结束按钮 Loading；前端应 `await` 导出 Promise 并在 `finally` 恢复状态，不能只依赖成功分支回调。
 - `V8.Office.ExportExcel/ExportWord/ExportPowerPoint` 返回的是 `DosResult<byte[]>`；先判断 `Code`，再对 `Data` 调用 `System.Convert.ToBase64String`。
 - 前端调用 Office 导出接口时，新代码优先使用 `V8.Http.GetResponse/PostResponse`；`V8.Post/V8.Get` 仅用于兼容历史代码，不再作为新代码首选。
 
@@ -152,7 +154,7 @@ return {
 | `NumberFormat/HeaderStyle/Style` | 数字格式与列级样式 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-003 sha256=3391b00657d2cb9a6b3db530c43258ac2b7d69f940add48327618348226ad37e -->
+<!-- microi-progressive:chunk id=v8-export-import-003 sha256=5975618ee1d3b9a4828d9f88cf35bc4efe4a8d7f45b94bd40077fa50b1d89c1f -->
 ## 解析上传的 Excel / CSV（导入）
 
 ```javascript
