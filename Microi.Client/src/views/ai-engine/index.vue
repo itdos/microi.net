@@ -422,16 +422,15 @@
                                         <div class="mcp-action-info">
                                             <strong>{{ action.Title || action.Action }}</strong>
                                             <small>{{ action.Action }}</small>
+                                            <small v-if="action.__error" class="mcp-action-error">{{ action.__error }}</small>
+                                            <small v-else-if="action.__result">已执行</small>
+                                            <details class="mcp-action-params">
+                                                <summary>查看提交参数与代码</summary>
+                                                <pre>{{ JSON.stringify(action.Params, null, 2) }}</pre>
+                                            </details>
                                         </div>
-                                        <el-button
-                                            size="small"
-                                            type="primary"
-                                            plain
-                                            :loading="action.__loading"
-                                            @click="executeMcpAction(action)"
-                                        >
-                                            执行
-                                        </el-button>
+                                        <small v-if="action.__loading">执行中…</small>
+                                        <small v-else-if="action.__uncertain">结果待核对</small>
                                     </div>
                                 </div>
                             </div>
@@ -792,6 +791,7 @@ import { useRoute } from "vue-router";
 import { useDiyStore } from "@/pinia";
 import { generateMiniMaxImage } from "./minimax-image-task.js";
 import { generateMiniMaxMusic } from "./minimax-music-task.js";
+import { mapMcpCallTrace } from "./ai-mcp-agent-result.js";
 import {
     ArrowLeft,
     ArrowRight,
@@ -817,6 +817,10 @@ import {
     VideoPlay
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import {
+    canUseBuilderMcp,
+    chooseConversationalModel
+} from "./ai-mcp-builder.js";
 import { renderAiMarkdown } from "@/utils/ai-markdown.js";
 import {
     AI_IMAGE_PRIMARY_TOOLS,
@@ -866,17 +870,6 @@ const SOURCE = "ai-engine-workbench";
 const SECURE_DATA_SOURCE = "mci-ai-data-assistant";
 const AI_DATA_PERMISSION = { id: "AiDataAnalysis", name: "AI数据分析" };
 const AI_BUILDER_PERMISSION = { id: "AiLowCodeModeling", name: "低代码建模" };
-const ACTION_ENDPOINTS = {
-    GetDbSchema: "/api/V8Engine/GetDbSchema",
-    CreateTable: "/api/V8Engine/CreateTable",
-    AddField: "/api/V8Engine/AddField",
-    CreateModule: "/api/V8Engine/CreateModule",
-    CreateApiEngine: "/api/V8Engine/CreateApiEngine",
-    UpdateApiEngineCode: "/api/V8Engine/UpdateApiEngineCode",
-    SavePageEngine: "/api/V8Engine/SavePageEngine",
-    ValidateLowCodeSystem: "/api/V8Engine/ValidateLowCodeSystem",
-    RefreshSchemaCache: "/api/V8Engine/RefreshSchemaCache"
-};
 const imageToolGroups = Object.entries(AI_IMAGE_TOOL_CATEGORIES).map(([key, label]) => ({
     key,
     label,
@@ -963,10 +956,6 @@ const platformStats = reactive({
     ApiEngineCount: 0,
     UserCount: 0
 });
-const actionContext = reactive({
-    lastTableId: "",
-    lastTableName: ""
-});
 const secureAssistantAvailable = ref(false);
 const secureAssistantScopeLabel = ref("当前角色");
 const secureAssistantRoleText = ref("已授权用户");
@@ -994,7 +983,8 @@ const semanticModeOptions = computed(() => [
         disabled: !secureAssistantAvailable.value
     },
     { label: "高级数据查询", value: "data" },
-    { label: "低代码建模", value: "builder" }
+    { label: canUseMcpBuilder.value ? "低代码建模" : "低代码建模（需 Level ≥ 9999）",
+        value: "builder", disabled: !canUseMcpBuilder.value }
 ]);
 
 const reasoningEffortOptions = [
@@ -1020,7 +1010,7 @@ const quickPrompts = computed(() => {
         {
             key: "builder",
             title: "创建业务模块",
-            desc: "生成表、字段、菜单和按钮方案",
+            desc: "对话中自动创建表、字段、菜单和接口",
             text: "帮我创建一个客户跟进管理模块，包含客户、联系人、跟进记录三张表，并生成后台菜单。"
         },
         {
@@ -1101,6 +1091,7 @@ const isAiAdmin = computed(() => {
     const user = currentUser.value || {};
     return user._IsAdmin === true || user.IsAdmin === true || Number(user.Level || 0) >= 9999;
 });
+const canUseMcpBuilder = computed(() => canUseBuilderMcp(currentUser.value));
 const workspaceTitle = computed(() => ({
     chat: isLanding.value ? "AI 创作中心" : "AI助手",
     image: "AI绘图",
@@ -1407,7 +1398,7 @@ async function loadAiModels() {
             aiModelList.value = getData(result) || [];
             mergeAuthorizedSecureModels();
             if (!selectedAiModel.value && aiModelList.value.length) {
-                selectedAiModel.value = aiModelList.value[0];
+                selectedAiModel.value = chooseConversationalModel(aiModelList.value);
             }
         } else {
             ElMessage.error(result?.Msg || "加载 AI 模型失败");
@@ -1617,8 +1608,6 @@ function newConversation() {
     messages.value = [];
     inputText.value = "";
     selectedFiles.value = [];
-    actionContext.lastTableId = "";
-    actionContext.lastTableName = "";
     historyPanelVisible.value = false;
 }
 
@@ -1751,6 +1740,7 @@ async function selectConversation(item) {
         const content = normalizeLoadedMessageContent(record, role);
         return {
             id: record.Id || makeId("msg"),
+            __rowId: record.__rowId || "",
             role,
             mode: record.Mode || "chat",
             content,
@@ -1760,7 +1750,7 @@ async function selectConversation(item) {
             streaming: false,
             error: record.Error || "",
             code: record.Code || "",
-            actions: hydrateMcpActions(record.Actions || []),
+            actions: (record.Actions || []).map(item => reactive(item)),
             queryRows: record.QueryRows || [],
             attachments: record.Attachments || [],
             modelId: record.ModelId || record.AiModel || "",
@@ -2496,8 +2486,8 @@ function getModePermissionDeniedText(mode) {
     if (mode === "music" && !isAiAdmin.value) {
         return "当前账号没有 AI 音乐生成权限。音乐生成会消耗供应商额度并写入租户文件存储，目前仅向平台管理员开放。";
     }
-    if ((mode === "builder" || mode === "project") && !isAiAdmin.value) {
-        return "当前账号没有低代码建模权限。为避免误操作创建或修改表、字段、菜单、接口引擎，只有管理员可以执行该能力。";
+    if ((mode === "builder" || mode === "project") && !canUseMcpBuilder.value) {
+        return "当前账号没有低代码建模权限。创建或修改表、字段、菜单和接口引擎要求 Level >= 9999。";
     }
     return "";
 }
@@ -2629,7 +2619,7 @@ function buildSystemPrompt(mode) {
         "普通聊天只能做常规问答、附件理解、安全的数据分析建议，不要把普通聊天伪装成 SQL 查询结果。"
     ];
     if (mode === "builder") {
-        lines.push("低代码建模必须先输出可核对方案；涉及写入平台时只输出可人工确认的 MCP 动作，不要声称已经执行。");
+        lines.push("请使用服务端 microi_codex 工具发现并调用当前租户的吾码 MCP。用户要求创建、修改或删除时直接执行并回读，不输出 McpActions JSON；只要求规划时只调用读取工具。最终只报告真实工具结果。");
     }
     if (mode === "code") {
         lines.push("V8 编程回答要遵守平台 V8 API、参数化查询、多语言和性能规范。");
@@ -2831,9 +2821,8 @@ function inferProjectName(text, projectType) {
 }
 
 async function sendBuilderQuestion(text, assistantMessage, attachments = []) {
-    const prompt = buildMcpPrompt(text);
-    await sendChatStream({
-        UserChatMsg: prompt,
+    await sendBuilderChat({
+        UserChatMsg: text,
         SystemChatMsg: buildSystemPrompt("builder"),
         AiModel: selectedRuntimeModelId.value,
         AiModelId: selectedAiModel.value.Id || "",
@@ -2843,12 +2832,37 @@ async function sendBuilderQuestion(text, assistantMessage, attachments = []) {
         Source: SOURCE,
         Mode: "builder",
         ReasoningEffort: effectiveReasoningEffort.value
-    }, assistantMessage, { extractActions: true });
-    assistantMessage.actions = extractMcpActions(assistantMessage.rawContent || assistantMessage.content);
-    assistantMessage.content = stripActionJson(assistantMessage.content || "");
+    }, assistantMessage);
 }
 
-async function sendChatStream(payload, assistantMessage, options = {}) {
+async function sendBuilderChat(payload, assistantMessage) {
+    // 服务端完成 MCP 工具循环后一次性返回最终答案与真实工具回执。
+    abortController = new AbortController();
+    payload.RelayModel = isRelayStationSelected.value ? selectedRelayModel.value : "";
+    const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/Chat`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            authorization: DiyCommon.getToken() ? `Bearer ${DiyCommon.getToken()}` : "",
+            lang: DiyCommon.GetCurrentLang ? DiyCommon.GetCurrentLang() : "zh-CN"
+        },
+        body: JSON.stringify(payload),
+        signal: abortController.signal
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    const result = await response.json();
+    if (!isOk(result)) throw new Error(result?.Msg || "在线 MCP 建模失败");
+    const answer = normalizeAiText(getData(result));
+    if (!answer.trim()) throw new Error("模型没有返回 MCP 执行结果");
+    const parts = splitThinkingText(answer);
+    assistantMessage.rawContent = answer;
+    assistantMessage.thinking = parts.thinking;
+    assistantMessage.content = parts.content;
+    assistantMessage.actions = mapMcpCallTrace(result?.DataAppend || result?.dataAppend)
+        .map(item => reactive(item));
+}
+
+async function sendChatStream(payload, assistantMessage) {
     abortController = new AbortController();
     payload.RelayModel = isRelayStationSelected.value ? selectedRelayModel.value : "";
     const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/ChatStream`, {
@@ -2999,9 +3013,6 @@ async function readChatSse(response, assistantMessage, options = {}) {
         }
     }
     if (buffer) dispatch();
-    if (options.extractActions) {
-        assistantMessage.actions = extractMcpActions(fullText);
-    }
 }
 
 function applyStreamText(message, rawText) {
@@ -3120,131 +3131,6 @@ function parseCodeResponse(text) {
     return { explanation, code };
 }
 
-function buildMcpPrompt(text) {
-    return [
-        "线上AI已接入平台 Skills + MCP 受控工具桥：低代码建模动作必须输出 McpActions，由前端按钮调用 /api/V8Engine 对应工具执行。",
-        "当前支持表、字段、菜单、接口引擎、界面引擎、校验和缓存刷新；复杂 AI 应用源码走 ai_app_* 接口引擎并存储到 HDFS。",
-        "你是线上低代码建模助手。",
-        `当前租户 OsClient=${osClient.value}。`,
-        "你需要根据用户需求给出简洁方案，并在确实需要写入平台时，输出可人工确认执行的 MCP 动作。",
-        "可用动作：CreateTable、AddField、CreateModule、CreateApiEngine、UpdateApiEngineCode、SavePageEngine、ValidateLowCodeSystem、RefreshSchemaCache。",
-        "字段物理类型必须使用 varchar(N)、mediumtext、longtext、int、bigint、decimal(18,N)，日期时间用 varchar(25)，不要使用 datetime/date/timestamp/float/double/boolean。",
-        `高风险能力权限：${AI_DATA_PERMISSION.name}、${AI_BUILDER_PERMISSION.name} 已由前端校验；后端执行动作时仍必须做权限与租户边界校验。`,
-        "如果要输出动作，请在回答末尾单独给一个 JSON 代码块，格式为：",
-        '{"McpActions":[{"Action":"CreateTable","Title":"创建客户表","Params":{"Name":"diy_customer","Description":"客户表"}}]}',
-        "不要直接假装已经执行，动作需要用户点击执行。",
-        "",
-        "用户需求：",
-        text
-    ].join("\n");
-}
-
-function stripActionJson(content) {
-    return content.replace(/```json\s*[\s\S]*?"McpActions"[\s\S]*?```/gi, "").trim() || content;
-}
-
-function extractMcpActions(content) {
-    const actions = [];
-    const regex = /```json\s*([\s\S]*?)```/gi;
-    let match;
-    while ((match = regex.exec(content)) !== null) {
-        try {
-            const parsed = JSON.parse(match[1]);
-            if (Array.isArray(parsed.McpActions)) {
-                actions.push(...parsed.McpActions);
-            }
-        } catch {}
-    }
-    return hydrateMcpActions(actions);
-}
-
-function hydrateMcpActions(actions = []) {
-    return actions.map((item) => reactive({
-        Action: item.Action,
-        Title: item.Title,
-        Params: item.Params || {},
-        __result: item.__result || null,
-        __loading: false
-    })).filter((item) => item.Action && ACTION_ENDPOINTS[item.Action]);
-}
-
-async function executeMcpAction(action) {
-    if (!isAiAdmin.value) {
-        ElMessage.warning("只有管理员可以执行低代码建模动作");
-        return;
-    }
-    const endpoint = ACTION_ENDPOINTS[action.Action];
-    if (!endpoint) {
-        ElMessage.warning("暂不支持该动作：" + action.Action);
-        return;
-    }
-    action.__loading = true;
-    try {
-        const payload = prepareMcpActionPayload(action);
-        if (shouldSkipAutoSystemField(action, payload)) {
-            ElMessage.success(`${action.Title || action.Action} 已跳过：系统基础字段由创建表自动生成`);
-            action.__result = { Skipped: true, Reason: "AutoSystemField" };
-            return;
-        }
-        if (action.Action === "AddField" && !payload.TableId) {
-            ElMessage.error("请先执行创建表，或在字段动作中提供 TableId");
-            return;
-        }
-        const result = await DiyCommon.PostAsync(endpoint, payload, null, null, "json");
-        if (isOk(result)) {
-            action.__result = result.Data || result.data || {};
-            rememberMcpActionResult(action, action.__result);
-            ElMessage.success(`${action.Title || action.Action} 执行成功`);
-            const msg = reactive({
-                id: makeId("system"),
-                role: "assistant",
-                mode: "builder",
-                content: `${action.Title || action.Action} 执行成功\n${JSON.stringify(result.Data || {}, null, 2)}`,
-                time: nowText()
-            });
-            messages.value.push(msg);
-            await saveMessage(msg);
-            scrollToBottom();
-        } else {
-            ElMessage.error(result?.Msg || `${action.Action} 执行失败`);
-        }
-    } finally {
-        action.__loading = false;
-    }
-}
-
-function prepareMcpActionPayload(action) {
-    const payload = {
-        OsClient: osClient.value,
-        ...(action.Params || {})
-    };
-    if (action.Action === "AddField") {
-        payload.TableId = payload.TableId || payload.DiyTableId || payload.tableId || actionContext.lastTableId;
-        payload.Name = payload.Name || payload.FieldName || payload.Key;
-        payload.Label = payload.Label || payload.Title || payload.Name;
-        payload.Type = payload.Type || "varchar(200)";
-        payload.Component = payload.Component || "Text";
-    }
-    if (action.Action === "CreateModule") {
-        payload.DiyTableId = payload.DiyTableId || payload.TableId || actionContext.lastTableId;
-    }
-    return payload;
-}
-
-function shouldSkipAutoSystemField(action, payload) {
-    if (action.Action !== "AddField") return false;
-    const name = String(payload.Name || "").toLowerCase();
-    return ["id", "createtime", "updatetime", "createuser", "osclient"].includes(name);
-}
-
-function rememberMcpActionResult(action, data) {
-    if (action.Action !== "CreateTable") return;
-    const tableId = data?.TableId || data?.Id || data?.DiyTableId || "";
-    const tableName = data?.Name || data?.TableName || action.Params?.Name || "";
-    if (tableId) actionContext.lastTableId = tableId;
-    if (tableName) actionContext.lastTableName = tableName;
-}
-
 function buildChatHistoryPayload() {
     const contentMessages = messages.value
         .filter((item) => item && item.content && !item.streaming)
@@ -3256,9 +3142,9 @@ function buildChatHistoryPayload() {
     }));
 }
 
-async function saveMessage(message) {
+async function saveMessage(message, strict = false) {
     try {
-        await DiyCommon.FormEngine.AddFormData("mic_ai_record", {
+        const record = {
             AiModelId: selectedAiModel.value?.Id || "",
             AiModel: selectedRuntimeModelId.value,
             Content: JSON.stringify({
@@ -3281,16 +3167,25 @@ async function saveMessage(message) {
                     Action: item.Action,
                     Title: item.Title,
                     Params: item.Params,
-                    __result: item.__result || null
+                    __result: item.__result || null,
+                    __uncertain: item.__uncertain || false
                 })),
                 QueryRows: message.queryRows || [],
                 Time: message.time || nowText(),
                 CreatedAt: new Date().toISOString()
             })
-        });
+        };
+        // 建模动作的结果要回写原会话行，刷新后才可按已执行状态继续，避免重放建表。
+        const result = message.__rowId
+            ? await DiyCommon.FormEngine.UptFormData("mic_ai_record", { Id: message.__rowId, ...record })
+            : await DiyCommon.FormEngine.AddFormData("mic_ai_record", record);
+        if (!isOk(result)) throw new Error(result?.Msg || "会话记录保存失败");
+        if (!message.__rowId) message.__rowId = getData(result)?.Id || "";
+        if (strict && !message.__rowId) throw new Error("会话记录未返回 Id，建模写入已停止");
         await loadHistory();
     } catch (error) {
         console.warn("[AiEngine] save message failed", error);
+        if (strict) throw error;
     }
 }
 
@@ -4484,6 +4379,7 @@ async function copyText(text) {
 
 .mcp-action-info {
     min-width: 0;
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 3px;
@@ -4498,6 +4394,27 @@ async function copyText(text) {
 
 .mcp-action-info small {
     color: #8b94a3;
+}
+
+.mcp-action-params {
+    width: 100%;
+    max-width: 720px;
+    color: var(--ai-text-secondary, #596273);
+    font-size: 12px;
+}
+
+.mcp-action-params summary {
+    cursor: pointer;
+    width: fit-content;
+}
+
+.mcp-action-params pre {
+    max-height: 260px;
+    margin: 7px 0 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 12px;
 }
 
 .composer {

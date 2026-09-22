@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-17T09:22:11.386Z",
+  "generatedAt": "2026-09-21T02:34:15.954Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2091,11 +2091,11 @@
       ]
     },
     "v8-export-import": {
-      "originalSha256": "352bfd7867f58404c7007ea1c8c989daae74450d823088a46c07552bf37e249f",
-      "originalLines": 618,
+      "originalSha256": "ed28c4bb50e94d1ab7db577a621e1c5c25d944b46a61b52b1109796ada794e49",
+      "originalLines": 622,
       "prefixSha256": "66c7f536caa188c61deccbe2417c82e64084a0edaba3298ac7f202936f5476ff",
       "prefixBytes": 1126,
-      "entryLines": 216,
+      "entryLines": 220,
       "chunks": [
         {
           "id": "v8-export-import-000",
@@ -2117,16 +2117,16 @@
           "id": "v8-export-import-002",
           "ordinal": 6,
           "destination": "v8-export-import/SKILL.md",
-          "sha256": "8a1bdefc16e306ae30a5764760b98af05cc0c804409afb6e86a7440674750413",
-          "lines": 19,
+          "sha256": "c18ba2c06baf3e7fb2cea79fe46637d3223d1f6b6454aa46057cfb80addd352a",
+          "lines": 21,
           "heading": "文件响应与前端调用约定"
         },
         {
           "id": "v8-export-import-003",
           "ordinal": 7,
           "destination": "v8-export-import/SKILL.md",
-          "sha256": "3391b00657d2cb9a6b3db530c43258ac2b7d69f940add48327618348226ad37e",
-          "lines": 44,
+          "sha256": "5975618ee1d3b9a4828d9f88cf35bc4efe4a8d7f45b94bd40077fa50b1d89c1f",
+          "lines": 46,
           "heading": "解析上传的 Excel（导入）"
         },
         {

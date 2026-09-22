@@ -209,3 +209,58 @@ test('microi_codex discovers and invokes existing tools through one entry point'
     await server.close();
   }
 });
+
+test('microi_codex executes the same CRM table, field, menu and API-engine writes as local Microi.Code', async () => {
+  const writes: Array<{ kind: string; value: unknown }> = [];
+  const fakeClient = {
+    createTable: async (name: string, description: string) => {
+      writes.push({ kind: 'table', value: { name, description } });
+      return { Code: 1, Data: { TableId: 'crm-table-id' } };
+    },
+    addField: async (field: Record<string, unknown>) => {
+      writes.push({ kind: 'field', value: field });
+      return { Code: 1 };
+    },
+    getFieldList: async () => ({ Code: 1, Data: [] }),
+    createModule: async (module: Record<string, unknown>) => {
+      writes.push({ kind: 'module', value: module });
+      return { Code: 1, Data: { ModuleId: 'crm-module-id' } };
+    },
+    createEngine: async (engine: Record<string, unknown>) => {
+      writes.push({ kind: 'engine', value: engine });
+      return { Code: 1, Data: { Id: 'crm-engine-id' } };
+    },
+  } as unknown as MicroiClient;
+  const server = createMcpServer(fakeClient, {
+    osClient: 'iTdos', apiBaseUrl: 'http://localhost:61501',
+    label: 'CRM test', codexMode: true,
+  });
+  const client = new Client({ name: 'online-ai-crm-test', version: '1.0.0' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  try {
+    const invoke = async (action: string, params: Record<string, unknown>) =>
+      client.callTool({ name: 'microi_codex', arguments: { action, params } }) as Promise<CallToolResult>;
+    const table = await invoke('microi_create_table', { name: 'Crm_Customer', description: '客户信息' });
+    const field = await invoke('microi_add_field', {
+      tableId: 'crm-table-id', name: 'CustomerName', label: '客户名称', type: 'varchar(200)', component: 'Text',
+    });
+    const module = await invoke('microi_create_module', {
+      name: '客户管理', diyTableId: 'crm-table-id', confirmExecution: '客户管理',
+    });
+    const engine = await invoke('microi_create_engine', {
+      apiEngineKey: 'crm-customer-summary', apiName: 'CRM 客户汇总',
+      code: 'return { Code: 1, Data: { Count: 0 } };',
+    });
+    for (const result of [table, field, module, engine])
+      assert.notEqual(result.isError, true, JSON.stringify(result.content));
+    assert.deepEqual(writes.map(write => write.kind), ['table', 'field', 'module', 'engine']);
+    assert.equal((writes[1].value as Record<string, unknown>).TableId, 'crm-table-id');
+    assert.equal((writes[2].value as Record<string, unknown>).DiyTableId, 'crm-table-id');
+    assert.equal((writes[2].value as Record<string, unknown>).Display, 1);
+    assert.equal((writes[2].value as Record<string, unknown>).AppDisplay, 1);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});

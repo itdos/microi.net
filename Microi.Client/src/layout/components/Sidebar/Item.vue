@@ -1,9 +1,9 @@
 <template>
     <div class="menu-item-wrapper">
-        <el-icon v-if="resolvedIcon" class="sub-el-icon svg-icon">
+        <el-icon v-if="resolvedIcon" class="sub-el-icon svg-icon" :class="{ 'mci-sidebar-parent-icon': isParent }">
             <component :is="resolvedIcon" />
         </el-icon>
-        <el-icon v-else class="sub-el-icon svg-icon">
+        <el-icon v-else class="sub-el-icon svg-icon" :class="{ 'mci-sidebar-parent-icon': isParent }">
             <List />
         </el-icon>
         <span v-if="title" class="menu-title" :title="title" :aria-label="title">{{ title }}</span>
@@ -59,6 +59,10 @@ export default {
         title: {
             type: String,
             default: ""
+        },
+        isParent: {
+            type: Boolean,
+            default: false
         },
         menuId: {
             type: String,
@@ -190,22 +194,15 @@ export default {
     justify-content: center;
     position: relative;
     
-    // 图标容器背景效果
-    &::before {
+    // 仅父菜单显示圆形底色；currentColor 跟随侧栏主题文字色，亮暗和自定义主题均可用。
+    &.mci-sidebar-parent-icon::before {
         content: '';
         position: absolute;
-        inset: -4px;
-        border-radius: 6px;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
-        opacity: 0;
-        transition: opacity 0.3s ease;
+        inset: -7px;
+        border-radius: 50%;
+        background: color-mix(in srgb, currentColor 12%, transparent);
+        pointer-events: none;
     }
-}
-
-// 悬停时图标背景发光
-.el-menu-item:hover .sub-el-icon::before,
-.el-sub-menu__title:hover .sub-el-icon::before {
-    opacity: 1;
 }
 
 // 活动状态图标特效

@@ -9,17 +9,17 @@ namespace Microi.net
         private const string PermissionTokenItemKey = "__Microi_V8Mcp_PermissionToken__";
         private const string PermissionErrorItemKey = "__Microi_V8Mcp_PermissionError__";
 
-        public static async Task<(bool ok, string msg, dynamic token)> CheckCurrentRequestAsync()
+        public static async Task<(bool ok, string msg, dynamic token)> CheckCurrentRequestAsync(bool forceRefresh = false)
         {
             try
             {
                 var httpContext = DiyHttpContext.Current;
-                if (httpContext?.Items.TryGetValue(PermissionTokenItemKey, out var cachedToken) == true
+                if (!forceRefresh && httpContext?.Items.TryGetValue(PermissionTokenItemKey, out var cachedToken) == true
                     && cachedToken is CurrentToken trustedToken)
                 {
                     return (true, "", trustedToken);
                 }
-                if (httpContext?.Items.TryGetValue(PermissionErrorItemKey, out var cachedError) == true)
+                if (!forceRefresh && httpContext?.Items.TryGetValue(PermissionErrorItemKey, out var cachedError) == true)
                 {
                     return (false, cachedError?.ToString() ?? "权限验证失败", null);
                 }
@@ -32,8 +32,9 @@ namespace Microi.net
                 }
 
                 var currentUser = currentToken.CurrentUser;
-                var tokenClaimsAdministrator = currentUser["_IsAdmin"].Val<bool>()
-                    || currentUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
+                // 入口与主库复核保持相同的 Level 门槛，避免旧版管理员标记放宽 MCP。
+                var tokenClaimsAdministrator =
+                    currentUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
                 var isCurrentAdministrator = tokenClaimsAdministrator
                     && PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
                         currentToken.OsClient,

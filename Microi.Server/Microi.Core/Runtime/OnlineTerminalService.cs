@@ -84,18 +84,6 @@ namespace Microi.net
             {
                 clientInfo.Terminals.RemoveAll(d => string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase));
             }
-            if (IsMeaningfulDid(didValue))
-            {
-                clientInfo.Terminals.RemoveAll(d =>
-                    string.Equals(d.Did, didValue, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(d.ClientType.DosIsNullOrWhiteSpace("PC"), clientTypeValue, StringComparison.OrdinalIgnoreCase));
-            }
-            if (!deviceClientId.DosIsNullOrWhiteSpace())
-            {
-                clientInfo.Terminals.RemoveAll(d =>
-                    string.Equals(d.DeviceClientId, deviceClientId, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(d.ClientType.DosIsNullOrWhiteSpace("PC"), clientTypeValue, StringComparison.OrdinalIgnoreCase));
-            }
             clientInfo.Terminals.RemoveAll(d => d.ConnectionId == connectionId);
             clientInfo.Terminals.Insert(0, new ClientTerminalInfo
             {
@@ -268,10 +256,7 @@ namespace Microi.net
                 var lastActiveTime = isCurrentRequest ? DateTime.Now : (tokenEntry.UpdateTime == default ? tokenEntry.CreateTime : tokenEntry.UpdateTime);
                 var liveTerminal = clientInfo.Terminals.FirstOrDefault(d =>
                     !IsTokenConnectionId(d.ConnectionId)
-                    && (string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase)
-                        || (IsMeaningfulDid(did)
-                            && string.Equals(d.Did, did, StringComparison.OrdinalIgnoreCase)
-                            && string.Equals(d.ClientType.DosIsNullOrWhiteSpace("PC"), clientType, StringComparison.OrdinalIgnoreCase))));
+                    && string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase));
 
                 if (liveTerminal != null)
                 {
@@ -593,10 +578,7 @@ namespace Microi.net
 
             var liveTerminal = clientInfo.Terminals.FirstOrDefault(d =>
                 !IsTokenConnectionId(d.ConnectionId)
-                && (string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase)
-                    || (IsMeaningfulDid(did)
-                        && string.Equals(d.Did, did, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(d.ClientType.DosIsNullOrWhiteSpace("PC"), clientType, StringComparison.OrdinalIgnoreCase))));
+                && string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase));
             if (liveTerminal != null)
             {
                 liveTerminal.DeviceClientId = liveTerminal.DeviceClientId.DosIsNullOrWhiteSpace(IsMeaningfulDid(did) ? did : "");
@@ -723,12 +705,11 @@ namespace Microi.net
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
             var key = GetLoginTokenKey(osClient, userId);
 
-            currentToken.Tokens = currentToken.Tokens?
-                .Where(d => d != null && !(string.Equals(d.Token, requestToken, StringComparison.Ordinal)
-                                            || (IsMeaningfulDid(did)
-                                                && string.Equals(d.Did, did, StringComparison.Ordinal)
-                                                && string.Equals(d.ClientType, clientType, StringComparison.Ordinal))))
-                .ToList() ?? new List<TokensModel>();
+            var sessionId = DiyToken.GetLoginSessionId(requestToken);
+            var removedHashes = (currentToken.Tokens ?? new List<TokensModel>())
+                .Where(d => d != null && string.Equals(DiyToken.GetLoginSessionId(d.Token), sessionId, StringComparison.Ordinal))
+                .Select(d => HashToken(d.Token)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            currentToken.Tokens = DiyToken.WithoutLoginSession(currentToken.Tokens, requestToken);
             if (currentToken.Tokens.Count == 0)
             {
                 await cache.RemoveAsync(key).ConfigureAwait(false);
@@ -744,11 +725,8 @@ namespace Microi.net
                              ?? cache.HashGet<ClientInfo>(GetOnlineHashKey(osClient), userId);
             if (clientInfo != null)
             {
-                var tokenHash = HashToken(requestToken);
                 clientInfo.Terminals?.RemoveAll(d => d != null &&
-                    (string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase)
-                     || (IsMeaningfulDid(did) && string.Equals(d.Did, did, StringComparison.Ordinal)
-                         && string.Equals(d.ClientType, clientType, StringComparison.Ordinal))));
+                    !d.TokenHash.DosIsNullOrWhiteSpace() && removedHashes.Contains(d.TokenHash));
                 if ((clientInfo.Terminals?.Count ?? 0) == 0 && (clientInfo.ConnectionIds?.Count ?? 0) == 0)
                 {
                     await cache.RemoveAsync(GetChatOnlineKey(osClient, userId)).ConfigureAwait(false);
@@ -967,26 +945,20 @@ namespace Microi.net
             return activeTokens.Count != before;
         }
 
-        private static string GetTerminalIdentity(ClientTerminalInfo terminal)
+        internal static string GetTerminalIdentity(ClientTerminalInfo terminal)
         {
             if (terminal == null)
             {
                 return Guid.NewGuid().ToString("N");
             }
 
-            var clientType = terminal.ClientType.DosIsNullOrWhiteSpace("PC");
-            if (IsMeaningfulDid(terminal.Did))
-            {
-                return $"did:{clientType}:{terminal.Did}";
-            }
-            if (IsMeaningfulDeviceId(terminal.DeviceClientId))
-            {
-                return $"device:{clientType}:{terminal.DeviceClientId}";
-            }
             if (!terminal.TokenHash.DosIsNullOrWhiteSpace())
             {
                 return $"token:{terminal.TokenHash}";
             }
+            var clientType = terminal.ClientType.DosIsNullOrWhiteSpace("PC");
+            if (IsMeaningfulDid(terminal.Did)) return $"did:{clientType}:{terminal.Did}:{terminal.ConnectionId}";
+            if (IsMeaningfulDeviceId(terminal.DeviceClientId)) return $"device:{clientType}:{terminal.DeviceClientId}:{terminal.ConnectionId}";
             return $"connection:{terminal.ConnectionId}";
         }
 
@@ -1095,19 +1067,11 @@ namespace Microi.net
             }
 
             var before = tokenModel.Tokens.Count;
-            tokenModel.Tokens.RemoveAll(d =>
-            {
-                if (terminal == null)
-                {
-                    return false;
-                }
-                var sameToken = !terminal.TokenHash.DosIsNullOrWhiteSpace()
-                                && string.Equals(HashToken(d.Token), terminal.TokenHash, StringComparison.OrdinalIgnoreCase);
-                var sameDevice = !terminal.Did.DosIsNullOrWhiteSpace()
-                                 && string.Equals(d.Did, terminal.Did, StringComparison.OrdinalIgnoreCase)
-                                 && string.Equals(d.ClientType.DosIsNullOrWhiteSpace("PC"), terminal.ClientType.DosIsNullOrWhiteSpace("PC"), StringComparison.OrdinalIgnoreCase);
-                return sameToken || sameDevice;
-            });
+            var matchingToken = tokenModel.Tokens.FirstOrDefault(d => d != null && terminal != null
+                && !terminal.TokenHash.DosIsNullOrWhiteSpace()
+                && string.Equals(HashToken(d.Token), terminal.TokenHash, StringComparison.OrdinalIgnoreCase));
+            if (matchingToken != null)
+                tokenModel.Tokens = DiyToken.WithoutLoginSession(tokenModel.Tokens, matchingToken.Token);
 
             if (tokenModel.Tokens.Count != before)
             {

@@ -346,9 +346,8 @@ export default {
             return false;
         },
         // 导出数据
-        ExportDiyTableRow(btn) {
+        async ExportDiyTableRow(btn) {
             var self = this;
-            self.BtnExportLoading = true;
             var url = self.DiyCommon.GetApiBase() + "/api/FormEngine/ExportDiyTableRow";
             var paramType = "json";
             if (!self.DiyCommon.IsNull(self.SysMenuModel.ExportApi)) {
@@ -361,7 +360,6 @@ export default {
             }
             var param = {
                 TableId: self.TableId,
-                //2020-12-07-注意：目前只有导出接口不支持token验证，所以导出接口需要加入[AllowAnonymous]特性，并且手动指定OsClient或_CurrentSysUser
                 OsClient: self.diyStore.OsClient, //self.OsClient,
                 _Keyword: self.Keyword,
                 //要导出所有数据，所以不分页
@@ -447,15 +445,18 @@ export default {
                 param._Where = appendWhereList(param._Where, exactSearchWhere);
             }
 
-            self.DiyCommon.FormExportFileV2(
-                url,
-                param,
-                function () {
-                    self.BtnExportLoading = false;
-                },
-                self.SysMenuModel.Name,
-                paramType
-            );
+            self.BtnExportLoading = true;
+            try {
+                return await self.DiyCommon.FormExportFileV2(
+                    url,
+                    param,
+                    null,
+                    self.SysMenuModel.Name,
+                    paramType
+                );
+            } finally {
+                self.BtnExportLoading = false;
+            }
         },
         // ========== 工作流相关：通过 SysMenuModel.OpenType=='WorkFlow' && FlowDesignId 实现一键发起申请 / 一键处理工作 ==========
         IsWorkFlowMenu() {

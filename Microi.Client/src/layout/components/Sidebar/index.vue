@@ -75,6 +75,7 @@
                 >
                     <menu-item
                         :icon="node.icon"
+                        :is-parent="node.hasChildren"
                         :title="node.title"
                         :menu-id="node.menuId"
                         :badge-config="node.badgeConfig"

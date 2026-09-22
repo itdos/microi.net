@@ -9,12 +9,6 @@ outline: [2, 3]
 
 本页汇总 Microi吾码三个版本的功能、授权与支持服务，帮助开发者和企业按交付需求选型。可先阅读版本建议，再对照下方功能表及授权说明确认适用范围。
 
-## 账号授权期限与系统激活记录
-
-平台管理员可在系统账号中设置 `LicenseType` 和“账号授权到期时间（UTC）”（`LicenseExpirationDate`）。这是账号可签发授权的期限，适用于限期授权、试用和转授客户系统。已签发系统的实际有效期以其签名 License 为准，账号字段的调整不会改写已经签发的 License；商业买断与后续技术支持的约定见下文。
-
-在 `/#/license` 申请或续期时，可以选择较短的系统授权期限，最长不得超过账号到期时间；个人版账号不能签发企业版。后端会从官方账号记录重新校验这些约束。新签发的 License 同时记录激活账号 Account 和名称 Name；旧 License 未包含记录时会明确提示重新签发。授权剩余 7 天及以内时，`admin` 每次登录通过系统提醒收到到期提示，关闭回执只作用于本次登录。
-
 <section class="mci-edition-hero" aria-label="Microi吾码版本买断授权说明">
   <div class="mci-edition-hero__copy">
     <span class="mci-edition-eyebrow">一次买断 · 永久有效</span>
