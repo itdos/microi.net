@@ -1117,6 +1117,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					tableName: this.tableName,
 					menuId: this.menuId,
 					rowId: this.rowId,
+					draftRowId: this.draftRowId,
 					mode: this.mode,
 					recordAdapter: this.recordAdapter,
 					draftRelation: this.draftRelation,
