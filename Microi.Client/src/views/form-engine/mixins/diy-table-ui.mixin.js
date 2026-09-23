@@ -1514,7 +1514,7 @@ LoadFabPosition() {
             if (str.length >= 10) return str.substring(0, 10);
             return str;
         },
-        // 卡片点击：先执行原有行点击逻辑，再打开详情
+        // 卡片点击：行点击 V8 与原生详情分别执行，原生详情遵守行级显隐条件。
         CardItemClick(item) {
             var self = this;
             if (self.PropsTableType === 'OpenTable') {
@@ -1526,7 +1526,7 @@ LoadFabPosition() {
                 return;
             }
             self.DiyTableRowClick(item);
-            if (self.IsPermission('NoDetail')) {
+            if (self.ShouldShowRowDetailAction(item)) {
                 self.OpenDetail(item, 'View');
             }
         },

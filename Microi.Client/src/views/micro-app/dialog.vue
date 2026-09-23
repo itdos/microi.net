@@ -135,6 +135,7 @@ export default {
                 hostViewport: this.hostViewport,
                 microRoute: this.routePath,
                 dialog: true,
+                dialogHeaderBridge: true,
                 dialogData: this.DataAppend?.Data || {},
                 route: { microRoute: this.routePath, microRoutePath: this.routePath }
             };
@@ -251,7 +252,9 @@ export default {
             if (applyMicroAppToken(payload)) return;
             const type = String(payload?.type || payload?.Type || "").toLowerCase();
             const data = payload?.data ?? payload?.Data ?? payload;
-            if (type === "app-dialog:success" || type === "success") {
+            if (type === "app-dialog:header") {
+                this.$emit("header-change", data);
+            } else if (type === "app-dialog:success" || type === "success") {
                 this.invokeCallback("OnSuccess", data);
                 this.close();
             } else if (type === "app-dialog:cancel" || type === "cancel") {
@@ -318,6 +321,18 @@ export default {
         pushViewportContract() {
             const app = this.$refs.microApp;
             if (app && typeof app.setData === "function") app.setData({ ...this.microAppData, type: "host:resize" });
+        },
+        dispatchHeaderAction(actionId) {
+            const app = this.$refs.microApp;
+            // micro-app DOM 节点通过 data 属性向子应用派发数据；它不提供 setData 方法。
+            const payload = { ...this.microAppData, type: "host:dialog-action", actionId, requestId: `${Date.now()}-${Math.random()}` };
+            if (app && "data" in app) {
+                app.data = payload;
+                return;
+            }
+            if (this.microAppName && typeof window.microApp?.forceSetData === "function") {
+                window.microApp.forceSetData(this.microAppName, payload);
+            }
         },
         resolveRuntimeThemeColor() {
             const styles = getComputedStyle(document.documentElement);
