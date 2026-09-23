@@ -318,6 +318,12 @@ public class SecurityGuardAndSysUserRegressionTests
             _IsAdmin = false,
             Level = 1
         });
+        var adminFlagWithoutLevel = JObject.FromObject(new
+        {
+            Id = "admin-user",
+            _IsAdmin = true,
+            Level = 999
+        });
         var databaseUser = new SysUser
         {
             Id = "admin-user",
@@ -332,6 +338,8 @@ public class SecurityGuardAndSysUserRegressionTests
             administrator, databaseUser, Array.Empty<SysRole>()));
         Assert.False(PlatformAdministratorSecurity.HasEffectivePlatformAdministratorLevel(
             ordinaryUser, databaseUser, Array.Empty<SysRole>()));
+        Assert.False(PlatformAdministratorSecurity.HasEffectivePlatformAdministratorLevel(
+            adminFlagWithoutLevel, databaseUser, Array.Empty<SysRole>()));
         Assert.False(PlatformAdministratorSecurity.HasEffectivePlatformAdministratorLevel(
             null, databaseUser, Array.Empty<SysRole>()));
     }

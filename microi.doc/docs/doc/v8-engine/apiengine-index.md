@@ -187,6 +187,9 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 <img src="https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" alt="接口引擎运行结果" style="margin: 5px;">
 
 ### 使用接口引擎替换导出接口
+
+将接口地址配置到后台菜单的【导出接口替换】后，登录用户发起导出时，平台会自动通过 `Authorization: Bearer <DiyToken>` 请求头携带身份。因此接口引擎应保持【允许匿名调用】关闭，并开启【响应文件】；不要通过开放匿名调用绕过 Token 校验。失败响应会显示接口返回的真实 `Msg`，并自动结束导出按钮的 Loading 状态。
+
 ::: details 展开查看 JavaScript 代码（49 行）
 ```javascript
 //新建一个接口引擎，代码如下：

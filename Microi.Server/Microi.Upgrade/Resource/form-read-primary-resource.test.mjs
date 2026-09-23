@@ -18,7 +18,10 @@ test('ReadPrimary正式声明具有真实nullable列、设计器字段、升级�
   assert.match(pkg.DDLStatements.find(x => x.TableName === 'diy_table').DDL, /`ReadPrimary` int NULL/);
   assert.ok(pkg.PackageInfo.RequiredPlatformCapabilities.includes(readPrimaryCapability));
   assert.equal(pkg.PackageInfo.Version, pkg.PackageInfo.ChangeLog.Version);
-  assert.match(pkg.PackageInfo.ChangeLog.Content, /显式事务|后端/);
+  const readPrimaryHistory = pkg.PackageInfo.ChangeHistory
+    .split('\n')
+    .find(line => line.includes('v7.7.4'));
+  assert.match(readPrimaryHistory ?? '', /主库读取|显式事务|后端/);
 });
 test('ReadPrimary生成器幂等且保留其它字段、旧日志、数据与资源所有权', () => {
   const once = configureReadPrimary(pkg), twice = configureReadPrimary(once);

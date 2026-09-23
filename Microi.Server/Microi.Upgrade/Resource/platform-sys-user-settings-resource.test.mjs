@@ -91,7 +91,7 @@ test('profile engine updates only the trusted current user and uses atom-normali
       Email: 'user@example.test',
       Sex: '保密',
       Lang: 'zh-CN',
-      Avatar: '/other-tenant/member/avatar/a.png',
+      Avatar: '/tenant-a/member/avatar/safe.png',
       PublicAvatar: '/other-tenant/member/public-avatar/a.png',
     },
     CurrentUser: { Id: 'trusted-user', Name: '旧昵称' },
@@ -143,6 +143,25 @@ test('profile engine updates only the trusted current user and uses atom-normali
   assert.equal(hooks.length, 2)
   assert.ok(hooks.every(item => item.key === 'platform-user-custom-hook'))
   for (const forbidden of ['Account', 'Level', 'OsClient']) assert.ok(!(forbidden in updateModel))
+})
+
+test('profile engine rejects an avatar path from another tenant before writing', () => {
+  const { execute } = loadEngine('platform-user-update-profile')
+  let writes = 0
+  const result = execute({
+    Param: { Name: '新昵称', Avatar: '/other-tenant/member/avatar/a.png' },
+    CurrentUser: { Id: 'trusted-user' },
+    OsClient: 'tenant-a',
+    Method: {
+      PrepareCurrentUserProfileUpdate() {
+        return { Code: 1, Data: { UserId: 'trusted-user', OsClient: 'tenant-a', CurrentProfile: { Name: '旧昵称' } } }
+      },
+    },
+    FormEngine: { UptFormData() { writes++; return { Code: 1 } } },
+    ApiEngine: { Run() { throw new Error('hook must not run') } },
+  })
+  assert.equal(result.Code, 0)
+  assert.equal(writes, 0)
 })
 
 test('profile engine does not reverse a committed update when its after hook fails', () => {
