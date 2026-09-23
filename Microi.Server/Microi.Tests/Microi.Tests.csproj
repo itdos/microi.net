@@ -35,6 +35,9 @@
     <!-- 独立连接池故障节点是可执行测试夹具，不并入 xUnit 入口。 -->
     <Compile Remove="Fixtures\DatabasePoolNode\**\*.cs" />
     <ProjectReference Include="Fixtures\DatabasePoolNode\DatabasePoolNode.csproj" ReferenceOutputAssembly="false" />
+    <!-- 内存诊断需在独立进程改变线程池并采集 EventPipe；测试断言由中央 xUnit 入口运行。 -->
+    <Compile Remove="Fixtures\MemoryDiagnosticsNode\**\*.cs" />
+    <ProjectReference Include="Fixtures\MemoryDiagnosticsNode\Microi.MemoryDiagnostics.Fixture.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
