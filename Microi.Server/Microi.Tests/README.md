@@ -29,6 +29,13 @@
 无法分类、零测试、失败、取消、跳过或 todo 均失败关闭。Playwright 文件由真实
 浏览器入口负责，不能混入 Node 单测冒充 E2E。
 
+内存诊断回归也由 `Microi.Tests` 的 xUnit 用例自动发现。`Fixtures/MemoryDiagnosticsNode`
+只是受统一项目构建的隔离进程夹具，用于线程池耗尽、EventPipe 轮转和 HTTP 宿主，
+不再作为第二个独立测试项目运行。Quick 执行合同断言与脚本基准的结果校验；Full
+还执行身份刷新、栈轮转、MongoDB 事故重放和有界 MySQL 查询。后两者分别使用
+`MICROI_TEST_MONGO_CURRENT` 与专用测试库 `MICROI_MEMORY_TEST_CONN`；未单独提供
+MySQL 连接时复用 Full 的 `MICROI_TEST_SCHEDULE_MYSQL` 专用库。
+
 `Microi一键编译发布.sh` 在发布后端、构建前端或仅推送镜像时自动调用 `Full`：先取得发布锁，
 保持已加载候选源码的共享服务供测试使用，通过后再停止服务、改版本及发布。
 PC/API 镜像候选仍覆盖根仓及六个闭源子仓的源码与内置资源；独立 `microi.uniapp`
