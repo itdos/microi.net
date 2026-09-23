@@ -30,7 +30,7 @@ function related() {
     uni: { showToast: (value) => toasts.push(value.title) },
     loadModuleRows: async (config, options) => {
       moduleRequests.push({ config, options })
-      return { rows: [], count: 0 }
+      return { rows: [], count: options.extraWhere?.some((item) => item.FormEngineKey) ? 2 : 0 }
     },
     V8: { FormEngine: { GetTableData: async (table, params) => { requests.push({ table, params }); return { Code: 1, Data: [], DataCount: 0 } } } }
   })
@@ -40,7 +40,7 @@ function related() {
     tableChildAuth: { ParentRowId: 'parent-1', Parent: { ParentRowId: 'ancestor-1' } },
     hydrateProposalInstallationPointRows: async (rows) => rows, hydrateCollectionRows: async (rows) => rows
   }
-  for (const key of ['filterFields', 'filterFormData', 'activeFilterCount']) {
+  for (const key of ['filterFields', 'filterFormData', 'activeFilterCount', 'relatedMetricDefinitions']) {
     Object.defineProperty(state, key, { get: () => definition.computed[key].call(state) })
   }
   return { state, requests, moduleRequests, toasts }
@@ -142,8 +142,9 @@ test('关联筛选取消放弃草稿，重置不提前请求，非法日期阻�
   state.resetAdvancedFilters()
   assert.equal(state.filterValues.Enabled, 0)
   state.applyAdvancedFilters(); await new Promise(setImmediate)
-  assert.equal(requests.length, 1)
+  assert.equal(requests.length, 2)
   assert.deepEqual(plain(requests[0].params._Where), [{ Name: 'ParentId', Type: '=', Value: 'parent-1' }])
+  assert.deepEqual(plain(requests[1].params._Where), [{ Name: 'ParentId', Type: '=', Value: 'parent-1' }])
 })
 
 for (const parent of ['customer', 'order']) test(`${parent} 关联查询始终保留外键与完整授权链，多选/时间/地区按共同规则发送`, async () => {
@@ -198,9 +199,10 @@ test('配置联表的 TableChild 走模块查询并保留授权链、父子外�
   state.filterValues = { 'Diy_ShouhouDD.Leixing': ['安装'] }
 
   await state.loadData(true, true)
+  await state.loadRelatedMetrics(true)
 
   assert.equal(requests.length, 0)
-  assert.equal(moduleRequests.length, 1)
+  assert.equal(moduleRequests.length, 2)
   const call = moduleRequests[0]
   assert.equal(call.config.moduleEngineKey, 'service-goods-module')
   for (const field of ['Leixing', 'FuwuZT', 'ShebeiBH']) assert.ok(call.config.selectFields.includes(field), field)
@@ -210,6 +212,14 @@ test('配置联表的 TableChild 走模块查询并保留授权链、父子外�
     { Name: 'ShebeiBH', Type: '=', Value: 'device-1' },
     { FormEngineKey: 'Diy_ShouhouDD', Name: 'Leixing', Type: 'In', Value: ['安装'] }
   ])
+  const metricCall = moduleRequests[1]
+  assert.equal(metricCall.options.tableChildModuleQuery, true)
+  assert.deepEqual(plain(metricCall.options.tableChildAuth), plain(state.tableChildAuth))
+  assert.deepEqual(plain(metricCall.options.extraWhere), [
+    { Name: 'ShebeiBH', Type: '=', Value: 'device-1' },
+    { FormEngineKey: 'Diy_ShouhouDD', Name: 'Leixing', Type: 'In', Value: ['安装'] }
+  ])
+  assert.equal(state.metricValues.total, 2)
 })
 
 test('关联选择器分页和树懒加载携带菜单、父子授权和子表外键，主列表仍可省略上下文', async () => {

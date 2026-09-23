@@ -161,8 +161,9 @@ const orderDetail = {
 const deviceDetail = {
   Id: 'device-001', ShebeiBH: 'SB-HZ-2026-0068', ShangpinMC: '集福鲤校园直饮机', ShebeiXH: 'JFL-S600',
   ShebeiZT: '正常使用', ShebeiGZZT: '在线', HezuoFS: '租赁', KehuID: 'customer-001', KehuMC: '滨江区实验学校',
-  DingdanID: 'order-001', DingdanBH: 'DD202512080032', AnzhuangWZ: '教学楼一层饮水间', TenantName: '集福鲤杭州运营中心',
+  DingdanID: 'order-001', DingdanSPID: 'order-product-001', DingdanBH: 'DD202512080032', AnzhuangWZ: '教学楼一层饮水间', TenantName: '集福鲤杭州运营中心',
   FuwuKSSJ: '2026-08-01', FuwuJSSJ: '2029-07-31', ZuijinFWSJ: '2026-06-18', ZhibaoSJ: '2028-07-31',
+  ShebeiEWM: 'iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAAAklEQVR4AewaftIAAANMSURBVO3BUW5jwREEwawG73/lsn4NaxbYwVs2ZWVE+gVpySAtGqRFg7RokBYN0qJBWvTiD5Lw07XlJAk32nKShJO23EjCT9eW7wzSokFaNEiLBmnRIC0apEUvLrXlUyTht2rLp0jC3xqkRYO0aJAWDdKiQVo0SIte/ANJeFpbPkUSTtryKZLwtLY8aZAWDdKiQVo0SIsGadEgLXrxi7XlJAknbTlJwklb9N8GadEgLRqkRYO0aJAWDdKiF79YEp7WlpMknLTlNxqkRYO0aJAWDdKiQVo0SIte/ANt+QnacpKEG0n4FG35dIO0aJAWDdKiQVo0SIsGadGLS0n46ZJw0paTJJy05SQJT0vCTzZIiwZp0SAtGqRFg7RokBalX9D/SMI7teU3GqRFg7RokBYN0qJBWjRIi178QRJO2nIjCf/P2nKShJMknLTlRhJO2nKShKe15TuDtGiQFg3SokFaNEiLBmnRiz9oy40knLTlRhJO2vJOSXhaW06S8LQk3GjLkwZp0SAtGqRFg7RokBYN0qL0CxeScNKWkyS8U1tuJOGkLe+UhBttuZGEp7XlO4O0aJAWDdKiQVo0SIsGaVH6hYcl4UZb3ikJ79SWpyXhRltOknDSlicN0qJBWjRIiwZp0SAtGqRF6RcuJOGd2nKShJO23EjCSVueloQbbfkUSThpy3cGadEgLRqkRYO0aJAWDdKi9Au/VBJO2nIjCTfa8rQkvFNb/tYgLRqkRYO0aJAWDdKiQVqUfuEgCT9dW06ScKMtN5Jwoy0nSbjRlk8wSIsGadEgLRqkRYO0aJAWvbjUlk+RhHdKwtPacpKEpyXhaW35W4O0aJAWDdKiQVo0SIsGadGLfyAJT2vLp2jLSRLeqS03knDSlpMknCThpC3fGaRFg7RokBYN0qJBWjRIi17oW235FG35FG150iAtGqRFg7RokBYN0qJBWvTiF2vLSRJO2nLSlqcl4aQtJ0k4actJEp7Wlu8M0qJBWjRIiwZp0SAtGqRFL/6BtujvJOFGEm4k4RMM0qJBWjRIiwZp0SAtGqRFLy4l4adLwo0k3GjLjbacJOFGWz7BIC0apEWDtGiQFg3SokFalH5BWjJIiwZp0SAtGqRFg7ToP+ea+ToAFk9hAAAAAElFTkSuQmCC',
   Beizhu: '设备运行正常，下次保养前检查滤芯余量。', CreateTime: '2026-01-08 11:30:00'
 };
 
@@ -179,6 +180,7 @@ const deviceIotTable = {
 const deviceIotFields = [
   { Id: 'device-no', TableName: 'Diy_KehuSB', Name: 'ShebeiBH', Label: '设备编号', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 10, Tab: 'device-basic', Config: '{}' },
   { Id: 'device-name', TableName: 'Diy_KehuSB', Name: 'ShangpinMC', Label: '设备名称', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 20, Tab: 'device-basic', Config: '{}' },
+  { Id: 'device-qrcode', TableName: 'Diy_KehuSB', Name: 'ShebeiEWM', Label: '设备二维码', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 30, Tab: 'device-basic', Readonly: true, Config: '{}' },
   { Id: 'device-iot-join', TableName: 'Diy_KehuSB', Name: 'JoinForm184', Label: 'IoT物联网', Component: 'JoinForm', Visible: 1, AppVisible: 1, Sort: 100, Tab: 'device-iot', Config: JSON.stringify({ JoinForm: { TableId: 'table-yuelong-device', TableName: 'diy_yuelong_device', TableLabel: '跃龙物联网设备', JoinFieldName: 'Id', FormMode: 'View', SnapshotApiEngineKey: 'xjy-device-iot-snapshot' } }) }
 ];
 
@@ -444,7 +446,27 @@ const targets = [
   },
   {
     name: 'device-detail', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
-    required: ['.hero-band', '.info-band', '.bottom-actions']
+    required: ['.hero-band', '.info-band', '.native-control__qrcode', '.device-section-actions', '.device-section-action--preview', '.device-section-action--qrcode', '.bottom-actions'],
+    expectedText: ['预览商品详情', '生成设备二维码']
+  },
+  {
+    name: 'device-product-preview', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
+    invokeMethod: 'previewDeviceProduct', afterSelector: '.detail-container',
+    selectorAfterClick: '.detail-container',
+    ignoreSafeArea: true,
+    required: ['.detail-container']
+  },
+  {
+    name: 'device-qrcode-generation', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
+    invokeMethod: 'generateDeviceQrCode', autoConfirm: true, clearDeviceQr: true,
+    afterSelector: '.native-control__qrcode',
+    selectorAfterClick: '.detail-page',
+    required: ['.native-control__qrcode', '.device-section-action--preview', '.device-section-action--qrcode']
+  },
+  {
+    name: 'device-edit-actions', route: '/#/pages/native-form/index?table=Diy_KehuSB&id=device-001&mode=Edit&title=编辑设备', selector: '.native-form-page',
+    required: ['.native-control__qrcode', '.tenant-field-actions', '.tenant-field-action--preview', '.tenant-field-action--qrcode'],
+    expectedText: ['预览商品详情', '生成设备二维码', '取消', '保存']
   },
   {
     name: 'device-iot', route: '/#/pages/native-form/index?table=Diy_KehuSB&id=device-001&mode=View&title=设备详情', selector: '.native-form-page',
@@ -821,8 +843,14 @@ function buildMockResponse(request) {
   if (lowerUrl.includes('getformdata') && (table === 'Diy_ShouhouDD' || lowerUrl.includes('diy_shouhoudd'))) {
     return { Code: 1, Data: taskDetail };
   }
+  if (lowerUrl.includes('getformdata') && String(table).toLowerCase() === 'diy_dingdansp') {
+    return { Code: 1, Data: { Id: 'order-product-001', ShangpinID: 'product-001' } };
+  }
   if (lowerUrl.includes('getformdata') && (table === 'Diy_Dingdan' || lowerUrl.includes('diy_dingdan'))) {
     return { Code: 1, Data: orderDetail };
+  }
+  if (lowerUrl.includes('getformdataanonymous') && String(table).toLowerCase() === 'diy_shangpin') {
+    return { Code: 1, Data: products.find((item) => item.Id === body.Id) || products[0] };
   }
   if (lowerUrl.includes('getformdata') && (table === 'Diy_KehuSB' || lowerUrl.includes('diy_kehusb'))) {
     return { Code: 1, Data: deviceDetail };
@@ -869,6 +897,12 @@ function buildMockResponse(request) {
   }
   if (apiEngineKey === 'service_statusstatistics') {
     return { Code: 1, Data: { pending: 1, TodoCount: 2, acceptance: 1, cacceptance: 1, evaluated: 1, FinishCount: 1, cancel: 0, suspend: 0 } };
+  }
+  if (apiEngineKey === 'addsbcode') {
+    return { Code: 1, Data: deviceDetail.ShebeiEWM };
+  }
+  if (apiEngineKey === 'goods_detail') {
+    return { Code: 1, Data: products[0], DataAppend: { FieldList: [] } };
   }
   if (apiEngineKey === 'xjy-device-iot-snapshot') {
     return {
@@ -1002,7 +1036,7 @@ async function waitForSelector(cdp, selector, timeoutMs = 15000) {
     returnByValue: true
   });
   const detail = diagnostics.result && diagnostics.result.value;
-  fail(`Selector did not render: ${selector}; page=${JSON.stringify(detail || {})}`);
+  fail(`Selector did not render: ${selector}; page=${JSON.stringify(detail || {})}; requests=${JSON.stringify(mockRequestLog.slice(-6))}`);
 }
 
 async function waitForExpression(cdp, expression, timeoutMs = 15000) {
@@ -1332,7 +1366,7 @@ async function inspectLayout(cdp, target, viewport) {
         right: rootStyle ? parseFloat(rootStyle.getPropertyValue('--mci-safe-right')) || 0 : 0,
         capsuleRight: rootStyle ? parseFloat(rootStyle.getPropertyValue('--mci-capsule-right')) || 0 : 0
       };
-      const safeMatches = ['top', 'bottom', 'left', 'right', 'capsuleRight'].every((key) =>
+      const safeMatches = ${JSON.stringify(Boolean(target.ignoreSafeArea))} || ['top', 'bottom', 'left', 'right', 'capsuleRight'].every((key) =>
         Math.abs(Number(safe[key] || 0) - Number(expectedSafe[key] || 0)) <= 1
       );
       const header = document.querySelector('.home-header, .profile-hero, .search-header, .news-header, .msg-header, .page-header, .page-nav, .catalog-header, .camera-nav, .login-nav');
@@ -1495,7 +1529,32 @@ async function main() {
         await cdp.send('Page.navigate', { url: `http://127.0.0.1:${appPort}/?visual=${Date.now()}&${safeQuery}${route}` });
         await waitForSelector(cdp, target.selector);
         await delay(900);
-        if (target.clickSelector) {
+        if (target.invokeMethod) {
+          const invocation = await cdp.send('Runtime.evaluate', {
+            expression: `(async () => {
+              let component = document.querySelector(${JSON.stringify(target.selector)}).__vueParentComponent;
+              while (component && !(component.proxy && typeof component.proxy[${JSON.stringify(target.invokeMethod)}] === 'function')) component = component.parent;
+              if (!component || !component.proxy) return false;
+              if (${JSON.stringify(Boolean(target.clearDeviceQr))}) component.proxy.detail = { ...component.proxy.detail, ShebeiEWM: '' };
+              if (${JSON.stringify(Boolean(target.autoConfirm))}) component.proxy.confirm = async () => true;
+              await component.proxy[${JSON.stringify(target.invokeMethod)}]();
+              return { invoked: true, action: component.proxy.deviceActionKey };
+            })()`,
+            awaitPromise: true,
+            returnByValue: true
+          });
+          if (!(invocation.result && invocation.result.value && invocation.result.value.invoked)) fail(`Component method did not render: ${target.invokeMethod}; result=${JSON.stringify(invocation.result && invocation.result.value)}`);
+          await delay(500);
+          const invokedView = await cdp.send('Runtime.evaluate', {
+            expression: `({ found: Boolean(document.querySelector(${JSON.stringify(target.afterSelector || target.selector)})), url: location.href })`,
+            returnByValue: true
+          });
+          if (!(invokedView.result && invokedView.result.value && invokedView.result.value.found)) {
+            fail(`Component method did not navigate: ${target.invokeMethod}; result=${JSON.stringify(invocation.result.value)}; view=${JSON.stringify(invokedView.result && invokedView.result.value)}; requests=${JSON.stringify(mockRequestLog.slice(-8))}`);
+          }
+          await waitForSelector(cdp, target.afterSelector || target.selector);
+          await delay(450);
+        } else if (target.clickSelector) {
           const interactionTarget = await cdp.send('Runtime.evaluate', {
             expression: `(() => { const element = document.querySelector(${JSON.stringify(target.clickSelector)}); if (!element) return null; const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`,
             returnByValue: true

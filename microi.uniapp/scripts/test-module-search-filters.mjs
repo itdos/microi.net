@@ -106,7 +106,7 @@ test('后台明确配置的查询字段不受移动表单显隐影响，但仍�
 test('模块定义使用完整字段元数据编译后台筛选，而不是只读取移动表单可见字段', () => {
   assert.match(
     moduleRegistrySource,
-    /const searchMetadataFields = \[\s*\.\.\.searchProjectionFields,\s*\.\.\.projectionFields,\s*\.\.\.appendSystemAuditFields\(definition\.layoutFields\?\.length \? definition\.layoutFields : fields\)\s*\]/
+    /const searchMetadataFields = \[\s*\.\.\.searchProjectionFields,\s*\.\.\.projectionFields,\s*\.\.\.metadataFields,\s*\.\.\.appendSystemAuditFields\(definition\.layoutFields\?\.length \? definition\.layoutFields : fields\)\s*\]/
   )
   assert.match(
     moduleRegistrySource,
