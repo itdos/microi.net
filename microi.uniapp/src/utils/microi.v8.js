@@ -2024,6 +2024,7 @@ export function createMicroiV8(options = {}) {
       Request: formEngineRequest,
       GetDiyTableModel: (table, data, options) => formEngineMetadata('GetDiyTableModel', table, data, options),
       GetDiyFieldList: (data, options) => formEngineMetadata('GetDiyFieldList', data, {}, options),
+      GetDiyFieldByDiyTables: (data, options) => formEngineMetadata('GetDiyFieldByDiyTables', data, {}, options),
       GetTableData: (table, data, options) => formEngineRequest('gettabledata', table, data, options),
       GetFormData: (table, data, options) => formEngineRequest('getformdata', table, data, options),
       GetTableDataTree: (table, data, options) => formEngineRequest('gettabledatatree', table, data, options),

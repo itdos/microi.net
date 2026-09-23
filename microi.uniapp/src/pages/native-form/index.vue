@@ -186,7 +186,7 @@
 						<!-- zhy：详情模式下给租户配置的长文本字段传入最大可视行数。 -->
 						<view v-else-if="tenantFieldPresentation(field).type !== 'action'" class="tenant-field-control-wrap"
 							:class="{ 'tenant-field-control-wrap--clearable': tenantFieldPresentation(field).clearable }">
-							<mci-native-field v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
+							<mci-native-field v-model="form[field.Name]" :field="tenantNativeField(field)" :readonly="isReadonly(field)"
 								:readonly-max-lines="readonlyMaxLines(field)"
 								:table-name="tableName" :form-data="form" :form-data-id="rowId" :menu-id="menuId"
 								:file-access-menu-id="fileMenuId"
@@ -203,8 +203,11 @@
 						<view v-if="tenantBottomFieldActions(field).length" class="tenant-field-actions">
 							<view v-for="action in tenantBottomFieldActions(field)" :key="action.key"
 								class="tenant-field-action"
-								:class="{ 'tenant-field-action--disabled': action.disabled }"
-								hover-class="tenant-field-action--pressed" @tap="runTenantFieldAction(field, action)">
+								:class="[
+									{ 'tenant-field-action--disabled': action.disabled, 'tenant-field-action--compact': action.compact },
+									action.tone ? `tenant-field-action--${action.tone}` : ''
+								]"
+								hover-class="tenant-field-action--pressed" @tap.stop="runTenantFieldAction(field, action)">
 								<view v-if="action.iconType === 'location'" class="tenant-field-label-action__location"></view>
 								<text v-else-if="action.icon" class="tenant-field-action__icon">{{ action.icon }}</text>
 								<text>{{ action.label }}</text>
@@ -365,6 +368,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import MciCustomerPicker from '@/components/mci-customer-picker/mci-customer-picker.vue'
 	import MciPosterDetail from '@/components/mci-poster-detail/mci-poster-detail.vue'
 	import MciVisitTargetFields from '@/components/mci-visit-target-fields/mci-visit-target-fields.vue'
+
+	const TENANT_NATIVE_FIELD_CACHE = new WeakMap()
 
 	function createDraftRowId() {
 		let seed = Date.now()
@@ -604,6 +609,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		},
 		onShow() {
 			this.openingEdit = false
+			if (this.tenantFormState) this.tenantFormState.deviceActionKey = ''
 			// 编辑页只在落库后通知来源详情；取消保留详情原数据、Tab 和滚动位置。
 			if (this.mode === 'View' && this.refreshAfterEdit) {
 				this.refreshAfterEdit = false
@@ -1111,6 +1117,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					tableName: this.tableName,
 					menuId: this.menuId,
 					rowId: this.rowId,
+					draftRowId: this.draftRowId,
 					mode: this.mode,
 					recordAdapter: this.recordAdapter,
 					draftRelation: this.draftRelation,
@@ -1138,6 +1145,19 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			},
 			tenantFieldPresentation(field) {
 				return getTenantFormFieldPresentation(this.tenantFormContext(), field)
+			},
+			tenantNativeField(field) {
+				const presentation = this.tenantFieldPresentation(field)
+				if (!presentation.nativeComponent) return field
+				const cached = TENANT_NATIVE_FIELD_CACHE.get(field)
+				if (cached && cached.component === presentation.nativeComponent) return cached.value
+				const value = {
+					...field,
+					component: presentation.nativeComponent,
+					Component: presentation.nativeComponent
+				}
+				TENANT_NATIVE_FIELD_CACHE.set(field, { component: presentation.nativeComponent, value })
+				return value
 			},
 			relatedPresentation(field) {
 				return getTenantFormRelatedPresentation(this.tenantFormContext(), field)
@@ -2025,6 +2045,29 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 
 	.tenant-field-action--pressed {
 		transform: scale(.97);
+	}
+
+	.tenant-field-action--compact {
+		min-width: 0;
+		height: 62rpx;
+		padding: 0 18rpx;
+		border: 1rpx solid var(--mci-border, #dce7eb);
+		border-radius: 10rpx;
+		background: var(--mci-bg-muted, #f4f8fa);
+		box-shadow: none;
+		color: #3f6270;
+		font-size: 22rpx;
+		font-weight: 600;
+	}
+
+	.tenant-field-action--compact .tenant-field-action__icon {
+		font-size: 24rpx;
+	}
+
+	.tenant-field-action--compact.tenant-field-action--qrcode {
+		border-color: #f0d4cc;
+		background: #fff6f2;
+		color: #c64b35;
 	}
 
 	.tenant-field-map {

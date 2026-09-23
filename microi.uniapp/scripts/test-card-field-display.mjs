@@ -75,7 +75,7 @@ assert.doesNotMatch(
   '关联 Tab 已有子菜单和表单授权上下文，不应重复加载并覆盖通用模块定义'
 )
 
-assert.match(relatedListSource, /createMenuModuleDefinition\(menu, this\.definition, this\.table\)/, '详情 Tab 应复用独立列表的菜单卡片编译逻辑')
+assert.match(relatedListSource, /createMenuModuleDefinition\(menu, this\.definition, this\.table, this\.moduleMetadataFields\)/, '详情 Tab 应复用独立列表的菜单卡片编译逻辑并携带 Join 字段元数据')
 assert.match(relatedListSource, /title:\s*menuConfig\.title/, '独立子表标题必须使用当前子菜单名称')
 assert.match(relatedListSource, /'titleField', 'title', 'statusField'/, '后台刷新完整菜单时必须同步模块标题')
 assert.match(relatedListSource, /\$emit\('title-change', title\)/, '子表模块名称刷新后必须通知独立页面更新导航标题')

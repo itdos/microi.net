@@ -1,5 +1,6 @@
 import { V8, getUser, post } from '@/utils/request.js'
 import {
+  cachedRequest,
   dedupeRequest,
   readCache,
   removeCachePrefix,
@@ -529,6 +530,60 @@ export async function loadNativeFormDefinition(tableName, refresh = false, optio
   }
 }
 
+function referencedModuleTableIds(menu = {}) {
+  const result = []
+  const seen = new Set()
+  const add = (value) => {
+    const id = String(value || '').trim()
+    const key = id.toLowerCase()
+    if (!id || seen.has(key)) return
+    seen.add(key)
+    result.push(id)
+  }
+  add(menu.DiyTableId)
+  ;['JoinTables', 'SearchFieldIds', 'SelectFields'].forEach((name) => {
+    const rows = parseJson(menu[name], [])
+    ;(Array.isArray(rows) ? rows : []).forEach((item) => {
+      if (item && typeof item === 'object') add(item.TableId || item.tableId || (name === 'JoinTables' ? item.Id : ''))
+    })
+  })
+  return result
+}
+
+// Module search/card projections only contain a field id and label. Load the authorized
+// primary + JoinTable definitions so mobile filters retain the real component and data source.
+export async function loadNativeModuleFields(menu = {}, options = {}) {
+  const tableIds = referencedModuleTableIds(menu)
+  if (!menu?.Id || tableIds.length < 2) return []
+  const user = options.user || getUser() || {}
+  const cacheKey = `module-fields:v1:${hashText(JSON.stringify([
+    user.Id || user.Account || 'guest',
+    nativeRoleCacheKey(user),
+    definitionAuthorizationScope(options),
+    menu.Id,
+    menu.UpdateTime,
+    menu.ViewConfigVersion,
+    tableIds
+  ]))}`
+  const result = await cachedRequest(cacheKey, async () => {
+    const response = await V8.FormEngine.GetDiyFieldByDiyTables({
+      TableIds: tableIds,
+      _SysMenuId: options.menuId || menu.Id,
+      _ModuleEngineKey: options.moduleEngineKey || menu.ModuleEngineKey || '',
+      ...(options.tableChildAuth ? { _TableChildAuth: options.tableChildAuth } : {}),
+      _OrderBy: 'Sort',
+      _OrderByType: 'ASC'
+    })
+    if (!response || Number(response.Code) !== 1) {
+      throw new Error(response?.Msg || '模块关联字段配置加载失败')
+    }
+    return (Array.isArray(response.Data) ? response.Data : []).map((field) =>
+      normalizeField(field, { user, displayDefaultField: false })
+    )
+  }, { refresh: options.refresh === true, maxAge: FORM_VERSION_MAX_AGE, allowStale: true })
+  return JSON.parse(JSON.stringify(result.data || []))
+}
+
 export function scopeNativeFormDefinition(definition, options = {}) {
   if (!definition) return definition
   const include = new Set((options.includeNames || []).map((name) => String(name).toLowerCase()))
@@ -893,6 +948,7 @@ export default {
   groupFields,
   loadNativeTableModel,
   loadNativeFormDefinition,
+  loadNativeModuleFields,
   scopeNativeFormDefinition,
   applyNativeFormViewDefinition,
   hydrateNativeFormOptions,

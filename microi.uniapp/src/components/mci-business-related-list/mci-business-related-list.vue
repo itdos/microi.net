@@ -488,6 +488,7 @@ import {
   fieldDisplayValue,
   hydrateNativeFormOptions,
   loadNativeFormDefinition,
+  loadNativeModuleFields,
   loadNativeTableModel,
   parseJson
 } from '@/platform/native-form.js'
@@ -625,6 +626,7 @@ export default {
       moduleKey: '',
       config: {},
       menuId: '',
+      moduleMetadataFields: [],
       viewManifest: null,
       componentDisposed: false,
       initializeRequestId: 0,
@@ -658,6 +660,7 @@ export default {
       latestSummaryError: '',
       latestSummaryExpanded: true,
       metricLoading: false,
+      metricRequestId: 0,
       metricValues: {},
       listBodyHeight: 0,
       layoutMeasureTimers: [],
@@ -1516,8 +1519,25 @@ export default {
         if (!isCurrent()) return
         this.menu = menu || null
         this.menuId = menu?.Id || this.childMenuId || ''
+        let moduleMetadataFields = []
+        if (menu) {
+          try {
+            moduleMetadataFields = await loadNativeModuleFields(menu, {
+              menuId: this.menuId,
+              moduleEngineKey: menu.ModuleEngineKey || menu.Id || '',
+              tableChildAuth: this.tableChildAuth,
+              user: this.currentUser,
+              refresh
+            })
+          } catch (error) {
+            // Projection metadata remains a safe text-field fallback when an older server
+            // does not expose the multi-table metadata endpoint.
+          }
+        }
+        if (!isCurrent()) return
+        this.moduleMetadataFields = moduleMetadataFields
         const menuConfig = menu
-          ? createMenuModuleDefinition(menu, this.definition, this.table)
+          ? createMenuModuleDefinition(menu, this.definition, this.table, this.moduleMetadataFields)
           : null
         const platformCardConfig = menuConfig
           ? {
@@ -1618,7 +1638,7 @@ export default {
           // 数据查询仍并行执行，因此刷新元数据不会让列表停留在骨架屏。
           const childMenu = this.tableChildAuth ? await this.loadChildPresentationMenu() : null
           const menuConfig = this.tableChildAuth
-            ? (childMenu ? createMenuModuleDefinition(childMenu, this.definition, this.table) : null)
+            ? (childMenu ? createMenuModuleDefinition(childMenu, this.definition, this.table, this.moduleMetadataFields) : null)
             : await loadModuleDefinition(this.menuId, true, { includeHidden: true })
           if (requestId !== this.presentationRequestId) return
           this.applyCardPresentationConfig(menuConfig)
@@ -1842,10 +1862,7 @@ export default {
       this.error = ''
       try {
         const pageSize = this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15)
-        const keywordWhere = buildKeywordWhere(
-          this.keywordSearchFields.length ? this.keywordSearchFields : this.filterFields,
-          this.keyword
-        )
+        const keywordWhere = this.buildKeywordFilterWhere()
         const extraWhere = [
           { Name: this.childFkField, Type: '=', Value: this.relationValue },
           ...this.buildFilterWhere(),
@@ -1949,37 +1966,46 @@ export default {
       const metrics = this.relatedMetricDefinitions
       if (!metrics.length || !this.relationValue || !this.config.table) return
       const relationValue = this.relationValue
-      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue
+      const requestId = ++this.metricRequestId
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && requestId === this.metricRequestId
       this.metricLoading = true
       const range = this.monthRange()
-      const baseWhere = [
+      const keywordWhere = this.buildKeywordFilterWhere()
+      const activeWhere = [
         { Name: this.childFkField, Type: '=', Value: this.relationValue },
-        ...(this.config.fixedWhere || [])
+        ...this.buildFilterWhere(),
+        ...keywordWhere
       ]
+      const moduleAssociationQuery = this.requiresModuleAssociationQuery()
       try {
         const values = {}
         await Promise.all(metrics.map(async (metric) => {
-          const where = [...baseWhere, ...(metric.where || [])]
+          const where = [...activeWhere, ...(metric.where || [])]
           if (metric.monthField) {
             where.push({ Name: metric.monthField, Type: '>=', Value: range.start })
             where.push({ Name: metric.monthField, Type: '<', Value: range.end })
           }
-          if (metric.aggregateField) {
+          if (metric.aggregateField || moduleAssociationQuery) {
             const summary = await loadModuleRows(this.config, {
               pageIndex: 1,
               pageSize: 1,
+              keyword: keywordWhere.length ? '' : this.keyword.trim(),
               refresh,
               cacheAge: 0,
               tableChildAuth: this.tableChildAuth,
+              tableChildModuleQuery: moduleAssociationQuery,
               extraWhere: where
             })
-            values[metric.key] = Number(statisticsFieldValue(summary.append, metric.aggregateField, 0)) || 0
+            values[metric.key] = metric.aggregateField
+              ? Number(statisticsFieldValue(summary.append, metric.aggregateField, 0)) || 0
+              : Number(summary.count || 0)
             return
           }
           const payload = {
             _PageIndex: 1,
             _PageSize: 1,
-            _Where: where,
+            _Keyword: keywordWhere.length ? '' : this.keyword.trim(),
+            _Where: [...(this.config.fixedWhere || []), ...where],
             _TableChildAuth: this.tableChildAuth
           }
           const response = await V8.FormEngine.GetTableData(this.config.table, payload)
@@ -1996,12 +2022,12 @@ export default {
     },
     search() {
       clearTimeout(this.searchTimer)
-      this.loadData(true, true)
+      return this.refreshFilteredRows()
     },
     // zhy：搜索词输入后防抖自动检索，减少逐字请求并避免依赖搜索按钮。
     scheduleSearch() {
       clearTimeout(this.searchTimer)
-      this.searchTimer = setTimeout(() => this.loadData(true, true), 350)
+      this.searchTimer = setTimeout(() => this.refreshFilteredRows(), 350)
     },
     // zhy：右侧重置同时清空关键词与子菜单筛选面板中的全部条件。
     resetSearch() {
@@ -2010,13 +2036,13 @@ export default {
       this.filterValues = {}
       this.filterDraft = {}
       this.filterOpen = false
-      this.loadData(true, true)
+      return this.refreshFilteredRows()
     },
     clearKeyword() {
       if (!this.keyword) return
       clearTimeout(this.searchTimer)
       this.keyword = ''
-      this.loadData(true, true)
+      return this.refreshFilteredRows()
     },
     // zhy：将接口返回的完整 DataCount 交给父表单做字段联动；筛选状态一并上送，避免误用局部数量。
     emitDataCount() {
@@ -2076,6 +2102,15 @@ export default {
     buildFilterWhere() {
       return buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser)
     },
+    buildKeywordFilterWhere() {
+      return buildKeywordWhere(
+        this.keywordSearchFields.length ? this.keywordSearchFields : this.filterFields,
+        this.keyword
+      )
+    },
+    refreshFilteredRows() {
+      return Promise.all([this.loadData(true, true), this.loadRelatedMetrics(true)])
+    },
     openAdvancedFilters() {
       this.filterDraft = JSON.parse(JSON.stringify(this.filterValues || {}))
       this.filterOpen = true
@@ -2090,7 +2125,7 @@ export default {
       }
       this.filterValues = JSON.parse(JSON.stringify(this.filterDraft))
       this.filterOpen = false
-      this.loadData(true, true)
+      return this.refreshFilteredRows()
     },
     isCustomerOrderList() {
       // 该组件只负责详情页关联列表。实际客户详情没有传 parentTableName，
@@ -2740,6 +2775,22 @@ export default {
         .includes(this.moduleKey)) {
         uni.navigateTo({
           url: `/pages/business/detail?key=${encodeURIComponent(this.moduleKey)}&id=${encodeURIComponent(row.Id)}&menuId=${encodeURIComponent(this.menuId || '')}`
+        })
+        return
+      }
+      if (this.proposalDraftGroup) {
+        // 主方案尚未保存时，点位 Id 只存在于页面草稿会话；详情页必须沿用草稿关系读取，
+        // 不能把它当作已落库记录交给 GetFormData，否则会得到 NoExistData。
+        openForm({
+          table: this.config.table,
+          rowId: row.Id,
+          mode: 'View',
+          title: `${this.config.title || this.sectionTitle}详情`,
+          menuId: this.menuId,
+          menuAliases: this.config.menuAliases || [],
+          tableChildAuth: this.tableChildAuth,
+          includeRelated: false,
+          draftRelation: this.proposalDraftGroup.key
         })
         return
       }
