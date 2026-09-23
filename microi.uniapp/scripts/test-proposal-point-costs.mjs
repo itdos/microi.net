@@ -19,6 +19,74 @@ const points = [
   { Id: 'b', AnzhuangdianweiId: 'plan', ShebeiSL: 3, Renshu: 60, ShebeiDJZL: 900, ShebeiDJ: 5000, GenghuanLXJG: 200 }
 ]
 
+test('PC 点位行内保存及详情返回均通过低代码事件刷新主表比价信息', () => {
+  const parent = fs.readFileSync(path.join(engineRoot, '表单引擎/需求方案（diy_kehufaxx）/表单V8事件/前端表单进入V8事件（InFormV8）.js'), 'utf8')
+  const child = fs.readFileSync(path.join(engineRoot, '表单引擎/需求方案安装点位（diy_anzhuang_dw）/表单V8事件/前端表单提交后V8事件（OutFormV8）.js'), 'utf8')
+  assert.match(parent, /window\.RefreshProposalAfterPointSaved/)
+  assert.match(parent, /GetFormData\('diy_anzhuang_dw'/)
+  assert.match(parent, /await V8\.RefreshProposalPointCosts\(\)/)
+  assert.match(child, /await window\.CalcHezuohou\(\)/)
+  assert.ok(child.indexOf('window.CalcHezuohou') < child.indexOf('V8.ParentV8'))
+
+  const patches = JSON.parse(fs.readFileSync(path.join(project, 'resources/xjy/proposal-costs/field-patches.json'), 'utf8'))
+  const childPatch = patches.find(item => item.tableId === '01KWGB9WD5AEQX19GQ1NP442TT')
+  const targetIds = [
+    '01KZWWHD2YBK4AYVAV9DWWZ4FG', '01KWH02DKG5QXSPDYZBN6KAR69',
+    '01KZWWHDFDGEWFZJD5CEYVNTBE', '01KZWWHE7EQMWMWE61CB2W0CCW',
+    '01KZWWHEBJENBC798EGC956ZMD', '01KZWWHEFMQVBVN8SNY9YDQMKS'
+  ]
+  const fields = childPatch.fieldList.filter(field => targetIds.includes(field.id))
+  assert.equal(fields.length, targetIds.length)
+  for (const field of fields) {
+    assert.match(field.v8Code, /window\.RefreshProposalAfterPointSaved\(V8,/)
+    assert.equal(JSON.parse(field.config).V8Code, field.v8Code)
+  }
+})
+
+test('PC 行内编辑等待点位事务提交后才刷新，详情退出优先刷新当前主表实例', async () => {
+  const parentSource = fs.readFileSync(path.join(engineRoot, '表单引擎/需求方案（diy_kehufaxx）/表单V8事件/前端表单进入V8事件（InFormV8）.js'), 'utf8')
+  const scheduled = []
+  let parentRefreshes = 0
+  const form = { Id: 'plan', Renshu: 10, DangqianYSFS: '直饮机', DangqianYSSBSL: 1, HesuanNS: 5 }
+  const window = {}
+  const context = {
+    window,
+    setTimeout(callback) { scheduled.push(callback) },
+    V8: {
+      LoadMode: 'Run', FormMode: 'Edit', Form: form,
+      FormSet(name, value) { form[name] = value }, FieldSet() {}, Tips() {},
+      ApiEngine: { async Run() { parentRefreshes++; return { Code: 1, Data: [{ CostFields: { HezuoHYSZCBAll: parentRefreshes } }] } } },
+      FormEngine: {}
+    }
+  }
+  await new vm.Script(`(async function(){${parentSource}\n})()`).runInNewContext(context)
+  assert.equal(parentRefreshes, 1)
+
+  let pointReads = 0
+  const pointV8 = {
+    Form: { Id: 'point', Renshu: 20 },
+    FormEngine: { async GetFormData() {
+      pointReads++
+      return { Code: 1, Data: { Id: 'point', Renshu: pointReads === 1 ? 10 : 20 } }
+    } }
+  }
+  window.RefreshProposalAfterPointSaved(pointV8, { Renshu: 20 })
+  while (scheduled.length) await scheduled.shift()()
+  assert.equal(pointReads, 2)
+  assert.equal(parentRefreshes, 2)
+  assert.equal(form.HezuoHYSZCBAll, 2)
+
+  const childSource = fs.readFileSync(path.join(engineRoot, '表单引擎/需求方案安装点位（diy_anzhuang_dw）/表单V8事件/前端表单提交后V8事件（OutFormV8）.js'), 'utf8')
+  let currentParentRefreshes = 0
+  let legacyParentRefreshes = 0
+  await new vm.Script(`(async function(){${childSource}\n})()`).runInNewContext({
+    window: { async CalcHezuohou() { currentParentRefreshes++ } },
+    V8: { LoadMode: 'Run', ParentV8: { Form: {}, async RefreshProposalPointCosts() { legacyParentRefreshes++ } } }
+  })
+  assert.equal(currentParentRefreshes, 1)
+  assert.equal(legacyParentRefreshes, 0)
+})
+
 test('不同型号、数量按点位计费，人数和租金不重复乘数量', () => {
   const first = calculateInstallationPointCosts(points[0], 5)
   assert.equal(first.HezuoHYDCB, 1500)

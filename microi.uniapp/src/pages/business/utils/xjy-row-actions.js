@@ -202,7 +202,7 @@ export function getBusinessRowActions(key, row = {}, user = getUser() || {}, men
   if (key === 'devices') {
     actions.push({ key: 'device-repair', label: '报修', tone: 'primary' })
     actions.push({ key: 'device-consumables', label: '耗材' })
-    if (Number(user.Level || 0) >= 999 || user.TenantId) actions.push({ key: 'device-qrcode', label: '生成二维码', confirm: '确认重新生成该设备二维码吗？' })
+    if (canEditMenuRecord(menuId, user)) actions.push({ key: 'device-qrcode', label: '生成二维码', confirm: '确认重新生成该设备二维码吗？' })
   }
   if (key === 'visits') {
     const state = String(row.ShenpiZT || '')
@@ -286,10 +286,11 @@ export async function executeBusinessRowAction(actionKey, row = {}, input = '', 
   }), '客户方案删除失败')
   if (actionKey === 'member-remove') ensure(await callApiEngine('remove_menber', { Id: id }), '成员移出失败')
   if (actionKey === 'device-qrcode') {
+    if (!canEditMenuRecord(context.menuId, user)) throw new Error('当前账号没有设备列表编辑权限')
     const qrCode = await generateDeviceQrCode(id, createDeviceQrCodeAdapters(V8, {
       menuId: context.menuId || ''
     }))
-    rowPatch = { ShebeiEWM: qrCode }
+    rowPatch = qrCode
   }
   if (actionKey === 'visit-approve' || actionKey === 'visit-reject') {
     const approved = actionKey === 'visit-approve'
