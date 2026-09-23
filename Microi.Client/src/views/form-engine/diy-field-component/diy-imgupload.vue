@@ -81,6 +81,8 @@
                 v-else
                 :src="getImageDisplayPath()"
                 :preview-src-list="[getImageDisplayPath()]"
+                :preview-teleported="true"
+                :z-index="50000"
                 fit="cover"
                 class="preview-image"
             />
@@ -119,6 +121,8 @@
                 v-else
                 :src="getImageDisplayPath()"
                 :preview-src-list="[getImageDisplayPath()]"
+                :preview-teleported="true"
+                :z-index="50000"
                 fit="cover"
                 class="preview-image"
             />
@@ -154,6 +158,8 @@
                     :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
                     :preview-src-list="GetImgUploadImgs()"
                     :initial-index="index"
+                    :preview-teleported="true"
+                    :z-index="50000"
                     fit="cover"
                     :hide-on-click-modal='true'
                     class="card-image"
