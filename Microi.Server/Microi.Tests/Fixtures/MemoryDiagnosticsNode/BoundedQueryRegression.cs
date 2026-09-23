@@ -6,9 +6,10 @@ internal static class BoundedQueryRegression
 {
     public static void Run()
     {
-        var connectionString = Environment.GetEnvironmentVariable("MICROI_MEMORY_TEST_CONN");
+        var connectionString = Environment.GetEnvironmentVariable("MICROI_MEMORY_TEST_CONN")
+            ?? Environment.GetEnvironmentVariable("MICROI_TEST_SCHEDULE_MYSQL");
         if (string.IsNullOrWhiteSpace(connectionString))
-            throw new InvalidOperationException("MICROI_MEMORY_TEST_CONN must point to a dedicated test MySQL database.");
+            throw new InvalidOperationException("MICROI_MEMORY_TEST_CONN or MICROI_TEST_SCHEDULE_MYSQL must point to a dedicated test MySQL database.");
         var db = new DbSession(DatabaseType.MySql, connectionString);
         const string sql = """
             WITH digits AS (SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9),
