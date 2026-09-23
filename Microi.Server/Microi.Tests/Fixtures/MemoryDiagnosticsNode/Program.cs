@@ -37,15 +37,26 @@ if (args.FirstOrDefault() == "http")
     Console.WriteLine(await client.GetStringAsync(args[1]));
     return;
 }
+if (args.FirstOrDefault() == "allocation-loop")
+{
+    var ready = Path.GetFullPath(args[1]);
+    Directory.CreateDirectory(Path.GetDirectoryName(ready)!);
+    using var observation = ExecutionObservation.Enter("V8", "segment-rotation", "isolated-test");
+    File.WriteAllText(ready, Environment.ProcessId.ToString());
+    // 段轮转测试单独采集此进程，避免为 EventPipe 生成样本而压住 xUnit 宿主。
+    while (true) { ProbeAllocation(); ExecutionObservation.Pulse(); await Task.Delay(10); }
+}
 if (args.FirstOrDefault() == "serve")
 {
     var root = Path.GetFullPath(args[1]);
     Directory.CreateDirectory(root);
     Environment.SetEnvironmentVariable("OsClient", "memorytesta");
     var unusedSql = new Dos.ORM.DbSession(Dos.ORM.DatabaseType.MySql, "Server=127.0.0.1;Port=1;Database=unused;User ID=unused;");
+    var mongoConnection = Environment.GetEnvironmentVariable("MICROI_TEST_MONGO_CURRENT")
+        ?? throw new InvalidOperationException("MICROI_TEST_MONGO_CURRENT is required for the isolated HTTP fixture.");
     foreach (var tenant in new[] { "memorytesta", "memorytestb" })
         OsClient.ClientList[tenant] = new OsClientSecret { OsClient = tenant, Db = unusedSql, DbRead = unusedSql,
-            OsClientModel = new JObject { ["Id"] = tenant, ["DbMongoConnection"] = args[2] } };
+            OsClientModel = new JObject { ["Id"] = tenant, ["DbMongoConnection"] = mongoConnection } };
     var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = root });
     builder.WebHost.UseUrls("http://127.0.0.1:0");
     builder.Services.AddSingleton<IMemoryIncidentRepository, V8MongoDB>();
@@ -83,7 +94,9 @@ if (args.FirstOrDefault() == "serve")
         return new { Done = true };
     });
     await app.StartAsync();
-    File.WriteAllText(Path.Combine(root, "ready.json"), System.Text.Json.JsonSerializer.Serialize(new { Url = app.Urls.Single(), ProcessId = Environment.ProcessId, BootId = ExecutionObservation.BootId }));
+    var ready = Path.Combine(root, "ready.json");
+    File.WriteAllText(ready + ".tmp", System.Text.Json.JsonSerializer.Serialize(new { Url = app.Urls.Single(), ProcessId = Environment.ProcessId, BootId = ExecutionObservation.BootId }));
+    File.Move(ready + ".tmp", ready);
     await app.WaitForShutdownAsync();
     return;
 }
@@ -239,14 +252,16 @@ Check("Shared-volume retention never removes another live node checkpoint", () =
     store.Trim(Guid.NewGuid().ToString("N"));
     Assert(!File.Exists(checkpoint), "expired stopped node checkpoint not trimmed");
 });
-if (args.Length > 1)
+if (args.Length > 1 && args[1] == "mongo")
 {
     Check("Mongo replay is monotonic and resident memory is available", () =>
     {
         var tenant = "memoryrepositorytest";
         var unusedSql = new Dos.ORM.DbSession(Dos.ORM.DatabaseType.MySql, "Server=127.0.0.1;Port=1;Database=unused;User ID=unused;");
+        var mongoConnection = Environment.GetEnvironmentVariable("MICROI_TEST_MONGO_CURRENT")
+            ?? throw new InvalidOperationException("MICROI_TEST_MONGO_CURRENT is required for the Mongo regression.");
         OsClient.ClientList[tenant] = new OsClientSecret { OsClient = tenant, Db = unusedSql, DbRead = unusedSql,
-            OsClientModel = new JObject { ["Id"] = tenant, ["DbMongoConnection"] = args[1] } };
+            OsClientModel = new JObject { ["Id"] = tenant, ["DbMongoConnection"] = mongoConnection } };
         var repository = (IMemoryIncidentRepository)new V8MongoDB();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         var incident = new JObject { ["Id"] = Guid.NewGuid().ToString("N"), ["Tenant"] = tenant,
