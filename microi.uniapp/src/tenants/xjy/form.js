@@ -7,8 +7,7 @@ import {
   normalizeOptions,
   parseJson
 } from '@/platform/native-form.js'
-import { formatRegion } from '@/platform/business-runtime.js'
-import { findMenu, openForm } from '@/platform/business-runtime.js'
+import { findMenu, formatRegion, openForm } from '@/platform/business-runtime.js'
 import { canAddMenuRecord } from '@/platform/menu-permission.js'
 import {
   TERMINATION_TABLE, TERMINATION_MENU_ID, terminationFromOrder,
@@ -62,6 +61,13 @@ import {
   contractStateByEndDate,
   orderCustomerSourceValues
 } from './order-contract.mjs'
+import {
+  canGenerateDeviceQrCode,
+  createDeviceQrCodeAdapters,
+  generateDeviceQrCode,
+  resolveDeviceProductId,
+  withDeviceActionTimeout
+} from './device-detail-actions.mjs'
 
 const CUSTOMER_TABLE = 'diy_kehu'
 const CUSTOMER_CASE_TABLE = 'diy_anli'
@@ -71,6 +77,9 @@ const CASEBOOK_CASE_TABLE = 'diy_anlice_child'
 const ORDER_TABLE = 'diy_dingdan'
 function isTerminationForm(context) {
   return String(context.tableName || '').toLowerCase() === 'diy_duanyueshenqing'
+}
+function isDeviceForm(context) {
+  return String(context.tableName || '').toLowerCase() === 'diy_kehusb'
 }
 const ORDER_PRODUCT_TABLE = 'diy_dingdansp'
 const PRODUCT_TABLE = 'diy_shangpin'
@@ -1645,7 +1654,8 @@ export function createState() {
     installationCodeField: '',
     installationCodeValue: '',
     installationLocationInitialized: false,
-    installationLocationValues: {}
+    installationLocationValues: {},
+    deviceActionKey: ''
   }
 }
 
@@ -2123,6 +2133,28 @@ export function getFieldActions(context, field) {
   if (!field) return []
   const name = String(field.Name || '').toLowerCase()
   const label = String(field.Label || '').trim()
+  if (isDeviceForm(context) && ['Add', 'Edit'].includes(context.mode) && name === 'shebeiewmpath') {
+    const busy = String(context.state.deviceActionKey || '')
+    const actions = [{
+      key: 'xjy-device-product-preview',
+      label: busy === 'product' ? '正在打开…' : '预览商品详情',
+      icon: '▤',
+      compact: true,
+      tone: 'preview',
+      disabled: Boolean(busy)
+    }]
+    if (canGenerateDeviceQrCode(context.menuId, getUser() || {}, context.mode)) {
+      actions.push({
+        key: 'xjy-device-qrcode',
+        label: busy === 'qrcode' ? '生成中…' : '生成设备二维码',
+        icon: '▦',
+        compact: true,
+        tone: 'qrcode',
+        disabled: Boolean(busy)
+      })
+    }
+    return actions
+  }
   if (isTerminationForm(context) && name === 'dingdanxq') {
     return [{ key: 'xjy-termination-order-detail', label: field.Label || '查看订单详情', icon: '▤',
       disabled: !context.form.DingdanID }]
@@ -2173,6 +2205,48 @@ export function getFieldActions(context, field) {
 }
 
 export async function runFieldAction(context, field, action) {
+  if (action?.key === 'xjy-device-product-preview') {
+    context.state.deviceActionKey = 'product'
+    try {
+      const productId = await withDeviceActionTimeout(resolveDeviceProductId(context.form, (orderProductId) =>
+        V8.FormEngine.Request('getformdata', 'Diy_DingdanSP', {
+          Id: orderProductId,
+          _SelectFields: ['Id', 'ShangpinID']
+        }, {
+          checkCode: false,
+          timeout: 8000
+        })
+      ), 10000, '商品信息读取超时，请重试')
+      uni.navigateTo({ url: `/pages/mall/detail?id=${encodeURIComponent(productId)}` })
+      return { handled: true }
+    } finally {
+      context.state.deviceActionKey = ''
+    }
+  }
+  if (action?.key === 'xjy-device-qrcode') {
+    if (!canGenerateDeviceQrCode(context.menuId, getUser() || {}, context.mode)) {
+      throw new Error(`当前账号没有设备列表${context.mode === 'Add' ? '新增' : '编辑'}权限`)
+    }
+    context.state.deviceActionKey = 'qrcode'
+    try {
+      const isAdd = context.mode === 'Add' && !context.rowId
+      const deviceId = context.rowId || context.form.Id || context.draftRowId
+      const qrCode = await withDeviceActionTimeout(
+        generateDeviceQrCode(deviceId, createDeviceQrCodeAdapters(V8, {
+          menuId: context.menuId || '',
+          isAdd
+        })),
+        15000,
+        '二维码生成超时，请稍后重试'
+      )
+      context.patchForm(qrCode)
+      context.state.deviceQrCodeValues = qrCode
+      uni.showToast({ title: '设备二维码已生成', icon: 'success' })
+      return { handled: true }
+    } finally {
+      context.state.deviceActionKey = ''
+    }
+  }
   if (action?.key === 'xjy-termination-order-detail' && context.form.DingdanID) {
     const menu = await findMenu(['合同订单'], ORDER_TABLE)
     if (!menu?.Id) throw new Error('当前账号没有订单查看权限')
@@ -2563,6 +2637,10 @@ export async function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  if (isDeviceForm(context) && context.state.deviceQrCodeValues) {
+    // 二维码图片字段为只读控件，新增时显式随表单提交，保证草稿 Id 与二维码内容一致。
+    return { ...context.state.deviceQrCodeValues }
+  }
   if (isTerminationForm(context)) {
     if (!context.form.DingdanID) throw new Error('请重新选择有效订单')
     if (context.state.terminationGoodsReady === false) throw new Error('请确认订单商品已完整加载')

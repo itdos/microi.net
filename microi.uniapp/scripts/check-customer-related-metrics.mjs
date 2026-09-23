@@ -9,13 +9,19 @@ const business = fs.readFileSync(path.join(root, 'src/tenants/xjy/business.js'),
 
 assert.match(related, /class="search-row"[\s\S]*?v-if="!isPreview && relatedMetrics\.length"/,
 	'客户关联 Tab 的统计条必须展示在检索框下方')
-assert.match(related, /const baseWhere = \[[\s\S]*?this\.childFkField[\s\S]*?this\.relationValue[\s\S]*?this\.config\.fixedWhere/,
-  '统计查询必须限定当前客户外键并继承模块固定条件')
+assert.match(related, /const activeWhere = \[[\s\S]*?this\.childFkField[\s\S]*?this\.relationValue[\s\S]*?this\.buildFilterWhere\(\)[\s\S]*?keywordWhere/,
+  '统计查询必须限定当前父子外键并继承当前筛选与关键词条件')
+assert.match(related, /_Where: \[\.\.\.\(this\.config\.fixedWhere \|\| \[\]\), \.\.\.where\]/,
+  '非模块统计查询必须继续继承模块固定条件')
+assert.match(related, /tableChildModuleQuery: moduleAssociationQuery/,
+  'Join 统计查询必须复用模块引擎并避免重新叠加子菜单数据范围')
+assert.match(related, /refreshFilteredRows\(\)[\s\S]*?Promise\.all\(\[this\.loadData\(true, true\), this\.loadRelatedMetrics\(true\)\]\)/,
+  '搜索、重置与筛选必须同时刷新列表和统计数据')
 assert.match(related, /_TableChildAuth: this\.tableChildAuth/,
   '统计查询必须携带完整 TableChild 授权链')
 assert.match(related, /Promise\.all\(metrics\.map/,
   '同一 Tab 的多个统计指标应并行加载')
-assert.match(related, /if \(metric\.aggregateField\)[\s\S]*?loadModuleRows\(this\.config,[\s\S]*?statisticsFieldValue\(summary\.append, metric\.aggregateField, 0\)/,
+assert.match(related, /if \(metric\.aggregateField \|\| moduleAssociationQuery\)[\s\S]*?loadModuleRows\(this\.config,[\s\S]*?statisticsFieldValue\(summary\.append, metric\.aggregateField, 0\)/,
   '金额等汇总指标必须使用模块引擎的服务端全量 StatisticsFields')
 assert.match(related, /handleDataChanged[\s\S]*?loadRelatedMetrics\(true\)/,
   '子表增删改后必须刷新统计')

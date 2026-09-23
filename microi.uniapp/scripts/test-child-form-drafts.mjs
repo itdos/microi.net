@@ -65,6 +65,37 @@ test('actual add/edit/copy/delete/refresh handlers keep unsaved points local and
   assert.throws(() => drafts.readChildDraft(group.key, group.tableName, original.Id), /已失效/)
 })
 
+test('opening an unsaved installation point detail keeps the draft relation instead of querying a missing row', async () => {
+  const group = fixture('detail-parent')
+  group.rows = [{ Id: 'draft-point', AnzhuangCS: '一楼茶水间' }]
+  const opened = []
+  const ctx = {
+    proposalDraftGroup: group,
+    moduleKey: '',
+    config: { table: points.PROPOSAL_INSTALLATION_TABLE, title: '需求方案安装点位', menuAliases: [] },
+    sectionTitle: '安装点位',
+    menuId: 'child-menu',
+    childMenuId: 'child-menu',
+    currentUser: {},
+    tableChildAuth: group.auth,
+    presentation: {}
+  }
+  ctx.openDetail = listMethod('openDetail', {
+    openForm: (options) => opened.push(options),
+    canEditMenuRecord: () => true,
+    uni: { navigateTo() {} }
+  }).bind(ctx)
+
+  ctx.openDetail(group.rows[0])
+
+  assert.equal(opened.length, 1)
+  assert.equal(opened[0].rowId, 'draft-point')
+  assert.equal(opened[0].mode, 'View')
+  assert.equal(opened[0].draftRelation, group.key)
+  assert.equal(opened[0].includeRelated, false)
+  drafts.disposeChildDraftSession('detail-parent')
+})
+
 test('flush uses the saved parent, original authorization chain, Client events and current parent defaults', async () => {
   const group = fixture('draft-parent')
   group.rows = [{ Id: 'p1', ShebeiSL: 2 }, { Id: 'p2', ShebeiSL: 0 }]
