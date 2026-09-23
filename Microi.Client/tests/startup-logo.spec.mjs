@@ -58,10 +58,13 @@ test('broken logo, stale load and removed setting cannot replace the current fal
     assert.equal(nodes.startupTenantLogo.hidden, true);
 });
 
-test('startup markup uses the local artwork and current config refresh reaches the same renderer', () => {
+test('startup markup uses the vector Microi brand fallback and current config refresh reaches the same renderer', () => {
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
     const store = readFileSync(new URL('../src/pinia/modules/diy.js', import.meta.url), 'utf8');
-    assert.match(html, /id="startupDefaultLogo"[^>]+microi-startup-brand/);
+    assert.match(html, /id="startupDefaultLogo"[^>]+\/static\/img\/logo\/logo20200526\.svg/);
+    assert.match(html, /\.mci-logo-core\.has-default-logo img\s*\{[^}]*width:\s*80px;[^}]*height:\s*80px;/);
+    assert.doesNotMatch(html, /\.mci-logo-ring\.has-default-logo::before[\s\S]{0,180}display:\s*none/);
+    assert.doesNotMatch(html, /microi-startup-brand\.png/);
     assert.match(html, /MicroiSetStartupLogo\(cfg\)/);
     assert.doesNotMatch(html, /lc\.innerHTML/);
     assert.match(store, /MicroiSetStartupLogo\(val\)/);

@@ -259,6 +259,66 @@ namespace Microi.net
             return token.DosTrim().DosReplace("Bearer ", "");
         }
 
+        // did describes a device, not a login. Several mini programs can share it.
+        internal static string GetLoginSessionId(string token)
+        {
+            var normalized = NormalizeBearerToken(token);
+            if (normalized.DosIsNullOrWhiteSpace()) return "";
+            try
+            {
+                var id = new JwtSecurityTokenHandler().ReadJwtToken(normalized)
+                    .Claims.FirstOrDefault(c => c.Type == "MicroiSessionId")?.Value;
+                if (!id.DosIsNullOrWhiteSpace()) return id;
+            }
+            catch { /* Legacy tokens still need a stable rotation identity. */ }
+            using (var sha = SHA256.Create())
+                return "legacy:" + BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(normalized))).Replace("-", "");
+        }
+
+        internal static string ResolveLoginDid(string did, string loginSessionId)
+        {
+            return did.DosIsNullOrWhiteSpace()
+                || string.Equals(did, "Empty", StringComparison.OrdinalIgnoreCase)
+                ? "Session:" + loginSessionId
+                : did;
+        }
+
+        internal static string AddOrRotateSessionToken(
+            List<TokensModel> tokens, TokensModel next, string rotateFromToken, DateTime now)
+        {
+            var previous = NormalizeBearerToken(rotateFromToken);
+            if (previous.DosIsNullOrWhiteSpace())
+            {
+                tokens.Insert(0, next);
+                return next.Token;
+            }
+
+            var sessionId = GetLoginSessionId(previous);
+            var alreadyRotated = tokens.FirstOrDefault(d => d != null && !d.RetiredTime.HasValue
+                && !string.Equals(NormalizeBearerToken(d.Token), previous, StringComparison.Ordinal)
+                && string.Equals(GetLoginSessionId(d.Token), sessionId, StringComparison.Ordinal));
+            if (alreadyRotated != null)
+            {
+                alreadyRotated.IP = next.IP;
+                alreadyRotated.UpdateTime = now;
+                return alreadyRotated.Token;
+            }
+
+            foreach (var entry in tokens.Where(d => d != null && !d.RetiredTime.HasValue
+                && string.Equals(GetLoginSessionId(d.Token), sessionId, StringComparison.Ordinal)))
+                entry.RetiredTime = now;
+            tokens.Insert(0, next);
+            return next.Token;
+        }
+
+        internal static List<TokensModel> WithoutLoginSession(IEnumerable<TokensModel> tokens, string requestToken)
+        {
+            var sessionId = GetLoginSessionId(requestToken);
+            return (tokens ?? Enumerable.Empty<TokensModel>())
+                .Where(d => d != null && !string.Equals(GetLoginSessionId(d.Token), sessionId, StringComparison.Ordinal))
+                .ToList();
+        }
+
         public static bool IsTokenEntryWithinRotationGrace(TokensModel tokenEntry, DateTime? now = null)
         {
             if (tokenEntry == null)
@@ -623,7 +683,6 @@ namespace Microi.net
                         did = headerDid;
                     }
                 }
-                did = did.DosIsNullOrWhiteSpace() ? "Empty" : did;
                 var ip = IPHelper.GetClientIP(context).Data ?? "";
                 {
                     // Access-key scope belongs to one terminal token. Never write it
@@ -642,13 +701,11 @@ namespace Microi.net
                     claims.Add(new Claim("UserId", userId));
                     // 秒级签发时间不能保证两次真实登录的 Token 不同。
                     claims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")));
-                    var loginSessionId = Guid.NewGuid().ToString("N");
-                    if (!string.IsNullOrWhiteSpace(param.RotateFromToken))
-                    {
-                        try { loginSessionId = new JwtSecurityTokenHandler().ReadJwtToken(NormalizeBearerToken(param.RotateFromToken))
-                            .Claims.FirstOrDefault(c => c.Type == "MicroiSessionId")?.Value ?? loginSessionId; }
-                        catch { /* 旧 Token 有效性仍由下方锁内会话核验决定。 */ }
-                    }
+                    var loginSessionId = string.IsNullOrWhiteSpace(param.RotateFromToken)
+                        ? Guid.NewGuid().ToString("N")
+                        : GetLoginSessionId(param.RotateFromToken);
+                    // An absent or literal Empty did must not merge unrelated logins.
+                    did = ResolveLoginDid(did, loginSessionId);
                     claims.Add(new Claim("MicroiSessionId", loginSessionId));
                     claims.Add(new Claim("OsClient", osClient));
                     claims.Add(new Claim("ClientType", clientType));
@@ -775,54 +832,16 @@ namespace Microi.net
                                             && IsTokenEntryWithinRotationGrace(d, dateTimeNow))
                                 .ToList() ?? new List<TokensModel>();
 
-                            var currentTerminalToken = tokenModel.Tokens.FirstOrDefault(d =>
-                                !d.RetiredTime.HasValue
-                                && string.Equals(d.Did, did, StringComparison.Ordinal)
-                                && string.Equals(d.ClientType, clientType, StringComparison.Ordinal));
-
-                            // 同一终端已有另一个并发请求完成了续签时，复用它的新 Token，避免连续轮换和响应乱序。
-                            var reuseConcurrentRotation = !rotateFromToken.DosIsNullOrWhiteSpace()
-                                && currentTerminalToken != null
-                                && !string.Equals(
-                                    NormalizeBearerToken(currentTerminalToken.Token),
-                                    rotateFromToken,
-                                    StringComparison.Ordinal);
-                            if (reuseConcurrentRotation)
+                            access_token = AddOrRotateSessionToken(tokenModel.Tokens, new TokensModel
                             {
-                                access_token = currentTerminalToken.Token;
-                                currentTerminalToken.IP = ip;
-                                currentTerminalToken.UpdateTime = dateTimeNow;
-                            }
-                            else
-                            {
-                                if (rotateFromToken.DosIsNullOrWhiteSpace())
-                                {
-                                    // 主动登录/换号应立即替换同终端旧登录态，不应用自动续签的兼容窗口。
-                                    tokenModel.Tokens.RemoveAll(d =>
-                                        string.Equals(d.Did, did, StringComparison.Ordinal)
-                                        && string.Equals(d.ClientType, clientType, StringComparison.Ordinal));
-                                }
-                                else
-                                {
-                                    foreach (var oldToken in tokenModel.Tokens.Where(d =>
-                                                 !d.RetiredTime.HasValue
-                                                 && string.Equals(d.Did, did, StringComparison.Ordinal)
-                                                 && string.Equals(d.ClientType, clientType, StringComparison.Ordinal)))
-                                    {
-                                        oldToken.RetiredTime = dateTimeNow;
-                                    }
-                                }
-                                tokenModel.Tokens.Insert(0, new TokensModel
-                                {
-                                    Token = access_token,
-                                    AuthVersion = CurrentAuthVersion,
-                                    ClientType = clientType,
-                                    Did = did,
-                                    IP = ip,
-                                    CreateTime = dateTimeNow,
-                                    UpdateTime = dateTimeNow
-                                });
-                            }
+                                Token = access_token,
+                                AuthVersion = CurrentAuthVersion,
+                                ClientType = clientType,
+                                Did = did,
+                                IP = ip,
+                                CreateTime = dateTimeNow,
+                                UpdateTime = dateTimeNow
+                            }, rotateFromToken, dateTimeNow);
                             tokenModel.Token = access_token;
                         }
 

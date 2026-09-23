@@ -8,6 +8,7 @@
     {"name":"golang:1.26.7-alpine","source":"docker.io/library/golang:1.26.7-alpine","digest":"sha256:28d89ee9cc0ff9fec75c82ca201e6bf7fdf9a679d4b7b24dfa04f2bb766bb468","scopes":["panel-build"]},
     {"name":"alpine:3.24.1","source":"docker.io/library/alpine:3.24.1","digest":"sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b","scopes":["panel-build"]},
     {"name":"dotnet-aspnet:10.0","source":"mcr.microsoft.com/dotnet/aspnet:10.0","digest":"sha256:1fe86375600b62e6566b465da9553eef0621f13c67f40fe764cd8dbb1dee1497","scopes":["build"]},
+    {"name":"node:22-bookworm-slim","source":"docker.io/library/node:22-bookworm-slim","digest":"sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9","scopes":["build"]},
     {"name":"nginx:acs-sample-20260909","source":"registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx:latest","digest":"sha256:423210a5903e9683d2bc8436ed06343ad5955c1aec71a04e1d45bd70b0d68460","scopes":["build"]},
     {"name":"nginx:1.30.4-alpine","source":"docker.io/library/nginx:1.30.4-alpine","digest":"sha256:dc5069ad14f19660b141b21236140b91656bf89bbc3e2417c70ae650cd66104c","scopes":["panel"]},
     {"name":"nginx:1.31.5-alpine","source":"docker.io/library/nginx:1.31.5-alpine","digest":"sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3","scopes":["panel"]},

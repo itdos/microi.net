@@ -27,9 +27,13 @@ description: Microi AI 引擎、MiniMax 图片/音乐/视频生成与预览、�
 
 平台 AI 包含聊天/流式聊天、模型代理、模型路由、订阅配额、NL2SQL、NL2V8、数据库 Schema 关键词检索、可选向量融合和 V8 Skill 文档检索。AI 输出是建议，不是授权；执行 SQL、V8 或 MCP 写入前仍走平台权限与确认。
 
-当前入口并不共用一条检索链路：普通 `Chat/ChatStream` 使用服务端会话上下文和固定核心规范 Prompt；`NL2SQL` 使用当前租户 Schema 双模式检索；`NL2V8` 使用 Skill 镜像与当前租户 Schema 双模式检索。默认模式不依赖 Ollama、`nomic-embed-text` 或 Qdrant；只有显式开启向量数据库时才增加向量通道。`Microi.Server/Microi.AI` 不是 MCP Host，没有注册 MCP Tools，也没有处理 `tool_calls` 的代理循环。MCP Server 目前由 Codex、Copilot、Cursor、Claude Code 等外部宿主调用。禁止仅凭 Prompt 中出现“使用 MCP”就声称在线 AI 已经执行工具。
+当前入口并不共用一条检索链路：普通 `Chat/ChatStream` 使用服务端会话上下文和固定核心规范 Prompt；`NL2SQL` 使用当前租户 Schema 双模式检索；`NL2V8` 使用 Skill 镜像与当前租户 Schema 双模式检索。默认模式不依赖 Ollama、`nomic-embed-text` 或 Qdrant；只有显式开启向量数据库时才增加向量通道。在线低代码建模在 `Microi.AI` 内建立同版 `microi.mcp` 会话，模型通过 `microi_codex` 执行工具循环。普通对话仍不调用 MCP；不能仅凭 Prompt 声称工具已执行，必须检查工具返回和回读。
 
-未来若给平台在线 AI 增加工具调用，优先在 `Microi.AI` 内建立受限 Tool Gateway，复用 FormEngine、V8McpLogic 等后端服务的授权入口；不要让后端使用超级管理员 Token 再请求自己的 MCP。每次工具调用必须继承当前用户、`OsClient`、Token/权限快照和审计上下文，模型只能提出调用建议，服务端仍负责参数白名单、写操作确认、幂等、步数/时长/结果大小上限和权威回读。工具返回的数据继续按不可信内容处理，不能反向覆盖系统规则。
+在线 `/#/mic-ai-engine` 的低代码建模模式使用本地 Microi.Code 同一份 `microi.mcp` 工具目录：先 `list_tools`/`describe_tool`，再执行表、字段、菜单、接口引擎、Manifest 系统编排、删除等原 MCP 工具。用户在对话中明确要求写入时自动执行，不需要网页按钮；明确“只规划、不执行”时只调用只读工具。前端仅向 `Level >= 9999` 开放建模入口；服务端进入模式和每次工具调用前都以当前 DiyToken、主库账号及有效角色复核。工具原有确认值、审计和回读规则继续生效；超时或结果不确定时停止，不自动重试写操作。商城包不替换平台前后端程序。
+
+建模对话使用非流式 `/api/Ai/Chat` 获取服务端 MCP 工具循环最终答案和工具名称/状态；普通对话保持流式。完整系统先调用 `microi_get_db_schema`、`microi_get_manifest_schema`、`microi_plan_system`，用 `microi_generate_system(dryRun=true)` 验证，再按用户明确创建请求调用 `dryRun=false` 并用 `microi_validate_system` 回读。模型提交的参数由原 MCP Schema 校验，不能在前端绕过。
+
+在线工具网关仅转发当前请求的真实 DiyToken 与租户到同版 MCP，不创建服务账号或提权 Token；不继承宿主其它凭据。每次调用前复核当前管理员权限，模型只能提出调用建议，MCP 继续负责参数 Schema、写操作确认、幂等、审计和权威回读。对浏览器本地文件，先通过受控上传取得服务器可读内容，不能把客户端路径当作 API 节点路径。
 
 ## 商业授权与调用入口
 
@@ -235,7 +239,7 @@ MCP 提供实时事实和受控执行；关键词索引提供低依赖、确定�
 - [ ] 带行级范围或高风险查询失败关闭，并改走审核、参数化和审计的业务 ApiEngine
 - [ ] NL2V8 保存前有确认、语法、版本、回读和执行验证
 - [ ] Prompt injection 不能调用未授权工具
-- [ ] `microi_chat` 只调用对话入口、拒绝身份/密钥/Endpoint 覆盖并返回最终结果；在尚无模型 `tool_calls` Agent Loop 时，不会声称平台在线 AI 已执行其它 MCP 工具
+- [ ] `microi_chat` 只调用对话入口、拒绝身份/密钥/Endpoint 覆盖并返回最终结果；在线建模的自动执行必须由独立、受当前登录用户鉴权的 MCP HTTP 动作与写后回读证明，不把 `microi_chat` 的回答当作工具执行回执
 - [ ] 各流式入口分别验证断开取消或明确仅有超时，不做过度承诺
 - [ ] Prompt/Answer 当前留存范围已披露；全面脱敏只能在真实实现并回读后声明
 - [ ] 新旧节点知识库版本可共存
