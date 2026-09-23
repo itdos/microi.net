@@ -1976,10 +1976,6 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
-  if (isDeviceForm(context) && String(field?.Name || '').toLowerCase() === 'shebeiewm') {
-    // PC 查看态通过 V8TmpEngineForm 输出 data:image/png;base64；移动端以等价的原生图片控件展示。
-    return { nativeComponent: 'Qrcode', readonly: true }
-  }
   if (isTerminationForm(context)) {
     if (String(field?.Name || '').toLowerCase() === 'dingdanxq') {
       return { type: 'action', hideLabel: true, visible: true }
@@ -2137,7 +2133,7 @@ export function getFieldActions(context, field) {
   if (!field) return []
   const name = String(field.Name || '').toLowerCase()
   const label = String(field.Label || '').trim()
-  if (isDeviceForm(context) && context.mode === 'Edit' && name === 'shebeiewm') {
+  if (isDeviceForm(context) && ['Add', 'Edit'].includes(context.mode) && name === 'shebeiewmpath') {
     const busy = String(context.state.deviceActionKey || '')
     const actions = [{
       key: 'xjy-device-product-preview',
@@ -2147,7 +2143,7 @@ export function getFieldActions(context, field) {
       tone: 'preview',
       disabled: Boolean(busy)
     }]
-    if (canGenerateDeviceQrCode(getUser() || {})) {
+    if (canGenerateDeviceQrCode(context.menuId, getUser() || {}, context.mode)) {
       actions.push({
         key: 'xjy-device-qrcode',
         label: busy === 'qrcode' ? '生成中…' : '生成设备二维码',
@@ -2228,17 +2224,23 @@ export async function runFieldAction(context, field, action) {
     }
   }
   if (action?.key === 'xjy-device-qrcode') {
-    if (!canGenerateDeviceQrCode(getUser() || {})) throw new Error('当前账号没有生成设备二维码的权限')
+    if (!canGenerateDeviceQrCode(context.menuId, getUser() || {}, context.mode)) {
+      throw new Error(`当前账号没有设备列表${context.mode === 'Add' ? '新增' : '编辑'}权限`)
+    }
     context.state.deviceActionKey = 'qrcode'
     try {
+      const isAdd = context.mode === 'Add' && !context.rowId
+      const deviceId = context.rowId || context.form.Id || context.draftRowId
       const qrCode = await withDeviceActionTimeout(
-        generateDeviceQrCode(context.rowId || context.form.Id, createDeviceQrCodeAdapters(V8, {
-          menuId: context.menuId || ''
+        generateDeviceQrCode(deviceId, createDeviceQrCodeAdapters(V8, {
+          menuId: context.menuId || '',
+          isAdd
         })),
         15000,
         '二维码生成超时，请稍后重试'
       )
-      context.patchForm({ ShebeiEWM: qrCode })
+      context.patchForm(qrCode)
+      context.state.deviceQrCodeValues = qrCode
       uni.showToast({ title: '设备二维码已生成', icon: 'success' })
       return { handled: true }
     } finally {
@@ -2635,6 +2637,10 @@ export async function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  if (isDeviceForm(context) && context.state.deviceQrCodeValues) {
+    // 二维码图片字段为只读控件，新增时显式随表单提交，保证草稿 Id 与二维码内容一致。
+    return { ...context.state.deviceQrCodeValues }
+  }
   if (isTerminationForm(context)) {
     if (!context.form.DingdanID) throw new Error('请重新选择有效订单')
     if (context.state.terminationGoodsReady === false) throw new Error('请确认订单商品已完整加载')

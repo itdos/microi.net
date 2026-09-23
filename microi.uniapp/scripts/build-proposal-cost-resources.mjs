@@ -19,6 +19,50 @@ function event(table, label, type, eventLabel, version, description, body) {
   descriptors.push({ formEngineKey: table, eventType: type, file, description })
 }
 
+const pointPreviewAndRefresh = fieldName => `if (V8.LoadMode === 'Design') return;
+if (typeof window.CalcInstallationPointCosts === 'function') window.CalcInstallationPointCosts();
+if (typeof window.RefreshProposalAfterPointSaved === 'function') {
+  window.RefreshProposalAfterPointSaved(V8, { ${fieldName}: V8.Form.${fieldName} });
+}`
+
+const deviceModelPreviewAndRefresh = `if (V8.LoadMode === 'Design') return;
+if (V8.ThisValue) {
+V8.FormSet('ShebeiMC', V8.ThisValue.ShangpinMC); V8.FormSet('ShebeiDJ', V8.ThisValue.Xianjia); V8.FormSet('ShebeiDJZL', V8.ThisValue.ZulinXJ); V8.FormSet('GenghuanLXJG', V8.ThisValue.GenghuanLXJG); V8.FormSet('ShebeiXHID', V8.ThisValue.Id);
+}
+if (typeof window.CalcInstallationPointCosts === 'function') window.CalcInstallationPointCosts();
+if (typeof window.RefreshProposalAfterPointSaved === 'function') {
+  window.RefreshProposalAfterPointSaved(V8, {
+    ShebeiXHID: V8.Form.ShebeiXHID,
+    ShebeiDJ: V8.Form.ShebeiDJ,
+    ShebeiDJZL: V8.Form.ShebeiDJZL,
+    GenghuanLXJG: V8.Form.GenghuanLXJG
+  });
+}`
+
+function updatePointFieldRefreshPatches() {
+  const patchFile = path.join(project, 'resources/xjy/proposal-costs/field-patches.json')
+  const resources = JSON.parse(fs.readFileSync(patchFile, 'utf8'))
+  const child = resources.find(item => item.tableId === '01KWGB9WD5AEQX19GQ1NP442TT')
+  const codeById = {
+    '01KZWWHD2YBK4AYVAV9DWWZ4FG': deviceModelPreviewAndRefresh,
+    '01KWH02DKG5QXSPDYZBN6KAR69': pointPreviewAndRefresh('ShebeiSL'),
+    '01KZWWHDFDGEWFZJD5CEYVNTBE': pointPreviewAndRefresh('Renshu'),
+    '01KZWWHE7EQMWMWE61CB2W0CCW': pointPreviewAndRefresh('ShebeiDJZL'),
+    '01KZWWHEBJENBC798EGC956ZMD': pointPreviewAndRefresh('ShebeiDJ'),
+    '01KZWWHEFMQVBVN8SNY9YDQMKS': pointPreviewAndRefresh('GenghuanLXJG')
+  }
+  if (!child) throw new Error('未找到安装点位字段补丁')
+  for (const field of child.fieldList) {
+    const code = codeById[field.id]
+    if (!code) continue
+    field.v8Code = code
+    const config = JSON.parse(field.config || '{}')
+    config.V8Code = code
+    field.config = JSON.stringify(config)
+  }
+  fs.writeFileSync(patchFile, JSON.stringify(resources, null, 2) + '\n')
+}
+
 const server = `
 // 当前服务器使用 Insert/Update/Delete；同时兼容旧事件的 Add/Upt/Del。
 var costAction = String(V8.FormSubmitAction || '').toLowerCase();
@@ -128,9 +172,14 @@ window.CalcInstallationPointCosts();
 event('diy_anzhuang_dw', '需求方案安装点位', 'OutFormV8', '前端表单提交后V8事件', 'v1.0.1',
   '点位关闭后刷新父表合作后汇总；不覆盖父表未保存的现状输入，不重复写库。', `
 if (V8.LoadMode === 'Design') return;
-var parent = V8.ParentV8;
-if (parent && parent.Form && typeof parent.RefreshProposalPointCosts === 'function') {
-  await parent.RefreshProposalPointCosts();
+// 子表详情的 ParentV8 可能是字段级上下文；优先调用主表 InFormV8 暴露的闭包。
+if (typeof window.CalcHezuohou === 'function') {
+  await window.CalcHezuohou();
+} else {
+  var parent = V8.ParentV8;
+  if (parent && parent.Form && typeof parent.RefreshProposalPointCosts === 'function') {
+    await parent.RefreshProposalPointCosts();
+  }
 }
 `)
 
@@ -176,6 +225,58 @@ V8.RefreshProposalPointCosts = async function () {
   for (var key in values) V8.FormSet(key, values[key]);
 };
 window.CalcHezuohou = function () { return V8.RefreshProposalPointCosts(); };
+// 表格行内编辑会在字段事件结束后自动保存。轮询当前点位，确认服务端提交及父表汇总
+// 已在同一事务完成后再刷新主表，避免固定延时造成旧数据覆盖新值。
+var pointRefreshTasks = {};
+window.RefreshProposalAfterPointSaved = function (pointV8, expectedFields) {
+  if (!pointV8 || !pointV8.Form || !pointV8.Form.Id || !pointV8.FormEngine || !expectedFields) return;
+  var pointId = pointV8.Form.Id;
+  var taskKey = String(pointId);
+  var token = (pointRefreshTasks[taskKey] || 0) + 1;
+  pointRefreshTasks[taskKey] = token;
+  var attempts = 0;
+  function normalized(value) {
+    return value === null || value === undefined ? '' : String(value).trim();
+  }
+  var checkSaved = async function () {
+    if (pointRefreshTasks[taskKey] !== token) return;
+    attempts++;
+    try {
+      var selectFields = ['Id'];
+      var fieldName;
+      for (fieldName in expectedFields) {
+        if (selectFields.indexOf(fieldName) < 0) selectFields.push(fieldName);
+      }
+      var response = await pointV8.FormEngine.GetFormData('diy_anzhuang_dw', {
+        Id: pointId,
+        _SelectFields: selectFields
+      });
+      var row = response && response.Code == 1 ? response.Data : null;
+      var matched = !!row;
+      if (matched) {
+        for (fieldName in expectedFields) {
+          if (normalized(row[fieldName]) !== normalized(expectedFields[fieldName])) {
+            matched = false;
+            break;
+          }
+        }
+      }
+      if (matched) {
+        if (pointRefreshTasks[taskKey] === token) delete pointRefreshTasks[taskKey];
+        await V8.RefreshProposalPointCosts();
+        return;
+      }
+    } catch (error) {
+      // 自动保存尚未完成或瞬时读取失败时继续短轮询，不打断用户编辑。
+    }
+    if (attempts < 20 && pointRefreshTasks[taskKey] === token) {
+      setTimeout(checkSaved, 250);
+    } else if (pointRefreshTasks[taskKey] === token) {
+      delete pointRefreshTasks[taskKey];
+    }
+  };
+  setTimeout(checkSaved, 60);
+};
 window.CalcHezuoqian();
 await V8.RefreshProposalPointCosts();
 `)
@@ -249,4 +350,5 @@ descriptors.push({ apiEngineKey: 'xjy_compare_customer_proposals', file: engineF
 const report = outputFlag >= 0 ? target : path.join(workspace, '.tmp/proposal-point-costs')
 fs.mkdirSync(report, { recursive: true })
 fs.writeFileSync(path.join(report, 'resources.json'), JSON.stringify(descriptors, null, 2))
+updatePointFieldRefreshPatches()
 console.log(JSON.stringify({ resources: descriptors.length, report }))

@@ -7,6 +7,16 @@ const QR_CODE_KEYS = [
   'Base64'
 ]
 
+const QR_CODE_PATH_KEYS = [
+  'ShebeiEWMPath',
+  'FilePath',
+  'FilePathName',
+  'Path',
+  'PreviewUrl',
+  'FullPath',
+  'FileUrl'
+]
+
 function parseJsonObject(value) {
   const text = String(value || '').trim()
   if (!text || (!text.startsWith('{') && !text.startsWith('['))) return null
@@ -34,6 +44,26 @@ export function extractQrCodeValue(payload, depth = 0) {
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'Data')) {
     return extractQrCodeValue(payload.Data, depth + 1)
+  }
+  return ''
+}
+
+export function extractQrCodePath(payload, depth = 0) {
+  if (payload === null || payload === undefined || depth > 4) return ''
+  if (typeof payload === 'string' || typeof payload === 'number') {
+    const text = String(payload).trim()
+    const parsed = parseJsonObject(text)
+    return parsed ? extractQrCodePath(parsed, depth + 1) : ''
+  }
+  if (typeof payload !== 'object') return ''
+
+  for (const key of QR_CODE_PATH_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(payload, key)) continue
+    const value = String(payload[key] || '').trim()
+    if (value) return value
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'Data')) {
+    return extractQrCodePath(payload.Data, depth + 1)
   }
   return ''
 }
@@ -92,6 +122,7 @@ export async function materializeQrCodeImageSource(payload, options = {}) {
 }
 
 export default {
+  extractQrCodePath,
   extractQrCodeValue,
   materializeQrCodeImageSource,
   normalizeQrCodeStorageValue,

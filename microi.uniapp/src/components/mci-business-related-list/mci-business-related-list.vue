@@ -2778,6 +2778,22 @@ export default {
         })
         return
       }
+      if (this.proposalDraftGroup) {
+        // 主方案尚未保存时，点位 Id 只存在于页面草稿会话；详情页必须沿用草稿关系读取，
+        // 不能把它当作已落库记录交给 GetFormData，否则会得到 NoExistData。
+        openForm({
+          table: this.config.table,
+          rowId: row.Id,
+          mode: 'View',
+          title: `${this.config.title || this.sectionTitle}详情`,
+          menuId: this.menuId,
+          menuAliases: this.config.menuAliases || [],
+          tableChildAuth: this.tableChildAuth,
+          includeRelated: false,
+          draftRelation: this.proposalDraftGroup.key
+        })
+        return
+      }
       const requestedMode = String(this.presentation.openMode || 'View')
       const mode = requestedMode === 'Edit' && canEditMenuRecord(this.menuId || this.childMenuId, this.currentUser)
         ? 'Edit'
