@@ -103,9 +103,10 @@ namespace Microi.net
             // Requiring both the signed-in principal and the primary database to say
             // "administrator" makes request-body forgery useless and fails closed
             // while login/authorization caches are being refreshed.
+            // AI/MCP 设计写入要求账号 Level 达到平台级；_IsAdmin 只是旧版 UI 标记，
+            // 不能让低级别账号凭此标记获得建表、改字段等管理能力。
             var tokenClaimsAdministrator =
-                currentUser["_IsAdmin"].Val<bool>() == true
-                || currentUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
+                currentUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
             if (!tokenClaimsAdministrator || databaseUser.Level < DiyCommon.MaxRoleLevel)
             {
                 return false;

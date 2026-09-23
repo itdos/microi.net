@@ -44,7 +44,9 @@ export default {
                     },
                     OnSuccess: param.OnSuccess,
                     OnCancel: param.OnCancel,
-                    OnError: param.OnError
+                    OnError: param.OnError,
+                    Header: param.Header,
+                    OnHeaderAction: param.OnHeaderAction
                 }
             });
         },

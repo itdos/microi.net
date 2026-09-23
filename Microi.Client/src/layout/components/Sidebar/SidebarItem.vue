@@ -33,6 +33,7 @@
             <item
                 v-if="item.meta"
                 :icon="item.meta.icon"
+                :is-parent="true"
                 :title="generateTitle(item.meta.title)"
                 :menu-id="item.meta.Id"
                 :badge-config="item.meta.MenuBadgeConfig"
@@ -45,6 +46,7 @@
                     <item
                         v-if="item.meta"
                         :icon="item.meta && item.meta.icon"
+                        :is-parent="true"
                         :title="generateTitle(item?.meta?.title)"
                         :menu-id="item.meta.Id"
                         :badge-config="item.meta.MenuBadgeConfig"
