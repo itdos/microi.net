@@ -11,6 +11,7 @@ import {
   withDeviceActionTimeout
 } from '../src/tenants/xjy/device-detail-actions.mjs'
 import {
+  extractQrCodePath,
   extractQrCodeValue,
   materializeQrCodeImageSource,
   resolveQrCodeImageSource
@@ -21,6 +22,7 @@ const detailSource = fs.readFileSync(path.join(root, 'src/pages/business/detail.
 const formExtensionSource = fs.readFileSync(path.join(root, 'src/tenants/xjy/form.js'), 'utf8')
 const nativeFormSource = fs.readFileSync(path.join(root, 'src/pages/native-form/index.vue'), 'utf8')
 const nativeFieldSource = fs.readFileSync(path.join(root, 'src/components/mci-native-field/mci-native-field.vue'), 'utf8')
+const mediaUploaderSource = fs.readFileSync(path.join(root, 'src/components/mci-media-uploader/mci-media-uploader.vue'), 'utf8')
 const rowActionsSource = fs.readFileSync(path.join(root, 'src/pages/business/utils/xjy-row-actions.js'), 'utf8')
 
 test('设备已有商品Id时直接打开商品，不重复查询订单商品', async () => {
@@ -53,15 +55,22 @@ test('设备商品关联缺失或失效时给出可读错误', async () => {
   )
 })
 
-test('二维码入口沿用设备列表的租户与超级管理员权限边界', () => {
-  assert.equal(canGenerateDeviceQrCode({ Level: 999 }), true)
-  assert.equal(canGenerateDeviceQrCode({ TenantId: 'tenant-1' }), true)
-  assert.equal(canGenerateDeviceQrCode({ Level: 1, TenantId: '' }), false)
+test('二维码入口沿用设备列表表单的新增和编辑权限', () => {
+  const menuId = 'device-menu'
+  const editUser = { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Edit' }] }] }
+  const addUser = { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Add' }] }] }
+  assert.equal(canGenerateDeviceQrCode(menuId, { Level: 999 }, 'Edit'), true)
+  assert.equal(canGenerateDeviceQrCode(menuId, editUser, 'Edit'), true)
+  assert.equal(canGenerateDeviceQrCode(menuId, editUser, 'Add'), false)
+  assert.equal(canGenerateDeviceQrCode(menuId, addUser, 'Add'), true)
+  assert.equal(canGenerateDeviceQrCode(menuId, addUser, 'Edit'), false)
 })
 
 test('兼容平台接口返回设备对象或历史二维码字符串', () => {
   const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB'
+  const path = 'xjy/device-qrcode/device-1.png'
   assert.equal(extractQrCodeValue({ Code: 1, Data: { Id: 'device-1', ShebeiEWM: png } }), png)
+  assert.equal(extractQrCodePath({ Code: 1, Data: { ShebeiEWMPath: path } }), path)
   assert.equal(extractQrCodeValue({ Code: 1, Data: png }), png)
   assert.equal(resolveQrCodeImageSource(png), `data:image/png;base64,${png}`)
   assert.equal(resolveQrCodeImageSource(`data:image/png;base64,${png}`), `data:image/png;base64,${png}`)
@@ -82,19 +91,20 @@ test('小程序二维码把 Base64 物化为本地图片路径，不把 data URL
 
 test('新版接口返回设备对象时直接使用已落库字段，不重复更新触发客户端事件', async () => {
   const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB'
+  const path = 'xjy/device-qrcode/device-1.png'
   let updateCalls = 0
   const value = await generateDeviceQrCode('device-1', {
     callApiEngine: async (key, params) => {
       assert.equal(key, 'AddSBCode')
       assert.deepEqual(params, { Id: 'device-1' })
-      return { Code: 1, Data: { Id: 'device-1', ShebeiEWM: png } }
+      return { Code: 1, Data: { Id: 'device-1', ShebeiEWM: png, ShebeiEWMPath: path } }
     },
     updateFormData: async () => {
       updateCalls += 1
       return { Code: 1 }
     }
   })
-  assert.equal(value, png)
+  assert.deepEqual(value, { ShebeiEWM: png, ShebeiEWMPath: path })
   assert.equal(updateCalls, 0)
 })
 
@@ -108,7 +118,7 @@ test('接口直接返回 Base64 时由服务端落库，客户端不再重复更
       return { Code: 1 }
     }
   })
-  assert.equal(value, png)
+  assert.deepEqual(value, { ShebeiEWM: png, ShebeiEWMPath: '' })
   assert.equal(updateCalls, 0)
 })
 
@@ -124,7 +134,7 @@ test('接口异步落库时有界回读二维码字段', async () => {
     },
     wait: async (duration) => waits.push(duration)
   })
-  assert.equal(value, png)
+  assert.deepEqual(value, { ShebeiEWM: png, ShebeiEWMPath: '' })
   assert.equal(reads, 3)
   assert.deepEqual(waits, [250, 700])
 })
@@ -145,13 +155,14 @@ test('设备二维码严格复用旧平台 ApiEngineKey 协议并为每个请求
       }
     }
   }
-  const adapters = createDeviceQrCodeAdapters(client)
+  const adapters = createDeviceQrCodeAdapters(client, { menuId: 'device-menu', isAdd: true })
   await adapters.callApiEngine('AddSBCode', { Id: 'device-1' })
-  await adapters.getFormData('Diy_KehuSB', { Id: 'device-1', _SelectFields: ['Id', 'ShebeiEWM'] })
+  await adapters.getFormData('Diy_KehuSB', { Id: 'device-1', _SelectFields: ['Id', 'ShebeiEWM', 'ShebeiEWMPath'] })
   assert.equal(calls[0][0], 'legacy')
   assert.equal(calls[0][1], 'AddSBCode')
+  assert.deepEqual(calls[0][2], { Id: 'device-1', SysMenuId: 'device-menu', IsAdd: true })
   assert.equal(calls[0][3].timeout, 10000)
-  assert.deepEqual(calls[1].slice(0, 4), ['request', 'getformdata', 'Diy_KehuSB', { Id: 'device-1', _SelectFields: ['Id', 'ShebeiEWM'] }])
+  assert.deepEqual(calls[1].slice(0, 4), ['request', 'getformdata', 'Diy_KehuSB', { Id: 'device-1', _SelectFields: ['Id', 'ShebeiEWM', 'ShebeiEWMPath'], _SysMenuId: 'device-menu' }])
   assert.equal(calls[1][4].readUseQueryEngine, false)
 })
 
@@ -181,19 +192,16 @@ test('设备信息分组包含两个图标按钮并复用平台业务链路', ()
   assert.match(rowActionsSource, /createDeviceQrCodeAdapters\(V8,/)
 })
 
-test('设备编辑页显示相同动作，并用微信本地文件渲染二维码且不残留原生弹窗遮罩', () => {
-  assert.match(formExtensionSource, /context\.mode === 'Edit'[\s\S]*?name === 'shebeiewm'/)
+test('设备新增和编辑页把动作挂到永久二维码图片字段并使用原生图片预览', () => {
+  assert.match(formExtensionSource, /\['Add', 'Edit'\]\.includes\(context\.mode\)[\s\S]*?name === 'shebeiewmpath'/)
   assert.match(formExtensionSource, /xjy-device-product-preview[\s\S]*?xjy-device-qrcode/)
-  assert.match(formExtensionSource, /nativeComponent: 'Qrcode'/)
+  assert.match(formExtensionSource, /context\.draftRowId/)
+  assert.match(formExtensionSource, /deviceQrCodeValues/)
+  assert.doesNotMatch(formExtensionSource, /nativeComponent: 'Qrcode'/)
   assert.match(nativeFormSource, /tenantNativeField\(field\)/)
   assert.match(nativeFormSource, /tenant-field-action--compact/)
-  assert.match(nativeFieldSource, /materializeQrCodeImageSource\(this\.modelValue/)
-  assert.match(nativeFieldSource, /options\.writeBase64File = writeWeixinQrCodeFile/)
-  assert.match(nativeFieldSource, /encoding: 'base64'/)
-  assert.match(nativeFieldSource, /component === 'Qrcode' && qrcodeUrl/)
-  assert.match(nativeFieldSource, /component === 'Qrcode' && qrcodeUrl[\s\S]*?@tap\.stop="previewQrCode"/)
-  assert.doesNotMatch(nativeFieldSource, /show-menu-by-longpress/)
-  assert.match(nativeFieldSource, /uni\.previewImage\([\s\S]*?current: this\.qrcodeUrl[\s\S]*?urls: \[this\.qrcodeUrl\]/)
+  assert.match(nativeFieldSource, /<mci-media-uploader v-if="isImage && hasModelValue"/)
+  assert.match(mediaUploaderSource, /preview\(index\)[\s\S]*?uni\.previewImage/)
   assert.match(detailSource, /this\.key === 'devices' \? V8\.FormEngine\.Request\('getformdata'[\s\S]*?readUseQueryEngine: false/)
   assert.doesNotMatch(formExtensionSource, /xjy-device-qrcode[\s\S]{0,1200}uni\.showModal/)
   assert.doesNotMatch(detailSource, /generateDeviceQrCode\(\)[\s\S]{0,700}this\.confirm/)

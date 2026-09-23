@@ -162,6 +162,17 @@ test("image uploads default to compressed previews and preserve an explicit opt-
     assert.doesNotMatch(source, /Preview:\s*props\.field\.Config\.ImgUpload\.Preview\s*\|\|\s*false/);
 });
 
+test("image upload previews escape form stacking contexts", () => {
+    const source = fs.readFileSync(path.join(componentRoot, "diy-imgupload.vue"), "utf8");
+    const imageTags = source.match(/<el-image\b[\s\S]*?\/>/g) || [];
+
+    assert.equal(imageTags.length, 3, "单图编辑、单图查看和多图预览入口必须全部受层级保护");
+    imageTags.forEach((tag) => {
+        assert.match(tag, /:preview-teleported="true"/);
+        assert.match(tag, /:z-index="50000"/);
+    });
+});
+
 test("image crop uploads preserve the untouched original through the protected multipart protocol", () => {
     const source = fs.readFileSync(path.join(componentRoot, "diy-imgupload.vue"), "utf8");
     const cropDialog = fs.readFileSync(path.join(componentRoot, "diy-image-crop-dialog.vue"), "utf8");

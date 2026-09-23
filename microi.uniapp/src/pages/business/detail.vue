@@ -1478,7 +1478,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				return (matching || this.visibleSections[0]).key
 			},
 			canGenerateDeviceQrCodeAction() {
-				return this.key === 'devices' && canGenerateDeviceQrCode(this.currentUser)
+				return this.key === 'devices' && canGenerateDeviceQrCode(this.menuId, this.currentUser, 'Edit')
 			},
 			formTabs() {
 				return (this.definition?.formTabs || []).map((tab) => ({
