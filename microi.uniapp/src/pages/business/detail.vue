@@ -220,6 +220,11 @@
 						:parent-form="detail" :parent-menu-id="menuId" />
 				</view>
 
+				<view v-if="emptyFormTabLoading || emptyFormTabMessage" class="empty-form-tab-state">
+					<text>{{ emptyFormTabLoading ? '正在加载页签内容…' : emptyFormTabMessage }}</text>
+					<button v-if="!emptyFormTabLoading" @tap="refreshEmptyFormTab">重试</button>
+				</view>
+
 				<view v-if="key === 'tasks' && showMerchantAcceptance" class="acceptance-band">
 					<view>
 						<text class="acceptance-title">商家验收</text>
@@ -1291,6 +1296,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				tenantDerivedState: {},
 				expandedSections: {},
 				activeFormTabKey: '',
+				emptyFormTabLoading: false,
+				emptyFormTabMessage: '',
+				emptyFormTabRequestId: 0,
 				standaloneRelatedAddKey: '',
 				standaloneRelatedAddAvailable: false,
 				standaloneRelatedFilterKey: '',
@@ -1998,6 +2006,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				}
 			},
 			async loadDetail(showLoading = true, refreshManifest = false) {
+				this.emptyFormTabRequestId += 1
+				this.emptyFormTabLoading = false
+				this.emptyFormTabMessage = ''
 				if (!this.id) {
 					this.error = '缺少业务数据编号'
 					this.loading = false
@@ -2018,7 +2029,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 							Id: this.id,
 							...(this.menuId ? { _SysMenuId: this.menuId } : {})
 						})),
-						loadNativeFormDefinition(this.moduleConfig.table).catch(() => null)
+						loadNativeFormDefinition(this.moduleConfig.table, false, {
+							menuId: this.menuId
+						}).catch(() => null)
 					])
 					if (!result || result.Code !== 1 || !result.Data) throw new Error((result && result.Msg) ||
 						'未找到该条业务数据')
@@ -2298,13 +2311,48 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			},
 			selectFormTab(tab) {
 				if (!tab || !tab.key) return
+				this.emptyFormTabRequestId += 1
+				this.emptyFormTabLoading = false
+				this.emptyFormTabMessage = ''
 				this.deviceActionKey = ''
 				this.standaloneRelatedAddAvailable = false
 				this.standaloneRelatedAddKey = ''
 				this.standaloneRelatedFilterOpen = false
 				this.standaloneRelatedFilterKey = ''
 				this.activeFormTabKey = tab.key
-				this.$nextTick(() => this.scheduleRelatedViewportMeasure())
+				this.$nextTick(() => {
+					this.scheduleRelatedViewportMeasure()
+					if (!this.visibleSections.length && !this.activeRelatedTabs.length) {
+						this.refreshEmptyFormTab()
+					}
+				})
+			},
+			async refreshEmptyFormTab() {
+				if (this.emptyFormTabLoading || !this.activeFormTabKey) return
+				const requestId = ++this.emptyFormTabRequestId
+				const tabKey = this.activeFormTabKey
+				this.emptyFormTabLoading = true
+				this.emptyFormTabMessage = ''
+				try {
+					const definition = await loadNativeFormDefinition(this.moduleConfig.table, true, {
+						menuId: this.menuId
+					})
+					if (requestId !== this.emptyFormTabRequestId || tabKey !== this.activeFormTabKey) return
+					this.definition = definition
+					this.initializeFormTabs()
+					this.$nextTick(() => {
+						if (requestId !== this.emptyFormTabRequestId || tabKey !== this.activeFormTabKey) return
+						if (!this.visibleSections.length && !this.activeRelatedTabs.length) {
+							this.emptyFormTabMessage = '该页签没有可显示的关联内容，请检查表单字段配置'
+						}
+					})
+				} catch (error) {
+					if (requestId === this.emptyFormTabRequestId && tabKey === this.activeFormTabKey) {
+						this.emptyFormTabMessage = error.message || '页签内容加载失败，请重试'
+					}
+				} finally {
+					if (requestId === this.emptyFormTabRequestId) this.emptyFormTabLoading = false
+				}
 			},
 			setStandaloneRelatedAddState(tab, available) {
 				if (!tab || !this.standaloneChildTab || tab.key !== this.standaloneChildTab.key) return
@@ -3203,6 +3251,17 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	.related-tab-panel {
 		margin-top: 14rpx;
 		background: #fff;
+	}
+	.empty-form-tab-state {
+		padding: 56rpx 28rpx;
+		color: #607983;
+		text-align: center;
+		font-size: 26rpx;
+	}
+	.empty-form-tab-state button {
+		width: 160rpx;
+		margin: 24rpx auto 0;
+		font-size: 24rpx;
 	}
 
 	.info-band {

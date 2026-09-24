@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { compileTemplate, parse } from '@vue/compiler-sfc'
 import { canAddMenuRecord, canEditMenuRecord } from '../src/platform/menu-permission.js'
 import {
   customerDeviceLookupCandidates,
@@ -24,9 +25,30 @@ test('售后任务新增入口精确服从当前菜单新增权限', () => {
 test('表单编辑入口精确服从当前菜单编辑权限', () => {
   const menuId = 'casebook-menu'
   assert.equal(canEditMenuRecord(menuId, { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Read' }] }] }), false)
+  assert.equal(canEditMenuRecord(menuId, { Level: 9998, _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Read' }] }] }), false, '非超级管理员的高等级角色不能绕过只读配置')
+  assert.equal(canEditMenuRecord(menuId, { Level: 9998, _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Edit' }] }] }), true, '高等级普通角色仍按显式编辑授权放行')
+  assert.equal(canEditMenuRecord(menuId, { Level: 9999, _RoleLimits: [] }), true, '平台超级管理员沿用全权规则')
   assert.equal(canEditMenuRecord(menuId, { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Edit' }] }] }), true)
   assert.equal(canEditMenuRecord(menuId, { _RoleLimits: JSON.stringify([{ FkId: menuId, Permission: [{ Name: '编辑' }] }]) }), true)
   assert.equal(canEditMenuRecord('other-menu', { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Edit' }] }] }), false)
+})
+
+test('售后任务完整表单入口按编辑权限显示，直达编辑页也必须复核权限', () => {
+  const detail = fs.readFileSync(path.join(root, 'src/pages/task/detail.vue'), 'utf8')
+  const feedback = fs.readFileSync(path.join(root, 'src/pages/native/task-feedback.vue'), 'utf8')
+  const form = fs.readFileSync(path.join(root, 'src/pages/native-form/index.vue'), 'utf8')
+  assert.match(detail, /v-if="task\.Id && canEditTaskRecord" class="nav-more"/)
+  assert.match(detail, /canEditTaskRecord\(\)[\s\S]*?canEditMenuRecord\(this\.taskMenuId, this\.currentUser\)/)
+  assert.match(detail, /openFullForm\(\)[\s\S]*?if \(!this\.canEditTaskRecord\)[\s\S]*?mode: 'Edit'/)
+  assert.match(feedback, /openFullForm\(\)[\s\S]*?mode:'View'/)
+  assert.match(form, /this\.mode === 'Edit' && this\.rowId && isFormEngineRecordAdapter\(this\.recordAdapter\)[\s\S]*?canEditMenuRecord\(this\.menuId, getUser\(\) \|\| \{\}\)/)
+  assert.match(form, /async submit\(\)[\s\S]*?this\.mode === 'Edit'[\s\S]*?canEditMenuRecord\(this\.menuId, getUser\(\) \|\| \{\}\)/)
+  for (const [name, source] of [['任务详情', detail], ['完成服务', feedback], ['原生表单', form]]) {
+    const parsed = parse(source, { filename: `${name}.vue` })
+    assert.deepEqual(parsed.errors, [], `${name} 单文件组件解析失败`)
+    const compiled = compileTemplate({ source: parsed.descriptor.template.content, filename: `${name}.vue`, id: 'task-edit-permission' })
+    assert.deepEqual(compiled.errors, [], `${name} 页面模板编译失败`)
+  }
 })
 
 test('历史错误客户设备Id会回退到设备业务键', () => {

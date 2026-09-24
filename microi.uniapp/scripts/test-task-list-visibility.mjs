@@ -18,12 +18,19 @@ test('客户身份使用精确角色名且内部客户管理角色不会被模�
   assert.doesNotMatch(businessSource, /const isCustomer = \/客户\//)
 })
 
-test('客户隐藏负责人开关，内部人员明确显示只看我负责', () => {
-  assert.match(listSource, /v-if="showMineSwitch" class="mine-switch"/)
-  assert.match(listSource, />只看我负责<\/text>/)
+test('客户隐藏阶段待办切换，内部人员按当前责任阶段查看', () => {
+  assert.match(listSource, /v-if="showMineSwitch" class="scope-row"/)
+  assert.match(listSource, /v-for="option in scopeOptions"/)
   assert.match(listSource, /showMineSwitch\(\) \{ return !this\.isCustomerAccount \}/)
-  assert.match(listSource, /this\.mineOnly = this\.isCustomerAccount \? false : options\.scope !== 'all'/)
+  assert.match(listSource, /this\.scope = this\.isCustomerAccount \? 'all' : normalizeTaskScope\(options\.scope, true\)/)
+  assert.match(listSource, /this\.mineOnly = this\.scope !== 'all'/)
   assert.match(listSource, /mineOnly: this\.isCustomerAccount \? false : this\.mineOnly/)
+})
+
+test('阶段待办筛选位于本周本月时间筛选上方', () => {
+  const scope = listSource.indexOf('class="scope-row"')
+  const period = listSource.indexOf('class="quick-filter"')
+  assert.ok(scope >= 0 && period >= 0 && scope < period)
 })
 
 test('报修成功按服务端任务Id定位，并继续经过模块列表权限', () => {
