@@ -1,3 +1,5 @@
+import { buildTaskScopeWhere } from './task-responsibility.mjs'
+
 export async function loadHomeSummary(context, options = {}) {
   const {
     user = {},
@@ -22,8 +24,8 @@ export async function loadHomeSummary(context, options = {}) {
 
   const pendingStates = ['待接单', '待服务', '待客服验收', '待客户验收', '待评价', '暂停']
   const taskWhere = [{ Name: 'Zhuangtai', Type: 'In', Value: pendingStates }]
-  if (role.isService && !role.isAdmin && user.Id) {
-    taskWhere.push({ Name: 'ShouhouRYID', Type: '=', Value: user.Id })
+  if ((role.isService || role.isSupport) && !role.isAdmin && user.Id) {
+    taskWhere.push(...buildTaskScopeWhere('todo', user.Id))
   }
   const common = { pageIndex: 1, pageSize: 1, refresh: options.refresh === true }
   const requests = [

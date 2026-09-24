@@ -91,7 +91,8 @@ test('persisted private media binds to authoritative form metadata or stays expl
 
   assert.match(feedback, /:file-context="taskFileContext\('JieguoTP'\)"/)
   assert.match(feedback, /:file-context="taskFileContext\('ShipinSC'\)"/)
-  assert.match(feedback, /loadNativeFormDefinition\(TASK_TABLE[\s\S]{0,700}formDataId:this\.taskId[\s\S]{0,160}fieldId:field\.Id[\s\S]{0,80}sysMenuId:menu\.Id/)
+  assert.match(feedback, /loadNativeFormDefinition\(TASK_TABLE,false,\{menuId:menu\.Id\}\)/)
+  assert.match(feedback, /formDataId:this\.taskId,fieldId:field\.Id,sysMenuId:menu\.Id/)
   assert.match(followUp, /:file-context="photoFileContext"/)
   assert.match(followUp, /formDataId: this\.id[\s\S]{0,100}fieldId: field\.Id[\s\S]{0,80}sysMenuId: menu\.Id/)
 
