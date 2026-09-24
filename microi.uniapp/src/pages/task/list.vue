@@ -34,18 +34,16 @@
       </view>
     </scroll-view>
 
+    <view v-if="showMineSwitch" class="scope-row">
+      <view v-for="option in scopeOptions" :key="option.value" class="scope-chip" :class="{ active: scope === option.value }" @tap="selectScope(option.value)">{{ option.label }}</view>
+    </view>
     <view class="quick-filter">
       <scroll-view class="period-scroll" scroll-x :show-scrollbar="false">
         <view class="period-row">
           <view v-for="item in periods" :key="item.value" class="period-chip" :class="{ active: period === item.value }" @tap="selectPeriod(item.value)"><text>{{ item.label }}</text><text class="period-chip__count">{{ periodCount(item) }}</text></view>
         </view>
       </scroll-view>
-      <view v-if="showMineSwitch" class="mine-switch" @tap="toggleMine">
-        <view class="mine-switch__track" :class="{ active: mineOnly }"><view class="mine-switch__thumb"></view></view>
-        <text>只看我负责</text>
-      </view>
     </view>
-
     <scroll-view v-if="typeOptions.length" class="type-scroll" scroll-x :show-scrollbar="false">
       <view class="type-row">
         <view class="type-chip" :class="{ active: !type }" @tap="changeType('')">全部类型</view>
@@ -157,6 +155,7 @@ import { canAddMenuRecord } from '@/platform/menu-permission.js'
 import { listReturnMixin } from '@/platform/list-return.js'
 import { getUser } from '@/utils/request.js'
 import { getRoleProfile } from '@/tenants/xjy/business.js'
+import { TASK_SCOPE_OPTIONS, normalizeTaskScope } from '@/tenants/xjy/task-responsibility.mjs'
 import { readListEntryPeriod } from '@/platform/list-entry-period.mjs'
 import { buildListFilterWhere, hasListFilterValue, validateListFilters } from '@/platform/list-filter-fields.mjs'
 import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
@@ -208,6 +207,8 @@ export default {
       taskFilterFields: [],
       filterValues: {},
       taskModuleEngineKey: 'Diy_ShouhouDD',
+      scopeOptions: TASK_SCOPE_OPTIONS,
+      scope: 'todo',
       mineOnly: true,
       orderType: 'ASC',
       loading: true,
@@ -237,7 +238,7 @@ export default {
       return Number(hasListFilterValue(this.city)) + configured + Number(this.orderType !== 'ASC') + Number(this.period === 'custom')
     },
     hasActiveListFilters() {
-      const defaultMineOnly = !this.isCustomerAccount
+      const defaultScope = this.isCustomerAccount ? 'all' : 'todo'
       return Boolean(
         String(this.keyword || '').trim()
         || this.state
@@ -247,7 +248,7 @@ export default {
         || hasListFilterValue(this.city)
         || Object.values(this.filterValues || {}).some((value) => hasListFilterValue(value))
         || this.orderType !== 'ASC'
-        || this.mineOnly !== defaultMineOnly
+        || this.scope !== defaultScope
       )
     },
     filterFormData() { return {} },
@@ -255,7 +256,7 @@ export default {
     isCustomerAccount() { return this.roleProfile.isCustomer === true },
     showMineSwitch() { return !this.isCustomerAccount },
     emptyStateDescription() {
-      return this.isCustomerAccount ? '可切换状态、时间或其他筛选条件' : '可切换状态、时间或关闭“只看我负责”'
+      return this.isCustomerAccount ? '可切换状态、时间或其他筛选条件' : '可切换状态、时间或选择“我参与的”“全部有权”'
     },
     displayRows() {
       const rows = this.focusedTask ? [this.focusedTask, ...this.rows] : this.rows
@@ -280,7 +281,8 @@ export default {
     const user = getUser() || {}
     this.currentUser = user
     this.focusTaskId = decodeURIComponent(options.focusTaskId || options.taskId || '')
-    this.mineOnly = this.isCustomerAccount ? false : options.scope !== 'all'
+    this.scope = this.isCustomerAccount ? 'all' : normalizeTaskScope(options.scope, true)
+    this.mineOnly = this.scope !== 'all'
     if (this.focusTaskId) {
       this.state = ''
       this.period = 'all'
@@ -290,7 +292,7 @@ export default {
       user.Id || user.Account || 'guest',
       this.customerId || 'all-customers',
       options.state ? `entry-state:${this.state}` : 'default-state',
-      this.isCustomerAccount ? 'customer-scope' : (this.mineOnly ? 'assigned-scope' : 'all-authorized-scope')
+      this.isCustomerAccount ? 'customer-scope' : `${this.scope}-scope`
     ]
     if (entryPeriod.forceFresh) {
       taskListSessionParts.push(`performance:${this.period}:${this.customStart || '-'}:${this.customEnd || '-'}`)
@@ -363,6 +365,7 @@ export default {
         customEnd: this.customEnd,
         city: this.city,
         filterValues: JSON.parse(JSON.stringify(this.filterValues || {})),
+        scope: this.scope,
         mineOnly: this.isCustomerAccount ? false : this.mineOnly,
         orderType: this.orderType,
         finished: this.finished,
@@ -376,11 +379,13 @@ export default {
       const fields = [
         'rows', 'count', 'stateCounts', 'typeCounts', 'periodCounts', 'pageIndex', 'keyword',
         'customerId', 'state', 'type', 'period', 'dateField', 'customStart', 'customEnd',
-        'city', 'filterValues', 'mineOnly', 'orderType', 'finished', 'stale'
+        'city', 'filterValues', 'scope', 'mineOnly', 'orderType', 'finished', 'stale'
       ]
       fields.forEach((field) => {
         if (Object.prototype.hasOwnProperty.call(payload, field)) this[field] = payload[field]
       })
+      this.scope = this.isCustomerAccount ? 'all' : normalizeTaskScope(payload.scope, payload.mineOnly)
+      this.mineOnly = this.scope !== 'all'
       this.loading = false
       this.refreshing = false
       this.mciApplyListSnapshotPosition(snapshot)
@@ -398,6 +403,7 @@ export default {
         dateField: this.dateField,
         city: this.taskCityStatisticValue(),
         extraWhere: this.buildTaskFilterWhere(),
+        scope: this.scope,
         mineOnly: this.isCustomerAccount ? false : this.mineOnly,
         orderBy: this.dateField,
         orderType: this.orderType,
@@ -478,6 +484,7 @@ export default {
         city: '',
         customerId: '',
         mineOnly: false,
+        scope: 'all',
         refresh,
         extraWhere: [{ Name: 'Id', Type: '=', Value: this.focusTaskId }]
       }))
@@ -536,9 +543,10 @@ export default {
     changeState(value) { if (this.state === value) return; this.state = value; this.loadData(true, true) },
     changeType(value) { if (this.type === value) return; this.type = value; this.loadData(true, true) },
     selectPeriod(value) { this.period = value; if (value === 'custom') this.filterVisible = true; else this.loadData(true, true) },
-    toggleMine() {
-      if (this.isCustomerAccount) return
-      this.mineOnly = !this.mineOnly
+    selectScope(scope) {
+      if (this.isCustomerAccount || this.scope === scope) return
+      this.scope = scope
+      this.mineOnly = scope !== 'all'
       this.loadData(true, true)
     },
     applyFilters() {
@@ -551,7 +559,7 @@ export default {
     },
     resetFilters(load = true) {
       this.keyword = ''; this.state = ''; this.type = ''; this.period = 'month'; this.dateField = 'YujiSHSJ'
-      this.customStart = ''; this.customEnd = ''; this.city = []; this.filterValues = {}; this.mineOnly = !this.isCustomerAccount; this.orderType = 'ASC'
+      this.customStart = ''; this.customEnd = ''; this.city = []; this.filterValues = {}; this.scope = this.isCustomerAccount ? 'all' : 'todo'; this.mineOnly = this.scope !== 'all'; this.orderType = 'ASC'
       this.filterVisible = false
       if (load) this.loadData(true, true)
     },
@@ -584,6 +592,7 @@ export default {
         keyword: this.keyword.trim(), state: this.state, type: this.type, period: this.period,
         customRange: this.customRange, dateField: this.dateField, city: this.taskCityStatisticValue(),
         extraWhere: this.buildTaskFilterWhere(),
+        scope: this.scope,
         mineOnly: this.isCustomerAccount ? false : this.mineOnly, orderBy: this.dateField, orderType: this.orderType,
         customerId: this.customerId || ''
       }
@@ -634,18 +643,16 @@ export default {
 .state-card.is-success.active text { color: #17825f; }
 .state-card.is-danger.active { border-color: #c34c47; background: #fff2f1; }
 .state-card.is-danger.active text { color: #c34c47; }
-.quick-filter { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; border-top: 1px solid #edf2f4; border-bottom: 1px solid #e7eef1; background: #fff; }
+.quick-filter { display: grid; grid-template-columns: minmax(0,1fr); align-items: center; border-top: 1px solid #edf2f4; border-bottom: 1px solid #e7eef1; background: #fff; }
 .period-scroll { min-width: 0; white-space: nowrap; }
 .period-row { display: inline-flex; gap: 10rpx; padding: 14rpx 12rpx 14rpx 22rpx; }
 .period-chip, .type-chip { flex: none; height: 52rpx; padding: 0 20rpx; border-radius: 6px; color: #5e7882; background: #f0f5f7; font-size: 21rpx; line-height: 52rpx; }
 .period-chip { display: flex; align-items: center; gap: 7rpx; line-height: normal; }
 .period-chip__count { font-size: 18rpx; opacity: .72; }
 .period-chip.active, .type-chip.active { color: #fff; background: #087da8; }
-.mine-switch { height: 78rpx; display: flex; align-items: center; gap: 9rpx; padding: 0 22rpx 0 14rpx; border-left: 1px solid #e7eef1; color: #405e69; font-size: 21rpx; white-space: nowrap; }
-.mine-switch__track { width: 58rpx; height: 32rpx; padding: 3rpx; border-radius: 19rpx; background: #cbd7dc; box-sizing: border-box; transition: background .18s ease; }
-.mine-switch__thumb { width: 26rpx; height: 26rpx; border-radius: 50%; background: #fff; box-shadow: 0 2rpx 6rpx rgba(25,57,68,.22); transition: transform .18s ease; }
-.mine-switch__track.active { background: #087da8; }
-.mine-switch__track.active .mine-switch__thumb { transform: translateX(26rpx); }
+.scope-row { display: flex; gap: 10rpx; padding: 12rpx 22rpx; background: #fff; border-bottom: 1px solid #e7eef1; }
+.scope-chip { flex: 1; padding: 12rpx 8rpx; border-radius: 12rpx; background: #f0f5f7; color: #405e69; font-size: 22rpx; text-align: center; }
+.scope-chip.active { background: #087da8; color: #fff; font-weight: 700; }
 .type-scroll { width: 100%; border-bottom: 1px solid #e7eef1; background: #fff; white-space: nowrap; }
 .type-row { display: inline-flex; gap: 10rpx; padding: 12rpx 22rpx; }
 .type-chip text { margin-left: 7rpx; opacity: .72; }
