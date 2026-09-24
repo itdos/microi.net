@@ -40,3 +40,25 @@ test('embedded groups retain their own preview layout and never lock the whole f
   assert.equal(isStandaloneChildLayout([{ source: 'CollapseGroup', relatedFields: [child('contacts')] }], []), false)
   assert.equal(isStandaloneChildLayout(), false)
 })
+
+test('business detail reloads a blank tab with its menu authorization context', () => {
+  const source = readFileSync(new URL('../src/pages/business/detail.vue', import.meta.url), 'utf8')
+  assert.match(source, /loadNativeFormDefinition\(this\.moduleConfig\.table, false, \{\s*menuId: this\.menuId\s*\}\)/)
+  assert.match(source, /loadNativeFormDefinition\(this\.moduleConfig\.table, true, \{\s*menuId: this\.menuId\s*\}\)/)
+  const body = source.match(/selectFormTab\(tab\)\s*\{([\s\S]*?)\n\s*\},\n\s*async refreshEmptyFormTab/)[1]
+  const select = vm.runInNewContext(`(function (tab) { ${body} })`)
+  let refreshes = 0
+  const state = {
+    activeFormTabKey: '', emptyFormTabRequestId: 0,
+    visibleSections: [], activeRelatedTabs: [],
+    scheduleRelatedViewportMeasure() {},
+    refreshEmptyFormTab() { refreshes += 1 },
+    $nextTick(callback) { callback() }
+  }
+  select.call(state, { key: 'after-sales' })
+  assert.equal(state.activeFormTabKey, 'after-sales')
+  assert.equal(refreshes, 1)
+  state.visibleSections = [{ key: 'has-content' }]
+  select.call(state, { key: 'basic' })
+  assert.equal(refreshes, 1)
+})

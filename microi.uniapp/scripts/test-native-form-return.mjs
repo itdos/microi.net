@@ -21,6 +21,8 @@ function setup(overrides = {}) {
   const sandbox = {
     themeMixin: {}, MciBusinessRelatedList: {}, MciCustomerPicker: {}, MciPosterDetail: {}, MciVisitTargetFields: {},
     console, getUser: () => ({}), setUser() {}, V8: { FormEngine: {} },
+    findMenu: async (_aliases, _table, _refresh, menuId) => ({ Id: menuId || 'cases-menu' }),
+    canEditMenuRecord: () => true,
     parseJson: (value, fallback) => { try { return JSON.parse(value) } catch { return fallback } },
     normalizeFormRecordAdapter: value => value,
     isFormEngineRecordAdapter: value => value === 'form-engine',
@@ -182,6 +184,34 @@ for (const mode of ['Add', 'Edit']) {
     })
   }
 }
+
+test('只读角色手工进入编辑地址时降为查看，调用保存也不能写入', async () => {
+  const app = setup({ canEditMenuRecord: () => false })
+  const page = app.createPage({ mode: 'Edit', id: 'row-1', menuId: 'task-menu' })
+  await tick()
+  assert.equal(page.mode, 'View')
+  await page.submit()
+  assert.equal(app.calls.saves.length, 0)
+  assert.match(app.calls.toasts.at(-1).title, /没有编辑权限/)
+})
+
+test('编辑页无法确认当前菜单时同样降为查看', async () => {
+  const app = setup({ findMenu: async () => null })
+  const page = app.createPage({ mode: 'Edit', id: 'row-1' })
+  await tick()
+  assert.equal(page.mode, 'View')
+  await page.submit()
+  assert.equal(app.calls.saves.length, 0)
+})
+
+test('非法 URL 模式不能当作编辑表单保存', async () => {
+  const app = setup()
+  const page = app.createPage({ mode: 'Other', id: 'row-1' })
+  await tick()
+  assert.equal(page.mode, 'View')
+  await page.submit()
+  assert.equal(app.calls.saves.length, 0)
+})
 
 test('新增后继续维护子表的 stayAfterAdd 行为保留', async () => {
   const app = setup()

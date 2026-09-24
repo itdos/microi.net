@@ -27,7 +27,9 @@ function permissionNames(permission) {
 }
 
 export function isPlatformAdmin(user = {}) {
-  return user._IsAdmin === true || Number(user.Level || 0) >= 999
+  const adminFlag = user._IsAdmin
+  return adminFlag === true || adminFlag === 1 || String(adminFlag || '').toLowerCase() === 'true' ||
+    String(adminFlag || '') === '1' || Number(user.Level || 0) >= 9999
 }
 
 export function hasExactMenuPermission(menuId, names, user = {}) {

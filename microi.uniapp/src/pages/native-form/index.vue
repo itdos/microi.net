@@ -317,6 +317,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		setUser
 	} from '@/utils/request.js'
 	import { canEditMenuRecord } from '@/platform/menu-permission.js'
+	import { findMenu } from '@/platform/business-runtime.js'
 	import { buildFormSubsections } from '@/platform/form-subsections.mjs'
 	import { isStandaloneChildLayout } from '@/platform/related-tab-layout.mjs'
 	import { createChildDraftSession, disposeChildDraftSession, flushChildDrafts } from '@/platform/child-form-drafts.mjs'
@@ -584,7 +585,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			this.fileMenuId = decodeURIComponent(options.fileMenuId || '')
 			this.rowId = decodeURIComponent(options.id || '')
 			this.draftRelation = decodeURIComponent(options.draftRelation || '')
-			this.mode = options.mode || (this.rowId ? 'View' : 'Add')
+			const requestedMode = options.mode || (this.rowId ? 'View' : 'Add')
+			this.mode = ['Add', 'Edit', 'View'].includes(requestedMode) ? requestedMode : 'View'
 			this.title = decodeOption(options.title)
 			this.stayAfterAdd = String(options.stayAfterAdd || '0') === '1'
 			this.showRelated = String(options.related ?? '1') !== '0'
@@ -853,6 +855,13 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				this.embeddedRelatedMore = {}
 				this.error = ''
 				try {
+					if (this.mode === 'Edit' && this.rowId && isFormEngineRecordAdapter(this.recordAdapter) && !this.tableChildAuth) {
+						// URL 的 mode/menuId 由客户端传入，普通记录编辑必须回到当前授权菜单重新核对。
+						const authorizedMenu = await findMenu([], this.tableName, refresh, this.menuId).catch(() => null)
+						if (loadId !== this.formLoadId) return
+						this.menuId = authorizedMenu?.Id || ''
+						if (!authorizedMenu || !canEditMenuRecord(this.menuId, getUser() || {})) this.mode = 'View'
+					}
 					const manifestPromise = loadModuleViewManifest({
 						table: this.tableName,
 						menuId: this.menuId,
@@ -1300,6 +1309,12 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			},
 			async submit() {
 				if (this.saving || this.saveReturnTimer) return
+				if (!['Add', 'Edit'].includes(this.mode) || (this.mode === 'Edit' && this.rowId &&
+					isFormEngineRecordAdapter(this.recordAdapter) && !this.tableChildAuth &&
+					!canEditMenuRecord(this.menuId, getUser() || {}))) {
+					uni.showToast({ title: '当前账号没有编辑权限', icon: 'none' })
+					return
+				}
 				const uploadStateList = Object.values(this.uploadStates || {})
 				const pendingUploadCount = uploadStateList.reduce((total, item) => total + Number(item.pendingCount || 0), 0)
 				const failedUploadCount = uploadStateList.reduce((total, item) => total + Number(item.failedCount || 0), 0)
