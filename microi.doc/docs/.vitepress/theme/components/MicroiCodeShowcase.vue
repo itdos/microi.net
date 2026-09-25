@@ -44,7 +44,7 @@
         <span><small>RELEASES</small><strong id="microi-code-history-title">版本记录</strong></span>
         <span class="microi-code-history-toggle__meta">{{ releases.length }} 个安装包 <span aria-hidden="true">{{ historyOpen ? '收起 −' : '展开 +' }}</span></span>
       </button>
-      <div v-if="historyOpen" id="microi-code-history-content">
+      <div v-show="historyOpen" id="microi-code-history-content">
       <div class="release-list">
         <article v-for="release in visibleReleases" :key="`${release.version}-${release.platform}`">
           <div><strong>v{{ release.version }}</strong><span>{{ release.platform }}</span></div>
@@ -109,6 +109,7 @@ const screenshots = [
 
 const releases = [
   { version: '1.1.3', platform: 'macOS Intel', note: 'x64 DMG · 197.5 MiB · 未签名、未公证', url: mac.archive, sha256: mac.sha256 },
+  { version: '1.1.3', platform: 'macOS Intel ZIP', note: '自动更新包 · 228.2 MiB', url: 'https://static.itdos.com/itdos/microi-code/1.1.3/f8056741d597/202609/Microi-Code-1_1_3-mac-x64.zip', sha256: 'f8056741d5972378317a05c31691e9c1f6c5a7bd3efbe483225611784544b2cb' },
   { version: '1.1.3', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: windows.archive, sha256: windows.sha256 },
   { version: '1.1.2', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.1.2/9c74faa0a06b/202609/Microi-Code-1_1_2-windows-x64-setup.exe' },
   { version: '1.1.1', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.1.1/8d6730cec534/202609/Microi-Code-1_1_1-windows-x64-setup.exe' },
