@@ -25,9 +25,21 @@ internal static class SegmentRotationRegression
             var samples = evidence.GetProperty("Samples").GetInt64();
             var lost = evidence.GetProperty("LostEvents").GetInt64();
             var missing = evidence.GetProperty("MissingStackSamples").GetInt64();
-            if (samples <= 0 || lost != 0 || missing != 0) throw new InvalidOperationException($"Trace must retain allocation samples and resolved stacks: samples={samples}, lost={lost}, missing={missing}.");
+            var rows = evidence.GetProperty("Top").EnumerateArray().ToArray();
+            var byteArrays = rows.Where(row => row.GetProperty("Type").GetString() == "System.Byte[]").ToArray();
+            var probeSamples = byteArrays.Sum(row => row.GetProperty("Stack").EnumerateArray()
+                .Any(frame => frame.GetString()?.Contains("ProbeAllocation", StringComparison.Ordinal) == true)
+                    ? row.GetProperty("Samples").GetInt64() : 0);
+            var stacklessBytes = byteArrays.Sum(row => row.GetProperty("Stack").GetArrayLength() == 0
+                ? row.GetProperty("Samples").GetInt64() : 0);
+            // EventPipe can emit an incidental runtime allocation without a stack. Preserve that
+            // quality signal, while requiring every allocation from the test workload to resolve.
+            if (samples <= 0 || lost != 0 || probeSamples < samples / 2 || stacklessBytes != 0
+                || missing > 1 || rows.Sum(row => row.GetProperty("Samples").GetInt64()) != samples)
+                throw new InvalidOperationException($"Trace must retain all allocation samples and workload stacks: samples={samples}, probe={probeSamples}, stacklessBytes={stacklessBytes}, lost={lost}, missing={missing}.");
             if (Directory.EnumerateFiles(directory, "allocation-*.nettrace").Count() > 2) throw new InvalidOperationException("Completed trace retention exceeded two segments.");
-            results.Add(new { Round = round, Bytes = length, Samples = samples, LostEvents = lost, MissingStackSamples = missing });
+            results.Add(new { Round = round, Bytes = length, Samples = samples, ProbeSamples = probeSamples,
+                StacklessBytes = stacklessBytes, LostEvents = lost, MissingStackSamples = missing });
         }
         Console.WriteLine(JsonSerializer.Serialize(new { Passed = true, ProcessId = processId, Segments = results }));
     }

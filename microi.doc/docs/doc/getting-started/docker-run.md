@@ -211,6 +211,8 @@ bash install-microi.sh --repair-network
 | 13 | 安装器源码固定为 UTF-8 no-BOM，并会在任何中文提示前校验可用 UTF-8 locale；原始 locale 明确为 GBK、GB18030 或 GB2312 时自动转码输出。由于服务器无法知道 SSH/宝塔终端实际采用的字符集，如果首屏提示的编码与终端设置不一致，可先执行无副作用检查：`MICROI_INSTALL_OUTPUT_ENCODING=GBK bash install-microi.sh --encoding-check-only`；确认中文正常后用同一变量运行正式安装。可选值为 `UTF-8`、`GB18030`、`GBK`、`GB2312`，推荐优先把终端客户端直接切换为 UTF-8；Windows 旧终端通常先尝试 `GBK`。仅执行 `export LANG=...` 不能改变终端客户端的解码方式。 |
 | 14 | 当前一键安装只把吾码 API 与脚本创建的主数据库加入同一个 `microi.slice`，并回读父级 CPU、内存和 Swap 合计硬上限；其它服务不加入。旧安装不会自动补写，请按“宿主机 CPU / 内存保护”一节升级 |
 
+**API 健康检查边界：**`/api/Diagnostics/liveness`、`/api/Diagnostics/health` 和兼容地址 `/apiengine/platform-service-health` 是宿主存活检查。固定 GET 路由会在动态路由、租户安全解析及业务请求压力控制前快速返回；`Healthy` 只表示 API 进程能响应，不证明 MongoDB、Redis、MySQL 或第三方设备服务可用。部署和事故恢复仍需分别检查依赖连接、日志队列状态与实际业务接口，不能只凭该返回值判定系统已恢复。
+
 ### 📋 端口分配表（默认从 61600 开始）
 
 | 端口 | 服务 | 容器内部端口 |

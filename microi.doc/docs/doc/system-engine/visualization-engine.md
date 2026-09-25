@@ -37,7 +37,7 @@ Microi吾码提供多条可视化路线。界面引擎、报表引擎、go-view 
 
 3D 引擎以独立 AI 应用 `microi-3d-engine` 交付，应用类型为 `MicroService`。它包含设计器、渲染器、场景树、属性面板、材质、灯光、后处理、模型爆炸和相机路径；源码与编译产物分别进入私有源码区和不可变运行资产，安装包同时携带可移植菜单与运行时清单。
 
-官方商城当前发布版本为 `v1.3.1`。安装后的“3D引擎”设计器通过统一宿主页打开 `/micro-app/microi-3d-engine/designer`；“AI应用 → 3D数字孪生”打开 `/micro-app/microi-3d-engine/digital-twin`。独立地址 `https://api.itdos.com/micro-app/iTdos/microi-3d-engine/index.html` 默认免登录进入数字孪生且不显示设计器宿主头部。渲染页 `/renderer` 标记为内部路由，由设计器或业务页面传入配置后复用。
+官方商城当前发布版本为 `v1.8.1`。安装后的“3D引擎”设计器通过统一宿主页打开 `/micro-app/microi-3d-engine/designer`；“AI应用 → 3D数字孪生”打开 `/micro-app/microi-3d-engine/digital-twin`。独立地址 `https://api.itdos.com/micro-app/iTdos/microi-3d-engine/index.html` 默认免登录进入数字孪生且不显示设计器宿主头部。渲染页 `/renderer` 标记为内部路由，由设计器或业务页面传入配置后复用。
 
 版本库中的 `Microi.Client/src/views/3d-engine/` 保留 Three.js 实现与回归测试来源；线上运行和跨租户安装以 AI 应用的私有源码、v3 committed runtime 与商城不可变安装快照为准。
 
@@ -45,13 +45,15 @@ Microi吾码提供多条可视化路线。界面引擎、报表引擎、go-view 
 
 ### 宁波城市摩尔数字孪生示范
 
-`/digital-twin` 使用 Three.js 程序化场景重建红褐色公寓高楼、连续低层商业街与中央拱门，场景包含蓝天白云、道路、树木、行人和车辆。造型参考用户提供的多角度照片与现场沙盘照片，另附 AI 生成的概念参考图；它是可交互的演示模型，不是实测 BIM/CAD 或精确施工图复刻。
+`/digital-twin` 使用 Three.js 程序化场景重建红褐色公寓高楼、连续低层商业街与中央拱门，场景包含蓝天白云、道路、树木、32 名循环步态行人和 7 辆双向循环的曲面车体。造型参考用户提供的多角度照片与现场沙盘照片，另附 AI 生成的概念参考图；它是可交互的演示模型，不是实测 BIM/CAD、汽车厂商数字样车或精确施工图复刻。
 
 此类浏览器内楼层/住户点选采用 Three.js：可直接嵌入 MicroService，且能与吾码菜单、主题和接口引擎共用宿主能力。Blender 可用于日后制作替换用的 GLB 美术资产；当前演示不依赖 Unity WebGL 或外部 BIM 文件。
 
 页面可从整栋进入楼层，再选中楼层内住户或商铺；三维空间气泡、右侧设备列表和运行指标同步更新。每层至少 20 户公寓；重复点击同一楼层或空间不重建整个场景。浅色及深色宿主主题的楼层、工具栏、图例和聊天输入保持可读，窄视口可纵向滚动。建筑空间智能体“小吾”提供文字问答，不提供方言语音服务。
 
-楼栋、楼层、空间、设备及问答记录分别保存在 `mci_twin_building`、`mci_twin_floor`、`mci_twin_space`、`mci_twin_device`、`mci_twin_query_log`；`mci_twin_bootstrap` 与 `mci_twin_ask` 接口引擎允许匿名读取/问答，匿名问答不写日志。商城 `v1.3.1` 安装包含前四张表的 828 条演示种子记录（1 栋、12 层、280 个空间、535 台设备），问答日志不作为种子。设备运行值与用能值为模拟数据，不代表实时 BMS/IoT 接入。当前程序化园区资产可演示交互，但尚未达到概念图 90%–95% 的商业级视觉相似度。
+整栋视图的车流、车轮与行人步态默认循环播放，包括系统或浏览器开启“减少动态效果”时；该设置只抑制装饰性过渡，不隐式关闭演示所需的动态街景。需要静止画面时点击场景工具栏“暂停”，或按 `P`；再次点击“播放”或按 `P` 恢复。页面隐藏、切换楼层及返回整栋时会冻结并校正动画时钟，避免恢复后车辆或行人瞬移。
+
+楼栋、楼层、空间、设备及问答记录分别保存在 `mci_twin_building`、`mci_twin_floor`、`mci_twin_space`、`mci_twin_device`、`mci_twin_query_log`；`mci_twin_bootstrap` 与 `mci_twin_ask` 接口引擎允许匿名读取/问答，匿名问答不写日志。商城 `v1.8.1` 安装包含前四张表的 828 条演示种子记录（1 栋、12 层、280 个空间、535 台设备），问答日志不作为种子。设备运行值与用能值为模拟数据，不代表实时 BMS/IoT 接入。当前程序化园区资产可演示交互，但尚未达到概念图 90%–95% 的商业级视觉相似度。
 
 需要 Unity 物理、角色控制、复杂交互或现有 Unity 工程时，使用独立的 [Unity 3D 与 WebGL 集成](/doc/system-engine/unity-integration)。Unity 客户端通过 UPM SDK 与宿主桥接，业务通讯继续进入 V8 接口引擎，不需要为每个项目新增专用 Server Controller。
 

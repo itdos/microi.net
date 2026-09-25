@@ -23,7 +23,7 @@ function progressHarness() {
     const script = parse(dialogSource).descriptor.script.content;
     const exported = parseScript(script, { sourceType: "module" }).program.body.find(node => node.type === "ExportDefaultDeclaration").declaration;
     const methods = exported.properties.find(node => node.key.name === "methods").value.properties;
-    const names = ["stopImportProgressPolling", "getImportProgress", "handleUploadSuccess", "handleDialogClosed", "handleFileChange"];
+    const names = ["stopUploadWatchdog", "stopImportProgressPolling", "handleLegacyProgressFailure", "getImportProgress", "handleUploadSuccess", "handleDialogClosed", "handleFileChange"];
     const callbacks = [], timers = new Map(), emitted = [];
     let id = 0;
     const context = vm.createContext({
@@ -34,6 +34,7 @@ function progressHarness() {
     const state = {
         ...bound, visible: true, legacyImportRunning: false, legacyProgressGeneration: 0,
         submitting: true, uploadSucceeded: false, tableId: "fixture", importProgressApi: "/progress",
+        legacyProgressFailures: 0, legacyProgressStartedAt: 0,
         appendMenuContext: value => value, stopBackgroundTaskPolling() {},
         $emit: (...args) => emitted.push(args), $t: value => value,
         DiyCommon: { Post: (_url, _params, callback) => callbacks.push(callback), Result: result => result.Code === 1, IsNull: value => value == null }
@@ -58,6 +59,17 @@ test("accepted background imports keep polling and refresh the list only after c
     h.state.getImportProgress();
     h.callbacks.shift()({ Code: 1, Data: ["已全部成功结束"] });
     assert.equal(h.emitted.length, 1);
+});
+
+test("the completed 7/7 progress wording releases the loading import button", () => {
+    const h = progressHarness();
+    h.state.handleUploadSuccess({ Code: 1 });
+    h.callbacks.shift()({ Code: 1, Data: ["已读取 [7] 条有效数据，正在写入...", "已写入 [7/7] 条数据", "成功导入 [7/7] 条数据，主表按钮状态已刷新。"] });
+    assert.equal(h.state.legacyImportRunning, false);
+    assert.equal(h.state.submitting, false);
+    assert.equal(h.state.uploadSucceeded, true);
+    assert.equal(h.emitted.length, 1);
+    assert.equal(h.timers.size, 0);
 });
 
 test("failed imports stop without success and partial commits refresh exactly once", () => {
@@ -95,6 +107,31 @@ test("upload status changes do not erase the background job or parse its workboo
     assert.equal(h.state.legacyImportRunning, true);
     assert.equal(h.callbacks.length, 1);
     assert.equal(h.state.uploadResult.Code, 1);
+});
+
+test("three missing progress responses release the import button without claiming success", () => {
+    const h = progressHarness();
+    h.state.handleUploadSuccess({ Code: 1 });
+    for (let i = 0; i < 3; i++) {
+        h.tick(); // 当前进度请求超时
+        if (i < 2) h.tick(); // 有界重试
+    }
+    assert.equal(h.state.legacyImportRunning, false);
+    assert.equal(h.state.submitting, false);
+    assert.equal(h.state.uploadSucceeded, false);
+    assert.equal(h.emitted.length, 0);
+    assert.match(h.state.customError, /进度暂无法确认/);
+    assert.equal(h.timers.size, 0);
+});
+
+test("a late response after timeout cannot turn an unknown import into success", () => {
+    const h = progressHarness();
+    h.state.handleUploadSuccess({ Code: 1 });
+    const stale = h.callbacks.shift();
+    h.tick();
+    stale({ Code: 1, Data: ["已全部成功结束"] });
+    assert.equal(h.emitted.length, 0);
+    assert.equal(h.state.uploadSucceeded, false);
 });
 
 test("smart import dialog remains a valid Vue SFC", () => {

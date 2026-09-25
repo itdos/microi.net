@@ -76,9 +76,10 @@ AI 第一次使用时先查询 `action=Capabilities`，再按返回的动作、�
 |---|---|---|
 | `Capabilities` | 能力目录与真实边界 | 无 |
 | `Snapshot` | 请求、进程、主机、Docker、队列、诊断和实时网络 | `windowMinutes=1..15`、`top`、`includeHost`、`includeDocker` |
-| `Memory` | 当前节点内存压力、执行分配、对象类型和采集质量 | 无；必须先核对采集器心跳与存储错误 |
-| `MemoryIncidents` | 当前租户共享事故与本机持久记录摘要 | 最近最多 50 条 |
+| `Memory` | 当前节点内存压力、线程池及共享请求槽占用/等待、执行分配、对象类型和采集质量 | 无；必须先核对采集器心跳与存储错误 |
+| `MemoryIncidents` | 当前租户共享事故与本机持久记录摘要；持续线程池积压也会触发留证 | 最近最多 50 条 |
 | `MemoryIncident` | 执行链、代码哈希、CLR 分配栈和退出证据 | 32 位小写十六进制 `incidentId` |
+
 | `Logs` | 日志列表和完整详情数据 | `keyword/type/category/source/level/searchMonth/pageIndex/pageSize` |
 | `LogTypes` | 日志类型与数量 | `keyword/searchMonth` |
 | `LogStats` | 总数、错误、警告、慢 SQL、慢执行、异常 | `keyword/searchMonth` |
@@ -91,6 +92,9 @@ AI 第一次使用时先查询 `action=Capabilities`，再按返回的动作、�
 | `TrafficHistory` | MySQL 固定时间桶流量趋势 | `rangeKey`；可选 `dimensionType` |
 | `HistoricalDashboard` | 同一时间范围内的热点接口、IP、帐号、租户、内容类型与请求/流量总览 | `rangeKey=live5|today|yesterday|3d|7d|15d|30d|3m|6m|1y`、`top` |
 | `TrafficDetails` | 跨月大文件、上传下载和可疑传输 MongoDB 明细 | `rangeKey`、`pageIndex/pageSize`；可选 `keyword/transferAction/ip/userId/endpoint` |
+
+`Memory` 和事故帧中的 `PressureGlobal*`、`PressureV8Global*` 给出共享槽占用与排队；持续满额排队触发 `SustainedRequestGateWait` 留证。它说明当前节点共享闸门拥堵，需结合租户执行链定位长请求，不能只凭片段数归责某租户。
+请求先取单接口/单租户槽，再取共享 V8/全局槽，避免故障租户在自身槽前排队时占住其它租户的共享容量。不得把 V8.Http 全局默认 600 秒改短来处理单个上游故障；业务需要时按接口明确配置超时。
 
 示例：
 

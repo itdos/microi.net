@@ -44,7 +44,7 @@ public sealed class DiagnosticsController : ControllerBase
         return BuildHealthyResult("microi-api-host/health-v1");
     }
 
-    private static DosResult BuildHealthyResult(string healthContract)
+    internal static DosResult BuildHealthyResult(string healthContract)
     {
         return new DosResult(1, new
         {

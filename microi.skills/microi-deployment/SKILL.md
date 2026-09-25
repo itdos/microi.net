@@ -75,7 +75,7 @@ Playwright 使用 `browser.newContext()`。人工第二组至少使用无痕窗�
 - MySQL、Redis、MongoDB、MinIO/HDFS 地址和持久卷；
 - 当前 `OsClient`、数据库备份、对象存储备份和配置备份；
 - JWT/AuthSecret 等集群共享密钥的指纹一致性，绝不输出明文；
-- `/api/Diagnostics/health` readiness 与 `/api/Diagnostics/liveness`；
+- `/api/Diagnostics/health`、`/api/Diagnostics/liveness` 与兼容地址 `/apiengine/platform-service-health` 仅证明 API 宿主存活，均不检查 MongoDB、Redis、MySQL 或外部设备接口；依赖可用性另查服务探针与真实业务路径。健康 GET 在动态路由和业务压力控制前响应，禁止把相似路径或 POST 当作免限流入口；
 - 当前运行中的 Node、dotnet、Docker build 等重任务。
 
 ## 后端配置单一事实源（强制）
