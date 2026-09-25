@@ -4,6 +4,7 @@ import { cachedRequest, readPageState, removeCachePrefix, writePageState } from 
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
 import { compileModuleFilterFields } from '@/platform/list-filter-fields.mjs'
 import { normalizeTaskFlowCapabilities } from '@/tenants/xjy/task-flow-capability.mjs'
+import { buildTaskScopeWhere, normalizeTaskScope } from '@/tenants/xjy/task-responsibility.mjs'
 import {
   resolveCustomerDeviceReference
 } from '@/tenants/xjy/task-device-reference.mjs'
@@ -110,6 +111,8 @@ export function normalizeTask(row = {}) {
     state: formatFieldValue(row.Zhuangtai, '', { empty: '' }),
     serviceUser: formatFieldValue(row.ShouhouRY, '', { empty: '' }),
     serviceUserId: row.ShouhouRYID || '',
+    supportUser: formatFieldValue(row.HouxuFZR, '', { empty: '' }),
+    supportUserId: row.HouxuFZRID || '',
     planTime: row.YujiSHSJ || '',
     appointmentTime: row.YuyueSJ || '',
     acceptedTime: row.JiedanSJ || '',
@@ -151,7 +154,7 @@ export async function loadTasks(options = {}) {
     where.push({ Name: 'Chengshi', Type: 'Like', Value: options.city })
   }
   if (options.customerId) where.push({ Name: 'KehuID', Type: '=', Value: options.customerId })
-  if (options.mineOnly && user.Id) where.push({ Name: 'ShouhouRYID', Type: '=', Value: user.Id })
+  where.push(...buildTaskScopeWhere(normalizeTaskScope(options.scope, options.mineOnly), user.Id))
   const payload = {
     ModuleEngineKey: 'Diy_ShouhouDD',
     _PageIndex: pageIndex,
@@ -197,7 +200,8 @@ function buildTaskStatisticsPayload(filters = {}) {
     KehuId: filters.customerId || '',
     city: filters.city || '',
     keyword: filters.keyword || '',
-    isClicked: filters.mineOnly === true,
+    isClicked: normalizeTaskScope(filters.scope, filters.mineOnly) !== 'all',
+    taskScope: normalizeTaskScope(filters.scope, filters.mineOnly),
     selectedType: filters.type || '',
     periodDateField: filters.dateField || 'YujiSHSJ',
     PeriodRanges: periodRanges
@@ -234,7 +238,8 @@ export async function loadTaskStateCounts(filters = {}) {
       city: filters.city || '',
       keyword: filters.keyword || '',
       type: filters.type || '',
-      isClicked: filters.mineOnly === true
+      isClicked: normalizeTaskScope(filters.scope, filters.mineOnly) !== 'all',
+      taskScope: normalizeTaskScope(filters.scope, filters.mineOnly)
     }
     TASK_DATE_FIELDS.forEach((item) => { payload[item.value] = [] })
     if (range) payload[filters.dateField || 'YujiSHSJ'] = range
@@ -287,7 +292,14 @@ export async function loadTaskFlowCapabilities(id, refresh = false) {
     allowStale: false
   })
   const result = ensureSuccess(cached.data, '任务流程权限加载失败')
-  return { actions: normalizeTaskFlowCapabilities(result), stale: cached.stale === true }
+  return {
+    actions: normalizeTaskFlowCapabilities(result),
+    merchantAcceptanceEnabled: result.Data && result.Data.MerchantAcceptanceEnabled !== false,
+    customerAcceptanceEnabled: result.Data && result.Data.CustomerAcceptanceEnabled !== false,
+    evaluationEnabled: result.Data && result.Data.EvaluationEnabled !== false,
+    taskOverrideAllowed: !!(result.Data && result.Data.TaskOverrideAllowed),
+    stale: cached.stale === true
+  }
 }
 
 function normalizeTaskDevice(row = {}) {
@@ -549,6 +561,24 @@ export async function loadServiceUsers(keyword = '') {
   return result.Data || []
 }
 
+export async function loadSupportUsers(keyword = '') {
+  const user = getUser() || {}
+  if (!user.TenantId) return []
+  const result = ensureSuccess(await V8.FormEngine.GetTableData('Sys_User', {
+    _Keyword: keyword || '',
+    _Where: [
+      { Name: 'State', Type: '=', Value: 1 },
+      { Name: 'TenantId', Type: '=', Value: user.TenantId },
+      { GroupStart: true, Name: 'RoleIdsString', Type: 'Like', Value: '客服' },
+      { AndOr: 'OR', Name: 'RoleIds', Type: 'Like', Value: 'e757d4f5-e204-4039-9624-960bc3c60cbf' },
+      { AndOr: 'OR', Name: 'RoleIds', Type: 'Like', Value: '1c4283aa-68c4-4680-a066-f931f593435e', GroupEnd: true }
+    ],
+    _SelectFields: ['Id', 'Name', 'Account', 'Phone', 'DeptName', 'RoleIdsString'],
+    _OrderBy: 'Name', _OrderByType: 'ASC', _PageIndex: 1, _PageSize: 100
+  }), '客服列表加载失败')
+  return result.Data || []
+}
+
 export async function updateTask(id, values) {
   const payload = { Id: id, ...values, _InvokeType: 'Client' }
   const menuId = await taskMenuId()
@@ -570,6 +600,7 @@ export async function runTaskAction(action, task, values = {}) {
     }],
     cancel: ['shouhoudd_chexiao', { Id: id, ShouhouRYID: user.Id }],
     finish: ['shouhoudd_finish', { Id: id, ...values }],
+    reassignSupport: ['shouhoudd_reassign_support', { Id: id, HouxuFZRID: values.HouxuFZRID, Reason: values.reason || '' }],
     merchantPass: ['task_acceptance', { Id: id, ShangjiaYSZT: '通过', type: 1 }],
     merchantReject: ['task_acceptance', { Id: id, ShangjiaYSZT: '不通过', ShangjiaYSYJ: values.reason || '', type: 3 }],
     customerPass: ['task_acceptance', { Id: id, KehuYSZT: '通过', type: 2 }],
@@ -726,6 +757,7 @@ export default {
   loadTaskDeviceDetail,
   loadTaskEquipmentPackage,
   loadServiceUsers,
+  loadSupportUsers,
   updateTask,
   runTaskAction,
   saveTaskDevice,
