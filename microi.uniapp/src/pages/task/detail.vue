@@ -1,6 +1,6 @@
 <template>
   <mci-page-shell class="detail-page" :style="mciTokenStyle" title="任务详情" @back="goBack">
-    <template #right><view v-if="task.Id" class="nav-more" hover-class="nav-more--pressed" @tap="openFullForm"><text>•••</text></view></template>
+    <template #right><view v-if="task.Id && canEditTaskRecord" class="nav-more" hover-class="nav-more--pressed" @tap="openFullForm"><text>•••</text></view></template>
 
     <mci-skeleton v-if="loading" type="detail" :rows="7" />
     <view v-else-if="error" class="error-state"><text class="error-state__mark">!</text><text class="error-state__title">任务加载失败</text><text class="error-state__text">{{ error }}</text><view class="error-state__button" @tap="loadAll(true)"><text>重新加载</text></view></view>
@@ -21,7 +21,7 @@
 
       <scroll-view class="timeline-scroll" scroll-x :show-scrollbar="false">
         <view class="timeline-row">
-          <view v-for="(step, index) in timeline" :key="step.name" class="timeline-step" :class="{ active: step.active, current: step.current }">
+          <view v-for="(step, index) in timeline" :key="step.name" class="timeline-step" :class="{ active: step.active, current: step.current, skipped: step.skipped }">
             <view class="timeline-step__line"></view><view class="timeline-step__dot"><text v-if="step.active">✓</text></view><text class="timeline-step__name">{{ step.name }}</text><text class="timeline-step__time">{{ step.time || '—' }}</text>
           </view>
         </view>
@@ -42,6 +42,8 @@
           <text v-if="action.key === 'devices'" class="quick-action__badge">{{ completedDeviceCount }}/{{ devices.length }}</text>
         </view>
       </view>
+
+      <view v-if="task.state === '待客服验收'" class="support-owner"><text>当前客服</text><text>{{ task.supportUser || '待分配（请联系主管）' }}</text></view>
 
       <view v-if="needsFlowCapabilities && capabilityError" class="flow-warning">
         <view class="flow-warning__icon"><text>!</text></view>
@@ -81,7 +83,7 @@
       <view v-for="action in bottomActions" :key="action.key" class="bottom-button" :class="`bottom-button--${action.style || 'plain'}`" :disabled="submitting" hover-class="bottom-button--pressed" @tap="runBottomAction(action.key)"><text v-if="action.iconText" class="bottom-button__icon">{{ action.iconText }}</text><text>{{ action.label }}</text></view>
     </view>
 
-    <view v-if="assignVisible" class="sheet-mask" @tap="assignVisible = false"><view class="bottom-sheet" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>指派服务人员</text><view @tap="assignVisible = false"><text>×</text></view></view><view class="sheet-search"><input v-model="userKeyword" placeholder="搜索姓名、帐号或部门" confirm-type="search" @input="scheduleUserSearch" @confirm="searchUsers" /><text @tap="resetUserSearch">重置</text></view><scroll-view class="user-list" scroll-y><mci-skeleton v-if="usersLoading" type="list" :rows="4" /><template v-else><view v-for="user in users" :key="user.Id" class="user-row" :class="{ active: selectedUser && selectedUser.Id === user.Id }" @tap="selectedUser = user"><view class="user-avatar"><text>{{ (user.Name || user.Account || '人').slice(0,1) }}</text></view><view><text class="user-name">{{ user.Name || user.Account }}</text><text class="user-meta">{{ [user.DeptName, user.RoleName, user.Phone].filter(Boolean).join(' · ') }}</text></view><text class="user-check">{{ selectedUser && selectedUser.Id === user.Id ? '✓' : '' }}</text></view></template></scroll-view><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="assignVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="confirmAssign"><text>确认指派</text></view></view></view></view>
+    <view v-if="assignVisible" class="sheet-mask" @tap="assignVisible = false"><view class="bottom-sheet" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>{{ assignMode === 'support' ? '分配客服验收负责人' : '指派服务人员' }}</text><view @tap="assignVisible = false"><text>×</text></view></view><view class="sheet-search"><input v-model="userKeyword" placeholder="搜索姓名、帐号或部门" confirm-type="search" @input="scheduleUserSearch" @confirm="searchUsers" /><text @tap="resetUserSearch">重置</text></view><scroll-view class="user-list" scroll-y><mci-skeleton v-if="usersLoading" type="list" :rows="4" /><template v-else><view v-for="user in users" :key="user.Id" class="user-row" :class="{ active: selectedUser && selectedUser.Id === user.Id }" @tap="selectedUser = user"><view class="user-avatar"><text>{{ (user.Name || user.Account || '人').slice(0,1) }}</text></view><view><text class="user-name">{{ user.Name || user.Account }}</text><text class="user-meta">{{ [user.DeptName, user.RoleName, user.RoleIdsString, user.Phone].filter(Boolean).join(' · ') }}</text></view><text class="user-check">{{ selectedUser && selectedUser.Id === user.Id ? '✓' : '' }}</text></view></template></scroll-view><textarea v-if="assignMode === 'support'" v-model="supportReason" class="reason-textarea" maxlength="500" placeholder="请填写分配或转交原因" /><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="assignVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="confirmAssign"><text>{{ assignMode === 'support' ? '确认分配' : '确认指派' }}</text></view></view></view></view>
 
     <view v-if="timeVisible" class="sheet-mask" @tap="timeVisible = false"><view class="bottom-sheet bottom-sheet--compact" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>{{ timeEditor.label }}</text><view @tap="timeVisible = false"><text>×</text></view></view><view class="datetime-grid"><picker mode="date" :value="editorDate" @change="editorDate = $event.detail.value"><view class="picker-control"><text>{{ editorDate || '选择日期' }}</text></view></picker><picker mode="time" :value="editorTime" @change="editorTime = $event.detail.value"><view class="picker-control"><text>{{ editorTime || '选择时间' }}</text></view></picker></view><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="timeVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="saveTime"><text>保存时间</text></view></view></view></view>
 
@@ -95,12 +97,14 @@
 import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
+import { canEditMenuRecord } from '@/platform/menu-permission.js'
 import { callApiEngine, findMenu, formatDateTime, openForm } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
 import { buildTaskTimeline, formatTaskLoadError } from '@/tenants/xjy/task-detail-presentation.mjs'
 import {
   hasTaskPermission,
   loadServiceUsers,
+  loadSupportUsers,
   loadTask,
   loadTaskFlowCapabilities,
   loadTaskDevices,
@@ -122,8 +126,9 @@ export default {
   mixins: [themeMixin],
   data() {
     return {
-      id: '', task: {}, devices: [], taskCapabilities: [], capabilityError: '', currentUser: {}, loading: true, refreshing: false,
+      id: '', task: {}, devices: [], taskCapabilities: [], merchantAcceptanceEnabled: true, customerAcceptanceEnabled: true, evaluationEnabled: true, capabilityError: '', currentUser: {}, loading: true, refreshing: false,
       stale: false, error: '', submitting: false, assignVisible: false, usersLoading: false, users: [],
+      assignMode: 'service', supportReason: '',
       metadataDefinition: null, taskMenuId: '', expandedMetadata: {},
       selectedUser: null, userKeyword: '', userSearchTimer: null, userLoadRequestId: 0, timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
       rejectVisible: false, rejectMode: 'merchant', rejectReason: '', evaluateVisible: false,
@@ -136,6 +141,12 @@ export default {
     shortType() { return String(this.task.type || '服务').slice(0, 2) },
     isOwner() { return !!(this.currentUser.Id && String(this.currentUser.Id) === String(this.task.serviceUserId)) },
     isAdmin() { return Number(this.currentUser.Level || 0) >= 999 || /管理员/.test(this.currentUser.RoleName || '') },
+    canEditTaskRecord() { return canEditMenuRecord(this.taskMenuId, this.currentUser) },
+    canReassignSupport() {
+      const role = [this.currentUser.RoleName, this.currentUser.RoleIdsString, this.currentUser.RoleIds].filter(Boolean).join(',')
+      return !!this.currentUser.TenantId && String(this.currentUser.TenantId) === String(this.task.TenantId || '') &&
+        (Number(this.currentUser.Level || 0) >= 9999 || /客服主管|总经理|1c4283aa-68c4-4680-a066-f931f593435e|01KKXHE2XYV2AP8DH2VNYV7B01|99b3a372-ea79-480b-92f7-8e4e458915ed|31d0abd5-8769-42ad-852b-06bfec5da90c|030e9f54-7eb9-4bd8-8101-e8fe86b3f5dc/.test(role))
+    },
     completedDeviceCount() { return this.devices.filter((item) => item.status === '已完成').length },
     incompleteDeviceCount() { return Math.max(0, this.devices.length - this.completedDeviceCount) },
     metadataGroups() {
@@ -147,7 +158,11 @@ export default {
       })).filter((group) => group.fields.length)
     },
     timeline() {
-      return buildTaskTimeline(this.task, (value) => formatDateTime(value, true))
+      return buildTaskTimeline(this.task, (value) => formatDateTime(value, true), {
+        merchantAcceptanceEnabled: this.merchantAcceptanceEnabled,
+        customerAcceptanceEnabled: this.customerAcceptanceEnabled,
+        evaluationEnabled: this.evaluationEnabled
+      })
     },
     timeRows() {
       return [
@@ -172,7 +187,7 @@ export default {
       return actions
     },
     needsFlowCapabilities() {
-      return ['待客服验收', '待客户验收', '待评价'].includes(this.task.state)
+      return ['待客服验收', '待客户验收', '待评价', '已结束'].includes(this.task.state)
     },
     bottomActions() {
       const state = this.task.state
@@ -183,11 +198,21 @@ export default {
         return actions
       }
       if (state === '待服务' && (this.isOwner || this.isAdmin)) return [{ key: 'cancel', label: '撤销接单', style: 'plain' }, { key: 'finish', label: '去完成服务', style: 'primary' }]
-      if (state === '待客服验收') return [{ key: 'merchantReject', label: '退回处理', style: 'danger-plain' }, { key: 'merchantPass', label: '验收通过', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
-      if (state === '待客户验收') return [{ key: 'customerReject', label: '退回处理', style: 'danger-plain' }, { key: 'customerPass', label: '确认验收', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
-      if (state === '待评价' && this.canRunTaskAction('evaluate')) return [{ key: 'evaluate', label: '评价本次服务', style: 'primary', iconText: '★' }]
-      if (/已结束|已完成/.test(String(state)) && this.task.Pingjia && !this.task.ZhuipingNR) return [{ key: 'followUp', label: '追加评价', style: 'plain' }]
-      return []
+      if (state === '待客服验收') {
+        const actions = [{ key: 'merchantReject', label: '退回处理', style: 'danger-plain' }, { key: 'merchantPass', label: '验收通过', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
+        if (this.canReassignSupport) actions.unshift({ key: 'reassignSupport', label: this.task.supportUserId ? '转交客服' : '分配客服', style: 'plain' })
+        return actions
+      }
+      const actions = []
+      if (['待客户验收', '待评价', '已结束'].includes(state)) {
+        actions.push(
+          { key: 'customerReject', label: '验收不通过', style: 'danger-plain' },
+          { key: 'customerPass', label: '客户确认验收', style: 'success' }
+        )
+      }
+      if (['待客户验收', '待评价'].includes(state)) actions.push({ key: 'evaluate', label: '评价本次服务', style: 'primary', iconText: '★' })
+      if (/已结束|已完成/.test(String(state)) && this.task.Pingjia && !this.task.ZhuipingNR) actions.push({ key: 'followUp', label: '追加评价', style: 'plain' })
+      return actions.filter((item) => this.canRunTaskAction(item.key))
     }
   },
   onLoad(options) {
@@ -205,6 +230,7 @@ export default {
     async loadAll(refresh = false, showLoading = true) {
       if (!this.id) { this.error = '缺少任务编号'; this.loading = false; return }
       if (showLoading) this.loading = true
+      this.currentUser = getUser() || {}
       this.error = ''
       try {
         const definitionRequest = loadNativeFormDefinition('Diy_ShouhouDD', refresh).catch(() => this.metadataDefinition)
@@ -229,6 +255,9 @@ export default {
         this.task = taskResult.task
         this.devices = devices
         this.taskCapabilities = capabilities.actions || []
+        this.merchantAcceptanceEnabled = capabilities.merchantAcceptanceEnabled !== false
+        this.customerAcceptanceEnabled = capabilities.customerAcceptanceEnabled !== false
+        this.evaluationEnabled = capabilities.evaluationEnabled !== false
         this.metadataDefinition = definition || null
         this.taskMenuId = menu && menu.Id || ''
         this.stale = taskResult.stale
@@ -284,6 +313,9 @@ export default {
       try {
         const capabilities = await loadTaskFlowCapabilities(this.id, true)
         this.taskCapabilities = capabilities.actions || []
+        this.merchantAcceptanceEnabled = capabilities.merchantAcceptanceEnabled !== false
+        this.customerAcceptanceEnabled = capabilities.customerAcceptanceEnabled !== false
+        this.evaluationEnabled = capabilities.evaluationEnabled !== false
         if (!this.taskCapabilities.length) uni.showToast({ title: '当前账号没有可执行的流程操作', icon: 'none' })
       } catch (error) {
         this.capabilityError = (error && error.message) || '流程操作加载失败'
@@ -294,11 +326,15 @@ export default {
     },
     async runBottomAction(key) {
       if (this.submitting) return
-      if (['merchantReject', 'merchantPass', 'customerReject', 'customerPass', 'evaluate'].includes(key) && !this.canRunTaskAction(key)) {
+      if (['merchantReject', 'merchantPass', 'customerReject', 'customerPass', 'evaluate', 'followUp'].includes(key) && !this.canRunTaskAction(key)) {
         uni.showToast({ title: '当前角色无权执行该流程', icon: 'none' })
         return
       }
-      if (key === 'assign') { this.assignVisible = true; this.loadUsers(); return }
+      if (key === 'assign' || key === 'reassignSupport') {
+        this.assignMode = key === 'reassignSupport' ? 'support' : 'service'
+        this.selectedUser = null; this.userKeyword = ''; this.supportReason = ''
+        this.assignVisible = true; this.loadUsers(); return
+      }
       if (key === 'finish') {
         if (!this.task.visitTime) { uni.showToast({ title: '请先填写上门时间或完成现场打卡', icon: 'none' }); return }
         const pending = this.devices.filter((item) => item.status !== '已完成')
@@ -330,7 +366,7 @@ export default {
       const requestId = ++this.userLoadRequestId
       this.usersLoading = true
       try {
-        const users = await loadServiceUsers(this.userKeyword.trim())
+        const users = await (this.assignMode === 'support' ? loadSupportUsers : loadServiceUsers)(this.userKeyword.trim())
         if (requestId === this.userLoadRequestId) this.users = users
       } catch (error) {
         if (requestId === this.userLoadRequestId) uni.showToast({ title: error.message || '人员加载失败', icon: 'none' })
@@ -339,19 +375,27 @@ export default {
       }
     },
     async confirmAssign() {
-      if (!this.selectedUser) { uni.showToast({ title: '请选择服务人员', icon: 'none' }); return }
+      if (!this.selectedUser || (this.assignMode === 'support' && !this.supportReason.trim())) { uni.showToast({ title: this.assignMode === 'support' ? '请选择客服并填写原因' : '请选择服务人员', icon: 'none' }); return }
       await this.withSubmit(async () => {
-        await runTaskAction('assign', this.task, { ShouhouRY: this.selectedUser.Name || this.selectedUser.Account, ShouhouRYID: this.selectedUser.Id, ShouhouRYDH: this.selectedUser.Phone || '' })
+        if (this.assignMode === 'support') await runTaskAction('reassignSupport', this.task, { HouxuFZRID: this.selectedUser.Id, reason: this.supportReason.trim() })
+        else await runTaskAction('assign', this.task, { ShouhouRY: this.selectedUser.Name || this.selectedUser.Account, ShouhouRYID: this.selectedUser.Id, ShouhouRYDH: this.selectedUser.Phone || '' })
         this.assignVisible = false
         await this.loadAll(true, false)
-        uni.showToast({ title: '指派成功', icon: 'success' })
+        uni.showToast({ title: this.assignMode === 'support' ? '客服分配成功' : '指派成功', icon: 'success' })
       })
     },
     async submitReject() {
       const action = this.rejectMode === 'merchant' ? 'merchantReject' : 'customerReject'
       if (!this.canRunTaskAction(action)) { uni.showToast({ title: '当前角色无权执行该流程', icon: 'none' }); return }
       if (!this.rejectReason.trim()) { uni.showToast({ title: '请填写不通过原因', icon: 'none' }); return }
-      await this.withSubmit(async () => { await runTaskAction(action, this.task, { reason: this.rejectReason.trim() }); this.rejectVisible = false; await this.loadAll(true, false); uni.showToast({ title: '已退回处理', icon: 'success' }) })
+      await this.withSubmit(async () => {
+        const result = await runTaskAction(action, this.task, { reason: this.rejectReason.trim() })
+        this.rejectVisible = false
+        await this.loadAll(true, false)
+        const reworkTaskId = result && result.Data && result.Data.ReworkTaskId
+        if (reworkTaskId) uni.showModal({ title: '已受理返工', content: '原任务保留结案记录，已新建关联返工任务并通知客服。', showCancel: false })
+        else uni.showToast({ title: '已退回待服务', icon: 'success' })
+      })
     },
     toggleEvaluationTag(tag) { const index = this.evaluation.tags.indexOf(tag); if (index >= 0) this.evaluation.tags.splice(index, 1); else this.evaluation.tags.push(tag) },
     async submitEvaluation() {
@@ -372,7 +416,10 @@ export default {
       const query = [`taskId=${encodeURIComponent(this.id)}`, `taskNo=${encodeURIComponent(this.task.no || '')}`, `customer=${encodeURIComponent(this.task.customer || '')}`, `taskType=${encodeURIComponent(this.task.type || '')}`].join('&')
       uni.navigateTo({ url: `/pages/native/task-feedback?${query}` })
     },
-    openFullForm() { openForm({ table: 'Diy_ShouhouDD', rowId: this.id, mode: 'Edit', title: '完整售后任务', menuAliases: ['售后任务', '售后订单'] }) },
+    openFullForm() {
+      if (!this.canEditTaskRecord) { uni.showToast({ title: '当前账号没有编辑权限', icon: 'none' }); return }
+      openForm({ table: 'Diy_ShouhouDD', rowId: this.id, mode: 'Edit', title: '完整售后任务', menuId: this.taskMenuId, menuAliases: ['售后任务', '售后订单'] })
+    },
     confirm(content) { return new Promise((resolve) => uni.showModal({ title: '请确认', content, success: (result) => resolve(!!result.confirm), fail: () => resolve(false) })) },
     async withSubmit(handler) {
       this.submitting = true; uni.showLoading({ title: '正在提交', mask: true })
@@ -391,6 +438,7 @@ export default {
 .detail-scroll--with-actions { height: calc(100vh - var(--mci-safe-top) - 92rpx - 112rpx - var(--mci-safe-bottom)); }
 .offline-tip { padding: 12rpx 22rpx; color: #7c5b1c; background: #fff8e6; font-size: 21rpx; }
 .hero-band { position: relative; overflow: hidden; min-height: 276rpx; padding: 30rpx 26rpx 26rpx; color: #fff; background: #063b5c; box-sizing: border-box; }
+.support-owner { display: flex; justify-content: space-between; padding: 16rpx 26rpx; background: #eef7fb; color: #27576e; font-size: 23rpx; }
 .hero-band__water, .hero-band__shade { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-band__water { opacity: .48; }
 .hero-band__shade { background: linear-gradient(105deg,rgba(4,48,70,.97),rgba(4,91,118,.78)); }
@@ -412,6 +460,7 @@ export default {
 .timeline-step__dot { position: relative; z-index: 1; width: 31rpx; height: 31rpx; margin: 0 auto; border: 4rpx solid #fff; border-radius: 50%; color: #fff; background: #c9d5d9; box-shadow: 0 0 0 2rpx #c9d5d9; font-size: 16rpx; line-height: 31rpx; box-sizing: border-box; }
 .timeline-step.active .timeline-step__line, .timeline-step.active .timeline-step__dot { background: #087da8; }.timeline-step.active .timeline-step__dot { box-shadow: 0 0 0 2rpx #087da8; }.timeline-step.current .timeline-step__dot { box-shadow: 0 0 0 5rpx rgba(8,125,168,.18); }
 .timeline-step__name, .timeline-step__time { display: block; }.timeline-step__name { margin-top: 10rpx; color: #66808a; font-size: 20rpx; }.timeline-step.active .timeline-step__name { color: #24505f; font-weight: 650; }.timeline-step__time { margin-top: 4rpx; color: #9aaab0; font-size: 17rpx; }
+.timeline-step.skipped .timeline-step__dot { background: #e8eef0; box-shadow: 0 0 0 2rpx #c5d0d4; }.timeline-step.skipped .timeline-step__time { color: #78909a; }
 .service-time-scroll { border-top: 10rpx solid #f1f6f8; border-bottom: 0; }.service-time-row { padding-top: 25rpx; }.service-time-step { width: 176rpx; padding: 0 4rpx 5rpx; border-radius: 8px; box-sizing: border-box; transition: background .16s ease, transform .16s ease; }.service-time-step.editable { cursor: pointer; }.service-time-step--pressed { background: #edf7fa; transform: scale(.985); }.service-time-step .timeline-step__name { white-space: nowrap; }.service-time-step .timeline-step__time { min-height: 44rpx; padding: 0 3rpx; white-space: normal; line-height: 1.35; }.timeline-divider { height: 14rpx; border-top: 1px solid #e5edef; border-bottom: 1px solid #e5edef; background: #f1f6f8; box-sizing: border-box; }
 .action-band { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 18rpx 12rpx; background: #fff; }
 .action-band--four { grid-template-columns: repeat(4,minmax(0,1fr)); }

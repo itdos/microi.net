@@ -87,14 +87,25 @@ export default {
       try{
         const menu=await findMenu(['售后任务','售后订单'],TASK_TABLE)
         if(!menu||!menu.Id)throw new Error('当前账号没有售后任务菜单权限')
-        const definition=await loadNativeFormDefinition(TASK_TABLE,false,{menuId:menu.Id})
-        const contexts={}
-        TASK_FILE_FIELDS.forEach((name)=>{
-          const field=(definition.fields||[]).find((item)=>String(item.Name||'').toLowerCase()===name.toLowerCase())
-          if(field&&field.Id)contexts[name]={formEngineKey:TASK_TABLE,formDataId:this.taskId,fieldId:field.Id,sysMenuId:menu.Id}
-        })
-        if(TASK_FILE_FIELDS.some((name)=>!contexts[name]))throw new Error('售后任务附件字段元数据不完整')
+        const toContexts=(definition)=>{
+          const contexts={}
+          TASK_FILE_FIELDS.forEach((name)=>{
+            const field=(definition.fields||[]).find((item)=>String(item.Name||'').toLowerCase()===name.toLowerCase())
+            if(field&&field.Id)contexts[name]={formEngineKey:TASK_TABLE,formDataId:this.taskId,fieldId:field.Id,sysMenuId:menu.Id}
+          })
+          return contexts
+        }
+        let contexts=toContexts(await loadNativeFormDefinition(TASK_TABLE,false,{menuId:menu.Id}))
+        if(TASK_FILE_FIELDS.some((name)=>!contexts[name])){
+          // 元数据可能仍是旧缓存；重取一次，但单个字段缺失不得连带隐藏另一字段的历史私有附件。
+          try{contexts=toContexts(await loadNativeFormDefinition(TASK_TABLE,true,{menuId:menu.Id}))}catch(error){}
+        }
         this.fileContexts=contexts
+        const missing=TASK_FILE_FIELDS.filter((name)=>!contexts[name])
+        if(missing.length){
+          const labels=missing.map((name)=>name==='JieguoTP'?'照片':'视频').join('、')
+          this.fileContextError=`${labels}附件元数据不可用，对应私有附件暂不能预览或上传`
+        }
       }catch(error){
         this.fileContextError=(error&&error.message)||'私有服务附件授权上下文不可用，已隐藏历史附件'
       }
@@ -102,7 +113,8 @@ export default {
     taskFileContext(fieldName){return this.fileContexts[fieldName]||EMPTY_PRIVATE_FILE_CONTEXT},
     async loadDevices(refresh=false){try{this.devices=await loadTaskDevices(this.taskId,refresh)}catch(error){this.devices=[]}},
     openDevice(device){uni.navigateTo({url:`/pages/task/device?id=${encodeURIComponent(device.Id)}&taskId=${encodeURIComponent(this.taskId)}&taskType=${encodeURIComponent(this.taskType)}`})},
-    openFullForm(){openForm({table:'Diy_ShouhouDD',rowId:this.taskId,mode:'Edit',title:'完整售后任务',menuAliases:['售后任务','售后订单']})},
+    // 服务填写页的“完整信息”只是查阅入口；编辑须由表单页独立核对后台 Edit 权限。
+    openFullForm(){openForm({table:'Diy_ShouhouDD',rowId:this.taskId,mode:'View',title:'完整售后任务',menuAliases:['售后任务','售后订单']})},
     parseUpload(value){if(!value)return[];if(Array.isArray(value))return value;try{const rows=JSON.parse(value);return Array.isArray(rows)?rows:[rows]}catch(error){return[]}},
     openWatermarkCamera(){const query=`customer=${encodeURIComponent(this.customer)}&address=${encodeURIComponent(this.task.address||'服务现场')}`;uni.navigateTo({url:`/pages/native/watermark-camera?${query}`,success:(result)=>{if(!result.eventChannel)return;result.eventChannel.on('watermarkCaptured',async(data)=>{if(!data||!data.path)return;try{const upload=await V8.uploadFile(data.path,{path:`xjy/task-result/${this.taskId}/watermark`,preview:true});const rows=this.parseUpload(this.form.photos);rows.push(upload.Data);this.form.photos=JSON.stringify(rows)}catch(error){uni.showToast({title:error.message||'水印照片上传失败',icon:'none'})}})}})},
     saveDraft(showToast=true){writeTaskDraft(`finish:${this.taskId}`,{form:{...this.form}});this.draftRestored=true;this.draftSavedAt=Date.now();if(showToast)uni.showToast({title:'草稿已保存',icon:'success'})},

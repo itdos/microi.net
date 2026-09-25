@@ -59,7 +59,8 @@ test('二维码入口沿用设备列表表单的新增和编辑权限', () => {
   const menuId = 'device-menu'
   const editUser = { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Edit' }] }] }
   const addUser = { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Add' }] }] }
-  assert.equal(canGenerateDeviceQrCode(menuId, { Level: 999 }, 'Edit'), true)
+  assert.equal(canGenerateDeviceQrCode(menuId, { Level: 999 }, 'Edit'), false)
+  assert.equal(canGenerateDeviceQrCode(menuId, { Level: 9999 }, 'Edit'), true)
   assert.equal(canGenerateDeviceQrCode(menuId, editUser, 'Edit'), true)
   assert.equal(canGenerateDeviceQrCode(menuId, editUser, 'Add'), false)
   assert.equal(canGenerateDeviceQrCode(menuId, addUser, 'Add'), true)
