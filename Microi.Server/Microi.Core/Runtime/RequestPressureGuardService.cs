@@ -19,6 +19,31 @@ namespace Microi.net
         private static readonly object GateRegistryLock = new object();
         private const int MaximumGateRegistryEntries = 4096;
         private const int MaximumGateKeyLength = 256;
+        private static long _globalWaiting;
+        private static long _v8GlobalWaiting;
+
+        /// <summary>
+        /// 当前节点的共享压力槽快照。事故留证可据此区分业务等待与主机资源不足；
+        /// Active/Waiting 是采样瞬间的近似值，不表示某个租户独占的请求数。
+        /// </summary>
+        public static RequestPressureSnapshot Snapshot()
+        {
+            var options = RequestPressureGuardOptions.FromConfiguration();
+            return new RequestPressureSnapshot
+            {
+                SampledAtUtc = DateTime.UtcNow,
+                Global = GateSnapshot("global", options.GlobalMaxConcurrentRequests, Interlocked.Read(ref _globalWaiting)),
+                V8Global = GateSnapshot("v8:global", options.V8GlobalMaxConcurrentRequests, Interlocked.Read(ref _v8GlobalWaiting))
+            };
+        }
+
+        private static RequestPressureGateSnapshot GateSnapshot(string key, int limit, long waiting)
+        {
+            var active = Gates.TryGetValue($"{key}:limit:{limit}", out var gate)
+                ? Math.Max(0, limit - gate.CurrentCount)
+                : 0;
+            return new RequestPressureGateSnapshot { Limit = limit, Active = active, Waiting = waiting };
+        }
 
         public static async Task<RequestPressureLease> TryEnterAsync(
             string path,
@@ -37,6 +62,8 @@ namespace Microi.net
             {
                 var gate = GetOrCreateGate(item);
                 var entered = false;
+                if (item.Type == "Global") Interlocked.Increment(ref _globalWaiting);
+                if (item.Type == "V8Global") Interlocked.Increment(ref _v8GlobalWaiting);
                 try
                 {
                     entered = await gate.WaitAsync(
@@ -45,6 +72,11 @@ namespace Microi.net
                 }
                 catch (OperationCanceledException)
                 {
+                }
+                finally
+                {
+                    if (item.Type == "Global") Interlocked.Decrement(ref _globalWaiting);
+                    if (item.Type == "V8Global") Interlocked.Decrement(ref _v8GlobalWaiting);
                 }
 
                 if (!entered)
@@ -157,7 +189,25 @@ namespace Microi.net
                 item.WaitMilliseconds = waitMilliseconds;
             }
 
+            // 先等待单接口/单租户容量，再占共享容量。若先占 V8Global，
+            // 某租户达到 V8Tenant 上限后的排队请求仍会耗尽全局槽，拖慢其它租户。
+            // 所有请求采用同一顺序获取租约，释放时按逆序进行。
+            result.Sort((left, right) => GatePriority(left.Type).CompareTo(GatePriority(right.Type)));
             return result.Where(item => item.Limit > 0);
+        }
+
+        private static int GatePriority(string type)
+        {
+            switch (type)
+            {
+                case "ApiEngine": return 0;
+                case "V8Tenant": return 1;
+                case "Tenant": return 2;
+                case "Route": return 3;
+                case "V8Global": return 4;
+                case "Global": return 5;
+                default: return 6;
+            }
         }
 
         private static string NormalizeKnownTenant(string osClient)
@@ -404,6 +454,20 @@ namespace Microi.net
         public string Type { get; }
         public string Message { get; }
         internal int WaitMilliseconds { get; set; }
+    }
+
+    public sealed class RequestPressureSnapshot
+    {
+        public DateTime SampledAtUtc { get; set; }
+        public RequestPressureGateSnapshot Global { get; set; }
+        public RequestPressureGateSnapshot V8Global { get; set; }
+    }
+
+    public sealed class RequestPressureGateSnapshot
+    {
+        public int Limit { get; set; }
+        public int Active { get; set; }
+        public long Waiting { get; set; }
     }
 
     public sealed class RequestPressureGuardOptions

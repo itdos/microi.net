@@ -176,6 +176,8 @@ test("notification links reject script schemes and keep safe routes", () => {
     assert.equal(normalizeNotificationLink("data:text/html,x", "https://microi.example"), "");
     assert.equal(normalizeNotificationLink("/mic/orders/1", "https://microi.example"), "/mic/orders/1");
     assert.equal(normalizeNotificationLink("#message", "https://microi.example"), "#message");
+    assert.equal(normalizeNotificationLink("/#/xiangmuguanli1?FormDataId=project-1", "https://microi.example"), "#/xiangmuguanli1?FormDataId=project-1");
+    assert.equal(normalizeNotificationLink("https://microi.example/#/xiangmuguanli1?FormDataId=project-1", "https://microi.example"), "#/xiangmuguanli1?FormDataId=project-1");
     assert.equal(normalizeNotificationLink("https://docs.microi.net/a", "https://microi.example"), "https://docs.microi.net/a");
     assert.equal(normalizeNotificationLink("//evil.example/x", "https://microi.example"), "https://evil.example/x");
 });
@@ -192,5 +194,10 @@ test("notification center binds the fixed SignalR event and performs authoritati
     assert.match(component, /DiyCommon\.Notification\.List/);
     assert.match(component, /DiyCommon\.Notification\.MarkRead/);
     assert.match(component, /dispatchPlatformNotificationSnapshot/);
+    assert.match(component, /PLATFORM_NOTIFICATION_DISCONNECTED_POLL_MS = 15000/);
+    assert.match(component, /PLATFORM_NOTIFICATION_CONNECTED_POLL_MS = 60000/);
+    assert.match(component, /this\.startPlatformNotificationPolling\(\)/);
+    assert.match(component, /beforeUnmount\(\)[\s\S]*?this\.stopPlatformNotificationPolling\(\)/);
+    assert.match(component, /Promise\.race\(\[[\s\S]*?DiyCommon\.Notification\.List/);
     assert.doesNotMatch(main, /ChatType\s*==\s*"吾码IM"/);
 });

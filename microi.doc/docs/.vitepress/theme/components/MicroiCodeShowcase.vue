@@ -9,7 +9,6 @@
         <div class="microi-code-actions">
           <a class="is-primary" :href="windows.latest"><DownloadIcon />下载 Windows</a>
           <a :href="mac.latest"><DownloadIcon />下载 macOS Intel</a>
-          <a class="is-text" href="#版本记录">查看历史版本 <span aria-hidden="true">↓</span></a>
         </div>
         <ul class="microi-code-facts" aria-label="Microi Code 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
@@ -21,21 +20,6 @@
         <img src="/images/product-screenshots/microi-code-ai-remove-light.png" alt="Microi Code AI 图像处理工作台">
         <span><strong>29 项图像能力</strong><small>参数、上传、任务与结果都在桌面端完成</small></span>
       </a>
-    </div>
-
-    <div class="microi-code-platforms" aria-label="Microi Code 下载">
-      <article>
-        <header><span class="platform-mark"><WindowsIcon /></span><div><p>WINDOWS</p><h2>Windows x64</h2></div><em>v{{ windows.version }}</em></header>
-        <p>适用于 Windows 10 / 11。安装包未签名，下载后可使用下方 SHA-256 校验完整性。</p>
-        <div class="platform-actions"><a :href="windows.latest">下载 latest</a><a :href="windows.archive">不可变归档</a></div>
-        <code>{{ windows.sha256 }}</code>
-      </article>
-      <article>
-        <header><span class="platform-mark"><AppleIcon /></span><div><p>MACOS</p><h2>macOS Intel</h2></div><em>v{{ mac.version }}</em></header>
-        <p>Intel x64 原生包；Apple Silicon 可通过 Rosetta 2 运行。当前包未签名、未公证。</p>
-        <div class="platform-actions"><a :href="mac.latest">下载 latest</a><a :href="mac.archive">不可变归档</a></div>
-        <code>{{ mac.sha256 }}</code>
-      </article>
     </div>
 
     <div class="microi-code-section-head">
@@ -56,16 +40,24 @@
     </div>
 
     <section id="版本记录" class="microi-code-history" aria-labelledby="microi-code-history-title">
-      <div class="microi-code-section-head">
-        <div><p>RELEASES</p><h2 id="microi-code-history-title">版本记录</h2></div>
-        <span>latest 始终指向对应平台最新版，历史归档永久保留</span>
-      </div>
+      <button class="microi-code-history-toggle" type="button" :aria-expanded="historyOpen" aria-controls="microi-code-history-content" @click="historyOpen = !historyOpen">
+        <span><small>RELEASES</small><strong id="microi-code-history-title">版本记录</strong></span>
+        <span class="microi-code-history-toggle__meta">{{ releases.length }} 个安装包 <span aria-hidden="true">{{ historyOpen ? '收起 −' : '展开 +' }}</span></span>
+      </button>
+      <div v-if="historyOpen" id="microi-code-history-content">
       <div class="release-list">
-        <article v-for="release in releases" :key="`${release.version}-${release.platform}`">
+        <article v-for="release in visibleReleases" :key="`${release.version}-${release.platform}`">
           <div><strong>v{{ release.version }}</strong><span>{{ release.platform }}</span></div>
           <p>{{ release.note }}</p>
           <a :href="release.url">下载归档</a>
+          <code v-if="release.sha256" class="release-checksum">SHA-256 {{ release.sha256 }}</code>
         </article>
+      </div>
+      <nav v-if="pageCount > 1" class="microi-code-history-pages" aria-label="版本记录分页">
+        <button type="button" :disabled="historyPage === 1" @click="historyPage--">上一页</button>
+        <span>第 {{ historyPage }} / {{ pageCount }} 页</span>
+        <button type="button" :disabled="historyPage === pageCount" @click="historyPage++">下一页</button>
+      </nav>
       </div>
     </section>
 
@@ -77,12 +69,10 @@
 </template>
 
 <script setup>
-import { h } from 'vue'
+import { computed, h, ref } from 'vue'
 
 const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true', fill }, [h('path', { d: path })])
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
-const WindowsIcon = svgIcon('M3 5.5 10.7 4v7H3V5.5Zm9-.2L21 3.5V11h-9V5.3ZM3 12.3h7.7v7L3 18v-5.7Zm9 0h9v7.5L12 18v-5.7Z', 'currentColor')
-const AppleIcon = svgIcon('M16.7 12.7c0-2.5 2-3.7 2.1-3.8a4.5 4.5 0 0 0-3.6-1.9c-1.5-.1-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.5 1.3 0 1.8-.8 3.4-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.2 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-3-.9-3-4.1ZM14.2 5.4A4.2 4.2 0 0 0 15.2 2a4.4 4.4 0 0 0-3 1.6 4 4 0 0 0-1 3.2 3.7 3.7 0 0 0 3-1.4Z', 'currentColor')
 
 function trackPointer(event) {
   const target = event.currentTarget
@@ -97,17 +87,17 @@ function resetPointer(event) {
 }
 
 const windows = {
-  version: '1.1.1',
-  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe?v=1.1.1',
-  archive: 'https://static.itdos.com/itdos/microi-code/1.1.1/8d6730cec534/202609/Microi-Code-1_1_1-windows-x64-setup.exe',
-  sha256: '8d6730cec534326fd67565b81b48283d9c5f6d049bea2f7a3592e3931223a888'
+  version: '1.1.3',
+  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe',
+  archive: 'https://static.itdos.com/itdos/microi-code/1.1.3/29f4aef8fede/202609/Microi-Code-1_1_3-windows-x64-setup.exe',
+  sha256: '29f4aef8fede578500da3557c3d8350129e035337e008f5e1aaa69162ddb0aee'
 }
 
 const mac = {
-  version: '1.0.8',
-  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-mac-x64.dmg?v=1.0.8',
-  archive: 'https://static.itdos.com/itdos/microi-code/1.0.8/61546bc443f2/202609/Microi-Code-1_0_8-mac-x64.dmg',
-  sha256: '61546bc443f2aa16f0b8d1833c2359f94d37edddca3ab2e3541d87834c657a3f'
+  version: '1.1.3',
+  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-mac-x64.dmg',
+  archive: 'https://static.itdos.com/itdos/microi-code/1.1.3/3fedbfacdfe9/202609/Microi-Code-1_1_3-mac-x64.dmg',
+  sha256: '3fedbfacdfe952bf33c8f406a783cb1af83255d621451f3c31e140d062ad6bfd'
 }
 
 const screenshots = [
@@ -118,10 +108,13 @@ const screenshots = [
 ]
 
 const releases = [
-  { version: '1.1.1', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: windows.archive },
+  { version: '1.1.3', platform: 'macOS Intel', note: 'x64 DMG · 197.5 MiB · 未签名、未公证', url: mac.archive, sha256: mac.sha256 },
+  { version: '1.1.3', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: windows.archive, sha256: windows.sha256 },
+  { version: '1.1.2', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.1.2/9c74faa0a06b/202609/Microi-Code-1_1_2-windows-x64-setup.exe' },
+  { version: '1.1.1', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.1.1/8d6730cec534/202609/Microi-Code-1_1_1-windows-x64-setup.exe' },
   { version: '1.1.0', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.1.0/514bef357d0e/202609/Microi-Code-1_1_0-windows-x64-setup.exe' },
   { version: '1.0.9', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.0.9/0f95ebfb898d/202609/Microi-Code-1_0_9-windows-x64-setup.exe' },
-  { version: '1.0.8', platform: 'macOS Intel', note: 'x64 DMG · 197.4 MiB · 未签名', url: mac.archive },
+  { version: '1.0.8', platform: 'macOS Intel', note: 'x64 DMG · 197.4 MiB · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.0.8/61546bc443f2/202609/Microi-Code-1_0_8-mac-x64.dmg' },
   { version: '1.0.7', platform: 'Windows x64', note: '历史版本', url: 'https://static.itdos.com/itdos/microi-code/1.0.7/297c04b0934c/202609/Microi-Code-1_0_7-windows-x64-setup.exe' },
   { version: '1.0.6', platform: 'Windows x64', note: '历史版本', url: 'https://static.itdos.com/itdos/microi-code/1.0.6/1bca07dfbeb2/202609/Microi-Code-1_0_6-windows-x64-setup.exe' },
   { version: '1.0.5', platform: 'Windows x64', note: '历史版本', url: 'https://static.itdos.com/itdos/microi-code/1.0.5/c5a26f363082/202609/Microi-Code-1_0_5-windows-x64-setup.exe' },
@@ -132,6 +125,12 @@ const releases = [
   { version: '1.0.0', platform: 'Windows x64', note: '首个正式编号版本', url: 'https://static.itdos.com/itdos/microi-code/1.0.0/dd0f2e79e80b/202609/Microi-Code-1_0_0-windows-x64-setup.exe' },
   { version: '0.2.0', platform: 'Windows x64', note: '早期预览版本', url: 'https://static.itdos.com/itdos/microi-code/0.2.0/e991814b16a1/202609/Microi-Code-0_2_0-windows-x64-setup.exe' }
 ]
+
+const historyOpen = ref(false)
+const historyPage = ref(1)
+const pageSize = 6
+const pageCount = computed(() => Math.ceil(releases.length / pageSize))
+const visibleReleases = computed(() => releases.slice((historyPage.value - 1) * pageSize, historyPage.value * pageSize))
 </script>
 
 <style scoped>
@@ -239,7 +238,16 @@ const releases = [
 .microi-code-flow article { padding: 22px; }
 .microi-code-flow h3 { font-weight: 580; }
 .microi-code-history { padding: 1px 30px 0; }
-.microi-code-history .microi-code-section-head { margin-inline: 0; }
+.microi-code-history-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; border: 0; border-block: 1px solid var(--vp-c-divider); background: transparent; color: var(--vp-c-text-1); text-align: left; cursor: pointer; }
+.microi-code-history-toggle > span:first-child { display: grid; gap: 4px; }
+.microi-code-history-toggle small { color: var(--vp-c-brand-1); font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+.microi-code-history-toggle strong { font-size: 23px; font-weight: 620; }
+.microi-code-history-toggle__meta { display: flex; gap: 18px; color: var(--vp-c-text-2); font-size: 12px; }
+.microi-code-history-toggle__meta span { color: var(--vp-c-brand-1); font-weight: 650; }
+.microi-code-history-pages { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 20px; color: var(--vp-c-text-2); font-size: 12px; }
+.microi-code-history-pages button { padding: 7px 12px; border: 1px solid var(--vp-c-divider); border-radius: 8px; background: var(--vp-c-bg-soft); color: var(--vp-c-text-1); cursor: pointer; }
+.microi-code-history-pages button:disabled { opacity: .4; cursor: default; }
+.release-checksum { grid-column: 1 / -1; overflow-wrap: anywhere; color: var(--vp-c-text-3); font-size: 10px; }
 .release-list article { grid-template-columns: 176px minmax(0,1fr) auto; padding: 14px 8px; }
 .release-list a { display:inline-flex; min-height:32px; align-items:center; padding:0 11px; border:1px solid var(--vp-c-divider); border-radius:8px; }
 .microi-code-credit { margin: 50px 30px 0; padding: 26px 0 8px; }

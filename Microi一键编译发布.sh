@@ -1186,8 +1186,9 @@ validate_publish_artifacts "$PUBLISH_DIR"
 print_success "Microi.net.Api 发布成功"
 
 # --- 生成 NuGet 包（独立打包，避免编译期文件锁）---
-# 只在需要 nupkg（推送NuGet 或 加密DLL替换）时执行
-if [ "$PUSH_NUGET" = true ] || [ "$HAS_ENCRYPT" = true ]; then
+# 同版本 NuGet 已发布并选择跳过时，镜像仍会加密 DLL，但不重新打包
+# 已发布的不可变包。模式 1 保留本地包替换的原有用途。
+if [ "$PUSH_NUGET" = true ] || { [ "$HAS_ENCRYPT" = true ] && [ "$DEPLOY_MODE" = "1" ]; }; then
     print_divider
     print_step "dotnet pack 生成 NuGet 包（--no-build，基于已编译产物）..."
     echo ""
@@ -1406,9 +1407,9 @@ validate_publish_artifacts "$PUBLISH_DIR"
 fi  # END: if PUBLISH_BACKEND
 
 # ─── 阶段（条件）: NuGet 包 DLL 替换（加密版本）──────────
-# 只要 DLL 已加密就执行替换，无论是否推送（模式1也会执行）
+# 只有本次推送 NuGet，或模式 1 明确要求本地包替换，才修改 nupkg。
 NUPKG_REPLACED=false
-if [ "$DLL_ENCRYPTED" = true ]; then
+if [ "$DLL_ENCRYPTED" = true ] && { [ "$PUSH_NUGET" = true ] || [ "$DEPLOY_MODE" = "1" ]; }; then
     print_phase "替换 NuGet 包中的 DLL 为加密版本"
 
     replace_dll_in_nupkg() {
