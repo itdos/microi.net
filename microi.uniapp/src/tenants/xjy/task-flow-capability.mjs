@@ -3,7 +3,8 @@ export const TASK_POST_SERVICE_ACTIONS = Object.freeze([
   'merchantReject',
   'customerPass',
   'customerReject',
-  'evaluate'
+  'evaluate',
+  'followUp'
 ])
 
 const ACTION_SET = new Set(TASK_POST_SERVICE_ACTIONS)

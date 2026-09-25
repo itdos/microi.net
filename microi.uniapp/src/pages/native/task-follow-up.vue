@@ -4,6 +4,7 @@
     <scroll-view v-else class="page-scroll" scroll-y>
       <view class="page-content">
         <view class="task-band"><view class="task-mark"><text>评</text></view><view><text>{{ task.KehuMC || '售后服务' }}</text><text>{{ [task.Leixing, task.ShouhouRY, formatDate(task.FinishTime)].filter(Boolean).join(' · ') }}</text></view></view>
+        <view v-if="!authorized" class="private-media-notice"><text>{{ authorizationError || '当前账号没有追加评价权限' }}</text></view>
         <view v-if="fileContextError" class="private-media-notice"><text>{{ fileContextError }}</text></view>
         <view class="section-title">现场照片</view>
         <view class="upload-panel"><mci-media-uploader v-model="photos" :max-count="9" upload-path="xjy/task-follow-up" :file-context="photoFileContext" /></view>
@@ -12,7 +13,7 @@
         <view class="bottom-space" />
       </view>
     </scroll-view>
-    <view v-if="!loading" class="bottom-bar" slot="fixed"><button class="primary-button" :loading="submitting" :disabled="submitting" @tap="submit">提交追加评价</button></view>
+    <view v-if="!loading && authorized" class="bottom-bar" slot="fixed"><button class="primary-button" :loading="submitting" :disabled="submitting" @tap="submit">提交追加评价</button></view>
   </mci-page-shell>
 </template>
 
@@ -20,8 +21,9 @@
 import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
-import { findMenu, requireLogin } from '@/platform/business-runtime.js'
+import { callApiEngine, findMenu, requireLogin } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
+import { loadTaskFlowCapabilities } from '@/utils/xjy-task.js'
 
 const TASK_TABLE = 'Diy_ShouhouDD'
 const FOLLOW_UP_PHOTO_FIELD = 'ZhuipingT'
@@ -31,7 +33,7 @@ export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/native/task-follow-up') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/native/task-follow-up') },
   mixins: [themeMixin],
-  data() { return { id: '', task: {}, photos: '[]', content: '', loading: true, submitting: false, photoFileContext: EMPTY_PRIVATE_FILE_CONTEXT, fileContextError: '' } },
+  data() { return { id: '', task: {}, photos: '[]', content: '', loading: true, submitting: false, authorized: false, authorizationError: '', photoFileContext: EMPTY_PRIVATE_FILE_CONTEXT, fileContextError: '' } },
   async onLoad(options) {
     if (!requireLogin()) return
     this.id = decodeURIComponent(options.id || '')
@@ -43,10 +45,13 @@ export default {
         const result = await V8.FormEngine.GetFormData('Diy_ShouhouDD', { Id: this.id })
         if (!result || Number(result.Code) !== 1 || !result.Data) throw new Error((result && result.Msg) || '任务不存在')
         this.task = result.Data
+        const capabilities = await loadTaskFlowCapabilities(this.id, true)
+        this.authorized = capabilities.actions.includes('followUp')
+        this.authorizationError = this.authorized ? '' : '当前账号无权对该任务追加评价'
         await this.preparePhotoFileContext()
         this.photos = result.Data.ZhuipingT || '[]'
         this.content = result.Data.ZhuipingNR || ''
-      } catch (error) { uni.showToast({ title: error.message || '任务加载失败', icon: 'none' }) }
+      } catch (error) { this.authorized = false; this.authorizationError = error.message || '权限加载失败'; uni.showToast({ title: this.authorizationError, icon: 'none' }) }
       finally { this.loading = false }
     },
     async preparePhotoFileContext() {
@@ -70,12 +75,11 @@ export default {
     },
     async submit() {
       if (this.submitting) return
+      if (!this.authorized) { uni.showToast({ title: '当前账号无权追加评价', icon: 'none' }); return }
       if (!this.content.trim() && (!this.photos || this.photos === '[]')) { uni.showToast({ title: '请填写内容或上传照片', icon: 'none' }); return }
       this.submitting = true
       try {
-        const result = await V8.FormEngine.UptFormData('Diy_ShouhouDD', {
-          Id: this.id, ZhuipingT: this.photos || '[]', ZhuipingNR: this.content.trim(), _InvokeType: 'Client'
-        })
+        const result = await callApiEngine('shouhoudd_follow_up', { Id: this.id, ZhuipingT: this.photos || '[]', ZhuipingNR: this.content.trim() })
         if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '追加评价提交失败')
         uni.$emit('xjy:task-changed', { id: this.id })
         uni.showToast({ title: '追加评价已提交', icon: 'success' })

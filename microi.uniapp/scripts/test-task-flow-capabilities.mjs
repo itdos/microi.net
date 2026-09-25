@@ -16,6 +16,8 @@ const tests = [
   ['精确动作才授权', () => {
     assert.equal(hasTaskFlowCapability(['customerPass'], 'customerPass'), true)
     assert.equal(hasTaskFlowCapability(['customerPass'], 'customerReject'), false)
+    assert.deepEqual(normalizeTaskFlowCapabilities({ Code: 1, Data: { Actions: ['followUp', 'evaluate'] } }), ['followUp', 'evaluate'])
+    assert.equal(hasTaskFlowCapability(['followUp'], 'evaluate'), false)
   }]
 ]
 
