@@ -73,6 +73,10 @@ namespace Microi.net.Api
 
         private static bool ShouldSkip(HttpContext context)
         {
+            if (HostLivenessPolicy.IsLivenessGet(context.Request.Method, context.Request.Path.Value))
+            {
+                return true;
+            }
             if (context.WebSockets.IsWebSocketRequest || HttpMethods.IsOptions(context.Request.Method))
             {
                 return true;

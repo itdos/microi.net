@@ -414,6 +414,8 @@ import {
 } from "@/utils/official-app-notice";
 
 const STORE_CHECK_INTERVAL = 10 * 60 * 1000;
+const PLATFORM_NOTIFICATION_CONNECTED_POLL_MS = 60000;
+const PLATFORM_NOTIFICATION_DISCONNECTED_POLL_MS = 15000;
 
 export default {
     name: "BackgroundTaskCenter",
@@ -446,6 +448,8 @@ export default {
             onlineUsers: [],
             loading: false,
             notificationLoading: false,
+            platformNotificationPollTimer: null,
+            platformNotificationPollingDisposed: false,
             storeLoading: false,
             bulkPlatformAppsLoading: false,
             terminalLoading: false,
@@ -533,20 +537,24 @@ export default {
     },
     mounted() {
         this.officialAppChecksDisposed = false;
+        this.platformNotificationPollingDisposed = false;
         this.bindWebsocket();
         this.refreshTasks();
         this.loadPlatformNotifications();
+        this.startPlatformNotificationPolling();
         this.startOfficialAppChecker();
         window.addEventListener("microi-websocket-connected", this.handleWebSocketConnected);
         window.addEventListener("microi-background-task-started", this.handleBackgroundTaskStarted);
         document.addEventListener("visibilitychange", this.handleTaskVisibilityChange);
     },
     beforeUnmount() {
+        this.platformNotificationPollingDisposed = true;
         this.invalidateOfficialAppCheckWork(true);
         window.removeEventListener("microi-websocket-connected", this.handleWebSocketConnected);
         window.removeEventListener("microi-background-task-started", this.handleBackgroundTaskStarted);
         document.removeEventListener("visibilitychange", this.handleTaskVisibilityChange);
         this.stopOfficialAppChecker();
+        this.stopPlatformNotificationPolling();
         const ws = this.getWebsocket();
         if (ws && typeof ws.off === "function") {
             ws.off("ReceiveBackgroundTaskList", this.handleTaskList);
@@ -639,6 +647,7 @@ export default {
             this.bindWebsocket();
             this.loadTasks();
             this.loadPlatformNotifications();
+            this.startPlatformNotificationPolling();
             if (this.visible && (this.activeTab === "myTerminals" || this.activeTab === "onlineUsers")) {
                 this.loadTerminals();
             }
@@ -692,6 +701,25 @@ export default {
             if (!document.hidden && this.tasks.some((item) => isActiveBackgroundTask(item))) {
                 this.loadTasks();
             }
+            if (!document.hidden) this.loadPlatformNotifications();
+        },
+        startPlatformNotificationPolling() {
+            if (this.platformNotificationPollingDisposed) return;
+            this.stopPlatformNotificationPolling();
+            const connected = this.getWebsocket()?.state === "Connected";
+            const delay = connected
+                ? PLATFORM_NOTIFICATION_CONNECTED_POLL_MS
+                : PLATFORM_NOTIFICATION_DISCONNECTED_POLL_MS;
+            // SignalR 只是低延迟唤醒；MySQL 通知记录是权威事实。连接长期断开时持续补读。
+            this.platformNotificationPollTimer = window.setTimeout(async () => {
+                this.platformNotificationPollTimer = null;
+                if (!document.hidden) await this.loadPlatformNotifications();
+                this.startPlatformNotificationPolling();
+            }, delay);
+        },
+        stopPlatformNotificationPolling() {
+            if (this.platformNotificationPollTimer) window.clearTimeout(this.platformNotificationPollTimer);
+            this.platformNotificationPollTimer = null;
         },
         handleOnlineTerminalChanged() {
             if (this.visible && (this.activeTab === "myTerminals" || this.activeTab === "onlineUsers")) {
@@ -765,8 +793,14 @@ export default {
         async loadPlatformNotifications() {
             if (this.notificationLoading || !DiyCommon.Notification) return;
             this.notificationLoading = true;
+            let requestTimeout;
             try {
-                const result = await DiyCommon.Notification.List({ _PageIndex: 1, _PageSize: 15 });
+                const result = await Promise.race([
+                    DiyCommon.Notification.List({ _PageIndex: 1, _PageSize: 15 }),
+                    new Promise((_, reject) => {
+                        requestTimeout = window.setTimeout(() => reject(new Error("平台通知查询超时")), 12000);
+                    })
+                ]);
                 if (result && result.Code === 1) {
                     const normalized = normalizePlatformNotificationResult(result);
                     this.platformNotifications = normalized.rows;
@@ -776,6 +810,7 @@ export default {
             } catch (error) {
                 console.warn("[PlatformNotification] load failed", error);
             } finally {
+                if (requestTimeout) window.clearTimeout(requestTimeout);
                 this.notificationLoading = false;
             }
         },
