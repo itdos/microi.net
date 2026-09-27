@@ -68,6 +68,7 @@ function nav(): DefaultTheme.NavItem[] {
 	return [
 		{ text: "首页", link: "/" },
 		{ text: "🤖 AI应用", link: "/apps" },
+        { text: "AI CAD", link: "/ai-cad" },
     { text: "文档", link: "/doc/index" },//🪧
 		{ text: "成功案例", link: "/case/case-index" },
 		{
