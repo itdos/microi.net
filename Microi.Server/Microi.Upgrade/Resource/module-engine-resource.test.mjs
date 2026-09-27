@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
 const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const resource = JSON.parse(fs.readFileSync(path.join(resourceDir, "app.microi.module-engine.json"), "utf8"));
 
 test("module engine package version and physical menu badge columns are current", () => {
-    assert.equal(resource.PackageInfo.Version, "v7.6.7");
+    assert.equal(resource.PackageInfo.Version, "v7.6.8");
     assert.ok(resource.PackageInfo.RequiredPlatformCapabilities.includes("ClientFeature:TagsViewBoundFormDesign"));
     const physicalNames = new Set((resource.PhysicalColumns || []).map((item) => item.COLUMN_NAME));
     for (const name of ["MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema", "DetailCodeShowV8"]) {
@@ -16,6 +17,31 @@ test("module engine package version and physical menu badge columns are current"
         assert.match(resource.DDLStatements[0].DDL, new RegExp(`\\b${name}\\b`));
     }
     assert.ok(physicalNames.has("FormPresentation"), "missing shared diy_table.FormPresentation snapshot");
+});
+
+test("CodeForm menu keeps table authorization while selecting a MicroService page", () => {
+    const choices = JSON.parse(field("OpenType").Data);
+    assert.ok(choices.some((item) => item.Key === "CodeForm"));
+    const event = resource.DiyTables.find((item) => item.Name === "sys_menu").InFormV8;
+    assert.match(event, /openTypeKey == 'CodeForm'/);
+    assert.match(event, /GetOpenTypeKey\(v8\.Form\) != 'CodeForm'/);
+    assert.match(field("MicroServiceId").V8Code, /GetOpenTypeKey\(V8\.Form\) != 'CodeForm'/);
+    const form = { OpenType: "CodeForm", DiyTableId: "table-1", MicroServiceId: "" };
+    const visibility = {};
+    const v8 = {
+        Form: form,
+        FormMode: "Upt",
+        FormSet(name, value) { form[name] = value; },
+        FieldSet(name, property, value) { visibility[`${name}.${property}`] = value; },
+        FormEngine: { GetTableData() { throw new Error("empty service must not query pages"); } }
+    };
+    const window = {};
+    vm.runInNewContext(event, { V8: v8, window }, { timeout: 1000 });
+    assert.equal(form.DiyTableId, "table-1");
+    assert.equal(visibility["DiyTableId.Visible"], true);
+    window.ApplyMicroServicePage(v8, { RoutePath: "/forms/biz_order", MenuUrl: "/micro-app/microi-generated-forms/forms/biz_order" });
+    assert.equal(form.DiyTableId, "table-1");
+    assert.equal(form.MicroServiceRoutePath, "/forms/biz_order");
 });
 
 function field(name) {

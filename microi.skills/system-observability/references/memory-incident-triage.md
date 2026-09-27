@@ -38,7 +38,9 @@
 | `Collector.LostEvents/OverflowSamples/UnattributedEstimatedBytes` | 丢事件、溢出和无归属量同时报告，不把未知量分摊给热点接口 |
 | `Executions.RegistryOverflowCount` | 活动执行登记有硬容量，溢出时不能声称清单完整 |
 | `Evidence.LocalStorageError/DroppedUnuploadedFiles` | 写盘失败与预算淘汰影响能否事后恢复；磁盘满优先排查 |
-| `Evidence.SharedStorageError/PendingUploads` | Mongo 异常时使用本机证据，另一节点看不到尚未上传记录 |
+| `Evidence.SharedStorageError/PendingUploads` | Mongo 完整证据同步状态；关键证据另查 MySQL，不能据此判断全部历史不可用 |
+| `Evidence.CriticalStorage` | 核对 MySQL 确认次数/时间、待写、丢弃和错误。未确认队列不是持久化成功 |
+| `RequestWaits / WaitEvidence` | 实时等待与事故保留峰值分别读取。峰值分组的 ObservedAtUtc 可能不同，不能相加为并发总数或线程数 |
 | 事故 `Stacks` / `Evidence.StackQuality` | 报告缺栈样本、截断、丢事件；部分证据不能称为完整分配栈 |
 
 每 2 秒检查点、约 2 分钟压力窗口、共享 14 天历史、本机 256 MiB 历史预算均为有界默认值。原始片段单段最多 64 MiB，保留最近两段，加上正在写入的一段最多 192 MiB；主体达到 16 MiB 就提前收尾，EventPipe 缓冲固定 64 MiB。完整 API 的 rundown 实测约 35 MiB，原 16/32 MiB 缓冲会丢事件，不能仅以小型测试宿主验收采集完整性。极快退出、调度阻塞、卷丢失、磁盘满和早期崩溃仍可能扩大缺口。整个容器退出后尝试尾段与前段恢复，并保留 `MissingStackSamples/Truncated`。不要删除日志卷来“修复”采集。
@@ -53,6 +55,8 @@
 6. RSS 高但分配不吻合时继续查长期保留、静态缓存、非托管内存与其它进程。Mongo 的 RAM、WiredTiger 缓存、日志库磁盘空间分别判断；磁盘 22 GB 不能改写成进程内存 22 GB。
 7. 修复后在隔离环境按相同数据、并发、脚本与窗口比较结果正确性、分配率、堆/RSS、GC、P95/P99 与错误率。生产不制造真实 OOM 来验收。
 
+主机 CPU、内存正常而 API 不响应时，先查 `WaitEvidence.Groups/Samples` 的租户、接口、Gate 阶段、HTTP 目标与 TraceId，再与 `WorstThreadPoolFrame`、共享槽指标及外部服务记录对齐。HTTP 目标使用路径哈希，可对候选 URL 的路径计算 SHA-256 比对；不保存凭据或查询参数。长等待本身可以是正常业务，默认 600 秒与显式长超时不因此缩短。没有采到当时的线程池状态时，不能凭请求数量倒推出工作线程耗尽。
+
 结论须包含“已证实事实、原因假设与依据、缺失证据、修复、复测、交付版本边界”。不得用单次演练外推固定成功概率；具体接口/事件定位与存活对象/代码行根因是不同精度。
 
 ## 两个容易误解的性能数字
@@ -66,7 +70,7 @@
 
 ## 完整交付验收
 
-- API：包含诊断运行时和 helper、可写持久 `logs` 卷、心跳与质量可读。
+- API：包含诊断运行时和 helper，关键事故 MySQL 表及索引已通过商城安装并回读确认。原始分配栈仍要求可写持久 `logs` 卷；容器无卷时 MySQL 已确认记录可跨重建读取，但不能声称完整栈已保留。
 - 商城/页面：查询引擎、内存与事故界面、固定发布版本一致，真实页面可读事故。
 - MCP：发行包实际 initialize/tools/list/describe_tool 成功，三个只读动作通路与非法 Id 拦截正常；没有通过查询生成业务写入或放宽权限。
 - Skills/文档：本手册随 CLI/插件打包；官方文档使用既有“系统日志/监控”页面，解释使用流程和成本。

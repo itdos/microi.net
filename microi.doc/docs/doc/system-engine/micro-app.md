@@ -26,6 +26,8 @@
 
 吾码官网 [AI 应用广场](https://microi.net/apps.html) 中的大部分 AI 应用均采用 MicroService 实现。这样既能独立展示和访问，也能无缝嵌入吾码菜单、表单与业务弹层，而不必把每个定制页面都打进 `Microi.Client` 主包。
 
+例如，[星河现场·旗舰抽奖互动平台](https://microi.net/app-detail.html?app=event-lottery-studio)（`event-lottery-studio`）可从官网应用卡片直接体验。未登录用户可查看应用首页；创建抽奖项目或凭加入码参与时，先使用吾码账号登录。没有账号可从应用中的“注册账号”前往吾码官网完成手机号验证和密码设置，再返回应用登录。正式开奖、中奖记录和领奖核销由服务端接口引擎处理；彩排结果不写入正式中奖表。官方应用包包含后台菜单、业务表、接口引擎和微服务运行资产，租户安装与官网集中体验是两个独立入口。
+
 ## 真实案例：同一能力融入不同业务位置
 
 <div class="micro-app-case-grid">
@@ -703,7 +705,7 @@ console.log(hostData.dialogData);
 | `cache` | 菜单型微服务的运行时缓存上下文，包含 `mode/state/instanceName/stateEvent`；弹窗和表单嵌入不承诺页签保活。 |
 | `dialog` | 由 `OpenAppDialog` 打开时为 `true`。 |
 | `dialogData` | 宿主传入的 `Data`。 |
-| `route` | 包含 `microRoute`、`microRoutePath` 的兼容对象。 |
+| `route` | 菜单宿主包含 `path`、`fullPath`、`query`、`microRoute` 和 `microRoutePath`；其它宿主按入口提供。 |
 
 使用模板自带 SDK 初始化上下文：
 
@@ -718,6 +720,12 @@ const result = await V8.ApiEngine.Run('get-device-detail', {
 ```
 
 不要把 Token 拼接进 URL。SDK 会把运行时 Token 放入 `Authorization`，并携带当前 `osclient` 请求头。
+
+### 宿主路由查询参数
+
+嵌入微服务的 iframe 地址与宿主地址隔离，不能仅通过子应用 location.hash 读取站点、业务Id等查询参数。菜单宿主下发 microRoute 及 route.query；应用应合并自身白名单参数，保留完整路径和查询参数，并监听宿主数据变化。同一路径的查询参数变化也应刷新业务数据、取消旧请求，主题或尺寸快照不得覆盖应用内部导航。弹窗可从 microRoute 查询串或 dialogData 读取声明参数；独立访问才回退自身hash。
+
+生成宿主页面链接时使用可信上下文的 webBase、apiBase 与 osClient，不猜测父窗口地址，不把Token写入URL。验收覆盖嵌入冷启动、同路径换参数、独立入口、无效参数和跨请求迟到响应。
 
 ## 菜单页签保活与单一缓存所有者
 

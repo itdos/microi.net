@@ -18,6 +18,8 @@ export const API = {
     GENERATE_MINIMAX_IMAGE: '/api/Ai/GenerateMiniMaxImage',
     GET_MINIMAX_IMAGE_TASK: '/api/Ai/GetMiniMaxImageTask',
     RECOVER_MINIMAX_IMAGE_TASK: '/api/Ai/RecoverMiniMaxImageTask',
+    GET_MEDIA_MODELS: '/api/Ai/GetMediaModels',
+    GET_MINIMAX_TOKEN_PLAN_REMAINS: '/api/Ai/GetMiniMaxTokenPlanRemains',
     GENERATE_MINIMAX_MUSIC: '/api/Ai/GenerateMiniMaxMusic',
     GENERATE_MINIMAX_SPEECH: '/api/Ai/GenerateMiniMaxSpeech',
     OCR_RECOGNIZE: '/apiengine/platform-ocr-recognize',

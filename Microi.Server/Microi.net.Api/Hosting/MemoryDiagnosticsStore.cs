@@ -137,6 +137,12 @@ public sealed class MemoryDiagnosticsStore(string root)
             foreach (var name in new[] { "LogDataBytes", "LogStorageBytes", "LogIndexBytes" }) mongo.Remove(name);
         value.Remove("DefaultTenant");
         value["Executions"] = FilterExecutions(value["Executions"] as JArray, tenant);
+        foreach (var waits in new[] { value["RequestWaits"], value["WaitEvidence"] }.OfType<JObject>())
+        {
+            foreach (var name in new[] { "Groups", "Samples", "Recent" }) waits[name] = FilterExecutions(waits[name] as JArray, tenant);
+            waits["ActiveCount"] = (waits["Groups"] as JArray)!.Sum(row => row.Value<int>("Count"));
+            waits["ActiveCountScope"] = "仅已保留的本租户分组；全节点截断/溢出计数表示可见性缺口。";
+        }
         value["AllocationTop"] = FilterAllocations(value["AllocationTop"] as JArray, tenant);
         if (value["Stacks"] is JObject stacks)
         {
@@ -154,6 +160,32 @@ public sealed class MemoryDiagnosticsStore(string root)
             value["Boundary"] = (value.Value<string>("Boundary") ?? "") + $" 进程分配采样 {samples} 条，其中 {missing} 条缺少方法栈，丢事件 {lost}，聚合溢出 {overflow}。";
         }
         return value;
+    }
+
+    /// <summary>恢复后的空快照不抹掉阻塞现场。分组保留并发数最高的真实时刻，样本保留最长等待；二者不能相加当线程数。</summary>
+    public static void RetainWaitEvidence(JObject incident, JObject checkpoint)
+    {
+        var evidence = incident["WaitEvidence"] as JObject ?? new JObject { ["FirstSampledAtUtc"] = checkpoint["UpdatedAtUtc"]?.DeepClone() };
+        // Newtonsoft 对已有 Parent 的 token 再次赋值会克隆；只在首次建立时挂接，后续必须修改实际挂在事故上的对象。
+        if (incident["WaitEvidence"] is not JObject) incident["WaitEvidence"] = evidence;
+        evidence["LastSampledAtUtc"] = checkpoint["UpdatedAtUtc"]?.DeepClone();
+        foreach (var (name, limit) in new[] { ("Groups", 256), ("Samples", 128) })
+        {
+            var incoming = (checkpoint["RequestWaits"]?[name] as JArray ?? new JArray()).OfType<JObject>().Select(x => {
+                var row = (JObject)x.DeepClone(); row["ObservedAtUtc"] = checkpoint["UpdatedAtUtc"]?.DeepClone(); return row;
+            });
+            var all = (evidence[name] as JArray ?? new JArray()).OfType<JObject>().Concat(incoming);
+            var rows = all.GroupBy(x => name == "Samples" ? x.Value<string>("Id") : new JArray(
+                new[] { "OsClient", "Kind", "Stage", "ApiEngineKey", "Target" }.Select(k => x.Value<string>(k) ?? "")).ToString(Formatting.None))
+                .Select(g => g.OrderByDescending(x => x.Value<int>("Count")).ThenByDescending(x => x.Value<long>(name == "Samples" ? "ElapsedMs" : "LongestMs")).First())
+                .OrderByDescending(x => x.Value<int>("Count")).ThenByDescending(x => x.Value<long>(name == "Samples" ? "ElapsedMs" : "LongestMs")).ToArray();
+            evidence[name] = new JArray(rows.Take(limit).Select(x => x.DeepClone()));
+            evidence["Discarded" + name] = evidence.Value<long>("Discarded" + name) + Math.Max(0, rows.Length - limit);
+        }
+        if (checkpoint["Current"] is JObject current && current["ThreadPoolAvailableWorkers"] != null
+            && (evidence["WorstThreadPoolFrame"] is not JObject prior || current.Value<int>("ThreadPoolAvailableWorkers") < prior.Value<int>("ThreadPoolAvailableWorkers")))
+            evidence["WorstThreadPoolFrame"] = current.DeepClone();
+        evidence["Boundary"] = "分组是各自峰值时刻，不代表同时发生；ObservedAtUtc 标明时间。等待数不是线程数，丢弃计数表示取证缺口。";
     }
     public static JArray FilterExecutions(JArray? list, string tenant) => new((list ?? new JArray()).OfType<JObject>()
         .Where(x => string.Equals(x.Value<string>("OsClient"), tenant, StringComparison.OrdinalIgnoreCase)).Select(x => x.DeepClone()));

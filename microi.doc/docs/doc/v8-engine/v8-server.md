@@ -441,6 +441,8 @@ var result = V8.Notification.Send({
 
 原生新增管线独立确定实际主键，`SubmitBeforeServerV8` 的 `V8.Form.Id` 可能为空；在事件里自行补 GUID 不等于改变实际插入主键。条码、明细或审计等需要主表 Id 的写入，应在 `SubmitAfterServerV8` 核验 `V8.Form.Id` 并通过同一 `V8.DbTrans` 回读主记录后执行。After 仍在事务提交前，附属记录失败应返回 `Code=0`，主表与附属记录一起回滚。验收同时比较新增响应 Id、主表 Id、附属外键和审计 RowId，避免成功响应掩盖孤立引用。
 
+提交前、提交后事件可能复用同一个 Jint 全局环境。生成公共库时，不要在两段事件里重复声明同名顶层 `let/const`；使用各事件独立函数作用域，或允许重复初始化的 `var`。单独编译两段脚本无法覆盖此问题，必须执行真实表单的完整 Before → After 链路并确认事务成功。
+
 前端/外部 HTTP 的菜单授权、历史无 `_SysMenuId` 推断、TableChild 委托和行级权限规则详见 [FormEngine 安全授权](./form-engine.md#安全授权模型)。
 
 平台内部的多层封装也必须保留来源：如果一个已校验管理员的设计器或升级任务在内部再次调用 FormEngine，应传递原管理员上下文，或由服务器构造带 `_TrustedServerInvocation` 的强类型参数；不要把数据转成裸 `JObject` 后依赖类型推断。可信标记是服务端实现细节，V8 代码和 HTTP 客户端都不需要、也不能自行设置。

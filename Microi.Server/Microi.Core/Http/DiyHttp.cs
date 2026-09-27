@@ -18,6 +18,24 @@ namespace Microi.net
     /// </summary>
     public partial class DiyHttp : IMicroiHttp
     {
+        // 外部依赖尚未返回时就登记等待；默认 600 秒和调用者显式 Timeout 完全保持原语义。
+        // 只保存目标主机/端口与路径哈希，不采集 URL 凭据、参数、请求头或响应正文。
+        private static async Task<T> ObserveHttp<T>(DiyHttpParam param, Func<Task<T>> action)
+        {
+            using var observation = RequestWaitObservation.Enter("Http", target: RequestWaitObservation.HttpTarget(param.Url), timeoutSeconds: param.Timeout);
+            observation.Stage("AwaitingHttpCompletion:" + param.Method);
+            try
+            {
+                var result = await action().ConfigureAwait(false);
+                if (result is RestResponse response)
+                    observation.Outcome(response.ResponseStatus == ResponseStatus.Completed
+                        ? ((int)response.StatusCode >= 400 ? "HttpStatus:" + (int)response.StatusCode : "Completed")
+                        : "Transport:" + response.ResponseStatus);
+                return result;
+            }
+            catch (Exception ex) { observation.Outcome(ex.GetType().Name); throw; }
+        }
+
         // 使用静态 RestClient 实例复用连接，避免 Socket 耗尽
         private static readonly RestClient _sharedClient = new RestClient(new RestClientOptions
         {
@@ -527,7 +545,7 @@ namespace Microi.net
         {
             param.Method = "POST";
             var restObj = GetRestClientAndRequest(param);
-            var response = await restObj.Client.ExecutePostAsync(restObj.Request);
+            var response = await ObserveHttp(param, () => restObj.Client.ExecutePostAsync(restObj.Request));
             return response;
         }
 
@@ -551,7 +569,7 @@ namespace Microi.net
         {
             param.Method = "PATCH";
             var restObj = GetRestClientAndRequest(param);
-            return await restObj.Client.ExecuteAsync(restObj.Request);
+            return await ObserveHttp(param, () => restObj.Client.ExecuteAsync(restObj.Request));
         }
 
         /// <summary>
@@ -563,8 +581,8 @@ namespace Microi.net
         {
             param.Method = "GET";
             var restObj = GetRestClientAndRequest(param);
-            //var response = await restObj.Client.ExecutePostAsync(restObj.Request);
-            var response = await restObj.Client.ExecuteAsync(restObj.Request);
+            //var response = await ObserveHttp(param, () => restObj.Client.ExecutePostAsync(restObj.Request));
+            var response = await ObserveHttp(param, () => restObj.Client.ExecuteAsync(restObj.Request));
             byte[] imageBytes = response.RawBytes; // 图片的字节数组
             return response;
         }
@@ -578,7 +596,7 @@ namespace Microi.net
         {
             param.Method = "POST";
             var restObj = GetRestClientAndRequest(param);
-            var response = await restObj.Client.PostAsync<T>(restObj.Request);////这样当timeout会抛出异常
+            var response = await ObserveHttp(param, () => restObj.Client.PostAsync<T>(restObj.Request));////这样当timeout会抛出异常
             return response;
         }
         /// <summary>
@@ -590,7 +608,7 @@ namespace Microi.net
         {
             param.Method = "POST";
             var restObj = GetRestClientAndRequest(param);
-            var response = await restObj.Client.ExecutePostAsync(restObj.Request);////这样当timeout不会抛出异常
+            var response = await ObserveHttp(param, () => restObj.Client.ExecutePostAsync(restObj.Request));////这样当timeout不会抛出异常
             if (!response.ErrorMessage.DosIsNullOrWhiteSpace())
             {
                 return response.ErrorMessage;
@@ -606,7 +624,7 @@ namespace Microi.net
         //{
         //    param.Method = "POST";
         //    var restObj = GetRestClientAndRequest(param);
-        //    var response = await restObj.Client.ExecutePostAsync(restObj.Request);
+        //    var response = await ObserveHttp(param, () => restObj.Client.ExecutePostAsync(restObj.Request));
         //    XmlDeserializer xml = new XmlDeserializer();
         //    var result = xml.Deserialize<T>(response);
         //    return result;
@@ -616,7 +634,7 @@ namespace Microi.net
         //{
         //    param.Method = "POST";
         //    var restObj = GetRestClientAndRequest(param);
-        //    var response = await restObj.Client.ExecutePostAsync(restObj.Request);
+        //    var response = await ObserveHttp(param, () => restObj.Client.ExecutePostAsync(restObj.Request));
         //    //XmlDeserializer xml = new XmlDeserializer();
         //    //var result = xml.Deserialize<T>(response);
         //    var result = DeserializeFromXml<dynamic>(response.Content);
@@ -643,7 +661,7 @@ namespace Microi.net
             var restObj = GetRestClientAndRequest(param);
             // var result = await restObj.Client.GetAsync<string>(restObj.Request);
             // var result = await restObj.Client.GetAsync(restObj.Request);
-            var response = await restObj.Client.ExecuteGetAsync(restObj.Request);
+            var response = await ObserveHttp(param, () => restObj.Client.ExecuteGetAsync(restObj.Request));
             if (!response.ErrorMessage.DosIsNullOrWhiteSpace())
             {
                 return response.ErrorMessage;
@@ -659,7 +677,7 @@ namespace Microi.net
         {
             param.Method = "GET";
             var restObj = GetRestClientAndRequest(param);
-            var response = await restObj.Client.ExecuteGetAsync(restObj.Request);
+            var response = await ObserveHttp(param, () => restObj.Client.ExecuteGetAsync(restObj.Request));
             return response;
         }
         /// <summary>
@@ -674,7 +692,7 @@ namespace Microi.net
                 Url = url,
                 Method = "GET"
             });
-            return await restObj.Client.GetAsync<string>(restObj.Request);
+            return await ObserveHttp(new DiyHttpParam { Url = url, Method = "GET" }, () => restObj.Client.GetAsync<string>(restObj.Request));
         }
         /// <summary>
         /// 
@@ -686,7 +704,7 @@ namespace Microi.net
         {
             param.Method = "GET";
             var restObj = GetRestClientAndRequest(param);
-            return await restObj.Client.GetAsync<T>(restObj.Request);
+            return await ObserveHttp(param, () => restObj.Client.GetAsync<T>(restObj.Request));
         }
         /// <summary>
         /// 
@@ -697,7 +715,7 @@ namespace Microi.net
         {
             param.Method = "GET";
             var restObj = GetRestClientAndRequest(param);
-            return new MemoryStream(restObj.Client.DownloadData(restObj.Request));
+            return new MemoryStream(await ObserveHttp(new DiyHttpParam { Url = restObj.Request.Resource, Method = "GET", Timeout = (int)(restObj.Request.Timeout?.TotalSeconds ?? 600) }, () => Task.FromResult(restObj.Client.DownloadData(restObj.Request))));
         }
         /// <summary>
         /// 
@@ -711,7 +729,7 @@ namespace Microi.net
                 Url = url,
                 Method = "GET"
             });
-            return new MemoryStream(restObj.Client.DownloadData(restObj.Request));
+            return new MemoryStream(await ObserveHttp(new DiyHttpParam { Url = restObj.Request.Resource, Method = "GET", Timeout = (int)(restObj.Request.Timeout?.TotalSeconds ?? 600) }, () => Task.FromResult(restObj.Client.DownloadData(restObj.Request))));
         }
         /// <summary>
         /// 
@@ -722,7 +740,7 @@ namespace Microi.net
         {
             param.Method = "GET";
             var restObj = GetRestClientAndRequest(param);
-            return restObj.Client.DownloadData(restObj.Request);
+            return await ObserveHttp(new DiyHttpParam { Url = restObj.Request.Resource, Method = "GET", Timeout = (int)(restObj.Request.Timeout?.TotalSeconds ?? 600) }, () => Task.FromResult(restObj.Client.DownloadData(restObj.Request)));
         }
         /// <summary>
         /// 
@@ -736,7 +754,7 @@ namespace Microi.net
                 Url = url,
                 Method = "GET"
             });
-            return restObj.Client.DownloadData(restObj.Request);
+            return await ObserveHttp(new DiyHttpParam { Url = restObj.Request.Resource, Method = "GET", Timeout = (int)(restObj.Request.Timeout?.TotalSeconds ?? 600) }, () => Task.FromResult(restObj.Client.DownloadData(restObj.Request)));
         }
     }
 }

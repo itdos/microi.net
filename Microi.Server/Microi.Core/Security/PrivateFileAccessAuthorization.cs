@@ -485,6 +485,33 @@ namespace Microi.net
         }
 
         private static async Task<DosResult> AuthorizeFileManagerObjectAsync(DiyUploadParam param)
+            => await AuthorizeFileManagerObjectCoreAsync(param, true).ConfigureAwait(false);
+
+        /// <summary>
+        /// File cabinet Office editing can target either bucket. This method keeps the
+        /// administrator, authoritative menu, exact key, and object-existence checks;
+        /// the normal private-file URL entry remains private-only.
+        /// </summary>
+        public static async Task<DosResult> AuthorizeFileManagerOfficeAsync(DiyUploadParam param)
+        {
+            if (param?._CurrentUser == null)
+                return new DosResult(1001, null, "登录身份已过期，请重新登录！");
+            var contextError = ValidateResourceContext(param, out var kind);
+            if (contextError != null) return contextError;
+            if (kind != FileManagerObjectResourceKind)
+                return new DosResult(0, null, "仅支持文件柜对象！");
+            try
+            {
+                return await AuthorizeFileManagerObjectCoreAsync(param, param.Limit != false)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                return AuthorizationUnavailable(param, "FileManagerOffice", ex);
+            }
+        }
+
+        private static async Task<DosResult> AuthorizeFileManagerObjectCoreAsync(DiyUploadParam param, bool limit)
         {
             if (!TryNormalizeFileManagerObjectPath(param, out var storagePath))
                 return new DosResult(0, null, "文件柜对象标识与所请求的私有文件不一致！");
@@ -514,13 +541,15 @@ namespace Microi.net
             return await AuthorizeExistingObjectAsync(
                 param,
                 storagePath,
-                "文件柜未找到所请求的权威私有对象！").ConfigureAwait(false);
+                "文件柜未找到所请求的权威对象！",
+                limit).ConfigureAwait(false);
         }
 
         private static async Task<DosResult> AuthorizeExistingObjectAsync(
             DiyUploadParam param,
             string storagePath,
-            string failureMessage)
+            string failureMessage,
+            bool limit = true)
         {
             var client = OsClientExtend.GetClient(param.OsClient);
             if (client?.OsClientModel == null)
@@ -529,12 +558,13 @@ namespace Microi.net
             var hdfs = string.Equals(hdfsType, "MinIO", StringComparison.OrdinalIgnoreCase)
                 ? MicroiEngine.HDFSFactory(HDFSType.MinIO)
                 : string.Equals(hdfsType, "S3", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(hdfsType, "AmazonS3", StringComparison.OrdinalIgnoreCase)
                     ? MicroiEngine.HDFSFactory(HDFSType.AmazonS3)
                     : MicroiEngine.HDFSFactory(HDFSType.Aliyun);
             var exists = await hdfs.ObjectExist(new HDFSParam
             {
                 ClientModel = client,
-                Limit = true,
+                Limit = limit,
                 FileFullPath = storagePath,
                 NetworkIsInternet = false
             }).ConfigureAwait(false);

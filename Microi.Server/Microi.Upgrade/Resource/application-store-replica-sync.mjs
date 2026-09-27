@@ -286,13 +286,19 @@ async function reconcileReplicaPair(resourceName, sideName, baseSource, standalo
 function maskReplicatedEngineFields(packageContent, basePackageContent) {
   const packageModel = parsePackage(packageContent);
   const basePackageModel = parsePackage(basePackageContent);
-  // PackageInfo.Version is delivery metadata, not mergeable business content.
+  // PackageInfo delivery metadata is one unit, not mergeable business content.
   // A failed release rerun can leave the local package at the target platform
   // version while the official store independently increments its package
   // version. Mask it during the structural three-way merge and restore the
   // highest observed version after the merge so retries stay monotonic.
   if (packageModel.PackageInfo && basePackageModel.PackageInfo) {
-    packageModel.PackageInfo.Version = basePackageModel.PackageInfo.Version;
+    for (const field of ['Version', 'ChangeLog', 'ChangeHistory']) {
+      if (Object.hasOwn(basePackageModel.PackageInfo, field)) {
+        packageModel.PackageInfo[field] = structuredClone(basePackageModel.PackageInfo[field]);
+      } else {
+        delete packageModel.PackageInfo[field];
+      }
+    }
   }
   for (const mapping of applicationStoreReplicaMappings) {
     const engine = findEmbeddedEngine(packageModel, mapping.apiEngineKey);
@@ -596,17 +602,31 @@ export async function mergeApplicationStoreReplicas({
     maskedRemotePackage,
   );
   const mergedPackageModel = parsePackage(mergedPackage);
-  const observedPackageVersions = [
-    parsePackage(basePackageContent)?.PackageInfo?.Version,
-    parsePackage(localPackageContent)?.PackageInfo?.Version,
-    parsePackage(remotePackageContent)?.PackageInfo?.Version,
-  ].filter(Boolean);
-  const highestObservedPackageVersion = observedPackageVersions.reduce(
-    (highest, version) => compareSemanticVersions(version, highest) > 0 ? version : highest,
-    observedPackageVersions[0] || '',
-  );
-  if (mergedPackageModel.PackageInfo && highestObservedPackageVersion) {
-    mergedPackageModel.PackageInfo.Version = highestObservedPackageVersion;
+  const baseInfo = parsePackage(basePackageContent)?.PackageInfo || {};
+  const localInfo = parsePackage(localPackageContent)?.PackageInfo || {};
+  const remoteInfo = parsePackage(remotePackageContent)?.PackageInfo || {};
+  const deliveryFields = ['Version', 'ChangeLog', 'ChangeHistory'];
+  const delivery = info => JSON.stringify(deliveryFields.map(field => info[field]));
+  let selectedInfo = baseInfo;
+  for (const candidate of [remoteInfo, localInfo]) {
+    const comparison = compareSemanticVersions(candidate.Version, selectedInfo.Version);
+    if (comparison > 0) {
+      selectedInfo = candidate;
+    } else if (comparison === 0 && delivery(candidate) !== delivery(selectedInfo)) {
+      if (delivery(selectedInfo) === delivery(baseInfo)) selectedInfo = candidate;
+      else if (delivery(candidate) !== delivery(baseInfo)) {
+        throw new Error('应用商城包同版本投递元数据冲突，需先核对官网与本地 ChangeLog');
+      }
+    }
+  }
+  if (mergedPackageModel.PackageInfo) {
+    for (const field of deliveryFields) {
+      if (Object.hasOwn(selectedInfo, field)) {
+        mergedPackageModel.PackageInfo[field] = structuredClone(selectedInfo[field]);
+      } else {
+        delete mergedPackageModel.PackageInfo[field];
+      }
+    }
   }
   const synchronizedPackage = synchronizeApplicationStoreEngines(
     canonicalizeResource(applicationStorePackageName, JSON.stringify(mergedPackageModel)),

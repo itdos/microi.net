@@ -58,7 +58,7 @@ export function resolveMenuRenderSource(item = {}) {
         || item.IsMicroiService === 1
         || asTrimmedString(item.IsMicroiService).toLowerCase() === "true"
         || asTrimmedString(item.IsMicroiService) === "1";
-    if (["microapp", "microservice"].includes(openType)
+    if (["microapp", "microservice", "codeform"].includes(openType)
         || legacyMicroService
         || componentPath.includes("/micro-app/host")) {
         return "microservice";

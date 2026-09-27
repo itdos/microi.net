@@ -13,6 +13,7 @@ const read = relativePath => readFile(new URL(relativePath, import.meta.url), "u
 
 test("route and menu sources distinguish microservices from explicit custom paths", () => {
     assert.equal(resolveMenuRenderSource({ OpenType: "MicroService" }), "microservice");
+    assert.equal(resolveMenuRenderSource({ OpenType: "CodeForm", DiyTableId: "table-1" }), "microservice");
     assert.equal(resolveMenuRenderSource({ ComponentPath: "/micro-app/host" }), "microservice");
     assert.equal(resolveMenuRenderSource({ ComponentPath: "/views/custom/order-board.vue" }), "custom");
     assert.equal(resolveMenuRenderSource({ ComponentPath: "/diy/diy-table" }), "");

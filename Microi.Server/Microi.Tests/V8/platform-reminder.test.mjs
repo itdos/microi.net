@@ -59,7 +59,8 @@ test('发布接收范围写入失败时，规则和发布快照同时回滚', ()
     FormEngine:{GetFormData:(table,key)=>table==='mci_platform_reminder'?{Code:1,Data:working}:{Code:2},
       GetTableData:()=>({Code:1,Data:[]}),UptFormDataByWhere:()=>({Code:1}),AddFormData:()=>({Code:1}),
       AddTableData:()=>({Code:0,Msg:'injected target failure'})}};
-  const result = new Function('V8',code+';'+body)(V8);
+  const license = readFileSync(new URL('../../Microi.Upgrade/Resource/license-expiry-model.js', import.meta.url), 'utf8');
+  const result = new Function('V8',code+';'+license+';'+body)(V8);
   assert.equal(result.Code,0);assert.match(result.Msg,/injected target failure/);
   assert.deepEqual(committed,initial,'failed publication must not commit the rule claim outside the transaction');
 });
