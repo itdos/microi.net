@@ -31,6 +31,7 @@ export const DOC_VISUAL_PROFILES = Object.freeze({
   'getting-started/win-install-microi': 'guide',
   'index': 'showcase',
   'more/copy-module': 'guide',
+  'more/enterprise-ai-development-series': 'showcase',
   'more/db-dictionary': 'reference',
   'more/dos-orm': 'reference',
   'more/dos-result': 'reference',
