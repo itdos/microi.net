@@ -9,6 +9,7 @@
         <div class="ai-cad-actions">
           <a class="primary" href="/app-detail.html?app=microi-ai-cad">查看 AI 应用 <span aria-hidden="true">↗</span></a>
           <a class="secondary" href="#ai-cad-gallery">浏览 4K 截图 <span aria-hidden="true">↓</span></a>
+          <a class="secondary" href="https://static.itdos.com/itdos/mcp/assets/ai-cad/plugin/202609/MicroiAiCad_Addin-v1_0_0.zip" target="_blank" rel="noopener noreferrer">下载插件包 <span aria-hidden="true">↘</span></a>
         </div>
         <p class="ai-cad-disclosure">当前展示的是工作台示例界面。SolidWorks 插件已完成本地构建，真实建模与出图仍待安装有许可证的 SolidWorks 后验收。</p>
       </div>
