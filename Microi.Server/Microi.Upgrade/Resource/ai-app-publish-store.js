@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v2.0.3
+ * Version: v2.0.4
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -1370,6 +1370,27 @@ function mergeUniqueRows(left, right, keyFields) {
   return result;
 }
 
+// PACKAGE_PHYSICAL_INDEX_MERGE_V1：表、同表的每个索引都必须保留。
+// 建表重复沿用既有基础结构优先语义；同名索引不同定义必须报错，不能选一条静默发布。
+function mergePackageDdl(left, right) {
+  var result = [], seen = Object.create(null);
+  var items = toArray(left).concat(toArray(right));
+  for (var i = 0; i < items.length; i++) {
+    var row = items[i] || {}, sql = String(row.DDL || '').trim();
+    var table = sql.match(/^CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+[`"\[]?([A-Za-z0-9_]+)/i);
+    var index = sql.match(/^CREATE\s+(?:UNIQUE\s+)?INDEX\s+[`"\[]?([A-Za-z0-9_]+)[`"\]]?\s+ON\s+[`"\[]?([A-Za-z0-9_]+)/i);
+    var alter = sql.match(/^ALTER\s+TABLE\s+[`"\[]?([A-Za-z0-9_]+)[`"\]]?\s+ADD\s+(?:UNIQUE\s+)?(?:INDEX|KEY)\s+[`"\[]?([A-Za-z0-9_]+)/i);
+    var key = table ? 'table:' + table[1].toLowerCase() : index ? 'index:' + index[2].toLowerCase() + ':' + index[1].toLowerCase()
+      : alter ? 'index:' + alter[1].toLowerCase() + ':' + alter[2].toLowerCase() : 'ddl:' + String(row.TableName || '') + ':' + sql;
+    if (seen[key]) {
+      if (key.indexOf('index:') === 0 && seen[key] !== sql) throw new Error('应用包同名索引DDL不一致：' + key);
+      continue;
+    }
+    seen[key] = sql; result.push(row);
+  }
+  return result;
+}
+
 function exportScheduleJobs(jobNames, apiEngines) {
   var names = selectionValues(jobNames, ['JobName', 'Name', 'Value']);
   if (names.length === 0) return [];
@@ -2044,7 +2065,7 @@ selectedExport.SysMenus = normalizeExactExportedMenuClosure(
   menuContract,
   exactMenuIds
 );
-infrastructure.DDLStatements = mergeUniqueRows(infrastructure.DDLStatements, selectedExport.DDLStatements, ['TableName']);
+infrastructure.DDLStatements = mergePackageDdl(infrastructure.DDLStatements, selectedExport.DDLStatements);
 infrastructure.DiyTables = mergeUniqueRows(infrastructure.DiyTables, selectedExport.DiyTables, ['Id', 'Name']);
 infrastructure.DiyFields = mergeUniqueRows(infrastructure.DiyFields, selectedExport.DiyFields, ['Id']);
 var selectedDataSets = toArray(selectedExport.DataSets);

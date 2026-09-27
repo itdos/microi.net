@@ -766,6 +766,13 @@ export declare class MicroiClient {
     getMiniMaxImageTask(taskId: string): Promise<ApiResponse>;
     /** 恢复仅重新下载既有供应商结果；后端保证不会重新发起图片生成。 */
     recoverMiniMaxImageTask(taskId: string): Promise<ApiResponse>;
+    /** 只读：当前租户实时可用的图像/视频/音乐/配音模型目录（含安全投影，不含密钥）。 */
+    getMediaModels(): Promise<ApiResponse>;
+    /**
+     * 只读：MiniMax Token Plan 官方额度回读。生成前先预检可避免多路并发把
+     * 图片/视频窗口额度打满后再盲目排队。
+     */
+    getMiniMaxTokenPlanRemains(): Promise<ApiResponse>;
     generateMiniMaxSpeech(data: Record<string, unknown>): Promise<ApiResponse>;
     createModule(data: {
         Name: string;

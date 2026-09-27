@@ -2,8 +2,18 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-file-upload-008 sha256=7cda0fe7bb978e7219cb3c1ba30813e1a5e777f1272410f85d4c7ecc1882cc3d -->
+<!-- microi-progressive:chunk id=v8-file-upload-008 sha256=b7b809862a9d82f0270ae99486acb5fe23185b9d5efad073ae39b282724e2e32 -->
 ## Office 文件在线编辑版本号规则
+
+### 文件柜 Office 版本
+
+文件柜对象没有表单字段 JSON。`Microi.Client/src/views/file-manage/` 打开 Office 文件时传当前文件柜菜单、原始对象键和桶类型到 `/online-office`；后端 `GetFileCabinetOfficeMeta`、`SaveFileCabinetOfficeDocument` 每次重新校验管理员 DiyToken、权威文件柜菜单及原对象存在，绝不相信前端传来的版本路径或 `canEdit`。公有桶和私有桶都可编辑，历史快照及索引始终放在当前租户私有桶的 `.microi-office-history/<按桶及原键生成的摘要>/` 下，文件柜列表隐藏该内部目录。
+
+文件柜初始版本为 `v1.0.0`；每次手动保存前先把当前字节归档为上一版本，再覆盖原对象键并持久化版本索引，版本依次递增。原对象键始终是最新版本，历史版本只读。用共享 Redis 租约串行保存并比较 `ExpectedVersion`；索引写入失败须恢复原对象，不能把未持久化索引的响应视为成功。历史版本预览用 `ResourceKind=FileManagerObject`、`ResourceId=历史快照键`、权威 `SysMenuId` 重新签发私有审计代理地址。修改文件柜对象移动/重命名/删除语义时，必须同时处理其版本索引与历史快照，防止索引失联或残留。
+
+MCP 只读发现使用 `microi_list_file_cabinet_objects(path, limit)` 与 `microi_get_file_cabinet_office_meta(filePathName, sysMenuId, limit)`；后者必须使用权威文件柜菜单 Id，普通用户和访问密钥无权调用。它们不下载文件字节，也不代表已发布新版本。整文件夹移动/重命名和跨平台文件同步不能视为 Office 历史迁移；迁移存储时需连同私有桶历史前缀一起处理，并回读原对象和历史版本。
+
+OnlyOffice 前端组件 npm 包不能替代 Docs 文档服务。`DocsAPI.DocEditor` 的同一存储版本必须使用稳定文档 key，避免每位用户生成不同 key 后失去协同；版本更新后 key 才应变化。Univer 开源包并不包含与现有链路等价的 Office 文件转换、协同服务和历史版本，不能直接加一个系统设置选项就声称切换完成。
 
 当文件上传控件开启【Office 在线预览】、【允许在线编辑】和【开启 Office 文件版本号】时，前后端必须遵循统一版本规则：
 
@@ -39,7 +49,7 @@
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-009 sha256=e01219d4f1a8f8c535e0b5aa5620120c37bd5e79af27dbbd63babda8d887cd13 -->
+<!-- microi-progressive:chunk id=v8-file-upload-009 sha256=1cc3ff1b6a5c756d957819f198c13ea181143db484527d1931aefc8e0d52993c -->
 ## ImgUpload / FileUpload 字段值兼容规则
 
 `ImgUpload` 不能假设只是一种值结构。PC 表单、移动端、旧数据、单图/多图、公开/私有桶会混合出现以下格式：

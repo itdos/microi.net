@@ -2,19 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
-const source=fs.readFileSync(new URL('platform-reminder-model.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('platform-reminder-runtime.body.js',import.meta.url),'utf8');
+const source=fs.readFileSync(new URL('platform-reminder-model.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('license-expiry-model.js',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('platform-reminder-runtime.body.js',import.meta.url),'utf8');
 function fixture(){
  const records=new Map(),now=Date.now(),batch={Id:'a'.repeat(32),State:'Published',SnapshotJson:JSON.stringify({Title:'启动版本介绍',Content:'说明',ScopeType:'Users',AllTargets:true,AccountScope:'SuperAdmins',MinimumReceiverProtocol:2,DisplayMode:'AfterServerRestart',StartsAt:new Date(now-1000).toISOString(),EndsAt:new Date(now+86400000).toISOString(),RepeatMode:'None'})};
  let current={UserId:'admin',Administrator:true,ProductEdition:'OpenSource',ProtocolVersion:2,RestartEpoch:'202609100900000000000-'+'a'.repeat(32)};
  let concurrentEntry='',staleReads=0;
- const atoms=[];
- const V8={Param:{},OsClient:'tenant-one',DbTrans:{},EncryptHelper:{Sha256Hex:value=>createHash('sha256').update(value).digest('hex')},Method:{RunPlatformApiRuntime:p=>{atoms.push(p);return {Code:1,Data:p.Action==='Context'?current:[]}}},
+ const atoms=[],policies={};
+ const V8={Param:{},OsClient:'tenant-one',DbTrans:{},EncryptHelper:{Sha256Hex:value=>createHash('sha256').update(value).digest('hex')},Method:{RunPlatformApiRuntime:p=>{atoms.push(p);return {Code:1,Data:p.Action==='Context'?current:p.Action==='ParentLicensePolicy'?policies.parent:[],DataAppend:{LicenseExpiryPolicy:policies.official}}}},
   FormEngine:{GetTableData(table,q){const data=table==='mci_platform_reminder_batch'?[batch]:[...records.values()].filter(row=>q._Where[0][2].includes(row.Id)&&row.ReceiverUserId===current.UserId);return {Code:1,Data:data}},
    GetFormData(table,q){if(staleReads>0){staleReads--;return {Code:2}}const row=records.get(q.Id);return row?{Code:1,Data:row}:{Code:2}},
    AddFormData(table,row){assert.equal(table,'mci_platform_reminder_receipt');if(concurrentEntry){records.set(row.Id,{...row,EntryId:concurrentEntry});concurrentEntry='';staleReads=1;return {Code:0,Msg:'unique Id'}}if(records.has(row.Id))return {Code:0,Msg:'unique Id'};records.set(row.Id,{...row});return {Code:1}},
    UptFormData(table,row){assert.equal(table,'mci_platform_reminder_receipt');Object.assign(records.get(row.Id),row);return {Code:1}}
   }};
- return {records,atoms,batch,race(entry){concurrentEntry=entry},identity(p){current={...current,...p}},tenant(value){V8.OsClient=value},run(p){V8.Param=p;return new Function('V8',source)(V8)}};
+ return {records,atoms,batch,policies,race(entry){concurrentEntry=entry},identity(p){current={...current,...p}},tenant(value){V8.OsClient=value},run(p){V8.Param=p;return new Function('V8',source)(V8)}};
 }
 test('唯一插入竞争且事务快照未刷新时失败关闭，原会话重试不重复领取',()=>{
  const f=fixture(),item=f.run({Action:'Inbox'}).Data[0];f.race('winning-document-001');
@@ -56,8 +56,8 @@ test('撤回、过期或可信启动批次缺失不再投递，也不制造回�
 test('signed license at seven days warns once per trusted login, including expired licenses',()=>{
  const f=fixture(); f.batch.State='Withdrawn';
  const end=new Date(Date.now()+7*86400000).toISOString();
- f.identity({LoginId:'c'.repeat(32),LicenseExpirationDate:end});
- const first=f.run({Action:'Inbox'}).Data[0]; assert.equal(first.Source,'SystemLicense'); assert.equal(first.Severity,'warning');
+ f.identity({LoginId:'c'.repeat(32),LicenseExpirationDate:end,SystemProductEdition:'Enterprise'});
+ const first=f.run({Action:'Inbox'}).Data[0]; assert.equal(first.Source,'SystemLicense'); assert.equal(first.Severity,'error');
  f.run({Action:'Acknowledge',Id:first.Id}); assert.equal(f.run({Action:'Inbox'}).Data.length,0);
  // Refresh and a second page keep the trusted login id; a new sign-in gets a new occurrence.
  assert.equal(f.run({Action:'Inbox',LoginId:'forged',EntryId:'new-document-00001'}).Data.length,0);
@@ -66,4 +66,28 @@ test('signed license at seven days warns once per trusted login, including expir
  f.identity({LicenseExpirationDate:new Date(Date.now()+8*86400000).toISOString()}); assert.equal(f.run({Action:'Inbox'}).Data.length,0);
  f.identity({LicenseExpirationDate:end,Administrator:false}); assert.equal(f.run({Action:'Inbox',Administrator:true}).Data.length,0);
  f.identity({Administrator:true,LoginId:''}); assert.equal(f.run({Action:'Inbox'}).Data.length,0);
+});
+
+test('官方30天与主租户7天独立投递和确认，非admin超级管理员也能接收',()=>{
+ const f=fixture();f.batch.State='Withdrawn';
+ f.policies.official={Enterprise:{AdvanceDays:30,Content:'官方{版本} {倒计时}'}};
+ f.policies.parent={Personal:{AdvanceDays:7,Content:'请向主租户续费，到期{到期时间}'}};
+ f.identity({UserId:'second-super-admin',Administrator:true,LoginId:'e'.repeat(32),SystemProductEdition:'Enterprise',TenantProductEdition:'Personal',LicenseExpirationDate:new Date(Date.now()+20*86400000).toISOString(),TenantLicenseExpirationDate:new Date(Date.now()+3*86400000).toISOString()});
+ const all=f.run({Action:'Inbox'}).Data;assert.deepEqual(all.map(x=>x.Source),['SystemLicense','TenantLicense']);
+ assert.match(all[0].Content,/官方企业版/);assert.match(all[1].Content,/请向主租户续费/);assert.match(all[1].Content,/倒计时3天/);
+ f.run({Action:'Acknowledge',Id:all[0].Id});assert.deepEqual(f.run({Action:'Inbox'}).Data.map(x=>x.Source),['TenantLicense']);
+ f.policies.official.Enterprise.Content='变更文案不会清除回执';assert.deepEqual(f.run({Action:'Inbox'}).Data.map(x=>x.Source),['TenantLicense']);
+ f.identity({LicenseExpirationDate:new Date(Date.now()+40*86400000).toISOString()});assert.deepEqual(f.run({Action:'Inbox'}).Data.map(x=>x.Source),['TenantLicense']);
+ f.identity({ProductEdition:'OpenSource',LicenseExpirationDate:new Date(Date.now()-86400000).toISOString(),TenantLicenseExpirationDate:new Date(Date.now()-2*86400000).toISOString()});
+ assert.deepEqual(f.run({Action:'Inbox'}).Data.map(x=>x.Source),['SystemLicense','TenantLicense']);
+});
+
+test('授权策略只允许官方或主租户管理，普通公告动作不能撤回策略',()=>{
+ const f=fixture();f.identity({IsMainTenant:false,IsOfficialPlatform:false});
+ for(const ScopeType of ['Editions','Tenants'])assert.equal(f.run({Action:'LicensePolicyGet',ScopeType}).Code,0);
+ f.identity({IsMainTenant:true});assert.equal(f.run({Action:'LicensePolicyGet',ScopeType:'Tenants'}).Data.Revision,0);
+ assert.equal(f.run({Action:'LicensePolicySave',ScopeType:'Tenants'}).Code,0);
+ assert.equal(f.run({Action:'LicensePolicyValidate',ScopeType:'Tenants',Policy:{Enterprise:{AdvanceDays:0}}}).Code,0);
+ const id='f'.repeat(32);f.records.set(id,{Id:id,Revision:1,ReminderType:'LicenseExpiry',Status:'Published'});
+ for(const Action of ['Withdraw','Publish'])assert.match(f.run({Action,Id:id,ExpectedRevision:1}).Msg,/授权到期提醒设置/);
 });

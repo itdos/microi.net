@@ -1,4 +1,5 @@
 var model = createPlatformReminderModel();
+var licenseModel = createLicenseExpiryModel();
 var p = V8.Param || {}, now = Date.now(), isoNow = new Date(now).toISOString();
 var ruleFields = ['Id','Title','ReminderType','ScopeType','Revision','Status','RuleJson','PublishedBatchId','UpdateTime'];
 var batchFields = ['Id','RuleId','Revision','Title','State','ScopeType','SnapshotJson','StartsAt','EndsAt','PublishRequestId','CreateTime'];
@@ -26,6 +27,11 @@ function stable(value) { return V8.EncryptHelper.Sha256Hex(String(value)).substr
 function safeId(value) { var valueText = String(value || ''); if (!/^[a-f0-9]{32}$/.test(valueText)) throw new Error('提醒标识无效。'); return valueText; }
 function parse(value) { return typeof value === 'string' ? JSON.parse(value) : value; }
 function requireAdmin(context) { if (!context.Administrator) throw new Error('只有当前租户的平台管理员可以维护提醒。'); }
+function policyId(scope) { return stable('LicenseExpiryPolicy|' + scope); }
+function readPolicy(scope) {
+  var found = row('mci_platform_reminder', policyId(scope), ruleFields);
+  return { Revision: found ? Number(found.Revision) : 0, Policy: licenseModel.normalize(found ? parse(found.RuleJson) : null) };
+}
 function receiptId(item, context) {
   if (item.DisplayMode === 'EveryLogin') return stable(String(V8.OsClient).toLowerCase() + '|' + context.UserId + '|' + item.Id + '|' + context.LoginId);
   var entry = item.DisplayMode === 'EveryEntry' ? String(p.EntryId || '') : 'once';
@@ -47,18 +53,19 @@ function validateTargets(rule) {
 }
 function collect(context) {
   var items = [], warnings = [], nextAt = now + 60000;
-  // 签名 License 是到期事实源；关闭状态仍走系统提醒的持久化回执，每次真实登录重新提示。
-  var licenseEnd = Date.parse(context.LicenseExpirationDate || '');
-  if (context.Administrator && context.LoginId && isFinite(licenseEnd) && licenseEnd - now <= 7 * 86400000) {
-    var licenseBatchId = stable('LicenseExpiry|' + context.LicenseExpirationDate);
-    var expiryText = new Date(licenseEnd).toISOString().replace('T', ' ').replace('.000Z', ' UTC');
-    items.push({ Id: 'SystemLicense:' + stable(licenseBatchId + '|' + context.LoginId), BatchId: licenseBatchId, Source: 'SystemLicense',
-      Slot: 0, DueAt: new Date(licenseEnd - 7 * 86400000).toISOString(), NextAt: nextAt,
-      Title: licenseEnd <= now ? '系统授权已到期' : '系统授权即将到期',
-      Content: '当前系统授权到期时间为 ' + expiryText + '。请及时联系授权账号持有人续期，并在授权管理中重新部署有效授权。',
-      Icon: 'Warning', Severity: licenseEnd <= now ? 'error' : 'warning', Priority: 100,
-      DisplayMode: 'EveryLogin', EndsAt: new Date(Math.max(now, licenseEnd) + 86400000).toISOString(),
-      LinkUrl: '/#/license', LinkText: '查看授权' });
+  var officialPolicy = null, parentPolicy = null;
+  function appendLicense(policy, edition, expiration, parent) {
+    if (!context.Administrator || !context.LoginId) return;
+    var item;
+    try { item = licenseModel.project(policy, edition, expiration, now, parent); }
+    catch (_) { item = licenseModel.project(null, edition, expiration, now, parent); }
+    if (!item) return;
+    // 两层分别持有回执；策略文案/分钟变化不能让同一次登录已确认的提醒再次弹出。
+    item.Source = parent ? 'TenantLicense' : 'SystemLicense';
+    item.BatchId = stable(item.Source + '|' + expiration);
+    item.Id = item.Source + ':' + stable(item.BatchId + '|' + context.LoginId);
+    item.NextAt = nextAt;
+    items.push(item);
   }
   var own = query('mci_platform_reminder_batch', [['State','=','Published'],['EndsAt','>',isoNow]], batchFields).Data || [];
   function append(rows, source, scope, key) {
@@ -75,9 +82,14 @@ function collect(context) {
   try { append(atom('Inherited').Data, 'Parent', 'Tenants', V8.OsClient); } catch (_) { warnings.push('ParentUnavailable'); }
   try {
     var official = atom('Official');
+    officialPolicy = official.DataAppend && official.DataAppend.LicenseExpiryPolicy;
     append(official.Data, 'Official', 'Editions', context.ProductEdition);
     if (official.DataAppend && official.DataAppend.OfficialUnavailable) warnings.push('OfficialUnavailable');
   } catch (_) { warnings.push('OfficialUnavailable'); }
+  if (context.IsOfficialPlatform) { try { officialPolicy = readPolicy('Editions').Policy; } catch (_) { warnings.push('OfficialPolicyUnavailable'); } }
+  if (context.TenantLicenseExpirationDate) { try { parentPolicy = atom('ParentLicensePolicy').Data; } catch (_) { warnings.push('ParentPolicyUnavailable'); } }
+  appendLicense(officialPolicy, context.SystemProductEdition || context.ProductEdition, context.LicenseExpirationDate, false);
+  appendLicense(parentPolicy, context.TenantProductEdition, context.TenantLicenseExpirationDate, true);
   return { Items: items, Warnings: warnings, NextCheckAt: new Date(nextAt).toISOString() };
 }
 try {
@@ -125,6 +137,30 @@ try {
         ActiveIds: inbox.Items.map(function(item) { return item.Id; }) } };
   }
   requireAdmin(context);
+  if (action === 'LicensePolicyGet' || action === 'LicensePolicySave' || action === 'LicensePolicyValidate') {
+    var scope = String(p.ScopeType || 'Tenants');
+    if (scope !== 'Tenants' && scope !== 'Editions') throw new Error('授权提醒范围无效。');
+    if (scope === 'Editions' ? !context.IsOfficialPlatform : !context.IsMainTenant) throw new Error('只有官方服务或主租户可以维护对应授权提醒。');
+    var policy = readPolicy(scope);
+    if (action === 'LicensePolicyGet') return { Code: 1, Data: policy };
+    if (!p.Policy || typeof p.Policy !== 'object') throw new Error('请提交完整授权提醒策略。');
+    var normalized = licenseModel.normalize(p.Policy);
+    if (action === 'LicensePolicyValidate') return { Code: 1, Data: { Policy: normalized } };
+    if (p.ExpectedRevision == null || Number(p.ExpectedRevision) !== policy.Revision) {
+      if (JSON.stringify(policy.Policy) === JSON.stringify(normalized)) return { Code: 1, Data: policy, Msg: '配置已经保存。' };
+      throw new Error('授权提醒已被其他人修改，请刷新后重试。');
+    }
+    var id = policyId(scope), json = JSON.stringify(normalized);
+    if (!policy.Revision) check(V8.FormEngine.AddFormData('mci_platform_reminder', { Id: id, Title: '授权到期提醒',
+      ReminderType: 'LicenseExpiry', ScopeType: scope, Revision: 1, Status: 'Published', RuleJson: json }, V8.DbTrans));
+    else {
+      var changed = V8.DbTrans.FromSql('UPDATE mci_platform_reminder SET RuleJson=@json,Revision=Revision+1 WHERE Id=@id AND Revision=@revision AND IsDeleted<>1')
+        .AddInParameter('@json',json).AddInParameter('@id',id).AddInParameter('@revision',policy.Revision).ExecuteNonQuery();
+      if (Number(changed) !== 1) throw new Error('授权提醒保存冲突，请刷新后重试。');
+    }
+    atom('Signal');
+    return { Code: 1, Data: { Revision: policy.Revision + 1, Policy: normalized }, Msg: '授权提醒配置已保存并生效。' };
+  }
   if (action === 'Recipients') {
     if (p.ScopeType === 'Tenants') { if (!context.IsMainTenant) throw new Error('只有主租户可以选择子租户。'); return atom('Tenants'); }
     if (p.ScopeType === 'Editions') {
@@ -137,7 +173,7 @@ try {
     return { Code: 1, Data: (options.Data || []).map(function (user) { return { Key: user.Id, Name: user.Name || user.Account }; }), DataCount: options.DataCount };
   }
   if (action === 'List') {
-    var where = [];
+    var where = [['ReminderType','<>','LicenseExpiry']];
     if (p.ScopeType) where.push(['ScopeType','=',p.ScopeType]);
     if (p.TargetKey) {
       var targetKey = model.list([p.TargetKey])[0];
@@ -162,6 +198,7 @@ try {
     if (p.RequestId && !/^[A-Za-z0-9-]{16,80}$/.test(String(p.RequestId))) throw new Error('保存请求标识无效。');
     var ruleId = p.Id ? safeId(p.Id) : p.RequestId ? stable(String(V8.OsClient).toLowerCase()+'|Draft|'+p.RequestId) : stable(V8.Method.NewGuid());
     var old = p.Id || p.RequestId ? row('mci_platform_reminder', ruleId, ruleFields) : null;
+    if (old && old.ReminderType === 'LicenseExpiry') throw new Error('请通过授权到期提醒设置维护此策略。');
     if (p.Id && !old) throw new Error('提醒规则不存在。');
     if (!p.Id && old) {
       if (JSON.stringify(parse(old.RuleJson)) !== JSON.stringify(rule)) throw new Error('此请求已保存过不同内容，请先读取已创建的草稿再修改。');
@@ -183,6 +220,7 @@ try {
   if (action === 'Publish' || action === 'Withdraw') {
     var id = safeId(p.Id), current = row('mci_platform_reminder', id, ruleFields);
     if (!current) throw new Error('提醒规则不存在。');
+    if (current.ReminderType === 'LicenseExpiry') throw new Error('请通过授权到期提醒设置维护此策略。');
     if (Number(p.ExpectedRevision) !== Number(current.Revision)) throw new Error('规则版本已变化，请刷新后重试。');
     if (action === 'Withdraw') {
       if (current.Status === 'Withdrawn') return { Code: 1, Data: { Id: id, AlreadyWithdrawn: true } };

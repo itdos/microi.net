@@ -1,15 +1,35 @@
 ---
 name: ai-engine
-description: Microi AI 引擎、MiniMax 图片/音乐/视频生成与预览、模型代理、NL2SQL/NL2V8 和知识库规范。用于媒体生成、模型路由、密钥与订阅配额、Schema/Skill 检索、流式响应、租户隔离和验收。
+description: Microi AI 引擎、MiniMax 图片/音乐/视频生成与预览、自建数字人直播、模型代理、NL2SQL/NL2V8 和知识库规范。用于媒体生成、本机免费推理、模型路由、密钥与订阅配额、Schema/Skill 检索、流式响应、租户隔离和验收。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi AI Engine
 
+涉及 AI 员工、多岗位协作或 OpenClaw 执行节点时，读取
+[AI 员工与执行节点](references/ai-employees.md)。先区分职责、持久任务、真实工具权限与人工验收，不能把聊天提示词或设计蓝图当作已经运行的员工系统。
+
+### AI 员工的最小执行约束
+
+以下关键规则同时进入后端内嵌知识快照，详细案例留在上述参考文件：
+
+- DiyToken 决定租户与负责人；岗位不等于管理员帐号。任务、依赖、成果、报告和验收均校验同一数据范围，原生 CRUD 不能绕过状态机。
+- 先从当前用户获授权目录选择 `AiModel / AiModelId`，不能假定模型名可留空；显式模型不可用就失败，不静默切换账号。
+- 持久后台任务先领取并提交，再调用外部模型；组合稳定幂等键、数据库条件写入、租约与独立调用开始标记。等待模型时不持有业务行锁，结果未知不盲目重发。
+- OpenClaw 必须核对安装版本与实际配置格式，显式指定 Agent；按租户、负责人、任务和尝试隔离目录与会话，不回退 `main`。Gateway 密钥只留在本机服务端。
+- 草稿模式检查真实工具拒绝策略；提示词不是权限隔离。扩大工具权限必须逐项建立白名单、审批、幂等、目录/网络边界和副作用回读。
+- 报告超时重放相同成果，取消或旧租约的迟到结果不得改写任务。供应商用量缺失显示未知，尝试次数不等于金额预算。
+- OpenClaw Gateway 的模型输出只接受绑定本次执行的明确终稿区间；推理草稿不得进入成果。缺少终稿标记时保持结果未知并人工核对，不用猜测文本边界。
+- 模型成功、后台任务成功与人工验收通过分别取证；财务、招聘、研发、测试和营销草稿不能冒充付款、录用、部署、测试通过或发布。
+
 平台媒体生成的受控 HTTP 入口包括 `/api/Ai/`、`/api/Ai/GenerateMiniMaxImage`、`/api/Ai/GenerateMiniMaxMusic`、`/api/Ai/CreateMiniMaxVideo`、`/api/Ai/GetMiniMaxVideoTask`、`/api/Ai/GetMiniMaxVideoFile`、`/api/Ai/PersistMiniMaxVideoFile` 和恢复原任务的 `/api/Ai/RecoverMiniMaxImageTask`；AI 工作流统一调用 Managed 接口引擎 `/apiengine/platform-ai-workflow`，通过 `Action` 选择概览、节点详情、生成、列表、读取、保存或删除。调用方只提交业务参数和模型选择，供应商密钥、租户配额、任务归属和文件读取权限由服务端判定。生成结果必须先进入当前租户 HDFS 或受控临时句柄，浏览器不接触供应商密钥、图片 Base64、音频十六进制或原始视频任务 Id。`PersistMiniMaxVideoFile` 只能转存当前登录用户所属且已完成的任务，禁止作为任意 URL 搬运器。
 
 ## 能力
+
+### 自建数字人直播与免费本机推理
+
+需求涉及“数字人直播、本机部署、免费模型、不要扣 token、MuseTalk、LiveTalking、OBS”时，先读取 [自建数字人交付规范](references/self-hosted-digital-human.md)。免费指无供应商推理账单，不得把云端试用、Edge TTS 或其它在线服务冒充离线方案；必须分别验证吾码业务资源、本机推理、音画输出和外部平台开播。
 
 ### 媒体模型目录与中转（2026-09）
 

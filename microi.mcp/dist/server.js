@@ -2289,6 +2289,8 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_generate_minimax_image',
     'microi_get_minimax_image_task',
     'microi_recover_minimax_image_task',
+    'microi_list_media_models',
+    'microi_get_minimax_token_plan_remains',
     'microi_generate_minimax_music',
     'microi_generate_minimax_speech',
     'microi_translate',
@@ -3208,10 +3210,10 @@ export function createMcpServer(client, context) {
     // ========================
     // Tools: MiniMax 图片、原创音乐与短对白
     // ========================
-    server.tool('microi_generate_minimax_image', `Queue one persistent MiniMax text-to-image task through the authenticated Microi AI engine for OsClient "${osClient}". Provider credentials stay on the server and completed originals are persisted to the current tenant HDFS. The first successful response is normally Code=2 with Data.TaskId; continue with microi_get_minimax_image_task using that exact TaskId. This may consume external AI quota, so confirmExecution must exactly equal requestId. Never change RequestId after a timeout or uncertain response.`, {
+    server.tool('microi_generate_minimax_image', `Queue one persistent MiniMax text-to-image task through the authenticated Microi AI engine for OsClient "${osClient}". Provider credentials stay on the server and completed originals are persisted to the current tenant HDFS. The first successful response is normally Code=2 with Data.TaskId; continue with microi_get_minimax_image_task using that exact TaskId. Call microi_list_media_models first to pick a live image model and microi_get_minimax_token_plan_remains to preflight the provider quota before queuing. This may consume external AI quota, so confirmExecution must exactly equal requestId. Never change RequestId after a timeout or uncertain response.`, {
         requestId: z.string().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/u).describe('Stable idempotency key. Reuse it for the same prompt and parameters.'),
         prompt: z.string().min(1).max(1500).describe('Original image brief. The backend collapses control characters and validates the final request.'),
-        model: z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/u).optional().describe('Configured image model. Default image-01.'),
+        model: z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/u).optional().describe('Configured image model Id from microi_list_media_models. Default image-01; the catalog may include an independent provider-tool image channel that does not consume the Token Plan image quota.'),
         aiModelId: z.string().min(1).max(160).optional().describe('Optional current-tenant mic_ai record Id selected from the live media model catalog.'),
         aspectRatio: z.enum(['1:1', '16:9', '4:3', '3:2', '2:3', '3:4', '9:16', '21:9']).optional(),
         resolution: z.enum(['1K', '2K', '4K']).optional().describe('Only for a live protocol that declares resolution support.'),
@@ -3277,6 +3279,32 @@ export function createMcpServer(client, context) {
         }
         catch (e) {
             return { content: [{ type: 'text', text: `MiniMax image result recovery failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_list_media_models', `List the live media model catalog (image, video, music, speech) for OsClient "${osClient}" as a safe projection without provider credentials. Read-only and free. Call it before image or video generation to discover which models are currently available and which protocol each one uses.`, {}, async () => {
+        try {
+            const result = await client.getMediaModels();
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                structuredContent: result,
+                ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Media model catalog read failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_get_minimax_token_plan_remains', `Read the live MiniMax Token Plan usage windows for OsClient "${osClient}" (model_name "general" = image pool, "video" = video pool). Read-only and free. Call it before any image or video generation: current_interval_remaining_percent=0 with current_interval_status=2 means the window is exhausted and new queued tasks are rejected upstream until end_time.`, {}, async () => {
+        try {
+            const result = await client.getMiniMaxTokenPlanRemains();
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                structuredContent: result,
+                ...(![1, 2].includes(Number(result.Code)) ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `MiniMax token plan readback failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
         }
     });
     server.tool('microi_generate_minimax_music', `Generate one original instrumental music asset through the authenticated Microi AI engine for OsClient "${osClient}". The server prefers MiniMax music-3.0 and safely falls back to the official open-source MiniMax-Music3 Space only after an explicit 410 retirement response. It keeps provider credentials private, persists the result to tenant HDFS, and uses RequestId for idempotency. This may consume external AI quota, so confirmExecution must exactly equal requestId.`, {
@@ -4858,7 +4886,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 统一查询系统日志/监控
     // ========================
-    server.tool('microi_query_system_observability', `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. For memory exhaustion/OOM/abnormal allocations: Memory checks current-node pressure, Collector freshness/loss and Evidence storage health; MemoryIncidents returns up to 50 tenant-scoped incident summaries in Data.Items; MemoryIncident reads detail by incidentId from that list. Correlate execution/parent ids, API engine key, V8 table/event/workflow identity, script hash, allocation types/CLR stacks and Trace. Report missing stacks, lost/unattributed samples and storage gaps before assigning a cause. Allocated bytes are NOT retained heap or exclusive RSS; never sum inclusive parent and child allocations. These read actions do not enable V8 limits, create heap dumps, kill processes or write business data. They require a compatible API diagnostic runtime as well as the query engine; updating MCP alone cannot install the backend. Other read actions cover logs/statistics/details, signals, Trace, hot API rank, host/Docker/queues, application logs, security, platform statistics and traffic history. The backend enforces administrator permission, tenant isolation, bounded pagination and redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`, {
+    server.tool('microi_query_system_observability', `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. For memory exhaustion/OOM/abnormal allocations: Memory checks current-node pressure, Collector freshness/loss and Evidence storage health; MemoryIncidents returns up to 50 tenant-scoped incident summaries in Data.Items; MemoryIncident reads detail by incidentId from that list. RequestWaits groups pending admission/HTTP by tenant, API, stage and redacted dependency target; samples carry TraceId. Counts are requests/calls, never worker-thread counts. Evidence.CriticalStorage reports acknowledged MySQL writes, pending/dropped snapshots and errors; RelationalStorage in incident reads is independent of Mongo/local files. Only acknowledged critical evidence survives container file loss; MySqlCriticalEvidence omits raw allocation stacks and EvidenceTruncated must be reported. Correlate execution/parent ids, API engine key, V8 table/event/workflow identity, script hash, allocation types/CLR stacks and Trace. Report missing stacks, lost/unattributed samples and storage gaps before assigning a cause. Allocated bytes are NOT retained heap or exclusive RSS; never sum inclusive parent and child allocations. These read actions do not enable V8 limits, create heap dumps, kill processes or write business data. They require a compatible API diagnostic runtime as well as the query engine; updating MCP alone cannot install the backend. Other read actions cover logs/statistics/details, signals, Trace, hot API rank, host/Docker/queues, application logs, security, platform statistics and traffic history. The backend enforces administrator permission, tenant isolation, bounded pagination and redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`, {
         action: z.enum([
             'Capabilities', 'Snapshot', 'Logs', 'LogTypes', 'LogStats', 'Signal', 'Trace',
             'ApiRank', 'AppLogs', 'PlatformStats', 'SecurityData', 'TrafficHistory', 'TrafficDetails', 'HistoricalDashboard', 'Memory', 'MemoryIncidents', 'MemoryIncident', 'DatabasePools', 'DatabasePoolRecovery',

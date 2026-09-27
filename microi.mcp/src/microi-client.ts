@@ -3281,6 +3281,23 @@ export class MicroiClient {
     });
   }
 
+  async listFileCabinetObjects(path: string, limit: boolean): Promise<ApiResponse> {
+    return this.post('/api/HDFS/ListObjects', {
+      OsClient: this.config.osClient,
+      Path: path,
+      Limit: limit,
+    });
+  }
+
+  async getFileCabinetOfficeMeta(filePathName: string, sysMenuId: string, limit: boolean): Promise<ApiResponse> {
+    return this.post('/api/HDFS/GetFileCabinetOfficeMeta', {
+      OsClient: this.config.osClient,
+      FilePathName: filePathName,
+      SysMenuId: sysMenuId,
+      Limit: limit,
+    });
+  }
+
   /**
    * 图片生成只负责以稳定 RequestId 创建持久任务。Code=2 表示已排队，
    * 调用方必须继续查询同一个 TaskId，不能因超时更换 RequestId 重复消费额度。

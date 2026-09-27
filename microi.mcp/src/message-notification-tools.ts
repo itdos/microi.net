@@ -8,6 +8,8 @@ const configEngine='platform-message-notification-config',reminderEngine='platfo
 const identifier=z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/);
 const requestId=z.string().regex(/^[A-Za-z0-9-]{16,80}$/);
 const channels=z.enum(['平台内部','邮件','短信','微信公众号模板消息']);
+const expirySetting=z.object({AdvanceDays:z.number().int().min(1).max(3650).default(7),Content:z.string().max(8000).default('')}).strict();
+const expiryPolicy=z.object({Personal:expirySetting,Enterprise:expirySetting}).strict();
 const businessRule=z.object({
  Key:identifier.max(50),Title:z.string().min(1).max(50),Type:z.array(channels).min(1).max(4),IsEnable:z.boolean(),
  Receivers:z.array(identifier).max(200).default([]),ReceiversRoles:z.array(identifier).max(50).default([]),
@@ -37,8 +39,8 @@ function uncertain():CallToolResult{return failed('未取得确定回执。请�
 function preview(expected:string,operation:string,target:string):CallToolResult{return output({dryRun:true,operation,target,confirmationRequired:expected,message:'此调用没有写入或发布；核对当前连接、内容与范围后，使用精确确认串执行。'});}
 
 export function registerMessageNotificationTools(server:McpServer,client:MicroiClient,context:McpServerContext):void {
- server.tool('microi_get_notification_context',`读取当前租户 ${context.osClient} 的统一消息通知中心：能力、原 mic_msgset 业务配置、系统公告、接收对象、微信模板及分页投递记录。仅查询当前租户角色；Tenants/Editions 使用 AllAccounts 或 SuperAdmins，绝不读取其它平台的角色列表。本工具不会发送消息。`,{
-  action:z.enum(['Capabilities','BusinessRules','BusinessRule','Reminders','Reminder','Recipients','Templates','Adapters','Logs','History']).default('Capabilities'),
+ server.tool('microi_get_notification_context',`读取当前租户 ${context.osClient} 的统一消息通知中心：能力、原 mic_msgset 业务配置、系统公告、接收对象、微信模板及分页投递记录。仅查询当前租户角色；Tenants/Editions 使用 AllAccounts 或 SuperAdmins，绝不读取其它平台的角色列表。本工具不会发送消息。LicensePolicyGet 配合 recipientScope=Editions/Tenants 读取官方/主租户的个人版与企业版授权提醒策略。`,{
+  action:z.enum(['Capabilities','BusinessRules','BusinessRule','Reminders','Reminder','Recipients','Templates','Adapters','Logs','History','LicensePolicyGet']).default('Capabilities'),
   id:identifier.optional(),keyword:z.string().max(100).optional(),recipientScope:z.enum(['Users','Roles','Tenants','Editions']).optional(),
   configId:identifier.optional(),channelType:channels.optional(),pageIndex:z.number().int().min(1).optional(),pageSize:z.number().int().min(1).max(100).optional()
  },async input=>{
@@ -57,6 +59,7 @@ export function registerMessageNotificationTools(server:McpServer,client:MicroiC
    if(input.action==='Reminders'){key=reminderEngine;action='List';}
    if(input.action==='Reminder'){key=reminderEngine;action='Get';}
    if(input.action==='History')key=reminderEngine;
+   if(input.action==='LicensePolicyGet'){key=reminderEngine;if(!['Tenants','Editions'].includes(input.recipientScope||''))return failed('授权提醒需指定 recipientScope=Tenants 或 Editions。');}
    // 当前租户帐号/角色走同一有界查询；跨租户和产品版本仅获取固定目标目录。
    if(input.action==='Recipients'&&['Tenants','Editions'].includes(input.recipientScope||''))key=reminderEngine;
    const result=await execute(client,key,{Action:action,Id:input.id,Keyword:input.keyword,ScopeType:input.recipientScope==='Roles'?undefined:input.recipientScope||'Users',Kind:input.recipientScope==='Roles'?'Roles':'Users',ConfigId:input.configId,ChannelType:input.channelType,PageIndex:input.pageIndex,PageSize:input.pageSize});
@@ -79,9 +82,22 @@ export function registerMessageNotificationTools(server:McpServer,client:MicroiC
    return output({Code:readback.Code,Mutation:result,Readback:readback},readback.Code!==1);
   }catch{return uncertain();}
  });
- server.tool('microi_manage_system_reminder','在统一消息通知应用中校验、保存、发布或撤回系统公告。Save 只保存草稿；只有通过官方 License 身份判断的服务可选择 Editions，主租户可选择 Tenants。AccountScope 使用 SuperAdmins 或 AllAccounts，由接收服务按本地可信身份裁剪。AfterServerRestart 要求接收协议 2，每个帐号在每次 API 启动批次中领取一次。只有用户授权对应内容和接收范围后才发布。结果不确定时复用原 requestId；confirmExecution 为 <action>:<id 或 requestId>。',{
-  action:z.enum(['Validate','Save','Publish','Withdraw']).default('Validate'),id:z.string().regex(/^[a-f0-9]{32}$/).optional(),expectedRevision:z.number().int().min(1).optional(),requestId:requestId.optional(),rule:reminderRule.optional(),confirmExecution:z.string().optional()
+ server.tool('microi_manage_system_reminder','在统一消息通知应用中校验、保存、发布或撤回系统公告。Save 只保存草稿；只有通过官方 License 身份判断的服务可选择 Editions，主租户可选择 Tenants。AccountScope 使用 SuperAdmins 或 AllAccounts，由接收服务按本地可信身份裁剪。AfterServerRestart 要求接收协议 2，每个帐号在每次 API 启动批次中领取一次。只有用户授权对应内容和接收范围后才发布。结果不确定时复用原 requestId；confirmExecution 为 <action>:<id 或 requestId>。LicensePolicyValidate/LicensePolicySave 使用 scopeType=Editions/Tenants 和 policy={Personal:{AdvanceDays,Content},Enterprise:{AdvanceDays,Content}}；天数1-3650，空文案使用默认；保存需先读取 expectedRevision（首次0），确认串 LicensePolicySave:<scopeType>，保存成功自动回读。',{
+  action:z.enum(['Validate','Save','Publish','Withdraw','LicensePolicyValidate','LicensePolicySave']).default('Validate'),id:z.string().regex(/^[a-f0-9]{32}$/).optional(),expectedRevision:z.number().int().min(0).optional(),requestId:requestId.optional(),rule:reminderRule.optional(),scopeType:z.enum(['Tenants','Editions']).optional(),policy:expiryPolicy.optional(),confirmExecution:z.string().optional()
  },async input=>{
+  if(input.action.startsWith('LicensePolicy')){
+   if(!input.scopeType||!input.policy)return failed('授权提醒需要 scopeType 与 policy；官方 Editions 与主租户 Tenants 独立维护。');
+   const save=input.action==='LicensePolicySave',expected=`LicensePolicySave:${input.scopeType}`;
+   if(save&&input.expectedRevision===undefined)return failed('保存前必须查询 LicensePolicyGet 并传 expectedRevision，首次为 0。');
+   if(save&&input.confirmExecution!==expected)return preview(expected,input.action,input.scopeType);
+   try{
+    if(save)await client.writeAuditLog('microi_manage_system_reminder',input.scopeType,JSON.stringify({action:input.action,expectedRevision:input.expectedRevision}));
+    const result=await execute(client,reminderEngine,{Action:input.action,ScopeType:input.scopeType,Policy:input.policy,ExpectedRevision:input.expectedRevision});
+    if(result.Code!==1||!save)return output(result,result.Code!==1);
+    const readback=await execute(client,reminderEngine,{Action:'LicensePolicyGet',ScopeType:input.scopeType});
+    return output({Code:readback.Code,Mutation:result,Readback:readback},readback.Code!==1);
+   }catch{return uncertain();}
+  }
   if(['Validate','Save'].includes(input.action)&&!input.rule)return failed('校验和保存提醒必须提供 rule。');
   if(['Publish','Withdraw'].includes(input.action)&&(!input.id||input.expectedRevision===undefined))return failed('发布或撤回必须提供已回读的 id 和 expectedRevision。');
   if(input.action==='Save'&&input.id&&input.expectedRevision===undefined)return failed('编辑提醒必须提供 expectedRevision。');
