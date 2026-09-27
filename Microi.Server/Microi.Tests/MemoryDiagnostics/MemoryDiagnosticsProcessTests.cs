@@ -27,6 +27,16 @@ public sealed class MemoryDiagnosticsProcessTests
     }
 
     [Fact, Trait("Category", "FullStack")]
+    public async Task CriticalIncidentMySql_ReplayIsolationAndExhaustedBusinessPool()
+    {
+        Assert.True(!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_INCIDENT_TEST_MYSQL"))
+            || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_TEST_SCHEDULE_MYSQL")), "Full 事故持久化验收需要隔离 MySQL。");
+        var output = await RunFixtureAsync(TimeSpan.FromMinutes(3), "incident-acceptance", NewEvidenceDirectory());
+        Assert.Contains("\"Passed\":true", output, StringComparison.Ordinal);
+        Assert.Contains("\"NewProcessEmptyFilesystemRead\":true", output, StringComparison.Ordinal);
+    }
+
+    [Fact, Trait("Category", "FullStack")]
     public async Task MongoIncidentReplay_UsesCurrentTestServer()
     {
         RequireEnvironment("MICROI_TEST_MONGO_CURRENT");

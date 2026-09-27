@@ -22,7 +22,7 @@ public class LicenseAccountEntitlementTests
     [Theory]
     [InlineData("Personal", "Enterprise", "2036-09-14", 1)]
     [InlineData("Enterprise", "Enterprise", "2026-09-13", 1)]
-    [InlineData("Enterprise", "Enterprise", "", 1)]
+    [InlineData("Enterprise", "Enterprise", "invalid", 1)]
     [InlineData("Enterprise", "Enterprise", "2036-09-14", 121)]
     [InlineData("Enterprise", "Enterprise", "2036-09-14", -1)]
     [InlineData("Enterprise", "Unknown", "2036-09-14", 1)]
@@ -33,4 +33,20 @@ public class LicenseAccountEntitlementTests
     public void PersonalMayNotExtendUpdateServicesPastRuntime()
         => Assert.NotNull(LicenseAccountEntitlement.Resolve(User("Personal"), "Personal", Now.AddMonths(1),
             Now.AddMonths(2), Now, out _, out _, out _));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void UnsetAccountExpiryIsPermanentButEditionAndRequestedDatesRemainValidated(string? expiry)
+    {
+        Assert.Null(LicenseAccountEntitlement.Resolve(User("Enterprise", expiry!), "Enterprise", Now.AddYears(60), null, Now,
+            out _, out var end, out _));
+        Assert.Equal(Now.AddYears(60), end);
+        Assert.Null(LicenseAccountEntitlement.Resolve(User("Enterprise", expiry!), null, null, null, Now,
+            out _, out end, out _));
+        Assert.Equal(DateTime.MaxValue.Date, end.Date);
+        Assert.NotNull(LicenseAccountEntitlement.Resolve(User("Personal", expiry!), "Enterprise", Now.AddYears(1), null, Now,
+            out _, out _, out _));
+    }
 }

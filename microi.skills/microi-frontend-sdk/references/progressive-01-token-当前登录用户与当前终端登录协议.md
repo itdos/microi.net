@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-frontend-sdk-006 sha256=85694df371b7b889b5bf4aea5bc98d604232eb5c7b88b8a0eae8a26d70877009 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-006 sha256=6f779d619a24b1c03fb02efbc4bc25d41ce3254dbfbf1c63af137dcd9a45790b -->
 ## Token、当前登录用户与当前终端登录协议
 
 Microi 后端不是只保存一个全局 Token。每个租户、每个 `sys_user` 在 Redis 中维护一份 `CurrentToken`，其中 `CurrentUser` 表示平台当前登录用户，`Tokens` 表示该用户的多个当前终端登录。每个终端项至少包含 `Token`、`ClientType`、`Did`、`IP`、`CreateTime`、`UpdateTime`；退出、管理员清除登录信息、同终端重新登录或 Token 轮换都会影响该列表。

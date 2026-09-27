@@ -232,7 +232,7 @@
 
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import FolderTree from './components/FolderTree.vue'
@@ -242,8 +242,10 @@ import CadViewer from './components/CadViewer.vue'
 import FileSyncDialog from './components/FileSyncDialog.vue'
 import { fileManageApi } from './api'
 import { DiyCommon } from '@/utils/microi.net.import'
+import { createFileCabinetOfficeSession, isOfficeFileType, isOfficeHistoryPath } from '@/utils/office-document.js'
 
 const route = useRoute()
+const router = useRouter()
 // 只接受路由匹配后由权限菜单写入的 meta，绝不信任 query/params 中可手工修改的菜单 Id。
 const fileManagerSysMenuId = computed(() => String(route.meta?.Id || route.meta?.SysMenuId || ''))
 
@@ -554,7 +556,7 @@ function findFolderById(id, folderList = folders.value) {
 }
 
 const mapFolderRows = (rows = [], parentId = null) => (rows || [])
-  .filter(f => !isDeletedPath(f.FullPath, true))
+  .filter(f => !isDeletedPath(f.FullPath, true) && !isOfficeHistoryPath(f.FullPath))
   .map(f => ({
     id: f.FullPath,
     name: f.Name,
@@ -778,7 +780,7 @@ const loadFolderFiles = async (folderId) => {
       applyFolderChildren(folderId, result.Data.Folders || [])
 
       const fileList = (result.Data.Files || [])
-        .filter(f => !isDeletedPath(f.FullPath, false))
+        .filter(f => !isDeletedPath(f.FullPath, false) && !isOfficeHistoryPath(f.FullPath))
         .map(f => ({
           id: f.FullPath,
           name: f.Name,
@@ -881,6 +883,27 @@ const handleFolderContextAction = ({ action, folder }) => {
 }
 
 // 处理文件打开
+const openOfficeFile = (file) => {
+  if (!file?.filePath || !isOfficeFileType(file.type) || recycleMode.value) return false
+  if (!fileManagerSysMenuId.value) {
+    ElMessage.error('文件柜菜单上下文不可用，无法打开Office文档')
+    return true
+  }
+  const sessionKey = `microi-file-office-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const payload = createFileCabinetOfficeSession(file, {
+    limit: isPrivateBucket.value,
+    sysMenuId: fileManagerSysMenuId.value
+  })
+  try {
+    window.sessionStorage.setItem(sessionKey, JSON.stringify(payload))
+  } catch {
+    ElMessage.error('浏览器会话存储不可用，无法安全打开Office文档')
+    return true
+  }
+  router.push({ path: '/online-office', query: { officeSessionKey: sessionKey } })
+  return true
+}
+
 const handleFileOpen = (file) => {
   if (recycleMode.value) {
     if (file.isFolder) {
@@ -897,6 +920,7 @@ const handleFileOpen = (file) => {
     handleFolderSelect(file)
     return
   }
+  if (openOfficeFile(file)) return
   
   const fileType = file.type?.toLowerCase()
   const cadTypes = ['dwg', 'step', 'stp', 'dxf']
@@ -1215,8 +1239,10 @@ const handleContextMenuAction = ({ action, file }) => {
       handleFileOpen(file)
       break
     case 'preview':
-      previewFile.value = file
-      previewVisible.value = true
+      if (!openOfficeFile(file)) {
+        previewFile.value = file
+        previewVisible.value = true
+      }
       break
     case 'download':
       handleDownload(file)

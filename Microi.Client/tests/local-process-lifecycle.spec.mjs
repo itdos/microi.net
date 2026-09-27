@@ -63,7 +63,9 @@ function removeFixture(root) {
     assert.ok(ownedFixtures.has(root), '只能回收本用例创建的目录');
     assert.equal(path.dirname(path.resolve(root)), path.resolve(fixtureParent));
     assert.ok(path.basename(root).startsWith('microi-process-lifecycle-'));
-    fs.rmSync(root, { recursive: true, force: true });
+    // Windows can release an exited executable's file handle slightly after
+    // the process exit event. Retry only this test-owned fixture directory.
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     ownedFixtures.delete(root);
 }
 

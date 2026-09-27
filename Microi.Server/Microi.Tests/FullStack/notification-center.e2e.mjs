@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {chromium} from '../../../Microi.Client/node_modules/playwright/index.mjs';
+import {acknowledgeExistingReminders} from './platform-reminders.e2e.mjs';
 
 const required=name=>{const value=process.env[name]?.trim();if(!value)throw Error(`Notification regression requires ${name}`);return value;};
 assert.equal(required('MICROI_TEST_ALLOW_WRITES'),'YES');
@@ -15,6 +16,13 @@ try{
   const apiBase=(process.env[child?'MICROI_TEST_CHILD_API_BASE':'MICROI_TEST_API_BASE']||required('MICROI_TEST_API_BASE')).replace(/\/+$/,'');
   const context=await browser.newContext({ignoreHTTPSErrors:new URL(apiBase).hostname==='localhost',viewport:{width:1440,height:1000}});
   const page=await context.newPage();
+  const reminderEvents=[];
+  page.on('response',async response=>{
+   if(!response.url().includes('/apiengine/platform-reminder-runtime'))return;
+   const body=response.request().postData()||'';
+   let action;try{action=JSON.parse(body).Action;}catch{action=new URLSearchParams(body).get('Action');}
+   try{const result=await response.json();reminderEvents.push({action,status:response.status(),code:result.Code,at:new Date().toISOString()});}catch{}
+  });
   try{
    await page.route('**/api/SysUser/Login',route=>route.continue({postData:JSON.stringify({...route.request().postDataJSON(),_AutomationTestLogin:true})}));
    await page.goto(`${required('MICROI_TEST_FRONTEND_BASE')}/?OsClient=${encodeURIComponent(tenant)}&ApiBase=${encodeURIComponent(apiBase)}`,{waitUntil:'domcontentloaded',timeout:60000});
@@ -25,6 +33,8 @@ try{
    const loginPromise=page.waitForResponse(r=>r.url().includes('/api/SysUser/Login'));
    await page.getByRole('button',{name:/^登\s*录$/}).click();
    const login=await (await loginPromise).json();assert.equal(login.Code,1,'Real credential login must succeed');
+   // 官方启动提醒会正常遮挡后续操作；用真实按钮和回执确认，禁止 force click 或屏蔽提醒接口。
+   await acknowledgeExistingReminders(page);
    await page.locator('.task-entry[title="通知中心"]').click({timeout:60000});
    const endpoint=await page.evaluate(()=>window.__MICROI_RUNTIME_ENDPOINT__);
    assert.equal(endpoint.osClient.toLowerCase(),tenant.toLowerCase());
@@ -56,6 +66,11 @@ try{
     results.push({tenant,status:'Passed',scenario:'Notification center maintenance',taskId:result.Data.Id});
    }
    await page.screenshot({path:path.join(directory,`${child?'child':'main'}-notification.png`),animations:'disabled'});
+  }catch(error){
+   // 只保留动作、状态和可见页面，不记录 Header、Token 或登录请求体。
+   await page.screenshot({path:path.join(directory,`${child?'child':'main'}-notification-failure.png`),fullPage:true});
+   fs.writeFileSync(path.join(directory,`${child?'child':'main'}-notification-failure.json`),JSON.stringify({tenant,error:error.message,reminderEvents,visibleReminders:await page.locator('.mci-platform-reminder:visible').allTextContents()},null,2));
+   throw error;
   }finally{await context.close();}
  }
  assert.equal(results.length,2);

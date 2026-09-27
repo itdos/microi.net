@@ -81,6 +81,7 @@
 import DynamicOnlyOfficeEditor from "../diy-components/onlyoffice-base.vue";
 import { computed, getCurrentInstance } from "vue";
 import { useDiyStore } from "@/pinia";
+import { createOfficeDocumentKey } from "@/utils/office-document.js";
 import { Document, Download, View, WarningFilled } from "@element-plus/icons-vue";
 
 export default {
@@ -116,7 +117,9 @@ export default {
             serverUrl: "",
             editorConfig: {},
             editorInstance: null,
-            documentKeySeed: Date.now(),
+            fileCabinetMode: false,
+            fileCabinetPath: "",
+            fileCabinetLimit: true,
             filePath: "",
             fileName: "",
             fileType: "",
@@ -158,7 +161,8 @@ export default {
             return String(this.fileType || "").toLowerCase() === "pdf";
         },
         canSaveOffice() {
-            return this.canEdit && this.filePath && this.Load && this.getDocumentType(this.fileType) !== "pdf";
+            return this.canEdit && this.filePath && this.Load && this.getDocumentType(this.fileType) !== "pdf"
+                && (!this.fileCabinetMode || this.normalizeComparePath(this.sourceFilePath) === this.normalizeComparePath(this.fileCabinetPath));
         },
         saveButtonText() {
             return this.enableVersion ? "保存为新版本" : "保存文件";
@@ -186,7 +190,12 @@ export default {
         this.applyRoutePayload(sessionPayload || {});
         const canOpen = await this.validateOfficeAccess();
         if (!canOpen) return;
-        await this.loadOfficeFileMeta();
+        try {
+            await this.loadOfficeFileMeta();
+        } catch (error) {
+            this.previewError = error?.message || "文件柜版本信息读取失败";
+            return;
+        }
         await this.openCurrentFile();
     },
     beforeUnmount() {
@@ -242,6 +251,9 @@ export default {
             }
 
             this.sourceFilePath = sourceFilePath;
+            this.fileCabinetMode = this.parseBoolean(query.fileCabinetMode || payload.fileCabinetMode);
+            this.fileCabinetPath = this.safeDecode(payload.fileCabinetPath || query.fileCabinetPath || sourceFilePath);
+            this.fileCabinetLimit = this.parseBoolean(payload.fileCabinetLimit ?? query.fileCabinetLimit ?? isPrivate);
             this.sourceApiUrl = this.isApiEngineSource(routeFilePath) ? routeFilePath : "";
             this.isPrivate = isPrivate;
             this.hdfs = this.safeDecode(query.hdfs || query.HDFS || payload.hdfs || payload.HDFS || "");
@@ -482,6 +494,25 @@ export default {
             }
         },
         async loadOfficeFileMeta() {
+            if (this.fileCabinetMode) {
+                if (!this.isAuthenticated || !this.fileCabinetPath || !this.sysMenuId) {
+                    throw new Error("文件柜Office访问缺少登录身份或菜单上下文");
+                }
+                const result = await this.postJson("/api/HDFS/GetFileCabinetOfficeMeta", {
+                    FilePathName: this.fileCabinetPath,
+                    SysMenuId: this.sysMenuId,
+                    Limit: this.fileCabinetLimit
+                });
+                if (result?.Code !== 1 || !result.Data?.FileMeta) {
+                    throw new Error(result?.Msg || "文件柜Office版本信息读取失败");
+                }
+                // The server normalizes object keys; use its authoritative path
+                // so both the latest-version guard and subsequent saves agree.
+                this.fileCabinetPath = result.Data.FileMeta.OriginalPath;
+                this.enableVersion = true;
+                this.applyOfficeFileMeta(result.Data.FileMeta, { preferPath: this.fileCabinetPath });
+                return;
+            }
             if (!this.isAuthenticated || !this.formEngineKey || !this.formDataId || !this.fieldId || !this.DiyCommon?.Post) return;
             try {
                 const result = await this.postJson("/api/HDFS/GetOfficeFileMeta", {
@@ -579,7 +610,6 @@ export default {
         async reloadEditor() {
             const filePath = await this.resolvePreviewFilePath("");
             this.filePath = filePath;
-            this.documentKeySeed = Date.now();
             this.editorConfig = this.buildEditorConfig(filePath, this.GetCurrentUser || {});
             this.Load = false;
             await this.$nextTick();
@@ -641,6 +671,8 @@ export default {
         getFreshPrivateFileUrl(filePathName) {
             return this.postJson("/apiengine/platform-private-file-url", {
                 FilePathName: filePathName,
+                ResourceKind: this.fileCabinetMode ? "FileManagerObject" : undefined,
+                ResourceId: this.fileCabinetMode ? filePathName : undefined,
                 HDFS: this.hdfs || (this.SysConfig && this.SysConfig.HDFS) || "Aliyun",
                 FormEngineKey: this.formEngineKey,
                 FormDataId: this.formDataId,
@@ -660,7 +692,8 @@ export default {
         buildEditorConfig(filePath, currentUser) {
             if (!filePath) return {};
             const documentType = this.getDocumentType(this.fileType);
-            const allowEdit = this.canEdit && documentType !== "pdf";
+            const allowEdit = this.canEdit && documentType !== "pdf"
+                && (!this.fileCabinetMode || this.normalizeComparePath(this.sourceFilePath) === this.normalizeComparePath(this.fileCabinetPath));
             return {
                 width: "100%",
                 height: "100%",
@@ -690,12 +723,13 @@ export default {
             };
         },
         buildDocumentKey(filePath) {
-            const raw = `${this.sourceFilePath || filePath || ""}|${this.currentVersion || ""}|${this.documentKeySeed}`;
-            let hash = 0;
-            for (let i = 0; i < raw.length; i++) {
-                hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
-            }
-            return `document-${Math.abs(hash)}-${this.documentKeySeed}`;
+            return createOfficeDocumentKey({
+                tenant: this.OsClient,
+                bucket: this.fileCabinetMode ? (this.fileCabinetLimit ? "private" : "public") : "form",
+                path: this.sourceFilePath || filePath,
+                version: this.currentVersion,
+                updatedAt: this.officeFileMeta?.UpdateTime
+            });
         },
         getDocumentType(fileType) {
             const type = String(fileType || "").toLowerCase();
@@ -734,6 +768,7 @@ export default {
             });
             if (!selected) return;
             this.sourceFilePath = selected.Path || selected.FilePathName || "";
+            if (this.fileCabinetMode) this.isPrivate = this.parseBoolean(selected.Limit);
             this.fileName = selected.Name || selected.FileName || this.fileName;
             this.fileSize = selected.Size || selected.FileSize || this.fileSize;
             this.currentVersion = selected.Version || "";
@@ -805,9 +840,11 @@ export default {
             this.saveLoading = true;
             try {
                 const downloadUrl = await this.requestEditorDownloadUrl();
-                const result = await this.postJson("/api/HDFS/SaveOfficeDocument", {
+                const result = await this.postJson(this.fileCabinetMode
+                    ? "/api/HDFS/SaveFileCabinetOfficeDocument"
+                    : "/api/HDFS/SaveOfficeDocument", {
                     DownloadUrl: downloadUrl,
-                    FilePathName: this.sourceFilePath,
+                    FilePathName: this.fileCabinetMode ? this.fileCabinetPath : this.sourceFilePath,
                     FileName: this.fileName,
                     FileType: this.fileType,
                     Limit: this.isPrivate,
@@ -818,7 +855,8 @@ export default {
                     SysMenuId: this.sysMenuId,
                     _TableChildAuth: this.tableChildAuth || undefined,
                     EnableVersion: this.enableVersion,
-                    CurrentFileMeta: this.officeFileMeta
+                    CurrentFileMeta: this.officeFileMeta,
+                    ExpectedVersion: this.fileCabinetMode ? this.officeFileMeta?.Version : undefined
                 });
                 if (!((this.DiyCommon.Result && this.DiyCommon.Result(result)) || result?.Code === 1)) {
                     throw new Error(result?.Msg || "保存失败");
@@ -840,6 +878,7 @@ export default {
                 this.syncRouteState();
                 document.title = this.fileName ? `${this.fileName} - 在线文档` : document.title;
                 this.DiyCommon?.Tips?.(this.enableVersion ? "已保存为新版本" : "文件已保存", true);
+                await this.reloadEditor();
             } catch (error) {
                 this.DiyCommon?.Tips?.(error?.message || "文件保存失败", false);
             } finally {
@@ -904,7 +943,10 @@ export default {
                 tableChildAuth: this.tableChildAuth,
                 canEdit: this.canEdit,
                 enableOfficeVersion: this.enableVersion,
-                fileMeta: this.officeFileMeta
+                fileMeta: this.officeFileMeta,
+                fileCabinetMode: this.fileCabinetMode,
+                fileCabinetPath: this.fileCabinetPath,
+                fileCabinetLimit: this.fileCabinetLimit
             };
         },
         syncRouteState() {
@@ -929,6 +971,9 @@ export default {
                 isPrivate: this.isPrivate ? "1" : "0",
                 canEdit: this.canEdit ? "1" : "0",
                 enableOfficeVersion: this.enableVersion ? "1" : "0",
+                fileCabinetMode: this.fileCabinetMode ? "1" : "0",
+                fileCabinetPath: this.fileCabinetPath || undefined,
+                fileCabinetLimit: this.fileCabinetLimit ? "1" : "0",
                 officeSessionKey: sessionKey
             };
             delete query.filePath;
