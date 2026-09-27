@@ -37,6 +37,13 @@ description: Microi 模块引擎与 sys_menu 配置指南。用于创建或修�
 5. 同一次创建配齐业务按钮、FormBtns、PageTabs 和批量按钮。
 6. 写后回读模块，检查字段映射、按钮 JSON、路由和目标页面。
 
+### 菜单图标必须可辨识（强制）
+
+- 每个新建或修改的菜单都必须设置与业务相关的图标；根目录、分类及子菜单不能批量使用同一个默认图标。优先按名称和实际功能选择，例如客户用 `UserFilled`、日程用 `Calendar`、仓储用 `Box`、办公用 `OfficeBuilding`。
+- 主后台侧栏读取 `sys_menu.IconClass`（CSS/组件图标），不是图片字段 `Icon`。优先填写当前前端已注册的 Element Plus 图标名；使用 FontAwesome/CSS 名称时先核对兼容映射，不能填入不存在的类名后让全部菜单回退为 `Document`。
+- 没有贴切图标时，从实际可用图标集合中随机选一个，并将选择结果保存；可以按稳定菜单 Id 生成确定的随机分配，避免每次刷新或重新发布都变图标。同组菜单应有适当差异，不强求不同业务绝对不重复。
+- 通过 `microi_create_module` / `microi_update_module` 或 Manifest 的模块配置写入，并把图标纳入应用包。只修改图片字段、只检查数据库字符串或只改本地 Manifest 不算完成；必须回读 `IconClass`，在真实侧栏检查图标可见且有区别。
+
 ### 新模块表单打开方式（强制默认）
 
 - AI 新建 `diy_table` / 业务模块时，`FormOpenType` 默认写 `Dialog`，`FormOpenWidth`
@@ -65,6 +72,13 @@ description: Microi 模块引擎与 sys_menu 配置指南。用于创建或修�
 
 普通状态、开关等低基数字段不能机械创建单列索引。只有真实查询、关联、唯一约束
 或扫描需要的索引才进入 Manifest 并通过 MCP 创建、回读。
+
+Manifest 中按字段名声明统计列，使用 `statFields` 或 `statisticsFieldNames`，例如
+`statFields: ['Amount', 'Quantity']`；MCP 会解析目标租户的字段 Id。
+`statisticsFields` / `StatisticsFields` 表示已经转换好的原生 JSON，元素为
+`{ Id: '真实 diy_field.Id', Type: 'Sum' }`，不能填字段名称字符串。发布前用有记录的
+实际列表检查 `DataAppend.StatisticsFields` 及页面汇总，再以无权限账号检查汇总范围；
+HTTP 成功或菜单字段非空不足以证明统计有效。
 
 ## AI 模块视觉交付门禁（强制）
 
@@ -105,6 +119,9 @@ description: Microi 模块引擎与 sys_menu 配置指南。用于创建或修�
 | `SecondMenu` | 仅作为父菜单 |
 | `Report` | 虚拟报表 |
 | `MicroService` | 已发布前端微服务页面 |
+| `CodeForm` | 表单设计器生成并在已发布微服务中运行的独立 Vue 3 页面；必须绑定 `DiyTableId` |
+
+`CodeForm` 复用 MicroService 宿主与菜单权限上下文。先在表单设计器生成源码，保存至 `microi-generated-forms`，构建并发布微服务；再配置 `MicroServiceKey + MicroServiceRoutePath`（以及当前租户真实的 `MicroServiceId + MicroServicePageId`），保留原表的 `DiyTableId`。Manifest 生成器可解析可移植的 Key/RoutePath；`microi_create_module` 必须传实际 Id。不能把只保存私有源码当作已发布运行产物。
 
 Iframe 不把长期 Token、密码或连接串放 URL。第三方单点登录使用短期、一次性、
 可撤销的服务端交换票据，限制 redirect/scope，并在落地后清理地址栏。

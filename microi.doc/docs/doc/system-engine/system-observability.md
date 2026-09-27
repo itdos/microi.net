@@ -30,6 +30,36 @@
 
 ![系统日志/监控总览](/images/system-observability/overview-navigation.png)
 
+## API 排队与容器重建后的事故证据
+
+升级包含 `critical-incidents/mysql-v1` 的 API，并安装新版【系统日志/监控】应用后，
+关键事故保存到当前租户主库的 `mci_runtime_incident`。不要求 API 能写容器外目录。
+普通日志仍使用 MongoDB；完整分配栈仍由诊断文件与 MongoDB 保存。
+
+| 入口/字段 | 如何判断 |
+|---|---|
+| `Memory.RequestWaits.Groups` | 按租户、接口、阶段和外部目标汇总；`Gate:V8Tenant` 表示等待本租户名额 |
+| `Samples / Recent` | 查看 TraceId、执行 Id、当前等待时长或完成结果；注册溢出及省略计数必须同时核对 |
+| 事故 `WaitEvidence` | 保留并发峰值、最长等待样本和 `WorstThreadPoolFrame`；恢复后的空快照不抹掉现场。各分组按自己的 `ObservedAtUtc` 判断，不能相加为同时发生的总数 |
+| `Evidence.CriticalStorage` | `Scope=CurrentNodeAllLoadedTenants` 表示当前节点全部已加载租户的写库状态；`AcknowledgedWrites`、`LastAcknowledgedAtUtc` 是节点级确认，必须读回当前租户的 MySQL 事故验证归属；`Pending` 不是已保存 |
+| `MemoryIncidents.RelationalStorage` | MySQL 查询状态独立于 MongoDB；Mongo 不可用仍可查已确认关键证据 |
+| `StorageKind=MySqlCriticalEvidence` | 当前详情来自 MySQL，`RawStacksStoredHere=false`；检查 `EvidenceTruncated` |
+
+外部目标只保存协议、主机、端口和路径 SHA-256，不保存查询、路径明文、请求头、正文或凭据。
+`AwaitingHttpCompletion` 包含连接、服务端处理和接收，不能直接断言是 DNS、TCP 或对方内部故障。
+Admission 数量与 HTTP 调用数量不能相加成线程数。持续等待 10 秒只触发留证，600 秒默认超时和显式长超时不变。
+
+采样与 MySQL 写入各使用独立线程。数据库最多两个并发无池连接，连接/命令各 2 秒；
+写入失败按租户退避 10 秒，避免同一故障数据库的每条记录重复占用连接等待。待写队列最多 64 个事故，每租户最多 8 个并合并新快照；全局满时优先从占用最多的租户释放旧快照，让新租户仍可留证。`RetryingTenants` 表示退避中的租户数量，`DroppedSnapshots` 包含容量替换或拒绝，未确认文件仍可重放。单条关键证据最多 256 KiB；
+持久目录中的事故由独立写库线程每 10 秒分批重放，使用单独的 MySQL 版本确认文件；Mongo 的写入确认不代替 MySQL 确认。重启后继续补写，`SpoolReplayError` 表示本地重放异常。
+每租户保留 14 天或最新 512 条。记录带租户幂等键和版本，旧节点重放不能覆盖较新证据。
+新表和索引由官方应用包安装，运行时不自动建表；`MySqlError:1146` 时先检查应用是否已更新。
+当前关系库后备支持 MySQL，其他驱动明确报告不支持，继续保留既有 Mongo/WAL 通路。
+
+**持久化边界**：API 容器重建不会删除 MySQL 已确认记录。尚在内存队列、MySQL 与 Mongo
+同时不可用、数据库自身磁盘丢失或采样前强杀仍可能缺证；这不等于零丢失保证。
+没有持久日志卷时，原始 EventPipe 片段仍会丢失，不能把关键证据称为完整调用栈。
+
 ## 内存吃满与异常退出定位
 
 “内存与事故”使用独立于 V8 资源限制的诊断采集。`V8Limit=0/false` 继续允许复杂业务执行，采集器不会终止脚本，也不会替业务设置内存或语句限额。仅打开前端页面、升级微服务或开启 V8 限制，都不能代替升级包含诊断运行时的 API。

@@ -5,6 +5,20 @@
 ![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## 模块配置
 
+### 菜单图标
+
+侧栏的 CSS/组件图标配置在 `sys_menu.IconClass`，图片字段 `Icon` 不能代替它。优先选择已注册的 Element Plus 图标名，如客户用 `UserFilled`、日程用 `Calendar`、仓储用 `Box`、办公用 `OfficeBuilding`；FontAwesome 名称必须在当前前端兼容映射内，否则会显示默认文档图标。
+
+为每个菜单选择符合业务的图标。没有相关图标时，从可用图标集合随机选择并保存，避免全部菜单相同，也避免每次刷新改变。MCP 使用 `microi_update_module` 的 `module.IconClass` 更新，回读字段后还需在实际侧栏检查；发布应用时一并打包，保证安装后保留。
+
+### 统计列的字段映射
+
+通过 MCP Manifest 配置金额或数量统计时，按字段名填写 `statFields: ['Amount', 'Quantity']`
+（也支持 `statisticsFieldNames`），由 MCP 转换为当前租户的字段 Id。
+原生 `StatisticsFields` 则保存 `[{"Id":"真实字段Id","Type":"Sum"}]`，不能直接写
+`["Amount"]`，否则列表可能有数据而汇总为空。配置后应检查真实列表的
+`DataAppend.StatisticsFields` 和页面汇总，并验证撤销权限后统计也受数据范围限制。
+
 ### 导入与导出按钮显示条件
 
 更新“模块引擎”应用后，在模块设计的【按钮】分组配置 `ImportCodeShowV8`、`ExportCodeShowV8`。
@@ -341,6 +355,21 @@ PC 可继续兼容历史按钮 V8，但跨端视图只向小程序输出规范�
 ## 打开方式
 ### **Diy**
 >* 以表单引擎渲染，打开是一个表格
+
+### **CodeForm**
+
+由表单设计器生成独立 Vue 3 页面，在已构建并发布的 MicroService 中运行。菜单仍绑定原 `DiyTableId`，同时填写 `MicroServiceId`、`MicroServicePageId`、`MicroServiceKey` 和 `MicroServiceRoutePath`；宿主将真实 `sysMenuId` 传给页面，生成页以 `_SysMenuId` 调用 FormEngine。不能用未发布的源码或无权限的直链替代菜单入口。
+
+```json
+{
+  "OpenType": "CodeForm",
+  "DiyTableId": "原表 Id",
+  "MicroServiceKey": "microi-generated-forms",
+  "MicroServiceRoutePath": "/forms/biz_order"
+}
+```
+
+MCP Manifest 可通过 `microServiceKey + microServiceRoutePath` 解析当前租户的两个微服务 Id；使用 `microi_create_module` 时需传入已回读的 `microServiceId` 和 `microServicePageId`。升级模块引擎官方应用后才会出现该选项。设计器保存 Vue 源码后，还需构建、发布微服务，再切换菜单；已有人工作码时需手工合并，设计器不会覆盖。
 
 ### **Component**
 >* 以定制vue组件打开，需要填写定制组件路径

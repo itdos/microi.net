@@ -1144,6 +1144,10 @@ function runDataSetImportFixture(options = {}) {
     V8: {
       OsClient: "target-tenant",
       FormEngine: {
+        GetTableData(tableName) {
+          assert.equal(tableName, 'diy_field');
+          return { Code: 1, Data: [], DataCount: 0 };
+        },
         GetFormData(tableName, query) {
           if (tableName === "diy_table") return { Code: 1, Data: { Id: "table-id", Name: "diy_schedule_job" } };
           if (query && query.Id) {

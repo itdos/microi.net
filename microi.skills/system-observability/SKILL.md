@@ -140,6 +140,18 @@ UnblockIp:<ip>
 7. 执行累计分配和 EventPipe 抽样不是存活堆或 RSS；父执行包含子调用，不能相加或把最高分配者直接宣布为唯一根因。CLR 栈关联脚本哈希和资源身份，不保证 JavaScript 行号。
 8. MongoDB 驻留内存、WiredTiger 缓存和日志库存储空间分开解释；磁盘大小不能当作进程 RAM。未正常退出只说明检查点未完成正常关闭，不单独证明 OOM。
 
+## 关键事故 MySQL 持久化与等待归因
+
+- 包含 `critical-incidents/mysql-v1` 的后端将关键事故异步直写当前租户主库 `mci_runtime_incident`，不依赖本地写文件或 Mongo 成功。表和索引必须由【系统日志/监控】官方应用安装；不新增启动 DDL 或环境开关。
+- 持久目录中的事故由独立写库线程每 10 秒分批补写 MySQL，重启后继续；MySQL 版本确认文件与 Mongo 的 `.ack` 独立。核对 `SpoolReplayError`，未挂持久卷且尚未写库的内存队列不在重启恢复保证内。
+- `Memory.RequestWaits` 包含按接口/阶段/目标的 Groups、活动 Samples 和 Recent。HTTP 目标只有主机/端口与路径哈希，不采路径明文、参数或凭据；TraceId 关联执行。Admission 与 Http 是不同计数，不能相加成工作线程数。
+- 事故 `WaitEvidence` 保留分组并发峰值、最长请求样本及最差线程池帧，恢复后的空快照不覆盖现场。各分组 `ObservedAtUtc` 可能不同，不能相加为同一时刻并发量；DiscardedGroups/DiscardedSamples 和 EvidenceTruncated 表示有界取证缺口。
+- `Gate:V8Tenant` 表示租户闸门等待；`AwaitingHttpCompletion` 包含连接/远端处理/接收，不虚构 DNS/TCP 分段。等待超过 10 秒只留证，不改 600 秒默认与显式长超时。
+- 核对 `Evidence.CriticalStorage` 的 AcknowledgedWrites、LastAcknowledgedAtUtc、Pending、DroppedSnapshots、Error；Scope=CurrentNodeAllLoadedTenants 表示这些是节点全部已加载租户的合计，不能据此断言当前租户已写库，必须回读该租户的 MySQL 事故。只有已确认写入才能宣称可跨容器重建读取。MySqlError:1146 提示先核对应用表升级。关系库后备当前仅支持 MySQL，其他驱动明确降级，不能说全部数据库已验收。
+- MySQL 详情标记 `StorageKind=MySqlCriticalEvidence`、RawStacksStoredHere=false；EvidenceTruncated 和 RequestWaits 省略/溢出计数必须报告。MemoryIncidents/MemoryIncident 分别报告 RelationalStorage 与 SharedStorage，Mongo 失败不能掩盖 SQL 成功。
+- 采样与写库使用独立线程。最多 2 个无池连接，连接/命令各 2 秒；失败按租户退避 10 秒。全局最多 64 个合并待写快照，每租户最多 8 个；全局满时从占用最多的租户释放旧快照，新租户仍可进入。核对 MaximumTenantPending、RetryingTenants 与 DroppedSnapshots；容量替换不等于写库确认，旧 spool 不得挤出较新现场。每条 256 KiB、每租户 14 天或最新 512 条，旧快照不能覆盖新证据。
+- 必测：目录不可写 + Mongo 不可用时仍写 MySQL、业务连接池耗尽、单个或多个故障租户填满队列时健康租户仍可写入、跨节点与租户隔离、旧快照重放、线程池饥饿、容器删除后新节点查询。原始栈仍需持久卷；数据库同时故障与尚未确认的强杀窗口不承诺零丢失。
+
 ## 内存事故留证规范
 
 处理内存吃满、OOM、异常分配、长循环或重启丢日志时，必须继续读取 [内存事故排查手册](references/memory-incident-triage.md)，按字段与证据质量完成归因，不得仅返回一个热点排行。

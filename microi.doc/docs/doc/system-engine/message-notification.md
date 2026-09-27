@@ -113,7 +113,17 @@
 | `mci_platform_reminder_target` | 发布记录与用户、租户或产品版本的映射；全部范围仅保存一条通配映射 |
 | `mci_platform_reminder_receipt` | 当前租户、当前用户的领取与关闭回执；`ShownAt / ClosedAt` 区分已领取与已关闭，稳定主键完成去重 |
 
-`platform-reminder-runtime` 提供 `Capabilities / Recipients / List / Get / Validate / Save / Publish / Withdraw / History / Inbox / Presented / Acknowledge`。管理员身份和租户从真实 DiyToken 重新验证，客户端不能传入用户或官方标志代替授权。管理表不开放普通客户端直接 CRUD；发布状态、快照和接收范围在同一 `V8.DbTrans` 事务中提交。最小发布示例：
+### 授权到期提醒
+
+在“消息通知 → 授权到期提醒”分别设置个人版、企业版的提前天数和文案。官方服务可配置“吾码官方授权提醒”，主租户可配置“子租户授权提醒”；未配置时提前 7 天并使用默认文案。支持 `{版本}`、`{到期时间}`、`{倒计时}` 占位符；倒计时精确到分钟，未填写占位符时自动附加。日期为 UTC，提前天数范围为 1–3650。
+
+接收端先检查固定 `https://api.itdos.com` 官方策略，再独立检查主租户策略，两条提醒可同时出现。网络暂时不可用使用默认策略；主租户配置不覆盖官方授权提醒。每次真实登录重新提醒；未确认时刷新仍显示；“我知道了”写入当前登录的回执。“查看授权”在系统内跳转，不确认已读。授权提醒标题为红色，右上角付费版本标签在剩余不足 7 天时每秒更新倒计时，这个固定显示窗口独立于提醒天数设置。
+
+“仅超级管理员”按当前租户有效用户的 `Level >= 9999` 及有效管理员角色核验，不限于 `admin` 帐号。普通用户和请求伪造的 Level 无法取得管理员提醒。
+
+此能力需同时升级平台前后端、SaaS 引擎与消息通知应用。策略保存在当前租户 `mci_platform_reminder` 中，不随应用升级覆盖。接口动作 `LicensePolicyGet / LicensePolicyValidate / LicensePolicySave` 使用 `ScopeType=Editions`（仅官方）或 `Tenants`（仅主租户）；保存携带读取到的 `ExpectedRevision`，首次为 0，成功后回读。MCP 可通过 `microi_get_notification_context` 的 `LicensePolicyGet` 查询，使用 `microi_manage_system_reminder` 的对应动作维护，保存确认串为 `LicensePolicySave:<范围>`。
+
+`platform-reminder-runtime` 还提供 `Capabilities / Recipients / List / Get / Validate / Save / Publish / Withdraw / History / Inbox / Presented / Acknowledge`。管理员身份和租户从真实 DiyToken 重新验证，客户端不能传入用户或官方标志代替授权。管理表不开放普通客户端直接 CRUD；发布状态、快照和接收范围在同一 `V8.DbTrans` 事务中提交。最小发布示例：
 
 ```js
 // 先通过管理界面或 Save 保存草稿，重复请求使用相同 RequestId。

@@ -6,9 +6,11 @@ Microi 吾码在线 AI 引擎已内置“**大模型关键词扩展 → 当前�
 `Ollama + nomic-embed-text + Qdrant` 继续作为可选的模糊语义召回增强。只有确实需要处理大量别名、行业术语或描述非常模糊的问题时才建议启用。未启用时平台绝不连接、初始化、同步或搜索向量库；显式启用但连接失败时，平台会安全回退到关键词 Schema 检索。
 :::
 
-::: tip 两个独立培训专题
+::: tip AI 能力专题
 - [AI 数据分析](./ai-data-analysis)：自然语言提问、权限感知 Schema、NL2SQL、经营结论与真实移动端预览。
 - [AI 创作中心](./ai-creative-studio)：AI 图片、视频、声音与音乐创作，以及完整 29 项图像工具。
+- [自建数字人直播](./digital-human-live)：本机模型、话术和问答知识、OBS 接入与 4K 功能截图。
+- [AI 员工中心与吾码小龙虾](./ai-employee-center)：十岗团队、任务依赖、持久执行、成果验收和 OpenClaw 节点。
 :::
 
 ## 📸 预览图
@@ -30,6 +32,10 @@ AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Mic
 - `Microi.Core` 只保存跨模块接口与请求/响应模型。`Microi.AI` 通过 `AddMicroiAI()` 自注册领域服务和生命周期任务；API 宿主不应感知 Ollama、Qdrant、Embedding 或 Schema 索引实现。
 
 这一边界同时适用于 Controller、SignalR Hub、后台初始化和未来 Tool Gateway。新增 AI 入口时应先扩展 `IMicroiAI` 或 `Microi.AI` 内的专用服务，再由接口层做薄委托，不能把业务逻辑复制到 Controller。
+
+## 自建数字人直播：本机免费推理 {#self-hosted-digital-human-live}
+
+通过应用商城的 **自建数字人直播**（`digital-human-live`），吾码管理话术与知识，中文语音、文字问答和口型画面由用户自己的电脑生成。独立专题包含五张 4K 功能截图、本机部署、OBS 接入和已验证的音画边界：[查看自建数字人直播](./digital-human-live)。
 
 ## 授权边界：服务器 License 与中转 ApiKey 是两套机制
 

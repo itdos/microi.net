@@ -77,6 +77,20 @@ function run(storeRows, options = {}) {
     Db: {
       FromSql(sql) {
         queries.push(sql)
+        if (/FROM\s+sys_role\b/i.test(sql)) {
+          if (options.roleReadFailure) throw new Error('role catalog unavailable')
+          return { ToArray: () => options.templateRoles || [
+            { Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 9999, IsDeleted: 0 },
+            { Id: '949b2e88-cfa1-44cd-b234-85f043785ece', Level: 0, IsDeleted: 0 }
+          ] }
+        }
+        if (/FROM\s+sys_dept\b/i.test(sql)) {
+          if (options.departmentReadFailure) throw new Error('department catalog unavailable')
+          return { ToArray: () => options.templateDepartments || [
+            { Id: '933da282-adf7-4b1d-90f9-bfad70dae3a5', IsDeleted: 0 },
+            { Id: 'b4612bd0-f318-40f3-a620-547fa3e9cbc2', IsDeleted: 0 }
+          ] }
+        }
         // 安装记录与商城定义是不同读边界，模拟器不能用商城行冒充已安装应用。
         if (/FROM\s+sys_microistoreversion\b/i.test(sql)) {
           return { ToArray: () => options.installedRows || [] }
@@ -444,7 +458,7 @@ test('owned print API references and standard page routes are cleaned without re
 })
 
 test('ordinary application declarations cannot claim physical page print or workflow engine tables', () => {
-  const names = ['mic_page', 'mic_print', 'wf_flowdesign', 'wf_node', 'wf_line', 'sys_microistore_package']
+  const names = ['mic_page', 'mic_print', 'wf_flowdesign', 'wf_node', 'wf_line', 'sys_microistore_package', 'sys_role', 'sys_dept', 'sys_userfk']
   const { result } = run([{ Id: 'business', AppKey: 'business', ApplicationType: 'Regular', AppPakcet: JSON.stringify({ DiyTables: names.map(Name => ({ Name })) }) }], { menuPages: [[]] })
   assert.equal(result.Code, 1)
   assert.deepEqual(result.Data.ApplicationOwnedTables, [])
@@ -463,4 +477,84 @@ test('application HDFS package indices are removed before stores without purging
   const absent = run([], { optionalTables: [] }).result
   assert.equal(absent.Code, 1)
   assert.doesNotMatch(absent.Data.Sql, /DELETE p FROM sys_microistore_package p/)
+})
+
+test('empty template retains only canonical roles and rebuilds admin/demo role snapshots', () => {
+  const { result } = run([])
+  assert.equal(result.Code, 1)
+  assert.deepEqual(result.Data.TemplateRoleIds, [
+    '5db47859-35a3-411a-a1f7-99482e057d24', '949b2e88-cfa1-44cd-b234-85f043785ece'
+  ])
+  const sql = result.Data.Sql
+  assert.match(sql, /DELETE FROM sys_role WHERE Id NOT IN \('5db47859-35a3-411a-a1f7-99482e057d24','949b2e88-cfa1-44cd-b234-85f043785ece'\);/)
+  assert.match(sql, /RoleIds=CASE WHEN LOWER\(Account\)='admin' THEN '\[\{"Id":"5db47859-35a3-411a-a1f7-99482e057d24","Name":"超级管理员","Level":9999\}\]'/)
+  assert.match(sql, /ELSE '\[\{"Id":"949b2e88-cfa1-44cd-b234-85f043785ece","Name":"演示角色","Level":0\}\]'/)
+  assert.match(sql, /RolePermissionDetails='\[\]', DeptIds='\[\]'/)
+  assert.match(sql, /BaseLimit=CASE WHEN Id='949b2e88-cfa1-44cd-b234-85f043785ece' THEN '\["OnlyGet"\]'/)
+  assert.match(sql, /LEFT JOIN sys_role r ON r.Id=rl.RoleId[\s\S]*WHERE r.Id IS NULL/)
+  assert.match(sql, /LEFT JOIN diy_table t ON t.Id=rl.FkId[\s\S]*LOWER\(COALESCE\(rl.Type,''\)\)='table' AND t.Id IS NULL/)
+  assert.ok(sql.lastIndexOf('EMPTY_DATABASE_ROLE_PERMISSION_RESIDUE_V1') > sql.lastIndexOf("delete from sys_menu where"))
+})
+
+test('missing, deleted, elevated demo or unreadable canonical role rejects incomplete empty template', () => {
+  for (const options of [
+    { roleReadFailure: true },
+    { templateRoles: [] },
+    { templateRoles: [{ Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 9999, IsDeleted: 0 }] },
+    { templateRoles: [
+      { Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 9999, IsDeleted: 0 },
+      { Id: '949b2e88-cfa1-44cd-b234-85f043785ece', Level: 9999, IsDeleted: 0 }
+    ] },
+    { templateRoles: [
+      { Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 9999, IsDeleted: 1 },
+      { Id: '949b2e88-cfa1-44cd-b234-85f043785ece', Level: 0, IsDeleted: 0 }
+    ] }
+  ]) {
+    const { result } = run([], options)
+    assert.equal(result.Code, 0)
+    assert.match(result.Msg, /初始角色/)
+    assert.equal(result.Data?.Sql, undefined)
+  }
+})
+
+test('orphan installations require a retained platform identity, never a name or loose prefix', () => {
+  const { result } = run([], { optionalTables: ['sys_microistoreversion', 'sys_appinstalled'] })
+  assert.equal(result.Code, 1)
+  const sql = result.Data.Sql
+  assert.match(sql, /CREATE TEMPORARY TABLE IF NOT EXISTS temp_core_apps/)
+  assert.match(sql, /DELETE iv FROM sys_microistoreversion iv\s+LEFT JOIN temp_core_apps p/)
+  assert.match(sql, /COALESCE\(iv.StoreId,''\)<>'' AND iv.StoreId=p.Id/)
+  assert.match(sql, /COALESCE\(iv.StoreId,''\)='' AND iv.AppId<>'' AND iv.AppId IN \(p.Id,p.AppId,p.AppKey\)/)
+  assert.match(sql, /WHERE p.Id IS NULL OR COALESCE\(iv.IsDeleted,0\)<>0;/)
+  assert.match(sql, /DELETE ai FROM sys_appinstalled ai\s+LEFT JOIN temp_core_apps p/)
+  assert.match(sql, /DROP TEMPORARY TABLE temp_core_apps;/)
+  const absent = run([], { optionalTables: [] }).result
+  assert.doesNotMatch(absent.Data.Sql, /DELETE iv FROM sys_microistoreversion iv|DELETE ai FROM sys_appinstalled ai/)
+})
+
+test('empty template rebuilds a minimal organization and user department names without legacy account links', () => {
+  const { result } = run([], { optionalTables: ['sys_userfk'] })
+  assert.equal(result.Code, 1)
+  assert.deepEqual(result.Data.TemplateDepartmentIds, ['933da282-adf7-4b1d-90f9-bfad70dae3a5', 'b4612bd0-f318-40f3-a620-547fa3e9cbc2'])
+  assert.match(result.Data.Sql, /DELETE FROM sys_dept WHERE Id NOT IN \('933da282-adf7-4b1d-90f9-bfad70dae3a5','b4612bd0-f318-40f3-a620-547fa3e9cbc2'\);/)
+  assert.match(result.Data.Sql, /DeptId='b4612bd0-f318-40f3-a620-547fa3e9cbc2', DeptName='默认部门', DeptIds='\[\]'/)
+  assert.match(result.Data.Sql, /THEN '默认组织' ELSE '默认部门' END/)
+  assert.match(result.Data.Sql, /DELETE FROM sys_userfk;/)
+  const absent=run([], { optionalTables: [] }).result
+  assert.doesNotMatch(absent.Data.Sql, /DELETE FROM sys_userfk;/)
+})
+
+test('missing, deleted or unreadable canonical department prevents publishing a broken organization', () => {
+  for (const options of [
+    { departmentReadFailure: true }, { templateDepartments: [] },
+    { templateDepartments: [
+      { Id: '933da282-adf7-4b1d-90f9-bfad70dae3a5', IsDeleted: 0 },
+      { Id: 'b4612bd0-f318-40f3-a620-547fa3e9cbc2', IsDeleted: 1 }
+    ] }
+  ]) {
+    const { result }=run([],options)
+    assert.equal(result.Code,0)
+    assert.match(result.Msg,/初始组织/)
+    assert.equal(result.Data?.Sql,undefined)
+  }
 })

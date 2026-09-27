@@ -56,3 +56,26 @@ test('portable MicroService menu resolves tenant-specific service and page ids',
     MicroServiceKey: 'ai-platform-studio',
   });
 });
+
+test('CodeForm menu keeps its table binding and resolves a published Vue page', async () => {
+  const codeForm = {
+    name: '订单代码页', table: 'Biz_Order', openType: 'CodeForm',
+    microServiceKey: 'microi-generated-forms', microServiceRoutePath: '/forms/biz_order',
+  };
+  const plan = buildPlan({ modules: [codeForm] });
+  assert.deepEqual(plan.errors, []);
+  const binding = await resolveMicroServiceModuleBinding({
+    async getMicroService() {
+      return { Code: 1, Msg: 'ok', Data: {
+        Service: { Id: 'service-1', MsKey: 'microi-generated-forms' },
+        Pages: [{ Id: 'page-1', RoutePath: '/forms/biz_order' }],
+      } };
+    },
+  }, codeForm);
+  assert.equal(binding?.OpenType, 'CodeForm');
+  assert.equal(binding?.MicroServicePageId, 'page-1');
+  await assert.rejects(
+    resolveMicroServiceModuleBinding({ getMicroService: async () => ({ Code: 1, Msg: 'ok', Data: {} }) }, { ...codeForm, table: '' }),
+    /必须绑定真实 diy_table/,
+  );
+});

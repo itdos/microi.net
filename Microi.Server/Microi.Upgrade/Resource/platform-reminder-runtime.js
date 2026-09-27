@@ -10,12 +10,11 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-reminder-runtime
- * Version: v1.0.7
+ * Version: v1.1.0
  * Function:
- * - 统一系统公告的草稿、校验、发布快照、计划和回执；支持可信帐号范围及每次后端重启后的首次登录展示，采用稳定请求与数据库唯一领取，事务失败不重复发布。
+ * - 统一平台公告、授权到期策略和持久化回执；官方与主租户分别配置个人版/企业版文案和提前天数，按可信授权时间独立计算每次登录提醒。
  */
 
-// 平台提醒的纯业务规则；生成器将此文件原样嵌入 Managed 运行时，Node 回归执行同一份代码。
 function createPlatformReminderModel() {
   // 参数只用于业务规则，身份、租户、官方授权必须来自宿主可信 Context。
   function text(value) { return String(value == null ? '' : value).trim(); }
@@ -138,7 +137,45 @@ function createPlatformReminderModel() {
   return { normalize: normalize, occurrence: occurrence, matches: matches, acceptsAccount: acceptsAccount, project: project, list: list };
 }
 
+
+// 文案与时间编排属于 Managed 接口引擎；期限及身份只能来自宿主可信上下文。
+function createLicenseExpiryModel() {
+  function normalize(input) {
+    var result = {};
+    ['Personal', 'Enterprise'].forEach(function(edition) {
+      var value = input && input[edition] || {}, days = value.AdvanceDays == null ? 7 : Number(value.AdvanceDays);
+      if (!isFinite(days) || Math.floor(days) !== days || days < 1 || days > 3650) throw new Error('提前提醒天数必须是 1 到 3650 的整数。');
+      var content = String(value.Content || '').trim();
+      if (content.length > 8000) throw new Error('授权提醒文案最多 8000 字。');
+      result[edition] = { AdvanceDays: days, Content: content };
+    });
+    return result;
+  }
+  function project(policy, edition, expiration, now, parent) {
+    var end = Date.parse(expiration || '');
+    if (['Personal', 'Enterprise'].indexOf(edition) < 0 || !isFinite(end)) return null;
+    var setting = normalize(policy)[edition];
+    if (end - now > setting.AdvanceDays * 86400000) return null;
+    var minutes = Math.max(0, Math.ceil((end - now) / 60000));
+    var countdown = Math.floor(minutes / 1440) + '天' + Math.floor(minutes / 60) % 24 + '小时' + minutes % 60 + '分';
+    var expiry = new Date(end).toISOString().slice(0, 19).replace('T', ' ') + ' UTC';
+    var label = edition === 'Enterprise' ? '企业版' : '个人版';
+    var content = setting.Content || (parent ? '当前子租户{版本}授权到期时间为 {到期时间}。倒计时{倒计时}。请及时联系主租户管理员续期。'
+      : '当前系统授权到期时间为 {到期时间}。倒计时{倒计时}。请及时联系授权账号持有人续期，并在授权管理中重新部署有效授权。');
+    var hasCountdown = content.indexOf('{倒计时}') >= 0;
+    content = content.replace(/\{版本\}/g, label).replace(/\{到期时间\}/g, expiry).replace(/\{倒计时\}/g, countdown);
+    if (!hasCountdown) content += '\n倒计时' + countdown + '。';
+    return { Content: content, DueAt: new Date(end - setting.AdvanceDays * 86400000).toISOString(),
+      Title: (parent ? '子租户授权' : '系统授权') + (end <= now ? '已到期' : '即将到期'),
+      TitleTone: 'danger', Icon: 'warning', Severity: 'error', Priority: parent ? 99 : 100,
+      EndsAt: new Date(Math.max(now, end) + 86400000).toISOString(), DisplayMode: 'EveryLogin',
+      LinkUrl: '/#/license', LinkText: '查看授权', Slot: 0 };
+  }
+  return { normalize: normalize, project: project };
+}
+
 var model = createPlatformReminderModel();
+var licenseModel = createLicenseExpiryModel();
 var p = V8.Param || {}, now = Date.now(), isoNow = new Date(now).toISOString();
 var ruleFields = ['Id','Title','ReminderType','ScopeType','Revision','Status','RuleJson','PublishedBatchId','UpdateTime'];
 var batchFields = ['Id','RuleId','Revision','Title','State','ScopeType','SnapshotJson','StartsAt','EndsAt','PublishRequestId','CreateTime'];
@@ -166,6 +203,11 @@ function stable(value) { return V8.EncryptHelper.Sha256Hex(String(value)).substr
 function safeId(value) { var valueText = String(value || ''); if (!/^[a-f0-9]{32}$/.test(valueText)) throw new Error('提醒标识无效。'); return valueText; }
 function parse(value) { return typeof value === 'string' ? JSON.parse(value) : value; }
 function requireAdmin(context) { if (!context.Administrator) throw new Error('只有当前租户的平台管理员可以维护提醒。'); }
+function policyId(scope) { return stable('LicenseExpiryPolicy|' + scope); }
+function readPolicy(scope) {
+  var found = row('mci_platform_reminder', policyId(scope), ruleFields);
+  return { Revision: found ? Number(found.Revision) : 0, Policy: licenseModel.normalize(found ? parse(found.RuleJson) : null) };
+}
 function receiptId(item, context) {
   if (item.DisplayMode === 'EveryLogin') return stable(String(V8.OsClient).toLowerCase() + '|' + context.UserId + '|' + item.Id + '|' + context.LoginId);
   var entry = item.DisplayMode === 'EveryEntry' ? String(p.EntryId || '') : 'once';
@@ -187,18 +229,19 @@ function validateTargets(rule) {
 }
 function collect(context) {
   var items = [], warnings = [], nextAt = now + 60000;
-  // 签名 License 是到期事实源；关闭状态仍走系统提醒的持久化回执，每次真实登录重新提示。
-  var licenseEnd = Date.parse(context.LicenseExpirationDate || '');
-  if (context.Administrator && context.LoginId && isFinite(licenseEnd) && licenseEnd - now <= 7 * 86400000) {
-    var licenseBatchId = stable('LicenseExpiry|' + context.LicenseExpirationDate);
-    var expiryText = new Date(licenseEnd).toISOString().replace('T', ' ').replace('.000Z', ' UTC');
-    items.push({ Id: 'SystemLicense:' + stable(licenseBatchId + '|' + context.LoginId), BatchId: licenseBatchId, Source: 'SystemLicense',
-      Slot: 0, DueAt: new Date(licenseEnd - 7 * 86400000).toISOString(), NextAt: nextAt,
-      Title: licenseEnd <= now ? '系统授权已到期' : '系统授权即将到期',
-      Content: '当前系统授权到期时间为 ' + expiryText + '。请及时联系授权账号持有人续期，并在授权管理中重新部署有效授权。',
-      Icon: 'Warning', Severity: licenseEnd <= now ? 'error' : 'warning', Priority: 100,
-      DisplayMode: 'EveryLogin', EndsAt: new Date(Math.max(now, licenseEnd) + 86400000).toISOString(),
-      LinkUrl: '/#/license', LinkText: '查看授权' });
+  var officialPolicy = null, parentPolicy = null;
+  function appendLicense(policy, edition, expiration, parent) {
+    if (!context.Administrator || !context.LoginId) return;
+    var item;
+    try { item = licenseModel.project(policy, edition, expiration, now, parent); }
+    catch (_) { item = licenseModel.project(null, edition, expiration, now, parent); }
+    if (!item) return;
+    // 两层分别持有回执；策略文案/分钟变化不能让同一次登录已确认的提醒再次弹出。
+    item.Source = parent ? 'TenantLicense' : 'SystemLicense';
+    item.BatchId = stable(item.Source + '|' + expiration);
+    item.Id = item.Source + ':' + stable(item.BatchId + '|' + context.LoginId);
+    item.NextAt = nextAt;
+    items.push(item);
   }
   var own = query('mci_platform_reminder_batch', [['State','=','Published'],['EndsAt','>',isoNow]], batchFields).Data || [];
   function append(rows, source, scope, key) {
@@ -215,9 +258,14 @@ function collect(context) {
   try { append(atom('Inherited').Data, 'Parent', 'Tenants', V8.OsClient); } catch (_) { warnings.push('ParentUnavailable'); }
   try {
     var official = atom('Official');
+    officialPolicy = official.DataAppend && official.DataAppend.LicenseExpiryPolicy;
     append(official.Data, 'Official', 'Editions', context.ProductEdition);
     if (official.DataAppend && official.DataAppend.OfficialUnavailable) warnings.push('OfficialUnavailable');
   } catch (_) { warnings.push('OfficialUnavailable'); }
+  if (context.IsOfficialPlatform) { try { officialPolicy = readPolicy('Editions').Policy; } catch (_) { warnings.push('OfficialPolicyUnavailable'); } }
+  if (context.TenantLicenseExpirationDate) { try { parentPolicy = atom('ParentLicensePolicy').Data; } catch (_) { warnings.push('ParentPolicyUnavailable'); } }
+  appendLicense(officialPolicy, context.SystemProductEdition || context.ProductEdition, context.LicenseExpirationDate, false);
+  appendLicense(parentPolicy, context.TenantProductEdition, context.TenantLicenseExpirationDate, true);
   return { Items: items, Warnings: warnings, NextCheckAt: new Date(nextAt).toISOString() };
 }
 try {
@@ -265,6 +313,30 @@ try {
         ActiveIds: inbox.Items.map(function(item) { return item.Id; }) } };
   }
   requireAdmin(context);
+  if (action === 'LicensePolicyGet' || action === 'LicensePolicySave' || action === 'LicensePolicyValidate') {
+    var scope = String(p.ScopeType || 'Tenants');
+    if (scope !== 'Tenants' && scope !== 'Editions') throw new Error('授权提醒范围无效。');
+    if (scope === 'Editions' ? !context.IsOfficialPlatform : !context.IsMainTenant) throw new Error('只有官方服务或主租户可以维护对应授权提醒。');
+    var policy = readPolicy(scope);
+    if (action === 'LicensePolicyGet') return { Code: 1, Data: policy };
+    if (!p.Policy || typeof p.Policy !== 'object') throw new Error('请提交完整授权提醒策略。');
+    var normalized = licenseModel.normalize(p.Policy);
+    if (action === 'LicensePolicyValidate') return { Code: 1, Data: { Policy: normalized } };
+    if (p.ExpectedRevision == null || Number(p.ExpectedRevision) !== policy.Revision) {
+      if (JSON.stringify(policy.Policy) === JSON.stringify(normalized)) return { Code: 1, Data: policy, Msg: '配置已经保存。' };
+      throw new Error('授权提醒已被其他人修改，请刷新后重试。');
+    }
+    var id = policyId(scope), json = JSON.stringify(normalized);
+    if (!policy.Revision) check(V8.FormEngine.AddFormData('mci_platform_reminder', { Id: id, Title: '授权到期提醒',
+      ReminderType: 'LicenseExpiry', ScopeType: scope, Revision: 1, Status: 'Published', RuleJson: json }, V8.DbTrans));
+    else {
+      var changed = V8.DbTrans.FromSql('UPDATE mci_platform_reminder SET RuleJson=@json,Revision=Revision+1 WHERE Id=@id AND Revision=@revision AND IsDeleted<>1')
+        .AddInParameter('@json',json).AddInParameter('@id',id).AddInParameter('@revision',policy.Revision).ExecuteNonQuery();
+      if (Number(changed) !== 1) throw new Error('授权提醒保存冲突，请刷新后重试。');
+    }
+    atom('Signal');
+    return { Code: 1, Data: { Revision: policy.Revision + 1, Policy: normalized }, Msg: '授权提醒配置已保存并生效。' };
+  }
   if (action === 'Recipients') {
     if (p.ScopeType === 'Tenants') { if (!context.IsMainTenant) throw new Error('只有主租户可以选择子租户。'); return atom('Tenants'); }
     if (p.ScopeType === 'Editions') {
@@ -277,7 +349,7 @@ try {
     return { Code: 1, Data: (options.Data || []).map(function (user) { return { Key: user.Id, Name: user.Name || user.Account }; }), DataCount: options.DataCount };
   }
   if (action === 'List') {
-    var where = [];
+    var where = [['ReminderType','<>','LicenseExpiry']];
     if (p.ScopeType) where.push(['ScopeType','=',p.ScopeType]);
     if (p.TargetKey) {
       var targetKey = model.list([p.TargetKey])[0];
@@ -302,6 +374,7 @@ try {
     if (p.RequestId && !/^[A-Za-z0-9-]{16,80}$/.test(String(p.RequestId))) throw new Error('保存请求标识无效。');
     var ruleId = p.Id ? safeId(p.Id) : p.RequestId ? stable(String(V8.OsClient).toLowerCase()+'|Draft|'+p.RequestId) : stable(V8.Method.NewGuid());
     var old = p.Id || p.RequestId ? row('mci_platform_reminder', ruleId, ruleFields) : null;
+    if (old && old.ReminderType === 'LicenseExpiry') throw new Error('请通过授权到期提醒设置维护此策略。');
     if (p.Id && !old) throw new Error('提醒规则不存在。');
     if (!p.Id && old) {
       if (JSON.stringify(parse(old.RuleJson)) !== JSON.stringify(rule)) throw new Error('此请求已保存过不同内容，请先读取已创建的草稿再修改。');
@@ -323,6 +396,7 @@ try {
   if (action === 'Publish' || action === 'Withdraw') {
     var id = safeId(p.Id), current = row('mci_platform_reminder', id, ruleFields);
     if (!current) throw new Error('提醒规则不存在。');
+    if (current.ReminderType === 'LicenseExpiry') throw new Error('请通过授权到期提醒设置维护此策略。');
     if (Number(p.ExpectedRevision) !== Number(current.Revision)) throw new Error('规则版本已变化，请刷新后重试。');
     if (action === 'Withdraw') {
       if (current.Status === 'Withdrawn') return { Code: 1, Data: { Id: id, AlreadyWithdrawn: true } };
@@ -361,3 +435,5 @@ try {
   }
   throw new Error('不支持的提醒动作。');
 } catch (error) { return { Code: 0, Msg: String(error.message || error) }; }
+
+

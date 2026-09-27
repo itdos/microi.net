@@ -109,6 +109,7 @@ namespace Microi.net
             "mci_user_access_key",
             "mci_security_access_log",
             "mci_security_attack_event",
+            "mci_runtime_incident",
             "mci_security_ip_block",
             "mci_spider_account",
             "mci_spider_profile",

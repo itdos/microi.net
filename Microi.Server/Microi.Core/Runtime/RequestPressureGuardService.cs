@@ -58,8 +58,12 @@ namespace Microi.net
             }
 
             var acquired = new List<SemaphoreSlim>();
+            var observation = RequestWaitObservation.Enter("Admission", NormalizeKnownTenant(osClient), ExtractApiEngineKey(NormalizeRequestPath(path)));
+            try
+            {
             foreach (var item in BuildGateRequests(path, osClient, options))
             {
+                observation.Stage("Gate:" + item.Type);
                 var gate = GetOrCreateGate(item);
                 var entered = false;
                 if (item.Type == "Global") Interlocked.Increment(ref _globalWaiting);
@@ -82,13 +86,19 @@ namespace Microi.net
                 if (!entered)
                 {
                     Release(acquired);
+                    acquired.Clear();
+                    observation.Outcome(cancellationToken.IsCancellationRequested ? "Cancelled" : "QueueTimeout:" + item.Type);
+                    observation.Dispose();
                     return RequestPressureLease.Rejected(item);
                 }
 
                 acquired.Add(gate);
             }
 
-            return RequestPressureLease.Entered(acquired);
+            observation.Stage("Executing");
+            return RequestPressureLease.Entered(acquired, observation);
+            }
+            catch { Release(acquired); observation.Outcome("Failed"); observation.Dispose(); throw; }
         }
 
         private static SemaphoreSlim GetOrCreateGate(RequestPressureGate item)
@@ -408,6 +418,7 @@ namespace Microi.net
     public sealed class RequestPressureLease : IDisposable
     {
         private IReadOnlyList<SemaphoreSlim> _acquired;
+        private RequestWaitObservation.Scope _observation;
 
         private RequestPressureLease(bool isEntered, IReadOnlyList<SemaphoreSlim> acquired, RequestPressureGate failedGate)
         {
@@ -419,9 +430,9 @@ namespace Microi.net
         public bool IsEntered { get; }
         public RequestPressureGate FailedGate { get; }
 
-        internal static RequestPressureLease Entered(IReadOnlyList<SemaphoreSlim> acquired)
+        internal static RequestPressureLease Entered(IReadOnlyList<SemaphoreSlim> acquired, RequestWaitObservation.Scope observation = null)
         {
-            return new RequestPressureLease(true, acquired, null);
+            return new RequestPressureLease(true, acquired, null) { _observation = observation };
         }
 
         internal static RequestPressureLease Rejected(RequestPressureGate failedGate)
@@ -431,6 +442,7 @@ namespace Microi.net
 
         public void Dispose()
         {
+            Interlocked.Exchange(ref _observation, null)?.Dispose();
             var acquired = Interlocked.Exchange(ref _acquired, null);
             if (acquired != null)
             {

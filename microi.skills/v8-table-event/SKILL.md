@@ -61,7 +61,7 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 - `diy_table.V8Limit` 是表后端提交前、提交后和数据处理 V8 的正向开关：缺失、`null`、`0/false` 均不设置 Jint 单次超时、语句、函数递归和累计分配预算，只有 `1/true` 才启用这些限制。旧 `V8Unlimited` 仅在新字段不存在时反向推断，新的 MCP、Manifest 和应用资源只写 `V8Limit`。进程常驻内存、取消、并发、接口嵌套深度、权限和数据库保护始终生效。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-003 sha256=5140cd224fd5ac044715f0b3ac79d18f8816d4ce36b6c05cc04e044dbf956214 -->
+<!-- microi-progressive:chunk id=v8-table-event-003 sha256=a6313d9007c8c72e1b8fb56ca7764eb0856029c9937c35d5f2e294539b3c7134 -->
 ## ⚠️ 关键陷阱（必读）
 
 ### 1. 设计模式保护（前端事件必加）
@@ -88,6 +88,8 @@ if (V8.Form.Money > 100000 && V8.CurrentUser.RoleName.indexOf('总经理') === -
 ```
 
 ### 4. 共享事务操作其它表
+
+提交前与提交后事件可能在同一 Jint 全局环境依次运行。两个事件复用生成库时，顶层初始化变量使用可重复声明的 `var`，或放入各事件独立函数作用域；不要在两段代码里重复声明同名顶层 `let/const`。验收须真实新增/更新走完 Before → After，并验证提交后回读及审计；分别做语法检查不能发现跨事件重复声明。
 
 ```javascript
 // 在 SubmitBeforeServerV8 / SubmitAfterServerV8 中

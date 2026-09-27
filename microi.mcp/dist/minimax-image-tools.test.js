@@ -112,4 +112,63 @@ test('MiniMax image MCP tool rejects incomplete exact dimensions before remote g
         await server.close();
     }
 });
+test('media model catalog and Token Plan readback stay read-only and never queue generation', async () => {
+    const calls = [];
+    const fakeClient = {
+        getMediaModels: async () => {
+            calls.push('models');
+            return {
+                Code: 1,
+                Data: {
+                    Models: [
+                        { Id: 'image-01', Capability: 'image', Protocol: 'minimax-image' },
+                        { Id: 'minimax-code-image', Capability: 'image', Protocol: 'minimax-connector-image' },
+                    ],
+                },
+                Msg: '',
+            };
+        },
+        getMiniMaxTokenPlanRemains: async () => {
+            calls.push('remains');
+            return {
+                Code: 1,
+                Data: {
+                    Usage: {
+                        model_remains: [
+                            { model_name: 'general', current_interval_remaining_percent: 0, current_interval_status: 2 },
+                        ],
+                    },
+                },
+                Msg: '',
+            };
+        },
+        generateMiniMaxImage: async () => {
+            calls.push('generate');
+            return { Code: 2, Data: {}, Msg: '' };
+        },
+    };
+    const server = createMcpServer(fakeClient, {
+        osClient: 'tenant-a', apiBaseUrl: 'https://microi.test', label: '测试租户', codexMode: true,
+    });
+    const client = new Client({ name: 'media-model-catalog-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+        const models = await client.callTool({
+            name: 'microi_codex', arguments: { action: 'microi_list_media_models', params: {} },
+        });
+        assert.equal(models.isError, undefined);
+        assert.match(textOf(models), /minimax-code-image/u);
+        const remains = await client.callTool({
+            name: 'microi_codex', arguments: { action: 'microi_get_minimax_token_plan_remains', params: {} },
+        });
+        assert.equal(remains.isError, undefined);
+        assert.match(textOf(remains), /current_interval_remaining_percent/u);
+        assert.deepEqual(calls, ['models', 'remains']);
+    }
+    finally {
+        await client.close();
+        await server.close();
+    }
+});
 //# sourceMappingURL=minimax-image-tools.test.js.map
