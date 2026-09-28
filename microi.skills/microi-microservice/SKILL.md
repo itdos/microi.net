@@ -44,6 +44,7 @@ description: Microi 前端微服务 MicroService 开发与交付指南。用于�
 - `sys_microiservice`：已发布运行时。
 - `sys_microiservice_page`：页面路由。
 - 编译后的 HTML/JS/CSS/图片放公有 HDFS，源码不公开。
+- 官方应用的独立体验入口统一为 `https://static.itdos.com/{OsClient小写}/micro-app/{AppKey}/index.html`，公有桶固定根承载最新版编译文件、`/{Version}/` 承载不可变历史编译文件；私有桶采用相同相对目录承载对应源码文件。宿主内部的 `/micro-app/{AppKey}/{RoutePath}` 是菜单路由，不是对外 CDN 体验地址。发布后核对 CDN 刷新完成、入口及资源可访问、业务 API 仍指向目标租户。
 
 不能从 `sys_microiservice` 公有产物反推完整源码，也不把大 JS/CSS 长期塞数据库 JSON。
 

@@ -97,6 +97,49 @@ namespace Microi.net
             });
         }
 
+        public Task<DosResult> CopyObject(DiyUploadParam param)
+        {
+            PrepareSinglePath(param);
+            param.Path = TenantConfigurationSecurity.NormalizeStoragePath(_osClient, param.Path);
+            var storage = ResolveStorage();
+            return storage.Client.CopyObject(new HDFSParam
+            {
+                ClientModel = storage.ClientModel,
+                Limit = param.Limit,
+                FileFullPath = param.FilePathName,
+                DestPath = param.Path
+            });
+        }
+
+        public Task<DosResult<bool>> ObjectExist(DiyUploadParam param)
+        {
+            PrepareSinglePath(param);
+            var storage = ResolveStorage();
+            return storage.Client.ObjectExist(new HDFSParam
+            {
+                ClientModel = storage.ClientModel,
+                Limit = param.Limit,
+                FileFullPath = param.FilePathName
+            });
+        }
+
+        public async Task<DosResult> GetObjectSha256(DiyUploadParam param)
+        {
+            PrepareSinglePath(param);
+            var storage = ResolveStorage();
+            using var digest = new V8ObjectHashStream();
+            var result = await storage.Client.CopyObjectToStream(new HDFSParam
+            {
+                ClientModel = storage.ClientModel,
+                Limit = param.Limit,
+                FileFullPath = param.FilePathName,
+                FileStream = digest
+            }).ConfigureAwait(false);
+            if (result.Code != 1) return result;
+            var (sha256, wireSha256, size) = digest.Complete();
+            return new DosResult(1, new { Sha256 = sha256, WireSha256 = wireSha256, Size = size });
+        }
+
         private void PrepareFilePaths(DiyUploadParam param)
         {
             Prepare(param);

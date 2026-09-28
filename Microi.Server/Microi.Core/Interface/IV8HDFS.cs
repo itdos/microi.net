@@ -19,5 +19,10 @@ namespace Microi.net
         Task<DosResult> CreateFolder(DiyUploadParam param);
         Task<DosResult> RenameObject(DiyUploadParam param);
         Task<DosResult> MoveObject(DiyUploadParam param);
+        Task<DosResult> CopyObject(DiyUploadParam param);
+        Task<DosResult<bool>> ObjectExist(DiyUploadParam param);
+
+        /// <summary>Stream and hash one tenant-scoped public or private object.</summary>
+        Task<DosResult> GetObjectSha256(DiyUploadParam param);
     }
 }

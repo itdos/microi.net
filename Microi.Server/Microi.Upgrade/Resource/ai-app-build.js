@@ -1173,6 +1173,16 @@ if (isBlank(appId)) return fail("AppId不能为空");
 var app = getApp(appId);
 if (!app || app.Code !== 1 || !app.Data) return { Code: 2, Data: null, Msg: "AI应用不存在" };
 var requestedAction = text(V8.Param.Action || "Build");
+// Official marketplace releases now use the v3 streamed publisher, which
+// verifies the fixed CDN path before recording success. This legacy writer
+// creates ai-app-publish URLs and cannot safely replace a migrated release.
+var officialLegacyPublishActions = ["Build", "PromoteStoreAsset", "PromoteStoreAssetsBatch",
+  "FinalizeStoreAssets", "PromoteStoreAssets", "RepairStableLatest", "PromoteStableAssetsBatch",
+  "PublishLegacyMicroAppRedirects", "RegisterResumablePublicDownload",
+  "PromoteResumablePublicDownload"];
+if (text(V8.OsClient).toLowerCase() === "itdos"
+    && officialLegacyPublishActions.indexOf(requestedAction) >= 0)
+  return fail("吾码官方 AI 应用请通过 v3 MCP 流式发布；旧 ai_app_build 入口不具备固定 CDN 地址与历史源码验收能力。");
 /* RESUMABLE_PUBLIC_DOWNLOAD_REGISTRATION_V1
  * 大安装包先通过 ApplicationAsset Protocol v3 完成分片、断点续传、逐片
  * SHA-256 与服务端合并校验；这里只登记已经 Succeeded 的不可变公有对象，
