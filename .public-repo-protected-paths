@@ -4,6 +4,7 @@ Microi.Server/Microi.AI
 Microi.Server/Microi.MCP
 Microi.VSCode
 Microi.Code
+Microi.Agent
 Microi.Client/src/views/webos
 Microi.Server/Microi.WorkFlow
 Microi.Server/Microi.Vision
