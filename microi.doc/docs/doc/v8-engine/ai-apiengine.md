@@ -13,7 +13,7 @@
 ## 📌 推荐提示词
 
 ::: tip 推荐工作流
-先通过 [Microi吾码 AI 开发工具：VS Code 插件 + CLI](./vs-code-plugin.md) 完成服务器登录、Skills 与 MCP 初始化。纯命令行用户运行 `microi init --pull` 后，应新开一个 AI 对话，让 Codex、Claude Code 或 Trae 加载新增 MCP。
+先通过 [Microi吾码 AI 开发工具：VS Code 插件 + CLI](./microi-agent.md) 完成服务器登录、Skills 与 MCP 初始化。纯命令行用户运行 `microi init --pull` 后，应新开一个 AI 对话，让 Codex、Claude Code 或 Trae 加载新增 MCP。
 
 提示词不需要重复粘贴全部 V8 API，也不要写真实密码。只需明确目标租户、需求事实源、交付范围、写入闸门和验收标准。
 
@@ -170,7 +170,7 @@ AI 能不能提高效率，不只取决于模型本身，更取决于模型要�
 
 ## 💻 本地 AI 编程（VS Code 插件 + microi.net/cli）
 
-Microi吾码提供同一套 AI 开发能力的两个入口：VS Code 插件负责资源树、Diff、远程执行和逐行调试；`@microi.net/cli` 负责无需 IDE 的连接、登录、AI/MCP 初始化、代码拉取、差异检查和显式推送。两者共用工作区配置、Token、Skills、MCP 和同步基线，完整功能与命令以 [AI 开发工具文档](./vs-code-plugin.md) 为准。
+Microi吾码提供同一套 AI 开发能力的两个入口：VS Code 插件负责资源树、Diff、远程执行和逐行调试；`@microi.net/cli` 负责无需 IDE 的连接、登录、AI/MCP 初始化、代码拉取、差异检查和显式推送。两者共用工作区配置、Token、Skills、MCP 和同步基线，完整功能与命令以 [AI 开发工具文档](./microi-agent.md) 为准。
 
 ### 工作原理
 

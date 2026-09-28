@@ -1,6 +1,6 @@
 // 页面、sitemap 和验收共用规范地址，避免各自拼出不同的搜索入口。
 export const SITE_URL = 'https://microi.net'
-const UTILITY_PAGES = new Set(['/404.html', '/login.html', '/profile.html', '/app-detail.html', '/uniapp-preview.html'])
+const UTILITY_PAGES = new Set(['/404.html', '/login.html', '/profile.html', '/app-detail.html', '/uniapp-preview.html', '/doc/v8-engine/vs-code-plugin.html', '/download/microi-agent/latest.html'])
 
 export function canonicalPath(input) {
   let path = String(input || '').replace(/\\/g, '/')
