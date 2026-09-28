@@ -15,6 +15,7 @@ Microi.Server/Microi.AI
 Microi.Server/Microi.MCP
 Microi.VSCode
 Microi.Code
+Microi.Agent
 Microi.Client/src/views/webos
 Microi.Server/Microi.WorkFlow
 Microi.Server/Microi.Vision'
@@ -89,6 +90,7 @@ filter_protected_paths() {
         "microi.server/microi.mcp",
         "microi.vscode",
         "microi.code",
+        "microi.agent",
         "microi.client/src/views/webos",
         "microi.server/microi.workflow",
         "microi.server/microi.vision"
