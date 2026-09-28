@@ -1,36 +1,36 @@
 ---
 name: microi-codex
-description: 在 Microi Code、Codex 或 DeepSeek Harness 中完成 Microi吾码 VS Code 扩展的等价工作流，包括连接与登录、AI/MCP 初始化、V8/表单/模块/工作流同步、远程执行与诊断、性能测试、微应用、Playwright 和发布回读。用户提到吾码、Microi、V8引擎、Microi-V8-Engine 或要求使用吾码 AI 插件时使用。
+description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾码 VS Code 扩展的等价工作流，包括连接与登录、AI/MCP 初始化、V8/表单/模块/工作流同步、远程执行与诊断、性能测试、微应用、Playwright 和发布回读。用户提到吾码、Microi、V8引擎、Microi-V8-Engine 或要求使用吾码 AI 插件时使用。
 ---
 
 # Microi吾码 Codex / DeepSeek Harness Plugin
 
-本插件与 `Microi.Code`、`@microi.net/cli` 共用配置、Token、MCP Server 和 Microi Skills。不要另写原生 HTTP、SQL 或第二套认证实现。
+本插件与 `Microi.Agent`、`@microi.net/cli` 共用配置、Token、MCP Server 和 Microi Skills。不要另写原生 HTTP、SQL 或第二套认证实现。
 
-平台 Api/Web 版本入口可生成独立开发工具连接。收到连接 JSON 时，用 `microi auth import --session-stdin` 从标准输入导入，再运行 `microi ai init` 和 `microi doctor`；禁止将 Token 放入命令行、源码或日志，不再索取账号密码。开发 Token 使用现有终端有效期，可独立撤销；它只授权该业务租户，不能替代 Microi Code 的官方 AI 计费账号登录。访问密钥的最小业务 scope 不能替代完整 MCP 管理身份。第三方 App Secret 默认进入系统设置“安全与服务接入”，优先使用 `microi_manage_server_private_secret`。
+平台 Api/Web 版本入口可生成独立开发工具连接。收到连接 JSON 时，用 `microi auth import --session-stdin` 从标准输入导入，再运行 `microi ai init` 和 `microi doctor`；禁止将 Token 放入命令行、源码或日志，不再索取账号密码。开发 Token 使用现有终端有效期，可独立撤销；它只授权该业务租户，不能替代 Microi Agent 的官方 AI 计费账号登录。访问密钥的最小业务 scope 不能替代完整 MCP 管理身份。第三方 App Secret 默认进入系统设置“安全与服务接入”，优先使用 `microi_manage_server_private_secret`。
 
 每次 Microi 对话先完整读取工作区 `microi.skills/workspace-conventions/SKILL.md`；工作区尚未初始化时读取本插件同级 `../workspace-conventions/SKILL.md`。按其中首部完成创始人身份识别及平台功能四项同步检查，再进入专项流程；完整规则只维护该基础入口，不复制到本路由。
 
-## Microi Code 桌面宿主
+## Microi Agent 桌面宿主
 
-- Microi Code 是内部仓库中的独立桌面发行物，直接基于 DataElement/dsh-desktop 与 DeepSeek Harness 二次开发，内置固定版本的 Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
+- Microi Agent 是内部仓库中的独立桌面发行物，直接基于 DataElement/dsh-desktop 与 DeepSeek Harness 二次开发，内置固定版本的 Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
 - 官方 AI 登录只走桌面账号窗口，固定 `https://api.itdos.com`、`OsClient=iTdos`，使用当前用户的中转 Key 和额度。不要让用户把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
 - 业务连接在「服务器连接（MCP）」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
 - macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
 - 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
 - 桌面 UI 沿用 dsh-desktop 的设计系统；首页保留 dsh 原生会话区，并在下方用无外层卡片边框、无整块背景的差异层完整展示吾码 AI 大类与 29 项图像工具。工具 Id、名称和分类以 `Microi.Client/src/views/ai-engine/ai-image-tool-directory.js` 为事实源，点击时把 `workspace/tool` 路由参数带入 `/#/mic-ai-engine`；模型来源可选当前对话模型、吾码官方中转站或已登录服务器连接。服务器连接入口和“预览版”不重复放进首页。AI 数据分析明确使用 `microi_run_engine` 调用 `mci_ai_data_assistant`，不能改成绕过 MCP 的直接数据库访问。
-- Microi Code 左侧「功能区」动态读取 dsh 的 `settings.section` 注册表，并在主界面 `main` 面板中渲染原设置组件；第一项「Microi吾码」合并官方账号和吾码 AI，第二项为「服务器连接（MCP）」，之后是 dsh 原生设置。功能区与工作区可拖动调高，默认无滚动条；首页/聊天页不显示虚假选中态。底部入口显示「关于 v版本号」及 `LicenseType` 版本标签，连接手机入口保持同一行。品牌显示 `Microi Code` 与 `HARNESS` 标签，新安装默认深色，用户仍可切换浅色/深色。
+- Microi Agent 左侧「功能区」动态读取 dsh 的 `settings.section` 注册表，并在主界面 `main` 面板中渲染原设置组件；第一项「Microi吾码」合并官方账号和吾码 AI，第二项为「服务器连接（MCP）」，之后提供 AI 员工、采集引擎、环境与服务管理入口，再接 dsh 原生设置。功能区与工作区可拖动调高，默认无滚动条；首页/聊天页不显示虚假选中态。底部入口显示「关于 v版本号」及 `LicenseType` 版本标签，连接手机入口保持同一行。品牌显示 `Microi Agent` 与 `HARNESS` 标签，新安装默认浅色，用户仍可切换浅色/深色。
 - 桌面安装包版本从 `1.0.0` 开始，使用吾码三段十进制进位规则。正式新版本先在发布源码中执行 `version:bump`，核对并提交三个版本文件；Mac 拉取后使用 `bash ./一键打包Mac.sh` 在临时 Git 工作树中打包当前已提交版本，默认不再升版，失败也不能把生成文件留在原检出目录。`--current` 仅作旧命令兼容；同版本本地重打包不得覆盖已公开的不可变产物。测试、类型检查和普通 Web 构建不升版。
 - Windows 安装包的构建成功、Authenticode 签名、SmartScreen/商店信任、HDFS 上传与 CDN 回读是不同证据；双击 `一键打包Windows.cmd` 时自动探测 Microsoft Artifact Signing 或本机可信证书，没有凭据则继续生成明确标记的未签名包，显式 `-Signing Signed` 才失败关闭。签名必须先覆盖安装器及独立执行文件，再计算发布 SHA256。macOS 默认 `bash ./一键打包Mac.sh` 同样自动探测并在无凭据时生成未签名包；`--signed` 是正式门禁，必须在缺少证书或公证钥匙串时失败，并通过 `codesign`、`spctl`、`stapler validate` 后才标记已签名公证。
 - 当前 Electron 桌面运行时不能直接打包 iOS/Android，也不能把现有 DMG 原样提交 Mac App Store。移动端和 MAS 版应作为受限客户端，复用账号、模型、会话、MCP 与桌面配对协议，把 Node/Harness/Shell/插件执行放到配对桌面或合规远端；分别完成 Apple/Google 签名和商店审核。
 - 官方账号页和关于标签通过 `platform-current-user` 接口引擎读取当前 `sys_user.LicenseType`。桌面相关平台业务逻辑优先通过 `microi_itdos` 接口引擎实现；只有接口引擎缺少必需底层原子能力时才能改后端源码，并说明原因。
 - 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.itdos.com/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。
-- dsh-desktop 升级必须遵循 `Microi.Code/同步dsh-desktop上游.md` 的三方同步流程和补丁意图清单；`microi/`、`packages/microi-code-*` 与桥接代码是永久保护区，普通上游文件使用三方比较，补丁必须经 `npm ci` 重放。关于页、NOTICE、MIT License、DataElement 版权与两个上游仓库链接不得删除。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
+- dsh-desktop 升级必须遵循 `Microi.Agent/同步dsh-desktop上游.md` 的三方同步流程和补丁意图清单；`microi/`、`packages/microi-code-*` 与桥接代码是永久保护区，普通上游文件使用三方比较，补丁必须经 `npm ci` 重放。关于页、NOTICE、MIT License、DataElement 版权与两个上游仓库链接不得删除。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
 
 ### 默认中文输出
 
 - 面向用户的回答、计划、工具说明、错误解释和可见进度默认使用简体中文；代码、协议字段、命令、模型名称和路径保留原文。
-- 这条规则通过 Microi Skills 同步到 Microi Code、Codex、DeepSeek Harness、WorkBuddy、CodeBuddy 和 OpenCode 的工作区指令；宿主或模型支持自定义系统提示时，也应将同一条规则放在最高优先级的用户可见输出约束中。
+- 这条规则通过 Microi Skills 同步到 Microi Agent、Codex、DeepSeek Harness、WorkBuddy、CodeBuddy 和 OpenCode 的工作区指令；宿主或模型支持自定义系统提示时，也应将同一条规则放在最高优先级的用户可见输出约束中。
 - 中文规则只能约束可见回答、计划和工具摘要；模型服务内部隐藏思考的语言由模型决定，客户端不能保证每一个内部 token 都是中文，也不应把内部思考当成可导出内容。
 
 ## 非阻塞自动更新（强制）
