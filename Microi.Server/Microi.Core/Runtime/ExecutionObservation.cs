@@ -33,6 +33,10 @@ namespace Microi.net
         public static readonly string BootId = Guid.NewGuid().ToString("N");
         public static string CurrentExecutionId => Flow.Value?.State.Id ?? "";
 
+        /// <summary>返回脱离可变执行状态的标识快照，供等待取证关联；不返回脚本或业务参数。</summary>
+        public static ExecutionObservationSnapshot CurrentIdentity() => Flow.Value?.State is State state
+            ? Copy(state, DateTime.UtcNow) : new ExecutionObservationSnapshot { TraceId = MicroiTraceContext.CurrentTraceId };
+
         public static Scope Enter(string kind, string key, string tenant = "", string table = "", string eventName = "", string script = null)
         {
             // 只保留受限标识和源码哈希，禁止把脚本正文或业务对象送入常驻注册表。

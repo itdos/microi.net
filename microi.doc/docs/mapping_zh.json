@@ -55,6 +55,9 @@
 
   "system-engine":"系统引擎",
   "ai-engine.md":"AI引擎与Microi.AI中转站",
+  "ai-cad.md":"AI CAD与SolidWorks插件",
+  "digital-human-live.md":"自建数字人直播",
+  "ai-employee-center.md":"AI员工中心与小龙虾",
   "ai-data-analysis.md":"AI数据分析",
   "ai-creative-studio.md":"AI创作中心（图片/视频/音乐）",
   "ai-workflow-suite.md":"AI工作流、蓝图与状态机",
@@ -89,6 +92,7 @@
   "message-notification.md" : "消息通知",
 
   "more" : "更多文档",
+  "enterprise-ai-development-series.md" : "企业AI开发系列教程",
   "dos-orm.md" : "Dos.ORM",
   "sys-config.md" : "系统设置",
   "copy-module.md" : "模块复制",

@@ -92,6 +92,8 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
                         Executions: { ObservationMode: 'BoundaryAccounting+BackgroundIdentity', IdentityRegistryOverflowCount: 0,
                             NativeThreadIdentityUnavailableCount: 0, IdentityRefreshFailureCount: 0 },
                         Collector: { ObservedIdentityProtocolVersion: 2, BackgroundIdentityRefreshes: 17, RejectedStaleIdentityMarkers: 1 },
+                        RequestWaits: { Contract: 'request-waits/v1', ActiveCount: 2, Groups: [{ Kind: 'Http', Stage: 'AwaitingHttpCompletion:GET', TimeoutSeconds: 600 }] },
+                        Evidence: { CriticalStorage: { AcknowledgedWrites: 4, Pending: 1, DroppedSnapshots: 2 } },
                     } : {}),
                 } };
         },
@@ -121,7 +123,7 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
             arguments: { action: 'describe_tool', params: { name: 'microi_query_system_observability' } },
         });
         assert.equal(description.isError, undefined);
-        for (const term of ['MemoryIncidents', 'MemoryIncident', 'incidentId', 'Collector', 'retained heap', 'Host.Processes', 'HostProcessesVisible', 'Host.DiskIO.Devices']) {
+        for (const term of ['MemoryIncidents', 'MemoryIncident', 'incidentId', 'RequestWaits', 'CriticalStorage', 'RelationalStorage', 'Collector', 'retained heap', 'Host.Processes', 'HostProcessesVisible', 'Host.DiskIO.Devices']) {
             assert.ok(toolText(description).includes(term), `AI discovery must explain ${term}`);
         }
         const capabilities = await client.callTool({
@@ -174,7 +176,7 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
             if (action === 'Memory') {
                 for (const field of ['BoundaryAccounting+BackgroundIdentity', 'IdentityRegistryOverflowCount',
                     'NativeThreadIdentityUnavailableCount', 'IdentityRefreshFailureCount', 'ObservedIdentityProtocolVersion',
-                    'BackgroundIdentityRefreshes', 'RejectedStaleIdentityMarkers'])
+                    'BackgroundIdentityRefreshes', 'RejectedStaleIdentityMarkers', 'request-waits/v1', 'TimeoutSeconds', 'CriticalStorage', 'AcknowledgedWrites', 'DroppedSnapshots'])
                     assert.ok(toolText(result).includes(field), `MCP must preserve diagnostic quality field ${field}`);
             }
         }
@@ -230,7 +232,9 @@ test('memory MCP preserves incomplete evidence and backend failures without invo
     let reply = {
         Code: 1, Msg: '', Data: {
             Items: [{ Id: incidentId, Stacks: { MissingStackSamples: 527, Truncated: true },
+                    StorageKind: 'MySqlCriticalEvidence', EvidenceTruncated: true, WaitEvidence: { WorstThreadPoolFrame: { ThreadPoolAvailableWorkers: 0 } },
                     Evidence: { StackQuality: { MissingStackSamples: 527 } } }],
+            RelationalStorage: 'Available', RelationalRecordsRead: 1,
             SharedStorage: 'Unavailable', LocalFallbackAvailable: true,
             Evidence: { PendingUploads: 2, SharedStorageError: 'TimeoutException' },
         },

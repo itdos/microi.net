@@ -2323,6 +2323,23 @@ export class MicroiClient {
             allowNativeFallback: false,
         });
     }
+    /** 只读：当前租户实时可用的图像/视频/音乐/配音模型目录（含安全投影，不含密钥）。 */
+    async getMediaModels() {
+        return this.get(API.GET_MEDIA_MODELS, {}, {
+            timeoutMs: 30_000,
+            operationName: 'read live media model catalog',
+        });
+    }
+    /**
+     * 只读：MiniMax Token Plan 官方额度回读。生成前先预检可避免多路并发把
+     * 图片/视频窗口额度打满后再盲目排队。
+     */
+    async getMiniMaxTokenPlanRemains() {
+        return this.get(API.GET_MINIMAX_TOKEN_PLAN_REMAINS, {}, {
+            timeoutMs: 30_000,
+            operationName: 'read MiniMax token plan remains',
+        });
+    }
     async generateMiniMaxSpeech(data) {
         return this.post(API.GENERATE_MINIMAX_SPEECH, data, {
             timeoutMs: 10 * 60_000,

@@ -73,3 +73,17 @@ test('未知写入结果只提示回读，不回显敏感异常或自动重复�
  const result=await client.callTool({name:'microi_configure_business_notification',arguments:{action:'Save',rule:config,confirmExecution:'Save:order_approved'}});
  assert.equal(result.isError,true);const value=JSON.stringify(result);assert.match(value,/先按原 Id/);assert.doesNotMatch(value,/sensitive-value/);assert.equal(calls.length,1);
 },()=>{throw new Error('sensitive-value')}));
+
+test('授权策略查询、校验与版本化保存使用独立范围且保存后回读',async()=>session(async(client,calls)=>{
+ const policy={Personal:{AdvanceDays:7,Content:''},Enterprise:{AdvanceDays:30,Content:'到期{到期时间}，倒计时{倒计时}'}};
+ await client.callTool({name:'microi_get_notification_context',arguments:{action:'LicensePolicyGet',recipientScope:'Editions'}});
+ assert.equal(calls[0].key,'platform-reminder-runtime');assert.equal(calls[0].p.ScopeType,'Editions');
+ const args={action:'LicensePolicySave',scopeType:'Editions',policy,expectedRevision:0};
+ const preview=decode(await client.callTool({name:'microi_manage_system_reminder',arguments:args}) as CallToolResult);
+ assert.equal(preview.confirmationRequired,'LicensePolicySave:Editions');assert.equal(calls.length,1);
+ await client.callTool({name:'microi_manage_system_reminder',arguments:{...args,confirmExecution:'LicensePolicySave:Editions'}});
+ assert.deepEqual(calls.map(x=>x.p.Action),['LicensePolicyGet','LicensePolicySave','LicensePolicyGet']);
+ assert.equal(calls[1].p.ExpectedRevision,0);assert.equal(calls[2].p.ScopeType,'Editions');
+ assert.ok(calls.every(x=>!x.p.OsClient));
+ const bad=await client.callTool({name:'microi_manage_system_reminder',arguments:{...args,policy:{...policy,Enterprise:{AdvanceDays:0,Content:''}}}});assert.equal(bad.isError,true);assert.equal(calls.length,3);
+}));

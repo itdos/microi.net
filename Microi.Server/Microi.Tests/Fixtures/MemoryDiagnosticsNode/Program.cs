@@ -11,6 +11,13 @@ using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
 
 // 隔离测试宿主：只使用测试租户和指定的本机测试数据库。
+if (args.FirstOrDefault() == "incident-acceptance") { await IncidentDurabilityAcceptance.Run(Path.GetFullPath(args[1])); return; }
+if (args.FirstOrDefault() == "incident-repository") { IncidentDurabilityFixture.RepositoryRegression(); return; }
+if (args.FirstOrDefault() == "incident")
+{
+    await IncidentDurabilityFixture.Run(Path.GetFullPath(args[1]), args[2] == "unwritable", args.Length > 3 ? args[3] : "http://127.0.0.1:0");
+    return;
+}
 if (args.FirstOrDefault() == "segments")
 {
     await SegmentRotationRegression.RunAsync(int.Parse(args[1]), Path.GetFullPath(args[2]));

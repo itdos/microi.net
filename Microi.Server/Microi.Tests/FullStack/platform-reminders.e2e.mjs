@@ -5,6 +5,7 @@ import {pathToFileURL} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {verifyBusinessNotificationConfiguration} from './message-notification-config.e2e.mjs';
+import {verifyLicenseExpiryPresentation} from './license-expiry.e2e.mjs';
 const {chromium}=createRequire(new URL('../../../Microi.Client/package.json',import.meta.url))('playwright');
 
 // 此专项使用真实登录和真实接口，只发送给测试账号本人；失败也撤回本次创建的规则。
@@ -17,28 +18,40 @@ async function runtime(page,Action,params={}) {
  },{Action,params});
 }
 async function ready(page){await page.waitForFunction(()=>window.__VUE_APP__?.config.globalProperties.DiyCommon?.getToken()&&window.__MICROI_REMINDER_ENTRY_ID__);}
-async function acknowledgeExistingReminders(page) {
+export async function acknowledgeExistingReminders(page) {
+ await ready(page);
  // 真实租户可能已有官方启动提醒。按真实用户操作确认测试账号当前队列，
  // 不能让它挡住新建测试提醒，也不能关闭功能、改优先级或跳过新提醒断言。
  const isAction=(response,action)=>response.url().includes('/apiengine/platform-reminder-runtime')
   && response.request().postData()?.includes(action);
- const inbox=page.waitForResponse(response=>isAction(response,'Inbox'));
- await page.evaluate(()=>window.dispatchEvent(new Event('online')));
- const result=await(await inbox).json();assert.equal(result.Code,1,result.Msg);
+ async function refreshInbox(){
+  const inbox=page.waitForResponse(response=>isAction(response,'Inbox'));
+  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+  const result=await(await inbox).json();assert.equal(result.Code,1,result.Msg);
+  // 网络回执先于 Vue 更新和 Element Plus 过渡；等待真实界面提交，不能重复点击已关闭的旧按钮。
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  return result;
+ }
+ let result=await refreshInbox();
  const visible=page.locator('.mci-platform-reminder:visible');
- if(result.Data?.length)await visible.first().waitFor({state:'visible',timeout:15000});
  const acknowledged=[];
- for(let i=0;i<10&&await visible.count();i++) {
+ for(let i=0;i<10;i++) {
+  if(result.Data?.length)await visible.first().waitFor({state:'visible',timeout:15000});
+  if(!await visible.count())break;
   const title=await visible.first().locator('.el-dialog__title').innerText();
+  const previousText=await visible.first().innerText();
   assert.ok(!title.startsWith('平台提醒自动回归'),'发现其它尚未收尾的回归提醒，不能代为确认');
   const receipt=page.waitForResponse(response=>isAction(response,'Acknowledge'));
   await visible.first().getByRole('button',{name:'我知道了'}).click();
   const response=await(await receipt).json();assert.equal(response.Code,1,response.Msg);acknowledged.push(title);
-  await page.locator('.mci-platform-reminder').evaluateAll(async elements=>{
-   await Promise.all(elements.flatMap(element=>element.getAnimations({subtree:true})).map(animation=>animation.finished.catch(()=>{})));
-  });
+  await page.waitForFunction(previous=>{
+   const dialog=[...document.querySelectorAll('.mci-platform-reminder')].find(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden');
+   return !dialog||(dialog.querySelector('.mci-platform-reminder__content')&&dialog.innerText!==previous);
+  },previousText);
+  result=await refreshInbox();
  }
  assert.equal(await visible.count(),0,'已有提醒队列必须先由测试账号确认');
+ assert.equal(result.Data?.length||0,0,'服务器不能残留尚未处理的提醒');
  return acknowledged;
 }
 export async function verifyPlatformReminders(page,directory) {
@@ -125,6 +138,6 @@ if(typeof process!=='undefined'&&process.argv[1]&&import.meta.url===pathToFileUR
   const box=page.locator('.privacy-policy-wrapper .el-checkbox').first();if(await box.count()&&!(await box.locator('input').isChecked()))await box.click();
   const login=page.waitForResponse(r=>r.url().includes('/api/SysUser/Login'));await page.getByRole('button',{name:/^登\s*录$/}).click();assert.equal((await(await login).json()).Code,1);
   const directory=path.resolve(process.argv[2]||'.tmp/platform-reminder-tests');
-  const result=await verifyPlatformReminders(page,directory);const configuration=await verifyBusinessNotificationConfiguration(page,directory);console.log(JSON.stringify({reminders:result,businessConfiguration:configuration}));
+  const result=await verifyPlatformReminders(page,directory);const configuration=await verifyBusinessNotificationConfiguration(page,directory);const license=await verifyLicenseExpiryPresentation(page,directory);console.log(JSON.stringify({reminders:result,businessConfiguration:configuration,license}));
  }finally{await browser.close();}
 }

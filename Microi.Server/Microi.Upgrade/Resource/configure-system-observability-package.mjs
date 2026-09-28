@@ -9,6 +9,14 @@ const runtime=saas.ApplicationBundles.filter(x=>x.Application?.AppKey==='microi-
 assert.equal(runtime.length,1);assert.equal(runtime[0].IncludeSource,false);
 assert.equal(runtime[0].AssetStoragePolicy.Build,'DatabaseOnly');
 model.ApplicationBundles=structuredClone(runtime);
+// 独立日志包复用 SaaS 底包的同一托管入口，避免重装日志包回退旧客户端兼容路由。
+for (const key of ['mci-system-observability-query', 'mci-system-observability-action']) {
+  const shared = saas.SysApiEngines.filter(x => x.ApiEngineKey === key);
+  assert.equal(shared.length, 1, `共享监控入口缺失或重复：${key}`);
+  const index = model.SysApiEngines.findIndex(x => x.ApiEngineKey === key);
+  assert.ok(index >= 0, `日志包入口缺失：${key}`);
+  model.SysApiEngines[index] = structuredClone(shared[0]);
+}
 Object.assign(model.PackageInfo,{MenuCount:model.SysMenus.length,TableCount:model.DiyTables.length,
  FieldCount:model.DiyFields.length,DDLCount:model.DDLStatements.length,PhysicalColumnCount:model.PhysicalColumns.length,
  ApiEngineCount:model.SysApiEngines.length,AiApplicationCount:1,DataSetCount:(model.DataSets||[]).length,DataRowCount:0});

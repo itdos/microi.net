@@ -4760,6 +4760,51 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     },
   );
 
+  // File cabinet object/version discovery is read-only. The API enforces the
+  // current DiyToken administrator and authoritative file-cabinet menu boundary.
+  server.tool(
+    'microi_list_file_cabinet_objects',
+    `List one current-tenant file-cabinet directory on OsClient "${osClient}". Requires an interactive platform administrator; private/public bucket selection is explicit. This does not download file bytes.`,
+    {
+      path: z.string().max(2048).default('').describe('Directory prefix under the current tenant root.'),
+      limit: z.boolean().default(true).describe('true for private bucket, false for public bucket.'),
+    },
+    async ({ path, limit }) => {
+      try {
+        const result = await client.listFileCabinetObjects(path, limit);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: { Code: result.Code, Data: result.Data, Msg: result.Msg || '' },
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (error: unknown) {
+        return { content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_get_file_cabinet_office_meta',
+    `Read durable Office version metadata for one exact file-cabinet object on OsClient "${osClient}". Requires the current tenant's authoritative file-cabinet SysMenuId and interactive platform administrator; no file bytes or edits are returned.`,
+    {
+      filePathName: z.string().min(1).max(2048).describe('Exact object key returned by the file-cabinet listing.'),
+      sysMenuId: z.string().min(1).max(100).describe('Authoritative current-tenant file-cabinet menu Id.'),
+      limit: z.boolean().default(true).describe('Bucket of the original file: true=private, false=public.'),
+    },
+    async ({ filePathName, sysMenuId, limit }) => {
+      try {
+        const result = await client.getFileCabinetOfficeMeta(filePathName, sysMenuId, limit);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: { Code: result.Code, Data: result.Data, Msg: result.Msg || '' },
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (error: unknown) {
+        return { content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }], isError: true };
+      }
+    },
+  );
+
   server.tool(
     'microi_get_table_indexes',
     `List normalized physical database indexes for one table in OsClient "${osClient}". Returns one item per index with ordered Columns, IsUnique and IsPrimary. Use this before changing indexes and again for readback verification.`,
@@ -5771,7 +5816,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_query_system_observability',
-    `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. For memory exhaustion/OOM/abnormal allocations: Memory checks current-node pressure, Collector freshness/loss and Evidence storage health; MemoryIncidents returns up to 50 tenant-scoped incident summaries in Data.Items; MemoryIncident reads detail by incidentId from that list. Correlate execution/parent ids, API engine key, V8 table/event/workflow identity, script hash, allocation types/CLR stacks and Trace. Report missing stacks, lost/unattributed samples and storage gaps before assigning a cause. Allocated bytes are NOT retained heap or exclusive RSS; never sum inclusive parent and child allocations. These read actions do not enable V8 limits, create heap dumps, kill processes or write business data. They require a compatible API diagnostic runtime as well as the query engine; updating MCP alone cannot install the backend. Other read actions cover logs/statistics/details, signals, Trace, hot API rank, host/Docker/queues, application logs, security, platform statistics and traffic history. The backend enforces administrator permission, tenant isolation, bounded pagination and redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`,
+    `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. For memory exhaustion/OOM/abnormal allocations: Memory checks current-node pressure, Collector freshness/loss and Evidence storage health; MemoryIncidents returns up to 50 tenant-scoped incident summaries in Data.Items; MemoryIncident reads detail by incidentId from that list. RequestWaits groups pending admission/HTTP by tenant, API, stage and redacted dependency target; samples carry TraceId. Counts are requests/calls, never worker-thread counts. Evidence.CriticalStorage reports acknowledged MySQL writes, pending/dropped snapshots and errors; RelationalStorage in incident reads is independent of Mongo/local files. Only acknowledged critical evidence survives container file loss; MySqlCriticalEvidence omits raw allocation stacks and EvidenceTruncated must be reported. Correlate execution/parent ids, API engine key, V8 table/event/workflow identity, script hash, allocation types/CLR stacks and Trace. Report missing stacks, lost/unattributed samples and storage gaps before assigning a cause. Allocated bytes are NOT retained heap or exclusive RSS; never sum inclusive parent and child allocations. These read actions do not enable V8 limits, create heap dumps, kill processes or write business data. They require a compatible API diagnostic runtime as well as the query engine; updating MCP alone cannot install the backend. Other read actions cover logs/statistics/details, signals, Trace, hot API rank, host/Docker/queues, application logs, security, platform statistics and traffic history. The backend enforces administrator permission, tenant isolation, bounded pagination and redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`,
     {
       action: z.enum([
         'Capabilities', 'Snapshot', 'Logs', 'LogTypes', 'LogStats', 'Signal', 'Trace',
@@ -7639,7 +7684,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       display: z.number().optional().describe('Show in PC menu (1=yes, 0=no). Default: 1'),
       appDisplay: z.number().optional().describe('Show in mobile menu (1=yes, 0=no). Default: 1'),
       hasChild: z.number().optional().describe('Whether this menu has visible child menus. A hidden TableChild carrier module MUST set 0.'),
-      openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page", "MicroService"'),
+      openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page", "MicroService", "CodeForm". CodeForm keeps diyTableId while rendering a generated Vue 3 page in a MicroService.'),
       url: z.string().optional().describe('Menu route. MicroService menus normally use /micro-app/{MicroServiceKey}/{routePath}.'),
       sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
       icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
@@ -7670,9 +7715,9 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       mobileListFields: z.string().optional().describe('JSON array of fields shown in mobile/card list. If omitted and diyTableId is bound, backend picks compact title/status/summary fields.'),
       cardTitleTagFields: z.string().optional().describe('JSON array of fields shown as title tags on mobile/card view.'),
       cardBottomTagFields: z.string().optional().describe('JSON array of fields shown as bottom tags on mobile/card view.'),
-      microServiceId: z.string().optional().describe('sys_microiservice.Id. Required when openType=MicroService.'),
-      microServicePageId: z.string().optional().describe('sys_microiservice_page.Id for this menu route. Required when openType=MicroService.'),
-      microServiceRoutePath: z.string().optional().describe('Internal Vue route such as /context-test. Required when openType=MicroService.'),
+      microServiceId: z.string().optional().describe('sys_microiservice.Id. Required when openType=MicroService or CodeForm.'),
+      microServicePageId: z.string().optional().describe('sys_microiservice_page.Id for this menu route. Required when openType=MicroService or CodeForm.'),
+      microServiceRoutePath: z.string().optional().describe('Internal Vue route such as /context-test. Required when openType=MicroService or CodeForm.'),
       microServiceKey: z.string().optional().describe('sys_microiservice.MsKey/AppKey. Used to generate the friendly menu URL.'),
       confirmExecution: z.string().optional().describe('Required for real writes. Must exactly equal name, or EXECUTE. Omit for a dry-run payload.'),
     },
@@ -7684,7 +7729,8 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields,
       microServiceId, microServicePageId, microServiceRoutePath, microServiceKey, confirmExecution }) => {
       try {
-        const isMicroService = String(openType || '').toLowerCase() === 'microservice'
+        const isCodeForm = String(openType || '').toLowerCase() === 'codeform';
+        const isMicroService = String(openType || '').toLowerCase() === 'microservice' || isCodeForm
           || Boolean(microServiceId || microServicePageId || microServiceRoutePath || microServiceKey);
         let effectiveOpenType = openType;
         let effectiveComponentName = componentName;
@@ -7692,6 +7738,9 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         let effectiveUrl = url;
         let effectiveMicroServiceRoutePath = microServiceRoutePath;
         if (isMicroService) {
+          if (isCodeForm && !diyTableId) {
+            return { content: [{ type: 'text', text: 'Error: CodeForm 菜单必须绑定 diyTableId。' }], isError: true };
+          }
           const missing = [
             !microServiceId ? 'microServiceId' : '',
             !microServicePageId ? 'microServicePageId' : '',
@@ -7706,7 +7755,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
             return { content: [{ type: 'text', text: `Error: microServiceRoutePath 不合法：${microServiceRoutePath}` }], isError: true };
           }
           effectiveMicroServiceRoutePath = routePath;
-          effectiveOpenType = 'MicroService';
+          effectiveOpenType = isCodeForm ? 'CodeForm' : 'MicroService';
           effectiveComponentName = componentName || 'MicroService';
           effectiveComponentPath = componentPath || '/micro-app/host';
           const encodedRoute = routePath === '/'

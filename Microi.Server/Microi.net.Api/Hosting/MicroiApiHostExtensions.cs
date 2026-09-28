@@ -266,6 +266,7 @@ public static class MicroiApiHostExtensions
         app.UseForwardedHeaders();
         if (!app.Environment.IsDevelopment()) app.UseHsts();
         app.UseGlobalExceptionHandler();
+        app.UseHostLiveness();
         app.Use(async (context, next) =>
         {
             if (RequestBodyLimitError.IsHdfsUploadPath(context.Request.Path))

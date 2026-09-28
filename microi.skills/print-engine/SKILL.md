@@ -109,8 +109,10 @@ ZICOX CC4、BLE/SPP 或
 文本 `text` 与长文本 `longText` 的 `options.formatter` 接收
 `function(title, value, options, templateData)`；文本控件还可能传第五个 `target`。
 第一参数是标题，绑定数据在第二参数。不要直接传入 `function(value)` 编码器，否则会把
-标题当业务值打印。表格单元格的 `formatter2(title, field, row, index, options)` 是另一合同。
+标题当业务值打印。表格单元格的 `formatter2(value, row, index, options)` 是另一合同，首参是当前单元格值，第三参是列索引。
 金额应由后端精确计算后作为字符串输出，不能在打印页转换为 `Number` 再求和。
+表格列应使用 `function(value){ return escapeText(value); }` 这一形式。验收必须检查实际打印 iframe 的商品、数量、单价及金额单元格；表头、合计正确并不能证明明细正确，设计画布的 testData 也不能作为实际打印数据。
+
 业务文本经过 formatter 进入 HTML 时必须编码 `& < > " '`，并用含标签的值与大额金额
 调用真实函数签名做回归。模板保存成功只证明存储，仍须用实际数据预览分页、合计与长条款。
 
@@ -220,7 +222,7 @@ ZICOX CC4、BLE/SPP 或
 
 | 属性 | 函数签名 | 说明 |
 |------|----------|------|
-| formatter2 | `function(title, field, row, index, options)` | 单元格渲染 |
+| formatter2 | `function(value, row, index, options)` | 单元格渲染，首参为值、index为列索引 |
 | styler2 | `function(value, row, index, options)` | 单元格样式 |
 | rowStyler | `function(row, index, options)` | 行样式 |
 | footerFormatter | `function(options, rows, data, el)` | 表尾渲染 |

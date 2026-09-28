@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-reminder-official-feed
- * Version: v1.0.4
+ * Version: v1.0.5
  * Function:
- * - 由吾码官方 License 身份限定的公开平台公告源，仅返回匹配产品版本的已发布投影；按接收协议过滤超级管理员范围和重启频率，不暴露租户目标、用户或回执。
+ * - 固定官方平台公开公告源，按接收协议和产品版本筛选，并返回个人版/企业版授权到期提醒策略；不返回草稿、目标、用户和回执。
  */
 
 var context = V8.Method.RunPlatformApiRuntime({ RuntimeKey: 'PlatformReminders', Action: 'Context' });
@@ -33,5 +33,12 @@ for (var i=0; batches.Data && i<batches.Data.length; i++) {
   var minimumProtocol = Math.max(Number(rule.MinimumReceiverProtocol || 1), rule.AccountScope === 'SuperAdmins' || rule.DisplayMode === 'AfterServerRestart' ? 2 : 1);
   if (minimumProtocol <= receiverProtocol && rule.ScopeType === 'Editions' && targets.indexOf(edition) >= 0) output.push({ Id: batch.Id, State: 'Published', SnapshotJson: batch.SnapshotJson });
 }
-return { Code: 1, Data: output, DataAppend: { ProtocolVersion: 2 } };
+// 只公开自动授权提醒模板，不暴露配置记录、接收人或其它租户信息。
+var policyResult = V8.FormEngine.GetTableData('mci_platform_reminder', {
+  _Where: [['ReminderType','=','LicenseExpiry'],['ScopeType','=','Editions'],['Status','=','Published']],
+  _SelectFields: ['RuleJson'], _PageSize: 1
+});
+var licensePolicy = null;
+try { if (Number(policyResult.Code) === 1 && policyResult.Data && policyResult.Data.length) licensePolicy = JSON.parse(policyResult.Data[0].RuleJson); } catch (_) { }
+return { Code: 1, Data: output, DataAppend: { ProtocolVersion: 2, LicenseExpiryPolicy: licensePolicy } };
 

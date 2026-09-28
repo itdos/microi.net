@@ -1,0 +1,146 @@
+.ai-cad-landing-document .VPPage { padding: 0 !important; }
+.ai-cad-landing {
+  --cad-bg: #081622;
+  --cad-surface: #102533;
+  --cad-text: #eef8f8;
+  --cad-muted: #a9c1c9;
+  --cad-accent: #45cfbd;
+  background: var(--cad-bg);
+  color: var(--cad-text);
+  overflow: clip;
+  font-family: "Inter", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+}
+.ai-cad-landing * { box-sizing: border-box; }
+.ai-cad-landing .ai-cad-hero {
+  min-height: 680px;
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 94px 34px 84px;
+  display: grid;
+  grid-template-columns: minmax(380px, .87fr) minmax(520px, 1.13fr);
+  gap: 62px;
+  align-items: center;
+}
+.ai-cad-landing .ai-cad-hero-copy { position: relative; z-index: 1; }
+.ai-cad-landing .ai-cad-eyebrow {
+  display: inline-block;
+  color: var(--cad-accent);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .2em;
+}
+.ai-cad-landing .ai-cad-release {
+  display: inline-block;
+  margin-left: 14px;
+  padding: 5px 10px;
+  border: 1px solid rgba(69, 207, 189, .5);
+  border-radius: 99px;
+  color: #b9e7dc;
+  font-size: 11px;
+}
+.ai-cad-landing h1 {
+  margin: 20px 0 24px;
+  font-size: clamp(42px, 4.6vw, 72px);
+  line-height: 1.13;
+  letter-spacing: -.045em;
+  font-weight: 760;
+}
+.ai-cad-landing h1 em {
+  font-style: normal;
+  background: linear-gradient(95deg, #58ddc6, #9debdc 55%, #edf8f8);
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.ai-cad-landing .ai-cad-hero-copy > p:not(.ai-cad-disclosure) {
+  margin: 0;
+  max-width: 570px;
+  color: var(--cad-muted);
+  line-height: 1.85;
+  font-size: 17px;
+}
+.ai-cad-landing .ai-cad-actions { display: flex; gap: 13px; flex-wrap: wrap; margin-top: 34px; }
+.ai-cad-landing .ai-cad-actions a {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  min-height: 48px;
+  padding: 0 21px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform .2s ease, border-color .2s ease, background .2s ease;
+}
+.ai-cad-landing .ai-cad-actions a:hover { transform: translateY(-2px); }
+.ai-cad-landing .ai-cad-actions .primary { background: var(--cad-accent); color: #08212c; }
+.ai-cad-landing .ai-cad-actions .secondary { color: var(--cad-text); border: 1px solid #496876; }
+.ai-cad-landing .ai-cad-disclosure {
+  margin: 26px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid #c99552;
+  color: #c9bca8;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.ai-cad-landing .ai-cad-hero-visual {
+  margin: 0;
+  padding: 9px;
+  border: 1px solid #2c5260;
+  border-radius: 17px;
+  background: #122733;
+  box-shadow: 0 35px 100px rgba(0, 0, 0, .35), 0 0 70px rgba(56, 197, 179, .1);
+  transform: perspective(1500px) rotateY(-4deg);
+}
+.ai-cad-landing img { display: block; width: 100%; height: auto; }
+.ai-cad-landing .ai-cad-hero-visual img { border-radius: 9px; }
+.ai-cad-landing .ai-cad-hero-visual figcaption { padding: 10px 7px 2px; color: var(--cad-muted); font-size: 11px; }
+.ai-cad-landing .ai-cad-section { padding: 90px max(34px, calc((100vw - 1492px) / 2)); }
+.ai-cad-landing .ai-cad-section-head { max-width: 760px; margin-bottom: 34px; }
+.ai-cad-landing h2 { margin: 12px 0 0; font-size: clamp(28px, 3.3vw, 42px); line-height: 1.25; }
+.ai-cad-landing .ai-cad-section-head p { margin: 18px 0 0; color: var(--cad-muted); line-height: 1.8; }
+.ai-cad-landing .ai-cad-value { background: #0e2230; }
+.ai-cad-landing .ai-cad-flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.ai-cad-landing .ai-cad-flow > div {
+  min-height: 188px;
+  padding: 24px;
+  border: 1px solid #254653;
+  border-radius: 12px;
+  background: #142e3c;
+}
+.ai-cad-landing .ai-cad-flow span { display: block; color: var(--cad-accent); font-size: 13px; font-weight: 750; margin-bottom: 18px; }
+.ai-cad-landing .ai-cad-flow strong { display: block; font-size: 18px; }
+.ai-cad-landing .ai-cad-flow p { margin: 12px 0 0; color: var(--cad-muted); font-size: 13px; line-height: 1.75; }
+.ai-cad-landing .ai-cad-gallery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.ai-cad-landing .ai-cad-gallery-grid figure { margin: 0; border: 1px solid #254653; border-radius: 13px; overflow: hidden; background: var(--cad-surface); }
+.ai-cad-landing .ai-cad-gallery-grid a { display: block; overflow: hidden; }
+.ai-cad-landing .ai-cad-gallery-grid img { transition: transform .25s ease; }
+.ai-cad-landing .ai-cad-gallery-grid a:hover img { transform: scale(1.025); }
+.ai-cad-landing .ai-cad-gallery-grid figcaption { display: flex; gap: 12px; align-items: baseline; padding: 17px 20px; }
+.ai-cad-landing .ai-cad-gallery-grid figcaption span { color: var(--cad-accent); font-size: 12px; font-weight: 700; }
+.ai-cad-landing .ai-cad-gallery-grid figcaption strong { font-size: 17px; }
+.ai-cad-landing .ai-cad-gallery-grid figcaption small { color: var(--cad-muted); margin-left: auto; }
+.ai-cad-landing .ai-cad-scope { display: grid; grid-template-columns: 1.2fr .8fr; gap: 70px; align-items: center; background: #0e2230; }
+.ai-cad-landing .ai-cad-scope p { max-width: 720px; color: var(--cad-muted); line-height: 1.8; }
+.ai-cad-landing .ai-cad-scope-stats { display: flex; gap: 12px; }
+.ai-cad-landing .ai-cad-scope-stats div { flex: 1; padding: 22px 16px; border: 1px solid #30505c; border-radius: 10px; background: #142e3c; text-align: center; }
+.ai-cad-landing .ai-cad-scope-stats strong { display: block; color: var(--cad-accent); font-size: 38px; line-height: 1.2; }
+.ai-cad-landing .ai-cad-scope-stats span { color: var(--cad-muted); font-size: 12px; }
+@media (max-width: 1000px) {
+  .ai-cad-landing .ai-cad-hero { grid-template-columns: 1fr; gap: 42px; padding-top: 68px; }
+  .ai-cad-landing .ai-cad-hero-visual { transform: none; }
+  .ai-cad-landing .ai-cad-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ai-cad-landing .ai-cad-scope { grid-template-columns: 1fr; gap: 26px; }
+}
+@media (max-width: 620px) {
+  .ai-cad-landing .ai-cad-hero { padding: 54px 20px 64px; }
+  .ai-cad-landing .ai-cad-release { margin: 12px 0 0; }
+  .ai-cad-landing .ai-cad-section { padding: 64px 20px; }
+  .ai-cad-landing .ai-cad-flow, .ai-cad-landing .ai-cad-gallery-grid { grid-template-columns: 1fr; }
+  .ai-cad-landing .ai-cad-flow > div { min-height: 0; }
+  .ai-cad-landing .ai-cad-gallery-grid figcaption { flex-wrap: wrap; }
+  .ai-cad-landing .ai-cad-gallery-grid figcaption small { margin-left: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-cad-landing .ai-cad-actions a, .ai-cad-landing .ai-cad-gallery-grid img { transition: none; }
+}

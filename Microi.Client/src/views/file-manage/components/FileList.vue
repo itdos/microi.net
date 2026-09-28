@@ -214,7 +214,7 @@
               <el-tooltip v-if="!file.isFolder" content="下载" placement="top">
                 <el-button :icon="Download" circle text @click.stop="emitFileAction('download', file)" />
               </el-tooltip>
-              <el-tooltip v-if="!file.isFolder" content="预览" placement="top">
+              <el-tooltip v-if="!file.isFolder" :content="isOfficeFile(file) ? 'Office 在线编辑/版本' : '预览'" placement="top">
                 <el-button :icon="View" circle text @click.stop="emitFileAction('preview', file)" />
               </el-tooltip>
               <el-tooltip content="更多" placement="top">
@@ -393,7 +393,7 @@
           </el-dropdown-item>
           <el-dropdown-item v-if="!recycleMode" command="preview">
             <el-icon><View /></el-icon>
-            <span>预览</span>
+            <span>{{ isOfficeFile(listContextMenuFile) ? 'Office 在线编辑/版本' : '预览' }}</span>
           </el-dropdown-item>
           <el-dropdown-item v-if="!recycleMode" divided command="download">
             <el-icon><Download /></el-icon>
@@ -451,7 +451,7 @@
           </el-dropdown-item>
           <el-dropdown-item v-if="!recycleMode" command="preview">
             <el-icon><View /></el-icon>
-            <span>预览</span>
+            <span>{{ isOfficeFile(contextMenuFile) ? 'Office 在线编辑/版本' : '预览' }}</span>
           </el-dropdown-item>
           <el-dropdown-item v-if="!recycleMode" divided command="download">
             <el-icon><Download /></el-icon>
@@ -520,7 +520,10 @@ import {
   Close,
   MoreFilled
 } from '@element-plus/icons-vue'
+
 import FileIcon from './FileIcon.vue'
+
+const isOfficeFile = (file) => !file?.isFolder && /^(doc|docx|xls|xlsx|ppt|pptx|csv)$/i.test(String(file?.type || ''))
 
 const props = defineProps({
   files: {

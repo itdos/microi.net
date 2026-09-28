@@ -47,7 +47,7 @@
 `text`、`longText` 的 `options.formatter` 使用
 `function(title, value, options, templateData)`：第一参数是标题，第二参数才是
 `field` 绑定的数据；文本控件还可能传第五个 `target`。表格单元格使用
-`formatter2(title, field, row, index, options)`，值取 `row[field]`，不要混用这两种签名。
+`formatter2(value, row, index, options)`，第一参数就是当前单元格值，第二参数是业务行，第三参数是列索引；不要把列索引当作业务行，也不要混用文本与表格签名。
 
 ```javascript
 // 放入 options.formatter 的函数源码；业务文本必须编码后再进入打印 HTML。
@@ -57,6 +57,8 @@ const formatter = function (title, value) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 };
 ```
+
+表格列应使用 `function(value){ return escapeText(value); }` 这一形式。验收必须检查实际打印 iframe 的商品、数量、单价及金额单元格；表头、合计正确并不能证明明细正确，设计画布的 testData 也不能作为实际打印数据。
 
 金额由业务后端计算并作为字符串传入，打印层不要转为 JavaScript `Number` 求和。
 更新已有模板时保留模板 `Id`，保存后回读 `PageObj`、`PrintObj`，再验证实际数据预览。
