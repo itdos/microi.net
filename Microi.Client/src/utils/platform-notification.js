@@ -210,10 +210,15 @@ export function dispatchPlatformNotificationSnapshot(rows, unreadCount, target) 
 export function normalizeNotificationLink(value, currentOrigin = "") {
     const link = String(value || "").trim();
     if (!link || /^(javascript|data|vbscript):/i.test(link)) return "";
+    // 平台业务消息使用 /#/route 深链接；交给 Vue Router 的普通路径会丢失 hash 路由及记录 Id。
+    if (link.startsWith("/#/")) return link.slice(1);
     if ((link.startsWith("/") && !link.startsWith("//")) || link.startsWith("#")) return link;
     try {
         const parsed = new URL(link, currentOrigin || "http://microi.local");
         if (!/^https?:$/i.test(parsed.protocol)) return "";
+        if (currentOrigin && parsed.origin === new URL(currentOrigin).origin && parsed.hash.startsWith("#/")) {
+            return parsed.hash;
+        }
         return parsed.href;
     } catch (_) {
         return "";

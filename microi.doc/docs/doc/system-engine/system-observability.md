@@ -30,6 +30,36 @@
 
 ![系统日志/监控总览](/images/system-observability/overview-navigation.png)
 
+## API 排队与容器重建后的事故证据
+
+升级包含 `critical-incidents/mysql-v1` 的 API，并安装新版【系统日志/监控】应用后，
+关键事故保存到当前租户主库的 `mci_runtime_incident`。不要求 API 能写容器外目录。
+普通日志仍使用 MongoDB；完整分配栈仍由诊断文件与 MongoDB 保存。
+
+| 入口/字段 | 如何判断 |
+|---|---|
+| `Memory.RequestWaits.Groups` | 按租户、接口、阶段和外部目标汇总；`Gate:V8Tenant` 表示等待本租户名额 |
+| `Samples / Recent` | 查看 TraceId、执行 Id、当前等待时长或完成结果；注册溢出及省略计数必须同时核对 |
+| 事故 `WaitEvidence` | 保留并发峰值、最长等待样本和 `WorstThreadPoolFrame`；恢复后的空快照不抹掉现场。各分组按自己的 `ObservedAtUtc` 判断，不能相加为同时发生的总数 |
+| `Evidence.CriticalStorage` | `Scope=CurrentNodeAllLoadedTenants` 表示当前节点全部已加载租户的写库状态；`AcknowledgedWrites`、`LastAcknowledgedAtUtc` 是节点级确认，必须读回当前租户的 MySQL 事故验证归属；`Pending` 不是已保存 |
+| `MemoryIncidents.RelationalStorage` | MySQL 查询状态独立于 MongoDB；Mongo 不可用仍可查已确认关键证据 |
+| `StorageKind=MySqlCriticalEvidence` | 当前详情来自 MySQL，`RawStacksStoredHere=false`；检查 `EvidenceTruncated` |
+
+外部目标只保存协议、主机、端口和路径 SHA-256，不保存查询、路径明文、请求头、正文或凭据。
+`AwaitingHttpCompletion` 包含连接、服务端处理和接收，不能直接断言是 DNS、TCP 或对方内部故障。
+Admission 数量与 HTTP 调用数量不能相加成线程数。持续等待 10 秒只触发留证，600 秒默认超时和显式长超时不变。
+
+采样与 MySQL 写入各使用独立线程。数据库最多两个并发无池连接，连接/命令各 2 秒；
+写入失败按租户退避 10 秒，避免同一故障数据库的每条记录重复占用连接等待。待写队列最多 64 个事故，每租户最多 8 个并合并新快照；全局满时优先从占用最多的租户释放旧快照，让新租户仍可留证。`RetryingTenants` 表示退避中的租户数量，`DroppedSnapshots` 包含容量替换或拒绝，未确认文件仍可重放。单条关键证据最多 256 KiB；
+持久目录中的事故由独立写库线程每 10 秒分批重放，使用单独的 MySQL 版本确认文件；Mongo 的写入确认不代替 MySQL 确认。重启后继续补写，`SpoolReplayError` 表示本地重放异常。
+每租户保留 14 天或最新 512 条。记录带租户幂等键和版本，旧节点重放不能覆盖较新证据。
+新表和索引由官方应用包安装，运行时不自动建表；`MySqlError:1146` 时先检查应用是否已更新。
+当前关系库后备支持 MySQL，其他驱动明确报告不支持，继续保留既有 Mongo/WAL 通路。
+
+**持久化边界**：API 容器重建不会删除 MySQL 已确认记录。尚在内存队列、MySQL 与 Mongo
+同时不可用、数据库自身磁盘丢失或采样前强杀仍可能缺证；这不等于零丢失保证。
+没有持久日志卷时，原始 EventPipe 片段仍会丢失，不能把关键证据称为完整调用栈。
+
 ## 内存吃满与异常退出定位
 
 “内存与事故”使用独立于 V8 资源限制的诊断采集。`V8Limit=0/false` 继续允许复杂业务执行，采集器不会终止脚本，也不会替业务设置内存或语句限额。仅打开前端页面、升级微服务或开启 V8 限制，都不能代替升级包含诊断运行时的 API。
@@ -94,10 +124,18 @@
 | `ContainerMemoryPressure` | 可读取的 cgroup 内存使用达到有效上限的 80% |
 | `RapidRssGrowth` | 相较约 10 秒前，API RSS 增长至少 256 MiB |
 | `HighAllocationRate` | 托管分配率达到 128 MiB/s |
+| `SustainedThreadPoolBacklog` | 间隔约 10 秒的两次采样均有至少 64 个排队工作项，且线程池线程数达到 CPU 数两倍与 16 中的较大值；仅表示持续积压，不单独证明线程池饥饿 |
+| `SustainedRequestGateWait` | 间隔约 10 秒的两次采样均有共享请求槽等待，且当前全局或 V8 全局槽已满；可直接检查同帧 `Pressure*` 字段 |
 | `CgroupOomKillObserved` | cgroup 的 OOM kill 计数增加；仍需核对具体被杀进程 |
 | `DiskSpacePressure` | 诊断目录所在磁盘可用空间低于 256 MiB |
 
 当前压力窗口最多 60 帧，正常每 2 秒采样。持续事故合并更新，压力消退超过 60 秒或单次记录超过 5 分钟后封存。采集与解析进程另有内存和运行时限，诊断故障会显示降级；不能把这套有界采集当成持续全量性能分析器。
+
+`Memory.Current` 和事故 `Current`/`Frames` 另记录 `ThreadPoolThreads`、`ThreadPoolPendingWorkItems`、`ThreadPoolCompletedWorkItems`、`ThreadPoolAvailableWorkers`、`ThreadPoolMaxWorkers`。结合请求排队、外部 HTTP 耗时和 CPU 同窗分析；单帧队列值不足以断言线程池饥饿。
+
+同一采样帧还记录 `PressureGlobalActive/Limit/Waiting` 与 `PressureV8GlobalActive/Limit/Waiting`。先看共享业务槽、V8 槽是否满额或有人等待，再与当时的租户执行链对应；这些是当前节点的瞬时值，不能把某个租户的执行片段数直接当成它占用的槽位数。
+
+请求槽按单接口、单租户、共享 V8、全局的顺序获取：某租户在自身槽前排队时，不占用其它租户共用的 V8/全局槽。V8.Http 未显式填写超时时仍保持 600 秒；共享槽保护不能靠缩短所有业务调用的默认超时实现。
 
 ### 人工与 AI 共用的定位步骤
 
@@ -108,6 +146,8 @@
 5. **检查分配路径**：沿对象类型与 CLR 栈，结合 `Trace`、慢 SQL、请求字节、循环、逐行查询、大对象序列化和缓存写入，建立可验证的原因假设。浏览器 V8 事件要追到其调用的后端 API。
 6. **验证保留和压力来源**：若 RSS 持续增长而分配热点不匹配，继续查存活对象、缓存、非托管内存，以及 Mongo/MySQL 等独立进程。采样不能代替受控堆分析或数据库执行计划。
 7. **修复后对照复测**：相同业务数据、并发和窗口下比较返回结果、分配率、托管堆、RSS、GC、P95/P99 与错误率。先验证业务正确，再判断是否消除了异常增长。
+
+当“机器资源正常但多租户 API 超时”时，先测固定宿主存活检查，再看 `Memory.Current` 的共享槽占用/等待与线程池排队；读取对应 `MemoryIncident.Frames` 确认事故当时是否满额，结合租户执行链定位长耗时接口。若长接口依赖外部 HTTP，从 API 服务器对目标地址做有界连通测试，并检查该接口的显式超时和前端重试频率。只有槽位满额与等待同窗出现，才能把共享闸门拥堵定为已证实；否则继续查路由、数据库池、网络和客户端中断，不以 CPU/内存正常推断 API 正常。
 
 最终诊断应分别列出“已证实的事实、最可能原因、缺失证据、修复与复测结果”。证据完整时有较高机会缩小到具体接口或事件；准确定位长期存活对象或某一行 JavaScript，仍取决于事故类型与补充分析。定位概率属于条件性的工程判断，不能用一次演练结果推导通用成功率或承诺 100%。
 

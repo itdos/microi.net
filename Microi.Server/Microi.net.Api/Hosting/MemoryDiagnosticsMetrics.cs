@@ -16,6 +16,17 @@ public sealed class MemoryDiagnosticsMetrics
     public long TotalAllocatedBytes { get; set; }
     public double AllocationBytesPerSecond { get; set; }
     public int Gen2Collections { get; set; }
+    public int ThreadPoolThreads { get; set; }
+    public long ThreadPoolPendingWorkItems { get; set; }
+    public long ThreadPoolCompletedWorkItems { get; set; }
+    public int ThreadPoolAvailableWorkers { get; set; }
+    public int ThreadPoolMaxWorkers { get; set; }
+    public int PressureGlobalActive { get; set; }
+    public int PressureGlobalLimit { get; set; }
+    public long PressureGlobalWaiting { get; set; }
+    public int PressureV8GlobalActive { get; set; }
+    public int PressureV8GlobalLimit { get; set; }
+    public long PressureV8GlobalWaiting { get; set; }
     public long? HostTotalBytes { get; set; }
     public long? HostAvailableBytes { get; set; }
     public long? SwapTotalBytes { get; set; }
@@ -42,6 +53,20 @@ public sealed class MemoryDiagnosticsMetrics
             value.GcHeapBytes = gc.HeapSizeBytes; value.GcCommittedBytes = gc.TotalCommittedBytes;
             value.GcFragmentedBytes = gc.FragmentedBytes; value.GcPausePercent = gc.PauseTimePercentage;
             value.TotalAllocatedBytes = GC.GetTotalAllocatedBytes(false); value.Gen2Collections = GC.CollectionCount(2);
+            value.ThreadPoolThreads = ThreadPool.ThreadCount;
+            value.ThreadPoolPendingWorkItems = ThreadPool.PendingWorkItemCount;
+            value.ThreadPoolCompletedWorkItems = ThreadPool.CompletedWorkItemCount;
+            ThreadPool.GetAvailableThreads(out var availableWorkers, out _);
+            ThreadPool.GetMaxThreads(out var maxWorkers, out _);
+            value.ThreadPoolAvailableWorkers = availableWorkers;
+            value.ThreadPoolMaxWorkers = maxWorkers;
+            var pressure = RequestPressureGuardService.Snapshot();
+            value.PressureGlobalActive = pressure.Global.Active;
+            value.PressureGlobalLimit = pressure.Global.Limit;
+            value.PressureGlobalWaiting = pressure.Global.Waiting;
+            value.PressureV8GlobalActive = pressure.V8Global.Active;
+            value.PressureV8GlobalLimit = pressure.V8Global.Limit;
+            value.PressureV8GlobalWaiting = pressure.V8Global.Waiting;
             if (previous != null) value.AllocationBytesPerSecond = Math.Max(0, value.TotalAllocatedBytes - previous.TotalAllocatedBytes)
                 / Math.Max(.1, (value.AtUtc - previous.AtUtc).TotalSeconds);
             if (OperatingSystem.IsLinux())
@@ -96,6 +121,22 @@ public sealed class MemoryDiagnosticsMetrics
             && current.ContainerCurrentBytes >= current.ContainerLimitBytes * .8) result.Add("ContainerMemoryPressure");
         if (tenSecondsAgo != null && current.RssBytes - tenSecondsAgo.RssBytes >= 256L * 1024 * 1024) result.Add("RapidRssGrowth");
         if (current.AllocationBytesPerSecond >= 128L * 1024 * 1024) result.Add("HighAllocationRate");
+        // A sustained queue deserves an incident even when CPU and memory are normal.
+        // A backlog is evidence of delayed work, not by itself proof of ThreadPool starvation.
+        if (tenSecondsAgo?.ThreadPoolPendingWorkItems >= 64
+            && current.ThreadPoolPendingWorkItems >= 64
+            && current.ThreadPoolThreads >= Math.Max(16, Environment.ProcessorCount * 2))
+            result.Add("SustainedThreadPoolBacklog");
+        if (tenSecondsAgo != null && (
+                (current.PressureGlobalLimit > 0
+                 && current.PressureGlobalActive >= current.PressureGlobalLimit
+                 && current.PressureGlobalWaiting > 0
+                 && tenSecondsAgo.PressureGlobalWaiting > 0)
+                || (current.PressureV8GlobalLimit > 0
+                    && current.PressureV8GlobalActive >= current.PressureV8GlobalLimit
+                    && current.PressureV8GlobalWaiting > 0
+                    && tenSecondsAgo.PressureV8GlobalWaiting > 0)))
+            result.Add("SustainedRequestGateWait");
         if (tenSecondsAgo?.ContainerOomKillCount != null && current.ContainerOomKillCount > tenSecondsAgo.ContainerOomKillCount) result.Add("CgroupOomKillObserved");
         if (current.DiskAvailableBytes is >= 0 and < 256L * 1024 * 1024) result.Add("DiskSpacePressure");
         return result.ToArray();

@@ -1610,7 +1610,7 @@ export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: strin
     const openType = getString(item, 'openType', 'OpenType');
     const microServiceKey = getString(item, 'microServiceKey', 'MicroServiceKey');
     const microServiceRoutePath = getString(item, 'microServiceRoutePath', 'MicroServiceRoutePath');
-    const isMicroService = openType.toLowerCase() === 'microservice'
+    const isMicroService = ['microservice', 'codeform'].includes(openType.toLowerCase())
       || Boolean(
         getNumber(item, 'isMicroiService', 'IsMicroiService') === 1
         || microServiceKey
@@ -2436,7 +2436,7 @@ export async function resolveMicroServiceModuleBinding(
   const rawRoutePath = getString(module, 'microServiceRoutePath', 'MicroServiceRoutePath');
   const explicitServiceId = getString(module, 'microServiceId', 'MicroServiceId');
   const explicitPageId = getString(module, 'microServicePageId', 'MicroServicePageId');
-  const isMicroService = openType.toLowerCase() === 'microservice'
+  const isMicroService = ['microservice', 'codeform'].includes(openType.toLowerCase())
     || Boolean(
       getNumber(module, 'isMicroiService', 'IsMicroiService') === 1
       || microServiceKey
@@ -2445,6 +2445,9 @@ export async function resolveMicroServiceModuleBinding(
       || explicitPageId,
     );
   if (!isMicroService) return undefined;
+  if (openType.toLowerCase() === 'codeform' && !getString(module, 'diyTableId', 'DiyTableId', 'table', 'tableName', 'diyTableName', 'DiyTableName')) {
+    throw new Error('CodeForm 菜单必须绑定真实 diy_table，供表单代码获取菜单与表权限上下文');
+  }
   if (!microServiceKey || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(microServiceKey)) {
     throw new Error(`MicroService 菜单缺少合法的 microServiceKey：${microServiceKey || '(empty)'}`);
   }
@@ -2483,7 +2486,7 @@ export async function resolveMicroServiceModuleBinding(
     : `/${routePath.slice(1).split('/').map((segment) => encodeURIComponent(segment)).join('/')}`;
   return {
     IsMicroiService: 1,
-    OpenType: 'MicroService',
+    OpenType: openType.toLowerCase() === 'codeform' ? 'CodeForm' : 'MicroService',
     ComponentName: getString(module, 'componentName', 'ComponentName') || 'MicroService',
     ComponentPath: getString(module, 'componentPath', 'ComponentPath') || '/micro-app/host',
     Url: getString(module, 'url', 'Url') || `/micro-app/${encodeURIComponent(microServiceKey)}${encodedRoute}`,
@@ -2831,7 +2834,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
       modules: {
         table: 'Bind by table name. The generator resolves the table Id after create/refresh schema.',
         hasChild: 'For a hidden TableChild carrier module set display=0, appDisplay=0 and hasChild=0 explicitly.',
-        microServiceKey: 'Portable sys_microiservice.MsKey reference for openType=MicroService. The generator resolves the tenant-specific MicroServiceId before any writes.',
+        microServiceKey: 'Portable sys_microiservice.MsKey reference for openType=MicroService or CodeForm. CodeForm must also bind a diyTableId/table. The generator resolves the tenant-specific MicroServiceId before any writes.',
         microServiceRoutePath: 'Portable sys_microiservice_page.RoutePath reference such as /overview. The generator resolves and verifies MicroServicePageId before any writes.',
         listFields: 'Field names/labels/ids for grid columns. Produces TableDiyFieldIds and SelectFields. When omitted, generator chooses title/no/status/person/amount/time fields.',
         searchFields: 'Field names/labels/ids for search controls. Produces SearchFieldIds object array. When omitted, generator chooses title/no/status/type/category/person/time fields.',

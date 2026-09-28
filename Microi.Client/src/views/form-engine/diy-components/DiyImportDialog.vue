@@ -442,6 +442,13 @@ export default {
             _xlsx: null,
             _workbook: null,
             _importStepTimer: null,
+            _uploadWatchdogTimer: null,
+            _customImportIdempotencyKey: "",
+            _backgroundPollStartedAt: 0,
+            _backgroundPollFailures: 0,
+            _legacyProgressRequestTimer: null,
+            legacyProgressFailures: 0,
+            legacyProgressStartedAt: 0,
             _backgroundTaskTimer: null,
             RefreshRight,
             Warning,
@@ -578,8 +585,7 @@ export default {
                 && !this.submitting
                 && !this.isTaskActive
                 && !this.legacyImportRunning
-                && !this.backgroundTaskId
-                && !this.uploadSucceeded
+                && !this.isTaskActive
             );
         },
         customProgressPercentage() {
@@ -694,11 +700,13 @@ export default {
             return fixedFormData;
         },
         clearImportState(clearSelectedFile = true) {
+            this.stopUploadWatchdog();
             this.stopImportProgressPolling();
             this.legacyImportRunning = false;
             this.stopBackgroundTaskPolling();
             if (clearSelectedFile) this.selectedFile = null;
             if (clearSelectedFile) this.importIdempotencyKey = "";
+            if (clearSelectedFile) this._customImportIdempotencyKey = "";
             this.parsedImport = null;
             this.parsing = false;
             this.submitting = false;
@@ -747,6 +755,7 @@ export default {
             this.clearImportState(false);
             this.selectedFile = file;
             this.importIdempotencyKey = this.DiyCommon.NewGuid();
+            this._customImportIdempotencyKey = "";
             this.parsing = true;
             try {
                 this.validateExcelFile(file);
@@ -938,14 +947,29 @@ export default {
                 this.customError = this.$t("Msg.ImportSubmitFailed");
                 return;
             }
-            uploader.submit();
+            // 上传回调丢失时也必须解除按钮 Loading；重试沿用同一文件的幂等键。
+            this.stopUploadWatchdog();
+            this._uploadWatchdogTimer = window.setTimeout(() => {
+                this._uploadWatchdogTimer = null;
+                if (!this.submitting) return;
+                this.submitting = false;
+                this.customError = "上传响应超时，请先核对导入结果，再用当前文件重试。";
+            }, 90000);
+            try {
+                uploader.submit();
+            } catch (error) {
+                this.stopUploadWatchdog();
+                this.submitting = false;
+                this.customError = this.formatAnalysisError(error);
+            }
         },
         async startCustomImport() {
             this.submitting = true;
             this.customError = "";
             try {
                 const options = this.dialogOptions || {};
-                const operationId = this.DiyCommon.NewGuid();
+                // An uncertain queue response must reuse the same key; a new file resets it.
+                if (!this._customImportIdempotencyKey) this._customImportIdempotencyKey = `${options.ApiEngineKey}:${this.DiyCommon.NewGuid()}`;
                 const params = Object.assign({}, options.Param || {}, {
                     _ImportRowsJson: JSON.stringify(this.parsedImport.rows),
                     _ImportMetaJson: JSON.stringify(this.importMetadata),
@@ -955,7 +979,7 @@ export default {
                     _ImportFileSize: this.selectedFile.size
                 });
                 const backgroundOptions = Object.assign({
-                    IdempotencyKey: `${options.ApiEngineKey}:${operationId}`,
+                    IdempotencyKey: this._customImportIdempotencyKey,
                     ConcurrencyKey: options.ApiEngineKey,
                     MaxAttempts: 1
                 }, options.BackgroundOptions || {});
@@ -972,6 +996,8 @@ export default {
                 this.backgroundTaskId = taskData.Id || taskData.TaskId || taskData.BackgroundTaskId || "";
                 this.backgroundTask = Object.assign({ Status: "Pending", Progress: 0 }, taskData);
                 if (!this.backgroundTaskId) throw new Error(this.$t("Msg.ImportTaskIdMissing"));
+                this._backgroundPollStartedAt = Date.now();
+                this._backgroundPollFailures = 0;
                 try {
                     window.dispatchEvent(new CustomEvent("microi-background-task-started", { detail: result }));
                 } catch (_) { }
@@ -985,25 +1011,37 @@ export default {
         async pollBackgroundTask() {
             if (!this.backgroundTaskId) return;
             try {
-                const result = await this.DiyCommon.PostAsync(
+                let requestTimer;
+                const result = await Promise.race([this.DiyCommon.PostAsync(
                     "/apiengine/platform-background-task",
                     { Action: "Status", Id: this.backgroundTaskId },
                     null,
                     null,
                     "json"
-                );
+                ), new Promise((_, reject) => { requestTimer = window.setTimeout(() => reject(new Error("查询导入任务状态超时")), 12000); })]).finally(() => window.clearTimeout(requestTimer));
                 if (result && Number(result.Code) === 1 && result.Data) {
                     this.backgroundTask = Object.assign({}, this.backgroundTask || {}, result.Data);
+                    this._backgroundPollFailures = 0;
+                } else {
+                    this._backgroundPollFailures++;
                 }
                 if (this.backgroundTask && TERMINAL_TASK_STATUSES.includes(this.backgroundTask.Status)) {
                     if (this.backgroundTask.Status === "Succeeded" && !this.customSuccessEmitted) {
                         this.customSuccessEmitted = true;
                         this.$emit("import-success", this.backgroundTask);
                     }
+                    this._customImportIdempotencyKey = "";
                     return;
                 }
             } catch (error) {
                 this.customError = this.formatAnalysisError(error);
+                this._backgroundPollFailures++;
+            }
+            if (this._backgroundPollFailures >= 3 || Date.now() - this._backgroundPollStartedAt >= 300000) {
+                this.backgroundTask = { ...(this.backgroundTask || {}), Status: "Unknown" };
+                this.backgroundTaskId = "";
+                this.customError = "导入任务状态暂无法确认，请先核对数据列表；如需重试将使用原任务幂等键。";
+                return;
             }
             this._backgroundTaskTimer = window.setTimeout(() => this.pollBackgroundTask(), 1500);
         },
@@ -1018,25 +1056,55 @@ export default {
             this.visible = false;
         },
         handleDialogClosed() {
+            this.stopUploadWatchdog();
             this.stopBackgroundTaskPolling();
             this.stopImportProgressPolling();
+        },
+        stopUploadWatchdog() {
+            if (this._uploadWatchdogTimer) clearTimeout(this._uploadWatchdogTimer);
+            this._uploadWatchdogTimer = null;
         },
         stopImportProgressPolling() {
             this.legacyProgressGeneration++;
             if (this._importStepTimer) clearTimeout(this._importStepTimer);
             this._importStepTimer = null;
+            if (this._legacyProgressRequestTimer) clearTimeout(this._legacyProgressRequestTimer);
+            this._legacyProgressRequestTimer = null;
+        },
+        handleLegacyProgressFailure() {
+            if (!this.legacyImportRunning) return;
+            this.legacyProgressFailures++;
+            if (this.legacyProgressFailures >= 3 || Date.now() - this.legacyProgressStartedAt >= 300000) {
+                // 结果未知不能标记成功；释放按钮并保留本文件幂等键供安全重试。
+                this.legacyImportRunning = false;
+                this.submitting = false;
+                this.customError = "导入进度暂无法确认，请先核对列表，再用当前文件重试。";
+                return;
+            }
+            this._importStepTimer = setTimeout(() => this.getImportProgress(), 1500);
         },
         getImportProgress() {
             if (this._importStepTimer) clearTimeout(this._importStepTimer);
             this._importStepTimer = null;
+            if (this._legacyProgressRequestTimer) clearTimeout(this._legacyProgressRequestTimer);
+            this._legacyProgressRequestTimer = null;
             const generation = ++this.legacyProgressGeneration;
             const requestParam = this.appendMenuContext({ TableId: this.tableId });
-            this.DiyCommon.Post(this.importProgressApi, requestParam, (result) => {
+            this._legacyProgressRequestTimer = setTimeout(() => {
                 if (generation !== this.legacyProgressGeneration || !this.visible) return;
+                this._legacyProgressRequestTimer = null;
+                this.legacyProgressGeneration++;
+                this.handleLegacyProgressFailure();
+            }, 12000);
+            try { this.DiyCommon.Post(this.importProgressApi, requestParam, (result) => {
+                if (generation !== this.legacyProgressGeneration || !this.visible) return;
+                if (this._legacyProgressRequestTimer) clearTimeout(this._legacyProgressRequestTimer);
+                this._legacyProgressRequestTimer = null;
                 if (this.DiyCommon.Result(result) && !this.DiyCommon.IsNull(result.Data) && Array.isArray(result.Data)) {
+                    this.legacyProgressFailures = 0;
                     this.importStepList = result.Data;
                     const progress = result.Data.join("\n");
-                    const succeeded = /已全部成功结束/.test(progress);
+                    const succeeded = /已全部成功结束|成功导入\s*(?:了)?\s*\[(\d+)\s*\/\s*\1\]\s*条数据/.test(progress);
                     const partial = /已按用户选择跳过错误行，其余成功行均已提交/.test(progress);
                     const failed = /已失败[！!]|导入失败.*线程关闭/.test(progress);
                     if (this.legacyImportRunning && (succeeded || partial || failed)) {
@@ -1044,9 +1112,19 @@ export default {
                         this.uploadSucceeded = succeeded || partial;
                         if (succeeded || partial) this.$emit("import-success", this.uploadResult);
                     }
+                } else {
+                    this.handleLegacyProgressFailure();
+                    return;
                 }
-                if (this.legacyImportRunning) this._importStepTimer = setTimeout(() => this.getImportProgress(), 1000);
-            });
+                if (this.legacyImportRunning) {
+                    if (Date.now() - this.legacyProgressStartedAt >= 300000) this.handleLegacyProgressFailure();
+                    else this._importStepTimer = setTimeout(() => this.getImportProgress(), 1000);
+                }
+            }); } catch (error) {
+                if (this._legacyProgressRequestTimer) clearTimeout(this._legacyProgressRequestTimer);
+                this._legacyProgressRequestTimer = null;
+                this.handleLegacyProgressFailure();
+            }
         },
         delImportProgress() {
             const requestParam = this.appendMenuContext({ TableId: this.tableId });
@@ -1058,19 +1136,26 @@ export default {
             });
         },
         handleUploadSuccess(result) {
+            this.stopUploadWatchdog();
             this.submitting = false;
             this.uploadResult = result;
             if (result && Number(result.Code) === 1) {
                 // Code=1 accepts the background import; completion comes from its progress.
                 this.legacyImportRunning = true;
+                this.legacyProgressFailures = 0;
+                this.legacyProgressStartedAt = Date.now();
                 this.getImportProgress();
             } else if (result) {
                 this.legacyImportRunning = false;
                 this.customError = result.Msg || result.Message || this.$t("Msg.ImportFailed");
                 this.DiyCommon.Result(result);
+            } else {
+                this.legacyImportRunning = false;
+                this.customError = this.$t("Msg.ImportFailed");
             }
         },
         handleUploadError(error) {
+            this.stopUploadWatchdog();
             this.submitting = false;
             this.customError = (error && (error.message || error.msg)) || this.$t("Msg.ImportUploadFailed");
         },
@@ -1089,6 +1174,7 @@ export default {
         }
     },
     beforeUnmount() {
+        this.stopUploadWatchdog();
         this.stopImportProgressPolling();
         this.stopBackgroundTaskPolling();
     }

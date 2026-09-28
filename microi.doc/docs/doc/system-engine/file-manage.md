@@ -122,7 +122,7 @@
 |---|:---:|:---:|:---:|---|
 | 上传 | ✓ | — | ✓ | 多文件上传到当前目录，随后显示进度和结果。 |
 | 新建文件夹 | — | ✓ | — | 可从顶部工具栏、目录树或空白区域创建。 |
-| 打开 / 预览 | ✓ | ✓ | — | 双击文件夹进入；双击可预览类型打开预览窗口。 |
+| 打开 / 预览 | ✓ | ✓ | — | 双击文件夹进入；Office 文件打开在线编辑与版本页，其它可预览类型打开预览窗口。 |
 | 下载 | ✓ | — | — | 私有文件先获取短时地址，再由浏览器下载。 |
 | 重命名 | ✓ | ✓ | — | 保留所在目录，仅更新对象名称。 |
 | 移动 | ✓ | ✓ | ✓ | 选择目标目录后移动，路径始终限制在当前租户范围。 |
@@ -138,16 +138,17 @@
   <article class="is-image"><span>IMAGE</span><strong>图片</strong><p><code>jpg</code>、<code>jpeg</code>、<code>png</code>、<code>gif</code>、<code>bmp</code>、<code>svg</code>、<code>webp</code>、<code>ico</code></p><small>适配容器显示，可放大查看并下载原文件。</small></article>
   <article class="is-doc"><span>PDF</span><strong>PDF 文档</strong><p><code>pdf</code></p><small>在文件柜弹窗内嵌浏览器 PDF 阅读器。</small></article>
   <article class="is-media"><span>MEDIA</span><strong>音视频</strong><p><code>mp4</code>、<code>webm</code>、<code>ogg</code>；<code>mp3</code>、<code>wav</code>、<code>flac</code>、<code>aac</code>、<code>m4a</code></p><small>使用浏览器原生播放控件，实际解码能力取决于浏览器。</small></article>
-  <article class="is-code"><span>TEXT</span><strong>文本与代码</strong><p><code>txt</code>、<code>md</code>、<code>json</code>、<code>xml</code>、<code>csv</code>、<code>log</code>、配置与常见源码文件</p><small>只读显示文本内容，不会在预览中执行脚本。</small></article>
+  <article class="is-code"><span>TEXT</span><strong>文本与代码</strong><p><code>txt</code>、<code>md</code>、<code>json</code>、<code>xml</code>、<code>log</code>、配置与常见源码文件</p><small>只读显示文本内容，不会在预览中执行脚本。</small></article>
   <article class="is-cad"><span>CAD</span><strong>CAD / 3D</strong><p><code>dwg</code>、<code>step</code>、<code>stp</code></p><small>读取同目录转换得到的 DXF / STL 预览文件，支持缩放、重置、旋转 / 俯视和全屏。</small></article>
-  <article class="is-other"><span>FILE</span><strong>其他格式</strong><p>DOCX、XLSX、PPTX、压缩包及未识别格式</p><small>显示文件信息并提供下载，不会伪装成已支持在线预览。</small></article>
+  <article class="is-doc"><span>OFFICE</span><strong>Office 文档</strong><p><code>doc/docx</code>、<code>xls/xlsx</code>、<code>ppt/pptx</code>、<code>csv</code></p><small>使用已配置的 OnlyOffice 在线编辑；手动保存生成历史版本。</small></article>
+  <article class="is-other"><span>FILE</span><strong>其他格式</strong><p>压缩包及未识别格式</p><small>显示文件信息并提供下载，不会伪装成已支持在线预览。</small></article>
 </div>
 
 ::: info CAD 预览有前置条件
 DWG 需要同名的 `_preview.dxf`，STEP / STP 需要同名的 `_preview.stl`。转换链路、格式限制和生产验收方法见 [3D、CAD 与数据大屏](/doc/system-engine/visualization-engine)。
 :::
 
-Office 在线编辑属于独立集成能力，不等同于文件柜的内置预览。需要 Word、Excel、PowerPoint 在线编辑时，请查看 [Office 在线编辑](/doc/more/office)。
+Office 在线编辑依赖当前租户配置的 OnlyOffice Docs 服务。文件柜的私有桶、公有桶均支持打开与手动版本管理；历史版本只读，最新版本可编辑。查看配置、权限和版本存储规则请阅读 [Office 在线编辑](/doc/more/office)。
 
 ## 回收站：给误操作留一次反悔机会
 
@@ -253,7 +254,8 @@ Office 在线编辑属于独立集成能力，不等同于文件柜的内置预�
 
 ::: warning 请按已实现能力验收
 - 右键菜单中的“分享、复制、剪切”目前是预留交互入口，不应把提示消息当成已完成的权限分享或跨目录剪贴板能力。
-- 文件柜不内置 DOCX、XLSX、PPTX 在线预览；这些格式默认下载，在线编辑走 Office 集成。
+- Word、Excel、PowerPoint、CSV 在线编辑要求 OnlyOffice Docs 服务可用，并且文档服务能访问平台的文件地址；只安装前端 npm 包不能替代该服务。
+- Office 历史版本随单个文件的移动、重命名处理；整文件夹操作和跨平台同步不会自动迁移子文件的版本索引与私有历史快照。
 - 远程吾码与 MinIO 直连不能直接组合，需要以当前平台为中转分步执行。
 - 树上限、网络带宽、浏览器内存、对象存储策略和目标平台版本都会影响一次同步规模。
 :::

@@ -13,17 +13,19 @@ Microi Code 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌�
 
 ## 安装、签名与平台兼容
 
-Windows 与 macOS 的 latest、不可变归档、SHA-256 和历史版本已经集中在页面顶部。latest 只覆盖对应平台的固定文件名；带版本与内容哈希的归档地址永久保留。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS 当前公开下载版本以页面顶部为准；新版本必须在 Mac 构建机同时生成 DMG 和 ZIP，ZIP 上传后才支持应用内自动更新。
+页面顶部的 Windows 与 macOS 按钮始终下载各自的 latest 安装包。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
 
 - 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。
-- macOS 已公开的 Intel 版本为未签名、未公证包；以后以页面顶部实际下载状态为准。内部源码根目录执行 `bash ./一键打包Mac.sh --unsigned --current` 可以按已发布的同一版本号生成 Mac DMG/ZIP，待上传 CDN 后再更新下载入口。Dock 图标在 Mac 构建时自动生成合适留白。具备证书与 `notarytool` 凭据时也可选择签名、公证；`--signed` 在缺少凭据时失败。
+- macOS Intel 安装包未签名、未公证；Apple Silicon 可通过 Rosetta 2 运行。内部源码根目录执行 `bash ./一键打包Mac.sh --unsigned --current` 可以按已发布的同一版本号生成 Mac DMG/ZIP。首次打包会下载并校验固定版本的 cloudflared；网络中断后重新执行同一命令即可续传，也可通过 `MICROI_CLOUDFLARED_ASSET=/已下载的官方压缩包路径` 指定本地文件，哈希不符会停止构建。Dock 图标在 Mac 构建时自动生成合适留白。具备证书与 `notarytool` 凭据时也可选择签名、公证；`--signed` 在缺少凭据时失败。
 - 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 还要求 App Sandbox，并限制下载执行改变功能的代码；现有本地 Node/Harness、Shell、工作区和插件能力不能原样上架。后续移动端和 MAS 版应作为独立受限客户端，复用吾码账号、AI 中转、会话、MCP 与桌面配对协议，把 Agent 执行放到配对桌面或远端，再分别完成 Apple/Google 商店签名与审核。
 
 安装后依次「打开项目 → 登录吾码账号 → 添加业务服务器 → 初始化项目 / 拉取资源」，即可开始开发。AI 使用的是你的官方中转额度，实际可用模型与额度以账号页面为准。停止任务或退出后保留历史记录，后续可在新任务中引用历史继续。
 
+在「服务器连接（MCP）」卡片点击「应用到 Microi Code」，会读取该应用的 `SysLogo`、`SysShortTitle` / `SysTitle`，并将 Logo 与名称应用到 Microi Code 左上角。品牌设置只保存在当前电脑的 Electron 本机配置中，不会上传文件、修改业务系统的 `sys_config`，也不会把 `Microi Code` 写回租户；「恢复 Microi Code 品牌」只清除本机品牌设置。
+
 ### 开源基础、版权与后续同步
 
-Microi Code 没有重新实现 dsh-desktop。内部源码仓库使用四层结构：`upstream/dsh-desktop/` 保存未修改的上游快照；`apps/microi-code/packages/microi-code-*`、`microi/` 与 `src/main/microi-*` 保存永久保护的吾码功能；`patches/` 只记录侧栏插槽、设置席位、首页徽标、品牌文案和默认主题等最小差异；同步脚本再对“旧上游、新上游、当前产品”做三方比较。上游未触及的吾码文件继续保留，吾码未修改的上游文件可以自动升级，双方同时修改的文件必须报告冲突并人工合并。补丁无法重放、测试失败或界面验收不通过时都不会推进上游基线。每次同步都要按补丁意图清单重新验证登录、AI 中转、LicenseType、服务器连接、AI 列表、数据分析、插件安装、功能区、关于页、移动连接、Windows/macOS 构建和更新源。
+Microi Code 没有重新实现 dsh-desktop。内部源码仓库使用四层结构：`upstream/dsh-desktop/` 保存未修改的上游快照；`apps/microi-code/packages/microi-code-*`、`apps/microi-code/packages/dsh-desktop-client-ui/`、`microi/` 与 `src/main/microi-*` 保存永久保护的吾码功能；`patches/` 只记录侧栏插槽、设置席位、首页徽标、品牌文案和默认主题等最小差异；同步脚本再对“旧上游、新上游、当前产品”做三方比较。上游未触及的吾码文件继续保留，吾码未修改的上游文件可以自动升级，双方同时修改的文件必须报告冲突并人工合并。补丁无法重放、测试失败或界面验收不通过时都不会推进上游基线。每次同步都要按补丁意图清单重新验证登录、AI 中转、LicenseType、服务器连接、AI 列表、数据分析、插件安装、功能区、关于页、移动连接、Windows/macOS 构建和更新源。
 
 吾码桌面业务优先通过 `microi_itdos` 接口引擎实现，接口引擎实在缺少所需底层原子能力时才修改后端源码。当前账号版本直接读取现有 `platform-current-user` 返回的 `sys_user.LicenseType`；更新目录由 `https://api.itdos.com/microi-code/updates/` 下的匿名接口引擎提供，安装包二进制由 HDFS 流式上传。Windows/macOS 安装包内置固定版本并校验过 SHA-256 的 cloudflared，互联网连接不再在首次使用时从 GitHub 临时下载约 50 MB 可执行文件。
 

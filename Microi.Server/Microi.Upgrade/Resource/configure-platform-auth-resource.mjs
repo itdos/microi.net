@@ -93,9 +93,9 @@ const specs = [
     key: 'send-sms-reg', name: '平台图形校验后发送注册短信',
     file: '[官网]注册发送短信(send-sms-reg).js', sourceDirectory: path.resolve(sourceDirectory, '..'),
     allowAnonymous: 1, stopHttp: 0, ownership: 'Platform', policy: 'Managed',
-    version: 'v1.0.4', lock: 1, lockKey: '', timeout: 120,
+    version: 'v1.0.6', lock: 1, lockKey: '', timeout: 120,
     category: '系统/身份与登录', testParam: '{}',
-    changeHistory: '2026-09-09 v1.0.3 Managed 注册入口；租户/命名空间校验、原子消费、分布式限流与单次派发证明。\n'
+    changeHistory: '2026-09-27 v1.0.6 注册短信遵循系统图形验证码开关，保持手机号与来源限流。\n2026-09-09 v1.0.3 Managed 注册入口；租户/命名空间校验、原子消费、分布式限流与单次派发证明。\n'
   }
 ];
 pkg.SysApiEngines ||= [];

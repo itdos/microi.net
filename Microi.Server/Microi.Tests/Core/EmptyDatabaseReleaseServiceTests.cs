@@ -338,6 +338,8 @@ public sealed class EmptyDatabaseReleaseServiceTests
         var operationalTables = Assert.IsType<string[]>(operationalTablesField!.GetValue(null));
         Assert.Contains("sys_microistore", protectedTables);
         Assert.Contains("sys_microiservice", protectedTables);
+        Assert.Contains("mci_runtime_incident", protectedTables);
+        Assert.Contains("mci_runtime_incident", operationalTables);
         foreach (var table in new[]
                  {
                      "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",

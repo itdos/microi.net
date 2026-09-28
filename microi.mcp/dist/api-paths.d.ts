@@ -15,6 +15,8 @@ export declare const API: {
     readonly GENERATE_MINIMAX_IMAGE: "/api/Ai/GenerateMiniMaxImage";
     readonly GET_MINIMAX_IMAGE_TASK: "/api/Ai/GetMiniMaxImageTask";
     readonly RECOVER_MINIMAX_IMAGE_TASK: "/api/Ai/RecoverMiniMaxImageTask";
+    readonly GET_MEDIA_MODELS: "/api/Ai/GetMediaModels";
+    readonly GET_MINIMAX_TOKEN_PLAN_REMAINS: "/api/Ai/GetMiniMaxTokenPlanRemains";
     readonly GENERATE_MINIMAX_MUSIC: "/api/Ai/GenerateMiniMaxMusic";
     readonly GENERATE_MINIMAX_SPEECH: "/api/Ai/GenerateMiniMaxSpeech";
     readonly OCR_RECOGNIZE: "/apiengine/platform-ocr-recognize";

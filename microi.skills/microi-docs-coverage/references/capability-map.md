@@ -28,6 +28,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `more/db-dictionary.md` | microi-db-schema | 核心表和字段归属 |
 | `more/dos-orm.md` | dos-orm, v8-sql-query | ORM 查询、参数和事务 |
 | `more/dos-result.md` | v8-utilities, v8-crud-api | DosResult/DosResultList 返回协议 |
+| `more/enterprise-ai-development-series.md` | microi-system-delivery, microi-form-engine, module-engine, v8-api-config | 信息型页面；企业 AI 开发课程与平台引擎实践索引 |
 | `more/hdfs.md` | v8-file-upload | 分布式文件存储和 URL |
 | `more/identity-verification.md` | v8-security, v8-utilities, microi-microservice, app-store, v8-saas-multi-tenant | DiyToken、登录方式气泡、Passkey、Authenticator TOTP、Gitee/微信/GitHub、动态租户设置、严格人脸、一次性步进票据、个人中心和自动升级包 |
 | `more/office.md` | v8-export-import, microi-microservice | Office 导入导出与在线编辑集成 |
@@ -35,6 +36,9 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `more/sso.md` | microi-sso, v8-security, app-store | 双向 OIDC/SAML2/CAS、账号映射、协议端点、安全基线、商城发布与验收 |
 | `more/sys-config.md` | v8-utilities, microi-deployment | 系统/租户配置和敏感边界 |
 | `system-engine/ai-engine.md` | ai-engine, v8-http-integration, microi-ai-application | 模型代理、License、V8.AI、MCP 对话、跨端调用和安全 |
+| `system-engine/ai-cad.md` | ai-engine, v8-api-config, microi-ai-application, app-store | 吾码接口引擎到 SolidWorks 桌面插件的参数计划、模型回读、BOM 与图纸交付边界 |
+| `system-engine/digital-human-live.md` | ai-engine, microi-microservice, app-store, playwright-e2e | 自建数字人直播、本机推理、话术知识、OBS 接入、4K 功能截图与实测边界 |
+| `system-engine/ai-employee-center.md` | ai-engine, job-engine, v8-security, microi-microservice | AI 员工职责、任务依赖、草稿验收、执行租约和 OpenClaw 节点 |
 | `system-engine/ai-data-analysis.md` | ai-engine, v8-security, v8-saas-multi-tenant | 权限感知 Schema、NL2SQL、实时经营分析、追问与数据边界 |
 | `system-engine/ai-creative-studio.md` | ai-engine, v8-image-processing, v8-file-upload | 图片、视频、音乐、29 项图像工具、HDFS 结果与创作安全边界 |
 | `system-engine/ai-platform-governance.md` | ai-platform-governance, app-store, business-blueprint, page-engine | 门户、身份、配置、发布、服务韧性、Trace/日志、资产协作与可恢复导入 |

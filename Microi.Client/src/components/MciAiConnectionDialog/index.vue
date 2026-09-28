@@ -1,7 +1,7 @@
 <template>
     <div class="ai-connection-entry">
         <button type="button" class="runtime-version-button" data-testid="runtime-version" @click="visible = true">{{ text }}</button>
-        <button v-if="!hideEdition" type="button" class="runtime-version-button platform-edition-button" data-testid="platform-edition" @click="router.push('/license')">{{ edition || '授权版本' }}</button>
+        <button v-if="!hideEdition" type="button" class="runtime-version-button platform-edition-button" :class="{ 'is-expiring': countdown }" data-testid="platform-edition" @click="router.push('/license')">{{ edition || '授权版本' }}<span v-if="countdown"> {{ countdown }}</span></button>
     </div>
     <el-dialog v-model="visible" title="开发工具连接" width="min(760px, 92vw)" class="ai-connection-dialog" append-to-body draggable destroy-on-close>
         <div class="ai-connection-details">
@@ -25,13 +25,15 @@ import { useDiyStore } from '@/pinia/modules/diy';
 import { ElMessage } from 'element-plus';
 import { DiyCommon } from '@/utils/diy.common';
 import { buildAiConnectionPrompt, copyConnectionText } from '@/utils/ai-connection.js';
-import { platformEditionLabel, hideSystemLicenseVersion } from '@/utils/platform-edition.js';
+import { platformEditionLabel, hideSystemLicenseVersion, licenseCountdown } from '@/utils/platform-edition.js';
 defineProps({ text: { type: String, required: true } });
 const visible = ref(false), copying = ref(false), sessionEdition = ref('');
 const diyStore = useDiyStore(), router = useRouter();
-const edition = computed(() => platformEditionLabel(diyStore.SysConfig?.PlatformEdition) || sessionEdition.value);
+const edition = computed(() => sessionEdition.value || platformEditionLabel(diyStore.SysConfig?.PlatformEdition));
+const expiration = ref(''), clock = ref(Date.now());
+const countdown = computed(() => licenseCountdown(expiration.value, clock.value));
 const hideEdition = computed(() => hideSystemLicenseVersion(diyStore.SysConfig));
-let editionRetry, editionAttempts = 0, disposed = false;
+let editionRetry, clockTimer, editionAttempts = 0, disposed = false;
 const apiBase = computed(() => DiyCommon.GetApiBase());
 const osClient = computed(() => DiyCommon.GetOsClient());
 const promptPreview = computed(() => buildAiConnectionPrompt({ ApiBase: apiBase.value, OsClient: osClient.value, Token: '<复制时生成的独立 Token>' }));
@@ -41,17 +43,21 @@ async function sessionAction(Action) {
     try { return JSON.parse(response); } catch { throw new Error('平台返回格式无效，请重试。'); }
 }
 async function loadEdition() {
-    if (disposed || platformEditionLabel(diyStore.SysConfig?.PlatformEdition)) return;
+    if (disposed) return;
     editionAttempts++;
     try {
         const result = await sessionAction('GetConnectionInfo');
-        if (!disposed && result?.Code === 1 && result.Data) sessionEdition.value = platformEditionLabel(result.Data.ProductType);
+        if (!disposed && result?.Code === 1 && result.Data) {
+            sessionEdition.value = platformEditionLabel(result.Data.ProductType);
+            expiration.value = result.Data.LicenseExpirationDate || '';
+            editionAttempts = 0;
+        }
     } catch { /* 版本查询失败不影响业务页面。 */ }
     // 旧后端短暂失败时有界重试，不能永久消失或把未知授权冒充开源版。
-    if (!disposed && !edition.value && editionAttempts < 3) editionRetry = setTimeout(loadEdition, editionAttempts * 3000);
+    if (!disposed) editionRetry = setTimeout(loadEdition, editionAttempts > 0 && editionAttempts < 3 ? editionAttempts * 3000 : 60000);
 }
-onMounted(loadEdition);
-onBeforeUnmount(() => { disposed = true; clearTimeout(editionRetry); });
+onMounted(() => { void loadEdition(); clockTimer = setInterval(() => { clock.value = Date.now(); }, 1000); });
+onBeforeUnmount(() => { disposed = true; clearTimeout(editionRetry); clearInterval(clockTimer); });
 async function copyConnection() {
     if (copying.value) return;
     copying.value = true;
@@ -69,6 +75,7 @@ async function copyConnection() {
 .ai-connection-entry { display:flex; align-items:center; gap:6px; flex:none; margin:0 18px 0 12px; }
 .runtime-version-button { cursor:pointer; color:var(--el-color-primary); border:1px solid var(--el-color-primary-light-7); border-radius:999px; background:var(--el-color-primary-light-9); font:inherit; font-size:11px; padding:2px 9px; white-space:nowrap; }
 .runtime-version-button:hover { background:var(--el-color-primary-light-8); }
+.platform-edition-button.is-expiring { color:var(--el-color-danger); border-color:var(--el-color-danger-light-7); background:var(--el-color-danger-light-9); font-variant-numeric:tabular-nums; }
 .runtime-version-button:focus-visible { outline:2px solid var(--el-color-primary); outline-offset:3px; }
 .ai-connection-details { display:grid; grid-template-columns:2fr 1fr; gap:12px; }
 .ai-connection-details>div { padding:14px 16px; border-radius:14px; background:var(--el-fill-color-light); min-width:0; }
