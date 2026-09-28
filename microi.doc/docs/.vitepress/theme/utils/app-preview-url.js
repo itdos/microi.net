@@ -1,13 +1,6 @@
 import { buildApplicationLaunchUrl } from './uniapp-preview-mode.js'
 import { normalizeUploadPath } from './upload-resource-url.js'
 
-const stableApplicationEntries = Object.freeze({
-  // The fixed query key bypasses the one legacy CDN object that cached a
-  // redirect page. The entry shell itself is evergreen and resolves the
-  // committed current release inside its full-screen iframe.
-  'microi-unity-taoyuan': 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current'
-})
-
 // 新字段排在前面，后续字段仅用于兼容旧商城记录。版本、发布任务字段
 // 故意不在候选集合中，避免首页、应用广场和详情页各自选中不同历史产物。
 const experienceUrlFields = Object.freeze([
@@ -133,12 +126,30 @@ function canonicalStableUrl(candidate, baseUrl, runtime, applicationKey) {
 }
 
 export function resolveStableApplicationEntry(application = {}, baseUrl = 'https://microi.net', runtime = {}) {
-  // Unity WebGL 使用公有桶稳定别名承接最新版；应用发布记录中的 v3 相对
-  // PreviewUrl 属于构建内部入口，直接基于 microi.net 解析会落到错误域名。
   const applicationKey = String(
     application.AppKey || application.AppId || application.appKey || application.appId || application.Key || application.key || ''
   ).trim().toLowerCase()
-  if (stableApplicationEntries[applicationKey]) return stableApplicationEntries[applicationKey]
+  const applicationType = String(application.ApplicationType || application.AppType || '').trim().toLowerCase()
+  const tenant = String(runtime.osClient || '').trim().toLowerCase()
+  const fileServer = String(runtime.fileServer || '').replace(/\/+$/, '')
+  const projectedPath = `/${tenant}/micro-app/${applicationKey}/index.html`
+  // A marketplace record switches only after the physical CDN objects have
+  // been verified. Preserve old links while the bulk migration is in flight.
+  const hasProjectedEntry = applicationUrlCandidates(application).some(candidate => {
+    try {
+      return new URL(candidate.value, candidateBaseUrl(candidate, baseUrl, runtime)).pathname === projectedPath
+    } catch { return false }
+  })
+  if (['web', 'uniapp', 'microservice'].includes(applicationType)
+    && /^[a-z0-9_-]+$/.test(applicationKey)
+    && /^[a-z0-9_-]+$/.test(tenant)
+    && /^https:\/\//i.test(fileServer)
+    && hasProjectedEntry) {
+    return `${fileServer}${projectedPath}`
+  }
+  if (applicationKey === 'microi-unity-taoyuan' && !hasProjectedEntry) {
+    return 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current'
+  }
   for (const candidate of applicationUrlCandidates(application)) {
     const stableUrl = canonicalStableUrl(candidate, baseUrl, runtime, applicationKey)
     if (stableUrl) return stableUrl

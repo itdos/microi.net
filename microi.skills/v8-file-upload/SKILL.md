@@ -82,9 +82,15 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 | `V8.FilesByteBase64` | 接收上传时携带的文件字典 `{ FileName: base64 }` |
 | `V8.Method.Upload({...})` | 服务端上传文件到 HDFS（推荐） |
 | `V8.Method.GetPrivateFileUrl({FilePathName})` | 生成私有桶临时访问 URL |
+| `V8.Method.CopyObject({FilePathName,Path,Limit})` | 当前租户同一桶内服务端复制，保留原对象；用于固定入口与版本快照 |
+| `V8.Method.ObjectExist({FilePathName,Limit})` | 检查当前租户公有/私有桶对象是否存在 |
+| `V8.Method.GetObjectSha256({FilePathName,Limit})` | 在服务端流式计算对象原始字节与旧版 Base64 文本的 SHA-256 和字节数；不把对象内容送入 V8 |
+| `V8.Method.ListObjects({Path,Limit,Recursive,Marker,MaxKeys})` | 分页列举当前租户前缀，单页最多 1000 个 |
 | `/apiengine/platform-private-file-url` | 官网 PC/UniApp 按菜单、记录、字段和对象引用换取私有文件短链 |
 | `V8.Http.GetResponse({Url}).RawBytes` | 下载远程文件为字节数组 |
 | 接口返回 `{ FileName, ContentType, FileByteBase64 }` | 接口直接响应文件 |
+
+固定 CDN 应用回填优先使用服务端 `CopyObject`，公有桶复制编译资产、私有桶复制源码；`Limit` 在源与目标间保持一致，`Path` 和 `FilePathName` 均由后端收敛到当前租户。大对象用 `GetObjectSha256` 流式核对原对象和复制目标，公有体验路径仍须从 CDN 独立回读。历史版本目标已存在时须核对字节哈希，发现不同内容立即停止；固定根可在新版本验证后覆盖。`ListObjects` 必须分页并限制到单个应用前缀，不得把这些存储管理原子直接开放为匿名业务接口。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=v8-file-upload-001 sha256=bacff382201c915334757946ee60d4a65db4e9663dd9e1f86bb68c1c16589321 -->
