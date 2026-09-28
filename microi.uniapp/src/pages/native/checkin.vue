@@ -77,15 +77,21 @@
             <view class="text-action" @tap="chooseFromAlbum">从相册选择</view>
           </view>
           <view class="photo-grid">
-            <view v-for="(photo, index) in photos" :key="photo.path" class="photo-item">
+            <view v-for="(photo, index) in photos" :key="photo.clientId" class="photo-item">
               <image :src="photo.path" mode="aspectFill" @tap="previewPhoto(index)" />
-              <view class="photo-remove" @tap="removePhoto(index)"><text>×</text></view>
+              <view v-if="photo.uploadState !== 'passed'" class="photo-upload-status" @tap.stop>
+                <view v-if="['queued', 'uploading', 'checking'].includes(photo.uploadState)" class="photo-upload-spinner"></view>
+                <text>{{ photoUploadStatusText(photo) }}</text>
+                <text v-if="isPhotoUploadFailed(photo)" class="photo-retry" @tap.stop="retryPhoto(photo.clientId)">重试</text>
+              </view>
+              <view class="photo-remove" @tap.stop="removePhoto(index)"><text>×</text></view>
             </view>
             <view v-if="photos.length < 6" class="photo-add" @tap="openWatermarkCamera">
               <image src="/static/xjy/watermarkCamera/camera.png" mode="aspectFit" />
               <text>水印拍照</text>
             </view>
           </view>
+          <text v-if="photoUploadSummary" class="photo-upload-summary">{{ photoUploadSummary }}</text>
         </view>
 
         <view class="privacy-note">
@@ -98,7 +104,7 @@
     <view v-if="!initialLoading" class="submit-bar">
       <button class="submit-button" :loading="submitting" :disabled="submitting" @tap="submit">
         <view v-if="!submitting" class="submit-check-icon"><text>✓</text></view>
-        <text>{{ submitting ? '正在提交' : '确认打卡' }}</text>
+        <text>{{ submitButtonText }}</text>
       </button>
     </view>
     <mci-ai-launcher />
@@ -116,6 +122,13 @@ import {
   checkinTimeLabel,
   normalizeCheckinStatistics
 } from '@/platform/checkin-statistics.mjs'
+import {
+  checkinPhotoUploadStatusText,
+  createCheckinPhoto,
+  getUploadedCheckinPhotoData,
+  queuedCheckinPhotos,
+  updateCheckinPhotoUploadState
+} from '@/platform/checkin-photo-upload.mjs'
 import { updateTask } from '@/utils/xjy-task.js'
 import MciVisitTargetFields from '@/components/mci-visit-target-fields/mci-visit-target-fields.vue'
 
@@ -137,6 +150,9 @@ export default {
       mapReady: false,
       mapMountTimer: null,
       submitting: false,
+      photoSequence: 0,
+      photoUploadPromise: null,
+      photoUploadActive: true,
       location: { latitude: 0, longitude: 0, address: '' },
       photos: [],
       form: { targetType: '客户', name: '', remark: '' },
@@ -150,6 +166,20 @@ export default {
       if (!this.location.latitude || !this.location.longitude) return []
       return [{ id: 1, latitude: this.location.latitude, longitude: this.location.longitude, width: 28, height: 36 }]
     },
+    hasPhotoUploading() {
+      return this.photos.some((photo) => ['queued', 'uploading', 'checking'].includes(photo.uploadState))
+    },
+    photoUploadSummary() {
+      const failed = this.photos.filter((photo) => this.isPhotoUploadFailed(photo)).length
+      if (failed) return `${failed} 张照片上传失败，可点击照片重试`
+      const pending = this.photos.filter((photo) => ['queued', 'uploading', 'checking'].includes(photo.uploadState)).length
+      if (pending) return `${pending} 张照片正在后台上传，您可以继续填写其它信息`
+      return this.photos.length ? '现场照片已上传完成' : ''
+    },
+    submitButtonText() {
+      if (!this.submitting) return '确认打卡'
+      return this.hasPhotoUploading ? '正在等待照片上传' : '正在提交'
+    }
   },
   onLoad(options) {
     try {
@@ -169,6 +199,7 @@ export default {
     this.initializePage()
   },
   onUnload() {
+    this.photoUploadActive = false
     if (this.timer) clearInterval(this.timer)
     if (this.mapMountTimer) clearTimeout(this.mapMountTimer)
   },
@@ -273,6 +304,7 @@ export default {
       if (this.$refs.targetFields) this.$refs.targetFields.closeOptions()
     },
     openWatermarkCamera() {
+      if (this.submitting) return
       if (this.photos.length >= 6) return
       const query = [
         `customer=${encodeURIComponent(this.form.name || '')}`,
@@ -286,37 +318,137 @@ export default {
           if (!result.eventChannel) return
           result.eventChannel.on('watermarkCaptured', (data) => {
             if (!data || !data.path) return
-            this.photos = [...this.photos, { path: data.path, size: Number(data.size || 0), watermarked: true }].slice(0, 6)
+            this.addPhotosAndUpload([{ path: data.path, size: Number(data.size || 0), watermarked: true }])
           })
         }
       })
     },
     chooseFromAlbum() {
+      if (this.submitting) return
       const count = 6 - this.photos.length
       if (count <= 0) return
-      const success = (files) => {
-        const additions = files.map((file) => ({ path: file.tempFilePath || file.path, size: file.size || 0 })).filter((file) => file.path)
-        this.photos = [...this.photos, ...additions].slice(0, 6)
-      }
+      const success = (files) => this.addPhotosAndUpload(files)
       if (uni.chooseMedia) {
         uni.chooseMedia({ count, mediaType: ['image'], sourceType: ['album'], success: (res) => success(res.tempFiles || []) })
       } else {
-        uni.chooseImage({ count, sourceType: ['album'], success: (res) => success((res.tempFilePaths || []).map((path) => ({ path }))) })
+        uni.chooseImage({
+          count,
+          sourceType: ['album'],
+          success: (res) => success((res.tempFiles && res.tempFiles.length)
+            ? res.tempFiles
+            : (res.tempFilePaths || []).map((path) => ({ path })))
+        })
       }
     },
+    addPhotosAndUpload(files) {
+      if (this.submitting) return
+      const capacity = Math.max(0, 6 - this.photos.length)
+      const additions = (files || []).slice(0, capacity).map((file) => createCheckinPhoto(file, {
+        clientId: `checkin-photo-${Date.now()}-${++this.photoSequence}`,
+        watermarked: file && file.watermarked === true
+      })).filter((photo) => photo.path)
+      if (!additions.length) return
+      this.photos = [...this.photos, ...additions]
+      // 选择完成即后台预上传；提交只复用 uploadedData，不再重复上传成功照片。
+      this.startPhotoUpload().catch((error) => {
+        console.error('拜访打卡照片预上传异常', error)
+      })
+    },
     removePhoto(index) {
+      if (this.submitting) return
       this.photos.splice(index, 1)
     },
     previewPhoto(index) {
       uni.previewImage({ current: index, urls: this.photos.map((item) => item.path) })
     },
-    async uploadPhotos() {
-      const uploaded = []
-      for (const photo of this.photos) {
-        const result = await V8.uploadFile(photo.path, { path: 'xjy/checkin', preview: true })
-        uploaded.push(result.Data)
+    photoUploadStatusText(photo) {
+      return checkinPhotoUploadStatusText(photo)
+    },
+    isPhotoUploadFailed(photo) {
+      return ['error', 'rejected', 'timeout', 'cancelled'].includes(photo && photo.uploadState)
+    },
+    retryPhoto(clientId) {
+      if (this.submitting) return
+      const photo = this.photos.find((item) => item.clientId === clientId)
+      if (!photo) return
+      updateCheckinPhotoUploadState(photo, 'queued')
+      photo.uploadedData = null
+      this.startPhotoUpload().catch((error) => {
+        console.error('拜访打卡照片重试异常', error)
+      })
+    },
+    async startPhotoUpload() {
+      if (this.photoUploadPromise) return this.photoUploadPromise
+      const uploadPromise = this.drainPhotoUploadQueue()
+      this.photoUploadPromise = uploadPromise
+      try {
+        return await uploadPromise
+      } finally {
+        if (this.photoUploadPromise === uploadPromise) this.photoUploadPromise = null
       }
-      return uploaded
+    },
+    async drainPhotoUploadQueue() {
+      while (this.photoUploadActive) {
+        const batch = queuedCheckinPhotos(this.photos)
+        if (!batch.length) return
+        batch.forEach((photo) => updateCheckinPhotoUploadState(photo, 'uploading'))
+        let outcomes = []
+        try {
+          outcomes = await V8.uploadFiles(batch.map((photo) => ({
+            filePath: photo.path,
+            file: photo.sourceFile || photo,
+            clientId: photo.clientId
+          })), {
+            path: 'xjy/checkin',
+            preview: true,
+            multiple: true,
+            concurrency: 2,
+            resolveUrl: false,
+            isItemCancelled: (index) => {
+              const source = batch[index]
+              return !this.photoUploadActive || !source || !this.photos.some((photo) => photo.clientId === source.clientId)
+            },
+            onItemChange: ({ Index, Status, Result, Error }) => {
+              const source = batch[Index]
+              if (!source) return
+              const photo = this.photos.find((item) => item.clientId === source.clientId)
+              if (!photo) return
+              updateCheckinPhotoUploadState(photo, Status, {
+                data: Result && Result.Data,
+                error: Error
+              })
+            }
+          })
+        } catch (error) {
+          console.error('拜访打卡批量上传失败', error)
+          batch.forEach((source) => {
+            const photo = this.photos.find((item) => item.clientId === source.clientId)
+            if (photo) updateCheckinPhotoUploadState(photo, 'error', { error })
+          })
+        }
+
+        let failedCount = 0
+        batch.forEach((source, index) => {
+          const photo = this.photos.find((item) => item.clientId === source.clientId)
+          if (!photo) return
+          const outcome = outcomes[index]
+          if (outcome && Number(outcome.Code) === 1 && outcome.Data) {
+            updateCheckinPhotoUploadState(photo, 'passed', { data: outcome.Data })
+            return
+          }
+          if (!this.isPhotoUploadFailed(photo)) {
+            updateCheckinPhotoUploadState(photo, 'error', { error: outcome && outcome.Error })
+          }
+          failedCount += 1
+        })
+        if (failedCount) {
+          uni.showToast({ title: `${failedCount} 张照片上传失败，请点击重试`, icon: 'none' })
+        }
+      }
+    },
+    async ensurePhotoUploadsReady() {
+      await this.startPhotoUpload()
+      return getUploadedCheckinPhotoData(this.photos)
     },
     async submit() {
       if (this.submitting) return
@@ -327,7 +459,7 @@ export default {
       this.submitting = true
       try {
         const user = await getVerifiedCurrentUser()
-        const uploaded = await this.uploadPhotos()
+        const uploaded = await this.ensurePhotoUploadsReady()
         const result = await V8.FormEngine.AddFormData('Diy_location', {
           BaifangDXLX: this.form.targetType,
           BaifangDX: this.form.name.trim(),
@@ -435,6 +567,10 @@ export default {
 .photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14rpx; }
 .photo-item, .photo-add { position: relative; aspect-ratio: 1; border-radius: 12rpx; overflow: hidden; }
 .photo-item image { width: 100%; height: 100%; }
+.photo-upload-status { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8rpx; padding: 16rpx; background: rgba(5, 38, 50, 0.68); color: #fff; text-align: center; font-size: 21rpx; }
+.photo-upload-spinner { width: 30rpx; height: 30rpx; border: 3rpx solid rgba(255, 255, 255, 0.35); border-top-color: #fff; border-radius: 50%; animation: photo-upload-spin 0.8s linear infinite; }
+.photo-retry { padding: 7rpx 18rpx; border: 1rpx solid rgba(255, 255, 255, 0.72); border-radius: 999rpx; background: rgba(255, 255, 255, 0.14); font-size: 20rpx; }
+.photo-upload-summary { display: block; margin-top: 14rpx; color: #6d8792; font-size: 21rpx; line-height: 30rpx; }
 .photo-remove { position: absolute; top: 6rpx; right: 6rpx; display: flex; align-items: center; justify-content: center; width: 40rpx; height: 40rpx; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 30rpx; }
 .photo-add { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2rpx dashed #cbdce3; background: #f5f9fa; color: #748d98; font-size: 22rpx; }
 .photo-add image { width: 54rpx; height: 54rpx; margin-bottom: 8rpx; }
@@ -444,4 +580,5 @@ export default {
 .submit-button { display: flex; align-items: center; justify-content: center; gap: 12rpx; width: 100%; height: 84rpx; margin: 0; border: none; border-radius: 16rpx; background: #e94b2c; color: #fff; font-size: 28rpx; font-weight: 650; line-height: 84rpx; box-shadow: 0 9rpx 24rpx rgba(233, 75, 44, 0.22); }
 .submit-check-icon { display: flex; align-items: center; justify-content: center; width: 34rpx; height: 34rpx; border: 3rpx solid rgba(255,255,255,.88); border-radius: 50%; font-size: 22rpx; line-height: 1; }
 .submit-button::after { border: none; }
+@keyframes photo-upload-spin { to { transform: rotate(360deg); } }
 </style>
