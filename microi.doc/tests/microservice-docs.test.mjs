@@ -172,7 +172,10 @@ test('future AI delivery rules prohibit manual chunks and require standalone aut
   const docsSkill = readSkill('microi-docs-coverage');
   const sdkSkill = readSkill('microi-frontend-sdk');
   const uiSkill = readSkill('ui-design');
-  const aiInstructions = read('Microi.Code/src/editor/typingsManager.ts');
+  // 公开仓不携带独立私有桌面仓；同目录开发时仍验证 AI 指令快照。
+  const agentSource = 'Microi.Agent/src/editor/typingsManager.ts';
+  const privateAgentPresent = fs.existsSync(path.join(repositoryRoot, agentSource));
+  const aiInstructions = privateAgentPresent ? read(agentSource) : '';
   const mcp = read('microi.mcp/src/server.ts');
   const scaffold = read('microi.mcp/src/microservice-scaffold.ts');
   const host = read('Microi.Client/src/views/micro-app/host.vue');
@@ -181,7 +184,11 @@ test('future AI delivery rules prohibit manual chunks and require standalone aut
   for (const token of ['中文文档视觉与可读性契约', 'doc-visual-profiles.js', 'npm run audit:visual', '&.dark', 'WCAG AA']) assert.ok(docsSkill.includes(token));
   for (const token of ['MicroService 独立运行认证', 'EnableCaptcha', 'captchaid']) assert.ok(sdkSkill.includes(token));
   for (const token of ['VitePress 中文文档布局规范', '86ch', 'prefers-reduced-motion', 'html:lang(zh).dark', '全站扫描']) assert.ok(uiSkill.includes(token));
-  for (const token of ['sync-source-files.json', 'EnableCaptcha', 'permissionContext={sysMenuId,moduleEngineKey,diyTableId}']) assert.ok(aiInstructions.includes(token));
+  if (privateAgentPresent) {
+    for (const token of ['sync-source-files.json', 'EnableCaptcha', 'permissionContext={sysMenuId,moduleEngineKey,diyTableId}']) assert.ok(aiInstructions.includes(token));
+  } else {
+    assert.match(read('.public-repo-protected-paths'), /^Microi\.Agent$/m);
+  }
   for (const token of ['buildLocalMicroServiceSourceManifest', 'aiContextFileBytes', 'manualChunking']) assert.ok(mcp.includes(token));
   for (const token of ['buildStandaloneAuthModule', 'GetSysConfig', 'GetCaptcha', '_CaptchaId']) assert.ok(scaffold.includes(token));
   assert.match(host, /permissionContext/);
@@ -254,6 +261,13 @@ test('local source runtime documents and enforces URL endpoint priority with iso
 });
 
 test('workspace Skills and the packaged Codex plugin carry the same rules', () => {
+  const packagedSkills = path.join(repositoryRoot, 'Microi.Agent', 'plugins', 'microi', 'skills');
+  if (!fs.existsSync(packagedSkills)) {
+    // 公开源码检出不应为通过文档构建而引入闭源仓文件。
+    assert.match(read('.public-repo-protected-paths'), /^Microi\.Agent$/m);
+    assert.ok(!fs.existsSync(path.join(repositoryRoot, 'Microi.Agent')));
+    return;
+  }
   const files = [
     '.progressive-disclosure-manifest.json',
     'workspace-conventions/SKILL.md',
@@ -278,7 +292,7 @@ test('workspace Skills and the packaged Codex plugin carry the same rules', () =
   for (const file of files) {
     assert.equal(
       sha256(`microi.skills/${file}`),
-      sha256(`Microi.Code/plugins/microi/skills/${file}`),
+      sha256(`Microi.Agent/plugins/microi/skills/${file}`),
       `${file} must be synchronized into the packaged plugin`,
     );
   }
