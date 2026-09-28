@@ -26,7 +26,7 @@ test('uses the stable latest entry and removes runtime/cache query parameters', 
   )
 })
 
-test('repairs the legacy toolbox root that omitted the tenant and index file', () => {
+test('keeps the legacy toolbox entry until its CDN objects are migrated', () => {
   const actual = resolveApplicationExperienceUrl({
     AppKey: 'microi-developer-toolbox',
     ApplicationType: 'Web',
@@ -43,7 +43,7 @@ test('repairs the legacy toolbox root that omitted the tenant and index file', (
 })
 
 test('accepts all Microi upload field shapes when resolving an application preview', () => {
-  const expected = 'https://static.itdos.com/itdos/ai-app-publish/four-shapes/index.html'
+  const expected = 'https://static.itdos.com/itdos/micro-app/four-shapes/index.html'
   const previewValues = [
     expected,
     '/itdos/ai-app-publish/four-shapes/index.html',
@@ -54,7 +54,7 @@ test('accepts all Microi upload field shapes when resolving an application previ
     ]
   ]
 
-  for (const PreviewUrl of previewValues) {
+  for (const [index, PreviewUrl] of previewValues.entries()) {
     assert.equal(resolveApplicationExperienceUrl({
       AppKey: 'four-shapes',
       ApplicationType: 'Web',
@@ -62,7 +62,7 @@ test('accepts all Microi upload field shapes when resolving an application previ
     }, desktopWindow, {
       fileServer: 'https://static.itdos.com',
       osClient: 'iTdos'
-    }), expected)
+    }), index === 0 ? expected : 'https://static.itdos.com/itdos/ai-app-publish/four-shapes/index.html')
   }
 })
 
@@ -93,25 +93,27 @@ test('routes protocol v3 stable application paths through the API instead of HDF
   }), 'https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/ocean-fishing-unity/assets/index.html')
 })
 
-test('normalizes historical Web and mixed-case v3 routes to the one runtime stable entry', () => {
+test('uses the CDN entry only when the marketplace record points to it', () => {
   const runtime = {
     apiBase: 'https://api.itdos.com',
     fileServer: 'https://static.itdos.com',
     osClient: 'iTdos'
   }
-  const expected = 'https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/canonical-office/assets/index.html'
+  const expected = 'https://static.itdos.com/itdos/micro-app/canonical-office/index.html'
   const records = [
     { StablePreviewUrl: 'https://static.itdos.com/micro-app/v3/tenants/iTdos/kinds/Web/apps/canonical-office/assets/index.html?version=9' },
     { PublicPublishPath: '/micro-app/v3/tenants/ITDOS/kinds/UniApp/apps/canonical-office/assets/index.html' },
-    { PreviewUrl: expected }
+    { PreviewUrl: expected },
+    { StablePreviewUrl: 'https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/canonical-office/assets/index.html', PreviewUrl: expected }
   ]
 
-  for (const fields of records) {
+  for (const [index, fields] of records.entries()) {
     assert.equal(resolveApplicationExperienceUrl({
       AppKey: 'canonical-office',
       ApplicationType: 'Web',
       ...fields
-    }, desktopWindow, runtime), expected)
+    }, desktopWindow, runtime), index >= 2 ? expected
+      : 'https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/canonical-office/assets/index.html')
   }
 })
 
@@ -135,8 +137,9 @@ test('keeps unrelated query parameters while normalizing the latest entry', () =
 test('Unity Taoyuan always launches from its public stable entry without a version segment', () => {
   const actual = withPreviewVersion(
     '/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-unity-taoyuan/releases/v1.4.9/assets/index.html?v=1.4.9',
-    { AppKey: 'microi-unity-taoyuan', AppVersion: 'v1.4.9' },
-    'https://microi.net'
+    { AppKey: 'microi-unity-taoyuan', ApplicationType: 'MicroService', AppVersion: 'v1.4.9' },
+    'https://microi.net',
+    { osClient: 'iTdos', fileServer: 'https://static.itdos.com' }
   )
 
   assert.equal(actual, 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current')
