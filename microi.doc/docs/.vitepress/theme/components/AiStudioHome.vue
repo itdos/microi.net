@@ -114,7 +114,7 @@ const authToken = ref('')
 const currentUser = ref(null)
 const chatError = ref('')
 const PROFILE_AI_PREFILL_KEY = 'microi_profile_ai_prefill'
-const MICROI_CODE_DOC_URL = '/doc/v8-engine/vs-code-plugin.html'
+const MICROI_CODE_DOC_URL = '/doc/v8-engine/microi-agent.html'
 
 const isAuthed = computed(() => Boolean(authToken.value && currentUser.value?.Id))
 const loginUrl = computed(() => `/login.html?redirect=${encodeURIComponent(route.path || '/')}`)
@@ -124,12 +124,12 @@ const copy = computed(() => locale.value === 'en-US' ? {
   titleLeadParts: ['Open-source AI', 'development framework'],
   titleEmphasisLines: ['30+ mature engines'],
   lead: 'AI low-code, microservices, and the V8 engine share one delivery path. In high-reuse business scenarios, AI development can use 10×+ fewer tokens and move 10×+ faster.',
-  primaryAction: 'Training syllabus', secondaryAction: 'Download Microi Code',
+  primaryAction: 'Training syllabus', secondaryAction: 'Download Microi Agent',
   proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
   proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '30+ mature engines'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
   mapDesc: 'Low-code, V8, and microservices share one AI-ready foundation.',
-  aiLayer: 'AI collaboration', aiTools: ['Microi Code', 'Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
+  aiLayer: 'AI collaboration', aiTools: ['Microi Agent', 'Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
   developmentModes: [
     { level: '01', label: 'Standard workflows', title: 'AI low-code development', description: '30+ engines · forms · modules · workflows · reports', note: 'READY' },
     { level: '02', label: 'Business differentiation', title: 'V8 engine AI coding', description: 'APIs · events · integrations · automation · instant activation', note: 'TOKEN-SMART', featured: true },
@@ -158,12 +158,12 @@ const copy = computed(() => locale.value === 'en-US' ? {
   titleLeadParts: ['开源 AI', '开发框架'],
   titleEmphasisLines: ['30+ 成熟引擎'],
   lead: '融合 AI 低代码、微服务与 V8 引擎；在平台能力高度复用的典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，更快交付企业应用。',
-  primaryAction: '查看培训大纲', secondaryAction: '下载 Microi Code',
+  primaryAction: '查看培训大纲', secondaryAction: '下载 Microi Agent',
   proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
   proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '30+ 成熟引擎'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',
   mapDesc: '低代码、V8 与微服务共用一套可复用的 AI 开发底座。',
-  aiLayer: 'AI 协作层', aiTools: ['Microi Code', 'Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
+  aiLayer: 'AI 协作层', aiTools: ['Microi Agent', 'Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
   developmentModes: [
     { level: '01', label: '标准业务', title: 'AI 低代码开发', description: '30+ 引擎 · 表单 · 模块 · 流程 · 报表', note: '开箱即用' },
     { level: '02', label: '差异逻辑', title: 'V8 引擎 AI 编程', description: '接口 · 事件 · 集成 · 自动化 · 保存即生效', note: '更省 Token', featured: true },
