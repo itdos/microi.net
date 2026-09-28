@@ -152,6 +152,16 @@ else {
     Write-Host "Microi-V8-Engine is not present; skipping its repository-owned source gate."
 }
 
+$fileCabinetOfficeTest = Join-Path (Split-Path -Parent $serverRoot) 'Microi.Client/tests/file-cabinet-office.spec.mjs'
+if (-not (Test-Path -LiteralPath $fileCabinetOfficeTest)) {
+    throw "File-cabinet Office regression test is missing: $fileCabinetOfficeTest"
+}
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    throw 'Node.js is required for the file-cabinet Office regression gate.'
+}
+node --test $fileCabinetOfficeTest
+if ($LASTEXITCODE -ne 0) { throw "File-cabinet Office regression tests failed with exit code $LASTEXITCODE." }
+
 Write-Host "Restoring Microi.Tests with one restore worker..."
 dotnet restore $project --disable-parallel --force-evaluate -m:1 -nr:false -p:BuildInParallel=false -v:minimal
 if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed with exit code $LASTEXITCODE." }
@@ -213,6 +223,10 @@ if ($Mode -eq "Full") {
         --logger "trx;LogFileName=microi-full-stack.trx" `
         -m:1
     if ($LASTEXITCODE -ne 0) { throw "Full-stack release gate failed with exit code $LASTEXITCODE." }
+
+    Write-Host "Validating incident evidence rendering, storage failures and mobile layout..."
+    node (Join-Path $testRoot 'FullStack\incident-observability-component.mjs') $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw "Incident evidence browser component gate failed with exit code $LASTEXITCODE." }
 
     Write-Host "Validating real login and notification-center maintenance in isolated browser contexts..."
     node (Join-Path $testRoot 'FullStack\notification-center.e2e.mjs') $ResultsDirectory

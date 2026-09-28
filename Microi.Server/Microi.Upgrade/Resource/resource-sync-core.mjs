@@ -943,6 +943,43 @@ export async function mergeJavascriptResource(name, baseContent, localContent, r
 
 export async function mergeResource(name, baseContent, localContent, remoteContent) {
   if (name.endsWith('.json')) {
+    if (name.startsWith('app.microi.')) {
+      const [base, local, remote] = [baseContent, localContent, remoteContent].map(JSON.parse);
+      const fields = ['Version', 'ChangeLog', 'ChangeHistory'];
+      const signature = info => JSON.stringify(fields.map(field => info?.[field]));
+      const masked = model => {
+        const result = structuredClone(model);
+        if (result.PackageInfo && base.PackageInfo) {
+          for (const field of fields) {
+            if (Object.hasOwn(base.PackageInfo, field)) result.PackageInfo[field] = structuredClone(base.PackageInfo[field]);
+            else delete result.PackageInfo[field];
+          }
+        }
+        return JSON.stringify(result);
+      };
+      const merged = JSON.parse(mergeJsonResource(name, masked(base), masked(local), masked(remote)));
+      let selected = base.PackageInfo || {};
+      for (const candidate of [remote.PackageInfo || {}, local.PackageInfo || {}]) {
+        const comparison = compareSemanticVersionParts(
+          semanticVersionParts(candidate.Version, `${name} 候选版本`, true),
+          semanticVersionParts(selected.Version, `${name} 当前选定版本`, true),
+        );
+        if (comparison > 0) selected = candidate;
+        else if (comparison === 0 && signature(candidate) !== signature(selected)) {
+          if (signature(selected) === signature(base.PackageInfo)) selected = candidate;
+          else if (signature(candidate) !== signature(base.PackageInfo)) {
+            throw new Error(`${name} 同版本投递元数据冲突，需先核对官网与本地 ChangeLog`);
+          }
+        }
+      }
+      if (merged.PackageInfo) {
+        for (const field of fields) {
+          if (Object.hasOwn(selected, field)) merged.PackageInfo[field] = structuredClone(selected[field]);
+          else delete merged.PackageInfo[field];
+        }
+      }
+      return canonicalizeResource(name, JSON.stringify(merged));
+    }
     return mergeJsonResource(name, baseContent, localContent, remoteContent);
   }
   return mergeJavascriptResource(name, baseContent, localContent, remoteContent);

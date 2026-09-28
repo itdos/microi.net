@@ -151,7 +151,8 @@ namespace Microi.net
                 "OsClient", "IsEnable", "ClientName", "OsClientType", "OsClientNetwork",
                 "DbConn", "DbType", "DbReadConn", "DbReadType", "DbMongoConnection",
                 "AuthSecret", "AuthSecretRotateVersion", "DomainName", "ServerTag",
-                "OwnerUserId", "OwnerPhone"
+                "OwnerUserId", "OwnerPhone",
+                "LicenseProductType", "LicenseExpirationDate"
             };
 
         private static readonly HashSet<string> SysConfigNeverCopyFieldSet =

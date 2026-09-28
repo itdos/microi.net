@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: export-microi-store-package
- * Version: v1.3.0
+ * Version: v1.3.1
  * Function:
  * - 导出或持久发布 Microi 应用安装包；支持预制平台包、UTF-8 HDFS、FormEngine fence CAS、两阶段不可变快照收口，并同步服务端与客户端最低版本门禁。
  */
@@ -654,6 +654,73 @@ try {
         return 'varchar(255)';
     };
 
+    // PACKAGE_PHYSICAL_INDEX_EXPORT_V1
+    // 只读取本次声明表的真实索引；一次参数化目录查询避免逐表往返。
+    // 当前导出物理列协议使用 MySQL，未知源库及不能无损表达的索引必须停止，不能发布缺少约束的包。
+    var getPhysicalIndexStatements = function (selectedTables, selectedFields, auditFields) {
+        var owned = Object.create(null), names = [], slots = [];
+        for (var ti = 0; ti < selectedTables.length; ti++) {
+            var table = selectedTables[ti], name = String(table.Name || ''), key = name.toLowerCase();
+            if (!isSafeIdentifier(name)) throw new Error('导出索引的表名不合法');
+            if (owned[key]) continue;
+            if (names.length >= 1000) throw new Error('单次索引导出最多支持1000张责任表');
+            var columns = Object.create(null);
+            for (var ai = 0; ai < auditFields.length; ai++) columns[String(auditFields[ai].Name).toLowerCase()] = true;
+            for (var fi = 0; fi < selectedFields.length; fi++) {
+                var field = selectedFields[fi];
+                if (field.TableId == table.Id && field.Type && String(field.Type) != '1') columns[String(field.Name).toLowerCase()] = true;
+            }
+            owned[key] = { TableName: name, TableId: table.Id, Columns: columns, Seen: false };
+            slots.push('@p' + names.length); names.push(name);
+        }
+        if (!names.length) return [];
+        var dbType = String(V8.OsClientModel && (V8.OsClientModel.DbType || V8.OsClientModel.OsClientDbType) || 'MySql').toLowerCase();
+        if (dbType.indexOf('mysql') < 0 && dbType.indexOf('mariadb') < 0) throw new Error('索引导出尚不支持当前源数据库：' + dbType);
+        var query = V8.Db.FromSql(
+            'SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX, NON_UNIQUE, INDEX_TYPE, SUB_PART, COLLATION AS SORT_ORDER '
+            + 'FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (' + slots.join(',') + ') '
+            + 'ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX'
+        );
+        for (var pi = 0; pi < names.length; pi++) query = query.AddInParameter(slots[pi], names[pi]);
+        var rows = query.ToArray();
+        if (!rows || rows.length > 100000) throw new Error('索引目录读取失败或超出上限');
+        var groups = Object.create(null), groupKeys = [];
+        var value = function (row, name) { return row[name] !== undefined ? row[name] : row[name.toLowerCase()]; };
+        for (var ri = 0; ri < rows.length; ri++) {
+            var row = rows[ri], tableName = String(value(row, 'TABLE_NAME') || ''), tableKey = tableName.toLowerCase();
+            var indexName = String(value(row, 'INDEX_NAME') || ''), column = String(value(row, 'COLUMN_NAME') || '');
+            var target = owned[tableKey], position = Number(value(row, 'SEQ_IN_INDEX')), nonUnique = Number(value(row, 'NON_UNIQUE'));
+            var type = String(value(row, 'INDEX_TYPE') || '').toUpperCase(), prefix = value(row, 'SUB_PART'), order = String(value(row, 'SORT_ORDER') || '').toUpperCase();
+            if (!target || !isSafeIdentifier(indexName) || !isSafeIdentifier(column) || !target.Columns[column.toLowerCase()]
+                || !Number.isInteger(position) || position < 1 || position > 64 || (nonUnique !== 0 && nonUnique !== 1))
+                throw new Error('索引定义不完整或引用未声明列：' + tableName + '.' + indexName);
+            if (type !== 'BTREE' || (prefix !== null && prefix !== undefined && String(prefix) !== '') || order !== 'A')
+                throw new Error('索引无法按标准包无损表达，请使用已审计的专用包：' + tableName + '.' + indexName);
+            target.Seen = true;
+            var groupKey = tableKey + ':' + indexName.toLowerCase(), group = groups[groupKey];
+            if (!group) { group = groups[groupKey] = { Table: target, Name: indexName, NonUnique: nonUnique, Columns: [] }; groupKeys.push(groupKey); }
+            if (group.NonUnique !== nonUnique || group.Columns[position - 1]) throw new Error('索引目录存在冲突：' + tableName + '.' + indexName);
+            group.Columns[position - 1] = column;
+        }
+        for (var ni = 0; ni < names.length; ni++) if (!owned[names[ni].toLowerCase()].Seen) throw new Error('未读取到责任表的物理索引：' + names[ni]);
+        groupKeys.sort(); var statements = [];
+        for (var gi = 0; gi < groupKeys.length; gi++) {
+            var item = groups[groupKeys[gi]], quoted = [];
+            for (var ci = 0; ci < item.Columns.length; ci++) {
+                if (!item.Columns[ci]) throw new Error('索引列顺序不完整：' + item.Name);
+                quoted.push('`' + item.Columns[ci] + '`');
+            }
+            // Id主键已在建表语句中交付；不能把其它复合主键悄悄降为Id主键。
+            if (item.Name.toLowerCase() === 'primary') {
+                if (item.NonUnique !== 0 || item.Columns.length !== 1 || item.Columns[0].toLowerCase() !== 'id') throw new Error('索引导出不支持非Id主键：' + item.Table.TableName);
+                continue;
+            }
+            statements.push({ TableName: item.Table.TableName, TableId: item.Table.TableId, IndexName: item.Name,
+                DDL: 'CREATE ' + (item.NonUnique === 0 ? 'UNIQUE ' : '') + 'INDEX `' + item.Name + '` ON `' + item.Table.TableName + '` (' + quoted.join(',') + ');' });
+        }
+        return statements;
+    };
+
     // 为每个表生成DDL
     var ddlStatements = [];
     for (var i = 0; i < exportTables.length; i++) {
@@ -750,6 +817,10 @@ try {
         }
     }
 
+    // 建表/补列在前，索引在后；新建与既有租户升级均有独立索引DDL可幂等回读。
+    var exportedIndexStatements = getPhysicalIndexStatements(exportTables, exportFields, fixedDiyField);
+    for (var indexStatement = 0; indexStatement < exportedIndexStatements.length; indexStatement++) ddlStatements.push(exportedIndexStatements[indexStatement]);
+    debugLog.physicalIndexCount = exportedIndexStatements.length;
     debugLog.ddlStatementsCount = ddlStatements.length;
 
     // ==================== 步骤6：查询工作流数据（可选） ====================
@@ -1174,7 +1245,8 @@ try {
         for (var appPackageIndex = 0; appPackageIndex < applicationPackages.length; appPackageIndex++) {
             var infrastructurePackage = applicationPackages[appPackageIndex] || {};
             appendUnique(packageData.DDLStatements, copyArray(infrastructurePackage.DDLStatements), function (item) {
-                return String((item && (item.TableName || item.Name)) || JSON.stringify(item));
+                // 同一表的建表和各索引是不同物理对象，不能只按表名吞掉索引。
+                return String((item && (item.TableName || item.Name)) || '') + ':' + String(item && item.DDL || JSON.stringify(item));
             });
             appendUnique(packageData.PhysicalColumns, copyArray(infrastructurePackage.PhysicalColumns), function (item) {
                 return String((item && (item.TableName || item.Name)) || JSON.stringify(item));

@@ -12,5 +12,6 @@
     <Compile Include="../../../Microi.net.Api/Hosting/MemoryDiagnosticsService.cs" Link="Runtime/MemoryDiagnosticsService.cs" />
     <Compile Include="../../../Microi.net.Api/Hosting/MemoryDiagnosticsStore.cs" Link="Runtime/MemoryDiagnosticsStore.cs" />
     <Compile Include="../../../Microi.net.Api/Hosting/MemoryDiagnosticsMetrics.cs" Link="Runtime/MemoryDiagnosticsMetrics.cs" />
+    <Compile Include="../../../Microi.net.Api/Hosting/CriticalIncidentWriter.cs" Link="Runtime/CriticalIncidentWriter.cs" />
   </ItemGroup>
 </Project>
