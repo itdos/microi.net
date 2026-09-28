@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {
   currentUserRoleIds,
   filterFieldsByHiddenCollapseScope,
+  hasVisibleNativeField,
   isPlatformAdmin,
   nativeFieldRoleVisibility,
   nativeRoleCacheKey,
@@ -19,6 +20,11 @@ assert.equal(nativeFieldRoleVisibility({ BindRole: '[]' }, {}).visible, true)
 assert.equal(nativeFieldRoleVisibility({ BindRole: JSON.stringify([salesId]) }, { _IsAdmin: true }).visible, true)
 assert.equal(isPlatformAdmin({ Level: 9999 }), true)
 assert.notEqual(nativeRoleCacheKey({ RoleIds: [salesId] }), nativeRoleCacheKey({ RoleIds: [financeId] }))
+
+assert.equal(hasVisibleNativeField({ fields: [{ Name: 'ShengchengZQRW', visible: true }] }, 'shengchengzqrw'), true)
+assert.equal(hasVisibleNativeField({ fields: [{ Name: 'ShengchengZQRW', visible: false }] }, 'ShengchengZQRW'), false)
+assert.equal(hasVisibleNativeField({ fields: [] }, 'ShengchengZQRW'), false)
+assert.equal(hasVisibleNativeField(null, 'ShengchengZQRW'), false)
 
 const scopedFields = filterFieldsByHiddenCollapseScope([
   { Name: 'Before', component: 'Text', visible: true },
