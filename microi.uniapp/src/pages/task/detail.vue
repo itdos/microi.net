@@ -36,7 +36,7 @@
       </scroll-view>
       <view class="timeline-divider"></view>
 
-      <view class="action-band" :class="{ 'action-band--four': quickActions.length === 4 }">
+      <view class="action-band" :class="{ 'action-band--two': quickActions.length === 2, 'action-band--four': quickActions.length === 4 }">
         <view v-for="action in quickActions" :key="action.key" class="quick-action" hover-class="quick-action--pressed" @tap="runQuickAction(action.key)">
           <view class="quick-action__icon" :class="`tone-${action.tone || 'blue'}`"><image :src="action.icon" mode="aspectFit" /></view><text>{{ action.label }}</text>
           <text v-if="action.key === 'devices'" class="quick-action__badge">{{ completedDeviceCount }}/{{ devices.length }}</text>
@@ -129,7 +129,7 @@ export default {
       id: '', task: {}, devices: [], taskCapabilities: [], merchantAcceptanceEnabled: true, customerAcceptanceEnabled: true, evaluationEnabled: true, capabilityError: '', currentUser: {}, loading: true, refreshing: false,
       stale: false, error: '', submitting: false, assignVisible: false, usersLoading: false, users: [],
       assignMode: 'service', supportReason: '',
-      metadataDefinition: null, taskMenuId: '', expandedMetadata: {},
+      metadataDefinition: null, taskMenuId: '', customerMenuId: '', expandedMetadata: {},
       selectedUser: null, userKeyword: '', userSearchTimer: null, userLoadRequestId: 0, timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
       rejectVisible: false, rejectMode: 'merchant', rejectReason: '', evaluateVisible: false,
       evaluation: { rate: 5, deviceRate: 5, staffRate: 5, tags: [], content: '' },
@@ -142,6 +142,7 @@ export default {
     isOwner() { return !!(this.currentUser.Id && String(this.currentUser.Id) === String(this.task.serviceUserId)) },
     isAdmin() { return Number(this.currentUser.Level || 0) >= 999 || /管理员/.test(this.currentUser.RoleName || '') },
     canEditTaskRecord() { return canEditMenuRecord(this.taskMenuId, this.currentUser) },
+    canOpenCustomerDetail() { return Boolean(this.task.KehuID && this.customerMenuId) },
     canReassignSupport() {
       const role = [this.currentUser.RoleName, this.currentUser.RoleIdsString, this.currentUser.RoleIds].filter(Boolean).join(',')
       return !!this.currentUser.TenantId && String(this.currentUser.TenantId) === String(this.task.TenantId || '') &&
@@ -178,11 +179,14 @@ export default {
       return (pending || this.timeRows[this.timeRows.length - 1] || {}).field
     },
     quickActions() {
-      const actions = [
-        { key: 'customer', label: '客户详情', icon: '/static/xjy/business/kehu.png', tone: 'blue' },
+      const actions = []
+      if (this.canOpenCustomerDetail) actions.push(
+        { key: 'customer', label: '客户详情', icon: '/static/xjy/business/kehu.png', tone: 'blue' }
+      )
+      actions.push(
         { key: 'checkin', label: '现场打卡', icon: '/static/xjy/business/dw.png', tone: 'orange' },
         { key: 'devices', label: '任务设备', icon: '/static/xjy/business/shebei.png', tone: 'violet' }
-      ]
+      )
       if (this.task.ServiceRecordId) actions.push({ key: 'archive', label: '档案结果', icon: '/static/xjy/business/fwjllb.png', tone: 'green' })
       return actions
     },
@@ -231,6 +235,8 @@ export default {
       if (!this.id) { this.error = '缺少任务编号'; this.loading = false; return }
       if (showLoading) this.loading = true
       this.currentUser = getUser() || {}
+      // 权限刷新期间先关闭客户入口，防止角色刚被回收时继续沿用旧菜单上下文。
+      this.customerMenuId = ''
       this.error = ''
       try {
         const definitionRequest = loadNativeFormDefinition('Diy_ShouhouDD', refresh).catch(() => this.metadataDefinition)
@@ -240,17 +246,26 @@ export default {
           this.capabilityError = (error && error.message) || '请检查网络后重试'
           return { actions: [] }
         })
-        const menuRequest = findMenu(
-          ['售后订单', '售后任务', '我的任务'],
-          'Diy_ShouhouDD',
-          refresh
-        ).catch(() => null)
-        const [taskResult, devices, definition, capabilities, menu] = await Promise.all([
+        // 客户权限先强制回源，再让任务菜单复用同一份授权树，避免沿用角色调整前的旧缓存。
+        const menuContextRequest = (async () => {
+          const customerMenu = await findMenu(
+            ['客户', '客户管理', '我的客户'],
+            'Diy_Kehu',
+            true
+          ).catch(() => null)
+          const taskMenu = await findMenu(
+            ['售后订单', '售后任务', '我的任务'],
+            'Diy_ShouhouDD',
+            false
+          ).catch(() => null)
+          return { taskMenu, customerMenu }
+        })()
+        const [taskResult, devices, definition, capabilities, menuContext] = await Promise.all([
           loadTask(this.id, refresh),
           loadTaskDevices(this.id, refresh),
           definitionRequest,
           capabilityRequest,
-          menuRequest
+          menuContextRequest
         ])
         this.task = taskResult.task
         this.devices = devices
@@ -259,7 +274,8 @@ export default {
         this.customerAcceptanceEnabled = capabilities.customerAcceptanceEnabled !== false
         this.evaluationEnabled = capabilities.evaluationEnabled !== false
         this.metadataDefinition = definition || null
-        this.taskMenuId = menu && menu.Id || ''
+        this.taskMenuId = menuContext.taskMenu && menuContext.taskMenu.Id || ''
+        this.customerMenuId = menuContext.customerMenu && menuContext.customerMenu.Id || ''
         this.stale = taskResult.stale
       } catch (error) {
         this.error = formatTaskLoadError(error)
@@ -292,7 +308,13 @@ export default {
       })
     },
     runQuickAction(key) {
-      if (key === 'customer' && this.task.KehuID) return uni.navigateTo({ url: `/pages/business/detail?key=customers&id=${encodeURIComponent(this.task.KehuID)}` })
+      if (key === 'customer') {
+        if (!this.canOpenCustomerDetail) {
+          uni.showToast({ title: '当前账号没有客户表单查看权限', icon: 'none' })
+          return
+        }
+        return uni.navigateTo({ url: `/pages/business/detail?key=customers&menuId=${encodeURIComponent(this.customerMenuId)}&id=${encodeURIComponent(this.task.KehuID)}` })
+      }
       if (key === 'checkin') {
         if (!this.isOwner && !this.isAdmin) return uni.showToast({ title: '仅当前服务人员可打卡', icon: 'none' })
         const query = `customer=${encodeURIComponent(this.task.customer || '')}&customerId=${encodeURIComponent(this.task.KehuID || '')}&taskId=${encodeURIComponent(this.id)}`
@@ -463,6 +485,7 @@ export default {
 .timeline-step.skipped .timeline-step__dot { background: #e8eef0; box-shadow: 0 0 0 2rpx #c5d0d4; }.timeline-step.skipped .timeline-step__time { color: #78909a; }
 .service-time-scroll { border-top: 10rpx solid #f1f6f8; border-bottom: 0; }.service-time-row { padding-top: 25rpx; }.service-time-step { width: 176rpx; padding: 0 4rpx 5rpx; border-radius: 8px; box-sizing: border-box; transition: background .16s ease, transform .16s ease; }.service-time-step.editable { cursor: pointer; }.service-time-step--pressed { background: #edf7fa; transform: scale(.985); }.service-time-step .timeline-step__name { white-space: nowrap; }.service-time-step .timeline-step__time { min-height: 44rpx; padding: 0 3rpx; white-space: normal; line-height: 1.35; }.timeline-divider { height: 14rpx; border-top: 1px solid #e5edef; border-bottom: 1px solid #e5edef; background: #f1f6f8; box-sizing: border-box; }
 .action-band { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 18rpx 12rpx; background: #fff; }
+.action-band--two { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .action-band--four { grid-template-columns: repeat(4,minmax(0,1fr)); }
 .quick-action { position: relative; min-width: 0; min-height: 112rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; transition: background .16s ease; }.quick-action--pressed { background: #edf5f8; }
 .quick-action__icon { width: 52rpx; height: 52rpx; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: #087da8; background: #e8f6fa; font-size: 23rpx; font-weight: 700; }.quick-action__icon image { width: 32rpx; height: 32rpx; }.quick-action__icon.tone-green { color: #167658; background: #e8f7f1; }.quick-action__icon.tone-orange { color: #bd6813; background: #fff2df; }.quick-action__icon.tone-violet { color: #6d4ba5; background: #f1ecfa; }

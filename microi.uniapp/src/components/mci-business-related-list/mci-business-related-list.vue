@@ -1273,8 +1273,20 @@ export default {
     toggleLatestSummary() {
       this.latestSummaryExpanded = !this.latestSummaryExpanded
     },
+    preserveUnsavedParentRows() {
+      if (String(this.parentMode || '').toLowerCase() !== 'add' || !this.rows.length) return false
+      // 新增主表尚未落库时，关联模块的 INNER JOIN 无法回读已按草稿父 Id 创建的子表记录。
+      // 页面返回刷新必须保留接口回传并已合并的可信快照，不能用空查询结果覆盖当前商品列表。
+      this.count = this.rows.length
+      this.finished = true
+      this.loading = false
+      this.error = ''
+      this.emitDataCount()
+      return true
+    },
     refreshData() {
       if (!this.relationValue || !this.config.table) return Promise.resolve()
+      if (this.preserveUnsavedParentRows()) return Promise.resolve()
       return Promise.all([this.loadData(true, true, false, true), this.loadRelatedMetrics(true)])
     },
     async hydrateProposalInstallationPointRows(rows = []) {
