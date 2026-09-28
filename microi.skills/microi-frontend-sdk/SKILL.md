@@ -71,7 +71,7 @@ export function createApp() {
 `Microi.Client` 主后台运行时已内置前后端同构的 `V8.Http.Get/Post/Patch` 及对应 Response 方法；表单事件、按钮 V8 等宿主前端新代码必须优先使用 `V8.Http`，旧 `V8.Post/Get` 仅作兼容保留，其参数和兼容规则以 `v8-http-integration/SKILL.md` 为准。独立项目使用本 SDK、且不在主后台 V8 宿主中时，才使用 SDK 自身的小写 `V8.get/post`、`ApiEngine`、`FormEngine`；不要把它们与宿主旧版大写 `V8.Post/Get` 混为一谈，也不要假设浏览器可以绕过第三方接口的 CORS。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-002 sha256=c514dbf966c96102ea04cdf6f967814f2babe74fceaaee6c1f771d351bfdb8eb -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-002 sha256=7e624a3f79211435570dab7a9f4981b1bcccd73d1da5981a53c97fd1e498e007 -->
 ## 登录与验证码封装
 
 SDK 或项目请求模块必须提供登录所需的系统配置和验证码薄封装，不要让页面散落手写。
@@ -114,6 +114,8 @@ export async function login(account, pwd, captcha = {}) {
 AI 生成的前端微服务不能假定永远在主平台 iframe/micro-app 宿主中运行：
 
 - `window.microApp` 存在且宿主下发 Token 时，直接配置同一个 SDK 实例并进入业务页，不重复显示登录。
+- 平台会话验证使用 `platform-current-user` 等权威身份接口，不得用某个业务模块的 `Options/Bootstrap` 成功与否判断是否已登录。`ROLE_DENIED`、未配置职责、业务初始化失败和网络错误分别显示权限/配置/重试状态，不能把有效平台会话降级为账号密码页。
+- 嵌入宿主时不渲染独立登录表单；短暂等待上下文显示骨架，失败显示原始原因与重新连接入口，真实失效才引导从主站恢复登录。独立地址保留平台账号登录；子应用收到响应续签必须通过 `micro-app:token` 把新旧 Token 回传宿主，防止切换页面后重新使用旧会话。
 - 独立访问时从 `.microi-micro-app.json`/构建配置取得 `apiBase` 与 `osClient`，先复用 SDK 已保存的有效 Token；无 Token 时显示平台帐号密码登录。
 - 初始化必须调用 `V8.GetSysConfig(true)` 并按 `EnableCaptcha` 动态决定验证码。验证码接口固定为 `GET /api/Captcha/GetCaptcha`，响应头读取 `captchaid`；只有启用时才向 `V8.Login` 追加 `_CaptchaId/_CaptchaValue`。
 - 登录仍签发平台 DiyToken，不创建平行 Token、平行用户表或微服务自有密码体系。失效事件回到登录态，Token 续签仍按本 Skill 的单实例规则处理。
@@ -183,6 +185,8 @@ uni.request({ url: apiBase + '/apiengine/' + key, header: { Token: token } });
 <!-- microi-progressive:end -->
 
 ## 复盘：FormEngine 新增请求只在外层保留 Id
+
+独立前端调用 `AddFormData(table, row)` 时，第二参数是业务行，会整体进入 `_RowModel`。需要显式菜单授权时使用完整对象重载：`AddFormData({ FormEngineKey: table, _SysMenuId: menuId, _RowModel: row })`；不要把 `_SysMenuId`、`_FormData` 再包进字符串重载的业务行。由平台生成主键时从 row 中省略 `Id`，不能传空字符串；确需预生成 Id 时按下述双位置契约传有效值。使用实际内嵌 SDK 的传输测试核对外层权限和行模型，再以普通角色完成真实表单新增及 After 回读。
 
 - 触发场景：uni-app/微信小程序预生成记录 Id 后调用 `V8.FormEngine.AddFormData(table, row)`，服务端表单事件中 `V8.Form.Id` 仍为空，按父 Id 查询子表时误命中外键为空的孤儿数据。
 - 根因：SDK 将 `Id` 从业务行模型 `_RowModel` 中移出后只写到请求外层；外层 Id 可用于接口寻址，但不会稳定进入表单事件的 `V8.Form`。
