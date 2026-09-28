@@ -59,6 +59,7 @@ import {
 } from './order-summary.mjs'
 import {
   contractStateByEndDate,
+  orderInitialCustomerDefaults,
   orderCustomerSourceValues
 } from './order-contract.mjs'
 import {
@@ -236,6 +237,36 @@ const ORDER_CUSTOMER_SELECT_FIELDS = [
   'FuzeR', 'FuzeRID', 'FuzeRDH',
   'ZhuanshuKF', 'ZhuanshuKFID', 'ZhuanshuKFDH',
   'ShouhouRY', 'ShouhouRYID', 'ShouhouRYDH'
+]
+const ORDER_PERSONNEL_LINKS = [
+  {
+    source: ORDER_FIELDS.owner,
+    id: 'ownerId',
+    phone: 'ownerPhone',
+    idLabel: '负责人ID',
+    phoneLabel: '负责人电话'
+  },
+  {
+    source: ORDER_FIELDS.serviceAgent,
+    id: 'serviceAgentId',
+    phone: 'serviceAgentPhone',
+    idLabel: '专属客服ID',
+    phoneLabel: '专属客服电话'
+  },
+  {
+    source: ORDER_FIELDS.afterSales,
+    id: 'afterSalesId',
+    phone: 'afterSalesPhone',
+    idLabel: '售后人员Id',
+    phoneLabel: '售后人员电话'
+  },
+  {
+    source: ORDER_FIELDS.installer,
+    id: 'installerId',
+    phone: 'installerPhone',
+    idLabel: '安装人Id',
+    phoneLabel: '安装人电话'
+  }
 ]
 const PERSON_ID_KEYS = ['Id', 'ID', 'id', 'UserId', 'UserID', 'userId', 'Value', 'value']
 const PERSON_PHONE_KEYS = [
@@ -637,8 +668,11 @@ async function initializeOrder(context) {
   )
   applyOrderValues(context, emptyDefaults)
 
+  // 客户资料只是新增订单的初始快照；编辑页必须保留订单自己的可修改值。
+  if (!isOrderAdd(context)) return
+
   // 从客户/合作客户的订单 Tab 进入时只有客户 Id、名称，没有触发客户选择事件。
-  // 新增页仅在负责人信息仍为空时补查一次客户，避免覆盖路由明确传入的值。
+  // 路由明确传入的字段优先，未显式传入的字段才从客户主数据补齐。
   const customerId = context.form[orderFieldName(context, 'customerId', '客户Id')]
   if (!customerId) return
   try {
@@ -647,7 +681,10 @@ async function initializeOrder(context) {
       _SelectFields: ORDER_CUSTOMER_SELECT_FIELDS
     })
     if (result && Number(result.Code) === 1 && result.Data) {
-      applyOrderValues(context, orderCustomerValues(context, result.Data))
+      applyOrderValues(context, orderInitialCustomerDefaults(
+        orderCustomerValues(context, result.Data),
+        context.defaultValues
+      ))
     }
   } catch (error) {
     // 客户联动属于便捷回填，读取失败不阻断订单新增，用户仍可手动选择客户或负责人。
@@ -2364,22 +2401,9 @@ export async function handleFieldSelect(context, payload) {
       })
       return { handled: true }
     }
-    const personnel = [
-      {
-        source: ORDER_FIELDS.owner,
-        id: 'ownerId',
-        phone: 'ownerPhone',
-        idLabel: '负责人ID',
-        phoneLabel: '负责人电话'
-      },
-      {
-        source: ORDER_FIELDS.installer,
-        id: 'installerId',
-        phone: 'installerPhone',
-        idLabel: '安装人Id',
-        phoneLabel: '安装人电话'
-      }
-    ].find((item) => selectedFieldName === item.source.toLowerCase())
+    const personnel = ORDER_PERSONNEL_LINKS.find((item) =>
+      selectedFieldName === item.source.toLowerCase()
+    )
     if (personnel) {
       // zhy：人员选择器返回 sys_user 原始行，从中提取 Id、Phone 并同步到订单关联字段。
       applyOrderValues(context, {
@@ -2566,17 +2590,13 @@ export async function handleFieldChange(context, payload) {
       applyOrderValues(context, orderCustomerValues(context, {}, true))
       return { handled: true }
     }
-    if (changedFieldName === ORDER_FIELDS.owner.toLowerCase()) {
+    const personnel = ORDER_PERSONNEL_LINKS.find((item) =>
+      changedFieldName === item.source.toLowerCase()
+    )
+    if (personnel) {
       applyOrderValues(context, {
-        [orderFieldName(context, 'ownerId', '负责人ID')]: '',
-        [orderFieldName(context, 'ownerPhone', '负责人电话')]: ''
-      })
-      return { handled: true }
-    }
-    if (changedFieldName === ORDER_FIELDS.installer.toLowerCase()) {
-      applyOrderValues(context, {
-        [orderFieldName(context, 'installerId', '安装人Id')]: '',
-        [orderFieldName(context, 'installerPhone', '安装人电话')]: ''
+        [orderFieldName(context, personnel.id, personnel.idLabel)]: '',
+        [orderFieldName(context, personnel.phone, personnel.phoneLabel)]: ''
       })
       return { handled: true }
     }
