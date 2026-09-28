@@ -312,16 +312,17 @@ Web、UniApp 和 MicroService 的真实编译目录应使用 MCP 工具 `microi_
 
 1. MCP 在本机按文件流计算 SHA-256，先拒绝符号链接、`.git`、`node_modules`、密钥/环境文件和超过 20000 个文件的异常目录；协议 v3 不设置 Microi 产品级文件/目录字节上限。
 2. 不超过 128 MiB 的文件兼容旧版单请求；更大文件自动创建确定性断点会话，默认以 16 MiB `application/octet-stream` 分片发送。每片校验精确 `Content-Length`、SHA-256，并从 HDFS 写后回读。
-3. 所有文件写完后，MCP 只提交路径、大小和摘要清单到 `/api/V8Engine/FinalizeApplicationStreamPublish`。API 回读版本对象与完整性标记，再使用阿里云 OSS、MinIO 或 S3 的服务端 `CopyObject` 切换稳定地址。
-4. 非入口资源先切换，`index.html` 最后切换；同一应用使用跨节点分布式锁串行发布，避免两个版本并发产生混合资源。
+3. 所有文件写完后，MCP 只提交路径、大小和摘要清单到 `/api/V8Engine/FinalizeApplicationStreamPublish`。API 回读不可变版本对象与完整性标记，再用对象存储服务端 `CopyObject` 投影到公开的版本目录；私有源码按同样相对目录保留最新版与历史快照。
+4. 固定根的非入口资源先切换，`index.html` 最后切换；同一应用使用跨节点分布式锁串行发布。随后刷新被覆写的 CDN 固定路径并等待刷新任务完成，从 CDN 回读入口及引用资源，才更新商城体验地址。
 
 ```text
-历史版本：{tenant}/ai-app-publish/{appKey}/versions/v1.2.3/index.html
-稳定地址：{tenant}/ai-app-publish/{appKey}/index.html
-latest别名：{tenant}/ai-app-publish/{appKey}/latest/index.html
+公有桶历史版本：{tenant}/micro-app/{appKey}/v1.2.3/index.html
+公有桶稳定地址：{tenant}/micro-app/{appKey}/index.html
+私有桶源码版本：{tenant}/micro-app/{appKey}/v1.2.3/{sourceFile}
+私有桶最新源码：{tenant}/micro-app/{appKey}/{sourceFile}
 ```
 
-微服务历史目录保持 `{tenant}/micro-app/{appKey}/v1.2.3/`，稳定入口同样不带版本号。数据库只保存路径、大小、SHA-256、版本和路由等元数据。失败后可以用相同版本和摘要安全重试；完整清单确认前不会切换稳定入口。
+Web、UniApp 与 MicroService 均采用该目录；官网体验地址是 `https://static.itdos.com/{tenant}/micro-app/{appKey}/index.html`。v3 内部不可变对象键仍可作为校验源，不作为官网链接；CDN 直接读取公有桶，不承担动态版本解析。数据库只保存路径、大小、SHA-256、版本和路由等元数据。失败后可用相同版本和摘要安全重试；历史目录若已有不同字节则拒绝覆盖。
 
 几十 MB 不是 Jint 的固定内存上限，HDFS 本身也没有这种限制。旧发布流程的问题是先把二进制扩成约 `4/3` 大小的 Base64，再经 JSON、Jint 字符串和多层复制产生累计分配。普通小型 V8 上传可继续使用 `V8.Method.Upload`；真实编译目录和大型资产必须使用协议 v3。5 GiB 文件默认是 320 片，网络或进程重启后查询远端状态并只补缺片。每个会话在 `mci_ai_app_file` 以 `StorageScope=ApplicationAssetMultipartSession` 保留，管理员可从“系统引擎 → 超大文件上传记录”查看字节进度、分片数、心跳、错误与恢复建议。最终能力由协议技术边界、对象存储、磁盘、网关和网络共同决定，而不是普通表单的整文件上限。
 

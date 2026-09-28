@@ -183,7 +183,8 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 ## 版本与回滚
 
 - 版本号单调递增，保存变更清单和前后哈希。
-- 公有发布必须同时保留两套入口：`/{OsClient}/ai-app-publish/{AppKey}/index.html` 永远指向最新版，`.../versions/{Version}/index.html` 永远保留该历史版本。先完整上传并逐字节验签不可变版本目录，再切换稳定入口。带 `data-microi-immutable-runtime` 的新入口通过版本目录解析全部资源，可先切换入口；旧入口仍在其它稳定资产之后切换。不能机械固定“入口永远最后”而破坏两种契约。
+- 官方 Web、UniApp、MicroService 体验路径统一为公有桶对象键 `/{OsClient小写}/micro-app/{AppKey}/index.html`，通过 `https://static.itdos.com` 访问；`/{OsClient小写}/micro-app/{AppKey}/{Version}/index.html` 及同目录资源是不可变历史版本。私有桶按同样相对目录保存最新版与各历史版本的源码；编译包没有源码时明确记为 `NotIncluded`。v3 的 `microi/application-assets/v3/...` 仍可作为内部校验源，但 `/micro-app/v3/tenants/...` API resolver 和旧 `ai-app-publish` 不再作为官方商城体验链接。
+- 发布顺序为完整上传并验证版本目录、复制私有源码快照、提升固定根的非入口资源、最后提升固定 `index.html`。CDN 对所有被覆写的固定路径做精确刷新并回读任务 `Complete`，再从 `static.itdos.com` 回读入口及引用资源，最后更新 `sys_microistore.PreviewUrl/PublicPublishPath`；任一步失败保留旧商城入口并进入可恢复状态。跨版本重发不得覆写历史目录的不同内容。官网列表、详情、二维码和“立即体验”只能展示固定根的 CDN URL，不带版本、请求指纹或缓存绕过参数。
 - stage 前回读并冻结应用的 `CurrentVersion + AppVersion`；finalize 必须同时传 `ExpectedCurrentVersion + ExpectedAppVersion`，在以不可变 AppId 加锁后再次 compare-and-set。缺失前置条件、AppId/AppKey 漂移或旧请求晚到一律失败关闭；重新发布必须重新盘点，不能静默回退。
 - 新清单发布成功时，同应用 `dist/` 下不再出现的 active 文件元数据只能条件式改为可逆归档 scope，条件必须包含 AppId、路径、旧 scope 与版本；禁止删除 HDFS/数据库记录，也不得触碰 Private、非 `dist/` 或另一应用的行。
 - 官网、二维码和用户分享只使用无版本号根入口，不追加 `v/apiBase/OsClient`。目标租户的 `ApiBase/OsClient` 在发布或安装时写入入口 HTML 的 `window.__MICROI_APP_CONTEXT__ / MICROI_API_BASE / MICROI_OS_CLIENT`；安装包不得沿用发布端运行上下文。

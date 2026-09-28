@@ -999,6 +999,15 @@ export function validateApplicationAssetV3FinalizeEvidence(
     || stableResolverPath.includes('/requests/')) {
     throw new Error(`${context}.StableResolverPath 不是 versionless v3 resolver`);
   }
+  if (expected.publishMode === 'finalize' && evidence.Completed === true) {
+    const match = /^\/micro-app\/v3\/tenants\/([^/]+)\/kinds\/runtime\/apps\/([^/]+)\/assets\//u.exec(stableResolverPath);
+    if (!match) throw new Error(`${context}.StableResolverPath 缺少租户或 AppKey`);
+    const version = normalizedApplicationVersion(expected.versionNo);
+    requireStreamEvidenceString(evidence, 'CdnPreviewPath',
+      `/${match[1]}/micro-app/${match[2]}/${expected.encodedEntryPath}`, context);
+    requireStreamEvidenceString(evidence, 'CdnVersionPreviewPath',
+      `/${match[1]}/micro-app/${match[2]}/${version}/${expected.encodedEntryPath}`, context);
+  }
   return evidence;
 }
 
@@ -2372,6 +2381,22 @@ export async function runApplicationDirectoryStreamPublish(
           previewTruncated: manifest.assets.length > 200,
         }, null, 2) }],
       };
+    }
+
+    if (v3 && publishMode !== 'stage') {
+      const status = await client.getStatus();
+      const capabilities = asJsonRecord(status.Data);
+      if (status.Code !== 1 || capabilities.ApplicationCdnProjectionSupported !== true) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            error: '目标 API 尚未启用固定 CDN 对象投影；请先部署支持 ApplicationCdnProjectionSupported 的后端。',
+            publishMode,
+            uploadedCount: 0,
+            retrySafe: true,
+          }, null, 2) }],
+          isError: true,
+        };
+      }
     }
 
     let uploadedCount = 0;
