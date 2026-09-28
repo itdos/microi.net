@@ -401,6 +401,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		loadNativeFormDefinition
 	} from '@/platform/native-form.js'
 	import {
+		hasVisibleNativeField
+	} from '@/platform/native-field-visibility.mjs'
+	import {
 		getTenantFormFieldPresentation,
 		getTenantFormFieldActions,
 		runTenantFormFieldAction,
@@ -1923,6 +1926,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			},
 			canGeneratePeriodicTasks() {
 				if (this.key !== 'customers' || !this.roleProfile.isInternal || this.canClaimCustomer) return false
+				// 生成任务对应表单字段的 BindRole 是平台唯一权限来源；元数据缺失时失败关闭。
+				if (!hasVisibleNativeField(this.definition, 'ShengchengZQRW')) return false
 				return ['BaoyangZQ', 'DanganCXZQ', 'HuifangZQ', 'ShuizhiJCZQ', 'ShoukuanZQ']
 					.some((field) => Number(this.detail[field] || 0) > 0)
 			},
@@ -2582,6 +2587,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			async runTaskEngine(engine, payload, successMessage, refreshAfter = true) {
 				if (this.submitting) return false
 				this.submitting = true
+				let errorMessage = ''
 				uni.showLoading({
 					title: '正在提交',
 					mask: true
@@ -2589,6 +2595,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				try {
 					const result = await callApiEngine(engine, payload)
 					if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '操作未成功')
+					uni.hideLoading()
 					uni.showToast({
 						title: successMessage,
 						icon: 'success'
@@ -2596,14 +2603,19 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					if (refreshAfter) await this.loadDetail(false)
 					return true
 				} catch (error) {
-					uni.showToast({
-						title: error.message || '操作失败',
-						icon: 'none'
-					})
+					errorMessage = error.message || error.Msg || '操作失败'
 					return false
 				} finally {
 					uni.hideLoading()
 					this.submitting = false
+					if (errorMessage) {
+						uni.showModal({
+							title: '操作失败',
+							content: errorMessage,
+							showCancel: false,
+							confirmText: '我知道了'
+						})
+					}
 				}
 			},
 			async claimCustomer() {
@@ -2630,6 +2642,10 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				await this.releaseCustomer()
 			},
 			async generatePeriodicTasks() {
+				if (!this.canGeneratePeriodicTasks) {
+					uni.showToast({ title: '当前账号无生成任务权限', icon: 'none' })
+					return
+				}
 				const confirmed = await this.confirm('将按客户及客户设备的服务周期生成售后任务。请确认服务周期已经维护完整。')
 				if (!confirmed) return
 				await this.runTaskEngine('kehu_dingqirw', {
