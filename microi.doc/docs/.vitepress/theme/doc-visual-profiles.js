@@ -85,6 +85,7 @@ export const DOC_VISUAL_PROFILES = Object.freeze({
   'v8-engine/mcp-server': 'guide',
   'v8-engine/v8-client': 'reference',
   'v8-engine/v8-server': 'reference',
+  'v8-engine/microi-agent': 'guide',
   'v8-engine/vs-code-plugin': 'guide',
   'v8-engine/where': 'reference',
 });
