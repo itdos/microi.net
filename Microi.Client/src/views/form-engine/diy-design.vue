@@ -21,6 +21,7 @@
                     </el-dropdown-menu>
                 </template>
             </el-dropdown>
+            <el-button v-if="PageType != 'Report' && CurrentDiyTableModel && CurrentDiyTableModel.Id" @click="OpenGeneratedFormCode">生成 Vue 3 代码</el-button>
             <el-dropdown trigger="click" @command="HandleMoreCommand">
                 <el-button>
                     更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -319,6 +320,19 @@
             v-if="ShowPreviewFormDialog"
             ref="refDiyDesign_PreviewFormDialog"
         ></DiyFormDialog>
+        <el-dialog v-model="ShowGeneratedFormCode" title="表单 Vue 3 代码" width="min(960px, 94vw)" destroy-on-close>
+            <p>设计器仍维护字段、表结构和权限。这里生成独立 Vue 页面；保存后可在 AI 应用工作台改文字、布局和逻辑，完成 Vite 构建与微服务发布后再把菜单切换为“表单代码”。</p>
+            <p v-if="GeneratedFormCodeError" class="form-codegen-error" role="alert">{{ GeneratedFormCodeError }}</p>
+            <template v-else>
+                <el-input :model-value="GeneratedFormCode" type="textarea" :rows="18" readonly aria-label="生成的 Vue 源码" />
+                <p v-if="GeneratedFormCodeResult">已保存到 {{ GeneratedFormCodeResult.appKey }}/{{ GeneratedFormCodeResult.pagePath }}，路由 {{ GeneratedFormCodeResult.routePath }}。源码已保存，尚需构建并发布运行产物。</p>
+            </template>
+            <template #footer>
+                <el-button @click="ShowGeneratedFormCode = false">关闭</el-button>
+                <el-button v-if="GeneratedFormCodeResult" @click="$router.push('/mic-ai-app/' + GeneratedFormCodeResult.appId)">打开源码工作台</el-button>
+                <el-button type="primary" :loading="SavingGeneratedFormCode" :disabled="!!GeneratedFormCodeError || !GeneratedFormCode" @click="SaveGeneratedFormCode">保存到微服务</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -343,6 +357,8 @@ import {
     persistFieldValueChangeV8,
     setFieldValueChangeV8
 } from "../../utils/diy-field-v8.js";
+import { generateFormVue } from "../../utils/form-codegen.js";
+import { saveGeneratedFormSource } from "../../utils/form-codegen-publish.js";
 
 // 异步加载完整表单组件用于预览（与 diy-table 保持一致的复用方式）
 const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
@@ -467,6 +483,11 @@ export default {
 
             // 预览表单弹窗按需挂载
             ShowPreviewFormDialog: false,
+            ShowGeneratedFormCode: false,
+            SavingGeneratedFormCode: false,
+            GeneratedFormCode: "",
+            GeneratedFormCodeError: "",
+            GeneratedFormCodeResult: null,
 
             FieldTypeList: [
                 {
@@ -597,6 +618,38 @@ export default {
         }
     },
     methods: {
+        OpenGeneratedFormCode() {
+            this.GeneratedFormCodeResult = null;
+            this.GeneratedFormCodeError = "";
+            this.GeneratedFormCode = "";
+            try {
+                this.GeneratedFormCode = generateFormVue(this.CurrentDiyTableModel, this.DiyFieldList);
+            } catch (error) {
+                this.GeneratedFormCodeError = error?.message || String(error);
+            }
+            this.ShowGeneratedFormCode = true;
+        },
+        async SaveGeneratedFormCode() {
+            if (!this.GeneratedFormCode || this.SavingGeneratedFormCode) return;
+            this.SavingGeneratedFormCode = true;
+            this.GeneratedFormCodeError = "";
+            try {
+                this.GeneratedFormCodeResult = await saveGeneratedFormSource(
+                    (key, params) => this.DiyCommon.ApiEngine.Run(key, {
+                        ...params,
+                        OsClient: this.DiyCommon.GetOsClient()
+                    }),
+                    this.CurrentDiyTableModel,
+                    this.DiyFieldList
+                );
+                this.DiyCommon.Tips("Vue 源码已保存到微服务，请构建发布后切换模块打开方式。");
+            } catch (error) {
+                this.GeneratedFormCodeError = error?.message || String(error);
+                this.DiyCommon.Tips(this.GeneratedFormCodeError, false);
+            } finally {
+                this.SavingGeneratedFormCode = false;
+            }
+        },
         SyncDesignRouteContext() {
             var self = this;
             var tableId = String(self.$route?.params?.Id || "");
@@ -618,6 +671,8 @@ export default {
             self.CurrentDiyFieldModel = null;
             self.CurrentDiyTableModel = {};
             self.FormDiyTableModel = {};
+            self.ShowGeneratedFormCode = false;
+            self.GeneratedFormCodeResult = null;
             return true;
         },
         LoadDesignRouteData() {

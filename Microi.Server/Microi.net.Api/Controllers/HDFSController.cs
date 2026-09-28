@@ -1761,7 +1761,8 @@ namespace Microi.net.Api
             var pathError = NormalizeFilePaths(param);
             if (pathError != null) return Json(pathError);
 
-            var result = await new MicroiHDFS().DeleteObject(param);
+            var result = await DeleteFileCabinetOfficeObjectAsync(param,
+                () => new MicroiHDFS().DeleteObject(param));
             return Json(result);
         }
 
@@ -1813,7 +1814,8 @@ namespace Microi.net.Api
             var destinationPathError = NormalizeObjectPath(param);
             if (destinationPathError != null) return Json(destinationPathError);
 
-            var result = await new MicroiHDFS().RenameObject(param);
+            var result = await MoveFileCabinetOfficeObjectAsync(param,
+                () => new MicroiHDFS().RenameObject(param));
             return Json(result);
         }
 
@@ -1842,7 +1844,8 @@ namespace Microi.net.Api
             var destinationPathError = NormalizeObjectPath(param);
             if (destinationPathError != null) return Json(destinationPathError);
 
-            var result = await new MicroiHDFS().MoveObject(param);
+            var result = await MoveFileCabinetOfficeObjectAsync(param,
+                () => new MicroiHDFS().MoveObject(param));
             return Json(result);
         }
 

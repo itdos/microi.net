@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { platformEditionLabel, hideSystemLicenseVersion, mergeLoginSysConfig } from '../src/utils/platform-edition.js';
+import { platformEditionLabel, hideSystemLicenseVersion, mergeLoginSysConfig, licenseCountdown } from '../src/utils/platform-edition.js';
+test('授权标签仅在最后七天逐秒倒计时，过期和无效日期不会显示负值', () => {
+    const now = Date.parse('2026-09-26T00:00:00Z');
+    const end = new Date(now + ((5 * 24 + 19) * 3600 + 38 * 60 + 20) * 1000).toISOString();
+    assert.equal(licenseCountdown(end, now), '5天19小时38分20秒');
+    assert.equal(licenseCountdown(end, now + 1000), '5天19小时38分19秒');
+    assert.equal(licenseCountdown(new Date(now + 7 * 86400000).toISOString(), now), '');
+    assert.equal(licenseCountdown(new Date(now).toISOString(), now), '已到期');
+    for (const invalid of ['', null, 'invalid']) assert.equal(licenseCountdown(invalid, now), '');
+});
 test('授权类型映射区分未授权、已授权与未知状态', () => {
     for (const value of ['', 'OpenSource', 'opensource']) assert.equal(platformEditionLabel(value), '开源版');
     assert.equal(platformEditionLabel('Personal'), '个人版');

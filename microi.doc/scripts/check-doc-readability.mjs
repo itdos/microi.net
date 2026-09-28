@@ -19,6 +19,7 @@ const customSiteShells = new Map([
   ['index.md', '官网首页'],
   ['apps.md', 'AI 应用广场'],
   ['app-detail.md', 'AI 应用详情'],
+  ['ai-cad.md', 'AI CAD 产品页'],
   ['profile.md', '用户中心'],
   ['login.md', '登录页'],
   ['contact/index.md', '联系页'],

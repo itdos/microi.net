@@ -14,6 +14,8 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
 {
     private readonly MemoryDiagnosticsStore _store;
     private readonly IServiceProvider _services;
+    private readonly RelationalIncidentRepository _relational;
+    private readonly CriticalIncidentWriter _critical;
     private readonly string _boot = ExecutionObservation.BootId, _directory, _helper;
     private readonly string _node = Environment.MachineName;
     private readonly string _version = typeof(MemoryDiagnosticsService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
@@ -33,6 +35,7 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
     private string _collectorError = "Starting", _storageError = "", _sharedError = "NotYetSynced";
     private int _pending, _replayCursor;
     private long _replayed;
+    private string _samplerStage = "Starting";
     private readonly Dictionary<string, (int Pid, DateTime Started, long SampleTick, double CpuMs)> _helperSamples = new();
 
     public MemoryDiagnosticsService(IHostEnvironment environment, IServiceProvider services)
@@ -41,9 +44,15 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
         _store = new MemoryDiagnosticsStore(Path.Combine(environment.ContentRootPath, "logs", "memory-diagnostics"));
         _directory = _store.BootDirectory(_boot);
         _helper = Path.Combine(AppContext.BaseDirectory, "diagnostics", "Microi.MemoryDiagnostics.dll");
+        _relational = services.GetService<RelationalIncidentRepository>() ?? new RelationalIncidentRepository();
+        _critical = new CriticalIncidentWriter(_relational.Save, _store);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    // 请求线程池耗尽时采样仍继续；磁盘写入与共享存储分别降级，不把取证绑在业务调度上。
+    protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.Factory.StartNew(
+        () => SampleLoop(stoppingToken), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
+    private void SampleLoop(CancellationToken stoppingToken)
     {
         var replay = ReplayLoopAsync(stoppingToken);
         var dependencies = DatabaseLoopAsync(stoppingToken);
@@ -53,9 +62,14 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
             {
                 try
                 {
-                    Directory.CreateDirectory(_directory);
-                    _hostLease ??= new FileStream(Path.Combine(_directory, "host.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-                    EnsureCollector();
+                    _storageError = "";
+                    _samplerStage = "LocalCollector";
+                    TryLocal(() => {
+                        Directory.CreateDirectory(_directory);
+                        _hostLease ??= new FileStream(Path.Combine(_directory, "host.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                        EnsureCollector();
+                    });
+                    _samplerStage = "ProcessMetrics";
                     var metrics = MemoryDiagnosticsMetrics.Read(_directory, _current);
                     MemoryDiagnosticsMetrics[] history;
                     lock (_gate)
@@ -64,58 +78,72 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
                         while (_history.Count > 60) _history.Dequeue();
                         history = _history.ToArray(); _current = metrics;
                     }
+                    _samplerStage = "RequestEvidence";
                     var executions = ExecutionObservation.Snapshot(top: 50);
-                    var triggers = MemoryDiagnosticsMetrics.Triggers(metrics, history.LastOrDefault(m => m.AtUtc <= metrics.AtUtc.AddSeconds(-9)));
-                    if (triggers.Length > 0) _lastTrigger = metrics.AtUtc;
-                    if (_incident == null && triggers.Length > 0)
+                    var waits = RequestWaitObservation.Snapshot();
+                    var triggers = MemoryDiagnosticsMetrics.Triggers(metrics, history.LastOrDefault(m => m.AtUtc <= metrics.AtUtc.AddSeconds(-9))).ToList();
+                    if ((waits["Groups"] as JArray)?.Any(g => g.Value<long>("LongestMs") >= 10000 && g.Value<string>("Stage") != "Executing") == true)
+                        triggers.Add("ObservedLongRequestWait");
+                    if (triggers.Count > 0) _lastTrigger = metrics.AtUtc;
+                    if (_incident == null && triggers.Count > 0)
                     {
                         _incident = NewIncident(Guid.NewGuid().ToString("N"), _boot, metrics.AtUtc, string.Join(",", triggers));
                         _lastIncidentWrite = DateTime.MinValue;
                     }
+                    _samplerStage = "Checkpoint";
                     var checkpoint = BuildCheckpoint(metrics, history, executions);
-                    _store.Write(Path.Combine(_directory, "checkpoint.json"), checkpoint);
+                    checkpoint["RequestWaits"] = waits;
+                    TryLocal(() => _store.Write(Path.Combine(_directory, "checkpoint.json"), checkpoint));
                     if (_incident != null)
                     {
+                        _samplerStage = "MergeIncident";
                         MergeIncident(_incident, checkpoint);
                         if ((metrics.AtUtc - _lastIncidentWrite).TotalSeconds >= 10)
                         {
                             var id = _incident.Value<string>("Id")!;
-                            _store.Write(Path.Combine(_directory, "incident-state.json"), _incident);
+                            _samplerStage = "PersistTenants";
                             PersistTenants(_incident);
-                            if (!File.Exists(Path.Combine(_directory, "stacks-" + id + ".json"))) File.WriteAllText(Path.Combine(_directory, "capture.request"), id);
+                            TryLocal(() => {
+                                _store.Write(Path.Combine(_directory, "incident-state.json"), _incident);
+                                if (!File.Exists(Path.Combine(_directory, "stacks-" + id + ".json"))) File.WriteAllText(Path.Combine(_directory, "capture.request"), id);
+                            });
                             _lastIncidentWrite = metrics.AtUtc;
                         }
                         if ((metrics.AtUtc - _lastTrigger).TotalSeconds > 60 || (metrics.AtUtc - _incident.Value<DateTime>("OccurredAtUtc")).TotalMinutes > 5)
                         {
                             _incident["Status"] = "Recorded";
                             PersistTenants(_incident); _incident = null;
-                            File.Delete(Path.Combine(_directory, "incident-state.json"));
+                            TryLocal(() => File.Delete(Path.Combine(_directory, "incident-state.json")));
                         }
                     }
-                    if (++_iteration % 15 == 1) { RecoverInterruptedBoots(); _store.Trim(_boot); }
-                    _storageError = "";
+                    if (++_iteration % 15 == 1) TryLocal(() => { RecoverInterruptedBoots(); _store.Trim(_boot); });
                 }
                 catch (Exception ex) { _storageError = ex.GetType().Name; }
-                await Task.Delay(2000, stoppingToken).ConfigureAwait(false);
+                _samplerStage = "BetweenSamples";
+                if (stoppingToken.WaitHandle.WaitOne(2000)) break;
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
         finally
         {
-            try
-            {
+            TryLocal(() => {
                 var checkpoint = MemoryDiagnosticsStore.Read(Path.Combine(_directory, "checkpoint.json"));
                 if (checkpoint != null) { checkpoint["GracefulStop"] = true; _store.Write(Path.Combine(_directory, "checkpoint.json"), checkpoint); }
-                if (_incident != null) { _incident["Status"] = "HostStopping"; PersistTenants(_incident); }
-            }
-            catch { }
-            try { await replay.WaitAsync(TimeSpan.FromSeconds(4)).ConfigureAwait(false); } catch { }
-            try { await dependencies.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); } catch { }
+            });
+            try { if (_incident != null) { _incident["Status"] = "HostStopping"; PersistTenants(_incident); } } catch { }
+            try { replay.Wait(TimeSpan.FromSeconds(4)); } catch { }
+            try { dependencies.Wait(TimeSpan.FromSeconds(2)); } catch { }
+            _critical.Dispose();
             _collector?.Dispose(); // Child flushes when this exact parent's identity exits.
             // 离线解析器有自己的 45 秒硬期限；停机不等待重型解析完成。
             _recoveryAnalyzer?.Dispose();
             _hostLease?.Dispose();
         }
+    }
+
+    private void TryLocal(Action action)
+    {
+        try { action(); } catch (Exception ex) { _storageError = ex.GetType().Name; }
     }
 
     private JObject BuildCheckpoint(MemoryDiagnosticsMetrics metrics, MemoryDiagnosticsMetrics[] history, ExecutionObservationWindow executions) => new()
@@ -138,13 +166,15 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
 
     private void MergeIncident(JObject incident, JObject checkpoint)
     {
-        foreach (var key in new[] { "UpdatedAtUtc", "Frames", "Current", "ActiveCount", "RegistryOverflowCount", "Evidence", "DefaultTenant", "MongoDB" })
+        MemoryDiagnosticsStore.RetainWaitEvidence(incident, checkpoint);
+        foreach (var key in new[] { "UpdatedAtUtc", "Frames", "Current", "ActiveCount", "RegistryOverflowCount", "Evidence", "DefaultTenant", "MongoDB", "RequestWaits" })
             incident[key] = checkpoint[key]?.DeepClone();
         incident["PeakRssBytes"] = Math.Max(incident.Value<long>("PeakRssBytes"), checkpoint["Current"]?.Value<long>("RssBytes") ?? 0);
         var all = (incident["Executions"] as JArray ?? new JArray()).Concat(checkpoint["Executions"] as JArray ?? new JArray()).OfType<JObject>();
         incident["Executions"] = new JArray(all.GroupBy(e => e.Value<string>("ExecutionId"))
             .Select(g => g.OrderByDescending(e => e.Value<long>("InclusiveAllocatedBytes")).First())
-            .OrderByDescending(e => e.Value<long>("InclusiveAllocatedBytes")).Take(200).Select(e => e.DeepClone()));
+            .OrderByDescending(e => e.Value<string>("Outcome") == "Running")
+            .ThenByDescending(e => e.Value<long>("ElapsedMs")).Take(200).Select(e => e.DeepClone()));
         var bootDirectory = _store.BootDirectory(incident.Value<string>("BootId")!);
         var collector = MemoryDiagnosticsStore.Read(Path.Combine(bootDirectory, "collector.json"));
         if (collector != null)
@@ -159,8 +189,16 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
     private void PersistTenants(JObject incident)
     {
         var tenants = (incident["Executions"] as JArray ?? new JArray()).OfType<JObject>().Select(e => e.Value<string>("OsClient"))
+            .Concat((incident["RequestWaits"]?["Groups"] as JArray ?? new JArray()).Select(e => e.Value<string>("OsClient")))
+            .Concat((incident["WaitEvidence"]?["Groups"] as JArray ?? new JArray()).Select(e => e.Value<string>("OsClient")))
             .Append(incident.Value<string>("DefaultTenant")).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase).Take(200);
-        foreach (var tenant in tenants) _store.SaveIncident(incident.Value<string>("BootId")!, MemoryDiagnosticsStore.ForTenant(incident, tenant!));
+        foreach (var tenant in tenants)
+        {
+            var value = MemoryDiagnosticsStore.ForTenant(incident, tenant!);
+            // 入队不依赖本地目录；即使容器只读/磁盘满，MySQL 仍可确认关键证据。
+            _critical.Enqueue(value);
+            TryLocal(() => _store.SaveIncident(incident.Value<string>("BootId")!, value));
+        }
     }
 
     private void RecoverInterruptedBoots()
@@ -330,6 +368,7 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
             lock (_gate) result = new JObject { ["Current"] = _current == null ? null : JObject.FromObject(_current), ["History"] = JArray.FromObject(_history) };
             result["BootId"] = _boot; result["NodeId"] = _node; result["BuildVersion"] = _version; result["CurrentNodeOnly"] = true;
             result["Executions"] = JObject.FromObject(ExecutionObservation.Snapshot(tenant, 100));
+            result["RequestWaits"] = RequestWaitObservation.Snapshot(tenant);
             result["Collector"] = CollectorHealth(collector);
             lock (_gate) result["HelperProcesses"] = new JObject
             {
@@ -345,25 +384,36 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
             return result;
         }
         if (action == "memoryincident" && !Guid.TryParseExact(incidentId, "N", out _)) throw new ArgumentException("IncidentId must be a 32-character identifier.");
-        var local = _store.LocalIncidents(tenant, action == "memoryincident" ? incidentId : null).ToList();
+        var local = new List<JObject>();
+        TryLocal(() => local.AddRange(_store.LocalIncidents(tenant, action == "memoryincident" ? incidentId : null)));
+        var sql = new List<JObject>();
+        var relationalStatus = "Available";
+        try { sql.AddRange(_relational.Read(tenant, action == "memoryincident" ? incidentId : null)); }
+        catch (Exception ex) { relationalStatus = ex.GetType().Name; }
         var remote = new List<JObject>();
         var shared = "Available";
         try
         {
             var repository = _services.GetService<IMemoryIncidentRepository>();
             if (repository == null) shared = "Unavailable";
-            else if (action == "memoryincident") { var value = await repository.GetAsync(tenant, incidentId, cancellationToken).ConfigureAwait(false); if (value != null) remote.Add(value); }
-            else remote.AddRange(await repository.ListAsync(tenant, 50, cancellationToken).ConfigureAwait(false));
+            else
+            {
+                using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                bounded.CancelAfter(TimeSpan.FromSeconds(3));
+                if (action == "memoryincident") { var value = await repository.GetAsync(tenant, incidentId, bounded.Token).ConfigureAwait(false); if (value != null) remote.Add(value); }
+                else remote.AddRange(await repository.ListAsync(tenant, 50, bounded.Token).ConfigureAwait(false));
+            }
         }
         catch (Exception ex) { shared = ex.GetType().Name; }
-        var merged = local.Concat(remote).GroupBy(v => v.Value<string>("Id"))
+        var merged = local.Concat(remote).Concat(sql).GroupBy(v => v.Value<string>("Id"))
             .Select(g => g.OrderByDescending(v => v.Value<DateTime>("UpdatedAtUtc")).First())
             .OrderByDescending(v => v.Value<DateTime>("OccurredAtUtc")).Take(50).ToList();
         return new JObject
         {
             ["Items"] = new JArray(merged.Select(v => action == "memoryincident" ? v : MemoryDiagnosticsStore.Summary(v))),
             ["SharedStorage"] = shared, ["LocalFallbackAvailable"] = local.Count > 0,
-            ["Scope"] = "Tenant shared history plus current node persistent WAL; other nodes' unuploaded WAL is not visible.", ["Evidence"] = Evidence()
+            ["RelationalStorage"] = relationalStatus, ["RelationalItems"] = sql.Count,
+            ["Scope"] = "当前租户 MySQL 关键证据 + Mongo 详情 + 本机 WAL；只有外部存储已确认记录可跨容器重建读取。", ["Evidence"] = Evidence()
         };
     }
 
@@ -410,6 +460,9 @@ public sealed class MemoryDiagnosticsService : BackgroundService, IMemoryDiagnos
         ["SharedWrites"] = Interlocked.Read(ref _replayed), ["SharedStorageError"] = _sharedError,
         ["LocalStorageError"] = _storageError.Length == 0 ? _store.LastError : _storageError, ["DroppedUnuploadedFiles"] = _store.DroppedFiles,
         ["CollectorLauncherError"] = _collectorError, ["PersistedVolumeRequired"] = true,
+        ["CriticalStorage"] = _critical.Health(), ["SamplerMode"] = "DedicatedThread",
+        ["SamplerStage"] = _samplerStage, ["LastProcessSampleAtUtc"] = _current?.AtUtc,
+        ["PersistedVolumePurpose"] = "原始分配栈和未上传完整事故；MySQL 已确认关键证据不依赖此卷。",
         ["AllocationBoundary"] = "累计分配、分配采样与存活内存不同；不能把最高分配者自动判为唯一根因。线程累计分配在执行边界结算，长循环实时分配请看独立采样；后台身份刷新不代表业务已取得进展。",
         ["CrashBoundary"] = "正常采样间隔 2 秒，调度阻塞、磁盘满/丢失、进程早期崩溃会扩大缺口；不承诺零丢失。"
     };

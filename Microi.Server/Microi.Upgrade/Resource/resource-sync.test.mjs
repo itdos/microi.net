@@ -13,6 +13,7 @@ import {
   isTemporaryOfficialResourceFailure,
   mergeJavascriptResource,
   mergeJsonResource,
+  mergeResource,
   normalizeOfficialPackageExecutionLimits,
   planOfficialResourcePublishBatches,
   selectOfficialPackageMergeBase,
@@ -345,6 +346,52 @@ test('应用商城包允许失败重跑版本与官网独立升版并保留最�
   });
 
   assert.equal(JSON.parse(merged.packageContent).PackageInfo.Version, 'v7.5.0');
+});
+
+test('应用商城失败重跑保留较高版本的完整投递日志', async () => {
+  const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
+  const publisher = engineSource('ai_app_publish_store', 'v1.0.0', 'return { Code: 1 };');
+  const builder = engineSource('ai_app_build', 'v1.0.0', 'return { Code: 1 };');
+  const makePackage = (version, title) => {
+    const model = JSON.parse(applicationStorePackage({ importer, publisher, builder, version }));
+    model.PackageInfo.ChangeLog = { Version: version, Title: title, ChangeType: 'Fix', Content: title, ReleaseTime: '2026-09-27 12:00:00' };
+    model.PackageInfo.ChangeHistory = `2026-09-27 ${version} ${title}\n`;
+    return JSON.stringify(model);
+  };
+  const replicas = replicaMaps({ importer, publisher, builder });
+  const merged = await mergeApplicationStoreReplicas({
+    basePackageContent: makePackage('v7.4.13', 'base'),
+    localPackageContent: makePackage('v7.4.15', 'local release'),
+    remotePackageContent: makePackage('v7.4.14', 'remote release'),
+    baseStandaloneContents: replicas,
+    localStandaloneContents: replicas,
+    remoteStandaloneContents: replicas,
+  });
+  const info = JSON.parse(merged.packageContent).PackageInfo;
+  assert.equal(info.Version, 'v7.4.15');
+  assert.equal(info.ChangeLog.Title, 'local release');
+  assert.match(info.ChangeHistory, /v7\.4\.15 local release/);
+});
+
+test('普通官方应用失败重跑保留较高版本的完整投递日志', async () => {
+  const makePackage = (version, title, localValue, remoteValue) => JSON.stringify({
+    PackageInfo: {
+      Version: version,
+      ChangeLog: { Version: version, Title: title, ChangeType: 'Fix', Content: title, ReleaseTime: '2026-09-27 12:00:00' },
+      ChangeHistory: `2026-09-27 ${version} ${title}\n`,
+    },
+    Config: { Local: localValue, Remote: remoteValue },
+  });
+  const merged = JSON.parse(await mergeResource(
+    'app.microi.saas-engine.json',
+    makePackage('v8.3.35', 'base', 1, 1),
+    makePackage('v8.3.38', 'local release', 2, 1),
+    makePackage('v8.3.37', 'remote release', 1, 3),
+  ));
+  assert.equal(merged.PackageInfo.Version, 'v8.3.38');
+  assert.equal(merged.PackageInfo.ChangeLog.Title, 'local release');
+  assert.match(merged.PackageInfo.ChangeHistory, /v8\.3\.38 local release/);
+  assert.deepEqual(merged.Config, { Local: 2, Remote: 3 });
 });
 
 test('JSON 三方合并保留本地与官网的非冲突修改', () => {

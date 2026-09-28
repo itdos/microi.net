@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_download_build_zip
- * Version: v1.2.4
+ * Version: v1.3.6
  * Function:
- * - 从当前应用真实编译产物生成可移植 Build ZIP；MicroService 优先读取稳定运行时地址，并逐文件校验 HTTP 状态、原始字节长度与 SHA-256，失败时才回退公有 HDFS。
+ * - 从当前应用真实编译产物生成可移植 Build ZIP；Web/UniApp 只读取当前 v3 发布资源，优先稳定运行时地址并校验字节与 SHA-256。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -199,7 +199,7 @@ function readAssetBase64(asset) {
       return validateResponseBytes(V8.Http.GetResponse({ Url: apiBase + stablePath, Timeout: 180 }), asset, '稳定运行时地址');
     } catch (error) { stableError = text(error.message); }
   }
-  var filePathName = text(asset.PublishHdfsPath || asset.FilePathName || asset.HdfsPath || asset.FilePath || asset.FullPath || asset.Url || asset.url);
+  var filePathName = text(asset.HdfsPath || asset.PublishHdfsPath || asset.FilePathName || asset.FilePath || asset.FullPath || asset.Url || asset.url);
   if (isBlank(filePathName)) throw new Error('编译文件缺少存储地址：' + text(asset.Path || asset.FileName));
   try {
     var url = getPublicUrl(filePathName);
@@ -241,12 +241,26 @@ if (text(app.AppType) === 'MicroService') {
 } else {
   var compiledFilesResult = getFiles(appId);
   if (!compiledFilesResult || compiledFilesResult.Code !== 1) return compiledFilesResult || fail('读取真实编译文件失败');
-  var compiledFiles = toArray(compiledFilesResult.Data);
+  var allCompiledFiles = toArray(compiledFilesResult.Data);
+  var currentStreamFiles = [];
+  var legacyFiles = [];
+  for (var candidateIndex = 0; candidateIndex < allCompiledFiles.length; candidateIndex++) {
+    var candidate = allCompiledFiles[candidateIndex] || {};
+    var scope = text(candidate.StorageScope);
+    if (scope === 'PublicBuildStream' || scope === 'PrivateBuildStream') currentStreamFiles.push(candidate);
+    else if (scope === 'PublicBuild' || scope === 'PrivateBuild') legacyFiles.push(candidate);
+  }
+  // Archived releases and multipart upload sessions are not installable build assets.
+  var compiledFiles = currentStreamFiles.length ? currentStreamFiles : legacyFiles;
   for (var compiledIndex = 0; compiledIndex < compiledFiles.length; compiledIndex++) {
     var compiledFile = compiledFiles[compiledIndex] || {};
     if (parseInt(compiledFile.IsDirectory || 0, 10) === 1) continue;
     var buildPath = buildArchivePath(compiledFile.FilePath || compiledFile.FileName);
     if (isBlank(buildPath)) continue;
+    if (currentStreamFiles.length) {
+      compiledFile.StableFilePathName = text(compiledFile.PublishHdfsPath);
+      compiledFile.Sha256 = text(compiledFile.ContentHash).toLowerCase();
+    }
     var buildKey = buildPath.toLowerCase(); if (seenPaths[buildKey]) return fail('编译资产路径重复：' + buildPath);
     seenPaths[buildKey] = true; entries.push({ Path: buildPath, FileByteBase64: readAssetBase64(compiledFile) });
   }

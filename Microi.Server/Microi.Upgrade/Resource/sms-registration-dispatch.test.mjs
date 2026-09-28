@@ -12,7 +12,7 @@ const sources={
 };
 function fixture(){
  const hashes=new Map(),values=new Map(),expires=new Map();let serial=0,clock=Date.now();
- const state={calls:0,ip:'192.0.2.8',providerOk:true,loseConsume:false,lastCode:null,userExists:true,userError:false};
+ const state={calls:0,ip:'192.0.2.8',providerOk:true,loseConsume:false,lastCode:null,userExists:true,userError:false,enableCaptcha:true};
  const key=k=>{assert.ok(k.startsWith('Microi:lxwb:'),'tenant namespace');if(expires.get(k)<=clock){hashes.delete(k);values.delete(k);}return k;};
  const Cache={
   Get:k=>values.get(key(k)),Set:(k,v)=>{values.set(key(k),v);return true;},
@@ -28,7 +28,7 @@ function fixture(){
  function run(name,Param){
   assert.ok(sources[name]);
   return vm.runInNewContext('(function(){'+sources[name]+'})()',{
-   V8:{Param,OsClient:'lxwb',Cache,Method,SysConfig,OsClientModel:{},FormEngine:{GetFormData:()=>state.userError?{Code:0}:state.userExists?{Code:1,Data:{Id:'u'}}:{Code:2}},ApiEngine:{Run:run},Sms:{Send:p=>{
+   V8:{Param,OsClient:'lxwb',Cache,Method,SysConfig,OsClientModel:{},FormEngine:{GetFormData:(_table,query)=>query?._SelectFields?.includes('EnableCaptcha')?{Code:1,Data:{EnableCaptcha:state.enableCaptcha}}:state.userError?{Code:0}:state.userExists?{Code:1,Data:{Id:'u'}}:{Code:2}},ApiEngine:{Run:run},Sms:{Send:p=>{
     state.calls++;state.lastCode=JSON.parse(p.TemplateParam).code;
     return {Code:state.providerOk?1:0,Data:{Body:{Code:state.providerOk?'OK':'isv.BUSINESS_LIMIT_CONTROL',Message:'provider fixture'}}};
    }}},Date:class extends Date{constructor(...a){super(...(a.length?a:[clock]));}static now(){return clock;}}
@@ -50,6 +50,15 @@ test('wrong proof, missing image and cross-tenant identifiers cannot reach provi
  for(const p of [{},{_CaptchaValue:'WRONG'},{_CaptchaId:'Microi:itdos:Captcha:'+'a'.repeat(32),_CaptchaValue:'TEST'},{OsClient:'itdos',_CaptchaValue:'TEST'}]){
   const f=fixture(),id=f.captcha();const r=f.run('send-sms-reg',{Phone:'13812345678',_CaptchaId:id,...p});assert.notEqual(r.Code,1);assert.equal(f.state.calls,0);
  }
+});
+test('disabled system image captcha allows registration but still rate limits SMS sends',()=>{
+ const f=fixture();f.state.enableCaptcha=false;
+ for(let i=0;i<6;i++){
+  if(i)f.advance(31000);
+  const r=f.run('send-sms-reg',{Phone:'13812345678'});
+  assert.equal(r.Code===1,i<5,r.Msg);
+ }
+ assert.equal(f.state.calls,5);
 });
 test('atomic HDEL loser cannot dispatch even after reading correct image value',()=>{
  const f=fixture();f.state.loseConsume=true;const r=f.run('send-sms-reg',{Phone:'13812345678',_CaptchaId:f.captcha(),_CaptchaValue:'test'});assert.notEqual(r.Code,1);assert.equal(f.state.calls,0);

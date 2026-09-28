@@ -119,6 +119,7 @@ function isMicroAppMenu(item) {
         || item.IsMicroiService === "1"
         || String(item.IsMicroiService || "").toLowerCase() === "true";
     return openType === "microapp"
+        || openType === "codeform"
         || openType === "micro-app"
         || openType === "micro_app"
         || openType === "microservice"

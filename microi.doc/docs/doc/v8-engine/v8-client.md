@@ -62,6 +62,22 @@ V8.FieldSet('UserName', 'Readonly', true);
 V8.FieldSet('字段名', 'Data', [{Id:1}, {Id:2}]);
 ```
 
+只读详情可能使用静态展示器，不挂载下拉组件。若当前值已成为 `{Key: Id, Value: Id}` 占位对象，仅更新 `Data` 不一定刷新显示名。取得服务端授权的选项后，可静默补齐同Key名称；数据库继续保存原Key。纯名称回显不需要触发 `FormSet` 的字段联动。
+
+```js
+// result.Data 必须来自服务端当前记录权限范围内的关联选项。
+// 异步请求结束后，先核对仍是同一个表单、记录及选择，再执行本段。
+var current = V8.Form.Contact;
+var key = current && typeof current === 'object' ? current.Key : current;
+var selected = result.Data.find(x => x.Key === key);
+if (selected) {
+  V8.FieldSet('Contact', 'Data', result.Data);
+  V8.Form.Contact = { Key: key, Value: selected.Value };
+}
+```
+
+关联不存在、停用或没有权限时显示实际原因，不能改选第一项、清空旧关联或凭客户端名称授予权限。新增检索、编辑和只读详情需分别验收，尤其检查首屏之外的已有值及快速切换后的迟到响应。
+
 ## V8.FormMode
 >* 获取当前Form打开的模式，可能的值：Add（新增）、Edit（编辑）、View（预览）
 ```js
@@ -821,6 +837,8 @@ V8.OpenAppDialog({
 
 宿主会自动向微服务传入当前环境，不需要把 Token 拼接到 URL：
 
+嵌入平台的微服务应复用宿主会话，不再次展示账号密码登录表单。需要确认会话时调用 `platform-current-user`；任务、订单或内容的业务接口可能因缺少职责、站点范围或配置而拒绝请求，这些错误不能被当作未登录。应显示原始业务原因并提供重试，保留当前会话。只有认证失效响应才进入会话恢复，由吾码主站完成重新登录。子应用收到 SDK 续签 Token 时通过 `micro-app:token` 回传新 Token 和对应的 `requestToken`，避免宿主旧快照覆盖新会话；不在 URL、日志或错误提示中输出 Token。
+
 ```js
 var hostData = window.microApp.getData();
 
@@ -1242,6 +1260,18 @@ var rowResult = await V8.FormEngine.GetFormData({
 ```
 
 ### 菜单上下文、跨表兼容与性能
+
+独立微服务内嵌 SDK 的 `AddFormData(table, row)` 会把第二参数整体封装为 `_RowModel`。需要同时传菜单上下文时，使用完整参数对象，避免把控制参数当作业务字段：
+
+```js
+await V8.FormEngine.AddFormData({
+  FormEngineKey: 'Diy_Product',
+  _SysMenuId: menuId,
+  _RowModel: { Name: '测试商品' }
+});
+```
+
+由平台生成主键时省略行模型的 `Id`，不要填空字符串。更新时仍传递用户读取到的期望版本，不能因 SDK 补读完整行而覆盖旧版本，从而绕过冲突检测。
 
 - 当前 V8 目标表就是当前菜单绑定表时，前端 scoped facade 自动注入真实 `_SysMenuId`，历史项目不需要逐个补参数。
 - 跨表调用不会错误继承当前主表菜单。未显式传菜单时，后端根据当前用户有效角色可访问的目标表菜单授权快照推断权限，兼容大量历史前端 V8。

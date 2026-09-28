@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.9.7
+ * Version: v3.0.0
  * Function:
  * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时、旧库内置包提交后注册任务，以及安装后资源和字节完整性强回读。
  */
@@ -8933,6 +8933,123 @@ try {
     // ==================== 步骤4：处理wf_flowdesign数据（可选） ====================
     activeImportStage = '步骤4-工作流设计';
 
+    // WORKFLOW_TENANT_CONFIGURATION_V1：声明保留租户配置的包只覆盖流程定义，
+    // 不能用发布方的空模板抹掉目标审批人。图结构不兼容时停用待复核，不继承错误岗位。
+    // 流程、节点、连线的读写必须共享 V8.DbTrans：独立提交的写入在可重复读快照中不可见，
+    // 会导致成功写入后回读不存在，并在失败重试时留下半套流程。统一由外层接口决定提交/回滚。
+    var workflowTenantPlan = { Flows: {}, Nodes: {} };
+    var workflowPreserveTenant = Package.Installation
+        && Package.Installation.ConfigurationPolicy === 'PreserveTenantValues';
+    var workflowValue = function (row, key) {
+        for (var name in row) if (name.toLowerCase() === key.toLowerCase()) return row[name];
+        return undefined;
+    };
+    var workflowComparable = function (value) {
+        if (value === null || typeof value === 'undefined') return '';
+        if (value === true) return '1';
+        if (value === false) return '0';
+        return String(value).replace(/\r\n/g, '\n');
+    };
+    // 读取错误与“不存在”分开处理；同一事务内先完成配置盘点，再改任何流程资源。
+    var readWorkflowRow = function (table, id, fields) {
+        var result = V8.FormEngine.GetFormData(table, { Id: id, _SelectFields: fields }, V8.DbTrans);
+        if (result && result.Code == 2) return null;
+        if (!result || result.Code != 1 || !result.Data)
+            throw new Error('工作流配置读取失败：' + table + '/' + id + '，' + ((result && result.Msg) || '无返回'));
+        return result.Data;
+    };
+    var readWorkflowChildren = function (table, flowId, fields) {
+        var rows = [];
+        for (var page = 1; page <= 25; page++) {
+            var result = V8.FormEngine.GetTableData(table, {
+                _Where: [['FlowDesignId', '=', flowId]], _SelectFields: fields,
+                _OrderBy: 'Id', _OrderByType: 'ASC', _PageIndex: page, _PageSize: 200
+            }, V8.DbTrans);
+            if (!result || result.Code != 1 || !result.Data || typeof result.Data.length !== 'number')
+                throw new Error('工作流配置读取失败：' + table + '/' + flowId);
+            for (var i = 0; i < result.Data.length; i++) rows.push(result.Data[i]);
+            if (result.Data.length < 200) return rows;
+        }
+        throw new Error('工作流配置读取超过安全上限：' + table + '/' + flowId);
+    };
+    var workflowShape = function (rows, fields) {
+        var values = [];
+        for (var i = 0; i < rows.length; i++) {
+            var row = [];
+            for (var j = 0; j < fields.length; j++) row.push(workflowComparable(workflowValue(rows[i], fields[j])));
+            values.push(JSON.stringify(row));
+        }
+        values.sort();
+        return JSON.stringify(values);
+    };
+    if (workflowPreserveTenant) {
+        var incomingWorkflowNodes = Package.WfNodes || [], incomingWorkflowLines = Package.WfLines || [];
+        for (var workflowIndex = 0; workflowIndex < (Package.WfFlowDesigns || []).length; workflowIndex++) {
+            var incomingFlow = Package.WfFlowDesigns[workflowIndex];
+            if (!incomingFlow.Id) throw new Error('工作流配置读取失败：流程缺少Id');
+            var oldFlow = readWorkflowRow('wf_flowdesign', incomingFlow.Id, ['Id', 'TableId', 'IsEnable']);
+            if (!oldFlow) continue;
+            var sameTable = workflowComparable(workflowValue(oldFlow, 'TableId')) === workflowComparable(incomingFlow.TableId);
+            var oldNodes = readWorkflowChildren('wf_node', incomingFlow.Id, ['Id', 'FlowDesignId', 'NodeType']);
+            var oldLines = readWorkflowChildren('wf_line', incomingFlow.Id, ['Id', 'FlowDesignId', 'FromNodeId', 'ToNodeId', 'LineValue']);
+            var nextNodes = [], nextLines = [];
+            for (var ni = 0; ni < incomingWorkflowNodes.length; ni++)
+                if (incomingWorkflowNodes[ni].FlowDesignId === incomingFlow.Id) nextNodes.push(incomingWorkflowNodes[ni]);
+            for (var li = 0; li < incomingWorkflowLines.length; li++)
+                if (incomingWorkflowLines[li].FlowDesignId === incomingFlow.Id) nextLines.push(incomingWorkflowLines[li]);
+            var compatible = sameTable
+                && workflowShape(oldNodes, ['Id', 'NodeType']) === workflowShape(nextNodes, ['Id', 'NodeType'])
+                && workflowShape(oldLines, ['Id', 'FromNodeId', 'ToNodeId', 'LineValue']) === workflowShape(nextLines, ['Id', 'FromNodeId', 'ToNodeId', 'LineValue']);
+            workflowTenantPlan.Flows['$' + incomingFlow.Id] = {
+                SameTable: sameTable, IsEnable: compatible ? workflowValue(oldFlow, 'IsEnable') : 0
+            };
+            if (!compatible) {
+                // 在途待办仍引用原节点，不能在升级时搬动其审批图；不替用户完成或撤回真实审批。
+                var activeWorks = V8.FormEngine.GetTableData('wf_work', {
+                    _Where: [['FlowDesignId', '=', incomingFlow.Id], ['WorkState', '=', 'Todo']],
+                    _SelectFields: ['Id'], _PageIndex: 1, _PageSize: 1
+                }, V8.DbTrans);
+                if (!activeWorks || activeWorks.Code != 1 || !activeWorks.Data)
+                    throw new Error('工作流在途待办读取失败：' + incomingFlow.Id);
+                if (activeWorks.Data.length > 0)
+                    throw new Error('工作流结构变化但仍有在途待办，请完成或撤回后更新：' + incomingFlow.Id);
+                stats.WorkflowRebindRequired = (stats.WorkflowRebindRequired || 0) + 1;
+                debugLog['workflow_rebind_required_' + incomingFlow.Id] = '流程结构发生变化，已停用；请复核全部节点、连线和目标审批岗位后启用。';
+            }
+        }
+        // 节点Id不能跨流程借用。只保留同一业务表、同一节点用途的真实目标绑定，V8仍随包覆盖。
+        for (var bindingNodeIndex = 0; bindingNodeIndex < incomingWorkflowNodes.length; bindingNodeIndex++) {
+            var bindingNode = incomingWorkflowNodes[bindingNodeIndex];
+            if (!bindingNode.Id || !bindingNode.FlowDesignId) throw new Error('工作流配置读取失败：节点缺少Id或流程归属');
+            var oldNode = readWorkflowRow('wf_node', bindingNode.Id, ['Id', 'FlowDesignId', 'NodeType', 'Users', 'Roles', 'Depts']);
+            if (!oldNode) continue;
+            if (workflowComparable(workflowValue(oldNode, 'FlowDesignId')) !== workflowComparable(bindingNode.FlowDesignId))
+                throw new Error('工作流节点归属冲突：' + bindingNode.Id);
+            var parentPlan = workflowTenantPlan.Flows['$' + bindingNode.FlowDesignId];
+            if (parentPlan && parentPlan.SameTable
+                && workflowComparable(workflowValue(oldNode, 'NodeType')) === workflowComparable(bindingNode.NodeType)) {
+                workflowTenantPlan.Nodes['$' + bindingNode.Id] = {
+                    Users: workflowValue(oldNode, 'Users'), Roles: workflowValue(oldNode, 'Roles'), Depts: workflowValue(oldNode, 'Depts')
+                };
+            }
+        }
+    }
+    // 接口返回成功不能代替实际落库。校验声明式字段和V8，审计时间/操作者仍由平台维护。
+    var assertWorkflowReadback = function (table, expected) {
+        var fields = [];
+        for (var field in expected) {
+            if (field.charAt(0) !== '_' && ['createtime', 'updatetime', 'userid', 'username', 'osclient'].indexOf(field.toLowerCase()) < 0)
+                fields.push(field);
+        }
+        var latest = readWorkflowRow(table, expected.Id, fields);
+        if (!latest) throw new Error('工作流写入后回读不存在：' + table + '/' + expected.Id);
+        for (var i = 0; i < fields.length; i++) {
+            var name = fields[i];
+            if (workflowComparable(workflowValue(latest, name)) !== workflowComparable(expected[name]))
+                throw new Error('工作流写入后回读不一致：' + table + '/' + expected.Id + '/' + name);
+        }
+    };
+
     if (Package.WfFlowDesigns && Package.WfFlowDesigns.length > 0) {
         reportProgress(80, '正在导入工作流设计');
         debugLog.step4 = '开始处理wf_flowdesign数据';
@@ -8954,22 +9071,25 @@ try {
             }
             modelCopy.OsClient = V8.OsClient;
             modelCopy.Id = flow.Id;
+            var flowTenantConfig = workflowTenantPlan.Flows['$' + flow.Id];
+            if (flowTenantConfig) modelCopy.IsEnable = flowTenantConfig.IsEnable;
             if (exists) {
-                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', modelCopy);
+                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', modelCopy, V8.DbTrans);
                 if (uptResult.Code == 1) {
                     stats.FlowUpdated++;
                 } else {
-                    debugLog['flow_upt_error_' + flow.Id] = uptResult.Msg;
+                    throw new Error('工作流设计写入失败：' + flow.Id + '，' + uptResult.Msg);
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('wf_flowdesign', modelCopy);
+                var addResult = V8.FormEngine.AddFormData('wf_flowdesign', modelCopy, V8.DbTrans);
                 if (addResult.Code == 1) {
                     stats.FlowInserted++;
                 } else {
-                    debugLog['flow_add_error_' + flow.Id] = addResult.Msg;
+                    throw new Error('工作流设计写入失败：' + flow.Id + '，' + addResult.Msg);
                 }
             }
+            assertWorkflowReadback('wf_flowdesign', modelCopy);
         }
 
         debugLog.step4Result = '工作流数据处理完成：新增' + stats.FlowInserted + '，修改' + stats.FlowUpdated;
@@ -8999,22 +9119,30 @@ try {
             }
             modelCopy.OsClient = V8.OsClient;
             modelCopy.Id = node.Id;
+            var nodeTenantConfig = workflowTenantPlan.Nodes['$' + node.Id];
+            if (nodeTenantConfig) {
+                modelCopy.Users = nodeTenantConfig.Users;
+                modelCopy.Roles = nodeTenantConfig.Roles;
+                modelCopy.Depts = nodeTenantConfig.Depts;
+                stats.WorkflowBindingsPreserved = (stats.WorkflowBindingsPreserved || 0) + 1;
+            }
             if (exists) {
-                var uptResult = V8.FormEngine.UptFormData('wf_node', modelCopy);
+                var uptResult = V8.FormEngine.UptFormData('wf_node', modelCopy, V8.DbTrans);
                 if (uptResult.Code == 1) {
                     stats.NodeUpdated++;
                 } else {
-                    debugLog['node_upt_error_' + node.Id] = uptResult.Msg;
+                    throw new Error('工作流节点写入失败：' + node.Id + '，' + uptResult.Msg);
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('wf_node', modelCopy);
+                var addResult = V8.FormEngine.AddFormData('wf_node', modelCopy, V8.DbTrans);
                 if (addResult.Code == 1) {
                     stats.NodeInserted++;
                 } else {
-                    debugLog['node_add_error_' + node.Id] = addResult.Msg;
+                    throw new Error('工作流节点写入失败：' + node.Id + '，' + addResult.Msg);
                 }
             }
+            assertWorkflowReadback('wf_node', modelCopy);
         }
 
         debugLog.step5Result = '节点数据处理完成：新增' + stats.NodeInserted + '，修改' + stats.NodeUpdated;
@@ -9046,21 +9174,22 @@ try {
             modelCopy.Id = line.Id;
             if (exists) {
                 // 存在则修改
-                var uptResult = V8.FormEngine.UptFormData('wf_line', modelCopy);
+                var uptResult = V8.FormEngine.UptFormData('wf_line', modelCopy, V8.DbTrans);
                 if (uptResult.Code == 1) {
                     stats.LineUpdated++;
                 } else {
-                    debugLog['line_upt_error_' + line.Id] = uptResult.Msg;
+                    throw new Error('工作流连线写入失败：' + line.Id + '，' + uptResult.Msg);
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('wf_line', modelCopy);
+                var addResult = V8.FormEngine.AddFormData('wf_line', modelCopy, V8.DbTrans);
                 if (addResult.Code == 1) {
                     stats.LineInserted++;
                 } else {
-                    debugLog['line_add_error_' + line.Id] = addResult.Msg;
+                    throw new Error('工作流连线写入失败：' + line.Id + '，' + addResult.Msg);
                 }
             }
+            assertWorkflowReadback('wf_line', modelCopy);
         }
 
         debugLog.step6Result = '连线数据处理完成：新增' + stats.LineInserted + '，修改' + stats.LineUpdated;
@@ -9864,6 +9993,53 @@ try {
         updateuser: true
     };
 
+    // DATASET_FIXED_AUTO_NUMBER_V1：模板等资源的固定编号也是跨表引用契约。
+    // AddFormData 会生成新号，普通 UptFormData 会忽略自动编号。只按目标真实字段元数据，
+    // 对本次允许写入的显式非空编号做最小强制更新，并在同一事务内回读；失败不能推进安装版本。
+    var getDataSetAutoNumberFields = function (tableId, tableName) {
+        var result = V8.FormEngine.GetTableData('diy_field', {
+            _Where: [['TableId', '=', tableId], ['Component', '=', 'AutoNumber']],
+            _SelectFields: ['Name', 'Component'], _PageSize: 1000, _PageIndex: 1
+        }, V8.DbTrans);
+        if (!result || result.Code != 1 || !result.Data || result.Data.length == null
+            || Number(result.DataCount || 0) > 1000 || result.Data.length >= 1000) {
+            throw new Error('应用数据自动编号元数据读取失败或超限：' + tableName);
+        }
+        var fields = [], seen = {};
+        for (var i = 0; i < result.Data.length; i++) {
+            var field = result.Data[i], name = String(field.Name || ''), lower = name.toLowerCase();
+            if (field.Component != 'AutoNumber' || !isSafeDataTableName(name)
+                || name.charAt(0) == '_' || lower == 'id' || protectedDataRowFields[lower] || seen[lower]) {
+                throw new Error('应用数据自动编号字段无效：' + tableName);
+            }
+            fields.push(name); seen[lower] = true;
+        }
+        return fields;
+    };
+    var restoreDataSetAutoNumbers = function (tableName, row, fields) {
+        var patch = { Id: row.Id, _ForceUpt: true }, selected = ['Id'];
+        for (var i = 0; i < fields.length; i++) {
+            var name = fields[i], value = row[name];
+            if (!Object.prototype.hasOwnProperty.call(row, name) || value === null || value === undefined || value === '') continue;
+            if ((typeof value != 'string' && typeof value != 'number')
+                || (typeof value == 'number' && !isFinite(value))) {
+                throw new Error('应用数据自动编号值无效：' + tableName + '.' + name);
+            }
+            patch[name] = value; selected.push(name);
+        }
+        if (selected.length == 1) return;
+        var updated = V8.FormEngine.UptFormData(tableName, patch, V8.DbTrans);
+        if (!updated || updated.Code != 1) throw new Error('应用数据自动编号恢复失败：' + tableName + '，Id=' + row.Id);
+        var stored = V8.FormEngine.GetFormData(tableName, { Id: row.Id, _SelectFields: selected }, V8.DbTrans);
+        if (!stored || stored.Code != 1 || !stored.Data) throw new Error('应用数据自动编号回读失败：' + tableName);
+        for (var j = 1; j < selected.length; j++) {
+            var key = selected[j];
+            if (stored.Data[key] === null || stored.Data[key] === undefined || String(stored.Data[key]) !== String(patch[key])) {
+                throw new Error('应用数据自动编号回读不一致：' + tableName + '.' + key);
+            }
+        }
+    };
+
     // DATASET_PARENT_BINDING_V1：配置子表种子按目标库真实父记录绑定，不能携带官方主库的记录 Id。
     // 只解析固定表/字段与参数化相等条件，并且只读取 Id；禁止任意 SQL、V8 或动态表达式。
     var resolveDataSetParentBinding = function (dataSet) {
@@ -9920,6 +10096,8 @@ try {
         if (sourceRows.length > 5000) {
             throw new Error('应用数据导入失败：表 ' + dataTableName + ' 单个数据集超过5000条限制');
         }
+        var dataAutoNumberFields = sourceRows.length > 0
+            ? getDataSetAutoNumberFields(tableDefinitionResult.Data.Id, dataTableName) : [];
 
         for (var dataRowIndex = 0; dataRowIndex < sourceRows.length; dataRowIndex++) {
             var sourceRow = remapPackageDataRowReferences(
@@ -9973,10 +10151,10 @@ try {
 
             var writeDataResult;
             if (existingData.Exists) {
-                writeDataResult = V8.FormEngine.UptFormData(dataTableName, targetRow);
+                writeDataResult = V8.FormEngine.UptFormData(dataTableName, targetRow, V8.DbTrans);
                 if (writeDataResult && writeDataResult.Code == 1) stats.DataUpdated++;
             } else {
-                writeDataResult = V8.FormEngine.AddFormData(dataTableName, targetRow);
+                writeDataResult = V8.FormEngine.AddFormData(dataTableName, targetRow, V8.DbTrans);
                 if (writeDataResult && writeDataResult.Code == 1) stats.DataInserted++;
                 if ((!writeDataResult || writeDataResult.Code != 1) && conflictPolicy == 'InsertIfMissing') {
                     var concurrentData = findExistingPackageData(dataTableName, sourceRow, conflictPolicy, conflictFields);
@@ -9991,6 +10169,7 @@ try {
             if (!writeDataResult || writeDataResult.Code != 1) {
                 throw new Error('应用数据导入失败：表 ' + dataTableName + '，Id=' + targetRow.Id + '，' + ((writeDataResult && writeDataResult.Msg) || '未知错误'));
             }
+            restoreDataSetAutoNumbers(dataTableName, targetRow, dataAutoNumberFields);
         }
         stats.DataSetCount++;
     }

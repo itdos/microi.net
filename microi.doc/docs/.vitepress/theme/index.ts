@@ -5,6 +5,7 @@ import DefaultTheme from "vitepress/theme";
 import ContactCard from "./components/ContactCard.vue";
 import ProductShowcase from "./components/ProductShowcase.vue";
 import AiStudioHome from "./components/AiStudioHome.vue";
+import AiCadLanding from "./components/AiCadLanding.vue";
 import AppDetail from "./components/AppDetail.vue";
 import UserBar from "./components/UserBar.vue";
 import LoginPage from "./components/LoginPage.vue";
@@ -31,6 +32,7 @@ import "./styles/unity-integration.scss";
 import "./styles/update-log.scss";
 import "./styles/training-syllabus-deck.scss";
 import "./styles/ai-capability-docs.scss";
+import "./styles/ai-cad-landing.scss";
 
 const APPEARANCE_KEY = 'vitepress-theme-appearance'
 
@@ -98,6 +100,7 @@ export default {
         ctx.app.component('LoginPage', LoginPage);
         ctx.app.component('ProfilePage', ProfilePage);
         ctx.app.component('AiStudioHome', AiStudioHome);
+        ctx.app.component('AiCadLanding', AiCadLanding);
         ctx.app.component('ProductShowcase', ProductShowcase);
         ctx.app.component('AppDetail', AppDetail);
         ctx.app.component('MciNugetStats', MciNugetStats);
