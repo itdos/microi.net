@@ -1,4 +1,4 @@
-﻿{
+{
   "index.md" : "平台介绍",
   "edition-comparison.md" : "版本选择（开源/个人/企业）",
 
@@ -36,7 +36,8 @@
 
   "v8-engine":"V8引擎",
   "ai-apiengine.md" : "AI 编程",
-  "vs-code-plugin.md":"Microi Code / VS Code / CLI",
+  "microi-agent.md":"Microi Agent / VS Code / CLI",
+  "vs-code-plugin.md":"Microi Agent 旧链接跳转",
   "mcp-server.md":"MCP Server 完整指南",
   "api-engine.md" : "API 接口引擎",
   "v8-server.md" : "V8函数-后端",

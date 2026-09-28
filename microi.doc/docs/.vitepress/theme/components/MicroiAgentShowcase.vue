@@ -3,21 +3,21 @@
     <div class="microi-code-ambient" aria-hidden="true"><i></i><i></i><i></i></div>
     <div class="microi-code-hero">
       <div class="microi-code-hero__copy">
-        <p class="microi-code-kicker"><span></span>MICROI CODE <b>HARNESS</b></p>
+        <p class="microi-code-kicker"><span></span>MICROI AGENT <b>HARNESS</b></p>
         <h2 id="microi-code-title">让 AI 在<strong>完整业务底座</strong>上工作</h2>
         <p class="microi-code-lead">代码、吾码账号、AI 中转站、MCP 与 30+ 成熟引擎，在一个桌面工作台协同。</p>
         <div class="microi-code-actions">
-          <a class="is-primary" :href="windows.latest"><DownloadIcon />下载 Windows</a>
-          <a :href="mac.latest"><DownloadIcon />下载 macOS Intel</a>
+          <a class="is-primary" href="/download/microi-agent/latest.html?platform=windows"><DownloadIcon />下载 Windows <small>v{{ liveVersions.windows }}</small></a>
+          <a href="/download/microi-agent/latest.html?platform=mac"><DownloadIcon />下载 macOS <small>v{{ liveVersions.mac }}</small></a>
         </div>
-        <ul class="microi-code-facts" aria-label="Microi Code 产品事实">
+        <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
           <li><strong>原生能力</strong><span>MCP · Skills · Harness</span></li>
         </ul>
       </div>
       <a class="microi-code-hero__visual" href="/images/product-screenshots/microi-code-ai-remove-light.png" data-fancybox="microi-code-gallery">
-        <img src="/images/product-screenshots/microi-code-ai-remove-light.png" alt="Microi Code AI 图像处理工作台">
+        <img src="/images/product-screenshots/microi-code-ai-remove-light.png" alt="Microi Agent AI 图像处理工作台">
         <span><strong>29 项图像能力</strong><small>参数、上传、任务与结果都在桌面端完成</small></span>
       </a>
     </div>
@@ -33,7 +33,7 @@
       </a>
     </div>
 
-    <div class="microi-code-flow" aria-label="Microi Code 工作流程">
+    <div class="microi-code-flow" aria-label="Microi Agent 工作流程">
       <article><span>01</span><h3>登录与连接</h3><p>使用吾码账号，或连接自己的模型与业务租户。</p></article>
       <article><span>02</span><h3>选择能力</h3><p>对话、数据、图像、视频、音乐与应用统一进入。</p></article>
       <article><span>03</span><h3>完成交付</h3><p>Harness 执行任务，吾码引擎承接权限、数据与业务。</p></article>
@@ -63,16 +63,31 @@
 
     <footer class="microi-code-credit">
       <div><span>OPEN SOURCE FOUNDATION</span><strong>尊重上游，持续演进</strong></div>
-      <p>Microi Code 基于 <a href="https://github.com/dataelement/dsh-desktop" target="_blank" rel="noopener noreferrer">dsh-desktop</a> 与 <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener noreferrer">DeepSeek Harness</a> 二次开发，保留 DataElement 的 MIT 版权声明。</p>
+      <p>Microi Agent 基于 <a href="https://github.com/dataelement/dsh-desktop" target="_blank" rel="noopener noreferrer">dsh-desktop</a> 与 <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener noreferrer">DeepSeek Harness</a> 二次开发，保留 DataElement 的 MIT 版权声明。</p>
     </footer>
   </section>
 </template>
 
 <script setup>
-import { computed, h, ref } from 'vue'
+import { computed, h, onMounted, reactive, ref } from 'vue'
 
 const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true', fill }, [h('path', { d: path })])
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
+
+// 更新清单由 iTdos 接口引擎发布；版本发布后官网源码无需随之改动。
+const liveVersions = reactive({ windows: '获取中', mac: '获取中' })
+const UPDATE_BASE = 'https://api.itdos.com/microi-code/updates/latest/'
+function versionFromYaml(yaml) {
+  return /^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\s*$/m.exec(yaml)?.[1] || ''
+}
+onMounted(async () => {
+  await Promise.all([
+    fetch(UPDATE_BASE + 'latest.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => { liveVersions.windows = versionFromYaml(yaml) || '未知' }).catch(() => { liveVersions.windows = '未知' }),
+    fetch(UPDATE_BASE + 'latest-mac.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => {
+      liveVersions.mac = versionFromYaml(yaml) || '未知'
+    }).catch(() => { liveVersions.mac = '未知' })
+  ])
+})
 
 function trackPointer(event) {
   const target = event.currentTarget
@@ -87,24 +102,21 @@ function resetPointer(event) {
 }
 
 const windows = {
-  version: '1.1.3',
   latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe',
   archive: 'https://static.itdos.com/itdos/microi-code/1.1.3/29f4aef8fede/202609/Microi-Code-1_1_3-windows-x64-setup.exe',
   sha256: '29f4aef8fede578500da3557c3d8350129e035337e008f5e1aaa69162ddb0aee'
 }
 
 const mac = {
-  version: '1.1.3',
-  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-mac-x64.dmg',
   archive: 'https://static.itdos.com/itdos/microi-code/1.1.3/3fedbfacdfe9/202609/Microi-Code-1_1_3-mac-x64.dmg',
   sha256: '3fedbfacdfe952bf33c8f406a783cb1af83255d621451f3c31e140d062ad6bfd'
 }
 
 const screenshots = [
-  { src: '/images/product-screenshots/microi-code-ai-center-dark.jpg', alt: 'Microi Code 深色 AI 能力中心', title: 'AI 能力中心', caption: '能力与来源清晰分层' },
-  { src: '/images/product-screenshots/microi-code-home-light.jpg', alt: 'Microi Code 浅色首页', title: '首页入口', caption: '7 项主能力与 29 项图像工具' },
-  { src: '/images/product-screenshots/microi-code-task-workspace.png', alt: 'Microi Code 任务工作区', title: '真实任务', caption: '轨迹、文件与后台任务统一查看' },
-  { src: '/images/product-screenshots/microi-code-ai-remove-light.png', alt: 'Microi Code AI 消除功能', title: '原生工作台', caption: '上传、参数、生成与下载闭环' }
+  { src: '/images/product-screenshots/microi-code-ai-center-dark.jpg', alt: 'Microi Agent 深色 AI 能力中心', title: 'AI 能力中心', caption: '能力与来源清晰分层' },
+  { src: '/images/product-screenshots/microi-code-home-light.jpg', alt: 'Microi Agent 浅色首页', title: '首页入口', caption: '7 项主能力与 29 项图像工具' },
+  { src: '/images/product-screenshots/microi-code-task-workspace.png', alt: 'Microi Agent 任务工作区', title: '真实任务', caption: '轨迹、文件与后台任务统一查看' },
+  { src: '/images/product-screenshots/microi-code-ai-remove-light.png', alt: 'Microi Agent AI 消除功能', title: '原生工作台', caption: '上传、参数、生成与下载闭环' }
 ]
 
 const releases = [
