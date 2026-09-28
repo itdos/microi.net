@@ -2023,6 +2023,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				this.error = ''
 				try {
 					await this.loadViewManifest(refreshManifest)
+					// 客户详情属于后台表单能力；没有当前账号真实授权的菜单上下文时禁止直达读取。
+					if (this.key === 'customers' && !this.menuId) throw new Error('当前账号没有客户表单查看权限')
 					const [result, definitionResult] = await Promise.all([
 						(this.key === 'devices' ? V8.FormEngine.Request('getformdata', this.moduleConfig.table, {
 							Id: this.id,
@@ -2083,9 +2085,23 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				}
 			},
 			async loadViewManifest(refresh = false) {
+				let menuId = this.menuId
 				try {
-					let menuId = this.menuId
-					if (!menuId) {
+					if (this.key === 'customers') {
+						// 即使路由携带 menuId，也必须在当前用户的授权菜单树中重新解析，不能信任 URL。
+						const menu = await findMenu(
+							this.moduleConfig.menuAliases || [],
+							this.moduleConfig.table,
+							true,
+							menuId
+						)
+						menuId = menu && menu.Id || ''
+						if (!menuId) {
+							this.menuId = ''
+							this.viewManifest = null
+							return
+						}
+					} else if (!menuId) {
 						const menu = await findMenu(
 							this.moduleConfig.menuAliases || [],
 							this.moduleConfig.table,
@@ -2108,7 +2124,13 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					} else {
 						this.menuId = menuId
 					}
-				} catch (error) {}
+				} catch (error) {
+					// 客户权限解析失败时必须失败关闭，不能继续使用上一次缓存的 menuId。
+					if (this.key === 'customers') {
+						this.menuId = ''
+						this.viewManifest = null
+					}
+				}
 			},
 			isActionImage(value) {
 				return /^(https?:|\/|static\/)/i.test(String(value || ''))
