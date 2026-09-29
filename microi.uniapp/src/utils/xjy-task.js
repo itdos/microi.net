@@ -10,6 +10,7 @@ import {
 } from '@/tenants/xjy/task-device-reference.mjs'
 import {
   TASK_DEVICE_FALLBACK_SEARCH_FIELDS,
+  buildTaskDeviceKeywordWhere,
   buildTaskDeviceServiceStatusWhere
 } from '@/tenants/xjy/task-device-filters.mjs'
 
@@ -404,18 +405,9 @@ export async function loadTaskDevicesPage(taskId, options = {}) {
   const where = [
     { Name: 'ShouhouDDID', Type: '=', Value: taskId },
     ...buildTaskDeviceServiceStatusWhere(serviceStatus),
-    ...extraWhere
+    ...extraWhere,
+    ...buildTaskDeviceKeywordWhere(keyword)
   ]
-  if (keyword) {
-    where.push(
-      { GroupStart: true, Name: 'ShebeiMC', Type: 'Like', Value: keyword },
-      { AndOr: 'OR', Name: 'ShangpinMC', Type: 'Like', Value: keyword },
-      { AndOr: 'OR', Name: 'ShebeiXH', Type: 'Like', Value: keyword },
-      { AndOr: 'OR', Name: 'ShangpinXH', Type: 'Like', Value: keyword },
-      { AndOr: 'OR', Name: 'ShebeiBH', Type: 'Like', Value: keyword },
-      { AndOr: 'OR', Name: 'AnzhuangWZ', Type: 'Like', Value: keyword, GroupEnd: true }
-    )
-  }
   const cacheKey = `task:devices:${taskIdentity()}:${taskId}:${pageIndex}:${pageSize}:${JSON.stringify(where)}`
   const cached = await cachedRequest(cacheKey, () => V8.FormEngine.GetTableData(TASK_DEVICE_TABLE, {
     _Where: where,
