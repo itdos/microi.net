@@ -178,7 +178,7 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 <thead><tr><th width="80">Edition</th><th width="140">Price</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><strong>Open Source</strong></td><td>Free</td><td>Platform source code from the Gitee repository; commercial use allowed, freely modify, unlimited distribution. <strong>Only online AI features unavailable; local AI is unaffected</strong></td></tr>
-<tr><td><strong>Enterprise</strong></td><td>¥78,000 one-time</td><td>Includes WebOS source code, with additional training, consulting, and after-sales support, <strong>priority platform upgrade requests</strong>. Optional technical support is ¥11,700/year (15%).</td></tr>
+<tr><td><strong>Enterprise</strong></td><td>¥78,000 one-time</td><td>Includes WebOS source code, with additional training, consulting, and after-sales support, <strong>priority platform upgrade requests</strong>. Optional technical support is ¥15,000/year.</td></tr>
 </tbody>
 </table>
 
