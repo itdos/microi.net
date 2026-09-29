@@ -1316,12 +1316,12 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					return
 				}
 				const uploadStateList = Object.values(this.uploadStates || {})
-				const pendingUploadCount = uploadStateList.reduce((total, item) => total + Number(item.pendingCount || 0), 0)
+				const uploadingCount = uploadStateList.reduce((total, item) => total + Number(item.uploadingCount || 0), 0)
 				const failedUploadCount = uploadStateList.reduce((total, item) => total + Number(item.failedCount || 0), 0)
-				if (pendingUploadCount > 0 || failedUploadCount > 0) {
+				if (uploadingCount > 0 || failedUploadCount > 0) {
 					uni.showToast({
-						title: pendingUploadCount > 0
-							? `还有 ${pendingUploadCount} 张图片正在处理`
+						title: uploadingCount > 0
+							? `还有 ${uploadingCount} 张图片正在上传`
 							: `请删除 ${failedUploadCount} 张失败图片后重试`,
 						icon: 'none'
 					})

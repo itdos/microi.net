@@ -1131,6 +1131,19 @@ export function createMicroiV8(options = {}) {
     return result.code;
   }
 
+  async function createContentSecurityUploadSession() {
+    const loginCode = await getWeChatContentSecurityLoginCode();
+    const result = await apiEngineRun('mci-wechat-content-status-batch', {
+      Action: 'CreateUploadSession',
+      ContentSecurityLoginCode: loginCode
+    }, { checkCode: false, silentError: true });
+    const sessionId = String(result && result.Data && result.Data.SessionId || '');
+    if (!result || Number(result.Code) !== 1 || !/^[a-fA-F0-9]{32}$/.test(sessionId)) {
+      throw { Code: result && result.Code, Msg: result && result.Msg, ContentSecuritySessionUnavailable: true };
+    }
+    return sessionId;
+  }
+
   const CONTENT_SECURITY_BATCH_ENGINE = 'mci-wechat-content-status-batch';
   const CONTENT_SECURITY_TERMINAL = new Set(['Passed', 'Rejected', 'Error', 'Timeout', 'Cancelled']);
 
@@ -1337,6 +1350,34 @@ export function createMicroiV8(options = {}) {
     return /\.(?:jpe?g|png|gif|bmp|webp)(?:$|[?#])/i.test(name);
   }
 
+  async function compressClientImage(filePath, options = {}) {
+    const runtimeUni = getUni();
+    if (!isWeChatMiniProgramRuntime() || options.clientCompress === false ||
+      !runtimeUni || typeof runtimeUni.compressImage !== 'function' ||
+      !isImageUpload(filePath, options) || /\.gif(?:$|[?#])/i.test(String(filePath || ''))) {
+      return { filePath, compressed: false };
+    }
+    // uni.chooseMedia 返回的是带 size/tempFilePath 的普通对象，并不是 Blob；压缩阈值也要读取该对象。
+    const file = pickUploadFileLike(options.file) ||
+      (options.file && typeof options.file === 'object' ? options.file : {});
+    const threshold = Math.max(100, Number(options.clientCompressThresholdKb || 500)) * 1024;
+    const size = Number(file.size || options.fileSize || 0);
+    if (size > 0 && size <= threshold) return { filePath, compressed: false };
+    try {
+      const result = await new Promise((resolve, reject) => runtimeUni.compressImage({
+        src: filePath,
+        quality: Math.min(95, Math.max(50, Number(options.clientCompressQuality || 82))),
+        success: resolve,
+        fail: reject
+      }));
+      const compressedPath = String(result && result.tempFilePath || '');
+      return compressedPath ? { filePath: compressedPath, compressed: compressedPath !== filePath } : { filePath, compressed: false };
+    } catch (error) {
+      // 压缩是传输优化，失败时回退原图；安全审核仍由后端强制执行。
+      return { filePath, compressed: false };
+    }
+  }
+
   // 文件上传同时支持 uni.uploadFile 与浏览器 fetch/FormData。
   async function uploadFileInternal(filePath, options = {}, deferContentSecurity = false) {
     const runtimeUni = getUni();
@@ -1359,11 +1400,21 @@ export function createMicroiV8(options = {}) {
 
     const requiresContentSecurity = isWeChatMiniProgramRuntime() &&
       options.contentSecurity !== false && isImageUpload(filePath, options);
+    const useV8ContentSecurityUpload = requiresContentSecurity && !!options.contentSecuritySessionId;
     if (requiresContentSecurity) {
       uploadData.ContentSecurityRequired = 'true';
       uploadData.ContentSecurityScene = String(options.contentSecurityScene || 1);
-      uploadData.ContentSecurityLoginCode = await getWeChatContentSecurityLoginCode();
+      if (options.contentSecuritySessionId) {
+        uploadData.ContentSecuritySessionId = String(options.contentSecuritySessionId);
+        uploadData.Action = 'Upload';
+      } else {
+        uploadData.ContentSecurityLoginCode = await getWeChatContentSecurityLoginCode();
+      }
+      if (options.clientImageCompressed === true) uploadData.ClientImageCompressed = 'true';
     }
+    const uploadUrl = options.url || (useV8ContentSecurityUpload
+      ? `/apiengine/${CONTENT_SECURITY_BATCH_ENGINE}`
+      : `/api/HDFS/${action}`);
 
     let body;
     const fetchSource = pickUploadFileSource(filePath, options);
@@ -1376,7 +1427,7 @@ export function createMicroiV8(options = {}) {
       const formData = new FormData();
       Object.keys(uploadData).forEach((key) => formData.append(key, uploadData[key]));
       formData.append(options.name || 'file', file, picked.name || (file && file.name) || 'file');
-      const res = await fetch(buildUrl(options.url || `/api/HDFS/${action}`), {
+      const res = await fetch(buildUrl(uploadUrl), {
         method: 'POST',
         headers: buildUploadHeaders({ ...options, headers: options.headers || {} }),
         body: formData
@@ -1397,7 +1448,7 @@ export function createMicroiV8(options = {}) {
         try {
           body = await new Promise((resolve, reject) => {
             runtimeUni.uploadFile({
-              url: buildUrl(options.url || `/api/HDFS/${action}`),
+              url: buildUrl(uploadUrl),
               filePath,
               name: options.name || 'file',
               header: buildUploadHeaders({ ...options, headers: options.headers || {} }),
@@ -1429,11 +1480,13 @@ export function createMicroiV8(options = {}) {
       throw error;
     }
     if (requiresContentSecurity) {
-      if (!data.ContentSecurityReviewId || !['Pending', 'Passed'].includes(data.ContentSecurityStatus)) {
+      if (!data.ContentSecurityReviewId || !['Pending', 'Passed', 'Rejected', 'Error'].includes(data.ContentSecurityStatus)) {
         const error = { Code: 0, Msg: '内容安全检测暂不可用，请稍后重试。' };
         if (options.silentError !== true) toast(error.Msg);
         throw error;
       }
+      if (data.ContentSecurityStatus === 'Rejected') throw contentSecurityError('Rejected');
+      if (data.ContentSecurityStatus === 'Error') throw contentSecurityError('Error');
       try {
         if (!deferContentSecurity && data.ContentSecurityStatus !== 'Passed') {
           const reviewed = await waitForContentSecurity(data.ContentSecurityReviewId, options);
@@ -1475,6 +1528,18 @@ export function createMicroiV8(options = {}) {
     }
     if (!entries.length) return [];
 
+    let contentSecuritySessionId = String(options.contentSecuritySessionId || '');
+    const hasWeChatImages = isWeChatMiniProgramRuntime() && options.contentSecurity !== false &&
+      entries.some((entry) => isImageUpload(entry.filePath, { ...options, file: entry.file, fileName: entry.fileName }));
+    if (hasWeChatImages && !contentSecuritySessionId) {
+      try {
+        // 同一批图片只执行一次 wx.login 和 jscode2session；旧后端不支持时自动退回逐图 code。
+        contentSecuritySessionId = await createContentSecurityUploadSession();
+      } catch (error) {
+        if (!error || error.ContentSecuritySessionUnavailable !== true) throw error;
+      }
+    }
+
     const requestedConcurrency = Number(options.concurrency || 3);
     const concurrency = Math.min(3, Math.max(1,
       Number.isFinite(requestedConcurrency) ? Math.floor(requestedConcurrency) : 3));
@@ -1502,10 +1567,17 @@ export function createMicroiV8(options = {}) {
         }
         notifyUploadItem(options, { Index: entry.index, Status: 'uploading' });
         try {
-          const result = await uploadFileInternal(entry.filePath, {
+          const prepared = await compressClientImage(entry.filePath, {
+            ...options,
+            file: entry.file,
+            fileName: entry.fileName || options.fileName
+          });
+          const result = await uploadFileInternal(prepared.filePath, {
             ...options,
             file: entry.file,
             fileName: entry.fileName || options.fileName,
+            contentSecuritySessionId,
+            clientImageCompressed: prepared.compressed,
             silentError: true
           }, true);
           if (isItemCancelled(entry.index)) {
@@ -1513,11 +1585,25 @@ export function createMicroiV8(options = {}) {
             continue;
           }
           const data = result.Data || {};
-          if (data.ContentSecurityReviewId && data.ContentSecurityStatus === 'Pending') {
+          const returnedSecurityStatus = String(data.ContentSecurityStatus || '');
+          if (data.ContentSecurityReviewId && returnedSecurityStatus === 'Rejected') {
+            const rejectedError = contentSecurityError('Rejected');
+            outcomes[entry.index] = { Code: 0, Error: rejectedError, Result: result };
+            notifyUploadItem(options, { Index: entry.index, Status: 'rejected', Error: rejectedError, Result: result });
+          } else if (data.ContentSecurityReviewId && returnedSecurityStatus === 'Error') {
+            const reviewError = contentSecurityError('Error');
+            outcomes[entry.index] = { Code: 0, Error: reviewError, Result: result };
+            notifyUploadItem(options, { Index: entry.index, Status: 'error', Error: reviewError, Result: result });
+          } else if (data.ContentSecurityReviewId && returnedSecurityStatus === 'Pending') {
             const reviewId = String(data.ContentSecurityReviewId);
-            pending.push({ entry, result, reviewId });
-            reviewIndexes[reviewId] = entry.index;
-            notifyUploadItem(options, { Index: entry.index, Status: 'checking' });
+            if (options.deferContentSecurityReview === true) {
+              outcomes[entry.index] = { Code: 1, Data: data, Result: result, PendingReview: true };
+              notifyUploadItem(options, { Index: entry.index, Status: 'checking', Result: result });
+            } else {
+              pending.push({ entry, result, reviewId });
+              reviewIndexes[reviewId] = entry.index;
+              notifyUploadItem(options, { Index: entry.index, Status: 'checking', Result: result });
+            }
           } else {
             outcomes[entry.index] = { Code: 1, Data: data, Result: result };
             notifyUploadItem(options, { Index: entry.index, Status: 'passed', Result: result });
@@ -2011,6 +2097,7 @@ export function createMicroiV8(options = {}) {
     uploadFiles,
     waitForContentSecurity,
     waitForContentSecurityBatch,
+    getContentSecurityStatuses,
     getSafeArea,
     formatDate,
     toNumber,
