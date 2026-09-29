@@ -6,6 +6,10 @@ import { compileModuleFilterFields } from '@/platform/list-filter-fields.mjs'
 import { normalizeTaskFlowCapabilities } from '@/tenants/xjy/task-flow-capability.mjs'
 import { buildTaskScopeWhere, normalizeTaskScope } from '@/tenants/xjy/task-responsibility.mjs'
 import {
+  buildServiceAssigneeRequest,
+  buildSupportAssigneeWhere
+} from '@/tenants/xjy/task-assignee-query.mjs'
+import {
   resolveCustomerDeviceReference
 } from '@/tenants/xjy/task-device-reference.mjs'
 import {
@@ -540,31 +544,16 @@ export async function loadTaskEquipmentPackage(taskDeviceId) {
 }
 
 export async function loadServiceUsers(keyword = '') {
-  const where = [{ Name: 'State', Type: '=', Value: 1 }]
-  const result = ensureSuccess(await V8.FormEngine.GetTableData('Sys_User', {
-    _Keyword: keyword || '',
-    _Where: where,
-    _SelectFields: ['Id', 'Name', 'Account', 'Phone', 'DeptName', 'RoleName'],
-    _OrderBy: 'Name',
-    _OrderByType: 'ASC',
-    _PageIndex: 1,
-    _PageSize: 100
-  }), '服务人员加载失败')
+  const result = ensureSuccess(await callApiEngine('get-sysUser-list', buildServiceAssigneeRequest(keyword)), '服务人员加载失败')
   return result.Data || []
 }
 
-export async function loadSupportUsers(keyword = '') {
+export async function loadSupportUsers(keyword = '', tenantId = '') {
   const user = getUser() || {}
-  if (!user.TenantId) return []
+  const resolvedTenantId = tenantId || user.TenantId
+  if (!resolvedTenantId) return []
   const result = ensureSuccess(await V8.FormEngine.GetTableData('Sys_User', {
-    _Keyword: keyword || '',
-    _Where: [
-      { Name: 'State', Type: '=', Value: 1 },
-      { Name: 'TenantId', Type: '=', Value: user.TenantId },
-      { GroupStart: true, Name: 'RoleIdsString', Type: 'Like', Value: '客服' },
-      { AndOr: 'OR', Name: 'RoleIds', Type: 'Like', Value: 'e757d4f5-e204-4039-9624-960bc3c60cbf' },
-      { AndOr: 'OR', Name: 'RoleIds', Type: 'Like', Value: '1c4283aa-68c4-4680-a066-f931f593435e', GroupEnd: true }
-    ],
+    _Where: buildSupportAssigneeWhere({ keyword, tenantId: resolvedTenantId }),
     _SelectFields: ['Id', 'Name', 'Account', 'Phone', 'DeptName', 'RoleIdsString'],
     _OrderBy: 'Name', _OrderByType: 'ASC', _PageIndex: 1, _PageSize: 100
   }), '客服列表加载失败')
