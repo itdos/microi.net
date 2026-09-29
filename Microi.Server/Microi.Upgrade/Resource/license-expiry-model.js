@@ -13,7 +13,8 @@ function createLicenseExpiryModel() {
   }
   function project(policy, edition, expiration, now, parent) {
     var end = Date.parse(expiration || '');
-    if (['Personal', 'Enterprise'].indexOf(edition) < 0 || !isFinite(end)) return null;
+    // DateTime.MinValue is the default for an installation without a paid expiry, not an expired contract.
+    if (['Personal', 'Enterprise'].indexOf(edition) < 0 || !isFinite(end) || end < Date.UTC(2000, 0, 1)) return null;
     var setting = normalize(policy)[edition];
     if (end - now > setting.AdvanceDays * 86400000) return null;
     var minutes = Math.max(0, Math.ceil((end - now) / 60000));

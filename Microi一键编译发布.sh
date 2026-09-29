@@ -1807,7 +1807,9 @@ if [ "$PUBLISH_DOC" = true ]; then
     ensure_docker_running
 
     print_step "构建 Docker 镜像: microi.doc"
-    (cd microi.doc/docs/.vitepress && docker build -t microi.doc .)
+    # 当前阿里云镜像仓库不接受 BuildKit 附带的 OCI empty attestation manifest。
+    # 用单镜像清单构建，避免层上传完成后返回 unknown manifest class。
+    (cd microi.doc/docs/.vitepress && DOCKER_BUILDKIT=0 docker build -t microi.doc .)
     print_success "Docker 镜像构建完成"
 
     print_step "登录 registry.cn-beijing.aliyuncs.com..."
