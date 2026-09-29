@@ -146,7 +146,10 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 | **系统引擎** | AI 引擎、V8 引擎、表单引擎、接口引擎、界面引擎、打印引擎、工作流引擎、Office 引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS 引擎、搜索引擎、消息队列引擎、IoT 物联网 MQTT 引擎、报表引擎、3D 引擎、goView 数据大屏、定制组件、应用商城、多数据库扩展、微服务、任务调度、自定义导出模板、单点登录、聊天系统、公众号平台管理等。 |
 | **分布式架构** | 支持 Docker、K8S、Jenkins、Rancher、CI/CD、RabbitMQ、Redis 分布式缓存、ElasticSearch、MongoDB、OSS / MinIO / Amazon S3 分布式存储及分布式任务调度；所有系统引擎均按分布式部署设计。 |
 | **跨平台、跨数据库、跨语言** | 支持 Linux、Windows、国产操作系统、主流云和本地化部署；支持 MySQL、SQL Server、Oracle、PostgreSQL、达梦、人大金仓等数据库，以及分库分表、读写分离与多主同步，精确版本以部署文档为准；通过 OpenAPI、SDK 与 gRPC 支持多语言二次开发。 |
+<!-- 暂停个人版销售，保留原文以便恢复
 | **无限制与开放能力** | 不限制用户数、表单数、数据量和数据库数量；平台源码通过 Gitee 开源，个人版和企业版均额外包含 WebOS 源码，并支持 Vue、React、Angular 与 .NET 二次开发。 |
+-->
+| **无限制与开放能力** | 不限制用户数、表单数、数据量和数据库数量；平台源码通过 Gitee 开源，企业版额外包含 WebOS 源码，并支持 Vue、React、Angular 与 .NET 二次开发。 |
 
 > 从业务想法到企业级应用，Microi吾码围绕 AI 编程、低代码建模、系统集成与私有化交付，提供清晰、可扩展的数字化能力底座。
 
@@ -228,10 +231,14 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 ### 🏗️ 基础架构
 
+<!-- 暂停个人版销售，保留原文以便恢复
+<tr><td>♾️ <strong>无限制</strong></td><td>不限制用户数、表单数、数据量和数据库数量；平台源码通过 Gitee 开源，个人版和企业版均额外包含 WebOS 源码</td></tr>
+-->
+
 <table>
 <thead><tr><th width="200">能力</th><th>说明</th></tr></thead>
 <tbody>
-<tr><td>♾️ <strong>无限制</strong></td><td>不限制用户数、表单数、数据量和数据库数量；平台源码通过 Gitee 开源，个人版和企业版均额外包含 WebOS 源码</td></tr>
+<tr><td>♾️ <strong>无限制</strong></td><td>不限制用户数、表单数、数据量和数据库数量；平台源码通过 Gitee 开源，企业版额外包含 WebOS 源码</td></tr>
 <tr><td>🌐 <strong>跨平台</strong></td><td>基于 .NET10，<a href="https://www.nuget.org/packages/Microi.net#versions-body-tab">核心库采用 .Net Standard 开发</a>，支持 gRPC 跨语言通信</td></tr>
 <tr><td>🗄️ <strong>跨数据库</strong></td><td>支持 MySQL、SQL Server、Oracle、PostgreSQL、达梦、人大金仓等数据库，以及读写分离与分库分表；精确版本见部署文档</td></tr>
 <tr><td>☁️ <strong>分布式部署</strong></td><td>Docker / K8S / Jenkins / Rancher / CI/CD</td></tr>
@@ -277,20 +284,36 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 ---
 
+<!-- 暂停个人版销售，保留原文以便恢复
 ## 💰 开源版、个人版、企业版区别
+-->
+## 💰 开源版、企业版区别
+
+<!-- 暂停个人版销售，保留原文以便恢复
+<tr><td><strong>个人版</strong></td><td><strong>￥999 买断</strong></td><td>额外包含 <strong>WebOS 源码</strong>，软件功能与企业版一致，<strong>无任何限制、无限分发部署、无限商用、永久有效</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
+-->
+
+<!-- 暂停个人版销售，保留原文以便恢复
+<tr><td><strong>企业版</strong></td><td><strong>￥2.5w 买断</strong></td><td>同样额外包含 <strong>WebOS 源码</strong>，授权<strong>永久有效</strong>，并提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
+-->
 
 <table>
 <thead><tr><th width="80">版本</th><th width="140">价格</th><th>说明</th></tr></thead>
 <tbody>
 <tr><td><strong>开源版</strong></td><td>免费</td><td>Gitee 仓库提供的平台源码；可商用、随意修改、无限分发部署。<strong>开源版仅无法使用在线 AI 相关功能，本地 AI 不受影响</strong></td></tr>
-<tr><td><strong>个人版</strong></td><td><strong>￥999 买断</strong></td><td>额外包含 <strong>WebOS 源码</strong>，软件功能与企业版一致，<strong>无任何限制、无限分发部署、无限商用、永久有效</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
-<tr><td><strong>企业版</strong></td><td><strong>￥2.5w 买断</strong></td><td>同样额外包含 <strong>WebOS 源码</strong>，授权<strong>永久有效</strong>，并提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
+<tr><td><strong>企业版</strong></td><td><strong>￥7.8w 买断</strong></td><td>额外包含 <strong>WebOS 源码</strong>，授权<strong>永久有效</strong>，并提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
 </tbody>
 </table>
 
+<!-- 暂停个人版销售，保留原文以便恢复
 > 个人版 ￥999、企业版 ￥2.5w 均为一次买断价格，授权永久有效。后续可选技术支持为个人版 ¥499/年、企业版 ¥1.5w/年，由用户自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”，实际服务通常不会机械地卡得很严格，遇到具体情况可以先友好沟通。
+-->
+> 企业版 ￥7.8w 为一次买断价格，授权永久有效。后续可选技术支持为 ¥1.17w/年（￥7.8w × 15%），由用户自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”，实际服务通常不会机械地卡得很严格，遇到具体情况可以先友好沟通。
 
+<!-- 暂停个人版销售，保留原文以便恢复
 > [→ 查看开源版、个人版、企业版的详细区别与选择建议](/doc/edition-comparison)
+-->
+> [→ 查看开源版、企业版的详细区别与选择建议](/doc/edition-comparison)
 
 ---
 

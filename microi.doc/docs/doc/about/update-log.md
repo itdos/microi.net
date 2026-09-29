@@ -1118,7 +1118,9 @@
 - **MinIO 上传回读兼容不支持 HEAD 的代理与最小对象权限**：当 SDK `StatObject` 因代理把 HEAD 改写为 GET，或对象凭据只有读写对象而没有桶列表权限时，HDFS 改用禁止重定向的一字节签名 Range GET 做失败关闭的内容回读，精确核对对象总大小、`Content-Range` 与首字节；404 仍识别为缺失对象，其它权限／网络错误保持失败，不把签名 URL 写入诊断或日志。该兼容只用于证明刚写入对象可读，不放宽租户、桶、路径或私有文件授权。
 - **AI 平台治理应用升级为 v2.0.3 并回归标准源码目录**：前端工程从商城发布包内部迁入当前官方服务器与租户的 `Microi-V8-Engine/.../iTdos.Product.Internal/AI应用/ai-platform-studio`，`microi.apps` 只保留官方应用商城发布资源；构建器固定校验 `api.itdos.com + iTdos + AppKey` 后从该唯一源码目录生成资产。Manifest 在“系统引擎”下新增“AI平台治理”父菜单和治理工作台微服务菜单，将原 40 个数据菜单按门户、身份、访问、配置、发布、服务、可观测、资产和导入九类归档，形成 40 张表、42 个菜单、64 个接口引擎与 10 条治理路由，同时保留 Managed 核心和 CreateIfMissing 租户 Hook 的所有权边界。
 - **中文官网文档建立全局可读性与暗色模式设计门禁**：不再只给单页堆叠大段文字，主题按 `overview/guide/reference/policy/showcase` 为 66 个手工维护中文页面逐一建档，统一阅读宽度、段落节奏、编号标题、卡片／列表、表格、图片、折叠区、焦点态、移动端与减少动态效果；另登记 1 个受保护页和 6 个专用站点页，自动翻译生成的英文文档明确排除。暗色主题为正文、次要文字、卡片、表头、隔行背景、代码注释和行号提供独立高对比色，不再沿用亮色渐变造成白字／浅字不可读；MicroService 与版本对比页另有响应式 Hero、能力卡、案例图和决策卡布局。静态视觉审计用于阻止覆盖遗漏和明显低对比回归，但不冒充真实浏览器的桌面／移动、亮色／暗色人工验收。
+<!-- 暂停个人版销售，保留原文以便恢复
 - **买断授权、AI 开发优势与 NuGet 公开采用数据统一官网口径**：开源版／个人版／企业版独立页面明确个人版 ￥999、企业版 ￥2.5w 都是一次买断且永久有效，后续可选技术支持分别为 ¥499/年、¥1.5w/年；不购买也可永久使用已授权版本，只是满一年后新增的部分功能可能无法使用，并保留“做一单生意、交一个朋友”的友好沟通说明。首页、README、快速开始、案例与多个核心文档同步“成熟引擎复用、在典型匹配项目中 Token 和开发周期有机会改善 10 倍以上、更加稳定成熟且开箱即用”的限定口径。NuGet 组件先显示官方接口引擎在 Redis 共享的最近一次成功汇总，以轨道、扫光和状态胶囊明确展示“正在更新”，完成后切换为“当前 API 实时汇总”；同页多组件共享请求、上游失败保留缓存。2026-08-11 实际匿名回读为 ITdos 名下 38 个公开包、累计 8,942,864 次下载；“可公开检索的 .NET AI 低代码平台中位居首位”明确不是微软／NuGet 官方评选，长期公开数据只能从侧面反映平台成熟度与开发者采用情况，不作为自证结论。
+-->
 - **Microi.VSCode v4.9.0 收口三端发布、异常恢复与文档同步**：扩展、`@microi.net/cli`、Codex／CodeBuddy／WorkBuddy 清单及 bundled Skills 统一升版；发布器在改版本和构建前完成 npm Token 或一次交互登录检查，固定先发 npm、再发 Visual Studio Marketplace 和 Open VSX。正常上传成功不再无意义轮询公共索引；上传 5xx／断线和同版本补发才精确回读目标，Open VSX 已接收 VSIX 后返回 503 可由版本回读恢复为成功，真正不确定时输出明确的部分完成与单目标补发命令而不是未捕获调用栈。补发复用原始 tgz／VSIX、不递增版本、不重复构建；发布凭据不会进入公开 npm tarball或 VSIX，README 与官网发布章节由同步测试保持一致。
 - **版本元数据与 NuGet AI 检索标签完整统一**：`Directory.Build.props`、Microi.Client、Microi.net、Microi.AI 及服务器端 19 个公共包统一升至 v7.2.6；实际解包核对 19/19 个 `.nuspec` 均含独立 `AI` 标签，同时保留 LowCode、V8、Microi吾码等既有关键词。Microi.AI 本版除版本与标签元数据外没有额外业务源码差异；Microi.net 除版本元数据外还包含上述 TableChild 展示修复。
 - **自动化验证与 v7.2.6 正式制品回读**：中文文档视觉覆盖 66/66、微服务文档 5/5、NuGet 缓存组件 7/7、MCP 类型检查与 108/108、Microi.Client 微应用宿主 9/9、AI 治理应用包 23/23、治理微服务 5/5、服务端关系／TableChild／MinIO 定向测试 46/46，以及 Microi.VSCode 完整类型检查、双 TypeScript 构建、129 工具启动握手、CLI、Codex 和发布恢复链全部通过；测试发现并修复了 README 与官网发布章节不同步后完整重跑成功。`Microi一键编译发布.sh` 按 `7.2.6、4、0、2、2、0` 完成现代前端、串行压缩、Chrome 49 legacy、后端 Release、DLL 加密、HTTP 200 存活探针、19 个 NuGet 包及前后端正式／测试 Docker 推送，成功轮总耗时 14 分 04 秒、0 个构建错误，5 条 xUnit 分析器建议不影响制品。后端 `latest/v7.2.6/dev-latest` 摘要收敛为 `sha256:905638b4ed2aeadcecfc84115826a7c9c30a7dcbd2020a2f94904e18afe82ce5`，前端 Web／Client 的 `latest/v7.2.6` 摘要收敛为 `sha256:6fc9f5af282b469faf3d510c129e327d64038beffaf0e4ccfc83523f15a781fe`；Dos.Common、Dos.ORM、Microi.AI、Cache、Captcha、Core、HDFS、Job、MongoDB、MQ、MQTT、Microi.net、OCR、Office、SearchEngine、Spider、Upgrade、V8Engine、WeChat 共 19/19 个 v7.2.6 包已从 NuGet 官方 Flat Container 完成公共版本回读。
@@ -1137,7 +1139,9 @@
 - **应用商城发布、资产准备和安装协议继续收口**：发布器精确传递用户请求版本，并强制 `RequestedVersion == Prepared.PackageVersion == AppPakcet.PackageInfo.Version`；菜单、表、接口引擎和任务选择只来自本次包正文，不能沿用旧版本状态。新增源码与运行资产准备、确定性请求和内容哈希回读，修复大型源包、离线自包含包、版本终态、精确菜单合同和安装选择漂移；安装器独立处理 ScheduleJobs checkpoint、受管核心冲突回滚、租户 Hook 永不覆盖和中断恢复。正式发布同步后的官方“应用商城”资源已升至 v7.2.7，并完成资源正文回读。
 - **Microi.net 与 Microi.AI 增加可信 V8 原子能力**：Microi.net 新增授权解释、身份目录、日志信号和任务调度方法，可信执行上下文、接口嵌套、租户 AI 与缓存同步传递追踪和服务端身份；Microi.AI 增加 MiniMax 视频创建、任务查询和文件下载代理，供应商 Key、原始 task_id/file_id 不进入可编辑 V8 或业务表。根仓控制器和接口同步暴露最小协议边界，业务编排继续由接口引擎和应用包完成；两子仓程序集版本统一升至 7.2.5。
 - **Codex/VS Code 继续坚持单一共享核心**：Microi.VSCode 保持 v4.8.2，由唯一 `@microi.net/cli` 包同时承载 CLI、MCP、多宿主清单和 60 个 Skills；Codex 安装器不再把 npm 包误作远程插件源，而是校验包内插件身份后原子复制到 `${CODEX_HOME}/microi-net-marketplace/plugins/microi`，生成官方支持的本地 marketplace，再安装 `microi@microi-net`。旧 npm／marketplace 标识只在新版完整安装成功后迁移，损坏目标、版本漂移和非受管目录均失败关闭；鉴权恢复、CLI 包、源码包、发布守卫、129 工具握手和各宿主测试同步更新。
+<!-- 暂停个人版销售，保留原文以便恢复
 - **架构图、官网与 Skills 完整同步**：重制“Microi吾码 AI平台 架构图”为 1920×1080 高清 PNG 与可无限缩放 SVG，中央 V8引擎核心、几十+引擎能力卡、跨端入口、数据与基础设施层及“10×+ 更省 Token、10×+ 更快开发、成熟底座更稳定、开箱即用更快交付”价值带采用高对比矢量排版；图中不出现底层解释器名称，188+ 功能点使用短标签卡片呈现。官网首页、根 README、AI 平台治理、Page 源码桥、应用商城、AI 引擎和 VS Code 文档，以及 `microi.skills`／插件内 Skills 能力地图均已同步；官网另新增开源版／个人版／企业版买断授权对比页，以及 NuGet 官方双节点实时下载统计、超时降级和共享请求组件。
+-->
 - **自动化验收与真实浏览器缺陷闭环**：AI 平台 Manifest 21/21、商城资源 114/114、治理微服务 4/4、架构图 3/3、Microi.Client 定向 14/14、MCP 97/97、Microi.Server 全量 2235/2235，以及租约、fencing、幂等、Outbox、后台接管、流式发布和健康检查专项 203/203 全部通过；Microi.VSCode 完整类型检查、构建、鉴权恢复、诊断与包测试通过。共享 61501/61500 以管理员身份完成 10 条 PC 和 10 条 390×844 移动路由真实浏览器验收，实际发现并修复移动治理导航与宿主底栏重叠，加入几何断言后 20/20 通过；测试只关闭本任务浏览器。破坏性双节点强杀、网络分区和旧新容器滚动共存未在连接官方数据的共享环境执行，不用契约测试冒充生产混沌成功。
 - **v7.2.5 正式制品与公共回读**：`Microi一键编译发布.sh` 按 `7.2.5、4、0、2、2、0` 完成官方资源同步、现代前端、串行压缩、Chrome 49 legacy、后端 Release、DLL 加密、HTTP 200 存活探针、19 个 NuGet 包及前后端正式／测试 Docker 推送，成功轮总耗时 11 分 55 秒、0 个构建错误；5 条提示为 xUnit 分析器建议，不影响制品。后端 `latest/v7.2.5/dev-latest` 摘要收敛为 `sha256:787273640780f0d0b5274a846aaef7bb9ddfe58ff278d45a61fc55013b6a9718`，前端 Web／Client 的 `latest/v7.2.5` 摘要收敛为 `sha256:0a922351b097fc85f8ee6baa6fef82c44e2293c9f7833b5600458bc9afd7bfbc`；Dos.Common、Dos.ORM、Microi.AI、Cache、Captcha、Core、HDFS、Job、MongoDB、MQ、MQTT、Microi.net、OCR、Office、SearchEngine、Spider、Upgrade、V8Engine、WeChat 共 19/19 个 v7.2.5 包完成 NuGet 公共 Flat Container HTTP 200 回读。
 
@@ -2154,7 +2158,9 @@
 - Microi.net：新增：优化错误信息返回格式，增强可读性和调试信息（commit f13be09）
 - 新增：新增 设计工具 用于 Microi Page，Print Engine 校验, 构建,，保存（commit bbad781e）
 - 新增：增强图片上传功能，支持替换与预览，优化上传状态管理（commit 1f8d1a0f）
+<!-- 暂停个人版销售，保留原文以便恢复
 - 新增：更新个人版说明，增加无限商用和永久有效的描述（commit 08e98359）
+-->
 - 新增：添加移动端高品质视觉标准和质量门禁，优化移动应用体验（commit c9959b47）
 - 新增：增强 移动端 UI 组件，视觉规范（commit 8f4f599b）
 - Microi.VSCode：新增：更新版本号至 2.1.3，增强 MCP 服务器管理功能，添加多个 MCP 相关命令和状态监控（commit 9dd65f4）
