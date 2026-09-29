@@ -203,6 +203,7 @@ export default {
             // Mobile keeps the record header and form content compact. Do not
             // mount the Banner at all, which also prevents its metric requests.
             if (this.diyStore && this.diyStore.IsPhoneView) return false;
+            if (this.HideTopBanner === true) return false;
             return hasFormBannerConfig(this.EffectivePresentationConfig && this.EffectivePresentationConfig.Banner);
         },
         IsControlCenterPresentation() {

@@ -923,8 +923,8 @@ test("Android 权限、V8 编辑器、官网菜单与 Skills 保持同一双型�
     assert.match(guide, /BLUETOOTH_SCAN/);
 
     const skill = readFileSync(new URL("../../microi.skills/v8-frontend-events/references/bluetooth-print.md", import.meta.url), "utf8");
-    const bundledSkill = readFileSync(new URL("../../Microi.Code/plugins/microi/skills/v8-frontend-events/references/bluetooth-print.md", import.meta.url), "utf8");
-    assert.equal(bundledSkill, skill);
+    const bundledSkill = readFileSync(new URL("../../Microi.Agent/plugins/microi/skills/v8-frontend-events/references/bluetooth-print.md", import.meta.url), "utf8");
+    assert.equal(bundledSkill.replace(/\r\n/g, "\n"), skill.replace(/\r\n/g, "\n"));
     assert.match(skill, /GP-M322/);
     assert.match(skill, /ZICOX CC4/);
     assert.match(skill, /BLUETOOTH_CONNECT/);

@@ -58,7 +58,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=9fae6ea3c3b238d5d830f308599d7512d1ed6364cb495d432278ada8680f769e -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=c8e47f78e3835be000ad627874908d644025f81e5047ee5c9fd9c14161c9fea5 -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -154,6 +154,8 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 - 框架水印覆盖 `100vw × 100vh` 且固定 `pointer-events:none`。开启后内容空值默认 `$SysTitle$ - $UserName$`（用户名为空回退账号）、方向默认 `DiagonalUp`、密度默认 `Comfortable`、字号空值/0 默认 14，透明度空值/0 默认 30；亮色、深色、弹层、键盘和减少动态效果模式都要验收。
 
 ### 用户级界面偏好（强制）
+
+右上角主题设置的边角风格默认圆角；已安装 `sys_user.CornerStyle` 时从账号偏好恢复，旧租户才使用浏览器本地兼容值。根元素 `data-mci-corner-style` 控制全局角半径，覆盖动态挂载的 Element Plus 弹层。顶栏入口统一使用 40px 触控区域和 20px 图标，AI 入口使用图标组件，不使用图片。模块 `HideTableBanner`、`HideFormBanner` 只在值明确为 `1/true` 时隐藏对应 Banner，并跳过其专属统计请求；未安装开关字段的旧菜单继续显示。
 
 - 主题色、浅色/深色、菜单子级展开方式等需要“换设备仍生效”的选择必须保存到当前 DiyToken 用户的 `sys_user` 白名单字段；`localStorage` 只作为未安装新字段租户和匿名启动阶段的兼容回退，不能作为跨设备事实源。
 - 已安装用户偏好字段时优先级固定为“当前用户显式值 → 租户 `sys_config` → 平台安全默认”；个人菜单值 `System` 表示继承租户配置。不得让上一位用户的浏览器本地主题覆盖下一位已登录用户。

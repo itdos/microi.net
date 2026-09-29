@@ -210,7 +210,7 @@ test('microi_codex discovers and invokes existing tools through one entry point'
   }
 });
 
-test('microi_codex executes the same CRM table, field, menu and API-engine writes as local Microi.Code', async () => {
+test('microi_codex executes the same CRM table, field, menu and API-engine writes as local Microi.Agent', async () => {
   const writes: Array<{ kind: string; value: unknown }> = [];
   const fakeClient = {
     createTable: async (name: string, description: string) => {

@@ -53,6 +53,13 @@ export function resolveUserThemeColor(user = {}, localColor = "", systemColor = 
     return text(localColor) || text(systemColor) || fallback;
 }
 
+export function resolveUserCornerStyle(user = {}, localStyle = "round") {
+    if (hasInstalledUserPreference(user, "CornerStyle")) {
+        return String(user.CornerStyle || "").toLowerCase() === "square" ? "square" : "round";
+    }
+    return String(localStyle || "").toLowerCase() === "square" ? "square" : "round";
+}
+
 export function normalizeUserMenuChildExpandMode(value) {
     const normalized = text(value).toLowerCase();
     if (normalized === "right") return USER_MENU_CHILD_EXPAND_MODE.RIGHT;

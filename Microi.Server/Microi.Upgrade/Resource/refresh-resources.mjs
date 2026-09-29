@@ -92,14 +92,6 @@ async function verifyPlatformServiceReleaseSource() {
   }
 }
 
-function hasSafeAdministratorRoleBootstrap(content) {
-  return content.includes('ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1')
-    || (content.includes('var candidateRoleIds = [];')
-      && content.includes('var assessRoleHolders = function')
-      && content.includes('if (missingRoleHolders.OrdinaryHolder)')
-      && content.includes('缺失角色引用不唯一'));
-}
-
 function validateReleaseCandidate(name, content) {
   if (!content.trim()) throw new Error(`${name} 内容为空`);
   validateOfficialPackageChangeLog(name, content);
@@ -150,7 +142,7 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('ADMIN_MENU_PERMISSION_V1')
       || !content.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
       || !content.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
-      || !hasSafeAdministratorRoleBootstrap(content)
+      || !content.includes('ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1')
       || !content.includes('PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1')
       || !content.includes('UNUSED_WORKFLOW_PHYSICAL_SCHEMA_V1')
       || !content.includes('MYSQL_IDENTIFIER_FOREIGN_KEY_SCOPE_V1')
@@ -648,7 +640,7 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
-        || !hasSafeAdministratorRoleBootstrap(importerCode)
+        || !importerCode.includes('ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1')
         || !importerCode.includes('PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1')
         || !importerCode.includes('PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1')
         || !importerCode.includes('MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1')
@@ -754,9 +746,8 @@ function validateReleaseCandidate(name, content) {
         || !String(marketplaceSourceEngine?.ApiV8Code || '').includes('MARKETPLACE_SOURCE_HEADER_ISOLATION_V1')
         || !String(marketplaceSourceEngine?.ApiV8Code || '').includes("V8.ApiEngine.Run('platform-marketplace-source-hook'")
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source']?.UpgradePolicy !== 'Managed'
-        || !['ApiEngine:platform-marketplace-source@v1.0.5',
-          'ApiEngine:platform-marketplace-source@v1.0.6'].some(capability =>
-          (packageModel?.PackageInfo?.RequiredPlatformCapabilities || []).includes(capability))
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes(`ApiEngine:platform-marketplace-source@${marketplaceSourceEngine?.Version || ''}`)
         || engineVersionNumber(marketplaceSourceHook) < 1_000_000
         || Number(marketplaceSourceHook?.StopHttp) !== 1
         || !String(marketplaceSourceHook?.ApiV8Code || '').trimEnd().endsWith('return { Code : 1 };')
@@ -833,7 +824,7 @@ function validateReleaseCandidate(name, content) {
       || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')
       || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
       || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
-        || !hasSafeAdministratorRoleBootstrap(importerCode)
+        || !importerCode.includes('ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1')
         || !importerCode.includes('PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1')
       || !importerCode.includes('PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1')
       || !importerCode.includes('MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1')
@@ -892,10 +883,9 @@ function validateReleaseCandidate(name, content) {
               'BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1',
               'ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1',
               'ADMIN_MENU_PERMISSION_DB_TIME_V1',
+              'ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1',
               'PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1',
-            ].filter(marker => !importerCode.includes(marker)).concat(
-              hasSafeAdministratorRoleBootstrap(importerCode) ? [] : ['safe administrator role bootstrap'],
-            ),
+            ].filter(marker => !importerCode.includes(marker)),
           }),
         );
       }
@@ -1455,16 +1445,6 @@ if (process.argv.includes('--validate-only')) {
   let currentReleaseVersion;
   for (const name of resourceNames) {
     let content = normalizeOfficialPackageExecutionLimits(name, mergedResources.get(name));
-    if (name.endsWith('.json')) {
-      const packageModel = JSON.parse(content);
-      if (!String(packageModel?.PackageInfo?.ChangeLog?.ChangeType || '').trim()) {
-        const localChangeType = String(JSON.parse(localResources.get(name))?.PackageInfo?.ChangeLog?.ChangeType || '').trim();
-        if (!localChangeType) throw new Error(`${name} 的本地和官网 ChangeLog.ChangeType 均为空，无法安全修复`);
-        packageModel.PackageInfo.ChangeLog.ChangeType = localChangeType;
-        content = canonicalizeResource(name, JSON.stringify(packageModel));
-        process.stdout.write(`${name}\t沿用本地已验证的 ChangeLog.ChangeType=${localChangeType}\n`);
-      }
-    }
     if (name.endsWith('.json') && remoteResources.get(name).content !== content) {
       const packageModel = JSON.parse(content);
       const packageVersion = String(packageModel?.PackageInfo?.Version || '');
@@ -1483,11 +1463,7 @@ if (process.argv.includes('--validate-only')) {
         }
         // 包内容需要越过官网当前版本时，版本号、结构化日志和历史记录必须
         // 作为一个整体推进，避免生成无法通过自身发布门禁的半成品资源。
-        // Some older official packages were published before ChangeType became
-        // mandatory. Keep the merged release text and recover only its missing
-        // classification from the locally validated package.
-        const localChangeType = JSON.parse(localResources.get(name))?.PackageInfo?.ChangeLog?.ChangeType;
-        advanceOfficialPackageVersion(packageModel.PackageInfo, selectedVersion, undefined, localChangeType);
+        advanceOfficialPackageVersion(packageModel.PackageInfo, selectedVersion);
         content = canonicalizeResource(name, JSON.stringify(packageModel));
         process.stdout.write(`${name}\tPackageInfo.Version 自动提升为 ${selectedVersion}\n`);
       }

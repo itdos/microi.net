@@ -20,6 +20,7 @@
 
 <script>
 import { Operation } from "@element-plus/icons-vue";
+import { workflowNodePosition } from "@/utils/workflow-node-position";
 
 export default {
     components: {
@@ -48,11 +49,7 @@ export default {
             // if (!self.NodeModel.top && self.NodeModel.PositionTop) {
             //     self.NodeModel.top = self.NodeModel.PositionTop + 'px';
             // }
-            var result = {
-                top: self.NodeModel.PositionTop,
-                left: self.NodeModel.PositionLeft
-            };
-            return result;
+            return workflowNodePosition(self.NodeModel);
         },
         nodeIcoClass() {
             var self = this;

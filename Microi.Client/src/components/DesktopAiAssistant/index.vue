@@ -8,13 +8,7 @@
             title="AI助手"
             @click="openAssistant"
         >
-            <span class="desktop-ai-entry__ring" aria-hidden="true"></span>
-            <img
-                class="desktop-ai-entry__robot"
-                src="/static/mci/ai/assistant-robot.png"
-                alt=""
-                aria-hidden="true"
-            />
+            <el-icon class="desktop-ai-entry__icon" aria-hidden="true"><MagicStick /></el-icon>
         </button>
 
         <el-dialog
@@ -31,7 +25,7 @@
         >
             <template #header>
                 <div class="desktop-ai-dialog__title" data-testid="desktop-ai-dialog-drag-handle">
-                    <img src="/static/mci/ai/assistant-robot.png" alt="" aria-hidden="true" />
+                    <el-icon class="desktop-ai-entry__icon" aria-hidden="true"><MagicStick /></el-icon>
                     <span>
                         <strong>AI助手</strong>
                         <small>拖动标题栏可移动窗口</small>
@@ -48,6 +42,7 @@
 import { computed, ref, watch } from "vue";
 import { useDiyStore } from "@/pinia";
 import AiEngine from "@/views/ai-engine/index.vue";
+import { MagicStick } from "@element-plus/icons-vue";
 import { isMobileAiAssistantEnabled } from "@/components/MobileTabBar/mobile-ai-entry.js";
 
 defineOptions({ name: "DesktopAiAssistant" });
@@ -88,45 +83,27 @@ watch(aiAssistantEnabled, (enabled) => {
     padding: 0;
     border: 0;
     border-radius: var(--mci-radius-sm, 6px);
-    color: var(--mci-color-primary, #409eff);
+    color: var(--el-text-color-regular, #5a5e66);
     background: transparent;
     cursor: pointer;
     transition: background-color 0.18s ease, transform 0.18s ease;
 }
 
-.desktop-ai-entry:hover { background: var(--el-fill-color-light, rgba(0, 0, 0, 0.025)); }
+.desktop-ai-entry:hover { background: var(--el-fill-color-light, rgba(0, 0, 0, 0.025)); color: var(--mci-color-primary, #409eff); }
 .desktop-ai-entry:active { transform: scale(0.94); }
 .desktop-ai-entry:focus-visible {
     outline: 2px solid var(--mci-color-primary, #409eff);
     outline-offset: -2px;
 }
 
-.desktop-ai-entry__ring {
-    position: absolute;
-    inset: 4px;
-    border: 1px solid rgba(24, 166, 184, 0.24);
-    border-radius: 50%;
-    pointer-events: none;
-    animation: desktopAiSlotPulse 2.8s ease-in-out infinite;
-}
-
-.desktop-ai-entry__robot {
-    position: relative;
-    z-index: 1;
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-    pointer-events: none;
-}
-
-@keyframes desktopAiSlotPulse {
-    0%, 100% { transform: scale(0.96); opacity: 0.45; }
-    50% { transform: scale(1); opacity: 0.9; }
+.desktop-ai-entry__icon {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
 }
 
 @media (prefers-reduced-motion: reduce) {
     .desktop-ai-entry { transition: none; }
-    .desktop-ai-entry__ring { animation: none; }
 }
 </style>
 
@@ -166,10 +143,8 @@ watch(aiAssistantEnabled, (enabled) => {
     gap: 10px;
 }
 
-.desktop-ai-dialog__title > img {
-    width: 34px;
-    height: 34px;
-    object-fit: contain;
+.desktop-ai-dialog__title > .desktop-ai-entry__icon {
+    color: var(--mci-color-primary, #409eff);
 }
 
 .desktop-ai-dialog__title > span {

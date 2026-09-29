@@ -372,6 +372,10 @@ namespace Microi.net
             {
                 var request = ToJObject((object)dynamicParam);
                 var action = GetJsonString(request, "Action").Trim();
+                if (string.Equals(action, "logs", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "historylogs", StringComparison.OrdinalIgnoreCase))
+                    return ReadMqttLogs(osClient, request,
+                        string.Equals(action, "historylogs", StringComparison.OrdinalIgnoreCase));
                 var runtime = MicroiEngine.TryGetService<IMicroiMQTT>();
                 if (runtime == null) return new DosResult(0, null, "MQTT 插件尚未安装或未启动。");
                 switch (action.ToLowerInvariant())
