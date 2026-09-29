@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
-import { buildTaskDeviceServiceStatusWhere } from '../src/tenants/xjy/task-device-filters.mjs'
+import {
+  buildTaskDeviceKeywordWhere,
+  buildTaskDeviceServiceStatusWhere
+} from '../src/tenants/xjy/task-device-filters.mjs'
 
 const detailSource = fs.readFileSync(new URL('../src/pages/task/device.vue', import.meta.url), 'utf8')
 const feedbackSource = fs.readFileSync(new URL('../src/pages/native/task-feedback.vue', import.meta.url), 'utf8')
@@ -39,11 +42,16 @@ test('任务设备列表可按名称型号编号和安装位置检索', () => {
   assert.match(listSource, /placeholder="搜索设备名称、型号、编号、安装位置"/)
   assert.match(listSource, /loadTaskDevicesPage\(this\.taskId, \{[^}]*keyword: this\.keyword/s)
   assert.match(taskSource, /const keyword = String\(options\.keyword \|\| ''\)\.trim\(\)/)
-  for (const field of ['ShebeiMC', 'ShangpinMC', 'ShebeiXH', 'ShangpinXH', 'ShebeiBH', 'AnzhuangWZ']) {
-    assert.match(taskSource, new RegExp(`Name: '${field}', Type: 'Like', Value: keyword`))
-  }
-  assert.match(taskSource, /GroupStart: true/)
-  assert.match(taskSource, /GroupEnd: true/)
+  assert.match(taskSource, /\.\.\.buildTaskDeviceKeywordWhere\(keyword\)/)
+
+  const where = buildTaskDeviceKeywordWhere('  老厂  ')
+  assert.deepEqual(where.map((item) => item.Name), ['AnzhuangWZ', 'ShebeiXH', 'ShebeiBH', 'ShebeiMC'])
+  assert.ok(where.every((item) => item.Type === 'Like' && item.Value === '老厂'))
+  assert.equal(where[0].GroupStart, true)
+  assert.equal(where.at(-1).GroupEnd, true)
+  assert.equal(where.slice(1).every((item) => item.AndOr === 'OR'), true)
+  assert.equal(where.some((item) => ['ShangpinMC', 'ShangpinXH'].includes(item.Name)), false)
+  assert.deepEqual(buildTaskDeviceKeywordWhere('   '), [])
 })
 
 test('任务设备列表复用后台子表筛选并将服务状态作为顶部独立筛选', () => {

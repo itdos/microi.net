@@ -55,7 +55,7 @@ function collect(context) {
   var items = [], warnings = [], nextAt = now + 60000;
   var officialPolicy = null, parentPolicy = null;
   function appendLicense(policy, edition, expiration, parent) {
-    if (!context.Administrator || !context.LoginId) return;
+    if (!(context.SuperAdministratorRecipient === true || context.SuperAdministratorRecipient == null && context.Administrator === true) || !context.LoginId) return;
     var item;
     try { item = licenseModel.project(policy, edition, expiration, now, parent); }
     catch (_) { item = licenseModel.project(null, edition, expiration, now, parent); }
@@ -211,7 +211,8 @@ try {
       if (Number(p.ExpectedRevision) !== Number(old.Revision)) throw new Error('规则已被其他人修改，请刷新后重新编辑。');
       var affected = V8.DbTrans.FromSql('UPDATE mci_platform_reminder SET Title=@title,ReminderType=@kind,ScopeType=@scope,RuleJson=@json,Revision=Revision+1,Status=@status,UpdateTime=@time WHERE Id=@id AND Revision=@revision AND IsDeleted<>1')
         .AddInParameter('@title',rule.Title).AddInParameter('@kind',rule.ReminderType).AddInParameter('@scope',rule.ScopeType)
-        .AddInParameter('@json',JSON.stringify(rule)).AddInParameter('@status','Draft').AddInParameter('@time',String(System.DateTime.Now.ToString('yyyy-MM-dd HH:mm:ss')))
+        // Jint 的 .NET DateTime 投影不保证 ToString 可作为 JS 函数调用；统一使用 V8 日期函数。
+        .AddInParameter('@json',JSON.stringify(rule)).AddInParameter('@status','Draft').AddInParameter('@time',DateNow('yyyy-MM-dd HH:mm:ss'))
         .AddInParameter('@id',ruleId).AddInParameter('@revision',Number(old.Revision)).ExecuteNonQuery();
       if (Number(affected) !== 1) throw new Error('规则保存冲突，请刷新后重试。');
     }

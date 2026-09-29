@@ -2,9 +2,31 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hasVisibleNativeField, nativeFieldRoleVisibility } from '../src/platform/native-field-visibility.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const detailSource = fs.readFileSync(path.join(projectRoot, 'src/pages/business/detail.vue'), 'utf8')
+const runtimeSource = fs.readFileSync(path.join(projectRoot, 'src/platform/business-runtime.js'), 'utf8')
+
+const periodicTaskField = {
+  Name: 'ShengchengZQRW',
+  BindRole: JSON.stringify(['e757d4f5-e204-4039-9624-960bc3c60cbf'])
+}
+const definitionFor = (user) => {
+  const visibility = nativeFieldRoleVisibility(periodicTaskField, user)
+  return { fields: visibility.visible ? [{ ...periodicTaskField, visible: true }] : [] }
+}
+
+assert.equal(
+  hasVisibleNativeField(definitionFor({ RoleIds: ['958b0d41-5851-45ef-967d-02cff27bc5ee'] }), periodicTaskField.Name),
+  false,
+  '销售角色不在平台 BindRole 中时不得显示生成任务'
+)
+assert.equal(
+  hasVisibleNativeField(definitionFor({ RoleIds: ['e757d4f5-e204-4039-9624-960bc3c60cbf'] }), periodicTaskField.Name),
+  true,
+  '客服角色在平台 BindRole 中时应保留生成任务入口'
+)
 
 assert.doesNotMatch(
   detailSource,
@@ -32,6 +54,16 @@ assert.match(
 )
 assert.match(
   detailSource,
+  /canGeneratePeriodicTasks\(\)[\s\S]*?hasVisibleNativeField\(this\.definition, 'ShengchengZQRW'\)/,
+  '生成任务必须复用平台字段 BindRole 过滤结果，不能给全部内部角色放行'
+)
+assert.match(
+  detailSource,
+  /async generatePeriodicTasks\(\)[\s\S]*?if \(!this\.canGeneratePeriodicTasks\)[\s\S]*?当前账号无生成任务权限/,
+  '生成任务点击入口必须再次校验权限并在无权时失败关闭'
+)
+assert.match(
+  detailSource,
   /v-if="hasCustomerMoreActions"[\s\S]*?@tap="showCustomerMoreSheet = true"/,
   '客户低频操作应从更多入口打开'
 )
@@ -54,6 +86,52 @@ assert.match(
   detailSource,
   /async runCustomerMoreAction\(action\)[\s\S]*?await this\.releaseCustomer\(\)/,
   '更多操作必须复用原有移入公海业务逻辑与二次确认'
+)
+assert.match(
+  runtimeSource,
+  /const direct = await V8\.ApiEngine\.Run\([\s\S]*?direct !== undefined && direct !== null\) return direct/,
+  '接口引擎 Code=0 业务失败必须原样返回，不能再次调用旧接口'
+)
+assert.doesNotMatch(
+  runtimeSource,
+  /direct && direct\.Code !== 0/,
+  '接口兼容回退不得把 Code=0 业务失败误判为新路由不可用'
+)
+
+const callApiEngineSource = runtimeSource.match(
+  /export async function callApiEngine\(key, data = \{\}\) \{[\s\S]*?\n\}/
+)
+assert.ok(callApiEngineSource, '必须能定位接口引擎兼容调用函数')
+const createCallApiEngine = (apiEngine) => new Function(
+  'V8',
+  `${callApiEngineSource[0].replace('export async function', 'async function')}; return callApiEngine`
+)({ ApiEngine: apiEngine })
+
+let legacyCallCount = 0
+const businessFailure = await createCallApiEngine({
+  Run: async () => ({ Code: 0, Msg: '无换芯统计数据插入' }),
+  RunLegacy: async () => {
+    legacyCallCount += 1
+    return { Code: 1 }
+  }
+})('kehu_dingqirw', { Id: 'customer-1' })
+assert.deepEqual(businessFailure, { Code: 0, Msg: '无换芯统计数据插入' })
+assert.equal(legacyCallCount, 0, '业务失败不得兼容重试或吞掉原始 Msg')
+
+const fallbackSuccess = await createCallApiEngine({
+  Run: async () => { throw new Error('新路由不可达') },
+  RunLegacy: async () => {
+    legacyCallCount += 1
+    return { Code: 1, Msg: '旧路由成功' }
+  }
+})('legacy-engine')
+assert.equal(fallbackSuccess.Code, 1)
+assert.equal(legacyCallCount, 1, '只有新路由异常时才允许回退旧接口')
+
+assert.match(
+  detailSource,
+  /async runTaskEngine\([\s\S]*?catch \(error\)[\s\S]*?errorMessage = error\.message \|\| error\.Msg[\s\S]*?finally \{[\s\S]*?uni\.hideLoading\(\)[\s\S]*?uni\.showModal\(\{[\s\S]*?content: errorMessage/,
+  '任务接口失败时必须先关闭 loading，再用模态框完整展示服务端 Msg'
 )
 
 console.log('客户详情底部操作栏与更多操作面板检查通过')
