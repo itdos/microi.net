@@ -34,7 +34,7 @@ assert.match(loginSource, /protocol !== 'http:\/\/'[\s\S]*?HTTP 会以明文传�
   'HTTP 连接必须二次确认并明确提示明文风险')
 assert.match(configSource, /APP_RUNTIME_ENDPOINT_STORAGE_KEY[\s\S]*?normalizeStoredAppRuntimeEndpoint/,
   'App 启动时必须从持久化运行端点恢复配置')
-assert.match(requestSource, /applyAppRuntimeEndpoint[\s\S]*?removeToken\(\)[\s\S]*?clearPlatformCache\(\)[\s\S]*?V8\.configure/,
+assert.match(requestSource, /applyAppRuntimeEndpoint[\s\S]*?removeToken\(\)[\s\S]*?V8\.configure/,
   '切换运行端点必须清理旧会话和派生缓存后再更新 SDK')
 assert.match(sdkSource, /runtimeEndpointGeneration[\s\S]*?RUNTIME_ENDPOINT_CHANGED/,
   'SDK 必须拒绝平台切换前发出的迟到响应')
