@@ -1,8 +1,9 @@
 import appConfig from '../config.js';
 import { createMicroiV8, shouldFallbackPlatformSysConfig } from './microi.v8.js';
 import { shouldPromptAuthExpired } from '../platform/auth-expired-policy.mjs';
-import { clearPlatformCache, removeCachePrefix } from '../platform/cache.js';
+import { clearPlatformCache } from '../platform/cache.js';
 import { clearRetainedListSessions } from '../platform/list-session.mjs';
+import { clearAuthScopedStorageCaches } from '../platform/auth-storage-cleanup.mjs';
 import {
   APP_RUNTIME_ENDPOINT_STORAGE_KEY,
   buildAppRuntimeEndpoint
@@ -169,26 +170,6 @@ export const V8 = createMicroiV8({
   }
 });
 
-function clearRuntimeEndpointStorageCaches() {
-  const runtimeUni = getRuntimeUni();
-  if (!runtimeUni) return;
-  const exactKeys = [
-    'SysConfig',
-    'sys_config_cache',
-    'microi_diy_table_ids_v2',
-    'mci_ai_model_selection',
-    'xjy_ai_model_selection'
-  ];
-  const prefixes = ['microi_mobile_menu_tree_v2:'];
-  try {
-    exactKeys.forEach((key) => runtimeUni.removeStorageSync(key));
-    const storageInfo = runtimeUni.getStorageInfoSync();
-    (storageInfo.keys || []).forEach((key) => {
-      if (prefixes.some((prefix) => String(key).startsWith(prefix))) runtimeUni.removeStorageSync(key);
-    });
-  } catch (error) {}
-}
-
 export function applyRuntimeSysConfig(sysConfig = {}) {
   const model = sysConfig && typeof sysConfig === 'object' ? sysConfig : {};
   const fileServer = String(model.FileServer || appConfig.apiBase || '').replace(/\/+$/, '');
@@ -270,9 +251,6 @@ export function applyAppRuntimeEndpoint(input = {}, options = {}) {
 
   if (changed) {
     removeToken();
-    clearPlatformCache();
-    clearRetainedListSessions();
-    clearRuntimeEndpointStorageCaches();
   }
 
   appConfig.apiBase = endpoint.apiBase;
@@ -303,10 +281,12 @@ export function setToken(token) {
 
 export function removeToken() {
   V8.clearToken();
-  // 登录用户维度的首页统计属于会话数据，退出或失效后不能继续从本地快照恢复。
-  removeCachePrefix('tab:summary:');
+  // 账号切换时删除全部可重建的平台缓存，避免旧账号菜单、列表和详情缓存持续累积，
+  // 最终挤满小程序存储并导致新 Token / 用户信息无法写入。
+  clearPlatformCache();
   clearRetainedListSessions();
   const runtimeUni = getRuntimeUni();
+  clearAuthScopedStorageCaches(runtimeUni);
   if (runtimeUni && typeof runtimeUni.$emit === 'function') {
     runtimeUni.$emit('mci:auth-changed');
     runtimeUni.$emit('xjy-auth-changed');
