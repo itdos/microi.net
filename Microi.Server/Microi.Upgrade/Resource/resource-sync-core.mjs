@@ -502,7 +502,7 @@ function formatLocalReleaseTime(value) {
  * 提版必须把结构化更新日志和历史记录一起推进，否则发布门禁会留下一个
  * PackageInfo.Version 已更新、ChangeLog 仍指向旧版的半成品候选包。
  */
-export function advanceOfficialPackageVersion(packageInfo, nextVersion, releaseTime = formatLocalReleaseTime(new Date())) {
+export function advanceOfficialPackageVersion(packageInfo, nextVersion, releaseTime = formatLocalReleaseTime(new Date()), fallbackChangeType = '') {
   if (!packageInfo || typeof packageInfo !== 'object' || Array.isArray(packageInfo)) {
     throw new Error('PackageInfo 必须是对象，无法自动提升官方应用包版本');
   }
@@ -513,11 +513,13 @@ export function advanceOfficialPackageVersion(packageInfo, nextVersion, releaseT
       || String(changeLog.Version || '').trim() !== previousVersion) {
     throw new Error('自动提升官方应用包版本前，PackageInfo.ChangeLog 必须与当前版本一致');
   }
-  for (const fieldName of ['Title', 'ChangeType', 'Content']) {
+  const effectiveChangeType = String(changeLog.ChangeType || '').trim() || String(fallbackChangeType || '').trim();
+  for (const fieldName of ['Title', 'Content']) {
     if (typeof changeLog[fieldName] !== 'string' || !changeLog[fieldName].trim()) {
       throw new Error(`自动提升官方应用包版本前，PackageInfo.ChangeLog.${fieldName} 不能为空`);
     }
   }
+  if (!effectiveChangeType) throw new Error('自动提升官方应用包版本前，PackageInfo.ChangeLog.ChangeType 不能为空');
   if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(releaseTime || '').trim())) {
     throw new Error('自动提升官方应用包版本的发布时间必须为 yyyy-MM-dd HH:mm:ss');
   }
@@ -527,6 +529,7 @@ export function advanceOfficialPackageVersion(packageInfo, nextVersion, releaseT
     : `v${String(nextVersion).trim()}`;
   packageInfo.Version = normalizedVersion;
   changeLog.Version = normalizedVersion;
+  changeLog.ChangeType = effectiveChangeType;
   changeLog.ReleaseTime = String(releaseTime).trim();
 
   const currentRecord = {
