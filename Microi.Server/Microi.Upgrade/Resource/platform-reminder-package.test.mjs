@@ -29,6 +29,14 @@ test('notification package delivers reminder schema, managed engines and one rec
  for(const p of [message,saas]){const receipts=p.DiyTables.find(t=>t.Name==='mci_platform_reminder_receipt');assert.ok(p.DiyFields.some(f=>f.TableId===receipts.Id&&f.Name==='ShownAt'));}
  assert.ok(!saas.DiyTables.some(t=>t.Name==='mic_msgset'),'原业务配置仍由消息通知包单一维护');
 });
+test('商城托管包与可编辑提醒源码一致，升级后不会恢复草稿保存错误',()=>{
+ const runtime=readFileSync(new URL('platform-reminder-runtime.js',import.meta.url),'utf8');
+ const packaged=message.SysApiEngines.find(e=>e.ApiEngineKey==='platform-reminder-runtime');
+ assert.equal(packaged.ApiV8Code,runtime);
+ assert.equal(packaged.Version,'v1.1.3');
+ assert.match(runtime,/DateNow\('yyyy-MM-dd HH:mm:ss'\)/);
+ assert.doesNotMatch(runtime,/System\.DateTime\.Now\.ToString\('yyyy-MM-dd HH:mm:ss'\)/);
+});
 test('official publication validates complete reminder ownership and rejects a missing engine',()=>{
  const source=readFileSync(new URL('official-resource-api.js',import.meta.url),'utf8');
  const validate=new Function('V8',source.slice(0,source.indexOf('var action ='))+'\nreturn validatePublishResource;')({Param:{}});

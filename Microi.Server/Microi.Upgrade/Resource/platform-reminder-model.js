@@ -100,7 +100,8 @@ function createPlatformReminderModel() {
     if (!isFinite(protocol) || !isFinite(receiverProtocol) || protocol < 1 || Math.floor(protocol) !== protocol || protocol > receiverProtocol) return false;
     if ((scope === 'SuperAdmins' || rule.DisplayMode === 'AfterServerRestart') && receiverProtocol < 2) return false;
     if (['AllAccounts', 'SuperAdmins'].indexOf(scope) < 0) return false;
-    if (scope === 'SuperAdmins' && context.Administrator !== true) return false;
+    if (scope === 'SuperAdmins' && context.SuperAdministratorRecipient !== true
+      && !(context.SuperAdministratorRecipient == null && context.Administrator === true)) return false;
     if (['Once', 'EveryEntry', 'EveryLogin', 'AfterServerRestart'].indexOf(rule.DisplayMode) < 0) return false;
     if (rule.DisplayMode === 'EveryLogin' && !/^[a-f0-9]{32,64}$/.test(String(context.LoginId || ''))) return false;
     return rule.DisplayMode !== 'AfterServerRestart' || /^[A-Za-z0-9-]{16,80}$/.test(text(context.RestartEpoch));
@@ -119,4 +120,3 @@ function createPlatformReminderModel() {
   }
   return { normalize: normalize, occurrence: occurrence, matches: matches, acceptsAccount: acceptsAccount, project: project, list: list };
 }
-
