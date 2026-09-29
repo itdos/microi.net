@@ -96,6 +96,42 @@ test('opening an unsaved installation point detail keeps the draft relation inst
   drafts.disposeChildDraftSession('detail-parent')
 })
 
+test('returning from child detail keeps rows selected for an unsaved parent instead of applying an empty refresh', async () => {
+  let remoteLoads = 0
+  let metricLoads = 0
+  let countEvents = 0
+  const ctx = {
+    parentMode: 'Add',
+    relationValue: 'draft-order-1',
+    config: { table: 'Diy_DingdanSP' },
+    rows: [{ Id: 'order-product-1', DingdanID: 'draft-order-1', ShangpinMC: '净水设备' }],
+    count: 0,
+    finished: false,
+    loading: true,
+    error: '旧错误',
+    emitDataCount() { countEvents++ },
+    loadData() { remoteLoads++; return Promise.resolve() },
+    loadRelatedMetrics() { metricLoads++; return Promise.resolve() }
+  }
+  ctx.preserveUnsavedParentRows = listMethod('preserveUnsavedParentRows').bind(ctx)
+  ctx.refreshData = listMethod('refreshData').bind(ctx)
+
+  await ctx.refreshData()
+
+  assert.equal(ctx.rows.length, 1)
+  assert.equal(ctx.rows[0].ShangpinMC, '净水设备')
+  assert.equal(ctx.count, 1)
+  assert.equal(ctx.finished, true)
+  assert.equal(ctx.loading, false)
+  assert.equal(ctx.error, '')
+  assert.equal(countEvents, 1)
+  assert.deepEqual({ remoteLoads, metricLoads }, { remoteLoads: 0, metricLoads: 0 })
+
+  ctx.parentMode = 'Edit'
+  await ctx.refreshData()
+  assert.deepEqual({ remoteLoads, metricLoads }, { remoteLoads: 1, metricLoads: 1 })
+})
+
 test('flush uses the saved parent, original authorization chain, Client events and current parent defaults', async () => {
   const group = fixture('draft-parent')
   group.rows = [{ Id: 'p1', ShebeiSL: 2 }, { Id: 'p2', ShebeiSL: 0 }]
@@ -199,7 +235,7 @@ test('actual parent Save waits for the parent, retains failed children and retri
     } }
   }
   const submit = vm.runInNewContext(`({${source.slice(method.start, method.end)}})`, globals).submit
-  const ctx = { rowId: '', draftRowId: 'save-button', uploadStates: {}, form: { Id: 'save-button' },
+  const ctx = { mode: 'Add', recordAdapter: 'form-engine', rowId: '', draftRowId: 'save-button', uploadStates: {}, form: { Id: 'save-button' },
     tableName: 'diy_kehufaxx', definition: { fields: [] }, defaultValues: {}, tenantFormContext: () => ({}),
     tenantFieldPresentation: () => ({}) }
   await submit.call(ctx)

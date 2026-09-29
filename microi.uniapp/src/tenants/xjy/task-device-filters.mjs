@@ -13,6 +13,25 @@ export const TASK_DEVICE_FALLBACK_SEARCH_FIELDS = Object.freeze(
   }))
 )
 
+const TASK_DEVICE_KEYWORD_FIELDS = Object.freeze(
+  TASK_DEVICE_FALLBACK_FILTER_FIELDS.map((field) => field.field)
+)
+
+export function buildTaskDeviceKeywordWhere(keyword = '') {
+  const value = String(keyword || '').trim()
+  if (!value) return []
+
+  // 关键词只能查询售后设备子表真实字段；卡片显示用的历史商品字段不能进入 _Where，
+  // 否则任意关键词都会因字段元数据不存在而让整次列表查询失败。
+  return TASK_DEVICE_KEYWORD_FIELDS.map((Name, index) => ({
+    ...(index === 0 ? { GroupStart: true } : { AndOr: 'OR' }),
+    Name,
+    Type: 'Like',
+    Value: value,
+    ...(index === TASK_DEVICE_KEYWORD_FIELDS.length - 1 ? { GroupEnd: true } : {})
+  }))
+}
+
 export function buildTaskDeviceServiceStatusWhere(serviceStatus = 'all') {
   if (serviceStatus === 'completed') {
     return [{ Name: 'FuwuZTZ', Type: '=', Value: '1' }]

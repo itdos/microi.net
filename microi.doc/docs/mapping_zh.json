@@ -1,6 +1,7 @@
 {
   "index.md" : "平台介绍",
-  "edition-comparison.md" : "版本选择（开源/个人/企业）",
+  "$comment_edition_comparison" : "暂停个人版销售，保留原侧栏文案：版本选择（开源/个人/企业）",
+  "edition-comparison.md" : "版本选择（开源/企业）",
 
   "case-index.md" : "成功案例",
   

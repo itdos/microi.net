@@ -64,3 +64,29 @@ test('发布接收范围写入失败时，规则和发布快照同时回滚', ()
   assert.equal(result.Code,0);assert.match(result.Msg,/injected target failure/);
   assert.deepEqual(committed,initial,'failed publication must not commit the rule claim outside the transaction');
 });
+
+test('编辑已发布公告可保存新版草稿，并使用 V8 日期函数写入更新时间', () => {
+  const body = readFileSync(new URL('../../Microi.Upgrade/Resource/platform-reminder-runtime.body.js', import.meta.url), 'utf8');
+  const license = readFileSync(new URL('../../Microi.Upgrade/Resource/license-expiry-model.js', import.meta.url), 'utf8');
+  const id = 'a'.repeat(32);
+  const rule = { ...input, Title: '版本介绍', ScopeType: 'Editions', AllTargets: false,
+    TargetKeys: ['OpenSource'], EndsAt: new Date(Date.now() + 86400000).toISOString() };
+  const old = { Id: id, Revision: 1, ReminderType: 'Announcement', RuleJson: JSON.stringify(rule) };
+  const parameters = {};
+  const V8 = {
+    Param: { Action: 'Save', Id: id, ExpectedRevision: 1, Rule: { ...rule, Content: '现提供开源版与企业版。' } },
+    OsClient: 'iTdos',
+    DbTrans: { FromSql: () => ({ AddInParameter(key, value) { parameters[key] = value; return this; }, ExecuteNonQuery: () => 1 }) },
+    Method: { RunPlatformApiRuntime: () => ({ Code: 1, Data: { ...admin, IsOfficialPlatform: true, UserId: 'admin' } }) },
+    FormEngine: { GetFormData: () => ({ Code: 1, Data: old }) },
+  };
+  // 模拟生产 Jint 的 DateTime 投影：其 ToString 属性不是可调用的 JS 函数。
+  const System = { DateTime: { Now: { ToString: 'not callable' } } };
+  const DateNow = pattern => pattern === 'yyyy-MM-dd HH:mm:ss' ? '2026-09-29 12:34:56' : '';
+  const result = new Function('V8', 'System', 'DateNow', code + ';' + license + ';' + body)(V8, System, DateNow);
+  assert.equal(result.Code, 1, result.Msg);
+  assert.deepEqual(result.Data, { Id: id, Revision: 2 });
+  assert.equal(parameters['@time'], '2026-09-29 12:34:56');
+  assert.equal(parameters['@status'], 'Draft');
+  assert.equal(JSON.parse(parameters['@json']).Content, '现提供开源版与企业版。');
+});

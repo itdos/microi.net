@@ -125,7 +125,7 @@ export default {
     severities(){return this.bootstrap.Severities||[]},
     confidentialities(){return this.bootstrap.Confidentialities||[]},
     selectedRule(){return (this.bootstrap.Rules||[]).find((rule)=>(rule.Severity==='*'||rule.Severity===this.form.Severity)&&(rule.Confidentiality==='*'||rule.Confidentiality===this.form.Confidentiality))||null},
-    uploadPending(){return Number(this.imagesUploadState.pendingCount||0)>0||Number(this.filesUploadState.pendingCount||0)>0||Number(this.imagesUploadState.failedCount||0)>0||Number(this.filesUploadState.failedCount||0)>0}
+    uploadPending(){return Number(this.imagesUploadState.uploadingCount||0)>0||Number(this.filesUploadState.pendingCount||0)>0||Number(this.imagesUploadState.failedCount||0)>0||Number(this.filesUploadState.failedCount||0)>0}
   },
   onLoad(options){this.activeTab=['submit','mine','public'].includes(options.tab)?options.tab:'submit';this.refreshLogin();this.restoreDraftKey();this.loadCurrent()},
   onShow(){this.refreshLogin();if(this.activeTab==='mine'&&this.isLoggedIn&&!this.loading)this.reloadList()},

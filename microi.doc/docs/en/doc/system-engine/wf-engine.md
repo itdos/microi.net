@@ -18,7 +18,7 @@
 > * [Process Attributes] and [Node Attributes] are driven by [Form Engine] for greater flexibility
 > * Rich front-end V8 events and back-end V8 events to meet complex business requirements, such as calling V8 functions to send`邮件、短信、微信`notifications, such as calling`FormEngine`、`ApiEngine`Implement complex business logic
 > * [Process Engine] and Business Forms`完全解耦`It is convenient to integrate third-party forms and secondary development. Even without a form, [the process engine] can rely on one`FromData`JSON data to run the process
-> * Process Designer Fully Open Source
+> * The process designer supports visual configuration and extension
 > * Process business management has been applied in hundreds of customers
 
 ## Preview image

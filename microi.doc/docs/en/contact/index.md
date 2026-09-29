@@ -6,7 +6,9 @@
 const contacts = [
   {
     name: 'Anderson.周',
-    role: 'CTO、个人版售前/售后',
+// 暂停个人版销售，保留原文以便恢复
+//     role: 'CTO、个人版售前/售后',
+    role: 'CTO',
     qrCode: 'https://static.itdos.com/upload/img/ScreenShot_2026-02-07_011010_5522.jpeg',
     avatar: 'https://static.itdos.com/upload/img/2026-02-07_000741_083.jpg',
     phone: '-',
@@ -64,7 +66,9 @@ const contacts = [
 <ContactCard :contacts="contacts" />
 
 ::: tip💡Purchase Tips
+<!-- 暂停个人版销售，保留原文以便恢复
 - To purchase * * Personal Edition * *, you need to inform your recommendation source (understand the channel of Microi code)
+-->
 - Purchase **Enterprise Edition** Please contact **Business**
 :::
 
