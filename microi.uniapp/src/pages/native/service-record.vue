@@ -255,7 +255,7 @@ export default {
       return items
     },
     archivePhotoUploadBlocked() {
-      return Object.values(this.archivePhotoUploadStates).some((state) => Number(state && state.pendingCount || 0) > 0 || Number(state && state.failedCount || 0) > 0)
+      return Object.values(this.archivePhotoUploadStates).some((state) => Number(state && state.uploadingCount || 0) > 0 || Number(state && state.failedCount || 0) > 0)
     }
   },
   watch: {
