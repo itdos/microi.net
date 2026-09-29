@@ -97,8 +97,8 @@ assert.equal(
   '三种登录入口都必须同时校验 Token 和用户 Id'
 )
 assert.ok(!loginSource.includes('setUser(result.Data)'), '登录页不得缓存未经归一化和校验的响应包装对象')
-assert.match(requestSource, /removeToken\(\)[\s\S]*?removeCachePrefix\('tab:summary:'\)/,
-  '退出或登录失效时必须清除用户维度的首页统计快照')
+assert.match(requestSource, /removeToken\(\)[\s\S]*?clearPlatformCache\(\)[\s\S]*?clearAuthScopedStorageCaches\(runtimeUni\)/,
+  '退出或登录失效时必须清除全部可重建的平台与账号缓存')
 assert.match(workspaceSource, /this\.isLoggedIn = !!token && !!currentUser\.Id[\s\S]*?this\.summaryRequestId \+= 1[\s\S]*?this\.summary = \{ orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 \}/,
   '首页恢复显示时必须校验完整会话、失效旧统计请求并清空旧值')
 assert.match(profileSource, /this\.isLoggedIn = !!token && !!currentUser\.Id[\s\S]*?if \(!this\.isLoggedIn\)[\s\S]*?this\.summary = \{ orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 \}/,
