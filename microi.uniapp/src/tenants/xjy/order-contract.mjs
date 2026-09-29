@@ -41,6 +41,13 @@ export function orderCustomerSourceValues(row = {}, cleared = false) {
   }
 }
 
+// 新增订单只把客户资料当作初始默认值；调用入口明确传入的值优先，不能被客户主数据覆盖。
+export function orderInitialCustomerDefaults(customerValues = {}, explicitDefaults = {}) {
+  return Object.fromEntries(Object.entries(customerValues).filter(([name]) =>
+    !Object.prototype.hasOwnProperty.call(explicitDefaults || {}, name)
+  ))
+}
+
 export function localDateText(now = new Date()) {
   const date = now instanceof Date ? now : new Date(now)
   if (Number.isNaN(date.getTime())) return ''

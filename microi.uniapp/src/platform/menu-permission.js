@@ -37,7 +37,20 @@ export function hasExactMenuPermission(menuId, names, user = {}) {
   if (!menuId) return false
   const expected = new Set((Array.isArray(names) ? names : [names]).map((item) => String(item || '').trim()))
   return roleLimits(user)
-    .filter((item) => String(item.FkId || '') === String(menuId))
+    .filter((item) => {
+      const type = String(item && item.Type || '').trim().toLowerCase()
+      return String(item && item.FkId || '') === String(menuId) && (!type || type === 'menu')
+    })
+    .some((row) => permissionNames(row.Permission).some((name) => expected.has(name)))
+}
+
+export function hasExactTablePermission(tableId, names, user = {}) {
+  if (isPlatformAdmin(user)) return true
+  if (!tableId) return false
+  const expected = new Set((Array.isArray(names) ? names : [names]).map((item) => String(item || '').trim()))
+  return roleLimits(user)
+    .filter((item) => String(item && item.FkId || '') === String(tableId) &&
+      String(item && item.Type || '').trim().toLowerCase() === 'table')
     .some((row) => permissionNames(row.Permission).some((name) => expected.has(name)))
 }
 
@@ -51,4 +64,16 @@ export function canAddMenuRecord(menuId, user = {}) {
 
 export function canEditMenuRecord(menuId, user = {}) {
   return hasExactMenuPermission(menuId, ['Edit', '编辑'], user)
+}
+
+export function canDeleteTableRecord(tableId, user = {}) {
+  return hasExactTablePermission(tableId, ['Del', '删除'], user)
+}
+
+export function canAddTableRecord(tableId, user = {}) {
+  return hasExactTablePermission(tableId, ['Add', '新增'], user)
+}
+
+export function canEditTableRecord(tableId, user = {}) {
+  return hasExactTablePermission(tableId, ['Edit', '编辑'], user)
 }

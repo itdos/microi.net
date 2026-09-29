@@ -36,7 +36,7 @@
       </scroll-view>
       <view class="timeline-divider"></view>
 
-      <view class="action-band" :class="{ 'action-band--four': quickActions.length === 4 }">
+      <view class="action-band" :class="{ 'action-band--two': quickActions.length === 2, 'action-band--four': quickActions.length === 4 }">
         <view v-for="action in quickActions" :key="action.key" class="quick-action" hover-class="quick-action--pressed" @tap="runQuickAction(action.key)">
           <view class="quick-action__icon" :class="`tone-${action.tone || 'blue'}`"><image :src="action.icon" mode="aspectFit" /></view><text>{{ action.label }}</text>
           <text v-if="action.key === 'devices'" class="quick-action__badge">{{ completedDeviceCount }}/{{ devices.length }}</text>
@@ -83,7 +83,7 @@
       <view v-for="action in bottomActions" :key="action.key" class="bottom-button" :class="`bottom-button--${action.style || 'plain'}`" :disabled="submitting" hover-class="bottom-button--pressed" @tap="runBottomAction(action.key)"><text v-if="action.iconText" class="bottom-button__icon">{{ action.iconText }}</text><text>{{ action.label }}</text></view>
     </view>
 
-    <view v-if="assignVisible" class="sheet-mask" @tap="assignVisible = false"><view class="bottom-sheet" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>{{ assignMode === 'support' ? '分配客服验收负责人' : '指派服务人员' }}</text><view @tap="assignVisible = false"><text>×</text></view></view><view class="sheet-search"><input v-model="userKeyword" placeholder="搜索姓名、帐号或部门" confirm-type="search" @input="scheduleUserSearch" @confirm="searchUsers" /><text @tap="resetUserSearch">重置</text></view><scroll-view class="user-list" scroll-y><mci-skeleton v-if="usersLoading" type="list" :rows="4" /><template v-else><view v-for="user in users" :key="user.Id" class="user-row" :class="{ active: selectedUser && selectedUser.Id === user.Id }" @tap="selectedUser = user"><view class="user-avatar"><text>{{ (user.Name || user.Account || '人').slice(0,1) }}</text></view><view><text class="user-name">{{ user.Name || user.Account }}</text><text class="user-meta">{{ [user.DeptName, user.RoleName, user.RoleIdsString, user.Phone].filter(Boolean).join(' · ') }}</text></view><text class="user-check">{{ selectedUser && selectedUser.Id === user.Id ? '✓' : '' }}</text></view></template></scroll-view><textarea v-if="assignMode === 'support'" v-model="supportReason" class="reason-textarea" maxlength="500" placeholder="请填写分配或转交原因" /><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="assignVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="confirmAssign"><text>{{ assignMode === 'support' ? '确认分配' : '确认指派' }}</text></view></view></view></view>
+    <view v-if="assignVisible" class="sheet-mask" @tap="assignVisible = false"><view class="bottom-sheet" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>{{ assignMode === 'support' ? '分配客服验收负责人' : '指派服务人员' }}</text><view @tap="assignVisible = false"><text>×</text></view></view><view class="sheet-search"><input v-model="userKeyword" placeholder="搜索姓名、账号、手机、部门或商家" confirm-type="search" @input="scheduleUserSearch" @confirm="searchUsers" /><text @tap="resetUserSearch">重置</text></view><scroll-view class="user-list" scroll-y><mci-skeleton v-if="usersLoading" type="list" :rows="4" /><view v-else-if="!users.length" class="user-empty"><text>{{ userKeyword.trim() ? (assignMode === 'support' ? '未找到匹配的客服' : '未找到匹配的服务人员') : '暂无可指派人员' }}</text></view><template v-else><view v-for="user in users" :key="user.Id" class="user-row" :class="{ active: selectedUser && selectedUser.Id === user.Id }" @tap="selectedUser = user"><view class="user-avatar"><text>{{ (user.Name || user.Account || '人').slice(0,1) }}</text></view><view><text class="user-name">{{ user.Name || user.Account }}</text><text class="user-meta">{{ [user.TenantName, user.DeptName, user.RoleName, user.RoleIdsString, user.Phone].filter(Boolean).join(' · ') }}</text></view><text class="user-check">{{ selectedUser && selectedUser.Id === user.Id ? '✓' : '' }}</text></view></template></scroll-view><textarea v-if="assignMode === 'support'" v-model="supportReason" class="reason-textarea" maxlength="500" placeholder="请填写分配或转交原因" /><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="assignVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="confirmAssign"><text>{{ assignMode === 'support' ? '确认分配' : '确认指派' }}</text></view></view></view></view>
 
     <view v-if="timeVisible" class="sheet-mask" @tap="timeVisible = false"><view class="bottom-sheet bottom-sheet--compact" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>{{ timeEditor.label }}</text><view @tap="timeVisible = false"><text>×</text></view></view><view class="datetime-grid"><picker mode="date" :value="editorDate" @change="editorDate = $event.detail.value"><view class="picker-control"><text>{{ editorDate || '选择日期' }}</text></view></picker><picker mode="time" :value="editorTime" @change="editorTime = $event.detail.value"><view class="picker-control"><text>{{ editorTime || '选择时间' }}</text></view></picker></view><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="timeVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="saveTime"><text>保存时间</text></view></view></view></view>
 
@@ -129,7 +129,7 @@ export default {
       id: '', task: {}, devices: [], taskCapabilities: [], merchantAcceptanceEnabled: true, customerAcceptanceEnabled: true, evaluationEnabled: true, capabilityError: '', currentUser: {}, loading: true, refreshing: false,
       stale: false, error: '', submitting: false, assignVisible: false, usersLoading: false, users: [],
       assignMode: 'service', supportReason: '',
-      metadataDefinition: null, taskMenuId: '', expandedMetadata: {},
+      metadataDefinition: null, taskMenuId: '', customerMenuId: '', expandedMetadata: {},
       selectedUser: null, userKeyword: '', userSearchTimer: null, userLoadRequestId: 0, timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
       rejectVisible: false, rejectMode: 'merchant', rejectReason: '', evaluateVisible: false,
       evaluation: { rate: 5, deviceRate: 5, staffRate: 5, tags: [], content: '' },
@@ -142,6 +142,7 @@ export default {
     isOwner() { return !!(this.currentUser.Id && String(this.currentUser.Id) === String(this.task.serviceUserId)) },
     isAdmin() { return Number(this.currentUser.Level || 0) >= 999 || /管理员/.test(this.currentUser.RoleName || '') },
     canEditTaskRecord() { return canEditMenuRecord(this.taskMenuId, this.currentUser) },
+    canOpenCustomerDetail() { return Boolean(this.task.KehuID && this.customerMenuId) },
     canReassignSupport() {
       const role = [this.currentUser.RoleName, this.currentUser.RoleIdsString, this.currentUser.RoleIds].filter(Boolean).join(',')
       return !!this.currentUser.TenantId && String(this.currentUser.TenantId) === String(this.task.TenantId || '') &&
@@ -178,11 +179,14 @@ export default {
       return (pending || this.timeRows[this.timeRows.length - 1] || {}).field
     },
     quickActions() {
-      const actions = [
-        { key: 'customer', label: '客户详情', icon: '/static/xjy/business/kehu.png', tone: 'blue' },
+      const actions = []
+      if (this.canOpenCustomerDetail) actions.push(
+        { key: 'customer', label: '客户详情', icon: '/static/xjy/business/kehu.png', tone: 'blue' }
+      )
+      actions.push(
         { key: 'checkin', label: '现场打卡', icon: '/static/xjy/business/dw.png', tone: 'orange' },
         { key: 'devices', label: '任务设备', icon: '/static/xjy/business/shebei.png', tone: 'violet' }
-      ]
+      )
       if (this.task.ServiceRecordId) actions.push({ key: 'archive', label: '档案结果', icon: '/static/xjy/business/fwjllb.png', tone: 'green' })
       return actions
     },
@@ -231,6 +235,8 @@ export default {
       if (!this.id) { this.error = '缺少任务编号'; this.loading = false; return }
       if (showLoading) this.loading = true
       this.currentUser = getUser() || {}
+      // 权限刷新期间先关闭客户入口，防止角色刚被回收时继续沿用旧菜单上下文。
+      this.customerMenuId = ''
       this.error = ''
       try {
         const definitionRequest = loadNativeFormDefinition('Diy_ShouhouDD', refresh).catch(() => this.metadataDefinition)
@@ -240,17 +246,26 @@ export default {
           this.capabilityError = (error && error.message) || '请检查网络后重试'
           return { actions: [] }
         })
-        const menuRequest = findMenu(
-          ['售后订单', '售后任务', '我的任务'],
-          'Diy_ShouhouDD',
-          refresh
-        ).catch(() => null)
-        const [taskResult, devices, definition, capabilities, menu] = await Promise.all([
+        // 客户权限先强制回源，再让任务菜单复用同一份授权树，避免沿用角色调整前的旧缓存。
+        const menuContextRequest = (async () => {
+          const customerMenu = await findMenu(
+            ['客户', '客户管理', '我的客户'],
+            'Diy_Kehu',
+            true
+          ).catch(() => null)
+          const taskMenu = await findMenu(
+            ['售后订单', '售后任务', '我的任务'],
+            'Diy_ShouhouDD',
+            false
+          ).catch(() => null)
+          return { taskMenu, customerMenu }
+        })()
+        const [taskResult, devices, definition, capabilities, menuContext] = await Promise.all([
           loadTask(this.id, refresh),
           loadTaskDevices(this.id, refresh),
           definitionRequest,
           capabilityRequest,
-          menuRequest
+          menuContextRequest
         ])
         this.task = taskResult.task
         this.devices = devices
@@ -259,7 +274,8 @@ export default {
         this.customerAcceptanceEnabled = capabilities.customerAcceptanceEnabled !== false
         this.evaluationEnabled = capabilities.evaluationEnabled !== false
         this.metadataDefinition = definition || null
-        this.taskMenuId = menu && menu.Id || ''
+        this.taskMenuId = menuContext.taskMenu && menuContext.taskMenu.Id || ''
+        this.customerMenuId = menuContext.customerMenu && menuContext.customerMenu.Id || ''
         this.stale = taskResult.stale
       } catch (error) {
         this.error = formatTaskLoadError(error)
@@ -292,7 +308,13 @@ export default {
       })
     },
     runQuickAction(key) {
-      if (key === 'customer' && this.task.KehuID) return uni.navigateTo({ url: `/pages/business/detail?key=customers&id=${encodeURIComponent(this.task.KehuID)}` })
+      if (key === 'customer') {
+        if (!this.canOpenCustomerDetail) {
+          uni.showToast({ title: '当前账号没有客户表单查看权限', icon: 'none' })
+          return
+        }
+        return uni.navigateTo({ url: `/pages/business/detail?key=customers&menuId=${encodeURIComponent(this.customerMenuId)}&id=${encodeURIComponent(this.task.KehuID)}` })
+      }
       if (key === 'checkin') {
         if (!this.isOwner && !this.isAdmin) return uni.showToast({ title: '仅当前服务人员可打卡', icon: 'none' })
         const query = `customer=${encodeURIComponent(this.task.customer || '')}&customerId=${encodeURIComponent(this.task.KehuID || '')}&taskId=${encodeURIComponent(this.id)}`
@@ -366,10 +388,20 @@ export default {
       const requestId = ++this.userLoadRequestId
       this.usersLoading = true
       try {
-        const users = await (this.assignMode === 'support' ? loadSupportUsers : loadServiceUsers)(this.userKeyword.trim())
-        if (requestId === this.userLoadRequestId) this.users = users
+        const keyword = this.userKeyword.trim()
+        const users = this.assignMode === 'support'
+          ? await loadSupportUsers(keyword, this.task.TenantId)
+          : await loadServiceUsers(keyword)
+        if (requestId === this.userLoadRequestId) {
+          this.users = users
+          if (this.selectedUser && !users.some((user) => String(user.Id) === String(this.selectedUser.Id))) this.selectedUser = null
+        }
       } catch (error) {
-        if (requestId === this.userLoadRequestId) uni.showToast({ title: error.message || '人员加载失败', icon: 'none' })
+        if (requestId === this.userLoadRequestId) {
+          this.users = []
+          this.selectedUser = null
+          uni.showToast({ title: error.message || '人员加载失败', icon: 'none' })
+        }
       } finally {
         if (requestId === this.userLoadRequestId) this.usersLoading = false
       }
@@ -463,6 +495,7 @@ export default {
 .timeline-step.skipped .timeline-step__dot { background: #e8eef0; box-shadow: 0 0 0 2rpx #c5d0d4; }.timeline-step.skipped .timeline-step__time { color: #78909a; }
 .service-time-scroll { border-top: 10rpx solid #f1f6f8; border-bottom: 0; }.service-time-row { padding-top: 25rpx; }.service-time-step { width: 176rpx; padding: 0 4rpx 5rpx; border-radius: 8px; box-sizing: border-box; transition: background .16s ease, transform .16s ease; }.service-time-step.editable { cursor: pointer; }.service-time-step--pressed { background: #edf7fa; transform: scale(.985); }.service-time-step .timeline-step__name { white-space: nowrap; }.service-time-step .timeline-step__time { min-height: 44rpx; padding: 0 3rpx; white-space: normal; line-height: 1.35; }.timeline-divider { height: 14rpx; border-top: 1px solid #e5edef; border-bottom: 1px solid #e5edef; background: #f1f6f8; box-sizing: border-box; }
 .action-band { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 18rpx 12rpx; background: #fff; }
+.action-band--two { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .action-band--four { grid-template-columns: repeat(4,minmax(0,1fr)); }
 .quick-action { position: relative; min-width: 0; min-height: 112rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; transition: background .16s ease; }.quick-action--pressed { background: #edf5f8; }
 .quick-action__icon { width: 52rpx; height: 52rpx; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: #087da8; background: #e8f6fa; font-size: 23rpx; font-weight: 700; }.quick-action__icon image { width: 32rpx; height: 32rpx; }.quick-action__icon.tone-green { color: #167658; background: #e8f7f1; }.quick-action__icon.tone-orange { color: #bd6813; background: #fff2df; }.quick-action__icon.tone-violet { color: #6d4ba5; background: #f1ecfa; }
@@ -494,7 +527,7 @@ export default {
 .text-block { padding: 19rpx 0; border-bottom: 1px solid #f0f4f5; }.text-block:last-child { border-bottom: none; }.text-block__label, .text-block__value { display: block; }.text-block__label { color: #71868f; font-size: 21rpx; }.text-block__value { margin-top: 8rpx; color: #294b57; font-size: 24rpx; line-height: 1.68; white-space: pre-wrap; word-break: break-all; }.text-block--warning { margin: 13rpx 0; padding: 17rpx; border-left: 3px solid #cf6d2d; background: #fff6ed; }.detail-spacer { height: 35rpx; }
 .bottom-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; display: flex; gap: 13rpx; padding: 15rpx 21rpx calc(15rpx + var(--mci-safe-bottom)); border-top: 1px solid #e3ebee; background: rgba(255,255,255,.97); }.bottom-button { flex: 1; min-width: 0; height: 82rpx; display: flex; align-items: center; justify-content: center; gap: 10rpx; border-radius: 7px; color: #486670; background: #edf3f5; font-size: 25rpx; font-weight: 700; line-height: 1; text-align: center; transition: transform .16s ease; }.bottom-button__icon { font-size: 27rpx; line-height: 1; }.bottom-button--primary { color: #fff; background: #e54625; }.bottom-button--success { color: #fff; background: #137657; }.bottom-button--danger-plain { color: #b4433e; background: #fff0ef; }.bottom-button--pressed { transform: scale(.98); }
 .error-state { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50rpx; text-align: center; }.error-state__mark { width: 78rpx; height: 78rpx; border-radius: 50%; color: #fff; background: #c34c47; font-size: 42rpx; line-height: 78rpx; }.error-state__title { margin-top: 20rpx; font-size: 29rpx; font-weight: 700; }.error-state__text { margin-top: 9rpx; color: #788c94; font-size: 23rpx; white-space: pre-wrap; word-break: break-all; }.error-state__button { margin-top: 26rpx; padding: 16rpx 34rpx; border-radius: 6px; color: #fff; background: #087da8; font-size: 23rpx; }
-.sheet-mask { position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; background: rgba(11,32,40,.5); }.bottom-sheet { width: 100%; max-height: 82vh; padding: 12rpx 25rpx calc(22rpx + var(--mci-safe-bottom)); border-radius: 8px 8px 0 0; background: #fff; box-sizing: border-box; animation: sheetUp .22s ease-out both; }.bottom-sheet--compact { max-height: 64vh; }.sheet-handle { width: 70rpx; height: 8rpx; margin: 0 auto 18rpx; border-radius: 4rpx; background: #d5e0e4; }.sheet-heading { min-height: 64rpx; display: flex; align-items: center; justify-content: space-between; color: #17333e; font-size: 30rpx; font-weight: 750; }.sheet-heading > view { width: 54rpx; height: 54rpx; border-radius: 50%; color: #698089; background: #f0f5f7; font-size: 34rpx; line-height: 54rpx; text-align: center; }.sheet-search { display: grid; grid-template-columns: minmax(0,1fr) 90rpx; align-items: center; height: 72rpx; margin: 15rpx 0; padding-left: 20rpx; border: 1px solid #dce7eb; border-radius: 7px; background: #f6f9fa; }.sheet-search input { width: 100%; font-size: 23rpx; }.sheet-search > text { color: #087da8; font-size: 22rpx; text-align: center; }.user-list { max-height: 48vh; }.user-row { min-height: 88rpx; display: grid; grid-template-columns: 54rpx minmax(0,1fr) 42rpx; gap: 13rpx; align-items: center; padding: 6rpx 10rpx; border-bottom: 1px solid #edf2f4; box-sizing: border-box; }.user-row.active { background: #edf8fb; }.user-avatar { width: 50rpx; height: 50rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: #087da8; font-size: 22rpx; }.user-name, .user-meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.user-name { color: #294b57; font-size: 24rpx; font-weight: 650; }.user-meta { margin-top: 4rpx; color: #84969d; font-size: 19rpx; }.user-check { color: #087da8; font-size: 27rpx; text-align: center; }.sheet-actions { display: grid; grid-template-columns: 1fr 1.7fr; gap: 13rpx; margin-top: 22rpx; }.sheet-button { height: 80rpx; border-radius: 7px; font-size: 25rpx; font-weight: 700; line-height: 80rpx; text-align: center; }.sheet-button--plain { color: #496671; background: #edf3f5; }.sheet-button--primary { color: #fff; background: #e54625; }.sheet-button--danger { color: #fff; background: #b4433e; }.datetime-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; margin: 24rpx 0; }.picker-control { height: 78rpx; padding: 0 18rpx; border: 1px solid #dce7eb; border-radius: 7px; color: #294b57; background: #f6f9fa; font-size: 24rpx; line-height: 78rpx; text-align: center; }.reason-textarea { width: 100%; height: 190rpx; margin-top: 20rpx; padding: 18rpx; border: 1px solid #dce7eb; border-radius: 7px; background: #f6f9fa; box-sizing:border-box; font-size: 24rpx; line-height: 1.6; }.rating-row { min-height: 72rpx; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #edf2f4; color: #405f69; font-size: 23rpx; }.rating-star { margin-left: 10rpx; color: #d7e0e3; font-size: 37rpx; }.rating-star.active { color: #efac28; }.evaluation-tags { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 18rpx; }.evaluation-tags view { padding: 10rpx 15rpx; border: 1px solid #dce7eb; border-radius: 6px; color: #607982; background: #f7fafb; font-size: 21rpx; }.evaluation-tags view.active { border-color: #087da8; color: #087da8; background: #edf8fb; }
+.sheet-mask { position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; background: rgba(11,32,40,.5); }.bottom-sheet { width: 100%; max-height: 82vh; padding: 12rpx 25rpx calc(22rpx + var(--mci-safe-bottom)); border-radius: 8px 8px 0 0; background: #fff; box-sizing: border-box; animation: sheetUp .22s ease-out both; }.bottom-sheet--compact { max-height: 64vh; }.sheet-handle { width: 70rpx; height: 8rpx; margin: 0 auto 18rpx; border-radius: 4rpx; background: #d5e0e4; }.sheet-heading { min-height: 64rpx; display: flex; align-items: center; justify-content: space-between; color: #17333e; font-size: 30rpx; font-weight: 750; }.sheet-heading > view { width: 54rpx; height: 54rpx; border-radius: 50%; color: #698089; background: #f0f5f7; font-size: 34rpx; line-height: 54rpx; text-align: center; }.sheet-search { display: grid; grid-template-columns: minmax(0,1fr) 90rpx; align-items: center; height: 72rpx; margin: 15rpx 0; padding-left: 20rpx; border: 1px solid #dce7eb; border-radius: 7px; background: #f6f9fa; }.sheet-search input { width: 100%; font-size: 23rpx; }.sheet-search > text { color: #087da8; font-size: 22rpx; text-align: center; }.user-list { max-height: 48vh; }.user-empty { min-height: 220rpx; display: flex; align-items: center; justify-content: center; color: #84969d; font-size: 23rpx; }.user-row { min-height: 88rpx; display: grid; grid-template-columns: 54rpx minmax(0,1fr) 42rpx; gap: 13rpx; align-items: center; padding: 6rpx 10rpx; border-bottom: 1px solid #edf2f4; box-sizing: border-box; }.user-row.active { background: #edf8fb; }.user-avatar { width: 50rpx; height: 50rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: #087da8; font-size: 22rpx; }.user-name, .user-meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.user-name { color: #294b57; font-size: 24rpx; font-weight: 650; }.user-meta { margin-top: 4rpx; color: #84969d; font-size: 19rpx; }.user-check { color: #087da8; font-size: 27rpx; text-align: center; }.sheet-actions { display: grid; grid-template-columns: 1fr 1.7fr; gap: 13rpx; margin-top: 22rpx; }.sheet-button { height: 80rpx; border-radius: 7px; font-size: 25rpx; font-weight: 700; line-height: 80rpx; text-align: center; }.sheet-button--plain { color: #496671; background: #edf3f5; }.sheet-button--primary { color: #fff; background: #e54625; }.sheet-button--danger { color: #fff; background: #b4433e; }.datetime-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; margin: 24rpx 0; }.picker-control { height: 78rpx; padding: 0 18rpx; border: 1px solid #dce7eb; border-radius: 7px; color: #294b57; background: #f6f9fa; font-size: 24rpx; line-height: 78rpx; text-align: center; }.reason-textarea { width: 100%; height: 190rpx; margin-top: 20rpx; padding: 18rpx; border: 1px solid #dce7eb; border-radius: 7px; background: #f6f9fa; box-sizing:border-box; font-size: 24rpx; line-height: 1.6; }.rating-row { min-height: 72rpx; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #edf2f4; color: #405f69; font-size: 23rpx; }.rating-star { margin-left: 10rpx; color: #d7e0e3; font-size: 37rpx; }.rating-star.active { color: #efac28; }.evaluation-tags { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 18rpx; }.evaluation-tags view { padding: 10rpx 15rpx; border: 1px solid #dce7eb; border-radius: 6px; color: #607982; background: #f7fafb; font-size: 21rpx; }.evaluation-tags view.active { border-color: #087da8; color: #087da8; background: #edf8fb; }
 .bottom-button--primary, .sheet-button--primary { background: #c6381f; }
 @keyframes sheetUp { from{transform:translateY(100%);opacity:.7}to{transform:translateY(0);opacity:1} }
 @media (prefers-reduced-motion: reduce) { .bottom-sheet, .bottom-button, .quick-action, .service-time-step { animation: none; transition: none; } }

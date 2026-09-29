@@ -463,7 +463,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
-      - /microi/microi.net.license:/app/microi.net.license # 个人版/企业版license授权文件
+      - /microi/microi.net.license:/app/microi.net.license # license authorization file
     environment:  
       - OsClient=iTdos
       - OsClientType=Product
@@ -812,3 +812,4 @@ docker exec -it redis容器名称 redis-cli -a 'redis密码' info clients
 ::: dangerReverse proxy must be configured
 MinIO must set`proxy_set_header Host $http_host`otherwise, the private bucket can only be uploaded and cannot be downloaded. This issue does not occur in the default configurations of Alibaba Cloud OSS, CDN, and Server Load Balancer.
 :::
+<!-- 暂停个人版销售，保留原文以便恢复：      - /microi/microi.net.license:/app/microi.net.license # 个人版/企业版license授权文件 -->

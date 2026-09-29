@@ -116,10 +116,14 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 
 ### 🏗️ Infrastructure
 
+<!-- 暂停个人版销售，保留原文以便恢复
+<tr><td>♾️ <strong>Unlimited</strong></td><td>No limits on users, forms, data volume, or databases. Platform source code is available on Gitee; Personal and Enterprise editions additionally include WebOS source code</td></tr>
+-->
+
 <table>
 <thead><tr><th width="200">Capability</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td>♾️ <strong>Unlimited</strong></td><td>No limits on users, forms, data volume, or databases. Platform source code is available on Gitee; Personal and Enterprise editions additionally include WebOS source code</td></tr>
+<tr><td>♾️ <strong>Unlimited</strong></td><td>No limits on users, forms, data volume, or databases. Platform source code is available on Gitee; the Enterprise edition additionally includes WebOS source code</td></tr>
 <tr><td>🌐 <strong>Cross-Platform</strong></td><td>Based on .NET10, <a href="https://www.nuget.org/packages/Microi.net#versions-body-tab">core libraries built with .NET Standard</a>, supports gRPC cross-language communication</td></tr>
 <tr><td>🗄️ <strong>Cross-Database</strong></td><td>MySQL 5.5+ / SQL Server 2016+ / Oracle 11g+, supports read-write separation / sharding</td></tr>
 <tr><td>☁️ <strong>Distributed Deployment</strong></td><td>Docker / K8S / Jenkins / Rancher / CI/CD</td></tr>
@@ -157,14 +161,24 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 
 ---
 
+<!-- 暂停个人版销售，保留原文以便恢复
 ## 💰 Open Source vs Personal vs Enterprise Edition
+-->
+## 💰 Open Source vs Enterprise Edition
+
+<!-- 暂停个人版销售，保留原文以便恢复
+<tr><td><strong>Personal</strong></td><td>¥999</td><td>Additionally includes <strong>WebOS source code</strong>, with the same software features as the Enterprise edition, <strong>no restrictions, unlimited distribution</strong></td></tr>
+-->
+
+<!-- 暂停个人版销售，保留原文以便恢复
+<tr><td><strong>Enterprise</strong></td><td>¥100k (¥25k down)</td><td>Also includes WebOS source code, with additional training, consulting, and after-sales support, <strong>priority platform upgrade requests</strong></td></tr>
+-->
 
 <table>
 <thead><tr><th width="80">Edition</th><th width="140">Price</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><strong>Open Source</strong></td><td>Free</td><td>Platform source code from the Gitee repository; commercial use allowed, freely modify, unlimited distribution. <strong>Only online AI features unavailable; local AI is unaffected</strong></td></tr>
-<tr><td><strong>Personal</strong></td><td>¥999</td><td>Additionally includes <strong>WebOS source code</strong>, with the same software features as the Enterprise edition, <strong>no restrictions, unlimited distribution</strong></td></tr>
-<tr><td><strong>Enterprise</strong></td><td>¥100k (¥25k down)</td><td>Also includes WebOS source code, with additional training, consulting, and after-sales support, <strong>priority platform upgrade requests</strong></td></tr>
+<tr><td><strong>Enterprise</strong></td><td>¥78,000 one-time</td><td>Includes WebOS source code, with additional training, consulting, and after-sales support, <strong>priority platform upgrade requests</strong>. Optional technical support is ¥15,000/year.</td></tr>
 </tbody>
 </table>
 

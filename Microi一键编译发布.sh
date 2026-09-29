@@ -1807,7 +1807,8 @@ if [ "$PUBLISH_DOC" = true ]; then
     ensure_docker_running
 
     print_step "构建 Docker 镜像: microi.doc"
-    (cd microi.doc/docs/.vitepress && docker build --provenance=false -t microi.doc .)
+    # 当前阿里云镜像仓库不接受 BuildKit 附带的 OCI attestation manifest。
+    (cd microi.doc/docs/.vitepress && docker build --provenance=false --sbom=false -t microi.doc .)
     print_success "Docker 镜像构建完成"
 
     print_step "登录 registry.cn-beijing.aliyuncs.com..."

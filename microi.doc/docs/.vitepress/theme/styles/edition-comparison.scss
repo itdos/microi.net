@@ -1,5 +1,6 @@
 /**
- * 开源版 / 个人版 / 企业版对比页
+ * 开源版 / 个人版 / 企业版对比页（历史说明，暂停展示）
+ * 开源版 / 企业版对比页
  * 只在 pageClass=mci-edition-page 下生效，避免影响其它文档页。
  */
 
@@ -250,8 +251,13 @@ html.dark .mci-edition-page {
   gap: 18px;
 }
 
+/* 暂停个人版销售，保留原文以便恢复
 .mci-edition-page .mci-edition-card-grid--versions {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+*/
+.mci-edition-page .mci-edition-card-grid--versions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .mci-edition-page .mci-edition-version-card {
@@ -588,6 +594,7 @@ html.dark .mci-edition-page {
   font-weight: 800;
 }
 
+/* 暂停个人版销售，保留原文以便恢复
 .mci-edition-page .vp-doc th:nth-child(3),
 .mci-edition-page .vp-doc td:nth-child(3) {
   background: var(--mci-edition-red-soft);
@@ -597,8 +604,18 @@ html.dark .mci-edition-page {
 .mci-edition-page .vp-doc td:nth-child(4) {
   background: var(--mci-edition-gold-soft);
 }
+*/
+.mci-edition-page .vp-doc th:nth-child(3),
+.mci-edition-page .vp-doc td:nth-child(3) {
+  background: var(--mci-edition-gold-soft);
+}
 
+/* 暂停个人版销售，保留原文以便恢复
 .mci-edition-page .vp-doc tbody tr:nth-child(even) td:not(:nth-child(3)):not(:nth-child(4)) {
+  background: rgba(100, 116, 139, .035);
+}
+*/
+.mci-edition-page .vp-doc tbody tr:nth-child(even) td:not(:nth-child(3)) {
   background: rgba(100, 116, 139, .035);
 }
 
@@ -770,9 +787,16 @@ html.dark .mci-edition-page {
   line-height: 1.65 !important;
 }
 
+/* 暂停个人版销售，保留原文以便恢复
 .mci-edition-page .mci-edition-decision-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+}
+*/
+.mci-edition-page .mci-edition-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 15px;
 }
 
@@ -966,8 +990,13 @@ html.dark .mci-edition-page {
     grid-template-columns: 1fr;
   }
 
+  /* 暂停个人版销售：原双价格卡布局保留。
   .mci-edition-page .mci-edition-price-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  */
+  .mci-edition-page .mci-edition-price-stack {
+    grid-template-columns: 1fr;
   }
 
   .mci-edition-page .mci-edition-card-grid--versions,
@@ -983,9 +1012,11 @@ html.dark .mci-edition-page {
     min-height: 0;
   }
 
+/* 暂停个人版销售，保留原文以便恢复
   .mci-edition-page .mci-edition-version-card--enterprise {
     grid-column: 1 / -1;
   }
+*/
 
   .mci-edition-page .mci-edition-decision-grid {
     grid-template-columns: 1fr;
@@ -1008,7 +1039,8 @@ html.dark .mci-edition-page {
   }
 }
 
-/* 窄正文下把横向大表重排为“维度标题 + 三版本”对比卡，避免文字被挤成密集小列。 */
+/* 历史说明：窄正文下把横向大表重排为“维度标题 + 三版本”对比卡。 */
+/* 窄正文下把横向大表重排为“维度标题 + 两版本”对比卡，避免文字被挤成密集小列。 */
 @container (max-width: 760px) {
   .mci-edition-page .vp-doc table {
     display: block;
@@ -1036,7 +1068,10 @@ html.dark .mci-edition-page {
 
   .mci-edition-page .vp-doc tbody tr {
     display: grid;
+/* 暂停个人版销售，保留原文以便恢复
     grid-template-columns: repeat(3, minmax(0, 1fr));
+*/
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     overflow: hidden;
     border: 1px solid var(--mci-edition-line);
     border-radius: var(--mci-edition-radius-sm);
@@ -1066,9 +1101,13 @@ html.dark .mci-edition-page {
     border-left: 1px solid var(--mci-edition-line);
   }
 
+/* 暂停个人版销售，保留原文以便恢复
   .mci-edition-page .vp-doc tbody td:nth-child(2)::before,
   .mci-edition-page .vp-doc tbody td:nth-child(3)::before,
   .mci-edition-page .vp-doc tbody td:nth-child(4)::before {
+*/
+  .mci-edition-page .vp-doc tbody td:nth-child(2)::before,
+  .mci-edition-page .vp-doc tbody td:nth-child(3)::before {
     display: block;
     margin-bottom: 7px;
     color: var(--mci-edition-subtle);
@@ -1081,6 +1120,7 @@ html.dark .mci-edition-page {
     content: "开源版";
   }
 
+/* 暂停个人版销售，保留原文以便恢复
   .mci-edition-page .vp-doc tbody td:nth-child(3)::before {
     content: "个人版";
   }
@@ -1088,8 +1128,15 @@ html.dark .mci-edition-page {
   .mci-edition-page .vp-doc tbody td:nth-child(4)::before {
     content: "企业版";
   }
+*/
+  .mci-edition-page .vp-doc tbody td:nth-child(3)::before {
+    content: "企业版";
+  }
 
+/* 暂停个人版销售，保留原文以便恢复
   .mci-edition-page .vp-doc tbody tr:nth-child(even) td:not(:nth-child(3)):not(:nth-child(4)) {
+*/
+  .mci-edition-page .vp-doc tbody tr:nth-child(even) td:not(:nth-child(3)) {
     background: transparent;
   }
 
@@ -1118,8 +1165,13 @@ html.dark .mci-edition-page {
     grid-template-columns: 1fr;
   }
 
+  /* 暂停个人版销售：原双价格卡布局保留。
   .mci-edition-page .mci-edition-price-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  */
+  .mci-edition-page .mci-edition-price-stack {
+    grid-template-columns: 1fr;
   }
 
   .mci-edition-page .mci-edition-card-grid--versions,
@@ -1135,9 +1187,11 @@ html.dark .mci-edition-page {
     min-height: 0;
   }
 
+/* 暂停个人版销售，保留原文以便恢复
   .mci-edition-page .mci-edition-version-card--enterprise {
     grid-column: 1 / -1;
   }
+*/
 
   .mci-edition-page .mci-edition-decision-grid {
     grid-template-columns: 1fr;

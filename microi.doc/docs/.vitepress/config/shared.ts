@@ -48,6 +48,15 @@ export const shared = defineConfig({
 
 		search: {
 			provider: "local",
+			options: {
+				// 保留源文件里的历史注释，但不让站内搜索展示已暂停售卖的内容。
+				_render: (source, env, markdown) => {
+					const html = markdown.render(source, env);
+					return env.frontmatter?.search === false
+						? ""
+						: html.replace(/<!--[\s\S]*?-->/gu, "");
+				},
+			},
 		},
 	},
 	vite: {

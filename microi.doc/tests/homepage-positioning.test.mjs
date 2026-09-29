@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { installerFromYaml } from '../docs/.vitepress/theme/utils/microi-agent-download.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspaceRoot = path.resolve(projectRoot, '..')
@@ -57,10 +58,10 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.doesNotMatch(component, /downloadMeta:/)
   assert.doesNotMatch(component, /Windows x64 · v1\.0\.2/)
   assert.match(component, /aiTools: \['Microi Agent', 'Codex'/)
-  assert.match(microiCodeShowcase, /\/download\/microi-agent\/latest\.html\?platform=windows/)
-  assert.match(microiCodeShowcase, /\/download\/microi-agent\/latest\.html\?platform=mac/)
+  assert.match(microiCodeShowcase, /:href="downloadUrls\.windows"/)
+  assert.match(microiCodeShowcase, /:href="downloadUrls\.mac"/)
   assert.match(microiCodeShowcase, /latest-mac\.yml/)
-  assert.match(microiCodeShowcase, /liveVersions\.mac = versionFromYaml\(yaml\)/)
+  assert.match(microiCodeShowcase, /downloadUrls\.mac = installerFromYaml\(yaml, 'mac'\)/)
   const latestRedirect = read('docs/public/download/microi-agent/latest.html')
   assert.match(latestRedirect, /latest-mac\.yml/)
   assert.match(latestRedirect, /latest\.yml/)
@@ -92,6 +93,13 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(frontmatter, /30\+ 成熟引擎、AI 低代码、微服务与 V8 引擎/)
   assert.doesNotMatch(frontmatter, /开源 AI 应用开发平台|企业级 AI 应用开发框架|开源 AI 低代码平台/)
   assert.doesNotMatch(frontmatter, /titleTemplate: 相比传统 AI 开发/)
+})
+
+test('agent download buttons select a trusted installer from the live update manifest', () => {
+  const yaml = `version: 1.2.0\nfiles:\n  - url: https://evil.example/Microi-Agent-1.2.0-windows.exe\n  - url: https://static.itdos.com/releases/Microi-Agent-1.2.0-mac.zip\n  - url: https://static.itdos.com/releases/Microi-Agent-1.2.0-mac.dmg\n  - url: https://static.itdos.com/releases/Microi-Agent-1.2.0-windows.exe\n`
+  assert.equal(installerFromYaml(yaml, 'mac'), 'https://static.itdos.com/releases/Microi-Agent-1.2.0-mac.dmg')
+  assert.equal(installerFromYaml(yaml, 'windows'), 'https://static.itdos.com/releases/Microi-Agent-1.2.0-windows.exe')
+  assert.equal(installerFromYaml('files:\n  - url: https://evil.example/agent.dmg\n', 'mac'), '')
 })
 
 test('the related-links menu exposes the training syllabus immediately before the update log', () => {
