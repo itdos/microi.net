@@ -75,7 +75,20 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
       DingdanID: parentId
     })
     if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '商品添加失败')
-    uni.$emit('microi:data-changed', { table: 'Diy_DingdanSP', parentId })
+    const createdRows = Array.isArray(result.Data) ? result.Data : []
+    if (createdRows.length) {
+      // 新增订单尚未落库，模块查询的 INNER JOIN 暂时看不到商品；使用接口返回的可信快照即时回显。
+      createdRows.forEach((row) => uni.$emit('microi:data-changed', {
+        table: 'Diy_DingdanSP',
+        id: row.Id,
+        row,
+        parentId,
+        parentValue: row.DingdanID || parentId
+      }))
+    } else {
+      // 兼容尚未升级接口引擎的服务端，已保存订单仍可按原逻辑回读列表。
+      uni.$emit('microi:data-changed', { table: 'Diy_DingdanSP', parentId })
+    }
     return { matched: true, handled: true }
   }
 

@@ -289,7 +289,9 @@ export async function loadModulePeriodCounts(moduleConfig, options = {}) {
 export async function callApiEngine(key, data = {}) {
   try {
     const direct = await V8.ApiEngine.Run(key, data, { checkCode: false })
-    if (direct && direct.Code !== 0) return direct
+    // Code=0 是接口已经正常返回的业务失败，必须原样交给页面展示 Msg。
+    // 只有新路由不可达或没有返回响应时才回退旧接口，避免失败操作被重复执行。
+    if (direct !== undefined && direct !== null) return direct
   } catch (e) {}
   return V8.ApiEngine.RunLegacy(key, data, { checkCode: false })
 }

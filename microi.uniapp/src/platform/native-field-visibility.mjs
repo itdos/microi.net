@@ -53,6 +53,14 @@ export function nativeFieldRoleVisibility(field = {}, user = {}) {
   }
 }
 
+export function hasVisibleNativeField(definition, fieldName) {
+  const expectedName = String(fieldName || '').trim().toLowerCase()
+  if (!expectedName || !Array.isArray(definition?.fields)) return false
+  return definition.fields.some((field) =>
+    field?.visible !== false && String(field?.Name || '').trim().toLowerCase() === expectedName
+  )
+}
+
 export function nativeRoleCacheKey(user = {}) {
   return JSON.stringify({
     admin: isPlatformAdmin(user),
