@@ -39,7 +39,10 @@ AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Mic
 
 ## 授权边界：服务器 License 与中转 ApiKey 是两套机制
 
+<!-- 暂停个人版销售，保留原文以便恢复
 在未修改的吾码官方发布物中，内置在线 AI 的核心推理入口会统一读取服务器 License：`Chat`、`ChatStream`、`NL2SQL`、`NL2SQLStreaming`、`NL2V8Engine` 以及它们的可信聊天编排，只有本机存在有效的 `Personal` 或 `Enterprise` License 时才继续调用模型。自己在 `mic_ai` 中配置 DeepSeek、OpenAI 等供应商的 Endpoint/ApiKey，并不会绕过这层服务器授权。
+-->
+在未修改的吾码官方发布物中，内置在线 AI 的核心推理入口会统一读取服务器 License：`Chat`、`ChatStream`、`NL2SQL`、`NL2SQLStreaming`、`NL2V8Engine` 以及它们的可信聊天编排，只有本机存在有效的付费授权时才继续调用模型。自己在 `mic_ai` 中配置 DeepSeek、OpenAI 等供应商的 Endpoint/ApiKey，并不会绕过这层服务器授权。
 
 服务器 License 的真实信任链是：
 
