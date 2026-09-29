@@ -13,6 +13,9 @@ const nativeForm = readFileSync(resolve(root, 'src/pages/native-form/index.vue')
 assert.match(sdk, /#ifdef MP-WEIXIN[\s\S]*ContentSecurityLoginCode/)
 assert.match(sdk, /\/api\/WeChatContentSecurity\/Status/)
 assert.match(sdk, /mci-wechat-content-status-batch/)
+assert.match(sdk, /Action: 'CreateUploadSession'/)
+assert.match(sdk, /ContentSecuritySessionId/)
+assert.match(sdk, /compressImage/)
 assert.match(sdk, /status === 'Passed'/)
 assert.match(sdk, /status === 'Rejected'[\s\S]*你发布的内容含违规信息/)
 assert.ok(
@@ -41,10 +44,11 @@ assert.ok(
   uploader.indexOf("uploadState: 'queued'") < uploader.indexOf('await V8.uploadFiles(batch,'),
   'all local previews must be published before the bounded upload pool starts'
 )
-assert.match(uploader, /item && item\.Path && item\.uploadState !== 'checking'/)
+assert.match(uploader, /deferContentSecurityReview: true/)
+assert.match(uploader, /item && item\.Path && item\.uploadState !== 'uploading'/)
 assert.match(uploader, /\$emit\('upload-state'/)
 assert.match(nativeField, /@upload-state="\$emit\('upload-state', \$event\)"/)
 assert.match(nativeForm, /@upload-state="handleUploadState\(field, \$event\)"/)
-assert.match(nativeForm, /pendingUploadCount > 0 \|\| failedUploadCount > 0/)
+assert.match(nativeForm, /uploadingCount > 0 \|\| failedUploadCount > 0/)
 
 console.log('Microi UniApp WeChat content security checks passed.')
