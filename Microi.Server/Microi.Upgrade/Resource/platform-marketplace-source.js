@@ -7,6 +7,14 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-marketplace-source
+ * Version: v1.0.6
+ * Function:
+ * - 请补充该 V8 代码的完整功能说明。
+ */
+
 /* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
 var marketplaceRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '');
 var marketplaceAction = String(V8.Param.Action || '').trim();
@@ -24,9 +32,14 @@ function marketplaceText(value) {
 }
 
 function isOfficialPublicSource(param) {
+  // V8.Param.OsClient is normalized to the execution tenant before this code runs.
+  // Accept that scoped value as well as the official source identity supplied by
+  // trusted nested calls; the public source and API base must still match exactly.
+  var sourceTenant = marketplaceText(param && param.OsClient).toLowerCase();
   return marketplaceText(param && param.SourceId).toLowerCase() === 'official'
     && marketplaceText(param && param.ApiBase).replace(/\/+$/, '').toLowerCase() === 'https://api.itdos.com'
-    && marketplaceText(param && param.OsClient).toLowerCase() === 'itdos';
+    && (sourceTenant === 'itdos'
+      || (sourceTenant && sourceTenant === marketplaceText(V8.OsClient).toLowerCase()));
 }
 
 function marketplaceListRouteUnavailable(result) {
@@ -132,7 +145,7 @@ if(['Discover','Captcha','Login','Query','Disconnect'].indexOf(marketplaceAction
   return runtimeResult;
 }
 
-/* V8 ApiEngine | ApiEngineKey: platform-marketplace-source | Version: v1.0.5 */
+/* V8 ApiEngine | ApiEngineKey: platform-marketplace-source | Version: v1.0.6 */
 
 var param = V8.Param || {};
 
