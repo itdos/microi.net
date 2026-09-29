@@ -74,7 +74,8 @@ export default {
     },
     uploadSummary() {
       const state = this.currentUploadState()
-      if (state.pendingCount > 0) return `已通过 ${state.passedCount}/${state.totalCount}，${state.pendingCount} 张处理中`
+      if (state.uploadingCount > 0) return `${state.uploadingCount} 张正在上传`
+      if (state.reviewingCount > 0) return `${state.reviewingCount} 张安全审核中，可先提交，失败后会通过站内消息通知`
       if (state.failedCount > 0) return `${state.failedCount} 张未完成，请删除后重试`
       return ''
     }
@@ -93,6 +94,8 @@ export default {
         // 只读业务详情已经在服务端完成记录级鉴权并签发临时 URL，应直接消费该 URL；
         // 编辑态仍按字段上下文重新取址，避免把临时能力地址写回业务字段。
         this.items = await Promise.all(rows.filter(Boolean).map((item) => this.resolveItem(item, false, this.readonly)))
+        await this.refreshPendingReviews(false)
+        this.emitUploadState()
       } finally {
         this.syncing = false
       }
@@ -105,10 +108,13 @@ export default {
       const runtimeUrls = (this.fileContext && this.fileContext.runtimeUrls) || {}
       const runtimeUrl = !forceServer && (runtimeUrls[String(raw.Id || '')] || runtimeUrls[String(path || '')]) || ''
       let url = localPath || runtimeUrl
-      if (!url && preferProvidedUrl && providedUrl) {
+      const securityStatus = String(raw.ContentSecurityStatus || '')
+      const securityRequired = raw.ContentSecurityRequired === true || String(raw.ContentSecurityRequired).toLowerCase() === 'true'
+      const reviewPending = securityRequired && securityStatus && securityStatus !== 'Passed'
+      if (!url && !reviewPending && preferProvidedUrl && providedUrl) {
         url = await V8.resolveFileUrl(providedUrl, this.fileContext)
       }
-      if (!url && path) {
+      if (!url && !reviewPending && path) {
         url = await V8.resolveFileUrl(
           { ...raw, Path: path, Url: '', url: '', localPath: '' },
           this.fileContext
@@ -121,6 +127,7 @@ export default {
         // 保持空地址并展示受控占位，不能再次把相对路径拼到公有 FileServer。
         url: url || '',
         localPath,
+        uploadState: raw.uploadState || ({ Pending: 'checking', Passed: 'passed', Rejected: 'rejected', Error: 'error' }[securityStatus] || (path ? 'passed' : 'error')),
         resolving: false,
         resolveFailures: 0
       }
@@ -203,6 +210,8 @@ export default {
           preview: this.mediaType === 'image',
           multiple: this.maxCount > 1,
           concurrency: 3,
+          deferContentSecurityReview: true,
+          clientCompress: true,
           resolveUrl: false,
           isCancelled: () => generation !== this.uploadGeneration,
           isItemCancelled: (index) => generation !== this.uploadGeneration || findItemIndex(batch[index].clientId) < 0,
@@ -211,7 +220,7 @@ export default {
             const itemIndex = findItemIndex(batch[Index].clientId)
             if (itemIndex < 0) return
             const current = this.items[itemIndex]
-            if (Status === 'passed' && Result && Result.Data) {
+            if ((Status === 'passed' || Status === 'checking') && Result && Result.Data) {
               const data = Result.Data
               this.items.splice(itemIndex, 1, {
                 ...data,
@@ -219,7 +228,7 @@ export default {
                 clientId: batch[Index].clientId,
                 localPath: batch[Index].filePath,
                 url: batch[Index].filePath,
-                uploadState: 'passed',
+                uploadState: Status,
                 uploadError: '',
                 resolving: false,
                 resolveFailures: 0
@@ -255,12 +264,64 @@ export default {
           if (replacing) {
             const replacementIndex = findItemIndex(batch[0].clientId)
             const replacement = replacementIndex >= 0 ? this.items[replacementIndex] : null
-            if (replacement && replacement.uploadState !== 'passed') this.items.splice(replacementIndex, 1, replacementOriginal)
+            if (replacement && ['error', 'rejected', 'timeout', 'cancelled'].includes(replacement.uploadState)) {
+              this.items.splice(replacementIndex, 1, replacementOriginal)
+            }
           }
           this.uploading = false
           this.emitValue()
           this.emitUploadState()
+          this.monitorPendingReviews(generation)
         }
+      }
+    },
+    async refreshPendingReviews(emitValue = true) {
+      const reviewItems = this.items.filter((item) => item && item.ContentSecurityReviewId &&
+        String(item.ContentSecurityStatus || 'Pending') === 'Pending')
+      if (!reviewItems.length) return
+      try {
+        const response = await V8.getContentSecurityStatuses(reviewItems.map((item) => item.ContentSecurityReviewId))
+        const statuses = {}
+        ;(response.Items || []).forEach((item) => { statuses[String(item.ReviewId)] = String(item.Status || 'Error') })
+        for (const item of reviewItems) {
+          const status = statuses[String(item.ContentSecurityReviewId)]
+          if (!status || status === 'Pending') continue
+          item.ContentSecurityStatus = status
+          item.uploadState = status.toLowerCase()
+          if (status === 'Passed' && item.Path) {
+            const resolved = await this.resolveItem(item, true, this.readonly)
+            item.url = resolved.url
+          } else if (status !== 'Passed') {
+            item.url = item.localPath || ''
+          }
+        }
+        if (emitValue && !this.readonly) this.emitValue()
+      } catch (error) {
+        // 其他获授权查看者不一定是上传人；查询失败时继续保留待审占位，不主动解析文件地址。
+      }
+    },
+    async monitorPendingReviews(generation) {
+      const reviewItems = this.items.filter((item) => item && item.uploadState === 'checking' && item.ContentSecurityReviewId)
+      if (!reviewItems.length) return
+      try {
+        const reviewed = await V8.waitForContentSecurityBatch(reviewItems.map((item) => item.ContentSecurityReviewId), {
+          isCancelled: () => generation !== this.uploadGeneration
+        })
+        if (generation !== this.uploadGeneration) return
+        const statuses = {}
+        ;(reviewed.Items || []).forEach((item) => { statuses[String(item.ReviewId)] = String(item.Status || 'Error') })
+        let rejected = 0
+        for (const item of reviewItems) {
+          const status = statuses[String(item.ContentSecurityReviewId)] || 'Error'
+          item.ContentSecurityStatus = status
+          item.uploadState = status.toLowerCase()
+          if (status === 'Rejected') rejected += 1
+        }
+        this.emitValue()
+        this.emitUploadState()
+        if (rejected > 0) uni.showToast({ title: `${rejected} 张图片未通过审核，请替换后重试`, icon: 'none' })
+      } catch (error) {
+        // 页面离开或短暂网络失败不影响已保存的待审记录，最终结果由回调和站内消息兜底。
       }
     },
     remove(index) {
@@ -299,12 +360,15 @@ export default {
       return labels[item.uploadState] || '处理中'
     },
     currentUploadState() {
+      const uploadStates = new Set(['queued', 'uploading'])
       const pendingStates = new Set(['queued', 'uploading', 'checking'])
-      const failedStates = new Set(['rejected', 'timeout', 'error'])
+      const failedStates = new Set(['rejected', 'timeout', 'error', 'cancelled'])
+      const uploadingCount = this.items.filter((item) => uploadStates.has(item.uploadState)).length
+      const reviewingCount = this.items.filter((item) => item.uploadState === 'checking').length
       const pendingCount = this.items.filter((item) => pendingStates.has(item.uploadState)).length
       const failedCount = this.items.filter((item) => failedStates.has(item.uploadState)).length
       const passedCount = this.items.filter((item) => item.Path && !pendingStates.has(item.uploadState) && !failedStates.has(item.uploadState)).length
-      return { pendingCount, failedCount, passedCount, totalCount: this.items.length }
+      return { pendingCount, uploadingCount, reviewingCount, failedCount, passedCount, totalCount: this.items.length }
     },
     emitUploadState() {
       this.$emit('upload-state', this.currentUploadState())
@@ -322,7 +386,7 @@ export default {
       })
     },
     emitValue() {
-      const savedItems = this.items.filter((item) => item && item.Path && item.uploadState !== 'checking' && item.uploadState !== 'uploading' && item.uploadState !== 'queued').map((item) => {
+      const savedItems = this.items.filter((item) => item && item.Path && item.uploadState !== 'uploading' && item.uploadState !== 'queued' && !['rejected', 'timeout', 'error', 'cancelled'].includes(item.uploadState)).map((item) => {
         const {
           url,
           Url,

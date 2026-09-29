@@ -27,7 +27,7 @@ export function updateCheckinPhotoUploadState(photo, status, payload = {}) {
   if (!photo) return photo
   const normalizedStatus = toText(status).toLowerCase() || 'error'
   photo.uploadState = normalizedStatus
-  if (normalizedStatus === 'passed') {
+  if (normalizedStatus === 'passed' || normalizedStatus === 'checking') {
     photo.uploadedData = payload.data || payload.Data || photo.uploadedData
     photo.uploadError = ''
   } else if (PENDING_STATES.has(normalizedStatus)) {
@@ -52,7 +52,7 @@ export function checkinPhotoUploadStatusText(photo) {
 }
 
 export function getUploadedCheckinPhotoData(photos = []) {
-  const pending = photos.filter((photo) => photo && PENDING_STATES.has(toText(photo.uploadState).toLowerCase()))
+  const pending = photos.filter((photo) => photo && ['queued', 'uploading'].includes(toText(photo.uploadState).toLowerCase()))
   if (pending.length) throw new Error(`还有 ${pending.length} 张照片正在上传，请稍候`)
 
   const failed = photos.filter((photo) => photo && FAILED_STATES.has(toText(photo.uploadState).toLowerCase()))
