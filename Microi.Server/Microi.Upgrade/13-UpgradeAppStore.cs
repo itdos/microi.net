@@ -324,7 +324,7 @@ namespace Microi.net
                 && code.Contains("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1")
                 && code.Contains("ABSENT_PACKAGE_TABLE_DEFER_DDL_V1")
                 && code.Contains("DATABASE_INLINE_SERVING_API_CONTEXT_V1")
-                && code.Contains("ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1")
+                && HasSafeAdministratorRoleBootstrap(code)
                 && code.Contains("PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1")
                 && code.Contains("UNUSED_WORKFLOW_PHYSICAL_SCHEMA_V1")
                 && code.Contains("MYSQL_IDENTIFIER_FOREIGN_KEY_SCOPE_V1")
@@ -337,6 +337,24 @@ namespace Microi.net
                 && code.Contains("SQLSERVER_PHYSICAL_SCHEMA_DIALECT_V1")
                 && code.Contains("SQLSERVER_PHYSICAL_FIELD_CHANGE_V1")
                 && code.Contains("V8.Method.RequireManagedProtocolContext");
+        }
+
+        private static bool HasSafeAdministratorRoleBootstrap(string code)
+        {
+            return code.Contains("ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1")
+                || (code.Contains("var candidateRoleIds = [];")
+                    && code.Contains("var assessRoleHolders = function")
+                    && code.Contains("if (missingRoleHolders.OrdinaryHolder)")
+                    && code.Contains("缺失角色引用不唯一"));
+        }
+
+        private static bool HasSafeAdministratorLegacyRoleGrant(string code)
+        {
+            return code.Contains("ADMIN_MENU_LEGACY_ACCOUNT_ROLE_V1")
+                || (code.Contains("if (holders.ActiveAdministrator && !holders.OrdinaryHolder)")
+                    && code.Contains("if (exclusiveLegacyRoles.length > 1)")
+                    && code.Contains("legacyAccountAdministratorRoleId = String(exclusiveLegacyRoles[0].Id).toLowerCase()")
+                    && code.Contains("Number(role.Level || 0) >= 9999"));
         }
 
         private static bool HasPinnedBulkCapabilities(string code, System.Version version)
@@ -3384,7 +3402,7 @@ AND COLUMN_NAME IN ('Id','TableId','UserId','DataBaseId','ParentId')")
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("PLATFORM_PHYSICAL_NULLABLE_V1") ||
                     !content.Contains("PLATFORM_MYSQL_NULL_DEFAULT_V1") ||
-                    !content.Contains("ADMIN_MENU_LEGACY_ACCOUNT_ROLE_V1") ||
+                    !HasSafeAdministratorLegacyRoleGrant(content) ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
                     !content.Contains("System.DateTime.Now.ToString") ||
@@ -4839,4 +4857,3 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
         }
     }
 }
-
