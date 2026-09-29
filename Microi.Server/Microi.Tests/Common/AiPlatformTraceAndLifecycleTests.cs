@@ -99,12 +99,15 @@ public sealed class AiPlatformTraceAndLifecycleTests
         var serverRoot = FindServerRoot();
         var methodSource = File.ReadAllText(Path.Combine(serverRoot, "Microi.Core", "V8Engine", "Runtime", "V8Method.cs"));
         var mongoSource = File.ReadAllText(Path.Combine(serverRoot, "Microi.MongoDB", "V8MongoDB.cs"));
+        var lifecycleStart = methodSource.IndexOf("public DosResult RunSystemLogLifecycle(", StringComparison.Ordinal);
+        Assert.True(lifecycleStart >= 0);
+        var lifecycleSource = methodSource[lifecycleStart..];
+        var uploadIndex = lifecycleSource.IndexOf("PutObject", StringComparison.Ordinal);
+        var verifyIndex = lifecycleSource.IndexOf("ObjectExist", StringComparison.Ordinal);
+        var commitIndex = lifecycleSource.IndexOf("CommitSystemLogLifecycleBatch", StringComparison.Ordinal);
 
-        Assert.True(methodSource.IndexOf("PutObject", StringComparison.Ordinal)
-                    < methodSource.IndexOf("ObjectExist", StringComparison.Ordinal));
-        Assert.True(methodSource.IndexOf("ObjectExist", StringComparison.Ordinal)
-                    < methodSource.IndexOf("CommitSystemLogLifecycleBatch", StringComparison.Ordinal));
-        Assert.Contains("BackgroundTaskRuntime.IsLeaseCurrent", methodSource);
+        Assert.True(uploadIndex >= 0 && uploadIndex < verifyIndex && verifyIndex < commitIndex);
+        Assert.Contains("BackgroundTaskRuntime.IsLeaseCurrent", lifecycleSource);
         Assert.Contains("_log_lifecycle_receipts", mongoSource);
         Assert.Contains("ArchiveVerified", mongoSource);
         Assert.Contains("BuildLifecycleFilter(param)", mongoSource);
