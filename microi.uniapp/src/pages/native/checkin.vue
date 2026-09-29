@@ -403,6 +403,8 @@ export default {
             preview: true,
             multiple: true,
             concurrency: 2,
+            deferContentSecurityReview: true,
+            clientCompress: true,
             resolveUrl: false,
             isItemCancelled: (index) => {
               const source = batch[index]
@@ -433,7 +435,9 @@ export default {
           if (!photo) return
           const outcome = outcomes[index]
           if (outcome && Number(outcome.Code) === 1 && outcome.Data) {
-            updateCheckinPhotoUploadState(photo, 'passed', { data: outcome.Data })
+            updateCheckinPhotoUploadState(photo,
+              outcome.Data.ContentSecurityStatus === 'Pending' ? 'checking' : 'passed',
+              { data: outcome.Data })
             return
           }
           if (!this.isPhotoUploadFailed(photo)) {
