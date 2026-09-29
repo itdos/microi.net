@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
-const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Code','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
+const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Agent','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
 // Build products and the synchronization receipt are not executable source candidates.
 const generated=/(^|\/)(?:dist|bin|obj|node_modules|TestResults|\.resource-sync-base|\.git)(?:\/|$)|\.(?:vsix|nupkg|snupkg)$/i;
 // 此门禁用于 PC/API Docker 发布，独立 UniApp 的页面、客户资源和包版本不进入这两个镜像。
@@ -14,12 +14,19 @@ const generated=/(^|\/)(?:dist|bin|obj|node_modules|TestResults|\.resource-sync-
 const independentMobileSource=name=>/^microi\.uniapp\//i.test(name)
  &&!/^microi\.uniapp\/src\/utils\//i.test(name)
  &&name!=='microi.uniapp/scripts/test-request-queue.mjs';
+// Microi Code desktop installer is released and verified on its own channel.
+// Its app/upstream checkout does not enter the PC/API images or the VSIX/CLI;
+// the shared plugin, MCP, Skills and server-engine sources remain guarded.
+const independentDesktopSource=name=>/^Microi\.Agent\/(?:apps\/microi-code|upstream\/dsh-desktop)\//i.test(name);
+// 官方中文/英文正文与发布日志由单独的官网模式 6 验证；它们不是 PC/API Full
+// 或 Docker 的输入。官网主题代码、构建脚本、测试、依赖和平台 Skills 仍进入候选。
+const documentationOnly=name=>/^microi\.doc\/docs\/(?:doc|en)\/.*\.(?:md|mdx)$/i.test(name);
 
 // 插件打包重复生成这两份已跟踪元数据。仅顶层 builtAt 是非行为时间；
 // 版本、依赖、文件数量与源码摘要仍全部进入候选，未知字段和其它文件不得排除。
 const timestampMetadata=new Set([
- 'Microi.Code/plugins/microi/assets/build-meta.json',
- 'Microi.Code/plugins/microi/scripts/microi-skills.meta.json',
+ 'Microi.Agent/plugins/microi/assets/build-meta.json',
+ 'Microi.Agent/plugins/microi/scripts/microi-skills.meta.json',
 ]);
 function candidateBytes(key,bytes){
  if(!timestampMetadata.has(key))return bytes;
@@ -37,7 +44,7 @@ export async function snapshotCandidate(root=workspace,repos=repositories){
   for(const name of [...new Set(names)].sort()){
    const key=path.posix.join(repository.replaceAll('\\','/'),name.replaceAll('\\','/'));
    const buildRecipe=/\/bin\/Release\/(?:Dockerfile|default\.conf)$/.test(key);
-   if((generated.test(key)&&!buildRecipe)||independentMobileSource(key))continue;
+   if((generated.test(key)&&!buildRecipe)||independentMobileSource(key)||independentDesktopSource(key)||documentationOnly(key))continue;
    try{files[key]=createHash('sha256').update(candidateBytes(key,await readFile(path.resolve(cwd,name)))).digest('hex');}
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }

@@ -181,7 +181,7 @@ export default {
             return this.ModulePresentationHeader;
         },
         HasModuleHero() {
-            return Boolean(this.ModulePresentationHeader.Visible);
+            return !this.HideTableTopBanner && Boolean(this.ModulePresentationHeader.Visible);
         },
         IsDefaultModuleHero() {
             return Boolean(this.ModulePresentationHeader.IsDefault);
@@ -482,7 +482,10 @@ export default {
             };
         },
         async RefreshModulePresentationData(rows = [], queryParam = {}, generation = this._presentationRequestGeneration) {
-            const apiMetrics = (this.ModuleHero.Metrics || []).filter((metric) => metric.ApiEngineKey);
+            // Banner 关闭后不执行其统计接口；按钮角标仍可独立请求。
+            const apiMetrics = this.HideTableTopBanner
+                ? []
+                : (this.ModuleHero.Metrics || []).filter((metric) => metric.ApiEngineKey);
             const menu = this.SysMenuModel || {};
             const collections = [menu.PageTabs, menu.MoreBtns, menu.PageBtns, menu.BatchSelectMoreBtns, menu.ExportMoreBtns, menu.FormBtns];
             const badgeGroups = collectBadgeApiGroups(collections);
@@ -552,7 +555,7 @@ export default {
         },
         ScheduleModulePresentationRefresh() {
             if (this._moduleMetricRefreshTimer) window.clearTimeout(this._moduleMetricRefreshTimer);
-            const metricSeconds = (this.ModuleHero.Metrics || [])
+            const metricSeconds = (this.HideTableTopBanner ? [] : (this.ModuleHero.Metrics || []))
                 .map((metric) => Number(metric.RefreshSeconds || 0))
                 .filter((value) => value > 0);
             const menu = this.SysMenuModel || {};

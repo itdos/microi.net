@@ -78,13 +78,13 @@ set -o pipefail
 if [ "${1:-}" = "--microi-code" ]; then
     cd "$(dirname "$0")"
     shift
-    if [ ! -f "Microi.Code/apps/microi-code/package.json" ]; then
-        printf '%s\n' '缺少内部 Microi.Code 仓库。请从公司 GitLab 克隆；禁止加入根公开仓库。' >&2
+    if [ ! -f "Microi.Agent/apps/microi-code/package.json" ]; then
+        printf '%s\n' '缺少内部 Microi.Agent 仓库。请从公司 GitLab 克隆；禁止加入根公开仓库。' >&2
         exit 1
     fi
     case "${1:-}" in
-      --mac) exec bash Microi.Code/一键打包Mac.sh "${@:2}" ;;
-      --win|'') cd Microi.Code/apps/microi-code && npm ci && npm run typecheck && npm test && npm run package:win ;;
+      --mac) exec bash Microi.Agent/一键打包Mac.sh "${@:2}" ;;
+      --win|'') cd Microi.Agent/apps/microi-code && npm ci && npm run typecheck && npm test && npm run package:win ;;
       *) printf '%s\n' 'Microi Code 仅支持 --win 或 --mac。' >&2; exit 1 ;;
     esac
     exit $?
@@ -290,7 +290,7 @@ DOCKER_PLANS=(
     "后端镜像-仅测试|api|microi-api-dev|microi-api-dev:{latest}"
     "后端镜像-正式和测试|api|microi-api|microi-api:{latest},microi-api:{version},microi-api-dev:{latest}"
     "前端镜像-测试|client|microi-web-dev|microi-web-dev:{latest},microi-web-dev:{version},microi-client-dev:{latest},microi-client-dev:{version}"
-    "前端镜像-正式和测试|client|microi-web|microi-web:{latest},microi-web:{version},microi-web-dev:{latest},microi-web-dev:{version},microi-client-dev:{latest},microi-client-dev:{version}"
+    "前端镜像-正式和测试|client|microi-web|microi-web:{latest},microi-web:{version},microi-client:{latest},microi-client:{version},microi-web-dev:{latest},microi-web-dev:{version},microi-client-dev:{latest},microi-client-dev:{version}"
 )
 #
 # 【前端 package.json 文件路径列表】（用于同步更新版本号）
@@ -366,6 +366,15 @@ print_divider() {
 
 # 直接启动前端构建守护器，避免 Git Bash + nvm-windows 的 npm POSIX 包装器
 # 在异常关闭时留下多层 bash/npm 残留进程。
+# Interrupted runs may leave an owner-verified stale lock. Recover it before
+# any temporary test service is started by a release wrapper.
+if [ "${1:-}" = "--recover-stale-lock" ]; then
+    acquire_workspace_lock
+    release_workspace_lock
+    print_success "已核验并释放本工作区的过期发布锁"
+    exit 0
+fi
+
 run_client_build() {
     local _node_cmd="node"
     local _build_args=()
@@ -1078,15 +1087,20 @@ if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
         print_fail "升版后的源码尚未通过 Full；请用当前版本重新加载共享服务并重跑发布。Microi.Ops 保持独立版本。"
     fi
 fi
-# 后端发布产物会把 Resource 下的基础应用打入程序集，因此必须在编译前完成
-# 本地 / iTdos 官网三方合并。仅官网有更新时无需 Token；需要写回官网时由
-# MICROI_UPGRADE_RESOURCE_TOKEN 提供管理员令牌。冲突或发布后回读不一致会终止发布。
+# 后端发布产物会把 Resource 下的基础应用打入程序集，因此必须在编译前校验资源。
+# 常规流程会同步并写回 iTdos；正式发布可显式延后官方应用写回，先完成平台渠道。
+# 延后模式要求发布前已完成只读三方预合并，渠道成功后再按远端哈希并发保护写回。
 if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ]; then
     print_phase "同步 iTdos 官网与后端内置升级资源"
     if ! command -v node >/dev/null 2>&1; then
         print_fail "未找到 Node.js，无法执行升级资源三方同步"
     fi
-    if ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate; then
+    if [ "$MICROI_DEFER_OFFICIAL_RESOURCE_PUBLISH" = "1" ]; then
+        if ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --validate-only; then
+            print_fail "内置升级资源校验失败；已阻止后端发布"
+        fi
+        print_info "官方应用写回已安排在平台渠道与插件成功后执行；本阶段仅校验本地候选。"
+    elif ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate; then
         print_fail "升级资源同步失败；已阻止后端发布，避免官网与内置应用商城互相覆盖"
     fi
     print_success "升级资源安全检查已完成（实时同步或已验证离线基线，详见上方明细）"
@@ -1674,13 +1688,14 @@ docker_push_plan() {
     fi
 
     # 使用 Docker 内容摘要缓存；publish/dist 内容变化会自动使 COPY 层失效。
+    # 当前镜像仓库不接受 Buildx 默认证明清单的 OCI empty manifest，构建时关闭证明附件。
     # 优先检查基础镜像更新；远端 Registry 短暂不可达时重试，最终只允许回退到
     # Docker 已缓存且能被本地解析的基础镜像，避免一次 TLS 超时中断整轮发布。
     print_step "构建镜像: $local_image"
     local _docker_build_ok=false
     local _docker_build_attempt=1
     while [ "$_docker_build_attempt" -le 3 ]; do
-        if (cd "$build_dir" && docker build --provenance=false --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             _docker_build_ok=true
             break
         fi
@@ -1692,7 +1707,7 @@ docker_push_plan() {
     done
     if [ "$_docker_build_ok" != true ]; then
         print_warning "远端基础镜像连续拉取失败，尝试使用 Docker 本地缓存完成本次构建..."
-        if (cd "$build_dir" && docker build --provenance=false --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             print_warning "已使用本地缓存的基础镜像完成构建；发布后请关注远端 Registry 连通性。"
         else
             print_fail "Docker 镜像构建失败，远端拉取和本地缓存均不可用: $local_image"
@@ -1712,6 +1727,20 @@ docker_push_plan() {
         local _remote_name=$(echo "$_img_tag" | cut -d':' -f1)
         local _remote_tag=$(echo "$_img_tag" | cut -d':' -f2)
         docker tag "$local_image" "$full_tag"
+        # 断点续发时仅复用已由当前本地镜像取得的同内容仓库摘要。
+        # 本地 RepoDigests 与远端指定标签均一致才跳过；查询失败或版本不同仍正常推送。
+        local _published_repo="${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${_remote_name}"
+        local _local_published_digest
+        _local_published_digest=$(docker image inspect "$local_image" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
+            | awk -v prefix="${_published_repo}@" 'index($0,prefix)==1 {print substr($0,length(prefix)+1); exit}')
+        local _remote_digest=""
+        if [[ "$_local_published_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            _remote_digest=$(docker buildx imagetools inspect "$full_tag" --format '{{.Manifest.Digest}}' 2>/dev/null | tr -d '\r' || true)
+        fi
+        if [ "$_remote_digest" = "$_local_published_digest" ] && [ -n "$_remote_digest" ]; then
+            print_info "已回读相同 digest，复用远端标签: $full_tag ($_remote_digest)"
+            continue
+        fi
         print_step "推送: $full_tag"
         docker push "$full_tag"
     done

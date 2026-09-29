@@ -3356,7 +3356,7 @@ export class MicroiClient {
     Name: string; DiyTableId?: string; ParentId?: string;
     ComponentName?: string; ComponentPath?: string;
     Display?: number; AppDisplay?: number; HasChild?: number;
-    OpenType?: string; Url?: string; Sort?: number;
+    OpenType?: string; FlowDesignId?: string; Url?: string; Sort?: number;
     Icon?: string; SearchFieldIds?: string; TableDiyFieldIds?: string;
     DefaultOrderBy?: string; SqlWhere?: string;
     MenuBadgeEnabled?: number; MenuBadgeApiEngineKey?: string;
@@ -3391,7 +3391,8 @@ export class MicroiClient {
       || data.MicroServicePageId
       || data.MicroServiceRoutePath,
     );
-    if (!hasMicroServiceBinding) return result;
+    const hasWorkflowBinding = data.OpenType === 'WorkFlow';
+    if (!hasMicroServiceBinding && !hasWorkflowBinding) return result;
 
     const responseData = result.Data && typeof result.Data === 'object'
       ? result.Data as Record<string, unknown>
@@ -3401,11 +3402,16 @@ export class MicroiClient {
       return {
         Code: 0,
         Data: { CreateResponse: result.Data },
-        Msg: '菜单已创建，但返回结果缺少 ModuleId，无法写入并回读微服务关联字段。',
+        Msg: '菜单已创建，但返回结果缺少 ModuleId，无法写入并回读流程或微服务关联字段。',
       };
     }
 
-    const bindingPatch: Record<string, unknown> = {
+    const bindingPatch: Record<string, unknown> = hasWorkflowBinding ? {
+      ModuleId: moduleId,
+      OpenType: 'WorkFlow',
+      DiyTableId: data.DiyTableId,
+      FlowDesignId: data.FlowDesignId,
+    } : {
       ModuleId: moduleId,
       IsMicroiService: 1,
       OpenType: data.OpenType || 'MicroService',
@@ -3425,14 +3431,14 @@ export class MicroiClient {
           CreateResponse: result.Data,
           BindingResponse: bindingResult.Data,
         },
-        Msg: `菜单基础记录已创建，但微服务关联字段写入或回读失败：${bindingResult.Msg || '未知错误'}`,
+        Msg: `菜单基础记录已创建，但流程或微服务关联字段写入或回读失败：${bindingResult.Msg || '未知错误'}`,
       };
     }
     return {
       ...result,
       Data: {
         ...responseData,
-        MicroServiceBindingVerified: true,
+        ...(hasWorkflowBinding ? { WorkflowBindingVerified: true } : { MicroServiceBindingVerified: true }),
         BindingVerification: bindingResult.Data,
       },
     };

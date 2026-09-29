@@ -1,6 +1,6 @@
 <template>
     <el-dropdown trigger="hover" class="international" @command="handleSetLanguage">
-        <div class="international-trigger" :class="{ compact }">
+        <div class="international-trigger" :class="{ compact }" :title="currentLabel" :aria-label="`当前语言：${currentLabel}`">
             <font-awesome-icon v-if="compact" icon="fa-solid fa-language" aria-hidden="true" />
             <span v-else style="font-size: 13px;">{{ currentLabel }}</span>
         </div>
@@ -129,9 +129,9 @@ export default {
     white-space: nowrap;
 
     &.compact {
-        width: 30px;
-        height: 30px;
-        font-size: 17px;
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
     }
 }
 </style>

@@ -24,7 +24,7 @@
                         :id="nodeModel.Id"
                         :key="nodeModel.Id"
                         :ref="'refNodeModel_' + nodeModel.Id"
-                        :style="nodeContainerStyle(nodeModel)"
+                        :style="nodeContainerStyle(nodeModel, WF_Node_List.indexOf(nodeModel))"
                         @click="clickNode(nodeModel)"
                         @mouseup="changeNodeSite(nodeModel)"
                         :class="nodeContainerClass(nodeModel)"
@@ -151,6 +151,7 @@ import { ForceDirected } from "../js/force-directed";
 import { cloneDeep } from "lodash";
 import DiyForm from "@/views/form-engine/diy-form";
 import _ from "underscore";
+import { workflowNodePosition } from "@/utils/workflow-node-position";
 export default {
     setup() {
         const tagsViewStore = useTagsViewStore();
@@ -345,13 +346,8 @@ export default {
             };
         },
         // 节点容器样式
-        nodeContainerStyle(nodeModel) {
-            var self = this;
-            var result = {
-                top: nodeModel.PositionTop,
-                left: nodeModel.PositionLeft
-            };
-            return result;
+        nodeContainerStyle(nodeModel, index = 0) {
+            return workflowNodePosition(nodeModel, index);
         },
         nodeIcoClass(nodeModel) {
             var self = this;

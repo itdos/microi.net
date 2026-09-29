@@ -2298,6 +2298,21 @@ export class MicroiClient {
             operationName: 'generate MiniMax music',
         });
     }
+    async listFileCabinetObjects(path, limit) {
+        return this.post('/api/HDFS/ListObjects', {
+            OsClient: this.config.osClient,
+            Path: path,
+            Limit: limit,
+        });
+    }
+    async getFileCabinetOfficeMeta(filePathName, sysMenuId, limit) {
+        return this.post('/api/HDFS/GetFileCabinetOfficeMeta', {
+            OsClient: this.config.osClient,
+            FilePathName: filePathName,
+            SysMenuId: sysMenuId,
+            Limit: limit,
+        });
+    }
     /**
      * 图片生成只负责以稳定 RequestId 创建持久任务。Code=2 表示已排队，
      * 调用方必须继续查询同一个 TaskId，不能因超时更换 RequestId 重复消费额度。
@@ -2359,7 +2374,8 @@ export class MicroiClient {
             || data.MicroServiceId
             || data.MicroServicePageId
             || data.MicroServiceRoutePath);
-        if (!hasMicroServiceBinding)
+        const hasWorkflowBinding = data.OpenType === 'WorkFlow';
+        if (!hasMicroServiceBinding && !hasWorkflowBinding)
             return result;
         const responseData = result.Data && typeof result.Data === 'object'
             ? result.Data
@@ -2369,10 +2385,15 @@ export class MicroiClient {
             return {
                 Code: 0,
                 Data: { CreateResponse: result.Data },
-                Msg: '菜单已创建，但返回结果缺少 ModuleId，无法写入并回读微服务关联字段。',
+                Msg: '菜单已创建，但返回结果缺少 ModuleId，无法写入并回读流程或微服务关联字段。',
             };
         }
-        const bindingPatch = {
+        const bindingPatch = hasWorkflowBinding ? {
+            ModuleId: moduleId,
+            OpenType: 'WorkFlow',
+            DiyTableId: data.DiyTableId,
+            FlowDesignId: data.FlowDesignId,
+        } : {
             ModuleId: moduleId,
             IsMicroiService: 1,
             OpenType: data.OpenType || 'MicroService',
@@ -2392,14 +2413,14 @@ export class MicroiClient {
                     CreateResponse: result.Data,
                     BindingResponse: bindingResult.Data,
                 },
-                Msg: `菜单基础记录已创建，但微服务关联字段写入或回读失败：${bindingResult.Msg || '未知错误'}`,
+                Msg: `菜单基础记录已创建，但流程或微服务关联字段写入或回读失败：${bindingResult.Msg || '未知错误'}`,
             };
         }
         return {
             ...result,
             Data: {
                 ...responseData,
-                MicroServiceBindingVerified: true,
+                ...(hasWorkflowBinding ? { WorkflowBindingVerified: true } : { MicroServiceBindingVerified: true }),
                 BindingVerification: bindingResult.Data,
             },
         };

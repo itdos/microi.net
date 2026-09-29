@@ -469,7 +469,7 @@ Redis 不可用或无法取得版本时，服务端直接回源当前租户数�
 
 普通聊天不调用 MCP。选择 `/#/mic-ai-engine` 的“低代码建模”模式后，`Microi.AI` 在服务端启动随 API 发布的 `microi.mcp` 运行包，以当前登录用户的 DiyToken 和租户建立独立 MCP 会话，并向所选模型提供 `microi_codex` 工具。模型通过 `list_tools`、`describe_tool` 发现完整工具目录，再调用原 MCP 工具；模型的 `tool_calls` 与工具结果在服务端循环处理。
 
-`Level >= 9999` 且主库账号/角色仍有效的管理员，在对话中明确要求创建、修改或删除时，模型可以使用与本地 Microi.Code 相同的 MCP 工具目录，不需要网页“执行”按钮。仅要求规划时只调用读取工具。权限在进入建模及每次工具调用前复核；工具本身仍执行原有参数验证、确认值、审计和回读。浏览器传入的 `_IsAdmin`、`Level`、`OsClient`、Token 或模型参数不能代替授权；普通账号不能进入 MCP 建模模式。
+`Level >= 9999` 且主库账号/角色仍有效的管理员，在对话中明确要求创建、修改或删除时，模型可以使用与本地 Microi.Agent 相同的 MCP 工具目录，不需要网页“执行”按钮。仅要求规划时只调用读取工具。权限在进入建模及每次工具调用前复核；工具本身仍执行原有参数验证、确认值、审计和回读。浏览器传入的 `_IsAdmin`、`Level`、`OsClient`、Token 或模型参数不能代替授权；普通账号不能进入 MCP 建模模式。
 
 建模对话使用 `/api/Ai/Chat` 返回完整结果和本次 MCP 工具名称/状态；常规对话继续使用流式入口。模型工具参数交给同版 `microi.mcp` 的原始 Schema 和处理器验证。完整系统优先按 `get_db_schema → get_manifest_schema → plan_system → generate_system(dryRun=true) → generate_system(dryRun=false) → validate_system` 执行。工具传输异常或超时后停止，不自动重放可能成功的写入；先回读目标资源再继续。
 

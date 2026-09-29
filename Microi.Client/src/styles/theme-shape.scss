@@ -1,0 +1,18 @@
+/* 统一覆盖框架、Element Plus 弹层及动态应用容器；弹层通常挂到 body 根节点。 */
+html[data-mci-corner-style="square"] {
+    --el-border-radius-base: 0px;
+    --el-border-radius-small: 0px;
+    --el-border-radius-round: 0px;
+    --el-border-radius-circle: 0px;
+    --mci-radius-sm: 0px;
+    --mci-radius-xs: 0px;
+    --mci-radius-md: 0px;
+    --mci-radius-lg: 0px;
+    --mci-radius-xl: 0px;
+    --mci-radius-full: 0px;
+    --mci-shape-dialog: 0px;
+
+    *, *::before, *::after {
+        border-radius: 0 !important;
+    }
+}

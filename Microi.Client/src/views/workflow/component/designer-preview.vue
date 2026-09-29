@@ -3,7 +3,7 @@
         <div style="display: flex; height: 80vh">
             <div id="itdos_flowchart" ref="itdos_flowchart" class="container">
                 <template v-for="nodeModel in WF_Node_List" :key="nodeModel.Id">
-                    <div :id="nodeModel.Id" :ref="'refNodeModel_' + nodeModel.Id" :style="nodeContainerStyle(nodeModel)" @mouseup="changeNodeSite(nodeModel)" :class="nodeContainerClass(nodeModel)">
+                    <div :id="nodeModel.Id" :ref="'refNodeModel_' + nodeModel.Id" :style="nodeContainerStyle(nodeModel, WF_Node_List.indexOf(nodeModel))" @mouseup="changeNodeSite(nodeModel)" :class="nodeContainerClass(nodeModel)">
                         <!-- 最左侧的那条竖线 -->
                         <div class="itdos-wf-node-left"></div>
                         <!-- 节点类型的图标 -->
@@ -41,6 +41,7 @@ import { easyFlowMixin } from "../js/mixins";
 import lodash from "lodash";
 import { cloneDeep } from "lodash";
 import _ from "underscore";
+import { workflowNodePosition } from "@/utils/workflow-node-position";
 export default {
     name: "WFDesignPreview",
     components: {
@@ -158,7 +159,7 @@ export default {
             };
         },
         // 节点容器样式
-        nodeContainerStyle(nodeModel) {
+        nodeContainerStyle(nodeModel, index = 0) {
             var self = this;
             // if (!self.NodeModel.left && self.NodeModel.PositionLeft) {
             //     self.NodeModel.left = self.NodeModel.PositionLeft + 'px';
@@ -167,8 +168,7 @@ export default {
             //     self.NodeModel.top = self.NodeModel.PositionTop + 'px';
             // }
             var result = {
-                top: nodeModel.PositionTop,
-                left: nodeModel.PositionLeft,
+                ...workflowNodePosition(nodeModel, index),
                 backgroundColor: self.propsCurrentNodeId == nodeModel.Id ? "#ccc" : "#fff"
             };
             return result;

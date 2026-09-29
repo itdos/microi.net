@@ -3,7 +3,7 @@
     <div class="execution-logs__toolbar">
       <el-date-picker v-model="month" type="month" value-format="YYYYMM" format="YYYY年MM月" :clearable="false" aria-label="日志月份" @change="reset" />
       <el-button :loading="loading" @click="reset">刷新</el-button>
-      <span>{{ history ? '历史日志仅供查询' : '任务执行记录' }} · 按月查询</span>
+      <span>{{ history ? '历史日志' : '任务执行记录' }}{{ source ? ` · 来源：${source}` : '' }} · 按月查询</span>
     </div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <el-table v-mci-loading:table="loading" :data="rows" :empty-text="error ? '日志读取失败' : (loading ? '正在读取日志' : '本月暂无日志')" row-key="Id" max-height="480">
@@ -36,7 +36,7 @@ const root = ref();
 const month = ref(new Date().getFullYear() + String(new Date().getMonth() + 1).padStart(2, '0'));
 const history = computed(() => props.field?.Config?.ScheduleLogSource === 'History');
 const jobName = computed(() => props.FormDiyTableModel?.JobName || props.FormData?.JobName || '');
-const rows = ref([]), loading = ref(false), error = ref(''), cursors = ref([]), nextCursor = ref(null);
+const rows = ref([]), loading = ref(false), error = ref(''), source = ref(''), cursors = ref([]), nextCursor = ref(null);
 let observer, visible = false, loadedKey = '', generation = 0;
 const key = () => `${jobName.value}|${month.value}|${history.value}`;
 function status(row) {
@@ -62,6 +62,7 @@ async function load(cursor = null) {
     if (result.DataAppend?.HasMore && (!result.DataAppend.BeforeLogTime || !result.DataAppend.BeforeLogId))
       throw new Error('日志服务未返回完整翻页信息，请检查后端版本。');
     rows.value = result.Data;
+    source.value = result.DataAppend?.Source || '';
     if (result.DataAppend?.HasMore) nextCursor.value = { BeforeLogTime: result.DataAppend.BeforeLogTime, BeforeLogId: result.DataAppend.BeforeLogId };
     loadedKey = key();
   } catch (e) {
@@ -70,7 +71,7 @@ async function load(cursor = null) {
 }
 // 隐藏页签中切换任务也要清除在途状态；旧请求完成后不能覆盖新任务或阻止懒加载。
 function reset() {
-  cursors.value = []; loadedKey = ''; ++generation;
+  cursors.value = []; source.value = ''; loadedKey = ''; ++generation;
   loading.value = false; rows.value = []; error.value = ''; nextCursor.value = null;
   if (visible) load();
 }
