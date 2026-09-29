@@ -174,12 +174,15 @@ test('任务调度菜单随 SaaS 官方包交付完整列表、搜索、排序�
   assert.match(buttons.find(item => item.Name === '恢复').V8Code, /\/api\/Job\/ResumeJob/);
 });
 
-test('任务调度启用指标按真实“正常”状态统计', () => {
+test('模块统计只读取菜单声明的计数定义并按真实菜单范围授权', () => {
   const engine = packageData.SysApiEngines.find(item => item.ApiEngineKey === 'mci-module-presentation-stats');
   assert.ok(engine);
-  assert.equal(engine.Version, 'v1.0.7');
+  assert.equal(engine.Version, 'v1.1.3');
   assert.equal(engine.ApiV8Code.replace(/\r\n/g, '\n').trim(), statsCode.replace(/\r\n/g, '\n'));
-  assert.match(statsCode, /Metric_2_Status\.Where = \[\['Status', '=', '正常'\]\]/);
+  assert.match(statsCode, /DECLARATIVE_MODULE_STATISTICS_V1/);
+  assert.match(statsCode, /schema\.PresentationStatistics/);
+  assert.match(statsCode, /canCount\(def\.ScopeMenuId\)/);
+  assert.match(statsCode, /sourceMenu\.DiyTableId/);
 });
 
 test('官方包元数据与接口引擎数量一致', () => {
