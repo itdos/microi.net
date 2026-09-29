@@ -34,6 +34,7 @@ import "animate.css";
 import "./styles/itdos.diy.scss";
 // MCI (Microi Cool Interface) 设计系统 — 移动端及全局变量
 import "./styles/mci-design.scss";
+import "./styles/theme-shape.scss";
 import "./styles/ui-density.scss";
 import { initializeUiDensity } from "./utils/ui-density.js";
 import axios from "axios";
@@ -50,6 +51,7 @@ import { installLegacyQrCodeDownload } from "./utils/legacy-qrcode.js";
 import { installMciDialogRuntime, refreshMciDialogMaskBlur } from "./utils/mci-dialog-runtime.js";
 // 主题色工具 - 360 极速浏览器兼容方案
 import { initThemeColor, setThemeColor } from "./utils/theme-color";
+import { initCornerStyle } from "./utils/theme-shape";
 import { resolveUserThemeColor } from "./utils/user-visual-preferences.js";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
@@ -66,6 +68,7 @@ window.__MICROI_WEBOS_EMBEDDED_RUNTIME__ = isWebosEmbeddedRuntime;
 
 // 初始化主题色系统（必须在样式加载后执行）
 initThemeColor();
+initCornerStyle();
 // 在 MicroApp 与 Vue 挂载前恢复用户的字体/间距密度，避免首屏跳动，
 // 并让后续挂载的租户微服务继承同一组 CSS 变量。
 initializeUiDensity();

@@ -36,12 +36,15 @@ public class ScheduleExecutionLogTests
     [InlineData(1, false)]
     [InlineData(1, true)]
     [InlineData(0, false)]
-    public async Task JobOutcome_IsRecordedWithoutSql_AndQueueFailureCannotFailBusiness(int code, bool queueThrows)
+    public async Task JobOutcome_PrefersAcknowledgedMongo_AndUsesSqlOnlyOnFailure(int code, bool queueThrows)
     {
         var engine = DispatchProxy.Create<IApiEngine, EngineProxy>();
         ((EngineProxy)engine).ResultCode = code;
-        var queue = new QueueRecorder { Throws = queueThrows };
-        using var provider = new ServiceCollection().AddSingleton(engine).AddSingleton<ISysLogQueue>(queue).BuildServiceProvider();
+        var mongo = DispatchProxy.Create<IMongoDB, MongoProxy>();
+        ((MongoProxy)mongo).Fails = queueThrows;
+        var forms = DispatchProxy.Create<IFormEngine, FormProxy>();
+        using var provider = new ServiceCollection().AddSingleton(engine).AddSingleton(mongo)
+            .AddSingleton(forms).BuildServiceProvider();
         var locator = typeof(MicroiEngine).GetField("_serviceProvider", BindingFlags.NonPublic | BindingFlags.Static)!;
         var previous = locator.GetValue(null);
         locator.SetValue(null, provider);
@@ -50,7 +53,7 @@ public class ScheduleExecutionLogTests
             var context = DispatchProxy.Create<IJobExecutionContext, ContextProxy>();
             await new MicroiApiEngineJob().Execute(context);
             Assert.Equal(1, ((EngineProxy)engine).Runs);
-            var record = Assert.Single(queue.Records);
+            var record = Assert.Single(((MongoProxy)mongo).Records);
             Assert.Equal("job-log-test", record.OsClient);
             Assert.Equal("minute", record.TargetId);
             Assert.Equal(ScheduleExecutionLog.TargetType, record.TargetType);
@@ -58,6 +61,98 @@ public class ScheduleExecutionLogTests
             Assert.Equal(code == 1 ? "Completed" : "Failed", record.Action);
             Assert.NotEmpty(record.EventId);
             Assert.NotNull(record.OccurredAt);
+            Assert.Equal(queueThrows ? 1 : 0, ((FormProxy)forms).Writes);
+        }
+        finally { locator.SetValue(null, previous); }
+    }
+
+    public class MongoProxy : DispatchProxy
+    {
+        public bool Fails;
+        public List<SysLogParam> Records = [];
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
+        {
+            if (method!.Name != nameof(IMongoDB.AddSysLogs)) throw new InvalidOperationException(method.Name);
+            Records.AddRange((IReadOnlyCollection<SysLogParam>)args![0]!);
+            return Task.FromResult(new Dos.Common.DosResult(Fails ? 0 : 1));
+        }
+    }
+
+    [Fact]
+    public async Task OperationalLogStorage_ReportsFailureWhenBothStoresReject()
+    {
+        var mongo = DispatchProxy.Create<IMongoDB, MongoProxy>();
+        ((MongoProxy)mongo).Fails = true;
+        using var provider = new ServiceCollection().AddSingleton(mongo).BuildServiceProvider();
+        var locator = typeof(MicroiEngine).GetField("_serviceProvider", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var previous = locator.GetValue(null);
+        locator.SetValue(null, provider);
+        try
+        {
+            var fallbacks = 0;
+            var saved = await OperationalLogStorage.WriteAsync(
+                new SysLogParam { OsClient = "tenant", TargetType = "MqttEvent" },
+                () => { fallbacks++; return Task.FromResult(new Dos.Common.DosResult(0)); });
+            Assert.False(saved);
+            Assert.Equal(1, fallbacks);
+            Assert.Single(((MongoProxy)mongo).Records);
+        }
+        finally { locator.SetValue(null, previous); }
+    }
+
+    [Fact]
+    public void OperationalLogStorage_RedactsSecretsAndBoundsLargePayloads()
+    {
+        var sanitized = OperationalLogStorage.SanitizeContent("{\"token\":\"secret-value\",\"data\":\"ok\"}");
+        Assert.DoesNotContain("secret-value", sanitized);
+        Assert.Contains("ok", sanitized);
+        Assert.True(OperationalLogStorage.SanitizeContent(new string('x', 20000)).Length <= 16385);
+    }
+
+    public class FormProxy : DispatchProxy
+    {
+        public int Writes;
+        public string ExpectedTable = "diy_schedule_job_log";
+        public JObject? LastPayload;
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
+        {
+            if (method!.Name != nameof(IFormEngine.AddFormDataAsync)) throw new InvalidOperationException(method.Name);
+            Assert.Equal(ExpectedTable, args![0]);
+            LastPayload = JObject.FromObject(args[1]!);
+            Writes++;
+            return Task.FromResult(new Dos.Common.DosResult(1));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    public async Task MqttBusinessLog_WritesMongoFirst_AndFallsBackOnlyOnFailure(bool mongoFails, int sqlWrites)
+    {
+        var mongo = DispatchProxy.Create<IMongoDB, MongoProxy>();
+        ((MongoProxy)mongo).Fails = mongoFails;
+        var forms = DispatchProxy.Create<IFormEngine, FormProxy>();
+        ((FormProxy)forms).ExpectedTable = "mci_mqtt_log";
+        using var provider = new ServiceCollection().AddSingleton(mongo).AddSingleton(forms).BuildServiceProvider();
+        var locator = typeof(MicroiEngine).GetField("_serviceProvider", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var previous = locator.GetValue(null);
+        locator.SetValue(null, provider);
+        try
+        {
+            var method = typeof(MicroiMQTT).GetMethod("WriteMqttLogAsync", BindingFlags.NonPublic | BindingFlags.Static)!;
+            await (Task)method.Invoke(null, new object?[] { "tenant", "Receive", "device-1", "tenant/tenant/a", "payload" })!;
+            var record = Assert.Single(((MongoProxy)mongo).Records);
+            Assert.Equal("MqttEvent", record.TargetType);
+            Assert.Equal("device-1", record.TargetId);
+            Assert.Equal("tenant/tenant/a", record.Api);
+            Assert.Equal("payload", record.Content);
+            Assert.Equal(sqlWrites, ((FormProxy)forms).Writes);
+            if (mongoFails)
+            {
+                var sql = ((FormProxy)forms).LastPayload!;
+                Assert.Equal(record.EventId, sql["Id"]?.ToString());
+                Assert.Null(sql["Topic"]); // 该物理表没有 Topic 列。
+            }
         }
         finally { locator.SetValue(null, previous); }
     }

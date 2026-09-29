@@ -80,11 +80,22 @@ test('preference generator delegates to the system-account fact source and canno
   assert.doesNotMatch(generator, /writeFileSync/);
 });
 
+test('system-account package carries the account-level corner style field', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(resourceDir, 'app.microi.sys_user.json'), 'utf8'));
+  const field = pkg.DiyFields.find(item => item.TableName === 'sys_user' && item.Name === 'CornerStyle');
+  assert.equal(field.Component, 'Radio');
+  assert.equal(field.DefaultValue, 'round');
+  assert.deepEqual(JSON.parse(field.Data).map(item => item.Key), ['round', 'square']);
+  assert.ok(pkg.PhysicalColumns.some(item => item.TABLE_NAME === 'sys_user' && item.COLUMN_NAME === 'CornerStyle' && item.COLUMN_DEFAULT === 'round'));
+  assert.match(pkg.DDLStatements.find(item => item.TableName === 'sys_user').DDL, /`CornerStyle` varchar\(25\)/);
+});
+
 test('engine saves only its fixed whitelist against the token user', () => {
   const { result, updateModel, hooks } = run({
     DefaultIndexUrl: '#/dashboard',
     ThemeColor: '#12abef',
     ThemeMode: 'DARK',
+    CornerStyle: 'SQUARE',
     MenuChildExpandMode: 'right',
     DesktopType: 'windows',
     DesktopBg: '/junchi/member/background.webp',
@@ -106,6 +117,7 @@ test('engine saves only its fixed whitelist against the token user', () => {
     DefaultIndexUrl: '/dashboard',
     ThemeColor: '#12ABEF',
     ThemeMode: 'dark',
+    CornerStyle: 'square',
     MenuChildExpandMode: 'Right',
     DesktopType: 'windows',
     DesktopBg: '/junchi/member/background.webp',
@@ -132,6 +144,7 @@ test('engine rejects external routes, invalid colors and cross-tenant desktop pa
   assert.equal(run({ DefaultIndexUrl: '/login' }).result.Code, 0);
   assert.equal(run({ ThemeColor: 'red' }).result.Code, 0);
   assert.equal(run({ ThemeMode: 'system' }).result.Code, 0);
+  assert.equal(run({ CornerStyle: 'circle' }).result.Code, 0);
   assert.equal(run({ MenuChildExpandMode: 'popup' }).result.Code, 0);
   assert.equal(run({ DesktopBg: '/itdos/member/background.webp' }).result.Code, 0);
   assert.equal(run({ DesktopDockMenu: Array.from({ length: 101 }, (_, index) => `menu-${index}`) }).result.Code, 0);

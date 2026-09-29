@@ -93,6 +93,17 @@ test('prebuilt artifacts require Full source provenance and are rechecked before
  assert.match(push,/release-artifact\.mjs verify[\s\S]*?print_fail/);
 });
 
+test('formal frontend plan publishes client latest and version from the same accepted image',()=>{
+ const plan=source.split('\n').find(line=>line.includes('"前端镜像-正式和测试|client|'));
+ assert.ok(plan,'formal frontend plan must exist');
+ const tags=plan.match(/"([^"]+)"/)?.[1].split('|')[3].split(',');
+ for(const tag of ['microi-client:{latest}','microi-client:{version}','microi-client-dev:{latest}']){
+  assert.ok(tags.includes(tag),`missing ${tag}`);
+ }
+ const testPlan=source.split('\n').find(line=>line.includes('"前端镜像-测试|client|'));
+ assert.ok(testPlan&&!testPlan.includes('microi-client:{latest}'),'test-only plan must not overwrite the formal tag');
+});
+
 for(const mode of ['capture','verify'])test(`candidate ${mode} failure prevents publication`,()=>{
  const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',input:`
 print_phase(){ :; }

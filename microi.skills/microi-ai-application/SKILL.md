@@ -92,8 +92,10 @@ UniApp 使用 Vue 3 + TypeScript 的官方 Vite 工具链，并同时遵守 `mic
 6. 官方 Web、UniApp、MicroService 的体验地址统一为 `https://static.itdos.com/{OsClient小写}/micro-app/{AppKey}/index.html`，公有桶对象键与域名后的路径完全一致；不再按运行类型分叉到 `ai-app-publish`，也不把 v3 内部 API resolver 用作公开体验地址。当前版本的全部编译文件写入该应用固定根，历史版本写入同根的 `/{Version}/` 目录；历史目录一旦验证不得覆写成不同字节。
 7. 同一版本私有源码文件使用相同的租户、应用、版本相对路径写入私有桶；固定根保存最近一次已完成发布的源码。确实不含源码的编译包在包声明中记录 `Source=NotIncluded`，运行时版本的 `SourceSnapshotPath` 保持空值，不得从公有产物伪造源码。先校验完整公有版本与私有源码快照，再提升固定根的非入口资产和 `index.html`；固定入口切换后提交 CDN 精确路径刷新，回读刷新任务终态和公有入口及引用资源，再更新商城 `PreviewUrl/PublicPublishPath`。刷新任务仅提交成功、单个 CDN 节点 200 或本地构建成功都不算完成。
 8. 官网、二维码、分享链接和商城“立即体验”只使用固定根 `index.html`；版本目录仅供回滚与显式历史预览。CDN 直接读取公有桶对象，不要求其做动态版本解析或反向代理。发布器必须使 HTML 引用的 JS/CSS 在切换时已存在，并验证从 `static.itdos.com` 打开的应用仍把业务 API 请求发往目标租户的 `ApiBase`。
+   v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 和版本 `PreviewUrl` 在数据库内保留以 `/` 开头的对象路径，后端完成态检查会与投影路径逐字比较；官网接口与商城工作台对外展示时使用租户 `FileServer` 转为完整 CDN URL。不得为统一展示直接把这些 v3 内部字段改写成绝对 URL。
 9. 新的官方 Web、UniApp、MicroService 发布统一使用支持固定 CDN 投影的 v3 目录流式发布；旧 `ai_app_build` 只保留历史兼容和迁移读取，不作为新版本发布入口。目标 API 的 `ApplicationCdnProjectionSupported` 未启用时先部署后端并停止新发布，不回退到 `ai-app-publish`。
-9. `SharedPublicRuntime.EntryUrl` 和历史版本目录仅用于历史记录、回滚、摘要校验与审计。回读应用、版本、active 文件清单和 SHA-256；旧清单文件只能可逆归档，不能删除。再分别直接请求稳定当前入口、不可变版本入口及主要 JS/CSS，并断言前者完成加载后地址栏仍不含版本段。
+10. 官方 `static.itdos.com` 的刷新凭据从当前租户后端系统设置 `Integration.Cdn.Aliyun.*` 读取，兼容旧的 `Integration.Dns.Aliyun.*` 与 SaaS `AlidnsKeyId/AlidnsKeySecret`；必须成对配置并具备刷新及任务查询权限。刷新任务可能合并多个 URL 到同一任务号，应以全部任务 `Complete` 和 CDN 文件哈希回读为准；不得仅凭提交成功切换商城入口。批量发布须考虑 CDN 每日刷新配额。
+11. `SharedPublicRuntime.EntryUrl` 和历史版本目录仅用于历史记录、回滚、摘要校验与审计。回读应用、版本、active 文件清单和 SHA-256；旧清单文件只能可逆归档，不能删除。再分别直接请求稳定当前入口、不可变版本入口及主要 JS/CSS，并断言前者完成加载后地址栏仍不含版本段。
 
 ## 完成定义
 

@@ -565,7 +565,7 @@ const engineSlides: EngineSlide[] = [
 // 这些是官网左侧导航中的关键交付入口，已有独立培训页或由相邻引擎页承接，
 // 因此只补进总览而不重复制造内容相同的详情幻灯片。
 const atlasSupplementalEntries: AtlasEntry[] = [
-  { id: 'ai-dev-tools', nav: 'AI 开发工具（VS Code + CLI）', href: '/doc/v8-engine/vs-code-plugin.html' },
+  { id: 'ai-dev-tools', nav: 'AI 开发工具（VS Code + CLI）', href: '/doc/v8-engine/microi-agent.html' },
   { id: 'mcp-server', nav: 'MCP Server 完整指南', href: '/doc/v8-engine/mcp-server.html' },
   { id: 'multi-end-client', nav: 'PC、WebOS 与移动端', href: '/doc/system-engine/multi-end-client.html' },
   { id: 'file-manage', nav: '文件柜', href: '/doc/system-engine/file-manage.html' },
@@ -622,7 +622,7 @@ if (atlasEntryIds.length !== atlasEntries.length || new Set(atlasEntryIds).size 
 }
 
 const activationLinks = [
-  { label: 'VS Code 插件', href: '/doc/v8-engine/vs-code-plugin.html' },
+  { label: 'VS Code 插件', href: '/doc/v8-engine/microi-agent.html' },
   { label: 'MCP Server', href: '/doc/v8-engine/mcp-server.html' },
   { label: '@microi.net/cli', href: '/doc/v8-engine/mcp-server.html#cli' },
 ]

@@ -5,6 +5,19 @@
 ![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## 模块配置
 
+### 审批工作流打开方式
+
+模块【打开方式】选择 `WorkFlow` 时，【关联流程引擎】保存的是
+`sys_menu.FlowDesignId`，必须指向已启用的 `wf_flowdesign.Id`；模块
+`DiyTableId` 与流程 `TableId` 必须是同一张业务表。通过 MCP 的完整 Manifest
+创建新流程与模块时，模块可设置 `openType:"WorkFlow"` 和
+`flowName:"同包流程名称"`，生成器会回填当前租户的流程 Id。
+关联已有流程时使用精确 `flowDesignId`，不能填流程名称或跨租户 Id。
+
+交付时回读 `OpenType/FlowDesignId/DiyTableId`，从模块打开表单发起真实
+记录，并检查审批人的待办、流程图和历史。节点坐标与人员绑定规则见
+[工作流引擎](/doc/system-engine/wf-engine)。
+
 ### 菜单图标
 
 侧栏的 CSS/组件图标配置在 `sys_menu.IconClass`，图片字段 `Icon` 不能代替它。优先选择已注册的 Element Plus 图标名，如客户用 `UserFilled`、日程用 `Calendar`、仓储用 `Box`、办公用 `OfficeBuilding`；FontAwesome 名称必须在当前前端兼容映射内，否则会显示默认文档图标。
@@ -39,12 +52,15 @@
 
 管理员也可在【系统账号】表单的“个人设置”页签维护该字段。MCP 维护账号数据时使用同名字段 `DefaultIndexUrl`；留空表示继承系统默认值。
 
-个人设置还支持 `sys_user.ThemeColor`、`ThemeMode` 和 `MenuChildExpandMode`。右上角主题设置与平台个人中心统一调用官方 Managed 接口引擎 `platform-user-update-preferences` 保存：
+个人设置还支持 `sys_user.ThemeColor`、`ThemeMode`、`CornerStyle` 和 `MenuChildExpandMode`。右上角主题设置与平台个人中心统一调用官方 Managed 接口引擎 `platform-user-update-preferences` 保存：
 
 - `ThemeColor` 留空时继承 `sys_config.ThemeColor`；
 - `ThemeMode` 使用 `light / dark`；
+- `CornerStyle` 使用 `round / square`，默认圆角；
 - `MenuChildExpandMode` 使用 `System / Down / Right`，其中 `System` 继承系统设置；
 - 已安装这些字段时以账号值为准，换设备登录也会恢复；旧租户未安装字段时仅保留浏览器本地兼容行为。
+
+右上角【主题设置 → 边角风格】可在“圆角／直角”之间切换。直角模式即时覆盖框架按钮、输入框、弹窗、页面容器、卡片和 Tab 的边角。安装新版系统账号应用后，选择保存在当前账号并在其它设备恢复；旧租户暂存在当前浏览器。顶栏的通知、搜索、主题、密度、AI、蓝牙及全屏入口使用统一的 40px 触控区域和 20px 线性图标，AI 入口不再依赖图片资源。升级 `Microi.Client` 后生效。
 
 接口引擎只从当前 DiyToken 读取用户 Id 和租户，不接受调用方指定目标用户/租户，也不写账号、手机号、部门、角色、Level、状态、密码、认证因子或登录审计字段。管理员表单中的“个人设置”Tab 应继续用 CollapseGroup 将语言与首页、主题与菜单、桌面外观分组。
 
@@ -513,6 +529,21 @@ V8.Result = {
 >* **关联表**：join哪些表，设置表的别名
 
 >* **查询列**：select哪些字段
+
+>* **多级表头**：`sys_menu.TableHeaders` 填写 JSON 数组；每组 `Label` 为合并表头标题，`Fields` 为当前可见且连续的查询列字段名。例如：
+
+```json
+[
+  { "Label": "人数（人）", "Fields": ["Total", "Male", "Female"] },
+  { "Label": "学历（人）", "Fields": ["Master", "Bachelor"] }
+]
+```
+
+分组内可再使用 `Children` 建立更深层表头。未配置或 JSON 错误、字段重复、列不连续时保留普通单层表头，防止数据列错位。排序、筛选、行操作仍使用原字段。需要模块引擎官方应用 v8.4.3 和支持 `ModuleMultiHeaderV1` 的新版客户端；AI 可在 Manifest 的 `modules[].tableHeaders` 中填写同样的数组。
+
+如需三级表头，可用 `[{"Label":"人员","Children":[{"Label":"人数（人）","Fields":["Total","Male","Female"]},{"Label":"学历（人）","Fields":["Master","Bachelor"]}]}]`。`Children` 中每个子组仍需 `Label` 和 `Fields`（或继续嵌套 `Children`），所有底层字段在实际表格中必须连续。
+
+模块引擎【更多配置】新增两个独立开关：`HideTableBanner` 对应“关闭表格顶部 Banner 区域”，`HideFormBanner` 对应“关闭表单顶部 Banner 区域”。默认均为关闭，即两个 Banner 正常显示。开启后对应 Banner 不渲染，其专属统计接口也不会执行；按钮角标等其它功能接口保持正常。AI 可在 Manifest 模块中传 `hideTableBanner: 1` 或 `hideFormBanner: 1`。这些开关仅控制当前模块，不修改 `diy_table.FormPresentation` 的共享配置。
 
 >* **不显示列**：有些id字段select后不需要显示在表格上
 

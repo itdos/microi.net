@@ -42,6 +42,18 @@
                     </div>
                 </div>
 
+                <!-- 全局边角风格 -->
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title">
+                        <el-icon><Grid /></el-icon>
+                        <span>边角风格</span>
+                    </div>
+                    <div class="mci-mode-row" role="group" aria-label="边角风格">
+                        <button type="button" class="mci-mode-btn" :class="{ active: cornerStyle === 'round' }" @click="changeCornerStyle('round')">圆角</button>
+                        <button type="button" class="mci-mode-btn" :class="{ active: cornerStyle === 'square' }" @click="changeCornerStyle('square')">直角</button>
+                    </div>
+                </div>
+
                 <!-- 主题色（MCI 设计系统统一调色板） -->
                 <div class="mci-theme-section">
                     <div class="mci-theme-title">
@@ -91,8 +103,7 @@
         <template #reference>
             <slot name="trigger">
                 <button type="button" class="theme-select-trigger" aria-label="主题设置" title="主题设置">
-                    <!-- <el-icon class="theme-icon"><Brush /></el-icon> -->
-                    <font-awesome-icon icon="fa-solid fa-shirt" style="font-size: 16px;" />
+                    <el-icon class="theme-icon"><Brush /></el-icon>
                 </button>
             </slot>
         </template>
@@ -100,10 +111,11 @@
 </template>
 
 <script>
-import { Brush, Sunny, Moon, Check, MagicStick, InfoFilled } from "@element-plus/icons-vue";
+import { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid } from "@element-plus/icons-vue";
 import { computed, watch } from "vue";
 import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
+import { getCornerStyle, setCornerStyle } from "@/utils/theme-shape.js";
 import {
     getThemePalettes,
     setThemeColor as applyThemeColor,
@@ -113,14 +125,15 @@ import {
 import {
     hasInstalledUserPreference,
     resolveUserThemeColor,
-    resolveUserThemeMode
+    resolveUserThemeMode,
+    resolveUserCornerStyle
 } from "@/utils/user-visual-preferences.js";
 
 const DEFAULT_THEME_COLOR = "#409eff";
 
 export default {
     name: "ThemeSelect",
-    components: { Brush, Sunny, Moon, Check, MagicStick, InfoFilled },
+    components: { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid },
     props: {
         showMode: {
             type: Boolean,
@@ -158,6 +171,7 @@ export default {
         return {
             ShowThemes: false,
             themeMode: 'light',
+            cornerStyle: getCornerStyle(),
             pendingPreferencePatch: {},
             preferenceSaveTimer: null,
             preferenceSaveInFlight: false,
@@ -172,7 +186,8 @@ export default {
         },
         canSyncThemePreferences() {
             return hasInstalledUserPreference(this.CurrentUser, "ThemeMode")
-                || hasInstalledUserPreference(this.CurrentUser, "ThemeColor");
+                || hasInstalledUserPreference(this.CurrentUser, "ThemeColor")
+                || hasInstalledUserPreference(this.CurrentUser, "CornerStyle");
         },
         preferenceSaveStatusText() {
             const keys = {
@@ -193,6 +208,7 @@ export default {
             "light"
         );
         setThemeMode(this.themeMode);
+        this.applyResolvedCornerStyle();
         const appliedColor = applyThemeColor(this.themeColor || DEFAULT_THEME_COLOR);
         if (appliedColor && !this.isActive(appliedColor)) this.diyStore.setThemeColor(appliedColor);
     },
@@ -205,9 +221,22 @@ export default {
         },
         "SysConfig.ThemeMode"() {
             this.applyResolvedThemeMode();
+        },
+        "CurrentUser.CornerStyle"() {
+            this.applyResolvedCornerStyle();
+        },
+        "CurrentUser.Id"() {
+            this.applyResolvedCornerStyle();
         }
     },
     methods: {
+        applyResolvedCornerStyle() {
+            this.cornerStyle = setCornerStyle(resolveUserCornerStyle(this.CurrentUser, getCornerStyle()));
+        },
+        changeCornerStyle(style) {
+            this.cornerStyle = setCornerStyle(style);
+            this.saveInstalledVisualPreferences({ CornerStyle: this.cornerStyle });
+        },
         applyResolvedThemeMode() {
             const mode = resolveUserThemeMode(
                 this.CurrentUser,
@@ -282,8 +311,11 @@ export default {
                 if (!result || result.Code !== 1) {
                     throw new Error(result?.Msg || "个人主题偏好保存失败");
                 }
-                if (result.Data) {
-                    this.diyStore.setCurrentUser({ ...result.Data, ...this.pendingPreferencePatch });
+                // RefreshLoginUser may return a scheduled refresh receipt rather
+                // than the login-user projection. Keep the authenticated user
+                // snapshot unless the response identifies this same user.
+                if (result.Data?.Id && String(result.Data.Id) === String(this.CurrentUser?.Id)) {
+                    this.diyStore.setCurrentUser({ ...this.CurrentUser, ...result.Data, ...this.pendingPreferencePatch });
                 }
                 succeeded = true;
                 this.preferenceSaveState = Object.keys(this.pendingPreferencePatch).length ? "pending" : "saved";

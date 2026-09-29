@@ -1181,6 +1181,7 @@ trustedOfficialPlatformPackage = trustedOfficialPlatformPackage || trustedEmbedd
 var listSize = function (value) {
     return value && value.length !== undefined ? Number(value.length) || 0 : 0;
 };
+// ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1: only the unique current-tenant administrator role may be restored.
 // BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1：历史 BulkAdaptiveSingleSlice
 // 只按资源条数估算工作量，会把包含重 DDL、实体生成和权限回填的官方包误判为
 // “小包”，造成单事务长期占用且没有可恢复检查点。为兼容旧批量工作器继续接收
@@ -9634,7 +9635,16 @@ try {
         reportProgress(95, '正在导入接口引擎');
         debugLog.step7 = '开始处理sys_apiengine数据';
 
-        var sysApiEngines = Package.SysApiEngines;
+        // Keep the official resource publisher outside all installable packages.
+        var sysApiEngines = [];
+        for (var protectedIndex = 0; protectedIndex < Package.SysApiEngines.length; protectedIndex++) {
+            var protectedCandidate = Package.SysApiEngines[protectedIndex];
+            if (String(protectedCandidate && protectedCandidate.ApiEngineKey || '').toLowerCase() === 'get-microi-upgrade-resource') {
+                debugLog['apiengine_protected_' + protectedIndex] = '跳过受保护接口引擎：' + protectedCandidate.ApiEngineKey;
+                continue;
+            }
+            sysApiEngines.push(protectedCandidate);
+        }
 
         for (var i = 0; i < sysApiEngines.length; i++) {
             var apiEngine = sysApiEngines[i];

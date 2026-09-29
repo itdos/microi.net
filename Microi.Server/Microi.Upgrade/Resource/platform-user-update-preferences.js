@@ -91,6 +91,16 @@ if (hasValue('ThemeMode')) {
   updateCount++;
 }
 
+if (hasValue('CornerStyle')) {
+  // 枚举先在后端校验，再写当前 DiyToken 用户，禁止透传任意样式值。
+  var cornerStyle = text(param.CornerStyle).toLowerCase();
+  if (cornerStyle !== 'round' && cornerStyle !== 'square') {
+    return fail('边角风格只能是 round 或 square。');
+  }
+  updateModel.CornerStyle = cornerStyle;
+  updateCount++;
+}
+
 if (hasValue('MenuChildExpandMode')) {
   var menuModeRaw = text(param.MenuChildExpandMode).toLowerCase();
   var menuMode = menuModeRaw === '' || menuModeRaw === 'system'
@@ -193,7 +203,7 @@ function comparablePreference(name, value) {
   }
   var result = text(value);
   if (name === 'ThemeColor') return result.toUpperCase();
-  if (name === 'ThemeMode' || name === 'DesktopType') return result.toLowerCase();
+  if (name === 'ThemeMode' || name === 'CornerStyle' || name === 'DesktopType') return result.toLowerCase();
   return result;
 }
 
