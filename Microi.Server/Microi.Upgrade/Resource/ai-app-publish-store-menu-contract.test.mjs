@@ -12,9 +12,10 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v2.0.4 V3 source", () => {
+test("publisher package metadata matches the maintained V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v2.0.4");
+  assert.match(packagedPublisher.Version, /^v\d+\.\d+\.\d+$/);
+  assert.ok(publisherSource.includes(`Version: ${packagedPublisher.Version}`));
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -1073,7 +1074,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v2\.0\.4/);
+  assert.ok(publisherSource.includes(`Version: ${packagedPublisher.Version}`));
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

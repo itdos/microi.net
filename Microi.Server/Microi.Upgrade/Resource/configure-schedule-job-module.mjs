@@ -83,6 +83,7 @@ const resumeCode = `V8.ConfirmTips('确认要恢复吗？', function(){
 });`;
 
 const viewSchema = {
+  PresentationStatistics: { Version: 1, MenuCountEnabled: true, MenuWhere: [] },
   Views: [
     {
       Key: `${menuId}-list`,
@@ -110,6 +111,7 @@ const viewSchema = {
               Label: '启用',
               Source: 'ApiEngine',
               ApiEngineKey: 'mci-module-presentation-stats',
+              Count: { Where: [['Status', '=', '正常']] },
               ValuePath: '',
               Icon: 'fas fa-circle-check',
               Tone: 'success',

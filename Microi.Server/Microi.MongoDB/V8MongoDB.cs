@@ -495,7 +495,10 @@ namespace Microi.net
                         var writeResult = await collection.BulkWriteAsync(writes, new BulkWriteOptions { IsOrdered = false }).ConfigureAwait(false);
                         if (!writeResult.IsAcknowledged)
                             return new DosResult(0, null, "MongoDB did not acknowledge sys log persistence.");
-                        await EnsureSysLogIndexesAsync(host).ConfigureAwait(false);
+                        // 索引维护发生在已确认持久化之后；索引失败不能把成功写入
+                        // 误报成 MongoDB 故障，进而让运行日志重复写入 MySQL 兜底表。
+                        try { await EnsureSysLogIndexesAsync(host).ConfigureAwait(false); }
+                        catch { Console.Error.WriteLine("Microi：系统日志已写入 MongoDB，但索引维护失败；请检查索引诊断。"); }
                         _sysLogCircuitOpenUntil.TryRemove(circuitKey, out _);
                         persisted += writes.Count;
                     }
@@ -562,6 +565,8 @@ namespace Microi.net
         {
             if (param.TargetType == ScheduleExecutionLog.TargetType)
                 return await GetScheduleLogs(param).ConfigureAwait(false);
+            if (param.TargetType == "MqttEvent")
+                return await GetMqttLogs(param).ConfigureAwait(false);
             //如果传入了时间
             var tableName = "log_";
             if (param._SearchMonth.DosIsNullOrWhiteSpace())
@@ -757,6 +762,41 @@ namespace Microi.net
             // 精确任务范围 + 稳定游标 + 多取一条，千万级日志也不执行 Count/Skip。
             var rows = await MongodbClient<SysLog>.MongodbInfoClient(host)
                 .Find(filter, new FindOptions { MaxTime = TimeSpan.FromSeconds(10), Hint = new BsonString("idx_Job_Target_Time_Event") })
+                .Sort(Builders<SysLog>.Sort.Descending(x => x.CreateTime).Descending(x => x.EventId))
+                .Limit(size + 1).ToListAsync().ConfigureAwait(false);
+            var more = rows.Count > size;
+            if (more) rows.RemoveAt(rows.Count - 1);
+            var last = rows.LastOrDefault();
+            return new DosResultList<SysLog>(1, rows, "", rows.Count)
+            {
+                DataAppend = new { HasMore = more, BeforeLogTime = last?.CreateTime, BeforeLogId = last?.EventId, ExactTotal = false }
+            };
+        }
+
+        private async Task<DosResultList<SysLog>> GetMqttLogs(SysLogParam param)
+        {
+            if (string.IsNullOrWhiteSpace(param.OsClient)
+                || !DateTime.TryParseExact(param._SearchMonth, "yyyyMM", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out _)
+                || (param.TargetId?.Length ?? 0) > 100)
+                return new DosResultList<SysLog>(0, null, "MQTT 日志查询月份或客户端不合法。");
+            var host = CreateTenantMongoHost(param.OsClient, "log_" + param._SearchMonth);
+            await EnsureSysLogIndexesAsync(host).ConfigureAwait(false);
+            var f = Builders<SysLog>.Filter;
+            var filter = f.Eq(x => x.TargetType, "MqttEvent");
+            if (!string.IsNullOrWhiteSpace(param.TargetId)) filter &= f.Eq(x => x.TargetId, param.TargetId);
+            if (param.BeforeLogTime.HasValue)
+            {
+                if (string.IsNullOrWhiteSpace(param.BeforeLogId) || param.BeforeLogId.Length > 100)
+                    return new DosResultList<SysLog>(0, null, "日志翻页游标不完整。");
+                filter &= f.Lt(x => x.CreateTime, param.BeforeLogTime.Value)
+                    | (f.Eq(x => x.CreateTime, param.BeforeLogTime.Value) & f.Lt(x => x.EventId, param.BeforeLogId));
+            }
+            var size = Math.Clamp(param._PageSize ?? 20, 1, 100);
+            var hint = string.IsNullOrWhiteSpace(param.TargetId)
+                ? "idx_Target_Time_Event" : "idx_Job_Target_Time_Event";
+            var rows = await MongodbClient<SysLog>.MongodbInfoClient(host)
+                .Find(filter, new FindOptions { MaxTime = TimeSpan.FromSeconds(10), Hint = new BsonString(hint) })
                 .Sort(Builders<SysLog>.Sort.Descending(x => x.CreateTime).Descending(x => x.EventId))
                 .Limit(size + 1).ToListAsync().ConfigureAwait(false);
             var more = rows.Count > size;
@@ -1626,6 +1666,11 @@ namespace Microi.net
                         Builders<SysLog>.IndexKeys.Ascending(d => d.TargetType).Ascending(d => d.TargetId)
                             .Descending(d => d.CreateTime).Descending(d => d.EventId),
                         new CreateIndexOptions { Name = "idx_Job_Target_Time_Event" }));
+                if (!existingIndexNames.Contains("idx_Target_Time_Event"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.TargetType)
+                            .Descending(d => d.CreateTime).Descending(d => d.EventId),
+                        new CreateIndexOptions { Name = "idx_Target_Time_Event" }));
                 if (!existingIndexNames.Contains("idx_CreateTime_desc"))
                     toCreate.Add(new CreateIndexModel<SysLog>(
                         Builders<SysLog>.IndexKeys.Descending(d => d.CreateTime),

@@ -147,9 +147,9 @@ namespace Microi.net
                     Msg = MicroiTaskSchedulingPolicy.SkipMessage, ScheduledFireTime = time.UtcDateTime.ToString("O"),
                     Trigger = trigger.ToString(), NodeId = node
                 });
-                // 队列接受后由持久化重放负责落库，确定性 EventId 在 MongoDB 最终去重。
-                if (!ScheduleExecutionLog.Write(tenant, job.Name, id, "Skipped", message, null, 0, time.LocalDateTime))
-                    throw new InvalidOperationException("跳过记录未被日志队列接受。");
+                // 只有持久化完成后才确认该次跳过，避免 Redis 短期预留掩盖日志故障。
+                if (!await ScheduleExecutionLog.WriteAsync(tenant, job.Name, id, "Skipped", message, null, 0, time.LocalDateTime).ConfigureAwait(false))
+                    throw new InvalidOperationException("跳过记录未能持久化。");
                 await db.ScriptEvaluateAsync("if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('set',KEYS[1],'done','EX',604800) end return 0",
                     new RedisKey[] { key }, new RedisValue[] { owner }).ConfigureAwait(false);
             }

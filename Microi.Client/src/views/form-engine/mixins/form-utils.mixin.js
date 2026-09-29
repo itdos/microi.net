@@ -159,6 +159,13 @@ export default {
             var config = field.Config && typeof field.Config === 'object'
                 ? field.Config
                 : {};
+
+            // MQTT 设备表的内置日志字段沿用旧 TableChild 元数据；新版运行日志
+            // 由受权平台入口按 MongoDB 优先、关系库故障兜底读取。
+            if (self.TableName?.toLowerCase() === 'mci_mqtt_client'
+                && field.Name === 'MqttLogs' && component === 'TableChild') {
+                return 'MicroiMqttExecutionLogs';
+            }
             
             // V8模板引擎组件（只在查看模式下）
             if (!self.DiyCommon.IsNull(field.V8TmpEngineForm) && self.FormMode == 'View') {

@@ -23,7 +23,7 @@ using Dos.ORM;using System;namespace Microi.net{
 
 		#region Model        private string _Id;		private string _Name;		private string _Description;		private string _EnName;		private string _EnDescription;		private string _Code;		private string _Url;		private string _Link;		private string _ParentId;		private int _Sort;		private string _Icon;		private string _IconClass;		private DateTime _CreateTime;		private string _OpenType;		private string _ComponentName;		private string _ComponentPath;		private string _JquerySelector;		private int _MultRun;		private int _Display;
 		private int _AppDisplay;
-        private string _Class;		private string _UserId;		private string _StoreId;		private string _DiyTableId;		private string _TableDiyFieldIds;		private string _PageTemplate;		private string _SearchFieldIds;		private string _DiyConfig;		private int? _MenuBadgeEnabled;		private string _MenuBadgeApiEngineKey;		private int _EnableViewSchema;		private string _ViewSchemaVersion;		private int _ViewConfigVersion;		private string _ViewSchema;		private string _SortFieldIds;		private string _SqlWhere;		private string _SqlJoin;		private string _StatisticsFields;		private int _IsDeleted;		private string _DefaultOrderBy;		private string _NotShowFields;		private string _ImportTemplate;		private string _ImportTemplateName;		private string _MoreBtns;		private string _ImportV8;		private string _ExportV8;		private string _ExportMoreBtns;		private string _DetailPageV8;		private string _BatchSelectMoreBtns;		private string _PageBtns;		private string _PageTabs;		private int _InTableEdit;		private string _InTableEditFields;		private string _TableHeaders;		private int _IsMicroiService;		private DateTime? _UpdateTime;		private string _UserName;		private string _FormBtns;		private string _SelectFields;		private string _JoinTables;
+        private string _Class;		private string _UserId;		private string _StoreId;		private string _DiyTableId;		private string _TableDiyFieldIds;		private string _PageTemplate;		private string _SearchFieldIds;		private string _DiyConfig;		private int? _MenuBadgeEnabled;		private string _MenuBadgeApiEngineKey;		private int _EnableViewSchema;		private string _ViewSchemaVersion;		private int _ViewConfigVersion;		private string _ViewSchema;		private string _SortFieldIds;		private string _SqlWhere;		private string _SqlJoin;		private string _StatisticsFields;		private int _IsDeleted;		private string _DefaultOrderBy;		private string _NotShowFields;		private string _ImportTemplate;		private string _ImportTemplateName;		private string _MoreBtns;		private string _ImportV8;		private string _ExportV8;		private string _ExportMoreBtns;		private string _DetailPageV8;		private string _BatchSelectMoreBtns;		private string _PageBtns;		private string _PageTabs;		private int _InTableEdit;		private string _InTableEditFields;		private string _TableHeaders;        private int? _HideTableBanner;        private int? _HideFormBanner;		private int _IsMicroiService;		private DateTime? _UpdateTime;		private string _UserName;		private string _FormBtns;		private string _SelectFields;		private string _JoinTables;
 		//private string _RoleGroup;
 
 
@@ -377,6 +377,22 @@ using Dos.ORM;using System;namespace Microi.net{
 
 		/// <summary>		/// 多级表头数据		/// </summary>        [Field("TableHeaders")]		public string TableHeaders		{			get { return _TableHeaders; }			set			{				this.OnPropertyValueChange("TableHeaders");				this._TableHeaders = value;			}		}
 
+        /// <summary>关闭模块列表顶部 Banner；空值保持显示。</summary>
+        [Field("HideTableBanner")]
+        public int? HideTableBanner
+        {
+            get { return _HideTableBanner; }
+            set { OnPropertyValueChange("HideTableBanner"); _HideTableBanner = value; }
+        }
+
+        /// <summary>关闭模块表单顶部 Banner；空值保持显示。</summary>
+        [Field("HideFormBanner")]
+        public int? HideFormBanner
+        {
+            get { return _HideFormBanner; }
+            set { OnPropertyValueChange("HideFormBanner"); _HideFormBanner = value; }
+        }
+
 
 
 
@@ -457,7 +473,7 @@ using Dos.ORM;using System;namespace Microi.net{
 			return new Field[] {				_.Id,				_.Name,				_.Description,				_.EnName,				_.EnDescription,				_.Code,				_.Url,				_.Link,				_.ParentId,				_.Sort,				_.Icon,				_.IconClass,				_.CreateTime,				_.OpenType,				_.ComponentName,				_.ComponentPath,				_.JquerySelector,				_.MultRun,				_.Display,				_.AppDisplay,
                 _.Class,				_.UserId,				_.StoreId,				_.DiyTableId,				_.TableDiyFieldIds,				_.PageTemplate,				_.SearchFieldIds,				_.DiyConfig,
 				_.MenuBadgeEnabled,
-				_.MenuBadgeApiEngineKey,				_.EnableViewSchema,				_.ViewSchemaVersion,				_.ViewConfigVersion,				_.ViewSchema,				_.SortFieldIds,				_.SqlWhere,				_.SqlJoin,				_.StatisticsFields,				_.IsDeleted,				_.DefaultOrderBy,				_.NotShowFields,				_.ImportTemplate,				_.ImportTemplateName,				_.MoreBtns,				_.ImportV8,				_.ExportV8,				_.ExportMoreBtns,				_.DetailPageV8,				_.BatchSelectMoreBtns,				_.PageBtns,				_.PageTabs,				_.InTableEdit,				_.InTableEditFields,				_.TableHeaders,				_.IsMicroiService,				_.UpdateTime,				_.UserName,				_.FormBtns,				_.SelectFields,				_.JoinTables,				//_.RoleGroup,			};
+				_.MenuBadgeApiEngineKey,				_.EnableViewSchema,				_.ViewSchemaVersion,				_.ViewConfigVersion,				_.ViewSchema,				_.SortFieldIds,				_.SqlWhere,				_.SqlJoin,				_.StatisticsFields,				_.IsDeleted,				_.DefaultOrderBy,				_.NotShowFields,				_.ImportTemplate,				_.ImportTemplateName,				_.MoreBtns,				_.ImportV8,				_.ExportV8,				_.ExportMoreBtns,				_.DetailPageV8,				_.BatchSelectMoreBtns,				_.PageBtns,				_.PageTabs,				_.InTableEdit,				_.InTableEditFields,				_.TableHeaders,                _.HideTableBanner,                _.HideFormBanner,				_.IsMicroiService,				_.UpdateTime,				_.UserName,				_.FormBtns,				_.SelectFields,				_.JoinTables,				//_.RoleGroup,			};
 		}
 
 
@@ -470,7 +486,7 @@ using Dos.ORM;using System;namespace Microi.net{
 			return new object[] {				this._Id,				this._Name,				this._Description,				this._EnName,				this._EnDescription,				this._Code,				this._Url,				this._Link,				this._ParentId,				this._Sort,				this._Icon,				this._IconClass,				this._CreateTime,				this._OpenType,				this._ComponentName,				this._ComponentPath,				this._JquerySelector,				this._MultRun,				this._Display,				this._AppDisplay,
                 this._Class,				this._UserId,				this._StoreId,				this._DiyTableId,				this._TableDiyFieldIds,				this._PageTemplate,				this._SearchFieldIds,				this._DiyConfig,
 				this._MenuBadgeEnabled,
-				this._MenuBadgeApiEngineKey,				this._EnableViewSchema,				this._ViewSchemaVersion,				this._ViewConfigVersion,				this._ViewSchema,				this._SortFieldIds,				this._SqlWhere,				this._SqlJoin,				this._StatisticsFields,				this._IsDeleted,				this._DefaultOrderBy,				this._NotShowFields,				this._ImportTemplate,				this._ImportTemplateName,				this._MoreBtns,				this._ImportV8,				this._ExportV8,				this._ExportMoreBtns,				this._DetailPageV8,				this._BatchSelectMoreBtns,				this._PageBtns,				this._PageTabs,				this._InTableEdit,				this._InTableEditFields,				this._TableHeaders,				this._IsMicroiService,				this._UpdateTime,				this._UserName,				this._FormBtns,				this._SelectFields,				this._JoinTables,				//this._RoleGroup,			};
+				this._MenuBadgeApiEngineKey,				this._EnableViewSchema,				this._ViewSchemaVersion,				this._ViewConfigVersion,				this._ViewSchema,				this._SortFieldIds,				this._SqlWhere,				this._SqlJoin,				this._StatisticsFields,				this._IsDeleted,				this._DefaultOrderBy,				this._NotShowFields,				this._ImportTemplate,				this._ImportTemplateName,				this._MoreBtns,				this._ImportV8,				this._ExportV8,				this._ExportMoreBtns,				this._DetailPageV8,				this._BatchSelectMoreBtns,				this._PageBtns,				this._PageTabs,				this._InTableEdit,				this._InTableEditFields,				this._TableHeaders,                this._HideTableBanner,                this._HideFormBanner,				this._IsMicroiService,				this._UpdateTime,				this._UserName,				this._FormBtns,				this._SelectFields,				this._JoinTables,				//this._RoleGroup,			};
 		}
 
 
@@ -846,6 +862,8 @@ using Dos.ORM;using System;namespace Microi.net{
 
 
 			/// <summary>			/// 多级表头数据			/// </summary>            public readonly static Field TableHeaders = new Field("TableHeaders", "sys_menu", "多级表头数据");
+            public readonly static Field HideTableBanner = new Field("HideTableBanner", "sys_menu", "关闭表格顶部 Banner 区域");
+            public readonly static Field HideFormBanner = new Field("HideFormBanner", "sys_menu", "关闭表单顶部 Banner 区域");
 
 
 

@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.6.9
+ * Version: v1.7.1
  * Function:
- * - AI应用编译发布、固定最新版发布、可恢复大文件下载登记与受控静态资源热修；固定入口使用永久加载壳解析数据库已提交的当前版本，历史入口保留不可变产物；并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
+ * - AI 应用历史发布兼容与固定最新版 CDN 精确刷新
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || "成功" }; }
@@ -245,16 +245,42 @@ function aliyunPercentEncode(value) {
     .replace(/\*/g, "%2A")
     .replace(/%7E/gi, "~");
 }
-function osClientSecretValue(name) {
-  try { return text(V8.OsClientModel && V8.OsClientModel[name]); } catch (e) { return ""; }
+function aliyunCdnCredentials() {
+  var settings = V8.SysConfig && V8.SysConfig.ServerPrivateSettings || {};
+  var saas = V8.OsClientModel || {};
+  var prefixes = ["Integration.Cdn.Aliyun.", "Integration.Dns.Aliyun."];
+  for (var i = 0; i < prefixes.length; i++) {
+    var id = text(settings[prefixes[i] + "AccessKeyId"]).trim();
+    var secret = text(settings[prefixes[i] + "AccessKeySecret"]).trim();
+    if (id || secret) {
+      if (!id || !secret) return fail("当前租户 CDN 凭据配置不成对：" + prefixes[i]);
+      return ok({ Id: id, Secret: secret });
+    }
+  }
+  var legacyPairs = [["AlidnsKeyId", "AlidnsKeySecret"],
+    ["AliOssPublicAccessKeyId", "AliOssPublicAccessKeySecret"]];
+  for (var pairIndex = 0; pairIndex < legacyPairs.length; pairIndex++) {
+    var names = legacyPairs[pairIndex];
+    var oldId = text(saas[names[0]]).trim();
+    var oldSecret = text(saas[names[1]]).trim();
+    if (oldId || oldSecret) {
+      if (!oldId || !oldSecret) return fail("当前租户 CDN 凭据配置不成对：" + names[0]);
+      return ok({ Id: oldId, Secret: oldSecret });
+    }
+  }
+  return fail("当前租户未配置阿里云 CDN 凭据");
 }
 function refreshStableCdnPaths(paths, allowMutableAssets) {
   var fileServer = "";
   try { fileServer = text(V8.SysConfig && V8.SysConfig.FileServer).replace(/\/+$/, ""); } catch (e) {}
   if (!/^https?:\/\//i.test(fileServer)) return ok({ Skipped: true, Reason: "FileServer不是HTTP CDN地址" });
-  var accessKeyId = osClientSecretValue("AliOssPublicAccessKeyId");
-  var accessKeySecret = osClientSecretValue("AliOssPublicAccessKeySecret");
-  if (isBlank(accessKeyId) || isBlank(accessKeySecret)) return ok({ Skipped: true, Reason: "未配置公有桶AccessKey" });
+  var credentials = aliyunCdnCredentials();
+  if (!credentials || credentials.Code !== 1) {
+    if (fileServer === "https://static.itdos.com") return credentials || fail("官方 CDN 凭据不可用");
+    return ok({ Skipped: true, Reason: "当前租户未配置阿里云 CDN 凭据" });
+  }
+  var accessKeyId = credentials.Data.Id;
+  var accessKeySecret = credentials.Data.Secret;
   var urls = [];
   var seen = {};
   var sourcePaths = toArray(paths);

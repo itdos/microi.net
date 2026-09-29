@@ -1470,10 +1470,10 @@ test('trusted empty-tenant bootstrap restores only the missing role already refe
   const replay = runAdminMenuPermissionFixture({ roles: result.calls.roleInserts, roleLimits: result.roleLimits, users: [user] });
   assert.equal(replay.calls.roleInserts.length, 0);
   assert.equal(replay.calls.add.length + replay.calls.update.length, 0);
-  const alternateId = 'some-other-role';
-  const alternateUser = { ...user, RoleIds: JSON.stringify([alternateId]) };
-  const alternate = runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [alternateUser], missingRoleLimitMetadata: true });
-  assert.deepEqual(alternate.calls.roleInserts.map(role => role.Id), [alternateId]);
+  const portableUser = { ...user, RoleIds: JSON.stringify(['some-other-role']) };
+  const portable = runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [portableUser] });
+  assert.deepEqual(portable.calls.roleInserts.map(role => role.Id), ['some-other-role']);
+  assert.deepEqual(portable.roleLimits.map(limit => limit.RoleId), ['some-other-role']);
   for (const variant of [
     { trustedOfficial: false },
     { users: [] },

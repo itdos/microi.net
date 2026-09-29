@@ -7,6 +7,33 @@ description: Microi V8 工作流事件指南。用于编写审批流条件、节
 
 # Microi V8 工作流事件开发
 
+## AI / MCP 生成流程的必检契约
+
+这里的流程是 `wf_flowdesign + wf_node + wf_line` 审批引擎，不是 `ai-workflow`。
+先用 `microi_get_db_schema` 查询 `wf_flowdesign`、`wf_node`、`wf_line`、
+`sys_menu` 与目标业务表，再用 `microi_list_roles` 或管理员只读表查询确认当前租户的
+真实用户、角色、部门、岗位 Id。人工节点 `Approve/Countersign/End` 必须配置
+`Users/Roles/Depts/BindJobs` 至少一种真实 `[{"Id":"...","Name":"..."}]`
+绑定，或明确采用上游节点 `AllowSelectUsers=1` 手动选人。
+`SameDeptApprove=1` 只筛选候选人，不能单独产生审批人。
+不能把 `Roles:"Manager"`、字符串 Id 数组或另一个租户的 Id 当作绑定。
+
+节点类型只使用 `Start/Auto/Business/Approve/Countersign/End/AutoEnd`；
+`End` 是人工节点，自动结束用 `AutoEnd`。每个节点应有稳定 Id；
+`PositionLeft/PositionTop` 使用像素（如 `"320px"`）。新版 MCP 对缺失坐标按
+拓扑层级布局并补 `px`，明确重叠、非法类型、断线、不可达、无人审批会在写入前失败。
+节点人员绑定在写入时仅保留 `Id/Name`，不能把完整 `sys_user` 记录及密码字段嵌入流程。
+MCP 写入前会回读当前租户的用户、角色、部门和岗位 Id；回读失败或 Id 不存在时停止保存。
+
+模块入口使用 `sys_menu.OpenType="WorkFlow"`、`FlowDesignId=<已启用流程真实 Id>`，
+`DiyTableId` 与 `wf_flowdesign.TableId` 相同。完整 Manifest 内可用模块
+`flowName` 指向同一份 `workflows[].FlowDesign.FlowName`，生成器保存流程后补写并回读
+`FlowDesignId`；引用既有流程时传 `flowDesignId`。上线前从模块打开并发起一条真实
+业务记录，确认流程图节点、人员待办、审批、历史与模块入口均正确。
+
+全部配置字段、节点类型和运行操作见
+[流程配置清单](references/workflow-configuration.md)。
+
 你正在开发 Microi 吾码平台的工作流（审批流程）V8 事件。流程引擎基于表单引擎，通过 V8 事件控制审批逻辑。
 
 ## 后端类库与接口边界

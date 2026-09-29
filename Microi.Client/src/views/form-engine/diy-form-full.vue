@@ -241,6 +241,7 @@
                             :FieldSearchKeyword="FormFieldSearchKeyword"
                             :PresentationMode="PresentationMode"
                             :PresentationConfig="PresentationConfig"
+                            :HideTopBanner="IsFormTopBannerHidden()"
                             @CallbackFormSubmit="CallbackFormSubmitPage"
                             @CallbackSetFormData="CallbackSetFormData"
                             @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
@@ -641,6 +642,7 @@
                         :FieldSearchKeyword="FormFieldSearchKeyword"
                         :PresentationMode="PresentationMode"
                         :PresentationConfig="PresentationConfig"
+                        :HideTopBanner="IsFormTopBannerHidden()"
                         :DefaultValues="FieldFormDefaultValues"
                         :SelectFields="FieldFormSelectFields"
                         :FixedTabs="FieldFormFixedTabs"
@@ -1053,6 +1055,7 @@
                         :FieldSearchKeyword="FormFieldSearchKeyword"
                         :PresentationMode="PresentationMode"
                         :PresentationConfig="PresentationConfig"
+                        :HideTopBanner="IsFormTopBannerHidden()"
                         :DefaultValues="FieldFormDefaultValues"
                         :SelectFields="FieldFormSelectFields"
                         :FixedTabs="FieldFormFixedTabs"
@@ -1277,6 +1280,7 @@
                 :FormMode="'View'"
                 :LoadMode="'DataVersionPreview'"
                 :TableId="TableId"
+                :HideTopBanner="IsFormTopBannerHidden()"
                 :SysMenuId="SysMenuId"
                 :TableName="TableName"
                 :TableRowId="''"
@@ -1385,6 +1389,7 @@ import { isFormMaskBlurEnabled } from "@/utils/form-mask-blur.js";
 import { sanitizeHtml } from "@/utils/safe-html.js";
 import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode, runV8ButtonVisibilityCodeAsync } from "@/utils/v8-button-visibility";
 import { resolveFormPresentationConfig } from "./form-presentation-runtime.js";
+import { isModuleBannerHidden } from "./utils/module-banner-visibility.js";
 import {
     diyFormFullCleanupMixin,
     diyFormFullMobileMixin,
@@ -1582,6 +1587,9 @@ export default {
     //  3) ParentV8_Data 闭包持有
     //  4) Element Plus 子组件 ref（fieldForm、refWFHistory 等）
     methods: {
+        IsFormTopBannerHidden() {
+            return isModuleBannerHidden(this.SysMenuModel?.HideFormBanner);
+        },
         GetFormPresentation() {
             return resolveFormPresentationConfig(this.CurrentDiyTableModel || {}, {}, "");
         },

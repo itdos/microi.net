@@ -11,6 +11,7 @@ test('默认七天边界和文案分钟倒计时', () => {
   assert.match(model.project(null, 'Enterprise', end.replace('.000Z','.123Z'), now, false).Content, /2026-10-01 19:38:00 UTC/);
   assert.equal(model.project(null, 'Enterprise', end, now - 2 * 86400000, false), null);
   assert.equal(model.project(null, 'OpenSource', end, now, false), null);
+  assert.equal(model.project(null, 'Enterprise', '0001-01-01T00:00:00Z', now, false), null);
   assert.match(model.project(null, 'Personal', end, Date.parse(end), false).Content, /倒计时0天0小时0分/);
 });
 test('官方和父级阈值独立，不要求官方提醒先触发', () => {

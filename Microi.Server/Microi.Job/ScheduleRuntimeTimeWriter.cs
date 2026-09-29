@@ -19,8 +19,16 @@ namespace Microi.net
 
         internal static bool HasChanged(JObject observed, string lastTime, string nextTime)
         {
-            return !string.Equals(ReadTime(observed["LastTime"]) ?? "", lastTime ?? "", StringComparison.Ordinal)
+            return !string.Equals(ReadTime(observed["LastTime"]) ?? "", PreserveLastExecution(observed, lastTime), StringComparison.Ordinal)
                 || !string.Equals(ReadTime(observed["NextTime"]) ?? "", nextTime ?? "", StringComparison.Ordinal);
+        }
+
+        // Quartz creates a fresh trigger when its cron is edited. Its PreviousFireTime is then
+        // null, but that does not erase the job's last actual execution before the edit.
+        internal static string PreserveLastExecution(JObject observed, string quartzLastTime)
+        {
+            var persisted = ReadTime(observed["LastTime"]);
+            return string.IsNullOrWhiteSpace(quartzLastTime) ? persisted ?? "" : quartzLastTime;
         }
 
         internal static Task<int> WriteAsync(string osClient, JObject observed, string lastTime, string nextTime)
@@ -39,6 +47,7 @@ namespace Microi.net
             if (observed == null || string.IsNullOrWhiteSpace(observed["Id"]?.Value<string>()))
                 throw new ArgumentException("运行状态写回必须指定已读取的任务行。", nameof(observed));
             if (!HasChanged(observed, lastTime, nextTime)) return 0;
+            lastTime = PreserveLastExecution(observed, lastTime);
 
             // 每分钟的运行态投影不是配置修改。通用 UptFormData 会无条件生成完整版本，
             // 并在每次写入前扫描历史版本号；此处只允许固定表、固定两列的参数化更新。

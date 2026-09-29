@@ -9,7 +9,7 @@ const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const resource = JSON.parse(fs.readFileSync(path.join(resourceDir, "app.microi.module-engine.json"), "utf8"));
 
 test("module engine package version and physical menu badge columns are current", () => {
-    assert.equal(resource.PackageInfo.Version, "v8.4.2");
+    assert.equal(resource.PackageInfo.Version, "v8.4.3");
     assert.ok(resource.PackageInfo.RequiredPlatformCapabilities.includes("ClientFeature:TagsViewBoundFormDesign"));
     const physicalNames = new Set((resource.PhysicalColumns || []).map((item) => item.COLUMN_NAME));
     for (const name of ["MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema", "DetailCodeShowV8"]) {
@@ -17,6 +17,20 @@ test("module engine package version and physical menu badge columns are current"
         assert.match(resource.DDLStatements[0].DDL, new RegExp(`\\b${name}\\b`));
     }
     assert.ok(physicalNames.has("FormPresentation"), "missing shared diy_table.FormPresentation snapshot");
+});
+
+test("module configuration exposes multilevel headers and independent Banner switches", () => {
+    const headers = field("TableHeaders");
+    assert.equal(headers.Visible, 1);
+    assert.equal(headers.Tab, field("SelectFields").Tab);
+    const sourceTabs = configOf(field("DataSourceFieldTabs")).FieldTabs.Tabs;
+    assert.ok(sourceTabs.some((tab) => tab.FieldNames.includes("TableHeaders")));
+    for (const name of ["HideTableBanner", "HideFormBanner"]) {
+        assert.equal(field(name).Visible, 1);
+        assert.equal(field(name).Component, "Switch");
+        assert.ok(resource.PhysicalColumns.some((column) => column.TABLE_NAME === "sys_menu" && column.COLUMN_NAME === name));
+        assert.match(resource.DDLStatements[0].DDL, new RegExp(name));
+    }
 });
 
 test("CodeForm menu keeps table authorization while selecting a MicroService page", () => {
@@ -42,6 +56,12 @@ test("CodeForm menu keeps table authorization while selecting a MicroService pag
     window.ApplyMicroServicePage(v8, { RoutePath: "/forms/biz_order", MenuUrl: "/micro-app/microi-generated-forms/forms/biz_order" });
     assert.equal(form.DiyTableId, "table-1");
     assert.equal(form.MicroServiceRoutePath, "/forms/biz_order");
+});
+
+test("WorkFlow menu exposes both the business table and bound flow selector", () => {
+    const event = resource.DiyTables.find((item) => item.Name === "sys_menu").InFormV8;
+    assert.match(event, /openTypeKey == 'Diy' \|\| openTypeKey == 'CodeForm' \|\| openTypeKey == 'WorkFlow'/);
+    assert.match(event, /FieldSet\('FlowDesignId', 'Visible', openTypeKey == 'WorkFlow'\)/);
 });
 
 function field(name) {

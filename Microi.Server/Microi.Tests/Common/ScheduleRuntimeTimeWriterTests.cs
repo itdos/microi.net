@@ -13,6 +13,8 @@ public class ScheduleRuntimeTimeWriterTests
     [InlineData("2026-09-13 12:00:00", "2026-09-13 12:01:00", "2026-09-13 12:00:00", "2026-09-13 12:01:00", false)]
     [InlineData(null, "", "2026-09-13 12:00:00", "2026-09-13 12:01:00", true)]
     [InlineData("2026-09-13 12:00:00", "2026-09-13 12:01:00", "2026-09-13 12:00:00", "", true)]
+    [InlineData("2026-09-13 12:00:00", "2026-09-13 12:01:00", "", "2026-09-14 12:01:00", true)]
+    [InlineData("2026-09-13 12:00:00", "2026-09-13 12:01:00", "", "2026-09-13 12:01:00", false)]
     public void UnchangedRuntimeDoesNotNeedPersistence(string? oldLast, string? oldNext, string? last, string? next, bool changed)
         => Assert.Equal(changed, ScheduleRuntimeTimeWriter.HasChanged(new JObject { ["LastTime"] = oldLast, ["NextTime"] = oldNext }, last!, next!));
 
@@ -21,6 +23,14 @@ public class ScheduleRuntimeTimeWriterTests
     {
         var row = new JObject { ["LastTime"] = new DateTime(2026, 9, 13, 12, 0, 0), ["NextTime"] = "" };
         Assert.False(ScheduleRuntimeTimeWriter.HasChanged(row, "2026-09-13 12:00:00", ""));
+    }
+
+    [Fact]
+    public void FreshQuartzTriggerDoesNotErasePreviousExecution()
+    {
+        var row = new JObject { ["LastTime"] = "2026-09-28 22:10:00", ["NextTime"] = "2026-09-29 22:10:00" };
+        Assert.Equal("2026-09-28 22:10:00", ScheduleRuntimeTimeWriter.PreserveLastExecution(row, ""));
+        Assert.True(ScheduleRuntimeTimeWriter.HasChanged(row, "", "2026-09-30 08:10:00"));
     }
 
     [Fact]
@@ -73,6 +83,11 @@ public class ScheduleRuntimeTimeWriterIntegrationTests
             observed["LastTime"] = "2026-09-13 12:00:00";
             observed["NextTime"] = "2026-09-13 12:01:00";
             Assert.Equal(0, await ScheduleRuntimeTimeWriter.WriteAsync(db, observed, observed["LastTime"]!.ToString(), observed["NextTime"]!.ToString()));
+            // Rescheduling a cron gives Quartz a fresh trigger with no PreviousFireTime.
+            // The new next fire time must persist without clearing the last actual run.
+            Assert.Equal(1, await ScheduleRuntimeTimeWriter.WriteAsync(db, observed, "", "2026-09-14 08:10:00"));
+            Assert.Equal("2026-09-13 12:00:00", db.FromSql("SELECT LastTime FROM diy_schedule_job WHERE Id='row'").ToScalar<string>());
+            observed["NextTime"] = "2026-09-14 08:10:00";
             db.FromSql("UPDATE diy_schedule_job SET Status='暂停' WHERE Id='row'").ExecuteNonQuery();
             Assert.Equal(0, await ScheduleRuntimeTimeWriter.WriteAsync(db, observed, "next", "next"));
             db.FromSql("UPDATE diy_schedule_job SET Status='正常',IsDeleted=1 WHERE Id='row'").ExecuteNonQuery();

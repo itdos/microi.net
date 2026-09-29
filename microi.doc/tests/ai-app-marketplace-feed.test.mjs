@@ -249,6 +249,28 @@ test('私有运行时不进入官网列表、精确详情或搜索兜底，独�
   assert.ok(fallback.DataAppend.Search.RelatedApps.every(row => !['engine-runtime', 'private-web'].includes(row.AppKey)))
 })
 
+test('3D 引擎和 AI 工作流在官网各展示一条，历史平台包链接落到可体验的微服务', () => {
+  const rows = [
+    { Id: '3d-package', AppKey: 'app.microi.3d-engine', AppName: '3D引擎', ApplicationType: 'Platform', IsApprove: 1, IsPublic: 1 },
+    { Id: '3d-runtime', AppKey: 'microi-3d-engine', AppName: '3D引擎', ApplicationType: 'MicroService', Status: 'Published', BuildStatus: 'Success', IsPublic: 1, PreviewUrl: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-3d-engine/assets/index.html' },
+    { Id: 'workflow-package', AppKey: 'app.microi.ai-workflow', AppName: 'AI工作流', ApplicationType: 'Platform', IsApprove: 1, IsPublic: 1 },
+    { Id: 'workflow-runtime', AppKey: 'microi-ai-workflow', AppName: 'AI工作流', ApplicationType: 'MicroService', Status: 'Published', BuildStatus: 'Success', IsPublic: 1, PreviewUrl: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-ai-workflow/assets/index.html' }
+  ]
+  const run = Param => new Function('V8', engineSource)({
+    Param, SysConfig: {}, FormEngine: {
+      GetTableData: () => ({ Code: 1, Data: rows, DataCount: rows.length }),
+      GetFormData: (_table, request) => ({ Code: 1, Data: rows.find(row => row.AppKey === request._Where[0][4]) })
+    }
+  })
+  assert.deepEqual(new Set(run({}).Data.map(row => row.AppKey)), new Set(['microi-3d-engine', 'microi-ai-workflow']))
+  assert.deepEqual(run({ Keyword: '3D引擎' }).Data.map(row => row.AppKey), ['microi-3d-engine'])
+  assert.equal(run({ ExactAppKey: 'app.microi.3d-engine' }).Data[0].AppKey, 'app.microi.3d-engine')
+  assert.equal(run({ ExactAppKey: 'app.microi.ai-workflow' }).Data[0].AppKey, 'app.microi.ai-workflow')
+  assert.equal(run({ ExactAppKey: 'app.microi.3d-engine' }).Data[0].Id, '3d-runtime')
+  assert.equal(run({ ExactAppKey: 'app.microi.ai-workflow' }).Data[0].Id, 'workflow-runtime')
+  assert.ok(run({ ExactAppKey: 'app.microi.3d-engine' }).Data[0].PreviewUrl.includes('/microi-3d-engine/'))
+})
+
 test('official_ai_apps 在普通分类内始终推荐优先，再按所选条件排序', () => {
   const rows = [
     { Id: 'ordinary-new', AppKey: 'ordinary-new', AppName: '普通新应用', ApplicationType: 'Platform', Category: 'business', IsApprove: 1, IsRecommend: 0, AppUpdateTime: '2026-08-27' },

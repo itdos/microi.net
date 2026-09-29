@@ -28,7 +28,7 @@
 
             <search id="header-search" class="right-menu-item hover-effect" />
 
-            <lang-select class="right-menu-item hover-effect" />
+            <lang-select class="right-menu-item hover-effect" compact />
 
             <ThemeSelect class="right-menu-item hover-effect" />
 
@@ -43,7 +43,7 @@
             <!-- 切换界面风格 -->
             <el-dropdown v-if="hasWebOS" trigger="hover">
                 <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
-                    <font-awesome-icon icon="fa-solid fa-display" style="color: var(--el-text-color-regular);font-size:18px;" />
+                    <el-icon class="menu-icon"><Monitor /></el-icon>
                 </a>
                 <template #dropdown>
                     <el-dropdown-menu>
@@ -73,7 +73,7 @@
             </el-dropdown>
 
             <!-- 浏览器全屏 -->
-            <div class="right-menu-item hover-effect" @click="toggleBrowserFullScreen" :title="isBrowserFullScreen ? '退出全屏' : '全屏'">
+            <div class="right-menu-item hover-effect" role="button" tabindex="0" @click="toggleBrowserFullScreen" @keydown.enter.prevent="toggleBrowserFullScreen" :title="isBrowserFullScreen ? '退出全屏' : '全屏'">
                 <el-icon class="menu-icon"><FullScreen v-if="!isBrowserFullScreen" /><Close v-else /></el-icon>
             </div>
 
@@ -555,9 +555,11 @@ export default {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 8px;
+            padding: 0;
+            width: 40px;
+            flex: 0 0 40px;
             height: 40px;
-            font-size: 18px;
+            font-size: 20px;
             color: var(--el-text-color-regular, #5a5e66);
             white-space: nowrap;
 
@@ -572,6 +574,9 @@ export default {
             }
 
             &.tenant-name {
+                width: auto;
+                flex: 0 1 auto;
+                padding: 0 8px;
                 font-size: 13px;
                 color: var(--el-text-color-secondary, #606266);
                 // font-weight: 500;
@@ -580,6 +585,31 @@ export default {
 
         // 统一图标样式
         .menu-icon {
+            font-size: 20px;
+        }
+
+        :deep(.theme-select-trigger),
+        :deep(.ui-density-trigger),
+        :deep(.desktop-ai-entry),
+        :deep(.bluetooth-navbar-entry),
+        :deep(.header-search),
+        :deep(.task-entry) {
+            width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
+        }
+
+        :deep(.header-search.show) {
+            width: 260px;
+            flex: 0 0 260px;
+            justify-content: flex-start;
+            padding: 0 10px;
+        }
+
+        :deep(.el-icon),
+        :deep(.svg-inline--fa) {
+            width: 20px;
+            height: 20px;
             font-size: 20px;
         }
 
