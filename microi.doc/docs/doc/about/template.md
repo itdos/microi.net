@@ -62,6 +62,11 @@
 
 ### 功能文档
 
+<!-- 暂停个人版销售，保留旧版对比/合伙人文章入口以便恢复：
+| 版本区别 | [CSDN](https://microi.blog.csdn.net/article/details/143974752) |
+| 成为合伙人 | [CSDN](https://microi.blog.csdn.net/article/details/143974715) |
+-->
+
 | 文档 | 链接 |
 | :-- | :-- |
 | 分布式存储配置 | [CSDN](https://microi.blog.csdn.net/article/details/143763937) |
@@ -70,8 +75,8 @@
 | 表单控件数据源绑定 | [CSDN](https://microi.blog.csdn.net/article/details/143767223) |
 | 复制表单和模块 | [CSDN](https://microi.blog.csdn.net/article/details/143950112) |
 | 低代码 vs 传统开发 | [CSDN](https://microi.blog.csdn.net/article/details/143866006) |
-| 版本区别 | [CSDN](https://microi.blog.csdn.net/article/details/143974752) |
-| 成为合伙人 | [CSDN](https://microi.blog.csdn.net/article/details/143974715) |
+| 版本区别 | [本站版本对比](/doc/edition-comparison) |
+| 成为合伙人 | [本站合伙人说明](/doc/about/partner) |
 
 ### 实战文档
 
