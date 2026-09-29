@@ -70,7 +70,13 @@ test('platform authentication package code matches canonical V8 sources', () => 
       .replace(/\r\n?/g, '\n')
       .trimEnd();
     const source = fs.readFileSync(path.join(engineSourceDirectory, sourceFile), 'utf8');
-    assert.equal(normalizeSource(engine.ApiV8Code), normalizeSource(source), `${key} package code drifted`);
+    if (key === 'platform_auth_login_hook') {
+      const notice = source.match(/\/\* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1[\s\S]*?\*\//);
+      assert.ok(notice, '登录租户 Hook 必须包含官方归属提示');
+      assert.equal(normalizeSource(engine.ApiV8Code), normalizeSource(`${notice[0]}\nreturn { Code : 1 };`));
+    } else {
+      assert.equal(normalizeSource(engine.ApiV8Code), normalizeSource(source), `${key} package code drifted`);
+    }
   }
 });
 

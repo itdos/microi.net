@@ -525,7 +525,9 @@ test('installer can attach package root menus to root, an existing menu, or an a
   assert.match(importerSource, /installContainerModuleKey\.length > 50/);
   assert.match(importerSource, /AddFormData\('sys_menu', installContainerMenuModel\)/);
   assert.match(importerSource, /grantAdministratorPermissionsForNewMenu\(installContainerMenuModel\)/);
-  assert.match(importerSource, /ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1/);
+  assert.match(importerSource, /var candidateRoleIds = \[\];/);
+  assert.match(importerSource, /assessRoleHolders/);
+  assert.match(importerSource, /missingRoleHolders\.OrdinaryHolder/);
   assert.match(importerSource, /AddInParameter\('@p0', 9999\)/);
   assert.match(importerSource, /\['Read', 'Add', 'Edit', 'Del', 'Export', 'Import'\]/);
   assert.match(importerSource, /assertAdministratorMenuPermissionReadback/);
