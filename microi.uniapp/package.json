@@ -77,7 +77,7 @@
     "check:task-flow-capabilities": "node --test scripts/test-task-flow-capabilities.mjs scripts/test-task-detail-presentation.mjs scripts/test-service-record-view.mjs scripts/test-task-type-policy.mjs",
     "check:task-list-visibility": "node --test scripts/test-task-list-visibility.mjs",
     "check:performance-stats-navigation": "node --test scripts/test-performance-stats-navigation.mjs",
-    "check:task-post-service-permission": "npm run check:task-flow-capabilities && node --test scripts/test-task-responsibility.mjs scripts/test-task-feedback-media-context.mjs scripts/test-task-action-permissions.mjs",
+    "check:task-post-service-permission": "npm run check:task-flow-capabilities && node --test scripts/test-task-responsibility.mjs scripts/test-task-feedback-media-context.mjs scripts/test-task-action-permissions.mjs scripts/test-task-assignee-search.mjs",
     "check:list-session": "node --test scripts/test-list-session.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:profiles": "node scripts/check-profiles.cjs",
