@@ -2,7 +2,7 @@
 
 > **在线 + 本地双模式 AI 编程，让 AI 充分了解你的 V8 API 与数据库结构**
 
-平台全部源码开源：[GitHub](https://github.com/itdos/microi.net) / [Gitee](https://gitee.com/ITdos/microi.net)
+平台仓库：[GitHub](https://github.com/itdos/microi.net) / [Gitee](https://gitee.com/ITdos/microi.net)
 
 <MciNugetStats variant="feature" />
 

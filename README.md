@@ -127,7 +127,7 @@
 
 | AI 开发 | 低代码建模 | 企业集成 | 私有化交付 |
 |---|---|---|---|
-| AI 理解 V8 API 与真实数据库结构，可在 VS Code 本地编程，也可在平台在线编程 | 表单、模块、工作流、界面、打印、报表等 30+ 引擎覆盖应用全生命周期 | 跨数据库、RabbitMQ、MQTT、Redis、MongoDB、ElasticSearch、Office 与第三方 API | Docker / K8S / CI/CD，多节点分布式部署；PC、UniApp、多端源码开放 |
+| AI 理解 V8 API 与真实数据库结构，可在 VS Code 本地编程，也可在平台在线编程 | 表单、模块、工作流、界面、打印、报表等 30+ 引擎覆盖应用全生命周期 | 跨数据库、RabbitMQ、MQTT、Redis、MongoDB、ElasticSearch、Office 与第三方 API | Docker / K8S / CI/CD，多节点分布式部署，覆盖 PC、UniApp 等多端交付 |
 
 > Microi吾码不是“只生成页面”的工具。它把业务数据模型、后端接口、权限、流程、前端交互和部署交付放进同一条可持续维护的工程链路。
 
@@ -221,7 +221,7 @@
 <table>
 <thead><tr><th width="200">能力</th><th>说明</th></tr></thead>
 <tbody>
-<tr><td>♾️ <strong>无限制</strong></td><td>不限制用户数、表单数、数据量和数据库数量；PC 传统界面与移动端源码 100% 开放、后端 99% 开放，WebOS 源码按对应版本授权提供</td></tr>
+<tr><td>♾️ <strong>无限制</strong></td><td>不限制用户数、表单数、数据量和数据库数量</td></tr>
 <tr><td>🌐 <strong>跨平台</strong></td><td>基于 .NET10，<a href="https://www.nuget.org/packages/Microi.net#versions-body-tab">核心库采用 .Net Standard 开发</a>，支持 gRPC 跨语言通信</td></tr>
 <tr><td>🗄️ <strong>跨数据库</strong></td><td>支持 MySQL、SQL Server、Oracle、PostgreSQL、达梦、人大金仓等数据库，以及读写分离与分库分表；精确版本见部署文档</td></tr>
 <tr><td>☁️ <strong>分布式部署</strong></td><td>Docker / K8S / Jenkins / Rancher / CI/CD</td></tr>
@@ -271,7 +271,7 @@
 ## 💰 开源版、企业版区别
 
 <!-- 暂停个人版销售，保留原文以便恢复
-<tr><td><strong>个人版</strong></td><td><strong>￥999 买断</strong></td><td>额外包含 <strong>WebOS 100% 完整源码</strong>，功能、开源程度与企业版完全一致，<strong>无任何限制、无限分发部署、无限商用、永久有效</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
+<tr><td><strong>个人版</strong></td><td><strong>￥999 买断</strong></td><td>额外包含 <strong>WebOS 源码</strong>，功能与企业版一致，<strong>无任何限制、无限分发部署、无限商用、永久有效</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
 -->
 
 <!-- 暂停个人版销售，保留原文以便恢复
@@ -281,15 +281,15 @@
 <table>
 <thead><tr><th width="80">版本</th><th width="140">价格</th><th>说明</th></tr></thead>
 <tbody>
-<tr><td><strong>开源版</strong></td><td>免费</td><td>PC 传统界面 100% 源码、移动端 100% 源码、后端 99% 源码；可商用、随意修改、无限分发部署。<strong>开源版仅无法使用在线 AI 相关功能，本地 AI 不受影响</strong></td></tr>
-<tr><td><strong>企业版</strong></td><td><strong>￥7.8w 买断</strong></td><td>额外包含 <strong>WebOS 100% 完整源码</strong>，<strong>永久有效</strong>，并提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
+<tr><td><strong>开源版</strong></td><td>免费</td><td>按 Gitee 仓库许可证使用，可商用、修改和分发部署。<strong>开源版仅无法使用在线 AI 相关功能，本地 AI 不受影响</strong></td></tr>
+<tr><td><strong>企业版</strong></td><td><strong>￥7.8w 买断</strong></td><td>额外包含 <strong>WebOS 源码</strong>，<strong>永久有效</strong>，并提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
 </tbody>
 </table>
 
 <!-- 暂停个人版销售，保留原文以便恢复
-> 个人版 ￥999、企业版 ￥2.5w 均为一次买断价格，授权永久有效。后续可选技术支持为个人版 ¥499/年、企业版 ¥1.5w/年，由用户自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”，实际服务通常不会机械地卡得很严格，遇到具体情况可以先友好沟通。
+> 个人版 ￥999、企业版 ￥2.5w 均为一次买断价格，授权永久有效。后续可选技术支持为个人版 ¥499/年、企业版 ¥1.5w/年，由用户自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”。
 -->
-> 企业版 ￥7.8w 为一次买断价格，授权永久有效。后续可选技术支持为 ¥1.17w/年（￥7.8w × 15%），由用户自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”，实际服务通常不会机械地卡得很严格，遇到具体情况可以先友好沟通。
+> 企业版 ￥7.8w 为一次买断价格，授权永久有效。后续可选技术支持为 ¥1.17w/年（￥7.8w × 15%），由用户自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”。
 
 <!-- 暂停个人版销售，保留原文以便恢复
 > [→ 查看开源版、个人版、企业版的详细区别与选择建议](https://microi.net/doc/edition-comparison.html)
@@ -320,7 +320,7 @@
 
 ```
 Microi.net/
-├── Microi.Server/          # 🔧 后端 99% 源码（.NET10）
+├── Microi.Server/          # 🔧 后端（.NET10）
 │   ├── Microi.net.Api/     #     Web API 层（ASP.NET Core 控制器）
 │   ├── Microi.Core/        #     核心基础设施库（接口定义/模型/抽象）
 │   ├── Microi.AI/          #     AI 领域实现（模型路由、Schema/NL2SQL、代理、计量、工作流）
@@ -342,10 +342,10 @@ Microi.net/
 │   ├── Microi.Tests/       #     后端自动化测试
 │   ├── Dos.ORM/            #     自研 ORM 基础库
 │   └── Dos.Common/         #     通用工具类库
-├── Microi.Client/          # 🖥️ PC 传统界面 100% 源码（Vue3 + Element-Plus + Vite + Pinia）
+├── Microi.Client/          # 🖥️ PC 传统界面（Vue3 + Element-Plus + Vite + Pinia）
 │   └── src/views/webos/     #     WebOS 桌面式门户（源码按对应版本授权）
 ├── Microi.UI/              # 🎨 Web / UniApp 统一设计系统
-├── microi.uniapp/          # 📱 UniApp 移动端 100% 源码（小程序 / H5 / App）
+├── microi.uniapp/          # 📱 UniApp 移动端（小程序 / H5 / App）
 ├── microi.app/             # 📱 HBuilderX APK/IPA 套壳打包工程（Wap2App）
 ├── Microi.Code/          # 🧩 VS Code 插件与 Microi CLI
 ├── microi.mcp/             # 🔌 MCP Server 源码（AI Agent 工具）
