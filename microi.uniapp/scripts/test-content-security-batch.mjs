@@ -6,12 +6,16 @@ function reviewId(index) {
   return index.toString(16).padStart(32, '0')
 }
 
-function createRuntime({ uploadDelay = 10 } = {}) {
+function createRuntime({ uploadDelay = 10, compressTo = '', uploadStatus = 'Pending' } = {}) {
   let loginIndex = 0
   let uploadIndex = 0
   let activeUploads = 0
   let maxActiveUploads = 0
   const loginCodes = []
+  const sessionIds = []
+  const uploadedPaths = []
+  const uploadUrls = []
+  const compressedSources = []
 
   globalThis.wx = { login() {} }
   globalThis.uni = {
@@ -20,10 +24,14 @@ function createRuntime({ uploadDelay = 10 } = {}) {
       loginCodes.push(code)
       success({ code })
     },
-    uploadFile({ formData, success }) {
+    uploadFile({ url, filePath, formData, success }) {
       const current = ++uploadIndex
       activeUploads += 1
       maxActiveUploads = Math.max(maxActiveUploads, activeUploads)
+      sessionIds.push(formData.ContentSecuritySessionId || '')
+      uploadedPaths.push(filePath)
+      uploadUrls.push(url)
+      assert.equal(formData.Action, 'Upload')
       setTimeout(() => {
         activeUploads -= 1
         success({
@@ -34,7 +42,7 @@ function createRuntime({ uploadDelay = 10 } = {}) {
               Path: `/tenant/img/${current}.jpg`,
               Url: `https://files.example.test/${current}.jpg`,
               ContentSecurityReviewId: reviewId(current),
-              ContentSecurityStatus: 'Pending',
+              ContentSecurityStatus: uploadStatus,
               LoginCodeUsed: formData.ContentSecurityLoginCode
             }
           })
@@ -43,9 +51,19 @@ function createRuntime({ uploadDelay = 10 } = {}) {
     },
     showToast() {}
   }
+  if (compressTo) {
+    globalThis.uni.compressImage = ({ src, success }) => {
+      compressedSources.push(src)
+      success({ tempFilePath: compressTo })
+    }
+  }
 
   return {
     loginCodes,
+    sessionIds,
+    uploadedPaths,
+    uploadUrls,
+    compressedSources,
     maxActiveUploads: () => maxActiveUploads,
     cleanup() {
       delete globalThis.wx
@@ -59,7 +77,16 @@ function createClient(requestAdapter) {
     apiBase: 'https://api.example.test',
     osClient: 'tenant',
     maxConcurrent: 8,
-    requestAdapter
+    requestAdapter: async (request) => {
+      if (request.url.includes('mci-wechat-content-status-batch') &&
+        request.data && request.data.Action === 'CreateUploadSession') {
+        return {
+          statusCode: 200,
+          data: { Code: 1, Data: { SessionId: 'a'.repeat(32), ExpiresInSeconds: 600 } }
+        }
+      }
+      return requestAdapter(request)
+    }
   })
 }
 
@@ -97,13 +124,83 @@ test('three images upload concurrently and share one batch status request', asyn
     })
 
     assert.equal(runtime.maxActiveUploads(), 3)
-    assert.equal(runtime.loginCodes.length, 3)
-    assert.equal(new Set(runtime.loginCodes).size, 3, 'each upload must use a fresh one-time login code')
+    assert.equal(runtime.loginCodes.length, 1)
+    assert.deepEqual(new Set(runtime.sessionIds), new Set(['a'.repeat(32)]), 'one batch session must be shared by all uploads')
+    assert.equal(runtime.uploadUrls.every((url) => url.includes('/apiengine/mci-wechat-content-status-batch')), true)
     assert.equal(batchCalls.length, 1)
     assert.equal(batchCalls[0].length, 3)
     assert.deepEqual(outcomes.map((item) => item.Code), [1, 1, 1])
     assert.equal(events.filter((item) => item.endsWith(':checking')).length, 3)
     assert.equal(events.filter((item) => item.endsWith(':passed')).length, 3)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test('large images are compressed before upload while small images keep their original path', async () => {
+  const runtime = createRuntime({ compressTo: 'wxfile://compressed.jpg' })
+  const client = createClient(async () => {
+    throw new Error('deferred review must not request status')
+  })
+  try {
+    const outcomes = await client.uploadFiles([
+      { filePath: 'wxfile://large.jpg', size: 900 * 1024 },
+      { filePath: 'wxfile://small.jpg', size: 100 * 1024 }
+    ], {
+      preview: true,
+      resolveUrl: false,
+      deferContentSecurityReview: true,
+      clientCompress: true
+    })
+    assert.deepEqual(outcomes.map((item) => item.Code), [1, 1])
+    assert.deepEqual(runtime.compressedSources, ['wxfile://large.jpg'])
+    assert.deepEqual(
+      [...runtime.uploadedPaths].sort(),
+      ['wxfile://compressed.jpg', 'wxfile://small.jpg'].sort()
+    )
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test('deferred reviews return pending records without waiting for a status request', async () => {
+  const runtime = createRuntime()
+  let statusCalls = 0
+  const client = createClient(async () => {
+    statusCalls += 1
+    throw new Error('deferred review must not poll before returning')
+  })
+  try {
+    const outcomes = await client.uploadFiles([
+      { filePath: 'wxfile://one.jpg' },
+      { filePath: 'wxfile://two.jpg' }
+    ], {
+      preview: true,
+      resolveUrl: false,
+      deferContentSecurityReview: true
+    })
+    assert.deepEqual(outcomes.map((item) => item.Code), [1, 1])
+    assert.equal(outcomes.every((item) => item.PendingReview === true), true)
+    assert.equal(statusCalls, 0)
+    assert.equal(runtime.loginCodes.length, 1)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test('an early rejected callback is isolated immediately instead of being treated as passed', async () => {
+  const runtime = createRuntime({ uploadStatus: 'Rejected' })
+  const client = createClient(async () => {
+    throw new Error('terminal upload result must not request status')
+  })
+  try {
+    const outcomes = await client.uploadFiles([{ filePath: 'wxfile://rejected.jpg' }], {
+      preview: true,
+      resolveUrl: false,
+      deferContentSecurityReview: true
+    })
+    assert.equal(outcomes[0].Code, 0)
+    assert.equal(outcomes[0].Error.Status, 'Rejected')
   } finally {
     runtime.cleanup()
   }
