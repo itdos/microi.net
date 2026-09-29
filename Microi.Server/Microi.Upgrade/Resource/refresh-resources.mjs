@@ -754,8 +754,9 @@ function validateReleaseCandidate(name, content) {
         || !String(marketplaceSourceEngine?.ApiV8Code || '').includes('MARKETPLACE_SOURCE_HEADER_ISOLATION_V1')
         || !String(marketplaceSourceEngine?.ApiV8Code || '').includes("V8.ApiEngine.Run('platform-marketplace-source-hook'")
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source']?.UpgradePolicy !== 'Managed'
-        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
-          .includes('ApiEngine:platform-marketplace-source@v1.0.5')
+        || !['ApiEngine:platform-marketplace-source@v1.0.5',
+          'ApiEngine:platform-marketplace-source@v1.0.6'].some(capability =>
+          (packageModel?.PackageInfo?.RequiredPlatformCapabilities || []).includes(capability))
         || engineVersionNumber(marketplaceSourceHook) < 1_000_000
         || Number(marketplaceSourceHook?.StopHttp) !== 1
         || !String(marketplaceSourceHook?.ApiV8Code || '').trimEnd().endsWith('return { Code : 1 };')
