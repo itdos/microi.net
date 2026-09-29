@@ -8,7 +8,10 @@
 - Platform Positioning: Open Source AI Low Code Platform (. NET10 Vue3Element-PlusRedis cross-database)
 - Core concept: **"Everything is a form engine"**
 - Architecture Overview: PC/Mobile UniApp / WebOS
+<!-- 暂停个人版销售，保留原文以便恢复
 - Version Comparison: Open Source Edition/Personal Edition/Enterprise Edition
+-->
+- Version Comparison: Open Source Edition/Enterprise Edition
 
 ---
 

@@ -21,19 +21,34 @@ In order to promote the development of open source projects, please communicate 
 
 ## ✅Application Requirements
 
+<!-- 暂停个人版销售，保留原文以便恢复
 - **购买过个人版**的用户
+-->
+- Contact the business team to confirm partnership eligibility
 
 ---
 
+<!-- 暂停个人版销售，保留原文以便恢复
 ## 💰The difference between open source edition, personal edition and enterprise edition
+-->
+## 💰Open Source and Enterprise editions
 
+<!-- 暂停个人版销售，保留原文以便恢复
 | Version | Price | Explanation |
 | :--: | :--: | ---- |
 | Open source version | Free | Basic functions |
 | Personal Edition | ¥999 | There is no difference with the enterprise edition function |
 | Enterprise Edition | 10w/year | Full-featured enterprise services |
+-->
+| Version | Price | Explanation |
+| :--: | :--: | ---- |
+| Open source version | Free | Platform source code from Gitee; commercial use and distribution allowed |
+| Enterprise Edition | ¥78,000 one-time | Perpetual license, WebOS source code, training, consulting, and priority platform upgrade requests; optional technical support ¥11,700/year (15%) |
 
+<!-- Personal Edition sales are paused. Former comparison link retained for restoration:
 Detailed comparison:[CSDN article](https://microi.blog.csdn.net/article/details/143974752)
+-->
+Detailed comparison: [current edition comparison](/doc/edition-comparison)
 
 ---
 
@@ -48,7 +63,10 @@ Detailed comparison:[CSDN article](https://microi.blog.csdn.net/article/details/
 | 2019年 | [宁波小吾科技](https://www.tianyancha.com/company/3360828707)成立，平台更名为 **Microi吾码** |
 | 2020年 | Xiao Wu Technology Won * * $10 million Angel Wheel Venture Capital * *, with a research and development team of more than 30 people. |
 | 2018~2023 | The enterprise version has been applied to * * 5 listed companies * *, a number of state-owned enterprises, * * hundreds of * * enterprises |
+<!-- 暂停个人版销售，保留原文以便恢复
 | November 2024 | Microi code * * officially open source * *, open * * personal version $999 * * |
+-->
+| November 2024 | Microi officially became open source |
 
 ---
 

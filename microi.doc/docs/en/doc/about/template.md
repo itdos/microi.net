@@ -61,6 +61,11 @@
 
 ### Functional Documentation
 
+<!-- Personal Edition sales are paused. Keep the former comparison and partner article links for later restoration:
+| Version difference | [CSDN](https://microi.blog.csdn.net/article/details/143974752) |
+| Become a partner | [CSDN](https://microi.blog.csdn.net/article/details/143974715) |
+-->
+
 | Document | Link |
 | :-- | :-- |
 | Distributed Storage Configuration | [CSDN](https://microi.blog.csdn.net/article/details/143763937) |
@@ -69,8 +74,8 @@
 | Form Control Data Source Binding | [CSDN](https://microi.blog.csdn.net/article/details/143767223) |
 | Copy forms and modules | [CSDN](https://microi.blog.csdn.net/article/details/143950112) |
 | Low Code vs Traditional Development | [CSDN](https://microi.blog.csdn.net/article/details/143866006) |
-| Version difference | [CSDN](https://microi.blog.csdn.net/article/details/143974752) |
-| Become a partner | [CSDN](https://microi.blog.csdn.net/article/details/143974715) |
+| Version difference | [Current comparison](/doc/edition-comparison) |
+| Become a partner | [Current partner details](/en/doc/about/partner) |
 
 ### Actual Combat Document
 
