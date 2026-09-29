@@ -45,7 +45,10 @@ In order to promote the development of open source projects, please communicate 
 | Open source version | Free | Platform source code from Gitee; commercial use and distribution allowed |
 | Enterprise Edition | ¥78,000 one-time | Perpetual license, WebOS source code, training, consulting, and priority platform upgrade requests; optional technical support ¥11,700/year (15%) |
 
+<!-- Personal Edition sales are paused. Former comparison link retained for restoration:
 Detailed comparison:[CSDN article](https://microi.blog.csdn.net/article/details/143974752)
+-->
+Detailed comparison: [current edition comparison](/doc/edition-comparison)
 
 ---
 
