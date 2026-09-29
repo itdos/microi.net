@@ -68,6 +68,10 @@ function saveRolePermissions(requested) {
     OldForm: {},
     DbTrans: {},
     FormEngine: {
+      GetFormData(name) {
+        if (name === 'sys_role') return { Code: 1, Data: { Id: 'limited-role', Level: 1, TenantId: '' } };
+        throw new Error(`出现未预期的单行数据访问：${name}`);
+      },
       GetTableData(name) {
         if (name === 'sys_role') return { Code: 1, Data: [], DataCount: 0 };
         if (name === 'sys_menu') {
