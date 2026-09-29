@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-reminder-runtime
- * Version: v1.1.0
+ * Version: v1.1.3
  * Function:
- * - 统一平台公告、授权到期策略和持久化回执；官方与主租户分别配置个人版/企业版文案和提前天数，按可信授权时间独立计算每次登录提醒。
+ * - 统一平台公告、授权到期策略和持久化回执；修复已发布公告保存新版草稿时的日期格式化异常。
  */
 
 function createPlatformReminderModel() {
@@ -117,7 +117,8 @@ function createPlatformReminderModel() {
     if (!isFinite(protocol) || !isFinite(receiverProtocol) || protocol < 1 || Math.floor(protocol) !== protocol || protocol > receiverProtocol) return false;
     if ((scope === 'SuperAdmins' || rule.DisplayMode === 'AfterServerRestart') && receiverProtocol < 2) return false;
     if (['AllAccounts', 'SuperAdmins'].indexOf(scope) < 0) return false;
-    if (scope === 'SuperAdmins' && context.Administrator !== true) return false;
+    if (scope === 'SuperAdmins' && context.SuperAdministratorRecipient !== true
+      && !(context.SuperAdministratorRecipient == null && context.Administrator === true)) return false;
     if (['Once', 'EveryEntry', 'EveryLogin', 'AfterServerRestart'].indexOf(rule.DisplayMode) < 0) return false;
     if (rule.DisplayMode === 'EveryLogin' && !/^[a-f0-9]{32,64}$/.test(String(context.LoginId || ''))) return false;
     return rule.DisplayMode !== 'AfterServerRestart' || /^[A-Za-z0-9-]{16,80}$/.test(text(context.RestartEpoch));
@@ -137,7 +138,6 @@ function createPlatformReminderModel() {
   return { normalize: normalize, occurrence: occurrence, matches: matches, acceptsAccount: acceptsAccount, project: project, list: list };
 }
 
-
 // 文案与时间编排属于 Managed 接口引擎；期限及身份只能来自宿主可信上下文。
 function createLicenseExpiryModel() {
   function normalize(input) {
@@ -153,7 +153,8 @@ function createLicenseExpiryModel() {
   }
   function project(policy, edition, expiration, now, parent) {
     var end = Date.parse(expiration || '');
-    if (['Personal', 'Enterprise'].indexOf(edition) < 0 || !isFinite(end)) return null;
+    // DateTime.MinValue is the default for an installation without a paid expiry, not an expired contract.
+    if (['Personal', 'Enterprise'].indexOf(edition) < 0 || !isFinite(end) || end < Date.UTC(2000, 0, 1)) return null;
     var setting = normalize(policy)[edition];
     if (end - now > setting.AdvanceDays * 86400000) return null;
     var minutes = Math.max(0, Math.ceil((end - now) / 60000));
@@ -231,7 +232,7 @@ function collect(context) {
   var items = [], warnings = [], nextAt = now + 60000;
   var officialPolicy = null, parentPolicy = null;
   function appendLicense(policy, edition, expiration, parent) {
-    if (!context.Administrator || !context.LoginId) return;
+    if (!(context.SuperAdministratorRecipient === true || context.SuperAdministratorRecipient == null && context.Administrator === true) || !context.LoginId) return;
     var item;
     try { item = licenseModel.project(policy, edition, expiration, now, parent); }
     catch (_) { item = licenseModel.project(null, edition, expiration, now, parent); }
@@ -387,7 +388,8 @@ try {
       if (Number(p.ExpectedRevision) !== Number(old.Revision)) throw new Error('规则已被其他人修改，请刷新后重新编辑。');
       var affected = V8.DbTrans.FromSql('UPDATE mci_platform_reminder SET Title=@title,ReminderType=@kind,ScopeType=@scope,RuleJson=@json,Revision=Revision+1,Status=@status,UpdateTime=@time WHERE Id=@id AND Revision=@revision AND IsDeleted<>1')
         .AddInParameter('@title',rule.Title).AddInParameter('@kind',rule.ReminderType).AddInParameter('@scope',rule.ScopeType)
-        .AddInParameter('@json',JSON.stringify(rule)).AddInParameter('@status','Draft').AddInParameter('@time',String(System.DateTime.Now.ToString('yyyy-MM-dd HH:mm:ss')))
+        // Jint 的 .NET DateTime 投影不保证 ToString 可作为 JS 函数调用；统一使用 V8 日期函数。
+        .AddInParameter('@json',JSON.stringify(rule)).AddInParameter('@status','Draft').AddInParameter('@time',DateNow('yyyy-MM-dd HH:mm:ss'))
         .AddInParameter('@id',ruleId).AddInParameter('@revision',Number(old.Revision)).ExecuteNonQuery();
       if (Number(affected) !== 1) throw new Error('规则保存冲突，请刷新后重试。');
     }
