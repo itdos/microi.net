@@ -38,6 +38,7 @@ Thumbs.db
 /Microi.Server/Microi.MCP/
 /Microi.VSCode/
 /Microi.Code/
+/Microi.Agent/
 /Microi.Client/src/views/webos/
 /Microi.Server/Microi.WorkFlow/
 /Microi.Server/Microi.Vision/
@@ -171,4 +172,3 @@ AI测试要用到的帐号密码.txt
 # Python 本地解释器缓存不属于源码或交付制品。
 **/__pycache__/
 *.pyc
-
