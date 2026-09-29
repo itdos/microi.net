@@ -796,7 +796,7 @@ export default {
       return Object.keys(this.proposalBatchEnabled || {}).filter((name) => this.proposalBatchEnabled[name] === true).length
     },
     proposalBatchHasPendingUploads() {
-      return Object.values(this.proposalBatchUploadStates || {}).some((state) => Number(state?.pendingCount || 0) > 0)
+      return Object.values(this.proposalBatchUploadStates || {}).some((state) => Number(state?.uploadingCount || 0) > 0 || Number(state?.failedCount || 0) > 0)
     },
     proposalBatchCanSubmit() {
       return this.proposalBatchSelectedRows.length >= 2 && this.proposalBatchEnabledCount > 0 &&
