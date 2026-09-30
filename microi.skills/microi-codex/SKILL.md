@@ -26,6 +26,7 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 - 官方账号页和关于标签通过 `platform-current-user` 接口引擎读取当前 `sys_user.LicenseType`。桌面相关平台业务逻辑优先通过 `microi_itdos` 接口引擎实现；只有接口引擎缺少必需底层原子能力时才能改后端源码，并说明原因。
 - 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.itdos.com/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。
 - Windows 安装验收必须包含旧卸载器损坏后的升级、同版本重装、超过 260 字符的路径以及全部文件 SHA-256 回读。安装器使用当次发布的兼容卸载器，并用固定哈希的 Unicode 7-Zip 直接解压到目标目录，禁止恢复临时目录解压后使用 NSIS `CopyFiles` 复制的流程；该流程会将路径或复制错误误报为“应用无法关闭”。进程检查仅匹配安装目录内的产品主程序及内置 Node，不能按整个目录匹配安装器或无关程序。
+- 长路径验收必须先安装完整旧版本，再在同一目录覆盖升级及再次重装，不能只在空目录或仅含模拟卸载器的目录安装。卸载清理、旧文件备份迁移和失败回滚均须支持 Windows 扩展路径；通过真实 NSIS 与独占文件句柄验证长路径迁移和占用回滚，不能仅用 JS 文件操作或首次解压测试替代。
 - 桌面平台 Worker 必须在真实安装包内验证 IPC 与 Windows DPAPI。旧保险库只有成功解密且明文为零字节时才允许迁移为空文档；损坏或其他 Windows 用户的保险库保留原文件并返回具体错误。启动初始化拒绝不能让 Node 服务退出；单元测试、安装成功与真实桌面账号/AI 员工页面联调是三个独立验收层。
 - dsh-desktop 升级必须遵循 `Microi.Agent/同步dsh-desktop上游.md` 的三方同步流程和补丁意图清单；`microi/`、`packages/microi-code-*` 与桥接代码是永久保护区，普通上游文件使用三方比较，补丁必须经 `npm ci` 重放。关于页、NOTICE、MIT License、DataElement 版权与两个上游仓库链接不得删除。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
 
