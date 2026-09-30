@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-30T04:03:31.649Z",
+  "generatedAt": "2026-09-30T10:38:46.982Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,11 +169,11 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "ca3f12481dc195380abc461c7259e8a5d202df88b4b6806e5fdb36d86aeb6f4d",
-      "originalLines": 699,
+      "originalSha256": "811f79af5f1479a59e8e1784029a08b5f3532032d951c6c19e4c6b26ef748bd4",
+      "originalLines": 700,
       "prefixSha256": "650039258e4d5a0b1bb6f93baaf3dae02995573f6f053152eb71eabfb3d64783",
       "prefixBytes": 1363,
-      "entryLines": 241,
+      "entryLines": 242,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
@@ -195,8 +195,8 @@
           "id": "microi-client-frontend-002",
           "ordinal": 2,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "8880429d365b6cc36c1132f5c9774e5be452dd55d057026b010174e65e707022",
-          "lines": 108,
+          "sha256": "2a10489fe38576db661f08076d5bd9c7cf0a39a0329a137810d899d7a395d36d",
+          "lines": 109,
           "heading": "2. 表单引擎三层结构"
         },
         {
@@ -1196,11 +1196,11 @@
       ]
     },
     "page-engine": {
-      "originalSha256": "c8e90118f653f4bba746e6401847a760f6133fa7bbfe4a0934fc33b4f892dcec",
-      "originalLines": 454,
-      "prefixSha256": "9030021f4fede8495c3832d8e4fb92fc80d74f6f0a7a13995e24f714eab068a6",
-      "prefixBytes": 3797,
-      "entryLines": 206,
+      "originalSha256": "503ccbd8872dc275f4517c04422480b2f28fbf816ed24ef1734ace0b76b42dc5",
+      "originalLines": 455,
+      "prefixSha256": "c2d87a18beb8ff701da099fd402a180bdfc26d26be1da0180108fa1a2c6c92f5",
+      "prefixBytes": 4140,
+      "entryLines": 207,
       "chunks": [
         {
           "id": "page-engine-000",
@@ -1262,8 +1262,8 @@
           "id": "page-engine-007",
           "ordinal": 8,
           "destination": "page-engine/SKILL.md",
-          "sha256": "9d5fced79d01857e14e83888681b44f06c69fcc79abf6551dcec312d96c1c02b",
-          "lines": 13,
+          "sha256": "ce0486eb9d2282bc199972e167e85aca7b03860d15abdd03982c4a23a90e206e",
+          "lines": 14,
           "heading": "运行态布局与滚动规范"
         },
         {
