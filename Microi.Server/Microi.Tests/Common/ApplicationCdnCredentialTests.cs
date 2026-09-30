@@ -148,4 +148,18 @@ public class ApplicationCdnCredentialTests
     {
         Assert.Null(ReadRefreshTasks(new JObject { ["Tasks"] = "unexpected" }));
     }
+
+    [Theory]
+    [InlineData("阿里云 CDN RefreshObjectCaches 失败：QuotaExceeded.Refresh", true)]
+    [InlineData("quotaexceeded.refresh", true)]
+    [InlineData("QuotaExceeded.Prefetch", false)]
+    [InlineData("AccessDenied", false)]
+    [InlineData(null, false)]
+    public void DirectoryRefreshFallbackOnlyHandlesFileRefreshQuota(string message, bool expected)
+    {
+        var method = typeof(V8McpLogic).GetMethod("IsApplicationCdnFileQuotaExceeded",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        Assert.Equal(expected, method.Invoke(null, new object[] { message is null ? null : new InvalidOperationException(message) }));
+    }
 }

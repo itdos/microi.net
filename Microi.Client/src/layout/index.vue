@@ -4,7 +4,7 @@
     <!-- 经典传统模式（仅当非 WebOS 时渲染，避免 WebOS 异步加载期间闪烁经典传统布局） -->
     <div v-else-if="!isWebOS || hideShellForAnonymous" :class="classObj" class="app-wrapper-microi">
         <!-- 左边菜单区域（移动端不显示） -->
-        <sidebar v-if="!hideShellForAnonymous && ShowClassicLeft != 0 && !diyStore.IsPhoneView" class="sidebar-container-microi" :style="GetMenuBg()" />
+        <sidebar v-if="!hideShellForAnonymous && !isTopNavigation && ShowClassicLeft != 0 && !diyStore.IsPhoneView" class="sidebar-container-microi" :style="GetMenuBg()" />
         <div :class="{ hasTagsView: !hideShellForAnonymous && needTagsView && !diyStore.IsPhoneView, 'mobile-view': diyStore.IsPhoneView, 'anonymous-shell-hidden': hideShellForAnonymous }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
             <!-- 顶部导航区域（移动端不显示） -->
             <div v-if="!hideShellForAnonymous && !diyStore.IsPhoneView" :class="{ 'fixed-header-microi': fixedHeader }" :style="GetFixedHeaderMicroiStyle()">
@@ -41,6 +41,7 @@ import { computed, shallowRef, markRaw } from "vue";
 import { loadAppContainer, getAppContainerSync } from "@/utils/webos-detect.js";
 import { isEmbeddedWebosWindowRuntime } from "@/utils/webos-embedded-runtime.js";
 import { DiyCommon } from "@/utils/microi.net.import";
+import { resolveUserNavigationLayout } from '@/utils/user-visual-preferences';
 
 export default {
     name: "Layout",
@@ -103,6 +104,9 @@ export default {
         };
     },
     computed: {
+        isTopNavigation() {
+            return !this.diyStore.IsPhoneView && resolveUserNavigationLayout(this.diyStore.GetCurrentUser?.NavigationLayout, this.SysConfig?.NavigationLayout) === 'Top';
+        },
         isCollapse() {
             return !this.sidebar.opened;
         },
@@ -112,7 +116,8 @@ export default {
                 openSidebar: this.sidebar.opened && !this.diyStore.IsPhoneView,
                 withoutAnimation: this.sidebar.withoutAnimation,
                 mobile: this.diyStore.IsPhoneView,
-                'phone-view': this.diyStore.IsPhoneView
+                'phone-view': this.diyStore.IsPhoneView,
+                'top-navigation-layout': this.isTopNavigation
             };
         },
         hideShellForAnonymous() {
@@ -145,7 +150,7 @@ export default {
             var self = this;
             var result = {};
 
-            if (self.hideShellForAnonymous) {
+            if (self.hideShellForAnonymous || self.isTopNavigation) {
                 result["marginLeft"] = "0px";
                 return result;
             }

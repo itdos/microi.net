@@ -110,7 +110,7 @@ test('system-account package exclusively owns admin, preferences, profile and it
   const packageName = 'app.microi.sys_user.json'
   const packageModel = readPackage(packageName)
   assert.equal(packageModel.PackageInfo?.Name, '系统账号')
-  assert.equal(packageModel.PackageInfo?.Version, 'v8.3.11')
+  assert.equal(packageModel.PackageInfo?.Version, 'v8.4.7')
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
     ?.includes('ApiEngine:platform-sys-user-admin@v1.0.2'))
 

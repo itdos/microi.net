@@ -282,9 +282,9 @@ test('generated AI and system-account package JSON files are idempotent with exa
       file: 'app.microi.sys_user.json',
       counts: {
         TableCount: 3,
-        FieldCount: 94, // 圆角/直角账号偏好同时进入字段与物理列契约。
+        FieldCount: 95, // 边角风格与导航菜单位置同时进入字段契约。
         DDLCount: 3,
-        PhysicalColumnCount: 355,
+        PhysicalColumnCount: 356,
         ApiEngineCount: 8,
         DataSetCount: 0,
         DataRowCount: 0,

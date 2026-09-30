@@ -84,9 +84,9 @@ test('system-account package carries the account-level corner style field', () =
   const pkg = JSON.parse(fs.readFileSync(path.join(resourceDir, 'app.microi.sys_user.json'), 'utf8'));
   const field = pkg.DiyFields.find(item => item.TableName === 'sys_user' && item.Name === 'CornerStyle');
   assert.equal(field.Component, 'Radio');
-  assert.equal(field.DefaultValue, 'round');
-  assert.deepEqual(JSON.parse(field.Data).map(item => item.Key), ['round', 'square']);
-  assert.ok(pkg.PhysicalColumns.some(item => item.TABLE_NAME === 'sys_user' && item.COLUMN_NAME === 'CornerStyle' && item.COLUMN_DEFAULT === 'round'));
+  assert.equal(field.DefaultValue, 'System');
+  assert.deepEqual(JSON.parse(field.Data).map(item => item.Key), ['System', 'round', 'square']);
+  assert.ok(pkg.PhysicalColumns.some(item => item.TABLE_NAME === 'sys_user' && item.COLUMN_NAME === 'CornerStyle' && item.COLUMN_DEFAULT === null));
   assert.match(pkg.DDLStatements.find(item => item.TableName === 'sys_user').DDL, /`CornerStyle` varchar\(25\)/);
 });
 
@@ -97,6 +97,7 @@ test('engine saves only its fixed whitelist against the token user', () => {
     ThemeMode: 'DARK',
     CornerStyle: 'SQUARE',
     MenuChildExpandMode: 'right',
+    NavigationLayout: 'top',
     DesktopType: 'windows',
     DesktopBg: '/junchi/member/background.webp',
     RandomDesktopBg: false,
@@ -119,6 +120,7 @@ test('engine saves only its fixed whitelist against the token user', () => {
     ThemeMode: 'dark',
     CornerStyle: 'square',
     MenuChildExpandMode: 'Right',
+    NavigationLayout: 'Top',
     DesktopType: 'windows',
     DesktopBg: '/junchi/member/background.webp',
     RandomDesktopBg: 0,
@@ -146,8 +148,17 @@ test('engine rejects external routes, invalid colors and cross-tenant desktop pa
   assert.equal(run({ ThemeMode: 'system' }).result.Code, 0);
   assert.equal(run({ CornerStyle: 'circle' }).result.Code, 0);
   assert.equal(run({ MenuChildExpandMode: 'popup' }).result.Code, 0);
+  assert.equal(run({ NavigationLayout: 'iframe' }).result.Code, 0);
   assert.equal(run({ DesktopBg: '/itdos/member/background.webp' }).result.Code, 0);
   assert.equal(run({ DesktopDockMenu: Array.from({ length: 101 }, (_, index) => `menu-${index}`) }).result.Code, 0);
+});
+
+test('inherited presentation values remain explicit and cannot change another account', () => {
+  for (const input of ['', 'System', 'system']) {
+    const {result, updateModel} = run({CornerStyle:input,NavigationLayout:input,MenuChildExpandMode:input,Id:'other-account'});
+    assert.equal(result.Code,1);
+    assert.deepEqual(updateModel,{Id:'user-1',CornerStyle:'System',NavigationLayout:'System',MenuChildExpandMode:'System'});
+  }
 });
 
 test('both framework clients call the Managed ApiEngine instead of a binary-only controller', () => {
