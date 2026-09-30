@@ -13,6 +13,8 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 
 ## Microi Agent 桌面宿主
 
+- 桌面与手机配对的本机 HTTP 监听必须避开 Fetch 标准禁止端口。系统自动分配的端口也可能不可浏览器访问；只有浏览器允许的真实监听端口才能进入配对 URL。自动命中禁止端口时关闭监听再有界重选，显式配置禁止端口须报错；权限和占用错误仍保留原错误，不改变系统动态端口范围、不绕过浏览器安全策略。同步上游时保护共同端口选择器、配对监听与对应回归。
+
 - Microi Agent 是内部仓库中的独立桌面发行物，直接基于 DataElement/dsh-desktop 与 DeepSeek Harness 二次开发，内置固定版本的 Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
 - 官方 AI 登录只走桌面账号窗口，固定 `https://api.itdos.com`、`OsClient=iTdos`，使用当前用户的中转 Key 和额度。不要让用户把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
 - 业务连接在「服务器连接（MCP）」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
