@@ -2,3 +2,5 @@
 import test from 'node:test'
 void test
 import '../../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/microi-unity-cs/tests/gateway.test.mjs'
+import '../../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/microi-unity-cs/tests/reference-assets.test.mjs'
+import '../../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/microi-unity-cs/tests/game-context.test.mjs'
