@@ -1,8 +1,9 @@
 <template>
     <div class="navbar-microi" :style="GetNavbarMicroiStyle()" v-if="ShowClassicTop != 0">
-        <hamburger id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
+        <top-navigation v-if="isTopNavigation" />
+        <hamburger v-else id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
 
-        <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
+        <breadcrumb v-if="!isTopNavigation" id="breadcrumb-container" class="breadcrumb-container" />
 
         <div class="right-menu">
             <!-- 租户名称 -->
@@ -139,10 +140,13 @@ import { useDiyStore, useAppStore, useUserStore } from "@/pinia";
 import { computed } from "vue";
 import { hasWebOS } from "@/utils/webos-detect.js";
 import { getRealtimeStatusText } from "@/utils/realtime-connection.js";
+import TopNavigation from './TopNavigation.vue';
+import { resolveUserNavigationLayout } from '@/utils/user-visual-preferences';
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
 export default {
     components: {
+        TopNavigation,
         Breadcrumb,
         Hamburger,
         LangSelect,
@@ -157,6 +161,7 @@ export default {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
         const userStore = useUserStore();
+        const isTopNavigation = computed(() => !diyStore.IsPhoneView && resolveUserNavigationLayout(diyStore.GetCurrentUser?.NavigationLayout, diyStore.SysConfig?.NavigationLayout) === 'Top');
 
         const sidebar = computed(() => appStore.sidebar);
         const device = computed(() => appStore.device);
@@ -174,6 +179,7 @@ export default {
 
         return {
             diyStore,
+            isTopNavigation,
             appStore,
             userStore,
             hasWebOS,

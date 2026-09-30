@@ -21,9 +21,9 @@ test('PAGE5 starts with the shared AI composer and contains the complete operati
   assert.equal(page.JsonObj.formConfig.watermarkStyle.content, '');
   const wrappers = page.JsonObj.wrapperList;
   assert.equal(wrappers[0].widgetList[0].type, 'aiengine');
-  assert.equal(wrappers[0].wrapperOption.span, 24);
+  assert.equal(wrappers[0].wrapperOption.span, 14);
   assert.equal(wrappers[1].widgetList[0].type, 'homeoverview');
-  assert.equal(wrappers[1].wrapperOption.span, 24);
+  assert.equal(wrappers[1].wrapperOption.span, 10);
   assert.deepEqual(
     widgets(page.JsonObj).map(widget => widget.type),
     ['aiengine', 'homeoverview', 'workcenter', 'diycalendar', 'diytable'],

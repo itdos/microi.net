@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-29T05:46:11.323Z",
+  "generatedAt": "2026-09-30T04:03:31.649Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,11 +169,11 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "7ed47ad5bc562102fd0319a277786934e4394dfb6c41ad0f138061c3eb16fc49",
-      "originalLines": 697,
-      "prefixSha256": "c5534e3a06a1777a213adab604313ab0f3340d7ff3cb432acc827b28dd7c5017",
-      "prefixBytes": 1356,
-      "entryLines": 239,
+      "originalSha256": "ca3f12481dc195380abc461c7259e8a5d202df88b4b6806e5fdb36d86aeb6f4d",
+      "originalLines": 699,
+      "prefixSha256": "650039258e4d5a0b1bb6f93baaf3dae02995573f6f053152eb71eabfb3d64783",
+      "prefixBytes": 1363,
+      "entryLines": 241,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
@@ -187,7 +187,7 @@
           "id": "microi-client-frontend-001",
           "ordinal": 1,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "e9667a3a534e09b964c4a11796c003b48edc4093c66ed0c8777aefd4188a4ba8",
+          "sha256": "112177bb326f8d26803e3bd9248011d839fe8d081431320d0e09f90f82487984",
           "lines": 30,
           "heading": "1. 技术栈和源码入口"
         },
@@ -195,8 +195,8 @@
           "id": "microi-client-frontend-002",
           "ordinal": 2,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "c8e47f78e3835be000ad627874908d644025f81e5047ee5c9fd9c14161c9fea5",
-          "lines": 106,
+          "sha256": "8880429d365b6cc36c1132f5c9774e5be452dd55d057026b010174e65e707022",
+          "lines": 108,
           "heading": "2. 表单引擎三层结构"
         },
         {
@@ -211,7 +211,7 @@
           "id": "microi-client-frontend-004",
           "ordinal": 7,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "174028eca01dc0987236803041ab5ac1bf18705a6609a4ba640df0c553533c1e",
+          "sha256": "7d9e9b8b8f6b2c790d3cefd02b9dc0cda5d55ede477f98a48d92c8975990d3ff",
           "lines": 40,
           "heading": "7. 验证建议"
         },
@@ -1196,11 +1196,11 @@
       ]
     },
     "page-engine": {
-      "originalSha256": "8d989e26c559d1d7d9ce5dfbfd213ec60068e28c9dc00dce02091baee86e9bb9",
-      "originalLines": 444,
-      "prefixSha256": "60896f59151ef4b322c894ffefb9f4a8323fac5f572f70a0522c44000e07ef69",
-      "prefixBytes": 2530,
-      "entryLines": 196,
+      "originalSha256": "c8e90118f653f4bba746e6401847a760f6133fa7bbfe4a0934fc33b4f892dcec",
+      "originalLines": 454,
+      "prefixSha256": "9030021f4fede8495c3832d8e4fb92fc80d74f6f0a7a13995e24f714eab068a6",
+      "prefixBytes": 3797,
+      "entryLines": 206,
       "chunks": [
         {
           "id": "page-engine-000",

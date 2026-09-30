@@ -42,15 +42,28 @@
                     </div>
                 </div>
 
-                <!-- 全局边角风格 -->
+                <!-- 当前账号可覆盖租户的界面默认值 -->
                 <div class="mci-theme-section">
                     <div class="mci-theme-title">
                         <el-icon><Grid /></el-icon>
                         <span>边角风格</span>
                     </div>
                     <div class="mci-mode-row" role="group" aria-label="边角风格">
-                        <button type="button" class="mci-mode-btn" :class="{ active: cornerStyle === 'round' }" @click="changeCornerStyle('round')">圆角</button>
-                        <button type="button" class="mci-mode-btn" :class="{ active: cornerStyle === 'square' }" @click="changeCornerStyle('square')">直角</button>
+                        <button v-for="option in cornerOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="cornerPreference === option.value" :class="{ active: cornerPreference === option.value }" @click="changeCornerStyle(option.value)">{{ option.label }}</button>
+                    </div>
+                </div>
+
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title"><el-icon><Menu /></el-icon><span>导航菜单位置</span></div>
+                    <div class="mci-mode-row" role="group" aria-label="导航菜单位置">
+                        <button v-for="option in navigationOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="navigationPreference === option.value" :class="{ active: navigationPreference === option.value }" @click="changeNavigationLayout(option.value)">{{ option.label }}</button>
+                    </div>
+                </div>
+
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title"><el-icon><Expand /></el-icon><span>菜单子级展开方式</span></div>
+                    <div class="mci-mode-row" role="group" aria-label="菜单子级展开方式">
+                        <button v-for="option in menuExpandOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="menuExpandPreference === option.value" :class="{ active: menuExpandPreference === option.value }" @click="changeMenuChildExpandMode(option.value)">{{ option.label }}</button>
                     </div>
                 </div>
 
@@ -111,7 +124,7 @@
 </template>
 
 <script>
-import { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid } from "@element-plus/icons-vue";
+import { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand } from "@element-plus/icons-vue";
 import { computed, watch } from "vue";
 import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
@@ -126,14 +139,17 @@ import {
     hasInstalledUserPreference,
     resolveUserThemeColor,
     resolveUserThemeMode,
-    resolveUserCornerStyle
+    resolveUserCornerStyle,
+    normalizeUserCornerStyle,
+    normalizeUserNavigationLayout,
+    normalizeUserMenuChildExpandMode
 } from "@/utils/user-visual-preferences.js";
 
 const DEFAULT_THEME_COLOR = "#409eff";
 
 export default {
     name: "ThemeSelect",
-    components: { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid },
+    components: { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand },
     props: {
         showMode: {
             type: Boolean,
@@ -172,6 +188,9 @@ export default {
             ShowThemes: false,
             themeMode: 'light',
             cornerStyle: getCornerStyle(),
+            cornerOptions: [{value:'System',label:'跟随系统'},{value:'round',label:'圆角'},{value:'square',label:'直角'}],
+            navigationOptions: [{value:'System',label:'跟随系统'},{value:'Side',label:'侧边导航'},{value:'Top',label:'顶部导航'}],
+            menuExpandOptions: [{value:'System',label:'跟随系统'},{value:'Down',label:'向下展开'},{value:'Right',label:'向右展开'}],
             pendingPreferencePatch: {},
             preferenceSaveTimer: null,
             preferenceSaveInFlight: false,
@@ -180,6 +199,9 @@ export default {
         };
     },
     computed: {
+        cornerPreference() { return normalizeUserCornerStyle(this.CurrentUser?.CornerStyle); },
+        navigationPreference() { return normalizeUserNavigationLayout(this.CurrentUser?.NavigationLayout); },
+        menuExpandPreference() { return normalizeUserMenuChildExpandMode(this.CurrentUser?.MenuChildExpandMode); },
         // 每种显示模式固定 12 色（6 × 2）；暗色模式不出现白色主色。
         mciPresets() {
             return getThemePalettes(this.themeMode);
@@ -187,7 +209,9 @@ export default {
         canSyncThemePreferences() {
             return hasInstalledUserPreference(this.CurrentUser, "ThemeMode")
                 || hasInstalledUserPreference(this.CurrentUser, "ThemeColor")
-                || hasInstalledUserPreference(this.CurrentUser, "CornerStyle");
+                || hasInstalledUserPreference(this.CurrentUser, "CornerStyle")
+                || hasInstalledUserPreference(this.CurrentUser, "NavigationLayout")
+                || hasInstalledUserPreference(this.CurrentUser, "MenuChildExpandMode");
         },
         preferenceSaveStatusText() {
             const keys = {
@@ -227,15 +251,28 @@ export default {
         },
         "CurrentUser.Id"() {
             this.applyResolvedCornerStyle();
+        },
+        "SysConfig.CornerStyle"() {
+            this.applyResolvedCornerStyle();
         }
     },
     methods: {
         applyResolvedCornerStyle() {
-            this.cornerStyle = setCornerStyle(resolveUserCornerStyle(this.CurrentUser, getCornerStyle()));
+            this.cornerStyle = setCornerStyle(resolveUserCornerStyle(this.CurrentUser, getCornerStyle(), this.SysConfig?.CornerStyle));
         },
         changeCornerStyle(style) {
-            this.cornerStyle = setCornerStyle(style);
-            this.saveInstalledVisualPreferences({ CornerStyle: this.cornerStyle });
+            if (!hasInstalledUserPreference(this.CurrentUser, 'CornerStyle')) {
+                this.cornerStyle = setCornerStyle(style === 'System' ? this.SysConfig?.CornerStyle : style);
+                return;
+            }
+            this.saveInstalledVisualPreferences({ CornerStyle: normalizeUserCornerStyle(style) });
+            this.applyResolvedCornerStyle();
+        },
+        changeNavigationLayout(value) {
+            this.saveInstalledVisualPreferences({ NavigationLayout: normalizeUserNavigationLayout(value) });
+        },
+        changeMenuChildExpandMode(value) {
+            this.saveInstalledVisualPreferences({ MenuChildExpandMode: normalizeUserMenuChildExpandMode(value) });
         },
         applyResolvedThemeMode() {
             const mode = resolveUserThemeMode(
@@ -420,6 +457,8 @@ export default {
 
 .mci-theme-panel-body {
     padding: 14px 16px 16px;
+    max-height: min(640px, calc(100vh - 180px));
+    overflow-y: auto;
 }
 
 .mci-theme-section {

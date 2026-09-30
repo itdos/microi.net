@@ -19,6 +19,16 @@ MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_pag
 
 用户提供参考截图时，先拆出面板行列比例、指标主次、图表与表格高度、标题/筛选位置，再用原生 pannel/statistic/chart/tabel/list 组合配置。不能把所有指标替换成一排大色块，也不能用模板假数据声称已接通客户业务。必须用同一视口截图检查浅色和平台深色，检查页面缩放后的断行与纵向空白；布局接近度和真实数据绑定分别验收。
 
+### 平台智能工作首页
+
+保留 `aiengine` 原生 AI 创作中心，与 `homeoverview` 工作概览组成桌面首行 14/10 栅格；任务、月历与公告放在下一行，移动端自动切为 24 栅格。不能把任务的完整 15 行列表或未配置日程的大空白块直接堆在首屏。
+
+- `homeoverview.widgetParams[0]` 为真实个人统计接口 `platform-home-overview`，`[1].value="compact"` 启用紧凑指标、常用应用与趋势；所有数据仍受当前用户权限过滤。
+- `workcenter.widgetParams` 按索引依次为视图、工作菜单、流程菜单、公告菜单、日历菜单、分页条数；`[5].value=5` 用于首页任务，范围 5–20，不能影响独立“我的工作”页面。
+- `diycalendar.widgetParams[1].value="compact"` 在没有可访问日程模块时展示本月日期，并明确提示未配置，不伪造任务。
+- `diytable.widgetParams[4].value="NoticeList"` 以只读公告列表展示真实授权公告；表、菜单仍在 `[0]/[1]`，模块缺失时使用 `referencePolicy.onMissing="RemoveWidget"` 移除可选组件及空容器。
+- 修改已有首页前通过 MCP 读取页面及历史 `CurrentHash`，保存传 `expectedCurrentHash`，再回读 JSON 和历史，保留可恢复版本。
+
 你正在为 Microi 吾码平台生成界面引擎页面的 JSON 数据。界面引擎页面由 `formData` 对象描述，用户导入 JSON 即可使用。
 
 <!-- microi-progressive:begin -->
