@@ -7,8 +7,8 @@
         <h2 id="microi-code-title">让 AI 在<strong>完整业务底座</strong>上工作</h2>
         <p class="microi-code-lead">代码、吾码账号、AI 中转站、MCP 与 30+ 成熟引擎，在一个桌面工作台协同。</p>
         <div class="microi-code-actions">
-          <a class="is-primary" :href="downloadUrls.windows"><DownloadIcon />下载 Windows <small>v{{ liveVersions.windows }}</small></a>
-          <a :href="downloadUrls.mac"><DownloadIcon />下载 macOS <small>v{{ liveVersions.mac }}</small></a>
+          <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows <small>v{{ liveVersions.windows }}</small></a>
+          <a :href="downloadUrls.mac" target="_blank" rel="noopener"><DownloadIcon />下载 macOS <small>v{{ liveVersions.mac }}</small></a>
         </div>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
@@ -76,11 +76,11 @@ const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
 
 // 更新清单由 iTdos 接口引擎发布；版本发布后官网源码无需随之改动。
-const liveVersions = reactive({ windows: '1.1.9', mac: '1.1.7' })
-// 首屏链接必须立即可下载；联网后用官方清单更新目标，无需每次发版修改官网源码。
+const liveVersions = reactive({ windows: '1.3.1', mac: '1.2.2' })
+// 下载按钮始终使用永久入口；点击时由官方清单选择当前安装包，首屏不依赖异步请求。
 const downloadUrls = reactive({
-  windows: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe',
-  mac: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.1.7/requests/314f32071d4da727ea278cda3920a6115d3f671873d74d313750560467641ff0/assets/Microi-Code-1.1.7-mac-universal.dmg'
+  windows: 'https://microi.net/download/microi-agent/latest.html?platform=windows',
+  mac: 'https://microi.net/download/microi-agent/latest.html?platform=mac'
 })
 const UPDATE_BASE = 'https://api.itdos.com/microi-code/updates/latest/'
 function versionFromYaml(yaml) {
@@ -88,10 +88,9 @@ function versionFromYaml(yaml) {
 }
 onMounted(async () => {
   await Promise.all([
-    fetch(UPDATE_BASE + 'latest.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => { liveVersions.windows = versionFromYaml(yaml) || liveVersions.windows; downloadUrls.windows = installerFromYaml(yaml, 'windows') || downloadUrls.windows }).catch(() => {}),
+    fetch(UPDATE_BASE + 'latest.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => { if (installerFromYaml(yaml, 'windows')) liveVersions.windows = versionFromYaml(yaml) || liveVersions.windows }).catch(() => {}),
     fetch(UPDATE_BASE + 'latest-mac.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => {
       liveVersions.mac = versionFromYaml(yaml) || liveVersions.mac
-      downloadUrls.mac = installerFromYaml(yaml, 'mac') || downloadUrls.mac
     }).catch(() => {})
   ])
 })
@@ -127,6 +126,11 @@ const screenshots = [
 ]
 
 const releases = [
+  { version: '1.3.1', platform: 'Windows x64', note: '安装程序 · 147.8 MiB · 回环恢复与浏览器端口修复 · 未签名', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.1/requests/f9f26f0bea6edc7ca0113fcd90b06026d6ea61ba7138e25bfbed1502d7d34c87/assets/Microi-Agent-1.3.1-windows-x64-setup.exe', sha256: '2d76b5d148ea8d26da41d1877a95293837737cee36d95cc80df091befc1feb3c' },
+  { version: '1.3.0', platform: 'Windows x64', note: '安装程序 · 147.8 MiB · 本地 Harness 启动恢复 · 未签名', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.0/requests/4d8c1107cf309fa37a27405166cba140ef1d3f04011116badaa229f1580d206c/assets/Microi-Agent-1.3.0-windows-x64-setup.exe', sha256: '3a269fb188d526d33eb48334788e7c6a16bf20795d252ecfbace24e9d0956b63' },
+  { version: '1.2.9', platform: 'Windows x64', note: '安装程序 · 145.4 MiB · 双通道启动探测 · 未签名', url: 'https://static.itdos.com/itdos/microi-code/1.2.9/3b30b1e7adb5/202610/Microi-Agent-1_2_9-windows-x64-setup.exe', sha256: '3b30b1e7adb57f8d7910dc500f977d0913937f88aa3852247379a181a5691a41' },
+  { version: '1.2.2', platform: 'macOS Universal', note: 'Intel / Apple Silicon · DMG · 363.3 MiB · Developer ID 签名、Apple 公证与 Gatekeeper 校验通过 · macOS 13.5+', url: 'https://static.itdos.com/itdos/micro-app/microi-code-downloads/v1.2.2/Microi-Agent-1.2.2-mac-universal.dmg', sha256: '273cb60b06d032e9f3f7951ade0d50c96e978b160a3eee0de28efc9ed8c9a3e4' },
+  { version: '1.2.2', platform: 'macOS Universal ZIP', note: '自动更新包 · 405.8 MiB · 已签名、公证的 Universal App · macOS 13.5+', url: 'https://static.itdos.com/itdos/micro-app/microi-code-downloads/v1.2.2/Microi-Agent-1.2.2-mac-universal.zip', sha256: '577f637fad51837b46f604edf09dafec09a6cccb0574e88bee35ae61875e9a24' },
   { version: '1.1.3', platform: 'macOS Intel', note: 'x64 DMG · 197.5 MiB · 未签名、未公证', url: mac.archive, sha256: mac.sha256 },
   { version: '1.1.3', platform: 'macOS Intel ZIP', note: '自动更新包 · 228.2 MiB', url: 'https://static.itdos.com/itdos/microi-code/1.1.3/f8056741d597/202609/Microi-Code-1_1_3-mac-x64.zip', sha256: 'f8056741d5972378317a05c31691e9c1f6c5a7bd3efbe483225611784544b2cb' },
   { version: '1.1.3', platform: 'Windows x64', note: '安装程序 · 177.0 MiB · 未签名', url: windows.archive, sha256: windows.sha256 },
@@ -277,8 +281,8 @@ const visibleReleases = computed(() => releases.slice((historyPage.value - 1) * 
 </style>
 
 <style>
-.mci-microi-code-page .VPDoc .aside {
-  display: none;
+@media (min-width: 1280px) {
+  .mci-microi-code-page .VPDoc .aside { display: block; }
 }
 .mci-microi-code-page .VPDoc .container {
   max-width: 1520px;
