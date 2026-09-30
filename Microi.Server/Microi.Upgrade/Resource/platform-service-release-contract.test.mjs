@@ -81,6 +81,18 @@ test("平台内置微服务只从显式发布契约解析正式源码根", async
   );
 });
 
+test('all declared platform service package targets carry the same immutable runtime', async () => {
+  const contract = await readJson('platform-service-release.json');
+  const packages = await Promise.all(contract.PackageTargets.map(file => readJson(path.basename(file))));
+  const first = platformBundle(packages[0]);
+  for (const pkg of packages.slice(1)) {
+    const candidate = platformBundle(pkg);
+    assert.equal(candidate.VersionNo, first.VersionNo);
+    assert.equal(candidate.MicroService.DistHash, first.MicroService.DistHash);
+    assert.deepEqual(candidate.BuildAssets, first.BuildAssets);
+  }
+});
+
 test("两个官方基线包携带同一份可离线启动的数据库运行产物", async () => {
   const contract = await readJson("platform-service-release.json");
   const [saasPackage, storePackage, saasSyncBase, storeSyncBase, sourcePackage] = await Promise.all([

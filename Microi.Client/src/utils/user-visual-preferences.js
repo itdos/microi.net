@@ -53,11 +53,29 @@ export function resolveUserThemeColor(user = {}, localColor = "", systemColor = 
     return text(localColor) || text(systemColor) || fallback;
 }
 
-export function resolveUserCornerStyle(user = {}, localStyle = "round") {
+export function normalizeUserCornerStyle(value) {
+    const normalized = text(value).toLowerCase();
+    return normalized === 'round' || normalized === 'square' ? normalized : 'System';
+}
+
+export function resolveUserCornerStyle(user = {}, localStyle = "round", systemStyle = "") {
+    const tenantDefault = text(systemStyle).toLowerCase() === 'square' ? 'square' : 'round';
     if (hasInstalledUserPreference(user, "CornerStyle")) {
-        return String(user.CornerStyle || "").toLowerCase() === "square" ? "square" : "round";
+        const personal = normalizeUserCornerStyle(user.CornerStyle);
+        return personal === 'System' ? tenantDefault : personal;
     }
-    return String(localStyle || "").toLowerCase() === "square" ? "square" : "round";
+    return normalizeUserCornerStyle(localStyle) === 'square' ? 'square' : tenantDefault;
+}
+
+export function normalizeUserNavigationLayout(value) {
+    const normalized = text(value).toLowerCase();
+    return normalized === 'top' ? 'Top' : normalized === 'side' ? 'Side' : 'System';
+}
+
+export function resolveUserNavigationLayout(userValue, systemValue) {
+    const personal = normalizeUserNavigationLayout(userValue);
+    if (personal !== 'System') return personal;
+    return normalizeUserNavigationLayout(systemValue) === 'Top' ? 'Top' : 'Side';
 }
 
 export function normalizeUserMenuChildExpandMode(value) {

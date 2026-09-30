@@ -140,6 +140,36 @@ test("v3 package creation time is fixed to the release across exact replays", ()
   assert.equal(creationTime(false, "2026-09-09 03:00:00"), "2026-09-09 03:00:00");
 });
 
+test("V3 marketplace proof accepts the fixed CDN entry only for its committed tenant app", () => {
+  const context = { V8: { OsClient: "iTdos" } };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "readV3CommittedProof")}
+    ${extractFunction(publisherSource, "assertV3CommittedStore")}
+    read = readV3CommittedProof;
+    assertStore = assertV3CommittedStore;
+  `, context);
+  const proof = context.read({
+    VersionId: "version-1", RuntimeManifestHash: "a".repeat(64),
+    PublishFence: "6", PublishRowVersion: "6", VersionRowVersion: "6",
+    PublishState: "Completed",
+    StableResolverPath: "/micro-app/v3/tenants/itdos/kinds/runtime/apps/ai-platform-studio/assets/index.html",
+    CdnPreviewPath: "/itdos/micro-app/ai-platform-studio/index.html",
+    RequestId: "request-1", RequestFingerprint: "b".repeat(64),
+  });
+  const row = {
+    AppKey: "ai-platform-studio", CommittedPublishVersionId: "version-1",
+    CommittedRuntimeManifestHash: "a".repeat(64), PublishFence: 6,
+    PublishRowVersion: 6, PublishState: "Completed",
+    PublicPublishPath: "/itdos/micro-app/ai-platform-studio/index.html",
+  };
+  assert.doesNotThrow(() => context.assertStore(row, proof, "readback"));
+  assert.throws(() => context.assertStore({ ...row, AppKey: "another-app" }, proof, "readback"), /CdnPreviewPath/);
+  assert.throws(() => context.assertStore({ ...row, PublicPublishPath: "/itdos/micro-app/another-app/index.html" }, proof, "readback"), /PublicPublishPath/);
+  assert.throws(() => context.read({ ...proof, CdnPreviewPath: "/itdos/micro-app/../index.html" }), /CdnPreviewPath/);
+});
+
 test("inline runtime sizes handle both Jint arrays and CLR wrappers and enforce the aggregate limit", () => {
   const block = publisherSource.slice(publisherSource.indexOf("if (requestedDatabaseOnlyBuild) {"), publisherSource.indexOf("var generatedResourcePolicies ="));
   const html = Buffer.from("<!doctype html><html><head></head><body>ok</body></html>");

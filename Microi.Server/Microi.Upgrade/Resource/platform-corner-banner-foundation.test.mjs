@@ -23,8 +23,8 @@ test('new tenant account preference matches the independently upgradable account
   const appField = field(account, 'CornerStyle');
   assert.ok(baseField);
   assert.equal(baseField.Id, appField.Id);
-  assert.equal(baseField.DefaultValue, 'round');
-  assert.deepEqual(JSON.parse(baseField.Data).map(item => item.Key), ['round', 'square']);
+  assert.equal(baseField.DefaultValue, 'System');
+  assert.deepEqual(JSON.parse(baseField.Data).map(item => item.Key), ['System', 'round', 'square']);
   const baseColumn = column(saas, 'sys_user', 'CornerStyle');
   const appColumn = column(account, 'sys_user', 'CornerStyle');
   assert.equal(baseColumn.COLUMN_TYPE, appColumn.COLUMN_TYPE);
