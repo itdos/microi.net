@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "yixiaoer": {
+      "source": "d:\\Users\\Administrator\\AppData\\Local\\nvm\\v20.20.1\\node_modules\\@yixiaoermail\\cli\\skills\\yixiaoer",
+      "sourceType": "local",
+      "computedHash": "1b955724aaeb4cfe95c741c820177b790ab7903a950e7198d9ec81703b032811"
+    }
+  }
+}
