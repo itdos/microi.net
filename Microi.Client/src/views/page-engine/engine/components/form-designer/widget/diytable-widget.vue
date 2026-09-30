@@ -1,9 +1,10 @@
 <template>
-  <div class="diytable-widget" :class="{ 'is-design-mode': isDesignMode }" :style="{ width: '100%', height: autoHeight }">
+  <div class="diytable-widget" :class="{ 'is-design-mode': isDesignMode, 'is-notice-list': isNoticeList }" :style="{ width: '100%', height: autoHeight }">
     <div v-if="!tableId" class="widget-placeholder">
       <el-icon :size="32"><Grid /></el-icon>
       <span>{{ $pet('DIY表格 - 请配置模块ID') }}</span>
     </div>
+    <component v-else-if="isNoticeList" :is="noticeComp" embedded initial-tab="notice" :notice-menu-id="sysMenuId" />
     <component
       v-else
       :is="diyTableComp"
@@ -34,6 +35,8 @@ const route = useRoute()
 const diyTableComp = shallowRef(
   defineAsyncComponent(() => import('@/views/form-engine/diy-table.vue'))
 )
+const noticeComp = defineAsyncComponent(() => import('@/views/workflow/my-work.vue'))
+const isNoticeList = computed(() => props.widgetObj.widgetParams?.[4]?.value === 'NoticeList')
 
 const autoHeight = computed(() => {
   return isDesignMode.value ? props.widgetObj.widgetOption.height + 'px' : 'auto'
@@ -85,6 +88,11 @@ onBeforeUnmount(() => {
 .diytable-widget.is-design-mode {
   overflow: auto;
 }
+.diytable-widget.is-notice-list :deep(.notice-header) { flex-direction:column;align-items:stretch;gap:6px; }
+.diytable-widget.is-notice-list :deep(.notice-meta) { flex-wrap:wrap;gap:6px; }
+.diytable-widget.is-notice-list :deep(.notice-title) { width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.5; }
+.diytable-widget.is-notice-list :deep(.notice-date) { font-size:11px; }
+.diytable-widget.is-notice-list :deep(.notice-item) { padding:10px 12px; }
 .diytable-widget:not(.is-design-mode) :deep(.home-notice-table .keyword-search) {
   min-height: 32px;
   padding: 2px 4px;

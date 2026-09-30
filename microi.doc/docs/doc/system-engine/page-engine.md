@@ -19,6 +19,21 @@
 
 `wrapperOption.heightMode="content"` 让容器随内容撑开，避免标题或少量指标留下大块空白；明确需要固定画布时选择 `fixed`。图表自身仍可设置高度。统计组件新增“摘要”和“明细指标”外观，可组合主指标、次指标、图表、表格来还原紧凑报表。配置和真实数据接口保持分离；升级平台前端后，已有页面即可获得主题适配与内容高度处理。
 
+### 智能工作首页
+
+平台首页保留 AI 创作中心，桌面首行采用 AI 创作与真实工作概览的 14/10 栅格，第二行并排展示任务、月历和公告。移动端自动单列，容器使用内容高度，不设置卡片内滚动条。
+
+原生组件新增以下配置，均可通过 MCP 保存页面 JSON：
+
+| 组件 | 配置 | 效果 |
+|---|---|---|
+| `homeoverview` | `widgetParams[1].value="compact"` | 紧凑指标、常用应用和近 7 日真实趋势 |
+| `workcenter` | `widgetParams[5].value=5` | 首页任务每页 5 条，独立工作页面保留原分页 |
+| `diycalendar` | `widgetParams[1].value="compact"` | 无日程模块时显示小型月历及配置提示 |
+| `diytable` | `widgetParams[4].value="NoticeList"` | 将有权访问的公告以只读列表展示 |
+
+菜单和表绑定保持真实租户资源，公告属于可选组件，未安装公告模块的租户自动移除对应组件及空容器。保存已有页面时传入历史返回的 `expectedCurrentHash`，防止覆盖并发修改。
+
 ## 试用地址
 >Microi吾码界面引擎：[https://microi.net/page-engine](https://microi.net/page-engine)
 ## npm组件集成方式

@@ -10,10 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-user-update-preferences
- * Version: v1.1.0
+ * Version: v1.1.2
  * Function:
- * - 仅允许登录用户保存自己的界面偏好；目标用户和租户始终取当前 DiyToken 上下文。
- * - 固定白名单覆盖首页、主题、菜单展开和桌面外观，不接受账号、角色、组织或认证字段。
+ * - 仅允许当前 DiyToken 用户保存自己的首页、主题、边角、导航、菜单展开与桌面偏好；空值或 System 跟随租户设置。
  */
 
 if (!V8.CurrentUser || !V8.CurrentUser.Id) {
@@ -94,10 +93,19 @@ if (hasValue('ThemeMode')) {
 if (hasValue('CornerStyle')) {
   // 枚举先在后端校验，再写当前 DiyToken 用户，禁止透传任意样式值。
   var cornerStyle = text(param.CornerStyle).toLowerCase();
-  if (cornerStyle !== 'round' && cornerStyle !== 'square') {
-    return fail('边角风格只能是 round 或 square。');
+  if (cornerStyle !== '' && cornerStyle !== 'system' && cornerStyle !== 'round' && cornerStyle !== 'square') {
+    return fail('边角风格只能是 System、round 或 square。');
   }
-  updateModel.CornerStyle = cornerStyle;
+  updateModel.CornerStyle = !cornerStyle || cornerStyle === 'system' ? 'System' : cornerStyle;
+  updateCount++;
+}
+
+if (hasValue('NavigationLayout')) {
+  var layoutRaw = text(param.NavigationLayout).toLowerCase();
+  var layout = !layoutRaw || layoutRaw === 'system' ? 'System'
+    : (layoutRaw === 'top' ? 'Top' : (layoutRaw === 'side' ? 'Side' : ''));
+  if (!layout) return fail('导航菜单位置只能是 System、Side 或 Top。');
+  updateModel.NavigationLayout = layout;
   updateCount++;
 }
 

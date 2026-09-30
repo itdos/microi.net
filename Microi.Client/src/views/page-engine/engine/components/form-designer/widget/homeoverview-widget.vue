@@ -1,5 +1,5 @@
 <template>
-  <section class="home-overview" data-testid="platform-home-overview">
+  <section class="home-overview" :class="{ 'is-dashboard-compact': compactDashboard }" data-testid="platform-home-overview">
     <div v-if="loading" class="overview-skeleton" role="status" :aria-label="$pet('首页概览加载中')">
       <div class="skeleton-heading"><span></span><span></span></div>
       <div class="skeleton-metrics"><span v-for="item in 4" :key="item"></span></div>
@@ -132,6 +132,7 @@ const metrics = computed(() => [
 ])
 
 const engineKey = computed(() => String(props.widgetObj?.widgetParams?.[0]?.value || 'platform-home-overview').trim())
+const compactDashboard = computed(() => props.widgetObj?.widgetParams?.[1]?.value === 'compact')
 
 function normalizeResult(result) {
   if (result?.Result?.Code !== undefined) return result.Result
@@ -425,6 +426,27 @@ onBeforeUnmount(() => {
 .overview-error > div { display: grid; gap: 3px; }
 .overview-error strong { color: var(--home-text); }
 .overview-error button { border: 1px solid var(--home-border); border-radius: 9px; background: var(--home-panel); color: var(--home-text); cursor: pointer; padding: 7px 11px; }
+
+.is-dashboard-compact {
+  min-height: 0;
+  padding: 0;
+  .overview-heading { min-height: 44px; padding-bottom: 10px; gap: 8px; }
+  .overview-heading h2 { font-size: 18px; }
+  .overview-heading p { display: none; }
+  .assistant-link { display: none; }
+  .metric-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); border-radius: var(--mci-radius-md, 10px); }
+  .metric-item { min-height: 64px; padding: 8px 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+  .metric-item strong { font-size: 22px; }
+  .metric-item small { display: none; }
+  .overview-body { display: flex; flex-direction: column-reverse; gap: 10px; margin-top: 10px; }
+  .trend-panel,.apps-panel { min-height: 0; padding: 10px 12px; border-radius: var(--mci-radius-md, 10px); }
+  .usage-chart { height: 138px; }
+  .app-entry { min-height: 44px; padding: 3px 0; }
+  .app-icon { width: 30px; height: 30px; }
+  .section-heading { min-height: 24px; }
+  .section-heading span { display: none; }
+  .overview-error { min-height: 200px; }
+}
 
 @media (max-width: 980px) {
   .overview-body { grid-template-columns: 1fr; }

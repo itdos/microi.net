@@ -6487,8 +6487,22 @@ body.dark .ai-engine-page,
 }
 
 .ai-engine-page.is-empty-chat.is-compact .empty-hero {
-    padding-top: 16px;
+    padding: 12px 0 6px;
 }
+
+.ai-engine-page.is-empty-chat.is-compact .ai-engine-main { overflow: visible; grid-template-rows: 46px; }
+.ai-engine-page.is-empty-chat.is-compact .ai-engine-header { min-height: 46px; }
+.ai-engine-page.is-empty-chat.is-compact .empty-hero h1 { font-size: clamp(22px, 1.7vw, 28px); }
+.ai-engine-page.is-empty-chat.is-compact .empty-hero p { font-size: 12px; }
+.ai-engine-page.is-empty-chat.is-compact .hero-kicker { display: none; }
+.ai-engine-page.is-empty-chat.is-compact .composer { padding: 5px 0 12px; }
+.ai-engine-page.is-empty-chat.is-compact .composer-box :deep(.el-textarea__inner) { min-height: 48px !important; font-size: 14px; padding: 12px 14px 6px; }
+.ai-engine-page.is-empty-chat.is-compact .creation-category-grid { gap: 8px; }
+.ai-engine-page.is-empty-chat.is-compact .creation-category { min-height: 88px; padding: 10px; gap: 8px; border-radius: var(--mci-radius-md, 10px); }
+.ai-engine-page.is-empty-chat.is-compact .creation-category > header { gap: 7px; }
+.ai-engine-page.is-empty-chat.is-compact .creation-category > header > span { width: 28px; height: 28px; flex-basis: 28px; font-size: 15px; }
+.ai-engine-page.is-empty-chat.is-compact .creation-category > header strong { font-size: 12px; }
+.ai-engine-page.is-empty-chat.is-compact .creation-category > header small { font-size: 10px; }
 
 .ai-engine-page.is-empty-chat.is-compact .platform-stats,
 .ai-engine-page.is-empty-chat.is-compact .quick-prompts {

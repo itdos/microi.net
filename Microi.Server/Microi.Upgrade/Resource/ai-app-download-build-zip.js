@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_download_build_zip
- * Version: v1.3.6
+ * Version: v1.3.7
  * Function:
  * - 从当前应用真实编译产物生成可移植 Build ZIP；Web/UniApp 只读取当前 v3 发布资源，优先稳定运行时地址并校验字节与 SHA-256。
  */
@@ -194,6 +194,18 @@ function readAssetBase64(asset) {
     && stablePath.indexOf('..') < 0 && stablePath.indexOf('?') < 0 && stablePath.indexOf('#') < 0;
   var apiBase = text(V8.SysConfig && V8.SysConfig.ApiBase).replace(/\/+$/g, '');
   var stableError = '';
+  // v3 投影后的公有桶固定路径由 FileServer 直连；旧 v3 resolver 继续兼容。
+  var cdnPrefix = '/' + normalizePath(V8.OsClient).toLowerCase() + '/micro-app/'
+    + normalizePath(app.AppKey).toLowerCase() + '/';
+  var safeCdnPath = stablePath.toLowerCase().indexOf(cdnPrefix) === 0
+    && stablePath.indexOf('..') < 0 && stablePath.indexOf('//') < 0
+    && stablePath.indexOf('?') < 0 && stablePath.indexOf('#') < 0;
+  var fileServer = text(V8.SysConfig && V8.SysConfig.FileServer).replace(/\/+$/g, '');
+  if (safeCdnPath && /^https?:\/\//i.test(fileServer)) {
+    try {
+      return validateResponseBytes(V8.Http.GetResponse({ Url: fileServer + stablePath, Timeout: 180 }), asset, 'CDN 固定地址');
+    } catch (cdnError) { stableError = text(cdnError.message); }
+  }
   if (safeStablePath && /^https?:\/\//i.test(apiBase)) {
     try {
       return validateResponseBytes(V8.Http.GetResponse({ Url: apiBase + stablePath, Timeout: 180 }), asset, '稳定运行时地址');

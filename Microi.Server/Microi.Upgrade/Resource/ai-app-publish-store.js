@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v2.0.5
+ * Version: v2.0.6
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -1678,6 +1678,7 @@ function readV3CommittedProof(value) {
     VersionRowVersion: text(value.VersionRowVersion),
     PublishState: text(value.PublishState),
     StableResolverPath: text(value.StableResolverPath),
+    CdnPreviewPath: text(value.CdnPreviewPath),
     RequestId: text(value.RequestId),
     RequestFingerprint: text(value.RequestFingerprint).toLowerCase()
   };
@@ -1689,6 +1690,10 @@ function readV3CommittedProof(value) {
   if (proof.PublishState !== 'Completed') throw new Error('CommittedProof.PublishState 必须是 Completed');
   if (isBlank(proof.StableResolverPath) || proof.StableResolverPath.indexOf('/micro-app/v3/tenants/') < 0) {
     throw new Error('CommittedProof.StableResolverPath 不是 v3 stable resolver');
+  }
+  if (!isBlank(proof.CdnPreviewPath)
+      && !/^\/[a-z0-9_-]+\/micro-app\/[a-z0-9_-]+\/index\.html$/.test(proof.CdnPreviewPath)) {
+    throw new Error('CommittedProof.CdnPreviewPath 不是租户应用固定 CDN 入口');
   }
   if (isBlank(proof.RequestId) || !/^[a-f0-9]{64}$/.test(proof.RequestFingerprint)) {
     throw new Error('CommittedProof 缺少 RequestId/RequestFingerprint');
@@ -1706,8 +1711,15 @@ function assertV3CommittedStore(row, proof, label) {
       || text(row.PublishState) !== 'Completed') {
     throw new Error(label + ' committed pointer 已漂移，禁止写入旧版本安装包');
   }
-  if (text(row.PublicPublishPath) !== proof.StableResolverPath) {
-    throw new Error(label + ' PublicPublishPath 与 stable resolver 不一致');
+  var expectedCdnPath = '/' + text(V8.OsClient).toLowerCase() + '/micro-app/'
+    + text(row.AppKey || row.AppId).toLowerCase() + '/index.html';
+  if (!isBlank(proof.CdnPreviewPath) && proof.CdnPreviewPath !== expectedCdnPath) {
+    throw new Error(label + ' CdnPreviewPath 与当前租户应用不一致');
+  }
+  var publishedPath = text(row.PublicPublishPath);
+  if (publishedPath !== proof.StableResolverPath
+      && (isBlank(proof.CdnPreviewPath) || publishedPath !== proof.CdnPreviewPath)) {
+    throw new Error(label + ' PublicPublishPath 与提交证明的稳定入口不一致');
   }
 }
 
