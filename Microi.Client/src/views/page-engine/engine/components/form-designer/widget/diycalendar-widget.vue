@@ -5,6 +5,7 @@
       :is="calendarComp"
       :key="'diycalendar_' + widgetObj.widgetOption.number"
       embedded
+      :compact="compactDashboard"
       :menu-id="calendarMenuId"
     />
     <div v-else-if="compactDashboard" class="home-calendar-fallback">

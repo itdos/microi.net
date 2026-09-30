@@ -1,5 +1,5 @@
 <template>
-    <div class="microi-calendar" :class="{ 'is-embedded': embedded, 'is-read-only': readOnly }" ref="calendarRoot">
+    <div class="microi-calendar" :class="{ 'is-embedded': embedded, 'is-read-only': readOnly, 'is-compact': compact }" ref="calendarRoot">
         <!-- 日历统计卡片 -->
         <div class="cal-stats">
             <div class="cal-stat-card today-card">
@@ -37,7 +37,7 @@
                 <div class="fc-custom-event" :class="{ 'is-completed': isCompleted(arg.event) }">
                     <span class="event-dot" :class="isCompleted(arg.event) ? 'dot-done' : 'dot-pending'"></span>
                     <span class="event-time" v-if="arg.timeText">{{ arg.timeText }}</span>
-                    <span class="event-title">{{ arg.event.title }}</span>
+                    <span class="event-title" :title="arg.event.title">{{ arg.event.title }}</span>
                 </div>
             </template>
         </FullCalendar>
@@ -89,7 +89,7 @@
                     </el-radio-group>
                 </el-form-item>
                 <el-form-item label="备注">
-                    <el-input v-model="form.Beizhu" type="textarea" :rows="3" placeholder="请输入备注信息" maxlength="2000" />
+                    <el-input v-model="form.Remark" type="textarea" :rows="3" placeholder="请输入备注信息" maxlength="2000" />
                 </el-form-item>
             </el-form>
             <template #footer>
@@ -120,6 +120,8 @@ export default {
     components: { FullCalendar },
     props: {
         embedded: { type: Boolean, default: false },
+        // 首页窄卡片只压缩展示密度，保留同一日程新增、编辑和真实持久化流程。
+        compact: { type: Boolean, default: false },
         // readOnly 是显式可选模式，首页嵌入本身不会自动开启。
         readOnly: { type: Boolean, default: false },
         // 首页菜单只为查询补 Read 上下文；增删改继续沿用原有表单权限，避免降级既有能力。
@@ -130,7 +132,7 @@ export default {
             dialogVisible: false,
             editingEventId: null,
             submitting: false,
-            form: { Title: "", StartTime: "", EndTime: "", State: "未完成", Beizhu: "" },
+            form: { Title: "", StartTime: "", EndTime: "", State: "未完成", Remark: "" },
             formRules: {
                 Title: [{ required: true, message: "请输入日程标题", trigger: "blur" }],
                 StartTime: [{ required: true, message: "请选择开始时间", trigger: "change" }]
@@ -144,13 +146,19 @@ export default {
                         click: this.handleAddEvent
                     }
                 },
-                headerToolbar: {
+                headerToolbar: this.compact ? {
+                    left: 'prev,next today', center: 'title', right: this.readOnly ? '' : 'addEvent'
+                } : {
                     left: this.readOnly ? "prev,next today" : "addEvent prev,next today",
                     center: "title",
                     right: "dayGridMonth,timeGridWeek,timeGridDay"
                 },
                 locales: [zhLocale],
                 locale: "zh-cn",
+                ...(this.compact ? {
+                    dayHeaderFormat: { weekday: 'narrow' },
+                    dayCellContent: info => String(info.date.getDate())
+                } : {}),
                 initialView: "dayGridMonth",
                 editable: !this.readOnly,
                 selectable: !this.readOnly,
@@ -163,8 +171,10 @@ export default {
                 eventDisplay: "block",
                 eventResizableFromStart: !this.readOnly,
                 nowIndicator: true,
-                navLinks: true,
+                // 紧凑月历的日期数字也用于新建，不让 FullCalendar 抢先跳入日视图。
+                navLinks: !this.compact,
                 events: this.fetchEvents,
+                dateClick: this.readOnly ? undefined : this.handleDateClick,
                 select: this.readOnly ? undefined : this.handleDateSelect,
                 eventClick: this.readOnly ? undefined : this.handleEventClick,
                 eventDrop: this.readOnly ? undefined : this.handleEventDrop,
@@ -289,7 +299,8 @@ export default {
                                 end: item.EndTime,
                                 backgroundColor: done ? COLOR_DONE : COLOR_PENDING,
                                 borderColor: done ? COLOR_DONE : COLOR_PENDING,
-                                extendedProps: { State: item.State, Beizhu: item.Beizhu }
+                                // 官方日程字段为 Remark，读取历史事件时兼容旧备注键。
+                                extendedProps: { State: item.State, Remark: item.Remark ?? item.Beizhu ?? "" }
                             };
                         })
                     );
@@ -300,6 +311,14 @@ export default {
                 console.error("加载日历事件失败:", e);
                 successCallback([]);
             }
+        },
+
+        // 单击日期不依赖拖拽选择，窄卡片、触屏和月历空白处都可直接创建日程。
+        handleDateClick(info) {
+            if (this.readOnly) return;
+            var end = new Date(info.date);
+            end.setHours(end.getHours() + 1);
+            this.handleDateSelect({ start: info.date, end: end, view: info.view });
         },
 
         // 选择日期区间 → 打开新建弹窗
@@ -313,7 +332,7 @@ export default {
                 StartTime: self.formatDate(selectInfo.start),
                 EndTime: self.formatDate(selectInfo.end),
                 State: "未完成",
-                Beizhu: ""
+                Remark: ""
             };
             self.dialogVisible = true;
         },
@@ -329,7 +348,7 @@ export default {
                 StartTime: self.formatDate(event.start),
                 EndTime: event.end ? self.formatDate(event.end) : self.formatDate(event.start),
                 State: (event.extendedProps && event.extendedProps.State) || "未完成",
-                Beizhu: (event.extendedProps && event.extendedProps.Beizhu) || ""
+                Remark: (event.extendedProps && (event.extendedProps.Remark ?? event.extendedProps.Beizhu)) || ""
             };
             self.dialogVisible = true;
         },
@@ -403,7 +422,7 @@ export default {
                     StartTime: self.form.StartTime,
                     EndTime: self.form.EndTime || self.form.StartTime,
                     State: self.form.State,
-                    Beizhu: self.form.Beizhu
+                    Remark: self.form.Remark
                 };
                 var result;
                 if (self.editingEventId) {
@@ -468,7 +487,7 @@ export default {
                 StartTime: self.formatDate(new Date()),
                 EndTime: "",
                 State: "未完成",
-                Beizhu: ""
+                Remark: ""
             };
             self.dialogVisible = true;
         }
@@ -649,6 +668,25 @@ export default {
         .fc-event:hover .fc-event-resizer {
             opacity: 1;
         }
+    }
+}
+
+.microi-calendar.is-embedded.is-compact {
+    .cal-stats { display: none; }
+    // 窄日期单元格优先保留可点击标题，时间和状态在编辑弹窗中完整显示。
+    .fc-custom-event {
+        gap: 0;
+        padding: 0;
+        .event-dot, .event-time { display: none; }
+        .event-title { min-width: 0; width: 100%; }
+    }
+    :deep(.fc) {
+        .fc-toolbar { flex-wrap: wrap; gap: 6px; }
+        .fc-toolbar-title { font-size: 13px; }
+        .fc-button { padding: 3px 5px; }
+        .fc-daygrid-day-frame { min-height: 42px; }
+        .fc-daygrid-day-number { font-size: 11px; }
+        .fc-daygrid-event { padding: 1px 2px; }
     }
 }
 

@@ -587,6 +587,15 @@ export default {
                 color: var(--el-text-color-secondary, #606266);
                 // font-weight: 500;
             }
+
+            // 用户入口包含头像和姓名，不能沿用普通图标的固定 40px flex 基准。
+            &.avatar-container {
+                width: auto;
+                flex: 0 0 auto;
+                max-width: 200px;
+                .avatar-wrapper { min-width: 0; }
+                .avatar-wrapper > span { overflow: hidden; text-overflow: ellipsis; }
+            }
         }
 
         // 统一图标样式
