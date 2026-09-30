@@ -16,6 +16,7 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 页面顶部的 Windows 与 macOS 按钮使用固定的 latest 入口，每次点击均从官方更新清单取得当前安装包地址。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
 
 - 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。
+- 如果旧安装包提示 `Failed to decompress files` 或 `Error opening output file(s)`，请从本页顶部重新下载 Windows latest 安装包后运行；不要重复启动下载目录中缓存的旧安装包。新版安装器改用能处理内置中文技能文件名的解压方式，覆盖安装会保留工作区和会话数据。
 - macOS Intel 安装包未签名、未公证；Apple Silicon 可通过 Rosetta 2 运行。内部源码根目录执行 `bash ./一键打包Mac.sh --unsigned --current` 可以按已发布的同一版本号生成 Mac DMG/ZIP。首次打包会下载并校验固定版本的 cloudflared；网络中断后重新执行同一命令即可续传，也可通过 `MICROI_CLOUDFLARED_ASSET=/已下载的官方压缩包路径` 指定本地文件，哈希不符会停止构建。Dock 图标在 Mac 构建时自动生成合适留白。具备证书与 `notarytool` 凭据时也可选择签名、公证；`--signed` 在缺少凭据时失败。
 - 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 还要求 App Sandbox，并限制下载执行改变功能的代码；现有本地 Node/Harness、Shell、工作区和插件能力不能原样上架。后续移动端和 MAS 版应作为独立受限客户端，复用吾码账号、AI 中转、会话、MCP 与桌面配对协议，把 Agent 执行放到配对桌面或远端，再分别完成 Apple/Google 商店签名与审核。
 

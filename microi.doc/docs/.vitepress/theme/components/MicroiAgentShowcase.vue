@@ -7,8 +7,8 @@
         <h2 id="microi-code-title">让 AI 在<strong>完整业务底座</strong>上工作</h2>
         <p class="microi-code-lead">代码、吾码账号、AI 中转站、MCP 与 30+ 成熟引擎，在一个桌面工作台协同。</p>
         <div class="microi-code-actions">
-          <a class="is-primary" :href="downloadUrls.windows"><DownloadIcon />下载 Windows <small>v{{ liveVersions.windows }}</small></a>
-          <a :href="downloadUrls.mac"><DownloadIcon />下载 macOS <small>v{{ liveVersions.mac }}</small></a>
+          <a class="is-primary" :href="downloadUrls.windows"><DownloadIcon />下载 Windows <small v-if="liveVersions.windows">v{{ liveVersions.windows }}</small></a>
+          <a :href="downloadUrls.mac"><DownloadIcon />下载 macOS <small v-if="liveVersions.mac">v{{ liveVersions.mac }}</small></a>
         </div>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
@@ -76,10 +76,10 @@ const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
 
 // 更新清单由 iTdos 接口引擎发布；版本发布后官网源码无需随之改动。
-const liveVersions = reactive({ windows: '1.1.9', mac: '1.1.7' })
+const liveVersions = reactive({ windows: '', mac: '' })
 // 首屏链接必须立即可下载；联网后用官方清单更新目标，无需每次发版修改官网源码。
 const downloadUrls = reactive({
-  windows: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe',
+  windows: 'https://static.itdos.com/itdos/microi-code/latest/Microi-Code-latest-windows-x64-setup.exe',
   mac: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.1.7/requests/314f32071d4da727ea278cda3920a6115d3f671873d74d313750560467641ff0/assets/Microi-Code-1.1.7-mac-universal.dmg'
 })
 const UPDATE_BASE = 'https://api.itdos.com/microi-code/updates/latest/'
@@ -109,7 +109,7 @@ function resetPointer(event) {
 }
 
 const windows = {
-  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe',
+  latest: 'https://static.itdos.com/itdos/microi-code/latest/Microi-Code-latest-windows-x64-setup.exe',
   archive: 'https://static.itdos.com/itdos/microi-code/1.1.3/29f4aef8fede/202609/Microi-Code-1_1_3-windows-x64-setup.exe',
   sha256: '29f4aef8fede578500da3557c3d8350129e035337e008f5e1aaa69162ddb0aee'
 }
