@@ -58,7 +58,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=8880429d365b6cc36c1132f5c9774e5be452dd55d057026b010174e65e707022 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=2a10489fe38576db661f08076d5bd9c7cf0a39a0329a137810d899d7a395d36d -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -159,6 +159,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 - 边角风格先读取当前用户 `CornerStyle`：`round/square` 显式覆盖；空值或 `System` 继承租户 `sys_config.CornerStyle`，租户空值默认为圆角。不得把空个人值提前归一为 `round`，否则会阻断租户直角设置。
 - 桌面经典布局使用 `NavigationLayout=Side/Top`，个人空值或 `System` 继承租户，租户空值为侧边导航。顶部导航复用当前权限路由、角标与外链，空间不足收纳到更多菜单；移动端仍采用底部导航。右上角同时配置 `MenuChildExpandMode=System/Down/Right`，通过同一个个人偏好接口跨设备保存。
+- 桌面壳层使用视口高度与可收缩的 flex 内容区，只有路由内容滚动，导航和 Tab 不随页面滚动；移动端仍保留文档滚动。用户入口含头像与姓名，不能使用纯图标的固定 flex 宽度；异步图表须在真实 DOM 挂载后观察尺寸变化，避免侧边/顶部导航切换后撑破卡片。
 - 主题色、浅色/深色、菜单子级展开方式等需要“换设备仍生效”的选择必须保存到当前 DiyToken 用户的 `sys_user` 白名单字段；`localStorage` 只作为未安装新字段租户和匿名启动阶段的兼容回退，不能作为跨设备事实源。
 - 已安装用户偏好字段时优先级固定为“当前用户显式值 → 租户 `sys_config` → 平台安全默认”；个人菜单值 `System` 表示继承租户配置。不得让上一位用户的浏览器本地主题覆盖下一位已登录用户。
 - 自助保存优先使用官方 `Managed` 接口引擎，由 `V8.CurrentUser.Id` 与 `V8.OsClient` 推导用户和租户，并在服务端构造固定白名单更新对象；接口参数禁止决定目标 Id/OsClient，也禁止写入 Account、Phone、Tenant、Dept、Role、Level、State、Pwd、认证因子和登录审计字段。只有缺少可复用可信原子能力时才新增 C# DTO/端点。保存成功后调用 `V8.Method.RefreshLoginUser` 刷新登录缓存，并让微服务宿主重新同步 `CurrentUser`。

@@ -159,7 +159,16 @@ async function loadDashboard() {
 
 function renderChart() {
   if (loading.value || errorMessage.value || !chartRef.value) return
-  if (!chartInstance) chartInstance = echarts.init(chartRef.value)
+  if (!chartInstance) {
+    chartInstance = echarts.init(chartRef.value)
+    // 图表在异步数据返回后才挂载；此时绑定观察器，避免只在 mounted 观察到空 ref。
+    resizeObserver?.disconnect()
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => chartInstance?.resize())
+      resizeObserver.observe(chartRef.value)
+    }
+  }
+  chartInstance.resize()
   const rootStyle = getComputedStyle(chartRef.value)
   const primary = rootStyle.getPropertyValue('--mci-theme-color').trim() || '#7c3aed'
   const text = rootStyle.getPropertyValue('--mci-text-secondary').trim() || (dark.value ? '#aab4c4' : '#6b7280')
@@ -250,10 +259,6 @@ watch(() => formData.value?.JsonObj?.formConfig?.lastRefreshTime, loadDashboard)
 
 onMounted(() => {
   loadDashboard()
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => chartInstance?.resize())
-    if (chartRef.value) resizeObserver.observe(chartRef.value)
-  }
   if (typeof MutationObserver !== 'undefined') {
     themeObserver = new MutationObserver(() => nextTick(renderChart))
     themeObserver.observe(document.documentElement, {
