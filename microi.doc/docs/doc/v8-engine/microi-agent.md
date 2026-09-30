@@ -18,6 +18,7 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 - 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。
 - 如果旧安装包提示 `Failed to decompress files` 或 `Error opening output file(s)`，请从本页顶部重新下载 Windows latest 安装包后运行；不要重复启动下载目录中缓存的旧安装包。新版安装器改用能处理内置中文技能文件名的解压方式，覆盖安装会保留工作区和会话数据。
 - 如果已退出应用仍提示“无法关闭”，请重新下载新版 latest 安装包：旧安装器可能把长路径或文件复制失败误报成应用正在运行。新版直接解压到安装目录，并使用当次发行的兼容卸载器完成升级；工作区、会话和用户配置保持不变，真实权限或占用问题会显示具体错误。
+- 如果 1.2.5 覆盖安装提示“旧版本文件清理失败（错误码 2）”，请更新至 1.2.6 或更新版本。旧版首次安装可以写入长路径，但覆盖升级的旧文件清理仍可能失败；新版同时修复旧文件枚举、迁移和回滚的长路径兼容，无需修改 Windows 长路径系统策略。
 - “工作区服务连接已断开”与云端账号未登录是不同问题。新版修复了旧空凭据保险库导致服务退出的情况；对损坏或其他 Windows 用户加密的凭据会保留原文件并报告具体错误，不会静默清空凭据。安装成功后还应打开「Microi吾码」和「AI 员工」检查本机服务连接。
 - macOS Intel 安装包未签名、未公证；Apple Silicon 可通过 Rosetta 2 运行。内部源码根目录执行 `bash ./一键打包Mac.sh --unsigned --current` 可以按已发布的同一版本号生成 Mac DMG/ZIP。首次打包会下载并校验固定版本的 cloudflared；网络中断后重新执行同一命令即可续传，也可通过 `MICROI_CLOUDFLARED_ASSET=/已下载的官方压缩包路径` 指定本地文件，哈希不符会停止构建。Dock 图标在 Mac 构建时自动生成合适留白。具备证书与 `notarytool` 凭据时也可选择签名、公证；`--signed` 在缺少凭据时失败。
 - 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 还要求 App Sandbox，并限制下载执行改变功能的代码；现有本地 Node/Harness、Shell、工作区和插件能力不能原样上架。后续移动端和 MAS 版应作为独立受限客户端，复用吾码账号、AI 中转、会话、MCP 与桌面配对协议，把 Agent 执行放到配对桌面或远端，再分别完成 Apple/Google 商店签名与审核。
