@@ -320,6 +320,8 @@ microi update --background --workspace "<工作区绝对路径>" --json
 
 断网、权限不足、Windows `EBUSY` 文件占用或宿主暂不支持热更新时，状态写入 `~/.microi/updater/status.json` 并在后台延后重试。界面可以非模态提示“立即重试/查看日志”，但用户不处理也不影响当前、正在进行或新建工作。设置 `microi.automaticUpdates=false` 可显式关闭 VS Code 端自动检查，已有功能仍照常使用。
 
+从开发工具 5.8.0 起，更新器会从已安装的 Node.js 目录查找 npm，包括插件安装的 `~/.microi/nodejs`、Homebrew、Volta 和 NVM；使用绝对入口启动，并为 npm 子进程补齐 Node.js 路径。macOS 从 Dock 启动 VS Code 未继承终端 PATH 时，也能完成更新。日志中的 `spawnSync npm ENOENT` 表示本机未找到 npm 入口；先更新扩展，再在吾码设置中安装本地 Node.js，或安装官方 Node.js。查看 `~/.microi/updater/status.json` 可确认实际结果，安装新版扩展不要求中断当前工作。
+
 开发仓库先运行 `npm run codex:build`，再用 `microi codex install --yes --source ./Microi.Agent` 验收仓库 marketplace；重启 ChatGPT/Codex 桌面端后，来源显示为 **Microi.Net**。npm 安装器生成用户本地 marketplace 所使用的模板见 `codex/marketplace.npm.json`。
 
 安装后在新 Codex 任务中先调用 `microi_codex` 的 `profiles` 动作。它会读取 `Microi-V8-Engine/.microi-config.json`；未初始化时，使用插件内置 `scripts/microi-cli.js init --workspace <工作区>`。多连接时把 `profiles` 返回的稳定 `name` 传给后续工具调用。
@@ -743,7 +745,7 @@ npm run publish:cli:resume
 
 ### `npm install -g @microi.net/cli` 提示包不存在
 
-说明 npm 首次公开发布尚未完成，或当前 registry 不是 npm 官方源。开发阶段可在仓库根目录执行 `npm install -g ./Microi.Agent/plugins/microi`；发布后用 `npm view @microi.net/cli version` 回读确认。
+先用 `npm view @microi.net/cli version --registry=https://registry.npmjs.org/` 回读官方版本，核对当前 registry；新版本发布后的缓存传播可能短暂延迟。开发阶段可在仓库根目录执行 `npm install -g ./Microi.Agent/plugins/microi`。若自动更新日志是 `spawnSync npm ENOENT`，请按上面的“非阻塞自动更新”检查本机 Node.js/npm，而不是重复登录 npm。
 
 ### 远程执行与调试不可用
 
@@ -775,6 +777,11 @@ npm run publish:cli:resume
 ## 更新日志
 
 版本、日期和条目格式沿用[平台更新日志](/doc/about/update-log.html)。安装包版本与 CLI 版本分别管理；历史故障、修复尝试和客户验证边界继续保留。
+
+### 开发工具 v5.8.0 - (2026-10-01)
+
+- **修复 macOS GUI 自动更新找不到 npm**：更新器从本机已安装的 Node.js 目录发现 npm，使用绝对入口，并为子进程补齐路径；明确区分本机运行时缺失和官方 registry 网络故障。更新过程继续保留现有工作、MCP 与会话。
+- **合并并同步开发知识**：合并其他电脑推送的 Skills、MCP 和工作流配置更新；npm、Visual Studio Marketplace、Open VSX 均已回读为 5.8.0。本机 VSIX 已安装；使用 VS Code 自带 Electron 和不含 npm 的 GUI 路径执行真实更新器，最终状态为 `completed`，全局 CLI 为 5.8.0。
 
 ### v1.3.1 - (2026-10-01)
 
