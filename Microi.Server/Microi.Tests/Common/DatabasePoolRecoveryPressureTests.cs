@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microi.net;
 using Microsoft.AspNetCore.Http;
 using System.Collections.Concurrent;
@@ -9,6 +8,30 @@ namespace Microi.Tests.Common;
 [Collection("TenantContextGlobal")]
 public sealed class DatabasePoolRecoveryPressureTests
 {
+    private sealed class ReservedRouteGate : IDisposable
+    {
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _registry;
+        private readonly string _key;
+        private readonly SemaphoreSlim? _owned;
+
+        public ReservedRouteGate(string route, int limit)
+        {
+            _registry = (ConcurrentDictionary<string, SemaphoreSlim>)typeof(RequestPressureGuardService)
+                .GetField("Gates", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+            _key = $"route:{route}:limit:{limit}";
+            var gate = new SemaphoreSlim(limit, limit);
+            if (_registry.TryAdd(_key, gate)) _owned = gate;
+            else gate.Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (_owned == null) return;
+            _registry.TryRemove(new KeyValuePair<string, SemaphoreSlim>(_key, _owned));
+            _owned.Dispose();
+        }
+    }
+
     [Fact]
     public async Task TenantV8Queue_DoesNotOccupyAnotherTenantsSharedV8Slot()
     {
@@ -72,7 +95,9 @@ public sealed class DatabasePoolRecoveryPressureTests
     public async Task PressureSnapshot_RecordsSaturatedGlobalGateAndWaitingRequest()
     {
         var options = RequestPressureGuardOptions.FromConfiguration();
-        using var seed = await RequestPressureGuardService.TryEnterAsync("/api/test", "", options, CancellationToken.None);
+        using var routeGate = new ReservedRouteGate("api/pressure-tests/snapshot", options.RouteMaxConcurrentRequests);
+        const string testPath = "/api/pressure-tests/snapshot";
+        using var seed = await RequestPressureGuardService.TryEnterAsync(testPath, "", options, CancellationToken.None);
         var gates = (System.Collections.IDictionary)typeof(RequestPressureGuardService).GetField("Gates", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
         var gate = (SemaphoreSlim)gates["global:limit:" + options.GlobalMaxConcurrentRequests]!;
         var drained = 0;
@@ -80,7 +105,7 @@ public sealed class DatabasePoolRecoveryPressureTests
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         try
         {
-            var waiting = RequestPressureGuardService.TryEnterAsync("/api/test", "", options, cancellation.Token);
+            var waiting = RequestPressureGuardService.TryEnterAsync(testPath, "", options, cancellation.Token);
             var observed = SpinWait.SpinUntil(() =>
             {
                 var snapshot = RequestPressureGuardService.Snapshot();
@@ -107,7 +132,8 @@ public sealed class DatabasePoolRecoveryPressureTests
     public async Task SaturatedBusinessGate_DoesNotDelayExactLivenessGet(string method, string path, bool expectedBypass)
     {
         var options = RequestPressureGuardOptions.FromConfiguration();
-        using var seed = await RequestPressureGuardService.TryEnterAsync("/api/test", "", options, CancellationToken.None);
+        using var routeGate = new ReservedRouteGate("api/pressure-tests/liveness", options.RouteMaxConcurrentRequests);
+        using var seed = await RequestPressureGuardService.TryEnterAsync("/api/pressure-tests/liveness", "", options, CancellationToken.None);
         var gates = (System.Collections.IDictionary)typeof(RequestPressureGuardService).GetField("Gates", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
         var gate = (SemaphoreSlim)gates["global:limit:" + options.GlobalMaxConcurrentRequests]!;
         var drained = 0;
@@ -138,7 +164,9 @@ public sealed class DatabasePoolRecoveryPressureTests
     public async Task SaturatedBusinessGate_OnlyMatchedEmergencyPostUsesIndependentSlot(bool marked, string method, bool allowed)
     {
         var options = RequestPressureGuardOptions.FromConfiguration();
-        using var seed = await RequestPressureGuardService.TryEnterAsync("/api/test", "", options, CancellationToken.None);
+        using var seedRouteGate = new ReservedRouteGate("api/pressure-tests/emergency", options.RouteMaxConcurrentRequests);
+        using var endpointRouteGate = new ReservedRouteGate("api/Diagnostics/database-pools", options.RouteMaxConcurrentRequests);
+        using var seed = await RequestPressureGuardService.TryEnterAsync("/api/pressure-tests/emergency", "", options, CancellationToken.None);
         var gates = (System.Collections.IDictionary)typeof(RequestPressureGuardService).GetField("Gates", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
         var gate = (SemaphoreSlim)gates["global:limit:" + options.GlobalMaxConcurrentRequests]!;
         var drained = 0;

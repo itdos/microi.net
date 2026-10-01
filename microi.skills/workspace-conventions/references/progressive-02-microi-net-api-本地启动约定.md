@@ -86,10 +86,10 @@ AI 通过 MCP、接口引擎、数据库脚本或平台 API 修改任何远端 V
 收尾流程：
 - 若远端是通过 MCP 写入的，以远端当前生效代码为准回写本地文件。
 - 若本地文件是先手工修改的，先推送到远端，再重新拉取/复核，确保本地与远端一致。
-- 优先使用 Microi.Code 插件的同步/查看同步状态能力；没有可调用插件时，可在 `.tmp/` 写一次性同步脚本，但脚本必须先 dry-run 输出差异摘要，再 apply。
+- 优先使用 Microi.Agent 插件的同步/查看同步状态能力；没有可调用插件时，可在 `.tmp/` 写一次性同步脚本，但脚本必须先 dry-run 输出差异摘要，再 apply。
 - 复核结果应确认 touched 范围内 `Changed=0`、`Created=0`、`LocalOnly=0` 或说明剩余差异原因。
 - 空 V8 代码不生成本地 `.js` 文件；若已有空 `.js` 文件，收尾同步时应删除，避免被误判为本地未推送。
-- AI 收尾不能只看自写脚本的 dry-run；只要工作区安装了 Microi.Code 插件，就必须按插件“查看同步状态”的口径再复核一次。最终回复中要明确说明插件口径是否为 0；若仍有本地未推送/远端差异，必须列出具体资源类型、Key 和本地文件路径，不能只报数量。
+- AI 收尾不能只看自写脚本的 dry-run；只要工作区安装了 Microi.Agent 插件，就必须按插件“查看同步状态”的口径再复核一次。最终回复中要明确说明插件口径是否为 0；若仍有本地未推送/远端差异，必须列出具体资源类型、Key 和本地文件路径，不能只报数量。
 - 当远端代码与本地代码完全一致但插件仍提示“本地未推送”时，优先校准 `.microi-meta.json` 的 `updateTime/filePath` 与本地文件 `mtime`，并再次执行插件口径同步检查；不要让时间戳误差遗留给用户。
 - AI 通过 MCP/API 直接写远端 V8 后，必须立即回读远端当前生效代码到本地并校准 `.microi-meta.json` 与文件 `mtime`。这不是可选清理动作，而是交付完成条件；否则 VS Code 插件会按时间戳继续提示“本地未推送”。
 - 若同步状态非 0，必须先列出具体文件并分类处理：正文一致仅校准 meta/mtime，远端较新则拉回，本地较新则推送，双方都改过则人工合并。生产资金/资产系统不能为清状态盲目覆盖远端。
@@ -124,7 +124,7 @@ VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”
 - MCP 的初始化说明必须使用真实 `MICROI_OS_CLIENT` 作为租户边界。中文显示名通过 ASCII 的 `MICROI_LABEL_BASE64` 传输并在 MCP 内解码，旧版 `MICROI_LABEL` 只作兼容；显示名不能当成租户 Key 写入“只能管理某租户”的安全提示。
 - 遇到 `ByteString`、`greater than 255` 或“第 N 个字符无法写入 Header”时，必须先检查实际异常索引和所有 HTTP Header 来源。Microi MCP 的设备标识来自 `did` / `MICROI_MCP_DID`；默认值若直接拼接中文 Windows 主机名，会在 `MCP:` 后第 4 个字符报错。`MICROI_LABEL_BASE64` 只用于显示，不会作为业务 HTTP Header 发送，禁止在未核对调用链前把错误归因于中文 Label。插件和 MCP 必须把 DID 规范化为稳定的可打印 ASCII。
 - MCP 连接失败时，AI 在完成配置、进程、Header、`initialize`、`tools/list` 和只读状态调用的证据链之前，不得修改 Token、租户、服务器地址或执行远端写入。连接恢复后先完成只读基线盘点，再按用户授权开始写入。
-- 修复 Microi.Code 插件的 MCP 生成逻辑后，必须重新生成配置、重启对应 MCP server，并在当前 AI 会话中再次验证工具发现与一次只读工具调用。
+- 修复 Microi.Agent 插件的 MCP 生成逻辑后，必须重新生成配置、重启对应 MCP server，并在当前 AI 会话中再次验证工具发现与一次只读工具调用。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=workspace-conventions-032 sha256=147cbc7a3870a1bc41c6e0b5ec317cf27e0e99e51eb71a1c540ebffde9507f10 -->
@@ -191,18 +191,18 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
 当用户反馈“Codex/VS Code 设置中能看到 MCP，但当前 AI 会话不能调用对应工具”时，不能只回答“当前会话没有注入”。必须按层排查：
 
 1. 先确认 `.vscode/mcp.json`、`.cursor/mcp.json`、工作区根 `.mcp.json` 和 `~/.codex/config.toml` 都能解析，且目标 server key 为稳定 ASCII 格式，例如 `microi_itdos`，不要使用中文名或横杠。
-2. 再用 Microi.Code 插件的“诊断 MCP 可调用性”命令，或等价脚本直接启动对应 `mcp-server.js` / `mcp-codex-stdio-adapter.js`，执行 `initialize` 和 `tools/list`，确认 `microi_get_db_schema`、`microi_get_field_list`、`microi_add_field`、`microi_update_field`、`microi_refresh_schema_cache` 等核心工具真实返回。
-3. 如果当前 AI 客户端支持工具发现或延迟加载，AI 必须先主动执行工具发现/热加载流程，例如 `tool_search`、客户端 MCP refresh、Microi.Code 的启动/诊断命令；不要先让用户手动重启、重载或重新生成 MCP。
+2. 再用 Microi.Agent 插件的“诊断 MCP 可调用性”命令，或等价脚本直接启动对应 `mcp-server.js` / `mcp-codex-stdio-adapter.js`，执行 `initialize` 和 `tools/list`，确认 `microi_get_db_schema`、`microi_get_field_list`、`microi_add_field`、`microi_update_field`、`microi_refresh_schema_cache` 等核心工具真实返回。
+3. 如果当前 AI 客户端支持工具发现或延迟加载，AI 必须先主动执行工具发现/热加载流程，例如 `tool_search`、客户端 MCP refresh、Microi.Agent 的启动/诊断命令；不要先让用户手动重启、重载或重新生成 MCP。
 4. 如果真实握手成功但 Codex 当前对话仍没有注入 `mcp__...` 工具，AI 仍应优先使用等价的 MCP stdio JSON-RPC 直连 fallback 完成当前任务：读取对应 MCP 配置、启动 adapter/server、执行 `initialize`、`tools/list`、`tools/call`，并严格遵守该 MCP 绑定的 API Server 和 OsClient 边界。直连脚本必须放在 `.tmp/` 或使用一次性 stdin，不得散落到项目目录。
 5. 只有在客户端不支持热加载、直连 fallback 也无法完成任务，或写操作边界无法确认时，才告知用户需要新开对话、重载 Codex 或检查 MCP 配置。说明必须写清楚：MCP 配置和进程是否可用、当前会话为什么没有注入工具、已经尝试过哪些自动恢复动作。
 6. 如果握手失败，要把失败层级说清楚：配置文件解析失败、路径不存在、token 文件缺失、MCP 进程启动失败、`initialize` 失败、`tools/list` 缺核心工具，不能把这些问题混成“用户没启用 MCP”。
-7. Microi.Code 生成 MCP 配置时应清理旧的中文/横杠 Microi MCP key，只保留 `microi_<osClient>` 或 `microi_<osClient>_<host>` 形式，避免不同 AI 客户端因 namespace 不稳定而无法注入工具。
+7. Microi.Agent 生成 MCP 配置时应清理旧的中文/横杠 Microi MCP key，只保留 `microi_<osClient>` 或 `microi_<osClient>_<host>` 形式，避免不同 AI 客户端因 namespace 不稳定而无法注入工具。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=workspace-conventions-037 sha256=8906aca9ab0a621ffc8f50c4909e6a858543acd803e427880dbdf5932a52ec8f -->
 ## Windows MCP 控制台闪窗复盘
 
-当用户反馈“打开 Microi.Code、添加服务器或初始化 MCP 后连续弹出并立即关闭多个 cmd 窗口”时，应按进程风暴排查，不能只给已有 `spawn` 补 `windowsHide`：
+当用户反馈“打开 Microi.Agent、添加服务器或初始化 MCP 后连续弹出并立即关闭多个 cmd 窗口”时，应按进程风暴排查，不能只给已有 `spawn` 补 `windowsHide`：
 
 1. MCP 配置文件是各客户端的事实源。内容未变化时必须使用 write-if-changed，禁止仅为“同步”而反复改写文件并触发监听器重启。
 2. 生成 `~/.codex/config.toml` 后，禁止再隐式循环执行 `codex mcp list/remove/add`；服务器数量越多，这类逐项 CLI 同步越会放大成几十个瞬时控制台进程。

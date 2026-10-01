@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-27T10:57:40.650Z",
+  "generatedAt": "2026-09-30T10:38:46.982Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,11 +169,11 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "d9407a48870499be219695abd9f346baceda9aa20b009280c0012bd0d59b78d3",
-      "originalLines": 695,
-      "prefixSha256": "c5534e3a06a1777a213adab604313ab0f3340d7ff3cb432acc827b28dd7c5017",
-      "prefixBytes": 1356,
-      "entryLines": 237,
+      "originalSha256": "811f79af5f1479a59e8e1784029a08b5f3532032d951c6c19e4c6b26ef748bd4",
+      "originalLines": 700,
+      "prefixSha256": "650039258e4d5a0b1bb6f93baaf3dae02995573f6f053152eb71eabfb3d64783",
+      "prefixBytes": 1363,
+      "entryLines": 242,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
@@ -187,7 +187,7 @@
           "id": "microi-client-frontend-001",
           "ordinal": 1,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "e9667a3a534e09b964c4a11796c003b48edc4093c66ed0c8777aefd4188a4ba8",
+          "sha256": "112177bb326f8d26803e3bd9248011d839fe8d081431320d0e09f90f82487984",
           "lines": 30,
           "heading": "1. 技术栈和源码入口"
         },
@@ -195,8 +195,8 @@
           "id": "microi-client-frontend-002",
           "ordinal": 2,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "9fae6ea3c3b238d5d830f308599d7512d1ed6364cb495d432278ada8680f769e",
-          "lines": 104,
+          "sha256": "2a10489fe38576db661f08076d5bd9c7cf0a39a0329a137810d899d7a395d36d",
+          "lines": 109,
           "heading": "2. 表单引擎三层结构"
         },
         {
@@ -211,7 +211,7 @@
           "id": "microi-client-frontend-004",
           "ordinal": 7,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "174028eca01dc0987236803041ab5ac1bf18705a6609a4ba640df0c553533c1e",
+          "sha256": "7d9e9b8b8f6b2c790d3cefd02b9dc0cda5d55ede477f98a48d92c8975990d3ff",
           "lines": 40,
           "heading": "7. 验证建议"
         },
@@ -1196,11 +1196,11 @@
       ]
     },
     "page-engine": {
-      "originalSha256": "8d989e26c559d1d7d9ce5dfbfd213ec60068e28c9dc00dce02091baee86e9bb9",
-      "originalLines": 444,
-      "prefixSha256": "60896f59151ef4b322c894ffefb9f4a8323fac5f572f70a0522c44000e07ef69",
-      "prefixBytes": 2530,
-      "entryLines": 196,
+      "originalSha256": "503ccbd8872dc275f4517c04422480b2f28fbf816ed24ef1734ace0b76b42dc5",
+      "originalLines": 455,
+      "prefixSha256": "c2d87a18beb8ff701da099fd402a180bdfc26d26be1da0180108fa1a2c6c92f5",
+      "prefixBytes": 4140,
+      "entryLines": 207,
       "chunks": [
         {
           "id": "page-engine-000",
@@ -1262,8 +1262,8 @@
           "id": "page-engine-007",
           "ordinal": 8,
           "destination": "page-engine/SKILL.md",
-          "sha256": "9d5fced79d01857e14e83888681b44f06c69fcc79abf6551dcec312d96c1c02b",
-          "lines": 13,
+          "sha256": "ce0486eb9d2282bc199972e167e85aca7b03860d15abdd03982c4a23a90e206e",
+          "lines": 14,
           "heading": "运行态布局与滚动规范"
         },
         {
@@ -2221,11 +2221,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "e186e90a39840877322425a1c8f3fec8178489d92653ef387879ae244e0edab7",
-      "originalLines": 614,
-      "prefixSha256": "761e74738e41d472349122770c59a31a86ca8900d9a4470b5aa912b9863382a1",
-      "prefixBytes": 13304,
-      "entryLines": 257,
+      "originalSha256": "6e430d7c55b30526baa86aa0bc534f78384a62a0f6beb4766cff938939a2f561",
+      "originalLines": 615,
+      "prefixSha256": "3554bc485deead22c00ae25dee693baf2ca81a0839769e046fff8a8f2eb87462",
+      "prefixBytes": 13535,
+      "entryLines": 258,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -2745,11 +2745,11 @@
       ]
     },
     "v8-mq-mqtt": {
-      "originalSha256": "a8ff733f1d7a6fb32e61e31ed14bab32c6d4f8643f696ca701b194da5d7ffd78",
-      "originalLines": 338,
+      "originalSha256": "f6c8f7bd873b40c9de383445f3a2b5aeab8d801e0e3615a497732067915cc5e8",
+      "originalLines": 339,
       "prefixSha256": "b20db62e20fefcd72f899ff2eccbccfc8240e65cabb87d7ff0e61ea89fcc4b01",
       "prefixBytes": 812,
-      "entryLines": 176,
+      "entryLines": 177,
       "chunks": [
         {
           "id": "v8-mq-mqtt-000",
@@ -2763,8 +2763,8 @@
           "id": "v8-mq-mqtt-001",
           "ordinal": 2,
           "destination": "v8-mq-mqtt/SKILL.md",
-          "sha256": "e38b5b491e061fc87f7e1f1446f5c4a7eb6d5f9616d18ca63632a566810c98d9",
-          "lines": 13,
+          "sha256": "834e8270912c25c900ca046d533f64c104a875acf8865919ffff5dca5442e7e6",
+          "lines": 14,
           "heading": "注意事项"
         },
         {

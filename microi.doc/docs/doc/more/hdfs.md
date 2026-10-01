@@ -114,7 +114,7 @@ PC 表单的图片、文件和富文本上传会提交 `FormEngineKey + FieldId 
 ]
 ```
 
-排查“普通用户只能上传到平台预定义的文件目录”时，先在浏览器网络面板查看失败请求实际提交的 `Path`、`Limit`，然后为该目录添加最小授权，保存后重试。系统设置保存沿用共享缓存失效机制，下一次上传重新读取规则，无需重启；已经完成的上传不会被追溯删除。规则为空、未命中或被删除时，恢复原有 `file / img / avatar / editor` 私有安全目录策略。最多 128 条规则，错误规则在新版表单引擎保存时会被拒绝。
+排查“普通用户只能上传到平台预定义的文件目录”时，先在浏览器网络面板查看失败请求实际提交的 `Path`、`Limit`，检查是否把同一目录同时作为 `Path` 和 `path` 两个 multipart 字段提交。客户端应只提交一个 `Path`；修复后的后端会合并值相同的重复字段，值不同时明确拒绝。确认请求目录后再添加最小授权，避免为了绕过重复参数导致的误判而扩大规则。系统设置保存沿用共享缓存失效机制，下一次上传重新读取规则，无需重启；已经完成的上传不会被追溯删除。规则为空、未命中或被删除时，恢复原有 `file / img / avatar / editor` 私有安全目录策略。最多 128 条规则，错误规则在新版表单引擎保存时会被拒绝。
 
 规则只适用于**没有表单字段上下文**的已登录交互式上传，不改变标准字段上传的表/菜单/行授权；半套字段上下文仍拒绝。它不授予文件读取、删除、列目录、应用发布或跨租户权限；实际上传路径不能是根目录、包含通配符、穿越路径、`micro-app`、`ai-app*`、`app-store`、数据库备份和 `_origin` 等保留路径。即使管理员配置 `**`，这些保护仍优先执行。访问密钥会话不能借此获取目录权限。租户停用上传、内容检测、大小、数量及每日配额限制仍然生效，头像、待审图片及原图不会因此转为公有。
 
@@ -312,16 +312,23 @@ Web、UniApp 和 MicroService 的真实编译目录应使用 MCP 工具 `microi_
 
 1. MCP 在本机按文件流计算 SHA-256，先拒绝符号链接、`.git`、`node_modules`、密钥/环境文件和超过 20000 个文件的异常目录；协议 v3 不设置 Microi 产品级文件/目录字节上限。
 2. 不超过 128 MiB 的文件兼容旧版单请求；更大文件自动创建确定性断点会话，默认以 16 MiB `application/octet-stream` 分片发送。每片校验精确 `Content-Length`、SHA-256，并从 HDFS 写后回读。
-3. 所有文件写完后，MCP 只提交路径、大小和摘要清单到 `/api/V8Engine/FinalizeApplicationStreamPublish`。API 回读版本对象与完整性标记，再使用阿里云 OSS、MinIO 或 S3 的服务端 `CopyObject` 切换稳定地址。
-4. 非入口资源先切换，`index.html` 最后切换；同一应用使用跨节点分布式锁串行发布，避免两个版本并发产生混合资源。
+3. 所有文件写完后，MCP 只提交路径、大小和摘要清单到 `/api/V8Engine/FinalizeApplicationStreamPublish`。API 回读不可变版本对象与完整性标记，再用对象存储服务端 `CopyObject` 投影到公开的版本目录；私有源码按同样相对目录保留最新版与历史快照。
+4. 固定根的非入口资源先切换，`index.html` 最后切换；同一应用使用跨节点分布式锁串行发布。随后刷新被覆写的 CDN 固定路径并等待刷新任务完成，从 CDN 回读入口及引用资源，才更新商城体验地址。
 
 ```text
-历史版本：{tenant}/ai-app-publish/{appKey}/versions/v1.2.3/index.html
-稳定地址：{tenant}/ai-app-publish/{appKey}/index.html
-latest别名：{tenant}/ai-app-publish/{appKey}/latest/index.html
+公有桶历史版本：{tenant}/micro-app/{appKey}/v1.2.3/index.html
+公有桶稳定地址：{tenant}/micro-app/{appKey}/index.html
+私有桶源码版本：{tenant}/micro-app/{appKey}/v1.2.3/{sourceFile}
+私有桶最新源码：{tenant}/micro-app/{appKey}/{sourceFile}
 ```
 
-微服务历史目录保持 `{tenant}/micro-app/{appKey}/v1.2.3/`，稳定入口同样不带版本号。数据库只保存路径、大小、SHA-256、版本和路由等元数据。失败后可以用相同版本和摘要安全重试；完整清单确认前不会切换稳定入口。
+Web、UniApp 与 MicroService 均采用该目录；官网体验地址是 `https://static.itdos.com/{tenant}/micro-app/{appKey}/index.html`。v3 内部不可变对象键仍可作为校验源，不作为官网链接；CDN 直接读取公有桶，不承担动态版本解析。数据库只保存路径、大小、SHA-256、版本和路由等元数据。失败后可用相同版本和摘要安全重试；历史目录若已有不同字节则拒绝覆盖。
+
+v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在数据库中使用以 `/` 开头的对象路径，发布完成态检查依赖该路径；官网接口和后台工作台通过租户 `FileServer` 生成完整的 CDN 体验链接。不要为了统一展示而直接将这些内部字段改成绝对 URL。
+
+使用官方 `static.itdos.com` 时，发布端从当前租户“系统设置 → 安全与服务接入”的 `Integration.Cdn.Aliyun.AccessKeyId/AccessKeySecret` 读取 CDN 凭据；旧租户可沿用 `Integration.Dns.Aliyun.*` 或 SaaS 配置中的 `AlidnsKeyId/AlidnsKeySecret`。密钥必须成对配置，并具备阿里云 CDN 刷新与任务查询权限。刷新提交只会返回任务号，发布器需等任务全部为 `Complete` 且从 CDN 按大小、SHA-256 回读成功后才确认发布；凭据缺失或任务失败时会保留可恢复状态。阿里云默认每天有 URL 刷新配额，批量迁移前应核对当日配额与已用量。
+
+迁移存量应用时，旧历史对象可能已缺失。只有商城编译包、仍可访问的当前体验路由或本地归档中的原始字节与冻结发布清单的大小、SHA-256 完全一致，才可补齐；无法恢复的历史版本保持原记录并列入待补清单。当前版本独立校验通过后可以先切换固定体验入口，不能把缺失的历史目录当成已归档版本。
 
 几十 MB 不是 Jint 的固定内存上限，HDFS 本身也没有这种限制。旧发布流程的问题是先把二进制扩成约 `4/3` 大小的 Base64，再经 JSON、Jint 字符串和多层复制产生累计分配。普通小型 V8 上传可继续使用 `V8.Method.Upload`；真实编译目录和大型资产必须使用协议 v3。5 GiB 文件默认是 320 片，网络或进程重启后查询远端状态并只补缺片。每个会话在 `mci_ai_app_file` 以 `StorageScope=ApplicationAssetMultipartSession` 保留，管理员可从“系统引擎 → 超大文件上传记录”查看字节进度、分片数、心跳、错误与恢复建议。最终能力由协议技术边界、对象存储、磁盘、网关和网络共同决定，而不是普通表单的整文件上限。
 

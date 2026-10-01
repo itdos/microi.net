@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { resolveStableApplicationEntry } from '../docs/.vitepress/theme/utils/app-preview-url.js'
 
 const testDir = path.dirname(fileURLToPath(import.meta.url))
 const workspaceRoot = path.resolve(testDir, '../..')
@@ -46,11 +47,6 @@ const recommendEngineSource = await readFile(
   ),
   'utf8'
 )
-const previewUrlSource = await readFile(
-  path.join(testDir, '../docs/.vitepress/theme/utils/app-preview-url.js'),
-  'utf8'
-)
-
 test('推荐是紧跟全部的虚拟分类，并转换为独立接口筛选参数', () => {
   const categories = componentSource.match(/const defaultBusinessCategories = \[[\s\S]*?\n\]/)?.[0] || ''
   const allIndex = categories.indexOf("value: 'all'")
@@ -92,12 +88,22 @@ test('应用接口失败后停止自动触底重试，只保留用户主动重�
 })
 
 test('Unity 桃源立即体验使用固定永久壳而不是不可变版本产物', () => {
-  const stableEntry = previewUrlSource.match(/'microi-unity-taoyuan':\s*'([^']+)'/)?.[1] || ''
+  // 调用真实解析器保留旧入口契约；通用解析取代字面量映射后，测试不应依赖源码写法。
+  const stableEntry = resolveStableApplicationEntry({
+    AppKey: 'microi-unity-taoyuan', ApplicationType: 'MicroService',
+    PreviewUrl: 'https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-unity-taoyuan/releases/v1.0.0/requests/build/assets/index.html'
+  })
   assert.equal(
     stableEntry,
     'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current'
   )
   assert.doesNotMatch(stableEntry, /\/releases\/|\/requests\/|\/versions\/|v\d+\.\d+\.\d+/i)
+  const migrated = resolveStableApplicationEntry({
+    AppKey: 'microi-unity-taoyuan', ApplicationType: 'MicroService',
+    PublicPublishPath: '/itdos/micro-app/microi-unity-taoyuan/index.html'
+  }, 'https://microi.net', { fileServer: 'https://static.itdos.com', osClient: 'iTdos' })
+  assert.equal(migrated, 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html')
+  assert.doesNotMatch(migrated, /\/releases\/|\/requests\/|\/versions\//i)
 })
 
 test('official_ai_apps only returns recommended published applications when requested', () => {
@@ -133,6 +139,29 @@ test('official_ai_apps only returns recommended published applications when requ
   assert.equal(result.Data[0].IsRecommend, 1)
   assert.equal(result.DataAppend.RecommendedOnly, true)
   assert.equal(result.DataAppend.Categories.some(item => item.Key === 'recommended'), false)
+})
+
+test('官网保留已发布固定 CDN 入口，源码改动期间仍展示上一个完成版本', () => {
+  const rows = [
+    { Id: 'committed', AppKey: 'committed-app', ApplicationType: 'MicroService',
+      Status: 'Published', BuildStatus: 'Changed', CurrentVersion: 15, AppVersion: 'v2.0.15',
+      PublicPublishPath: '/itdos/micro-app/committed-app/index.html' },
+    { Id: 'unbuilt', AppKey: 'unbuilt-app', ApplicationType: 'MicroService',
+      Status: 'Published', BuildStatus: 'Changed', CurrentVersion: 0 },
+    { Id: 'private', AppKey: 'private-app', ApplicationType: 'MicroService',
+      Status: 'Published', BuildStatus: 'Changed', CurrentVersion: 15, IsPublic: 0,
+      PublicPublishPath: '/itdos/micro-app/private-app/index.html' },
+    { Id: 'draft', AppKey: 'draft-app', ApplicationType: 'MicroService',
+      Status: 'Draft', BuildStatus: 'Changed', CurrentVersion: 15,
+      PublicPublishPath: '/itdos/micro-app/draft-app/index.html' }
+  ]
+  const result = new Function('V8', engineSource)({
+    Param: {}, SysConfig: { FileServer: 'https://static.itdos.com' },
+    FormEngine: { GetTableData: () => ({ Code: 1, Data: rows, DataCount: rows.length }) }
+  })
+  assert.deepEqual(result.Data.map(item => item.AppKey), ['committed-app'])
+  assert.equal(result.Data[0].PreviewUrl,
+    'https://static.itdos.com/itdos/micro-app/committed-app/index.html')
 })
 
 test('平台应用分类兼容旧名称，筛选不混入其它业务分类或私有应用', () => {
@@ -247,6 +276,28 @@ test('私有运行时不进入官网列表、精确详情或搜索兜底，独�
   const fallback = run({ Keyword: '运行时内部关键词' })
   assert.equal(fallback.DataCount, 0)
   assert.ok(fallback.DataAppend.Search.RelatedApps.every(row => !['engine-runtime', 'private-web'].includes(row.AppKey)))
+})
+
+test('3D 引擎和 AI 工作流在官网各展示一条，历史平台包链接落到可体验的微服务', () => {
+  const rows = [
+    { Id: '3d-package', AppKey: 'app.microi.3d-engine', AppName: '3D引擎', ApplicationType: 'Platform', IsApprove: 1, IsPublic: 1 },
+    { Id: '3d-runtime', AppKey: 'microi-3d-engine', AppName: '3D引擎', ApplicationType: 'MicroService', Status: 'Published', BuildStatus: 'Success', IsPublic: 1, PreviewUrl: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-3d-engine/assets/index.html' },
+    { Id: 'workflow-package', AppKey: 'app.microi.ai-workflow', AppName: 'AI工作流', ApplicationType: 'Platform', IsApprove: 1, IsPublic: 1 },
+    { Id: 'workflow-runtime', AppKey: 'microi-ai-workflow', AppName: 'AI工作流', ApplicationType: 'MicroService', Status: 'Published', BuildStatus: 'Success', IsPublic: 1, PreviewUrl: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-ai-workflow/assets/index.html' }
+  ]
+  const run = Param => new Function('V8', engineSource)({
+    Param, SysConfig: {}, FormEngine: {
+      GetTableData: () => ({ Code: 1, Data: rows, DataCount: rows.length }),
+      GetFormData: (_table, request) => ({ Code: 1, Data: rows.find(row => row.AppKey === request._Where[0][4]) })
+    }
+  })
+  assert.deepEqual(new Set(run({}).Data.map(row => row.AppKey)), new Set(['microi-3d-engine', 'microi-ai-workflow']))
+  assert.deepEqual(run({ Keyword: '3D引擎' }).Data.map(row => row.AppKey), ['microi-3d-engine'])
+  assert.equal(run({ ExactAppKey: 'app.microi.3d-engine' }).Data[0].AppKey, 'app.microi.3d-engine')
+  assert.equal(run({ ExactAppKey: 'app.microi.ai-workflow' }).Data[0].AppKey, 'app.microi.ai-workflow')
+  assert.equal(run({ ExactAppKey: 'app.microi.3d-engine' }).Data[0].Id, '3d-runtime')
+  assert.equal(run({ ExactAppKey: 'app.microi.ai-workflow' }).Data[0].Id, 'workflow-runtime')
+  assert.ok(run({ ExactAppKey: 'app.microi.3d-engine' }).Data[0].PreviewUrl.includes('/microi-3d-engine/'))
 })
 
 test('official_ai_apps 在普通分类内始终推荐优先，再按所选条件排序', () => {

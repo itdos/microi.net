@@ -148,7 +148,7 @@ function assertOfficialPair({
 test('message-notification and Store selected ApiEngine key sets stay exact and policy-closed', () => {
   assertPackageKeyClosure(messagePackage, MESSAGE_SELECTED_API_ENGINE_KEYS);
   assertPackageKeyClosure(storePackage, STORE_SELECTED_API_ENGINE_KEYS);
-  assert.equal(messagePackage.PackageInfo.Version, 'v8.3.9');
+  assert.equal(messagePackage.PackageInfo.Version, 'v8.3.13');
   assert.equal(messagePackage.PackageInfo.ChangeLog?.Version, messagePackage.PackageInfo.Version);
   assert.equal(storePackage.PackageInfo.ChangeLog?.Version, storePackage.PackageInfo.Version);
   assert.match(String(storePackage.PackageInfo.ChangeHistory || ''), /v7\.7\.27/);
@@ -191,7 +191,7 @@ test('official Managed cores and CreateIfMissing hooks carry immutable package c
     appName: '应用商城',
     managedKey: 'platform-marketplace-source',
     managedFile: 'platform-marketplace-source.js',
-    managedVersion: 'v1.0.5',
+    managedVersion: 'v1.0.6',
     // 已登录商城与通知中心需要进入 Managed 运行时；AllowAnonymous=0 继续在
     // V8 执行前强制鉴权，StopHttp=1 会把合法客户端也提前短路。
     managedStopHttp: 0,

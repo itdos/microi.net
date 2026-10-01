@@ -23,6 +23,7 @@ public sealed partial class PanelRepository
 {
     private readonly string connection;
     private readonly IDataProtector protector;
+    private readonly object enqueueGate = new();
     public string OwnerId { get; }
     public PanelRepository(OpsOptions options, OpsStore store, IDataProtectionProvider protection)
     {
@@ -65,6 +66,14 @@ public sealed partial class PanelRepository
         if (cmd.ExecuteNonQuery() != 1) throw new OpsException("插件记录已变化。", 409);
     }
     public PanelOperation Enqueue(string action, string requestId, PanelResource resource, string actor, string? payload = null, string? expectedRevision = null, string? fingerprintMaterial = null, PanelSchedule? scheduleClaim = null, AcmeQueueClaim? acmeClaim = null)
+    {
+        // A single panel process owns this SQLite store. Serialize local enqueue
+        // transactions so simultaneous scheduler ticks cannot race BeginTransaction;
+        // the database constraints still protect the durable request and slot state.
+        lock (enqueueGate)
+            return EnqueueCore(action, requestId, resource, actor, payload, expectedRevision, fingerprintMaterial, scheduleClaim, acmeClaim);
+    }
+    private PanelOperation EnqueueCore(string action, string requestId, PanelResource resource, string actor, string? payload, string? expectedRevision, string? fingerprintMaterial, PanelSchedule? scheduleClaim, AcmeQueueClaim? acmeClaim)
     {
         if (!Guid.TryParse(requestId, out _)) throw new OpsException("操作需要稳定的 UUID 请求标识。");
         var fingerprint = UpdateCoordinator.Hash(action + "\n" + resource.Id + (action == "Install" ? "\n" + Encode(resource) : "") + (fingerprintMaterial ?? (payload == null ? "" : "\n" + payload)));

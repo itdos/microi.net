@@ -502,7 +502,7 @@ function formatLocalReleaseTime(value) {
  * 提版必须把结构化更新日志和历史记录一起推进，否则发布门禁会留下一个
  * PackageInfo.Version 已更新、ChangeLog 仍指向旧版的半成品候选包。
  */
-export function advanceOfficialPackageVersion(packageInfo, nextVersion, releaseTime = formatLocalReleaseTime(new Date())) {
+export function advanceOfficialPackageVersion(packageInfo, nextVersion, releaseTime = formatLocalReleaseTime(new Date()), fallbackChangeType = '') {
   if (!packageInfo || typeof packageInfo !== 'object' || Array.isArray(packageInfo)) {
     throw new Error('PackageInfo 必须是对象，无法自动提升官方应用包版本');
   }
@@ -513,11 +513,13 @@ export function advanceOfficialPackageVersion(packageInfo, nextVersion, releaseT
       || String(changeLog.Version || '').trim() !== previousVersion) {
     throw new Error('自动提升官方应用包版本前，PackageInfo.ChangeLog 必须与当前版本一致');
   }
-  for (const fieldName of ['Title', 'ChangeType', 'Content']) {
+  const effectiveChangeType = String(changeLog.ChangeType || '').trim() || String(fallbackChangeType || '').trim();
+  for (const fieldName of ['Title', 'Content']) {
     if (typeof changeLog[fieldName] !== 'string' || !changeLog[fieldName].trim()) {
       throw new Error(`自动提升官方应用包版本前，PackageInfo.ChangeLog.${fieldName} 不能为空`);
     }
   }
+  if (!effectiveChangeType) throw new Error('自动提升官方应用包版本前，PackageInfo.ChangeLog.ChangeType 不能为空');
   if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(releaseTime || '').trim())) {
     throw new Error('自动提升官方应用包版本的发布时间必须为 yyyy-MM-dd HH:mm:ss');
   }
@@ -527,6 +529,7 @@ export function advanceOfficialPackageVersion(packageInfo, nextVersion, releaseT
     : `v${String(nextVersion).trim()}`;
   packageInfo.Version = normalizedVersion;
   changeLog.Version = normalizedVersion;
+  changeLog.ChangeType = effectiveChangeType;
   changeLog.ReleaseTime = String(releaseTime).trim();
 
   const currentRecord = {
@@ -840,20 +843,34 @@ function mergeValue(base, local, remote, path, conflicts) {
     if (setLikeArrayPaths.has(path)) {
       return mergeSetLikeArray(base, local, remote, path, conflicts);
     }
-    const identityField = findIdentityField(base, local, remote);
+    // 物理列的名字只在表内唯一，DDL 以表名唯一；使用真实复合身份合并不同表的并行新增。
+    const schemaIdentity = path === '$.PhysicalColumns'
+      ? item => `${String(item.TABLE_NAME || '').toLowerCase()}:${String(item.COLUMN_NAME || '').toLowerCase()}`
+      : path === '$.DDLStatements' ? item => {
+        const index = String(item.DDL || '').match(/^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+[`"\[]?([\w-]+)/i);
+        return `${String(item.TableName || '').toLowerCase()}:${index ? `index:${index[1].toLowerCase()}` : 'table'}`;
+      } : null;
+    const identityField = schemaIdentity ? 'schemaKey' : findIdentityField(base, local, remote);
     if (!identityField) {
       conflicts.push(`${path}: 无稳定标识的数组被两端同时修改`);
       return clone(local);
     }
 
-    const toMap = items => new Map(items.map(item => [String(item[identityField]), item]));
+    const keyOf = schemaIdentity || (item => String(item[identityField]));
+    if (schemaIdentity && [base,local,remote].some(items => items.some(item =>
+      path === '$.PhysicalColumns' ? !item.TABLE_NAME || !item.COLUMN_NAME : !item.TableName)
+      || new Set(items.map(keyOf)).size !== items.length)) {
+      conflicts.push(`${path}: 物理结构身份缺失或重复`);
+      return clone(local);
+    }
+    const toMap = items => new Map(items.map(item => [keyOf(item), item]));
     const baseMap = toMap(base);
     const localMap = toMap(local);
     const remoteMap = toMap(remote);
     const order = [];
     for (const items of [base, local, remote]) {
       for (const item of items) {
-        const key = String(item[identityField]);
+        const key = keyOf(item);
         if (!order.includes(key)) order.push(key);
       }
     }
@@ -885,10 +902,20 @@ export function mergeJsonResource(name, baseContent, localContent, remoteContent
   const base = JSON.parse(canonicalizeResource(name, baseContent));
   const local = JSON.parse(canonicalizeResource(name, localContent));
   const remote = JSON.parse(canonicalizeResource(name, remoteContent));
+  // 计数是合并后数组的投影，不是可竞争编辑的业务配置；真实资源内容仍逐项执行三方冲突保护。
+  const derivedCounts = {FieldCount:'DiyFields',PhysicalColumnCount:'PhysicalColumns'};
+  for (const [count, collection] of Object.entries(derivedCounts)) {
+    if ([base,local,remote].every(model => model.PackageInfo && Array.isArray(model[collection]))) {
+      for (const model of [base,local,remote]) model.PackageInfo[count] = 0;
+    }
+  }
   const conflicts = [];
   const merged = mergeValue(base, local, remote, '$', conflicts);
   if (conflicts.length) {
     throw new Error(`${name} 存在 ${conflicts.length} 个 JSON 冲突：\n- ${conflicts.slice(0, 20).join('\n- ')}`);
+  }
+  for (const [count,collection] of Object.entries(derivedCounts)) {
+    if (merged.PackageInfo && Array.isArray(merged[collection])) merged.PackageInfo[count] = merged[collection].length;
   }
   return `${JSON.stringify(merged, null, 2)}\n`;
 }

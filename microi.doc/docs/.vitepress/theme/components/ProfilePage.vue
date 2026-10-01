@@ -1499,12 +1499,13 @@ async function beginGiteeStarOAuth() {
   try {
     const resp = await authenticatedFetch(apiEngineUrl('official_gitee_star_oauth_start'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      // OAuth 启动只有标量参数；表单编码同时兼容尚未升级 JSON Body 合并的后端。
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
         ReturnUrl: `${window.location.origin}/profile.html#/create`,
         TenantKey: tenantKey.value,
         _Lang: locale.value
-      })
+      }).toString()
     })
     const result = await resp.json()
     if (isSessionExpiredResult(result)) {
@@ -1713,7 +1714,7 @@ async function createTenant() {
         OsClient: OS_CLIENT,
         // 先进入兼容提交器，再由其内部调用 StopHttp=1 的 worker。这样当前已部署
         // 后端与未来支持 TrustedServerInvocation 的后端都能安全执行。
-        ApiEngineKey: 'official_create_tenant',
+        TargetApiEngineKey: 'official_create_tenant',
         Title: t('createTenant'),
         Param: {
           TenantKey: tenantKey.value,

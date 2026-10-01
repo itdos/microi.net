@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v2.0.4
+ * Version: v2.0.6
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -45,6 +45,26 @@ function boolValue(value, fallback) {
   if (value === null || value === undefined || value === '') return fallback;
   var normalized = text(value).replace(/^\s+|\s+$/g, '').toLowerCase();
   return value === true || value === 1 || ['1', 'true', 'yes', 'on', 'enabled'].indexOf(normalized) >= 0;
+}
+/* MARKETPLACE_OFFLINE_PACKAGE_REPUBLISH_V1
+ * 离线下架与安装包发布是两个独立状态。重发安装包不得意外上架旧应用；
+ * 只有超级管理员显式传 PublishListing=true 才重新上架。
+ */
+function publicationListingFields(previousStore, parameters) {
+  var previous = previousStore || {};
+  var requested = parameters || {};
+  var previousStatus = trimText(previous.Status).toLowerCase();
+  var publishListing = boolValue(requested.PublishListing, false);
+  var previousApproval = previous.IsApprove;
+  var approval = requested.IsApprove !== null && requested.IsApprove !== undefined
+    && !isBlank(requested.IsApprove)
+    ? requested.IsApprove
+    : (previousApproval === null || previousApproval === undefined || isBlank(previousApproval)
+        ? '是' : previousApproval);
+  return {
+    Status: previousStatus === 'offline' && !publishListing ? 'Offline' : 'Published',
+    IsApprove: approval
+  };
 }
 function readStoredPackage(row) {
   if (!row) return {};
@@ -1658,6 +1678,7 @@ function readV3CommittedProof(value) {
     VersionRowVersion: text(value.VersionRowVersion),
     PublishState: text(value.PublishState),
     StableResolverPath: text(value.StableResolverPath),
+    CdnPreviewPath: text(value.CdnPreviewPath),
     RequestId: text(value.RequestId),
     RequestFingerprint: text(value.RequestFingerprint).toLowerCase()
   };
@@ -1669,6 +1690,10 @@ function readV3CommittedProof(value) {
   if (proof.PublishState !== 'Completed') throw new Error('CommittedProof.PublishState 必须是 Completed');
   if (isBlank(proof.StableResolverPath) || proof.StableResolverPath.indexOf('/micro-app/v3/tenants/') < 0) {
     throw new Error('CommittedProof.StableResolverPath 不是 v3 stable resolver');
+  }
+  if (!isBlank(proof.CdnPreviewPath)
+      && !/^\/[a-z0-9_-]+\/micro-app\/[a-z0-9_-]+\/index\.html$/.test(proof.CdnPreviewPath)) {
+    throw new Error('CommittedProof.CdnPreviewPath 不是租户应用固定 CDN 入口');
   }
   if (isBlank(proof.RequestId) || !/^[a-f0-9]{64}$/.test(proof.RequestFingerprint)) {
     throw new Error('CommittedProof 缺少 RequestId/RequestFingerprint');
@@ -1686,8 +1711,15 @@ function assertV3CommittedStore(row, proof, label) {
       || text(row.PublishState) !== 'Completed') {
     throw new Error(label + ' committed pointer 已漂移，禁止写入旧版本安装包');
   }
-  if (text(row.PublicPublishPath) !== proof.StableResolverPath) {
-    throw new Error(label + ' PublicPublishPath 与 stable resolver 不一致');
+  var expectedCdnPath = '/' + text(V8.OsClient).toLowerCase() + '/micro-app/'
+    + text(row.AppKey || row.AppId).toLowerCase() + '/index.html';
+  if (!isBlank(proof.CdnPreviewPath) && proof.CdnPreviewPath !== expectedCdnPath) {
+    throw new Error(label + ' CdnPreviewPath 与当前租户应用不一致');
+  }
+  var publishedPath = text(row.PublicPublishPath);
+  if (publishedPath !== proof.StableResolverPath
+      && (isBlank(proof.CdnPreviewPath) || publishedPath !== proof.CdnPreviewPath)) {
+    throw new Error(label + ' PublicPublishPath 与提交证明的稳定入口不一致');
   }
 }
 
@@ -2388,6 +2420,7 @@ if (action === 'Publish') {
    * 预览图、分类、作者和价格等元数据，避免无参发布把字段降级为空或默认值。
    */
   var preservedStore = existingStore || app || {};
+  var listing = publicationListingFields(existingStore, V8.Param);
   var hasParam = function (name) {
     return V8.Param[name] !== undefined && V8.Param[name] !== null && !isBlank(V8.Param[name]);
   };
@@ -2428,8 +2461,8 @@ if (action === 'Publish') {
     AppOriPrice: hasParam('AppOriPrice') ? V8.Param.AppOriPrice : (preservedStore.AppOriPrice || 0),
     AppRate: hasParam('AppRate') ? V8.Param.AppRate : (preservedStore.AppRate || 5),
     AppPreview: hasParam('AppPreview') ? V8.Param.AppPreview : (preservedStore.AppPreview || app.AppPreview || ''),
-    IsApprove: hasParam('IsApprove') ? V8.Param.IsApprove : (preservedStore.IsApprove || '是'),
-    Status: 'Published',
+    IsApprove: listing.IsApprove,
+    Status: listing.Status,
     BuildStatus: 'Success',
     CurrentVersion: preservedStore.CurrentVersion || app.CurrentVersion || 1,
     PreviewUrl: preservedStore.PreviewUrl || app.PreviewUrl || '',

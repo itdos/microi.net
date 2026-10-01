@@ -1,8 +1,9 @@
 <template>
     <div class="navbar-microi" :style="GetNavbarMicroiStyle()" v-if="ShowClassicTop != 0">
-        <hamburger id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
+        <top-navigation v-if="isTopNavigation" />
+        <hamburger v-else id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
 
-        <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
+        <breadcrumb v-if="!isTopNavigation" id="breadcrumb-container" class="breadcrumb-container" />
 
         <div class="right-menu">
             <!-- 租户名称 -->
@@ -28,7 +29,7 @@
 
             <search id="header-search" class="right-menu-item hover-effect" />
 
-            <lang-select class="right-menu-item hover-effect" />
+            <lang-select class="right-menu-item hover-effect" compact />
 
             <ThemeSelect class="right-menu-item hover-effect" />
 
@@ -43,7 +44,7 @@
             <!-- 切换界面风格 -->
             <el-dropdown v-if="hasWebOS" trigger="hover">
                 <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
-                    <font-awesome-icon icon="fa-solid fa-display" style="color: var(--el-text-color-regular);font-size:18px;" />
+                    <el-icon class="menu-icon"><Monitor /></el-icon>
                 </a>
                 <template #dropdown>
                     <el-dropdown-menu>
@@ -73,7 +74,7 @@
             </el-dropdown>
 
             <!-- 浏览器全屏 -->
-            <div class="right-menu-item hover-effect" @click="toggleBrowserFullScreen" :title="isBrowserFullScreen ? '退出全屏' : '全屏'">
+            <div class="right-menu-item hover-effect" role="button" tabindex="0" @click="toggleBrowserFullScreen" @keydown.enter.prevent="toggleBrowserFullScreen" :title="isBrowserFullScreen ? '退出全屏' : '全屏'">
                 <el-icon class="menu-icon"><FullScreen v-if="!isBrowserFullScreen" /><Close v-else /></el-icon>
             </div>
 
@@ -139,10 +140,13 @@ import { useDiyStore, useAppStore, useUserStore } from "@/pinia";
 import { computed } from "vue";
 import { hasWebOS } from "@/utils/webos-detect.js";
 import { getRealtimeStatusText } from "@/utils/realtime-connection.js";
+import TopNavigation from './TopNavigation.vue';
+import { resolveUserNavigationLayout } from '@/utils/user-visual-preferences';
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
 export default {
     components: {
+        TopNavigation,
         Breadcrumb,
         Hamburger,
         LangSelect,
@@ -157,6 +161,7 @@ export default {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
         const userStore = useUserStore();
+        const isTopNavigation = computed(() => !diyStore.IsPhoneView && resolveUserNavigationLayout(diyStore.GetCurrentUser?.NavigationLayout, diyStore.SysConfig?.NavigationLayout) === 'Top');
 
         const sidebar = computed(() => appStore.sidebar);
         const device = computed(() => appStore.device);
@@ -174,6 +179,7 @@ export default {
 
         return {
             diyStore,
+            isTopNavigation,
             appStore,
             userStore,
             hasWebOS,
@@ -555,9 +561,11 @@ export default {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 8px;
+            padding: 0;
+            width: 40px;
+            flex: 0 0 40px;
             height: 40px;
-            font-size: 18px;
+            font-size: 20px;
             color: var(--el-text-color-regular, #5a5e66);
             white-space: nowrap;
 
@@ -572,14 +580,51 @@ export default {
             }
 
             &.tenant-name {
+                width: auto;
+                flex: 0 1 auto;
+                padding: 0 8px;
                 font-size: 13px;
                 color: var(--el-text-color-secondary, #606266);
                 // font-weight: 500;
+            }
+
+            // 用户入口包含头像和姓名，不能沿用普通图标的固定 40px flex 基准。
+            &.avatar-container {
+                width: auto;
+                flex: 0 0 auto;
+                max-width: 200px;
+                .avatar-wrapper { min-width: 0; }
+                .avatar-wrapper > span { overflow: hidden; text-overflow: ellipsis; }
             }
         }
 
         // 统一图标样式
         .menu-icon {
+            font-size: 20px;
+        }
+
+        :deep(.theme-select-trigger),
+        :deep(.ui-density-trigger),
+        :deep(.desktop-ai-entry),
+        :deep(.bluetooth-navbar-entry),
+        :deep(.header-search),
+        :deep(.task-entry) {
+            width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
+        }
+
+        :deep(.header-search.show) {
+            width: 260px;
+            flex: 0 0 260px;
+            justify-content: flex-start;
+            padding: 0 10px;
+        }
+
+        :deep(.el-icon),
+        :deep(.svg-inline--fa) {
+            width: 20px;
+            height: 20px;
             font-size: 20px;
         }
 

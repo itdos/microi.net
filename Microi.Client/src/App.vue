@@ -14,7 +14,8 @@ import { ElConfigProvider } from "element-plus";
 import { useDiyStore, useSettingsStore, useAppStore } from "@/pinia";
 import { getElementLocale, normalizeLocale } from "@/lang";
 import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
-import { resolveUserThemeMode } from "@/utils/user-visual-preferences.js";
+import { resolveUserThemeMode, resolveUserCornerStyle } from "@/utils/user-visual-preferences.js";
+import { getCornerStyle, setCornerStyle } from "@/utils/theme-shape.js";
 import {
     hasCurrentUserAuthorizationSnapshot,
     isAuthorizationResponseForActiveIdentity
@@ -93,6 +94,9 @@ export default {
         };
     },
     watch: {
+        "GetCurrentUser.CornerStyle"() { this.applyResolvedCornerStyle(); },
+        "GetCurrentUser.Id"() { this.applyResolvedCornerStyle(); },
+        "diyStore.SysConfig.CornerStyle"() { this.applyResolvedCornerStyle(); },
         "$route.fullPath": function () {
             this.syncClassicShellVisibility();
         },
@@ -280,6 +284,7 @@ export default {
         restoreMciMode() {
             try {
                 this.applyResolvedThemeMode();
+                this.applyResolvedCornerStyle();
             } catch (e) {}
         },
         applyResolvedThemeMode() {
@@ -291,6 +296,9 @@ export default {
             );
             // 通过统一入口恢复浅色/暗色，并同步当前 palette 的全部令牌。
             applyThemeMode(mode);
+        },
+        applyResolvedCornerStyle() {
+            setCornerStyle(resolveUserCornerStyle(this.GetCurrentUser || {}, getCornerStyle(), this.diyStore.SysConfig?.CornerStyle));
         },
         readLocalThemeMode() {
             try {

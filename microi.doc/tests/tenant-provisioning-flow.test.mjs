@@ -15,15 +15,15 @@ const giteeStatusPath = path.join(engineRoot, '[官网]Gitee Star验证状态(of
 const giteeBindingTransferPath = path.join(engineRoot, '[官网]Gitee账号绑定迁移(official_gitee_star_binding_transfer).js')
 const profileI18nPath = path.join(workspace, 'microi.doc/docs/.vitepress/theme/profile-i18n.ts')
 const sysUserLogicPath = path.join(workspace, 'Microi.Server/Microi.Core/Logic/SysUserLogic.cs')
-const sysUserControllerPath = path.join(workspace, 'Microi.Server/Microi.net.Api/Controllers/SysUserController.cs')
-const tenantProvisioningServicePath = path.join(workspace, 'Microi.Server/Microi.net/Common/TenantProvisioningService.cs')
+const sysUserControllerPath = path.join(workspace, 'Microi.Server/Microi.net/Identity/SysUserSessionRuntime.cs')
+const tenantProvisioningServicePath = path.join(workspace, 'Microi.Server/Microi.Core/Runtime/TenantProvisioningService.cs')
 
 const read = file => fs.readFileSync(file, 'utf8')
 
 test('profile submits tenant creation to the persistent background queue', () => {
   const source = read(profilePath)
   assert.match(source, /\/api\/BackgroundTask\/RunApiEngine/)
-  assert.match(source, /ApiEngineKey:\s*'official_create_tenant'/)
+  assert.match(source, /TargetApiEngineKey:\s*'official_create_tenant'/)
   assert.doesNotMatch(source, /ApiEngineKey:\s*'official_create_tenant_worker'/)
   assert.match(source, /ConcurrencyKey:.*tenantKey\.value\.trim\(\)\.toLowerCase\(\)/)
   assert.doesNotMatch(source, /AdminDefaultPassword\s*\|\|\s*tenant\.OsClient/)
