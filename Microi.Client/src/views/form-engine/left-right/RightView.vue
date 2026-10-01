@@ -27,6 +27,7 @@
                 :FormMode="FormMode"
                 :TableChildFormMode="TableChildFormMode"
                 :TableId="TableId"
+                :HideTopBanner="isModuleBannerHidden(SysMenuModel?.HideFormBanner)"
                 :TableName="TableName"
                 :TableRowId="TableRowId"
                 :DefaultValues="FieldFormDefaultValues"
@@ -64,6 +65,7 @@ import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import { useDiyStore } from "@/pinia";
 import _ from "underscore";
 import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode } from "@/utils/v8-button-visibility";
+import { isModuleBannerHidden } from "@/views/form-engine/utils/module-banner-visibility.js";
 
 export default {
     name: "diy-form-dialog",
@@ -155,6 +157,7 @@ export default {
         var self = this;
     },
     methods: {
+        isModuleBannerHidden,
         /**
          * 必传：TableId或TableName、FormMode（Add/Edit/View）、Id（当FormMode为View或Edit时，必传Id）
          * 可传：DialogType（Dialog/Drawer），若不传，则读取表单设计中配置的宽度。

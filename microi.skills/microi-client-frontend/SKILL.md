@@ -27,7 +27,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=e9667a3a534e09b964c4a11796c003b48edc4093c66ed0c8777aefd4188a4ba8 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=112177bb326f8d26803e3bd9248011d839fe8d081431320d0e09f90f82487984 -->
 ## 1. 技术栈和源码入口
 
 ### 详情评论与代码版本的按需读取
@@ -58,7 +58,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=9fae6ea3c3b238d5d830f308599d7512d1ed6364cb495d432278ada8680f769e -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=2a10489fe38576db661f08076d5bd9c7cf0a39a0329a137810d899d7a395d36d -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -155,6 +155,11 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 ### 用户级界面偏好（强制）
 
+右上角主题设置的边角风格默认圆角；已安装 `sys_user.CornerStyle` 时从账号偏好恢复，旧租户才使用浏览器本地兼容值。根元素 `data-mci-corner-style` 控制全局角半径，覆盖动态挂载的 Element Plus 弹层。顶栏入口统一使用 40px 触控区域和 20px 图标，AI 入口使用图标组件，不使用图片。模块 `HideTableBanner`、`HideFormBanner` 只在值明确为 `1/true` 时隐藏对应 Banner，并跳过其专属统计请求；未安装开关字段的旧菜单继续显示。
+
+- 边角风格先读取当前用户 `CornerStyle`：`round/square` 显式覆盖；空值或 `System` 继承租户 `sys_config.CornerStyle`，租户空值默认为圆角。不得把空个人值提前归一为 `round`，否则会阻断租户直角设置。
+- 桌面经典布局使用 `NavigationLayout=Side/Top`，个人空值或 `System` 继承租户，租户空值为侧边导航。顶部导航复用当前权限路由、角标与外链，空间不足收纳到更多菜单；移动端仍采用底部导航。右上角同时配置 `MenuChildExpandMode=System/Down/Right`，通过同一个个人偏好接口跨设备保存。
+- 桌面壳层使用视口高度与可收缩的 flex 内容区，只有路由内容滚动，导航和 Tab 不随页面滚动；移动端仍保留文档滚动。用户入口含头像与姓名，不能使用纯图标的固定 flex 宽度；异步图表须在真实 DOM 挂载后观察尺寸变化，避免侧边/顶部导航切换后撑破卡片。
 - 主题色、浅色/深色、菜单子级展开方式等需要“换设备仍生效”的选择必须保存到当前 DiyToken 用户的 `sys_user` 白名单字段；`localStorage` 只作为未安装新字段租户和匿名启动阶段的兼容回退，不能作为跨设备事实源。
 - 已安装用户偏好字段时优先级固定为“当前用户显式值 → 租户 `sys_config` → 平台安全默认”；个人菜单值 `System` 表示继承租户配置。不得让上一位用户的浏览器本地主题覆盖下一位已登录用户。
 - 自助保存优先使用官方 `Managed` 接口引擎，由 `V8.CurrentUser.Id` 与 `V8.OsClient` 推导用户和租户，并在服务端构造固定白名单更新对象；接口参数禁止决定目标 Id/OsClient，也禁止写入 Account、Phone、Tenant、Dept、Role、Level、State、Pwd、认证因子和登录审计字段。只有缺少可复用可信原子能力时才新增 C# DTO/端点。保存成功后调用 `V8.Method.RefreshLoginUser` 刷新登录缓存，并让微服务宿主重新同步 `CurrentUser`。
@@ -185,7 +190,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=174028eca01dc0987236803041ab5ac1bf18705a6609a4ba640df0c553533c1e -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=7d9e9b8b8f6b2c790d3cefd02b9dc0cda5d55ede477f98a48d92c8975990d3ff -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）

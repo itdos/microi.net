@@ -18,6 +18,10 @@ Microi 低代码平台中，`Select / Radio / Checkbox` 等选项组件支持两
 
 > ⚠️ 注意：若误将 Key 与 Value 设置为相同中文，后台和 DB 中存的就是中文字符串（如 `Level='普通会员'`）。
 
+### 字段 V8 必须按保存格式读取选中值
+
+`SelectSaveFormat='Text'` 时，`V8.Form.<字段>` 可以是保存字段的原始文本；旧配置可能仍为对象或 JSON 文本。按钮不能无条件读取 `.TableName`、`.Id` 等对象属性。先按真实 Config 提取值并校验非空，再调用接口；接口失败和网络异常均在 `finally` 恢复 Loading。验收须覆盖文本、旧对象、JSON 文本和空选项。
+
 ---
 
 ## 二、移动端前端显示枚举值的规范

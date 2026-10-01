@@ -31,6 +31,12 @@ Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 A
 | 访问密钥 | `microi_list_my_access_keys`、`microi_create_my_access_key`、`microi_revoke_my_access_key` | 管理当前用户自己的限期访问密钥 |
 | E2E | `microi_get_playwright_context`、`microi_plan_playwright_e2e` | 生成租户绑定的测试上下文和计划 |
 
+审批工作流包需包含 `FlowDesign/Nodes/Lines`。MCP 保存前检查人工节点的人员策略、
+节点类型、坐标重叠与拓扑可达性，并回读当前租户的用户、角色、部门和岗位 Id；
+缺省坐标会按拓扑补成像素值。模块 `openType=WorkFlow` 可在同一 Manifest 中通过
+`flowName` 绑定已启用流程，或用 `flowDesignId` 指向现有流程；必须同步绑定相同
+业务表。详见 [工作流引擎](/doc/system-engine/wf-engine)。
+
 ## 推荐接入方式
 
 ### 从已登录平台复制连接说明
@@ -92,6 +98,8 @@ action=microi_get_db_schema, params={...}
 7. `microi_validate_system`：独立回读表、字段、接口、菜单、页面、打印、流程等结果。
 
 Manifest 支持角色、表、索引、数据源、接口引擎、事件、菜单、权限、页面、打印模板、工作流和任务。常规表单字段不要默认写 `FormWidth=24`；整行控件才使用整行宽度。绑定表的菜单应同时补齐 PC/移动列、搜索列、隐藏列、排序、统计与卡片字段。
+
+模块 `modules[].tableHeaders` 可配置合并表头，例如 `[{"Label":"人数（人）","Fields":["Total","Male","Female"]}]`；字段名须与相邻的可见表格列一致。嵌套分组使用 `Children`。设置 `hideTableBanner: 1` 或 `hideFormBanner: 1` 可分别关闭顶部列表和表单 Banner，省略或设为 `0` 则保持显示。已有模块可用 `microi_update_module` 更新 `TableHeaders`、`HideTableBanner`、`HideFormBanner` 并回读，完整字段说明见[模块引擎](/doc/system-engine/module-engine.html)。
 
 `TableChild` 的回查索引必须对应真实物理列。默认独立租户库不自动创建 `OsClient` 列，例如子表外键为 `OrderId` 时使用 `columns:["OrderId"]`；只有显式声明了 `OsClient` 物理列的共享表，才使用 `columns:["OsClient","OrderId"]`。平台固定物理列是 `Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted`；`CreateUser` 不是默认字段，`TableChild` 与布局控件本身也不能建索引。新版计划检查在远端写入前拒绝这些无效索引，存量工具出现错误的租户列要求时应更新 MCP，不应为通过计划而虚构字段。
 

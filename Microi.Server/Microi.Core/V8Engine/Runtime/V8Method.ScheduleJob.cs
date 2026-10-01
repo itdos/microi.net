@@ -117,15 +117,27 @@ namespace Microi.net
             }
             if (!history)
             {
-                var result = MicroiEngine.MongoDB.GetSysLog(new SysLogParam
+                DosResultList<SysLog> result = null;
+                try
                 {
-                    OsClient = tenant, TargetType = ScheduleExecutionLog.TargetType, TargetId = name,
-                    _SearchMonth = month, _PageSize = size, BeforeLogTime = before, BeforeLogId = beforeId
-                }).ConfigureAwait(false).GetAwaiter().GetResult();
-                return new DosResult(result.Code, result.Data, result.Msg)
-                { DataAppend = result.DataAppend, DataCount = result.DataCount };
+                    result = MicroiEngine.MongoDB.GetSysLog(new SysLogParam
+                    {
+                        OsClient = tenant, TargetType = ScheduleExecutionLog.TargetType, TargetId = name,
+                        _SearchMonth = month, _PageSize = size, BeforeLogTime = before, BeforeLogId = beforeId
+                    }).ConfigureAwait(false).GetAwaiter().GetResult();
+                }
+                catch { /* MongoDB 查询不可用，继续尝试当前租户关系库。 */ }
+                if (result?.Code == 1)
+                {
+                    var cursor = result.DataAppend == null ? new JObject() : JObject.FromObject(result.DataAppend);
+                    cursor["Source"] = "MongoDB";
+                    return new DosResult(result.Code, result.Data, result.Msg)
+                    { DataAppend = cursor, DataCount = result.DataCount };
+                }
+                // MongoDB 查询失败时才使用关系库；Mongo 查询成功但本月为空不切换来源。
+                return ReadScheduleExecutionLogs(tenant, request, true);
             }
-            // 历史表仅保留查询，不删除、不搬迁、不再写入；固定投影和参数化范围。
+            // 显式历史查询和 MongoDB 故障兜底共用固定投影与参数化范围。
             // 不走 TableChild 的全量 Count，避免打开任务表单时扫描多年历史。
             var client = OsClientExtend.GetClient(tenant);
             if (client?.Db == null || !string.Equals(client.OsClient, tenant, StringComparison.OrdinalIgnoreCase))
@@ -152,7 +164,7 @@ namespace Microi.net
             return new DosResult(1, rows)
             {
                 DataCount = rows.Count,
-                DataAppend = new { HasMore = more, BeforeLogTime = last?["CreateTime"], BeforeLogId = last?["Id"], ExactTotal = false }
+                DataAppend = new { Source = "MySQL", HasMore = more, BeforeLogTime = last?["CreateTime"], BeforeLogId = last?["Id"], ExactTotal = false }
             };
         }
 

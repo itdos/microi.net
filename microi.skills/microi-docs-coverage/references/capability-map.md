@@ -76,6 +76,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `v8-engine/apiengine-index.md` | v8-crud-api, v8-api-config | 接口引擎实战和规范 |
 | `v8-engine/form-engine.md` | v8-crud-api, v8-formengine-http, module-engine, microi-form-engine | FormEngine API、HTTP、原生查询身份/统计范围与按表主库策略 |
 | `v8-engine/mcp-server.md` | microi-system-delivery, microi-codex-installer, v8-security | MCP 工具、确认、审计、文件、日志、备份与访问密钥 |
+| `v8-engine/microi-agent.md` | microi-codex, microi-codex-installer | Microi Agent 桌面安装、连接诊断与更新 |
 | `v8-engine/v8-client.md` | v8-utilities, v8-frontend-events, v8-http-integration, v8-security, ai-engine, print-engine | 全部前端 V8、平台 AI、强身份验证、扫码和蓝牙打印 |
 | `v8-engine/v8-server.md` | v8-utilities, v8-api-config, v8-http-integration, v8-security, ai-engine | 全部后端 V8、强身份票据、平台 AI 和专项路由 |
 | `v8-engine/vs-code-plugin.md` | v8-explorer-tree, microi-client-frontend, workspace-conventions | VS Code 插件、Microi CLI、AI/MCP 初始化、类型、资源树和共享工作区 |

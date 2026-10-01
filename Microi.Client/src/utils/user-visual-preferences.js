@@ -53,6 +53,31 @@ export function resolveUserThemeColor(user = {}, localColor = "", systemColor = 
     return text(localColor) || text(systemColor) || fallback;
 }
 
+export function normalizeUserCornerStyle(value) {
+    const normalized = text(value).toLowerCase();
+    return normalized === 'round' || normalized === 'square' ? normalized : 'System';
+}
+
+export function resolveUserCornerStyle(user = {}, localStyle = "round", systemStyle = "") {
+    const tenantDefault = text(systemStyle).toLowerCase() === 'square' ? 'square' : 'round';
+    if (hasInstalledUserPreference(user, "CornerStyle")) {
+        const personal = normalizeUserCornerStyle(user.CornerStyle);
+        return personal === 'System' ? tenantDefault : personal;
+    }
+    return normalizeUserCornerStyle(localStyle) === 'square' ? 'square' : tenantDefault;
+}
+
+export function normalizeUserNavigationLayout(value) {
+    const normalized = text(value).toLowerCase();
+    return normalized === 'top' ? 'Top' : normalized === 'side' ? 'Side' : 'System';
+}
+
+export function resolveUserNavigationLayout(userValue, systemValue) {
+    const personal = normalizeUserNavigationLayout(userValue);
+    if (personal !== 'System') return personal;
+    return normalizeUserNavigationLayout(systemValue) === 'Top' ? 'Top' : 'Side';
+}
+
 export function normalizeUserMenuChildExpandMode(value) {
     const normalized = text(value).toLowerCase();
     if (normalized === "right") return USER_MENU_CHILD_EXPAND_MODE.RIGHT;

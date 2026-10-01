@@ -285,7 +285,7 @@ return { Code: 0, Msg: '未识别的 MQTT 事件：' + eventName };
 | 表 | 自动维护内容 | 建议用途 |
 | --- | --- | --- |
 | `mci_mqtt_client` | `ClientId`、`IsOnline`、`LastConnectTime`、设备级 `ApiEngineId` | 设备接入台账与路由配置 |
-| `mci_mqtt_log` | `ServerStart`、`ServerStop`、`Connect`、`Disconnect`、`Subscribe`、`Receive` | 审计、排障和短周期运行记录 |
+| MQTT 运行日志 | `ServerStart`、`ServerStop`、`Connect`、`Disconnect`、`Subscribe`、`Receive` | 优先写入租户 MongoDB 月度系统日志，写入失败才回退 `mci_mqtt_log`；用于审计与排障 |
 
 租户默认走 `sys_osclients.MqttApiEngine`。如果在 `mci_mqtt_client.ApiEngineId` 为某台设备选择专属接口引擎，该设备连接后会优先走设备级处理器，适合：
 
@@ -316,7 +316,7 @@ return { Code: 0, Msg: '未识别的 MQTT 事件：' + eventName };
   </article>
 </div>
 
-`mci_mqtt_log` 用于运行审计，不应代替长期遥测仓。高频场景必须设计日志保留与归档策略，并用真实消息大小、QoS、V8 耗时和落库方式做容量测试；案例规模不能直接当作任意部署的性能承诺。
+MQTT 运行日志通过 `platform-mqtt` 的 `Action=Logs` 按月读取：MongoDB 优先，查询失败时才查询当前租户的 `mci_mqtt_log`；可用 `ClientId` 筛选设备。`Action=HistoryLogs` 始终查询关系库，用于查看旧记录以及 Mongo 故障期间的兜底记录。新版 PC 客户端的设备通讯日志与 MQTT 日志菜单使用这一入口，需要后端和前端一起升级。旧关系库行保留，不自动删除。高频场景必须设计日志保留与归档策略，并用真实消息大小、QoS、V8 耗时和落库方式做容量测试；案例规模不能直接当作任意部署的性能承诺。
 
 ## 服务端安全下行
 
@@ -361,7 +361,7 @@ await mqttService.PublishAsync(
 | 入口 | 能看到什么 | 边界 |
 | --- | --- | --- |
 | `mci_mqtt_client` | 设备、最后连接时间、基础在线状态、专属引擎 | 异常掉电后需结合心跳超时判断 |
-| `mci_mqtt_log` | 启停、连接、断开、订阅、接收记录 | 需要保留、归档与容量策略 |
+| MQTT 运行日志 | 启停、连接、断开、订阅、接收记录 | MongoDB 优先，`mci_mqtt_log` 仅作故障兜底及旧记录查询；需要保留、归档与容量策略 |
 | 系统日志 `Type=MQTT` | 端口占用、凭据拒绝、Topic ACL、V8 异常等诊断 | 不记录明文密码或证书密码 |
 | MQTT 管理状态接口 | `IsRunning`、当前租户、当前节点连接快照 | 仅平台管理员、仅当前节点 |
 

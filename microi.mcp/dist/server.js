@@ -732,6 +732,14 @@ export function validateApplicationAssetV3FinalizeEvidence(result, expected) {
         || stableResolverPath.includes('/requests/')) {
         throw new Error(`${context}.StableResolverPath 不是 versionless v3 resolver`);
     }
+    if (expected.publishMode === 'finalize' && evidence.Completed === true) {
+        const match = /^\/micro-app\/v3\/tenants\/([^/]+)\/kinds\/runtime\/apps\/([^/]+)\/assets\//u.exec(stableResolverPath);
+        if (!match)
+            throw new Error(`${context}.StableResolverPath 缺少租户或 AppKey`);
+        const version = normalizedApplicationVersion(expected.versionNo);
+        requireStreamEvidenceString(evidence, 'CdnPreviewPath', `/${match[1]}/micro-app/${match[2]}/${expected.encodedEntryPath}`, context);
+        requireStreamEvidenceString(evidence, 'CdnVersionPreviewPath', `/${match[1]}/micro-app/${match[2]}/${version}/${expected.encodedEntryPath}`, context);
+    }
     return evidence;
 }
 /**
@@ -1910,6 +1918,21 @@ export async function runApplicationDirectoryStreamPublish(client, input) {
                             previewTruncated: manifest.assets.length > 200,
                         }, null, 2) }],
             };
+        }
+        if (v3 && publishMode !== 'stage') {
+            const status = await client.getStatus();
+            const capabilities = asJsonRecord(status.Data);
+            if (status.Code !== 1 || capabilities.ApplicationCdnProjectionSupported !== true) {
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({
+                                error: '目标 API 尚未启用固定 CDN 对象投影；请先部署支持 ApplicationCdnProjectionSupported 的后端。',
+                                publishMode,
+                                uploadedCount: 0,
+                                retrySafe: true,
+                            }, null, 2) }],
+                    isError: true,
+                };
+            }
         }
         let uploadedCount = 0;
         let idempotentCount = 0;
@@ -4020,6 +4043,41 @@ export function createMcpServer(client, context) {
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // File cabinet object/version discovery is read-only. The API enforces the
+    // current DiyToken administrator and authoritative file-cabinet menu boundary.
+    server.tool('microi_list_file_cabinet_objects', `List one current-tenant file-cabinet directory on OsClient "${osClient}". Requires an interactive platform administrator; private/public bucket selection is explicit. This does not download file bytes.`, {
+        path: z.string().max(2048).default('').describe('Directory prefix under the current tenant root.'),
+        limit: z.boolean().default(true).describe('true for private bucket, false for public bucket.'),
+    }, async ({ path, limit }) => {
+        try {
+            const result = await client.listFileCabinetObjects(path, limit);
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                structuredContent: { Code: result.Code, Data: result.Data, Msg: result.Msg || '' },
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (error) {
+            return { content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }], isError: true };
+        }
+    });
+    server.tool('microi_get_file_cabinet_office_meta', `Read durable Office version metadata for one exact file-cabinet object on OsClient "${osClient}". Requires the current tenant's authoritative file-cabinet SysMenuId and interactive platform administrator; no file bytes or edits are returned.`, {
+        filePathName: z.string().min(1).max(2048).describe('Exact object key returned by the file-cabinet listing.'),
+        sysMenuId: z.string().min(1).max(100).describe('Authoritative current-tenant file-cabinet menu Id.'),
+        limit: z.boolean().default(true).describe('Bucket of the original file: true=private, false=public.'),
+    }, async ({ filePathName, sysMenuId, limit }) => {
+        try {
+            const result = await client.getFileCabinetOfficeMeta(filePathName, sysMenuId, limit);
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                structuredContent: { Code: result.Code, Data: result.Data, Msg: result.Msg || '' },
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (error) {
+            return { content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }], isError: true };
         }
     });
     server.tool('microi_get_table_indexes', `List normalized physical database indexes for one table in OsClient "${osClient}". Returns one item per index with ordered Columns, IsUnique and IsPrimary. Use this before changing indexes and again for readback verification.`, {
@@ -6688,7 +6746,8 @@ export function createMcpServer(client, context) {
         display: z.number().optional().describe('Show in PC menu (1=yes, 0=no). Default: 1'),
         appDisplay: z.number().optional().describe('Show in mobile menu (1=yes, 0=no). Default: 1'),
         hasChild: z.number().optional().describe('Whether this menu has visible child menus. A hidden TableChild carrier module MUST set 0.'),
-        openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page", "MicroService"'),
+        openType: z.string().optional().describe('Open type. Default: "Diy". Options include "Diy", "WorkFlow", "Url", "Page", "MicroService", "CodeForm". WorkFlow requires diyTableId and flowDesignId for an enabled flow bound to the same table.'),
+        flowDesignId: z.string().optional().describe('Required when openType=WorkFlow: wf_flowdesign.Id of an enabled flow bound to diyTableId.'),
         url: z.string().optional().describe('Menu route. MicroService menus normally use /micro-app/{MicroServiceKey}/{routePath}.'),
         sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
         icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
@@ -6719,21 +6778,40 @@ export function createMcpServer(client, context) {
         mobileListFields: z.string().optional().describe('JSON array of fields shown in mobile/card list. If omitted and diyTableId is bound, backend picks compact title/status/summary fields.'),
         cardTitleTagFields: z.string().optional().describe('JSON array of fields shown as title tags on mobile/card view.'),
         cardBottomTagFields: z.string().optional().describe('JSON array of fields shown as bottom tags on mobile/card view.'),
-        microServiceId: z.string().optional().describe('sys_microiservice.Id. Required when openType=MicroService.'),
-        microServicePageId: z.string().optional().describe('sys_microiservice_page.Id for this menu route. Required when openType=MicroService.'),
-        microServiceRoutePath: z.string().optional().describe('Internal Vue route such as /context-test. Required when openType=MicroService.'),
+        microServiceId: z.string().optional().describe('sys_microiservice.Id. Required when openType=MicroService or CodeForm.'),
+        microServicePageId: z.string().optional().describe('sys_microiservice_page.Id for this menu route. Required when openType=MicroService or CodeForm.'),
+        microServiceRoutePath: z.string().optional().describe('Internal Vue route such as /context-test. Required when openType=MicroService or CodeForm.'),
         microServiceKey: z.string().optional().describe('sys_microiservice.MsKey/AppKey. Used to generate the friendly menu URL.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Must exactly equal name, or EXECUTE. Omit for a dry-run payload.'),
-    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, hasChild, openType, url, sort, icon, menuBadgeEnabled, menuBadgeApiEngineKey, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields, microServiceId, microServicePageId, microServiceRoutePath, microServiceKey, confirmExecution }) => {
+    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, hasChild, openType, flowDesignId, url, sort, icon, menuBadgeEnabled, menuBadgeApiEngineKey, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields, microServiceId, microServicePageId, microServiceRoutePath, microServiceKey, confirmExecution }) => {
         try {
-            const isMicroService = String(openType || '').toLowerCase() === 'microservice'
+            const isWorkflow = String(openType || '').toLowerCase() === 'workflow';
+            if (isWorkflow) {
+                if (!diyTableId || !flowDesignId) {
+                    return { content: [{ type: 'text', text: 'Error: WorkFlow 菜单必须同时绑定 diyTableId 与 flowDesignId。' }], isError: true };
+                }
+                const flowResult = await client.getTableData('wf_flowdesign', {
+                    Id: flowDesignId, _SelectFields: ['Id', 'TableId', 'IsEnable'], _PageSize: 2,
+                });
+                const flowRows = unwrapList(flowResult.Data);
+                const targetFlow = flowRows.find((row) => String(row.Id || '') === flowDesignId);
+                if (flowResult.Code !== 1 || !targetFlow || Number(targetFlow.IsEnable) !== 1
+                    || String(targetFlow.TableId || '') !== diyTableId) {
+                    return { content: [{ type: 'text', text: 'Error: flowDesignId 必须指向已启用且绑定同一 diyTableId 的流程。' }], isError: true };
+                }
+            }
+            const isCodeForm = String(openType || '').toLowerCase() === 'codeform';
+            const isMicroService = String(openType || '').toLowerCase() === 'microservice' || isCodeForm
                 || Boolean(microServiceId || microServicePageId || microServiceRoutePath || microServiceKey);
-            let effectiveOpenType = openType;
+            let effectiveOpenType = isWorkflow ? 'WorkFlow' : openType;
             let effectiveComponentName = componentName;
             let effectiveComponentPath = componentPath;
             let effectiveUrl = url;
             let effectiveMicroServiceRoutePath = microServiceRoutePath;
             if (isMicroService) {
+                if (isCodeForm && !diyTableId) {
+                    return { content: [{ type: 'text', text: 'Error: CodeForm 菜单必须绑定 diyTableId。' }], isError: true };
+                }
                 const missing = [
                     !microServiceId ? 'microServiceId' : '',
                     !microServicePageId ? 'microServicePageId' : '',
@@ -6748,7 +6826,7 @@ export function createMcpServer(client, context) {
                     return { content: [{ type: 'text', text: `Error: microServiceRoutePath 不合法：${microServiceRoutePath}` }], isError: true };
                 }
                 effectiveMicroServiceRoutePath = routePath;
-                effectiveOpenType = 'MicroService';
+                effectiveOpenType = isCodeForm ? 'CodeForm' : 'MicroService';
                 effectiveComponentName = componentName || 'MicroService';
                 effectiveComponentPath = componentPath || '/micro-app/host';
                 const encodedRoute = routePath === '/'
@@ -6788,6 +6866,7 @@ export function createMcpServer(client, context) {
                                     ParentId: parentId,
                                     HasChild: hasChild,
                                     OpenType: effectiveOpenType || 'Diy',
+                                    FlowDesignId: flowDesignId,
                                     ComponentName: effectiveComponentName,
                                     ComponentPath: effectiveComponentPath,
                                     Url: effectiveUrl,
@@ -6808,7 +6887,7 @@ export function createMcpServer(client, context) {
                 Name: name, DiyTableId: diyTableId, ParentId: parentId,
                 ComponentName: effectiveComponentName, ComponentPath: effectiveComponentPath,
                 Display: display ?? 1, AppDisplay: appDisplay ?? 1, HasChild: hasChild,
-                OpenType: effectiveOpenType, Url: effectiveUrl, Sort: sort,
+                OpenType: effectiveOpenType, FlowDesignId: flowDesignId, Url: effectiveUrl, Sort: sort,
                 Icon: icon,
                 MenuBadgeEnabled: menuBadgeEnabled ?? 0,
                 MenuBadgeApiEngineKey: menuBadgeApiEngineKey,
@@ -7037,7 +7116,7 @@ export function createMcpServer(client, context) {
         appKey: z.string().regex(/^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/u).describe('Stable lowercase application key and local directory name.'),
         name: z.string().min(1).max(120).describe('Human-readable MicroService name.'),
         description: z.string().optional().describe('Optional application description.'),
-        aiApplicationsDirectory: z.string().optional().describe('Absolute tenant AI应用 directory. Defaults to MICROI_AI_APPLICATIONS_DIR injected by Microi.Code.'),
+        aiApplicationsDirectory: z.string().optional().describe('Absolute tenant AI应用 directory. Defaults to MICROI_AI_APPLICATIONS_DIR injected by Microi.Agent.'),
         buildVersion: z.string().regex(/^v\d+\.\d+\.\d+$/u).optional().default('v0.1.0').describe('Initial semantic build version. Default v0.1.0.'),
         routes: z.array(z.object({
             path: z.string().describe('Internal route path such as /context-test.'),
@@ -7052,7 +7131,7 @@ export function createMcpServer(client, context) {
             const targetRoot = String(aiApplicationsDirectory || process.env.MICROI_AI_APPLICATIONS_DIR || '').trim();
             if (!targetRoot) {
                 return {
-                    content: [{ type: 'text', text: 'Error: 缺少 AI 应用目录。请由 Microi.Code 注入 MICROI_AI_APPLICATIONS_DIR，或显式传入 aiApplicationsDirectory。' }],
+                    content: [{ type: 'text', text: 'Error: 缺少 AI 应用目录。请由 Microi.Agent 注入 MICROI_AI_APPLICATIONS_DIR，或显式传入 aiApplicationsDirectory。' }],
                     isError: true,
                 };
             }

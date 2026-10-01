@@ -151,12 +151,13 @@ try {
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-mq-mqtt-001 sha256=e38b5b491e061fc87f7e1f1446f5c4a7eb6d5f9616d18ca63632a566810c98d9 -->
+<!-- microi-progressive:chunk id=v8-mq-mqtt-001 sha256=834e8270912c25c900ca046d533f64c104a875acf8865919ffff5dca5442e7e6 -->
 ## 注意事项
 
 - MQ 消费者接口引擎通过 `V8.Param.Message` 获取消息，包含 `EventId`、兼容 `Id`、`OsClient`、`Message`、`CurrentUserId`
 - MQ 适合异步解耦、削峰填谷、耗时操作异步化
 - MQTT 七类事件在同一个接口引擎中处理，通过 `V8.EventName` 区分
+- MQTT 运行日志确认写入租户 MongoDB 月度系统日志，`TargetType=MqttEvent`；MongoDB 持久化失败才写当前租户的 `mci_mqtt_log`。`platform-mqtt` 的 `Action=Logs` 按月读 MongoDB，查询失败时才回退 MySQL；`Action=HistoryLogs` 显式读旧记录及故障兜底记录，`ClientId` 可选。新版 PC 客户端的设备 `MqttLogs` 字段及 MQTT 日志菜单使用此入口；旧客户端仍读关系库，须随 API 一起升级。
 - MQTT 适合 IoT 设备管理、实时数据采集
 - 设备/告警/工单等业务事实优先进入关系库，高频遥测可进入 MongoDB，大附件进入对象存储
 - RabbitMQ 租户凭据在 SaaS 引擎登记前必须先在真实 RabbitMQ 创建 user/vhost/权限；内嵌 MQTT Broker 直接校验 SaaS 中的 MQTT 凭据，使用外部 MQTT Broker 时另行完成真实 Broker 账号、ACL 与适配器配置

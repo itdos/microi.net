@@ -28,9 +28,9 @@ public class MicroiTaskSchedulingCacheTests
         var cache = DispatchProxy.Create<IMicroiCache, CacheProxy>();
         ((CacheProxy)cache).Database = db;
         var form = DispatchProxy.Create<IFormEngine, FormProxy>();
-        var recorder = new QueueRecorder();
+        var recorder = DispatchProxy.Create<IMongoDB, MongoRecorder>();
         using var provider = new ServiceCollection().AddSingleton<IMicroiCacheTenant>(new CacheTenant(cache))
-            .AddSingleton(form).AddSingleton<ISysLogQueue>(recorder).BuildServiceProvider();
+            .AddSingleton(form).AddSingleton(recorder).BuildServiceProvider();
         var locator = typeof(MicroiEngine).GetField("_serviceProvider", BindingFlags.NonPublic | BindingFlags.Static)!;
         var previous = locator.GetValue(null);
         locator.SetValue(null, provider);
@@ -51,9 +51,10 @@ public class MicroiTaskSchedulingCacheTests
             var trigger = new TriggerKey("daily", "group");
             var time = DateTimeOffset.UtcNow;
             await Task.WhenAll(Enumerable.Range(0, 24).Select(i => MicroiDisabledScheduleObserver.WriteSkip(tenant, job, trigger, time, "node-" + i)));
-            var row = Assert.Single(recorder.Rows).Value;
-            Assert.Equal(1, recorder.AddAttempts);
-            var message = JObject.Parse(row["Content"]!.ToString());
+            var stored = (MongoRecorder)recorder;
+            var row = Assert.Single(stored.Rows).Value;
+            Assert.Equal(1, stored.AddAttempts);
+            var message = JObject.Parse(row.Content!);
             Assert.Equal("Skipped", message["Status"]);
             Assert.False((bool)message["Executed"]!);
             Assert.Equal("SystemTaskSchedulingDisabled", message["Reason"]);
@@ -65,25 +66,24 @@ public class MicroiTaskSchedulingCacheTests
             // 模拟日志已落库但缓存凭据丢失；确定性数据库主键与回读仍避免第二条记录。
             await db.KeyDeleteAsync(dedupKey);
             await MicroiDisabledScheduleObserver.WriteSkip(tenant, job, trigger, time, "replacement-node");
-            Assert.Single(recorder.Rows);
-            Assert.Equal(2, recorder.AddAttempts);
+            Assert.Single(stored.Rows);
+            Assert.Equal(2, stored.AddAttempts);
             await db.KeyDeleteAsync(dedupKey);
         }
         finally { locator.SetValue(null, previous); }
     }
 
-    private sealed class QueueRecorder : ISysLogQueue
+    public class MongoRecorder : DispatchProxy
     {
-        public ConcurrentDictionary<string, JObject> Rows = new();
+        public ConcurrentDictionary<string, SysLogParam> Rows = new();
         public int AddAttempts;
-        public bool Enqueue(SysLogParam param)
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
+            if (method!.Name != nameof(IMongoDB.AddSysLogs)) throw new InvalidOperationException(method.Name);
             Interlocked.Increment(ref AddAttempts);
-            Rows.TryAdd(param.EventId, JObject.FromObject(param));
-            return true;
+            foreach (var row in (IReadOnlyCollection<SysLogParam>)args![0]!) Rows.TryAdd(row.EventId, row);
+            return Task.FromResult(new DosResult(1));
         }
-        public SysLogQueueHealth GetHealth() => new();
-        public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class CacheTenant(IMicroiCache cache) : IMicroiCacheTenant

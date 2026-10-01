@@ -1057,6 +1057,7 @@ test('protocol v3 finalize returns Pending without probing and exact replay keep
         const finalizeCalls = [];
         let uploadCalls = 0;
         const fakeClient = {
+            getStatus: async () => ({ Code: 1, Data: { ApplicationCdnProjectionSupported: true }, Msg: '' }),
             uploadApplicationAssetStream: async () => {
                 uploadCalls += 1;
                 return { Code: 0, Data: null, Msg: 'finalize must not upload' };
@@ -1094,7 +1095,11 @@ test('protocol v3 finalize returns Pending without probing and exact replay keep
                         RetryAfterMs: 0,
                         ReleasePrefix: releasePrefix,
                         ReleaseEntryPath: `${releasePrefix}/assets/index.html`,
-                        StableResolverPath: '/micro-app/v3/tenants/iTdos/kinds/Web/apps/v3-finalize-app/assets/index.html',
+                        StableResolverPath: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/v3-finalize-app/assets/index.html',
+                        ...(completed ? {
+                            CdnPreviewPath: '/itdos/micro-app/v3-finalize-app/index.html',
+                            CdnVersionPreviewPath: '/itdos/micro-app/v3-finalize-app/v2.0.0/index.html',
+                        } : {}),
                         RuntimeManifestHash: input.RuntimeManifestHash,
                         SourceManifestHash: input.SourceManifestHash,
                     },

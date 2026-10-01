@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: export-microi-store-package
- * Version: v1.3.1
+ * Version: v1.3.3
  * Function:
  * - 导出或持久发布 Microi 应用安装包；支持预制平台包、UTF-8 HDFS、FormEngine fence CAS、两阶段不可变快照收口，并同步服务端与客户端最低版本门禁。
  */
@@ -28,8 +28,17 @@ var AiAppSelections = V8.Param.AiAppSelections || V8.Param.SelectAiApp || [];
 var PreparedAssets = V8.Param.PreparedAssets || V8.Param.AiAppPackageManifest || [];
 var PackageName = V8.Param.PackageName || '未命名应用包';  // 应用包名称
 var PackageVersion = V8.Param.PackageVersion || '1.0.0';  // 应用包版本
+var RequestedServerMinVersion = String(V8.Param.ServerMinVersion || '').replace(/^\s+|\s+$/g, '');
+var RequestedClientMinVersion = String(V8.Param.ClientMinVersion || '').replace(/^\s+|\s+$/g, '');
 var PersistStoreId = String(V8.Param.PersistStoreId || '').replace(/^\s+|\s+$/g, '');
 var PersistAppKey = String(V8.Param.PersistAppKey || '').replace(/^\s+|\s+$/g, '');
+// MARKETPLACE_OFFLINE_EXPORT_REPUBLISH_V1：重制安装包不能隐式改变商品上架状态。
+// 上架是独立的显式操作；未审批状态仍由现有商城记录原样保留。
+function persistedListingStatus(storeRow, params) {
+    if (params && (params.PublishListing === true || params.PublishListing === 1
+        || String(params.PublishListing || '').toLowerCase() == 'true')) return 'Published';
+    return String(storeRow && storeRow.Status || 'Published');
+}
 var HasExpectedPersistAppVersion = typeof V8.Param.ExpectedPersistAppVersion != 'undefined';
 var HasExpectedPersistPackageSha256 = typeof V8.Param.ExpectedPersistPackageSha256 != 'undefined';
 var ExpectedPersistAppVersion = String(V8.Param.ExpectedPersistAppVersion || '').replace(/^\s+|\s+$/g, '');
@@ -1202,6 +1211,8 @@ try {
         PackageInfo: {
             Name: PackageName,
             Version: PackageVersion,
+            ServerMinVersion: RequestedServerMinVersion,
+            ClientMinVersion: RequestedClientMinVersion,
             CreateTime: new Date().toISOString(),
             CreateUser: V8.CurrentUser.Name || '未知',
             MenuCount: exportMenus.length,
@@ -1306,6 +1317,7 @@ try {
             throw new Error('持久化发布失败：商城记录不存在，StoreId=' + PersistStoreId);
         }
         var storeRow = storeResult.Data;
+        var listingStatus = persistedListingStatus(storeRow, V8.Param);
         if (PersistAppKey && String(storeRow.AppKey || storeRow.AppId || '').toLowerCase() != PersistAppKey.toLowerCase()) {
             throw new Error('持久化发布失败：PersistAppKey 与商城记录不一致');
         }
@@ -1419,6 +1431,10 @@ try {
         packageData.PackageInfo.Version = exactPackageVersion;
         packageData.PackageInfo.AppId = storeRow.AppKey || storeRow.AppId || PersistAppKey;
         packageData.PackageInfo.ApplicationType = storeRow.ApplicationType || 'Platform';
+        // MARKETPLACE_MINIMUM_VERSION_PRESERVE_V1：重制历史包没有显式门禁时沿用当前商品的版本下限。
+        // 绝不能因导出器的新包默认空值而降低可安装版本门槛。
+        packageData.PackageInfo.ServerMinVersion = RequestedServerMinVersion || String(storeRow.ServerMinVersion || '');
+        packageData.PackageInfo.ClientMinVersion = RequestedClientMinVersion || String(storeRow.ClientMinVersion || '');
         packageData.PackageInfo.ChangeLog = {
             Version: changeLogs[0].Version,
             Title: changeLogs[0].Title,
@@ -1441,7 +1457,7 @@ try {
         var isExactPublishedStore = function (row) {
             return !!row
                 && String(row.AppVersion || '') == exactPackageVersion
-                && String(row.Status || '') == 'Published'
+                && String(row.Status || '') == listingStatus
                 && String(row.BuildStatus || '') == 'Success'
                 && String(row.AppPakcet || '') == ''
                 && String(row.PackageId || '') == String(packagePointer.PackageId || '')
@@ -1590,7 +1606,7 @@ try {
             PackageUploadedAt: packagePointer.PackageUploadedAt,
             ServerMinVersion: String(packageData.PackageInfo.ServerMinVersion || ''),
             ClientMinVersion: String(packageData.PackageInfo.ClientMinVersion || ''),
-            Status: 'Published',
+            Status: listingStatus,
             BuildStatus: 'Success',
             AppPublishTime: DateNow('yyyy-MM-dd HH:mm:ss'),
             AppUpdateTime: DateNow('yyyy-MM-dd HH:mm:ss')
@@ -1600,12 +1616,13 @@ try {
         }
         var verifyResult = V8.FormEngine.GetFormData('sys_microistore', {
             Id: PersistStoreId,
-            _SelectFields: ['Id', 'AppKey', 'AppVersion', 'Status', 'BuildStatus', 'AppPakcet', 'PackageId', 'PackageStorageMode', 'PackageHdfsPath', 'PackageSha256', 'PackageSize', 'ServerMinVersion', 'ClientMinVersion']
+            _SelectFields: ['Id', 'AppKey', 'AppVersion', 'Status', 'IsApprove', 'BuildStatus', 'AppPakcet', 'PackageId', 'PackageStorageMode', 'PackageHdfsPath', 'PackageSha256', 'PackageSize', 'ServerMinVersion', 'ClientMinVersion']
         }, V8.DbTrans);
         var verifyRow = verifyResult && verifyResult.Code == 1 ? verifyResult.Data : null;
         if (!verifyRow
             || String(verifyRow.AppVersion || '') != exactPackageVersion
-            || String(verifyRow.Status || '') != 'Published'
+            || String(verifyRow.Status || '') != listingStatus
+            || String(verifyRow.IsApprove || 0) != String(storeRow.IsApprove || 0)
             || String(verifyRow.BuildStatus || '') != 'Success'
             || String(verifyRow.AppPakcet || '') != ''
             || String(verifyRow.PackageHdfsPath || '') != String(packagePointer.PackageHdfsPath || '')

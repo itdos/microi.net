@@ -7,7 +7,7 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 
 # Microi 吾码 Playwright E2E 自动化测试
 
-> **2026-05 更新（重要）**：Microi.Code 插件生成的所有 E2E 产物现已统一隔离到 `<projectRoot>/.microi-e2e/` 目录，**不再**写入 `tests/e2e/`、根目录 `playwright.config.js` 或 `.env.e2e.example`。
+> **2026-05 更新（重要）**：Microi.Agent 插件生成的所有 E2E 产物现已统一隔离到 `<projectRoot>/.microi-e2e/` 目录，**不再**写入 `tests/e2e/`、根目录 `playwright.config.js` 或 `.env.e2e.example`。
 > - `playwright.config.js` 位于 `.microi-e2e/playwright.config.js`，`testDir` 为 `./` （即 `.microi-e2e/specs/`）
 > - 报告路径 `.microi-e2e/report/`，截图 `.microi-e2e/screenshots/`
 > - 上下文 `.microi-e2e/.microi-playwright-context.json`
@@ -47,7 +47,7 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 |------|---------|
 | 一次性 Python/JS/PS1 脚本 | `<workspace-root>/.tmp/` |
 | 诊断截图、调试输出 | `<workspace-root>/.tmp/screenshots/` 或子目录 |
-| E2E 测试产物（Microi.Code 插件生成） | `<workspace-root>/.microi-e2e/` |
+| E2E 测试产物（Microi.Agent 插件生成） | `<workspace-root>/.microi-e2e/` |
 | AI 一次性 Playwright 脚本、截图、日志、报告 | `<workspace-root>/.tmp/`、`<workspace-root>/.tmp/screenshots/`、`<workspace-root>/.tmp/reports/` |
 | 性能测试报告 | `<workspace-root>/.microi-performance/`（仅限此目录） |
 
@@ -55,7 +55,7 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 
 `.tmp/` 目录已在 `.gitignore` 中排除，AI 可以在此自由创建临时文件。任务完成后如无价值可以不清理，也可以整体删除该目录。
 
-**2026-06 强制补充**：AI 手写的一次性 Playwright 验证脚本、运行日志、截图和报告只能写到工作区根目录 `.tmp/`。不要写到 `Microi.Client/`、`Microi.Server/`、`microi.doc/` 或其它子项目目录，即使这些目录已有 `tests/` 目录也不例外。只有 Microi.Code 插件正式初始化的可复用 E2E 工程，才使用 `.microi-e2e/`。
+**2026-06 强制补充**：AI 手写的一次性 Playwright 验证脚本、运行日志、截图和报告只能写到工作区根目录 `.tmp/`。不要写到 `Microi.Client/`、`Microi.Server/`、`microi.doc/` 或其它子项目目录，即使这些目录已有 `tests/` 目录也不例外。只有 Microi.Agent 插件正式初始化的可复用 E2E 工程，才使用 `.microi-e2e/`。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=playwright-e2e-003 sha256=69b8842a221a0de60f8605c5059deee391be0f16f0b6cbc5ddfb3cfd210268db -->

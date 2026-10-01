@@ -189,6 +189,23 @@ test('官网三方同步自动提版时同步推进结构化日志和历史记�
   assert.equal(arrayHistory.ChangeHistory[1].Version, 'v1.2.3');
 });
 
+test('旧官网包缺少 ChangeType 时仅从本地已验证包补齐分类', () => {
+  const packageInfo = {
+    Version: 'v8.3.39',
+    ChangeLog: {
+      Version: 'v8.3.39', Title: '官网原有说明', ChangeType: '',
+      Content: '官网已发布的修复内容。', ReleaseTime: '2026-09-28 10:00:00',
+    },
+    ChangeHistory: '2026-09-28 v8.3.39 官网已发布的修复内容。\n',
+  };
+  assert.throws(() => advanceOfficialPackageVersion(structuredClone(packageInfo), 'v8.3.40', '2026-09-29 12:00:00'), /ChangeType/);
+  advanceOfficialPackageVersion(packageInfo, 'v8.3.40', '2026-09-29 12:00:00', 'Fix');
+  assert.equal(packageInfo.Version, 'v8.3.40');
+  assert.equal(packageInfo.ChangeLog.ChangeType, 'Fix');
+  assert.equal(packageInfo.ChangeLog.Content, '官网已发布的修复内容。');
+  assert.match(packageInfo.ChangeHistory, /v8\.3\.39/);
+});
+
 test('旧资源生成器的最低版本门禁只提升 Version 且不修改 ChangeLog', () => {
   const currentChangeLog = {
     Version: 'v7.6.1',

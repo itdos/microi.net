@@ -31,6 +31,54 @@
 >* **WF_Work**：流程工作待办表，如发起一个流程实例，产生了3个待办，会写入3条WF_Work数据
 >* **WF_History**：流程轨迹表，详细记录流程每一步、每个人的所有操作，如同意、拒绝、撤回等
 
+## 用 AI / MCP 创建可运行的审批流程
+
+本页介绍的是 `wf_*` 审批工作流，区别于 [AI 工作流](/doc/system-engine/ai-workflow-suite)。
+AI 建模应先读取当前租户的 `wf_flowdesign`、`wf_node`、`wf_line`、`sys_menu`、
+目标业务表和人员/角色数据；不同租户的 Id 不能直接复制。
+
+| 位置 | 必要配置 | 检查点 |
+|---|---|---|
+| 流程定义 `wf_flowdesign` | `FlowName`、`TableId=diy_table.Id`、`IsEnable=1` | 流程启用且业务表真实存在；可选分类、描述、排序、流程起止 V8、发起角色。 |
+| 节点 `wf_node` | 稳定 `Id`、`NodeName`、`NodeType`、`PositionLeft/Top` | 类型为 `Start/Auto/Business/Approve/Countersign/End/AutoEnd`；坐标如 `320px`，不同节点不能叠放。 |
+| 人工节点 | `Users/Roles/Depts/BindJobs` 之一，或明确的同部门/上游选人策略 | 四个绑定字段为 `[{"Id":"当前租户 Id","Name":"显示名"}]` JSON；`End` 是人工结束，自动结束用 `AutoEnd`。 |
+| 连线 `wf_line` | `FromNodeId`、`ToNodeId`、`LineName` | 端点存在、从开始节点可达，标题为“起点 到 终点”。多出线在源节点 `LineValueV8` 设 `V8.NextNodeId` 或 `V8.LineValue`。 |
+| 模块 `sys_menu` | `OpenType="WorkFlow"`、`FlowDesignId`、`DiyTableId` | 关联已启用的流程真实 Id；模块表与流程 `TableId` 一致。 |
+
+节点还可配置 `AllowSelectUsers`（上游手选下节点接收人）、`AllowAddUsers`、
+`AllowRecall`、`AllowHandOver`、`HideHandOverSelect`、`BackNodes`、`Timeout`、
+`CopyUsers`、`SameDeptApprove`、`FieldsConfig`/`FieldsConfigComponent`、
+`StartV8`/`StartV8Server`、`EndV8`/`EndV8Server`、`LineValueV8`。
+流程定义另有 `Roles`、`StartV8`、`EndV8`、`JsonData` 和预览等配置；
+连线还有 `LineValue`、兼容 `V8Code`。这些字段的实际类型以当前租户
+`microi_get_db_schema` 回读为准，不要为让校验通过随意填空字符串。
+
+```json
+{
+  "workflows": [{
+    "FlowDesign": { "FlowName": "费用审批", "table": "Biz_Expense", "IsEnable": 1 },
+    "Nodes": [
+      { "Id": "start", "NodeName": "发起", "NodeType": "Start" },
+      { "Id": "finance", "NodeName": "财务审批", "NodeType": "Approve",
+        "Roles": [{ "Id": "<从当前租户角色查询>", "Name": "财务" }] },
+      { "Id": "end", "NodeName": "完成", "NodeType": "AutoEnd" }
+    ],
+    "Lines": [
+      { "Id": "l1", "FromNodeId": "start", "ToNodeId": "finance" },
+      { "Id": "l2", "FromNodeId": "finance", "ToNodeId": "end" }
+    ]
+  }],
+  "modules": [{ "name": "费用申请", "table": "Biz_Expense",
+    "openType": "WorkFlow", "flowName": "费用审批" }]
+}
+```
+
+先运行 `microi_plan_system`、`microi_check_workflow_package`；分支流程再用
+`microi_test_workflow_condition` 测样例表单。生成器会给缺少坐标的节点按拓扑
+补像素位置，并在同包模块保存后写入真实 `FlowDesignId`。保存后回读三张定义表与
+`sys_menu`，再用真实发起人和审批人完成发起、处理、历史、流程图和模块入口测试。
+结构检查无法证明当前人员仍有效或实际待办可到达，必须做运行时验收。
+
 ### 人员配置与业务快照
 
 通过 MCP 或应用包配置节点人员时，`WF_Node.Users` 保存的是 JSON 对象数组：

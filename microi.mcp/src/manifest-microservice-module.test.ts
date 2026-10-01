@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildPlan, resolveMicroServiceModuleBinding } from './advanced-tools.js';
+import { buildPlan, normalizeAllMenuJson, resolveMicroServiceModuleBinding } from './advanced-tools.js';
 
 const portableModule = {
   name: 'AI平台治理工作台',
@@ -10,6 +10,21 @@ const portableModule = {
   microServiceKey: 'ai-platform-studio',
   microServiceRoutePath: '/overview',
 };
+
+test('module manifest accepts grouped headers and independent banner switches', () => {
+  const normalized = normalizeAllMenuJson({
+    tableHeaders: [{ Label: '人数', Fields: ['Total', 'Male', 'Female'] }],
+    hideTableBanner: true,
+    hideFormBanner: false,
+  });
+  assert.deepEqual(normalized.errors, []);
+  assert.equal(normalized.data.TableHeaders, '[{"Label":"人数","Fields":["Total","Male","Female"]}]');
+  assert.equal(normalized.data.HideTableBanner, 1);
+  assert.equal(normalized.data.HideFormBanner, 0);
+  assert.ok(normalizeAllMenuJson({ tableHeaders: '{invalid' }).errors.length);
+  assert.ok(normalizeAllMenuJson({ tableHeaders: [{ Label: '无字段', Fields: [] }] }).errors.length);
+  assert.ok(normalizeAllMenuJson({ tableHeaders: [{ Label: '错误嵌套', Children: [{ Label: '', Fields: ['Total'] }] }] }).errors.length);
+});
 
 test('Manifest accepts portable MicroService menu references without tenant ids', () => {
   const plan = buildPlan({ modules: [portableModule] });

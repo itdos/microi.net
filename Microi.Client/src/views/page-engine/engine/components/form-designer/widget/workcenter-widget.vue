@@ -8,6 +8,7 @@
       :flow-menu-id="flowMenuId"
       :notice-menu-id="noticeMenuId"
       :calendar-menu-id="calendarMenuId"
+      :embedded-page-size="embeddedPageSize"
       embedded
     />
   </div>
@@ -40,6 +41,7 @@ const workMenuId = computed(() => resolveMenu(1, 'wf_work'))
 const flowMenuId = computed(() => resolveMenu(2, 'wf_flow'))
 const noticeMenuId = computed(() => resolveMenu(3, 'diy_notice'))
 const calendarMenuId = computed(() => resolveMenu(4, 'microi_calendar'))
+const embeddedPageSize = computed(() => Math.max(5, Math.min(20, Number(props.widgetObj.widgetParams?.[5]?.value) || 10)))
 
 onBeforeUnmount(() => {
   workCenterComp.value = null

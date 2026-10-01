@@ -26,16 +26,17 @@ Quartz 管理能力包含查询、添加、更新、暂停、恢复、删除任�
 
 ### 执行日志与只读诊断
 
-- 新执行/失败/跳过记录使用 `ScheduleExecutionLog` 进入系统日志队列，落入 `sys_log_<tenant>/log_yyyyMM`；固定 `TargetType=ScheduledJob`、`TargetId=JobName`，`EventId` 幂等重放。日志队列失败不得改变业务结果，不再回写关系库日志表。
+- 新执行/失败/跳过记录使用 `ScheduleExecutionLog`，直接等待 MongoDB 确认写入 `sys_log_<tenant>/log_yyyyMM`；固定 `TargetType=ScheduledJob`、`TargetId=JobName`，`EventId` 幂等。MongoDB 确认失败才写当前租户的 `diy_schedule_job_log`，两者均失败不得改变业务结果。`AddSysLog` 仅代表异步入队，不能用作本能力的持久化确认。
 - 表单使用字段级 Tabs，分别放置“运行日志”和“历史日志”只读表格；仅显示的页签发起查询。历史 `diy_schedule_job_log` 保留，不自动删除、搬迁或清空。
 - `platform-schedule-job` 的 `logs/historylogs` 要求任务名、月份，每页最多 100 条，按时间+Id 游标多取一条判断 `HasMore`，不计算多年数据总数。Mongo 索引为 `(TargetType,TargetId,CreateTime,EventId)`；历史表索引 `(JobName,CreateTime,Id)` 通过声明式应用包交付并现场回读。
 - 用 `microi_query_job_runtime` 或 `microi_run_engine` 的 `Action=diagnostics` 核验启动、待机、实际执行数、领取进展、设置读取失败、触发器与心跳。一个租户的设置读取超时只能关闭该租户，不能拖住其它租户；每租户最多一个在途读，不能按轮询叠加请求。
-- MongoDB 连接或协议不兼容必须显示查询失败，不能伪装为空日志；先验证目标 Mongo 与驱动兼容。镜像更新不等于 Mongo 升级，队列接受不等于日志已持久化，spool 应在持久卷并验收恢复重放。
+- `logs` 优先读 MongoDB，MongoDB 查询失败时自动读关系库；成功的空集合不回退。`historylogs` 固定读关系库。两个库都不可用必须显示查询失败，不能伪装为空日志。镜像更新不等于 Mongo 升级；后台系统日志队列的 spool 仍应在持久卷并验收恢复重放。
 
 ### 运行时间刷新与配置版本分离
 
 - Quartz 周期同步 `LastTime/NextTime` 是运行状态投影，不能调用通用 `UptFormData` 生成配置版本或数据日志；用户保存名称、Cron、代码等配置仍走原表单事件和版本链路。
 - 只读取 Id、任务名和两个时间列；时间未变化时不写入。变化时由可信调度内核向同一租户主库执行固定两列参数化 CAS，匹配原时间、任务名、正常状态与未删除条件；并发/陈旧结果命中 0 行时不重放。
+- 编辑 Cron 重建触发器后，Quartz 的 PreviousFireTime 可能为空；同步时不得因此清空数据库已有的 `LastTime`，新的 `NextTime` 仍应更新。验收需覆盖“已执行任务改到当天已过时间，下一次排到次日”的场景，并分别核对新旧执行日志。
 - 历史版本保留不自动删除。持续高 CPU 时核对 `mic_data_version` 实际物理索引，不以应用包已声明索引推断旧库已安装；用 MCP 回读 `(TableId,TableRowId,CreateTime)`，并比较 MySQL digest 两次采样的执行数、扫描行数与耗时差值。
 - 此修复要求更新调度后端；既有 `platform-schedule-job`、任务元数据及 MCP 查询/保存协议保持兼容。验收覆盖两租户同名任务、两连接竞争、未变化、暂停/软删除/重命名后陈旧写入、主库选择和配置字段不变。
 
@@ -45,7 +46,7 @@ Quartz 管理能力包含查询、添加、更新、暂停、恢复、删除任�
 - 开启时在 Quartz 领取触发器、处理 Misfire 之前按租户过滤；领取后、真正触发前重新读取系统设置缓存。禁止仅在 `IJob.Execute`、Listener veto 或业务 V8 入口 return：共享 Quartz 可能已经推进 NextFireTime，造成旧版漏执行。
 - 集群故障恢复也不得清理停用租户的在途记录或创建其补偿触发器。Quartz 以故障节点为单位清理记录，所以同一故障节点混有被停用租户时，新版推迟该故障节点整组恢复，交给旧节点或关闭开关后处理；其它健康节点仍正常领取。
 - 正常保存系统设置在事务提交后失效缓存，下一次调度检查生效，不用重启；不是强制中断，已经开始的任务允许完成。缓存/配置读取失败拒绝该租户的新领取，不影响其它健康租户；Redis/失效通知异常时不能承诺硬实时。
-- 停用期间只读观察周期计划，不推进共享触发器；每个“租户 + Job + Trigger + 计划时间”向 Mongo 日志队列提交确定性事件，包含 `Status=Skipped`、`Executed=false`、`Reason=SystemTaskSchedulingDisabled` 和中文说明。Redis 原子预留与 Mongo 确定性主键共同防止多新版节点重复记录；日志说明仅代表新版未执行，旧版仍可能正常执行。不补跑业务、不补写进程停机历史；新增/修改计划的日志目录最多约 10 秒更新。
+- 停用期间只读观察周期计划，不推进共享触发器；每个“租户 + Job + Trigger + 计划时间”持久化确定性事件，包含 `Status=Skipped`、`Executed=false`、`Reason=SystemTaskSchedulingDisabled` 和中文说明。Redis 原子预留与日志确定性主键共同防止多新版节点重复记录；日志说明仅代表新版未执行，旧版仍可能正常执行。不补跑业务、不补写进程停机历史；新增/修改计划的日志目录最多约 10 秒更新。
 - 普通接口调用、MQ 消费、升级/应用安装等持久后台任务不属于此开关的范围。手动触发 Quartz 任务仍经过门禁。
 - 交付顺序：先安装字段并打开开关，再让新版节点参与调度；确认旧版所有调度进程已停止且在途任务完成后，关闭开关交接。不同业务库分别设置，不能用一个租户的值控制全部租户。
 - 验收至少覆盖：默认兼容、开关实时读取、租户隔离、共享库旧节点继续领取、领取后开关变化不推进触发器、Misfire 不误推进、多节点日志去重；不得在真实生产任务上制造副作用做测试。

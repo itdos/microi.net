@@ -1690,6 +1690,10 @@ function normalizePreviewUrl(url) {
     const value = String(url || "").trim();
     if (!value) return "";
     if (/^(https?:|data:|blob:)/i.test(value)) return value;
+    if (/^\/[a-z0-9_-]+\/micro-app\/[a-z0-9_-]+\/(?:v\d+\.\d+\.\d+\/)?index\.html$/i.test(value)) {
+        const fileServer = String(DiyCommon.GetFileServer ? DiyCommon.GetFileServer() : "").replace(/\/$/, "");
+        if (fileServer) return `${fileServer}${value}`;
+    }
     const apiBase = String(DiyCommon.GetApiBase ? DiyCommon.GetApiBase() : "").replace(/\/$/, "");
     if (value.startsWith("/")) {
         return `${apiBase}${value}`;

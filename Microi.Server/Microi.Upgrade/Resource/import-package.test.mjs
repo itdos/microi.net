@@ -1470,16 +1470,19 @@ test('trusted empty-tenant bootstrap restores only the missing role already refe
   const replay = runAdminMenuPermissionFixture({ roles: result.calls.roleInserts, roleLimits: result.roleLimits, users: [user] });
   assert.equal(replay.calls.roleInserts.length, 0);
   assert.equal(replay.calls.add.length + replay.calls.update.length, 0);
+  const portableUser = { ...user, RoleIds: JSON.stringify(['some-other-role']) };
+  const portable = runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [portableUser] });
+  assert.deepEqual(portable.calls.roleInserts.map(role => role.Id), ['some-other-role']);
+  assert.deepEqual(portable.roleLimits.map(limit => limit.RoleId), ['some-other-role']);
   for (const variant of [
     { trustedOfficial: false },
     { users: [] },
     { users: [{ ...user, State: 0 }] },
     { users: [{ ...user, IsDeleted: 1 }] },
-    { users: [{ ...user, RoleIds: JSON.stringify(['some-other-role']) }] },
     { roles: [{ Id: id, Level: 9999, IsDeleted: 1 }] },
     { roles: [{ Id: 'tenant-role', Level: 1, IsDeleted: 0 }] },
     { roleLimits: [{ Id: 'orphan', RoleId: id }] },
-  ]) assert.throws(() => runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [user], ...variant }), /未找到有效的系统管理员角色/);
+  ]) assert.throws(() => runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [user], ...variant }), /未找到有效的系统管理员角色/, JSON.stringify(variant));
   assert.throws(() => runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [user, { ...user, Level: 1 }] }), /非管理员账号引用/);
   assert.throws(() => runAdminMenuPermissionFixture({ roles: [], roleLimits: [], users: [user], dropRoleInsert: true }), /恢复后回读不一致/);
 });

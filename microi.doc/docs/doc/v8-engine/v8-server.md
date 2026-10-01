@@ -720,6 +720,8 @@ var textUploadResult = V8.Method.UploadText({
 
 `UploadText` 只接受 `Content` 和一个安全的 `FileName`，禁止同时传 `FilesByteBase64/FilesByte/Files`。它避免字符串先转 Base64 再还原字节产生的额外内存和错误文本编码，但不会替调用方完成内容哈希：商城等可信发布流程仍须对上传结果回读，并核对 UTF-8 字节数与 SHA-256 后才能提交数据库指针。
 
+应用编译资产和私有源码在当前租户桶内迁移时，可使用 `V8.Method.CopyObject({ FilePathName: 'itdos/旧对象', Path: 'itdos/micro-app/app-key/v1.0.0/index.html', Limit: false })`。`Limit: true` 对应私有桶源码，源与目标不能跨桶；两个路径均被收敛到当前租户。`V8.Method.ObjectExist({ FilePathName, Limit })` 检查对象，`V8.Method.GetObjectSha256({ FilePathName, Limit })` 在服务端流式返回 `Data.Sha256`（原始字节）、`Data.WireSha256`（旧版 Base64 文本）和 `Data.Size`，不把对象字节传入 V8。`V8.Method.ListObjects({ Path, Limit, Recursive: true, Marker, MaxKeys })` 按单个应用前缀分页列举，单页上限 1000。历史版本复制前核对已有目标哈希，完成后还须从 CDN 独立回读公有资产；不能因 `CopyObject` 返回成功就更新商城体验地址。这些管理原子只在可信后端接口引擎中使用，不向匿名调用者开放。
+
 #### 上传 HTTP 请求的接口引擎扩展
 
 `V8.Method.UploadCurrentRequestAsync()` 执行当前上传 HTTP 请求的可信文件流操作；

@@ -15,6 +15,38 @@ namespace Microi.net
     /// </summary>
     public static class PlatformAdministratorSecurity
     {
+        /// <summary>平台提醒只要求有效帐号达到超级管理员等级；不授予配置写权限。</summary>
+        public static bool IsCurrentSuperAdministratorRecipient(string osClient, JObject currentUser)
+        {
+            if (osClient.DosIsNullOrWhiteSpace()) return false;
+            try
+            {
+                var dbSession = OsClientExtend.GetClient(osClient)?.Db;
+                var userId = currentUser?["Id"].Val<string>();
+                if (dbSession == null || userId.DosIsNullOrWhiteSpace()) return false;
+                var databaseUser = dbSession.From<SysUser>()
+                    .Select(SysUser._.Id, SysUser._.State, SysUser._.IsDeleted, SysUser._.Level)
+                    .Where(user => user.Id == userId && user.State == 1 && user.IsDeleted != 1)
+                    .First();
+                return HasCurrentSuperAdministratorRecipientLevel(currentUser, databaseUser);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：[PlatformAdministratorSecurity] 超级管理员提醒接收资格复核失败：{ex.Message}");
+                return false;
+            }
+        }
+
+        internal static bool HasCurrentSuperAdministratorRecipientLevel(JObject currentUser, SysUser databaseUser)
+        {
+            if (currentUser == null || databaseUser == null || databaseUser.State != 1 || databaseUser.IsDeleted == 1) return false;
+            var userId = currentUser["Id"].Val<string>();
+            return !userId.DosIsNullOrWhiteSpace()
+                && string.Equals(userId, databaseUser.Id, StringComparison.OrdinalIgnoreCase)
+                && currentUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel
+                && databaseUser.Level >= DiyCommon.MaxRoleLevel;
+        }
+
         public static bool IsCurrentPlatformAdministrator(string osClient, JObject currentUser)
         {
             if (osClient.DosIsNullOrWhiteSpace())

@@ -22,7 +22,8 @@ test("PC navbar exposes the same feature-gated robot entry", () => {
     assert.match(navbarSource, /<DesktopAiAssistant\s*\/>/);
     assert.match(desktopSource, /isMobileAiAssistantEnabled\(diyStore\.SysConfig\)/);
     assert.match(desktopSource, /data-testid="desktop-ai-entry"/);
-    assert.match(desktopSource, /src="\/static\/mci\/ai\/assistant-robot\.png"/);
+    assert.match(desktopSource, /<el-icon[^>]*><MagicStick\s*\/><\/el-icon>/);
+    assert.doesNotMatch(desktopSource, /<img\b|assistant-robot\.png/);
     assert.match(desktopSource, /aria-label="打开AI助手"/);
     assert.doesNotMatch(desktopSource, /吾码\s*AI\s*助手|吾码AI助手/);
 });

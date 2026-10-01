@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [ValidateSet("Quick", "Full", "Panel")]
     [string]$Mode = "Quick",
@@ -112,13 +112,24 @@ if (Test-Path -LiteralPath $desktopPackage) {
     }
     Write-Host 'Running Microi Code desktop Vitest regression tests...'
     Push-Location $desktopRoot
+    $originalDesktopTestPath = $env:Path
     try {
+        # The desktop Harness tests require Node 24 APIs; the platform Node
+        # regressions above retain their own established runtime and TAP format.
+        if ($env:MICROI_DESKTOP_NODE_HOME) {
+            $desktopNode = Join-Path $env:MICROI_DESKTOP_NODE_HOME 'node.exe'
+            if (-not (Test-Path -LiteralPath $desktopNode)) {
+                throw "MICROI_DESKTOP_NODE_HOME does not contain node.exe: $env:MICROI_DESKTOP_NODE_HOME"
+            }
+            $env:Path = "$env:MICROI_DESKTOP_NODE_HOME;$originalDesktopTestPath"
+        }
         # 正式门禁与数据库、浏览器和双 API 同机运行；串行 Vitest worker 保留全部
         # 用例，同时避免 Windows 提交额度紧张时并发 worker 产生伪失败或争用插件目录。
         npm test -- --maxWorkers=1 --no-file-parallelism
         if ($LASTEXITCODE -ne 0) { throw "Microi Code desktop regression tests failed with exit code $LASTEXITCODE." }
     }
     finally {
+        $env:Path = $originalDesktopTestPath
         Pop-Location
     }
 }
@@ -150,6 +161,12 @@ if (Test-Path -LiteralPath $v8Repository) {
     if ($LASTEXITCODE -ne 0) { throw "V8 interface-engine syntax check failed with exit code $LASTEXITCODE." }
     node --test $v8Test
     if ($LASTEXITCODE -ne 0) { throw "V8 interface-engine regression tests failed with exit code $LASTEXITCODE." }
+    $cdnContextTest = Join-Path $v8TenantRoots[0] 'AI应用/microi-platform-service/test/cdn-context.test.mjs'
+    if (-not (Test-Path -LiteralPath $cdnContextTest)) {
+        throw "The platform service CDN context regression test is missing: $cdnContextTest"
+    }
+    node --test $cdnContextTest
+    if ($LASTEXITCODE -ne 0) { throw "Platform service CDN context regression test failed with exit code $LASTEXITCODE." }
 }
 else {
     Write-Host "Microi-V8-Engine is not present; skipping its repository-owned source gate."
