@@ -76,7 +76,7 @@ const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
 
 // 更新清单由 iTdos 接口引擎发布；版本发布后官网源码无需随之改动。
-const liveVersions = reactive({ windows: '1.3.1', mac: '1.3.2' })
+const liveVersions = reactive({ windows: '1.3.2', mac: '1.3.2' })
 // 下载按钮始终使用永久入口；点击时由官方清单选择当前安装包，首屏不依赖异步请求。
 const downloadUrls = reactive({
   windows: 'https://microi.net/download/microi-agent/latest.html?platform=windows',
@@ -126,6 +126,7 @@ const screenshots = [
 ]
 
 const releases = [
+  { version: '1.3.2', platform: 'Windows x64', note: '公开测试 · 安装程序 · 147.8 MiB · 私有管道启动恢复 · 未签名 · 客户电脑安装启动待验证', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.3/requests/f111516a6830ae292ea8e9211a7f2ea764215983872309e25da56d054f9c3296/assets/Microi-Agent-1.3.2-windows-x64-setup.exe', sha256: 'e83b901c911d78e2e03d1feb018e51709f76ca20650ef7fd10cdcac7b8b4cf47' },
   { version: '1.3.2', platform: 'macOS Universal', note: 'Intel / Apple Silicon · DMG · 363.1 MiB · Developer ID 签名、Apple 公证与 Gatekeeper 校验通过 · macOS 13.5+', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.dmg', sha256: '2bb4ba682de125cfefae90251527ff48b97d8ce504f0f1f4110998e661f9d675' },
   { version: '1.3.2', platform: 'macOS Universal ZIP', note: '自动更新包 · 405.3 MiB · 已签名、公证的 Universal App · macOS 13.5+', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.zip', sha256: '7726972144f5b118faaf81fe1b023da174b67c92b789a131e2bc1aeb31ffef62' },
   { version: '1.3.1', platform: 'Windows x64', note: '安装程序 · 147.8 MiB · 回环恢复与浏览器端口修复 · 未签名', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.1/requests/f9f26f0bea6edc7ca0113fcd90b06026d6ea61ba7138e25bfbed1502d7d34c87/assets/Microi-Agent-1.3.1-windows-x64-setup.exe', sha256: '2d76b5d148ea8d26da41d1877a95293837737cee36d95cc80df091befc1feb3c' },

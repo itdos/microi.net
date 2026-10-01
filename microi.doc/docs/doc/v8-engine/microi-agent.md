@@ -17,6 +17,8 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 
 页面顶部的 Windows 与 macOS 按钮使用固定的 latest 入口，每次点击均从官方更新清单取得当前安装包地址。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
 
+**Windows 1.3.2 已开放下载测试**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
+
 - 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。普通 Microsoft 帐号不能直接签官网 EXE；免费的 Microsoft Store MSIX 渠道须完成开发者身份及应用审核，再由微软签名分发，当前尚未上架。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
 - 如果旧安装包提示 `Failed to decompress files` 或 `Error opening output file(s)`，请从本页顶部重新下载 Windows latest 安装包后运行；不要重复启动下载目录中缓存的旧安装包。新版安装器改用能处理内置中文技能文件名的解压方式，覆盖安装会保留工作区和会话数据。
 - 如果已退出应用仍提示“无法关闭”，旧安装器可能把长路径或文件复制失败误报成应用正在运行。新版使用当次发行的兼容卸载器完成升级；工作区、会话和用户配置保持不变。如果新版仍失败，请使用下面的诊断入口，不要反复重装。
@@ -777,6 +779,12 @@ npm run publish:cli:resume
 ## 更新日志
 
 版本、日期和条目格式沿用[平台更新日志](/doc/about/update-log.html)。安装包版本与 CLI 版本分别管理；历史故障、修复尝试和客户验证边界继续保留。
+
+### Windows v1.3.2 公开测试 - (2026-10-01)
+
+- **开放最新 Windows 测试下载**：官网永久入口、最新更新清单、版本目录与官方下载资源均已更新为 Windows x64 1.3.2；旧版本及 macOS Universal 1.3.2 签名公证文件继续保留。下载资源应用采用独立的 v1.3.3 发布记录，桌面程序版本为 1.3.2。
+- **保留验证边界**：1022 项回归通过、10 项平台条件跳过，生产构建及 MacBook 上真实私有管道 HTTP、Cookie 和 WebSocket 验证通过；**客户 Windows 原生安装及启动仍待确认**。EXE 未签名，Microsoft Store 免费签名仍待账号和应用审核。
+- **下载与校验**：[Windows x64 测试安装包](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.3/requests/f111516a6830ae292ea8e9211a7f2ea764215983872309e25da56d054f9c3296/assets/Microi-Agent-1.3.2-windows-x64-setup.exe)，154,982,105 字节；SHA256：`e83b901c911d78e2e03d1feb018e51709f76ca20650ef7fd10cdcac7b8b4cf47`。[Windows 1.3.2 更新清单归档](https://api.itdos.com/microi-code/updates/archive/1.3.2/latest.yml)。发布后已完整下载并核对大小、SHA256 和 SHA512。
 
 ### v1.3.2 - (2026-10-01)
 
