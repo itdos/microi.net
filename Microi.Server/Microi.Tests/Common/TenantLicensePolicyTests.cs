@@ -25,6 +25,15 @@ public class TenantLicensePolicyTests
             Assert.Equal("Enterprise", expired["SystemProductType"]);
             information.SetValue(null, null);
             Assert.Equal("OpenSource", TenantLicensePolicy.Snapshot(null)["ProductType"]);
+            Assert.Equal("OpenSource", TenantLicensePolicy.SystemReminderEdition());
+            information.SetValue(null, new Microi.License.LicenseInfo { ProductType = "Enterprise", ExpirationDate = DateTime.MinValue });
+            var missingExpiry = TenantLicensePolicy.Snapshot(null);
+            Assert.Equal("OpenSource", missingExpiry["SystemProductType"]);
+            Assert.True(string.IsNullOrEmpty(missingExpiry["SystemLicenseExpirationDate"]?.Value<string>()));
+            Assert.Equal("OpenSource", TenantLicensePolicy.SystemReminderEdition());
+            information.SetValue(null, new Microi.License.LicenseInfo { ProductType = "Enterprise", ExpirationDate = DateTime.UtcNow.AddDays(-2) });
+            Assert.Equal("Enterprise", TenantLicensePolicy.SystemReminderEdition());
+            Assert.NotNull(TenantLicensePolicy.Snapshot(null)["SystemLicenseExpirationDate"]);
         }
         finally
         {

@@ -1,0 +1,56 @@
+# 简书文章发布参数 (JianShu Article)
+
+> [!IMPORTANT]
+> **前提条件 (Prerequisite)**:
+> 在使用本平台的特定参数之前，你 **必须** 已经阅读并理解了 [文章发布首页 (Index)](./index.md) 中定义的 Payload 根结构。本页仅描述 `contentPublishForm` 内部的平台差异化字段。
+
+
+## 触发场景 (Trigger)
+- **意图辨析**：用户指定在“Jianshu”平台发布文章内容时触发。
+- **典型提示词**：
+  - “发布这篇文章到Jianshu”
+  - “并在Jianshu上同步更新”
+
+## 执行逻辑 (Logic Flow)
+1. **内容处理**：确保文章正文符合Jianshu要求的格式。
+2. **参数装配**：提取标题、正文至 `contentPublishForm`；简书文章不需要封面。
+3. **指令执行**：先执行 `yxer validate <platform> <type> <payload.json>`，再执行 `yxer publish <type> <platform> <payload.json> [--publish-channel local --client-id <clientId>]`。
+
+
+本平台文章发布通过 `contentPublishForm` 承载以下参数。
+
+## 1. contentPublishForm 参数定义
+
+| 字段名 | 类型 | 必填 | 说明 | 默认值 |
+| :--- | :--- | :--- | :--- | :--- |
+| `formType` | `string` | **是** | 固定值: `task` | `task` |
+| `title` | `string` | **是** | 文章标题 | - |
+| `content` | `string` | **是** | 文章内容 (HTML 格式) | - |
+| `pubType` | `number` | **是** | 发布类型: 0-草稿, 1-直接发布 | 1 |
+
+## 2. Payload 完整示例
+
+```json
+{
+  "action": "publish",
+  "publishType": "article",
+  "platforms": ["简书"],
+  "publishArgs": {
+    "accountForms": [
+      {
+        "platformAccountId": "acc_js_001",
+        "contentPublishForm": {
+          "formType": "task",
+          "title": "这是文章标题",
+          "content": "<h1>简书文章标题</h1><p>内容正文...</p>",
+          "pubType": 1
+        }
+      }
+    ]
+  }
+}
+```
+
+## 相关接口
+
+简书文章发布不需要上传或传入封面。

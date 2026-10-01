@@ -7,6 +7,24 @@ import {
     resolveUserThemeColor,
     resolveUserThemeMode
 } from "../src/utils/user-visual-preferences.js";
+import { resolveUserCornerStyle, resolveUserNavigationLayout, normalizeUserNavigationLayout } from "../src/utils/user-visual-preferences.js";
+
+test("empty corner preference inherits the tenant, with round as the empty tenant default", () => {
+    assert.equal(resolveUserCornerStyle({ Id: 'u1', CornerStyle: '' }, 'round', 'square'), 'square');
+    assert.equal(resolveUserCornerStyle({ Id: 'u1', CornerStyle: 'System' }, 'square', ''), 'round');
+    assert.equal(resolveUserCornerStyle({ Id: 'u1', CornerStyle: 'round' }, 'square', 'square'), 'round');
+    assert.equal(resolveUserCornerStyle({ Id: 'u2', CornerStyle: '' }, 'square', ''), 'round');
+    assert.equal(resolveUserCornerStyle({ Id: 'old-user' }, 'square', ''), 'square');
+});
+
+test("navigation placement follows the tenant unless the current user chooses a valid override", () => {
+    assert.equal(normalizeUserNavigationLayout('TOP'), 'Top');
+    assert.equal(normalizeUserNavigationLayout('unknown'), 'System');
+    assert.equal(resolveUserNavigationLayout('System', 'Top'), 'Top');
+    assert.equal(resolveUserNavigationLayout('', ''), 'Side');
+    assert.equal(resolveUserNavigationLayout('Side', 'Top'), 'Side');
+    assert.equal(resolveUserNavigationLayout('Top', 'Side'), 'Top');
+});
 
 test("installed per-user theme values override device-local and system values", () => {
     assert.equal(

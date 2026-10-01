@@ -91,6 +91,46 @@ function createUniAppShellHelpers() {
   return context.result;
 }
 
+function resolveCdnCredentials(settings, saas) {
+  const context = { V8: { SysConfig: { ServerPrivateSettings: settings }, OsClientModel: saas } };
+  vm.runInNewContext(`
+    function text(value) { return value === null || value === undefined ? "" : String(value); }
+    function ok(data) { return { Code: 1, Data: data }; }
+    function fail(message) { return { Code: 0, Msg: message }; }
+    ${extractFunction("aliyunCdnCredentials")}
+    result = aliyunCdnCredentials();
+  `, context);
+  return context.result;
+}
+
+test("official CDN refresh accepts current tenant and legacy DNS credentials but rejects partial pairs", () => {
+  const current = resolveCdnCredentials({
+    "Integration.Cdn.Aliyun.AccessKeyId": "current-id",
+    "Integration.Cdn.Aliyun.AccessKeySecret": "current-secret",
+  }, { AlidnsKeyId: "old-id", AlidnsKeySecret: "old-secret" });
+  assert.equal(current.Code, 1);
+  assert.equal(current.Data.Id, "current-id");
+  const legacy = resolveCdnCredentials({}, { AlidnsKeyId: "dns-id", AlidnsKeySecret: "dns-secret" });
+  assert.equal(legacy.Code, 1);
+  assert.equal(legacy.Data.Id, "dns-id");
+  const tenantDns = resolveCdnCredentials({
+    "Integration.Dns.Aliyun.AccessKeyId": "tenant-dns-id",
+    "Integration.Dns.Aliyun.AccessKeySecret": "tenant-dns-secret",
+  }, { AlidnsKeyId: "old-id", AlidnsKeySecret: "old-secret" });
+  assert.equal(tenantDns.Code, 1);
+  assert.equal(tenantDns.Data.Id, "tenant-dns-id");
+  const legacyOss = resolveCdnCredentials({}, {
+    AliOssPublicAccessKeyId: "oss-id", AliOssPublicAccessKeySecret: "oss-secret",
+  });
+  assert.equal(legacyOss.Code, 1);
+  assert.equal(legacyOss.Data.Id, "oss-id");
+  const partial = resolveCdnCredentials({ "Integration.Cdn.Aliyun.AccessKeyId": "partial" },
+    { AlidnsKeyId: "old-id", AlidnsKeySecret: "old-secret" });
+  assert.equal(partial.Code, 0);
+  assert.match(partial.Msg, /不成对/);
+  assert.match(source, /fileServer === "https:\/\/static\.itdos\.com"\) return credentials/);
+});
+
 test("published entry injects the current tenant runtime context before application scripts", () => {
   const inject = createInjector();
   const html = inject("<!doctype html><html><head><script src=\"app.js\"></script></head><body></body></html>");
@@ -227,7 +267,7 @@ test("all compiled and marketplace promotion paths wrap raw UniApp entries only"
 test("application-store package and server upgrade both carry the fixed builder", () => {
   const packaged = packageModel.SysApiEngines.find(item => item.ApiEngineKey === "ai_app_build");
   assert.ok(packaged);
-  assert.equal(packaged.Version, "v1.6.9");
+  assert.equal(packaged.Version, "v1.7.1");
   assert.equal(packaged.ApiV8Code.replace(/\r\n/g, "\n"), source.replace(/\r\n/g, "\n"));
   assert.ok(
     compareSemver(packageModel.PackageInfo.Version, "v6.5.4") >= 0,

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using StackExchange.Redis;
@@ -291,19 +292,30 @@ namespace Microi.net.Api
             return filePathName;
         }
 
-        private string ResolveUploadPath(DiyUploadParam param)
+        /// <summary>
+        /// multipart 可以同时携带 Path/path；模型绑定会把重复值拼到字符串中，导致已有目录授权误判。
+        /// 只合并完全相同的路径，冲突值必须拒绝，不能替客户端挑选一个较宽的授权目录。
+        /// </summary>
+        internal static DosResult? ResolveUploadPathForRequest(
+            DiyUploadParam param,
+            IEnumerable<KeyValuePair<string, StringValues>>? query,
+            IEnumerable<KeyValuePair<string, StringValues>>? form)
         {
-            var path = param.Path;
-            if (path.DosIsNullOrWhiteSpace()) path = Request.Query["Path"].ToString();
-            try
+            var paths = new List<string>();
+            foreach (var source in new[] { query, form })
             {
-                if (path.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                if (source == null) continue;
+                foreach (var item in source)
                 {
-                    path = Request.Form["Path"].ToString();
+                    if (!string.Equals(item.Key, "Path", StringComparison.OrdinalIgnoreCase)) continue;
+                    foreach (var value in item.Value) paths.Add((value ?? string.Empty).Trim());
                 }
             }
-            catch (InvalidOperationException) { }
-            return path;
+            if (paths.Count == 0) return null;
+            if (paths.Skip(1).Any(path => !string.Equals(path, paths[0], StringComparison.Ordinal)))
+                return new DosResult(0, null, "请求中存在互相冲突的Path参数！");
+            param.Path = paths[0];
+            return null;
         }
 
         private async Task<JObject?> GetClientUserFromToken(string osClient)
@@ -780,6 +792,10 @@ namespace Microi.net.Api
         {
             var accessError = await DefaultParam(param);
             if (accessError != null) return Json(accessError);
+            var pathBindingError = Request.HasFormContentType
+                ? ResolveUploadPathForRequest(param, Request.Query, Request.Form)
+                : null;
+            if (pathBindingError != null) return Json(pathBindingError);
             var pathError = NormalizeUploadPath(param);
             if (pathError != null) return Json(pathError);
 
@@ -820,7 +836,15 @@ namespace Microi.net.Api
                 return Json(new DosResult(1001, null, "登录身份已过期！"));
             }
 
-            param.Path = ResolveUploadPath(param);
+            if (Request.HasFormContentType)
+            {
+                var pathBindingError = ResolveUploadPathForRequest(param, Request.Query, Request.Form);
+                if (pathBindingError != null) return Json(pathBindingError);
+            }
+            else if (param.Path.DosIsNullOrWhiteSpace())
+            {
+                param.Path = Request.Query["Path"].ToString();
+            }
             param.OsClient = osClient;
             var pathError = NormalizeUploadPath(param);
             if (pathError != null)

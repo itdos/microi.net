@@ -445,4 +445,4 @@ Completed → RollingBack → RolledBack
 - [界面引擎](/doc/system-engine/page-engine)
 - [微服务](/doc/system-engine/micro-app)
 - [应用商城](/doc/system-engine/app-store)
-- [AI 开发工具](/doc/v8-engine/vs-code-plugin)
+- [AI 开发工具](/doc/v8-engine/microi-agent)

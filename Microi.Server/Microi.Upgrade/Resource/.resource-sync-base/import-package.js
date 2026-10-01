@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.0
+ * Version: v3.0.3
  * Function:
- * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时、旧库内置包提交后注册任务，以及安装后资源和字节完整性强回读。
+ * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  */
 
 // INSTALLED_RUNTIME_SUMMARY_V1：入口按目标租户改写后，以实际安装资产的哈希和大小
@@ -1181,6 +1181,7 @@ trustedOfficialPlatformPackage = trustedOfficialPlatformPackage || trustedEmbedd
 var listSize = function (value) {
     return value && value.length !== undefined ? Number(value.length) || 0 : 0;
 };
+// ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1: only the unique current-tenant administrator role may be restored.
 // BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1：历史 BulkAdaptiveSingleSlice
 // 只按资源条数估算工作量，会把包含重 DDL、实体生成和权限回填的官方包误判为
 // “小包”，造成单事务长期占用且没有可恢复检查点。为兼容旧批量工作器继续接收
@@ -7931,9 +7932,7 @@ try {
     };
     var getAdministratorRolesForMenuGrant = function () {
         if (administratorRolesForMenuGrant !== null) return administratorRolesForMenuGrant;
-        // ADMIN_ROLE_BOOTSTRAP_PHYSICAL_V1: the first marketplace installation
-        // precedes the SaaS package which owns role metadata. Query the current
-        // tenant's authoritative physical roles, including legacy NULL deletes.
+        // 初次安装可能尚无角色元数据，读取当前租户的物理角色表。
         var readRoles = function () {
             return V8.Db.FromSql('SELECT ' + administratorIdTextSql + ', Name, ' + quotePhysicalIdentifier('Level')
                 + ', IsDeleted FROM sys_role WHERE ' + quotePhysicalIdentifier('Level')
@@ -7942,77 +7941,94 @@ try {
                 .AddInParameter('@p0', 9999).AddInParameter('@p1', 1).ToArray() || [];
         };
         var roleRows = readRoles();
-        // ADMIN_MENU_LEGACY_ACCOUNT_ROLE_V1: a legacy tenant can retain the
-        // built-in role at 998/9998 while its authoritative account is already
-        // a system administrator. Keep the role level and account bindings;
-        // only grant menus when every non-deleted holder is an administrator.
         var roleIdFromReference = function (value) {
-            return String(value && typeof value === 'object' ? value.Id || '' : value || '').toLowerCase();
+            return String(value && typeof value === 'object' ? value.Id || '' : value || '').replace(/^\s+|\s+$/g, '').toLowerCase();
+        };
+        // 只从数据库内真实、活动的管理员账号推导候选，不信任包或请求中的角色 Id。
+        var candidateRoleIds = [];
+        if (roleRows.length === 0 && trustedOfficialPlatformPackage) {
+            var activeAdministrators = V8.Db.FromSql('SELECT RoleIds, ' + quotePhysicalIdentifier('Level')
+                + ', State, IsDeleted FROM sys_user WHERE ' + quotePhysicalIdentifier('Level')
+                + ' >= @p0 AND State = @p1 AND (IsDeleted <> @p2 OR IsDeleted IS NULL)')
+                .AddInParameter('@p0', 9999).AddInParameter('@p1', 1).AddInParameter('@p2', 1).ToArray() || [];
+            for (var administratorIndex = 0; administratorIndex < activeAdministrators.length; administratorIndex++) {
+                var administrator = activeAdministrators[administratorIndex] || {};
+                if (Number(administrator.Level) < 9999 || Number(administrator.State) !== 1
+                    || Number(administrator.IsDeleted || 0) === 1) continue;
+                var references = parseMenuPermissionArray(administrator.RoleIds);
+                for (var referenceIndex = 0; referenceIndex < references.length; referenceIndex++) {
+                    var candidateId = roleIdFromReference(references[referenceIndex]);
+                    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(candidateId)) continue;
+                    if (candidateRoleIds.indexOf(candidateId) < 0) candidateRoleIds.push(candidateId);
+                }
+            }
+            if (candidateRoleIds.length > 64) throw new Error('管理员角色候选过多，已阻止自动补充权限，请核对现有角色绑定');
+        }
+        var readRoleHolders = function (roleId) {
+            return V8.Db.FromSql('SELECT RoleIds, ' + quotePhysicalIdentifier('Level')
+                + ', State, IsDeleted FROM sys_user WHERE RoleIds LIKE @p0')
+                .AddInParameter('@p0', '%' + roleId + '%').ToArray() || [];
+        };
+        var assessRoleHolders = function (roleId, includeDeletedOrdinary) {
+            var users = readRoleHolders(roleId);
+            var activeAdministratorFound = false;
+            var ordinaryHolderFound = false;
+            for (var userIndex = 0; userIndex < users.length; userIndex++) {
+                var user = users[userIndex] || {};
+                var deleted = Number(user.IsDeleted || 0) === 1;
+                if (deleted && !includeDeletedOrdinary) continue;
+                var roleIds = parseMenuPermissionArray(user.RoleIds);
+                var referencesRole = false;
+                for (var idIndex = 0; idIndex < roleIds.length; idIndex++) {
+                    if (roleIdFromReference(roleIds[idIndex]) === roleId) referencesRole = true;
+                }
+                if (!referencesRole) continue;
+                if (!(Number(user.Level) >= 9999)) ordinaryHolderFound = true;
+                else if (!deleted && Number(user.State) === 1) activeAdministratorFound = true;
+            }
+            return { ActiveAdministrator: activeAdministratorFound, OrdinaryHolder: ordinaryHolderFound };
         };
         if (roleRows.length === 0 && trustedOfficialPlatformPackage) {
-            var accountRoleId = '5db47859-35a3-411a-a1f7-99482e057d24';
-            var accountRoles = V8.Db.FromSql('SELECT ' + administratorIdTextSql + ', Name, '
-                + quotePhysicalIdentifier('Level') + ', IsDeleted FROM sys_role WHERE Id = @p0')
-                .AddInParameter('@p0', accountRoleId).ToArray() || [];
-            if (accountRoles.length === 1 && Number(accountRoles[0].IsDeleted || 0) !== 1
-                && (Number(accountRoles[0].Level) === 998 || Number(accountRoles[0].Level) === 9998)) {
-                var accountUsers = V8.Db.FromSql('SELECT RoleIds, ' + quotePhysicalIdentifier('Level')
-                    + ', State, IsDeleted FROM sys_user WHERE RoleIds LIKE @p0')
-                    .AddInParameter('@p0', '%' + accountRoleId + '%').ToArray() || [];
-                var activeAccountAdministrator = false;
-                var ordinaryAccountHolder = false;
-                for (var accountIndex = 0; accountIndex < accountUsers.length; accountIndex++) {
-                    var account = accountUsers[accountIndex] || {};
-                    if (Number(account.IsDeleted || 0) === 1) continue;
-                    var accountReferences = parseMenuPermissionArray(account.RoleIds);
-                    for (var accountReferenceIndex = 0; accountReferenceIndex < accountReferences.length; accountReferenceIndex++) {
-                        if (roleIdFromReference(accountReferences[accountReferenceIndex]) !== accountRoleId) continue;
-                        if (!(Number(account.Level) >= 9999)) ordinaryAccountHolder = true;
-                        else if (Number(account.State) === 1) activeAccountAdministrator = true;
-                    }
-                }
-                if (activeAccountAdministrator && !ordinaryAccountHolder) {
-                    legacyAccountAdministratorRoleId = accountRoleId;
-                    roleRows = accountRoles;
-                    debugLog.admin_menu_legacy_account_role = '仅为现有系统管理员独占的旧内置角色补充菜单权限；不修改用户、角色等级或绑定';
-                }
+            var exclusiveLegacyRoles = [];
+            for (var candidateIndex = 0; candidateIndex < candidateRoleIds.length; candidateIndex++) {
+                var accountRoleId = candidateRoleIds[candidateIndex];
+                var accountRoles = V8.Db.FromSql('SELECT ' + administratorIdTextSql + ', Name, '
+                    + quotePhysicalIdentifier('Level') + ', IsDeleted FROM sys_role WHERE Id = @p0')
+                    .AddInParameter('@p0', accountRoleId).ToArray() || [];
+                if (accountRoles.length !== 1 || Number(accountRoles[0].IsDeleted || 0) === 1
+                    || (Number(accountRoles[0].Level) !== 998 && Number(accountRoles[0].Level) !== 9998)) continue;
+                var holders = assessRoleHolders(accountRoleId, false);
+                if (holders.ActiveAdministrator && !holders.OrdinaryHolder) exclusiveLegacyRoles.push(accountRoles[0]);
+            }
+            if (exclusiveLegacyRoles.length > 1) throw new Error('存在多个管理员独占的旧角色，无法确定待补充对象，已阻止自动授权');
+            if (exclusiveLegacyRoles.length === 1) {
+                legacyAccountAdministratorRoleId = String(exclusiveLegacyRoles[0].Id).toLowerCase();
+                roleRows = exclusiveLegacyRoles;
+                debugLog.admin_menu_legacy_account_role = '按真实管理员绑定补充唯一独占旧角色的菜单权限；不修改账号、角色等级或绑定';
             }
         }
         if (roleRows.length === 0 && trustedOfficialPlatformPackage) {
-            // An early empty tenant may retain its active administrator and the
-            // original role reference while both role tables are empty. Restore
-            // only that missing link; never promote a user, re-enable a role,
-            // overwrite an existing role, or trust a role id supplied by a package.
-            var legacyRoleId = '5db47859-35a3-411a-a1f7-99482e057d24';
+            // 角色和权限表都为空时，仅恢复一个无歧义的现有管理员角色引用。
             var roleCount = Number(V8.Db.FromSql('SELECT COUNT(*) FROM sys_role').ToScalar());
             var limitCount = Number(V8.Db.FromSql('SELECT COUNT(*) FROM sys_rolelimit').ToScalar());
             if (roleCount === 0 && limitCount === 0) {
-                var users = V8.Db.FromSql('SELECT RoleIds, ' + quotePhysicalIdentifier('Level')
-                    + ', State, IsDeleted FROM sys_user WHERE RoleIds LIKE @p0')
-                    .AddInParameter('@p0', '%' + legacyRoleId + '%').ToArray() || [];
-                var activeAdministratorFound = false;
-                for (var userIndex = 0; userIndex < users.length; userIndex++) {
-                    var user = users[userIndex] || {};
-                    var roleIds = parseMenuPermissionArray(user.RoleIds);
-                    var referencesLegacyRole = false;
-                    for (var idIndex = 0; idIndex < roleIds.length; idIndex++) {
-                        if (roleIdFromReference(roleIds[idIndex]) === legacyRoleId) referencesLegacyRole = true;
+                if (candidateRoleIds.length > 1) throw new Error('缺失角色引用不唯一，已阻止自动恢复，请核对管理员绑定');
+                if (candidateRoleIds.length === 1) {
+                    var legacyRoleId = candidateRoleIds[0];
+                    var missingRoleHolders = assessRoleHolders(legacyRoleId, true);
+                    if (missingRoleHolders.OrdinaryHolder) {
+                        throw new Error('缺失管理员角色被非管理员账号引用，已阻止自动恢复，避免扩大权限');
                     }
-                    if (!referencesLegacyRole) continue;
-                    if (!(Number(user.Level) >= 9999)) {
-                        throw new Error('旧管理员角色被非管理员账号引用，已阻止自动恢复，避免扩大权限');
+                    if (missingRoleHolders.ActiveAdministrator) {
+                        V8.Db.FromSql('INSERT INTO sys_role (Id, Name, ' + quotePhysicalIdentifier('Level')
+                            + ', IsDeleted, CreateTime) VALUES (@p0, @p1, @p2, @p3, CURRENT_TIMESTAMP)')
+                            .AddInParameter('@p0', legacyRoleId).AddInParameter('@p1', '系统管理员')
+                            .AddInParameter('@p2', 9999).AddInParameter('@p3', 0).ExecuteNonQuery();
+                        roleRows = readRoles();
+                        if (roleRows.length !== 1 || String(roleRows[0].Id).toLowerCase() !== legacyRoleId)
+                            throw new Error('管理员角色恢复后回读不一致，已阻止提交');
+                        debugLog.admin_role_bootstrap = '仅恢复现有活动管理员已引用的唯一缺失系统角色；账号和角色绑定未修改';
                     }
-                    if (Number(user.State) === 1 && Number(user.IsDeleted || 0) !== 1) activeAdministratorFound = true;
-                }
-                if (activeAdministratorFound) {
-                    V8.Db.FromSql('INSERT INTO sys_role (Id, Name, ' + quotePhysicalIdentifier('Level')
-                        + ', IsDeleted, CreateTime) VALUES (@p0, @p1, @p2, @p3, CURRENT_TIMESTAMP)')
-                        .AddInParameter('@p0', legacyRoleId).AddInParameter('@p1', '系统管理员')
-                        .AddInParameter('@p2', 9999).AddInParameter('@p3', 0).ExecuteNonQuery();
-                    roleRows = readRoles();
-                    if (roleRows.length !== 1 || String(roleRows[0].Id).toLowerCase() !== legacyRoleId)
-                        throw new Error('旧管理员角色恢复后回读不一致，已阻止提交');
-                    debugLog.admin_role_bootstrap = '仅恢复现有活动管理员已引用的缺失系统角色；账号和角色绑定未修改';
                 }
             }
         }
@@ -9619,19 +9635,21 @@ try {
         reportProgress(95, '正在导入接口引擎');
         debugLog.step7 = '开始处理sys_apiengine数据';
 
-        var sysApiEngines = Package.SysApiEngines;
+        // Keep the official resource publisher outside all installable packages.
+        var sysApiEngines = [];
+        for (var protectedIndex = 0; protectedIndex < Package.SysApiEngines.length; protectedIndex++) {
+            var protectedCandidate = Package.SysApiEngines[protectedIndex];
+            if (String(protectedCandidate && protectedCandidate.ApiEngineKey || '').toLowerCase() === 'get-microi-upgrade-resource') {
+                debugLog['apiengine_protected_' + protectedIndex] = '跳过受保护接口引擎：' + protectedCandidate.ApiEngineKey;
+                continue;
+            }
+            sysApiEngines.push(protectedCandidate);
+        }
 
         for (var i = 0; i < sysApiEngines.length; i++) {
             var apiEngine = sysApiEngines[i];
             activeImportResource = 'sys_apiengine:' + String(apiEngine && apiEngine.ApiEngineKey || i);
             var apiEnginePolicy = getApiEngineResourcePolicy(apiEngine.ApiEngineKey);
-
-            // 升级资源入口只在官方租户独立维护，禁止应用数据包覆盖或安装它。
-            var apiEngineKeyLower = apiEngine.ApiEngineKey ? String(apiEngine.ApiEngineKey).toLowerCase() : '';
-            if (apiEngineKeyLower === 'get-microi-upgrade-resource') {
-                debugLog['apiengine_protected_' + i] = '跳过受保护接口引擎：' + apiEngine.ApiEngineKey;
-                continue;
-            }
 
             if (!apiEngine.Id && !apiEngine.ApiEngineKey) {
                 debugLog['apiengine_no_id_key_' + i] = '跳过无Id和ApiEngineKey的接口引擎数据';

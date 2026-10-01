@@ -3,6 +3,8 @@ title: Microi Agent
 titleTemplate: 吾码桌面 AI 开发工作台
 description: 下载 Microi Agent Windows 与 macOS 安装包，了解吾码账号、AI 中转站、MCP、Skills、DeepSeek Harness 与 dsh-desktop 的完整集成方式。
 pageClass: mci-microi-code-page
+aside: true
+outline: [2, 3]
 ---
 
 # Microi Agent
@@ -33,7 +35,15 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 
 ### 开源基础、版权与后续同步
 
-Microi Agent 没有重新实现 dsh-desktop。内部源码仓库使用四层结构：`upstream/dsh-desktop/` 保存未修改的上游快照；`apps/microi-code/packages/microi-code-*`、`apps/microi-code/packages/dsh-desktop-client-ui/`、`microi/` 与 `src/main/microi-*` 保存永久保护的吾码功能；`patches/` 只记录侧栏插槽、设置席位、首页徽标、品牌文案和默认主题等最小差异；同步脚本再对“旧上游、新上游、当前产品”做三方比较。上游未触及的吾码文件继续保留，吾码未修改的上游文件可以自动升级，双方同时修改的文件必须报告冲突并人工合并。补丁无法重放、测试失败或界面验收不通过时都不会推进上游基线。每次同步都要按补丁意图清单重新验证登录、AI 中转、LicenseType、服务器连接、AI 列表、数据分析、插件安装、功能区、关于页、移动连接、Windows/macOS 构建和更新源。
+Microi Agent 没有重新实现 dsh-desktop。内部源码仓库使用四层结构：
+
+`upstream/dsh-desktop/` 保存未修改的上游快照。
+
+`apps/microi-code/packages/microi-code-*`、`apps/microi-code/packages/dsh-desktop-client-ui/`、`microi/` 与 `src/main/microi-*` 保存永久保护的吾码功能。
+
+`patches/` 只记录侧栏插槽、设置席位、首页徽标、品牌文案和默认主题等最小差异；同步脚本再对“旧上游、新上游、当前产品”做三方比较。上游未触及的吾码文件继续保留，吾码未修改的上游文件可以自动升级，双方同时修改的文件必须报告冲突并人工合并。
+
+补丁无法重放、测试失败或界面验收不通过时都不会推进上游基线。每次同步都要按补丁意图清单重新验证登录、AI 中转、LicenseType、服务器连接、AI 列表、数据分析、插件安装、功能区、关于页、移动连接、Windows/macOS 构建和更新源。
 
 吾码桌面业务优先通过 `microi_itdos` 接口引擎实现，接口引擎实在缺少所需底层原子能力时才修改后端源码。当前账号版本直接读取现有 `platform-current-user` 返回的 `sys_user.LicenseType`；更新目录由 `https://api.itdos.com/microi-code/updates/` 下的匿名接口引擎提供，安装包二进制由 HDFS 流式上传。Windows/macOS 安装包内置固定版本并校验过 SHA-256 的 cloudflared，互联网连接不再在首次使用时从 GitHub 临时下载约 50 MB 可执行文件。
 
@@ -791,7 +801,7 @@ npm run publish:cli:resume
 - 保留 MacBook 同期提交的 Windows 跨平台试验打包入口，通过 Git 合并交付。
 - 验收：合并后 128 个测试文件、1015 项通过、1 项仅适用 macOS 的检查跳过，类型检查通过。使用安装包内 Node/Harness 与实际 Chromium 页面验收普通模式和安全模式，注入客户观测到的 Node 超时后仍能加载页面；真实安装目录分别约 10.7 秒和 7.8 秒完成该验收。1.2.8 → 1.2.9 升级覆盖 D 盘中文长路径、C 盘临时目录与真实字节范围锁，安装约 66.8 秒，15553 个文件校验通过。
 - 上述数据来自开发验收环境，**客户 Windows 11 设备仍需下载安装后确认**；没有把单元测试通过表述为所有客户、所有插件或 AI 员工完整业务均已验收。
-- Windows 安装包 SHA-256：`3b30b1e7adb57f8d7910dc500f977d0913937f88aa3852247379a181a5691a41`。使用顶部 latest 按钮下载；固定文件、不可变归档、更新清单及版本目录均已独立回读校验。
+- Windows 安装包 SHA-256：`3b30b1e7adb57f8d7910dc500f977d0913937f88aa3852247379a181a5691a41`。该版通过“版本记录”中的历史归档下载；固定文件、不可变归档、发行时更新清单及版本目录均已独立回读校验。顶部 latest 按钮下载实时最新版，不保证仍为 1.2.9。
 
 ### v1.2.8 - (2026-09-30)
 

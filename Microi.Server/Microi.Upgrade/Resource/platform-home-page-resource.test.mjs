@@ -21,9 +21,9 @@ test('PAGE5 starts with the shared AI composer and contains the complete operati
   assert.equal(page.JsonObj.formConfig.watermarkStyle.content, '');
   const wrappers = page.JsonObj.wrapperList;
   assert.equal(wrappers[0].widgetList[0].type, 'aiengine');
-  assert.equal(wrappers[0].wrapperOption.span, 24);
+  assert.equal(wrappers[0].wrapperOption.span, 14);
   assert.equal(wrappers[1].widgetList[0].type, 'homeoverview');
-  assert.equal(wrappers[1].wrapperOption.span, 24);
+  assert.equal(wrappers[1].wrapperOption.span, 10);
   assert.deepEqual(
     widgets(page.JsonObj).map(widget => widget.type),
     ['aiengine', 'homeoverview', 'workcenter', 'diycalendar', 'diytable'],
@@ -58,4 +58,19 @@ test('SaaS package delivers PAGE5 by stable-id upsert and declares its client/ru
   ]) {
     assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(capability), capability);
   }
+});
+
+test('homepage calendar ships its real module and schema without copying tenant events', () => {
+  const calendar = widgets(page.JsonObj).find(widget => widget.type === 'diycalendar');
+  const menu = packageModel.SysMenus.find(item => item.Id === calendar.widgetParams[0].value);
+  assert.ok(menu, 'Calendar module binding must exist in the same portable package');
+  assert.equal(menu.ParentId, '');
+  assert.equal(Number(menu.Display), 0);
+  const table = packageModel.DiyTables.find(item => item.Id === menu.DiyTableId);
+  assert.equal(table?.Name, 'microi_calendar');
+  const names = packageModel.DiyFields.filter(item => item.TableId === table.Id).map(item => item.Name).sort();
+  assert.deepEqual(names, ['Content', 'EndTime', 'Remark', 'StartTime', 'State', 'Title']);
+  assert.ok(packageModel.PhysicalColumns.some(item => JSON.stringify(item).includes('microi_calendar')));
+  assert.ok(packageModel.DDLStatements.some(item => /CREATE TABLE.*microi_calendar/is.test(item.DDL)));
+  assert.equal(packageModel.DataSets.some(item => item.TableName.toLowerCase() === 'microi_calendar'), false);
 });

@@ -1,20 +1,38 @@
 export const diycalendar = {
-  type: 'diycalendar',
-  label: 'DIY日历',
-  category: 0,
-  show: 1,
-  icon: 'Calendar',
-  img: '',
-  widgetOption: {
-    height: 600,
+  "type": "diycalendar",
+  "label": "DIY日历",
+  "category": 0,
+  "show": 1,
+  "icon": "Calendar",
+  "img": "",
+  "widgetOption": {
+    "height": 600
   },
-  widgetParams: [
+  "widgetParams": [
     {
-      sort: 0,
-      label: '日历表单模块',
-      type: 'sysmenu',
-      value: '',
-      typeOptions: {},
+      "sort": 0,
+      "label": "日历表单模块",
+      "type": "sysmenu",
+      "value": "",
+      "typeOptions": {}
     },
-  ],
+    {
+      "sort": 1,
+      "label": "布局密度",
+      "type": "select",
+      "value": "standard",
+      "typeOptions": {
+        "options": [
+          {
+            "label": "标准",
+            "value": "standard"
+          },
+          {
+            "label": "紧凑工作台",
+            "value": "compact"
+          }
+        ]
+      }
+    }
+  ]
 }

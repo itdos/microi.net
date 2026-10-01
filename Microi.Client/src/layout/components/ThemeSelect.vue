@@ -42,6 +42,31 @@
                     </div>
                 </div>
 
+                <!-- 当前账号可覆盖租户的界面默认值 -->
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title">
+                        <el-icon><Grid /></el-icon>
+                        <span>边角风格</span>
+                    </div>
+                    <div class="mci-mode-row" role="group" aria-label="边角风格">
+                        <button v-for="option in cornerOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="cornerPreference === option.value" :class="{ active: cornerPreference === option.value }" @click="changeCornerStyle(option.value)">{{ option.label }}</button>
+                    </div>
+                </div>
+
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title"><el-icon><Menu /></el-icon><span>导航菜单位置</span></div>
+                    <div class="mci-mode-row" role="group" aria-label="导航菜单位置">
+                        <button v-for="option in navigationOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="navigationPreference === option.value" :class="{ active: navigationPreference === option.value }" @click="changeNavigationLayout(option.value)">{{ option.label }}</button>
+                    </div>
+                </div>
+
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title"><el-icon><Expand /></el-icon><span>菜单子级展开方式</span></div>
+                    <div class="mci-mode-row" role="group" aria-label="菜单子级展开方式">
+                        <button v-for="option in menuExpandOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="menuExpandPreference === option.value" :class="{ active: menuExpandPreference === option.value }" @click="changeMenuChildExpandMode(option.value)">{{ option.label }}</button>
+                    </div>
+                </div>
+
                 <!-- 主题色（MCI 设计系统统一调色板） -->
                 <div class="mci-theme-section">
                     <div class="mci-theme-title">
@@ -91,8 +116,7 @@
         <template #reference>
             <slot name="trigger">
                 <button type="button" class="theme-select-trigger" aria-label="主题设置" title="主题设置">
-                    <!-- <el-icon class="theme-icon"><Brush /></el-icon> -->
-                    <font-awesome-icon icon="fa-solid fa-shirt" style="font-size: 16px;" />
+                    <el-icon class="theme-icon"><Brush /></el-icon>
                 </button>
             </slot>
         </template>
@@ -100,10 +124,11 @@
 </template>
 
 <script>
-import { Brush, Sunny, Moon, Check, MagicStick, InfoFilled } from "@element-plus/icons-vue";
+import { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand } from "@element-plus/icons-vue";
 import { computed, watch } from "vue";
 import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
+import { getCornerStyle, setCornerStyle } from "@/utils/theme-shape.js";
 import {
     getThemePalettes,
     setThemeColor as applyThemeColor,
@@ -113,14 +138,18 @@ import {
 import {
     hasInstalledUserPreference,
     resolveUserThemeColor,
-    resolveUserThemeMode
+    resolveUserThemeMode,
+    resolveUserCornerStyle,
+    normalizeUserCornerStyle,
+    normalizeUserNavigationLayout,
+    normalizeUserMenuChildExpandMode
 } from "@/utils/user-visual-preferences.js";
 
 const DEFAULT_THEME_COLOR = "#409eff";
 
 export default {
     name: "ThemeSelect",
-    components: { Brush, Sunny, Moon, Check, MagicStick, InfoFilled },
+    components: { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand },
     props: {
         showMode: {
             type: Boolean,
@@ -158,6 +187,10 @@ export default {
         return {
             ShowThemes: false,
             themeMode: 'light',
+            cornerStyle: getCornerStyle(),
+            cornerOptions: [{value:'System',label:'跟随系统'},{value:'round',label:'圆角'},{value:'square',label:'直角'}],
+            navigationOptions: [{value:'System',label:'跟随系统'},{value:'Side',label:'侧边导航'},{value:'Top',label:'顶部导航'}],
+            menuExpandOptions: [{value:'System',label:'跟随系统'},{value:'Down',label:'向下展开'},{value:'Right',label:'向右展开'}],
             pendingPreferencePatch: {},
             preferenceSaveTimer: null,
             preferenceSaveInFlight: false,
@@ -166,13 +199,19 @@ export default {
         };
     },
     computed: {
+        cornerPreference() { return normalizeUserCornerStyle(this.CurrentUser?.CornerStyle); },
+        navigationPreference() { return normalizeUserNavigationLayout(this.CurrentUser?.NavigationLayout); },
+        menuExpandPreference() { return normalizeUserMenuChildExpandMode(this.CurrentUser?.MenuChildExpandMode); },
         // 每种显示模式固定 12 色（6 × 2）；暗色模式不出现白色主色。
         mciPresets() {
             return getThemePalettes(this.themeMode);
         },
         canSyncThemePreferences() {
             return hasInstalledUserPreference(this.CurrentUser, "ThemeMode")
-                || hasInstalledUserPreference(this.CurrentUser, "ThemeColor");
+                || hasInstalledUserPreference(this.CurrentUser, "ThemeColor")
+                || hasInstalledUserPreference(this.CurrentUser, "CornerStyle")
+                || hasInstalledUserPreference(this.CurrentUser, "NavigationLayout")
+                || hasInstalledUserPreference(this.CurrentUser, "MenuChildExpandMode");
         },
         preferenceSaveStatusText() {
             const keys = {
@@ -193,6 +232,7 @@ export default {
             "light"
         );
         setThemeMode(this.themeMode);
+        this.applyResolvedCornerStyle();
         const appliedColor = applyThemeColor(this.themeColor || DEFAULT_THEME_COLOR);
         if (appliedColor && !this.isActive(appliedColor)) this.diyStore.setThemeColor(appliedColor);
     },
@@ -205,9 +245,35 @@ export default {
         },
         "SysConfig.ThemeMode"() {
             this.applyResolvedThemeMode();
+        },
+        "CurrentUser.CornerStyle"() {
+            this.applyResolvedCornerStyle();
+        },
+        "CurrentUser.Id"() {
+            this.applyResolvedCornerStyle();
+        },
+        "SysConfig.CornerStyle"() {
+            this.applyResolvedCornerStyle();
         }
     },
     methods: {
+        applyResolvedCornerStyle() {
+            this.cornerStyle = setCornerStyle(resolveUserCornerStyle(this.CurrentUser, getCornerStyle(), this.SysConfig?.CornerStyle));
+        },
+        changeCornerStyle(style) {
+            if (!hasInstalledUserPreference(this.CurrentUser, 'CornerStyle')) {
+                this.cornerStyle = setCornerStyle(style === 'System' ? this.SysConfig?.CornerStyle : style);
+                return;
+            }
+            this.saveInstalledVisualPreferences({ CornerStyle: normalizeUserCornerStyle(style) });
+            this.applyResolvedCornerStyle();
+        },
+        changeNavigationLayout(value) {
+            this.saveInstalledVisualPreferences({ NavigationLayout: normalizeUserNavigationLayout(value) });
+        },
+        changeMenuChildExpandMode(value) {
+            this.saveInstalledVisualPreferences({ MenuChildExpandMode: normalizeUserMenuChildExpandMode(value) });
+        },
         applyResolvedThemeMode() {
             const mode = resolveUserThemeMode(
                 this.CurrentUser,
@@ -282,8 +348,11 @@ export default {
                 if (!result || result.Code !== 1) {
                     throw new Error(result?.Msg || "个人主题偏好保存失败");
                 }
-                if (result.Data) {
-                    this.diyStore.setCurrentUser({ ...result.Data, ...this.pendingPreferencePatch });
+                // RefreshLoginUser may return a scheduled refresh receipt rather
+                // than the login-user projection. Keep the authenticated user
+                // snapshot unless the response identifies this same user.
+                if (result.Data?.Id && String(result.Data.Id) === String(this.CurrentUser?.Id)) {
+                    this.diyStore.setCurrentUser({ ...this.CurrentUser, ...result.Data, ...this.pendingPreferencePatch });
                 }
                 succeeded = true;
                 this.preferenceSaveState = Object.keys(this.pendingPreferencePatch).length ? "pending" : "saved";
@@ -388,6 +457,8 @@ export default {
 
 .mci-theme-panel-body {
     padding: 14px 16px 16px;
+    max-height: min(640px, calc(100vh - 180px));
+    overflow-y: auto;
 }
 
 .mci-theme-section {

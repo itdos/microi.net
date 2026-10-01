@@ -6,6 +6,12 @@
             padding: _IsTableChild ? '0px' : '0px',
             paddingTop : (_IsTableChild || diyStore.IsPhoneView) ? '0px' : '0px' }"
     >
+        <MicroiMqttExecutionLogs
+            v-if="!_IsTableChild && CurrentDiyTableModel?.Name === 'mci_mqtt_log'"
+            :AllClients="true"
+            :ParentV8="ParentV8_Data || ParentV8"
+        />
+        <template v-else>
         <!-- 模块门头始终位于 PageTabs 上方：默认紧凑标题，ViewSchema 可追加副标题与动态指标。 -->
         <section
             v-if="ShowModuleHeroSkeleton"
@@ -653,6 +659,7 @@
                         v-if="DiyCommon.IsNull(SysMenuModel) || (!DiyCommon.IsNull(SysMenuModel) && !SysMenuModel.HiddenIndex)"
                     >
                     </el-table-column>
+                    <GroupedTableColumns :headers="SysMenuModel?.TableHeaders" :fields="PresentationTableFieldList">
                     <template v-for="(field, fieldIndex) in PresentationTableFieldList" :key="TypeFieldName + 'table_column_fieldid_' + field.Id">
                         <el-table-column
                             :prop="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
@@ -828,6 +835,7 @@
                             </template>
                         </el-table-column>
                     </template>
+                    </GroupedTableColumns>
                     <!-- :sortable="IsSortField('CreateTime') ? 'custom' : false" -->
                     <el-table-column
                         v-if="ColIsDisplay('CreateTime')"
@@ -2040,6 +2048,7 @@
                 </el-col>
             </el-row>
         </el-drawer>
+        </template>
 
         <!-- 菜单权限设置弹窗 -->
         <DiyPermissionDialog
@@ -2130,6 +2139,8 @@ import DiyImportDialog from "@/views/form-engine/diy-components/DiyImportDialog.
 import DiyPermissionDialog from "@/views/form-engine/diy-components/DiyPermissionDialog.vue";
 import DiyIndexManager from "@/views/form-engine/diy-components/DiyIndexManager.vue";
 import DiyTableSpecialCell from "@/views/form-engine/diy-components/DiyTableSpecialCell.vue";
+import GroupedTableColumns from "@/views/form-engine/diy-components/GroupedTableColumns.vue";
+import { isModuleBannerHidden } from "@/views/form-engine/utils/module-banner-visibility.js";
 import DiySearch from "@/views/form-engine/diy-search.vue";
 import DiyModleSearch from "@/views/form-engine/diy-mobile-search.vue";
 import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
@@ -2165,9 +2176,11 @@ export default {
         DiyPermissionDialog,
         DiyIndexManager,
         DiyTableSpecialCell,
+        GroupedTableColumns,
         DiySearch,
         DiyModleSearch,
         MciRenderSourceBadge,
+        MicroiMqttExecutionLogs: defineAsyncComponent(() => import("@/views/mqtt-engine/ExecutionLogs.vue")),
         ModuleFormWorkbench: defineAsyncComponent(() => import("@/views/form-engine/diy-components/module-form-workbench.vue")),
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyTableChild: defineAsyncComponent(() => import("@/views/form-engine/diy-table"))
@@ -2312,7 +2325,11 @@ export default {
             return this.IsTopLevelModuleContext && !this.diyStore.IsPhoneView;
         },
         ShowModuleHeroSkeleton() {
-            return this.IsTopLevelModuleShell && this.moduleShellLoading === true;
+            return !this.HideTableTopBanner && this.IsTopLevelModuleShell && this.moduleShellLoading === true;
+        },
+        HideTableTopBanner() {
+            const value = this.SysMenuModel?.HideTableBanner ?? this.ModuleChromeMenu?.HideTableBanner;
+            return isModuleBannerHidden(value);
         },
         ModuleShellSkeletonHasMetrics() {
             if (typeof this._moduleShellHadMetrics === "boolean") return this._moduleShellHadMetrics;

@@ -38,6 +38,24 @@ import {
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const refreshSource = await readFile(resolve(testDirectory, 'refresh-resources.mjs'), 'utf8');
+
+test('concurrent schema changes in different tables merge by physical identity and derive counts', () => {
+  const base={PackageInfo:{FieldCount:0,PhysicalColumnCount:0},DiyFields:[],DDLStatements:[],PhysicalColumns:[]};
+  const branch=table=>({PackageInfo:{FieldCount:1,PhysicalColumnCount:1},DiyFields:[{Id:table,Name:'Style'}],
+    DDLStatements:[{TableName:table,DDL:`CREATE TABLE ${table}`},{TableName:table,DDL:`CREATE INDEX ix_style ON ${table} (Style)`}],PhysicalColumns:[{TABLE_NAME:table,COLUMN_NAME:'Style'}]});
+  const merged=JSON.parse(mergeJsonResource('app.microi.saas-engine.json',JSON.stringify(base),JSON.stringify(branch('sys_config')),JSON.stringify(branch('sys_osclients'))));
+  assert.equal(merged.PackageInfo.FieldCount,2);assert.equal(merged.PackageInfo.PhysicalColumnCount,2);
+  assert.deepEqual(merged.DDLStatements.map(x=>x.TableName),['sys_config','sys_config','sys_osclients','sys_osclients']);
+  assert.equal(merged.PhysicalColumns.length,2);
+});
+
+test('concurrent edits to the same physical column or table DDL still require resolution', () => {
+  const base={PhysicalColumns:[{TABLE_NAME:'sys_config',COLUMN_NAME:'Style',COLUMN_TYPE:'varchar(20)'}],DDLStatements:[{TableName:'sys_config',DDL:'old'}]};
+  const local=structuredClone(base),remote=structuredClone(base);
+  local.PhysicalColumns[0].COLUMN_TYPE='varchar(25)';remote.PhysicalColumns[0].COLUMN_TYPE='varchar(30)';
+  local.DDLStatements[0].DDL='local';remote.DDLStatements[0].DDL='remote';
+  assert.throws(()=>mergeJsonResource('app.microi.saas-engine.json',JSON.stringify(base),JSON.stringify(local),JSON.stringify(remote)),/JSON 冲突/);
+});
 const releaseSource = await readFile(resolve(testDirectory, '../../../Microi一键编译发布.sh'), 'utf8');
 const officialEngineSource = await readFile(resolve(testDirectory, 'official-resource-api.js'), 'utf8');
 const mcpPublisherSource = await readFile(resolve(testDirectory, 'mcp-resource-publisher.mjs'), 'utf8');

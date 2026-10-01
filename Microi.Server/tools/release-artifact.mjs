@@ -28,7 +28,8 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  if(!['capture','verify'].includes(mode)||!['api','client'].includes(type)||!manifest||!receiptFile)throw Error('Usage: release-artifact.mjs capture|verify api|client <tested-source-manifest> <receipt>');
  const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
  const candidate=JSON.parse(await fs.readFile(manifest,'utf8'));
- if(changedCandidate(candidate,await snapshotCandidate()).length)throw Error('Source changed after Full acceptance');
+ const changed=changedCandidate(candidate,await snapshotCandidate());
+ if(changed.length)throw Error(`Source changed after Full acceptance:\n${changed.slice(0,40).join('\n')}`);
  const directory=path.join(root,type==='api'?'Microi.Server/Microi.net.Api/bin/Release':'Microi.Client/bin/Release');
  const files=await artifactFiles(directory,type);
  if(mode==='capture'){

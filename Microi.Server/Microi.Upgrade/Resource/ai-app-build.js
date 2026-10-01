@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.6.9
+ * Version: v1.7.1
  * Function:
- * - AI应用编译发布、固定最新版发布、可恢复大文件下载登记与受控静态资源热修；固定入口使用永久加载壳解析数据库已提交的当前版本，历史入口保留不可变产物；并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
+ * - AI 应用历史发布兼容与固定最新版 CDN 精确刷新
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || "成功" }; }
@@ -245,16 +245,42 @@ function aliyunPercentEncode(value) {
     .replace(/\*/g, "%2A")
     .replace(/%7E/gi, "~");
 }
-function osClientSecretValue(name) {
-  try { return text(V8.OsClientModel && V8.OsClientModel[name]); } catch (e) { return ""; }
+function aliyunCdnCredentials() {
+  var settings = V8.SysConfig && V8.SysConfig.ServerPrivateSettings || {};
+  var saas = V8.OsClientModel || {};
+  var prefixes = ["Integration.Cdn.Aliyun.", "Integration.Dns.Aliyun."];
+  for (var i = 0; i < prefixes.length; i++) {
+    var id = text(settings[prefixes[i] + "AccessKeyId"]).trim();
+    var secret = text(settings[prefixes[i] + "AccessKeySecret"]).trim();
+    if (id || secret) {
+      if (!id || !secret) return fail("当前租户 CDN 凭据配置不成对：" + prefixes[i]);
+      return ok({ Id: id, Secret: secret });
+    }
+  }
+  var legacyPairs = [["AlidnsKeyId", "AlidnsKeySecret"],
+    ["AliOssPublicAccessKeyId", "AliOssPublicAccessKeySecret"]];
+  for (var pairIndex = 0; pairIndex < legacyPairs.length; pairIndex++) {
+    var names = legacyPairs[pairIndex];
+    var oldId = text(saas[names[0]]).trim();
+    var oldSecret = text(saas[names[1]]).trim();
+    if (oldId || oldSecret) {
+      if (!oldId || !oldSecret) return fail("当前租户 CDN 凭据配置不成对：" + names[0]);
+      return ok({ Id: oldId, Secret: oldSecret });
+    }
+  }
+  return fail("当前租户未配置阿里云 CDN 凭据");
 }
 function refreshStableCdnPaths(paths, allowMutableAssets) {
   var fileServer = "";
   try { fileServer = text(V8.SysConfig && V8.SysConfig.FileServer).replace(/\/+$/, ""); } catch (e) {}
   if (!/^https?:\/\//i.test(fileServer)) return ok({ Skipped: true, Reason: "FileServer不是HTTP CDN地址" });
-  var accessKeyId = osClientSecretValue("AliOssPublicAccessKeyId");
-  var accessKeySecret = osClientSecretValue("AliOssPublicAccessKeySecret");
-  if (isBlank(accessKeyId) || isBlank(accessKeySecret)) return ok({ Skipped: true, Reason: "未配置公有桶AccessKey" });
+  var credentials = aliyunCdnCredentials();
+  if (!credentials || credentials.Code !== 1) {
+    if (fileServer === "https://static.itdos.com") return credentials || fail("官方 CDN 凭据不可用");
+    return ok({ Skipped: true, Reason: "当前租户未配置阿里云 CDN 凭据" });
+  }
+  var accessKeyId = credentials.Data.Id;
+  var accessKeySecret = credentials.Data.Secret;
   var urls = [];
   var seen = {};
   var sourcePaths = toArray(paths);
@@ -1173,6 +1199,16 @@ if (isBlank(appId)) return fail("AppId不能为空");
 var app = getApp(appId);
 if (!app || app.Code !== 1 || !app.Data) return { Code: 2, Data: null, Msg: "AI应用不存在" };
 var requestedAction = text(V8.Param.Action || "Build");
+// Official marketplace releases now use the v3 streamed publisher, which
+// verifies the fixed CDN path before recording success. This legacy writer
+// creates ai-app-publish URLs and cannot safely replace a migrated release.
+var officialLegacyPublishActions = ["Build", "PromoteStoreAsset", "PromoteStoreAssetsBatch",
+  "FinalizeStoreAssets", "PromoteStoreAssets", "RepairStableLatest", "PromoteStableAssetsBatch",
+  "PublishLegacyMicroAppRedirects", "RegisterResumablePublicDownload",
+  "PromoteResumablePublicDownload"];
+if (text(V8.OsClient).toLowerCase() === "itdos"
+    && officialLegacyPublishActions.indexOf(requestedAction) >= 0)
+  return fail("吾码官方 AI 应用请通过 v3 MCP 流式发布；旧 ai_app_build 入口不具备固定 CDN 地址与历史源码验收能力。");
 /* RESUMABLE_PUBLIC_DOWNLOAD_REGISTRATION_V1
  * 大安装包先通过 ApplicationAsset Protocol v3 完成分片、断点续传、逐片
  * SHA-256 与服务端合并校验；这里只登记已经 Succeeded 的不可变公有对象，

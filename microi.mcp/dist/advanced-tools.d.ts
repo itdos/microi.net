@@ -2,6 +2,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { MicroiClient, ApiResponse } from './microi-client.js';
 import type { McpServerContext } from './server.js';
 type JsonRecord = Record<string, unknown>;
+type WorkflowCheckResult = {
+    ok: boolean;
+    errors: string[];
+    warnings: string[];
+    summary: JsonRecord;
+};
 export declare function analyzeBackgroundWorkload(buttonInput: unknown, options?: {
     inferActionSemantics?: boolean;
 }): {
@@ -59,6 +65,8 @@ export declare function buildPlan(manifest: JsonRecord): {
     errors: string[];
     warnings: string[];
 };
+export declare function validateWorkflowPackage(workflow: JsonRecord): WorkflowCheckResult;
+export declare function workflowPayload(workflow: JsonRecord, tableIdByName: Map<string, string>): JsonRecord;
 /** 生成 diy_table 的 Banner 语义配置；保留显式空字段与空数组，只有未选择时按真实字段推断。 */
 export declare function buildDefaultFormBanner(table: JsonRecord): JsonRecord;
 /**

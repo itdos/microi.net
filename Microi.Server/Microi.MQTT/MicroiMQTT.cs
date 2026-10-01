@@ -742,7 +742,7 @@ namespace Microi.net
         #region 内部日志(mci_mqtt_log) 与 设备表(mci_mqtt_client) 操作
 
         /// <summary>
-        /// 写入 mci_mqtt_log（系统日志：连接/断开/订阅/消息/服务启停）。
+        /// MQTT 运行日志优先写 MongoDB，只有持久化失败才写 mci_mqtt_log。
         /// 失败仅打印告警，不会中断 MQTT 主流程。
         /// </summary>
         private static async Task WriteMqttLogAsync(string osClient, string type, string clientId, string topic, object data)
@@ -752,16 +752,26 @@ namespace Microi.net
                 string dataStr = null;
                 if (data != null)
                 {
-                    dataStr = data is string s ? s : JsonConvert.SerializeObject(data);
+                    dataStr = OperationalLogStorage.SanitizeContent(
+                        data is string s ? s : JsonConvert.SerializeObject(data));
                 }
-                await MicroiEngine.FormEngine.AddFormDataAsync(LogTable, new
+                var eventId = Guid.NewGuid().ToString("N");
+                var occurredAt = DateTime.Now;
+                var saved = await OperationalLogStorage.WriteAsync(new SysLogParam
                 {
                     OsClient = osClient,
-                    ClientId = clientId,
-                    Type = type,
-                    Topic = topic,
-                    Data = dataStr
-                });
+                    EventId = eventId, OccurredAt = occurredAt,
+                    Category = "MqttEvent", Type = type, Source = "MQTT",
+                    TargetType = "MqttEvent", TargetId = clientId,
+                    Action = type, Title = type, Api = topic, Content = dataStr,
+                    Level = 1, Success = true
+                }, () => MicroiEngine.FormEngine.AddFormDataAsync(LogTable, new
+                {
+                    OsClient = osClient, Id = eventId, ClientId = clientId,
+                    Type = type, Data = dataStr, CreateTime = occurredAt, IsDeleted = 0
+                })).ConfigureAwait(false);
+                if (!saved)
+                    WriteMqttDiagnostic(osClient, "BusinessLogWriteFailed", "MQTT 业务日志写入失败", $"Type={type}; Topic={topic}", 2, clientId);
             }
             catch (Exception ex)
             {

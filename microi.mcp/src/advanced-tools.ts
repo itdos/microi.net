@@ -483,6 +483,20 @@ function normalizeMenuJsonArray(fieldName: string, raw?: unknown): { ok: boolean
   return { ok: errors.length === 0, value: JSON.stringify(normalized), errors, warnings };
 }
 
+function validTableHeaderGroup(value: unknown, depth = 0): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 3) return false;
+  const group = value as JsonRecord;
+  const label = String(group.Label ?? group.label ?? '').trim();
+  if (!label || label.length > 80) return false;
+  const fields = group.Fields ?? group.fields;
+  const children = group.Children ?? group.children;
+  if (Array.isArray(fields) && fields.length > 0 && children === undefined) {
+    return fields.length <= 64 && fields.every(field => typeof field === 'string' && field.trim().length > 0 && field.length <= 128);
+  }
+  return fields === undefined && Array.isArray(children) && children.length > 0
+    && children.length <= 32 && children.every(child => validTableHeaderGroup(child, depth + 1));
+}
+
 export function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; errors: string[]; warnings: string[] } {
   const result = { ...data };
   const errors: string[] = [];
@@ -510,14 +524,33 @@ export function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; erro
   }
   const numericAliases: Array<[string, string]> = [
     ['MenuBadgeEnabled', 'menuBadgeEnabled'],
+    ['HideTableBanner', 'hideTableBanner'],
+    ['HideFormBanner', 'hideFormBanner'],
     ['EnableViewSchema', 'enableViewSchema'],
     ['ViewConfigVersion', 'viewConfigVersion'],
   ];
   for (const [canonical, alias] of numericAliases) {
     if (data[canonical] === undefined && data[alias] === undefined) continue;
-    const value = getNumber(data, canonical, alias);
-    if (value !== undefined) result[canonical] = canonical.endsWith('Enabled') ? (value === 1 ? 1 : 0) : value;
+    const raw = data[canonical] ?? data[alias];
+    const value = (canonical === 'HideTableBanner' || canonical === 'HideFormBanner') && typeof raw === 'boolean'
+      ? (raw ? 1 : 0)
+      : getNumber(data, canonical, alias);
+    if (value !== undefined) result[canonical] = (canonical.endsWith('Enabled') || canonical.endsWith('Banner')) ? (value === 1 ? 1 : 0) : value;
     delete result[alias];
+  }
+  const headerKey = ['TableHeaders', 'tableHeaders'].find((candidate) => data[candidate] !== undefined);
+  if (headerKey) {
+    try {
+      const groups = typeof data[headerKey] === 'string' ? JSON.parse(data[headerKey] as string) : data[headerKey];
+      if (!Array.isArray(groups) || groups.length > 32 || groups.some(group => !validTableHeaderGroup(group))) {
+        errors.push('TableHeaders 必须为最多 32 个分组的数组，每组包含 Label 和 Fields 或 Children 数组。');
+      } else {
+        result.TableHeaders = JSON.stringify(groups);
+      }
+    } catch {
+      errors.push('TableHeaders 必须是合法 JSON 数组。');
+    }
+    delete result.tableHeaders;
   }
   const stringAliases: Array<[string, string]> = [
     ['MenuBadgeApiEngineKey', 'menuBadgeApiEngineKey'],
@@ -1608,6 +1641,29 @@ export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: strin
     const tableRef = getString(item, 'table', 'tableName', 'diyTableName', 'DiyTableName');
     const moduleName = getString(item, 'name', 'Name');
     const openType = getString(item, 'openType', 'OpenType');
+    if (openType.toLowerCase() === 'workflow') {
+      const flowName = getString(item, 'flowName', 'FlowName');
+      const flowId = getString(item, 'flowDesignId', 'FlowDesignId');
+      if (!flowName && !flowId) errors.push(`modules.${moduleName || '(unnamed)'}.flowName 或 flowDesignId 必须指向已启用流程`);
+      if (flowName && !workflows.some((workflow) => getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign), 'FlowName', 'flowName') === flowName)) {
+        errors.push(`modules.${moduleName || '(unnamed)'}.flowName ${flowName} 未在本次 workflows 中声明；现有流程请使用 flowDesignId`);
+      }
+      const targetFlow = workflows.find((workflow) => getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign), 'FlowName', 'flowName') === flowName);
+      if (targetFlow) {
+        const design = asRecord(targetFlow.FlowDesign ?? targetFlow.flowDesign);
+        if (getNumber(design, 'IsEnable', 'isEnable') === 0 || getValue(design, 'IsEnable', 'isEnable') === false) {
+          errors.push(`modules.${moduleName || '(unnamed)'}.flowName ${flowName} 指向禁用流程`);
+        }
+        const moduleTable = getString(item, 'table', 'tableName', 'diyTableName', 'DiyTableName');
+        const flowTable = getString(design, 'table', 'tableName', 'diyTableName', 'DiyTableName');
+        if (moduleTable && flowTable && moduleTable.toLowerCase() !== flowTable.toLowerCase()) {
+          errors.push(`modules.${moduleName || '(unnamed)'} 的 table 与流程 ${flowName} 的业务表不一致`);
+        }
+      }
+      if (!getString(item, 'diyTableId', 'DiyTableId', 'table', 'tableName', 'diyTableName', 'DiyTableName')) {
+        errors.push(`modules.${moduleName || '(unnamed)'} 必须绑定与流程相同的 diy_table`);
+      }
+    }
     const microServiceKey = getString(item, 'microServiceKey', 'MicroServiceKey');
     const microServiceRoutePath = getString(item, 'microServiceRoutePath', 'MicroServiceRoutePath');
     const isMicroService = ['microservice', 'codeform'].includes(openType.toLowerCase())
@@ -1699,16 +1755,96 @@ function getNodeType(node: JsonRecord): string {
 }
 
 function isStartNode(node: JsonRecord): boolean {
-  const value = `${getNodeType(node)} ${getNodeName(node)}`.toLowerCase();
-  return value.includes('start') || value.includes('begin') || value.includes('开始') || value.includes('发起');
+  return getNodeType(node) === 'Start';
 }
 
 function isEndNode(node: JsonRecord): boolean {
-  const value = `${getNodeType(node)} ${getNodeName(node)}`.toLowerCase();
-  return value.includes('end') || value.includes('finish') || value.includes('结束') || value.includes('完成');
+  return ['End', 'AutoEnd'].includes(getNodeType(node));
 }
 
-function validateWorkflowPackage(workflow: JsonRecord): WorkflowCheckResult {
+const workflowNodeTypes = new Set(['Start', 'Auto', 'Business', 'End', 'AutoEnd', 'Countersign', 'Approve']);
+const workflowManualNodeTypes = new Set(['Approve', 'Countersign', 'End']);
+const workflowBindingFields = ['Users', 'Roles', 'Depts', 'BindJobs'] as const;
+const workflowReferenceFields = [...workflowBindingFields, 'CopyUsers'] as const;
+
+function workflowBinding(node: JsonRecord, field: typeof workflowReferenceFields[number], errors: string[]): JsonRecord[] {
+  const value = getValue(node, field, field[0].toLowerCase() + field.slice(1));
+  if (value === undefined || value === null || value === '') return [];
+  let parsed: unknown = value;
+  if (typeof value === 'string') {
+    try { parsed = JSON.parse(value); } catch { parsed = null; }
+  }
+  if (!Array.isArray(parsed) || parsed.some((item) => !getString(asRecord(item), 'Id') || !getString(asRecord(item), 'Name', 'JobName'))) {
+    errors.push(`节点 ${getNodeName(node) || getNodeId(node)}.${field} 必须是 [{Id,Name}] 数组；不能使用角色名或 Id 字符串`);
+    return [];
+  }
+  return (parsed as JsonRecord[]).map((item) => ({ Id: getString(item, 'Id'), Name: getString(item, 'Name', 'JobName') }));
+}
+
+function workflowBackNodes(node: JsonRecord, nodeById: Map<string, JsonRecord>, errors: string[]): string {
+  const raw = getValue(node, 'BackNodes', 'backNodes');
+  if (raw === undefined || raw === null || raw === '') return '[]';
+  let parsed: unknown = raw;
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw); } catch { parsed = null; }
+  }
+  if (!Array.isArray(parsed)) {
+    errors.push(`节点 ${getNodeName(node) || getNodeId(node)}.BackNodes 必须是节点 Id 或 {Id,NodeName} 数组`);
+    return '[]';
+  }
+  const normalized = parsed.map((item) => {
+    const id = typeof item === 'string' ? item : getString(asRecord(item), 'Id');
+    if (!nodeById.has(id)) errors.push(`节点 ${getNodeName(node) || getNodeId(node)}.BackNodes 引用了不存在的节点 ${id}`);
+    const referenced = nodeById.get(id);
+    return { Id: id, NodeName: referenced ? getNodeName(referenced) : getString(asRecord(item), 'NodeName') };
+  });
+  return JSON.stringify(normalized);
+}
+
+function workflowCoordinate(node: JsonRecord, field: 'PositionLeft' | 'PositionTop', errors: string[]): number | undefined {
+  const raw = getValue(node, field, field[0].toLowerCase() + field.slice(1));
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const match = /^(\d+(?:\.\d+)?)(?:px)?$/.exec(String(raw).trim());
+  if (!match || Number(match[1]) > 100000) {
+    errors.push(`节点 ${getNodeName(node) || getNodeId(node)}.${field} 必须是非负像素坐标`);
+    return undefined;
+  }
+  return Number(match[1]);
+}
+
+function workflowLayout(nodes: JsonRecord[], lines: JsonRecord[], errors: string[]): JsonRecord[] {
+  const byId = new Map(nodes.map((node) => [getNodeId(node), node]));
+  const depth = new Map<string, number>();
+  const queue = nodes.filter(isStartNode).map(getNodeId);
+  queue.forEach((id) => depth.set(id, 0));
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const line of lines.filter((item) => getString(item, 'FromNodeId', 'fromNodeId') === id)) {
+      const next = getString(line, 'ToNodeId', 'toNodeId');
+      if (!byId.has(next) || depth.has(next)) continue;
+      depth.set(next, (depth.get(id) || 0) + 1);
+      queue.push(next);
+    }
+  }
+  const rows = new Map<number, number>();
+  const occupied = new Set<string>();
+  return nodes.map((node, index) => {
+    const layer = depth.get(getNodeId(node)) ?? index;
+    const row = rows.get(layer) || 0;
+    rows.set(layer, row + 1);
+    const left = workflowCoordinate(node, 'PositionLeft', errors) ?? (80 + layer * 260);
+    const top = workflowCoordinate(node, 'PositionTop', errors) ?? (120 + row * 150);
+    const point = `${left}:${top}`;
+    if (occupied.has(point)) errors.push(`节点 ${getNodeName(node) || getNodeId(node)} 与其它节点坐标重叠`);
+    occupied.add(point);
+    const result: JsonRecord = { ...node, PositionLeft: `${left}px`, PositionTop: `${top}px` };
+    for (const field of workflowReferenceFields) result[field] = JSON.stringify(workflowBinding(node, field, errors));
+    result.BackNodes = workflowBackNodes(node, byId, errors);
+    return result;
+  });
+}
+
+export function validateWorkflowPackage(workflow: JsonRecord): WorkflowCheckResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const { flow, nodes, lines } = getWorkflowParts(workflow);
@@ -1720,15 +1856,17 @@ function validateWorkflowPackage(workflow: JsonRecord): WorkflowCheckResult {
   const incoming = new Map<string, JsonRecord[]>();
 
   if (!flowName) errors.push('FlowDesign.FlowName 不能为空');
+  workflowBinding(flow, 'Roles', errors);
   if (!nodes.length) errors.push('Nodes 至少需要包含开始、审批/业务、结束节点');
   if (!lines.length) errors.push('Lines 至少需要连接开始到下一节点');
-  if (!flowTableId && !flowTableRef) warnings.push('FlowDesign.TableId 为空；普通审批流建议绑定业务 diy_table');
+  if (!flowTableId && !flowTableRef) warnings.push('流程未绑定业务 diy_table；若要通过模块引擎打开流程，必须绑定同一业务表');
 
   nodes.forEach((node, index) => {
     const id = getNodeId(node);
     const name = getNodeName(node);
     if (!id) errors.push(`Nodes[${index}].Id/NodeId 不能为空`);
     if (!name) errors.push(`Nodes[${index}].NodeName 不能为空`);
+    if (!workflowNodeTypes.has(getNodeType(node))) errors.push(`Nodes[${index}].NodeType 必须是 Start/Auto/Business/End/AutoEnd/Countersign/Approve`);
     if (id) {
       if (nodeById.has(id)) errors.push(`节点 Id 重复：${id}`);
       nodeById.set(id, node);
@@ -1753,6 +1891,8 @@ function validateWorkflowPackage(workflow: JsonRecord): WorkflowCheckResult {
   if (startNodes.length !== 1) errors.push(`需要且仅需要 1 个开始节点，当前 ${startNodes.length} 个`);
   if (endNodes.length < 1) errors.push('至少需要 1 个结束节点');
 
+  const normalizedNodes = workflowLayout(nodes, lines, errors);
+
   nodes.forEach((node) => {
     const id = getNodeId(node);
     const name = getNodeName(node) || id;
@@ -1761,11 +1901,34 @@ function validateWorkflowPackage(workflow: JsonRecord): WorkflowCheckResult {
     const inLines = incoming.get(id) || [];
     if (!isStartNode(node) && inLines.length === 0) warnings.push(`节点 ${name} 没有入线`);
     if (!isEndNode(node) && outLines.length === 0) warnings.push(`节点 ${name} 没有出线`);
+    if (workflowManualNodeTypes.has(getNodeType(node))) {
+      const bindings = workflowBindingFields.flatMap((field) => workflowBinding(node, field, []));
+      const selectedByPrevious = inLines.some((line) => {
+        const predecessor = nodeById.get(getString(line, 'FromNodeId', 'fromNodeId')) || {};
+        return getNumber(predecessor, 'AllowSelectUsers', 'allowSelectUsers') === 1
+          || getValue(predecessor, 'AllowSelectUsers', 'allowSelectUsers') === true;
+      });
+      if (!bindings.length && !selectedByPrevious) {
+        errors.push(`人工节点 ${name} 未绑定 Users/Roles/Depts/BindJobs，且上游节点没有手动选人策略；SameDeptApprove 仅筛选候选人，不能独立指定审批人`);
+      }
+    }
     if (outLines.length > 1) {
       const conditionCode = getString(node, 'LineValueV8', 'lineValueV8', 'V8Code', 'v8Code');
       if (!conditionCode) warnings.push(`节点 ${name} 有 ${outLines.length} 条出线，建议配置 LineValueV8，并优先用 V8.NextNodeId 指定下一节点`);
     }
   });
+
+  const visited = new Set<string>(startNodes.map(getNodeId));
+  const pending = [...visited];
+  while (pending.length) {
+    const current = pending.shift()!;
+    for (const line of outgoing.get(current) || []) {
+      const next = getString(line, 'ToNodeId', 'toNodeId');
+      if (!visited.has(next) && nodeById.has(next)) { visited.add(next); pending.push(next); }
+    }
+  }
+  for (const node of nodes) if (getNodeId(node) && !visited.has(getNodeId(node))) errors.push(`节点 ${getNodeName(node)} 从开始节点不可达`);
+  if (endNodes.length && !endNodes.some((node) => visited.has(getNodeId(node)))) errors.push('结束节点从开始节点不可达');
 
   return {
     ok: errors.length === 0,
@@ -1777,6 +1940,7 @@ function validateWorkflowPackage(workflow: JsonRecord): WorkflowCheckResult {
       table: flowTableRef,
       nodeCount: nodes.length,
       lineCount: lines.length,
+      positions: normalizedNodes.map((node) => ({ id: getNodeId(node), left: node.PositionLeft, top: node.PositionTop })),
       startNodes: startNodes.map((node) => ({ id: getNodeId(node), name: getNodeName(node) })),
       endNodes: endNodes.map((node) => ({ id: getNodeId(node), name: getNodeName(node) })),
     },
@@ -1862,13 +2026,17 @@ function buildWorkflowAssignment(route: JsonRecord): JsonRecord {
   return lineValue ? { LineValue: lineValue } : { NextNodeId: toNodeId };
 }
 
-function workflowPayload(workflow: JsonRecord, tableIdByName: Map<string, string>): JsonRecord {
+export function workflowPayload(workflow: JsonRecord, tableIdByName: Map<string, string>): JsonRecord {
   const { flow, nodes, lines } = getWorkflowParts(workflow);
   const nextFlow = { ...flow };
+  const roleErrors: string[] = [];
+  nextFlow.Roles = JSON.stringify(workflowBinding(flow, 'Roles', roleErrors));
+  if (roleErrors.length) throw new Error(roleErrors.join('；'));
   const tableRef = getString(flow, 'table', 'tableName', 'TableName', 'diyTableName', 'DiyTableName');
   if (!getString(nextFlow, 'TableId', 'tableId') && tableRef) {
     const resolvedTableId = tableIdByName.get(tableRef.toLowerCase());
-    if (resolvedTableId) nextFlow.TableId = resolvedTableId;
+    if (!resolvedTableId) throw new Error(`流程业务表 ${tableRef} 在当前租户不存在`);
+    nextFlow.TableId = resolvedTableId;
   }
   const nodeNameById = new Map<string, string>();
   const nextNodes = nodes.map((node, index) => {
@@ -1884,7 +2052,41 @@ function workflowPayload(workflow: JsonRecord, tableIdByName: Map<string, string
     const lineName = getString(line, 'LineName', 'lineName') || `${nodeNameById.get(fromNodeId) || fromNodeId || '当前节点'} 到 ${nodeNameById.get(toNodeId) || toNodeId || '下一节点'}`;
     return { ...line, Id: getString(line, 'Id', 'id', 'LineId', 'lineId') || `wf_line_${index + 1}_${randomId().slice(0, 8)}`, LineName: lineName };
   });
-  return { FlowDesign: nextFlow, Nodes: nextNodes, Lines: nextLines };
+  const layoutErrors: string[] = [];
+  const laidOutNodes = workflowLayout(nextNodes, nextLines, layoutErrors);
+  if (layoutErrors.length) throw new Error(layoutErrors.join('；'));
+  return { FlowDesign: nextFlow, Nodes: laidOutNodes, Lines: nextLines };
+}
+
+async function verifyWorkflowReferences(client: MicroiClient, payload: JsonRecord): Promise<string[]> {
+  const references: Array<{ table: string; field: string; owners: JsonRecord[] }> = [
+    { table: 'sys_user', field: 'Users', owners: getArray(payload, 'Nodes') },
+    { table: 'sys_user', field: 'CopyUsers', owners: getArray(payload, 'Nodes') },
+    { table: 'sys_role', field: 'Roles', owners: [asRecord(payload.FlowDesign), ...getArray(payload, 'Nodes')] },
+    { table: 'sys_dept', field: 'Depts', owners: getArray(payload, 'Nodes') },
+    { table: 'diy_job', field: 'BindJobs', owners: getArray(payload, 'Nodes') },
+  ];
+  const errors: string[] = [];
+  for (const reference of references) {
+    const ids = [...new Set(reference.owners.flatMap((owner) => {
+      try { return asArray(JSON.parse(getString(owner, reference.field) || '[]')).map((item) => getString(item, 'Id')).filter(Boolean); }
+      catch { errors.push(`${reference.field} 不是有效 JSON`); return []; }
+    }))];
+    for (let offset = 0; offset < ids.length; offset += 100) {
+      const batch = ids.slice(offset, offset + 100);
+      try {
+        const response = await client.getTableData(reference.table, {
+          _Where: [['Id', 'In', batch]], _SelectFields: ['Id'], _PageIndex: 1, _PageSize: batch.length + 1,
+        });
+        if (response.Code !== 1) throw new Error(response.Msg || `Code=${response.Code}`);
+        const found = new Set(unwrapList(response.Data).map((row) => getString(row, 'Id')));
+        for (const id of batch) if (!found.has(id)) errors.push(`${reference.field} 引用了当前租户不存在的 ${reference.table}.Id=${id}`);
+      } catch (error) {
+        errors.push(`${reference.field} 无法核对当前租户 ${reference.table}：${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+  return errors;
 }
 
 async function audit(client: MicroiClient, action: string, target: string, payload: unknown): Promise<void> {
@@ -1978,12 +2180,20 @@ function modulePayload(module: JsonRecord, tableIdByName: Map<string, string>, m
     AppDisplay: appDisplay,
     HasChild: getNumber(module, 'hasChild', 'HasChild'),
     OpenType: openType,
+    FlowDesignId: getString(module, 'flowDesignId', 'FlowDesignId'),
     Url: getString(module, 'url', 'Url'),
     Sort: getNumber(module, 'sort', 'Sort'),
     Icon: getString(module, 'icon', 'Icon'),
     SearchFieldIds: getExplicitJsonString(module, 'searchFieldIds', 'SearchFieldIds') || resolvedFields.SearchFieldIds,
     TableDiyFieldIds: getExplicitJsonString(module, 'tableDiyFieldIds', 'TableDiyFieldIds') || resolvedFields.TableDiyFieldIds,
     SelectFields: getExplicitJsonString(module, 'selectFields', 'SelectFields') || resolvedFields.SelectFields,
+    TableHeaders: getExplicitJsonString(module, 'tableHeaders', 'TableHeaders'),
+    HideTableBanner: typeof (module.hideTableBanner ?? module.HideTableBanner) === 'boolean'
+      ? ((module.hideTableBanner ?? module.HideTableBanner) ? 1 : 0)
+      : getNumber(module, 'hideTableBanner', 'HideTableBanner'),
+    HideFormBanner: typeof (module.hideFormBanner ?? module.HideFormBanner) === 'boolean'
+      ? ((module.hideFormBanner ?? module.HideFormBanner) ? 1 : 0)
+      : getNumber(module, 'hideFormBanner', 'HideFormBanner'),
     DefaultOrderBy: getExplicitJsonString(module, 'DefaultOrderBy') || resolvedFields.DefaultOrderBy,
     SqlWhere: getString(module, 'sqlWhere', 'SqlWhere'),
     SqlJoin: getString(module, 'sqlJoin', 'SqlJoin'),
@@ -2783,9 +2993,9 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
       workflows: [{
         FlowDesign: { FlowName: 'Order approval', TableId: '<Biz_Order table id or tableName-resolved id>', IsEnable: 1 },
         Nodes: [
-          { Id: 'start', NodeName: '发起人', NodeType: 'Start', AllowSelectUsers: 0, PositionLeft: 80, PositionTop: 160, LineValueV8: '' },
-          { Id: 'manager', NodeName: '部门经理审批', NodeType: 'Approve', Roles: 'Manager', AllowSelectUsers: 1, PositionLeft: 320, PositionTop: 160 },
-          { Id: 'end', NodeName: '结束', NodeType: 'End', PositionLeft: 560, PositionTop: 160 },
+          { Id: 'start', NodeName: '发起人', NodeType: 'Start', AllowSelectUsers: 0, PositionLeft: '80px', PositionTop: '160px', LineValueV8: '' },
+          { Id: 'manager', NodeName: '部门经理审批', NodeType: 'Approve', Roles: [{ Id: '<从 microi_list_roles 查询>', Name: '部门经理' }], AllowSelectUsers: 0, PositionLeft: '320px', PositionTop: '160px' },
+          { Id: 'end', NodeName: '结束', NodeType: 'AutoEnd', PositionLeft: '560px', PositionTop: '160px' },
         ],
         Lines: [
           { Id: 'line_start_manager', FromNodeId: 'start', ToNodeId: 'manager', LineName: '发起人 到 部门经理审批', LineValue: '' },
@@ -2794,6 +3004,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
       }],
       jobs: [],
     },
+    workflowModuleExample: { name: '订单审批', table: 'Biz_Order', openType: 'WorkFlow', flowName: 'Order approval', display: 1, appDisplay: 1 },
     relationExamples: {
       joinForm: {
         parentStorageField: { name: 'CustomerId', label: 'Customer Id', type: 'varchar(50)', component: 'Text', visible: 0, appVisible: 0 },
@@ -2832,11 +3043,15 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
         relation: 'Required for JoinForm/TableChild. Use {cardinality:"1:1"|"N:1",targetTable,joinFieldName} for JoinForm, or {cardinality:"1:N",targetTable,childForeignKey,childModule,primaryTableFieldName:"Id"} for TableChild. Names are resolved to tenant ids only after resources exist; raw ids are not portable.',
       },
       modules: {
+        workflow: '流程模块设置 openType=WorkFlow，并用 flowName 引用同一 Manifest 内已启用流程；生成后自动写入 sys_menu.FlowDesignId。引用现有流程时传精确 flowDesignId。模块 table/diyTableId 必须与 wf_flowdesign.TableId 相同。',
         table: 'Bind by table name. The generator resolves the table Id after create/refresh schema.',
         hasChild: 'For a hidden TableChild carrier module set display=0, appDisplay=0 and hasChild=0 explicitly.',
         microServiceKey: 'Portable sys_microiservice.MsKey reference for openType=MicroService or CodeForm. CodeForm must also bind a diyTableId/table. The generator resolves the tenant-specific MicroServiceId before any writes.',
         microServiceRoutePath: 'Portable sys_microiservice_page.RoutePath reference such as /overview. The generator resolves and verifies MicroServicePageId before any writes.',
         listFields: 'Field names/labels/ids for grid columns. Produces TableDiyFieldIds and SelectFields. When omitted, generator chooses title/no/status/person/amount/time fields.',
+        tableHeaders: 'Optional multilevel grid header groups, for example [{Label:"人数（人）",Fields:["Total","Male","Female"]}]. Fields must be visible, consecutive listFields. Nested groups use Children. Stored in sys_menu.TableHeaders; omitted keeps one header row.',
+        hideTableBanner: 'Set to 1 to hide the module grid top Banner and skip its metric API calls; omitted/0 keeps the Banner.',
+        hideFormBanner: 'Set to 1 to hide the module form top Banner and skip its metric API calls; omitted/0 keeps the Banner.',
         searchFields: 'Field names/labels/ids for search controls. Produces SearchFieldIds object array. When omitted, generator chooses title/no/status/type/category/person/time fields.',
         sortFields: 'Field names/labels/ids for sortable fields. Produces SortFieldIds. When omitted, generator chooses date/time, Sort and numeric business fields.',
         hiddenFields: 'Field names/labels/ids to hide. Produces NotShowFields. When omitted, generator hides Id-like fields, foreign keys, system fields and layout/large controls.',
@@ -2996,6 +3211,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
       const tableIdByName = new Map<string, string>();
       const moduleIdByName = new Map<string, string>();
       const roleIdByName = new Map<string, string>();
+      const flowIdByName = new Map<string, string>();
       const fieldLookup = createFieldLookup();
       const manifestModules = getArray(manifest, 'modules', 'Modules');
       const microServiceBindings: Array<JsonRecord | undefined> = [];
@@ -3314,9 +3530,27 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
 
         for (const workflow of getArray(manifest, 'workflows', 'Workflows')) {
           const payload = workflowPayload(workflow, tableIdByName);
+          const referenceErrors = await verifyWorkflowReferences(client, payload);
+          if (referenceErrors.length) return textResult(JSON.stringify({ ok: false, failedAt: 'saveWorkflowPackage:references', errors: referenceErrors, results }, null, 2), true);
           const response = await client.saveWorkflowPackage(payload);
           results.push({ step: 'saveWorkflowPackage', workflow: getString(asRecord(payload.FlowDesign ?? payload.flowDesign ?? payload), 'FlowName', 'flowName'), response });
           if (response.Code !== 1) return textResult(JSON.stringify({ ok: false, failedAt: 'saveWorkflowPackage', workflow: payload, response, results }, null, 2), true);
+          const flowName = getString(asRecord(payload.FlowDesign), 'FlowName');
+          const flowId = getString(asRecord(response.Data), 'FlowDesignId');
+          if (flowName && flowId) flowIdByName.set(flowName, flowId);
+        }
+
+        for (const module of manifestModules) {
+          if (getString(module, 'openType', 'OpenType').toLowerCase() !== 'workflow') continue;
+          const moduleName = getString(module, 'name', 'Name');
+          const flowName = getString(module, 'flowName', 'FlowName');
+          if (!flowName) continue;
+          const flowId = flowIdByName.get(flowName);
+          const moduleId = moduleIdByName.get(moduleName.toLowerCase());
+          if (!flowId || !moduleId) return textResult(JSON.stringify({ ok: false, failedAt: 'bindWorkflowModule', moduleName, flowName, results }, null, 2), true);
+          const response = await client.updateModule({ ModuleId: moduleId, OpenType: 'WorkFlow', FlowDesignId: flowId });
+          results.push({ step: 'bindWorkflowModule', moduleName, flowName, flowId, response });
+          if (response.Code !== 1) return textResult(JSON.stringify({ ok: false, failedAt: 'bindWorkflowModule', moduleName, flowName, response, results }, null, 2), true);
         }
 
         for (const job of getArray(manifest, 'jobs', 'Jobs')) {
@@ -3351,7 +3585,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
   });
   server.tool('microi_list_modules', `List menu modules for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Modules', await client.listModules(keyword)));
   server.tool('microi_get_module', `Get one menu module by ModuleId for OsClient ${osClient}.`, { moduleId: z.string() }, async ({ moduleId }) => apiText('Module Detail', await client.getModule(moduleId)));
-  server.tool('microi_update_module', `Incrementally update an existing menu module, including MenuBadgeEnabled/MenuBadgeApiEngineKey, full ViewSchema Layout.List/Layout.Card configuration, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
+  server.tool('microi_update_module', `Incrementally update an existing menu module, including TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
     const normalized = normalizeAllMenuJson(module);
     if (normalized.errors.length) return textResult(JSON.stringify(normalized, null, 2), true);
     const target = getString(module, 'moduleId', 'ModuleId', 'Id') || getString(module, 'name', 'Name');
@@ -3396,8 +3630,23 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     const check = validateWorkflowPackage(workflow);
     if (!check.ok) return textResult(JSON.stringify(check, null, 2), true);
     if (confirmExecution !== name && confirmExecution !== 'EXECUTE') return textResult(`写入已拦截：请传 confirmExecution="${name}" 或 "EXECUTE"。`, true);
+    const tableIdByName = new Map<string, string>();
+    if (getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign), 'table', 'tableName')) {
+      const schema = await client.getDbSchema();
+      if (schema.Code !== 1) return apiText('Read workflow table schema', schema);
+      for (const table of asArray(asRecord(schema.Data).Tables)) {
+        const name = getString(table, 'Name');
+        const id = getString(table, 'Id');
+        if (name && id) tableIdByName.set(name.toLowerCase(), id);
+      }
+    }
+    let payload: JsonRecord;
+    try { payload = workflowPayload(workflow, tableIdByName); }
+    catch (error) { return textResult(error instanceof Error ? error.message : String(error), true); }
+    const referenceErrors = await verifyWorkflowReferences(client, payload);
+    if (referenceErrors.length) return textResult(JSON.stringify({ ok: false, errors: referenceErrors }, null, 2), true);
     await audit(client, 'microi_save_workflow_package', name, workflow);
-    return apiText('Save Workflow Package', await client.saveWorkflowPackage(workflow));
+    return apiText('Save Workflow Package', await client.saveWorkflowPackage(payload));
   });
 
   server.tool('microi_save_job', `Create or update a scheduled job. For ApiEngine jobs use JobType="1" and ApiEngineKey. OsClient ${osClient}.`, { job: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ job, confirmExecution }) => {

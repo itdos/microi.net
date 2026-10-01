@@ -37,7 +37,7 @@ Microi吾码提供多条可视化路线。界面引擎、报表引擎、go-view 
 
 通用 3D 引擎由官方 `Platform` 应用 `app.microi.3d-engine` 拥有，并内含独立微服务 `microi-3d-engine`。它包含设计器、渲染器、场景树、属性面板、材质、灯光、后处理、模型爆炸和相机路径；源码与编译产物分别进入私有源码区和不可变运行资产。批量“安装/更新全部平台应用”只选择 `Platform` 包，因而安装的是通用引擎，不会附带某个客户的楼宇模型或演示数据。
 
-通用微服务运行版本为 `v1.9.0`，官方平台包装应用版本为 `v1.1.2`。安装后的“3D引擎”设计器通过统一宿主页打开 `/micro-app/microi-3d-engine/designer`；独立入口 `https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-3d-engine/assets/index.html` 默认进入设计器，需登录使用。渲染页 `/renderer` 是内部路由，由设计器或业务页面传入配置后复用。历史 `v1.8.1` 及更早版本曾将城市摩尔项目错误混入该微服务与商城包；更新到拆分后的版本时，不应再从通用引擎取得城市摩尔页面。旧版本应用安装到目标租户后，平台包升级不会自动删除该租户原有的城市摩尔业务表、数据或旧菜单；须另做目标租户库存盘点及用户授权的数据迁移/清理。
+通用微服务运行版本为 `v1.9.0`，官方平台包装应用版本为 `v1.1.2`。安装后的“3D引擎”设计器通过统一宿主页打开 `/micro-app/microi-3d-engine/designer`；独立入口 `https://static.itdos.com/itdos/micro-app/microi-3d-engine/index.html` 默认进入设计器，需登录使用。渲染页 `/renderer` 是内部路由，由设计器或业务页面传入配置后复用。历史 `v1.8.1` 及更早版本曾将城市摩尔项目错误混入该微服务与商城包；更新到拆分后的版本时，不应再从通用引擎取得城市摩尔页面。旧版本应用安装到目标租户后，平台包升级不会自动删除该租户原有的城市摩尔业务表、数据或旧菜单；须另做目标租户库存盘点及用户授权的数据迁移/清理。
 
 版本库中的 `Microi.Client/src/views/3d-engine/` 保留 Three.js 实现与回归测试来源；线上运行和跨租户安装以 AI 应用的私有源码、v3 committed runtime 与商城不可变安装快照为准。
 
@@ -45,7 +45,7 @@ Microi吾码提供多条可视化路线。界面引擎、报表引擎、go-view 
 
 ### 3D 数字孪生 · 城市摩尔示范
 
-“3D 数字孪生 · 城市摩尔”现由独立 `MicroService` AI 应用 `microi-ningbo-city-mall` 承载，菜单 `/micro-app/microi-ningbo-city-mall/digital-twin`，免登录公开入口为 `https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-ningbo-city-mall/assets/index.html`。它**不是**通用引擎的子页面，也不随“全部更新平台应用”安装；需要在应用商城单独安装。`/digital-twin` 使用 Three.js 程序化场景重建红褐色公寓高楼、连续低层商业街与中央拱门，场景包含蓝天白云、道路、树木、32 名循环步态行人和 7 辆双向循环的曲面车体。造型参考用户提供的多角度照片与现场沙盘照片，另附 AI 生成的概念参考图；它是可交互的演示模型，不是实测 BIM/CAD、汽车厂商数字样车或精确施工图复刻。
+“3D 数字孪生 · 城市摩尔”现由独立 `MicroService` AI 应用 `microi-ningbo-city-mall` 承载，菜单 `/micro-app/microi-ningbo-city-mall/digital-twin`，免登录公开入口为 `https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html`。它**不是**通用引擎的子页面，也不随“全部更新平台应用”安装；需要在应用商城单独安装。`/digital-twin` 使用 Three.js 程序化场景重建红褐色公寓高楼、连续低层商业街与中央拱门，场景包含蓝天白云、道路、树木、32 名循环步态行人和 7 辆双向循环的曲面车体。造型参考用户提供的多角度照片与现场沙盘照片，另附 AI 生成的概念参考图；它是可交互的演示模型，不是实测 BIM/CAD、汽车厂商数字样车或精确施工图复刻。
 
 此类浏览器内楼层/住户点选采用 Three.js：可直接嵌入 MicroService，且能与吾码菜单、主题和接口引擎共用宿主能力。Blender 可用于日后制作替换用的 GLB 美术资产；当前演示不依赖 Unity WebGL 或外部 BIM 文件。
 

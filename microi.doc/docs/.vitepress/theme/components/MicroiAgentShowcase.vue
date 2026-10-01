@@ -7,8 +7,8 @@
         <h2 id="microi-code-title">让 AI 在<strong>完整业务底座</strong>上工作</h2>
         <p class="microi-code-lead">代码、吾码账号、AI 中转站、MCP 与 30+ 成熟引擎，在一个桌面工作台协同。</p>
         <div class="microi-code-actions">
-          <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows <small>v{{ liveVersions.windows }}</small></a>
-          <a :href="downloadUrls.mac" target="_blank" rel="noopener"><DownloadIcon />下载 macOS <small>v{{ liveVersions.mac }}</small></a>
+          <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows <small v-if="liveVersions.windows">v{{ liveVersions.windows }}</small></a>
+          <a :href="downloadUrls.mac" target="_blank" rel="noopener"><DownloadIcon />下载 macOS <small v-if="liveVersions.mac">v{{ liveVersions.mac }}</small></a>
         </div>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
@@ -108,7 +108,7 @@ function resetPointer(event) {
 }
 
 const windows = {
-  latest: 'https://static.itdos.com/itdos/microi-code/latest/202609/Microi-Code-latest-windows-x64-setup.exe',
+  latest: 'https://static.itdos.com/itdos/microi-code/latest/Microi-Code-latest-windows-x64-setup.exe',
   archive: 'https://static.itdos.com/itdos/microi-code/1.1.3/29f4aef8fede/202609/Microi-Code-1_1_3-windows-x64-setup.exe',
   sha256: '29f4aef8fede578500da3557c3d8350129e035337e008f5e1aaa69162ddb0aee'
 }
@@ -182,6 +182,7 @@ const visibleReleases = computed(() => releases.slice((historyPage.value - 1) * 
   --mc-card-strong: color-mix(in srgb, var(--vp-c-bg-soft) 92%, transparent);
   position: relative;
   isolation: isolate;
+  container-type: inline-size;
   width: min(1240px, calc(100vw - 360px));
   margin: 18px 50% 64px;
   padding: 30px;
@@ -278,6 +279,11 @@ const visibleReleases = computed(() => releases.slice((historyPage.value - 1) * 
 @media(max-width:1280px){.microi-code-showcase{width:calc(100% - 32px);margin-inline:auto;transform:none}.microi-code-hero{grid-template-columns:1fr}.microi-code-hero__visual{transform:none}.microi-code-gallery a:first-child{grid-row:auto}.microi-code-gallery a:first-child img{height:auto;aspect-ratio:1.72}.microi-code-gallery a:nth-child(4){grid-column:auto}.microi-code-gallery a:nth-child(4) img{aspect-ratio:1.72}}
 @media(max-width:760px){.microi-code-showcase{width:calc(100% - 20px);padding:10px;border-radius:20px}.microi-code-hero{padding:32px 10px 36px}.microi-code-hero h2{font-size:38px!important}.microi-code-platforms,.microi-code-gallery{grid-template-columns:1fr;margin-inline:10px}.microi-code-section-head,.microi-code-flow,.microi-code-credit{margin-inline:10px}.microi-code-history{padding-inline:10px}.microi-code-facts{grid-template-columns:1fr;gap:12px}.microi-code-facts li{padding:0;border-left:0}.release-list article{grid-template-columns:1fr;gap:7px}}
 @media(prefers-reduced-motion:reduce){.microi-code-hero__visual,.microi-code-gallery img{transition:none}.microi-code-showcase::before{display:none}}
+@container (max-width: 900px) {
+  .microi-code-hero { grid-template-columns: minmax(0, 1fr); padding-inline: 10px; }
+  .microi-code-hero__visual { transform: none; }
+  .microi-code-section-head { align-items: start; flex-direction: column; }
+}
 </style>
 
 <style>
