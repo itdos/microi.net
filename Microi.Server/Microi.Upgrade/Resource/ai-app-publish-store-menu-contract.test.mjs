@@ -12,9 +12,10 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v2.0.4 V3 source", () => {
+test("publisher package metadata matches the maintained V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v2.0.4");
+  assert.match(packagedPublisher.Version, /^v\d+\.\d+\.\d+$/);
+  assert.ok(publisherSource.includes(`Version: ${packagedPublisher.Version}`));
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -137,6 +138,36 @@ test("v3 package creation time is fixed to the release across exact replays", ()
   assert.equal(creationTime(true, "2026-09-08 02:00:00"), creationTime(true, "2026-09-09 03:00:00"));
   assert.equal(creationTime(true, "later"), "2026-09-08 01:00:00");
   assert.equal(creationTime(false, "2026-09-09 03:00:00"), "2026-09-09 03:00:00");
+});
+
+test("V3 marketplace proof accepts the fixed CDN entry only for its committed tenant app", () => {
+  const context = { V8: { OsClient: "iTdos" } };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "readV3CommittedProof")}
+    ${extractFunction(publisherSource, "assertV3CommittedStore")}
+    read = readV3CommittedProof;
+    assertStore = assertV3CommittedStore;
+  `, context);
+  const proof = context.read({
+    VersionId: "version-1", RuntimeManifestHash: "a".repeat(64),
+    PublishFence: "6", PublishRowVersion: "6", VersionRowVersion: "6",
+    PublishState: "Completed",
+    StableResolverPath: "/micro-app/v3/tenants/itdos/kinds/runtime/apps/ai-platform-studio/assets/index.html",
+    CdnPreviewPath: "/itdos/micro-app/ai-platform-studio/index.html",
+    RequestId: "request-1", RequestFingerprint: "b".repeat(64),
+  });
+  const row = {
+    AppKey: "ai-platform-studio", CommittedPublishVersionId: "version-1",
+    CommittedRuntimeManifestHash: "a".repeat(64), PublishFence: 6,
+    PublishRowVersion: 6, PublishState: "Completed",
+    PublicPublishPath: "/itdos/micro-app/ai-platform-studio/index.html",
+  };
+  assert.doesNotThrow(() => context.assertStore(row, proof, "readback"));
+  assert.throws(() => context.assertStore({ ...row, AppKey: "another-app" }, proof, "readback"), /CdnPreviewPath/);
+  assert.throws(() => context.assertStore({ ...row, PublicPublishPath: "/itdos/micro-app/another-app/index.html" }, proof, "readback"), /PublicPublishPath/);
+  assert.throws(() => context.read({ ...proof, CdnPreviewPath: "/itdos/micro-app/../index.html" }), /CdnPreviewPath/);
 });
 
 test("inline runtime sizes handle both Jint arrays and CLR wrappers and enforce the aggregate limit", () => {
@@ -1073,7 +1104,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v2\.0\.4/);
+  assert.ok(publisherSource.includes(`Version: ${packagedPublisher.Version}`));
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

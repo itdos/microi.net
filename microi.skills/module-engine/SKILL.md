@@ -120,6 +120,13 @@ HTTP 成功或菜单字段非空不足以证明统计有效。
 | `Report` | 虚拟报表 |
 | `MicroService` | 已发布前端微服务页面 |
 | `CodeForm` | 表单设计器生成并在已发布微服务中运行的独立 Vue 3 页面；必须绑定 `DiyTableId` |
+| `WorkFlow` | 审批工作流模块；必须绑定 `DiyTableId` 和已启用流程的 `FlowDesignId` |
+
+`WorkFlow` 模块的 `DiyTableId` 必须等于 `wf_flowdesign.TableId`。完整 Manifest
+可填写 `flowName` 引用同一份 `workflows` 定义，生成器保存流程后回填
+`sys_menu.FlowDesignId`；引用已存在流程时填真实 `flowDesignId`。
+使用 `microi_get_module` 回读 `OpenType/FlowDesignId/DiyTableId`，再从模块
+实际发起并检查审批待办。流程节点人员、坐标和拓扑详见 `v8-workflow`。
 
 `CodeForm` 复用 MicroService 宿主与菜单权限上下文。先在表单设计器生成源码，保存至 `microi-generated-forms`，构建并发布微服务；再配置 `MicroServiceKey + MicroServiceRoutePath`（以及当前租户真实的 `MicroServiceId + MicroServicePageId`），保留原表的 `DiyTableId`。Manifest 生成器可解析可移植的 Key/RoutePath；`microi_create_module` 必须传实际 Id。不能把只保存私有源码当作已发布运行产物。
 
@@ -235,3 +242,9 @@ PageTabs 通过 `TargetSysMenuId` 切换不同模块/表时，入口模块必须
   语义色可区分，并在浅色/深色主题下保持可读。
 - PC 复合列和 Mobile Card 引用的附加字段均在查询结果中；长文本、空值、模板值不破版。
 - PC 和移动端分别验证；MicroService 还要验证运行时、页面路由和宿主上下文。
+### 多级表头与顶部 Banner
+
+- 数据源【多级表头】使用现有 `sys_menu.TableHeaders`，填写 `[{"Label":"人数（人）","Fields":["Total","Male","Female"]}]`；`Fields` 必须引用可见、连续的查询列字段名。嵌套分组可使用 `Children`。缺省、非法 JSON、重复或不连续字段时客户端回退普通表头。
+- Manifest `modules[].tableHeaders` 接受同一数组，MCP 写入 `sys_menu.TableHeaders`；更新已有菜单可通过 `microi_update_module` 传同名字段并回读，不能把合并表头放入已废弃的 `DiyConfig`。
+- 模块的 `HideTableBanner`、`HideFormBanner` 分别关闭表格与表单顶部 Banner。未配置或 `0` 均显示；设为 `1` 后对应专属统计接口不执行，按钮角标接口不受影响。Manifest 使用 `hideTableBanner`、`hideFormBanner`。
+- 上述配置由模块引擎官方应用交付，验收应分别核对物理列、字段可见性、商城包哈希，以及普通表头、合并表头和两种 Banner 开关的真实页面与请求。

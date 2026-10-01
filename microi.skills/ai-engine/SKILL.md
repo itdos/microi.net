@@ -49,7 +49,7 @@ description: Microi AI 引擎、MiniMax 图片/音乐/视频生成与预览、�
 
 当前入口并不共用一条检索链路：普通 `Chat/ChatStream` 使用服务端会话上下文和固定核心规范 Prompt；`NL2SQL` 使用当前租户 Schema 双模式检索；`NL2V8` 使用 Skill 镜像与当前租户 Schema 双模式检索。默认模式不依赖 Ollama、`nomic-embed-text` 或 Qdrant；只有显式开启向量数据库时才增加向量通道。在线低代码建模在 `Microi.AI` 内建立同版 `microi.mcp` 会话，模型通过 `microi_codex` 执行工具循环。普通对话仍不调用 MCP；不能仅凭 Prompt 声称工具已执行，必须检查工具返回和回读。
 
-在线 `/#/mic-ai-engine` 的低代码建模模式使用本地 Microi.Code 同一份 `microi.mcp` 工具目录：先 `list_tools`/`describe_tool`，再执行表、字段、菜单、接口引擎、Manifest 系统编排、删除等原 MCP 工具。用户在对话中明确要求写入时自动执行，不需要网页按钮；明确“只规划、不执行”时只调用只读工具。前端仅向 `Level >= 9999` 开放建模入口；服务端进入模式和每次工具调用前都以当前 DiyToken、主库账号及有效角色复核。工具原有确认值、审计和回读规则继续生效；超时或结果不确定时停止，不自动重试写操作。商城包不替换平台前后端程序。
+在线 `/#/mic-ai-engine` 的低代码建模模式使用本地 Microi.Agent 同一份 `microi.mcp` 工具目录：先 `list_tools`/`describe_tool`，再执行表、字段、菜单、接口引擎、Manifest 系统编排、删除等原 MCP 工具。用户在对话中明确要求写入时自动执行，不需要网页按钮；明确“只规划、不执行”时只调用只读工具。前端仅向 `Level >= 9999` 开放建模入口；服务端进入模式和每次工具调用前都以当前 DiyToken、主库账号及有效角色复核。工具原有确认值、审计和回读规则继续生效；超时或结果不确定时停止，不自动重试写操作。商城包不替换平台前后端程序。
 
 建模对话使用非流式 `/api/Ai/Chat` 获取服务端 MCP 工具循环最终答案和工具名称/状态；普通对话保持流式。完整系统先调用 `microi_get_db_schema`、`microi_get_manifest_schema`、`microi_plan_system`，用 `microi_generate_system(dryRun=true)` 验证，再按用户明确创建请求调用 `dryRun=false` 并用 `microi_validate_system` 回读。模型提交的参数由原 MCP Schema 校验，不能在前端绕过。
 

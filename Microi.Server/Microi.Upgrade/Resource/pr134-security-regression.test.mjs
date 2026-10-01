@@ -68,6 +68,12 @@ function saveRolePermissions(requested) {
     OldForm: {},
     DbTrans: {},
     FormEngine: {
+      GetFormData(name, query, transaction) {
+        assert.equal(name, 'sys_role');
+        assert.equal(JSON.stringify(query._Where), JSON.stringify([['Id', '=', 'limited-role']]));
+        assert.equal(transaction, V8.DbTrans);
+        return { Code: 1, Data: { Id: 'limited-role', Level: 1, TenantId: '' } };
+      },
       GetTableData(name) {
         if (name === 'sys_role') return { Code: 1, Data: [], DataCount: 0 };
         if (name === 'sys_menu') {

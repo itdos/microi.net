@@ -13,6 +13,7 @@ const packagePath = resolve(scriptDirectory, 'app.microi.saas-engine.json');
 const storePackagePath = resolve(scriptDirectory, 'app.microi.store.json');
 const messagePackagePath = resolve(scriptDirectory, 'app.microi.message-notification.json');
 const observabilityPackagePath = resolve(scriptDirectory, 'app.microi.sys-log.json');
+const observabilitySourcePath = resolve(scriptDirectory, 'system-observability-package-source.json');
 const releaseContractPath = resolve(scriptDirectory, 'platform-service-release.json');
 const releaseContract = JSON.parse(await readFile(releaseContractPath, 'utf8'));
 if (releaseContract?.SchemaVersion !== 1 || releaseContract?.AppKey !== 'microi-platform-service') {
@@ -52,6 +53,7 @@ const applicationVersionArgument = argumentValue('--application-version');
 const saasPackageVersionArgument = argumentValue('--saas-package-version');
 const storePackageVersionArgument = argumentValue('--store-package-version');
 const messagePackageVersionArgument = argumentValue('--message-package-version');
+const observabilityPackageVersionArgument = argumentValue('--observability-package-version');
 const sourceManifestHashOverride = argumentValue('--source-manifest-hash');
 const runtimeManifestHashOverride = argumentValue('--runtime-manifest-hash');
 const changeSummary = argumentValue('--change-summary').trim();
@@ -218,6 +220,7 @@ function contentType(path) {
 const packageModel = JSON.parse(await readFile(packagePath, 'utf8'));
 const storePackageModel = JSON.parse(await readFile(storePackagePath, 'utf8'));
 const messagePackageModel = JSON.parse(await readFile(messagePackagePath, 'utf8'));
+const observabilityPackageModel = JSON.parse(await readFile(observabilityPackagePath, 'utf8'));
 let databaseBackupDialogCount = 0;
 for (const menu of packageModel.SysMenus || []) {
   if (!menu.PageBtns) continue;
@@ -673,10 +676,31 @@ messagePackageModel.ApplicationBundles.push(deepClone(bundle));
 synchronizeStoreRuntimeSchema(messagePackageModel, packageModel);
 refreshPackageCounts(messagePackageModel);
 
+// 发布契约中的所有共享运行时持有者必须同时推进，避免独立安装回写旧运行时。
+const previousObservabilityBundle = (observabilityPackageModel.ApplicationBundles || []).find(item => item?.Application?.AppKey === releaseContract.AppKey);
+if (previousObservabilityBundle?.VersionNo !== version || previousObservabilityBundle?.MicroService?.DistHash !== localRuntimeManifestHash) {
+  const nextVersion = observabilityPackageVersionArgument || saasPackageVersionArgument;
+  if (!/^v\d+\.\d+\.\d+$/.test(nextVersion) || compareSemanticVersion(nextVersion, observabilityPackageModel.PackageInfo.Version) <= 0) {
+    throw new Error('系统日志/监控运行时变化时，必须提供更高的 --observability-package-version（缺省使用新的 SaaS 包版本）');
+  }
+  const content = `同步平台内置微服务 ${version} 的已校验运行产物与个人外观设置。${changeSummary}`;
+  observabilityPackageModel.PackageInfo.Version = nextVersion;
+  observabilityPackageModel.PackageInfo.ChangeLog = {Version:nextVersion,Title:'平台内置微服务运行时同步',ChangeType:'Update',Content:content,ReleaseTime:localTime};
+  observabilityPackageModel.PackageInfo.ChangeHistory = `${localTime.slice(0,10)} ${nextVersion} ${content}\n${observabilityPackageModel.PackageInfo.ChangeHistory || ''}`;
+}
 validateReleaseTargets();
 await writeFile(packagePath, `${JSON.stringify(packageModel, null, 2)}\n`, 'utf8');
 await writeFile(storePackagePath, `${JSON.stringify(storePackageModel, null, 2)}\n`, 'utf8');
 await writeFile(messagePackagePath, `${JSON.stringify(messagePackageModel, null, 2)}\n`, 'utf8');
+// 日志包的表、字段由官方母版事实源生成，只推进发布元数据；共享运行时由生成器读取刚写入的 SaaS 包。
+const observabilitySource = JSON.parse(await readFile(observabilitySourcePath, 'utf8'));
+for (const key of ['Version', 'ChangeLog', 'ChangeHistory', 'ChangeLogs']) {
+  if (observabilityPackageModel.PackageInfo[key] !== undefined) {
+    observabilitySource.PackageInfo[key] = deepClone(observabilityPackageModel.PackageInfo[key]);
+  }
+}
+await writeFile(observabilitySourcePath, `${JSON.stringify(observabilitySource, null, 2)}\n`, 'utf8');
+execFileSync(process.execPath, [resolve(scriptDirectory, 'configure-system-observability-package.mjs'), '--refresh-candidate'], { windowsHide: true, stdio: 'pipe' });
 process.stdout.write(JSON.stringify({
   releaseContractPath,
   applicationRoot,

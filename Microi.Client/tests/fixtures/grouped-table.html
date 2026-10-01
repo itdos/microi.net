@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8" /><title>多级表头浏览器验收</title></head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import { createApp, h } from 'vue';
+    import { ElTable, ElTableColumn } from 'element-plus';
+    import GroupedTableColumns from '../../src/views/form-engine/diy-components/GroupedTableColumns.vue';
+
+    const fields = ['Type', 'Total', 'Male', 'Female', 'Amount'].map((Name) => ({ Name, Label: Name }));
+    const rows = [{ Type: '员工', Total: 67, Male: 38, Female: 29, Amount: 100 }];
+    const headers = [{ Label: '人数（人）', Children: [
+      { Label: '总数', Fields: ['Total'] },
+      { Label: '性别', Fields: ['Male', 'Female'] }
+    ] }];
+    createApp({
+      render: () => h(ElTable, { data: rows, border: true }, {
+        default: () => [
+          h(ElTableColumn, { type: 'index', label: '序号' }),
+          h(GroupedTableColumns, { headers, fields }, {
+            default: () => fields.map((field) => h(ElTableColumn, {
+              key: field.Name, prop: field.Name, label: field.Label
+            }))
+          }),
+          h(ElTableColumn, { label: '操作' })
+        ]
+      })
+    }).mount('#app');
+  </script>
+</body>
+</html>

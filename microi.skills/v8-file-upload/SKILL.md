@@ -42,6 +42,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 - 浏览器上传必须携带 `FormEngineKey + FieldId + SysMenuId`，编辑已有记录再带 `FormDataId`，TableChild 再带父子授权上下文。后端先用 FormEngine 校验动作权限，再从当前租户回读 `diy_field.Component/Config`，用权威 `Limit` 覆盖请求值，并把目录固定为 `ImgUpload→img`、`FileUpload→file`、`RichText→editor`。
 - 客户端 `Limit`、`Path`、字段 Id 和菜单 Id 都只是待验证线索。没有可验证字段上下文的普通交互式上传默认私有并限制到安全一级目录；不能为了恢复公有字段语义而重新信任裸 `Limit=false`。
 - 兼容旧移动端/定制页面时，在普通系统设置 `sys_config.HdfsUploadRules` 配置目录与角色规则，无需逐个改客户端。`Path` 使用区分大小写的租户内相对路径；`RoleIds` 是真实角色 Id 数组，或显式启用 `AllAuthenticated`；`IncludeSubdirectories` 和 `AllowPublic` 默认关闭。只有后端有效角色命中且显式允许公有，才尊重请求 `Limit=false`。规则不是秘密，不必放入后端私有设置，修改权限与服务端判定必须严格受控。
+- 排查目录授权失败时先检查 multipart 是否同时提交 `Path` 和 `path`。客户端只应提交一个 `Path`；后端对相同值归一，对不同值拒绝，不能因重复字段误判而扩大 `HdfsUploadRules`。
 - 后端 v8.2.9+ 的配置 `Path` 支持 `*`（单层任意字符）、`**`（零到多层目录，须独占层级）、`?`、`[abc]`、`[a-z]`、`[!0-9]`/`[^0-9]`、`{a,b}` 候选及组合；优先 `files/{inspection,quality}/**` 这类最小业务前缀，不能为省事直接向全部用户配置 `** + AllowPublic`。只匹配请求目录，不匹配文件名或服务端追加的年月。实际上传路径不接受通配符；保留目录先于 glob 校验，不能用宽泛规则绕过。最多512字符/规则、4层花括号、32候选、4096令牌；有界动态规划和有界语法缓存不得缓存租户授权结果。先更新全部后端节点再配置新语法，精确旧规则仍兼容。
 - 目录规则只扩展无字段上下文上传，不绕过表/菜单/行权限、租户隔离、保留路径、文件类型、内容检测及配额；不能授予访问密钥会话、私有文件读取或应用发布权限。规则通过系统设置共享缓存读取，保存/删除后失效；应用包只发布字段和可空 DDL，禁止附带会覆盖租户规则的配置数据。验收覆盖授权/未授权角色、路径边界、公私桶、禁用用户、跨租户、规则撤销及缓存生效。
 - 老 `ImgUpload/FileUpload` 缺失 `Limit` 时兼容为公有；老 `RichText` 缺失上传配置时默认私有。微信待审图片与裁剪/压缩 `_origin` 原图始终私有，字段公有配置不能放宽这些特殊边界。客户端保存与预览必须以上传响应的实际 `Limit` 为准。
@@ -82,9 +83,15 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 | `V8.FilesByteBase64` | 接收上传时携带的文件字典 `{ FileName: base64 }` |
 | `V8.Method.Upload({...})` | 服务端上传文件到 HDFS（推荐） |
 | `V8.Method.GetPrivateFileUrl({FilePathName})` | 生成私有桶临时访问 URL |
+| `V8.Method.CopyObject({FilePathName,Path,Limit})` | 当前租户同一桶内服务端复制，保留原对象；用于固定入口与版本快照 |
+| `V8.Method.ObjectExist({FilePathName,Limit})` | 检查当前租户公有/私有桶对象是否存在 |
+| `V8.Method.GetObjectSha256({FilePathName,Limit})` | 在服务端流式计算对象原始字节与旧版 Base64 文本的 SHA-256 和字节数；不把对象内容送入 V8 |
+| `V8.Method.ListObjects({Path,Limit,Recursive,Marker,MaxKeys})` | 分页列举当前租户前缀，单页最多 1000 个 |
 | `/apiengine/platform-private-file-url` | 官网 PC/UniApp 按菜单、记录、字段和对象引用换取私有文件短链 |
 | `V8.Http.GetResponse({Url}).RawBytes` | 下载远程文件为字节数组 |
 | 接口返回 `{ FileName, ContentType, FileByteBase64 }` | 接口直接响应文件 |
+
+固定 CDN 应用回填优先使用服务端 `CopyObject`，公有桶复制编译资产、私有桶复制源码；`Limit` 在源与目标间保持一致，`Path` 和 `FilePathName` 均由后端收敛到当前租户。大对象用 `GetObjectSha256` 流式核对原对象和复制目标，公有体验路径仍须从 CDN 独立回读。历史版本目标已存在时须核对字节哈希，发现不同内容立即停止；固定根可在新版本验证后覆盖。`ListObjects` 必须分页并限制到单个应用前缀，不得把这些存储管理原子直接开放为匿名业务接口。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=v8-file-upload-001 sha256=bacff382201c915334757946ee60d4a65db4e9663dd9e1f86bb68c1c16589321 -->

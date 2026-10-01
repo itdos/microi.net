@@ -345,6 +345,25 @@ public class SecurityGuardAndSysUserRegressionTests
     }
 
     [Fact]
+    public void ReminderRecipientIncludesEveryActiveLevel9999UserWithoutGrantingConfigurationRights()
+    {
+        var token = JObject.FromObject(new { Id = "second-super-admin", Level = DiyCommon.MaxRoleLevel });
+        var user = new SysUser { Id = "second-super-admin", Account = "second-admin", Level = DiyCommon.MaxRoleLevel,
+            State = 1, IsDeleted = 0, RoleIds = string.Empty };
+        Assert.True(PlatformAdministratorSecurity.HasCurrentSuperAdministratorRecipientLevel(token, user));
+        Assert.False(PlatformAdministratorSecurity.HasEffectivePlatformAdministratorLevel(token, user, Array.Empty<SysRole>()));
+        user.State = 0;
+        Assert.False(PlatformAdministratorSecurity.HasCurrentSuperAdministratorRecipientLevel(token, user));
+        user.State = 1; user.Level = DiyCommon.MaxRoleLevel - 1;
+        Assert.False(PlatformAdministratorSecurity.HasCurrentSuperAdministratorRecipientLevel(token, user));
+        user.Level = DiyCommon.MaxRoleLevel;
+        Assert.False(PlatformAdministratorSecurity.HasCurrentSuperAdministratorRecipientLevel(
+            JObject.FromObject(new { Id = "second-super-admin", Level = DiyCommon.MaxRoleLevel - 1 }), user));
+        Assert.False(PlatformAdministratorSecurity.HasCurrentSuperAdministratorRecipientLevel(
+            JObject.FromObject(new { Id = "another-user", Level = DiyCommon.MaxRoleLevel }), user));
+    }
+
+    [Fact]
     public void DefaultIndexUrlValidation_IsOwnedByTheManagedPreferenceEngine()
     {
         var root = FindRepositoryRoot();

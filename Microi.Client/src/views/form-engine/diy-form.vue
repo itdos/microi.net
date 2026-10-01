@@ -431,7 +431,7 @@
 
 <script>
 import draggable from "vuedraggable";
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import _ from "underscore";
 import { useDiyStore } from "@/pinia";
 
@@ -478,7 +478,8 @@ export default {
     components: {
         draggable,
         DiyReadonlyValue,
-        StandardFormBanner
+        StandardFormBanner,
+        MicroiMqttExecutionLogs: defineAsyncComponent(() => import('@/views/mqtt-engine/ExecutionLogs.vue'))
     },
     setup() {
         const diyStore = useDiyStore();
@@ -517,6 +518,10 @@ export default {
         SysMenuId: {
             type: String,
             default: ""
+        },
+        HideTopBanner: {
+            type: Boolean,
+            default: false
         },
         TableChildAuth: {
             type: Object,

@@ -2,14 +2,14 @@
   "Id": "d50ea9ce-c4d1-445f-b1f6-1e456bd4cd90",
   "Title": "智能工作首页",
   "Number": "PAGE5",
-  "Desc": "以统一 AI 对话为首屏入口，结合当前用户真实常用应用、访问趋势、工作中心、日历与公告的响应式工作首页。",
+  "Desc": "紧凑智能工作台，保留 AI 创作中心与真实常用应用、访问趋势，任务、日历和公告并排展示，移动端自动换行。",
   "RoutePath": "/",
   "ComponentPath": "/page-engine/renderer",
   "JsonObj": {
     "formConfig": {
       "gutter": 0,
       "mask": true,
-      "drag": true,
+      "drag": false,
       "left": true,
       "hover": true,
       "shadow": false,
@@ -17,11 +17,16 @@
       "watermark": false,
       "mobile": false,
       "dark": false,
+      "themeMode": "system",
+      "density": "compact",
       "autoRefresh": 0,
       "lastRefreshTime": "",
       "watermarkStyle": {
         "content": "",
-        "font": { "fontSize": 16, "color": "rgba(0, 0, 0, 0.08)" },
+        "font": {
+          "fontSize": 16,
+          "color": "rgba(0, 0, 0, 0.08)"
+        },
         "rotate": -22
       },
       "dynamicStyle": {
@@ -40,21 +45,49 @@
         "wrapperOption": {
           "number": 93001,
           "gutter": 0,
-          "span": 24,
+          "span": 14,
           "offset": 0,
           "push": 0,
           "pull": 0,
-          "height": 555,
+          "height": 420,
           "marginTop": 0,
-          "margin": "0px 8px 12px 8px",
+          "margin": "0px 5px 10px 5px",
           "pannelColor": "",
-          "dynamicStyle": { "padding": "0px", "backgroundColor": "transparent" },
+          "dynamicStyle": {
+            "padding": "0px",
+            "backgroundColor": "var(--mci-bg-card, var(--el-bg-color))"
+          },
           "titleOption": {
             "hidden": true,
             "title": "AI 创作入口",
-            "dynamicStyle": { "textAlign": "left", "padding": "0px", "height": "0px", "lineHeight": "0px", "fontSize": "0px", "fontWeight": "600", "color": "var(--el-text-color-primary)" },
-            "moreOption": { "hidden": true, "icon": "More", "iconShow": false, "text": "完整 AI 助手", "linkurl": "/mic-ai-engine", "linktype": "router", "refresh": "0", "datetime": "0", "autotime": false, "autotimeval": 1, "dynamicStyle": { "color": "", "fontSize": "12px" } }
-          }
+            "dynamicStyle": {
+              "textAlign": "left",
+              "padding": "0px",
+              "height": "0px",
+              "lineHeight": "0px",
+              "fontSize": "0px",
+              "fontWeight": "600",
+              "color": "var(--el-text-color-primary)",
+              "fontFamily": "inherit"
+            },
+            "moreOption": {
+              "hidden": true,
+              "icon": "More",
+              "iconShow": false,
+              "text": "完整 AI 助手",
+              "linkurl": "/mic-ai-engine",
+              "linktype": "router",
+              "refresh": "0",
+              "datetime": "0",
+              "autotime": false,
+              "autotimeval": 1,
+              "dynamicStyle": {
+                "color": "",
+                "fontSize": "12px"
+              }
+            }
+          },
+          "heightMode": "content"
         },
         "widgetList": [
           {
@@ -62,7 +95,20 @@
             "label": "AI助手",
             "category": 0,
             "show": 1,
-            "widgetOption": { "number": 94001, "wrapperNumber": 93001, "span": 24, "offset": 0, "push": 0, "pull": 0, "height": 555, "marginTop": 0, "dynamicStyle": { "padding": "0px", "backgroundColor": "transparent" } },
+            "widgetOption": {
+              "number": 94001,
+              "wrapperNumber": 93001,
+              "span": 24,
+              "offset": 0,
+              "push": 0,
+              "pull": 0,
+              "height": 380,
+              "marginTop": 0,
+              "dynamicStyle": {
+                "padding": "0px",
+                "backgroundColor": "transparent"
+              }
+            },
             "widgetParams": [],
             "icon": "",
             "img": ""
@@ -78,21 +124,49 @@
         "wrapperOption": {
           "number": 93002,
           "gutter": 0,
-          "span": 24,
+          "span": 10,
           "offset": 0,
           "push": 0,
           "pull": 0,
-          "height": 455,
+          "height": 420,
           "marginTop": 0,
-          "margin": "0px 8px 12px 8px",
+          "margin": "0px 5px 10px 5px",
           "pannelColor": "",
-          "dynamicStyle": { "padding": "14px", "backgroundColor": "var(--mci-bg-card, var(--el-bg-color))" },
+          "dynamicStyle": {
+            "padding": "12px",
+            "backgroundColor": "var(--mci-bg-card, var(--el-bg-color))"
+          },
           "titleOption": {
             "hidden": true,
             "title": "工作概览",
-            "dynamicStyle": { "textAlign": "left", "padding": "0px", "height": "0px", "lineHeight": "0px", "fontSize": "0px", "fontWeight": "600", "color": "var(--el-text-color-primary)" },
-            "moreOption": { "hidden": true, "icon": "More", "iconShow": false, "text": "更多", "linkurl": "/", "linktype": "router", "refresh": "0", "datetime": "0", "autotime": false, "autotimeval": 1, "dynamicStyle": { "color": "", "fontSize": "12px" } }
-          }
+            "dynamicStyle": {
+              "textAlign": "left",
+              "padding": "0px",
+              "height": "0px",
+              "lineHeight": "0px",
+              "fontSize": "0px",
+              "fontWeight": "600",
+              "color": "var(--el-text-color-primary)",
+              "fontFamily": "inherit"
+            },
+            "moreOption": {
+              "hidden": true,
+              "icon": "More",
+              "iconShow": false,
+              "text": "更多",
+              "linkurl": "/",
+              "linktype": "router",
+              "refresh": "0",
+              "datetime": "0",
+              "autotime": false,
+              "autotimeval": 1,
+              "dynamicStyle": {
+                "color": "",
+                "fontSize": "12px"
+              }
+            }
+          },
+          "heightMode": "content"
         },
         "widgetList": [
           {
@@ -100,9 +174,48 @@
             "label": "智能首页概览",
             "category": 0,
             "show": 1,
-            "widgetOption": { "number": 94002, "wrapperNumber": 93002, "span": 24, "offset": 0, "push": 0, "pull": 0, "height": 425, "marginTop": 0, "dynamicStyle": { "padding": "0px", "backgroundColor": "transparent" } },
+            "widgetOption": {
+              "number": 94002,
+              "wrapperNumber": 93002,
+              "span": 24,
+              "offset": 0,
+              "push": 0,
+              "pull": 0,
+              "height": 380,
+              "marginTop": 0,
+              "dynamicStyle": {
+                "padding": "0px",
+                "backgroundColor": "transparent"
+              }
+            },
             "widgetParams": [
-              { "sort": 0, "label": "首页概览接口", "type": "input", "value": "platform-home-overview", "typeOptions": { "rows": 1 } }
+              {
+                "sort": 0,
+                "label": "首页概览接口",
+                "type": "input",
+                "value": "platform-home-overview",
+                "typeOptions": {
+                  "rows": 1
+                }
+              },
+              {
+                "sort": 1,
+                "label": "布局密度",
+                "type": "select",
+                "value": "compact",
+                "typeOptions": {
+                  "options": [
+                    {
+                      "label": "标准",
+                      "value": "standard"
+                    },
+                    {
+                      "label": "紧凑工作台",
+                      "value": "compact"
+                    }
+                  ]
+                }
+              }
             ],
             "icon": "",
             "img": ""
@@ -118,21 +231,49 @@
         "wrapperOption": {
           "number": 93003,
           "gutter": 0,
-          "span": 12,
+          "span": 14,
           "offset": 0,
           "push": 0,
           "pull": 0,
-          "height": 570,
+          "height": 400,
           "marginTop": 0,
-          "margin": "0px 8px 12px 8px",
+          "margin": "0px 5px 10px 5px",
           "pannelColor": "",
-          "dynamicStyle": { "padding": "14px", "backgroundColor": "var(--mci-bg-card, var(--el-bg-color))" },
+          "dynamicStyle": {
+            "padding": "12px",
+            "backgroundColor": "var(--mci-bg-card, var(--el-bg-color))"
+          },
           "titleOption": {
             "hidden": false,
             "title": "我的工作",
-            "dynamicStyle": { "textAlign": "left", "padding": "0 0 10px 2px", "height": "28px", "lineHeight": "28px", "fontSize": "17px", "fontWeight": "600", "color": "var(--el-text-color-primary)" },
-            "moreOption": { "hidden": true, "icon": "More", "iconShow": false, "text": "更多", "linkurl": "/", "linktype": "router", "refresh": "0", "datetime": "0", "autotime": false, "autotimeval": 1, "dynamicStyle": { "color": "", "fontSize": "12px" } }
-          }
+            "dynamicStyle": {
+              "textAlign": "left",
+              "padding": "0 0 8px 0",
+              "height": "24px",
+              "lineHeight": "24px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "color": "var(--el-text-color-primary)",
+              "fontFamily": "inherit"
+            },
+            "moreOption": {
+              "hidden": true,
+              "icon": "More",
+              "iconShow": false,
+              "text": "更多",
+              "linkurl": "/",
+              "linktype": "router",
+              "refresh": "0",
+              "datetime": "0",
+              "autotime": false,
+              "autotimeval": 1,
+              "dynamicStyle": {
+                "color": "",
+                "fontSize": "12px"
+              }
+            }
+          },
+          "heightMode": "content"
         },
         "widgetList": [
           {
@@ -140,11 +281,79 @@
             "label": "工作中心",
             "category": 0,
             "show": 1,
-            "widgetOption": { "number": 94003, "wrapperNumber": 93003, "span": 24, "offset": 0, "push": 0, "pull": 0, "height": 520, "marginTop": 0, "dynamicStyle": { "padding": "0px", "backgroundColor": "transparent" } },
+            "widgetOption": {
+              "number": 94003,
+              "wrapperNumber": 93003,
+              "span": 24,
+              "offset": 0,
+              "push": 0,
+              "pull": 0,
+              "height": 360,
+              "marginTop": 0,
+              "dynamicStyle": {
+                "padding": "0px",
+                "backgroundColor": "transparent"
+              }
+            },
             "widgetParams": [
-              { "sort": 0, "label": "显示内容", "type": "select", "value": "work", "typeOptions": { "rows": 3, "options": [{ "label": "我的工作", "value": "work" }, { "label": "日历", "value": "calendar" }, { "label": "公告", "value": "notice" }] } },
-              { "sort": 1, "label": "待办表单模块", "type": "sysmenu", "value": "299b8094-7e9e-4862-8e3c-62fdc4cc8a09", "typeOptions": {} },
-              { "sort": 2, "label": "流程表单模块", "type": "sysmenu", "value": "01KX884VMCV672GN43Z5RCT84X", "typeOptions": {} }
+              {
+                "sort": 0,
+                "label": "显示内容",
+                "type": "select",
+                "value": "work",
+                "typeOptions": {
+                  "rows": 3,
+                  "options": [
+                    {
+                      "label": "我的工作",
+                      "value": "work"
+                    },
+                    {
+                      "label": "日历",
+                      "value": "calendar"
+                    },
+                    {
+                      "label": "公告",
+                      "value": "notice"
+                    }
+                  ]
+                }
+              },
+              {
+                "sort": 1,
+                "label": "待办表单模块",
+                "type": "sysmenu",
+                "value": "299b8094-7e9e-4862-8e3c-62fdc4cc8a09",
+                "typeOptions": {}
+              },
+              {
+                "sort": 2,
+                "label": "流程表单模块",
+                "type": "sysmenu",
+                "value": "01KX884VMCV672GN43Z5RCT84X",
+                "typeOptions": {}
+              },
+              {
+                "sort": 3,
+                "label": "公告模块",
+                "type": "sysmenu",
+                "value": "",
+                "typeOptions": {}
+              },
+              {
+                "sort": 4,
+                "label": "日历模块",
+                "type": "sysmenu",
+                "value": "",
+                "typeOptions": {}
+              },
+              {
+                "sort": 5,
+                "label": "首页任务分页条数",
+                "type": "input",
+                "value": 5,
+                "typeOptions": {}
+              }
             ],
             "icon": "",
             "img": ""
@@ -160,21 +369,49 @@
         "wrapperOption": {
           "number": 93004,
           "gutter": 0,
-          "span": 12,
+          "span": 5,
           "offset": 0,
           "push": 0,
           "pull": 0,
-          "height": 570,
+          "height": 300,
           "marginTop": 0,
-          "margin": "0px 8px 12px 8px",
+          "margin": "0px 5px 10px 5px",
           "pannelColor": "",
-          "dynamicStyle": { "padding": "14px", "backgroundColor": "var(--mci-bg-card, var(--el-bg-color))" },
+          "dynamicStyle": {
+            "padding": "12px",
+            "backgroundColor": "var(--mci-bg-card, var(--el-bg-color))"
+          },
           "titleOption": {
             "hidden": false,
-            "title": "今日日程",
-            "dynamicStyle": { "textAlign": "left", "padding": "0 0 10px 2px", "height": "28px", "lineHeight": "28px", "fontSize": "17px", "fontWeight": "600", "color": "var(--el-text-color-primary)" },
-            "moreOption": { "hidden": true, "icon": "More", "iconShow": false, "text": "更多", "linkurl": "/", "linktype": "router", "refresh": "0", "datetime": "0", "autotime": false, "autotimeval": 1, "dynamicStyle": { "color": "", "fontSize": "12px" } }
-          }
+            "title": "本月日程",
+            "dynamicStyle": {
+              "textAlign": "left",
+              "padding": "0 0 8px 0",
+              "height": "24px",
+              "lineHeight": "24px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "color": "var(--el-text-color-primary)",
+              "fontFamily": "inherit"
+            },
+            "moreOption": {
+              "hidden": true,
+              "icon": "More",
+              "iconShow": false,
+              "text": "更多",
+              "linkurl": "/",
+              "linktype": "router",
+              "refresh": "0",
+              "datetime": "0",
+              "autotime": false,
+              "autotimeval": 1,
+              "dynamicStyle": {
+                "color": "",
+                "fontSize": "12px"
+              }
+            }
+          },
+          "heightMode": "content"
         },
         "widgetList": [
           {
@@ -182,8 +419,38 @@
             "label": "DIY日历",
             "category": 0,
             "show": 1,
-            "widgetOption": { "number": 94004, "wrapperNumber": 93004, "span": 24, "offset": 0, "push": 0, "pull": 0, "height": 520, "marginTop": 0, "dynamicStyle": { "padding": "0px", "backgroundColor": "transparent" } },
-            "widgetParams": [],
+            "widgetOption": {
+              "number": 94004,
+              "wrapperNumber": 93004,
+              "span": 24,
+              "offset": 0,
+              "push": 0,
+              "pull": 0,
+              "height": 260,
+              "marginTop": 0,
+              "dynamicStyle": {
+                "padding": "0px",
+                "backgroundColor": "transparent"
+              }
+            },
+            "widgetParams": [
+              {
+                "sort": 0,
+                "label": "日历模块",
+                "type": "sysmenu",
+                "value": "a283360d-9f1f-43d3-9380-074d60b87375",
+                "typeOptions": {
+                  "rows": 3
+                }
+              },
+              {
+                "sort": 1,
+                "label": "布局密度",
+                "type": "input",
+                "value": "compact",
+                "typeOptions": {}
+              }
+            ],
             "icon": "",
             "img": ""
           }
@@ -198,21 +465,49 @@
         "wrapperOption": {
           "number": 93005,
           "gutter": 0,
-          "span": 24,
+          "span": 5,
           "offset": 0,
           "push": 0,
           "pull": 0,
-          "height": 500,
+          "height": 300,
           "marginTop": 0,
-          "margin": "0px 8px 12px 8px",
+          "margin": "0px 5px 10px 5px",
           "pannelColor": "",
-          "dynamicStyle": { "padding": "14px", "backgroundColor": "var(--mci-bg-card, var(--el-bg-color))" },
+          "dynamicStyle": {
+            "padding": "12px",
+            "backgroundColor": "var(--mci-bg-card, var(--el-bg-color))"
+          },
           "titleOption": {
             "hidden": false,
             "title": "公告",
-            "dynamicStyle": { "textAlign": "left", "padding": "0 0 10px 2px", "height": "28px", "lineHeight": "28px", "fontSize": "17px", "fontWeight": "600", "color": "var(--el-text-color-primary)" },
-            "moreOption": { "hidden": true, "icon": "More", "iconShow": false, "text": "更多", "linkurl": "/", "linktype": "router", "refresh": "0", "datetime": "0", "autotime": false, "autotimeval": 1, "dynamicStyle": { "color": "", "fontSize": "12px" } }
-          }
+            "dynamicStyle": {
+              "textAlign": "left",
+              "padding": "0 0 8px 0",
+              "height": "24px",
+              "lineHeight": "24px",
+              "fontSize": "14px",
+              "fontWeight": "600",
+              "color": "var(--el-text-color-primary)",
+              "fontFamily": "inherit"
+            },
+            "moreOption": {
+              "hidden": true,
+              "icon": "More",
+              "iconShow": false,
+              "text": "更多",
+              "linkurl": "/",
+              "linktype": "router",
+              "refresh": "0",
+              "datetime": "0",
+              "autotime": false,
+              "autotimeval": 1,
+              "dynamicStyle": {
+                "color": "",
+                "fontSize": "12px"
+              }
+            }
+          },
+          "heightMode": "content"
         },
         "widgetList": [
           {
@@ -220,19 +515,77 @@
             "label": "DIY表格",
             "category": 0,
             "show": 1,
+            "widgetOption": {
+              "number": 94005,
+              "wrapperNumber": 93005,
+              "span": 24,
+              "offset": 0,
+              "push": 0,
+              "pull": 0,
+              "height": 260,
+              "marginTop": 0,
+              "dynamicStyle": {
+                "padding": "0px",
+                "backgroundColor": "transparent"
+              }
+            },
+            "widgetParams": [
+              {
+                "sort": 0,
+                "label": "模块ID",
+                "type": "input",
+                "value": "e6de62e8-dfd3-4fa0-9856-104ca1f1d34a",
+                "typeOptions": {
+                  "rows": 1,
+                  "dataJson": {}
+                }
+              },
+              {
+                "sort": 1,
+                "label": "菜单ID",
+                "type": "sysmenu",
+                "value": "01KX884VXENKCJQMMTYPS2PK63",
+                "typeOptions": {}
+              },
+              {
+                "sort": 2,
+                "label": "容器样式",
+                "type": "input",
+                "value": "home-notice-table",
+                "typeOptions": {}
+              },
+              {
+                "sort": 3,
+                "label": "分页条数",
+                "type": "input",
+                "value": "[10]",
+                "typeOptions": {}
+              },
+              {
+                "sort": 4,
+                "label": "呈现方式",
+                "type": "select",
+                "value": "NoticeList",
+                "typeOptions": {
+                  "options": [
+                    {
+                      "label": "模块表格",
+                      "value": "Table"
+                    },
+                    {
+                      "label": "公告列表",
+                      "value": "NoticeList"
+                    }
+                  ]
+                }
+              }
+            ],
+            "icon": "",
+            "img": "",
             "referencePolicy": {
               "onMissing": "RemoveWidget",
               "reason": "公告模块属于可选首页扩展；目标租户未安装公告表和菜单时移除本组件及空容器"
-            },
-            "widgetOption": { "number": 94005, "wrapperNumber": 93005, "span": 24, "offset": 0, "push": 0, "pull": 0, "height": 450, "marginTop": 0, "dynamicStyle": { "padding": "0px", "backgroundColor": "transparent" } },
-            "widgetParams": [
-              { "sort": 0, "label": "模块ID", "type": "input", "value": "e6de62e8-dfd3-4fa0-9856-104ca1f1d34a", "typeOptions": { "rows": 1, "dataJson": {} } },
-              { "sort": 1, "label": "菜单ID", "type": "sysmenu", "value": "01KX884VXENKCJQMMTYPS2PK63", "typeOptions": {} },
-              { "sort": 2, "label": "容器样式", "type": "input", "value": "home-notice-table", "typeOptions": {} },
-              { "sort": 3, "label": "分页条数", "type": "input", "value": "[10]", "typeOptions": {} }
-            ],
-            "icon": "",
-            "img": ""
+            }
           }
         ]
       }

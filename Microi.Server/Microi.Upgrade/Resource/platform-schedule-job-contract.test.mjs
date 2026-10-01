@@ -174,12 +174,18 @@ test('任务调度菜单随 SaaS 官方包交付完整列表、搜索、排序�
   assert.match(buttons.find(item => item.Name === '恢复').V8Code, /\/api\/Job\/ResumeJob/);
 });
 
-test('任务调度启用指标按真实“正常”状态统计', () => {
+test('任务调度启用指标按可信菜单中的真实“正常”状态统计', () => {
   const engine = packageData.SysApiEngines.find(item => item.ApiEngineKey === 'mci-module-presentation-stats');
   assert.ok(engine);
-  assert.equal(engine.Version, 'v1.0.7');
+  assert.equal(engine.Version, 'v1.1.3');
   assert.equal(engine.ApiV8Code.replace(/\r\n/g, '\n').trim(), statsCode.replace(/\r\n/g, '\n'));
-  assert.match(statsCode, /Metric_2_Status\.Where = \[\['Status', '=', '正常'\]\]/);
+  assert.match(statsCode, /readRows\('sys_menu'/);
+  assert.match(statsCode, /metric\.Count/);
+  const menu = packageData.SysMenus.find(item => item.Id === 'b08cce71-3a9e-4c4c-a2af-b0936b47b9a8');
+  const schema = JSON.parse(menu.ViewSchema);
+  assert.equal(schema.PresentationStatistics.Version, 1);
+  const metric = schema.Views[0].Layout.Hero.Metrics.find(item => item.Key === 'Metric_2_Status');
+  assert.deepEqual(metric.Count.Where, [['Status', '=', '正常']]);
 });
 
 test('官方包元数据与接口引擎数量一致', () => {

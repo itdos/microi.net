@@ -26,6 +26,11 @@ const legacySmsSourceDirectory = path.resolve(
   '未分类'
 );
 const pkg = JSON.parse(fs.readFileSync(resourcePath, 'utf8'));
+function safeLoginHookTemplate(source) {
+  const notice = source.match(/\/\* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1[\s\S]*?\*\//);
+  if (!notice) throw new Error('登录租户 Hook 缺少 CreateIfMissing 官方提示');
+  return `${notice[0]}\nreturn { Code : 1 };\n`;
+}
 const specs = [
   {
     id: '01KXNQJGRK4H5WGWPMYP4AH3EP', key: 'official_password_reset_send_sms',
@@ -125,7 +130,7 @@ for (const spec of specs) {
     ApiRoutes: pkg.SysApiEngines.find(item => item.ApiEngineKey === spec.key)?.ApiRoutes || (spec.key === 'platform_auth_sms_login' ? '/api/SysUser/SmsLogin' : ''),
     Lock: spec.lock || 0,
     ...(spec.lockKey !== undefined ? { LockKey: spec.lockKey } : {}),
-    ApiV8Code: source,
+    ApiV8Code: spec.key === 'platform_auth_login_hook' ? safeLoginHookTemplate(source) : source,
     ApiRole: '[]',
     ...(spec.responseFile !== undefined ? { ResponseFile: spec.responseFile } : {}),
     ...(spec.responseType !== undefined ? { ResponseType: spec.responseType } : {}),

@@ -999,6 +999,15 @@ export function validateApplicationAssetV3FinalizeEvidence(
     || stableResolverPath.includes('/requests/')) {
     throw new Error(`${context}.StableResolverPath 不是 versionless v3 resolver`);
   }
+  if (expected.publishMode === 'finalize' && evidence.Completed === true) {
+    const match = /^\/micro-app\/v3\/tenants\/([^/]+)\/kinds\/runtime\/apps\/([^/]+)\/assets\//u.exec(stableResolverPath);
+    if (!match) throw new Error(`${context}.StableResolverPath 缺少租户或 AppKey`);
+    const version = normalizedApplicationVersion(expected.versionNo);
+    requireStreamEvidenceString(evidence, 'CdnPreviewPath',
+      `/${match[1]}/micro-app/${match[2]}/${expected.encodedEntryPath}`, context);
+    requireStreamEvidenceString(evidence, 'CdnVersionPreviewPath',
+      `/${match[1]}/micro-app/${match[2]}/${version}/${expected.encodedEntryPath}`, context);
+  }
   return evidence;
 }
 
@@ -2372,6 +2381,22 @@ export async function runApplicationDirectoryStreamPublish(
           previewTruncated: manifest.assets.length > 200,
         }, null, 2) }],
       };
+    }
+
+    if (v3 && publishMode !== 'stage') {
+      const status = await client.getStatus();
+      const capabilities = asJsonRecord(status.Data);
+      if (status.Code !== 1 || capabilities.ApplicationCdnProjectionSupported !== true) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            error: '目标 API 尚未启用固定 CDN 对象投影；请先部署支持 ApplicationCdnProjectionSupported 的后端。',
+            publishMode,
+            uploadedCount: 0,
+            retrySafe: true,
+          }, null, 2) }],
+          isError: true,
+        };
+      }
     }
 
     let uploadedCount = 0;
@@ -7684,7 +7709,8 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       display: z.number().optional().describe('Show in PC menu (1=yes, 0=no). Default: 1'),
       appDisplay: z.number().optional().describe('Show in mobile menu (1=yes, 0=no). Default: 1'),
       hasChild: z.number().optional().describe('Whether this menu has visible child menus. A hidden TableChild carrier module MUST set 0.'),
-      openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page", "MicroService", "CodeForm". CodeForm keeps diyTableId while rendering a generated Vue 3 page in a MicroService.'),
+      openType: z.string().optional().describe('Open type. Default: "Diy". Options include "Diy", "WorkFlow", "Url", "Page", "MicroService", "CodeForm". WorkFlow requires diyTableId and flowDesignId for an enabled flow bound to the same table.'),
+      flowDesignId: z.string().optional().describe('Required when openType=WorkFlow: wf_flowdesign.Id of an enabled flow bound to diyTableId.'),
       url: z.string().optional().describe('Menu route. MicroService menus normally use /micro-app/{MicroServiceKey}/{routePath}.'),
       sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
       icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
@@ -7721,7 +7747,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       microServiceKey: z.string().optional().describe('sys_microiservice.MsKey/AppKey. Used to generate the friendly menu URL.'),
       confirmExecution: z.string().optional().describe('Required for real writes. Must exactly equal name, or EXECUTE. Omit for a dry-run payload.'),
     },
-    async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, hasChild, openType, url, sort,
+    async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, hasChild, openType, flowDesignId, url, sort,
       icon, menuBadgeEnabled, menuBadgeApiEngineKey, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere,
       enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema,
       moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns,
@@ -7729,10 +7755,25 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields,
       microServiceId, microServicePageId, microServiceRoutePath, microServiceKey, confirmExecution }) => {
       try {
+        const isWorkflow = String(openType || '').toLowerCase() === 'workflow';
+        if (isWorkflow) {
+          if (!diyTableId || !flowDesignId) {
+            return { content: [{ type: 'text', text: 'Error: WorkFlow 菜单必须同时绑定 diyTableId 与 flowDesignId。' }], isError: true };
+          }
+          const flowResult = await client.getTableData('wf_flowdesign', {
+            Id: flowDesignId, _SelectFields: ['Id', 'TableId', 'IsEnable'], _PageSize: 2,
+          });
+          const flowRows = unwrapList<Record<string, unknown>>(flowResult.Data);
+          const targetFlow = flowRows.find((row) => String(row.Id || '') === flowDesignId);
+          if (flowResult.Code !== 1 || !targetFlow || Number(targetFlow.IsEnable) !== 1
+            || String(targetFlow.TableId || '') !== diyTableId) {
+            return { content: [{ type: 'text', text: 'Error: flowDesignId 必须指向已启用且绑定同一 diyTableId 的流程。' }], isError: true };
+          }
+        }
         const isCodeForm = String(openType || '').toLowerCase() === 'codeform';
         const isMicroService = String(openType || '').toLowerCase() === 'microservice' || isCodeForm
           || Boolean(microServiceId || microServicePageId || microServiceRoutePath || microServiceKey);
-        let effectiveOpenType = openType;
+        let effectiveOpenType = isWorkflow ? 'WorkFlow' : openType;
         let effectiveComponentName = componentName;
         let effectiveComponentPath = componentPath;
         let effectiveUrl = url;
@@ -7799,6 +7840,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
                 ParentId: parentId,
                 HasChild: hasChild,
                 OpenType: effectiveOpenType || 'Diy',
+                FlowDesignId: flowDesignId,
                 ComponentName: effectiveComponentName,
                 ComponentPath: effectiveComponentPath,
                 Url: effectiveUrl,
@@ -7819,7 +7861,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           Name: name, DiyTableId: diyTableId, ParentId: parentId,
           ComponentName: effectiveComponentName, ComponentPath: effectiveComponentPath,
           Display: display ?? 1, AppDisplay: appDisplay ?? 1, HasChild: hasChild,
-          OpenType: effectiveOpenType, Url: effectiveUrl, Sort: sort,
+          OpenType: effectiveOpenType, FlowDesignId: flowDesignId, Url: effectiveUrl, Sort: sort,
           Icon: icon,
           MenuBadgeEnabled: menuBadgeEnabled ?? 0,
           MenuBadgeApiEngineKey: menuBadgeApiEngineKey,
@@ -8092,7 +8134,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       appKey: z.string().regex(/^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/u).describe('Stable lowercase application key and local directory name.'),
       name: z.string().min(1).max(120).describe('Human-readable MicroService name.'),
       description: z.string().optional().describe('Optional application description.'),
-      aiApplicationsDirectory: z.string().optional().describe('Absolute tenant AI应用 directory. Defaults to MICROI_AI_APPLICATIONS_DIR injected by Microi.Code.'),
+      aiApplicationsDirectory: z.string().optional().describe('Absolute tenant AI应用 directory. Defaults to MICROI_AI_APPLICATIONS_DIR injected by Microi.Agent.'),
       buildVersion: z.string().regex(/^v\d+\.\d+\.\d+$/u).optional().default('v0.1.0').describe('Initial semantic build version. Default v0.1.0.'),
       routes: z.array(z.object({
         path: z.string().describe('Internal route path such as /context-test.'),
@@ -8108,7 +8150,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         const targetRoot = String(aiApplicationsDirectory || process.env.MICROI_AI_APPLICATIONS_DIR || '').trim();
         if (!targetRoot) {
           return {
-            content: [{ type: 'text', text: 'Error: 缺少 AI 应用目录。请由 Microi.Code 注入 MICROI_AI_APPLICATIONS_DIR，或显式传入 aiApplicationsDirectory。' }],
+            content: [{ type: 'text', text: 'Error: 缺少 AI 应用目录。请由 Microi.Agent 注入 MICROI_AI_APPLICATIONS_DIR，或显式传入 aiApplicationsDirectory。' }],
             isError: true,
           };
         }

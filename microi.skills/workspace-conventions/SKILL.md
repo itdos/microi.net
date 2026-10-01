@@ -115,7 +115,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 |------|---------|
 | 一次性脚本（.py / .mjs / .ps1 / .sh） | `.tmp/` |
 | 诊断截图、调试图片 | `.tmp/screenshots/` |
-| E2E 测试产物（Microi.Code 插件生成） | `.microi-e2e/` |
+| E2E 测试产物（Microi.Agent 插件生成） | `.microi-e2e/` |
 | AI 一次性 E2E 脚本、截图、日志、报告 | `.tmp/`、`.tmp/screenshots/`、`.tmp/reports/` |
 | 性能测试 HTML 报告 | `.microi-performance/` |
 | 项目专属临时文件 | `<对应子项目目录>/` 内，不要写到根目录 |
@@ -129,7 +129,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 
 `.tmp/` 已在 `.gitignore` 中排除，可以随意创建临时文件。任务完成后如无保留价值可以不清理。
 
-**2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.Code 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
+**2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.Agent 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=workspace-conventions-005 sha256=c48d857c8e3086b29f99ab14d362f99c60d7dd00f9617709ea4f4dcad370611e -->
@@ -142,7 +142,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 吾码 MCP 前端源码 | `microi.mcp/` |
 | 吾码 MCP 后端源码 | `Microi.Server/Microi.MCP/`；HTTP 接口声明保留在 `Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs` |
 | 吾码 skills / 知识库 | `microi.skills/` |
-| 吾码 VS Code 插件项目 | `Microi.Code/` |
+| 吾码 VS Code 插件项目 | `Microi.Agent/` |
 | 吾码低代码平台后台系统前端源码 | `Microi.Client/` |
 | 吾码后台系统前端移动端自适应源码 | `Microi.Client/src/views/mobile/` |
 | 吾码低代码后端源码 | `Microi.Server/` |

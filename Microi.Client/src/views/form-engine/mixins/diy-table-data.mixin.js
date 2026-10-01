@@ -621,6 +621,9 @@ export default {
 
         GetDiyTableRow(recParam,type) {
             let self = this;
+            // 内置 MQTT 日志菜单由专用只读组件查询 MongoDB/关系库故障兜底。
+            // 元数据和菜单权限仍按原流程加载，这里不再对隐藏的旧表格发起 MySQL 列表查询。
+            if (!self._IsTableChild && self.CurrentDiyTableModel?.Name === 'mci_mqtt_log') return;
             //zhy此处通过判断是pc或移动端的搜索条件，来决定如何合并搜索条件。type1,2为移动端下拉菜单搜索和更多搜索，3，4为PC端外部搜索和更多搜索
             // console.log(recParam,type,666666)
             if(recParam && recParam._Where && recParam._Where.length > 0 && (type == 1 || type == 2 || type == 3 || type == 4)){

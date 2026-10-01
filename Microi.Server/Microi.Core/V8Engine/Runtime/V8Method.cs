@@ -1610,6 +1610,44 @@ namespace Microi.net
             return CreateTenantHdfs(param).MoveObject(param).GetAwaiter().GetResult();
         }
 
+        /// <summary>
+        /// Copy an object within the current tenant and the selected public or
+        /// private bucket. Source and destination are both normalized by the
+        /// tenant HDFS proxy; callers cannot supply a storage client or secrets.
+        /// </summary>
+        public DosResult CopyObject(dynamic dynamicParam)
+        {
+            var param = DynamicToDiyUploadParam(dynamicParam);
+            if (string.IsNullOrWhiteSpace(param.FilePathName) || string.IsNullOrWhiteSpace(param.Path))
+                return new DosResult(0, null, "FilePathName和Path不能为空！");
+            return CreateTenantHdfs(param).CopyObject(param).GetAwaiter().GetResult();
+        }
+
+        public DosResult<bool> ObjectExist(dynamic dynamicParam)
+        {
+            var param = DynamicToDiyUploadParam(dynamicParam);
+            if (string.IsNullOrWhiteSpace(param.FilePathName))
+                return new DosResult<bool>(0, false, "FilePathName不能为空！");
+            return CreateTenantHdfs(param).ObjectExist(param).GetAwaiter().GetResult();
+        }
+
+        public DosResult GetObjectSha256(dynamic dynamicParam)
+        {
+            var param = DynamicToDiyUploadParam(dynamicParam);
+            if (string.IsNullOrWhiteSpace(param.FilePathName))
+                return new DosResult(0, null, "FilePathName不能为空！");
+            return CreateTenantHdfs(param).GetObjectSha256(param).GetAwaiter().GetResult();
+        }
+
+        public DosResult ListObjects(dynamic dynamicParam)
+        {
+            var param = DynamicToDiyUploadParam(dynamicParam);
+            if (string.IsNullOrWhiteSpace(param.Path))
+                return new DosResult(0, null, "Path不能为空！");
+            param.MaxKeys = Math.Min(1000, Math.Max(1, param.MaxKeys.GetValueOrDefault(1000)));
+            return CreateTenantHdfs(param).ListObjects(param).GetAwaiter().GetResult();
+        }
+
         private static V8TenantHDFS CreateTenantHdfs(DiyUploadParam param)
         {
             if (param == null) throw new ArgumentNullException(nameof(param));

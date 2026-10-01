@@ -78,7 +78,7 @@
                         PropsHideMoreFunctions
                         PropsHideAdminDesign
                         :PropsEmbedded="embedded"
-                        :PageSizeList="[10]"
+                        :PageSizeList="embedded ? [embeddedPageSize] : [10]"
                         ContainerClass="workflow-form-engine-table"
                     />
 
@@ -115,17 +115,17 @@
                                 <span :title="scope.row.FlowTitle">{{ scope.row.FlowTitle }}</span>
                             </template>
                         </el-table-column>
-                        <el-table-column :label="'内容'" show-overflow-tooltip>
+                        <el-table-column v-if="!embedded" :label="'内容'" show-overflow-tooltip>
                             <template #default="scope">
                                 <span v-safe-html="GetNotice(scope.row)"></span>
                             </template>
                         </el-table-column>
-                        <el-table-column :label="'发送人'" width="100">
+                        <el-table-column v-if="!embedded" :label="'发送人'" width="100">
                             <template #default="scope">
                                 <span :title="scope.row.Sender">{{ scope.row.Sender }}</span>
                             </template>
                         </el-table-column>
-                        <el-table-column :label="'节点名称'" show-overflow-tooltip width="120">
+                        <el-table-column v-if="!embedded" :label="'节点名称'" show-overflow-tooltip width="120">
                             <template #default="scope">
                                 <span v-safe-html="GetNodeName(scope.row)"></span>
                             </template>
@@ -140,7 +140,7 @@
                                 <span :title="scope.row.CreateTime">{{ scope.row.CreateTime }}</span>
                             </template>
                         </el-table-column>
-                        <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" width="240">
+                        <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="embedded ? 170 : 240">
                             <template #default="scope">
                                 <el-button type="primary" :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, 'Edit')">
                                     {{ "去处理" }}
@@ -400,6 +400,7 @@ export default {
         DiyTable: defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"))
     },
     props: {
+        embeddedPageSize: { type: Number, default: 10 },
         initialTab: {
             type: String,
             default: "work",
@@ -586,7 +587,7 @@ export default {
             CurrentTableId: "",
             CurrentTableRowId: "",
             PageIndex: 1,
-            PageSize: 15,
+            PageSize: this.embedded ? this.embeddedPageSize : 15,
             DataCount: 0,
             CurrentWorkModel: {},
             FlowTitle: "",

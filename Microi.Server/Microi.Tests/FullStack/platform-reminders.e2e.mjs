@@ -98,7 +98,15 @@ export async function verifyPlatformReminders(page,directory) {
   await dialog(every.title).waitFor({state:'visible',timeout:75000});await withdraw(every);
   await dialog(every.title).waitFor({state:'hidden',timeout:75000});checks.push('每次刷新再次显示、撤回收回');
 
-  await page.evaluate(async()=>{const socket=window.__VUE_APP__.config.globalProperties.$websocket;await socket?.stop();window.__MICROI_REALTIME_STATE__={state:'Disconnected'};window.dispatchEvent(new Event('online'));});stopped=true;
+  await page.evaluate(async()=>{
+   // Token refresh may reconnect after stop(), which would make this a realtime
+   // test instead of proving the scheduled-reminder polling fallback.
+   window.tryConnectWebSocket=()=>({success:false,reason:'polling fallback test'});
+   const socket=window.__VUE_APP__.config.globalProperties.$websocket;
+   await socket?.stop();
+   window.__MICROI_REALTIME_STATE__={state:'Disconnected'};
+   window.dispatchEvent(new Event('online'));
+  });stopped=true;
   const timing=Date.now(),timed=await publish('Once',{ReminderType:'Scheduled',StartsAt:new Date(timing+5000).toISOString(),EndsAt:new Date(timing+40000).toISOString()});
   await dialog(timed.title).waitFor({state:'visible',timeout:35000});
   assert.equal(await page.evaluate(()=>window.__VUE_APP__.config.globalProperties.$websocket?.state),'Disconnected');

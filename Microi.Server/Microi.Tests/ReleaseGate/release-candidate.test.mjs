@@ -8,7 +8,7 @@ import {snapshotCandidate,changedCandidate} from '../../tools/release-candidate.
 
 test('only documented plugin build timestamps are ignored; versions, hashes and executable source stay guarded',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'microi-release-candidate-'));
- const name='Microi.Code/plugins/microi/assets/build-meta.json';
+ const name='Microi.Agent/plugins/microi/assets/build-meta.json';
  try{
   execFileSync('git',['init','--quiet'],{cwd:root});
   await mkdir(path.dirname(path.join(root,name)),{recursive:true});
@@ -83,6 +83,54 @@ test('independent UniApp delivery does not invalidate PC API images but shared S
   }
   assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[
    'Microi.Client/src/main.js','Microi.Server/Microi.Upgrade/Resource/app.json','microi.uniapp/src/utils/microi.v8.js'
+  ]);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('official documentation text is published by the website gate without invalidating PC API Full',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'microi-release-candidate-'));
+ try{
+  execFileSync('git',['init','--quiet'],{cwd:root});
+  const names=[
+   'microi.doc/docs/doc/about/update-log.md',
+   'microi.doc/docs/doc/more/hdfs.md',
+   'microi.doc/docs/en/guide.md',
+   'microi.doc/docs/.vitepress/theme/index.ts',
+   'microi.doc/scripts/build.mjs'
+  ];
+  for(const name of names){
+   await mkdir(path.dirname(path.join(root,name)),{recursive:true});
+   await writeFile(path.join(root,name),'before');
+  }
+  const before=await snapshotCandidate(root,['.']);
+  for(const name of names)await writeFile(path.join(root,name),'after');
+  assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[
+   'microi.doc/docs/.vitepress/theme/index.ts','microi.doc/scripts/build.mjs'
+  ]);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('independent desktop installer work does not invalidate PC API images while shared plugin inputs remain guarded',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'microi-release-candidate-'));
+ try{
+  execFileSync('git',['init','--quiet'],{cwd:root});
+  const names=[
+   'Microi.Agent/apps/microi-code/src/main/runtime/harness-runtime.ts',
+   'Microi.Agent/upstream/dsh-desktop/src/main.ts',
+   'Microi.Agent/plugins/microi/package.json',
+   'Microi.Agent/server-engines/microi_code_update_latest.js',
+   'Microi.Server/Microi.MCP/Microi.MCP.csproj'
+  ];
+  for(const name of names){
+   await mkdir(path.dirname(path.join(root,name)),{recursive:true});
+   await writeFile(path.join(root,name),'before');
+  }
+  const before=await snapshotCandidate(root,['.']);
+  for(const name of names)await writeFile(path.join(root,name),'after');
+  assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[
+   'Microi.Agent/plugins/microi/package.json',
+   'Microi.Agent/server-engines/microi_code_update_latest.js',
+   'Microi.Server/Microi.MCP/Microi.MCP.csproj'
   ]);
  }finally{await rm(root,{recursive:true,force:true});}
 });
