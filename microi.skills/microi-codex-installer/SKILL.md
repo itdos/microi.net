@@ -24,6 +24,8 @@ description: 当用户在 Codex、DeepSeek Harness、WorkBuddy、CodeBuddy、Qod
 
 自动更新只从 npm 官方 registry 读取 CLI 最新版：
 
+图形界面启动的 VS Code/Electron 可能没有终端 PATH。更新器必须发现用户安装的 Node/npm（Microi 用户目录、系统安装目录、Homebrew、nvm/Volta），优先用对应 Node 与 npm-cli.js 的绝对路径运行，并为 npm 子进程补齐 PATH。独立 Node 不继承 Electron 的 `ELECTRON_RUN_AS_NODE`，原 Electron 宿主执行 CLI 时保留它；不得从当前工作区查找并执行同名程序。缺少本机运行时应准确说明 Node/npm 未安装，不能误报 npm 官方 registry 不可访问；继续保留后台延后重试和不重载当前窗口规则。
+
 ```bash
 npm view '@microi.net/cli' version --json --prefer-online --registry=https://registry.npmjs.org/
 ```
