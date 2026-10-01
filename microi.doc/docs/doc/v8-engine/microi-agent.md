@@ -17,7 +17,7 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 
 页面顶部的 Windows 与 macOS 按钮使用固定的 latest 入口，每次点击均从官方更新清单取得当前安装包地址。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
 
-- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。
+- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。普通 Microsoft 帐号不能直接签官网 EXE；免费的 Microsoft Store MSIX 渠道须完成开发者身份及应用审核，再由微软签名分发，当前尚未上架。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
 - 如果旧安装包提示 `Failed to decompress files` 或 `Error opening output file(s)`，请从本页顶部重新下载 Windows latest 安装包后运行；不要重复启动下载目录中缓存的旧安装包。新版安装器改用能处理内置中文技能文件名的解压方式，覆盖安装会保留工作区和会话数据。
 - 如果已退出应用仍提示“无法关闭”，旧安装器可能把长路径或文件复制失败误报成应用正在运行。新版使用当次发行的兼容卸载器完成升级；工作区、会话和用户配置保持不变。如果新版仍失败，请使用下面的诊断入口，不要反复重装。
 - 1.2.6 修复了已重现的长路径清理问题，但仍有客户报告“旧版本文件清理失败（错误码 2）”。该数字是卸载器退出码，不能直接判断哪个文件失败、是否被占用或缺少权限，也不能据此认为所有客户的升级问题已解决。
@@ -778,6 +778,22 @@ npm run publish:cli:resume
 
 版本、日期和条目格式沿用[平台更新日志](/doc/about/update-log.html)。安装包版本与 CLI 版本分别管理；历史故障、修复尝试和客户验证边界继续保留。
 
+### v1.3.2 - (2026-10-01)
+
+- **macOS Universal 更新并完成签名公证**：支持 Intel 与 Apple Silicon；应用与 DMG 均通过 Developer ID 签名、Apple 公证、票据装订及 Gatekeeper 验证。发布后的更新清单按最终文件重新计算 SHA512，保留 macOS 1.2.2 及全部历史归档。
+- **修复本机 TCP 双栈失败后的启动恢复**：只有 IPv4 与 IPv6 的实际 HTTP 探测均失败时，才使用当前 Harness 的私有管道；保留原认证、Cookie、中文请求和 WebSocket 事件流。1022 项回归通过；真实 Harness/Electron 在普通与安全模式通过私有管道进入工作台。Windows x64 1.3.2 候选 EXE 已构建，**客户 Windows 原生安装及启动仍待验收**。
+- **Windows 免费签名进度**：Microsoft Store 公司账号已进入身份审核；MSIX 身份、商店签名与应用审核尚未完成，公开 Windows 下载及自动更新继续保持 1.3.1。普通 Microsoft 帐号不能给官网 EXE 提供受信任的代码签名；未签名候选包不标为可信发行。
+- **macOS 下载与校验**：通过 `microi_itdos` 发布官方应用 v1.3.2，开发工具 5.8.0 的修复与发布见下一项。
+
+| 文件 | 用途 | 大小 |
+| --- | --- | --- |
+| [Universal DMG](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.dmg) | 手动安装 | 380,707,421 字节 |
+| [Universal ZIP](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.zip) | 自动更新 | 424,992,762 字节 |
+
+- DMG SHA256：`2bb4ba682de125cfefae90251527ff48b97d8ce504f0f1f4110998e661f9d675`。
+- ZIP SHA256：`7726972144f5b118faaf81fe1b023da174b67c92b789a131e2bc1aeb31ffef62`。
+- [1.3.2 macOS 更新清单归档](https://api.itdos.com/microi-code/updates/archive/1.3.2/latest-mac.yml)。
+
 ### 开发工具 v5.8.0 - (2026-10-01)
 
 - **修复 macOS GUI 自动更新找不到 npm**：更新器从本机已安装的 Node.js 目录发现 npm，使用绝对入口，并为子进程补齐路径；明确区分本机运行时缺失和官方 registry 网络故障。更新过程继续保留现有工作、MCP 与会话。
@@ -851,7 +867,7 @@ npm run publish:cli:resume
 - **v1.1.6**：修复 macOS 更新失败后的恢复流程，保留原安装与用户数据。
 - **v1.1.5**：优化 Markdown 渲染及解析范围，减少会话页面重复处理。
 - **v1.1.4**：改善渲染性能和跨架构 macOS 构建流程。
-- 当时发布的 macOS 通用包为 1.1.7；Windows 新版发布不会自动提高 Mac 清单版本。后续 Mac 包需在 MacBook 构建、校验并单独上传，再更新对应清单；最新签名发行见下方 macOS 1.2.2 记录。
+- 当时发布的 macOS 通用包为 1.1.7；Windows 新版发布不会自动提高 Mac 清单版本。后续 Mac 包需在 MacBook 构建、校验并单独上传，再更新对应清单；macOS 1.2.2 和 1.3.2 的签名发行记录保留在本页日志，当前版本以页首为准。
 
 ### v1.1.0～1.1.3 - (2026-09-20～2026-09-24)
 
