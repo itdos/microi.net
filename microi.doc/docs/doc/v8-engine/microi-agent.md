@@ -19,7 +19,7 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 
 **Windows 1.3.2 已开放下载测试**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
 
-- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。普通 Microsoft 帐号不能直接签官网 EXE；免费的 Microsoft Store MSIX 渠道须完成开发者身份及应用审核，再由微软签名分发，当前尚未上架。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
+- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。Microsoft 公司身份已验证，商店 MSIX 1.3.3 已于 2026 年 10 月 2 日正式提交，当前状态为**正在认证**，通过后自动免费上架至 [Microsoft Store](https://apps.microsoft.com/detail/9NKCS76ZMFXR)，由微软签名分发。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 测试包仍为未签名 1.3.2。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
 - 如果旧安装包提示 `Failed to decompress files` 或 `Error opening output file(s)`，请从本页顶部重新下载 Windows latest 安装包后运行；不要重复启动下载目录中缓存的旧安装包。新版安装器改用能处理内置中文技能文件名的解压方式，覆盖安装会保留工作区和会话数据。
 - 如果已退出应用仍提示“无法关闭”，旧安装器可能把长路径或文件复制失败误报成应用正在运行。新版使用当次发行的兼容卸载器完成升级；工作区、会话和用户配置保持不变。如果新版仍失败，请使用下面的诊断入口，不要反复重装。
 - 1.2.6 修复了已重现的长路径清理问题，但仍有客户报告“旧版本文件清理失败（错误码 2）”。该数字是卸载器退出码，不能直接判断哪个文件失败、是否被占用或缺少权限，也不能据此认为所有客户的升级问题已解决。
@@ -29,7 +29,15 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 - **安装仍失败时**：Windows 1.2.7 起已将诊断集成进安装器。失败窗口提供「复制安装日志」和「打开日志」，无需下载独立诊断工具。日志保存在 `%LOCALAPPDATA%\Microi Agent\installer-logs\`；目录不可写时使用 `%TEMP%\Microi-Agent-installer-logs\`，退出安装后仍保留。日志包含实际失败步骤、文件路径、迁移的 Win32 错误、卸载器或 7-Zip 退出码、回滚错误，以及只读文件访问和 Restart Manager 占用 PID 检查。请把复制的日志提供给支持人员；本机测试通过仍不代表该客户设备已通过验收。
 - “工作区服务连接已断开”与云端账号未登录是不同问题。新版修复了旧空凭据保险库导致服务退出的情况；对损坏或其他 Windows 用户加密的凭据会保留原文件并报告具体错误，不会静默清空凭据。安装成功后还应打开「Microi吾码」和「AI 员工」检查本机服务连接。
 - macOS 正式安装包采用 Universal 通用架构，原生支持 Intel 与 Apple Silicon，最低要求 macOS 13.5。正式发布使用 Developer ID Application 签名，并在发布前完成 Apple 公证及 Gatekeeper 验证；历史未签名包的状态以对应归档记录为准。内部源码根目录执行 `bash ./一键打包Mac.sh --signed --current` 可以按源码当前版本生成签名 DMG/ZIP；默认构建 Universal，也可使用 `--arch arm64` 或 `--arch x64` 选择与宿主匹配的单架构。首次打包会下载并校验固定版本的 cloudflared；网络中断后重新执行同一命令即可续传，也可通过 `MICROI_CLOUDFLARED_ASSET=/已下载的官方压缩包路径` 指定本地文件，哈希不符会停止构建。Dock 图标在 Mac 构建时自动生成合适留白。一键脚本在证书与 `notarytool` 凭据完整时自动启用签名、公证；`--signed` 在缺少凭据时失败。
-- 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 版采用独立 App Sandbox 客户端，提供本地提示词管理和桌面配对会话；Node/Harness、Shell、项目文件、插件与 MCP 在已配对的桌面或其服务端执行。商店版正在准备提交，**尚未通过 Apple 审核或开放商店下载**；需要完整本机开发能力时，仍使用本页顶部的已签名、公证 DMG。商店版本由 App Store 更新，不安装站外更新或插件。
+- 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 版采用独立 App Sandbox 客户端，提供本地提示词管理和桌面配对会话；Node/Harness、Shell、项目文件、插件与 MCP 在已配对的桌面或其服务端执行。1.3.2（构建 1.3.3）已于 2026 年 10 月 2 日提交，Apple 当前状态为**等待审核，尚未开放商店下载**；商店入口为 [Mac App Store](https://apps.apple.com/app/id6818076490)。需要完整本机开发能力时，仍使用本页顶部的已签名、公证 DMG。商店版本由 App Store 更新，不安装站外更新或插件。
+
+### Windows 商店版隐私政策 {#windows-store-privacy}
+
+本政策适用于 Microsoft Store 分发的 Microi Agent 桌面版。应用提供 AI 对话、项目工具、MCP 和吾码业务连接；项目、会话、本机配置与日志默认保存在当前用户的数据目录。商店负责应用更新，应用不会用官网 EXE 替换商店安装。
+
+登录吾码账号时，账号信息和认证请求发送到用户选择的吾码服务器。使用 AI、MCP、图片、音频或视频服务时，用户提交的提示词、附件及任务所需的项目内容发送到所选服务；具体保存期限、额度和访问权限由这些服务及所属租户决定。配置第三方模型、MCP 或业务连接前，请了解其隐私政策与权限。应用不内置广告追踪 SDK；本声明不表示用户选择的云服务不收集或保存数据。
+
+AI 对文件、命令和业务数据的访问遵循当前任务授权和工具确认。敏感文件应避免主动提交到不可信服务；用户可在应用内删除会话、断开连接及清除登录状态，清理本机数据前请备份需要保留的内容。云端账号或数据的删除请求请联系对应服务；吾码官方服务的隐私与支持联系邮箱为 admin@microi.net。
 
 ### Mac App Store 客户端
 
@@ -793,6 +801,13 @@ npm run publish:cli:resume
 ## 更新日志
 
 版本、日期和条目格式沿用[平台更新日志](/doc/about/update-log.html)。安装包版本与 CLI 版本分别管理；历史故障、修复尝试和客户验证边界继续保留。
+
+### Windows 商店 v1.3.3 / Mac App Store 送审 - (2026-10-02)
+
+- **两个商店正式提交**：Windows x64 MSIX 1.3.3 已通过包验证并进入 Microsoft 认证；Mac App Store 1.3.2（构建 1.3.3）正在等待 Apple 审核。均设为审核通过后免费自动发布，审核期间商店入口可能尚未开放下载。
+- **官网增加商店入口**：顶部 Windows、macOS 下载按钮下分别提供 Microsoft Store、Mac App Store 链接与实际审核状态，官网已有 EXE、签名公证 DMG 下载继续可用。更新日志仍位于本文最下方。
+- **商店更新与隐私**：Windows 商店版停用站外更新清单、下载和 EXE 安装，仅打开本产品商店页；已补充商店隐私政策。Mac 商店版继续采用独立沙盒客户端，完整本机开发能力使用签名公证 DMG。
+- **验证与素材**：Windows 商店更新隔离及普通安装更新行为的 9 项回归、TypeScript 检查通过；MSIX 的 15,563 个文件完成解包哈希核对。商店上传高清 Logo 和实际客户端截屏；客户 Windows 原生安装与启动仍待验证。
 
 ### Windows v1.3.2 公开测试 - (2026-10-01)
 
