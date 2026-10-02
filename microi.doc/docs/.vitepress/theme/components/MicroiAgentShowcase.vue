@@ -7,9 +7,16 @@
         <h2 id="microi-code-title">让 AI 在<strong>完整业务底座</strong>上工作</h2>
         <p class="microi-code-lead">代码、吾码账号、AI 中转站、MCP 与 30+ 成熟引擎，在一个桌面工作台协同。</p>
         <div class="microi-code-actions">
-          <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows <small v-if="liveVersions.windows">v{{ liveVersions.windows }}</small></a>
-          <a :href="downloadUrls.mac" target="_blank" rel="noopener"><DownloadIcon />下载 macOS <small v-if="liveVersions.mac">v{{ liveVersions.mac }}</small></a>
+          <div class="microi-code-platform-download">
+            <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows <small v-if="liveVersions.windows">v{{ liveVersions.windows }}</small></a>
+            <a class="microi-code-store-link" href="https://apps.microsoft.com/detail/9NKCS76ZMFXR" target="_blank" rel="noopener noreferrer">Microsoft Store <small>正在认证</small><span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="microi-code-platform-download">
+            <a :href="downloadUrls.mac" target="_blank" rel="noopener"><DownloadIcon />下载 macOS <small v-if="liveVersions.mac">v{{ liveVersions.mac }}</small></a>
+            <a class="microi-code-store-link" href="https://apps.apple.com/app/id6818076490" target="_blank" rel="noopener noreferrer">Mac App Store <small>等待审核</small><span aria-hidden="true">↗</span></a>
+          </div>
         </div>
+        <p class="microi-code-store-note">商店入口在审核通过后开放下载；现在可使用上方官网安装包。</p>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
@@ -234,6 +241,11 @@ const visibleReleases = computed(() => releases.slice((historyPage.value - 1) * 
 .microi-code-actions a { min-height: 44px; gap: 8px; padding: 0 16px; border-radius: 11px; background: var(--mc-card); backdrop-filter: blur(14px); }
 .microi-code-actions a svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .microi-code-actions a.is-text { padding-inline: 8px; border-color: transparent; background: transparent; color: var(--vp-c-text-2); }
+.microi-code-platform-download { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
+.microi-code-actions a.microi-code-store-link { min-height: 36px; gap: 6px; padding: 0 9px; border: 0; background: transparent; font-size: 12px; color: var(--vp-c-brand-1); }
+.microi-code-store-link small { padding: 2px 6px; border-radius: 5px; background: var(--vp-c-bg-soft); color: var(--vp-c-text-2); font-weight: 400; }
+.microi-code-store-note { margin: 10px 0 0; color: var(--vp-c-text-2); font-size: 12px; line-height: 1.7; }
+@media (max-width: 640px) { .microi-code-platform-download { width: 100%; } }
 .microi-code-facts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 0; margin-top: 30px; }
 .microi-code-facts li { min-width: 0; padding: 0 14px; border-left: 1px solid var(--vp-c-divider); }
 .microi-code-facts li:first-child { padding-left: 0; border-left: 0; }
