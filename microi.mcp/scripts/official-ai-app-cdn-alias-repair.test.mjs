@@ -125,6 +125,30 @@ test('default DryRun verifies frozen canonical hash and plans aliases without wr
   assert.equal(r.Data.TotalAliases,6);assert.equal(r.Data.NextAliasStart,2);assert.equal(f.copies.length,0);
   assert.equal(JSON.stringify([f.store,f.version]),before);assert.equal(f.writes.length,0);
 });
+test('JObject-shaped inherited empty Path getter does not become a caller selector', () => {
+  const f=fixture();delete f.param.DryRun;let inheritedReads=0;
+  // 模拟 CLR JObject 暴露 JToken.Path；请求本身没有这个字段。
+  const clrPrototype=Object.create(null);
+  Object.defineProperty(clrPrototype,'Path',{enumerable:true,get(){inheritedReads++;return '';}});
+  Object.setPrototypeOf(f.param,clrPrototype);
+  const r=f.run();assert.equal(r.Code,1,JSON.stringify(r));assert.equal(r.Data.DryRun,true);
+  assert.equal(f.copies.length,0);assert.equal(inheritedReads,0);
+});
+test('JObject-shaped params retain explicit authorized copy fields after normalization', () => {
+  const f=fixture();Object.setPrototypeOf(f.param,{get Path(){return '';}});
+  const r=f.run();assert.equal(r.Code,1,JSON.stringify(r));assert.equal(r.Data.DryRun,false);
+  assert.equal(f.copies.length,4);assert.equal(f.writes.length,0);
+});
+test('explicit own empty Path remains forbidden even with a CLR-shaped prototype', () => {
+  const f=fixture();Object.setPrototypeOf(f.param,{get Path(){return '';}});
+  Object.defineProperty(f.param,'Path',{value:'',enumerable:true});
+  refuses(f,/不接受调用方路径\/来源参数：Path/);assert.equal(f.calls.length,0);
+});
+test('inherited expected binding cannot substitute for an explicit request field', () => {
+  const f=fixture();delete f.param.ExpectedPublishFence;
+  Object.setPrototypeOf(f.param,{ExpectedPublishFence:'4'});
+  refuses(f,/ExpectedPublishFence 缺失/);assert.equal(f.calls.length,0);
+});
 for (const state of ['ProjectionPending','RepairRequired','Completed']) test(state+' repairs both raw canonical aliases and preserves encoded sources', () => {
   const f=fixture();f.store.PublishState=state;f.version.PublishState=state;const before=JSON.stringify([f.store,f.version]);
   const r=f.run();assert.equal(r.Code,1,JSON.stringify(r));assert.equal(f.copies.length,4);
