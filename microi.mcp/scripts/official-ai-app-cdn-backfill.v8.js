@@ -8,7 +8,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_cdn_backfill
- * Version: v1.5.2
+ * Version: v1.5.3
  * Function:
  * - 官方 AI 应用 CDN 固定路径迁移、流式哈希回读、阿里云 CDN 精确刷新与旧版编译错误对象修复；数据库保留相对对象路径，官网输出静态域名完整 URL。
  */
@@ -429,7 +429,9 @@ function readCommittedCdnAliasPrimaryRow(table, id) {
   return row;
 }
 function repairCommittedCdnAliases() {
-  var p = V8.Param;
+  // Jint 的 JObject 会暴露继承的 JToken.Path；先保留请求 JSON 字段为普通对象，
+  // 避免把 CLR 空属性误判为调用方路径。显式 Path（含空字符串）仍保留并被拒绝。
+  var p = JSON.parse(JSON.stringify(V8.Param));
   var expected = {};
   var copied = [];
   var attempted = [];
