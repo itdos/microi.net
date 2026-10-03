@@ -1,0 +1,1035 @@
+/* ========================================================
+ * MCI 设计系统 — uni-app 全局样式（rpx 单位）
+ * 与 Microi.Client 移动端 mci-design.scss 同源
+ * 参考：microi.skills/ui-design/SKILL.md
+ * 命名前缀：--mci- / .mci-
+ * ======================================================== */
+
+/* === 主题变量（Microi 蓝白管理套件默认；租户运行时可逐字段覆盖） === */
+page,
+page[data-theme="light"] {
+  /* 主色调 */
+  --mci-color-primary: #2563EB;
+  --mci-color-primary-light: #5B8CFF;
+  --mci-color-primary-dark: #1749B6;
+  --mci-color-primary-glow: rgba(37, 99, 235, 0.18);
+  --mci-color-primary-soft: rgba(37, 99, 235, 0.09);
+  --mci-color-primary-faint: rgba(37, 99, 235, 0.045);
+  --mci-color-brand: #2563EB;
+
+  /* 强调色 */
+  --mci-color-accent-blue: #2563EB;
+  --mci-color-accent-cyan: #0EA5E9;
+  --mci-color-accent-pink: #EF4444;
+  --mci-color-accent-yellow: #F59E0B;
+
+  /* 状态色 */
+  --mci-color-success: #10B981;
+  --mci-color-warning: #F59E0B;
+  --mci-color-danger: #EF4444;
+  --mci-color-info: #2563EB;
+
+  /* 背景 */
+  --mci-bg-base: #F8FAFC;
+  --mci-bg-elevated: #FFFFFF;
+  --mci-bg-surface: #F1F5F9;
+  --mci-bg-soft: #F8FAFC;
+  --mci-bg-card: #FFFFFF;
+  --mci-bg-card-hover: rgba(255, 255, 255, 0.98);
+  --mci-bg-mask: rgba(0, 0, 0, 0.42);
+
+  /* 文本 */
+  --mci-text-primary: #111827;
+  --mci-text-secondary: #667280;
+  --mci-text-tertiary: #9CA3AF;
+  --mci-text-muted: #CBD5E1;
+  --mci-text-placeholder: #9CA3AF;
+  --mci-text-on-primary: #FFFFFF;
+  --mci-text-on-primary-soft: rgba(255, 255, 255, 0.76);
+  --mci-text-on-primary-muted: rgba(255, 255, 255, 0.58);
+  --mci-surface-on-primary: rgba(255, 255, 255, 0.10);
+  --mci-surface-on-primary-strong: rgba(255, 255, 255, 0.16);
+  --mci-border-on-primary: rgba(255, 255, 255, 0.20);
+
+  /* 边框 */
+  --mci-border-color: #E5E7EB;
+  --mci-border-color-hover: #CBD5E1;
+
+  /* 渐变 */
+  --mci-gradient-primary: linear-gradient(135deg, #1749B6 0%, #2563EB 58%, #5B8CFF 100%);
+  --mci-gradient-warm: linear-gradient(135deg, #F59E0B 0%, #FB923C 100%);
+  --mci-gradient-cool: linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%);
+
+  /* 阴影 / 光晕 */
+  --mci-shadow-sm: 0 2rpx 8rpx rgba(15, 18, 30, 0.06);
+  --mci-shadow-md: 0 8rpx 24rpx rgba(15, 18, 30, 0.10);
+  --mci-shadow-lg: 0 16rpx 48rpx rgba(15, 18, 30, 0.14);
+  --mci-shadow-card: 0 8rpx 26rpx rgba(15, 49, 66, 0.07);
+  --mci-shadow-nav: 0 10rpx 32rpx rgba(15, 49, 66, 0.14);
+  --mci-shadow-button: 0 12rpx 40rpx var(--mci-color-primary-glow);
+  --mci-glow-primary: 0 0 48rpx var(--mci-color-primary-glow),
+                      0 0 120rpx rgba(33, 150, 243, 0.18);
+
+  /* 圆角（rpx） */
+  --mci-radius-xs: 10rpx;
+  --mci-radius-sm: 16rpx;
+  --mci-radius-md: 20rpx;
+  --mci-radius-lg: 24rpx;
+  --mci-radius-xl: 28rpx;
+  --mci-radius-2xl: 32rpx;
+  --mci-radius-full: 9999rpx;
+
+  /* 间距（rpx） */
+  --mci-space-1: 4rpx;
+  --mci-space-2: 8rpx;
+  --mci-space-3: 16rpx;
+  --mci-space-4: 24rpx;
+  --mci-space-5: 32rpx;
+  --mci-space-6: 40rpx;
+  --mci-space-8: 56rpx;
+  --mci-space-12: 80rpx;
+
+  /* 字号（rpx） */
+  --mci-text-xs: 22rpx;
+  --mci-text-sm: 26rpx;
+  --mci-text-base: 28rpx;
+  --mci-text-md: 32rpx;
+  --mci-text-lg: 36rpx;
+  --mci-text-xl: 44rpx;
+  --mci-text-2xl: 56rpx;
+  --mci-text-3xl: 68rpx;
+
+  /* 字重 */
+  --mci-font-regular: 400;
+  --mci-font-medium: 500;
+  --mci-font-semibold: 600;
+  --mci-font-bold: 700;
+
+  /* 动效 */
+  --mci-duration-fast: 150ms;
+  --mci-duration-base: 250ms;
+  --mci-duration-slow: 400ms;
+
+  /* TabBar */
+  --mci-tabbar-height: 142rpx;
+  /* Shared bottom geometry keeps fixed commands, floating actions and the
+   * final scroll rows from competing for the same safe-area space. */
+  --mci-fixed-action-height: 128rpx;
+  --mci-floating-action-size: 96rpx;
+  --mci-floating-action-gap: 32rpx;
+  --mci-safe-top: env(safe-area-inset-top, 0);
+  --mci-safe-bottom: env(safe-area-inset-bottom, 0);
+  --mci-safe-left: env(safe-area-inset-left, 0);
+  --mci-safe-right: env(safe-area-inset-right, 0);
+  --mci-status-bar-height: 0px;
+  --mci-nav-height: 44px;
+  --mci-header-height: 44px;
+  --mci-nav-side-width: 52px;
+  --mci-capsule-right: 0px;
+
+  /* Legacy ops aliases now resolve to the Blue Suite native surfaces. */
+  --mci-ops-header: #FFFFFF;
+  --mci-ops-header-deep: #F8FAFC;
+  --mci-ops-canvas: #F8FAFC;
+  --mci-ops-panel: #FFFFFF;
+  --mci-ops-panel-strong: #FFFFFF;
+  --mci-ops-ink: #111827;
+  --mci-ops-muted: #667280;
+  --mci-ops-line: #E5E7EB;
+  --mci-ops-line-soft: #F1F5F9;
+  --mci-ops-accent: #2563EB;
+  --mci-ops-accent-soft: #EFF6FF;
+  --mci-ops-action: #2563EB;
+  --mci-ops-success: #10B981;
+  --mci-ops-warning: #F59E0B;
+  --mci-ops-danger: #EF4444;
+  --mci-ops-radius: 24rpx;
+  --mci-ops-control-radius: 18rpx;
+  --mci-ops-shadow: 0 4rpx 18rpx rgba(15, 23, 42, .055);
+}
+
+/* Runtime-safe custom navigation. The page root supplies the measured tokens. */
+.mci-safe-top {
+  box-sizing: border-box;
+  padding-top: var(--mci-status-bar-height, env(safe-area-inset-top, 0px)) !important;
+}
+
+.mci-safe-nav-row {
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: var(--mci-nav-left-width, 52px) minmax(0, 1fr) var(--mci-nav-side-width, 52px) !important;
+  min-height: var(--mci-nav-height, 44px) !important;
+  padding-right: max(16rpx, var(--mci-safe-right, 0px)) !important;
+  padding-left: max(16rpx, var(--mci-safe-left, 0px)) !important;
+}
+
+.mci-safe-bottom {
+  box-sizing: border-box;
+  padding-bottom: max(16rpx, var(--mci-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+}
+
+/* === Structured page texture === */
+.mci-page-texture {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  display: none;
+}
+.mci-page-texture::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: -40%;
+  width: 180%;
+  height: 28%;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transform: rotate(-12deg);
+  animation: mciTextureScan 8s ease-in-out infinite;
+}
+@keyframes mciTextureScan {
+  0%, 35% { transform: translate3d(0, -220rpx, 0) rotate(-12deg); opacity: 0; }
+  55% { opacity: 0.7; }
+  100% { transform: translate3d(0, 980rpx, 0) rotate(-12deg); opacity: 0; }
+}
+
+/* === 通用工具类 === */
+.mci-card {
+  background: var(--mci-app-surface, var(--mci-bg-card));
+  border: 1rpx solid var(--mci-border-color);
+  border-radius: var(--mci-radius-surface, var(--mci-radius-lg));
+  box-shadow: none;
+}
+
+.mci-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80rpx;
+  padding: 0 56rpx;
+  background: var(--mci-gradient-primary);
+  color: #fff;
+  font-size: var(--mci-text-base);
+  font-weight: var(--mci-font-semibold);
+  border: none;
+  border-radius: var(--mci-radius-control, 12px);
+  box-shadow: var(--mci-shadow-button);
+  transition: transform var(--mci-duration-fast) ease;
+}
+.mci-btn--ghost {
+  background: transparent;
+  color: var(--mci-color-primary);
+  border: 2rpx solid var(--mci-color-primary);
+  box-shadow: none;
+}
+.mci-btn:active { transform: scale(0.96); }
+
+.mci-text-gradient {
+  color: var(--mci-color-primary);
+  -webkit-text-fill-color: var(--mci-color-primary);
+}
+
+/* === 入场动画 === */
+@keyframes mciFadeInUp {
+  from { opacity: 0; transform: translateY(20rpx); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.mci-fade-in-up { animation: mciFadeInUp var(--mci-duration-slow) ease both; }
+
+@keyframes mciShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* === uniapp 页面统一风格覆盖（对齐 Microi.Client 移动端） === */
+.mall-container,
+.news-container,
+.workspace-container,
+.message-container,
+.profile-container,
+.chat-container,
+.detail-container,
+.news-detail-container,
+.privacy-container,
+.privacy-page,
+.about-container,
+.about-page {
+  background: var(--mci-bg-base) !important;
+  color: var(--mci-text-primary);
+}
+
+.prompt-card,
+.mci-auth-prompt__card,
+.menu-card,
+.news-item,
+.product-card,
+.msg-item,
+.contact-item,
+.func-group,
+.submenu-panel,
+.filter-panel,
+.new-chat-panel,
+.sheet-panel,
+.pwd-panel {
+  background: var(--mci-bg-elevated) !important;
+  color: var(--mci-text-primary);
+  border: 1rpx solid var(--mci-border-color);
+  box-shadow: var(--mci-shadow-md);
+}
+
+.search-wrap,
+.search-input-wrap,
+.panel-search-input,
+.pwd-input,
+.price-input {
+  background: var(--mci-bg-card) !important;
+  color: var(--mci-text-primary) !important;
+  border-color: var(--mci-border-color) !important;
+}
+
+.empty-text,
+.item-title,
+.card-title,
+.msg-name,
+.contact-name,
+.news-item-title,
+.featured-title,
+.submenu-item-name,
+.lang-name {
+  color: var(--mci-text-primary) !important;
+}
+
+.empty-sub,
+.item-value,
+.card-model,
+.card-supplier,
+.msg-preview,
+.msg-time,
+.contact-dept,
+.meta-time,
+.meta-views,
+.news-item-meta,
+.footer-text,
+.tip-text,
+.section-title,
+.theme-name,
+.sheet-close,
+.pwd-label {
+  color: var(--mci-text-secondary) !important;
+}
+
+.mci-btn,
+.prompt-btn,
+.mci-auth-prompt__button,
+.empty-btn,
+.filter-confirm-btn,
+.pwd-confirm {
+  background: var(--mci-gradient-primary) !important;
+  color: #fff !important;
+  box-shadow: var(--mci-shadow-button);
+}
+
+.filter-reset-btn,
+.pwd-cancel {
+  background: transparent !important;
+  color: var(--mci-text-secondary) !important;
+  border: 1rpx solid var(--mci-border-color-hover) !important;
+}
+
+.func-item,
+.lang-item,
+.submenu-item,
+.panel-contact-item,
+.contact-item,
+.msg-item,
+.news-item {
+  border-bottom-color: var(--mci-border-color) !important;
+}
+
+/* === Mobile polish pass: page surfaces, states, safe areas === */
+.mall-container,
+.news-container,
+.workspace-container,
+.message-container,
+.profile-container,
+.chat-container,
+.detail-container,
+.privacy-page,
+.about-page {
+  animation: mciPageEnter 360ms ease both;
+  padding-left: var(--mci-safe-left);
+  padding-right: var(--mci-safe-right);
+}
+
+@keyframes mciPageEnter {
+  from { opacity: 0; transform: translateY(12rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nav-bar,
+.custom-navbar,
+.chat-header,
+.message-header,
+.workspace-header,
+.about-header,
+.article-header,
+.title-section,
+.param-section,
+.supplier-section,
+.lease-section,
+.article-body,
+.about-desc,
+.info-group,
+.privacy-content .section,
+.loading-content,
+.error-state {
+  background: var(--mci-bg-elevated) !important;
+  color: var(--mci-text-primary) !important;
+  border-color: var(--mci-border-color) !important;
+}
+
+.nav-bar,
+.custom-navbar,
+.chat-header,
+.message-header {
+  box-shadow: var(--mci-shadow-sm) !important;
+}
+
+.about-header,
+.article-header,
+.title-section,
+.param-section,
+.supplier-section,
+.lease-section,
+.article-body,
+.about-desc,
+.info-group,
+.privacy-content .section,
+.loading-content,
+.error-state {
+  border: 1rpx solid var(--mci-border-color);
+  border-radius: var(--mci-radius-xl);
+  box-shadow: var(--mci-shadow-sm);
+}
+
+.privacy-page {
+  padding: 30rpx;
+}
+
+.privacy-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  padding-bottom: calc(72rpx + var(--mci-safe-bottom)) !important;
+}
+
+.privacy-content .section {
+  margin-bottom: 0 !important;
+  padding: 28rpx;
+}
+
+.article-body {
+  margin: 0 32rpx;
+  padding: 28rpx !important;
+  line-height: 1.85;
+}
+
+.about-content {
+  padding: 30rpx !important;
+}
+
+.about-logo,
+.user-avatar,
+.contact-avatar,
+.msg-avatar,
+.image-placeholder,
+.product-image,
+.cover-image {
+  background: var(--mci-bg-surface) !important;
+  border-color: var(--mci-border-color) !important;
+}
+
+.nav-back,
+.action-btn,
+.mode-toggle,
+.info-item,
+.func-item,
+.lang-item,
+.theme-item,
+.mode-item,
+.submenu-item,
+.panel-contact-item,
+.contact-item,
+.msg-item,
+.news-item,
+.product-card,
+.featured-card,
+.category-item,
+.sort-item,
+.filter-btn,
+.filter-reset-btn,
+.filter-confirm-btn,
+.bar-action,
+.bar-btn,
+.pwd-cancel,
+.pwd-confirm,
+.empty-btn,
+.prompt-btn,
+.mci-auth-prompt__button {
+  min-height: 88rpx;
+  transition: transform var(--mci-duration-fast) ease, box-shadow var(--mci-duration-fast) ease, background-color var(--mci-duration-fast) ease;
+}
+
+.nav-back:active,
+.action-btn:active,
+.mode-toggle:active,
+.info-item:active,
+.func-item:active,
+.lang-item:active,
+.theme-item:active,
+.mode-item:active,
+.submenu-item:active,
+.panel-contact-item:active,
+.contact-item:active,
+.msg-item:active,
+.news-item:active,
+.product-card:active,
+.featured-card:active,
+.category-item:active,
+.sort-item:active,
+.filter-btn:active,
+.filter-reset-btn:active,
+.filter-confirm-btn:active,
+.bar-action:active,
+.bar-btn:active,
+.pwd-cancel:active,
+.pwd-confirm:active,
+.empty-btn:active,
+.prompt-btn:active,
+.mci-auth-prompt__button:active {
+  transform: scale(0.97);
+}
+
+.bottom-bar,
+.chat-input-area,
+.popup-footer,
+.sheet-panel,
+.pwd-panel,
+.new-chat-panel {
+  background: var(--mci-bg-elevated) !important;
+  border-color: var(--mci-border-color) !important;
+  box-shadow: var(--mci-shadow-lg) !important;
+}
+
+.bottom-bar,
+.chat-input-area,
+.popup-footer {
+  padding-bottom: calc(20rpx + var(--mci-safe-bottom)) !important;
+}
+
+.sheet-mask,
+.pwd-mask,
+.filter-mask,
+.new-chat-mask,
+.settings-mask,
+.booking-mask,
+.loading-overlay {
+  background: var(--mci-bg-mask) !important;
+}
+
+.settings-panel {
+  box-sizing: border-box;
+  padding-top: var(--mci-safe-top);
+  padding-bottom: var(--mci-safe-bottom);
+}
+
+.loading-overlay .loading-content,
+.error-state {
+  padding: 40rpx;
+}
+
+.section-title,
+.article-title,
+.product-title,
+.about-name,
+.nav-title,
+.header-title,
+.ws-title,
+.user-name,
+.sheet-title,
+.popup-title,
+.settings-title,
+.pwd-title,
+.navbar-title text {
+  color: var(--mci-text-primary) !important;
+}
+
+.section-text,
+.desc-text,
+.about-version,
+.article-meta,
+.loading-text,
+.error-text,
+.back-icon,
+.arrow,
+.bar-label,
+.meta-time,
+.meta-views,
+.update-time text,
+.navbar-title,
+.action-icon {
+  color: var(--mci-text-secondary) !important;
+}
+
+.bar-btn,
+.pwd-confirm,
+.filter-confirm-btn,
+.empty-btn,
+.prompt-btn,
+.mci-auth-prompt__button,
+.error-btn {
+  color: var(--mci-text-on-primary) !important;
+}
+
+.bar-btn text,
+.pwd-confirm text,
+.filter-confirm-btn text,
+.empty-btn text,
+.prompt-btn text,
+.mci-auth-prompt__button text,
+.error-btn text {
+  color: var(--mci-text-on-primary) !important;
+}
+
+.skeleton-card,
+.skeleton-item,
+.sk-line,
+.skeleton-line,
+.skeleton-image {
+  background: linear-gradient(90deg, var(--mci-bg-surface) 25%, var(--mci-bg-card-hover) 50%, var(--mci-bg-surface) 75%) !important;
+  background-size: 400% 100% !important;
+  animation: mciShimmer 1.5s ease infinite;
+}
+
+.loading-spinner {
+  background: transparent !important;
+  border-color: var(--mci-border-color) !important;
+  border-top-color: var(--mci-color-primary) !important;
+}
+
+/* ========================================================
+ * Light Field v3 — app-wide operational surface contract
+ * ======================================================== */
+.mci-live-drop,
+.mci-page-texture,
+.mci-page-texture::after {
+  display: none !important;
+  animation: none !important;
+}
+
+.workspace-container,
+.message-container,
+.profile-container,
+.chat-container,
+.detail-container,
+.privacy-page,
+.about-page,
+.module-catalog,
+.module-list,
+.module-detail,
+.api-report,
+.native-form-page,
+.password-page,
+.reminders-page,
+.page-engine-page,
+.dashboard-page {
+  background: var(--mci-app-canvas, #F4F6F5) !important;
+}
+
+.state-panel,
+.state-card,
+.error-state,
+.loading-content,
+.empty-state {
+  color: var(--mci-text-primary) !important;
+}
+
+.state-panel__text,
+.state-text,
+.error-text,
+.empty-note,
+.loading-text {
+  color: var(--mci-text-secondary) !important;
+}
+
+.state-panel .mci-btn,
+.state-card .mci-btn,
+.error-btn,
+.empty-btn {
+  min-height: 88rpx !important;
+  border-radius: var(--mci-radius-control, 12px) !important;
+  background: var(--mci-gradient-primary) !important;
+  box-shadow: var(--mci-shadow-button) !important;
+}
+
+button,
+[role="button"],
+input,
+textarea,
+picker {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--mci-color-primary) !important;
+  outline-offset: 2px;
+}
+
+/* Cross-platform CSS icons; avoid text glyphs that vary by system font. */
+.mci-icon-chevron {
+  display: inline-block;
+  flex: none;
+  width: 14rpx;
+  height: 14rpx;
+  box-sizing: border-box;
+  border-top: 3rpx solid currentColor;
+  border-right: 3rpx solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--mci-duration-fast) ease;
+}
+.mci-icon-chevron--down { transform: rotate(135deg); }
+.mci-icon-chevron--open { transform: rotate(-45deg); }
+.mci-icon-close,
+.mci-icon-plus {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 28rpx;
+  height: 28rpx;
+}
+.mci-icon-close::before,
+.mci-icon-close::after,
+.mci-icon-plus::before,
+.mci-icon-plus::after {
+  position: absolute;
+  top: 12rpx;
+  left: 1rpx;
+  width: 26rpx;
+  height: 3rpx;
+  border-radius: 3rpx;
+  background: currentColor;
+  content: '';
+}
+.mci-icon-close::before { transform: rotate(45deg); }
+.mci-icon-close::after { transform: rotate(-45deg); }
+.mci-icon-plus::after { transform: rotate(90deg); }
+.mci-icon-search {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 24rpx;
+  height: 24rpx;
+  box-sizing: border-box;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+}
+.mci-icon-search::after {
+  position: absolute;
+  right: -8rpx;
+  bottom: -4rpx;
+  width: 10rpx;
+  height: 3rpx;
+  border-radius: 3rpx;
+  background: currentColor;
+  content: '';
+  transform: rotate(45deg);
+}
+
+.sheet-panel,
+.pwd-panel,
+.new-chat-panel,
+.editor-sheet,
+.customer-sheet,
+.invite-sheet,
+.settings-panel {
+  background: var(--mci-app-canvas, #F4F6F5) !important;
+  border-color: var(--mci-divider) !important;
+}
+
+.bottom-bar,
+.chat-input-area,
+.popup-footer,
+.sheet-bottom,
+.detail-action-bar,
+.form-actions {
+  background: var(--mci-app-surface, #FEFFFE) !important;
+  border-color: var(--mci-divider) !important;
+  box-shadow: var(--mci-shadow-dock) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mci-fade-in-up,
+  .mci-fade-up,
+  .mall-container,
+  .news-container,
+  .workspace-container,
+  .message-container,
+  .profile-container,
+  .chat-container,
+  .detail-container,
+  .privacy-page,
+  .about-page {
+    animation: none !important;
+  }
+}
+
+/* ========================================================
+ * Microi Blue Mobile Management Suite — final cross-page layer
+ * The selectors below intentionally bridge older engine-page class names.
+ * ======================================================== */
+.dashboard-page,
+.page-engine-page,
+.module-catalog,
+.module-list,
+.module-detail,
+.api-report,
+.native-form-page,
+.password-page,
+.reminders-page,
+.chat-container,
+.privacy-page,
+.about-page {
+  color: var(--mci-text-primary) !important;
+  background: var(--mci-app-canvas, #F8FAFC) !important;
+}
+
+.dashboard-header,
+.page-engine-header,
+.module-header,
+.chat-header {
+  color: var(--mci-text-primary) !important;
+  border-bottom: 1rpx solid var(--mci-divider) !important;
+  background: #FFFFFF !important;
+  box-shadow: none !important;
+}
+
+.dashboard-nav,
+.page-engine-nav,
+.module-nav,
+.chat-header .header-inner {
+  color: var(--mci-text-primary) !important;
+}
+
+.dashboard-nav__title,
+.dashboard-nav__subtitle,
+.page-engine-nav__title,
+.page-engine-nav__subtitle,
+.module-nav__title,
+.chat-header .header-title,
+.back-text {
+  color: var(--mci-text-primary) !important;
+}
+
+.dashboard-nav__subtitle,
+.page-engine-nav__subtitle,
+.back-text {
+  color: var(--mci-text-secondary) !important;
+}
+
+.dashboard-nav__back,
+.dashboard-nav__button,
+.page-engine-nav__back,
+.page-engine-nav__button,
+.module-nav__back,
+.module-nav__button,
+.chat-header .header-back,
+.chat-header .header-right {
+  color: var(--mci-color-primary) !important;
+}
+
+.dashboard-hero,
+.page-engine-intro,
+.entity-hero {
+  border: 0 !important;
+  border-radius: var(--mci-radius-deck, 16px) !important;
+  color: #FFFFFF !important;
+  background: linear-gradient(135deg, var(--mci-color-primary-dark), var(--mci-color-primary), var(--mci-color-primary-light)) !important;
+  box-shadow: var(--mci-shadow-deck) !important;
+}
+
+.dashboard-hero__title,
+.dashboard-hero__subtitle,
+.dashboard-hero__kicker,
+.page-engine-intro text,
+.entity-hero__title,
+.entity-hero__meta,
+.entity-hero__status {
+  color: #FFFFFF !important;
+}
+
+.page-engine-intro__mark,
+.dashboard-hero__icon,
+.entity-hero__icon {
+  color: #FFFFFF !important;
+  border-color: rgba(255,255,255,.28) !important;
+  background: rgba(255,255,255,.14) !important;
+}
+
+.dashboard-card,
+.dashboard-action,
+.page-engine-filter-card,
+.page-engine-state,
+.module-group,
+.data-card,
+.filter-card,
+.report-card,
+.detail-section,
+.workflow-card,
+.form-section,
+.form-panel,
+.reminder-card,
+.settings-list,
+.more-panel,
+.ai-disclosure,
+.ai-model-bar,
+.state-panel,
+.state-card {
+  color: var(--mci-text-primary) !important;
+  border: 1rpx solid var(--mci-divider) !important;
+  border-radius: var(--mci-radius-surface, 14px) !important;
+  background: #FFFFFF !important;
+  box-shadow: var(--mci-shadow-card) !important;
+}
+
+.module-grid,
+.report-grid,
+.dashboard-metrics,
+.action-grid {
+  gap: 16rpx !important;
+}
+
+.module-item,
+.dashboard-action,
+.action-grid__item,
+.settings-item {
+  min-height: 88rpx !important;
+  border-radius: var(--mci-radius-control, 12px) !important;
+}
+
+.module-item--pressed,
+.data-card--pressed,
+.dashboard-pressed,
+.form-actions__pressed,
+.edit-command--pressed {
+  background: var(--mci-color-primary-faint) !important;
+  transform: scale(.98);
+}
+
+.search-input-wrap,
+.search-row,
+.filter-row,
+.period-row,
+.status-row,
+.page-engine-filter__control,
+.page-engine-filter__input,
+.field-row,
+.input-wrapper,
+.input-wrap,
+.form-field,
+.tenant-field-control-wrap {
+  border-color: var(--mci-divider) !important;
+  border-radius: var(--mci-radius-control, 12px) !important;
+  background: #FFFFFF !important;
+}
+
+.search-input,
+.field-input,
+.page-engine-filter__input,
+.chat-textarea,
+input,
+textarea {
+  color: var(--mci-text-primary) !important;
+}
+
+.status-chip,
+.status-item,
+.period-item,
+.tab,
+.mode-item {
+  border-radius: 10rpx !important;
+}
+
+.status-chip.active,
+.status-item.active,
+.period-item.active,
+.tab.active,
+.mode-item.active {
+  color: var(--mci-color-primary) !important;
+  border-color: var(--mci-color-primary) !important;
+  background: var(--mci-color-primary-soft) !important;
+}
+
+.mci-btn,
+.primary-button,
+.floating-add,
+.page-engine-filter-actions__primary,
+.page-engine-state__button,
+.send-btn,
+.account-login-btn,
+.mp-login-btn {
+  min-height: 88rpx !important;
+  border-radius: var(--mci-radius-control, 12px) !important;
+  color: #FFFFFF !important;
+  background: var(--mci-color-primary) !important;
+  box-shadow: none !important;
+}
+
+.bottom-bar,
+.chat-input-area,
+.detail-action-bar,
+.form-actions,
+.sheet-bottom {
+  border-top: 1rpx solid var(--mci-divider) !important;
+  background: rgba(255,255,255,.98) !important;
+  box-shadow: var(--mci-shadow-dock) !important;
+}
+
+.sheet-panel,
+.editor-sheet,
+.customer-sheet,
+.settings-panel,
+.captcha-dialog {
+  border-radius: 28rpx 28rpx 0 0 !important;
+  background: var(--mci-app-canvas, #F8FAFC) !important;
+}
+
+.state-panel__text,
+.state-text,
+.dashboard-section-subtitle,
+.page-engine-footnote,
+.dashboard-footnote,
+.detail-field__label,
+.form-field__description,
+.report-field__label,
+.summary-label,
+.field-label,
+.msg-preview,
+.bubble-time,
+.hint-text {
+  color: var(--mci-text-secondary) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-item--pressed,
+  .data-card--pressed,
+  .dashboard-pressed,
+  .form-actions__pressed,
+  .edit-command--pressed { transform: none !important; }
+}
