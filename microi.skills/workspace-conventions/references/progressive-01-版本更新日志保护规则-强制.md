@@ -139,7 +139,7 @@ AI 开始处理定制页面、弹窗、Web、UniApp、微服务或应用商城�
 如果 MCP 返回登录过期，必须先修复或刷新目标 MCP 身份，再继续把 MCP 读取结果当作当前事实；不能因为读取失败就假设在线应用不存在并重复创建。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-020 sha256=64ab3dbde08488e8cf9f320bf74d97c938507170723022efeb6ab4f96380f9ca -->
+<!-- microi-progressive:chunk id=workspace-conventions-020 sha256=60e6dac03e25861d4e0507c30ab28d28e26ada4cbe3231c3b029eb2367dc7224 -->
 ## VS Code 插件空目录生成规则
 
 Microi.Agent 面向普通用户时，用户本地可能只是一个空工作区。插件生成 AI 指令文件时不能假设用户已经有 `microi.skills/`、`Microi-V8-Engine/`、`AI-Project/` 或某个固定前端项目目录。
@@ -151,7 +151,7 @@ Microi.Agent 面向普通用户时，用户本地可能只是一个空工作区�
 - 插件升级时应继续保护用户本地修改过的 skill 文件，只覆盖插件曾生成且用户未改过的文件。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-021 sha256=cee19f2fffffce3b4bcd9347a50ecf27add4be0c919e1cf5d00df98d487d29b8 -->
+<!-- microi-progressive:chunk id=workspace-conventions-021 sha256=963e489e2bdda4614c8b3089830b8bb855603dbd4338ddcc7ae29519d560766f -->
 ## Microi 版本号规则
 
 Microi 通用版本号采用 `主版本.次版本.修订版本` 三段数字格式，从 `1.0.0` 开始。每次发布时最后一位加 1；当某一位超过 `9` 时向前一位进位并将当前位归 `0`，例如 `1.0.9 -> 1.1.0`、`1.9.9 -> 2.0.0`、`9.9.9 -> 10.0.0`。
@@ -185,7 +185,7 @@ if (string.IsNullOrWhiteSpace(tableName)) { return; }
 如果方法内部只通过 `DynamicHelper` 读取对象字段，方法参数优先声明为 `object`，不要声明为 `dynamic`。这样可以减少 C# 运行时动态绑定进入普通字符串工具链的机会。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=1dfe4286cfee04571a3d24a32af15365b9da6abffe9acfd92a75539e6160f2bd -->
+<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=4ef009cbfca343640e69ccdb6be47f3cb13ad8a67f9ff770debce20c919f1bb3 -->
 ## 根目录保留文件说明
 
 根目录只允许存在以下类型的文件和目录：

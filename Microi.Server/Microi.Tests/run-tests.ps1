@@ -92,7 +92,8 @@ if ($Mode -eq "Full") {
 
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 
-# 自动发现统一入口、应用包和 PC 端所有 node:test 回归；新增测试不得依赖手工补清单。
+# 自动发现平台统一入口、平台内置应用包和 PC 端的 node:test 回归；新增平台测试不依赖手工清单。
+# 独立业务应用、游戏及客户项目使用自己的测试入口，不通过转调文件进入平台 Quick/Full。
 # 真正浏览器/数据库测试仍由下方 Full 环境入口执行，不能伪装成离线单元测试。
 node (Join-Path $testRoot 'run-node-regressions.mjs') $ResultsDirectory
 if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with exit code $LASTEXITCODE." }

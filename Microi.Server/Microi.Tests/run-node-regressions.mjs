@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+// 仅发现平台测试、平台内置资源和平台 PC 测试；独立应用不得以转调文件接入。
 export const roots=['Microi.Server/Microi.Tests','Microi.Server/Microi.Upgrade/Resource','Microi.Client/tests'];
 // Microi Code 桌面仓的当前测试使用 Vitest + TypeScript，由 run-tests.ps1 通过
 // 该应用自己的 npm test 入口执行。不要把它误交给 node --test，也不要因为旧的

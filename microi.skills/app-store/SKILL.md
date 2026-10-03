@@ -39,6 +39,13 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 
 ## 包内容
 
+### 仅共享编译运行产物
+
+- 消费者只需运行应用、无需安装业务资源时，显式传 `RuntimeAssetsOnly=true`；只接受 `ProtocolVersion=3 + ApplicationType=Web + 显式 IncludeSource=false` 和通过现有 `CommittedProof`、运行清单校验的 `SharedPublicRuntime`。不能把“不包含源码”自动等同于此模式；省略或 `false` 保持原有打包行为。
+- 请求的菜单、表、接口、移除接口、工作流、任务、数据、路由、页面及资源策略选择均必须为空；既有商城行的 `SelectMenu/SelectTable/SelectApiEngine/SelectData` 和 `PreparedAssets.MenuContract` 非空时拒绝，禁止静默清理历史选择。不能与 `DatabaseOnlyBuild` 混用。
+- 现有 `microi_run_engine` 的 `params` 是动态对象，可传此开关，无需增加工具参数。对 `ai_app_publish_store` 的 `Action=InspectResourceSnapshot` 和 `Action=Publish` 都使用同一组冻结模式、版本、资产及提交证明，后者将前者返回的 `ResourceSnapshotHash` 作为 `ExpectedResourceSnapshotHash` 传入。MCP 的 `confirmExecution` 仍必须匹配引擎 Key。
+- 下载真实发布包后，断言 `DDLStatements/PhysicalColumns/DiyTables/DiyFields/DataSets/SysMenus/WfFlowDesigns/WfNodes/WfLines/SysApiEngines/ScheduleJobs` 十一项数组全部为零，`SourceFiles/BuildAssets` 为零，`SourceZip/BuildZip` 为空，唯一运行交付为 `SharedPublicRuntime`。源码分发、服务端业务迁移和共享运行入口是独立事实，不能将共享公有编译产物当成目标租户已有业务接口或权限。
+
 ### 物理索引闭包
 
 标准导出器必须同时导出责任表的真实唯一索引和普通复合索引，按列顺序生成独立
