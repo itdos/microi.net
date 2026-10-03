@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-03T15:52:15.909Z",
+  "generatedAt": "2026-10-03T15:53:33.081Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2221,17 +2221,17 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "723a5f92ebf7043867be0b26db05220be8f495781efbe18c4fbc4f5195028973",
+      "originalSha256": "5aaf8ed912c03d214e213cf5643b3bf055eb532b0e9c1a2ad1de0cc729bf08d6",
       "originalLines": 633,
-      "prefixSha256": "7e17cc2cea557a0107bba8df27ab98a140475a9028ed34ff6e0c6aba498dc4d6",
-      "prefixBytes": 17288,
+      "prefixSha256": "3080789ab7853ddcd056c23faba4a82eb02443a6107d811692a9bb45e753deb5",
+      "prefixBytes": 17212,
       "entryLines": 276,
       "chunks": [
         {
           "id": "v8-file-upload-000",
           "ordinal": 0,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "dbe3a930c0a93c6524105d8d2d4dbdc8f207d56c706b1bafee5e09455a27a728",
+          "sha256": "6155d8bbc643dc0034c66190ab5b4173ef56eba1d99a994bfce7d12ec70f52ee",
           "lines": 18,
           "heading": "核心 API"
         },
@@ -2239,7 +2239,7 @@
           "id": "v8-file-upload-001",
           "ordinal": 1,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "75f69f74c9e9c6799fdddb39d14fa2e831886aa1f9e41a1388e37b7fb620b91e",
+          "sha256": "d535a333639a9005f5d20f25e36e2753a11835380713c1bb063ae618e6cea4af",
           "lines": 16,
           "heading": "第三方数据库附件迁移"
         },
@@ -2247,7 +2247,7 @@
           "id": "v8-file-upload-002",
           "ordinal": 2,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "2aec315a252c2738bc3055dd5840e31e4984c4fc884d9bbf059b585b302b389c",
+          "sha256": "176e9f91705f20416e177d7dbdbd32fb8f81dff6ba0da1a45b533795d187f0e0",
           "lines": 101,
           "heading": "接收前端上传的文件"
         },
@@ -2255,7 +2255,7 @@
           "id": "v8-file-upload-003",
           "ordinal": 5,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "ba21d592f1927ae9624bd76ba16782b4f3b5ee5356bf8ea4189e854587855b62",
+          "sha256": "d02dfde4abd2349cd92de1daee129bc08ba42142b5f6229736588cb3e0dbf43c",
           "lines": 13,
           "heading": "跨平台文件同步登录会话"
         },
@@ -2263,7 +2263,7 @@
           "id": "v8-file-upload-004",
           "ordinal": 6,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "3bf875aea7d54bc627985d9f6737a00da8a1f7f2d81d348c2748e1e04270432c",
+          "sha256": "fac343cf83be0748ed0d176a573f916ff4b496815d3fb6e15ed1ef9ce129fbf3",
           "lines": 26,
           "heading": "下载远程文件并存到 HDFS"
         },
@@ -2271,7 +2271,7 @@
           "id": "v8-file-upload-005",
           "ordinal": 3,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "01cb8412758acacfe3e84e8021f1969e518da5820ef1797769f48185ab59c9a8",
+          "sha256": "45f848d78235d8a315663fc77a2d9565b1a22791917591704040712fb56d1bee",
           "lines": 150,
           "heading": "公有桶 vs 私有桶"
         },
@@ -2279,7 +2279,7 @@
           "id": "v8-file-upload-006",
           "ordinal": 4,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "ea9c7893f77b8cb5ed0492100de21cdcb3e719022de468bfdebe57e10c8fba90",
+          "sha256": "2dcf2dd7a571cc4757e9015cf213191be2dc3f041d91b0de51ed8ee00b0b86e7",
           "lines": 50,
           "heading": "接口直接响应文件（下载/导出）"
         },
@@ -2287,7 +2287,7 @@
           "id": "v8-file-upload-007",
           "ordinal": 7,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "59ebcaa605d26def44cd027c0975a01fffee8670a890b4ed18b4138527be8a1b",
+          "sha256": "710eb73f616aff2ebce65a82568abe8208b701c1211a7e95ce500b1ce20b363f",
           "lines": 27,
           "heading": "通过 URL 列表批量下载并入库"
         },
@@ -2295,7 +2295,7 @@
           "id": "v8-file-upload-008",
           "ordinal": 8,
           "destination": "v8-file-upload/references/progressive-02-office-文件在线编辑版本号规则.md",
-          "sha256": "e6dc41e68545af58245bc6f2ca37781c85a049715df6a5381fe4ea57a7a01535",
+          "sha256": "5dacdb706cc408a76a576da55c497756cd974819863162c6a50ad36504738051",
           "lines": 46,
           "heading": "Office 文件在线编辑版本号规则"
         },
@@ -2303,7 +2303,7 @@
           "id": "v8-file-upload-009",
           "ordinal": 9,
           "destination": "v8-file-upload/references/progressive-02-office-文件在线编辑版本号规则.md",
-          "sha256": "1cc3ff1b6a5c756d957819f198c13ea181143db484527d1931aefc8e0d52993c",
+          "sha256": "fa3e980be41d5e1030b516f91ddaf5505917073936f08f919f34cad979b9b054",
           "lines": 82,
           "heading": "ImgUpload / FileUpload 字段值兼容规则"
         },
@@ -2311,7 +2311,7 @@
           "id": "v8-file-upload-010",
           "ordinal": 10,
           "destination": "v8-file-upload/references/progressive-02-office-文件在线编辑版本号规则.md",
-          "sha256": "229294a07a8db953219c35292db5558430addb576505695b9ce88a275eb46232",
+          "sha256": "f34d476435c3a8321df017b481771d757f580c8d75f7648fdd54ee1c624d116c",
           "lines": 26,
           "heading": "安全注意"
         }
