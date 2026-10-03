@@ -3525,7 +3525,17 @@ onUnmounted(() => {
 .step-item > span { width: 26px; height: 26px; border-radius: 50%; font-size: 11px; }
 .step-item strong { font-size: 12px; font-weight: 500; }
 .step-item small, .step-wait-notice, .step-elapsed { font-size: 10px; }
-.tenant-card { background: var(--portal-bg); border: 1px solid var(--portal-line); border-radius: 10px; box-shadow: none; }
+/* 子组件也消费个人中心主题，避免实际已有租户时仍露出旧橙色卡片和低对比文字。 */
+.profile-page :deep(.tenant-card) { background: var(--portal-bg); border: 1px solid var(--portal-line); border-radius: 10px; box-shadow: none; }
+.profile-page :deep(.tenant-title-block small) { color: var(--portal-muted); }
+.profile-page :deep(.tenant-open) { background: #2563eb; color: #fff; box-shadow: none; }
+.profile-page :deep(.tenant-domain), .profile-page :deep(.tenant-password-tip) { background: var(--portal-bg); border-color: var(--portal-line); color: var(--portal-text); }
+.profile-page :deep(.tenant-password-tip b) { color: var(--portal-text); }
+.profile-page :deep(.tenant-password-tip small) { color: var(--portal-muted); }
+.dark .profile-page :deep(.tenant-card), .dark .profile-page :deep(.tenant-domain), .dark .profile-page :deep(.tenant-password-tip) { background: var(--portal-bg); border-color: var(--portal-line); color: var(--portal-text); }
+.dark .profile-page :deep(.tenant-domain a) { color: #9bb6ff; }
+.dark .profile-page :deep(.tenant-password-tip b) { color: var(--portal-text); }
+.dark .profile-page :deep(.tenant-password-tip small) { color: var(--portal-muted); }
 .invitation-page { display: grid; gap: 24px; }
 .invitation-share { display: grid; grid-template-columns: 1fr; gap: 24px; }
 .invitation-share h2 { margin-top: 10px; }
