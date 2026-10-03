@@ -3555,7 +3555,7 @@ onUnmounted(() => {
 .license-record h3 { font-size: 15px; margin: 0; font-weight: 600; }
 .license-record p { margin: 4px 0 0; font-size: 12px; }
 .license-status { margin-left: auto; font-size: 11px; border-radius: 4px; padding: 4px 8px; color: var(--portal-muted); background: var(--portal-surface); }
-.license-status.valid { color: #078561; background: #e9f8f1; }
+.license-status.valid { color: #066a4c; background: #e9f8f1; }
 .license-record dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; padding-top: 22px; margin: 0; }
 .license-record dt { font-size: 11px; color: var(--portal-muted); }
 .license-record dd { margin: 4px 0 0; font-size: 12px; overflow-wrap: anywhere; }
@@ -3571,6 +3571,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 :global(.dark .profile-sidebar), :global(.dark .content-panel), :global(.dark .welcome-card), :global(.dark .portal-shortcuts button){ background: var(--portal-surface); border-color: var(--portal-line); color: var(--portal-text); }
 :global(.dark .brand), :global(.dark .profile-header h1), :global(.dark .content-panel h2){ color: var(--portal-text); }
 :global(.dark .side-menu-item.active){ background: #23314b; color: #86aefe; }
+:global(.dark .profile-page .system-symbol){ color: #9bb6ff; }
+:global(.dark .profile-page .license-status.valid){ color: #a3e7cb; background: #163b2e; }
 @media(max-width: 1100px) { .profile-page { grid-template-columns: 196px minmax(0,1fr); } .profile-main { padding: 32px 24px; } .portal-shortcuts { gap: 12px; } .portal-shortcuts button { padding: 20px; } .content-grid { grid-template-columns: 1fr; } }
 @media(max-width: 760px) { .profile-page { display: block; } .profile-sidebar { position: static; height: auto; padding: 20px 18px 14px; border-right: none; border-bottom: 1px solid var(--portal-line); } .brand { margin-bottom: 20px; } .side-menu { display: flex; flex-direction: row; overflow-x: auto; padding-bottom: 4px; gap: 6px; } .side-menu-item { flex: 0 0 auto; min-height: 38px; padding: 8px 12px; font-size: 12px; } .menu-icon { display: none; } .sidebar-footer { display: none; } .profile-main { padding: 28px 18px; } .profile-header { gap: 12px; margin-bottom: 24px; } .profile-header h1 { font-size: 24px; } .header-desc { font-size: 12px; } .header-actions { flex-shrink: 0; } .welcome-card, .content-panel { padding: 24px; } .welcome-card p { line-height: 1.8; } .portal-shortcuts { grid-template-columns: 1fr; } .portal-shortcuts button { display: grid; grid-template-columns: 32px 1fr; gap: 8px 12px; padding: 20px; } .shortcut-icon { grid-row: span 3; margin: 0; } .portal-shortcuts small { padding-top: 4px; } .invitation-link { flex-direction: column; } .license-record dl { grid-template-columns: 1fr; } .portal-help { gap: 16px; } }
 
