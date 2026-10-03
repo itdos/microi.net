@@ -1,0 +1,562 @@
+/**
+ * 多语言模块 (i18n) — 中文 / English
+ * 用法：
+ *   import { t, setLang, getLang } from '@/utils/i18n.js'
+ *   t('common.confirm')  // => '确定' or 'OK'
+ */
+
+const STORAGE_KEY = 'microi_language'
+
+let _lang = 'zh-CN'
+try { _lang = uni.getStorageSync(STORAGE_KEY) || 'zh-CN' } catch (e) {}
+
+export function getLang() { return _lang }
+export function setLang(lang) {
+  _lang = lang
+  try { uni.setStorageSync(STORAGE_KEY, lang) } catch (e) {}
+}
+
+// ─── 翻译字典 ───
+const messages = {
+  'zh-CN': {
+    // ── 通用 ──
+    common: {
+      confirm: '确定',
+      cancel: '取消',
+      back: '返回',
+      loading: '加载中...',
+      loadingDot: '加载中...',
+      noMore: '— 已经到底了 —',
+      retry: '重试',
+      send: '发送',
+      reset: '重置',
+      search: '搜索',
+      all: '全部',
+      tip: '提示',
+      networkError: '网络错误',
+      networkException: '网络异常，请稍后再试',
+      operationFailed: '操作失败',
+      poweredBy: 'Powered by',
+      loginFirst: '请先登录',
+      loginNow: '立即登录',
+      notLoggedIn: '未登录',
+      clickToLogin: '点击登录 →',
+      account: '账号',
+      user: '用户',
+      noData: '暂无数据',
+      justNow: '刚刚',
+      minuteAgo: '分钟前',
+      yesterday: '昨天',
+      daysAgo: '天前',
+      today: '今天',
+      month: '月',
+      day: '日',
+      views: '次浏览',
+      end: '— END —',
+      piece: '张',
+    },
+
+    // ── 登录页 ──
+    login: {
+      authLogin: '小程序授权登录',
+      accountLogin: '账号密码登录',
+      enterAccount: '请输入账号',
+      enterPassword: '请输入密码',
+      enterCaptcha: '请输入验证码',
+      gettingCaptcha: '获取中...',
+      loginBtn: '登 录',
+      agreePre: '我已阅读并同意',
+      serviceAgreement: '《服务协议》',
+      and: '和',
+      privacyPolicy: '《隐私政策》',
+      authLoginFailed: '授权登录失败',
+      authNotSupported: '当前平台不支持授权登录',
+      pleaseUseAccount: '请使用账号密码登录',
+      loginFailed: '登录失败，请稍后再试',
+      unboundAuth: '该账号尚未绑定，请使用账号密码登录',
+      encryptionFailed: '密码加密失败',
+      loginFailedMsg: '登录失败',
+      pleaseAgree: '请先阅读并同意服务协议与隐私政策',
+      welcomeBack: '欢迎回来',
+      // 兼容旧key
+      wechatLogin: '小程序授权登录',
+      wechatLoginFailed: '授权登录失败',
+      unboundWechat: '该账号尚未绑定，请使用账号密码登录',
+    },
+
+    // ── 商城 ──
+    mall: {
+      searchPlaceholder: '搜索商品名称、型号、供应商',
+      noProductName: '未命名商品',
+      lease: '租赁',
+      filter: '滤芯',
+      purchase: '买断',
+      noProducts: '暂无商品',
+      tryOther: '换个分类或条件试试',
+      advancedFilter: '高级筛选',
+      productType: '商品类型',
+      priceRange: '价格区间（元）',
+      minPrice: '最低价',
+      maxPrice: '最高价',
+      confirmFilter: '确认筛选',
+      // detail
+      productDetail: '商品详情',
+      noImage: '暂无图片',
+      purchasePrice: '买断价格',
+      replaceFilter: '更换滤芯',
+      yuanPerUnit: '元/台',
+      yuanPerPiece: '元/支',
+      yuanPerYear: '元/年',
+      leasable: '可租赁',
+      leasePrice: '租赁价格',
+      yuanPerUnitYear: '元/台/年',
+      model: '型号',
+      category: '分类',
+      supplyInfo: '供应信息',
+      merchant: '商家',
+      supplier: '供应商',
+      productParams: '商品参数',
+      caseImages: '案例图片',
+      noProductDetail: '暂无商品详情',
+      noCaseImages: '暂无案例图片',
+      share: '分享',
+      favorited: '已收藏',
+      favorite: '收藏',
+      bookNow: '立即预约',
+      bookProduct: '预约商品',
+      quantity: '数量',
+      name: '姓名',
+      phone: '手机号',
+      enterName: '请输入姓名',
+      enterPhone: '请输入手机号码',
+      confirmBook: '确认预约',
+      loadFailed: '加载失败',
+      shareHint: '请点击右上角 ··· 分享',
+      unfavorited: '已取消收藏',
+      enterCorrectPhone: '请输入正确的手机号',
+      bookSuccess: '预约成功',
+      bookFailed: '预约失败',
+    },
+
+    // ── 资讯 ──
+    news: {
+      title: '资讯',
+      subtitle: '了解行业最新动态',
+      noNews: '暂无资讯',
+      checkLater: '稍后再来看看吧',
+      newsDetail: '资讯详情',
+      articleNotFound: '文章不存在或已删除',
+      backToList: '返回列表',
+    },
+
+    // ── 工作台 ──
+    workspace: {
+      title: '工作台',
+      loginHint: '登录后即可使用工作台功能',
+      noMenu: '暂无工作台菜单',
+      contactAdmin: '请联系管理员配置权限',
+      menu: '菜单',
+      subMenu: '子菜单',
+    },
+
+    // ── 消息 ──
+    message: {
+      title: '消息',
+      contacts: '通讯录',
+      loginHint: '登录后即可使用消息功能',
+      searchMsg: '搜索消息',
+      searchContact: '搜索联系人',
+      noMessages: '暂无消息',
+      startChat: '发起聊天',
+      noContacts: '暂无联系人',
+      selectContact: '选择联系人',
+      aiAssistant: 'AI助手',
+      aiGreeting: '我是您的AI助手，有什么可以帮您？',
+      system: '系统',
+      // chat
+      chat: '聊天',
+      inputMsg: '输入消息...',
+      image: '图片',
+      camera: '拍摄',
+      file: '文件',
+      location: '位置',
+      chatInfo: '聊天信息',
+      muteNotification: '消息免打扰',
+      pinChat: '置顶聊天',
+      clearHistory: '清空聊天记录',
+      me: '我',
+      reconnecting: '连接已断开，正在重连...',
+      sendFailed: '发送失败',
+      clearHistoryConfirm: '确定要清空聊天记录吗？',
+    },
+
+    // ── 我的 ──
+    profile: {
+      langSwitch: '语言切换',
+      aboutSystem: '关于系统',
+      privacyPolicy: '隐私政策',
+      changePassword: '修改密码',
+      logout: '退出登录',
+      selectLang: '选择语言',
+      oldPassword: '原密码',
+      newPassword: '新密码',
+      confirmPassword: '确认密码',
+      enterOldPwd: '请输入原密码',
+      enterNewPwd: '请输入新密码（至少6位）',
+      enterConfirmPwd: '请再次输入新密码',
+      langSwitched: '已切换为中文',
+      pwdMinLength: '新密码至少6位',
+      pwdNotMatch: '两次密码不一致',
+      pwdChanged: '密码修改成功',
+      changeFailed: '修改失败',
+      logoutConfirm: '确定要退出登录吗？',
+      loggedOut: '已退出登录',
+    },
+
+    // ── 关于 ──
+    about: {
+      version: '版本',
+      service: '服务协议',
+      privacy: '隐私政策',
+      desc: '是一款企业级应用，提供高效便捷的移动办公体验。',
+    },
+
+    // ── 隐私政策 ──
+    privacy: {
+      title: '隐私政策',
+      intro: '引言',
+      introText: '欢迎使用{appName}（以下简称“本应用”）。我们重视您的隐私与个人信息安全。本政策说明本应用如何处理、存储和保护信息，以及您如何行使相关权利。若您不同意本政策，请停止使用本应用。',
+      infoCollect: '一、信息收集',
+      infoCollectItem1: '1. 企业连接信息：您选择并验证的 HTTPS API 地址、OsClient 与连接状态，用于定位所属企业系统。',
+      infoCollectItem2: '2. 账号与业务信息：登录时处理账号、加密密码、登录令牌、用户标识、权限，以及您在企业授权范围内查看或提交的表单、附件等业务数据。',
+      infoCollectItem3: '3. 设备与运行信息：在保障安全、维持会话和排查故障所必需时处理设备型号、操作系统版本、应用启动、错误与网络信息。',
+      infoUse: '二、信息使用',
+      infoUseDesc: '我们收集的信息将用于以下目的：',
+      infoUseItem1: '1. 验证企业连接、用户身份与访问权限',
+      infoUseItem2: '2. 提供企业授权的移动办公与业务协同功能',
+      infoUseItem3: '3. 保障账号、会话和系统安全并排查故障',
+      infoUseItem4: '4. 履行适用法律法规要求',
+      infoStorage: '三、信息存储与保护',
+      infoStorageItem1: '1. 登录令牌和必要偏好存储在当前设备，用于保持会话；退出或切换企业连接时会清理相关本地数据。',
+      infoStorageItem2: '2. 业务数据通过 HTTPS 传输至您选择的企业服务端，其保存期限与管理规则由对应企业决定。',
+      infoStorageItem3: '3. 账号、菜单、元数据与缓存按 API 地址和 OsClient 隔离；密码采用 RSA 非对称加密传输。',
+      infoShare: '四、信息共享',
+      infoShareDesc: '我们不会出售或出租您的个人信息。仅在以下必要范围内处理或提供信息：',
+      infoShareItem1: '1. 向您主动选择并验证的企业服务端发送完成业务所需的数据',
+      infoShareItem2: '2. 经您明确同意，由必要的技术服务提供方按约定处理信息',
+      infoShareItem3: '3. 法律法规、监管机关依法要求，或保护合法权益所必需',
+      yourRights: '五、您的权利',
+      yourRightsItem1: '1. 您有权访问和修改您的个人信息',
+      yourRightsItem2: '2. 您可以退出账号、切换企业连接并清理本地会话数据',
+      yourRightsItem3: '3. 您可以拒绝非必要权限；业务数据的查询、更正、导出或删除请联系所连接企业的系统管理员',
+      minorProtection: '六、未成年人保护',
+      minorProtectionDesc: '本应用主要面向企业用户。如果您未满18周岁，请在监护人指导下使用本应用。',
+      policyUpdate: '七、政策更新',
+      policyUpdateDesc: '处理目的、权限或第三方组件发生实质变化时，我们会更新本政策并在应用内公布，请您定期查阅。',
+      contactUs: '八、联系我们',
+      contactUsDesc: '企业账号与业务数据问题请联系所连接企业的系统管理员；产品与平台信息可访问 www.microi.net。',
+      lastUpdate: '最后更新日期：2026年9月1日',
+    },
+
+    service: {
+      title: '服务协议',
+      subtitle: '使用条款与服务边界',
+      intro: '一、服务说明',
+      introText: '{appName}是连接企业自有 Microi 系统的移动工作台。企业账号、菜单、权限和业务数据由用户选择的企业服务端提供并管理。',
+      connection: '二、企业连接',
+      connectionText: '用户应仅连接所属企业提供并确认的 HTTPS API 地址和 OsClient。本应用会先验证企业配置，验证通过后才保存连接信息；切换企业会退出原账号并清理相关缓存。',
+      account: '三、账号与使用',
+      accountText: '用户应妥善保管账号，不得绕过企业权限、攻击服务端或处理无权访问的数据。账号开通、停用、数据更正与删除由对应企业按照其管理制度处理。',
+      permissions: '四、功能与权限',
+      permissionsText: '相机、相册、麦克风和定位仅在用户主动使用拍摄、上传、录音、拜访、打卡或地图功能时申请；拒绝某项权限不会阻止使用与该权限无关的功能。',
+      changes: '五、服务变更',
+      changesText: '应用功能可能随平台升级调整。企业服务端不可用、账号权限不足或网络异常时，相应业务功能可能暂时无法使用。',
+      contact: '六、联系与争议',
+      contactText: '产品与平台信息可访问 www.microi.net。具体企业数据、账号和业务问题应优先联系所连接企业的系统管理员。',
+      lastUpdate: '最后更新日期：2026年9月1日',
+    },
+  },
+
+  'en': {
+    common: {
+      confirm: 'OK',
+      cancel: 'Cancel',
+      back: 'Back',
+      loading: 'Loading...',
+      loadingDot: 'Loading...',
+      noMore: '— No more data —',
+      retry: 'Retry',
+      send: 'Send',
+      reset: 'Reset',
+      search: 'Search',
+      all: 'All',
+      tip: 'Notice',
+      networkError: 'Network error',
+      networkException: 'Network error, please try again later',
+      operationFailed: 'Operation failed',
+      poweredBy: 'Powered by',
+      loginFirst: 'Please login first',
+      loginNow: 'Login Now',
+      notLoggedIn: 'Not logged in',
+      clickToLogin: 'Tap to login →',
+      account: 'Account',
+      user: 'User',
+      noData: 'No data',
+      justNow: 'Just now',
+      minuteAgo: ' min ago',
+      yesterday: 'Yesterday',
+      daysAgo: ' days ago',
+      today: 'Today',
+      month: '/',
+      day: '',
+      views: ' views',
+      end: '— END —',
+      piece: '',
+    },
+
+    login: {
+      authLogin: 'Authorize Login',
+      accountLogin: 'Account Login',
+      enterAccount: 'Enter account',
+      enterPassword: 'Enter password',
+      enterCaptcha: 'Enter captcha',
+      gettingCaptcha: 'Loading...',
+      loginBtn: 'Login',
+      agreePre: 'I have read and agree to the ',
+      serviceAgreement: 'Terms of Service',
+      and: ' and ',
+      privacyPolicy: 'Privacy Policy',
+      authLoginFailed: 'Authorization login failed',
+      authNotSupported: 'Auth login not supported on this platform',
+      pleaseUseAccount: 'Please use account & password to login',
+      loginFailed: 'Login failed, please try again',
+      unboundAuth: 'Account not bound, please use account & password',
+      encryptionFailed: 'Password encryption failed',
+      loginFailedMsg: 'Login failed',
+      pleaseAgree: 'Please agree to the Terms of Service and Privacy Policy',
+      welcomeBack: 'Welcome back',
+      // backward-compatible keys
+      wechatLogin: 'Authorize Login',
+      wechatLoginFailed: 'Authorization login failed',
+      unboundWechat: 'Account not bound, please use account & password',
+    },
+
+    mall: {
+      searchPlaceholder: 'Search product name, model, supplier',
+      noProductName: 'Unnamed product',
+      lease: 'Lease',
+      filter: 'Filter',
+      purchase: 'Purchase',
+      noProducts: 'No products',
+      tryOther: 'Try another category or filter',
+      advancedFilter: 'Advanced Filter',
+      productType: 'Product Type',
+      priceRange: 'Price Range',
+      minPrice: 'Min',
+      maxPrice: 'Max',
+      confirmFilter: 'Apply Filter',
+      productDetail: 'Product Detail',
+      noImage: 'No image',
+      purchasePrice: 'Purchase Price',
+      replaceFilter: 'Replace Filter',
+      yuanPerUnit: '/unit',
+      yuanPerPiece: '/pc',
+      yuanPerYear: '/year',
+      leasable: 'Leasable',
+      leasePrice: 'Lease Price',
+      yuanPerUnitYear: '/unit/year',
+      model: 'Model',
+      category: 'Category',
+      supplyInfo: 'Supply Info',
+      merchant: 'Merchant',
+      supplier: 'Supplier',
+      productParams: 'Product Specs',
+      caseImages: 'Case Images',
+      noProductDetail: 'No product detail',
+      noCaseImages: 'No case images',
+      share: 'Share',
+      favorited: 'Saved',
+      favorite: 'Save',
+      bookNow: 'Book Now',
+      bookProduct: 'Book Product',
+      quantity: 'Qty',
+      name: 'Name',
+      phone: 'Phone',
+      enterName: 'Enter name',
+      enterPhone: 'Enter phone number',
+      confirmBook: 'Confirm Booking',
+      loadFailed: 'Load failed',
+      shareHint: 'Tap ··· at top right to share',
+      unfavorited: 'Removed from favorites',
+      enterCorrectPhone: 'Enter valid phone number',
+      bookSuccess: 'Booked successfully',
+      bookFailed: 'Booking failed',
+    },
+
+    news: {
+      title: 'News',
+      subtitle: 'Stay updated with industry trends',
+      noNews: 'No news yet',
+      checkLater: 'Check back later',
+      newsDetail: 'News Detail',
+      articleNotFound: 'Article not found or deleted',
+      backToList: 'Back to List',
+    },
+
+    workspace: {
+      title: 'Workspace',
+      loginHint: 'Login to access workspace features',
+      noMenu: 'No workspace menus',
+      contactAdmin: 'Please contact administrator',
+      menu: 'Menu',
+      subMenu: 'Sub Menu',
+    },
+
+    message: {
+      title: 'Messages',
+      contacts: 'Contacts',
+      loginHint: 'Login to use messaging',
+      searchMsg: 'Search messages',
+      searchContact: 'Search contacts',
+      noMessages: 'No messages',
+      startChat: 'Start Chat',
+      noContacts: 'No contacts',
+      selectContact: 'Select Contact',
+      aiAssistant: 'AI Assistant',
+      aiGreeting: "I'm your AI assistant, how can I help?",
+      system: 'System',
+      chat: 'Chat',
+      inputMsg: 'Type a message...',
+      image: 'Photo',
+      camera: 'Camera',
+      file: 'File',
+      location: 'Location',
+      chatInfo: 'Chat Info',
+      muteNotification: 'Mute',
+      pinChat: 'Pin Chat',
+      clearHistory: 'Clear History',
+      me: 'Me',
+      reconnecting: 'Disconnected, reconnecting...',
+      sendFailed: 'Send failed',
+      clearHistoryConfirm: 'Clear all chat history?',
+    },
+
+    profile: {
+      langSwitch: 'Language',
+      aboutSystem: 'About',
+      privacyPolicy: 'Privacy Policy',
+      changePassword: 'Change Password',
+      logout: 'Logout',
+      selectLang: 'Select Language',
+      oldPassword: 'Current Password',
+      newPassword: 'New Password',
+      confirmPassword: 'Confirm Password',
+      enterOldPwd: 'Enter current password',
+      enterNewPwd: 'Enter new password (min 6 chars)',
+      enterConfirmPwd: 'Re-enter new password',
+      langSwitched: 'Switched to English',
+      pwdMinLength: 'Password must be at least 6 characters',
+      pwdNotMatch: 'Passwords do not match',
+      pwdChanged: 'Password changed successfully',
+      changeFailed: 'Change failed',
+      logoutConfirm: 'Confirm logout?',
+      loggedOut: 'Logged out',
+    },
+
+    about: {
+      version: 'Version',
+      service: 'Terms of Service',
+      privacy: 'Privacy Policy',
+      desc: 'is an enterprise application providing efficient mobile office experience.',
+    },
+
+    privacy: {
+      title: 'Privacy Policy',
+      intro: 'Introduction',
+      introText: 'Welcome to {appName} (the “App”). We value your privacy and personal information security. This policy explains how the App processes, stores and protects information and how you may exercise your rights. If you disagree, please stop using the App.',
+      infoCollect: '1. Information Collection',
+      infoCollectItem1: '1. Enterprise connection data: the validated HTTPS API address, OsClient and connection state used to locate your enterprise system.',
+      infoCollectItem2: '2. Account and business data: account, encrypted password, login token, user identifier, permissions and business forms or attachments you access or submit within enterprise authorization.',
+      infoCollectItem3: '3. Device and runtime data: device model, OS version, launches, errors and network information when required for security, session continuity or troubleshooting.',
+      infoUse: '2. Information Usage',
+      infoUseDesc: 'The information we collect will be used for the following purposes:',
+      infoUseItem1: '1. Validating enterprise connections, user identity and access permissions',
+      infoUseItem2: '2. Providing enterprise-authorized mobile work and collaboration features',
+      infoUseItem3: '3. Protecting accounts, sessions and systems and troubleshooting failures',
+      infoUseItem4: '4. Complying with applicable legal requirements',
+      infoStorage: '3. Data Storage & Protection',
+      infoStorageItem1: '1. Login tokens and required preferences are stored on the current device to maintain your session and are cleared when you sign out or switch enterprise connections.',
+      infoStorageItem2: '2. Business data is transmitted over HTTPS to the enterprise server you selected. Retention and governance are determined by that enterprise.',
+      infoStorageItem3: '3. Accounts, menus, metadata and caches are isolated by API address and OsClient. Passwords are transmitted using RSA asymmetric encryption.',
+      infoShare: '4. Information Sharing',
+      infoShareDesc: 'We do not sell or rent your personal information. Data is processed or provided only when necessary:',
+      infoShareItem1: '1. To send business data to the enterprise server you actively selected and validated',
+      infoShareItem2: '2. By required technology providers under agreed safeguards and with explicit consent where required',
+      infoShareItem3: '3. When required by law, regulators or the protection of lawful rights',
+      yourRights: '5. Your Rights',
+      yourRightsItem1: '1. You have the right to access and modify your personal information',
+      yourRightsItem2: '2. You may sign out, switch enterprise connections and clear local session data',
+      yourRightsItem3: '3. You may refuse non-essential permissions. Contact the connected enterprise administrator to access, correct, export or delete business data',
+      minorProtection: '6. Minor Protection',
+      minorProtectionDesc: 'The App is primarily intended for enterprise users. If you are under 18, please use it under parental guidance.',
+      policyUpdate: '7. Policy Updates',
+      policyUpdateDesc: 'We may update this policy when processing purposes, permissions or third-party components materially change. Updates will be published in the App.',
+      contactUs: '8. Contact Us',
+      contactUsDesc: 'For enterprise account or business-data questions, contact the administrator of the connected enterprise. Product information is available at www.microi.net.',
+      lastUpdate: 'Last updated: September 1, 2026',
+    },
+
+    service: {
+      title: 'Terms of Service',
+      subtitle: 'Terms of use and service boundaries',
+      intro: '1. Service Description',
+      introText: '{appName} is a mobile workspace that connects to enterprise-owned Microi systems. Accounts, menus, permissions and business data are provided and managed by the enterprise server selected by the user.',
+      connection: '2. Enterprise Connection',
+      connectionText: 'Only connect to the HTTPS API address and OsClient confirmed by your enterprise. The App validates the configuration before saving it. Switching enterprises signs out the previous account and clears related caches.',
+      account: '3. Account and Acceptable Use',
+      accountText: 'Protect your account. Do not bypass enterprise permissions, attack a server or access data without authorization. Account activation, suspension, correction and deletion are managed by the relevant enterprise.',
+      permissions: '4. Features and Permissions',
+      permissionsText: 'Camera, photos, microphone and location permissions are requested only when you actively use related features such as capture, upload, recording, visits, check-in or maps. Denial does not block unrelated features.',
+      changes: '5. Service Changes',
+      changesText: 'Features may change as the platform evolves. Some functions may be temporarily unavailable when an enterprise server, account permission or network is unavailable.',
+      contact: '6. Contact and Disputes',
+      contactText: 'Product information is available at www.microi.net. Contact the administrator of the connected enterprise for account, business-data and service questions.',
+      lastUpdate: 'Last updated: September 1, 2026',
+    },
+  }
+}
+
+/**
+ * 翻译函数
+ * @param {string} key  点分隔路径，如 'common.confirm', 'login.enterAccount'
+ * @param {object} params  插值参数，如 { appName: 'xxx' }
+ * @returns {string}
+ */
+export function t(key, params) {
+  const lang = _lang
+  const dict = messages[lang] || messages['zh-CN']
+  const parts = key.split('.')
+  let val = dict
+  for (const p of parts) {
+    if (val && typeof val === 'object') val = val[p]
+    else { val = undefined; break }
+  }
+  if (val === undefined) {
+    // fallback to zh-CN
+    val = messages['zh-CN']
+    for (const p of parts) {
+      if (val && typeof val === 'object') val = val[p]
+      else { val = undefined; break }
+    }
+  }
+  if (typeof val !== 'string') return key
+  // 插值
+  if (params) {
+    Object.keys(params).forEach(k => {
+      val = val.replace(new RegExp('\\{' + k + '\\}', 'g'), params[k])
+    })
+  }
+  return val
+}
+
+export default { t, getLang, setLang }

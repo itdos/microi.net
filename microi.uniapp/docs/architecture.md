@@ -104,6 +104,12 @@ src/tenants/<tenant>/
 后恢复。仓库默认生成物必须始终指向 `xjy`，以保证同事直接运行原命令得到
 当前交付版。
 
+通用 App 使用可选的 `microi` Profile。与现有页面同名而交互不同的源码仅在
+该 Profile 构建期间从 `profiles/microi/overrides/src/` 临时激活；新平台模块、
+组件和路由仍放在共享 `src/`。构建结束必须恢复默认 xjy 源文件，且不能并行
+运行多个 Profile 构建。隔离层的使用与逐步共用规则见
+`profiles/microi/README.md`。
+
 ## 动态更新链路
 
 1. 登录后读取当前角色可见的 `sys_menu`。
