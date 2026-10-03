@@ -30,6 +30,7 @@
 | `microi_recover_minimax_image_task` | 恢复已有供应商图片结果并重新落盘，不重新生成 | 恢复既有任务 |
 | `microi_get_db_schema` | 获取数据库表结构（表名、字段、类型、描述） | 只读 |
 | `microi_get_table_indexes` | 获取一张物理表的标准化索引（有序字段、唯一性、主键标识） | 只读 |
+| `microi_delete_empty_directory_marker` | 通过专用安全路由仅删除当前租户单个零字节空目录标记并严格回读；旧后端 404 不降级普通删除 | 默认 dry run；`confirmExecution` 精确等于路径 |
 | `microi_create_table_index` | 校验物理字段、幂等创建索引并回读 | 读写（需确认） |
 | `microi_drop_table_index` | 删除非主键索引并回读 | 破坏性写入（需确认） |
 | `microi_list_engines` | 列出所有接口引擎 | 只读 |

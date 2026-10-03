@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-file-upload-008 sha256=b7b809862a9d82f0270ae99486acb5fe23185b9d5efad073ae39b282724e2e32 -->
+<!-- microi-progressive:chunk id=v8-file-upload-008 sha256=5dacdb706cc408a76a576da55c497756cd974819863162c6a50ad36504738051 -->
 ## Office 文件在线编辑版本号规则
 
 ### 文件柜 Office 版本
@@ -49,7 +49,7 @@ OnlyOffice 前端组件 npm 包不能替代 Docs 文档服务。`DocsAPI.DocEdit
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-009 sha256=1cc3ff1b6a5c756d957819f198c13ea181143db484527d1931aefc8e0d52993c -->
+<!-- microi-progressive:chunk id=v8-file-upload-009 sha256=fa3e980be41d5e1030b516f91ddaf5505917073936f08f919f34cad979b9b054 -->
 ## ImgUpload / FileUpload 字段值兼容规则
 
 `ImgUpload` 不能假设只是一种值结构。PC 表单、移动端、旧数据、单图/多图、公开/私有桶会混合出现以下格式：
@@ -132,7 +132,7 @@ function publicUploadUrl(path) {
 跨端保存时保留上传响应的实际 `Limit`（兼容布尔值、`1/0` 与对应字符串），只删除临时签名地址和本地预览状态。历史对象缺少该标记时按字段配置取址；已有私有标记优先于公有字段缺省值。单图字段兼容历史单元素数组，不应在字段值预处理阶段把数组直接清空。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-010 sha256=229294a07a8db953219c35292db5558430addb576505695b9ce88a275eb46232 -->
+<!-- microi-progressive:chunk id=v8-file-upload-010 sha256=f34d476435c3a8321df017b481771d757f580c8d75f7648fdd54ee1c624d116c -->
 ## 安全注意
 
 - ❌ 不要让前端任意指定 `Path`（路径穿越风险），只允许后端固定路径

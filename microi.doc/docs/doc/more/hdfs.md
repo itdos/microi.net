@@ -367,6 +367,16 @@ v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在
 
 富文本编辑器的远程图片抓取 `catchimage` 默认关闭，避免把平台变成任意 URL 下载器或内网探测代理。业务若需要采集远程资源，应使用单独的受控接口，并实现域名白名单、DNS/IP 校验、禁止跳转、超时、响应体上限和文件头校验。
 
+### 仅删除空目录标记
+
+事故恢复只需移除一个目录占位对象时，使用专用 `POST /api/HDFS/DeleteEmptyDirectoryMarker`，显式传 `FilePathName`（保留末尾 `/`）与 `Limit`（`true` 私有桶、`false` 公有桶）。服务端读取 JSON 后强制 `EmptyDirectoryOnly=true`；客户端传 `false` 也不能改成递归删除。旧后端缺少该路由时必须停止，不能回退 `/api/HDFS/DeleteObject`。
+
+此操作只允许当前租户仍然有效的平台超级管理员 DiyToken 会话；访问密钥、普通帐号、撤权用户、未知绝对路径、URL、通配符、路径穿越和租户根均被拒绝。平台用当前租户配置固定供应商与桶，完整核验原始对象列表和零字节大小，只删除精确标记 key；不调用前缀批量删除。非空目录、缺失大小、未知分页、权限失败和删除后无法确认空前缀都返回失败。标记已不存在时也需完整回读才返回幂等成功，成功正文须含 `DeletionMode=EmptyDirectoryMarkerOnly` 与 `VerifiedAbsent=true`。
+
+标准 MCP `microi_delete_empty_directory_marker` 默认仅产生本地 dry run；执行参数 `confirmExecution` 必须精确等于 `filePathName`。删除结果未知时保留原 key，先回读，不能自动换键或再次上传。
+
+该能力不是“零字节条件删除 CAS”，也不证明历史从未 PUT。供应商 SDK 没有统一的条件 DELETE；若同 key 在核验后被其它写入替换，无法保证只删除旧版本。因此执行前必须隔离原业务请求、排除活跃写入，并单独保留历史 NoPUT 或受控恢复的证据。并发新写入的后代不会被删除，但会使删除后回读失败。
+
 #### 升级兼容说明
 
 - 历史公有文件不会因升级自动迁移；先复制到租户私有桶、回读核验，再停止旧公有访问。数据库继续保存租户内相对路径，不保存对象存储密钥或真实签名 URL。

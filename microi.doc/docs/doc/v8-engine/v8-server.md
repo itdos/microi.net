@@ -2490,6 +2490,10 @@ WFNodeStart：流程节点开始V8事件
 | 任务调度 | `V8.Method.SaveScheduleJob`、`V8.Method.ManageScheduleJob` | 仅当前租户超级管理员；保存只允许接口引擎任务。表单先检查 `ManageScheduleJob({Action:'Capabilities'})` 的 `RuntimeOnly` 能力，再直接调用 `SaveScheduleJob` 并传 `RuntimeOnly:true`：仅同步 Quartz 并回读状态，由原表单事务写元数据。直接调用可保留业务 `ApiEngineKey`，避免嵌套 `V8.ApiEngine.Run` 将同名路由参数改成管理接口 Key；默认保存仍写完整任务。不能用 HTTP 回调本平台或在提交事件中再次写当前表 |
 | 支付、微信、DNS | 对应 `V8.*` 扩展 | 单独校验签名、幂等键、回调重放、金额与租户凭据，不要返回密钥 |
 
+`V8.HDFS.DeleteObject` 的目录路径必须保留末尾 `/`，租户根和其它租户绝对路径不能删除。恢复单个零字节空目录标记时显式传 `EmptyDirectoryOnly:true`、`Limit:true/false`，并等待异步结果；服务端从可信 V8 作用域或 DiyToken 复核当前租户实际管理员权限，不信任参数中的用户、角色、供应商或密钥。该模式完整核验同桶前缀与大小，只删除精确标记，随后严格回读；未知分页、缺少元数据、非空或回读失败一律拒绝。`Code=1` 必须同时携带 `Data.DeletionMode='EmptyDirectoryMarkerOnly'` 和 `VerifiedAbsent=true`。
+
+HTTP/MCP 使用专用 `/api/HDFS/DeleteEmptyDirectoryMarker` 路由，旧后端 `404` 不能降级为普通目录删除。此操作不构成零字节 CAS，也不能证明历史 NoPUT；业务层须先隔离原请求、排除同 key 的活跃写入，并保留原请求键与独立恢复证据。详见[分布式存储](../more/hdfs)。
+
 动态建表、动态字段、数据库备份/清空、缓存连接管理、接口引擎代码写入等属于控制面能力。即使某个低层方法在 V8 对象上可见，也不等于普通业务脚本可以安全暴露；控制面 HTTP API 还会独立执行 `Level >= 9999` 管理员门禁。
 
 ## 执行上下文与资源限制
