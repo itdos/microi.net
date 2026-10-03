@@ -8,7 +8,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_cdn_backfill
- * Version: v1.5.3
+ * Version: v1.5.4
  * Function:
  * - 官方 AI 应用 CDN 固定路径迁移、流式哈希回读、阿里云 CDN 精确刷新与旧版编译错误对象修复；数据库保留相对对象路径，官网输出静态域名完整 URL。
  */
@@ -535,14 +535,18 @@ function repairCommittedCdnAliases() {
     same(hash, expected.RuntimeManifestHash, 'CanonicalManifestHash');
     return aliases;
   }
-  function digest(path, optional, asset) {
+  function digest(path, optional, asset, expectedWireHash) {
     var actual = digestOf(path, false, optional);
     if (!actual) throw new Error('缺少可信存储摘要能力');
     if (actual.Missing) return actual;
     if (actual.Sha256 !== asset.Sha256 || actual.Size !== asset.Size)
       throw new Error('对象存在异字节，拒绝覆盖或作为来源：' + path);
-    // Sha256 可能是解码后摘要，因此还要求 WireSha256 相同，拒绝压缩或转换过的物理对象。
-    if (actual.WireSha256 !== asset.Sha256) throw new Error('对象 wire hash 与冻结字节不一致：' + path);
+    // V8ObjectHashStream.Sha256 是原始物理字节摘要，只有它和 Size 对照冻结清单。
+    // WireSha256 是 Base64 ASCII 文本摘要，不能与 manifest 的原始摘要比较；
+    // 校验格式并绑定来源/目标的同一 wire 摘要，防止传输摘要异常或复制后不一致。
+    if (!/^[a-f0-9]{64}$/.test(actual.WireSha256)) throw new Error('对象 wire hash 格式不合法：' + path);
+    if (expectedWireHash && actual.WireSha256 !== expectedWireHash)
+      throw new Error('对象 wire hash 与来源不一致：' + path);
     return actual;
   }
   try {
@@ -591,13 +595,14 @@ function repairCommittedCdnAliases() {
       var asset = selected[ai];
       var source = versionBase + '/' + asset.Path.replace(/@/g, '%40');
       var targets = [versionBase + '/' + asset.Path, base + '/' + asset.Path];
-      digest(source, false, asset);
+      var sourceDigest = digest(source, false, asset);
       var targetStates = [];
       for (var ti = 0; ti < targets.length; ti++) {
-        var targetState = digest(targets[ti], true, asset);
-        targetStates.push({ Path: targets[ti], Missing: targetState.Missing === true });
+        var targetState = digest(targets[ti], true, asset, sourceDigest.WireSha256);
+        targetStates.push({ Path: targets[ti], Missing: targetState.Missing === true,
+          WireSha256: targetState.Missing ? null : targetState.WireSha256 });
       }
-      inspected.push({ Asset: asset, Source: source, Targets: targetStates });
+      inspected.push({ Asset: asset, Source: source, SourceDigest: sourceDigest, Targets: targetStates });
     }
     freshBinding();
     if (!dryRun) {
@@ -607,8 +612,8 @@ function repairCommittedCdnAliases() {
           var destination = work.Targets[di].Path;
           // 批量上限很小仍逐写重新读取发布绑定，不能使用引擎开始时的旧 current 快照授权写入。
           freshBinding();
-          digest(work.Source, false, work.Asset);
-          var exists = digest(destination, true, work.Asset);
+          var currentSourceDigest = digest(work.Source, false, work.Asset, work.SourceDigest.WireSha256);
+          var exists = digest(destination, true, work.Asset, currentSourceDigest.WireSha256);
           if (!exists.Missing) continue;
           freshBinding();
           attempted.push(destination);
@@ -617,7 +622,8 @@ function repairCommittedCdnAliases() {
           if (!result || result.Code !== 1) throw new Error('别名复制失败：' + destination);
           // 对象存储写入不会随 V8 Code:0 回滚；后续校验失败也必须保留已尝试、已复制证据供回读。
           copied.push({ Path: destination, Sha256: work.Asset.Sha256, Size: work.Asset.Size });
-          digest(destination, false, work.Asset);
+          var copiedDigest = digest(destination, false, work.Asset, currentSourceDigest.WireSha256);
+          copied[copied.length - 1].WireSha256 = copiedDigest.WireSha256;
           freshBinding();
         }
       }
