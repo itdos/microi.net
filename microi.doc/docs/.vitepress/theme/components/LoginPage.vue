@@ -140,6 +140,7 @@
           </div>
 
           <div v-else>
+            <p v-if="inviteCode" class="invitation-banner">你正在通过朋友的邀请加入吾码。完成注册后将建立邀请关系。</p>
             <div class="auth-tabs" role="tablist" aria-label="登录注册切换">
               <button class="auth-tab" :class="{ active: authTab === 'login' }" type="button" @click="switchAuthTab('login')">登录</button>
               <button class="auth-tab" :class="{ active: authTab === 'register' }" type="button" @click="switchAuthTab('register')">注册</button>
@@ -270,6 +271,7 @@ const isRestoring = ref(true)
 const isCaptchaLoading = ref(false)
 let captchaGeneration = 0
 const authTab = ref('login')
+const inviteCode = ref('')
 const loginAccount = ref('')
 const loginPassword = ref('')
 const rememberPassword = ref(false)
@@ -704,6 +706,7 @@ async function handleRegister() {
       headers: apiEngineHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         Action: 'register',
+        InviteCode: inviteCode.value,
         LoginType: 'sms',
         Phone: registerPhone.value,
         _CaptchaValue: devSmsBypass.value ? '' : registerSmsCode.value,
@@ -733,6 +736,8 @@ function handleLoginSuccess(resp, result) {
   const savedTenantOsClient = result.DataAppend?.TenantOsClient || ''
   const savedTenantUrl = result.DataAppend?.TenantUrl || result.DataAppend?.Url || (savedTenantOsClient ? `https://${savedTenantOsClient}.microi.net` : '')
 
+  const fileServer = String(result.DataAppend?.SysConfig?.FileServer || '')
+  if (/^https?:\/\//i.test(fileServer)) localStorage.setItem('microi_doc_public_file_server', fileServer.replace(/\/+$/, ''))
   localStorage.setItem('microi_doc_token', token)
   localStorage.setItem('microi_doc_user', JSON.stringify(currentUser.value))
   localStorage.setItem('microi_doc_phone', result.Data?.Phone || registerPhone.value || loginAccount.value)
@@ -1060,7 +1065,9 @@ onMounted(async () => {
   await restoreSession()
   if (isAuthed.value) return
   const query = new URLSearchParams(window.location.search)
-  if (query.get('tab') === 'register') authTab.value = 'register'
+  const code = query.get('invite') || ''
+  if (code && /^[A-Za-z0-9-]{1,36}$/.test(code)) inviteCode.value = code
+  if (query.get('tab') === 'register' || inviteCode.value) authTab.value = 'register'
   rememberPassword.value = localStorage.getItem('microi_doc_remember_login') === '1'
   if (rememberPassword.value) {
     loginAccount.value = localStorage.getItem('microi_doc_login_account') || ''
@@ -1877,4 +1884,5 @@ onUnmounted(() => {
     padding: 28px 22px;
   }
 }
+.invitation-banner { font-size: 13px; line-height: 1.7; padding: 14px 16px; border: 1px solid #cbdcff; background: #eef4ff; color: #2563eb; border-radius: 8px; margin-bottom: 20px; }
 </style>
