@@ -200,6 +200,8 @@ namespace Microi.net
         public TableChildAuthorizationContext _TableChildAuth { get; set; }
         public string HDFS { get; set; }
         public string FilePathName { get; set; }
+        /// <summary>仅允许真实管理员删除完整核验的零字节空目录标记，绝不递归。</summary>
+        public bool? EmptyDirectoryOnly { get; set; }
         public List<string> FilePathNames { get; set; }
         // public string OsClient { get; set; }
         public string FileId { get; set; }

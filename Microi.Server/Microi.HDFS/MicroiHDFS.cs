@@ -964,6 +964,9 @@ namespace Microi.net
             {
                 hdfs = configuredHdfs;
             }
+            if (param.EmptyDirectoryOnly == true && (!param.Limit.HasValue
+                || hdfs != "Aliyun" && hdfs != "MinIO" && hdfs != "S3"))
+                return new DosResult(0, null, "当前存储类型或桶选择不支持严格空目录标记删除。");
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
             {
@@ -982,6 +985,7 @@ namespace Microi.net
             {
                 ClientModel = clientModel,
                 Limit = param.Limit,
+                EmptyDirectoryOnly = param.EmptyDirectoryOnly,
                 FileFullPath = param.FilePathName
             });
         }

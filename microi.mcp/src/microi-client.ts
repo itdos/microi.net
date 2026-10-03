@@ -3289,6 +3289,21 @@ export class MicroiClient {
     });
   }
 
+  /** 专用安全路由，旧 API 的 404/未知结果绝不改走普通递归 DeleteObject。 */
+  async deleteEmptyDirectoryMarker(filePathName: string, limit: boolean): Promise<ApiResponse> {
+    const result = await this.post('/api/HDFS/DeleteEmptyDirectoryMarker', {
+      OsClient: this.config.osClient,
+      FilePathName: filePathName,
+      Limit: limit,
+      EmptyDirectoryOnly: true,
+    }, { allowNativeFallback: false, operationName: 'delete exact empty directory marker' });
+    const data = result.Data as { DeletionMode?: unknown; VerifiedAbsent?: unknown } | null | undefined;
+    if (result.Code === 1 && (data?.DeletionMode !== 'EmptyDirectoryMarkerOnly' || data.VerifiedAbsent !== true)) {
+      throw new Error('Empty marker deletion protocol was not verified; retain the original request and perform readback.');
+    }
+    return result;
+  }
+
   async getFileCabinetOfficeMeta(filePathName: string, sysMenuId: string, limit: boolean): Promise<ApiResponse> {
     return this.post('/api/HDFS/GetFileCabinetOfficeMeta', {
       OsClient: this.config.osClient,
