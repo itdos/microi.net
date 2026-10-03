@@ -1812,6 +1812,9 @@ fi
 if [ "$PUBLISH_DOC" = true ]; then
     print_phase "发布官方网站文档"
 
+    # 个人中心必须属于已推送的候选提交；隔离旧工作树不能再覆盖已交付的页面。
+    node microi.doc/scripts/check-account-portal.mjs --require-committed
+
     # 自动检测可用的包管理器（优先 pnpm，其次 npm，最后 yarn）
     DOC_PKG_MGR=""
     if command -v pnpm &>/dev/null; then
@@ -1830,6 +1833,7 @@ if [ "$PUBLISH_DOC" = true ]; then
 
     print_step "构建 VitePress 文档..."
     (cd microi.doc && $DOC_PKG_MGR docs:build)
+    node microi.doc/scripts/check-account-portal.mjs --dist --require-committed
     print_success "VitePress 构建完成"
 
     # 确保 Docker 已启动
