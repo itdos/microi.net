@@ -415,7 +415,7 @@ function readRuntimeAssetBase64(runtimeAsset, path) {
 }
 function isTextFile(path) {
   var lower = text(path).toLowerCase();
-  var extensions = ['.vue','.js','.jsx','.ts','.tsx','.json','.html','.htm','.css','.scss','.sass','.less','.md','.txt','.xml','.yaml','.yml','.toml','.ini','.env','.cs','.csproj','.sln','.java','.kt','.go','.py','.php','.rb','.rs','.sql','.sh','.ps1','.bat','.cmd'];
+  var extensions = ['.vue','.js','.jsx','.mjs','.cjs','.ts','.tsx','.mts','.cts','.json','.html','.htm','.css','.scss','.sass','.less','.md','.txt','.xml','.yaml','.yml','.toml','.ini','.env','.cs','.csproj','.sln','.java','.kt','.go','.py','.php','.rb','.rs','.sql','.sh','.ps1','.bat','.cmd'];
   for (var i = 0; i < extensions.length; i++) {
     if (lower.lastIndexOf(extensions[i]) === lower.length - extensions[i].length) return true;
   }
