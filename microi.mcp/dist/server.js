@@ -4063,6 +4063,26 @@ export function createMcpServer(client, context) {
             return { content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }], isError: true };
         }
     });
+    server.tool('microi_delete_empty_directory_marker', `Delete only one exact zero-byte empty-directory marker on current OsClient "${osClient}". Requires an interactive live platform administrator and an explicitly selected bucket. The dedicated safe route never falls back to recursive DeleteObject on older servers. Complete prefix/size/after-read evidence is required. This is not a zero-byte CAS or historical NoPUT proof: isolate the original request and exclude active writers before execution. Omit confirmExecution for a local dry run; execution requires it to equal filePathName exactly. Preserve the same key and read back after timeout or uncertain outcome.`, {
+        filePathName: z.string().min(2).max(2048).refine(value => value.endsWith('/'), 'A directory marker must end with /.').describe('One exact current-tenant directory-marker key, with trailing slash; tenant roots and traversal are rejected by the API.'),
+        limit: z.boolean().describe('Required bucket selection: true=private, false=public.'),
+        confirmExecution: z.string().optional().describe('Must equal filePathName exactly for deletion; omit for a local no-write dry run.'),
+    }, async ({ filePathName, limit, confirmExecution }) => {
+        if (confirmExecution !== filePathName) {
+            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, FilePathName: filePathName, Limit: limit, DeletionMode: 'EmptyDirectoryMarkerOnly', ReadyToExecute: false }) }] };
+        }
+        try {
+            const result = await client.deleteEmptyDirectoryMarker(filePathName, limit);
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                structuredContent: { Code: result.Code, Data: result.Data, Msg: result.Msg || '' },
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (error) {
+            return { content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }], isError: true };
+        }
+    });
     server.tool('microi_get_file_cabinet_office_meta', `Read durable Office version metadata for one exact file-cabinet object on OsClient "${osClient}". Requires the current tenant's authoritative file-cabinet SysMenuId and interactive platform administrator; no file bytes or edits are returned.`, {
         filePathName: z.string().min(1).max(2048).describe('Exact object key returned by the file-cabinet listing.'),
         sysMenuId: z.string().min(1).max(100).describe('Authoritative current-tenant file-cabinet menu Id.'),

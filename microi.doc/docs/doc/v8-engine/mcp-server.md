@@ -73,6 +73,12 @@ CLI 与插件共用连接、Token、MCP、Skills、V8 工作区和同步基线�
 
 需要自行部署时，`microi.mcp` 支持本地 stdio 与远程 SSE。SSE 适合团队共享，但必须放在受控网络、TLS 和反向代理之后，并绑定服务器端凭据；不要把管理员帐号密码写入公开镜像或前端配置。
 
+MCP 的租户连接由 API、`OsClient`、`OsClientType`、`OsClientNetwork` 共同确定。独立部署可设置 `MICROI_OS_CLIENT` 及可选 `MICROI_OS_CLIENT_TYPE`、`MICROI_OS_CLIENT_NETWORK`；显式 Type/Network 必须绑定非空 OsClient。已配置坐标随 Login 表单、Refresh 正文和所有 API Header 传输，流式 multipart 表单也使用同一坐标，普通 JSON 业务正文与 GET 查询不额外注入 Type/Network。省略可选项保持原协议；单次请求与已配置坐标冲突、重复或含非法标识时发送前拒绝。
+
+SSE 每个连接使用 `X-Microi-OsClient` 及可选 `X-Microi-OsClientType`、`X-Microi-OsClientNetwork` 选择对应坐标，省略项沿用服务器默认值；Login、续签和工具上下文保持同一连接身份。恢复后必须先执行 `initialize`、`tools/list` 和 `microi_get_status`，核对服务端实际四段连接身份。Token 文件键或本地配置不能代替该回读，也不能为匹配分区而修改 SaaS 租户网络记录。
+
+三参数只声明连接目标，不能切换 API 节点的可信运行分区或发布门禁。ApiBase 必须指向目标分区的真实节点；Header 正确而状态仍不符时停止写入，修正节点地址，不改 SaaS/gate、不借其它分区任务，也不通过请求头强迫节点切区。
+
 ## Codex 单入口兼容
 
 部分 Codex 版本不会稳定注入超大工具集。Microi 提供 `microi_codex` 单入口：
