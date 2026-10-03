@@ -252,7 +252,41 @@ test("small MicroServices can publish a verified database-only runtime without l
   assert.match(publisherSource, /Build:\s*'DatabaseOnly'/);
   assert.match(publisherSource, /databaseOnlyService\.StorageMode = 'db'/);
   assert.match(publisherSource, /databaseOnlyService\.MsUrl = 'db'/);
-  assert.match(publisherSource, /inlineBase64 \|\| readRuntimeAssetBase64/);
+  // 正式 v2.0.8 为全局运行对象增加可信提交上下文，不能用旧相邻字符串
+  // 误拒三参分支；直接执行资产选择，保持真实字节校验与旧二参兼容。
+  const html = Buffer.from('<!doctype html><html><body>verified</body></html>');
+  const committed = { Tenant: 'itdos', AppKey: 'test', VersionId: 'version-1' };
+  const reads = [];
+  let acceptedContext = committed;
+  const context = {
+    String, Buffer,
+    System: { Convert: { FromBase64String: value => Buffer.from(value, 'base64') } },
+    committedRuntimeAssetContext: () => acceptedContext,
+    readRuntimeAssetBase64(...args) { reads.push(args); return html.toString('base64'); },
+  };
+  vm.createContext(context);
+  for (const name of ['text', 'isBlank', 'normalizePath', 'runtimeAssetContentType',
+    'sha256RuntimeAssetBytes', 'runtimeAssetBase64MatchesManifest', 'getBuildAssets']) {
+    // 顶层函数边界不会把 normalizePath 的正则字符类误当字符串引号。
+    const start = publisherSource.indexOf(`function ${name}(`);
+    const next = publisherSource.indexOf('\nfunction ', start + 1);
+    assert.ok(start >= 0 && next > start, `missing actual helper ${name}`);
+    vm.runInContext(publisherSource.slice(start, next), context);
+  }
+  const asset = { Path: 'index.html', ContentBase64: html.toString('base64'), Size: html.length,
+    Sha256: crypto.createHash('sha256').update(html).digest('hex') };
+  const runtime = row => ({ Service: { AssetsJson: JSON.stringify([row]), EntryPath: 'index.html' } });
+  assert.equal(context.getBuildAssets({}, null, runtime(asset))[0].FileByteBase64, asset.ContentBase64);
+  assert.equal(reads.length, 0, 'verified inline bytes must avoid a second remote read');
+  assert.throws(() => context.getBuildAssets({}, null, runtime({ ...asset, Sha256: '0'.repeat(64) })), /SHA-256/);
+  assert.equal(reads.length, 0, 'bad inline bytes must stop before remote fallback');
+  context.getBuildAssets({}, null, runtime({ ...asset, ContentBase64: '' }));
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].length, 3);
+  assert.equal(reads[0][2], committed, 'exact trusted context must reach the fixed resolver');
+  acceptedContext = null;
+  context.getBuildAssets({}, null, runtime({ ...asset, ContentBase64: '' }));
+  assert.equal(reads[1].length, 2, 'legacy runtime keeps the original reader contract');
 });
 
 test("database-only text assets prefer decoded HTTP content over transport raw bytes", () => {

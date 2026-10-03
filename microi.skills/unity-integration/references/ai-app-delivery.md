@@ -75,6 +75,22 @@ tests/
 
 租户 Hook 使用新的稳定 Key；首次安装后归租户维护，同 Key 后续版本不能改回 `Managed`。
 
+### 仅共享编译运行产物
+
+消费者只获得运行应用、不安装业务资源时，商城发布显式传
+`RuntimeAssetsOnly=true`。只接受 `ProtocolVersion=3`、`ApplicationType=Web`、
+显式 `IncludeSource=false` 和已通过提交证明校验的 `SharedPublicRuntime`。
+源码是否在本地或私有开发端保管，与消费者包不含源码分别验收；此模式本身不要求上传本地源码。
+
+- 请求资源选择、历史 `SelectMenu/SelectTable/SelectApiEngine/SelectData` 和
+  `PreparedAssets.MenuContract` 均为空，非空时拒绝，不自动抹除；禁止混用 `DatabaseOnlyBuild`。
+- 通过既有 `microi_run_engine.params` 向 `ai_app_publish_store` 传入开关，先
+  `InspectResourceSnapshot` 再 `Publish + ExpectedResourceSnapshotHash`，两次使用同一组冻结参数。
+- 回读真实包的十一项资源数组、`SourceFiles/BuildAssets` 均为零，`SourceZip/BuildZip` 为空，
+  只保留共享运行交付。完整数组和兼容条件见 [应用商城 Skill](../../app-store/SKILL.md#仅共享编译运行产物)。
+- 此模式的目标验收检查编译入口、宿主身份和实际服务契约；没有声明的表、菜单、接口及 Hook
+  不应在消费者租户生成。需要租户业务资源时使用普通资源包流程。
+
 ## 官方发布顺序
 
 只有当前 MCP 明确绑定官方 `https://api.itdos.com`、`OsClient=iTdos` 且用户已授权写入时才执行：

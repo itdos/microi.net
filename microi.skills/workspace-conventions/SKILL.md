@@ -6,7 +6,7 @@ description: 每次 Microi 任务开始前必读的基础规范。用于识别�
 # Microi 工作区全局约定
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=0343e85fedcdf44a2dbf11c73b697b39a713d9b00054f979e40b9a085aae2353 -->
+<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=d64145e9e39c0796f680659543d7504871749ea93858938aa31c9884a15a1e79 -->
 ## 任务启动前 Skill 读取规则（强制）
 
 AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端、后端、UniApp、文档、测试或交付任务前，必须先按任务类型读取相关 `microi.skills/**/SKILL.md`。不能等到写代码或出问题后才补读。
@@ -36,10 +36,11 @@ AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端�
 - 任务若只要求分析、评审或制定规范，仍保持只读或仅修改指定规范；身份标记不授权无关线上写入。客户部署、容器更新和应用自动安装与官方发布是独立动作，服从用户指定的手动/自动边界；用户明确手动更新时不得擅自部署。
 - 收尾必须区分“源码/文档已修改、测试通过、应用已发布回读、Skills/插件已打包或已分发、镜像已推送、客户已安装或已部署”。只有实际渠道验收成功才能说其它用户已可获取；不得把文档本地构建或插件本地副本同步称为已上线。
 
-### 每个新增与修复必须进入统一回归门禁（强制）
+### 平台回归与独立应用测试归属（强制）
 
-- 创始人源码工作区的每个功能新增、缺陷修复和兼容性调整都必须同时交付可重复执行的回归测试；先证明旧行为失败，再验证修复成功，覆盖正常、边界、失败、安全与存量兼容路径。不得只改源码或用手工截图代替自动回归。
-- C# 单元/组件/集成测试归入 `Microi.Server/Microi.Tests`。前端、应用包与 V8 的 Node 行为测试可留在责任源码旁，但必须由 `Microi.Tests/run-tests.ps1` 的自动发现入口执行；真实浏览器、数据库及第三方集成必须明确归入 Full 或专项验收，不得冒充离线单测。新增公共后端能力同时补相应 HTTP 闭环。
+- 创始人源码工作区中的每个平台功能新增、缺陷修复和兼容性调整都必须同时交付可重复执行的回归测试；先证明旧行为失败，再验证修复成功，覆盖正常、边界、失败、安全与存量兼容路径。不得只改源码或用手工截图代替自动回归。
+- 平台 C# 单元/组件/集成测试归入 `Microi.Server/Microi.Tests`。平台前端、平台内置应用包与平台 V8 的 Node 行为测试可留在责任源码旁，由 `Microi.Tests/run-tests.ps1` 自动发现执行；平台真实浏览器、数据库及第三方集成归入 Full 或平台专项验收，不得冒充离线单测。新增公共后端能力同时补相应 HTTP 闭环。
+- 官方或社区独立业务应用、游戏及客户项目的测试归应用自身源码根的 `tests/` 或独立测试工程，由该应用自己的测试和发布入口执行；不得放入 `Microi.Tests`、创建转调包装或接入平台 Quick/Full。官方发布身份不改变测试归属。应用开发中涉及平台通用缺陷时，仅把通用最小回归夹具加入平台门禁，应用业务断言仍在应用项目维护。
 - `Microi一键编译发布.sh` 的所有 PC/API 镜像路径（包括仅推送、热修复）都必须先通过 Full；缺少环境、零用例、失败、取消、跳过、待办或无法解析测试结果一律停止。禁止关闭断言、删测试、排除失败项目或修改门禁阈值来发布。
 - 测试成功必须绑定本次候选源码和实际构建上下文的内容哈希，构建后、每次推送前复核。旧产物没有可验证回执或源码/产物漂移时必须重建重测，禁止“当前源码通过测试 + 推送另一份旧 DLL/前端 dist”。
 - 交付记录逐项列明修复与测试映射、执行数量、未覆盖边界和镜像摘要。覆盖率与 Full 都不能证明所有租户业务、任意生产数据和第三方系统绝对无误；真实客户路径仍需只读验收。详细矩阵见 `microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md`。
@@ -106,7 +107,7 @@ AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker
 - 本规则只约束 `Microi.Client/` 吾码框架前端源码。独立 MicroService、Web、UniApp 等应用源码仍按其交付 Skill 在发布前执行自身必要的构建；不得因为本规则跳过微服务正式产物生成。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-004 sha256=533d4a6d674f5980fdf6e9ae376b240af20e3191126a20eae3d6235897f45a88 -->
+<!-- microi-progressive:chunk id=workspace-conventions-004 sha256=a12a204339ee40367f4c09d085d818515b0d94c7c0d748d0d455fede6b98a2e4 -->
 ## 临时文件与 AI 产物放置规则（强制）
 
 AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、测试截图、临时报告**，**严禁放在工作区根目录（`<workspace-root>/`）**，必须放在指定位置：
@@ -132,7 +133,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 **2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.Agent 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=c48d857c8e3086b29f99ab14d362f99c60d7dd00f9617709ea4f4dcad370611e -->
+<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=f627ee155b40014af76926b3a432601aa3f6bec5a7eb98ca0540c83fa41f1e5a -->
 ## Microi 源码路径速查（工作区根相对路径）
 
 当用户提到“吾码后端源码”“吾码前端源码”“表单引擎源码”“官网源码”等简称时，默认按下列路径定位；如果当前工作区缺少对应目录，再用 `rg --files` 或目录搜索确认实际位置。

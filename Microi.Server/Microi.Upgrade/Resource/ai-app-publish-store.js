@@ -10,13 +10,24 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v2.0.6
+ * Version: v2.0.9
  * Function:
- * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
+ * - 应用源码、运行与正式安装包发布。已提交V3运行资产按当前租户、应用、版本与请求指纹验证对象身份，私有HDFS不足时使用固定平台稳定地址，并校验实际字节大小和SHA256。
+ * - 组合运行应用从源权威记录携带严格IsPublic/IsApprove标记，拒绝请求覆盖与无效类型；保留历史公开兼容和源码独立授权。
+ * - RuntimeAssetsOnly 显式交付编译运行资产，禁止平台结构、资源代码及源码泄入游戏安装包；旧调用保持兼容。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
 function fail(msg, data) { return { Code: 0, Data: data || null, Msg: msg || '执行失败' }; }
+// APPLICATION_BUNDLE_SOURCE_VISIBILITY_V1：运行容器的可见性和源审批状态
+// 来自本次权威应用行，不接受发布请求的同名字段覆盖。历史 NULL 公开语义继续
+// 兼容；缺失审批不推断为已批准。非开关值在准备文件、写包前失败关闭。
+function applicationBundleSourceFlag(value, fallback, name) {
+  if (value === undefined || value === null) return fallback;
+  if (value === false || value === 0 || value === '0') return 0;
+  if (value === true || value === 1 || value === '1') return 1;
+  throw new Error('ApplicationBundle.Application.' + name + ' 只允许 0/1/boolean');
+}
 function text(value, fallback) {
   if (value === null || value === undefined) return fallback || '';
   return String(value);
@@ -45,6 +56,78 @@ function boolValue(value, fallback) {
   if (value === null || value === undefined || value === '') return fallback;
   var normalized = text(value).replace(/^\s+|\s+$/g, '').toLowerCase();
   return value === true || value === 1 || ['1', 'true', 'yes', 'on', 'enabled'].indexOf(normalized) >= 0;
+}
+/* APPLICATION_RUNTIME_ASSETS_ONLY_V1
+ * 仅共享公有编译运行时的安装包不得再次携带平台基础表或租户业务资源。
+ * 此模式必须显式选择，且仍经过 v3 提交证明、运行清单和资源快照 CAS；
+ * 请求与历史选集非空时拒绝，避免空数组回退到上一版业务资源。
+ */
+function runtimeAssetsOnlyHasSelection(value) {
+  if (value === null || value === undefined || value === '') return false;
+  var parsed = value;
+  if (typeof value === 'string') {
+    if (isBlank(value)) return false;
+    try { parsed = JSON.parse(value); } catch (error) { return true; }
+  }
+  if (parsed === null || parsed === undefined) return false;
+  if (typeof parsed !== 'object') return true;
+  var keys = Object.keys(parsed);
+  if (parsed.length !== undefined) {
+    if (Number(parsed.length) !== 0) return true;
+    for (var i = 0; i < keys.length; i++) if (keys[i] !== 'length') return true;
+    return false;
+  }
+  return keys.length !== 0;
+}
+function validateRuntimeAssetsOnlyMode(enabled, context, parameters, previousStore, packageAssets) {
+  if (!enabled) return ok();
+  var facts = context || {};
+  if (facts.ProtocolV3 !== true || facts.ApplicationType !== 'Web'
+      || facts.IncludeSource !== false || facts.IncludeSourceSupplied !== true
+      || !facts.SharedPublicRuntime || facts.DatabaseOnlyBuild) {
+    return fail('RuntimeAssetsOnly 仅支持 ProtocolVersion=3、Web、显式 IncludeSource=false 与已验证 SharedPublicRuntime。');
+  }
+  var requested = parameters || {};
+  var selectionFields = ['MenuIds', 'SelectMenu', 'TableIds', 'SelectTable',
+    'ApiEngineKeys', 'SelectApiEngine', 'ApiEngineRemovalKeys', 'FlowIds',
+    'ScheduleJobNames', 'JobNames', 'DataSelections', 'DataSets', 'SelectData',
+    'Routes', 'Pages', 'MenuContract', 'ResourcePolicies', 'ApiEnginePolicies'];
+  for (var i = 0; i < selectionFields.length; i++) {
+    if (runtimeAssetsOnlyHasSelection(requested[selectionFields[i]])) {
+      return fail('RuntimeAssetsOnly 禁止非空资源选择：' + selectionFields[i]);
+    }
+  }
+  var previous = previousStore || {};
+  var historicalFields = ['SelectMenu', 'SelectTable', 'SelectApiEngine', 'SelectData'];
+  for (var h = 0; h < historicalFields.length; h++) {
+    if (runtimeAssetsOnlyHasSelection(previous[historicalFields[h]])) {
+      return fail('RuntimeAssetsOnly 禁止继承非空历史资源选择：' + historicalFields[h]);
+    }
+  }
+  if (runtimeAssetsOnlyHasSelection(packageAssets && packageAssets.MenuContract)) {
+    return fail('RuntimeAssetsOnly 禁止 PreparedAssets 非空 MenuContract。');
+  }
+  return ok();
+}
+function validateRuntimeAssetsOnlyPackage(enabled, packageModel) {
+  if (!enabled) return ok();
+  var resourceNames = ['DDLStatements', 'PhysicalColumns', 'DiyTables', 'DiyFields',
+    'DataSets', 'SysMenus', 'WfFlowDesigns', 'WfNodes', 'WfLines', 'SysApiEngines', 'ScheduleJobs'];
+  for (var i = 0; i < resourceNames.length; i++) {
+    if (runtimeAssetsOnlyHasSelection(packageModel[resourceNames[i]])) {
+      return fail('RuntimeAssetsOnly 安装包资源必须为空：' + resourceNames[i]);
+    }
+  }
+  var bundle = packageModel.ApplicationBundle || {};
+  var assets = bundle.PackageAssets || {};
+  if (packageModel.PackageInfo.IncludeSource !== false || bundle.IncludeSource !== false
+      || !bundle.SharedPublicRuntime || assets.SourceZip || assets.BuildZip
+      || runtimeAssetsOnlyHasSelection(bundle.SourceFiles)
+      || runtimeAssetsOnlyHasSelection(bundle.BuildAssets)
+      || bundle.MicroService || runtimeAssetsOnlyHasSelection(bundle.Routes)) {
+    return fail('RuntimeAssetsOnly 安装包仅允许 SharedPublicRuntime，不得包含源码、ZIP 或租户运行资源。');
+  }
+  return ok();
 }
 /* MARKETPLACE_OFFLINE_PACKAGE_REPUBLISH_V1
  * 离线下架与安装包发布是两个独立状态。重发安装包不得意外上架旧应用；
@@ -367,8 +450,111 @@ function stableApiOrigin(value) {
   var match = /^(https?:\/\/[^\/?#]+)/i.exec(text(value).replace(/^\s+|\s+$/g, ''));
   return match ? match[1] : '';
 }
+/* COMMITTED_RUNTIME_ASSET_API_RESOLVER_V1: global v3 objects remain outside the
+ * tenant HDFS proxy. Derive their resolver from the exact persisted owner and
+ * completed version, never from a caller URL or compatibility CDN projection. */
+function committedRuntimeAssetContext(app, runtime, runtimeAssets) {
+  var hasGlobalV3 = false;
+  for (var i = 0; i < runtimeAssets.length; i++) {
+    var objectPath = text(runtimeAssets[i] && (runtimeAssets[i].FilePathName || runtimeAssets[i].HdfsPath || runtimeAssets[i].PathName));
+    if (/^\/?microi\/application-assets\/v3\//i.test(objectPath)) hasGlobalV3 = true;
+  }
+  if (!hasGlobalV3) return null;
+  var tenant = text(V8.OsClient).toLowerCase();
+  var appKey = text(app && app.AppKey);
+  var versionId = text(app && app.CommittedPublishVersionId);
+  var runtimeHash = text(app && app.CommittedRuntimeManifestHash).toLowerCase();
+  if (!/^[a-z0-9_-]+$/.test(tenant) || !/^[a-z0-9_-]+$/.test(appKey)
+      || isBlank(app && app.Id) || isBlank(versionId) || !/^[a-f0-9]{64}$/.test(runtimeHash)
+      || text(app.PublishState) !== 'Completed') {
+    throw new Error('全局 v3 运行资产缺少当前租户应用的已完成提交指针');
+  }
+  var version = getCommittedVersion(app.Id, app.CommittedPublishVersionId);
+  var versionNo = text(version.VersionNo);
+  var fingerprint = text(version.RequestFingerprint).toLowerCase();
+  var service = runtime && runtime.Service || {};
+  var manifest = parseObject(service.AssetManifestJson, {});
+  if (text(version.Id) !== versionId || text(version.AppId) !== text(app.Id)
+      || text(version.PublishState || version.Status) !== 'Completed'
+      || normalizeExactVersion(versionNo) !== versionNo
+      || !/^[a-f0-9]{64}$/.test(fingerprint)
+      || text(version.RuntimeManifestHash).toLowerCase() !== runtimeHash
+      || text(service.MsKey) !== appKey || text(service.BuildVersion) !== versionNo
+      || Number(manifest.SchemaVersion) !== 3
+      || text(manifest.CommittedPublishVersionId) !== versionId
+      || text(manifest.RuntimeManifestHash).toLowerCase() !== runtimeHash
+      || text(manifest.RequestFingerprint).toLowerCase() !== fingerprint) {
+    throw new Error('全局 v3 运行资产与当前所属应用的精确提交版本或清单不一致');
+  }
+  var releasePrefix = 'microi/application-assets/v3/tenants/' + tenant
+    + '/kinds/runtime/apps/' + appKey + '/releases/' + versionNo
+    + '/requests/' + fingerprint;
+  if (!isBlank(version.ReleasePrefix) && text(version.ReleasePrefix) !== releasePrefix) {
+    throw new Error('全局 v3 运行资产的不可变发布目录与当前提交版本不一致');
+  }
+  var context = { Tenant: tenant, AppKey: appKey, ObjectPrefix: releasePrefix + '/assets/',
+    ManifestAssets: toArray(manifest.Assets) };
+  // Validate the whole projection before issuing a resolver request.
+  for (var assetIndex = 0; assetIndex < runtimeAssets.length; assetIndex++) {
+    committedRuntimeAssetResolverPath(runtimeAssets[assetIndex], text(runtimeAssets[assetIndex] && runtimeAssets[assetIndex].Path), context);
+  }
+  return context;
+}
+function committedRuntimeAssetResolverPath(runtimeAsset, path, context) {
+  var originalPath = text(runtimeAsset && runtimeAsset.Path);
+  var parts = originalPath.split('/');
+  if (isBlank(originalPath) || originalPath !== path || /[\\:%?#\u0000-\u001f]/.test(originalPath)) {
+    throw new Error('全局 v3 运行资产相对路径不是合法原始路径');
+  }
+  var encodedParts = [];
+  for (var i = 0; i < parts.length; i++) {
+    if (!parts[i] || parts[i] === '.' || parts[i] === '..') throw new Error('全局 v3 运行资产相对路径包含非法目录段');
+    encodedParts.push(encodeURIComponent(parts[i]));
+  }
+  var objectPath = text(runtimeAsset && (runtimeAsset.FilePathName || runtimeAsset.HdfsPath || runtimeAsset.PathName));
+  var sha = text(runtimeAsset && (runtimeAsset.Sha256 || runtimeAsset.Hash)).toLowerCase();
+  var size = Number(runtimeAsset && runtimeAsset.Size);
+  if (objectPath !== context.ObjectPrefix + originalPath || !/^[a-f0-9]{64}$/.test(sha)
+      || !isFinite(size) || size <= 0 || Math.floor(size) !== size) {
+    throw new Error('全局 v3 运行资产的租户、应用、版本、请求、大小或 SHA-256 不一致');
+  }
+  var matches = 0;
+  for (var assetIndex = 0; assetIndex < context.ManifestAssets.length; assetIndex++) {
+    var manifestAsset = context.ManifestAssets[assetIndex] || {};
+    if (text(manifestAsset.Path) !== originalPath) continue;
+    if (text(manifestAsset.FilePathName) !== objectPath || Number(manifestAsset.Size) !== size
+        || text(manifestAsset.Sha256 || manifestAsset.Hash).toLowerCase() !== sha) {
+      throw new Error('全局 v3 运行资产投影与已提交清单的文件事实不一致');
+    }
+    matches++;
+  }
+  if (matches !== 1) throw new Error('全局 v3 运行资产必须精确命中一条已提交文件清单');
+  return '/micro-app/v3/tenants/' + context.Tenant + '/kinds/runtime/apps/'
+    + context.AppKey + '/assets/' + encodedParts.join('/');
+}
+function committedRuntimeResponseIsValid(response, runtimeAsset) {
+  if (!response || Number(response.StatusCode) !== 200 || !isBlank(response.ErrorMessage)) return false;
+  // Jint can expose the HTTP bridge List<T> through Count rather than length.
+  var headers = response.Headers || [];
+  var headerCount = Number(headers.length !== undefined ? headers.length
+    : (headers.Count !== undefined ? headers.Count : (headers.Length !== undefined ? headers.Length : 0)));
+  var expectedSha = text(runtimeAsset.Sha256 || runtimeAsset.Hash).toLowerCase();
+  for (var i = 0; i < headerCount; i++) {
+    var name = text(headers[i] && headers[i].Name).toLowerCase();
+    var value = text(headers[i] && headers[i].Value);
+    if (name === 'location' && !isBlank(value)) return false;
+    if (name === 'etag' && value !== '"' + expectedSha + '"') return false;
+  }
+  return true;
+}
 function readRuntimeAssetBase64(runtimeAsset, path) {
+  var committedContext = arguments.length > 2 ? arguments[2] : null;
+  var committedResolverPath = committedContext
+    ? committedRuntimeAssetResolverPath(runtimeAsset, path, committedContext) : '';
   var hdfsPath = text(runtimeAsset && (runtimeAsset.FilePathName || runtimeAsset.HdfsPath || runtimeAsset.PathName));
+  if (/^\/?microi\/application-assets\/v3\//i.test(hdfsPath) && !committedContext) {
+    throw new Error('全局 v3 运行资产缺少可信提交版本上下文');
+  }
   if (!isBlank(hdfsPath)) {
     try {
       var authoritativeBase64 = readFileBase64(hdfsPath, isTextFile(path), false);
@@ -384,15 +570,26 @@ function readRuntimeAssetBase64(runtimeAsset, path) {
     && normalizedStablePath.indexOf('..') < 0
     && normalizedStablePath.indexOf('?') < 0
     && normalizedStablePath.indexOf('#') < 0;
+  if (committedContext) {
+    normalizedStablePath = committedResolverPath;
+    safeStablePath = true;
+  }
   // ApiBase deployments may be configured either as an origin or with an
   // /api suffix. Stable micro-app routes always live at the trusted origin.
   var apiOrigin = stableApiOrigin(V8.SysConfig && V8.SysConfig.ApiBase);
   if (safeStablePath && !isBlank(apiOrigin)) {
     try {
-      var stableResponse = V8.Http.GetResponse({
+      var stableRequest = {
         Url: apiOrigin + normalizedStablePath,
         Timeout: 120
-      });
+      };
+      // The existing strict HTTP primitive disables automatic redirects and
+      // applies the SaaS-managed platform SSRF policy to this trusted origin.
+      if (committedContext) stableRequest.RequireSsrfProtection = true;
+      var stableResponse = V8.Http.GetResponse(stableRequest);
+      if (committedContext && !committedRuntimeResponseIsValid(stableResponse, runtimeAsset)) {
+        throw new Error('全局 v3 稳定运行资产响应状态、重定向或 ETag 不一致');
+      }
       // V8.Http may expose transport RawBytes before the HTTP bridge has applied
       // content decoding. For text assets the decoded Content is authoritative;
       // otherwise a valid HTML entry can be mistaken for compressed or
@@ -517,15 +714,22 @@ function getBuildAssets(app, latestVersion, runtime) {
   if (runtime && runtime.Service && runtime.Service.AssetsJson) {
     var runtimeAssets = [];
     try { runtimeAssets = JSON.parse(runtime.Service.AssetsJson); } catch (e) { runtimeAssets = []; }
+    var committedContext = committedRuntimeAssetContext(app, runtime, runtimeAssets);
     for (var i = 0; i < runtimeAssets.length; i++) {
       var runtimeAsset = runtimeAssets[i] || {};
       var path = normalizePath(runtimeAsset.Path || runtimeAsset.FileName || 'asset-' + i);
       var inlineBase64 = text(runtimeAsset.ContentBase64 || runtimeAsset.FileByteBase64 || runtimeAsset.Base64);
+      if (committedContext && !isBlank(inlineBase64)
+          && !runtimeAssetBase64MatchesManifest(runtimeAsset, inlineBase64)) {
+        throw new Error('全局 v3 内联运行资产与已提交清单的大小或 SHA-256 不一致');
+      }
       assets.push({
         Path: path,
         FileName: runtimeAsset.FileName || path.substring(path.lastIndexOf('/') + 1),
         ContentType: runtimeAssetContentType(path, runtimeAsset.ContentType),
-        FileByteBase64: inlineBase64 || readRuntimeAssetBase64(runtimeAsset, path),
+        FileByteBase64: inlineBase64 || (committedContext
+          ? readRuntimeAssetBase64(runtimeAsset, path, committedContext)
+          : readRuntimeAssetBase64(runtimeAsset, path)),
         Size: runtimeAsset.Size || 0,
         Sha256: runtimeAsset.Sha256 || runtimeAsset.Hash || '',
         IsEntry: runtimeAsset.IsEntry === true || path === text(runtime.Service.EntryPath || 'index.html')
@@ -1752,6 +1956,13 @@ if (isBlank(appIdOrKey)) return fail('AppId 或 AppKey 不能为空');
 var appResult = getApp(appIdOrKey);
 if (!appResult || appResult.Code !== 1 || !appResult.Data) return { Code: 2, Data: null, Msg: 'AI应用不存在' };
 var app = appResult.Data;
+var bundleSourceFlags;
+try {
+  bundleSourceFlags = {
+    IsPublic: applicationBundleSourceFlag(app.IsPublic, 1, 'IsPublic'),
+    IsApprove: applicationBundleSourceFlag(app.IsApprove, 0, 'IsApprove')
+  };
+} catch (bundleSourceFlagError) { return fail(bundleSourceFlagError.message); }
 // MARKETPLACE_STABLE_APPLICATION_IDENTITY_V1：发布前必须从权威商城行得到
 // 可持久化的稳定标识；只存在一侧时对称补齐，禁止再发布 AppId=NULL 的记录。
 var marketplaceAppId = trimText(app.AppId || app.AppKey);
@@ -1765,6 +1976,7 @@ var action = text(V8.Param.Action || 'Package');
 var protocolVersionText = text(V8.Param.ProtocolVersion);
 if (!isBlank(protocolVersionText) && protocolVersionText !== '3') return fail('ProtocolVersion 只支持显式 v3 或省略');
 var protocolV3 = protocolVersionText === '3';
+var runtimeAssetsOnly = boolValue(V8.Param.RuntimeAssetsOnly, false);
 var repairCurrentPackageVersion = boolValue(V8.Param.RepairCurrentPackageVersion, false);
 if (protocolV3 && action !== 'Publish' && action !== 'InspectResourceSnapshot') {
   return fail('ProtocolVersion=3 只允许 Action=Publish 或 InspectResourceSnapshot');
@@ -1844,6 +2056,13 @@ var requestedSharedPublicRuntime = V8.Param.SharedPublicRuntime || null;
 if (typeof requestedSharedPublicRuntime === 'string') {
   requestedSharedPublicRuntime = parseObject(requestedSharedPublicRuntime, null);
 }
+// 不符合纯运行资产边界的调用在任何资产准备器可能写入前失败；下文仍须
+// 在完整 SharedPublicRuntime 校验后再次验证全部选择和最终包正文。
+if (runtimeAssetsOnly && (!protocolV3 || appType !== 'Web'
+    || includeSource || !includeSourceParamSupplied
+    || !requestedSharedPublicRuntime || requestedDatabaseOnlyBuild)) {
+  return fail('RuntimeAssetsOnly 仅支持 ProtocolVersion=3、Web、显式 IncludeSource=false 与已验证 SharedPublicRuntime。');
+}
 var preparedList = parseArray(V8.Param.PreparedAssets || V8.Param.AiAppPackageManifest);
 var packageAssets = null;
 for (var preparedIndex = 0; preparedIndex < preparedList.length; preparedIndex++) {
@@ -1910,7 +2129,9 @@ if (packageAssets && packageAssets.BuildZip
 }
 var sourceFiles = [];
 var buildAssets = [];
-var infrastructure = getApplicationInfrastructure();
+var infrastructure = runtimeAssetsOnly
+  ? { DDLStatements: [], DiyTables: [], DiyFields: [] }
+  : getApplicationInfrastructure();
 // 微服务以真实运行态 BuildVersion 为准；其它应用比较最近构建版本与商城
 // 语义版本，既不接受旧调用参数降级，也不把 v3.0.0 降成构建流水号 v1.0.4。
 // 发布编排器在“最新不可变版本已成功完成、仅安装包阶段中断”时可显式复用。
@@ -2010,6 +2231,17 @@ if (sharedPublicRuntime) {
     HostContext: true
   };
 }
+var runtimeAssetsOnlyValidation = validateRuntimeAssetsOnlyMode(runtimeAssetsOnly, {
+  ProtocolV3: protocolV3,
+  ApplicationType: appType,
+  IncludeSource: includeSource,
+  IncludeSourceSupplied: includeSourceParamSupplied,
+  SharedPublicRuntime: sharedPublicRuntime,
+  DatabaseOnlyBuild: requestedDatabaseOnlyBuild
+}, V8.Param, existingStore, packageAssets);
+if (!runtimeAssetsOnlyValidation || runtimeAssetsOnlyValidation.Code !== 1) {
+  return runtimeAssetsOnlyValidation || fail('RuntimeAssetsOnly 模式校验失败。');
+}
 var entryPath = protocolV3
   ? text(committedVersion.EntryPath)
   : text((runtime.Service && runtime.Service.EntryPath) || 'index.html');
@@ -2025,6 +2257,7 @@ var explicitApiEngineSelection = V8.Param.ApiEngineKeys !== undefined
   && V8.Param.ApiEngineKeys !== null;
 var scheduleJobNames = parseArray(V8.Param.ScheduleJobNames || V8.Param.JobNames);
 var requestedResourcePolicies = V8.Param.ResourcePolicies || V8.Param.ApiEnginePolicies || {};
+if (!runtimeAssetsOnly) {
 if (dataSelections.length === 0 && existingStore && existingStore.SelectData) {
   dataSelections = parseArray(existingStore.SelectData);
 }
@@ -2036,6 +2269,7 @@ if (tableIds.length === 0 && existingStore && existingStore.SelectTable) {
 }
 if (apiEngineKeys.length === 0 && existingStore && existingStore.SelectApiEngine) {
   apiEngineKeys = selectionValues(existingStore.SelectApiEngine, ['ApiEngineKey', 'Key', 'Value']);
+}
 }
 var apiEngineSelectionValidation = validateOfficialPlatformApiEngineSelection(
   apiEngineKeys,
@@ -2050,7 +2284,7 @@ var apiEngineSelectionValidation = validateOfficialPlatformApiEngineSelection(
 if (!apiEngineSelectionValidation || apiEngineSelectionValidation.Code !== 1) {
   return apiEngineSelectionValidation || fail('官方 Platform 应用接口资源选择校验失败。');
 }
-if (scheduleJobNames.length === 0 && existingStore) {
+if (!runtimeAssetsOnly && scheduleJobNames.length === 0 && existingStore) {
   var previousPackageWithJobs = readStoredPackage(existingStore);
   var previousJobs = toArray(previousPackageWithJobs.ScheduleJobs);
   for (var previousJobIndex = 0; previousJobIndex < previousJobs.length; previousJobIndex++) {
@@ -2147,6 +2381,8 @@ var packageModel = {
       ApplicationType: appType,
       Category: text(V8.Param.Category || app.Category || 'other'),
       PublisherType: text(V8.Param.PublisherType || app.PublisherType || '官方应用'),
+      IsPublic: bundleSourceFlags.IsPublic,
+      IsApprove: bundleSourceFlags.IsApprove,
       Description: text(V8.Param.AppDetail || app.AppDetail || app.Description),
       CurrentVersion: app.CurrentVersion || 1,
       EntryPath: entryPath,
@@ -2305,6 +2541,11 @@ var generatedResourcePolicies = buildApiEngineResourcePolicies(
   }
 );
 if (generatedResourcePolicies) packageModel.ResourcePolicies = generatedResourcePolicies;
+
+var runtimeAssetsOnlyPackageValidation = validateRuntimeAssetsOnlyPackage(runtimeAssetsOnly, packageModel);
+if (!runtimeAssetsOnlyPackageValidation || runtimeAssetsOnlyPackageValidation.Code !== 1) {
+  return runtimeAssetsOnlyPackageValidation || fail('RuntimeAssetsOnly 安装包校验失败。');
+}
 
 var resourceSnapshotReceipt = null;
 try {
