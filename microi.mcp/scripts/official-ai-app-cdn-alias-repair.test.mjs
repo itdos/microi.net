@@ -8,6 +8,8 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const draft = readFileSync(path.join(here, 'official-ai-app-cdn-backfill.v8.js'), 'utf8');
 const h = input => createHash('sha256').update(input).digest('hex');
+// 与 V8ObjectHashStream 相同：WireSha256 是原始字节的 Base64 ASCII 文本摘要。
+const hashBase64 = bytes => h(Buffer.from(bytes).toString('base64'));
 const clone = input => JSON.parse(JSON.stringify(input));
 const manifestHash = rows => h(rows.toSorted((a,b) => a.Path < b.Path ? -1 : a.Path > b.Path ? 1 : 0)
   .map(a => `${a.Path}\t${a.Sha256}\t${a.Size}`).join('\n'));
@@ -97,7 +99,7 @@ function fixture(count = 6) {
           data.onDigest?.(params.FilePathName);
           const bytes = data.objects.get(params.FilePathName);
           if (!bytes) return {Code:0,Msg:'NoSuchKey'};
-          return {Code:1,Data:{Sha256:h(bytes),WireSha256:data.wireOverride ?? h(bytes),Size:bytes.length}};
+          return {Code:1,Data:{Sha256:h(bytes),WireSha256:data.wireFor?.(params.FilePathName,bytes) ?? data.wireOverride ?? hashBase64(bytes),Size:bytes.length}};
         },
         CopyObject(params) {
           assert.equal(params.Limit,false); assert.equal(params.OsClient,'iTdos');
@@ -184,7 +186,37 @@ test('whole-batch preflight refuses existing conflict in later alias before writ
 });
 test('wrong source bytes reject even when canonical aliases missing',()=>{const f=fixture();f.objects.set(f.source(0),Buffer.from('wrong'));refuses(f,/异字节/);});
 test('missing encoded source fails closed with no upload or URL fallback',()=>{const f=fixture();f.objects.delete(f.source(0));refuses(f,/不存在/);});
-test('wire digest mismatch rejects compressed/transformed content',()=>{const f=fixture();f.wireOverride='f'.repeat(64);refuses(f,/wire hash/);});
+test('raw manifest hash and distinct Base64 wire hash accept the real primitive contract',()=>{
+  const f=fixture();const bytes=f.objects.get(f.source(0));assert.notEqual(h(bytes),hashBase64(bytes));
+  const r=f.run();assert.equal(r.Code,1,JSON.stringify(r));assert.equal(f.copies.length,4);
+  const first=r.Data.Inspected[0];assert.equal(first.SourceDigest.Sha256,h(bytes));
+  assert.equal(first.SourceDigest.WireSha256,hashBase64(bytes));
+  assert.equal(r.Data.Copied[0].WireSha256,first.SourceDigest.WireSha256);
+});
+test('raw mismatch is rejected even when wire hash happens to equal the frozen raw hash',()=>{
+  const f=fixture();const original=f.objects.get(f.source(0));
+  f.objects.set(f.source(0),Buffer.alloc(original.length,0));f.wireOverride=f.manifest[1].Sha256;
+  refuses(f,/异字节/);assert.equal(f.calls.filter(c=>c[1]===f.target(0)).length,0);
+});
+for(const malformed of ['', 'not-a-hash', 'f'.repeat(63), 'g'.repeat(64)])
+  test('malformed source wire digest fails closed: '+JSON.stringify(malformed),()=>{
+    const f=fixture();f.wireOverride=malformed;refuses(f,/wire hash 格式/);
+  });
+test('existing target with same raw bytes but different wire digest fails preflight',()=>{
+  const f=fixture();f.objects.set(f.target(0),f.objects.get(f.source(0)));
+  f.wireFor=p=>p===f.target(0)?'f'.repeat(64):undefined;
+  refuses(f,/wire hash 与来源/);
+});
+test('post-copy target wire mismatch stops after the first attempted alias',()=>{
+  const f=fixture();f.wireFor=p=>p===f.target(0)?'f'.repeat(64):undefined;
+  const r=refuses(f,/wire hash 与来源/,1);assert.equal(r.Data.RequiresReadback,true);
+  assert.equal(r.Data.Copied.length,1);assert.equal(r.Data.Copied[0].WireSha256,undefined);
+});
+test('source wire drift after preflight is rejected before copy despite matching raw bytes',()=>{
+  const f=fixture();let digests=0;
+  f.wireFor=p=>p===f.source(0)&&++digests>1?'f'.repeat(64):undefined;
+  refuses(f,/wire hash 与来源/);
+});
 test('same hash field with forged size is rejected by actual object length',()=>{
   const f=fixture();f.manifest[1].Size++;f.commitManifest();refuses(f,/异字节/);
 });
