@@ -444,7 +444,10 @@ namespace Microi.net
 
         private static string BuildAuthorizeUrl(ExternalLoginProviderOptions provider, string redirectUri, string state)
         {
-            var query = "client_id=" + Uri.EscapeDataString(provider.ClientId)
+            // 微信网站应用要求 appid；其它固定 OAuth 供应商仍使用 client_id。
+            // 只改变公开应用标识的参数名，Secret 继续仅由服务端交换 code 时使用。
+            var clientIdParameter = provider.Key == "WeChat" ? "appid" : "client_id";
+            var query = clientIdParameter + "=" + Uri.EscapeDataString(provider.ClientId)
                         + "&redirect_uri=" + Uri.EscapeDataString(redirectUri)
                         + "&response_type=code"
                         + "&scope=" + Uri.EscapeDataString(provider.Scope ?? string.Empty)
