@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-03T08:32:34.727Z",
+  "generatedAt": "2026-10-03T13:27:18.485Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2786,17 +2786,17 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "ef779c0c6eb788f3c78c4e77ce5774f3e290e36fad344316368b0ee26e1f49e9",
-      "originalLines": 511,
-      "prefixSha256": "c3b2ae10a39461ee69fda3c7e994d072ca6d8c9dc6f2338742bc8f07e0dcffd0",
-      "prefixBytes": 1648,
-      "entryLines": 197,
+      "originalSha256": "763e444f654ab915905de33fc0aa92d6bcd8588fb91837fb3afc61f3ada430da",
+      "originalLines": 521,
+      "prefixSha256": "d926b16a03ac1a7774cb57dab1f5b72ddc51c95574cebab17aa4a81dfc40757b",
+      "prefixBytes": 2606,
+      "entryLines": 207,
       "chunks": [
         {
           "id": "v8-security-000",
           "ordinal": 0,
           "destination": "v8-security/SKILL.md",
-          "sha256": "2e81552d91b61d9d7f96cba1502306e186f0a288d5db8d443c4e524fce748bc9",
+          "sha256": "a6a4311b1a799ea4ed005b22c01cb8230509aaf09aeead5a17c8c46da74772c8",
           "lines": 52,
           "heading": "0. 租户动态系统设置与密钥边界"
         },
@@ -2804,7 +2804,7 @@
           "id": "v8-security-001",
           "ordinal": 1,
           "destination": "v8-security/SKILL.md",
-          "sha256": "ccec93b880295123923b2375dbc616c5ab02aaf43af9a79f26b7ac953609866d",
+          "sha256": "51070dc1148f49c796dd605045b7fcb5970290638cf85e844c17d81962afa7aa",
           "lines": 24,
           "heading": "0.5 接口引擎配置安全"
         },
@@ -2812,7 +2812,7 @@
           "id": "v8-security-002",
           "ordinal": 2,
           "destination": "v8-security/SKILL.md",
-          "sha256": "7229e5f8d200c0dfbab08752405f5e88d7edc80e9e92b6802880c022b09ca893",
+          "sha256": "fdc1cbd297d141bfef8e9e0ee58a972410ffc9b6b778b217b5610f86139f514c",
           "lines": 28,
           "heading": "1. 防 SQL 注入"
         },
@@ -2820,7 +2820,7 @@
           "id": "v8-security-003",
           "ordinal": 4,
           "destination": "v8-security/SKILL.md",
-          "sha256": "8813dffa5c5c4c8816abddf3628579d474fe02137504d6c909f36303d4692560",
+          "sha256": "4f875f2eaf69716bf7d2b92d42ba079ec952cfcbc3211682b8d73f53ca8fd398",
           "lines": 42,
           "heading": "3. 输入验证"
         },
@@ -2828,7 +2828,7 @@
           "id": "v8-security-004",
           "ordinal": 5,
           "destination": "v8-security/SKILL.md",
-          "sha256": "1703ea824e4807b24d30225d41e16fb36b0fecc21c63a4ab0296106185460a27",
+          "sha256": "13385475478ef17b58798db43779503a924385e599ad6ed5a8abd396949064aa",
           "lines": 22,
           "heading": "4. 防 XSS"
         },
@@ -2836,7 +2836,7 @@
           "id": "v8-security-005",
           "ordinal": 3,
           "destination": "v8-security/references/progressive-01-2-权限校验.md",
-          "sha256": "0a0f4864a315285b0ed3824e31d1f62d83077a389628f4eae6a0b3550ca50237",
+          "sha256": "09f88aaf8da914fdbec8bc8668cef588a02217354a210515230471fbfdddd27f",
           "lines": 101,
           "heading": "2. 权限校验"
         },
@@ -2844,7 +2844,7 @@
           "id": "v8-security-006",
           "ordinal": 6,
           "destination": "v8-security/references/progressive-01-2-权限校验.md",
-          "sha256": "3a40db54a44c9c76bd3dd7255d1a6b15dcf8b8b90c2d032b7eda80532f023d7d",
+          "sha256": "c7a43f46e8636fc3cbf792dfb8ff6c17890bd0a4d57025ba29cc37de2373dcbe",
           "lines": 21,
           "heading": "5. 防重复提交"
         },
@@ -2852,7 +2852,7 @@
           "id": "v8-security-007",
           "ordinal": 7,
           "destination": "v8-security/references/progressive-01-2-权限校验.md",
-          "sha256": "35706b9a254fb5788b64535947261f66fd8c06e17103b2169f8be02fce05fa65",
+          "sha256": "360a677ffa518b108e304f92922f9eaa2a12d44e863a16ce7439d9afe5616766",
           "lines": 71,
           "heading": "6. 敏感数据"
         },
@@ -2860,7 +2860,7 @@
           "id": "v8-security-008",
           "ordinal": 8,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "6e0b7de3cd72cc030c93566c03ddf2191af6163d378e5ec8a40828eee9873477",
+          "sha256": "2ff2de57d90237ef31cf6cccdb940b8ebb2a268a7726216946de4ba672a12248",
           "lines": 40,
           "heading": "7. 日志记录"
         },
@@ -2868,7 +2868,7 @@
           "id": "v8-security-009",
           "ordinal": 9,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "b7a65ce2785a6a3d02dc1bc08c16c5ae03e38aa199d4bc204abe5978057f1ea1",
+          "sha256": "e430777e54dc5c9e24e5f981db467dbe0ed3e9a297042a545891dd644e10a485",
           "lines": 20,
           "heading": "8. 错误处理"
         },
@@ -2876,7 +2876,7 @@
           "id": "v8-security-010",
           "ordinal": 10,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "4b68e2730cc6ac2ba8eeb4458c71e9ee157b9ac8054dcab364f364b2e0bd1c05",
+          "sha256": "26ae8c22e1db1edca4d159d68423ae14ec84b528e5cc4deb305010f89871f57e",
           "lines": 25,
           "heading": "9. Token、终端会话与租户隔离"
         },
@@ -2884,7 +2884,7 @@
           "id": "v8-security-011",
           "ordinal": 11,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "78053ef853bdffb4eaad90354204555d836d67b9a18f2a6c0ac74a0142df2794",
+          "sha256": "d625724d1e14db9cbd707b74d5ed1e5cd3fc44d58ff46baed65e3fd09728e817",
           "lines": 11,
           "heading": "10. Jint 运行时升级边界"
         },
@@ -2892,7 +2892,7 @@
           "id": "v8-security-012",
           "ordinal": 12,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "f7ac9ee1702759fbf5b256ef7b7069ebce75cb845b59786d4eab928335001bf6",
+          "sha256": "5f0a43b36ce88e6fed819887acfda86d2b07f5929c958edade902a95b9dfdb66",
           "lines": 30,
           "heading": "安全检查清单"
         },
@@ -2900,7 +2900,7 @@
           "id": "v8-security-013",
           "ordinal": 13,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "809cd12c1b5fbba76a0b09ebbddf5d2e34189d26ee510c285389294c35b91176",
+          "sha256": "d87a3b8c82d4eb9c88ee5214711672f9e0684895dc3f4eca32b0278587f68426",
           "lines": 22,
           "heading": "浏览器访问密钥"
         }
