@@ -20,7 +20,7 @@ const app = {
   PreviewUrl: '/old/preview/index.html'
 };
 
-function verify(stableBytes) {
+function verify(stableBytes, releaseBytes = index) {
   const cache = new Map();
   const v8 = {
     Param: { AppId: appId, Action: 'Verify', ConfirmAppId: appId,
@@ -37,12 +37,19 @@ function verify(stableBytes) {
     },
     Http: { GetResponse({ Url }) {
       const path = new URL(Url).pathname;
+      // 线上引擎先核验不可变入口再计算兼容投影；夹具必须暴露该真实读取路径。
+      if (path === '/old/release/assets/index.html')
+        return { StatusCode: 200, RawBytes: releaseBytes };
       if (path === '/itdos/micro-app/sample-app/v1.0.0/index.html')
         return { StatusCode: 200, RawBytes: index };
       if (path === '/itdos/micro-app/sample-app/index.html')
         return { StatusCode: 200, RawBytes: stableBytes };
       throw new Error(path);
     } },
+    Base64: {
+      Base64ToString(value) { return Buffer.from(value, 'base64').toString('utf8'); },
+      StringToBase64(value) { return Buffer.from(value, 'utf8').toString('base64'); }
+    },
     Method: {
       CreateZip({ Entries }) { return { Code: 1, Data: { FileByteBase64: Entries[0].FileByteBase64 } }; },
       ExtractZip({ FileByteBase64 }) {
@@ -65,7 +72,13 @@ test('v3 version and fixed CDN bytes pass exact manifest verification', () => {
 test('v3 fixed CDN bytes fail when they differ from the manifest', () => {
   const result = verify(Buffer.from('stale CDN response'));
   assert.equal(result.Code, 0);
-  assert.match(result.Msg, /发布资产长度或哈希不符/);
+  assert.equal(result.Msg, '固定资产回读哈希不符：itdos/micro-app/sample-app/index.html');
+});
+
+test('v3 immutable source corruption is rejected before accepting matching public aliases', () => {
+  const result = verify(index, Buffer.from('changed immutable source'));
+  assert.equal(result.Code, 0);
+  assert.match(result.Msg, /入口原始字节与冻结清单不符/);
 });
 
 test('legacy JavaScript URL dependencies are included in the historical plan', () => {
