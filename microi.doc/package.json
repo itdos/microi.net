@@ -39,8 +39,8 @@
 		"test:marketplace": "node --test tests/marketplace-query-state.test.mjs tests/site-session.test.mjs",
 		"docs:dev": "vitepress dev docs --host",
 		"dev": "vitepress dev docs --host",
-		"docs:build": "npm run check:content && npm run test:seo && vitepress build docs && npm run check:theme && npm run check:seo",
-		"build": "npm run check:content && npm run test:seo && vitepress build docs && npm run check:theme && npm run check:seo",
+		"docs:build": "node scripts/check-account-portal.mjs && node --test tests/account-portal-release.test.mjs && npm run check:content && npm run test:seo && vitepress build docs && node scripts/check-account-portal.mjs --dist && npm run check:theme && npm run check:seo",
+		"build": "npm run docs:build",
 		"docs:preview": "vitepress preview docs"
 	},
 	"devDependencies": {

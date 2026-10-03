@@ -106,7 +106,7 @@ AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker
 - 本规则只约束 `Microi.Client/` 吾码框架前端源码。独立 MicroService、Web、UniApp 等应用源码仍按其交付 Skill 在发布前执行自身必要的构建；不得因为本规则跳过微服务正式产物生成。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-004 sha256=533d4a6d674f5980fdf6e9ae376b240af20e3191126a20eae3d6235897f45a88 -->
+<!-- microi-progressive:chunk id=workspace-conventions-004 sha256=a12a204339ee40367f4c09d085d818515b0d94c7c0d748d0d455fede6b98a2e4 -->
 ## 临时文件与 AI 产物放置规则（强制）
 
 AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、测试截图、临时报告**，**严禁放在工作区根目录（`<workspace-root>/`）**，必须放在指定位置：
@@ -132,7 +132,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 **2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.Agent 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=c48d857c8e3086b29f99ab14d362f99c60d7dd00f9617709ea4f4dcad370611e -->
+<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=f627ee155b40014af76926b3a432601aa3f6bec5a7eb98ca0540c83fa41f1e5a -->
 ## Microi 源码路径速查（工作区根相对路径）
 
 当用户提到“吾码后端源码”“吾码前端源码”“表单引擎源码”“官网源码”等简称时，默认按下列路径定位；如果当前工作区缺少对应目录，再用 `rg --files` 或目录搜索确认实际位置。
@@ -222,8 +222,16 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - `Microi.net.Api/Controllers` 除五个兼容内核 Controller 与统一旧客户端兼容 Controller 外，只能保留已证明接口引擎无法承担的薄协议 Controller；每个保留项必须同步登记 `api-ownership-catalog.json` 并由结构测试锁定。已完整迁入接口引擎的旧 Controller 必须继续物理删除。
 - `Program.cs` 只保留有说明的插件注册和最薄宿主入口；ASP.NET 组合代码可留在同项目 `Hosting`，可复用业务/运行时逻辑进入 `Microi.Core`、`Microi.net`、`Microi.Upgrade` 或对应插件，禁止通过新建“中转层”掩盖归属问题。
 
-<!-- microi-progressive:chunk id=workspace-conventions-009 sha256=dc7dbe2d2f60466a7170fff65a5df8769bc795b4ab23151a24b665380d7c6e37 -->
+<!-- microi-progressive:chunk id=workspace-conventions-009 sha256=cb0a9b2286d51e41dfd3c4249f28d4ac57b6736112be3c1f57f8eb405d0631b1 -->
 ## 多对话共享工作区变更归属保护（强制）
+
+### 功能验收后的源码提交与推送（强制）
+
+- 每个已完成并通过相应验收的功能、修复或独立里程碑，必须把本任务源码、测试和必要文档按实际 Git 仓库分别提交并推送；不能仅保存在工作区、stash、临时目录或已发布产物中。用户明确要求不提交/不推送、只读任务和未完成的实验除外，不为无改动仓库制造空提交。
+- 提交前回读工作树、暂存区、上游和远端；按可核验的本任务 hunk 暂存，保留其它对话的改动与既有暂存项。公开根仓只提交公开代码；闭源目录只从各自独立仓库根提交并推送到其已有内部远端，严格执行公开仓闭源路径门禁，不能用 gitlink 或强制添加绕过隔离。
+- 推送前先获取上游的新提交并安全整合；共享工作区有并行改动时优先在隔离候选中合并，不用整树 stash/reset 覆盖他人成果，不强推共享分支，不绕过仓库 Hook。需要精确回滚时保留独立、说明清楚的功能提交；回滚已推送功能通常使用新的反向提交，不改写共享历史。
+- 正式发布前，候选必须包含此前已交付功能的提交，并完成本任务提交、推送及远端提交号回读，再从该冻结候选构建与发布。仅更新某个说明页面时也要核对整个站点的候选；隔离工作树不能因为没有未提交变更就被当成最新线上功能。发布锁只防并发，不能代替源码完整性检查。
+- 收尾逐仓记录本地提交号、远端分支和回读结果，并区分源码推送、构建发布与真实线上验收。网络、权限、冲突或门禁阻止推送时，保留本地提交、准确报告未推送项并继续完成可独立推进的工作；不得宣称完整交付，也不得为赶进度先发布未交付源码。
 
 同一工作区可能同时被用户、其它 Codex 对话、IDE、自动化任务或外部 Git 操作修改。任务启动前已经存在、或无法用本对话证据严格证明归属的差异，一律视为他人资产并保留；“工作区是脏的”不是清理授权。
 
