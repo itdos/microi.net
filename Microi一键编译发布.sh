@@ -73,6 +73,17 @@ set +o posix 2>/dev/null || true
 set -e
 set -o pipefail
 
+# macOS 默认没有 GNU timeout；探针仍必须有时限，不能误判健康的 Docker。
+run_with_timeout() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$@"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "$@"
+    else
+        node "$PWD/Microi.Server/tools/run-with-timeout.mjs" "$@"
+    fi
+}
+
 # Microi Code 使用独立内部 GitLab 仓库；桌面构建不进入平台 Docker/NuGet 发布流程。
 # bash Microi一键编译发布.sh --microi-code [--win|--mac] [--arm64|--x64]
 if [ "${1:-}" = "--microi-code" ]; then
@@ -1296,7 +1307,7 @@ if [ "$SMOKE_INJECTED" = true ]; then
                 print_info "  - ${name}: 配置缺失（跳过）"
                 return 0
             fi
-            if timeout 3 bash -c "</dev/tcp/${host}/${port}" 2>/dev/null; then
+            if run_with_timeout 3 bash -c "</dev/tcp/${host}/${port}" 2>/dev/null; then
                 print_info "  ✓ ${name} ${host}:${port} 可达"
                 return 0
             else
@@ -1341,7 +1352,7 @@ if ! (
         echo "  ❌ 冒烟测试失败: 未找到 curl，无法验证 liveness HTTP 状态！"
         exit 1
     fi
-    if timeout 1 bash -c "</dev/tcp/127.0.0.1/${SMOKE_PORT}" 2>/dev/null; then
+    if run_with_timeout 1 bash -c "</dev/tcp/127.0.0.1/${SMOKE_PORT}" 2>/dev/null; then
         echo "  ❌ 冒烟测试失败: 本机端口 ${SMOKE_PORT} 已被占用；可通过 SMOKE_PORT 指定其它空闲端口。"
         exit 1
     fi
@@ -1552,7 +1563,7 @@ ensure_docker_running() {
     # docker.exe can itself hang while Docker Desktop/WSL is half-started. The
     # outer 60-second loop is not a real bound unless every probe is bounded.
     _docker_daemon_ready() {
-        timeout 5 docker info </dev/null > /dev/null 2>&1
+        run_with_timeout 5 docker info </dev/null > /dev/null 2>&1
     }
 
     if _docker_daemon_ready; then
