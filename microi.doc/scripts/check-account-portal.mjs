@@ -51,7 +51,9 @@ function main() {
       const committed = execFileSync('git', ['show', `HEAD:microi.doc/${name}`], { cwd: project });
       if (sha(committed) !== hashes[name]) throw new Error(`发布源码尚未提交：${name}`);
     }
-    git(['merge-base', '--is-ancestor', 'HEAD', '@{upstream}']);
+    // 冻结候选通常为 detached HEAD；检查远端分支包含该提交，不能要求候选另建发布分支。
+    const delivered = git(['for-each-ref', '--format=%(refname)', '--contains', 'HEAD', 'refs/remotes/origin/']).split('\n').filter(ref => ref && !ref.endsWith('/HEAD'));
+    if (!delivered.length) throw new Error('候选提交尚未推送到 origin 的任何分支。');
   }
   const snapshot = path.resolve(project, '../.tmp/microi-doc-build/account-portal-source.json');
   if (!process.argv.includes('--dist')) {
