@@ -19,7 +19,8 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 
 **Windows 1.3.2 已开放下载测试**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
 
-- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。Microsoft 公司身份已验证，商店 MSIX 1.3.3 已于 2026 年 10 月 2 日正式提交，当前状态为**正在认证**，通过后自动免费上架至 [Microsoft Store](https://apps.microsoft.com/detail/9NKCS76ZMFXR)，由微软签名分发。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 测试包仍为未签名 1.3.2。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
+- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 测试包仍为未签名 1.3.2。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
+- **Windows 商店版 1.3.3 已发布**：2026 年 10 月 3 日复查，Microsoft 后台显示“在 Microsoft Store 中”，中国区公开产品页已显示 Microi Agent 的名称、发行者、截屏与介绍；商店 MSIX 由微软签名分发。请在 Windows 设备打开 [Microsoft Store](https://apps.microsoft.com/detail/9NKCS76ZMFXR) 查看获取入口。本机 Mac 的产品页没有获取按钮，**Windows 原生获取、安装与启动仍待验收**；商店发布不会改变官网 EXE 的未签名状态。
 - 如果旧安装包提示 `Failed to decompress files` 或 `Error opening output file(s)`，请从本页顶部重新下载 Windows latest 安装包后运行；不要重复启动下载目录中缓存的旧安装包。新版安装器改用能处理内置中文技能文件名的解压方式，覆盖安装会保留工作区和会话数据。
 - 如果已退出应用仍提示“无法关闭”，旧安装器可能把长路径或文件复制失败误报成应用正在运行。新版使用当次发行的兼容卸载器完成升级；工作区、会话和用户配置保持不变。如果新版仍失败，请使用下面的诊断入口，不要反复重装。
 - 1.2.6 修复了已重现的长路径清理问题，但仍有客户报告“旧版本文件清理失败（错误码 2）”。该数字是卸载器退出码，不能直接判断哪个文件失败、是否被占用或缺少权限，也不能据此认为所有客户的升级问题已解决。
@@ -801,6 +802,11 @@ npm run publish:cli:resume
 ## 更新日志
 
 版本、日期和条目格式沿用[平台更新日志](/doc/about/update-log.html)。安装包版本与 CLI 版本分别管理；历史故障、修复尝试和客户验证边界继续保留。
+
+### Windows 商店 v1.3.3 已发布 - (2026-10-03)
+
+- **商店状态更新**：Microsoft 后台已显示“在 Microsoft Store 中”，中国区公开产品页已展示 Microi Agent、Microi吾码发行者及产品素材；顶部商店入口同步标注“已发布”。请在 Windows 设备查看获取入口；本机 Mac 未显示获取按钮，Windows 原生获取、安装与启动仍待验收。
+- **下载渠道保留**：商店 MSIX 由微软签名分发并通过商店更新；官网 Windows 1.3.2 EXE 仍为未签名测试包。官网 macOS 1.3.2 完整签名公证 DMG 继续可用，独立沙盒 Mac App Store 1.3.2（构建 1.3.3）仍等待 Apple 审核。
 
 ### Windows 商店 v1.3.3 / Mac App Store 送审 - (2026-10-02)
 
