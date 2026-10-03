@@ -103,6 +103,9 @@ if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with ex
 # 默认对零用例和失败用例返回非零，禁止把空的历史 tests/ 目录视作通过。
 $workspaceRoot = Split-Path -Parent $serverRoot
 $desktopRoot = Join-Path $workspaceRoot 'Microi.Agent/apps/microi-code'
+if (-not (Test-Path -LiteralPath (Join-Path $desktopRoot 'package.json'))) {
+    $desktopRoot = Join-Path $workspaceRoot 'Microi.Code/apps/microi-code'
+}
 $desktopPackage = Join-Path $desktopRoot 'package.json'
 if (Test-Path -LiteralPath $desktopPackage) {
     if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
