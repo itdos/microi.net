@@ -8,7 +8,7 @@
         <p class="microi-code-lead">代码、吾码账号、AI 中转站、MCP 与 30+ 成熟引擎，在一个桌面工作台协同。</p>
         <div class="microi-code-actions">
           <div class="microi-code-platform-download">
-            <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows <small v-if="liveVersions.windows">v{{ liveVersions.windows }}</small></a>
+            <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows 完整版 <small v-if="liveVersions.windows">v{{ liveVersions.windows }}</small></a>
             <a class="microi-code-store-link" href="https://apps.microsoft.com/detail/9NKCS76ZMFXR" target="_blank" rel="noopener noreferrer">Microsoft Store <small>已发布</small><span aria-hidden="true">↗</span></a>
           </div>
           <div class="microi-code-platform-download">
@@ -16,7 +16,8 @@
             <a class="microi-code-store-link" href="https://apps.apple.com/app/id6818076490" target="_blank" rel="noopener noreferrer">Mac App Store <small>尚未开放下载</small><span aria-hidden="true">↗</span></a>
           </div>
         </div>
-        <p class="microi-code-store-note">Windows 商店产品页已公开，请在 Windows 设备查看获取；Mac 商店尚未开放下载。官网完整版已更新至 1.3.4。</p>
+        <p class="microi-code-store-install"><a href="https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge" target="_blank" rel="noopener noreferrer">微软签名 EXE 在线安装器 <span aria-hidden="true">↗</span></a><span>商店版 1.3.3 · Windows 10 2004+ / 11 · x64 · 需联网</span></p>
+        <p class="microi-code-store-note">官网 Windows 完整版 1.3.4 EXE 未签名；在线安装器安装微软签名商店版。macOS 1.3.4 DMG 已签名、公证，Mac 商店尚未开放下载。</p>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
@@ -248,6 +249,9 @@ const visibleReleases = computed(() => releases.slice((historyPage.value - 1) * 
 .microi-code-actions a.microi-code-store-link { min-height: 36px; gap: 6px; padding: 0 9px; border: 0; background: transparent; font-size: 12px; color: var(--vp-c-brand-1); }
 .microi-code-store-link small { padding: 2px 6px; border-radius: 5px; background: var(--vp-c-bg-soft); color: var(--vp-c-text-2); font-weight: 400; }
 .microi-code-store-note { margin: 10px 0 0; color: var(--vp-c-text-2); font-size: 12px; line-height: 1.7; }
+.microi-code-store-install { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 12px 0 0; font-size: 12px; line-height: 1.7; }
+.microi-code-store-install a { color: var(--vp-c-brand-1); font-weight: 600; }
+.microi-code-store-install > span { color: var(--vp-c-text-2); }
 @media (max-width: 640px) { .microi-code-platform-download { width: 100%; } }
 .microi-code-facts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 0; margin-top: 30px; }
 .microi-code-facts li { min-width: 0; padding: 0 14px; border-left: 1px solid var(--vp-c-divider); }
