@@ -8,7 +8,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_cdn_backfill
- * Version: v1.5.4
+ * Version: v1.5.5
  * Function:
  * - 官方 AI 应用 CDN 固定路径迁移、流式哈希回读、阿里云 CDN 精确刷新与旧版编译错误对象修复；数据库保留相对对象路径，官网输出静态域名完整 URL。
  */
