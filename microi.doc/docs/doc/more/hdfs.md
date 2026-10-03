@@ -348,6 +348,51 @@ v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在
 
 接口引擎、后端表单 V8 和平台内部任务调用 `V8.Method.Upload` 属于可信服务端普通上传，可以由业务代码选择安全路径和公私有桶，但仍受全局文件数量、单文件和单次总量硬限制。只有应用资产协议 v3 具有独立断点与无产品字节上限语义；浏览器、移动端和普通 HTTP 客户端不能通过伪造 `_TrustedServerInvocation`、`Limit` 或 `Path` 获得这种信任。
 
+#### 已提交应用的 CDN 特殊字符别名修复
+
+对象键、清单逻辑路径和浏览器 URL 是三个不同的值。例如，逻辑文件名 `asset@subasset.json` 对应的公开对象键应保留 `@`，浏览器 URL 可将它编码为 `%40`；若对象键本身含字面量 `%40`，访问这个旧对象的 URL 则需写成 `%2540`。不能把 URL 编码结果直接当作新的对象键，也不能在 HDFS 中对所有对象键统一反解码，否则会改变存量对象的身份。
+
+当已提交的协议 v3 应用出现这类 CDN 投影缺口时，可由当前租户平台超级管理员通过受管接口引擎 `ai_app_cdn_backfill` 的 `Action=RepairCommittedCdnAliases` 补充别名。它只复制经过验证的既有公有对象，不接收文件体，不修改清单，也不删除或重命名原编码对象。v3 内部不可变对象、完整性标记、请求身份和运行清单摘要保持原样。
+
+调用前必须回读当前商城记录与版本完整记录，并冻结以下参数；不得仅凭 AppKey 或上次运行的缓存值发起修复：
+
+| 参数 | 绑定要求 |
+|---|---|
+| `AppId`、`ConfirmAppId` | 同一精确应用 Id；当前用户仍须满足 `Level >= 9999` |
+| `ExpectedAppKey`、`ExpectedVersionId`、`ExpectedVersionNo` | 当前应用及版本归属 |
+| `ExpectedRequestId`、`ExpectedRequestFingerprint`、`ExpectedRuntimeManifestHash` | 该版本协议 v3 请求身份与完整运行清单摘要 |
+| `ExpectedCommittedPublishVersionId`、`ExpectedCommittedRuntimeManifestHash` | 商城当前已提交版本指针及摘要 |
+| `ExpectedCurrentVersion`、`ExpectedPublishFence`、`ExpectedPublishRowVersion` | 当前版本号计数、发布栅栏和行版本，使用规范十进制字符串，避免大整数精度丢失 |
+| `DryRun` | 默认 `true`，只检查绑定与对象摘要；仅显式 `false` 执行复制 |
+| `AliasStart`、`AliasCount` | 默认分别为 0、1；`AliasStart` 索引冻结清单内符合范围的原始 `@` JSON 列表；`AliasCount` 为 1–5，不是全部资产的分页大小 |
+
+服务端同时核对当前活动指针、版本归属、协议、版本 `FencingToken`、派生的 `ReleasePrefix`，以及商城和版本的发布状态；两者状态只接受 `ProjectionPending`、`RepairRequired` 或 `Completed`。完整清单按平台既定的 ordinal 路径排序，以 `Path<TAB>Sha256<TAB>Size`、行间 LF、末尾无 LF 和 UTF-8 重新计算 SHA-256，后续回读还须确认冻结清单字符串未变。
+
+允许补齐的路径仅为 `assets/<bundle>/import/<两位十六进制>/<文件名>@<子资源>.json`，且必须是非入口、公有运行 JSON，单文件不超过 1 MiB。清单中出现不支持的 `@` 路径时整次拒绝，不静默跳过。私有或源码资源、百分号转义、绝对路径、目录穿越、自定义桶或目标路径、调用方上传内容均不属于此动作。
+
+该维护动作还要求完整运行清单使用安全 ASCII 相对路径、恰好一个入口、最多 20000 项、单项不超过 2 GiB、合计不超过 4 GiB。这是此小范围修复动作的校验边界，不改变协议 v3 正常流式发布的容量语义。
+
+对每个冻结逻辑路径 `P`，复制路径由服务端按当前租户推导，均使用 `Limit:false`：
+
+| 用途 | 对象键 |
+|---|---|
+| 保留的既有来源 | `{tenant}/micro-app/{AppKey}/{VersionNo}/{P 中的 @ 替换为字面量 %40}` |
+| 版本目录别名 | `{tenant}/micro-app/{AppKey}/{VersionNo}/{原始 P}` |
+| 固定目录别名 | `{tenant}/micro-app/{AppKey}/{原始 P}` |
+
+传给存储原子的必须是租户内对象路径，不能用 HTTPS 来源 URL 代替。每个资产最多产生版本目录和固定目录两次复制，因此一批最多 5 个资产、10 次复制。执行前先检查整批来源和目标：来源内容 SHA-256、物理 `WireSha256` 及大小必须与冻结清单一致；已有目标字节相同则跳过，任何目标字节不同则整批拒绝，不覆盖。每次复制前后再次核对摘要和最新发布绑定。
+
+`CopyObject` 当前没有原子的 create-if-absent/禁止覆盖参数，响应会明确返回 `AtomicCreateOnly:false`。前置检查能拒绝已观察到的冲突，不能消除“检查后、复制前”另一个写入者改动目标的窗口。修复期间不能有另一发布者或任意写入者竞争同一固定路径；既有后台投影可继续写入同一冻结版本的相同字节。指针、活动版本、栅栏、行版本或清单发生变化时，停止当前流程，核对已产生的副作用并重新取得契约，不能只替换预期参数强行续跑。
+
+建议按以下顺序执行：
+
+1. 回读当前绑定，对最多 5 个资产执行 `DryRun:true`，检查返回的来源、目标、摘要和大小。
+2. 使用同一组冻结绑定及游标执行 `DryRun:false`，记录 `Attempted`、`Copied`、`RequiresReadback` 和 `NextAliasStart`。
+3. 独立从版本及固定 CDN URL 回读实际字节、大小和 SHA-256。超时、未知结果或 `Code=0` 不能证明对象未写入；先回读已尝试路径，再决定是否重试。数据库事务回滚不能撤销 OSS 复制。
+4. 下一批重新回读当前事实并核对契约，再使用返回的 `NextAliasStart`。全部别名核对后，由原发布后台继续完成 CDN 刷新、公开回读和状态收敛。
+
+此动作不刷新 CDN、不推进提交指针、不修改发布状态，也不将 `ProjectionPending/RepairRequired` 强制改成 `Completed`。复制成功不能代替刷新任务完成、公网字节一致和真实浏览器资源加载验收；旧 404 缓存也需通过原发布刷新流程处理。
+
 ### 私有文件必须绑定业务记录
 
 普通用户调用 `/apiengine/platform-private-file-url` 时，除文件相对路径外必须提交：
