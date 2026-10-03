@@ -2,12 +2,14 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=7e836f587a670e0be56abf880f6164a739ef1a31cfdb3864c09697a1980a3910 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=4bb7b2c4a8e3a97f1b6d5c0fcf067bc87b17dd8abc3544c7661ff9914b3a4c5e -->
 ## 自动化测试必须覆盖的坑
 
 ### 后端统一测试与发布门禁
 
-- 每一个新功能或 Bug 修复必须提供对应回归用例；C# 进入 `Microi.Tests`，前端与资源/V8 测试进入统一 Node 自动发现范围。修复先保留失败证据，再跑成功、边界、异常、权限及旧格式兼容用例；不能仅添加字符串存在断言替代行为测试。
+- 官方或社区独立业务应用、游戏和客户项目在应用自己的 `tests/` 或独立测试工程维护回归，由应用自己的测试及发布入口执行；不得通过直接放文件、转调包装或自动扫描加入平台 Quick/Full。官方商城发布不使业务应用变为平台内置能力。平台 SDK、商城协议、安装器及通用缺陷的最小回归仍由平台负责。
+
+- 每个平台新功能或 Bug 修复必须提供对应回归用例；平台 C# 进入 `Microi.Tests`，平台前端与内置资源/V8 测试进入平台 Node 自动发现范围。修复先保留失败证据，再跑成功、边界、异常、权限及旧格式兼容用例；不能仅添加字符串存在断言替代行为测试。
 - `run-node-regressions.mjs` 自动发现 `Microi.Tests`、`Microi.Upgrade/Resource`、`Microi.Client/tests` 的确定性测试。新文件无法分类即失败；Playwright 用例必须走真实浏览器入口，不能用 Node 执行后把跳过当通过。所有计数需回读，0 用例、失败、取消、skipped、todo 均拒绝发布。
 - 仅推送模式也必须取得发布锁并执行 Full。源码候选哈希、构建上下文哈希与 `release-artifact.mjs` 回执必须一致，且每个 Docker push 前再验证；无回执的历史产物不允许上传。文档专用模式不运行无关后端业务测试。
 - 测试评审按身份/权限、多租户隔离、CRUD/事务、V8 同步异步与 `return/V8.Result`、存储安全、缓存/任务幂等、升级回滚、应用包幂等、浏览器登录/目标路由、发布脚本失败关闭分类盘点。新增能力补所在分类，不承诺一轮测试覆盖所有未知业务。
@@ -130,7 +132,7 @@
 - 每次修复资金/资产业务规则后，必须同步更新项目蓝图/方案文档中的触发点、计算公式、字段口径和验收方式，不能只改代码或只在对话里说明。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-007 sha256=e1b60c9a355503f1230a2fda597b9cbe7ca0c9ba678f96c6f5a1b2da3dfa6c8b -->
+<!-- microi-progressive:chunk id=microi-system-delivery-007 sha256=67fa060b6520a80e41818ac0974c0b38ff3171c97a1c558a01667b854865fa7a -->
 ## 复盘记录格式
 
 每次用户手工测出问题，修复后都要把问题写入对应通用 Skill，格式如下：

@@ -63,6 +63,44 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 
 旧库可由超级管理员运行应用商城包提供的容量治理后台任务。任务先自愈缺失字段，再以有界 Id 游标分批外置 `sys_microistore` 和商城相关 `mic_data_version` 快照；每行都在 HDFS 校验成功后以原值 CAS 清理，因此节点重启、重试或并发修改不会误删。任务不会对数 GB 的历史 JSON 执行全表 `LIKE`，也不会自动运行可能长时间锁表的 `OPTIMIZE TABLE`。逻辑正文清空后，如需让 MySQL 物理文件立即缩小，应在完成备份的维护窗口由数据库管理员另行评估执行。
 
+## 仅共享编译运行产物
+
+只希望安装者获得运行应用、无需在目标租户创建业务资源时，可在
+`ai_app_publish_store` 中显式启用 `RuntimeAssetsOnly=true`。
+它复用已提交的公有编译运行产物，不随商城包交付源码，也不导出发布方的表、
+接口引擎或业务数据。仅设置 `IncludeSource=false` 不会自动启用此模式。
+
+| 条件 | 要求 |
+|---|---|
+| 发布协议与类型 | 显式 `ProtocolVersion=3`、`ApplicationType=Web`、`IncludeSource=false`。 |
+| 运行产物 | `SharedPublicRuntime` 必须通过已提交版本的 `CommittedProof` 和运行清单校验。 |
+| 资源选择 | 请求中的菜单、表、接口、工作流、任务、数据、路由、页面和资源策略均为空。既有商城行的 `SelectMenu/SelectTable/SelectApiEngine/SelectData` 也必须为空；非空时拒绝发布，不会自动清除。 |
+| 包资产 | `PreparedAssets.MenuContract` 为空；不能同时使用 `DatabaseOnlyBuild`。 |
+
+下面是应合并到完整发布参数中的模式字段，不能替代应用身份、版本、资产和提交证明：
+
+```json
+{
+  "ProtocolVersion": 3,
+  "ApplicationType": "Web",
+  "RuntimeAssetsOnly": true,
+  "IncludeSource": false
+}
+```
+
+现有 MCP `microi_run_engine` 的 `params` 可直接传递这些字段。先对同一组冻结参数
+调用 `Action=InspectResourceSnapshot`，取得 `ResourceSnapshotHash`；再以
+`Action=Publish` 和对应 `ExpectedResourceSnapshotHash` 发布。
+两次调用都保留 `RuntimeAssetsOnly=true`，不能在检查后更换版本、资产、提交证明或资源选择。
+发布端须先更新到支持此开关的 `ai_app_publish_store`；不支持时不能回退成普通包发布。
+省略此开关或设为 `false` 时，仍使用原有打包流程。
+
+发布后须下载实际商城包核验：`DDLStatements`、`PhysicalColumns`、`DiyTables`、
+`DiyFields`、`DataSets`、`SysMenus`、`WfFlowDesigns`、`WfNodes`、`WfLines`、
+`SysApiEngines`、`ScheduleJobs` 全部为空；`SourceFiles` 和 `BuildAssets` 为空，
+`SourceZip`、`BuildZip` 为空，运行交付只有 `SharedPublicRuntime`。
+该模式不会迁移服务端业务；安装后的身份、接口与数据仍须按应用自身的服务契约验收。
+
 ## 安装、升级与安全
 
 - 随包数据中的固定自动编号会保留：导入器 `v2.9.8` 按目标表的 `AutoNumber` 字段元数据，
