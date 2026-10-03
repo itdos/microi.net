@@ -9,14 +9,14 @@
         <div class="microi-code-actions">
           <div class="microi-code-platform-download">
             <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows <small v-if="liveVersions.windows">v{{ liveVersions.windows }}</small></a>
-            <a class="microi-code-store-link" href="https://apps.microsoft.com/detail/9NKCS76ZMFXR" target="_blank" rel="noopener noreferrer">Microsoft Store <small>正在认证</small><span aria-hidden="true">↗</span></a>
+            <a class="microi-code-store-link" href="https://apps.microsoft.com/detail/9NKCS76ZMFXR" target="_blank" rel="noopener noreferrer">Microsoft Store <small>已发布</small><span aria-hidden="true">↗</span></a>
           </div>
           <div class="microi-code-platform-download">
             <a :href="downloadUrls.mac" target="_blank" rel="noopener"><DownloadIcon />下载 macOS <small v-if="liveVersions.mac">v{{ liveVersions.mac }}</small></a>
             <a class="microi-code-store-link" href="https://apps.apple.com/app/id6818076490" target="_blank" rel="noopener noreferrer">Mac App Store <small>等待审核</small><span aria-hidden="true">↗</span></a>
           </div>
         </div>
-        <p class="microi-code-store-note">商店入口在审核通过后开放下载；现在可使用上方官网安装包。</p>
+        <p class="microi-code-store-note">Windows 商店产品页已公开，请在 Windows 设备查看获取；Mac 商店仍等待审核。官网安装包继续可用。</p>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
