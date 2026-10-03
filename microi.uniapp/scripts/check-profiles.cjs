@@ -77,7 +77,12 @@ for (const profileId of profileIds) {
   pagePaths.forEach((pagePath) => {
     const vuePath = path.join(projectRoot, 'src', `${pagePath}.vue`)
     const nvuePath = path.join(projectRoot, 'src', `${pagePath}.nvue`)
-    check(fs.existsSync(vuePath) || fs.existsSync(nvuePath), `${profileId}: 路由缺少页面源码 ${pagePath}`)
+    check(
+      fs.existsSync(vuePath) || fs.existsSync(nvuePath) ||
+        !!findArtifact(artifacts, 'src', `${pagePath}.vue`) ||
+        !!findArtifact(artifacts, 'src', `${pagePath}.nvue`),
+      `${profileId}: 路由缺少页面源码 ${pagePath}`
+    )
   })
   check(generatedProfileSource(profile).includes(`"profileId": "${profileId}"`), `${profileId}: 配置生成失败`)
   if (activeTabBarArtifact) {
