@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-file-upload-005 sha256=9efd186d8af26854bbed4d675b31fff57202a0139094798d9a41c3e4769fd092 -->
+<!-- microi-progressive:chunk id=v8-file-upload-005 sha256=45f848d78235d8a315663fc77a2d9565b1a22791917591704040712fb56d1bee -->
 ## 公有桶 vs 私有桶
 
 ### 应用商城 ZIP
@@ -153,7 +153,7 @@ var url = V8.Method.GetPrivateFileUrl({
 - `Limit:false` 的公有文件允许通过 CDN/公有桶直接访问，不要求记录用户行为日志，也不要为了审计强制改走私有代理。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-006 sha256=8d4fedab2418c7df7973b78d4b9d6c5fa77907929d401800689cd1b5b468f32f -->
+<!-- microi-progressive:chunk id=v8-file-upload-006 sha256=2dcf2dd7a571cc4757e9015cf213191be2dc3f041d91b0de51ed8ee00b0b86e7 -->
 ## 接口直接响应文件（下载/导出）
 
 接口引擎需要在配置中开启【**响应文件**】选项，然后返回特殊结构：
@@ -204,7 +204,7 @@ return {
 注意：如果远程系统返回的是错误页、登录页、业务容器格式（例如金蝶 PLM 电子仓 `KD_C_PLM`、或其它文件头不是 `%PDF-` 的伪 PDF），不要在 V8 里伪装成 PDF。后端会返回 JSON 错误，包含 `ExpectedFirstAscii`、`ActualFirstAscii`、`ActualFirstHex`、`Length`，按这些信息排查上游下载接口。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-007 sha256=59ebcaa605d26def44cd027c0975a01fffee8670a890b4ed18b4138527be8a1b -->
+<!-- microi-progressive:chunk id=v8-file-upload-007 sha256=710eb73f616aff2ebce65a82568abe8208b701c1211a7e95ce500b1ce20b363f -->
 ## 通过 URL 列表批量下载并入库
 
 ```javascript
