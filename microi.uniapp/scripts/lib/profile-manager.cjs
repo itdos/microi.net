@@ -7,6 +7,32 @@ function profilePath(profileId, fileName) {
   return path.join(projectRoot, 'profiles', profileId, fileName)
 }
 
+function profileSourceOverrides(profileId) {
+  const root = profilePath(profileId, path.join('overrides', 'src'))
+  if (!fs.existsSync(root)) return []
+  if (!fs.lstatSync(root).isDirectory()) throw new Error(`Profile 源码覆盖目录无效: ${root}`)
+  const reserved = new Set(['pages.json', 'manifest.json', 'Info.plist', 'AndroidManifest.xml'])
+  const artifacts = []
+  function walk(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const source = path.join(directory, entry.name)
+      if (entry.isDirectory()) {
+        walk(source)
+      } else if (entry.isFile()) {
+        const relative = path.relative(root, source)
+        if (reserved.has(relative) || relative.startsWith(`generated${path.sep}`)) {
+          throw new Error(`Profile 源码覆盖了生成文件: ${source}`)
+        }
+        artifacts.push({ target: path.join(projectRoot, 'src', relative), content: fs.readFileSync(source) })
+      } else {
+        throw new Error(`Profile 源码覆盖不允许符号链接或特殊文件: ${source}`)
+      }
+    }
+  }
+  walk(root)
+  return artifacts
+}
+
 function loadProfile(profileId) {
   const source = profilePath(profileId, 'profile.cjs')
   if (!fs.existsSync(source)) {
@@ -100,6 +126,7 @@ function getProfileArtifacts(profileId) {
   const manifestSource = profilePath(profileId, 'manifest.json')
   const iosInfoPlistSource = profilePath(profileId, 'Info.plist')
   const androidManifestSource = profilePath(profileId, 'AndroidManifest.xml')
+  const androidPrivacySource = profilePath(profileId, 'androidPrivacy.json')
   const tenantSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'business.js')
   const tenantNativeTableSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'native-table.js')
   const tenantFormSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'form.js')
@@ -109,7 +136,7 @@ function getProfileArtifacts(profileId) {
   }
   const pagesContent = fs.readFileSync(pagesSource)
   const pagesConfig = JSON.parse(pagesContent.toString('utf8'))
-  return [
+  const artifacts = [
     {
       target: path.join(projectRoot, 'src', 'pages.json'),
       content: pagesContent
@@ -152,6 +179,10 @@ function getProfileArtifacts(profileId) {
       content: Buffer.from(generatedTenantRuntimeSource(profile), 'utf8')
     }
   ]
+  if (fs.existsSync(androidPrivacySource)) {
+    artifacts.push({ target: path.join(projectRoot, 'src', 'androidPrivacy.json'), content: fs.readFileSync(androidPrivacySource) })
+  }
+  return [...artifacts, ...profileSourceOverrides(profileId)]
 }
 
 function activateProfile(profileId) {
@@ -161,20 +192,26 @@ function activateProfile(profileId) {
     existed: fs.existsSync(target),
     content: fs.existsSync(target) ? fs.readFileSync(target) : null
   }))
-  artifacts.forEach(({ target, content }) => {
-    if (content === null) {
-      if (fs.existsSync(target)) fs.rmSync(target)
-      return
-    }
-    fs.mkdirSync(path.dirname(target), { recursive: true })
-    fs.writeFileSync(target, content)
-  })
-  return () => {
+  const restore = () => {
     backups.forEach(({ target, existed, content }) => {
       if (existed) fs.writeFileSync(target, content)
       else if (fs.existsSync(target)) fs.rmSync(target)
     })
   }
+  try {
+    artifacts.forEach(({ target, content }) => {
+      if (content === null) {
+        if (fs.existsSync(target)) fs.rmSync(target)
+        return
+      }
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.writeFileSync(target, content)
+    })
+  } catch (error) {
+    restore()
+    throw error
+  }
+  return restore
 }
 
 module.exports = {

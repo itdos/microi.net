@@ -1,0 +1,242 @@
+/**
+ * 系统配置缓存工具
+ * 提供 SysConfig 的获取、缓存和读取
+ */
+import { applyRuntimeSysConfig, getPlatformSysConfigResult } from './request.js'
+import appConfig from '../config.js'
+import { resolveAiAssistantEntryEnabled } from '@/platform/ai-entry-visibility.mjs'
+import { isEnabledFlag, isInviteEntryVisible, isMessageTabBarVisible } from './feature-flags.js'
+
+export { isEnabledFlag, isInviteEntryVisible, isMessageTabBarVisible } from './feature-flags.js'
+
+const CACHE_KEY = 'sys_config_cache'
+const CACHE_EXPIRE = 30 * 60 * 1000 // 缓存30分钟
+const AI_FLAG_EXPIRE = 60 * 1000
+
+let sysConfigRequest = null
+let aiFlagRequest = null
+let messageTabBarFlagRequest = null
+let inviteEntryFlagRequest = null
+let aiModelFlagRequest = null
+let aiFlagState = {
+  checkedAt: 0,
+  enabled: false
+}
+let messageTabBarFlagState = {
+  checkedAt: 0,
+  enabled: true
+}
+let inviteEntryFlagState = {
+  checkedAt: 0,
+  enabled: true
+}
+let aiModelFlagState = {
+  checkedAt: 0,
+  enabled: false
+}
+
+export function resetSysConfigRuntimeCache() {
+  sysConfigRequest = null
+  aiFlagRequest = null
+  messageTabBarFlagRequest = null
+  inviteEntryFlagRequest = null
+  aiModelFlagRequest = null
+  aiFlagState = { checkedAt: 0, enabled: false }
+  messageTabBarFlagState = { checkedAt: 0, enabled: true }
+  inviteEntryFlagState = { checkedAt: 0, enabled: true }
+  aiModelFlagState = { checkedAt: 0, enabled: false }
+  try { uni.removeStorageSync(CACHE_KEY) } catch (error) {}
+}
+
+/**
+ * 从缓存读取 SysConfig
+ */
+export function getCachedSysConfig() {
+  try {
+    const cached = uni.getStorageSync(CACHE_KEY)
+    if (cached && cached.data && cached.time) {
+      if (Date.now() - cached.time < CACHE_EXPIRE) {
+        return cached.data
+      }
+    }
+  } catch (e) {}
+  return null
+}
+
+/**
+ * 写入缓存
+ */
+function setCachedSysConfig(data) {
+  try {
+    uni.setStorageSync(CACHE_KEY, {
+      data,
+      time: Date.now()
+    })
+  } catch (e) {}
+}
+
+/**
+ * 获取 SysConfig（优先缓存，否则请求接口）
+ * @returns {Promise<Object|null>}
+ */
+export async function getSysConfig(options = {}) {
+  const refresh = options === true || (options && options.refresh === true)
+  // 先尝试读缓存
+  if (!refresh) {
+    const cached = getCachedSysConfig()
+    if (cached) {
+      applyRuntimeSysConfig(cached)
+      return cached
+    }
+  }
+
+  if (sysConfigRequest) return sysConfigRequest
+
+  // 请求接口
+  sysConfigRequest = (async () => {
+    try {
+      const result = await getPlatformSysConfigResult({
+        _SearchEqual: { IsEnable: 1 },
+        OsClient: appConfig.osClient
+      })
+      if (result.Code === 1 && result.Data) {
+        applyRuntimeSysConfig(result.Data)
+        setCachedSysConfig(result.Data)
+        return result.Data
+      }
+    } catch (e) {
+      console.log('[SysConfig] fetch error:', e.message)
+    }
+    return null
+  })()
+
+  try {
+    return await sysConfigRequest
+  } finally {
+    sysConfigRequest = null
+  }
+}
+
+/**
+ * 与 Microi.Client 共用 DisableAiAssistant 负向开关。
+ * 读取 SysConfig 失败时仍返回 false；入口显示后，角色、模型与数据权限继续由
+ * mci_ai_data_assistant Bootstrap 失败即关闭，不能仅凭入口可见发送问题。
+ */
+export async function getAiAssistantEnabled(options = {}) {
+  const force = options === true || (options && options.refresh === true)
+  const fresh = aiFlagState.checkedAt && Date.now() - aiFlagState.checkedAt < AI_FLAG_EXPIRE
+  if (!force && fresh) return aiFlagState.enabled
+  if (aiFlagRequest) return aiFlagRequest
+
+  aiFlagRequest = (async () => {
+    const config = await getSysConfig({ refresh: true })
+    const enabled = resolveAiAssistantEntryEnabled(config)
+    aiFlagState = { checkedAt: Date.now(), enabled }
+    return enabled
+  })()
+
+  try {
+    return await aiFlagRequest
+  } catch (error) {
+    aiFlagState = { checkedAt: Date.now(), enabled: false }
+    return false
+  } finally {
+    aiFlagRequest = null
+  }
+}
+
+/**
+ * 消息 TabBar 采用负向开关。配置字段缺失或请求失败时保持显示，
+ * 兼容尚未升级 Sys_Config 的既有租户。
+ */
+export async function getMessageTabBarEnabled(options = {}) {
+  const force = options === true || (options && options.refresh === true)
+  const fresh = messageTabBarFlagState.checkedAt && Date.now() - messageTabBarFlagState.checkedAt < AI_FLAG_EXPIRE
+  if (!force && fresh) return messageTabBarFlagState.enabled
+  if (messageTabBarFlagRequest) return messageTabBarFlagRequest
+
+  messageTabBarFlagRequest = (async () => {
+    const config = await getSysConfig({ refresh: true })
+    const enabled = isMessageTabBarVisible(config)
+    messageTabBarFlagState = { checkedAt: Date.now(), enabled }
+    return enabled
+  })()
+
+  try {
+    return await messageTabBarFlagRequest
+  } catch (error) {
+    messageTabBarFlagState = { checkedAt: Date.now(), enabled: true }
+    return true
+  } finally {
+    messageTabBarFlagRequest = null
+  }
+}
+
+/**
+ * “我的”页邀请入口采用负向开关；旧租户和临时网络失败均保持原行为。
+ */
+export async function getInviteEntryEnabled(options = {}) {
+  const force = options === true || (options && options.refresh === true)
+  const fresh = inviteEntryFlagState.checkedAt && Date.now() - inviteEntryFlagState.checkedAt < AI_FLAG_EXPIRE
+  if (!force && fresh) return inviteEntryFlagState.enabled
+  if (inviteEntryFlagRequest) return inviteEntryFlagRequest
+
+  inviteEntryFlagRequest = (async () => {
+    const config = await getSysConfig({ refresh: true })
+    const enabled = isInviteEntryVisible(config)
+    inviteEntryFlagState = { checkedAt: Date.now(), enabled }
+    return enabled
+  })()
+
+  try {
+    return await inviteEntryFlagRequest
+  } catch (error) {
+    inviteEntryFlagState = { checkedAt: Date.now(), enabled: true }
+    return true
+  } finally {
+    inviteEntryFlagRequest = null
+  }
+}
+
+/**
+ * AI 模型选择采用失败关闭策略：只有服务端最新配置明确开启时，
+ * 才显示运行模型、模型通道及其关联的推理选项。
+ */
+export async function getAiModelEnabled(options = {}) {
+  const force = options === true || (options && options.refresh === true)
+  const fresh = aiModelFlagState.checkedAt && Date.now() - aiModelFlagState.checkedAt < AI_FLAG_EXPIRE
+  if (!force && fresh) return aiModelFlagState.enabled
+  if (aiModelFlagRequest) return aiModelFlagRequest
+
+  aiModelFlagRequest = (async () => {
+    const config = await getSysConfig({ refresh: true })
+    const enabled = isEnabledFlag(config && config.IsShowAiModel)
+    aiModelFlagState = { checkedAt: Date.now(), enabled }
+    return enabled
+  })()
+
+  try {
+    return await aiModelFlagRequest
+  } catch (error) {
+    aiModelFlagState = { checkedAt: Date.now(), enabled: false }
+    return false
+  } finally {
+    aiModelFlagRequest = null
+  }
+}
+
+/**
+ * 获取图片服务器完整路径
+ */
+export function getServerPath(path) {
+  if (!path) return ''
+  if (path.startsWith('{')) {
+    try {
+      const obj = JSON.parse(path)
+      path = obj.Path || obj.path || ''
+    } catch (e) {}
+  }
+  if (!path) return ''
+  if (path.startsWith('http')) return path
+  return appConfig.fileServer + (path.startsWith('/') ? '' : '/') + path
+}
