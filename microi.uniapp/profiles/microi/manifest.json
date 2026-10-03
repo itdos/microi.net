@@ -1,0 +1,75 @@
+{
+  "name": "Microi吾码",
+  "appid": "__UNI__7F0A5A1",
+  "description": "Microi 吾码单品牌多租户企业应用移动工作台",
+  "versionName": "1.0.1",
+  "versionCode": "118",
+  "transformPx": false,
+  "uniStatistics": { "enable": false },
+  "app-plus": {
+    "privacy": { "prompt": "template" },
+    "distribute": {
+      "android": {
+        "permissions": [
+          "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>"
+        ]
+      },
+      "ios": {
+        "appid": "com.jima.microi",
+        "devices": "iphone",
+        "deploymentTarget": "15.0",
+        "CFBundleName": "Microi",
+        "idfa": false,
+        "ATS": {
+          "NSAppTransportSecurity": {
+            "NSAllowsArbitraryLoads": false
+          }
+        },
+        "capabilities": {
+          "plists": {
+            "NSAppTransportSecurity": {
+              "NSAllowsArbitraryLoads": false
+            }
+          }
+        },
+        "privacyDescription": {
+          "NSCameraUsageDescription": "用于用户主动拍摄表单、现场或业务附件",
+          "NSPhotoLibraryUsageDescription": "用于用户主动选择并上传图片或视频附件",
+          "NSPhotoLibraryAddUsageDescription": "用于将用户明确选择的业务图片保存到相册",
+          "NSMicrophoneUsageDescription": "用于用户主动录制业务语音或带声音的视频附件",
+          "NSLocationWhenInUseUsageDescription": "用于用户主动执行拜访、移动打卡、地图选点或现场服务",
+          "NSLocationAlwaysAndWhenInUseUsageDescription": "用于用户主动开启的外勤、拜访或现场任务在切换到后台后继续记录必要的位置；未启用相关功能时不会访问定位"
+        }
+      },
+      "icons": {
+        "ios": {
+          "appstore": "src/static/app-icons/ios/appstore.png",
+          "iphone": {
+            "app@2x": "src/static/app-icons/ios/iphone-app-2x.png",
+            "app@3x": "src/static/app-icons/ios/iphone-app-3x.png",
+            "notification@2x": "src/static/app-icons/ios/notification-2x.png",
+            "notification@3x": "src/static/app-icons/ios/notification-3x.png",
+            "settings@2x": "src/static/app-icons/ios/settings-2x.png",
+            "settings@3x": "src/static/app-icons/ios/settings-3x.png",
+            "spotlight@2x": "src/static/app-icons/ios/spotlight-2x.png",
+            "spotlight@3x": "src/static/app-icons/ios/spotlight-3x.png"
+          }
+        }
+      }
+    },
+    "modules": { "Barcode": {}, "Camera": {}, "Geolocation": {}, "Maps": {} }
+  },
+  "h5": {},
+  "mp-weixin": {
+    "appid": "",
+    "lazyCodeLoading": "requiredComponents",
+    "setting": { "urlCheck": true, "es6": true, "enhance": true, "postcss": true, "minified": true, "ignoreDevUnusedFiles": false, "compileHotReLoad": false },
+    "usingComponents": true,
+    "optimization": { "subPackages": true },
+    "permission": { "scope.userLocation": { "desc": "用于用户主动执行拜访、移动打卡、地图选点或现场服务" } },
+    "requiredPrivateInfos": ["getLocation", "chooseLocation"]
+  },
+  "vueVersion": "3"
+}

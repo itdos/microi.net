@@ -1,0 +1,17 @@
+/* Blue Suite sign-in: direct credentials on a bright native canvas. */
+.login-container { color: var(--mci-text-primary); background: var(--mci-app-canvas, #f8fafc); }
+.login-shade { display: none; }
+.login-nav { color: var(--mci-text-primary); background: #fff; border-bottom: 1rpx solid var(--mci-divider); }
+.login-nav-back { min-height: 88rpx; }.login-nav-back-icon, .login-nav-back-text { color: var(--mci-text-secondary); }
+.login-content { justify-content: flex-start; padding: 34rpx 28rpx 28rpx; }
+.logo-section { width: 100%; margin: 0 0 28rpx; align-items: center; }
+.logo-image { width: 88rpx; height: 88rpx; margin-bottom: 15rpx; border: 1rpx solid var(--mci-divider); border-radius: 24rpx; background: #fff; box-shadow: var(--mci-shadow-card); }
+.app-name { margin: 0; color: var(--mci-text-primary); font-size: 37rpx; line-height: 46rpx; font-weight: 730; }
+.app-subtitle { margin-top: 4rpx; color: var(--mci-text-secondary); font-size: 21rpx; }.logo-section::after { display: none; }
+.app-endpoint-card { width: 100%; margin: 0 0 18rpx; padding: 0; overflow: hidden; color: var(--mci-text-primary); border: 1rpx solid var(--mci-divider); border-radius: 22rpx; background: #fff; box-shadow: none; }
+.app-endpoint-summary { min-height: 84rpx; padding: 10rpx 18rpx; }.app-endpoint-title { color: var(--mci-text-primary); }.app-endpoint-current, .app-endpoint-help, .app-endpoint-label { color: var(--mci-text-secondary); }.app-endpoint-status { color: var(--mci-color-success); background: var(--mci-color-success-soft); }.app-endpoint-switch, .app-endpoint-switch-icon { color: var(--mci-color-primary); }
+.app-endpoint-editor { padding: 15rpx 18rpx 18rpx; border-top: 1rpx solid var(--mci-divider); }.app-endpoint-field { border-color: var(--mci-divider); background: var(--mci-bg-soft); }.app-endpoint-input, .app-endpoint-protocol { color: var(--mci-text-primary); }.app-endpoint-apply { color: #fff; background: var(--mci-color-primary); }
+.form-section, .auth-section { width: 100%; padding: 20rpx; box-sizing: border-box; border: 1rpx solid var(--mci-divider); border-radius: 26rpx; background: #fff; box-shadow: var(--mci-shadow-card); }
+.input-group { margin-bottom: 16rpx; }.input-wrapper { height: 92rpx; padding: 0 18rpx; border: 1rpx solid var(--mci-divider); border-radius: 18rpx; background: var(--mci-bg-soft); }.input-wrapper:focus-within { border-color: var(--mci-color-primary); background: #fff; box-shadow: 0 0 0 3rpx var(--mci-color-primary-faint); }
+.input-label { color: var(--mci-text-secondary); font-size: 20rpx; }.login-input { color: var(--mci-text-primary); }.remember-options { border-bottom: 1rpx solid var(--mci-divider); }.remember-option { color: var(--mci-text-secondary); }.remember-check--checked { border-color: var(--mci-color-primary); background: var(--mci-color-primary); }
+.account-login-btn, .mp-login-btn { height: 92rpx; border-radius: 18rpx; color: #fff; background: var(--mci-color-primary); box-shadow: 0 10rpx 24rpx var(--mci-color-primary-glow); }.privacy-section { width: 100%; margin-top: 18rpx; }.privacy-text { color: var(--mci-text-secondary); }.privacy-link { color: var(--mci-color-primary); }.check-box { border-color: var(--mci-border-color-hover); }.footer { padding-top: 10rpx; }.login-footer-text { color: var(--mci-text-tertiary); }
