@@ -16,6 +16,20 @@ function readWorkspace(relativePath) {
   return fs.readFileSync(path.join(workspaceRoot, relativePath), 'utf8')
 }
 
+test('agent release history stays at the end of the guide and preserves both platform releases', () => {
+  const guide = read('docs/doc/v8-engine/microi-agent.md')
+  const sections = [...guide.matchAll(/^## (.+)$/gm)]
+  assert.equal(sections.at(-1)?.[1], '更新日志', 'readers finish the usage guide before version history')
+  const history = guide.slice(sections.at(-1).index)
+  assert.ok(sections.at(-1).index > guide.lastIndexOf('\n:::\n'), 'history is visible outside the collapsed development guide')
+  assert.match(history, /^### v1\.3\.1 - \(2026-10-01\)$/m)
+  assert.match(history, /^### v1\.3\.0 - \(2026-10-01\)$/m)
+  assert.match(history, /^### v1\.2\.9 - \(2026-10-01\)$/m)
+  assert.match(history, /microi-agent-macos-signed-1\.2\.2/)
+  assert.match(history, /3a269fb188d526d33eb48334788e7c6a16bf20795d252ecfbace24e9d0956b63/)
+  assert.match(history, /客户 Windows 原生安装与启动仍待确认/)
+})
+
 test('homepage presents Microi as an open-source AI development framework', () => {
   const component = read('docs/.vitepress/theme/components/AiStudioHome.vue')
   const microiCodeShowcase = read('docs/.vitepress/theme/components/MicroiAgentShowcase.vue')
@@ -61,7 +75,9 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(microiCodeShowcase, /:href="downloadUrls\.windows"/)
   assert.match(microiCodeShowcase, /:href="downloadUrls\.mac"/)
   assert.match(microiCodeShowcase, /latest-mac\.yml/)
-  assert.match(microiCodeShowcase, /downloadUrls\.mac = installerFromYaml\(yaml, 'mac'\)/)
+  assert.match(microiCodeShowcase, /https:\/\/microi\.net\/download\/microi-agent\/latest\.html\?platform=windows/)
+  assert.match(microiCodeShowcase, /https:\/\/microi\.net\/download\/microi-agent\/latest\.html\?platform=mac/)
+  assert.doesNotMatch(microiCodeShowcase, /downloadUrls\.(?:windows|mac)\s*=/, 'buttons keep their permanent resolver when update labels refresh')
   const latestRedirect = read('docs/public/download/microi-agent/latest.html')
   assert.match(latestRedirect, /latest-mac\.yml/)
   assert.match(latestRedirect, /latest\.yml/)

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-03T06:09:20.476Z",
+  "generatedAt": "2026-10-03T08:32:34.727Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -3196,11 +3196,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "f7581cf45b6bfd3856d8121ae66e3f7e9f3d74d467d85da58433f82bc24f7027",
-      "originalLines": 595,
+      "originalSha256": "f1684b8aa9289cacaed583ca94dfef65169d9aea23aed42bfc6ee3d4c9b4571c",
+      "originalLines": 603,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
-      "entryLines": 263,
+      "entryLines": 271,
       "chunks": [
         {
           "id": "workspace-conventions-000",
@@ -3278,8 +3278,8 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "dc7dbe2d2f60466a7170fff65a5df8769bc795b4ab23151a24b665380d7c6e37",
-          "lines": 28,
+          "sha256": "cb0a9b2286d51e41dfd3c4249f28d4ac57b6736112be3c1f57f8eb405d0631b1",
+          "lines": 36,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },
         {
