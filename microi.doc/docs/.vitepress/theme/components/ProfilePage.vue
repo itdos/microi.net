@@ -6,7 +6,7 @@
         <span v-else class="brand-mark">{{ profileInitial }}</span>
         <span>
           <strong>{{ profileName }}</strong>
-          <small>{{ licenseShortText }}</small>
+          <small>{{ currentUser?.Account || 'Microi Account' }}</small>
         </span>
       </a>
       <nav class="side-menu">
@@ -18,20 +18,11 @@
           :class="{ active: activeMenu === item.key }"
           @click="navigateProfile(item.key)"
         >
-          <span class="menu-icon">{{ item.icon }}</span>
+          <span class="menu-icon" aria-hidden="true">{{ item.icon }}</span>
           <span>{{ item.name }}</span>
         </button>
       </nav>
-      <div class="sidebar-footer">
-        <div class="sidebar-token-card">
-          <span>{{ t('remainingToken') }}</span>
-          <strong>{{ formatTokenNumber(relayToken.RemainingTokens) }}</strong>
-          <div class="sidebar-token-track" aria-hidden="true">
-            <i :style="{ width: `${tokenUsagePercent}%` }"></i>
-          </div>
-          <small>{{ t('tokenUsedTotal', { used: formatTokenNumber(relayToken.UsedTokens), total: formatTokenNumber(relayToken.GiftTokens) }) }}</small>
-        </div>
-      </div>
+      <div class="sidebar-footer"><a href="/">← 返回官网</a><button type="button" @click="logout">退出登录</button></div>
     </aside>
 
     <main class="profile-main">
@@ -42,13 +33,13 @@
           <p class="header-desc">{{ pageDesc }}</p>
         </div>
         <div class="header-actions">
-          <a v-if="primaryTenantUrl" class="ghost-action" :href="primaryTenantUrl" target="_blank" rel="noopener">{{ t('enterBackend') }}</a>
-          <button class="primary-action" type="button" @click="refreshCenter">{{ t('refresh') }}</button>
+          <button class="ghost-action" type="button" :disabled="isLoading || licenseLoading" @click="refreshCenter">↻ {{ t('refresh') }}</button>
         </div>
       </header>
 
       <div v-if="profileNotice" class="profile-notice" :class="profileNotice.type" role="status">{{ profileNotice.message }}</div>
 
+      <p v-if="profileError" class="error-box" role="alert">{{ profileError }}</p>
       <section v-if="!isAuthed" class="state-panel">
         <h2>{{ t('loginRequired') }}</h2>
         <p>{{ t('loginRequiredDesc') }}</p>
@@ -56,78 +47,41 @@
       </section>
 
       <template v-else>
-        <section v-if="activeMenu === 'overview'" class="profile-hero">
-          <div>
-            <p class="eyebrow">Microi Account</p>
-            <h2>{{ t('overview') }}</h2>
-            <p>{{ t('overviewDesc', { name: profileName }) }}</p>
+        <section v-if="activeMenu === 'overview'" class="portal-overview">
+          <div class="welcome-card"><span class="welcome-label">YOUR WORKSPACE</span><h2>{{ profileName }}，欢迎回来</h2><p>在这里管理系统、查看授权，和朋友一起开启吾码之旅。</p><button class="primary-action" @click="navigateProfile('create')">＋ 创建新系统</button></div>
+          <div class="portal-shortcuts">
+            <button @click="navigateProfile('systems')"><span class="shortcut-icon">▦</span><strong>我的系统</strong><span>{{ tenants.length }} 个云端系统</span><small>管理系统与访问入口 →</small></button>
+            <button @click="navigateProfile('licenses')"><span class="shortcut-icon">✓</span><strong>系统授权</strong><span>个人版 · 企业版</span><small>查看帐号授权记录 →</small></button>
+            <button @click="navigateProfile('invitations')"><span class="shortcut-icon">♧</span><strong>邀请朋友</strong><span>一起使用吾码</span><small>分享链接与邀请关系 →</small></button>
           </div>
-          <article class="license-card">
-            <span>{{ t('currentLicense') }}</span>
-            <strong>{{ licenseDisplayTitle }}</strong>
-            <small>{{ licenseDisplayDesc }}</small>
-          </article>
+          <div class="portal-help"><span>需要帮助？</span><a href="/doc/system-engine/saas-engine.html">阅读使用文档 ↗</a><a href="/contact/">联系吾码 ↗</a></div>
         </section>
 
-        <section v-if="activeMenu === 'overview'" class="overview-grid">
-          <article class="stat-card">
-            <span>{{ t('tenantCreated') }}</span>
-            <strong>{{ tenants.length }}</strong>
-            <small>{{ t('freeQuota', { count: tenantDatabaseQuota }) }}</small>
-          </article>
-          <article class="stat-card">
-            <span>{{ t('freeCreate') }}</span>
-            <strong>{{ canCreateFreeTenant ? t('available') : t('used') }}</strong>
-            <small>{{ t('freeCreateTip') }}</small>
-          </article>
-          <article class="stat-card">
-            <span>{{ t('expansionPrice') }}</span>
-            <strong>¥{{ tenantCenter.NextTenantPrice || 9.9 }}</strong>
-            <small>{{ t('expansionPriceTip') }}</small>
-          </article>
-          <article class="stat-card token-stat-card">
-            <span>{{ t('relayToken') }}</span>
-            <strong>{{ formatTokenNumber(relayToken.RemainingTokens) }}</strong>
-            <small>{{ t('tokenUsedTotal', { used: formatTokenNumber(relayToken.UsedTokens), total: formatTokenNumber(relayToken.GiftTokens) }) }}</small>
-          </article>
-        </section>
-
-        <ProfileAiSummary
-          v-if="activeMenu === 'overview'"
-          compact
-          :api-key="aiApiKey"
-          :endpoint="aiApiEndpoint || 'https://api.itdos.com/v1'"
-          :total="relayToken.GiftTokens"
-          :used="relayToken.UsedTokens"
-          :remaining="relayToken.RemainingTokens"
-          :locale="locale"
-          :labels="aiSummaryLabels"
-          @copy="copyAiApiKey"
-        />
-
-        <section v-if="activeMenu === 'overview'" class="content-panel tenant-overview-panel">
-          <div class="panel-head">
-            <div>
-              <h2>{{ t('saasTenants') }}</h2>
-              <p>{{ t('tenantDesc') }}</p>
-            </div>
-            <button class="primary-action small" type="button" @click="navigateProfile('create')">{{ t('createTenant') }}</button>
-          </div>
+        <section v-if="activeMenu === 'systems'" class="content-panel tenant-overview-panel">
+          <div class="panel-head"><div><h2>云端系统</h2><p>你的专属系统与访问入口。自部署系统的授权信息可在「系统授权」查看。</p></div><button class="primary-action small" @click="navigateProfile('create')">＋ 创建系统</button></div>
           <div v-if="isLoading" class="loading-row">{{ t('loadingTenants') }}</div>
           <TenantList v-else :tenants="tenants" />
           <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="navigateProfile('create')" />
-          <div class="billing-strip">
-            <div>
-              <span>{{ t('freeCreate') }}</span>
-              <strong>{{ t('oneTenant') }}</strong>
-              <small>{{ t('freeQuotaDesc') }}</small>
-            </div>
-            <div>
-              <span>{{ t('expansionPrice') }}</span>
-              <strong>{{ t('expansionAmount', { price: tenantCenter.NextTenantPrice || 9.9 }) }}</strong>
-              <small>{{ t('expansionDesc') }}</small>
-            </div>
+        </section>
+
+        <section v-if="activeMenu === 'licenses'" class="content-panel">
+          <div class="panel-head"><div><h2>帐号的系统授权</h2><p>与吾码框架「授权记录」使用同一份记录，包含个人版和企业版。</p></div><span class="record-count">{{ licenseTotal }} 条记录</span></div>
+          <p v-if="licenseError" class="error-box" role="alert">{{ licenseError }}</p>
+          <p v-else-if="licenseLoading" class="loading-row">正在读取授权记录…</p>
+          <div v-else-if="licenses.length" class="license-records">
+            <article v-for="record in licenses" :key="record.Id" class="license-record">
+              <div class="license-record-heading"><span class="system-symbol">▦</span><div><h3>{{ record.Company || record.Name || '吾码系统' }}</h3><p>{{ record.ProductType === 'Enterprise' ? '企业版' : record.ProductType === 'Personal' ? '个人版' : record.ProductType || record.LicenseType || '系统授权' }}</p></div><span class="license-status" :class="{ valid: licenseStatus(record) === '已授权' }">{{ licenseStatus(record) }}</span></div>
+              <dl><div><dt>系统标识</dt><dd>{{ record.HID || '—' }}</dd></div><div><dt>授权到期</dt><dd>{{ record.ExpirationDate || '—' }}</dd></div><div><dt>更新服务到期</dt><dd>{{ record.UpdateExpirationDate || '—' }}</dd></div><div><dt>申请时间</dt><dd>{{ record.CreateTime || '—' }}</dd></div></dl>
+              <p v-if="record.RejectReason && record.Status === 'Rejected'" class="error-box">{{ record.RejectReason }}</p>
+            </article>
           </div>
+          <div v-else class="portal-empty"><span>✓</span><h3>暂无授权记录</h3><p>在你的吾码系统「授权记录」提交申请后，可以在这里查看进度。</p></div>
+          <div v-if="licenseTotal > 20" class="portal-pagination"><button :disabled="licenseLoading || licensePage <= 1" @click="loadLicenses(licensePage - 1)">上一页</button><span>{{ licensePage }} / {{ Math.ceil(licenseTotal / 20) }}</span><button :disabled="licenseLoading || licensePage * 20 >= licenseTotal" @click="loadLicenses(licensePage + 1)">下一页</button></div>
+        </section>
+
+        <section v-if="activeMenu === 'invitations'" class="invitation-page">
+          <article class="content-panel invitation-share"><div><span class="welcome-label">GROW TOGETHER</span><h2>邀请朋友，一起创造</h2><p>朋友通过链接完成注册后，会自动出现在你的邀请关系中。</p></div><div class="invitation-link"><input :value="invitationLink" readonly aria-label="我的邀请链接" /><button class="primary-action" @click="copyInvitationLink">复制链接</button></div></article>
+          <article class="content-panel"><div class="panel-head"><div><h2>我的邀请关系</h2><p>展开节点查看下级邀请，注册时间与最后登录官网时间独立展示。</p></div></div><div class="invitation-root"><img v-if="profileAvatarUrl" :src="profileAvatarUrl" alt="" /><span v-else class="root-avatar">{{ profileInitial }}</span><div><strong>{{ profileName }}</strong><small>{{ currentUser.Account }} · 我</small></div></div><InvitationTree :key="invitationRefreshKey" :parent-id="String(currentUser.Id)" :load-children="loadInvitationChildren" /></article>
         </section>
 
         <section v-if="activeMenu === 'create'" class="content-grid">
@@ -168,7 +122,7 @@
                 <p>{{ tenantProgress || tenantStepSummary }}</p>
               </div>
             </div>
-            <div class="step-list">
+            <details class="progress-details" :open="isCreating"><summary>{{ isCreating ? '正在开通你的系统' : '查看开通步骤' }}</summary><div class="step-list">
               <div v-for="(step, index) in tenantSteps" :key="step.Key" class="step-item" :class="step.Status">
                 <span>{{ index + 1 }}</span>
                 <div>
@@ -178,7 +132,7 @@
                   <small>{{ step.Detail }}</small>
                 </div>
               </div>
-            </div>
+            </div></details>
           </div>
         </section>
 
@@ -221,7 +175,7 @@
             @token-refreshed="handleAiTokenRefreshed"
             @refresh-quota="refreshAiAfterChat"
           />
-          <ProfileAiSummary
+          <details class="portal-detail"><summary>接入信息与 Token 额度</summary><ProfileAiSummary
             :api-key="aiApiKey"
             :endpoint="aiApiEndpoint || 'https://api.itdos.com/v1'"
             :total="relayToken.GiftTokens"
@@ -231,7 +185,8 @@
             :labels="aiSummaryLabels"
             @copy="copyAiApiKey"
           />
-          <h3 class="usage-section-title">{{ t('usageRecords') }}</h3>
+          </details>
+          <details class="portal-detail"><summary>{{ t('usageRecords') }}</summary>
           <div class="usage-table-wrap">
             <table class="usage-table">
               <thead><tr><th>{{ t('time') }}</th><th>{{ t('model') }}</th><th>{{ t('promptPreview') }}</th><th>{{ t('input') }}</th><th>{{ t('output') }}</th><th>{{ t('deduction') }}</th><th>{{ t('remaining') }}</th><th>{{ t('source') }}</th></tr></thead>
@@ -259,7 +214,8 @@
             <strong>{{ aiUsagePageIndex }} / {{ aiUsageTotalPages }}</strong>
             <button type="button" :disabled="aiUsageLoading || aiUsagePageIndex >= aiUsageTotalPages" @click="goAiUsagePage(aiUsagePageIndex + 1)">{{ t('nextPage') }}</button>
           </div>
-          <h3 class="usage-section-title recharge-title">{{ t('rechargeRecords') }}</h3>
+          </details>
+          <details class="portal-detail"><summary>{{ t('rechargeRecords') }}</summary>
           <div class="usage-table-wrap">
             <table class="usage-table">
               <thead><tr><th>{{ t('time') }}</th><th>{{ t('rechargeAmount') }}</th><th>{{ t('afterTotal') }}</th><th>{{ t('afterRemaining') }}</th><th>{{ t('rechargeType') }}</th><th>{{ t('status') }}</th><th>{{ t('source') }}</th><th>{{ t('remark') }}</th></tr></thead>
@@ -287,9 +243,9 @@
             <strong>{{ rechargePageIndex }} / {{ rechargeTotalPages }}</strong>
             <button type="button" :disabled="rechargeLoading || rechargePageIndex >= rechargeTotalPages" @click="goRechargePage(rechargePageIndex + 1)">{{ t('nextPage') }}</button>
           </div>
+          </details>
         </section>
 
-        <p v-if="profileError" class="page-error">{{ profileError }}</p>
       </template>
     </main>
 
@@ -361,6 +317,8 @@
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import ProfileAiChat from './ProfileAiChat.vue'
 import ProfileAiSummary from './ProfileAiSummary.vue'
+import InvitationTree from './InvitationTree.vue'
+import { buildSiteSessionHeaders, getOrCreateSiteDid } from '../utils/site-session.js'
 import { getInitialProfileLocale, normalizeProfileLocale, translateProfile } from '../profile-i18n'
 import { createOpenClawAuthBridge, isOpenClawBridgeMode } from '../openclaw-auth-bridge'
 import { resolveSiteApiBase } from '../utils/site-api-base.js'
@@ -386,6 +344,7 @@ const profileError = ref('')
 const profileNotice = ref(null)
 const profileDraftName = ref('')
 const profileDraftAvatar = ref('')
+const profileAvatarChanged = ref(false)
 const profileDraftPreview = ref('')
 const profileFileInput = ref(null)
 const isSavingProfile = ref(false)
@@ -441,13 +400,16 @@ const tenantCredentialDeliveryIds = new Map()
 
 const menus = computed(() => [
   { key: 'overview', name: t('overview'), icon: '⌂' },
+  { key: 'systems', name: '我的系统', icon: '▦' },
   { key: 'create', name: t('createTenant'), icon: '+' },
+  { key: 'licenses', name: '系统授权', icon: '✓' },
+  { key: 'invitations', name: '邀请关系', icon: '♧' },
   { key: 'ai', name: t('aiRelay'), icon: 'AI' },
   { key: 'account', name: t('account'), icon: '◉' }
 ])
 
-const menuKeys = ['overview', 'create', 'ai', 'account']
-const routeAliases = { tenants: 'overview', billing: 'overview' }
+const menuKeys = ['overview', 'systems', 'create', 'licenses', 'invitations', 'ai', 'account']
+const routeAliases = { tenants: 'systems', billing: 'licenses' }
 
 const tenantStepMessages = {
   'zh-CN': [
@@ -480,7 +442,7 @@ const canCreateFreeTenant = computed(() => tenantUsedQuota.value < tenantDatabas
 const primaryTenantUrl = computed(() => tenants.value[0]?.Url || '')
 const profileName = computed(() => currentUser.value?.Name || currentUser.value?.NickName || currentUser.value?.Account || 'Microi吾码')
 const profileInitial = computed(() => String(profileName.value || 'M').trim().slice(0, 1).toUpperCase())
-const profileAvatarUrl = computed(() => normalizeAvatarUrl(currentUser.value?.Avatar || currentUser.value?.HeadImgUrl || currentUser.value?.HeadImg || currentUser.value?.AvatarUrl))
+const profileAvatarUrl = computed(() => normalizeAvatarUrl(currentUser.value?.PublicAvatar || currentUser.value?.Avatar || currentUser.value?.HeadImgUrl || currentUser.value?.HeadImg || currentUser.value?.AvatarUrl))
 const profileDraftAvatarUrl = computed(() => profileDraftPreview.value || normalizeAvatarUrl(profileDraftAvatar.value) || profileAvatarUrl.value)
 const avatarStyles = computed(() => locale.value === 'en-US'
   ? [{ key: 'professional', label: 'Professional' }, { key: 'anime', label: 'Anime' }, { key: '3d', label: '3D' }, { key: 'watercolor', label: 'Watercolor' }]
@@ -512,7 +474,10 @@ const licenseDisplayTitle = computed(() => licenseInfo.value.title)
 const licenseDisplayDesc = computed(() => licenseInfo.value.desc)
 const pageTitle = computed(() => {
   const map = {
-    overview: t('overview'),
+    overview: '账户概览',
+    systems: '我的系统',
+    licenses: '系统授权',
+    invitations: '邀请关系',
     create: t('createTenant'),
     ai: t('aiRelay'),
     account: t('account')
@@ -522,7 +487,8 @@ const pageTitle = computed(() => {
 const pageDesc = computed(() => {
   if (!isAuthed.value) return t('loginPageDesc')
   if (activeMenu.value === 'create') return t('createPageDesc')
-  return t('pageDesc', { name: profileName.value })
+  const descriptions = { overview: '你的系统、授权与邀请，一个清晰的工作空间。', systems: '管理你已创建的云端系统。', licenses: '查看这个帐号的全部系统授权和申请进度。', invitations: '分享吾码，查看你的多级邀请关系。', ai: '专注对话和创作，按需查看使用记录。', account: '管理公开资料与账户设置。' }
+  return descriptions[activeMenu.value] || t('pageDesc', { name: profileName.value })
 })
 const aiSummaryLabels = computed(() => ({ title: t('aiTitle'), desc: t('aiDesc'), copy: t('copyApiKey'), apiBase: t('apiBase'), apiKey: t('apiKey'), generating: t('generating'), total: t('totalToken'), used: t('usedToken'), remaining: t('remainingToken') }))
 const tenantStepSummary = computed(() => {
@@ -770,14 +736,16 @@ function normalizeAvatarUrl(value) {
   if (!url) return ''
   if (/^(https?:|data:|blob:)/i.test(url)) return url
   if (url.startsWith('//')) return `https:${url}`
-  if (url.startsWith('/')) return `${API_BASE}${url}`
-  return `${API_BASE}/${url.replace(/^\.?\//, '')}`
+  const fileServer = typeof window === 'undefined' ? API_BASE : localStorage.getItem('microi_doc_public_file_server') || API_BASE
+  if (url.startsWith('/')) return `${fileServer.replace(/\/+$/, '')}${url}`
+  return `${fileServer.replace(/\/+$/, '')}/${url.replace(/^\.?\//, '')}`
 }
 
 function syncProfileDraft() {
   profileDraftName.value = String(currentUser.value?.Name || currentUser.value?.NickName || currentUser.value?.Account || '').trim()
-  profileDraftAvatar.value = String(currentUser.value?.Avatar || currentUser.value?.HeadImgUrl || currentUser.value?.HeadImg || currentUser.value?.AvatarUrl || '').trim()
+  profileDraftAvatar.value = String(currentUser.value?.PublicAvatar || currentUser.value?.Avatar || currentUser.value?.HeadImgUrl || currentUser.value?.HeadImg || currentUser.value?.AvatarUrl || '').trim()
   profileDraftPreview.value = ''
+  profileAvatarChanged.value = false
 }
 
 async function uploadProfileAvatar(file) {
@@ -787,7 +755,7 @@ async function uploadProfileAvatar(file) {
   try {
     const form = new FormData()
     form.append('file', file, file.name || `avatar-${Date.now()}.jpg`)
-    form.append('Path', 'member/avatar')
+    form.append('Path', 'member/public-avatar')
     form.append('Limit', 'false')
     form.append('Preview', 'true')
     form.append('OsClient', OS_CLIENT)
@@ -796,6 +764,7 @@ async function uploadProfileAvatar(file) {
     if (!response.ok || Number(result?.Code) !== 1) throw new Error(result?.Msg || t('avatarUploadFailed'))
     const path = String(result?.Data?.Path || result?.Data?.FilePathName || '').trim()
     if (!path) throw new Error(t('avatarUploadFailed'))
+    profileAvatarChanged.value = true
     profileDraftAvatar.value = path
     profileDraftPreview.value = normalizeAvatarUrl(path)
     return path
@@ -879,11 +848,11 @@ async function saveProfile() {
   try {
     const response = await authenticatedFetch(`${API_BASE}/apiengine/platform-user-update-profile?OsClient=${OS_CLIENT}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Name: name, Avatar: profileDraftAvatar.value })
+      body: JSON.stringify({ Name: name, ...(profileAvatarChanged.value ? { PublicAvatar: profileDraftAvatar.value } : {}) })
     })
     const result = await response.json()
     if (!response.ok || Number(result?.Code) !== 1) throw new Error(result?.Msg || t('profileSaveFailed'))
-    currentUser.value = result.Data || { ...currentUser.value, Name: name, Avatar: profileDraftAvatar.value }
+    currentUser.value = result.Data || { ...currentUser.value, Name: name, ...(profileAvatarChanged.value ? { PublicAvatar: profileDraftAvatar.value } : {}) }
     localStorage.setItem('microi_doc_user', JSON.stringify(currentUser.value))
     syncProfileDraft()
     window.dispatchEvent(new CustomEvent('microi-login-success'))
@@ -898,7 +867,7 @@ async function saveProfile() {
 function syncMenuFromHash() {
   if (typeof window === 'undefined') return
   const nextKey = normalizeProfileRoute(window.location.hash)
-  if (nextKey !== 'overview') clearAllTenantAdminCredentials()
+  if (nextKey !== 'systems') clearAllTenantAdminCredentials()
   activeMenu.value = nextKey
   if (nextKey === 'create') {
     restoreActiveTenantProgress()
@@ -910,7 +879,7 @@ function syncMenuFromHash() {
 
 function navigateProfile(key) {
   const nextKey = normalizeProfileRoute(key)
-  if (nextKey !== 'overview') clearAllTenantAdminCredentials()
+  if (nextKey !== 'systems') clearAllTenantAdminCredentials()
   activeMenu.value = nextKey
   if (typeof window !== 'undefined') {
     const nextHash = `#/${nextKey}`
@@ -947,10 +916,9 @@ function syncAuthTokenFromResponse(response) {
 }
 
 async function authenticatedFetch(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: { ...(options.headers || {}), ...authHeaders() }
-  })
+  const headers = { ...buildSiteSessionHeaders({ token: authToken.value, osClient: OS_CLIENT, did: getOrCreateSiteDid() }), ...(url.includes('/apiengine/') ? { apiengine: '1' } : {}), ...(options.headers || {}), ...authHeaders() }
+  if (typeof FormData !== 'undefined' && options.body instanceof FormData) delete headers['Content-Type']
+  const response = await fetch(url, { ...options, headers })
   syncAuthTokenFromResponse(response)
   return response
 }
@@ -1178,7 +1146,7 @@ async function refreshCenter() {
       localStorage.setItem('microi_doc_tenant', tenants.value[0].OsClient || '')
       localStorage.setItem('microi_doc_tenant_url', tenants.value[0].Url || '')
     }
-    await Promise.all([refreshRelayTokenSummary(), refreshAiApiKey(), refreshAiUsage(), refreshRechargeLogs()])
+    await refreshActivePage()
     return true
   } catch {
     profileError.value = t('networkFailed')
@@ -1187,6 +1155,44 @@ async function refreshCenter() {
     isLoading.value = false
   }
 }
+
+const licenses = ref([]), licenseTotal = ref(0), licensePage = ref(1), licenseLoading = ref(false), licenseError = ref('')
+const invitationRefreshKey = ref(0)
+const invitationLink = computed(() => typeof window === 'undefined' ? '' : `${window.location.origin}/login.html?tab=register&invite=${encodeURIComponent(currentUser.value?.Id || '')}`)
+async function portalRequest(key, params = {}) {
+  const response = await authenticatedFetch(apiEngineUrl(key), { method: 'POST', body: JSON.stringify(params) })
+  const result = await response.json()
+  if (isSessionExpiredResult(result)) { handleSessionExpired(); throw new Error('登录已过期，请重新登录。') }
+  if (!response.ok || Number(result.Code) !== 1) throw new Error(result.Msg || '读取失败，请稍后重试。')
+  return result.Data || {}
+}
+async function loadLicenses(page = 1) {
+  if (!isAuthed.value || licenseLoading.value) return
+  licenseLoading.value = true; licenseError.value = ''
+  try { const data = await portalRequest('official_account_licenses', { PageIndex: page }); licenses.value = data.Records || []; licenseTotal.value = data.Total || 0; licensePage.value = page }
+  catch (error) { licenseError.value = error.message }
+  finally { licenseLoading.value = false }
+}
+function licenseStatus(record) {
+  if (Number(record.Revoked) === 1) return '已撤销'
+  if (record.Status === 'Rejected') return '未通过'
+  if (record.Status !== 'Issued') return '待审核'
+  const expiry = Date.parse(String(record.ExpirationDate || '').replace(/-/g, '/'))
+  if (Number.isFinite(expiry) && expiry < Date.now()) return '已到期'
+  return '已授权'
+}
+async function loadInvitationChildren(parentId, page = 1) {
+  const data = await portalRequest('official_account_invitations', { ParentId: parentId, PageIndex: page })
+  data.Nodes = (data.Nodes || []).map(node => ({ ...node, Avatar: normalizeAvatarUrl(node.Avatar) }))
+  return data
+}
+async function refreshActivePage() {
+  if (!isAuthed.value) return
+  if (activeMenu.value === 'licenses') await loadLicenses()
+  else if (activeMenu.value === 'invitations') invitationRefreshKey.value++
+  else if (activeMenu.value === 'ai') await Promise.all([refreshRelayTokenSummary(), refreshAiApiKey(), refreshAiUsage(), refreshRechargeLogs()])
+}
+watch(activeMenu, () => { void refreshActivePage() })
 
 async function refreshRelayTokenSummary() {
   if (!isAuthed.value) return
@@ -1330,6 +1336,11 @@ function rechargeStatusText(value) {
 function formatSignedToken(value) {
   const amount = Number(value || 0)
   return `${amount > 0 ? '+' : ''}${formatTokenNumber(amount)}`
+}
+
+async function copyInvitationLink() {
+  const copied = await copyTextValue(invitationLink.value)
+  showProfileNotice(copied ? 'success' : 'error', copied ? '邀请链接已复制。' : t('copyFailed'))
 }
 
 async function copyAiApiKey() {
@@ -1707,14 +1718,14 @@ async function createTenant() {
   let keepPollingAfterRequestError = false
   startTenantProgress(traceId)
   try {
-    const resp = await authenticatedFetch(`${API_BASE}/api/BackgroundTask/RunApiEngine`, {
+    const resp = await authenticatedFetch(apiEngineUrl('platform-background-task'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', osclient: OS_CLIENT },
       body: JSON.stringify({
         OsClient: OS_CLIENT,
-        // 先进入兼容提交器，再由其内部调用 StopHttp=1 的 worker。这样当前已部署
-        // 后端与未来支持 TrustedServerInvocation 的后端都能安全执行。
-        TargetApiEngineKey: 'official_create_tenant',
+        Action: 'RunApiEngine',
+        // 持久任务的目标必须与开通原子校验的工作器 Key 一致。
+        TargetApiEngineKey: 'official_create_tenant_worker',
         Title: t('createTenant'),
         Param: {
           TenantKey: tenantKey.value,
@@ -1846,7 +1857,7 @@ async function pollTenantProgress(traceId) {
       tenantKey.value = ''
       systemName.value = ''
       await refreshCenter()
-      navigateProfile('overview')
+      navigateProfile('systems')
       stopTenantProgress()
       isCreating.value = false
       return
@@ -3273,7 +3284,7 @@ onUnmounted(() => {
   color: #e2e8f0;
 }
 
-:global(.dark) .star-reminder-dialog {
+:global(.dark .star-reminder-dialog){
   border-color: rgba(251, 146, 60, 0.24);
   background:
     radial-gradient(circle at 86% 8%, rgba(251, 146, 60, 0.14), transparent 34%),
@@ -3281,45 +3292,45 @@ onUnmounted(() => {
   color: #e5e7eb;
 }
 
-:global(.dark) .star-policy-notice {
+:global(.dark .star-policy-notice){
   border-color: rgba(251, 146, 60, 0.24);
   background: linear-gradient(135deg, rgba(124, 45, 18, 0.24), rgba(17, 24, 39, 0.72));
 }
 
-:global(.dark) .star-policy-notice strong {
+:global(.dark .star-policy-notice strong){
   color: #fdba74;
 }
 
-:global(.dark) .star-policy-notice p {
+:global(.dark .star-policy-notice p){
   color: #cbd5e1;
 }
 
-:global(.dark) .star-reminder-dialog h2 {
+:global(.dark .star-reminder-dialog h2){
   color: #f8fafc;
 }
 
-:global(.dark) .star-reminder-description,
-:global(.dark) .star-reminder-thanks {
+:global(.dark .star-reminder-description),
+:global(.dark .star-reminder-thanks){
   color: #cbd5e1;
 }
 
-:global(.dark) .star-reminder-status {
+:global(.dark .star-reminder-status){
   background: rgba(239, 68, 68, 0.12);
   color: #fca5a5;
 }
 
-:global(.dark) .star-project-link {
+:global(.dark .star-project-link){
   border-color: rgba(251, 146, 60, 0.25);
   background: rgba(251, 146, 60, 0.1);
   color: #fb923c;
 }
 
-:global(.dark) .star-reminder-close {
+:global(.dark .star-reminder-close){
   background: rgba(148, 163, 184, 0.12);
   color: #cbd5e1;
 }
 
-:global(.dark) .star-reminder-cancel {
+:global(.dark .star-reminder-cancel){
   color: #94a3b8;
 }
 
@@ -3461,4 +3472,140 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 }
+/* Account workspace: restrained surfaces, clear hierarchy and compact navigation. */
+.profile-page { --portal-bg: #f7f8fa; --portal-surface: #fff; --portal-text: #182230; --portal-muted: #667085; --portal-line: #e8ecf1; min-height: 100vh; grid-template-columns: 224px minmax(0,1fr); background: var(--portal-bg); color: var(--portal-text); }
+.profile-sidebar { background: var(--portal-surface); color: var(--portal-text); border-right: 1px solid var(--portal-line); padding: 32px 20px; }
+.brand { color: var(--portal-text); gap: 12px; margin-bottom: 36px; }
+.brand strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.brand small { color: var(--portal-muted); font-size: 11px; }
+.brand-mark, .brand-avatar-img { width: 40px; height: 40px; border-radius: 50%; background: #eef3ff; color: #2563eb; border: none; }
+.side-menu { gap: 5px; }
+.side-menu-item { min-height: 44px; padding: 10px 12px; border-radius: 8px; color: var(--portal-muted); background: transparent; font-size: 14px; font-weight: 500; border: none; }
+.side-menu-item:hover { color: var(--portal-text); background: var(--portal-bg); }
+.side-menu-item.active { color: #2563eb; background: #eef3ff; box-shadow: none; }
+.menu-icon { width: 24px; color: inherit; background: transparent; font-size: 19px; }
+.sidebar-footer { margin-top: auto; border-top: 1px solid var(--portal-line); padding-top: 24px; display: grid; gap: 16px; font-size: 12px; color: var(--portal-muted); }
+.sidebar-footer button, .sidebar-footer a { text-align: left; color: inherit; }
+.profile-main { padding: 48px clamp(24px,4vw,72px); max-width: 1500px; min-width: 0; width: 100%; }
+.profile-header { margin-bottom: 32px; align-items: center; }
+.eyebrow { color: var(--portal-muted); font-size: 10px; letter-spacing: .14em; font-weight: 500; margin-bottom: 8px; }
+.profile-header h1 { font-size: 28px; font-weight: 600; letter-spacing: -.04em; line-height: 1.3; }
+.header-desc { color: var(--portal-muted); font-size: 13px; margin-top: 10px; }
+.primary-action { background: #2563eb; color: #fff; border: 1px solid #2563eb; border-radius: 7px; box-shadow: none; padding: 10px 18px; font-size: 13px; font-weight: 500; }
+.primary-action:hover { background: #1d4ed8; transform: none; box-shadow: none; }
+.ghost-action { background: var(--portal-surface); color: var(--portal-muted); border: 1px solid var(--portal-line); border-radius: 7px; box-shadow: none; padding: 9px 14px; font-size: 13px; }
+.content-panel, .state-panel { background: var(--portal-surface); border: 1px solid var(--portal-line); border-radius: 12px; box-shadow: none; padding: 28px; }
+.content-panel h2, .panel-head h2 { font-size: 17px; font-weight: 600; color: var(--portal-text); }
+.content-panel p, .panel-head p, .account-intro { color: var(--portal-muted); font-size: 13px; line-height: 1.7; }
+.portal-overview { display: grid; gap: 24px; }
+.welcome-card { background: var(--portal-surface); border: 1px solid var(--portal-line); border-radius: 12px; padding: 40px; }
+.welcome-label { color: #2563eb; font-size: 10px; font-weight: 600; letter-spacing: .15em; }
+.welcome-card h2 { font-size: clamp(22px,3vw,30px); font-weight: 600; letter-spacing: -.04em; margin: 12px 0; }
+.welcome-card p { color: var(--portal-muted); font-size: 14px; margin-bottom: 28px; }
+.portal-shortcuts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
+.portal-shortcuts button { display: flex; flex-direction: column; align-items: start; gap: 10px; text-align: left; background: var(--portal-surface); border: 1px solid var(--portal-line); border-radius: 12px; padding: 26px; transition: border-color .15s; }
+.portal-shortcuts button:hover { border-color: #93b4fa; }
+.shortcut-icon { color: #2563eb; font-size: 24px; margin-bottom: 8px; }
+.portal-shortcuts strong { font-size: 16px; font-weight: 600; }
+.portal-shortcuts span:not(.shortcut-icon), .portal-shortcuts small { color: var(--portal-muted); font-size: 12px; }
+.portal-shortcuts small { padding-top: 14px; }
+.portal-help { display: flex; gap: 24px; font-size: 12px; color: var(--portal-muted); padding: 8px 0; flex-wrap: wrap; }
+.portal-help a { color: #2563eb; }
+.content-grid { grid-template-columns: minmax(0,1.2fr) minmax(0,1fr); align-items: start; gap: 24px; }
+.form-row input, .account-form input { background: var(--portal-bg); border: 1px solid var(--portal-line); color: var(--portal-text); border-radius: 7px; box-shadow: none; height: 44px; font-size: 14px; }
+.form-row label { font-size: 13px; font-weight: 500; }
+.form-row small { color: var(--portal-muted); font-size: 11px; }
+.star-policy-notice { background: var(--portal-bg); border-color: var(--portal-line); border-radius: 8px; }
+.star-policy-notice__icon { color: #d18a20; background: transparent; }
+.star-policy-notice strong { font-size: 12px; color: var(--portal-text); }
+.star-policy-notice p { font-size: 11px; color: var(--portal-muted); }
+.progress-details summary { cursor: pointer; color: #2563eb; font-size: 13px; padding: 8px 0; }
+.step-list { gap: 14px; padding-top: 22px; }
+.step-item { padding: 0; border: none; background: transparent; gap: 14px; }
+.step-item > span { width: 26px; height: 26px; border-radius: 50%; font-size: 11px; }
+.step-item strong { font-size: 12px; font-weight: 500; }
+.step-item small, .step-wait-notice, .step-elapsed { font-size: 10px; }
+/* 子组件也消费个人中心主题，避免实际已有租户时仍露出旧橙色卡片和低对比文字。 */
+.profile-page :deep(.tenant-card) { background: var(--portal-bg); border: 1px solid var(--portal-line); border-radius: 10px; box-shadow: none; }
+.profile-page :deep(.tenant-title-block small) { color: var(--portal-muted); }
+.profile-page :deep(.tenant-open) { background: #2563eb; color: #fff; box-shadow: none; }
+.profile-page :deep(.tenant-domain), .profile-page :deep(.tenant-password-tip) { background: var(--portal-bg); border-color: var(--portal-line); color: var(--portal-text); }
+.profile-page :deep(.tenant-password-tip b) { color: var(--portal-text); }
+.profile-page :deep(.tenant-password-tip small) { color: var(--portal-muted); }
+.dark .profile-page :deep(.tenant-card), .dark .profile-page :deep(.tenant-domain), .dark .profile-page :deep(.tenant-password-tip) { background: var(--portal-bg); border-color: var(--portal-line); color: var(--portal-text); }
+.dark .profile-page :deep(.tenant-domain a) { color: #9bb6ff; }
+.dark .profile-page :deep(.tenant-password-tip b) { color: var(--portal-text); }
+.dark .profile-page :deep(.tenant-password-tip small) { color: var(--portal-muted); }
+.invitation-page { display: grid; gap: 24px; }
+.invitation-share { display: grid; grid-template-columns: 1fr; gap: 24px; }
+.invitation-share h2 { margin-top: 10px; }
+.invitation-link { display: flex; gap: 12px; }
+.invitation-link input { min-width: 0; flex: 1; background: var(--portal-bg); color: var(--portal-muted); border: 1px solid var(--portal-line); border-radius: 7px; padding: 12px 16px; font-size: 13px; }
+.invitation-root { display: flex; gap: 12px; align-items: center; padding: 16px 0 24px; border-bottom: 1px solid var(--portal-line); }
+.invitation-root img, .root-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #eef3ff; }
+.root-avatar { display: grid; place-items: center; color: #2563eb; }
+.invitation-root strong, .invitation-root small { display: block; }
+.invitation-root strong { font-size: 14px; font-weight: 600; }
+.invitation-root small { color: var(--portal-muted); font-size: 12px; margin-top: 3px; }
+.record-count { font-size: 12px; color: var(--portal-muted); }
+.license-records { display: grid; gap: 16px; }
+.license-record { padding: 22px; background: var(--portal-bg); border: 1px solid var(--portal-line); border-radius: 9px; }
+.license-record-heading { display: flex; align-items: center; gap: 14px; }
+.system-symbol { color: #2563eb; font-size: 24px; }
+.license-record h3 { font-size: 15px; margin: 0; font-weight: 600; }
+.license-record p { margin: 4px 0 0; font-size: 12px; }
+.license-status { margin-left: auto; font-size: 11px; border-radius: 4px; padding: 4px 8px; color: var(--portal-muted); background: var(--portal-surface); }
+.license-status.valid { color: #066a4c; background: #e9f8f1; }
+.license-record dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; padding-top: 22px; margin: 0; }
+.license-record dt { font-size: 11px; color: var(--portal-muted); }
+.license-record dd { margin: 4px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+.portal-empty { padding: 48px 16px; text-align: center; color: var(--portal-muted); }
+.portal-empty > span { font-size: 32px; color: var(--portal-muted); }
+.portal-empty h3 { font-size: 15px; margin: 14px 0 8px; font-weight: 500; }
+.portal-empty p { font-size: 12px; }
+.portal-pagination { display: flex; gap: 20px; justify-content: end; align-items: center; margin-top: 24px; font-size: 12px; }
+.portal-pagination button { padding: 8px 12px; border: 1px solid var(--portal-line); border-radius: 6px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid #2563eb; outline-offset: 4px; }
+:global(.dark .profile-page){ --portal-bg: #11151b; --portal-surface: #191f28; --portal-text: #e7ecf4; --portal-muted: #99a5b8; --portal-line: #2b3340; background: var(--portal-bg); color: var(--portal-text); }
+:global(.dark .profile-sidebar), :global(.dark .content-panel), :global(.dark .welcome-card), :global(.dark .portal-shortcuts button){ background: var(--portal-surface); border-color: var(--portal-line); color: var(--portal-text); }
+:global(.dark .brand), :global(.dark .profile-header h1), :global(.dark .content-panel h2){ color: var(--portal-text); }
+:global(.dark .side-menu-item.active){ background: #23314b; color: #86aefe; }
+:global(.dark .profile-page .system-symbol){ color: #9bb6ff; }
+:global(.dark .profile-page .license-status.valid){ color: #a3e7cb; background: #163b2e; }
+@media(max-width: 1100px) { .profile-page { grid-template-columns: 196px minmax(0,1fr); } .profile-main { padding: 32px 24px; } .portal-shortcuts { gap: 12px; } .portal-shortcuts button { padding: 20px; } .content-grid { grid-template-columns: 1fr; } }
+@media(max-width: 760px) { .profile-page { display: block; } .profile-sidebar { position: static; height: auto; padding: 20px 18px 14px; border-right: none; border-bottom: 1px solid var(--portal-line); } .brand { margin-bottom: 20px; } .side-menu { display: flex; flex-direction: row; overflow-x: auto; padding-bottom: 4px; gap: 6px; } .side-menu-item { flex: 0 0 auto; min-height: 38px; padding: 8px 12px; font-size: 12px; } .menu-icon { display: none; } .sidebar-footer { display: none; } .profile-main { padding: 28px 18px; } .profile-header { gap: 12px; margin-bottom: 24px; } .profile-header h1 { font-size: 24px; } .header-desc { font-size: 12px; } .header-actions { flex-shrink: 0; } .welcome-card, .content-panel { padding: 24px; } .welcome-card p { line-height: 1.8; } .portal-shortcuts { grid-template-columns: 1fr; } .portal-shortcuts button { display: grid; grid-template-columns: 32px 1fr; gap: 8px 12px; padding: 20px; } .shortcut-icon { grid-row: span 3; margin: 0; } .portal-shortcuts small { padding-top: 4px; } .invitation-link { flex-direction: column; } .license-record dl { grid-template-columns: 1fr; } .portal-help { gap: 16px; } }
+
+
+.profile-page .primary-action { background: #2563eb; border-color: #2563eb; color: #fff; }
+:global(.dark .profile-page .welcome-label), :global(.dark .profile-page .shortcut-icon), :global(.dark .profile-page .portal-help a), :global(.dark .profile-page .progress-details summary) { color: #93b5ff; }
+.profile-page .brand-mark { background: #eef3ff; color: #2563eb; border-radius: 50%; }
+.profile-page .star-policy-notice { background: var(--portal-bg); border-color: var(--portal-line); }
+.profile-page .sidebar-footer { color: var(--portal-muted); }
+.portal-detail { border-top: 1px solid var(--portal-line); padding-top: 20px; margin-top: 24px; }
+.portal-detail summary { font-size: 14px; font-weight: 500; cursor: pointer; margin-bottom: 16px; }
+
+.profile-page :deep(.profile-ai-chat) { background: var(--portal-surface); color: var(--portal-text); border-color: var(--portal-line); border-radius: 10px; box-shadow: none; }
+.profile-page :deep(.ai-chat-head), .profile-page :deep(.ai-chat-main), .profile-page :deep(.ai-chat-composer) { background: var(--portal-surface); border-color: var(--portal-line); }
+.profile-page :deep(.ai-chat-history), .profile-page :deep(.history-title small), .profile-page :deep(.quick-prompts button) { background: var(--portal-bg); border-color: var(--portal-line); }
+.profile-page :deep(.ai-chat-head h2), .profile-page :deep(.ai-chat-welcome h3), .profile-page :deep(.ai-chat-composer textarea), .profile-page :deep(.quick-prompts button) { color: var(--portal-text); }
+.profile-page :deep(.history-empty), .profile-page :deep(.history-title), .profile-page :deep(.ai-chat-toolbar label), .profile-page :deep(.api-status), .profile-page :deep(.ai-chat-head p), .profile-page :deep(.ai-chat-welcome p), .profile-page :deep(.composer-bottom > span) { color: var(--portal-muted); }
+.profile-page :deep(.ai-chat-toolbar select) { color: var(--portal-text); background: var(--portal-bg); border-color: var(--portal-line); color-scheme: normal; }
+.profile-page :deep(.new-chat), .profile-page :deep(.send-button) { color: #fff; background: #2563eb; border-color: #2563eb; border-radius: 7px; }
+.profile-page :deep(.ai-chat-brand) { color: var(--portal-muted); }
+.profile-page :deep(.history-title span), .profile-page :deep(.ai-chat-history span) { color: var(--portal-muted); }
+.profile-page :deep(.ai-chat-composer textarea::placeholder) { color: var(--portal-muted); opacity: 1; }
+.profile-page :deep(.ai-chat-welcome > span) { background: #2563eb; border-color: #2563eb; color: #fff; }
+.profile-page .avatar-generator-mark { background: #2563eb; color: #fff; }
+.profile-page .avatar-generator-close, .profile-page .star-reminder-close { background: var(--portal-bg); color: var(--portal-text); }
+.profile-page .avatar-generator-dialog textarea { background: var(--portal-bg); color: var(--portal-text); }
+.profile-page .avatar-generator-dialog textarea::placeholder { color: var(--portal-muted); opacity: 1; }
+.profile-page .star-reminder-icon { background: #b45309; color: #fff; box-shadow: none; }
+.profile-page .star-project-link { background: var(--portal-bg); border-color: var(--portal-line); color: var(--portal-text); }
+.profile-page .step-elapsed { color: var(--portal-muted); }
+.profile-page .avatar-editor > span { background: #2563eb; color: #fff; box-shadow: none; }
+.profile-page .ghost-action.danger { color: #b91c1c; }
+:global(.dark .profile-page .ghost-action.danger) { color: #fca5a5; }
+.profile-page .star-policy-notice__icon { color: #93610b; }
+:global(.dark .profile-page .star-policy-notice__icon) { color: #ffc36d; }
 </style>
