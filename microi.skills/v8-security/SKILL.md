@@ -9,6 +9,8 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，必须遵守以下安全规范。
 
+登录与安全开关只能读取已启用且未删除的 `sys_config`；开关写入后须回读匿名能力和实际登录界面，避免历史停用/软删除行造成数据库与运行状态不一致。
+
 访问密钥由 `microi_list_my_access_keys`、`microi_create_my_access_key`、`microi_revoke_my_access_key` 管理，只允许当前用户、限期、最小 scope，明文仅创建时返回一次。外部身份回调固定为 `/api/ExternalLogin/Callback`，服务端校验租户、Provider、state、redirect 和回调域名，验证成功后仍签发 DiyToken。
 
 微信网站扫码登录先读取当前租户能力、`WeChatLoginEnabled` 和私密设置元信息，
