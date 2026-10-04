@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.4.1
+ * Version: v1.4.4
  * Function:
- * - 为吾码官方应用提供固定资源白名单的读取、发布、SHA 乐观锁、事务行锁、不可变版本与发布回读；验证各应用接口、物理结构和微服务产物完整交付。
+ * - 官方固定资源发布与投影控制面。默认九应用全量投影保持不变；SystemLog作用范围只接受app.microi.sys-log.json及同一PackageInfo.AppId，在可信官方管理员、完整已发布SHA和事务锁下复用现有Managed/CIM投影及缓存失效。
  */
 
 var PARAM = V8.Param || {};
@@ -35,6 +35,7 @@ function sha256(value) {
 }
 
 function getEngineKey(name) {
+  if (name === "export-package.js") return "export-microi-store-package";
   if (name === "import-package.js") return "import-microi-store-package";
   if (name === "ai-app-publish-store.js") return "ai_app_publish_store";
   if (name === "official-resource-api.js") return "get-microi-upgrade-resource";
@@ -68,6 +69,7 @@ var officialApplicationResourceNames = [
 ];
 
 var standaloneControlPlaneResources = {
+  "export-microi-store-package": "export-package.js",
   "import-microi-store-package": "import-package.js",
   "ai_app_publish_store": "ai-app-publish-store.js",
   "get-microi-upgrade-resource": "official-resource-api.js"
@@ -356,7 +358,7 @@ function validateV8FirstPackage(name, packageModel) {
     assertExactEngineKeys(packageModel, [
       "platform-user-update-preferences", "user-module-table-preference", "sys-user-security-action",
       "platform-user-update-profile", "platform-sys-user-admin", "platform-user-custom-hook",
-      "platform-user-access-key", "platform-home-overview"
+      "platform-user-access-key", "platform-home-overview", "official_account_invitations"
     ], name);
     var sysUserAdmin = findEngine(packageModel, "platform-sys-user-admin");
     var sysUserAdminCode = text(sysUserAdmin && sysUserAdmin.ApiV8Code);
@@ -803,6 +805,13 @@ function invalidateLiveApiEngineCache(previous, latest) {
 }
 
 function parseReconcileItems() {
+  // OFFICIAL_SYSTEM_LOG_PROJECTION_SCOPE_V1: exact optional owner, default nine unchanged.
+  var projectionScope = text(PARAM.ProjectionScope).trim();
+  if (projectionScope && projectionScope !== "SystemLog") {
+    throw new Error("官方接口投影作用范围不支持");
+  }
+  var requiredResourceNames = projectionScope === "SystemLog"
+    ? ["app.microi.sys-log.json"] : officialApplicationResourceNames;
   var items = PARAM.Resources;
   if (typeof items === "string") items = JSON.parse(items);
   if (!items || typeof items.length !== "number") {
@@ -813,7 +822,7 @@ function parseReconcileItems() {
     var item = items[itemIndex] || {};
     var name = text(item.Name || item.ResourceName).trim();
     var expectedSha = text(item.ExpectedSha256 || item.ExpectedRemoteSha256).toLowerCase();
-    if (officialApplicationResourceNames.indexOf(name) < 0) {
+    if (requiredResourceNames.indexOf(name) < 0) {
       throw new Error("官方接口投影包含非固定应用资源：" + name);
     }
     if (!/^[a-f0-9]{64}$/.test(expectedSha)) {
@@ -822,12 +831,12 @@ function parseReconcileItems() {
     if (byName[name]) throw new Error("官方接口投影资源名称重复：" + name);
     byName[name] = { Name: name, ExpectedSha256: expectedSha };
   }
-  if (items.length !== officialApplicationResourceNames.length) {
-    throw new Error("官方接口投影必须包含全部 " + officialApplicationResourceNames.length + " 个应用资源");
+  if (items.length !== requiredResourceNames.length) {
+    throw new Error("官方接口投影必须包含全部 " + requiredResourceNames.length + " 个应用资源");
   }
   var normalized = [];
-  for (var nameIndex = 0; nameIndex < officialApplicationResourceNames.length; nameIndex++) {
-    var requiredName = officialApplicationResourceNames[nameIndex];
+  for (var nameIndex = 0; nameIndex < requiredResourceNames.length; nameIndex++) {
+    var requiredName = requiredResourceNames[nameIndex];
     if (!byName[requiredName]) throw new Error("官方接口投影缺少应用资源：" + requiredName);
     normalized.push(byName[requiredName]);
   }
@@ -856,6 +865,10 @@ function preparePublishedApiEngineProjection() {
     packageHashes[item.Name] = actualSha;
     var validated = validatePublishResource(item.Name, text(current.Data.Content));
     var packageModel = validated.PackageModel || {};
+    if (item.Name === "app.microi.sys-log.json"
+        && text(packageModel.PackageInfo && packageModel.PackageInfo.AppId) !== "app.microi.sys-log") {
+      throw new Error("系统日志投影文件与 PackageInfo.AppId 不匹配");
+    }
     ensurePackageChangeLog(current.Data.RowId, packageModel);
     var policies = packageModel.ResourcePolicies && packageModel.ResourcePolicies.ApiEngines;
     var engines = asArray(packageModel.SysApiEngines);
@@ -1142,7 +1155,7 @@ function lockPublishRows() {
   // “校验 ExpectedRemoteSha256 + 写入”在同一数据库事务内保持原子。
   V8.Db.FromSql(
     "SELECT Id FROM sys_apiengine "
-    + "WHERE ApiEngineKey IN ('ai_app_publish_store','get-microi-upgrade-resource','import-microi-store-package') "
+    + "WHERE ApiEngineKey IN ('ai_app_publish_store','export-microi-store-package','get-microi-upgrade-resource','import-microi-store-package') "
     + "ORDER BY Id FOR UPDATE"
   ).ToArray();
   V8.Db.FromSql(
