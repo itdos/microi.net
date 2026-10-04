@@ -110,6 +110,8 @@ namespace Microi.net
             "mci_security_access_log",
             "mci_security_attack_event",
             "mci_runtime_incident",
+            // 原生规则审批是执行授权；误授普通表权限不得恢复 Status/RevokedAt。
+            "mci_runtime_installation",
             "mci_security_ip_block",
             "mci_spider_account",
             "mci_spider_profile",
