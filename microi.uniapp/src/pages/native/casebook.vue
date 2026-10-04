@@ -1,6 +1,7 @@
 <template>
   <mci-page-shell class="casebook-page" :style="mciTokenStyle" :title="bookId ? '案例册详情' : '新增案例册'" subtitle="客户成功案例" @back="goBack">
     <mci-skeleton v-if="loading" type="list" :rows="6" />
+    <view v-else-if="error" class="empty-list" @tap="initialize"><text>{{ error }}</text><text>点击重新加载</text></view>
     <scroll-view v-else class="page-scroll" scroll-y>
       <view class="page-content">
         <view class="book-panel">
@@ -57,8 +58,9 @@
             <view class="source-check"><text>{{ isAdded(item) ? '✓' : selectedCaseIds.includes(item.Id) ? '✓' : '' }}</text></view>
             <view class="source-main"><text>{{ item.Biaoti || '未命名案例' }}</text><text>{{ item.KehuMC || '未关联客户' }}{{ isAdded(item) ? ' · 已收录' : '' }}</text></view>
           </button>
-          <view v-if="!caseLoading && !sourceCases.length" class="empty-list">未找到客户案例</view>
-          <view v-if="caseLoading && sourceCases.length" class="loading-more">加载中</view>
+          <view v-if="!caseLoading && caseError" class="empty-list" @tap="searchCases">{{ caseError }}，点击重试</view>
+          <view v-else-if="!caseLoading && !sourceCases.length" class="empty-list">未找到客户案例</view>
+          <mci-skeleton v-if="caseLoading && sourceCases.length" type="list" :rows="1" compact />
         </scroll-view>
         <view class="picker-submit"><button :loading="addingCases" :disabled="!selectedCaseIds.length || addingCases" @tap="addSelectedCases">添加 {{ selectedCaseIds.length || '' }}</button></view>
       </view>
@@ -73,6 +75,7 @@ import { getUser, V8 } from '@/utils/request.js'
 import { exportCasebookPdf } from '@/utils/api.js'
 import appConfig from '@/config.js'
 import { findMenu, openForm, requireLogin } from '@/platform/business-runtime.js'
+import { initializeAuthenticatedPage } from '@/platform/login-navigation.mjs'
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
 import { canEditMenuRecord } from '@/platform/menu-permission.js'
 
@@ -112,11 +115,11 @@ export default {
   mixins: [themeMixin],
   data() {
     return {
-      loading: true, childLoading: false, creating: false, addingCases: false,
+      loading: true, authInitialized: false, authInitializing: false, error: '', childLoading: false, creating: false, addingCases: false,
       exportingPdf: false,
       bookId: '', book: {}, bookName: '', bookMenuId: '', currentUser: {}, children: [],
       casePhotoContext: EMPTY_PRIVATE_FILE_CONTEXT, casePhotoContextError: '',
-      casePickerVisible: false, caseKeyword: '', caseLoading: false, sourceCases: [], casePage: 1, caseCount: 0, selectedCaseIds: [], searchTimer: null
+      casePickerVisible: false, caseKeyword: '', caseLoading: false, caseError: '', caseRequestId: 0, sourceCases: [], casePage: 1, caseCount: 0, selectedCaseIds: [], searchTimer: null
     }
   },
   computed: {
@@ -139,17 +142,11 @@ export default {
     }
   },
   async onLoad(options) {
-    if (!requireLogin()) return
-    this.currentUser = getUser() || {}
     this.bookId = options.id || ''
-    if (!this.canEdit && !this.bookId) {
-      uni.showToast({ title: '当前账号不能新建案例册', icon: 'none' })
-      setTimeout(this.goBack, 800)
-      return
-    }
-    await this.initialize()
+    await this.initializeAfterLogin()
   },
   async onShow() {
+    if (!this.authInitialized) { await this.initializeAfterLogin(); return }
     if (this.loading || !this.bookId) return
     try {
       // 从原生编辑表单返回时回源，确保案例册名称与案例快照立即反映刚保存的内容。
@@ -160,13 +157,27 @@ export default {
   },
   onUnload() { clearTimeout(this.searchTimer) },
   methods: {
+    initializeAfterLogin() {
+      return initializeAuthenticatedPage(this, requireLogin, async function () {
+        this.currentUser = getUser() || {}
+        if (!this.canEdit && !this.bookId) {
+          uni.showToast({ title: '当前账号不能新建案例册', icon: 'none' })
+          this.loading = false
+          setTimeout(this.goBack, 800)
+          return
+        }
+        await this.initialize()
+      })
+    },
     async initialize() {
+      this.loading = true
+      this.error = ''
       try {
         if (this.bookId) {
           await Promise.all([this.loadBook(), this.prepareBookPermissionContext(), this.prepareCasePhotoContext()])
           await this.loadChildren()
         }
-      } catch (error) { uni.showToast({ title: error.message || '案例册加载失败', icon: 'none' }) }
+      } catch (error) { this.error = error.message || '案例册加载失败'; uni.showToast({ title: this.error, icon: 'none' }) }
       finally { this.loading = false }
     },
     async loadBook() {
@@ -285,25 +296,29 @@ export default {
     },
     openCasePicker() { this.casePickerVisible = true; this.selectedCaseIds = []; if (!this.sourceCases.length) this.searchCases() },
     closeCasePicker() { this.casePickerVisible = false },
-    async searchCases() { this.casePage = 1; this.sourceCases = []; await this.loadCases() },
+    async searchCases() { this.casePage = 1; this.sourceCases = []; await this.loadCases(true) },
     async loadMoreCases() {
       if (this.caseLoading || this.sourceCases.length >= this.caseCount) return
       this.casePage += 1
       await this.loadCases()
     },
-    async loadCases() {
-      if (this.caseLoading) return
+    async loadCases(reset = false) {
+      if (this.caseLoading && !reset) return
+      const requestId = ++this.caseRequestId
+      const page = this.casePage
       this.caseLoading = true
+      this.caseError = ''
       try {
         const result = await V8.FormEngine.GetTableData('Diy_Anli', {
-          _Keyword: this.caseKeyword.trim(), _OrderBy: 'UpdateTime', _OrderByType: 'DESC', _PageIndex: this.casePage, _PageSize: 20
+          _Keyword: this.caseKeyword.trim(), _OrderBy: 'UpdateTime', _OrderByType: 'DESC', _PageIndex: page, _PageSize: 20
         })
+        if (requestId !== this.caseRequestId) return
         if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '客户案例加载失败')
         const rows = Array.isArray(result.Data) ? result.Data : []
-        this.sourceCases = this.casePage === 1 ? rows : this.sourceCases.concat(rows)
+        this.sourceCases = page === 1 ? rows : this.sourceCases.concat(rows)
         this.caseCount = Number(result.DataCount || this.sourceCases.length)
-      } catch (error) { uni.showToast({ title: error.message || '客户案例加载失败', icon: 'none' }) }
-      finally { this.caseLoading = false }
+      } catch (error) { if (requestId === this.caseRequestId) { this.caseError = error.message || '客户案例加载失败'; if (page > 1) this.casePage = page - 1; uni.showToast({ title: this.caseError, icon: 'none' }) } }
+      finally { if (requestId === this.caseRequestId) this.caseLoading = false }
     },
     isAdded(item) { return this.children.some((child) => String(child.KehuID || '') === String(item.KehuID || '') && String(child.Biaoti || '') === String(item.Biaoti || '')) },
     toggleCase(item) {

@@ -16,7 +16,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 模块引擎或 `sys_menu`。逐步建模在字段完成后调用 `microi_configure_form_banner` 回读验收。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=acb3a22e04ba26f9fda584956e1eff38c9deebaeb827a7fc3a947abdac4214a6 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=bdbc78e88e50c53a3bd29eeb76ce34e3fed8eec5f4ba16371417d2aeee9c2fbe -->
 ## 交付总原则
 
 1. **先事实源，后建模**：先读需求文档、截图、现有蓝图、数据库结构和菜单结构，形成业务蓝图；不要边猜边建表、边猜边写接口。
@@ -30,7 +30,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 9. **平台能力四项同步**：按 `workspace-conventions/SKILL.md` 首部识别创始人源码工作区；每项平台新增、增强或修复都逐项判断应用商城、官方中文文档、Skills、MCP 是否需要完善，交付时列出证据或无需修改的依据。复用已有 MCP 能力，不机械新增工具；镜像发布不等于客户部署，客户手动更新边界必须保留。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=174d99145946baf94a5eee934fc1453921fa7eed544b853f86be515582dc1343 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=0e58c2126bd11900a4d0f4a7012b463f304490587443e90346c64e9f85dfcf10 -->
 ## 用户问题编号跟踪（强制）
 
 用户一次提出多个问题时，必须先拆成 `1、2、3、4...` 的问题清单，并在交付过程中保持同一编号，不得合并吞掉或用笼统“已优化”代替。
@@ -46,7 +46,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 最终回复必须按原始编号逐项汇总：哪些已实现、哪些未实现、是否通过全自动化测试、是否通过截图验证。不能只给总括性“都完成了”。如果某项没有测试或没有截图，必须明说“未覆盖/未截图”，并说明原因。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=65a36ed6c448bbfb0226acedaaa334046be68278b2e89eb301cd99b4e141da3e -->
+<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=adeb9e4ec4beadf3b7ba33325e860b378b81f6d7e95b25879b64ca4ee1c91987 -->
 ## 平台安全与存量兼容验收（强制）
 
 AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉及 FormEngine、菜单、角色、子表、文件、SaaS 或登录协议的交付，都必须按以下服务端边界设计和验收：
@@ -99,7 +99,7 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 9. SaaS 脱敏投影不包含基础设施密钥，Redis anonymous/temporary/非管理员管理失败。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-003 sha256=479ccdb65450c7741b052a30d8e4a11917bc19d80bf9b4ac89ea00092b4aaa73 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-003 sha256=8e2891f2a149d6828b653b9f0735ea39a4df5ba60178c79f0e5b0065ce72ee84 -->
 ## 前端交付检查清单
 
 - 底部 tabBar 图标不 404。
@@ -113,7 +113,7 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 - 订单状态角标只给需要处理的状态，不给“全部/已完成/已取消”等静态分类堆数字。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=08ccc8091df4d3933a208d9a7ad054ada9e7f245818bf8f8c96b3e1e44857b66 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=9a226a70ef240ce83151c140d002253dccbf7efa63653f61c8825f2b69c1c7d3 -->
 ## 交付完成定义
 
 一次 Microi 全系统交付只有同时满足以下条件才算完成：

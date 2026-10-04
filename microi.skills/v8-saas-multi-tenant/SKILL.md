@@ -21,6 +21,12 @@ Microi 多租户 = **`OsClient` + `OsClientType` + `OsClientNetwork`** 三参数
 
 主租户不是固定字符串 `master`，而是由当前部署的环境变量 `OsClient` 或 `AppSettings:OsClient` 决定。租户记录存放在受保护的 `sys_osclients` 表中；普通业务角色和普通 V8 不得直接查询、复制或修改该表。
 
+标准 MCP 连接必须保持 API 与这三个租户坐标一致。`MICROI_OS_CLIENT_TYPE`、`MICROI_OS_CLIENT_NETWORK` 是 MCP 进程的可选连接配置，显式设置时必须绑定非空 `MICROI_OS_CLIENT`；它们随 Login 表单、Refresh 正文、所有 API Header 和流式 multipart 表单传输，普通 JSON 业务正文与 GET 查询不额外注入 Type/Network。省略可选项保持原协议。SSE 对应 `X-Microi-OsClient`、`X-Microi-OsClientType`、`X-Microi-OsClientNetwork`，每个连接独立绑定身份；单次请求与已配置坐标冲突、重复或含非法标识时发送前拒绝。
+
+连接或恢复后先执行 `initialize`、`tools/list`、`microi_get_status`，按服务端实际 API、OsClient、Type、Network 核验目标分区，再读基线或写入。Token 文件的四段键不能证明 HTTP 已选中该分区；不匹配时修复连接传输，不修改 SaaS 租户网络记录、跨分区借用身份或更换原业务请求键。
+
+API 必须指向目标分区的真实节点。三参数 Header 只声明连接目标，不能切换节点可信运行分区或发布门禁；Header 已正确而 status 仍不匹配时停止写入并修正节点地址，禁止修改 SaaS/gate、借其它分区任务或用请求头强迫节点切区。
+
 ## 上下文变量
 
 ```javascript

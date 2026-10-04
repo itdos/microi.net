@@ -10,8 +10,8 @@ namespace Microi.net
     {
         /// <summary>
         /// 启动、新租户开通和管理员手动补跑共用的单租户升级入口。
-        /// 数据库版本只在全部历史迁移成功后前向推进；已达到当前基线的租户只读一次
-        /// ServerVersion 后跳过历史链；仅检查 SQL Server 文件身份索引的当前协议约束。
+        /// 数据库版本只在启动与商城恢复成功后前向推进；已达到当前基线的租户只读一次
+        /// ServerVersion 后跳过历史链；只检查必要物理兼容和商城恢复，不安装可选应用。
         /// </summary>
         public async Task<DosResult> UpgradeTenantAsync(
             string osClient,
@@ -68,7 +68,8 @@ namespace Microi.net
                 if (IsVersionAtLeast(beforeVersion, targetVersion))
                 {
                     var protocolIndexRepaired = false;
-                    if (!Upgrade25.CurrentFileIdentityIndexReady(runtimeClient)
+                    var marketplaceRecovered = false;
+                    if (!ApplicationAssetIdentityCompatibility.CurrentFileIdentityIndexReady(runtimeClient)
                         || !RuntimeColumnNullability.Ready(runtimeClient))
                     {
                         var repair = await EnsureRuntimePhysicalPrerequisitesAsync(
@@ -77,14 +78,27 @@ namespace Microi.net
                         if (repair.Code != 1) throw new InvalidOperationException(repair.Msg);
                         protocolIndexRepaired = true;
                     }
+                    if (await UpgradeAppStore.NeedRefreshAsync(runtimeClient.OsClient).ConfigureAwait(false))
+                    {
+                        using var recoveryLease = UpgradeDistributedLease.TryAcquire(runtimeClient.OsClient, out var recoveryLeaseReason);
+                        if (recoveryLease == null) throw new InvalidOperationException("商城恢复无法取得共享租约：" + recoveryLeaseReason);
+                        using (UpgradeExecutionLeaseContext.Enter(recoveryLease))
+                        {
+                            var recoveryErrors = await new UpgradeAppStore().Run(runtimeClient.OsClient).ConfigureAwait(false);
+                            recoveryLease.ThrowIfLost();
+                            if (recoveryErrors.Count > 0) throw new InvalidOperationException(string.Join("；", recoveryErrors));
+                        }
+                        marketplaceRecovered = true;
+                    }
                     return BuildAlreadyCurrentResult(
                         runtimeClient,
                         backgroundTaskId,
                         beforeVersion,
                         targetVersion,
                         "ServerVersion已覆盖当前一次性运行时基线，已快速跳过历史升级链。",
-                        leaseAcquired: protocolIndexRepaired,
-                        protocolIndexRepaired: protocolIndexRepaired);
+                        leaseAcquired: protocolIndexRepaired || marketplaceRecovered,
+                        protocolIndexRepaired: protocolIndexRepaired,
+                        marketplaceRecovered: marketplaceRecovered);
                 }
 
                 ThrowIfCancelled(backgroundTaskId, cancellationToken);
@@ -238,7 +252,7 @@ namespace Microi.net
                     AfterVersion = afterVersion,
                     AlreadyCurrent = alreadyCurrent,
                     FastPath = false,
-                    RuntimeInvariantsChecked = Upgrade36.OneTimeInvariantNames,
+                    RuntimeInvariantsChecked = new[] { "启动与应用商城恢复" },
                     CacheReloaded = cacheReloaded,
                     CacheMessage = cacheReloaded ? null : cacheMessage
                 }, message);
@@ -300,9 +314,12 @@ namespace Microi.net
             string targetVersion,
             string reason,
             bool leaseAcquired = false,
-            bool protocolIndexRepaired = false)
+            bool protocolIndexRepaired = false,
+            bool marketplaceRecovered = false)
         {
-            var message = protocolIndexRepaired
+            var message = marketplaceRecovered
+                ? "租户数据库版本已是当前版本；商城必要资源已恢复并强回读，未执行历史迁移。"
+                : protocolIndexRepaired
                 ? "租户数据库版本已是当前版本；启动物理兼容结构已在租约内修复、未执行历史迁移、未刷新缓存。"
                 : leaseAcquired
                     ? "租户数据库版本已是当前版本；已在租约内确认，未执行历史迁移、未刷新缓存。"
@@ -320,6 +337,7 @@ namespace Microi.net
                 FastPath = true,
                 LeaseAcquired = leaseAcquired,
                 ProtocolIndexRepaired = protocolIndexRepaired,
+                MarketplaceRecovered = marketplaceRecovered,
                 RuntimeInvariantsChecked = Array.Empty<string>(),
                 CacheReloaded = false,
                 CacheMessage = (string)null

@@ -141,7 +141,7 @@ if(typeof process!=='undefined'&&process.argv[1]&&import.meta.url===pathToFileUR
   const context=await browser.newContext({ignoreHTTPSErrors:new URL(apiBase).hostname==='localhost',viewport:{width:1440,height:1000}});
   const page=await context.newPage();page.setDefaultTimeout(30000);
   await page.goto(`${required('MICROI_TEST_FRONTEND_BASE')}/?OsClient=${encodeURIComponent(tenant)}&ApiBase=${encodeURIComponent(apiBase)}`,{waitUntil:'domcontentloaded'});
-  await page.getByPlaceholder(/用户名|账号|帐号|username/i).first().fill(required('MICROI_TEST_ACCOUNT'));
+  await page.getByPlaceholder(/用户名|账号|帐号|user\s*name/i).first().fill(required('MICROI_TEST_ACCOUNT'));
   await page.getByPlaceholder(/密码|password/i).first().fill(required('MICROI_TEST_PASSWORD'));
   const box=page.locator('.privacy-policy-wrapper .el-checkbox').first();if(await box.count()&&!(await box.locator('input').isChecked()))await box.click();
   const login=page.waitForResponse(r=>r.url().includes('/api/SysUser/Login'));await page.getByRole('button',{name:/^登\s*录$/}).click();assert.equal((await(await login).json()).Code,1);

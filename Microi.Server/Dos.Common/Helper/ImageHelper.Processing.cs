@@ -1553,6 +1553,10 @@ namespace Dos.Common
             for (var index = 0; index < text.Length;)
             {
                 var codepoint = char.ConvertToUtf32(text, index);
+                // macOS LastResort may report a placeholder glyph for Unicode noncharacters.
+                // They cannot represent text, even when a system fallback claims coverage.
+                if ((codepoint >= 0xFDD0 && codepoint <= 0xFDEF) || (codepoint & 0xFFFF) >= 0xFFFE)
+                    throw new InvalidOperationException($"Unicode 非字符 U+{codepoint:X4} 不能作为文字绘制，已拒绝输出缺字方框。");
                 var charLength = char.IsSurrogatePair(text, index) ? 2 : 1;
                 var value = text.Substring(index, charLength);
                 var typeface = FindExistingTypeface(ownedTypefaces, codepoint);

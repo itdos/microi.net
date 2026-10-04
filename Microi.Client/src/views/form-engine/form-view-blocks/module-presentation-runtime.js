@@ -125,7 +125,8 @@ function topCurrentPageCategory(fields, rows) {
         if (!value || value.length > 16 || /^[-+]?\d+(?:\.\d+)?$/.test(value) || /^[\[{]/.test(value)) return;
         counts.set(value, (counts.get(value) || 0) + 1);
     });
-    const first = [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0];
+    // 计数相同时沿用实际行的先后顺序，避免宿主语言改变同一结果的默认指标。
+    const first = [...counts.entries()].sort((left, right) => right[1] - left[1])[0];
     return first ? { field: categoryField, label: first[0], value: first[1] } : null;
 }
 

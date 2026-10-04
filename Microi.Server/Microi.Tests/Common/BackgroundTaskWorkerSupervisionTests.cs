@@ -51,7 +51,7 @@ public sealed class BackgroundTaskWorkerSupervisionTests
             "BackgroundTaskWorkerRuntime.cs"));
         var engine = File.ReadAllText(Path.Combine(
             serverRoot,
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "platform-background-task.js"));
         var runtime = File.ReadAllText(Path.Combine(

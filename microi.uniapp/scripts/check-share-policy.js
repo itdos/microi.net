@@ -151,7 +151,7 @@ currentPage = { route: 'pages/business/detail', options: { key: 'customers', id:
 sandbox.shareTest.maybeRedirectSharedReceiver()
 assert(navigations.length === navigationCountAfterFollow + 1, 'Private shared pages must route a guest to login')
 assert(decodeURIComponent(navigations[navigationCountAfterFollow]).includes('/pages/business/detail?key=customers&id=customer-1&fromShare=1'), 'Login must retain the original shared route')
-queuedTimers.shift()()
+assert(queuedTimers.length === 0, 'Shared login must use the global navigation guard instead of an independent timeout lock')
 sandbox.testToken = 'valid-token'
 sandbox.testUser = { Id: 'user-1' }
 sandbox.shareTest.maybeRedirectSharedReceiver()

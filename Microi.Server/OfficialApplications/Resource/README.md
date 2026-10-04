@@ -1,0 +1,119 @@
+# 基础应用升级资源
+
+`Microi.Upgrade` 随程序集内置一套经过校验的基础应用数据包，保证老数据库和不通外网的客户服务器至少可以自动安装表单引擎、模块引擎、SaaS 引擎、SSO 身份联邦、应用商城、系统账号、系统设置、消息通知和 AI助手，并同步交付它们依赖的官方 Managed 接口引擎与租户 CreateIfMissing Hook。
+
+升级程序不需要任何环境变量：并行尝试从吾码官方数据库获取并完整校验全部资源；只有整组资源都有效时才使用在线最新版，否则整组回退到程序集内置版本，绝不混用两套资源。客户服务器无法访问外网时会自动使用当前后端程序集随版本发布的基线包。
+
+## V8-first 官方包合同
+
+平台业务接口采用“官方 `Managed` 核心 + 租户 `CreateIfMissing` Hook”。当前独立归属如下：
+
+| 官方应用 | Managed 核心 | 租户 Hook |
+|---|---|---|
+| `app.microi.form-engine`（表单引擎） | 包内表单运行与维护接口 | 当前无通用 Hook；业务个性化放在表单事件或独立接口引擎 |
+| `app.microi.module-engine`（模块引擎） | 包内模块运行与维护接口 | 当前无通用 Hook；菜单业务放在按钮/Tab V8 或独立接口引擎 |
+| `app.microi.saas-engine`（SaaS引擎） | 平台启动、旧版 `microi-init` 兼容、租户、外部登录和微信绑定接口 | `platform-runtime-custom-hook`、`platform_auth_login_hook` |
+| `app.microi.sso`（SSO 身份联邦） | `sso_*` 协议编排接口 | `sso_event_hook` |
+| `app.microi.sys_user`（系统账号） | `platform-sys-user-admin`、`platform-user-update-profile`、`platform-user-update-preferences` | `platform-user-custom-hook` |
+| `app.microi.sys-config`（系统设置） | `platform-tenant-system-settings` | `platform-system-settings-custom-hook` |
+| `app.microi.message-notification`（消息通知） | `platform-chat-system-message`、`platform-chat-runtime` | `platform-message-notification-custom-hook` |
+| `app.microi.store`（应用商城） | `platform-marketplace-source` | `platform-marketplace-source-hook` |
+| `app.microi.ai-engine`（AI助手） | `mci_ai_data_assistant`、`platform-ai-account`、`platform-ai-runtime` | `platform-ai-custom-hook` |
+
+两类源码顶部都必须保留醒目的官方所有权提示。可信官方应用安装、更新或重新安装会恢复 `Managed` 核心；`CreateIfMissing` 只在首次缺失时创建，默认可执行正文必须精确为 `return { Code : 1 };`，租户后续修改、禁用或软删除均不得被官方升级覆盖。上述 Hook 固定 `StopHttp=1`、禁止匿名，并与核心共享 `V8.DbTrans`；Hook 返回失败会阻断对应业务阶段。
+
+Upgrade13 重放这九个程序集内置官方包时，先校验固定资源名和包契约，再由宿主建立绑定 `import-microi-store-package + OsClient` 的一次性可信上下文。导入器只有同时收到内置包请求并成功消费该上下文，才可恢复 `Platform/Managed` 官方源码；客户端或普通 V8 仅伪造同名参数会失败关闭，`Tenant/CreateIfMissing` 在任何情况下都不会被这条通道覆盖。
+
+商城源登录和断开必须先经过 `platform-marketplace-source` 的 `AuthorizeOperation`。其 Before Hook 只接收 `Stage / SourceApiEngineKey / Action / SourceId`，不能接收 `ApiBase`、远端 `OsClient`、账号、密码、Token 或凭据密文。SaaS 包中的 `platform-external-login-binding`、`platform-wechat-user-binding` 还必须同时保持 `StopHttp=1`、`AllowAnonymous=0`、`Lock=1`，避免普通 V8 修改或伪造协议持久化入口。
+
+定向合同测试：
+
+```powershell
+node --test Microi.Server/OfficialApplications/Resource/controller-v8-first-resource.test.mjs
+node --test Microi.Server/OfficialApplications/Resource/controller-v8-first-package-contract.test.mjs
+```
+
+新增升级步骤的 `Version` 必须按“正式进入发布包的先后顺序”全局单调递增，不能沿用最初开发分支的旧版本号。`sys_config.ServerVersion` 是迁移游标，而不是源码创建日期；若新步骤的版本号低于客户数据库已经记录的游标，该步骤会被永久跳过。同一补丁版本可使用第四段修订号（例如 `6.5.7.1`、`6.5.7.2`）表达严格执行顺序。每个步骤还必须保持幂等，以容忍执行成功后、推进版本号前的节点重启。
+
+吾码官方应用源数据库不能执行第 13 步基础包回写，否则过期基线可能覆盖官方主库刚维护但尚未重新导出的商城数据。判断规则不是单独依赖租户名，而是必须同时满足“`Microi.net` 的 `LicenseService.HasPrivateKey()` 为真 + `OsClient=iTdos`”。官方签发私钥不会随客户 NuGet/发布包分发，因此客户即使也使用 `iTdos` 租户名仍会正常执行基础应用升级。该保护只跳过应用商城基线导入，其它结构升级照常执行。
+
+应用安装器从 v1.2.9 起由后台任务按租户串行执行，并启用接口引擎分布式锁；导入器内部还会重试 MySQL 死锁。v1.2.10 起，仅当客户接口引擎菜单已有至少 2 个 `PageTabs` 时保留客户多 Tab 分类；空值、空数组或只有 1 个 Tab 时仍使用官方包配置。v1.4.0 起，微服务安装会按 `LegacyMenuUrls/LegacyComponentPaths` 迁移目标端菜单并写入稳定 `MsKey` URL，但在原开发服务器重复安装时保留仍可运行的原生组件菜单；声明携带源码时，包体校验和源码写入回读都必须成功。v1.5.0 起，Web、UniApp、微服务和平台应用统一以 `sys_microistore` 为主表，`mci_ai_app_file / mci_ai_app_version` 仅保存源码清单和构建版本；成功安装后会向官方商城累计去重安装次数。v1.6.4 起，微服务公有编译文件首次安装后会写入带 `OsClient` 前缀的真实稳定对象 Key，并同步运行清单的 `FilePathName/HdfsPath/PublishHdfsPath`，避免旧临时路径失效后回退到无 CORS 的静态域。v1.6.6 起，离线包显式选择 `StorageMode=db` 时会把公有编译文件写入同源运行清单，同时仍保留 HDFS 源码与编译资产，适配客户 FileServer/CDN 尚未统一的环境。v1.10.4 起，只有显式声明 `AssetStoragePolicy.Build=DatabaseOnly`、使用 `StorageMode=db` 且不超过 256 文件/5MB 的微服务包，才可不依赖目标租户 HDFS；`Source=NotIncluded` 必须同时满足 `IncludeSource=false` 且不携带 `SourceFiles/SourceZip`，普通应用仍严格要求对象存储。OSS/MinIO 403 会返回租户、私有/公有范围、错误类型和可执行权限建议。v1.10.5 起，后台分片会把已提交进度写入检查点，恢复执行时按检查点和阶段下限单调上报，不再因重新取包从 55% 等阶段值倒退到 3%；批量协调器 v1.1.6 同样继承子检查点进度，避免外层再次覆盖。v1.10.6 起，旧租户仅缺少 `sys_rolelimit` 的低代码元数据时会降级到参数化物理表读写，写后严格回读并前后两次推进授权缓存版本；其它数据库或鉴权错误仍失败并返回原始原因与修复建议。v1.10.7 起，恢复分片还会从共享任务表或新版任务信封继承已持久化进度，兼容旧平台节点时也不会因检查点四舍五入回退。v1.10.8 起，旧租户物理权限写入使用数据库端 `CURRENT_TIMESTAMP`，避免 Jint/区域设置把时间序列化为 MySQL 严格模式不接受的本地格式；该表达式兼容 MySQL、SQL Server 与 Oracle。v1.10.9 起，远程 ZIP 安装默认每个后台片段只提交一个资产，统一导入器使用平台既有 8GB 累计分配上限，避免小型压缩包在 byte[]、Base64、解压 Entry 与 JS/.NET 互操作中累计触发错误；普通接口引擎仍保持默认限制，超大运行资产继续走 HDFS multipart 而不进入 Jint。v1.10.10 起，官方 Web/UniApp 可显式声明 `AssetStoragePolicy.Build=SharedPublicRuntime`，但必须同时使用 `Source=NotIncluded`、无查询参数的 HTTPS 版本目录、与 v3 committed proof 一致的 64 位运行清单哈希；安装只登记共享运行地址并继续安装租户表、菜单与 V8 引擎，不复制相同大资源。普通应用、私有源码和离线包边界保持不变。平台后台任务内核同时保留显式阶段百分比和真实单位 ETA，并对同量纲 `Current` 强制单调。发布器 v1.4.3 与商城基线 v6.5.6 起，`SourceZip` 只包含剥离 `source/` 包装目录后的真实源码并按原始字节保留图片、字体等二进制文件，`BuildZip` 则包含剥离 `build/ / dist/` 包装目录后的完整真实运行资产；发布器 v1.4.4 对尚未迁移出真实 dist 元数据的历史应用仅保留 `BuildLog` 单入口兼容回退，避免生成空包。老库缺少全局 `DateNow` 时，平台接口使用局部 `System.DateTime.Now` 回退，不会覆盖客户自定义的全局 V8。
+
+## 平台内置微服务发布门禁
+
+`platform-service-release.json` 是 `microi-platform-service` 的唯一发布源码契约。正式源码可以位于完整工作区中的独立 Git 仓库；`Microi-V8-Engine` 同名目录只作为租户同步镜像，`Microi.Client` 只提供通用微服务宿主，两者都不能被脚本静默当作第二源码根。
+
+只读核对源码、`dist`、路由和两个内置包，不修改文件：
+
+```powershell
+node Microi.Server/OfficialApplications/Resource/embed-platform-service-bundle.mjs --verify-only
+```
+
+命令必须在源码版本、`SourceManifestHash`、`RuntimeManifestHash`、逐文件 Base64/大小/SHA-256、`microi.routes.json`、`app.microi.saas-engine.json` 与 `app.microi.store.json` 完全一致时才成功。正式更新两个包时仍由同一脚本生成，完成后再次执行 `--verify-only`；HDFS/CDN 只是运行镜像，只有发布回读哈希与同一 `RuntimeManifestHash` 一致后才可切换，镜像故障不得替代数据库启动产物。
+
+`refresh-resources.mjs --publish` 会在任何官网写入前自动执行同一只读门禁，并要求唯一源码根来自无未提交修改的 Git 提交，因此正式发布不能跳过；只读资源盘点不要求修改或重新发布平台微服务。
+
+## 更新内置基线
+
+维护人员无需逐个手工复制数据包。同步器在 `.resource-sync-base/` 保存上一次“本地与官网完全一致”的共同基线，并以该基线执行三方合并：
+
+- 只有官网修改：自动合并到本地。
+- 只有本地修改：使用 `--publish` 写回官网。
+- 两端修改不同 JSON 节点或不同 JS 可执行代码：合并后同时保留。V8 文件头的说明和 `Version` 作为发布元数据单独处理，不会再因两端正常独立升版而制造代码冲突；合成出第三份新正文时自动在两端最高版本上再升一版。
+- 同一 JSON 节点或同一段 JS 可执行逻辑被改成不同内容：报告真实冲突并终止，不覆盖任意一端。JS 正文会依次尝试 Git 默认、histogram、patience、minimal 锚点算法，只有全部无法安全合并才要求人工处理。
+- 发布官网时携带读取时的 SHA-256；若发布期间官网又被更新，服务端拒绝覆盖。发布完成后必须逐项回读一致，才推进共同基线。
+- 任一 JSON 应用包内容需要写回官网时，`PackageInfo.Version` 必须高于官网当前 `AppVersion`；服务端写入后会在同一事务内回读校验包内容哈希和商城版本，避免包内版本落后于商城元数据。
+- 九个官方 JSON 应用包的每个新版本都必须包含与 `PackageInfo.Version` 精确一致的结构化 `PackageInfo.ChangeLog`，并由 `PackageInfo.ChangeHistory` 覆盖当前版本。表单引擎、模块引擎、SaaS 引擎与 SSO 的固定维护顺序是：先运行各自的业务资源生成器，再运行 `official-api-engine-notice.mjs` 归一化 notice/policy，然后运行 `configure-official-package-changelogs.mjs` 写入最终版本及日志，通过合同测试后才可执行 `refresh-resources.mjs` 合并或发布。其它官方包继续由各自生成器写入。缺失、错版、必填项为空，或这四个包的当前版本历史日期/正文与 `ChangeLog` 不一致，都会在官网写入前失败关闭。
+
+只检查、拉取和三方合并时，在仓库根目录执行：
+
+```powershell
+node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs
+```
+
+需要把本地合并结果发布到 iTdos 官网时，CI/无人值守环境优先通过环境变量注入令牌，不得写入仓库：
+
+```powershell
+$env:MICROI_UPGRADE_RESOURCE_TOKEN = '<iTdos 超级管理员 Token>'
+node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --publish
+Remove-Item Env:MICROI_UPGRADE_RESOURCE_TOKEN
+```
+
+本地执行一键发布时，同步器默认安全复用工作区中已配置并登录的 `microi_itdos` MCP，通过同一个官方接口引擎完成十二项资源读取、三方合并、`PublishBatch` 和发布后回读；不会出现“HTTP 读一份、MCP 写另一份”的事实源分叉。它会严格校验 MCP 必须绑定 `https://api.itdos.com + iTdos`，并继续保留固定资源白名单、官网 SHA 乐观锁及发布后回读校验；同步器不会读取、打印或写入 MCP Token。Token 文件按 `ApiBase|OsClient|OsClientType|OsClientNetwork` 四段精确身份读取，即使后两段为空也保留分隔符，避免误用可能已过期的旧版兼容键；签名失效时由 VS Code SecretStorage 恢复代理重新登录并原子写回。恢复代理通过 `onStartupFinished` 确定性启动，避免大型工作区的递归 `workspaceContains` 扫描超时后无人处理恢复请求。可以用 `MICROI_UPGRADE_RESOURCE_MCP_CONFIG` 显式指定 MCP 配置文件，默认从当前工作区向上查找 `.mcp.json`、`.vscode/mcp.json` 或 `.cursor/mcp.json`；若配置仍指向已安装的旧插件目录，发布器会自动选择同目录下版本更高的已安装插件。CI 没有 MCP 配置但注入了 `MICROI_UPGRADE_RESOURCE_TOKEN` 时，`auto` 模式才回退到官网 HTTP；也可用 `MICROI_UPGRADE_RESOURCE_TRANSPORT=mcp|http|auto` 显式固定传输方式。如果本机既没有可用的官方 MCP 登录态，也没有环境变量令牌，发布仍会中止并给出明确提示。
+
+`Microi一键编译发布.sh` 的后端编译/发布模式会在 `dotnet build` 前自动执行同一条 `--publish` 命令。因此，本地资源或官网资源任一侧更新后，下一次后端发布都会先完成合并、官网写回（如有）、回读和基线更新；冲突、令牌缺失、并发哈希变化或回读不一致都会阻止后端发布。
+
+脚本只允许处理以下十二个固定资源：
+
+1. `import-package.js`
+2. `ai-app-publish-store.js`
+3. `official-resource-api.js`（`get-microi-upgrade-resource` 自身）
+4. `app.microi.form-engine.json`
+5. `app.microi.module-engine.json`
+6. `app.microi.saas-engine.json`
+7. `app.microi.sso.json`
+8. `app.microi.store.json`
+9. `app.microi.sys_user.json`
+10. `app.microi.sys-config.json`
+11. `app.microi.message-notification.json`
+12. `app.microi.ai-engine.json`
+
+官方接口：
+
+```text
+https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos&Name={resourceName}
+```
+
+首次部署同步机制时，必须先人工确认十二项本地资源与官网完全一致，再执行一次：
+
+```powershell
+node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --initialize-base
+```
+
+该命令不会覆盖任何资源；任一项不一致都会拒绝建立基线。`--synchronize-local` 仅用于让 `app.microi.store.json` 内嵌的导入器、发布器、构建器与独立 JS 文件保持一致，不会访问或修改官网。正式同步会把这些独立源码和商城包内嵌代码视为同一组逻辑副本：说明文字、换行、独立升版或不同可执行代码段的修改可自动合并，只有同一段可执行逻辑被改成不同实现时才阻止发布。`ai-app-build.js` 仍是随服务器发布的本地事实源，不扩入官网十二项资源白名单。
+
+刷新后必须构建 `Microi.Upgrade`，确认十一个运行期升级资源及随服务器发布的 `ai-app-build.js`（合计十二项）均已作为 `EmbeddedResource` 写入程序集；`official-resource-api.js` 是仅供维护发布链路同步官网接口的源码，不写入运行程序集。发布包运行时不依赖这些源码文件存在。
+
+刷新脚本会拒绝低于 v1.9.1、缺少租户接口引擎所有权不可逆保护、接口引擎资源基线或“无商城标识时跳过安装计数”、MySQL 宽表行宽溢出时的非索引 `varchar` 行外文本回退、可信批量小包单事务、安装统计 JSON 字符串响应解析、接口引擎写后回读、统一应用商城、断点复用、微服务公有 HDFS 稳定路径、DB 运行产物兜底、Jint 安全清理、原生菜单保护、源码校验或安装统计能力的导入器；也会拒绝低于 v1.6.0 的发布器，以及低于 v7.0.13、缺少官方平台应用过滤、自适应安全分片、子安装失败详情透传、批量安装后台检查点、可信后台自举保护或严格 `SourceZip / BuildZip` 资产边界的商城基线。普通或社区包的 `Managed` 仍按 Base/Local/Incoming 三方保护，客户修改会整包冲突回滚；只有从固定官网实时回读并验证为官方 `ApplicationType=Platform` 的可信包，`Managed` 才按官方源码覆盖。`CreateIfMissing` 首次创建后始终归租户维护，后续不得改回 `Managed` 接管。行宽回退只在 MySQL 明确返回 65,535 字节上限且字段不参与索引时触发，类型覆盖写入共享后台任务 checkpoint；普通异常和索引字段继续失败关闭。批量引擎在兼容尚未部署后端可信调用修复的节点时使用 `StopHttp=0`，但必须同时校验由 HTTP 控制器剥离的 `_TrustedServerInvocation`、任务 Id、任务信封和正数 fencing token；普通 HTTP 仍然失败关闭。“全部安装/更新”固定只规划 `ApplicationType=Platform` 的官方平台应用；小型官方包以一个应用一个事务完成，超过字段、表、资产或随包数据安全阈值的包继续使用内部 checkpoint 分片。
+
+v1.10.11 起，后台安装检查点会累计在线应用、共享公共运行时、菜单、接口引擎、随包数据和安装版本等跨分片统计；最终任务结果展示整次安装的真实汇总，不再只显示最后一个分片的局部计数。

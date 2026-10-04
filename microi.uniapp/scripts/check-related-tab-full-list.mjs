@@ -61,7 +61,9 @@ for (const token of [
   '_PageIndex: this.pageIndex',
   '_PageSize: pageSize',
   'loadMore() { this.loadData(false) }',
-  "<text>{{ loading ? '正在加载' : '加载更多' }}</text>",
+  '<mci-skeleton v-if="loading" type="list" :rows="1" compact />',
+  '<view v-else-if="!isPreview && !finished" class="load-more" hover-class="load-more--pressed" @tap="loadMore">',
+  '<text>加载更多</text>',
   '<view v-else-if="!isPreview" class="load-finished"><text>共 {{ count }} 条</text></view>'
 ]) {
   assert.ok(relatedList.includes(token), `完整关联列表分页能力缺失：${token}`)

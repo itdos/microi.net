@@ -5,7 +5,7 @@ import path from 'node:path';
 // 浏览器使用真实登录。只替换本测试页面的时钟相关接口响应，不修改实际 License 或租户期限。
 // 可信日期、两层投递及持久回执由 TenantLicensePolicyTests 和 platform-reminder-presentation.test.mjs 验证。
 export async function verifyLicenseExpiryPresentation(page,directory){
- const checks=[],source=await fs.readFile(new URL('../../Microi.Upgrade/Resource/license-expiry-model.js',import.meta.url),'utf8');
+ const checks=[],source=await fs.readFile(new URL('../../OfficialApplications/Resource/license-expiry-model.js',import.meta.url),'utf8');
  const model=new Function(source+';return createLicenseExpiryModel();')();
  const expiration=new Date(Date.now()+5*86400000+19*3600000+38*60000+20000).toISOString();
  let closed=false,acknowledgements=0,inboxReads=0;

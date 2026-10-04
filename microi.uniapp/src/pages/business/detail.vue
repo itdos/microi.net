@@ -50,6 +50,9 @@
 					</view>
 				</view>
 
+				<xjy-customer-contract-totals v-if="showCustomerContractTotals"
+					:state="customerContractTotals" @retry="loadCustomerContractAmounts" />
+
 				<!-- <view v-if="key === 'customers'" class="quick-band">
 					<view class="quick-action" hover-class="quick-action--pressed" @tap="addCustomerVisit">
 						<image src="/static/xjy/business/baifang.png" mode="aspectFit" />
@@ -428,6 +431,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	} from './utils/xjy-row-actions.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 	import { customerCaseChildField } from '@/tenants/xjy/native-table.js'
+	import XjyCustomerContractTotals from '@/tenants/xjy/components/customer-contract-totals.vue'
+	import { customerContractTotalsSupported, loadCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
 	import {
 		canGenerateDeviceQrCode,
 		resolveDeviceProductId,
@@ -1269,7 +1274,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/business/detail') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/business/detail') },
-		components: { MciBusinessRelatedList },
+		components: { MciBusinessRelatedList, XjyCustomerContractTotals },
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -1296,6 +1301,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				definition: null,
 				viewManifest: null,
 				metricValues: {},
+				customerContractTotals: { status: 'loading' },
+				customerContractTotalsRequestId: 0,
 				tenantDerivedState: {},
 				expandedSections: {},
 				activeFormTabKey: '',
@@ -1313,6 +1320,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			}
 		},
 		computed: {
+			showCustomerContractTotals() {
+				return customerContractTotalsSupported(this.moduleConfig.table)
+			},
 			canEditRecord() {
 				return canEditMenuRecord(this.menuId, this.currentUser)
 			},
@@ -1973,6 +1983,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			this.scheduleRelatedViewportMeasure()
 		},
 		onUnload() {
+			this.customerContractTotalsRequestId += 1
 			this.clearRelatedViewportMeasureTimers()
 		},
 		methods: {
@@ -2059,6 +2070,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 						}
 					})
 					if (this.key === 'customers') await this.loadCustomerRelationMetrics()
+					else if (this.showCustomerContractTotals) await this.loadCustomerContractAmounts()
 					if (!Object.keys(this.expandedSections).length) {
 						this.$nextTick(() => {
 							const first = this.visibleSections[0]
@@ -2403,8 +2415,26 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				) || candidates.find(Boolean)
 				if (target && typeof target.openAdd === 'function') target.openAdd()
 			},
-			// zhy：设备数、订单数和订单金额统一从关联模块实时统计，避免依赖
-			// Diy_Kehu.ShebeiSL / DingdanSL 这两个未必回写的冗余字段。
+			async loadCustomerContractAmounts() {
+				if (!this.showCustomerContractTotals) return
+				const requestId = ++this.customerContractTotalsRequestId
+				const customerId = String(this.detail.Id || this.id || '')
+				const menuId = this.menuId
+				this.customerContractTotals = { status: 'loading' }
+				try {
+					const totals = await loadCustomerContractTotals({
+						customerIds: [customerId],
+						customerMenuId: this.menuId,
+						run: (key, params) => V8.ApiEngine.Run(key, params, { checkCode: false })
+					})
+					if (requestId !== this.customerContractTotalsRequestId || menuId !== this.menuId || customerId !== String(this.detail.Id || this.id || '')) return
+					this.customerContractTotals = totals[customerId] || { status: 'unavailable', message: '合同金额暂未获取', values: {} }
+				} catch (error) {
+					if (requestId !== this.customerContractTotalsRequestId || menuId !== this.menuId || customerId !== String(this.detail.Id || this.id || '')) return
+					this.customerContractTotals = { status: 'unavailable', message: error?.message || '合同金额加载失败', values: {} }
+				}
+			},
+			// 设备数、订单数和订单金额从关联模块实时统计，不依赖客户主表冗余字段。
 			async loadCustomerRelationMetrics() {
 				const customerId = this.detail.Id || this.id
 				const loadSummary = async (moduleKey) => {
@@ -2424,7 +2454,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				}
 				const [deviceSummary, orderSummary] = await Promise.allSettled([
 					loadSummary('devices'),
-					loadSummary('orders')
+					loadSummary('orders'),
+					this.loadCustomerContractAmounts()
 				])
 				const values = { ...this.metricValues }
 				values['customer-device-count'] = deviceSummary.status === 'fulfilled'

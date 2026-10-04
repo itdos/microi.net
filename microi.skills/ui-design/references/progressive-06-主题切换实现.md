@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=ui-design-018 sha256=c83c67d0a4520a52e8933e5b8785fe3a725e1b47b675cf1f5aa945187c9cfd2c -->
+<!-- microi-progressive:chunk id=ui-design-018 sha256=0775731c9096616e8a72cdc5bcef34d8069d72bee2f2e00d1bc1fe78a82b91e6 -->
 ## 主题切换实现
 
 ### 首选：Microi.UI 运行时
@@ -179,7 +179,7 @@ function toggle() { cur.value = toggleTheme(); uni.showToast({ title: '已切换
 
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-019 sha256=535f58f5173e164ebe23480d3a65ce894fcf0aab65dddc209dabd86c939cf9b6 -->
+<!-- microi-progressive:chunk id=ui-design-019 sha256=b18f827091a6dd59b45177b6004ba86dfabdb299b9e22ea1f232ea0412765e30 -->
 ## 命名规范
 
 - CSS 变量前缀：`--mci-`

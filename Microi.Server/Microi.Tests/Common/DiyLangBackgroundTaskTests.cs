@@ -350,7 +350,7 @@ public sealed class DiyLangBackgroundTaskTests
         var package = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "app.microi.saas-engine.json")));
         var moreButtons = package.Descendants()

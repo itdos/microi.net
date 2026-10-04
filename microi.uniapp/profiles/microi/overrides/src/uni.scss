@@ -1,0 +1,36 @@
+/* uni.scss - 全局样式变量
+ * MCI 设计系统接入点
+ * 1. SCSS 变量（编译时常量，可在 <style lang="scss"> 中使用）
+ * 2. CSS 自定义属性 (--mci-*) 由 styles/mci-design.scss 注入到 page 选择器
+ */
+
+/* ========== MCI 品牌色（SCSS 编译时常量） ========== */
+$mci-color-primary: #6C2BD9;
+$mci-color-primary-light: #8B5CF6;
+$mci-color-accent-blue: #2196F3;
+$mci-color-accent-cyan: #06B6D4;
+$mci-color-accent-pink: #EC4899;
+
+$mci-bg-base: #F5F5FA;
+$mci-bg-elevated: #FFFFFF;
+
+$mci-text-primary: #1A1A2E;
+$mci-text-secondary: rgba(26, 26, 46, 0.65);
+$mci-text-tertiary: rgba(26, 26, 46, 0.45);
+
+$mci-color-success: #07C160;
+$mci-color-warning: #FF9900;
+$mci-color-danger: #E8294A;
+
+/* ========== 旧版 brand-color 别名（兼容历史代码） ========== */
+$brand-color: $mci-color-primary;
+$brand-color-light: $mci-color-primary-light;
+$brand-color-dark: #3a56d4;
+$text-color: $mci-text-primary;
+$text-color-secondary: #999999;
+$text-color-placeholder: #cccccc;
+$bg-color: $mci-bg-base;
+$border-color: #eeeeee;
+$success-color: $mci-color-success;
+$warning-color: $mci-color-warning;
+$error-color: $mci-color-danger;

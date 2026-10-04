@@ -49,7 +49,7 @@
           <text v-else-if="field.component === 'Radio'" class="radio-mark">{{ selected(option) ? '●' : '○' }}</text><text>{{ option.label }}</text>
         </view>
       </view>
-      <text v-if="chipLoading" class="option-state">正在加载…</text>
+      <mci-skeleton v-if="chipLoading" type="list" :rows="1" compact />
       <text v-else-if="chipError" class="option-state" @tap="loadChips">{{ chipError }}，点击重试</text>
       <text v-else-if="chipHasMore" class="option-state" @tap="loadChips">加载更多选项</text>
       <text v-else-if="!chipOptions.length" class="option-state">暂无可选项</text>

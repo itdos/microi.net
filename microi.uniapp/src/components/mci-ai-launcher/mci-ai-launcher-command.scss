@@ -1,0 +1,35 @@
+/* Microi Blue Suite dock: five equal native tool slots across H5 and App. */
+.mci-bottom-dock {
+  right: max(0px, var(--mci-safe-right, 0px));
+  bottom: 0;
+  left: max(0px, var(--mci-safe-left, 0px));
+  grid-template-columns: minmax(0, 4fr) minmax(0, 1fr);
+  gap: 0;
+  padding: 0 8rpx max(0px, var(--mci-safe-bottom, env(safe-area-inset-bottom, 0px)));
+  border-top: 1rpx solid var(--mci-border-color);
+  background: rgba(255,255,255,.98);
+  box-shadow: 0 -3px 12px rgba(16,47,60,.075);
+}
+.mci-bottom-dock [role='button'] { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.mci-bottom-dock [role='button']:focus-visible { outline: 3rpx solid var(--mci-focus-ring); outline-offset: -3rpx; }
+.mci-bottom-dock--without-ai { grid-template-columns: minmax(0, 1fr); }
+.mci-bottom-dock__nav,
+.mci-bottom-dock--without-ai .mci-bottom-dock__nav { height: 110rpx; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.mci-bottom-dock__item { position: relative; min-height: 96rpx; gap: 2rpx; color: var(--mci-text-tertiary); }
+.mci-bottom-dock__item::before { position: absolute; top: 0; left: 50%; width: 32rpx; height: 4rpx; border-radius: 0 0 3rpx 3rpx; background: transparent; transform: translateX(-50%); content: ''; }
+.mci-bottom-dock__item--active { color: var(--mci-color-primary); }
+.mci-bottom-dock__item--active::before { background: var(--mci-color-primary); }
+.mci-bottom-dock__item--pressed { transform: none; background: var(--mci-color-primary-faint); }
+.mci-bottom-dock__icon { width: 34rpx; height: 34rpx; }
+.mci-bottom-dock__label { font-size: 18rpx; line-height: 25rpx; font-weight: 650; }
+.mci-ai-launcher { position: relative; width: 100%; height: 110rpx; min-width: 0; min-height: 96rpx; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.mci-ai-launcher::before { position: absolute; top: 13rpx; width: 46rpx; height: 46rpx; border: 1rpx solid var(--mci-border-color); border-radius: 7rpx; background: var(--mci-ops-header, #102f3c); content: ''; }
+.mci-ai-launcher__ring { display: none; }
+.mci-ai-launcher__robot { position: relative; width: 38rpx; height: 38rpx; margin-top: -14rpx; }
+.mci-ai-launcher__label { right: 0; bottom: 8rpx; left: 0; color: var(--mci-text-tertiary); font-size: 18rpx; line-height: 25rpx; font-weight: 650; }
+.mci-ai-launcher--pressed { transform: none; background: var(--mci-color-primary-faint); box-shadow: none; }
+.mci-ai-launcher--fallback { right: max(0px, var(--mci-safe-right, 0px)); }
+@media screen and (min-width: 768px) {
+  .mci-bottom-dock { right: auto; left: 50%; width: min(430px, 100vw); transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) { .mci-bottom-dock__item, .mci-ai-launcher { transition: none; } }

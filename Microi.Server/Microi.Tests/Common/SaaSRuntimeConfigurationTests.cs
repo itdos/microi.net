@@ -66,7 +66,7 @@ public class SaaSRuntimeConfigurationTests
 
         var root = FindRepositoryRoot();
         var source = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "23-UpgradeSaaSRuntimeSettings.cs"));
+            root, "Microi.Server", "Microi.Tests", "Fixtures", "RetiredUpgrade", "23-UpgradeSaaSRuntimeSettings.cs"));
         Assert.Contains("new RuntimeField(name, label, \"mediumtext\"", source);
         Assert.Contains("PromoteExistingMySqlTextColumns", source);
         Assert.DoesNotContain("new RuntimeField(name, label, \"varchar(2000)\"", source);
@@ -708,7 +708,7 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
-    public void PendingUpgradeChainMaintainsApplicationStreamV3SchemaBeforeBaselineAdvances()
+    public void RecoveryPackagePrecedesVersionAdvanceWithoutOptionalPublishingSchemaMigration()
     {
         var root = FindRepositoryRoot();
         var source = File.ReadAllText(Path.Combine(
@@ -716,18 +716,14 @@ public class SaaSRuntimeConfigurationTests
         var coordinator = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
 
-        var gateInvariantIndex = source.IndexOf("EnsureTenantGateInvariant", StringComparison.Ordinal);
-        var streamSchemaInvariantIndex = source.IndexOf("EnsureApplicationStreamV3SchemaInvariant", StringComparison.Ordinal);
-        var baselineIndex = source.IndexOf("new Upgrade36().Run", StringComparison.Ordinal);
-
-        Assert.True(gateInvariantIndex >= 0,
-            "A pending upgrade must maintain the tenant application gate schema.");
-        Assert.True(streamSchemaInvariantIndex > gateInvariantIndex,
-            "The V3 stream schema must be maintained after its tenant gate.");
-        Assert.True(baselineIndex > streamSchemaInvariantIndex,
-            "Application publish prerequisites must be ready before the one-time baseline advances.");
-        Assert.DoesNotContain("EnsureTenantGateInvariant", coordinator, StringComparison.Ordinal);
-        Assert.DoesNotContain("EnsureApplicationStreamV3SchemaInvariant", coordinator, StringComparison.Ordinal);
+        var metadata = source.IndexOf("EnsureMarketplaceMetadataBootstrapUnderLeaseAsync", StringComparison.Ordinal);
+        var install = source.IndexOf("new UpgradeAppStore().Run", StringComparison.Ordinal);
+        var advance = source.IndexOf("PersistServerVersionForwardOnlyAsync(osClientSecret, UpgradeAppStore.Version)", StringComparison.Ordinal);
+        Assert.True(metadata >= 0 && install > metadata);
+        Assert.True(advance > install, "Only verified startup and marketplace recovery may advance ServerVersion.");
+        Assert.DoesNotContain("new Upgrade36().Run", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureTenantGateInvariant", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureApplicationStreamV3SchemaInvariant", source, StringComparison.Ordinal);
         Assert.Contains("if (IsVersionAtLeast(beforeVersion, targetVersion))", coordinator, StringComparison.Ordinal);
     }
 
@@ -927,7 +923,7 @@ public class SaaSRuntimeConfigurationTests
         Assert.Contains("TranslateApiKey", Upgrade31.FieldNames);
 
         var upgradeSource = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(), "Microi.Server", "Microi.Upgrade",
+            FindRepositoryRoot(), "Microi.Server", "Microi.Tests", "Fixtures", "RetiredUpgrade",
             "31-UpgradeTranslateTenantSettings.cs"));
         Assert.DoesNotContain("Type = \"varchar", upgradeSource);
         Assert.Contains("Name = \"TranslateUrl\", Label = \"翻译服务地址\", Type = \"mediumtext\"", upgradeSource);
@@ -1053,7 +1049,7 @@ public class SaaSRuntimeConfigurationTests
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "app.microi.saas-engine.json")));
         var authSecret = Assert.Single(

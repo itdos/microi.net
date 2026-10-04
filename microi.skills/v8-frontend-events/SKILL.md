@@ -14,7 +14,7 @@ description: Microi 前端 V8 事件与客户端能力指南。用于编写浏�
 > 本文重点是 **字段事件、按钮事件、列表事件、模板引擎、其它前端钩子**。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-frontend-events-000 sha256=70e28f65232cb781fcf3dadd2e1896bd1534b15876545170e81667aa6322724d -->
+<!-- microi-progressive:chunk id=v8-frontend-events-000 sha256=69ad0ebf0c8aca6edcbc0bbfe7e280986525bf28f68da8cb33c8efbc4509f7da -->
 ## 能力路由
 
 - 查询前端 V8 全部上下文、导航、表单、列表、网络、引擎与工具入口时，读取 `../v8-utilities/references/client-api-index.md`。
@@ -25,7 +25,7 @@ description: Microi 前端 V8 事件与客户端能力指南。用于编写浏�
 - 登录后的敏感操作使用 `V8.Identity.Verify` 完成 Passkey/严格人脸交互；前端只取得一次性 Ticket，后端接口引擎必须重算 `ActionHash` 并原子消费，不能把前端成功当作授权。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-001 sha256=a9f8e1aed64db4b57ff762eb557c0d764b5f703a722dc080d273c4111afe234f -->
+<!-- microi-progressive:chunk id=v8-frontend-events-001 sha256=eaab87d01b0fd2b6964326ee11edd7b793899c679930c575a0a2b309d36a367a -->
 ## 字段事件（在【字段属性】中配置）
 
 ### FieldValueChange — 值变更事件（最常用）
@@ -111,7 +111,7 @@ V8.OpenAnyTable({
 `ReadOnlyButton` 的产品文案是【禁用插槽按钮】：只控制按钮是否可点击，不等同于字段只读，应保留用于权限和状态控制。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-002 sha256=332a6ed2c90fe8ff23f04d7fd1c3a24df263b2692f2c292337a468a0423b409f -->
+<!-- microi-progressive:chunk id=v8-frontend-events-002 sha256=faf64dbf6ded2a086c347bea31edecb7d6fc8b765114290d17998b7370d17372 -->
 ## 按钮事件
 
 ### V8BtnRun — 按钮点击执行（菜单按钮、表单按钮）
@@ -151,19 +151,19 @@ return V8.Form.Status === '待审核' && V8.CurrentUser.RoleName.indexOf('审批
 至少覆盖“主表详情 → 定制子表 → 子记录详情”链路中的含 `await` 显隐代码。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-003 sha256=68aab95ab02bfca93b69eaea1c188650cb7ef13f8566bee81a63c660a4437512 -->
+<!-- microi-progressive:chunk id=v8-frontend-events-003 sha256=6c44ac4b3bc74f128b5efb8b7b51851ca28bdfc3e8f8b52a3d50f9fc043d4977 -->
 ## 模板引擎事件
 
 `TableTemplateEngine` / `FormTemplateEngine` — 见 `v8-template-engine/SKILL.md`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-004 sha256=2db34699ad5433a8c8b194c9ce9909ed4d420d257dd8c6532238215402499c82 -->
+<!-- microi-progressive:chunk id=v8-frontend-events-004 sha256=4071ce5e92d2352e455e4dbe5310cc3d8f8c349721ad53f734397d30dc0b2c4e -->
 ## 工作流事件（前端）
 
 `WFNodeEnd` — 流程节点结束后前端通知。详见 `v8-workflow/SKILL.md`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-005 sha256=e7f73123dfc00720f60c49705e91854b6f18cb0506a115a6078481dc37aed41c -->
+<!-- microi-progressive:chunk id=v8-frontend-events-005 sha256=717095c6c96b1895cf607d787854a6f99c9ac90cc9282bdc95b5f9b4cfa4095e -->
 ## 设计模式保护（CRITICAL）
 
 ```javascript

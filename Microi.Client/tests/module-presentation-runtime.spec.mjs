@@ -41,6 +41,11 @@ test("top-level desktop lists receive a compact default header without enabling 
     assert.equal(header.Title, "全量测试(勿删)");
     assert.equal(header.Description, "测试模块");
     assert.deepEqual(header.Metrics.map((metric) => metric.Label), ["总金额合计", "筛选结果", "本页待处理"]);
+    const reversed = buildAutomaticPresentationMetrics({
+        fields: [{ Name: "Status", Label: "状态", Component: "Select", Type: "varchar(25)" }],
+        rows: [{ Status: "已完成" }, { Status: "待处理" }]
+    });
+    assert.equal(reversed.find((metric) => metric.Label === "本页已完成").DefaultValue, 1);
 
     assert.equal(resolveListPresentationHeader({ menu: { Name: "子表" }, isTableChild: true }).Visible, false);
     assert.equal(resolveListPresentationHeader({ menu: { Name: "嵌入表" }, embedded: true }).Visible, false);

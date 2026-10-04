@@ -358,7 +358,7 @@ public sealed class ApplicationStreamSchemaUpgradeTests
     [Fact]
     public void AppStoreFreshInstallResourceContainsEveryV3ColumnAndMetadataDefinition()
     {
-        var loadResources = typeof(UpgradeAppStore).GetMethod(
+        var loadResources = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(loadResources);
