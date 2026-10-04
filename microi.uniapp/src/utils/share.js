@@ -340,11 +340,9 @@ export function enableShareMenu(vm) {
   // #endif
 }
 
-let sharedAuthRedirecting = false
-
 export function maybeRedirectSharedReceiver() {
   // #ifdef MP-WEIXIN
-  if (sharedAuthRedirecting || typeof getCurrentPages !== 'function') return
+  if (typeof getCurrentPages !== 'function') return
   const pages = getCurrentPages()
   const current = pages && pages.length ? pages[pages.length - 1] : null
   if (!current || String(current.options && current.options.fromShare || '') !== '1') return
@@ -352,13 +350,11 @@ export function maybeRedirectSharedReceiver() {
   const user = getUser() || {}
   if (getToken() && user.Id) return
 
-  // 原页面留在栈中；登录页已有 redirect 恢复逻辑，业务记录继续走服务端行权限。
-  sharedAuthRedirecting = true
+  // 与鉴权和业务入口共享全局登录导航锁；去重的 invoke(false) 不会触发 complete，
+  // 因此这里不能维护独立锁，否则一次被取消就会永久跳过后续分享登录引导。
   const redirect = buildFriendShare(null, current.route).path
   uni.navigateTo({
-    url: `/pages/login/index?redirect=${encodeURIComponent(redirect)}`,
-    fail: () => { sharedAuthRedirecting = false },
-    complete: () => { setTimeout(() => { sharedAuthRedirecting = false }, 800) }
+    url: `/pages/login/index?redirect=${encodeURIComponent(redirect)}`
   })
   // #endif
 }

@@ -33,7 +33,7 @@
 4. `Microi.Server/Microi.Core/Interface/IMicroiMQTT.cs`：
    `IMicroiMQTT.PublishAsync(osClient, ...)` 可信后端发布和节点状态接口。
 5. `Microi.Server/Microi.Core/V8Engine/Runtime/V8Method.PlatformPluginRuntimes.cs`
-   与 `Microi.Server/Microi.Upgrade/Resource/platform-mqtt.js`：平台管理员、当前节点
+   与 `Microi.Server/OfficialApplications/Resource/platform-mqtt.js`：平台管理员、当前节点
    状态、租户 Topic 边界与接口引擎交付入口。
 6. `microi.doc/docs/doc/system-engine/mqtt-engine.md`：面向用户的完整能力说明。
 

@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-crud-api-015 sha256=f68c7713878a84a265a5185940d25db21525e73a7dba6d05ba6f82030b96e60a -->
+<!-- microi-progressive:chunk id=v8-crud-api-015 sha256=75eb96d81537ac44c7bca1a97a557c427baa198434cfab003e91982b8b81c419 -->
 ## _Where 条件语法速查
 
 ```javascript
@@ -36,7 +36,7 @@
 **支持的操作符：** `=`, `==`, `<>`, `!=`, `>`, `>=`, `<`, `<=`, `Like`, `NotLike`, `StartLike`, `EndLike`, `In`, `NotIn`
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-016 sha256=6fe2c6360151a569c46bdc2234b622f7ae8a2f3f76376fda5d90b2ab10ac4e51 -->
+<!-- microi-progressive:chunk id=v8-crud-api-016 sha256=820f49da26c6be5baa52520152780fc155ed84e747e89a1f50b954d3112fa202 -->
 ## 注意事项
 
 - `_Where` 是参数化查询，自动防 SQL 注入，**不要拼接 SQL 字符串**

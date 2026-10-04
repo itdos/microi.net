@@ -14,6 +14,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$isWindowsHost = $env:OS -eq 'Windows_NT'
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
     $WorkspaceRoot = Join-Path $PSScriptRoot '..\..'
@@ -26,11 +27,17 @@ $frontendRoot = (Join-Path $resolvedWorkspace 'Microi.Client').Replace('/', '\')
 $releaseOutput = Join-Path $resolvedWorkspace 'Microi.Server\Microi.net.Api\bin\Release'
 $releaseLockDirectory = Join-Path $resolvedWorkspace '.tmp\microi-process-state\release.lock'
 $processCurrentDirectoryCache = @{}
+if (-not $isWindowsHost) {
+    # POSIX 身份保留路径大小写；命令行或 CWD 无法回读时仍失败关闭。
+    $backendRoot = Join-Path $resolvedWorkspace 'Microi.Server/Microi.net.Api'
+    $frontendRoot = Join-Path $resolvedWorkspace 'Microi.Client'
+}
+
 
 # Win32_Process 不公开进程当前目录。Vite 子进程由相对路径启动且父 npm/终端已经退出时，
 # CommandLine 只剩 node_modules/vite/bin/vite.js，无法证明它属于哪个工作区。这里通过只读
 # Windows 进程参数回读 CWD；读取失败时返回空，后续身份校验继续失败关闭。
-if ($null -eq ('Microi.ProcessTools.NativeProcessInspector' -as [type])) {
+if ($isWindowsHost -and $null -eq ('Microi.ProcessTools.NativeProcessInspector' -as [type])) {
     Add-Type -Language CSharp -TypeDefinition @'
 using System;
 using System.ComponentModel;
@@ -197,7 +204,36 @@ function Write-Info([string]$Message) {
     Write-Host "[Microi process manager] $Message"
 }
 
+function Get-PosixProcessSnapshot {
+    $commands = @{}
+    & ps -axo 'pid=,args=' | ForEach-Object {
+        if ($_ -match '^\s*(\d+)\s+(.*)$') { $commands[[int]$Matches[1]] = $Matches[2] }
+    }
+    if ($LASTEXITCODE -ne 0) { throw '无法只读回读进程命令行，已停止。' }
+    $result = @{}
+    & ps -axo 'pid=,ppid=,comm=' | ForEach-Object {
+        if ($_ -match '^\s*(\d+)\s+(\d+)\s+(.*)$') {
+            $processId = [int]$Matches[1]
+            $parentId = [int]$Matches[2]
+            $executable = $Matches[3].Trim()
+            $name = [System.IO.Path]::GetFileName($executable)
+            $startTicks = 0L
+            if ($name -match '^(node|dotnet|Microi\.net\.Api(?:\.exe)?)$') {
+                try { $startTicks = (Get-Process -Id $processId -ErrorAction Stop).StartTime.Ticks } catch {}
+            }
+            $result[$processId] = [PSCustomObject]@{
+                ProcessId = $processId; ParentProcessId = $parentId; Name = $name
+                CommandLine = [string]$commands[$processId]; ExecutablePath = $executable
+                StartTimeTicks = $startTicks
+            }
+        }
+    }
+    if ($LASTEXITCODE -ne 0) { throw '无法只读回读进程身份，已停止。' }
+    return $result
+}
+
 function Get-ProcessSnapshot {
+    if (-not $isWindowsHost) { return Get-PosixProcessSnapshot }
     $result = @{}
     Get-CimInstance Win32_Process -ErrorAction Stop | ForEach-Object {
         $result[[int]$_.ProcessId] = $_
@@ -221,7 +257,16 @@ function Get-ProcessCurrentDirectory($ProcessInfo) {
 
     $currentDirectory = ''
     try {
-        $rawDirectory = [Microi.ProcessTools.NativeProcessInspector]::GetCurrentDirectory($processId)
+        if ($isWindowsHost) {
+            $rawDirectory = [Microi.ProcessTools.NativeProcessInspector]::GetCurrentDirectory($processId)
+        } else {
+            $cwd = @(& lsof -a -p $processId -d cwd -Fn 2>$null | Where-Object { $_.StartsWith('n/') })
+            if ($LASTEXITCODE -ne 0 -or $cwd.Count -ne 1) { throw '进程工作目录无法唯一回读。' }
+            $rawDirectory = $cwd[0].Substring(1)
+            $currentDirectory = [System.IO.Path]::GetFullPath($rawDirectory).TrimEnd('/')
+            $processCurrentDirectoryCache[$processId] = $currentDirectory
+            return $currentDirectory
+        }
         if (-not [string]::IsNullOrWhiteSpace($rawDirectory)) {
             $currentDirectory = ([System.IO.Path]::GetFullPath($rawDirectory)).TrimEnd('\', '/').Replace('/', '\').ToLowerInvariant()
         }
@@ -234,6 +279,24 @@ function Get-ProcessCurrentDirectory($ProcessInfo) {
 }
 
 function Test-IsWorkspaceBackend($ProcessInfo) {
+    if (-not $isWindowsHost) {
+        $name = ([string]$ProcessInfo.Name).ToLowerInvariant()
+        if ($name -eq 'microi.net.api') {
+            # macOS/Linux 的 dotnet run 会启动无扩展名 apphost；可执行文件必须
+            # 精确位于当前 API 项目的 bin 下，并保留规范路径与 CWD 的身份校验。
+            # 同名外部程序、路径越界或无法读取身份时均拒绝结束。
+            $executable = [string]$ProcessInfo.ExecutablePath
+            try { $canonicalExecutable = [System.IO.Path]::GetFullPath($executable) } catch { return $false }
+            if ($executable -cne $canonicalExecutable) { return $false }
+            if (-not $executable.StartsWith($backendRoot + '/bin/', [StringComparison]::Ordinal)) { return $false }
+            if ([System.IO.Path]::GetFileName($executable) -cne 'Microi.net.Api') { return $false }
+            return (Get-ProcessCurrentDirectory $ProcessInfo) -ceq $backendRoot
+        }
+        if ($name -ne 'dotnet' -and $name -ne 'microi.net.api.exe') { return $false }
+        $text = Get-CommandText $ProcessInfo
+        if (-not ($text.Contains('microi.net.api.dll') -or $text.Contains('microi.net.api.exe') -or $text.Contains('microi.net.api.csproj') -or $text.Contains('dotnet run'))) { return $false }
+        return (Get-ProcessCurrentDirectory $ProcessInfo) -ceq $backendRoot
+    }
     $processName = ([string]$ProcessInfo.Name).ToLowerInvariant()
     if ($processName -ne 'dotnet.exe' -and $processName -ne 'microi.net.api.exe') { return $false }
     $text = Get-CommandText $ProcessInfo
@@ -254,6 +317,12 @@ function Test-IsWorkspaceBackend($ProcessInfo) {
 }
 
 function Test-IsWorkspaceFrontend($ProcessInfo) {
+    if (-not $isWindowsHost) {
+        if (([string]$ProcessInfo.Name).ToLowerInvariant() -ne 'node') { return $false }
+        $text = Get-CommandText $ProcessInfo
+        if (-not ($text.Contains('node_modules\') -and $text.Contains('\vite\bin\vite'))) { return $false }
+        return (Get-ProcessCurrentDirectory $ProcessInfo) -ceq $frontendRoot
+    }
     $processName = ([string]$ProcessInfo.Name).ToLowerInvariant()
     if ($processName -ne 'node.exe') { return $false }
     $text = Get-CommandText $ProcessInfo
@@ -273,6 +342,11 @@ function Test-IsWorkspaceFrontend($ProcessInfo) {
 }
 
 function Get-ListeningProcessIds([int]$Port) {
+    if (-not $isWindowsHost) {
+        $ids = @(& lsof -nP "-iTCP:$Port" -sTCP:LISTEN -t 2>$null | Where-Object { $_ -match '^\d+$' } | Select-Object -Unique)
+        if ($LASTEXITCODE -gt 1) { throw '无法回读监听端口，已停止。' }
+        return @($ids | ForEach-Object { [int]$_ })
+    }
     $ids = @()
     try {
         $ids = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction Stop |
@@ -338,6 +412,15 @@ function Assert-ListenerIdentity(
     }
 }
 
+# POSIX 的已退出子进程可能等待父进程回收而暂时保留 PID；僵尸状态已不持有资源。
+function Get-LivePosixProcess([int]$ProcessId) {
+    $state = @(& /bin/ps -p $ProcessId -o stat= 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $state.Count -eq 0) { return $null }
+    if ($state.Count -ne 1) { throw '进程状态无法唯一回读，已停止。' }
+    if ($state[0].Trim().StartsWith('Z')) { return $null }
+    return Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+}
+
 function Stop-VerifiedProcessTree($ProcessInfo, [hashtable]$Snapshot, [string]$Reason) {
     if ($null -eq $ProcessInfo) { return }
     $processId = [int]$ProcessInfo.ProcessId
@@ -347,6 +430,34 @@ function Stop-VerifiedProcessTree($ProcessInfo, [hashtable]$Snapshot, [string]$R
     if ($null -eq (Get-Process -Id $processId -ErrorAction SilentlyContinue)) { return }
 
     Write-Info "正在结束 $Reason：$(Get-ProcessSummary $ProcessInfo $Snapshot)"
+    if (-not $isWindowsHost) {
+        # 终止前复核进程启动时间，拒绝 PID 复用；只遍历这个已证明归属的根进程后代。
+        $live = Get-LivePosixProcess $processId
+        if ($null -eq $live) { return }
+        if ($ProcessInfo.StartTimeTicks -le 0 -or $live.StartTime.Ticks -ne $ProcessInfo.StartTimeTicks) { throw '目标 PID 身份已变化，拒绝结束。' }
+        $tree = [System.Collections.Generic.List[object]]::new()
+        function Add-Descendant([int]$parent) {
+            foreach ($child in $Snapshot.Values | Where-Object { [int]$_.ParentProcessId -eq $parent }) {
+                if ([int]$child.ProcessId -eq $PID) { throw '拒绝结束进程管理器自身。' }
+                Add-Descendant ([int]$child.ProcessId)
+                try { $running = Get-LivePosixProcess ([int]$child.ProcessId); $tree.Add(@{ Id = $running.Id; Start = $running.StartTime.Ticks }) } catch {}
+            }
+        }
+        Add-Descendant $processId
+        $tree.Add(@{ Id = $processId; Start = $live.StartTime.Ticks })
+        foreach ($target in $tree) {
+            $running = Get-LivePosixProcess $target.Id
+            if ($null -ne $running -and $running.StartTime.Ticks -eq $target.Start) { & /bin/kill -TERM $target.Id 2>$null }
+        }
+        $deadline = [DateTime]::UtcNow.AddSeconds(5)
+        while ([DateTime]::UtcNow -lt $deadline -and (Get-LivePosixProcess $processId)) { Start-Sleep -Milliseconds 100 }
+        foreach ($target in $tree) {
+            $running = Get-LivePosixProcess $target.Id
+            if ($null -ne $running -and $running.StartTime.Ticks -eq $target.Start) { & /bin/kill -KILL $target.Id 2>$null }
+        }
+        if (Get-LivePosixProcess $processId) { throw "无法结束已验证的根进程 PID=$processId" }
+        return
+    }
     try {
         & taskkill.exe /PID $processId /T 2>&1 | Out-Null
     }

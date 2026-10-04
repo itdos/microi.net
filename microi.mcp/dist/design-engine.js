@@ -492,6 +492,19 @@ function scenarioData(scenario) {
 }
 export function buildPageDesign(input) {
     const prompt = input.prompt || '';
+    if (/平台首页|智能工作台|AI.*首页|首页.*AI|platform.*home/i.test(prompt)) {
+        const dark = /dark|深色|黑色/.test(`${prompt} ${input.style || ''}`);
+        const nativePanel = (title, type, span, params) => makeWrapper(title, span, 360, number => [makeWidget(type, title, number, 24, 320, params)], dark);
+        return {
+            formConfig: { ...defaultPageFormConfig, title: input.title || '智能工作首页', dark, themeMode: dark ? 'dark' : 'system' },
+            wrapperList: [
+                nativePanel('AI 创作中心', 'aiengine', 14, []),
+                nativePanel('工作概览', 'homeoverview', 10, [param(0, '个人统计接口', 'input', 'platform-home-overview'), param(1, '布局密度', 'select', 'compact')]),
+                nativePanel('我的工作', 'workcenter', 16, [param(0, '视图', 'select', 'work'), param(1, '工作菜单', 'sysmenu', ''), param(2, '流程菜单', 'sysmenu', ''), param(3, '公告菜单', 'sysmenu', ''), param(4, '日历菜单', 'sysmenu', ''), param(5, '首页任务分页条数', 'input', 5)]),
+                nativePanel('本月日程', 'diycalendar', 8, [param(0, '日历菜单', 'sysmenu', ''), param(1, '布局密度', 'input', 'compact')]),
+            ],
+        };
+    }
     const scenario = scenarioFromPrompt(prompt, input.theme);
     const style = `${prompt} ${input.style || ''}`.toLowerCase();
     const dark = /dark|深色|黑色/.test(style);

@@ -1,14 +1,15 @@
+import workspacePaths from './lib/workspace-paths.js'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
 import { parse, compileTemplate } from '@vue/compiler-sfc'
 
-const engineDir = new URL('../../Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/', import.meta.url)
-const readEngine = (name) => fs.readFileSync(new URL(name, engineDir), 'utf8')
-const executeAcceptance = new Function('V8', readEngine('移动端-任务验收功能(task_acceptance).js'))
-const executeAuthorization = new Function('V8', readEngine('售后流程动作授权(shouhoudd_authorize_flow_action).js'))
-const executeFinish = new Function('V8', readEngine('售后服务订单服务完成(shouhoudd_finish).js'))
-const executeEvaluation = new Function('V8', readEngine('售后服务订单评价(shouhoudd_pingjia).js'))
+const readEngine = (key) => fs.readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), key), 'utf8')
+const executeAcceptance = new Function('V8', readEngine('task_acceptance'))
+const executeAuthorization = new Function('V8', readEngine('shouhoudd_authorize_flow_action'))
+const executeFinish = new Function('V8', readEngine('shouhoudd_finish'))
+const executeEvaluation = new Function('V8', readEngine('shouhoudd_pingjia'))
 
 const enabledPolicy = (patch = {}) => ({ Code: 1, Data: {
   Enabled: 1, NeedMerchantAcceptance: 1, NeedCustomerAcceptance: 1,

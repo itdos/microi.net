@@ -817,6 +817,33 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 对象删除必须区分文件和末尾带斜杠的目录。先执行既有租户/穿越校验，
+        /// 再恢复目录后缀；拒绝租户根，避免目录递归语义扩大到全部租户对象。
+        /// 绝对路径只接受当前租户根，不把未知绝对前缀误当作相对业务目录。
+        /// </summary>
+        public static string NormalizeStorageDeletePath(string osClient, string path)
+        {
+            var tenant = NormalizeTenantId(osClient);
+            var value = (path ?? string.Empty).Trim();
+            if (value.Length == 0 || value.Length > 2048
+                || value.IndexOfAny(new[] { '*', '?', '#', '[', ']', '{', '}' }) >= 0
+                || Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                   && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                throw new ArgumentException("删除对象必须指定明确的当前租户路径。", nameof(path));
+            if (value.StartsWith("/", StringComparison.Ordinal))
+            {
+                var first = value.TrimStart('/').Split('/')[0];
+                if (!string.Equals(first, tenant, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("禁止删除其它租户或未知绝对目录。");
+            }
+            var normalized = NormalizeStoragePath(tenant, value);
+            var root = "/" + tenant.ToLowerInvariant();
+            if (string.Equals(normalized.TrimEnd('/'), root, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("禁止删除租户根目录。", nameof(path));
+            return value.EndsWith("/", StringComparison.Ordinal) ? normalized + "/" : normalized;
+        }
+
+        /// <summary>
         /// Upload.Path 是逻辑子目录；它最终仍由 HDFS facade 拼接租户根和日期。
         /// </summary>
         public static string NormalizeUploadSubPath(string osClient, string path)

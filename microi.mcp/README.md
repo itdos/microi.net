@@ -30,6 +30,7 @@
 | `microi_recover_minimax_image_task` | 恢复已有供应商图片结果并重新落盘，不重新生成 | 恢复既有任务 |
 | `microi_get_db_schema` | 获取数据库表结构（表名、字段、类型、描述） | 只读 |
 | `microi_get_table_indexes` | 获取一张物理表的标准化索引（有序字段、唯一性、主键标识） | 只读 |
+| `microi_delete_empty_directory_marker` | 通过专用安全路由仅删除当前租户单个零字节空目录标记并严格回读；旧后端 404 不降级普通删除 | 默认 dry run；`confirmExecution` 精确等于路径 |
 | `microi_create_table_index` | 校验物理字段、幂等创建索引并回读 | 读写（需确认） |
 | `microi_drop_table_index` | 删除非主键索引并回读 | 破坏性写入（需确认） |
 | `microi_list_engines` | 列出所有接口引擎 | 只读 |
@@ -219,6 +220,10 @@ claude mcp add microi -- \
 
 > 将 `/path/to/microi.mcp` 替换为实际克隆路径。`MICROI_OS_CLIENT` 留空则使用后端默认应用。
 
+需要选择具体分区时，同时设置 `MICROI_OS_CLIENT`、`MICROI_OS_CLIENT_TYPE` 和 `MICROI_OS_CLIENT_NETWORK`。已配置的坐标随 Login 表单、Refresh 正文和每次 API Header 传输，流式 multipart 表单使用同一坐标；普通 JSON 业务正文和 GET 查询不额外注入 Type/Network。省略可选参数保持原协议。连接构造后坐标固定，单次请求的顶层字段、查询或特殊 URL 坐标与已配置值冲突、重复或包含非法标识时，在发送前拒绝。连接或恢复后先执行 `initialize`、`tools/list`、`microi_get_status`，核对实际 API、OsClient、Type、Network；Token 文件名不能代替服务端状态回读。
+
+三参数声明连接目标，不能切换 API 节点的可信运行分区或发布门禁。API 地址必须指向目标分区的真实节点；Header 已正确传输但状态仍不匹配时停止写入并修正节点地址，不修改 SaaS/gate、借用其它分区任务或用请求头强迫节点切区。
+
 ---
 
 ## 远程 SSE 模式（团队 / 生产推荐）
@@ -302,6 +307,8 @@ Cursor（`.cursor/mcp.json`）：
 }
 ```
 
+SSE 每个连接还可设置 `X-Microi-OsClientType` 和 `X-Microi-OsClientNetwork`，与 `X-Microi-OsClient` 一起覆盖服务器配置的对应默认坐标，并绑定该连接的 Login、续签、工具上下文和所有传输分支。重复头、非法标识或与普通坐标头冲突的值会拒绝连接；省略的项沿用服务器默认配置。
+
 > ⚠️ 配置文件包含敏感信息，请加入 `.gitignore` 避免提交到 Git。
 
 ---
@@ -316,6 +323,8 @@ Cursor（`.cursor/mcp.json`）：
 | `MICROI_TOKEN` | ※ | JWT Token（VS Code 插件自动管理） | |
 | `MICROI_TOKEN_FILE` | | Token 文件路径（VS Code 插件自动管理） | |
 | `MICROI_OS_CLIENT` | | 应用标识 | |
+| `MICROI_OS_CLIENT_TYPE` | | 可选租户类型；须绑定非空 `MICROI_OS_CLIENT` | `Product` |
+| `MICROI_OS_CLIENT_NETWORK` | | 可选租户网络；须绑定非空 `MICROI_OS_CLIENT` | `Internal` |
 | `MICROI_RSA_PUBLIC_KEY` | | 自定义 RSA 公钥（PEM） | |
 | `MCP_TRANSPORT` | | `stdio`（默认） 或 `sse` | |
 | `MCP_PORT` | | SSE 端口（默认 `3000`） | |

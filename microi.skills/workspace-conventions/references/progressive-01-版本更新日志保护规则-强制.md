@@ -100,7 +100,7 @@ AI 为 Microi 平台新增或修改任何业务逻辑、后台工具、数据维
 - 平台级强制安全校验不能为了“全部低代码化”放进租户可编辑脚本而被绕过；可以留在 C#，但必须是通用、失败关闭的安全边界，不得夹带某个项目的业务文案、字段组合或状态机。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=9364579ba944874dcdcc71c44066e285e2a3e88140255531e03deb2ec2cab598 -->
+<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=e33b8387bbe8dbc400249ca9d16f91656149492f5f7ce253cbfa67b80f4ca8ef -->
 ## 应用商城优先于 Microi.Upgrade（强制）
 
 能由应用包声明、差异安装和回读验收完成的升级，不得在 `Microi.Server/Microi.Upgrade/` 新增定制 .NET 升级类。表、字段、Tab、菜单、角色权限、接口引擎、表单事件、数据源、页面、打印、工作流、任务及可幂等安装的种子数据，默认都属于应用商城资源。
@@ -109,6 +109,7 @@ AI 为 Microi 平台新增或修改任何业务逻辑、后台工具、数据维
 - 吾码官方开发者若可调用绑定 `https://api.itdos.com`、`OsClient=iTdos` 的 `microi_itdos`，必须先在官方主租户通过 MCP 更新资源，重新制作并发布对应官方应用，发布后按字段/菜单/引擎/包版本回读；再用目标租户 MCP 安装/更新并轮询后台任务到 `Succeeded`。
 - 当前用户没有 `microi_itdos` 权限时，通过其自己的 MCP/Manifest 幂等升级自己的数据库并回读；不得为了单个租户把定制迁移塞进通用后端。确需让更多用户复用时，应生成其有权维护的社区/私有应用包。
 - 只有应用商城运行前就必须存在的物理兼容基础、跨版本核心协议迁移、存储格式变化，或安装器自身无法安全表达的不可逆平台迁移，才允许进入 `Microi.Upgrade`。每个例外必须写明“为什么应用包不能完成”、影响范围、回滚/前后兼容、分布式幂等和验收依据。
+- 自动恢复只保证启动、普通登录、菜单导航和应用商城安装／更新，SSO、AI、通知、备份、OCR、翻译等应用不能成为自动升级或启动门禁。完整官方资源放在 `Microi.Server/OfficialApplications/Resource/`，按显式清单生成 `Microi.Upgrade/Resource/` 的两项恢复资源；完整官方包的增长不得自动扩大启动闭包。更高版本且就绪的手动商城更新和既有租户 Hook 保留，失败不推进版本。
 - 允许的 .NET 迁移只能按持久化版本/迁移账本执行待办步骤，使用共享租约且业务幂等；禁止把新迁移同时加入版本链和“每次启动无条件全租户对账”列表。启动成本必须与待执行迁移数相关，不能随历史升级文件总数对每个租户线性增长。
 - 评审 `Microi.Upgrade` PR 时先做资源分类：若只是补字段、Tab 或低代码元数据，移出升级器并发布应用包；若保留 C#，必须提供双节点、重复启动、租约丢失、失败不推进版本以及旧新节点共存测试。
 
@@ -139,7 +140,7 @@ AI 开始处理定制页面、弹窗、Web、UniApp、微服务或应用商城�
 如果 MCP 返回登录过期，必须先修复或刷新目标 MCP 身份，再继续把 MCP 读取结果当作当前事实；不能因为读取失败就假设在线应用不存在并重复创建。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-020 sha256=64ab3dbde08488e8cf9f320bf74d97c938507170723022efeb6ab4f96380f9ca -->
+<!-- microi-progressive:chunk id=workspace-conventions-020 sha256=60e6dac03e25861d4e0507c30ab28d28e26ada4cbe3231c3b029eb2367dc7224 -->
 ## VS Code 插件空目录生成规则
 
 Microi.Agent 面向普通用户时，用户本地可能只是一个空工作区。插件生成 AI 指令文件时不能假设用户已经有 `microi.skills/`、`Microi-V8-Engine/`、`AI-Project/` 或某个固定前端项目目录。
@@ -151,7 +152,7 @@ Microi.Agent 面向普通用户时，用户本地可能只是一个空工作区�
 - 插件升级时应继续保护用户本地修改过的 skill 文件，只覆盖插件曾生成且用户未改过的文件。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-021 sha256=cee19f2fffffce3b4bcd9347a50ecf27add4be0c919e1cf5d00df98d487d29b8 -->
+<!-- microi-progressive:chunk id=workspace-conventions-021 sha256=963e489e2bdda4614c8b3089830b8bb855603dbd4338ddcc7ae29519d560766f -->
 ## Microi 版本号规则
 
 Microi 通用版本号采用 `主版本.次版本.修订版本` 三段数字格式，从 `1.0.0` 开始。每次发布时最后一位加 1；当某一位超过 `9` 时向前一位进位并将当前位归 `0`，例如 `1.0.9 -> 1.1.0`、`1.9.9 -> 2.0.0`、`9.9.9 -> 10.0.0`。
@@ -185,7 +186,7 @@ if (string.IsNullOrWhiteSpace(tableName)) { return; }
 如果方法内部只通过 `DynamicHelper` 读取对象字段，方法参数优先声明为 `object`，不要声明为 `dynamic`。这样可以减少 C# 运行时动态绑定进入普通字符串工具链的机会。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=1dfe4286cfee04571a3d24a32af15365b9da6abffe9acfd92a75539e6160f2bd -->
+<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=4ef009cbfca343640e69ccdb6be47f3cb13ad8a67f9ff770debce20c919f1bb3 -->
 ## 根目录保留文件说明
 
 根目录只允许存在以下类型的文件和目录：

@@ -13,6 +13,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { calculateBuildMemoryPlan } from './build-memory-plan.mjs';
+import { readAvailableMemory } from './available-memory.mjs';
 import {
     resolveBuildOutputMode,
     validateBuildOutputMode
@@ -31,7 +32,7 @@ const legacyOutDir = path.join(projectDir, 'bin', 'Release', '.legacy-dist');
 const logDir = path.join(projectDir, '.tmp', 'build-logs');
 const guardPidPath = path.join(logDir, 'guard.pid');
 const totalMemory = os.totalmem();
-const freeMemory = os.freemem();
+const freeMemory = readAvailableMemory();
 const pauseMemoryUsageRatio = 0.95;
 const resumeMemoryUsageRatio = 0.9;
 const resumeStableSampleCount = 5;
@@ -282,7 +283,7 @@ function closeMemoryWaitInput() {
 async function waitForStartMemory(context, requiredStartMemory) {
     if (memoryWaitBypassed) return;
 
-    let available = os.freemem();
+    let available = readAvailableMemory();
     if (available >= requiredStartMemory) return;
 
     waitingForMemory = true;
@@ -295,7 +296,7 @@ async function waitForStartMemory(context, requiredStartMemory) {
     while (available < requiredStartMemory && !memoryWaitBypassed) {
         await waitForMemoryPoll(5000);
         if (memoryWaitBypassed) break;
-        available = os.freemem();
+        available = readAvailableMemory();
         if (Date.now() - lastWaitLogAt >= 30000) {
             lastWaitLogAt = Date.now();
             const usageRatio = 1 - available / totalMemory;
@@ -398,7 +399,7 @@ writeFileSync(guardPidPath, `${process.pid}\n`, 'utf8');
 
 const monitor = setInterval(() => {
     if (!activeChild) return;
-    const available = os.freemem();
+    const available = readAvailableMemory();
     const phaseMemoryDrop = Math.max(0, phaseStartFreeMemory - available);
     const systemMemoryUsageRatio = 1 - available / totalMemory;
     const progressInterval = pausedForMemory ? 10000 : 30000;
@@ -496,7 +497,7 @@ process.once('SIGTERM', () => handleSignal('SIGTERM'));
 async function runVitePhase(name, variant, outDir) {
     await waitForStartMemory(`${name}构建`, requiredModernStartMemory);
     return new Promise((resolve, reject) => {
-        phaseStartFreeMemory = os.freemem();
+        phaseStartFreeMemory = readAvailableMemory();
         activePhaseName = name;
         lastProgressAt = 0;
         warnedForPhaseMemory = false;
@@ -566,7 +567,7 @@ async function runVitePhase(name, variant, outDir) {
 async function runNodeScriptPhase({ name, scriptPath, heapLimitMb, requiredStartMemory, logName }) {
     await waitForStartMemory(name, requiredStartMemory);
     return new Promise((resolve, reject) => {
-        phaseStartFreeMemory = os.freemem();
+        phaseStartFreeMemory = readAvailableMemory();
         activePhaseName = name;
         lastProgressAt = 0;
         warnedForPhaseMemory = false;

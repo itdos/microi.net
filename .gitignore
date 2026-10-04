@@ -52,6 +52,7 @@ Thumbs.db
 *.sln.docstates
 microi.doc/docs/.vitepress/publish-microi-doc.sh
 package-lock.json
+!/microi.mcp/package-lock.json
 
 /Microi.Server/Microi.net.Api/Properties/PublishProfiles
 
@@ -172,3 +173,4 @@ AI测试要用到的帐号密码.txt
 # Python 本地解释器缓存不属于源码或交付制品。
 **/__pycache__/
 *.pyc
+AI- Project-Temp/

@@ -36,7 +36,7 @@ test("direct-token and SSO guards use the same user-route precedence", () => {
 
 test("signed-in users save their own route through the platform service and login rechecks access", async () => {
   const personalSettings = readPlatformServiceSource("src/PersonalSettings.vue");
-  const preferencesEngine = await readFile(new URL("../../Microi.Server/Microi.Upgrade/Resource/platform-user-update-preferences.js", import.meta.url), "utf8");
+  const preferencesEngine = await readFile(new URL("../../Microi.Server/OfficialApplications/Resource/platform-user-update-preferences.js", import.meta.url), "utf8");
   assert.match(navbarSource, /OpenPersonalSettings/);
   assert.match(navbarSource, /\/micro-app\/microi-platform-service\/personal-settings/);
   assert.match(personalSettings, /client\.ApiEngine\.Run\('platform-user-update-preferences'/);

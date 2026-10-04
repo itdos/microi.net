@@ -29,6 +29,12 @@ const available = new Set(fromGit ? git.stdout.split('\0').filter(Boolean)
 const protectedRoots = fs.readFileSync(path.join(workspace, '.public-repo-protected-paths'), 'utf8')
   .split(/\r?\n/).filter(line => line && !line.startsWith('#'));
 
+function projectReferenceTarget(project, include) {
+  // csproj 的 Windows 分隔符必须在解析 .. 之前归一化，Mac/Linux 才能核对同一真实项目。
+  return path.relative(workspace,
+    path.resolve(workspace, path.dirname(project), include.replaceAll('\\', '/'))).replaceAll('\\', '/');
+}
+
 function missingProjectReferences(available) {
   const missing = [];
   for (const project of available) {
@@ -36,8 +42,7 @@ function missingProjectReferences(available) {
     const source = fs.readFileSync(path.join(workspace, project), 'utf8');
     for (const match of source.matchAll(/<ProjectReference\b[^>]*\bInclude="([^"]+)"/g)) {
       if (match[1].includes('$(')) continue;
-      const target = path.relative(workspace,
-        path.resolve(workspace, path.dirname(project), match[1])).replaceAll('\\', '/');
+      const target = projectReferenceTarget(project, match[1]);
       // 私有源码由公开方案的 NuGet 模式提供；根公开仓不能收进这些目录。
       if (protectedRoots.some(root => target === root || target.startsWith(root + '/'))) continue;
       if (!available.has(target) || !fs.existsSync(path.join(workspace, target)))
@@ -46,6 +51,20 @@ function missingProjectReferences(available) {
   }
   return missing;
 }
+
+test('Windows 和 Unix csproj 引用解析为同一真实路径，保护目录仍按规范路径识别', () => {
+  const project = 'Microi.Server/Microi.Cache/Microi.Cache.csproj';
+  for (const dependency of ['Dos.Common', 'Microi.Core', 'Microi.net']) {
+    const expected = `Microi.Server/${dependency}/${dependency}.csproj`;
+    assert.equal(projectReferenceTarget(project, `..\\${dependency}\\${dependency}.csproj`), expected);
+    assert.equal(projectReferenceTarget(project, `../${dependency}/${dependency}.csproj`), expected);
+  }
+  const protectedTarget = projectReferenceTarget(project, '..\\Microi.net\\Microi.net.csproj');
+  assert.ok(protectedRoots.some(root => protectedTarget.startsWith(root + '/')));
+  assert.equal(projectReferenceTarget('Microi.Server/Microi.Tests/Microi.Tests.csproj',
+    'Fixtures\\DatabasePoolNode\\DatabasePoolNode.csproj'),
+  'Microi.Server/Microi.Tests/Fixtures/DatabasePoolNode/DatabasePoolNode.csproj');
+});
 
 test('公开源码的项目引用形成完整闭包', () => {
   assert.deepEqual(missingProjectReferences(available), []);

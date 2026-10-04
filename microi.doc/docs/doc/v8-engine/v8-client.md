@@ -1133,6 +1133,7 @@ V8.OpenAnyForm({
       //调用指派接口
       var result = await V8.ApiEngine.Run('shouhoudd_zhipai',{
         Id: v8.Form.Id,
+        ShouhouRYID: v8.Form.ShouhouRYID,
         ShouhouRY: v8.Form.ShouhouRY,
       });
       callback(result);
@@ -1144,6 +1145,8 @@ V8.OpenAnyForm({
 :::
 
 `OpenAnyForm` 负责发起打开动作，不是“等待用户关闭后返回结果”的 Promise。需要替换保存行为时使用 `EventReplace.Submit(v8, param, callback)`，其中小写 `v8` 是被打开的子表单上下文；外层 `V8` 仍是发起打开动作的父上下文。替换提交后必须调用 `callback(DosResult)`。
+
+指派人员应提交准确的人员 `Id`；接口从当前租户主库复核账号状态、商家与权限，并回读姓名、电话和指派人快照。客户端传入的姓名、商家或缓存中的管理员等级不能作为授权依据。
 
 ## V8.OpenAnyTable
 >* 打开一个任意列表

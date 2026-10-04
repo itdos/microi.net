@@ -6,7 +6,7 @@
 			<view class="xjy-live-drop"></view>
 			<view class="header-inner">
 				<text class="header-title">{{ t('message.title') }}</text>
-				<view class="header-action" v-if="isLoggedIn" @tap="showNewChat = true">
+				<view class="header-action" v-if="isLoggedIn" @tap="openNewChat">
 					<text class="action-icon">✚</text>
 				</view>
 			</view>
@@ -123,10 +123,11 @@
 			</view>
 
 			<!-- 空状态 -->
-			<view class="empty-state" v-if="!loading && filteredMessageList.length === 0">
+			<view v-if="!loading && messageError" class="empty-state" @tap="retryMessages"><text class="empty-text">{{ messageError }}</text><text>点击重新加载</text></view>
+			<view class="empty-state" v-else-if="!loading && filteredMessageList.length === 0 && !messageError">
 				<image class="empty-icon" src="/static/tab-message.png" mode="aspectFit" />
 				<text class="empty-text">{{ t('message.noMessages') }}</text>
-				<view class="empty-btn" @tap="showNewChat = true">
+				<view class="empty-btn" @tap="openNewChat">
 					<text>{{ t('message.startChat') }}</text>
 				</view>
 			</view>
@@ -158,15 +159,14 @@
 			</view>
 
 			<!-- 加载更多提示 -->
-			<view v-if="contactLoadingMore" class="loading-more-hint">
-				<text>加载中...</text>
-			</view>
+			<mci-skeleton v-if="(contactLoadingMore || contactLoading) && contactList.length" type="list" :rows="1" compact />
 			<view v-else-if="!contactHasMore && contactList.length > 0" class="loading-more-hint">
 				<text>已加载全部联系人</text>
 			</view>
 
 			<!-- 空状态 -->
-			<view class="empty-state" v-if="!contactLoading && contactList.length === 0">
+			<view v-if="!contactLoading && contactError" class="empty-state" @tap="retryContacts"><text class="empty-text">{{ contactError }}</text><text>点击重新加载</text></view>
+			<view class="empty-state" v-else-if="!contactLoading && !contactError && contactList.length === 0">
 				<image class="empty-icon" src="/static/xjy/repair/tongxunlu.png" mode="aspectFit" />
 				<text class="empty-text">{{ t('message.noContacts') }}</text>
 			</view>
@@ -186,6 +186,9 @@
 						@input="searchDialogContacts" />
 				</view>
 				<scroll-view class="panel-list" scroll-y>
+					<mci-skeleton v-if="dialogLoading" type="list" :rows="4" />
+					<view v-else-if="dialogError" class="type-status" @tap="searchDialogContacts">{{ dialogError }}，点击重试</view>
+					<view v-else-if="!dialogContactList.length" class="type-status">未找到联系人</view>
 					<view v-for="c in dialogContactList" :key="c.Id" class="panel-contact-item"
 						@tap="startDialogChat(c)">
 						<view class="panel-contact-avatar">
@@ -247,7 +250,12 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				dialogKeyword: '',
 				showNewChat: false,
 				loading: true,
+				messageError: '',
 				contactLoading: false,
+				contactError: '',
+				dialogLoading: false,
+				dialogError: '',
+				dialogRequestSeq: 0,
 				refreshing: false,
 				messageList: [],
 				contactList: [],
@@ -314,6 +322,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		},
 
 		methods: {
+			openNewChat() { this.showNewChat = true; return this.searchDialogContacts() },
+			retryContacts() { this.contactPageIndex = 1; this.contactHasMore = true; return this.loadContacts(false) },
+			retryMessages() { this.messageError = ''; this.loading = !this.messageList.length; this._messageInitialized = false; return this.initSignalR() },
 			messageCacheKey() {
 				const user = getUser() || {}
 				return `message:${user.Id || 'anonymous'}`
@@ -399,6 +410,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					return
 				}
 				this._messageInitializing = true
+				this.messageError = ''
 				this.loading = this.messageList.length === 0
 				// 先停止可能存在的旧轮询，避免重复启动
 				this.stopPolling()
@@ -416,6 +428,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 
 					// 接收最近联系人列表
 					this._onReceiveLastContacts = (data) => {
+						this.messageError = ''
 						console.log('[Message] ReceiveSendLastContacts:', data?.length || 0)
 						if (Array.isArray(data)) {
 							this.messageList = data
@@ -454,11 +467,12 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					// 请求最近联系人
 					this.requestLastContacts()
 
-					// 超时保护：如果8秒内没收到回调，关闭loading并显示空状态
+					// 超时结束骨架但展示可重试错误，不能把未收到数据误判成空列表。
 					this._loadingTimeout = setTimeout(() => {
 						if (this.loading) {
 							console.warn('[Message] 加载超时，关闭loading')
 							this.loading = false
+							this.messageError = '消息加载超时，请重试'
 							this.refreshing = false
 							this.syncAiEntries()
 						}
@@ -466,6 +480,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 
 					// 如果 SignalR 连接失败，使用轮询兜底
 					if (!client.isConnected) {
+						this.messageError = '消息连接暂不可用，请重试'
 						console.warn('[Message] SignalR未连接，启动轮询兜底')
 						this.loading = false
 						this.syncAiEntries()
@@ -473,6 +488,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					}
 				} catch (e) {
 					console.error('[Message] initSignalR error:', e)
+					this.messageError = e.message || '消息加载失败'
 					this.loading = false
 					this.refreshing = false
 					// 连接失败兜底
@@ -495,6 +511,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					return true
 				} else {
 					console.warn('[Message] requestLastContacts: SignalR未连接')
+					this.messageError = '消息连接暂不可用，请重试'
 					this.loading = false
 					this.finishMessageRefresh()
 					this.syncAiEntries()
@@ -599,6 +616,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			// 加载通讯录（支持分页和远端搜索）
 			async loadContacts(isLoadMore = false) {
 				const requestSeq = ++this.contactRequestSeq
+				this.contactError = ''
 				const requestPageIndex = this.contactPageIndex
 				const roleIds = [...this.selectedTypes]
 				const roleNames = [...this.selectedTypesLabelArry]
@@ -651,8 +669,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				} catch (e) {
 					console.error('[Message] loadContacts error:', e)
 					if (requestSeq === this.contactRequestSeq) {
-						if (!isLoadMore) this.contactList = []
-						this.contactHasMore = false
+						// 失败保留已显示联系人和分页位置，重试不会跳过失败页。
+						this.contactError = (e && e.message) || '通讯录加载失败'
+						if (isLoadMore) this.contactPageIndex = Math.max(1, requestPageIndex - 1)
 						uni.showToast({
 							title: (e && e.message) || '人员角色筛选失败',
 							icon: 'none'
@@ -698,6 +717,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 
 			// 搜索弹窗联系人
 			async searchDialogContacts() {
+				const requestSeq = ++this.dialogRequestSeq
+				this.dialogLoading = true
+				this.dialogError = ''
 				try {
 					const res = await post('/apiengine/platform-sys-user-public-info', {
 						State: 1,
@@ -705,11 +727,15 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 						_PageSize: 15,
 						_Keyword: this.dialogKeyword
 					}, true)
-					if (res.Code === 1 && res.Data) {
+					if (requestSeq !== this.dialogRequestSeq) return
+					if (!res || Number(res.Code) !== 1) throw new Error((res && res.Msg) || '联系人加载失败')
+					if (res.Data) {
 						this.dialogContactList = (res.Data || []).filter(item => this.aiAssistantEnabled || !this.isAiIdentity(item))
 					}
 				} catch (e) {
-					console.error('[Message] searchDialogContacts error:', e)
+					if (requestSeq === this.dialogRequestSeq) this.dialogError = e.message || '联系人加载失败'
+				} finally {
+					if (requestSeq === this.dialogRequestSeq) this.dialogLoading = false
 				}
 			},
 

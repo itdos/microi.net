@@ -111,6 +111,10 @@ fi
 
 # 同版本 Docker 热修复只发布经过完整测试的本地候选，不升版、不发布 NuGet，
 # 不同步官方数据库资源；保留常规发布的 Full、混淆后冒烟和镜像门禁。
+MICROI_FULL_ONLY=false
+if [ "${1:-}" = "--full-only" ]; then
+    MICROI_FULL_ONLY=true
+fi
 MICROI_DOCKER_ONLY_HOTFIX=false
 if [ "${1:-}" = "--docker-only-hotfix" ]; then
     MICROI_DOCKER_ONLY_HOTFIX=true
@@ -635,13 +639,24 @@ fi
 # DLL 加密能力检测
 HAS_ENCRYPT=false
 ENCRYPT_SCRIPT="Microi.Server/Microi.net/License/scripts/encrypt-dll.sh"
-if [ -d "Microi.Server/Microi.net" ] && [ -d "Microi.Server/Microi.AI" ] && [ -d "Microi.Server/Microi.MCP" ] && [ -d "Microi.Server/Microi.WorkFlow" ] && [ -d "Microi.Server/Microi.Vision" ]; then
-    if [ -f "$ENCRYPT_SCRIPT" ]; then
-        HAS_ENCRYPT=true
-        print_success "DLL 加密: 可用（检测到 Microi.net + Microi.AI + Microi.MCP + Microi.WorkFlow + Microi.Vision 源码）"
-    else
-        print_warning "DLL 加密: 源码存在但加密脚本缺失: $ENCRYPT_SCRIPT"
+MICROI_ENCRYPTION_RECEIPT="$PWD/.tmp/microi-release-gate/api-encryption.json"
+# 闭源源码存在时只能进入完整加密链，缺项目或缺工具都不是开源模式。
+# 在任何编译/上传之前失败，避免 HAS_ENCRYPT=false 让后续门禁失效。
+_closed_source_count=0
+for _closed_project in "${ENCRYPTED_PROJECTS[@]}"; do
+    if [ -f "Microi.Server/${_closed_project}/${_closed_project}.csproj" ]; then
+        _closed_source_count=$((_closed_source_count + 1))
     fi
+done
+if [ "$_closed_source_count" -gt 0 ]; then
+    if [ "$_closed_source_count" -ne "${#ENCRYPTED_PROJECTS[@]}" ]; then
+        print_fail "闭源源码不完整；五个闭源项目必须全部存在并统一加密，禁止降级为无需加密发布。"
+    fi
+    if [ ! -f "$ENCRYPT_SCRIPT" ]; then
+        print_fail "闭源源码存在但加密脚本缺失: $ENCRYPT_SCRIPT；禁止发布 NuGet 或后端 Docker。"
+    fi
+    HAS_ENCRYPT=true
+    print_success "DLL 加密: 可用（检测到 Microi.net + Microi.AI + Microi.MCP + Microi.WorkFlow + Microi.Vision 源码）"
 else
     print_info "DLL 加密: 跳过（开源版本无需加密）"
 fi
@@ -687,7 +702,11 @@ else
 fi
 
 echo ""
-read -r -p "  是否手动指定版本号？直接回车使用默认版本 ${NEXT_VERSION}: " _version_input
+if [ "$MICROI_FULL_ONLY" = true ]; then
+    _version_input="$CURRENT_VERSION"
+else
+    read -r -p "  是否手动指定版本号？直接回车使用默认版本 ${NEXT_VERSION}: " _version_input
+fi
 if [ -n "$_version_input" ]; then
     if [[ ! "$_version_input" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         print_fail "版本号格式无效: $_version_input（请输入三段数字，例如 6.4.3）"
@@ -721,9 +740,14 @@ fi
     echo "    5) 仅推送Docker镜像（跳过编译，直接使用已有产物推送）"
     echo "    6) 只编译和推送【官方网站文档】"
     echo ""
-    read -p "  请输入选项 [1/2/3/4/5/6]: " DEPLOY_MODE
+    if [ "$MICROI_FULL_ONLY" = true ]; then
+        DEPLOY_MODE=7
+    else
+        read -p "  请输入选项 [1/2/3/4/5/6]: " DEPLOY_MODE
+    fi
     case "$DEPLOY_MODE" in
         1|2|3|4|5|6) ;;
+        7) [ "$MICROI_FULL_ONLY" = true ] || print_fail "Full 专用入口必须显式使用 --full-only" ;;
         *) print_fail "无效选项: $DEPLOY_MODE（仅支持 1/2/3/4/5/6）" ;;
     esac
 
@@ -860,7 +884,7 @@ fi
 PUBLISH_DOC=false
 if [ "$DEPLOY_MODE" = "6" ]; then
     PUBLISH_DOC=true
-elif [ -d "microi.doc" ]; then
+elif [ "$MICROI_FULL_ONLY" != true ] && [ -d "microi.doc" ]; then
     echo ""
     echo -e "  ${BOLD}【官方网站文档】${NC}"
     echo "    是否同时发布官方网站文档（构建 VitePress 并推送 Docker 镜像）？"
@@ -918,7 +942,7 @@ if [ "$MICROI_DOCKER_ONLY_HOTFIX" = true ]; then
     SKIP_NUGET_REQUESTED=true
     print_info "同版本 Docker 热修复：版本保持 ${VERSION}，只发布 Docker，不写官方应用源。"
 fi
-_mode_names=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像" "只编译和推送官方网站文档")
+_mode_names=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像" "只编译和推送官方网站文档" "只执行完整 Full（不构建发行物、不上传）")
 echo ""
 echo -e "  ${BOLD}════════════════════════════════════════════════════════${NC}"
 echo -e "  ${BOLD}✅ 选择完毕，即将开始全自动执行${NC}"
@@ -972,58 +996,9 @@ PLATFORM_DOCKER_SELECTED=false
 if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then
     PLATFORM_DOCKER_SELECTED=true
 fi
-if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ] || [ "$PLATFORM_DOCKER_SELECTED" = true ]; then
+if [ "$MICROI_FULL_ONLY" = true ] || [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ] || [ "$PLATFORM_DOCKER_SELECTED" = true ]; then
     print_phase "取得工作区发布独占权"
     acquire_workspace_lock
-fi
-
-# 在升版、官方资源写入、NuGet/Docker 推送之前执行完整业务回归。
-# 此处需要仍在运行的已加载候选源码的测试 API，因此必须早于 PrepareRelease。
-# 缺少隔离测试租户/凭据、测试失败或跳过均停止发布；不能靠 AI 提示词代替门禁。
-if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "${PLATFORM_DOCKER_SELECTED:-false}" = true ]; then
-    # bin/Release/Dockerfile 是已跟踪的 Docker 构建配方投影。必须在冻结候选前
-    # 从单一事实源同步，否则 Docker 阶段再复制会导致 Full 后候选漂移。
-    if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] && [ -f "Microi.Server/Microi.net.Api/Dockerfile.runtime" ]; then
-        if ! cmp -s "Microi.Server/Microi.net.Api/Dockerfile.runtime" "Microi.Server/Microi.net.Api/bin/Release/Dockerfile"; then
-            cp "Microi.Server/Microi.net.Api/Dockerfile.runtime" "Microi.Server/Microi.net.Api/bin/Release/Dockerfile"
-            print_info "已在冻结候选前同步后端 Docker 构建配方。"
-        fi
-    fi
-    print_phase "发布前全量自动化测试（失败即停止）"
-    MICROI_RELEASE_CANDIDATE="$PWD/.tmp/microi-release-gate/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
-    if ! node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
-        print_fail "无法记录七个仓库的候选源码；已停止发布。"
-    fi
-    if command -v pwsh >/dev/null 2>&1; then
-        _test_powershell="pwsh"
-    elif command -v powershell.exe >/dev/null 2>&1; then
-        _test_powershell="powershell.exe"
-    else
-        print_fail "缺少 PowerShell，无法执行 Microi.Tests Full 发布门禁。"
-    fi
-    if ! "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
-        -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode Full -Configuration Release -SolutionPath "$SLN_FILE" \
-        -ResultsDirectory "$PWD/.tmp/microi-release-gate/$(date +%Y%m%d-%H%M%S)"; then
-        print_fail "全量测试未通过；已停止升版、官方应用资源写入和平台发布。请修复后重跑，禁止跳过失败用例。"
-    fi
-    if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
-        print_fail "验收期间源码发生变化；必须重新加载最终候选并重跑 Full。"
-    fi
-    print_success "Microi.Tests Full 全量回归通过"
-fi
-
-# 编译/发布会改写共享输出目录，必须先取得工作区级互斥权。Windows 下随后只结束
-# 当前工作区的 61501 后端、61500 Vite 及额外 Release 后端；浏览器、VS Code、
-# Playwright Test Server、数据库和 Redis 一律不碰。这样多个 AI 共用服务时不会靠
-# “结束所有 node/dotnet/chrome”碰运气，也不会把 Release DLL 留在运行进程中。
-if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ]; then
-    if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
-        print_step "识别并停止当前工作区的共享开发服务，检查 Release DLL 文件锁..."
-        if ! prepare_release_workspace; then
-            print_fail "本地开发进程无法安全收尾；已阻止编译，避免误杀其它应用或再次遇到 DLL 文件锁。"
-        fi
-        print_success "共享开发服务已安全收尾，Release DLL 文件锁为 0"
-    fi
 fi
 
 # 前端资源预检必须发生在版本号、升级资源和其它源码变更之前。
@@ -1092,6 +1067,62 @@ if [ "$BUMP_VERSION" = true ]; then
     print_success "共更新 $update_count 个 .csproj + ${#PACKAGE_JSON_FILES[@]} 个 package.json"
 fi
 
+# 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行完整业务回归。
+# 此处需要仍在运行的已加载候选源码的测试 API，因此必须早于 PrepareRelease。
+# 缺少隔离测试租户/凭据、测试失败或跳过均停止发布；不能靠 AI 提示词代替门禁。
+if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "${PLATFORM_DOCKER_SELECTED:-false}" = true ]; then
+    # bin/Release/Dockerfile 是已跟踪的 Docker 构建配方投影。必须在冻结候选前
+    # 从单一事实源同步，否则 Docker 阶段再复制会导致 Full 后候选漂移。
+    if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] && [ -f "Microi.Server/Microi.net.Api/Dockerfile.runtime" ]; then
+        if ! cmp -s "Microi.Server/Microi.net.Api/Dockerfile.runtime" "Microi.Server/Microi.net.Api/bin/Release/Dockerfile"; then
+            cp "Microi.Server/Microi.net.Api/Dockerfile.runtime" "Microi.Server/Microi.net.Api/bin/Release/Dockerfile"
+            print_info "已在冻结候选前同步后端 Docker 构建配方。"
+        fi
+    fi
+    print_phase "发布前全量自动化测试（失败即停止）"
+    MICROI_RELEASE_CANDIDATE="$PWD/.tmp/microi-release-gate/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
+    if ! node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
+        print_fail "无法记录七个仓库的候选源码；已停止发布。"
+    fi
+    if command -v pwsh >/dev/null 2>&1; then
+        _test_powershell="pwsh"
+    elif command -v powershell.exe >/dev/null 2>&1; then
+        _test_powershell="powershell.exe"
+    else
+        print_fail "缺少 PowerShell，无法执行 Microi.Tests Full 发布门禁。"
+    fi
+    if ! "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
+        -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode Full -Configuration Release -SolutionPath "$SLN_FILE" \
+        -ResultsDirectory "$PWD/.tmp/microi-release-gate/$(date +%Y%m%d-%H%M%S)"; then
+        print_fail "全量测试未通过；本次版本仅在本地准备，已停止官方应用资源写入和平台发布。请修复后重跑，禁止跳过失败用例。"
+    fi
+    if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
+        print_fail "验收期间源码发生变化；必须重新加载最终候选并重跑 Full。"
+    fi
+    print_success "Microi.Tests Full 全量回归通过"
+fi
+
+# 插件发行修复等需要复验 Full，但不能重新生成或覆盖已成功发布的不可变平台制品。
+# 复用上方相同的独占锁、候选冻结、完整用例及漂移检查；不提供跳过或放宽门禁的路径。
+if [ "$MICROI_FULL_ONLY" = true ]; then
+    print_success "完整 Full 及候选一致性验收完成；未升版、未改写发行目录、未上传 NuGet/Docker/官网或官方应用。"
+    exit 0
+fi
+
+# 编译/发布会改写共享输出目录，必须先取得工作区级互斥权。Windows 下随后只结束
+# 当前工作区的 61501 后端、61500 Vite 及额外 Release 后端；浏览器、VS Code、
+# Playwright Test Server、数据库和 Redis 一律不碰。这样多个 AI 共用服务时不会靠
+# “结束所有 node/dotnet/chrome”碰运气，也不会把 Release DLL 留在运行进程中。
+if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ]; then
+    if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
+        print_step "识别并停止当前工作区的共享开发服务，检查 Release DLL 文件锁..."
+        if ! prepare_release_workspace; then
+            print_fail "本地开发进程无法安全收尾；已阻止编译，避免误杀其它应用或再次遇到 DLL 文件锁。"
+        fi
+        print_success "共享开发服务已安全收尾，Release DLL 文件锁为 0"
+    fi
+fi
+
 # ─── 阶段（条件）: 双向同步官方升级资源 ──────────────────
 if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
     if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
@@ -1107,11 +1138,11 @@ if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ]; th
         print_fail "未找到 Node.js，无法执行升级资源三方同步"
     fi
     if [ "$MICROI_DEFER_OFFICIAL_RESOURCE_PUBLISH" = "1" ]; then
-        if ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --validate-only; then
+        if ! node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --validate-only; then
             print_fail "内置升级资源校验失败；已阻止后端发布"
         fi
         print_info "官方应用写回已安排在平台渠道与插件成功后执行；本阶段仅校验本地候选。"
-    elif ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate; then
+    elif ! node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate; then
         print_fail "升级资源同步失败；已阻止后端发布，避免官网与内置应用商城互相覆盖"
     fi
     print_success "升级资源安全检查已完成（实时同步或已验证离线基线，详见上方明细）"
@@ -1248,9 +1279,11 @@ fi
 if [ "$HAS_ENCRYPT" = true ]; then
     print_divider
     print_step "加密 DLL（Microi.net.dll + Microi.AI.dll + Microi.MCP.dll + Microi.WorkFlow.dll + Microi.Vision.dll）..."
+    node Microi.Server/tools/release-encryption.mjs plain "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" || print_fail "缺少五个实际 DLL 的加密前证据；禁止发布。"
     if ! bash "$ENCRYPT_SCRIPT" "$PUBLISH_DIR"; then
         print_fail "DLL 加密失败！请查看上方 Obfuscar 具体错误（工具缺失或依赖解析失败）"
     fi
+    node Microi.Server/tools/release-encryption.mjs encrypted "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" || print_fail "实际 DLL 未全部改变或加密指纹不匹配；禁止发布。"
     DLL_ENCRYPTED=true
     print_success "DLL 加密完成"
 fi
@@ -1534,6 +1567,9 @@ if [ "$PUSH_NUGET" = true ]; then
     if [ "$HAS_ENCRYPT" = true ] && [ "$NUPKG_REPLACED" != true ]; then
         print_fail "NuGet 包中的 DLL 未被替换为加密版本，禁止推送！"
     fi
+    if [ "$HAS_ENCRYPT" = true ]; then
+        node Microi.Server/tools/release-encryption.mjs packages "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" || print_fail "实际 NuGet ZIP 中存在未加密/旧 DLL 或缺少闭源 DLL；禁止上传。"
+    fi
 
     # 推送 NuGet 包
     print_phase "推送 NuGet 包"
@@ -1730,6 +1766,9 @@ docker_push_plan() {
     for _img_tag in "${_images[@]}"; do
         if ! node Microi.Server/tools/release-artifact.mjs verify "$plan_type" "$MICROI_RELEASE_CANDIDATE" "$receipt"; then
             print_fail "镜像推送前源码或产物发生漂移；已停止推送。"
+        fi
+        if [ "$plan_type" = "api" ] && [ "$HAS_ENCRYPT" = true ]; then
+            node Microi.Server/tools/release-encryption.mjs image "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$local_image" || print_fail "实际 Docker 镜像中的闭源 DLL 与本次加密证据不符；禁止上传。"
         fi
         # 替换占位符
         _img_tag=$(echo "$_img_tag" | sed "s/{latest}/latest/g" | sed "s/{version}/v${version}/g")

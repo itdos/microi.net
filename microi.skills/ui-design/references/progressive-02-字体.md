@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=ui-design-009 sha256=3e553809ea501d359553ba0e78a1cf83c9fccc0cdc06a5d562d73af7ebc0c09d -->
+<!-- microi-progressive:chunk id=ui-design-009 sha256=e7dcc4c0be203d5cddf6ec93d7db66ff78f4997e60eafcbd4c91cabab227767f -->
 ## 字体
 
 ```css
@@ -73,7 +73,7 @@
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-010 sha256=06dccf8f187ce38d807057735f6b6acbf9a9037f37f64544fb933f16f28e58f0 -->
+<!-- microi-progressive:chunk id=ui-design-010 sha256=cb6d86f002d44d484b3bb10b12e4194360739323609450f9c99e6aa10004cb24 -->
 ## 间距与触摸目标
 
 ### 界面引擎仪表盘密度与对齐
@@ -119,7 +119,7 @@
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-011 sha256=fba089e9a092efca57bfad2a34a4b9bada857c1072b09488e29b3cf28eefaba1 -->
+<!-- microi-progressive:chunk id=ui-design-011 sha256=dc8c655353a6349e385ea9187fe23a377b4d69e1f2bf102aa736e987a624bcc5 -->
 ## 骨架屏 Loading 设计规范
 
 所有依赖接口、数据库、远程资源或异步计算的数据区域，首屏加载态必须使用骨架屏（Skeleton Screen），不能只显示 spinner、进度圈、空图标或“数据加载中...”文案。骨架屏属于基础体验规范，适用于 PC、移动端 H5、uni-app、小程序和 WebView。

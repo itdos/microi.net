@@ -15,6 +15,12 @@ description: Microi V8 工作流事件指南。用于编写审批流条件、节
 真实用户、角色、部门、岗位 Id。人工节点 `Approve/Countersign/End` 必须配置
 `Users/Roles/Depts/BindJobs` 至少一种真实 `[{"Id":"...","Name":"..."}]`
 绑定，或明确采用上游节点 `AllowSelectUsers=1` 手动选人。
+应用安装母版可显式设置 `FlowDesign.IsEnable=0`（也接受字符串 `"0"`），
+此时人工节点允许空绑定并保持禁用；`false/null/空字符串/省略` 不属于该例外。
+禁用模板仍检查所有节点、连线、坐标及绑定格式，任何非空人员、角色、部门或岗位
+仍必须通过当前租户真实 Id 回读。不得填入 `UNBOUND_*` 等不存在的占位 Id。
+目标租户配置真实审批人后，应先重新检查再显式启用，并验收真实业务流转；
+禁用模板保存成功只证明安装结构完整，不能当作审批已可用或商业交付完成。
 `SameDeptApprove=1` 只筛选候选人，不能单独产生审批人。
 不能把 `Roles:"Manager"`、字符串 Id 数组或另一个租户的 Id 当作绑定。
 
@@ -45,7 +51,7 @@ MCP 写入前会回读当前租户的用户、角色、部门和岗位 Id；回�
 - 官方发布时 `Microi.WorkFlow` 必须生成 NuGet 包，并与 `Microi.AI` 使用同一 Obfuscar 配置加密后替换包内 DLL；不得推送未加密的 WorkFlow 包。开源安装只消费 NuGet，不要求存在私有源码。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-workflow-000 sha256=9030cd2de9f1febfb9a749c82cf83e97ccb8fb972a3f8f0ff11067488e14cd8e -->
+<!-- microi-progressive:chunk id=v8-workflow-000 sha256=bd13a63ee55b2a01041fc2e080ca06ab2fbfd3146fa130811061c9f9e8b4cf84 -->
 ## 本地优先与版本头（必做）
 
 工作流节点、连线条件、开始/结束节点等 V8 代码如果有本地文件，必须优先修改 `microi-v8-engine/<租户>/<项目>/...` 下的本地文件，再同步到数据库。插件提示本地/远端不一致时，先比对并合并，不得直接覆盖。
@@ -68,7 +74,7 @@ MCP 写入前会回读当前租户的用户、角色、部门和岗位 Id；回�
 生成工作流 V8 代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；路线选择、审批人计算、状态回写、撤回/驳回处理、跨表联动等复杂代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。若工作流存储表支持 `Version`/`ChangeHistory`，历史说明也必须最新在前并保留旧记录。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-001 sha256=53550786c531c347cfe9d92247b07d127c348210f07e302a1b68f278136c3e77 -->
+<!-- microi-progressive:chunk id=v8-workflow-001 sha256=935b29e9f3afde02aa78a77468b48afd204facb3b1dafaf9d23dc3bd69832717 -->
 ## 工作流物理表
 
 | 表名 | 说明 |
@@ -86,6 +92,9 @@ MCP 写入前会回读当前租户的用户、角色、部门和岗位 Id；回�
 - 自动结束节点的 `NodeType` 使用 `AutoEnd`。它可能继承上一人工节点的 `ApprovalType=Agree`，并生成一条结束历史；核对独立审批人数时只计入明确配置的人工节点，不能把结束节点当成额外审核人。
 - 原生 `CancelFlow` 可将请求中的 `FormData` 写回 `wf_flow.FormData`；未传时可能保存 `{}`。应用不能把取消后的实例 `FormData` 当成不可变的原始提交快照。需要恢复冻结业务单时，优先核对业务表保存的服务端快照摘要；若使用原生历史，必须限定同一实例、同一业务表/行、唯一原始开始节点及发起人、自动提交历史，并检查版本、金额、配置摘要和零待办。此分支只能恢复草稿或驳回状态，不能据此批准或过账。
 - 当前 `CancelFlow(WFParam)` 使用独立事务，没有 `StartWork/SendWork` 的共享 `DbTrans` 重载。应用不得在持有实例、工作或业务行锁的接口事务内调用取消，也不能假设给它多传一个参数便会共享事务。微服务可顺序执行“服务端核验并返回真实待办坐标 → 原生取消 → 业务终态复核”，每个请求完成后释放其事务；网络结果未知时先复核终态，不能盲目重发取消或提前恢复业务状态。
+- 业务接口与原生节点共同读取配置、公共引用和业务行时，先画出宿主与脚本合并的锁图。原生审批进入节点前可能已持有流程实例锁；既存流程的业务复核应先通过当前主库有界只读发现真实实例，再在同一共享事务锁定该实例，随后获取固定配置/引用锁及业务行锁，重读验证归属未变。待办发现扫描只读不能提前锁工作行后再等流程；公共引用围栏只协调锁序，不能读取配置值来继承授权。必须逐入口审查包括定义、身份与配置的相反锁序，不以一条 SQL 或单次模拟成功宣称全系统无死锁。
+- 已由可信原生历史证明取消或驳回的终态恢复只校验原提交归属、当前授权和可恢复状态，不应要求审批期间未发生正常库存、成本或其他业务余额变化；此恢复不产生过账副作用。批准与过账仍必须严格比较冻结快照、当前期间及业务版本，并覆盖撤权、并发和响应未知时使用原请求键恢复。
+- 真实原生多接收人流程中的 `OtherDone` 只表示同阶段并列待办被 `CloseOtherWork` 关闭，不是该接收人已经审批。仅在同实体/实例/定义/审批节点/来源节点与唯一真实 `Agree` + `Done` 工作精确绑定，接收人不同于实际办理人，且没有该并列工作办理历史时，才能作为终态旁证；不能把它计作独立审核人。开始提交、实际人工审批仍必须 `Done`，未知节点、待办、撤回、取消、重复历史或模糊绑定失败关闭。覆盖真实五工作（3 `Done`、2 `OtherDone`）原生来源及新稿/原键恢复，不能靠把状态统一映射为 `Done` 通过。
 - 验收至少覆盖真实取消时不传 `FormData`、伪造取消载荷、退回后直接重提被拒绝、取消后新实例重提、自动结束继承 `Agree`，以及普通角色不能修改取证用的流程历史。模拟正确 JSON 不替代原生 HTTP 验收。
 
 直接 SQL 查询常用场景：
@@ -112,7 +121,7 @@ var history = V8.Db.FromSql(
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-002 sha256=377698ecb64266fb74399ea664010e0a46156d13c3e047de1b2cbae3dbba15c7 -->
+<!-- microi-progressive:chunk id=v8-workflow-002 sha256=38a77bbee9ea30f036a9d9ef7150e2a738f4533dc9f05c23a3d00ff86aefc60d -->
 ## 流程 V8 事件执行顺序
 
 工作流合并提交请求的 `_FormSubmitAction` 可使用 `Add/Edit`；表单后端事件中的
@@ -139,7 +148,7 @@ var history = V8.Db.FromSql(
 13. **节点结束 V8 事件（前端 WFNodeEnd）**
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-003 sha256=f5776a5b8fe4e460f79e20e9806b3a80bcadf6f1e09408880bd5ca911cb79533 -->
+<!-- microi-progressive:chunk id=v8-workflow-003 sha256=2cef523c79040139ffdfba070930ce94db18d5b3486fa35a2a694dafa2c8a186 -->
 ## V8.WF 上下文属性
 
 ### 所有流程事件可访问
@@ -174,7 +183,7 @@ var history = V8.Db.FromSql(
 | `V8.WF.WorkResult` | 流程执行结果（发送到了哪个节点、哪些审批人） |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-004 sha256=d8445c1d473579fde063179d6330eefaa2373f1166e837656b780058295de3a3 -->
+<!-- microi-progressive:chunk id=v8-workflow-004 sha256=99db9f8361d90ce1659922ee2497b7d2f235da009219b8b6a8f22d603b818eff -->
 ## ApprovalType 审批类型
 
 | 值 | 说明 |
@@ -185,7 +194,7 @@ var history = V8.Db.FromSql(
 | `Auto` | 发起流程(开始节点) / 业务节点 / 自动结束节点 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-005 sha256=96e49e15fcb4b9da83f46b6818e198f338cb77ce76d11c56dfddebc2cc24f881 -->
+<!-- microi-progressive:chunk id=v8-workflow-005 sha256=28ada7e06b18590b20935fcaaa2006c868532db89838dfe3799ce2ca0f97c918 -->
 ## 条件判断 V8 事件（后端 WFNodeLine）
 
 根据业务规则决定流程走向。优先推荐设置 `V8.NextNodeId` 直接指定下一节点；如仍使用条件线的条件值，也可以设置 `V8.LineValue`。
@@ -204,7 +213,7 @@ if (V8.Form.Money <= 100) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-006 sha256=8e2a82330c7f49c3a03920123531d310ea329fd310179918d835e3c05d49771a -->
+<!-- microi-progressive:chunk id=v8-workflow-006 sha256=d3a984b0e45aed19da942e0fa6c4183751d6057b7360e6eb11068e538d598cf9 -->
 ## 前端发起流程
 
 ```javascript

@@ -46,7 +46,8 @@
 import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
-import { findMenu, openForm } from '@/platform/business-runtime.js'
+import { findMenu, openForm, requireLogin } from '@/platform/business-runtime.js'
+import { initializeAuthenticatedPage } from '@/platform/login-navigation.mjs'
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
 import { loadTask, loadTaskDevices, readTaskDraft, removeTaskDraft, runTaskAction, writeTaskDraft } from '@/utils/xjy-task.js'
 
@@ -58,11 +59,12 @@ export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/native/task-feedback') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/native/task-feedback') },
   mixins:[themeMixin],
-  data(){return{taskId:'',taskNo:'',customer:'',taskType:'',task:{},devices:[],form:{amount:'',result:'',photos:'[]',videos:'[]',followType:''},loading:true,submitting:false,draftRestored:false,draftSavedAt:0,fileContexts:{},fileContextError:''}},
+  data(){return{taskId:'',taskNo:'',customer:'',taskType:'',task:{},devices:[],form:{amount:'',result:'',photos:'[]',videos:'[]',followType:''},loading:true,authInitialized:false,authInitializing:false,submitting:false,draftRestored:false,draftSavedAt:0,fileContexts:{},fileContextError:''}},
   computed:{completedDeviceCount(){return this.devices.filter((item)=>item.status==='已完成').length},devicesCompleted(){return this.devices.length===0||this.completedDeviceCount===this.devices.length},draftTime(){return this.draftSavedAt?new Date(this.draftSavedAt).toLocaleString():''}},
-  onLoad(options){this.taskId=decodeURIComponent(options.taskId||'');this.taskNo=decodeURIComponent(options.taskNo||'');this.customer=decodeURIComponent(options.customer||'');this.taskType=decodeURIComponent(options.taskType||'');this.loadData()},
-  onShow(){if(!this.loading&&this.taskId)this.loadDevices(true)},
+  onLoad(options){this.taskId=decodeURIComponent(options.taskId||'');this.taskNo=decodeURIComponent(options.taskNo||'');this.customer=decodeURIComponent(options.customer||'');this.taskType=decodeURIComponent(options.taskType||'');return this.initializeAfterLogin()},
+  onShow(){if(!this.authInitialized)return this.initializeAfterLogin();if(!this.loading&&this.taskId)this.loadDevices(true)},
   methods:{
+    initializeAfterLogin(){return initializeAuthenticatedPage(this,requireLogin,this.loadData)},
     async loadData(){
       if(!this.taskId){uni.showToast({title:'缺少任务编号',icon:'none'});this.loading=false;return}
       this.loading=true

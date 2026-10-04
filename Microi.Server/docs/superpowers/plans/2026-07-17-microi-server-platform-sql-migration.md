@@ -862,9 +862,9 @@ git -C ./Microi.Server/Microi.AI commit -m "refactor: migrate AI storage and NL2
 - Modify: Microi.Server/Microi.Upgrade/3-UpgradeLang.cs
 - Modify: Microi.Server/Microi.Upgrade/5-UpgradeApiEngine.cs
 - Modify: Microi.Server/Microi.Upgrade/13-UpgradeAppStore.cs
-- Modify: Microi.Server/Microi.Upgrade/Resource/app.microi.store.json
-- Modify: Microi.Server/Microi.Upgrade/Resource/app.microi.module-engine.json
-- Modify: Microi.Server/Microi.Upgrade/Resource/app.microi.form-engine.json
+- Modify: Microi.Server/OfficialApplications/Resource/app.microi.store.json
+- Modify: Microi.Server/OfficialApplications/Resource/app.microi.module-engine.json
+- Modify: Microi.Server/OfficialApplications/Resource/app.microi.form-engine.json
 - Create: Microi.Server/Microi.Upgrade/Migrations/MicroiMigrationCatalog.cs
 - Create: Microi.Server/Microi.Upgrade/Migrations/UpgradeSqlExecutionAuthorizer.cs
 - Create: Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/UpgradeHarness.cs
@@ -1087,7 +1087,7 @@ findings are zero.
 
 ~~~powershell
 git status --short -- ./Microi.Server/Microi.Upgrade ./Microi.Server/tests
-git add -- ./Microi.Server/Microi.Upgrade/Upgrade.cs ./Microi.Server/Microi.Upgrade/MicroiUpgradeExtensions.cs ./Microi.Server/Microi.Upgrade/1-UpgradeAppDisplay.cs ./Microi.Server/Microi.Upgrade/2-UpgradeSysConfig.cs ./Microi.Server/Microi.Upgrade/3-UpgradeLang.cs ./Microi.Server/Microi.Upgrade/5-UpgradeApiEngine.cs ./Microi.Server/Microi.Upgrade/13-UpgradeAppStore.cs ./Microi.Server/Microi.Upgrade/Resource/app.microi.store.json ./Microi.Server/Microi.Upgrade/Resource/app.microi.module-engine.json ./Microi.Server/Microi.Upgrade/Resource/app.microi.form-engine.json ./Microi.Server/Microi.Upgrade/Migrations/MicroiMigrationCatalog.cs ./Microi.Server/Microi.Upgrade/Migrations/UpgradeSqlExecutionAuthorizer.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/UpgradeHarness.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/PlatformProductionSurfaceInventory.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/PlatformManagedExecutionSurfaceAssert.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/Lifecycle/UpgradeIdempotencyTests.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/Lifecycle/UpgradeFailureTests.cs
+git add -- ./Microi.Server/Microi.Upgrade/Upgrade.cs ./Microi.Server/Microi.Upgrade/MicroiUpgradeExtensions.cs ./Microi.Server/Microi.Upgrade/1-UpgradeAppDisplay.cs ./Microi.Server/Microi.Upgrade/2-UpgradeSysConfig.cs ./Microi.Server/Microi.Upgrade/3-UpgradeLang.cs ./Microi.Server/Microi.Upgrade/5-UpgradeApiEngine.cs ./Microi.Server/Microi.Upgrade/13-UpgradeAppStore.cs ./Microi.Server/OfficialApplications/Resource/app.microi.store.json ./Microi.Server/OfficialApplications/Resource/app.microi.module-engine.json ./Microi.Server/OfficialApplications/Resource/app.microi.form-engine.json ./Microi.Server/Microi.Upgrade/Migrations/MicroiMigrationCatalog.cs ./Microi.Server/Microi.Upgrade/Migrations/UpgradeSqlExecutionAuthorizer.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/UpgradeHarness.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/PlatformProductionSurfaceInventory.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/PlatformManagedExecutionSurfaceAssert.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/Lifecycle/UpgradeIdempotencyTests.cs ./Microi.Server/tests/Microi.Server.IntegrationTests/Lifecycle/UpgradeFailureTests.cs
 git diff --cached --name-only
 git diff --cached --check
 git commit -m "refactor: migrate upgrades to portable AST plans"

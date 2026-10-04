@@ -207,7 +207,7 @@ public sealed class WeChatContentSecurityTests
         var service = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.WeChat", "Security", "WeChatContentSecurityService.cs"));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.saas-engine.json")));
         var callback = package["SysApiEngines"]!.Values<JObject>()
             .Single(item => item.Value<string>("ApiEngineKey") == "platform-wechat-content-security-callback");
 

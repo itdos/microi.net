@@ -33,7 +33,7 @@ public class PlatformRolePermissionTreeTests
         var resourceDirectory = Path.Combine(
             root,
             "Microi.Server",
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource");
         var source = File.ReadAllText(Path.Combine(resourceDirectory, "platform-sys-menu.js"))
             .Replace("\r\n", "\n");

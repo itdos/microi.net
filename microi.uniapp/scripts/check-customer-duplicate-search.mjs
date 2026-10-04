@@ -1,3 +1,4 @@
+import workspacePaths from './lib/workspace-paths.js'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -5,15 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const uniRoot = path.join(root, 'microi.uniapp')
-const enginePath = path.join(
-  root,
-  'Microi-V8-Engine',
-  '集福鲤平台 (api.jifulii.com)',
-  'xjy.Product.Internal',
-  '接口引擎',
-  '未分类',
-  '小程序客户跨商家查重(xjy-search-private-customers).js'
-)
+const enginePath = workspacePaths.findSyncedXjyEngine(uniRoot, 'xjy-search-private-customers')
 const source = fs.readFileSync(enginePath, 'utf8')
 const execute = new Function('V8', 'DateNow', source)
 

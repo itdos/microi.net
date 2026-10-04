@@ -42,7 +42,8 @@
             <text @tap="resetAllFilters">重置筛选</text>
           </view>
         </view>
-        <view v-if="devices.length" class="device-list">
+        <mci-skeleton v-if="searching && !devices.length" type="list" :rows="5" />
+        <view v-else-if="devices.length" class="device-list">
           <view v-for="device in devices" :id="deviceAnchorId(device)" :key="device.Id" class="device-card device-list-session-item" hover-class="device-card--pressed" @tap="openDevice(device)">
             <image src="/static/xjy/business/shebei.png" mode="aspectFit" />
             <view class="device-copy">
@@ -52,7 +53,8 @@
             </view>
             <view class="device-side"><text class="device-status" :class="{ complete: device.status === '已完成' }">{{ device.status }}</text><text class="device-arrow">›</text></view>
           </view>
-          <view class="list-end"><text v-if="loadingMore">正在加载更多...</text><text v-else-if="finished">已展示全部 {{ count }} 台任务设备</text><text v-else>上拉加载更多</text></view>
+          <mci-skeleton v-if="loadingMore || searching" type="list" :rows="1" compact />
+          <view v-else class="list-end"><text v-if="finished">已展示全部 {{ count }} 台任务设备</text><text v-else>上拉加载更多</text></view>
         </view>
         <view v-else-if="hasListFilters" class="empty-state"><image src="/static/xjy/business/shebei.png" mode="aspectFit" /><text>没有符合条件的任务设备</text><text>请调整服务状态、搜索词或筛选字段后重试</text><view class="empty-state__action" hover-class="empty-state__action--pressed" @tap="resetAllFilters"><text>重置筛选</text></view></view>
         <view v-else class="empty-state"><image src="/static/xjy/business/shebei.png" mode="aspectFit" /><text>当前任务尚未关联设备</text><text>添加后可在这里逐台查看和处理</text></view>

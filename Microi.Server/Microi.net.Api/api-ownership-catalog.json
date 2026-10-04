@@ -13,7 +13,7 @@
   "Controllers": {
     "ApiEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "FormEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "HDFSController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "HDFSController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime", "Reason": "可信会话、当前租户存储命名空间及原始文件协议；DeleteEmptyDirectoryMarker仅强制EmptyDirectoryOnly并复用删除内核，旧后端404不得退回递归删除。精确标记/原始元数据/分页/回读由HDFS供应商原子核验，业务事故恢复证据与请求隔离仍归应用。" },
     "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.mcp", "Disposition": "KernelRuntime", "ImplementationProject": "Microi.MCP", "Implementation": "Http/V8McpEndpointService.cs" }
   },
   "UploadProtocol": {

@@ -46,7 +46,8 @@
 import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
-import { callApiEngine, formatFieldValue, formatRegion } from '@/platform/business-runtime.js'
+import { callApiEngine, formatFieldValue, formatRegion, requireLogin } from '@/platform/business-runtime.js'
+import { initializeAuthenticatedPage } from '@/platform/login-navigation.mjs'
 
 export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/native/customer-share') },
@@ -54,7 +55,7 @@ export default {
   mixins: [themeMixin],
   data() {
     return {
-      customerId: '', customer: {}, tenants: [], selectedTenant: null, keyword: '', loading: true, submitting: false, error: '',
+      customerId: '', customer: {}, tenants: [], selectedTenant: null, keyword: '', loading: true, authInitialized: false, authInitializing: false, submitting: false, error: '',
       relations: [
         { name: '联系人', icon: '/static/xjy/business/lianxiren.png', checked: false },
         { name: '跟进', icon: '/static/xjy/business/baifang.png', checked: false },
@@ -79,8 +80,10 @@ export default {
     },
     selectedRelations() { return this.relations.filter((item) => item.checked).map((item) => item.name) }
   },
-  onLoad(options) { this.customerId = decodeURIComponent(options.customerId || options.id || ''); this.loadData() },
+  onLoad(options) { this.customerId = decodeURIComponent(options.customerId || options.id || ''); return this.initializeAfterLogin() },
+  onShow() { if (!this.authInitialized) return this.initializeAfterLogin() },
   methods: {
+    initializeAfterLogin() { return initializeAuthenticatedPage(this, requireLogin, this.loadData) },
     tenantMeta(item) {
       return [formatFieldValue(item.LianxiR, '', { empty: '' }), formatFieldValue(item.LianxiDH, '', { empty: '' })]
         .filter(Boolean).join(' · ') || '集福鲤合作商家'

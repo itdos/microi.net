@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=ui-design-024 sha256=7af53d03d0828232aaf7ab54d6527f5e2cf292d8eb493d75d9ab42adc3030ba3 -->
+<!-- microi-progressive:chunk id=ui-design-024 sha256=19bc007acce56bb980d647154c2eb455e0a24aee5a020c4eed4231baf56e38f4 -->
 ## 表单分组规范：Tabs vs CollapseGroup（强制）
 
 > **核心原则**：默认**不分组** → 小业务域用 **`CollapseGroup` 折叠分组** → 只有足够长或强任务隔离的业务域才用 **`Tabs` 分页**。禁止只按字段数判断：双列布局中 8 个短字段约占 4 行，仍不应独占 Tab；普通业务域通常达到 6 个有效表单行才考虑 Tab。
@@ -53,7 +53,7 @@
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-025 sha256=e6e11a8153bc5d1a1c5e9f1868aaae9a101843961fcf94dba42681b0a6091ad7 -->
+<!-- microi-progressive:chunk id=ui-design-025 sha256=3809bc3c37dcfc812f58d9a0f7811a24e612944f2ade248104223fbd4172fa15 -->
 ## 缓存刷新（解决"我改了字段但页面不变"问题）
 
 平台对 `diy_field` 的字段列表有 Redis 缓存，键格式 `Microi:{OsClient}:FormData:diy_table_field_list:{TableId|TableName}`。
@@ -72,7 +72,7 @@ microi_refresh_schema_cache { "tables": ["mall_address", "mall_member"] }
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-026 sha256=3d53780b3ae17dabba22a2567d0d6e2c51e4dbce504d6e341b737881a3c4e749 -->
+<!-- microi-progressive:chunk id=ui-design-026 sha256=97d1198e46e1b759a59e47ccfc1a69ada9f068fcd2ce481d4f9b0f53124c5704 -->
 ## 接口引擎匿名访问
 
 登录、注册、首页公共数据等接口必须 `AllowAnonymous=1`，否则未登录用户调用会拿到 `null`：
@@ -86,7 +86,7 @@ microi_set_engine_anonymous {
 
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-027 sha256=e6e15cc34871821da89f70cb2a5326942d9d90fe99ed5c5a315415ac57f1532c -->
+<!-- microi-progressive:chunk id=ui-design-027 sha256=4ff1aff2f0309fe2bacaae1e12a1ca40875211c010b4041f1d0c11d89634650d -->
 ## MCI-UI 与第三方组件库策略
 
 Microi 的 UI 规范不应该只停留在 skills 文档。面向品牌长期建设时，应形成可复用的 MCI-UI 体系：设计变量、基础样式、组件约定、示例站点、移动端与 PC 网站组件库。
@@ -102,7 +102,7 @@ Microi 的 UI 规范不应该只停留在 skills 文档。面向品牌长期建�
 - `microi.doc` 作为 VitePress 官方文档站，应逐步成为 MCI-UI 的展示入口：组件演示、设计变量、移动端骨架屏、安全区、富文本、上传资源、主题切换都应该有可查看示例，而不是只写在 skill 中。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-028 sha256=eee54b657b766f1d1ef137fb1df07fc8eec0b5363502838475eda81f9d031512 -->
+<!-- microi-progressive:chunk id=ui-design-028 sha256=3d8b5773f340f253a48a09657a3d01b80eeccd4874c34c641547cb5994dc0a42 -->
 ## MCI-UI 源码落地位置
 
 MCI-UI 已在吾码源码根目录落地：`Microi.UI/`。

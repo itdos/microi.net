@@ -162,6 +162,24 @@ return V8.FormEngine.UptFormData('payment_order', {
 
 `{Provider}` 目前支持 `Gitee`、`WeChat`、`GitHub`。回调地址由后端按当前 API 域名固定生成：`/api/ExternalLogin/Callback?OsClient={租户}&Provider={Provider}`，应把【开始授权】接口返回的 `CallbackUrl` 原样登记到第三方平台。生产环境必须使用 HTTPS；`localhost` 仅用于受控开发。RP ID、Origin 或第三方回调域名配错时，浏览器/供应商会正确拒绝验证。
 
+### 微信网站应用扫码登录
+
+1. 在微信开放平台使用已审核的网站应用，并确认该应用已获得微信登录权限。
+   授权回调域名必须匹配【开始授权】返回的 `CallbackUrl` 所属域名。
+2. 在【系统设置 → 安全与服务接入】启用并保存 `Login.WeChat.ClientId`
+   （填写网站应用 AppID）与 `Login.WeChat.ClientSecret`（填写 AppSecret）；
+   Scope 使用 `snsapi_login`。随后开启系统设置的 `WeChatLoginEnabled`。
+3. 先用已有吾码账号登录，在个人中心绑定本人微信；退出后再选择微信扫码登录。
+   未绑定的微信身份不能直接进入系统，也不会自动获得管理员权限。
+
+微信授权地址使用 `https://open.weixin.qq.com/connect/qrconnect`，应用标识参数为
+`appid`；Gitee 和 GitHub 继续使用 `client_id`。AppSecret 不进入授权 URL、浏览器或应用包。
+其它租户安装平台应用后仍须配置自己的网站应用凭据与回调域名。
+
+本地前端可以通过明确的 `ApiBase` 指向已配置的公网 API 进行扫码联调；
+本地后端生成的 `localhost` 回调不能代替开放平台已登记的公网域名。
+自动化验证授权参数、拒绝路径与普通登录后，还须用真实微信完成一次绑定和扫码登录验收。
+
 五个浏览器公开字段完整名称为 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub`。旧 `LoginPasskeyDisplay`、`LoginAuthenticatorDisplay`、`LoginGiteeDisplay`、`LoginWeChatDisplay`、`LoginGitHubDisplay` 只用于兼容尚未升级的租户，不再作为新配置入口。旧 `mci_system_setting` 的 `Login.*.Enabled` / `Security.PasswordChange.RequireStepUp` 同样只在对应新实体字段缺失或为空时回退读取；新版“安全与服务接入”不再显示、保存或删除这些迁移项。
 
 基础空库应用 `app.microi.saas-engine` 会幂等安装身份表、动态私密设置表、外部身份表、公开系统设置字段和平台内置微服务。存量租户的增量能力由独立“系统账号” `app.microi.sys_user` 与“系统设置” `app.microi.sys-config` 安装：前者唯一拥有用户偏好/资料 Managed 接口与用户 Hook，后者唯一拥有租户私密设置 Managed 接口与设置 Hook；这些接口不再复制到 SaaS 或应用商城包。安装器不会覆盖租户已有明确选择。运行时只在新字段缺失或为空时读取历史 `mci_system_setting` / `sys_osclients` 值；管理员一旦保存新字段，`sys_config` 就成为能力开关的唯一事实源。

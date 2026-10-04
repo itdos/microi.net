@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-const source = new URL('../../../microi.openclaw/server/services/employee-worker.test.cjs', import.meta.url);
-assert.ok(fs.existsSync(source), '统一回归要求提供吾码小龙虾源码');
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {officialRepositorySource} from './official-application-source.mjs';
+const source = pathToFileURL(path.join(officialRepositorySource('microi.openclaw'),'server/services/employee-worker.test.cjs'));
 await import(source.href);

@@ -380,3 +380,9 @@ return { Code: 1, Data: { Upstream: resp.Content, Summary: summary.Data } };
 ❌ 内部接口忘开 `StopHttp` → 被外部直接调用绕过校验  
 ❌ 对账接口未配置 `LockKey` → 集群多实例并发执行 → 数据双倍  
 ❌ 文件下载接口未开 `IsResponseFile` → 返回 JSON 而非文件流
+
+## 复盘：后台任务调度路由与执行目标的参数边界
+
+- HTTP 调用持久后台任务时使用固定 `/apiengine/platform-background-task?OsClient=` 与 `Action: 'RunApiEngine'`；目标接口放在独立的 `TargetApiEngineKey`，业务参数放在 `Param`，幂等和并发策略放在 `Options`。不可用正文 `ApiEngineKey` 改写路由调度器。
+- 回归至少验证嵌套业务参数与 Options 能完整抵达可信后台原子、同一幂等键返回原任务、匿名及未授权身份拒绝执行。页面提交成功后还需回读后台任务终态，不能将“已排队”视为业务完成。
+- 原子能力若按持久任务记录中的接口 Key 校验可信执行身份，队列目标必须是该原子允许的工作器本身；嵌套调用不会改写任务记录的接口身份。禁止把兼容提交器排入队列后再调用工作器，并通过扩大 Key 白名单或省略栅栏令牌校验掩盖目标不一致。回归应对照队列目标与原子的固定 Key，并走一次真实写流程到终态。

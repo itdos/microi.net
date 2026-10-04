@@ -1,3 +1,5 @@
+import workspacePaths from './lib/workspace-paths.js'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
@@ -9,8 +11,8 @@ import { mergeModuleFilterFields, buildListFilterWhere } from '../src/platform/l
 import * as visibility from '../src/platform/native-field-visibility.mjs'
 import * as treeOptions from '../src/platform/native-tree-options.mjs'
 
-const engineUrl = new URL('../../Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/移动端通讯录获取系统人员(get-sysUser-list)(get-sysUser-list).js', import.meta.url)
-const engine = Function('V8', readFileSync(process.env.DIRECTORY_ENGINE_TEST_FILE || engineUrl, 'utf8'))
+const enginePath = process.env.DIRECTORY_ENGINE_TEST_FILE || workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'get-sysUser-list')
+const engine = Function('V8', readFileSync(enginePath, 'utf8'))
 const table = { Id: 'users-table', Name: 'Sys_User', Description: '员工信息' }
 const fields = ['Name', 'Account', 'Phone', 'Sex', 'DeptName', 'RoleIds', 'DeptId', 'UserType', 'Jobs', 'State', 'Pwd', 'AiApiKey'].map((Name, i) => ({
   Id: `field-${Name}`, Name, Label: Name === 'Sex' ? '性别' : Name,

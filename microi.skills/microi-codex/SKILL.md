@@ -13,6 +13,11 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 
 ## Microi Agent 桌面宿主
 
+- 桌面包内置技能目录；干净工作区输入 `/microi` 可发现吾码入口，再读取基础规范与专项技能。查不到时先核对当前桌面版本及内置技能资源，不要求用户复制开发机目录，也不要把 MCP 工具名当成斜杠技能名。
+- 对话输入框上下键回填成功提交的提示词，向下可恢复未发送草稿。菜单、输入法候选、选区和多行正常光标移动优先；不要在用户编辑文本时强行覆盖草稿。
+- 消息编辑/撤回通过真实会话分叉到该消息之前的已完成轮次；原会话和已经执行的文件修改保留。撤回将消息恢复为草稿，编辑则重新发送；这不是撤销文件系统。图片随草稿恢复，无法安全恢复的文件附件明确拒绝，不能静默删除附件或只改屏幕文字而保留旧模型上下文。
+- AI 员工桌面工作台提供十岗、任务草稿、执行、成果审阅、已验收依赖、目标和预算。云端执行复用员工中心；本机执行使用显式受限 OpenClaw Agent 与已有 Gateway。Harness 的会话/技能/定时能力不能证明 OpenClaw 的渠道、Gateway、设备节点与全部 cron 语义已完整内置。相关配置和验收读取 `ai-engine/references/ai-employees.md`。
+
 - 桌面与手机配对的本机 HTTP 监听必须避开 Fetch 标准禁止端口。系统自动分配的端口也可能不可浏览器访问；只有浏览器允许的真实监听端口才能进入配对 URL。自动命中禁止端口时关闭监听再有界重选，显式配置禁止端口须报错；权限和占用错误仍保留原错误，不改变系统动态端口范围、不绕过浏览器安全策略。同步上游时保护共同端口选择器、配对监听与对应回归。
 
 - Microi Agent 是内部仓库中的独立桌面发行物，直接基于 DataElement/dsh-desktop 与 DeepSeek Harness 二次开发，内置固定版本的 Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
@@ -29,6 +34,7 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 - 当前 Electron 桌面运行时不能直接打包 iOS/Android，也不能把现有 DMG 原样提交 Mac App Store。移动端和 MAS 版应作为受限客户端，复用账号、模型、会话、MCP 与桌面配对协议，把 Node/Harness/Shell/插件执行放到配对桌面或合规远端；分别完成 Apple/Google 签名和商店审核。
 - MAS 使用独立 `electron.vite.mas.config.ts` 与 `electron-builder.mas.cjs` 构建最小客户端，应用包只含客户端入口、受限 preload、静态界面和版权材料；不能把父工程依赖、Harness、独立 Node 或站外更新器混入沙盒包。正式包使用 Mac App Distribution 与 Mac Installer Distribution；本机验证使用 Mac Development 和包含该设备的开发描述文件。签名钥匙串必须先用实际保存的密码完成锁定、解锁往返验证，再启动构建；记录密码不得被重复生成过程覆盖。签名包、本机运行、Apple 上传处理、提交审核和正式上架分别回读，不能以包已生成代替上架。商店截屏使用经过验证的真实客户端界面，按 Apple 接受的高清尺寸上传，保留原始高清 Logo。
 - Windows Microsoft Store 使用分配给产品的 MSIX Identity/Publisher，上传包由商店签名。MSIX 运行时以 Electron 的 `process.windowsStore` 识别，禁止调用官网 EXE 更新、降级或安装入口；手动检查更新转到该产品的 Microsoft Store 页面，版本列表不请求 NSIS 归档。包内 PE/x64、Manifest/BlockMap 校验、Windows 原生运行、商店认证和正式可下载分别记录。官网 Windows/macOS 下载按钮旁可展示真实商店产品链接，但审核中必须明确标注，不能把未开放页面称为已上架。
+- 闭源商业项目要求免费可信 EXE 下载时，已发布的免费 Store MSIX 可使用 Microsoft Store Web Installer：从官方 badge 生成器的 Direct 模式取得该产品 `get.microsoft.com/installer/download/` 链接，验证真实下载的 Microsoft 签名及文件摘要。这是联网安装当前商店版的小型 EXE，不是给官网完整 NSIS EXE 签名；保留两渠道并说明版本差异，不把下载成功写成原生安装通过，不将动态安装器冒充固定版本 CDN 产物。按当前包 Manifest 的 MinVersion 和架构记录系统条件，分别说明旧 Windows、x86、ARM 仿真、LTSC/Server、离线与企业策略边界；不降低安全策略或虚构全部系统验收。自签名不能产生公众信任，免费开源签名服务不适用于私有商业源码。
 - 复用已签名 MAS 应用制作开发测试包时，必须替换 `Contents/embedded.provisionprofile`，核对描述文件中的证书与开发签名及当前设备一致；`codesign --verify` 通过仍不能替代实际启动。资料目录中的描述文件保持私有权限，复制到安装包后设为普通用户可读，并检查整个有效载荷，避免 ITMS-90255。沙盒阻止调试监听时不得扩大正式包的网络监听权限；自动化测试入口只放入独立开发副本，正式入口、preload 与界面应核对同源，测试入口和配对口令不得进入正式安装包。安装包上传成功后仍要回读 Apple 处理状态、选择构建、上传高清素材并实际提交审核。
 - 官方账号页和关于标签通过 `platform-current-user` 接口引擎读取当前 `sys_user.LicenseType`。桌面相关平台业务逻辑优先通过 `microi_itdos` 接口引擎实现；只有接口引擎缺少必需底层原子能力时才能改后端源码，并说明原因。
 - 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.itdos.com/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。

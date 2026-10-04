@@ -429,6 +429,8 @@ namespace Microi.net.Api
             }
             if (param.Path.DosIsNullOrWhiteSpace()) param.Path = json["Path"]?.Val<string>();
             if (param.Limit == null && json["Limit"] != null) param.Limit = json["Limit"]?.Val<bool>();
+            if (param.EmptyDirectoryOnly == null && json["EmptyDirectoryOnly"] != null)
+                param.EmptyDirectoryOnly = json["EmptyDirectoryOnly"]?.Val<bool>();
             if (param.Preview == null && json["Preview"] != null) param.Preview = json["Preview"]?.Val<bool>();
             if (param.ForOfficePreview == null && json["ForOfficePreview"] != null) param.ForOfficePreview = json["ForOfficePreview"]?.Val<bool>();
             if (param.ReturnFileType.DosIsNullOrWhiteSpace()) param.ReturnFileType = json["ReturnFileType"]?.Val<string>();
@@ -1771,8 +1773,22 @@ namespace Microi.net.Api
         /// 传入 FilePathName（文件完整路径），如果是文件夹路径需以"/"结尾
         /// </summary>
         [HttpPost]
-        public async Task<JsonResult> DeleteObject(DiyUploadParam param)
+        public Task<JsonResult> DeleteObject(DiyUploadParam param)
+            => DeleteObjectCore(param, forceEmptyOnly: false);
+
+        /// <summary>
+        /// 兼容安全的专用路由：旧后端没有此路由时返回 404，绝不回退普通递归删除。
+        /// 强制模式在 JSON 读取之后设置，调用方传 false 不能扩大为普通目录删除。
+        /// </summary>
+        [HttpPost]
+        public Task<JsonResult> DeleteEmptyDirectoryMarker(DiyUploadParam param)
+            => DeleteObjectCore(param, forceEmptyOnly: true);
+
+        private async Task<JsonResult> DeleteObjectCore(DiyUploadParam param, bool forceEmptyOnly)
         {
+            param ??= new DiyUploadParam();
+            await LoadJsonBody(param);
+            if (forceEmptyOnly) param.EmptyDirectoryOnly = true;
             var accessError = await DefaultParam(param);
             if (accessError != null) return Json(accessError);
             var adminError = RequirePlatformAdmin(param);
@@ -1782,8 +1798,20 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "FilePathName不能为空！"));
             }
-            var pathError = NormalizeFilePaths(param);
-            if (pathError != null) return Json(pathError);
+            try
+            {
+                param.FilePathName = TenantConfigurationSecurity.NormalizeStorageDeletePath(param.OsClient, param.FilePathName);
+            }
+            catch
+            {
+                return Json(new DosResult(0, null, "删除对象路径不符合当前租户安全边界。"));
+            }
+            if (param.EmptyDirectoryOnly == true)
+            {
+                var denied = await HdfsObjectDeleteAuthorization.AuthorizeEmptyDirectoryAsync(param.OsClient);
+                if (denied != null) return Json(denied);
+                if (!param.Limit.HasValue) return Json(new DosResult(0, null, "空目录标记删除必须明确选择公有或私有桶。"));
+            }
 
             var result = await DeleteFileCabinetOfficeObjectAsync(param,
                 () => new MicroiHDFS().DeleteObject(param));

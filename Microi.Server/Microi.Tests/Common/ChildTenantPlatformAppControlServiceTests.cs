@@ -126,7 +126,7 @@ public class ChildTenantPlatformAppControlServiceTests
         var orchestrator = File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "bulk-update-child-tenant-platform-apps.js"));
         Assert.Contains("Phase: 'Monitor'", orchestrator, StringComparison.Ordinal);
@@ -222,7 +222,7 @@ public class ChildTenantPlatformAppControlServiceTests
         var worker = File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "bulk-import-packages.js"));
 
@@ -262,7 +262,7 @@ public class ChildTenantPlatformAppControlServiceTests
         var importerSource = File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "import-package.js"));
 
@@ -330,8 +330,8 @@ public class ChildTenantPlatformAppControlServiceTests
             "Upgrade.cs"));
 
         Assert.Contains("RUNTIME_EMBEDDED_PHYSICAL_CONTRACT_V1", source, StringComparison.Ordinal);
-        Assert.Contains("app.microi.form-engine.json", source, StringComparison.Ordinal);
-        Assert.Contains("app.microi.saas-engine.json", source, StringComparison.Ordinal);
+        Assert.Contains("app.microi.bootstrap.json", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("app.microi.saas-engine.json", source, StringComparison.Ordinal);
         Assert.Contains("RuntimePhysicalColumnContracts.Value", source, StringComparison.Ordinal);
         Assert.Contains("diy_table", source, StringComparison.Ordinal);
         Assert.Contains("diy_field", source, StringComparison.Ordinal);

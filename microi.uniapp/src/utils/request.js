@@ -4,6 +4,7 @@ import { shouldPromptAuthExpired } from '../platform/auth-expired-policy.mjs';
 import { clearPlatformCache } from '../platform/cache.js';
 import { clearRetainedListSessions } from '../platform/list-session.mjs';
 import { clearAuthScopedStorageCaches } from '../platform/auth-storage-cleanup.mjs';
+import { createLoginNavigationGuard, installLoginNavigationInterceptors, pageLocation } from '../platform/login-navigation.mjs';
 import {
   APP_RUNTIME_ENDPOINT_STORAGE_KEY,
   buildAppRuntimeEndpoint
@@ -12,7 +13,6 @@ import {
 const TOKEN_KEY = 'microi_token';
 const USER_KEY = 'microi_user';
 
-let redirectingToLogin = false;
 let authExpiredPrompting = false;
 
 function getRuntimeUni() {
@@ -90,46 +90,36 @@ function uniRequestAdapter(options = {}) {
     });
 }
 
+function currentPages() {
+  try { return typeof getCurrentPages === 'function' ? getCurrentPages() : []; } catch (error) { return []; }
+}
+
+const loginNavigationGuard = createLoginNavigationGuard({
+  getPages: currentPages,
+  hasSession: () => !!getToken() && !!getUser()?.Id
+});
+
+export function initializeLoginNavigation() {
+  return installLoginNavigationInterceptors(getRuntimeUni(), loginNavigationGuard);
+}
+
+export function notifyLoginPageOpened() {
+  loginNavigationGuard.pageOpened();
+}
+
 function redirectToLogin() {
-  if (redirectingToLogin) return;
-  redirectingToLogin = true;
-
-  try {
-    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
-    const current = pages && pages.length ? pages[pages.length - 1] : null;
-    let redirect = '';
-
-    if (current && current.route) {
-      const opts = current.options || {};
-      const qs = Object.keys(opts).map((key) => `${key}=${encodeURIComponent(opts[key])}`).join('&');
-      redirect = `/${current.route}${qs ? `?${qs}` : ''}`;
-    }
-
-    if (current && current.route && current.route.indexOf('pages/login') !== -1) {
-      redirectingToLogin = false;
-      return;
-    }
-
-    const url = `/pages/login/index${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''}`;
-    uni.navigateTo({
-      url,
-      fail: () => {
-        uni.switchTab({
-          url: '/pages/workspace/index',
-          complete: () => {
-            redirectingToLogin = false;
-          }
-        });
-      },
-      complete: () => {
-        setTimeout(() => {
-          redirectingToLogin = false;
-        }, 800);
-      }
-    });
-  } catch (e) {
-    redirectingToLogin = false;
-  }
+  const runtimeUni = getRuntimeUni();
+  if (!runtimeUni || (getToken() && getUser()?.Id)) return;
+  const pages = currentPages();
+  if (pages.some((page) => String(page?.route || '').replace(/^\/+/, '').startsWith('pages/login/'))) return;
+  initializeLoginNavigation();
+  const redirect = pageLocation(pages[pages.length - 1]);
+  const url = `/pages/login/index${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''}`;
+  runtimeUni.navigateTo({
+    url,
+    // 页面栈已满时替换当前页；保留原目标，登录完成后通过清栈恢复，避免重新压栈。
+    fail: () => runtimeUni.redirectTo({ url, fail: () => runtimeUni.reLaunch({ url }) })
+  });
 }
 
 export const V8 = createMicroiV8({
@@ -148,12 +138,12 @@ export const V8 = createMicroiV8({
     const runtimeUni = getRuntimeUni();
     const message = body && body.Msg ? String(body.Msg) : '当前登录身份已过期，请重新登录。';
     if (!shouldPromptAuthExpired(body, getCurrentRoute())) {
-      authExpiredPrompting = false;
-      // 让业务页已经发起的 navigateTo 先完成；届时 redirectToLogin 会识别登录页并退出。
-      setTimeout(() => redirectToLogin(), 50);
+      redirectToLogin();
       return;
     }
-    if (!runtimeUni || typeof runtimeUni.showModal !== 'function' || authExpiredPrompting) {
+    // 并发失效响应只保留一次提示和导航；迟到的模态框回调仍须检查新登录态。
+    if (authExpiredPrompting) return;
+    if (!runtimeUni || typeof runtimeUni.showModal !== 'function') {
       redirectToLogin();
       return;
     }

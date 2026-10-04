@@ -1,6 +1,7 @@
+import workspacePaths from './lib/workspace-paths.js'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { test } from 'node:test'
 import {
   ASSIGNEE_KEYWORD_FIELDS,
@@ -24,32 +25,20 @@ test('客服负责人查询继续保留客服角色和商家限制', () => {
   assert.deepEqual(supportWhere.slice(-ASSIGNEE_KEYWORD_FIELDS.length).map((item) => item.Value), Array(ASSIGNEE_KEYWORD_FIELDS.length).fill('朱立雄'))
 })
 
-const engineFile = join(
-  import.meta.dirname,
-  '..',
-  '..',
-  'Microi-V8-Engine',
-  '集福鲤平台 (api.jifulii.com)',
-  'xjy.Product.Internal',
-  '接口引擎',
-  '未分类',
-  '售后服务订单指派(shouhoudd_zhipai).js'
-)
-const engineSource = readFileSync(engineFile, 'utf8')
-const directoryEngineSource = readFileSync(join(
-  import.meta.dirname,
-  '..',
-  '..',
-  'Microi-V8-Engine',
-  '集福鲤平台 (api.jifulii.com)',
-  'xjy.Product.Internal',
-  '接口引擎',
-  '未分类',
-  '移动端通讯录获取系统人员(get-sysUser-list)(get-sysUser-list).js'
-), 'utf8')
+const engineSource = readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'shouhoudd_zhipai'), 'utf8')
+const directoryEngineSource = readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'get-sysUser-list'), 'utf8')
+
+// 服务端保存会单调提升版本；门禁要求修复的最低语义版本，不拒绝已发布的后续补丁。
+function assertMinimumVersion(source, minimum) {
+  const match = source.match(/^\s*\*\s*Version:\s*v(\d+)\.(\d+)\.(\d+)\s*$/m)
+  assert.ok(match, '接口源码必须包含有效的语义版本头')
+  const actual = match.slice(1).map(Number)
+  const comparison = actual.reduce((result, value, index) => result || Math.sign(value - minimum[index]), 0)
+  assert.ok(comparison >= 0, `接口版本 v${actual.join('.')} 必须至少为 v${minimum.join('.')}`)
+}
 
 test('通讯录接口从主库判定平台管理员，普通账号强制商家隔离且管理员可搜索商家名', () => {
-  assert.match(directoryEngineSource, /Version: v1\.1\.3/)
+  assertMinimumVersion(directoryEngineSource, [1, 1, 3])
   assert.match(directoryEngineSource, /var isPlatformAdmin = userLevel >= 9999/)
   assert.match(directoryEngineSource, /if \(!isPlatformAdmin\)[\s\S]*Name: 'TenantId'/)
   assert.match(directoryEngineSource, /Name: 'TenantName'[\s\S]*GroupEnd: true/)
@@ -116,7 +105,7 @@ test('普通账号可以指派同商家的任意角色人员，姓名电话仍�
   assert.equal(updatedRows[0].ShouhouRY, '朱立雄')
   assert.equal(updatedRows[0].ShouhouRYDH, '13800000000')
   assert.equal(updatedRows[0].ZhipaiR, '指派人')
-  assert.match(engineSource, /Version: v1\.0\.3/)
+  assertMinimumVersion(engineSource, [1, 0, 3])
 })
 
 test('普通账号不能跨商家指派，缓存中的伪造超级管理员等级不能绕过', () => {

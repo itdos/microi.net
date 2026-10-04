@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
-import { buildTokenFileLookupKeys, MicroiClient, type MicroiConfig } from './microi-client.js';
+import { buildTokenFileLookupKeys, resolveSseTenantConfig, MicroiClient, type MicroiConfig } from './microi-client.js';
 import { createMcpServer, type McpServerContext } from './server.js';
 import { resolveMcpLabel } from './mcp-label.js';
 import { selectPreferredAuthorizationTokenFromCandidates } from './token-utils.js';
@@ -135,8 +135,8 @@ async function main(): Promise<void> {
       console.error('  MICROI_PASSWORD     - Login password (fallback if no token)');
       console.error('Optional:');
       console.error('  MICROI_OS_CLIENT    - OsClient identifier');
-      console.error('  MICROI_OS_CLIENT_TYPE - Optional OsClient type for exact token identity');
-      console.error('  MICROI_OS_CLIENT_NETWORK - Optional OsClient network for exact token identity');
+      console.error('  MICROI_OS_CLIENT_TYPE - Optional OsClient type for exact transport/token identity');
+      console.error('  MICROI_OS_CLIENT_NETWORK - Optional OsClient network for exact transport/token identity');
       process.exit(1);
     }
     const client = new MicroiClient(config);
@@ -181,7 +181,9 @@ async function main(): Promise<void> {
 
 /** stdio 模式：适用于 VS Code / Cursor 本地启动 */
 async function startStdio(server: ReturnType<typeof createMcpServer>): Promise<void> {
-  const transport = new StdioServerTransport();
+  // 完整应用包的正规Base64协议可能超过SDK默认10MiB。固定有界wire缓冲允许既有大包，
+  // 不改变HTTP/HDFS/业务限额；超过128MiB的单条JSON-RPC须使用已有流式资产协议。
+  const transport = new StdioServerTransport(process.stdin, process.stdout, { maxBufferSize: 128 * 1024 * 1024 });
   await server.connect(transport);
   console.error('[microi-mcp] Server started (stdio mode)');
 }
@@ -190,7 +192,7 @@ async function startStdio(server: ReturnType<typeof createMcpServer>): Promise<v
  * SSE 模式：每个连接独立认证
  *
  * 认证方式（按优先级）：
- * 1. 请求头 X-Microi-Username / X-Microi-Password / X-Microi-OsClient
+ * 1. 请求头 X-Microi-Username / X-Microi-Password / X-Microi-OsClient，以及可选 X-Microi-OsClientType / X-Microi-OsClientNetwork
  * 2. 环境变量 MICROI_USERNAME / MICROI_PASSWORD / MICROI_OS_CLIENT（兜底默认值）
  * 3. 均无 → 拒绝连接 (401)
  */
@@ -204,7 +206,6 @@ async function startSSE(port: number, defaultConfig: MicroiConfig): Promise<void
   app.get('/sse', async (req, res) => {
     const username = (req.headers['x-microi-username'] as string) || defaultConfig.username;
     const password = (req.headers['x-microi-password'] as string) || defaultConfig.password;
-    const osClient = (req.headers['x-microi-osclient'] as string) || defaultConfig.osClient || '';
 
     if (!username || !password) {
       res.status(401).json({
@@ -215,22 +216,22 @@ async function startSSE(port: number, defaultConfig: MicroiConfig): Promise<void
     }
 
     try {
+      const tenantConfig = resolveSseTenantConfig(req.headers, defaultConfig);
+      const osClient = tenantConfig.osClient || '';
       // 每个连接创建独立的 MicroiClient，独立登录、独立 Token 刷新
       const client = new MicroiClient({
         apiBaseUrl: defaultConfig.apiBaseUrl,
         username,
         password,
-        osClient,
-        osClientType: defaultConfig.osClientType,
-        osClientNetwork: defaultConfig.osClientNetwork,
+        ...tenantConfig,
         rsaPublicKey: defaultConfig.rsaPublicKey,
       });
       await client.login();
 
       const sseContext: McpServerContext = {
         osClient: osClient || '',
-        osClientType: defaultConfig.osClientType || '',
-        osClientNetwork: defaultConfig.osClientNetwork || '',
+        osClientType: tenantConfig.osClientType || '',
+        osClientNetwork: tenantConfig.osClientNetwork || '',
         apiBaseUrl: defaultConfig.apiBaseUrl,
         label: '',
       };

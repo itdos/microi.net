@@ -403,7 +403,7 @@ public sealed class EsaExactCnameBindingTests
         var source = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
             "Microi.Server",
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "admin-ensure-saas-tenant-domain-binding.js"));
         var engine = new Engine();

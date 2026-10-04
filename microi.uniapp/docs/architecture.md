@@ -55,6 +55,10 @@ Profile 使用通用模块目录、动态列表、动态详情和动态表单；
 
 平台层禁止出现租户表名、字段名、品牌文案、租户素材和定制路由。
 
+列表首屏在进入页面或打开远程选择器的当帧即进入骨架态，菜单与元数据等待也属于初次加载；只有当前请求成功完成且确实没有记录才显示空态。请求失败结束骨架并提供错误与重试入口，不能解释为没有数据。恢复非空缓存或刷新、分页时保留可读记录，列表底部使用 `mci-skeleton` 的 `compact` 模式提示后续加载；尚未完成请求的空缓存不能提前结束骨架。
+
+分类切换、远程搜索与分页使用请求代次保护，迟到结果不能覆盖新筛选或结束新请求的骨架，失败分页可重新请求同一页。共享骨架颜色由主题令牌控制，并兼容减少动态效果设置。`scripts/list-loading.test.mjs` 通过可控慢请求、失败和并发请求执行真实页面方法，覆盖成功空数据、缓存恢复、重试及选择器首开等状态。
+
 ### 2. 视图协议层
 
 `sys_menu` 负责一个业务入口的列表、卡片、详情和编辑视图。同一菜单可用
@@ -95,6 +99,20 @@ src/tenants/<tenant>/
 事务逻辑。定制详情可组合硬编码 Hero/流程区和动态元数据分组，新增后台字段
 会自动进入折叠区。
 
+集福鲤客户合同金额由 `src/tenants/xjy/customer-contract-totals.mjs` 与租户组件
+共同适配，客户列表和详情共用 `xjy-customer-contract-totals` 只读聚合接口。
+同页批量传入 `CustomerIds` 和真实 `CustomerSysMenuId`，服务端负责授权、合同
+状态、有效期、合作方式及设备/滤芯金额归类；前端不逐客户查询订单，也不从
+`DingdanJE` 拆分合同类型。返回 `Data.Customers[id]` 的 `Rental.Current/All`、
+`Buyout.All`、`AnnualFilter.Current/All`，分别展示当前有效期和全部合同金额。
+`Scope`、`CurrentDefinition` 是可选口径说明。
+
+金额状态只挂在列表行副本的 `__xjyContractTotals`，不回写客户业务字段或 SDK
+查询缓存。真实零金额展示 `¥0.00`；权限、网络、响应缺失或部分值缺失展示
+“未获取”并提供重试，不能用零掩盖失败。金额加载属于列表首屏加载过程，
+迟到响应不能覆盖新搜索；详情金额重试使用独立请求代次。确定性回归由统一
+入口发现 `Microi.Server/Microi.Tests/UniApp/customer-contract-totals.test.mjs`。
+
 ### 4. Profile 层
 
 `profiles/<id>/profile.cjs` 管理 OsClient、API、文件服务、品牌、功能开关和
@@ -103,6 +121,12 @@ src/tenants/<tenant>/
 `scripts/run-profile.cjs` 在构建子进程中生成 `src/generated/*` 桥接并在结束
 后恢复。仓库默认生成物必须始终指向 `xjy`，以保证同事直接运行原命令得到
 当前交付版。
+
+通用 App 使用可选的 `microi` Profile。与现有页面同名而交互不同的源码仅在
+该 Profile 构建期间从 `profiles/microi/overrides/src/` 临时激活；新平台模块、
+组件和路由仍放在共享 `src/`。构建结束必须恢复默认 xjy 源文件，且不能并行
+运行多个 Profile 构建。隔离层的使用与逐步共用规则见
+`profiles/microi/README.md`。
 
 ## 动态更新链路
 

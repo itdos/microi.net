@@ -14,7 +14,7 @@ Microi.UI 是 Microi 产品共享前端设计系统。Vue 3 网站、响应式�
 这是自动规则。不要等用户明确说“遵循 `microi.skills/microi-ui/SKILL.md`”。只要仓库、需求、文件路径或项目上下文属于 Microi 生态，且工作涉及前端界面、网站界面、H5、uni-app、小程序、客户/员工/会员页面、报告、仪表盘或视觉打磨，就默认读取并应用本 skill。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-ui-000 sha256=1fdfec21b03bf209a64b65bc4c1d22cf443b065125d3fb7700d8e1751694394b -->
+<!-- microi-progressive:chunk id=microi-ui-000 sha256=f7196312987e0d8cb833f3ae0d96f014d57e2ca1fb120333accbe25a05f7c83d -->
 ## 核心承诺
 
 Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
@@ -30,7 +30,7 @@ Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
 - 每个移动端页面都必须处理安全区、加载状态、按下反馈和底部操作。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-001 sha256=33d0fbc900090983a0e5959e10f611a3ebb3b9b2c0dc1d13ce7569cfc4701211 -->
+<!-- microi-progressive:chunk id=microi-ui-001 sha256=044beeb0089cefa69844d2ff8a39f2130987af557cc63c03701c2b822f0b9c88 -->
 ## 内置设计模式
 
 当需求只说“主流、高级、好看”时，先为页面确定一种主模式，再开始选组件和写样式：
@@ -53,7 +53,7 @@ Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
 - [原创模式案例](../ui-design/assets/pattern-showcase/index.html) 只用于理解结构、状态和视觉差异，业务项目应替换为自己的信息架构和合法资产。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-002 sha256=37946ecc4b9c4cdca0be4279d6538070cbc9126d9d17305aaaddb0f0806d2fdc -->
+<!-- microi-progressive:chunk id=microi-ui-002 sha256=cc3389777d88e0dfa5f83cdae60fbe5e23605525cf7ad95a28a41b9c71f8863c -->
 ## 源码结构
 
 - `Microi.UI/src/theme/tokens.css`：设计变量、色板、圆角、阴影、动效、移动端场景变量。
@@ -63,7 +63,7 @@ Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
 - `Microi.UI/src/uniapp`：uni-app Vue 3 组件。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-003 sha256=a099b33b210ebc71ac9d76076e9cea92e03ce34fd1a2d1ace63d4c6660dee7e0 -->
+<!-- microi-progressive:chunk id=microi-ui-003 sha256=749502e10b376884c9f2038fe2e0e385eab8f72646ce1af7daf5c18161c87a79 -->
 ## 默认要求
 
 - **禁止弧形包边**：Tab、卡片、导航、提示条不使用随容器圆角弯曲的强调色侧边框。默认无侧框；需要选中侧标时使用独立的直竖线，与上下边缘留白，不能沿圆角包住上下边缘。中性容器边框与直线端点小圆角不受影响；完整规则见 `../ui-design/SKILL.md`。
@@ -87,7 +87,7 @@ Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
 - 页面安全区验收以 `pages.json` 全路由为清单，至少覆盖 iPhone、Android 和微信开发者工具；首页、详情、表单、底部弹层及 fixed 操作栏必须全部通过。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-004 sha256=7703ed0887bf7d160e212133227a577ccec3d1375530962127a9232d603d7193 -->
+<!-- microi-progressive:chunk id=microi-ui-004 sha256=e40239e4859edb17b2c0bb2bc39009692c3a1207d59b3dd11a983130aede75c2 -->
 ## 组件选择
 
 - `MciPage`：页面壳、安全区、动效、高品质移动端背景。
@@ -121,7 +121,7 @@ Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
 - 可点击整卡必须有 hover/focus/pressed、键盘 Enter/Space、可见焦点与内部控件事件隔离；骨架屏和最终卡片结构等高。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-005 sha256=f46f6672b60d4faad4a0fc501036bcb7b9d04545952ad8acb716668aac699454 -->
+<!-- microi-progressive:chunk id=microi-ui-005 sha256=7cd46e4c2b14511700c0c30b449ceff038c029f451e03b7963892354c548ad11 -->
 ## 高品质移动端视觉标准
 
 移动端应用必须像经过打磨的产品，而不是把后台表单硬塞进手机视口。

@@ -74,10 +74,11 @@ public class StartupDependencySqlServerIntegrationTests
             Assert.True(UpgradeAppStore.StartupDependenciesReady(client, out var reason), reason);
             var count = database.FromSql("SELECT COUNT(*) FROM sys_apiengine").ToScalar<int>();
             Assert.Equal(UpgradeAppStore.RequiredStartupDependencyEngineKeys.Length, count);
-            Assert.True(count > 100);
+            Assert.Equal(24, count);
+            Assert.Equal(0, database.FromSql("SELECT COUNT(*) FROM sys_apiengine WHERE ApiEngineKey LIKE 'sso[_]%' OR ApiEngineKey LIKE 'database-backup-%'").ToScalar<int>());
 
             var version = database.FromSql("SELECT Version FROM sys_apiengine WHERE ApiEngineKey=@p0")
-                .AddInParameter("p0", "database-backup-download").ToScalar<string>();
+                .AddInParameter("p0", "platform-os-client-by-domain").ToScalar<string>();
             if (versionType?.StartsWith("nchar(") == true || versionType?.StartsWith("char(") == true)
                 Assert.Equal(50, version.Length);
             if (versionType?.EndsWith("NOT NULL") == true)
@@ -101,7 +102,7 @@ public class StartupDependencySqlServerIntegrationTests
             Assert.Equal(cleared, cache.Cleared.Count);
 
             // 真正的版本差异依然由 Managed 包纠正，不得把 Trim 变成跳过版本检查。
-            database.FromSql("UPDATE sys_apiengine SET Version='v0.0.0' WHERE ApiEngineKey='database-backup-download'").ExecuteNonQuery();
+            database.FromSql("UPDATE sys_apiengine SET Version='v0.0.0' WHERE ApiEngineKey='platform-os-client-by-domain'").ExecuteNonQuery();
             Assert.False(UpgradeAppStore.StartupDependenciesReady(restartedClient, out _));
             var repaired = await UpgradeAppStore.EnsureStartupDependenciesUnderLeaseAsync(restartedClient);
             Assert.True(repaired.Code == 1, repaired.Msg);

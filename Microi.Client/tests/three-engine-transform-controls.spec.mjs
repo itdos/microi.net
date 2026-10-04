@@ -2,13 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const testsDir = path.dirname(fileURLToPath(import.meta.url));
-const enginePath = path.resolve(
-    testsDir,
-    "../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/microi-3d-engine/src/three-engine/core/Engine.js"
-);
+import { officialApplicationSource } from '../../Microi.Server/Microi.Tests/V8/official-application-source.mjs';
+const enginePath = path.join(officialApplicationSource('microi-3d-engine'), 'src/three-engine/core/Engine.js');
 
 test("Three.js r182 TransformControls mounts its Object3D helper", async () => {
     const source = await readFile(enginePath, "utf8");

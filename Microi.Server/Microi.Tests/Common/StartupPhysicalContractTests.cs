@@ -116,7 +116,7 @@ public sealed class StartupPhysicalContractTests
     [InlineData("licenseRows", false)]
     public void FoundationPackage_RequiresCompleteSchemaAndPreservesTenantData(string corruption, bool expected)
     {
-        var loader = typeof(UpgradeAppStore).GetMethod("LoadBundledResources", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var loader = typeof(OfficialApplicationPackageValidation).GetMethod("LoadBundledResources", BindingFlags.NonPublic | BindingFlags.Static)!;
         var resources = (Dictionary<string, string>)loader.Invoke(null, null)!;
         var package = JObject.Parse(resources["app.microi.saas-engine.json"]);
         switch (corruption)
@@ -143,7 +143,7 @@ public sealed class StartupPhysicalContractTests
                 ((JArray)package["DataSets"]!).Add(new JObject { ["TableName"] = "mci_license_server", ["Rows"] = new JArray(new JObject { ["LicenseContent"] = "must never ship" }) });
                 break;
         }
-        var validator = typeof(UpgradeAppStore).GetMethod("HasPackagedFoundationSchema", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var validator = typeof(OfficialApplicationPackageValidation).GetMethod("HasPackagedFoundationSchema", BindingFlags.NonPublic | BindingFlags.Static)!;
         Assert.Equal(expected, (bool)validator.Invoke(null, new object[] { package })!);
     }
 }

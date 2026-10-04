@@ -68,7 +68,7 @@ test('independent UniApp delivery does not invalidate PC API images but shared S
    'microi.uniapp/src/pages/customer.vue':'mobile before',
    'microi.uniapp/src/utils/microi.v8.js':'sdk before',
    'Microi.Client/src/main.js':'client before',
-   'Microi.Server/Microi.Upgrade/Resource/app.json':'package before'
+   'Microi.Server/OfficialApplications/Resource/app.json':'package before'
   };
   for(const [name,content]of Object.entries(contents)){
    await mkdir(path.dirname(path.join(root,name)),{recursive:true});
@@ -78,11 +78,11 @@ test('independent UniApp delivery does not invalidate PC API images but shared S
   await writeFile(path.join(root,'microi.uniapp/package.json'),'{"version":"2"}');
   await writeFile(path.join(root,'microi.uniapp/src/pages/customer.vue'),'mobile after');
   assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[]);
-  for(const name of ['microi.uniapp/src/utils/microi.v8.js','Microi.Client/src/main.js','Microi.Server/Microi.Upgrade/Resource/app.json']){
+  for(const name of ['microi.uniapp/src/utils/microi.v8.js','Microi.Client/src/main.js','Microi.Server/OfficialApplications/Resource/app.json']){
    await writeFile(path.join(root,name),'after');
   }
   assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[
-   'Microi.Client/src/main.js','Microi.Server/Microi.Upgrade/Resource/app.json','microi.uniapp/src/utils/microi.v8.js'
+   'Microi.Client/src/main.js','Microi.Server/OfficialApplications/Resource/app.json','microi.uniapp/src/utils/microi.v8.js'
   ]);
  }finally{await rm(root,{recursive:true,force:true});}
 });
@@ -107,6 +107,19 @@ test('official documentation text is published by the website gate without inval
   assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[
    'microi.doc/docs/.vitepress/theme/index.ts','microi.doc/scripts/build.mjs'
   ]);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('the exact internal maintenance log can change while runtime skills, sources and publication guards remain frozen',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'microi-release-maintenance-'));
+ try{
+  execFileSync('git',['init','--quiet'],{cwd:root});
+  const names=['Microi.Agent/维护交接与更新记录.md','Microi.Agent/src/extension.ts','Microi.Agent/publish.js','Microi.Agent/scripts/verify-vsix-package.cjs','Microi.Agent/plugins/microi/skills/workspace-conventions/SKILL.md'];
+  for(const name of names){await mkdir(path.dirname(path.join(root,name)),{recursive:true});await writeFile(path.join(root,name),'before');}
+  const before=await snapshotCandidate(root,['.']);await writeFile(path.join(root,names[0]),'Periodic store status log only');
+  assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[]);
+  for(const name of names.slice(1))await writeFile(path.join(root,name),'after');
+  assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),names.slice(1).sort());
  }finally{await rm(root,{recursive:true,force:true});}
 });
 

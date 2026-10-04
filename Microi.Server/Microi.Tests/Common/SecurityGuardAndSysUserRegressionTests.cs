@@ -372,9 +372,9 @@ public class SecurityGuardAndSysUserRegressionTests
         var compatibilityControllerPath = Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers", "LegacyMobileCompatibilityController.cs");
         var engine = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "platform-user-update-preferences.js"));
+            root, "Microi.Server", "OfficialApplications", "Resource", "platform-user-update-preferences.js"));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.sys_user.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.sys_user.json")));
         var preferenceEngine = package["SysApiEngines"]!.Values<JObject>()
             .Single(item => item["ApiEngineKey"]?.ToString() == "platform-user-update-preferences");
 
@@ -412,16 +412,16 @@ public class SecurityGuardAndSysUserRegressionTests
     {
         var root = FindRepositoryRoot();
         var migration = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "35-UpgradeFileUploadDisableSwitch.cs"));
+            root, "Microi.Server", "Microi.Tests", "Fixtures", "RetiredUpgrade", "35-UpgradeFileUploadDisableSwitch.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
         var baseline = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "36-UpgradeRuntimeInvariantBaseline.cs"));
+            root, "Microi.Server", "Microi.Tests", "Fixtures", "RetiredUpgrade", "36-UpgradeRuntimeInvariantBaseline.cs"));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.saas-engine.json")));
 
         Assert.Contains("public static string Version = \"6.9.9.1\"", migration);
-        Assert.Contains("new Upgrade35().Run", upgrade);
+        Assert.DoesNotContain("new Upgrade35().Run", upgrade);
         Assert.Contains("Upgrade35-文件上传负向开关", baseline);
         Assert.DoesNotContain("UPDATE sys_osclients SET FileUploadEnabled", migration);
         Assert.DoesNotContain("UPDATE sys_osclients SET DisableFileUpload", migration);

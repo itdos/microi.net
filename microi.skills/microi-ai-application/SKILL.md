@@ -88,6 +88,7 @@ UniApp 使用 Vue 3 + TypeScript 的官方 Vite 工具链，并同时遵守 `mic
 2. 依次执行类型检查、单元测试、生产构建和产物静态扫描。
 3. 检查 `dist/build` 不含源码、Token、密钥、localhost、source map 或陈旧 chunk。
 4. 同步私有源码，再流式发布公有构建目录；源码同步失败不得继续发布。发布前回读并冻结应用的 `CurrentVersion` 与 `AppVersion`，stage 只上传不可变版本资产，finalize 必须同时提交 `ExpectedCurrentVersion` 与 `ExpectedAppVersion` 做 compare-and-set；缺一项、状态漂移或回读不一致都停止，不能自动覆盖较新发布。
+   - v3 的应用基线、fence、应用行版本及 active/committed 指针是原始请求的不可变事实；stage 后只按回读更新版本行的 `ExpectedVersionRowVersion`。已提交但仍为 `ProjectionPending` 时，先回读版本与应用，保留原 `RequestId / RequestFingerprint / DeliveryBatchId` 和首次 finalize 的应用基线，重放原请求取得幂等完成回执；禁止把提交后的新指针或 fence 拼入旧请求。只有 `Completed=true` 与 CDN 文件完整性回读同时通过，才继续发布安装包。
 5. 每次创建、修改、升级或重新发布 AI 应用，必须在任何源码同步、stage、finalize 或商城制包之前，为目标精确 `AppVersion` 写入 `sys_microistore_changelog`。日志的 `StoreId / Version / Title / ChangeType / Content / ReleaseTime` 必须完整；发布工具显式传入含义一致且非空的 `changeSummary`，发布后同时回读商城子表与 `mci_ai_app_version.ChangeSummary`。缺日志或版本不一致必须停止发布。
 6. 官方 Web、UniApp、MicroService 的体验地址统一为 `https://static.itdos.com/{OsClient小写}/micro-app/{AppKey}/index.html`，公有桶对象键与域名后的路径完全一致；不再按运行类型分叉到 `ai-app-publish`，也不把 v3 内部 API resolver 用作公开体验地址。当前版本的全部编译文件写入该应用固定根，历史版本写入同根的 `/{Version}/` 目录；历史目录一旦验证不得覆写成不同字节。
 7. 同一版本私有源码文件使用相同的租户、应用、版本相对路径写入私有桶；固定根保存最近一次已完成发布的源码。确实不含源码的编译包在包声明中记录 `Source=NotIncluded`，运行时版本的 `SourceSnapshotPath` 保持空值，不得从公有产物伪造源码。先校验完整公有版本与私有源码快照，再提升固定根的非入口资产和 `index.html`；固定入口切换后提交 CDN 精确路径刷新，回读刷新任务终态和公有入口及引用资源，再更新商城 `PreviewUrl/PublicPublishPath`。刷新任务仅提交成功、单个 CDN 节点 200 或本地构建成功都不算完成。
@@ -98,6 +99,14 @@ UniApp 使用 Vue 3 + TypeScript 的官方 Vite 工具链，并同时遵守 `mic
 11. `SharedPublicRuntime.EntryUrl` 和历史版本目录仅用于历史记录、回滚、摘要校验与审计。回读应用、版本、active 文件清单和 SHA-256；旧清单文件只能可逆归档，不能删除。再分别直接请求稳定当前入口、不可变版本入口及主要 JS/CSS，并断言前者完成加载后地址栏仍不含版本段。
 
 ## 完成定义
+
+### 真实写入与源码包可执行性
+
+- 遇到 Jint 的 CLR 类型解析或程序集缺失，先在目标后端复现。优先调用已公开且经过验证的 `V8.Method` 原子，禁止用 `Math.random` 代替正式随机源；使用 UUID 随机位时必须核对宿主运行时的随机保证、避开固定版本位并使用拒绝采样消除模偏差。
+- 一次业务操作中的 SQL、行锁、请求幂等响应、库存、凭证和审计必须通过同一个 `V8.DbTrans` 执行。仅验证返回失败不足以证明回滚；自动化测试还须回读每类副作用与请求记录，确认没有永久 `Processing` 或部分提交。
+- 领奖码等可逆业务秘密优先使用现有可信宿主的租户／接口绑定保护原子；兼容旧格式时只读旧密钥，不要求新安装租户人工补充未声明配置。真实测试覆盖生成、再次解密、过期、错误码和重复核销。
+- 私有源码 ZIP 中的 `package.json`、lockfile、构建／检查脚本与行为测试必须自包含。下载到独立目录后仍可安装、测试并构建，不得引用开发工作区的父目录脚本或缺失工具链。构建回执绑定候选源码和逐文件产物哈希，任一漂移即失效。
+- 从业务入口登录真实账号，完成首个写操作及整个生命周期；再验证不同身份、撤权、重复请求、并发与刷新恢复。静态截图、模拟登录或合同正则匹配不能替代这些验收。
 
 - `vue-tsc --noEmit`、单元测试和生产构建通过。
 - 源码、lockfile、Manifest、构建版本和远端文件哈希一致。

@@ -19,7 +19,7 @@
 
     <view v-if="open" class="visit-target-combobox__dropdown">
       <scroll-view class="visit-target-combobox__list" scroll-y lower-threshold="80" @scrolltolower="loadMore">
-        <view v-if="loading && !rows.length" class="visit-target-combobox__state"><text>正在检索{{ targetLabel }}…</text></view>
+        <mci-skeleton v-if="loading && !rows.length" type="list" :rows="3" compact />
         <view v-else-if="error && !rows.length" class="visit-target-combobox__state">
           <text>{{ error }}</text>
           <text class="visit-target-combobox__state-note">仍可保留当前输入并直接提交</text>
@@ -43,7 +43,9 @@
             </view>
           </view>
           <view class="visit-target-combobox__footer">
-            <text>{{ loading ? '正在加载…' : finished ? `共 ${total} 条` : '上拉加载更多' }}</text>
+            <mci-skeleton v-if="loading" type="list" :rows="1" compact />
+            <text v-else-if="error" @tap="searchNow">{{ error }}，点击重试</text>
+            <text v-else>{{ finished ? `共 ${total} 条` : '上拉加载更多' }}</text>
           </view>
         </view>
       </scroll-view>

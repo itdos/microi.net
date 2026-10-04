@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-workflow-007 sha256=9c40c62b67065c7e9f6821ef748d75595f004f069909258d9867490b74e115b7 -->
+<!-- microi-progressive:chunk id=v8-workflow-007 sha256=953f9a9405bc929adab9365997f917e10df0fa16bbb2cf1448806d07fdcc945a -->
 ## 节点开始 V8 事件
 
 ### 前端 — 指定审批人
@@ -26,7 +26,7 @@ if (!V8.Form.ApprovalFiles) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-008 sha256=f023312e7d95c518428c2e6d1df99b43cc36d41659aa75768b13ff83cf52b3b0 -->
+<!-- microi-progressive:chunk id=v8-workflow-008 sha256=5849ffaac5c7ffdf3dcfbf4fe8e18951415e1843bd7e233f6a50e36673767f14 -->
 ## 节点结束 V8 事件
 
 ### 后端 — 流程结束后业务处理
@@ -88,7 +88,7 @@ if (V8.WF.WorkResult) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-009 sha256=a927ce0325e130608823800c83c85d9e83d54fea61dbcfed32208d49f4012118 -->
+<!-- microi-progressive:chunk id=v8-workflow-009 sha256=301ee4a5554069c509c559377fa57340af41b5c014cfdf95be834150ab8c8899 -->
 ## 前端打开流程表单
 
 ```javascript
@@ -106,7 +106,7 @@ V8.OpenFormWF(V8.Form, 'View', {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-010 sha256=ea15dea212f044a16bdccbf75ebe3a28ce3eb3ff27c989e8c6b4ec567e170032 -->
+<!-- microi-progressive:chunk id=v8-workflow-010 sha256=99dde7c6359317e8b4eb72bddfc568520506550c8381e53d3d238e716c92272c -->
 ## MCP 创建/检查/测试工作流
 
 从自然语言需求创建审批流时，优先整理成完整 Manifest 的 `workflows` 配置，再走 MCP 干跑和验收流程。
@@ -149,13 +149,13 @@ MCP 操作顺序：
 - 图形条件生成的 V8 会带 `MICROI_WF_LINE_CONDITION_JSON` 标记，MCP 测试工具只解析该标记，不执行任意手写 V8。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-011 sha256=ab8c37da582f7463663ab9a609cf31e95c94e38181bc37b7c880a27f19f01a0e -->
+<!-- microi-progressive:chunk id=v8-workflow-011 sha256=70703905fd4bdbde1d645e8d1dbb77569a352da8c2014b2acd2e997464b7397a -->
 ## 发起流程与表单保存
 
 新建业务数据并发起流程时，应先保存表单，再启动流程，或使用平台的合并接口 `StartWorkWithForm` 在同一事务里完成。首次发起建议以 `Add` 模式打开流程表单；如果前端提前生成了 `Id` 但业务表还没有该行，后端会使用 `_NoLineForAdd` 兜底，避免 `UptFormData` 报“数据显示不存在”。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-012 sha256=39a371dc5106862955945741a65c2fd08423cfedbc028e6aba0ba6aadde9cc34 -->
+<!-- microi-progressive:chunk id=v8-workflow-012 sha256=4f7575ce99688366c05f2267d8271c12215d05c89e5664f7564d5cf04a94f281 -->
 ## 流程相关表
 
 | 表 | 说明 |
@@ -168,7 +168,7 @@ MCP 操作顺序：
 | `WF_History` | 流程轨迹表 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-013 sha256=1e0afbf91035c773357ab43dbc3658a62e368ce65ca329d1047d543558ea2e90 -->
+<!-- microi-progressive:chunk id=v8-workflow-013 sha256=d6b942d331b8504cb0e59e48ecb370e88ce572d50b1e50bf367dcbc6796fed23 -->
 ## 注意事项
 
 - 条件判断 V8 事件可以设置 `V8.NextNodeId` 直接指定下一节点；未设置时才按 `V8.LineValue` 匹配条件线的**条件值**

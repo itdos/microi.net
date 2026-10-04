@@ -1,0 +1,386 @@
+{
+  "SchemaVersion": 1,
+  "Description": "官方接口引擎与表事件的唯一可编辑发行源码契约；生成器只读取声明源码，禁止自动回退租户镜像。CreateIfMissing仅安全默认模板，不复制母租户个性化Hook。",
+  "OfficialApiBase": "https://api.itdos.com",
+  "OfficialOsClient": "iTdos",
+  "Entries": [
+    {
+      "Key": "platform_auth_sms_login",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "platform_auth_sms_login.js",
+      "Version": "v1.0.3",
+      "Sha256": "a10fb9aa09890b96680361ce304501470cab57557daef810a4d22e716a7a1c4d",
+      "Package": "app.microi.saas-engine.json"
+    },
+    {
+      "Key": "platform_auth_login_event",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/platform_auth_login_event.js",
+      "Version": "v1.0.1",
+      "Sha256": "f4c273846748ad6d3be444fd7e302efcf7786db95b54e2e649e1fdb63584f559",
+      "Package": "app.microi.saas-engine.json"
+    },
+    {
+      "Key": "platform_auth_login_hook",
+      "Kind": "ApiEngine",
+      "SourceRole": "SafeTenantHookTemplate",
+      "File": "OfficialApiSources/platform_auth_login_hook.js",
+      "Version": "v1.0.3",
+      "Sha256": "9578905ba8e97aecf334d0b277c2bfad83618c097eb9e4f7f1938e8c218c6239",
+      "Package": "app.microi.saas-engine.json"
+    },
+    {
+      "Key": "send_sms_reg",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/send_sms_reg.js",
+      "Version": "v1.0.2",
+      "Sha256": "6ef4945eea7efbe917ef7979ab90d4c0b1596c60aeb4ea800ae8395720443515",
+      "Package": "app.microi.saas-engine.json"
+    },
+    {
+      "Key": "send-sms-reg",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/send-sms-reg.js",
+      "Version": "v1.0.6",
+      "Sha256": "047675c57a03727464fe7753da0ecf7a92ba3e11c839a8e79c3a51bba4ec23de",
+      "Package": "app.microi.saas-engine.json"
+    },
+    {
+      "Key": "official_password_reset_send_sms",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/official_password_reset_send_sms.js",
+      "Version": "v1.0.5",
+      "Sha256": "98517f45d4aee8a242c06d7545fbd380e43884516994ef7c4d342219fc1045b6",
+      "Package": "app.microi.saas-engine.json"
+    },
+    {
+      "Key": "sso_capabilities",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_capabilities.js",
+      "Version": "v1.0.3",
+      "Sha256": "f87c59d2c9e5deb540640d91487c3c7d9f1b41e2ef54116430115540bd3fd087",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_legacy_capabilities",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_legacy_capabilities.js",
+      "Version": "v1.0.4",
+      "Sha256": "a6813e9f44c704543a896d85872dee5de73f3cb54a0c0f7039a453fa5c775c2c",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_connection_runtime",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_connection_runtime.js",
+      "Version": "v1.0.3",
+      "Sha256": "e034c5b12c4facc9a69eaf51ab8ac3c58cc6897a0008a2acc8e746ff08308057",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_resolve_federated_identity",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_resolve_federated_identity.js",
+      "Version": "v1.0.3",
+      "Sha256": "d0b4aa9ac6203573bb74a71c0e2c5910bf9ffca8b57c87576fb4ffe4e0c9ec07",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_protocol_event",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_protocol_event.js",
+      "Version": "v1.0.3",
+      "Sha256": "8f7d681f3c5f7ed1b57fec96d785d15a6803001a035e2a4b1317313468ae3309",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_event_hook",
+      "Kind": "ApiEngine",
+      "SourceRole": "SafeTenantHookTemplate",
+      "File": "OfficialApiSources/sso_event_hook.js",
+      "Version": "v1.0.3",
+      "Sha256": "c018db2ea709a6cec54619235b68962774249114fc79f2b54067ad2c914300ba",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_outbound_claims",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_outbound_claims.js",
+      "Version": "v1.0.3",
+      "Sha256": "eae5ce311b3f02c387407d8295c5bea817be09af9433da2ca35ef733e7244d00",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_complete_login",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_complete_login.js",
+      "Version": "v1.0.3",
+      "Sha256": "ff15e3a42413e81e7feadf1b4379cfb657b51164e9fe17b54fe3f8f4f60d7e63",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_rotate_client_secret",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_rotate_client_secret.js",
+      "Version": "v1.0.3",
+      "Sha256": "3877ba65684be22ab93b37ead860af605c8d1c3e49a85b67de5a321586e5ac83",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_legacy_token_login",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "sso_legacy_token_login.js",
+      "Version": "v1.0.5",
+      "Sha256": "6c4438e4014007c498a3f0735ebdfdc5257c5f019c49f7d74995d6342fab6e7f",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_user_runtime",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_user_runtime.js",
+      "Version": "v1.0.3",
+      "Sha256": "98a10f97442da3275652dea6dbbdd1a926d266fc976ee363f80b7fb7dfc4c7fb",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_begin",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_begin.js",
+      "Version": "v1.0.3",
+      "Sha256": "21aa214163bea32f0a8f133d8faadbfe5597a4f0f0b384c9ad541c55178e71eb",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_complete_authorization",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_complete_authorization.js",
+      "Version": "v1.0.3",
+      "Sha256": "2b0f2711bf1e0aff88990a1ea428dd9a6e74897fb7ad29c5e4c178fba75eaff2",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_oidc_callback",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_oidc_callback.js",
+      "Version": "v1.0.3",
+      "Sha256": "0b70e6dca8b8b55bfe30d11265b71f532ae30754c3a2ef68440b5bdfebeaaa59",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_oidc_discovery",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_oidc_discovery.js",
+      "Version": "v1.0.3",
+      "Sha256": "a624dd36d9238ed3a9a06c8e1122ca837535c76634071a46a3c30de6869bf800",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_oidc_jwks",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_oidc_jwks.js",
+      "Version": "v1.0.3",
+      "Sha256": "1de5c29f679f3cd9cdfca97f215c607209caf768c0d0181ad7a72787489c41e2",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_oidc_authorize",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_oidc_authorize.js",
+      "Version": "v1.0.3",
+      "Sha256": "67424fc59cc09be21e8b32afaa073a884610d5c3f4ababfa73a4203ab66f65f8",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_oidc_token",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_oidc_token.js",
+      "Version": "v1.0.3",
+      "Sha256": "db56fc0fe2b5c7e68466957bd1a7fd734f6a958de654c1ef8d03d9f556af3da6",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_oidc_userinfo",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_oidc_userinfo.js",
+      "Version": "v1.0.3",
+      "Sha256": "6acbd1479e8daef0d6b0077a18b5177caeadd66dc7a7ca0a6a3741ea1b7496e7",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_oidc_introspect",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_oidc_introspect.js",
+      "Version": "v1.0.3",
+      "Sha256": "6f541ec8d5924ea925f773be9d46ce9d432b0058dcac7d4c1e69fde06339afbc",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_oidc_revoke",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_oidc_revoke.js",
+      "Version": "v1.0.3",
+      "Sha256": "651cf795dd404a585d611c8e10edd36eb9858b7ee7505c336da35be09c7422f0",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_oidc_logout",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_oidc_logout.js",
+      "Version": "v1.0.3",
+      "Sha256": "f2d1ff9208b81ec3f1d227eecd533e56b0f1de376b0e16e60597f1c8896a134b",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_cas_callback",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_cas_callback.js",
+      "Version": "v1.0.3",
+      "Sha256": "295ca7ce90a953c623c98b610b4d6d0151d568827a093872d9e6d578d07272cd",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_cas_login",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_cas_login.js",
+      "Version": "v1.0.3",
+      "Sha256": "72424fc361116fdccfd003fb043a56a3473fb7de1da40c59eedbd224e39cd8e6",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_cas_service_validate",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_cas_service_validate.js",
+      "Version": "v1.0.3",
+      "Sha256": "0726870620f947a5fd447476c8ef5b850091148c01b3e9283667a9e02c5bd47d",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_cas_p3_service_validate",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_cas_p3_service_validate.js",
+      "Version": "v1.0.3",
+      "Sha256": "e282d93d7daa18e4d01ecfb615adf1cb5d636e0091d8033e477b6ac633b85067",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_cas_validate",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_cas_validate.js",
+      "Version": "v1.0.3",
+      "Sha256": "3b6dce92c949b31c0fa3c348d78a5f5ea016675e26a24ec59f17c02b9eadd141",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_cas_logout",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_cas_logout.js",
+      "Version": "v1.0.3",
+      "Sha256": "7631def5c8f64823ab29bb6441c45a30537a0ca9da20c666736e9aa88e502881",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_saml_begin",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_saml_begin.js",
+      "Version": "v1.0.3",
+      "Sha256": "7ece3cca70b7874d9e1187d746522429bab627865c2a9974e89cbf0e962b1ad6",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_saml_acs",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_saml_acs.js",
+      "Version": "v1.0.3",
+      "Sha256": "cdcd84f52b2b1876ef416ac354c8a204259b36866af17701c17672767de08a93",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_saml_login",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_saml_login.js",
+      "Version": "v1.0.3",
+      "Sha256": "e07b398600b90ee55fc0a731939b6083c56c79cc9f3e71b9636f6346aa8e569f",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_saml_complete",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_saml_complete.js",
+      "Version": "v1.0.3",
+      "Sha256": "e4bda550b8e3ca32ba77e5cf270c64c124d87e3c43c9a26a6be4dc8cd2ef03d2",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_saml_idp_metadata",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_saml_idp_metadata.js",
+      "Version": "v1.0.3",
+      "Sha256": "b521eddab99ee8273ed68afa4604d3fd837caf4f3a1f0caed2c4d6d1ad24741f",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_saml_sp_metadata",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_saml_sp_metadata.js",
+      "Version": "v1.0.3",
+      "Sha256": "5215fb6b49faa0abaf8e6d4b6c42772f3b1540f33f76240fa8fc74a38eff712f",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sso_http_saml_logout",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sso_http_saml_logout.js",
+      "Version": "v1.0.3",
+      "Sha256": "6a6c216d7a916ef6a8dd791cd2ffd78def7f5f79b753b084f52b77bfade4d73c",
+      "Package": "app.microi.sso.json"
+    },
+    {
+      "Key": "sys_microistore.SubmitBeforeServerV8",
+      "Kind": "FormEvent",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/sys_microistore.SubmitBeforeServerV8.js",
+      "Version": "v1.1.4",
+      "Sha256": "5e169af84e1182a995c3f9ab3afc2662dce64d23bb21c2ca87c40fbdb837df7c",
+      "Package": "app.microi.store.json"
+    }
+  ]
+}

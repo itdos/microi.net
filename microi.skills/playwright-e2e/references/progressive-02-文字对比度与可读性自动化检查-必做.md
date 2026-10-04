@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=playwright-e2e-013 sha256=cce51ad8ff52cd1339b5a1ce4986d8167b5cccb77637e8a3d438da9da03b68cd -->
+<!-- microi-progressive:chunk id=playwright-e2e-013 sha256=ca9bd62faa3dbc125592e1185577e24f58d4bdc391afdc9c4537d261651442ec -->
 ## 文字对比度与可读性自动化检查（必做）
 
 凡涉及前端样式、卡片、芯片、按钮、价格区间筛选条、退出登录、徽章、覆盖文字（金色/渐变背景上的小字）、列表副标题、空状态等，**测试与人眼复核都必须执行对比度检查**。典型教训：筛选条文字、幽灵按钮、轻色副标题在近似底色下肉眼几乎不可见，但接口/DOM 断言全部通过——这类对比度问题必须通过自动化审计捕捉。
@@ -72,7 +72,7 @@ expect(lowContrast, '低对比度文字: ' + JSON.stringify(lowContrast.slice(0,
 5. 价格区间、状态、筛选这类**导航/筛选元素出现在列表中部作为标题**——必须移到顶部 sticky 工具栏，并与正文形成色彩区隔。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-014 sha256=3eea01cf70e67d545fede1724b049ed852da60cf0a4ea0bda6b2e1d6de84400d -->
+<!-- microi-progressive:chunk id=playwright-e2e-014 sha256=e5858cce6f743573d699ed7d2d07f958d15be96c28028a91163e841f6d3c016a -->
 ## 安装
 
 ```bash
@@ -122,7 +122,7 @@ npx playwright test
 手写 Playwright 脚本时读取 `PW_CHROMIUM_EXECUTABLE` / `PW_BROWSER_EXECUTABLE` 并传给 `chromium.launch({ executablePath })`；Playwright Test 配置中通过 `use.launchOptions.executablePath` 读取该环境变量。只有 CDN、系统浏览器和本地缓存都不可用时，才报告浏览器不可用。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-015 sha256=9b937381fb4cda1a8a010c5a0f803d48861c9dbcf503774a4b1dba4c0d33985a -->
+<!-- microi-progressive:chunk id=playwright-e2e-015 sha256=0ceff2869cb591370ba1cf1766ae673e7ed99f97f42bb757aadeae832f0f8803 -->
 ## playwright.config.js 模板
 
 ```js

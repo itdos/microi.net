@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-http-integration-004 sha256=88c4d57c8f52d60f547b92fc14c0552fa9283e857c65fac4ae4b756f39997260 -->
+<!-- microi-progressive:chunk id=v8-http-integration-004 sha256=36b643a5b4f6df39a09673e872d5dd8cefacef2666ca1987636e7dfd0a51bdd3 -->
 ## GET 请求
 
 ```javascript
@@ -17,7 +17,7 @@ var data = JSON.parse(result);
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-005 sha256=055100b212469d8ebd7e42fa9220fbb25b89b5ba10413d8867d2ba4f2c014c94 -->
+<!-- microi-progressive:chunk id=v8-http-integration-005 sha256=b3c3761d78bb6a57e850e1e5f23cd8ab2a3e8aa309cf97570fffce8ff04bc5cf -->
 ## 获取完整响应（含状态码和响应头）
 
 ```javascript
@@ -58,7 +58,7 @@ var resp = V8.Http.PatchResponse({
 - DNS 校验不能代替网络层出站 ACL。生产环境还应在容器、主机或网关阻断云元数据和非必要私网段。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-006 sha256=6e787d9b46d5ba82ef5d2394525d8a36649b1d722a6a59eacf8dd54884e14b3b -->
+<!-- microi-progressive:chunk id=v8-http-integration-006 sha256=92592fccdf3ae61d101be02400077ca249847df900ccf6a23ad9449186cc23e5 -->
 ## 前端 V8 行为与兼容性
 
 - 前端新代码应优先使用 `await V8.Http.Get/Post/Patch`，参数与后端一致；不要再把 `V8.Post/Get` 作为新功能首选。旧 `V8.Post/Get` 仅作为兼容 API 保留，其回调和 Promise 写法保持不变。
@@ -68,7 +68,7 @@ var resp = V8.Http.PatchResponse({
 - 浏览器端不支持后端的 `FilesStream`，可使用 `FilesByteBase64`、`FilesByteString` 或 `FilesByte`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-007 sha256=92a9eea0bf36292444a9aae6cc73c91eda6e9b5d8d8ce78f6b8ca50cc47c28f8 -->
+<!-- microi-progressive:chunk id=v8-http-integration-007 sha256=8715b52d42f883e2dc45be404325ba45a1969e31f6daae9a0a4fb0396fd902d7 -->
 ## 下载远程文件（图片、PDF 等二进制）
 
 ```javascript
@@ -91,7 +91,7 @@ var up = V8.Method.Upload({
 > 文件上传/下载完整模式见 `v8-file-upload/SKILL.md`
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-008 sha256=81da35a51dd4d8e43ddc5242045ca0b4590ed140d589b491e45b41231b7c13d2 -->
+<!-- microi-progressive:chunk id=v8-http-integration-008 sha256=6ff1480c66e30451a51586fc2d71984de1c3f3289778937dc2b83bbe24c084f2 -->
 ## 第三方密钥不要硬编码
 
 ```javascript
@@ -113,7 +113,7 @@ var resp = V8.Http.GetResponse({
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-009 sha256=a12a323aae2e4bb30c3a998e570b6ed8c7e76641afe0f54dffd7701611ff1c6e -->
+<!-- microi-progressive:chunk id=v8-http-integration-009 sha256=ffa9ee404ccd38850e55144309f6173ce56229dccaa05b8b4ff48e19c78fa620 -->
 ## 实战模式
 
 ### 微信小程序 access_token
@@ -201,7 +201,7 @@ return { Code: 1, Msg: 'ok' };
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-010 sha256=34d6d62f7d02a585b17bc93f65c260be7c50529f65b4f9ea4ec12da4285f82da -->
+<!-- microi-progressive:chunk id=v8-http-integration-010 sha256=d38c91b4f643d3bd6c11a474a1f292087db19b78dbe50e9ccd34e8b0dc8ea615 -->
 ## V8.Office.SendEmail — 发送邮件
 
 ```javascript

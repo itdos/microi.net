@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=ui-design-015 sha256=18e252a8b3e87b6522a9f434e7332afc9be1a5ab0797d7bd9e5d639bdcc9d240 -->
+<!-- microi-progressive:chunk id=ui-design-015 sha256=4b94ff9643e3db76b247a63e8460e1768b6fdfeb87d65e3ec07fba94460e75c1 -->
 ## 移动端专用规范
 
 ### 1. 视口设置
@@ -136,7 +136,7 @@
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-016 sha256=2c997040cef24fb5e8b6f2faab6d354473d4a962560fdaffd13f11294eb4cf1f -->
+<!-- microi-progressive:chunk id=ui-design-016 sha256=fa50a41e93b623948d7f21521953413b049bc401d8a4c4af3bf7e8f3e3f8fbde -->
 ## 装饰性背景（低性能消耗方案）
 
 ### 结构化背景
@@ -209,7 +209,7 @@ Microi 背景必须服务内容层级，不能喧宾夺主。优先使用网格�
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-017 sha256=dfd5e3fe5ccef15772d0687dc031ce302cc9b2277e06f5c6dd0ad7113343f540 -->
+<!-- microi-progressive:chunk id=ui-design-017 sha256=8d90d30831026b8cf401dac69b15d5a1439719aa5640b1eb868722e24567e113 -->
 ## 性能检查清单
 
 - [ ] 动画只使用 `transform` / `opacity`

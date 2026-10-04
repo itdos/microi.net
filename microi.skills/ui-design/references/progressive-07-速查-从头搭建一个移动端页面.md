@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=ui-design-020 sha256=25aa81a39c664b1873ff5e7a3c5d0e8ad2b929824c90e16bd020f64c98a34b54 -->
+<!-- microi-progressive:chunk id=ui-design-020 sha256=2efd631603aff04a45f251f0fc06ac83b39b2aebc1551b311920aac4ac6b9273 -->
 ## 速查：从头搭建一个移动端页面
 
 ```vue
@@ -56,7 +56,7 @@
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-021 sha256=8a8884b0b064e7805cd03d904541b12da4539e73172d31f00d32c1ecfaee32f6 -->
+<!-- microi-progressive:chunk id=ui-design-021 sha256=210d5091c308f562b56bce93b257a74ed1894cf0f15393f703149c05c3ac2584 -->
 ## 🚨 移动端低代码项目落地踩坑（必读，2026.5）
 
 实战中频繁出现的 7 类问题，统一按以下规则处理。
@@ -122,7 +122,7 @@ Scoped SCSS 中的 `.entry text { font-size: 40rpx; }` 会同时放大图标文�
 - 长任务使用后台任务并持久化进度；普通接口写入后以远端回读为最终依据。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-022 sha256=4962a1ec7bc49ae1a2706c58fb6f929304ca254e3fd4d8b626fefbc17067bce2 -->
+<!-- microi-progressive:chunk id=ui-design-022 sha256=8f8a9a69e2816682ac2b6a26d932c23240c477191d4f3029a821dafe23250c7b -->
 ## 🔗 关联字段：保存真实 Id，界面展示可读标签
 
 关联字段的数据库事实值通常是 `XxxId`。表单使用 `JoinForm`、`OpenTable` 或带数据源的 `Select` 显示名称，`SelectSaveField` 保存 `Id`，`SelectLabel` 展示名称。不要因为列表默认显示 Id，就强制所有业务表冗余一对可编辑的 `XxxId/XxxName` 字段。
@@ -165,7 +165,7 @@ Scoped SCSS 中的 `.entry text { font-size: 40rpx; }` 会同时放大图标文�
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-023 sha256=1c731f6915dae4de788e84af3f6a59cf5d116a4de1f9ca5541f13b55110521ca -->
+<!-- microi-progressive:chunk id=ui-design-023 sha256=9767f1e46e8491d63a9f9a00fadef9125d124841a79141f07dd7e4529da3bc25 -->
 ## 表单布局规范（Column）
 
 > 平台默认设计标准：所有 `diy_table` **应使用双列布局** (`Column = 2`)，更紧凑现代，符合主流后台 SaaS 视觉密度。

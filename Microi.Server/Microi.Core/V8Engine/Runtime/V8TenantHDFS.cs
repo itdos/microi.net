@@ -54,16 +54,24 @@ namespace Microi.net
             });
         }
 
-        public Task<DosResult> DeleteObject(DiyUploadParam param)
+        public async Task<DosResult> DeleteObject(DiyUploadParam param)
         {
-            PrepareSinglePath(param);
-            var storage = ResolveStorage();
-            return storage.Client.DeleteObject(new HDFSParam
+            Prepare(param);
+            param.FilePathName = TenantConfigurationSecurity.NormalizeStorageDeletePath(_osClient, param.FilePathName);
+            if (param.EmptyDirectoryOnly == true)
+            {
+                var denied = await HdfsObjectDeleteAuthorization.AuthorizeEmptyDirectoryAsync(_osClient).ConfigureAwait(false);
+                if (denied != null) return denied;
+                if (!param.Limit.HasValue) return new DosResult(0, null, "空目录标记删除必须明确选择公有或私有桶。");
+            }
+            var storage = ResolveStorage(param.EmptyDirectoryOnly == true);
+            return await storage.Client.DeleteObject(new HDFSParam
             {
                 ClientModel = storage.ClientModel,
                 Limit = param.Limit,
+                EmptyDirectoryOnly = param.EmptyDirectoryOnly,
                 FileFullPath = param.FilePathName
-            });
+            }).ConfigureAwait(false);
         }
 
         public Task<DosResult> CreateFolder(DiyUploadParam param)
@@ -169,11 +177,14 @@ namespace Microi.net
             param.HDFS = null;
         }
 
-        private StorageContext ResolveStorage()
+        private StorageContext ResolveStorage(bool strictProvider = false)
         {
             var clientModel = OsClientExtend.GetClient(_osClient)
                               ?? throw new InvalidOperationException("当前租户运行配置不存在。");
             var hdfs = clientModel.OsClientModel?["HDFS"]?.ToString();
+            if (strictProvider && !string.IsNullOrWhiteSpace(hdfs)
+                && hdfs != "Aliyun" && hdfs != "MinIO" && hdfs != "S3")
+                throw new InvalidOperationException("当前存储类型不支持严格空目录标记删除。");
             var client = hdfs switch
             {
                 "MinIO" => MicroiEngine.HDFSFactory(HDFSType.MinIO),

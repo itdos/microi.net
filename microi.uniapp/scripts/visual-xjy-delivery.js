@@ -313,6 +313,54 @@ const moduleRows = {
   Diy_Tenant: { rows: [merchantDetail], count: 1, statistics: {} }
 };
 
+// 本地视觉替身显式声明授权菜单与表模型，不能把空菜单/统计对象当模块协议。
+const visualMenus = Object.entries(moduleRows).map(([tableName]) => ({
+  Id: `visual-menu-${tableName.toLowerCase()}`,
+  Name: ({ Diy_Kehu: '我的客户', Diy_ShouhouDD: '售后任务', Diy_Dingdan: '合同订单', Diy_KehuSB: '设备列表', Diy_Tenant: '商家' })[tableName],
+  DiyTableId: `visual-table-${tableName.toLowerCase()}`, DiyTableName: tableName,
+  ModuleEngineKey: tableName, Display: 1, AppDisplay: 1,
+  MobileListFields: ({ Diy_Kehu: ['KehuMC', 'Zhuangtai', 'KehuLX', 'FuzeR'], Diy_Tenant: ['TenantName', 'LianxiR', 'LianxiRDH', 'Chengshi'] })[tableName] || [],
+  CardTitleTagFields: [], CardBottomTagFields: [], DefaultOrderBy: 'CreateTime'
+}));
+const visualRowsByTable = {
+  diy_kehu: customerDetail, diy_shouhoudd: taskDetail, diy_dingdan: orderDetail,
+  diy_kehusb: deviceDetail, diy_tenant: merchantDetail, diy_xiansuo: leadDetail,
+  diy_zhaopin: recruitmentDetail, diy_needrelease: demandDetail, diy_anlice: casebookDetail
+};
+function visualTable(tableKey) {
+  const normalized = String(tableKey || '').toLowerCase().replace(/^visual-table-/, '');
+  if (normalized === 'diy_anli' || normalized === customerCaseTable.Id) return customerCaseTable;
+  if (normalized === 'diy_anlice_child' || normalized === casebookCaseTable.Id) return casebookCaseTable;
+  if (normalized === 'diy_kehusb' || normalized === deviceIotTable.Id) return deviceIotTable;
+  if (normalized === 'sys_user' || normalized === sysUserTable.Id) return sysUserTable;
+  const menu = visualMenus.find(item => item.DiyTableName.toLowerCase() === normalized);
+  return { Id: `visual-table-${normalized}`, Name: menu?.DiyTableName || tableKey, Description: menu?.Name || tableKey };
+}
+function visualFields(tableKey) {
+  const table = visualTable(tableKey);
+  const normalized = String(table.Name || '').toLowerCase();
+  if (normalized === 'sys_user') return sysUserFields;
+  if (normalized === 'diy_anli') return customerCaseFields;
+  if (normalized === 'diy_anlice_child') return casebookCaseFields;
+  if (normalized === 'diy_kehusb') return deviceIotFields;
+  const row = visualRowsByTable[normalized];
+  if (!row) return [];
+  const labels = { KehuMC: '客户名称', TenantName: '商家名称', LianxiR: '联系人', LianxiRDH: '联系电话', LianxiDH: '联系电话', KehuLX: '客户类型', FuzeR: '负责人', Chengshi: '城市', Zhuangtai: '状态', DingdanBH: '订单编号', DingdanJE: '订单金额' };
+  return Object.keys(row).filter(name => name !== 'Id').map((Name, index) => ({
+    Id: `visual-field-${normalized}-${Name}`, Name, TableName: table.Name,
+    Label: labels[Name] || Name, Component: Name === 'Chengshi' ? 'Address' : typeof row[Name] === 'number' ? 'NumberText' : 'Text',
+    Visible: 1, AppVisible: 1, Sort: index + 1, Config: '{}'
+  }));
+}
+function visualCustomerContractTotals(ids) {
+  // 固定测试金额，只证明五项显示和排版；真实金额核对由独立线上验收完成。
+  return { Code: 1, Data: { Customers: Object.fromEntries(ids.map((id, index) => [id, {
+    Rental: { Current: (128000 + index * 100).toFixed(2), All: (238000 + index * 100).toFixed(2) },
+    Buyout: { All: (68000 + index * 100).toFixed(2) },
+    AnnualFilter: { Current: (6800 + index * 10).toFixed(2), All: (16800 + index * 10).toFixed(2) }
+  }])), AsOf: '2026-10-02', Scope: '本地视觉测试替身金额', CurrentDefinition: '测试有效合同期内 / 所有合同累计' } };
+}
+
 const mockRequestLog = [];
 
 function requestDateRange(body = {}) {
@@ -400,19 +448,19 @@ const targets = [
   },
   {
     name: 'customer-detail', route: '/#/pages/business/detail?key=customers&id=customer-001', selector: '.detail-page',
-    required: ['.hero-band', '.quick-band', '.bottom-actions'],
+    required: ['.hero-band', '.bottom-actions .action-button', '.contract-totals'],
     expectedText: ['领取客户'],
     forbiddenText: ['移入公海']
   },
   {
     name: 'customer-private-detail', route: '/#/pages/business/detail?key=customers&id=customer-private-001', selector: '.detail-page',
-    required: ['.hero-band', '.quick-band', '.bottom-actions'],
+    required: ['.hero-band', '.bottom-actions .action-button', '.contract-totals'],
     expectedText: ['移入公海'],
     forbiddenText: ['领取客户']
   },
   {
     name: 'customer-private-other-owner', route: '/#/pages/business/detail?key=customers&id=customer-private-other-001', selector: '.detail-page',
-    required: ['.hero-band', '.quick-band', '.bottom-actions'],
+    required: ['.hero-band', '.bottom-actions .action-button', '.contract-totals'],
     expectedText: ['生成任务'],
     forbiddenText: ['领取客户', '移入公海']
   },
@@ -758,6 +806,11 @@ function buildMockResponse(request) {
   mockRequestLog.push({ url, body, table, time: Date.now() });
 
   if (request.method === 'OPTIONS') return { status: 204, body: '' };
+  if (apiEngineKey === 'xjy-customer-contract-totals') {
+    if (!body.CustomerSysMenuId || !Array.isArray(body.CustomerIds) || !body.CustomerIds.length) return { Code: 0, Msg: '测试合同金额请求缺少客户菜单或客户编号' };
+    return visualCustomerContractTotals(body.CustomerIds);
+  }
+  if (apiEngineKey === 'platform-current-user') return { Code: 1, Data: { ...sysUserRow, TenantId: 'tenant-xjy', Level: 10 } };
   if (lowerUrl.includes('gettabledatatree') && String(table).toLowerCase() === 'sys_dept') return {
     Code: 1, Data: [{ Id: 'dept-sales', Name: '业务部' }, { Id: 'dept-service', Name: '服务部' }], DataCount: 2
   };
@@ -768,19 +821,18 @@ function buildMockResponse(request) {
       DeptName: '业务部', DeptId: 'dept-sales', DeptIds: '[["dept-sales"]]', RoleIds: '["role-sales"]',
       _CardDisplay: { RoleIds: '销售', DeptId: '业务部' }, CreateTime: '2026-09-01 09:00:00', UpdateTime: '2026-09-02 09:00:00' }], DataCount: periodCount(body, 1) };
   }
-  if (lowerUrl.includes('getsysconfig') || lowerUrl.includes('microi-init')) {
-    return { Code: 1, Data: { SysTitle: '集福鲤', SysShortTitle: '集福鲤', CompanyName: '新纪源水科技', DisableAiAssistant: 0 } };
+  if (apiEngineKey === 'platform-sys-config' || lowerUrl.includes('getsysconfig') || lowerUrl.includes('microi-init')) {
+    // 本图集验证模型选择开启场景，必须模拟服务端显式开启而非依赖缺省值。
+    return { Code: 1, Data: { SysTitle: '集福鲤', SysShortTitle: '集福鲤', CompanyName: '新纪源水科技', DisableAiAssistant: 0, IsShowAiModel: 1 } };
   }
   if (lowerUrl.includes('formengine/getdiytablemodel')) {
-    const tableName = String(table).toLowerCase();
-    return { Code: 1, Data: tableName === 'diy_anli' ? customerCaseTable : tableName === 'diy_anlice_child' ? casebookCaseTable : tableName === 'diy_kehusb' ? deviceIotTable : sysUserTable };
+    return { Code: 1, Data: visualTable(table) };
   }
   if (lowerUrl.includes('formengine/getdiyfieldlist')) {
-    const tableName = String(table).toLowerCase();
-    const fields = tableName === 'diy_anli' ? customerCaseFields : tableName === 'diy_anlice_child' ? casebookCaseFields : tableName === 'diy_kehusb' ? deviceIotFields : sysUserFields;
+    const fields = visualFields(table || body.TableId);
     return { Code: 1, Data: fields, DataCount: fields.length };
   }
-  if (lowerUrl.includes('moduleengine/gettabledata')) {
+  if (lowerUrl.includes('moduleengine/gettabledata') || apiEngineKey === 'platform-module-data') {
     const result = moduleRows[table] || { rows: [], count: 0, statistics: {} };
     const effectiveCount = periodCount(body, result.count);
     const pageIndex = Math.max(1, Number(body._PageIndex || 1));
@@ -887,7 +939,7 @@ function buildMockResponse(request) {
   if (lowerUrl.includes('getformdata') && String(table).toLowerCase() === 'sys_user') {
     return { Code: 1, Data: sysUserRow };
   }
-  if (lowerUrl.includes('getsysmenustep')) return { Code: 1, Data: [] };
+  if (lowerUrl.includes('getsysmenustep')) return { Code: 1, Data: visualMenus };
   if (apiEngineKey === 'type-tongji') {
     return {
       Code: 1,
@@ -1001,6 +1053,15 @@ function buildMockResponse(request) {
 async function installApiMock(cdp) {
   cdp.on('Fetch.requestPaused', async (event) => {
     const response = buildMockResponse(event.request || {});
+    const gate = customerListGate;
+    const body = parsePostData((event.request || {}).postData);
+    const table = body.ModuleEngineKey || body.FormEngineKey || body.TableName || '';
+    // 只在首屏骨架验收中暂停客户列表响应；元数据和金额协议继续使用各自明确替身。
+    if (gate && String(table).toLowerCase() === 'diy_kehu' && /platform-module-data|moduleengine\/gettabledata/i.test(event.request.url)) {
+      gate.started = true;
+      if (Number(body._PageSize) > 1) gate.expectedRows = Math.min(Number(body._PageSize), customers.length);
+      await gate.promise;
+    }
     const status = response && response.status ? response.status : 200;
     const payload = typeof response === 'object' && Object.prototype.hasOwnProperty.call(response, 'body') ? response.body : response;
     await cdp.send('Fetch.fulfillRequest', {
@@ -1016,6 +1077,42 @@ async function installApiMock(cdp) {
     });
   });
   await cdp.send('Fetch.enable', { patterns: [{ urlPattern: 'https://api.jifulii.com/*', requestStage: 'Request' }] });
+}
+
+let customerListGate = null;
+
+async function testCustomerFirstLoading(cdp, viewport) {
+  // 首次进入必须是冷缓存：只清此隔离浏览器的列表派生缓存，保留登录和菜单测试上下文。
+  await cdp.send('Runtime.evaluate', {
+    expression: `Object.keys(localStorage).filter(key => key.startsWith('microi_uniapp_cache_v3:module:')).forEach(key => localStorage.removeItem(key))`, returnByValue: true
+  });
+  let release;
+  const gate = { promise: new Promise(resolve => { release = resolve; }), started: false };
+  customerListGate = gate;
+  try {
+    const navigation = await cdp.send('Runtime.evaluate', {
+      expression: `location.origin + location.pathname + location.search + '&firstLoading=' + Date.now() + '#/pages/business/list?key=customers'`, returnByValue: true
+    });
+    await cdp.send('Page.navigate', { url: navigation.result.value });
+    await waitForSelector(cdp, '.list-page .mci-skeleton');
+    for (let index = 0; index < 300 && !gate.started; index += 1) await delay(50);
+    if (!gate.started || !gate.expectedRows) fail(`Customer Loading fixture did not intercept the real module list request: ${JSON.stringify(mockRequestLog.slice(-12))}`);
+    const target = { name: 'customers-loading', selector: '.list-page', required: ['.mci-skeleton'], forbiddenSelectors: ['.data-card', '.empty-state'], forbiddenText: ['暂无数据', '暂无记录', '加载失败'] };
+    const layout = await inspectLayout(cdp, target, viewport);
+    if (!layout || !layout.ok) fail(`First customer Loading rendered empty/error state: ${JSON.stringify(layout)}`);
+    const screenshotPath = path.join(outputRoot, `customers-loading-${viewport.name}.png`);
+    const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
+    release();
+    customerListGate = null;
+    await waitForSelector(cdp, '.list-page .data-card');
+    await waitForExpression(cdp, `!document.querySelector('.list-page .mci-skeleton') && document.querySelectorAll('.data-card').length === ${gate.expectedRows}`);
+    console.log(`PASS customers-loading ${viewport.name} -> pending request skeleton without empty state, then ${gate.expectedRows} data cards matching _PageSize.`);
+    return { target: 'customers-loading', viewport: viewport.name, screenshotPath, layout, expectedRows: gate.expectedRows, source: 'local deferred module response fixture' };
+  } finally {
+    release();
+    customerListGate = null;
+  }
 }
 
 async function waitForSelector(cdp, selector, timeoutMs = 15000) {
@@ -1142,7 +1239,7 @@ async function testPeriodFiltersAndRefresh(cdp, appPort) {
     await waitForExpression(cdp, `[...document.querySelectorAll('.period-item.active')].some((item) => item.innerText.includes(${JSON.stringify(label)}))`);
     await delay(350);
     return (await cdp.send('Runtime.evaluate', {
-      expression: `Number((document.querySelector('.summary-value') || {}).innerText || -1)`, returnByValue: true
+      expression: `(() => { const metric = [...document.querySelectorAll('.summary-metric')].find(item => /记录$/.test((item.querySelector('.summary-metric__label') || {}).innerText || '')); const text = ((metric && metric.querySelector('.summary-metric__value')) || {}).innerText || ''; const count = text.match(/^([0-9,]+)条$/); return count ? Number(count[1].replace(/,/g, '')) : -1; })()`, returnByValue: true
     })).result.value;
   };
   const today = await clickPeriod('本日');
@@ -1151,7 +1248,7 @@ async function testPeriodFiltersAndRefresh(cdp, appPort) {
     fail(`Business period filter did not change statistics: today=${today}, month=${month}`);
   }
 
-  const beforeRequests = mockRequestLog.filter((item) => /moduleengine\/gettabledata/i.test(item.url) && item.table === 'Diy_Kehu').length;
+  const beforeRequests = mockRequestLog.filter((item) => /platform-module-data|moduleengine\/gettabledata/i.test(item.url) && item.table === 'Diy_Kehu').length;
   const refreshState = await cdp.send('Runtime.evaluate', {
     expression: `(async () => {
       let component = document.querySelector('.list-page').__vueParentComponent;
@@ -1163,9 +1260,15 @@ async function testPeriodFiltersAndRefresh(cdp, appPort) {
     awaitPromise: true,
     returnByValue: true
   });
-  const afterRequests = mockRequestLog.filter((item) => /moduleengine\/gettabledata/i.test(item.url) && item.table === 'Diy_Kehu').length;
-  if (!refreshState.result.value.found || refreshState.result.value.refreshing || refreshState.result.value.loading || afterRequests <= beforeRequests) {
-    fail(`Business pull refresh did not finish or reload: ${JSON.stringify({ state: refreshState.result.value, beforeRequests, afterRequests })}`);
+  // Vue 的刷新事件处理器不承诺返回请求 Promise，必须等待页面自身结束实际加载。
+  if (!refreshState.result.value.found) fail('Business refresh handler did not exist.');
+  await waitForExpression(cdp, `(() => { let component = document.querySelector('.list-page').__vueParentComponent; while (component && !(component.proxy && typeof component.proxy.refresh === 'function')) component = component.parent; return Boolean(component && component.proxy && !component.proxy.refreshing && !component.proxy.loading && component.proxy.rows.length === 9); })()`);
+  const completedRefreshState = await cdp.send('Runtime.evaluate', {
+    expression: `(() => { let component = document.querySelector('.list-page').__vueParentComponent; while (component && !(component.proxy && typeof component.proxy.refresh === 'function')) component = component.parent; return { found: Boolean(component && component.proxy), refreshing: component.proxy.refreshing, loading: component.proxy.loading, count: component.proxy.rows.length }; })()`, returnByValue: true
+  });
+  const afterRequests = mockRequestLog.filter((item) => /platform-module-data|moduleengine\/gettabledata/i.test(item.url) && item.table === 'Diy_Kehu').length;
+  if (!completedRefreshState.result.value.found || completedRefreshState.result.value.refreshing || completedRefreshState.result.value.loading || afterRequests <= beforeRequests) {
+    fail(`Business pull refresh did not finish or reload: ${JSON.stringify({ state: completedRefreshState.result.value, beforeRequests, afterRequests })}`);
   }
 
   await cdp.send('Page.navigate', { url: `http://127.0.0.1:${appPort}/?visual=${Date.now()}#/pages/task/list` });
@@ -1191,6 +1294,36 @@ async function setLoggedInState(cdp) {
     expression: `localStorage.setItem('microi_token', 'xjy-visual-token'); localStorage.setItem('microi_user', ${JSON.stringify(JSON.stringify(user))});`,
     returnByValue: true
   });
+}
+
+async function inspectCustomerContractTotals(cdp, target) {
+  if (!['customers', 'customer-detail'].includes(target.name)) return null;
+  await waitForExpression(cdp, `document.querySelectorAll('.contract-totals__value').length >= 5 && !document.querySelector('.contract-totals__value--missing')`);
+  const result = await cdp.send('Runtime.evaluate', {
+    expression: `(() => {
+      const root = document.querySelector('.contract-totals');
+      const groups = [...root.querySelectorAll('.contract-totals__group')].map(group => ({
+        title: group.querySelector('.contract-totals__group-title').innerText,
+        labels: [...group.querySelectorAll('.contract-totals__label')].map(node => node.innerText),
+        values: [...group.querySelectorAll('.contract-totals__value')].map(node => node.innerText)
+      }));
+      const clipped = [...root.querySelectorAll('.contract-totals__group-title,.contract-totals__label,.contract-totals__value')].filter(node => {
+        const rect = node.getBoundingClientRect(), outer = node.parentElement.getBoundingClientRect();
+        return node.scrollWidth > node.clientWidth + 1 || rect.left < outer.left - 1 || rect.right > outer.right + 1;
+      }).map(node => node.innerText);
+      return { groups, clipped };
+    })()`, returnByValue: true
+  });
+  const state = result.result.value;
+  const expectedTitles = ['租赁总价', '买断总价', '包年换芯总价'];
+  const expectedLabels = target.name === 'customers' ? ['当前有效', '所有合同'] : ['当前有效合同期内', '所有合同'];
+  if (JSON.stringify(state.groups.map(group => group.title)) !== JSON.stringify(expectedTitles) ||
+      JSON.stringify(state.groups.map(group => group.values.length)) !== '[2,1,2]' ||
+      state.groups[0].labels.join('|') !== expectedLabels.join('|') || state.groups[2].labels.join('|') !== expectedLabels.join('|') ||
+      state.groups.flatMap(group => group.values).some(value => !/^¥[\d,]+\.\d{2}$/.test(value)) || state.clipped.length) {
+    fail(`Customer contract totals render failed: ${JSON.stringify(state)}`);
+  }
+  return { source: 'local visual fixture', ...state };
 }
 
 async function testDirectoryCardRefresh(cdp) {
@@ -1461,6 +1594,9 @@ async function main() {
   let browser;
   let cdp;
   const report = [];
+  const crossPageChecks = [];
+  let navigationViewport = null;
+  let completed = false;
   const browserErrors = [];
   let currentContext = 'startup';
 
@@ -1488,11 +1624,21 @@ async function main() {
     });
     await installApiMock(cdp);
 
+    if (process.env.XJY_VISUAL_NAVIGATION_ONLY === '1') {
+      // 独立导航补测也必须明确使用手机视口，不能因跳过图集循环而回到浏览器桌面默认尺寸。
+      const viewport = activeViewports.find(item => item.name === 'large-430x932') || activeViewports[0];
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: viewport.width, height: viewport.height, deviceScaleFactor: viewport.scale,
+        mobile: true, screenWidth: viewport.width, screenHeight: viewport.height
+      });
+      navigationViewport = { name: viewport.name, requested: { width: viewport.width, height: viewport.height, mobile: true, deviceScaleFactor: viewport.scale }, actual: null };
+    }
+
     await cdp.send('Page.navigate', { url: `http://127.0.0.1:${appPort}/` });
     await waitForSelector(cdp, 'body');
     await setLoggedInState(cdp);
 
-    for (const viewport of activeViewports) {
+    for (const viewport of process.env.XJY_VISUAL_NAVIGATION_ONLY === '1' ? [] : activeViewports) {
       await cdp.send('Emulation.setDeviceMetricsOverride', {
         width: viewport.width, height: viewport.height, deviceScaleFactor: viewport.scale,
         mobile: true, screenWidth: viewport.width, screenHeight: viewport.height
@@ -1603,6 +1749,7 @@ async function main() {
         });
         const layout = await inspectLayout(cdp, target, viewport);
         const waterMotion = await verifyHeroVideo(cdp, target);
+        const customerContractTotals = await inspectCustomerContractTotals(cdp, target);
         const fileName = `${target.name}-${viewport.name}.png`;
         const screenshotPath = path.join(outputRoot, fileName);
         // Prime Chromium's compositor after rapid full-page navigations. Without
@@ -1619,7 +1766,7 @@ async function main() {
         const unexpectedBrowserErrors = routeErrors.filter((item) => !allowedPatterns.some((pattern) => item.text.includes(pattern)));
         const result = {
           target: target.name, viewport: viewport.name, screenshotPath, fileSize, layout,
-          waterMotion, browserErrors: unexpectedBrowserErrors, expectedBrowserErrors
+          waterMotion, customerContractTotals, browserErrors: unexpectedBrowserErrors, expectedBrowserErrors
         };
         report.push(result);
         if (!layout || !layout.ok) fail(`Layout check failed for ${target.name} at ${viewport.name}: ${JSON.stringify(layout)}`);
@@ -1631,22 +1778,38 @@ async function main() {
           await testDirectoryFilters(cdp, viewport);
           await testDirectoryCardRefresh(cdp);
         }
+        if (target.name === 'customers' && process.env.XJY_VISUAL_LOADING === '1') report.push(await testCustomerFirstLoading(cdp, viewport));
       }
     }
 
     // Targeted visual runs are intentionally isolated from the unrelated
     // catalogue/list navigation scenarios. The full suite still exercises
     // these cross-page checks when no target filter is supplied.
-    if (!process.env.XJY_VISUAL_TARGET) {
+    if (!process.env.XJY_VISUAL_TARGET || process.env.XJY_VISUAL_NAVIGATION === '1' || process.env.XJY_VISUAL_NAVIGATION_ONLY === '1') {
       currentContext = 'business-list-return';
       await testBusinessListReturn(cdp, appPort);
+      crossPageChecks.push('business-list-return');
       currentContext = 'period-filter-refresh';
       await testPeriodFiltersAndRefresh(cdp, appPort);
+      crossPageChecks.push('period-filter-refresh');
+      if (navigationViewport) {
+        const measured = await cdp.send('Runtime.evaluate', {
+          expression: `({ innerWidth: window.innerWidth, innerHeight: window.innerHeight, devicePixelRatio: window.devicePixelRatio })`, returnByValue: true
+        });
+        navigationViewport.actual = measured.result.value;
+        if (!navigationViewport.actual || navigationViewport.actual.innerWidth !== navigationViewport.requested.width || navigationViewport.actual.innerHeight !== navigationViewport.requested.height) {
+          fail(`Navigation mobile viewport did not match requested metrics: ${JSON.stringify(navigationViewport)}`);
+        }
+        console.log(`PASS navigation-mobile-viewport -> ${navigationViewport.actual.innerWidth}x${navigationViewport.actual.innerHeight}, mobile=true, DPR=${navigationViewport.actual.devicePixelRatio}.`);
+      }
     }
 
-    fs.writeFileSync(path.join(outputRoot, 'report.json'), JSON.stringify({ generatedAt: new Date().toISOString(), report }, null, 2));
-    console.log(`Visual delivery check passed: ${report.length} screenshots.`);
+    completed = true;
+    console.log(process.env.XJY_VISUAL_NAVIGATION_ONLY === '1' ? `Navigation delivery check passed: ${crossPageChecks.length} checks.` : `Visual delivery check passed: ${report.length} screenshots.`);
   } finally {
+    // 额外历史目标失败时同样保留此前已完成图像与断言，不能把部分成功记录冒称全链通过。
+    const reportName = process.env.XJY_VISUAL_NAVIGATION_ONLY === '1' ? 'navigation-report.json' : 'report.json';
+    fs.writeFileSync(path.join(outputRoot, reportName), JSON.stringify({ generatedAt: new Date().toISOString(), completed, context: currentContext, targets: activeTargets.map(target => target.name), crossPageChecks, navigationViewport, report }, null, 2));
     if (cdp) cdp.close();
     if (browser && !browser.killed) browser.kill();
     await waitForProcessExit(browser);
