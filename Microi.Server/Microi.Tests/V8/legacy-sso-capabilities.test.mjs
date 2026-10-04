@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
 
-const pkg=JSON.parse(fs.readFileSync(new URL('../../Microi.Upgrade/Resource/app.microi.sso.json',import.meta.url),'utf8'));
+const pkg=JSON.parse(fs.readFileSync(new URL('../../OfficialApplications/Resource/app.microi.sso.json',import.meta.url),'utf8'));
 const code=pkg.SysApiEngines.find(x=>x.ApiEngineKey==='sso_legacy_capabilities').ApiV8Code;
 function project(rows){
  const result=vm.runInNewContext(`(function(){${code}\n})()`,{V8:{FormEngine:{GetTableData:()=>({Code:1,Data:rows})}}});

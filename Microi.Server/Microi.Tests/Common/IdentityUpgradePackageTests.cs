@@ -20,9 +20,9 @@ public class IdentityUpgradePackageTests
         Assert.Contains("var tenantName = tenantNames[index]", hostedService, StringComparison.Ordinal);
         Assert.Contains("UpgradeProgress.EnterTenant(tenantName, index + 1, tenantNames.Count, batch)", hostedService, StringComparison.Ordinal);
         Assert.Contains("UpgradeTenantAsync(tenantName", hostedService, StringComparison.Ordinal);
-        Assert.Contains("SaaSEnginePackageResourceName", appStoreUpgrade, StringComparison.Ordinal);
+        Assert.DoesNotContain("SaaSEnginePackageResourceName", appStoreUpgrade, StringComparison.Ordinal);
         Assert.Contains(
-            "InstallUpgradePackage(osClient, msgs, SaaSEnginePackageResourceName",
+            "InstallUpgradePackage(osClient, errors, BootstrapPackageResourceName",
             appStoreUpgrade,
             StringComparison.Ordinal);
     }
@@ -30,7 +30,7 @@ public class IdentityUpgradePackageTests
     [Fact]
     public void BundledSaasPackageBootstrapsIdentityAndPersonalCenter()
     {
-        var loader = typeof(UpgradeAppStore).GetMethod(
+        var loader = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(loader);
@@ -203,7 +203,7 @@ public class IdentityUpgradePackageTests
     [Fact]
     public void BundledFormEngineUsesNegativeMaskBlurSwitch()
     {
-        var loader = typeof(UpgradeAppStore).GetMethod(
+        var loader = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(loader);
@@ -228,8 +228,8 @@ public class IdentityUpgradePackageTests
     public void StoreImporterOnlyNormalizesLegacyBooleanTextForDeclaredSwitchFields()
     {
         var root = FindRepositoryRoot();
-        var importerPath = Path.Combine(root, "Microi.Server", "Microi.Upgrade", "Resource", "import-package.js");
-        var baseImporterPath = Path.Combine(root, "Microi.Server", "Microi.Upgrade", "Resource",
+        var importerPath = Path.Combine(root, "Microi.Server", "OfficialApplications", "Resource", "import-package.js");
+        var baseImporterPath = Path.Combine(root, "Microi.Server", "OfficialApplications", "Resource",
             ".resource-sync-base", "import-package.js");
         var importer = File.ReadAllText(importerPath);
         var baseImporter = File.ReadAllText(baseImporterPath);

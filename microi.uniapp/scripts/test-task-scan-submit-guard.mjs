@@ -1,3 +1,5 @@
+import workspacePaths from './lib/workspace-paths.js'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
@@ -11,9 +13,9 @@ test('process device action keeps the maintenance icon in enabled and disabled s
   assert.doesNotMatch(scanPageSource, /<view v-else class="lock-icon"/)
 })
 
-const scanQuerySource = fs.readFileSync(new URL('../../Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/根据设备Id（扫码）获取最近任务列表(getrenwu-by-shebeiid).js', import.meta.url), 'utf8')
-const scanSubmitSource = fs.readFileSync(new URL('../../Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/扫码做任务的提交任务按钮(scan-code-tasks).js', import.meta.url), 'utf8')
-const finishTaskSource = fs.readFileSync(new URL('../../Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/售后服务订单服务完成(shouhoudd_finish).js', import.meta.url), 'utf8')
+const scanQuerySource = fs.readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'getrenwu-by-shebeiid'), 'utf8')
+const scanSubmitSource = fs.readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'scan-code-tasks'), 'utf8')
+const finishTaskSource = fs.readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'shouhoudd_finish'), 'utf8')
 
 test('本次修改的三个 V8 接口源码语法有效', () => {
   for (const source of [scanQuerySource, scanSubmitSource, finishTaskSource]) {

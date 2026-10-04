@@ -37,6 +37,12 @@ Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 A
 `flowName` 绑定已启用流程，或用 `flowDesignId` 指向现有流程；必须同步绑定相同
 业务表。详见 [工作流引擎](/doc/system-engine/wf-engine)。
 
+应用安装母版可将 `FlowDesign.IsEnable` 显式设为 `0` 或字符串 `"0"`，保持
+禁用且不填写租户审批人。此时仅允许人工节点空绑定，拓扑、节点类型、绑定格式
+及任何已填写的真实用户、角色、部门、岗位引用仍须通过检查和当前租户回读；
+`false`、`null`、省略或 `UNBOUND_*` 假 Id 不能绕过门禁。目标租户使用正常配置
+入口绑定真实审批人，重新检查后再启用；禁用模板安装成功不代表审批可用。
+
 ## 推荐接入方式
 
 ### 从已登录平台复制连接说明
@@ -72,6 +78,21 @@ CLI 与插件共用连接、Token、MCP、Skills、V8 工作区和同步基线�
 ### 独立 stdio / SSE
 
 需要自行部署时，`microi.mcp` 支持本地 stdio 与远程 SSE。SSE 适合团队共享，但必须放在受控网络、TLS 和反向代理之后，并绑定服务器端凭据；不要把管理员帐号密码写入公开镜像或前端配置。
+
+MCP 的租户连接由 API、`OsClient`、`OsClientType`、`OsClientNetwork` 共同确定。独立部署可设置 `MICROI_OS_CLIENT` 及可选 `MICROI_OS_CLIENT_TYPE`、`MICROI_OS_CLIENT_NETWORK`；显式 Type/Network 必须绑定非空 OsClient。已配置坐标随 Login 表单、Refresh 正文和所有 API Header 传输，流式 multipart 表单也使用同一坐标，普通 JSON 业务正文与 GET 查询不额外注入 Type/Network。省略可选项保持原协议；单次请求与已配置坐标冲突、重复或含非法标识时发送前拒绝。
+
+SSE 每个连接使用 `X-Microi-OsClient` 及可选 `X-Microi-OsClientType`、`X-Microi-OsClientNetwork` 选择对应坐标，省略项沿用服务器默认值；Login、续签和工具上下文保持同一连接身份。恢复后必须先执行 `initialize`、`tools/list` 和 `microi_get_status`，核对服务端实际四段连接身份。Token 文件键或本地配置不能代替该回读，也不能为匹配分区而修改 SaaS 租户网络记录。
+
+三参数只声明连接目标，不能切换 API 节点的可信运行分区或发布门禁。ApiBase 必须指向目标分区的真实节点；Header 正确而状态仍不符时停止写入，修正节点地址，不改 SaaS/gate、不借其它分区任务，也不通过请求头强迫节点切区。
+
+标准 stdio 服务使用固定 `128 MiB`（`134217728` 字节）未解析 JSON-RPC 缓冲，
+超过上限会拒绝并关闭连接；调用端若仍使用 SDK 默认 `10 MiB`，大响应仍会失败。
+按整个 UTF-8 wire 计算 Base64、JSON 信封及重复 `Data/Result`，不能只按原包大小估算。
+单 Base64 字段理论可承载约 `96 MiB` 原字节减信封，但这不是 HDFS `256 MiB`
+应用包能力的新限制，也不保证任意 `64 MiB` 结果能通过重复正文包装。
+已有正规完整包协议继续保留精确版本、CAS、HDFS 哈希回读及不可变快照；超限源码或
+运行资产使用已有目录/文件 stream、分片及小型回执，禁止设无限缓冲。连接关闭后先
+回读原请求结果，再决定是否恢复；不能盲重传或换请求键。
 
 ## Codex 单入口兼容
 

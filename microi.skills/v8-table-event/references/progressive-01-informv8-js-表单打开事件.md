@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-table-event-005 sha256=38d1253f165733f4d1064dea9d381c087848f715da8acda7d5aa3bbbee464a86 -->
+<!-- microi-progressive:chunk id=v8-table-event-005 sha256=e4b6982f63971cf590b635f89643ba437bfd714cb78fe5d9690d43100e07c2c1 -->
 ## InFormV8.js — 表单打开事件
 
 ```javascript
@@ -31,7 +31,7 @@ if (V8.CurrentUser.RoleName.indexOf('管理员') === -1) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-006 sha256=e62b20919da58241cbe816a3b62d9a8eef5b713f8afab776f69c26f87df691c7 -->
+<!-- microi-progressive:chunk id=v8-table-event-006 sha256=961c57d02a597e26abddc7c4d3b9f8f2f0b1f4ba6f8164ee3bbe7800bd78804b -->
 ## SubmitFormV8.js — 前端提交校验
 
 ```javascript
@@ -50,7 +50,7 @@ if (V8.Form.StartDate > V8.Form.EndDate) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-007 sha256=4187c2ed36373b1ee239c5668c2ec898a52029b3ce5443aba688ffec4a690a8e -->
+<!-- microi-progressive:chunk id=v8-table-event-007 sha256=e074fbd1736d4a80e58c4b4c06338a40b5f8f89045eddf0d09f325ff1d48a7d4 -->
 ## SubmitBeforeServerV8.js — 服务端提交前
 
 ```javascript
@@ -97,7 +97,7 @@ if (V8.FormSubmitAction === 'Insert' || V8.FormSubmitAction === 'Update') {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-008 sha256=be4accafd23b39c0a2be912d4c0b4f3bc79e43c88604d7a0bfc5637357e13550 -->
+<!-- microi-progressive:chunk id=v8-table-event-008 sha256=d013a6f8b5cc1c114e7563fc98322ea6fa5ffce93e10d6bdf489c82344985082 -->
 ## SubmitAfterServerV8.js — 服务端提交后
 
 ```javascript
@@ -139,7 +139,7 @@ V8.Method.AddSysLog({
 `SubmitAfterServerV8` 的“After”仍是“写入后、提交前”。需要在事务真正提交后才发布的缓存版本、跨节点通知等副作用，不能直接在事件中执行。平台为 `microi_database` 提供专用 `V8.Method.RefreshExtensionDatabases()`：事件调用时只登记提交后回调，提交成功才递增当前租户共享 Redis 版本，回滚时自动丢弃。普通业务的外部消息仍优先使用同事务 outbox，不能把任意不可撤销副作用都塞进内存回调。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-009 sha256=d415302a8108d9e11755a046bdbffe0c84a135ec6ed0e6b1dc3fc128a8ef38b6 -->
+<!-- microi-progressive:chunk id=v8-table-event-009 sha256=406c88d14167773a0d7597d4b622f9a53c2046f4d4cfd740cfb5addd13f80434 -->
 ## DataFilterV8.js — 服务端数据处理事件
 
 获取列表/表单数据后，每行数据都会执行一次此事件。
@@ -174,7 +174,7 @@ if (V8.Form.Phone) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-010 sha256=98cd7d87efe30386f8ddfdd52e6d6f3a13e7b69ab4b9b83663aa05472ee144f2 -->
+<!-- microi-progressive:chunk id=v8-table-event-010 sha256=e41feb40c52d46b7df9c18bf19fe3800194bbc92ce7415864529c69e09b335bc -->
 ## 事件上下文变量
 
 ### 前端事件

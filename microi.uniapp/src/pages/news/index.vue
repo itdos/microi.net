@@ -82,7 +82,11 @@
       </view>
 
       <!-- 空状态 -->
-      <view class="empty-state" v-if="!loading && newsList.length === 0">
+      <view class="empty-state" v-if="!loading && error && !newsList.length">
+        <text class="empty-text">资讯加载失败</text><text class="empty-sub">{{ error }}</text>
+        <view class="mci-btn" @tap="retryList">重新加载</view>
+      </view>
+      <view class="empty-state" v-else-if="!loading && newsList.length === 0 && !error">
         <image class="empty-icon" src="/static/xjy/repair/notice.png" mode="aspectFit" />
         <text class="empty-text">{{ t('news.noNews') }}</text>
         <text class="empty-sub">{{ t('news.checkLater') }}</text>
@@ -90,7 +94,8 @@
 
       <!-- 加载更多 -->
       <view class="load-more" v-if="newsList.length > 0">
-        <text v-if="loadingMore" class="load-more-text">{{ t('common.loading') }}</text>
+        <mci-skeleton v-if="loading || loadingMore" type="list" :rows="1" compact />
+        <text v-else-if="error" class="load-more-text" @tap="retryList">{{ error }}，点击重试</text>
         <text v-else-if="noMore" class="load-more-text">{{ t('common.noMore') }}</text>
       </view>
       <view class="mci-tabbar-spacer" aria-hidden="true" />
@@ -131,6 +136,7 @@ export default {
       banners: [],
       newsList: [],
       loading: true,
+      error: '',
       loadingMore: false,
       refreshing: false,
       noMore: false,
@@ -149,27 +155,33 @@ export default {
       } catch (e2) {}
     }
     const snapshot = readNewsSnapshot()
-    if (snapshot) this.applyInitialSnapshot(snapshot)
+    if (snapshot) this.applyInitialSnapshot(snapshot, false)
     this.loadInitialSnapshot()
   },
 
   methods: {
-    applyInitialSnapshot(snapshot) {
+    applyInitialSnapshot(snapshot, settled = true) {
       this.banners = snapshot.banners || []
       this.newsList = snapshot.news || []
       this.noMore = this.newsList.length < this.pageSize
-      this.loading = false
+      // 非空缓存立即可读；空缓存仍等待本次请求终态，避免首屏闪出“暂无资讯”。
+      this.loading = !settled && !this.newsList.length
+      this.error = snapshot.error || ''
     },
 
     async loadInitialSnapshot() {
+      this.loading = !this.newsList.length
+      this.error = ''
       try {
         this.applyInitialSnapshot(await loadNewsSnapshot())
       } catch (error) {
-        if (!this.newsList.length) console.error('[News] initial snapshot error:', error)
+        this.error = error.message || '资讯加载失败'
       } finally {
         this.loading = false
       }
     },
+
+    retryList() { return this.loadNews(false) },
 
     // 加载轮播图
     async loadBanners() {
@@ -185,6 +197,7 @@ export default {
 
     // 加载资讯列表
     async loadNews(append = false) {
+      this.error = ''
       if (!append) {
         this.loading = true
         this.pageIndex = 1
@@ -199,7 +212,8 @@ export default {
           pageSize: this.pageSize
         })
         if (seq !== this._loadNewsSeq) return
-        if (res.Code === 1) {
+        if (!res || Number(res.Code) !== 1) throw new Error((res && res.Msg) || '资讯加载失败')
+        if (Number(res.Code) === 1) {
           const list = res.Data || []
           if (append) {
             this.newsList = [...this.newsList, ...list]
@@ -211,7 +225,9 @@ export default {
           }
         }
       } catch (e) {
-        console.error('[News] loadNews error:', e)
+        if (seq !== this._loadNewsSeq) return
+        this.error = e.message || '资讯加载失败'
+        if (append) this.pageIndex = Math.max(1, requestPage - 1)
       } finally {
         if (seq === this._loadNewsSeq) {
           this.loading = false
@@ -386,7 +402,7 @@ export default {
 
 .featured-title {
   font-size: 32rpx;
-  color: #fff;
+  color: #fff !important;
   font-weight: 600;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -404,7 +420,7 @@ export default {
 .featured-meta .meta-time,
 .featured-meta .meta-views {
   font-size: 22rpx;
-  color: rgba(255,255,255,0.7);
+  color: #fff !important;
   margin-right: 20rpx;
 }
 

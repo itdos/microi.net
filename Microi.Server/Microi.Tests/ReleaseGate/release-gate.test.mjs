@@ -7,12 +7,42 @@ import test from 'node:test';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const source=fs.readFileSync(path.join(root,'Microi一键编译发布.sh'),'utf8');
-const begin=source.indexOf('# 在升版、官方资源写入、NuGet/Docker 推送之前执行完整业务回归。');
+const begin=source.indexOf('# 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行完整业务回归。');
 const end=source.indexOf('# 编译/发布会改写共享输出目录',begin);
 assert.ok(begin>0&&end>begin,'The release script must contain the actual full-test gate');
 const gate=source.slice(begin,end);
 const gitExec=process.platform==='win32'?execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim():'';
 const bash=process.platform==='win32'?path.resolve(gitExec,'../../..','bin/bash.exe'):'bash';
+
+for (const scenario of [
+ {name:'open source checkout without closed projects',projects:[],script:false,passed:true,encrypted:false},
+ {name:'all five closed projects and encryption script',projects:['Microi.net','Microi.AI','Microi.MCP','Microi.WorkFlow','Microi.Vision'],script:true,passed:true,encrypted:true},
+ {name:'closed sources with missing encryption script',projects:['Microi.net','Microi.AI','Microi.MCP','Microi.WorkFlow','Microi.Vision'],script:false,passed:false},
+ ...['Microi.net','Microi.AI','Microi.MCP','Microi.WorkFlow','Microi.Vision'].map(project=>({name:`partial closed source ${project}`,projects:[project],script:true,passed:false}))
+]) test(`encryption capability fails closed: ${scenario.name}`,()=>{
+ const directory=fs.mkdtempSync(path.join(root,'.tmp','release-encryption-capability-'));
+ const names=['Microi.net','Microi.AI','Microi.MCP','Microi.WorkFlow','Microi.Vision'];
+ try {
+  for(const project of scenario.projects){
+   const folder=path.join(directory,'Microi.Server',project);fs.mkdirSync(folder,{recursive:true});
+   fs.writeFileSync(path.join(folder,project+'.csproj'),'<Project />');
+  }
+  if(scenario.script){const script=path.join(directory,'Microi.Server/Microi.net/License/scripts/encrypt-dll.sh');fs.mkdirSync(path.dirname(script),{recursive:true});fs.writeFileSync(script,'exit 0\n');}
+  const begin=source.indexOf('# DLL 加密能力检测'),end=source.indexOf('# 版本信息',begin);
+  assert.ok(begin>0&&end>begin);
+  const result=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:directory,encoding:'utf8',input:`
+print_info(){ :; }
+print_success(){ :; }
+print_fail(){ printf '%s\\n' "$*"; exit 17; }
+ENCRYPTED_PROJECTS=(${names.join(' ')})
+${source.slice(begin,end)}
+printf 'PUBLICATION_REACHED=%s\\n' "$HAS_ENCRYPT"
+`});
+  assert.ifError(result.error);assert.equal(result.status,scenario.passed?0:17,result.stderr);
+  assert.equal(result.stdout.includes('PUBLICATION_REACHED='),scenario.passed);
+  if(scenario.passed)assert.ok(result.stdout.includes(`PUBLICATION_REACHED=${scenario.encrypted}`));
+ }finally{fs.rmSync(directory,{recursive:true,force:true});}
+});
 
 test('release JSON reader handles numeric ports, escaped strings, BOM and nested settings',()=>{
  const directory=path.join(root,'.tmp','release-json-reader-fixture');fs.mkdirSync(directory,{recursive:true});
@@ -62,7 +92,9 @@ for(const scenario of [
  {name:'successful full tests allow platform publication',backend:true,client:false,exit:0,passed:true,called:true},
  {name:'frontend publication also requires full tests',backend:false,client:true,exit:19,passed:false,called:true},
  {name:'prebuilt Docker push cannot bypass failed tests',backend:false,client:false,docker:true,exit:19,passed:false,called:true},
- {name:'documentation-only work avoids the backend gate',backend:false,client:false,exit:19,passed:true,called:false}
+ {name:'documentation-only work avoids the backend gate',backend:false,client:false,exit:19,passed:true,called:false},
+ {name:'Full-only mode enforces every test before ending without publication',fullOnly:true,backend:false,client:false,exit:0,passed:false,exitStatus:0,called:true},
+ {name:'Full-only test failure prevents successful completion',fullOnly:true,backend:false,client:false,exit:19,passed:false,called:true}
 ])test(scenario.name,()=>{
  const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',input:`
 print_phase(){ :; }
@@ -71,13 +103,14 @@ print_fail(){ exit 1; }
 pwsh(){ printf 'TEST_ARGUMENTS=%s\\n' "$*"; return ${scenario.exit}; }
 node(){ printf 'CANDIDATE_ARGUMENTS=%s\\n' "$*"; return 0; }
 PUBLISH_BACKEND=${scenario.backend}
+MICROI_FULL_ONLY=${scenario.fullOnly||false}
 BUILD_CLIENT=${scenario.client}
 PLATFORM_DOCKER_SELECTED=${scenario.docker||false}
 ${gate}
 printf 'PUBLICATION_REACHED\\n'
 `});
  assert.ifError(result.error);
- assert.equal(result.status,scenario.passed?0:1,result.stderr);
+ assert.equal(result.status,scenario.exitStatus??(scenario.passed?0:1),result.stderr);
  assert.equal(result.stdout.includes('PUBLICATION_REACHED'),scenario.passed);
  assert.equal(result.stdout.includes('TEST_ARGUMENTS='),scenario.called);
  if(scenario.called)assert.match(result.stdout,/-Mode Full -Configuration Release/);
@@ -124,10 +157,14 @@ test('publication refuses resource merge drift and preserves the independent Pan
  assert.match(source,/find Microi\.Server[^\n]*-not -path "\*\/Microi\.Panel\/\*"/);
 });
 
-test('full tests precede version edits, resource publication and platform pushes',()=>{
- for(const marker of ['# ─── 阶段（条件）: 更新版本号','refresh-resources.mjs --publish','dotnet nuget push']){
-  const offset=source.indexOf(marker);assert.ok(offset>end,`${marker} must follow the full-test gate`);
+test('selected versions are frozen before Full and every publication still waits for successful Full',()=>{
+ const version=source.indexOf('# ─── 阶段（条件）: 更新版本号'),capture=source.indexOf('release-candidate.mjs capture');
+ assert.ok(version>0&&version<begin&&begin<capture,'Full must test the selected release version, not the preceding version');
+ assert.ok(source.indexOf('# 前端资源预检必须发生')<version,'Resource preflight must still precede version preparation');
+ for(const marker of ['refresh-resources.mjs --publish','dotnet nuget push']){
+   const offset=source.indexOf(marker);assert.ok(offset>end,`${marker} must follow the full-test gate`);
  }
+ assert.equal(source.match(/print_step "更新 Directory\.Build\.props/g)?.length,1,'Selected version preparation must not execute twice');
 });
 
 test('real schedule stores belong to Full and their settings fail fast before builds',()=>{

@@ -39,7 +39,7 @@
 
     <scroll-view class="data-scroll" scroll-y refresher-enabled :refresher-triggered="refreshing"
       @refresherrefresh="refresh" @scrolltolower="loadMore">
-      <mci-skeleton v-if="loading && pageIndex === 1" type="list" :rows="5" />
+      <mci-skeleton v-if="loading && !rows.length" type="list" :rows="5" />
       <view v-else-if="error && !rows.length" class="state-panel">
         <text class="state-panel__title">列表加载失败</text>
         <text class="state-panel__text">{{ error }}</text>
@@ -72,7 +72,9 @@
             </view>
           </view>
         </view>
-        <view class="load-state">{{ loading ? '正在加载…' : finished ? `已加载全部 ${count} 条` : '继续上拉加载' }}</view>
+        <mci-skeleton v-if="loading" type="list" :rows="1" compact />
+        <view v-else-if="error" class="load-state" @tap="loadData(false, true)">{{ error }}，点击重试</view>
+        <view v-else class="load-state">{{ finished ? `已加载全部 ${count} 条` : '继续上拉加载' }}</view>
       </view>
       <view v-else-if="!loading" class="state-panel">
         <text class="state-panel__title">暂无{{ config.title || '' }}数据</text>

@@ -121,12 +121,12 @@
       @refresherrefresh="refresh"
       @scrolltolower="loadMore"
     >
-      <view v-if="loading && pageIndex === 1 && !restrictedRows.length" class="skeleton-list">
-        <view v-for="item in 5" :key="item" class="skeleton-card">
-          <view class="skeleton-line wide"></view>
-          <view class="skeleton-line"></view>
-          <view class="skeleton-line short"></view>
-        </view>
+      <mci-skeleton v-if="loading && !rows.length && !restrictedRows.length" type="list" :rows="5" />
+
+      <view v-else-if="!loading && (error || metadataError) && !rows.length" class="empty-state">
+        <text class="empty-title">列表加载失败</text>
+        <text class="empty-text">{{ error || metadataError }}</text>
+        <view class="mci-btn" @tap="initializeList(false, true)">重新加载</view>
       </view>
 
       <view v-else-if="rows.length || restrictedRows.length || restrictedLoading || restrictedError" class="data-list">
@@ -170,20 +170,24 @@
           @open="openDetail"
           @phone="callPhone"
           @action="triggerRowAction"
-        />
+        >
+          <xjy-customer-contract-totals v-if="showCustomerContractTotals"
+            :state="row.__xjyContractTotals" compact @retry="loadData(true, true)" />
+        </mci-business-card>
         </view>
 
-        <view v-if="rows.length" class="load-state">
-          <text v-if="loading">正在加载...</text>
-          <text v-else-if="finished">已加载全部 {{ count }} 条</text>
+        <mci-skeleton v-if="loading && rows.length" type="list" :rows="1" compact />
+        <view v-if="!loading && error" class="load-state" @tap="loadData(false, true)"><text>{{ error }}，点击重试</text></view>
+        <view v-else-if="rows.length && !loading" class="load-state">
+          <text v-if="finished">已加载全部 {{ count }} 条</text>
           <text v-else>继续上拉加载</text>
         </view>
-        <view v-if="!rows.length && restrictedRows.length" class="restricted-normal-empty">
+        <view v-if="!loading && !rows.length && restrictedRows.length" class="restricted-normal-empty">
           <text>当前权限列表中没有其他匹配客户</text>
         </view>
       </view>
 
-      <view v-else-if="!metadataError" class="empty-state">
+      <view v-else-if="!loading && !error && !metadataError" class="empty-state">
         <image :src="entry.icon" mode="aspectFit" />
         <text class="empty-title">暂无{{ config.title }}数据</text>
         <text class="empty-text">{{ canAddRecord ? '可调整搜索条件，或使用右下角新增' : '可调整搜索条件后重试' }}</text>
@@ -283,6 +287,8 @@ import {
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 import MciRestrictedRecordCard from '@/components/mci-restricted-record-card/mci-restricted-record-card.vue'
+import XjyCustomerContractTotals from '@/tenants/xjy/components/customer-contract-totals.vue'
+import { customerContractTotalsSupported, hydrateCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
 import {
   formatDateTime,
   formatFieldValue,
@@ -332,7 +338,7 @@ function formatMetricValue(value, metric = {}) {
 export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/business/list') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/business/list') },
-  components: { MciBusinessCard, MciRestrictedRecordCard, MciListFilterField },
+  components: { MciBusinessCard, MciRestrictedRecordCard, MciListFilterField, XjyCustomerContractTotals },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {
@@ -356,7 +362,9 @@ export default {
       metricValues: {},
       metricLoading: false,
       pageIndex: 1,
-      loading: false,
+      // 菜单和元数据同样属于首屏请求，不能等列表接口开始后才进入加载态。
+      loading: true,
+      error: '',
       refreshing: false,
       finished: false,
       whereField: '',
@@ -392,6 +400,9 @@ export default {
     }
   },
   computed: {
+    showCustomerContractTotals() {
+      return customerContractTotalsSupported(this.config.table || this.baseConfig.table)
+    },
     canAddRecord() {
       return canAddMenuRecord(this.menuId, this.currentUser)
     },
@@ -587,6 +598,8 @@ export default {
       }
     },
     async initializeList(restored = false, refresh = false) {
+      this.loading = !restored || !this.rows.length
+      this.error = ''
       if (!this.baseConfig.skipModuleMetadata && !this.baseConfig.metadataApiEngineKey) {
         try {
           const menu = await findMenu(
@@ -611,7 +624,9 @@ export default {
         this.count = 0
         this.dataAppend = {}
         this.finished = true
-        uni.showToast({ title: '当前账号无权查看该业务数据', icon: 'none' })
+        this.metadataError = '当前账号无权查看该业务数据'
+        this.loading = false
+        this.refreshing = false
         return
       }
       this.baseConfig = { ...this.baseConfig, menuId: this.menuId }
@@ -620,6 +635,7 @@ export default {
       if (!restored || !this.rowsContainConfiguredCardFields() || this.baseConfig.metadataApiEngineKey) {
         await this.loadData(true, refresh)
       } else {
+        this.loading = false
         this.loadPlatformStatistics(this.buildCurrentListOptions(refresh), this.loadRequestId)
       }
       if (restored && this.keyword.trim()) await this.loadRestrictedRows(refresh)
@@ -850,15 +866,21 @@ export default {
         this.metricLoading = false
       }
       this.loading = true
+      this.error = ''
       const options = this.buildCurrentListOptions(refresh)
       options.pageIndex = this.pageIndex
       const customRange = options.customRange
       try {
         const result = await loadModuleRows(this.config, options)
         if (requestId !== this.loadRequestId) return
-        const incomingRows = this.key === 'installationPositions'
+        let incomingRows = this.key === 'installationPositions'
           ? await hydrateInstallationPositionRows(result.rows)
           : result.rows
+        incomingRows = await hydrateCustomerContractTotals(incomingRows, {
+          table: this.config.table,
+          customerMenuId: this.menuId,
+          run: (key, params) => V8.ApiEngine.Run(key, params, { checkCode: false })
+        })
         if (requestId !== this.loadRequestId) return
         this.rows = reset ? incomingRows : [...this.rows, ...incomingRows]
         this.count = result.count
@@ -879,7 +901,10 @@ export default {
           }).catch(() => {})
         }
       } catch (error) {
-        if (requestId === this.loadRequestId) uni.showToast({ title: error.message || '数据加载失败', icon: 'none' })
+        if (requestId === this.loadRequestId) {
+          this.error = error.message || '数据加载失败'
+          uni.showToast({ title: this.error, icon: 'none' })
+        }
       } finally {
         if (requestId === this.loadRequestId) {
           this.loading = false
@@ -1095,6 +1120,7 @@ export default {
     },
     rowsContainConfiguredCardFields() {
       if (!this.rows.length) return true
+      if (this.showCustomerContractTotals && this.rows.some(row => !row.__xjyContractTotals)) return false
       const fields = [
         this.config.titleField,
         ...(this.config.lines || []).map((line) => line.field),

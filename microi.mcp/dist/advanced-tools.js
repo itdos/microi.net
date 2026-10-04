@@ -1772,6 +1772,10 @@ export function validateWorkflowPackage(workflow) {
     const flowName = getString(flow, 'FlowName', 'flowName', 'Name', 'name');
     const flowTableId = getString(flow, 'TableId', 'tableId');
     const flowTableRef = getString(flow, 'table', 'tableName', 'TableName', 'diyTableName', 'DiyTableName');
+    // 安装母版只在显式禁用时允许尚未绑定租户审批人；不把 false/null/缺省当作禁用。
+    // 仅放宽“绑定不能为空”，结构检查及保存时的真实租户引用核验仍全部执行。
+    const disabledTemplate = Object.prototype.hasOwnProperty.call(flow, 'IsEnable')
+        && (flow.IsEnable === 0 || flow.IsEnable === '0');
     const nodeById = new Map();
     const outgoing = new Map();
     const incoming = new Map();
@@ -1843,7 +1847,7 @@ export function validateWorkflowPackage(workflow) {
                 return getNumber(predecessor, 'AllowSelectUsers', 'allowSelectUsers') === 1
                     || getValue(predecessor, 'AllowSelectUsers', 'allowSelectUsers') === true;
             });
-            if (!bindings.length && !selectedByPrevious) {
+            if (!bindings.length && !selectedByPrevious && !disabledTemplate) {
                 errors.push(`人工节点 ${name} 未绑定 Users/Roles/Depts/BindJobs，且上游节点没有手动选人策略；SameDeptApprove 仅筛选候选人，不能独立指定审批人`);
             }
         }
@@ -3071,7 +3075,7 @@ export function registerAdvancedTools(server, client, context) {
         const plan = buildPlan(manifest);
         return textResult(JSON.stringify({ ok: plan.errors.length === 0, dryRun: true, ...plan }, null, 2), plan.errors.length > 0);
     });
-    server.tool('microi_check_workflow_package', 'Validate a wf_flowdesign + wf_node + wf_line workflow package locally before saving. Checks topology, node ids, line endpoints, start/end nodes and multi-route condition setup.', { workflow: jsonRecordSchema.describe('Workflow package with FlowDesign, Nodes and Lines') }, async ({ workflow }) => {
+    server.tool('microi_check_workflow_package', '保存前检查 wf_flowdesign + wf_node + wf_line 的拓扑、节点类型、Id、连线、开始/结束节点及多路线配置。只有 FlowDesign.IsEnable 显式为 0 或 "0" 的禁用安装母版允许人工节点空绑定；启用或省略仍要求人员策略。任何非空绑定必须为 Id/Name 对象，保存时继续回读当前租户真实引用。', { workflow: jsonRecordSchema.describe('Workflow package with FlowDesign, Nodes and Lines') }, async ({ workflow }) => {
         const check = validateWorkflowPackage(workflow);
         return textResult(JSON.stringify(check, null, 2), !check.ok);
     });
@@ -3514,7 +3518,7 @@ export function registerAdvancedTools(server, client, context) {
         await audit(client, 'microi_save_print_template', title, payload);
         return apiText('Save Print Template', await client.savePrintTemplate(payload));
     });
-    server.tool('microi_save_workflow_package', `Create or update wf_flowdesign + wf_node + wf_line as one workflow package. OsClient ${osClient}.`, { workflow: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ workflow, confirmExecution }) => {
+    server.tool('microi_save_workflow_package', `在当前租户 ${osClient} 一次保存 wf_flowdesign + wf_node + wf_line。显式 IsEnable=0 或 "0" 的禁用安装母版可保持空人员绑定，仍检查全部拓扑和绑定格式；任何已填写的用户、角色、部门、岗位均须当前租户真实回读，假占位 Id 或引用回读失败会拒绝保存。启用或省略 IsEnable 仍强制人工节点人员策略。`, { workflow: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ workflow, confirmExecution }) => {
         const name = getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign ?? workflow), 'FlowName', 'flowName', 'name');
         const check = validateWorkflowPackage(workflow);
         if (!check.ok)

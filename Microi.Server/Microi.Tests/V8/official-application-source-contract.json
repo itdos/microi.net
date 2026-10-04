@@ -1,0 +1,1256 @@
+{
+  "SchemaVersion": 1,
+  "Origin": {
+    "ApiBase": "https://api.itdos.com",
+    "OsClient": "iTdos",
+    "ReadProtocol": "microi_list_applications + microi_get_application_context(includeContents=true)"
+  },
+  "Applications": [
+    {
+      "AppKey": "microi-ai-cad",
+      "AppId": "01M3GST5C6KFYC6X2TQDBDGZ50",
+      "Version": "v1.0.0",
+      "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.default.default/AI应用/microi-ai-cad",
+      "SourceManifestHash": "14091c1b7d345e49b9cc363b0d7d83067998599123177365af48f2786b9c1718",
+      "ContextSha256": "d31596c9d1a0f99f42880e10964ad7aba328ff5c10caf6316ac93863c29fa010",
+      "FileCount": 22,
+      "SourceBytes": 185254,
+      "Files": [
+        {
+          "Path": ".gitignore",
+          "Size": 83,
+          "Sha256": "3674a74ac509526a491d05339e22c798bf8b4c97405613743e1d4f5bd7943cec"
+        },
+        {
+          "Path": ".microi-micro-app.json",
+          "Size": 520,
+          "Sha256": "b751f84b6e4cf89ba100092fccfdd624f64aec696af65a1992afbdaecb5f5c7a"
+        },
+        {
+          "Path": "api/ai_cad_plan.js",
+          "Size": 5836,
+          "Sha256": "39493b42396e6baa92d9a0d1ec1c77a34b738000ad651c9434eb632d380df432"
+        },
+        {
+          "Path": "index.html",
+          "Size": 337,
+          "Sha256": "4ef3a8991396297c8635b90a1141546fb6021497fb74ce5b8eb66b5a0570c37d"
+        },
+        {
+          "Path": "microi.routes.json",
+          "Size": 170,
+          "Sha256": "f7485ee54eb93a9e4226cb62ccc57c71206b201a0e2b48150a1a6447e584748b"
+        },
+        {
+          "Path": "package-lock.json",
+          "Size": 50859,
+          "Sha256": "1bd50c635ef71d0d8b084818b97bada7213c5eb32c2053aa21809b3edf1c3a07"
+        },
+        {
+          "Path": "package.json",
+          "Size": 565,
+          "Sha256": "199f2580a0378174544cbdc2fc96fe83b13f11869ed247a09211f5c09c0d335d"
+        },
+        {
+          "Path": "src/App.vue",
+          "Size": 3480,
+          "Sha256": "f5a039e9e02f5ab41debc9a14fcb552b3088a81391f565a98767132b4571d366"
+        },
+        {
+          "Path": "src/auth.ts",
+          "Size": 4082,
+          "Sha256": "37b8d62e2acf20335ffcc4742e876e10edaf2f1f081515f72110c97f0e03ccb5"
+        },
+        {
+          "Path": "src/components/CadPreview.vue",
+          "Size": 5499,
+          "Sha256": "658ea12c6f672861f073d22b369e8383244c2ed988cb75656ef9289fc77fda73"
+        },
+        {
+          "Path": "src/domain/cad-plan.ts",
+          "Size": 5186,
+          "Sha256": "00282baa370d15d1503fa81ef4efd65a5ea87f119da23bd16f57ed662bb6cac5"
+        },
+        {
+          "Path": "src/env.d.ts",
+          "Size": 678,
+          "Sha256": "9dc8d567e7fe4ebbff45cf3e9e548da27b083a5f96b7e06ea017833c6dbe4fac"
+        },
+        {
+          "Path": "src/main.ts",
+          "Size": 226,
+          "Sha256": "4fcb9b7fd9f7ba5351e887fa49d28061a0ea3d5114dfdce287c8e329c33e37c1"
+        },
+        {
+          "Path": "src/microi.ts",
+          "Size": 2845,
+          "Sha256": "510befb5cf9abd1ece6397182e0801c2a302d2a6f375b06d3f5c12e5fd9b70ce"
+        },
+        {
+          "Path": "src/pages/StudioPage.vue",
+          "Size": 12886,
+          "Sha256": "af4dc1115cbf4319099d5c65ae18d1ecce3dc42c4f5f3d2161fd8fa82f91915c"
+        },
+        {
+          "Path": "src/routes.ts",
+          "Size": 846,
+          "Sha256": "1f5b65cd6b9ca01aee552a66cc21d55c50ff9894deb87145ee7679e735c968f8"
+        },
+        {
+          "Path": "src/services/cad.ts",
+          "Size": 511,
+          "Sha256": "a56fd58a7702c2f0da337a464cc51210ccc520dc808a722a391d4c1027aedd8d"
+        },
+        {
+          "Path": "src/style.css",
+          "Size": 12744,
+          "Sha256": "524acbdfb73a6e89a5bb24a059feabf8b9a522b25dab4d9f3d37fff652a7ac33"
+        },
+        {
+          "Path": "src/utils/microi.v8.js",
+          "Size": 74537,
+          "Sha256": "89ab7a2e3dcb8e4312e95febcbffdf82b5b714d32f50c986eab6ce730173d174"
+        },
+        {
+          "Path": "tests/plan-engine.test.mjs",
+          "Size": 2474,
+          "Sha256": "a75c67670ff9d773ae30285be86ba3b9415502c0aff4e31b103a4fe52e817113"
+        },
+        {
+          "Path": "tsconfig.json",
+          "Size": 621,
+          "Sha256": "1a0a388253edcdc1c86f0bfc071f71fe02ab522c4094d10bfbaf48876d44f51a"
+        },
+        {
+          "Path": "vite.config.ts",
+          "Size": 269,
+          "Sha256": "37d2ebfba794e5d1a4d93c1d1d7d684d74dd7e53c4a298858986eaacb6908cac"
+        }
+      ]
+    },
+    {
+      "AppKey": "ai-employee-center",
+      "AppId": "01M3F2GZ388EZWSFX43K6AX6FP",
+      "Version": "v1.0.0",
+      "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.default.default/AI应用/ai-employee-center",
+      "SourceManifestHash": "f662366490a2523c8d05d1e02b707b79c07b86f0fed359bee0775b7f52d10175",
+      "ContextSha256": "45a66b0fd7ee0e1df7ed178f5f5a4e1e3585477f4f25b2d901e21035a2a609f6",
+      "FileCount": 36,
+      "SourceBytes": 309076,
+      "Files": [
+        {
+          "Path": ".gitignore",
+          "Size": 83,
+          "Sha256": "3674a74ac509526a491d05339e22c798bf8b4c97405613743e1d4f5bd7943cec"
+        },
+        {
+          "Path": ".microi-micro-app.json",
+          "Size": 489,
+          "Sha256": "94f71281d9694ab107e7db7927d14a299f6be323e5fedbd1802830b83c6898d7"
+        },
+        {
+          "Path": "DESIGN.md",
+          "Size": 2441,
+          "Sha256": "2f87f9bfa35dbfdbd93a15358ba8a8a509736571b850fe3528e07ce7e60344e8"
+        },
+        {
+          "Path": "backend/draft.js",
+          "Size": 5351,
+          "Sha256": "b517bbe241e4d063e4648111fcab50e661085b3c2f1fcd9665c29783361e5479"
+        },
+        {
+          "Path": "backend/gateway.js",
+          "Size": 24509,
+          "Sha256": "0dc6805c92a16690dad43c36c21e40899678fcc5533a9366f1726e5ae6c9709c"
+        },
+        {
+          "Path": "backend/roles.json",
+          "Size": 2404,
+          "Sha256": "d64ab4811f065513f8725534a325dddbd283bf9c756a7ea886014c03c8afe096"
+        },
+        {
+          "Path": "index.html",
+          "Size": 319,
+          "Sha256": "e7a5c94286704e34c2ff558161b6a0f5badaeb3125cba57c4d0c0f2958d1e9e9"
+        },
+        {
+          "Path": "manifest.json",
+          "Size": 64460,
+          "Sha256": "4b84e80383d111510508b72d76eaba0968d3c8595db61c81889b41e389ebe1b6"
+        },
+        {
+          "Path": "microi.routes.json",
+          "Size": 994,
+          "Sha256": "5aea46b72f9ed3a265a83809c9cd6be62f1540f78a36e1747e730ed22c96253f"
+        },
+        {
+          "Path": "package-lock.json",
+          "Size": 48052,
+          "Sha256": "21e7d7a4683403d462776f8803eb9920d66b9fc8d85c523e49b5af4ecfb62c50"
+        },
+        {
+          "Path": "package.json",
+          "Size": 515,
+          "Sha256": "1ca61397765ed5a9a087851bc6ad4dfa9a70ddae337794a0cfb10342a58745ac"
+        },
+        {
+          "Path": "resource-policies.json",
+          "Size": 235,
+          "Sha256": "053afe625aa10e8175a041128c1801a3a45dd4eb7c51e568a6b02a659c1ebcf1"
+        },
+        {
+          "Path": "scripts/build-manifest.mjs",
+          "Size": 6526,
+          "Sha256": "9bc9c85e7d87afa254b00d4154a6b59ef1278f5bc26a666485cb0eb9d96f5268"
+        },
+        {
+          "Path": "src/App.vue",
+          "Size": 7094,
+          "Sha256": "2839cd6cf6d9e3866c8c39945ec1ddbf44e219f3e962d6d014683f03be46901e"
+        },
+        {
+          "Path": "src/auth.ts",
+          "Size": 4082,
+          "Sha256": "37b8d62e2acf20335ffcc4742e876e10edaf2f1f081515f72110c97f0e03ccb5"
+        },
+        {
+          "Path": "src/components/TaskComposer.vue",
+          "Size": 3151,
+          "Sha256": "381921c1b40dcb46b8751b4f20acaf71d75d85fea48b9de39ecbaba7c98f4634"
+        },
+        {
+          "Path": "src/components/TaskDetail.vue",
+          "Size": 5058,
+          "Sha256": "3f46ba6df66906379366524177d08e65f854f93ea7d73f15b6839d4d1371dba5"
+        },
+        {
+          "Path": "src/components/TaskList.vue",
+          "Size": 1364,
+          "Sha256": "7b6ecfc49ee03a2ae6828b26779ee37674979bc71b081221341fa25a9e871562"
+        },
+        {
+          "Path": "src/env.d.ts",
+          "Size": 387,
+          "Sha256": "e439dc9fdc58ff5d5092f490e5c1f9ca49110d8d11b5735950f9771ac7ac1cd9"
+        },
+        {
+          "Path": "src/main.ts",
+          "Size": 226,
+          "Sha256": "4fcb9b7fd9f7ba5351e887fa49d28061a0ea3d5114dfdce287c8e329c33e37c1"
+        },
+        {
+          "Path": "src/microi.ts",
+          "Size": 3830,
+          "Sha256": "cdfb776045c198b481d31c12048bf4f5efec2e35e7814734f23272b7edb5030a"
+        },
+        {
+          "Path": "src/pages/EmployeesPage.vue",
+          "Size": 2882,
+          "Sha256": "b7de8e4a1fa44a751ee92e22c9ec7b02546b602ba69cc29071addd7b2c234f5b"
+        },
+        {
+          "Path": "src/pages/GoalsPage.vue",
+          "Size": 4633,
+          "Sha256": "ecd753f6ee91b89a93bee6995c54d37ae817150315a9def5ded1b8ec4af1c968"
+        },
+        {
+          "Path": "src/pages/NodesPage.vue",
+          "Size": 1654,
+          "Sha256": "8c31e4ed58e933ee9e6cc0b945a9a99e81d1c507c5dd98adf7cb0c5e39a81e0e"
+        },
+        {
+          "Path": "src/pages/OverviewPage.vue",
+          "Size": 2401,
+          "Sha256": "2bee44b23614b1740d67616aba5794f7448cc2ab255bad74d4bd388500b3facd"
+        },
+        {
+          "Path": "src/pages/ReviewsPage.vue",
+          "Size": 823,
+          "Sha256": "e6b9aef3d9c71ab94fa8eb6e4403ee04e60fad1160a2b24297f7008bf8b3c4f4"
+        },
+        {
+          "Path": "src/pages/TasksPage.vue",
+          "Size": 1222,
+          "Sha256": "55faee57e2ddfb924cf56c8509ef7dc02cdea563a3f9d5d33b90779702ac98b5"
+        },
+        {
+          "Path": "src/routes.ts",
+          "Size": 1583,
+          "Sha256": "58597b00ae0a3198ef57ea6a0760c7f34069ac4fee372303a82fd86631020ac9"
+        },
+        {
+          "Path": "src/style.css",
+          "Size": 14983,
+          "Sha256": "a0e957b9361baf881ee19d0a1c25a92957816da885a98946d9e9fdeaa358b66e"
+        },
+        {
+          "Path": "src/team.ts",
+          "Size": 5019,
+          "Sha256": "7c344ee5eec3b2f3bc97a5ce972d736e2de5950f24a537cd2811765b2892a4fa"
+        },
+        {
+          "Path": "src/utils/microi.v8.js",
+          "Size": 74537,
+          "Sha256": "89ab7a2e3dcb8e4312e95febcbffdf82b5b714d32f50c986eab6ce730173d174"
+        },
+        {
+          "Path": "tests/context.test.cjs",
+          "Size": 1569,
+          "Sha256": "357a487c0fb7ed50b128f969c85b188467e3b260c5fff4d7d08a1405227ed82b"
+        },
+        {
+          "Path": "tests/draft.test.cjs",
+          "Size": 2627,
+          "Sha256": "60fe4429fd049fc27d3303cfdca475fe5a4c8d33d1ff79f55e1bef983859517a"
+        },
+        {
+          "Path": "tests/gateway.test.cjs",
+          "Size": 12683,
+          "Sha256": "c2f12da46242537a2bc6eefcf1cbc2981ecd4af28424ce46270a2cfd583eb5e0"
+        },
+        {
+          "Path": "tsconfig.json",
+          "Size": 621,
+          "Sha256": "1a0a388253edcdc1c86f0bfc071f71fe02ab522c4094d10bfbaf48876d44f51a"
+        },
+        {
+          "Path": "vite.config.ts",
+          "Size": 269,
+          "Sha256": "37d2ebfba794e5d1a4d93c1d1d7d684d74dd7e53c4a298858986eaacb6908cac"
+        }
+      ]
+    },
+    {
+      "AppKey": "mci-email",
+      "AppId": "01M1W08A2NS3XMFR3CKBPDVQKQ",
+      "Version": "v1.0.5",
+      "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.default.default/AI应用/mci-email",
+      "SourceManifestHash": "33a6ebf3e0ccacd02a7a2a8a93b4bf09b1ea21701fbba340ad86bafd3f1e2b4e",
+      "ContextSha256": "d8c6cb5bcc11c691ac9d2f12a8f096b9dac380102cf3e3547af88bea5e77e138",
+      "FileCount": 48,
+      "SourceBytes": 344732,
+      "Files": [
+        {
+          "Path": ".gitignore",
+          "Size": 83,
+          "Sha256": "3674a74ac509526a491d05339e22c798bf8b4c97405613743e1d4f5bd7943cec"
+        },
+        {
+          "Path": ".microi-micro-app.json",
+          "Size": 487,
+          "Sha256": "d76128cb8a7ccfda908c88fb658d74180c9d30ac43807499a8dda7ca9a918ae6"
+        },
+        {
+          "Path": "MCI-DESIGN.md",
+          "Size": 3470,
+          "Sha256": "558307a9ce428cdec411b350ca8033768573003b78150f3a4dc19650956a62bb"
+        },
+        {
+          "Path": "README.md",
+          "Size": 3608,
+          "Sha256": "fd8d05669cd79dfbf52f3c8a74801c55a3a765c03795bb95fbf6214610c48e8b"
+        },
+        {
+          "Path": "THIRD-PARTY-NOTICES.md",
+          "Size": 1540,
+          "Sha256": "abcda1fdb1a0286ec748f1a77a17383babfd7ff4b891e93af353b1b73212839f"
+        },
+        {
+          "Path": "api/mci-email-auto-sync.js",
+          "Size": 201,
+          "Sha256": "656ff271b06c602730d7f8e3649e11223e004f4ceb071542b13894b614007c84"
+        },
+        {
+          "Path": "api/mci-email-hook.js",
+          "Size": 259,
+          "Sha256": "ed1361cde5b6e2aa2b8a3962fcd268dd8e434a1afc1efa6e12a5c942be4c6112"
+        },
+        {
+          "Path": "api/mci-email-sync-step.js",
+          "Size": 10744,
+          "Sha256": "6007c4c35fcba28f2d3a0c87a04c9dd77dd34020f7155756fbfbc31d97168133"
+        },
+        {
+          "Path": "api/mci-email-sync.js",
+          "Size": 366,
+          "Sha256": "9f722a88657301704bbe7c57291a18b88e910b1e8be49e78166c08e24bef9ed5"
+        },
+        {
+          "Path": "api/mci-email.js",
+          "Size": 15535,
+          "Sha256": "a3b38503733d479b02ac3807a98ef362e1f6385cc75fa6ecc4c79271e81b1f2f"
+        },
+        {
+          "Path": "events/CacheDataFilterV8.js",
+          "Size": 192,
+          "Sha256": "a218d550e287433b69d7d855b31fb535232380517fdca53d12dfc0a6b2037dfc"
+        },
+        {
+          "Path": "events/CacheSubmitBeforeServerV8.js",
+          "Size": 204,
+          "Sha256": "b618691f14c4b03e9185dd417ac3bcea89af9475d99f91185126f57dfe1f36d9"
+        },
+        {
+          "Path": "events/DataFilterV8.js",
+          "Size": 224,
+          "Sha256": "6df85d48d6476e2fdb66b5f060d4d4f1ed3b070bfcf73957da9ccc2291064f40"
+        },
+        {
+          "Path": "events/InFormV8.js",
+          "Size": 450,
+          "Sha256": "8150d20fcd20e475cc60ce558b84034e37246b80ed18ffe39e86a475e7fedef3"
+        },
+        {
+          "Path": "events/SubmitBeforeServerV8.js",
+          "Size": 3379,
+          "Sha256": "9aae20810f480cb579722cedb05844fd21583620bc9d2d514860e0b021d6cb49"
+        },
+        {
+          "Path": "index.html",
+          "Size": 308,
+          "Sha256": "17b67fd1d29aae21c36f89517cb1d92f7aeefeac41729e4976ab2fcd7d575190"
+        },
+        {
+          "Path": "manifest.json",
+          "Size": 17383,
+          "Sha256": "7924f0947bc0089d8aa2b2a72b6c4a7e4c268ab779fb84650b7880f299e1ff0d"
+        },
+        {
+          "Path": "microi.routes.json",
+          "Size": 176,
+          "Sha256": "7bfba679d7444403c0f5e85b7fd872691cdbf4e8138e396ba963dedf6b07c48f"
+        },
+        {
+          "Path": "package-lock.json",
+          "Size": 48034,
+          "Sha256": "a046a47aab15242efa52d5af9f7a5ffee74f87b9fb92c959053236068a74df1c"
+        },
+        {
+          "Path": "package.json",
+          "Size": 539,
+          "Sha256": "5e1641736f4f299288a25b92e1e334a4ba3ca0bea1f0dac763d5d265a9a56ff2"
+        },
+        {
+          "Path": "platform/V8Email.cs",
+          "Size": 25028,
+          "Sha256": "d5365fb98224780be1dfc387690b4e86774d480a6a0bf2ee16b44add67daf8b7"
+        },
+        {
+          "Path": "platform/V8EmailTests.cs",
+          "Size": 4194,
+          "Sha256": "f6edd5694e89905d14fa01ba5f2e07a56745e6f5c9e3089ac305377d85e18c02"
+        },
+        {
+          "Path": "resources/api-engine-config.json",
+          "Size": 671,
+          "Sha256": "abdab268bfbc31b9ca53d598ba1a668ee2f4997adaa1019d75e120c555e927e2"
+        },
+        {
+          "Path": "resources/menu.json",
+          "Size": 253,
+          "Sha256": "5f1cf48b86ec9bc75f118f4dcff83e2f3eb2a87cb600b98666e38bfcf08f7352"
+        },
+        {
+          "Path": "resources/resource-policies.json",
+          "Size": 533,
+          "Sha256": "05c179f9ce366266a57fdbcf8231975cbbf9b2652c746a5e79415f9cd7b03933"
+        },
+        {
+          "Path": "resources/schedule-jobs.json",
+          "Size": 368,
+          "Sha256": "e7957f31dc695e8214277fc20cb82e972f15248192b57ccc5fb752b9b58844b1"
+        },
+        {
+          "Path": "resources/table-options.json",
+          "Size": 849,
+          "Sha256": "07b0ed77030222c6da04de83b679ba32830dae9234ef81269208d64111a434f3"
+        },
+        {
+          "Path": "src/App.vue",
+          "Size": 4567,
+          "Sha256": "e40b325d3e20a2a4d71e2c2f90c0937d51aaebd735de8df8e4efcf01846b8271"
+        },
+        {
+          "Path": "src/auth.ts",
+          "Size": 4082,
+          "Sha256": "37b8d62e2acf20335ffcc4742e876e10edaf2f1f081515f72110c97f0e03ccb5"
+        },
+        {
+          "Path": "src/components/MailIcon.vue",
+          "Size": 1630,
+          "Sha256": "3711662bc9034b69e832a8ed512c30c1fd13fd63787c8faf91b24c8dce91e0de"
+        },
+        {
+          "Path": "src/email.ts",
+          "Size": 3012,
+          "Sha256": "909ebc85d3e1ba3476ee9eca96913594e777d4409125d7a9e3a73ce145f62b09"
+        },
+        {
+          "Path": "src/env.d.ts",
+          "Size": 387,
+          "Sha256": "e439dc9fdc58ff5d5092f490e5c1f9ca49110d8d11b5735950f9771ac7ac1cd9"
+        },
+        {
+          "Path": "src/mail.css",
+          "Size": 25106,
+          "Sha256": "48653988bb633b8647844650d9e13d7e019bb87b7f9b307ce44cecbec218ef08"
+        },
+        {
+          "Path": "src/main.ts",
+          "Size": 426,
+          "Sha256": "88e4322e1959ac1c2ea76a078f7ab24dad3f28ad00ed58b7240df8a62bcf7f12"
+        },
+        {
+          "Path": "src/microi.ts",
+          "Size": 2845,
+          "Sha256": "510befb5cf9abd1ece6397182e0801c2a302d2a6f375b06d3f5c12e5fd9b70ce"
+        },
+        {
+          "Path": "src/pages/EmailWorkspacePage.vue",
+          "Size": 26406,
+          "Sha256": "79ab9369edc883b8ae2c77e3200c71b5f8ed14d054e2b2b8c8e1edba5837b793"
+        },
+        {
+          "Path": "src/routes.ts",
+          "Size": 852,
+          "Sha256": "cc7436ae30b0c95bc57ff148267d166165cfbb8cc814273963a4651d1de7cb7d"
+        },
+        {
+          "Path": "src/style.css",
+          "Size": 7595,
+          "Sha256": "a1db8bd0dda2735b4b45c798c25eaa1f952604c014ebd785b3f70c3050afb682"
+        },
+        {
+          "Path": "src/utils/microi.v8.js",
+          "Size": 73705,
+          "Sha256": "33f8b5b92209e7a4ecc4ece21b23a4e63cc2f6cf82fabd0f9e64e6ca287b6d16"
+        },
+        {
+          "Path": "src/vendor/mci-ui/theme/index.css",
+          "Size": 22800,
+          "Sha256": "df5ec11e92954596c4914007e13a09137f65125a423ecbd2d5fe1ff43615da18"
+        },
+        {
+          "Path": "src/vendor/mci-ui/theme/runtime.js",
+          "Size": 3828,
+          "Sha256": "0ce49cd6bba25891d351e523e37cf10befdd04a2cf2f014d866a8ed0a36579a8"
+        },
+        {
+          "Path": "src/vendor/mci-ui/theme/tokens.css",
+          "Size": 14730,
+          "Sha256": "083cd08421f9d2014f939524b271741f7391ace7ba011f07dd7c1c91e9a519fc"
+        },
+        {
+          "Path": "src/vendor/mci-ui/web/components/MciButton.vue",
+          "Size": 3229,
+          "Sha256": "dff78297de7d3457be243a425d97df711db4b2db1a34244ed7dcacc487a4553f"
+        },
+        {
+          "Path": "src/vendor/mci-ui/web/components/MciPage.vue",
+          "Size": 753,
+          "Sha256": "99853044535cb1785358b494ea6e366a097712fed12e30c939798b2ace17e864"
+        },
+        {
+          "Path": "tests/sync-changes.test.mjs",
+          "Size": 6260,
+          "Sha256": "a8dc002a654402421f82715d78e5d489ba770c26571447ac4b83fddfbe3ac9a0"
+        },
+        {
+          "Path": "tests/sync-pagination.test.mjs",
+          "Size": 2551,
+          "Sha256": "0bb2826346f67cc70f2a18af3de570e8b9eba99d0d4d003f4ca2fd10feee5eaf"
+        },
+        {
+          "Path": "tsconfig.json",
+          "Size": 621,
+          "Sha256": "1a0a388253edcdc1c86f0bfc071f71fe02ab522c4094d10bfbaf48876d44f51a"
+        },
+        {
+          "Path": "vite.config.ts",
+          "Size": 269,
+          "Sha256": "37d2ebfba794e5d1a4d93c1d1d7d684d74dd7e53c4a298858986eaacb6908cac"
+        }
+      ]
+    },
+    {
+      "AppKey": "microi-3d-engine",
+      "AppId": "01M1H0CFADBMHHQM4HEVJQM1ZC",
+      "Version": "v1.9.0",
+      "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.default.default/AI应用/microi-3d-engine",
+      "SourceManifestHash": "cb53c425e437289d0931989c7a456feb539e46f5e2cd647ac11157405632a42c",
+      "ContextSha256": "dad88cd8beec2ff7e98b35192677e8a72947dbf69d56843fedf52eef7cfb26f2",
+      "FileCount": 32,
+      "SourceBytes": 290388,
+      "Files": [
+        {
+          "Path": ".gitignore",
+          "Size": 83,
+          "Sha256": "3674a74ac509526a491d05339e22c798bf8b4c97405613743e1d4f5bd7943cec"
+        },
+        {
+          "Path": ".microi-micro-app.json",
+          "Size": 493,
+          "Sha256": "a68c0e01f098c0e012a8cc1ea439f7daee2830b8f97494b095293e97d9c374fb"
+        },
+        {
+          "Path": "index.html",
+          "Size": 308,
+          "Sha256": "17b67fd1d29aae21c36f89517cb1d92f7aeefeac41729e4976ab2fcd7d575190"
+        },
+        {
+          "Path": "microi.routes.json",
+          "Size": 433,
+          "Sha256": "9002b0ecaa497e719cbfb46c3cee814a54302ca218259facf406637eea0dae37"
+        },
+        {
+          "Path": "package-lock.json",
+          "Size": 59324,
+          "Sha256": "bfa11afd6481d3d0f3f4fa13b47eb92becbab3d4b953f915aa586f1ed735bde0"
+        },
+        {
+          "Path": "package.json",
+          "Size": 655,
+          "Sha256": "a0f84829deeab9913c25544e2dc7c9407e3c91711928fa3b472a380f517ac184"
+        },
+        {
+          "Path": "src/App.vue",
+          "Size": 7169,
+          "Sha256": "e55e0348fa5bccc62e0818aee399379b89f46b0bf66ba39b1a0bcb0717e7a943"
+        },
+        {
+          "Path": "src/auth.ts",
+          "Size": 4082,
+          "Sha256": "37b8d62e2acf20335ffcc4742e876e10edaf2f1f081515f72110c97f0e03ccb5"
+        },
+        {
+          "Path": "src/env.d.ts",
+          "Size": 387,
+          "Sha256": "e439dc9fdc58ff5d5092f490e5c1f9ca49110d8d11b5735950f9771ac7ac1cd9"
+        },
+        {
+          "Path": "src/main.ts",
+          "Size": 323,
+          "Sha256": "a0904dcbc258250f591e081f17505d17f2b061e1b77a8e08b6344e4b38ee15b4"
+        },
+        {
+          "Path": "src/microi.ts",
+          "Size": 2845,
+          "Sha256": "510befb5cf9abd1ece6397182e0801c2a302d2a6f375b06d3f5c12e5fd9b70ce"
+        },
+        {
+          "Path": "src/pages/ThreeDEngineDesignerPage.vue",
+          "Size": 387,
+          "Sha256": "69e04bbe3b4842f15c6e629b6cdb07c13d9607341325f273fa9114ff7fde07c9"
+        },
+        {
+          "Path": "src/pages/ThreeDEngineRendererPage.vue",
+          "Size": 406,
+          "Sha256": "cfcd7bc8cc5c818f8ef070b9518b2c744cacff528861ded85fdd65a99110b306"
+        },
+        {
+          "Path": "src/routes.ts",
+          "Size": 1111,
+          "Sha256": "72a014a19bdc59262291b50c9b2cfd2c045cff177d36d9dd634a34c608dd083f"
+        },
+        {
+          "Path": "src/style.css",
+          "Size": 8616,
+          "Sha256": "2a70e616ddc39b77f5f4939e48bc6c5c578e5de109e1e0c7cbb99706307830e5"
+        },
+        {
+          "Path": "src/three-engine/components/PresetGallery.vue",
+          "Size": 3319,
+          "Sha256": "a20a8b8349ef627aeb829122f1c81c0e085afd74a1bab2770802df1b5cf060a5"
+        },
+        {
+          "Path": "src/three-engine/components/PropertyPanel.vue",
+          "Size": 24437,
+          "Sha256": "be51831f1a1f2d74270c541e1006e430be011869ca52600727881e02a386dbb3"
+        },
+        {
+          "Path": "src/three-engine/components/SceneTree.vue",
+          "Size": 3198,
+          "Sha256": "71f4bcc7bfdb28e94f6654f33c0aa11977db38190aec29db12ea9ac388f7adce"
+        },
+        {
+          "Path": "src/three-engine/components/Toolbar.vue",
+          "Size": 4670,
+          "Sha256": "26f2444da2c429f6ff16b8dbb69589270aa719b9600b2815b3a6eea478305fe1"
+        },
+        {
+          "Path": "src/three-engine/components/Viewport.vue",
+          "Size": 5392,
+          "Sha256": "cfe712aac5c02e4c8cdedd46738cb13b9d20d7e734fab3fdb292d5968f361f18"
+        },
+        {
+          "Path": "src/three-engine/core/CameraPath.js",
+          "Size": 7947,
+          "Sha256": "de2130ae16cd463f01c6b2c9e0c1a5b49939734c04c19beacc759bed4ed721b8"
+        },
+        {
+          "Path": "src/three-engine/core/Engine.js",
+          "Size": 36939,
+          "Sha256": "c0b1ea34e089a83bf1732cb4918b7e5b22a397d2afebc36ed9010c7c92c814fe"
+        },
+        {
+          "Path": "src/three-engine/core/MaterialManager.js",
+          "Size": 8168,
+          "Sha256": "83a2c598cc256c179c71d77c16aa72a6e3cec3b5bc2480f2827f41b22c640027"
+        },
+        {
+          "Path": "src/three-engine/core/ModelExploder.js",
+          "Size": 3121,
+          "Sha256": "019fbb9b38aa8005fc5b4ee87f274302d955693e4821221c0c2a594486b42e42"
+        },
+        {
+          "Path": "src/three-engine/core/ModelLoader.js",
+          "Size": 2060,
+          "Sha256": "38f3a3ea7b498358af5136fada2b2a1be04830424ad794b77ccfe07701dc3042"
+        },
+        {
+          "Path": "src/three-engine/core/Presets.js",
+          "Size": 8457,
+          "Sha256": "fb36924fb3ebb52401f7633223d57b357f58d466b460972e9615e85290c5f1fc"
+        },
+        {
+          "Path": "src/three-engine/designer.vue",
+          "Size": 12167,
+          "Sha256": "75e79d2d02862ec95c76c989f8d72c35f1a62f254786d46987ce54ac8d51150f"
+        },
+        {
+          "Path": "src/three-engine/renderer.vue",
+          "Size": 7876,
+          "Sha256": "4fe379c2f93b1a2ebb353a228163e2767803ffc509532698b7d2c924e9584b0f"
+        },
+        {
+          "Path": "src/utils/microi.v8.js",
+          "Size": 73622,
+          "Sha256": "e1503fec0a0bc0077efc6429b4f16a9e2ba3e7e1188a7b5587a7aa1b1788fda0"
+        },
+        {
+          "Path": "tests/scene-contract.test.mjs",
+          "Size": 1503,
+          "Sha256": "3a6f778a44db9569ce2261dfc68f4d433640f548f150ef9f135715ea0ea8b8a5"
+        },
+        {
+          "Path": "tsconfig.json",
+          "Size": 621,
+          "Sha256": "1a0a388253edcdc1c86f0bfc071f71fe02ab522c4094d10bfbaf48876d44f51a"
+        },
+        {
+          "Path": "vite.config.ts",
+          "Size": 269,
+          "Sha256": "37d2ebfba794e5d1a4d93c1d1d7d684d74dd7e53c4a298858986eaacb6908cac"
+        }
+      ]
+    }
+  ],
+  "Repositories": [
+    {
+      "RepositoryKey": "microi.openclaw",
+      "RepositoryUrl": "https://gitee.com/microi-net/microi.openclaw.git",
+      "GitCommit": "8ba083a1049dc6c5f5e79c55c1ec6010adabc70e",
+      "SourceRoot": "microi.openclaw",
+      "FileCount": 99,
+      "SourceBytes": 37423866,
+      "SourceManifestHash": "e90863950e359059d74329773a4e14bd6ef7e4592564fcf231ab07548e5dc241",
+      "Files": [
+        {
+          "Path": ".github/workflows/build.yml",
+          "Size": 1056,
+          "Sha256": "d2f141d6cb15bc050455e989900a12041ce5444bb1e86b9374812619cc320c4a"
+        },
+        {
+          "Path": ".gitignore",
+          "Size": 937,
+          "Sha256": "431a29ac2fbcd8d8821d860636c0ceae397a4716e8b0825f96cb6d390ab73525"
+        },
+        {
+          "Path": ".microi-e2e/.env.e2e.example",
+          "Size": 302,
+          "Sha256": "d742ec74179ce47a5379de7b8bcc5b330e7f512ff5b7853af1e15d95a54170c4"
+        },
+        {
+          "Path": ".microi-e2e/.gitignore",
+          "Size": 267,
+          "Sha256": "a053293383382a06d86dd69863a06a5e90eced6ed14535109588676eb476b6c6"
+        },
+        {
+          "Path": ".microi-e2e/helpers/microi.js",
+          "Size": 1771,
+          "Sha256": "75018b36e8db1dbb85cc888e5aadc2a66237f39ebcb7f329b07ba75ee511a98c"
+        },
+        {
+          "Path": ".microi-e2e/playwright.config.js",
+          "Size": 1677,
+          "Sha256": "e0eabb0b12d1b3b7dade71f54f730213bdfe28e56f923db5412575416874c242"
+        },
+        {
+          "Path": ".microi-e2e/specs/api-contract.spec.js",
+          "Size": 662,
+          "Sha256": "188b7a286b3801d6411fc600fde4758d4dc3c5f25991c3bc3eb18d5ad9099bb3"
+        },
+        {
+          "Path": ".microi-e2e/specs/auth.spec.js",
+          "Size": 902,
+          "Sha256": "a5c33a4a295fef08ef82fb6848c45ce77ab3339e4600709e012c16918f30fd04"
+        },
+        {
+          "Path": ".microi-e2e/specs/network.spec.js",
+          "Size": 1229,
+          "Sha256": "4412c312b6f6443537a72198d6c3bd20e7f3957c9e224920670429db12767360"
+        },
+        {
+          "Path": ".microi-e2e/specs/smoke.spec.js",
+          "Size": 1979,
+          "Sha256": "4b60149c7d2a2e7810a7c5e200b232491cc94cf20055a4946d82227f3e598418"
+        },
+        {
+          "Path": ".microi-e2e/specs/visual-and-assets.spec.js",
+          "Size": 3034,
+          "Sha256": "801ddbb3ca99de65e32e8314e930c8120b690efebc00db4f6081d5969f60b8cc"
+        },
+        {
+          "Path": "LICENSE",
+          "Size": 1088,
+          "Sha256": "4d5d8b5170ffa95705428429e0f72bf722b9f9218cfcb1f2dac52aa990021abb"
+        },
+        {
+          "Path": "QQ.exe",
+          "Size": 34512896,
+          "Sha256": "b57b63269261a2cd297c3e28bed1dac0ab18095bfcc0c6fc8b140eb64a0ee1cf"
+        },
+        {
+          "Path": "README.md",
+          "Size": 24819,
+          "Sha256": "2089a5ecd6a7dd6b55c9a6738f64c325b144d7ac8b8f36f5aecdf498f4b3dee9"
+        },
+        {
+          "Path": "_meta.json",
+          "Size": 222,
+          "Sha256": "bfa6b5f0d1fcf61bedb45f1650278f84dd104524be7a614afe51e405afc418c3"
+        },
+        {
+          "Path": "electron/icon.ico",
+          "Size": 178067,
+          "Sha256": "332e6333fda547d1a6707fc59ac6faa922fb6399438ca08500a9efca5c4f8291"
+        },
+        {
+          "Path": "electron/icon.png",
+          "Size": 1710257,
+          "Sha256": "0ab265b4091b77ede081f88b3e55ba1373a75ca7ec730c15008911314339121b"
+        },
+        {
+          "Path": "electron/main.js",
+          "Size": 6047,
+          "Sha256": "5b978607cd9df16b925a762dcde0758e5dedf76645e24caf59a8154e4097074c"
+        },
+        {
+          "Path": "index.html",
+          "Size": 360,
+          "Sha256": "bdb4fd0a10c38b5b1d67de7dfcd683035d1baa4eee622b54d0a4b7d40b926d06"
+        },
+        {
+          "Path": "package.json",
+          "Size": 3665,
+          "Sha256": "1c1aedc323af7b16f3e288061075c2e08ea816ad5e279289e307b656da73ea27"
+        },
+        {
+          "Path": "release/builder-effective-config.yaml",
+          "Size": 1150,
+          "Sha256": "c29e81f36ecc0199b9a834647f7367b6d828fee7aa8268056755c5b14a71339d"
+        },
+        {
+          "Path": "scripts/bump-version.js",
+          "Size": 569,
+          "Sha256": "2af871dc65872a2e9890508aebe10cdf4bc1aceeabcbe2b062851e54cfc7c266"
+        },
+        {
+          "Path": "scripts/bundle-openclaw.js",
+          "Size": 2778,
+          "Sha256": "885f0b7564ac5bb52de262767f62cb3f6e90b547a37e986562476ca3cf060f83"
+        },
+        {
+          "Path": "scripts/ddddocr-cli.py",
+          "Size": 2173,
+          "Sha256": "12de88f64e6b9a788c63f3862cb851117f52d493e6b590a57d0a594a515f373c"
+        },
+        {
+          "Path": "scripts/electron-build.js",
+          "Size": 1912,
+          "Sha256": "e9fa3556f809d249fee1983bad3d8fcf392fad7bac40e43f990bc5d9bf217c63"
+        },
+        {
+          "Path": "scripts/gen-icon.js",
+          "Size": 7807,
+          "Sha256": "cffc18a3a5b5fcf538766e7553d1993246d13803f1abbc0a6ce22c02feecbf2e"
+        },
+        {
+          "Path": "scripts/setup.js",
+          "Size": 1627,
+          "Sha256": "4c253c91ea20bbbe93391f3f3cacdba99d58f23a30b0f3d96d95e47e016abe2a"
+        },
+        {
+          "Path": "server/app-config.js",
+          "Size": 3127,
+          "Sha256": "a76237b67e1d37bc5ddf094698065d6703b392ffbec52f271f9edda3e6a6d807"
+        },
+        {
+          "Path": "server/index.js",
+          "Size": 9365,
+          "Sha256": "026a446bb4a9e77f543745702b9dc55234a330dbb5ae46b5723f5411553f3102"
+        },
+        {
+          "Path": "server/routes/action.js",
+          "Size": 10191,
+          "Sha256": "5d330c257a061b19eb9df44aa841702473a23a23e31a106d15e0042ed999c0b5"
+        },
+        {
+          "Path": "server/routes/auth.js",
+          "Size": 3017,
+          "Sha256": "87cbfeda142c4649e55eebba17d58fd6716f185d91a6070eb597e3c8f5ab96a3"
+        },
+        {
+          "Path": "server/routes/channels.js",
+          "Size": 20132,
+          "Sha256": "0f8b2e7ac228f6a1a1faa9c71078cc0700f9bfd67fff781fe65dd4f7656adefc"
+        },
+        {
+          "Path": "server/routes/chat-history.js",
+          "Size": 4852,
+          "Sha256": "c7f35dea86200fce10cc955014a800ddac31fe0a51fa57eb79b23c39451f8070"
+        },
+        {
+          "Path": "server/routes/chat.js",
+          "Size": 11391,
+          "Sha256": "7b5f950b0ed8859fa5df5fa590c3b408d1dcd87e6b7edd938fe0daf6f061fd82"
+        },
+        {
+          "Path": "server/routes/config.js",
+          "Size": 22377,
+          "Sha256": "fb96321f2fe272dd3ef1decdce7fb39432c5a0a2be6eb7972d6441b35c69b95c"
+        },
+        {
+          "Path": "server/routes/employee-worker.js",
+          "Size": 6600,
+          "Sha256": "4932ff4c7c949a98037d692dec30901cc97f79d7f3031e227e5bb7ca7bc6963d"
+        },
+        {
+          "Path": "server/routes/env.js",
+          "Size": 36464,
+          "Sha256": "30843d8e8f315fd96272e1ff6de211af2bca40782d3616aa8c86913993b03742"
+        },
+        {
+          "Path": "server/routes/file.js",
+          "Size": 5894,
+          "Sha256": "5b366b5c4a4f88d3c327d5fb80d72273feaa150753e01af9f4558f6a86eacbd2"
+        },
+        {
+          "Path": "server/routes/logs.js",
+          "Size": 1951,
+          "Sha256": "fa61cb59adb69e7e2473a18f921c1bbf4c6ffbce867bbe5ffb09a62e24343d8d"
+        },
+        {
+          "Path": "server/routes/machine.js",
+          "Size": 1477,
+          "Sha256": "d709c5aac5f790702fc073a3b9693296369dc35ecbba809f6c06d70c16ca67ff"
+        },
+        {
+          "Path": "server/routes/napcat.js",
+          "Size": 20749,
+          "Sha256": "be280f365456a8fa1f2b865880435ea6bc88314d9fca3e3474eb563150fada98"
+        },
+        {
+          "Path": "server/routes/plugins.js",
+          "Size": 12105,
+          "Sha256": "c83d84a8e37b586627c0348b36dce25e4ca6d99fddc41597df5e0a572d1f3e4e"
+        },
+        {
+          "Path": "server/routes/remote.js",
+          "Size": 4265,
+          "Sha256": "ccd54c3eb6555105712fb4c3567fd9226a92c64311df92244693d6e7ad6101f3"
+        },
+        {
+          "Path": "server/routes/service.js",
+          "Size": 27861,
+          "Sha256": "276213a73e350a75a33c3006a67485d7dd10976986246d7f7024632fc8c44420"
+        },
+        {
+          "Path": "server/routes/skills.js",
+          "Size": 6236,
+          "Sha256": "685cb68834ec4d266876cde4330e6eb666a49c82bc6843781bca184ca29901c1"
+        },
+        {
+          "Path": "server/routes/spider-worker.js",
+          "Size": 57344,
+          "Sha256": "4537d73ec674c0015cdbc5120d3d94348f46e0a94769850ef01a64d011d8042a"
+        },
+        {
+          "Path": "server/routes/status.js",
+          "Size": 3366,
+          "Sha256": "350f852a282b41ad53f4a0ac4c77dc48b6493056e767cd7b6338b6a7916744d6"
+        },
+        {
+          "Path": "server/routes/tasks.js",
+          "Size": 6450,
+          "Sha256": "20e98302b3b57716b718838d541cdd035d835fdc5f1c07e48715bbbd4486f3dc"
+        },
+        {
+          "Path": "server/routes/video.js",
+          "Size": 6733,
+          "Sha256": "748dba4bc33f74ca7597497158c95d20e4409174fbe88c6aef1d271574aea963"
+        },
+        {
+          "Path": "server/routes/wechatferry.js",
+          "Size": 11580,
+          "Sha256": "fb0cdf2129c6c1b8aafe1b88aae45ff6d67e74ebe4788abcf8403b57d2137653"
+        },
+        {
+          "Path": "server/routes/wechatpadpro.js",
+          "Size": 36114,
+          "Sha256": "88439ef954b92ab6ef9cf8d542d9014bd6ee1ea9bedd59ce2d599cd00c1ffa1a"
+        },
+        {
+          "Path": "server/scheduler/engine.js",
+          "Size": 13763,
+          "Sha256": "77da92e29c9a9b60c223ad26bf678a5ba46da5a25a107662db5997a032a862d7"
+        },
+        {
+          "Path": "server/scheduler/executors.js",
+          "Size": 20000,
+          "Sha256": "a1b839c52651fe5fe89c0eccf1cdd1666a73ebd59330d4af9c2df8beecb8c459"
+        },
+        {
+          "Path": "server/services/ai-sandbox.js",
+          "Size": 4158,
+          "Sha256": "a4753fa60ce36afe3c6a6b1efeb1cc3522bc1e8e55be689c1d37ac6a65095fba"
+        },
+        {
+          "Path": "server/services/chat-history-store.js",
+          "Size": 3282,
+          "Sha256": "65426916871da286ea63185f850891da7424229b139a6211e5854d7412bc1df6"
+        },
+        {
+          "Path": "server/services/employee-vault.js",
+          "Size": 1344,
+          "Sha256": "61eb40393148eac7dc08c73eb0234902bd795e38b272b19bf053696106cb82d5"
+        },
+        {
+          "Path": "server/services/employee-worker.js",
+          "Size": 13748,
+          "Sha256": "b8de5a96aeaf5522789b9f0edbec98ee3f8de46c290dbfe381c87009e976f55e"
+        },
+        {
+          "Path": "server/services/employee-worker.test.cjs",
+          "Size": 5516,
+          "Sha256": "6f1565091696d52bf5b0a7a570ffcda70e8e58f38f7e063c848f3b31bb0b6ac4"
+        },
+        {
+          "Path": "server/services/feishu-poll.js",
+          "Size": 12469,
+          "Sha256": "ef7a8ce736984569640d61748ecc4dbb77407233d1e1da31d6f630c4cdcbce5b"
+        },
+        {
+          "Path": "server/services/feishu-ws.js",
+          "Size": 10306,
+          "Sha256": "21985543dcf73ce1981c0d2bbee27695ad8ee1f159ead2f4c76e2e69223d8a5e"
+        },
+        {
+          "Path": "server/services/local-captcha-ocr.js",
+          "Size": 6136,
+          "Sha256": "d758dc4e9f877420439a6598b751a23ceae2099d1de6fb7867adbc22600da90f"
+        },
+        {
+          "Path": "server/services/microi-spider-client.js",
+          "Size": 7495,
+          "Sha256": "905f0683b0b6cedfc638b59e30026d3631f7e14634f1364f96ef912ae5d22f20"
+        },
+        {
+          "Path": "server/services/openclaw-ai-client.js",
+          "Size": 8574,
+          "Sha256": "58f3e0660d1135a06e10e87705d92cf14a6e8e1a03c4c065c3805598c7b31e2e"
+        },
+        {
+          "Path": "server/services/qq-bot.js",
+          "Size": 17269,
+          "Sha256": "1fdf8212157e327b6c77348dd6ee336087df3f719f6b3de198950976eccf1aea"
+        },
+        {
+          "Path": "server/services/qq-onebot.js",
+          "Size": 13720,
+          "Sha256": "fec394e2731381ab79c076467a224426473ab22d6444fcf23bd7b9dbd98f87ef"
+        },
+        {
+          "Path": "server/services/spider-browser-session.js",
+          "Size": 15507,
+          "Sha256": "567dca239af726e5ccc30b06720d845316358dead109125ef4adc2bcd7761b6b"
+        },
+        {
+          "Path": "server/services/spider-worker-store.js",
+          "Size": 1592,
+          "Sha256": "d1f15b16517f76e9fc42ca7404a8d244808a3edccf3f81e4c625caee8433e2dd"
+        },
+        {
+          "Path": "server/tools/wechatferry-bridge.py",
+          "Size": 7205,
+          "Sha256": "4196d8dbf8b4705bf24aa05fe858fb1017b95dc746b30cdced42f8e67220c811"
+        },
+        {
+          "Path": "server/utils.download.test.js",
+          "Size": 2438,
+          "Sha256": "28c3b4581cb8e2f1ec6dfff73bb3401eed9ce80e4f8d46e8e8c4181f400db204"
+        },
+        {
+          "Path": "server/utils.js",
+          "Size": 19011,
+          "Sha256": "c2e78c3fced62a0b84b29221f501ddb81ecba5aa7aebec6da5f76da9ee3c8cf6"
+        },
+        {
+          "Path": "src/App.vue",
+          "Size": 4560,
+          "Sha256": "ae6f2f56935a8b099c6c7b91cf8a3f6b5cef4870c99b622d5c1eabb2f2c35bc8"
+        },
+        {
+          "Path": "src/api.js",
+          "Size": 1557,
+          "Sha256": "e1fa9badc1186f757390d757959ea7462f1408c921866ac4e7e3d2303e05370f"
+        },
+        {
+          "Path": "src/components/MicroiAccountFrame.vue",
+          "Size": 3607,
+          "Sha256": "736e8e08ad61ed73752e90e23a6ea94c0f04565fcb5c05f9d572711f540b1bc7"
+        },
+        {
+          "Path": "src/config.json",
+          "Size": 167,
+          "Sha256": "ee20ea26da6444b0f0d938c73dfda90b958cb4a107c155828149da4fbfd66f05"
+        },
+        {
+          "Path": "src/main.js",
+          "Size": 673,
+          "Sha256": "7a65da1a92898a972893c37301aa91e2871730dd0e5fe37dd4ecdbaf90e570bd"
+        },
+        {
+          "Path": "src/router/index.js",
+          "Size": 2719,
+          "Sha256": "ff27f51ee2ed982977ce156c9348afb1f52a5778ea22f16eb70785ddb9998e01"
+        },
+        {
+          "Path": "src/utils/microi-account.js",
+          "Size": 3702,
+          "Sha256": "fded060d9325d3ff03e15bc96021e1777bc555feae8d6558602279c643c46da5"
+        },
+        {
+          "Path": "src/views/About.vue",
+          "Size": 11261,
+          "Sha256": "18f6469eccc136968a28f0fdd413d0ede6ec9091628c1f2b7e30ca8f984cad5f"
+        },
+        {
+          "Path": "src/views/Channels.vue",
+          "Size": 26562,
+          "Sha256": "4cb75f5fe6e9e62f7047afd34e5e1370f02b0b41de8fb71f8ba06efe5699d9ec"
+        },
+        {
+          "Path": "src/views/Chat.vue",
+          "Size": 63471,
+          "Sha256": "fc8bde2c586aa7da81b678a12d6f210e577de308599cbdc12e9c88b3e949fb5b"
+        },
+        {
+          "Path": "src/views/Config.vue",
+          "Size": 13873,
+          "Sha256": "e4469df895921da8083b6534a76591e66fda78c48371fb3863d982d6320f6bba"
+        },
+        {
+          "Path": "src/views/Dashboard.vue",
+          "Size": 5797,
+          "Sha256": "200929f279caeff9aff5681a8de645c6311636c99e27aec82fce0f887b007345"
+        },
+        {
+          "Path": "src/views/Employees.vue",
+          "Size": 4868,
+          "Sha256": "37d3545ea4062141d71c4ce1774023074b8b141991505826462341c7213f5b6c"
+        },
+        {
+          "Path": "src/views/Environment.vue",
+          "Size": 8701,
+          "Sha256": "3bf9e643ce6625db26ffc917a9c6daefe73eb7d47bbd8e79688990912b36dd92"
+        },
+        {
+          "Path": "src/views/Home.vue",
+          "Size": 8067,
+          "Sha256": "3abbb296276048527bac51523a05ba8f6bbb2c414bf264203102ef8d31eb8354"
+        },
+        {
+          "Path": "src/views/Layout.vue",
+          "Size": 11089,
+          "Sha256": "bef295831b14c48c2046f8d33493e477a74cce14f5fdf4a2caa82158f9d71dde"
+        },
+        {
+          "Path": "src/views/Login.vue",
+          "Size": 14139,
+          "Sha256": "8a20be1f9e658c2dff1931a87d901707c516f5ff48881ba25520149570cf6a69"
+        },
+        {
+          "Path": "src/views/Logs.vue",
+          "Size": 6396,
+          "Sha256": "749a5e4c83d329d6eca0502a158f7dbbb3d8f27b60fb1c8b75dc5b5cc4ada968"
+        },
+        {
+          "Path": "src/views/MicroiBg.vue",
+          "Size": 8923,
+          "Sha256": "6f8742b29b9cb342b264a949f4bf4391e97b922eae29fc50c911bde42a0bd41d"
+        },
+        {
+          "Path": "src/views/Plugins.vue",
+          "Size": 84388,
+          "Sha256": "f84ec1b925182a82bca7309228c7e55afb817cd70c809c31ad1fcee6a58cdf82"
+        },
+        {
+          "Path": "src/views/Purchase.vue",
+          "Size": 19571,
+          "Sha256": "bc444c4263f105434bc9b3b7045d7bee83ad97870f89db9774f0d50f24208ace"
+        },
+        {
+          "Path": "src/views/Remote.vue",
+          "Size": 9185,
+          "Sha256": "8323a054f4edd9c04a4bf485f28a72f9504825877ac065b420f92285d706a6b5"
+        },
+        {
+          "Path": "src/views/Service.vue",
+          "Size": 24820,
+          "Sha256": "3623d36d32f1a350f035988389d8e8ea431acf591cfa03a55ce4dd02b2798dea"
+        },
+        {
+          "Path": "src/views/Skills.vue",
+          "Size": 10807,
+          "Sha256": "979059232d4a782313a9b82426294ce40c9002416ccdacdbb613e86886b5d729"
+        },
+        {
+          "Path": "src/views/SpiderWorker.vue",
+          "Size": 45594,
+          "Sha256": "0b0483b6cb2a38322da60198daa07db3f6f8fa62a8ab6c88255e72be76f1267d"
+        },
+        {
+          "Path": "src/views/Tasks.vue",
+          "Size": 29009,
+          "Sha256": "b15f2a82dbda476ff68009171f32dd978afcd32bf7b7819d0dc6c953c6291848"
+        },
+        {
+          "Path": "src/views/UserCenter.vue",
+          "Size": 16940,
+          "Sha256": "44373f10fed02069e8a657ff080ecd1ef83183aae594171959c6cc947b01b21c"
+        },
+        {
+          "Path": "tmp-check-openclaw.js",
+          "Size": 356,
+          "Sha256": "f1f29ba2177678c2c5a9d8efa2ae5660216e00d0a82d903537b66a6351f0c7c0"
+        },
+        {
+          "Path": "vite.config.js",
+          "Size": 637,
+          "Sha256": "f170ae25a14e12dfc1663491fb0eb254ccf35251f4d70900dd202728c06bcfaf"
+        }
+      ]
+    }
+  ]
+}

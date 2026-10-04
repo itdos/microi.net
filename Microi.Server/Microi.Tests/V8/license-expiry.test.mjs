@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-const code = readFileSync(new URL('../../Microi.Upgrade/Resource/license-expiry-model.js', import.meta.url), 'utf8');
+const code = readFileSync(new URL('../../OfficialApplications/Resource/license-expiry-model.js', import.meta.url), 'utf8');
 const model = new Function(code + ';return createLicenseExpiryModel()')();
 const now = Date.parse('2026-09-26T00:00:00Z'), end = new Date(now + 5 * 86400000 + 19 * 3600000 + 38 * 60000).toISOString();
 test('默认七天边界和文案分钟倒计时', () => {

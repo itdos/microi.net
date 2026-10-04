@@ -1,0 +1,17 @@
+{
+  "SchemaVersion": 1,
+  "AppKey": "event-lottery-studio",
+  "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.default.default/AI应用/event-lottery-studio/source",
+  "BehaviorTest": "test/gateway-behavior.test.mjs",
+  "DeliveryTests": [
+    "test/frontend-delivery.behavior.test.mjs",
+    "test/workbench-menu-contract.test.mjs",
+    "test/source-ownership.contract.test.mjs",
+    "../test/gateway-contract.test.mjs",
+    "../test/manifest-contract.test.mjs",
+    "../test/cluster-acceptance-contract.test.mjs",
+    "../test/deploy-contract.test.mjs",
+    "../test/build-delivery-contract.test.mjs",
+    "../test/v3-release-contract.test.mjs"
+  ]
+}
