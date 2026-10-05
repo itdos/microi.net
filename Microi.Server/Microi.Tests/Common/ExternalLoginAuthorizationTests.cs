@@ -7,6 +7,45 @@ namespace Microi.Tests.Common;
 public class ExternalLoginAuthorizationTests
 {
     [Theory]
+    [InlineData("https://api.example.test", "http", "internal:80", "", "https://api.example.test/api/ExternalLogin/Callback")]
+    [InlineData("https://api.example.test/gateway/", "http", "attacker.invalid", "/private", "https://api.example.test/gateway/api/ExternalLogin/Callback")]
+    [InlineData("https://api.example.test", "https", "localhost:61501", "", "https://api.example.test/api/ExternalLogin/Callback")]
+    [InlineData("", "https", "api.example.test:8443", "/gateway", "https://api.example.test:8443/gateway/api/ExternalLogin/Callback")]
+    [InlineData(null, "http", "localhost:61501", "", "http://localhost:61501/api/ExternalLogin/Callback")]
+    [InlineData("http://127.0.0.1:61501/", "http", "internal", "", "http://127.0.0.1:61501/api/ExternalLogin/Callback")]
+    public void CallbackUrl_UsesCanonicalTenantApiBase_AndPreservesLegacySecureFallback(
+        string? apiBase, string scheme, string host, string pathBase, string expectedPath)
+    {
+        var builder = typeof(ExternalLoginRuntime).GetMethod(
+            "BuildCallbackUrl", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(builder);
+        var url = Assert.IsType<string>(builder!.Invoke(null,
+            [apiBase, scheme, host, pathBase, "tenant&other=invalid", "GitHub"]));
+        var uri = new Uri(url);
+        Assert.Equal(expectedPath, uri.GetLeftPart(UriPartial.Path));
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        Assert.Equal("tenant&other=invalid", query["OsClient"].ToString());
+        Assert.Equal("GitHub", query["Provider"].ToString());
+        Assert.Equal(2, query.Count);
+    }
+
+    [Theory]
+    [InlineData("http://api.example.test")]
+    [InlineData("https://user:password@api.example.test")]
+    [InlineData("https://api.example.test?redirect=attacker")]
+    [InlineData("https://api.example.test#fragment")]
+    [InlineData("/relative")]
+    [InlineData("file:///tmp/callback")]
+    [InlineData("")]
+    public void CallbackUrl_RejectsInvalidConfiguredAddress_AndInsecurePublicFallback(string apiBase)
+    {
+        var builder = typeof(ExternalLoginRuntime).GetMethod(
+            "BuildCallbackUrl", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(builder);
+        Assert.Null(builder!.Invoke(null, [apiBase, "http", "api.example.test", "", "tenant", "GitHub"]));
+    }
+
+    [Theory]
     [InlineData("WeChat", "https://open.weixin.qq.com/connect/qrconnect", "appid", "snsapi_login", "#wechat_redirect")]
     [InlineData("Gitee", "https://gitee.com/oauth/authorize", "client_id", "user_info", "")]
     [InlineData("GitHub", "https://github.com/login/oauth/authorize", "client_id", "read:user user:email", "")]
