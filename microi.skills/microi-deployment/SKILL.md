@@ -55,6 +55,8 @@ DLL 加密脚本只在 Git Bash、MSYS 或 Cygwin 中转换 Windows 路径，优
 
 原生依赖审批在目标 Linux CLR 中验证完整程序集引用链及实际字节哈希。驱动扩展也属于交付依赖：Oracle Core 23.26.300 同时交付同版本 Azure、Kerberos、OCI、ConfigFile、AWS、GCP 六个官方扩展及传递依赖，以 `ProviderDependencyDeliveryTests` 验证真实装载，不连接云服务。缺文件、身份冲突和哈希变化继续失败关闭；先复现并修复包装，再重新 Full 和镜像回读，禁止跳过未执行的依赖或开放 V8/MCP 任意装载。
 
+System.Drawing.Common 的 .NET 10 支持库引用 System.Formats.Nrbf，Dos.Common 显式交付同版本官方包；该文件不能从 WindowsDesktop 共享框架复制来冒充 Linux 制品。通过真实引用装载回归和 Linux 依赖验证，保留 Windows GDI 平台限制，Linux 绘图使用既有 SkiaSharp。
+
 | 场景 | 推荐入口 |
 |---|---|
 | 生产 Linux、快速安装、可滚动升级 | Docker/Compose |

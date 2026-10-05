@@ -181,6 +181,8 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 依赖统一也要覆盖存量模块：MongoDB 兼容构建与 NuGet 包声明共同使用 DnsClient 1.7.0，以满足 Azure 配置提供者的版本下界；MongoDB 3.6/7 的真实验收仍由 Full 执行。OCI 带有独立强名称的旧密码学程序集，微信支付继续使用 BouncyCastle.Cryptography 2.6.2；测试通过显式程序集别名断言原来的认证标签篡改异常，避免同名类型导致编译歧义，不改变运行时密码学协议。
 
+System.Drawing.Common 的 .NET 10 支持程序集还引用 System.Formats.Nrbf；该文件不在 ASP.NET Core 共享框架内，Dos.Common 显式交付同版本官方 NuGet 包，并由上述回归验证引用与文件。Windows GDI 的运行平台限制不变；Linux 图像处理继续使用 SkiaSharp。依赖可解析不等于在 Linux 执行 Windows 绘图 API。
+
 共享源码持续变化时，可将完整候选源码及依赖保存到独立发布目录，在那里运行同一 Full 和一键发布脚本。专用测试服务使用独立端口，并通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口，默认仍为 61501、61500。进程管理器继续检查 PID、命令行和工作区归属；原工作区服务不受影响。这两个变量仅用于发布脚本，不是生产 API 配置。
 
 进程管理器也支持通过 PowerShell 7 检查 macOS/Linux 的真实监听进程、命令行和工作目录；路径按大小写精确匹配，结束前再次核对启动时间，拒绝 PID 复用。`dotnet run` 启动的无扩展名 `Microi.net.Api` apphost 还必须使用规范绝对路径，位于所选 API 项目的 `bin/` 下，且工作目录精确等于该项目；相同名称、其它目录、路径中的 `.`/`..` 或无法读取启动时间都不能作为可停止的身份。只能停止已证明属于所选工作区的 API/Vite 及其后代，无法读取身份时停止操作。此能力不改变一键脚本对共享开发服务的既有处理策略；跨平台回归使用独立目录和端口，不以模拟对象代替真实进程。

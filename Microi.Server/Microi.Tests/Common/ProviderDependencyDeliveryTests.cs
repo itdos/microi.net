@@ -7,6 +7,21 @@ namespace Microi.Tests.Common;
 public sealed class ProviderDependencyDeliveryTests
 {
     [Fact]
+    public void Drawing_provider_support_dependencies_are_delivered_with_the_platform()
+    {
+        var drawing = typeof(System.Drawing.Image).Assembly;
+        var support = Assert.Single(drawing.GetReferencedAssemblies(),
+            reference => reference.Name == "System.Private.Windows.Core");
+        var supportAssembly = Assembly.Load(support);
+        var nrbf = Assert.Single(supportAssembly.GetReferencedAssemblies(),
+            reference => reference.Name == "System.Formats.Nrbf");
+        var loaded = Assembly.Load(nrbf);
+        Assert.Equal(nrbf.Name, loaded.GetName().Name);
+        Assert.True(loaded.GetName().Version >= nrbf.Version);
+        Assert.True(File.Exists(loaded.Location));
+    }
+
+    [Fact]
     public void Oracle_provider_extension_references_are_delivered_with_the_platform()
     {
         var provider = typeof(OracleConnection).Assembly;
