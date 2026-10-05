@@ -10,7 +10,7 @@ description: Microi V8 表单事件开发。用于编写 InFormV8、SubmitFormV8
 你正在开发 Microi 吾码平台的 V8 表单事件。事件绑定在表单引擎的表上，在数据操作的不同阶段自动触发。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-table-event-000 sha256=dd86294c8cf42f580b2eb806d981c239c0efc2934505c0716e804de2f8a9235c -->
+<!-- microi-progressive:chunk id=v8-table-event-000 sha256=2550fa4a7329b46ccee98d24e0bb1975e99a85b0b78aefd7d96be36505c82cd8 -->
 ## 本地优先与版本头（必做）
 
 AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<项目>/表单引擎/.../<事件Label>（<EventType>）.js` 本地文件，再通过 MCP 或 VS Code 插件同步到数据库。文件中文名必须取 `diy_table` 对应 `diy_field.Label`，其中 `SubmitFormV8` 为 `前端表单提交前V8事件（SubmitFormV8）.js`，`OutFormV8` 为 `前端表单提交后V8事件（OutFormV8）.js`。若插件显示“本地和远端不一致”，先读取本地与远端并合并有效差异，不能直接覆盖。
@@ -38,7 +38,7 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 生成 V8 事件代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；提交前校验、提交后联动、字段显隐、数据脱敏、跨表写入、复杂条件判断等代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-001 sha256=7bad55ca6781e6ca458a0333a47c71a3bad30334d146e940496c45c4ffa7ddf5 -->
+<!-- microi-progressive:chunk id=v8-table-event-001 sha256=f2517369ec5221c06950d05088793270a53f92cb7b96587d859a264a46c2c6d2 -->
 ## 事件类型
 
 | 事件 | 运行端 | V8.EventName | 触发时机 | 用途 |
@@ -51,7 +51,7 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 | `DataFilterV8.js` | **后端** | `DataFilter` | 获取列表/表单数据后 | 每行数据加工、脱敏、补充字段 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-002 sha256=86c13bfd4dbc035e5498fe072ed176780ed31975b64eda09c1a378de986ab73d -->
+<!-- microi-progressive:chunk id=v8-table-event-002 sha256=230de68b48d85dd28ec5667bb46953305b41d34d376cf3eb5f223d63fb463837 -->
 ## 事件触发规则
 
 - 后端 V8 事件 / 接口引擎中调用 `V8.FormEngine` 增删改 → **不触发**表单 V8 事件
@@ -61,7 +61,7 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 - `diy_table.V8Limit` 是表后端提交前、提交后和数据处理 V8 的正向开关：缺失、`null`、`0/false` 均不设置 Jint 单次超时、语句、函数递归和累计分配预算，只有 `1/true` 才启用这些限制。旧 `V8Unlimited` 仅在新字段不存在时反向推断，新的 MCP、Manifest 和应用资源只写 `V8Limit`。进程常驻内存、取消、并发、接口嵌套深度、权限和数据库保护始终生效。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-003 sha256=a6313d9007c8c72e1b8fb56ca7764eb0856029c9937c35d5f2e294539b3c7134 -->
+<!-- microi-progressive:chunk id=v8-table-event-003 sha256=271cf2359a152663040ed31ecc2289836df4d32d0fc9c47735dffbf9b59b9837 -->
 ## ⚠️ 关键陷阱（必读）
 
 ### 1. 设计模式保护（前端事件必加）
@@ -113,7 +113,7 @@ V8.ApiEngine.Run('other-engine', { Form: V8.Form }, V8.DbTrans);
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-004 sha256=d3852ea4ed2f399ca19b537372d7f53a7d8f667d39ebd215210957fb8b6d9c0f -->
+<!-- microi-progressive:chunk id=v8-table-event-004 sha256=b3e59588ccfe532602d8f103f3c7b69beb800dc2092aeb8202616b4050324555 -->
 ## 前端事件特有 API
 
 ```javascript

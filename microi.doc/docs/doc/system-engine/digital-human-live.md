@@ -1,10 +1,10 @@
 ---
-title: 自建数字人直播
-description: Microi吾码自建数字人直播的本机部署、4K功能截图、话术与知识管理、OBS接入和实测验收边界。
+title: 自建数字人直播与 AI 换脸
+description: Microi吾码自建数字人直播、照片人物与服装动作、视频换脸、本机部署、4K截图和OBS接入。
 outline: [2, 3]
 ---
 
-# 自建数字人直播
+# 自建数字人直播与 AI 换脸
 
 需要长期播报、并希望避免按 token 或音视频时长支付云端推理费用时，可以使用吾码 AI 应用广场的 **[自建数字人直播](https://microi.net/app-detail.html?app=digital-human-live)**（`digital-human-live`）。吾码管理话术、知识和测试记录；中文语音、文字问答与口型画面在用户自己的电脑上生成。本机 WebRTC 画面页可用于浏览器预览；接入 OBS 时还需在实际安装的 OBS 版本中单独验证音画连接。
 
@@ -12,7 +12,7 @@ outline: [2, 3]
 
 ## 4K 功能截图
 
-以下五图均从数字人直播应用实际页面组件采集，原始像素为 **3840 × 2160**，点击可查看原图。这里的 4K 指界面截图尺寸，口型视频源仍为 480 × 640、25 fps，不应理解成 4K 模型推理。第一张是本机模型生成中文语音和口型后，经浏览器 WebRTC 收到的画面；所用人像由图像生成工具为文档制作，只用作演示素材。其余工作台和本机设置显示未配对状态；话术与知识库以隔离的示例数据渲染，用于展示交互布局，不代表线上租户的业务回读或外部平台真实开播。
+以下十一图均为实际应用页面或本机 OBS 录制帧，原始像素为 **3840 × 2160**，点击可查看原图。这里的 4K 指界面截图或 OBS 输出尺寸，口型及换脸视频源仍为 480 × 640，不应理解成 4K 模型推理。第一张是本机模型生成中文语音和口型后，经浏览器 WebRTC 收到的画面；所用人像由图像生成工具为文档制作，只用作演示素材。第二至第六张是新版照片驱动与换脸工作台，浏览器自动化通过官方接口引擎授权，再调用本机视频生成与两种摄像头实时动作接口；第七张是把实际生成人像与服装动作视频作为媒体源后由 OBS 录制的画面。演示人物均为合成测试素材。其余工作台和本机设置显示未配对状态；话术与知识库以隔离的示例数据渲染，用于展示交互布局，不代表线上租户的业务回读或外部平台真实开播。
 
 <div class="mci-doc-screenshot-grid">
   <figure>
@@ -20,6 +20,42 @@ outline: [2, 3]
       <img src="/images/digital-human-live/live-preview-4k.png" width="3840" height="2160" loading="lazy" alt="数字人直播本机 WebRTC 播报预览：演示人像、已连接画面、中文话术、生成速度与播报队列" />
     </a>
     <figcaption>本机实测播报：演示人像经 MuseTalk 口型生成后由 WebRTC 送入工作台；不代表 OBS 实时来源或外部平台已开播。</figcaption>
+  </figure>
+  <figure>
+    <a href="/images/digital-human-live/motion-workbench-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看照片驱动与 AI 换脸工作台 4K 原图">
+      <img src="/images/digital-human-live/motion-workbench-4k.png" width="3840" height="2160" loading="lazy" alt="照片驱动与 AI 换脸工作台：两种模式、源照片、驱动视频、素材授权和本机生成入口" />
+    </a>
+    <figcaption>照片驱动工作台：选择已授权照片与视频，在吾码账号和本机配对通过后提交任务。</figcaption>
+  </figure>
+  <figure>
+    <a href="/images/digital-human-live/motion-face-result-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看本机视频换脸结果 4K 原图">
+      <img src="/images/digital-human-live/motion-face-result-4k.png" width="3840" height="2160" loading="lazy" alt="视频换脸实际结果：演示女像面部跟随男像驱动视频，男像头发衣服背景保留，页面显示速度与下载入口" />
+    </a>
+    <figcaption>只换脸实测：保留驱动视频的身体、衣服与背景；面部边缘在当前轻量算法下可见。</figcaption>
+  </figure>
+  <figure>
+    <a href="/images/digital-human-live/motion-body-result-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看照片人物与服装动作结果 4K 原图">
+      <img src="/images/digital-human-live/motion-body-result-4k.png" width="3840" height="2160" loading="lazy" alt="照片人物与服装动作实际结果：演示女像及金色服装按驱动视频姿态进行二维形变" />
+    </a>
+    <figcaption>人像与衣服动作实测：照片中的人像和金色衣服随驱动姿态形变；半身照片无法还原未拍到的下半身。</figcaption>
+  </figure>
+  <figure>
+    <a href="/images/digital-human-live/motion-live-face-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看摄像头实时换脸预览 4K 原图">
+      <img src="/images/digital-human-live/motion-live-face-4k.png" width="3840" height="2160" loading="lazy" alt="摄像头实时换脸预览：测试摄像头帧经本机 WebSocket 处理后显示在页面画布" />
+    </a>
+    <figcaption>摄像头实时预览：自动化使用测试视频作为虚拟摄像头；麦克风和 OBS 窗口采集需分别配置。</figcaption>
+  </figure>
+  <figure>
+    <a href="/images/digital-human-live/motion-live-body-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看摄像头实时人物与服饰动作 4K 原图">
+      <img src="/images/digital-human-live/motion-live-body-4k.png" width="3840" height="2160" loading="lazy" alt="摄像头实时人物与衣服动作预览：测试摄像头帧驱动演示照片里的金色礼服人物" />
+    </a>
+    <figcaption>实时人物与衣服动作：虚拟摄像头逐帧输入，本机返回合成视频帧；服饰形变仍受单张照片视角限制。</figcaption>
+  </figure>
+  <figure>
+    <a href="/images/digital-human-live/obs-recorded-body-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看 OBS 实际录制的人像与服装动作 4K 帧">
+      <img src="/images/digital-human-live/obs-recorded-body-4k.png" width="3840" height="2160" loading="lazy" alt="OBS 媒体来源录制的照片人物与金色衣服动作视频实际帧，竖向人物居中，左右为黑色画布" />
+    </a>
+    <figcaption>OBS 媒体来源实录：本机生成片段循环输入 OBS 后录制，显示人像与衣服动作；不是直播平台推流截图。</figcaption>
   </figure>
   <figure>
     <a href="/images/digital-human-live/studio-workbench-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看数字人直播工作台 4K 原图">
@@ -54,6 +90,14 @@ outline: [2, 3]
 | 吾码管理 | MicroService、FormEngine、DiyToken | 话术、问答知识、角色权限、测试记录 |
 | 本机推理 | Qwen3 0.6B、MeloTTS、MuseTalk 1.5 | 组织回答、中文语音、口型画面 |
 | 本机输出 | WebRTC、MP4、OBS 媒体来源或浏览器来源 | 保存音画片段，并在 OBS 验证捕获与推流配置 |
+
+## 照片人物动作与视频换脸
+
+【AI 换脸与动作】提供两种本机模式。**只换脸**以拍摄视频为主体，使用已授权照片的面部随视频表情与头部位置变化，保留拍摄视频的头发、身体、衣服与背景。**人像与衣服动作**从照片提取人物轮廓、服装与姿态，以二维网格形变跟随驱动视频，并用统一背景填充。它不能推断源照片里不存在的身体或衣服背面，也不是高保真全身生成；遮挡、快速转身和手部交叉会造成明显失真。建议先用正面、清晰、完整拍到所需身体部位的照片与平稳视频试拍。
+
+点击生成时，浏览器先调用吾码接口引擎 `dhl-motion-prepare`；引擎使用当前 DiyToken、当前租户与【直播测试记录】菜单权限核准任务，再调用可由租户扩展的 `dhl-motion-hook`。接口只返回本机执行契约，不接收照片或视频字节。网页随后把素材提交到配对的 `127.0.0.1:17861` 本机服务；完成后在本机预览、下载 MP4，可选择保存不含媒体内容的测试记录。**只换脸和人物服饰动作都支持摄像头实时预览**：浏览器逐帧送到同一回环服务的 WebSocket，再显示处理帧。输出嵌入“AI 生成”标识。源人物和拍摄者都需允许这种用途，不应把合成画面冒充真人身份。
+
+本机程序基于 MediaPipe 关键点、OpenCV 和二维形变实现，新增模式不调用云端模型，不计 MiniMax token。它是低资源可运行的试验性效果，不承诺影视级换脸或稳定的全身直播。输出视频最长 15 秒、最多 450 帧、处理宽度最多 640 像素；超限输入会拒绝。官方演示样例用 RTX 2080 SUPER 所在电脑的合成素材、24 帧、2 秒、480 × 640 进行自动化，HTTP 任务实测只换脸 21.25 fps、人像与衣服动作 20.88 fps；网页侧分别验证了实时只换脸和实时人物服饰动作的 WebSocket 视频帧。帧处理速度并不等于整个直播链路的端到端帧率。
 
 本版采用 **片段先生成、完成后播报** 的缓冲方式。支持话术播报和手动输入观众问题；完成的片段按队列播放，空闲时保持人像。问答延迟包含文字生成、语音生成和口型生成，不能把“输出 25 fps”当成“模型实时生成 25 fps”。工作台展示的口型生成帧率和耗时来自本机实测。
 
@@ -106,6 +150,8 @@ http://127.0.0.1:17861/output
 2026-09-26 的首版本机样例使用 RTX 2080 SUPER、480 × 640 画面：1.669 秒中文片段总生成耗时 12.495 秒，口型阶段 4.98 fps；2.601 秒知识问答片段总耗时 15.058 秒，口型阶段 9.10 fps。输出文件为 H.264 + AAC、25 fps，音画时长差约 29 毫秒；本机浏览器 WebRTC 测试实际收到两条媒体轨道，统计丢包为 0。这些是短样例，不能代表长时直播性能。
 
 2026-09-27 在 OBS 32.2.2 中用“媒体来源”循环播放上述 2.601 秒片段，并建立独立的 720 × 1280 竖屏配置。将 480 × 640 原片左右各裁剪 60 像素后适配画布，OBS 本地录制得到 26.23 秒 H.264 + AAC 双声道 MP4，音频峰值 −17.2 dB。该测试仅使用研究人像素材验证本机捕获。相同 OBS 的“浏览器”来源停在配对面板，服务端 `peers=0`，未通过实时 WebRTC 接入；也未验证外部平台推流。不得把这段循环录制称为真实开播。
+
+2026-10-04 新增“人物与衣服动作”后，使用本机实际生成的 `api-body.mp4` 作为 OBS“媒体来源”，独立验收场景通过 OBS WebSocket 回读了当前场景、来源路径与录制状态，录制约 9 秒。回读的 MP4 可解码为 **3840 × 2160、30 fps、288 帧**，上方第七张图是该录像中间帧。此项证明 OBS 能接收并录制生成片段；摄像头实时换脸及人物服饰动作已在应用页面及本机 WebSocket 自动化验证，尚未验证 OBS 对其实时窗口的捕获、平台推流或观众端接收。
 
 应用源码同步使用 `.microi-micro-app.json` 的 `SourceExcludes` 排除 `runtime/.local`、`.venv`、缓存和测试产物；不能只依赖 `.gitignore`。模型权重、人像、配对码与生成视频不进入公开应用包。上游研究测试素材的使用范围与模型代码许可不同，不能将其默认作为商业主播素材。
 

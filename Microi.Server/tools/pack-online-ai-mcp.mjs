@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { copyOnlineAiMcpRuntime } from './online-ai-mcp-runtime.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const source = path.join(root, 'microi.mcp');
@@ -30,18 +31,13 @@ try {
   npm(['prune', '--omit=dev', '--ignore-scripts']);
   if (!fs.existsSync(path.join(staging, 'dist/index.js')))
     throw new Error('The packaged MCP entry point is missing');
+  const destination = verifyOnly ? path.join(staging, 'runtime') : path.join(publish, 'ai-mcp');
+  copyOnlineAiMcpRuntime(staging, destination);
   if (verifyOnly) {
-    console.log('Online AI MCP runtime reproducible build and production-dependency prune passed');
+    console.log('Online AI MCP runtime reproducible build, production prune and self-contained copy passed');
     process.exitCode = 0;
   } else {
-  const destination = path.join(publish, 'ai-mcp');
-  fs.mkdirSync(destination, { recursive: true });
-  for (const name of ['package.json', 'dist', 'node_modules']) {
-    fs.cpSync(path.join(staging, name), path.join(destination, name), { recursive: true, force: true });
-  }
-  if (!fs.existsSync(path.join(destination, 'dist/index.js')))
-    throw new Error('The packaged MCP entry point is missing');
-  console.log('Online AI MCP runtime packed into API publish output');
+    console.log('Online AI MCP runtime packed into API publish output');
   }
 } finally {
   // The generated staging path is always a direct child of the fixed workspace directory.

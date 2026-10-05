@@ -53,7 +53,8 @@
         <mci-skeleton v-if="customerLoading" type="list" :rows="3" />
         <scroll-view v-else class="customer-list" scroll-y>
           <view v-for="item in customers" :key="item.Id" class="customer-row" @tap="selectCustomer(item)"><text>{{ item.KehuMC || item.Name || item.Bianhao || '未命名客户' }}</text><text>›</text></view>
-          <view v-if="!customers.length" class="empty small"><text class="empty-title">未找到客户</text></view>
+          <view v-if="customerError" class="empty small" @tap="loadCustomers"><text class="empty-title">{{ customerError }}</text><text>点击重新加载</text></view>
+          <view v-else-if="!customers.length" class="empty small"><text class="empty-title">未找到客户</text></view>
         </scroll-view>
       </view>
     </view>
@@ -78,7 +79,7 @@ export default {
   data() {
     return {
       loading: true, tab: 'pending', tabs: [{ key: 'pending', label: '待完成' }, { key: 'all', label: '全部' }, { key: 'done', label: '已完成' }],
-      rows: [], editorVisible: false, customerVisible: false, customerLoading: false, customerKeyword: '', customers: [],
+      rows: [], editorVisible: false, customerVisible: false, customerLoading: false, customerError: '', customerKeyword: '', customers: [],
       customerSearchTimer: null, customerLoadRequestId: 0,
       form: { Id: '', CustomerId: '', CustomerName: '', date: '', time: '', Title: '', Content: '', Done: false, CreateTime: '' }
     }
@@ -122,13 +123,14 @@ export default {
     async loadCustomers() {
       const requestId = ++this.customerLoadRequestId
       this.customerLoading = true
+      this.customerError = ''
       try {
         const result = await V8.FormEngine.GetTableData('Diy_Kehu', { _Keyword: this.customerKeyword.trim(), _SelectFields: ['Id', 'KehuMC', 'Name', 'Bianhao'], _OrderBy: 'CreateTime', _OrderByType: 'DESC', _PageIndex: 1, _PageSize: 100 })
         if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '客户加载失败')
         if (requestId === this.customerLoadRequestId) this.customers = Array.isArray(result.Data) ? result.Data : []
       } catch (error) {
         if (requestId === this.customerLoadRequestId) {
-          this.customers = []
+          this.customerError = error.message || '客户加载失败'
           uni.showToast({ title: error.message || '客户加载失败', icon: 'none' })
         }
       } finally {

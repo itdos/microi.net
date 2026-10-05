@@ -20,6 +20,7 @@
     {"name":"redis:8.10.1","source":"docker.io/library/redis:8.10.1","digest":"sha256:298e5b3bc566bade82f46ad5511777a4a07a294097ce16ada2f6a42be5239df5","scopes":["panel"]},
     {"name":"mongo:8.0.30","source":"docker.io/library/mongo:8.0.30","digest":"sha256:5bbb7c9e9f240257a96db8c365dfd871448230003519339c44a7e2bbcd00a2fd","scopes":["panel"]},
     {"name":"mongo:7.0.41","source":"docker.io/library/mongo:7.0.41","digest":"sha256:66f3cb7106154d8793364d06c1f56933795ee9ca2fdf63c194ce1403228f38d7","scopes":["panel"]},
+    {"name":"mongo:3.6.23-amd64","source":"docker.io/library/mongo:3.6.23","digest":"sha256:19c11a8f1064fd2bb713ef1270f79a742a184cd57d9bb922efdd2a8eca514af8","scopes":["release-fixture"]},
     {"name":"mssql-server:2022-CU26-GDR1-ubuntu-22.04","source":"mcr.microsoft.com/mssql/server:2022-CU26-GDR1-ubuntu-22.04","digest":"sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb","scopes":["panel"]},
     {"name":"mssql-server:2019-CU32-GDR11-ubuntu-20.04","source":"mcr.microsoft.com/mssql/server:2019-CU32-GDR11-ubuntu-20.04","digest":"sha256:ef0b8db33970ecd01bed49c3a84a1d083c435a9891718df619298b67b352e74a","scopes":["panel"]},
     {"name":"mssql-server:2019-GA-ubuntu-16.04","source":"mcr.microsoft.com/mssql/server:2019-GA-ubuntu-16.04","digest":"sha256:c8fa22553ce421b0482febcafa712b29cbb933b0d97a8671686797b31cf157a9","scopes":["test"]},

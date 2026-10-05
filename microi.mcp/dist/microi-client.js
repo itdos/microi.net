@@ -20,6 +20,55 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
 1DsI9VJ7gTHGL3R7sQIDAQAB
 -----END PUBLIC KEY-----`;
+/** 只验证并冻结本连接的可选租户坐标，不从单次业务正文切换身份。 */
+export function resolveTransportTenantTuple(config) {
+    const tuple = {};
+    for (const [field, key] of [['osClient', 'OsClient'], ['osClientType', 'OsClientType'], ['osClientNetwork', 'OsClientNetwork']]) {
+        const value = config[field];
+        if (value === undefined || value === '')
+            continue;
+        if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(value))
+            throw new Error('MCP租户坐标必须是有界ASCII标识：' + key);
+        tuple[key] = value;
+    }
+    if ((tuple.OsClientType || tuple.OsClientNetwork) && !tuple.OsClient)
+        throw new Error('显式Type/Network必须绑定OsClient');
+    return Object.freeze(tuple);
+}
+export function assertTransportTenantTuple(tuple, payload) {
+    if (!payload || typeof payload !== 'object')
+        return;
+    const entries = payload instanceof URLSearchParams ? Array.from(payload.entries()) : Object.entries(payload);
+    const seen = new Set();
+    for (const [key, value] of entries) {
+        const canonical = ['OsClient', 'OsClientType', 'OsClientNetwork'].find(k => k.toLowerCase() === key.toLowerCase());
+        if (!canonical)
+            continue;
+        if (seen.has(canonical))
+            throw new Error('重复MCP租户坐标：' + canonical);
+        seen.add(canonical);
+        if (value === undefined)
+            continue;
+        if (!Object.hasOwn(tuple, canonical))
+            continue; // 未配置的旧连接不改变既有请求正文语义。
+        if (typeof value !== 'string' || value.toLowerCase() !== tuple[canonical].toLowerCase())
+            throw new Error('请求租户坐标与当前MCP连接冲突：' + canonical);
+    }
+}
+/** SSE的显式会话坐标与后端HTTP、工具上下文共用同一元组；重复头不能降级成环境默认值。 */
+export function resolveSseTenantConfig(headers, defaults) {
+    const config = {};
+    for (const [field, header] of [['osClient', 'x-microi-osclient'], ['osClientType', 'x-microi-osclienttype'], ['osClientNetwork', 'x-microi-osclientnetwork']]) {
+        const value = headers[header];
+        if (value !== undefined && typeof value !== 'string')
+            throw new Error('重复SSE租户坐标头：' + header);
+        config[field] = value === undefined ? defaults[field] : value;
+    }
+    const tuple = resolveTransportTenantTuple(config);
+    const ordinary = Object.fromEntries(['osclient', 'osclienttype', 'osclientnetwork'].filter(k => headers[k] !== undefined).map(k => [k, headers[k]]));
+    assertTransportTenantTuple(tuple, ordinary);
+    return config;
+}
 /**
  * Return token-file keys from the most specific tenant identity to legacy keys.
  * New writers use api|os|type|network even when type/network are empty, while
@@ -275,6 +324,7 @@ function modulePatchMatches(expected, actual) {
  */
 export class MicroiClient {
     config;
+    tenantTuple;
     token = '';
     refreshTimer;
     rsaPublicKey;
@@ -289,7 +339,8 @@ export class MicroiClient {
     /** 刷新签发的替代 Token 仍被拒绝时，凭据恢复阶段也必须 single-flight。 */
     inflightCredentialRecovery;
     constructor(config) {
-        this.config = config;
+        this.tenantTuple = resolveTransportTenantTuple(config);
+        this.config = { ...config };
         this.reloadWorkspaceCredentials();
         this.rsaPublicKey = config.rsaPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY;
         this.did = resolveMcpDid(process.env.MICROI_MCP_DID, os.hostname());
@@ -300,6 +351,18 @@ export class MicroiClient {
         if (config.token) {
             this.token = normalizeAuthorizationToken(config.token);
         }
+    }
+    /** Header始终来自冻结连接，所有传输分支和续签共享，不信任请求覆盖。 */
+    tenantHeaders() { return { ...this.tenantTuple }; }
+    assertTenantRequest(reqPath, ...payloads) {
+        for (const payload of payloads)
+            assertTransportTenantTuple(this.tenantTuple, payload);
+        const endpoint = new URL(reqPath, this.config.apiBaseUrl);
+        assertTransportTenantTuple(this.tenantTuple, endpoint.searchParams);
+        const pathCoordinates = new URLSearchParams();
+        for (const m of endpoint.pathname.matchAll(/--(OsClient(?:Type|Network)?)--([^/]*?)(?=--|$)/gi))
+            pathCoordinates.append(m[1], decodeURIComponent(m[2]));
+        assertTransportTenantTuple(this.tenantTuple, pathCoordinates);
     }
     /** RSA 加密（PKCS1_PADDING，兼容 Microi 前端 JSEncrypt） */
     rsaEncrypt(plainText) {
@@ -333,16 +396,15 @@ export class MicroiClient {
         const loginBody = new URLSearchParams();
         loginBody.append('Account', this.config.username);
         loginBody.append('Pwd', encryptedPwd);
-        if (this.config.osClient) {
-            loginBody.append('OsClient', this.config.osClient);
-        }
+        for (const [key, value] of Object.entries(this.tenantTuple))
+            loginBody.append(key, value);
         loginBody.append('_ClientType', 'MCP');
         const res = await fetch(`${this.config.apiBaseUrl}${API.LOGIN}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 did: this.did,
-                ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
+                ...this.tenantHeaders(),
             },
             body: loginBody.toString(),
         });
@@ -394,12 +456,12 @@ export class MicroiClient {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${this.token}`,
                         did: this.did,
-                        ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
+                        ...this.tenantHeaders(),
                     },
                     // 同时把旧 token 放在 body 里（后端 SysUserController.RefreshToken 兼容两种位置）
                     body: JSON.stringify({
                         authorization: this.token,
-                        OsClient: this.config.osClient || undefined,
+                        ...this.tenantHeaders(),
                         _ClientType: 'MCP',
                     }),
                 });
@@ -626,6 +688,7 @@ export class MicroiClient {
         return this.requestJson('GET', reqPath, undefined, params, 'initial', options);
     }
     async requestJson(method, reqPath, body, params, authRecoveryStage = 'initial', options = {}) {
+        this.assertTenantRequest(reqPath, body, params);
         let url = `${this.config.apiBaseUrl}${reqPath}`;
         if (method === 'GET' && params) {
             const qs = new URLSearchParams(params).toString();
@@ -634,8 +697,7 @@ export class MicroiClient {
         }
         const requestToken = this.token;
         const headers = { Authorization: `Bearer ${requestToken}`, did: this.did };
-        if (this.config.osClient)
-            headers.OsClient = this.config.osClient;
+        Object.assign(headers, this.tenantHeaders());
         if (method === 'POST')
             headers['Content-Type'] = 'application/json';
         const timeoutMs = resolveTimeoutMs(options.timeoutMs, this.requestTimeoutMs, options.maxTimeoutMs);
@@ -749,9 +811,11 @@ export class MicroiClient {
      */
     async requestMultipartFile(reqPath, fields, filePath, fileName, authRecoveryStage = 'initial', timeoutMs, contentEncoding, allowGzipFallback = true) {
         const requestToken = this.token;
+        this.assertTenantRequest(reqPath, fields);
+        const scopedFields = { ...fields, ...this.tenantHeaders() };
         const transportFields = contentEncoding === 'gzip'
-            ? { ...fields, ContentEncoding: 'gzip' }
-            : fields;
+            ? { ...scopedFields, ContentEncoding: 'gzip' }
+            : scopedFields;
         const boundary = `----microi-mcp-${crypto.randomBytes(24).toString('hex')}`;
         const multipart = buildMultipartFileBody(transportFields, filePath, fileName, boundary, contentEncoding);
         const controller = new AbortController();
@@ -765,7 +829,7 @@ export class MicroiClient {
                 headers: {
                     Authorization: `Bearer ${requestToken}`,
                     did: this.did,
-                    ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
+                    ...this.tenantHeaders(),
                     'Content-Type': `multipart/form-data; boundary=${boundary}`,
                     // The original-byte transport has an exact deterministic size. Some
                     // reverse proxies reset chunked multipart uploads before ASP.NET can
@@ -874,6 +938,8 @@ export class MicroiClient {
     async requestJsonNative(method, url, headers, body, timeoutMs) {
         const endpoint = new URL(url);
         const requestModule = endpoint.protocol === 'https:' ? https : http;
+        this.assertTenantRequest(url, headers, body === undefined ? undefined : JSON.parse(body));
+        const scopedHeaders = { ...headers, ...this.tenantHeaders() };
         const bodyBuffer = body === undefined ? undefined : Buffer.from(body, 'utf8');
         return new Promise((resolve, reject) => {
             let settled = false;
@@ -891,7 +957,7 @@ export class MicroiClient {
                 method,
                 timeout: timeoutMs,
                 headers: {
-                    ...headers,
+                    ...scopedHeaders,
                     ...(bodyBuffer ? { 'Content-Length': String(bodyBuffer.length) } : {}),
                 },
             }, response => {
@@ -933,7 +999,8 @@ export class MicroiClient {
     }
     async requestMultipartFileNative(reqPath, fields, filePath, fileName, timeoutMs, contentEncoding) {
         const boundary = `----microi-mcp-native-${crypto.randomBytes(24).toString('hex')}`;
-        const multipart = buildMultipartFileBody(fields, filePath, fileName, boundary, contentEncoding);
+        this.assertTenantRequest(reqPath, fields);
+        const multipart = buildMultipartFileBody({ ...fields, ...this.tenantHeaders() }, filePath, fileName, boundary, contentEncoding);
         const endpoint = new URL(`${this.config.apiBaseUrl}${reqPath}`);
         const requestModule = endpoint.protocol === 'https:' ? https : http;
         try {
@@ -955,7 +1022,7 @@ export class MicroiClient {
                     headers: {
                         Authorization: `Bearer ${this.token}`,
                         did: this.did,
-                        ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
+                        ...this.tenantHeaders(),
                         'Content-Type': `multipart/form-data; boundary=${boundary}`,
                         ...(contentEncoding === undefined
                             ? { 'Content-Length': String(multipart.contentLength) }
@@ -1016,6 +1083,7 @@ export class MicroiClient {
             throw new Error('断点分片 start/length 必须是非负 JavaScript 安全整数');
         }
         const endpoint = new URL(`${this.config.apiBaseUrl}${reqPath}`);
+        this.assertTenantRequest(reqPath, query);
         for (const [key, value] of Object.entries(query))
             endpoint.searchParams.set(key, value);
         const requestToken = this.token;
@@ -1039,7 +1107,7 @@ export class MicroiClient {
                 headers: {
                     Authorization: `Bearer ${requestToken}`,
                     did: this.did,
-                    ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
+                    ...this.tenantHeaders(),
                     'Content-Type': 'application/octet-stream',
                     'Content-Length': String(length),
                 },
@@ -2304,6 +2372,20 @@ export class MicroiClient {
             Path: path,
             Limit: limit,
         });
+    }
+    /** 专用安全路由，旧 API 的 404/未知结果绝不改走普通递归 DeleteObject。 */
+    async deleteEmptyDirectoryMarker(filePathName, limit) {
+        const result = await this.post('/api/HDFS/DeleteEmptyDirectoryMarker', {
+            OsClient: this.config.osClient,
+            FilePathName: filePathName,
+            Limit: limit,
+            EmptyDirectoryOnly: true,
+        }, { allowNativeFallback: false, operationName: 'delete exact empty directory marker' });
+        const data = result.Data;
+        if (result.Code === 1 && (data?.DeletionMode !== 'EmptyDirectoryMarkerOnly' || data.VerifiedAbsent !== true)) {
+            throw new Error('Empty marker deletion protocol was not verified; retain the original request and perform readback.');
+        }
+        return result;
     }
     async getFileCabinetOfficeMeta(filePathName, sysMenuId, limit) {
         return this.post('/api/HDFS/GetFileCabinetOfficeMeta', {

@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-frontend-events-006 sha256=7ef892121df52256c6d8c4e9da546c3f60d365f2a3cab0cb315da0b8d1fe68cd -->
+<!-- microi-progressive:chunk id=v8-frontend-events-006 sha256=b5dc7a887237bb719a26a0d56974d3fc99cb051b88223351742204eb7612b2ef -->
 ## 列表事件
 
 ### TableRowClick — 行点击
@@ -40,7 +40,7 @@ V8.RefreshTable({ _PageIndex: 1 });
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-007 sha256=3f634f1942bdd72c87a68a2a6c4883eb2bf1e95b64bc9dc895646484f9d77a9d -->
+<!-- microi-progressive:chunk id=v8-frontend-events-007 sha256=72ebf0b52fe19865043c3315ebaab9009e34db5abaf988c81965fce4fa8ae879 -->
 ## 常用前端 API
 
 | API | 说明 |
@@ -150,7 +150,7 @@ V8.OpenAppDialog({
 `V8.ConfirmTips` 当前是 callback API，且内容使用 HTML 模式渲染。只传固定文案或经过 HTML 转义的简单展示；严禁直接拼接用户输入、接口消息、数据库富文本和不可信 URL。三个以上字段、上传、表格、Tab、步骤条、代码编辑器或需要复用的页面必须使用 `V8.OpenAppDialog`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-008 sha256=eebeb0230087c0deb368baac02bd39bb4b5aa054ed19d9aa43be9447f8ef1d6d -->
+<!-- microi-progressive:chunk id=v8-frontend-events-008 sha256=6811b564f0992b3251578d40ad30ceda68c3c4d2938f413d76e276de4e1a65db -->
 ## 前端 FormEngine 菜单上下文与兼容授权
 
 前端 V8 不需要为每个历史项目手工补 `_SysMenuId`。新版 PC 表单引擎通过作用域 FormEngine facade 透明处理菜单上下文：
@@ -182,7 +182,7 @@ var products = await V8.FormEngine.GetTableData('Product', {
 前端没有 `GetTableDataCount`、`GetTableDataTree`（前端名称是 `GetTableTree`）、`AddTableData`、`UptTableData`、`DelTableData`、`AddField`。Import/Export 是独立端点与专项菜单权限，也不是 facade 方法。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-009 sha256=5e83f07a0fbcebf1eb02f3af5aa58936b3d1c3d19b0a6a0b1a0f14c66fcd6177 -->
+<!-- microi-progressive:chunk id=v8-frontend-events-009 sha256=d5f628b4cdc5b4cc116f60af04742242f5c0411784593338ea13c89e1e90afe5 -->
 ## 异步写法（async/await vs 回调）
 
 ```javascript
@@ -197,7 +197,7 @@ V8.FormEngine.GetTableData('Product', { _PageSize: 10 }, function(r) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-frontend-events-010 sha256=3ca077a857ffc9f58c7290e26c7e106c0e882897b1b9b669c66b4fe7615c3821 -->
+<!-- microi-progressive:chunk id=v8-frontend-events-010 sha256=efea9a8791d11e8d51aa2869c92583a451a5f20d93961faf763945458bca60de -->
 ## 死循环陷阱
 
 ❌ **禁止** 在 `SubmitFormV8.js` 里调用 `V8.FormSubmit()` —— 会无限递归

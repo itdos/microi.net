@@ -84,7 +84,7 @@ install_docker_apt(){
   # 不为安装面板卸载用户已有的容器运行时；如存在冲突，由管理员选择保留或迁移。
   for existing_package in docker.io docker-compose docker-compose-v2 podman-docker containerd runc; do
     if [[ $(dpkg-query -W -f='${Status}' "$existing_package" 2>/dev/null || true) == 'install ok installed' ]]; then
-      fail "检测到已有容器运行时包 $existing_package，请先按Docker文档处理兼容性；未卸载或替换它"
+      fail "检测到已有容器运行时包 ${existing_package}，请先按Docker文档处理兼容性；未卸载或替换它"
     fi
   done
   DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o DPkg::Lock::Timeout=300 update

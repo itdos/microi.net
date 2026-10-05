@@ -1,13 +1,14 @@
+import workspacePaths from './lib/workspace-paths.js'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
 import { compileTemplate, parse } from '@vue/compiler-sfc'
 
-const engineDir = new URL('../../Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/', import.meta.url)
-const readEngine = (name) => fs.readFileSync(new URL(name, engineDir), 'utf8')
-const authorize = new Function('V8', readEngine('售后流程动作授权(shouhoudd_authorize_flow_action).js'))
-const followUp = new Function('V8', readEngine('售后追加评价(shouhoudd_follow_up).js'))
-const legacyAcceptance = new Function('V8', readEngine('验收售后任务(shouhou_yanshou).js'))
+const readEngine = (key) => fs.readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), key), 'utf8')
+const authorize = new Function('V8', readEngine('shouhoudd_authorize_flow_action'))
+const followUp = new Function('V8', readEngine('shouhoudd_follow_up'))
+const legacyAcceptance = new Function('V8', readEngine('shouhou_yanshou'))
 const beforeSubmit = new Function('V8', fs.readFileSync(new URL('../../Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/表单引擎/售后订单（Diy_ShouhouDD）/表单V8事件/后端表单提交前V8事件（SubmitBeforeServerV8）.js', import.meta.url), 'utf8'))
 const permissionIds = {
   merchantPass: '56b9d9f5-667d-45d4-a4d4-17d9bf541172',

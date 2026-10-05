@@ -150,7 +150,7 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
         Assert.DoesNotContain("Integrations:WeChat:", runtimeReader, StringComparison.Ordinal);
 
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.saas-engine.json")));
         var packageFieldNames = package["DiyFields"]!
             .OfType<JObject>()
             .Where(field => string.Equals(
@@ -219,7 +219,7 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
         var atom = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Core", "V8Engine", "Runtime", "V8Method.Chanjet.cs"));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.saas-engine.json")));
         var systemSettings = Assert.Single(
             package["DataSets"]!.Children<JObject>(),
             item => string.Equals(

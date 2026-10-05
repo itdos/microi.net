@@ -15,7 +15,7 @@ const files = {
   mqttInterface: 'Microi.Server/Microi.Core/Interface/IMicroiMQTT.cs',
   tenantSecurity: 'Microi.Server/Microi.Core/SaaSEngine/TenantConfigurationSecurity.cs',
   platformRuntime: 'Microi.Server/Microi.Core/V8Engine/Runtime/V8Method.PlatformPluginRuntimes.cs',
-  platformApiEngine: 'Microi.Server/Microi.Upgrade/Resource/platform-mqtt.js'
+  platformApiEngine: 'Microi.Server/OfficialApplications/Resource/platform-mqtt.js'
 };
 
 const content = {};

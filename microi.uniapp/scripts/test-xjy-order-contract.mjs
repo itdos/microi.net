@@ -1,3 +1,5 @@
+import workspacePaths from './lib/workspace-paths.js'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
@@ -135,10 +137,7 @@ test('订单新增和编辑保存均保留用户修改后的人员快照，不�
 })
 
 test('商品接口返回新订单商品快照，新增订单可在父表保存前即时回显', () => {
-  const engineSource = fs.readFileSync(new URL(
-    '接口引擎/未分类/订单商品提交(ordergoods).js',
-    v8Root
-  ), 'utf8')
+  const engineSource = fs.readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'ordergoods'), 'utf8')
   const batches = []
   const productFilterQueries = []
   const v8 = {

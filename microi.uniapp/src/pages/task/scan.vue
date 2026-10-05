@@ -51,6 +51,7 @@
           </view>
         </view>
       </view>
+      <view v-else-if="error" class="empty-state" @tap="loadTasks"><text>{{ error }}</text><text>点击重新加载</text></view>
       <view v-else class="empty-state">
         <image :src="xjyAssets.scan" mode="aspectFit" />
         <text>{{ deviceId ? '该设备没有未完成的售后任务' : '请扫描设备二维码' }}</text>
@@ -74,8 +75,8 @@ export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/task/scan') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/task/scan') },
   mixins:[themeMixin],
-  data(){return{deviceId:'',tasks:[],loading:false,submitting:false,currentUser:{},searchTimer:null,loadRequestId:0}},
-  onLoad(options){this.currentUser=getUser()||{};this.deviceId=decodeURIComponent(options.deviceId||'')},
+  data(){return{deviceId:'',tasks:[],loading:true,error:'',submitting:false,currentUser:{},searchTimer:null,loadRequestId:0}},
+  onLoad(options){this.currentUser=getUser()||{};this.deviceId=decodeURIComponent(options.deviceId||'');this.loading=!!this.deviceId.trim()},
   // 设备处理页返回后重新读取服务状态和整单完成数，提交按钮不使用进入页面时的旧数据。
   onShow(){this.currentUser=getUser()||{};if(this.deviceId.trim())this.loadTasks()},
   onUnload(){clearTimeout(this.searchTimer)},
@@ -102,6 +103,7 @@ export default {
       const rowKeys=new Set()
       let pageIndex=1
       this.loading=true
+      this.error=''
       try{
         // 接口按页限制单次数据库读取；客户端连续取完所有页，保证历史未完成任务不会被截断。
         while(true){
@@ -124,7 +126,7 @@ export default {
         }
         if(requestId===this.loadRequestId)this.tasks=rows
       }catch(error){
-        if(requestId===this.loadRequestId){this.tasks=[];uni.showToast({title:error.message||'任务查询失败',icon:'none'})}
+        if(requestId===this.loadRequestId){this.error=error.message||'任务查询失败';uni.showToast({title:this.error,icon:'none'})}
       }finally{
         if(requestId===this.loadRequestId)this.loading=false
       }

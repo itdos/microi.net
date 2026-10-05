@@ -442,6 +442,12 @@ HTTP 热路径
 
 只读动作有 `Domains`、`Trend`、`Reports`、`ReportList`、`Sls`、`Configs`、`Config`、`Rules`、`Operations`；写入流程为 `Preview` → `Submit`，保留返回的 `Command/BeforeHash/ExpiresAt/PreviewToken` 并提供稳定 `RequestKey`，结果不明使用 `Reconcile`。后台 `mci-cdn-core`、`mci-cdn-aliyun`、`mci-cdn-worker` 禁止 HTTP 直调。业务资源由【系统日志/监控】包托管，微服务沿用统一平台应用，不新增重复商城条目。
 
+CMS 历史公有媒体撤稿使用专门的 `RefreshCmsMedia` 与 `CmsRefreshStatus`。先查 `Capabilities` 中的 `CmsMediaRefresh/CmsRefreshTaskReadback`；管理员提交时只传原 `RendId` 和原 `CmsTaskId`。服务端从当前租户的已撤回衍生、已确认源删除的撤销任务和可信 `FileServer` 计算唯一旧 URL，不接受客户端 URL、目录、查询参数、云密钥或自定义云端入口。
+
+云刷新之前，接口将稳定请求键、任务前快照、执行租约与 `CloudWriteStarted` 写入独立的 `mci_cdn_operation`。返回未知或 HTTP 超时后保留原操作 `Id`，只调用 `CmsRefreshStatus` 回读原任务；不能用新请求键再次刷新。供应商任务全部 `Complete/100%`、原 URL 严格返回 `404`，且 CMS 再次确认源对象不存在，才允许原撤销任务完成。仅源删除、隐藏图片、供应商受理或带随机参数的 URL 返回 404 都不满足此验收。CMS 私有代理媒体继续按批准引用和当前权限读取，撤回后禁止代理读取；浏览器已下载或保存的副本无法召回。
+
+阿里云刷新通常需约 5～6 分钟传播。本入口每次只刷新一个经过权威 CMS 记录校验的文件，禁止目录和正则刷新。阿里云默认文件刷新额度为每日 10,000 条，刷新 API 上限为 50 QPS，任务查询上限为 5 QPS；刷新本身不单独收费，重新回源仍可能产生对象存储请求与流量费用。具体额度和费用以云账号为准。参见[文件刷新 API](https://www.alibabacloud.com/help/en/cdn/developer-reference/api-cdn-2018-05-10-refreshobjectcaches)、[刷新任务查询](https://www.alibabacloud.com/help/en/cdn/developer-reference/api-cdn-2018-05-10-describerefreshtasks)和[刷新与预热说明](https://help.aliyun.com/zh/cdn/user-guide/refresh-and-prefetch/)。
+
 安装包不包含任何云密钥、客户规则、SLS 项目或测试封禁。高访问 IP 可能是共享出口、合法下载或升级程序重复请求；应结合 IP 与资源交叉排行确认原因，不能仅依据 TOP 名次判定攻击。
 
 连接 Microi MCP 后，先发现能力：

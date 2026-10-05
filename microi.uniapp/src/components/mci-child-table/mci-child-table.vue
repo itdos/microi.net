@@ -22,15 +22,9 @@
         <text>保存主表后可维护{{ sectionTitle }}</text>
       </view>
 
-      <view v-else-if="loading" class="child-table__loading">
-        <view v-for="item in 2" :key="item" class="child-skeleton">
-          <view class="child-skeleton__title"></view>
-          <view class="child-skeleton__line"></view>
-          <view class="child-skeleton__line short"></view>
-        </view>
-      </view>
+      <mci-skeleton v-else-if="loading && !rows.length" type="list" :rows="2" compact />
 
-      <view v-else-if="error" class="child-table__empty">
+      <view v-else-if="error && !rows.length" class="child-table__empty">
         <text class="child-table__error">{{ error }}</text>
         <text class="child-table__retry" @tap="loadRows(true)">重新加载</text>
       </view>
@@ -62,10 +56,12 @@
         </view>
       </view>
 
-      <view v-else class="child-table__empty">
+      <view v-else-if="!loading" class="child-table__empty">
         <text>暂无{{ sectionTitle }}</text>
         <text v-if="canMaintain" class="child-table__retry" @tap="addRow">添加第一条</text>
       </view>
+      <mci-skeleton v-if="loading && rows.length" type="list" :rows="1" compact />
+      <view v-else-if="error && rows.length" class="child-table__empty" @tap="loadRows(true)">{{ error }}，点击重试</view>
     </view>
   </view>
 </template>

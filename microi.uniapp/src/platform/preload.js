@@ -55,18 +55,21 @@ export async function loadMallSnapshot(options = {}) {
     const categories = categoryState.result
     const types = typeState.result
     const products = productState.result
+    // 分类成功不代表商品查询成功；首屏没有可读缓存时必须把商品失败传回页面。
+    if (!products && !(previous.products || []).length) throw productState.error
     return {
       categories: categories ? (categories.Data || []) : (previous.categories || []),
       types: types ? (types.Data || []) : (previous.types || []),
       products: products ? (products.Data || []) : (previous.products || []),
-      totalCount: products ? Number(products.DataCount || 0) : Number(previous.totalCount || 0)
+      totalCount: products ? Number(products.DataCount || 0) : Number(previous.totalCount || 0),
+      productError: productState.error?.message || ''
     }
   }, { maxAge: 10 * 60 * 1000, refresh: options.refresh === true, allowStale: true }).catch((error) => {
     const cached = readMallSnapshot()
     if (cached) return { data: cached, fromCache: true, stale: true, error }
     throw error
   })
-  return result.data
+  return { ...result.data, error: result.error?.message || '' }
 }
 
 export function readNewsSnapshot() {

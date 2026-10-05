@@ -26,7 +26,7 @@ try{
   try{
    await page.route('**/api/SysUser/Login',route=>route.continue({postData:JSON.stringify({...route.request().postDataJSON(),_AutomationTestLogin:true})}));
    await page.goto(`${required('MICROI_TEST_FRONTEND_BASE')}/?OsClient=${encodeURIComponent(tenant)}&ApiBase=${encodeURIComponent(apiBase)}`,{waitUntil:'domcontentloaded',timeout:60000});
-   await page.getByPlaceholder(/用户名|账号|帐号|username/i).first().fill(required(child?'MICROI_TEST_CHILD_ACCOUNT':'MICROI_TEST_ACCOUNT'));
+   await page.getByPlaceholder(/用户名|账号|帐号|user\s*name/i).first().fill(required(child?'MICROI_TEST_CHILD_ACCOUNT':'MICROI_TEST_ACCOUNT'));
    await page.getByPlaceholder(/密码|password/i).first().fill(required(child?'MICROI_TEST_CHILD_PASSWORD':'MICROI_TEST_PASSWORD'));
    const checkbox=page.locator('.el-checkbox').first();
    if(await checkbox.count()&&!(await checkbox.getAttribute('class')).includes('is-checked'))await checkbox.click();
@@ -35,19 +35,19 @@ try{
    const login=await (await loginPromise).json();assert.equal(login.Code,1,'Real credential login must succeed');
    // 官方启动提醒会正常遮挡后续操作；用真实按钮和回执确认，禁止 force click 或屏蔽提醒接口。
    await acknowledgeExistingReminders(page);
-   await page.locator('.task-entry[title="通知中心"]').click({timeout:60000});
+   await page.locator('.task-entry[title="通知中心"], .task-entry[title="Notification center"]').click({timeout:60000});
    const endpoint=await page.evaluate(()=>window.__MICROI_RUNTIME_ENDPOINT__);
    assert.equal(endpoint.osClient.toLowerCase(),tenant.toLowerCase());
    assert.equal(endpoint.apiBase.replace(/\/$/,''),apiBase.replace(/\/$/,''));
-   await page.getByRole('tab',{name:/平台应用/}).click();
-   const button=page.getByRole('button',{name:'安装/更新全部平台应用',exact:true});
+   await page.getByRole('tab',{name:/平台应用|Platform apps/i}).click();
+   const button=page.getByRole('button',{name:/^(安装\/更新全部平台应用|Install\/update all platform apps)$/i});
    if(!child&&tenant.toLowerCase()==='itdos'){
     assert.equal(await button.count(),0,'Official publishing tenant must not install its own packages');
     results.push({tenant,status:'Passed',scenario:'Official publishing source exclusion'});
    }else{
     await button.click();
     const submittedPromise=page.waitForResponse(r=>r.url().includes('/apiengine/platform-background-task')&&r.request().postData()?.includes('RunApiEngine'),{timeout:45000}).catch(error=>({error}));
-    await page.locator('.el-message-box').getByRole('button',{name:/确定|确认/}).click();
+    await page.locator('.el-message-box').getByRole('button',{name:/^(确定|确认|OK|Confirm)$/i}).click();
     const submitted=await submittedPromise;if(submitted.error)throw submitted.error;
     const result=await submitted.json();assert.equal(result.Code,1,result.Msg);assert.ok(result.Data?.Id);
     const request=submitted.request();

@@ -19,7 +19,7 @@ const {
     renameMobileAiConversation,
     sendMobileAiQuestion,
     setMobileAiConversationArchived
-} = await loadClientModule(new URL("../src/views/mobile/ai-assistant-api.js", import.meta.url));
+} = await loadClientModule(new URL("../src/views/mobile/ai-assistant-api.js", import.meta.url), { locale: "zh-CN" });
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const pageSource = fs.readFileSync(path.resolve(testDir, "../src/views/mobile/ai-assistant.vue"), "utf8");
@@ -153,6 +153,15 @@ test("Bootstrap failures distinguish missing installation from role authorizatio
 
     const incomplete = classifyMobileAiBootstrapFailure(new Error("表 mci_ai_data_domain 不存在"));
     assert.equal(incomplete.kind, MOBILE_AI_BOOTSTRAP_FAILURES.installIncomplete);
+});
+
+test("AI assistant uses the selected English locale while retaining safe failure classification", async () => {
+    const english = await loadClientModule(new URL("../src/views/mobile/ai-assistant-api.js", import.meta.url), { locale: "en" });
+    assert.deepEqual(english.newMobileAiConversation(), { ConversationId: "", Title: "New conversation", Messages: [] });
+    const missing = english.classifyMobileAiBootstrapFailure(new Error("sys_apiengine mci_ai_data_assistant not found"));
+    assert.equal(missing.kind, MOBILE_AI_BOOTSTRAP_FAILURES.serviceMissing);
+    assert.equal(missing.title, "This tenant has not installed AI Assistant");
+    assert.doesNotMatch(missing.description, /sys_apiengine|mci_ai_data_assistant/);
 });
 
 test("dedicated page exposes stable automation hooks and persistent capability controls", () => {

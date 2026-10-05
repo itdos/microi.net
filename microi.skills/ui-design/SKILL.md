@@ -16,7 +16,7 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 ---
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=ui-design-000 sha256=ba7fc233da47ef8d477540bc5a2b982eb0fef852cfffe9da12e5c0d03a57614d -->
+<!-- microi-progressive:chunk id=ui-design-000 sha256=cb6d5153948310d2ec489d63189cef0387e23e5023b0977a39e4981ac7ddf8f5 -->
 ## 整体风格定义
 
 - **禁止弧形包边**：Tab、卡片、导航项、提示条和分组标题不得把强调色 `border-left` / `border-right` 与容器圆角组合成沿上下圆角弯曲的侧框，也不得用渐变、阴影或伪元素模拟同样的包边。默认不加侧框；需要强调时使用与容器边框独立的直竖线，垂直居中、与上下边缘留出间距且不随容器圆角弯折。直线端点可以有轻微圆角，容器本身仍可使用中性圆角边框。横向 Tabs 继续使用独立选中表面，不添加装饰线。亮色、暗色与移动端截图都必须核对这一规则。
@@ -54,7 +54,7 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-001 sha256=9593e1ab2bf4931cf4f0d96b87ce59c04a8d340dbf30c705f90375ec38d131fd -->
+<!-- microi-progressive:chunk id=ui-design-001 sha256=1fe31e1ccbb6ede7c2f549b374f91056fa8a11c0b8f4e86e60041f68b23d434b -->
 ## 样式隔离与抗覆盖
 
 - Microi.UI 页面或局部 UI 必须使用 `.mci-page`、`data-mci-ui-root` 或项目级 `.mci-*` 根容器包裹，避免被宿主项目、第三方组件库、Markdown 渲染器的全局 CSS 意外覆盖。
@@ -67,7 +67,7 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-002 sha256=0d1bac0d19d61d288a6eb25f18fc15a045bca3df9a01399d5ce5224c8accffd3 -->
+<!-- microi-progressive:chunk id=ui-design-002 sha256=ee85cba1f72b3b7e8327aaf86b4a713e0c45792c910b18a8d3518cfdcc42b572 -->
 ## 高端视觉标准
 
 - 每个新页面必须有首屏视觉重心：核心数据、主任务、产品/品牌对象或可操作内容应在第一屏明确出现，不能只有说明文字或空白装饰。
@@ -92,7 +92,7 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-003 sha256=62b9d5696d23ded43a0a7c82d520b69ee8182269579c7171808325877144abd3 -->
+<!-- microi-progressive:chunk id=ui-design-003 sha256=e1d719d0eeab855b943a4f0de45af1c5b5d08b310e9ea6b183c229c3f5ae0e06 -->
 ## PC 后台菜单宫格 / 入口页规范
 
 适用于 `sys_menu` 子菜单入口、工作台快捷入口、后台功能入口页。此类页面是操作入口，不是营销卡片墙，重点是密度克制、对齐稳定、快速识别。
@@ -106,7 +106,7 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 - 修改后必须截图验收 1366/1440/1920 桌面宽度和 390 左右移动宽度，检查每行数量、行列对齐、卡片内边距、标题与统计间距、文字溢出和横向滚动。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-004 sha256=5d3aebaa07bf0df572b5eadfbc567fa58138a78816f0edf25fcff1a93d914ac7 -->
+<!-- microi-progressive:chunk id=ui-design-004 sha256=ea379e7873b78b532fa959b64d4a97b89af19959037c5211afec47c30d58410f -->
 ## PC 后台数据卡片模式规范
 
 适用于 `diy-table` 卡片模式、任务/应用/客户/资产列表。它是高频数据操作容器，不是营销海报或入口宫格。
@@ -122,7 +122,7 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-005 sha256=99d3734279a75fe306ebf09943b0c550433d311c1df0b9cc63137aca835b9972 -->
+<!-- microi-progressive:chunk id=ui-design-005 sha256=02cd6f4dfc86ebafc58fd770795f4ccb55fe43f1e851ef450ae49ceb0413bc1d -->
 ## 形态模式（圆角 / 扁平）
 
 Microi 项目必须支持用户或项目级形态偏好：`data-mci-shape="rounded"` 与 `data-mci-shape="flat"`。
@@ -158,7 +158,7 @@ Microi 项目必须支持用户或项目级形态偏好：`data-mci-shape="round
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-006 sha256=f8d9a7c96a2c2696f82b596bdf1a7d02bed72ff796036c05d771ca3954bf68ba -->
+<!-- microi-progressive:chunk id=ui-design-006 sha256=0a13456c54c0413d3055802d8789f924eb0d2f5918de2763d1e1fc0b5f60f634 -->
 ## 圆角
 
 ```css

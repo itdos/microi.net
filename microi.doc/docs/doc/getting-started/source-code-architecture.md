@@ -70,7 +70,7 @@ platform-service-release.json 指定的独立 Git 源码根
   → Microi.Client/src/views/micro-app/ 宿主、Resolve 与兼容入口回退
 ```
 
-正式构建和跨工程测试必须读取 `Microi.Server/Microi.Upgrade/Resource/platform-service-release.json`，不得硬编码 `AI-Project` 或某个 `Microi-V8-Engine` 镜像路径。`embed-platform-service-bundle.mjs --verify-only` 会同时核对源码版本、源码清单哈希、`dist` 逐文件哈希、路由以及两个内置包；官网资源正式发布还要求源码根来自无未提交修改的 Git 提交，任一处漂移即阻止发布。
+正式构建和跨工程测试必须读取 `Microi.Server/OfficialApplications/Resource/platform-service-release.json`，不得硬编码 `AI-Project` 或某个 `Microi-V8-Engine` 镜像路径。`embed-platform-service-bundle.mjs --verify-only` 会同时核对源码版本、源码清单哈希、`dist` 逐文件哈希、路由以及两个内置包；官网资源正式发布还要求源码根来自无未提交修改的 Git 提交，任一处漂移即阻止发布。
 
 数据库内联产物是平台启动和恢复权威，受 256 文件、5MB、无可编辑源码的严格边界约束。HDFS/CDN 可以保存正式源码或作为运行资产镜像，但只有回读哈希与同一 `RuntimeManifestHash` 完全一致后才可启用；HDFS 不可用或镜像不一致时继续使用数据库产物，不能反向覆盖它。`Microi.Client` 只保留通用宿主、错误诊断和通知中心恢复入口，不保留第二份平台业务实现。
 

@@ -25,6 +25,11 @@ export interface MicroiConfig {
     /** 写请求响应不确定时，单次远端回读超时，默认 5 秒 */
     readbackRequestTimeoutMs?: number;
 }
+/** 只验证并冻结本连接的可选租户坐标，不从单次业务正文切换身份。 */
+export declare function resolveTransportTenantTuple(config: Pick<MicroiConfig, 'osClient' | 'osClientType' | 'osClientNetwork'>): Readonly<Record<string, string>>;
+export declare function assertTransportTenantTuple(tuple: Readonly<Record<string, string>>, payload: unknown): void;
+/** SSE的显式会话坐标与后端HTTP、工具上下文共用同一元组；重复头不能降级成环境默认值。 */
+export declare function resolveSseTenantConfig(headers: Record<string, string | string[] | undefined>, defaults: MicroiConfig): Pick<MicroiConfig, 'osClient' | 'osClientType' | 'osClientNetwork'>;
 /**
  * Return token-file keys from the most specific tenant identity to legacy keys.
  * New writers use api|os|type|network even when type/network are empty, while
@@ -482,6 +487,7 @@ export interface PlaywrightContextData {
  */
 export declare class MicroiClient {
     private config;
+    private readonly tenantTuple;
     private token;
     private refreshTimer?;
     private rsaPublicKey;
@@ -496,6 +502,9 @@ export declare class MicroiClient {
     /** 刷新签发的替代 Token 仍被拒绝时，凭据恢复阶段也必须 single-flight。 */
     private inflightCredentialRecovery?;
     constructor(config: MicroiConfig);
+    /** Header始终来自冻结连接，所有传输分支和续签共享，不信任请求覆盖。 */
+    private tenantHeaders;
+    private assertTenantRequest;
     /** RSA 加密（PKCS1_PADDING，兼容 Microi 前端 JSEncrypt） */
     private rsaEncrypt;
     /** 外部更新 token（由 VS Code 扩展 token 文件同步） */
@@ -759,6 +768,8 @@ export declare class MicroiClient {
     setEngineRoles(data: Record<string, unknown>): Promise<ApiResponse>;
     generateMiniMaxMusic(data: Record<string, unknown>): Promise<ApiResponse>;
     listFileCabinetObjects(path: string, limit: boolean): Promise<ApiResponse>;
+    /** 专用安全路由，旧 API 的 404/未知结果绝不改走普通递归 DeleteObject。 */
+    deleteEmptyDirectoryMarker(filePathName: string, limit: boolean): Promise<ApiResponse>;
     getFileCabinetOfficeMeta(filePathName: string, sysMenuId: string, limit: boolean): Promise<ApiResponse>;
     /**
      * 图片生成只负责以稳定 RequestId 创建持久任务。Code=2 表示已排队，

@@ -8,15 +8,16 @@
         <p class="microi-code-lead">代码、吾码账号、AI 中转站、MCP 与 30+ 成熟引擎，在一个桌面工作台协同。</p>
         <div class="microi-code-actions">
           <div class="microi-code-platform-download">
-            <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows <small v-if="liveVersions.windows">v{{ liveVersions.windows }}</small></a>
+            <a class="is-primary" :href="downloadUrls.windows" target="_blank" rel="noopener"><DownloadIcon />下载 Windows 完整版 <small v-if="liveVersions.windows">v{{ liveVersions.windows }}</small></a>
             <a class="microi-code-store-link" href="https://apps.microsoft.com/detail/9NKCS76ZMFXR" target="_blank" rel="noopener noreferrer">Microsoft Store <small>已发布</small><span aria-hidden="true">↗</span></a>
           </div>
           <div class="microi-code-platform-download">
             <a :href="downloadUrls.mac" target="_blank" rel="noopener"><DownloadIcon />下载 macOS <small v-if="liveVersions.mac">v{{ liveVersions.mac }}</small></a>
-            <a class="microi-code-store-link" href="https://apps.apple.com/app/id6818076490" target="_blank" rel="noopener noreferrer">Mac App Store <small>等待审核</small><span aria-hidden="true">↗</span></a>
+            <a class="microi-code-store-link" href="https://apps.apple.com/app/id6818076490" target="_blank" rel="noopener noreferrer">Mac App Store <small>尚未开放下载</small><span aria-hidden="true">↗</span></a>
           </div>
         </div>
-        <p class="microi-code-store-note">Windows 商店产品页已公开，请在 Windows 设备查看获取；Mac 商店仍等待审核。官网安装包继续可用。</p>
+        <p class="microi-code-store-install"><a href="https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge" target="_blank" rel="noopener noreferrer">微软签名 EXE 在线安装器 <span aria-hidden="true">↗</span></a><span>商店版 1.3.3 · Windows 10 2004+ / 11 · x64 · 需联网</span></p>
+        <p class="microi-code-store-note">官网 Windows 完整版 1.3.4 EXE 未签名；在线安装器安装微软签名商店版。macOS 1.3.4 DMG 已签名、公证，Mac 商店尚未开放下载。</p>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
@@ -83,7 +84,7 @@ const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
 
 // 更新清单由 iTdos 接口引擎发布；版本发布后官网源码无需随之改动。
-const liveVersions = reactive({ windows: '1.3.2', mac: '1.3.2' })
+const liveVersions = reactive({ windows: '1.3.4', mac: '1.3.4' })
 // 下载按钮始终使用永久入口；点击时由官方清单选择当前安装包，首屏不依赖异步请求。
 const downloadUrls = reactive({
   windows: 'https://microi.net/download/microi-agent/latest.html?platform=windows',
@@ -133,6 +134,9 @@ const screenshots = [
 ]
 
 const releases = [
+  { version: '1.3.4', platform: "macOS Universal", note: "员工工作台与对话操作 · Developer ID 签名、Apple 公证与 Gatekeeper 通过 · macOS 13.5+", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-mac-universal.dmg", sha256: "d54a27349627fd9015319d4239ddd120bb9a3d1b3960676be02bec2402d5c5c6" },
+  { version: '1.3.4', platform: "macOS Universal ZIP", note: "员工工作台与对话操作 · Developer ID 签名、Apple 公证与 Gatekeeper 通过 · macOS 13.5+", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-mac-universal.zip", sha256: "967739c2e8f72e81f6dfe6478c9a7f8dfff8dfa857e25caf22c0312ac4048f74" },
+  { version: '1.3.4', platform: "Windows x64", note: "员工工作台与对话操作 · 未签名公开测试 · 客户原生安装待验收", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-windows-x64-setup.exe", sha256: "f220d69e9f4cebc3f05c7e79a031a9cabbd71fce0ccad33d54c775dbadf3b7b3" },
   { version: '1.3.2', platform: 'Windows x64', note: '公开测试 · 安装程序 · 147.8 MiB · 私有管道启动恢复 · 未签名 · 客户电脑安装启动待验证', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.3/requests/f111516a6830ae292ea8e9211a7f2ea764215983872309e25da56d054f9c3296/assets/Microi-Agent-1.3.2-windows-x64-setup.exe', sha256: 'e83b901c911d78e2e03d1feb018e51709f76ca20650ef7fd10cdcac7b8b4cf47' },
   { version: '1.3.2', platform: 'macOS Universal', note: 'Intel / Apple Silicon · DMG · 363.1 MiB · Developer ID 签名、Apple 公证与 Gatekeeper 校验通过 · macOS 13.5+', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.dmg', sha256: '2bb4ba682de125cfefae90251527ff48b97d8ce504f0f1f4110998e661f9d675' },
   { version: '1.3.2', platform: 'macOS Universal ZIP', note: '自动更新包 · 405.3 MiB · 已签名、公证的 Universal App · macOS 13.5+', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.zip', sha256: '7726972144f5b118faaf81fe1b023da174b67c92b789a131e2bc1aeb31ffef62' },
@@ -245,6 +249,9 @@ const visibleReleases = computed(() => releases.slice((historyPage.value - 1) * 
 .microi-code-actions a.microi-code-store-link { min-height: 36px; gap: 6px; padding: 0 9px; border: 0; background: transparent; font-size: 12px; color: var(--vp-c-brand-1); }
 .microi-code-store-link small { padding: 2px 6px; border-radius: 5px; background: var(--vp-c-bg-soft); color: var(--vp-c-text-2); font-weight: 400; }
 .microi-code-store-note { margin: 10px 0 0; color: var(--vp-c-text-2); font-size: 12px; line-height: 1.7; }
+.microi-code-store-install { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 12px 0 0; font-size: 12px; line-height: 1.7; }
+.microi-code-store-install a { color: var(--vp-c-brand-1); font-weight: 600; }
+.microi-code-store-install > span { color: var(--vp-c-text-2); }
 @media (max-width: 640px) { .microi-code-platform-download { width: 100%; } }
 .microi-code-facts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 0; margin-top: 30px; }
 .microi-code-facts li { min-width: 0; padding: 0 14px; border-left: 1px solid var(--vp-c-divider); }

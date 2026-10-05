@@ -3,6 +3,7 @@ import {execFileSync} from 'node:child_process';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {snapshotReleaseComposition} from './release-composition.mjs';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Agent','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
@@ -20,7 +21,10 @@ const independentMobileSource=name=>/^microi\.uniapp\//i.test(name)
 const independentDesktopSource=name=>/^Microi\.Agent\/(?:apps\/microi-code|upstream\/dsh-desktop)\//i.test(name);
 // 官方中文/英文正文与发布日志由单独的官网模式 6 验证；它们不是 PC/API Full
 // 或 Docker 的输入。官网主题代码、构建脚本、测试、依赖和平台 Skills 仍进入候选。
-const documentationOnly=name=>/^microi\.doc\/docs\/(?:doc|en)\/.*\.(?:md|mdx)$/i.test(name);
+const documentationOnly=name=>/^microi\.doc\/docs\/(?:doc|en)\/.*\.(?:md|mdx)$/i.test(name)
+ // 定时商店巡检只追加内部交接日志；不进入 PC/API、VSIX 或 CLI 运行制品。
+ // 仅此精确日志路径豁免；Skills、MCP、测试、发布脚本与运行知识仍受门禁保护。
+ ||name==='Microi.Agent/维护交接与更新记录.md';
 
 // 插件打包重复生成这两份已跟踪元数据。仅顶层 builtAt 是非行为时间；
 // 版本、依赖、文件数量与源码摘要仍全部进入候选，未知字段和其它文件不得排除。
@@ -36,7 +40,7 @@ function candidateBytes(key,bytes){
  return JSON.stringify(metadata);
 }
 
-export async function snapshotCandidate(root=workspace,repos=repositories){
+export async function snapshotCandidate(root=workspace,repos=repositories,options={}){
  const files={};
  for(const repository of repos){
   const cwd=path.resolve(root,repository);
@@ -49,11 +53,20 @@ export async function snapshotCandidate(root=workspace,repos=repositories){
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }
  }
- return {scope:'pc-api-docker-with-mobile-sdk-contracts',files};
+ const privateInputs=await snapshotReleaseComposition(root,options);
+ if(privateInputs){
+  for(const [key,value]of Object.entries(privateInputs.files)){
+   if(Object.hasOwn(files,key)&&files[key]!==value)throw Error(`Private composition source collision: ${key}`);
+   files[key]=value;
+  }
+ }
+ return {scope:'pc-api-docker-with-mobile-sdk-contracts',files,...(privateInputs?{composition:privateInputs.composition}:{})};
 }
 
 export function changedCandidate(before,after){
- return [...new Set([...Object.keys(before.files),...Object.keys(after.files)])].filter(name=>before.files[name]!==after.files[name]).sort();
+ const changed=[...new Set([...Object.keys(before.files),...Object.keys(after.files)])].filter(name=>before.files[name]!==after.files[name]);
+ if(JSON.stringify(before.composition??null)!==JSON.stringify(after.composition??null))changed.push('<private-build-composition>');
+ return changed.sort();
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

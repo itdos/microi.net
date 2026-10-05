@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-table-event-011 sha256=80a4d5538406b23ac45b463def94ef977e365b4dffdefdcbb1d31af0cac71830 -->
+<!-- microi-progressive:chunk id=v8-table-event-011 sha256=80a852d31b69084c28828f124a83a2240d82309642619bc72debe3e7c271b3db -->
 ## 前端事件名（V8.EventName 可能的值）
 
 | 值 | 说明 |
@@ -25,7 +25,7 @@
 | `WFNodeEnd` | 流程节点结束 V8 事件 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-012 sha256=eb7de1dc530ad35ea2b8d9538ef9e6e687bf93f58cf8d278e5db9034085c3abf -->
+<!-- microi-progressive:chunk id=v8-table-event-012 sha256=405c8a081022ffa2cc977bc80a591a7315ba208e5b49e176c7708a8037a35cf6 -->
 ## 注意事项
 
 - 前端事件可使用 `window` 对象和 `async/await`，后端事件不可以

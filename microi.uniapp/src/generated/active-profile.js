@@ -14,7 +14,7 @@ export default {
   "platformName": "集福鲤平台",
   "servicePlatformName": "集福鲤服务平台",
   "poweredBy": "集福鲤",
-  "versionName": "2.0.1",
+  "versionName": "2.0.2",
   "releaseNotes": [
     "修复客户、订单、跟进记录等列表请求 404",
     "模块列表请求切换至新版接口引擎"
