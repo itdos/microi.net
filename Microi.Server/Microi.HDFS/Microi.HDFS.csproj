@@ -43,7 +43,7 @@
   <ItemGroup>
     <PackageReference Include="Minio" Version="7.0.0" />
     <PackageReference Include="Aliyun.OSS.SDK.NetCore" Version="2.14.1" />
-    <PackageReference Include="AWSSDK.Core" Version="4.0.100.8" />
+    <PackageReference Include="AWSSDK.Core" Version="4.0.102.8" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />

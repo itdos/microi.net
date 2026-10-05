@@ -58,6 +58,8 @@
     <PackageReference Include="Oracle.ManagedDataAccess.Oci" Version="23.26.300" />
     <PackageReference Include="Oracle.ManagedDataAccess.ConfigFile" Version="23.26.300" />
     <PackageReference Include="Oracle.ManagedDataAccess.Aws" Version="23.26.300" />
+    <!-- The Oracle AWS extension references SQS although its NuGet manifest omits that dependency. -->
+    <PackageReference Include="AWSSDK.SQS" Version="4.0.100.15" />
     <PackageReference Include="Oracle.ManagedDataAccess.Gcp" Version="23.26.300" />
     <!-- Npgsql 10.x only targets net8.0+; 8.0.9 is the latest line compatible with this netstandard2.1 library. -->
     <PackageReference Include="Npgsql" Version="8.0.9" />

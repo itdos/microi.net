@@ -29,13 +29,18 @@ public sealed class ProviderDependencyDeliveryTests
             .Where(name => name.Name?.StartsWith("Oracle.ManagedDataAccess.", StringComparison.Ordinal) == true)
             .ToArray();
         Assert.NotEmpty(extensions);
-        foreach (var reference in extensions)
+        var pending = new Queue<AssemblyName>(extensions);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        while (pending.TryDequeue(out var reference))
         {
+            if (!seen.Add(reference.FullName)) continue;
+            Assert.True(seen.Count <= 512, "Provider dependency closure exceeded its assembly budget.");
             var loaded = Assembly.Load(reference);
             Assert.Equal(reference.Name, loaded.GetName().Name);
             Assert.True(loaded.GetName().Version >= reference.Version);
             Assert.False(string.IsNullOrEmpty(loaded.Location));
             Assert.True(File.Exists(loaded.Location));
+            foreach (var dependency in loaded.GetReferencedAssemblies()) pending.Enqueue(dependency);
         }
     }
 }
