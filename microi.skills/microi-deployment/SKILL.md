@@ -47,11 +47,15 @@ macOS 前端构建使用有界 `vm_stat` 探针，根据真实页大小读取空
 
 DLL 加密脚本只在 Git Bash、MSYS 或 Cygwin 中转换 Windows 路径，优先使用 `cygpath`；macOS/Linux 必须保留原生绝对路径，不能把 `/Users` 或 `/usr` 误认为盘符。修复时先对隔离的构建副本执行原加密器，核对五个目标 DLL 的实际哈希变化及加密指纹，再由一键脚本重新执行 Full、加密和最终产物冒烟；不得以专项测试替代发布门禁。
 
+加密脚本被 `source` 引入时只提供函数，不执行发行入口。SQLite 回归使用真实解释器及隔离标准库，Windows 选择 `python`，其它宿主使用 `python3`；不能用假解释器或跳过 SQL 断言。字节契约下的包投影和内联源码按 Git 的 LF 规则检出，不能忽略原始字节差异来通过测试。
+
 只要检测到闭源项目源码，就必须具备完整的五项目加密链；源码不完整、加密脚本缺失都要硬失败，不能降级为 `HAS_ENCRYPT=false` 的开源模式。一键脚本由 `release-encryption.mjs` 保存五个实际 DLL 的加密前后 SHA-256，并要求每个 DLL 字节改变且匹配原加密器指纹。上传 NuGet 前检查真实 ZIP 中所有闭源 DLL；上传后端 Docker 前从不启动、不联网的临时容器读取实际镜像内五个 DLL，与加密回执逐字节哈希核对。缺回执、明文重编译覆盖、包或镜像中的旧 DLL 均阻止上传；最终渠道仍需独立回读，不以本地检查代替已发布证据。
 
 在线 AI 的 MCP 运行目录必须由已锁定依赖干净安装、编译和裁剪后完整复制。生产命令的符号链接应解析为真实文件并保留执行权限，不能依赖即将清理的临时目录；损坏、越界或循环链接在替换旧运行目录前失败，重新打包清除旧依赖残留。保留制品门禁对符号链接的拒绝规则，专项验证使用同一复制逻辑并核对清理临时目录后命令仍可运行；修复打包逻辑后重新 Full。
 
 私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，实际镜像和部署仍需独立回读。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
+
+组合环境只属于发行工具所在工作区；临时测试仓库和其它源码根显式传递自己的环境。不得把主发行环境传入隔离夹具，也不得吞掉显式错误组合；实际 CLI 继续严格验证全部四项属性。
 
 原生依赖审批在目标 Linux CLR 中验证完整程序集引用链及实际字节哈希。驱动扩展也属于交付依赖：Oracle Core 23.26.300 同时交付同版本 Azure、Kerberos、OCI、ConfigFile、AWS、GCP 六个官方扩展及传递依赖，以 `ProviderDependencyDeliveryTests` 验证真实装载，不连接云服务。缺文件、身份冲突和哈希变化继续失败关闭；先复现并修复包装，再重新 Full 和镜像回读，禁止跳过未执行的依赖或开放 V8/MCP 任意装载。
 
