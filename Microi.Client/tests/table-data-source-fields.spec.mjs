@@ -55,7 +55,7 @@ test("loads asynchronous field data only after the table field list is reactive"
     const source = fs.readFileSync(
         path.join(clientRoot, "src/views/form-engine/mixins/diy-table-schema.mixin.js"),
         "utf8"
-    );
+    ).replace(/\r\n/g, "\n");
     const assignmentIndex = source.indexOf("self.DiyFieldList = result.Data;");
     const dataSourceIndex = source.indexOf(
         "var dataSourceFields = selectTableDataSourceFields(\n                self.DiyFieldList",
