@@ -69,9 +69,12 @@ export function buildBootstrapPackage() {
   engines.set('import-microi-store-package', importer);
   // 从完整官方包投影，沿用原接口的资源策略和正文；不制造第二份可编辑业务源码。
   const pkg = {
-    PackageInfo: {Name:'启动与应用商城恢复基础', AppId:'app.microi.bootstrap', Version:'v1.0.0',
+    PackageInfo: {Name:'启动与应用商城恢复基础', AppId:'app.microi.bootstrap', Version:'v1.0.1',
       ApplicationType:'Platform', IncludeSource:false, RequiredPlatformCapabilities:[]},
-    DDLStatements:[...ddl.values()], PhysicalColumns:[...columns.values()],
+    // 空库必须先创建表，再创建独立索引；Map 的收集顺序不代表 DDL 依赖顺序。
+    DDLStatements:[...ddl.entries()].filter(([key]) => key.endsWith('/table')).map(([, row]) => row)
+      .concat([...ddl.entries()].filter(([key]) => !key.endsWith('/table')).map(([, row]) => row)),
+    PhysicalColumns:[...columns.values()],
     DiyTables:[...tables.values()], DiyFields:[...fields.values()],
     SysMenus:store.SysMenus.filter(menu => menu.ModuleEngineKey === 'sys_microistore' || menu.ModuleEngineKey === 'sys_microistore_changelog'),
     SysApiEngines:bootstrapEngines.map(key => engines.get(key)),

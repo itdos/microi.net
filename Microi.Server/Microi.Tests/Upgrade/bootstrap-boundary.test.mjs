@@ -68,3 +68,20 @@ test('恢复元数据、物理列和建表声明保持闭合', () => {
     for (const [,name] of ddl.DDL.matchAll(/(?:^|[,\n(])\s*`([A-Za-z_][A-Za-z0-9_]*)`\s+[A-Za-z]/g)) assert.ok(columns.has(name.toLowerCase()), `${ddl.TableName}.${name}`);
   }
 });
+
+test('空旧库先创建声明表，再执行其索引，包括首个 DDL 分片', async () => {
+  const {buildBootstrapPackage} = await import('../../OfficialApplications/Resource/build-bootstrap-package.mjs');
+  const pkg = buildBootstrapPackage();
+  const created = new Set();
+  let indexes = 0;
+  for (const statement of pkg.DDLStatements) {
+    const table = statement.TableName.toLowerCase();
+    if (/^\s*CREATE\s+TABLE\b/i.test(statement.DDL)) created.add(table);
+    else if (/^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\b/i.test(statement.DDL)) {
+      assert.ok(created.has(table), `空库尚未创建索引依赖表：${table}`);
+      indexes++;
+    }
+  }
+  assert.ok(created.has('mic_data_version'));
+  assert.ok(indexes > 0);
+});
