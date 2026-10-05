@@ -155,7 +155,7 @@ test("SysConfig fallback is narrow and retries only missing-engine or unsupporte
         "/api/FormEngine/GetSysConfig"
     ]);
     assert.ok(calls.every(item => item.skipAuthorization === true));
-    assert.ok(calls.every(item => item.timeout === 15000));
+    assert.ok(calls.every(item => Number.isFinite(item.timeout) && item.timeout > 15000 && item.timeout <= 60000));
 
     let timeoutCalls = 0;
     await assert.rejects(

@@ -298,6 +298,27 @@ AND {RuntimeScopePredicate}")
                 .ExecuteNonQuery() == 1;
         }
 
+        internal static bool ResumeSaasPublicTrial(BackgroundTaskRecord task)
+        {
+            if (!SaasPromotionSecurity.CanResumePublicTrialTask(task)) return false;
+            var client = GetRequiredClient(task.OsClient);
+            // 保留原 GrantCipher、幂等键和加密数据库检查点。CAS 后仍由 Worker 领取新栅栏，禁止重建已有库。
+            return FromSql(client, $@"UPDATE {TableName} SET Status='Pending',StatusText='恢复开通',
+Msg='正在恢复原开通申请',EndTime=NULL,NextRunTime=@now,LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@now
+WHERE Id=@id AND OsClient=@tenant AND UserKey=@user AND ApiEngineKey=@worker
+AND BusinessTable='mci_saas_referral_link' AND BusinessId=@link AND Status='Failed'
+AND CancelRequested=0 AND FencingToken=@fence AND AttemptCount=@attempt AND AttemptCount<MaxAttempts
+AND ExecutionCount=@executions AND ExecutionCount<MaxAttempts
+AND (IsDeleted=0 OR IsDeleted IS NULL) AND {RuntimeScopePredicate}")
+                .AddInParameter("now", DbTime(DateTime.Now.AddSeconds(1)))
+                .AddInParameter("id", task.Id).AddInParameter("tenant", task.OsClient).AddInParameter("user", task.UserKey)
+                .AddInParameter("worker", SaasPromotionSecurity.WorkerEngine).AddInParameter("link", task.BusinessId)
+                .AddInParameter("fence", task.FencingToken).AddInParameter("attempt", task.AttemptCount)
+                .AddInParameter("executions", task.ExecutionCount)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType()).AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
+                .ExecuteNonQuery() == 1;
+        }
+
         public static int ClearSucceeded(string osClient, string userKey)
         {
             var client = GetRequiredClient(osClient);
@@ -1108,6 +1129,17 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
             return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ordinal)
                 ? Math.Max(0, ordinal)
                 : 0;
+        }
+
+        /// <summary>仅当前租约持有者可保存可信开通检查点；秘密须由调用方先加密。</summary>
+        internal static bool SaveProvisioningCheckpoint(BackgroundTaskRecord item, JObject checkpoint)
+        {
+            if (item?.ApiEngineKey != SaasPromotionSecurity.WorkerEngine) return false;
+            var json = checkpoint.ToString(Newtonsoft.Json.Formatting.None);
+            if (!OwnedUpdate(item, "CheckpointJson=@checkpoint,UpdateTime=@now", command => command
+                    .AddSensitiveInParameter("checkpoint", json).AddInParameter("now", DateTime.UtcNow))) return false;
+            item.CheckpointJson = json;
+            return true;
         }
 
         private static bool OwnedUpdate(

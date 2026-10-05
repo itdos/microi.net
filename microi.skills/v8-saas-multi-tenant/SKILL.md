@@ -57,6 +57,37 @@ V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
 
 ## 平台级配置与主租户规则
 
+### 推广中心与匿名空库开通
+
+- 主租户现有 `V8.FormEngine` 允许显式指定子租户；子租户被 `V8TenantContext.EnforceOsClient`
+  强制限制到自身。主租户业务员的业务范围须由接口引擎再次授权，不能仅凭主租户上下文放行全部租户。
+- SaaS 官方应用唯一拥有三个 Managed Key：`platform-saas-promotion`、`platform-saas-public-trial`、
+  `platform-saas-public-trial-worker`。内置微服务的 `/saas-promotion` 归系统引擎，公开 `/saas-trial`
+  仅固定主租户、固定应用可匿名解析，禁止用 src/appKey/routePath 查询参数扩大匿名宿主范围。
+- `V8.Method.AuthorizeSaasPromotion()` 仅绑定推广接口，重新读取有效账号、角色、菜单与管理角色。
+  默认业务员范围为 `ReferralUserId=当前sys_user.Id`；管理角色可读全局，平台管理员才可配置。
+  `V8.Method.ReadSaasTenantUsage({TenantIds,Refresh})` 只绑定同一接口，最多20个已授权子租户，无任意SQL或连接参数。
+- 统计使用目标库主库固定聚合，缓存60秒、刷新至少15秒、并行最多4库。缺失或失败显示未知，
+  近7/30天登录用户与日期分布来自 `LastLoginTime`，不能声称获得历史登录次数。旧租户归属和期限为空
+  时保持未分配/未登记；试用结束不代替许可证，也不自动停库。
+- `V8.Method.CreateSaasReferralCapability(linkId)` 只为授权推荐人或管理者签发绑定主租户与分区的链接票据。
+- `V8.Method.ResumeSaasPublicTrialTask(taskId)` 仅供同一推广接口的原推荐人或授权管理者恢复失败申请。
+  保留原幂等键和加密数据库检查点，最多执行三次；不得重新分配已有数据库账号密码。
+  公开空库使用主租户提供的启动地址，`DomainName` 保持未绑定，不能把含下划线的租户标识拼成独立域名。
+- 公开接口通过 `V8.Method.SaasPublicTrialAtom` 校验主配置、签名链接、推荐人、验证码和额度，冻结单向密码哈希
+  与受认证加密的限开通票据。Worker 设置 `StopHttp=1`，`V8.Method.ProvisionPublicSaasTrial` 验证固定Key、
+  持久任务身份与 fencing token，不接受伪造管理员。相同UUID和相同输入复用任务，不同输入拒绝。
+  DDL 前持久化加密账号检查点；强杀后恢复同一任务，已有账号必须使用检查点原凭据通过验证，禁止覆盖密码。
+  进度只用独立短期票据和安全结果投影，不能暴露连接、密码、任务正文或票据密钥。
+- 公开开关与额度字段 `SaasPublicTrial*`、管理角色 `SaasPromotionManagerRoleIds` 仅当前主租户分区有效；
+  推荐Id、请求Id、完成检查点、试用期限、联系与跟进字段不得从主租户复制给子租户。
+- `platform-saas-promotion-hook` 为 CreateIfMissing，仅 `BeforeCreateLink/Assign/UpdateFollowup` 脱敏事件。
+  不直接修改 Managed 接口保存个性化代码。更新 SaaS 应用和基础空库包两条链，并验证真实业务员、
+  管理员、匿名开库、同UUID重复提交、暂停后恢复及子租户越权，不以离线测试代替。
+- 复用标准 MCP `microi_get_db_schema`、`microi_add_field`、`microi_create_table_index`、`microi_create_engine`、
+  `microi_save_engine_code`、`microi_create_module`、`microi_run_engine` 及应用源码/流式发布工具；
+  先完整回读、计划和dryRun，再按已授权范围写入。已有推广Hook采用CreateIfMissing，不覆盖。
+
 制作空数据库时，角色、账号绑定和权限快照必须作为同一初始模板处理。只保留明确声明的初始角色，按权威角色重建保留账号的 `RoleIds` 与等级；删除业务角色及孤立菜单权限，清空包含源业务菜单的角色权限快照。初始角色缺失、删除或等级不符时停止制作，不得根据账号现有角色列表、角色名称或高等级推测哪些角色应保留。
 
 组织数据属于同一空库模板边界：只保留明确声明的初始组织和部门，将保留账号的部门绑定与名称同步归一，并清理旧版账号关系表。保护这些平台表的物理结构，初始组织缺失或已删除时停止制作；验收必须在新租户查看真实组织树，不能只检查角色数量。清理只能作用于制作过程的隔离副本。
