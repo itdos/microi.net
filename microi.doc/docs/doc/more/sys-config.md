@@ -114,6 +114,8 @@ AI 接入畅捷通等第三方服务时，应先使用 `microi_manage_server_pri
 
 运行时只读取 `IsEnable=1` 且未删除的系统配置；历史停用或软删除记录不会覆盖登录开关。若存在多条有效配置，按修改时间从新到旧、Id 从小到大读取第一条。开启第三方登录后还需要在“安全与服务接入”保存并启用对应 ClientId/AppID 和 Secret，用户须先绑定第三方身份。
 
+外部登录回调优先使用当前有效 `sys_config.ApiBase` 的公网 HTTPS 地址，保留其中的路径前缀，再追加 `/api/ExternalLogin/Callback?OsClient=<租户>&Provider=<供应商>`。反向代理在外部终止 TLS、后端接收 HTTP 时，仍使用该 HTTPS 地址；供应商控制台登记的回调须与它一致。`ApiBase` 不得包含账号密码、查询参数或片段。未配置 `ApiBase` 的旧租户可回退直接 HTTPS 或本机 HTTP 请求地址，其它无效地址会拒绝发起授权。此行为需更新后端，应用包中的配置字段无需新增。
+
 旧数据库启用 Passkey / Authenticator 时，需要同时更新平台前端、后端与官方“系统设置”“SaaS引擎”应用包；仅安装应用包不会替换正在运行的后端 DLL 或已部署的前端静态资源。完成更新后在 `sys_config` 打开公开能力与登录入口开关，存量用户仍须在个人中心分别登记自己的 Passkey 或 TOTP，系统不会替用户自动生成认证因子。Passkey 还要求可信 HTTPS 前端 Origin（`localhost` 仅限开发），HTTP 站点即使开关已打开也不能完成 WebAuthn 登记或登录。
 
 ## 开发配置与服务接入
