@@ -13,6 +13,8 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 
 访问密钥由 `microi_list_my_access_keys`、`microi_create_my_access_key`、`microi_revoke_my_access_key` 管理，只允许当前用户、限期、最小 scope，明文仅创建时返回一次。外部身份回调固定为 `/api/ExternalLogin/Callback`，服务端校验租户、Provider、state、redirect 和回调域名，验证成功后仍签发 DiyToken。
 
+外部登录回调优先按当前有效 `sys_config.ApiBase` 的公网 HTTPS 地址与路径前缀生成，不能从前端参数或未受信 `X-Forwarded-*` Header 获取。反向代理终止 TLS 时，容器的 HTTP Scheme 不能代替该地址；供应商控制台登记值须与真实 Begin 返回的 `CallbackUrl` 一致。配置不允许账号密码、查询参数或片段；未配置时仅兼容直接 HTTPS 或本机 HTTP，无效配置失败关闭。协议验收必须覆盖外部 HTTPS、内部 HTTP 与公网路径前缀，不能只测试本机请求。
+
 微信网站扫码登录先读取当前租户能力、`WeChatLoginEnabled` 和私密设置元信息，
 再核对开放平台已审核网站应用的微信登录权限与授权回调域名。
 `Login.WeChat.ClientId` 保存 AppID，`Login.WeChat.ClientSecret` 通过专用密钥工具保存，
