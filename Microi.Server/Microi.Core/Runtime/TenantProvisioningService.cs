@@ -20,6 +20,9 @@ namespace Microi.net
 {
     public sealed class AdminTenantProvisioningRequest
     {
+        // 推荐归属只由可信能力票据提供；持久任务记录不开放给可编辑 V8 设置。
+        public JObject RegistrationMetadata { get; set; }
+        internal BackgroundTaskRecord PublicTrialTaskRecord { get; set; }
         public string TenantKey { get; set; }
         public string SystemName { get; set; }
         public string OwnerPhone { get; set; }
@@ -408,8 +411,8 @@ namespace Microi.net
                 if (!Regex.IsMatch(osClientNetwork, @"^[A-Za-z][A-Za-z0-9_.-]{0,49}$"))
                     return new DosResult(0, null, "OsClientNetwork 格式不正确。");
 
-                if (domainName.DosIsNullOrWhiteSpace()) domainName = tenantKey + ".microi.net";
-                if (!Regex.IsMatch(domainName, @"^[A-Za-z0-9.-]+$") || domainName.Contains(".."))
+                if (!SaasPromotionSecurity.TryResolveProvisioningDomain(tenantKey, domainName,
+                        request.PublicTrialTaskRecord != null, out domainName))
                     return new DosResult(0, null, "域名格式不正确，请只填写域名，不要包含协议或路径。");
                 if (!databaseZipPath.DosIsNullOrWhiteSpace()
                     && !databaseZipName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
@@ -435,17 +438,41 @@ namespace Microi.net
                         "SELECT COUNT(*) FROM sys_osclients WHERE OsClient = @p0 AND IsDeleted = 0")
                     .AddInParameter("p0", tenantKey)
                     .ToScalar<int>();
+                string resumeConnection = null;
                 if (existCheck > 0)
-                    return new DosResult(0, new { OsClient = tenantKey, DomainName = domainName },
-                        "租户Key已存在，请更换后重试。");
+                {
+                    if (request.RegistrationMetadata == null)
+                        return new DosResult(0, null, "租户Key已存在，请更换后重试。");
+                    var existingRow = mainClient.Db.FromSql(@"SELECT DbConn,PublicTrialRequestId,ReferralUserId,ReferralLinkId,PublicTrialProvisioned
+                        FROM sys_osclients WHERE OsClient=@key AND OsClientType=@type AND OsClientNetwork=@network AND IsDeleted=0")
+                        .AddInParameter("key",tenantKey).AddInParameter("type",osClientType).AddInParameter("network",osClientNetwork).First<dynamic>();
+                    var existing = existingRow == null ? null : JObject.FromObject(existingRow);
+                    if (existing == null || new[] { "PublicTrialRequestId","ReferralUserId","ReferralLinkId" }.Any(name =>
+                            !OpaqueTokenSecurity.FixedEquals(existing[name]?.ToString(),request.RegistrationMetadata[name]?.ToString())))
+                        return new DosResult(0,null,"租户Key已属于另一条开通请求，拒绝重用。");
+                    if (SaasPromotionSecurity.Flag(existing["PublicTrialProvisioned"]))
+                        return new DosResult(1,new { OsClient=tenantKey,SystemName=systemName,DomainName=domainName,AdminAccount="admin",AlreadyProvisioned=true });
+                    resumeConnection = existing["DbConn"]?.ToString();
+                    if (string.IsNullOrWhiteSpace(resumeConnection)) return new DosResult(0,null,"开通检查点连接尚未就绪。");
+                }
 
                 progress.Milestone(19, 2, "租户Key未占用，正在创建隔离数据库与专用账号");
-                var databaseAccess = CreateTenantDatabaseAccess(dbName);
-                databaseCreated = true;
-                var newDbConn = databaseAccess.ConnectionString;
+                var newDbConn = resumeConnection;
+                DosResult addTenantResult = new DosResult(1);
+                DosResult importResult = new DosResult(1);
+                if (resumeConnection == null)
+                {
+                var seedImported = false;
+                var databaseAccess = request.PublicTrialTaskRecord == null
+                    ? CreateTenantDatabaseAccess(dbName)
+                    : CreatePublicTrialDatabaseAccess(request.PublicTrialTaskRecord, dbName,
+                        request.RegistrationMetadata["PublicTrialRequestId"]?.ToString(), out seedImported);
+                // 公开任务保留加密检查点及其拥有的资源，普通管理员流程仍按原规则补偿。
+                databaseCreated = request.PublicTrialTaskRecord == null;
+                newDbConn = databaseAccess.ConnectionString;
                 lease.ThrowIfLost();
 
-                var importResult = databaseZipPath.DosIsNullOrWhiteSpace()
+                importResult = seedImported ? new DosResult(1) : databaseZipPath.DosIsNullOrWhiteSpace()
                     ? ImportEmptySql(newDbConn, OsClientDefault.OsClientDbType)
                     : await ImportTenantSqlZipAsync(
                             mainClient,
@@ -458,22 +485,25 @@ namespace Microi.net
                 if (importResult.Code != 1)
                 {
                     progress.Failure("数据库初始化失败：" + importResult.Msg);
-                    return CompensateProvisioningFailure(importResult, tenantKey, dbName);
+                    return databaseCreated ? CompensateProvisioningFailure(importResult, tenantKey, dbName) : importResult;
                 }
+                if (request.PublicTrialTaskRecord != null) MarkPublicTrialSeedImported(request.PublicTrialTaskRecord);
                 if (databaseZipPath.DosIsNullOrWhiteSpace())
                     progress.Milestone(76, 3, "官方标准空库导入成功");
                 lease.ThrowIfLost();
 
                 progress.Milestone(80, 5, "数据库校验通过，正在登记 SaaS 租户运行配置");
-                var addTenantResult = AddOsClientRecord(mainClient, tenantKey, dbName, newDbConn,
-                    ownerPhone, systemName, osClientType, osClientNetwork, domainName);
+                addTenantResult = AddOsClientRecord(mainClient, tenantKey, dbName, newDbConn,
+                    ownerPhone, systemName, osClientType, osClientNetwork, domainName, request.RegistrationMetadata,
+                    preserveUnboundDomain: request.PublicTrialTaskRecord != null);
                 if (addTenantResult.Code != 1)
                 {
                     progress.Failure("登记 SaaS 租户失败：" + addTenantResult.Msg);
-                    return CompensateProvisioningFailure(addTenantResult, tenantKey, dbName);
+                    return databaseCreated ? CompensateProvisioningFailure(addTenantResult, tenantKey, dbName) : addTenantResult;
                 }
                 lease.ThrowIfLost();
 
+                }
                 progress.Milestone(84, 6, "租户运行配置已登记，正在初始化 admin 账号");
                 var adminName = (request.UserName ?? "").Trim();
                 if (adminName.DosIsNullOrWhiteSpace()) adminName = "管理员";
@@ -483,7 +513,7 @@ namespace Microi.net
                 if (initResult.Code != 1)
                 {
                     progress.Failure("初始化 admin 账号失败：" + initResult.Msg);
-                    return CompensateProvisioningFailure(initResult, tenantKey, dbName);
+                    return databaseCreated ? CompensateProvisioningFailure(initResult, tenantKey, dbName) : initResult;
                 }
 
                 progress.Milestone(88, 7, "admin 账号初始化成功，正在写入系统名称并暂停恢复库定时任务");
@@ -499,9 +529,8 @@ namespace Microi.net
                 if (reloadResult.Code != 1)
                 {
                     progress.Failure("刷新租户运行配置失败：" + reloadResult.Msg);
-                    return CompensateProvisioningFailure(
-                        new DosResult(0, reloadResult.Data, "刷新租户运行配置失败：" + reloadResult.Msg),
-                        tenantKey, dbName);
+                    var reloadFailure = new DosResult(0, reloadResult.Data, "刷新租户运行配置失败：" + reloadResult.Msg);
+                    return databaseCreated ? CompensateProvisioningFailure(reloadFailure, tenantKey, dbName) : reloadFailure;
                 }
                 lease.ThrowIfLost();
 
@@ -512,11 +541,8 @@ namespace Microi.net
                 if (upgradeResult.Code != 1)
                 {
                     progress.Failure("租户数据库升级失败：" + upgradeResult.Msg);
-                    return CompensateProvisioningFailure(
-                        new DosResult(0, upgradeResult.Data,
-                            "租户数据库升级失败：" + upgradeResult.Msg),
-                        tenantKey,
-                        dbName);
+                    var upgradeFailure = new DosResult(0, upgradeResult.Data,"租户数据库升级失败：" + upgradeResult.Msg);
+                    return databaseCreated ? CompensateProvisioningFailure(upgradeFailure, tenantKey, dbName) : upgradeFailure;
                 }
                 lease.ThrowIfLost();
                 progress.Milestone(
@@ -540,6 +566,12 @@ namespace Microi.net
                     DatabaseImport = importResult.Data,
                     Upgrade = upgradeResult.Data
                 }, "SaaS租户创建成功，数据库升级检查已完成。");
+                if (request.RegistrationMetadata != null)
+                {
+                    var recorded = mainClient.Db.FromSql("UPDATE sys_osclients SET PublicTrialProvisioned=1 WHERE OsClient=@key AND PublicTrialRequestId=@request")
+                        .AddInParameter("key",tenantKey).AddInParameter("request",request.RegistrationMetadata["PublicTrialRequestId"]?.ToString()).ExecuteNonQuery();
+                    if (recorded != 1) throw new InvalidOperationException("公开开通完成检查点未能唯一持久化。");
+                }
                 success.DataAppend = addTenantResult.DataAppend;
                 return success;
             }
@@ -3289,13 +3321,16 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
         /// </summary>
         private DosResult AddOsClientRecord(OsClientSecret mainClient, string osClient, string dbName,
             string newDbConn, string phone, string systemName, string osClientType = null,
-            string osClientNetwork = null, string requestedDomainName = null)
+            string osClientNetwork = null, string requestedDomainName = null, JObject registrationMetadata = null,
+            bool preserveUnboundDomain = false)
         {
             try
             {
                 var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 var id = Ulid.NewUlid().ToString();
-                var domainName = requestedDomainName.DosIsNullOrWhiteSpace()
+                // 只有可信公开任务允许尚未绑定域名；普通管理员开通保持既有默认域名兼容行为。
+                var domainName = preserveUnboundDomain ? (requestedDomainName ?? "").Trim()
+                    : requestedDomainName.DosIsNullOrWhiteSpace()
                     ? $"{osClient}.microi.net"
                     : requestedDomainName.Trim();
                 osClientType = osClientType.DosIsNullOrWhiteSpace()
@@ -3316,7 +3351,23 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                      @p5, @p6, @p7, @p8, @p9, @p10,
                      @p11, @p12, @p13, '60', '30')";
 
-                mainClient.Db.FromSql(sql)
+                var registrationFields = new[] { "ReferralUserId","ReferralLinkId","PublicTrialRequestId","TrialStartTime","TrialEndTime","PromotionStage","PromotionContact","PromotionPhone","SignupSource" };
+                if (registrationMetadata != null)
+                {
+                    if (registrationMetadata.Properties().Any(property => !registrationFields.Contains(property.Name)))
+                        return new DosResult(0,null,"未知的租户登记字段。");
+                    var selected = registrationFields.Where(name => registrationMetadata[name] != null).ToArray();
+                    sql = sql.Replace("AccessTokenLifetime)","AccessTokenLifetime,"+string.Join(",",selected)+")")
+                        .Replace("'60', '30')","'60', '30',"+string.Join(",",selected.Select((name,index)=>"@registration"+index))+")");
+                }
+                var insert = mainClient.Db.FromSql(sql);
+                if (registrationMetadata != null)
+                {
+                    var selected = registrationFields.Where(name => registrationMetadata[name] != null).ToArray();
+                    for (var fieldIndex=0;fieldIndex<selected.Length;fieldIndex++)
+                        insert.AddInParameter("registration"+fieldIndex,registrationMetadata[selected[fieldIndex]].ToString());
+                }
+                insert
                     .AddInParameter("p0", id)
                     .AddInParameter("p1", now)
                     .AddInParameter("p2", now)

@@ -213,6 +213,12 @@ public class MicroAppStableEntryTests
         var unsafeMetadata = JObject.FromObject(new { RouteMetaJson = "{\"SourceFile\":\"../secrets.txt\"}" });
         var unsafeResult = Assert.IsType<JObject>(method.Invoke(null, new object[] { unsafePage, unsafeMetadata }));
         Assert.Null(unsafeResult["SourceFile"]);
+
+        var publicPage = JObject.FromObject(new { Id = "public-page" });
+        var publicMetadata = JObject.FromObject(new { RouteMetaJson = "{\"Anonymous\":true,\"InternalSecret\":\"not-exposed\"}" });
+        var publicResult = Assert.IsType<JObject>(method.Invoke(null, new object[] { publicPage, publicMetadata }));
+        Assert.Equal("{\"Anonymous\":true}", publicResult["RouteMetaJson"]?.Value<string>());
+        Assert.Null(publicResult["InternalSecret"]);
     }
 
     [Fact]
