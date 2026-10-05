@@ -53,6 +53,8 @@ DLL 加密脚本只在 Git Bash、MSYS 或 Cygwin 中转换 Windows 路径，优
 
 私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，实际镜像和部署仍需独立回读。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
 
+原生依赖审批在目标 Linux CLR 中验证完整程序集引用链及实际字节哈希。驱动扩展也属于交付依赖：Oracle Core 23.26.300 同时交付同版本 Azure、Kerberos、OCI、ConfigFile、AWS、GCP 六个官方扩展及传递依赖，以 `ProviderDependencyDeliveryTests` 验证真实装载，不连接云服务。缺文件、身份冲突和哈希变化继续失败关闭；先复现并修复包装，再重新 Full 和镜像回读，禁止跳过未执行的依赖或开放 V8/MCP 任意装载。
+
 | 场景 | 推荐入口 |
 |---|---|
 | 生产 Linux、快速安装、可滚动升级 | Docker/Compose |
