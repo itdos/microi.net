@@ -5,8 +5,10 @@ import test from "node:test";
 const permissionSource = await readFile(new URL("../src/permission.js", import.meta.url), "utf8");
 const assistantSource = await readFile(new URL("../src/views/ai-engine/index.vue", import.meta.url), "utf8");
 const workbenchSource = await readFile(new URL("../src/views/ai-engine/ai-app-workbench.vue", import.meta.url), "utf8");
-const marketplaceSource = await readFile(new URL("../../AI-Project/microi/AI应用/microi-platform-service/src/Marketplace.vue", import.meta.url), "utf8");
-const marketplaceCompactCss = await readFile(new URL("../../AI-Project/microi/AI应用/microi-platform-service/src/marketplace-compact.css", import.meta.url), "utf8");
+const platformRelease = JSON.parse(await readFile(new URL("../../Microi.Server/OfficialApplications/Resource/platform-service-release.json", import.meta.url), "utf8"));
+const platformSource = new URL(`../../${platformRelease.SourceRoot}/`, import.meta.url);
+const marketplaceSource = await readFile(new URL("src/Marketplace.vue", platformSource), "utf8");
+const marketplaceCompactCss = await readFile(new URL("src/marketplace-compact.css", platformSource), "utf8");
 
 test("旧 AI 应用入口稳定跳转到统一应用商城", () => {
     assert.match(permissionSource, /to\.path === "\/mci-ai-app"/);

@@ -1,13 +1,16 @@
 /* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1
- * 【官方应用托管接口，请勿承载个性化代码】所属官方应用：SaaS引擎
- * ApiEngineKey: platform-saas-promotion; Managed; Version: v1.0.0
- * 主租户推广授权、台账、链接和跟进；扩展使用 platform-saas-promotion-hook。
+ * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】
+ * 所属官方应用：SaaS引擎
+ * ApiEngineKey：platform-saas-promotion
+ * 从可信吾码官方应用源安装、更新或重新安装“SaaS引擎”，都会以官方源码恢复此 Managed 接口。
+ * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，
+ * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-saas-promotion
- * Version: v1.0.4
+ * Version: v1.0.5
  * Function:
  * - 主租户推广授权、推荐归属、试用跟进、团队与用量统计、推广链接及公开开通配置。
  */
