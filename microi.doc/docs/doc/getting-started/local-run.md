@@ -181,6 +181,8 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 依赖统一也要覆盖存量模块：MongoDB 兼容构建与 NuGet 包声明共同使用 DnsClient 1.7.0，以满足 Azure 配置提供者的版本下界；MongoDB 3.6/7 的真实验收仍由 Full 执行。OCI 带有独立强名称的旧密码学程序集，微信支付继续使用 BouncyCastle.Cryptography 2.6.2；测试通过显式程序集别名断言原来的认证标签篡改异常，避免同名类型导致编译歧义，不改变运行时密码学协议。
 
+Oracle AWS 扩展的实际程序集还引用 SQS，尽管其 NuGet 清单只列出 S3、SecretsManager。Dos.ORM 显式交付 [AWSSDK.SQS 4.0.100.15](https://www.nuget.org/packages/AWSSDK.SQS/4.0.100.15)，HDFS 的 AWS Core 引用同步至其下界 4.0.102.8，避免旧直接引用触发包降级。Oracle 回归递归验证完整扩展引用链并保留 512 个程序集预算；不访问 AWS 或申请凭据。
+
 System.Drawing.Common 的 .NET 10 支持程序集还引用 System.Formats.Nrbf；该文件不在 ASP.NET Core 共享框架内，Dos.Common 显式交付同版本官方 NuGet 包，并由上述回归验证引用与文件。Windows GDI 的运行平台限制不变；Linux 图像处理继续使用 SkiaSharp。依赖可解析不等于在 Linux 执行 Windows 绘图 API。
 
 共享源码持续变化时，可将完整候选源码及依赖保存到独立发布目录，在那里运行同一 Full 和一键发布脚本。专用测试服务使用独立端口，并通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口，默认仍为 61501、61500。进程管理器继续检查 PID、命令行和工作区归属；原工作区服务不受影响。这两个变量仅用于发布脚本，不是生产 API 配置。
