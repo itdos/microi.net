@@ -195,7 +195,9 @@ namespace Microi.net
                 await UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(osClientSecret).ConfigureAwait(false);
                 runtimeInvariantStage = "接口引擎字段元数据兼容";
                 await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动恢复前").ConfigureAwait(false);
+                runtimeInvariantStage = "接口引擎缓存写入兼容";
                 await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动恢复前").ConfigureAwait(false);
+                runtimeInvariantStage = "旧菜单配置兼容";
                 await EnsureLegacyMenuDiyConfigCompatibilityAsync(osClientSecret).ConfigureAwait(false);
                 // 持久队列是商城安装更新的必要事实源；不启动备份、调度或其它业务任务。
                 runtimeInvariantStage = "Upgrade21-持久后台任务";
@@ -206,8 +208,11 @@ namespace Microi.net
                     errors = await new UpgradeAppStore().Run(osClientSecret.OsClient).ConfigureAwait(false);
                 }
                 if (errors.Count > 0) throw new InvalidOperationException(string.Join("；", errors));
+                runtimeInvariantStage = "接口引擎字段元数据复检";
                 await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动恢复后").ConfigureAwait(false);
+                runtimeInvariantStage = "接口引擎缓存写入复检";
                 await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动恢复后").ConfigureAwait(false);
+                runtimeInvariantStage = "菜单AppDisplay保护恢复";
                 await RestoreMenuAppDisplaySnapshotAsync(osClientSecret, snapshot).ConfigureAwait(false);
                 // 只有整个恢复闭包强回读成功才前向保存版本，失败允许在同版本幂等重试。
                 await PersistServerVersionForwardOnlyAsync(osClientSecret, UpgradeAppStore.Version).ConfigureAwait(false);
@@ -217,6 +222,16 @@ namespace Microi.net
             catch (Exception ex)
             {
                 var diagnostic = BuildUpgradeFailureDiagnostic(runtimeInvariantStage, ex);
+                // 只记录方法名，不含参数值、文件路径或客户连接配置；调用栈保留给
+                // 系统日志/控制台诊断，任务返回仍使用面向管理员的简洁失败摘要。
+                var frames = new System.Diagnostics.StackTrace(ex, false).GetFrames()
+                    ?? Array.Empty<System.Diagnostics.StackFrame>();
+                var trace = string.Join(" -> ", frames.Take(12).Select(frame =>
+                {
+                    var method = frame.GetMethod();
+                    return (method?.DeclaringType?.FullName ?? "unknown") + "." + (method?.Name ?? "unknown");
+                }));
+                UpgradeProgress.WriteLine($"Microi：【升级失败调用栈】【{osClientSecret.OsClient}】【{runtimeInvariantStage}】{trace}");
                 try { await RestoreMenuAppDisplaySnapshotAsync(osClientSecret, snapshot).ConfigureAwait(false); }
                 catch (Exception restoreError) { diagnostic += "；菜单显隐恢复失败：" + SanitizeUpgradeDiagnosticText(restoreError.Message); }
                 var queued = MicroiEngine.QueueSystemLog(osClientSecret.OsClient, "PlatformUpgrade", "TenantMigrationFailed",
@@ -318,37 +333,25 @@ namespace Microi.net
             await cache.RemoveAsync(
                 $"Microi:{osClientSecret.OsClient}:FormData:diy_table:sys_apiengine");
             var rebuiltAliases = await RebuildLegacyCompatibleApiEngineCacheAsync(
-                osClientSecret.OsClient);
+                osClientSecret);
             UpgradeProgress.WriteLine(
                 $"Microi：【接口引擎缓存兼容修复】【{osClientSecret.OsClient}】【{stage}】" +
                 $"已恢复多路由校验与v3/v6共享JSON写入契约，并重建{rebuiltAliases}个缓存别名。");
         }
 
         private static async Task<int> RebuildLegacyCompatibleApiEngineCacheAsync(
-            string osClient)
+            OsClientSecret client)
         {
             UpgradeExecutionLeaseContext.ThrowIfLost();
-            var listResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
-            {
-                FormEngineKey = "sys_apiengine",
-                OsClient = osClient,
-                _Where = new List<DiyWhere>
-                {
-                    new DiyWhere { Name = "IsEnable", Value = 1, Type = "=" }
-                },
-                _PageIndex = 1,
-                _PageSize = 100000
-            });
-            if (listResult.Code != 1)
-            {
-                throw new InvalidOperationException(
-                    "读取接口引擎以重建兼容缓存失败：" + listResult.Msg);
-            }
-
+            // 缓存属于启动控制面；此时尚未完成表单元数据和 V8 事件恢复，不能
+            // 经 FormEngine 回读或执行客户的 DataFilter/查询替换。与路由冷启动
+            // 共用主库权威读取，保留启用/软删除过滤及逐行独立快照。
+            var rows = ApiEngineAuthoritativeStore.GetAllEnabled(client);
+            var osClient = client.OsClient;
             var cachePlan = BuildApiEngineCacheSnapshotPlan(
-                listResult.Data == null
+                rows == null
                     ? Enumerable.Empty<object>()
-                    : listResult.Data.Cast<object>());
+                    : rows.Cast<object>());
             foreach (var conflict in cachePlan.Resolution.Conflicts)
             {
                 var owners = string.Join("、", conflict.Owners.Select(owner =>
