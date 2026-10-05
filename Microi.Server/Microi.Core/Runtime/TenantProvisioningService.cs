@@ -1475,7 +1475,7 @@ namespace Microi.net
                                 WHERE OsClient = @p0 AND IsDeleted = 0 LIMIT 1")
                             .AddInParameter("p0", osClient)
                             .First<dynamic>();
-                        var ownerUserId = ownerRow == null
+                        string ownerUserId = ownerRow == null
                             ? ""
                             : (JObject.FromObject(ownerRow)["OwnerUserId"]?.ToString() ?? "");
 
