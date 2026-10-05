@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.5
+ * Version: v3.0.6
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
@@ -6438,6 +6438,33 @@ try {
         }
         return modifications.length;
     };
+    // DECLARED_INDEX_TABLE_PREREQUISITE_V1：旧包可能把索引放在建表前。
+    // 只补齐当前包声明的缺失表，不重排数组，保持持久 DDL 检查点的索引含义。
+    var ensureDeclaredIndexTable = function (ddlInfo) {
+        if (ddlInfo.Kind != 'index' || ddlTableExists(ddlInfo.TableName)) return;
+        var tableItem = null;
+        var tableInfo = null;
+        for (var candidateIndex = 0; candidateIndex < allDdlStatements.length; candidateIndex++) {
+            var candidate = allDdlStatements[candidateIndex] || {};
+            if (String(candidate.TableName || '').toLowerCase() != String(ddlInfo.TableName).toLowerCase()) continue;
+            var candidateInfo = classifyDdlStatement(candidate.DDL, candidate.TableName);
+            if (candidateInfo.Kind != 'table') continue;
+            if (tableItem) throw new Error('索引依赖表存在多个建表声明：' + ddlInfo.TableName);
+            tableItem = {};
+            for (var property in candidate) tableItem[property] = candidate[property];
+            tableItem.DDL = normalizePackageDdlNullability(String(candidate.DDL));
+            tableInfo = candidateInfo;
+        }
+        if (!tableItem) throw new Error('索引依赖表缺失且应用包未声明建表：' + ddlInfo.TableName);
+        try {
+            executePackageDdl(tableItem, tableInfo);
+        } catch (error) {
+            // 并发节点已经建表时允许继续；其它错误不能被当作成功。
+            requirePackageDdlObject(tableInfo, error);
+        }
+        requirePackageDdlObject(tableInfo, null);
+        debugLog['ddl_index_table_prerequisite_' + ddlInfo.TableName] = '已按包声明创建并回读索引依赖表';
+    };
     var ddlTablesChecked = {};
     for (var i = 0; i < ddlStatements.length; i++) {
         var ddlItem = ddlStatements[i];
@@ -6448,6 +6475,7 @@ try {
         ddlItem = normalizedDdlItem;
 
         var ddlInfo = classifyDdlStatement(ddlItem.DDL, ddlItem.TableName);
+        ensureDeclaredIndexTable(ddlInfo);
         var ddlLogKey = ddlInfo.TableName + (ddlInfo.IndexName ? '_' + ddlInfo.IndexName : '_' + i);
         var alreadyExists = ddlInfo.Kind == 'table'
             ? ddlTableExists(ddlInfo.TableName)
