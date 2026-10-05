@@ -53,7 +53,10 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }
  }
- const privateInputs=await snapshotReleaseComposition(root,options);
+ // 环境中的发行组合只属于这个工具所在的真实工作区。临时仓库/另一源码根必须
+ // 显式传递其 environment，不能继承当前发行任务的路径；真实 CLI 仍严格核验全部四项属性。
+ const compositionOptions={...options,environment:options.environment??(path.resolve(root)===workspace?process.env:{})};
+ const privateInputs=await snapshotReleaseComposition(root,compositionOptions);
  if(privateInputs){
   for(const [key,value]of Object.entries(privateInputs.files)){
    if(Object.hasOwn(files,key)&&files[key]!==value)throw Error(`Private composition source collision: ${key}`);

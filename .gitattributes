@@ -2,3 +2,9 @@
 .githooks/* text eol=lf
 .public-repo-protected-paths text eol=lf
 *.pdf binary
+
+# 包投影及内联源码按原始字节校验，Windows 自动换行不得改变唯一源码。
+Microi.Server/OfficialApplications/Resource/import-package.js text eol=lf
+Microi.Server/Microi.Upgrade/Resource/import-package.js text eol=lf
+Microi.Server/Microi.Upgrade/Resource/app.microi.bootstrap.json text eol=lf
+microi.uniapp/resources/xjy/customer-contract-totals/engine.js text eol=lf

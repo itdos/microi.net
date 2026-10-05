@@ -165,6 +165,8 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 后端 DLL 加密在 macOS/Linux 使用原生绝对路径；仅 Git Bash、MSYS 或 Cygwin 转换 Windows 路径，优先使用 `cygpath`，避免把 `/Users`、`/usr` 误识别为盘符。路径修复应先在隔离构建副本上验证五个 DLL 的实际加密和指纹，然后重新执行一键脚本的 Full、加密及最终产物冒烟。
 
+加密脚本被 `source` 引入以测试路径函数时不执行发行入口。SQLite 回归使用真实解释器及隔离标准库：Windows 选择 `python`，避免 `python3` 命中商店占位程序；其它系统使用 `python3`。包投影和 Manifest 内联源码使用 Git 指定的 LF 字节，不修改断言来忽略换行差异。
+
 在线 AI 使用的 MCP 按依赖锁干净安装、编译和裁剪，再完整复制生产运行目录。生产命令的链接解析为真实文件并保留执行权限，使临时目录清理后命令仍可运行；损坏、越界和循环链接提前拒绝，重新打包不保留旧依赖。制品门禁继续拒绝符号链接，不能通过放宽门禁解决打包错误。
 
 前端构建在 macOS 使用有界 `vm_stat` 探针，按当前页大小统计空闲页与可回收文件页，不把文件缓存误判为构建占用，也不叠加匿名非活动页、压缩页或已包含的预读页。探针失败或格式未知时回退到原生空闲内存并继续执行保守门禁；Windows/Linux 保持原统计方式。启动余量、95% 暂停、90% 恢复及连续五秒稳定要求不变，不能靠跳过内存保护完成正式发布。可回收页的口径参考 [Apple 内核内存说明](https://github.com/apple-oss-distributions/xnu/blob/main/doc/vm/memorystatus_notify.md)。
@@ -176,6 +178,8 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 后台发行需要静态组合私有原生规则时，不能依赖根公开仓的文件清单覆盖被忽略的应用源码。发布进程设置 `MICROI_RELEASE_COMPOSITION_FILE` 指向工作区内的受控 JSON 契约，格式为 `schema:1`，包含 `properties`、`files`、`directories`、`artifacts`。`properties` 必须固定 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 四个文件路径，并与同一发布进程传给 MSBuild 的实际环境属性一致；这些文件必须同时进入 `files` 或 `directories`。
 
 `files` 列出项目、组合 targets、静态审批代码等文件；`directories` 列出应用自己的规则源码目录。契约原始正文和这些输入逐文件加入 Full 候选，新增、删除或修改均触发重新验收；禁止越界路径和符号链接，`bin/obj/dist` 等生成目录不作为源码。`artifacts` 使用 `{ "path":"publish/ApprovedRules.dll", "sha256":"<后台审批的实际DLL哈希>" }` 描述获批制品，最终 API 发布目录必须逐项匹配，缺失或不同均阻止捕获和推送。普通无私有组合的发布和 PC 制品沿用既有门禁。这些变量只供构建，不是生产 API 设置，也不授予 V8/MCP/HTTP 任意加载代码的权限。
+
+发行组合的进程环境只绑定工具所在的工作区。临时测试仓库或其它源码根须显式传递自己的环境，不能继承另一发行任务的私有路径；显式配置错误仍立即失败。
 
 私有原生规则的依赖审批必须核对实际目标 Linux CLR 中的完整程序集引用链，不能用 Windows 框架文件或“某次业务调用未使用”代替。发行缺少、身份冲突或哈希不匹配时，保持失败关闭并修复依赖交付。例如 Oracle Core 23.26.300 声明引用 Azure、Kerberos、OCI、ConfigFile、AWS、GCP 六个扩展，Dos.ORM 同时引用六份同版本官方包，由 NuGet 交付它们及其传递依赖；`ProviderDependencyDeliveryTests` 只验证真实 CLR 装载，不连接 Oracle 或云服务。修复后重新运行目标运行时依赖验证、Full 及最终镜像回读，不在 V8 或生产配置中提供任意 DLL 装载入口。包说明见 [Oracle Azure 扩展](https://www.nuget.org/packages/Oracle.ManagedDataAccess.Azure/23.26.300) 和 [Oracle OCI 扩展](https://www.nuget.org/packages/Oracle.ManagedDataAccess.Oci/23.26.300)。
 

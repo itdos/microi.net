@@ -83,3 +83,13 @@ test('无私有组合的旧候选与制品保持原有门禁语义',async()=>{
   const after={...before,composition:{schema:1}};assert.deepEqual(changedCandidate(before,after),['<private-build-composition>']);
  }finally{await cleanup(f.root);}
 });
+
+test('其它工作区的进程级组合不能污染临时仓库；显式错误组合仍失败关闭',async()=>{
+ const f=await fixture(),previous=process.env.MICROI_RELEASE_COMPOSITION_FILE;
+ try{
+  process.env.MICROI_RELEASE_COMPOSITION_FILE=path.join(path.dirname(f.root),'another-workspace','composition.json');
+  const isolated=await snapshotCandidate(f.root,['.']);assert.equal(isolated.composition,undefined);
+  await assert.rejects(snapshotCandidate(f.root,['.'],{environment:{MICROI_RELEASE_COMPOSITION_FILE:process.env.MICROI_RELEASE_COMPOSITION_FILE}}),/escapes/);
+  const explicit=await snapshotCandidate(f.root,['.'],f.options);assert.equal(explicit.composition.schema,1);
+ }finally{if(previous===undefined)delete process.env.MICROI_RELEASE_COMPOSITION_FILE;else process.env.MICROI_RELEASE_COMPOSITION_FILE=previous;await cleanup(f.root);}
+});

@@ -5,6 +5,8 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 
 const source = fs.readFileSync(new URL('./engine.js', import.meta.url), 'utf8')
+// Windows 的 python3 可能是商店占位程序；使用真实解释器及隔离标准库，防止宿主 Python 路径污染。
+const python = process.platform === 'win32' ? 'python' : 'python3'
 const makeOrder = (Id, KehuID = 'c1', extra = {}) => ({ Id, KehuID, IsDeleted: 0, DingdanZT: '已审批', HetongZT: '未断约', HetongKSSJ: '2026-10-02', HetongJSSJ: '2026-10-02', ...extra })
 const makeProduct = (Id, DingdanID, HezuoFS, Zongjia = 0, LvxinZJ = 0, extra = {}) => ({ Id, DingdanID, HezuoFS, HezuoFSZ: '', Zongjia, LvxinZJ, Shuliang: 7, IsDeleted: 0, ...extra })
 
@@ -67,7 +69,7 @@ function run(options = {}) {
       const query = { AddInParameter(name, value) { assert.ok(!(name in bindings)); bindings[name] = value; return query }, ToArray() {
         queries.push({ sql, bindings })
         if (options.dbFail) throw new Error('数据库不可用')
-        const result = spawnSync('python3', ['-c', sqlite], { input: JSON.stringify({ sql, bindings, ...data }), encoding: 'utf8' })
+        const result = spawnSync(python, ['-I', '-X', 'utf8', '-c', sqlite], { input: JSON.stringify({ sql, bindings, ...data }), encoding: 'utf8' })
         if (result.status !== 0) throw new Error(result.stderr)
         const rows = JSON.parse(result.stdout)
         return options.rows ? options.rows(rows, queries.length) : rows
