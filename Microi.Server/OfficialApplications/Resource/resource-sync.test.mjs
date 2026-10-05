@@ -1415,8 +1415,8 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 169);
-  assert.equal(managedCount, 158);
+  assert.equal(seenKeys.size, 173);
+  assert.equal(managedCount, 161);
   assert.ok(seenKeys.has('ai_app_cdn_backfill'), '官方 CDN 维护入口必须随商城包投影');
   for (const key of ['official_sms_login', 'official_account_invitations', 'official_account_licenses']) assert.ok(seenKeys.has(key));
   assert.ok(seenKeys.has('official_password_reset_send_sms'), '找回密码入口必须随官方包投影');
@@ -1424,7 +1424,8 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
   assert.ok(seenKeys.has('platform-hdfs-upload-hook'));
   for (const key of ['platform-reminder-runtime','platform-reminder-official-feed','platform-reminder-tick','platform-message-notification-config']) assert.ok(seenKeys.has(key));
   assert.ok(seenKeys.has('send-sms-reg'), '注册短信公开派发入口必须纳入官方投影闭包');
-  assert.equal(createIfMissingCount, 11);
+  assert.equal(createIfMissingCount, 12);
+  for (const key of ['platform-saas-promotion', 'platform-saas-public-trial', 'platform-saas-public-trial-worker', 'platform-saas-promotion-hook']) assert.ok(seenKeys.has(key));
 
   assert.match(officialEngineSource, /action === "reconcilepublishedapiengines"/);
   assert.match(officialEngineSource, /function preparePublishedApiEngineProjection\(\)/);
