@@ -55,9 +55,9 @@
                 <text>{{ String(row.Id) === String(selectedId) ? '✓' : '›' }}</text>
               </view>
             </view>
-            <view class="customer-picker__footer">
-              <text>{{ loading ? '正在加载…' : finished ? `共 ${total} 条` : '上拉加载更多' }}</text>
-            </view>
+            <mci-skeleton v-if="loading" type="list" :rows="1" compact />
+            <view v-else-if="error" class="customer-picker__footer" @tap="loadRows(true)"><text>{{ error }}，点击重试</text></view>
+            <view v-else class="customer-picker__footer"><text>{{ finished ? `共 ${total} 条` : '上拉加载更多' }}</text></view>
           </view>
         </scroll-view>
       </view>
@@ -96,9 +96,13 @@ export default {
     finished() { return this.total > 0 && this.rows.length >= this.total }
   },
   watch: {
-    visible(value) {
-      if (value && !this.rows.length) this.loadRows(true)
-      if (!value) clearTimeout(this.searchTimer)
+    visible: {
+      immediate: true,
+      handler(value) {
+        // 初始即打开的父级弹层也应同步开始请求，不能等下一次 visible 变化。
+        if (value && !this.rows.length) this.loadRows(true)
+        if (!value) clearTimeout(this.searchTimer)
+      }
     }
   },
   beforeUnmount() {

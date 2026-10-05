@@ -6,7 +6,7 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {resolve,dirname,extname,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../../..');
-const contract=JSON.parse(await readFile(resolve(root,'Microi.Server/Microi.Upgrade/Resource/platform-service-release.json'),'utf8'));
+const contract=JSON.parse(await readFile(resolve(root,'Microi.Server/OfficialApplications/Resource/platform-service-release.json'),'utf8'));
 const dist=resolve(root,contract.SourceRoot,'dist');
 const work=resolve(process.env.PANEL_TEST_RESULTS||resolve(root,'.tmp/panel-acceptance'),`platform-entry-${Date.now()}`);
 await mkdir(work,{recursive:true});

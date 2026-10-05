@@ -30,7 +30,7 @@ public class TenantAdminCredentialSecurityTests
     {
         var root = FindRepositoryRoot();
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.saas-engine.json")));
         var engine = package["SysApiEngines"]!.Values<JObject>()
             .Single(item => item.Value<string>("ApiEngineKey") == "platform-sys-user-session");
         var runtime = File.ReadAllText(Path.Combine(

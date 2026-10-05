@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=ui-design-014 sha256=abc0a2e1f26a1cfbfa5d73399e09479b7b71314a727bec8b0bf4258a5a3733dc -->
+<!-- microi-progressive:chunk id=ui-design-014 sha256=cf27a0b68280343d0a942dd327a92ee6753527756e48123daf5fa4a15c36520f -->
 ## 组件风格速查
 
 ### 卡片（通用）

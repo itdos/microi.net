@@ -71,7 +71,12 @@
         </view>
       </view>
 
-      <mci-skeleton v-if="loading && pageIndex === 1" type="list" :rows="6" />
+      <mci-skeleton v-if="loading && !displayRows.length" type="list" :rows="6" />
+
+      <view v-else-if="error && !displayRows.length" class="empty-state">
+        <text class="empty-state__title">任务加载失败</text><text class="empty-state__desc">{{ error }}</text>
+        <view class="empty-state__button" @tap="loadData(true, true)"><text>重新加载</text></view>
+      </view>
 
       <view v-else-if="displayRows.length" class="task-list">
         <view
@@ -87,10 +92,12 @@
             :state-class="taskStateClass(item.state)" @open="openTask" @phone="callPhone"
           />
         </view>
-        <view class="load-state"><text v-if="loading">正在加载...</text><text v-else-if="finished">共 {{ count }} 个任务，已全部加载</text><text v-else>上拉加载更多</text></view>
+        <mci-skeleton v-if="loading" type="list" :rows="1" compact />
+        <view v-else-if="error" class="load-state" @tap="loadData(false, true)"><text>{{ error }}，点击重试</text></view>
+        <view v-else class="load-state"><text v-if="finished">共 {{ count }} 个任务，已全部加载</text><text v-else>上拉加载更多</text></view>
       </view>
 
-      <view v-else class="empty-state">
+      <view v-else-if="!loading" class="empty-state">
         <image src="/static/xjy/repair/renwu.png" mode="aspectFit" />
         <text class="empty-state__title">当前条件下没有任务</text>
         <text class="empty-state__desc">{{ emptyStateDescription }}</text>
@@ -212,6 +219,7 @@ export default {
       mineOnly: true,
       orderType: 'ASC',
       loading: true,
+      error: '',
       refreshing: false,
       finished: false,
       stale: false,
@@ -447,6 +455,7 @@ export default {
       const requestId = ++this.loadRequestId
       if (reset) { this.pageIndex = 1; this.finished = false }
       this.loading = true
+      this.error = ''
       if (reset) this.mciRestoreListPosition(0)
       const filters = this.taskFilters({ refresh })
       try {
@@ -464,7 +473,10 @@ export default {
         this.loading = false
         if (reset) this.loadAuxiliaryCounts(filters, requestId)
       } catch (error) {
-        if (requestId === this.loadRequestId) uni.showToast({ title: error.message || '任务加载失败', icon: 'none' })
+        if (requestId === this.loadRequestId) {
+          this.error = error.message || '任务加载失败'
+          uni.showToast({ title: this.error, icon: 'none' })
+        }
       } finally {
         if (requestId === this.loadRequestId) {
           this.loading = false

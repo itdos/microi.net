@@ -1,15 +1,18 @@
 <template>
   <mci-page-shell class="select-page" :style="mciTokenStyle" title="选择售后设备" :subtitle="selectedIds.length ? `已选择 ${selectedIds.length} 台` : '从客户设备中选择'" @back="goBack">
     <view class="search-band"><view class="search-box"><text>⌕</text><input v-model="keyword" confirm-type="search" placeholder="搜索设备名称、型号、编号或位置" @input="scheduleSearch" @confirm="search" /><view v-if="keyword" @tap="clearKeyword"><text>×</text></view></view></view>
-    <mci-skeleton v-if="loading && pageIndex === 1" type="list" :rows="6" />
+    <mci-skeleton v-if="loading && !rows.length" type="list" :rows="6" />
     <scroll-view v-else class="device-scroll" scroll-y :refresher-enabled="true" :refresher-triggered="refreshing" @refresherrefresh="refresh" @scrolltolower="loadMore">
       <view v-if="rows.length" class="device-list">
         <view v-for="device in rows" :key="device.Id" class="device-row" :class="{ selected: isSelected(device), disabled: isExisting(device) }" hover-class="device-row--pressed" @tap="toggle(device)">
           <view class="check-box"><text>{{ isExisting(device) ? '已' : isSelected(device) ? '✓' : '' }}</text></view><image src="/static/xjy/business/shebei.png" mode="aspectFit" /><view class="device-copy"><text class="device-name">{{ device.ShangpinMC || device.ShebeiMC || '客户设备' }}</text><text class="device-meta">{{ [device.ShebeiXH, device.ShebeiBH].filter(Boolean).join(' · ') || '暂无型号与编号' }}</text><text class="device-position">{{ device.AnzhuangWZ || '暂未维护安装位置' }}</text></view><text class="device-state">{{ device.ShebeiZT || '-' }}</text>
         </view>
-        <view class="load-state"><text v-if="loading">正在加载...</text><text v-else-if="finished">已展示全部 {{ count }} 台设备</text><text v-else>上拉加载更多</text></view>
+        <mci-skeleton v-if="loading" type="list" :rows="1" compact />
+        <view v-else-if="error" class="load-state" @tap="loadDevices(false)"><text>{{ error }}，点击重试</text></view>
+        <view v-else class="load-state"><text v-if="finished">已展示全部 {{ count }} 台设备</text><text v-else>上拉加载更多</text></view>
       </view>
-      <view v-else class="empty-state"><image src="/static/xjy/business/shebei.png" mode="aspectFit" /><text>没有可选客户设备</text><text>请先在客户档案中维护设备信息</text></view>
+      <view v-else-if="error" class="empty-state" @tap="loadDevices(true)"><text>{{ error }}</text><text>点击重新加载</text></view>
+      <view v-else-if="!loading" class="empty-state"><image src="/static/xjy/business/shebei.png" mode="aspectFit" /><text>没有可选客户设备</text><text>请先在客户档案中维护设备信息</text></view>
       <view class="safe-space"></view>
     </scroll-view>
     <view class="bottom-bar"><view class="select-all" @tap="toggleAll"><view class="check-box" :class="{ selected: allSelectableSelected }"><text>{{ allSelectableSelected ? '✓' : '' }}</text></view><text>本页全选</text></view><view class="submit-button" :class="{ disabled: !selectedIds.length || submitting }" hover-class="submit-button--pressed" @tap="submit"><text>{{ submitting ? '正在添加' : `添加 ${selectedIds.length || ''} 台设备` }}</text></view></view>
@@ -26,7 +29,7 @@ export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/task/add-devices') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/task/add-devices') },
   mixins: [themeMixin],
-  data() { return { taskId: '', customerId: '', keyword: '', rows: [], existingIds: [], selected: {}, count: 0, pageIndex: 1, pageSize: 20, loading: true, refreshing: false, finished: false, submitting: false, loadRequestId: 0, searchTimer: null } },
+  data() { return { taskId: '', customerId: '', keyword: '', rows: [], existingIds: [], selected: {}, count: 0, pageIndex: 1, pageSize: 20, loading: true, error: '', refreshing: false, finished: false, submitting: false, loadRequestId: 0, searchTimer: null } },
   computed: {
     selectedIds() { return Object.keys(this.selected).filter((id) => this.selected[id]) },
     selectableRows() { return this.rows.filter((row) => !this.isExisting(row)) },
@@ -45,6 +48,7 @@ export default {
       const requestId = ++this.loadRequestId
       if (reset) { this.pageIndex = 1; this.finished = false }
       this.loading = true
+      this.error = ''
       try {
         const where = []
         if (this.customerId) where.push({ Name: 'KehuID', Type: '=', Value: this.customerId })
@@ -56,7 +60,7 @@ export default {
         this.count = Number(result.DataCount || 0)
         this.finished = this.rows.length >= this.count || items.length < this.pageSize
         if (!this.finished) this.pageIndex += 1
-      } catch (error) { if (requestId === this.loadRequestId) uni.showToast({ title: error.message || '设备加载失败', icon: 'none' }) } finally { if (requestId === this.loadRequestId) { this.loading = false; this.refreshing = false } }
+      } catch (error) { if (requestId === this.loadRequestId) { this.error = error.message || '设备加载失败'; uni.showToast({ title: this.error, icon: 'none' }) } } finally { if (requestId === this.loadRequestId) { this.loading = false; this.refreshing = false } }
     },
     isExisting(row) { return this.existingIds.includes(String(row.Id)) },
     isSelected(row) { return !!this.selected[row.Id] },

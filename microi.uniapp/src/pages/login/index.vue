@@ -112,6 +112,7 @@
             class="mp-login-btn phone-auth-btn"
             open-type="getPhoneNumber"
             :loading="phoneAuthLoading"
+            :disabled="phoneAuthLoading || loginReturnPending"
             @getphonenumber="handleGetPhoneNumber"
           >
             <text>授权手机号登录</text>
@@ -127,6 +128,7 @@
           <button
             class="mp-login-btn"
             :loading="wxLoginLoading"
+            :disabled="wxLoginLoading || loginReturnPending"
             @tap="handleAuthLogin"
           >
             <text>{{ t('login.authLogin') }}</text>
@@ -222,7 +224,7 @@
         <button
           class="account-login-btn"
           :loading="accountLoginLoading"
-          :disabled="accountLoginLoading || platformConnectionApplying"
+          :disabled="accountLoginLoading || platformConnectionApplying || loginReturnPending"
           @tap="handleAccountLogin"
         >
           <text>{{ t('login.loginBtn') }}</text>
@@ -269,6 +271,8 @@ import {
   applyRuntimeSysConfig,
   getPlatformSysConfigResult,
   getToken,
+  getUser,
+  notifyLoginPageOpened,
   post,
   probeAppRuntimeEndpoint,
   removeToken,
@@ -287,7 +291,7 @@ import {
   PLATFORMS,
   supportsAuthLogin
 } from '@/utils/platform.js'
-import { shouldResumePreviousPage } from '@/platform/login-navigation.mjs'
+import { buildLoginReturnPlan, decodeLoginRedirect, executeLoginReturnPlan, isLoginPageLocation } from '@/platform/login-navigation.mjs'
 import {
   APP_RUNTIME_ENDPOINT_PROTOCOLS,
   buildAppRuntimeEndpoint,
@@ -359,6 +363,7 @@ export default {
       // 加载状态
       wxLoginLoading: false,
       accountLoginLoading: false,
+      loginReturnPending: false,
       // 是否支持平台授权登录
       hasAuthLogin: supportsAuthLogin(),
       // 手机号授权（微信小程序新用户绑定）
@@ -402,6 +407,7 @@ export default {
   },
 
   onLoad(options) {
+    notifyLoginPageOpened()
     captureInvitation(options || {})
     this.restoreLoginPreferences()
     // 获取状态栏高度（优先使用新 API，兼容旧版本）
@@ -419,7 +425,7 @@ export default {
 
     // 保存登录后的重定向地址
     if (options && options.redirect) {
-      this.redirectUrl = decodeURIComponent(options.redirect)
+      this.redirectUrl = decodeLoginRedirect(options.redirect)
     }
 
     // 兼容带 logout 参数进入登录页的旧链接。
@@ -435,13 +441,23 @@ export default {
 
     // 如果已登录，直接跳转
     const token = getToken()
-    if (token) {
+    const currentUser = getUser()
+    if (isValidLoginSession(currentUser, token)) {
       this.navigateAfterLogin()
       return
     }
+    if (token || currentUser) removeToken()
 
     // 获取系统配置，判断是否开启验证码
     this.getSysConfig()
+  },
+
+  onShow() { notifyLoginPageOpened() },
+
+  onUnload() {
+    // 登录完成后等待提示结束的任务只属于当前页面，销毁后不能再操纵新页面栈。
+    if (this._loginReturnTimer) clearTimeout(this._loginReturnTimer)
+    this._loginReturnTimer = null
   },
 
   methods: {
@@ -770,6 +786,7 @@ export default {
      *       若用户未绑定，则弹出手机号授权按钮进行注册绑定
      */
     async handleAuthLogin() {
+      if (this.wxLoginLoading || this.accountLoginLoading || this.phoneAuthLoading || this.loginReturnPending) return
       if (!this.checkPrivacy()) return
 
       const provider = getLoginProvider()
@@ -848,6 +865,7 @@ export default {
      * 通过 <button open-type="getPhoneNumber"> 触发
      */
     async handleGetPhoneNumber(e) {
+      if (this.wxLoginLoading || this.accountLoginLoading || this.phoneAuthLoading || this.loginReturnPending) return
       if (e.detail.errMsg && !e.detail.errMsg.includes('ok')) {
         uni.showToast({ title: '您已取消手机号授权', icon: 'none' })
         return
@@ -920,6 +938,7 @@ export default {
      * 账号密码登录
      */
     async handleAccountLogin() {
+      if (this.wxLoginLoading || this.accountLoginLoading || this.phoneAuthLoading || this.loginReturnPending) return
       if (this.isAppRuntime && this.endpointDirty) {
         const connected = await this.applyPlatformConnection({ showSuccess: false })
         if (!connected) return
@@ -1056,61 +1075,30 @@ export default {
      * 登录完成后返回原生业务页或首页。
      */
     navigateAfterLogin() {
-      setTimeout(() => {
-        // 切换平台后必须销毁旧平台页面栈，避免返回旧租户详情或继续使用旧页面内存。
-        if (this.runtimeEndpointChanged) {
-          uni.reLaunch({ url: '/pages/workspace/index' })
+      if (this.loginReturnPending) return
+      this.loginReturnPending = true
+      this._loginReturnTimer = setTimeout(() => {
+        this._loginReturnTimer = null
+        // 欢迎提示期间也可能退出或切换会话，不能依据旧成功回调继续返回业务页。
+        if (!isValidLoginSession(getUser(), getToken())) {
+          this.loginReturnPending = false
           return
         }
         const pages = getCurrentPages()
-        const previousPage = pages.length > 1 ? pages[pages.length - 2] : null
-
-        // 登录页由失效业务页 navigateTo 打开时，原页面仍在栈中；直接返回并触发其 onShow。
-        // 禁止 redirectTo 同一路由，否则会形成“旧详情页 + 新详情页”的重复页面栈。
-        if (this.redirectUrl && shouldResumePreviousPage(previousPage, this.redirectUrl)) {
-          console.log('[Login] navigateBack: 恢复登录前页面...')
-          uni.navigateBack({
-            delta: 1,
-            fail: () => uni.redirectTo({
-              url: this.redirectUrl,
-              fail: () => uni.switchTab({ url: this.redirectUrl })
-            })
+        if (!isLoginPageLocation(pages[pages.length - 1]?.route)) {
+          this.loginReturnPending = false
+          return
+        }
+        // 切换平台后必须销毁旧平台页面栈，避免返回旧租户详情或继续使用旧页面内存。
+        if (this.runtimeEndpointChanged) {
+          executeLoginReturnPlan(uni, { method: 'reLaunch', url: '/pages/workspace/index' }, '/pages/workspace/index', () => {
+            this.loginReturnPending = false
           })
           return
         }
-
-        // 分享、扫码或冷启动没有可恢复页面时，才创建重定向目标页。
-        if (this.redirectUrl) {
-          console.log('[Login] redirectTo:', this.redirectUrl)
-          uni.redirectTo({
-            url: this.redirectUrl,
-            fail: () => {
-              // 可能是 tabBar 页面，用 switchTab
-              uni.switchTab({ url: this.redirectUrl })
-            }
-          })
-          return
-        }
-
-        // 默认返回上一页（用户从哪来就回到哪）
-        console.log('[Login] navigateBack: 返回上一页...')
-        if (pages.length > 1) {
-          uni.navigateBack({
-            fail: () => {
-              // 如果返回失败，跳首页
-              uni.switchTab({ url: '/pages/workspace/index' })
-            }
-          })
-        } else {
-          // 没有上一页（直接打开的登录页），跳到首页 Tab
-          uni.switchTab({
-            url: '/pages/workspace/index',
-            fail: (err) => {
-              console.error('[Login] switchTab 失败:', err)
-              uni.reLaunch({ url: '/pages/workspace/index' })
-            }
-          })
-        }
+        executeLoginReturnPlan(uni, buildLoginReturnPlan(pages, this.redirectUrl), '/pages/workspace/index', () => {
+          this.loginReturnPending = false
+        })
       }, 1500)
     },
 
@@ -1127,12 +1115,10 @@ export default {
      * 返回上一页或商城首页
      */
     goBack() {
-      const pages = getCurrentPages()
-      if (pages.length > 1) {
-        uni.navigateBack({ delta: 1 })
-      } else {
-        uni.switchTab({ url: '/pages/workspace/index' })
-      }
+      if (this._loginReturnTimer) clearTimeout(this._loginReturnTimer)
+      this._loginReturnTimer = null
+      this.loginReturnPending = false
+      executeLoginReturnPlan(uni, buildLoginReturnPlan(getCurrentPages()))
     }
   }
 }

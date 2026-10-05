@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microi.net;
+using Microi.Tests.Common;
 using MySql.Data.MySqlClient;
 using Newtonsoft.Json.Linq;
 
@@ -242,7 +243,7 @@ public sealed class EmptyDatabaseReleaseServiceTests
     [Fact]
     public void BundledSanitizationEngine_ProtectsCoreTablesFromApplicationOwnership()
     {
-        var loader = typeof(UpgradeAppStore).GetMethod(
+        var loader = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(loader);

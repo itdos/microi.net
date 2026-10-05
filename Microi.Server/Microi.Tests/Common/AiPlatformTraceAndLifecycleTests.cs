@@ -166,7 +166,7 @@ public sealed class AiPlatformTraceAndLifecycleTests
         var atom = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.Core", "V8Engine", "Runtime", "V8Method.ScheduleJob.cs"));
         var engine = File.ReadAllText(Path.Combine(
-            serverRoot, "Microi.Upgrade", "Resource", "platform-schedule-job.js"));
+            serverRoot, "OfficialApplications", "Resource", "platform-schedule-job.js"));
 
         Assert.Contains("GetTenantGroup", scheduler);
         Assert.Contains("JobBelongsToTenant", scheduler);
@@ -190,9 +190,9 @@ public sealed class AiPlatformTraceAndLifecycleTests
         var mcp = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.MCP", "V8Engine", "V8McpLogic.cs"));
         var publisher = File.ReadAllText(Path.Combine(
-            serverRoot, "Microi.Upgrade", "Resource", "ai-app-publish-store.js"));
+            serverRoot, "OfficialApplications", "Resource", "ai-app-publish-store.js"));
         var importer = File.ReadAllText(Path.Combine(
-            serverRoot, "Microi.Upgrade", "Resource", "import-package.js"));
+            serverRoot, "OfficialApplications", "Resource", "import-package.js"));
 
         Assert.Contains("RequireCurrentTenantSuperAdmin", host);
         Assert.Contains("UserAccessKeySecurity.IsSession", File.ReadAllText(Path.Combine(

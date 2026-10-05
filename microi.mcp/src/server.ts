@@ -4809,6 +4809,31 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   );
 
   server.tool(
+    'microi_delete_empty_directory_marker',
+    `Delete only one exact zero-byte empty-directory marker on current OsClient "${osClient}". Requires an interactive live platform administrator and an explicitly selected bucket. The dedicated safe route never falls back to recursive DeleteObject on older servers. Complete prefix/size/after-read evidence is required. This is not a zero-byte CAS or historical NoPUT proof: isolate the original request and exclude active writers before execution. Omit confirmExecution for a local dry run; execution requires it to equal filePathName exactly. Preserve the same key and read back after timeout or uncertain outcome.`,
+    {
+      filePathName: z.string().min(2).max(2048).refine(value => value.endsWith('/'), 'A directory marker must end with /.').describe('One exact current-tenant directory-marker key, with trailing slash; tenant roots and traversal are rejected by the API.'),
+      limit: z.boolean().describe('Required bucket selection: true=private, false=public.'),
+      confirmExecution: z.string().optional().describe('Must equal filePathName exactly for deletion; omit for a local no-write dry run.'),
+    },
+    async ({ filePathName, limit, confirmExecution }) => {
+      if (confirmExecution !== filePathName) {
+        return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, FilePathName: filePathName, Limit: limit, DeletionMode: 'EmptyDirectoryMarkerOnly', ReadyToExecute: false }) }] };
+      }
+      try {
+        const result = await client.deleteEmptyDirectoryMarker(filePathName, limit);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: { Code: result.Code, Data: result.Data, Msg: result.Msg || '' },
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (error: unknown) {
+        return { content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
     'microi_get_file_cabinet_office_meta',
     `Read durable Office version metadata for one exact file-cabinet object on OsClient "${osClient}". Requires the current tenant's authoritative file-cabinet SysMenuId and interactive platform administrator; no file bytes or edits are returned.`,
     {
@@ -5363,7 +5388,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_run_engine',
-    `Execute an API engine on Microi server (OsClient: ${osClient}). WARNING: May have side effects (DB writes, external API calls).`,
+    `执行当前租户 ${osClient} 的接口引擎，可能写数据库或调用外部接口，必须明确执行确认。标准 stdio 的单条 JSON-RPC 未解析缓冲上限为128MiB，调用端也须支持响应大小；该传输上限不改变后端业务或HDFS包限额。完整包Base64请求要计算整个wire字节数，Data/Result等重复响应也计入；超限资产使用已有目录/文件流式协议，不扩大为无限缓冲。`,
     {
       apiEngineKey: z.string().describe('The unique key of the API engine to execute'),
       params: z
@@ -8330,7 +8355,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_publish_application_directory_stream',
-    `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using deterministic RequestId evidence. Protocol v3 automatically switches files above the legacy 128 MiB request boundary to durable HDFS multipart sessions with per-part SHA-256, status readback and reconnect resume; logical files such as 5 GiB installers never enter Base64/Jint or whole-file memory. publishMode=stage uploads immutable version assets only; finalize rebuilds the same local manifest and promotes it without uploading; stage-and-finalize keeps the original one-call flow. Paths, hashes, sizes, request ids, version preconditions and final manifest evidence are verified strictly. Old API nodes without the resumable endpoints fail closed for oversized assets.`,
+    `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using deterministic RequestId evidence. Protocol v3 automatically switches files above the legacy 128 MiB request boundary to durable HDFS multipart sessions with per-part SHA-256, status readback and reconnect resume; logical files such as 5 GiB installers never enter Base64/Jint or whole-file memory. publishMode=stage uploads immutable version assets only; finalize rebuilds the same local manifest and promotes it without uploading; stage-and-finalize keeps the original one-call flow. Paths, hashes, sizes, request ids, version preconditions and final manifest evidence are verified strictly. Old API nodes without the resumable endpoints fail closed for oversized assets. 标准stdio的128MiB未解析JSON-RPC缓冲只承载工具参数/回执；目录资产继续原始字节流上传，不把大文件或源码ZIP塞入Base64工具参数。`,
     {
       appIdOrKey: z.string().min(1).describe('Existing sys_microistore Id or AppKey.'),
       versionNo: z.string().regex(/^v?\d+\.\d+\.\d+$/u).describe('Immutable semantic version, e.g. v1.2.3.'),
