@@ -6,6 +6,14 @@ import {spawn} from 'node:child_process';
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 // 仅发现平台测试、平台内置资源和平台 PC 测试；独立应用不得以转调文件接入。
 export const roots=['Microi.Server/Microi.Tests','Microi.Server/OfficialApplications/Resource','Microi.Client/tests'];
+// 内置微服务迁入契约指定的正式源码根后，全部行为测试继续归平台门禁。
+// 普通独立应用仍不参与自动发现，也不通过同步镜像目录选择另一份源码。
+const platformContract=JSON.parse(fs.readFileSync(path.join(workspace,'Microi.Server/OfficialApplications/Resource/platform-service-release.json'),'utf8'));
+const platformRoot=path.resolve(workspace,platformContract.SourceRoot||'');
+if(platformContract.SchemaVersion!==1||platformContract.AppKey!=='microi-platform-service'
+ ||path.isAbsolute(platformContract.SourceRoot||'')||!platformRoot.startsWith(workspace+path.sep))
+ throw Error('Invalid built-in platform-service source contract.');
+roots.push(path.relative(workspace,path.join(platformRoot,'test')));
 // Microi Code 桌面仓的当前测试使用 Vitest + TypeScript，由 run-tests.ps1 通过
 // 该应用自己的 npm test 入口执行。不要把它误交给 node --test，也不要因为旧的
 // 空 tests/ 目录存在就把零用例当作一个有效回归根。

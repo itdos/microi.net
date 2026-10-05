@@ -95,6 +95,10 @@ function run(storeRows, options = {}) {
     Db: {
       FromSql(sql) {
         queries.push(sql)
+        if (/EMPTY_DATABASE_SAAS_PROMOTION_FIELDS_V1/.test(sql)) {
+          if (options.promotionColumnFailure) throw new Error('promotion schema unavailable')
+          return { ToArray: () => (options.promotionFields || []).map(FieldName => ({ FieldName })) }
+        }
         if (/FROM\s+sys_user\b/i.test(sql)) {
           if (options.adminReadFailure) throw new Error('admin catalog unavailable')
           return { ToArray: () => options.adminUsers || [{ Id: 'admin-user', Level: 9999, IsDeleted: 0,
@@ -190,6 +194,31 @@ function run(storeRows, options = {}) {
   })
   return { result, queries }
 }
+
+test('promotion templates retain schema, clear referral data and disable public registration', () => {
+  const { result } = run([{ Id: 'custom', AppPakcet: JSON.stringify({ DiyTables: [{ Name: 'mci_saas_referral_link' }] }) }], {
+    optionalTables: ['mci_saas_referral_link'],
+    promotionFields: ['ReferralUserId', 'ReferralLinkId', 'PublicTrialRequestId', 'PublicTrialProvisioned', 'TrialEndTime',
+      'SaasPublicTrialEnabled', 'SaasPublicTrialWebBase', 'SaasPromotionManagerRoleIds', 'DbConn']
+  })
+  assert.equal(result.Code, 1)
+  assert.ok(result.Data.ProtectedPlatformTables.includes('mci_saas_referral_link'))
+  assert.ok(!result.Data.ApplicationOwnedTables.includes('mci_saas_referral_link'))
+  assert.match(result.Data.Sql, /DELETE FROM mci_saas_referral_link;/)
+  assert.match(result.Data.Sql, /`ReferralUserId`=NULL/)
+  assert.match(result.Data.Sql, /`SaasPublicTrialEnabled`=0/)
+  assert.match(result.Data.Sql, /`PublicTrialProvisioned`=0/)
+  assert.match(result.Data.Sql, /`SaasPromotionManagerRoleIds`=NULL/)
+  assert.doesNotMatch(result.Data.Sql, /`DbConn`=NULL/)
+})
+
+test('legacy templates omit missing promotion columns and fail closed when their schema cannot be read', () => {
+  const legacy = run([], { optionalTables: [], promotionFields: [] }).result
+  assert.equal(legacy.Code, 1)
+  assert.doesNotMatch(legacy.Data.Sql, /`ReferralUserId`=/)
+  assert.doesNotMatch(legacy.Data.Sql, /DELETE FROM mci_saas_referral_link;/)
+  assert.notEqual(run([], { promotionColumnFailure: true }).result.Code, 1)
+})
 
 test('non-platform package tables and StoreId menu tables enter the cleanup SQL', () => {
   const { result } = run([

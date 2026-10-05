@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.microi-ai-app-remote.json
+# 内置应用固定依赖清单随源码交付，保证发行产物可复建。
+!package-lock.json

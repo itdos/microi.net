@@ -2445,6 +2445,23 @@ var storageType = V8.ClientModel.HDFS; // ClientModel 是兼容别名
 
 共享基础设施可以复用同一 Redis、对象存储、RabbitMQ Broker、MQTT Broker 和搜索集群，但隔离边界由服务端强制执行：缓存 Key、对象路径、队列、Topic、索引分别绑定当前 `OsClient`。RabbitMQ、MQTT 和 Search 还必须为子租户配置独立凭据；缺少独立凭据时对应能力失败关闭，不会回退使用主租户账号。
 
+### 主租户推广授权与公开空库开通原子
+
+SaaS 应用通过以下固定 Key 调用可信原子。它们不能作为任意业务接口的通用跨租户或建库入口：
+
+| 方法 | 绑定接口 | 参数与结果 |
+| --- | --- | --- |
+| `V8.Method.AuthorizeSaasPromotion()` | `platform-saas-promotion` | 重新读取账号、角色、菜单；返回 `UserId,CanViewAll,CanConfigure` 及当前运行分区 |
+| `V8.Method.ReadSaasTenantUsage({TenantIds,Refresh})` | 同上 | 最多20个租户记录 Id；返回固定统计及采集状态、时间，不允许任意 SQL/连接 |
+| `V8.Method.CreateSaasReferralCapability(linkId)` | 同上 | 从主库核验推荐归属，签发绑定主租户与分区的公开链接票据 |
+| `V8.Method.ResumeSaasPublicTrialTask(taskId)` | 同上 | 原推荐人或授权管理者恢复失败申请；保留原幂等键、密码哈希和加密数据库检查点，总执行最多三次 |
+| `V8.Method.SaasPublicTrialAtom(parameters)` | `platform-saas-public-trial` | `Bootstrap / Queue / Progress`；校验链接、推荐人、验证码与额度，创建有幂等键的持久任务 |
+| `V8.Method.ProvisionPublicSaasTrial({GrantCipher})` | `platform-saas-public-trial-worker` | 只接受当前后台任务及栅栏令牌，不接受管理员身份、SQL包或连接参数 |
+
+业务员须具有推广菜单权限，只能读取本人推荐的子租户；管理角色可看全局，平台管理员才可修改公开开通配置。
+公开开通使用有限能力票据，不授予管理员会话。数据库 DDL 前持久化加密账号检查点，恢复时只接续同一任务，
+不接管其它请求的库或旋转既有账号密码。详见 [SaaS 推广中心与客户自主开通](../system-engine/saas-engine.md#saas-推广中心与客户自主开通)。
+
 ## 表单数据 V8.Form
 >* 表单提交事件中可访问表单数据，接口引擎中此对象为空。
 

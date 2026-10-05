@@ -1,7 +1,7 @@
 {
   "SchemaVersion": 1,
   "AppKey": "microi-platform-service",
-  "SourceRoot": "AI-Project/microi/AI应用/microi-platform-service",
+  "SourceRoot": "Microi.Server/OfficialApplications/PlatformService",
   "SourceRole": "CanonicalReleaseSource",
   "RuntimeDelivery": {
     "Primary": "DatabaseOnly",

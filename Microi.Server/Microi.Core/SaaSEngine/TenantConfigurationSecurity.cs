@@ -380,6 +380,9 @@ namespace Microi.net
         {
             var name = (fieldName ?? string.Empty).Trim();
             if (name.Length == 0) return false;
+            if (name.StartsWith("SaasPublicTrial", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("SaasPromotion", StringComparison.OrdinalIgnoreCase)
+                || new[] { "ReferralUserId","ReferralLinkId","PublicTrialRequestId","PublicTrialProvisioned","TrialStartTime","TrialEndTime","PromotionStage","PromotionContact","PromotionPhone","SignupSource","PromotionNotes","PromotionNextFollowup" }.Contains(name,StringComparer.OrdinalIgnoreCase)) return false;
             if (NeverCopyIdentityFieldSet.Contains(name)
                 || SharedInfrastructureFieldSet.Contains(name)
                 || TenantServiceCredentialFieldSet.Contains(name)

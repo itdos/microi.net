@@ -90,6 +90,7 @@ import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
 import MicroAppRuntimeError from "./runtime-error.vue";
 import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 import { hasRenderableMicroAppContent, shouldAutoRecoverMicroApp } from "./render-health.js";
+import { resolveSaasPublicTrialHostConfig } from "./saas-public-trial-route.js";
 import {
     createMicroAppHostCapabilities,
     createMicroAppHostActionResult,
@@ -1271,6 +1272,8 @@ export default {
                 name: this.ownedRouteName
             };
             const meta = this.ownedRouteMeta || {};
+            const publicTrialConfig = resolveSaasPublicTrialHostConfig(meta);
+            if (publicTrialConfig) return publicTrialConfig;
             const query = this.ownedRouteQuery || {};
             const metaParams = parseQueryString(meta.UrlParam);
             const all = {
