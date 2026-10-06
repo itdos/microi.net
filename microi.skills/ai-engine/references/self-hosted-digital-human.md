@@ -14,7 +14,7 @@ Windows 本机参考方案可采用 CPU 运行轻量 Qwen 与中文 TTS、CUDA �
 
 换脸模型选型要追踪身份向量的来源：FaceFusion 官方清单标记 GHOST 为 Apache-2.0、CrossFace 为 OpenRAIL-M，但其当前人脸识别代码仍由标记非商用的 ArcFace 产生身份向量；INSwapper 本身也标记非商用。不能只检查最后一段 GHOST 权重就宣称整条链可零授权费商用。参见 https://docs.facefusion.io/introduction/licenses 与 https://github.com/facefusion/facefusion/blob/master/facefusion/face_recognizer.py 。本机曾试用神经头像输出做只换脸合成，24 帧约 6.66 fps，但胡须、头发和下颌接缝使身份不一致；该原型未发布，不计入交付。
 
-当前 `digital-human-live` v0.4.1 本机路线使用 FasterLivePortrait 的 ONNX 预处理、MediaPipe 检测和 LivePortrait 官方 PyTorch 生成模块，避开 InsightFace 检测权重与 ONNX 5D `GridSample` 限制。源码保留两方 MIT 文本，权重由 `runtime/portrait-model-lock.json` 固定 revision、大小和 SHA-256，下载后仅放入 `.local/portrait`。RTX 2080 SUPER 上的 W/G 生成模块用 CUDA 半精度自动混合精度后，24 帧完整 HTTP 任务实测 6.85 fps、480 × 640；UI 和文档应写成“神经网络头像预览/短片生成”，不得仅凭输出 MP4 的 12 fps 编码帧率承诺流畅实时直播。它保留源照片的衣服和背景，但不做全身服饰动作；原二维换脸与服饰形变应标为实验性。
+当前 `digital-human-live` v0.4.2 本机路线使用 FasterLivePortrait 的 ONNX 预处理、MediaPipe 检测和 LivePortrait 官方 PyTorch 生成模块，避开 InsightFace 检测权重与 ONNX 5D `GridSample` 限制。源码保留两方 MIT 文本，权重由 `runtime/portrait-model-lock.json` 固定 revision、大小和 SHA-256，下载后仅放入 `.local/portrait`。RTX 2080 SUPER 上的 W/G 生成模块用 CUDA 半精度自动混合精度后，24 帧完整 HTTP 任务实测 6.85 fps、480 × 640；UI 和文档应写成“神经网络头像预览/短片生成”，不得仅凭输出 MP4 的 12 fps 编码帧率承诺流畅实时直播。它保留源照片的衣服和背景，但不做全身服饰动作；原二维换脸与服饰形变应标为实验性。
 
 ## 资源与模型
 
@@ -31,6 +31,7 @@ Windows 本机参考方案可采用 CPU 运行轻量 Qwen 与中文 TTS、CUDA �
 - DiyToken 仍是吾码身份与权限入口。数据请求使用平台 SDK、当前租户和真实模块权限；不要把 DiyToken 发往本机模型或其它第三方。
 - 若旧节点的 MCP 模块更新白名单不支持 ModuleEngineKey，不能以接口成功代替字段回读。可通过已有平台授权菜单接口的窄字段投影解析当前租户真实菜单 Id，携带 `_SysMenuId` 调用 FormEngine；不能写死发行租户 Id、放宽表权限或绕过标准 MCP 写入。
 - 本机运行时只监听回环地址，另用随机配对码换取有期限、绑定 Origin 的本机会话。配对码、内部模型密钥和访问会话不出现在 URL、云端业务列或日志中。
+- 同源浏览器的 JSON 配对 POST 可以带 `Origin`，后续同源 GET 可能省略该头；网关校验缺失头时应以已验证的回环 Host 和 scheme 还原同源，显式跨域 `Origin` 仍须与配对来源完全一致。OBS 浏览器来源应回读 `peers>0` 和有画面、有音轨的实际录像，不能只看配对按钮被点击。
 - CORS 使用精确 Origin 列表，同时校验 Host；需要浏览器本地网络权限时明确给出诊断，不以通配 CORS 或绑定公网地址规避限制。
 - 前端不开放任意 Endpoint、文件路径、命令、RTMP shell 参数或 Python 代码。模型输出只是待播报文本，不能执行 V8、SQL 或操作业务数据。
 - 本机媒体任务可由当前租户 Managed 接口引擎先验证 DiyToken、菜单/表读取权限、模式与稳定 requestId；接口仅返回本机执行契约，媒体字节只送往已配对的回环服务。租户 Hook 用 CreateIfMissing 保留扩展点。不能把远端接口返回成功当作本机视频已生成。
