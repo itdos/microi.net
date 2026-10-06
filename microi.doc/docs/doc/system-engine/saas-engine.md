@@ -157,7 +157,9 @@ SaaS 引擎中已移除提醒相关的行、页面和批量按钮，以及表单
 >* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internal"，`DbConn=`"Data Source=192.168.1.11;Database=microi_dev"时，代表使用了`内网IP`+`测试环境数据库`
 >* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internet"，`DbConn`="Data Source=59.110.139.95;Database=microi_dev"时，代表使用了`公网IP`+`测试环境数据库`
 
-空库脱敏脚本 v1.5.7 会只读组织机构表的真实物理列；旧库没有 `ParentName` 时，中性组织初始化只写 `ParentId`。字段发现失败会停止制作，不修改主库结构，不发布不完整空库包。该修复随 SaaS 引擎应用 v8.4.14 交付。
+空库脱敏脚本 v1.5.8 会只读组织机构表的真实物理列；旧库没有 `ParentName` 时，中性组织初始化只写 `ParentId`。字段发现失败会停止制作，不修改主库结构，不发布不完整空库包。该修复随 SaaS 引擎应用 v8.4.14 交付。
+
+SaaS 引擎 v8.4.15 的脱敏脚本 v1.5.9 先将平台微服务的商城行 Id 与兼容 AppKey 写入带主键的临时保留集合，再清理应用文件和版本。此步骤只在隔离副本执行，保留结果与旧脚本一致，避免 MySQL 5.7 对带 OR 的删除关联反复扫描。
 
 ### 租户未找到、缓存恢复与运行登记
 
