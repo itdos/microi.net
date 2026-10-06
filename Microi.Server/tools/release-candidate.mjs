@@ -3,6 +3,7 @@ import {execFileSync} from 'node:child_process';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {snapshotReleaseComposition} from './release-composition.mjs';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Agent','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
@@ -39,7 +40,7 @@ function candidateBytes(key,bytes){
  return JSON.stringify(metadata);
 }
 
-export async function snapshotCandidate(root=workspace,repos=repositories){
+export async function snapshotCandidate(root=workspace,repos=repositories,options={}){
  const files={};
  for(const repository of repos){
   const cwd=path.resolve(root,repository);
@@ -52,11 +53,20 @@ export async function snapshotCandidate(root=workspace,repos=repositories){
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }
  }
- return {scope:'pc-api-docker-with-mobile-sdk-contracts',files};
+ const privateInputs=await snapshotReleaseComposition(root,options);
+ if(privateInputs){
+  for(const [key,value]of Object.entries(privateInputs.files)){
+   if(Object.hasOwn(files,key)&&files[key]!==value)throw Error(`Private composition source collision: ${key}`);
+   files[key]=value;
+  }
+ }
+ return {scope:'pc-api-docker-with-mobile-sdk-contracts',files,...(privateInputs?{composition:privateInputs.composition}:{})};
 }
 
 export function changedCandidate(before,after){
- return [...new Set([...Object.keys(before.files),...Object.keys(after.files)])].filter(name=>before.files[name]!==after.files[name]).sort();
+ const changed=[...new Set([...Object.keys(before.files),...Object.keys(after.files)])].filter(name=>before.files[name]!==after.files[name]);
+ if(JSON.stringify(before.composition??null)!==JSON.stringify(after.composition??null))changed.push('<private-build-composition>');
+ return changed.sort();
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

@@ -19,7 +19,8 @@ function fixture(dialect, exists, declared=false) {
       AddInParameter(key,value){call[key]=value;return this;},ToArray(){return exists?[{TABLE_NAME:'microi_icon'}]:[];}
     };}}}
   };
-  vm.runInNewContext(helper,context);
+  const start=source.indexOf('function isEmptySharedTablePrerequisite('),end=source.indexOf('// INSTALLED_RUNTIME_SUMMARY_V1',start);
+  vm.runInNewContext((start<0?'':source.slice(start,end))+helper,context);
   return {run:context.validateDataSetTablePrerequisites,calls,context};
 }
 for (const dialect of ['MySql','SqlServer','Oracle']) {

@@ -43,6 +43,8 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 
 共享源码持续变化时，可在独立目录保存完整候选源码和依赖，以该目录运行同一 Full 与发布脚本。专用测试服务使用独立端口，通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口（默认仍为 61501、61500）；进程管理器仍必须核验 PID、命令行和工作区归属，不得结束原工作区服务。变量仅供发布脚本使用，不进入生产 API 配置。
 
+私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，实际镜像和部署仍需独立回读。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
+
 macOS 前端构建使用有界 `vm_stat` 探针，根据真实页大小读取空闲页与可回收文件页；匿名非活动页、压缩页和已包含的预读页不叠加。探针失败时回退原生空闲内存，Windows/Linux 保持既有方式；启动余量、95% 暂停与90%恢复及五秒稳定门禁均保留。统计错误应修正探针，正式发布保留内存门禁及共享进程；修复发布逻辑后重新 Full。
 
 DLL 加密脚本只在 Git Bash、MSYS 或 Cygwin 中转换 Windows 路径，优先使用 `cygpath`；macOS/Linux 必须保留原生绝对路径，不能把 `/Users` 或 `/usr` 误认为盘符。修复时先对隔离的构建副本执行原加密器，核对五个目标 DLL 的实际哈希变化及加密指纹，再由一键脚本重新执行 Full、加密和最终产物冒烟；不得以专项测试替代发布门禁。
