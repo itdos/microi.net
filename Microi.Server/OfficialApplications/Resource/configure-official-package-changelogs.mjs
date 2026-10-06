@@ -17,11 +17,11 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
   "releaseTime": "2026-09-06 12:30:00"
 }),
   "app.microi.module-engine.json": Object.freeze({
-  "version": "v7.6.4",
-  "title": "基础应用可选工作流依赖修复",
-  "changeType": "Fix",
-  "content": "修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。",
-  "releaseTime": "2026-09-05 19:16:00"
+  "version": "v8.4.4",
+  "title": "字段权限与树形拖动排序",
+  "changeType": "Feature",
+  "content": "新增角色、人员、部门与岗位的字段可见/可编辑权限设计器，表单引擎校验读取、筛选、统计、导出和写入；树形模块可按指定数值字段拖动排序，接口引擎将旧、新父级全部同级按间隔10重排，维护祖先链并拒绝循环、过期快照与越权写入。需配套更新平台。",
+  "releaseTime": "2026-10-07 06:00:00"
 }),
   "app.microi.store.json": Object.freeze({
   "version": "v8.2.5",
@@ -45,11 +45,11 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
   "releaseTime": "2026-09-06 19:50:00"
 }),
   "app.microi.sys_user.json": Object.freeze({
-  "version": "v7.6.6",
-  "title": "基础应用可选工作流依赖修复",
-  "changeType": "Fix",
-  "content": "修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。",
-  "releaseTime": "2026-09-05 19:16:00"
+  "version": "v8.4.9",
+  "title": "系统账号卡片与历史状态显示优化",
+  "changeType": "Feature",
+  "content": "系统账号卡片使用统一头像、姓名与状态层次，补齐字段标签并移除无说明的权限等级数字；历史状态2纳入禁用标签、筛选和真实统计。新版客户端区分卡片与背景，适配浅色、深色和手机。",
+  "releaseTime": "2026-10-07 06:00:00"
 }),
   "app.microi.sys-config.json": Object.freeze({
   "version": "v6.4.0",
