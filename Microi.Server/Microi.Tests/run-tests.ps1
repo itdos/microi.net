@@ -244,6 +244,7 @@ if ($LASTEXITCODE -ne 0) { throw "File-cabinet Office regression tests failed wi
 
 # Full 的 restore/build/test/list package 全部继承同一 SDK 输出目录。
 # API 与 PC 可并行 Full，不写对方或长期开发服务的 bin/obj；只修改本 PowerShell 子进程环境。
+$env:MICROI_TEST_REPOSITORY_ROOT = $workspaceRoot
 if ($Mode -eq 'Full') {
     $env:ArtifactsPath = [IO.Path]::GetFullPath((Join-Path $ResultsDirectory '.net-artifacts'))
     $env:UseArtifactsOutput = 'true'
