@@ -14,8 +14,8 @@ public class CacheAndUpgradeRegressionTests
     [Fact]
     public void BackgroundTaskStartupContractAcceptsBusinessProjectionAndKeepsLegacyAndSafetyChecks()
     {
-        var load = typeof(UpgradeAppStore).GetMethod("LoadBundledResources", BindingFlags.Static | BindingFlags.NonPublic)!;
-        var check = typeof(UpgradeAppStore).GetMethod("HasPlatformBackgroundTaskCapabilities", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var load = typeof(OfficialApplicationPackageValidation).GetMethod("LoadBundledResources", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var check = typeof(OfficialApplicationPackageValidation).GetMethod("HasPlatformBackgroundTaskCapabilities", BindingFlags.Static | BindingFlags.NonPublic)!;
         var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(load.Invoke(null, null));
         var package = JObject.Parse(resources["app.microi.store.json"]);
         var engine = Assert.Single(package["SysApiEngines"]!.Children<JObject>(), e => e["ApiEngineKey"]?.ToString() == "platform-background-task");
@@ -442,7 +442,7 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
-    public void Upgrade_RepairsOnlyOfficialWebsiteAnonymousApiContract()
+    public void StartupUpgradeDoesNotRewriteOfficialWebsiteBusinessResources()
     {
         var type = typeof(MicroiUpgrade);
         var keysField = type.GetField(
@@ -455,22 +455,17 @@ public class CacheAndUpgradeRegressionTests
             "EnsureOfficialWebsitePublicApiEngineContractAsync",
             BindingFlags.Instance | BindingFlags.NonPublic);
 
-        Assert.NotNull(keysField);
-        var keys = Assert.IsType<string[]>(keysField!.GetValue(null));
-        Assert.Equal(new[] { "send_sms_reg" }, keys);
-        Assert.NotNull(tenantCheck);
-        Assert.Equal(
-            Microi.License.LicenseService.IsOfficialPlatform("iTdos"),
-            Assert.IsType<bool>(tenantCheck!.Invoke(null, new object[] { "iTdos" })));
-        Assert.False(Assert.IsType<bool>(tenantCheck.Invoke(null, new object[] { "customer" })));
-        Assert.NotNull(repairMethod);
-        Assert.Equal(typeof(Task), repairMethod!.ReturnType);
+        Assert.Null(keysField);
+        Assert.Null(tenantCheck);
+        Assert.Null(repairMethod);
+        Assert.True(typeof(MicroiUpgrade).Assembly.GetManifestResourceNames().All(name => !name.Contains("send_sms_reg")));
+
     }
 
     [Fact]
     public void AppStoreBundle_KeepsTrustedImporterAboveJintTwoGigabyteBoundary()
     {
-        var loadResources = typeof(UpgradeAppStore).GetMethod(
+        var loadResources = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(loadResources);
@@ -490,7 +485,7 @@ public class CacheAndUpgradeRegressionTests
     [Fact]
     public void AppStoreBundle_DeliversStartupRuntimeDependenciesAsOneVerifiedCapability()
     {
-        var loadResources = typeof(UpgradeAppStore).GetMethod(
+        var loadResources = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(loadResources);
@@ -600,16 +595,16 @@ public class CacheAndUpgradeRegressionTests
     [Fact]
     public void AppStoreUpgrade_RejectsWorkersWithoutPinnedSnapshotCapabilities()
     {
-        var loadResources = typeof(UpgradeAppStore).GetMethod(
+        var loadResources = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.Static | BindingFlags.NonPublic);
-        var hasImporter = typeof(UpgradeAppStore).GetMethod(
+        var hasImporter = typeof(OfficialApplicationPackageValidation).GetMethod(
             "HasPinnedImporterCapabilities",
             BindingFlags.Static | BindingFlags.NonPublic);
-        var hasBulk = typeof(UpgradeAppStore).GetMethod(
+        var hasBulk = typeof(OfficialApplicationPackageValidation).GetMethod(
             "HasPinnedBulkCapabilities",
             BindingFlags.Static | BindingFlags.NonPublic);
-        var hasSysMenu = typeof(UpgradeAppStore).GetMethod(
+        var hasSysMenu = typeof(OfficialApplicationPackageValidation).GetMethod(
             "HasPlatformSysMenuCapabilities",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(loadResources);
@@ -681,13 +676,13 @@ public class CacheAndUpgradeRegressionTests
     [Fact]
     public void AppStoreBundle_DeliversMarketplaceRuntimeAndDetectsBrokenRuntimeBindings()
     {
-        var loadResources = typeof(UpgradeAppStore).GetMethod(
+        var loadResources = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.Static | BindingFlags.NonPublic);
-        var hasPackagedRuntime = typeof(UpgradeAppStore).GetMethod(
+        var hasPackagedRuntime = typeof(OfficialApplicationPackageValidation).GetMethod(
             "HasPackagedMarketplaceRuntime",
             BindingFlags.Static | BindingFlags.NonPublic);
-        var getRepairReason = typeof(UpgradeAppStore).GetMethod(
+        var getRepairReason = typeof(OfficialApplicationPackageValidation).GetMethod(
             "GetMarketplaceRuntimeRepairReason",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(loadResources);
@@ -758,10 +753,10 @@ public class CacheAndUpgradeRegressionTests
     [Fact]
     public void OfficialSsoBundle_IsEmbeddedAndCarriesManagedHookRuntimeContract()
     {
-        var loadResources = typeof(UpgradeAppStore).GetMethod(
+        var loadResources = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.Static | BindingFlags.NonPublic);
-        var hasPackagedSsoRuntime = typeof(UpgradeAppStore).GetMethod(
+        var hasPackagedSsoRuntime = typeof(OfficialApplicationPackageValidation).GetMethod(
             "HasPackagedSsoRuntime",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(loadResources);
@@ -814,7 +809,7 @@ public class CacheAndUpgradeRegressionTests
     [Fact]
     public void OfficialBundles_DoNotPersistRecursionAboveRuntimeHardCeiling()
     {
-        var loadResources = typeof(UpgradeAppStore).GetMethod(
+        var loadResources = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(loadResources);
@@ -840,7 +835,7 @@ public class CacheAndUpgradeRegressionTests
     [Fact]
     public void AppStoreRefresh_RejectsPersistedRecursionAboveEffectiveRuntimeCeiling()
     {
-        var hasExpectedSettings = typeof(UpgradeAppStore).GetMethod(
+        var hasExpectedSettings = typeof(OfficialApplicationPackageValidation).GetMethod(
             "HasExpectedPublisherSettings",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(hasExpectedSettings);
@@ -893,10 +888,10 @@ public class CacheAndUpgradeRegressionTests
     [Fact]
     public void OnlineAppStoreBundle_WithLegacyImporterLimit_RemainsRuntimeRepairable()
     {
-        var loadResources = typeof(UpgradeAppStore).GetMethod(
+        var loadResources = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.Static | BindingFlags.NonPublic);
-        var validateResource = typeof(UpgradeAppStore).GetMethod(
+        var validateResource = typeof(OfficialApplicationPackageValidation).GetMethod(
             "ValidateResourceContent",
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(loadResources);

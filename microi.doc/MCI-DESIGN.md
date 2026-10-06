@@ -21,6 +21,14 @@ tokens:
     primary: var(--mci-ai-primary)
     primaryStrong: var(--mci-ai-primary-strong)
     cool: var(--mci-ai-cool)
+    trainingStart: var(--mci-home-training-start)
+    trainingEnd: var(--mci-home-training-end)
+    agentStart: var(--mci-home-agent-start)
+    agentEnd: var(--mci-home-agent-end)
+    actionText: var(--mci-home-action-text)
+    pathViolet: var(--mci-home-path-violet)
+    pathBlue: var(--mci-home-path-blue)
+    pathTeal: var(--mci-home-path-teal)
     danger: var(--mci-color-danger, "#D92D20")
   typography:
     display: { size: "clamp(44px, 5.1vw, 62px)", lineHeight: 1.08, weight: 860 }
@@ -39,7 +47,7 @@ tokens:
   shape:
     control: var(--mci-radius-lg, 12px)
     card: 24px
-    heroMap: 26px
+    heroMap: 20px
     pill: var(--mci-radius-pill, 999px)
   elevation:
     card: var(--mci-ai-shadow-soft)
@@ -47,9 +55,9 @@ tokens:
 
 components:
   heroAction:
-    minHeight: 52px
+    minHeight: 46px
     states:
-      default: { background: "{tokens.color.primary}" }
+      default: { trainingGradient: ["{tokens.color.trainingStart}", "{tokens.color.trainingEnd}"], agentGradient: ["{tokens.color.agentStart}", "{tokens.color.agentEnd}"], text: "{tokens.color.actionText}" }
       hover: { lift: -2px }
       focus: { outline: "{tokens.color.primary}" }
       pressed: { scale: 0.98 }
@@ -58,7 +66,7 @@ components:
   developmentMap:
     background: "{tokens.color.surface}"
     radius: "{tokens.shape.heroMap}"
-    padding: "{tokens.spacing.card}"
+    padding: "16px 20px"
     states:
       default: { elevation: "{tokens.elevation.map}" }
       hover: { elevation: "{tokens.elevation.map}" }
@@ -94,7 +102,7 @@ omissions:
 ## 2. 视觉性格与情绪目标
 
 - 主情绪：可信。
-- 具体视觉隐喻：夜间工程控制台——精确边界、清晰分层、少量红色动作信号与青色交付信号。
+- 具体视觉隐喻：夜间工程控制台——精确边界、清晰分层、暖橙色学习入口、蓝色 Agent 入口与三条清晰的开发路径。
 - 辅助气质：克制、敏捷。
 - 选择理由：企业开发平台应让复杂能力看起来有秩序，而不是用功能文字墙证明强大。
 - 明确不采用的视觉语言：随机光球、彩虹渐变、纯聊天工具首屏、营销卡片无限堆叠。
@@ -102,7 +110,7 @@ omissions:
 ## 3. 颜色
 
 - 页面底色与表面关系：画布使用低对比结构网格；地图、价值带和 AI 输入区使用逐级抬升的表面色。
-- 主色只用于：主 CTA、定位强调、当前开发层和焦点状态。
+- 学习入口使用暖橙渐变，Agent 入口使用深蓝渐变；稳定的白色文字覆盖流光。三条路径使用紫、蓝、青语义色区分，亮暗主题分别提供足够对比度。品牌主色继续用于登录等既有操作。
 - 成功 / 警告 / 危险 / 信息色语义：沿用 MCI-UI 语义 token，不把装饰色当状态色。
 - 明亮与暗黑主题的对比策略：暗色使用更亮的红色强调，亮色使用更深的品牌红；正文不依赖透明渐变文字。
 - 透明表面的叠加底色：只叠加在 `--mci-ai-page-bg` 或 `--mci-ai-surface-soft` 上；不支持透明时退回实体表面。
@@ -119,24 +127,24 @@ omissions:
 
 ## 5. 布局与间距
 
-- Desktop：12 列，最大宽度 1320px；AI Studio 先以居中单列建立入口，平台定位区再用 5/7 左右分栏。
-- Tablet：8 列，1100px 以下转为单列，文案居中，开发路径图保持完整宽度。
+- Desktop：12 列，最大宽度 1320px；AI Studio 先以居中单列建立入口，两个入口独立占一行，统一能力面板使用三列开发路径。
+- Tablet：8 列，768–1050px 保持紧凑三列路径，文案居中，面板保持完整宽度。
 - Mobile：4 列，左右安全间距 14px；开发模式从三列变为三段纵向层级。
 - 内部紧凑间距：8–16px；相邻元数据保持同一视觉组。
-- 区域与页面留白：AI Studio 与平台定位区保持约 64–80px 视觉间隔；价值带与 NuGet 证据区保持 56–80px 间隔，禁止一处过疏、一处相贴。
+- 区域与页面留白：AI Studio 桌面上间距 104px、平板 40px、手机 32px，叠加平板/手机导航占位后与桌面保持相近的标题位置；能力带与 NuGet 证据区保持 28px 桌面间隔，禁止一处过疏、一处相贴。
 
 ## 6. 层级、材质与形状
 
 - 深度来自：色调层、细边框、结构网格与环境阴影；玻璃只用于导航等小面积区域。
-- 24–26px 卡片圆角表达完整平台，8–12px 控件圆角表达精确工具感；AI Studio 品牌标识保留金色圆点、暖金描边和完整胶囊轮廓。
-- 页面 / 卡片 / 浮层的层级关系：画布 < 连续价值带 < 开发路径图 / AI 输入区 < 导航。
+- 20–26px 卡片圆角表达完整平台，8–12px 控件圆角表达精确工具感；AI Studio 品牌标识保留金色圆点、暖金描边和完整胶囊轮廓。
+- 页面 / 卡片 / 浮层的层级关系：画布 < 融合优势的开发路径面板 / AI 输入区 < 独立入口行 < 导航。
 - 低性能与不支持透明效果时的降级：实体表面、无扫光、无模糊；信息结构不变。
 
 ## 7. 组件与状态
 
 | 组件 | Default | Hover / Focus / Pressed | Loading | Empty / Error | Disabled | Selected / Success |
 | --- | --- | --- | --- | --- | --- | --- |
-| 主按钮 | 品牌红、图标加文字 | 上浮 2px、3px 焦点环、按压 0.98 | 保持宽度 | - | 0.38 透明度 | - |
+| 主按钮 | 培训大纲为暖橙色、Microi Agent 为蓝色，图标加文字 | 上浮 2px、3px 焦点环、按压 0.98 | 保持宽度 | - | 0.38 透明度 | - |
 | 开发路径图 | 三层关系可读 | 可见边界与焦点 | 静态内容无需加载 | 无脚本仍完整显示 | - | V8 层用品牌色强调 |
 | AI 输入区 | 实体抬升表面 | 快捷按钮与发送按钮三态完整 | 思考点动效 | 错误文案和重试路径 | 未登录显示原因与登录按钮 | 登录后恢复输入 |
 | 应用 / NuGet 数据 | 复用现有组件契约 | 保留键盘焦点 | 贴合最终几何的骨架 | 明确重试，不循环请求 | - | 成功后展示可信数据 |
@@ -144,8 +152,8 @@ omissions:
 ## 8. 页面模式与信息架构
 
 1. 互动入口：Microi AI Studio 以原有金色胶囊品牌标识开场，先表达“复用成熟引擎、贯通低代码到源码、聚焦业务增量”，再承接需求输入。
-2. 平台定位：一句定位、培训大纲与 Microi Code 下载两项操作、平台事实与三层开发路径图，直接承接“开源 AI 开发框架”。下载按钮必须同时显示平台、架构和版本，并指向经 CDN 哈希回读的当前安装包。
-3. 核心任务：用三个连续价值块解释“30+ 成熟引擎开箱即用、Token 更省 10 倍+、速度提升 10 倍+”。
+2. 独立入口行：培训大纲与 Microi Agent 两项操作在同一行居中并排，桌面按钮高 46px、手机高 44px，整行最大宽 560px，分别进入培训大纲和 Agent 产品页；具体安装包的平台、架构与版本由 Agent 产品页承载。
+3. 核心任务：将“30+ 成熟引擎开箱即用、Token 更省 10 倍+、速度提升 10 倍+”分别融入 AI 低代码、V8、微服务三条紧凑路径，桌面面板约 180px 高，与 NuGet 数据卡接近。小图标、优势色与结构网格建立层次。
 4. 证据：NuGet 官方采用数据与公开应用。
 5. 最终行动：快速开始、源码架构、应用体验。
 
@@ -157,7 +165,7 @@ omissions:
 - 0—120ms：结构网格、AI Studio 品牌标识和登录入口可读。
 - 120—360ms：平台定位文案与按钮稳定呈现。
 - 360—800ms：开发路径图进入；不阻塞 CTA 或 AI 入口。
-- 循环动效存在理由：路径图低频扫光只提示“连续交付链”，8 秒一轮且可关闭。
+- 循环动效：两个入口使用 4 秒底色流动、3 秒亮色横向光带、4.5 秒白色微粒漂移；Agent 保留蓝色底并叠加蓝紫光带，培训大纲使用橙金光带，中心降低光带亮度以保持白字可读；路径面板为 9 秒低频扫光。只动画 transform、opacity、background-position，离开视口或切到后台时暂停；不依赖动画传达文字信息。
 - 图片比例与 `object-fit`：应用商城沿用固定预览比例；首屏不依赖图片。
 - `prefers-reduced-motion` 与静态降级：关闭扫光、思考点和过渡，保留最终布局。
 
@@ -165,9 +173,9 @@ omissions:
 
 | 宽度 | 栅格 | 导航 | 主操作 | 内容重排 |
 | --- | --- | --- | --- | --- |
-| 390 | 4 列 | VitePress 手机导航，44px 以上触控区 | 大纲与 Microi Code 下载按钮纵向满宽 | 路径图三层纵向排列，价值带单列 |
-| 768 | 8 列 | 紧凑导航 | 可并排或自然换行 | 首屏单列，地图保持横向三层 |
-| 1440 | 12 列 | 浮动玻璃导航 | 左侧并排 | 5/7 首屏分栏，价值带三列 |
+| 390 | 4 列 | VitePress 手机导航，44px 以上触控区 | 两个入口保持并排、完整可读 | 三条开发路径与各自优势纵向排列 |
+| 768 | 8 列 | 紧凑导航 | 独立入口行并排 | 首屏单列，地图保持横向三层 |
+| 1440 | 12 列 | 浮动玻璃导航 | 独立入口行居中并排 | 统一面板的三条路径各自融合优势 |
 
 ## 11. 可访问性、性能与降级
 

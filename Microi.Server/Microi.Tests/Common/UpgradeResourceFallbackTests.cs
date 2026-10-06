@@ -134,7 +134,7 @@ public class UpgradeResourceFallbackTests
 
     private static MethodInfo GetPrivateStaticMethod(string name)
     {
-        var method = typeof(UpgradeAppStore).GetMethod(
+        var method = typeof(OfficialApplicationPackageValidation).GetMethod(
             name,
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(method);

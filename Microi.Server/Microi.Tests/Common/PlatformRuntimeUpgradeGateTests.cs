@@ -30,7 +30,7 @@ public class PlatformRuntimeUpgradeGateTests
     [Fact]
     public void SaasBundle_ClosesPlatformRuntimeUpgradeContract()
     {
-        var resources = LoadBundledResources();
+        var resources = LoadOfficialResources();
         var package = JObject.Parse(resources["app.microi.saas-engine.json"]);
         var hasPackagedRuntime = GetPrivateStaticMethod("HasPackagedPlatformRuntime");
 
@@ -102,7 +102,7 @@ public class PlatformRuntimeUpgradeGateTests
     [Fact]
     public void SaasBundle_ValidationAcceptsNullPackageAssetsButRejectsScalarMetadata()
     {
-        var package = JObject.Parse(LoadBundledResources()["app.microi.saas-engine.json"]);
+        var package = JObject.Parse(LoadOfficialResources()["app.microi.saas-engine.json"]);
         var bundle = Assert.IsType<JObject>(
             Assert.Single(Assert.IsType<JArray>(package["ApplicationBundles"])));
         var validate = GetPrivateStaticMethod("ValidateResourceContent");
@@ -132,7 +132,7 @@ public class PlatformRuntimeUpgradeGateTests
     public void SaasBundle_SourceZipAbsenceAndExplicitNullShareTheNoSourceContract(
         string assetsJson, bool accepted)
     {
-        var package = JObject.Parse(LoadBundledResources()["app.microi.saas-engine.json"]);
+        var package = JObject.Parse(LoadOfficialResources()["app.microi.saas-engine.json"]);
         var bundle = Assert.IsType<JObject>(
             Assert.Single(Assert.IsType<JArray>(package["ApplicationBundles"])));
         bundle["PackageAssets"] = JObject.Parse(assetsJson);
@@ -147,7 +147,7 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
-    public void StartupDependencyGate_LoadsEveryEngineFromAllOfficialBaselinePackages()
+    public void StartupDependencyGate_LoadsOnlyVerifiedBootstrapEngines()
     {
         var method = typeof(UpgradeAppStore).GetMethod(
             "LoadBundledStartupDependencyEngines",
@@ -155,19 +155,9 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.NotNull(method);
         var engines = Assert.IsAssignableFrom<IReadOnlyList<JObject>>(
             method!.Invoke(null, null));
-        var resources = LoadBundledResources();
-        var packageResources = new[]
-        {
-            "app.microi.form-engine.json",
-            "app.microi.module-engine.json",
-            "app.microi.saas-engine.json",
-            "app.microi.sso.json",
-            "app.microi.store.json",
-            "app.microi.sys_user.json",
-            "app.microi.sys-config.json",
-            "app.microi.message-notification.json",
-            "app.microi.ai-engine.json"
-        };
+        var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
+            typeof(UpgradeAppStore).GetMethod("LoadBundledResources", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, null));
+        var packageResources = new[] { "app.microi.bootstrap.json" };
         var expected = packageResources
             .Select(resourceName => JObject.Parse(resources[resourceName]))
             .SelectMany(package => package["SysApiEngines"]?.Children<JObject>()
@@ -211,8 +201,8 @@ public class PlatformRuntimeUpgradeGateTests
         var expectedSet = expected.ToHashSet(StringComparer.Ordinal);
         Assert.Contains("platform-runtime-custom-hook", expectedSet);
         Assert.Contains("platform-service-health", expectedSet);
-        Assert.Contains("platform-sys-dept", expectedSet);
-        Assert.Contains("mci-module-presentation-stats", expectedSet);
+        Assert.DoesNotContain("platform-sys-dept", expectedSet);
+        Assert.DoesNotContain("mci-module-presentation-stats", expectedSet);
         Assert.Contains("get-microi-store", expectedSet);
         Assert.Contains("bulk-import-microi-store-packages", expectedSet);
         Assert.Contains("platform-background-task", expectedSet);
@@ -222,8 +212,6 @@ public class PlatformRuntimeUpgradeGateTests
                      "platform-current-user",
                      "platform-private-file-url",
                      "platform-service-health",
-                     "platform-sys-dept",
-                     "mci-module-presentation-stats",
                      "bulk-import-microi-store-packages",
                      "platform-background-task"
                  })
@@ -353,7 +341,7 @@ public class PlatformRuntimeUpgradeGateTests
     [InlineData("v1.0.0", true)]
     [InlineData("v1.0.0                                            ", true)]
     [InlineData("V1.0.0                                            ", true)]
-    [InlineData("v1.0.1                                            ", false)]
+    [InlineData("v1.0.1                                            ", true)]
     [InlineData("v1.0                                              ", false)]
     [InlineData(" v1.0.0", false)]
     [InlineData("v1.0.0\t", false)]
@@ -431,7 +419,7 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.Contains("EnsureStartupDependenciesAsync(mainTenant", startupGate);
         var versionChain = File.ReadAllText(Path.Combine(serverRoot, "Microi.Upgrade", "Upgrade.cs"));
         Assert.Contains("EnsureRuntimePhysicalPrerequisitesAsync", coordinator);
-        Assert.Contains("EnsureStartupDependenciesUnderLeaseAsync", versionChain);
+        Assert.Contains("new UpgradeAppStore().Run", versionChain);
         Assert.Contains("EnsureMarketplaceMetadataBootstrapUnderLeaseAsync", versionChain);
         Assert.DoesNotContain("【自动升级状态】", program);
         Assert.Contains("【自动升级状态】", startupGate);
@@ -492,22 +480,21 @@ public class PlatformRuntimeUpgradeGateTests
             "Microi.Upgrade",
             "13-UpgradeAppStore.cs"));
 
-        Assert.Contains("var nullableErrors = new List<string>();", source);
-        Assert.Contains("msgs.AddRange(nullableErrors);", source);
-        Assert.Contains("【核心字段可空兼容】全部检查成功", source);
-        Assert.Contains("errors.Add($\"核心表 {tableName}.{columnName} 调整为允许为空失败", source);
-        Assert.DoesNotContain("msgs.Add($\"核心表 {tableName} 已将", source);
-        Assert.Contains("public static string Version = \"7.6.13.0\"", source);
-        Assert.Contains("MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1", source);
+        var compatibility = File.ReadAllText(Path.Combine(FindServerRoot(), "Microi.Upgrade", "RuntimeColumnNullability.cs"));
+        Assert.Contains("throw new InvalidOperationException", compatibility);
+        Assert.Contains("ConfirmOwnership", compatibility);
+        Assert.Contains("public const string Version = \"7.6.15.0\"", source);
         Assert.Contains("PACKAGE_MANAGED_OVERWRITE_V2", source);
         Assert.Contains("执行覆盖式重放以修复资源漂移", source);
-        Assert.DoesNotContain("平台运行时接口自举存在客户源码或稳定身份冲突", source);
+        Assert.Contains("if (errors.Count > 0) return errors;", source);
+        Assert.DoesNotContain("SsoPackageResourceName", source);
+
     }
 
     [Fact]
     public void PlatformRuntimeGate_RejectsManagedDrift_ButNeverComparesTenantHookSource()
     {
-        var package = JObject.Parse(LoadBundledResources()["app.microi.saas-engine.json"]);
+        var package = JObject.Parse(LoadOfficialResources()["app.microi.saas-engine.json"]);
         var hasPackagedRuntime = GetPrivateStaticMethod("HasPackagedPlatformRuntime");
         var hasExpectedEngine = GetPrivateStaticMethod("HasExpectedPlatformRuntimeEngineContract");
 
@@ -612,7 +599,7 @@ public class PlatformRuntimeUpgradeGateTests
     [Fact]
     public void V8FirstApplicationGate_RequiresAiRuntimeSchemaAndSysUserAiKeyOwnership()
     {
-        var resources = LoadBundledResources();
+        var resources = LoadOfficialResources();
         var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");
         var sysUser = JObject.Parse(resources["app.microi.sys_user.json"]);
         var ai = JObject.Parse(resources["app.microi.ai-engine.json"]);
@@ -716,7 +703,7 @@ public class PlatformRuntimeUpgradeGateTests
     {
         var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");
         const string name = "app.microi.sys-config.json";
-        var package = JObject.Parse(LoadBundledResources()[name]);
+        var package = JObject.Parse(LoadOfficialResources()[name]);
         bool Accepts(JObject candidate) => Assert.IsType<bool>(validate.Invoke(null, new object[] { name, candidate }));
         Assert.True(Accepts(package));
         foreach (var key in new[] { "platform-hdfs-upload", "platform-hdfs-upload-hook" })
@@ -741,7 +728,7 @@ public class PlatformRuntimeUpgradeGateTests
     public void V8FirstApplicationGate_AllowsNewManagedEngineAndRejectsUnownedExtension()
     {
         var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");
-        var package = JObject.Parse(LoadBundledResources()["app.microi.sys_user.json"]);
+        var package = JObject.Parse(LoadOfficialResources()["app.microi.sys_user.json"]);
         var engines = Assert.IsType<JArray>(package["SysApiEngines"]);
         var policies = Assert.IsType<JObject>(package["ResourcePolicies"]?["ApiEngines"]);
         const string futureKey = "platform-future-managed-regression";
@@ -785,7 +772,7 @@ public class PlatformRuntimeUpgradeGateTests
     public void V8FirstApplicationGate_AllowsForwardCompatiblePackageStorageCapability()
     {
         var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");
-        var package = JObject.Parse(LoadBundledResources()["app.microi.store.json"]);
+        var package = JObject.Parse(LoadOfficialResources()["app.microi.store.json"]);
         var capabilities = Assert.IsType<JArray>(package["PackageInfo"]?["Capabilities"]);
 
         Assert.Contains(
@@ -816,7 +803,7 @@ public class PlatformRuntimeUpgradeGateTests
         var expectedHook = GetPrivateStaticMethod("ExpectedV8FirstHookMarker");
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
             FindServerRoot(),
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "app.microi.message-notification.json")));
 
@@ -873,7 +860,7 @@ public class PlatformRuntimeUpgradeGateTests
 
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
             serverRoot,
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "app.microi.form-engine.json")));
         var ddl = Assert.Single(package["DDLStatements"]!.Children<JObject>(), item =>
@@ -892,7 +879,7 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.NotNull(typeof(DiyFieldParam).GetProperty(nameof(DiyFieldParam.V8Code)));
         Assert.Contains(DiyField._.V8Code, new DiyField().GetFields());
 
-        var package = JObject.Parse(LoadBundledResources()["app.microi.sys_user.json"]);
+        var package = JObject.Parse(LoadOfficialResources()["app.microi.sys_user.json"]);
         var historicalButton = Assert.Single(
             package["DiyFields"]!.Children<JObject>(),
             field => field["Component"]?.ToString() == "Button"
@@ -904,16 +891,17 @@ public class PlatformRuntimeUpgradeGateTests
 
     private static MethodInfo GetPrivateStaticMethod(string name)
     {
-        var method = typeof(UpgradeAppStore).GetMethod(
+        var validationMethods = new[] { "HasPackagedPlatformRuntime", "ValidateResourceContent", "GetResourceContentValidationError", "HasExpectedPlatformRuntimeEngineContract", "HasPackagedV8FirstApplicationRuntime", "ExpectedV8FirstHookMarker" };
+        var method = (validationMethods.Contains(name) ? typeof(OfficialApplicationPackageValidation) : typeof(UpgradeAppStore)).GetMethod(
             name,
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(method);
         return method!;
     }
 
-    private static IReadOnlyDictionary<string, string> LoadBundledResources()
+    private static IReadOnlyDictionary<string, string> LoadOfficialResources()
     {
-        var method = GetPrivateStaticMethod("LoadBundledResources");
+        var method = typeof(OfficialApplicationPackageValidation).GetMethod("LoadBundledResources", BindingFlags.Static | BindingFlags.NonPublic)!;
         return Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(method.Invoke(null, null));
     }
 

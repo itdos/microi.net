@@ -175,6 +175,15 @@ export const constantRoutes = [
             }
         ]
     },
+    {
+        path: "/micro-app/microi-platform-service/saas-trial",
+        component: Layout,
+        hidden: true,
+        children: [{ path: "", name: "saas_public_trial", component: MicroAppHost,
+            meta: { title: "开通试用", anonymous: true, hideShellForAnonymous: true,
+                saasPublicTrial: true, microAppFriendlyRoute: true, microAppHost: true,
+                microAppCacheMode: "runtime-keep-alive", keepAlive: false } }]
+    },
     // MicroService 友好路由和表单设计器一样，属于平台协议入口而不是租户菜单。
     // 必须在首次解析 URL 时就存在；若等 GetSysMenuStep 后才动态注入，冷启动会先
     // 得到一个没有匹配组件的路由，菜单或网络稍有抖动就只剩空 RouterView。

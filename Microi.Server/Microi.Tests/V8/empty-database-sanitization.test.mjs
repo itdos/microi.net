@@ -5,14 +5,18 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
+const repo = path.resolve(here, '../../..')
+const contract = JSON.parse(fs.readFileSync(path.join(repo, 'AI-Project/标准产品套件/source-contract.json'), 'utf8'))
+assert.equal(contract.schemaVersion, 1)
+assert.equal(contract.target.apiBase, 'https://api.itdos.com')
+assert.equal(String(contract.target.osClient).toLowerCase(), 'itdos')
+assert.ok(typeof contract.sourceParent === 'string' && !path.isAbsolute(contract.sourceParent))
+const sourceParent = path.resolve(repo, contract.sourceParent)
+const relative = path.relative(repo, sourceParent)
+assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative), '责任源码根必须位于当前工作区')
+assert.ok(fs.statSync(sourceParent).isDirectory(), '契约责任源码缺失时必须失败')
 const enginePath = path.join(
-  here,
-  '..',
-  '..',
-  '..',
-  'Microi-V8-Engine',
-  'Microi吾码 (api.itdos.com)',
-  'iTdos.Product.Internal',
+  path.dirname(sourceParent),
   '接口引擎',
   '系统',
   '[SaaS引擎]主库空数据库脱敏SQL(admin_get_empty_database_sanitization_sql).js'
@@ -73,16 +77,40 @@ function run(storeRows, options = {}) {
   const queries = []
   const tablePages = options.tablePages || [defaultTables]
   const menuPages = options.menuPages || [defaultMenus]
+  const generatedIds = options.generatedIds || Array.from({ length: 7 }, (_, index) => `f0000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`)
+  let guidIndex = 0
   const result = execute({
+    Method: {
+      NewGuid() {
+        if (options.guidFailure) throw new Error('random identity unavailable')
+        return generatedIds[guidIndex++]
+      }
+    },
+    EncryptHelper: {
+      DESEncode(value) {
+        if (options.encryptionFailure) throw new Error('credential encryption unavailable')
+        return options.plaintextCipher ? value : `encrypted:${value}`
+      }
+    },
     Db: {
       FromSql(sql) {
         queries.push(sql)
+        if (/EMPTY_DATABASE_SAAS_PROMOTION_FIELDS_V1/.test(sql)) {
+          if (options.promotionColumnFailure) throw new Error('promotion schema unavailable')
+          return { ToArray: () => (options.promotionFields || []).map(FieldName => ({ FieldName })) }
+        }
+        if (/FROM\s+sys_user\b/i.test(sql)) {
+          if (options.adminReadFailure) throw new Error('admin catalog unavailable')
+          return { ToArray: () => options.adminUsers || [{ Id: 'admin-user', Level: 9999, IsDeleted: 0,
+            RoleIds: JSON.stringify([{ Id: '5db47859-35a3-411a-a1f7-99482e057d24' }]) }] }
+        }
         if (/FROM\s+sys_role\b/i.test(sql)) {
           if (options.roleReadFailure) throw new Error('role catalog unavailable')
-          return { ToArray: () => options.templateRoles || [
+          const roles = options.templateRoles || [
             { Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 9999, IsDeleted: 0 },
             { Id: '949b2e88-cfa1-44cd-b234-85f043785ece', Level: 0, IsDeleted: 0 }
-          ] }
+          ]
+          return { ToArray: () => roles.filter(role => role.Level === 9999 && role.IsDeleted === 0) }
         }
         if (/FROM\s+sys_dept\b/i.test(sql)) {
           if (options.departmentReadFailure) throw new Error('department catalog unavailable')
@@ -166,6 +194,31 @@ function run(storeRows, options = {}) {
   })
   return { result, queries }
 }
+
+test('promotion templates retain schema, clear referral data and disable public registration', () => {
+  const { result } = run([{ Id: 'custom', AppPakcet: JSON.stringify({ DiyTables: [{ Name: 'mci_saas_referral_link' }] }) }], {
+    optionalTables: ['mci_saas_referral_link'],
+    promotionFields: ['ReferralUserId', 'ReferralLinkId', 'PublicTrialRequestId', 'PublicTrialProvisioned', 'TrialEndTime',
+      'SaasPublicTrialEnabled', 'SaasPublicTrialWebBase', 'SaasPromotionManagerRoleIds', 'DbConn']
+  })
+  assert.equal(result.Code, 1)
+  assert.ok(result.Data.ProtectedPlatformTables.includes('mci_saas_referral_link'))
+  assert.ok(!result.Data.ApplicationOwnedTables.includes('mci_saas_referral_link'))
+  assert.match(result.Data.Sql, /DELETE FROM mci_saas_referral_link;/)
+  assert.match(result.Data.Sql, /`ReferralUserId`=NULL/)
+  assert.match(result.Data.Sql, /`SaasPublicTrialEnabled`=0/)
+  assert.match(result.Data.Sql, /`PublicTrialProvisioned`=0/)
+  assert.match(result.Data.Sql, /`SaasPromotionManagerRoleIds`=NULL/)
+  assert.doesNotMatch(result.Data.Sql, /`DbConn`=NULL/)
+})
+
+test('legacy templates omit missing promotion columns and fail closed when their schema cannot be read', () => {
+  const legacy = run([], { optionalTables: [], promotionFields: [] }).result
+  assert.equal(legacy.Code, 1)
+  assert.doesNotMatch(legacy.Data.Sql, /`ReferralUserId`=/)
+  assert.doesNotMatch(legacy.Data.Sql, /DELETE FROM mci_saas_referral_link;/)
+  assert.notEqual(run([], { promotionColumnFailure: true }).result.Code, 1)
+})
 
 test('non-platform package tables and StoreId menu tables enter the cleanup SQL', () => {
   const { result } = run([
@@ -479,40 +532,42 @@ test('application HDFS package indices are removed before stores without purging
   assert.doesNotMatch(absent.Data.Sql, /DELETE p FROM sys_microistore_package p/)
 })
 
-test('empty template retains only canonical roles and rebuilds admin/demo role snapshots', () => {
+test('empty template retains the current administrator role and creates an isolated read-only demo role', () => {
   const { result } = run([])
   assert.equal(result.Code, 1)
   assert.deepEqual(result.Data.TemplateRoleIds, [
-    '5db47859-35a3-411a-a1f7-99482e057d24', '949b2e88-cfa1-44cd-b234-85f043785ece'
+    '5db47859-35a3-411a-a1f7-99482e057d24', 'f0000000-0000-4000-8000-000000000001'
   ])
   const sql = result.Data.Sql
-  assert.match(sql, /DELETE FROM sys_role WHERE Id NOT IN \('5db47859-35a3-411a-a1f7-99482e057d24','949b2e88-cfa1-44cd-b234-85f043785ece'\);/)
+  assert.match(sql, /DELETE FROM sys_role WHERE Id <> '5db47859-35a3-411a-a1f7-99482e057d24';/)
+  assert.match(sql, /DELETE FROM sys_rolelimit WHERE RoleId <> '5db47859-35a3-411a-a1f7-99482e057d24';/)
   assert.match(sql, /RoleIds=CASE WHEN LOWER\(Account\)='admin' THEN '\[\{"Id":"5db47859-35a3-411a-a1f7-99482e057d24","Name":"超级管理员","Level":9999\}\]'/)
-  assert.match(sql, /ELSE '\[\{"Id":"949b2e88-cfa1-44cd-b234-85f043785ece","Name":"演示角色","Level":0\}\]'/)
+  assert.match(sql, /ELSE '\[\{"Id":"f0000000-0000-4000-8000-000000000001","Name":"演示角色","Level":0\}\]'/)
   assert.match(sql, /RolePermissionDetails='\[\]', DeptIds='\[\]'/)
-  assert.match(sql, /BaseLimit=CASE WHEN Id='949b2e88-cfa1-44cd-b234-85f043785ece' THEN '\["OnlyGet"\]'/)
+  assert.match(sql, /VALUES \('f0000000-0000-4000-8000-000000000001', '演示角色', 0, '\["OnlyGet"\]'/)
+  assert.doesNotMatch(sql, /949b2e88-cfa1-44cd-b234-85f043785ece/)
   assert.match(sql, /LEFT JOIN sys_role r ON r.Id=rl.RoleId[\s\S]*WHERE r.Id IS NULL/)
   assert.match(sql, /LEFT JOIN diy_table t ON t.Id=rl.FkId[\s\S]*LOWER\(COALESCE\(rl.Type,''\)\)='table' AND t.Id IS NULL/)
   assert.ok(sql.lastIndexOf('EMPTY_DATABASE_ROLE_PERMISSION_RESIDUE_V1') > sql.lastIndexOf("delete from sys_menu where"))
 })
 
-test('missing, deleted, elevated demo or unreadable canonical role rejects incomplete empty template', () => {
+test('missing, ambiguous, unbound, deleted or unreadable administrator identity rejects incomplete empty template', () => {
   for (const options of [
-    { roleReadFailure: true },
+    { roleReadFailure: true }, { adminReadFailure: true }, { adminUsers: [] },
+    { adminUsers: [{ Level: 0, RoleIds: '[]' }] },
+    { adminUsers: [{ Level: 9999, RoleIds: '{invalid' }] },
+    { adminUsers: [{ Level: 9999, RoleIds: '[]' }] },
+    { adminUsers: [{ Level: 9999, RoleIds: '[]' }, { Level: 9999, RoleIds: '[]' }] },
     { templateRoles: [] },
-    { templateRoles: [{ Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 9999, IsDeleted: 0 }] },
-    { templateRoles: [
-      { Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 9999, IsDeleted: 0 },
-      { Id: '949b2e88-cfa1-44cd-b234-85f043785ece', Level: 9999, IsDeleted: 0 }
-    ] },
-    { templateRoles: [
-      { Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 9999, IsDeleted: 1 },
-      { Id: '949b2e88-cfa1-44cd-b234-85f043785ece', Level: 0, IsDeleted: 0 }
-    ] }
+    { templateRoles: [{ Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 0, IsDeleted: 0 }] },
+    { templateRoles: [{ Id: '5db47859-35a3-411a-a1f7-99482e057d24', Level: 9999, IsDeleted: 1 }] },
+    { templateRoles: [{ Id: 'other-role', Level: 9999, IsDeleted: 0 }] },
+    { adminUsers: [{ Level: 9999, RoleIds: '[{"Id":"role-a"},{"Id":"role-b"}]' }], templateRoles: [
+      { Id: 'role-a', Level: 9999, IsDeleted: 0 }, { Id: 'role-b', Level: 9999, IsDeleted: 0 }] }
   ]) {
     const { result } = run([], options)
     assert.equal(result.Code, 0)
-    assert.match(result.Msg, /初始角色/)
+    assert.match(result.Msg, /初始身份/)
     assert.equal(result.Data?.Sql, undefined)
   }
 })
@@ -535,26 +590,46 @@ test('orphan installations require a retained platform identity, never a name or
 test('empty template rebuilds a minimal organization and user department names without legacy account links', () => {
   const { result } = run([], { optionalTables: ['sys_userfk'] })
   assert.equal(result.Code, 1)
-  assert.deepEqual(result.Data.TemplateDepartmentIds, ['933da282-adf7-4b1d-90f9-bfad70dae3a5', 'b4612bd0-f318-40f3-a620-547fa3e9cbc2'])
-  assert.match(result.Data.Sql, /DELETE FROM sys_dept WHERE Id NOT IN \('933da282-adf7-4b1d-90f9-bfad70dae3a5','b4612bd0-f318-40f3-a620-547fa3e9cbc2'\);/)
-  assert.match(result.Data.Sql, /DeptId='b4612bd0-f318-40f3-a620-547fa3e9cbc2', DeptName='默认部门', DeptIds='\[\]'/)
-  assert.match(result.Data.Sql, /THEN '默认组织' ELSE '默认部门' END/)
+  assert.deepEqual(result.Data.TemplateDepartmentIds, ['f0000000-0000-4000-8000-000000000002', 'f0000000-0000-4000-8000-000000000003'])
+  assert.match(result.Data.Sql, /DELETE FROM sys_dept;/)
+  assert.match(result.Data.Sql, /DeptId='f0000000-0000-4000-8000-000000000003', DeptName='默认部门', DeptIds='\[\]'/)
+  assert.match(result.Data.Sql, /\('f0000000-0000-4000-8000-000000000002', '默认组织', '00000000-0000-0000-0000-000000000000'/)
+  assert.match(result.Data.Sql, /\('f0000000-0000-4000-8000-000000000003', '默认部门', 'f0000000-0000-4000-8000-000000000002', '默认组织'/)
+  assert.doesNotMatch(result.Data.Sql, /933da282-adf7-4b1d-90f9-bfad70dae3a5|b4612bd0-f318-40f3-a620-547fa3e9cbc2/)
   assert.match(result.Data.Sql, /DELETE FROM sys_userfk;/)
   const absent=run([], { optionalTables: [] }).result
   assert.doesNotMatch(absent.Data.Sql, /DELETE FROM sys_userfk;/)
 })
 
-test('missing, deleted or unreadable canonical department prevents publishing a broken organization', () => {
+test('invalid, repeated or unavailable template identifiers prevent publishing a broken organization', () => {
   for (const options of [
-    { departmentReadFailure: true }, { templateDepartments: [] },
-    { templateDepartments: [
-      { Id: '933da282-adf7-4b1d-90f9-bfad70dae3a5', IsDeleted: 0 },
-      { Id: 'b4612bd0-f318-40f3-a620-547fa3e9cbc2', IsDeleted: 1 }
-    ] }
+    { guidFailure: true }, { generatedIds: ['invalid'] }, { generatedIds: [] },
+    { generatedIds: Array(8).fill('f0000000-0000-4000-8000-000000000001') }
   ]) {
     const { result }=run([],options)
     assert.equal(result.Code,0)
-    assert.match(result.Msg,/初始组织/)
+    assert.match(result.Msg,/初始身份/)
     assert.equal(result.Data?.Sql,undefined)
+  }
+})
+
+test('portable templates use tenant administrator identity and never depend on pre-existing demo or organization IDs', () => {
+  const {result, queries} = run([], { adminUsers: [{ Level: 9999, RoleIds: '[{"Id":"tenant-admin-role"}]' }],
+    templateRoles: [{ Id: 'tenant-admin-role', Level: 9999, IsDeleted: 0 }], templateDepartments: [], departmentReadFailure: true })
+  assert.equal(result.Code, 1)
+  assert.equal(result.Data.TemplateRoleIds[0], 'tenant-admin-role')
+  assert.match(result.Data.Sql, /WHERE Id <> 'tenant-admin-role'/)
+  assert.equal(new Set([...result.Data.TemplateRoleIds, ...result.Data.TemplateDepartmentIds]).size, 4)
+  assert.ok(queries.every(sql => !/FROM\s+sys_dept\b/i.test(sql)), '业务组织不能作为空库中性身份的前置依赖')
+})
+
+test('unavailable encryption, plaintext ciphertext or reused random secrets reject unsafe demonstration credentials', () => {
+  for (const options of [{ encryptionFailure: true }, { plaintextCipher: true },
+    { generatedIds: ['f0000000-0000-4000-8000-000000000001','f0000000-0000-4000-8000-000000000002','f0000000-0000-4000-8000-000000000003',
+      'f0000000-0000-4000-8000-000000000004','f0000000-0000-4000-8000-000000000005','f0000000-0000-4000-8000-000000000004','f0000000-0000-4000-8000-000000000005'] }]) {
+    const {result} = run([], options)
+    assert.equal(result.Code, 0)
+    assert.match(result.Msg, /演示凭据/)
+    assert.equal(result.Data?.Sql, undefined)
   }
 })

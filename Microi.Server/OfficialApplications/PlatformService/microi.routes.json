@@ -1,0 +1,116 @@
+[
+  {
+    "path": "/create-empty-tenant",
+    "name": "create-empty-tenant",
+    "title": "创建SaaS租户",
+    "sort": 0,
+    "isHome": true
+  },
+  {
+    "path": "/tenant-database-upgrade",
+    "name": "tenant-database-upgrade",
+    "title": "升级租户数据库",
+    "sort": 5,
+    "isHome": false
+  },
+  {
+    "path": "/app-store-data-selector",
+    "name": "app-store-data-selector",
+    "title": "选择应用数据",
+    "sort": 10,
+    "isHome": false
+  },
+  {
+    "path": "/app-package-selector",
+    "name": "app-package-selector",
+    "title": "配置 AI 应用包",
+    "sort": 20,
+    "isHome": false
+  },
+  {
+    "path": "/offline-package-installer",
+    "name": "offline-package-installer",
+    "title": "安装离线包",
+    "sort": 30,
+    "isHome": false
+  },
+  {
+    "path": "/database-backup",
+    "name": "database-backup",
+    "title": "数据库定时备份",
+    "sort": 40,
+    "isHome": false
+  },
+  {
+    "path": "/personal-settings",
+    "name": "personal-settings",
+    "title": "个人中心",
+    "sort": 50,
+    "isHome": false
+  },
+  {
+    "path": "/system-settings",
+    "name": "system-settings",
+    "title": "租户系统设置",
+    "sort": 60,
+    "isHome": false
+  },
+  {
+    "path": "/system-observability",
+    "name": "system-observability",
+    "title": "系统日志/监控",
+    "sort": 70,
+    "isHome": false,
+    "legacyMenuUrls": [
+      "/syslog",
+      "/mic-system-monitor"
+    ],
+    "retireLegacyMenus": true
+  },
+  {
+    "path": "/marketplace",
+    "name": "marketplace",
+    "title": "全能应用商城",
+    "sort": 80,
+    "isHome": false
+  },
+  {
+    "path": "/platform-ops",
+    "name": "platform-ops",
+    "title": "吾码服务器运维面板",
+    "sort": 90,
+    "isHome": false
+  },
+  {
+    "path": "/platform-reminders",
+    "name": "platform-reminders",
+    "title": "消息通知",
+    "legacyMenuUrls": [
+      "/xiaoxitongzhisz"
+    ],
+    "retireLegacyMenus": true,
+    "sort": 100,
+    "isHome": false,
+    "SourceFile": "src/PlatformReminders.vue"
+  },
+  {
+    "path": "/saas-promotion",
+    "name": "saas-promotion",
+    "title": "SaaS推广中心",
+    "sort": 110,
+    "isHome": false,
+    "SourceFile": "src/SaasPromotion.vue"
+  },
+  {
+    "path": "/saas-trial",
+    "name": "saas-trial",
+    "title": "开通试用",
+    "sort": 120,
+    "isHome": false,
+    "SourceFile": "src/SaasPublicTrial.vue",
+    "RouteMetaJson": {
+      "Anonymous": true,
+      "SourceFile": "src/SaasPublicTrial.vue"
+    }
+  }
+]

@@ -1,3 +1,5 @@
+import workspacePaths from './lib/workspace-paths.js'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -29,9 +31,9 @@ test('我参与的和全部有权不会误当成当前待办', () => {
 
 const root = join(import.meta.dirname, '..', '..', 'Microi-V8-Engine', '集福鲤平台 (api.jifulii.com)', 'xjy.Product.Internal')
 const eventSource = readFileSync(join(root, '表单引擎', '售后订单（Diy_ShouhouDD）', '表单V8事件', '后端表单提交前V8事件（SubmitBeforeServerV8）.js'), 'utf8')
-const authorizeSource = readFileSync(join(root, '接口引擎', '未分类', '售后流程动作授权(shouhoudd_authorize_flow_action).js'), 'utf8')
-const reassignSource = readFileSync(join(root, '接口引擎', '未分类', '售后客服阶段转交(shouhoudd_reassign_support).js'), 'utf8')
-const resolveSource = readFileSync(join(root, '接口引擎', '未分类', '售后任务阶段负责人解析(shouhoudd_resolve_stage_owners).js'), 'utf8')
+const authorizeSource = readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'shouhoudd_authorize_flow_action'), 'utf8')
+const reassignSource = readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'shouhoudd_reassign_support'), 'utf8')
+const resolveSource = readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'shouhoudd_resolve_stage_owners'), 'utf8')
 
 function runCreateEvent(form, rows) {
   const result = { FormSubmitAction: 'Add', Form: form, Action: { GetDateTimeNow: () => '2026-09-23 12:00:00' }, DbTrans: {},
@@ -93,8 +95,8 @@ test('服务端批量新增入口使用同样的订单优先责任人解析', ()
   assert.equal(result.Data.ShouhouRYID, 'service')
   assert.equal(result.Data.HouxuFZRID, 'order-cs')
   assert.equal(result.Data.HouxuFPLY, '合同订单专属客服')
-  for (const filename of ['PC端_订单审批(dingdan_shenpi).js', '移动端-申请售后(shenqing_shouhou).js', '客户生成周期任务(kehu_dingqirw).js']) {
-    assert.match(readFileSync(join(root, '接口引擎', '未分类', filename), 'utf8'), /shouhoudd_resolve_stage_owners/)
+  for (const apiEngineKey of ['dingdan_shenpi', 'shenqing_shouhou', 'kehu_dingqirw']) {
+    assert.match(readFileSync(workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), apiEngineKey), 'utf8'), /shouhoudd_resolve_stage_owners/)
   }
 })
 

@@ -223,6 +223,8 @@ var stable = await V8.Vision.Stabilize({
 
 根目录 `Microi一键编译发布.sh` 已把 `Microi.Vision` 纳入与 AI/Workflow 相同的 Obfuscar 清单：发布目录先混淆 DLL，再替换 nupkg 内原 DLL；缺少 `.microi-encrypted` 记录、混淆前后哈希不变或包内 DLL 哈希不一致都会阻止发布。模型权重独立部署，不进入源码仓和 NuGet。
 
+五个闭源项目（Microi.net、Microi.AI、Microi.MCP、Microi.WorkFlow、Microi.Vision）必须完整进入同一加密链。闭源源码存在而加密脚本缺失时直接停止，不能按开源模式跳过。一键脚本记录实际 DLL 加密前后的 SHA-256，上传前读取真实 NuGet ZIP 和实际 Docker 镜像中的 DLL，与已验证加密产物核对；明文或旧文件、缺失回执、加密后重编译覆盖都会阻止发布。正式渠道的包与镜像还要另行回读验证。
+
 ## 人脸与关注人员边界
 
 人脸模板属于高敏感生物特征：
