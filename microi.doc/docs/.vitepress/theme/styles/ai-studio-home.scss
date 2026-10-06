@@ -1326,8 +1326,8 @@ html.dark .ai-studio-summary {
   font-weight: 680;
   line-height: 1;
   text-decoration: none;
-  box-shadow: inset 0 0 14px color-mix(in srgb, var(--mci-home-flow-mid) 25%, transparent), 0 5px 18px color-mix(in srgb, var(--mci-home-action-start) 18%, transparent);
-  animation: mciHomeActionFlow 4s linear infinite;
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--mci-home-action-start) 18%, transparent);
+  animation: mciHomeActionFlow 8s linear infinite;
   transition: transform .2s ease;
 }
 
@@ -1339,15 +1339,15 @@ html.dark .ai-studio-summary {
   animation-delay: -2s;
 }
 
-/* 横向流动的亮色光带与白色微粒；中心降低亮度以保持标签对比度。 */
+/* 整个按钮内部共用低亮度渐变，不再用中心遮罩把光线挤成上下两条亮边。 */
 .ai-studio-summary__actions a::before {
   content: "";
   position: absolute;
   z-index: -1;
-  inset: 0 -100%;
-  background: repeating-linear-gradient(90deg, transparent 0%, var(--mci-home-flow-mid) 12%, var(--mci-home-flow-bright) 23%, var(--mci-home-flow-mid) 32%, transparent 50%);
-  mask-image: linear-gradient(180deg, #000, rgba(0,0,0,.08) 32%, rgba(0,0,0,.08) 68%, #000);
-  animation: mciHomeAuroraStream 3s linear infinite;
+  inset: 0 -60%;
+  background: linear-gradient(100deg, transparent 8%, var(--mci-home-flow-mid) 28%, var(--mci-home-flow-bright) 50%, var(--mci-home-flow-mid) 72%, transparent 92%);
+  opacity: .22;
+  animation: mciHomeAuroraStream 7s ease-in-out infinite alternate;
   pointer-events: none;
 }
 .ai-studio-summary__actions a.is-agent::before { animation-delay: -1.5s; }
@@ -1358,24 +1358,35 @@ html.dark .ai-studio-summary {
 .mci-home-flow-particles {
   position: absolute;
   z-index: -1;
-  inset: 0 -100%;
-  opacity: .75;
-  background:
-    radial-gradient(circle at 8% 23%, #fff 0 1px, transparent 2px),
-    radial-gradient(circle at 22% 79%, #fff 0 1.5px, transparent 2.5px),
-    radial-gradient(circle at 34% 13%, #fff 0 1px, transparent 2px),
-    radial-gradient(circle at 48% 87%, #fff 0 1px, transparent 2px),
-    radial-gradient(circle at 62% 22%, #fff 0 1.5px, transparent 2.5px),
-    radial-gradient(circle at 72% 79%, #fff 0 1px, transparent 2px),
-    radial-gradient(circle at 84% 14%, #fff 0 1px, transparent 2px),
-    radial-gradient(circle at 96% 87%, #fff 0 1.5px, transparent 2.5px);
-  background-size: 50% 100%;
-  /* 微粒位于标签上下两侧，保持细小、明亮、持续的横向流动。 */
-  mask-image: linear-gradient(180deg, #000 0 24%, transparent 34% 66%, #000 76%);
-  animation: mciHomeParticlesDrift 4.5s linear infinite;
+  inset: 0;
   pointer-events: none;
 }
-.ai-studio-summary__actions .is-agent .mci-home-flow-particles { animation-delay: -2.25s; }
+
+/* 每颗粒子有独立的位置、尺寸和相位，穿过内部而非整层横移；装饰层始终在文字下面。 */
+.mci-home-flow-particles i {
+  position: absolute;
+  left: var(--mci-particle-x);
+  top: var(--mci-particle-y);
+  width: var(--mci-particle-size, 2px);
+  height: var(--mci-particle-size, 2px);
+  border-radius: 50%;
+  background: var(--mci-home-action-text);
+  opacity: .5;
+  animation: mciHomeParticleFloat var(--mci-particle-duration, 7s) ease-in-out var(--mci-particle-delay, 0s) infinite alternate;
+}
+.mci-home-flow-particles i:nth-child(1) { --mci-particle-x: 8%; --mci-particle-y: 38%; --mci-particle-duration: 6.4s; --mci-particle-delay: -1.2s; }
+.mci-home-flow-particles i:nth-child(2) { --mci-particle-x: 17%; --mci-particle-y: 72%; --mci-particle-size: 3px; --mci-particle-duration: 8.2s; --mci-particle-delay: -5.6s; }
+.mci-home-flow-particles i:nth-child(3) { --mci-particle-x: 26%; --mci-particle-y: 23%; --mci-particle-duration: 7.3s; --mci-particle-delay: -3.1s; }
+.mci-home-flow-particles i:nth-child(4) { --mci-particle-x: 34%; --mci-particle-y: 57%; --mci-particle-duration: 9.1s; --mci-particle-delay: -7.4s; }
+.mci-home-flow-particles i:nth-child(5) { --mci-particle-x: 43%; --mci-particle-y: 78%; --mci-particle-size: 3px; --mci-particle-duration: 6.9s; --mci-particle-delay: -2.8s; }
+.mci-home-flow-particles i:nth-child(6) { --mci-particle-x: 49%; --mci-particle-y: 32%; --mci-particle-duration: 8.6s; --mci-particle-delay: -6.2s; }
+.mci-home-flow-particles i:nth-child(7) { --mci-particle-x: 57%; --mci-particle-y: 68%; --mci-particle-duration: 7.7s; --mci-particle-delay: -4.5s; }
+.mci-home-flow-particles i:nth-child(8) { --mci-particle-x: 64%; --mci-particle-y: 20%; --mci-particle-size: 3px; --mci-particle-duration: 9.4s; --mci-particle-delay: -1.7s; }
+.mci-home-flow-particles i:nth-child(9) { --mci-particle-x: 71%; --mci-particle-y: 49%; --mci-particle-duration: 6.7s; --mci-particle-delay: -5.1s; }
+.mci-home-flow-particles i:nth-child(10) { --mci-particle-x: 79%; --mci-particle-y: 75%; --mci-particle-size: 3px; --mci-particle-duration: 8.8s; --mci-particle-delay: -3.6s; }
+.mci-home-flow-particles i:nth-child(11) { --mci-particle-x: 86%; --mci-particle-y: 29%; --mci-particle-duration: 7.5s; --mci-particle-delay: -6.8s; }
+.mci-home-flow-particles i:nth-child(12) { --mci-particle-x: 92%; --mci-particle-y: 59%; --mci-particle-duration: 9.7s; --mci-particle-delay: -4.2s; }
+.ai-studio-summary__actions .is-agent .mci-home-flow-particles { transform: rotate(180deg); }
 .ai-studio-summary__actions a:hover,
 .ai-studio-summary__actions a:focus-visible {
   color: var(--mci-home-action-text) !important;
@@ -1436,13 +1447,17 @@ html.dark .ai-studio-summary {
 .ai-studio-summary__path footer strong { color: var(--mci-ai-text); font-weight: 650; }
 
 @keyframes mciHomeActionFlow { to { background-position: -200% 0; } }
-@keyframes mciHomeAuroraStream { to { transform: translateX(50%); } }
+@keyframes mciHomeAuroraStream { from { transform: translateX(-12%); } to { transform: translateX(12%); } }
 @keyframes mciHomeActionSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-@keyframes mciHomeParticlesDrift { to { transform: translateX(50%); } }
+@keyframes mciHomeParticleFloat {
+  0% { transform: translate(-8px, 4px); opacity: .3; }
+  50% { transform: translate(1px, -3px); opacity: .72; }
+  100% { transform: translate(12px, 2px); opacity: .42; }
+}
 
 .ai-studio-summary.is-motion-paused a,
 .ai-studio-summary.is-motion-paused a::before,
-.ai-studio-summary.is-motion-paused .mci-home-flow-particles,
+.ai-studio-summary.is-motion-paused .mci-home-flow-particles i,
 .ai-studio-summary.is-motion-paused .ai-studio-summary__path::before { animation-play-state: paused; }
 
 @media (min-width: 768px) and (max-width: 959px) {
@@ -1482,6 +1497,6 @@ html.dark .ai-studio-summary {
 @media (prefers-reduced-motion: reduce) {
   .ai-studio-summary__actions a,
   .ai-studio-summary__actions a::before,
-  .mci-home-flow-particles,
+  .mci-home-flow-particles i,
   .ai-studio-summary__path::before { animation: none !important; transition: none !important; }
 }

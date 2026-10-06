@@ -184,7 +184,7 @@ test('homepage visual contract covers responsive, focus, and reduced-motion stat
   assert.match(styles, /@media \(max-width: 767px\)/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
   assert.match(styles, /animation:\s*mciHomeActionFlow[^;]*infinite/)
-  assert.match(styles, /animation:\s*mciHomeParticlesDrift[^;]*infinite/)
+  assert.match(styles, /animation:\s*mciHomeParticleFloat[^;]*infinite/)
   assert.match(styles, /--mci-home-pointer-x/)
   assert.match(component, /@pointermove="trackPointer"/)
   assert.match(component, /prefers-reduced-motion: reduce/)
