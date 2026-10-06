@@ -71,24 +71,20 @@
 
         <div class="ai-studio-summary__path">
           <header>
-            <div><span>{{ copy.mapEyebrow }}</span><h2>{{ copy.mapTitle }}</h2></div>
+            <h2>{{ copy.mapTitle }}</h2>
             <p>{{ copy.mapDesc }}</p>
           </header>
           <div class="ai-studio-summary__modes">
             <article v-for="(mode, index) in copy.developmentModes" :key="mode.level" :class="`mci-home-mode--${mode.level}`">
-              <div class="mci-home-mode-heading">
-                <span class="mci-home-mode-icon" aria-hidden="true">
-                  <svg v-if="index === 0" viewBox="0 0 32 32"><path d="m16 3 12 7-12 7L4 10l12-7Z"/><path d="m4 16 12 7 12-7M4 22l12 7 12-7"/></svg>
-                  <svg v-else-if="index === 1" viewBox="0 0 32 32"><path d="m10 8-7 8 7 8M22 8l7 8-7 8M19 5l-6 22"/></svg>
-                  <svg v-else viewBox="0 0 32 32"><rect x="12" y="3" width="8" height="8" rx="2"/><rect x="3" y="21" width="8" height="8" rx="2"/><rect x="21" y="21" width="8" height="8" rx="2"/><path d="M16 11v5M7 21v-5h18v5"/></svg>
-                </span>
-                <span>{{ mode.level }} · {{ mode.label }}</span>
-              </div>
-              <h3>{{ mode.title }}</h3>
-              <p>{{ mode.description }}</p>
-              <div class="mci-home-mode-value">
-                <strong>{{ copy.values[index].kicker }}</strong>
-                <span>{{ copy.values[index].title }}</span>
+              <span class="mci-home-mode-icon" aria-hidden="true">
+                <svg v-if="index === 0" viewBox="0 0 32 32"><path d="m16 3 12 7-12 7L4 10l12-7Z"/><path d="m4 16 12 7 12-7M4 22l12 7 12-7"/></svg>
+                <svg v-else-if="index === 1" viewBox="0 0 32 32"><path d="m10 8-7 8 7 8M22 8l7 8-7 8M19 5l-6 22"/></svg>
+                <svg v-else viewBox="0 0 32 32"><rect x="12" y="3" width="8" height="8" rx="2"/><rect x="3" y="21" width="8" height="8" rx="2"/><rect x="21" y="21" width="8" height="8" rx="2"/><path d="M16 11v5M7 21v-5h18v5"/></svg>
+              </span>
+              <div class="mci-home-mode-body">
+                <h3>{{ mode.title }}</h3>
+                <strong class="mci-home-mode-value">{{ copy.values[index].kicker }}</strong>
+                <p>{{ mode.description }}</p>
               </div>
             </article>
           </div>
