@@ -44,16 +44,5 @@ public sealed class ApiRootPageEndpointTests
         Assert.False(File.Exists(Path.Combine(apiRoot, "Controllers", "HomeController.cs")));
     }
 
-    private static string FindServerRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Microi.net.Api"))
-                && Directory.Exists(Path.Combine(directory.FullName, "Microi.Core")))
-                return directory.FullName;
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("未找到 Microi.Server 根目录。");
-    }
+    private static string FindServerRoot() => Microi.Tests.Common.TestProjectPaths.ServerRoot();
 }

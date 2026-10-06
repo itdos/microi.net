@@ -305,33 +305,5 @@ public sealed class GameRealtimeProtocolTests
         Assert.Contains("DiyToken.ResolveClientTokenLifetime(clientModel, clientType)", hubSource);
     }
 
-    private static string FindServerRoot()
-    {
-        var workingDirectoryCandidate = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "Microi.Server");
-        if (Directory.Exists(Path.Combine(workingDirectoryCandidate, "Microi.net.Api"))
-            && Directory.Exists(Path.Combine(workingDirectoryCandidate, "Microi.Core")))
-        {
-            return workingDirectoryCandidate;
-        }
-
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current != null)
-        {
-            if (Directory.Exists(Path.Combine(current.FullName, "Microi.net.Api"))
-                && Directory.Exists(Path.Combine(current.FullName, "Microi.Core")))
-            {
-                return current.FullName;
-            }
-            var nestedServer = Path.Combine(current.FullName, "Microi.Server");
-            if (Directory.Exists(Path.Combine(nestedServer, "Microi.net.Api"))
-                && Directory.Exists(Path.Combine(nestedServer, "Microi.Core")))
-            {
-                return nestedServer;
-            }
-            current = current.Parent;
-        }
-        throw new DirectoryNotFoundException("未找到 Microi.Server 根目录。");
-    }
+    private static string FindServerRoot() => Microi.Tests.Common.TestProjectPaths.ServerRoot();
 }

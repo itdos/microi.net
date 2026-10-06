@@ -93,4 +93,23 @@
     <Compile Remove="Common\PlatformReminderBoundaryTests.cs" />
   </ItemGroup>
 
+  <!-- Copy the actual referenced executable output, including runtime/dependency
+       files, into this test build. SDK artifacts output does not use bin/Config/tfm. -->
+  <Target Name="CopyMemoryDiagnosticsFixture" AfterTargets="Build">
+    <MSBuild Projects="$(MSBuildProjectDirectory)/Fixtures/MemoryDiagnosticsNode/Microi.MemoryDiagnostics.Fixture.csproj"
+             Targets="GetTargetPath" BuildInParallel="false" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_MemoryDiagnosticsFixtureTarget" />
+    </MSBuild>
+    <PropertyGroup>
+      <_MemoryDiagnosticsFixtureDirectory>@(_MemoryDiagnosticsFixtureTarget->'%(RootDir)%(Directory)')</_MemoryDiagnosticsFixtureDirectory>
+    </PropertyGroup>
+    <Error Condition="'$(_MemoryDiagnosticsFixtureDirectory)' == '' or !Exists('@(_MemoryDiagnosticsFixtureTarget)')" Text="The referenced memory diagnostics fixture output is missing." />
+    <ItemGroup>
+      <_MemoryDiagnosticsFixtureFiles Include="$(_MemoryDiagnosticsFixtureDirectory)**/*" Condition="'$(_MemoryDiagnosticsFixtureDirectory)' != ''" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_MemoryDiagnosticsFixtureFiles)"
+          DestinationFiles="@(_MemoryDiagnosticsFixtureFiles->'$(OutDir)Fixtures/MemoryDiagnosticsNode/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
