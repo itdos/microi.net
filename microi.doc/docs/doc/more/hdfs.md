@@ -418,6 +418,8 @@ v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在
 
 在 **【SaaS 引擎】→【MinIO】** 处配置相关参数：
 
+服务端复制对象会保留源文件和原 MIME、元数据。旧后端的 MinIO SDK 7 对带 `charset` 的 MIME 可能构造重复 `Content-Type`，造成复制签名不匹配；升级后端复制传输修复即可，无需修改租户密钥、源对象 MIME 或关闭签名校验。恢复时保留原请求键，先回读目标字节数和 SHA-256，再继续；公有应用还需独立验证 CDN 字节。复制取消或超时后不要直接重试，目标可能已写入。
+
 > 💡 安装 MinIO 方法见：[Docker 部署文档](https://microi.blog.csdn.net/article/details/143576299)
 
 ![MinIO配置](https://static.itdos.com/upload/img/csdn/0bde20907de743f5b051036546837afa.png#pic_center)

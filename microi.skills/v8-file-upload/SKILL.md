@@ -107,6 +107,8 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 固定 CDN 应用回填优先使用服务端 `CopyObject`，公有桶复制编译资产、私有桶复制源码；`Limit` 在源与目标间保持一致，`Path` 和 `FilePathName` 均由后端收敛到当前租户。大对象用 `GetObjectSha256` 流式核对原对象和复制目标，公有体验路径仍须从 CDN 独立回读。历史版本目标已存在时须核对字节哈希，发现不同内容立即停止；固定根可在新版本验证后覆盖。`ListObjects` 必须分页并限制到单个应用前缀，不得把这些存储管理原子直接开放为匿名业务接口。
 
+MinIO SDK 7 的复制签名不匹配还可能来自带参数 MIME：SDK 对源 `Content-Type` 签名，却在 HTTP 请求中额外保留 `StringContent` 的默认 MIME。先在独立夹具核对源 MIME、重复头和真实存储返回，再升级后端复制传输修复；不能去掉 `charset`、关闭签名校验或下载后重传来伪造通过。修复后必须同时验证公私桶原始字节、精确 MIME、源元数据及源对象保留，固定入口恢复另覆盖主库权威、真实共享租约、双节点竞争和新进程重跑。取消/超时后保持原请求键，先回读目标再决定是否继续。
+
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=v8-file-upload-001 sha256=d535a333639a9005f5d20f25e36e2753a11835380713c1bb063ae618e6cea4af -->
 ## 第三方数据库附件迁移
