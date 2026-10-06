@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import {fileURLToPath} from 'node:url';
 import {discoverTests,regressionLogFileName} from '../run-node-regressions.mjs';
 
 function fixture(t,files){
@@ -25,7 +26,8 @@ test('missing aggregate children fail discovery rather than being skipped',t=>{
 });
 
 test('unknown and browser aggregate children cannot masquerade as Node regressions',t=>{
- for(const source of ["export const value=1;","import test from '@playwright/test';import assert from 'node:assert';"]){
+ // 运行时拼接子夹具的真实 import，避免收集器把本文件中的示例文本识别为浏览器入口。
+ for(const source of ["export const value=1;","import test from "+JSON.stringify('@playwright/test')+";import assert from 'node:assert';"]){
   const root=fixture(t,{'entry.test.mjs':"import './child.mjs'\n",'child.mjs':source});
   assert.throws(()=>discoverTests(root),/Unclassified regression import/);
  }
@@ -45,4 +47,9 @@ test('a discovered responsibility report is written without creating nested resu
  const file=path.join(directory,name);fs.writeFileSync(file,'# tests 1\n# pass 1\n# fail 0\n');
  assert.equal(fs.readFileSync(file,'utf8'),'# tests 1\n# pass 1\n# fail 0\n');
  assert.deepEqual(fs.readdirSync(directory),[name]);
+});
+
+test('the discovery responsibility self-tests are part of the mandatory Node gate',()=>{
+ const self=fileURLToPath(import.meta.url);
+ assert.ok(discoverTests(path.dirname(self)).includes(self),'Self-test fixture text must not silently exclude this responsibility');
 });
