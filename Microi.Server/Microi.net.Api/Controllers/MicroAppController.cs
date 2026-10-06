@@ -178,7 +178,7 @@ namespace Microi.net.Api
             return await ProxyApplicationAssetV3(
                 osClient,
                 immutableUrl,
-                assetPath,
+                GetText(snapshot.Asset, "Path", "path"),
                 snapshot.Asset);
         }
 
@@ -212,11 +212,10 @@ namespace Microi.net.Api
                         "Application v3 immutable asset is unavailable.");
                 }
 
-                var contentType = upstreamResponse.Content.Headers.ContentType?.ToString();
-                if (contentType.DosIsNullOrWhiteSpace())
-                {
-                    contentType = GuessContentType(assetPath);
-                }
+                // 旧上传器可能为已验证的网页产物写入通用二进制标签；只按已提交路径
+                // 归一空/通用标签，明确错误类型和下方正文/摘要校验仍然失败关闭。
+                var contentType = ResolveManagedContentType(
+                    assetPath, upstreamResponse.Content.Headers.ContentType?.ToString());
                 if (!IsContentTypeCompatible(assetPath, contentType))
                 {
                     return StatusCode(502,
@@ -373,11 +372,8 @@ namespace Microi.net.Api
                         return StatusCode(500, $"MicroApp inline asset base64 is invalid: {assetPath}");
                     }
 
-                    var inlineContentType = GetText(asset, "contentType", "ContentType");
-                    if (inlineContentType.DosIsNullOrWhiteSpace())
-                    {
-                        inlineContentType = GuessContentType(assetPath);
-                    }
+                    var inlineContentType = ResolveManagedContentType(
+                        assetPath, GetText(asset, "contentType", "ContentType"));
                     inlineBytes = RewriteStableEntryHtml(
                         inlineBytes,
                         inlineContentType,
@@ -408,11 +404,8 @@ namespace Microi.net.Api
                 var proxyBytes = await ReadFileAssetBytes(osClient, asset, redirectUrl);
                 if (proxyBytes != null)
                 {
-                    var proxyContentType = GetText(asset, "contentType", "ContentType");
-                    if (proxyContentType.DosIsNullOrWhiteSpace())
-                    {
-                        proxyContentType = GuessContentType(assetPath);
-                    }
+                    var proxyContentType = ResolveManagedContentType(
+                        assetPath, GetText(asset, "contentType", "ContentType"));
                     proxyBytes = RewriteStableEntryHtml(
                         proxyBytes,
                         proxyContentType,
@@ -454,11 +447,8 @@ namespace Microi.net.Api
                 return StatusCode(500, $"MicroApp asset base64 is invalid: {assetPath}");
             }
 
-            var contentType = GetText(asset, "contentType", "ContentType");
-            if (contentType.DosIsNullOrWhiteSpace())
-            {
-                contentType = GuessContentType(assetPath);
-            }
+            var contentType = ResolveManagedContentType(
+                assetPath, GetText(asset, "contentType", "ContentType"));
 
             bytes = RewriteStableEntryHtml(
                 bytes,
@@ -1346,6 +1336,7 @@ namespace Microi.net.Api
             }
 
             var fileServer = await GetFileServer(osClient);
+            if (fileServer.DosIsNullOrWhiteSpace()) return "";
             return $"{fileServer.TrimEnd('/')}/{value.TrimStart('/')}";
         }
 
@@ -1588,19 +1579,29 @@ namespace Microi.net.Api
         {
             try
             {
-                dynamic result = await MicroiEngine.FormEngine.GetSysConfig(osClient);
+                var result = await MicroiEngine.FormEngine.GetSysConfig(osClient);
                 if (result.Code == 1 && result.Data != null)
                 {
-                    var config = ToJObject(result.Data);
-                    var fileServer = config?["FileServer"].Val<string>();
-                    if (!fileServer.DosIsNullOrWhiteSpace()) return fileServer;
+                    // Data 是 dynamic；必须在边界转回 object/JObject，否则 Val 扩展方法
+                    // 会动态绑定失败，随后把当前租户的正确域名静默替换成平台默认域名。
+                    JObject config = ToJObject((object)result.Data);
+                    string fileServer = config?["FileServer"].Val<string>();
+                    if (!string.IsNullOrWhiteSpace(fileServer)
+                        && Uri.TryCreate(fileServer.Trim(), UriKind.Absolute, out var uri)
+                        && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
+                        && string.IsNullOrEmpty(uri.UserInfo)
+                        && string.IsNullOrEmpty(uri.Query)
+                        && string.IsNullOrEmpty(uri.Fragment))
+                    {
+                        return fileServer.Trim();
+                    }
                 }
             }
             catch
             {
-                // Use platform default below.
+                // 配置不可用时不访问其它租户/平台文件域名；调用者返回存储不可用。
             }
-            return "https://static.itdos.com";
+            return "";
         }
 
         private void SetAssetHeaders(
@@ -1640,7 +1641,9 @@ namespace Microi.net.Api
 
         private static bool IsHtmlAsset(string assetPath, string contentType)
         {
-            return Path.GetExtension(assetPath ?? "").Equals(".html", StringComparison.OrdinalIgnoreCase)
+            var extension = Path.GetExtension(assetPath ?? "");
+            return extension.Equals(".html", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".htm", StringComparison.OrdinalIgnoreCase)
                 || (!contentType.DosIsNullOrWhiteSpace()
                     && contentType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase));
         }
@@ -1736,26 +1739,16 @@ namespace Microi.net.Api
 
         private static string GuessContentType(string assetPath)
         {
-            return Path.GetExtension(assetPath).ToLowerInvariant() switch
-            {
-                ".html" => "text/html; charset=utf-8",
-                ".js" => "text/javascript; charset=utf-8",
-                ".mjs" => "text/javascript; charset=utf-8",
-                ".css" => "text/css; charset=utf-8",
-                ".json" => "application/json; charset=utf-8",
-                ".svg" => "image/svg+xml",
-                ".png" => "image/png",
-                ".jpg" => "image/jpeg",
-                ".jpeg" => "image/jpeg",
-                ".gif" => "image/gif",
-                ".webp" => "image/webp",
-                ".ico" => "image/x-icon",
-                ".woff" => "font/woff",
-                ".woff2" => "font/woff2",
-                ".ttf" => "font/ttf",
-                ".map" => "application/json; charset=utf-8",
-                _ => "application/octet-stream"
-            };
+            return ObjectStorageContentTypes.GetContentType(assetPath);
+        }
+
+        private static string ResolveManagedContentType(string assetPath, string contentType)
+        {
+            var mediaType = (contentType ?? "").Split(';')[0].Trim();
+            return mediaType.Length == 0
+                || mediaType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase)
+                ? GuessContentType(assetPath)
+                : contentType;
         }
     }
 }

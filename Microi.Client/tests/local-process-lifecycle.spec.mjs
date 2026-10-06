@@ -69,7 +69,19 @@ function removeFixture(root) {
     ownedFixtures.delete(root);
 }
 
-function runProcessManager(workspaceRoot, action, frontendPort, backendPort = 61501) {
+function prepareCopiedRuntime(source, destination) {
+    fs.copyFileSync(source, destination);
+    if (process.platform !== 'darwin') return;
+    // macOS 首次加载新路径下的 Mach-O 副本可能先停在 dyld 的系统校验中。
+    // 在夹具准备阶段验证副本能运行；监听端口的 15 秒期限与清理隔离断言保持原样。
+    const probe = spawnSync(destination, ['--version'], {
+        encoding: 'utf8', timeout: 60000, windowsHide: true
+    });
+    assert.equal(probe.status, 0, `复制的 Node 运行时不可用：${probe.error?.message || probe.stderr}`);
+    assert.equal(probe.stdout.trim(), process.version);
+}
+
+function runProcessManager(workspaceRoot, action, frontendPort, backendPort = 61501, releaseScope = 'all') {
     // StopBackend 会同时清理所选工作区的 Release 进程；测试绝不能指向真实源码工作区。
     assert.notEqual(path.resolve(workspaceRoot), repoRoot);
     assert.ok(path.resolve(workspaceRoot).startsWith(path.resolve(fixtureParent) + path.sep));
@@ -80,7 +92,8 @@ function runProcessManager(workspaceRoot, action, frontendPort, backendPort = 61
         '-Action', action,
         '-WorkspaceRoot', workspaceRoot,
         '-BackendPort', String(backendPort),
-        '-FrontendPort', String(frontendPort)
+        '-FrontendPort', String(frontendPort),
+        '-ReleaseScope', releaseScope
     ], {
         cwd: workspaceRoot,
         encoding: 'utf8',
@@ -98,12 +111,12 @@ function stopExactProcessTree(child) {
     }
 }
 
-test('一键发布先取得工作区互斥锁并调用精确进程管理器', () => {
+test('一键发布按所选范围取得锁并调用精确进程管理器', () => {
     const script = read('Microi一键编译发布.sh');
 
     assert.match(script, /acquire_workspace_lock/);
-    assert.match(script, /microi-process-state/);
-    assert.match(script, /release\.lock/);
+    assert.match(script, /release-lock\.mjs/);
+    assert.match(script, /MICROI_RELEASE_LOCK_DOMAINS/);
     assert.match(script, /Microi\.LocalProcessManager\.ps1/);
     assert.match(script, /-Action PrepareRelease/);
     assert.match(script, /release_workspace_lock/);
@@ -135,7 +148,7 @@ test('临时输出的 Microi.net.Api 仅在 CWD 精确属于当前工作区时�
     fs.mkdirSync(backendRoot, { recursive: true });
     const fakeBackend = path.join(testRoot, 'Microi.net.Api.exe');
     const listener = path.join(testRoot, 'listener.cjs');
-    fs.copyFileSync(process.execPath, fakeBackend);
+    prepareCopiedRuntime(process.execPath, fakeBackend);
     fs.writeFileSync(listener, [
         "const net = require('node:net');",
         "net.createServer(() => {}).listen(Number(process.argv[2]), '127.0.0.1');"
@@ -150,7 +163,7 @@ test('临时输出的 Microi.net.Api 仅在 CWD 精确属于当前工作区时�
         const otherBackendRoot = path.join(testRoot, 'other-workspace', 'Microi.Server', 'Microi.net.Api');
         const otherReleasePath = path.join(otherBackendRoot, 'bin', 'Release', 'Microi.net.Api.exe');
         fs.mkdirSync(path.dirname(otherReleasePath), { recursive: true });
-        fs.copyFileSync(process.execPath, otherReleasePath);
+        prepareCopiedRuntime(process.execPath, otherReleasePath);
         const otherReleasePort = await reservePort();
         otherReleaseBackend = spawn(otherReleasePath, [listener, String(otherReleasePort)], {
             cwd: otherBackendRoot, windowsHide: true, stdio: 'ignore'
@@ -275,7 +288,10 @@ test('相对入口 Vite 用进程工作目录识别当前工作区，并对外�
 test('自动化启动器阻止发布期间抢端口、只使用 Debug，并结束完整后端进程树', () => {
     const runner = read('Microi.Client/scripts/run-form-engine-freeze-trace.mjs');
 
-    assert.match(runner, /releaseLockPath/);
+    // 统一锁入口负责识别旧锁与独立 Agent 域；启动器必须明确保护平台服务。
+    assert.match(runner, /import \{ assertReleaseAvailable \} from '\.\.\/\.\.\/Microi\.Server\/tools\/release-lock\.mjs'/);
+    assert.match(runner, /assertReleaseAvailable\(repoRoot, 'api'\)/);
+    assert.match(runner, /assertReleaseAvailable\(repoRoot, 'pc'\)/);
     assert.match(runner, /assertReleaseIsNotRunning/);
     assert.match(runner, /PW_BACKEND_CONFIGURATION \|\| 'Debug'/);
     assert.match(runner, /PW_BACKEND_CONFIGURATION=Release is forbidden/);
@@ -307,6 +323,37 @@ test('DLL 被占用时报告原始路径与占用错误，不因 catch 中的错
         const result = spawnSync(process.platform === 'win32' ? 'powershell.exe' : 'pwsh', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { cwd: testRoot, windowsHide: true, encoding: 'utf8', timeout: 15000 });
         assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     } finally {
+        removeFixture(testRoot);
+    }
+});
+
+for(const scope of ['api','pc'])test(`真实 PrepareRelease ${scope} 只清理自身范围，另一范围服务保持监听`,async()=>{
+    const testRoot=createFixture(),workspaceRoot=path.join(testRoot,'workspace');
+    const backendRoot=path.join(workspaceRoot,'Microi.Server/Microi.net.Api'),frontendRoot=path.join(workspaceRoot,'Microi.Client');
+    fs.mkdirSync(backendRoot,{recursive:true});fs.mkdirSync(frontendRoot,{recursive:true});
+    const fakeBackend=path.join(testRoot,'Microi.net.Api.exe'),listener=path.join(testRoot,'listener.cjs');
+    prepareCopiedRuntime(process.execPath,fakeBackend);
+    fs.writeFileSync(listener,"require('node:net').createServer(()=>{}).listen(Number(process.argv[2]),'127.0.0.1');");
+    const viteEntry=path.join('node_modules','vite','bin','vite.js'),fixtureEntry=path.join(frontendRoot,viteEntry);
+    fs.mkdirSync(path.dirname(fixtureEntry),{recursive:true});
+    fs.writeFileSync(path.join(frontendRoot,'package.json'),'{"type":"module"}');
+    fs.writeFileSync(path.join(frontendRoot,'index.html'),'<!doctype html><title>Scoped release fixture</title>');
+    fs.writeFileSync(fixtureEntry,`import ${JSON.stringify(pathToFileURL(path.join(clientRoot,viteEntry)).href)};`);
+    let backend,frontend;
+    try{
+        const backendPort=await reservePort(),frontendPort=await reservePort();
+        backend=spawn(fakeBackend,[listener,String(backendPort)],{cwd:backendRoot,stdio:'ignore'});
+        frontend=spawn(process.execPath,[viteEntry,'--host','127.0.0.1','--port',String(frontendPort),'--strictPort'],{cwd:frontendRoot,stdio:'ignore'});
+        await waitForPort(backendPort);await waitForPort(frontendPort);
+        const result=runProcessManager(workspaceRoot,'PrepareRelease',frontendPort,backendPort,scope);
+        assert.equal(result.status,0,result.stdout+result.stderr);
+        const selected=scope==='api'?backend:frontend,retained=scope==='api'?frontend:backend;
+        assert.equal(await waitForExit(selected),true,'所选范围进程必须退出');
+        assert.equal(retained.exitCode,null,'另一个范围的进程必须保留');
+        await waitForPort(scope==='api'?frontendPort:backendPort);
+    }finally{
+        stopExactProcessTree(backend);stopExactProcessTree(frontend);
+        if(backend)await waitForExit(backend,5000);if(frontend)await waitForExit(frontend,5000);
         removeFixture(testRoot);
     }
 });

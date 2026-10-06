@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.7
+ * Version: v3.0.8
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
@@ -2961,6 +2961,99 @@ try {
         };
     };
 
+    // PRIVATE_SOURCE_ACTIVE_BASELINE_V1：Upload 的日期/时间戳地址不是活动源码身份。
+    // 用完整源码清单摘要建立不可变根，在当前租户私有桶内复制并校验原始字节，
+    // 保留旧对象；不能放宽源码 ZIP 的精确路径检查来掩盖安装器的元数据错误。
+    var privateSourceFileMetadata = function (file) {
+        file = file || {};
+        var path = firstTextParam([file.Path, file.FilePath, file.RelativePath, file.FileName]);
+        if (!path || path != path.trim() || /[\\:%?#\x00-\x1f*"<>|]/.test(path)
+            || path.charAt(0) == '/' || path.charAt(path.length - 1) == '/') {
+            throw new Error('PRIVATE_SOURCE_PATH_INVALID：源码路径必须是无别名的相对路径。');
+        }
+        var parts = path.split('/');
+        for (var pi = 0; pi < parts.length; pi++) {
+            if (!parts[pi] || parts[pi] == '.' || parts[pi] == '..') throw new Error('PRIVATE_SOURCE_PATH_INVALID：源码路径包含非法段。');
+        }
+        var hash = firstTextParam([file.Sha256, file.Hash, file.ContentHash]).toLowerCase();
+        var size = Number(file.Size);
+        // 旧内嵌源码没有清单摘要时仍按原始字节补齐；完整新包不重复解码大文件。
+        if (!hash || file.Size === undefined || file.Size === null) {
+            var base64 = firstTextParam([file.FileByteBase64, file.ContentBase64, file.Base64]);
+            if (!base64 && file.Content !== undefined && file.Content !== null) base64 = V8.Base64.StringToBase64(String(file.Content));
+            if (!base64) throw new Error('PRIVATE_SOURCE_MANIFEST_INVALID：源码缺少字节摘要或大小。');
+            if (!hash) hash = applicationFileSha256Base64(base64);
+            if (file.Size === undefined || file.Size === null) size = base64DecodedSize(base64);
+        }
+        if (!/^[a-f0-9]{64}$/.test(hash) || !isFinite(size) || Math.floor(size) != size || size < 0 || size > 256 * 1024 * 1024) {
+            throw new Error('PRIVATE_SOURCE_MANIFEST_INVALID：源码摘要或大小无效。');
+        }
+        return { Path: path, Hash: hash, Size: size };
+    };
+    var getPrivateSourceBaselineRoot = function (appId, files) {
+        if (!/^[A-Za-z0-9_.-]{1,128}$/.test(String(appId || '')) || appId == '.' || appId == '..'
+            || !files || !files.length || files.length > 2000) throw new Error('PRIVATE_SOURCE_MANIFEST_INVALID：应用或源码数量无效。');
+        var entries = [], seen = Object.create(null);
+        for (var fi = 0; fi < files.length; fi++) {
+            var entry = privateSourceFileMetadata(files[fi]), identity = '$' + entry.Path.toLowerCase();
+            if (seen[identity]) throw new Error('PRIVATE_SOURCE_PATH_DUPLICATE：源码路径不区分大小写重复。');
+            seen[identity] = true;entries.push(entry);
+        }
+        entries.sort(function(a, b) { return a.Path < b.Path ? -1 : a.Path > b.Path ? 1 : 0; });
+        var lines = [];for (var ei = 0; ei < entries.length; ei++) lines.push(entries[ei].Path + '\t' + entries[ei].Hash + '\t' + entries[ei].Size);
+        var manifestHash = String(V8.EncryptHelper.Sha256Hex(lines.join('\n')) || '').toLowerCase();
+        if (!/^[a-f0-9]{64}$/.test(manifestHash)) throw new Error('PRIVATE_SOURCE_MANIFEST_INVALID：源码清单摘要未生成。');
+        return 'ai-app-source-staged/' + appId + '/store-' + manifestHash;
+    };
+    var canonicalizePrivateSourceAsset = function (upload, root, file, appId, previouslyVerified) {
+        var entry = privateSourceFileMetadata(file), tenant = String(V8.OsClient || '').toLowerCase();
+        if (!/^[a-z0-9_-]{1,100}$/.test(tenant)) throw new Error('PRIVATE_SOURCE_TENANT_INVALID：源码租户无效。');
+        var target = '/' + tenant + '/' + root + '/' + entry.Path;
+        var original = String(upload && upload.HdfsPath || '');
+        if (!original || original != original.trim() || /[\\:%?#\x00-\x1f*"<>|]/.test(original)
+            || original.indexOf('//') >= 0) throw new Error('PRIVATE_SOURCE_OBJECT_PATH_INVALID：私有源码对象路径无效。');
+        var originalParts = original.replace(/^\//, '').split('/');
+        for (var oi = 0; oi < originalParts.length; oi++) {
+            if (!originalParts[oi] || originalParts[oi] == '.' || originalParts[oi] == '..') throw new Error('PRIVATE_SOURCE_OBJECT_PATH_INVALID：私有源码对象路径包含非法段。');
+        }
+        if (originalParts.length < 4 || originalParts[0] != tenant
+            || !/^ai-app-source(?:-staged)?$/.test(originalParts[1]) || originalParts[2].toLowerCase() != String(appId).toLowerCase()
+            || (upload.Reused && String(upload.StorageScope || '').toLowerCase() != 'private')
+            || String(upload.Hash || '').toLowerCase() != entry.Hash || Number(upload.Size) != entry.Size) {
+            throw new Error('PRIVATE_SOURCE_OBJECT_IDENTITY_INVALID：源码对象不属于当前租户应用或元数据不一致。');
+        }
+        var normalized = {
+            Path: entry.Path, HdfsPath: target, FilePathName: target, Size: entry.Size, Hash: entry.Hash,
+            StorageScope: 'Private', Reused: upload.Reused === true, MetadataChanged: original != target
+        };
+        // 已提交分片的前缀只复用同一包摘要根中的精确元数据。当前游标及重装的新
+        // 分片仍逐文件读取对象摘要；避免从包头恢复时反复流式读取所有旧大文件。
+        if (previouslyVerified && original == target) return normalized;
+        if (!V8.Method || !V8.Method.CopyObject || !V8.Method.ObjectExist || !V8.Method.GetObjectSha256) {
+            throw new Error('PRIVATE_SOURCE_STORAGE_CAPABILITY_MISSING：请先升级当前租户的私有对象复制与流式摘要能力。');
+        }
+        var verifyObject = function (objectPath) {
+            var result = V8.Method.GetObjectSha256({ FilePathName: objectPath, Limit: true });
+            if (!result || Number(result.Code) != 1 || !result.Data
+                || String(result.Data.Sha256 || '').toLowerCase() != entry.Hash || Number(result.Data.Size) != entry.Size) {
+                throw new Error('PRIVATE_SOURCE_OBJECT_BYTES_MISMATCH：源码对象原始字节摘要或大小不一致，元数据未推进。');
+            }
+        };
+        var exists = V8.Method.ObjectExist({ FilePathName: target, Limit: true });
+        if (!exists || Number(exists.Code) != 1 || (exists.Data !== true && exists.Data !== false)) {
+            throw new Error('PRIVATE_SOURCE_OBJECT_EXISTENCE_UNKNOWN：私有对象存在性未确认，元数据未推进。');
+        }
+        if (!exists.Data) {
+            verifyObject(original);
+            // Copy 的响应丢失不能触发盲目重传。目标的实际摘要/大小是本次复制是否
+            // 完成的依据；目标缺失或不一致时继续失败，保留任务与全部旧对象。
+            try { V8.Method.CopyObject({ FilePathName: original, Path: target, Limit: true }); }
+            catch (copyAcknowledgementError) {}
+        }
+        verifyObject(target);
+        return normalized;
+    };
+
     var pruneApplicationAssets = function (appId, expectedPaths) {
         if (!resumeInstall || !appId) return;
         var existingApplicationAssets = loadExistingApplicationAssets(appId);
@@ -3207,6 +3300,7 @@ try {
         if (sourceExpected && (!sourceFiles || !sourceFiles.length)) {
             throw new Error('安装包声明包含私有源码，但源码文件为空，已停止安装，避免只安装运行产物。');
         }
+        if (sourceFiles.length) sourceRoot = getPrivateSourceBaselineRoot(appId, sourceFiles);
         var uploadedSource = [];
         reportProgress(60, '正在写入' + appType + '应用私有源码');
         var totalBundleAssets = sourceFiles.length;
@@ -3216,15 +3310,25 @@ try {
             activeImportResource = appKey + ':Source:' + sourcePath;
             expectedApplicationPaths[sourcePath.toLowerCase()] = true;
             var sourceUpload = reuseApplicationAsset(existingApplicationAssets, sourcePath, sourceFile);
-            if (!sourceUpload) {
+            var sourcePreviouslyVerified = backgroundChunkingEnabled
+                && String(backgroundCheckpoint.Phase || '') == 'ApplicationAssets'
+                && String(backgroundCheckpoint.AssetKind || '') == 'Source'
+                && Number(backgroundCheckpoint.BundleIndex || 0) == bundleIndex
+                && i < Number(backgroundCheckpoint.AssetIndex || 0)
+                && sourceUpload && sourceUpload.HdfsPath == '/' + String(V8.OsClient || '').toLowerCase() + '/' + sourceRoot + '/' + sourcePath;
+            if (!sourcePreviouslyVerified) {
                 if (shouldContinueApplicationAssets(sourceFile)) {
                     return buildApplicationAssetContinuation(bundleIndex, 'Source', i, totalBundleAssets);
                 }
-                sourceUpload = uploadApplicationAsset(sourceRoot, sourceFile, true, false);
+                if (!sourceUpload) sourceUpload = uploadApplicationAsset(sourceRoot, sourceFile, true, false);
+            }
+            sourceUpload = canonicalizePrivateSourceAsset(sourceUpload, sourceRoot, sourceFile, appId, sourcePreviouslyVerified);
+            if (!sourcePreviouslyVerified) {
+                // 复制/校验复用文件也消耗资产分片预算，不能一次读写整个应用。
                 markApplicationAssetUploaded(sourceFile);
             }
             uploadedSource.push(sourceUpload);
-            if (sourceUpload.Reused) {
+            if (sourceUpload.Reused && !sourceUpload.MetadataChanged) {
                 stats.ApplicationSourceFilesReused++;
                 continue;
             }

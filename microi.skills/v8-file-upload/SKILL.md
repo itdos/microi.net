@@ -7,7 +7,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 # Microi V8 文件上传下载
 
-你正在为 Microi 吾码平台编写文件上传/下载/返回相关代码。平台分布式存储（HDFS）支持阿里云OSS、MinIO、亚马逊S3，存储方案由 SaaS 引擎按租户配置。
+你正在为 Microi 吾码平台编写文件上传/下载/返回相关代码。平台分布式存储（HDFS）支持阿里云OSS、MinIO、亚马逊S3，存储方案由 SaaS 引擎按租户配置。上传对象的 `Content-Type` 由框架按实际对象路径统一确定，覆盖 HTML、JS/MJS、CSS、JSON/MAP、SVG、字体与 WASM，未知后缀保留 `application/octet-stream`。MinIO、S3、OSS 普通与分片上传使用同一映射；该映射不替代上传权限、内容和配额校验。旧对象不会因后端升级自动改变元数据：先核对字节数和 SHA-256，再修正类型或按正式应用发布流程产生新版本。不要把源码与公有编译产物混在一起，也不要关闭 `nosniff` 掩盖类型错误。
 
 公开入口覆盖 `V8.uploadFile`、多文件 `V8.uploadFiles` 与 MCP `microi_upload_file_base64`。多文件上传必须限制并发、逐文件返回结果；Base64 工具只接受明确文件名、大小和租户内目标范围，写后回读路径、大小与哈希。
 

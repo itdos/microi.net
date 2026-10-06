@@ -1087,6 +1087,8 @@ AI 应用工作台“发布应用商城”
 
 控制台若只出现 `chrome-extension://... Failed to fetch dynamically imported module`，先用无扩展浏览器或无痕窗口复测；该地址属于浏览器扩展，不足以单独证明微服务产物加载失败。真正的微服务资源错误应能对应到 `/micro-app/{OsClient}/{AppKey}/{BuildVersion}/...` 或实际发布域名，并结合 Network 状态码、宿主诊断信息和可见 DOM 判断。
 
+首次打开时，宿主分别检查资源下载和页面渲染：资源下载最多等待 60 秒，资源齐备后的 `beforemount` 才开始 12 秒渲染检查。下载超过 12 秒但仍在正常进行时，不会提前销毁微服务。下载停滞或脚本始终没有渲染内容时仍只自动重建一次，最终显示诊断信息；成功仍以真实可见内容为准。此修复需要更新 PC 框架镜像。
+
 ### 切回页签后状态丢失或出现双重生命周期
 
 不要把菜单微服务的主框架 `meta.keepAlive` 改回 `true`。正确做法是保留 Vue 外层 `keepAlive:false`，由平台 `<micro-app keep-alive>` 单独保活，并让子应用监听 `appstate-change`。若第 6 个及之后的实例重新进入时冷启动，这是受控 LRU 淘汰，不是缓存失效；若 5 个以内也总是冷启动，则检查实例名是否随时间随机变化、入口 URL 是否被追加了每次不同的参数，以及子应用是否在 `afterhidden` 主动清空状态。
@@ -1100,6 +1102,32 @@ AI 应用工作台“发布应用商城”
 3. `AssetManifestJson` 是否包含请求文件。
 4. 构建产物是否已上传到公有 HDFS。
 5. Vite 构建的资源基础路径是否适配 `/micro-app/...`。
+
+协议 v3 还需检查当前租户 `sys_config.FileServer`（包含公有桶路径）及已提交版本的
+`ReleasePrefix / AssetManifestJson`。CDN 文件返回 200、API 运行入口返回 404 时，
+先确认 API 实际读取的是同一租户文件域名和对象路径；不要重复发布或切换到其它租户。
+运行网关读取配置失败时应返回存储不可用，不再静默使用平台默认文件域名。
+
+### 入口文件存在，但提示 HTML 无效或脚本类型错误
+
+文件内容正确仍可能被错误的 HTTP `Content-Type` 阻止加载。浏览器需要以下类型：
+
+| 文件 | 正确响应类型 |
+| --- | --- |
+| `.html / .htm` | `text/html` |
+| `.js / .mjs` | `text/javascript` |
+| `.css` | `text/css` |
+| `.json / .map` | `application/json` |
+| `.wasm` | `application/wasm` |
+
+框架上传时统一设置 MinIO、S3、OSS 的对象类型，OSS 分片上传也在初始化时设置。
+历史对象若返回 `application/octet-stream`，API 网关按已提交清单中的文件路径归一类型；
+HTML 仍须通过完整文档、大小和 SHA-256 校验，存储 XML 错误页继续拒绝，`nosniff` 保留。
+明确不兼容的类型不会被当成合法页面。
+
+此修复需要更新全部 API 节点。旧对象的 CDN 直接入口仍需通过存储管理修正类型，
+或按正常发布流程生成新版本；API 网关兼容不会修改对象元数据或清除 CDN 缓存。
+普通应用的 `StorageMode=db` 只作应急恢复，文件链路验收通过后恢复 `file` 模式。
 
 ### SDK 提示登录身份已过期
 

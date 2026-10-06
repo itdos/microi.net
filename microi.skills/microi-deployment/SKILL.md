@@ -43,6 +43,10 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 
 共享源码持续变化时，可在独立目录保存完整候选源码和依赖，以该目录运行同一 Full 与发布脚本。专用测试服务使用独立端口，通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口（默认仍为 61501、61500）；进程管理器仍必须核验 PID、命令行和工作区归属，不得结束原工作区服务。变量仅供发布脚本使用，不进入生产 API 配置。
 
+Windows Git Bash 发布锁必须把当前 Shell 的 MSYS PID 经真实 `ps` 的 `WINPID` 映射成 Windows 原生 PID，再以原生 PID 和唯一令牌登记、释放；映射失败或持有者退出立即停止，不借用其它进程。中文旧热修复入口通过 PowerShell UTF-8 命令行与精确工作区路径核验，不能只看标签或因大小写规范化误拒绝已核验入口。API、PC、官网和 Agent 仍各自互斥，实际 Bash 与原生宿主回归必须通过后重新 Full。
+
+私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，实际镜像和部署仍需独立回读。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
+
 macOS 前端构建使用有界 `vm_stat` 探针，根据真实页大小读取空闲页与可回收文件页；匿名非活动页、压缩页和已包含的预读页不叠加。探针失败时回退原生空闲内存，Windows/Linux 保持既有方式；启动余量、95% 暂停与90%恢复及五秒稳定门禁均保留。统计错误应修正探针，正式发布保留内存门禁及共享进程；修复发布逻辑后重新 Full。
 
 DLL 加密脚本只在 Git Bash、MSYS 或 Cygwin 中转换 Windows 路径，优先使用 `cygpath`；macOS/Linux 必须保留原生绝对路径，不能把 `/Users` 或 `/usr` 误认为盘符。修复时先对隔离的构建副本执行原加密器，核对五个目标 DLL 的实际哈希变化及加密指纹，再由一键脚本重新执行 Full、加密和最终产物冒烟；不得以专项测试替代发布门禁。
@@ -151,17 +155,15 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
 ## Windows 多 AI 本地服务与 Release 文件锁
 
 多个 AI 对话共用同一工作区和固定 `61500/61501` 时，前后端是工作区级单例共享服务，
-不是每个对话各自拥有的后台进程。发布必须使用“工作区互斥 + 精确身份识别 + DLL 锁复核”：
+不是每个对话各自拥有的后台进程。发布必须使用“同范围互斥 + 精确身份识别 + DLL 锁复核”：
 
 - 健康开发服务默认复用；需要重载源码时串行重启。长期后端只从项目目录执行
   `dotnet run --launch-profile Microi.net.Api`，禁止直接运行 `bin/Release/net10.0`
   或 `bin/Release/publish` 作为 E2E 服务。
-- 一键发布在改写输出目录前创建 `.tmp/microi-process-state/release.lock`；锁存在时其它 AI
-  不得启动、自愈或重启 `61500/61501`。
-- Windows 发布前调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease`。
-  只在端口、命令行和当前工作区路径同时匹配时停止 Microi API/Vite，并额外查找当前工作区
-  的 Release API；身份不匹配时失败关闭，禁止使用 `/IM dotnet.exe`、`/IM node.exe`、
-  `/IM chrome.exe` 或 `/IM msedge.exe` 全机清理。
+- API、PC、官网、Agent 分别使用 `api-release.lock`、`pc-release.lock`、`website-release.lock`、`agent-release.lock`，可并行发布；同类发布互斥。合并发布只取得所选产品的锁，部分取得失败时释放本次已取得的锁。
+- API 启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`；官网/Agent 不阻塞二者。旧全局锁仅在真实命令入口和状态目录证明 API 热修复或 Agent 归属后缩小阻塞范围，未知锁仍阻塞，不能删除活跃锁。
+- Windows 发布前调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease -ReleaseScope api|pc|all`。API 仅处理匹配工作区的后端与 Release DLL；PC 仅处理匹配的 Vite；官网不清理二者。禁止按进程名全机清理。
+- PC/API 各自保留完整 Full 门禁；Full 的 restore/build/test/package audit 输出统一隔离到本次结果目录 `.net-artifacts`。并行验收使用独立结果目录、测试服务/端口及隔离租户；共享版本与跨产品源码先冻结，测试期间不得修改。资源排队依据为当前并行阶段预算之和与系统余量，不使用单一全局发布窗口。
 - Vite 以相对 `node_modules/vite/bin/vite.js` 启动且父进程退出时，命令行可能没有绝对工作区路径。
   进程管理器只能把只读回读到的 CWD 精确等于当前 `Microi.Client` 作为补充证据；读取失败、
   CWD 属于其它目录或仅检测到孤儿状态时仍须失败关闭。回归同时覆盖当前工作区可精确停止、

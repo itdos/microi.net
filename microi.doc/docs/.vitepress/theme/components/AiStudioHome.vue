@@ -58,12 +58,12 @@
       <div class="ai-studio-summary" ref="summaryArea" :class="{ 'is-motion-paused': motionPaused }" aria-label="Microi 平台价值与开发路径">
         <div class="ai-studio-summary__actions">
           <a class="is-primary" :href="locale === 'en-US' ? '/en/doc/about/microi-training-syllabus' : '/doc/about/microi-training-syllabus'">
-            <span class="mci-home-flow-particles" aria-hidden="true"></span>
+            <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h10.5A2.5 2.5 0 0 1 18 7v12.5H7.5A2.5 2.5 0 0 1 5 17V4.5Z"/><path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H18M9 8h5"/></svg>
             <span>{{ copy.primaryAction }}</span>
           </a>
           <a class="is-agent" :href="MICROI_CODE_DOC_URL">
-            <span class="mci-home-flow-particles" aria-hidden="true"></span>
+            <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="12" rx="2"/><path d="M8 20h8M12 16v4m0-13v6m0 0 2.7-2.7M12 13l-2.7-2.7"/></svg>
             <span>{{ copy.secondaryAction }}</span>
           </a>

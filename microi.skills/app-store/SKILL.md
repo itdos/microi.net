@@ -51,6 +51,8 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 下载真实发布包后，断言 `DDLStatements/PhysicalColumns/DiyTables/DiyFields/DataSets/SysMenus/WfFlowDesigns/WfNodes/WfLines/SysApiEngines/ScheduleJobs` 十一项数组全部为零，`SourceFiles/BuildAssets` 为零，`SourceZip/BuildZip` 为空，唯一运行交付为 `SharedPublicRuntime`。源码分发、服务端业务迁移和共享运行入口是独立事实，不能将共享公有编译产物当成目标租户已有业务接口或权限。
 
 
+发布器 `v2.1.2` 修复受管接口更新后的重复发布摘要漂移：源码、`Managed` 策略和所有权均与已发布包相同时，保留该包的有效基线；真正的源码变更仍推进基线并保留历史兼容摘要。缺失或无效基线从实际旧源码重新建立，`CreateIfMissing` 租户 Hook 保持原策略。`Inspect` 与 `Publish` 必须使用相同的冻结 `PreparedAssets` 和资源选择，并在发布后立即重放原请求，独立核对包 SHA-256、字节数和不可变快照 Id；重放被 CAS 拒绝仍算失败，不能仅以首次成功声称幂等。
+
 ### 共享表的稀疏字段选集
 
 应用只扩展已有共享表的少数字段时，标准导出器和 `ai_app_publish_store` 接收
@@ -134,6 +136,16 @@ Inspect 和 Publish 使用完全相同的选择、`CommittedProof` 及运行清�
   `PrivateSourcePath` 的已提交活动根选择当前私有行（`VersionId` 为空、`StorageScope=Private`、
   非目录且未删除），禁止把历史版本、未提交源、上传会话或 `upload/v*` 编译文件混入。
   已完成原子同步后的活动根可以仍在 staged 目录，不能只按目录名猜测提交状态。
+  安装器必须把包内源码复制到当前租户私有桶中的清单摘要根
+  `ai-app-source-staged/{AppId}/store-{SourceManifestHash}`，对象地址精确等于该根加原始
+  `FilePath`，保留大小写、中文与空格。时间戳上传地址不能作为活动源码；旧对象必须保留。
+  使用既有 `CopyObject/ObjectExist/GetObjectSha256` 校验复制目标的原始字节与长度后再更新
+  当前元数据。同版本重装也修正旧路径；复制响应未知先回读目标，目标不同或能力缺失失败
+  关闭。复制及当前游标的对象验签计入分片预算，持久前缀只复用同一包摘要根的精确元数据。
+  ZIP 导出前后必须以原始 `FilePath/ContentHash/Size` 的完整当前清单重新核对 `store-` 根
+  摘要；分片切换后的部分旧根、清单漂移和摘要根格式错误均拒绝。去掉 `source/` 的归档名
+  不能代替安装根摘要的原始路径。
+  安装成功后仍须下载并核验原生源码 ZIP，不能削弱其权限、租户、路径或字节校验。
   缺失基线不回退历史；分页不完整、重复路径（含大小写）、对象后缀与归档路径不一致、
   大小或原始字节 SHA 漂移均停止。使用当前租户可信私有字节与已有 ZIP 原子，优先对同一
   返回归档调用可信 `ExtractZip`（兼容 `ReadZip`），完整核对每条路径、大小、原始字节 SHA、

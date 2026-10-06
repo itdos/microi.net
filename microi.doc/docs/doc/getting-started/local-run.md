@@ -181,6 +181,8 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 发行组合的进程环境只绑定工具所在的工作区。临时测试仓库或其它源码根须显式传递自己的环境，不能继承另一发行任务的私有路径；显式配置错误仍立即失败。
 
+Skills 的渐进披露清单校验原始 UTF-8 字节。根 `.gitattributes` 固定 `microi.skills` Markdown 与清单为 LF，避免 Windows checkout 改变摘要。拉取后运行 `node microi.skills/scripts/validate-progressive-disclosure.mjs` 验证完整正文；确实修改规则时，仅对已审阅的 Skill 使用 `refresh-progressive-disclosure.mjs <名称>` 更新清单，再同步插件与后端知识快照。不要用批量重签摘要掩盖未审阅的正文变化。
+
 私有原生规则的依赖审批必须核对实际目标 Linux CLR 中的完整程序集引用链，不能用 Windows 框架文件或“某次业务调用未使用”代替。发行缺少、身份冲突或哈希不匹配时，保持失败关闭并修复依赖交付。例如 Oracle Core 23.26.300 声明引用 Azure、Kerberos、OCI、ConfigFile、AWS、GCP 六个扩展，Dos.ORM 同时引用六份同版本官方包，由 NuGet 交付它们及其传递依赖；`ProviderDependencyDeliveryTests` 只验证真实 CLR 装载，不连接 Oracle 或云服务。修复后重新运行目标运行时依赖验证、Full 及最终镜像回读，不在 V8 或生产配置中提供任意 DLL 装载入口。包说明见 [Oracle Azure 扩展](https://www.nuget.org/packages/Oracle.ManagedDataAccess.Azure/23.26.300) 和 [Oracle OCI 扩展](https://www.nuget.org/packages/Oracle.ManagedDataAccess.Oci/23.26.300)。
 
 依赖统一也要覆盖存量模块：MongoDB 兼容构建与 NuGet 包声明共同使用 DnsClient 1.7.0，以满足 Azure 配置提供者的版本下界；MongoDB 3.6/7 的真实验收仍由 Full 执行。OCI 带有独立强名称的旧密码学程序集，微信支付继续使用 BouncyCastle.Cryptography 2.6.2；测试通过显式程序集别名断言原来的认证标签篡改异常，避免同名类型导致编译歧义，不改变运行时密码学协议。
@@ -191,7 +193,15 @@ System.Drawing.Common 的 .NET 10 支持程序集还引用 System.Formats.Nrbf�
 
 共享源码持续变化时，可将完整候选源码及依赖保存到独立发布目录，在那里运行同一 Full 和一键发布脚本。专用测试服务使用独立端口，并通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口，默认仍为 61501、61500。进程管理器继续检查 PID、命令行和工作区归属；原工作区服务不受影响。这两个变量仅用于发布脚本，不是生产 API 配置。
 
-进程管理器也支持通过 PowerShell 7 检查 macOS/Linux 的真实监听进程、命令行和工作目录；路径按大小写精确匹配，结束前再次核对启动时间，拒绝 PID 复用。`dotnet run` 启动的无扩展名 `Microi.net.Api` apphost 还必须使用规范绝对路径，位于所选 API 项目的 `bin/` 下，且工作目录精确等于该项目；相同名称、其它目录、路径中的 `.`/`..` 或无法读取启动时间都不能作为可停止的身份。只能停止已证明属于所选工作区的 API/Vite 及其后代，无法读取身份时停止操作。此能力不改变一键脚本对共享开发服务的既有处理策略；跨平台回归使用独立目录和端口，不以模拟对象代替真实进程。
+Windows Git Bash 的 MSYS PID 与 Windows 原生 PID 不同。一键发布先用真实 `ps` 的 `WINPID` 映射登记 API、PC、官网或 Agent 发布锁，退出时用同一个原生 PID 和令牌释放。映射缺失、重复或进程已退出均停止发布；不借用其它存活进程。旧 API 热修复归属检查以 UTF-8 读取中文入口，并核对实际工作区路径，不仅依赖锁中的标签。
+
+API、PC 框架、官网和 Microi Agent 各自使用 `.tmp/microi-process-state/` 下的 `api-release.lock`、`pc-release.lock`、`website-release.lock`、`agent-release.lock`，可以同时发布；同类发布互斥。合并发布只取得所选产品的锁，部分取得失败会撤回本次已取得的锁。API 服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`，或通过进程管理器 `AssertServiceStart -ReleaseScope api|pc|all` 检查。Windows 发布准备按相同范围清理：API 处理后端及 Release DLL，PC 处理 Vite，官网不停止二者。
+
+PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与依赖审计统一使用本次结果目录的 `.net-artifacts`，并行发布使用独立结果目录、测试服务/端口及隔离租户。官网的全部源码、主题、测试和依赖由官网发布验收，不影响 PC/API 的候选一致性；共享 SDK、Skills、MCP 与发布工具仍受候选保护。共享版本和跨产品改动应先准备并冻结，再并行发布。资源排队按实际并行阶段预算之和与系统余量判断，不再因无关产品占用一个全局窗口而等待。
+
+旧 `platform-release.lock` 或 `release.lock` 仅在 PID 的真实命令入口和共享状态目录证明属于 API 热修复或 Agent 时缩小阻塞范围；未知归属继续保守保护。原进程和唯一令牌释放自身锁，不能删除其它正在运行的发布锁。
+
+进程管理器也支持通过 PowerShell 7 检查 macOS/Linux 的真实监听进程、命令行和工作目录；路径按大小写精确匹配，结束前再次核对启动时间，拒绝 PID 复用。`dotnet run` 启动的无扩展名 `Microi.net.Api` apphost 还必须使用规范绝对路径，位于所选 API 项目的 `bin/` 下，且工作目录精确等于该项目；相同名称、其它目录、路径中的 `.`/`..` 或无法读取启动时间都不能作为可停止的身份。只能停止已证明属于所选工作区的 API/Vite 及其后代，无法读取身份时停止操作。一键脚本仅处理所选发布范围的共享开发服务；跨平台回归使用独立目录和端口，不以模拟对象代替真实进程。
 
 主、子租户必须在同一维护控制面的有效租户目录中；必要时用 `MICROI_TEST_CONTROL_API_BASE`、`MICROI_TEST_CHILD_API_BASE` 指定各自入口。详细变量和测试边界见源码 `Microi.Server/Microi.Tests/README.md`，报告应区分本地候选与已部署远端的结果。
 
