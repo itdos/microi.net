@@ -51,6 +51,9 @@ export function assertTestSummary(output){
  return result;
 }
 
+// 报告名只表示测试责任根，不能让宿主平台的目录分隔符创建未授权的报告子目录。
+export function regressionLogFileName(root){return root.replace(/[\\/]/g,'-')+'.tap';}
+
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const results=path.resolve(process.argv[2]||path.join(workspace,'.tmp/node-regressions'));
  fs.mkdirSync(results,{recursive:true});
@@ -58,7 +61,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  for(const root of roots){
   const files=discoverTests(path.join(workspace,root));
   if(!files.length)throw Error(`No regression tests discovered: ${root}`);
-  const log=path.join(results,root.replaceAll('/','-')+'.tap');
+  const log=path.join(results,regressionLogFileName(root));
   console.log(`Node regression discovery: ${root}: ${files.length} files`);
   const output=await new Promise((resolve,reject)=>{
    const child=spawn(process.execPath,['--test','--test-concurrency=1','--test-reporter=tap',...files.map(f=>path.relative(workspace,f))],{cwd:workspace,windowsHide:true});

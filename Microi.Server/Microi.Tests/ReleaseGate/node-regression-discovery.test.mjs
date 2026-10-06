@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {discoverTests} from '../run-node-regressions.mjs';
+import {discoverTests,regressionLogFileName} from '../run-node-regressions.mjs';
 
 function fixture(t,files){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-regression-discovery-'));
@@ -31,4 +31,18 @@ test('unknown and browser aggregate children cannot masquerade as Node regressio
  }
  const root=fixture(t,{'empty.test.mjs':'// no responsibility tests\n'});
  assert.throws(()=>discoverTests(root),/Unclassified regression test/);
+});
+
+test('Node reports use the same single filename for Windows and POSIX responsibility paths',()=>{
+ const expected='Microi.Server-OfficialApplications-PlatformService-test.tap';
+ for(const root of ['Microi.Server/OfficialApplications/PlatformService/test','Microi.Server\\OfficialApplications\\PlatformService\\test'])
+  assert.equal(regressionLogFileName(root),expected);
+});
+
+test('a discovered responsibility report is written without creating nested result directories',t=>{
+ const directory=fixture(t,{}),name=regressionLogFileName('Microi.Server\\OfficialApplications\\PlatformService\\test');
+ assert.equal(path.win32.dirname(name),'.');assert.equal(path.posix.dirname(name),'.');
+ const file=path.join(directory,name);fs.writeFileSync(file,'# tests 1\n# pass 1\n# fail 0\n');
+ assert.equal(fs.readFileSync(file,'utf8'),'# tests 1\n# pass 1\n# fail 0\n');
+ assert.deepEqual(fs.readdirSync(directory),[name]);
 });
