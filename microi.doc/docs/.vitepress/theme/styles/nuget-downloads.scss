@@ -338,7 +338,7 @@
   --mci-nuget-text: #f7f7f7;
   --mci-nuget-muted: #a7a7a7;
   width: min(1120px, calc(100% - 40px));
-  margin: 0 auto 58px;
+  margin: 0 auto 16px;
 }
 
 .mci-nuget-stats--home .mci-nuget-stats__card {
@@ -452,7 +452,7 @@
 
   .mci-nuget-stats--home {
     width: min(100% - 28px, 1120px);
-    margin: 22px auto 42px;
+    margin: 22px auto 16px;
     box-sizing: border-box;
   }
 

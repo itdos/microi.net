@@ -188,7 +188,7 @@ test('homepage visual contract covers responsive, focus, and reduced-motion stat
   assert.match(styles, /--mci-home-pointer-x/)
   assert.match(component, /@pointermove="trackPointer"/)
   assert.match(component, /prefers-reduced-motion: reduce/)
-  assert.match(nugetStyles, /\.mci-nuget-stats--home\s*\{[^}]*margin:\s*22px auto 42px/s)
+  assert.match(nugetStyles, /\.mci-nuget-stats--home\s*\{[^}]*margin:\s*22px auto 16px/s)
   assert.match(microiCodeShowcase, /\.microi-code-actions a\.is-primary[^}]*-webkit-text-fill-color:#fff!important/s)
   assert.match(styles, /padding: 104px 0 36px/)
   assert.match(styles, /margin: 0 auto 80px/)
