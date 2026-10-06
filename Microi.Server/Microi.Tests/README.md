@@ -52,12 +52,19 @@ AI CAD、AI 员工中心和邮箱的统一 Node 入口使用
 `MICROI_TEST_MONGO_CURRENT` 与专用测试库 `MICROI_MEMORY_TEST_CONN`；未单独提供
 MySQL 连接时复用 Full 的 `MICROI_TEST_SCHEDULE_MYSQL` 专用库。
 
+Full 的 SDK 输出统一位于本次结果目录 `.net-artifacts`。`run-tests.ps1` 只为当前测试
+进程绑定 `MICROI_TEST_REPOSITORY_ROOT`；源码定位以真实 `.csproj` 为标记，不能把
+隔离输出中同名的项目目录当成源码。内存诊断仍在独立子进程执行，并按当前测试
+程序集的 Configuration 与输出布局选定唯一夹具 DLL；产物缺失时失败，不借用旧 Debug。
+
 `Microi一键编译发布.sh` 在发布后端、构建前端或仅推送镜像时自动调用 `Full`：先取得发布锁，
 保持已加载候选源码的共享服务供测试使用，通过后再停止服务、改版本及发布。
 PC/API 镜像候选仍覆盖根仓及六个闭源子仓的源码与内置资源；独立 `microi.uniapp`
 的页面、客户资源和版本号不属于这两个镜像的构建输入，不阻断其发布。
 `microi.uniapp/src/utils/` 由后端 SDK 契约测试读取，继续参与内容哈希校验。
-缺少变量、零用例、失败或跳过均阻止发布；文档专用选项 6 不触发后端业务门禁。
+缺少变量、零用例或失败均阻止发布；确定性 Node 回归禁止跳过。桌面 Vitest 保留原始
+平台条件，Windows 未执行的 macOS/Unix 场景必须单列，不能作为其它系统的验收证明。
+文档专用选项 6 不触发后端业务门禁。
 AI 发布话术仍需要求在 VS Code 扩展发布前执行同一门禁，不能替代脚本检查。
 
 构建完成后保存候选源码与 Docker 构建上下文的 SHA-256 回执；每次推送再次回读。

@@ -168,6 +168,7 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
 - API 启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`；官网/Agent 不阻塞二者。旧全局锁仅在真实命令入口和状态目录证明 API 热修复或 Agent 归属后缩小阻塞范围，未知锁仍阻塞，不能删除活跃锁。
 - Windows 发布前调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease -ReleaseScope api|pc|all`。API 仅处理匹配工作区的后端与 Release DLL；PC 仅处理匹配的 Vite；官网不清理二者。禁止按进程名全机清理。
 - PC/API 各自保留完整 Full 门禁；Full 的 restore/build/test/package audit 输出统一隔离到本次结果目录 `.net-artifacts`。并行验收使用独立结果目录、测试服务/端口及隔离租户；共享版本与跨产品源码先冻结，测试期间不得修改。资源排队依据为当前并行阶段预算之和与系统余量，不使用单一全局发布窗口。
+- 测试进程的 `MICROI_TEST_REPOSITORY_ROOT` 必须绑定本轮源码工作区；源码定位核对真实项目文件，不能把 SDK 产物中的同名目录当成源码。内存诊断保留子进程隔离，只使用当前 Configuration 和当前输出布局对应的夹具 DLL，缺失即失败，禁止借用旧 Debug 产物。诊断守护器的调用参数与报告路径必须属于同一次尝试，历史报告不可用于本轮放行。
 - Vite 以相对 `node_modules/vite/bin/vite.js` 启动且父进程退出时，命令行可能没有绝对工作区路径。
   进程管理器只能把只读回读到的 CWD 精确等于当前 `Microi.Client` 作为补充证据；读取失败、
   CWD 属于其它目录或仅检测到孤儿状态时仍须失败关闭。回归同时覆盖当前工作区可精确停止、
