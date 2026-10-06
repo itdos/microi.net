@@ -1268,6 +1268,11 @@ html:not(.dark) .ai-studio-brand {
   padding-bottom: 28px;
 }
 
+/* 只收紧首页相邻区块，16px 底部间距与 8px 顶部留白合计 24px。 */
+.microi-ai-studio-home > .mci-nuget-stats--home + .ai-app-market .ai-app-shell {
+  padding-top: 8px;
+}
+
 .ai-studio-summary {
   --mci-home-training-start: #87380f;
   --mci-home-training-end: #9c4219;
