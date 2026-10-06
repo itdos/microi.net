@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,lstat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {snapshotReleaseComposition} from './release-composition.mjs';
@@ -49,7 +49,13 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
    const key=path.posix.join(repository.replaceAll('\\','/'),name.replaceAll('\\','/'));
    const buildRecipe=/\/bin\/Release\/(?:Dockerfile|default\.conf)$/.test(key);
    if((generated.test(key)&&!buildRecipe)||independentMobileSource(key)||independentDesktopSource(key)||documentationOnly(key))continue;
-   try{files[key]=createHash('sha256').update(candidateBytes(key,await readFile(path.resolve(cwd,name)))).digest('hex');}
+   try{
+    const sourcePath=path.resolve(cwd,name),stat=await lstat(sourcePath);
+    // Git 会把目录联接作为未跟踪输入列出；先验证路径类型，避免读目录抢先抛错而跳过私有契约边界。
+    if(stat.isSymbolicLink())throw Error(`Candidate source uses a symbolic link: ${key}`);
+    if(!stat.isFile())throw Error(`Candidate source must be a regular file: ${key}`);
+    files[key]=createHash('sha256').update(candidateBytes(key,await readFile(sourcePath))).digest('hex');
+   }
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }
  }
