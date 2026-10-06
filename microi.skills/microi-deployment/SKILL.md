@@ -45,6 +45,10 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 
 Windows Git Bash 发布锁必须把当前 Shell 的 MSYS PID 经真实 `ps` 的 `WINPID` 映射成 Windows 原生 PID，再以原生 PID 和唯一令牌登记、释放；映射失败或持有者退出立即停止，不借用其它进程。中文旧热修复入口通过 PowerShell UTF-8 命令行与精确工作区路径核验，不能只看标签或因大小写规范化误拒绝已核验入口。API、PC、官网和 Agent 仍各自互斥，实际 Bash 与原生宿主回归必须通过后重新 Full。
 
+PowerShell 5/7 进程管理入口同时固定 UTF-8 控制台与管道输出；脚本有 UTF-8 BOM
+不代表错误流编码正确。用真实子进程强制继承旧代码页，核对非零拒绝状态、完整中文
+诊断和无非法 UTF-8；保留原锁与进程归属断言，再重新 Full。
+
 私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，实际镜像和部署仍需独立回读。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
 
 macOS 前端构建使用有界 `vm_stat` 探针，根据真实页大小读取空闲页与可回收文件页；匿名非活动页、压缩页和已包含的预读页不叠加。探针失败时回退原生空闲内存，Windows/Linux 保持既有方式；启动余量、95% 暂停与90%恢复及五秒稳定门禁均保留。统计错误应修正探针，正式发布保留内存门禁及共享进程；修复发布逻辑后重新 Full。

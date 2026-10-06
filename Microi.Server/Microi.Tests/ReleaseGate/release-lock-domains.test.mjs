@@ -130,6 +130,26 @@ test('actual process manager service guard follows the same domain rules without
     acquireReleaseLock(root,'website',process.pid,token+'3');assert.equal(run('pc').status,0);
 }));
 
+test('actual process manager preserves Chinese lock diagnostics under inherited legacy console encoding',()=>withFixture(root=>{
+    acquireReleaseLock(root,'api',process.pid,token);
+    const binaries=[];
+    for(const value of [...new Set([process.env.MICROI_TEST_POWERSHELL,'pwsh','powershell'].filter(Boolean))]){
+        const probe=spawnSync(value,['-NoProfile','-Command','$PSVersionTable.PSVersion.ToString()'],{encoding:'utf8',timeout:10000});
+        if(probe.error?.code==='ENOENT')continue;
+        assert.ifError(probe.error);assert.equal(probe.status,0,probe.stderr);binaries.push(value);
+    }
+    assert.ok(binaries.length,'PowerShell is required; this regression never skips.');
+    const quote=value=>"'"+value.replaceAll("'","''")+"'";
+    // 原始脚本读取 UTF-8 BOM 正确，但继承 GBK/ASCII 后错误流仍丢失中文；真实子进程验证输出边界。
+    for(const binary of binaries){
+        const command=`[Console]::OutputEncoding=[System.Text.Encoding]::GetEncoding(${process.platform==='win32'?936:20127}); & ${quote(manager)} -Action AssertServiceStart -WorkspaceRoot ${quote(root)} -ReleaseScope api`;
+        const blocked=spawnSync(binary,['-NoProfile','-Command',command],{encoding:'utf8',timeout:15000});
+        assert.ifError(blocked.error);assert.equal(blocked.status,1,binary+': '+blocked.stderr);
+        assert.match(blocked.stderr,/api 发布正在进行，禁止停止或重启该范围的共享服务/);
+        assert.equal(blocked.stderr.includes('\uFFFD'),false,binary+' must emit valid UTF-8');
+    }
+}));
+
 test('actual Bash combined release functions release their original workspace lock after changing directories',()=>withFixture(root=>{
     const original=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
     const start=original.indexOf('release_workspace_lock() {');const end=original.indexOf('\nprepare_release_workspace()',start);

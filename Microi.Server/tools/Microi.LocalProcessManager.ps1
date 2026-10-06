@@ -16,6 +16,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Git Bash 启动的 PowerShell 可继承旧控制台代码页；管道与错误输出统一为 UTF-8，
+# 使 Node 发布门禁和人工终端读取相同的中文诊断，不改变发布锁或停止范围。
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Console]::OutputEncoding
 $isWindowsHost = $env:OS -eq 'Windows_NT'
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
