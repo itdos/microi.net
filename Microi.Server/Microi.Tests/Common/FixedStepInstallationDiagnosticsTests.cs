@@ -2,6 +2,7 @@ using Microi.FixedStep;
 using Microi.net;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
 
@@ -70,6 +71,84 @@ public sealed class FixedStepInstallationDiagnosticsTests
         var monitor=new FixedStepInstallationDiagnostics(new CompiledRulesDeployments(Array.Empty<ITrustedRulesRegistrar>()));
         Assert.Equal("DiagnosticBindingUnknown",Assert.Throws<InvalidOperationException>(()=>monitor.RecordAttempt(binding)).Message);
         Assert.Empty(monitor.Snapshot("tenant").Registrations);
+    }
+
+    [Fact]
+    public void Dependency_content_mismatch_reports_actual_trusted_identity_and_both_hashes()
+    {
+        var (monitor,binding,error)=DependencyFailure(true);
+        Assert.Equal("DependencyHashMismatch",error.Message);
+        monitor.RecordAttempt(binding,error);
+        var snapshot=monitor.Snapshot("tenant");
+        var row=JObject.FromObject(Assert.Single(snapshot.Registrations));
+        Assert.Equal(binding.EntryType.Assembly.FullName,row["DependencyIdentity"]?.Value<string>());
+        Assert.Equal(new string('0',64),row["DependencyExpectedSha256"]?.Value<string>());
+        var actual=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(binding.EntryType.Assembly.Location))).ToLowerInvariant();
+        Assert.Equal(actual,row["DependencyActualSha256"]?.Value<string>());
+        Assert.Equal("ContentMismatch",row["DependencyFailureReason"]?.Value<string>());
+        Assert.False(snapshot.AuthorizationProof);
+        Assert.Empty(monitor.Snapshot("other-tenant").Registrations);
+        Assert.DoesNotContain(binding.EntryType.Assembly.Location,JsonConvert.SerializeObject(snapshot));
+    }
+
+    [Fact]
+    public void Dependency_missing_manifest_does_not_read_or_expose_unapproved_file_hash()
+    {
+        var (monitor,binding,error)=DependencyFailure(false);
+        monitor.RecordAttempt(binding,error);
+        var row=JObject.FromObject(Assert.Single(monitor.Snapshot("tenant").Registrations));
+        Assert.Equal(binding.EntryType.Assembly.FullName,row["DependencyIdentity"]?.Value<string>());
+        Assert.Equal("MissingManifest",row["DependencyFailureReason"]?.Value<string>());
+        Assert.Null(row["DependencyExpectedSha256"]?.Value<string>());
+        Assert.Null(row["DependencyActualSha256"]?.Value<string>());
+        Assert.Equal("DependencyHashMismatch",row["ErrorCode"]?.Value<string>());
+    }
+
+    [Fact]
+    public void Dependency_failure_metadata_cannot_be_forged_through_exception_data()
+    {
+        var (_,binding)=FixedStepPublicationProofTests.Fixture();
+        var monitor=new FixedStepInstallationDiagnostics(new CompiledRulesDeployments(new[]{new Registrar(binding)}));
+        var error=new InvalidOperationException("DependencyHashMismatch");
+        error.Data["DependencyIdentity"]="/private/token-secret.pem";
+        error.Data["Microi.TrustedDependencyFailure.v1"]=new {DependencyIdentity="/private/token-secret.pem",DependencyActualSha256="secret-token"};
+        monitor.RecordAttempt(binding,error);
+        var row=JObject.FromObject(Assert.Single(monitor.Snapshot("tenant").Registrations));
+        Assert.Null(row["DependencyIdentity"]?.Value<string>());
+        Assert.Null(row["DependencyActualSha256"]?.Value<string>());
+        Assert.DoesNotContain("token-secret",row.ToString());Assert.DoesNotContain("secret-token",row.ToString());
+    }
+
+    [Fact]
+    public void Dependency_failure_witness_is_detached_and_cleared_after_success()
+    {
+        var (monitor,binding,error)=DependencyFailure(true);
+        monitor.RecordAttempt(binding,error);
+        var before=JObject.FromObject(Assert.Single(monitor.Snapshot("tenant").Registrations));
+        Assert.Equal("ContentMismatch",before["DependencyFailureReason"]?.Value<string>());
+        before["DependencyIdentity"]="forged";
+        Assert.Equal(binding.EntryType.Assembly.FullName,JObject.FromObject(Assert.Single(monitor.Snapshot("tenant").Registrations))["DependencyIdentity"]?.Value<string>());
+        monitor.RecordAttempt(binding);
+        var after=JObject.FromObject(Assert.Single(monitor.Snapshot("tenant").Registrations));
+        Assert.Equal("CatalogRegistered",after["State"]?.Value<string>());
+        Assert.Null(after["DependencyIdentity"]?.Value<string>());Assert.Null(after["DependencyExpectedSha256"]?.Value<string>());
+        Assert.Null(after["DependencyActualSha256"]?.Value<string>());Assert.Null(after["DependencyFailureReason"]?.Value<string>());
+    }
+
+    private static (FixedStepInstallationDiagnostics monitor,CompiledRulesBinding binding,InvalidOperationException error) DependencyFailure(bool manifestPresent)
+    {
+        // 真实Verifier在第一个已加载程序集处失败；测试不替换错误消息，也不运行尚未通过校验的规则工厂。
+        var (row,binding)=FixedStepPublicationProofTests.Fixture();
+        var receipt=RulesInstallationRecord.Verify(row,binding,true);
+        receipt.DependencyClosureSha256.Clear();
+        if(manifestPresent)receipt.DependencyClosureSha256[binding.EntryType.Assembly.FullName!]=new string('0',64);
+        var error=Assert.Throws<InvalidOperationException>(()=>InstallationVerifier.Verify(new InstallationStore(receipt),binding.Tenant,binding.RegistrationId,binding.EntryType));
+        return (new FixedStepInstallationDiagnostics(new CompiledRulesDeployments(new[]{new Registrar(binding)})),binding,error);
+    }
+
+    private sealed class InstallationStore(ApprovedInstallation receipt):IApprovedRulesInstallationStore
+    {
+        public ApprovedInstallation ReadVerified(string tenant,string registrationId)=>receipt;
     }
 
     private sealed class Registrar(CompiledRulesBinding binding):ITrustedRulesRegistrar
