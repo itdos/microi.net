@@ -190,7 +190,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=409130f5ad663cf48aac55db1ec2b5eea5f4513114ca6abc7e470f39208402d0 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=ab17865c6032884ccd896a0eb62387cf7f89edcf337c024f2251563f3bd0e4d9 -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）
@@ -226,6 +226,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 - 修改宿主、TagsView 或权限路由时，必须同时读取 [Vue3 前端微服务宿主规则](references/progressive-03-vue3-前端微服务宿主规则.md) 并运行微服务缓存契约测试。
 
 - 修改 Vue/JS 后先跑 VS Code Problems 或 `get_errors`。
+- 宿主按钮重置只作用于 `button:not(:focus-visible)`，不能用全局 `outline:none !important` 覆盖组件或微应用的键盘焦点。微应用保留自己的边框形状，焦点色使用已适配明暗表面的 `--mci-text-link`（缺省回退正文语义色），不能直接用浅品牌色。真实 Tab/Shift+Tab 回归须核对 `:focus-visible`、实际 `outline-style`、宽度、颜色与至少 3:1 对比度；`outline-style:none` 即使宽度非零也不可见。使用阴影焦点时另验实际 `box-shadow`，不能只看焦点状态。平台样式组件回归归 Full，应用自身按钮继续在真实业务页面验收。
 - 影响核心前端时跑 `Microi.Client` 的 `npm run build`。
 - 如果改了工作流、表单保存、按钮 V8，建议用实际 `sys_menu` 配置测试：
   - `FormBtns` 是否出现在表单右上角/FAB。
