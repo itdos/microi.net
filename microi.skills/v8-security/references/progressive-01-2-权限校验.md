@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-security-005 sha256=09f88aaf8da914fdbec8bc8668cef588a02217354a210515230471fbfdddd27f -->
+<!-- microi-progressive:chunk id=v8-security-005 sha256=81cedb2579661a4bcb09e410090d689b2228c46294eae2019ca0927cf6a5836a -->
 ## 2. 权限校验
 
 ### DiyToken 是平台会话与权限入口，不替换为 ASP.NET Identity
@@ -55,6 +55,19 @@ DiyToken 与 `sys_user`、`OsClient`、终端 `did`、共享 Redis 登录态、�
 - 快照 Key 必须包含独立的“序列化契约版本”。新增 `UserLevel`、`IsActiveUser` 等安全字段或改变字段语义时提升版本，让 Redis 中跨重启、滚动升级遗留的旧 JSON 立即失效，禁止缺失字段按 `0/false` 反序列化后误拒绝有效管理员或误放普通用户。
 - 已通过 `Level >= 9999` 校验的表单设计器批量写 `diy_field` 时，应在外层只授权一次，并校验所有字段都属于同一 `TableId`；随后在同一事务内更新元数据，批次结束后只清一次缓存/版本。不要让每个字段重新进入通用 FormEngine 授权、V8、日志和缓存管线。`AddDiyField/AddField` 等单字段能力仍须传递经服务端确认的管理员上下文；升级程序等无 HTTP 用户的可信任务必须构造强类型参数并设置不可由 JSON 绑定的 `_TrustedServerInvocation`。
 
+### 接口引擎嵌套调用的可信身份
+
+普通 HTTP 发起的同租户嵌套接口调用，在业务参数未提供身份时，由运行时从
+本次重新验证的 DiyToken 恢复 `V8.CurrentUser` 独立副本。不得通过客户端
+`_CurrentUser`、`UserId`、角色或管理员标记修补丢失的会话身份。
+跨租户公开调用仍清空原租户身份；匿名调用不会变成登录调用。
+已受控的 Controller 投影保持兼容，后台任务仍以服务端任务身份作用域为准。
+子脚本不能通过修改该副本改变共享 Token；后续请求仍需验证共享会话和授权。
+
+修复依赖后端运行时部署，不需要新增业务字段或改变接口参数。
+验收应先证明旧版丢失身份，再覆盖同租户真实 HTTP 嵌套调用、跨租户清空、
+匿名、后台任务优先、一次性交接与登录态撤销；不能放宽角色或 StopHttp 代替修复。
+
 ### 接口引擎中校验当前用户
 
 ```javascript
@@ -104,7 +117,7 @@ var result = V8.FormEngine.GetTableData('Order', {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-006 sha256=c7a43f46e8636fc3cbf792dfb8ff6c17890bd0a4d57025ba29cc37de2373dcbe -->
+<!-- microi-progressive:chunk id=v8-security-006 sha256=3a40db54a44c9c76bd3dd7255d1a6b15dcf8b8b90c2d032b7eda80532f023d7d -->
 ## 5. 防重复提交
 
 前端禁用按钮或普通 Cache 的 `Exists → Set` 只能改善体验，不能保证业务只执行一次。写操作必须接收稳定幂等键，并通过数据库唯一约束、条件更新或状态机原子落库；接口引擎可再配置 `LockKey` 降低并发，但锁不能代替业务幂等。
@@ -126,7 +139,7 @@ if (old.Code === 1 && old.Data) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-007 sha256=360a677ffa518b108e304f92922f9eaa2a12d44e863a16ce7439d9afe5616766 -->
+<!-- microi-progressive:chunk id=v8-security-007 sha256=35706b9a254fb5788b64535947261f66fd8c06e17103b2169f8be02fce05fa65 -->
 ## 6. 敏感数据
 
 ### 密码与认证

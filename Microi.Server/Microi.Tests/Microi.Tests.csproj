@@ -80,6 +80,8 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MicroiNetExists)' != 'true'">
+    <!-- 此夹具执行私仓 ApiEngine 的实际预处理源码；公开 NuGet 模式由已有 HTTP/角色测试覆盖。 -->
+    <Compile Remove="Common\ApiEngineNestedIdentityTests.cs" />
     <Compile Remove="Common\FormEngineTenantBoundaryTests.cs" />
     <Compile Remove="Common\FormEngineSqlIdentitySnapshotTests.cs" />
     <Compile Remove="Common\FormEngineReadPrimaryTests.cs" />
