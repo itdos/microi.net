@@ -69,6 +69,18 @@ function removeFixture(root) {
     ownedFixtures.delete(root);
 }
 
+function prepareCopiedRuntime(source, destination) {
+    fs.copyFileSync(source, destination);
+    if (process.platform !== 'darwin') return;
+    // macOS 首次加载新路径下的 Mach-O 副本可能先停在 dyld 的系统校验中。
+    // 在夹具准备阶段验证副本能运行；监听端口的 15 秒期限与清理隔离断言保持原样。
+    const probe = spawnSync(destination, ['--version'], {
+        encoding: 'utf8', timeout: 60000, windowsHide: true
+    });
+    assert.equal(probe.status, 0, `复制的 Node 运行时不可用：${probe.error?.message || probe.stderr}`);
+    assert.equal(probe.stdout.trim(), process.version);
+}
+
 function runProcessManager(workspaceRoot, action, frontendPort, backendPort = 61501) {
     // StopBackend 会同时清理所选工作区的 Release 进程；测试绝不能指向真实源码工作区。
     assert.notEqual(path.resolve(workspaceRoot), repoRoot);
@@ -135,7 +147,7 @@ test('临时输出的 Microi.net.Api 仅在 CWD 精确属于当前工作区时�
     fs.mkdirSync(backendRoot, { recursive: true });
     const fakeBackend = path.join(testRoot, 'Microi.net.Api.exe');
     const listener = path.join(testRoot, 'listener.cjs');
-    fs.copyFileSync(process.execPath, fakeBackend);
+    prepareCopiedRuntime(process.execPath, fakeBackend);
     fs.writeFileSync(listener, [
         "const net = require('node:net');",
         "net.createServer(() => {}).listen(Number(process.argv[2]), '127.0.0.1');"
@@ -150,7 +162,7 @@ test('临时输出的 Microi.net.Api 仅在 CWD 精确属于当前工作区时�
         const otherBackendRoot = path.join(testRoot, 'other-workspace', 'Microi.Server', 'Microi.net.Api');
         const otherReleasePath = path.join(otherBackendRoot, 'bin', 'Release', 'Microi.net.Api.exe');
         fs.mkdirSync(path.dirname(otherReleasePath), { recursive: true });
-        fs.copyFileSync(process.execPath, otherReleasePath);
+        prepareCopiedRuntime(process.execPath, otherReleasePath);
         const otherReleasePort = await reservePort();
         otherReleaseBackend = spawn(otherReleasePath, [listener, String(otherReleasePort)], {
             cwd: otherBackendRoot, windowsHide: true, stdio: 'ignore'

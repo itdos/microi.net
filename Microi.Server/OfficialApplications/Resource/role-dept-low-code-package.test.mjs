@@ -15,14 +15,15 @@ function sourceHash(value) {
 test("SaaS engine declares every changed legacy managed-engine baseline", () => {
   const fixtures = {
     admin_get_empty_database_sanitization_sql: {
-      // SaaS v8.4.14 的 v1.5.7 按真实组织物理列生成模板；历史兼容基线保持原值。
-      current: "330cb0bc0d12eba45e1492907ee2e3c98c43c714df4f5634abe25c1b72558677",
+      // SaaS v8.4.15 的 v1.5.9 物化平台运行时保留身份；历史兼容基线保持原值。
+      current: "5520896cf87e96e113eccffd648b46ef005761076837dd225b198edb15aeb7df",
       base: "e4a57b281874338cea6cf7f324f4eaac766040f9f42ee56ea998f21d23d9471a",
       compatible: [
         "a9fdf1568db3de5401c7d8341adf241e1ffd10a47790934795f17bef37399d80",
         "0630af69830abb822cdcf9657b6662b915c89119dcd3b169ab95fdf05a27d3ec",
         "3f877b2f71deb2c553ed6d3515839e307a1e82ecbf45d7bbc865ca1380cc4df0",
         "db42fca3c905fdd1ecf42586c3cfc40bb3b292a647118ca14c416743f7dbccc6",
+        "330cb0bc0d12eba45e1492907ee2e3c98c43c714df4f5634abe25c1b72558677",
       ],
     },
     admin_build_sanitized_empty_database: {

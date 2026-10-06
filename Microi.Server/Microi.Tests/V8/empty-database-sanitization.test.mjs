@@ -24,6 +24,25 @@ const enginePath = path.join(
 const engineSource = fs.readFileSync(enginePath, 'utf8')
 const execute = new Function('V8', engineSource)
 
+test('应用文件与版本清理先建立带主键的保留身份集合，避免 MySQL 5.7 OR 删除关联扫描', () => {
+  const { result, queries } = run([{ Id: 'platform-id', AppKey: 'microi-platform-service', AppPakcet: '' }], {
+    optionalTables: ['mci_ai_app_file', 'mci_ai_app_version']
+  })
+  assert.equal(result.Code, 1)
+  const sql = result.Data.Sql
+  const seed = sql.indexOf('CREATE TEMPORARY TABLE IF NOT EXISTS temp_platform_runtime_app_ids')
+  assert.ok(seed >= 0)
+  assert.match(sql, /temp_platform_runtime_app_ids\s*\(\s*Id VARCHAR\(191\) NOT NULL PRIMARY KEY/)
+  for (const alias of ['f', 'v']) {
+    const cleanup = sql.indexOf(`DELETE ${alias} FROM mci_ai_app_`)
+    assert.ok(cleanup > seed, '保留身份必须在清理前物化')
+    assert.match(sql, new RegExp(`LEFT JOIN temp_platform_runtime_app_ids p ON p.Id = ${alias}\\.AppId`))
+    assert.doesNotMatch(sql, new RegExp(`p.Id = ${alias}\\.AppId OR p.AppKey = ${alias}\\.AppId`))
+  }
+  assert.match(sql, /SELECT Id FROM sys_microistore[\s\S]*?UNION ALL\s+SELECT AppKey FROM sys_microistore/)
+  assert.ok(queries.every(query => /^\s*(?:\/\*[\s\S]*?\*\/\s*)?SELECT\b/i.test(query)), '源主库只读取，不在生成阶段清理')
+})
+
 function projectStoreRows(storeRows) {
   return storeRows.map((row) => {
     let packageModel = null

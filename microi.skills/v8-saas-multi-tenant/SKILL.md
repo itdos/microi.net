@@ -274,3 +274,5 @@ SELECT * FROM Contact WHERE OwnerId = $CurrentUser.Id$ AND Spouse = $CurrentUser
 ### 旧结构空库制作验收
 
 空库脱敏生成器应只读实际物理列；组织机构旧表缺少可选父级名称列时，只写已有父级 Id，不为制作模板修改主库结构。物理字段发现失败应在输出清理 SQL 前失败关闭。验收同时覆盖有该列、缺少该列及读取失败，最终检查隔离副本和官方空库下载包。
+
+应用文件与版本清理不得在 MySQL 5.7 的 DELETE 外连接中用 `Id = AppId OR AppKey = AppId`。先在隔离副本内物化带主键的 Id/AppKey 保留集合，分别覆盖当前商城 Id、历史 AppKey、业务应用、孤立记录与 NULL；验证新旧结果一致，源主库只读。真实 SQL 耗时与 Node 生成器测试需分别记录。
