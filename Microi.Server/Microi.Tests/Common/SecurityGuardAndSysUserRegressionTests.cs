@@ -448,8 +448,12 @@ public class SecurityGuardAndSysUserRegressionTests
         Assert.Single(columns, item =>
             item["TABLE_NAME"]?.Value<string>() == "sys_osclients"
             && item["COLUMN_NAME"]?.Value<string>() == "DisableFileUpload");
+        // 一个表可同时声明建表和索引 DDL；上传开关合同只要求建表声明唯一，
+        // 不能将推广查询索引误判为重复建表，索引仍由导入器独立幂等执行。
         var ddl = package["DDLStatements"]!.Values<JObject>().Single(item =>
-            item["TableName"]?.Value<string>() == "sys_osclients")["DDL"]?.Value<string>();
+            item["TableName"]?.Value<string>() == "sys_osclients"
+            && item["DDL"]?.Value<string>()?.TrimStart().StartsWith(
+                "CREATE TABLE", StringComparison.OrdinalIgnoreCase) == true)["DDL"]?.Value<string>();
         Assert.Contains("`DisableFileUpload` int NULL COMMENT '关闭文件上传'", ddl);
     }
 
