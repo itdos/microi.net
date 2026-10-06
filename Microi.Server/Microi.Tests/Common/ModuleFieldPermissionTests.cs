@@ -12,6 +12,14 @@ public sealed class ModuleFieldPermissionTests
         var read=ModuleFieldPermission.Resolve(Config(key,identity,true,false),Principal());Assert.True(read.Visible("Secret"));Assert.False(read.Editable("Secret"));
         var unrelated=ModuleFieldPermission.Resolve(Config(key,"unrelated",false,false),Principal());Assert.True(unrelated.Visible("Secret"));
     }
+    [Fact] public void RoleAndJobAssignmentsAreIndependentIdentities() {
+        var roleOnly = new FormEngineAuthorizationSnapshot { UserId="user", EffectiveRoleIds=new(){"shared-id"}, JobIds=new() };
+        Assert.True(ModuleFieldPermission.Resolve(Config("Jobs","shared-id",false,false),roleOnly).Visible("Secret"));
+        Assert.False(ModuleFieldPermission.Resolve(Config("Roles","shared-id",false,false),roleOnly).Visible("Secret"));
+        var jobOnly = new FormEngineAuthorizationSnapshot { UserId="user", EffectiveRoleIds=new(), JobIds=ModuleFieldPermission.Ids("[{\"Id\":\"shared-id\",\"JobName\":\"销售岗位\"}]") };
+        Assert.False(ModuleFieldPermission.Resolve(Config("Jobs","shared-id",false,false),jobOnly).Visible("Secret"));
+        Assert.True(ModuleFieldPermission.Resolve(Config("Roles","shared-id",false,false),jobOnly).Visible("Secret"));
+    }
     [Fact]public void DenyWinsAcrossGroupsAndMenuContextsAndDerivedValues() {
         var read=ModuleFieldPermission.Resolve(Config("Roles","role",true,true),Principal());
         read.Intersect(ModuleFieldPermission.Resolve(Config("Users","user",false,false),Principal()));read.RestrictAlias("Alias","Secret");

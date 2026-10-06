@@ -25,3 +25,10 @@ test('服务端有效权限投影大小写匹配，默认拒绝及未知协议�
     assert.deepEqual(resolvedModuleFieldAccess(access,'Id'),{visible:true,editable:false});
     assert.equal(resolvedModuleFieldAccess(null,'Name'),null);
 });
+
+test('job assignments stay separate from role identities', () => {
+ const config={Version:1,Enabled:true,DefaultVisible:true,DefaultEditable:true,Rules:[{Jobs:['role'],Fields:[{Name:'Secret',Visible:false,Editable:false}]}]};
+ assert.deepEqual(moduleFieldAccess(config,{RoleIds:['role'],Jobs:[{Id:'job',JobName:'岗位'}]},'Secret'),{visible:true,editable:true});
+ config.Rules[0].Jobs=['job'];
+ assert.deepEqual(moduleFieldAccess(config,{RoleIds:['role'],Jobs:[{Id:'job',JobName:'岗位'}]},'Secret'),{visible:false,editable:false});
+});
