@@ -35,7 +35,7 @@ AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Mic
 
 ## 自建数字人直播：本机免费推理 {#self-hosted-digital-human-live}
 
-通过应用商城的 **自建数字人直播**（`digital-human-live`），吾码管理话术与知识，中文语音、文字问答和口型画面由用户自己的电脑生成。独立专题包含五张 4K 功能截图、本机部署、OBS 接入和已验证的音画边界：[查看自建数字人直播](./digital-human-live)。
+通过应用商城的 **自建数字人直播**（`digital-human-live`），吾码管理话术与知识，中文语音、文字问答、口型画面和照片驱动头像由用户自己的电脑生成。独立专题包含多张 4K 功能截图、神经网络头像、手机摄像头局域网链路、本机部署及 OBS 验收边界：[查看自建数字人直播](./digital-human-live)。
 
 ## 授权边界：服务器 License 与中转 ApiKey 是两套机制
 
