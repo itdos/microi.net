@@ -95,6 +95,10 @@ function run(storeRows, options = {}) {
     Db: {
       FromSql(sql) {
         queries.push(sql)
+        if (/EMPTY_DATABASE_DEPARTMENT_PARENT_NAME_V1/.test(sql)) {
+          if (options.departmentColumnFailure) throw new Error('department columns unavailable')
+          return { ToArray: () => options.departmentParentNameMissing ? [] : [{ FieldName: 'ParentName' }] }
+        }
         if (/EMPTY_DATABASE_SAAS_PROMOTION_FIELDS_V1/.test(sql)) {
           if (options.promotionColumnFailure) throw new Error('promotion schema unavailable')
           return { ToArray: () => (options.promotionFields || []).map(FieldName => ({ FieldName })) }
@@ -194,6 +198,22 @@ function run(storeRows, options = {}) {
   })
   return { result, queries }
 }
+
+test('department template does not write ParentName when the real legacy schema omits it', () => {
+  const { result } = run([], { departmentParentNameMissing: true })
+  assert.equal(result.Code, 1)
+  const statement = result.Data.Sql.match(/INSERT INTO sys_dept[\s\S]*?;/)[0]
+  assert.doesNotMatch(statement, /ParentName/)
+  assert.match(statement, /'默认组织'/)
+  assert.match(statement, /'默认部门'/)
+})
+
+test('department schema discovery fails closed before emitting destructive SQL', () => {
+  const { result } = run([], { departmentColumnFailure: true })
+  assert.equal(result.Code, 0)
+  assert.match(result.Msg, /组织机构字段/)
+  assert.equal(result.Data?.Sql, undefined)
+})
 
 test('promotion templates retain schema, clear referral data and disable public registration', () => {
   const { result } = run([{ Id: 'custom', AppPakcet: JSON.stringify({ DiyTables: [{ Name: 'mci_saas_referral_link' }] }) }], {
