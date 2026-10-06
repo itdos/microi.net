@@ -6,11 +6,9 @@ namespace Microi.Tests.MemoryDiagnostics;
 /// <summary>内存诊断断言归入统一门禁；改变线程池或采集 EventPipe 的场景仍在子进程隔离。</summary>
 public sealed class MemoryDiagnosticsProcessTests
 {
-    private static readonly string TestRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
-    private static readonly string WorkspaceRoot = Path.GetFullPath(Path.Combine(TestRoot, "..", ".."));
-    private static readonly string Configuration = Path.GetFileName(Path.GetDirectoryName(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar))!);
-    private static readonly string Fixture = Path.Combine(TestRoot, "Fixtures", "MemoryDiagnosticsNode", "bin", Configuration,
-        "net10.0", "Microi.MemoryDiagnostics.Fixture.dll");
+    private static readonly string WorkspaceRoot = Common.TestProjectPaths.WorkspaceRoot();
+    private static readonly string Fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "MemoryDiagnosticsNode",
+        "Microi.MemoryDiagnostics.Fixture.dll");
 
     [Fact]
     public async Task UnitAndContractRegressions()

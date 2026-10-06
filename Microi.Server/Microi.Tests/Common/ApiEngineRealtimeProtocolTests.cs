@@ -404,18 +404,5 @@ public sealed class ApiEngineRealtimeProtocolTests
         };
     }
 
-    private static string FindServerRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current != null)
-        {
-            if (Directory.Exists(Path.Combine(current.FullName, "Microi.net.Api"))
-                && Directory.Exists(Path.Combine(current.FullName, "Microi.Core")))
-            {
-                return current.FullName;
-            }
-            current = current.Parent;
-        }
-        throw new DirectoryNotFoundException("未找到 Microi.Server 根目录。");
-    }
+    private static string FindServerRoot() => Microi.Tests.Common.TestProjectPaths.ServerRoot();
 }
