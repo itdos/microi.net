@@ -169,10 +169,19 @@ function splitEngineSource(source) {
   const normalized = normalizeText(source);
   const match = normalized.match(/^(\s*\/\*[\s\S]*?\*\/)(?:[ \t]*\n)+([\s\S]*)$/);
   if (!match) return { header: '', body: normalized };
-  return {
-    header: match[1].trimEnd(),
-    body: normalizeText(match[2]),
-  };
+  let header = match[1].trimEnd();
+  let body = normalizeText(match[2]);
+  // 官方保护提示位于 V8 元数据头之前。两块都属于发布说明；只剥第一块会
+  // 把独立升版的 Version 行送入正文合并，制造无法发布新修复的伪冲突。
+  // 仅吸收该固定提示后带 Key/Version 的元数据块，后续行为注释仍是正文。
+  if (header.includes('OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1')) {
+    const metadata = body.match(/^(\s*\/\*[\s\S]*?\*\/)(?:[ \t]*\n)+([\s\S]*)$/);
+    if (metadata && /ApiEngineKey\s*:/.test(metadata[1]) && /Version\s*:/.test(metadata[1])) {
+      header += `\n\n${metadata[1].trimEnd()}`;
+      body = normalizeText(metadata[2]);
+    }
+  }
+  return { header, body };
 }
 
 function normalizeEngineVersion(value) {

@@ -10,11 +10,12 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v2.1.1
+ * Version: v2.1.2
  * Function:
  * - 应用源码、运行与正式安装包发布。已提交V3运行资产按当前租户、应用、版本与请求指纹验证对象身份，私有HDFS不足时使用固定平台稳定地址，并校验实际字节大小和SHA256。
  * - 组合运行应用从源权威记录携带严格IsPublic/IsApprove标记，拒绝请求覆盖与无效类型；保留历史公开兼容和源码独立授权。
  * - RuntimeAssetsOnly 显式交付编译运行资产，禁止平台结构、资源代码及源码泄入游戏安装包；旧调用保持兼容。
+ * - 相同受管源码、策略与所有权的重复发布保留已发布基线，避免接口更新后资源快照摘要漂移。
  */
 
 /* SPARSE_TABLE_SELECTION_V1：只接受固定元数据Id；不接任意表定义、DDL或包正文覆盖。
@@ -1290,9 +1291,20 @@ function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStor
     };
     if (policy === 'Managed') {
       var previousEngine = previousEngines[key];
-      var baseHash = previousEngine
-        ? sha256Hex(text(previousEngine.ApiV8Code))
-        : text(source.BaseHash).toLowerCase();
+      // MANAGED_POLICY_IDENTICAL_SOURCE_REPLAY_V1: retain the published baseline
+      // for identical source/policy/ownership. Recomputing it from the just-published
+      // engine changes ResourceSnapshotHash on a retry after a successful upgrade.
+      var previousBaseHash = text(previousPolicy.BaseHash).toLowerCase();
+      var preservePublishedBase = previousEngine
+        && text(previousEngine.ApiV8Code) === text(engine.ApiV8Code)
+        && text(previousPolicy.UpgradePolicy || previousPolicy.Policy || 'Managed') === 'Managed'
+        && text(previousPolicy.Ownership || 'Application') === ownership
+        && /^[a-f0-9]{64}$/.test(previousBaseHash);
+      var baseHash = preservePublishedBase
+        ? previousBaseHash
+        : previousEngine
+          ? sha256Hex(text(previousEngine.ApiV8Code))
+          : text(source.BaseHash).toLowerCase();
       if (baseHash) entry.BaseHash = baseHash;
       var compatibleBaseHashes = normalizeSha256Hashes(
         source.CompatibleBaseHashes || source.LegacyBaseHashes || []
