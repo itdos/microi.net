@@ -445,30 +445,5 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.DoesNotContain("'[Current] [Total]'", sql);
     }
 
-    private static string FindServerRoot()
-    {
-        var repositoryRoot = Environment.GetEnvironmentVariable("MICROI_TEST_REPOSITORY_ROOT");
-        if (!string.IsNullOrWhiteSpace(repositoryRoot))
-        {
-            var configuredServerRoot = Path.Combine(repositoryRoot, "Microi.Server");
-            if (Directory.Exists(Path.Combine(configuredServerRoot, "Microi.Core"))
-                && Directory.Exists(Path.Combine(configuredServerRoot, "Microi.net.Api")))
-            {
-                return configuredServerRoot;
-            }
-        }
-
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Microi.Core"))
-                && Directory.Exists(Path.Combine(directory.FullName, "Microi.net.Api")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Cannot find Microi.Server root.");
-    }
+    private static string FindServerRoot() => Microi.Tests.Common.TestProjectPaths.ServerRoot();
 }

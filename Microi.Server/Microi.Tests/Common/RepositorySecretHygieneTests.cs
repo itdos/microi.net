@@ -63,20 +63,7 @@ public sealed class RepositorySecretHygieneTests
         Assert.Empty(privateSettings);
     }
 
-    private static string FindProjectRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "Microi.Tests.csproj")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the Microi.Tests project root.");
-    }
+    private static string FindProjectRoot() => Microi.Tests.Common.TestProjectPaths.ProjectRoot();
 
     private static bool HasGeneratedDirectory(string path)
     {
