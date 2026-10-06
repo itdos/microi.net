@@ -52,6 +52,7 @@
             iframe
             keep-alive
             @datachange="handleDataChange"
+            @beforemount="handleBeforeMount"
             @mounted="handleMounted"
             @unmount="handleUnmount"
             @beforeshow="handleBeforeShow"
@@ -259,6 +260,7 @@ export default {
             retryKey: 0,
             resolveGeneration: 0,
             mountWatchdog: null,
+            mountResourcesReady: false,
             autoMountRetryCount: 0,
             mountReadyGeneration: 0,
             mountReadyAttempt: -1,
@@ -875,6 +877,13 @@ export default {
             if (detail.sysMenuId && menuId && detail.sysMenuId !== menuId) return;
             this.retry();
         },
+        handleBeforeMount() {
+            if (this.mountState !== "mounting" || this.error) return;
+            // micro-app 在 HTML、样式和脚本下载结束后才发送 beforemount。
+            // 下载耗时不能消耗脚本渲染期限，否则销毁中的异步资源会继续写入失效容器。
+            this.mountResourcesReady = true;
+            this.startMountWatchdog(this.resolveGeneration, this.retryKey);
+        },
         handleMounted() {
             this.cacheState = "active";
             this.ensureRuntimeCacheRegistration();
@@ -942,7 +951,8 @@ export default {
         },
         startMountWatchdog(generation, attempt = this.retryKey) {
             this.clearMountWatchdog();
-            const deadline = Date.now() + 12000;
+            // 下载保留独立的有界窗口；资源齐备后仍使用原来的 12 秒渲染期限。
+            const deadline = Date.now() + (this.mountResourcesReady ? 12000 : 60000);
             const inspect = () => {
                 if (
                     generation !== this.resolveGeneration
@@ -1016,6 +1026,7 @@ export default {
                 this.mountReadyGeneration = 0;
                 this.mountReadyAttempt = -1;
                 this.childReadyRendered = false;
+                this.mountResourcesReady = false;
                 this.mountState = "mounting";
                 await this.$nextTick();
                 this.startMountWatchdog(generation, this.retryKey);
@@ -1417,6 +1428,7 @@ export default {
                 });
                 this.entryUrl = url;
                 this.cacheState = "starting";
+                this.mountResourcesReady = false;
                 this.mountState = "mounting";
                 this.startMountWatchdog(generation, this.retryKey);
             } catch (error) {

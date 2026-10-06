@@ -190,7 +190,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=525059f87aac3236d8bfa5d7bbc3fd461618754ca3aa5fe4d7d5c133cfdffb5d -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=409130f5ad663cf48aac55db1ec2b5eea5f4513114ca6abc7e470f39208402d0 -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）
@@ -217,6 +217,8 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
   `browser.newContext()` 验证两组运行目标互不串号。
 
 ### 菜单微服务缓存与恢复（强制）
+
+- 首次挂载分开检查资源下载与渲染：下载最多 60 秒，`beforemount` 资源齐备后才开始原有 12 秒渲染期限；不得在资源正常下载时提前销毁沙箱。成功仍要求真实可见 DOM，保留一次自愈与旧实例保护。回归覆盖超过 12 秒的真实下载、下载停滞、渲染停滞和陈旧实例事件。
 
 - 动态菜单宿主的 Vue 路由保持 `keepAlive:false`，由 `<micro-app keep-alive>` 独占运行时状态；契约固定为 `runtime-keep-alive`，禁止 Vue `KeepAlive` 和 micro-app 双层缓存。
 - 每个顶部 Tab 按完整路由生成稳定实例身份，最多保留 5 个隐藏实例并按 LRU 淘汰。关闭 Tab、退出登录、Token/角色变化以及版本或入口变化时必须精确销毁对应运行时。
