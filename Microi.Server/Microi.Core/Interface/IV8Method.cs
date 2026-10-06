@@ -195,6 +195,13 @@ namespace Microi.net
         DosResult GetAuthorizedPrivateFileUrl(dynamic dynamicParam);
 
         /// <summary>在租户开通 Before Hook 前校验可信主租户登录身份。</summary>
+        DosResult AuthorizeSaasPromotion();
+        DosResult ReadSaasTenantUsage(object parameters);
+        DosResult CreateSaasReferralCapability(string linkId);
+        DosResult SaasPublicTrialAtom(object parameters);
+        /// <summary>主租户授权推广人员恢复原失败开通任务；保留加密检查点和幂等请求。</summary>
+        DosResult ResumeSaasPublicTrialTask(string taskId);
+        DosResult ProvisionPublicSaasTrial(object parameters);
         DosResult AuthorizeCurrentUserTenantProvisioning();
 
         /// <summary>仅供官方租户开通接口按可信当前用户创建其 SaaS 租户。</summary>

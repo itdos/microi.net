@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 
 namespace Microi.Tests.Common;
 
@@ -8,10 +9,17 @@ public sealed class CdnSecurityBehaviorTests
     public async Task Cdn_policy_ip_ownership_and_partial_window_behaviors_pass()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "AI-Project")))
+        const string contractPath = "Microi.Server/OfficialApplications/Resource/platform-service-release.json";
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, contractPath)))
             directory = directory.Parent;
         Assert.NotNull(directory);
-        var app = Path.Combine(directory.FullName, "AI-Project", "microi", "AI应用", "microi-platform-service");
+        using var contract = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory.FullName, contractPath)));
+        var relativeSource = contract.RootElement.GetProperty("SourceRoot").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(relativeSource));
+        Assert.False(Path.IsPathRooted(relativeSource));
+        var app = Path.GetFullPath(Path.Combine(directory.FullName, relativeSource!));
+        Assert.StartsWith(directory.FullName + Path.DirectorySeparatorChar, app);
+        Assert.True(File.Exists(Path.Combine(app, "test/cdn-security.test.mjs")), "Canonical CDN security regression source is missing.");
         var start = new ProcessStartInfo("node")
         {
             WorkingDirectory = app,
@@ -21,6 +29,7 @@ public sealed class CdnSecurityBehaviorTests
             CreateNoWindow = true
         };
         start.ArgumentList.Add("--test");
+        start.ArgumentList.Add("--test-reporter=tap");
         start.ArgumentList.Add("test/cdn-security.test.mjs");
         using var process = Process.Start(start)!;
         var stdout = process.StandardOutput.ReadToEndAsync();

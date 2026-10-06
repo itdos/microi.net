@@ -73,7 +73,7 @@ function runProcessManager(workspaceRoot, action, frontendPort, backendPort = 61
     // StopBackend 会同时清理所选工作区的 Release 进程；测试绝不能指向真实源码工作区。
     assert.notEqual(path.resolve(workspaceRoot), repoRoot);
     assert.ok(path.resolve(workspaceRoot).startsWith(path.resolve(fixtureParent) + path.sep));
-    return spawnSync('powershell.exe', [
+    return spawnSync(process.platform === 'win32' ? 'powershell.exe' : 'pwsh', [
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
         '-File', path.join(repoRoot, 'Microi.Server', 'tools', 'Microi.LocalProcessManager.ps1'),
@@ -91,10 +91,11 @@ function runProcessManager(workspaceRoot, action, frontendPort, backendPort = 61
 
 function stopExactProcessTree(child) {
     if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
-    spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
-        windowsHide: true,
-        stdio: 'ignore'
-    });
+    if (process.platform === 'win32') {
+        spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    } else {
+        child.kill('SIGKILL');
+    }
 }
 
 test('一键发布先取得工作区互斥锁并调用精确进程管理器', () => {
@@ -127,9 +128,7 @@ test('Windows 进程管理器按端口、进程类型和工作区路径校验并
     assert.doesNotMatch(manager, /\/IM\s+(dotnet|node|chrome|msedge)/i);
 });
 
-test('临时输出的 Microi.net.Api 仅在 CWD 精确属于当前工作区时可结束', {
-    skip: process.platform !== 'win32'
-}, async () => {
+test('临时输出的 Microi.net.Api 仅在 CWD 精确属于当前工作区时可结束',  async () => {
     const testRoot = createFixture();
     const workspaceRoot = path.join(testRoot, 'workspace');
     const backendRoot = path.join(workspaceRoot, 'Microi.Server', 'Microi.net.Api');
@@ -200,9 +199,7 @@ test('临时输出的 Microi.net.Api 仅在 CWD 精确属于当前工作区时�
     }
 });
 
-test('相对入口 Vite 用进程工作目录识别当前工作区，并对外部工作区失败关闭', {
-    skip: process.platform !== 'win32'
-}, async () => {
+test('相对入口 Vite 用进程工作目录识别当前工作区，并对外部工作区失败关闭',  async () => {
     const viteEntry = path.join('node_modules', 'vite', 'bin', 'vite.js');
     assert.equal(fs.existsSync(path.join(clientRoot, viteEntry)), true, 'Microi.Client 必须已安装 Vite');
     const testRoot = createFixture();
@@ -287,9 +284,7 @@ test('自动化启动器阻止发布期间抢端口、只使用 Debug，并结�
     assert.doesNotMatch(runner, /backendProcess\.kill\(\)/);
 });
 
-test('DLL 被占用时报告原始路径与占用错误，不因 catch 中的错误对象丢失文件路径', {
-    skip: process.platform !== 'win32'
-}, () => {
+test('DLL 被占用时报告原始路径与占用错误，不因 catch 中的错误对象丢失文件路径',  () => {
     const testRoot = createFixture();
     try {
         const dll = path.join(testRoot, 'held.dll');
@@ -309,7 +304,7 @@ test('DLL 被占用时报告原始路径与占用错误，不因 catch 中的错
             '  if ([string]::IsNullOrWhiteSpace($locked[0].Error)) { throw "Original lock error was lost" }',
             '} finally { $held.Dispose() }'
         ].join('\n'));
-        const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { cwd: testRoot, windowsHide: true, encoding: 'utf8', timeout: 15000 });
+        const result = spawnSync(process.platform === 'win32' ? 'powershell.exe' : 'pwsh', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { cwd: testRoot, windowsHide: true, encoding: 'utf8', timeout: 15000 });
         assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     } finally {
         removeFixture(testRoot);

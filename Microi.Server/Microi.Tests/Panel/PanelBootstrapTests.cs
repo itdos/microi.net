@@ -13,7 +13,7 @@ public sealed class PanelBootstrapTests
         Assert.Equal("0.0.0.0:61890:8443",service["ports"]![0]!.ToString());
         Assert.DoesNotContain("microi-install-api",result.Compose);Assert.DoesNotContain(":8080",result.Compose);
         Assert.DoesNotContain("OPS_ADMIN_PASSWORD=",result.Environment);Assert.Contains("OPS_ADMIN_PASSWORD_FILE=",result.Environment);
-        using var cert=X509CertificateLoader.LoadPkcs12(result.Certificate,result.CertificatePassword,X509KeyStorageFlags.EphemeralKeySet);
+        using var cert=X509CertificateLoader.LoadPkcs12(result.Certificate,result.CertificatePassword,OperatingSystem.IsMacOS() ? X509KeyStorageFlags.DefaultKeySet : X509KeyStorageFlags.EphemeralKeySet);
         Assert.True(cert.HasPrivateKey);Assert.True(cert.MatchesHostname("panel.example.test"));
         Assert.False(cert.MatchesHostname("unrelated.example.test"));Assert.Equal(64,result.Fingerprint.Length);
     }

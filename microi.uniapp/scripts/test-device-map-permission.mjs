@@ -1,3 +1,4 @@
+import workspacePaths from './lib/workspace-paths.js'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -14,8 +15,8 @@ const businessSource = source('src/tenants/xjy/business.js')
 const runtimeSource = source('src/platform/business-runtime.js')
 const workspaceSource = source('src/pages/workspace/index.vue')
 const businessDetailSource = source('src/pages/business/detail.vue')
-const repairEngineSource = engineSource('Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/移动端-申请售后(shenqing_shouhou).js')
-const repairCancelEngineSource = engineSource('Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/客户取消报修(repair_cancel).js')
+const repairEngineSource = fs.readFileSync(workspacePaths.findSyncedXjyEngine(appRoot, 'shenqing_shouhou'), 'utf8')
+const repairCancelEngineSource = fs.readFileSync(workspacePaths.findSyncedXjyEngine(appRoot, 'repair_cancel'), 'utf8')
 const deviceMapMethod = mapSource.match(/async loadCustomerDevices\(\) \{[\s\S]*?\r?\n    \},\r?\n    async loadTaskDevices/)
 
 assert.ok(deviceMapMethod, '必须能定位客户设备地图加载方法')
@@ -43,7 +44,7 @@ assert.match(runtimeSource, /if \(!await canOpenBusinessEntry\(key\)\)/,
 assert.match(workspaceSource, /isHomeEntryVisible\(key\)/,
   '首页必须按地图入口权限过滤菜单')
 
-const deviceEngine = engineSource('Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/获取N公里范围内的所有设备列表数据(get_location_shebei-v2).js')
+const deviceEngine = fs.readFileSync(workspacePaths.findSyncedXjyEngine(appRoot, 'get_location_shebei-v2'), 'utf8')
 assert.match(deviceEngine, /if \(!currentUserId \|\| !tenantId\)/,
   '设备地图接口必须在缺少登录身份或租户时拒绝访问')
 assert.match(deviceEngine, /A\.TenantId = @p3/,

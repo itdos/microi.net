@@ -137,7 +137,7 @@ public class V8UnlimitedUpgradeTests
     {
         var root = FindRepositoryRoot();
         var migration = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "32-UpgradeV8RuntimeLimit.cs"));
+            root, "Microi.Server", "Microi.Tests", "Fixtures", "RetiredUpgrade", "32-UpgradeV8RuntimeLimit.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
         var apiEngine = File.ReadAllText(Path.Combine(
@@ -145,7 +145,7 @@ public class V8UnlimitedUpgradeTests
 
         Assert.Contains("UPDATE {orm.GetTableName(\"sys_apiengine\")}", migration, StringComparison.Ordinal);
         Assert.Contains("SET {orm.GetFieldName(FieldName)} = @p0", migration, StringComparison.Ordinal);
-        Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade32.Version)", upgrade, StringComparison.Ordinal);
+        Assert.DoesNotContain("AdvanceSuccessfulVersion(ref uptVersion, Upgrade32.Version)", upgrade, StringComparison.Ordinal);
         Assert.Contains("UnlimitedRuntime = !DynamicHelper.GetDynamicBoolValue", apiEngine, StringComparison.Ordinal);
         Assert.Contains("\"V8Limit\"", apiEngine, StringComparison.Ordinal);
     }
@@ -155,11 +155,11 @@ public class V8UnlimitedUpgradeTests
     {
         var root = FindRepositoryRoot();
         var migration = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "33-UpgradeDiyTableV8RuntimeLimit.cs"));
+            root, "Microi.Server", "Microi.Tests", "Fixtures", "RetiredUpgrade", "33-UpgradeDiyTableV8RuntimeLimit.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
         var baseline = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "36-UpgradeRuntimeInvariantBaseline.cs"));
+            root, "Microi.Server", "Microi.Tests", "Fixtures", "RetiredUpgrade", "36-UpgradeRuntimeInvariantBaseline.cs"));
 
         Assert.Equal("6.9.8.9", Upgrade33.Version);
         Assert.Contains("UPDATE {orm.GetTableName(\"diy_table\")}", migration, StringComparison.Ordinal);
@@ -173,10 +173,10 @@ public class V8UnlimitedUpgradeTests
         Assert.Contains("DefaultValue = \"0\"", migration, StringComparison.Ordinal);
         Assert.Contains("[\"Visible\"] = 0", migration, StringComparison.Ordinal);
         Assert.DoesNotContain("[\"IsDeleted\"] = 1", migration, StringComparison.Ordinal);
-        Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade33.Version)", upgrade, StringComparison.Ordinal);
+        Assert.DoesNotContain("AdvanceSuccessfulVersion(ref uptVersion, Upgrade33.Version)", upgrade, StringComparison.Ordinal);
         Assert.Contains("OneTimeInvariantNames[6], () => new Upgrade33().Run(osClient, false)", baseline, StringComparison.Ordinal);
         Assert.Contains("UpgradeExecutionLeaseContext.ThrowIfLost()", baseline, StringComparison.Ordinal);
-        Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade36.Version)", upgrade, StringComparison.Ordinal);
+        Assert.DoesNotContain("AdvanceSuccessfulVersion(ref uptVersion, Upgrade36.Version)", upgrade, StringComparison.Ordinal);
     }
 
     private static int Count(string value, string needle)

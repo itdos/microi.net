@@ -129,6 +129,8 @@ namespace Microi.net
             if (returnOrigin == null)
                 return Json(new DosResult(0, null, "外部登录回传 Origin 无效。"));
             var redirectUri = BuildCallbackUrl(osClient, provider.Key);
+            if (redirectUri == null)
+                return Json(new DosResult(0, null, "外部登录回调地址无效，请在系统设置中配置 HTTPS ApiBase。"));
             var stateValue = IdentityVerificationSecurity.NewOpaqueValue();
             var now = DateTimeOffset.UtcNow;
             var state = new OAuthState
@@ -438,13 +440,37 @@ namespace Microi.net
 
         private string BuildCallbackUrl(string osClient, string provider)
         {
-            return $"{Request.Scheme}://{Request.Host}{Request.PathBase}/api/ExternalLogin/Callback"
+            var sysConfig = TenantSystemSettingsSecurity.LoadTenantSysConfigSnapshot(osClient);
+            return BuildCallbackUrl(sysConfig["ApiBase"]?.ToString(),
+                Request.Scheme, Request.Host.Value, Request.PathBase.Value, osClient, provider);
+        }
+
+        // TLS 可能在反向代理终止，容器看到的 Scheme 不能代表供应商登记的公网回调。
+        // 优先采用当前租户的权威 ApiBase；禁止从客户端参数或未受信代理 Header 取地址。
+        // 无配置的旧租户仍支持直接 HTTPS/本机开发；无效配置失败关闭，避免授权码流向错误主机。
+        private static string BuildCallbackUrl(string configuredApiBase, string requestScheme,
+            string requestHost, string requestPathBase, string osClient, string provider)
+        {
+            var callbackBase = (configuredApiBase ?? string.Empty).Trim();
+            if (callbackBase.Length == 0)
+                callbackBase = $"{requestScheme}://{requestHost}{requestPathBase}";
+            if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var uri)
+                || !string.IsNullOrEmpty(uri.UserInfo)
+                || !string.IsNullOrEmpty(uri.Query)
+                || !string.IsNullOrEmpty(uri.Fragment)
+                || !(uri.Scheme == Uri.UriSchemeHttps
+                     || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)))
+                return null;
+            return uri.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/api/ExternalLogin/Callback"
                    + $"?OsClient={Uri.EscapeDataString(osClient)}&Provider={Uri.EscapeDataString(provider)}";
         }
 
         private static string BuildAuthorizeUrl(ExternalLoginProviderOptions provider, string redirectUri, string state)
         {
-            var query = "client_id=" + Uri.EscapeDataString(provider.ClientId)
+            // 微信网站应用要求 appid；其它固定 OAuth 供应商仍使用 client_id。
+            // 只改变公开应用标识的参数名，Secret 继续仅由服务端交换 code 时使用。
+            var clientIdParameter = provider.Key == "WeChat" ? "appid" : "client_id";
+            var query = clientIdParameter + "=" + Uri.EscapeDataString(provider.ClientId)
                         + "&redirect_uri=" + Uri.EscapeDataString(redirectUri)
                         + "&response_type=code"
                         + "&scope=" + Uri.EscapeDataString(provider.Scope ?? string.Empty)

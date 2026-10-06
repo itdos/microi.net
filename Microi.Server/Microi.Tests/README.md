@@ -7,6 +7,13 @@
 接口源码保留在 `Microi-V8-Engine`，其 Node 回归测试放在本项目 `V8/`
 目录并由 `run-tests.ps1` 自动执行，避免复制线上脚本到 C# 测试夹具。
 
+AI CAD、AI 员工中心和邮箱的统一 Node 入口使用
+`V8/official-application-source-contract.json` 声明的唯一官方源码根。恢复源码时先从
+官方 `iTdos` MCP 读取完整应用上下文，再逐文件核对原始字节数、SHA-256 与服务端
+`SourceManifestHash`；门禁在执行业务测试前复核完整清单。吾码小龙虾继续归属其独立
+官方 Git 仓，同时核对明确的提交与全部跟踪文件。缺少真实源码、正文漂移、路径越界
+或清单不完整都会失败，不能用编译产物重写被测业务，也不能跳过客户私有项目缺源项。
+
 ## 测试归属
 
 本项目只编排吾码平台能力及其内置资源的发布回归。官方或社区独立业务应用、
@@ -33,7 +40,7 @@
   真实 Redis 配置即时生效、并发跳过日志去重及新旧 Quartz 共库调度测试也属于
   Full，不属于无外部依赖的 Quick；所需配置在任何构建前检查，缺失即失败。
 
-`run-node-regressions.mjs` 自动发现本测试目录、`Microi.Upgrade/Resource` 和
+`run-node-regressions.mjs` 自动发现本测试目录、`OfficialApplications/Resource` 和
 `Microi.Client/tests` 的确定性 Node 测试；新增文件无需再维护手工清单。
 无法分类、零测试、失败、取消、跳过或 todo 均失败关闭。Playwright 文件由真实
 浏览器入口负责，不能混入 Node 单测冒充 E2E。

@@ -1,0 +1,1332 @@
+import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import vm from "node:vm";
+
+// Git 在 Windows 检出 CRLF；按规范换行提取分支，保持实际 CAS 与回读断言不变。
+const publisherSource = (await readFile(new URL("./ai-app-publish-store.js", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
+const packageModel = JSON.parse(
+  await readFile(new URL("./app.microi.store.json", import.meta.url), "utf8"),
+);
+const packagedPublisher = packageModel.SysApiEngines.find(
+  item => item.ApiEngineKey === "ai_app_publish_store",
+);
+
+test("publisher package metadata matches the maintained V3 source", () => {
+  assert.ok(packagedPublisher);
+  assert.match(packagedPublisher.Version, /^v\d+\.\d+\.\d+$/);
+  assert.ok(publisherSource.includes(`Version: ${packagedPublisher.Version}`));
+  assert.equal(
+    packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
+    publisherSource.replace(/\r\n/g, "\n"),
+  );
+});
+
+function createImmutableSnapshotHarness() {
+  const rows = new Map();
+  const added = [];
+  const context = {
+    V8: {
+      OsClient: "iTdos",
+      EncryptHelper: {
+        Sha256Hex(value) {
+          return crypto.createHash("sha256").update(String(value)).digest("hex");
+        },
+      },
+      FormEngine: {
+        GetFormData(table, query) {
+          if (table === "diy_table") {
+            return { Code: 1, Data: { Id: "store-table-id", Name: "sys_microistore" } };
+          }
+          if (table === "mic_data_version") {
+            return rows.has(query.Id)
+              ? { Code: 1, Data: rows.get(query.Id) }
+              : { Code: 2, Data: null };
+          }
+          throw new Error(`unexpected table ${table}`);
+        },
+        AddFormData(table, row) {
+          assert.equal(table, "mic_data_version");
+          if (rows.has(row.Id)) return { Code: 0, Msg: "duplicate" };
+          const saved = { ...row };
+          rows.set(row.Id, saved);
+          added.push(saved);
+          return { Code: 1, Data: saved };
+        },
+      },
+    },
+    JSON,
+    Object,
+    String,
+    Number,
+    isFinite,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "parseObject")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "sha256Hex")}
+    ${extractFunction(publisherSource, "marketplaceStoreTableId")}
+    ${extractFunction(publisherSource, "marketplacePackageSnapshotId")}
+    ${extractFunction(publisherSource, "marketplacePackageSnapshotMatches")}
+    ${extractFunction(publisherSource, "ensureMarketplacePackageSnapshot")}
+    result = ensureMarketplacePackageSnapshot;
+  `, context);
+  return { ensure: context.result, rows, added };
+}
+
+test("publisher creates and idempotently reuses a content-addressed immutable install snapshot", () => {
+  const harness = createImmutableSnapshotHarness();
+  const store = {
+    Id: "store-application-id",
+    AppVersion: "v1.2.3",
+    PackageHdfsPath: "/itdos/microi-store/packages/store/v1/package.json",
+    PackageSha256: "a".repeat(64),
+    PackageSize: 321,
+    AiAppPackageManifest: JSON.stringify([{ SourceZip: { Limit: true, StorageScope: "HdfsPrivate" } }]),
+    AiAppZipFiles: "[]",
+  };
+  const resourceHash = "b".repeat(64);
+
+  const created = harness.ensure(store, resourceHash);
+  assert.equal(created.Created, true);
+  assert.equal(created.StoreVersionId.length, 36);
+  assert.equal(harness.added.length, 1);
+  const snapshot = JSON.parse(harness.added[0].Data);
+  assert.equal(snapshot.PackageSnapshotSchemaVersion, 1);
+  assert.equal(snapshot.PackageResourceSnapshotHash, resourceHash);
+  assert.equal(snapshot.AiAppPackageManifest, store.AiAppPackageManifest);
+
+  const reused = harness.ensure({ ...store, AppUpdateTime: "later" }, resourceHash);
+  assert.equal(reused.Created, false);
+  assert.equal(reused.StoreVersionId, created.StoreVersionId);
+  assert.equal(harness.added.length, 1);
+});
+
+test("publisher fails closed when a deterministic install snapshot id has different package facts", () => {
+  const harness = createImmutableSnapshotHarness();
+  const store = {
+    Id: "store-application-id",
+    AppVersion: "v1.2.3",
+    PackageHdfsPath: "/itdos/microi-store/packages/store/v1/package.json",
+    PackageSha256: "c".repeat(64),
+    PackageSize: 321,
+    AiAppPackageManifest: "[]",
+    AiAppZipFiles: "[]",
+  };
+  const resourceHash = "d".repeat(64);
+  const created = harness.ensure(store, resourceHash);
+  const row = harness.rows.get(created.StoreVersionId);
+  row.Data = JSON.stringify({ ...JSON.parse(row.Data), PackageHdfsPath: "/different.json" });
+  assert.throws(
+    () => harness.ensure(store, resourceHash),
+    /正文不一致/,
+  );
+});
+
+test("microservice packages exclude deleted and disabled historical routes", () => {
+  assert.match(publisherSource, /\['AND', 'IsDeleted', '<>', 1\]/);
+  assert.match(publisherSource, /\['AND', 'IsEnable', '<>', 0\]/);
+});
+
+test("v3 package creation time is fixed to the release across exact replays", () => {
+  const expression = publisherSource.match(/CreateTime: ([^\n]+),/)[1];
+  function creationTime(protocolV3, now) {
+    return vm.runInNewContext(expression, { protocolV3, text: String, releaseChangeLog: { ReleaseTime: "2026-09-08 01:00:00" }, nowText: () => now });
+  }
+  assert.equal(creationTime(true, "2026-09-08 02:00:00"), creationTime(true, "2026-09-09 03:00:00"));
+  assert.equal(creationTime(true, "later"), "2026-09-08 01:00:00");
+  assert.equal(creationTime(false, "2026-09-09 03:00:00"), "2026-09-09 03:00:00");
+});
+
+test("V3 marketplace proof accepts the fixed CDN entry only for its committed tenant app", () => {
+  const context = { V8: { OsClient: "iTdos" } };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "readV3CommittedProof")}
+    ${extractFunction(publisherSource, "assertV3CommittedStore")}
+    read = readV3CommittedProof;
+    assertStore = assertV3CommittedStore;
+  `, context);
+  const proof = context.read({
+    VersionId: "version-1", RuntimeManifestHash: "a".repeat(64),
+    PublishFence: "6", PublishRowVersion: "6", VersionRowVersion: "6",
+    PublishState: "Completed",
+    StableResolverPath: "/micro-app/v3/tenants/itdos/kinds/runtime/apps/ai-platform-studio/assets/index.html",
+    CdnPreviewPath: "/itdos/micro-app/ai-platform-studio/index.html",
+    RequestId: "request-1", RequestFingerprint: "b".repeat(64),
+  });
+  const row = {
+    AppKey: "ai-platform-studio", CommittedPublishVersionId: "version-1",
+    CommittedRuntimeManifestHash: "a".repeat(64), PublishFence: 6,
+    PublishRowVersion: 6, PublishState: "Completed",
+    PublicPublishPath: "/itdos/micro-app/ai-platform-studio/index.html",
+  };
+  assert.doesNotThrow(() => context.assertStore(row, proof, "readback"));
+  assert.throws(() => context.assertStore({ ...row, AppKey: "another-app" }, proof, "readback"), /CdnPreviewPath/);
+  assert.throws(() => context.assertStore({ ...row, PublicPublishPath: "/itdos/micro-app/another-app/index.html" }, proof, "readback"), /PublicPublishPath/);
+  assert.throws(() => context.read({ ...proof, CdnPreviewPath: "/itdos/micro-app/../index.html" }), /CdnPreviewPath/);
+});
+
+test("inline runtime sizes handle both Jint arrays and CLR wrappers and enforce the aggregate limit", () => {
+  const block = publisherSource.slice(publisherSource.indexOf("if (requestedDatabaseOnlyBuild) {"), publisherSource.indexOf("var generatedResourcePolicies ="));
+  const html = Buffer.from("<!doctype html><html><head></head><body>ok</body></html>");
+  function run(extraBytes = 0, clrWrapper = false, invalidLength = false) {
+    let decodes = 0;
+    const assets = [{ Path: "index.html", FileByteBase64: html.toString("base64") }];
+    if (extraBytes) assets.push({ Path: "extra.bin", FileByteBase64: Buffer.alloc(extraBytes).toString("base64") });
+    const context = {
+      requestedDatabaseOnlyBuild: true, app: { AppKey: 'sample' }, latestVersion: { SourceManifestHash: 'a'.repeat(64) }, runtime: { Service: {} },
+      runtimeVersionNo: 'v1.0.0', sparseTableSelections: [],
+      packageModel: { PackageInfo: {}, ApplicationBundle: { PackageAssets: { BuildZip: { Path: 'existing.zip' }, SourceZip: null } } }, entryPath: "index.html", includeSource: false,
+      getBuildAssets: () => assets, normalizePath: String, text: String,
+      parseObject: (value, fallback) => value ? JSON.parse(value) : fallback,
+      sha256Hex: value => crypto.createHash('sha256').update(String(value)).digest('hex'),
+      fail: (Msg, Data) => ({ Code: 0, Msg, Data }),
+      sha256RuntimeAssetBytes: bytes => crypto.createHash("sha256").update(bytes).digest("hex"),
+      System: { Convert: { FromBase64String(value) {
+        decodes++;
+        if (invalidLength) return { Length: Number.NaN };
+        const bytes = Buffer.from(value, "base64");
+        if (clrWrapper) Object.defineProperty(bytes, "Length", { value: bytes.length });
+        return bytes;
+      } }, Text: { Encoding: { UTF8: { GetString: bytes => bytes.toString("utf8") } } } },
+    };
+    vm.createContext(context);
+    vm.runInContext(`${extractFunction(publisherSource, "runtimeAssetByteLength")}\nresult = (function () { ${block}\nreturn { Code: 1, Data: packageModel }; })();`, context);
+    return { result: context.result, decodes };
+  }
+  for (const clr of [false, true]) {
+    const completed = run(0, clr);
+    assert.equal(completed.result.Code, 1);
+    assert.equal(completed.result.Data.ApplicationBundle.BuildAssets[0].Size, html.length);
+    assert.equal(completed.decodes, 1, "HTML bytes are decoded once for size, content and hash");
+    const bundle = completed.result.Data.ApplicationBundle;
+    assert.equal(bundle.SourceFiles.length, 0);
+    assert.equal(bundle.PackageAssets.BuildZip, undefined);
+    assert.equal(bundle.PackageAssets.SourceZip, undefined);
+    const manifest = JSON.parse(bundle.MicroService.AssetManifestJson);
+    assert.equal(manifest.SchemaVersion, 2);
+    assert.equal(manifest.SourceManifestHash, 'a'.repeat(64));
+    assert.equal(manifest.Assets[0].FilePathName, 'database://sample/v1.0.0/index.html');
+    assert.equal(bundle.MicroService.DistHash, manifest.RuntimeManifestHash);
+  }
+  assert.equal(run(5 * 1024 * 1024 - html.length).result.Code, 1);
+  const oversized = run(5 * 1024 * 1024);
+  assert.equal(oversized.result.Code, 0);
+  assert.match(oversized.result.Msg, /总大小不能超过 5MB/);
+  assert.equal(run(0, false, true).result.Code, 0);
+});
+
+test('runtime MIME types survive missing V3 asset metadata without overriding explicit types', () => {
+  const context = { text: value => String(value || ''), isBlank: value => !String(value || '').trim() };
+  vm.createContext(context);
+  vm.runInContext(extractFunction(publisherSource, 'runtimeAssetContentType'), context);
+  assert.equal(context.runtimeAssetContentType('assets/app.js', ''), 'application/javascript; charset=utf-8');
+  assert.equal(context.runtimeAssetContentType('assets/image.jpg', null), 'image/jpeg');
+  assert.equal(context.runtimeAssetContentType('index.html', ''), 'text/html; charset=utf-8');
+  assert.equal(context.runtimeAssetContentType('file.bin', 'custom/type'), 'custom/type');
+});
+
+test("small MicroServices can publish a verified database-only runtime without losing source delivery", () => {
+  assert.match(publisherSource, /requestedDatabaseOnlyBuild/);
+  assert.match(publisherSource, /DatabaseOnlyBuild 最多允许 256 个编译文件/);
+  assert.match(publisherSource, /DatabaseOnlyBuild 总大小不能超过 5MB/);
+  assert.match(publisherSource, /DatabaseOnlyBuild 入口未返回完整 HTML 文档/);
+  assert.match(publisherSource, /databaseOnlyHtml = text\(System\.Text\.Encoding\.UTF8\.GetString\(/);
+  assert.match(publisherSource, /databaseOnlyHtmlLower\.indexOf\('<!doctype html'\)/);
+  assert.doesNotMatch(publisherSource, /\/<!doctype\\s\+html\/i\.test\(databaseOnlyHtml\)/);
+  assert.match(publisherSource, /function readRuntimeAssetBase64\(runtimeAsset, path\)/);
+  assert.match(publisherSource, /function runtimeAssetBase64MatchesManifest\(runtimeAsset, base64\)/);
+  assert.match(publisherSource, /function sha256RuntimeAssetBytes\(bytes\)/);
+  assert.match(publisherSource, /function stableApiOrigin\(value\)/);
+  assert.match(publisherSource, /runtimeAsset\.StableFilePathName/);
+  assert.match(publisherSource, /\/micro-app\\\/v3\\\/tenants/);
+  assert.match(publisherSource, /readRuntimeAssetBase64\(runtimeAsset, path\)/);
+  assert.match(publisherSource, /stableResponse\.Content/);
+  assert.match(publisherSource, /System\.Convert\.ToBase64String\(stableResponse\.RawBytes\)/);
+  assert.match(publisherSource, /if \(isTextFile\(path\) && stableResponse/);
+  assert.match(publisherSource, /Source:\s*includeSource \? 'PrivateHdfs' : 'NotIncluded'/);
+  assert.match(publisherSource, /Build:\s*'DatabaseOnly'/);
+  assert.match(publisherSource, /databaseOnlyService\.StorageMode = 'db'/);
+  assert.match(publisherSource, /databaseOnlyService\.MsUrl = 'db'/);
+  // 正式 v2.0.8 为全局运行对象增加可信提交上下文，不能用旧相邻字符串
+  // 误拒三参分支；直接执行资产选择，保持真实字节校验与旧二参兼容。
+  const html = Buffer.from('<!doctype html><html><body>verified</body></html>');
+  const committed = { Tenant: 'itdos', AppKey: 'test', VersionId: 'version-1' };
+  const reads = [];
+  let acceptedContext = committed;
+  const context = {
+    String, Buffer,
+    System: { Convert: { FromBase64String: value => Buffer.from(value, 'base64') } },
+    committedRuntimeAssetContext: () => acceptedContext,
+    readRuntimeAssetBase64(...args) { reads.push(args); return html.toString('base64'); },
+  };
+  vm.createContext(context);
+  for (const name of ['text', 'isBlank', 'normalizePath', 'runtimeAssetContentType',
+    'sha256RuntimeAssetBytes', 'runtimeAssetBase64MatchesManifest', 'getBuildAssets']) {
+    // 顶层函数边界不会把 normalizePath 的正则字符类误当字符串引号。
+    const start = publisherSource.indexOf(`function ${name}(`);
+    const next = publisherSource.indexOf('\nfunction ', start + 1);
+    assert.ok(start >= 0 && next > start, `missing actual helper ${name}`);
+    vm.runInContext(publisherSource.slice(start, next), context);
+  }
+  const asset = { Path: 'index.html', ContentBase64: html.toString('base64'), Size: html.length,
+    Sha256: crypto.createHash('sha256').update(html).digest('hex') };
+  const runtime = row => ({ Service: { AssetsJson: JSON.stringify([row]), EntryPath: 'index.html' } });
+  assert.equal(context.getBuildAssets({}, null, runtime(asset))[0].FileByteBase64, asset.ContentBase64);
+  assert.equal(reads.length, 0, 'verified inline bytes must avoid a second remote read');
+  assert.throws(() => context.getBuildAssets({}, null, runtime({ ...asset, Sha256: '0'.repeat(64) })), /SHA-256/);
+  assert.equal(reads.length, 0, 'bad inline bytes must stop before remote fallback');
+  context.getBuildAssets({}, null, runtime({ ...asset, ContentBase64: '' }));
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].length, 3);
+  assert.equal(reads[0][2], committed, 'exact trusted context must reach the fixed resolver');
+  acceptedContext = null;
+  context.getBuildAssets({}, null, runtime({ ...asset, ContentBase64: '' }));
+  assert.equal(reads[1].length, 2, 'legacy runtime keeps the original reader contract');
+});
+
+test("database-only text assets prefer decoded HTTP content over transport raw bytes", () => {
+  const html = '<!doctype html><html><head></head><body></body></html>';
+  const context = {
+    V8: {
+      SysConfig: { ApiBase: 'https://api.example.test' },
+      Http: {
+        GetResponse() {
+          return { Content: html, RawBytes: Buffer.from('{"gateway":"frame"}') };
+        },
+      },
+      Base64: {
+        StringToBase64(value) {
+          return Buffer.from(String(value), 'utf8').toString('base64');
+        },
+      },
+    },
+    System: {
+      Convert: {
+        FromBase64String(value) {
+          return Buffer.from(value, 'base64');
+        },
+        ToBase64String(value) {
+          return Buffer.from(value).toString('base64');
+        },
+      },
+    },
+    Buffer,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "isTextFile")}
+    ${extractFunction(publisherSource, "sha256RuntimeAssetBytes")}
+    ${extractFunction(publisherSource, "runtimeAssetBase64MatchesManifest")}
+    ${extractFunction(publisherSource, "stableApiOrigin")}
+    function readFileBase64() { throw new Error('unexpected HDFS fallback'); }
+    ${extractFunction(publisherSource, "readRuntimeAssetBase64")}
+    result = readRuntimeAssetBase64;
+  `, context);
+
+  const encoded = context.result({
+    StableFilePathName: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/app/assets/index.html',
+  }, 'index.html');
+  assert.equal(Buffer.from(encoded, 'base64').toString('utf8'), html);
+});
+
+test("database-only assets prefer the immutable HDFS object over the public resolver", () => {
+  const expected = Buffer.from('immutable-hdfs-html', 'utf8').toString('base64');
+  const context = {
+    V8: { SysConfig: { ApiBase: 'https://api.example.test' } },
+    System: {
+      Convert: {
+        FromBase64String(value) { return Buffer.from(value, 'base64'); },
+      },
+    },
+    Buffer,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "isTextFile")}
+    ${extractFunction(publisherSource, "sha256RuntimeAssetBytes")}
+    ${extractFunction(publisherSource, "runtimeAssetBase64MatchesManifest")}
+    ${extractFunction(publisherSource, "stableApiOrigin")}
+    function readFileBase64(path) {
+      if (path !== 'immutable/runtime/index.html') throw new Error('unexpected path');
+      return '${expected}';
+    }
+    ${extractFunction(publisherSource, "readRuntimeAssetBase64")}
+    result = readRuntimeAssetBase64;
+  `, context);
+
+  assert.equal(context.result({
+    FilePathName: 'immutable/runtime/index.html',
+    StableFilePathName: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/app/assets/index.html',
+  }, 'index.html'), expected);
+});
+
+test("database-only assets reject stale HDFS bytes and resolve stable routes from an ApiBase suffix", () => {
+  const html = '<!doctype html><html><head></head><body>stable</body></html>';
+  let requestedUrl = '';
+  const context = {
+    V8: {
+      SysConfig: { ApiBase: 'https://api.example.test/api/' },
+      Http: {
+        GetResponse({ Url }) {
+          requestedUrl = Url;
+          return { Content: html, RawBytes: Buffer.from('gateway-frame') };
+        },
+      },
+      Base64: {
+        StringToBase64(value) {
+          return Buffer.from(String(value), 'utf8').toString('base64');
+        },
+      },
+    },
+    System: {
+      Convert: {
+        FromBase64String(value) { return Buffer.from(value, 'base64'); },
+        ToBase64String(value) { return Buffer.from(value).toString('base64'); },
+      },
+    },
+    Buffer,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "isTextFile")}
+    ${extractFunction(publisherSource, "sha256RuntimeAssetBytes")}
+    ${extractFunction(publisherSource, "runtimeAssetBase64MatchesManifest")}
+    ${extractFunction(publisherSource, "stableApiOrigin")}
+    function readFileBase64() { return Buffer.from('stale').toString('base64'); }
+    ${extractFunction(publisherSource, "readRuntimeAssetBase64")}
+    result = readRuntimeAssetBase64;
+  `, context);
+
+  const encoded = context.result({
+    FilePathName: 'immutable/runtime/index.html',
+    StableFilePathName: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/app/assets/index.html',
+    Size: Buffer.byteLength(html),
+  }, 'index.html');
+  assert.equal(requestedUrl, 'https://api.example.test/micro-app/v3/tenants/itdos/kinds/runtime/apps/app/assets/index.html');
+  assert.equal(Buffer.from(encoded, 'base64').toString('utf8'), html);
+});
+
+test("runtime asset manifest SHA remains mandatory without native CLR cryptography", () => {
+  const good = Buffer.from('verified bytes', 'utf8');
+  const expectedSha = crypto.createHash('sha256').update(good).digest('hex');
+  const context = {
+    System: {
+      Convert: {
+        FromBase64String(value) { return Buffer.from(value, 'base64'); },
+      },
+    },
+    Buffer,
+    Number,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "sha256RuntimeAssetBytes")}
+    ${extractFunction(publisherSource, "runtimeAssetBase64MatchesManifest")}
+    result = runtimeAssetBase64MatchesManifest;
+  `, context);
+  assert.equal(context.result({ Size: good.length, Sha256: expectedSha }, good.toString('base64')), true);
+  assert.equal(context.result({ Size: good.length, Sha256: expectedSha }, Buffer.from('falsified byte', 'utf8').toString('base64')), false);
+});
+
+test("protocol v3 hydrates only the asset list from the exact committed runtime pointer", () => {
+  const proof = {
+    VersionId: 'version-1',
+    RuntimeManifestHash: 'a'.repeat(64),
+    PublishFence: '34',
+    RequestFingerprint: 'b'.repeat(64),
+  };
+  const context = {
+    V8: { Param: {} },
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "parseObject")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    function getMicroService() {
+      return { Service: {
+        BuildVersion: 'v1.9.14',
+        AssetsJson: '[{"Path":"index.html"}]',
+        AssetManifestJson: JSON.stringify({
+          CommittedPublishVersionId: 'version-1',
+          RuntimeManifestHash: '${'a'.repeat(64)}',
+          PublishFence: '34',
+          RequestFingerprint: '${'b'.repeat(64)}',
+          RouteSnapshotHash: '${'c'.repeat(64)}'
+        }),
+        AssetCount: 1,
+        TotalSize: '377'
+      }, Pages: [{ mutable: true }] };
+    }
+    ${extractFunction(publisherSource, "hydrateCommittedRuntimeAssets")}
+    result = hydrateCommittedRuntimeAssets;
+  `, context);
+  const runtime = {
+    Service: { MsKey: 'microi-platform-service', BuildVersion: 'v1.9.14', RouteSnapshotHash: 'c'.repeat(64) },
+    Pages: [{ committed: true }],
+  };
+  const hydrated = context.result({ AppKey: 'microi-platform-service' }, runtime, proof, 'v1.9.14');
+  assert.equal(hydrated.Service.AssetsJson, '[{"Path":"index.html"}]');
+  assert.deepEqual(hydrated.Pages, runtime.Pages);
+  assert.throws(
+    () => context.result({ AppKey: 'microi-platform-service' }, runtime, { ...proof, PublishFence: '35' }, 'v1.9.14'),
+    /CommittedProof 不一致/,
+  );
+});
+
+test("publisher enriches portable MicroService menu keys and rejects cross-app bindings", () => {
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "enrichMicroServiceMenuBindings")}
+    result = enrichMicroServiceMenuBindings;
+  `, context);
+
+  const packageFixture = {
+    ApplicationBundle: {
+      ApplicationType: "MicroService",
+      Application: { AppKey: "microi-platform-service" },
+      MicroService: { MsKey: "microi-platform-service" },
+      Routes: [{ RoutePath: "/system-observability" }],
+    },
+    SysMenus: [{
+      Id: "menu-log",
+      Name: "系统日志/监控",
+      OpenType: "MicroService",
+      MicroServiceRoutePath: "/system-observability",
+    }],
+  };
+  const result = context.result(packageFixture);
+  assert.equal(result.Code, 1);
+  assert.equal(packageFixture.SysMenus[0].MicroServiceKey, "microi-platform-service");
+  assert.equal(result.Data.Updated, 1);
+
+  packageFixture.SysMenus[0].MicroServiceKey = "another-app";
+  assert.match(context.result(packageFixture).Msg, /与当前应用包.*不一致/);
+  assert.match(publisherSource, /MICROSERVICE_MENU_KEY_ENRICHMENT_V1/);
+  assert.match(publisherSource, /microServiceMenuBindingResult = enrichMicroServiceMenuBindings\(packageModel\)/);
+});
+
+test("publisher emits platform-owned managed baselines and tenant-owned hooks for official platform apps", () => {
+  const context = {
+    V8: {
+      EncryptHelper: {
+        Sha256Hex(value) {
+          return crypto.createHash("sha256").update(String(value)).digest("hex");
+        },
+      },
+    },
+    JSON,
+    Object,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "parseObject")}
+    function readStoredPackage(row) { return parseObject(row && row.AppPakcet, {}); }
+    ${extractFunction(publisherSource, "sha256Hex")}
+    ${extractFunction(publisherSource, "apiEngineMap")}
+    ${extractFunction(publisherSource, "normalizeSha256Hashes")}
+    ${extractFunction(publisherSource, "buildApiEngineResourcePolicies")}
+    result = buildApiEngineResourcePolicies;
+  `, context);
+  const policies = context.result(
+    [
+      { ApiEngineKey: "core", ApiV8Code: "new-core" },
+      { ApiEngineKey: "hook", ApiV8Code: "template" },
+    ],
+    { ApiEngines: { hook: { UpgradePolicy: "CreateIfMissing" } } },
+    {
+      AppPakcet: JSON.stringify({
+        SysApiEngines: [{ ApiEngineKey: "core", ApiV8Code: "old-core" }],
+      }),
+    },
+    { ApplicationType: "Platform", PublisherType: "官方应用" },
+  );
+
+  assert.equal(policies.ApiEngines.core.UpgradePolicy, "Managed");
+  assert.equal(policies.ApiEngines.core.Ownership, "Platform");
+  assert.equal(
+    policies.ApiEngines.core.BaseHash,
+    crypto.createHash("sha256").update("old-core").digest("hex"),
+  );
+  assert.equal(policies.ApiEngines.hook.Ownership, "Tenant");
+  assert.equal(policies.ApiEngines.hook.UpgradePolicy, "CreateIfMissing");
+  assert.equal(policies.ApiEngines.hook.BaseHash, undefined);
+
+  const regularPolicies = context.result(
+    [{ ApiEngineKey: "core", ApiV8Code: "new-core" }],
+    null,
+    null,
+    { ApplicationType: "Web", PublisherType: "官方应用" },
+  );
+  assert.equal(regularPolicies.ApiEngines.core.Ownership, "Application");
+
+  const explicitlyApplicationOwned = context.result(
+    [{ ApiEngineKey: "core", ApiV8Code: "new-core" }],
+    { ApiEngines: { core: { UpgradePolicy: "Managed", Ownership: "Application" } } },
+    null,
+    { ApplicationType: "Platform", PublisherType: "官方应用" },
+  );
+  assert.equal(explicitlyApplicationOwned.ApiEngines.core.Ownership, "Application");
+});
+
+test("official Platform republish rejects incomplete persisted engine selections and requires explicit removals", () => {
+  const context = { JSON, Object, String };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "parseArray")}
+    function readStoredPackage(row) { return JSON.parse((row && row.AppPakcet) || '{}'); }
+    ${extractFunction(publisherSource, "normalizeApiEngineKeys")}
+    ${extractFunction(publisherSource, "validateOfficialPlatformApiEngineSelection")}
+    result = validateOfficialPlatformApiEngineSelection;
+  `, context);
+  const store = {
+    AppPakcet: JSON.stringify({
+      SysApiEngines: [
+        { ApiEngineKey: "engine-a" },
+        { ApiEngineKey: "engine-b" },
+        { ApiEngineKey: "engine-c" },
+      ],
+    }),
+  };
+  const official = { ApplicationType: "Platform", PublisherType: "官方应用" };
+
+  assert.equal(context.result(["engine-a", "engine-b", "engine-c"], false, store, official, []).Code, 1);
+  const fallbackFailure = context.result(["engine-a", "engine-b"], false, store, official, []);
+  assert.equal(fallbackFailure.Code, 0);
+  assert.match(fallbackFailure.Msg, /SelectApiEngine 不完整/);
+
+  const unconfirmedRemoval = context.result(["engine-a", "engine-b"], true, store, official, []);
+  assert.equal(unconfirmedRemoval.Code, 0);
+  assert.match(unconfirmedRemoval.Msg, /ApiEngineRemovalKeys/);
+  const confirmedRemoval = context.result(
+    ["engine-a", "engine-b", "engine-d"],
+    true,
+    store,
+    official,
+    ["engine-c"],
+  );
+  assert.equal(confirmedRemoval.Code, 1);
+  assert.deepEqual(Array.from(confirmedRemoval.Data.RemovedApiEngineKeys), ["engine-c"]);
+
+  assert.equal(
+    context.result(["engine-a"], false, store, { ApplicationType: "Web", PublisherType: "官方应用" }, []).Code,
+    1,
+  );
+  assert.match(publisherSource, /禁止从退化持久选择重发/);
+});
+
+function extractFunction(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `missing function ${name}`);
+  const brace = source.indexOf("{", start);
+  let depth = 0;
+  let quote = "";
+  let escaped = false;
+  for (let index = brace; index < source.length; index += 1) {
+    const char = source[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === quote) quote = "";
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") {
+      quote = char;
+      continue;
+    }
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  assert.fail(`unterminated function ${name}`);
+}
+
+function menuResolver() {
+  const declaration = publisherSource.match(
+    /var menuIds = parseArray\(V8\.Param\.MenuIds\);/,
+  );
+  const fallback = publisherSource.match(
+    /if \(menuIds\.length === 0 && existingStore && existingStore\.SelectMenu\) \{\s*menuIds = selectionValues\(existingStore\.SelectMenu, \['Id', 'MenuId', 'Value'\]\);\s*\}/,
+  );
+  assert.ok(declaration, "missing explicit MenuIds resolution");
+  assert.ok(fallback, "missing persisted SelectMenu fallback");
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "parseArray")}
+    ${extractFunction(publisherSource, "selectionValues")}
+    function resolve(param, store) {
+      var V8 = { Param: param || {} };
+      var existingStore = store || null;
+      ${declaration[0]}
+      ${fallback[0]}
+      return menuIds;
+    }
+    result = resolve;
+  `, context);
+  return context.result;
+}
+
+function storeMenuResolver() {
+  const expression = publisherSource.match(
+    /SelectMenu:\s*(V8\.Param[\s\S]*?),\s*SelectTable:/,
+  );
+  assert.ok(expression, "missing storeRow SelectMenu expression");
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "selectionJson")}
+    function resolve(param, existingStore) {
+      var V8 = { Param: param || {} };
+      return (${expression[1]});
+    }
+    result = resolve;
+  `, context);
+  return context.result;
+}
+
+function contractNormalizer() {
+  const functionSource = extractFunction(publisherSource, "normalizeMenuContract");
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "parseArray")}
+    ${extractFunction(publisherSource, "selectionValues")}
+    ${functionSource}
+    result = normalizeMenuContract;
+  `, context);
+  return context.result;
+}
+
+test("explicit MenuIds win over the persisted SelectMenu fallback", () => {
+  const resolve = menuResolver();
+  const resolved = resolve(
+    { MenuIds: ["menu-explicit"] },
+    { SelectMenu: JSON.stringify([{ Id: "menu-stored", Name: "stored" }]) },
+  );
+  assert.deepEqual(Array.from(resolved), ["menu-explicit"]);
+});
+
+test("persisted SelectMenu objects supply deduplicated MenuIds when the caller omits them", () => {
+  const resolve = menuResolver();
+  const resolved = resolve({}, {
+    SelectMenu: JSON.stringify([
+      { Id: "menu-a", Name: "A", ParentId: "root", DiyTableId: "table-a", DiyTableName: "A table" },
+      { Id: "MENU-A", Name: "duplicate" },
+      { MenuId: "menu-b", Name: "B" },
+    ]),
+  });
+  assert.deepEqual(Array.from(resolved), ["menu-a", "menu-b"]);
+});
+
+test("resolved MenuIds feed the exporter and exported SysMenus reach the root package", () => {
+  assert.match(
+    publisherSource,
+    /V8\.ApiEngine\.Run\('export-microi-store-package',\s*\{[\s\S]*?MenuIds:\s*menuIds,\s*ExactMenuIds:\s*exactMenuIds,/,
+  );
+  assert.match(publisherSource, /SysMenus:\s*toArray\(selectedExport\.SysMenus\),/);
+});
+
+test("ExactMenuIds is opt-in and is forwarded to the package exporter", () => {
+  assert.match(
+    publisherSource,
+    /var exactMenuIds = V8\.Param\.ExactMenuIds === true\s*\|\| V8\.Param\.ExactMenuIds === 1\s*\|\| text\(V8\.Param\.ExactMenuIds\)\.toLowerCase\(\) === 'true';/,
+  );
+  assert.doesNotMatch(
+    publisherSource,
+    /ExactMenuIds:\s*true/,
+    "normal manual packages must retain the exporter's recursive default",
+  );
+});
+
+test("MenuContract must exactly match the opt-in MenuIds and is attached to package assets", () => {
+  const normalize = contractNormalizer();
+  const contract = {
+    Count: 3,
+    MenuIds: ["parent", "sessions", "results"],
+    Menus: [{ Id: "parent" }, { Id: "sessions" }, { Id: "results" }],
+    AdminManifestPath: "source/admin-manifest.json",
+    AdminManifestSha256: "abc",
+  };
+  assert.equal(normalize(contract, ["parent", "sessions", "results"], true), contract);
+  assert.throws(() => normalize(contract, ["parent", "sessions"], true), /数量与精确 MenuIds 不一致/);
+  assert.throws(() => normalize(contract, ["parent", "sessions", "other"], true), /菜单集合与精确 MenuIds 不一致/);
+  assert.throws(() => normalize(contract, ["parent", "sessions", "results"], false), /只能与 ExactMenuIds=true/);
+  assert.match(publisherSource, /if \(menuContract && packageAssets\) packageAssets\.MenuContract = menuContract;/);
+  assert.match(publisherSource, /ExactMenuIds=true 时必须提供与菜单集合一致的 MenuContract/);
+});
+
+test("exact menu export removes only package-external root parents and preserves the contracted closure", () => {
+  const context = { JSON, Object, String };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "persistedJsonValue")}
+    ${extractFunction(publisherSource, "normalizeExactExportedMenuClosure")}
+    result = normalizeExactExportedMenuClosure;
+  `, context);
+
+  const contract = {
+    Count: 2,
+    MenuIds: ["root", "child"],
+    Menus: [
+      { Id: "root", Name: "业务根", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+      { Id: "child", Name: "数据管理", ParentId: "root", DiyTableId: "table-1", DiyTableName: "app_table" },
+    ],
+  };
+  const normalized = context.result([
+    { Id: "root", Name: "业务根", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+    { Id: "child", Name: "数据管理", ParentId: "root", DiyTableId: "table-1", DiyTableName: "app_table" },
+  ], contract, true);
+  assert.equal(normalized[0].ParentId, null);
+  assert.equal(normalized[1].ParentId, "root");
+
+  assert.throws(() => context.result([
+    { Id: "root", Name: "业务根", ParentId: "child", DiyTableId: "", DiyTableName: "" },
+    { Id: "child", Name: "数据管理", ParentId: "root", DiyTableId: "table-1", DiyTableName: "app_table" },
+  ], contract, true), /精确菜单根.*ParentId 与 MenuContract 不一致/);
+  assert.throws(() => context.result([
+    { Id: "root", Name: "错误名称", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+    { Id: "child", Name: "数据管理", ParentId: "root", DiyTableId: "table-1", DiyTableName: "app_table" },
+  ], contract, true), /Name 与 MenuContract 不一致/);
+
+  assert.throws(() => context.result([
+    { Id: "root-a", Name: "根A", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+    { Id: "root-b", Name: "根B", ParentId: "another-directory", DiyTableId: "", DiyTableName: "" },
+  ], {
+    Count: 2,
+    MenuIds: ["root-a", "root-b"],
+    Menus: [
+      { Id: "root-a", Name: "根A", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+      { Id: "root-b", Name: "根B", ParentId: "another-directory", DiyTableId: "", DiyTableName: "" },
+    ],
+  }, true), /唯一可移植根/u);
+
+  assert.throws(() => context.result([
+    { Id: "root", Name: "业务根", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+    { Id: "a", Name: "A", ParentId: "b", DiyTableId: "table-a", DiyTableName: "app_a" },
+    { Id: "b", Name: "B", ParentId: "a", DiyTableId: "table-b", DiyTableName: "app_b" },
+  ], {
+    Count: 3,
+    MenuIds: ["root", "a", "b"],
+    Menus: [
+      { Id: "root", Name: "业务根", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+      { Id: "a", Name: "A", ParentId: "b", DiyTableId: "table-a", DiyTableName: "app_a" },
+      { Id: "b", Name: "B", ParentId: "a", DiyTableId: "table-b", DiyTableName: "app_b" },
+    ],
+  }, true), /菜单父级环/u);
+});
+
+test("storeRow saves explicit SelectMenu metadata and otherwise preserves the stored JSON", () => {
+  const resolve = storeMenuResolver();
+  const menus = [{
+    Id: "menu-a",
+    Name: "A",
+    ParentId: "root",
+    DiyTableId: "table-a",
+    DiyTableName: "A table",
+  }];
+  const stored = JSON.stringify([{ Id: "menu-stored", Name: "stored" }]);
+  assert.equal(resolve({ SelectMenu: menus }, { SelectMenu: stored }), JSON.stringify(menus));
+  assert.equal(resolve({}, { SelectMenu: stored }), stored);
+  assert.equal(resolve({ SelectMenu: [] }, { SelectMenu: stored }), "[]", "an explicit empty selection clears the stored selection");
+});
+
+test("storeRow persists resolved resource ids when explicit package selections are supplied", () => {
+  assert.match(
+    publisherSource,
+    /V8\.Param\.MenuIds !== undefined && V8\.Param\.MenuIds !== null\s*\? selectionJson\(menuIds\)/,
+  );
+  assert.match(
+    publisherSource,
+    /SelectTable:[\s\S]*?V8\.Param\.TableIds !== undefined && V8\.Param\.TableIds !== null\s*\? selectionJson\(tableIds\)/,
+  );
+  assert.match(
+    publisherSource,
+    /SelectApiEngine:[\s\S]*?V8\.Param\.ApiEngineKeys !== undefined && V8\.Param\.ApiEngineKeys !== null\s*\? selectionJson\(apiEngineKeys\)/,
+  );
+});
+
+function exactPublishedVersionValidator() {
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "validateExactPublishedVersion")}
+    result = validateExactPublishedVersion;
+  `, context);
+  return context.result;
+}
+
+test("legacy exact package repair accepts only latest successful immutable states with an exact asset contract", () => {
+  const validate = exactPublishedVersionValidator();
+  const assets = { PackageVersion: "v1.5.5" };
+
+  for (const state of ["Published", "Completed"]) {
+    const result = validate(
+      { VersionNo: "v1.5.5", PublishState: state },
+      assets,
+      "v1.5.5",
+      false,
+    );
+    assert.equal(result.Code, 1, `legacy exact should accept ${state}`);
+    assert.equal(result.Data.AppVersion, "v1.5.5");
+  }
+
+  const legacyV2Result = validate(
+    { VersionNo: "v1.5.5", Status: "Published", PublishState: "LegacyUnverified" },
+    assets,
+    "v1.5.5",
+    false,
+  );
+  assert.equal(legacyV2Result.Code, 1, "legacy v2 must use its verified historical Status field");
+  assert.equal(
+    validate(
+      { VersionNo: "v1.5.5", Status: "Published", PublishState: "LegacyUnverified" },
+      assets,
+      "v1.5.5",
+      true,
+    ).Code,
+    0,
+    "protocol v3 must never accept a legacy-unverified pointer",
+  );
+
+  for (const state of ["Failed", "Preparing", "Publishing", "Pending", "Cancelled", ""]) {
+    const result = validate(
+      { VersionNo: "v1.5.5", PublishState: state },
+      assets,
+      "v1.5.5",
+      false,
+    );
+    assert.equal(result.Code, 0, `legacy exact must reject ${state || "empty"}`);
+    assert.match(result.Msg, /必须为 Published 或 Completed/);
+  }
+
+  assert.equal(
+    validate({ VersionNo: "v1.5.4", PublishState: "Completed" }, assets, "v1.5.5", false).Code,
+    0,
+    "an older version row must not satisfy the exact contract",
+  );
+  assert.equal(
+    validate(
+      { VersionNo: "v1.5.5", PublishState: "Completed" },
+      { PackageVersion: "v1.5.4" },
+      "v1.5.5",
+      false,
+    ).Code,
+    0,
+    "stale prepared assets must not satisfy the exact contract",
+  );
+  assert.equal(
+    validate({ VersionNo: "v1.5.5", PublishState: "Completed" }, {}, "v1.5.5", false).Code,
+    0,
+    "PreparedAssets.PackageVersion is mandatory",
+  );
+  assert.equal(
+    validate({ VersionNo: "v1.5.5", PublishState: "Completed" }, assets, "", false).Code,
+    0,
+    "AppVersion is mandatory instead of silently defaulting to v1.0.0",
+  );
+  assert.equal(
+    validate({ VersionNo: "v1.5.5", PublishState: "Published" }, assets, "v1.5.5", true).Code,
+    0,
+    "protocol v3 remains Completed-only",
+  );
+});
+
+test("interrupted package repair resolves legacy exact against the single newest version row", () => {
+  assert.match(
+    publisherSource,
+    /var exactPublishedVersion = protocolV3[\s\S]*?V8\.Param\.ExactPublishedVersion === true[\s\S]*?validateExactPublishedVersion\([\s\S]*?exactVersionRow,[\s\S]*?packageAssets,[\s\S]*?V8\.Param\.AppVersion/,
+  );
+  assert.match(
+    publisherSource,
+    /function getLatestVersion\(appId\)[\s\S]*?_OrderBy: 'CreateTime',[\s\S]*?_OrderByType: 'DESC',[\s\S]*?_PageSize: 1/,
+  );
+  assert.match(
+    publisherSource,
+    /var exactVersionRow = protocolV3 \? committedVersion : latestVersion;/,
+  );
+  assert.match(
+    publisherSource,
+    /var deliveryVersions = resolveDeliveryVersions\(\{[\s\S]*?ExactPublishedVersion: exactPublishedVersion,[\s\S]*?RequestedPublishedVersion: requestedPublishedVersion/,
+  );
+  assert.match(
+    publisherSource,
+    /AppVersion:\s*versionNo,/,
+    "the validated immutable version must be written back to the store",
+  );
+});
+
+test("legacy marketplace package version can advance without republishing identical microservice assets", () => {
+  const context = {
+    String,
+    parseInt,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "normalizeVersion")}
+    ${extractFunction(publisherSource, "highestVersion")}
+    ${extractFunction(publisherSource, "resolveDeliveryVersions")}
+    this.resolveDeliveryVersions = resolveDeliveryVersions;
+  `, context);
+
+  const legacy = context.resolveDeliveryVersions({
+    AppType: "MicroService",
+    RuntimeBuildVersion: "v2.0.4",
+    LatestVersion: "v2.0.4",
+    ApplicationVersion: "v2.0.4",
+    RequestedPackageVersion: "v2.0.6",
+    PreparedPackageVersion: "v2.0.6",
+    ExistingPackageVersion: "v2.0.5",
+    ExactPublishedVersion: false,
+  });
+  assert.equal(legacy.RuntimeVersion, "v2.0.4");
+  assert.equal(legacy.PackageVersion, "v2.0.6");
+
+  const exact = context.resolveDeliveryVersions({
+    AppType: "MicroService",
+    RuntimeBuildVersion: "v2.0.4",
+    RequestedPackageVersion: "v2.0.6",
+    PreparedPackageVersion: "v2.0.6",
+    ExistingPackageVersion: "v2.0.5",
+    RequestedPublishedVersion: "v2.0.4",
+    ExactPublishedVersion: true,
+  });
+  assert.equal(exact.RuntimeVersion, "v2.0.4");
+  assert.equal(exact.PackageVersion, "v2.0.4");
+
+  assert.match(publisherSource, /AppVersion:\s*runtimeVersionNo,/);
+  assert.match(publisherSource, /VersionNo:\s*runtimeVersionNo,/);
+  assert.match(publisherSource, /BuildVersion:\s*runtimeVersionNo/);
+  assert.match(publisherSource, /AppVersion:\s*versionNo,/);
+});
+
+test("current marketplace package repair is exact, version preserving, and independent from runtime version", () => {
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "validateCurrentPackageRepair")}
+    result = validateCurrentPackageRepair;
+  `, context);
+  const existing = { Id: "store-id", AppVersion: "v1.1.3" };
+  const assets = { PackageVersion: "v1.1.3" };
+  assert.equal(context.result(existing, assets, "v1.1.3", "Publish", false, false).Code, 1);
+  assert.equal(context.result(existing, assets, "v1.1.2", "Publish", false, false).Code, 0);
+  assert.equal(context.result(existing, { PackageVersion: "v1.1.2" }, "v1.1.3", "Publish", false, false).Code, 0);
+  assert.equal(context.result(existing, assets, "v1.1.3", "Publish", true, false).Code, 0);
+  assert.equal(context.result(existing, assets, "v1.1.3", "Publish", false, true).Code, 0);
+  assert.equal(context.result(existing, assets, "v1.1.3", "Package", false, false).Code, 0);
+  assert.match(publisherSource, /var versionNo = repairCurrentPackageVersion[\s\S]*currentPackageRepairValidation\.Data\.AppVersion/u);
+});
+
+test("current marketplace package repair uses the old package pointer as CAS and never touches runtime pointers", () => {
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "appendCurrentPackageRepairStringCas")}
+    ${extractFunction(publisherSource, "buildCurrentPackageRepairFields")}
+    result = buildCurrentPackageRepairFields;
+  `, context);
+  const fields = context.result({
+    AppName: "应用",
+    Name: "应用",
+    AppVersion: "v1.1.3",
+    AppId: "sample",
+    AppKey: "sample",
+    Status: "Published",
+    BuildStatus: "Success",
+    AppUpdateTime: "new-time",
+    PackageHdfsPath: "/new/package.json",
+    PackageSha256: "b".repeat(64),
+    PackageSize: 456,
+    AiAppPackageManifest: "[]",
+    AiAppZipFiles: "[]",
+  }, {
+    Id: "store-id",
+    AppVersion: "v1.1.3",
+    AppUpdateTime: "old-time",
+    PackageHdfsPath: "/old/package.json",
+    PackageSha256: "a".repeat(64),
+    PackageSize: 123,
+  });
+  assert.deepEqual(Array.from(fields._Where[0]), ["Id", "=", "store-id"]);
+  assert.ok(fields._Where.some(item => Array.from(item).join("|") === "AND|AppVersion|=|v1.1.3"));
+  assert.ok(fields._Where.some(item => Array.from(item).join("|") === "AND|PackageHdfsPath|=|/old/package.json"));
+  assert.ok(fields._Where.some(item => Array.from(item).join("|") === `AND|PackageSha256|=|${"a".repeat(64)}`));
+  assert.ok(fields._Where.some(item => Array.from(item).join("|") === "AND|PackageSize|=|123"));
+  assert.equal(fields.AppVersion, "v1.1.3");
+  for (const forbidden of ["CommittedPublishVersionId", "CommittedRuntimeManifestHash", "PublishFence", "PublishRowVersion", "PublishState"]) {
+    assert.equal(Object.hasOwn(fields, forbidden), false, `${forbidden} must remain runtime-owned`);
+  }
+  assert.match(publisherSource, /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', repairFields\)/u);
+  assert.match(publisherSource, /currentPackageRepairReadbackMatches\(repairedStore, storeRow, versionNo\)/u);
+});
+
+test("protocol v3 resolves the committed version by exact VersionId instead of a newer staged row", () => {
+  const context = {
+    V8: {
+      FormEngine: {
+        GetTableData(_table, query) {
+          assert.deepEqual(Array.from(query._Where[0]), ["Id", "=", "version-committed"]);
+          assert.deepEqual(Array.from(query._Where[1]), ["AND", "AppId", "=", "app-id"]);
+          return {
+            Code: 1,
+            Data: [{ Id: "version-committed", PublishState: "Completed" }],
+          };
+        },
+      },
+    },
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "getCommittedVersion")}
+    result = getCommittedVersion;
+  `, context);
+  const committed = context.result("app-id", "version-committed");
+  assert.equal(committed.Id, "version-committed");
+  assert.notEqual(committed.Id, "version-staged-newer");
+  assert.match(
+    publisherSource,
+    /var exactVersionRow = protocolV3 \? committedVersion : latestVersion;/,
+  );
+  assert.throws(() => {
+    context.V8.FormEngine.GetTableData = () => ({ Code: 1, Data: [] });
+    context.result("app-id", "missing");
+  }, /精确命中 1 条/u);
+});
+
+test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
+  assert.ok(publisherSource.includes(`Version: ${packagedPublisher.Version}`));
+  assert.match(
+    publisherSource,
+    /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,
+  );
+  assert.match(publisherSource, /AppVersion: storeRow\.AppVersion/u);
+  for (const field of [
+    "CommittedPublishVersionId",
+    "CommittedRuntimeManifestHash",
+    "PublishFence",
+    "PublishRowVersion",
+    "PublishState",
+  ]) {
+    assert.match(publisherSource, new RegExp(`\\['AND', '${field}', '='`, "u"));
+  }
+  const v3Branch = publisherSource.slice(
+    publisherSource.indexOf("if (protocolV3) {\n    // Core"),
+    publisherSource.indexOf("var publishResult = upsertStore(storeRow);"),
+  );
+  assert.doesNotMatch(v3Branch, /upsertStore|AddFormData|UptFormData\('sys_microistore'/u);
+  assert.match(v3Branch, /assertV3CommittedStore\(postPublishStore, committedProof, '写包后'\)/u);
+});
+
+function resourceSnapshotHarness() {
+  const context = {
+    V8: {
+      EncryptHelper: {
+        Sha256Hex(value) {
+          return crypto.createHash("sha256").update(String(value), "utf8").digest("hex");
+        },
+      },
+    },
+    JSON,
+    Object,
+    String,
+    isFinite,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "sha256Hex")}
+    var RESOURCE_SNAPSHOT_SCHEMA = 'Microi.ApplicationResourceSnapshot';
+    var RESOURCE_SNAPSHOT_SCHEMA_VERSION = 1;
+    ${extractFunction(publisherSource, "canonicalResourceJson")}
+    ${extractFunction(publisherSource, "sortCanonicalResourceArray")}
+    ${extractFunction(publisherSource, "normalizeSnapshotDataSets")}
+    ${extractFunction(publisherSource, "normalizeSnapshotMenuContract")}
+    ${extractFunction(publisherSource, "buildResourceSnapshot")}
+    ${extractFunction(publisherSource, "persistedJsonValue")}
+    ${extractFunction(publisherSource, "createResourceSnapshotReceipt")}
+    ${extractFunction(publisherSource, "readExpectedResourceSnapshotHash")}
+    ${extractFunction(publisherSource, "resourceSnapshotCasCapability")}
+    ${extractFunction(publisherSource, "enforceResourceSnapshotCas")}
+    result = {
+      create: createResourceSnapshotReceipt,
+      enforce: enforceResourceSnapshotCas
+    };
+  `, context);
+  return context.result;
+}
+
+test("resource snapshot is canonical across resource and dataset row order", () => {
+  const harness = resourceSnapshotHarness();
+  const resources = {
+    DiyTables: [{ Name: "z", Id: "2" }, { Id: "1", Name: "a" }],
+    DataSets: [{ TableName: "orders", Rows: [{ Id: "2" }, { Id: "1" }] }],
+    SysApiEngines: [{ ApiEngineKey: "b", ApiV8Code: "return 2" }, { ApiV8Code: "return 1", ApiEngineKey: "a" }],
+  };
+  const reversed = {
+    SysApiEngines: [...resources.SysApiEngines].reverse(),
+    DataSets: [{ Rows: [...resources.DataSets[0].Rows].reverse(), TableName: "orders" }],
+    DiyTables: [...resources.DiyTables].reverse(),
+  };
+  const contract = { MenuIds: ["menu-b", "menu-a"], Menus: [{ Id: "b" }, { Id: "a" }] };
+  const left = harness.create("sample-app", "v1.1.0", contract, resources, { ApiEngines: {} });
+  const right = harness.create("sample-app", "v1.1.0", {
+    Menus: [...contract.Menus].reverse(),
+    MenuIds: [...contract.MenuIds].reverse(),
+  }, reversed, { ApiEngines: {} });
+  assert.equal(left.ResourceSnapshotHash, right.ResourceSnapshotHash);
+  assert.equal(left.ResourceSnapshotCanonicalJson, right.ResourceSnapshotCanonicalJson);
+  assert.match(left.ResourceSnapshotHash, /^[a-f0-9]{64}$/u);
+  assert.deepEqual(Array.from(left.ResourceSnapshot.Resources.DataSets[0].Rows, row => row.Id), ["1", "2"]);
+});
+
+test("resource snapshot hashes the final persisted JSON shape instead of Jint host-object metadata", () => {
+  const harness = resourceSnapshotHarness();
+  const menuContract = {
+    Count: 2,
+    MenuIds: ["menu-b", "menu-a"],
+    Menus: [{ Id: "b" }, { Id: "a" }],
+  };
+  Object.defineProperty(menuContract, "length", { value: 0, enumerable: false });
+  const createdAt = new Date("2026-08-29T12:34:56.000Z");
+  const resources = {
+    ApplicationBundle: { PackageAssets: { MenuContract: menuContract } },
+    DiyTables: [{ Id: "table-1", CreateTime: createdAt }],
+    ResourcePolicies: { ApiEngines: {} },
+  };
+  const receipt = harness.create("sample-app", "v1.1.0", menuContract, resources, resources.ResourcePolicies);
+  assert.equal(receipt.ResourceSnapshot.MenuContract.Count, 2);
+  assert.deepEqual(Array.from(receipt.ResourceSnapshot.MenuContract.MenuIds), ["menu-a", "menu-b"]);
+  assert.equal(receipt.ResourceSnapshot.Resources.DiyTables[0].CreateTime, createdAt.toISOString());
+  assert.match(receipt.ResourceSnapshotHash, /^[a-f0-9]{64}$/u);
+});
+
+test("protocol v3 resource snapshot CAS inspects read-only and rejects missing or drifting hashes", () => {
+  const harness = resourceSnapshotHarness();
+  const receipt = harness.create("sample-app", "v1.1.0", null, { DiyTables: [{ Id: "1", Name: "one" }] }, null);
+  const inspect = harness.enforce("InspectResourceSnapshot", true, "", receipt);
+  assert.equal(inspect.Code, 1);
+  assert.equal(inspect.Data.ShouldPublish, false);
+  assert.equal(inspect.Data.ResourceSnapshotCasCapability.supported, true);
+  assert.equal(inspect.Data.ResourceSnapshotHash, receipt.ResourceSnapshotHash);
+  assert.equal(harness.enforce("Publish", true, "", receipt).Code, 0);
+  const drift = harness.enforce("Publish", true, "0".repeat(64), receipt);
+  assert.equal(drift.Code, 0);
+  assert.match(drift.Msg, /资源快照已漂移/u);
+  const matched = harness.enforce("Publish", true, receipt.ResourceSnapshotHash, receipt);
+  assert.equal(matched.Code, 1);
+  assert.equal(matched.Data.ShouldPublish, true);
+});
+
+test("resource snapshot gate and package fingerprint run before any package storage write", () => {
+  const gateIndex = publisherSource.indexOf("var resourceSnapshotGate = enforceResourceSnapshotCas(");
+  const markerIndex = publisherSource.indexOf("packageModel.ResourceSnapshot = {");
+  const storageIndex = publisherSource.indexOf("var storageResult = V8.ApiEngine.Run('microi-store-package-storage'");
+  assert.ok(markerIndex > 0 && gateIndex > markerIndex && storageIndex > gateIndex);
+  assert.match(publisherSource, /PackageInfo\.ResourceSnapshotHash = resourceSnapshotReceipt\.ResourceSnapshotHash/u);
+  assert.match(publisherSource, /ExpectedResourceSnapshotHash/u);
+  assert.match(publisherSource, /ResourceSnapshotCanonicalJson/u);
+});
+
+test("v3 route canonical JSON 固定向量与 Node/MCP 一致且拒绝非 safe integer", () => {
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "canonicalJson")}
+    result = canonicalJson;
+  `, context);
+  const value = [
+    { title: '中文"引号', meta: { z: 9007199254740991, a: -9007199254740991 }, path: "/a" },
+    { order: 0 },
+  ];
+  const canonical = context.result(value);
+  assert.equal(canonical, '[{"meta":{"a":-9007199254740991,"z":9007199254740991},"path":"/a","title":"中文\\"引号"},{"order":0}]');
+  assert.equal(crypto.createHash("sha256").update(canonical, "utf8").digest("hex"), "39ac0b5c44884edcb6497dbf6a0fa8a2e95a1f2a968e8eaa10e7557e0443d47e");
+  assert.throws(() => context.result([{ order: 1.5 }]), /safe integer/u);
+  assert.throws(() => context.result([{ order: 9007199254740992 }]), /safe integer/u);
+});
+
+test("v3 MicroService 包只使用 committed route/metadata snapshot，禁止回退 mutable live runtime", () => {
+  assert.match(
+    publisherSource,
+    /var runtime = appType === 'MicroService'[\s\S]*?protocolV3[\s\S]*?Service: V8\.Param\.MicroService \|\| null[\s\S]*?: getMicroService\(app\.AppKey\)/u,
+  );
+  assert.match(publisherSource, /if \(!protocolV3 && appType === 'MicroService'/u);
+  assert.match(publisherSource, /v3 MicroService 必须显式提供 MicroService snapshot，禁止回退 live runtime/u);
+  assert.match(
+    publisherSource,
+    /text\(committedVersion\.RouteSnapshotJson\) !== v3RouteSnapshot\.Json[\s\S]*?committedVersion\.RouteSnapshotHash/u,
+  );
+  assert.match(
+    publisherSource,
+    /var entryPath = protocolV3\s*\? text\(committedVersion\.EntryPath\)/u,
+  );
+  assert.match(
+    publisherSource,
+    /postCommittedVersion = getCommittedVersion[\s\S]*?postCommittedVersion\.RouteSnapshotJson[\s\S]*?route snapshot 已漂移/u,
+  );
+});
+
+test("v3 publisher emits a hash-pinned shared public runtime only for immutable Web delivery", () => {
+  assert.match(publisherSource, /SharedPublicRuntime 只允许 ProtocolVersion=3/);
+  assert.match(publisherSource, /SharedPublicRuntime 必须使用 IncludeSource=false/);
+  assert.match(publisherSource, /sharedManifestHash !== committedRuntimeHash/);
+  assert.match(publisherSource, /sharedEntryUrl\.toLowerCase\(\)\.indexOf\('\/' \+ runtimeVersionNo\.toLowerCase\(\) \+ '\/'\)/);
+  assert.match(publisherSource, /Build: 'SharedPublicRuntime'/);
+  assert.match(publisherSource, /packageModel\.ApplicationBundle\.SharedPublicRuntime = sharedPublicRuntime/);
+  assert.match(publisherSource, /SharedPublicRuntimeOnly: true/u);
+  assert.match(publisherSource, /RuntimeManifestHash: committedProof\.RuntimeManifestHash/u);
+  assert.match(publisherSource, /if \(packageAssets\.BuildZip\) packageZipFiles\.push/u);
+  assert.match(publisherSource, /AiAppZipFiles: JSON\.stringify\(packageZipFiles\)/u);
+  assert.doesNotMatch(
+    publisherSource,
+    /!packageAssets \|\| !packageAssets\.BuildZip\)\) return fail\('当前应用没有可安装的编译ZIP/u,
+  );
+});

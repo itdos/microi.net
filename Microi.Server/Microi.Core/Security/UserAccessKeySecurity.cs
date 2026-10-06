@@ -226,7 +226,8 @@ namespace Microi.net
             // `/*` was emitted by the first access-key UI when users entered
             // `*`; keep it as a compatibility alias and canonicalize to `*`.
             if (value == ScopeWildcard || value == "/*") return ScopeWildcard;
-            if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
+            if (!value.StartsWith("/", StringComparison.Ordinal)
+                && Uri.TryCreate(value, UriKind.Absolute, out var absolute))
             {
                 value = absolute.Fragment?.TrimStart('#') ?? "";
             }

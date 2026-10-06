@@ -86,7 +86,7 @@ public sealed class PlatformPrivateFileCompatibilityTests
             root, "Microi.Server", "Microi.net.Api", "Controllers",
             "LegacyMobileCompatibilityController.cs")));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.saas-engine.json")));
         var engine = package["SysApiEngines"]!.Values<JObject>()
             .Single(item => item["ApiEngineKey"]?.ToString() == "platform-private-file-url");
         Assert.Contains("/api/HDFS/GetPrivateFileUrl", engine["ApiRoutes"]?.ToString());

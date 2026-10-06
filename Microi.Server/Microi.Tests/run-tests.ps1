@@ -45,9 +45,37 @@ if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
     $ResultsDirectory = Join-Path $testRoot "TestResults"
 }
 
-$os = Get-CimInstance Win32_OperatingSystem
-$totalBytes = [double]$os.TotalVisibleMemorySize * 1KB
-$freeBytes = [double]$os.FreePhysicalMemory * 1KB
+if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') {
+    $os = Get-CimInstance Win32_OperatingSystem
+    $totalBytes = [double]$os.TotalVisibleMemorySize * 1KB
+    $freeBytes = [double]$os.FreePhysicalMemory * 1KB
+}
+elseif ($IsMacOS) {
+    $totalBytes = [double](& sysctl -n hw.memsize)
+    $vmStatistics = (& vm_stat) -join "`n"
+    if ($LASTEXITCODE -ne 0 -or $vmStatistics -notmatch 'page size of (\d+) bytes') {
+        throw 'Cannot read macOS physical-memory statistics for the build reserve gate.'
+    }
+    $pageBytes = [double]$Matches[1]
+    $availablePages = 0.0
+    # Inactive and speculative pages are reclaimable; do not count compressor or
+    # purgeable subsets twice. Keep the same physical-memory reserve below.
+    foreach ($label in @('free', 'inactive', 'speculative')) {
+        if ($vmStatistics -notmatch ("Pages {0}:\s+(\d+)\." -f $label)) {
+            throw "macOS memory statistics are missing Pages $label."
+        }
+        $availablePages += [double]$Matches[1]
+    }
+    $freeBytes = $availablePages * $pageBytes
+}
+elseif (Test-Path -LiteralPath '/proc/meminfo') {
+    $memoryInfo = Get-Content -LiteralPath '/proc/meminfo' -Raw
+    if ($memoryInfo -notmatch '(?m)^MemTotal:\s+(\d+)\s+kB') { throw 'Cannot read Linux MemTotal.' }
+    $totalBytes = [double]$Matches[1] * 1KB
+    if ($memoryInfo -notmatch '(?m)^MemAvailable:\s+(\d+)\s+kB') { throw 'Cannot read Linux MemAvailable.' }
+    $freeBytes = [double]$Matches[1] * 1KB
+}
+else { throw 'This host cannot provide physical-memory statistics for the build reserve gate.' }
 # 测试入口与工作区统一保留至少 1.5GB 或 5% 物理内存，避免旧的 6GB/20% 门槛在
 # 容器已受独立内存上限保护时误拦截可安全串行执行的验证任务。
 $reserveBytes = [Math]::Max(1.5GB, $totalBytes * 0.05)
@@ -103,6 +131,13 @@ if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with ex
 # 默认对零用例和失败用例返回非零，禁止把空的历史 tests/ 目录视作通过。
 $workspaceRoot = Split-Path -Parent $serverRoot
 $desktopRoot = Join-Path $workspaceRoot 'Microi.Agent/apps/microi-code'
+# 平台插件的制品边界直接验收真实 ZIP，避免只测工作树清单而漏掉已打包的私有资料。
+# 公开工作区没有内部插件仓时不引入其依赖；完整创始人工作区必须执行，失败停止 Full。
+$vsixSafetyTests = Join-Path $workspaceRoot 'Microi.Agent/scripts/test-vsix-package.test.cjs'
+if (Test-Path -LiteralPath $vsixSafetyTests) {
+    node --test $vsixSafetyTests
+    if ($LASTEXITCODE -ne 0) { throw "VSIX actual-archive safety gate failed with exit code $LASTEXITCODE." }
+}
 if (-not (Test-Path -LiteralPath (Join-Path $desktopRoot 'package.json'))) {
     $desktopRoot = Join-Path $workspaceRoot 'Microi.Code/apps/microi-code'
 }
@@ -118,11 +153,12 @@ if (Test-Path -LiteralPath $desktopPackage) {
         # The desktop Harness tests require Node 24 APIs; the platform Node
         # regressions above retain their own established runtime and TAP format.
         if ($env:MICROI_DESKTOP_NODE_HOME) {
-            $desktopNode = Join-Path $env:MICROI_DESKTOP_NODE_HOME 'node.exe'
+            $desktopNodeName = if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') { 'node.exe' } else { 'node' }
+            $desktopNode = Join-Path $env:MICROI_DESKTOP_NODE_HOME $desktopNodeName
             if (-not (Test-Path -LiteralPath $desktopNode)) {
-                throw "MICROI_DESKTOP_NODE_HOME does not contain node.exe: $env:MICROI_DESKTOP_NODE_HOME"
+                throw "MICROI_DESKTOP_NODE_HOME does not contain ${desktopNodeName}: $env:MICROI_DESKTOP_NODE_HOME"
             }
-            $env:Path = "$env:MICROI_DESKTOP_NODE_HOME;$originalDesktopTestPath"
+            $env:Path = $env:MICROI_DESKTOP_NODE_HOME + [IO.Path]::PathSeparator + $originalDesktopTestPath
         }
         # 正式门禁与数据库、浏览器和双 API 同机运行；串行 Vitest worker 保留全部
         # 用例，同时避免 Windows 提交额度紧张时并发 worker 产生伪失败或争用插件目录。
@@ -138,14 +174,25 @@ if (Test-Path -LiteralPath $desktopPackage) {
 $v8Test = Join-Path $testRoot "V8\empty-database-sanitization.test.mjs"
 $v8Repository = Join-Path (Split-Path -Parent $serverRoot) "Microi-V8-Engine"
 if (Test-Path -LiteralPath $v8Repository) {
-    $v8TenantRoots = @(Get-ChildItem -LiteralPath $v8Repository -Directory | ForEach-Object {
-        $candidate = Join-Path $_.FullName "iTdos.Product.Internal"
-        if (Test-Path -LiteralPath $candidate) { $candidate }
-    })
-    if ($v8TenantRoots.Count -ne 1) {
-        throw "Expected exactly one iTdos.Product.Internal source root, found $($v8TenantRoots.Count)."
+    # 与六应用责任入口共用唯一源码契约；不能扫描 Product.Internal/default 多份副本择新。
+    $suiteContractPath = Join-Path $workspaceRoot 'AI-Project/标准产品套件/source-contract.json'
+    if (-not (Test-Path -LiteralPath $suiteContractPath -PathType Leaf)) {
+        throw "The unique standard-suite source contract is missing: $suiteContractPath"
     }
-    $v8Sources = @(Get-ChildItem -LiteralPath $v8TenantRoots[0] -Recurse -File `
+    $suiteContract = Get-Content -LiteralPath $suiteContractPath -Raw | ConvertFrom-Json
+    if ($suiteContract.schemaVersion -ne 1 -or $suiteContract.target.apiBase -cne 'https://api.itdos.com' -or $suiteContract.target.osClient -ine 'iTdos') {
+        throw 'The standard-suite contract schema or official ApiBase/OsClient does not match.'
+    }
+    if ([string]::IsNullOrWhiteSpace($suiteContract.sourceParent) -or [IO.Path]::IsPathRooted($suiteContract.sourceParent)) {
+        throw 'The standard-suite sourceParent must be a workspace-relative path.'
+    }
+    $suiteSourceParent = [IO.Path]::GetFullPath((Join-Path $workspaceRoot $suiteContract.sourceParent))
+    $workspacePrefix = [IO.Path]::GetFullPath($workspaceRoot).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    if (-not $suiteSourceParent.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $suiteSourceParent -PathType Container)) {
+        throw "The contracted standard-suite source root is missing or outside the workspace: $suiteSourceParent"
+    }
+    $v8TenantRoot = Split-Path -Parent $suiteSourceParent
+    $v8Sources = @(Get-ChildItem -LiteralPath $v8TenantRoot -Recurse -File `
         -Filter "*admin_get_empty_database_sanitization_sql*.js" -ErrorAction SilentlyContinue)
     if ($v8Sources.Count -ne 1) {
         throw "Expected exactly one empty-database sanitization source, found $($v8Sources.Count)."
@@ -162,12 +209,24 @@ if (Test-Path -LiteralPath $v8Repository) {
     if ($LASTEXITCODE -ne 0) { throw "V8 interface-engine syntax check failed with exit code $LASTEXITCODE." }
     node --test $v8Test
     if ($LASTEXITCODE -ne 0) { throw "V8 interface-engine regression tests failed with exit code $LASTEXITCODE." }
-    $cdnContextTest = Join-Path $v8TenantRoots[0] 'AI应用/microi-platform-service/test/cdn-context.test.mjs'
+    # 平台内置应用有独立发行契约；当前官方正文是 cdn-security，旧 cdn-context
+    # 不在官方完整文件清单内。中央发现入口仍执行该契约下的全部责任测试。
+    $platformContractPath = Join-Path $serverRoot 'OfficialApplications/Resource/platform-service-release.json'
+    $platformContract = Get-Content -LiteralPath $platformContractPath -Raw | ConvertFrom-Json
+    if ($platformContract.SchemaVersion -ne 1 -or $platformContract.AppKey -cne 'microi-platform-service' -or
+        [string]::IsNullOrWhiteSpace($platformContract.SourceRoot) -or [IO.Path]::IsPathRooted($platformContract.SourceRoot)) {
+        throw 'The platform-service release source contract is invalid.'
+    }
+    $platformSourceRoot = [IO.Path]::GetFullPath((Join-Path $workspaceRoot $platformContract.SourceRoot))
+    if (-not $platformSourceRoot.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'The platform-service release source root is outside the workspace.'
+    }
+    $cdnContextTest = Join-Path $platformSourceRoot 'test/cdn-security.test.mjs'
     if (-not (Test-Path -LiteralPath $cdnContextTest)) {
-        throw "The platform service CDN context regression test is missing: $cdnContextTest"
+        throw "The platform service CDN security regression test is missing: $cdnContextTest"
     }
     node --test $cdnContextTest
-    if ($LASTEXITCODE -ne 0) { throw "Platform service CDN context regression test failed with exit code $LASTEXITCODE." }
+    if ($LASTEXITCODE -ne 0) { throw "Platform service CDN security regression test failed with exit code $LASTEXITCODE." }
 }
 else {
     Write-Host "Microi-V8-Engine is not present; skipping its repository-owned source gate."

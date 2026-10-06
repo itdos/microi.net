@@ -157,7 +157,7 @@ public sealed class ApiControllerOwnershipCatalogTests
             .ToArray();
         Assert.NotEmpty(routes);
         var packageRoutes = Directory.GetFiles(
-                Path.Combine(serverRoot, "Microi.Upgrade", "Resource"),
+                Path.Combine(serverRoot, "OfficialApplications", "Resource"),
                 "app.microi.*.json")
             .Select(File.ReadAllText)
             .Select(JObject.Parse)

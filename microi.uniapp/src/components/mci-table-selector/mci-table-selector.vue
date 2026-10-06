@@ -37,12 +37,7 @@
         </view>
 
         <scroll-view class="selector-list" scroll-y @scrolltolower="loadMore">
-          <view v-if="loading && !rows.length" class="selector-loading">
-            <view v-for="item in 5" :key="item" class="selector-skeleton">
-              <view class="selector-skeleton__dot"></view>
-              <view class="selector-skeleton__copy"><view></view><view></view></view>
-            </view>
-          </view>
+          <mci-skeleton v-if="loading && !rows.length" type="list" :rows="5" />
           <view v-else-if="error && !rows.length" class="selector-state">
             <text>{{ error }}</text>
             <text class="selector-state__action" @tap="loadRows(true)">重新加载</text>
@@ -59,7 +54,9 @@
                 </view>
               </view>
             </view>
-            <view class="selector-list__footer"><text>{{ loading ? '正在加载...' : finished ? `共 ${total} 条` : '上拉加载更多' }}</text></view>
+            <mci-skeleton v-if="loading" type="list" :rows="1" compact />
+            <view v-else-if="error" class="selector-list__footer" @tap="loadRows(true)"><text>{{ error }}，点击重试</text></view>
+            <view v-else class="selector-list__footer"><text>{{ finished ? `共 ${total} 条` : '上拉加载更多' }}</text></view>
           </view>
         </scroll-view>
 

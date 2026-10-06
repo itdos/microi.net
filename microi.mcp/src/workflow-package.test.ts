@@ -34,6 +34,108 @@ test('manual approval without an assignee strategy is rejected before remote wri
   assert.match(buildPlan({ workflows: [broken] }).errors.join(' '), /未绑定/);
 });
 
+// 安装母版必须能保持禁用且无租户人员；只有明确数字/字符串 0 放宽这一项绑定要求。
+function unboundTemplate(isEnable: unknown = 0) {
+  const template = structuredClone(flow) as Record<string, any>;
+  template.FlowDesign.IsEnable = isEnable;
+  delete template.Nodes[1].Roles;
+  return template;
+}
+
+for (const disabled of [0, '0']) {
+  test(`explicit disabled template ${JSON.stringify(disabled)} accepts empty bindings without enabling it`, () => {
+    const template = unboundTemplate(disabled);
+    assert.deepEqual(validateWorkflowPackage(template).errors, []);
+    assert.deepEqual(buildPlan({ workflows: [template] }).errors, []);
+    const payload = workflowPayload(template, new Map([['biz_expense', 'table-1']]));
+    assert.equal((payload.FlowDesign as Record<string, unknown>).IsEnable, disabled);
+    assert.equal((payload.Nodes as Array<Record<string, unknown>>)[1].Roles, '[]');
+  });
+}
+
+test('enabled, omitted and coercible disabled values still require an approval strategy', () => {
+  for (const value of [1, '1', false, null, '', '00', 'false', undefined]) {
+    const template = unboundTemplate(value);
+    if (value === undefined) delete template.FlowDesign.IsEnable;
+    assert.match(validateWorkflowPackage(template).errors.join(' '), /未绑定/, String(value));
+  }
+  const lowerCase = unboundTemplate();
+  delete lowerCase.FlowDesign.IsEnable;
+  lowerCase.FlowDesign.isEnable = 0;
+  assert.match(validateWorkflowPackage(lowerCase).errors.join(' '), /未绑定/);
+});
+
+test('disabled template still rejects invalid binding shape, node types and topology', () => {
+  for (const mutate of [
+    (template: Record<string, any>) => { template.Nodes[1].Roles = 'Finance'; },
+    (template: Record<string, any>) => { template.Nodes[1].NodeType = 'FakeApprove'; },
+    (template: Record<string, any>) => { template.Lines[1].FromNodeId = 'missing-node'; },
+    (template: Record<string, any>) => { template.Lines.pop(); },
+  ]) {
+    const template = unboundTemplate();
+    mutate(template);
+    assert.equal(validateWorkflowPackage(template).ok, false);
+  }
+});
+
+function workflowSaveHarness(read: (table: string, query: Record<string, any>) => Promise<any>) {
+  const handlers = new Map<string, (...args: any[]) => Promise<any>>();
+  const sent: Record<string, unknown>[] = [];
+  registerAdvancedTools({ tool(name: string, ...args: any[]) { handlers.set(name, args.at(-1)); } } as any, {
+    writeAuditLog: async () => ({ Code: 1 }),
+    getDbSchema: async () => ({ Code: 1, Data: { Tables: [{ Name: 'Biz_Expense', Id: 'table-1' }] } }),
+    getTableData: read,
+    saveWorkflowPackage: async (payload: Record<string, unknown>) => { sent.push(payload); return { Code: 1 }; },
+  } as any, { osClient: 'target-tenant' } as any);
+  return { sent, save: (workflow: Record<string, any>) => handlers.get('microi_save_workflow_package')!({ workflow, confirmExecution: '费用审批' }) };
+}
+
+test('standard save writes a disabled empty template without looking up or inventing approvers', async () => {
+  const h = workflowSaveHarness(async () => { throw new Error('Empty bindings must not invent a lookup'); });
+  const result = await h.save(unboundTemplate());
+  assert.equal(result.isError, false, result.content[0].text);
+  assert.equal(h.sent.length, 1);
+  assert.equal((h.sent[0].FlowDesign as Record<string, unknown>).IsEnable, 0);
+  assert.equal((h.sent[0].Nodes as Array<Record<string, unknown>>)[1].Users, '[]');
+});
+
+// 禁用不能成为绕过当前租户引用核验的开关；每类非空绑定仍查询真实注册表。
+for (const [field, table] of [['Users', 'sys_user'], ['CopyUsers', 'sys_user'], ['Roles', 'sys_role'], ['Depts', 'sys_dept'], ['BindJobs', 'diy_job']]) {
+  test(`disabled template rejects unavailable or cross-tenant ${field} references before any write`, async () => {
+    for (const mode of ['missing', 'revoked', 'other-tenant', 'failure']) {
+      const template = unboundTemplate();
+      template.Nodes[1][field] = [{ Id: 'UNBOUND_' + field, Name: '尚未配置' }];
+      let reads = 0;
+      const h = workflowSaveHarness(async (queried, query) => {
+        reads += 1;
+        assert.equal(queried, table);
+        assert.deepEqual(query._Where, [['Id', 'In', ['UNBOUND_' + field]]]);
+        if (mode === 'failure') return { Code: 0, Msg: '查询被撤权' };
+        return { Code: 1, Data: mode === 'other-tenant' ? [{ Id: 'other-tenant-user' }] : [] };
+      });
+      const result = await h.save(template);
+      assert.equal(result.isError, true, mode);
+      assert.match(result.content[0].text, /不存在|无法核对/);
+      assert.equal(reads, 1);
+      assert.equal(h.sent.length, 0);
+    }
+  });
+}
+
+test('disabled template retains and verifies a supplied real current-tenant binding', async () => {
+  const template = unboundTemplate();
+  template.Nodes[1].Users = [{ Id: 'tenant-user', Name: '实际人员', Password: 'must-not-leak' }];
+  const h = workflowSaveHarness(async (table, query) => {
+    assert.equal(table, 'sys_user');
+    assert.deepEqual(query._Where, [['Id', 'In', ['tenant-user']]]);
+    return { Code: 1, Data: [{ Id: 'tenant-user' }] };
+  });
+  const result = await h.save(template);
+  assert.equal(result.isError, false, result.content[0].text);
+  assert.equal(h.sent.length, 1);
+  assert.deepEqual(JSON.parse((h.sent[0].Nodes as Array<Record<string, unknown>>)[1].Users as string), [{ Id: 'tenant-user', Name: '实际人员' }]);
+});
+
 test('invalid binding, overlapping layout and unreachable node fail closed', () => {
   const broken = structuredClone(flow);
   (broken.Nodes[1] as Record<string, unknown>).Roles = 'Finance';

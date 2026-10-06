@@ -22,6 +22,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 import { callApiEngine, findMenu, requireLogin } from '@/platform/business-runtime.js'
+import { initializeAuthenticatedPage } from '@/platform/login-navigation.mjs'
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
 import { loadTaskFlowCapabilities } from '@/utils/xjy-task.js'
 
@@ -33,13 +34,14 @@ export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/native/task-follow-up') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/native/task-follow-up') },
   mixins: [themeMixin],
-  data() { return { id: '', task: {}, photos: '[]', content: '', loading: true, submitting: false, authorized: false, authorizationError: '', photoFileContext: EMPTY_PRIVATE_FILE_CONTEXT, fileContextError: '' } },
+  data() { return { id: '', task: {}, photos: '[]', content: '', loading: true, authInitialized: false, authInitializing: false, submitting: false, authorized: false, authorizationError: '', photoFileContext: EMPTY_PRIVATE_FILE_CONTEXT, fileContextError: '' } },
   async onLoad(options) {
-    if (!requireLogin()) return
     this.id = decodeURIComponent(options.id || '')
-    await this.loadTask()
+    await this.initializeAfterLogin()
   },
+  onShow() { if (!this.authInitialized) return this.initializeAfterLogin() },
   methods: {
+    initializeAfterLogin() { return initializeAuthenticatedPage(this, requireLogin, this.loadTask) },
     async loadTask() {
       try {
         const result = await V8.FormEngine.GetFormData('Diy_ShouhouDD', { Id: this.id })

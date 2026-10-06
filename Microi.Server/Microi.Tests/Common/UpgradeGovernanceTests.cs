@@ -5,19 +5,17 @@ namespace Microi.Tests.Common;
 public sealed class UpgradeGovernanceTests
 {
     [Fact]
-    public void RuntimeInvariantBaselineIsNewerThanLegacyHighWaterAndIsVersionGated()
+    public void StartupRecoveryBaselineIsNewerAndNoLongerRunsOptionalMigrations()
     {
-        Assert.True(Version.Parse(Upgrade36.Version) > Version.Parse(UpgradeAppStore.Version));
-        Assert.Equal("7.6.14.0", Upgrade36.Version);
-
+        Assert.True(Version.Parse(UpgradeAppStore.Version) > Version.Parse("7.6.14.0"));
         var root = FindRepositoryRoot();
         var upgrade = Read(root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs");
-        var baseline = Read(root, "Microi.Server", "Microi.Upgrade", "36-UpgradeRuntimeInvariantBaseline.cs");
-        Assert.Contains("StartVersionStep(CurrentVersion, Upgrade36.Version)", upgrade, StringComparison.Ordinal);
-        Assert.Contains("var needed = NeedUpgrade(currentVersion, targetVersion)", upgrade, StringComparison.Ordinal);
-        Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade36.Version)", upgrade, StringComparison.Ordinal);
-        Assert.Contains("UpgradeExecutionLeaseContext.ThrowIfLost()", baseline, StringComparison.Ordinal);
-        Assert.Contains("new Upgrade35().Run(osClient)", baseline, StringComparison.Ordinal);
+        Assert.Contains("StartVersionStep(CurrentVersion, UpgradeAppStore.Version)", upgrade);
+        Assert.Contains("PersistServerVersionForwardOnlyAsync(osClientSecret, UpgradeAppStore.Version)", upgrade);
+        foreach (var number in new[] { 8,14,16,17,18,20,23,24,26,28,29,30,31,34,35,36 })
+            Assert.DoesNotContain($"new Upgrade{number}()", upgrade);
+        Assert.Contains("UpgradeExecutionLeaseContext.ConfirmOwnership()", upgrade);
+        Assert.Contains("new Upgrade21().Run", upgrade);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+import workspacePaths from './lib/workspace-paths.js'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -6,15 +7,7 @@ import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
-const enginePath = path.join(
-  projectRoot,
-  'Microi-V8-Engine',
-  '集福鲤平台 (api.jifulii.com)',
-  'xjy.Product.Internal',
-  '接口引擎',
-  '投诉举报',
-  '[投诉举报]用户端(xjy-complaint-user).js'
-)
+const enginePath = workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'xjy-complaint-user')
 const manifestPath = path.join(
   projectRoot,
   'Microi-V8-Engine',
@@ -25,15 +18,7 @@ const manifestPath = path.join(
 )
 const uploaderPath = path.join(projectRoot, 'microi.uniapp', 'src', 'components', 'mci-media-uploader', 'mci-media-uploader.vue')
 const detailPath = path.join(projectRoot, 'microi.uniapp', 'src', 'pages', 'complaint', 'detail.vue')
-const adminEnginePath = path.join(
-  projectRoot,
-  'Microi-V8-Engine',
-  '集福鲤平台 (api.jifulii.com)',
-  'xjy.Product.Internal',
-  '接口引擎',
-  '投诉举报',
-  '[投诉举报]管理端(xjy-complaint-admin).js'
-)
+const adminEnginePath = workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'xjy-complaint-admin')
 
 const engineSource = fs.readFileSync(enginePath, 'utf8')
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))

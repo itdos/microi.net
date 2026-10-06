@@ -13,14 +13,39 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 
 <MicroiAgentShowcase />
 
+## AI 员工与对话工作流
+
+1. 在「Microi吾码」登录官方账号，或在「服务器连接（MCP）」登录自己的业务租户；「AI 员工」只读取所选连接下当前负责人的团队。未登录会显示明确的连接入口。
+2. 在「岗位团队」查看十个岗位的职责与交付成果，通过「岗位设置」调整名称、补充要求和启用状态。在「新建任务」填写成果目标、参考资料与可核验的验收标准，先保存草稿，再派发执行。
+3. 云端任务无需本机常驻；派发后提交后台执行。任务依次显示排队、执行、待验收及已验收状态。打开成果，填写验收意见后接受或退回；后续岗位只能把已验收任务选为前置成果，最多五项。
+4. 在「目标与节奏」设置有界的每日目标，在「执行设置」查看日 Token 预算与本机节点。未知供应商 usage 按保守预留计入预算；界面中的预算不是供应商计费的绝对封顶。
+
+成果是可审阅草稿。代码、测试计划、财务、招聘或营销文字不代表代码已经部署、测试已经执行、款项已支付、人员已录用或消息已发送。真实执行需要对应工具授权、日志、产物与回读。
+
+### Harness 和 OpenClaw 的关系
+
+Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾的员工领取、续租、受限岗位调用及回传协议已经迁入桌面差异层。Harness 不能替代 OpenClaw 的全部渠道、Gateway、设备节点及 cron 协议，不能因为有对话、技能或定时能力就称为完整 OpenClaw 已内置。[OpenClaw 官方仓库](https://github.com/openclaw/openclaw)、[定时任务说明](https://docs.openclaw.ai/automation/cron-jobs)。
+
+「本机 · OpenClaw 受限节点」需要已有 Gateway 与本机配置。准备岗位仅新增当前租户/负责人独立的十岗目录，保留默认 Agent、模型及密钥；岗位明确禁用工具，只生成草稿。准备后按 Gateway 的要求重启服务，再连接节点。停止节点会停止接单，正在执行和待回传的成果继续保留；失败报告使用原请求重放。Gateway、网络和有效登录必须持续可用，不能把短时自动测试称作连续 24 小时验收。
+
+### 对话历史、编辑与撤回
+
+- 输入框按 `↑` 回填已成功发送的提示词，按 `↓` 向后浏览并恢复未发送草稿。多行文本在开头/末尾才进入历史；输入法、选区、附件及候选菜单优先处理各自操作。
+- 已发送用户消息提供「编辑」「撤回」。编辑从该消息之前的已完成轮次分叉并重新发送；撤回将消息恢复为草稿。原会话保留在历史中，新会话的模型上下文不再包含被替换的消息。
+- 已执行的文件修改不会随撤回自动恢复。图片随草稿恢复；目前带文件附件的消息会明确提示在新会话重新添加文件，避免静默丢失附件。子智能体消息通过父会话继续处理。
+- 正式包内置吾码 Skills；在干净工作区输入 `/microi` 进入吾码流程，不再依赖开发机安装目录。业务服务器仍须独立登录与授权。
+
 ## 安装、签名与平台兼容
 
 页面顶部的 Windows 与 macOS 按钮使用固定的 latest 入口，每次点击均从官方更新清单取得当前安装包地址。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
 
-**Windows 1.3.2 已开放下载测试**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
+**Windows 与 macOS 1.3.5 已开放下载**：集成新版 dsh-desktop 与 Harness，保留员工工作台、上下键提示词历史、消息编辑/撤回和内置技能发现；同级沙盒权限请求使用当前有效模式。macOS Universal 已签名、公证；官网 Windows EXE 的签名状态与商店版本分别说明。已有启动恢复继续保留。
 
-- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 测试包仍为未签名 1.3.2。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
+**Windows 启动恢复说明**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
+
+- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 1.3.5 测试包仍为未签名 EXE，商店 MSIX 1.3.3 由微软签名。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
 - **Windows 商店版 1.3.3 已发布**：2026 年 10 月 3 日复查，Microsoft 后台显示“在 Microsoft Store 中”，中国区公开产品页已显示 Microi Agent 的名称、发行者、截屏与介绍；商店 MSIX 由微软签名分发。请在 Windows 设备打开 [Microsoft Store](https://apps.microsoft.com/detail/9NKCS76ZMFXR) 查看获取入口。本机 Mac 的产品页没有获取按钮，**Windows 原生获取、安装与启动仍待验收**；商店发布不会改变官网 EXE 的未签名状态。
+- **免费微软签名 EXE 在线安装器**：可直接下载 [Microi Agent 商店在线安装器](https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge)。这个小型 EXE 由 Microsoft Store 生成并签名，运行时联网检查设备条件、下载并安装当前商店版（当前为 1.3.3.0），后续由商店更新。它不包含官网 1.3.5 完整安装包，也不会给该完整 EXE 增加签名。采用[微软官方 Store Web Installer](https://learn.microsoft.com/en-us/windows/apps/distribute-through-store/how-to-use-store-web-installer-for-distribution)，无需购买代码签名证书；官网下载入口继续提供最新版完整包。
 - 如果旧安装包提示 `Failed to decompress files` 或 `Error opening output file(s)`，请从本页顶部重新下载 Windows latest 安装包后运行；不要重复启动下载目录中缓存的旧安装包。新版安装器改用能处理内置中文技能文件名的解压方式，覆盖安装会保留工作区和会话数据。
 - 如果已退出应用仍提示“无法关闭”，旧安装器可能把长路径或文件复制失败误报成应用正在运行。新版使用当次发行的兼容卸载器完成升级；工作区、会话和用户配置保持不变。如果新版仍失败，请使用下面的诊断入口，不要反复重装。
 - 1.2.6 修复了已重现的长路径清理问题，但仍有客户报告“旧版本文件清理失败（错误码 2）”。该数字是卸载器退出码，不能直接判断哪个文件失败、是否被占用或缺少权限，也不能据此认为所有客户的升级问题已解决。
@@ -30,7 +55,23 @@ Microi Agent 是基于 dsh-desktop 与 DeepSeek Harness 二次开发的吾码桌
 - **安装仍失败时**：Windows 1.2.7 起已将诊断集成进安装器。失败窗口提供「复制安装日志」和「打开日志」，无需下载独立诊断工具。日志保存在 `%LOCALAPPDATA%\Microi Agent\installer-logs\`；目录不可写时使用 `%TEMP%\Microi-Agent-installer-logs\`，退出安装后仍保留。日志包含实际失败步骤、文件路径、迁移的 Win32 错误、卸载器或 7-Zip 退出码、回滚错误，以及只读文件访问和 Restart Manager 占用 PID 检查。请把复制的日志提供给支持人员；本机测试通过仍不代表该客户设备已通过验收。
 - “工作区服务连接已断开”与云端账号未登录是不同问题。新版修复了旧空凭据保险库导致服务退出的情况；对损坏或其他 Windows 用户加密的凭据会保留原文件并报告具体错误，不会静默清空凭据。安装成功后还应打开「Microi吾码」和「AI 员工」检查本机服务连接。
 - macOS 正式安装包采用 Universal 通用架构，原生支持 Intel 与 Apple Silicon，最低要求 macOS 13.5。正式发布使用 Developer ID Application 签名，并在发布前完成 Apple 公证及 Gatekeeper 验证；历史未签名包的状态以对应归档记录为准。内部源码根目录执行 `bash ./一键打包Mac.sh --signed --current` 可以按源码当前版本生成签名 DMG/ZIP；默认构建 Universal，也可使用 `--arch arm64` 或 `--arch x64` 选择与宿主匹配的单架构。首次打包会下载并校验固定版本的 cloudflared；网络中断后重新执行同一命令即可续传，也可通过 `MICROI_CLOUDFLARED_ASSET=/已下载的官方压缩包路径` 指定本地文件，哈希不符会停止构建。Dock 图标在 Mac 构建时自动生成合适留白。一键脚本在证书与 `notarytool` 凭据完整时自动启用签名、公证；`--signed` 在缺少凭据时失败。
-- 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 版采用独立 App Sandbox 客户端，提供本地提示词管理和桌面配对会话；Node/Harness、Shell、项目文件、插件与 MCP 在已配对的桌面或其服务端执行。1.3.2（构建 1.3.3）已于 2026 年 10 月 2 日提交，Apple 当前状态为**等待审核，尚未开放商店下载**；商店入口为 [Mac App Store](https://apps.apple.com/app/id6818076490)。需要完整本机开发能力时，仍使用本页顶部的已签名、公证 DMG。商店版本由 App Store 更新，不安装站外更新或插件。
+- 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 版采用独立 App Sandbox 客户端，提供本地提示词管理和桌面配对会话；Node/Harness、Shell、项目文件、插件与 MCP 在已配对的桌面或其服务端执行。1.3.2（构建 1.3.3）已于 2026 年 10 月 2 日提交，最近一次后台核对为等待审核；2026 年 10 月 3 日公开入口仍**尚未开放商店下载**；商店入口为 [Mac App Store](https://apps.apple.com/app/id6818076490)。需要完整本机开发能力时，仍使用本页顶部的已签名、公证 DMG。商店版本由 App Store 更新，不安装站外更新或插件。
+
+### Windows 版本与下载选择
+
+当前 Windows 安装包只发布 **x64**。商店 MSIX 的实际清单最低版本为 **10.0.19041.0（Windows 10 2004）**；包声明允许安装不等同于客户设备已完成运行验收。建议使用维护中的 Windows 11，或已获得适用安全更新的 Windows 10。
+
+| 系统与架构 | 微软签名在线安装器 / 商店版 | 官网完整 EXE |
+| --- | --- | --- |
+| Windows 11 x64、Windows 10 2004 及以上 x64（含 22H2） | 满足包声明的系统条件；需联网，仍受商店可用性、账户、地区和管理员策略约束 | 提供最新版 1.3.5；当前未签名，客户原生安装、启动仍待验收 |
+| Windows 10 2004 之前的 x64（含 1809 / 1909） | 不满足当前商店包最低版本，不能用在线安装器绕过 | 当前 Electron / Node 以 Windows 10 为运行基线，但这些旧构建未验收；不承诺兼容，建议先升级系统 |
+| Windows 7 / 8 / 8.1、32 位 Windows（x86） | 不支持当前应用 | 不支持；当前 Electron 已不支持 Windows 7 / 8 / 8.1，包内 Node 和原生组件为 x64 |
+| Windows 11 ARM64 | 系统支持 x64 仿真，但本产品尚未完成 ARM 设备验收；没有 ARM64 原生包 | x64 仿真兼容性待验收；Windows 10 ARM 仅提供 x86 仿真，不能运行当前 x64 包 |
+| Windows LTSC / Server / 受管理企业设备 | 依具体系统构建、商店服务与策略而定；LTSC 2019 的 17763 低于当前包要求，Server 尚无已验收的商店安装路径 | 需独立验证桌面环境、权限和组件；Server Core 不作为桌面客户端支持目标 |
+
+商店在线安装器必须连接 Microsoft 服务；离线环境不能用它完成安装。企业安全策略或 `get.microsoft.com` 访问限制可能阻止下载、安装。可按组织批准的分发方式使用官网完整包，但这不会获得微软签名，也不保证通过 S 模式、WDAC、AppLocker 或其它应用控制策略。不要关闭安全软件、导入自签名根证书或降低策略来冒充公信签名。
+
+上面的兼容范围依据[微软 MSIX 平台规则](https://learn.microsoft.com/en-us/windows/msix/supported-platforms)、[Electron 系统要求](https://www.electronjs.org/blog/windows-7-to-8-1-deprecation-notice)、[Node 24 平台要求](https://github.com/nodejs/node/blob/v24.9.0/BUILDING.md)和[Windows ARM 仿真说明](https://learn.microsoft.com/en-us/windows/arm/apps-on-arm-x86-emulation)。Windows 真机安装、旧版升级、Harness、终端、登录、Skills、MCP 和商店更新需在对应系统分别验收；Mac/Wine 打包和网页检查不能替代这些结果。
 
 ### Windows 商店版隐私政策 {#windows-store-privacy}
 
@@ -60,13 +101,16 @@ AI 对文件、命令和业务数据的访问遵循当前任务授权和工具�
 
 ### 开源基础、版权与后续同步
 
+1.3.5 完整版的 dsh-desktop 基线为 [`beb6821af66d5980b2526ecb63b2df29badf4a1f`](https://github.com/dataelement/dsh-desktop/commit/beb6821af66d5980b2526ecb63b2df29badf4a1f)，Harness 使用 `0.2.1-alpha.1`、官方 tag `dsh-v0.2.1-alpha.1`，源码基线为 [`5badb15009ae1756c3afe0ae0cef1faafc290ccc`](https://github.com/deepseek-ai/deepseek-harness/commit/5badb15009ae1756c3afe0ae0cef1faafc290ccc)。这是官方当时最新的 alpha 代码；上一个完整版使用 desktop `97e02f8bf773` 与 Harness `0.1.5-rc.2`。内部 `.microi-upstream.json` 同时记录 Git 来源、npm 版本和 integrity，后续同步须保留吾码差异层并通过补丁、回归和真实界面门禁。
+
+
 Microi Agent 没有重新实现 dsh-desktop。内部源码仓库使用四层结构：
 
 `upstream/dsh-desktop/` 保存未修改的上游快照。
 
 `apps/microi-code/packages/microi-code-*`、`apps/microi-code/packages/dsh-desktop-client-ui/`、`microi/` 与 `src/main/microi-*` 保存永久保护的吾码功能。
 
-`patches/` 只记录侧栏插槽、设置席位、首页徽标、品牌文案和默认主题等最小差异；同步脚本再对“旧上游、新上游、当前产品”做三方比较。上游未触及的吾码文件继续保留，吾码未修改的上游文件可以自动升级，双方同时修改的文件必须报告冲突并人工合并。
+`patches/` 记录侧栏插槽、设置席位、首页徽标、品牌文案、提示词历史及消息操作等最小接入差异；同步脚本再对“旧上游、新上游、当前产品”做三方比较。上游未触及的吾码文件继续保留，吾码未修改的上游文件可以自动升级，双方同时修改的文件必须报告冲突并人工合并。
 
 补丁无法重放、测试失败或界面验收不通过时都不会推进上游基线。每次同步都要按补丁意图清单重新验证登录、AI 中转、LicenseType、服务器连接、AI 列表、数据分析、插件安装、功能区、关于页、移动连接、Windows/macOS 构建和更新源。
 
@@ -801,7 +845,38 @@ npm run publish:cli:resume
 
 ## 更新日志
 
+### v1.3.5 - (2026-10-05)
+
+- **dsh-desktop 与 Harness 上游同步**：推进两套上游准确提交记录，升级到 Harness `0.2.1-alpha.1`；保留吾码十岗员工、账号与中转站、MCP、Skills、品牌、更新渠道及安装/启动恢复。
+- **对话与权限兼容**：编辑/撤回适配新版会话选择、显式持有和分叉协议；上下键历史与 `/microi` 继续可用；同级沙盒权限请求直接沿用当前模式，真正提升权限仍要求有效模式与非空理由。
+- **构建与二开保护**：33 份补丁在干净安装中重放；PPT 使用可从源码重建的 16 模板、192 预览管线；Office 按目标系统和 Mac 架构隔离，避免混入宿主二进制。回归、真实界面与安装包验证结果记录在内部发行证明中；Windows 客户设备原生安装和启动仍需独立验收。
+- **验收与发行**：1,757 项回归通过，10 项平台条件跳过；13 项界面回归、1 项实际安装包原生组件及 Harness 首页验收通过。另完成安装包启动恢复、私有管道 HTTP/WebSocket 和独立 Worker 验收；Mac 构建辅助门禁定向检查 6 项通过。Windows EXE、Mac DMG/ZIP、两份更新清单及发行资料共 7 个 CDN 文件已完整回读，大小、SHA-256 与 SHA-512 均与本地一致。
+- [1.3.5 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.5/latest.yml)与 [macOS 清单](https://api.itdos.com/microi-code/updates/archive/1.3.5/latest-mac.yml)。历史安装包与版本清单继续保留。
+
+
 版本、日期和条目格式沿用[平台更新日志](/doc/about/update-log.html)。安装包版本与 CLI 版本分别管理；历史故障、修复尝试和客户验证边界继续保留。
+
+### Windows 免费签名在线安装器 - (2026-10-03)
+
+- **增加免费可信下载**：官网提供 Microsoft Store 生成的微软签名 EXE 在线安装器，安装当前商店版 1.3.3.0，继续保留商店产品页和官网完整安装包入口。完整 EXE 1.3.4 的签名状态不变。
+- **系统适用范围**：明确当前商店包最低 Windows 10 2004 / 19041、x64；列出旧 Windows、32 位、ARM、LTSC、Server、离线和企业策略的限制。包条件与 Windows 真机验收分开记录。
+
+### v1.3.4 - (2026-10-03)
+
+- **员工工作台**：整理任务、十岗团队、目标与执行设置，提供登录引导、任务筛选、草稿派发、已验收前置成果、成果及审计记录。岗位设置与日预算同步保留，刷新不会覆盖输入中的预算。
+- **吾码小龙虾节点迁入**：OpenClaw 受限岗位支持领取、续租、停止接单及结果持久化后幂等回传，配置按租户和负责人隔离；保留已有默认 Agent。完整 Gateway 仍需独立配置，云端成果是待审核草稿。
+- **对话交互**：上下键浏览已发送提示词并恢复未发送草稿；已发送消息可编辑、撤回并在分叉会话继续，保留原会话。文件改动不会自动撤销；文件附件须在新会话重新添加。
+- **账号与技能**：重整登录表单及员工页面的排版、间距和窄窗口布局；安装包内置 Skills，干净工作区可发现 `/microi`。
+- **二开保护与验证**：上游同步脚本保护补丁、员工节点、Skills 和专项测试；旧版失败对照及修复版回归通过。1,045 项回归通过、10 项平台条件跳过，18 项定向回归、4 项界面验收、1 项实际打包应用的原生组件/Harness 验收及 2 项真实云端成果验收通过。客户 Windows 原生安装、完整 OpenClaw Gateway 与连续 24 小时运行仍待验收。
+- **发布渠道**：官网 Windows x64 EXE 与 macOS Universal DMG/ZIP 更新为 1.3.4。macOS 已通过 Developer ID 签名、公证、装订及 Gatekeeper；Windows EXE 未签名。Windows 商店仍为独立 1.3.3 MSIX；Mac 沙盒商店版仍按 Apple 审核进度发布。
+
+| 文件 | 大小 | SHA256 |
+| --- | --- | --- |
+| [Universal DMG](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-mac-universal.dmg) | 381,574,856 字节 | `d54a27349627fd9015319d4239ddd120bb9a3d1b3960676be02bec2402d5c5c6` |
+| [Universal ZIP](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-mac-universal.zip) | 426,242,249 字节 | `967739c2e8f72e81f6dfe6478c9a7f8dfff8dfa857e25caf22c0312ac4048f74` |
+| [Windows x64 EXE](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-windows-x64-setup.exe) | 155,006,058 字节 | `f220d69e9f4cebc3f05c7e79a031a9cabbd71fce0ccad33d54c775dbadf3b7b3` |
+
+- [Windows 1.3.4 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.4/latest.yml) · [macOS 1.3.4 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.4/latest-mac.yml)。历史版本继续保留。
 
 ### Windows 商店 v1.3.3 已发布 - (2026-10-03)
 

@@ -60,14 +60,14 @@ const device = createWebBluetoothDevice(writes);
 
 globalThis.localStorage = localStorage;
 globalThis.sessionStorage = sessionStorage;
-globalThis.navigator = {
+Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
     platform: "test",
     bluetooth: {
         async requestDevice() { return device; },
         async getDevices() { return [device]; },
         addEventListener() {}
     }
-};
+} });
 
 const { createV8Print, initV8Print } = await import("../src/utils/v8-print.js");
 

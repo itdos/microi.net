@@ -5,7 +5,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 
 // 中央回归入口按发行契约加载同一份微服务测试，避免新增 SDK/页面回归只在应用目录执行。
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
-const contract=JSON.parse(await readFile(path.join(root,'Microi.Server/Microi.Upgrade/Resource/platform-service-release.json'),'utf8'));
+const contract=JSON.parse(await readFile(path.join(root,'Microi.Server/OfficialApplications/Resource/platform-service-release.json'),'utf8'));
 const source=path.resolve(root,contract.SourceRoot),relative=path.relative(root,source);
 assert.ok(relative&&!relative.startsWith('..')&&!path.isAbsolute(relative));
 const directory=path.join(source,'test');

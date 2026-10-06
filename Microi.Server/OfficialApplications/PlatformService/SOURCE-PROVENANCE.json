@@ -1,0 +1,25 @@
+{
+  "SchemaVersion": 1,
+  "AppKey": "microi-platform-service",
+  "SourceOrigin": "ImportedUpstreamProject",
+  "SourceKind": "MicroiRemoteApplication",
+  "NativeSourceComplete": false,
+  "Framework": "Vue3Vite",
+  "ApplicationType": "MicroService",
+  "AuthorshipClaimed": false,
+  "UpstreamEvidence": {
+    "RemoteManifest": ".microi-ai-app-remote.json",
+    "RemoteAppId": "01KX83R13GPCHWW8JZ0B7RS0DP",
+    "PulledAt": "2026-10-05T13:10:00Z",
+    "SourceManifestHash": "f109f7ed17c1c6cea3c5f01de4a1ea3be09efaac3eb79899de5294a5a00ecb99",
+    "FileCount": 69,
+    "ContentsComplete": true
+  },
+  "MarketplaceDisposition": "BuiltInOnly",
+  "DispositionReason": "该源码来自吾码平台远端内置应用同步，仅供平台内建能力维护，不作为独立商城应用发布。",
+  "CanonicalReleaseContract": "Microi.Server/OfficialApplications/Resource/platform-service-release.json",
+  "PlatformExtensions": [
+    "SaasPromotion",
+    "SaasPublicTrial"
+  ]
+}

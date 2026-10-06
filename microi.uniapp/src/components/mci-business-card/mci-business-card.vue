@@ -29,6 +29,8 @@
     <!-- zhy：列表长文本按模块配置限制行数，超出部分显示省略号，避免撑高卡片。 -->
     <text v-if="summary" class="card-summary" :style="summaryClampStyle">{{ summary }}</text>
 
+    <slot />
+
     <view class="card-bottom">
       <text>{{ time }}</text>
       <view class="card-bottom__links">

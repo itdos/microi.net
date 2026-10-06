@@ -27,7 +27,8 @@
 <script>
 import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { getUser, post } from '@/utils/request.js'
-import { callApiEngine } from '@/platform/business-runtime.js'
+import { callApiEngine, requireLogin } from '@/platform/business-runtime.js'
+import { initializeAuthenticatedPage } from '@/platform/login-navigation.mjs'
 import { themeMixin } from '@/utils/theme.js'
 
 export default {
@@ -35,16 +36,22 @@ export default {
   onShareTimeline() { return buildTimelineShare(this, 'pages/native/member-edit') },
   mixins: [themeMixin],
   data() {
-    return { loading: true, submitting: false, currentUser: {}, roles: [], selectedRoleIds: [], form: { name: '', phone: '', password: '123456' } }
+    return { loading: true, authInitialized: false, authInitializing: false, submitting: false, currentUser: {}, roles: [], selectedRoleIds: [], form: { name: '', phone: '', password: '123456' } }
   },
   computed: {
     selectedRoles() { return this.roles.filter((role) => this.selectedRoleIds.includes(String(role.Id))) }
   },
   async onLoad() {
-    this.currentUser = getUser() || {}
-    await this.loadRoles()
+    await this.initializeAfterLogin()
   },
+  onShow() { if (!this.authInitialized) return this.initializeAfterLogin() },
   methods: {
+    initializeAfterLogin() {
+      return initializeAuthenticatedPage(this, requireLogin, async function () {
+        this.currentUser = getUser() || {}
+        await this.loadRoles()
+      })
+    },
     goBack() { uni.navigateBack() },
     async loadRoles() {
       this.loading = true

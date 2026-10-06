@@ -97,7 +97,8 @@
                   <text>客户：{{ row.KehuMC || '未填写' }}</text>
                   <text>安装位置：{{ row.AnzhuangWZ || '未填写' }}</text>
                 </view>
-                <view class="device-picker-footer" @tap="loadMoreDevices"><text>{{ deviceListLoading ? '正在加载…' : deviceListError ? '加载失败，点击重试' : deviceListFinished ? `共 ${deviceTotal} 台设备` : '加载更多' }}</text></view>
+                <mci-skeleton v-if="deviceListLoading" type="list" :rows="1" compact />
+                <view v-else class="device-picker-footer" @tap="loadMoreDevices"><text>{{ deviceListError ? '加载失败，点击重试' : deviceListFinished ? `共 ${deviceTotal} 台设备` : '加载更多' }}</text></view>
               </view>
             </scroll-view>
           </view>
@@ -112,6 +113,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8, getUser, post } from '@/utils/request.js'
 import { callApiEngine, findMenu, loadModuleRows, requireLogin } from '@/platform/business-runtime.js'
+import { initializeAuthenticatedPage } from '@/platform/login-navigation.mjs'
 import { getBusinessModule } from '@/platform/business.js'
 
 function parseRegion(value) {
@@ -152,6 +154,8 @@ export default {
       customer: {},
       repairTypes: [],
       loading: true,
+      authInitialized: false,
+      authInitializing: false,
       submitting: false,
       error: '',
       form: { contact: '', phone: '', region: [], address: '', types: [], otherType: '', reason: '', images: '', videos: '' },
@@ -166,15 +170,16 @@ export default {
     // 显式入口标记隔离新流程，设备详情/列表原有的 deviceId、id 链接继续展示设备信息。
     this.directRepair = options.entry === 'quick'
     this.deviceId = this.directRepair ? '' : decodeURIComponent(options.deviceId || options.id || '')
-    if (!requireLogin()) return
-    this.loadData()
+    return this.initializeAfterLogin()
   },
+  onShow() { if (!this.authInitialized) return this.initializeAfterLogin() },
   onUnload() {
     clearTimeout(this.deviceSearchTimer)
     this.deviceRequestId += 1
     this.deviceListRequestId += 1
   },
   methods: {
+    initializeAfterLogin() { return initializeAuthenticatedPage(this, requireLogin, this.loadData) },
     async authorizedDeviceModule(refresh = false) {
       const base = getBusinessModule('devices')
       if (!base) throw new Error('设备模块未配置')

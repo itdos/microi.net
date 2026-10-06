@@ -48,7 +48,7 @@ namespace Microi.net
                 "sys_microiservice", "sys_microiservice_page",
                 "mci_ai_app", "mci_ai_project", "mci_ai_app_file", "mci_ai_app_version",
                 "microi_job_triggers", "microi_job_cron_triggers", "microi_job_job_details", "microi_job_calendars",
-                "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",
+                "mci_background_task", "mci_database_backup", "mci_gitee_star_audit", "mci_saas_referral_link",
                 "mci_system_setting", "mci_user_external_identity", "mci_user_access_key", "diy_sso",
                 "mci_identity_connector", "mci_identity_credential", "mci_identity_device", "mci_identity_face",
                 "mci_identity_group", "mci_identity_group_member", "mci_identity_sync_conflict", "mci_identity_sync_run",
@@ -64,7 +64,7 @@ namespace Microi.net
             StringComparer.OrdinalIgnoreCase);
         private static readonly string[] EmptyDatabaseOperationalTables =
         {
-            "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",
+            "mci_background_task", "mci_database_backup", "mci_gitee_star_audit", "mci_saas_referral_link",
             "mci_system_setting", "mci_user_external_identity", "mci_user_access_key", "diy_sso",
             "mci_identity_connector", "mci_identity_credential", "mci_identity_device", "mci_identity_face",
             "mci_identity_group", "mci_identity_group_member", "mci_identity_sync_conflict", "mci_identity_sync_run",
@@ -79,6 +79,29 @@ namespace Microi.net
         };
 
         private readonly string _backgroundTaskId;
+        private static readonly string[] PromotionTemplateFields =
+        {
+            "ReferralUserId", "ReferralLinkId", "PublicTrialRequestId", "PublicTrialProvisioned",
+            "TrialStartTime", "TrialEndTime", "PromotionStage", "PromotionContact", "PromotionPhone",
+            "SignupSource", "PromotionNotes", "PromotionNextFollowup", "SaasPublicTrialEnabled",
+            "SaasPublicTrialDays", "SaasPublicTrialDailyLimit", "SaasPublicTrialLinkLimit",
+            "SaasPublicTrialWebBase", "SaasPromotionManagerRoleIds"
+        };
+
+        // 模板导出的可信门禁必须独立防止旧 V8 脱敏脚本遗漏；只检查固定平台字段，兼容尚未升级的旧库。
+        private static string[] GetPromotionTemplateFields(MySqlConnection connection)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COLUMN_NAME FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='sys_osclients'";
+            command.CommandTimeout = DatabaseCleanupCommandTimeoutSeconds;
+            using var reader = command.ExecuteReader();
+            var actual = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (reader.Read()) actual.Add(reader.GetString(0));
+            return PromotionTemplateFields.Where(actual.Contains).ToArray();
+        }
+
+        private static string PromotionTemplateResetValue(string field) =>
+            field == "SaasPublicTrialEnabled" || field == "PublicTrialProvisioned" ? "0" : "NULL";
 
         public EmptyDatabaseReleaseService(string backgroundTaskId)
         {
@@ -202,6 +225,7 @@ namespace Microi.net
                 validation.CanonicalTemplateTenantCount,
                 validation.RemainingNonCanonicalTenants,
                 validation.RemainingTenantRuntimeConnectionResidue,
+                validation.RemainingPromotionTemplateResidue,
                 validation.RemainingAppPhysicalTables,
                 validation.RemainingApplicationPhysicalTables,
                 validation.RemainingApplicationTableDefinitions,
@@ -295,6 +319,7 @@ namespace Microi.net
                     CanonicalTemplateTenantCount = validation.CanonicalTemplateTenantCount,
                     RemainingNonCanonicalTenants = validation.RemainingNonCanonicalTenants,
                     RemainingTenantRuntimeConnectionResidue = validation.RemainingTenantRuntimeConnectionResidue,
+                    RemainingPromotionTemplateResidue = validation.RemainingPromotionTemplateResidue,
                     RemainingAppArtifacts = validation.RemainingAppArtifacts,
                     RemainingOperationalResidueRows = validation.RemainingOperationalResidueRows,
                     RemainingOperationalResidue = validation.RemainingOperationalResidue,
@@ -1013,6 +1038,10 @@ DROP TEMPORARY TABLE IF EXISTS temp_backend_app_owned_tables;");
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var promotionFields = GetPromotionTemplateFields(connection);
+            if (promotionFields.Length > 0)
+                ExecuteNonQuery(connection, "UPDATE sys_osclients SET " + string.Join(",",
+                    promotionFields.Select(field => QuoteIdentifier(field) + "=" + PromotionTemplateResetValue(field))) + ";");
             if (tablesToClear.Count == 0) return;
 
             ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=0;");
@@ -1066,6 +1095,10 @@ DROP TEMPORARY TABLE IF EXISTS temp_backend_app_owned_tables;");
                 tables,
                 removableApplicationTables);
             var remainingOperationalResidue = GetOperationalResidueRowCounts(connection, tables);
+            var promotionFields = GetPromotionTemplateFields(connection);
+            var remainingPromotionResidue = promotionFields.Length == 0 ? 0 : ExecuteScalarCount(connection,
+                "SELECT COUNT(*) FROM sys_osclients WHERE " + string.Join(" OR ", promotionFields.Select(field =>
+                    PromotionTemplateResetValue(field) == "0" ? "COALESCE(" + QuoteIdentifier(field) + ",0)<>0" : QuoteIdentifier(field) + " IS NOT NULL")) + ";");
             var remainingApplicationMenus = GetRemovableApplicationMenus(
                 connection,
                 removableApplicationResources);
@@ -1080,6 +1113,7 @@ DROP TEMPORARY TABLE IF EXISTS temp_backend_app_owned_tables;");
             {
                 RemainingNonTemplateUsers = ExecuteScalarCount(connection,
                     "SELECT COUNT(*) FROM `sys_user` WHERE LOWER(IFNULL(`Account`,'')) NOT IN ('admin','demo');"),
+                RemainingPromotionTemplateResidue = remainingPromotionResidue,
                 CanonicalTemplateTenantCount = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_osclients`
 WHERE LOWER(COALESCE(`OsClient`, '')) = 'itdos'
@@ -1246,6 +1280,8 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             {
                 violations.Add($"租户运行时连接残留={validation.RemainingTenantRuntimeConnectionResidue}");
             }
+            if (validation.RemainingPromotionTemplateResidue > 0)
+                violations.Add($"推广归属/公开开通配置残留={validation.RemainingPromotionTemplateResidue}");
             if (validation.RemainingAppPhysicalTables > 0)
             {
                 violations.Add($"app_ 物理表={validation.RemainingAppPhysicalTables}");
@@ -2670,6 +2706,7 @@ return 0";
             public long CanonicalTemplateTenantCount { get; set; }
             public long RemainingNonCanonicalTenants { get; set; }
             public long RemainingTenantRuntimeConnectionResidue { get; set; }
+            public long RemainingPromotionTemplateResidue { get; set; }
             public long RemainingAppPhysicalTables { get; set; }
             public long RemainingApplicationPhysicalTables { get; set; }
             public List<string> RemainingApplicationPhysicalTableNames { get; set; } = new List<string>();

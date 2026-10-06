@@ -13,7 +13,7 @@ public class PlatformRoleMutationSecurityTests
         var source = File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "platform-sys-role.js"));
 
@@ -75,7 +75,7 @@ public class PlatformRoleMutationSecurityTests
             root, "Microi.Server", "Microi.net.Api", "Controllers",
             "LegacyMobileCompatibilityController.cs")));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.sys_user.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.sys_user.json")));
         var engine = package["SysApiEngines"]!.Values<JObject>()
             .Single(item => item["ApiEngineKey"]?.ToString() == "platform-sys-user-admin");
         foreach (var route in new[]

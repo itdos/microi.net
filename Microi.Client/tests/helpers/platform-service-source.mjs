@@ -6,7 +6,7 @@ const helperDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(helperDirectory, "../../..");
 const releaseContractPath = path.resolve(
     repositoryRoot,
-    "Microi.Server/Microi.Upgrade/Resource/platform-service-release.json"
+    "Microi.Server/OfficialApplications/Resource/platform-service-release.json"
 );
 const releaseContract = JSON.parse(readFileSync(releaseContractPath, "utf8"));
 

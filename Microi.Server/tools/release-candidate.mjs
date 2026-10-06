@@ -21,7 +21,10 @@ const independentMobileSource=name=>/^microi\.uniapp\//i.test(name)
 const independentDesktopSource=name=>/^Microi\.Agent\/(?:apps\/microi-code|upstream\/dsh-desktop)\//i.test(name);
 // 官方中文/英文正文与发布日志由单独的官网模式 6 验证；它们不是 PC/API Full
 // 或 Docker 的输入。官网主题代码、构建脚本、测试、依赖和平台 Skills 仍进入候选。
-const documentationOnly=name=>/^microi\.doc\/docs\/(?:doc|en)\/.*\.(?:md|mdx)$/i.test(name);
+const documentationOnly=name=>/^microi\.doc\/docs\/(?:doc|en)\/.*\.(?:md|mdx)$/i.test(name)
+ // 定时商店巡检只追加内部交接日志；不进入 PC/API、VSIX 或 CLI 运行制品。
+ // 仅此精确日志路径豁免；Skills、MCP、测试、发布脚本与运行知识仍受门禁保护。
+ ||name==='Microi.Agent/维护交接与更新记录.md';
 
 // 插件打包重复生成这两份已跟踪元数据。仅顶层 builtAt 是非行为时间；
 // 版本、依赖、文件数量与源码摘要仍全部进入候选，未知字段和其它文件不得排除。

@@ -134,13 +134,7 @@
       :show-scrollbar="false"
       :lower-threshold="120" @scrolltolower="loadMore">
     <view class="related-list-scroll-content">
-    <view v-if="previewContentVisible && loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
-      <view v-for="item in (isPreview ? previewLimit : 3)" :key="item" class="skeleton-card">
-        <view class="skeleton-line wide"></view>
-        <view class="skeleton-line"></view>
-        <view class="skeleton-line short"></view>
-      </view>
-    </view>
+    <mci-skeleton v-if="previewContentVisible && loading && !rows.length && !waitingForParentSave" type="list" :rows="isPreview ? previewLimit : 3" />
 
     <view v-else-if="previewContentVisible && rows.length" class="related-data-list">
       <template v-if="isCollectionCardLayout">
@@ -253,8 +247,10 @@
         </view>
       </template>
       <block v-if="!isCollectionCardLayout">
-        <view v-if="!isPreview && !finished" class="load-more" hover-class="load-more--pressed" @tap="loadMore">
-          <text>{{ loading ? '正在加载' : '加载更多' }}</text>
+        <mci-skeleton v-if="loading" type="list" :rows="1" compact />
+        <view v-else-if="error" class="load-more" @tap="loadData(true, true)"><text>{{ error }}，点击重试</text></view>
+        <view v-else-if="!isPreview && !finished" class="load-more" hover-class="load-more--pressed" @tap="loadMore">
+          <text>加载更多</text>
         </view>
         <view v-else-if="!isPreview" class="load-finished"><text>共 {{ count }} 条</text></view>
       </block>
@@ -265,7 +261,7 @@
       <view @tap="loadData(true, true)"><text>重新加载</text></view>
     </view>
 
-    <view v-else-if="previewContentVisible" class="related-empty">
+    <view v-else-if="previewContentVisible && !loading" class="related-empty">
       <template v-if="waitingForParentSave">
         <text>保存当前表单后可新增{{ config.title || sectionTitle }}</text>
       </template>

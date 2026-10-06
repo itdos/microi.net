@@ -878,6 +878,8 @@ namespace Microi.net
         /// </summary>
         public async Task<DosResult> DeleteObject(HDFSParam param)
         {
+            if (param?.EmptyDirectoryOnly == true && (param.ClientModel == null || !param.Limit.HasValue))
+                return new DosResult(0, null, "空目录标记删除缺少可信租户或明确桶选择。");
             try
             {
                 var clientModel = param.ClientModel;
@@ -902,6 +904,48 @@ namespace Microi.net
                 };
                 var ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
 
+                if (param.EmptyDirectoryOnly == true)
+                {
+                    if (!param.Limit.HasValue || clientModel == null || string.IsNullOrWhiteSpace(bucketName))
+                        return new DosResult(0, null, "当前租户或存储桶不可核验。");
+                    return await EmptyDirectoryMarkerDeletion.DeleteAsync(clientModel.OsClient, param.FileFullPath,
+                        (key, token) =>
+                        {
+                            token.ThrowIfCancellationRequested();
+                            // 不传 Delimiter，读取原始 key/Size；两条已足够证明不是单空标记。
+                            var listing = ossClient.ListObjects(new ListObjectsRequest(bucketName)
+                            { Prefix = key, MaxKeys = 2 });
+                            token.ThrowIfCancellationRequested();
+                            var entries = listing.ObjectSummaries?.Select(item => new EmptyDirectoryMarkerDeletion.ObjectEntry
+                            { Key = item.Key, Size = item.Size }).ToList();
+                            if (entries?.Count == 1 && entries[0].Key == key && entries[0].Size == 0)
+                            {
+                                // OSS 的 Size 也有默认零值，另核对 HEAD 的明确长度 Header。
+                                var metadata = ossClient.GetObjectMetadata(bucketName, key);
+                                token.ThrowIfCancellationRequested();
+                                var lengths = metadata.HttpMetadata.Where(item => string.Equals(item.Key,
+                                    "Content-Length", StringComparison.OrdinalIgnoreCase)).ToList();
+                                if (lengths.Count != 1 || !long.TryParse(Convert.ToString(lengths[0].Value,
+                                    System.Globalization.CultureInfo.InvariantCulture), System.Globalization.NumberStyles.None,
+                                    System.Globalization.CultureInfo.InvariantCulture, out var size))
+                                    entries[0].Size = null;
+                                else entries[0].Size = size;
+                            }
+                            return Task.FromResult(new EmptyDirectoryMarkerDeletion.PrefixSnapshot
+                            {
+                                Complete = listing.BucketName == bucketName && listing.Prefix == key
+                                    && !listing.IsTruncated && listing.CommonPrefixes != null && !listing.CommonPrefixes.Any(),
+                                Objects = entries
+                            });
+                        },
+                        (key, token) =>
+                        {
+                            token.ThrowIfCancellationRequested();
+                            // 精确单 key 删除，不调用目录 DeleteObjects 批量分支。
+                            ossClient.DeleteObject(bucketName, key);
+                            return Task.CompletedTask;
+                        }, param.CancellationToken).ConfigureAwait(false);
+                }
                 var objectKey = param.FileFullPath.DosTrimStart('/');
 
                 // 如果是文件夹，递归删除所有子对象
@@ -962,6 +1006,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
+                if (param?.EmptyDirectoryOnly == true)
+                    return new DosResult(0, new { OutcomeUnknown = false, Stage = "ResolveProvider" }, "空目录标记存储配置暂不可核验。");
                 return new DosResult(0, null, "Aliyun OSS DeleteObject Error: " + ex.Message);
             }
         }
@@ -991,7 +1037,11 @@ namespace Microi.net
                 var config = new ClientConfiguration
                 {
                     ConnectionTimeout = 30000,
-                    MaxErrorRetry = 2
+                    MaxErrorRetry = 2,
+                    // SDK 2.14.1 的 CRC 包装令空流不可寻址，HTTP 因而变成
+                    // chunked 且没有 Content-Length，OSS 拒绝创建零字节标记。
+                    // 此客户端仅用于空目录标记；普通文件上传继续保留 CRC。
+                    EnableCrcCheck = false
                 };
                 var ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
 

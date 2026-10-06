@@ -9,6 +9,8 @@ namespace Microi.net
     {
         public OsClientSecret ClientModel { get; set; }
         public bool? Limit { get; set; }
+        /// <summary>精确删除空目录标记，禁止递归；必须显式选择公有/私有桶。</summary>
+        public bool? EmptyDirectoryOnly { get; set; }
         public string FileFullPath { get; set; }
         public string FileFullPathOrigin { get; set; }
         public List<string> FileFullPaths { get; set; }

@@ -167,8 +167,9 @@
             <view class="customer-main"><text class="customer-name">{{ item.KehuMC || '未命名客户' }}</text><text class="customer-meta">{{ customerMeta(item) }}</text></view>
             <text class="selected-mark">{{ customer.Id === item.Id ? '✓' : '›' }}</text>
           </button>
-          <view v-if="!customerLoading && !customers.length" class="empty-text">未找到合作客户</view>
-          <view v-if="customerLoading && customers.length" class="loading-more">加载中</view>
+          <view v-if="!customerLoading && customerError" class="empty-text" @tap="searchCustomers">{{ customerError }}，点击重试</view>
+          <view v-else-if="!customerLoading && !customers.length" class="empty-text">未找到合作客户</view>
+          <mci-skeleton v-if="customerLoading && customers.length" type="list" :rows="1" compact />
         </scroll-view>
       </view>
     </view>
@@ -180,6 +181,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser, post, V8 } from '@/utils/request.js'
 import { callApiEngine, formatFieldValue, formatRegion, requireLogin } from '@/platform/business-runtime.js'
+import { initializeAuthenticatedPage } from '@/platform/login-navigation.mjs'
 import {
   buildServiceRecordUpdatePayload,
   cloneServiceRecordEditState,
@@ -211,6 +213,8 @@ export default {
   data() {
     return {
       loading: true,
+      authInitialized: false,
+      authInitializing: false,
       submitting: false,
       readOnly: false,
       canEditArchive: false,
@@ -235,6 +239,8 @@ export default {
       customerPage: 1,
       customerCount: 0,
       customerLoading: false,
+      customerError: '',
+      customerRequestId: 0,
       customerSearchTimer: null
     }
   },
@@ -265,14 +271,15 @@ export default {
     }
   },
   async onLoad(options) {
-    if (!requireLogin()) return
     this.recordId = options.id || ''
     this.readOnly = options.mode === 'view'
     this.initialCustomerId = options.customerId || ''
-    await this.initialize()
+    await this.initializeAfterLogin()
   },
+  onShow() { if (!this.authInitialized) return this.initializeAfterLogin() },
   onUnload() { clearTimeout(this.customerSearchTimer) },
   methods: {
+    initializeAfterLogin() { return initializeAuthenticatedPage(this, requireLogin, this.initialize) },
     customerMeta(item) {
       return formatRegion(item.Chengshi) || formatFieldValue(item.XiangxiDZ || item.LianxiR, '', { empty: '' }) || '合作客户'
     },
@@ -438,31 +445,39 @@ export default {
     async searchCustomers() {
       this.customerPage = 1
       this.customers = []
-      await this.loadCustomers()
+      await this.loadCustomers(true)
     },
     async loadMoreCustomers() {
       if (this.customerLoading || this.customers.length >= this.customerCount) return
       this.customerPage += 1
       await this.loadCustomers()
     },
-    async loadCustomers() {
-      if (this.customerLoading) return
+    async loadCustomers(reset = false) {
+      if (this.customerLoading && !reset) return
+      // 搜索可以取代慢请求，分页只提交当前请求的页码与终态。
+      const requestId = ++this.customerRequestId
+      const page = this.customerPage
       this.customerLoading = true
+      this.customerError = ''
       try {
         const result = await V8.FormEngine.GetTableData('Diy_Kehu', {
           _Where: [{ Name: 'Zhuangtai', Type: '=', Value: '合作客户' }],
           _Keyword: this.customerKeyword.trim(),
           _SelectFields: ['Id', 'KehuMC', 'Chengshi', 'XiangxiDZ', 'LianxiR'],
-          _OrderBy: 'UpdateTime', _OrderByType: 'DESC', _PageIndex: this.customerPage, _PageSize: 20
+          _OrderBy: 'UpdateTime', _OrderByType: 'DESC', _PageIndex: page, _PageSize: 20
         })
+        if (requestId !== this.customerRequestId) return
         if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '客户加载失败')
         const rows = Array.isArray(result.Data) ? result.Data : []
-        this.customers = this.customerPage === 1 ? rows : this.customers.concat(rows)
+        this.customers = page === 1 ? rows : this.customers.concat(rows)
         this.customerCount = Number(result.DataCount || this.customers.length)
       } catch (error) {
-        uni.showToast({ title: error.message || '客户加载失败', icon: 'none' })
+        if (requestId !== this.customerRequestId) return
+        this.customerError = error.message || '客户加载失败'
+        if (page > 1) this.customerPage = page - 1
+        uni.showToast({ title: this.customerError, icon: 'none' })
       } finally {
-        this.customerLoading = false
+        if (requestId === this.customerRequestId) this.customerLoading = false
       }
     },
     async selectCustomer(item) {

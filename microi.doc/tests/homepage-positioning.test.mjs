@@ -67,8 +67,7 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(actions, /:href="MICROI_CODE_DOC_URL"/)
   assert.equal((actions.match(/<svg\b/g) || []).length, 2, 'both primary homepage actions should have an icon')
   assert.match(component, /\/doc\/v8-engine\/microi-agent\.html/)
-  assert.match(component, /secondaryAction: '下载 Microi Agent'/)
-  assert.match(component, /secondaryAction: 'Download Microi Agent'/)
+  assert.equal((component.match(/secondaryAction: 'Microi Agent'/g) || []).length, 2, 'both locales keep the concise Agent entry label')
   assert.doesNotMatch(component, /downloadMeta:/)
   assert.doesNotMatch(component, /Windows x64 · v1\.0\.2/)
   assert.match(component, /aiTools: \['Microi Agent', 'Codex'/)
@@ -102,7 +101,7 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.doesNotMatch(microiCodeShowcase, /\.VPDoc\s+\.aside\s*\{[^}]*display:\s*none/s, 'product styles must not hide the documentation outline')
   assert.match(microiCodeShowcase, /@pointermove="trackPointer"/)
   assert.match(microiCodeShowcase, /radial-gradient\(540px circle at var\(--pointer-x\) var\(--pointer-y\)/)
-  assert.match(component, /primaryAction: '查看培训大纲'/)
+  assert.match(component, /primaryAction: '培训大纲'/)
   assert.match(component, /primaryAction: 'Training syllabus'/)
   assert.doesNotMatch(component, /trainingAction:/)
   assert.ok(
@@ -184,14 +183,14 @@ test('homepage visual contract covers responsive, focus, and reduced-motion stat
   assert.match(styles, /@media \(min-width: 768px\) and \(max-width: 900px\)/)
   assert.match(styles, /@media \(max-width: 767px\)/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
-  assert.match(styles, /animation:\s*mciHomePrimaryPulse[^;]*infinite/)
-  assert.match(styles, /animation:\s*mciHomeSecondaryPulse[^;]*infinite/)
+  assert.match(styles, /animation:\s*mciHomeActionFlow[^;]*infinite/)
+  assert.match(styles, /animation:\s*mciHomeParticlesDrift[^;]*infinite/)
   assert.match(styles, /--mci-home-pointer-x/)
   assert.match(component, /@pointermove="trackPointer"/)
   assert.match(component, /prefers-reduced-motion: reduce/)
   assert.match(nugetStyles, /\.mci-nuget-stats--home\s*\{[^}]*margin:\s*22px auto 42px/s)
   assert.match(microiCodeShowcase, /\.microi-code-actions a\.is-primary[^}]*-webkit-text-fill-color:#fff!important/s)
-  assert.match(styles, /padding: 150px 0 36px/)
+  assert.match(styles, /padding: 104px 0 36px/)
   assert.match(styles, /margin: 0 auto 80px/)
   assert.match(styles, /margin-bottom: 56px/)
 
@@ -201,7 +200,7 @@ test('homepage visual contract covers responsive, focus, and reduced-motion stat
 
   assert.match(contract, /mode: brand-narrative/)
   assert.match(contract, /低代码 → V8 → 专业源码/)
-  assert.match(contract, /价值带与 NuGet 证据区保持 56–80px 间隔/)
+  assert.match(contract, /能力带与 NuGet 证据区保持 28px 桌面间隔/)
 })
 
 test('source architecture keeps the detailed selection guidance off the homepage', () => {

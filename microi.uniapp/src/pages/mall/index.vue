@@ -128,7 +128,11 @@
         </view>
 
         <!-- 空状态 -->
-        <view class="empty-state" v-if="!loading && products.length === 0">
+        <view class="empty-state" v-if="!loading && error && !products.length">
+          <text class="empty-text">商品加载失败</text><text class="empty-sub">{{ error }}</text>
+          <view class="mci-btn" @tap="retryList">重新加载</view>
+        </view>
+        <view class="empty-state" v-else-if="!loading && products.length === 0 && !error">
           <image class="empty-icon" src="/static/xjy/business/goods.png" mode="aspectFit" />
           <text class="empty-text">{{ t('mall.noProducts') }}</text>
           <text class="empty-sub">{{ t('mall.tryOther') }}</text>
@@ -136,7 +140,8 @@
 
         <!-- 加载更多 -->
         <view class="load-more" v-if="products.length > 0">
-          <text v-if="loadingMore" class="load-more-text">{{ t('common.loading') }}</text>
+          <mci-skeleton v-if="loading || loadingMore" type="list" :rows="1" compact />
+          <text v-else-if="error" class="load-more-text" @tap="retryList">{{ error }}，点击重试</text>
           <text v-else-if="noMore" class="load-more-text">{{ t('common.noMore') }}</text>
         </view>
         <view class="mci-tabbar-spacer" aria-hidden="true" />
@@ -233,6 +238,7 @@ export default {
       // 商品
       products: [],
       loading: true,
+      error: '',
       loadingMore: false,
       refreshing: false,
       noMore: false,
@@ -279,7 +285,7 @@ export default {
       }
     } catch (e) {}
     const snapshot = readMallSnapshot()
-    if (snapshot) this.applyInitialSnapshot(snapshot)
+    if (snapshot) this.applyInitialSnapshot(snapshot, false)
     this.loadInitialSnapshot()
 	//先临时调用下面两个接口，目前不调用的话初始页面不渲染，但接口明明也调用了的
 	// this.loadCategoryTree()
@@ -291,24 +297,30 @@ export default {
   },
 
   methods: {
-    applyInitialSnapshot(snapshot) {
+    applyInitialSnapshot(snapshot, settled = true) {
       this.categoryTree = (snapshot.categories || []).map((item) => ({ ...item, _expanded: false }))
       this.typeOptions = snapshot.types || []
       this.products = snapshot.products || []
       this.totalCount = Number(snapshot.totalCount || 0)
       this.noMore = this.products.length < this.pageSize
-      this.loading = false
+      // 缓存有商品时保持可读，空快照只有本次请求已结束才允许显示空态。
+      this.loading = !settled && !this.products.length
+      this.error = snapshot.productError || snapshot.error || ''
     },
 
     async loadInitialSnapshot() {
+      this.loading = !this.products.length
+      this.error = ''
       try {
         this.applyInitialSnapshot(await loadMallSnapshot())
       } catch (error) {
-        if (!this.products.length) console.error('[Mall] initial snapshot error:', error)
+        this.error = error.message || '商品加载失败'
       } finally {
         this.loading = false
       }
     },
+
+    retryList() { return this.loadProducts(false) },
 
     // 加载分类树（带子分类）
     async loadCategoryTree() {
@@ -393,6 +405,7 @@ export default {
 
     // 加载商品列表
     async loadProducts(append = false) {
+      this.error = ''
       if (!append) {
         this.loading = true
         this.pageIndex = 1
@@ -415,7 +428,8 @@ export default {
         })
         // 已被新请求覆盖，丢弃
         if (seq !== this._loadProductsSeq) return
-        if (res.Code === 1) {
+        if (!res || Number(res.Code) !== 1) throw new Error((res && res.Msg) || '商品加载失败')
+        if (Number(res.Code) === 1) {
           const list = res.Data || []
           if (append) {
             this.products = [...this.products, ...list]
@@ -426,14 +440,13 @@ export default {
           if (list.length < this.pageSize) {
             this.noMore = true
           }
-        } else if (append) {
-          // 失败回滚 pageIndex，避免下次跳页
-          this.pageIndex = Math.max(1, this.pageIndex - 1)
         }
       } catch (e) {
-        console.error('[Mall] loadProducts error:', e)
+        // 旧筛选请求的失败不能回滚新分类分页，也不能覆盖新请求的错误态。
+        if (seq !== this._loadProductsSeq) return
+        this.error = e.message || '商品加载失败'
         if (append) {
-          this.pageIndex = Math.max(1, this.pageIndex - 1)
+          this.pageIndex = Math.max(1, requestPage - 1)
         }
       } finally {
         if (seq === this._loadProductsSeq) {
@@ -750,7 +763,10 @@ export default {
 
 /* ========== 右侧商品列表 ========== */
 .product-area {
-  flex: 1;
+  /* 右侧滚动区按剩余空间收缩，避免原生 scroll-view 的默认宽度挤出屏幕。 */
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
   height: 100%;
 }
 

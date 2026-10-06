@@ -40,6 +40,19 @@ Content-Type: application/json
 
 两种入口都会把 JSON Body 恢复到 `V8.Param`；同名 Query/Form 参数保持既有优先级。接口层只负责 HTTP 路由、参数绑定和可信上下文恢复，不承载 AI、模型路由等业务逻辑。客户端提交的 `_CurrentUser`、`_InvokeType:'Server'` 或 `_TrustedServerInvocation` 不能建立服务端信任，身份和调用类型始终由认证中间件及接口层决定。
 
+嵌套 JSON 的 `JObject/JArray` 在 Jint 中可能仍是宿主对象，直接调用 `Array.isArray(V8.Param.rows)` 会与普通 JavaScript 数组不同。需要严格结构校验的业务入口，可先规范化有界业务参数，再执行字段白名单、真实数组、布尔、条数、权限与状态检查：
+
+严格业务白名单需要先区分宿主传输元数据。真实 HTTP 入口会重建 `ApiEngineKey / ApiAddress`、`_InvokeType`、`_DeviceId`、`_RouteValues` 和 `_HttpMethod / _RequestPath / _RequestScheme / _RequestHost / _RequestPathBase / _ContentType / _RawBody`；固定业务入口可逐项排除其确实支持的传输字段，并校验固定路由归属。不要整体允许所有下划线字段，不要重新解析 `_RawBody` 改写业务动作，也不要据这些值授权。已有历史调试器追加的 `TestParam1` 仅兼容 null/undefined、最多 200 字符的字符串、有限数字或布尔值，并立即丢弃；对象、数组、超长值和其它未知字段仍拒绝。实际 HTTP 验收须同时覆盖普通岗位、管理员、未知字段与越权输入，不能把离线干净参数等同于宿主实际请求。
+
+```javascript
+var input = JSON.parse(JSON.stringify(V8.Param || {}));
+if (!Array.isArray(input.rows) || input.rows.length > 200) {
+  return { Code: 0, Msg: '请提供不超过200条的真实JSON列表' };
+}
+```
+
+这个转换只处理业务 JSON，不能恢复可信身份或事务；继续使用当前 `V8.CurrentUser`、`V8.DbTrans` 和原生 `V8.WF`，拒绝客户端伪造的身份、处理人和流程字段。不要用“含 `length` 属性”放宽数组规则，也不要把大文件正文或整个可信 V8 对象往返序列化。修改后需要重新保存归属接口或更新应用包，并用真实 HTTP 参数、重放及非法类型验收；仅离线 JavaScript 数组测试不能证明宿主互操作通过。
+
 新增或可修改的前端、微服务、UniApp、MCP 与外部集成必须使用动态路径或引擎配置的唯一 `ApiAddress`，不得新增 `/api/ApiEngine/Run` 依赖。这样系统日志/监控、网关限流、访问审计和流量排行才能直接显示真实接口引擎；旧地址只保留在显式 `RunLegacy` 兼容方法中。
 
 ### 一个接口配置多个兼容路由
@@ -1171,6 +1184,8 @@ var result = V8.Image.Draw({
 这些限制是保护上限，不是业务推荐值。匿名接口应增加更严格的数量、尺寸、并发和权限限制。远程图片必须先通过 `V8.Http` 下载，并对用户可控 URL 做协议、域名和目标地址白名单校验，不能把 URL 或服务器路径直接传给 `V8.Image`。
 
 `FontFamily` 是首选字体。运行时会逐个 Unicode 字符验证字形：未传字体、指定字体不存在或某个字体缺少部分字符时，先回退到服务器已安装且包含该字形的字体，再回退到随 `Dos.Common` 程序集发布的 Noto Sans CJK SC；同一段中英文混排文字可使用多个字体段。因此没有安装任何系统字体的 Linux / 群晖 / 精简容器也能绘制基础拉丁字符、数字和简体中文。如果系统字体与内置字体都不包含某字符，接口会返回带字符及 `U+XXXX` 码位的明确错误，绝不会生成“口口”缺字方框。内置字体解决可用性，不替代品牌字体、繁体异体字、特殊符号或 Emoji 字体；要求固定字形时仍应在服务器安装业务字体并显式传 `FontFamily`。
+
+Unicode 非字符（`U+FDD0`–`U+FDEF`，以及各 Unicode 平面末尾的 `FFFE/FFFF`）会在匹配字体前被拒绝，并返回准确码位。macOS 的占位字体不会使这些字符被误判为可绘制文字。
 
 ## 当前用户 V8.CurrentUser
 >* 当前登陆用户信息，包含用户所属角色、组织机构等，包含使用表单引擎对sys_user表新增字段的信息。
@@ -2458,6 +2473,23 @@ var storageType = V8.ClientModel.HDFS; // ClientModel 是兼容别名
 
 共享基础设施可以复用同一 Redis、对象存储、RabbitMQ Broker、MQTT Broker 和搜索集群，但隔离边界由服务端强制执行：缓存 Key、对象路径、队列、Topic、索引分别绑定当前 `OsClient`。RabbitMQ、MQTT 和 Search 还必须为子租户配置独立凭据；缺少独立凭据时对应能力失败关闭，不会回退使用主租户账号。
 
+### 主租户推广授权与公开空库开通原子
+
+SaaS 应用通过以下固定 Key 调用可信原子。它们不能作为任意业务接口的通用跨租户或建库入口：
+
+| 方法 | 绑定接口 | 参数与结果 |
+| --- | --- | --- |
+| `V8.Method.AuthorizeSaasPromotion()` | `platform-saas-promotion` | 重新读取账号、角色、菜单；返回 `UserId,CanViewAll,CanConfigure` 及当前运行分区 |
+| `V8.Method.ReadSaasTenantUsage({TenantIds,Refresh})` | 同上 | 最多20个租户记录 Id；返回固定统计及采集状态、时间，不允许任意 SQL/连接 |
+| `V8.Method.CreateSaasReferralCapability(linkId)` | 同上 | 从主库核验推荐归属，签发绑定主租户与分区的公开链接票据 |
+| `V8.Method.ResumeSaasPublicTrialTask(taskId)` | 同上 | 原推荐人或授权管理者恢复失败申请；保留原幂等键、密码哈希和加密数据库检查点，总执行最多三次 |
+| `V8.Method.SaasPublicTrialAtom(parameters)` | `platform-saas-public-trial` | `Bootstrap / Queue / Progress`；校验链接、推荐人、验证码与额度，创建有幂等键的持久任务 |
+| `V8.Method.ProvisionPublicSaasTrial({GrantCipher})` | `platform-saas-public-trial-worker` | 只接受当前后台任务及栅栏令牌，不接受管理员身份、SQL包或连接参数 |
+
+业务员须具有推广菜单权限，只能读取本人推荐的子租户；管理角色可看全局，平台管理员才可修改公开开通配置。
+公开开通使用有限能力票据，不授予管理员会话。数据库 DDL 前持久化加密账号检查点，恢复时只接续同一任务，
+不接管其它请求的库或旋转既有账号密码。详见 [SaaS 推广中心与客户自主开通](../system-engine/saas-engine.md#saas-推广中心与客户自主开通)。
+
 ## 表单数据 V8.Form
 >* 表单提交事件中可访问表单数据，接口引擎中此对象为空。
 
@@ -2517,6 +2549,10 @@ WFNodeStart：流程节点开始V8事件
 | 主机监控 | `V8.System` | CPU、内存、磁盘、网络等运维数据仅供管理员/运维，不应从普通或匿名接口返回 |
 | 任务调度 | `V8.Method.SaveScheduleJob`、`V8.Method.ManageScheduleJob` | 仅当前租户超级管理员；保存只允许接口引擎任务。表单先检查 `ManageScheduleJob({Action:'Capabilities'})` 的 `RuntimeOnly` 能力，再直接调用 `SaveScheduleJob` 并传 `RuntimeOnly:true`：仅同步 Quartz 并回读状态，由原表单事务写元数据。直接调用可保留业务 `ApiEngineKey`，避免嵌套 `V8.ApiEngine.Run` 将同名路由参数改成管理接口 Key；默认保存仍写完整任务。不能用 HTTP 回调本平台或在提交事件中再次写当前表 |
 | 支付、微信、DNS | 对应 `V8.*` 扩展 | 单独校验签名、幂等键、回调重放、金额与租户凭据，不要返回密钥 |
+
+`V8.HDFS.DeleteObject` 的目录路径必须保留末尾 `/`，租户根和其它租户绝对路径不能删除。恢复单个零字节空目录标记时显式传 `EmptyDirectoryOnly:true`、`Limit:true/false`，并等待异步结果；服务端从可信 V8 作用域或 DiyToken 复核当前租户实际管理员权限，不信任参数中的用户、角色、供应商或密钥。该模式完整核验同桶前缀与大小，只删除精确标记，随后严格回读；未知分页、缺少元数据、非空或回读失败一律拒绝。`Code=1` 必须同时携带 `Data.DeletionMode='EmptyDirectoryMarkerOnly'` 和 `VerifiedAbsent=true`。
+
+HTTP/MCP 使用专用 `/api/HDFS/DeleteEmptyDirectoryMarker` 路由，旧后端 `404` 不能降级为普通目录删除。此操作不构成零字节 CAS，也不能证明历史 NoPUT；业务层须先隔离原请求、排除同 key 的活跃写入，并保留原请求键与独立恢复证据。详见[分布式存储](../more/hdfs)。
 
 动态建表、动态字段、数据库备份/清空、缓存连接管理、接口引擎代码写入等属于控制面能力。即使某个低层方法在 V8 对象上可见，也不等于普通业务脚本可以安全暴露；控制面 HTTP API 还会独立执行 `Level >= 9999` 管理员门禁。
 

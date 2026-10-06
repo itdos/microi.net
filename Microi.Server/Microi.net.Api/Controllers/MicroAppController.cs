@@ -485,6 +485,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [AllowAnonymous] // 固定主租户开通页在方法内校验；其它页面仍必须通过真实 DiyToken。
         public async Task<IActionResult> Resolve(
             string osClient,
             string appKey,
@@ -503,16 +504,19 @@ namespace Microi.net.Api
 
             var token = await DiyToken.GetCurrentToken(false);
             var tokenOsClient = Convert.ToString(token?.OsClient);
-            if (tokenOsClient.DosIsNullOrWhiteSpace())
+            var publicTrial = SaasPromotionSecurity.IsPublicTrialRoute(osClient, appKey, routePath, OsClientDefault.OsClient)
+                && SaasPromotionSecurity.IsPublicTrialEnabled(osClient);
+            if (!SaasPromotionSecurity.HasAuthenticatedSession(token) && !publicTrial)
             {
                 return Ok(new DosResult(1001, null, "登录状态已失效，请重新登录。"));
             }
-            if (!osClient.DosIsNullOrWhiteSpace()
+            if (!publicTrial && !osClient.DosIsNullOrWhiteSpace()
                 && !string.Equals(osClient, tokenOsClient, StringComparison.OrdinalIgnoreCase))
             {
                 return Ok(new DosResult(0, new { ReasonCode = "TENANT_MISMATCH" }, "当前登录租户与请求租户不一致。"));
             }
-            osClient = tokenOsClient;
+            if (!publicTrial) osClient = tokenOsClient;
+            if (publicTrial) { requirePage = true; includePageMetadata = true; version = null; }
             if (osClient.DosIsNullOrWhiteSpace() || appKey.DosIsNullOrWhiteSpace())
             {
                 return Ok(new DosResult(0, null, "OsClient and AppKey are required."));
@@ -591,6 +595,17 @@ namespace Microi.net.Api
                     AppKey = appKey,
                     RoutePath = NormalizeRoutePath(routePath)
                 }, "微服务页面不存在或已停用。"));
+            }
+
+            if (publicTrial)
+            {
+                JObject routeMeta;
+                try { routeMeta = JObject.Parse(page?["RouteMetaJson"]?.ToString() ?? "{}"); }
+                catch { routeMeta = new JObject(); }
+                if (!SaasPromotionSecurity.Flag(routeMeta["Anonymous"]))
+                    return Ok(new DosResult(1002, null, "公开开通页面尚未启用。"));
+                page = new JObject { ["PageTitle"] = page?["PageTitle"], ["RoutePath"] = SaasPromotionSecurity.PublicRoute,
+                    ["RouteMetaJson"] = "{\"Anonymous\":true}" };
             }
 
             return Ok(new DosResult(1, new
@@ -693,6 +708,9 @@ namespace Microi.net.Api
             try
             {
                 var routeMeta = JObject.Parse(routeMetaJson);
+                // 页面解析只需要公开标志；不得将存储中的任意内部元数据或密钥返回给浏览器。
+                if (SaasPromotionSecurity.Flag(routeMeta["Anonymous"]))
+                    page["RouteMetaJson"] = "{\"Anonymous\":true}";
                 var sourceFile = (routeMeta["SourceFile"] ?? routeMeta["sourceFile"])
                     ?.Val<string>()
                     ?.Replace('\\', '/')

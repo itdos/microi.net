@@ -1,0 +1,12 @@
+.workspace > aside > button.active::before {
+  top: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: 0 !important;
+  width: 4px !important;
+  height: 54% !important;
+  min-height: 18px;
+  max-height: 26px;
+  border-radius: 999px !important;
+  transform: translateY(-50%);
+}

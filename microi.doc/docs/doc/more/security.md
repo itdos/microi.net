@@ -325,6 +325,8 @@ ASP.NET Identity 是通用的 ASP.NET Core 用户管理框架，但不会自动�
 
 ### 浏览器访问密钥与免登录页面
 
+访问密钥的页面范围按 HTTP 路由校验。以 `/` 开头的站内路径保持路径语义，完整 HTTP(S) 地址再提取路径；Linux、macOS 与 Windows 必须一致，不能把站内路径误解析成文件 URI 后丢失查询、片段或页面范围。精确路由与允许的通配符继续分别校验。
+
 吾码支持为同一个帐号创建多个浏览器访问密钥，适合会议室电视、车间看板、信息屏等固定页面。它不是把帐号密码或长期 Token 放进 URL，也不是 Gitee/GitHub 私人令牌的网页登录翻版；访问密钥只负责兑换短期吾码会话。
 
 设计参考：[GitHub fine-grained PAT 权限模型](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)、[GitHub OAuth 临时代码流程](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps?apiVersion=2022-11-28)、[OWASP URL Token 安全要求](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html) 和 [Gitee 私人令牌](https://gitee.com/help/articles/4336)。API/Git 令牌与浏览器会话的用途不同，因此吾码使用“长期访问密钥兑换短期受限会话”，而不是直接把长期登录 Token 当作页面凭据。
