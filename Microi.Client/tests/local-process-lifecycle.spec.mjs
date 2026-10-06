@@ -287,7 +287,9 @@ test('相对入口 Vite 用进程工作目录识别当前工作区，并对外�
 test('自动化启动器阻止发布期间抢端口、只使用 Debug，并结束完整后端进程树', () => {
     const runner = read('Microi.Client/scripts/run-form-engine-freeze-trace.mjs');
 
-    assert.match(runner, /releaseLockPath/);
+    // 统一锁入口负责识别旧锁与独立 Agent 域；启动器必须明确保护平台服务。
+    assert.match(runner, /import \{ assertReleaseAvailable \} from '\.\.\/\.\.\/Microi\.Server\/tools\/release-lock\.mjs'/);
+    assert.match(runner, /assertReleaseAvailable\(repoRoot, 'platform'\)/);
     assert.match(runner, /assertReleaseIsNotRunning/);
     assert.match(runner, /PW_BACKEND_CONFIGURATION \|\| 'Debug'/);
     assert.match(runner, /PW_BACKEND_CONFIGURATION=Release is forbidden/);
