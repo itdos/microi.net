@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-menu-buttons-013 sha256=52939e7f29d0e3c7a2622c39bfc8484e27830ecb39a4205e57d5bdd437d60629 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-013 sha256=30fe801c52356f945f9adabbd5d947d251211d9f3f63f24ca596c1aed6594440 -->
 ## 10. 反模式（避免）
 
 ❌ 把所有业务逻辑塞进 `V8Code`，不创建接口引擎
@@ -27,7 +27,7 @@
 ✅ 先用 `microi_list_applications` / `microi_get_application_context` 查找现有微服务；优先在已有微服务新增页面，否则通过 MCP 创建微服务，再用 `V8.OpenAppDialog` 打开
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-014 sha256=2d11f4bb4b670c1051e4495ef1d95758420f520fea7d8c7d1c948f251a2ad4a3 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-014 sha256=ad4cb3a484857342e8e669163655b604a0a88ee4dec359743400a9493ff3c2d9 -->
 ## 10.2 复杂定制弹窗必须使用微服务
 
 `V8.ConfirmTips` 只适合纯文本确认或极少量一次性输入。出现以下任一情况即视为复杂页面：三个以上字段、响应式布局、联动校验、上传、表格、Tab、步骤条、代码编辑器、需要复用、后续会持续迭代。
@@ -59,7 +59,7 @@ V8.OpenAppDialog({
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-015 sha256=ab2bb9924c4468c8619237beaf94b86a98f9027649ab5c9e499652ae0068fbd4 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-015 sha256=a796c29f763905954dbe712f80b5aa3921d57886142542749c1dda79ff6cdc4b -->
 ## 11. ⚠️ `V8.CurrentUser` 拿不到的历史陷阱（必看）
 
 ### 现象

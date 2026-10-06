@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=playwright-e2e-008 sha256=cd1cc086cbbabd4083f7037e64b4f1951b284f70392e6fc5d729b322a161c39d -->
+<!-- microi-progressive:chunk id=playwright-e2e-008 sha256=1ac51fe5663202a639d1983dcd882e4559201b68c90b5b81a17231ed04e24182 -->
 ## 全自动登录（免验证码，但不免密码）——必读
 
 E2E 自动化最容易卡在「登录页有图形验证码」。Microi 后端允许自动化跳过验证码，但账号和密码必须始终走真实校验；如果密码配置错了，登录接口必须返回账号或密码错误。源码见 `Microi.Server/Microi.net.Api/Controllers/SysUserController.cs`（`Login` 方法开头）。
@@ -66,7 +66,7 @@ export async function automationLogin(page, {
 > 直连接口验收（不进页面）使用自动化标记拿 Token；历史 `_DEV_BYPASS_`、Dev Key 和 `DevLoginBypass` 均不得继续使用。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-009 sha256=bd153761389635cb99ac6d3e2809f1e49ca78926176a05ad555dc83702837790 -->
+<!-- microi-progressive:chunk id=playwright-e2e-009 sha256=1466c4443d44a2957877971ecef64e228732af26a9030d02543f4a82c01e24ca -->
 ## 表单引擎卡死/递归更新全自动化诊断
 
 当用户反馈“新增抽屉卡死”“设计页卡死”“点击控件无响应”“Maximum recursive updates exceeded”等表单引擎问题时，优先做可复现的 Playwright 诊断，而不是只靠猜测改代码。
@@ -121,7 +121,7 @@ npm run test:form-freeze:auto
 - 修复后必须重跑同一个诊断用例，确认最后 trace 不再无限重复，并且页面在 10-15 秒后仍可响应。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-010 sha256=10e0c01fcbdc6319d6d5037a068a50ed83df2f3b1498326fc349e17c71d30a5d -->
+<!-- microi-progressive:chunk id=playwright-e2e-010 sha256=484eff47612bc41ec9abf825d776e49bd71335f5815b0d1ce8749d9c86ba07bf -->
 ## 移动端视觉与资源验收
 
 uni-app H5、移动商城、分享海报、首页改版这类任务不能只跑接口和 DOM 断言。每次涉及页面风格、图片、二维码、商品卡片、首页聚合时，Playwright 必须补齐以下检查：
@@ -134,7 +134,7 @@ uni-app H5、移动商城、分享海报、首页改版这类任务不能只跑�
 - 对分享海报二维码，优先断言平台接口，如 `/api/Os/CreateQRCodeImage`，或平台接口引擎返回的 HDFS 图片路径。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-011 sha256=6f2c751a6f1eb21ea571972d5a2f9d5323b997dbcdca510c2e34784911af5504 -->
+<!-- microi-progressive:chunk id=playwright-e2e-011 sha256=1aadaaf4d0a757e7225a33ff2a9b6621ea6e6430fb7eb92cb96d40ffb87f66af -->
 ## 测试证据必须绑定需求编号
 
 当用户一次提出多个问题时，Playwright 用例、截图文件名和最终测试报告必须能回到原始 `1、2、3...` 编号。
@@ -145,7 +145,7 @@ uni-app H5、移动商城、分享海报、首页改版这类任务不能只跑�
 - 如果某项属于后台元数据或数据库配置，仍需通过接口/数据库回读给出证据；前端截图只能证明展示，不等价于后台配置已改。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-012 sha256=a6ed859419114f601d611534e3d07bbfce0055ea6b7809daea9200da962391b6 -->
+<!-- microi-progressive:chunk id=playwright-e2e-012 sha256=c5c754c843a1adfc4911e3676b36b6d4fc91cd2c269ee2dc000e547ac19428c6 -->
 ## 移动端/H5 回归纪律
 
 处理 uni-app H5 移动商城的交易、资产、登录、购物车、抢购、充值、分享或图片相关问题时，不能只改代码后让用户手工发现问题。完成实现后必须至少执行（以下变量按项目实际情况替换）：

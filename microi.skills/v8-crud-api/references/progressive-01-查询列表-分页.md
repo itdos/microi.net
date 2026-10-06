@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-crud-api-007 sha256=0c2f3755beaa958d4642f98835743cc37063725746a256db7c18e1e0628a0e90 -->
+<!-- microi-progressive:chunk id=v8-crud-api-007 sha256=66648d1a9ca67cc9cb1cdc0dd231f73c61723fbc48fc197cbd74ba6a2cde4319 -->
 ## 查询列表（分页）
 
 ```javascript
@@ -80,7 +80,7 @@ var result = V8.FormEngine.GetTableDataCount('SysUser', {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-008 sha256=f7141662789ec6013eb3a7723d9c76449f3ef705e76c694e0fa6b1a065869f6a -->
+<!-- microi-progressive:chunk id=v8-crud-api-008 sha256=3ac0bc88bec40eb1a24e0d4829fae58094760efd3a5b77d1cc52d87c5931a58b -->
 ## 更新
 
 ```javascript
@@ -115,7 +115,7 @@ V8.FormEngine.UptTableData(uptList);
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-009 sha256=b4c668215e95f9c25b0581251b5ba0a3ac52ac30a5deed994383d22334c3f484 -->
+<!-- microi-progressive:chunk id=v8-crud-api-009 sha256=70e57be16e8676712be6910bfe9d50b87482d02cbbe0ab18a397a58f70916dae -->
 ## 删除
 
 ```javascript
@@ -138,7 +138,7 @@ V8.FormEngine.DelTableData(delList);
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-010 sha256=62326b11ca42eb72bddd7e9e72974aa6b1e36f3a85c10ac19e677fed197b03ec -->
+<!-- microi-progressive:chunk id=v8-crud-api-010 sha256=620f7edf12046f4cc4f7142b9e8dbae4495d826b38efb97abdf36fde4206e7d4 -->
 ## 按条件批量操作
 
 ```javascript
@@ -156,7 +156,7 @@ V8.FormEngine.DelFormDataByWhere('SysUser', {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-011 sha256=e3fac807511be04f71971c32cfce5c4b87f7a5a349d171624e5c598452dc1def -->
+<!-- microi-progressive:chunk id=v8-crud-api-011 sha256=8bfaf89705627a0c0dd1a7723c09832cb00a1206910e3ed70ebdbde7ffa832f4 -->
 ## 事务处理
 
 ```javascript
@@ -175,7 +175,7 @@ V8.ApiEngine.Run('other-engine-key', { Id: 'xxx' }, V8.DbTrans);
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-012 sha256=c8fe5dc10f0a971d3763b51f54cd77e4f23aed816206edf019db56dd37f603ce -->
+<!-- microi-progressive:chunk id=v8-crud-api-012 sha256=9ddaf59ae87f41e640674a98efe47cee9d9a614b68e32003d229e16d48056609 -->
 ## 请求内异步与后台处理
 
 ```javascript
@@ -193,7 +193,7 @@ return resp.StatusCode >= 200 && resp.StatusCode < 300
 禁止用 `setTimeout` / `Task.Run` 实现“立即返回、后台继续”：接口返回后 Jint Engine、租户上下文、事务和执行租约会释放。脱离请求的任务使用后台任务、Job、MQ 或 outbox，并按 `EventId` 幂等处理与恢复。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-013 sha256=2bc08bec5b03ec51679c79db4b654c5c4f66179d8258de61d949d3e3affa379d -->
+<!-- microi-progressive:chunk id=v8-crud-api-013 sha256=6af864eb1b50594c3c0dcae5e550e51bd65e58b5cd1cb792e2dc7cda39432e5f -->
 ## 动态加字段（运行时改表结构）
 
 ```javascript
@@ -213,7 +213,7 @@ V8.FormEngine.AddField({
 日期时间字段统一使用 `varchar(25)` 保存 `yyyy-MM-dd HH:mm:ss`，组件使用 `DateTime`。禁止 `datetime/date/timestamp/float/double/boolean/string/text/nvarchar` 等平台不允许的物理类型。动态表/字段属于控制面能力，只允许 `Level >= 9999` 的可信管理脚本使用。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-014 sha256=42b43027eb510916aed85a3a21ea8a1c1c7697581ac8c48863e8ba8d0c793784 -->
+<!-- microi-progressive:chunk id=v8-crud-api-014 sha256=c2d308a122ce6bb284fef1cecc98aabb861cafcd7b2f6c8e12cfda664fdb359f -->
 ## 旧版 _Where 兼容
 
 ```javascript

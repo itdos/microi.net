@@ -222,6 +222,9 @@ UnblockIp:<ip>
 - 报表参数按类型分开：只有 13/15 传非空 Area，1/3/9/11 传非空 HttpCode，21/23 传 IsOverseas；17 不传 DomainName。不得统一附加无关或空筛选项，否则阿里云返回 InvalidParameter。内嵌调用的 V8.Param 可能是 CLR JObject，不向它写入配置对象，创建独立 JS 请求并从服务端读取接入配置。
 - SLS 只用固定查询模板与已校验域名/项目/地域/Logstore；自动判断基于 `remote_ip`、`response_size` 字节以及完整窗口、采集延迟、连续命中、白名单、冷却与限额。私网/环回/链路本地/组播和与保护 CIDR 重叠的地址不封禁。动态阈值须满足历史样本数，默认观察。
 - 云端变更先 `Preview` 再 `Submit`，请求号幂等、配置快照比较、独立持久化状态和租约不可省略。超时/崩溃记 Unknown 并 `Reconcile`，不能自动重发不确定写入。到期只删除本应用新增条目，重叠封禁延后回收。
+- CMS 历史公有媒体的专用动作是 `RefreshCmsMedia/CmsRefreshStatus`；先验证 Capabilities 的 `CmsMediaRefresh/CmsRefreshTaskReadback`。管理员只能提交 `RendId/CmsTaskId`；服务端必须从当前租户已 Offline 的衍生、同站/同版本/同 InputHash 的原源删除检查点、可信 FileServer 与 `/当前租户/mci-cms-public/` 路径计算唯一旧 URL。拒绝任意 URL/目录/正则/客户端任务 Id/云密钥；普通 CMS 角色不能进入管理员入口，内部调用仍须重查权威撤销记录。
+- 云刷新前独立提交操作请求键、租约、原任务快照和 `CloudWriteStarted`；未知只读回原任务，不重复云写入。缺失 TaskId 仅可依据原 URL、执行时间与前快照恢复唯一新任务，歧义保持 Unknown。任务全部 Complete/100%、原 URL 严格 HTTP404 后，CMS 还必须重查源对象不存在和当前发布权限，并在站点锁内消费当前租户权威 outbox。客户端 CacheVerified 标记、隐藏前台、源404、刷新受理或加随机参数404均不能作撤权成功。用户保存/下载副本不可召回。
+- 精确文件刷新通常约5～6分钟；单 URL 入口保留默认每日10,000文件刷新额度、50QPS写入与5QPS任务读取边界，任务历史仅3天且同秒同 URL 任务可能合并，不假定请求与 TaskId 一一对应。刷新本身无独立费用，回源对象存储请求/流量仍可能计费。以阿里云 [RefreshObjectCaches](https://www.alibabacloud.com/help/en/cdn/developer-reference/api-cdn-2018-05-10-refreshobjectcaches)、[DescribeRefreshTasks](https://www.alibabacloud.com/help/en/cdn/developer-reference/api-cdn-2018-05-10-describerefreshtasks)及[刷新预热说明](https://help.aliyun.com/zh/cdn/user-guide/refresh-and-prefetch/)核对实际额度。验收先 warm 自有测试旧 URL 至真实缓存命中，再原请求撤回，保留源删除后旧 URL 仍200的红证、云任务与原 URL404绿证；Node模型通过不能替代真实云端。
 - 单域名 IP 黑名单与全账号海量封禁必须分开；后者需阿里云开通，须明确 `ALL_CDN_DOMAINS`，不在验收时自动开通付费服务。`limit_rate` 是至少 100 KB/s 的下载速率，不是 QPS；日志规则也不等于实时边缘 WAF。
 - `mci-cdn-security-tick` 回收到期封禁；每条启用规则通过 `V8.Method.SaveScheduleJob` 创建错峰任务并使用独立数据库租约。安装包包含基础调度及三张表的结构，不带云密钥、规则实例、白名单或任何测试 IP。
 - 验收分开记录 Node 行为测试、真实管理员/云端只读、文档保留 IP 的受控封禁/到期恢复、真实宿主页面、包正文 SHA 与安装。日志未投递或海量服务未开通时，如实标为待配置，不伪造云端通过。
