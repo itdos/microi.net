@@ -35,7 +35,8 @@ function resolveMaybeRelative(filePath) {
 }
 
 async function assertReleaseIsNotRunning() {
-    assertReleaseAvailable(repoRoot, 'platform');
+    assertReleaseAvailable(repoRoot, 'api');
+    assertReleaseAvailable(repoRoot, 'pc');
 }
 
 async function readJson(filePath) {

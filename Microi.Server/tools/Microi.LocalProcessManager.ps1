@@ -4,7 +4,9 @@ param(
     [string]$Action = 'Status',
     [string]$WorkspaceRoot = '',
     [int]$BackendPort = 61501,
-    [int]$FrontendPort = 61500
+    [int]$FrontendPort = 61500,
+    [ValidateSet('api', 'pc', 'all')]
+    [string]$ReleaseScope = 'all'
 )
 
 # 只读盘点：
@@ -619,14 +621,21 @@ function Invoke-StopFrontend([hashtable]$Snapshot) {
 }
 
 try {
-    # Agent 安装包不改写平台输出；平台停止/启动仍须核验同域锁，发布者凭原令牌准备独占。
+    # 服务与发布按产品范围匹配；官网与 Agent 不阻塞 API/PC 的启动或清理。
+    $scopes = switch ($Action) {
+        'StopBackend' { @('api') }
+        'StopFrontend' { @('pc') }
+        default { if ($ReleaseScope -eq 'all') { @('api', 'pc') } else { @($ReleaseScope) } }
+    }
     if ($Action -ne 'Status') {
         $ownerToken = if ($Action -eq 'PrepareRelease') { $env:MICROI_RELEASE_LOCK_TOKEN } else { '' }
-        & node $releaseLockTool assert platform $resolvedWorkspace $ownerToken
-        if ($LASTEXITCODE -ne 0) { throw '平台发布正在进行，禁止停止或重启共享服务。' }
+        foreach ($scope in $scopes) {
+            & node $releaseLockTool assert $scope $resolvedWorkspace $ownerToken
+            if ($LASTEXITCODE -ne 0) { throw "$scope 发布正在进行，禁止停止或重启该范围的共享服务。" }
+        }
     }
     switch ($Action) {
-        'AssertServiceStart' { Write-Info '平台服务启动锁检查通过；Agent 发布不阻塞。' }
+        'AssertServiceStart' { Write-Info "服务启动锁检查通过：$($scopes -join ', ')。" }
 
         'Status' {
             Show-Status
@@ -643,20 +652,19 @@ try {
             Write-Info '前端清理完成。'
         }
         'PrepareRelease' {
-            Write-Info '进入发布独占准备：只处理当前工作区的 61501 后端、61500 Vite 和额外 Release 后端。'
-            $snapshot = Get-ProcessSnapshot
-            Invoke-StopBackend $snapshot -IncludeListener
-            $snapshot = Get-ProcessSnapshot
-            Invoke-StopFrontend $snapshot
-
-            if (@(Get-ListeningProcessIds $BackendPort).Count -gt 0) {
-                throw "后端端口 $BackendPort 未释放。"
+            Write-Info "进入发布准备：仅处理所选范围 $($scopes -join ', ') 的本工作区服务。"
+            if ($scopes -contains 'api') {
+                $snapshot = Get-ProcessSnapshot
+                Invoke-StopBackend $snapshot -IncludeListener
+                if (@(Get-ListeningProcessIds $BackendPort).Count -gt 0) { throw "后端端口 $BackendPort 未释放。" }
+                Assert-ReleaseFilesUnlocked
             }
-            if (@(Get-ListeningProcessIds $FrontendPort).Count -gt 0) {
-                throw "前端端口 $FrontendPort 未释放。"
+            if ($scopes -contains 'pc') {
+                $snapshot = Get-ProcessSnapshot
+                Invoke-StopFrontend $snapshot
+                if (@(Get-ListeningProcessIds $FrontendPort).Count -gt 0) { throw "前端端口 $FrontendPort 未释放。" }
             }
-            Assert-ReleaseFilesUnlocked
-            Write-Info '发布独占准备完成；未结束 Edge/Chrome、VS Code、Playwright Test Server、数据库或 Redis。'
+            Write-Info '发布准备完成；未处理其它发布范围、浏览器、VS Code、数据库或 Redis。'
         }
     }
 }

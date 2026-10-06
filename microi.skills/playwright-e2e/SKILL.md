@@ -146,8 +146,7 @@ PW_HOME_PATH=/#/pages/index/index
 
 同一工作区有多个 AI 对话时，服务自启动还必须遵守共享生命周期：
 
-- 先执行 `node Microi.Server/tools/release-lock.mjs assert platform <工作区根>`。平台 `platform-release.lock` 存在时禁止 Playwright `webServer`、
-  自愈脚本或 AI 重新抢占 `61500/61501`；等待平台发布结束后重新检查。独立 `agent-release.lock` 不阻塞；旧 `release.lock` 只在真实进程确认属于 Agent 后放行，未知归属仍阻塞。
+- API 服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 服务使用 `assert pc`。Playwright `webServer`、自愈脚本或 AI 只在对应范围发布时等待；官网/Agent 发布不阻塞 `61500/61501`。同时启动前后端时分别检查两项。旧锁仅在真实进程证明所属范围后缩小阻塞范围，未知锁继续保护，不得删除活跃锁。
 - 端口健康且 PID/命令行属于当前工作区时直接复用，不得每个对话都无条件“先杀再启动”。
   必须重载源码时才串行重启，并在状态播报中说明旧/新 PID。
 - 本地长期后端使用项目目录中的 `dotnet run --launch-profile Microi.net.Api`，禁止把

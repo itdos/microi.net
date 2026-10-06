@@ -8,7 +8,7 @@ import test from 'node:test';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const source=fs.readFileSync(path.join(root,'Microi一键编译发布.sh'),'utf8');
 const begin=source.indexOf('# 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行完整业务回归。');
-const end=source.indexOf('# 编译/发布会改写共享输出目录',begin);
+const end=source.indexOf('# 发布只清理所选范围的开发服务',begin);
 assert.ok(begin>0&&end>begin,'The release script must contain the actual full-test gate');
 const gate=source.slice(begin,end);
 const gitExec=process.platform==='win32'?execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim():'';
@@ -78,12 +78,13 @@ powershell.exe(){ printf '%s\\n' "$*"; }
 unset MICROI_RELEASE_BACKEND_PORT MICROI_RELEASE_FRONTEND_PORT
 ${ports?`MICROI_RELEASE_BACKEND_PORT=${ports.backend}\nMICROI_RELEASE_FRONTEND_PORT=${ports.frontend}`:''}
 ${preparation}
+BUILD_BACKEND=true; BUILD_CLIENT=false
 prepare_release_workspace
 `});
   assert.ifError(run.error);assert.equal(run.status,0,run.stderr);
   assert.ok(run.stdout.includes(`-BackendPort ${ports?.backend||61501}`),run.stdout);
   assert.ok(run.stdout.includes(`-FrontendPort ${ports?.frontend||61500}`),run.stdout);
-  assert.match(run.stdout,/-Action PrepareRelease/);
+  assert.match(run.stdout,/-Action PrepareRelease -ReleaseScope api/);
  }
 });
 

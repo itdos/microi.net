@@ -141,18 +141,15 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
 ## Windows 多 AI 本地服务与 Release 文件锁
 
 多个 AI 对话共用同一工作区和固定 `61500/61501` 时，前后端是工作区级单例共享服务，
-不是每个对话各自拥有的后台进程。发布必须使用“工作区互斥 + 精确身份识别 + DLL 锁复核”：
+不是每个对话各自拥有的后台进程。发布必须使用“同范围互斥 + 精确身份识别 + DLL 锁复核”：
 
 - 健康开发服务默认复用；需要重载源码时串行重启。长期后端只从项目目录执行
   `dotnet run --launch-profile Microi.net.Api`，禁止直接运行 `bin/Release/net10.0`
   或 `bin/Release/publish` 作为 E2E 服务。
-- 一键发布在改写输出目录前创建 `.tmp/microi-process-state/platform-release.lock`；平台锁存在时其它 AI
-  不得启动、自愈或重启 `61500/61501`。
-- Agent 桌面安装包使用独立 `agent-release.lock`，可与平台发布并行。启动前使用 `node Microi.Server/tools/release-lock.mjs assert platform <工作区根>`；兼容旧全局锁时必须回读真实 Agent 进程归属，未知锁仍阻塞，不能删除活跃持有者的锁。
-- Windows 发布前调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease`。
-  只在端口、命令行和当前工作区路径同时匹配时停止 Microi API/Vite，并额外查找当前工作区
-  的 Release API；身份不匹配时失败关闭，禁止使用 `/IM dotnet.exe`、`/IM node.exe`、
-  `/IM chrome.exe` 或 `/IM msedge.exe` 全机清理。
+- API、PC、官网、Agent 分别使用 `api-release.lock`、`pc-release.lock`、`website-release.lock`、`agent-release.lock`，可并行发布；同类发布互斥。合并发布只取得所选产品的锁，部分取得失败时释放本次已取得的锁。
+- API 启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`；官网/Agent 不阻塞二者。旧全局锁仅在真实命令入口和状态目录证明 API 热修复或 Agent 归属后缩小阻塞范围，未知锁仍阻塞，不能删除活跃锁。
+- Windows 发布前调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease -ReleaseScope api|pc|all`。API 仅处理匹配工作区的后端与 Release DLL；PC 仅处理匹配的 Vite；官网不清理二者。禁止按进程名全机清理。
+- PC/API 各自保留完整 Full 门禁；Full 的 restore/build/test/package audit 输出统一隔离到本次结果目录 `.net-artifacts`。并行验收使用独立结果目录、测试服务/端口及隔离租户；共享版本与跨产品源码先冻结，测试期间不得修改。资源排队依据为当前并行阶段预算之和与系统余量，不使用单一全局发布窗口。
 - Vite 以相对 `node_modules/vite/bin/vite.js` 启动且父进程退出时，命令行可能没有绝对工作区路径。
   进程管理器只能把只读回读到的 CWD 精确等于当前 `Microi.Client` 作为补充证据；读取失败、
   CWD 属于其它目录或仅检测到孤儿状态时仍须失败关闭。回归同时覆盖当前工作区可精确停止、
