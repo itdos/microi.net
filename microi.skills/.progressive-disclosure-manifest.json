@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-06T12:54:27.511Z",
+  "generatedAt": "2026-10-06T14:26:47.295Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2221,8 +2221,8 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "8612125e4189bc0d448558ac4b873c6422e2d62ede8b8d9636195e12e86e75ac",
-      "originalLines": 642,
+      "originalSha256": "7d9bb9c1d03396f27764346fbcc3cd9f62e4f77151bfe9c4a6d7b973860e2c75",
+      "originalLines": 665,
       "prefixSha256": "01a5357a6c11c20c56f70178e843dd0d2aac92e796042c0bc582e72c967f1ad1",
       "prefixBytes": 16221,
       "entryLines": 285,
@@ -2271,8 +2271,8 @@
           "id": "v8-file-upload-005",
           "ordinal": 3,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "45f848d78235d8a315663fc77a2d9565b1a22791917591704040712fb56d1bee",
-          "lines": 150,
+          "sha256": "0b4d57f32bfe913c3a2567d2e2a86f4d5ba505d60c4348ad472c117774bbfc31",
+          "lines": 173,
           "heading": "公有桶 vs 私有桶"
         },
         {

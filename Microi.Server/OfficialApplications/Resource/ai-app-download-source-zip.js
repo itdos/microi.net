@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_download_source_zip
- * Version: v1.2.5
+ * Version: v1.2.6
  * Function:
  * - 按当前租户和有效拥有者导出活动私有源码，固定源码根、排除历史与运行对象，分页与逐文件字节摘要前后校验。
  */
@@ -115,6 +115,17 @@ function getFiles(app) {
     if (Object.prototype.hasOwnProperty.call(seen, key)) reject('DUPLICATE');
     seen[key] = true; total += all[j].Size;
     if (total > 2147483648) reject('LIMIT');
+  }
+  // 安装任务逐批切换当前文件行时，旧活动根可能只剩部分清单；根内摘要是完整性承诺。
+  // 用原始 FilePath 验证，不能用去掉 source/ 包装目录后的归档路径替代。
+  var rootParts = base.substring(1).split('/');
+  if (rootParts[1] === 'ai-app-source-staged' && text(rootParts[3]).indexOf('store-') === 0) {
+    if (rootParts.length !== 4 || !/^store-[a-f0-9]{64}$/.test(rootParts[3])) reject('METADATA');
+    var nativeFiles = all.slice().sort(function(a, b) { return a.FilePath < b.FilePath ? -1 : a.FilePath > b.FilePath ? 1 : 0; });
+    var nativeHash = text(V8.EncryptHelper.Sha256Hex(nativeFiles.map(function(file) {
+      return file.FilePath + '\t' + file.ContentHash + '\t' + file.Size;
+    }).join('\n'))).toLowerCase();
+    if (nativeHash !== rootParts[3].substring(6)) reject('METADATA');
   }
   if (!all.length) reject('EMPTY');
   return all;
