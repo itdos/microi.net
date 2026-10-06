@@ -130,8 +130,10 @@ function extractNamedFunction(sourceText, name) {
 }
 
 function extractAssignedFunction(sourceText, name) {
-  const dependencies = ['buildPhysicalColumnDefinition', 'syncPhysicalColumnsFromPackage'].includes(name)
-    ? extractAssignedFunction(sourceText, 'physicalColumnRequiresNotNull') + '\n' : '';
+  const dependencies = (['buildPhysicalColumnDefinition', 'syncPhysicalColumnsFromPackage'].includes(name)
+    ? extractAssignedFunction(sourceText, 'physicalColumnRequiresNotNull') + '\n' : '')
+    + (name === 'syncPhysicalColumnsFromPackage'
+      ? extractAssignedFunction(sourceText, 'executeMysqlColumnDdlWithRowBudget') + '\n' : '');
   const start = sourceText.indexOf(`var ${name} = function (`);
   assert.notEqual(start, -1, `missing assigned function ${name}`);
   const brace = sourceText.indexOf("{", start);
