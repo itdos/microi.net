@@ -28,7 +28,7 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 官方升级资源属于独立控制面。`get-microi-upgrade-resource` 可以匿名读取固定白名单，但 `Publish/PublishBatch` 必须调用仅绑定该 Managed ApiEngineKey 的 `V8.Method.AuthorizeOfficialResourcePublish()`：固定 `iTdos` 官方租户、拒绝访问密钥会话，并从主库复核当前用户、状态和平台管理员角色。禁止只相信 `V8.CurrentUser.Level`，也禁止把这个可信原子复用于普通接口、租户 Hook 或表单事件；资源校验、SHA 乐观锁、事务行锁、写入及回读仍由 Managed V8 编排。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-security-000 sha256=a6a4311b1a799ea4ed005b22c01cb8230509aaf09aeead5a17c8c46da74772c8 -->
+<!-- microi-progressive:chunk id=v8-security-000 sha256=8b2e0bbacbe69787199e6c70a9d8727e547498dce9febb52629e41ba9dbaa076 -->
 ## 0. 租户动态系统设置与密钥边界
 
 **AI 默认处理路径：** 用户交付第三方 Secret 并授权配置时，优先调用 `microi_manage_server_private_secret`：List 只确认 Key/HasSecret；Save 使用 `confirmExecution=SAVE:<ConfigKey>`，固定 `IsSecret=true / IsPublic=false` 并自动脱敏回读。例如畅捷通使用 `Integration.Changjet.AppSecret`，后端从 `V8.SysConfig.ServerPrivateSettings` 使用。不要仅拒绝硬编码后停止，也不要因为 `OsClientModel` 不暴露密钥而误判服务端 V8 无法调用第三方。工具不提供原文揭示；更换已有 Key 前回读现状，超时只回读、不盲目重写。
@@ -81,7 +81,7 @@ Secret 只通过租户管理员专用端点写入租户绑定的认证密文。�
 - 多节点保存连接使用按 `OsClient + DbKey` 隔离的分布式锁，并由数据库唯一索引兜底；同步数据和附件仍必须使用业务幂等键，锁不能替代唯一约束、状态机或 inbox/outbox。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-001 sha256=51070dc1148f49c796dd605045b7fcb5970290638cf85e844c17d81962afa7aa -->
+<!-- microi-progressive:chunk id=v8-security-001 sha256=461dc1d5ae5dc51f7d33d4d0837914eaa352bb81cceb4b5a7de4e8bfac399878 -->
 ## 0.5 接口引擎配置安全
 
 代码以外，接口本身的配置项也是安全防线（详见 `v8-api-config/SKILL.md`）：
@@ -106,7 +106,7 @@ Secret 只通过租户管理员专用端点写入租户绑定的认证密文。�
 - 没有字段上下文的普通上传默认保持私有安全目录；管理员可在普通 `sys_config.HdfsUploadRules` 按可信角色授予业务目录（含有界 glob）与明确公有权限。必须先拒绝实际路径中的通配符、穿越和平台保留目录，再做模式匹配；通配符不是匿名/跨租户/发布授权。微信待审图片、头像、裁剪/压缩原图等更强规则继续优先。测试同时证明公有字段/目录可用、私有请求/伪造上下文/保留目录不可绕过。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-002 sha256=fdc1cbd297d141bfef8e9e0ee58a972410ffc9b6b778b217b5610f86139f514c -->
+<!-- microi-progressive:chunk id=v8-security-002 sha256=7229e5f8d200c0dfbab08752405f5e88d7edc80e9e92b6802880c022b09ca893 -->
 ## 1. 防 SQL 注入
 
 ### 必须：参数化查询
@@ -135,7 +135,7 @@ V8.Db.FromSql("SELECT * FROM " + V8.Param.table).ToArray();
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-003 sha256=4f875f2eaf69716bf7d2b92d42ba079ec952cfcbc3211682b8d73f53ca8fd398 -->
+<!-- microi-progressive:chunk id=v8-security-003 sha256=8813dffa5c5c4c8816abddf3628579d474fe02137504d6c909f36303d4692560 -->
 ## 3. 输入验证
 
 ### 必填校验
@@ -178,7 +178,7 @@ if (isNaN(amount) || amount <= 0 || amount > 999999.99) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-004 sha256=13385475478ef17b58798db43779503a924385e599ad6ed5a8abd396949064aa -->
+<!-- microi-progressive:chunk id=v8-security-004 sha256=1703ea824e4807b24d30225d41e16fb36b0fecc21c63a4ab0296106185460a27 -->
 ## 4. 防 XSS
 
 四个字符替换不是通用 XSS 防护。必须按输出上下文处理：
