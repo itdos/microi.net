@@ -6,6 +6,7 @@ import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensurePlatformServiceRuntimeFields } from './platform-service-runtime-fields.mjs';
+import { buildPlatformServiceRouteSnapshots } from './platform-service-route-snapshot.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../../../');
@@ -573,15 +574,9 @@ bundle.MicroService.AssetCount = buildAssets.length;
 bundle.MicroService.TotalSize = String(totalSize);
 bundle.MicroService.PublishTime = localTime;
 const existingRoutes = new Map((bundle.Routes || []).map(route => [route.RoutePath, route]));
-bundle.Routes = routeDefinitions.map(routeDefinition => {
-  const routePath = String(routeDefinition.path || '').trim();
-  if (!routePath.startsWith('/')) throw new Error(`微服务路由必须以 / 开头：${routePath}`);
+bundle.Routes = buildPlatformServiceRouteSnapshots(routeDefinitions, bundle.Routes || []).map(snapshot => {
+  const routePath = snapshot.RoutePath;
   const existing = existingRoutes.get(routePath) || {};
-  let portableRouteMeta = {};
-  try { portableRouteMeta = JSON.parse(existing.RouteMetaJson || '{}') || {}; }
-  catch { portableRouteMeta = {}; }
-  if (typeof portableRouteMeta !== 'object' || Array.isArray(portableRouteMeta)) portableRouteMeta = {};
-  delete portableRouteMeta._MicroiV3;
   return {
     Id: existing.Id || sha256(`microi-platform-service:${routePath}`).slice(0, 26).toUpperCase(),
     CreateTime: existing.CreateTime || localTime,
@@ -591,17 +586,17 @@ bundle.Routes = routeDefinitions.map(routeDefinition => {
     IsDeleted: 0,
     MicroServiceId: bundle.MicroService.Id,
     MicroServiceKey: 'microi-platform-service',
-    PageKey: String(routeDefinition.name || routePath.slice(1)),
-    PageName: String(existing.PageName || routeDefinition.name || routePath.slice(1)),
-    PageTitle: String(routeDefinition.title || routeDefinition.name || routePath),
+    PageKey: snapshot.PageKey,
+    PageName: snapshot.PageName,
+    PageTitle: snapshot.PageTitle,
     RoutePath: routePath,
     EntryPath: 'index.html',
     MenuUrl: `/micro-app/microi-platform-service${routePath}`,
-    Sort: Number(routeDefinition.sort || 0),
-    IsHome: routeDefinition.isHome === true || Number(routeDefinition.isHome) === 1 ? 1 : 0,
+    Sort: snapshot.Sort,
+    IsHome: snapshot.IsHome,
     IsEnable: 1,
     BuildVersion: version,
-    RouteMetaJson: JSON.stringify(portableRouteMeta),
+    RouteMetaJson: snapshot.RouteMetaJson,
     SourceDirName: 'microi-platform-service',
   };
 });
