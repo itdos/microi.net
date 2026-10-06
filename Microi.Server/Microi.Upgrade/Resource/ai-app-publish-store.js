@@ -10,12 +10,44 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v2.0.9
+ * Version: v2.1.2
  * Function:
  * - 应用源码、运行与正式安装包发布。已提交V3运行资产按当前租户、应用、版本与请求指纹验证对象身份，私有HDFS不足时使用固定平台稳定地址，并校验实际字节大小和SHA256。
  * - 组合运行应用从源权威记录携带严格IsPublic/IsApprove标记，拒绝请求覆盖与无效类型；保留历史公开兼容和源码独立授权。
  * - RuntimeAssetsOnly 显式交付编译运行资产，禁止平台结构、资源代码及源码泄入游戏安装包；旧调用保持兼容。
+ * - 相同受管源码、策略与所有权的重复发布保留已发布基线，避免接口更新后资源快照摘要漂移。
  */
+
+/* SPARSE_TABLE_SELECTION_V1：只接受固定元数据Id；不接任意表定义、DDL或包正文覆盖。
+ * JSON往返把Jint JObject/JArray转换为普通值后再验证，未知键不能被悄悄丢弃。
+ */
+function normalizeSparseTableSelections(value) {
+  if (value === undefined || value === null) return [];
+  if (typeof value === 'string') value = JSON.parse(value);
+  value = JSON.parse(JSON.stringify(value));
+  if (!Array.isArray(value) || value.length > 32) throw new Error('SparseTableSelections 必须是最多32项数组');
+  var result = [], seen = Object.create(null);
+  for (var i = 0; i < value.length; i++) {
+    var item = value[i];
+    if (!item || typeof item !== 'object' || Array.isArray(item)
+        || Object.keys(item).some(function(k) { return k !== 'TableId' && k !== 'FieldIds'; })
+        || typeof item.TableId !== 'string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(item.TableId)
+        || !Array.isArray(item.FieldIds) || item.FieldIds.length < 1 || item.FieldIds.length > 512)
+      throw new Error('SparseTableSelections 仅支持 TableId + 非空 FieldIds');
+    var key = '$' + item.TableId.toLowerCase();
+    if (seen[key]) throw new Error('SparseTableSelections 表重复');
+    seen[key] = true;var fields = [], ids = Object.create(null);
+    for (var f = 0; f < item.FieldIds.length; f++) {
+      var id = item.FieldIds[f];
+      if (typeof id !== 'string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(id) || ids['$'+id.toLowerCase()])
+        throw new Error('SparseTableSelections 字段Id无效或重复');
+      ids['$'+id.toLowerCase()] = true;fields.push(id);
+    }
+    fields.sort();result.push({ TableId: item.TableId, FieldIds: fields });
+  }
+  result.sort(function(a,b) { return a.TableId < b.TableId ? -1 : a.TableId > b.TableId ? 1 : 0; });
+  return result;
+}
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
 function fail(msg, data) { return { Code: 0, Data: data || null, Msg: msg || '执行失败' }; }
@@ -88,7 +120,7 @@ function validateRuntimeAssetsOnlyMode(enabled, context, parameters, previousSto
     return fail('RuntimeAssetsOnly 仅支持 ProtocolVersion=3、Web、显式 IncludeSource=false 与已验证 SharedPublicRuntime。');
   }
   var requested = parameters || {};
-  var selectionFields = ['MenuIds', 'SelectMenu', 'TableIds', 'SelectTable',
+  var selectionFields = ['MenuIds', 'SelectMenu', 'TableIds', 'SelectTable', 'SparseTableSelections',
     'ApiEngineKeys', 'SelectApiEngine', 'ApiEngineRemovalKeys', 'FlowIds',
     'ScheduleJobNames', 'JobNames', 'DataSelections', 'DataSets', 'SelectData',
     'Routes', 'Pages', 'MenuContract', 'ResourcePolicies', 'ApiEnginePolicies'];
@@ -1259,9 +1291,20 @@ function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStor
     };
     if (policy === 'Managed') {
       var previousEngine = previousEngines[key];
-      var baseHash = previousEngine
-        ? sha256Hex(text(previousEngine.ApiV8Code))
-        : text(source.BaseHash).toLowerCase();
+      // MANAGED_POLICY_IDENTICAL_SOURCE_REPLAY_V1: retain the published baseline
+      // for identical source/policy/ownership. Recomputing it from the just-published
+      // engine changes ResourceSnapshotHash on a retry after a successful upgrade.
+      var previousBaseHash = text(previousPolicy.BaseHash).toLowerCase();
+      var preservePublishedBase = previousEngine
+        && text(previousEngine.ApiV8Code) === text(engine.ApiV8Code)
+        && text(previousPolicy.UpgradePolicy || previousPolicy.Policy || 'Managed') === 'Managed'
+        && text(previousPolicy.Ownership || 'Application') === ownership
+        && /^[a-f0-9]{64}$/.test(previousBaseHash);
+      var baseHash = preservePublishedBase
+        ? previousBaseHash
+        : previousEngine
+          ? sha256Hex(text(previousEngine.ApiV8Code))
+          : text(source.BaseHash).toLowerCase();
       if (baseHash) entry.BaseHash = baseHash;
       var compatibleBaseHashes = normalizeSha256Hashes(
         source.CompatibleBaseHashes || source.LegacyBaseHashes || []
@@ -2251,6 +2294,17 @@ var exactMenuIds = V8.Param.ExactMenuIds === true
   || V8.Param.ExactMenuIds === 1
   || text(V8.Param.ExactMenuIds).toLowerCase() === 'true';
 var tableIds = parseArray(V8.Param.TableIds);
+var sparseSupplied=V8.Param.SparseTableSelections !== undefined && V8.Param.SparseTableSelections !== null;
+var sparseTableSelections;
+try { sparseTableSelections=normalizeSparseTableSelections(V8.Param.SparseTableSelections); }
+catch(sparseSelectionError) { return fail('稀疏选集无效：'+sparseSelectionError.message); }
+var storedTableSelection=parseArray(existingStore && existingStore.SelectTable);
+var storedSparse=storedTableSelection.filter(function(t){return t && typeof t==='object' && t.FieldIds !== undefined;});
+if(storedSparse.length && !sparseSupplied)return fail('已发布稀疏选集必须显式刷新 SparseTableSelections，清空请传[]；不能升级成整表选择。');
+var sparseStoreSelection=tableIds.concat(sparseTableSelections);
+if(sparseSupplied && V8.Param.SelectTable !== undefined && V8.Param.SelectTable !== null
+    && canonicalResourceJson(sortCanonicalResourceArray(parseArray(V8.Param.SelectTable))) !== canonicalResourceJson(sortCanonicalResourceArray(sparseStoreSelection)))
+  return fail('SelectTable 必须与完整 TableIds + SparseTableSelections 精确一致');
 var flowIds = parseArray(V8.Param.FlowIds);
 var apiEngineKeys = parseArray(V8.Param.ApiEngineKeys);
 var explicitApiEngineSelection = V8.Param.ApiEngineKeys !== undefined
@@ -2264,7 +2318,7 @@ if (dataSelections.length === 0 && existingStore && existingStore.SelectData) {
 if (menuIds.length === 0 && existingStore && existingStore.SelectMenu) {
   menuIds = selectionValues(existingStore.SelectMenu, ['Id', 'MenuId', 'Value']);
 }
-if (tableIds.length === 0 && existingStore && existingStore.SelectTable) {
+if (!sparseSupplied && tableIds.length === 0 && existingStore && existingStore.SelectTable) {
   tableIds = selectionValues(existingStore.SelectTable, ['Id', 'TableId', 'Value']);
 }
 if (apiEngineKeys.length === 0 && existingStore && existingStore.SelectApiEngine) {
@@ -2310,13 +2364,14 @@ var selectedExport = {
   DiyFields: [],
   DataSets: []
 };
-if (dataSelections.length > 0 || menuIds.length > 0 || tableIds.length > 0 || flowIds.length > 0 || apiEngineKeys.length > 0) {
+if (dataSelections.length > 0 || menuIds.length > 0 || tableIds.length > 0 || sparseTableSelections.length > 0 || flowIds.length > 0 || apiEngineKeys.length > 0) {
   var selectedExportResult = V8.ApiEngine.Run('export-microi-store-package', {
     MenuIds: menuIds,
     ExactMenuIds: exactMenuIds,
     FlowIds: flowIds,
     ApiEngineKeys: apiEngineKeys,
     TableIds: tableIds,
+    SparseTableSelections: sparseTableSelections,
     DataSelections: dataSelections,
     PackageName: text(V8.Param.AppName || app.Name || app.AppKey),
     PackageVersion: versionNo
@@ -2326,6 +2381,9 @@ if (dataSelections.length > 0 || menuIds.length > 0 || tableIds.length > 0 || fl
   }
   selectedExport = selectedExportResult.Data;
 }
+// 稀疏声明连同其权威资源体进入同一包；真正资源CAS仍由既有ResourceSnapshot计算。
+if(sparseTableSelections.length && canonicalResourceJson((selectedExport.PackageInfo||{}).SparseTableSelections||[]) !== canonicalResourceJson(sparseTableSelections))
+  return fail('导出器未确认同一稀疏选集，请先更新官方应用商城导出能力');
 selectedExport.SysMenus = normalizeExactExportedMenuClosure(
   selectedExport.SysMenus,
   menuContract,
@@ -2531,6 +2589,7 @@ if (requestedDatabaseOnlyBuild) {
     Reason: '小型平台微服务使用可验证数据库内联运行时，避免目标租户对象存储差异导致 404。'
   };
 }
+if(sparseTableSelections.length) packageModel.PackageInfo.SparseTableSelections=sparseTableSelections;
 var generatedResourcePolicies = buildApiEngineResourcePolicies(
   packageModel.SysApiEngines,
   requestedResourcePolicies,
@@ -2725,7 +2784,7 @@ if (action === 'Publish') {
       : (V8.Param.MenuIds !== undefined && V8.Param.MenuIds !== null
           ? selectionJson(menuIds)
           : selectionJson(existingStore && existingStore.SelectMenu)),
-    SelectTable: V8.Param.SelectTable !== undefined && V8.Param.SelectTable !== null
+    SelectTable: sparseSupplied ? selectionJson(sparseStoreSelection) : V8.Param.SelectTable !== undefined && V8.Param.SelectTable !== null
       ? selectionJson(V8.Param.SelectTable)
       : (V8.Param.TableIds !== undefined && V8.Param.TableIds !== null
           ? selectionJson(tableIds)

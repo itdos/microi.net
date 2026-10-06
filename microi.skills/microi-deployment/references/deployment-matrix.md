@@ -68,6 +68,14 @@ IIS 进程启动不代表 API 可用，仍要检查 readiness 和真实登录路
 
 ## 本地源码运行
 
+macOS 的一键发布探针通过 `run_with_timeout` 使用 GNU `timeout`、`gtimeout` 或仓库 Node 工具 `Microi.Server/tools/run-with-timeout.mjs`。缺少 GNU 命令不能据此判定 Docker 不健康；超时工具只停止自身创建的探针进程。官网专用选项 6 不发布 DLL/NuGet，后端发布的加密门禁保持有效。
+
+Obfuscar 路径转换只适用于 Git Bash/MSYS/Cygwin。macOS/Linux 的 `/Users`、`/usr` 等绝对路径直接传给工具；Windows 优先 `cygpath`，无该命令时只转换完整盘符根路径。修复后使用隔离副本验证五个 DLL 和指纹，再重新执行一键脚本的 Full 与最终加密产物冒烟。
+
+在线 AI MCP 的生产依赖和命令复制为完整、自足的运行快照，生产命令链接解析为真实文件，保留执行权限；损坏、越界及目录循环链接提前拒绝。临时构建目录清理后命令必须仍能运行，旧依赖不得残留；不放宽原制品门禁。
+
+前端构建的 macOS 可用内存按有界 `vm_stat` 的真实页大小计算空闲页加可回收文件页，不叠加匿名非活动、压缩或预读页。解析失败和探针超时回退原生空闲量；Windows/Linux 保持原统计方式。启动预算、95% 暂停、90% 恢复及连续五秒稳定门禁不变，正式发布不能跳过保护；统计错误应修正探针，并保留共享服务。
+
 后端：
 
 - 使用当前仓库规定的 .NET SDK；

@@ -14,7 +14,7 @@ description: Microi 菜单按钮与 Tab V8 指南。用于配置 sys_menu MoreBt
 ---
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-000 sha256=9ed7af82b50d25263818ad4b1ec1b5c6290d9d4a5a8cdc7f046440c0e6a0a1ff -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-000 sha256=bb9b02dd84d917e61d6a96b2b0222b31678994c38d1a14ea5cbbad02b5a2ab7d -->
 ## 1. 字段总览
 
 | 字段 | 渲染位置 | 必填项 |
@@ -29,7 +29,7 @@ description: Microi 菜单按钮与 Tab V8 指南。用于配置 sys_menu MoreBt
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-001 sha256=21a4d64e3ddf27766ecf2325a8af935c3b6e3134c4fa4df484ace9f1f356de6c -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-001 sha256=bc876765afdb17bd70766ab39e26afacb7207702272465abbc88309356357973 -->
 ## 3. 模式 A：弹窗收集参数 → 调接口引擎（最常用）
 
 ```js
@@ -57,7 +57,7 @@ V8.OpenAnyForm({
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-002 sha256=911b9cddbd448bb27d39d0de93274b0f67622e0b61026267d13300297931f34a -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-002 sha256=9e242daca15f6ccfeed786b7dba77fa4362a4baeca166981bb8e2a15234a28f7 -->
 ## 4. 模式 B：直接确认 + 接口调用
 
 `ConfirmTips` 使用 HTML 模式渲染内容，只传固定文案或经过 HTML 转义的简单文本；不要拼接用户输入、接口消息或数据库富文本。
@@ -76,7 +76,7 @@ V8.ConfirmTips('确认领取该任务？', function () {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-003 sha256=b58b1c9990f905a0b65bb72c472461bb46ce22eb1f5c73bec68938a162bdcb55 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-003 sha256=3b1d5525f9fc40203729f88d7e481b0ae6dc6cc9653f3752b330abbbcf68d4ef -->
 ## 4.1 模式 B2：在线微服务定制页（OpenAppDialog）
 
 当弹窗包含复杂布局、多步骤交互、实时校验或后续需要 AI 在线维护时，优先把页面实现为在线微服务，按钮 V8 代码只负责打开页面、传入上下文和接收结果。不要把长篇 HTML/CSS 写进 `V8Code`。

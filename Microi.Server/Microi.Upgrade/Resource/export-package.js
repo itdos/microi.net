@@ -10,10 +10,101 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: export-microi-store-package
- * Version: v1.3.3
+ * Version: v1.3.8
  * Function:
- * - 导出或持久发布 Microi 应用安装包；支持预制平台包、UTF-8 HDFS、FormEngine fence CAS、两阶段不可变快照收口，并同步服务端与客户端最低版本门禁。
+ * - 导出和持久发布完整应用安装包。工作流物理字段闭包在写入前验证；持久日志保留正式 ChangeType，缺失或未知分类失败关闭，完整正文 CAS、HDFS 与不可变快照继续强回读。
  */
+
+/* SPARSE_TABLE_SELECTION_V1：只接受固定元数据Id；不接任意表定义、DDL或包正文覆盖。
+ * JSON往返把Jint JObject/JArray转换为普通值后再验证，未知键不能被悄悄丢弃。
+ */
+function normalizeSparseTableSelections(value) {
+  if (value === undefined || value === null) return [];
+  if (typeof value === 'string') value = JSON.parse(value);
+  value = JSON.parse(JSON.stringify(value));
+  if (!Array.isArray(value) || value.length > 32) throw new Error('SparseTableSelections 必须是最多32项数组');
+  var result = [], seen = Object.create(null);
+  for (var i = 0; i < value.length; i++) {
+    var item = value[i];
+    if (!item || typeof item !== 'object' || Array.isArray(item)
+        || Object.keys(item).some(function(k) { return k !== 'TableId' && k !== 'FieldIds'; })
+        || typeof item.TableId !== 'string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(item.TableId)
+        || !Array.isArray(item.FieldIds) || item.FieldIds.length < 1 || item.FieldIds.length > 512)
+      throw new Error('SparseTableSelections 仅支持 TableId + 非空 FieldIds');
+    var key = '$' + item.TableId.toLowerCase();
+    if (seen[key]) throw new Error('SparseTableSelections 表重复');
+    seen[key] = true;var fields = [], ids = Object.create(null);
+    for (var f = 0; f < item.FieldIds.length; f++) {
+      var id = item.FieldIds[f];
+      if (typeof id !== 'string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(id) || ids['$'+id.toLowerCase()])
+        throw new Error('SparseTableSelections 字段Id无效或重复');
+      ids['$'+id.toLowerCase()] = true;fields.push(id);
+    }
+    fields.sort();result.push({ TableId: item.TableId, FieldIds: fields });
+  }
+  result.sort(function(a,b) { return a.TableId < b.TableId ? -1 : a.TableId > b.TableId ? 1 : 0; });
+  return result;
+}
+
+/* SPARSE_SHARED_TABLE_EXPORT_V1
+ * 稀疏表依赖既有责任包：不发共享建表/索引、不发Tabs/Column等表布局；
+ * 字段、物理列和默认行仍来自当前租户权威查询，安装时复用DataSet前置缺表拒绝。
+ */
+function projectSparseTables(selections, tables, fields, fullTableIds) {
+  var byId=Object.create(null), byName=Object.create(null), requested=Object.create(null);
+  var full=Object.create(null), resultTables=[],resultFields=[];
+  for(var fi=0;fi<fullTableIds.length;fi++)full['$'+String(fullTableIds[fi]).toLowerCase()]=true;
+  for(var si=0;si<selections.length;si++) {
+    var selected=selections[si],key='$'+selected.TableId.toLowerCase();
+    if(full[key])throw new Error('同一表不能同时完整与稀疏导出');
+    var matches=tables.filter(function(t){return String(t.Id).toLowerCase()===selected.TableId.toLowerCase();});
+    if(matches.length!==1)throw new Error('稀疏表不存在或不唯一');
+    var table=matches[0],name=String(table.Name||'');
+    if(!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(name)||Number(table.IsDeleted||0)!==0)throw new Error('稀疏表名称或状态无效');
+    if(['diy_table','diy_field','sys_menu','sys_apiengine','wf_flowdesign','wf_node','wf_line','sys_microistore','sys_microistore_changelog','mci_ai_app_file','mci_ai_app_version','sys_microiservice','sys_microiservice_page'].indexOf(name.toLowerCase())>=0)
+      throw new Error('稀疏选集不能裁剪平台安装基础设施');
+    var item={TableId:table.Id,TableName:name,FieldIds:selected.FieldIds,FieldNames:[],Names:Object.create(null)};
+    for(var j=0;j<selected.FieldIds.length;j++) {
+      var id=selected.FieldIds[j];var matchesField=fields.filter(function(f){return String(f.Id).toLowerCase()===id.toLowerCase();});
+      if(matchesField.length!==1||String(matchesField[0].TableId).toLowerCase()!==String(table.Id).toLowerCase())throw new Error('稀疏字段不存在、重复或属于其它表');
+      var field=matchesField[0],fieldName=String(field.Name||'');
+      if(!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(fieldName)||!field.Type||String(field.Type)==='1'||Number(field.IsDeleted||0)!==0||item.Names['$'+fieldName.toLowerCase()])
+        throw new Error('稀疏字段必须是唯一有效物理字段');
+      item.Names['$'+fieldName.toLowerCase()]=true;item.FieldNames.push(fieldName);requested['$'+String(field.Id).toLowerCase()]=true;
+    }
+    byId[key]=item;byName['$'+name.toLowerCase()]=item;
+  }
+  for(var ti=0;ti<tables.length;ti++) {var t=tables[ti];resultTables.push(byId['$'+String(t.Id).toLowerCase()]?{Id:t.Id,Name:t.Name}:t);}
+  for(var fj=0;fj<fields.length;fj++){var f=fields[fj];if(!byId['$'+String(f.TableId).toLowerCase()]||requested['$'+String(f.Id).toLowerCase()])resultFields.push(f);}
+  return {Tables:resultTables,Fields:resultFields,ById:byId,ByName:byName};
+}
+function sparsePhysicalColumns(columns,plan) {
+  var result=[],seen=Object.create(null);
+  for(var i=0;i<columns.length;i++) {
+    var col=columns[i],name=String(col.TABLE_NAME||col.TableName||''),field=String(col.COLUMN_NAME||col.ColumnName||'');
+    var item=plan.ByName['$'+name.toLowerCase()];
+    if(!item){result.push(col);continue;}
+    if(!item.Names['$'+field.toLowerCase()])continue;
+    var key='$'+name.toLowerCase()+'.'+field.toLowerCase();if(seen[key])throw new Error('稀疏物理字段重复');seen[key]=true;result.push(col);
+  }
+  Object.keys(plan.ByName).forEach(function(key){var item=plan.ByName[key];item.FieldNames.forEach(function(name){if(!seen['$'+item.TableName.toLowerCase()+'.'+name.toLowerCase()])throw new Error('稀疏字段缺少权威物理列');});});
+  return result;
+}
+function addSparseTablePrerequisites(dataSets,plan) {
+  var result=dataSets.slice();
+  Object.keys(plan.ById).forEach(function(key){
+    var item=plan.ById[key],sets=result.filter(function(s){return String(s.TableName).toLowerCase()===item.TableName.toLowerCase();});
+    for(var i=0;i<sets.length;i++) {
+      var s=sets[i];if(s.ConflictPolicy!=='InsertIfMissing')throw new Error('共享表默认数据只支持InsertIfMissing');
+      var required=(s.ConflictFields||[]).concat(['Id']);
+      (s.Rows||[]).forEach(function(row){required=required.concat(Object.keys(row));});
+      required.forEach(function(name){if(!item.Names['$'+String(name).toLowerCase()])throw new Error('稀疏默认数据引用未选择字段');});
+    }
+    // 标准零行DataSet只声明目标表前置依赖；不伪造种子行。现安装器先于DDL检查真实表存在。
+    if(!sets.length)result.push({TableId:item.TableId,TableName:item.TableName,SelectionMode:'Ids',RowIds:[],Where:[],ConflictPolicy:'InsertIfMissing',ConflictFields:['Id'],Rows:[]});
+  });
+  return result;
+}
 
 // ==================== 参数接收与校验 ====================
 
@@ -91,6 +182,12 @@ if (typeof DataSelections == 'string') {
 }
 DataSelections = copyArray(DataSelections);
 TableIds = copyArray(TableIds);
+var SparseTableSelections;
+try { SparseTableSelections = normalizeSparseTableSelections(V8.Param.SparseTableSelections); }
+catch (sparseSelectionError) { return {Code:0,Msg:'稀疏选集无效：'+sparseSelectionError.message}; }
+var sparseSelectionMap=Object.create(null);
+for(var sparseIndex=0;sparseIndex<SparseTableSelections.length;sparseIndex++) sparseSelectionMap['$'+SparseTableSelections[sparseIndex].TableId.toLowerCase()]=true;
+for(var fullIndex=0;fullIndex<TableIds.length;fullIndex++) if(sparseSelectionMap['$'+String(TableIds[fullIndex]).toLowerCase()]) return {Code:0,Msg:'同一表不能同时完整与稀疏导出'};
 if (typeof AiAppSelections == 'string') {
     try { AiAppSelections = JSON.parse(AiAppSelections || '[]'); } catch (aiSelectionError) { AiAppSelections = []; }
 }
@@ -187,7 +284,7 @@ for (var initialTableIndex = 0; initialTableIndex < TableIds.length; initialTabl
 }
 for (var selectionIndex = 0; selectionIndex < DataSelections.length; selectionIndex++) {
     var selectionTableId = DataSelections[selectionIndex] && DataSelections[selectionIndex].TableId;
-    if (selectionTableId && !selectedTableIdMap[String(selectionTableId)]) {
+    if (selectionTableId && !selectedTableIdMap[String(selectionTableId)] && !sparseSelectionMap['$'+String(selectionTableId).toLowerCase()]) {
         TableIds.push(selectionTableId);
         selectedTableIdMap[String(selectionTableId)] = true;
     }
@@ -201,7 +298,7 @@ var hasTableIds = TableIds && TableIds.length > 0;
 var hasDataSelections = DataSelections.length > 0;
 var hasAiAppIds = AiAppIds.length > 0;
 
-if (!hasMenuIds && !hasFlowIds && !hasApiEngineKeys && !hasTableIds && !hasDataSelections && !hasAiAppIds) {
+if (!hasMenuIds && !hasFlowIds && !hasApiEngineKeys && !hasTableIds && !hasDataSelections && !hasAiAppIds && SparseTableSelections.length === 0) {
     return {
         Code: 0,
         Msg: '参数错误：MenuIds、FlowIds、ApiEngineKeys、TableIds、DataSelections、AiAppIds 至少要传入一个非空数组'
@@ -248,7 +345,7 @@ try {
     someFieldList = someFieldList.Data;
 
     // 清理函数：移除对象中值为 null 或空字符串的属性，并移除跨租户字段
-    var cleanObject = function (obj) {
+    var cleanObject = function (obj, selectedEmptyFields) {
         var cleaned = {};
         // 需要移除的字段列表（跨租户数据）
         var excludeFields = {
@@ -265,8 +362,13 @@ try {
             if (excludeFields[key] || key.indexOf('_Raw') == 0 || key.charAt(0) == '_') {
                 continue;
             }
-            // 只保留有值的字段（排除 null、undefined、空字符串）
-            if (value !== null && value !== undefined && value !== '') {
+            // 稀疏默认数据的已选字段可保留源记录自己的真实空串；不把 NULL/缺键推断成默认值。
+            // Array.map 会传数字 index，只有内部传入的字段名列表才启用此规则；排除字段仍先过滤。
+            var preserveSelectedEmpty = value === '' && selectedEmptyFields
+                && typeof selectedEmptyFields.indexOf == 'function'
+                && selectedEmptyFields.indexOf(key) >= 0
+                && Object.prototype.hasOwnProperty.call(obj, key);
+            if (value !== null && value !== undefined && (value !== '' || preserveSelectedEmpty)) {
                 cleaned[key] = value;
             }
         }
@@ -321,6 +423,79 @@ try {
         }
 
         return result;
+    };
+
+    // MARKETPLACE_WORKFLOW_PHYSICAL_FIELD_CLOSURE_V1：预制包的 PhysicalColumns 是调用方正文，
+    // 不能反过来为未知工作流属性授权。发布前从当前租户数据库读固定三表真实列；目录读取失败
+    // 即停止，且必须早于 HDFS、日志、发布 fence 与商品指针。安装器仍独立严格回读所有字段。
+    var assertWorkflowPhysicalFields = function (model) {
+        var groups = [
+            { Key: 'WfFlowDesigns', Table: 'wf_flowdesign' },
+            { Key: 'WfNodes', Table: 'wf_node' },
+            { Key: 'WfLines', Table: 'wf_line' }
+        ];
+        for (var groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+            var group = groups[groupIndex], rows = model[group.Key];
+            if (rows === undefined || rows === null) continue;
+            if (!Array.isArray(rows) || typeof rows.length != 'number'
+                || !isFinite(rows.length) || rows.length < 0 || Math.floor(rows.length) != rows.length) {
+                throw new Error('工作流资源必须为数组：' + group.Key);
+            }
+            if (!rows.length) continue;
+
+            // 方言仅来自可信 OsClientModel，绝不采用包或 V8.Param 的 provider/schema。
+            // SQL Server OBJECT_ID 以当前数据库真实解析的对象为准，避免联合其他 schema 同名表。
+            var dbType = String(V8.OsClientModel && (V8.OsClientModel.DbType || V8.OsClientModel.OsClientDbType) || '')
+                .replace(/^\s+|\s+$/g, '').toLowerCase();
+            var schemaSql;
+            if (dbType == 'mysql' || dbType == 'mariadb') {
+                schemaSql = 'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS '
+                    + 'WHERE TABLE_SCHEMA=DATABASE() AND LOWER(TABLE_NAME)=LOWER(@p0) ORDER BY ORDINAL_POSITION';
+            } else if (dbType == 'sqlserver' || dbType == 'mssql') {
+                schemaSql = "SELECT name AS COLUMN_NAME FROM sys.columns WHERE object_id=OBJECT_ID(@p0,'U') ORDER BY column_id";
+            } else if (dbType == 'oracle') {
+                schemaSql = 'SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME=UPPER(@p0) ORDER BY COLUMN_ID';
+            } else {
+                throw new Error('工作流字段校验不支持当前数据库类型或类型缺失');
+            }
+            var schemaRows;
+            try {
+                schemaRows = V8.Db.FromSql(schemaSql).AddInParameter('@p0', group.Table).ToArray();
+            } catch (schemaError) {
+                // 不把数据库原始异常或连接信息拼入业务返回；受管导出器只返回固定表和门禁原因。
+                throw new Error('工作流物理列读取失败：' + group.Table);
+            }
+            if (!schemaRows || !schemaRows.length) {
+                throw new Error('工作流物理列为空：' + group.Table);
+            }
+            var columns = Object.create(null);
+            for (var columnIndex = 0; columnIndex < schemaRows.length; columnIndex++) {
+                var schemaRow = schemaRows[columnIndex] || {};
+                var columnName = String(schemaRow.COLUMN_NAME || schemaRow.ColumnName || schemaRow.column_name || '');
+                var columnKey = columnName.toLowerCase();
+                if (!isSafeIdentifier(columnName) || columns[columnKey]) {
+                    throw new Error('工作流物理列无效或大小写重复：' + group.Table);
+                }
+                columns[columnKey] = true;
+            }
+            if (!columns.id) throw new Error('工作流物理列缺少 Id：' + group.Table);
+            for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+                var row = rows[rowIndex];
+                if (!row || typeof row != 'object' || Array.isArray(row)) {
+                    throw new Error('工作流资源行必须为对象：' + group.Key + '/' + rowIndex);
+                }
+                var fields = Object.keys(row), seen = Object.create(null);
+                if (!fields.length) throw new Error('工作流资源行字段为空：' + group.Key + '/' + rowIndex);
+                for (var fieldIndex = 0; fieldIndex < fields.length; fieldIndex++) {
+                    var fieldName = fields[fieldIndex], fieldKey = fieldName.toLowerCase();
+                    if (seen[fieldKey] || !columns[fieldKey]) {
+                        // 值为 0/false/null 也需要物理列；不能删属性或假造默认值把坏包发布成绿。
+                        throw new Error('工作流字段不存在或大小写重复：' + group.Table + '/' + rowIndex + '/' + fieldName);
+                    }
+                    seen[fieldKey] = true;
+                }
+            }
+        }
     };
 
     // ==================== 步骤1：查询所有菜单数据 ====================
@@ -555,6 +730,12 @@ try {
         debugLog.extraTableIdsCount = TableIds.length;
     }
 
+    var fullExportTableIds=tableIds.slice();
+    for(var spi=0;spi<SparseTableSelections.length;spi++) {
+        var sparseId=SparseTableSelections[spi].TableId;
+        if(tableIdMap[sparseId])throw new Error('菜单或子表完整闭包与稀疏表冲突');
+        tableIds.push(sparseId);tableIdMap[sparseId]=true;
+    }
     // ==================== 步骤4：查询所有相关的diy_table数据 ====================
     // 获取 diy_table 所有字段 START
     var diyTableTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'diy_table');
@@ -634,6 +815,8 @@ try {
     // 清理 diy_field 数据
     exportFields = exportFields.map(cleanObject);
 
+    var sparseTablePlan=projectSparseTables(SparseTableSelections,exportTables,exportFields,fullExportTableIds);
+    exportTables=sparseTablePlan.Tables;exportFields=sparseTablePlan.Fields;
     debugLog.exportFieldsCount = exportFields.length;
 
     // ==================== 步骤5.5：生成DDL语句 ====================
@@ -735,6 +918,8 @@ try {
     for (var i = 0; i < exportTables.length; i++) {
         var table = exportTables[i];
         var tableName = table.Name;
+        // 已安装共享表仅补选定物理字段，不生成CREATE TABLE/INDEX，责任包继续维护共享结构。
+        if(typeof sparseTablePlan !== 'undefined' && sparseTablePlan.ById['$'+String(table.Id).toLowerCase()])continue;
         var tableFields = exportFields.filter(f => f.TableId == table.Id);
 
         if (!tableName) continue;
@@ -827,7 +1012,7 @@ try {
     }
 
     // 建表/补列在前，索引在后；新建与既有租户升级均有独立索引DDL可幂等回读。
-    var exportedIndexStatements = getPhysicalIndexStatements(exportTables, exportFields, fixedDiyField);
+    var exportedIndexStatements = getPhysicalIndexStatements(exportTables.filter(function(t){return !(typeof sparseTablePlan !== 'undefined' && sparseTablePlan.ById['$'+String(t.Id).toLowerCase()]);}), exportFields, fixedDiyField);
     for (var indexStatement = 0; indexStatement < exportedIndexStatements.length; indexStatement++) ddlStatements.push(exportedIndexStatements[indexStatement]);
     debugLog.physicalIndexCount = exportedIndexStatements.length;
     debugLog.ddlStatementsCount = ddlStatements.length;
@@ -1007,7 +1192,8 @@ try {
         'diy_table': true, 'diy_field': true, 'sys_menu': true, 'sys_user': true,
         'sys_role': true, 'sys_rolelimit': true, 'sys_osclients': true,
         'sys_config': true, 'sys_apiengine': true, 'sys_token': true,
-        'sys_userlogin': true, 'sys_microistore': true
+        'sys_userlogin': true, 'sys_microistore': true,
+        'mci_runtime_installation': true // 后台代码审批是独立可信动作，禁止应用数据包种入/恢复授权。
     };
     var isSafeDataName = function (name) {
         return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(name || ''));
@@ -1065,6 +1251,8 @@ try {
         }
 
         var dataQuery = { _PageIndex: 1, _PageSize: 5001 };
+        var sparseDataTable=sparseTablePlan.ById['$'+String(selectedTable.Id).toLowerCase()];
+        if(sparseDataTable) dataQuery._SelectFields=sparseDataTable.FieldNames.slice();
         if (selectionMode == 'Ids') dataQuery.Ids = rowIds;
         else dataQuery._Where = safeWhere;
         var selectedRowsResult = V8.FormEngine.GetTableData(selectedTable.Name, dataQuery);
@@ -1114,7 +1302,7 @@ try {
 
         var cleanRows = [];
         for (var cleanRowIndex = 0; cleanRowIndex < selectedRows.length; cleanRowIndex++) {
-            var cleanRow = cleanObject(selectedRows[cleanRowIndex]);
+            var cleanRow = cleanObject(selectedRows[cleanRowIndex], sparseDataTable ? sparseDataTable.FieldNames : null);
             for (var validateConflictIndex = 0; validateConflictIndex < conflictFields.length; validateConflictIndex++) {
                 var validateConflictField = conflictFields[validateConflictIndex];
                 if (!Object.prototype.hasOwnProperty.call(cleanRow, validateConflictField)
@@ -1127,7 +1315,7 @@ try {
             cleanRows.push(cleanRow);
         }
         exportDataRowCount += cleanRows.length;
-        exportDataSets.push({
+        var exportedDataSet = {
             TableId: selectedTable.Id,
             TableName: selectedTable.Name,
             TableDescription: selectedTable.Description || selectedTable.Name,
@@ -1136,11 +1324,14 @@ try {
             Where: selectionMode == 'Where' ? safeWhere : [],
             ConflictPolicy: conflictPolicy,
             ConflictFields: conflictFields,
-            // 配置子表种子保留显式父记录绑定，安装时解析目标租户 Id，不固化发布者的 Id。
-            ParentBinding: selection.ParentBinding || undefined,
             Rows: cleanRows
-        });
+        };
+        // 未声明父绑定时不创建该键；宿主把 undefined 序列化为 null 会改变稀疏数据集的严格形状。
+        // 普通配置子表的显式绑定仍交安装器校验，并在目标租户解析父记录 Id。
+        if (selection.ParentBinding) exportedDataSet.ParentBinding = selection.ParentBinding;
+        exportDataSets.push(exportedDataSet);
     }
+    exportDataSets=addSparseTablePrerequisites(exportDataSets,sparseTablePlan);
     debugLog.exportDataSetCount = exportDataSets.length;
     debugLog.exportDataRowCount = exportDataRowCount;
 
@@ -1160,7 +1351,7 @@ try {
         addUniqueTableName(physicalTableNameMap, physicalTableNames, someTableList[st].Name);
     }
 
-    var physicalColumns = getPhysicalColumns(physicalTableNames);
+    var physicalColumns = sparsePhysicalColumns(getPhysicalColumns(physicalTableNames),sparseTablePlan);
     debugLog.physicalTableNames = physicalTableNames;
     debugLog.physicalColumnsCount = physicalColumns.length;
 
@@ -1236,6 +1427,7 @@ try {
         DataSets: exportDataSets
     };
 
+    if(SparseTableSelections.length) packageData.PackageInfo.SparseTableSelections=SparseTableSelections;
     var appendUnique = function (target, source, keyGetter) {
         var exists = {};
         for (var targetIndex = 0; targetIndex < target.length; targetIndex++) {
@@ -1290,6 +1482,9 @@ try {
     if (ResourcePolicies) {
         packageData.ResourcePolicies = ResourcePolicies;
     }
+
+    // 原生导出与预制发布复用同一事实源；预制正文尚未载入时不校验将被替换的临时模型。
+    if (!PersistStoreId || !PreparedPersistPackageByteBase64) assertWorkflowPhysicalFields(packageData);
 
     debugLog.endTime = new Date().toISOString();
     debugLog.packageSize = JSON.stringify(packageData).length;
@@ -1362,6 +1557,7 @@ try {
                 throw new Error('持久化发布失败：预制包资源计数与正文不一致');
             }
             packageData = preparedPackageData;
+            assertWorkflowPhysicalFields(packageData);
         }
         var persistTitle = '';
         var persistContent = '';
@@ -1373,7 +1569,7 @@ try {
             persistTitle = String(PersistChangeLog.Title || '').replace(/^\s+|\s+$/g, '');
             persistContent = String(PersistChangeLog.Content || '').replace(/^\s+|\s+$/g, '');
             persistReleaseTime = String(PersistChangeLog.ReleaseTime || '').replace(/^\s+|\s+$/g, '');
-            persistChangeType = String(PersistChangeLog.ChangeType || 'Feature');
+            persistChangeType = String(PersistChangeLog.ChangeType || '').replace(/^\s+|\s+$/g, '');
             persistSort = parseInt(PersistChangeLog.Sort || 100, 10);
             if (!persistTitle || !persistContent || !persistReleaseTime) {
                 throw new Error('持久化发布失败：PersistChangeLog 必须包含 Title、Content、ReleaseTime');
@@ -1427,6 +1623,12 @@ try {
         } else if (changeLogs.length != 1) {
             throw new Error('持久化发布失败：必须先维护且仅维护一条精确版本更新日志 ' + exactPackageVersion);
         }
+        // MARKETPLACE_PERSIST_CHANGELOG_TYPE_V1：持久化正文必须保留正式日志的真实分类。
+        // 禁止为缺失/未知分类补默认值；在HDFS写包、发布fence和日志写入前失败关闭。
+        var exactChangeType = String(changeLogs[0].ChangeType || '').replace(/^\s+|\s+$/g, '');
+        if (['Feature', 'Improvement', 'Fix', 'Security', 'Breaking'].indexOf(exactChangeType) < 0) {
+            throw new Error('持久化发布失败：精确版本更新日志 ChangeType 缺失或不受支持');
+        }
         packageData.PackageInfo.Name = storeRow.AppName || storeRow.Name || PackageName;
         packageData.PackageInfo.Version = exactPackageVersion;
         packageData.PackageInfo.AppId = storeRow.AppKey || storeRow.AppId || PersistAppKey;
@@ -1438,6 +1640,7 @@ try {
         packageData.PackageInfo.ChangeLog = {
             Version: changeLogs[0].Version,
             Title: changeLogs[0].Title,
+            ChangeType: exactChangeType,
             Content: changeLogs[0].Content,
             ReleaseTime: changeLogs[0].ReleaseTime
         };

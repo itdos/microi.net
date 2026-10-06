@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-http-integration-011 sha256=b446647747ac6672f011f1cdc9bade6c6af774c7bf737472976f8ac49bbc7709 -->
+<!-- microi-progressive:chunk id=v8-http-integration-011 sha256=035d7ba47caf7a9f885bcb507a5e963811f292f3331a45f9b3f1b97ece6c2edc -->
 ## 错误处理模式
 
 ```javascript
@@ -28,7 +28,7 @@ try {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-http-integration-012 sha256=321e3eee95847088ca6c48ee0dba2b926e834fa492cfd97d1a347ae6cbb843d5 -->
+<!-- microi-progressive:chunk id=v8-http-integration-012 sha256=3cd56273cd9f23e8edec8849430d7545e9925a766a06a19be8c87ec1ef4ca0c8 -->
 ## 注意事项
 
 - `V8.Http.Post` 的 `PostParam` 不支持多级嵌套对象，嵌套需用 `PostParamString`

@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-mq-mqtt-002 sha256=7f130288432d55ab82bc57b7be6bd6a44c46d12df009a91a50534d5c54ef2ba9 -->
+<!-- microi-progressive:chunk id=v8-mq-mqtt-002 sha256=e3917adda6454dc4d17672df3afc11def6fbd2f7a77f24b3ac821320d6df7907 -->
 ## V8.MQTT — IoT 物联网
 
 先区分两个边界：MQTT 是设备实时双向通道，RabbitMQ 是服务端异步队列；

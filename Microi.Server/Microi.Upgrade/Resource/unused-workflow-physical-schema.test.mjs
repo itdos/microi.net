@@ -20,7 +20,10 @@ test('publication rejects accidental optional workflow schema before any tenant 
 });
 test('export omits unrelated workflow columns and preserves selected tables or actual flow dependencies',()=>{
  const s=fs.readFileSync(new URL('./export-package.js',import.meta.url),'utf8');
- const block=s.slice(s.indexOf('    var physicalTableNameMap ='),s.indexOf('    var physicalColumns = getPhysicalColumns'));
+ const start=s.indexOf('    var physicalTableNameMap =');
+ const end=s.indexOf('    var physicalColumns = ',start);
+ assert.ok(start>=0 && end>start,'physical table dependency block must remain present');
+ const block=s.slice(start,end);
  function names(owned,flows){const c={exportTables:owned?[{Name:'wf_flowdesign'}]:[],exportFlows:flows?[{}]:[],exportNodes:[],exportLines:[],someTableList:[{Name:'diy_field'},{Name:'wf_flowdesign'},{Name:'wf_node'}],addUniqueTableName:(m,l,n)=>{if(!m[n]){m[n]=true;l.push(n);}}};vm.runInNewContext(block,c);return [...c.physicalTableNames];}
  assert.deepEqual(names(false,false),['diy_field']);
  assert.deepEqual(names(true,false),['wf_flowdesign','diy_field']);

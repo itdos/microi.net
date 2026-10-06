@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-ui-006 sha256=ceee291596c4834218a0ca37b3b5e06499bacf8752fe38ae7b7c9bf1f5ee6359 -->
+<!-- microi-progressive:chunk id=microi-ui-006 sha256=640cefe2522ed4fa107299f8cebd22f9adb123f2cfa137841483aa43dc2ab446 -->
 ## 移动端场景蓝图
 
 ### 登录/注册
@@ -114,7 +114,7 @@
 - 活动页需要活动首屏、进度/状态、奖励/操作面板和规则面板。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-007 sha256=9729199bfc47719b776366ebfd8e542770ec427011c3c51a24b221ba615cc229 -->
+<!-- microi-progressive:chunk id=microi-ui-007 sha256=7160d9b28fb119dc5ee9c0a59e6a0a333defee6dab7dce52f5e56a8354e597e7 -->
 ## 网站/PC 站标准
 
 - 构建真实产品/站点体验，不要做通用落地页外壳。
@@ -126,7 +126,7 @@
 - 写页面局部 CSS 前优先使用 `MciHeroPanel`、`MciSection`、`MciCard`、`MciMetricCard` 和 `MciButton`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-008 sha256=77e0a70e1131fe90354eba315727bbd2f49c5929a98c767cb3dfef71f0c55234 -->
+<!-- microi-progressive:chunk id=microi-ui-008 sha256=4f6b3174c3353ba42388b1c2cdbeea5262adfbbccbd1021667ae642c80bf7a60 -->
 ## 后台菜单配套
 
 创建 Microi 低代码系统时，后台菜单不应全部是一层菜单。真实系统至少使用两级：
@@ -140,7 +140,7 @@
 移动端信息架构在可行时应与这些业务域匹配。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-009 sha256=2fe8adfc7c7d422a94ad667934c71113bbfced5df199a2a7ff0c14ceddb32373 -->
+<!-- microi-progressive:chunk id=microi-ui-009 sha256=741009676a3161ce7aed258306b759ffb8eeca3ee681c55fd4fc5b4fcc823059 -->
 ## AI 实施清单
 
 - Microi 前端、网站、H5、uni-app、小程序、客户门户、员工端、会员中心、仪表盘、报告、活动和视觉重设计任务要自动识别本 skill。
@@ -160,7 +160,7 @@
 - 检查未登录/未授权提示卡片是否在 header 与 tabBar/底栏之间的可用内容区上下左右居中，不能贴在顶部。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-ui-010 sha256=4cba6feaad134c973d51943e622199c944d12b67a860894a5415cfcd7eeb831f -->
+<!-- microi-progressive:chunk id=microi-ui-010 sha256=fe2debba61f4ebdab4d67df7df972c5c7456a2eea4e3b4fef6a04256165e999d -->
 ## 禁止输出
 
 - Microi.UI 文件或文档内不得出现外部 UI 库身份或复制来的类名前缀。

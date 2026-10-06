@@ -18,6 +18,7 @@ const identityFields = [
 ];
 
 const readableResourceIdentities = {
+  'export-package.js': 'export-microi-store-package',
   'import-package.js': 'import-microi-store-package',
   'ai-app-publish-store.js': 'ai_app_publish_store',
   'official-resource-api.js': 'ApiEngineKey: get-microi-upgrade-resource',
@@ -456,7 +457,43 @@ export function validateOfficialPackageInstallContracts(name, content) {
 
 // DATASET_SCHEMA_CLOSURE_V1: 官方母库已有物理表不能代替包的建表资源。
 // 发布前从实际种子字段反向检查，禁止让缺表错误到客户安装的最后阶段才暴露。
+// 稀疏共享表只扩展显式字段；这是独立、严格的依赖分支，不能为普通数据集免除结构闭包。
+export function validateSparseTableContract(name, model) {
+  const selected=model.PackageInfo?.SparseTableSelections;
+  if(selected===undefined)return new Map();
+  if(!Array.isArray(selected)||selected.length>32)throw new Error(`${name} 稀疏选集无效`);
+  const result=new Map(),lower=v=>String(v||'').toLowerCase();
+  const id=v=>typeof v==='string'&&/^[A-Za-z0-9_.-]{1,128}$/.test(v);
+  const namePattern=/^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+  for(const item of selected) {
+    if(!item||Array.isArray(item)||Object.keys(item).some(k=>!['TableId','FieldIds'].includes(k))||!id(item.TableId)||!Array.isArray(item.FieldIds)||!item.FieldIds.length||item.FieldIds.length>512||item.FieldIds.some(f=>!id(f))||new Set(item.FieldIds.map(lower)).size!==item.FieldIds.length)throw new Error(`${name} 稀疏选集无效`);
+    const tables=(model.DiyTables||[]).filter(t=>lower(t.Id)===lower(item.TableId));
+    if(tables.length!==1||Object.keys(tables[0]).some(k=>!['Id','Name'].includes(k)))throw new Error(`${name} 稀疏表不得携带共享布局`);
+    const table=tables[0],key=lower(table.Name);
+    if(!namePattern.test(table.Name)||result.has(key))throw new Error(`${name} 稀疏表名称重复或无效`);
+    if((model.DDLStatements||[]).some(d=>lower(d.TableName)===key))throw new Error(`${name} 稀疏表不得携带CREATE/INDEX`);
+    const fields=(model.DiyFields||[]).filter(f=>lower(f.TableId)===lower(item.TableId)),ids=new Set(item.FieldIds.map(lower));
+    if(fields.length!==ids.size||new Set(fields.map(f=>lower(f.Id))).size!==ids.size||fields.some(f=>!ids.has(lower(f.Id))||!namePattern.test(f.Name)||!f.Type||String(f.Type)==='1'))throw new Error(`${name} 稀疏字段与选集不一致`);
+    const names=new Set(fields.map(f=>lower(f.Name))),physical=(model.PhysicalColumns||[]).filter(c=>lower(c.TABLE_NAME)===key);
+    if(names.size!==fields.length||physical.length!==names.size||new Set(physical.map(c=>lower(c.COLUMN_NAME))).size!==names.size||physical.some(c=>!names.has(lower(c.COLUMN_NAME))))throw new Error(`${name} 稀疏物理列与选集不一致`);
+    const sets=(model.DataSets||[]).filter(s=>lower(s.TableName)===key);
+    if(!sets.length)throw new Error(`${name} 稀疏表缺少实际安装前置依赖`);
+    for(const set of sets){
+      if(lower(set.TableId)!==lower(item.TableId)||set.ConflictPolicy!=='InsertIfMissing'||!Array.isArray(set.Rows)||set.MetadataFieldsIfExists!==undefined||set.ParentBinding!==undefined)throw new Error(`${name} 稀疏默认数据不允许覆盖租户值`);
+      if(set.Rows.length===0){
+        if(Object.keys(set).some(k=>!['TableId','TableName','SelectionMode','RowIds','Where','ConflictPolicy','ConflictFields','Rows'].includes(k))||set.SelectionMode!=='Ids'||!Array.isArray(set.RowIds)||set.RowIds.length!==0||!Array.isArray(set.Where)||set.Where.length!==0||JSON.stringify(set.ConflictFields)!=='["Id"]')throw new Error(`${name} 标准零行依赖形状不完整`);
+      }else{
+        const required=new Set(['id',...(set.ConflictFields||[]).map(lower),...set.Rows.flatMap(r=>Object.keys(r).map(lower))]);
+        if(!Array.isArray(set.ConflictFields)||!set.ConflictFields.length||[...required].some(f=>!names.has(f)))throw new Error(`${name} 稀疏默认数据引用未选择字段`);
+      }
+    }
+    result.set(key,{table,names});
+  }
+  return result;
+}
+
 export function validateOfficialDataSetSchemaClosure(name, packageModel) {
+  const sparseTables=validateSparseTableContract(name,packageModel);
   const normalize = value => String(value || '').trim().toLowerCase();
   const dataSets = packageModel.DataSets || [];
   const dataRows = dataSets.reduce((count, dataSet) => count + (dataSet.Rows || []).length, 0);
@@ -467,6 +504,7 @@ export function validateOfficialDataSetSchemaClosure(name, packageModel) {
   }
   for (const dataSet of dataSets) {
     const tableName = normalize(dataSet.TableName);
+    if(sparseTables.has(tableName))continue; // 已逐项验证限定稀疏依赖；普通数据集下方闭包保持原样。
     const table = (packageModel.DiyTables || []).find(row => normalize(row.Name) === tableName);
     const ddl = (packageModel.DDLStatements || []).filter(row => normalize(row.TableName) === tableName
       && /\bCREATE\s+TABLE\b/i.test(String(row.DDL || ''))).map(row => row.DDL).join('\n');

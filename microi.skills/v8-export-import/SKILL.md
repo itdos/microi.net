@@ -12,7 +12,7 @@ description: Microi V8 Office 导入导出指南。用于使用 V8.Office 导出
 文档维护必须优先更新既有后端 V8 主文档 `microi.doc/docs/doc/v8-engine/v8-server.md`，再按需补充已有专题页；不得为同一组 `V8.Office` API 新建重复 Markdown 页面或文档路由。只维护 `microi.doc/docs/doc/` 中文文档，`docs/en/` 由官网统一翻译生成，不手工同步英文版。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-export-import-000 sha256=e4f13e7292335a4ea683c34ae13c3f794bdc297079a61c4099e3f547eb5e07ac -->
+<!-- microi-progressive:chunk id=v8-export-import-000 sha256=ea1d8edd1c2da7c7aeea5aa415d7b11d64c6243752b48b50667f3ba80be76e5b -->
 ## 核心 API
 
 标准表格导出使用 `.xlsx` 文件名及对应 OpenXML MIME。历史平台生成的“XLSX 内容但扩展名为 .xls”仅在 Excel 导入入口兼容：必须验证 OpenXML 工作簿包结构，再由 NPOI 解析；真正的 `.xls` 继续支持。禁止取消文件签名检查或把此兼容扩张到 OnlyOffice 回源、任意 ZIP、HTML/可执行文件。
@@ -27,7 +27,7 @@ description: Microi V8 Office 导入导出指南。用于使用 V8.Office 导出
 | `V8.Office.SendEmail({...})` | 发送邮件（HTML 内容） |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-001 sha256=9e166678e0cbc3b96814e9945a66c93426dd5ffb6a3c98bfbfe8dcb9e92ea5f9 -->
+<!-- microi-progressive:chunk id=v8-export-import-001 sha256=71c2d539b2dbc034927410e093775be9251b5883e2551a77d87d4e6121eed73a -->
 ## 自定义导出 Excel（接口引擎）
 
 平台默认导出仅支持表格已展示的字段。如需自定义（如列重排、合并、计算列、图片），用接口引擎替换【导出接口】。
@@ -132,7 +132,7 @@ return {
 优先级：列级样式覆盖全局样式；`Width` 覆盖 `DefaultColumnWidth`；开启 `AutoSize` 后以自动宽度为准，再应用 `MinWidth/MaxWidth`。不传这些新参数时保持旧版导出行为。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-002 sha256=c18ba2c06baf3e7fb2cea79fe46637d3223d1f6b6454aa46057cfb80addd352a -->
+<!-- microi-progressive:chunk id=v8-export-import-002 sha256=d26555b9a045d6a5920cf3dfd69cd20e2351aa3bab9c8499d3a5d79f58ffa6cd -->
 ## 文件响应与前端调用约定
 
 - 接口引擎必须开启【响应文件】，并返回正确的 `FileName`、`ContentType`、`FileByteBase64`。
@@ -154,7 +154,7 @@ return {
 | `NumberFormat/HeaderStyle/Style` | 数字格式与列级样式 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-003 sha256=5975618ee1d3b9a4828d9f88cf35bc4efe4a8d7f45b94bd40077fa50b1d89c1f -->
+<!-- microi-progressive:chunk id=v8-export-import-003 sha256=9adee471586dce589c6cf5dcaa32820ad05025c670ca885801cfa4711c584cdb -->
 ## 解析上传的 Excel / CSV（导入）
 
 ```javascript

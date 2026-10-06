@@ -10,10 +10,179 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.3
+ * Version: v3.0.5
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
+ * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
  */
+
+/* EMPTY_SHARED_TABLE_PREREQUISITE_V1
+ * 标准零行DataSet仅用于既有共享表依赖；它没有任何可写行/元数据策略。
+ * 旧安装器会拒绝受保护表数据集，新分支仅在物理前置检查后验证元数据并跳过写路径。
+ */
+function isEmptySharedTablePrerequisite(dataSet) {
+    var value=JSON.parse(JSON.stringify(dataSet));
+    if(!value || typeof value!=='object' || Array.isArray(value))return false;
+    var keys=Object.keys(value),allowed=['TableId','TableName','SelectionMode','RowIds','Where','ConflictPolicy','ConflictFields','Rows'];
+    if(keys.some(function(k){return allowed.indexOf(k)<0;}))return false;
+    return typeof value.TableId==='string' && /^[A-Za-z0-9_.-]{1,128}$/.test(value.TableId)
+        && typeof value.TableName==='string' && /^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(value.TableName)
+        && value.SelectionMode==='Ids' && value.ConflictPolicy==='InsertIfMissing'
+        && Array.isArray(value.Rows) && value.Rows.length===0
+        && Array.isArray(value.RowIds) && value.RowIds.length===0
+        && Array.isArray(value.Where) && value.Where.length===0
+        && Array.isArray(value.ConflictFields) && value.ConflictFields.length===1 && value.ConflictFields[0]==='Id';
+}
+
+// RUNTIME_APPROVAL_DATASET_DENY_V1：表结构可由官方包安装，授权数据不可由任何安装包种入。
+function validateRuntimeApprovalData(packageModel) {
+    var sets = (packageModel || {}).DataSets || [];
+    if (typeof sets === 'string') sets = JSON.parse(sets);
+    for (var i = 0; i < sets.length; i++) {
+        var dataSet = sets[i] || {};
+        if (String(dataSet.TableName || '').toLowerCase() === 'mci_runtime_installation'
+            && !isEmptySharedTablePrerequisite(dataSet))
+            throw new Error('后台规则审批数据禁止通过应用包新增、更新或恢复；只允许严格零行依赖。');
+    }
+}
+
+/* DECLARATIVE_PACKAGE_DDL_PREFLIGHT_V1
+ * 安装包只可声明结构。逐字符识别字符串、标识符与注释，不能用contains或
+ * 调用者的TableName掩盖第二语句、动态执行或另一个真实目标表。
+ */
+function readDeclarativePackageDdl(sql, declaredTableName) {
+    sql=String(sql||'');if(!sql.trim()||sql.length>2097152)throw new Error('应用包DDL为空或超过有界长度');
+    var tokens=[],i=0,ended=false;
+    function token(kind,value){if(ended)throw new Error('应用包DDL禁止多语句');tokens.push({Kind:kind,Value:value,Upper:value.toUpperCase()});}
+    while(i<sql.length){
+        var c=sql.charAt(i),n=sql.charAt(i+1);
+        if(/\s/.test(c)){i++;continue;}
+        if(c==='-'&&n==='-'){i+=2;while(i<sql.length&&sql.charAt(i)!=='\n'&&sql.charAt(i)!=='\r')i++;continue;}
+        if(c==='#'){while(i<sql.length&&sql.charAt(i)!=='\n'&&sql.charAt(i)!=='\r')i++;continue;}
+        if(c==='/'&&n==='*'){
+            if(sql.charAt(i+2)==='!'||sql.charAt(i+2)==='+'||(/^m!$/i).test(sql.substring(i+2,i+4)))throw new Error('应用包DDL禁止可执行注释和提示');
+            var close=sql.indexOf('*/',i+2);if(close<0)throw new Error('应用包DDL注释未闭合');
+            if(sql.substring(i+2,close).indexOf('/*')>=0)throw new Error('应用包DDL禁止歧义嵌套注释');i=close+2;continue;
+        }
+        if(c===';'){if(ended)throw new Error('应用包DDL禁止多语句');ended=true;i++;continue;}
+        if(c==="'"||c==='"'||c==='`'||c==='['){
+            var quote=c==='['?']':c,kind=c==="'"?'string':'identifier',value='',closed=false;i++;
+            while(i<sql.length){var q=sql.charAt(i++);
+                if(q==='\\')throw new Error('应用包DDL拒绝反斜杠引号歧义；字符串请使用标准重复引号');
+                if(q===quote){if(sql.charAt(i)===quote){value+=quote;i++;continue;}closed=true;break;}value+=q;
+            }
+            if(!closed)throw new Error('应用包DDL引号未闭合');token(kind,value);continue;
+        }
+        var word=/^[A-Za-z_][A-Za-z0-9_$]*/.exec(sql.substring(i));
+        if(word){token('word',word[0]);i+=word[0].length;continue;}
+        var number=/^\d+(?:\.\d+)?/.exec(sql.substring(i));
+        if(number){token('number',number[0]);i+=number[0].length;continue;}
+        if('(),.=+-'.indexOf(c)>=0){token('symbol',c);i++;continue;}
+        throw new Error('应用包DDL包含不支持的语法字符');
+    }
+    var at=0;
+    function wordIs(pos,value){return tokens[pos]&&tokens[pos].Kind==='word'&&tokens[pos].Upper===value;}
+    function take(value){if(!wordIs(at,value))throw new Error('应用包DDL仅支持声明式CREATE/ALTER列/INDEX');at++;}
+    function identifier(){var t=tokens[at++];if(!t||(t.Kind!=='word'&&t.Kind!=='identifier')||!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(t.Value))throw new Error('应用包DDL目标标识符无效');return t.Value;}
+    var kind='',table='',index='';
+    if(wordIs(at,'CREATE')){
+        at++;
+        if(wordIs(at,'TABLE')){at++;if(wordIs(at,'IF')){take('IF');take('NOT');take('EXISTS');}table=identifier();kind='table';}
+        else{if(wordIs(at,'UNIQUE'))at++;take('INDEX');index=identifier();take('ON');table=identifier();kind='index';}
+    }else if(wordIs(at,'ALTER')){
+        at++;take('TABLE');table=identifier();kind='alter';
+        if(!['ADD','MODIFY','ALTER','DROP'].some(function(w){return wordIs(at,w);}))throw new Error('应用包ALTER仅支持列或索引声明');
+        if(wordIs(at,'DROP')&&!wordIs(at+1,'COLUMN')&&!wordIs(at+1,'INDEX')&&!wordIs(at+1,'CONSTRAINT'))throw new Error('应用包ALTER DROP仅支持列或索引约束');
+        if(wordIs(at,'ADD')){var a=at+1;if(wordIs(a,'UNIQUE'))a++;if(wordIs(a,'INDEX')||wordIs(a,'KEY')){at=a+1;index=identifier();kind='index';}}
+    }else throw new Error('应用包DDL禁止DML、动态执行和未知声明');
+    if(String(declaredTableName||'').toLowerCase()!==table.toLowerCase())throw new Error('应用包DDL真实目标与TableName不一致');
+    if(!tokens[at]||(kind!=='alter'&&tokens[at].Value!=='('))throw new Error('应用包DDL必须包含结构定义，不能从查询创建数据');
+    var depth=0,outerClosed=-1;
+    for(var j=at;j<tokens.length;j++){
+        var t=tokens[j];
+        if(t.Kind==='symbol'&&t.Value==='(')depth++;
+        if(t.Kind==='symbol'&&t.Value===')'){depth--;if(depth<0)throw new Error('应用包DDL括号无效');if(depth===0&&outerClosed<0)outerClosed=j;}
+        if(t.Kind!=='word')continue;
+        if(['SELECT','INSERT','REPLACE','MERGE','TRUNCATE','EXEC','EXECUTE','CALL','GRANT','REVOKE','INTO','LOAD','DUMPFILE','OUTFILE','PREPARE','DEALLOCATE','DO','HANDLER','RENAME','AS','GO','BEGIN','END'].indexOf(t.Upper)>=0)throw new Error('应用包DDL禁止DML、动态执行和非声明式表达式');
+        if((t.Upper==='UPDATE'||t.Upper==='DELETE')&&!(wordIs(j-1,'ON')&&['CURRENT_TIMESTAMP','CASCADE','RESTRICT','NO','SET'].some(function(w){return wordIs(j+1,w);})))throw new Error('应用包DDL禁止数据更新');
+        if(t.Upper==='SET'&&!wordIs(j-1,'CHARACTER')&&!wordIs(j-1,'DELETE')&&!wordIs(j-1,'UPDATE'))throw new Error('应用包DDL禁止会话或动态赋值');
+    }
+    if(depth!==0||(kind!=='alter'&&outerClosed<0))throw new Error('应用包DDL结构括号未闭合');
+    // CREATE TABLE尾部仅接受已发行的声明式存储/字符集/注释选项；拒绝AS SELECT/第二块。
+    if(kind==='table')for(var tail=outerClosed+1;tail<tokens.length;tail++){
+        var option=tokens[tail];if(option.Kind==='string'||option.Kind==='number'||option.Value==='=')continue;
+        if(option.Kind!=='word'||!/^(ENGINE|INNODB|MYISAM|DEFAULT|CHARSET|CHARACTER|SET|COLLATE|ROW_FORMAT|DYNAMIC|COMPACT|COMPRESSED|REDUNDANT|COMMENT|AUTO_INCREMENT|UTF8[A-Z0-9_]*|LATIN1[A-Z0-9_]*)$/.test(option.Upper))throw new Error('应用包CREATE尾部包含未支持选项');
+    }
+    if(kind==='index'&&outerClosed!==tokens.length-1)throw new Error('应用包INDEX尾部包含未支持语法');
+    return {Kind:kind,TableName:table,IndexName:index};
+}
+function validateDeclarativePackageDdl(packageModel) {
+    var statements=(packageModel||{}).DDLStatements||[];
+    if(typeof statements==='string')statements=JSON.parse(statements);
+    if(!statements||typeof statements.length!=='number')throw new Error('DDLStatements必须是数组');
+    for(var i=0;i<statements.length;i++)readDeclarativePackageDdl(statements[i].DDL,statements[i].TableName);
+}
+
+/* SPARSE_TABLE_IMPORT_PREFLIGHT_V2
+ * 发布器不是导入端信任边界。直接传包和下载包都从原正文验证显式稀疏声明，
+ * 对目标仅主库只读查询；不通过同包DDL先造共享表，也不复活已删除元数据。
+ */
+var sparseSharedTableNames=Object.create(null);
+var packagePreflightPassed=false;
+function validateSparseSharedTableContract(packageModel) {
+    var original=(packageModel||{}),selected=(original.PackageInfo||{}).SparseTableSelections;
+    if(selected===undefined)return Object.create(null);
+    var model=JSON.parse(JSON.stringify({Selected:selected,DiyTables:original.DiyTables||[],DiyFields:original.DiyFields||[],PhysicalColumns:original.PhysicalColumns||[],DDLStatements:original.DDLStatements||[],DataSets:original.DataSets||[],DiyFieldRetirements:original.DiyFieldRetirements||[]}));
+    selected=model.Selected;if(!Array.isArray(selected)||selected.length>32)throw new Error('稀疏选集必须是最多32项数组');
+    var result=Object.create(null),seenIds=Object.create(null),lower=function(v){return String(v||'').toLowerCase();},id=function(v){return typeof v==='string'&&/^[A-Za-z0-9_.-]{1,128}$/.test(v);},name=/^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+    for(var i=0;i<selected.length;i++){
+        var item=selected[i],ids=Object.create(null);
+        if(!item||Array.isArray(item)||Object.keys(item).some(function(k){return k!=='TableId'&&k!=='FieldIds';})||!id(item.TableId)||!Array.isArray(item.FieldIds)||!item.FieldIds.length||item.FieldIds.length>512||seenIds['$'+lower(item.TableId)])throw new Error('稀疏选集形状无效或重复');
+        seenIds['$'+lower(item.TableId)]=true;
+        for(var f=0;f<item.FieldIds.length;f++){var fid=item.FieldIds[f];if(!id(fid)||ids['$'+lower(fid)])throw new Error('稀疏字段Id无效或重复');ids['$'+lower(fid)]=true;}
+        var tables=model.DiyTables.filter(function(t){return lower(t.Id)===lower(item.TableId);});
+        if(tables.length!==1||Object.keys(tables[0]).some(function(k){return k!=='Id'&&k!=='Name';}))throw new Error('稀疏表不得携带共享Tabs/Column或其它布局');
+        var table=tables[0],key='$'+lower(table.Name),names=Object.create(null);
+        if(!name.test(table.Name)||result[key]||model.DiyTables.filter(function(t){return lower(t.Name)===lower(table.Name);}).length!==1)throw new Error('稀疏表名称无效或重复');
+        var fields=model.DiyFields.filter(function(f){return lower(f.TableId)===lower(item.TableId);});
+        if(fields.length!==item.FieldIds.length)throw new Error('稀疏字段越出选集');
+        for(var fi=0;fi<fields.length;fi++){
+            var field=fields[fi];if(!ids['$'+lower(field.Id)]||!name.test(field.Name)||!field.Type||String(field.Type)==='1'||Number(field.IsDeleted||0)!==0||names['$'+lower(field.Name)]||model.DiyFields.filter(function(other){return lower(other.Id)===lower(field.Id);}).length!==1||(field.TableName&&lower(field.TableName)!==lower(table.Name)))throw new Error('稀疏字段身份、范围或物理类型无效');names['$'+lower(field.Name)]=true;
+        }
+        var columns=model.PhysicalColumns.filter(function(c){return lower(c.TABLE_NAME||c.TableName)===lower(table.Name);}),physicalNames=Object.create(null);
+        if(columns.length!==fields.length)throw new Error('稀疏物理列越出选集');
+        for(var ci=0;ci<columns.length;ci++){var col=columns[ci],cn=lower(col.COLUMN_NAME||col.ColumnName);if(!names['$'+cn]||physicalNames['$'+cn]||!(col.COLUMN_TYPE||col.DataType))throw new Error('稀疏物理列身份无效');physicalNames['$'+cn]=true;}
+        for(var di=0;di<model.DDLStatements.length;di++){var ddl=model.DDLStatements[di],parsed=readDeclarativePackageDdl(ddl.DDL,ddl.TableName);if(lower(parsed.TableName)===lower(table.Name))throw new Error('稀疏共享表不得携带CREATE/ALTER/INDEX');}
+        if(model.DiyFieldRetirements.some(function(x){return lower(x.TableName)===lower(table.Name);}))throw new Error('稀疏共享表不得退役既有字段');
+        var sets=model.DataSets.filter(function(s){return lower(s.TableName)===lower(table.Name)||lower(s.TableId)===lower(item.TableId);});
+        if(sets.length!==1)throw new Error('稀疏表必须有唯一明确的实际安装前置数据集');
+        var set=sets[0],allowed=['TableId','TableName','SelectionMode','RowIds','Where','ConflictPolicy','ConflictFields','Rows'];
+        if(Array.isArray(set.Rows)&&set.Rows.length)allowed.push('TableDescription'); // 标准导出器非空数据集的惰性说明，不参与写表。
+        if(lower(set.TableId)!==lower(item.TableId)||lower(set.TableName)!==lower(table.Name)||Object.keys(set).some(function(k){return allowed.indexOf(k)<0;})||set.SelectionMode!=='Ids'||set.ConflictPolicy!=='InsertIfMissing'||!Array.isArray(set.Rows)||!Array.isArray(set.RowIds)||!Array.isArray(set.Where)||set.Where.length||!Array.isArray(set.ConflictFields)||!set.ConflictFields.length)throw new Error('稀疏默认数据只能按Ids缺失插入，不可覆盖租户');
+        if(!set.Rows.length){if(!isEmptySharedTablePrerequisite(set))throw new Error('稀疏零行依赖形状无效');}
+        else{
+            if(!names.$id||set.RowIds.length!==set.Rows.length||set.ConflictFields.some(function(n){return !name.test(n)||!names['$'+lower(n)];}))throw new Error('稀疏默认数据引用未选择字段');
+            var rows=Object.create(null);for(var ri=0;ri<set.Rows.length;ri++){var row=set.Rows[ri];if(!row||Array.isArray(row)||!id(row.Id)||rows['$'+lower(row.Id)]||set.RowIds.indexOf(row.Id)<0||Object.keys(row).some(function(k){return !names['$'+lower(k)];}))throw new Error('稀疏默认行身份或字段越界');rows['$'+lower(row.Id)]=true;}
+        }
+        result[key]=table.Name;
+    }
+    return result;
+}
+function validateSharedTableTargets(packageModel,sparseNames) {
+    var required=Object.create(null),sets=(packageModel||{}).DataSets||[];
+    if(typeof sets==='string')sets=JSON.parse(sets);
+    Object.keys(sparseNames||{}).forEach(function(k){required[k]=sparseNames[k];});
+    for(var i=0;i<sets.length;i++)if(isEmptySharedTablePrerequisite(sets[i]))required['$'+String(sets[i].TableName).toLowerCase()]=sets[i].TableName;
+    var dbType=String(V8.OsClientModel&&(V8.OsClientModel.DbType||V8.OsClientModel.OsClientDbType)||'MySql').toLowerCase();
+    Object.keys(required).forEach(function(k){
+        var tableName=required[k],sql=dbType.indexOf('oracle')>=0?'SELECT TABLE_NAME FROM USER_TABLES WHERE LOWER(TABLE_NAME)=LOWER(@p0)':dbType.indexOf('sqlserver')>=0||dbType.indexOf('mssql')>=0?"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG=DB_NAME() AND LOWER(TABLE_NAME)=LOWER(@p0)":"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA=DATABASE() AND LOWER(TABLE_NAME)=LOWER(@p0)";
+        var physical=V8.Db.FromSql(sql).AddInParameter('@p0',tableName).ToArray();
+        if(!physical||physical.length!==1)throw new Error('共享表依赖物理表不存在或不唯一：'+tableName);
+        // 只读最小核心列，不依赖尚未执行的实体物理列自愈或FormEngine缓存。
+        var metadata=V8.Db.FromSql('SELECT Id, Name, IsDeleted FROM diy_table WHERE LOWER(Name)=LOWER(@p0)').AddInParameter('@p0',tableName).ToArray();
+        if(!metadata||metadata.length!==1||!metadata[0].Id||Number(metadata[0].IsDeleted||0)!==0)throw new Error('共享表依赖元数据不存在、重复或已删除：'+tableName);
+    });
+}
 
 // INSTALLED_RUNTIME_SUMMARY_V1：入口按目标租户改写后，以实际安装资产的哈希和大小
 // 生成本租户运行摘要；禁止沿用发布方摘要或已有微服务的旧 DistHash。
@@ -103,7 +272,43 @@ function retirePackageLayoutFields(packageModel, formEngine, cache, osClient) {
 
 // ==================== 参数接收与校验 ====================
 
+// APPLICATION_BUNDLE_EXPLICIT_VISIBILITY_V1：仅显式、严格的开关值可参与运行
+// 容器身份。旧包无声明时，已有目标配置保持；首次新增明确为私有，不能由
+// sys_microistore 的 Switch 默认1把嵌套工作台公开。源审批0也不能被构建成功改为1。
+function normalizeApplicationBundleFlag(value, name) {
+    if (value === false || value === 0 || value === '0') return 0;
+    if (value === true || value === 1 || value === '1') return 1;
+    throw new Error('ApplicationBundle.Application.' + name + ' 只允许 0/1/boolean');
+}
+function readApplicationBundleFlags(application) {
+    var flags = {}, names = ['IsPublic', 'IsApprove'];
+    for (var i = 0; i < names.length; i++) {
+        var name = names[i];
+        if (Object.prototype.hasOwnProperty.call(application || {}, name)) {
+            flags[name] = normalizeApplicationBundleFlag(application[name], name);
+        }
+    }
+    return flags;
+}
+function validateApplicationBundleFlags(packageModel) {
+    var model = packageModel || {}, bundles = [], plural = model.ApplicationBundles || [];
+    for (var i = 0; i < plural.length; i++) if (plural[i]) bundles.push(plural[i]);
+    var singular = model.ApplicationBundle || model.AiApplication || model.FrontendApplication;
+    if (singular) bundles.push(singular);
+    for (var j = 0; j < bundles.length; j++) {
+        readApplicationBundleFlags(bundles[j].Application || bundles[j].App || {});
+    }
+}
 var Package = V8.Param.Package;  // 应用数据包
+// 直接交付的包必须在物理前置检查之前完成旗标预检，连不兼容旧库也不产生DDL。
+// 从商城下载的正文在读取完成后再次预检，且早于该包任何资源/文件写入。
+if (Package) {
+    try { var approvalPackage = typeof Package == 'string' ? JSON.parse(Package) : Package; validateRuntimeApprovalData(approvalPackage); validateApplicationBundleFlags(approvalPackage); validateDeclarativePackageDdl(approvalPackage); validateSparseSharedTableContract(approvalPackage); }
+    catch (incomingBundleFlagError) {
+        return { Code: 0, Data: { ErrorType: 'APPLICATION_BUNDLE_FLAG_INVALID' },
+            Msg: '应用运行身份预检失败：' + incomingBundleFlagError.message };
+    }
+}
 // SQLSERVER_PHYSICAL_SCHEMA_DIALECT_V1：官方应用包继续保存 MySQL 逻辑类型，
 // 导入时按目标租户实际数据库方言生成物理 DDL，禁止 mediumtext/COLUMN_TYPE 等
 // MySQL 专有语法进入 SQL Server。
@@ -378,65 +583,6 @@ var physicalBootstrapOwnsSlice = physicalBootstrapChunkingEnabled
     && (!physicalBootstrapPhase || physicalBootstrapPhase == 'Prerequisites');
 var activeImportStage = '物理前置检查';
 var activeImportResource = '';
-
-try {
-    var generatedEntityPhysicalBootstrap = ensureGeneratedEntityPhysicalPrerequisites(
-        physicalBootstrapOwnsSlice ? 1 : 999
-    );
-    if (generatedEntityPhysicalBootstrap.Added.length > 0) {
-        debugLog.generated_entity_physical_bootstrap = generatedEntityPhysicalBootstrap.Added;
-    }
-    if (physicalBootstrapOwnsSlice && generatedEntityPhysicalBootstrap.ChangedTableCount > 0) {
-        var physicalBootstrapHasMore = generatedEntityPhysicalBootstrap.RemainingTableCount > 0;
-        var physicalBootstrapNextPhase = physicalBootstrapHasMore ? 'Prerequisites' : 'Ddl';
-        var physicalBootstrapProgress = physicalBootstrapHasMore ? 2 : 5;
-        var physicalBootstrapPackageInfo = Package && Package.PackageInfo ? Package.PackageInfo : {};
-        var physicalBootstrapContinuation = {
-            Version: 1,
-            TaskId: String(physicalBootstrapTaskId || ''),
-            Phase: physicalBootstrapNextPhase,
-            Index: 0,
-            Progress: physicalBootstrapProgress
-        };
-        var physicalBootstrapPackageVersion = String(
-            physicalBootstrapPackageInfo.Version || physicalBootstrapPackageInfo.AppVersion
-            || V8.Param.AppVersion || ''
-        );
-        var physicalBootstrapPackageIdentity = String(
-            physicalBootstrapPackageInfo.AppId || physicalBootstrapPackageInfo.AppKey
-            || V8.Param.AppId || V8.Param.AppKey || V8.Param.StoreId
-            || physicalBootstrapPackageInfo.Name || ''
-        );
-        var physicalBootstrapStoreVersionId = String(V8.Param.StoreVersionId || '');
-        if (physicalBootstrapPackageVersion) physicalBootstrapContinuation.PackageVersion = physicalBootstrapPackageVersion;
-        if (physicalBootstrapPackageIdentity) physicalBootstrapContinuation.PackageIdentity = physicalBootstrapPackageIdentity;
-        if (physicalBootstrapStoreVersionId) physicalBootstrapContinuation.StoreVersionId = physicalBootstrapStoreVersionId;
-        var physicalBootstrapMessage = physicalBootstrapHasMore
-            ? '平台运行时前置物理列已提交，将继续补齐下一张元数据表'
-            : '平台运行时前置物理列已提交，将继续导入应用物理结构';
-        return {
-            Code: 1,
-            Data: {
-                BackgroundTask: {
-                    HasMore: true,
-                    Checkpoint: physicalBootstrapContinuation,
-                    Progress: physicalBootstrapProgress,
-                    Msg: physicalBootstrapMessage
-                }
-            },
-            Msg: physicalBootstrapMessage
-        };
-    }
-} catch (physicalBootstrapError) {
-    return {
-        Code: 0,
-        Data: { '失败阶段': '物理前置检查' },
-        Msg: '应用安装前置物理结构自检失败：'
-            + (physicalBootstrapError && physicalBootstrapError.message
-                ? physicalBootstrapError.message
-                : String(physicalBootstrapError))
-    };
-}
 
 var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
 var installAction = String(V8.Param.InstallAction || V8.Param.Action || 'Install');
@@ -753,7 +899,7 @@ if ((!installUser || !installUser.Id) && V8.Method && V8.Method.GetCurrentToken)
     } catch (installUserError) { }
 }
 var reportProgress = function (progress, msg) {
-    if (!backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
+    if (!packagePreflightPassed || !backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
     try {
         progress = parseInt(progress, 10);
         if (isNaN(progress)) progress = lastReportedBackgroundProgress;
@@ -1080,6 +1226,71 @@ if (!Package.PackageInfo) {
     return {
         Code: 0,
         Msg: '参数错误：Package.PackageInfo不能为空'
+    };
+}
+try { validateRuntimeApprovalData(Package); validateApplicationBundleFlags(Package); validateDeclarativePackageDdl(Package); sparseSharedTableNames=validateSparseSharedTableContract(Package); validateSharedTableTargets(Package,sparseSharedTableNames); packagePreflightPassed=true; }
+catch (downloadedBundleFlagError) {
+    return { Code: 0, Data: { ErrorType: 'APPLICATION_BUNDLE_FLAG_INVALID' },
+        Msg: '应用运行身份预检失败：' + downloadedBundleFlagError.message };
+}
+
+// PACKAGE_PREFLIGHT_BEFORE_BOOTSTRAP_V2：直接包与下载包共用前置门禁，失败不做兼容DDL。
+try {
+    var generatedEntityPhysicalBootstrap = ensureGeneratedEntityPhysicalPrerequisites(
+        physicalBootstrapOwnsSlice ? 1 : 999
+    );
+    if (generatedEntityPhysicalBootstrap.Added.length > 0) {
+        debugLog.generated_entity_physical_bootstrap = generatedEntityPhysicalBootstrap.Added;
+    }
+    if (physicalBootstrapOwnsSlice && generatedEntityPhysicalBootstrap.ChangedTableCount > 0) {
+        var physicalBootstrapHasMore = generatedEntityPhysicalBootstrap.RemainingTableCount > 0;
+        var physicalBootstrapNextPhase = physicalBootstrapHasMore ? 'Prerequisites' : 'Ddl';
+        var physicalBootstrapProgress = physicalBootstrapHasMore ? 2 : 5;
+        var physicalBootstrapPackageInfo = Package && Package.PackageInfo ? Package.PackageInfo : {};
+        var physicalBootstrapContinuation = {
+            Version: 1,
+            TaskId: String(physicalBootstrapTaskId || ''),
+            Phase: physicalBootstrapNextPhase,
+            Index: 0,
+            Progress: physicalBootstrapProgress
+        };
+        var physicalBootstrapPackageVersion = String(
+            physicalBootstrapPackageInfo.Version || physicalBootstrapPackageInfo.AppVersion
+            || V8.Param.AppVersion || ''
+        );
+        var physicalBootstrapPackageIdentity = String(
+            physicalBootstrapPackageInfo.AppId || physicalBootstrapPackageInfo.AppKey
+            || V8.Param.AppId || V8.Param.AppKey || V8.Param.StoreId
+            || physicalBootstrapPackageInfo.Name || ''
+        );
+        var physicalBootstrapStoreVersionId = String(V8.Param.StoreVersionId || '');
+        if (physicalBootstrapPackageVersion) physicalBootstrapContinuation.PackageVersion = physicalBootstrapPackageVersion;
+        if (physicalBootstrapPackageIdentity) physicalBootstrapContinuation.PackageIdentity = physicalBootstrapPackageIdentity;
+        if (physicalBootstrapStoreVersionId) physicalBootstrapContinuation.StoreVersionId = physicalBootstrapStoreVersionId;
+        var physicalBootstrapMessage = physicalBootstrapHasMore
+            ? '平台运行时前置物理列已提交，将继续补齐下一张元数据表'
+            : '平台运行时前置物理列已提交，将继续导入应用物理结构';
+        return {
+            Code: 1,
+            Data: {
+                BackgroundTask: {
+                    HasMore: true,
+                    Checkpoint: physicalBootstrapContinuation,
+                    Progress: physicalBootstrapProgress,
+                    Msg: physicalBootstrapMessage
+                }
+            },
+            Msg: physicalBootstrapMessage
+        };
+    }
+} catch (physicalBootstrapError) {
+    return {
+        Code: 0,
+        Data: { '失败阶段': '物理前置检查' },
+        Msg: '应用安装前置物理结构自检失败：'
+            + (physicalBootstrapError && physicalBootstrapError.message
+                ? physicalBootstrapError.message
+                : String(physicalBootstrapError))
     };
 }
 
@@ -2927,6 +3138,7 @@ try {
         if (!bundle) return;
 
         var app = bundle.Application || bundle.App || {};
+        var applicationFlags = readApplicationBundleFlags(app);
         var appType = firstTextParam([bundle.ApplicationType, app.ApplicationType, app.AppType, Package.PackageInfo.ApplicationType, 'Web']);
         if (['Web', 'UniApp', 'MicroService'].indexOf(appType) < 0) {
             throw new Error('不支持的应用类型：' + appType);
@@ -3366,6 +3578,14 @@ try {
             PrivateSourcePath: uploadedSource.length ? sourceRoot : firstTextParam([existingApp && existingApp.PrivateSourcePath, app.PrivateSourcePath]),
             PublicPublishPath: installedPublicPublishPath
         };
+        if (Object.prototype.hasOwnProperty.call(applicationFlags, 'IsPublic')) {
+            appRow.IsPublic = applicationFlags.IsPublic;
+        } else if (!existingApp || !existingApp.Id) {
+            appRow.IsPublic = 0;
+        }
+        if (Object.prototype.hasOwnProperty.call(applicationFlags, 'IsApprove')) {
+            appRow.IsApprove = applicationFlags.IsApprove;
+        }
         // DATABASE_ONLY_PUBLISH_POINTER_RESET_V1：数据库内联运行时属于目标租户
         // 本地投影。空库从官方种子复制时可能带入另一租户的 v3 committed pointer；
         // 若继续保留，稳定入口会在读取 sys_microiservice 前按错误指针失败关闭。
@@ -4420,13 +4640,22 @@ try {
                 if (String(definition.TableName || '').toLowerCase() == targetName.toLowerCase()
                     && /\bCREATE\s+TABLE\b/i.test(String(definition.DDL || ''))) declaredDdl = true;
             }
-            if (declaredTable && declaredDdl) continue;
+            if (declaredTable && declaredDdl && !isEmptySharedTablePrerequisite(dataSets[dataSetIndex])
+                && !sparseSharedTableNames['$' + targetName.toLowerCase()]) continue;
             var query = runtimeIsSqlServer
                 ? 'SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG=DB_NAME() AND LOWER(TABLE_NAME)=LOWER(@p0)'
                 : 'SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LOWER(TABLE_NAME)=LOWER(@p0)';
             if (runtimeIsOracle) query = 'SELECT TABLE_NAME FROM USER_TABLES WHERE LOWER(TABLE_NAME)=LOWER(@p0)';
             var existing = V8.Db.FromSql(query).AddInParameter('@p0', targetName).ToArray();
             if (!existing || existing.length == 0) throw new Error('数据集依赖预检失败：目标表 ' + targetName + ' 尚未创建，应用包必须补齐表定义和建表资源后重新发布。');
+            // 零行共享依赖也必须已有表单元数据；不能先补出一张丢失布局的最小共享表再失败。
+            if (isEmptySharedTablePrerequisite(dataSets[dataSetIndex]) || sparseSharedTableNames['$' + targetName.toLowerCase()]) {
+                var sharedMetadata = V8.FormEngine.GetFormData('diy_table', {
+                    _Where: [['Name', '=', targetName]], _SelectFields: ['Id', 'Name']
+                });
+                if (!sharedMetadata || sharedMetadata.Code !== 1 || !sharedMetadata.Data || !sharedMetadata.Data.Id)
+                    throw new Error('共享表依赖元数据不存在：' + targetName);
+            }
         }
     };
     validateDataSetTablePrerequisites();
@@ -5051,23 +5280,7 @@ try {
     // Classify them before executing so reinstalling the same package is
     // idempotent instead of treating an existing index as an install failure.
     var classifyDdlStatement = function (ddl, fallbackTableName) {
-        var sql = String(ddl || '');
-        var createTable = sql.match(/^\s*CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+[`"\[]?([A-Za-z0-9_]+)/i);
-        if (createTable) {
-            return { Kind: 'table', TableName: createTable[1], IndexName: '' };
-        }
-
-        var createIndex = sql.match(/^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+[`"\[]?([A-Za-z0-9_]+)[`"\]]?\s+ON\s+[`"\[]?([A-Za-z0-9_]+)/i);
-        if (createIndex) {
-            return { Kind: 'index', TableName: createIndex[2], IndexName: createIndex[1] };
-        }
-
-        var alterIndex = sql.match(/^\s*ALTER\s+TABLE\s+[`"\[]?([A-Za-z0-9_]+)[`"\]]?\s+ADD\s+(?:UNIQUE\s+)?(?:INDEX|KEY)\s+[`"\[]?([A-Za-z0-9_]+)/i);
-        if (alterIndex) {
-            return { Kind: 'index', TableName: alterIndex[1], IndexName: alterIndex[2] };
-        }
-
-        return { Kind: 'other', TableName: String(fallbackTableName || ''), IndexName: '' };
+        return readDeclarativePackageDdl(ddl, fallbackTableName);
     };
 
     var ddlTableExists = function (tableName) {
@@ -9880,7 +10093,8 @@ try {
         'diy_table': true, 'diy_field': true, 'sys_menu': true, 'sys_user': true,
         'sys_role': true, 'sys_rolelimit': true, 'sys_osclients': true,
         'sys_config': true, 'sys_apiengine': true, 'sys_token': true,
-        'sys_userlogin': true, 'sys_microistore': true
+        'sys_userlogin': true, 'sys_microistore': true,
+        'mci_runtime_installation': true // 后台代码审批是独立可信动作，禁止应用数据包种入/恢复授权。
     };
     var isSafeDataTableName = function (name) {
         return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(name || ''));
@@ -10087,6 +10301,16 @@ try {
         var dataSet = dataSets[dataSetIndex] || {};
         var dataTableName = String(dataSet.TableName || '');
         var lowerDataTableName = dataTableName.toLowerCase();
+        // 缺物理表已在DATASET_TABLE_PREFLIGHT_V1、任何业务资源写入前失败。
+        // 此处仅验证已有元数据，不放开受保护表的新增/更新，也不创建不存在的共享表。
+        if(isEmptySharedTablePrerequisite(dataSet)) {
+            var dependencyTable=V8.FormEngine.GetFormData('diy_table',{
+                _Where:[['Name','=',dataTableName]],_SelectFields:['Id','Name']
+            });
+            if(!dependencyTable || dependencyTable.Code!==1 || !dependencyTable.Data || !dependencyTable.Data.Id)
+                throw new Error('共享表依赖元数据不存在：'+dataTableName);
+            stats.DataSetCount++;continue;
+        }
         if (!isSafeDataTableName(dataTableName) || protectedDataTables[lowerDataTableName] || lowerDataTableName.indexOf('wf_') == 0) {
             throw new Error('应用数据导入被拒绝：表 ' + dataTableName + ' 不允许写入');
         }

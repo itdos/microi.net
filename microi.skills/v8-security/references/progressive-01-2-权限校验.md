@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-security-005 sha256=0a0f4864a315285b0ed3824e31d1f62d83077a389628f4eae6a0b3550ca50237 -->
+<!-- microi-progressive:chunk id=v8-security-005 sha256=09f88aaf8da914fdbec8bc8668cef588a02217354a210515230471fbfdddd27f -->
 ## 2. 权限校验
 
 ### DiyToken 是平台会话与权限入口，不替换为 ASP.NET Identity
@@ -104,7 +104,7 @@ var result = V8.FormEngine.GetTableData('Order', {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-006 sha256=3a40db54a44c9c76bd3dd7255d1a6b15dcf8b8b90c2d032b7eda80532f023d7d -->
+<!-- microi-progressive:chunk id=v8-security-006 sha256=c7a43f46e8636fc3cbf792dfb8ff6c17890bd0a4d57025ba29cc37de2373dcbe -->
 ## 5. 防重复提交
 
 前端禁用按钮或普通 Cache 的 `Exists → Set` 只能改善体验，不能保证业务只执行一次。写操作必须接收稳定幂等键，并通过数据库唯一约束、条件更新或状态机原子落库；接口引擎可再配置 `LockKey` 降低并发，但锁不能代替业务幂等。
@@ -126,7 +126,7 @@ if (old.Code === 1 && old.Data) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-007 sha256=35706b9a254fb5788b64535947261f66fd8c06e17103b2169f8be02fce05fa65 -->
+<!-- microi-progressive:chunk id=v8-security-007 sha256=360a677ffa518b108e304f92922f9eaa2a12d44e863a16ce7439d9afe5616766 -->
 ## 6. 敏感数据
 
 ### 密码与认证

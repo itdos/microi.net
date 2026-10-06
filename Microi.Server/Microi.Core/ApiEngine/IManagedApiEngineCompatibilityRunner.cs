@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Dos.ORM;
 using Newtonsoft.Json.Linq;
@@ -15,6 +16,7 @@ namespace Microi.net
             string apiEngineKey,
             dynamic dynamicParam,
             JObject trustedCurrentUser,
-            DbTrans trans = null);
+            DbTrans trans = null,
+            CancellationToken cancellationToken = default);
     }
 }

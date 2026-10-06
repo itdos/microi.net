@@ -39,7 +39,13 @@ namespace Microi.net
                 var request = JsonHelper.ToJObject((object)dynamicParam) ?? new JObject();
                 var runtimeKey = (request["RuntimeKey"]?.ToString() ?? string.Empty).Trim();
                 if (!PlatformApiRuntimeEngineKeys.TryGetValue(runtimeKey, out var allowedKeys))
-                    return new DosResult(0, null, "平台接口运行时 Key 无效。");
+                {
+                    if (!string.Equals(runtimeKey, FixedStepRuntimeHost.RuntimeKey, StringComparison.Ordinal))
+                        return new DosResult(0, null, "平台接口运行时 Key 无效。");
+                    // 只有后台审批目录可扩展精确引擎白名单，不能从Param采信tenant/engine/node身份。
+                    allowedKeys = FixedStepRuntimeHost.GetApprovedEngineKeys(
+                        V8TenantContext.Current?.OsClient, request["Param"]?["RegistrationId"]?.ToString());
+                }
                 var denied = RequireTrustedApiEngine(allowedKeys);
                 if (denied != null) return denied;
                 if (!PlatformApiRuntimeRegistry.TryCreate(runtimeKey, out var runtime))

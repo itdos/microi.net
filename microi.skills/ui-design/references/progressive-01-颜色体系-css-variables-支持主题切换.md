@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=ui-design-007 sha256=b32dac5c75835929c6c55607807cad0cd14a013ddc1a41e307263549f2047867 -->
+<!-- microi-progressive:chunk id=ui-design-007 sha256=bd9e24e1cdc0017a1bffccbe48505ad8d0a274d65f28f4e6a80e591dec813407 -->
 ## 颜色体系（CSS Variables — 支持主题切换）
 
 所有颜色必须通过 CSS 变量引用，禁止硬编码色值。变量定义放在全局样式入口（PC 端 `src/styles/mci-design.scss`，移动端 `<style>` 内或独立 CSS 文件）。
@@ -150,7 +150,7 @@
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-008 sha256=80df5bdb440dea278d96692425780d40232b8ab4bbb604ee1b3f9727679ea65a -->
+<!-- microi-progressive:chunk id=ui-design-008 sha256=01af2cebf85683f180693fd76cf6c5f1db4380274a9924acf5542b7b5f868ebc -->
 ## 阴影体系（层次与质感）
 
 阴影是塑造层次感、可点击性和高级质感的关键。采用多层阴影叠加，但不要做脏、糊、重的阴影。

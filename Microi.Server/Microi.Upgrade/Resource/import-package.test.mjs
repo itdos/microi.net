@@ -1191,7 +1191,7 @@ function runDataSetImportFixture(options = {}) {
   };
   // 数据集片段也包含安装末尾的布局退役阶段，加载真实实现以覆盖无退役声明的旧包兼容。
   const retirementSource = source.slice(source.indexOf('// PACKAGE_LAYOUT_FIELD_RETIREMENTS_V1'), source.indexOf('// ==================== 参数接收与校验'));
-  vm.runInNewContext(`${retirementSource}\n(function () { ${dataSetImportSource[0]} }).call(this);`, fixtureContext);
+  vm.runInNewContext(`${extractNamedFunction(source, "isEmptySharedTablePrerequisite")}\n${retirementSource}\n(function () { ${dataSetImportSource[0]} }).call(this);`, fixtureContext);
   return { calls, stats: fixtureContext.stats, debugLog: fixtureContext.debugLog };
 }
 
@@ -1881,6 +1881,7 @@ test("resumed background slices keep task progress monotonic", () => {
     backgroundCheckpointPhase: "Physical",
     backgroundCheckpointIndex: 4,
     backgroundTaskId: "task-monotonic",
+    packagePreflightPassed: true,
     backgroundTaskEnvelope: {},
     backgroundChunkingEnabled: false,
     debugLog: {},
@@ -2856,7 +2857,7 @@ test("reinstall DDL classifies existing indexes for idempotent skipping", () => 
   );
   assert.ok(classifierSource, "DDL classifier should be extractable");
   const context = {};
-  vm.runInNewContext(`${classifierSource[0]}; result = classifyDdlStatement;`, context);
+  vm.runInNewContext(`${extractNamedFunction(source, "readDeclarativePackageDdl")}\n${classifierSource[0]}; result = classifyDdlStatement;`, context);
   const classify = context.result;
 
   assert.deepEqual(

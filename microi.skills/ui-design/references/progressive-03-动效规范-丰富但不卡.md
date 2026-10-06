@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=ui-design-012 sha256=d59ae14c3991bb27949dcdcc0df3114ecbd1e627d6a69f5f78d1247ea2e02cd6 -->
+<!-- microi-progressive:chunk id=ui-design-012 sha256=78f4544796729b2eb49bc892472e397962ec4fd3112dd4cecf29eba883a6888a -->
 ## 动效规范（丰富但不卡）
 
 ### 性能铁律
@@ -206,7 +206,7 @@
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-013 sha256=385528713388a28e0182e2df9e2ed828ddb7cccaf7a3a5e78354f46a588f6f1c -->
+<!-- microi-progressive:chunk id=ui-design-013 sha256=c2a784b1fc7d6f6f554661f4f1719d35c6c667037a817f697cb72e9535ae15eb -->
 ## Vue 3 过渡动画
 
 ```scss

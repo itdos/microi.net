@@ -179,6 +179,7 @@ test("inline runtime sizes handle both Jint arrays and CLR wrappers and enforce 
     if (extraBytes) assets.push({ Path: "extra.bin", FileByteBase64: Buffer.alloc(extraBytes).toString("base64") });
     const context = {
       requestedDatabaseOnlyBuild: true, app: { AppKey: 'sample' }, latestVersion: { SourceManifestHash: 'a'.repeat(64) }, runtime: { Service: {} },
+      sparseTableSelections: [], // This database-only fixture declares no sparse resources.
       runtimeVersionNo: 'v1.0.0',
       packageModel: { PackageInfo: {}, ApplicationBundle: { PackageAssets: { BuildZip: { Path: 'existing.zip' }, SourceZip: null } } }, entryPath: "index.html", includeSource: false,
       getBuildAssets: () => assets, normalizePath: String, text: String,

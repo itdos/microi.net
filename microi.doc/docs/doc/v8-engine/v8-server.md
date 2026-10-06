@@ -276,6 +276,34 @@ await renewLease();
 
 下面的 `/game-realtime` 是已有五款游戏的向后兼容协议；新业务和完成迁移后的游戏使用上面的通用协议。
 
+### 受信固定步长规则运行时（后端安装候选）
+
+需要持续模拟的应用可由现有 API 的通用宿主承载；业务路由、DiyToken、房间成员、主库事务、inbox、checkpoint 和结算仍由 Managed 接口引擎处理。该能力需要正式后端安装，保存 V8 代码或创建任务不会自动安装原子。规则程序集与应用适配属于私有应用发行包，不把业务 Domain 放入平台通用源码，也不增加业务 Controller。
+
+```js
+// 只能由当前租户已审批的精确 tick 接口引擎执行；不是浏览器可直接提交的信封。
+var identity = V8.Method.RunPlatformApiRuntime({
+  RuntimeKey: 'fixed-step-simulation',
+  Action: 'DescribeInvocation',
+  Param: { RegistrationId: trustedRegistrationId }
+});
+if (identity.Code !== 1) return identity;
+```
+
+原子动作包括 `DescribeInvocation`、`CreateInitialState`、`AdvanceBatch`、`Project`、`ObserveOwnedRoom`、`StopOwnedRoom`、`DrainOwnedRoom`。调用返回标准 `Code/Data`；实际当前租户与 ApiEngineKey 来自 V8 上下文，不能在 Param 中覆盖。NodeId 为宿主生成，TrustedPump 仅在受信后台调用作用域内成立。StopHttp 不阻止其它脚本 nested Run，因此实际引擎必须核成员或可信后台作用域，不能原样转发玩家信封。
+
+`ObserveOwnedRoom` 是有限的本机调度提示。当前没有 afterCommit 回调，接口引擎只能在所有持久写入成功、即将 return Code=1 时给出提交前提示；不能宣称提示已经处于提交之后。后续 pump 必须重新取得主库行锁，验证 owner/fence/租约与状态才可推进，原事务回滚不得产生合法写。`StopOwnedRoom` 立即取消在途请求；终局事务应调用 `DrainOwnedRoom`（RegistrationId/RoomId/RoomEpoch/AuthorityEpoch），返回 `Code=1, Data={Drained:true}` 只表示不再安排后续批次，当前请求仍可完成提交。Drain 不延长租约，也不阻止宿主全局停机取消；它不是数据库提交回执。
+
+临时预算或生命周期拒绝返回 `Code=0`、固定非敏感 `Msg`，并带 `DataAppend={ErrorCode,Retryable:true}`。ErrorCode只可能是 `KernelBusy`、`HostMemoryPressure`、`RoomStillDraining`、`CoordinatorStopping`、`StaleLease`、`ComputeBudgetExceeded`。授权、来源审批和未知异常不进入这个列表，也不暴露原异常。Managed应对精确白名单码显式 `return {Code:0,Msg:code}` 让宿主回滚，再让客户端有界退避并保持原RequestId/指令正文；不要把码当JS异常直接抛出，因为生产V8诊断会追加行列，破坏精确协议值。
+
+固定规则步长为 50ms，单批最多追赶4步、处理64条指令；进程最多2个计算、同租户最多1个，超额快速拒绝。50ms 是目标唤醒间隔，实际延迟和容量须实测。Job 的秒级任务负责恢复扫描与补偿，不能冒充20Hz连续步。未知提交必须用原 RequestId 和原语义重试；同一事务行锁下读取 DB 时间、验证租约/fence/CAS后才持久化并ACK。本机排程只保存有限唤醒提示，不能作为共享权威事实。
+
+审批资源由应用商城声明式安装，原生代码另外经过后台发行审批。私有应用编译组合固定 tenant/registration/入口与审批摘要，主库审批须同时匹配已安装版本、V3 Completed来源hash、真实DLL及依赖闭包。运行中撤销、卸载、软删来源或主库不可用均失败关闭。首批提供者限定同租户与MySQL；其它来源/方言不静默降级。没有任意DLL路径、URL或Type的V8/MCP注册入口，原生程序集也不是不可信代码沙箱。
+
+普通租户的编译证明默认 `TenantInstallation`，保留真实 Installed 回执及旧摘要。官方同租户发布源禁止安装自己，只能由后端发行组合明确固定 `OfficialPublishedSnapshot`：`InstallRecordId` 绑定 `mic_data_version.Id`，原始 `Data` 的UTF-8 SHA-256另固定于编译回执并参与独立审批摘要。该类别与快照摘要不从Param或自由表字段选择、不新增表字段、不伪造Installed。受信官方身份、当前Published/审批有效指针、Verified包hash/size/HDFS、不可变快照、V3 Completed源码hash及实际DLL依赖须全部匹配；当前状态变化、软删或主库不可用下次调用立即拒绝，旧历史存在不足以授权。跨租户仍拒绝，结构发布不等于后端安装或代码审批。审批表纳入通用强制管理员清单，普通用户即使误授表/菜单权限仍不得改授权状态；V8Limit和ReadPrimary不是写权限。
+
+Project 只返回当前用户绑定席位的安全快照和可见事件；完整checkpoint、未知敌人状态与内部凭据不可广播。通用SignalR只发送公开版本失效通知。源码/离线回归、真实Jint/SQL、后端部署、两节点故障恢复及用户实机体验需要分别验收。
+
 ### 多人游戏实时失效通知（兼容协议）
 
 发牌、出牌、碰杠胡、结算、捕鱼命中等规则必须在接口引擎中执行，并用数据库事务、`RequestId`、`ExpectedVersion`、唯一索引和行锁维护权威状态。SignalR 不承载这些业务命令，也不发送手牌；它只在接口引擎成功提交后通知同房玩家“房间版本已变化”，客户端随后重新调用 gateway 的 `Snapshot`。
