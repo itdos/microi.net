@@ -103,7 +103,7 @@ outline: [2, 3]
     <a href="/images/digital-human-live/obs-neural-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看 OBS 录制神经网络头像的 4K 原图">
       <img src="/images/digital-human-live/obs-neural-4k.png" width="3840" height="2160" loading="lazy" alt="OBS 媒体来源接收本机生成的神经网络头像片段，3840×2160 画布内的人像与左右黑边" />
     </a>
-    <figcaption>OBS 神经头像片段实录：本机模型完成 2 秒素材后，OBS 媒体来源循环播放并录制 7.8 秒；仅证明片段捕获，尚未证明实时窗口接入或外部推流。</figcaption>
+    <figcaption>OBS 神经头像片段实录：v0.4.1 本机模型完成 2 秒素材后，OBS 媒体来源循环播放并录制 7.83 秒；仅证明片段捕获，尚未证明实时窗口接入或外部推流。</figcaption>
   </figure>
 </div>
 
@@ -186,7 +186,7 @@ http://127.0.0.1:17861/output
 
 2026-10-04 新增“人物与衣服动作”后，使用本机实际生成的 `api-body.mp4` 作为 OBS“媒体来源”，独立验收场景通过 OBS WebSocket 回读了当前场景、来源路径与录制状态，录制约 9 秒。回读的 MP4 可解码为 **3840 × 2160、30 fps、288 帧**，上方第七张图是该录像中间帧。此项证明 OBS 能接收并录制生成片段；摄像头实时换脸及人物服饰动作已在应用页面及本机 WebSocket 自动化验证，尚未验证 OBS 对其实时窗口的捕获、平台推流或观众端接收。
 
-2026-10-07 用同一台 RTX 2080 SUPER 在本机生成神经网络头像 `gateway.mp4`（24 帧、2 秒、模型约 4.9 fps），再通过独立 OBS 场景和“媒体来源”循环录制。OBS WebSocket 回读场景与素材路径；保存的录像可解码为 **3840 × 2160、30 fps、234 帧、7.8 秒**，抽样帧有画面变化。上方最后一张图是 OBS 对该片段的 4K 截图。这仍不是手机摄像头到 OBS 的实时直连，也没有外部平台观众端验收。
+2026-10-07 用同一台 RTX 2080 SUPER 在本机生成 v0.4.1 神经网络头像 `gateway.mp4`（24 帧、2 秒、模型约 6.85 fps），再通过独立 OBS 场景和“媒体来源”循环录制。OBS WebSocket 回读场景与素材路径；保存的录像可解码为 **3840 × 2160、30 fps、235 帧、7.83 秒**，抽样帧有画面变化。上方最后一张图是 OBS 对该片段的 4K 截图。这仍不是手机摄像头到 OBS 的实时直连，也没有外部平台观众端验收。
 
 应用源码同步使用 `.microi-micro-app.json` 的 `SourceExcludes` 排除 `runtime/.local`、`.venv`、缓存和测试产物；不能只依赖 `.gitignore`。模型权重、人像、配对码与生成视频不进入公开应用包。上游研究测试素材的使用范围与模型代码许可不同，不能将其默认作为商业主播素材。
 
