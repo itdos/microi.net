@@ -380,7 +380,7 @@
 
         .diy-field-tabs {
             min-height: 44px;
-            border: 1px solid var(--field-tabs-border) !important;
+            border: 0 !important;
             border-bottom: 0 !important;
             border-top-left-radius: 8px !important;
             border-top-right-radius: 8px !important;
@@ -443,18 +443,8 @@
         border-right-width: 0;
     }
 
-    .field-tabs-row-start::before {
-        content: "";
-        position: absolute;
-        z-index: 0;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        border-left: 1px solid var(--field-tabs-border);
-        border-right: 1px solid var(--field-tabs-border);
-        pointer-events: none;
-    }
+    // 页签内容使用中性表面，选中状态只在导航中表达。
+    .field-tabs-row-start::before { display: none; }
 
     .field-tabs-row-start.is-guttered::before {
         left: 5px;
@@ -482,8 +472,8 @@
 
     @media (max-width: 768px) {
         .field-tabs-item {
-            border-left-width: 1px;
-            border-right-width: 1px;
+            border-left-width: 0;
+            border-right-width: 0;
 
             .container-form-item {
                 padding-left: 6px;

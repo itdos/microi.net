@@ -507,6 +507,9 @@ namespace Microi.net
         [JsonIgnore]
         public FormEngineAuthorizationSnapshot _AuthorizationSnapshot { get; set; }
 
+        [JsonIgnore]
+        public ModuleFieldPermission _FieldPermission { get; set; }
+
         /// <summary>
         /// Server-only projection marker set after an ordinary role is authorized
         /// to read sys_user. Query builders use it to remove password storage fields

@@ -18,6 +18,7 @@ namespace Microi.net
         public string SqlWhere { get; set; }
         public string SqlJoin { get; set; }
         public string JoinTables { get; set; }
+        public string FieldPermissions { get; set; }
     }
 
     public sealed class FormEngineAuthorizationSnapshot
@@ -26,6 +27,9 @@ namespace Microi.net
         public int UserLevel { get; set; }
         public bool IsActiveUser { get; set; }
         public List<string> EffectiveRoleIds { get; set; } = new List<string>();
+        public List<FormEngineAuthorizationMenuSnapshot> FieldPermissionMenus { get; set; } = new List<FormEngineAuthorizationMenuSnapshot>();
+        public List<string> DepartmentIds { get; set; } = new List<string>();
+        public List<string> JobIds { get; set; } = new List<string>();
         public List<SysRoleLimit> RoleLimits { get; set; } = new List<SysRoleLimit>();
         public List<FormEngineAuthorizationMenuSnapshot> Menus { get; set; } =
             new List<FormEngineAuthorizationMenuSnapshot>();
@@ -59,7 +63,7 @@ namespace Microi.net
         // an old payload that lacks newly-added security fields must never be
         // deserialized as the current contract (missing bool/int values otherwise
         // become false/0 and can incorrectly deny a valid platform administrator).
-        private const string SnapshotSchemaVersion = "2";
+        private const string SnapshotSchemaVersion = "4";
 
         public static string BuildVersionKey(string osClient)
         {

@@ -1,3 +1,4 @@
+import { moduleFieldAccess, resolvedModuleFieldAccess } from "@/utils/module-field-permissions.js";
 /**
  * DIY 通用工具函数 Mixin
  * 包含 diy-form.vue 和 diy-table-rowlist.vue 都可以使用的通用函数
@@ -6,7 +7,14 @@
  */
 
 export default {
+    data() { return { failedCardAvatars: {}, ModuleResolvedFieldAccess: null }; },
     methods: {
+        GetModuleFieldAccess(field) {
+            const resolved = resolvedModuleFieldAccess(this.ModuleResolvedFieldAccess, field?.Name || field);
+            if (resolved) return resolved;
+            const user = this.GetCurrentUser || this.diyStore?.CurrentUser || {};
+            return moduleFieldAccess(this.SysMenuModel?.FieldPermissions, user, field?.Name || field);
+        },
         /**
          * 获取文件服务器完整URL
          * @param {String|Object} url - 文件路径或文件对象
@@ -117,7 +125,16 @@ export default {
             return "#";
         },
 
+        CardAvatarFailed(row) { return !!this.failedCardAvatars[String(row.Id) + ':' + this.GetCardImageUrl(row, this.SysMenuModel?.TableCardImgField)]; },
+        CardAvatarLoadError(event, row) { this.failedCardAvatars[String(row.Id) + ':' + this.GetCardImageUrl(row, this.SysMenuModel?.TableCardImgField)] = true; },
+        IsCardIdentityImage() {
+            const field = this.ResolveCardImageField(this.SysMenuModel?.TableCardImgField);
+            // 头像按身份信息展示；普通商品/附件封面保留模块自己的布局与样式。
+            return !this.SysMenuModel?.TableCardImgStyle && /^(Avatar|PublicAvatar|HeadImg|HeadImage|Photo)$/i.test(field?.Name || '');
+        },
+
         GetCardContentLayoutClass() {
+            if (this.IsCardIdentityImage()) return "card-content-vertical";
             var style = String((this.SysMenuModel && this.SysMenuModel.TableCardImgStyle) || "");
             var imageUsesFullWidth = /(?:^|;)\s*width\s*:\s*100%\s*(?:;|$)/i.test(style);
             return this.SysMenuModel
