@@ -4,9 +4,9 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const domains = new Set(['platform', 'agent']);
+const domains = new Set(['api', 'pc', 'website', 'agent']);
 function directory(workspace, domain) {
-    if (!domains.has(domain)) throw new Error('发布锁范围必须为 platform 或 agent。');
+    if (!domains.has(domain)) throw new Error('发布锁范围必须为 api、pc、website 或 agent。');
     return path.join(path.resolve(workspace), '.tmp', 'microi-process-state', `${domain}-release.lock`);
 }
 function readOwner(lock) {
@@ -76,20 +76,44 @@ function verifiedLegacyAgent(owner, workspace) {
         return actual.startsWith(trusted) && fs.statSync(resolved).isFile();
     } catch { return false; }
 }
+function verifiedLegacyApi(owner, workspace) {
+    // 已运行的旧 API 热修复保留原锁；只能从真实命令入口与共享状态目录证明范围。
+    if (!owner.workspace) return false;
+    try {
+        const state = value => fs.realpathSync(path.join(value, '.tmp', 'microi-process-state'));
+        if (state(owner.workspace) !== state(workspace)) return false;
+        const text = normalized(command(owner.pid));
+        if (!/(?:^|\s)--docker-only-hotfix(?:\s|$)/.test(text)) return false;
+        const match = /(?:^|\s)(?:"([^"]*Microi一键编译发布\.sh)"|'([^']*Microi一键编译发布\.sh)'|([^\s"']*Microi一键编译发布\.sh))\s+--docker-only-hotfix(?:\s|$)/.exec(text);
+        const entry = match?.[1] || match?.[2] || match?.[3];
+        if (!entry) return false;
+        let resolved = entry;
+        if (!path.isAbsolute(entry)) {
+            const cwd = processDirectory(owner.pid);
+            if (!cwd || normalized(cwd) !== normalized(fs.realpathSync(owner.workspace))) return false;
+            resolved = path.resolve(cwd, entry);
+        }
+        return normalized(fs.realpathSync(resolved)) === normalized(fs.realpathSync(path.join(owner.workspace, 'Microi一键编译发布.sh')));
+    } catch { return false; }
+}
 export function inspectLocks(workspace) {
     const state = path.join(path.resolve(workspace), '.tmp', 'microi-process-state');
-    return ['platform', 'agent', 'legacy'].map(domain => {
-        const lock = domain === 'legacy' ? path.join(state, 'release.lock') : directory(workspace, domain);
+    return [...domains, 'platform', 'legacy'].map(domain => {
+        const lock = path.join(state, domain === 'legacy' ? 'release.lock' : `${domain}-release.lock`);
         if (!fs.existsSync(lock)) return { domain, path: lock, exists: false };
         const owner = readOwner(lock); const running = alive(owner.pid);
-        const effectiveDomain = domain === 'legacy' && running === true && verifiedLegacyAgent(owner, workspace) ? 'agent' : domain;
-        return { domain, effectiveDomain, path: lock, exists: true, pid: owner.pid || null, running };
+        let effectiveDomains = domains.has(domain) ? [domain] : domain === 'platform' ? ['api', 'pc', 'website'] : [...domains];
+        if (running === true && !domains.has(domain)) {
+            if (verifiedLegacyAgent(owner, workspace)) effectiveDomains = ['agent'];
+            else if (verifiedLegacyApi(owner, workspace)) effectiveDomains = ['api'];
+        }
+        return { domain, effectiveDomains, path: lock, exists: true, pid: owner.pid || null, running };
     });
 }
 export function assertReleaseAvailable(workspace, domain, ownerToken = '') {
     directory(workspace, domain);
     for (const lock of inspectLocks(workspace)) {
-        if (!lock.exists || lock.running === false || (lock.effectiveDomain !== domain && lock.effectiveDomain !== 'legacy')) continue;
+        if (!lock.exists || lock.running === false || !lock.effectiveDomains.includes(domain)) continue;
         const owner = readOwner(lock.path);
         if (ownerToken && owner.owner_token === ownerToken && lock.domain === domain && lock.running === true) continue;
         throw new Error(`发布范围 ${domain} 正被占用：${lock.path}（PID=${lock.pid || '未知'}）。`);
@@ -111,6 +135,7 @@ export function acquireReleaseLock(workspace, domain, pid, token = crypto.random
     fs.mkdirSync(path.dirname(lock), { recursive: true });
     recoverDeadLock(lock);
     recoverDeadLock(path.join(path.dirname(lock), 'release.lock'));
+    recoverDeadLock(path.join(path.dirname(lock), 'platform-release.lock'));
     assertReleaseAvailable(workspace, domain);
     fs.mkdirSync(lock); // mkdir 原子抢占；另一范围拥有自己的目录，不互相排队。
     const owner = `pid=${pid}\ndomain=${domain}\nowner_token=${token}\nstarted_at=${new Date().toISOString()}\nworkspace=${path.resolve(workspace)}\n`;
