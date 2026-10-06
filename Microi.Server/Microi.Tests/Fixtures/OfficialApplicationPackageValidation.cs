@@ -1510,6 +1510,7 @@ namespace Microi.net
                     !content.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
                     !content.Contains("LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1") ||
                     !content.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
+                    !content.Contains("MYSQL_EXISTING_ROW_BUDGET_V1") ||
                     !content.Contains("ADMIN_MENU_PERMISSION_V1") ||
                     !content.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
                     !content.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||
@@ -1783,6 +1784,7 @@ namespace Microi.net
                     !importerEngineCode.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
                     !importerEngineCode.Contains("LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1") ||
                     !importerEngineCode.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
+                    !importerEngineCode.Contains("MYSQL_EXISTING_ROW_BUDGET_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||

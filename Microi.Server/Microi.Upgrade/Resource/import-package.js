@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.6
+ * Version: v3.0.7
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
@@ -5085,6 +5085,15 @@ try {
         var fieldTableName = String(field.TableName || '').toLowerCase();
         var expectedTableName = String(tableName || '').toLowerCase();
         if (fieldTableName) return fieldTableName == expectedTableName;
+        if (!tableId) {
+            var declaredTables = Package.DiyTables || [];
+            for (var ti = 0; ti < declaredTables.length; ti++) {
+                if (String(declaredTables[ti].Name || '').toLowerCase() == expectedTableName) {
+                    tableId = String(declaredTables[ti].Id || '');
+                    break;
+                }
+            }
+        }
         return !!tableId && String(field.TableId || '') == String(tableId);
     };
 
@@ -5180,37 +5189,38 @@ try {
         if (targetType != 'mediumtext' && targetType != 'longtext') return false;
         if (isPackageColumnIndexed(tableName, columnName)) return false;
 
-        var matched = false;
-        var previousTypes = [];
+        // 先验证全部声明，再整体修改；不能让重复声明或物理快照中的数值类型
+        // 被半途改成文本，也不能将原包 LONGTEXT 缩窄成 MEDIUMTEXT。
+        var matchingFields = [], matchingColumns = [], previousTypes = [];
         var packageFields = Package.DiyFields || [];
+        var physicalColumns = Package.PhysicalColumns || [];
         for (var fieldIndex = 0; fieldIndex < packageFields.length; fieldIndex++) {
             var packageField = packageFields[fieldIndex] || {};
             if (!packageFieldBelongsToTable(packageField, tableName, tableId)
                 || String(packageField.Name || '').toLowerCase() != String(columnName).toLowerCase()) continue;
-            var currentFieldType = String(packageField.Type || '');
-            if (!/^(?:var)?char\s*\(\s*\d+\s*\)$/i.test(currentFieldType)
-                && !/^(?:medium|long)?text$/i.test(currentFieldType)) return false;
-            previousTypes.push(currentFieldType);
-            packageField.Type = targetType;
-            matched = true;
+            matchingFields.push(packageField);
+            previousTypes.push(String(packageField.Type || ''));
         }
-
-        var physicalColumns = Package.PhysicalColumns || [];
         for (var physicalIndex = 0; physicalIndex < physicalColumns.length; physicalIndex++) {
             var physicalColumn = physicalColumns[physicalIndex] || {};
-            var physicalTableName = getPhysicalValue(physicalColumn, ['TABLE_NAME', 'TableName']);
-            var physicalColumnName = getPhysicalValue(physicalColumn, ['COLUMN_NAME', 'ColumnName', 'Name']);
-            if (String(physicalTableName || '').toLowerCase() != String(tableName).toLowerCase()
-                || String(physicalColumnName || '').toLowerCase() != String(columnName).toLowerCase()) continue;
+            if (String(getPhysicalValue(physicalColumn, ['TABLE_NAME', 'TableName']) || '').toLowerCase() != String(tableName).toLowerCase()
+                || String(getPhysicalValue(physicalColumn, ['COLUMN_NAME', 'ColumnName', 'Name']) || '').toLowerCase() != String(columnName).toLowerCase()) continue;
+            matchingColumns.push(physicalColumn);
             previousTypes.push(String(getPhysicalValue(physicalColumn, ['COLUMN_TYPE', 'ColumnType', 'Type']) || ''));
-            physicalColumn.COLUMN_TYPE = targetType;
-            physicalColumn.DATA_TYPE = targetType;
-            if (physicalColumn.ColumnType !== undefined) physicalColumn.ColumnType = targetType;
-            if (physicalColumn.Type !== undefined) physicalColumn.Type = targetType;
-            matched = true;
         }
-
-        if (!matched) return false;
+        if (previousTypes.length == 0) return false;
+        for (var typeIndex = 0; typeIndex < previousTypes.length; typeIndex++) {
+            if (!/^(?:(?:var)?char\s*\(\s*\d+\s*\)|(?:tiny|medium|long)?text)$/i.test(previousTypes[typeIndex])) return false;
+            if (/^longtext$/i.test(previousTypes[typeIndex])) targetType = 'longtext';
+        }
+        for (var mf = 0; mf < matchingFields.length; mf++) matchingFields[mf].Type = targetType;
+        for (var mc = 0; mc < matchingColumns.length; mc++) {
+            var matchedColumn = matchingColumns[mc];
+            matchedColumn.COLUMN_TYPE = targetType;
+            matchedColumn.DATA_TYPE = targetType;
+            if (matchedColumn.ColumnType !== undefined) matchedColumn.ColumnType = targetType;
+            if (matchedColumn.Type !== undefined) matchedColumn.Type = targetType;
+        }
         rewritePackageDdlColumnType(tableName, columnName, targetType);
         mysqlOffpageTypeOverrides[mysqlOffpageOverrideKey(tableName, columnName)] = targetType;
         debugLog['mysql_row_offpage_fallback_' + tableName + '_' + columnName] =
@@ -5240,6 +5250,96 @@ try {
             )) promoted++;
         }
         return promoted;
+    };
+
+    // MYSQL_EXISTING_ROW_BUDGET_V1：历史宽表可能连新 TEXT 的行内指针都放不下。
+    // 先尝试将本次长列放到行外；短日期等保留原类型。仍不足时只扩宽本包拥有的
+    // 既有可空、无默认值 VARCHAR，保留内容/字符集/排序规则/说明，不删虚拟历史列。
+    // 真实索引（包括复合索引的非首列）也必须保护，不能仅相信源包或 COLUMN_KEY。
+    // MySQL DDL 不随 V8 事务回滚；每次扩宽立即强回读，后续重试以真实物理类型为准。
+    var executeMysqlColumnDdlWithRowBudget = function (tableName, tableId, columnName, buildSql) {
+        var indexedColumns = null;
+        for (var attempt = 0; attempt <= 8; attempt++) {
+            try {
+                return V8.Db.FromSql(buildSql()).ExecuteNonQuery();
+            } catch (error) {
+                if (runtimeIsSqlServer || !isMysqlRowSizeTooLargeError(error) || attempt == 8) throw error;
+                if (!isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) throw error;
+                if (indexedColumns === null) {
+                    indexedColumns = {};
+                    var indexRows = V8.Db.FromSql(
+                        'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS ' +
+                        'WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0)'
+                    ).AddInParameter('@p0', tableName).ToArray();
+                    if (!indexRows || typeof indexRows.length != 'number')
+                        throw new Error('MySQL行宽修复无法回读目标表索引，已停止：' + tableName);
+                    for (var ix = 0; ix < indexRows.length; ix++)
+                        indexedColumns[String(indexRows[ix].COLUMN_NAME || '').toLowerCase()] = true;
+                }
+
+                var currentType = '';
+                var declaredFields = Package.DiyFields || [];
+                for (var f = 0; f < declaredFields.length; f++) {
+                    if (packageFieldBelongsToTable(declaredFields[f], tableName, tableId)
+                        && String(declaredFields[f].Name || '').toLowerCase() == String(columnName).toLowerCase())
+                        currentType = String(declaredFields[f].Type || '');
+                }
+                var declaredColumns = Package.PhysicalColumns || [];
+                for (var pc = 0; pc < declaredColumns.length; pc++) {
+                    if (String(getPhysicalValue(declaredColumns[pc], ['TABLE_NAME', 'TableName']) || '').toLowerCase() == String(tableName).toLowerCase()
+                        && String(getPhysicalValue(declaredColumns[pc], ['COLUMN_NAME', 'ColumnName', 'Name']) || '').toLowerCase() == String(columnName).toLowerCase())
+                        currentType = String(getPhysicalValue(declaredColumns[pc], ['COLUMN_TYPE', 'ColumnType', 'Type']) || currentType);
+                }
+                var currentLength = /^varchar\s*\(\s*(\d+)\s*\)$/i.exec(currentType);
+                if (currentLength && Number(currentLength[1]) >= 255
+                    && !indexedColumns[String(columnName).toLowerCase()]
+                    && applyPackageColumnTypeOverride(tableName, tableId, columnName, 'mediumtext', '本次长列改用行外文本')) continue;
+
+                // 共享表只允许补包内缺列；腾挪既有列必须具备明确表所有权。
+                if (!packageOwnsPhysicalTable(tableName)) throw error;
+                var targetRows = readTargetPhysicalColumns(tableName);
+                var candidates = [];
+                for (var c = 0; c < targetRows.length; c++) {
+                    var target = targetRows[c], name = String(target.COLUMN_NAME || '');
+                    var lengthMatch = /^varchar\s*\(\s*(\d+)\s*\)$/i.exec(String(target.COLUMN_TYPE || ''));
+                    if (!isSafeIdentifier(name) || name.toLowerCase() == String(columnName).toLowerCase()
+                        || !lengthMatch || Number(lengthMatch[1]) < 255 || indexedColumns[name.toLowerCase()]
+                        || String(target.COLUMN_KEY || '') != '' || String(target.EXTRA || '') != ''
+                        || String(target.IS_NULLABLE || '').toUpperCase() != 'YES'
+                        || (target.COLUMN_DEFAULT !== null && target.COLUMN_DEFAULT !== undefined)
+                        || (target.CHARACTER_SET_NAME && !isSafeIdentifier(String(target.CHARACTER_SET_NAME)))
+                        || (target.COLLATION_NAME && !isSafeIdentifier(String(target.COLLATION_NAME)))) continue;
+                    candidates.push({ Column: target, Length: Number(lengthMatch[1]) });
+                }
+                candidates.sort(function (a, b) {
+                    return b.Length - a.Length || (a.Column.COLUMN_NAME < b.Column.COLUMN_NAME ? -1 : 1);
+                });
+                var reclaimed = false;
+                for (var candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {
+                    var candidate = candidates[candidateIndex].Column, candidateName = String(candidate.COLUMN_NAME);
+                    if (!applyPackageColumnTypeOverride(tableName, tableId, candidateName, 'mediumtext', '既有宽表释放行内空间')) continue;
+                    var candidateType = mysqlOffpageTypeOverrides[mysqlOffpageOverrideKey(tableName, candidateName)];
+                    var definition = quotePhysicalIdentifier(candidateName) + ' ' + candidateType;
+                    if (candidate.CHARACTER_SET_NAME) definition += ' CHARACTER SET ' + candidate.CHARACTER_SET_NAME;
+                    if (candidate.COLLATION_NAME) definition += ' COLLATE ' + candidate.COLLATION_NAME;
+                    definition += ' NULL';
+                    if (candidate.COLUMN_COMMENT) definition += " COMMENT '" + sqlString(candidate.COLUMN_COMMENT) + "'";
+                    V8.Db.FromSql('ALTER TABLE ' + quotePhysicalIdentifier(tableName) + ' MODIFY COLUMN ' + definition).ExecuteNonQuery();
+                    var readbackRows = readTargetPhysicalColumns(tableName), readback = null;
+                    for (var rb = 0; rb < readbackRows.length; rb++)
+                        if (String(readbackRows[rb].COLUMN_NAME).toLowerCase() == candidateName.toLowerCase()) readback = readbackRows[rb];
+                    if (!readback || String(readback.COLUMN_TYPE || '').toLowerCase() != candidateType
+                        || String(readback.IS_NULLABLE).toUpperCase() != 'YES'
+                        || String(readback.COLUMN_COMMENT || '') != String(candidate.COLUMN_COMMENT || '')
+                        || String(readback.CHARACTER_SET_NAME || '') != String(candidate.CHARACTER_SET_NAME || '')
+                        || String(readback.COLLATION_NAME || '') != String(candidate.COLLATION_NAME || ''))
+                        throw new Error('MySQL行宽修复后物理列回读不一致：' + tableName + '.' + candidateName);
+                    reclaimed = true;
+                    break;
+                }
+                if (!reclaimed) throw error;
+            }
+        }
     };
 
     var applyPersistedMysqlOffpageOverrides = function () {
@@ -5805,7 +5905,11 @@ try {
                         var addSql = 'ALTER TABLE ' + quotePhysicalIdentifier(tableName)
                             + (runtimeIsSqlServer ? ' ADD ' : ' ADD COLUMN ') + definition;
                         try {
-                            V8.Db.FromSql(addSql).ExecuteNonQuery();
+                            executeMysqlColumnDdlWithRowBudget(tableName, '', columnName, function () {
+                                return 'ALTER TABLE ' + quotePhysicalIdentifier(tableName)
+                                    + (runtimeIsSqlServer ? ' ADD ' : ' ADD COLUMN ')
+                                    + buildPhysicalColumnDefinition(sourceColumn, false);
+                            });
                         } catch (physicalAddError) {
                             if (runtimeIsSqlServer
                                 || !isMysqlRowSizeTooLargeError(physicalAddError)
@@ -5977,7 +6081,11 @@ try {
                         if (!definition) continue;
                         var modifySql = 'ALTER TABLE ' + quotePhysicalIdentifier(tableName)
                             + (runtimeIsSqlServer ? ' ALTER COLUMN ' : ' MODIFY COLUMN ') + definition;
-                        V8.Db.FromSql(modifySql).ExecuteNonQuery();
+                        executeMysqlColumnDdlWithRowBudget(tableName, '', columnName, function () {
+                            effectiveColumnType = mysqlOffpageTypeOverrides[mysqlOffpageOverrideKey(tableName, columnName)] || effectiveColumnType;
+                            return runtimeIsSqlServer ? modifySql : 'ALTER TABLE ' + quotePhysicalIdentifier(tableName)
+                                + ' MODIFY COLUMN ' + buildPhysicalColumnDefinition(sourceColumn, false, effectiveColumnType, targetColumn);
+                        });
                         result.Modified++;
                         debugLog['physical_schema_modified_' + tableName + '_' + columnName] =
                             'type:' + targetColumn.COLUMN_TYPE + '->' + effectiveColumnType + ', null:' + targetNullable + '->' + sourceNullable;
@@ -6665,7 +6773,10 @@ try {
                 var alterSQL = buildDiyFieldAddColumnSql(ddlItem.TableName, field, fieldType);
 
                 try {
-                    V8.Db.FromSql(alterSQL).ExecuteNonQuery();
+                    executeMysqlColumnDdlWithRowBudget(ddlItem.TableName, ddlItem.TableId, fieldName, function () {
+                        fieldType = mapToMySQLType(field.Type);
+                        return buildDiyFieldAddColumnSql(ddlItem.TableName, field, fieldType);
+                    });
                     existingColumns[existingColumnKey] = true;
                     existingColumnTypes[existingColumnKey] = fieldType;
                     fieldsAdded++;
