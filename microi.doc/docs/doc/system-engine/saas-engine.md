@@ -157,6 +157,8 @@ SaaS 引擎中已移除提醒相关的行、页面和批量按钮，以及表单
 >* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internal"，`DbConn=`"Data Source=192.168.1.11;Database=microi_dev"时，代表使用了`内网IP`+`测试环境数据库`
 >* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internet"，`DbConn`="Data Source=59.110.139.95;Database=microi_dev"时，代表使用了`公网IP`+`测试环境数据库`
 
+空库脱敏脚本 v1.5.7 会只读组织机构表的真实物理列；旧库没有 `ParentName` 时，中性组织初始化只写 `ParentId`。字段发现失败会停止制作，不修改主库结构，不发布不完整空库包。该修复随 SaaS 引擎应用 v8.4.14 交付。
+
 ### 租户未找到、缓存恢复与运行登记
 
 新增老数据库租户时，先填写可写的主库连接 `DbConn`；仅填写 `DbReadConn` 不能完成升级。JWT 密钥由后端生成并持久保存，页面只显示配置状态，无需手工填写。
