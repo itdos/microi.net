@@ -173,11 +173,11 @@
     "AiApplicationCount": 1,
     "IncludeSource": false,
     "ChangeLog": {
-      "Version": "v8.4.13",
-      "Title": "平台内置微服务运行时同步",
+      "Version": "v8.4.14",
+      "Title": "空库组织机构旧结构兼容",
       "ChangeType": "Update",
-      "Content": "重新嵌入平台内置微服务 v2.0.19 DatabaseOnly 运行时，确保官方在线应用与 SaaS 离线兜底产物一致。新增SaaS推广中心、真实子租户用量与登录统计、团队转化和试用跟进；推荐链接支持匿名验证码开通标准空库及幂等任务恢复。",
-      "ReleaseTime": "2026-10-06 01:35:30"
+      "Content": "空库脱敏按真实组织机构物理列生成中性组织，兼容缺失 ParentName 的旧库；字段发现失败不输出清理 SQL。",
+      "ReleaseTime": "2026-10-06 13:51:56"
     },
     "JobCount": 0,
     "AppId": "app.microi.saas-engine",
