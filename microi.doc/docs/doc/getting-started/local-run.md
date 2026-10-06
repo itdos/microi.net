@@ -179,6 +179,8 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 共享源码持续变化时，可将完整候选源码及依赖保存到独立发布目录，在那里运行同一 Full 和一键发布脚本。专用测试服务使用独立端口，并通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口，默认仍为 61501、61500。进程管理器继续检查 PID、命令行和工作区归属；原工作区服务不受影响。这两个变量仅用于发布脚本，不是生产 API 配置。
 
+平台 PC/API 与官网发布使用 `.tmp/microi-process-state/platform-release.lock`；Microi Agent 桌面安装包使用独立的 `agent-release.lock`，可以同时发布。服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert platform <工作区根>`，或使用进程管理器的 `AssertServiceStart`。平台锁仍阻止其它任务重启共享服务；旧 `release.lock` 只有在 PID 命令行、任务标签和共享状态目录共同证明属于 Agent 时才对平台放行，未知锁继续阻塞。锁由原进程和唯一令牌释放，不能删除其它正在运行的发布锁。并行发布仍遵守内存预算与各自测试门禁。
+
 进程管理器也支持通过 PowerShell 7 检查 macOS/Linux 的真实监听进程、命令行和工作目录；路径按大小写精确匹配，结束前再次核对启动时间，拒绝 PID 复用。`dotnet run` 启动的无扩展名 `Microi.net.Api` apphost 还必须使用规范绝对路径，位于所选 API 项目的 `bin/` 下，且工作目录精确等于该项目；相同名称、其它目录、路径中的 `.`/`..` 或无法读取启动时间都不能作为可停止的身份。只能停止已证明属于所选工作区的 API/Vite 及其后代，无法读取身份时停止操作。此能力不改变一键脚本对共享开发服务的既有处理策略；跨平台回归使用独立目录和端口，不以模拟对象代替真实进程。
 
 主、子租户必须在同一维护控制面的有效租户目录中；必要时用 `MICROI_TEST_CONTROL_API_BASE`、`MICROI_TEST_CHILD_API_BASE` 指定各自入口。详细变量和测试边界见源码 `Microi.Server/Microi.Tests/README.md`，报告应区分本地候选与已部署远端的结果。

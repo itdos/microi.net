@@ -93,8 +93,13 @@ if [ "${1:-}" = "--microi-code" ]; then
         printf '%s\n' '缺少内部 Microi.Agent 仓库。请从公司 GitLab 克隆；禁止加入根公开仓库。' >&2
         exit 1
     fi
+    # 桌面安装包只占 Agent 锁，不占平台 Docker/服务锁；退出只释放本次令牌。
+    _agent_lock_token=$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')
+    node Microi.Server/tools/release-lock.mjs acquire agent "$PWD" "$$" "$_agent_lock_token"
+    _agent_workspace="$PWD"
+    trap 'node "$_agent_workspace/Microi.Server/tools/release-lock.mjs" release agent "$_agent_workspace" "$$" "$_agent_lock_token"' EXIT
     case "${1:-}" in
-      --mac) exec bash Microi.Agent/一键打包Mac.sh "${@:2}" ;;
+      --mac) bash Microi.Agent/一键打包Mac.sh "${@:2}" ;;
       --win|'') cd Microi.Agent/apps/microi-code && npm ci && npm run typecheck && npm test && npm run package:win ;;
       *) printf '%s\n' 'Microi Code 仅支持 --win 或 --mac。' >&2; exit 1 ;;
     esac
@@ -158,47 +163,19 @@ stop_active_client_build() {
 
 release_workspace_lock() {
     [ "$MICROI_RELEASE_LOCK_HELD" != true ] && return 0
-    if [ -n "$MICROI_RELEASE_LOCK_DIR" ] && [ -d "$MICROI_RELEASE_LOCK_DIR" ]; then
-        rm -f "$MICROI_RELEASE_LOCK_DIR/owner.env"
-        rmdir "$MICROI_RELEASE_LOCK_DIR" 2>/dev/null || true
-    fi
+    node "$MICROI_RELEASE_WORKSPACE/Microi.Server/tools/release-lock.mjs" release platform "$MICROI_RELEASE_WORKSPACE" "$MICROI_RELEASE_OWNER_PID" "$MICROI_RELEASE_LOCK_TOKEN" || return 1
     MICROI_RELEASE_LOCK_HELD=false
 }
 
 acquire_workspace_lock() {
-    local _state_dir="$PWD/.tmp/microi-process-state"
-    local _lock_dir="$_state_dir/release.lock"
-    mkdir -p "$_state_dir"
-
-    if ! mkdir "$_lock_dir" 2>/dev/null; then
-        local _owner_pid=""
-        if [ -f "$_lock_dir/owner.env" ]; then
-            _owner_pid=$(sed -n 's/^pid=\([0-9][0-9]*\)$/\1/p' "$_lock_dir/owner.env" | head -1)
-        fi
-
-        # 只自动回收能证明持有进程已经退出的精确锁目录；无法证明时宁可阻止并发发布。
-        if [[ "$_owner_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$_owner_pid" 2>/dev/null; then
-            rm -f "$_lock_dir/owner.env"
-            rmdir "$_lock_dir" 2>/dev/null || true
-            mkdir "$_lock_dir" 2>/dev/null || print_fail "检测到无法安全回收的发布互斥锁: $_lock_dir"
-            print_warning "已回收上次异常退出留下的发布互斥锁（原 PID=$_owner_pid）"
-        else
-            local _owner_text="未知"
-            [ -n "$_owner_pid" ] && _owner_text="$_owner_pid"
-            print_fail "另一个吾码发布/编译流程正在使用当前工作区（PID=${_owner_text}）。
-请等待它结束；若确认上次异常退出，请先运行：
-powershell -NoProfile -ExecutionPolicy Bypass -File Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action Status"
-        fi
-    fi
-
-    MICROI_RELEASE_LOCK_DIR="$_lock_dir"
+    MICROI_RELEASE_WORKSPACE="$PWD"
+    MICROI_RELEASE_OWNER_PID="${BASHPID:-$$}"
+    MICROI_RELEASE_LOCK_TOKEN=$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')
+    node "$PWD/Microi.Server/tools/release-lock.mjs" acquire platform "$PWD" "${BASHPID:-$$}" "$MICROI_RELEASE_LOCK_TOKEN" || print_fail "平台发布锁被占用，已停止本次发布。"
+    export MICROI_RELEASE_LOCK_TOKEN
+    MICROI_RELEASE_LOCK_DIR="$PWD/.tmp/microi-process-state/platform-release.lock"
     MICROI_RELEASE_LOCK_HELD=true
-    {
-        echo "pid=${BASHPID:-$$}"
-        echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-        echo "workspace=$PWD"
-    } > "$_lock_dir/owner.env"
-    print_info "已取得工作区发布互斥锁；其它 AI 不应在本次发布期间重启 61500/61501。"
+    print_info "已取得平台发布锁；Agent 独立发布可同时执行，平台服务重启仍需等待本次发布结束。"
 }
 
 prepare_release_workspace() {
