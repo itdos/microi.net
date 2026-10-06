@@ -92,9 +92,16 @@ export async function verifySaasPromotionBrowser({page,url,directory,trial,actor
  await selectTheme(page,'dark');await assertReadable(app);
  await page.screenshot({path:path.join(directory,name+'-dark.png'),fullPage:true});
  await page.setViewportSize({width:390,height:844});
+ // 平台在窄屏切换 AppMain，原微服务宿主会卸载；先等新布局与真实页面完成挂载。
+ await page.locator('.app-wrapper-microi.mobile').waitFor({state:'visible',timeout:120000});
+ await app.waitFor({state:'visible',timeout:120000});
+ await app.locator('.sp-skeleton').waitFor({state:'hidden',timeout:240000});
  const fits=await app.evaluate(el=>el.getBoundingClientRect().width<=window.innerWidth+1);
  assert.equal(fits,true);await assertReadable(app);await page.screenshot({path:path.join(directory,name+'-mobile.png'),fullPage:true});
- await page.setViewportSize({width:1536,height:1100});await selectTheme(page,originalMode);
+ await page.setViewportSize({width:1536,height:1100});
+ await page.locator('.app-wrapper-microi:not(.mobile)').waitFor({state:'visible',timeout:120000});
+ await app.waitFor({state:'visible',timeout:120000});
+ await selectTheme(page,originalMode);
  assert.deepEqual(errors,[]);checks.push('明暗主题、390像素布局与控制台');
  return {passed:checks.length,failed:0,skipped:0,checks,total};
 }
