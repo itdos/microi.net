@@ -1,6 +1,6 @@
 ---
 title: 自建数字人直播与 AI 换脸
-description: Microi吾码自建数字人直播、照片人物与服装动作、视频换脸、本机部署、4K截图和OBS接入。
+description: Microi吾码自建数字人直播、视频换脸、手机摄像头局域网接入、本机部署、4K截图和OBS验收边界。
 outline: [2, 3]
 ---
 
@@ -12,7 +12,7 @@ outline: [2, 3]
 
 ## 4K 功能截图
 
-以下十一图均为实际应用页面或本机 OBS 录制帧，原始像素为 **3840 × 2160**，点击可查看原图。这里的 4K 指界面截图或 OBS 输出尺寸，口型及换脸视频源仍为 480 × 640，不应理解成 4K 模型推理。第一张是本机模型生成中文语音和口型后，经浏览器 WebRTC 收到的画面；所用人像由图像生成工具为文档制作，只用作演示素材。第二至第六张是新版照片驱动与换脸工作台，浏览器自动化通过官方接口引擎授权，再调用本机视频生成与两种摄像头实时动作接口；第七张是把实际生成人像与服装动作视频作为媒体源后由 OBS 录制的画面。演示人物均为合成测试素材。其余工作台和本机设置显示未配对状态；话术与知识库以隔离的示例数据渲染，用于展示交互布局，不代表线上租户的业务回读或外部平台真实开播。
+以下十五图均为实际应用页面或本机 OBS 录制帧。桌面图原始像素为 **3840 × 2160**；手机链路竖屏图为 **2160 × 3840**。点击可查看原图。这里的 4K 指界面截图或 OBS 输出尺寸，模型输出仍为 480 × 640，不应理解成 4K 模型推理。第一张是本机生成中文语音和口型后，经浏览器 WebRTC 收到的画面；所用人像为文档制作的合成演示素材。第二至第七张记录早期二维换脸、服饰动作及 OBS 片段录制效果，可作为历史基线；末尾两张神经网络头像图分别来自真实本机模型与浏览器虚拟手机摄像头联动测试、OBS 媒体来源录制测试，画质改善，但约 5 fps 仍未达到流畅直播。手机链路截图不是实体手机或商用画质证明。其余工作台和本机设置显示未配对状态；话术与知识库以隔离的示例数据渲染，不代表线上租户的业务回读或外部平台真实开播。
 
 <div class="mci-doc-screenshot-grid">
   <figure>
@@ -81,6 +81,30 @@ outline: [2, 3]
     </a>
     <figcaption>问答知识：常见问题、标准答复与启用状态；使用隔离的示例数据。</figcaption>
   </figure>
+  <figure>
+    <a href="/images/digital-human-live/phone-live-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看手机摄像头连接及本机换脸桌面 4K 原图">
+      <img src="/images/digital-human-live/phone-live-4k.png" width="3840" height="2160" loading="lazy" alt="桌面端手机摄像头连接码、已连接状态及本机二维换脸预览；浏览器虚拟摄像头测试" />
+    </a>
+    <figcaption>手机链路桌面端：同局域网 WebRTC 帧进入本机换脸服务；测试使用浏览器虚拟摄像头，二维脸部边缘仍有明显瑕疵。</figcaption>
+  </figure>
+  <figure>
+    <a href="/images/digital-human-live/phone-connection-portrait-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看手机摄像头竖屏连接 4K 原图">
+      <img src="/images/digital-human-live/phone-connection-portrait-4k.png" width="2160" height="3840" loading="lazy" alt="竖屏手机摄像头页面显示一次性连接码、授权确认、已连接电脑和虚拟摄像头预览" />
+    </a>
+    <figcaption>手机端交互：连接码、素材授权和视频预览均已自动化验证；此图为窄屏浏览器模拟，尚非实体手机验收。</figcaption>
+  </figure>
+  <figure>
+    <a href="/images/digital-human-live/neural-portrait-phone-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看神经网络头像与手机摄像头链路 4K 原图">
+      <img src="/images/digital-human-live/neural-portrait-phone-4k.png" width="3840" height="2160" loading="lazy" alt="本机 LivePortrait 神经网络头像预览，浏览器模拟手机摄像头经局域网 WebRTC 驱动" />
+    </a>
+    <figcaption>神经网络头像本机实测：手机端为浏览器虚拟摄像头，驱动帧经 WebRTC 到电脑再由本机模型生成；源照片的头发与服装保留，约 5 fps。</figcaption>
+  </figure>
+  <figure>
+    <a href="/images/digital-human-live/obs-neural-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看 OBS 录制神经网络头像的 4K 原图">
+      <img src="/images/digital-human-live/obs-neural-4k.png" width="3840" height="2160" loading="lazy" alt="OBS 媒体来源接收本机生成的神经网络头像片段，3840×2160 画布内的人像与左右黑边" />
+    </a>
+    <figcaption>OBS 神经头像片段实录：本机模型完成 2 秒素材后，OBS 媒体来源循环播放并录制 7.8 秒；仅证明片段捕获，尚未证明实时窗口接入或外部推流。</figcaption>
+  </figure>
 </div>
 
 ## 组成与能力边界
@@ -89,15 +113,24 @@ outline: [2, 3]
 | --- | --- | --- |
 | 吾码管理 | MicroService、FormEngine、DiyToken | 话术、问答知识、角色权限、测试记录 |
 | 本机推理 | Qwen3 0.6B、MeloTTS、MuseTalk 1.5 | 组织回答、中文语音、口型画面 |
+| 本机头像 | LivePortrait 神经生成模块、FasterLivePortrait ONNX 预处理、MediaPipe 检测 | 单张照片的脸部表情与头部动作；保留照片的头发、衣服和背景 |
 | 本机输出 | WebRTC、MP4、OBS 媒体来源或浏览器来源 | 保存音画片段，并在 OBS 验证捕获与推流配置 |
 
 ## 照片人物动作与视频换脸
 
-【AI 换脸与动作】提供两种本机模式。**只换脸**以拍摄视频为主体，使用已授权照片的面部随视频表情与头部位置变化，保留拍摄视频的头发、身体、衣服与背景。**人像与衣服动作**从照片提取人物轮廓、服装与姿态，以二维网格形变跟随驱动视频，并用统一背景填充。它不能推断源照片里不存在的身体或衣服背面，也不是高保真全身生成；遮挡、快速转身和手部交叉会造成明显失真。建议先用正面、清晰、完整拍到所需身体部位的照片与平稳视频试拍。
+【AI 换脸与动作】提供三种本机模式。**神经网络头像**根据驱动视频的头部表情生成源照片人物的新表情，源照片中的头发、服装和背景保持原样；它适合单人正脸及小幅转头，不会让整套衣服按拍摄者的手脚动作移动。**实验性二维换脸**以拍摄视频为主体，保留视频中的头发、衣服与背景，但脸部边缘和肤色融合目前不够自然。**实验性二维服饰动作**从照片提取人物轮廓、服装与姿态，以二维网格形变跟随视频；遮挡、转身和手部交叉会明显失真。这两种二维模式不可宣称高保真商业效果。
 
 点击生成时，浏览器先调用吾码接口引擎 `dhl-motion-prepare`；引擎使用当前 DiyToken、当前租户与【直播测试记录】菜单权限核准任务，再调用可由租户扩展的 `dhl-motion-hook`。接口只返回本机执行契约，不接收照片或视频字节。网页随后把素材提交到配对的 `127.0.0.1:17861` 本机服务；完成后在本机预览、下载 MP4，可选择保存不含媒体内容的测试记录。**只换脸和人物服饰动作都支持摄像头实时预览**：浏览器逐帧送到同一回环服务的 WebSocket，再显示处理帧。输出嵌入“AI 生成”标识。源人物和拍摄者都需允许这种用途，不应把合成画面冒充真人身份。
 
-本机程序基于 MediaPipe 关键点、OpenCV 和二维形变实现，新增模式不调用云端模型，不计 MiniMax token。它是低资源可运行的试验性效果，不承诺影视级换脸或稳定的全身直播。输出视频最长 15 秒、最多 450 帧、处理宽度最多 640 像素；超限输入会拒绝。官方演示样例用 RTX 2080 SUPER 所在电脑的合成素材、24 帧、2 秒、480 × 640 进行自动化，HTTP 任务实测只换脸 21.25 fps、人像与衣服动作 20.88 fps；网页侧分别验证了实时只换脸和实时人物服饰动作的 WebSocket 视频帧。帧处理速度并不等于整个直播链路的端到端帧率。
+神经网络头像由固定版本的 LivePortrait/FasterLivePortrait 模型在本机 CUDA 显卡推理，用 MediaPipe 替代 InsightFace 检测模型；安装时下载权重，推理时不调用云端模型，也不计 MiniMax token。输出视频最长 15 秒、最多 450 帧、处理宽度最多 640 像素。RTX 2080 SUPER 本机合成样例经完整 HTTP 任务生成 24 帧、2 秒、480 × 640 MP4，实测推理 **4.9 fps**，任务最终成功，文件 95,423 字节；浏览器模拟手机摄像头到本机服务也产生了真实头像画面。视频文件按 12 fps 播放不表示推理达 12 fps。原二维模式历史样例曾分别达到约 21 fps，但画质较差，不能据此推出神经网络模式的直播能力。
+
+### 手机摄像头局域网接入
+
+电脑先在【本机设置】连接回环服务，再进入【AI 换脸与动作】选择已获授权的源照片和“手机摄像头”，创建 8 位连接码。手机与电脑连接同一局域网，在吾码发布的手机摄像头页面用**同一个吾码账号**登录，输入连接码、确认使用权并授予摄像头权限。电脑显示“手机摄像头已连接”后选择神经网络头像或实验模式并启动预览；停止发送、离开手机页面或锁屏会释放摄像头。首次配对之外，手机不需要连接电脑的 `127.0.0.1`：该地址只由电脑浏览器访问。
+
+`dhl-phone-signal` 接口引擎使用当前 DiyToken、租户、登录用户和【直播测试记录】菜单权限交换 WebRTC 连接信息，房间有效期为 10 分钟。接口引擎不接收相机帧或源照片；相机帧由两端浏览器在局域网内点对点传送，再由电脑浏览器送入本机回环服务。连接信息会经过吾码服务器，因此“媒体留在本机”不等于“没有任何控制信息离开设备”。该版不配置公网 STUN/TURN；不同网络、访客 Wi-Fi 客户端隔离和部分防火墙下连接会失败。
+
+2026-10-07 的自动化在两套独立浏览器会话中，用虚拟摄像头验证了房间建立、同账号信令、电脑端 WebRTC 视频解码、本机服务处理和页面画布显示。神经网络头像一次回读为 19 帧、181,994 字节到达电脑，画布生成非透明图像；此前二维模式回读为 20 帧、214,205 字节。**尚未用实体手机、长时连续直播、OBS 实时窗口捕获或外部直播平台观众端验收**。上述截图和短样例不构成商业交付验收通过。
 
 本版采用 **片段先生成、完成后播报** 的缓冲方式。支持话术播报和手动输入观众问题；完成的片段按队列播放，空闲时保持人像。问答延迟包含文字生成、语音生成和口型生成，不能把“输出 25 fps”当成“模型实时生成 25 fps”。工作台展示的口型生成帧率和耗时来自本机实测。
 
@@ -105,7 +138,7 @@ outline: [2, 3]
 
 ## 本机部署
 
-准备 Windows 10/11、Python 3.12、可用的 NVIDIA CUDA 显卡；建议至少 8 GB 显存和 32 GB 内存。还应检查其它程序已经占用的资源。首次模型下载约 4.6 GB，CUDA 安装 wheel 约 2.45 GB，磁盘另需预留解压、Python 依赖和生成视频空间。
+准备 Windows 10/11、Python 3.12、可用的 NVIDIA CUDA 显卡；建议至少 8 GB 显存和 32 GB 内存。还应检查其它程序已经占用的资源。原本机模型首次下载约 4.6 GB，新增神经网络头像权重约 0.64 GB，CUDA 安装 wheel 约 2.45 GB；磁盘另需预留解压、依赖和生成视频空间。
 
 从应用私有源码取得 `runtime` 目录后，在应用目录执行：
 
@@ -114,7 +147,7 @@ powershell -ExecutionPolicy Bypass -File runtime/Install.ps1
 powershell -ExecutionPolicy Bypass -File runtime/Start.ps1
 ```
 
-安装脚本按固定版本下载公开权重、验证大文件 SHA-256，并建立应用自己的 Python 环境。模型下载与推理是两个步骤；安装需要网络，推理只读取本地文件。本机服务启动后检查显存余量，并限制同时生成的请求数量。
+安装脚本按固定版本下载公开权重、验证文件 SHA-256，并建立应用自己的 Python 环境。模型下载与推理是两个步骤；安装需要网络，推理只读取本地文件。神经网络头像权重的版本与校验值单独固定在 `runtime/portrait-model-lock.json`，不打进公开前端包。本机服务启动后检查显存余量，并限制同时生成的请求数量。
 
 打开吾码【数字人直播 → 数字人工作台 → 本机设置】，使用 `runtime/.local/pairing-code.txt` 中的配对码连接本机。上传一张本人或已获授权的清晰正面单人照片，再进入工作台连接预览、生成第一段话术。人像和生成片段保存在这台电脑，默认不上传到吾码文件服务器。
 
@@ -153,6 +186,8 @@ http://127.0.0.1:17861/output
 
 2026-10-04 新增“人物与衣服动作”后，使用本机实际生成的 `api-body.mp4` 作为 OBS“媒体来源”，独立验收场景通过 OBS WebSocket 回读了当前场景、来源路径与录制状态，录制约 9 秒。回读的 MP4 可解码为 **3840 × 2160、30 fps、288 帧**，上方第七张图是该录像中间帧。此项证明 OBS 能接收并录制生成片段；摄像头实时换脸及人物服饰动作已在应用页面及本机 WebSocket 自动化验证，尚未验证 OBS 对其实时窗口的捕获、平台推流或观众端接收。
 
+2026-10-07 用同一台 RTX 2080 SUPER 在本机生成神经网络头像 `gateway.mp4`（24 帧、2 秒、模型约 4.9 fps），再通过独立 OBS 场景和“媒体来源”循环录制。OBS WebSocket 回读场景与素材路径；保存的录像可解码为 **3840 × 2160、30 fps、234 帧、7.8 秒**，抽样帧有画面变化。上方最后一张图是 OBS 对该片段的 4K 截图。这仍不是手机摄像头到 OBS 的实时直连，也没有外部平台观众端验收。
+
 应用源码同步使用 `.microi-micro-app.json` 的 `SourceExcludes` 排除 `runtime/.local`、`.venv`、缓存和测试产物；不能只依赖 `.gitignore`。模型权重、人像、配对码与生成视频不进入公开应用包。上游研究测试素材的使用范围与模型代码许可不同，不能将其默认作为商业主播素材。
 
-组件来源与许可：[MuseTalk](https://github.com/TMElyralab/MuseTalk)、[MeloTTS ONNX](https://huggingface.co/csukuangfj/vits-melo-tts-zh_en)、[Qwen3 GGUF](https://huggingface.co/Qwen/Qwen3-0.6B-GGUF)、[llama.cpp](https://github.com/ggml-org/llama.cpp)。各模型 revision 和文件校验值由应用源码中的 `runtime/model-lock.json` 固定；硬件性能以自己的机器实测为准。
+组件来源与许可：[MuseTalk](https://github.com/TMElyralab/MuseTalk)、[MeloTTS ONNX](https://huggingface.co/csukuangfj/vits-melo-tts-zh_en)、[Qwen3 GGUF](https://huggingface.co/Qwen/Qwen3-0.6B-GGUF)、[llama.cpp](https://github.com/ggml-org/llama.cpp)、[LivePortrait](https://github.com/KlingAIResearch/LivePortrait)、[FasterLivePortrait](https://github.com/warmshao/FasterLivePortrait)。LivePortrait 代码许可明确指出其所引用的 **InsightFace 预训练检测权重仅可非商业研究**；本应用的神经网络头像链路使用 MediaPipe 检测，不下载或打包 InsightFace 权重。模型许可仍须按所用权重的具体来源核对，且照片人物的肖像和服装素材必须获得授权。各模型 revision 与校验值由应用源码中的两个模型锁文件固定；硬件性能以自己的机器实测为准。
