@@ -195,6 +195,10 @@ System.Drawing.Common 的 .NET 10 支持程序集还引用 System.Formats.Nrbf�
 
 Windows Git Bash 的 MSYS PID 与 Windows 原生 PID 不同。一键发布先用真实 `ps` 的 `WINPID` 映射登记 API、PC、官网或 Agent 发布锁，退出时用同一个原生 PID 和令牌释放。映射缺失、重复或进程已退出均停止发布；不借用其它存活进程。旧 API 热修复归属检查以 UTF-8 读取中文入口，并核对实际工作区路径，不仅依赖锁中的标签。
 
+进程管理器在 PowerShell 5 和 7 中显式设置 UTF-8 控制台与管道输出，避免 Git Bash
+继承 Windows 旧代码页后出现中文诊断乱码。编码不影响锁校验和停止范围；修复后仍须
+通过真实 PowerShell、Git Bash 回归及完整 Full，不能通过忽略错误文字来放行。
+
 API、PC 框架、官网和 Microi Agent 各自使用 `.tmp/microi-process-state/` 下的 `api-release.lock`、`pc-release.lock`、`website-release.lock`、`agent-release.lock`，可以同时发布；同类发布互斥。合并发布只取得所选产品的锁，部分取得失败会撤回本次已取得的锁。API 服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`，或通过进程管理器 `AssertServiceStart -ReleaseScope api|pc|all` 检查。Windows 发布准备按相同范围清理：API 处理后端及 Release DLL，PC 处理 Vite，官网不停止二者。
 
 PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与依赖审计统一使用本次结果目录的 `.net-artifacts`，并行发布使用独立结果目录、测试服务/端口及隔离租户。官网的全部源码、主题、测试和依赖由官网发布验收，不影响 PC/API 的候选一致性；共享 SDK、Skills、MCP 与发布工具仍受候选保护。共享版本和跨产品改动应先准备并冻结，再并行发布。资源排队按实际并行阶段预算之和与系统余量判断，不再因无关产品占用一个全局窗口而等待。
