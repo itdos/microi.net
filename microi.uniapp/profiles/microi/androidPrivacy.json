@@ -1,0 +1,24 @@
+{
+  "version": "1",
+  "prompt": "template",
+  "title": "服务协议和隐私政策",
+  "message": "请审慎阅读并充分理解<a href=\"static/service.html\">《服务协议》</a>和<a href=\"static/privacy.html\">《隐私政策》</a>。应用仅在你主动使用对应功能时申请相机、相册、麦克风或定位权限；业务数据发送到你选择并验证通过的 Microi HTTPS 服务。",
+  "buttonAccept": "同意并继续",
+  "buttonRefuse": "暂不同意",
+  "hrefLoader": "default",
+  "backToExit": "true",
+  "second": {
+    "title": "确认提示",
+    "message": "不同意<a href=\"static/service.html\">《服务协议》</a>和<a href=\"static/privacy.html\">《隐私政策》</a>将无法进入需要企业账号的工作台。",
+    "buttonAccept": "同意并继续",
+    "buttonRefuse": "退出应用"
+  },
+  "disagreeMode": { "support": false, "loadNativePlugins": false, "visitorEntry": false, "showAlways": true },
+  "styles": {
+    "backgroundColor": "#FFFFFF",
+    "borderRadius": "8px",
+    "title": { "color": "#17313B" },
+    "buttonAccept": { "color": "#087DA8" },
+    "buttonRefuse": { "color": "#647C87" }
+  }
+}

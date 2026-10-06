@@ -75,7 +75,7 @@ public sealed class V8CodeVersionServiceTests
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.Upgrade",
+            "OfficialApplications",
             "Resource",
             "app.microi.form-engine.json")));
         var ddlStatements = package["DDLStatements"]?.Children<JObject>().ToList() ?? [];

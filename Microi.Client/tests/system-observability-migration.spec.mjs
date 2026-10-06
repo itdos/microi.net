@@ -28,6 +28,6 @@ test('legacy monitor and SysLog controllers are deleted in favor of Managed ApiE
   const catalog = read(path.join(apiRoot, 'api-ownership-catalog.json'))
   assert.doesNotMatch(catalog, /SystemMonitorController/)
 
-  const packageText = read(path.join(workspaceRoot, 'Microi.Server/Microi.Upgrade/Resource/app.microi.saas-engine.json'))
+  const packageText = read(path.join(workspaceRoot, 'Microi.Server/OfficialApplications/Resource/app.microi.saas-engine.json'))
   assert.match(packageText, /platform-client-log/)
 })

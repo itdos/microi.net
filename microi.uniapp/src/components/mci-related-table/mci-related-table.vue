@@ -13,10 +13,8 @@
     </view>
 
     <view v-if="expanded">
-      <view v-if="loading" class="related-table__loading">
-        <view v-for="item in 2" :key="item" class="related-skeleton"><view></view><view></view></view>
-      </view>
-      <view v-else-if="error" class="related-table__state">
+      <mci-skeleton v-if="loading && !rows.length" type="list" :rows="2" compact />
+      <view v-else-if="error && !rows.length" class="related-table__state">
         <text class="related-table__error">{{ error }}</text>
         <text class="related-table__link" @tap="loadRows(true)">重新加载</text>
       </view>
@@ -33,6 +31,8 @@
           </view>
           <text class="related-row__arrow">›</text>
         </view>
+        <mci-skeleton v-if="loading" type="list" :rows="1" compact />
+        <view v-else-if="error" class="related-table__state" @tap="loadRows(true)">{{ error }}，点击重试</view>
       </view>
     </view>
   </view>

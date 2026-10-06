@@ -19,7 +19,7 @@ public sealed class HdfsUploadHookExampleTests
         while (root != null && !Directory.Exists(Path.Combine(root.FullName, "microi.doc"))) root = root.Parent;
         Assert.NotNull(root);
         var file = documentation ? "microi.doc/docs/doc/more/hdfs.md"
-            : "Microi.Server/Microi.Upgrade/Resource/platform-hdfs-upload-hook.js";
+            : "Microi.Server/OfficialApplications/Resource/platform-hdfs-upload-hook.js";
         var source = File.ReadAllText(Path.Combine(root.FullName, file));
         var example = documentation
             ? Regex.Match(source, @"```javascript\s*(var result = V8.Param.Result;[\s\S]*?|var result = JSON.parse[\s\S]*?)```").Groups[1].Value

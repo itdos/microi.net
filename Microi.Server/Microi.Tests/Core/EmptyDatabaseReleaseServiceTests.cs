@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microi.net;
+using Microi.Tests.Common;
 using MySql.Data.MySqlClient;
 using Newtonsoft.Json.Linq;
 
@@ -242,7 +243,7 @@ public sealed class EmptyDatabaseReleaseServiceTests
     [Fact]
     public void BundledSanitizationEngine_ProtectsCoreTablesFromApplicationOwnership()
     {
-        var loader = typeof(UpgradeAppStore).GetMethod(
+        var loader = typeof(OfficialApplicationPackageValidation).GetMethod(
             "LoadBundledResources",
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(loader);
@@ -334,12 +335,15 @@ public sealed class EmptyDatabaseReleaseServiceTests
         Assert.NotNull(validationType!.GetProperty("CanonicalTemplateTenantCount"));
         Assert.NotNull(validationType.GetProperty("RemainingNonCanonicalTenants"));
         Assert.NotNull(validationType.GetProperty("RemainingTenantRuntimeConnectionResidue"));
+        Assert.NotNull(validationType.GetProperty("RemainingPromotionTemplateResidue"));
         var protectedTables = Assert.IsAssignableFrom<ISet<string>>(protectedTablesField!.GetValue(null));
         var operationalTables = Assert.IsType<string[]>(operationalTablesField!.GetValue(null));
         Assert.Contains("sys_microistore", protectedTables);
         Assert.Contains("sys_microiservice", protectedTables);
         Assert.Contains("mci_runtime_incident", protectedTables);
         Assert.Contains("mci_runtime_incident", operationalTables);
+        Assert.Contains("mci_saas_referral_link", protectedTables);
+        Assert.Contains("mci_saas_referral_link", operationalTables);
         foreach (var table in new[]
                  {
                      "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",

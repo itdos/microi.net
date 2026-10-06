@@ -227,7 +227,10 @@ namespace Microi.net
                 osClient = TenantConfigurationSecurity.NormalizeTenantId(osClient);
                 var client = OsClientExtend.GetClient(osClient);
                 if (client?.Db == null) return new JObject();
-                var raw = client.Db.FromSql("SELECT * FROM sys_config").First<dynamic>();
+                // 历史软删除/停用行不能覆盖当前租户的登录与安全开关；重复启用时按最新保存值读取。
+                var raw = client.Db.FromSql(
+                    "SELECT * FROM sys_config WHERE (IsDeleted<>1 OR IsDeleted IS NULL) " +
+                    "AND IsEnable=1 ORDER BY UpdateTime DESC, Id ASC").First<dynamic>();
                 return raw as JObject ?? (raw == null ? new JObject() : JObject.FromObject((object)raw));
             }
             catch

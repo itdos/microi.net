@@ -1,0 +1,18 @@
+{
+  "SchemaVersion": 1,
+  "AppKey": "microi-platform-service",
+  "SourceRoot": "Microi.Server/OfficialApplications/PlatformService",
+  "SourceRole": "CanonicalReleaseSource",
+  "RuntimeDelivery": {
+    "Primary": "DatabaseOnly",
+    "Mirror": "HashVerifiedHdfsOrCdn",
+    "MaxAssetCount": 256,
+    "MaxTotalBytes": 5242880
+  },
+  "PackageTargets": [
+    "Microi.Server/OfficialApplications/Resource/app.microi.saas-engine.json",
+    "Microi.Server/OfficialApplications/Resource/app.microi.store.json",
+    "Microi.Server/OfficialApplications/Resource/app.microi.message-notification.json",
+    "Microi.Server/OfficialApplications/Resource/app.microi.sys-log.json"
+  ]
+}

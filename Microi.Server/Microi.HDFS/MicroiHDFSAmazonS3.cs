@@ -645,12 +645,16 @@ namespace Microi.net
         /// </summary>
         public async Task<DosResult> DeleteObject(HDFSParam param)
         {
+            if (param?.EmptyDirectoryOnly == true && (param.ClientModel == null || !param.Limit.HasValue))
+                return new DosResult(0, null, "空目录标记删除缺少可信租户或明确桶选择。");
             try
             {
                 var clientModel = param.ClientModel;
                 var isPrivate = param.Limit == true;
                 var minioClient = CreateS3Client(clientModel);
                 var bucketName = GetS3BucketName(clientModel, isPrivate);
+                if (param.EmptyDirectoryOnly == true)
+                    return await EmptyDirectoryMarkerDeletion.DeleteMinioCompatibleAsync(param, minioClient, bucketName).ConfigureAwait(false);
 
                 var objectKey = param.FileFullPath.DosTrimStart('/');
 
@@ -687,6 +691,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
+                if (param?.EmptyDirectoryOnly == true)
+                    return new DosResult(0, new { OutcomeUnknown = false, Stage = "ResolveProvider" }, "空目录标记存储配置暂不可核验。");
                 return new DosResult(0, null, "S3 DeleteObject Error: " + ex.Message);
             }
         }

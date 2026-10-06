@@ -18,15 +18,60 @@ const sysUserLogicPath = path.join(workspace, 'Microi.Server/Microi.Core/Logic/S
 const sysUserControllerPath = path.join(workspace, 'Microi.Server/Microi.net/Identity/SysUserSessionRuntime.cs')
 const tenantProvisioningServicePath = path.join(workspace, 'Microi.Server/Microi.Core/Runtime/TenantProvisioningService.cs')
 
-const read = file => fs.readFileSync(file, 'utf8')
+const tenantPackage = JSON.parse(fs.readFileSync(path.join(workspace, 'Microi.Server/OfficialApplications/Resource/app.microi.saas-engine.json'), 'utf8'))
+const read = file => {
+  if (file.startsWith(engineRoot)) {
+    const key = path.basename(file).match(/\(([^)]+)\)\.js$/)?.[1]
+    const engine = tenantPackage.SysApiEngines.find(item => item.ApiEngineKey === key)
+    if (!engine) throw new Error(`Missing packaged tenant engine: ${key}`)
+    return engine.ApiV8Code
+  }
+  return fs.readFileSync(file, 'utf8')
+}
 
 test('profile submits tenant creation to the persistent background queue', () => {
   const source = read(profilePath)
-  assert.match(source, /\/api\/BackgroundTask\/RunApiEngine/)
-  assert.match(source, /TargetApiEngineKey:\s*'official_create_tenant'/)
-  assert.doesNotMatch(source, /ApiEngineKey:\s*'official_create_tenant_worker'/)
+  assert.match(source, /apiEngineUrl\('platform-background-task'\)/)
+  assert.match(source, /Action:\s*'RunApiEngine'/)
+  assert.match(source, /TargetApiEngineKey:\s*'official_create_tenant_worker'/)
+  assert.doesNotMatch(source, /TargetApiEngineKey:\s*'official_create_tenant'/)
   assert.match(source, /ConcurrencyKey:.*tenantKey\.value\.trim\(\)\.toLowerCase\(\)/)
   assert.doesNotMatch(source, /AdminDefaultPassword\s*\|\|\s*tenant\.OsClient/)
+})
+
+test('queued tenant engine identity matches the trusted provisioning atom', () => {
+  const profile = read(profilePath)
+  const method = read(path.join(workspace, 'Microi.Server/Microi.Core/V8Engine/Runtime/V8Method.cs'))
+  const provisioning = method.slice(method.indexOf('public DosResult ProvisionTenant('), method.indexOf('public DosResult ProvisionAdminTenant('))
+  const target = profile.match(/TargetApiEngineKey:\s*'([^']+)'/)?.[1]
+  const expected = provisioning.match(/ResolveCurrentManagedBackgroundTask\(\s*json,\s*"([^"]+)"/)?.[1]
+  assert.ok(expected, 'the provisioning atom must pin an exact managed background engine')
+  assert.equal(target, expected, 'a compatibility wrapper cannot replace the durable worker identity')
+  const engine = tenantPackage.SysApiEngines.find(item => item.ApiEngineKey === target)
+  assert.equal(Number(engine.StopHttp), 1)
+  assert.equal(Number(engine.AllowAnonymous), 0)
+})
+
+test('Gitee authorization requests only user_info even when the caller supplies broader scopes', async () => {
+  const { runInNewContext } = await import('node:vm')
+  const engine = tenantPackage.SysApiEngines.find(item => item.ApiEngineKey === 'official_gitee_star_oauth_start')
+  const entries = new Map()
+  const V8 = {
+    CurrentUser: { Id: 'owner-user' }, OsClient: 'iTdos',
+    Param: { TenantKey: 'testtenant', ReturnUrl: 'https://microi.net/profile.html#/create', Scope: 'projects keys emails' },
+    OsClientModel: {
+      Id: 'main-config', GiteeStarRequired: 1, GiteeOAuthClientId: 'public-client-id',
+      GiteeOAuthRedirectUri: 'https://api.itdos.com/apiengine/gitee-callback-v1',
+      GiteeRepositoryOwner: 'ITdos', GiteeRepositoryName: 'microi.net'
+    },
+    Cache: { Get: key => entries.get(key), Set: (key, value) => entries.set(key, value) },
+    Method: { NewGuid: () => 'test-guid', GetTimestamp: () => 1 },
+    EncryptHelper: { Sha256Hex: () => 'a'.repeat(64) }
+  }
+  runInNewContext(engine.ApiV8Code, { V8, DateNow: () => '2026-10-02 00:00:00' })
+  assert.equal(V8.Result.Code, 1)
+  assert.equal(new URL(V8.Result.Data.AuthorizeUrl).searchParams.get('scope'), 'user_info')
+  assert.equal(V8.Result.Data.OAuthScope, 'user_info')
 })
 
 test('profile refreshes the authoritative identity before loading tenant actions', () => {

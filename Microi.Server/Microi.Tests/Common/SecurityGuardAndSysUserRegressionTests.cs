@@ -372,9 +372,9 @@ public class SecurityGuardAndSysUserRegressionTests
         var compatibilityControllerPath = Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers", "LegacyMobileCompatibilityController.cs");
         var engine = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "platform-user-update-preferences.js"));
+            root, "Microi.Server", "OfficialApplications", "Resource", "platform-user-update-preferences.js"));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.sys_user.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.sys_user.json")));
         var preferenceEngine = package["SysApiEngines"]!.Values<JObject>()
             .Single(item => item["ApiEngineKey"]?.ToString() == "platform-user-update-preferences");
 
@@ -412,16 +412,16 @@ public class SecurityGuardAndSysUserRegressionTests
     {
         var root = FindRepositoryRoot();
         var migration = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "35-UpgradeFileUploadDisableSwitch.cs"));
+            root, "Microi.Server", "Microi.Tests", "Fixtures", "RetiredUpgrade", "35-UpgradeFileUploadDisableSwitch.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
         var baseline = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "36-UpgradeRuntimeInvariantBaseline.cs"));
+            root, "Microi.Server", "Microi.Tests", "Fixtures", "RetiredUpgrade", "36-UpgradeRuntimeInvariantBaseline.cs"));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+            root, "Microi.Server", "OfficialApplications", "Resource", "app.microi.saas-engine.json")));
 
         Assert.Contains("public static string Version = \"6.9.9.1\"", migration);
-        Assert.Contains("new Upgrade35().Run", upgrade);
+        Assert.DoesNotContain("new Upgrade35().Run", upgrade);
         Assert.Contains("Upgrade35-文件上传负向开关", baseline);
         Assert.DoesNotContain("UPDATE sys_osclients SET FileUploadEnabled", migration);
         Assert.DoesNotContain("UPDATE sys_osclients SET DisableFileUpload", migration);
@@ -448,8 +448,12 @@ public class SecurityGuardAndSysUserRegressionTests
         Assert.Single(columns, item =>
             item["TABLE_NAME"]?.Value<string>() == "sys_osclients"
             && item["COLUMN_NAME"]?.Value<string>() == "DisableFileUpload");
+        // 一个表可同时声明建表和索引 DDL；上传开关合同只要求建表声明唯一，
+        // 不能将推广查询索引误判为重复建表，索引仍由导入器独立幂等执行。
         var ddl = package["DDLStatements"]!.Values<JObject>().Single(item =>
-            item["TableName"]?.Value<string>() == "sys_osclients")["DDL"]?.Value<string>();
+            item["TableName"]?.Value<string>() == "sys_osclients"
+            && item["DDL"]?.Value<string>()?.TrimStart().StartsWith(
+                "CREATE TABLE", StringComparison.OrdinalIgnoreCase) == true)["DDL"]?.Value<string>();
         Assert.Contains("`DisableFileUpload` int NULL COMMENT '关闭文件上传'", ddl);
     }
 

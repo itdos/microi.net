@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
-const code = readFileSync(new URL('../../Microi.Upgrade/Resource/platform-reminder-model.js', import.meta.url), 'utf8');
+const code = readFileSync(new URL('../../OfficialApplications/Resource/platform-reminder-model.js', import.meta.url), 'utf8');
 const model = new Function(code + '; return createPlatformReminderModel();')();
 const now = Date.parse('2026-09-10T00:00:00Z');
 const admin = { Administrator: true, IsMainTenant: true, IsOfficialPlatform: false };
@@ -47,7 +47,7 @@ test('重复目标去重、撤回隐藏、发布快照不受草稿影响', () =>
   assert.equal(model.project({ ...batch, State: 'Withdrawn' }, 'Local', now), null);
 });
 test('发布接收范围写入失败时，规则和发布快照同时回滚', () => {
-  const body = readFileSync(new URL('../../Microi.Upgrade/Resource/platform-reminder-runtime.body.js', import.meta.url), 'utf8');
+  const body = readFileSync(new URL('../../OfficialApplications/Resource/platform-reminder-runtime.body.js', import.meta.url), 'utf8');
   const id = 'a'.repeat(32), future = new Date(Date.now()+86400000).toISOString();
   const initial = {Id:id,Revision:1,Status:'Draft',PublishedBatchId:'',RuleJson:JSON.stringify({...input,EndsAt:future})};
   const committed = structuredClone(initial), working = structuredClone(initial);
@@ -59,15 +59,15 @@ test('发布接收范围写入失败时，规则和发布快照同时回滚', ()
     FormEngine:{GetFormData:(table,key)=>table==='mci_platform_reminder'?{Code:1,Data:working}:{Code:2},
       GetTableData:()=>({Code:1,Data:[]}),UptFormDataByWhere:()=>({Code:1}),AddFormData:()=>({Code:1}),
       AddTableData:()=>({Code:0,Msg:'injected target failure'})}};
-  const license = readFileSync(new URL('../../Microi.Upgrade/Resource/license-expiry-model.js', import.meta.url), 'utf8');
+  const license = readFileSync(new URL('../../OfficialApplications/Resource/license-expiry-model.js', import.meta.url), 'utf8');
   const result = new Function('V8',code+';'+license+';'+body)(V8);
   assert.equal(result.Code,0);assert.match(result.Msg,/injected target failure/);
   assert.deepEqual(committed,initial,'failed publication must not commit the rule claim outside the transaction');
 });
 
 test('编辑已发布公告可保存新版草稿，并使用 V8 日期函数写入更新时间', () => {
-  const body = readFileSync(new URL('../../Microi.Upgrade/Resource/platform-reminder-runtime.body.js', import.meta.url), 'utf8');
-  const license = readFileSync(new URL('../../Microi.Upgrade/Resource/license-expiry-model.js', import.meta.url), 'utf8');
+  const body = readFileSync(new URL('../../OfficialApplications/Resource/platform-reminder-runtime.body.js', import.meta.url), 'utf8');
+  const license = readFileSync(new URL('../../OfficialApplications/Resource/license-expiry-model.js', import.meta.url), 'utf8');
   const id = 'a'.repeat(32);
   const rule = { ...input, Title: '版本介绍', ScopeType: 'Editions', AllTargets: false,
     TargetKeys: ['OpenSource'], EndsAt: new Date(Date.now() + 86400000).toISOString() };

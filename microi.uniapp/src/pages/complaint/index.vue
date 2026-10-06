@@ -68,7 +68,9 @@
 
     <scroll-view v-else class="page-scroll" scroll-y @scrolltolower="loadMore">
       <view v-if="activeTab === 'public'" class="search-row"><input v-model="keyword" maxlength="50" confirm-type="search" placeholder="搜索公示编号或事项标题" @confirm="reloadList" /><view @tap="reloadList"><text>查询</text></view></view>
-      <view v-if="list.length" class="case-list">
+      <mci-skeleton v-if="listLoading && !list.length" type="list" :rows="5" />
+      <view v-else-if="listError && !list.length" class="state-panel state-panel--inline"><text>{{ listError }}</text><view class="state-action" @tap="reloadList">重新加载</view></view>
+      <view v-else-if="list.length" class="case-list">
         <view v-for="item in list" :key="item.Id" class="case-card" hover-class="case-card--pressed" @tap="openDetail(item)">
           <view class="case-head"><text>{{ activeTab === 'public' ? item.ComplaintNoMasked : item.ComplaintNo }}</text><text :class="statusTone(item.Status)">{{ statusLabel(item.Status) }}</text></view>
           <text class="case-title">{{ item.Title }}</text>
@@ -77,7 +79,9 @@
           <view v-if="activeTab === 'mine' && item.NextDeadlineAt" class="deadline-row"><text>{{ deadlineLabel(item.NextDeadlineType) }}</text><text>{{ item.NextDeadlineAt }}</text><text v-if="Number(item.OverdueCount || 0) > 0">已逾期 {{ item.OverdueCount }} 次</text></view>
           <view v-if="activeTab === 'public'" class="public-metrics"><text>响应 {{ hoursText(item.ResponseHours) }}</text><text>办结 {{ hoursText(item.ResolveHours) }}</text><text>{{ Number(item.IsOverdue) === 1 ? '存在逾期' : '时限内处理' }}</text></view>
         </view>
-        <text class="list-footer">{{ noMore ? '没有更多了' : listLoading ? '加载中…' : '继续上拉加载' }}</text>
+        <mci-skeleton v-if="listLoading" type="list" :rows="1" compact />
+        <text v-else-if="listError" class="list-footer" @tap="fetchList">{{ listError }}，点击重试</text>
+        <text v-else class="list-footer">{{ noMore ? '没有更多了' : '继续上拉加载' }}</text>
       </view>
       <view v-else class="state-panel state-panel--inline"><image :src="activeTab === 'public' ? '/static/xjy/user/fws.png' : '/static/xjy/business/tixing.png'" mode="aspectFit" /><text>{{ activeTab === 'public' ? '暂时没有已发布的处理公示' : '你还没有提交投诉举报' }}</text><view v-if="activeTab === 'mine'" class="state-action" @tap="changeTab('submit')"><text>我要投诉</text></view></view>
       <view class="bottom-space"></view>
@@ -115,7 +119,7 @@ export default {
   data() {
     return {
       tabs:[{key:'submit',label:'我要投诉'},{key:'mine',label:'我的记录'},{key:'public',label:'处理公示'}],
-      activeTab:'submit',loading:true,error:'',submitting:false,isLoggedIn:false,bootstrap:{},list:[],pageIndex:1,pageSize:10,noMore:false,listLoading:false,keyword:'',
+      activeTab:'submit',loading:true,error:'',submitting:false,isLoggedIn:false,bootstrap:{},list:[],pageIndex:1,pageSize:10,noMore:false,listLoading:false,listError:'',listRequestId:0,keyword:'',
       privateFileContext:PRIVATE_FILE_CONTEXT,imagesUploadState:{},filesUploadState:{},
       form:{ComplaintType:'',Severity:'General',Confidentiality:'Normal',Title:'',Content:'',ExpectedResult:'',RelatedNo:'',SubmitterPhone:'',EvidenceImages:'[]',EvidenceFiles:'[]',PublicConsent:false,IdempotencyKey:''}
     }
@@ -134,8 +138,22 @@ export default {
     restoreDraftKey(){const key=uni.getStorageSync('xjy_complaint_draft_key');this.form.IdempotencyKey=key||newIdempotencyKey();if(!key)uni.setStorageSync('xjy_complaint_draft_key',this.form.IdempotencyKey)},
     async loadCurrent(){this.error='';this.loading=true;try{const auth=this.activeTab!=='public'&&this.isLoggedIn;const result=await getComplaintBootstrap(auth);this.bootstrap=result.Data||{};if(!this.form.SubmitterPhone&&this.bootstrap.User)this.form.SubmitterPhone=this.bootstrap.User.Phone||'';if(this.activeTab!=='submit'&&(this.activeTab==='public'||this.isLoggedIn))await this.reloadList()}catch(error){this.error=error.message||'页面加载失败'}finally{this.loading=false}},
     changeTab(key){this.activeTab=key;this.error='';if(key==='submit'){if(!Object.keys(this.bootstrap).length)this.loadCurrent();return}this.reloadList()},
-    async reloadList(){if(this.activeTab!=='public'&&!this.isLoggedIn)return;this.pageIndex=1;this.noMore=false;this.list=[];await this.fetchList()},
-    async fetchList(){if(this.listLoading||this.noMore)return;this.listLoading=true;try{const result=this.activeTab==='public'?await getPublicComplaints({PageIndex:this.pageIndex,PageSize:this.pageSize,Keyword:this.keyword.trim()}):await getMyComplaints({PageIndex:this.pageIndex,PageSize:this.pageSize});const rows=result.Data||[];this.list=this.pageIndex===1?rows:this.list.concat(rows);this.noMore=rows.length<this.pageSize;this.pageIndex+=1}catch(error){uni.showToast({title:error.message||'列表加载失败',icon:'none'})}finally{this.listLoading=false}},
+    async reloadList(){if(this.activeTab!=='public'&&!this.isLoggedIn){this.listLoading=false;return}this.pageIndex=1;this.noMore=false;this.list=[];await this.fetchList(true)},
+    async fetchList(reset=false){
+      if((this.listLoading&&!reset)||this.noMore)return
+      // 每次切换公示/我的及搜索都建立新代次，迟到结果不能写进另一个页签。
+      const requestId=++this.listRequestId
+      const page=this.pageIndex
+      this.listLoading=true;this.listError=''
+      try{
+        const result=this.activeTab==='public'?await getPublicComplaints({PageIndex:page,PageSize:this.pageSize,Keyword:this.keyword.trim()}):await getMyComplaints({PageIndex:page,PageSize:this.pageSize})
+        if(requestId!==this.listRequestId)return
+        if(!result||Number(result.Code)!==1)throw new Error((result&&result.Msg)||'列表加载失败')
+        const rows=result.Data||[]
+        this.list=page===1?rows:this.list.concat(rows);this.noMore=rows.length<this.pageSize;this.pageIndex=page+1
+      }catch(error){if(requestId===this.listRequestId){this.listError=error.message||'列表加载失败';uni.showToast({title:this.listError,icon:'none'})}}
+      finally{if(requestId===this.listRequestId)this.listLoading=false}
+    },
     loadMore(){this.fetchList()},
     pickType(event){this.form.ComplaintType=(this.complaintTypes[Number(event.detail.value)]||{}).Key||''},
     pickSeverity(event){this.form.Severity=(this.severities[Number(event.detail.value)]||{}).Key||'General'},

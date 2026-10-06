@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 test('平台内置微服务责任源码的行为测试纳入统一回归',{timeout:65000},()=>{
- const contract=JSON.parse(fs.readFileSync(path.join(root,'Microi.Server/Microi.Upgrade/Resource/platform-service-release.json'),'utf8'));
+ const contract=JSON.parse(fs.readFileSync(path.join(root,'Microi.Server/OfficialApplications/Resource/platform-service-release.json'),'utf8'));
  const app=path.resolve(root,contract.SourceRoot);assert.ok(app.startsWith(root+path.sep));
  const tests=fs.readdirSync(path.join(app,'test')).filter(file=>file.endsWith('.test.mjs')).map(file=>path.join(app,'test',file));assert.ok(tests.length>0);
  // 只运行发布契约指定的事实源，不从同步镜像或旧产物择新。

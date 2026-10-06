@@ -5,7 +5,7 @@ import {pathToFileURL} from 'node:url';
 
 // Full 浏览器组件回归：真实 Vue 渲染，固定诊断合约；数据库故障由 C# 双进程测试独立验证。
 const root=path.resolve(import.meta.dirname,'../../..');
-const contract=JSON.parse(await fs.readFile(path.join(root,'Microi.Server/Microi.Upgrade/Resource/platform-service-release.json'),'utf8'));
+const contract=JSON.parse(await fs.readFile(path.join(root,'Microi.Server/OfficialApplications/Resource/platform-service-release.json'),'utf8'));
 const source=path.join(root,contract.SourceRoot),results=path.resolve(process.argv[2]||path.join(root,'.tmp/reports/incident-component'));
 await fs.mkdir(results,{recursive:true});
 const {createServer}=await import(pathToFileURL(path.join(source,'node_modules/vite/dist/node/index.js')));

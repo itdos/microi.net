@@ -1,7 +1,8 @@
 const PLATFORM_SYS_CONFIG_URL = "/apiengine/platform-sys-config";
 const LEGACY_SYS_CONFIG_URL = "/api/FormEngine/GetSysConfig";
 const FALLBACK_HTTP_STATUSES = new Set([404, 405, 501]);
-export const PLATFORM_BOOTSTRAP_REQUEST_TIMEOUT_MS = 15000;
+// 首次加载远程租户配置实测可超过15秒；仍以一分钟上限确保故障能够进入可重试的错误界面。
+export const PLATFORM_BOOTSTRAP_REQUEST_TIMEOUT_MS = 60000;
 
 function responsePayload(value) {
     if (!value) return null;

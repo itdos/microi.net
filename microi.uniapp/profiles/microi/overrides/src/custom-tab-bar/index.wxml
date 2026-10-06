@@ -1,0 +1,38 @@
+<view
+  class="mci-bottom-dock {{aiAssistantEnabled ? 'mci-bottom-dock--with-ai' : 'mci-bottom-dock--without-ai'}}"
+  style="--mci-dock-primary: {{selectedColor}}; padding-right: calc(24rpx + {{safeRight}}px); padding-bottom: calc(12rpx + {{safeBottom}}px); padding-left: calc(24rpx + {{safeLeft}}px);"
+  aria-label="底部导航"
+>
+  <view class="mci-bottom-dock__main">
+    <view class="mci-bottom-dock__nav" style="background-color: {{backgroundColor}};">
+      <view
+        wx:for="{{list}}"
+        wx:key="pagePath"
+        class="mci-bottom-dock__item {{selected === index ? 'mci-bottom-dock__item--active' : ''}}"
+        style="color: {{selected === index ? selectedColor : color}};"
+        data-index="{{index}}"
+        bindtap="switchTab"
+        hover-class="mci-bottom-dock__item--pressed"
+        hover-stay-time="120"
+        aria-role="button"
+        aria-label="{{item.text}}"
+      >
+        <view class="mci-bottom-dock__symbol mci-bottom-dock__symbol--{{item.symbol}}" />
+        <text class="mci-bottom-dock__label">{{item.text}}</text>
+      </view>
+    </view>
+    <view
+      wx:if="{{aiAssistantEnabled}}"
+      class="mci-bottom-dock__ai-slot"
+      bindtap="openAssistant"
+      hover-class="mci-bottom-dock__ai-slot--pressed"
+      hover-stay-time="120"
+      aria-role="button"
+      aria-label="打开AI助手"
+    >
+      <view class="mci-bottom-dock__ai-ring" />
+      <image class="mci-bottom-dock__ai-robot" src="/static/mci/ai/assistant-robot.png" mode="aspectFit" />
+      <text class="mci-bottom-dock__ai-label">AI</text>
+    </view>
+  </view>
+</view>
