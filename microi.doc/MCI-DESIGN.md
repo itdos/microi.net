@@ -47,7 +47,7 @@ tokens:
   shape:
     control: var(--mci-radius-lg, 12px)
     card: 24px
-    heroMap: 26px
+    heroMap: 20px
     pill: var(--mci-radius-pill, 999px)
   elevation:
     card: var(--mci-ai-shadow-soft)
@@ -66,7 +66,7 @@ components:
   developmentMap:
     background: "{tokens.color.surface}"
     radius: "{tokens.shape.heroMap}"
-    padding: "{tokens.spacing.card}"
+    padding: "16px 20px"
     states:
       default: { elevation: "{tokens.elevation.map}" }
       hover: { elevation: "{tokens.elevation.map}" }
@@ -128,7 +128,7 @@ omissions:
 ## 5. 布局与间距
 
 - Desktop：12 列，最大宽度 1320px；AI Studio 先以居中单列建立入口，两个入口独立占一行，统一能力面板使用三列开发路径。
-- Tablet：8 列，1100px 以下转为单列，文案居中，开发路径图保持完整宽度。
+- Tablet：8 列，768–1050px 保持紧凑三列路径，文案居中，面板保持完整宽度。
 - Mobile：4 列，左右安全间距 14px；开发模式从三列变为三段纵向层级。
 - 内部紧凑间距：8–16px；相邻元数据保持同一视觉组。
 - 区域与页面留白：AI Studio 桌面上间距 104px、平板 40px、手机 32px，叠加平板/手机导航占位后与桌面保持相近的标题位置；能力带与 NuGet 证据区保持 28px 桌面间隔，禁止一处过疏、一处相贴。
@@ -136,7 +136,7 @@ omissions:
 ## 6. 层级、材质与形状
 
 - 深度来自：色调层、细边框、结构网格与环境阴影；玻璃只用于导航等小面积区域。
-- 24–26px 卡片圆角表达完整平台，8–12px 控件圆角表达精确工具感；AI Studio 品牌标识保留金色圆点、暖金描边和完整胶囊轮廓。
+- 20–26px 卡片圆角表达完整平台，8–12px 控件圆角表达精确工具感；AI Studio 品牌标识保留金色圆点、暖金描边和完整胶囊轮廓。
 - 页面 / 卡片 / 浮层的层级关系：画布 < 融合优势的开发路径面板 / AI 输入区 < 独立入口行 < 导航。
 - 低性能与不支持透明效果时的降级：实体表面、无扫光、无模糊；信息结构不变。
 
