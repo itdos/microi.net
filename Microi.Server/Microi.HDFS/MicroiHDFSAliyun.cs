@@ -291,6 +291,11 @@ namespace Microi.net
                                 configPublic);
             try
             {
+                // 显式设置普通、压缩与零字节对象的类型，避免依赖供应商 SDK 的默认标签。
+                var metadata = new ObjectMetadata
+                {
+                    ContentType = ObjectStorageContentTypes.GetContentType(param.FileFullPath)
+                };
                 if (param.Preview == true && !param.FileFullPathOrigin.DosIsNullOrWhiteSpace())
                 {
                     //ConfigHelper.GetAppSettings("AliOssImgProcess")
@@ -308,12 +313,12 @@ namespace Microi.net
                         //上传（Preview压缩场景）
                         if (param.Limit == true)
                         {
-                            var ossResult = ossClientPrivate.PutObject(bucketNamePrivate, param.FileFullPath.TrimStart('/'), memoryStream);
+                            var ossResult = ossClientPrivate.PutObject(bucketNamePrivate, param.FileFullPath.TrimStart('/'), memoryStream, metadata);
                             return new DosResult(1, ossResult);
                         }
                         else
                         {
-                            var ossResult = ossClient.PutObject(bucketName, param.FileFullPath.TrimStart('/'), memoryStream);
+                            var ossResult = ossClient.PutObject(bucketName, param.FileFullPath.TrimStart('/'), memoryStream, metadata);
                             return new DosResult(1, ossResult);
                         }
                     }
@@ -340,8 +345,8 @@ namespace Microi.net
                     {
                         using var empty = new MemoryStream(Array.Empty<byte>(), false);
                         var emptyResult = param.Limit == true
-                            ? ossClientPrivate.PutObject(bucketNamePrivate, objectKey, empty)
-                            : ossClient.PutObject(bucketName, objectKey, empty);
+                            ? ossClientPrivate.PutObject(bucketNamePrivate, objectKey, empty, metadata)
+                            : ossClient.PutObject(bucketName, objectKey, empty, metadata);
                         return new DosResult(1, emptyResult);
                     }
 
@@ -362,12 +367,12 @@ namespace Microi.net
                     // 直接上传，让SDK自动处理
                     if (param.Limit == true)
                     {
-                        var ossResult = ossClientPrivate.PutObject(bucketNamePrivate, objectKey, param.FileStream);
+                        var ossResult = ossClientPrivate.PutObject(bucketNamePrivate, objectKey, param.FileStream, metadata);
                         return new DosResult(1, ossResult);
                     }
                     else
                     {
-                        var ossResult = ossClient.PutObject(bucketName, objectKey, param.FileStream);
+                        var ossResult = ossClient.PutObject(bucketName, objectKey, param.FileStream, metadata);
                         return new DosResult(1, ossResult);
                     }
                 }
@@ -463,8 +468,15 @@ namespace Microi.net
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                // 分片的最终对象元数据只在初始化时确定，不能等到完成后修正。
                 initiated = client.InitiateMultipartUpload(
-                    new InitiateMultipartUploadRequest(bucketName, objectKey));
+                    new InitiateMultipartUploadRequest(bucketName, objectKey)
+                    {
+                        ObjectMetadata = new ObjectMetadata
+                        {
+                            ContentType = ObjectStorageContentTypes.GetContentType(objectKey)
+                        }
+                    });
                 var partSize = CalculateMultipartPartSize(totalBytes);
                 var partETags = new List<PartETag>();
                 partNumber = 1;

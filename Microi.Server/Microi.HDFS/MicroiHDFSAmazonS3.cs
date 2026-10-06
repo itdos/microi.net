@@ -281,18 +281,7 @@ namespace Microi.net
                 bucketName = clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
             }
 
-            var fileSuffix = Path.GetExtension(param.FileFullPath).ToLower();
-            var contentType = "application/octet-stream";
-            if (fileSuffix == ".pdf")
-                contentType = "application/pdf";
-            else if (fileSuffix == ".gif")
-                contentType = "image/gif";
-            else if (fileSuffix == ".png")
-                contentType = "image/png";
-            else if (fileSuffix == ".bmp")
-                contentType = "image/bmp";
-            else if (fileSuffix == ".jpg" || fileSuffix == ".jpeg")
-                contentType = "image/jpeg";
+            var contentType = ObjectStorageContentTypes.GetContentType(param.FileFullPath);
 
             try
             {
