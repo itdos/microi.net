@@ -1924,11 +1924,11 @@
       ]
     },
     "v8-crud-api": {
-      "originalSha256": "222ea4bfc03e81f10348c7596a565ad7d1d1db7eced29334471f1a09cea6aee7",
-      "originalLines": 403,
+      "originalSha256": "487ffd0fb3301fa4d47e8879d3f9304d5b06797b219b5acca19a7680c145ee77",
+      "originalLines": 404,
       "prefixSha256": "629f1a8bfef47b39f4b1b143eccecc20d79dab1cd1ffd988dceb5b9eb61c2078",
       "prefixBytes": 766,
-      "entryLines": 178,
+      "entryLines": 179,
       "chunks": [
         {
           "id": "v8-crud-api-000",
@@ -1942,8 +1942,8 @@
           "id": "v8-crud-api-001",
           "ordinal": 1,
           "destination": "v8-crud-api/SKILL.md",
-          "sha256": "2e7809a53af3dcbafecc617f40dbb528a892fc734ab6029072d1fcf55e7ed968",
-          "lines": 14,
+          "sha256": "d0bed55dcaa08fd84319107269643dd5aba5aadecf4f394c8ac55d80ab959677",
+          "lines": 15,
           "heading": "核心规则"
         },
         {

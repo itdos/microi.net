@@ -90,6 +90,7 @@ Dispose 幂等，未 Commit 时自动回滚。事务内异步操作串行执行�
 
 - 至少在目标数据库 Provider 运行定向测试，不用 MySQL 结果宣称 Oracle/达梦通过。
 - 覆盖 NULL、DateTime、decimal、Guid、enum、byte[] 和分页边界。
+- FormEngine 的 decimal 字符串绑定固定使用 `InvariantCulture` 且禁用千分组，防止 `de-DE` / `tr-TR` 把 `1.500000` 转成 `1500000`。类型化 CLR 数值保留原值；无效、本地化逗号或越界仍抛字段转换错误。绑定层修复不能恢复上游 JavaScript 浮点丢失的位数，必须保留原十进制字符串并分别验收实际 Provider 往返与 HTTP 提交。
 - 覆盖事务提交/回滚、唯一冲突、超时、取消和连接故障。
 - BulkInsert/Upsert 核对受影响行、Identity 跳过、唯一键和重试副作用。
 - 读写分离覆盖从库故障、写后读主和降级。
