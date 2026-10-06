@@ -17,7 +17,7 @@
           </div>
         </div>
         <p class="microi-code-store-install"><a href="https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge" target="_blank" rel="noopener noreferrer">微软签名 EXE 在线安装器 <span aria-hidden="true">↗</span></a><span>商店版 1.3.3 · Windows 10 2004+ / 11 · x64 · 需联网</span></p>
-        <p class="microi-code-store-note">官网 Windows 完整版 1.3.5 EXE 未签名；在线安装器安装微软签名商店版。macOS 1.3.5 DMG 已签名、公证，Mac 商店尚未开放下载。</p>
+        <p class="microi-code-store-note">官网 Windows 完整版 1.3.6 EXE 未签名；在线安装器安装微软签名商店版。macOS 1.3.6 DMG 已签名、公证，Mac 商店尚未开放下载。</p>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
@@ -84,7 +84,7 @@ const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
 
 // 更新清单由 iTdos 接口引擎发布；版本发布后官网源码无需随之改动。
-const liveVersions = reactive({ windows: '1.3.5', mac: '1.3.5' })
+const liveVersions = reactive({ windows: '1.3.6', mac: '1.3.6' })
 // 下载按钮始终使用永久入口；点击时由官方清单选择当前安装包，首屏不依赖异步请求。
 const downloadUrls = reactive({
   windows: 'https://microi.net/download/microi-agent/latest.html?platform=windows',
@@ -134,6 +134,9 @@ const screenshots = [
 ]
 
 const releases = [
+  { version: '1.3.6', platform: "macOS Universal", note: "启动修复 · 签名公证 · Intel 完整应用启动、重启已验收 · macOS 13.5+", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.6/requests/5f22ed5595421f9c10db4bb5930d7df17b33dc6ba6ba54a70c366c374f00f247/assets/Microi-Agent-1.3.6-mac-universal.dmg", sha256: "5d1e38ae2e4ddadf460a880daf0f2b61f352779d9943e4f584cba6f07c6fc76c" },
+  { version: '1.3.6', platform: "macOS Universal ZIP", note: "启动修复自动更新包 · 已签名公证 · macOS 13.5+", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.6/requests/5f22ed5595421f9c10db4bb5930d7df17b33dc6ba6ba54a70c366c374f00f247/assets/Microi-Agent-1.3.6-mac-universal.zip", sha256: "fa450561060efee3bc5ff660cd89397c1c8a508b892ede0776e1fec1f8d43831" },
+  { version: '1.3.6', platform: "Windows x64", note: "启动链路修复 · 未签名公开测试 · Windows 10/11 x64 · 原生安装待验收", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.6/requests/5f22ed5595421f9c10db4bb5930d7df17b33dc6ba6ba54a70c366c374f00f247/assets/Microi-Agent-1.3.6-windows-x64-setup.exe", sha256: "a93cbb4b15472944f68cc8b42be67cbd358e7fc436dd046b941b8bf8807ebb16" },
   { version: '1.3.5', platform: "macOS Universal", note: "上游同步 · Developer ID 签名、Apple 公证与 Gatekeeper 通过 · macOS 13.5+", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.5/requests/6c74a2840b3e11a39779febb09e2a02889a97878b6b82b3cedeae89dbdaa9ff7/assets/Microi-Agent-1.3.5-mac-universal.dmg", sha256: "001df6d3a1695672c51cc04470cd441f260d22f152143e2b8b830a0bafb04ecc" },
   { version: '1.3.5', platform: "macOS Universal ZIP", note: "上游同步自动更新包 · 已签名、公证的 Universal App · macOS 13.5+", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.5/requests/6c74a2840b3e11a39779febb09e2a02889a97878b6b82b3cedeae89dbdaa9ff7/assets/Microi-Agent-1.3.5-mac-universal.zip", sha256: "51def793afbb8d01212dbda9ae0598eceac68c767d6123c90cc1af8f3b1e02d9" },
   { version: '1.3.5', platform: "Windows x64", note: "上游同步 · 未签名公开测试 · Windows 10/11 x64 · 客户原生安装待验收", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.5/requests/6c74a2840b3e11a39779febb09e2a02889a97878b6b82b3cedeae89dbdaa9ff7/assets/Microi-Agent-1.3.5-windows-x64-setup.exe", sha256: "ca57de4b654df5afa4d43909bddd7a4f03c9bf4f05da2277f1e1c28a8f6a3a08" },
