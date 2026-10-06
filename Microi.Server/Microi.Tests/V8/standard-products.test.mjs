@@ -52,9 +52,9 @@ test('唯一源码契约拒绝发布身份漂移及应用目录伪造',()=>{
 });
 for(const app of sources.apps){
   const files=discover(app.tests);assert.ok(files.length>0,'缺少应用责任测试');
-  // 聚合文件数不能让正常单文件因其它文件启动/运行成本耗尽限时。
-  // 每组保留60秒、768MB、串行和完整断言；完整发现清单逐项无重复执行。
-  const groupSize=5;
+  // 每份责任文件独立使用原有60秒、768MB限额；串行执行全部发现文件。
+  // 不把多个本来各自合格的文件合并进同一个60秒预算，也不放宽任何单文件限额。
+  const groupSize=1;
   const groups=Array.from({length:Math.ceil(files.length/groupSize)},(_,i)=>files.slice(i*groupSize,(i+1)*groupSize));
   assert.deepEqual(groups.flat(),files,'责任测试分组必须完整且不重复');
   test(app.name+'责任源码离线回归',{timeout:65000*groups.length},t=>{
