@@ -37,6 +37,10 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 本地包文件、生成器成功、单元测试通过、返回 TaskId 或 HTTP 200 都不能代替官方主数据库与商城回读。`.resource-sync-base` 只能在官网发布后逐项哈希一致时由同步器推进，不得与本地候选一起手工修改。若官方身份、MCP 登录或发布门禁失效，必须保留准确的未发布边界并修复链路；不得把本地 JSON 宣称为“其它吾码用户已经可以安装”。
 - 应用包不得携带真实地图 Key、Token、连接串或其它租户秘密。浏览器供应商 Key 等配置只交付字段/设置模板和安全读取能力，实际值由每个目标租户在安装后自行填写。
 
+### 后台原生规则的两种可信来源证明
+
+普通租户的编译证明默认 `TenantInstallation`，保留真实 Installed 回执及旧摘要。官方同租户发布源禁止安装自己，只能由后端发行组合明确固定 `OfficialPublishedSnapshot`：`InstallRecordId` 绑定 `mic_data_version.Id`，原始 `Data` 的UTF-8 SHA-256另固定于编译回执并参与独立审批摘要。该类别与快照摘要不从Param或自由表字段选择、不新增表字段、不伪造Installed。受信官方身份、当前Published/审批有效指针、Verified包hash/size/HDFS、不可变快照、V3 Completed源码hash及实际DLL依赖须全部匹配；当前状态变化、软删或主库不可用下次调用立即拒绝，旧历史存在不足以授权。跨租户仍拒绝，结构发布不等于后端安装或代码审批。审批表纳入通用强制管理员清单，普通用户即使误授表/菜单权限仍不得改授权状态；V8Limit和ReadPrimary不是写权限。
+
 ## 包内容
 
 ### 仅共享编译运行产物
@@ -45,6 +49,60 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 请求的菜单、表、接口、移除接口、工作流、任务、数据、路由、页面及资源策略选择均必须为空；既有商城行的 `SelectMenu/SelectTable/SelectApiEngine/SelectData` 和 `PreparedAssets.MenuContract` 非空时拒绝，禁止静默清理历史选择。不能与 `DatabaseOnlyBuild` 混用。
 - 现有 `microi_run_engine` 的 `params` 是动态对象，可传此开关，无需增加工具参数。对 `ai_app_publish_store` 的 `Action=InspectResourceSnapshot` 和 `Action=Publish` 都使用同一组冻结模式、版本、资产及提交证明，后者将前者返回的 `ResourceSnapshotHash` 作为 `ExpectedResourceSnapshotHash` 传入。MCP 的 `confirmExecution` 仍必须匹配引擎 Key。
 - 下载真实发布包后，断言 `DDLStatements/PhysicalColumns/DiyTables/DiyFields/DataSets/SysMenus/WfFlowDesigns/WfNodes/WfLines/SysApiEngines/ScheduleJobs` 十一项数组全部为零，`SourceFiles/BuildAssets` 为零，`SourceZip/BuildZip` 为空，唯一运行交付为 `SharedPublicRuntime`。源码分发、服务端业务迁移和共享运行入口是独立事实，不能将共享公有编译产物当成目标租户已有业务接口或权限。
+
+
+#发布器 `v2.1.2` 修复受管接口更新后的重复发布摘要漂移：源码、`Managed` 策略和所有权均与已发布包相同时，保留该包的有效基线；真正的源码变更仍推进基线并保留历史兼容摘要。缺失或无效基线从实际旧源码重新建立，`CreateIfMissing` 租户 Hook 保持原策略。`Inspect` 与 `Publish` 必须使用相同的冻结 `PreparedAssets` 和资源选择，并在发布后立即重放原请求，独立核对包 SHA-256、字节数和不可变快照 Id；重放被 CAS 拒绝仍算失败，不能仅以首次成功声称幂等。
+
+## 共享表的稀疏字段选集
+
+应用只扩展已有共享表的少数字段时，标准导出器和 `ai_app_publish_store` 接收
+`SparseTableSelections: [{ TableId, FieldIds }]`。Id 必须来自当前租户权威元数据，
+最多 32 张表、每表 512 个非重复字段；不接受调用方传表正文、DDL 或布局覆盖。
+同一表不能同时进入完整 `TableIds` 与稀疏选集，安装基础设施表不能被裁剪。
+
+导出只保留表 `Id/Name`、所选字段和对应物理列；不携带共享 `Tabs/Column`、
+其它字段、建表或索引。数据只允许 `InsertIfMissing`，行与冲突字段必须在选集中。
+没有数据行的共享表自动生成标准零行 `DataSet`，复用安装前置检查：缺物理表或
+共享表元数据时，在资源写入前失败；不是自动安装依赖，也不是空库建表契约。
+
+旧导入器会拒绝受保护共享表的零行 DataSet。须先升级包含
+`EMPTY_SHARED_TABLE_PREREQUISITE_V1` 的商城安装器，再安装混合应用。
+新分支仅接受严格零行形状，不给受保护表业务数据增加写权限。
+普通 DataSet 仍要求完整建表资源，不能借稀疏分支绕过结构闭包。
+
+导出器 `v1.3.8` 修复稀疏默认数据的序列化形状：未声明实际父绑定时，
+必须完全省略 `ParentBinding` 键，不能用 `undefined` 让宿主转成 `null`；
+普通配置子表的显式绑定保持原契约，稀疏导入安全门不放宽。
+仅保留稀疏选集中字段在源记录上真实存在的空字符串；NULL、缺失字段、
+未选字段不推断默认值，跨租户与隐藏元数据仍排除，普通全表导出保持旧行为。
+数值 `0` 原本就保留；秘密状态必须经已有可信设置入口规范源数据，
+不能由导出参数或包正文合成。升级后重新 Inspect 并冻结新摘要，旧快照不可改写。
+
+安装器 `v3.0.5` 同时执行 `SPARSE_TABLE_IMPORT_PREFLIGHT_V2`：直接传包和下载包均在进度持久化、物理兼容自举及资源写入前核验原始稀疏正文和目标。严格零行依赖不能由同包 `CREATE` 自行满足；带默认数据的稀疏表也必须已有实体表及唯一未删除的表单元数据。MySQL/SQL Server 查询要求 `BASE TABLE`，Oracle 使用 `USER_TABLES`。共享表只接受 `Id/Name`、精确字段与物理列及 `InsertIfMissing` 数据，不接受布局、其它字段、字段退役或该表 DDL；非空数据集可保留标准导出的 `TableDescription`，该描述不授权更新共享表布局。
+
+`DECLARATIVE_PACKAGE_DDL_PREFLIGHT_V1` 在同一写前门禁逐字符识别引号和注释，按实际 SQL 目标核对声明表名，只接受受支持的 `CREATE TABLE`、`CREATE INDEX` 与列/索引 `ALTER TABLE`。DML、动态执行、多语句、未知声明、MySQL/MariaDB 可执行注释及提示一律拒绝。字符串内部的分号和普通注释可保留；含反斜杠的引号内容因 SQL mode/方言歧义拒绝，改用 SQL 标准重复引号。现有官方包 DDL 已做字节绑定的解析回归；这不等于所有数据库版本上的实际 SQL 执行验收，未支持的方言模板须先补明确语法和回归，不能降级原样执行。
+
+
+Web 应用可用 `RuntimeAssetsOnly=false + IncludeSource=false` 同时携带
+`SharedPublicRuntime` 和声明式资源，六张标准应用基础设施表仍按权威闭包导出。
+Inspect 和 Publish 使用完全相同的选择、`CommittedProof` 及运行清单，Publish
+再传 `ExpectedResourceSnapshotHash`；旧稀疏选集必须显式刷新，不能退化为整表。
+`RuntimeAssetsOnly=true` 继续拒绝任何资源选集。
+
+现有 `microi_run_engine.params` 为通用对象，已能原样透传此选集，仍须
+`confirmExecution`。这不代表线上导出器已升级，也不能以私有源码含 Manifest
+代替正式包资源。接口默认禁用须另按实时能力配置并独立回读；当前
+`microi_generate_system` 的引擎 upsert 不会透传 `IsEnable/StopHttp`。
+
+后台规则审批表 `mci_runtime_installation` 的结构可由责任包安装，但审批业务行
+禁止经导出/导入 DataSets 种入、覆盖或恢复；只有严格零行依赖允许通过。
+可信程序集注册与管理员审批是独立动作，不能以商城发布或包安装代替。
+
+标准官方控制面现将 `export-package.js` 纳入固定单资源白名单，沿用
+`Resources[{Name,Content,ExpectedRemoteSha256}]`、可信官方授权、同事务行锁及回读。
+先 CAS 升级控制面，再 CAS 发布导出/导入/发布器，最后从完整母版发行归属商城包；
+源码、包正文、不可变快照和公开下载都须独立验证，不能只更新本地镜像。
+
 
 ### 物理索引闭包
 

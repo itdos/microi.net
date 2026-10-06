@@ -89,6 +89,15 @@ did: {DeviceId}
 - 表、索引、菜单、接口与权限通过应用 Manifest 安装，不为游戏资源新增 `Microi.Upgrade` 定制迁移。
 - 所有接口必须声明 `ResourcePolicies.ApiEngines`：官方核心 `Managed`；租户扩展 `CreateIfMissing`，后续升级不覆盖。
 
+### 持续权威模拟与平台宿主
+
+- 先区分接口引擎业务编排、持续固定步模拟和实时通知。SignalR版本通知不是规则执行；秒级Job只用于恢复/扫描/补偿，不能宣称20Hz连续模拟。
+- 仅在现有纯V8无法满足固定步规则时使用通用受信规则宿主。Domain与应用适配仍属于私有应用程序集，平台只提供调度/预算/作用域；禁止把整套游戏规则加入Microi.Server或新增游戏Controller。
+- 后台发行固定tenant、入口、审批摘要和实际DLL/依赖hash；主库绑定已安装与已完成发布版本，每次运行回读撤销。不得从玩家Param、可编辑V8或MCP传路径/URL/Type来装载代码。明确原生代码是受信后端代码，不是沙箱。
+- 使用 `RunPlatformApiRuntime` 之前核后端实际安装。公开入口只收意图，成员和席位由DiyToken重算；DB时钟、租约/fence、完整checkpoint与inbox在同一事务。未知提交保持原RequestId，停机停止接收并有界排空，旧owner不得续写。
+- 连续宿主唤醒需接Owned提示；当前无afterCommit回调，只能在持久写入成功后、return Code=1前发出有界提示，不能说已经提交后唤醒。pump仍须重新锁主库并核owner/fence/租约；原事务回滚不能产生合法推进。终局用DrainOwnedRoom停止后续调度，允许当前事务返回提交；StopOwnedRoom会立即取消当前请求。无外部主机不等于无需后端部署。只给本人/同队可见投影，公开频道不传全量状态。
+- 验收分离规则测试、原子编译、真实Jint/SQL、两节点/强杀恢复、HTTP与实际渲染；固定频率或协议夹具通过不能代表商业竞技品质。
+
 ### 5. 构建可安装 AI 应用
 
 - `ApplicationType` 使用 `Web`；Vue 3 + Vite + TypeScript 作为页面外壳，Unity Canvas/WebGL 与普通 DOM 分层。
@@ -146,6 +155,13 @@ did: {DeviceId}
 任何未执行层都要明确写成未验证或受阻。应用受理编号、源码测试或本地构建不能替代公开 URL、真实租户和非官方安装证据。
 
 ## 停止发布的条件
+
+### 复盘：运行时特效在 WebGL 被裁剪或短到看不见
+
+- 触发场景：编辑器开炮正常，公开 WebGL 只出现命中，没有可见飞行子弹。
+- 根因：仅运行时 AddComponent 的 LineRenderer、ParticleSystem 或 Collider 未纳入引擎保留，或高速 easing/过短 lifetime 使飞行阶段几乎不可见。
+- 通用规则：真实发布构建中保留所需模块与动态 Shader；炮口取实际炮管世界变换，飞行持续时间按距离限界，弹芯/尾迹/命中分层，共享材质不可逐次克隆泄漏。
+- 自动化检查：公开 WASM 实际加载，连续至少三帧断言弹体位置变化；检验四种武器、空射、真实权威命中与资源/console 错误。单帧截图不能证明动态特效。
 
 - Unity 许可证未激活或 WebGL 模块缺失。
 - Unity 构建只有外壳，没有真实 WASM/Data。

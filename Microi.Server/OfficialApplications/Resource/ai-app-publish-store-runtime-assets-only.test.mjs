@@ -66,7 +66,7 @@ export function runRuntimePublisher(overrides = {}, sourceText = source) {
         UptFormDataByWhere(...args) { writes.push(args); throw new Error('CAS rejection must not write'); },
       },
       Method: {},
-      ApiEngine: { Run(key) { calls.push({ engine: key }); throw new Error('unexpected selected export ' + key); } },
+      ApiEngine: { Run(key, params) { calls.push({ engine: key, params }); if(key === 'export-microi-store-package' && overrides.selectedExport) return { Code: 1, Data: overrides.selectedExport }; throw new Error('unexpected selected export ' + key); } },
     },
   };
   const result = vm.runInNewContext('(function(){\n' + sourceText + '\n})()', context, { timeout: 2000 });

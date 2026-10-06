@@ -93,6 +93,59 @@ Content 和二进制 RawBytes 都要按真实字节验证大小及 SHA-256。任
 
 旧库可由超级管理员运行应用商城包提供的容量治理后台任务。任务先自愈缺失字段，再以有界 Id 游标分批外置 `sys_microistore` 和商城相关 `mic_data_version` 快照；每行都在 HDFS 校验成功后以原值 CAS 清理，因此节点重启、重试或并发修改不会误删。任务不会对数 GB 的历史 JSON 执行全表 `LIKE`，也不会自动运行可能长时间锁表的 `OPTIMIZE TABLE`。逻辑正文清空后，如需让 MySQL 物理文件立即缩小，应在完成备份的维护窗口由数据库管理员另行评估执行。
 
+
+发布器 `v2.1.2` 修复受管接口更新后的重复发布摘要漂移：源码、`Managed` 策略和所有权均与已发布包相同时，保留该包的有效基线；真正的源码变更仍推进基线并保留历史兼容摘要。缺失或无效基线从实际旧源码重新建立，`CreateIfMissing` 租户 Hook 保持原策略。`Inspect` 与 `Publish` 必须使用相同的冻结 `PreparedAssets` 和资源选择，并在发布后立即重放原请求，独立核对包 SHA-256、字节数和不可变快照 Id；重放被 CAS 拒绝仍算失败，不能仅以首次成功声称幂等。
+
+## 共享表的稀疏字段选集
+
+应用只扩展已有共享表的少数字段时，标准导出器和 `ai_app_publish_store` 接收
+`SparseTableSelections: [{ TableId, FieldIds }]`。Id 必须来自当前租户权威元数据，
+最多 32 张表、每表 512 个非重复字段；不接受调用方传表正文、DDL 或布局覆盖。
+同一表不能同时进入完整 `TableIds` 与稀疏选集，安装基础设施表不能被裁剪。
+
+导出只保留表 `Id/Name`、所选字段和对应物理列；不携带共享 `Tabs/Column`、
+其它字段、建表或索引。数据只允许 `InsertIfMissing`，行与冲突字段必须在选集中。
+没有数据行的共享表自动生成标准零行 `DataSet`，复用安装前置检查：缺物理表或
+共享表元数据时，在资源写入前失败；不是自动安装依赖，也不是空库建表契约。
+
+旧导入器会拒绝受保护共享表的零行 DataSet。须先升级包含
+`EMPTY_SHARED_TABLE_PREREQUISITE_V1` 的商城安装器，再安装混合应用。
+新分支仅接受严格零行形状，不给受保护表业务数据增加写权限。
+普通 DataSet 仍要求完整建表资源，不能借稀疏分支绕过结构闭包。
+
+导出器 `v1.3.8` 修复稀疏默认数据的序列化形状：未声明实际父绑定时，
+必须完全省略 `ParentBinding` 键，不能用 `undefined` 让宿主转成 `null`；
+普通配置子表的显式绑定保持原契约，稀疏导入安全门不放宽。
+仅保留稀疏选集中字段在源记录上真实存在的空字符串；NULL、缺失字段、
+未选字段不推断默认值，跨租户与隐藏元数据仍排除，普通全表导出保持旧行为。
+数值 `0` 原本就保留；秘密状态必须经已有可信设置入口规范源数据，
+不能由导出参数或包正文合成。升级后重新 Inspect 并冻结新摘要，旧快照不可改写。
+
+安装器 `v3.0.5` 同时执行 `SPARSE_TABLE_IMPORT_PREFLIGHT_V2`：直接传包和下载包均在进度持久化、物理兼容自举及资源写入前核验原始稀疏正文和目标。严格零行依赖不能由同包 `CREATE` 自行满足；带默认数据的稀疏表也必须已有实体表及唯一未删除的表单元数据。MySQL/SQL Server 查询要求 `BASE TABLE`，Oracle 使用 `USER_TABLES`。共享表只接受 `Id/Name`、精确字段与物理列及 `InsertIfMissing` 数据，不接受布局、其它字段、字段退役或该表 DDL；非空数据集可保留标准导出的 `TableDescription`，该描述不授权更新共享表布局。
+
+`DECLARATIVE_PACKAGE_DDL_PREFLIGHT_V1` 在同一写前门禁逐字符识别引号和注释，按实际 SQL 目标核对声明表名，只接受受支持的 `CREATE TABLE`、`CREATE INDEX` 与列/索引 `ALTER TABLE`。DML、动态执行、多语句、未知声明、MySQL/MariaDB 可执行注释及提示一律拒绝。字符串内部的分号和普通注释可保留；含反斜杠的引号内容因 SQL mode/方言歧义拒绝，改用 SQL 标准重复引号。现有官方包 DDL 已做字节绑定的解析回归；这不等于所有数据库版本上的实际 SQL 执行验收，未支持的方言模板须先补明确语法和回归，不能降级原样执行。
+
+
+Web 应用可用 `RuntimeAssetsOnly=false + IncludeSource=false` 同时携带
+`SharedPublicRuntime` 和声明式资源，六张标准应用基础设施表仍按权威闭包导出。
+Inspect 和 Publish 使用完全相同的选择、`CommittedProof` 及运行清单，Publish
+再传 `ExpectedResourceSnapshotHash`；旧稀疏选集必须显式刷新，不能退化为整表。
+`RuntimeAssetsOnly=true` 继续拒绝任何资源选集。
+
+现有 `microi_run_engine.params` 为通用对象，已能原样透传此选集，仍须
+`confirmExecution`。这不代表线上导出器已升级，也不能以私有源码含 Manifest
+代替正式包资源。接口默认禁用须另按实时能力配置并独立回读；当前
+`microi_generate_system` 的引擎 upsert 不会透传 `IsEnable/StopHttp`。
+
+后台规则审批表 `mci_runtime_installation` 的结构可由责任包安装，但审批业务行
+禁止经导出/导入 DataSets 种入、覆盖或恢复；只有严格零行依赖允许通过。
+可信程序集注册与管理员审批是独立动作，不能以商城发布或包安装代替。
+
+标准官方控制面现将 `export-package.js` 纳入固定单资源白名单，沿用
+`Resources[{Name,Content,ExpectedRemoteSha256}]`、可信官方授权、同事务行锁及回读。
+先 CAS 升级控制面，再 CAS 发布导出/导入/发布器，最后从完整母版发行归属商城包；
+源码、包正文、不可变快照和公开下载都须独立验证，不能只更新本地镜像。
+
 ## 源码 ZIP 导出与制包校验
 
 应用商城 `v8.4.12` 的 `ai_app_download_source_zip` 只导出应用当前活动私有源码，参数为
