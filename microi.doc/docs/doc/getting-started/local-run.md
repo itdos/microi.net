@@ -173,6 +173,10 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 通过测试的候选源码和 Docker 构建上下文都会保存内容哈希回执，每次推送前重新校验。仅推送时没有回执或发现源码/产物变化会拒绝上传，必须重建重测，防止“当前源码测试通过、上传的却是旧 DLL/dist”。
 
+后台发行需要静态组合私有原生规则时，不能依赖根公开仓的文件清单覆盖被忽略的应用源码。发布进程设置 `MICROI_RELEASE_COMPOSITION_FILE` 指向工作区内的受控 JSON 契约，格式为 `schema:1`，包含 `properties`、`files`、`directories`、`artifacts`。`properties` 必须固定 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 四个文件路径，并与同一发布进程传给 MSBuild 的实际环境属性一致；这些文件必须同时进入 `files` 或 `directories`。
+
+`files` 列出项目、组合 targets、静态审批代码等文件；`directories` 列出应用自己的规则源码目录。契约原始正文和这些输入逐文件加入 Full 候选，新增、删除或修改均触发重新验收；禁止越界路径和符号链接，`bin/obj/dist` 等生成目录不作为源码。`artifacts` 使用 `{ "path":"publish/ApprovedRules.dll", "sha256":"<后台审批的实际DLL哈希>" }` 描述获批制品，最终 API 发布目录必须逐项匹配，缺失或不同均阻止捕获和推送。普通无私有组合的发布和 PC 制品沿用既有门禁。这些变量只供构建，不是生产 API 设置，也不授予 V8/MCP/HTTP 任意加载代码的权限。
+
 共享源码持续变化时，可将完整候选源码及依赖保存到独立发布目录，在那里运行同一 Full 和一键发布脚本。专用测试服务使用独立端口，并通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口，默认仍为 61501、61500。进程管理器继续检查 PID、命令行和工作区归属；原工作区服务不受影响。这两个变量仅用于发布脚本，不是生产 API 配置。
 
 进程管理器也支持通过 PowerShell 7 检查 macOS/Linux 的真实监听进程、命令行和工作目录；路径按大小写精确匹配，结束前再次核对启动时间，拒绝 PID 复用。`dotnet run` 启动的无扩展名 `Microi.net.Api` apphost 还必须使用规范绝对路径，位于所选 API 项目的 `bin/` 下，且工作目录精确等于该项目；相同名称、其它目录、路径中的 `.`/`..` 或无法读取启动时间都不能作为可停止的身份。只能停止已证明属于所选工作区的 API/Vite 及其后代，无法读取身份时停止操作。此能力不改变一键脚本对共享开发服务的既有处理策略；跨平台回归使用独立目录和端口，不以模拟对象代替真实进程。

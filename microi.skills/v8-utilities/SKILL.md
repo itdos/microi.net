@@ -69,6 +69,14 @@ var clientDecoded = V8.Base64.decode(clientEncoded);
 - 原有前后端全局 V8 必须保留，合并顺序为内置日期、函数库、租户原有代码；同名原有函数优先。不得用官方全局脚本整段覆盖客户脚本。函数库种子 `InsertIfMissing`，不得升级覆盖客户已改源码。
 - 列表和合并代码走 L1/Redis，表单引擎真实提交后更新租户版本并通知其它节点；回滚不变更版本。禁止通过直接 SQL 修改函数库规避失效。前端已打开页面需要刷新。
 
+## 受信固定步长运行时发现
+
+`V8.Method.RunPlatformApiRuntime({RuntimeKey:'fixed-step-simulation',Action,Param})` 属于需后端正式安装的通用原子。动作是 DescribeInvocation/CreateInitialState/AdvanceBatch/Project/ObserveOwnedRoom/StopOwnedRoom/DrainOwnedRoom；精确引擎Key由后台已审批目录限制，不能用通用private转发接口原样接受玩家信封。Param只能承载经接口引擎授权后的数据，不能指定Tenant/EngineKey/NodeId/客户端时钟作为真实上下文。Observe是提交前有界调度提示，后续须重新核DB，不是提交回执；终局用Drain保留当前请求提交机会，Stop则立即取消。规则程序集入口与hash须由私有后端发行组合固定，V8/MCP不提供上传即执行的注册能力。详细边界见unity-integration及后端V8主文档；线上缺原子时明确未安装，不能用Job/SignalR冒充。
+
+固定步运行时的临时拒绝仅使用 `DataAppend.ErrorCode` 六码白名单：KernelBusy/HostMemoryPressure/RoomStillDraining/CoordinatorStopping/StaleLease/ComputeBudgetExceeded，并要求 `Retryable===true`。Managed须显式catch-return稳定Code0并回滚，客户端有界同键重试；禁止按中文Msg或带行号异常猜测重试，更不能把授权/来源/未知失败当临时成功。此兼容扩展不增加审批表/配置或MCP任意注册入口。
+
+普通租户的编译证明默认 `TenantInstallation`，保留真实 Installed 回执及旧摘要。官方同租户发布源禁止安装自己，只能由后端发行组合明确固定 `OfficialPublishedSnapshot`：`InstallRecordId` 绑定 `mic_data_version.Id`，原始 `Data` 的UTF-8 SHA-256另固定于编译回执并参与独立审批摘要。该类别与快照摘要不从Param或自由表字段选择、不新增表字段、不伪造Installed。受信官方身份、当前Published/审批有效指针、Verified包hash/size/HDFS、不可变快照、V3 Completed源码hash及实际DLL依赖须全部匹配；当前状态变化、软删或主库不可用下次调用立即拒绝，旧历史存在不足以授权。跨租户仍拒绝，结构发布不等于后端安装或代码审批。审批表纳入通用强制管理员清单，普通用户即使误授表/菜单权限仍不得改授权状态；V8Limit和ReadPrimary不是写权限。
+
 ## 平台兼容入口索引
 
 下列旧 HTTP 地址仍由受控兼容链路识别，不能据此绕过 DiyToken、租户或权限校验：`/api/FormEngine/GetSysConfig`、`/api/Os/GetDateTimeNow`、`/api/SysLog/AddSysLog`、`/api/SysUser/`。畅捷通 V2 回调在接口引擎中编排，可信后端只提供当前租户绑定的 `V8.Method.DecodeChanjetCallbackV2` 原子。

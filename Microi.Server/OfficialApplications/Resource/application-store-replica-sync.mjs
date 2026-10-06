@@ -23,7 +23,7 @@ export const applicationStoreReplicaMappings = Object.freeze([
   Object.freeze({
     resourceName: 'export-package.js',
     apiEngineKey: 'export-microi-store-package',
-    publishedStandalone: false,
+    publishedStandalone: true,
   }),
   Object.freeze({
     resourceName: 'bulk-import-packages.js',

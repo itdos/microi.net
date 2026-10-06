@@ -4,7 +4,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
-const publisherSource = await readFile(new URL("./ai-app-publish-store.js", import.meta.url), "utf8");
+// Git 在 Windows 检出 CRLF；按规范换行提取分支，保持实际 CAS 与回读断言不变。
+const publisherSource = (await readFile(new URL("./ai-app-publish-store.js", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
 const packageModel = JSON.parse(
   await readFile(new URL("./app.microi.store.json", import.meta.url), "utf8"),
 );
