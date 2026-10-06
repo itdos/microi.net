@@ -2461,6 +2461,13 @@ namespace Microi.net.Api
             }
             param.IsDeleted = 0;
             var result = await MicroiEngine.FormEngine.GetDiyFieldList(param);
+            if (result.Code == 1 && authorization.DataAppend != null)
+            {
+                var append = result.DataAppend == null ? new JObject() : JObject.FromObject((object)result.DataAppend);
+                var access = JObject.FromObject((object)authorization.DataAppend)["FieldAccess"];
+                if (access != null) append["FieldAccess"] = access;
+                result.DataAppend = append;
+            }
             return Json(result);
         }
 

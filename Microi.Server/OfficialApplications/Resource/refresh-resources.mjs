@@ -41,6 +41,7 @@ import {
 } from './mcp-resource-publisher.mjs';
 
 const resourceNames = [
+  'export-package.js',
   'import-package.js',
   'ai-app-publish-store.js',
   'official-resource-api.js',

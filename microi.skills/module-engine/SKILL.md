@@ -244,6 +244,11 @@ PageTabs 通过 `TargetSysMenuId` 切换不同模块/表时，入口模块必须
 - PC 和移动端分别验证；MicroService 还要验证运行时、页面路由和宿主上下文。
 ### 多级表头与顶部 Banner
 
+- 字段权限使用模块 `FieldPermissions`（Manifest `fieldPermissions`），Version=1；按 Everyone/Roles/Users/Departments/Jobs 与 Fields 配置 Visible/Editable，授权对象数组保存 Id。多个匹配组限制取交集，隐藏同时不可编辑；普通用户按最终能力执行，超级管理员按原管理边界。岗位使用平台岗位/角色身份，不创建第二套人员模型。
+- 不能只做前端隐藏：FormEngine 查询、隐藏字段条件/排序/统计、导出、写入和导入均须校验。生成代码使用服务端 `DataAppend.FieldAccess`；未传菜单的客户端不能绕过该表已启用的模块限制。验收应覆盖普通账号、直接请求、角色/人员/部门/岗位匹配与只读写入失败。
+- 树模块拖动排序配置 `TreeDragSortEnabled`、`TreeDragSortField`（Manifest 同名小驼峰），排序字段必须为已注册数值字段。业务由 Managed、非匿名接口引擎 `mci-tree-drag-sort` 执行，可信原子仅负责固定引擎的模块解析、权限和白名单写入。
+- 拖动前取全树快照，移动时核验快照；旧、新父级的所有同级记录按间隔 10 重排，同时维护父级、祖先链、HasChild。不得仅更新被拖动记录，也不得按当前分页重排；跨级、循环、过期快照、任一兄弟无权编辑或写入失败必须整次回滚。
+
 - 数据源【多级表头】使用现有 `sys_menu.TableHeaders`，填写 `[{"Label":"人数（人）","Fields":["Total","Male","Female"]}]`；`Fields` 必须引用可见、连续的查询列字段名。嵌套分组可使用 `Children`。缺省、非法 JSON、重复或不连续字段时客户端回退普通表头。
 - Manifest `modules[].tableHeaders` 接受同一数组，MCP 写入 `sys_menu.TableHeaders`；更新已有菜单可通过 `microi_update_module` 传同名字段并回读，不能把合并表头放入已废弃的 `DiyConfig`。
 - 模块的 `HideTableBanner`、`HideFormBanner` 分别关闭表格与表单顶部 Banner。未配置或 `0` 均显示；设为 `1` 后对应专属统计接口不执行，按钮角标接口不受影响。Manifest 使用 `hideTableBanner`、`hideFormBanner`。

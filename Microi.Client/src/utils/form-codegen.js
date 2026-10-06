@@ -52,11 +52,11 @@ function fieldTemplate(field) {
     const value = `form[${key}]`;
     if (component === "Divider") return `      <h2 class="form-section-title">${label}</h2>`;
     if (component === "Alert" || component === "StaticText") return `      <p class="form-note">${label}</p>`;
-    if (component === "Guid" || component === "AutoNumber") return `      <label class="form-field"><span>${label}</span><input :value="${value} ?? ''" readonly /></label>`;
+    if (component === "Guid" || component === "AutoNumber") return `      <label v-if="canView('${name}')" class="form-field"><span>${label}</span><input :value="${value} ?? ''" readonly /></label>`;
     const required = Number(field.NotEmpty || 0) === 1 ? " required" : "";
     const fieldReadonly = Number(field.Readonly || 0) === 1;
-    const readonly = ` :readonly="mode === 'view'${fieldReadonly ? ' || true' : ''}"`;
-    const disabled = ` :disabled="mode === 'view'${fieldReadonly ? ' || true' : ''}"`;
+    const readonly = ` :readonly="mode === 'view' || !canEdit('${name}')${fieldReadonly ? ' || true' : ''}"`;
+    const disabled = ` :disabled="mode === 'view' || !canEdit('${name}')${fieldReadonly ? ' || true' : ''}"`;
     let control;
     if (component === "Textarea") control = `<textarea v-model="${value}"${required}${readonly} rows="4" />`;
     else if (component === "NumberText" || component === "Slider" || component === "Rate") control = `<input v-model.number="${value}" type="number"${required}${readonly} />`;
@@ -76,12 +76,12 @@ function fieldTemplate(field) {
             control = `<select v-model="${value}"${multiple ? " multiple" : ""}${required}${disabled}>\n          <option value="">请选择</option>\n${rows}\n        </select>`;
         }
     } else control = `<input v-model="${value}" type="text"${required}${readonly} />`;
-    return `      <label class="form-field"><span>${label}${required ? " *" : ""}</span>${control}</label>`;
+    return `      <label v-if="canView('${name}')" class="form-field"><span>${label}${required ? " *" : ""}</span>${control}</label>`;
 }
 
 /**
- * 生成一张表的独立 Vue 3 SFC。复杂控件与动态数据源要显式拒绝，避免生成一个
- * 表面可提交、实际会悄悄丢字段的页面。人工修改后仍可用设计器重新生成草稿并对比。
+ * 生成可维护的表单 Vue SFC。复杂控件、动态数据源与前端事件委托平台原表单，
+ * 保留已有行为；人工修改后的源码仍须审阅合并。
  */
 export function generateFormVue(table, fields) {
     const tableKey = safeTableKey(table?.Name);
@@ -89,9 +89,6 @@ export function generateFormVue(table, fields) {
     if (!tableId) throw new Error("缺少表 Id，请先保存表单设计。 ");
     const clientEvents = ["InFormV8", "SubmitFormV8", "OutFormV8"]
         .filter(key => String(table?.[key] || "").trim());
-    if (clientEvents.length) {
-        throw new Error(`表单包含前端 V8 事件（${clientEvents.join("、")}），需先把等价逻辑写入 Vue 页面后再切换菜单。`);
-    }
     const ordered = [...(Array.isArray(fields) ? fields : [])]
         .filter((field) => field && Number(field.IsDeleted || 0) !== 1 && Number(field.Visible ?? 1) !== 0)
         .sort((a, b) => Number(a.Sort || 0) - Number(b.Sort || 0));
@@ -100,13 +97,14 @@ export function generateFormVue(table, fields) {
         return [field.V8Code, field.V8CodeBlur, field.V8TmpEngineForm, field.V8TmpEngineTable,
             config.V8Code, config.V8CodeBlur].some(value => String(value || "").trim());
     });
-    if (scripted.length) {
-        throw new Error(`以下字段包含前端 V8 或模板代码，需先迁移逻辑：${scripted.map(field => field.Label || field.Name).join("、")}`);
-    }
-    const unsupported = ordered.filter((field) => !editableControls.has(field.Component || "Text")
-        && !displayControls.has(field.Component));
-    if (unsupported.length) {
-        throw new Error(`以下控件暂不支持自动生成，请先在 Vue 代码中实现后再切换菜单：${unsupported.map((field) => `${field.Label || field.Name}(${field.Component})`).join("、")}`);
+    const unsupported = ordered.filter((field) => !editableControls.has(field.Component || "Text") && !displayControls.has(field.Component));
+    const dynamicOptions = ordered.some(field => {
+        const config = parseJson(field.Config, {});
+        return config.DataSource && !["KeyValue", "Data"].includes(config.DataSource);
+    });
+    const emptyMultiOptions = ordered.some(field => ["MultipleSelect", "Checkbox"].includes(field.Component) && !parseJson(field.Data, []).length);
+    if (clientEvents.length || scripted.length || unsupported.length || dynamicOptions || emptyMultiOptions) {
+        return generateRuntimeFormVue(table, ordered);
     }
     const editable = ordered.filter((field) => editableControls.has(field.Component || "Text"));
     const title = String(table.Label || table.Description || tableKey);
@@ -121,8 +119,8 @@ export function generateFormVue(table, fields) {
     }).join("\n");
     const listFields = [...editable.filter(field => Number(field.Readonly || 0) !== 1),
         ...editable.filter(field => Number(field.Readonly || 0) === 1)].slice(0, 5);
-    const columns = listFields.map((field) => `        <th>${escapeHtml(field.Label || field.Name)}</th>`).join("\n");
-    const cells = listFields.map((field) => `        <td data-label="${escapeHtml(field.Label || field.Name)}">{{ row[${JSON.stringify(safeFieldName(field.Name))}] }}</td>`).join("\n");
+    const columns = listFields.map((field) => `        <th v-if="canView('${safeFieldName(field.Name)}')">${escapeHtml(field.Label || field.Name)}</th>`).join("\n");
+    const cells = listFields.map((field) => `        <td v-if="canView('${safeFieldName(field.Name)}')" data-label="${escapeHtml(field.Label || field.Name)}">{{ row[${JSON.stringify(safeFieldName(field.Name))}] }}</td>`).join("\n");
     const initial = Object.fromEntries(ordered
         .filter(field => editableControls.has(field.Component || "Text") || ["Guid", "AutoNumber"].includes(field.Component))
         .map(field => [safeFieldName(field.Name), field.Component === "Switch" ? false : field.Component === "MultipleSelect" || field.Component === "Checkbox" ? [] : ""]));
@@ -174,6 +172,10 @@ const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
 const form = reactive({ ...initialForm })
+const fieldAccess = ref(null)
+function canView(name) { return fieldAccess.value?.Fields?.[name]?.Visible ?? fieldAccess.value?.DefaultVisible ?? true }
+function canEdit(name) { return canView(name) && (fieldAccess.value?.Fields?.[name]?.Editable ?? fieldAccess.value?.DefaultEditable ?? true) }
+function acceptFieldAccess(result) { fieldAccess.value = result?.DataAppend?.FieldAccess || null }
 
 // 菜单 Id 来自宿主上下文；客户端参数只选择授权范围，服务端仍按 DiyToken 判权。
 function menuId() {
@@ -194,6 +196,7 @@ async function openRecord(row, targetMode) {
     // 列表由菜单的 SelectFields 裁剪，编辑前必须重新读取完整且已授权的单行。
     const result = await V8.FormEngine.GetFormData(tableKey, { Id: row.Id, _SysMenuId: menuId() })
     checkResult(result)
+    acceptFieldAccess(result)
     const detail = result.Data
     if (!detail || !detail.Id) throw new Error('未取得完整表单记录')
     for (const key of Object.keys(form)) delete form[key]
@@ -210,7 +213,7 @@ async function loadRows() {
   loading.value = true; error.value = ''
   try {
     const result = await V8.FormEngine.GetTableData(tableKey, { _SysMenuId: menuId(), _PageIndex: page.value, _PageSize: pageSize })
-    checkResult(result); rows.value = Array.isArray(result.Data) ? result.Data : []
+    checkResult(result); acceptFieldAccess(result); rows.value = Array.isArray(result.Data) ? result.Data : []
   } catch (cause) { error.value = cause?.message || String(cause) }
   finally { loading.value = false }
 }
@@ -218,12 +221,12 @@ async function save() {
   if (mode.value === 'view' || saving.value) return
   saving.value = true; error.value = ''
   try {
-    const record = Object.fromEntries(editableFieldNames.map(key => [key,
+    const record = Object.fromEntries(editableFieldNames.filter(canEdit).map(key => [key,
       dateFieldNames.includes(key) && form[key] ? String(form[key]).replace('T', ' ') : form[key]]))
     if (mode.value !== 'add') record.Id = form.Id
     const result = mode.value === 'add'
       ? await V8.FormEngine.AddFormData({ FormEngineKey: tableKey, _SysMenuId: menuId(), _RowModel: record })
-      : await V8.FormEngine.UptFormData(tableKey, { Id: record.Id, _SysMenuId: menuId(), _FormData: record })
+      : await V8.FormEngine.UptFormData({ FormEngineKey: tableKey, Id: record.Id, _SysMenuId: menuId(), _RowModel: record })
     checkResult(result); closeForm(); await loadRows()
   } catch (cause) { error.value = cause?.message || String(cause) }
   finally { saving.value = false }
@@ -287,3 +290,73 @@ onUnmounted(() => {
 `;
 
 export const generatedFormAppMarker = "microi-generated-form-app-v1";
+
+/** 复杂表单保留平台控件、数据源和 V8 事件，通过已有宿主动作打开完整表单。 */
+function generateRuntimeFormVue(table, fields) {
+    const tableKey = safeTableKey(table.Name);
+    const columns = fields.filter(f => !["Guid", "TableChild", "Tabs", "CollapseGroup", "Divider", "Alert", "Button", "ImgUpload", "FileUpload", "RichText"].includes(f.Component)).slice(0, 5);
+    return `<template>
+  <main class="form-code-page">
+    <header><div><h1>${escapeHtml(table.Label || table.Description || tableKey)}</h1><p>数据与表单共用当前模块的授权范围</p></div><button @click="openForm('Add')">新增</button></header>
+    <p v-if="error" role="alert">{{ error }}</p>
+    <section><button @click="loadRows" :disabled="loading">{{ loading ? '加载中…' : '刷新' }}</button>
+      <table><thead><tr>${columns.map(f => `<th v-if="canView('${safeFieldName(f.Name)}')">${escapeHtml(f.Label || f.Name)}</th>`).join('')}<th>操作</th></tr></thead>
+        <tbody><tr v-for="row in rows" :key="row.Id">${columns.map(f => `<td v-if="canView('${safeFieldName(f.Name)}')" data-label="${escapeHtml(f.Label || f.Name)}">{{ row[${JSON.stringify(safeFieldName(f.Name))}] }}</td>`).join('')}<td data-label="操作"><button @click="openForm('View', row.Id)">查看</button><button @click="openForm('Edit', row.Id)">编辑</button></td></tr></tbody>
+      </table><p v-if="!loading && !rows.length">暂无记录</p>
+      <nav><button :disabled="page === 1" @click="page--; loadRows()">上一页</button><span>第 {{ page }} 页 · 共 {{ total }} 条</span><button :disabled="page * pageSize >= total" @click="page++; loadRows()">下一页</button></nav>
+    </section>
+  </main>
+</template>
+<script setup>
+import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { microiV8 as V8 } from '../platform/microi'
+const tableKey = ${JSON.stringify(tableKey)}
+const rows = ref([]), error = ref(''), loading = ref(false), page = ref(1), total = ref(0), pageSize = 20
+const pending = new Map()
+const fieldAccess = ref(null)
+function canView(name) { return fieldAccess.value?.Fields?.[name]?.Visible ?? fieldAccess.value?.DefaultVisible ?? true }
+function menuId() {
+  const id = String(window.microApp?.getData?.()?.permissionContext?.sysMenuId || '')
+  if (!id) throw new Error('请从已授权的模块菜单打开表单代码页面')
+  return id
+}
+async function loadRows() {
+  loading.value = true; error.value = ''
+  try {
+    const result = await V8.FormEngine.GetTableData(tableKey, { _SysMenuId: menuId(), _PageIndex: page.value, _PageSize: pageSize })
+    if (Number(result?.Code) !== 1) throw new Error(result?.Msg || '读取失败')
+    fieldAccess.value = result.DataAppend?.FieldAccess || null
+    rows.value = result.Data || []; total.value = Number(result.DataCount || 0)
+  } catch (cause) { error.value = cause.message || String(cause) }
+  finally { loading.value = false }
+}
+function onHostData(message) {
+  if (message?.type === 'micro-app:form-saved' && message.data?.tableName?.toLowerCase() === tableKey.toLowerCase()) loadRows()
+  message = message?.hostActionResult || message
+  if (message?.type !== 'micro-app:host-action-result') return
+  const item = pending.get(message.requestId)
+  if (!item) return
+  clearTimeout(item.timer); pending.delete(message.requestId)
+  if (message.success === false || message.error) item.reject(new Error(message.error?.message || '表单打开失败'))
+  else item.resolve(message.data)
+}
+async function openForm(formMode, id = '') {
+  error.value = ''
+  try {
+    const sysMenuId = menuId(), app = window.microApp
+    if (!app?.dispatch || !app?.addDataListener) throw new Error('当前平台宿主不支持表单，请升级平台前端')
+    const requestId = crypto.randomUUID()
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('表单打开超时，请重试')) }, 30000)
+      pending.set(requestId, { resolve, reject, timer })
+      app.dispatch({ type: 'micro-app:host-action', protocol: 'microi.host.v1', requestId, action: 'openForm', data: { tableName: tableKey, formMode, id, sysMenuId } })
+    })
+  } catch (cause) { error.value = cause.message || String(cause) }
+}
+onMounted(() => { window.microApp?.addDataListener?.(onHostData); loadRows() })
+onBeforeUnmount(() => { window.microApp?.removeDataListener?.(onHostData); for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('页面已关闭')) } pending.clear() })
+</script>
+<style scoped>
+.form-code-page{padding:24px;max-width:1400px;margin:auto;color:var(--el-text-color-primary,#172033);background:var(--el-bg-color-page,#f4f6fa)}header,nav{display:flex;align-items:center;justify-content:space-between;gap:12px}h1{margin:0;font-size:24px}p{color:var(--el-text-color-secondary,#64748b)}section{margin-top:20px;padding:20px;border:1px solid var(--el-border-color-light,#e2e8f0);border-radius:14px;background:var(--el-bg-color,#fff);overflow:auto}button{cursor:pointer;min-height:40px;padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;color:#2563eb;background:#eff6ff}button:disabled{opacity:.5;cursor:default}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{text-align:left;padding:14px 10px;border-bottom:1px solid #e2e8f0}td button+button{margin-left:8px}nav{justify-content:flex-end;margin-top:16px}[role=alert]{color:#b42318}@media(max-width:640px){.form-code-page{padding:12px}section{padding:12px}thead{display:none}tr{display:grid;padding:8px 0;border-bottom:1px solid #e2e8f0}td{display:flex;gap:12px;border:0;padding:8px 0;overflow-wrap:anywhere}td:before{content:attr(data-label);flex:0 0 30%;color:#64748b}}
+</style>`;
+}
