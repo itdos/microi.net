@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertReleaseAvailable } from '../../Microi.Server/tools/release-lock.mjs';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = process.env.NODE_TLS_REJECT_UNAUTHORIZED || '0';
 
@@ -19,7 +20,6 @@ const frontendUrl = process.env.FRONTEND || process.env.PW_BASE_URL || 'http://l
 const osClient = process.env.MICROI_OSCLIENT || process.env.PW_OS_CLIENT || backendEnv;
 const launchProfile = process.env.PW_BACKEND_PROFILE || 'Microi.net.Api';
 const backendConfiguration = process.env.PW_BACKEND_CONFIGURATION || 'Debug';
-const releaseLockPath = path.join(repoRoot, '.tmp', 'microi-process-state', 'release.lock');
 
 function isExplicitFalse(value) {
     return value === false || value === 0 || value === '0' || value === 'false' || value === 'no' || value === 'off';
@@ -35,16 +35,7 @@ function resolveMaybeRelative(filePath) {
 }
 
 async function assertReleaseIsNotRunning() {
-    try {
-        await fs.access(releaseLockPath);
-        throw new Error(
-            `Workspace release lock exists: ${path.relative(repoRoot, releaseLockPath)}. ` +
-            'Wait for Microi一键编译发布.sh to finish before starting E2E services.'
-        );
-    } catch (error) {
-        if (error.code === 'ENOENT') return;
-        throw error;
-    }
+    assertReleaseAvailable(repoRoot, 'platform');
 }
 
 async function readJson(filePath) {

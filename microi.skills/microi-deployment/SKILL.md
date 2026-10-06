@@ -146,8 +146,9 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
 - 健康开发服务默认复用；需要重载源码时串行重启。长期后端只从项目目录执行
   `dotnet run --launch-profile Microi.net.Api`，禁止直接运行 `bin/Release/net10.0`
   或 `bin/Release/publish` 作为 E2E 服务。
-- 一键发布在改写输出目录前创建 `.tmp/microi-process-state/release.lock`；锁存在时其它 AI
+- 一键发布在改写输出目录前创建 `.tmp/microi-process-state/platform-release.lock`；平台锁存在时其它 AI
   不得启动、自愈或重启 `61500/61501`。
+- Agent 桌面安装包使用独立 `agent-release.lock`，可与平台发布并行。启动前使用 `node Microi.Server/tools/release-lock.mjs assert platform <工作区根>`；兼容旧全局锁时必须回读真实 Agent 进程归属，未知锁仍阻塞，不能删除活跃持有者的锁。
 - Windows 发布前调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease`。
   只在端口、命令行和当前工作区路径同时匹配时停止 Microi API/Vite，并额外查找当前工作区
   的 Release API；身份不匹配时失败关闭，禁止使用 `/IM dotnet.exe`、`/IM node.exe`、

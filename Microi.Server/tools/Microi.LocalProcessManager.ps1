@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidateSet('Status', 'PrepareRelease', 'StopBackend', 'StopFrontend')]
+    [ValidateSet('Status', 'AssertServiceStart', 'PrepareRelease', 'StopBackend', 'StopFrontend')]
     [string]$Action = 'Status',
     [string]$WorkspaceRoot = '',
     [int]$BackendPort = 61501,
@@ -25,7 +25,7 @@ $normalizedWorkspace = $resolvedWorkspace.Replace('/', '\').ToLowerInvariant()
 $backendRoot = (Join-Path $resolvedWorkspace 'Microi.Server\Microi.net.Api').Replace('/', '\').ToLowerInvariant()
 $frontendRoot = (Join-Path $resolvedWorkspace 'Microi.Client').Replace('/', '\').ToLowerInvariant()
 $releaseOutput = Join-Path $resolvedWorkspace 'Microi.Server\Microi.net.Api\bin\Release'
-$releaseLockDirectory = Join-Path $resolvedWorkspace '.tmp\microi-process-state\release.lock'
+$releaseLockTool = Join-Path $PSScriptRoot 'release-lock.mjs'
 $processCurrentDirectoryCache = @{}
 if (-not $isWindowsHost) {
     # POSIX 身份保留路径大小写；命令行或 CWD 无法回读时仍失败关闭。
@@ -547,16 +547,10 @@ function Show-Status {
     $frontendIds = @(Get-ListeningProcessIds $FrontendPort)
 
     Write-Info "工作区：$resolvedWorkspace"
-    if (Test-Path -LiteralPath $releaseLockDirectory) {
-        $ownerFile = Join-Path $releaseLockDirectory 'owner.env'
-        $ownerText = '无 owner.env'
-        if (Test-Path -LiteralPath $ownerFile -PathType Leaf) {
-            $ownerText = ((Get-Content -LiteralPath $ownerFile -Encoding UTF8 -ErrorAction SilentlyContinue) -join '，')
-        }
-        Write-Info "发布互斥锁：存在（发布进行中或上次异常退出），$ownerText"
-    }
-    else {
-        Write-Info '发布互斥锁：无'
+    $lockJson = & node $releaseLockTool status platform $resolvedWorkspace
+    if ($LASTEXITCODE -ne 0) { throw '无法核验发布锁范围。' }
+    foreach ($releaseLock in @($lockJson | ConvertFrom-Json)) {
+        Write-Info "发布锁 $($releaseLock.domain)：存在=$($releaseLock.exists)，路径=$($releaseLock.path)"
     }
     if ($backendIds.Count -eq 0) {
         Write-Info "后端端口 $BackendPort：未监听"
@@ -625,7 +619,15 @@ function Invoke-StopFrontend([hashtable]$Snapshot) {
 }
 
 try {
+    # Agent 安装包不改写平台输出；平台停止/启动仍须核验同域锁，发布者凭原令牌准备独占。
+    if ($Action -ne 'Status') {
+        $ownerToken = if ($Action -eq 'PrepareRelease') { $env:MICROI_RELEASE_LOCK_TOKEN } else { '' }
+        & node $releaseLockTool assert platform $resolvedWorkspace $ownerToken
+        if ($LASTEXITCODE -ne 0) { throw '平台发布正在进行，禁止停止或重启共享服务。' }
+    }
     switch ($Action) {
+        'AssertServiceStart' { Write-Info '平台服务启动锁检查通过；Agent 发布不阻塞。' }
+
         'Status' {
             Show-Status
         }
