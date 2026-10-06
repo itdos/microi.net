@@ -1613,3 +1613,21 @@ test('官网发布接口接受十个官方应用包并拒绝 AI 与首页资源�
     /microi-init/,
   );
 });
+
+test('Managed 保护说明前缀不把 V8 版本头误判为可执行正文冲突', async () => {
+  const notice = '/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 官方托管接口，只修改 Hook\n */\n\n';
+  const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
+  const builder = engineSource('ai_app_build', 'v1.0.0', 'return { Code: 1 };');
+  const body = 'function localFeature() {\n  return 1;\n}\n\n// 保留行为注释\n\nfunction remoteFeature() {\n  return 1;\n}';
+  const basePublisher = notice + engineSource('ai_app_publish_store', 'v1.5.4', body, '基线');
+  const localPublisher = notice + engineSource('ai_app_publish_store', 'v1.5.5', body.replace('function localFeature() {\n  return 1;', 'function localFeature() {\n  return 2;'), '本地');
+  const remotePublisher = notice + engineSource('ai_app_publish_store', 'v1.5.6', body.replace('function remoteFeature() {\n  return 1;', 'function remoteFeature() {\n  return 3;'), '官网');
+  const merged = await mergeReplicaFixture({baseImporter:importer,basePublisher,baseBuilder:builder,
+    localPublisher,localEmbeddedPublisher:basePublisher,remotePublisher,remoteEmbeddedPublisher:basePublisher});
+  const resolved = merged.standaloneContents.get('ai-app-publish-store.js');
+  assert.match(resolved, /Version: v1\.5\.7/);
+  assert.match(resolved, /OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1/);
+  assert.match(resolved, /保留行为注释/);
+  assert.match(resolved, /function localFeature\(\) \{\n  return 2;/);
+  assert.match(resolved, /function remoteFeature\(\) \{\n  return 3;/);
+});
