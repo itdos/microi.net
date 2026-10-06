@@ -38,7 +38,7 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 生成接口引擎代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；跨表事务、权限校验、状态机、金额/库存计算、复杂 `_Where` 条件等代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-001 sha256=2e7809a53af3dcbafecc617f40dbb528a892fc734ab6029072d1fcf55e7ed968 -->
+<!-- microi-progressive:chunk id=v8-crud-api-001 sha256=d0bed55dcaa08fd84319107269643dd5aba5aadecf4f394c8ac55d80ab959677 -->
 ## 核心规则
 
 - 接口引擎文件是纯 JavaScript（Jint 引擎，非 Node.js）
@@ -47,6 +47,7 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 - 严格业务字段白名单先逐项排除本入口支持的宿主传输字段：固定 `ApiEngineKey / ApiAddress`、调用类型、设备和 HTTP 请求元数据；不得把整个下划线前缀视为安全字段，不解析 `_RawBody` 重写动作，也不从传输字段取授权。历史调试器的 `TestParam1` 仅兼容 null/undefined、最多 200 字符的字符串、有限数字或布尔值并立即丢弃；对象、数组、超长值和其它未知字段继续拒绝。真实 HTTP 与内部调用都须验收，普通岗位无初始化配置副作用，权限继续读取权威当前用户与目标租户。
 - `V8.Param` 中嵌套 JSON 的 `JObject/JArray` 可能是 Jint 宿主对象，`Array.isArray` 不一定成立。需要严格数组、布尔或结构校验时，在业务入口对有界业务参数使用 `JSON.parse(JSON.stringify(V8.Param || {}))` 转为纯 JSON，再执行原字段白名单、类型、大小与权限校验；不能把只有 `length` 的对象当数组。只规范化业务参数，不复制或信任客户端身份、`V8.CurrentUser`、`V8.DbTrans` 或 `V8.WF`；大文件继续使用专用文件通道。验收须同时覆盖真实 HTTP 宿主集合和离线 JavaScript 数组。
 - 通过 `V8.CurrentUser` 获取当前登录用户信息
+- 高精度 `decimal(p,s)` / 带小数位 `number(p,s)` 的金额、数量、换算率使用无分组、英文小数点的十进制字符串，避免先 `Number()` / `parseFloat()` 或浮点运算丢位。后端使用固定文化解析，拒绝逗号分组、本地化逗号小数、指数、非数字和越界；业务层仍须按字段约束精度、小数位、范围和权限。空值兼容不变，不能从舍入后的历史值重建精度或擅自回填。用真实 HTTP、数据库写后读与目标租户验收，不能把 CLR 参数绑定冒充数据库成功。
 - 返回结果统一格式：`{ Code: 1, Data: any, Msg: '成功' }`
 - 所有 FormEngine 方法在服务器端支持第三个参数传入 `V8.DbTrans`（事务对象）
 - 服务端调用 FormEngine 默认**不触发**表单 V8 事件，加 `_InvokeType: 'Client'` 才触发
