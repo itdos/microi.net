@@ -20,7 +20,7 @@ export function moduleFieldAccess(raw, user, name) {
     if (!config?.Enabled) return { visible: true, editable: true };
     if (config.Version !== 1 || !Array.isArray(config.Rules)) return { visible: false, editable: false };
     let visible = config.DefaultVisible !== false, editable = config.DefaultEditable !== false;
-    const identities = { Users: permissionIds(user?.Id), Roles: permissionIds(user?.RoleIds), Departments: [...permissionIds(user?.DeptId), ...permissionIds(user?.DeptIds)], Jobs: [...permissionIds(user?.Jobs), ...permissionIds(user?.RoleIds)] };
+    const identities = { Users: permissionIds(user?.Id), Roles: permissionIds(user?.RoleIds), Departments: [...permissionIds(user?.DeptId), ...permissionIds(user?.DeptIds)], Jobs: permissionIds(user?.Jobs) };
     let found = false;
     for (const rule of config.Rules) {
         const matches = rule.Everyone || Object.entries(identities).some(([key, ids]) => permissionIds(rule[key]).some(id => ids.includes(id)));
