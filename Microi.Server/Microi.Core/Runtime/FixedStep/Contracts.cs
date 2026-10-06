@@ -122,6 +122,9 @@ public sealed class TickDispatchResult
 {
     public DispatchStatus Status { get; set; }
     public long LeaseRemainingMs { get; set; }
+    /// <summary>仅用于管理员节点诊断；协调器再次白名单化，不承载异常正文或授权。</summary>
+    public string DiagnosticCode { get; set; }="";
+    public int? ResultCode { get; set; }
 }
 public sealed class TickDispatch
 {

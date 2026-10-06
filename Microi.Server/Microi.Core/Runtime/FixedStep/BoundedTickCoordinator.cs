@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Microi.FixedStep
 {
 /// <summary>50ms 唤醒器不是全局权威锁。每次写入仍由 Managed 校验主库 lease/fence/revision。</summary>
-public sealed class BoundedTickCoordinator
+public sealed partial class BoundedTickCoordinator
 {
     public const int IntervalMilliseconds=50;
     public const int MaximumRooms=128;
@@ -42,7 +42,8 @@ public sealed class BoundedTickCoordinator
             var existing=rooms.FirstOrDefault(r=>r.Tenant==tenant&&r.Id==roomId);
             if(existing!=null)throw new InvalidOperationException(existing.Busy?"RoomStillDraining":"RoomAlreadyRegistered");
             if(rooms.Count>=MaximumRooms||rooms.Count(r=>r.Tenant==tenant)>=MaximumTenantRooms)throw new InvalidOperationException("TenantRoomBudgetExceeded");
-            rooms.Add(new Room{Tenant=tenant,RegistrationId=registration,Engine=engine,Id=roomId,Epoch=roomEpoch,Fence=authorityEpoch,LeaseDeadline=checked(clock.Milliseconds+remainingMs)});
+            var room=new Room{Tenant=tenant,RegistrationId=registration,Engine=engine,Id=roomId,Epoch=roomEpoch,Fence=authorityEpoch,LeaseDeadline=checked(clock.Milliseconds+remainingMs)};
+            rooms.Add(room);RecordLocalState(room,"Owned");
         }
     }
 
@@ -76,7 +77,7 @@ public sealed class BoundedTickCoordinator
         lock(gate)
         {
             var room=rooms.FirstOrDefault(r=>r.Tenant==tenant&&r.Id==roomId&&r.Epoch==roomEpoch&&r.Fence==authorityEpoch);
-            if(room==null)return;room.Removed=true;
+            if(room==null)return;room.Removed=true;RecordLocalState(room,"Stopped");
             if(room.Busy)cancel=room;else{rooms.Remove(room);room.Cancel.Dispose();}
         }
         // Cancel可同步执行dispatcher回调并重入Complete.finally；不要在持有集合锁时执行外部回调。
@@ -91,6 +92,7 @@ public sealed class BoundedTickCoordinator
             var room=rooms.FirstOrDefault(r=>r.Tenant==tenant&&r.RegistrationId==registration&&r.Id==roomId&&r.Epoch==roomEpoch&&r.Fence==authorityEpoch);
             if(room==null)return;
             room.Removed=true;
+            RecordLocalState(room,"Draining");
             // 不能在引擎 return Code=1 之前取消该请求自己的 token；busy 的资源由 Complete finally 回收。
             if(!room.Busy){rooms.Remove(room);room.Cancel.Dispose();}
         }
@@ -101,14 +103,16 @@ public sealed class BoundedTickCoordinator
     {
         lock(gate)
         {
+            lastWakeUtc=DateTime.UtcNow;
             if(stopping)return;
             var count=rooms.Count;if(count==0)return;
             for(var examined=0;examined<count&&running<MaximumGlobalConcurrency;examined++)
             {
                 if(cursor>=rooms.Count)cursor=0;var room=rooms[cursor++];
                 if(room.Removed||room.Busy||activeTenants.Contains(room.Tenant))continue;
-                if(clock.Milliseconds>=room.LeaseDeadline){room.Removed=true;room.Cancel.Cancel();continue;}
+                if(clock.Milliseconds>=room.LeaseDeadline){room.Removed=true;RecordLocalState(room,"Expired");room.Cancel.Cancel();continue;}
                 room.Busy=true;running++;activeTenants.Add(room.Tenant);
+                RecordDispatchStarted(room);
                 if(room.RequestId.Length==0)room.RequestId=Guid.NewGuid().ToString("N");
                 // 占位 Task 在锁内发布，Stop 不会错过已获准但尚未真正执行的批次。
                 var completion=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);room.Work=completion.Task;
@@ -129,21 +133,22 @@ public sealed class BoundedTickCoordinator
             var result=await dispatcher.DispatchAsync(new TickDispatch{Tenant=room.Tenant,RegistrationId=room.RegistrationId,EngineKey=room.Engine,RoomId=room.Id,RoomEpoch=room.Epoch,AuthorityEpoch=room.Fence,RequestId=room.RequestId},room.Cancel.Token).ConfigureAwait(false);
             lock(gate)
             {
+                RecordDispatchResult(room,result,clock.Milliseconds-before);
                 // 过期或 Stop 之后的响应不能复活本地 authority；真正 DB 提交仍由外层事务最后校验。
-                if(room.Removed||room.Cancel.IsCancellationRequested||clock.Milliseconds>=room.LeaseDeadline){room.Removed=true;return;}
-                if(result.Status==DispatchStatus.StaleLease){room.Removed=true;return;}
+                if(room.Removed||room.Cancel.IsCancellationRequested||clock.Milliseconds>=room.LeaseDeadline){if(!room.Removed)RecordLocalState(room,"Expired");room.Removed=true;return;}
+                if(result.Status==DispatchStatus.StaleLease){room.Removed=true;RecordLocalState(room,"StaleLease");return;}
                 if(result.Status==DispatchStatus.Committed||result.Status==DispatchStatus.Idle)room.RequestId="";
                 // Unknown 保留完全相同 RequestId；禁止生成新请求绕过未知提交。
                 if(result.LeaseRemainingMs>0&&result.LeaseRemainingMs<=30000)
                 {
                     var conservative=result.LeaseRemainingMs-(clock.Milliseconds-before);
-                    if(conservative<=0){room.Removed=true;return;}
+                    if(conservative<=0){room.Removed=true;RecordLocalState(room,"Expired");return;}
                     room.LeaseDeadline=checked(clock.Milliseconds+conservative);room.Cancel.CancelAfter((int)conservative);
                 }
             }
         }
-        catch(OperationCanceledException){lock(gate)room.Removed=true;}
-        catch { /* 传输未知状态保留 RequestId；只可同键重试，不能视为无副作用失败。 */ }
+        catch(OperationCanceledException){lock(gate){RecordDispatchFailure(room,"DispatcherCancelled");if(!room.Removed)RecordLocalState(room,"Cancelled");room.Removed=true;}}
+        catch { lock(gate)RecordDispatchFailure(room,"DispatcherException"); /* 未知仍保留原 RequestId，诊断不改变重试授权。 */ }
         finally
         {
             lock(gate){room.Busy=false;running--;activeTenants.Remove(room.Tenant);if(stopping||room.Removed){room.Removed=true;rooms.Remove(room);room.Cancel.Dispose();}}
@@ -153,8 +158,11 @@ public sealed class BoundedTickCoordinator
 
     public async Task RunAsync(CancellationToken stop)
     {
+        lock(gate){loopState="Running";loopStartedUtc=DateTime.UtcNow;}
         try{while(!stop.IsCancellationRequested){Pulse();await Task.Delay(IntervalMilliseconds,stop).ConfigureAwait(false);}}
         catch(OperationCanceledException)when(stop.IsCancellationRequested){}
+        catch{lock(gate){loopState="Faulted";loopErrorCode="LoopException";}throw;}
+        finally{lock(gate)if(loopState!="Faulted")loopState="Stopped";}
     }
     /// <summary>拒收新 room 后有界排空；超时取消在途，但不可把不可中断插件伪称已经停止。</summary>
     public async Task<bool> StopAsync(int graceMilliseconds)
@@ -167,7 +175,7 @@ public sealed class BoundedTickCoordinator
         {
             var snapshot=rooms.ToArray();
             // 必须先让全部房间不可再调度，再触发任何可能同步重入并摘除房间的取消回调。
-            foreach(var room in snapshot)room.Removed=true;
+            foreach(var room in snapshot){room.Removed=true;RecordLocalState(room,"Stopped");}
             cancel=snapshot.Where(r=>r.Busy).ToArray();
             foreach(var room in snapshot)if(!room.Busy){rooms.Remove(room);room.Cancel.Dispose();}
         }

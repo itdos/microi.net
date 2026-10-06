@@ -57,6 +57,26 @@
 例如 Linux 实际加载 `runtimes/unix` 或 `runtimes/linux` 下的 DLL 时，根目录同名通用文件的摘要不能替代它；
 发布门禁须按完整 `publish/runtimes/.../*.dll` 相对路径核验实际制品，继续拒绝路径穿越、重复路径与摘要差异。
 
+### 后台固定步调度
+
+同一管理员 `Snapshot` 还返回 `FixedStepPump`（`fixed-step-pump/v1`）。后台调用没有
+HTTP 请求记录；安装状态为 `CatalogRegistered` 不能证明后台正在推进。
+
+| 字段 | 如何判断 |
+|---|---|
+| `LoopState / LastWakeUtc` | 区分未启动、运行、停止和故障，核对当前节点的唤醒时间 |
+| `OwnedRooms / ActiveDispatches` | 仅当前租户的本机唤醒提示与在途数量，不代表主库租约或全站容量 |
+| `Rooms[].LocalState / LocalLeaseRemainingMs` | 本机状态及保守剩余时间；过期、停止的历史记录剩余时间为零 |
+| `Dispatches / Committed / Unknown` | 已安排调用及收到的提交/未知响应计数；提交仍需主库 checkpoint 独立回读 |
+| `LastOutcome / LastResultCode / LastErrorCode` | 白名单错误类别，如 `LoginRequired`、预算拒绝、陈旧租约、取消或异常；不返回错误正文 |
+
+摘要最多保留 128 个房间、每租户 16 个，节点重启后可丢失。移除本机提示不会立即抹掉
+最近失败；淘汰或字段缺失表示缺证，不能解释成零错误。快照不包含请求号、fence、
+Token、参数、异常栈或磁盘路径，也不触发规则工厂、审批查询和安装。
+
+`Unknown` 继续保留原 RequestId；观察摘要不能重新提交新请求、重置房间时间或跳过
+DB 租约。后端升级后才提供这些字段，现有 MCP 的 `Snapshot` 参数不变。
+
 ## API 排队与容器重建后的事故证据
 
 升级包含 `critical-incidents/mysql-v1` 的 API，并安装新版【系统日志/监控】应用后，
