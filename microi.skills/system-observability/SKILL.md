@@ -14,6 +14,7 @@ description: Microi 系统日志/监控查询、诊断与治理规范。用于�
 - 规则可信原子拒绝时先用现有 `microi_query_system_observability` 查询 `action=Snapshot`，读取 `FixedStepRuntime`（`fixed-step-installation/v1`）。后端部署才会提供诊断，MCP 更新不能安装程序集。
 - 只观察当前已认证租户、当前节点。`Available=false`/字段缺失表示不可用；`Registrations=[]` 表示本租户没有编译登记，不能伪造参数、放宽白名单或添加维护引擎排错。
 - 比对初始化时的 `ApiAssemblyFileSha256`、`AssemblyFileSha256` 与实际发布制品；不返回文件路径。`Pending` 尚无完成尝试；`RegistrationFailed` 用固定 `ErrorCode` 和时间/次数排错，未知异常只报通用失败码。
+- `DependencyHashMismatch` 时读取可信校验器的 `DependencyIdentity / DependencyFailureReason / DependencyExpectedSha256 / DependencyActualSha256`。原因限定 `MissingFile / MissingManifest / InvalidManifestHash / ContentMismatch`；缺清单或摘要无效不读取文件摘要，旧后端字段可能缺失。异常正文与 `Exception.Data` 不能伪造此记录；成功后清除旧失败。核对实际镜像与已审核审批，不能跳过依赖校验或从未经审核的请求值更新审批。
 - `CatalogRegistered` 只证明本进程曾完成注册，`AuthorizationProof=false`。真实调用继续回读主库审批、来源与撤销；目录状态不是当前授权或商业/多节点验收。查询不执行工厂、不读取审批、不触发安装，不暴露 SQL、配置、Token 或异常正文。
 - 该只读节点输出不新增商城声明式资源或 MCP 参数；沿用管理员鉴权与 `Snapshot` 工具，不扩展业务写入。
 

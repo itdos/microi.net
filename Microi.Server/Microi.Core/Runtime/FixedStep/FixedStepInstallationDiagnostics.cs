@@ -20,6 +20,7 @@ public sealed class FixedStepInstallationDiagnostics
         internal DateTime? LastAttemptUtc;
         internal DateTime? LastRegisteredUtc;
         internal string? ErrorCode;
+        internal DependencyHashWitness? DependencyFailure;
     }
     private static readonly HashSet<string> SafeErrors=new HashSet<string>(StringComparer.Ordinal)
     {
@@ -67,6 +68,8 @@ public sealed class FixedStepInstallationDiagnostics
             entry.LastAttemptUtc=DateTime.UtcNow;
             entry.Registered=error==null;
             entry.ErrorCode=error==null?null:error is InvalidOperationException&&SafeErrors.Contains(error.Message)?error.Message:"RegistrationFailed";
+            // 只消费校验器弱引用中的见证，不读取错误的Data/Message中的路径或用户可拼装的元数据。
+            entry.DependencyFailure=DependencyHashDiagnostics.Read(error);
             if(error==null)entry.LastRegisteredUtc=entry.LastAttemptUtc;
         }
     }
@@ -83,7 +86,9 @@ public sealed class FixedStepInstallationDiagnostics
                     RegistrationId=e.Binding.RegistrationId,EntryType=e.Binding.EntryType.FullName??"",
                     ApprovalDigest=e.Binding.ApprovalDigest,AssemblyFileSha256=e.AssemblyFileSha256,
                     State=e.Registered?"CatalogRegistered":e.Attempts==0?"Pending":"RegistrationFailed",
-                    Attempts=e.Attempts,LastAttemptUtc=e.LastAttemptUtc,LastRegisteredUtc=e.LastRegisteredUtc,ErrorCode=e.ErrorCode
+                    Attempts=e.Attempts,LastAttemptUtc=e.LastAttemptUtc,LastRegisteredUtc=e.LastRegisteredUtc,ErrorCode=e.ErrorCode,
+                    DependencyIdentity=e.DependencyFailure?.Identity,DependencyExpectedSha256=e.DependencyFailure?.ExpectedSha256,
+                    DependencyActualSha256=e.DependencyFailure?.ActualSha256,DependencyFailureReason=e.DependencyFailure?.Reason
                 }).ToArray();
             return new FixedStepInstallationSnapshot{Available=true,InitializedAtUtc=initializedAtUtc,ApiAssemblyFileSha256=apiAssemblyFileSha256,Registrations=rows};
         }
@@ -112,5 +117,10 @@ public sealed class FixedStepRegistrationSnapshot
     public DateTime? LastAttemptUtc {get;set;}
     public DateTime? LastRegisteredUtc {get;set;}
     public string? ErrorCode {get;set;}
+    /// <summary>仅真实Verifier失败时提供；管理员诊断字段不代表审批通过，且不返回文件路径。</summary>
+    public string? DependencyIdentity {get;set;}
+    public string? DependencyExpectedSha256 {get;set;}
+    public string? DependencyActualSha256 {get;set;}
+    public string? DependencyFailureReason {get;set;}
 }
 }

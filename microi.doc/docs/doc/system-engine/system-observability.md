@@ -43,11 +43,16 @@
 | `ApiAssemblyFileSha256`、`AssemblyFileSha256` | 初始化时固定程序集文件的摘要；与实际发布制品比对，不返回磁盘路径 |
 | `Pending` | 编译登记存在，尚无完成的注册尝试 |
 | `RegistrationFailed`、`ErrorCode` | 保持关闭；错误码只来自固定验证白名单，未知异常为 `RegistrationFailed` |
+| `DependencyIdentity`、`DependencyFailureReason` | `DependencyHashMismatch` 时，可信校验器记录失败的程序集完整名称；原因区分 `MissingFile / MissingManifest / InvalidManifestHash / ContentMismatch`，旧后端可能不提供 |
+| `DependencyExpectedSha256`、`DependencyActualSha256` | 有效审批清单的期望摘要与实际文件摘要；缺清单或清单摘要无效时不读取文件摘要，不返回路径 |
 | `CatalogRegistered` | 本进程曾完成目录注册；继续通过真实调用核验当前主库审批与发布指针 |
 
 `Attempts`、`LastAttemptUtc` 和 `LastRegisteredUtc` 用于判断后台重试与信息新鲜度。
 读取快照不执行规则工厂、不查询审批、不触发安装，也不返回 SQL、配置、Token 或异常正文。
 `AuthorizationProof=false`：目录状态不能代替主库权限、撤销检查、房间调用或多节点验收。
+依赖诊断只接受实际校验器产生的有界记录，不采用调用方的异常正文或 `Exception.Data`；
+成功后清除旧失败信息。发现摘要不一致时核对发布镜像、审批清单和该节点的实际依赖，
+不可为恢复调用而跳过校验或从未经审核的请求值更新审批。
 
 ## API 排队与容器重建后的事故证据
 
