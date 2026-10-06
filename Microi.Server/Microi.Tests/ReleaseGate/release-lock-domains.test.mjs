@@ -89,6 +89,21 @@ test('actual legacy Agent subprocess is recognized; platform proceeds without mo
         assert.equal(fs.readFileSync(path.join(lock,'owner.env'),'utf8'),original);
     }finally{child.kill();await new Promise(resolve=>child.once('exit',resolve));fs.rmSync(root,{recursive:true,force:true});}
 });
+for (const sameCwd of [true,false]) test('relative legacy Agent Python build entry requires its actual workspace cwd: '+sameCwd,async()=>{
+    const root=fixture(), foreign=fixture(), cwd=sameCwd?root:foreign;
+    const relative='.tmp/agent-test/build-windows-under-transfer.py',script=path.join(cwd,relative);
+    fs.mkdirSync(path.dirname(script),{recursive:true});fs.writeFileSync(script,'setInterval(()=>{},1000);');
+    const child=spawn(process.execPath,[relative],{cwd,stdio:'ignore'});
+    try {
+        await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
+        const lock=owner(root,'release.lock',`pid=${child.pid}\nworkspace=${root}\ntask=agent-test-release\n`);
+        const before=fs.readFileSync(path.join(lock,'owner.env'),'utf8');
+        if(sameCwd && process.platform!=='win32')assertReleaseAvailable(root,'platform');
+        else assert.throws(()=>assertReleaseAvailable(root,'platform'),/被占用/);
+        assert.throws(()=>assertReleaseAvailable(root,'agent'),/被占用/);
+        assert.equal(fs.readFileSync(path.join(lock,'owner.env'),'utf8'),before);
+    }finally{child.kill();await new Promise(resolve=>child.once('exit',resolve));fs.rmSync(root,{recursive:true,force:true});fs.rmSync(foreign,{recursive:true,force:true});}
+});
 test('actual CLI blocks platform restart but permits Agent under a platform lock',()=>withFixture(root=>{
     acquireReleaseLock(root,'platform',process.pid,token);
     const blocked=spawnSync(process.execPath,[tool,'assert','platform',root],{encoding:'utf8'});

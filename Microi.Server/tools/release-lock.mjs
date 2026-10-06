@@ -37,6 +37,18 @@ function command(pid) {
     return '';
 }
 function normalized(value) { const text = value.replaceAll('\\', '/'); return process.platform === 'win32' ? text.toLowerCase() : text; }
+function processDirectory(pid) {
+    if (process.platform === 'linux') {
+        try { return fs.realpathSync('/proc/' + Number(pid) + '/cwd'); } catch { return ''; }
+    }
+    if (process.platform === 'darwin') {
+        const result = spawnSync('/usr/sbin/lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], { encoding: 'utf8', timeout: 5000 });
+        const value = result.status === 0 ? result.stdout.split(/\r?\n/).find(line => line.startsWith('n'))?.slice(1) : '';
+        try { return value ? fs.realpathSync(value) : ''; } catch { return ''; }
+    }
+    return ''; // Windows 不能证明相对工作目录时只接受已核验的绝对入口。
+}
+
 function verifiedLegacyAgent(owner, workspace) {
     // 旧锁只有 task 标签不足以跨域放行；还要核验共享状态目录与真实进程中的 Agent 入口。
     if (!owner.workspace || !(owner.domain === 'agent' || /^(agent-|microi-code)/i.test(owner.task || ''))) return false;
@@ -46,8 +58,23 @@ function verifiedLegacyAgent(owner, workspace) {
     } catch { return false; }
     const text = normalized(command(owner.pid));
     const root = normalized(path.resolve(owner.workspace)) + '/';
-    return text.includes(root + normalized('Microi.Agent/')) ||
-        (text.includes(root + '.tmp/agent-') && /\.tmp\/agent-[^/\s]+\/(?:run-release\.py|build-[^\s]+\.sh|publish-[^\s]+\.(?:py|mjs|sh))(?=[\s"']|$)/.test(text));
+    if (text.includes(root + normalized('Microi.Agent/'))) return true;
+    const entry = /(?:^|\s)["']?((?:[^\s"']*\/)?\.tmp\/agent-[^/\s]+\/(?:run-release\.py|(?:build|publish)-[^/\s"']+\.(?:py|mjs|sh)))(?=[\s"']|$)/.exec(text)?.[1];
+    if (!entry) return false;
+    let resolved;
+    if (path.isAbsolute(entry)) resolved = path.resolve(entry);
+    else {
+        // Agent 旧入口既可能用绝对路径，也可能从真实工作区运行相对路径的阶段脚本。
+        const cwd = processDirectory(owner.pid);
+        try { if (!cwd || normalized(cwd) !== normalized(fs.realpathSync(owner.workspace))) return false; }
+        catch { return false; }
+        resolved = path.resolve(cwd, entry);
+    }
+    try {
+        const actual = normalized(fs.realpathSync(resolved));
+        const trusted = normalized(fs.realpathSync(owner.workspace)) + '/.tmp/agent-';
+        return actual.startsWith(trusted) && fs.statSync(resolved).isFile();
+    } catch { return false; }
 }
 export function inspectLocks(workspace) {
     const state = path.join(path.resolve(workspace), '.tmp', 'microi-process-state');
