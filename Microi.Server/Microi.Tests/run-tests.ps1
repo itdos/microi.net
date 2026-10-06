@@ -316,6 +316,10 @@ if ($Mode -eq "Full") {
     node (Join-Path $testRoot 'FullStack\incident-observability-component.mjs') $ResultsDirectory
     if ($LASTEXITCODE -ne 0) { throw "Incident evidence browser component gate failed with exit code $LASTEXITCODE." }
 
+    Write-Host "Validating visible keyboard focus against the actual frontend host styles..."
+    node (Join-Path $testRoot 'FullStack\button-keyboard-focus.component.mjs') $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw "Button keyboard-focus browser component gate failed with exit code $LASTEXITCODE." }
+
     Write-Host "Validating real login and notification-center maintenance in isolated browser contexts..."
     node (Join-Path $testRoot 'FullStack\notification-center.e2e.mjs') $ResultsDirectory
     if ($LASTEXITCODE -ne 0) { throw "Notification-center browser release gate failed with exit code $LASTEXITCODE." }

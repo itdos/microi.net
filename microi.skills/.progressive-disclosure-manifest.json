@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-06T14:26:47.295Z",
+  "generatedAt": "2026-10-06T17:29:39.053Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,11 +169,11 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "15b11fda32528b4d215313f674d41bd334f1a1b894a67e6358bfffb939e2b91f",
-      "originalLines": 702,
+      "originalSha256": "da358a1c173fde84e12eee0d4e3f21e720c544da108b1d6f765818b49ce716f5",
+      "originalLines": 703,
       "prefixSha256": "26b1774955c0d963f8debc78d6cd1caafb4ae9e0e14685b0c1541897b28ad354",
       "prefixBytes": 1348,
-      "entryLines": 244,
+      "entryLines": 245,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
@@ -211,8 +211,8 @@
           "id": "microi-client-frontend-004",
           "ordinal": 7,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "409130f5ad663cf48aac55db1ec2b5eea5f4513114ca6abc7e470f39208402d0",
-          "lines": 42,
+          "sha256": "ab17865c6032884ccd896a0eb62387cf7f89edcf337c024f2251563f3bd0e4d9",
+          "lines": 43,
           "heading": "7. 验证建议"
         },
         {
