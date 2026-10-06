@@ -41,3 +41,16 @@ test('CSV protects formulas, escapes quotes, and exports server authorized rows 
 test('fleet totals count every authorized target once and exclude unknown metrics',()=>{const v=summarizeUsage([{Id:'a',Status:'Ready',Forms:3,Users:0,CollectedAt:'2026-10-05T12:00:00Z'},{Id:'b',Status:'Partial',Users:7,CollectedAt:'2026-10-05T11:00:00Z'},{Id:'c',Status:'Unavailable',Forms:999},{Id:'a',Status:'Ready',Forms:100},{Id:'outside',Status:'Ready',Forms:999}],[{Id:'a',ReferralUserId:'sales-a'},{Id:'b',ReferralUserId:'sales-a'},{Id:'c',ReferralUserId:'sales-b'}]);assert.equal(v.Total,3);assert.equal(v.Readable,2);assert.deepEqual(v.Metrics.Forms,{Value:3,Covered:1});assert.deepEqual(v.Metrics.Users,{Value:7,Covered:2});assert.deepEqual(v.Metrics.ApiEngines,{Value:null,Covered:0});assert.equal(v.OldestCollectedAt,'2026-10-05T11:00:00Z');assert.equal(v.Team['sales-a'].Readable,2);assert.equal(v.Team['sales-b'].Metrics.Forms.Value,null)})
 test('an actually empty authorized scope has zero totals',()=>{const v=summarizeUsage([],[]);assert.equal(v.Total,0);assert.deepEqual(v.Metrics.Forms,{Value:0,Covered:0})})
 test('fleet totals reject non numeric, negative and infinite metrics',()=>{const v=summarizeUsage([{Id:'a',Status:'Ready',Forms:'10',Users:-1,Menus:Infinity}],[{Id:'a'}]);for(const key of ['Forms','Users','Menus'])assert.equal(v.Metrics[key].Value,null)})
+
+test('theme text remains readable on page, card and tinted navigation for custom light and dark colors',async()=>{
+ const {promotionTheme}=await import('../src/saas-promotion-model.js')
+ const rgb=value=>{if(value.startsWith('#')){const hex=value.length===4?[...value.slice(1)].map(n=>n+n).join(''):value.slice(1);return hex.match(/../g).map(n=>parseInt(n,16))}return value.match(/[\d.]+/g).slice(0,3).map(Number)}
+ const lum=c=>c.map(n=>n/255).map(n=>n<=.04045?n/12.92:((n+.055)/1.055)**2.4).reduce((s,n,i)=>s+n*[.2126,.7152,.0722][i],0)
+ const ratio=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05)
+ for(const mode of ['light','dark'])for(const color of ['#2563EB','#F59E0B','#FFFFFF','#008000','#000000']){
+  const theme=promotionTheme({themeMode:mode,themeColor:color,themePrimaryText:color,themeOnPrimary:'#fff'})
+  const surface=rgb(theme['--sp-surface']),primary=rgb(theme['--sp-primary']),backgrounds=[surface,rgb(theme['--sp-bg']),primary.map((n,i)=>n*.12+surface[i]*.88)]
+  for(const key of ['--sp-text','--sp-muted','--sp-primary-text','--sp-success','--sp-warning','--sp-danger'])for(const background of backgrounds)assert.ok(ratio(rgb(theme[key]),background)>=4.5,`${mode} ${color} ${key}`)
+  assert.ok(ratio(rgb(theme['--sp-on-primary']),primary)>=4.5)
+ }
+})

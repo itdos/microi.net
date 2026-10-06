@@ -33,10 +33,38 @@ export function safeTaskSnapshot(value) {
   if(!value||typeof value!=='object'||typeof value.RequestId!=='string'||typeof value.ProgressToken!=='string')return null
   return { RequestId:value.RequestId,ProgressToken:value.ProgressToken,TaskId:String(value.TaskId||'') }
 }
+function rgb(value) {
+  const hex=String(value).match(/^#([a-f\d]{3}|[a-f\d]{6})$/i)
+  if(hex){const s=hex[1].length===3?[...hex[1]].map(c=>c+c).join(''):hex[1];return [0,2,4].map(i=>parseInt(s.slice(i,i+2),16))}
+  const match=String(value).match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i)
+  return match?match.slice(1,4).map(Number):null
+}
+function contrast(a,b) {
+  const lum=c=>c.map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0)
+  const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)
+}
+const mix=(a,b,weight)=>a.map((v,i)=>v*weight+b[i]*(1-weight))
+function readableTone(value,backgrounds,dark,fallback) {
+  const source=rgb(value)||rgb(fallback),target=dark?[255,255,255]:[0,0,0]
+  for(let step=0;step<=20;step++){
+    const tone=mix(target,source,step/20).map(Math.round)
+    if(backgrounds.every(bg=>contrast(tone,bg)>=4.5))return `rgb(${tone.join(', ')})`
+  }
+  return dark?'#fff':'#000'
+}
 export function promotionTheme(context={}) {
   const dark=context.themeMode==='dark', t=context.themeTokens||{}
-  return { '--sp-primary':context.themeColor||'#337af5','--sp-primary-text':context.themePrimaryText||context.themeColor||'#2563d7','--sp-on-primary':context.themeOnPrimary||'#fff',
-    '--sp-bg':t.background|| (dark?'#111923':'#f3f6fb'),'--sp-surface':t.surface||(dark?'#1b2533':'#fff'),
-    '--sp-text':t.textPrimary||(dark?'#eef3fb':'#18273d'),'--sp-muted':t.textSecondary||(dark?'#b0bed2':'#64758c'),
+  const primary=context.themeColor||'#337af5',bg=t.background||(dark?'#111923':'#f3f6fb'),surface=t.surface||(dark?'#1b2533':'#fff')
+  const surfaceRgb=rgb(surface)||rgb(dark?'#1b2533':'#fff'),primaryRgb=rgb(primary)||rgb('#337af5')
+  const backgrounds=[rgb(bg)||surfaceRgb,surfaceRgb,mix(primaryRgb,surfaceRgb,.12)]
+  // 主色保留用户选择；正文及状态文字同时满足卡片、页面和选中菜单底色的可读性。
+  const tone=(value,fallback)=>readableTone(value,backgrounds,dark,fallback)
+  const onPrimary=rgb(context.themeOnPrimary||'#fff')
+  return { '--sp-primary':primary,'--sp-primary-text':tone(context.themePrimaryText||primary,dark?'#9ec5ff':'#2563d7'),
+    '--sp-on-primary':onPrimary&&contrast(onPrimary,primaryRgb)>=4.5?(context.themeOnPrimary||'#fff'):(contrast([255,255,255],primaryRgb)>=4.5?'#fff':'#000'),
+    '--sp-bg':bg,'--sp-surface':surface,'--sp-text':tone(t.textPrimary,dark?'#eef3fb':'#18273d'),'--sp-muted':tone(t.textSecondary,dark?'#b0bed2':'#64758c'),
+    '--sp-success':tone(dark?'#75ddb3':'#137853','#137853'),
+    '--sp-warning':readableTone(dark?'#f5c978':'#95600e',[...backgrounds,mix(rgb('#e8a33b'),surfaceRgb,.13)],dark,'#95600e'),
+    '--sp-danger':readableTone(dark?'#ffb4b4':'#b91c1c',[...backgrounds,mix(rgb('#ef6970'),surfaceRgb,.1)],dark,'#b91c1c'),
     '--sp-border':t.border||(dark?'#354357':'#e3eaf4') }
 }
