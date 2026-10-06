@@ -242,6 +242,14 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 node --test $fileCabinetOfficeTest
 if ($LASTEXITCODE -ne 0) { throw "File-cabinet Office regression tests failed with exit code $LASTEXITCODE." }
 
+# Full 的 restore/build/test/list package 全部继承同一 SDK 输出目录。
+# API 与 PC 可并行 Full，不写对方或长期开发服务的 bin/obj；只修改本 PowerShell 子进程环境。
+if ($Mode -eq 'Full') {
+    $env:ArtifactsPath = [IO.Path]::GetFullPath((Join-Path $ResultsDirectory '.net-artifacts'))
+    $env:UseArtifactsOutput = 'true'
+    Write-Host "Isolated Full build artifacts: $env:ArtifactsPath"
+}
+
 Write-Host "Restoring Microi.Tests with one restore worker..."
 dotnet restore $project --disable-parallel --force-evaluate -m:1 -nr:false -p:BuildInParallel=false -v:minimal
 if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed with exit code $LASTEXITCODE." }
@@ -307,6 +315,10 @@ if ($Mode -eq "Full") {
     Write-Host "Validating incident evidence rendering, storage failures and mobile layout..."
     node (Join-Path $testRoot 'FullStack\incident-observability-component.mjs') $ResultsDirectory
     if ($LASTEXITCODE -ne 0) { throw "Incident evidence browser component gate failed with exit code $LASTEXITCODE." }
+
+    Write-Host "Validating visible keyboard focus against the actual frontend host styles..."
+    node (Join-Path $testRoot 'FullStack\button-keyboard-focus.component.mjs') $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw "Button keyboard-focus browser component gate failed with exit code $LASTEXITCODE." }
 
     Write-Host "Validating real login and notification-center maintenance in isolated browser contexts..."
     node (Join-Path $testRoot 'FullStack\notification-center.e2e.mjs') $ResultsDirectory

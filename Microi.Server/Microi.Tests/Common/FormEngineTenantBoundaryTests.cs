@@ -129,6 +129,7 @@ public class FormEngineTenantBoundaryTests
     [InlineData("mci_security_access_log")]
     [InlineData("mci_security_attack_event")]
     [InlineData("mci_runtime_incident")]
+    [InlineData("mci_runtime_installation")]
     [InlineData("mci_security_ip_block")]
     [InlineData("mci_spider_account")]
     [InlineData("mci_spider_profile")]
@@ -284,6 +285,7 @@ public class FormEngineTenantBoundaryTests
     [InlineData("mci_platform_reminder_target")]
     [InlineData("mci_platform_reminder_receipt")]
     [InlineData("mci_runtime_incident")]
+    [InlineData("mci_runtime_installation")]
     public void ClientFormEngine_PlatformReminderTablesCannotReceiveOrdinaryDirectGrants(string tableName)
     {
         Assert.True(PlatformResourceSecurity.IsProtectedTable(tableName));

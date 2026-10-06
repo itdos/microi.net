@@ -190,7 +190,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=525059f87aac3236d8bfa5d7bbc3fd461618754ca3aa5fe4d7d5c133cfdffb5d -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=ab17865c6032884ccd896a0eb62387cf7f89edcf337c024f2251563f3bd0e4d9 -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）
@@ -218,12 +218,15 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 ### 菜单微服务缓存与恢复（强制）
 
+- 首次挂载分开检查资源下载与渲染：下载最多 60 秒，`beforemount` 资源齐备后才开始原有 12 秒渲染期限；不得在资源正常下载时提前销毁沙箱。成功仍要求真实可见 DOM，保留一次自愈与旧实例保护。回归覆盖超过 12 秒的真实下载、下载停滞、渲染停滞和陈旧实例事件。
+
 - 动态菜单宿主的 Vue 路由保持 `keepAlive:false`，由 `<micro-app keep-alive>` 独占运行时状态；契约固定为 `runtime-keep-alive`，禁止 Vue `KeepAlive` 和 micro-app 双层缓存。
 - 每个顶部 Tab 按完整路由生成稳定实例身份，最多保留 5 个隐藏实例并按 LRU 淘汰。关闭 Tab、退出登录、Token/角色变化以及版本或入口变化时必须精确销毁对应运行时。
 - 恢复时强制同步宿主上下文并检查真实可见 DOM；子应用监听 `appstate-change`，在 `afterhidden` 幂等暂停轮询、WebSocket 和观察器，在 `aftershow` 幂等恢复并重新测量布局，同时保留用户输入、筛选、滚动和内部路由。
 - 修改宿主、TagsView 或权限路由时，必须同时读取 [Vue3 前端微服务宿主规则](references/progressive-03-vue3-前端微服务宿主规则.md) 并运行微服务缓存契约测试。
 
 - 修改 Vue/JS 后先跑 VS Code Problems 或 `get_errors`。
+- 宿主按钮重置只作用于 `button:not(:focus-visible)`，不能用全局 `outline:none !important` 覆盖组件或微应用的键盘焦点。微应用保留自己的边框形状，焦点色使用已适配明暗表面的 `--mci-text-link`（缺省回退正文语义色），不能直接用浅品牌色。真实 Tab/Shift+Tab 回归须核对 `:focus-visible`、实际 `outline-style`、宽度、颜色与至少 3:1 对比度；`outline-style:none` 即使宽度非零也不可见。使用阴影焦点时另验实际 `box-shadow`，不能只看焦点状态。平台样式组件回归归 Full，应用自身按钮继续在真实业务页面验收。
 - 影响核心前端时跑 `Microi.Client` 的 `npm run build`。
 - 如果改了工作流、表单保存、按钮 V8，建议用实际 `sys_menu` 配置测试：
   - `FormBtns` 是否出现在表单右上角/FAB。

@@ -1,10 +1,12 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidateSet('Status', 'PrepareRelease', 'StopBackend', 'StopFrontend')]
+    [ValidateSet('Status', 'AssertServiceStart', 'PrepareRelease', 'StopBackend', 'StopFrontend')]
     [string]$Action = 'Status',
     [string]$WorkspaceRoot = '',
     [int]$BackendPort = 61501,
-    [int]$FrontendPort = 61500
+    [int]$FrontendPort = 61500,
+    [ValidateSet('api', 'pc', 'all')]
+    [string]$ReleaseScope = 'all'
 )
 
 # 只读盘点：
@@ -25,7 +27,7 @@ $normalizedWorkspace = $resolvedWorkspace.Replace('/', '\').ToLowerInvariant()
 $backendRoot = (Join-Path $resolvedWorkspace 'Microi.Server\Microi.net.Api').Replace('/', '\').ToLowerInvariant()
 $frontendRoot = (Join-Path $resolvedWorkspace 'Microi.Client').Replace('/', '\').ToLowerInvariant()
 $releaseOutput = Join-Path $resolvedWorkspace 'Microi.Server\Microi.net.Api\bin\Release'
-$releaseLockDirectory = Join-Path $resolvedWorkspace '.tmp\microi-process-state\release.lock'
+$releaseLockTool = Join-Path $PSScriptRoot 'release-lock.mjs'
 $processCurrentDirectoryCache = @{}
 if (-not $isWindowsHost) {
     # POSIX 身份保留路径大小写；命令行或 CWD 无法回读时仍失败关闭。
@@ -547,16 +549,10 @@ function Show-Status {
     $frontendIds = @(Get-ListeningProcessIds $FrontendPort)
 
     Write-Info "工作区：$resolvedWorkspace"
-    if (Test-Path -LiteralPath $releaseLockDirectory) {
-        $ownerFile = Join-Path $releaseLockDirectory 'owner.env'
-        $ownerText = '无 owner.env'
-        if (Test-Path -LiteralPath $ownerFile -PathType Leaf) {
-            $ownerText = ((Get-Content -LiteralPath $ownerFile -Encoding UTF8 -ErrorAction SilentlyContinue) -join '，')
-        }
-        Write-Info "发布互斥锁：存在（发布进行中或上次异常退出），$ownerText"
-    }
-    else {
-        Write-Info '发布互斥锁：无'
+    $lockJson = & node $releaseLockTool status platform $resolvedWorkspace
+    if ($LASTEXITCODE -ne 0) { throw '无法核验发布锁范围。' }
+    foreach ($releaseLock in @($lockJson | ConvertFrom-Json)) {
+        Write-Info "发布锁 $($releaseLock.domain)：存在=$($releaseLock.exists)，路径=$($releaseLock.path)"
     }
     if ($backendIds.Count -eq 0) {
         Write-Info "后端端口 $BackendPort：未监听"
@@ -625,7 +621,22 @@ function Invoke-StopFrontend([hashtable]$Snapshot) {
 }
 
 try {
+    # 服务与发布按产品范围匹配；官网与 Agent 不阻塞 API/PC 的启动或清理。
+    $scopes = switch ($Action) {
+        'StopBackend' { @('api') }
+        'StopFrontend' { @('pc') }
+        default { if ($ReleaseScope -eq 'all') { @('api', 'pc') } else { @($ReleaseScope) } }
+    }
+    if ($Action -ne 'Status') {
+        $ownerToken = if ($Action -eq 'PrepareRelease') { $env:MICROI_RELEASE_LOCK_TOKEN } else { '' }
+        foreach ($scope in $scopes) {
+            & node $releaseLockTool assert $scope $resolvedWorkspace $ownerToken
+            if ($LASTEXITCODE -ne 0) { throw "$scope 发布正在进行，禁止停止或重启该范围的共享服务。" }
+        }
+    }
     switch ($Action) {
+        'AssertServiceStart' { Write-Info "服务启动锁检查通过：$($scopes -join ', ')。" }
+
         'Status' {
             Show-Status
         }
@@ -641,20 +652,19 @@ try {
             Write-Info '前端清理完成。'
         }
         'PrepareRelease' {
-            Write-Info '进入发布独占准备：只处理当前工作区的 61501 后端、61500 Vite 和额外 Release 后端。'
-            $snapshot = Get-ProcessSnapshot
-            Invoke-StopBackend $snapshot -IncludeListener
-            $snapshot = Get-ProcessSnapshot
-            Invoke-StopFrontend $snapshot
-
-            if (@(Get-ListeningProcessIds $BackendPort).Count -gt 0) {
-                throw "后端端口 $BackendPort 未释放。"
+            Write-Info "进入发布准备：仅处理所选范围 $($scopes -join ', ') 的本工作区服务。"
+            if ($scopes -contains 'api') {
+                $snapshot = Get-ProcessSnapshot
+                Invoke-StopBackend $snapshot -IncludeListener
+                if (@(Get-ListeningProcessIds $BackendPort).Count -gt 0) { throw "后端端口 $BackendPort 未释放。" }
+                Assert-ReleaseFilesUnlocked
             }
-            if (@(Get-ListeningProcessIds $FrontendPort).Count -gt 0) {
-                throw "前端端口 $FrontendPort 未释放。"
+            if ($scopes -contains 'pc') {
+                $snapshot = Get-ProcessSnapshot
+                Invoke-StopFrontend $snapshot
+                if (@(Get-ListeningProcessIds $FrontendPort).Count -gt 0) { throw "前端端口 $FrontendPort 未释放。" }
             }
-            Assert-ReleaseFilesUnlocked
-            Write-Info '发布独占准备完成；未结束 Edge/Chrome、VS Code、Playwright Test Server、数据库或 Redis。'
+            Write-Info '发布准备完成；未处理其它发布范围、浏览器、VS Code、数据库或 Redis。'
         }
     }
 }

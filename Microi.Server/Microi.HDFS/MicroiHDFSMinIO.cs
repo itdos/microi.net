@@ -479,24 +479,13 @@ namespace Microi.net
                 bucketName = clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
             }
 
-            var fileSuffix = Path.GetExtension(param.FileFullPath).ToLower();
             var objectName = param.FileFullPath.DosTrimStart('/');
             var expectedSize = param.ContentLength
                                ?? (param.FileStream.CanSeek ? param.FileStream.Length : -1L);
             if (expectedSize < 0)
                 return new DosResult(0, null, "MinIO流式上传必须提供ContentLength。");
-            //很重要，否则直接访问图片路径会直接下载，而不是直接预览
-            var contentType = "application/octet-stream";
-            if (fileSuffix == ".pdf")
-                contentType = "application/pdf";
-            else if (fileSuffix == ".gif")
-                contentType = "image/gif";
-            else if (fileSuffix == ".png")
-                contentType = "image/png";
-            else if (fileSuffix == ".bmp")
-                contentType = "image/bmp";
-            else if (fileSuffix == ".jpg" || fileSuffix == ".jpeg")
-                contentType = "image/jpeg";
+            // 网页产物与图片共用同一映射，公有/私有桶都不能把脚本样式标成二进制。
+            var contentType = ObjectStorageContentTypes.GetContentType(param.FileFullPath);
 
             try
             {

@@ -731,8 +731,13 @@
 }
 
 $sideBarWidth: 240px !important;
-button {
+// 指针点击延续旧外观；键盘 focus-visible 交给组件/微应用自己的可见焦点样式。
+button:not(:focus-visible) {
     outline: none !important;
+}
+// 微应用保留自己的焦点形状，颜色使用已适配明暗表面的可读语义色，避免浅品牌色低对比。
+[data-mci-ui-root] :is(button, a, input, select, textarea):focus-visible {
+    outline-color: var(--mci-text-link, var(--mci-text-primary, var(--el-text-color-primary))) !important;
 }
 p {
     margin-bottom: 0px;

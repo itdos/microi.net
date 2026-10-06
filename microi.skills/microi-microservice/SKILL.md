@@ -135,6 +135,8 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 回读成功还不等于页面可用：必须直接请求稳定入口、版本入口和清单内的 JS/CSS；入口 `502` 且运行时/清单存在时，优先检查 API 节点是否能通过租户 MinIO 内网端点读取公有桶对象。不要反复发布同一份产物掩盖存储读取故障。
 - 服务器暂未部署修复且普通应用产物很小时，可把 `StorageMode=db` 与内联 `ContentBase64` 作为短期恢复手段；必须明确记录为临时方案。修复部署后重新流式发布到公有 HDFS，并恢复 `StorageMode=file`。只有上一条满足严格资源策略的受信任平台启动应用允许长期保留小型数据库产物；禁止借此把普通或大体积 JS/CSS 长期放进数据库 JSON。
 - 子租户发布时，源码、版本资产、回读验签、页面与缓存全部绑定当前 Token 的 `OsClient`；禁止回退到主租户或宿主服务器默认租户。切换前必须由当前 API 节点通过该子租户 HDFS 配置读回每个版本文件并校验大小/SHA-256。
+- CDN 同一不可变对象返回 200 而 API 稳定入口返回 404 时，先检查 API 读取到的当前租户 `FileServer`（含公有桶路径）和已提交 `ReleasePrefix`，不能把默认域名回退当作恢复。配置读取必须将 dynamic 数据显式转为 object/JObject，再调用扩展方法；缺失或无效配置失败关闭。
+- HTML/JS/CSS 被对象存储标为 `application/octet-stream` 时，文件字节可能完全正确。新上传统一设置对象 MIME；运行网关只对已提交资产的空/二进制通用标签按文件路径归一，保留类型兼容、HTML 完整性、大小、哈希及 `nosniff`。需更新全部 API 节点；旧对象的 CDN 直接入口另需修正元数据或正常发布新版本，不能把 API 兼容称为 CDN 已修复。
 
 ### 宿主路由查询参数
 
@@ -238,6 +240,7 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 - 菜单微服务只有一个缓存所有者：Vue 路由宿主固定 `meta.keepAlive=false`，`<micro-app keep-alive>` 独占子应用状态。禁止把外层 Vue `KeepAlive` 打开，也禁止子应用通过随机实例名规避运行时缓存；双层缓存会产生旧宿主与当前路由竞争、无数据、永久骨架屏和白屏。
 - 每个主框架 `fullPath` 使用稳定且不泄露查询参数/Token 的实例指纹。平台最多保留 5 个菜单运行时，超过后按 LRU 销毁最久未使用的隐藏实例；Tab 仍保留，再次进入允许冷启动。关闭当前/其它/全部 Tab、访问记录淘汰、退出登录、Token 重置、角色变化、同路由版本或入口变化时必须精确 `unmountApp(name,{destroy:true,clearData:true})`。
 - 恢复隐藏实例时，宿主用 `forceSetData` 同步当前 Token、OsClient、权限、主题、路由和视口，再复核 `micro-app-body/#app` 的真实可见 DOM；失败只允许自动销毁重建一次。`hostCapabilities.lifecycle` 暴露 `cacheOwner=micro-app`、`cacheMode=runtime-keep-alive`、`maxCachedTabs=5` 和状态事件。
+- 首次加载分别判断资源下载和脚本渲染：下载有 60 秒上限，`beforemount` 表示资源齐备后才开始 12 秒渲染期限；不能在资源仍正常下载时用渲染期限销毁实例。仍以真实可见 DOM 为成功证据，保持一次自愈、旧实例与隐藏页保护，并覆盖超过 12 秒下载、下载停滞及渲染停滞的回归。
 - AI 创建或修改菜单微服务时必须生成 `appstate-change` 适配：`afterhidden` 幂等暂停轮询、WebSocket、观察器和昂贵任务；`aftershow` 重新读取宿主数据、幂等恢复任务并在下一帧重算图表/虚拟列表。隐藏时保留表单输入、筛选、滚动与内部路由，禁止清空业务状态；弹窗和表单嵌入不套用菜单页签保活。
 
 ```js

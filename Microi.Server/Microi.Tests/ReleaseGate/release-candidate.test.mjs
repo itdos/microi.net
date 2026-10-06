@@ -87,7 +87,7 @@ test('independent UniApp delivery does not invalidate PC API images but shared S
  }finally{await rm(root,{recursive:true,force:true});}
 });
 
-test('official documentation text is published by the website gate without invalidating PC API Full',async()=>{
+test('all website inputs are published by the website gate without invalidating PC API Full',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'microi-release-candidate-'));
  try{
   execFileSync('git',['init','--quiet'],{cwd:root});
@@ -96,7 +96,10 @@ test('official documentation text is published by the website gate without inval
    'microi.doc/docs/doc/more/hdfs.md',
    'microi.doc/docs/en/guide.md',
    'microi.doc/docs/.vitepress/theme/index.ts',
-   'microi.doc/scripts/build.mjs'
+   'microi.doc/scripts/build.mjs',
+   'microi.doc/package.json',
+   'Microi.Client/src/main.js',
+   'microi.skills/workspace-conventions/SKILL.md'
   ];
   for(const name of names){
    await mkdir(path.dirname(path.join(root,name)),{recursive:true});
@@ -105,7 +108,7 @@ test('official documentation text is published by the website gate without inval
   const before=await snapshotCandidate(root,['.']);
   for(const name of names)await writeFile(path.join(root,name),'after');
   assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[
-   'microi.doc/docs/.vitepress/theme/index.ts','microi.doc/scripts/build.mjs'
+   'Microi.Client/src/main.js','microi.skills/workspace-conventions/SKILL.md'
   ]);
  }finally{await rm(root,{recursive:true,force:true});}
 });

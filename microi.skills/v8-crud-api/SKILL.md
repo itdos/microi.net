@@ -10,7 +10,7 @@ description: Microi V8 CRUD 接口引擎开发。用于编写服务端 JavaScrip
 你正在开发 Microi 吾码平台的 V8 接口引擎。接口引擎是运行在服务端的 JavaScript 函数，通过 `V8.FormEngine` 操作数据库，通过 `V8.Result` 或 `return` 返回结果。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-crud-api-000 sha256=d385cc7f9c0048ae1e2263e922ec33a97e8a321bcb88df4dc72a07c269fe1829 -->
+<!-- microi-progressive:chunk id=v8-crud-api-000 sha256=522eba2beee1f0b0df087fe86f1ff70bc74b8e9f68a844a5bea1471389a0df22 -->
 ## 本地优先与版本头（必做）
 
 AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目>/接口引擎/.../*.js` 本地文件，再通过 MCP 或 VS Code 插件同步到数据库。插件提示“本地和远端不一致”时，必须先读取本地与远端代码并合并有效差异，不能盲目用任一侧覆盖另一侧。
@@ -38,7 +38,7 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 生成接口引擎代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；跨表事务、权限校验、状态机、金额/库存计算、复杂 `_Where` 条件等代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-001 sha256=a084e227eac08d48b985439268bfaaac163c0f7e04dc1bea89b8ef9bf0e2bafb -->
+<!-- microi-progressive:chunk id=v8-crud-api-001 sha256=93eb45145fcf6849628c73e51f8ae5e450532b425bf763d63587a44dc84bd7aa -->
 ## 核心规则
 
 - 接口引擎文件是纯 JavaScript（Jint 引擎，非 Node.js）
@@ -48,13 +48,14 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 - `V8.Param` 中嵌套 JSON 的 `JObject/JArray` 可能是 Jint 宿主对象，`Array.isArray` 不一定成立。需要严格数组、布尔或结构校验时，在业务入口对有界业务参数使用 `JSON.parse(JSON.stringify(V8.Param || {}))` 转为纯 JSON，再执行原字段白名单、类型、大小与权限校验；不能把只有 `length` 的对象当数组。只规范化业务参数，不复制或信任客户端身份、`V8.CurrentUser`、`V8.DbTrans` 或 `V8.WF`；大文件继续使用专用文件通道。验收须同时覆盖真实 HTTP 宿主集合和离线 JavaScript 数组。
 - 通过 `V8.CurrentUser` 获取当前登录用户信息
 - 同租户 `V8.ApiEngine.Run` 嵌套调用缺少身份时，后端从本次重新验证的 DiyToken 恢复独立身份副本；不要让客户端补传 `_CurrentUser`。跨租户公开调用清空原租户身份，匿名仍匿名，可信后台任务保留任务身份。旧节点须更新包含修复的后端；实际验收同时覆盖普通账号 HTTP 嵌套调用、跨租户、匿名与后台任务，不能只用离线夹具证明上线。
+- 高精度 `decimal(p,s)` / 带小数位 `number(p,s)` 的金额、数量、换算率使用无分组、英文小数点的十进制字符串，避免先 `Number()` / `parseFloat()` 或浮点运算丢位。后端使用固定文化解析，拒绝逗号分组、本地化逗号小数、指数、非数字和越界；业务层仍须按字段约束精度、小数位、范围和权限。空值兼容不变，不能从舍入后的历史值重建精度或擅自回填。用真实 HTTP、数据库写后读与目标租户验收，不能把 CLR 参数绑定冒充数据库成功。
 - 返回结果统一格式：`{ Code: 1, Data: any, Msg: '成功' }`
 - 所有 FormEngine 方法在服务器端支持第三个参数传入 `V8.DbTrans`（事务对象）
 - 服务端调用 FormEngine 默认**不触发**表单 V8 事件，加 `_InvokeType: 'Client'` 才触发
 - 接口内 `return Code=1` 自动提交事务、`Code≠1` 自动回滚事务，**禁止**手动 Commit/Rollback
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-002 sha256=b1ec527e9a5e97b93ed9d59fdd9cd1dfae74149ab438d1a4a9e3b198976bb6a6 -->
+<!-- microi-progressive:chunk id=v8-crud-api-002 sha256=8a2aee7581fd589e15b219f2f79fdb442cb29adba667fc76e1e2e7a1f3bb1b43 -->
 ## 性能底线（必须自检）
 
 - 写接口引擎前必须先做数据访问计划：需要哪些表、哪些字段、预计数据量、是否分页、是否需要缓存。
@@ -74,7 +75,7 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 - 为便于用户核对，可以保存经过空白归一化的用户输入短摘要；摘要按 Unicode 文本元素截取，不能截断 emoji 或代理对，也不要把完整请求 JSON 当摘要。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-003 sha256=d46768bbaaf8b2ebfdd38e09d11e886b135cb65e78984dbfa67d75ec5f947175 -->
+<!-- microi-progressive:chunk id=v8-crud-api-003 sha256=a60257da3c153170b731b125c9b58614fe84030645c343688f70c9d060b0e0eb -->
 ## DosResult 状态码
 
 | Code | 含义 |
@@ -94,7 +95,7 @@ if (r.Code !== 1) return r;
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-004 sha256=6d58584cabd1659ae3af6cbddb797df2c0844c99fd8d2627d02a9c0eae98e8c2 -->
+<!-- microi-progressive:chunk id=v8-crud-api-004 sha256=4efce43d196d67f3b6125747c645477442235b39ecf0ddfca325fb3bd1f444ae -->
 ## 全局日期函数
 
 ```javascript
@@ -104,7 +105,7 @@ DateAdd(new Date(), 'd', 7, 'yyyy-MM-dd')     // 加减（s/m/h/d/w/q/M/y）
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-005 sha256=35220022799bbed7f9b3d82fe14dc0855aa8f77d0640ac411c61d222d02b0eda -->
+<!-- microi-progressive:chunk id=v8-crud-api-005 sha256=f3d8f0628ddd51845fc700fe63bfa037480f131484c8238874d380cb05a89a92 -->
 ## 查询单条
 
 ```javascript
@@ -126,7 +127,7 @@ return { Code: 1, Data: result.Data };
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-crud-api-006 sha256=510588ad14503caff0a92c614f0e7453bdd343a1e22711c6c5a2b3f8893b5a8d -->
+<!-- microi-progressive:chunk id=v8-crud-api-006 sha256=b8ae0ea6ccd746994ea5fa74f4ae4e6163c1ffd09eb141d6fd5863d77d36f35b -->
 ## 新增
 
 ```javascript
