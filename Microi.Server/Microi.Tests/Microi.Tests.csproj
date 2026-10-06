@@ -88,6 +88,7 @@
     <Compile Remove="Common\LicenseKeyTrustTests.cs" />
     <Compile Remove="Common\LicenseAccountEntitlementTests.cs" />
     <Compile Remove="Common\TenantLicensePolicyTests.cs" />
+    <Compile Remove="Common\FixedStepOfficialIdentityHostTests.cs" />
     <Compile Remove="Common\PlatformReminderBoundaryTests.cs" />
   </ItemGroup>
 

@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-export-import-007 sha256=33d817757174d42d2833f2ce3bbca6d8da341938f242d48bdad3891d6ab25230 -->
+<!-- microi-progressive:chunk id=v8-export-import-007 sha256=d2958751b32d5143693cbdb6fb72aeca97f450c80c360aa7d826d4f6595c0ab1 -->
 ## PowerPoint 导出
 
 PowerPoint 的幻灯片尺寸、图片/表格位置与宽高单位均为英寸，默认画布为 16:9（13.333 × 7.5）。
@@ -67,7 +67,7 @@ return {
 `Layout` 支持 `TitleSlide`、`TitleAndContent`。单页支持独立覆盖 `BackgroundColor/TitleColor/TextColor/TitleFontSize/BodyFontSize`。`TextItems` 支持 `Text/Level/Bullet/Bold/Italic/FontSize/FontColor/Alignment`；表格支持位置、尺寸、列宽、表头/单元格颜色；图片支持 Base64/data URI、位置和尺寸。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-008 sha256=4dcd566dd9c5b38703831c67cc5cc2f2a99b0e7121fe2d2be2c068cfc8f739c3 -->
+<!-- microi-progressive:chunk id=v8-export-import-008 sha256=af467dae5c05433fe3be2759f48a6ed09f67be04f620791652033804535ea39c -->
 ## 完整导入模式（含进度跟踪）
 
 模块引擎【导入接口替换】+【导入进度接口替换】可实现实时进度提示。
@@ -139,7 +139,7 @@ return { Code: 1, Data: stepStr ? JSON.parse(stepStr) : [] };
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-009 sha256=ba923bb2b464910d063e94a6f88dbb9b3229739cb5e39611c8cf275bc77b743c -->
+<!-- microi-progressive:chunk id=v8-export-import-009 sha256=f1583c2154c79acea7445119be851654d0cec81620fe0c1f0fadeee90f330bbf -->
 ## 接收并下载文件（HTTP 链接转 Excel）
 
 ```javascript
@@ -152,7 +152,7 @@ var base64 = System.Convert.ToBase64String(bytes);
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-010 sha256=372a60e928fe1b46d20ed8a7b8bd3736b2bc96465d6e6645c4ae849ca71ce987 -->
+<!-- microi-progressive:chunk id=v8-export-import-010 sha256=0df463f76ba60100c087364b48dab1886d1315b093577ea9485471b34a7a3f6c -->
 ## 子表导入自动关联主表
 
 当单独导入 `TableChild` 子表时，Excel 经常没有主表 Id，只带项目编号、客户名称等业务字段。默认导入引擎支持通过子表控件配置批量反查主表，并自动补齐子表外键。

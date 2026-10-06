@@ -5369,7 +5369,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       params: z
         .record(z.unknown())
         .optional()
-        .describe('Optional parameters to pass to the engine (available via V8.Param in the engine code)'),
+        .describe('接口引擎参数，原样传入 V8.Param。标准商城 export-microi-store-package / ai_app_publish_store 支持 SparseTableSelections:[{TableId,FieldIds}]：仅选既有共享表的权威字段，不接受任意正文覆盖；V3仍要求 CommittedProof + ExpectedResourceSnapshotHash，历史稀疏选集必须显式刷新。安装前先升级商城安装器并具备共享表责任包，RuntimeAssetsOnly 禁止稀疏资源。'),
       confirmExecution: z.string().optional().describe('Required because engine execution may write data. Use apiEngineKey or EXECUTE.'),
     },
     async ({ apiEngineKey, params, confirmExecution }) => {

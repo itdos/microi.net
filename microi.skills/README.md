@@ -8,7 +8,7 @@
 
 ## 包含的 Skills
 
-当前仓库包含 67 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
+当前仓库包含 68 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
 
 ### V8 引擎核心（后端）
 
@@ -90,6 +90,7 @@
 | **v8-formengine-http** | 移动端/外部系统直接调用 FormEngine HTTP 路由的约定 | `v8-formengine-http/SKILL.md` |
 | **v8-explorer-tree** | VS Code 插件 V8 资源管理器目录规范和本地文件归档 | `v8-explorer-tree/SKILL.md` |
 | **workspace-conventions** | 工作区文件放置、临时产物、项目专属目录和根目录污染防护 | `workspace-conventions/SKILL.md` |
+| **microi** | 吾码快捷入口，按任务读取工作区规则并选择已登录 MCP 连接 | `microi/SKILL.md` |
 | **microi-codex-installer** | Codex 插件立即检测、授权安装、旧 marketplace 迁移与验收 | `microi-codex-installer/SKILL.md` |
 | **microi-codex** | Codex 中连接租户、读取实时上下文并完成 Microi 等价工作流 | `microi-codex/SKILL.md` |
 | **production-readonly-audit** | 正式环境只读巡检，不改动线上数据的业务核对流程 | `production-readonly-audit/SKILL.md` |

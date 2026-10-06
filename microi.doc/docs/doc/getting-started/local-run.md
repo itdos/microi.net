@@ -165,6 +165,10 @@ Full 会依次执行：
 
 通过测试的候选源码和 Docker 构建上下文都会保存内容哈希回执，每次推送前重新校验。仅推送时没有回执或发现源码/产物变化会拒绝上传，必须重建重测，防止“当前源码测试通过、上传的却是旧 DLL/dist”。
 
+后台发行需要静态组合私有原生规则时，不能依赖根公开仓的文件清单覆盖被忽略的应用源码。发布进程设置 `MICROI_RELEASE_COMPOSITION_FILE` 指向工作区内的受控 JSON 契约，格式为 `schema:1`，包含 `properties`、`files`、`directories`、`artifacts`。`properties` 必须固定 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 四个文件路径，并与同一发布进程传给 MSBuild 的实际环境属性一致；这些文件必须同时进入 `files` 或 `directories`。
+
+`files` 列出项目、组合 targets、静态审批代码等文件；`directories` 列出应用自己的规则源码目录。契约原始正文和这些输入逐文件加入 Full 候选，新增、删除或修改均触发重新验收；禁止越界路径和符号链接，`bin/obj/dist` 等生成目录不作为源码。`artifacts` 使用 `{ "path":"publish/ApprovedRules.dll", "sha256":"<后台审批的实际DLL哈希>" }` 描述获批制品，最终 API 发布目录必须逐项匹配，缺失或不同均阻止捕获和推送。普通无私有组合的发布和 PC 制品沿用既有门禁。这些变量只供构建，不是生产 API 设置，也不授予 V8/MCP/HTTP 任意加载代码的权限。
+
 共享源码持续变化时，可将完整候选源码及依赖保存到独立发布目录，在那里运行同一 Full 和一键发布脚本。专用测试服务使用独立端口，并通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口，默认仍为 61501、61500。进程管理器继续检查 PID、命令行和工作区归属；原工作区服务不受影响。这两个变量仅用于发布脚本，不是生产 API 配置。
 
 主、子租户必须在同一维护控制面的有效租户目录中；必要时用 `MICROI_TEST_CONTROL_API_BASE`、`MICROI_TEST_CHILD_API_BASE` 指定各自入口。详细变量和测试边界见源码 `Microi.Server/Microi.Tests/README.md`，报告应区分本地候选与已部署远端的结果。
