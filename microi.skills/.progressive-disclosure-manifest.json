@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-06T06:51:08.558Z",
+  "generatedAt": "2026-10-06T08:51:59.684Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -1344,7 +1344,7 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "06fa2982a3b25c35365afdddd9a3e2a27e24413e35149728fa70d9d700a4383b",
+      "originalSha256": "385387e9756215dba21232c9f8ac6ba4c4994952a93f14cf6380d7fe1532316c",
       "originalLines": 806,
       "prefixSha256": "793ea4c951605d99e58c9f53eeff2dbee39bcaf3219a5a447a275ed84163949d",
       "prefixBytes": 1761,
@@ -1410,7 +1410,7 @@
           "id": "playwright-e2e-007",
           "ordinal": 8,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "c8d57e63b1445bea306218ccbea953412c0f20aa908fab7a0a3f4ea45602071d",
+          "sha256": "0618b12cc767395b29b18e22ca998929cb5aed87e17cd05b55da9a9962d516d4",
           "lines": 42,
           "heading": "服务自启动纪律（必做）"
         },
@@ -3196,8 +3196,8 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "b2c79a106267f2e01ceb3f18a855400b813e7d1c590aa446b872d02894764733",
-      "originalLines": 604,
+      "originalSha256": "8ee611cce0db7dd78278270ec092c03b06b667f4ffc51851464eab21934adec7",
+      "originalLines": 605,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
       "entryLines": 271,
@@ -3398,7 +3398,7 @@
           "id": "workspace-conventions-024",
           "ordinal": 24,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "4e97c278d0a813e23c2c56b11aec8b157b2b100ed6f46ea07d45dbe9954ca5aa",
+          "sha256": "a8cb1729aafd31402d1055d472a9f26439293d797c5ff2f84552d5d2a3d76162",
           "lines": 17,
           "heading": "Microi.net.Api 本地启动约定"
         },
@@ -3406,8 +3406,8 @@
           "id": "workspace-conventions-025",
           "ordinal": 25,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "07c3d729c8f1e9a2bf93ff00937e5d6eae4602d346e4f9254b03a33211ac4848",
-          "lines": 31,
+          "sha256": "d93f8884973bfe67901ed18cea6bf33172a271ed998e2cd348533516e49b43bd",
+          "lines": 32,
           "heading": "多 AI 对话共享本地服务与发布互斥（强制）"
         },
         {

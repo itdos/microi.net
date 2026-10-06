@@ -139,15 +139,15 @@ PW_HOME_PATH=/#/pages/index/index
 不要只说“代码已编译”或“需要用户自己重启后端”；除非用户明确要求不要中断当前服务，否则 AI 要主动完成重启。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=c8d57e63b1445bea306218ccbea953412c0f20aa908fab7a0a3f4ea45602071d -->
+<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=0618b12cc767395b29b18e22ca998929cb5aed87e17cd05b55da9a9962d516d4 -->
 ## 服务自启动纪律（必做）
 
 执行自动化测试、截图巡检、接口引擎回读、`/apiengine/{key}` 验收时，如果本地后端或前端不可达，不能把 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听当作任务终点。必须先自动启动所需服务，再继续完整验证。
 
 同一工作区有多个 AI 对话时，服务自启动还必须遵守共享生命周期：
 
-- 先检查 `.tmp/microi-process-state/release.lock`。发布锁存在时禁止 Playwright `webServer`、
-  自愈脚本或 AI 重新抢占 `61500/61501`；等待发布结束后重新检查。
+- 先执行 `node Microi.Server/tools/release-lock.mjs assert platform <工作区根>`。平台 `platform-release.lock` 存在时禁止 Playwright `webServer`、
+  自愈脚本或 AI 重新抢占 `61500/61501`；等待平台发布结束后重新检查。独立 `agent-release.lock` 不阻塞；旧 `release.lock` 只在真实进程确认属于 Agent 后放行，未知归属仍阻塞。
 - 端口健康且 PID/命令行属于当前工作区时直接复用，不得每个对话都无条件“先杀再启动”。
   必须重载源码时才串行重启，并在状态播报中说明旧/新 PID。
 - 本地长期后端使用项目目录中的 `dotnet run --launch-profile Microi.net.Api`，禁止把
