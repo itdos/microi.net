@@ -18,6 +18,11 @@
         </div>
         <p class="microi-code-store-install"><a href="https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge" target="_blank" rel="noopener noreferrer">微软签名 EXE 在线安装器 <span aria-hidden="true">↗</span></a><span>商店版 1.3.3 · Windows 10 2004+ / 11 · x64 · 需联网</span></p>
         <p class="microi-code-store-note">官网 Windows 完整版 1.3.6 EXE 未签名；在线安装器安装微软签名商店版。macOS 1.3.6 DMG 已签名、公证，Mac 商店尚未开放下载。</p>
+        <aside class="microi-code-repair-candidate" aria-label="Windows 安装修复候选">
+          <strong>Windows 安装修复</strong>
+          <p>1.3.6 升级目录切换失败时，可安装 1.3.7 候选复测。保留原目录与配置；Windows 真机验收待完成。</p>
+          <div><a href="https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-x64-setup.exe" target="_blank" rel="noopener noreferrer">Windows 1.3.7 安装修复候选 ↗</a><a href="https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-native-acceptance.zip" target="_blank" rel="noopener noreferrer">一键原生验收工具 ↗</a></div>
+        </aside>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
@@ -134,6 +139,7 @@ const screenshots = [
 ]
 
 const releases = [
+  { version: '1.3.7', platform: "Windows x64 候选", note: "安装目录切换修复 · 未签名测试候选 · 六项 Wine NSIS 回归通过 · Windows 原生待验收", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-x64-setup.exe", sha256: "91a5ab8d9a29382347020a0ff3e43536c0ed26d800a5d192b11fef4317853ad2" },
   { version: '1.3.6', platform: "macOS Universal", note: "启动修复 · 签名公证 · Intel 完整应用启动、重启已验收 · macOS 13.5+", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.6/requests/5f22ed5595421f9c10db4bb5930d7df17b33dc6ba6ba54a70c366c374f00f247/assets/Microi-Agent-1.3.6-mac-universal.dmg", sha256: "5d1e38ae2e4ddadf460a880daf0f2b61f352779d9943e4f584cba6f07c6fc76c" },
   { version: '1.3.6', platform: "macOS Universal ZIP", note: "启动修复自动更新包 · 已签名公证 · macOS 13.5+", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.6/requests/5f22ed5595421f9c10db4bb5930d7df17b33dc6ba6ba54a70c366c374f00f247/assets/Microi-Agent-1.3.6-mac-universal.zip", sha256: "fa450561060efee3bc5ff660cd89397c1c8a508b892ede0776e1fec1f8d43831" },
   { version: '1.3.6', platform: "Windows x64", note: "启动链路修复 · 未签名公开测试 · Windows 10/11 x64 · 原生安装待验收", url: "https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.6/requests/5f22ed5595421f9c10db4bb5930d7df17b33dc6ba6ba54a70c366c374f00f247/assets/Microi-Agent-1.3.6-windows-x64-setup.exe", sha256: "a93cbb4b15472944f68cc8b42be67cbd358e7fc436dd046b941b8bf8807ebb16" },
@@ -351,4 +357,9 @@ const visibleReleases = computed(() => releases.slice((historyPage.value - 1) * 
     padding-inline: 12px !important;
   }
 }
+</style>
+
+<style scoped>
+.microi-code-repair-candidate{margin:18px 0 0;padding:15px 17px;border:1px solid color-mix(in srgb,var(--vp-c-brand-1) 30%,var(--vp-c-divider));border-radius:12px;background:var(--vp-c-bg-soft)}
+.microi-code-repair-candidate strong{font-size:13px}.microi-code-repair-candidate p{margin:6px 0 10px;color:var(--vp-c-text-2);font-size:12px;line-height:1.7}.microi-code-repair-candidate div{display:flex;flex-wrap:wrap;gap:8px 16px}.microi-code-repair-candidate a{color:var(--vp-c-brand-1);font-size:12px;font-weight:650}
 </style>
