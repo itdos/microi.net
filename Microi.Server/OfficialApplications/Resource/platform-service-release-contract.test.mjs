@@ -30,14 +30,14 @@ function versionWeight(value) {
   return major * 1_000_000 + minor * 1_000 + patch;
 }
 
-async function collectFiles(root) {
+async function collectFiles(root, excludedDirectories = new Set()) {
   const result = [];
   async function visit(directory) {
     const entries = await readdir(directory, { withFileTypes: true });
     entries.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
     for (const entry of entries) {
       const fullPath = path.resolve(directory, entry.name);
-      if (entry.isDirectory()) await visit(fullPath);
+      if (entry.isDirectory() && !excludedDirectories.has(entry.name)) await visit(fullPath);
       else if (entry.isFile()) result.push(fullPath);
     }
   }
@@ -167,4 +167,24 @@ test("两个官方基线包携带同一份可离线启动的数据库运行产�
   assert.ok(versionWeight(storePackage.PackageInfo.Version) >= versionWeight(storeSyncBase.PackageInfo.Version));
   assert.ok(versionWeight(saasBundle.VersionNo) >= versionWeight(platformBundle(saasSyncBase).VersionNo));
   assert.ok(versionWeight(storeBundle.VersionNo) >= versionWeight(platformBundle(storeSyncBase).VersionNo));
+});
+
+test("四个内置包的源码清单必须与唯一源码根的实际字节一致", async () => {
+  const contract = await readJson("platform-service-release.json");
+  const sourceRoot = path.resolve(repositoryRoot, contract.SourceRoot);
+  const files = await collectFiles(sourceRoot, new Set(["dist", "node_modules"]));
+  assert.ok(files.length > 0);
+  const fingerprint = [];
+  for (const file of files) {
+    const bytes = await readFile(file);
+    fingerprint.push(`${path.relative(sourceRoot, file).replaceAll("\\", "/")}\t${sha256(bytes)}\t${bytes.length}`);
+  }
+  const actualSourceManifestHash = sha256(fingerprint.join("\n"));
+  for (const target of contract.PackageTargets) {
+    const model = JSON.parse(await readFile(path.resolve(repositoryRoot, target), "utf8"));
+    const bundle = platformBundle(model);
+    assert.ok(bundle, `${target} 缺少平台微服务`);
+    const manifest = JSON.parse(bundle.MicroService.AssetManifestJson);
+    assert.equal(manifest.SourceManifestHash, actualSourceManifestHash, `${target} 声明的发布源码已漂移`);
+  }
 });

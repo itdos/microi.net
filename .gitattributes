@@ -13,3 +13,6 @@ microi.uniapp/resources/xjy/customer-contract-totals/engine.js text eol=lf
 # Skills 渐进披露按原始 UTF-8 字节验签，跨平台 checkout 固定 LF。
 microi.skills/**/*.md text eol=lf
 microi.skills/.progressive-disclosure-manifest.json text eol=lf
+
+# Vue 生产样式标识和发布源码清单依赖原始字节；平台微服务按 Git 记录原样检出。
+Microi.Server/OfficialApplications/PlatformService/** -text
