@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-06T08:51:59.684Z",
+  "generatedAt": "2026-10-06T12:54:27.511Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -3196,7 +3196,7 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "8ee611cce0db7dd78278270ec092c03b06b667f4ffc51851464eab21934adec7",
+      "originalSha256": "c90a828864795008f95298603ce0402aa9095bfa6543be33c6cbfbdf48cde1d3",
       "originalLines": 605,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
@@ -3230,7 +3230,7 @@
           "id": "workspace-conventions-003",
           "ordinal": 3,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "f11353ab84b85f319d592dac979e9a44fac3bc5aa50f827ad5aaa728f83fa18d",
+          "sha256": "66922955adb5ff6198efefd6d4d8d8f6525ef7559663ea034e86e1e45f89eb9f",
           "lines": 19,
           "heading": "本地资源与 OOM 保护规范（强制）"
         },
@@ -3398,7 +3398,7 @@
           "id": "workspace-conventions-024",
           "ordinal": 24,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "a8cb1729aafd31402d1055d472a9f26439293d797c5ff2f84552d5d2a3d76162",
+          "sha256": "92c453b5fafa36d68098b3da5817d0de260a3cf454d8cae63f71a3f65e57bbdc",
           "lines": 17,
           "heading": "Microi.net.Api 本地启动约定"
         },
@@ -3406,7 +3406,7 @@
           "id": "workspace-conventions-025",
           "ordinal": 25,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "d93f8884973bfe67901ed18cea6bf33172a271ed998e2cd348533516e49b43bd",
+          "sha256": "eb8ddca8c6e3ece08c03b84f78bfcf16e3c0d08397534c74d93c15b40996af03",
           "lines": 32,
           "heading": "多 AI 对话共享本地服务与发布互斥（强制）"
         },

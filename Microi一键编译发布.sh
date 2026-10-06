@@ -163,7 +163,12 @@ stop_active_client_build() {
 
 release_workspace_lock() {
     [ "$MICROI_RELEASE_LOCK_HELD" != true ] && return 0
-    node "$MICROI_RELEASE_WORKSPACE/Microi.Server/tools/release-lock.mjs" release platform "$MICROI_RELEASE_WORKSPACE" "$MICROI_RELEASE_OWNER_PID" "$MICROI_RELEASE_LOCK_TOKEN" || return 1
+    local _domain _failed=false
+    for _domain in "${MICROI_RELEASE_LOCK_DOMAINS[@]}"; do
+        node "$MICROI_RELEASE_WORKSPACE/Microi.Server/tools/release-lock.mjs" release "$_domain" "$MICROI_RELEASE_WORKSPACE" "$MICROI_RELEASE_OWNER_PID" "$MICROI_RELEASE_LOCK_TOKEN" || _failed=true
+    done
+    [ "$_failed" = false ] || return 1
+    MICROI_RELEASE_LOCK_DOMAINS=()
     MICROI_RELEASE_LOCK_HELD=false
 }
 
@@ -171,16 +176,29 @@ acquire_workspace_lock() {
     MICROI_RELEASE_WORKSPACE="$PWD"
     MICROI_RELEASE_OWNER_PID="${BASHPID:-$$}"
     MICROI_RELEASE_LOCK_TOKEN=$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')
-    node "$PWD/Microi.Server/tools/release-lock.mjs" acquire platform "$PWD" "${BASHPID:-$$}" "$MICROI_RELEASE_LOCK_TOKEN" || print_fail "平台发布锁被占用，已停止本次发布。"
-    export MICROI_RELEASE_LOCK_TOKEN
-    MICROI_RELEASE_LOCK_DIR="$PWD/.tmp/microi-process-state/platform-release.lock"
+    MICROI_RELEASE_LOCK_DOMAINS=()
+    local _requested=() _domain
+    if [ "$BUILD_BACKEND" = true ] || [ ${#SELECTED_API_PLANS[@]} -gt 0 ]; then _requested+=(api); fi
+    if [ "$BUILD_CLIENT" = true ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then _requested+=(pc); fi
+    if [ "$PUBLISH_DOC" = true ]; then _requested+=(website); fi
+    # Full-only 同时验收 PC/API；普通单项发布仅持有自身范围。
+    if [ "$MICROI_FULL_ONLY" = true ]; then _requested=(api pc); fi
     MICROI_RELEASE_LOCK_HELD=true
-    print_info "已取得平台发布锁；Agent 独立发布可同时执行，平台服务重启仍需等待本次发布结束。"
+    for _domain in "${_requested[@]}"; do
+        if ! node "$PWD/Microi.Server/tools/release-lock.mjs" acquire "$_domain" "$PWD" "$MICROI_RELEASE_OWNER_PID" "$MICROI_RELEASE_LOCK_TOKEN"; then
+            release_workspace_lock || return 1
+            print_fail "$_domain 发布锁被占用，已释放本次取得的锁并停止发布。"
+            return 1
+        fi
+        MICROI_RELEASE_LOCK_DOMAINS+=("$_domain")
+    done
+    export MICROI_RELEASE_LOCK_TOKEN
+    print_info "已取得发布锁：${MICROI_RELEASE_LOCK_DOMAINS[*]}；API、PC、官网、Agent 各自独立，同类发布互斥。"
 }
 
 prepare_release_workspace() {
     if ! is_windows_shell; then
-        print_info "非 Windows 环境无需处理 DLL 文件锁；工作区发布互斥锁仍然生效。"
+        print_info "非 Windows 环境无需处理 DLL 文件锁；所选发布范围的互斥锁仍然生效。"
         return 0
     fi
 
@@ -207,9 +225,12 @@ prepare_release_workspace() {
         _workspace_windows_path=$(cygpath -w "$PWD")
     fi
 
+    local _scope=all
+    if [ "$BUILD_BACKEND" = true ] && [ "$BUILD_CLIENT" != true ]; then _scope=api; fi
+    if [ "$BUILD_CLIENT" = true ] && [ "$BUILD_BACKEND" != true ]; then _scope=pc; fi
     "$_powershell_cmd" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass \
         -File "$_manager_windows_path" \
-        -Action PrepareRelease \
+        -Action PrepareRelease -ReleaseScope "$_scope" \
         -WorkspaceRoot "$_workspace_windows_path" \
         -BackendPort "${MICROI_RELEASE_BACKEND_PORT:-61501}" \
         -FrontendPort "${MICROI_RELEASE_FRONTEND_PORT:-61500}" </dev/null
@@ -968,13 +989,13 @@ sleep 1
 # 开始执行
 # ══════════════════════════════════════════════════════════════
 
-# 测试构建也使用共享输出，先取得独占权；服务保持运行供业务回归使用。
+# 按所选产品取得锁；Full 构建使用本次结果目录隔离，服务保持运行供业务回归。
 PLATFORM_DOCKER_SELECTED=false
 if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then
     PLATFORM_DOCKER_SELECTED=true
 fi
 if [ "$MICROI_FULL_ONLY" = true ] || [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ] || [ "$PLATFORM_DOCKER_SELECTED" = true ]; then
-    print_phase "取得工作区发布独占权"
+    print_phase "取得所选范围发布独占权"
     acquire_workspace_lock
 fi
 
@@ -1070,7 +1091,7 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
     fi
     if ! "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
         -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode Full -Configuration Release -SolutionPath "$SLN_FILE" \
-        -ResultsDirectory "$PWD/.tmp/microi-release-gate/$(date +%Y%m%d-%H%M%S)"; then
+        -ResultsDirectory "$PWD/.tmp/microi-release-gate/$(date +%Y%m%d-%H%M%S)-$$"; then
         print_fail "全量测试未通过；本次版本仅在本地准备，已停止官方应用资源写入和平台发布。请修复后重跑，禁止跳过失败用例。"
     fi
     if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
@@ -1080,19 +1101,17 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
 fi
 
 # 插件发行修复等需要复验 Full，但不能重新生成或覆盖已成功发布的不可变平台制品。
-# 复用上方相同的独占锁、候选冻结、完整用例及漂移检查；不提供跳过或放宽门禁的路径。
+# 复用上方 PC/API 范围锁、候选冻结、完整用例及漂移检查；不提供跳过或放宽门禁的路径。
 if [ "$MICROI_FULL_ONLY" = true ]; then
     print_success "完整 Full 及候选一致性验收完成；未升版、未改写发行目录、未上传 NuGet/Docker/官网或官方应用。"
     exit 0
 fi
 
-# 编译/发布会改写共享输出目录，必须先取得工作区级互斥权。Windows 下随后只结束
-# 当前工作区的 61501 后端、61500 Vite 及额外 Release 后端；浏览器、VS Code、
-# Playwright Test Server、数据库和 Redis 一律不碰。这样多个 AI 共用服务时不会靠
-# “结束所有 node/dotnet/chrome”碰运气，也不会把 Release DLL 留在运行进程中。
+# 发布只清理所选范围的开发服务：API 对应后端与 Release DLL，PC 对应 Vite。
+# 官网不会停止 API/PC；身份核验及禁止按进程名全杀的规则保持不变。
 if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ]; then
     if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
-        print_step "识别并停止当前工作区的共享开发服务，检查 Release DLL 文件锁..."
+        print_step "识别并停止所选发布范围的开发服务，API 发布检查 Release DLL 文件锁..."
         if ! prepare_release_workspace; then
             print_fail "本地开发进程无法安全收尾；已阻止编译，避免误杀其它应用或再次遇到 DLL 文件锁。"
         fi
