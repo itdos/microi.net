@@ -12,7 +12,7 @@ Windows 本机参考方案可采用 CPU 运行轻量 Qwen 与中文 TTS、CUDA �
 
 商业交付若要求零模型授权费，分别核查代码、检测器、关键点模型、生成权重和样例素材。InsightFace 代码许可与其预训练模型许可不同，不能因某个项目整体标记 MIT 就直接打包非商用检测权重。LivePortrait 可评估以 MediaPipe 替代 InsightFace 检测，但还须固定官方权重 revision 与 SHA-256，实测输出并保留其 MIT 声明。部分 FasterLivePortrait ONNX 权重能加载，却在普通 ONNX Runtime 的 5D `GridSample` 实际推理时报错；“加载成功”不是模型可运行的证据，需验证完整生成帧。
 
-当前 `digital-human-live` v0.4 本机路线使用 FasterLivePortrait 的 ONNX 预处理、MediaPipe 检测和 LivePortrait 官方 PyTorch 生成模块，避开 InsightFace 检测权重与 ONNX 5D `GridSample` 限制。源码保留两方 MIT 文本，权重由 `runtime/portrait-model-lock.json` 固定 revision、大小和 SHA-256，下载后仅放入 `.local/portrait`。RTX 2080 SUPER 的 24 帧完整 HTTP 任务实测 4.9 fps、480 × 640，因此 UI 和文档应写成“神经网络头像预览/短片生成”，不得仅凭输出 MP4 的 12 fps 编码帧率承诺流畅实时直播。它保留源照片的衣服和背景，但不做全身服饰动作；原二维换脸与服饰形变应标为实验性。
+当前 `digital-human-live` v0.4.1 本机路线使用 FasterLivePortrait 的 ONNX 预处理、MediaPipe 检测和 LivePortrait 官方 PyTorch 生成模块，避开 InsightFace 检测权重与 ONNX 5D `GridSample` 限制。源码保留两方 MIT 文本，权重由 `runtime/portrait-model-lock.json` 固定 revision、大小和 SHA-256，下载后仅放入 `.local/portrait`。RTX 2080 SUPER 上的 W/G 生成模块用 CUDA 半精度自动混合精度后，24 帧完整 HTTP 任务实测 6.85 fps、480 × 640；UI 和文档应写成“神经网络头像预览/短片生成”，不得仅凭输出 MP4 的 12 fps 编码帧率承诺流畅实时直播。它保留源照片的衣服和背景，但不做全身服饰动作；原二维换脸与服饰形变应标为实验性。
 
 ## 资源与模型
 
