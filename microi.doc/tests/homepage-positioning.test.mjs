@@ -190,7 +190,7 @@ test('homepage visual contract covers responsive, focus, and reduced-motion stat
   assert.match(component, /prefers-reduced-motion: reduce/)
   assert.match(nugetStyles, /\.mci-nuget-stats--home\s*\{[^}]*margin:\s*22px auto 42px/s)
   assert.match(microiCodeShowcase, /\.microi-code-actions a\.is-primary[^}]*-webkit-text-fill-color:#fff!important/s)
-  assert.match(styles, /padding: 150px 0 36px/)
+  assert.match(styles, /padding: 104px 0 36px/)
   assert.match(styles, /margin: 0 auto 80px/)
   assert.match(styles, /margin-bottom: 56px/)
 
@@ -200,7 +200,7 @@ test('homepage visual contract covers responsive, focus, and reduced-motion stat
 
   assert.match(contract, /mode: brand-narrative/)
   assert.match(contract, /低代码 → V8 → 专业源码/)
-  assert.match(contract, /价值带与 NuGet 证据区保持 56–80px 间隔/)
+  assert.match(contract, /能力带与 NuGet 证据区保持 28px 桌面间隔/)
 })
 
 test('source architecture keeps the detailed selection guidance off the homepage', () => {
