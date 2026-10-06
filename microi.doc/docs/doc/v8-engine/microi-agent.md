@@ -39,13 +39,13 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 
 页面顶部的 Windows 与 macOS 按钮使用固定的 latest 入口，每次点击均从官方更新清单取得当前安装包地址。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
 
-**Windows 与 macOS 1.3.5 已开放下载**：集成新版 dsh-desktop 与 Harness，保留员工工作台、上下键提示词历史、消息编辑/撤回和内置技能发现；同级沙盒权限请求使用当前有效模式。macOS Universal 已签名、公证；官网 Windows EXE 的签名状态与商店版本分别说明。已有启动恢复继续保留。
+**Windows 与 macOS 1.3.6 已开放下载**：修复完整应用正常启动误用 Electron Helper 导致 Harness 原生加载器拒绝的问题。Harness、Worker 与插件命令统一使用包内独立 Node；最终签名 Mac 应用已验收正常启动、重启和再次打开。吾码员工、MCP、Skills、对话编辑与撤回继续保留。macOS Universal 已签名公证；官网 Windows EXE 仍为未签名公开测试，Windows 原生安装、启动另行验收。
 
 **Windows 启动恢复说明**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
 
-- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 1.3.5 测试包仍为未签名 EXE，商店 MSIX 1.3.3 由微软签名。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
+- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 1.3.6 测试包仍为未签名 EXE，商店 MSIX 1.3.3 由微软签名。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
 - **Windows 商店版 1.3.3 已发布**：2026 年 10 月 3 日复查，Microsoft 后台显示“在 Microsoft Store 中”，中国区公开产品页已显示 Microi Agent 的名称、发行者、截屏与介绍；商店 MSIX 由微软签名分发。请在 Windows 设备打开 [Microsoft Store](https://apps.microsoft.com/detail/9NKCS76ZMFXR) 查看获取入口。本机 Mac 的产品页没有获取按钮，**Windows 原生获取、安装与启动仍待验收**；商店发布不会改变官网 EXE 的未签名状态。
-- **免费微软签名 EXE 在线安装器**：可直接下载 [Microi Agent 商店在线安装器](https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge)。这个小型 EXE 由 Microsoft Store 生成并签名，运行时联网检查设备条件、下载并安装当前商店版（当前为 1.3.3.0），后续由商店更新。它不包含官网 1.3.5 完整安装包，也不会给该完整 EXE 增加签名。采用[微软官方 Store Web Installer](https://learn.microsoft.com/en-us/windows/apps/distribute-through-store/how-to-use-store-web-installer-for-distribution)，无需购买代码签名证书；官网下载入口继续提供最新版完整包。
+- **免费微软签名 EXE 在线安装器**：可直接下载 [Microi Agent 商店在线安装器](https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge)。这个小型 EXE 由 Microsoft Store 生成并签名，运行时联网检查设备条件、下载并安装当前商店版（当前为 1.3.3.0），后续由商店更新。它不包含官网 1.3.6 完整安装包，也不会给该完整 EXE 增加签名。采用[微软官方 Store Web Installer](https://learn.microsoft.com/en-us/windows/apps/distribute-through-store/how-to-use-store-web-installer-for-distribution)，无需购买代码签名证书；官网下载入口继续提供最新版完整包。
 - 如果旧安装包提示 `Failed to decompress files` 或 `Error opening output file(s)`，请从本页顶部重新下载 Windows latest 安装包后运行；不要重复启动下载目录中缓存的旧安装包。新版安装器改用能处理内置中文技能文件名的解压方式，覆盖安装会保留工作区和会话数据。
 - 如果已退出应用仍提示“无法关闭”，旧安装器可能把长路径或文件复制失败误报成应用正在运行。新版使用当次发行的兼容卸载器完成升级；工作区、会话和用户配置保持不变。如果新版仍失败，请使用下面的诊断入口，不要反复重装。
 - 1.2.6 修复了已重现的长路径清理问题，但仍有客户报告“旧版本文件清理失败（错误码 2）”。该数字是卸载器退出码，不能直接判断哪个文件失败、是否被占用或缺少权限，也不能据此认为所有客户的升级问题已解决。
@@ -63,7 +63,7 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 
 | 系统与架构 | 微软签名在线安装器 / 商店版 | 官网完整 EXE |
 | --- | --- | --- |
-| Windows 11 x64、Windows 10 2004 及以上 x64（含 22H2） | 满足包声明的系统条件；需联网，仍受商店可用性、账户、地区和管理员策略约束 | 提供最新版 1.3.5；当前未签名，客户原生安装、启动仍待验收 |
+| Windows 11 x64、Windows 10 2004 及以上 x64（含 22H2） | 满足包声明的系统条件；需联网，仍受商店可用性、账户、地区和管理员策略约束 | 提供最新版 1.3.6；当前未签名，客户原生安装、启动仍待验收 |
 | Windows 10 2004 之前的 x64（含 1809 / 1909） | 不满足当前商店包最低版本，不能用在线安装器绕过 | 当前 Electron / Node 以 Windows 10 为运行基线，但这些旧构建未验收；不承诺兼容，建议先升级系统 |
 | Windows 7 / 8 / 8.1、32 位 Windows（x86） | 不支持当前应用 | 不支持；当前 Electron 已不支持 Windows 7 / 8 / 8.1，包内 Node 和原生组件为 x64 |
 | Windows 11 ARM64 | 系统支持 x64 仿真，但本产品尚未完成 ARM 设备验收；没有 ARM64 原生包 | x64 仿真兼容性待验收；Windows 10 ARM 仅提供 x86 仿真，不能运行当前 x64 包 |
@@ -101,7 +101,7 @@ AI 对文件、命令和业务数据的访问遵循当前任务授权和工具�
 
 ### 开源基础、版权与后续同步
 
-1.3.5 完整版的 dsh-desktop 基线为 [`beb6821af66d5980b2526ecb63b2df29badf4a1f`](https://github.com/dataelement/dsh-desktop/commit/beb6821af66d5980b2526ecb63b2df29badf4a1f)，Harness 使用 `0.2.1-alpha.1`、官方 tag `dsh-v0.2.1-alpha.1`，源码基线为 [`5badb15009ae1756c3afe0ae0cef1faafc290ccc`](https://github.com/deepseek-ai/deepseek-harness/commit/5badb15009ae1756c3afe0ae0cef1faafc290ccc)。这是官方当时最新的 alpha 代码；上一个完整版使用 desktop `97e02f8bf773` 与 Harness `0.1.5-rc.2`。内部 `.microi-upstream.json` 同时记录 Git 来源、npm 版本和 integrity，后续同步须保留吾码差异层并通过补丁、回归和真实界面门禁。
+1.3.6 完整版的 dsh-desktop 基线为 [`beb6821af66d5980b2526ecb63b2df29badf4a1f`](https://github.com/dataelement/dsh-desktop/commit/beb6821af66d5980b2526ecb63b2df29badf4a1f)，Harness 使用 `0.2.1-alpha.1`、官方 tag `dsh-v0.2.1-alpha.1`，源码基线为 [`5badb15009ae1756c3afe0ae0cef1faafc290ccc`](https://github.com/deepseek-ai/deepseek-harness/commit/5badb15009ae1756c3afe0ae0cef1faafc290ccc)。这是官方当时最新的 alpha 代码；上一个完整版使用 desktop `97e02f8bf773` 与 Harness `0.1.5-rc.2`。内部 `.microi-upstream.json` 同时记录 Git 来源、npm 版本和 integrity，后续同步须保留吾码差异层并通过补丁、回归和真实界面门禁。
 
 
 Microi Agent 没有重新实现 dsh-desktop。内部源码仓库使用四层结构：
@@ -844,6 +844,15 @@ npm run publish:cli:resume
 :::
 
 ## 更新日志
+
+### v1.3.6 - (2026-10-06)
+
+- **修复正常入口启动失败**：1.3.5 的桌面 main 误用 Electron Helper，触发 Harness 原生加载器的运行时指纹拒绝。新版在所有平台真实执行安装包内独立 Node，保留 Windows 隐藏控制台、HTTP 探测、私有管道、Worker 和插件。
+- **纠正此前验收范围**：1.3.5 的打包测试直接启动了包内 Node，未覆盖完整应用正常入口，因此不能证明用户正常打开应用成功。新增永久保护的完整应用门禁；最终签名 macOS 包在 Intel Mac 上两次启动、真实 Worker IPC、员工连接引导及 Harness 重启通过。Apple Silicon 原生和 Windows 真机运行仍需独立验收。
+- **二开保护与回归**：固定 Node 选择器、正式入口用例和发布门禁纳入三方同步保护；1,764 项回归通过（10 项平台条件跳过），类型检查、生产构建和界面回归通过。历史故障、旧安装包、商店渠道和用户工作区保持原有更新规则。
+- **新版发布**：macOS Universal DMG/ZIP 已签名公证；Windows x64 EXE 为未签名公开测试。共 7 个 CDN 文件完整回读，大小与 SHA256/SHA512 一致；永久下载入口与自动更新指向 1.3.6。
+- [1.3.6 Windows 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.6/latest.yml) · [macOS 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.6/latest-mac.yml)。
+
 
 ### v1.3.5 - (2026-10-05)
 
