@@ -94,6 +94,7 @@ did: {DeviceId}
 - 平台固定 Managed 协议只授权当前租户和指定引擎；无玩家的后台执行不应注入匿名玩家，也不能要求伪造 DiyToken。普通调用、错租户/引擎与已消费作用域仍执行原守卫，玩家参数不能建立协议授权。出现后台 `LoginRequired` 先核后端升级；管理员用 `Snapshot.FixedStepPump` 读取有界节点摘要，再独立回读主库 checkpoint。日志缺项、本机剩余租约和调度计数不代表成功推进或商业联机验收。
 - 先区分接口引擎业务编排、持续固定步模拟和实时通知。SignalR版本通知不是规则执行；秒级Job只用于恢复/扫描/补偿，不能宣称20Hz连续模拟。
 - 仅在现有纯V8无法满足固定步规则时使用通用受信规则宿主。Domain与应用适配仍属于私有应用程序集，平台只提供调度/预算/作用域；禁止把整套游戏规则加入Microi.Server或新增游戏Controller。
+- 平台解决方案不登记应用私有工程路径；规则通过冻结组合的 `PrivateRulesProject` 引入。解决方案外的引用可能被 MSBuild 清除父配置而回退 Debug；显式组合应保持 API 配置传递，并核对实际 API 目录的规则 DLL `AssemblyConfiguration=Release`、原始哈希和 Linux 依赖闭包。单独 Release 编译通过不能代替正常解决方案/一键发行的实际产物。
 - 后台发行固定tenant、入口、审批摘要和实际DLL/依赖hash；主库绑定已安装与已完成发布版本，每次运行回读撤销。不得从玩家Param、可编辑V8或MCP传路径/URL/Type来装载代码。明确原生代码是受信后端代码，不是沙箱。
 - 原生固定步的100ms规则计算预算与可信主库授权等待分开计时；授权等待仍消耗总租约，每批回读撤销，结束后先核取消与租约再构造规则。工厂、恢复、推进、捕获共用一次计算预算，不以缓存授权、放宽100ms或逐阶段重置预算修复线上超时。离线合成等待只能证明边界，必须另测真实HTTP、冷启动及自然后台推进。
 - 实际超预算时先用现有管理员MCP `microi_query_system_observability` 的 `Snapshot` 回读 `FixedStepRuntime.CoreAssemblyFileSha256` 与 `Registrations[]` 的 `ComputeBudgetFailureCount/LastComputeBudgetPhase` 及三项累计毫秒值；旧节点缺字段不是零次失败。固定阶段只定位检测边界，不能推断某函数独自耗时；只存编译绑定的一条节点见证，按租户隔离、重启清零，不收房间/玩家/指令/自由异常。预算、错误码与每批授权保持原行为；须另测真实HTTP和共享主库推进。
