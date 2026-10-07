@@ -82,11 +82,9 @@ async function main(): Promise<void> {
     workspaceCredentialPasswordKey: process.env.MICROI_WORKSPACE_PASSWORD_KEY || undefined,
   };
 
-  // 本地开发服务器（localhost / 127.0.0.1）使用自签证书，允许 Node.js 跳过 TLS 验证
-  if (/^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(config.apiBaseUrl)) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    console.error('[microi-mcp] Detected localhost HTTPS, disabled TLS certificate verification');
-  }
+  // localhost 也承载真实租户会话，不能因地址是本机就关闭整个进程的 TLS 校验。
+  // 开发证书应由宿主信任库或启动前的 NODE_EXTRA_CA_CERTS 显式信任，保持 Node
+  // 默认验证及调用方已配置的严格策略；陌生证书在业务请求到达服务端前失败。
 
   // Token 文件优先级最高（VS Code 扩展持续刷新写入）
   const tokenFilePath = process.env.MICROI_TOKEN_FILE;

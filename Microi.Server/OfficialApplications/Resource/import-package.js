@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.8
+ * Version: v3.0.9
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
@@ -3310,11 +3310,18 @@ try {
             activeImportResource = appKey + ':Source:' + sourcePath;
             expectedApplicationPaths[sourcePath.toLowerCase()] = true;
             var sourceUpload = reuseApplicationAsset(existingApplicationAssets, sourcePath, sourceFile);
+            // PRIVATE_SOURCE_RESUME_AFTER_SOURCE_V2：Build/BuildRepair 表示同应用全部
+            // 源码已逐片校验；后续应用检查点也包含此前应用的已提交前缀。恢复时仅
+            // 复用同一包摘要根和精确元数据，不能重新消耗源码预算并退回 Source 游标。
+            var sourceCheckpointKind = String(backgroundCheckpoint.AssetKind || '');
+            var sourceCheckpointBundle = Number(backgroundCheckpoint.BundleIndex || 0);
             var sourcePreviouslyVerified = backgroundChunkingEnabled
                 && String(backgroundCheckpoint.Phase || '') == 'ApplicationAssets'
-                && String(backgroundCheckpoint.AssetKind || '') == 'Source'
-                && Number(backgroundCheckpoint.BundleIndex || 0) == bundleIndex
-                && i < Number(backgroundCheckpoint.AssetIndex || 0)
+                && (sourceCheckpointKind == 'Source' || sourceCheckpointKind == 'Build' || sourceCheckpointKind == 'BuildRepair')
+                && (bundleIndex < sourceCheckpointBundle
+                    || (sourceCheckpointBundle == bundleIndex
+                        && (sourceCheckpointKind == 'Build' || sourceCheckpointKind == 'BuildRepair'
+                            || i < Number(backgroundCheckpoint.AssetIndex || 0))))
                 && sourceUpload && sourceUpload.HdfsPath == '/' + String(V8.OsClient || '').toLowerCase() + '/' + sourceRoot + '/' + sourcePath;
             if (!sourcePreviouslyVerified) {
                 if (shouldContinueApplicationAssets(sourceFile)) {

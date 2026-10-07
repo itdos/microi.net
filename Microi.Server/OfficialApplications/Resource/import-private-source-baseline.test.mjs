@@ -77,6 +77,24 @@ test('source outside this application or tenant is rejected before storage acces
 test('a durable earlier source slice reuses verified canonical metadata without rehashing the prefix',()=>{
  const f=fixture({canonical:true});Object.assign(f.ctx,{backgroundChunkingEnabled:true,backgroundCheckpoint:{Phase:'ApplicationAssets',AssetKind:'Source',BundleIndex:0,AssetIndex:1}});const rows=f.run();assert.equal(rows[0].HdfsPath,f.target);assert.equal(f.calls.length,0);assert.equal(f.writes.length,0);
 });
+for(const kind of ['Build','BuildRepair'])test('编译文件检查点继续时不重新消耗已经验证的源码分片 '+kind,()=>{
+ const f=fixture({canonical:true});Object.assign(f.ctx,{backgroundChunkingEnabled:true,backgroundCheckpoint:{Phase:'ApplicationAssets',AssetKind:kind,BundleIndex:0,AssetIndex:0}});
+ f.ctx.shouldContinueApplicationAssets=()=>true;
+ const rows=f.run();assert.ok(Array.isArray(rows),'编译检查点不能退回 Source 游标');assert.equal(rows[0].HdfsPath,f.target);assert.equal(f.calls.length,0);assert.equal(f.writes.length,0);
+});
+test('后续应用检查点不会重复验证前一个应用的规范私有源码',()=>{
+ const f=fixture({canonical:true});Object.assign(f.ctx,{backgroundChunkingEnabled:true,backgroundCheckpoint:{Phase:'ApplicationAssets',AssetKind:'Source',BundleIndex:1,AssetIndex:0}});
+ f.ctx.shouldContinueApplicationAssets=()=>true;
+ assert.ok(Array.isArray(f.run()));assert.equal(f.calls.length,0);assert.equal(f.writes.length,0);
+});
+for(const change of ['unknown-kind','earlier-bundle','foreign-root'])test('未验证的检查点或非规范源码仍必须占用验证预算 '+change,()=>{
+ const f=fixture({canonical:true});Object.assign(f.ctx,{backgroundChunkingEnabled:true,backgroundCheckpoint:{Phase:'ApplicationAssets',AssetKind:'Build',BundleIndex:0,AssetIndex:0}});
+ if(change==='unknown-kind')f.ctx.backgroundCheckpoint.AssetKind='Unknown';
+ if(change==='earlier-bundle')f.ctx.bundleIndex=1;
+ if(change==='foreign-root')f.ctx.reuseApplicationAsset=()=>({Path:f.file.Path,HdfsPath:f.old,Hash:f.file.Sha256,Size:f.file.Size,StorageScope:'Private',Reused:true});
+ f.ctx.shouldContinueApplicationAssets=()=>true;
+ assert.deepEqual(copy(f.run()),{Continuation:[f.ctx.bundleIndex,'Source',0,1]});assert.equal(f.calls.length,0);assert.equal(f.writes.length,0);
+});
 test('canonical reuse also respects the source verification budget and returns the same next cursor',()=>{
  const f=fixture({canonical:true});f.ctx.shouldContinueApplicationAssets=()=>true;const r=f.run();assert.deepEqual(copy(r),{Continuation:[0,'Source',0,1]});assert.equal(f.calls.length,0);assert.equal(f.writes.length,0);
 });

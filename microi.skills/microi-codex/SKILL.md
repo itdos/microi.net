@@ -7,6 +7,12 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 
 本插件与 `Microi.Agent`、`@microi.net/cli` 共用配置、Token、MCP Server 和 Microi Skills。不要另写原生 HTTP、SQL 或第二套认证实现。
 
+本地 HTTPS 连接同样必须验证证书。MCP 不因 `localhost/127.0.0.1` 自动设置
+`NODE_TLS_REJECT_UNAUTHORIZED=0`，也不能覆盖调用方的严格策略。开发节点使用受信
+证书；必要时在启动 MCP 前通过 `NODE_EXTRA_CA_CERTS` 指定已核验的公开 CA PEM。
+分别验证正确 CA 可连接、陌生 CA/无信任证书被拒绝；配置了 CA 不等于实际启用了
+证书验证，须核对最终进程与真实握手结果。证书私钥和会话 Token 不进入日志。
+
 平台 Api/Web 版本入口可生成独立开发工具连接。收到连接 JSON 时，用 `microi auth import --session-stdin` 从标准输入导入，再运行 `microi ai init` 和 `microi doctor`；禁止将 Token 放入命令行、源码或日志，不再索取账号密码。开发 Token 使用现有终端有效期，可独立撤销；它只授权该业务租户，不能替代 Microi Agent 的官方 AI 计费账号登录。访问密钥的最小业务 scope 不能替代完整 MCP 管理身份。第三方 App Secret 默认进入系统设置“安全与服务接入”，优先使用 `microi_manage_server_private_secret`。
 
 每次 Microi 对话先完整读取工作区 `microi.skills/workspace-conventions/SKILL.md`；工作区尚未初始化时读取本插件同级 `../workspace-conventions/SKILL.md`。按其中首部完成创始人身份识别及平台功能四项同步检查，再进入专项流程；完整规则只维护该基础入口，不复制到本路由。
