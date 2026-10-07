@@ -338,12 +338,16 @@ public class FormEngineTenantBoundaryTests
         Assert.True(InvokeTableChildContextValidation(chain));
     }
 
-    [Fact]
-    public async Task AnonymousClient_CannotReadProtectedTable_ButKeepsOrdinaryAnonymousPolicy()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AnonymousClient_CannotReadProtectedTable_ButKeepsOrdinaryAnonymousPolicy(bool hasMenuMetadata)
     {
+        using var metadata = new AnonymousModuleMetadataFixture(hasMenuMetadata);
         var engine = new FormEngine();
         var param = new DiyTableRowParam
         {
+            OsClient = metadata.Tenant,
             _InvokeType = InvokeType.Client.ToString(),
             _IsAnonymous = true
         };
@@ -363,6 +367,26 @@ public class FormEngineTenantBoundaryTests
             param,
             new JObject { ["Id"] = "ordinary-id", ["Name"] = "diy_customer" },
             "Read"));
+        Assert.NotEmpty(metadata.Statements);
+    }
+
+    [Fact]
+    public async Task AnonymousClient_CannotProbeHiddenFieldUnderModulePermissions()
+    {
+        using var metadata = new AnonymousModuleMetadataFixture(true,
+            "{\"Version\":1,\"Enabled\":true,\"DefaultVisible\":false,\"DefaultEditable\":false,\"Rules\":[]}");
+        var param = new DiyTableRowParam
+        {
+            OsClient = metadata.Tenant,
+            _InvokeType = InvokeType.Client.ToString(),
+            _IsAnonymous = true,
+            _SearchEqual = new Dictionary<string, string> { ["Salary"] = "fixture-value" }
+        };
+        Assert.False(await InvokeClientAuthorization(new FormEngine(), param,
+            new JObject { ["Id"] = "ordinary-id", ["Name"] = "diy_customer" }, "Read"));
+        Assert.NotNull(param._FieldPermission);
+        Assert.False(param._FieldPermission.Visible("Salary"));
+        Assert.Contains(metadata.Statements, sql => sql.Contains("FROM sys_menu", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1791,7 +1815,13 @@ public class FormEngineTenantBoundaryTests
 
         Assert.Equal(a, b);
         Assert.NotEqual(a, otherTenant);
-        Assert.Contains(":Snapshot:v2:", a);
+        // v4 增加逐用户字段/岗位权限，不能复用历史 v2 的角色共享快照。
+        Assert.Contains(":Snapshot:v4:", a);
+        Assert.Contains(":7:shared:", a);
+        var userA = FormEngineAuthorizationCache.BuildSnapshotKey("tenant-a", "7", new[] { "role-a" }, "user-a");
+        var userB = FormEngineAuthorizationCache.BuildSnapshotKey("tenant-a", "7", new[] { "role-a" }, "user-b");
+        Assert.NotEqual(userA, userB);
+        Assert.NotEqual(a, userA);
     }
 
     [Theory]
