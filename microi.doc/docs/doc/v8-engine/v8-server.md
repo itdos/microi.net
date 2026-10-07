@@ -331,6 +331,28 @@ if (identity.Code !== 1) return identity;
 
 单批规则计算预算为 100ms，规则工厂、完整检查点恢复、各步推进和捕获共用该预算。每批仍从主库核验批准来源和撤销状态；这一可信授权等待单独计时，不计作规则计算，但仍消耗原总租约。授权结束后、构造规则前再次检查取消和租约，不能缓存授权、延长租约或给每个阶段重新分配预算。离线注入授权延迟只验证计时边界；实际 HTTP 延迟、冷启动和服务器负载仍需线上验收。
 
+升级后端后，管理员可用既有 `microi_query_system_observability` 的 `Snapshot` 读取
+`FixedStepRuntime.CoreAssemblyFileSha256` 和 `Registrations[]` 的计算预算见证。
+`ComputeBudgetFailureCount` 是当前节点累计次数；`LastComputeBudgetFailureUtc`、
+`LastComputeBudgetPhase` 及 `LastComputeBudgetComputeMilliseconds` /
+`LastComputeBudgetAuthorizationMilliseconds` / `LastComputeBudgetTotalMilliseconds`
+记录最后一次真实拒绝。旧后端缺少字段表示尚不支持，不能解释为零次失败。
+
+| 固定阶段值 | 超时检测所在的计算边界 |
+| --- | --- |
+| `InputValidation` | 信封、指令排序与哈希校验 |
+| `RuleFactory` | 已批准的固定规则工厂 |
+| `RestoreState` | 完整恢复与绑定核验 |
+| `ApplyCommand` | 应用收件箱指令 |
+| `AdvanceTick` | 确定性规则步推进 |
+| `CaptureState` | 捕获新检查点 |
+
+这些时间是单调时钟的累计墙上耗时，包含调度或 GC 等影响；计算时间扣除可信授权等待。
+阶段值只说明在哪个边界检测到总预算耗尽，不能当作该函数独自耗时或生产根因。
+见证只保留于最多 64 个编译部署绑定，不保存房间、玩家、指令、自由异常或秘密；
+管理员查询仍按当前租户隔离。节点重启会清零，跨节点需分别读取；它不是持久日志、
+审批、数据库提交、健康或商业验收证明。普通错误码、取消、租约和 100ms 预算保持不变。
+
 审批资源由应用商城声明式安装，原生代码另外经过后台发行审批。私有应用编译组合固定 tenant/registration/入口与审批摘要，主库审批须同时匹配已安装版本、V3 Completed来源hash、真实DLL及依赖闭包。运行中撤销、卸载、软删来源或主库不可用均失败关闭。首批提供者限定同租户与MySQL；其它来源/方言不静默降级。没有任意DLL路径、URL或Type的V8/MCP注册入口，原生程序集也不是不可信代码沙箱。
 
 普通租户的编译证明默认 `TenantInstallation`，保留真实 Installed 回执及旧摘要。官方同租户发布源禁止安装自己，只能由后端发行组合明确固定 `OfficialPublishedSnapshot`：`InstallRecordId` 绑定 `mic_data_version.Id`，原始 `Data` 的UTF-8 SHA-256另固定于编译回执并参与独立审批摘要。该类别与快照摘要不从Param或自由表字段选择、不新增表字段、不伪造Installed。受信官方身份、当前Published/审批有效指针、Verified包hash/size/HDFS、不可变快照、V3 Completed源码hash及实际DLL依赖须全部匹配；当前状态变化、软删或主库不可用下次调用立即拒绝，旧历史存在不足以授权。跨租户仍拒绝，结构发布不等于后端安装或代码审批。审批表纳入通用强制管理员清单，普通用户即使误授表/菜单权限仍不得改授权状态；V8Limit和ReadPrimary不是写权限。

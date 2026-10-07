@@ -21,6 +21,10 @@ public sealed class FixedStepInstallationDiagnostics
         internal DateTime? LastRegisteredUtc;
         internal string? ErrorCode;
         internal DependencyHashWitness? DependencyFailure;
+        internal int ComputeBudgetFailureCount;
+        internal DateTime? LastComputeBudgetFailureUtc;
+        internal string? LastComputeBudgetPhase;
+        internal long? LastComputeBudgetComputeMilliseconds,LastComputeBudgetAuthorizationMilliseconds,LastComputeBudgetTotalMilliseconds;
     }
     private static readonly HashSet<string> SafeErrors=new HashSet<string>(StringComparer.Ordinal)
     {
@@ -34,12 +38,14 @@ public sealed class FixedStepInstallationDiagnostics
     private readonly object gate=new object();
     private readonly Dictionary<string,Entry> entries=new Dictionary<string,Entry>(StringComparer.Ordinal);
     private readonly string? apiAssemblyFileSha256;
+    private readonly string? coreAssemblyFileSha256;
     private readonly DateTime initializedAtUtc=DateTime.UtcNow;
 
     public FixedStepInstallationDiagnostics(CompiledRulesDeployments deployments)
     {
         if(deployments==null)throw new ArgumentNullException(nameof(deployments));
         apiAssemblyFileSha256=FileHash(Assembly.GetEntryAssembly());
+        coreAssemblyFileSha256=FileHash(typeof(FixedStepKernel).Assembly);
         foreach(var binding in deployments.Snapshot())
             entries.Add(Key(binding.Tenant,binding.RegistrationId),new Entry{Binding=binding,AssemblyFileSha256=FileHash(binding.EntryType.Assembly)});
     }
@@ -55,6 +61,26 @@ public sealed class FixedStepInstallationDiagnostics
         catch{return null;}
     }
     private static string Key(string tenant,string registration)=>tenant+"\n"+registration;
+
+    /// <summary>仅内核实际超预算时更新编译绑定的一条节点见证；未知绑定或无效见证不扩容、不影响原拒绝。</summary>
+    internal void RecordComputeBudgetExceeded(string tenant,string registration,string phase,long computeMs,long authorizationMs,long totalMs)
+    {
+        // 不接收请求维度、自由异常文本或任意阶段名；字典上限沿用最多64个编译部署。
+        if(computeMs<=100||authorizationMs<0||totalMs<authorizationMs||totalMs-authorizationMs!=computeMs)return;
+        switch(phase)
+        {
+            case "InputValidation":case "RuleFactory":case "RestoreState":case "ApplyCommand":case "AdvanceTick":case "CaptureState":break;
+            default:return;
+        }
+        lock(gate)
+        {
+            if(!entries.TryGetValue(Key(tenant,registration),out var entry))return;
+            entry.ComputeBudgetFailureCount=Math.Min(entry.ComputeBudgetFailureCount,int.MaxValue-1)+1;
+            entry.LastComputeBudgetFailureUtc=DateTime.UtcNow;entry.LastComputeBudgetPhase=phase;
+            entry.LastComputeBudgetComputeMilliseconds=computeMs;entry.LastComputeBudgetAuthorizationMilliseconds=authorizationMs;
+            entry.LastComputeBudgetTotalMilliseconds=totalMs;
+        }
+    }
 
     /// <summary>仅由安装后台服务记录已经结束的一次尝试；自由文本异常、SQL、路径、配置与Token均不进入快照。</summary>
     public void RecordAttempt(CompiledRulesBinding binding,Exception? error=null)
@@ -88,9 +114,12 @@ public sealed class FixedStepInstallationDiagnostics
                     State=e.Registered?"CatalogRegistered":e.Attempts==0?"Pending":"RegistrationFailed",
                     Attempts=e.Attempts,LastAttemptUtc=e.LastAttemptUtc,LastRegisteredUtc=e.LastRegisteredUtc,ErrorCode=e.ErrorCode,
                     DependencyIdentity=e.DependencyFailure?.Identity,DependencyExpectedSha256=e.DependencyFailure?.ExpectedSha256,
-                    DependencyActualSha256=e.DependencyFailure?.ActualSha256,DependencyFailureReason=e.DependencyFailure?.Reason
+                    DependencyActualSha256=e.DependencyFailure?.ActualSha256,DependencyFailureReason=e.DependencyFailure?.Reason,
+                    ComputeBudgetFailureCount=e.ComputeBudgetFailureCount,LastComputeBudgetFailureUtc=e.LastComputeBudgetFailureUtc,
+                    LastComputeBudgetPhase=e.LastComputeBudgetPhase,LastComputeBudgetComputeMilliseconds=e.LastComputeBudgetComputeMilliseconds,
+                    LastComputeBudgetAuthorizationMilliseconds=e.LastComputeBudgetAuthorizationMilliseconds,LastComputeBudgetTotalMilliseconds=e.LastComputeBudgetTotalMilliseconds
                 }).ToArray();
-            return new FixedStepInstallationSnapshot{Available=true,InitializedAtUtc=initializedAtUtc,ApiAssemblyFileSha256=apiAssemblyFileSha256,Registrations=rows};
+            return new FixedStepInstallationSnapshot{Available=true,InitializedAtUtc=initializedAtUtc,ApiAssemblyFileSha256=apiAssemblyFileSha256,CoreAssemblyFileSha256=coreAssemblyFileSha256,Registrations=rows};
         }
     }
 }
@@ -104,6 +133,7 @@ public sealed class FixedStepInstallationSnapshot
     public bool Available {get;set;}
     public DateTime? InitializedAtUtc {get;set;}
     public string? ApiAssemblyFileSha256 {get;set;}
+    public string? CoreAssemblyFileSha256 {get;set;}
     public FixedStepRegistrationSnapshot[] Registrations {get;set;}=Array.Empty<FixedStepRegistrationSnapshot>();
 }
 public sealed class FixedStepRegistrationSnapshot
@@ -122,5 +152,12 @@ public sealed class FixedStepRegistrationSnapshot
     public string? DependencyExpectedSha256 {get;set;}
     public string? DependencyActualSha256 {get;set;}
     public string? DependencyFailureReason {get;set;}
+    /// <summary>仅当前节点累计和最后一次真实计算超时，非CPU剖析或跨节点持久日志；时间不含业务状态。</summary>
+    public int ComputeBudgetFailureCount {get;set;}
+    public DateTime? LastComputeBudgetFailureUtc {get;set;}
+    public string? LastComputeBudgetPhase {get;set;}
+    public long? LastComputeBudgetComputeMilliseconds {get;set;}
+    public long? LastComputeBudgetAuthorizationMilliseconds {get;set;}
+    public long? LastComputeBudgetTotalMilliseconds {get;set;}
 }
 }
