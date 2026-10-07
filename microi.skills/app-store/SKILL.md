@@ -518,6 +518,7 @@ staged 行、请求参数、`StableFilePathName` 或外部 CDN URL 推断版本�
 - 根因：把平台运行依赖维护成手写短清单，并只复制 SaaS 单包；接口之间的 `V8.ApiEngine.Run` 依赖、其它官方平台应用和个性化 Hook 没有进入同一闭包，旧数据库也没有可靠的启动前自愈与逐项回读。
 - 强制规则：启动前接口闭包必须由全部内置官方平台应用包动态计算，并递归解析接口调用；当前官方基线为 9 个包、106 个接口（98 个 `Managed`、8 个 `CreateIfMissing`），数量只是发布快照，运行逻辑不得硬编码。门禁逐项校验 Key、地址、启用状态、匿名/HTTP 状态和源码策略；缺失时从受信内置包按原所有权补齐，所有项严格回读成功后才对外提供流量。`CreateIfMissing` 首次创建后永不覆盖客户代码。
 - 控制面自举：官方资源发布必须先保证 `get-microi-upgrade-resource` 自身达到当前协议，再发布其它包；若控制面旧版本不能校验新包，先只发布并回读这一项，刷新动态路由缓存后再发布剩余资源。发布响应超时或 Redis 广播失败时先按资源 SHA 回读判断提交/回滚，禁止盲目重放。
+- 包内明确声明 `Managed` 的 `get-microi-upgrade-resource` 必须和其他受管接口一同原位覆盖；禁止硬编码跳过该 Key 却记安装成功。无 Managed 声明的历史包保留保护边界，官方发布/投影仍需可信后端鉴权。验收核对完整源码、版本、稳定 Id 和路由，不只读取安装状态。
 - 独立系统日志包的接口投影使用 `ReconcilePublishedApiEngines` 与显式 `ProjectionScope: 'SystemLog'`，仅允许单一 `app.microi.sys-log.json`，且包内 `PackageInfo.AppId` 必须为 `app.microi.sys-log`、`ExpectedSha256` 必须等于已发布完整包摘要。默认九包全量规则保持不变；未知范围、其它文件或部分九包选择都应拒绝。仍须执行官方鉴权、事务行锁、Managed／CreateIfMissing 规则及完整回读，不能将母版投影当作客户已安装。
 - 兼容与验收：历史 Controller 回退不能再转调可能缺失的同一个接口引擎；保留旧路由时必须使用可信 Core 原子或明确返回可诊断兼容结果。自动化测试应扫描 PC、UniApp、内置应用包和接口源码的全部 `/apiengine/` 与 `V8.ApiEngine.Run` 引用，证明每个依赖由官方包声明；真实启动必须对每个启用租户输出开始、缺项、修复、逐项成功及最终汇总日志，并同时验证匿名、登录态、商城批量计划和重复启动幂等。
 
