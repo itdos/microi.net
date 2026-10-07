@@ -96,6 +96,7 @@ did: {DeviceId}
 - 仅在现有纯V8无法满足固定步规则时使用通用受信规则宿主。Domain与应用适配仍属于私有应用程序集，平台只提供调度/预算/作用域；禁止把整套游戏规则加入Microi.Server或新增游戏Controller。
 - 后台发行固定tenant、入口、审批摘要和实际DLL/依赖hash；主库绑定已安装与已完成发布版本，每次运行回读撤销。不得从玩家Param、可编辑V8或MCP传路径/URL/Type来装载代码。明确原生代码是受信后端代码，不是沙箱。
 - 原生固定步的100ms规则计算预算与可信主库授权等待分开计时；授权等待仍消耗总租约，每批回读撤销，结束后先核取消与租约再构造规则。工厂、恢复、推进、捕获共用一次计算预算，不以缓存授权、放宽100ms或逐阶段重置预算修复线上超时。离线合成等待只能证明边界，必须另测真实HTTP、冷启动及自然后台推进。
+- 实际超预算时先用现有管理员MCP `microi_query_system_observability` 的 `Snapshot` 回读 `FixedStepRuntime.CoreAssemblyFileSha256` 与 `Registrations[]` 的 `ComputeBudgetFailureCount/LastComputeBudgetPhase` 及三项累计毫秒值；旧节点缺字段不是零次失败。固定阶段只定位检测边界，不能推断某函数独自耗时；只存编译绑定的一条节点见证，按租户隔离、重启清零，不收房间/玩家/指令/自由异常。预算、错误码与每批授权保持原行为；须另测真实HTTP和共享主库推进。
 - 依赖闭包在实际目标 Linux CLR 中遍历完整程序集引用链，包含平台与驱动的扩展程序集；Windows 框架哈希不可代替。缺失或冲突保持失败关闭，先补齐官方包交付并复现/修复回归，再重新 Full 和实际镜像验收，不以本局游戏尚未调用该驱动为理由跳过引用。
 - 使用 `RunPlatformApiRuntime` 之前核后端实际安装。公开入口只收意图，成员和席位由DiyToken重算；DB时钟、租约/fence、完整checkpoint与inbox在同一事务。未知提交保持原RequestId，停机停止接收并有界排空，旧owner不得续写。
 - 连续宿主唤醒需接Owned提示；当前无afterCommit回调，只能在持久写入成功后、return Code=1前发出有界提示，不能说已经提交后唤醒。pump仍须重新锁主库并核owner/fence/租约；原事务回滚不能产生合法推进。终局用DrainOwnedRoom停止后续调度，允许当前事务返回提交；StopOwnedRoom会立即取消当前请求。无外部主机不等于无需后端部署。只给本人/同队可见投影，公开频道不传全量状态。

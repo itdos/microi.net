@@ -1,3 +1,4 @@
+#nullable enable annotations
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,7 +19,11 @@ public sealed class FixedStepKernel
     public const int MaxPayloadBytes=4096;
     private readonly TrustedRulesCatalog catalog;
     private readonly IMonotonicClock clock;
-    public FixedStepKernel(TrustedRulesCatalog catalog,IMonotonicClock clock){this.catalog=catalog;this.clock=clock;}
+    private readonly FixedStepInstallationDiagnostics? diagnostics;
+    public FixedStepKernel(TrustedRulesCatalog catalog,IMonotonicClock clock):this(catalog,clock,null){}
+    /// <summary>可信宿主注入已有有界节点诊断；旧两参数调用保持计算行为，不创建诊断或授权缓存。</summary>
+    public FixedStepKernel(TrustedRulesCatalog catalog,IMonotonicClock clock,FixedStepInstallationDiagnostics? diagnostics)
+    {this.catalog=catalog;this.clock=clock;this.diagnostics=diagnostics;}
 
     public InitialStateResult CreateInitialState(InvocationContext context,string registrationId,string rulesVersion,string layoutId,string trustedSetupJson)
     {
@@ -35,8 +40,19 @@ public sealed class FixedStepKernel
         if(!Guard.Decimal(envelope.AuthorityEpoch)||!Guard.Decimal(envelope.Revision)||envelope.StartUnixMs<0||envelope.ServerNowUnixMs<envelope.StartUnixMs||envelope.LeaseUntilUnixMs<=envelope.ServerNowUnixMs||envelope.CompletedTick<0||envelope.CompletedTick>int.MaxValue-1000)throw new InvalidOperationException("InvalidClockOrFence");
         var begin=clock.Milliseconds;
         long authorizationElapsed=0;
+        var phase="InputValidation";
         var leaseBudget=envelope.LeaseUntilUnixMs-envelope.ServerNowUnixMs;
-        void CheckBudget(){cancellationToken.ThrowIfCancellationRequested();var elapsed=clock.Milliseconds-begin;if(elapsed<0||elapsed<authorizationElapsed||elapsed>=leaseBudget)throw new InvalidOperationException("StaleLease");if(elapsed-authorizationElapsed>100)throw new InvalidOperationException("ComputeBudgetExceeded");}
+        void CheckBudget()
+        {
+            cancellationToken.ThrowIfCancellationRequested();var elapsed=clock.Milliseconds-begin;
+            if(elapsed<0||elapsed<authorizationElapsed||elapsed>=leaseBudget)throw new InvalidOperationException("StaleLease");
+            if(elapsed-authorizationElapsed>100)
+            {
+                // 只记录固定阶段和时间数字，不携带状态、指令、房间或异常文本；观测不替代授权或持久化。
+                diagnostics?.RecordComputeBudgetExceeded(context.Tenant,envelope.RegistrationId,phase,elapsed-authorizationElapsed,authorizationElapsed,elapsed);
+                throw new InvalidOperationException("ComputeBudgetExceeded");
+            }
+        }
         CheckBudget();
         if(envelope.StateJson==null||Encoding.UTF8.GetByteCount(envelope.StateJson)>MaxStateBytes)throw new InvalidOperationException("StateTooLarge");
         if(envelope.Inbox==null||envelope.Inbox.Length>MaxInboxCommands)throw new InvalidOperationException("InboxOverflow");
@@ -58,7 +74,8 @@ public sealed class FixedStepKernel
         var factory=catalog.AuthorizeFactory(context,envelope.RegistrationId,false,envelope.RulesVersion,envelope.LayoutId);
         authorizationElapsed=clock.Milliseconds-authorizationBegin;
         if(authorizationElapsed<0)throw new InvalidOperationException("StaleLease");
-        CheckBudget();var rules=factory();CheckBudget();
+        CheckBudget();phase="RuleFactory";var rules=factory();CheckBudget();
+        phase="RestoreState";
         rules.Restore(envelope.StateJson);if(rules.CompletedTick!=envelope.CompletedTick)throw new InvalidOperationException("CheckpointTickMismatch");
         if(rules.Binding.Tenant!=context.Tenant||rules.Binding.RoomId!=envelope.RoomId||rules.Binding.RoomEpoch!=envelope.RoomEpoch)throw new InvalidOperationException("CheckpointBindingMismatch");
         CheckBudget();var receipts=new List<CommandReceipt>();var cursor=0;
@@ -67,14 +84,14 @@ public sealed class FixedStepKernel
             CheckBudget();
             while(cursor<commands.Length&&commands[cursor].AssignedTick<=rules.CompletedTick)
             {
-                var cmd=commands[cursor++];var at=rules.CompletedTick;var outcome=rules.Apply(cmd);
+                var cmd=commands[cursor++];var at=rules.CompletedTick;phase="ApplyCommand";var outcome=rules.Apply(cmd);
                 if(rules.CompletedTick!=at||string.IsNullOrEmpty(outcome)||outcome.Length>128)throw new InvalidOperationException("InvalidRulesReceipt");
                 receipts.Add(new CommandReceipt{CommandId=cmd.CommandId,SeatId=cmd.SeatId,Generation=cmd.Generation,Sequence=cmd.Sequence,AppliedTick=at,Outcome=outcome});CheckBudget();
             }
             if(rules.CompletedTick==target||rules.IsTerminal)break;
-            var previous=rules.CompletedTick;rules.AdvanceOneTick();if(rules.CompletedTick!=previous+1)throw new InvalidOperationException("RulesStepMismatch");
+            var previous=rules.CompletedTick;phase="AdvanceTick";rules.AdvanceOneTick();if(rules.CompletedTick!=previous+1)throw new InvalidOperationException("RulesStepMismatch");
         }
-        var state=rules.Capture();CheckBudget();if(state==null||Encoding.UTF8.GetByteCount(state)>MaxStateBytes)throw new InvalidOperationException("StateTooLarge");
+        phase="CaptureState";var state=rules.Capture();CheckBudget();if(state==null||Encoding.UTF8.GetByteCount(state)>MaxStateBytes)throw new InvalidOperationException("StateTooLarge");
         return new AdvanceResult{RequestId=envelope.RequestId,InputHash=InputHash(context,envelope),StateJson=state,StateHash=TrustedRulesCatalog.Hash(state),CompletedTick=rules.CompletedTick,DueTick=due,HasMore=!rules.IsTerminal&&rules.CompletedTick<due,IsTerminal=rules.IsTerminal,Receipts=receipts.ToArray()};
     }
 
