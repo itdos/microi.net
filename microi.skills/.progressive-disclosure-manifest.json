@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-06T17:29:39.053Z",
+  "generatedAt": "2026-10-07T02:28:38.552Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -1344,11 +1344,11 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "385387e9756215dba21232c9f8ac6ba4c4994952a93f14cf6380d7fe1532316c",
-      "originalLines": 806,
+      "originalSha256": "dceed63143b54db9f7829604d37aa0da0ab783182649801d8469952209ea4610",
+      "originalLines": 805,
       "prefixSha256": "793ea4c951605d99e58c9f53eeff2dbee39bcaf3219a5a447a275ed84163949d",
       "prefixBytes": 1761,
-      "entryLines": 198,
+      "entryLines": 197,
       "chunks": [
         {
           "id": "playwright-e2e-000",
@@ -1410,8 +1410,8 @@
           "id": "playwright-e2e-007",
           "ordinal": 8,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "0618b12cc767395b29b18e22ca998929cb5aed87e17cd05b55da9a9962d516d4",
-          "lines": 42,
+          "sha256": "6d285a719a85ce3f2c887b292c08cc69d9632964c341269f0f61bb2fdc403fac",
+          "lines": 41,
           "heading": "服务自启动纪律（必做）"
         },
         {
@@ -2221,8 +2221,8 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "7d9bb9c1d03396f27764346fbcc3cd9f62e4f77151bfe9c4a6d7b973860e2c75",
-      "originalLines": 665,
+      "originalSha256": "5b8d223cd64bf4dcd358b9d877776f8bb3b6df23e2545990455f037d4fbd185e",
+      "originalLines": 667,
       "prefixSha256": "01a5357a6c11c20c56f70178e843dd0d2aac92e796042c0bc582e72c967f1ad1",
       "prefixBytes": 16221,
       "entryLines": 285,
@@ -2231,8 +2231,8 @@
           "id": "v8-file-upload-000",
           "ordinal": 0,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "6155d8bbc643dc0034c66190ab5b4173ef56eba1d99a994bfce7d12ec70f52ee",
-          "lines": 18,
+          "sha256": "d134ef9d7df6a00a6f11149a7f73595d96d4feb0ffa159e520136c72de7f495a",
+          "lines": 20,
           "heading": "核心 API"
         },
         {
@@ -3196,7 +3196,7 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "c90a828864795008f95298603ce0402aa9095bfa6543be33c6cbfbdf48cde1d3",
+      "originalSha256": "3dc2745bfe3114e70dd23984e5851aaccfa079517dbdc78e6f5f6074a874ad4a",
       "originalLines": 605,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
@@ -3406,7 +3406,7 @@
           "id": "workspace-conventions-025",
           "ordinal": 25,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "eb8ddca8c6e3ece08c03b84f78bfcf16e3c0d08397534c74d93c15b40996af03",
+          "sha256": "4cf40c4ca771f7e04b80279646323a816378b98669f562ff8f4c647d5bf837ca",
           "lines": 32,
           "heading": "多 AI 对话共享本地服务与发布互斥（强制）"
         },
