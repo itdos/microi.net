@@ -609,7 +609,13 @@
                     v-if="TableDisplayMode == 'Table'"
                     class="diy-table-batch-drag-host"
                     @mousedown.capture="BatchDragSelectionMouseDown"
+                    @dragover="TreeDragOver"
+                    @drop="TreeDrop"
                 >
+                <div v-if="CanTreeDragSort()" class="tree-sort-guide">
+                    <span>拖动行内手柄排序；行中央放入下级，上下边缘插入同级。Alt + ↑ / ↓ 可移动同级。</span>
+                    <button type="button" class="tree-root-drop" :disabled="!treeDragId || treeDragBusy" @dragover.prevent @drop.prevent.stop="CommitTreePlacement(treeDragId, '', 'Root', treeDragPending)">移到根级</button>
+                </div>
                 <el-table
                     :id="'diy-table-' + TableId"
                     :ref="'diy-table-' + TableId"
@@ -637,6 +643,9 @@
                     row-key="Id"
                     :tree-props="{ children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild' }"
                 >
+                    <el-table-column v-if="CanTreeDragSort()" type="index" label="拖动" width="64" align="center">
+                        <template #default="scope"><button type="button" class="tree-sort-handle" :data-tree-node="scope.row.Id" :draggable="!treeDragBusy" :disabled="treeDragBusy" aria-label="拖动排序，Alt 加上下方向键移动同级" @click.stop @mousedown.stop @dragstart="TreeDragStart($event, scope.row)" @dragend="TreeDragEnd" @keydown.up="TreeKeyboardMove($event, scope.row, -1)" @keydown.down="TreeKeyboardMove($event, scope.row, 1)"><i class="fas fa-grip-vertical" /></button></template>
+                    </el-table-column>
                     <el-table-column v-if="IsOpenTableSingleSelect()" label="#" width="45" align="center">
                         <template #default="scope">
                             <el-radio
@@ -1090,7 +1099,7 @@
                         >
                             <el-card
                                 class="box-card card-data-animate no-padding card-redesign"
-                                :class="{ 'card-selected': IsCardSelectActive(item) }"
+                                :class="{ 'card-selected': IsCardSelectActive(item), 'card-identity': IsCardIdentityImage() }"
                                 :aria-label="CardPrimaryField ? GetPresentationFieldValue(item, CardPrimaryField) : undefined"
                                 role="button"
                                 tabindex="0"
@@ -1103,7 +1112,7 @@
                                 >
                                     <!-- 卡片图片区域 -->
                                     <img
-                                        v-if="SysMenuModel.TableCardImgField && GetCardImageValue(item, SysMenuModel.TableCardImgField)"
+                                        v-if="!IsCardIdentityImage() && SysMenuModel.TableCardImgField && GetCardImageValue(item, SysMenuModel.TableCardImgField)"
                                         :src="
                                             GetCardImageUrl(item, SysMenuModel.TableCardImgField)
                                         "
@@ -1131,8 +1140,10 @@
                                                 <el-icon v-if="IsOpenTableSingleSelect() ? (TableSelectedRow && TableSelectedRow.Id === item.Id) : isCardSelected(item)"><Check /></el-icon>
                                                 <span v-else>{{ getCardIndex(index) }}</span>
                                             </button>
-                                            <template v-else-if="!SysMenuModel.TableCardImgField || !GetCardImageValue(item, SysMenuModel.TableCardImgField)">
-                                                <span v-if="CardAvatarField" class="card-avatar">{{ GetCardAvatarText(item) }}</span>
+                                            <template v-else-if="IsCardIdentityImage() || !SysMenuModel.TableCardImgField || !GetCardImageValue(item, SysMenuModel.TableCardImgField)">
+                                                <img v-if="IsCardIdentityImage() && GetCardImageValue(item, SysMenuModel.TableCardImgField) && GetCardImageUrl(item, SysMenuModel.TableCardImgField) !== bodyBgSvg && !CardAvatarFailed(item)" :src="GetCardImageUrl(item, SysMenuModel.TableCardImgField)" class="card-avatar card-avatar--photo" alt="" @error="CardAvatarLoadError($event, item)" />
+                                                <span v-else-if="IsCardIdentityImage()" class="card-avatar card-avatar--fallback" aria-hidden="true">{{ GetCardImageFallbackText(item) }}</span>
+                                                <span v-else-if="CardAvatarField" class="card-avatar">{{ GetCardAvatarText(item) }}</span>
                                                 <span v-else-if="SysMenuModel.TableCardImgField" class="card-avatar card-avatar--fallback" aria-hidden="true">{{ GetCardImageFallbackText(item) }}</span>
                                                 <span v-else-if="!PresentationCardConfig || !PresentationCardConfig.HideIndex" class="card-index-badge">{{ getCardIndex(index) }}</span>
                                             </template>
@@ -1227,7 +1238,7 @@
                                                     :class="['is-' + GetPresentationTone(rightField), rightField.DisplayStyle ? 'is-' + rightField.DisplayStyle.toLowerCase() : '']"
                                                     :style="GetPresentationFieldStyle(rightField)"
                                                 >
-                                                    <span v-if="rightField.ShowLabel" class="card-right-label">{{ rightField.Label }}</span>
+                                                    <span v-if="rightField.ShowLabel !== false" class="card-right-label">{{ rightField.Label }}</span>
                                                     <span v-if="isMuban(rightField, { row: item })" v-safe-html:template="item[rightField.Name + '_TmpEngineResult']"></span>
                                                     <DiyTableSpecialCell
                                                         v-else-if="IsSpecialTableField(rightField)"
@@ -2102,6 +2113,7 @@
 </template>
 
 <script>
+import treeDragSortMixin from "./mixins/tree-drag-sort.mixin.js";
 import { computed } from "vue";
 import { defineAsyncComponent } from "vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
@@ -2155,6 +2167,7 @@ export default {
     name: "DiyTableRowlist",
     directives: {},
     mixins: [
+        treeDragSortMixin,
         tableUtilsMixin,
         diyCommonMixin,
         diyTableCleanupMixin,

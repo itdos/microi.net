@@ -12,7 +12,7 @@ const packageModel = JSON.parse(fs.readFileSync(
 
 test('module engine package advertises the NotShowFields runtime contract', () => {
   const packageInfo = packageModel.PackageInfo;
-  assert.equal(packageInfo.Version, 'v8.4.3');
+  assert.equal(packageInfo.Version, 'v8.4.4');
   assert.equal(packageInfo.ChangeLog.Version, packageInfo.Version);
   assert.equal(packageInfo.ChangeLog.ChangeType, 'Feature');
   assert.match(String(packageInfo.ChangeHistory), /v7\.6\.2[^\n]*NotShowFields/);

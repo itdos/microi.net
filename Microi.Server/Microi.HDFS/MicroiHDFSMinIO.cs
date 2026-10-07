@@ -80,7 +80,8 @@ namespace Microi.net
             bool configuredSsl,
             string accessKey,
             string secretKey,
-            string region = null)
+            string region = null,
+            HttpClient httpClient = null)
         {
             var normalized = NormalizeEndpoint(endpoint, configuredSsl);
             var builder = new MinioClient()
@@ -88,6 +89,7 @@ namespace Microi.net
                 .WithCredentials(accessKey, secretKey);
             if (normalized.UseSsl) builder = builder.WithSSL();
             if (!region.DosIsNullOrWhiteSpace()) builder = builder.WithRegion(region);
+            if (httpClient != null) builder = builder.WithHttpClient(httpClient);
             return builder.Build();
         }
 
@@ -731,7 +733,7 @@ namespace Microi.net
                    + rawMessage;
         }
 
-        private IMinioClient CreateMinioClient(OsClientSecret clientModel, bool isPrivate)
+        private IMinioClient CreateMinioClient(OsClientSecret clientModel, bool isPrivate, HttpClient httpClient = null)
         {
             var endPoint = clientModel.OsClientModel["MinIOEndPoint"].Val<string>();
             var osClientNetwork = Environment.GetEnvironmentVariable("OsClientNetwork", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClientNetwork") ?? "");
@@ -747,7 +749,7 @@ namespace Microi.net
                     : clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1,
                 clientModel.OsClientModel["MinIOAccessKey"].Val<string>(),
                 clientModel.OsClientModel["MinIOSecretKey"].Val<string>(),
-                clientModel.OsClientModel["MinIORegion"].Val<string>());
+                clientModel.OsClientModel["MinIORegion"].Val<string>(), httpClient);
         }
 
         private string GetBucketName(OsClientSecret clientModel, bool isPrivate)
@@ -1002,13 +1004,28 @@ namespace Microi.net
         /// <summary>
         /// 复制文件
         /// </summary>
+        private static HttpClient CreateCopyHttpClient(HttpMessageHandler transport)
+        {
+            return new HttpClient(new MinioCopyContentTypeHandler(transport))
+            {
+                Timeout = Timeout.InfiniteTimeSpan
+            };
+        }
+
+        /// <summary>在同一租户桶内由存储服务复制对象，保留原 MIME 和源对象。</summary>
         public async Task<DosResult> CopyObject(HDFSParam param)
         {
             try
             {
                 var clientModel = param.ClientModel;
                 var isPrivate = param.Limit == true;
-                var minioClient = CreateMinioClient(clientModel, isPrivate);
+                // 复制请求的签名和服务端元数据仍由 SDK/S3 处理；这里只修复 SDK 7
+                // 将带参数 MIME 额外追加到 StringContent 默认 MIME 的传输错误。
+                using var httpClient = CreateCopyHttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+                using var minioClient = CreateMinioClient(clientModel, isPrivate, httpClient);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(param.CancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(param.TimeoutSeconds.GetValueOrDefault() > 0 ? param.TimeoutSeconds.Value : 600));
+                timeout.Token.ThrowIfCancellationRequested();
                 var bucketName = GetBucketName(clientModel, isPrivate);
 
                 var sourceKey = param.FileFullPath.DosTrimStart('/');
@@ -1023,9 +1040,14 @@ namespace Microi.net
                     .WithObject(destKey)
                     .WithCopyObjectSource(cpSrcArgs);
 
-                await minioClient.CopyObjectAsync(copyArgs);
+                await minioClient.CopyObjectAsync(copyArgs, timeout.Token).ConfigureAwait(false);
 
                 return new DosResult(1);
+            }
+            catch (OperationCanceledException)
+            {
+                // 响应前取消不能证明对象未写入；由原请求键读回，禁止隐式重试复制。
+                return new DosResult(0, null, "MinIO 文件复制已取消或超时，结果可能已写入，请沿用原请求键回读。");
             }
             catch (Exception ex)
             {
@@ -1066,4 +1088,3 @@ namespace Microi.net
         }
     }
 }
-
