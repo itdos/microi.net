@@ -241,6 +241,8 @@ if (replay && replay.Code === 1) {
 
 ## WebGL 与 Windows 双端构建
 
+权威规则采用显式私有程序集组合时，平台解决方案不登记某个游戏的私有工程路径。发行使用冻结组合的 `PrivateRulesProject`，并保持 API 的 Release 配置向该工程传递；MSBuild 对解决方案之外的引用默认可能清除父配置并回退为 Debug。必须核对实际 API 输出目录的规则 DLL、其 `AssemblyConfiguration`、全部依赖哈希与目标 Linux 加载闭包，不能用单独 Release 构建成功替代一键发行构建验收。
+
 <div class="unity-doc-command">
   <span>UNITY 2022.3 LTS</span>
   <code>Microi → Taoyuan → Build WebGL</code>
