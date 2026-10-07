@@ -342,7 +342,7 @@ public class FormEngineTenantBoundaryTests
     [Fact]
     public async Task AnonymousClient_CannotReadProtectedTable_ButKeepsOrdinaryAnonymousPolicy()
     {
-        var engine = new FormEngine();
+        var engine = new AnonymousFieldPermissionFormEngine(new FormEngineAuthorizationSnapshot());
         var param = new DiyTableRowParam
         {
             _InvokeType = InvokeType.Client.ToString(),
@@ -364,6 +364,35 @@ public class FormEngineTenantBoundaryTests
             param,
             new JObject { ["Id"] = "ordinary-id", ["Name"] = "diy_customer" },
             "Read"));
+    }
+
+    [Fact]
+    public async Task AnonymousClient_UsesAuthoritativeFieldPolicyAndIgnoresAuthenticatedSnapshot()
+    {
+        var snapshot = new FormEngineAuthorizationSnapshot
+        {
+            FieldPermissionMenus = new List<FormEngineAuthorizationMenuSnapshot>
+            {
+                new()
+                {
+                    Id = "anonymous-menu", DiyTableId = "ordinary-id",
+                    FieldPermissions = "{\"Version\":1,\"Enabled\":true,\"Rules\":[{\"Everyone\":true,\"Fields\":[{\"Name\":\"Secret\",\"Visible\":false,\"Editable\":false}]}]}"
+                }
+            }
+        };
+        var engine = new AnonymousFieldPermissionFormEngine(snapshot);
+        var param = new DiyTableRowParam
+        {
+            _InvokeType = InvokeType.Client.ToString(), _IsAnonymous = true,
+            _SysMenuId = "unrelated-menu",
+            _AuthorizationSnapshot = new FormEngineAuthorizationSnapshot { UserLevel = DiyCommon.MaxRoleLevel }
+        };
+        var table = new JObject { ["Id"] = "ordinary-id", ["Name"] = "diy_customer" };
+        Assert.True(await InvokeClientAuthorization(engine, param, table, "Read"));
+        Assert.False(param._FieldPermission.Visible("Secret"));
+        param._OrderBy = "Secret";
+        Assert.False(await InvokeClientAuthorization(engine, param, table, "Read"));
+        Assert.Equal(2, engine.LoadCount);
     }
 
     [Fact]
@@ -1792,7 +1821,7 @@ public class FormEngineTenantBoundaryTests
 
         Assert.Equal(a, b);
         Assert.NotEqual(a, otherTenant);
-        Assert.Contains(":Snapshot:v2:", a);
+        Assert.Contains(":Snapshot:v4:", a);
     }
 
     [Theory]
@@ -2058,6 +2087,18 @@ public class FormEngineTenantBoundaryTests
             EnforcementCount++;
             LastRequestedOsClient = osClient;
             return string.Empty;
+        }
+    }
+
+    private sealed class AnonymousFieldPermissionFormEngine : FormEngine
+    {
+        private readonly FormEngineAuthorizationSnapshot snapshot;
+        public int LoadCount { get; private set; }
+        public AnonymousFieldPermissionFormEngine(FormEngineAuthorizationSnapshot snapshot) => this.snapshot = snapshot;
+        protected override FormEngineAuthorizationSnapshot LoadAnonymousFieldPermissionSnapshot(string osClient)
+        {
+            LoadCount++;
+            return snapshot;
         }
     }
 
