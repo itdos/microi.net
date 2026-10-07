@@ -20,7 +20,8 @@ test('表单设计生成独立 Vue SFC，复用菜单权限上下文与 FormEngi
   assert.match(source, /V8\.FormEngine\.GetTableData\(tableKey, \{ _SysMenuId: menuId\(\)/)
   assert.match(source, /V8\.FormEngine\.GetFormData\(tableKey, \{ Id: row\.Id, _SysMenuId: menuId\(\) \}\)/)
   assert.match(source, /_RowModel: record/)
-  assert.match(source, /_FormData: record/)
+  // 使用对象重载只提交可编辑字段，避免字符串重载合并服务器返回的只读字段。
+  assert.match(source, /UptFormData\(\{ FormEngineKey: tableKey, Id: record.Id, _SysMenuId: menuId\(\), _RowModel: record \}\)/)
   assert.match(source, /const editableFieldNames = \["Name","Quantity","Status"\]/)
   assert.match(source, /缺少菜单授权上下文/)
   assert.equal(generatedFormRoutePath(table), '/forms/biz_order')
@@ -30,24 +31,24 @@ test('表单设计生成独立 Vue SFC，复用菜单权限上下文与 FormEngi
   assert.deepEqual(compileTemplate({ source: parsed.descriptor.template.content, filename: 'Form_Biz_Order.vue', id: 'form-codegen' }).errors, [])
 })
 
-test('字段标签转义，复杂控件与动态数据源拒绝静默丢字段', () => {
+test('字段标签转义，复杂控件与动态数据源保留平台表单行为', () => {
   const source = generateFormVue(table, [{ Name: 'Name', Label: '<img src=x onerror=1>', Component: 'Text' }])
   assert.ok(!source.includes('<img src=x'))
   assert.match(source, /&lt;img src=x onerror=1&gt;/)
-  assert.throws(() => generateFormVue(table, [{ Name: 'Files', Component: 'FileUpload' }]), /暂不支持/)
-  assert.throws(() => generateFormVue(table, [{ Name: 'Status', Component: 'Select', Config: '{"DataSource":"Sql"}' }]), /动态数据源/)
+  assert.match(generateFormVue(table, [{ Name: 'Files', Component: 'FileUpload' }]), /action: 'openForm'/)
+  assert.match(generateFormVue(table, [{ Name: 'Status', Component: 'Select', Config: '{"DataSource":"Sql"}' }]), /action: 'openForm'/)
   assert.match(generateFormVue(table, [{ Name: 'Status', Component: 'Select', Config: '{"DataSource":"Data"}', Data: '[{"Key":"A","Value":"可用"}]' }]), /可用/)
   assert.match(generateFormVue(table, [{ Name: 'Status', Component: 'Select', Config: '{"DataSource":"Data"}', Data: '[]' }]), /未配置选项，请输入/)
-  assert.throws(() => generateFormVue(table, [{ Name: 'Choices', Component: 'MultipleSelect', Data: '[]' }]), /没有配置选项/)
-  assert.throws(() => generateFormVue(table, [{ Name: 'Group', Component: 'CollapseGroup' }]), /暂不支持/)
-  assert.throws(() => generateFormVue({ ...table, InFormV8: 'console.log(1)' }, fields), /前端 V8 事件/)
-  assert.throws(() => generateFormVue(table, [{ Name: 'Name', Component: 'Text', Config: { V8Code: 'return 1' } }]), /前端 V8 或模板代码/)
+  assert.match(generateFormVue(table, [{ Name: 'Choices', Component: 'MultipleSelect', Data: '[]' }]), /action: 'openForm'/)
+  assert.match(generateFormVue(table, [{ Name: 'Group', Component: 'CollapseGroup' }]), /action: 'openForm'/)
+  assert.match(generateFormVue({ ...table, InFormV8: 'console.log(1)' }, fields), /action: 'openForm'/)
+  assert.match(generateFormVue(table, [{ Name: 'Name', Component: 'Text', Config: { V8Code: 'return 1' } }]), /action: 'openForm'/)
   const withDisplay = generateFormVue(table, [...fields, { Name: 'SerialNo', Component: 'AutoNumber' }])
   assert.match(withDisplay, /"SerialNo": ""/)
   assert.match(withDisplay, /const editableFieldNames = \["Name","Quantity","Status"\]/)
   const withReadonly = generateFormVue(table, [...fields, { Name: 'Locked', Component: 'Text', Readonly: 1 }])
   assert.match(withReadonly, /const editableFieldNames = \["Name","Quantity","Status"\]/)
-  assert.ok(withReadonly.indexOf('<th>订单名称</th>') < withReadonly.indexOf('<th>Locked</th>'))
+  assert.ok(withReadonly.indexOf('>订单名称</th>') < withReadonly.indexOf('>Locked</th>'))
   const withDate = generateFormVue(table, [{ Name: 'OccurredAt', Component: 'DateTime' }])
   assert.match(withDate, /const dateFieldNames = \["OccurredAt"\]/)
   assert.match(withDate, /type="datetime-local" step="1"/)
@@ -91,4 +92,23 @@ test('保存生成微服务源码并回读；人工改动后拒绝覆盖', async
   files.set(first.pagePath, files.get(first.pagePath) + '\n<!-- 人工修改 -->')
   await assert.rejects(saveGeneratedFormSource(call, table, fields), /已手工修改/)
   assert.match(files.get(first.pagePath), /人工修改/)
+})
+
+
+test('复杂表单入口可编译并携带准确菜单授权与宿主结果回执', () => {
+  for (const field of [{Name:'Files',Component:'FileUpload'},{Name:'Children',Component:'TableChild'},{Name:'Name',Component:'Text',V8Code:'console.log(1)'}]) {
+    const source=generateFormVue(table,[field]);const parsed=parse(source,{filename:'RuntimeForm.vue'});
+    assert.deepEqual(parsed.errors,[]);assert.doesNotThrow(()=>compileScript(parsed.descriptor,{id:'runtime-form'}));
+    assert.deepEqual(compileTemplate({source:parsed.descriptor.template.content,filename:'RuntimeForm.vue',id:'runtime-form'}).errors,[]);
+    // 插值是 JavaScript 表达式，HTML 实体会使 vue-tsc 的表达式解析失败。
+    assert.doesNotMatch(source,/row\[&quot;/);
+    assert.match(source,/data: \{ tableName: tableKey, formMode, id, sysMenuId \}/);
+    assert.match(source,/message\?\.hostActionResult/);assert.match(source,/removeDataListener/);
+  }
+})
+
+test('基础表单按服务器有效字段权限隐藏并禁止提交只读列', () => {
+  const source=generateFormVue(table,fields);
+  assert.match(source,/v-if="canView\('Name'\)"/);assert.match(source,/!canEdit\('Name'\)/);
+  assert.match(source,/editableFieldNames\.filter\(canEdit\)/);assert.match(source,/DataAppend\?\.FieldAccess/);
 })

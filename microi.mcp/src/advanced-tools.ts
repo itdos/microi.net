@@ -523,6 +523,7 @@ export function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; erro
     if (normalized.ok && normalized.value !== undefined) result[canonical] = normalized.value;
   }
   const numericAliases: Array<[string, string]> = [
+    ['TreeDragSortEnabled', 'treeDragSortEnabled'],
     ['MenuBadgeEnabled', 'menuBadgeEnabled'],
     ['HideTableBanner', 'hideTableBanner'],
     ['HideFormBanner', 'hideFormBanner'],
@@ -532,7 +533,7 @@ export function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; erro
   for (const [canonical, alias] of numericAliases) {
     if (data[canonical] === undefined && data[alias] === undefined) continue;
     const raw = data[canonical] ?? data[alias];
-    const value = (canonical === 'HideTableBanner' || canonical === 'HideFormBanner') && typeof raw === 'boolean'
+    const value = canonical !== 'ViewConfigVersion' && typeof raw === 'boolean'
       ? (raw ? 1 : 0)
       : getNumber(data, canonical, alias);
     if (value !== undefined) result[canonical] = (canonical.endsWith('Enabled') || canonical.endsWith('Banner')) ? (value === 1 ? 1 : 0) : value;
@@ -553,6 +554,7 @@ export function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; erro
     delete result.tableHeaders;
   }
   const stringAliases: Array<[string, string]> = [
+    ['TreeDragSortField', 'treeDragSortField'],
     ['MenuBadgeApiEngineKey', 'menuBadgeApiEngineKey'],
     ['ViewSchemaVersion', 'viewSchemaVersion'],
   ];
@@ -561,7 +563,16 @@ export function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; erro
     result[canonical] = getString(data, canonical, alias);
     delete result[alias];
   }
-  const viewSchemaKey = ['ViewSchema', 'viewSchema'].find((candidate) => data[candidate] !== undefined);
+  const permissionKey = ['FieldPermissions', 'fieldPermissions'].find(key => data[key] !== undefined);
+  if (permissionKey) {
+    try {
+      const value = typeof data[permissionKey] === 'string' ? JSON.parse(data[permissionKey] as string) : data[permissionKey];
+      if (!value || typeof value !== 'object' || Array.isArray(value) || (value.Enabled && (value.Version !== 1 || !Array.isArray(value.Rules) || value.Rules.length > 200))) errors.push('FieldPermissions 必须为字段权限 v1 配置对象。');
+      else result.FieldPermissions = JSON.stringify(value);
+    } catch { errors.push('FieldPermissions 必须是合法 JSON 对象。'); }
+    delete result.fieldPermissions;
+  }
+  const viewSchemaKey = ['ViewSchema' , 'viewSchema'].find((candidate) => data[candidate] !== undefined);
   if (viewSchemaKey) {
     const normalized = normalizeViewSchemaJson(data[viewSchemaKey]);
     errors.push(...normalized.errors);
@@ -3589,7 +3600,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
   });
   server.tool('microi_list_modules', `List menu modules for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Modules', await client.listModules(keyword)));
   server.tool('microi_get_module', `Get one menu module by ModuleId for OsClient ${osClient}.`, { moduleId: z.string() }, async ({ moduleId }) => apiText('Module Detail', await client.getModule(moduleId)));
-  server.tool('microi_update_module', `Incrementally update an existing menu module, including TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
+  server.tool('microi_update_module', `Incrementally update an existing menu module, including FieldPermissions v1 (Rules with Users/Roles/Departments/Jobs and Fields.Visible/Editable), TreeDragSortEnabled/TreeDragSortField, TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
     const normalized = normalizeAllMenuJson(module);
     if (normalized.errors.length) return textResult(JSON.stringify(normalized, null, 2), true);
     const target = getString(module, 'moduleId', 'ModuleId', 'Id') || getString(module, 'name', 'Name');
