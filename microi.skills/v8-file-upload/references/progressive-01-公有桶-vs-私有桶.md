@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-file-upload-005 sha256=0b4d57f32bfe913c3a2567d2e2a86f4d5ba505d60c4348ad472c117774bbfc31 -->
+<!-- microi-progressive:chunk id=v8-file-upload-005 sha256=71cebd2f6946be49188c430c146b9ee923ceb0719fbda4bd3701b40152732cae -->
 ## 公有桶 vs 私有桶
 
 ### 应用商城 ZIP
@@ -41,6 +41,12 @@ var extractResult = V8.Method.ExtractZip({
 源码 ZIP 导出前后按完整原始文件路径、摘要和大小核对 `store-` 活动根的清单承诺，部分旧根
 或漂移拒绝输出；ZIP 中兼容去掉 `source/` 包装目录不改变安装根的原始路径摘要。
 仍须下载原生源码 ZIP 并逐文件验签，不用对象摘要代替 ZIP 实际返回字节的独立验证。
+
+大型 UTF8 源码可复用既有 `V8.Method.GetPrivateFileText` 与
+`V8.EncryptHelper.Sha256Hex/V8.Base64.StringToBase64`，避免 CLR byte[] 逐字节复制到 Jint。
+仅在字符串按 UTF8 的摘要与权威原字节摘要一致时采用，保留 BOM、换行并核对编码长度；
+二进制或有损解码仍使用原字节路径。文本原子存在却读取失败/异常时失败关闭，不换路径
+掩盖存储故障。旧宿主缺少文本或编码能力才沿用旧路径，最终同一 ZIP 的实际字节验签保持。
 
 ### 已提交应用的 CDN 特殊字符别名修复（强制）
 

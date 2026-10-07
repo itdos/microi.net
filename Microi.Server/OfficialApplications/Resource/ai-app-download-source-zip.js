@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_download_source_zip
- * Version: v1.2.6
+ * Version: v1.2.7
  * Function:
  * - 按当前租户和有效拥有者导出活动私有源码，固定源码根、排除历史与运行对象，分页与逐文件字节摘要前后校验。
  */
@@ -211,6 +211,21 @@ function sha256Bytes(bytes) {
 }
 function hasZipReader() { return typeof V8.Method.ExtractZip === 'function' || typeof V8.Method.ReadZip === 'function'; }
 async function readFileBase64(file, verifySha) {
+  // Jint 的 CLR 数组 Copy 会逐字节创建 JS 值；大文本改用既有原子的字符串边界。
+  // 只有 UTF8 文本摘要与权威原字节相同时才采用，BOM/换行保持；二进制仍读原字节。
+  // 原子存在却读取失败必须关闭，不能以另一条存储路径掩盖失败；最终 ZIP 校验保持不变。
+  if (typeof V8.Method.GetPrivateFileText === 'function' && V8.Base64 && typeof V8.Base64.StringToBase64 === 'function') {
+    runtimeStage = 'PrivateText';
+    var textResult = await V8.Method.GetPrivateFileText({ OsClient: V8.OsClient, FilePathName: file.HdfsPath, Limit: true, MaxBytes: file.Size });
+    if (!textResult || Number(textResult.Code) !== 1 || typeof textResult.Data !== 'string') reject('STORAGE');
+    runtimeStage = 'TextHash';
+    if (text(V8.EncryptHelper.Sha256Hex(textResult.Data)).toLowerCase() === file.ContentHash) {
+      runtimeStage = 'Base64';
+      var encoded = V8.Base64.StringToBase64(textResult.Data);
+      if (typeof encoded !== 'string' || encoded.length !== 4 * Math.ceil(file.Size / 3)) reject('SIZE');
+      return encoded;
+    }
+  }
   runtimeStage = 'PrivateBytes';
   var result = await V8.HDFS.GetPrivateFileByte({ OsClient: V8.OsClient, FilePathName: file.HdfsPath, Limit: true });
   if (!result || Number(result.Code) !== 1 || !result.Data) reject('STORAGE');

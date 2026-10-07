@@ -21,7 +21,7 @@ export function sourceFixture(count = 3) {
 
 // 显式模拟 FE 的活动源条件和可信 HDFS 字节边界；不模拟上传、发布或数据库写入。
 export async function runSourceZip(fixture = sourceFixture(), options = {}) {
-  const state = { app: copy(fixture.app), user: copy(fixture.user), rows: copy(fixture.rows), queries: [], reads: [], zips: [], zipReads: [], hashFactories: 0, writes: 0, signedUrls: 0, httpReads: 0, appReads: 0, userReads: 0 };
+  const state = { app: copy(fixture.app), user: copy(fixture.user), rows: copy(fixture.rows), queries: [], reads: [], textReads: [], zips: [], zipReads: [], hashFactories: 0, writes: 0, signedUrls: 0, httpReads: 0, appReads: 0, userReads: 0 };
   const bytes = new Map(fixture.bytes), userId = options.userId ?? state.user.Id;
   const V8 = {
     OsClient: options.tenant || 'iTdos', CurrentUser: { Id: userId, ...(options.currentUser || {}) }, Param: { AppId: state.app.Id, ...(options.param || {}) },
@@ -64,6 +64,18 @@ export async function runSourceZip(fixture = sourceFixture(), options = {}) {
     },
     Http: { GetResponse(param) { state.httpReads++; return { RawBytes: bytes.get(param.Url) }; } }
   };
+  if (options.nativeTextRead) {
+    // 真实既有原子返回字符串；用精确字节摘要决定能否采用 UTF8 快速路径。
+    V8.Method.GetPrivateFileText = param => {
+      state.textReads.push(copy(param)); options.onTextRead?.(state, bytes, param);
+      if (options.textStorageThrow) throw Error('private upstream address');
+      if (options.textStorageFailure) return { Code: 0, Msg: 'private upstream address' };
+      const raw = bytes.get(param.FilePathName);
+      if (raw.length > param.MaxBytes) return { Code: 0 };
+      return { Code: 1, Data: raw.toString('utf8') };
+    };
+    V8.Base64 = { StringToBase64: value => Buffer.from(value, 'utf8').toString('base64') };
+  }
   if (!options.zipReaderMissing) {
     // 仿真既有原子的可信返回：以将要返回的归档实际条目算原始字节SHA，不另读HDFS对象。
     const reader = param => {
