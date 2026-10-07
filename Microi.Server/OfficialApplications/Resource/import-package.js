@@ -3310,17 +3310,15 @@ try {
             activeImportResource = appKey + ':Source:' + sourcePath;
             expectedApplicationPaths[sourcePath.toLowerCase()] = true;
             var sourceUpload = reuseApplicationAsset(existingApplicationAssets, sourcePath, sourceFile);
-            // PRIVATE_SOURCE_RESUME_AFTER_SOURCE_V2：Build/BuildRepair 表示同应用全部
-            // 源码已逐片校验；后续应用检查点也包含此前应用的已提交前缀。恢复时仅
-            // 复用同一包摘要根和精确元数据，不能重新消耗源码预算并退回 Source 游标。
-            var sourceCheckpointKind = String(backgroundCheckpoint.AssetKind || '');
-            var sourceCheckpointBundle = Number(backgroundCheckpoint.BundleIndex || 0);
+            // APPLICATION_ASSET_SOURCE_BUILD_CURSOR_V1：已提交的运行阶段表示源码已完成，
+            // 后续 Bundle 也不得从包头重复消耗源码预算。仅复用已知资产阶段和同一清单
+            // 根下摘要、大小均匹配的私有元数据；未知游标或清单变化仍逐对象验证。
             var sourcePreviouslyVerified = backgroundChunkingEnabled
                 && String(backgroundCheckpoint.Phase || '') == 'ApplicationAssets'
-                && (sourceCheckpointKind == 'Source' || sourceCheckpointKind == 'Build' || sourceCheckpointKind == 'BuildRepair')
-                && (bundleIndex < sourceCheckpointBundle
-                    || (sourceCheckpointBundle == bundleIndex
-                        && (sourceCheckpointKind == 'Build' || sourceCheckpointKind == 'BuildRepair'
+                && ['Source', 'Build', 'BuildRepair'].indexOf(String(backgroundCheckpoint.AssetKind || '')) >= 0
+                && (Number(backgroundCheckpoint.BundleIndex || 0) > bundleIndex
+                    || (Number(backgroundCheckpoint.BundleIndex || 0) == bundleIndex
+                        && (String(backgroundCheckpoint.AssetKind || '') != 'Source'
                             || i < Number(backgroundCheckpoint.AssetIndex || 0))))
                 && sourceUpload && sourceUpload.HdfsPath == '/' + String(V8.OsClient || '').toLowerCase() + '/' + sourceRoot + '/' + sourcePath;
             if (!sourcePreviouslyVerified) {
