@@ -75,3 +75,13 @@ test('directory link cycles are rejected before replacing a prior runtime', asyn
   assert.throws(() => copyOnlineAiMcpRuntime(staging, destination), /Cyclic/);
   assert.equal((await fs.readFile(path.join(destination, 'prior.txt'))).toString(), 'preserve');
 });
+
+test('actual online MCP source compiles and packs a self-contained production runtime before release', () => {
+  const root = path.resolve(import.meta.dirname, '../../..');
+  const result = spawnSync(process.execPath, [
+    path.join(root, 'Microi.Server/tools/pack-online-ai-mcp.mjs'), '--verify-only'
+  ], { cwd: root, encoding: 'utf8', timeout: 120000, maxBuffer: 2 * 1024 * 1024 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr + '\n' + result.stdout);
+  assert.match(result.stdout, /Online AI MCP runtime reproducible build, production prune and self-contained copy passed/);
+});
