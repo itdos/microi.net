@@ -15,7 +15,9 @@ test('module field permissions preserve identity groups and tree ordering settin
   const policy = {Version:1,Enabled:true,DefaultVisible:true,DefaultEditable:false,Rules:[{Users:['user'],Roles:['role'],Departments:['dept'],Jobs:['job'],Fields:[{Name:'Salary',Visible:false,Editable:false}]}]};
   const normalized = normalizeAllMenuJson({fieldPermissions:policy,treeDragSortEnabled:true,treeDragSortField:'Sort'});
   assert.deepEqual(normalized.errors,[]);
-  assert.deepEqual(JSON.parse(normalized.data.FieldPermissions),policy);
+  const storedPolicy = normalized.data.FieldPermissions;
+  assert.ok(typeof storedPolicy === 'string', 'FieldPermissions must be stored as JSON text');
+  assert.deepEqual(JSON.parse(storedPolicy),policy);
   assert.equal(normalized.data.TreeDragSortEnabled,1);assert.equal(normalized.data.TreeDragSortField,'Sort');
   assert.ok(normalizeAllMenuJson({fieldPermissions:'{invalid'}).errors.length);
   assert.ok(normalizeAllMenuJson({fieldPermissions:{Version:2,Enabled:true,Rules:[]}}).errors.length);
