@@ -181,7 +181,7 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 API、PC 框架、官网和 Microi Agent 各自使用 `.tmp/microi-process-state/` 下的 `api-release.lock`、`pc-release.lock`、`website-release.lock`、`agent-release.lock`，可以同时发布；同类发布互斥。合并发布只取得所选产品的锁，部分取得失败会撤回本次已取得的锁。API 服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`，或通过进程管理器 `AssertServiceStart -ReleaseScope api|pc|all` 检查。Windows 发布准备按相同范围清理：API 处理后端及 Release DLL，PC 处理 Vite，官网不停止二者。
 
-PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与依赖审计统一使用本次结果目录的 `.net-artifacts`，并行发布使用独立结果目录、测试服务/端口及隔离租户。官网的全部源码、主题、测试和依赖由官网发布验收，不影响 PC/API 的候选一致性；共享 SDK、Skills、MCP 与发布工具仍受候选保护。共享版本和跨产品改动应先准备并冻结，再并行发布。资源排队按实际并行阶段预算之和与系统余量判断，不再因无关产品占用一个全局窗口而等待。
+PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与依赖审计统一使用本次结果目录的 `.net-artifacts`，并行发布使用独立结果目录、测试服务/端口及隔离租户。官网的全部源码、主题、测试和依赖由官网发布验收，不影响 PC/API 的候选一致性；共享 SDK、Skills、MCP 与发布工具仍受候选保护。共享版本和跨产品改动应先准备并冻结，再并行发布。资源排队按实际并行阶段预算之和与系统余量判断，不再因无关产品占用一个全局窗口而等待。 macOS/Linux 的进程管理器同时识别项目 `bin/` 和当前工作区 `.tmp/microi-release-gate/日期-时间-PID/.net-artifacts/bin/Microi.net.Api/debug|release/` 下的规范 API apphost；后者仍要求 API 项目 CWD 精确一致，其它工作区、任意输出目录、路径越界或无法回读身份均拒绝停止。
 
 旧 `platform-release.lock` 或 `release.lock` 仅在 PID 的真实命令入口和共享状态目录证明属于 API 热修复或 Agent 时缩小阻塞范围；未知归属继续保守保护。原进程和唯一令牌释放自身锁，不能删除其它正在运行的发布锁。
 
