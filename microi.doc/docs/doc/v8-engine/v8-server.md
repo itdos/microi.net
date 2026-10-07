@@ -763,6 +763,15 @@ var textUploadResult = V8.Method.UploadText({
 
 `UploadText` 只接受 `Content` 和一个安全的 `FileName`，禁止同时传 `FilesByteBase64/FilesByte/Files`。它避免字符串先转 Base64 再还原字节产生的额外内存和错误文本编码，但不会替调用方完成内容哈希：商城等可信发布流程仍须对上传结果回读，并核对 UTF-8 字节数与 SHA-256 后才能提交数据库指针。
 
+可信后端可用 `V8.Method.GetPrivateFileText({ OsClient: V8.OsClient, FilePathName, Limit: true, MaxBytes })`
+读取当前租户私有文本，成功返回 `{ Code: 1, Data: UTF8字符串 }`。`MaxBytes` 默认 64 MiB，
+受 256 MiB 固定上限约束；必须先验证 `Code=1` 和字符串类型，失败不能改走未经授权的下载地址。
+该方法按 UTF8 解码，不适合直接保真转换二进制。需要原字节保真的源码导出应先用
+`V8.EncryptHelper.Sha256Hex(result.Data)` 核对已验证的原字节摘要，再用
+`V8.Base64.StringToBase64(result.Data)` 编码并核对长度；摘要不匹配时使用原字节路径。
+最终仍核验将返回的 ZIP 实际条目，不以一次文本读取或另一份对象摘要代替归档验签。
+大文本这样避免 CLR 字节数组进入 Jint 的逐字节复制，权限、路径、配额和活动版本约束仍由调用方负责。
+
 应用编译资产和私有源码在当前租户桶内迁移时，可使用 `V8.Method.CopyObject({ FilePathName: 'itdos/旧对象', Path: 'itdos/micro-app/app-key/v1.0.0/index.html', Limit: false })`。`Limit: true` 对应私有桶源码，源与目标不能跨桶；两个路径均被收敛到当前租户。`V8.Method.ObjectExist({ FilePathName, Limit })` 检查对象，`V8.Method.GetObjectSha256({ FilePathName, Limit })` 在服务端流式返回 `Data.Sha256`（原始字节）、`Data.WireSha256`（旧版 Base64 文本）和 `Data.Size`，不把对象字节传入 V8。`V8.Method.ListObjects({ Path, Limit, Recursive: true, Marker, MaxKeys })` 按单个应用前缀分页列举，单页上限 1000。历史版本复制前核对已有目标哈希，完成后还须从 CDN 独立回读公有资产；不能因 `CopyObject` 返回成功就更新商城体验地址。这些管理原子只在可信后端接口引擎中使用，不向匿名调用者开放。
 
 MinIO/S3 复制保留源对象的 MIME 参数和元数据，包括 `text/css; charset=utf-8`。旧后端使用 MinIO SDK 7 时，带参数 MIME 的复制请求可能因重复 `Content-Type` 返回签名不匹配；需升级后端复制传输修复，再沿用原请求键回读目标并恢复。修复只还原 SDK 已签名的精确 MIME，继续由存储服务校验签名和执行复制；不能通过移除 `charset`、放宽签名校验或下载后重新上传来掩盖问题。取消或超时不证明目标未写入，必须先核对目标字节数与哈希。
