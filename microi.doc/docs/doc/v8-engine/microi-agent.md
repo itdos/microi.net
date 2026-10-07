@@ -41,6 +41,10 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 
 **Windows 与 macOS 1.3.6 已开放下载**：修复完整应用正常启动误用 Electron Helper 导致 Harness 原生加载器拒绝的问题。Harness、Worker 与插件命令统一使用包内独立 Node；最终签名 Mac 应用已验收正常启动、重启和再次打开。吾码员工、MCP、Skills、对话编辑与撤回继续保留。macOS Universal 已签名公证；官网 Windows EXE 仍为未签名公开测试，Windows 原生安装、启动另行验收。
 
+**Windows 1.3.7 安装修复候选**：如果 1.3.6 在升级时提示“新版本目录切换失败”，日志显示 `enable staged directory win32=5`，请退出正在运行的 Agent，下载 [1.3.7 Windows x64 安装修复候选](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-x64-setup.exe)，安装到原目录。无需先删除工作区、会话或配置。本次增加短暂占用重试和同盘文件迁移回退；迁移中途失败按逐项记录恢复，保留旧程序、暂存文件与未知冲突文件。单凭错误 5 无法确定拒绝操作的进程或策略，不直接归因于杀毒软件。
+
+安装后可下载 [一键原生验收工具](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-native-acceptance.zip)，解压并双击 `一键验收.cmd`。它自动回读安装后的全部文件 SHA-256，运行六项真实 NSIS 故障回归，再从完整产品主入口启动两次，检查 Worker 与 Harness 重启；结果 ZIP 位于工具 `result` 目录，失败也会保存证明。工具只导出证明 JSON 和测试截屏，不导出测试 Profile 或凭据。**当前六项 NSIS 夹具已在 Wine 通过，Windows 原生升级与启动仍待验收；自动更新 latest 暂保持 1.3.6，macOS 签名公证版仍为 1.3.6。**
+
 **Windows 启动恢复说明**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
 
 - 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 1.3.6 测试包仍为未签名 EXE，商店 MSIX 1.3.3 由微软签名。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
@@ -844,6 +848,13 @@ npm run publish:cli:resume
 :::
 
 ## 更新日志
+
+### v1.3.7 - (2026-10-07)
+
+- **修复 Windows 升级目录切换失败**：针对 1.3.6 安装日志中的 `Win32=5`，新增 5/32/33 有界重试；持续拒绝目录切换时，仅在本次成功创建的目标目录内做同盘文件迁移，不复制整包到系统临时盘。
+- **完善中途失败恢复**：逐项记录迁移意图，回滚时不覆盖旧文件或未知冲突；保留旧备份与未恢复暂存。回滚读到 EOF/短记录即停止，目录句柄关闭后才清理空目录。成功才提交并清理本次暂存。
+- **保留吾码二开与上游同步保护**：安装事务及真实 NSIS 回归进入受保护差异层；员工工作台、MCP、内置 Skills、对话历史、编辑与撤回保持。
+- **测试与发行范围**：1764 项单元回归通过、11 项平台条件跳过，类型检查及真实三方合并保护通过；最终 NSIS 源码六项故障夹具在 Wine 通过，覆盖中文长路径、短暂/持续错误 5、部分迁移失败及未知冲突。已提供未签名 Windows x64 手动测试候选和一键原生验收工具；Windows 真机升级/启动待验收，自动 latest 与 macOS 1.3.6 保持不变。
 
 ### v1.3.6 - (2026-10-06)
 

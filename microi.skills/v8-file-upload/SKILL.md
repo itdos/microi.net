@@ -89,7 +89,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 官网客户端读取私有文件统一调用 `/apiengine/platform-private-file-url`，提交 `FilePathName` 或有界 `FilePathNames`，并按资源类型提供权威定位参数：普通表单字段使用 `FormEngineKey + FormDataId + FieldId + SysMenuId`；用户头像使用 `ResourceKind=UserAvatar + ResourceId=用户Id`；菜单/部门导入模板分别使用 `MenuImportTemplate`、`DeptImportTemplate` 与对应记录 Id。CAD 私有派生预览使用 `ResourceKind=FormFieldDerivedPreview`，除表单四元组外必须同时提交字段中保存的 `OriginalFilePathName` 和单个派生 `FilePathName`；后端只接受同目录同 basename 的 DWG→`_preview.dxf`、STEP/STP→`_preview.stl` 唯一映射，并在对象存在后签名。文件柜对象使用 `ResourceKind=FileManagerObject`，`ResourceId` 必须与单个 `FilePathName` 大小写精确相同，并提交能力探针返回的当前租户权威 `SysMenuId`；此类签名只允许平台超级管理员 DiyToken 会话，访问密钥和普通菜单用户一律拒绝。后端会从权威字段或对象存储重新读取并精确匹配路径；管理员也不能只传裸路径绕过对象引用，普通客户端禁止换取私有文件原始 Byte/Stream。旧 `/api/HDFS/GetPrivateFileUrl` 与 `/api/HDFS/MallFileUrl` 只保留令牌格式兼容并转发同一 Managed 接口，新代码不得继续引用。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=6155d8bbc643dc0034c66190ab5b4173ef56eba1d99a994bfce7d12ec70f52ee -->
+<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=d134ef9d7df6a00a6f11149a7f73595d96d4feb0ffa159e520136c72de7f495a -->
 ## 核心 API
 
 | API | 说明 |
@@ -106,6 +106,8 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 | 接口返回 `{ FileName, ContentType, FileByteBase64 }` | 接口直接响应文件 |
 
 固定 CDN 应用回填优先使用服务端 `CopyObject`，公有桶复制编译资产、私有桶复制源码；`Limit` 在源与目标间保持一致，`Path` 和 `FilePathName` 均由后端收敛到当前租户。大对象用 `GetObjectSha256` 流式核对原对象和复制目标，公有体验路径仍须从 CDN 独立回读。历史版本目标已存在时须核对字节哈希，发现不同内容立即停止；固定根可在新版本验证后覆盖。`ListObjects` 必须分页并限制到单个应用前缀，不得把这些存储管理原子直接开放为匿名业务接口。
+
+MinIO SDK 7 的复制签名不匹配还可能来自带参数 MIME：SDK 对源 `Content-Type` 签名，却在 HTTP 请求中额外保留 `StringContent` 的默认 MIME。先在独立夹具核对源 MIME、重复头和真实存储返回，再升级后端复制传输修复；不能去掉 `charset`、关闭签名校验或下载后重传来伪造通过。修复后必须同时验证公私桶原始字节、精确 MIME、源元数据及源对象保留，固定入口恢复另覆盖主库权威、真实共享租约、双节点竞争和新进程重跑。取消/超时后保持原请求键，先回读目标再决定是否继续。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=v8-file-upload-001 sha256=d535a333639a9005f5d20f25e36e2753a11835380713c1bb063ae618e6cea4af -->
@@ -241,44 +243,11 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 验收至少覆盖：登录成功显示身份、退出后 Token 清空、历史连接一键重连、删除连接、密文落库、服务重启后仍可解密、目标平台缺少能力接口时的升级提示。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-004 sha256=8393c7b2b7ce36e563843f43f42e9a06a8cb69fc7b792930912353d846ee769f -->
-## 空目录标记的受控恢复
-
-- 只需移除一个目录占位对象时，使用 `V8.HDFS.DeleteObject({FilePathName:'当前租户目录/', Limit:true/false, EmptyDirectoryOnly:true})` 并等待异步结果。必须是当前租户实际有效超级管理员的可信 V8/DiyToken 会话；不能使用参数中的 `_CurrentUser`、访问密钥或临时维护引擎代替授权。
-- HTTP/MCP 必须使用专用 `/api/HDFS/DeleteEmptyDirectoryMarker` / `microi_delete_empty_directory_marker`，显式选择桶并保留末尾 `/`。旧后端缺路由、非标准结果或成功缺少 `DeletionMode=EmptyDirectoryMarkerOnly` / `VerifiedAbsent=true` 均停止，绝不回退普通递归删除。
-- MCP 默认 dry run；执行 `confirmExecution` 精确等于 `filePathName`。旧 `/api/HDFS/DeleteObject` 不能作为缺少专用路由时的回退。路径拒绝租户根、跨租户、未知绝对前缀、URL、通配符与穿越。原始列表必须完整、大小明确为零，供应商只删精确标记 key，再完整回读；不允许前缀批量删除、忽略续页或把缺失 Size 默认成零。
-- 这不是零字节对象 CAS，也不证明历史 NoPUT。同 key 版本替换没有跨供应商统一条件 DELETE；执行前必须隔离原请求并排除活跃写入。保留历史/当前证据的区别；未知结果先只读回查，不换请求键、不清其它对象、不自动再次 PUT。
-
-## 下载远程文件并存到 HDFS
-
-```javascript
-// 1) 下载远程图片
-var resp = V8.Http.GetResponse({ Url: V8.Param.imageUrl });
-if (resp.StatusCode !== 200) return { Code: 0, Msg: '下载失败' };
-
-// 2) 转 base64 后上传到 HDFS
-var base64 = System.Convert.ToBase64String(resp.RawBytes);
-var fileName = V8.Method.NewGuid() + '.png';
-
-var upResult = V8.Method.Upload({
-  FilesByteBase64: { [fileName]: base64 },
-  Limit: false,
-  Path: '/imported',
-  OsClient: V8.OsClient
-});
-
-return upResult;
-```
-
-> 在 V8/Jint 中避免把 `resp.RawBytes` 直接塞进 `FilesByte`；序列化时可能变成数字/浮点数组，导致 `Unexpected token when reading bytes`。更稳的是 `System.Convert.ToBase64String(resp.RawBytes)` 后使用 `FilesByteBase64`。
-
-移动端公开图片优先使用 `.jpg` / `.png` / `.webp`。如果上传 `.svg`，必须确认对象存储返回正确 `Content-Type: image/svg+xml`，否则浏览器可能拦截或不渲染。
-
-<!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）
 
 仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
 
 - [references/progressive-01-公有桶-vs-私有桶.md](references/progressive-01-公有桶-vs-私有桶.md)：公有桶 vs 私有桶；接口直接响应文件（下载/导出）；通过 URL 列表批量下载并入库
 - [references/progressive-02-office-文件在线编辑版本号规则.md](references/progressive-02-office-文件在线编辑版本号规则.md)：Office 文件在线编辑版本号规则；ImgUpload / FileUpload 字段值兼容规则；安全注意
+- [references/progressive-03-空目录标记与远程下载.md](references/progressive-03-空目录标记与远程下载.md)：精确空目录标记删除与远程文件下载入库
 <!-- microi-progressive:end -->

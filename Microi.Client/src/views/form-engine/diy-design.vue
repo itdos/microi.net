@@ -21,7 +21,7 @@
                     </el-dropdown-menu>
                 </template>
             </el-dropdown>
-            <el-button v-if="PageType != 'Report' && CurrentDiyTableModel && CurrentDiyTableModel.Id" @click="OpenGeneratedFormCode">生成 Vue 3 代码</el-button>
+            <el-button v-if="PageType != 'Report' && CurrentDiyTableModel && CurrentDiyTableModel.Id" @click="OpenGeneratedFormCode">生成表单代码</el-button>
             <el-dropdown trigger="click" @command="HandleMoreCommand">
                 <el-button>
                     更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -320,11 +320,11 @@
             v-if="ShowPreviewFormDialog"
             ref="refDiyDesign_PreviewFormDialog"
         ></DiyFormDialog>
-        <el-dialog v-model="ShowGeneratedFormCode" title="表单 Vue 3 代码" width="min(960px, 94vw)" destroy-on-close>
-            <p>设计器仍维护字段、表结构和权限。这里生成独立 Vue 页面；保存后可在 AI 应用工作台改文字、布局和逻辑，完成 Vite 构建与微服务发布后再把菜单切换为“表单代码”。</p>
+        <el-dialog v-model="ShowGeneratedFormCode" title="生成表单代码" width="min(960px, 94vw)" destroy-on-close>
+            <p>生成可编辑的表单页面源码。基础控件生成独立表单；复杂控件、动态数据源和前端事件继续调用平台原表单。保存后可在 AI 应用工作台定制布局，并按微服务流程构建发布。</p>
             <p v-if="GeneratedFormCodeError" class="form-codegen-error" role="alert">{{ GeneratedFormCodeError }}</p>
             <template v-else>
-                <el-input :model-value="GeneratedFormCode" type="textarea" :rows="18" readonly aria-label="生成的 Vue 源码" />
+                <el-input :model-value="GeneratedFormCode" type="textarea" :rows="18" readonly aria-label="生成的表单源码" />
                 <p v-if="GeneratedFormCodeResult">已保存到 {{ GeneratedFormCodeResult.appKey }}/{{ GeneratedFormCodeResult.pagePath }}，路由 {{ GeneratedFormCodeResult.routePath }}。源码已保存，尚需构建并发布运行产物。</p>
             </template>
             <template #footer>
@@ -642,7 +642,7 @@ export default {
                     this.CurrentDiyTableModel,
                     this.DiyFieldList
                 );
-                this.DiyCommon.Tips("Vue 源码已保存到微服务，请构建发布后切换模块打开方式。");
+                this.DiyCommon.Tips("表单源码已保存到微服务，请构建发布后切换模块打开方式。");
             } catch (error) {
                 this.GeneratedFormCodeError = error?.message || String(error);
                 this.DiyCommon.Tips(this.GeneratedFormCodeError, false);

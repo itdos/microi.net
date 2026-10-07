@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-06T17:49:10.764Z",
+  "generatedAt": "2026-10-07T00:37:40.829Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2221,18 +2221,18 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "7d9bb9c1d03396f27764346fbcc3cd9f62e4f77151bfe9c4a6d7b973860e2c75",
-      "originalLines": 665,
+      "originalSha256": "5b8d223cd64bf4dcd358b9d877776f8bb3b6df23e2545990455f037d4fbd185e",
+      "originalLines": 667,
       "prefixSha256": "01a5357a6c11c20c56f70178e843dd0d2aac92e796042c0bc582e72c967f1ad1",
       "prefixBytes": 16221,
-      "entryLines": 285,
+      "entryLines": 254,
       "chunks": [
         {
           "id": "v8-file-upload-000",
           "ordinal": 0,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "6155d8bbc643dc0034c66190ab5b4173ef56eba1d99a994bfce7d12ec70f52ee",
-          "lines": 18,
+          "sha256": "d134ef9d7df6a00a6f11149a7f73595d96d4feb0ffa159e520136c72de7f495a",
+          "lines": 20,
           "heading": "核心 API"
         },
         {
@@ -2262,7 +2262,7 @@
         {
           "id": "v8-file-upload-004",
           "ordinal": 6,
-          "destination": "v8-file-upload/SKILL.md",
+          "destination": "v8-file-upload/references/progressive-03-空目录标记与远程下载.md",
           "sha256": "8393c7b2b7ce36e563843f43f42e9a06a8cb69fc7b792930912353d846ee769f",
           "lines": 33,
           "heading": "下载远程文件并存到 HDFS"
@@ -2331,6 +2331,13 @@
             "Office 文件在线编辑版本号规则",
             "ImgUpload / FileUpload 字段值兼容规则",
             "安全注意"
+          ]
+        },
+        {
+          "path": "references/progressive-03-空目录标记与远程下载.md",
+          "headings": [
+            "空目录标记的受控恢复",
+            "下载远程文件并存到 HDFS"
           ]
         }
       ]

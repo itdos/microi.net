@@ -8,10 +8,9 @@ public sealed class MemoryDiagnosticsProcessTests
 {
     private static readonly string TestRoot = TestSourcePaths.FindTestsRoot();
     private static readonly string WorkspaceRoot = Path.GetFullPath(Path.Combine(TestRoot, "..", ".."));
-    private static readonly string Configuration = typeof(MemoryDiagnosticsProcessTests).Assembly
-        .GetCustomAttributes(typeof(System.Reflection.AssemblyConfigurationAttribute), false)
-        .Cast<System.Reflection.AssemblyConfigurationAttribute>().Single().Configuration;
-    private static readonly string Fixture = TestSourcePaths.MemoryDiagnosticsFixture(AppContext.BaseDirectory, TestRoot, Configuration);
+    // 新构建目标复制本轮实际夹具及其依赖；直接使用该独立输出，不回退历史 DLL。
+    private static readonly string Fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "MemoryDiagnosticsNode",
+        "Microi.MemoryDiagnostics.Fixture.dll");
 
     [Fact]
     public async Task UnitAndContractRegressions()
