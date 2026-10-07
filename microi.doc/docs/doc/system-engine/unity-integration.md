@@ -341,6 +341,24 @@ Unity WebGL 与安装包已作为公有运行资产提交，且消费者无需�
 AI 角色设定图用于约束脸型、发式、衣料与色彩，不是运行时截图。只有 Unity Player/WebGL 的近景截图、帧率、模型拓扑、材质通道和目标设备实测，才能证明实际画质；文档与商城页不得把设定图标成“AAA 实机”。
 :::
 
+### Editor 动画摄影棚与新增蒙皮
+
+同一次 Editor 更新中反复调用 `AnimationClip.SampleAnimation` 和 `Camera.Render` 时，
+需对所有目标克隆的 `SkinnedMeshRenderer` 设置
+`forceMatrixRecalculationPerRender = true`，让每次渲染重新计算蒙皮矩阵。
+否则刚性头发或附件可能已移动，身体却仍显示旧姿态。
+该设置仅用于独立摄影棚克隆，不默认修改运行 Prefab；
+使用条件见 [Unity 官方说明](https://docs.unity.com/en-us/engine/6000.5/script-reference/unityengine/skinnedmeshrenderer/forcematrixrecalculationperrender)。
+
+| 检查 | 必须保留的证据 |
+|---|---|
+| 可见对象归属 | 每个渲染器的场景、路径、网格与目标实例，排除参考模型混入。 |
+| 整体动作 | 身体、头发、武器和新增蒙皮逐帧 GPU 图与有限顶点；不能隐藏冻结身体来修饰结果。 |
+| 静止骨架 | 从导入绑定矩阵重建空间，验证所有实际加权骨骼；不能仅按名字或当前动作姿态绑定。 |
+| 材质与贴图 | 实际有面的材质槽、颜色空间、源图尺寸及目标平台实际导入尺寸分别回读。 |
+
+摄影棚输出、Player/WebGL 对局、目标设备性能与商业美术签收仍是不同验收层。
+
 ## 继续深入
 
 <div class="unity-doc-links">
