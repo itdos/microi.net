@@ -34,8 +34,10 @@ public sealed class FixedStepKernel
         Guard.Id(envelope.RegistrationId);Guard.Id(envelope.RoomId);Guard.Id(envelope.RoomEpoch);Guard.Id(envelope.RequestId);
         if(!Guard.Decimal(envelope.AuthorityEpoch)||!Guard.Decimal(envelope.Revision)||envelope.StartUnixMs<0||envelope.ServerNowUnixMs<envelope.StartUnixMs||envelope.LeaseUntilUnixMs<=envelope.ServerNowUnixMs||envelope.CompletedTick<0||envelope.CompletedTick>int.MaxValue-1000)throw new InvalidOperationException("InvalidClockOrFence");
         var begin=clock.Milliseconds;
+        long authorizationElapsed=0;
         var leaseBudget=envelope.LeaseUntilUnixMs-envelope.ServerNowUnixMs;
-        void CheckBudget(){cancellationToken.ThrowIfCancellationRequested();var elapsed=clock.Milliseconds-begin;if(elapsed<0||elapsed>=leaseBudget)throw new InvalidOperationException("StaleLease");if(elapsed>100)throw new InvalidOperationException("ComputeBudgetExceeded");}
+        void CheckBudget(){cancellationToken.ThrowIfCancellationRequested();var elapsed=clock.Milliseconds-begin;if(elapsed<0||elapsed<authorizationElapsed||elapsed>=leaseBudget)throw new InvalidOperationException("StaleLease");if(elapsed-authorizationElapsed>100)throw new InvalidOperationException("ComputeBudgetExceeded");}
+        CheckBudget();
         if(envelope.StateJson==null||Encoding.UTF8.GetByteCount(envelope.StateJson)>MaxStateBytes)throw new InvalidOperationException("StateTooLarge");
         if(envelope.Inbox==null||envelope.Inbox.Length>MaxInboxCommands)throw new InvalidOperationException("InboxOverflow");
         var due=(envelope.ServerNowUnixMs-envelope.StartUnixMs)/StepMilliseconds;
@@ -49,7 +51,14 @@ public sealed class FixedStepKernel
             Guard.Id(cmd.CommandId);if(!ids.Add(cmd.CommandId)||cmd.PayloadJson==null||Encoding.UTF8.GetByteCount(cmd.PayloadJson)>MaxPayloadBytes||cmd.CanonicalHash!=TrustedRulesCatalog.Hash(cmd.PayloadJson))throw new InvalidOperationException("CommandHashMismatch");
         }
         // 每批创建新 rules 实例，因此坏输入、超时或中途抛错不污染已提交 checkpoint，也没有进程内秘密 authority。
-        var rules=catalog.Create(context,envelope.RegistrationId,false,envelope.RulesVersion,envelope.LayoutId);
+        CheckBudget();
+        // 可信主库回读是授权等待，不是应用规则计算；两者均消耗同一总租约。
+        // 不缓存授权、不重新开始计算预算，固定工厂及其后的规则执行仍在100ms内。
+        var authorizationBegin=clock.Milliseconds;
+        var factory=catalog.AuthorizeFactory(context,envelope.RegistrationId,false,envelope.RulesVersion,envelope.LayoutId);
+        authorizationElapsed=clock.Milliseconds-authorizationBegin;
+        if(authorizationElapsed<0)throw new InvalidOperationException("StaleLease");
+        CheckBudget();var rules=factory();CheckBudget();
         rules.Restore(envelope.StateJson);if(rules.CompletedTick!=envelope.CompletedTick)throw new InvalidOperationException("CheckpointTickMismatch");
         if(rules.Binding.Tenant!=context.Tenant||rules.Binding.RoomId!=envelope.RoomId||rules.Binding.RoomEpoch!=envelope.RoomEpoch)throw new InvalidOperationException("CheckpointBindingMismatch");
         CheckBudget();var receipts=new List<CommandReceipt>();var cursor=0;
