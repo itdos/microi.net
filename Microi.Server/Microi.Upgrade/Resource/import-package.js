@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.9
+ * Version: v3.0.10
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
@@ -10087,11 +10087,14 @@ try {
         reportProgress(95, '正在导入接口引擎');
         debugLog.step7 = '开始处理sys_apiengine数据';
 
-        // Keep the official resource publisher outside all installable packages.
+        // PACKAGE_MANAGED_CONTROL_PLANE_V1：所选包明确声明 Managed 时，发布控制
+        // 接口也必须原位更新；无该声明的历史包继续保留旧保护边界。安装源码不会
+        // 授予官方发布权限，公开发布/投影仍由固定官方租户的可信后端原子鉴权。
         var sysApiEngines = [];
         for (var protectedIndex = 0; protectedIndex < Package.SysApiEngines.length; protectedIndex++) {
             var protectedCandidate = Package.SysApiEngines[protectedIndex];
-            if (String(protectedCandidate && protectedCandidate.ApiEngineKey || '').toLowerCase() === 'get-microi-upgrade-resource') {
+            if (String(protectedCandidate && protectedCandidate.ApiEngineKey || '').toLowerCase() === 'get-microi-upgrade-resource'
+                && getApiEngineResourcePolicy(protectedCandidate.ApiEngineKey).UpgradePolicy !== 'Managed') {
                 debugLog['apiengine_protected_' + protectedIndex] = '跳过受保护接口引擎：' + protectedCandidate.ApiEngineKey;
                 continue;
             }

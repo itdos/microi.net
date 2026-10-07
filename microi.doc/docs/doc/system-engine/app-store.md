@@ -292,6 +292,7 @@ SHA-256，以及文件总数与总量；原子存在但返回失败或不完整�
 - 商城页面按钮及其调用的接口引擎、权限和数据结构必须由同一版本应用包交付。导入器会在接口引擎新增/更新后清除缓存并回读 Key、启用状态、HTTP 状态和完整源码；任一项失败时整次安装回滚，不会留下“按钮可见但接口不存在”的半安装状态。
 - 发布器必须把请求发布的版本精确传给资产准备器，并回读 `RequestedVersion == PackageVersion == PackageInfo.Version`；禁止资产准备器静默改用“最新版本”。菜单、表和接口引擎的发布选择必须从本次包正文持久化，不能沿用上一版选择状态。
 - 接口引擎资源必须在包内声明 `ResourcePolicies.ApiEngines`。用户在商城选择安装、更新、重装或历史版本时，所选且已校验的包正文决定 `Managed` 资源，版本或本地差异不能制造整包冲突；`CreateIfMissing` 只在 Key 完全不存在时创建。启动恢复仅允许 `app.microi.bootstrap.json` 通过绑定当前租户和固定导入器的一次性宿主可信上下文执行，V8 参数不能伪造授权。启动恢复保留满足必要路由契约的更高版本接口及完整商城运行资产，避免覆盖用户已手动完成的更新。
+- 导入器 v3.0.10 同样更新包内明确声明为 `Managed` 的 `get-microi-upgrade-resource`，不得无条件跳过并仅推进安装版本。没有该声明的历史包保留原保护边界；安装控制接口源码不会授予官方发布权限，`Publish / PublishBatch / ReconcilePublishedApiEngines` 仍必须通过固定官方租户与可信后端鉴权。安装成功后逐项核对完整源码和版本。
 
 - `CreateIfMissing` 表示租户拥有的扩展 Hook：首次安装创建，后续更新永远跳过；同一 Key 一旦交给租户，后续版本也禁止改回 `Managed`，确需新官方核心时必须发布新 Key。官方应用必须采用“受管核心接口 + 租户扩展 Hook”，客户定制只写 Hook，扩展 Hook 按稳定 `EventId` 幂等。可信官方核心会在升级时被覆盖，因此不能把租户业务修改直接写进核心。
 - 商城源业务固定由 `platform-marketplace-source`（`Managed`）编排，个性化逻辑只写 `platform-marketplace-source-hook`（`CreateIfMissing`，默认正文精确为 `return { Code : 1 };`）。登录在任何远端配置读取、密码发送和凭据保存之前调用 `BeforeMarketplaceSourceLogin`；断开在删除服务端凭据之前调用 `BeforeMarketplaceSourceDisconnect`。Hook 失败会直接阻断操作，不能静默跳过。
