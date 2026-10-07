@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-07T02:28:38.552Z",
+  "generatedAt": "2026-10-07T14:09:52.345Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2221,8 +2221,8 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "5b8d223cd64bf4dcd358b9d877776f8bb3b6df23e2545990455f037d4fbd185e",
-      "originalLines": 667,
+      "originalSha256": "9bdc4b16083244c769999a003d6e3cfe3ed77e8d5d730c53dd8f58168cc26337",
+      "originalLines": 673,
       "prefixSha256": "01a5357a6c11c20c56f70178e843dd0d2aac92e796042c0bc582e72c967f1ad1",
       "prefixBytes": 16221,
       "entryLines": 285,
@@ -2231,7 +2231,7 @@
           "id": "v8-file-upload-000",
           "ordinal": 0,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "d134ef9d7df6a00a6f11149a7f73595d96d4feb0ffa159e520136c72de7f495a",
+          "sha256": "9402f7173710e8d110392f184119154a50187138ab7d698fce0b73b5f12123e2",
           "lines": 20,
           "heading": "核心 API"
         },
@@ -2271,8 +2271,8 @@
           "id": "v8-file-upload-005",
           "ordinal": 3,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "0b4d57f32bfe913c3a2567d2e2a86f4d5ba505d60c4348ad472c117774bbfc31",
-          "lines": 173,
+          "sha256": "71cebd2f6946be49188c430c146b9ee923ceb0719fbda4bd3701b40152732cae",
+          "lines": 179,
           "heading": "公有桶 vs 私有桶"
         },
         {
