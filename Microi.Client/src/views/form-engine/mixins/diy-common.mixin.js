@@ -1,4 +1,4 @@
-import { moduleFieldAccess, resolvedModuleFieldAccess } from "@/utils/module-field-permissions.js";
+import { moduleFieldAccess, resolvedModuleFieldAccess } from "../../../utils/module-field-permissions.js";
 /**
  * DIY 通用工具函数 Mixin
  * 包含 diy-form.vue 和 diy-table-rowlist.vue 都可以使用的通用函数
