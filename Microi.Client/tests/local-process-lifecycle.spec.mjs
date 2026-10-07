@@ -357,3 +357,31 @@ for(const scope of ['api','pc'])test(`真实 PrepareRelease ${scope} 只清理�
         removeFixture(testRoot);
     }
 });
+
+test('Full 独立编译目录的真实 apphost 只按当前工作区与 API CWD 精确清理',async()=>{
+    const testRoot=createFixture(),workspaceRoot=path.join(testRoot,'workspace');
+    const backendRoot=path.join(workspaceRoot,'Microi.Server','Microi.net.Api');
+    const executable=path.join(workspaceRoot,'.tmp','microi-release-gate','20261007-095710-29038','.net-artifacts','bin','Microi.net.Api','release',process.platform==='win32'?'Microi.net.Api.exe':'Microi.net.Api');
+    fs.mkdirSync(backendRoot,{recursive:true});fs.mkdirSync(path.dirname(executable),{recursive:true});
+    prepareCopiedRuntime(process.execPath,executable);
+    const listener=path.join(testRoot,'listener.cjs'),foreignCwd=path.join(testRoot,'foreign');
+    fs.mkdirSync(foreignCwd);fs.writeFileSync(listener,"require('node:net').createServer(()=>{}).listen(Number(process.argv[2]),'127.0.0.1');");
+    let owned,foreign;
+    try{
+        const ownedPort=await reservePort(),foreignPort=await reservePort();
+        owned=spawn(executable,[listener,String(ownedPort)],{cwd:backendRoot,stdio:'ignore'});
+        foreign=spawn(executable,[listener,String(foreignPort)],{cwd:foreignCwd,stdio:'ignore'});
+        await waitForPort(ownedPort);await waitForPort(foreignPort);
+        const accepted=runProcessManager(workspaceRoot,'StopBackend',61500,ownedPort);
+        assert.equal(accepted.status,0,accepted.stdout+accepted.stderr);
+        assert.equal(await waitForExit(owned),true,'Full 自有 apphost 必须可精确回收');
+        assert.equal(foreign.exitCode,null,'错误 CWD 的同名进程必须继续监听');
+        const rejected=runProcessManager(workspaceRoot,'StopBackend',61500,foreignPort);
+        assert.notEqual(rejected.status,0,'错误 CWD 必须失败关闭');
+        assert.equal(foreign.exitCode,null);await waitForPort(foreignPort);
+    }finally{
+        stopExactProcessTree(owned);stopExactProcessTree(foreign);
+        if(owned)await waitForExit(owned,5000);if(foreign)await waitForExit(foreign,5000);
+        removeFixture(testRoot);
+    }
+});

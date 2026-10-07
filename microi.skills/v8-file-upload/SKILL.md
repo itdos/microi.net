@@ -89,7 +89,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 官网客户端读取私有文件统一调用 `/apiengine/platform-private-file-url`，提交 `FilePathName` 或有界 `FilePathNames`，并按资源类型提供权威定位参数：普通表单字段使用 `FormEngineKey + FormDataId + FieldId + SysMenuId`；用户头像使用 `ResourceKind=UserAvatar + ResourceId=用户Id`；菜单/部门导入模板分别使用 `MenuImportTemplate`、`DeptImportTemplate` 与对应记录 Id。CAD 私有派生预览使用 `ResourceKind=FormFieldDerivedPreview`，除表单四元组外必须同时提交字段中保存的 `OriginalFilePathName` 和单个派生 `FilePathName`；后端只接受同目录同 basename 的 DWG→`_preview.dxf`、STEP/STP→`_preview.stl` 唯一映射，并在对象存在后签名。文件柜对象使用 `ResourceKind=FileManagerObject`，`ResourceId` 必须与单个 `FilePathName` 大小写精确相同，并提交能力探针返回的当前租户权威 `SysMenuId`；此类签名只允许平台超级管理员 DiyToken 会话，访问密钥和普通菜单用户一律拒绝。后端会从权威字段或对象存储重新读取并精确匹配路径；管理员也不能只传裸路径绕过对象引用，普通客户端禁止换取私有文件原始 Byte/Stream。旧 `/api/HDFS/GetPrivateFileUrl` 与 `/api/HDFS/MallFileUrl` 只保留令牌格式兼容并转发同一 Managed 接口，新代码不得继续引用。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=6155d8bbc643dc0034c66190ab5b4173ef56eba1d99a994bfce7d12ec70f52ee -->
+<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=d134ef9d7df6a00a6f11149a7f73595d96d4feb0ffa159e520136c72de7f495a -->
 ## 核心 API
 
 | API | 说明 |
@@ -278,9 +278,7 @@ return upResult;
 
 <!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）
-
 仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
-
 - [references/progressive-01-公有桶-vs-私有桶.md](references/progressive-01-公有桶-vs-私有桶.md)：公有桶 vs 私有桶；接口直接响应文件（下载/导出）；通过 URL 列表批量下载并入库
 - [references/progressive-02-office-文件在线编辑版本号规则.md](references/progressive-02-office-文件在线编辑版本号规则.md)：Office 文件在线编辑版本号规则；ImgUpload / FileUpload 字段值兼容规则；安全注意
 <!-- microi-progressive:end -->

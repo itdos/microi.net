@@ -139,7 +139,7 @@ PW_HOME_PATH=/#/pages/index/index
 不要只说“代码已编译”或“需要用户自己重启后端”；除非用户明确要求不要中断当前服务，否则 AI 要主动完成重启。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=0618b12cc767395b29b18e22ca998929cb5aed87e17cd05b55da9a9962d516d4 -->
+<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=6d285a719a85ce3f2c887b292c08cc69d9632964c341269f0f61bb2fdc403fac -->
 ## 服务自启动纪律（必做）
 
 执行自动化测试、截图巡检、接口引擎回读、`/apiengine/{key}` 验收时，如果本地后端或前端不可达，不能把 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听当作任务终点。必须先自动启动所需服务，再继续完整验证。
