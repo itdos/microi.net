@@ -1,5 +1,5 @@
 <template>
-  <section class="field-permission-designer" v-loading="loading">
+  <section class="field-permission-designer" v-mci-loading:form="loading">
     <el-alert v-if="hydrateError" :title="hydrateError" type="error" :closable="false" show-icon />
     <div class="permission-toolbar"><div><strong>字段权限</strong><p>按角色、人员、部门或岗位设置可见和可编辑字段。多个权限组命中时，拒绝优先。</p></div><el-switch v-model="config.Enabled" :disabled="readonly" active-text="启用" /></div>
     <div class="permission-defaults"><span>未指定字段的默认权限</span><el-checkbox v-model="config.DefaultVisible" :disabled="readonly" @change="config.DefaultEditable = config.DefaultEditable && config.DefaultVisible">可见</el-checkbox><el-checkbox v-model="config.DefaultEditable" :disabled="readonly || !config.DefaultVisible">可编辑</el-checkbox></div>
