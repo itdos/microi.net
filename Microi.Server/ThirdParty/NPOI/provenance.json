@@ -10019,14 +10019,16 @@
     {
       "source": "ooxml/XSSF/UserModel/XSSFClientAnchor.cs",
       "replacement": "Compatibility/XSSFClientAnchor.cs",
-      "sha256": "a3d71ae7d3879f22c8825d2505d0fde6c6c8880d76424b8c29ceb2cf7daacf80",
-      "change": "Use existing SKFont.MeasureText API; SkiaSharp 4 removed obsolete SKPaint text members."
+      "sha256": "da9a11b793ea8c7e7c6866596d1d62764dd0e0b953399e72123a85a58d7566c5",
+      "change": "Use existing SKFont.MeasureText API; SkiaSharp 4 removed obsolete SKPaint text members.",
+      "formatting": "Replacement copy normalizes line endings and trailing whitespace; original remains in verified archive."
     },
     {
       "source": "ooxml/XSSF/UserModel/XSSFSheet.cs",
       "replacement": "Compatibility/XSSFSheet.cs",
-      "sha256": "9a1e194e99f5d798ac82131cc0fe08a1f12ace846d8965ca571140b768e3a052",
-      "change": "Use existing SKFont.MeasureText API; SkiaSharp 4 removed obsolete SKPaint text members."
+      "sha256": "ad787e37d3d6b283f1e949de22f7d9fe3b77b4c2b402daa56c5aff062a546d16",
+      "change": "Use existing SKFont.MeasureText API; SkiaSharp 4 removed obsolete SKPaint text members.",
+      "formatting": "Replacement copy normalizes line endings and trailing whitespace; original remains in verified archive."
     }
   ]
 }

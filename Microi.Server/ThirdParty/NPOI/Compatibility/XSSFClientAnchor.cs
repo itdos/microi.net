@@ -177,7 +177,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="Sheet"></param>
         /// <param name="dx1"></param>
@@ -352,7 +352,7 @@ lblforbreak:
             {
                 return cell2 != null ? cell2 : calcCell(Cell1, size.cx, size.cy);
             }
-            
+
         }
 
         public override bool Equals(Object o)
@@ -392,7 +392,7 @@ lblforbreak:
             {
                 return Cell1;
             }
-            set 
+            set
             {
                 cell1 = value;
             }
@@ -410,7 +410,7 @@ lblforbreak:
             {
                 return Cell2;
             }
-            set 
+            set
             {
                 cell2 = value;
             }
@@ -560,6 +560,3 @@ lblforbreak:
         #endregion
     }
 }
-
-
-
