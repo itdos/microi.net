@@ -3,7 +3,7 @@ name: playwright-e2e
 description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。用于测试 PC Vue、本地多 ApiBase/OsClient 独立浏览器上下文、远端运行目标识别、前端微服务菜单切换与 keep-alive/LRU、uni-app H5、网站、界面引擎、移动商城、ApiEngine/FormEngine 契约、登录流程、写入闭环、网络防护、截图、报告和 Playwright Test for VSCode 集成。
 ---
 
-> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
+> **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
 
 # Microi 吾码 Playwright E2E 自动化测试
 
