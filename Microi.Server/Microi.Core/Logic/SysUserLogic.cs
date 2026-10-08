@@ -2286,11 +2286,13 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             //{
             //    return new DosResult(0, null, "组织机构必选！");
             //}
-            if (model.DeptId != null)
+            // 只校验本次提交的部门；稀疏改密请求保留历史组织数据。
+            if (param.DeptId != null && !model.DeptId.DosIsNullOrWhiteSpace())
             {
                 var deptModel = await new SysDeptLogic().GetSysDeptModel(new SysDeptParam()
                 {
-                    Id = model.DeptId
+                    Id = model.DeptId,
+                    OsClient = param.OsClient
                 });
                 if (deptModel.Code != 1)
                 {
