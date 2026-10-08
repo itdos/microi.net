@@ -3287,6 +3287,11 @@ function buildInstructions(ctx: McpServerContext): string {
 - API Server: ${ctx.apiBaseUrl}
 - OsClient (tenant): ${ctx.osClient}
 
+## Microi吾码基础规范（任何 AI 模型强制读取）
+每次新建或接续吾码任务，必须先完整读取工作区 microi.skills/workspace-conventions/SKILL.md；未初始化时读取已安装吾码插件中的 skills/workspace-conventions/SKILL.md。进度播报和非阻塞自动更新都是无条件基础规则，不能等用户提醒。
+首次工作说明以“Microi吾码开发工具版本”报告实际 CLI 版本、npm 官方 latest（附查询时间）、自动更新与 Skills/MCP 同步状态；用 microi version --json 回读 CLI，用 npm 官方 registry 查询 latest。未知项写检测中，不得把本 MCP 协议版本或 expectedVersion 当成 CLI/npm 最新版。
+已有 CLI 时必须投递 microi update --background --workspace "<工作区绝对路径>" --json，自动升级 @microi.net/cli 并同步 Skills、AI 规则和 MCP。更新失败延后重试并准确报告，不阻断当前工作、不强制重载、不终止正在运行的 MCP；用户明确关闭或宿主无执行权限时报告限制，签名桌面安装目录通过桌面官方渠道更新。完整执行及验收规则以基础入口为准。
+
 IMPORTANT: This server ONLY manages OsClient tenant "${ctx.osClient}". "${ctx.label || ctx.osClient}" is only a display name. When the user specifies a different tenant name, do NOT use this server.
 THIRD-PARTY SECRETS: For App Secret, client_secret, API keys or credentials such as Chanjet, FIRST inspect microi_manage_server_private_secret (List) and reuse System Settings > Security and Service Access. Save through that tool only when authorized, then read back HasSecret/IsSecret/IsEnabled. Backend V8 uses the existing protected settings capability. Do not invent environment variables, hardcode secrets, or block integration merely because the existing protected setting has not yet been populated. Never return plaintext or ciphertext values.
 PAGE DESIGN: Dashboards default to themeMode=system, density=compact and wrapper heightMode=content. Use native summary/detail statistic appearances and platform colour variables. Match reference panel proportions and verify light/dark screenshots; do not turn one-line metrics into large fixed-height colour blocks.

@@ -20,6 +20,8 @@ description: 当用户在 Codex、DeepSeek Harness、WorkBuddy、CodeBuddy、Qod
 
 ## 非阻塞自动更新（强制）
 
+任意 AI 模型与宿主每次新建或接续吾码任务，都必须执行 [基础规范](../workspace-conventions/SKILL.md) 中的版本检查、首次“Microi吾码开发工具版本”播报与后台自动升级；不能因为用户只问业务问题就跳过。`@microi.net/cli` 必须自动升级到 npm 官方 `latest`，再同步 Skills、AI 规则和 MCP。具体播报、回读与失败边界以基础规范为唯一来源；本技能提供执行和诊断方法。
+
 只要当前宿主已装有 Microi VS Code 扩展、`@microi.net/cli`、Codex 插件或 DeepSeek Harness bundle，就应由宿主/CLI 在后台投递自动更新。更新检查与业务工作并行，绝不能成为分析、MCP 调用、源码修改、构建、测试、发布或新任务的前置门禁。
 
 自动更新只从 npm 官方 registry 读取 CLI 最新版：
@@ -40,6 +42,8 @@ microi doctor --workspace "<工作区绝对路径>" --json
 ```
 
 旧版 CLI 尚不支持 `microi version --json` 时，可使用 `npm list --global '@microi.net/cli' --depth=0 --json` 读取全局安装版本。`microi codex status --json` 的 `expectedVersion` 来自当前 CLI 自带快照，只检查本地一致性，不能代替 npm 在线查询。
+
+Codex/DSH 的 `microi_codex action="profiles"` 同时返回 `toolchain`：`loadedVersion` 是当前进程已加载的提供者版本，`workspaceSkillsVersion` 是当前工作区 Skills manifest 版本；`automaticUpdate` 包含启用状态、状态文件路径、`state`、`latestObservedVersion`、`globalVersion` 和 `checkedAt`。历史状态只作诊断，不能当成刚查询的官方最新版；`unknown`、`scheduled`、`running`、`deferred` 和 `completed-with-warnings` 均不能声称全部同步完成。状态文件损坏或缺失时保留当前能力并重新后台检查。
 
 标准入口是非阻塞投递命令：
 
@@ -94,7 +98,7 @@ codex plugin list
 正常情况由 `microi update --background` 自动完成。需要人工立即恢复时，可直接把全局 CLI 更新到 npm 官方最新版：
 
 ```bash
-npm install --global @microi.net/cli@latest
+npm install --global @microi.net/cli@latest --registry=https://registry.npmjs.org/
 microi codex install --yes
 microi dsh install
 ```
