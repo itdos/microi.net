@@ -44,10 +44,10 @@ using System.Data;
 namespace NPOI.XSSF.UserModel
 {
     /// <summary>
-    /// High level representation of a SpreadsheetML worksheet. Sheets are the 
+    /// High level representation of a SpreadsheetML worksheet. Sheets are the
     /// central structures within a workbook, and are where a user does most of
-    /// his spreadsheet work. The most common type of sheet is the worksheet, 
-    /// which is represented as a grid of cells.Worksheet cells can contain 
+    /// his spreadsheet work. The most common type of sheet is the worksheet,
+    /// which is represented as a grid of cells.Worksheet cells can contain
     /// text, numbers, dates, and formulas. Cells can also be formatted.
     /// </summary>
     public partial class XSSFSheet : POIXMLDocumentPart, ISheet
@@ -76,7 +76,7 @@ namespace NPOI.XSSF.UserModel
         private CommentsTable sheetComments;
 
         /// <summary>
-        /// cache of master shared formulas in this sheet. Master shared 
+        /// cache of master shared formulas in this sheet. Master shared
         /// formula is the first formula in a group of shared formulas is saved
         /// in the f element.
         /// </summary>
@@ -130,8 +130,8 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Vertical page break information used for print layout view, page 
-        /// layout view, drawing print breaksin normal view, and for printing 
+        /// Vertical page break information used for print layout view, page
+        /// layout view, drawing print breaksin normal view, and for printing
         /// the worksheet.
         /// </summary>
         // YK: GetXYZArray() array accessors are deprecated in xmlbeans with
@@ -160,7 +160,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Get the default column width for the sheet (if the columns do not 
+        /// Get the default column width for the sheet (if the columns do not
         /// define their own width) in characters.
         /// </summary>
         public double DefaultColumnWidth
@@ -181,7 +181,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Get the default row height for the sheet (if the rows do not define 
+        /// Get the default row height for the sheet (if the rows do not define
         /// their own height) in twips(1/20 of a point)
         /// </summary>
         public short DefaultRowHeight
@@ -197,7 +197,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Get the default row height for the sheet measued in point size 
+        /// Get the default row height for the sheet measued in point size
         /// (if the rows do not define their own height).
         /// </summary>
         public float DefaultRowHeightInPoints
@@ -258,8 +258,8 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Gets the flag indicating whether the window should show 0 (zero) 
-        /// in cells Containing zero value. When false, cells with zero value 
+        /// Gets the flag indicating whether the window should show 0 (zero)
+        /// in cells Containing zero value. When false, cells with zero value
         /// appear blank instead of Showing the number zero.
         /// </summary>
         public bool DisplayZeros
@@ -348,8 +348,8 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Returns the default footer for the sheet, creating one as needed. 
-        /// You may also want to look at <see cref="FirstFooter"/>, 
+        /// Returns the default footer for the sheet, creating one as needed.
+        /// You may also want to look at <see cref="FirstFooter"/>,
         /// <see cref="OddFooter"/> and <see cref="EvenFooter"/>
         /// </summary>
         public IFooter Footer
@@ -364,7 +364,7 @@ namespace NPOI.XSSF.UserModel
 
         /// <summary>
         /// Returns the default header for the sheet, creating one as needed.
-        /// You may also want to look at <see cref="FirstFooter"/>, 
+        /// You may also want to look at <see cref="FirstFooter"/>,
         /// <see cref="OddFooter"/> and <see cref="EvenFooter"/>
         /// </summary>
         public IHeader Header
@@ -391,7 +391,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Returns the even footer. Not there by default, but when Set, 
+        /// Returns the even footer. Not there by default, but when Set,
         /// used on even pages.
         /// </summary>
         public IFooter EvenFooter
@@ -404,7 +404,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Returns the first page footer. Not there by default, but when 
+        /// Returns the first page footer. Not there by default, but when
         /// Set, used on the first page.
         /// </summary>
         public IFooter FirstFooter
@@ -417,7 +417,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Returns the odd header. Used on all pages unless other headers 
+        /// Returns the odd header. Used on all pages unless other headers
         /// also present, when used on only odd pages.
         /// </summary>
         public IHeader OddHeader
@@ -430,7 +430,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Returns the even header. Not there by default, but when 
+        /// Returns the even header. Not there by default, but when
         /// Set, used on even pages.
         /// </summary>
         public IHeader EvenHeader
@@ -443,7 +443,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Returns the first page header. Not there by default, but when 
+        /// Returns the first page header. Not there by default, but when
         /// Set, used on the first page.
         /// </summary>
         public IHeader FirstHeader
@@ -456,7 +456,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Determine whether printed output for this sheet will be 
+        /// Determine whether printed output for this sheet will be
         /// horizontally centered.
         /// </summary>
         public bool HorizontallyCenter
@@ -4559,7 +4559,7 @@ namespace NPOI.XSSF.UserModel
                     Debug.WriteLine("Warning: Can't get id for chart.");
                     continue;
                 }
-                
+
                 var newXSSFChart = (newSheetDrawing as XSSFDrawing).CreateChart(newAnchor) as XSSFChart;
                 var linkedChart = sourceCharts.FirstOrDefault(x=>x.GetPackageRelationship().Id == id);
                 if(linkedChart == null)
@@ -4572,7 +4572,7 @@ namespace NPOI.XSSF.UserModel
 
                 var linkedCTChart = linkedChart.GetCTChart();
                 var newCTChart = newXSSFChart.GetCTChart();
-                
+
                 newCTChart.plotArea =  linkedCTChart.plotArea;
                 newCTChart.extLst =  linkedCTChart.extLst;
                 newCTChart.title =  linkedCTChart.title;
@@ -4587,7 +4587,7 @@ namespace NPOI.XSSF.UserModel
                 newCTChart.pivotFmts =  linkedCTChart.pivotFmts;
                 newCTChart.showDLblsOverMax =  linkedCTChart.showDLblsOverMax;
 
-                
+
             }
         }
 
@@ -5907,15 +5907,15 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Return the default sheet view. This is the last one if the sheet's 
-        /// views, according to sec. 3.3.1.83 of the OOXML spec: "A single 
-        /// sheet view defInition. When more than 1 sheet view is defined in 
-        /// the file, it means that when opening the workbook, each sheet view 
-        /// corresponds to a separate window within the spreadsheet 
-        /// application, where each window is Showing the particular sheet. 
-        /// Containing the same workbookViewId value, the last sheetView 
-        /// defInition is loaded, and the others are discarded. When multiple 
-        /// windows are viewing the same sheet, multiple sheetView elements 
+        /// Return the default sheet view. This is the last one if the sheet's
+        /// views, according to sec. 3.3.1.83 of the OOXML spec: "A single
+        /// sheet view defInition. When more than 1 sheet view is defined in
+        /// the file, it means that when opening the workbook, each sheet view
+        /// corresponds to a separate window within the spreadsheet
+        /// application, where each window is Showing the particular sheet.
+        /// Containing the same workbookViewId value, the last sheetView
+        /// defInition is loaded, and the others are discarded. When multiple
+        /// windows are viewing the same sheet, multiple sheetView elements
         /// (with corresponding workbookView entries) are saved."
         /// </summary>
         /// <returns></returns>
@@ -6045,7 +6045,7 @@ namespace NPOI.XSSF.UserModel
         private static string GetReferenceBuiltInRecord(
             string sheetName, int startC, int endC, int startR, int endR)
         {
-            // Excel example for built-in title: 
+            // Excel example for built-in title:
             //   'second sheet'!$E:$F,'second sheet'!$2:$3
 
             CellReference colRef =
@@ -6458,7 +6458,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Creates an empty XSSFPivotTable and Sets up all its relationships 
+        /// Creates an empty XSSFPivotTable and Sets up all its relationships
         /// including: pivotCacheDefInition, pivotCacheRecords
         /// </summary>
         /// <returns>a pivotTable</returns>
@@ -6511,13 +6511,13 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Create a pivot table using the AreaReference or named/table range 
-        /// on sourceSheet, at the given position. If the source reference 
+        /// Create a pivot table using the AreaReference or named/table range
+        /// on sourceSheet, at the given position. If the source reference
         /// contains a sheet name, it must match the sourceSheet.
         /// </summary>
-        /// <param name="position">A reference to the top left cell where the 
+        /// <param name="position">A reference to the top left cell where the
         /// pivot table will start</param>
-        /// <param name="sourceSheet">The sheet containing the source data, 
+        /// <param name="sourceSheet">The sheet containing the source data,
         /// if the source reference doesn't contain a sheet name</param>
         /// <param name="refConfig"></param>
         /// <returns>The pivot table</returns>
@@ -6746,7 +6746,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="Width">In EMU</param>
         public void SetDefaultColWidth(int Width)
@@ -6916,7 +6916,7 @@ lblforbreak:
         {
             return SheetUtil.ToDataTable(this, firstRowAsHeader, showCalculatedValue);
         }
-        
+
         public XSSFHeaderFooterProperties HeaderFooterProperties
         {
             get
@@ -6930,7 +6930,7 @@ lblforbreak:
             get {
                 return new NCellRange(this, 0, 0, this.Workbook.SpreadsheetVersion.MaxRows, this.Workbook.SpreadsheetVersion.MaxColumns);
             }
-            
+
         }
 
         public NCellRange this[string address] => Cells[address];
