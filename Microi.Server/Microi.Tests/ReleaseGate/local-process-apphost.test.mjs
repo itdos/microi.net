@@ -25,11 +25,23 @@ foreach ($name in @('Get-CommandText','Test-IsWorkspaceBackend','Get-PosixProces
 function Get-ProcessCurrentDirectory($ProcessInfo) { return [string]$ProcessInfo.TestCwd }
 $nativeWindows=[System.IO.Path]::DirectorySeparatorChar -eq '\'
 $isWindowsHost=$false
-$backendRoot='/tmp/workspace with space/Microi.Server/Microi.net.Api'
+$resolvedWorkspace='/tmp/workspace with space'
+$backendRoot=$resolvedWorkspace+'/Microi.Server/Microi.net.Api'
+$isolated=$resolvedWorkspace+'/.tmp/microi-release-gate/20261007-095710-29038/.net-artifacts/bin/Microi.net.Api/release/Microi.net.Api'
 $good=$backendRoot+'/bin/Debug/net10.0/Microi.net.Api'
 $identity=@(
     @{Key='debug-apphost'; Name='Microi.net.Api'; Exe=$good; Cwd=$backendRoot},
     @{Key='release-apphost'; Name='Microi.net.Api'; Exe=$backendRoot+'/bin/Release/net10.0/Microi.net.Api'; Cwd=$backendRoot},
+    @{Key='isolated-full-release'; Name='Microi.net.Api'; Exe=$isolated; Cwd=$backendRoot},
+    @{Key='isolated-full-debug'; Name='Microi.net.Api'; Exe=$isolated.Replace('/release/','/debug/'); Cwd=$backendRoot},
+    @{Key='isolated-foreign-workspace'; Name='Microi.net.Api'; Exe=$isolated.Replace('workspace with space','foreign'); Cwd=$backendRoot},
+    @{Key='isolated-invalid-directory'; Name='Microi.net.Api'; Exe=$isolated.Replace('20261007-095710-29038','arbitrary'); Cwd=$backendRoot},
+    @{Key='isolated-other-project'; Name='Microi.net.Api'; Exe=$isolated.Replace('/bin/Microi.net.Api/','/bin/Other/'); Cwd=$backendRoot},
+    @{Key='isolated-other-configuration'; Name='Microi.net.Api'; Exe=$isolated.Replace('/release/','/publish/'); Cwd=$backendRoot},
+    @{Key='isolated-foreign-cwd'; Name='Microi.net.Api'; Exe=$isolated; Cwd='/tmp/foreign'},
+    @{Key='isolated-path-traversal'; Name='Microi.net.Api'; Exe=$isolated.Replace('/release/','/release/../release/'); Cwd=$backendRoot},
+    @{Key='isolated-sibling-prefix'; Name='Microi.net.Api'; Exe=$isolated.Replace('workspace with space','workspace with space-other'); Cwd=$backendRoot},
+    @{Key='isolated-filename-case'; Name='Microi.net.Api'; Exe=$isolated.Replace('/release/Microi.net.Api','/release/microi.net.api'); Cwd=$backendRoot},
     @{Key='foreign-executable'; Name='Microi.net.Api'; Exe='/tmp/foreign/Microi.net.Api'; Cwd=$backendRoot},
     @{Key='sibling-prefix'; Name='Microi.net.Api'; Exe=$backendRoot+'-other/bin/Microi.net.Api'; Cwd=$backendRoot},
     @{Key='escaped-bin'; Name='Microi.net.Api'; Exe=$backendRoot+'/bin/../../foreign/Microi.net.Api'; Cwd=$backendRoot},
@@ -131,14 +143,15 @@ test.before(()=>{
   assert.deepEqual(report.LoadedFunctions,['Get-CommandText','Test-IsWorkspaceBackend','Get-PosixProcessSnapshot']);
   assert.equal(report.NativeWindows,process.platform==='win32');
   assert.equal(report.NoProcessesStopped,true);assert.equal(report.NoNetwork,true);
-  const count=process.platform==='win32'?28:45;
+  const count=process.platform==='win32'?28:55;
   assert.equal(report.Results.length,count);assert.equal(new Set(report.Results.map(row=>row.Key)).size,count);
  }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
 
 function result(key){const rows=report.Results.filter(row=>row.Key===key);assert.equal(rows.length,1,key);return rows[0];}
 const posixCases=[
- ['debug-apphost',true],['release-apphost',true],
+ ['debug-apphost',true],['release-apphost',true],['isolated-full-release',true],['isolated-full-debug',true],
+ ...['isolated-foreign-workspace','isolated-invalid-directory','isolated-other-project','isolated-other-configuration','isolated-foreign-cwd','isolated-path-traversal','isolated-sibling-prefix','isolated-filename-case'].map(key=>[key,false]),
  ...['foreign-executable','sibling-prefix','escaped-bin','parent-normalization','dot-normalization','double-separator','foreign-cwd','missing-cwd','cwd-case','cwd-suffix','filename-case','foreign-process-name','empty-executable','dotnet-foreign-cwd'].map(key=>[key,false]),
  ['dotnet-project',true]
 ];

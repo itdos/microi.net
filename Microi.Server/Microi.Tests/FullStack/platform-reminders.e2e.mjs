@@ -141,10 +141,11 @@ if(typeof process!=='undefined'&&process.argv[1]&&import.meta.url===pathToFileUR
   const context=await browser.newContext({ignoreHTTPSErrors:new URL(apiBase).hostname==='localhost',viewport:{width:1440,height:1000}});
   const page=await context.newPage();page.setDefaultTimeout(30000);
   await page.goto(`${required('MICROI_TEST_FRONTEND_BASE')}/?OsClient=${encodeURIComponent(tenant)}&ApiBase=${encodeURIComponent(apiBase)}`,{waitUntil:'domcontentloaded'});
-  await page.getByPlaceholder(/用户名|账号|帐号|user\s*name/i).first().fill(required('MICROI_TEST_ACCOUNT'));
-  await page.getByPlaceholder(/密码|password/i).first().fill(required('MICROI_TEST_PASSWORD'));
+  // 登录页在租户配置加载前可能使用浏览器语言；账号、密码语义不依赖翻译文案。
+  await page.locator('input[autocomplete="username"]:visible').first().fill(required('MICROI_TEST_ACCOUNT'));
+  await page.locator('input[autocomplete="current-password"]:visible').first().fill(required('MICROI_TEST_PASSWORD'));
   const box=page.locator('.privacy-policy-wrapper .el-checkbox').first();if(await box.count()&&!(await box.locator('input').isChecked()))await box.click();
-  const login=page.waitForResponse(r=>r.url().includes('/api/SysUser/Login'));await page.getByRole('button',{name:/^登\s*录$/}).click();assert.equal((await(await login).json()).Code,1);
+  const login=page.waitForResponse(r=>r.url().includes('/api/SysUser/Login'));await page.locator('button.login-button').click();assert.equal((await(await login).json()).Code,1);
   const directory=path.resolve(process.argv[2]||'.tmp/platform-reminder-tests');
   const result=await verifyPlatformReminders(page,directory);const configuration=await verifyBusinessNotificationConfiguration(page,directory);const license=await verifyLicenseExpiryPresentation(page,directory);console.log(JSON.stringify({reminders:result,businessConfiguration:configuration,license}));
  }finally{await browser.close();}

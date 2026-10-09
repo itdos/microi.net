@@ -159,7 +159,7 @@ Full 会依次执行：
 6. 在独立浏览器 Context 中使用真实账号密码登录，验证通知中心按钮和后台任务完成；官方 iTdos 发布源应隐藏给自身安装应用的按钮。
 7. NuGet 易受攻击包和弃用包审计。
 
-一键编译发布脚本在后端发布、前端构建和“仅推送镜像”模式均强制执行 Full：缺少环境、凭据、零用例、失败、取消、跳过或待办均停止发布。测试时共享服务必须已经加载候选源码；取得发布锁后只使用现有服务，测试通过才停止服务并开始升版和发布。文档专用选项 6 不触发后端业务测试。AI 发布话术还应要求在 VS Code 扩展发布之前先运行同一门禁，话术不能替代脚本检查。
+一键编译发布脚本在后端发布、前端构建和“仅推送镜像”模式均强制执行 Full：缺少环境、凭据、零用例、失败、取消、跳过或待办均停止发布。测试时共享服务必须已经加载候选源码；取得发布锁后只使用现有服务，测试通过才停止服务并开始升版和发布。文档专用选项 6 不触发后端业务测试。AI 发布话术还应要求在 VS Code 扩展发布之前先运行同一门禁，话术不能替代脚本检查。 Full 中先用实际在线 MCP 源码完成 TypeScript 编译、生产依赖裁剪和自包含运行包检查，避免仅通过脚本运行测试后，直到后端发布才发现类型或打包错误。
 
 macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Docker 与端口探针优先使用 `timeout` / `gtimeout`，系统未安装时自动使用仓库内的 Node 时限工具，避免将正常 Docker 误判为启动超时。该模式只构建和推送官网镜像，不发布 DLL 或 NuGet；后端发布仍须通过原有加密和冒烟门禁。
 
@@ -181,7 +181,7 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 API、PC 框架、官网和 Microi Agent 各自使用 `.tmp/microi-process-state/` 下的 `api-release.lock`、`pc-release.lock`、`website-release.lock`、`agent-release.lock`，可以同时发布；同类发布互斥。合并发布只取得所选产品的锁，部分取得失败会撤回本次已取得的锁。API 服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`，或通过进程管理器 `AssertServiceStart -ReleaseScope api|pc|all` 检查。Windows 发布准备按相同范围清理：API 处理后端及 Release DLL，PC 处理 Vite，官网不停止二者。
 
-PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与依赖审计统一使用本次结果目录的 `.net-artifacts`，并行发布使用独立结果目录、测试服务/端口及隔离租户。官网的全部源码、主题、测试和依赖由官网发布验收，不影响 PC/API 的候选一致性；共享 SDK、Skills、MCP 与发布工具仍受候选保护。共享版本和跨产品改动应先准备并冻结，再并行发布。资源排队按实际并行阶段预算之和与系统余量判断，不再因无关产品占用一个全局窗口而等待。
+PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与依赖审计统一使用本次结果目录的 `.net-artifacts`，并行发布使用独立结果目录、测试服务/端口及隔离租户。官网的全部源码、主题、测试和依赖由官网发布验收，不影响 PC/API 的候选一致性；共享 SDK、Skills、MCP 与发布工具仍受候选保护。共享版本和跨产品改动应先准备并冻结，再并行发布。资源排队按实际并行阶段预算之和与系统余量判断，不再因无关产品占用一个全局窗口而等待。 macOS/Linux 的进程管理器同时识别项目 `bin/` 和当前工作区 `.tmp/microi-release-gate/日期-时间-PID/.net-artifacts/bin/Microi.net.Api/debug|release/` 下的规范 API apphost；后者仍要求 API 项目 CWD 精确一致，其它工作区、任意输出目录、路径越界或无法回读身份均拒绝停止。
 
 旧 `platform-release.lock` 或 `release.lock` 仅在 PID 的真实命令入口和共享状态目录证明属于 API 热修复或 Agent 时缩小阻塞范围；未知归属继续保守保护。原进程和唯一令牌释放自身锁，不能删除其它正在运行的发布锁。
 

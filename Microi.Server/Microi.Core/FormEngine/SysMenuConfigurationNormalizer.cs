@@ -73,6 +73,8 @@ namespace Microi.net
         {
             if (!IsSysMenuTable(tableName)) return;
             NormalizeNotShowFieldsInRow(row);
+            var permission = row?.Properties().FirstOrDefault(x => string.Equals(x.Name, "FieldPermissions", StringComparison.OrdinalIgnoreCase));
+            if (permission != null) ModuleFieldPermission.Validate(permission.Value.Type == JTokenType.String ? (string)permission.Value : permission.Value.ToString(Formatting.None));
         }
 
         public static T NormalizeRowForReturn<T>(T row, string tableName)

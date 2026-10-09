@@ -20,7 +20,7 @@ Pop-Location
 **本地后端自动重启要求（强制）**：本地联调需要启动或重启 `Microi.net.Api` 时，先执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`；API 锁存在时禁止启动或重启后端。PC、官网和 Agent 发布不阻塞 API 服务。无发布时先回读标准端口和 `/api/Diagnostics/liveness`，健康服务默认复用；只有本任务修改了需重载的后端代码、服务不健康或用户明确要求重启时，才可精确停止当前工作区的后端进程，然后在 `Microi.Server/Microi.net.Api` 目录执行 `dotnet run --launch-profile Microi.net.Api`。优先使用用户能在 VS Code 中看到和停止的终端（包含 VS Code 集成终端、VS Code 任务终端、用户明确允许的 VS Code 可追踪隐藏终端）；如果当前工具没有 VS Code 终端能力，允许使用本机可见的 `cmd`/PowerShell 窗口启动，禁止使用脱离用户可见窗口的后台服务或守护进程。不要误杀数据库、Redis、Node 前端或其它业务进程。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-025 sha256=eb8ddca8c6e3ece08c03b84f78bfcf16e3c0d08397534c74d93c15b40996af03 -->
+<!-- microi-progressive:chunk id=workspace-conventions-025 sha256=4cf40c4ca771f7e04b80279646323a816378b98669f562ff8f4c647d5bf837ca -->
 ## 多 AI 对话共享本地服务与发布互斥（强制）
 
 同一工作区的 4、5 个 AI 对话共用同一份源码和固定端口时，`61500/61501` 是工作区级单例共享服务，不属于某个对话。端口相同意味着无法让每个对话拥有一套独立进程；正确模型是“复用健康服务 + 需要重载时串行重启 + 同范围发布时独占”，不能让每个对话都无条件先杀再启动。
@@ -29,7 +29,7 @@ Pop-Location
 - 长期本地后端必须通过项目目录里的 `dotnet run --launch-profile Microi.net.Api` 使用开发输出。禁止把 `bin/Release/net10.0` 或 `bin/Release/publish` 的 `dotnet Microi.net.Api.dll` 当长期 E2E 服务；运行中的 Release DLL 会让后续 `dotnet build` 报 `MSB3021/MSB3027` 文件锁。
 - 一键编译发布按所选产品创建 `.tmp/microi-process-state/api-release.lock`、`pc-release.lock`、`website-release.lock` 或 `agent-release.lock`。合并发布按固定顺序取得所需锁；任何一项占用时撤回本次已取得的锁。Windows 的 `PrepareRelease -ReleaseScope api|pc|all` 仅清理所选范围：API 处理本工作区后端与 Release DLL，PC 处理本工作区 Vite；官网不停止二者。身份不匹配时停止，不得按进程名全杀。
 - Vite 子进程可能由相对 `node_modules/vite/bin/vite.js` 启动，父 npm/终端退出后命令行不再包含工作区绝对路径。Windows 进程管理器应先匹配命令行绝对路径；无法匹配时只读回读进程 CWD，只有 CWD 精确等于当前工作区 `Microi.Client` 且入口确为 Vite 才可结束。CWD 无法读取、属于其它目录或仅仅“父进程不存在”时必须失败关闭。
-- API、PC、官网和 Agent 可以同时发布，同类发布互斥。旧 `platform-release.lock` 与 `release.lock` 仅在真实 PID 命令入口及共享状态目录证明属于 API 热修复或 Agent 时缩小阻塞范围；未知归属继续保守阻塞，禁止删除活跃旧锁。Full 仍是 PC/API 发布硬门禁；其 .NET 输出放入本次结果目录的 `.net-artifacts`，并行 Full 使用独立结果目录、测试服务和隔离租户。共享版本号或跨产品源码必须先准备冻结，再启动并行发布，禁止测试期间改写候选。
+- API、PC、官网和 Agent 可以同时发布，同类发布互斥。旧 `platform-release.lock` 与 `release.lock` 仅在真实 PID 命令入口及共享状态目录证明属于 API 热修复或 Agent 时缩小阻塞范围；未知归属继续保守阻塞，禁止删除活跃旧锁。Full 仍是 PC/API 发布硬门禁；其 .NET 输出放入本次结果目录的 `.net-artifacts`，并行 Full 使用独立结果目录、测试服务和隔离租户。共享版本号或跨产品源码必须先准备冻结，再启动并行发布，禁止测试期间改写候选。 macOS/Linux 的 Full apphost 仅允许当前工作区 `.tmp/microi-release-gate/日期-时间-PID/.net-artifacts/bin/Microi.net.Api/debug|release/Microi.net.Api` 的规范路径，且 CWD 必须精确等于 API 项目；任意外部输出、其它工作区或路径归一化差异继续失败关闭。
 - 启动或重启 API 前检查 `assert api`，PC 前检查 `assert pc`；只有对应范围发布时等待或退出，官网/Agent 不阻塞共享服务。需要同时启动二者时分别检查两项；正常结束或中断由原进程和唯一令牌释放自身锁。
 - Edge/Chrome 主浏览器、VS Code 持有的 Playwright Test Server、语言服务和 MCP Node 进程不属于发布文件锁清理范围。浏览器自动化必须关闭本用例创建的 context/browser；不得通过 `taskkill /IM chrome.exe|msedge.exe|node.exe|dotnet.exe` 清空整机进程。
 - 人工盘点使用：`powershell -NoProfile -ExecutionPolicy Bypass -File Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action Status`。需要单独停止当前工作区服务时使用 `-Action StopBackend` 或 `-Action StopFrontend`，不再让用户根据任务管理器猜进程。

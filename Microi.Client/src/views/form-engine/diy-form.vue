@@ -519,6 +519,10 @@ export default {
             type: String,
             default: ""
         },
+        SysMenuModel: {
+            type: Object,
+            default: null
+        },
         HideTopBanner: {
             type: Boolean,
             default: false
@@ -1301,6 +1305,7 @@ export default {
         },
         GetAllData(param, callback) {
             var self = this;
+            self.ModuleResolvedFieldAccess = null;
             formTrace("diy-form:get-all-data-start", {
                 tableId: self.TableId,
                 tableName: self.TableName,
@@ -1448,6 +1453,7 @@ export default {
                     }
 
                     var resultGetDiyField = results[1];
+                    self.ModuleResolvedFieldAccess = resultGetDiyField.DataAppend?.FieldAccess || null;
                     formTrace("diy-form:fields-ready", {
                         table: self.DiyTableModel && self.DiyTableModel.Name,
                         fieldCount: resultGetDiyField && resultGetDiyField.Data ? resultGetDiyField.Data.length : 0,
@@ -1496,6 +1502,7 @@ export default {
                         }
                         var roeModelResult = await self.DiyCommon.PostAsync(getDiyTableRowModelUrl, param);
                         if (self.DiyCommon.Result(roeModelResult)) {
+                            self.ModuleResolvedFieldAccess = roeModelResult.DataAppend?.FieldAccess || self.ModuleResolvedFieldAccess;
                             if (!roeModelResult.Data.Id && (roeModelResult.Data.id || roeModelResult.Data.ID)) {
                                 roeModelResult.Data.Id = roeModelResult.Data.id || roeModelResult.Data.ID;
                             }
@@ -2312,6 +2319,7 @@ export default {
                     param._FormData = self.DiyCommon.ConvertRowModel(formDiyTableModel);
 
                     for (let key in param._FormData) {
+                        if (key !== "Id" && !self.GetModuleFieldAccess(key).editable) delete param._FormData[key];
                         if (key.endsWith("_RealPath") || key.endsWith("_TmpEngineResult")) {
                             delete param._FormData[key];
                         }

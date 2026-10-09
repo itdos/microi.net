@@ -21,6 +21,7 @@ const officialApplicationResourceNames = Object.freeze([
   'app.microi.ai-engine.json',
 ]);
 const officialResourceNames = new Set([
+  'export-package.js',
   'import-package.js',
   'ai-app-publish-store.js',
   'official-resource-api.js',

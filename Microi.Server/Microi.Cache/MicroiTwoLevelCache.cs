@@ -560,17 +560,20 @@ namespace Microi.net
             {
                 // 根据配置的清理比例删除旧缓存
                 var countToRemove = (int)(MicroiTwoLevelCacheConfig.MaxLocalCacheSize * MicroiTwoLevelCacheConfig.EvictionPercentage);
-                var toRemove = _localCache
+                // ConcurrentDictionary 的 Count 与 ICollection.CopyTo 不是同一次快照；
+                // 直接交给 LINQ 排序会在并发增删时产生空条目或数组容量异常。
+                // 必须调用字典自身的原子 ToArray，再只淘汰仍是快照旧值的条目。
+                var toRemove = _localCache.ToArray()
                     .OrderBy(kvp => kvp.Value.ExpireTime)
                     .Take(countToRemove)
-                    .Select(kvp => kvp.Key)
                     .ToList();
 
-                foreach (var k in toRemove)
+                var removedCount = 0;
+                foreach (var entryToRemove in toRemove)
                 {
-                    _localCache.TryRemove(k, out _);
+                    if (RemoveLocalCacheEntry(entryToRemove)) removedCount++;
                 }
-                WriteCacheLog("LocalCapacityEvicted", "本地缓存达到容量上限并已清理", $"已清理 {toRemove.Count} 个旧缓存项。", 1, success: true);
+                WriteCacheLog("LocalCapacityEvicted", "本地缓存达到容量上限并已清理", $"已清理 {removedCount} 个旧缓存项。", 1, success: true);
             }
 
             // 直接存储原值，Json.NET 会在需要时自动处理序列化
@@ -583,6 +586,14 @@ namespace Microi.net
 
             _localCache.AddOrUpdate(key, entry, (k, old) => entry);
 
+        }
+
+        /// <summary>
+        /// 仅移除快照中的同一缓存条目；并发刷新后的新值必须继续保留。
+        /// </summary>
+        private static bool RemoveLocalCacheEntry(KeyValuePair<string, CacheEntry> entry)
+        {
+            return ((ICollection<KeyValuePair<string, CacheEntry>>)_localCache).Remove(entry);
         }
 
         /// <summary>
@@ -813,21 +824,22 @@ namespace Microi.net
                             await Task.Delay(MicroiTwoLevelCacheConfig.CleanupInterval, _cleanupCts.Token);
 
                             var now = DateTime.UtcNow;
-                            var expiredKeys = _localCache
+                            var expiredEntries = _localCache.ToArray()
                                 .Where(kvp => kvp.Value.ExpireTime < now)
-                                .Select(kvp => kvp.Key)
                                 .ToList();
 
-                            foreach (var key in expiredKeys)
+                            var removedCount = 0;
+                            foreach (var expiredEntry in expiredEntries)
                             {
-                                _localCache.TryRemove(key, out _);
+                                // 扫描后被业务请求刷新的 Key 不再属于本轮过期快照。
+                                if (RemoveLocalCacheEntry(expiredEntry)) removedCount++;
                             }
 
-                            if (expiredKeys.Count > 0)
+                            if (removedCount > 0)
                             {
                                 if (MicroiTwoLevelCacheConfig.LogStatistics)
                                 {
-                                    WriteCacheLog("ExpiredEntriesRemoved", "本地过期缓存清理完成", $"已清理 {expiredKeys.Count} 个过期缓存项。", 1, success: true);
+                                    WriteCacheLog("ExpiredEntriesRemoved", "本地过期缓存清理完成", $"已清理 {removedCount} 个过期缓存项。", 1, success: true);
                                 }
                             }
 

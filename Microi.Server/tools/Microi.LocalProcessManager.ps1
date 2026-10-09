@@ -285,12 +285,18 @@ function Test-IsWorkspaceBackend($ProcessInfo) {
         $name = ([string]$ProcessInfo.Name).ToLowerInvariant()
         if ($name -eq 'microi.net.api') {
             # macOS/Linux 的 dotnet run 会启动无扩展名 apphost；可执行文件必须
-            # 精确位于当前 API 项目的 bin 下，并保留规范路径与 CWD 的身份校验。
+            # 精确位于当前 API 项目的 bin 或 Full 的独立编译目录，并保留规范路径与 CWD 的身份校验。
             # 同名外部程序、路径越界或无法读取身份时均拒绝结束。
             $executable = [string]$ProcessInfo.ExecutablePath
             try { $canonicalExecutable = [System.IO.Path]::GetFullPath($executable) } catch { return $false }
             if ($executable -cne $canonicalExecutable) { return $false }
-            if (-not $executable.StartsWith($backendRoot + '/bin/', [StringComparison]::Ordinal)) { return $false }
+            $isProjectOutput = $executable.StartsWith($backendRoot + '/bin/', [StringComparison]::Ordinal)
+            # Full 使用 UseArtifactsOutput 隔离编译；只接受当前工作区内固定协议的
+            # 日期-时间-PID 目录与 API apphost，不能因 CWD 正确而接受任意外部文件。
+            $gateRoot = Join-Path $resolvedWorkspace '.tmp/microi-release-gate'
+            $gatePattern = '^' + [regex]::Escape($gateRoot) + '/[0-9]{8}-[0-9]{6}-[0-9]+/\.net-artifacts/bin/Microi\.net\.Api/(debug|release)/Microi\.net\.Api$'
+            $isIsolatedFullOutput = [regex]::IsMatch($executable, $gatePattern, [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+            if (-not $isProjectOutput -and -not $isIsolatedFullOutput) { return $false }
             if ([System.IO.Path]::GetFileName($executable) -cne 'Microi.net.Api') { return $false }
             return (Get-ProcessCurrentDirectory $ProcessInfo) -ceq $backendRoot
         }

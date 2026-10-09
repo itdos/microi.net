@@ -60,7 +60,7 @@
             @afterhidden="handleAfterHidden"
             @error="handleMicroAppError"
         />
-        <DiyFormFull v-if="formDialogVisible" ref="refMicroAppFormDialog" />
+        <DiyFormFull v-if="formDialogVisible" ref="refMicroAppFormDialog" @CallbackGetDiyTableRow="onMarketplaceFormSaved" />
         <DiyCustomDialog
             v-if="platformPrintDialogVisible"
             ref="refPlatformPrintDialog"
@@ -282,6 +282,7 @@ export default {
             globalOverlayHole: { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 },
             globalOverlayScrollState: null,
             formDialogVisible: false,
+            marketplaceFormContext: null,
             marketplaceFormOpening: null,
             marketplaceFormOpeningKey: "",
             platformPrintDialogVisible: false,
@@ -752,19 +753,15 @@ export default {
                 if (typeof dialog?.Init !== "function") {
                     throw Object.assign(new Error("应用表单加载超时，请重试"), { code: "HOST_FORM_DIALOG_NOT_READY" });
                 }
+                this.marketplaceFormContext = { tableName, id: tableRowId, formMode };
                 dialog.Init({
                     TableName: tableName,
+                    SysMenuId: String(input?.sysMenuId || input?.SysMenuId || ""),
                     TableRowId: tableRowId,
                     DialogType: "Dialog",
                     Width: "80%",
                     FormMode: formMode,
-                    DefaultValues: input?.defaultValues || input?.DefaultValues || {},
-                    SubmitEvent: () => {
-                        this.deliverMicroAppData({
-                            type: "micro-app:form-saved",
-                            data: { tableName, id: tableRowId, formMode }
-                        });
-                    }
+                    DefaultValues: input?.defaultValues || input?.DefaultValues || {}
                 });
                 return { accepted: true, tableName, formMode, id: tableRowId };
             } catch (error) {
@@ -772,6 +769,13 @@ export default {
                 await this.$nextTick();
                 throw error;
             }
+        },
+        onMarketplaceFormSaved(param = {}) {
+            if (!this.marketplaceFormContext) return;
+            this.deliverMicroAppData({
+                type: "micro-app:form-saved",
+                data: { ...this.marketplaceFormContext, id: param.TableRowId || this.marketplaceFormContext.id }
+            }, true);
         },
         async openPlatformPrint(input) {
             const config = normalizeHostPlatformPrint(input, {

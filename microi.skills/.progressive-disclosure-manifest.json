@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-06T17:29:39.053Z",
+  "generatedAt": "2026-10-08T15:41:00.557Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -8,10 +8,10 @@
   },
   "skills": {
     "ai-platform-governance": {
-      "originalSha256": "05f3d5e9251f98c5e1ad91d21999ad689e820c403056327b7bf30c364b787636",
+      "originalSha256": "f8dc8d296d47be34249341ad1726a2a0dc89bccb7102a03a15fe65c4c8515f30",
       "originalLines": 323,
-      "prefixSha256": "dba917e613767e37f033527a17d009ba3e94b44ac9970ef59556d689f92a8bda",
-      "prefixBytes": 765,
+      "prefixSha256": "b171620caf35a706def15dda8a884532f6e4850531e8d30a36e67baad09b84fa",
+      "prefixBytes": 817,
       "entryLines": 178,
       "chunks": [
         {
@@ -169,10 +169,10 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "da358a1c173fde84e12eee0d4e3f21e720c544da108b1d6f765818b49ce716f5",
+      "originalSha256": "87e6cb65541e966c93c3226488da17e69e06d9281c35d2dede55647beb1e5c56",
       "originalLines": 703,
-      "prefixSha256": "26b1774955c0d963f8debc78d6cd1caafb4ae9e0e14685b0c1541897b28ad354",
-      "prefixBytes": 1348,
+      "prefixSha256": "19308dd1a04397f764cc5ab4fefe76093704564592396ce00482d28e952537b7",
+      "prefixBytes": 1400,
       "entryLines": 245,
       "chunks": [
         {
@@ -316,10 +316,10 @@
       ]
     },
     "microi-form-layout": {
-      "originalSha256": "48b0d879b5723b95330743e3b65a3adbb1f336e67b5cb819f2d7a2ef46687e67",
+      "originalSha256": "9bfe00fdab4e6d7a2d0eb540cc7a27989237a39db25ffc1f13580ef486d4ce72",
       "originalLines": 412,
-      "prefixSha256": "58d20430c1bccca61aee9a15342ad5fa027860148336290c12cb13c714021c7e",
-      "prefixBytes": 4189,
+      "prefixSha256": "afa6362418909c1e8bb1eee33045e1318acf464f7fb5bccc803b79ef233a7623",
+      "prefixBytes": 4241,
       "entryLines": 206,
       "chunks": [
         {
@@ -407,10 +407,10 @@
       ]
     },
     "microi-frontend-sdk": {
-      "originalSha256": "0f8d16f64b24f8a9ca71d5a1653d58604fb286d6f43eb9490f60930948708e19",
+      "originalSha256": "b7dbc04829a5437074db06ab0d52e62b1771ae47d1e8c59809c6298619db5cf6",
       "originalLines": 321,
-      "prefixSha256": "dc0f266bc26abc96d90f7cc653f85fb5968ee99405a393a8ae54b0b03d1bdbba",
-      "prefixBytes": 884,
+      "prefixSha256": "f64639b7e1c6cd7b2793d3506101cf1b91f77d306daabaae45599ecaefc551bb",
+      "prefixBytes": 936,
       "entryLines": 195,
       "chunks": [
         {
@@ -534,10 +534,10 @@
       ]
     },
     "microi-mobile-app-quality": {
-      "originalSha256": "0b8aa0a43906b5d6293d1d24ba86586a691094c1251e422305e228c4c0bd9dd2",
+      "originalSha256": "11d6f2aa2d11fef6ee56bd0090f58833ca5c219bcfe631c13da8498330765766",
       "originalLines": 463,
-      "prefixSha256": "f8c7ff069eba59ee314557b078d3684b92eb05d232adebfe2a0a01002e66b581",
-      "prefixBytes": 1087,
+      "prefixSha256": "eacdd78a8619f3c1dd4af9f8db1188e9ef75e13384bbdfe6aa93de230a9c431a",
+      "prefixBytes": 1139,
       "entryLines": 186,
       "chunks": [
         {
@@ -745,10 +745,10 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "15570ea01d0d01dbbd14cb5fd52f9d71683065be113ef105a8c134e8c4244444",
+      "originalSha256": "623f1bfa30623c17fc9bd354a24fedd86ea3d233c455d7df564129e99277b830",
       "originalLines": 511,
-      "prefixSha256": "b214ef7ff76ff4e5308294aefa4f2645792f9d40cc685ee46c12b39b3dfc0a7e",
-      "prefixBytes": 1512,
+      "prefixSha256": "2079d7b54e771c17cc0c1f8d72bd3acc53aa792f9dfc9f867b2026d6665147bc",
+      "prefixBytes": 1564,
       "entryLines": 138,
       "chunks": [
         {
@@ -833,10 +833,10 @@
       ]
     },
     "microi-ui": {
-      "originalSha256": "acb490be2bd901bf756726704cfe29c3fbded4b9d9330fe69c52211d1406d892",
+      "originalSha256": "85e4040691801d4bebfc61c98324627c6ae676368dd184b82e5d890486c77608",
       "originalLines": 343,
-      "prefixSha256": "81ef10c671d1602da4cae1f2ad20bad952353f92ef69ea35210a110583a7a5c4",
-      "prefixBytes": 1471,
+      "prefixSha256": "75af6f0201d9f479c55fe326907a4b682d038895bc0780501331d6bf66a8bfb3",
+      "prefixBytes": 1523,
       "entryLines": 193,
       "chunks": [
         {
@@ -942,10 +942,10 @@
       ]
     },
     "microi-uniapp-frontend": {
-      "originalSha256": "b4e3910b36bc41be9127a19e58a9c06549b83157076e045cd143139f4df574f1",
+      "originalSha256": "43181255a959523580a72bcd1c0700cd4806530f4957a5644db46fd975654fad",
       "originalLines": 503,
-      "prefixSha256": "2d6a1dbc94b51e1aa0e4b81865a65f83b56e91010039ae4834839f5c0634c887",
-      "prefixBytes": 2983,
+      "prefixSha256": "a05c2b8e8c89ba9f401718c6af05ccf66325ddd7228a06786aca4277dbf6bad5",
+      "prefixBytes": 3035,
       "entryLines": 194,
       "chunks": [
         {
@@ -1196,10 +1196,10 @@
       ]
     },
     "page-engine": {
-      "originalSha256": "ad242350b880bf8e06097698c8d756493168d7e16a448e59dda429d1c1d8badd",
+      "originalSha256": "08c2b53b016199e5495dae60e71a74b391d5f6923f66a95e002d2fd7a0df1b1b",
       "originalLines": 455,
-      "prefixSha256": "5d4916cdaaefe0687cb32e600bfb62dda31644ddc7b0f2b9970df2cade2886e4",
-      "prefixBytes": 4129,
+      "prefixSha256": "78b807d6e6d56642b9a5a848d9fafa0a869eb43411a98a61aab36d058c4b6b86",
+      "prefixBytes": 4181,
       "entryLines": 207,
       "chunks": [
         {
@@ -1344,11 +1344,11 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "385387e9756215dba21232c9f8ac6ba4c4994952a93f14cf6380d7fe1532316c",
-      "originalLines": 806,
-      "prefixSha256": "793ea4c951605d99e58c9f53eeff2dbee39bcaf3219a5a447a275ed84163949d",
-      "prefixBytes": 1761,
-      "entryLines": 198,
+      "originalSha256": "2d10953829afe69ba2df0619ec7d86b56972f832551417aba87043ea45c1826d",
+      "originalLines": 805,
+      "prefixSha256": "850e3df02e4c51188c0b06f99f4e81dcaba92f5422b1a4f88da91d828d23c161",
+      "prefixBytes": 1813,
+      "entryLines": 197,
       "chunks": [
         {
           "id": "playwright-e2e-000",
@@ -1410,8 +1410,8 @@
           "id": "playwright-e2e-007",
           "ordinal": 8,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "0618b12cc767395b29b18e22ca998929cb5aed87e17cd05b55da9a9962d516d4",
-          "lines": 42,
+          "sha256": "6d285a719a85ce3f2c887b292c08cc69d9632964c341269f0f61bb2fdc403fac",
+          "lines": 41,
           "heading": "服务自启动纪律（必做）"
         },
         {
@@ -1610,10 +1610,10 @@
       ]
     },
     "ui-design": {
-      "originalSha256": "90a81c91bfd52a9ae462e16314a9f0874de9de4a69ee328af47f88e6bbf1cfbc",
+      "originalSha256": "504a6106b863e05570d807c05ffd53ca6cb1018ded0fda829c27a0d80fc33a66",
       "originalLines": 1643,
-      "prefixSha256": "5f653948bdb48d7ff305a9fb3570fd5644d2c862864f452fe90e1f300ad69ec5",
-      "prefixBytes": 1089,
+      "prefixSha256": "744a375f6365c12aa0dd3a3158a6b3f6af4feecb482e01fa474a4fc48fdf50d0",
+      "prefixBytes": 1141,
       "entryLines": 224,
       "chunks": [
         {
@@ -1924,10 +1924,10 @@
       ]
     },
     "v8-crud-api": {
-      "originalSha256": "487ffd0fb3301fa4d47e8879d3f9304d5b06797b219b5acca19a7680c145ee77",
+      "originalSha256": "687244373089dce2e378a26eb28cb84353e91ac8a51380a10b7dbd93fdcf51e3",
       "originalLines": 404,
-      "prefixSha256": "629f1a8bfef47b39f4b1b143eccecc20d79dab1cd1ffd988dceb5b9eb61c2078",
-      "prefixBytes": 766,
+      "prefixSha256": "13f655834028b792eb87f441f2929a90688ca77dd56029bb932af229a9946162",
+      "prefixBytes": 818,
       "entryLines": 179,
       "chunks": [
         {
@@ -2091,10 +2091,10 @@
       ]
     },
     "v8-export-import": {
-      "originalSha256": "18e44f8db5db4a8e83c59f95c1d70150a9dc557acc9dbefc98446fd969a8ddc8",
+      "originalSha256": "9408b21ce633968f2640293aa4c06c15469b8a3af0b41c1907bc34f35cbac022",
       "originalLines": 622,
-      "prefixSha256": "a4e28800b43f8510f5503a354ad60f8887b9ce5fc1bde67d5c2d73fa8facf515",
-      "prefixBytes": 1113,
+      "prefixSha256": "2643314403817ee4b9533578ceb947e9dc954688498bd9c5726627ecf2b430d9",
+      "prefixBytes": 1165,
       "entryLines": 220,
       "chunks": [
         {
@@ -2221,18 +2221,18 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "7d9bb9c1d03396f27764346fbcc3cd9f62e4f77151bfe9c4a6d7b973860e2c75",
-      "originalLines": 665,
-      "prefixSha256": "01a5357a6c11c20c56f70178e843dd0d2aac92e796042c0bc582e72c967f1ad1",
-      "prefixBytes": 16221,
+      "originalSha256": "43aa7aa22caf8875187cd8044a6e29584587c854c213017f954933daf6f7f733",
+      "originalLines": 673,
+      "prefixSha256": "3de9d37351b364e2da7a0267ae837de14607547c8c56b96ea8aeda7d2e94766b",
+      "prefixBytes": 16273,
       "entryLines": 285,
       "chunks": [
         {
           "id": "v8-file-upload-000",
           "ordinal": 0,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "6155d8bbc643dc0034c66190ab5b4173ef56eba1d99a994bfce7d12ec70f52ee",
-          "lines": 18,
+          "sha256": "9402f7173710e8d110392f184119154a50187138ab7d698fce0b73b5f12123e2",
+          "lines": 20,
           "heading": "核心 API"
         },
         {
@@ -2271,8 +2271,8 @@
           "id": "v8-file-upload-005",
           "ordinal": 3,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "0b4d57f32bfe913c3a2567d2e2a86f4d5ba505d60c4348ad472c117774bbfc31",
-          "lines": 173,
+          "sha256": "71cebd2f6946be49188c430c146b9ee923ceb0719fbda4bd3701b40152732cae",
+          "lines": 179,
           "heading": "公有桶 vs 私有桶"
         },
         {
@@ -2336,10 +2336,10 @@
       ]
     },
     "v8-frontend-events": {
-      "originalSha256": "f58f220b29de5c99a508c5cfb4c52ca1f94889b8a5893a148f5a956cbef6ddbb",
+      "originalSha256": "161130bcd3e6f5059728be16d0b47e7a31e888994d009dd036dfa8da5ba2c475",
       "originalLines": 367,
-      "prefixSha256": "6ff1a26b7da2df77bf848195c55552cd691e81ce7831fba60b2b6a2a4bcd83e0",
-      "prefixBytes": 1248,
+      "prefixSha256": "2a1ea30769327bb6e98bfe19aad03843e4300a6553505618aaa73300a0776531",
+      "prefixBytes": 1300,
       "entryLines": 181,
       "chunks": [
         {
@@ -2445,10 +2445,10 @@
       ]
     },
     "v8-http-integration": {
-      "originalSha256": "387acb7128262046ea678c63f21d4d47e5097610f6578d2ea42dfa287ff9e63b",
+      "originalSha256": "1b91b341547f012e7e503098af70a9b7f54180b91cc36f22f2c0ac40a26f51be",
       "originalLines": 405,
-      "prefixSha256": "8eded6cd2df8229d91240db73a8a1fd6585b01351128579d6b46bc5b4e2ffa28",
-      "prefixBytes": 1738,
+      "prefixSha256": "efa01f809af3df007befdebcf6b1eb1b22d2cb048915df469fcfc6ac0588bdd6",
+      "prefixBytes": 1790,
       "entryLines": 183,
       "chunks": [
         {
@@ -2579,10 +2579,10 @@
       ]
     },
     "v8-menu-buttons": {
-      "originalSha256": "773e0b3ce74e057182c052de1a9cdcd6539ad301cbf1a3491a037911ee2599e2",
+      "originalSha256": "04209857890b743e491296d674392a05aea8f08596775c20df74c120998e5921",
       "originalLines": 688,
-      "prefixSha256": "39d1084a598f07e9454f0dda64707a52361d78c5593857c1b73a5cce7cd59e0b",
-      "prefixBytes": 952,
+      "prefixSha256": "555f377b40b30c30b628b0744d89bc4d93e720235ab65834d64fdd9b3a5397d1",
+      "prefixBytes": 1004,
       "entryLines": 187,
       "chunks": [
         {
@@ -2745,10 +2745,10 @@
       ]
     },
     "v8-mq-mqtt": {
-      "originalSha256": "befbdc0f50ab69290aaecd8252971ab75c82eb7aa7872b670ebc1bd9fac34ec4",
+      "originalSha256": "e4e69f3582f2f1b7780d33731310ddc0a142045e7a7f943140a85fbb09277753",
       "originalLines": 339,
-      "prefixSha256": "d601c2986655b2fbf818fe9739ee41543c4ff3c9df2f12a825e5d4b9a532aa08",
-      "prefixBytes": 801,
+      "prefixSha256": "47f1f0de3acd2abd1129754fcf329129358d4d078d07b033d80b5447dc879886",
+      "prefixBytes": 853,
       "entryLines": 177,
       "chunks": [
         {
@@ -2786,10 +2786,10 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "56c0130a5f689a41406c3de6d2cf1cfadc997dfece95927cd44e3ec0ac2fc659",
+      "originalSha256": "a5c5927a37fdd2547dcc7ed1941f4320613fb6414e0f4310d4490a1f5bb84a4e",
       "originalLines": 527,
-      "prefixSha256": "01b82afc702d828b5274b475e5c1a5afe68890a7d4369d520be2a14117499065",
-      "prefixBytes": 3380,
+      "prefixSha256": "e6bd4da404004b3012d17b6a389b62c320002b8b2fa3d88cc6e6e52ae55f4763",
+      "prefixBytes": 3432,
       "entryLines": 211,
       "chunks": [
         {
@@ -2928,10 +2928,10 @@
       ]
     },
     "v8-table-event": {
-      "originalSha256": "76d56d52507a6b999ed33bdde3f922c9fcb819a0ae4b6adfbe747b0349c977ee",
+      "originalSha256": "157ed861396d612b27ad3c0fa5f0432a5ed7cf51fa34594a8967b52cf0926bef",
       "originalLines": 397,
-      "prefixSha256": "66d1d17168fc30a07da08c48884b41aa3ff54d015bd733c6ac468b53eece594b",
-      "prefixBytes": 707,
+      "prefixSha256": "a132433d534bf15d72db277eec9196e0af74ac5575cb726c7beabd298ef37a7f",
+      "prefixBytes": 759,
       "entryLines": 177,
       "chunks": [
         {
@@ -3061,10 +3061,10 @@
       ]
     },
     "v8-workflow": {
-      "originalSha256": "81a13776806b353c93afc0e741bf2778f53fec20c623953d701833b961bc27e7",
+      "originalSha256": "04d226b40b71d9b898296d567d3f156e5bbdd94a4be95804354d9d41a542c3cc",
       "originalLines": 386,
-      "prefixSha256": "3c58be3abfede5431711bdd2cfd703c5a6d5cf91facf1f973dd8aa72e65d9f9d",
-      "prefixBytes": 4432,
+      "prefixSha256": "a3becda94bed70461e634cb7cda1f79100c611f402d080b03b067bf4e518f4af",
+      "prefixBytes": 4484,
       "entryLines": 253,
       "chunks": [
         {
@@ -3196,18 +3196,18 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "c90a828864795008f95298603ce0402aa9095bfa6543be33c6cbfbdf48cde1d3",
-      "originalLines": 605,
+      "originalSha256": "70c5646dce806ec67c690e61493aed76e98c33bf08ad9feffc83682921ea8a6b",
+      "originalLines": 608,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
-      "entryLines": 271,
+      "entryLines": 274,
       "chunks": [
         {
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "d64145e9e39c0796f680659543d7504871749ea93858938aa31c9884a15a1e79",
-          "lines": 48,
+          "sha256": "de99c1f81724b00065dd3cbbf8f4fd7d13fa35edac26c7fdb71f778529148a6b",
+          "lines": 51,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
         {
@@ -3406,7 +3406,7 @@
           "id": "workspace-conventions-025",
           "ordinal": 25,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "eb8ddca8c6e3ece08c03b84f78bfcf16e3c0d08397534c74d93c15b40996af03",
+          "sha256": "4cf40c4ca771f7e04b80279646323a816378b98669f562ff8f4c647d5bf837ca",
           "lines": 32,
           "heading": "多 AI 对话共享本地服务与发布互斥（强制）"
         },

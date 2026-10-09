@@ -393,6 +393,7 @@ export default {
             );
         },
         async GetAllData(param = {}) {
+            this.ModuleResolvedFieldAccess = null;
             var self = this;
             var contextVersion = Object.prototype.hasOwnProperty.call(param, "ContextVersion")
                 ? Number(param.ContextVersion || 0)
@@ -931,6 +932,7 @@ export default {
                     self.tableLoading = false;
 
                     if (self.DiyCommon.Result(result)) {
+                        self.ModuleResolvedFieldAccess = result.DataAppend?.FieldAccess || null;
                         console.log('[数据加载调试] 返回数据条数:', result.Data?.length, '总数:', result.DataCount);
                         console.log('[数据加载调试] isAppendMode:', isAppendMode, 'IsPhoneView:', self.diyStore.IsPhoneView);
                         console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);

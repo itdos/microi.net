@@ -570,6 +570,7 @@ export default {
         },
         GetBaseFieldIsShow(field) {
             var self = this;
+            if (field && !self.GetModuleFieldAccess(field).visible) return false;
             if (!field) return false;
 
             if (self.CanShowHiddenFields()) {

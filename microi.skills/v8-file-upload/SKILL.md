@@ -3,7 +3,7 @@ name: v8-file-upload
 description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 应用发布、V8.FilesByteBase64、V8.Method.Upload、私有文件 URL、文件响应、HDFS、OSS、MinIO 和 S3 存储。
 ---
 
-> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
+> **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
 
 # Microi V8 文件上传下载
 
@@ -89,7 +89,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 官网客户端读取私有文件统一调用 `/apiengine/platform-private-file-url`，提交 `FilePathName` 或有界 `FilePathNames`，并按资源类型提供权威定位参数：普通表单字段使用 `FormEngineKey + FormDataId + FieldId + SysMenuId`；用户头像使用 `ResourceKind=UserAvatar + ResourceId=用户Id`；菜单/部门导入模板分别使用 `MenuImportTemplate`、`DeptImportTemplate` 与对应记录 Id。CAD 私有派生预览使用 `ResourceKind=FormFieldDerivedPreview`，除表单四元组外必须同时提交字段中保存的 `OriginalFilePathName` 和单个派生 `FilePathName`；后端只接受同目录同 basename 的 DWG→`_preview.dxf`、STEP/STP→`_preview.stl` 唯一映射，并在对象存在后签名。文件柜对象使用 `ResourceKind=FileManagerObject`，`ResourceId` 必须与单个 `FilePathName` 大小写精确相同，并提交能力探针返回的当前租户权威 `SysMenuId`；此类签名只允许平台超级管理员 DiyToken 会话，访问密钥和普通菜单用户一律拒绝。后端会从权威字段或对象存储重新读取并精确匹配路径；管理员也不能只传裸路径绕过对象引用，普通客户端禁止换取私有文件原始 Byte/Stream。旧 `/api/HDFS/GetPrivateFileUrl` 与 `/api/HDFS/MallFileUrl` 只保留令牌格式兼容并转发同一 Managed 接口，新代码不得继续引用。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=6155d8bbc643dc0034c66190ab5b4173ef56eba1d99a994bfce7d12ec70f52ee -->
+<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=9402f7173710e8d110392f184119154a50187138ab7d698fce0b73b5f12123e2 -->
 ## 核心 API
 
 | API | 说明 |
@@ -105,7 +105,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 | `V8.Http.GetResponse({Url}).RawBytes` | 下载远程文件为字节数组 |
 | 接口返回 `{ FileName, ContentType, FileByteBase64 }` | 接口直接响应文件 |
 
-固定 CDN 应用回填优先使用服务端 `CopyObject`，公有桶复制编译资产、私有桶复制源码；`Limit` 在源与目标间保持一致，`Path` 和 `FilePathName` 均由后端收敛到当前租户。大对象用 `GetObjectSha256` 流式核对原对象和复制目标，公有体验路径仍须从 CDN 独立回读。历史版本目标已存在时须核对字节哈希，发现不同内容立即停止；固定根可在新版本验证后覆盖。`ListObjects` 必须分页并限制到单个应用前缀，不得把这些存储管理原子直接开放为匿名业务接口。
+固定 CDN 应用回填优先使用服务端 `CopyObject`，公有桶复制编译资产、私有桶复制源码；`Limit` 在源与目标间保持一致，`Path` 和 `FilePathName` 均由后端收敛到当前租户。大对象用 `GetObjectSha256` 流式核对原对象和复制目标，公有体验路径仍须从 CDN 独立回读。历史版本目标已存在时须核对字节哈希，发现不同内容立即停止；固定根可在新版本验证后覆盖。`ListObjects` 必须分页并限制到单个应用前缀，不得把这些存储管理原子直接开放为匿名业务接口。大型私有文本的 `GetPrivateFileText` 字符串边界及原字节/最终ZIP验签规则见[已有详细参考](references/progressive-01-公有桶-vs-私有桶.md)。
 
 MinIO SDK 7 的复制签名不匹配还可能来自带参数 MIME：SDK 对源 `Content-Type` 签名，却在 HTTP 请求中额外保留 `StringContent` 的默认 MIME。先在独立夹具核对源 MIME、重复头和真实存储返回，再升级后端复制传输修复；不能去掉 `charset`、关闭签名校验或下载后重传来伪造通过。修复后必须同时验证公私桶原始字节、精确 MIME、源元数据及源对象保留，固定入口恢复另覆盖主库权威、真实共享租约、双节点竞争和新进程重跑。取消/超时后保持原请求键，先回读目标再决定是否继续。
 
@@ -278,9 +278,7 @@ return upResult;
 
 <!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）
-
 仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
-
 - [references/progressive-01-公有桶-vs-私有桶.md](references/progressive-01-公有桶-vs-私有桶.md)：公有桶 vs 私有桶；接口直接响应文件（下载/导出）；通过 URL 列表批量下载并入库
 - [references/progressive-02-office-文件在线编辑版本号规则.md](references/progressive-02-office-文件在线编辑版本号规则.md)：Office 文件在线编辑版本号规则；ImgUpload / FileUpload 字段值兼容规则；安全注意
 <!-- microi-progressive:end -->

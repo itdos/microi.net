@@ -45,6 +45,13 @@ Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 A
 
 ## 推荐接入方式
 
+### 本地 HTTPS 证书
+
+新版 MCP 对 `localhost` 和 `127.0.0.1` 保持 Node 默认的证书校验，也保留启动者设置的
+严格策略。自签开发证书须先由系统或 MCP 进程信任；可在启动前用 `NODE_EXTRA_CA_CERTS`
+指定已核验的公开 CA PEM。不要把私钥写入配置，也不要设置全进程跳过 TLS 校验。
+验收应确认正确 CA 可以连接，无信任或陌生 CA 时请求在 TLS 握手阶段失败。
+
 ### 从已登录平台复制连接说明
 
 点击右上角 Api/Web 版本可查看 ApiBase、OsClient 和版本类型，并一键复制给 Codex、WorkBuddy 等工具。复制时服务器生成一个独立的开发工具 DiyToken，权限继承当前用户且可在在线终端单独撤销，不影响浏览器会话。无需把平台密码提供给 AI；访问密钥适用于已授权接口的窄权限调用，不替代需要建模、保存和发布的完整开发会话。
