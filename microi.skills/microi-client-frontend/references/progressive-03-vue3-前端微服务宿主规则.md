@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-011 sha256=4272be553eea5fd0ead8c7933b3b5231a6d8501bfed181294d1e5cf5965314d6 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-011 sha256=850ba16e253014a9d022582155cd3e18bf04dff375e82dd2947ea527bac4342a -->
 ## Vue3 前端微服务宿主规则
 
 `sys_menu.OpenType=MicroService` 时，动态路由必须把 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath` 和真实入口 `MicroAppUrl` 写入 route meta；浏览器侧菜单路由使用 `/#/micro-app/{MsKey}/{RoutePath}`，不要再生成 `/micro-app-host/{menuId}`，否则地址过长且刷新或直接访问菜单路由容易加载空白页。
@@ -102,7 +102,7 @@ CurrentUser、ApiBase 和 OsClient。无痕窗口是人工第二租户的最低�
 - 自动化检查：打开真实列表连续点击两次旧打印按钮，断言抽屉内出现打印引擎、打印数据接口成功、出现浏览器打印日志，并且没有未知组件警告、递归更新、页面异常或失败请求；保存首次和重复点击截图。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-012 sha256=4e579132c5176b46e6e9aa61e87982d63fe2c26c639f0ef3832614b2dacfcb3f -->
+<!-- microi-progressive:chunk id=microi-client-frontend-012 sha256=77e4f6a9fd4ed647275e9abeee2ea9589271c19af11602db5a73f74950b937bf -->
 ## 在线 AI 应用与微服务页面协作
 
 Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`。运行类型写入 `ApplicationType`：普通平台离线包的新建默认值为 `Regular`，既有商城平台应用/通知仍使用 `Platform`，另外还有 `Web / UniApp / MicroService`；读取端必须兼容 `Regular/Platform`。`Category` 保存游戏、企业、行业、教育等业务分类，`PublisherType` 保存官方/社区来源；`mci_ai_app_file / mci_ai_app_version` 仅作为私有源码清单和构建版本从表，其 `AppId` 必须指向 `sys_microistore.Id`。禁止再向 `mci_ai_app` 创建新的主记录。MicroService 另外使用 `sys_microiservice / sys_microiservice_page` 保存运行元数据和页面路由。
@@ -149,7 +149,7 @@ Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`�
 - 同一份 ApiKey/Token 摘要在 Overview 与 AI 页面复用同一个组件；Token 额度统一展示“总量/Total”，不要把总量写成“赠送”。复制密钥必须有明确成功或失败提示，并提供 Clipboard API 不可用时的兼容复制。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-013 sha256=57dc1ce4db6ce0aa4865b3d0ad11293a17e473a9f6bb92a084701ea239056d13 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-013 sha256=c4054f900b1f6af15ae9ffb483e7571570f9d2aa99a0e674ee0bb9a956f06172 -->
 ## 浏览器访问密钥路由
 
 - 固定看板免登录使用常量匿名路由 `/access-login`，密钥使用 `microi_ak_` 前缀，完整链接格式为 `{Microi.Client前端WebBase}/?OsClient={当前租户}#/access-login?access_key={密钥}&redirect={encodeURIComponent后的站内Hash路由}`。例如目标路由 `/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX` 必须生成 `redirect=%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX`。生成器只复制当前 `OsClient`，不能把其它页面查询参数带进凭据链接，也不能把 API Server 当成前端 WebBase。

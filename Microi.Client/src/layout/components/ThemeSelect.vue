@@ -3,7 +3,7 @@
         <div class="mci-theme-panel">
             <div class="mci-theme-panel-head">
                 <div class="mci-theme-heading">
-                    <span class="mci-theme-heading-icon"><el-icon><Brush /></el-icon></span>
+                    <span class="mci-theme-heading-icon"><el-icon><Setting /></el-icon></span>
                     <strong>{{ $t('Msg.Mobile.profile.themeSettings') }}</strong>
                 </div>
                 <button
@@ -55,7 +55,7 @@
 
                 <div class="mci-theme-section">
                     <div class="mci-theme-title"><el-icon><Menu /></el-icon><span>导航菜单位置</span></div>
-                    <div class="mci-mode-row" role="group" aria-label="导航菜单位置">
+                    <div class="mci-mode-row mci-navigation-mode-row" role="group" aria-label="导航菜单位置">
                         <button v-for="option in navigationOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="navigationPreference === option.value" :class="{ active: navigationPreference === option.value }" @click="changeNavigationLayout(option.value)">{{ option.label }}</button>
                     </div>
                 </div>
@@ -66,6 +66,8 @@
                         <button v-for="option in menuExpandOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="menuExpandPreference === option.value" :class="{ active: menuExpandPreference === option.value }" @click="changeMenuChildExpandMode(option.value)">{{ option.label }}</button>
                     </div>
                 </div>
+
+                <div class="mci-theme-section"><UiDensitySelect /></div>
 
                 <!-- 主题色（MCI 设计系统统一调色板） -->
                 <div class="mci-theme-section">
@@ -116,7 +118,7 @@
         <template #reference>
             <slot name="trigger">
                 <button type="button" class="theme-select-trigger" aria-label="主题设置" title="主题设置">
-                    <el-icon class="theme-icon"><Brush /></el-icon>
+                    <el-icon class="theme-icon"><Setting /></el-icon>
                 </button>
             </slot>
         </template>
@@ -124,7 +126,8 @@
 </template>
 
 <script>
-import { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand } from "@element-plus/icons-vue";
+import { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand, Setting } from "@element-plus/icons-vue";
+import UiDensitySelect from './UiDensitySelect.vue';
 import { computed, watch } from "vue";
 import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
@@ -149,7 +152,7 @@ const DEFAULT_THEME_COLOR = "#409eff";
 
 export default {
     name: "ThemeSelect",
-    components: { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand },
+    components: { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand, Setting, UiDensitySelect },
     props: {
         showMode: {
             type: Boolean,
@@ -189,7 +192,7 @@ export default {
             themeMode: 'light',
             cornerStyle: getCornerStyle(),
             cornerOptions: [{value:'System',label:'跟随系统'},{value:'round',label:'圆角'},{value:'square',label:'直角'}],
-            navigationOptions: [{value:'System',label:'跟随系统'},{value:'Side',label:'侧边导航'},{value:'Top',label:'顶部导航'}],
+            navigationOptions: [{value:'System',label:'跟随系统'},{value:'Side',label:'侧边导航'},{value:'Top',label:'顶部导航'},{value:'TopSide',label:'顶部 + 侧边导航'}],
             menuExpandOptions: [{value:'System',label:'跟随系统'},{value:'Down',label:'向下展开'},{value:'Right',label:'向右展开'}],
             pendingPreferencePatch: {},
             preferenceSaveTimer: null,
@@ -486,6 +489,7 @@ export default {
     display: flex;
     gap: 8px;
 }
+.mci-navigation-mode-row { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); }
 .mci-mode-btn {
     flex: 1;
     display: flex;

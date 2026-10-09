@@ -40,6 +40,12 @@ html[data-theme="dark"] {
     color: var(--el-text-color-regular, #334155) !important;
 }
 
+// 顶部/混合导航整行沿用侧栏主题。必须覆盖暗色设计系统的重要 background 简写兜底。
+html .navbar-microi.navbar-microi--themed {
+    background: var(--sidebar-bg-gradient) !important;
+    color: var(--sidebar-text-color) !important;
+}
+
 .navbar-microi .right-menu-item,
 .navbar-microi .avatar-wrapper,
 .navbar-microi .breadcrumb-container,

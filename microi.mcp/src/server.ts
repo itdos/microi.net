@@ -5907,7 +5907,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       ip: z.string().max(100).optional().describe('TrafficDetails client IP filter.'),
       userId: z.string().max(100).optional().describe('TrafficDetails authenticated user-id filter.'),
       endpoint: z.string().max(500).optional().describe('TrafficDetails normalized endpoint or /apiengine/{key} filter.'),
-      poolTarget: z.enum(['Both', 'Write', 'Read']).optional().describe('DatabasePools: 当前租户主/读池，默认 Both；独立应急鉴权，不依赖业务池。需要支持 database-pools/v1 的 API。'),
+      poolTarget: z.enum(['Both', 'Write', 'Read']).optional().describe('DatabasePools: 当前租户主/读池，默认 Both；回读最大/最小池、生命周期及 CapacityBudget 的当前节点所选去重池配置合计，不是实际占用或集群全量，Quartz/其它节点/扩展库/外部客户端须另计。独立应急鉴权，需要 database-pools/v1 的 API。'),
       operationId: z.string().regex(/^[0-9a-f]{32}$/u).optional().describe('DatabasePoolRecovery: 恢复操作编号，回读各节点状态；Pending/Incomplete 不代表已恢复。'),
     },
     async ({

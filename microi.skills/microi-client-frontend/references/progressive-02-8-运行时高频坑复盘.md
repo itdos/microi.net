@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-008 sha256=8cd14b9e9483cd23cc4ea25411c5c69e015387ade54131252a385c88be3a1a17 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-008 sha256=75a85c33adc8dcf89f3b1ad3efc004bc9378e1d41ff1eba6512f773ecee2db14 -->
 ## 8. 运行时高频坑复盘
 
 ### 前端 V8.Http 与后端同构契约
@@ -147,7 +147,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - 修改后运行静态门禁，确认源码不存在内容型 `v-loading`、`ElLoading.service`、硬编码黑色 Loading mask 或加载期空态；再用真实浏览器验证菜单、首页、表格、表单详情在亮色、暗色、自定义主题和移动端下的骨架几何、对比度、`aria-busy`、reduced-motion 及请求失败收口。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-009 sha256=b1105375a6b9477eb397a275c67cd7e1074ae14948c41bd594e91deb4a2ba9b0 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-009 sha256=aec6ac1daf1566f4893c86ab0b12a17dcd156b0f46fa81a7ca387ca59f13fe17 -->
 ## 7.1 登录验证码与 Sys_Config
 
 修改 `Microi.Client/src/views/login/index.vue` 或任何 PC 端登录扩展时，必须遵守平台登录验证码契约：
@@ -184,7 +184,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - 自动化检查：单测覆盖失败投影保留最后有效权限、合法撤权、访问密钥、登录切换迟到响应和注销竞态；真实浏览器拦截一次坏的当前用户投影，确认页面无需重新登录即可自动刷新，并连续检查新增、编辑按钮及刷新接口返回的管理员权限始终完整。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-010 sha256=2446aaeadddd95aa22dcd5935c5a9d60b51008bb1e0d5b5b7f6ee01f2fe9dd06 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-010 sha256=d89bb60734da788a027790c666287db8b6cda862e8f5fb3806543b07b3cce94c -->
 ## Microi 前端 SDK 约束
 
 当修改 `Microi.Client` 之外的 Vue3 前端、PC 官网、移动 H5 或定制微前端页面时，必须优先读取 `microi.skills/microi-frontend-sdk/SKILL.md` 并使用 `microi.skills/microi.v8.js`。`Microi.Client` 主后台已有平台请求与 Pinia 体系时，可以复用现有平台能力；但新增独立页面、外部站点、插件页、嵌入式页面不得再复制旧 Vue2/Vuex 版 `microi.v8.js`。

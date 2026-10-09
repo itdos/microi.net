@@ -14,7 +14,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 `SysConfig.HideSystemLicenseVersion` 缺省关闭，标签可点击跳转 `/license`，不能因一次请求失败永久消失。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-client-frontend-000 sha256=ea9cdd10772c42cc8202aa50ed3f8bec0a41588b16539b2968f256c7ee05cd3a -->
+<!-- microi-progressive:chunk id=microi-client-frontend-000 sha256=9b949c68b0867fc1ecf2e6cb1fd1bec45d22c01ad3be63485e0376d0183d1795 -->
 ## 单行文本插槽按钮约定
 
 - `diy-input.vue` 的插槽按钮行为存储在 `diy_field.Config.SlotButtonV8Code`。
@@ -27,7 +27,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=83fb9902ca2edddfc8b72de9578f28a6a7df5cadb2626e5ffb0321d62caa0bb0 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=112177bb326f8d26803e3bd9248011d839fe8d081431320d0e09f90f82487984 -->
 ## 1. 技术栈和源码入口
 
 ### 详情评论与代码版本的按需读取
@@ -58,7 +58,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=794b802f6d332bf124d4b3e1c92e68b785299f4ef5d5b4f58e00ce84bb69488c -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=a8b2f0a24201e9ae8312e3b7b48f53f826c4bc56e6be4d00a3fc5992d89235c5 -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -158,7 +158,9 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 右上角主题设置的边角风格默认圆角；已安装 `sys_user.CornerStyle` 时从账号偏好恢复，旧租户才使用浏览器本地兼容值。根元素 `data-mci-corner-style` 控制全局角半径，覆盖动态挂载的 Element Plus 弹层。顶栏入口统一使用 40px 触控区域和 20px 图标，AI 入口使用图标组件，不使用图片。模块 `HideTableBanner`、`HideFormBanner` 只在值明确为 `1/true` 时隐藏对应 Banner，并跳过其专属统计请求；未安装开关字段的旧菜单继续显示。
 
 - 边角风格先读取当前用户 `CornerStyle`：`round/square` 显式覆盖；空值或 `System` 继承租户 `sys_config.CornerStyle`，租户空值默认为圆角。不得把空个人值提前归一为 `round`，否则会阻断租户直角设置。
-- 桌面经典布局使用 `NavigationLayout=Side/Top`，个人空值或 `System` 继承租户，租户空值为侧边导航。顶部导航复用当前权限路由、角标与外链，空间不足收纳到更多菜单；移动端仍采用底部导航。右上角同时配置 `MenuChildExpandMode=System/Down/Right`，通过同一个个人偏好接口跨设备保存。
+- 桌面经典布局使用 `NavigationLayout=Side/Top/TopSide`，个人空值或 `System` 继承租户，租户空值为侧边导航。`TopSide` 将一级放顶部，当前一级的二级及更深菜单复用原侧栏；单个子菜单仍留在侧栏，无可见子菜单时隐藏侧栏并释放内容宽度。侧栏仍支持收起及 `MenuChildExpandMode=System/Down/Right`。顶部导航复用当前权限路由、角标与外链，空间不足收纳到更多菜单；移动端仍采用底部导航。当前路由与一级归属由 `hybrid-navigation.js` 统一投影，禁止修改共享权限树。
+- 顶部导航整行（含功能图标和账号姓名）使用主题运行时的 `--sidebar-*` 可读表面与前景；主题面板和业务弹层保留自身语义表面。主题入口为齿轮，界面密度在同一主题面板调整且仅保存在当前设备；AI 入口使用圆圈内 AI 字母 SVG，不能回退魔法棒或图片。
+- 头像菜单【修改密码】使用标准 `DiyCustomDialog + MicroAppDialog` 打开现有平台服务 `/personal-settings`，仅传 `Data.Action=ChangePassword` 选择密码展示模式；不能用宿主输入决定目标账号/租户，不新建密码旁路。当前密码校验、Passkey/TOTP/严格人脸一次性票据与提交继续复用个人中心，成功或卸载清除密码输入。定向回归使用 `hybrid-navigation.spec.mjs`、`password-dialog.spec.mjs` 和个人偏好资源测试。
 - 桌面壳层使用视口高度与可收缩的 flex 内容区，只有路由内容滚动，导航和 Tab 不随页面滚动；移动端仍保留文档滚动。用户入口含头像与姓名，不能使用纯图标的固定 flex 宽度；异步图表须在真实 DOM 挂载后观察尺寸变化，避免侧边/顶部导航切换后撑破卡片。
 - 主题色、浅色/深色、菜单子级展开方式等需要“换设备仍生效”的选择必须保存到当前 DiyToken 用户的 `sys_user` 白名单字段；`localStorage` 只作为未安装新字段租户和匿名启动阶段的兼容回退，不能作为跨设备事实源。
 - 已安装用户偏好字段时优先级固定为“当前用户显式值 → 租户 `sys_config` → 平台安全默认”；个人菜单值 `System` 表示继承租户配置。不得让上一位用户的浏览器本地主题覆盖下一位已登录用户。
@@ -168,7 +170,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-003 sha256=301f766dc1ab1c6b021aa861a76b44844905d432393ab407472f58f00d6283cd -->
+<!-- microi-progressive:chunk id=microi-client-frontend-003 sha256=a3e2b822a3c2aacea83d3cae796132786e3be45f3a18ceb621c477b6bd1a2442 -->
 ## 4. 工作流与表单提交
 
 工作流相关文件：
@@ -190,7 +192,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=ab17865c6032884ccd896a0eb62387cf7f89edcf337c024f2251563f3bd0e4d9 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=d3a1a826c7b1870b83f9b49b58f488adeb7627626bad7462742956ca1719cdb7 -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）

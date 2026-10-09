@@ -731,6 +731,8 @@ CLI 与多宿主 Plugin 的目标是让用户**无需先安装 IDE，也能完�
 4. **精准回读**：上传命令成功即结束该目标。只有上传报错或执行补发时，才短时回读对应目标，排除“服务端已写入、客户端收到 5xx 或断线”的不确定状态。
 5. **主动验收**：诊断全部公开状态时运行 `npm run publish:verify`；严格发布使用 `npm run publish:preflight:all` 与 `npm run publish:strict`。
 
+上传前会读取实际生成的 VSIX，保存完整文件清单、字节数、SHA-256 和敏感文件扫描回执到工作区 `.tmp/development-tools-releases/<版本>/`。归档中的 MCP 输出与全部构建输入、Skills 全部文件均须与本次源码指纹一致；超过 64 MiB、私有签名资料、凭据或安装包混入会立即停止。新发行和断点补发使用同一门禁，`vsce ls` 的工作树清单不能代替实际 ZIP 检查。npm Token 只绑定官方 HTTPS registry，临时 npmrc 仅保存 `${NPM_TOKEN}` 引用；发布子进程同时固定大小写两种 userconfig/registry 变量，覆盖外层 `npm run` 继承的旧配置。
+
 ### 本地构建与安装验收
 
 ```bash

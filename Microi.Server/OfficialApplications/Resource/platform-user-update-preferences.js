@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-user-update-preferences
- * Version: v1.1.2
+ * Version: v1.1.3
  * Function:
  * - 仅允许当前 DiyToken 用户保存自己的首页、主题、边角、导航、菜单展开与桌面偏好；空值或 System 跟随租户设置。
  */
@@ -103,8 +103,8 @@ if (hasValue('CornerStyle')) {
 if (hasValue('NavigationLayout')) {
   var layoutRaw = text(param.NavigationLayout).toLowerCase();
   var layout = !layoutRaw || layoutRaw === 'system' ? 'System'
-    : (layoutRaw === 'top' ? 'Top' : (layoutRaw === 'side' ? 'Side' : ''));
-  if (!layout) return fail('导航菜单位置只能是 System、Side 或 Top。');
+    : (layoutRaw === 'topside' ? 'TopSide' : (layoutRaw === 'top' ? 'Top' : (layoutRaw === 'side' ? 'Side' : '')));
+  if (!layout) return fail('导航菜单位置只能是 System、Side、Top 或 TopSide。');
   updateModel.NavigationLayout = layout;
   updateCount++;
 }

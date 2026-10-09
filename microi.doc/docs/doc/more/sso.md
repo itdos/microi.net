@@ -179,6 +179,8 @@ Service Ticket 为一次性票据，必须与原始 service 精确绑定；校�
 
 **OIDC 回调提示 state/nonce/PKCE 无效**：不要重用旧窗口或旧 code，核对代理后的外部 HTTPS Origin、回调地址和多节点 Redis。
 
+**OIDC 重复登录或退出时出现签名异常**：如果第一次成功、第二次出现 `ObjectDisposedException` 或签名验证失败，检查异常链是否引用已释放的 RSA。平台已修复请求级 RSA 与 IdentityModel 签名器缓存的生命周期：签名和 `id_token_hint` 验签使用不缓存请求密钥的工厂，仍验证 RS256、issuer、audience 和有效期。该修复通过后端平台升级交付，无需轮换租户私钥或清空连接；应用接口和表结构未变时不需要重装 SSO 包。只有错误链吻合才可据此归因，普通错误签名、错误证书或租户密钥不一致仍会拒绝。
+
 **SAML 签名失败**：核对 Entity ID、证书用途、签名算法、时钟、Destination/Audience 以及 Base64/PEM/PFX 格式，禁止为了联调关闭生产签名校验。
 
 **CAS Service Ticket 无效**：Ticket 只能使用一次，并且校验时的 service 必须与登录时完全一致。

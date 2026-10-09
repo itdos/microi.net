@@ -9,10 +9,12 @@ namespace Microi.net
         #region 默认值
 
         public static string OsClient = "";
-        /// <summary>默认连接池大小</summary>
-        public static int MaxPoolSize = 500;
+        /// <summary>每个节点、每个独立业务池的保守默认上限；连接串显式值优先。</summary>
+        // 数据库 max_connections 是全实例总量，不能让每个租户/读写池/节点都默认占用 500。
+        // 使用驱动默认的 100；多节点容量由管理员合计规划，不因池满自动扩容。
+        public static int MaxPoolSize = 100;
 
-        /// <summary>默认连接生命周期（秒）- 防止 MySQL 空闲连接超时</summary>
+        /// <summary>默认连接生命周期（秒）；归还时淘汰过龄连接，区别于空闲超时。</summary>
         public static int ConnectionLifetime = 300;
 
         /// <summary>默认 Redis 端口</summary>

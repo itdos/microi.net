@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-08T15:41:00.557Z",
+  "generatedAt": "2026-10-09T08:51:18.683Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,17 +169,17 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "87e6cb65541e966c93c3226488da17e69e06d9281c35d2dede55647beb1e5c56",
-      "originalLines": 703,
-      "prefixSha256": "19308dd1a04397f764cc5ab4fefe76093704564592396ce00482d28e952537b7",
-      "prefixBytes": 1400,
-      "entryLines": 245,
+      "originalSha256": "1f3a51de28c43b0467e23c3a4edc003a9cef10943699a0a1b61a7d81ada355a7",
+      "originalLines": 705,
+      "prefixSha256": "9c59063f7561713a30d5433fcaba7d9976b790758634f2a95bf827f251d7da4a",
+      "prefixBytes": 1415,
+      "entryLines": 247,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
           "ordinal": 0,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "ea9cdd10772c42cc8202aa50ed3f8bec0a41588b16539b2968f256c7ee05cd3a",
+          "sha256": "9b949c68b0867fc1ecf2e6cb1fd1bec45d22c01ad3be63485e0376d0183d1795",
           "lines": 12,
           "heading": "单行文本插槽按钮约定"
         },
@@ -187,7 +187,7 @@
           "id": "microi-client-frontend-001",
           "ordinal": 1,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "83fb9902ca2edddfc8b72de9578f28a6a7df5cadb2626e5ffb0321d62caa0bb0",
+          "sha256": "112177bb326f8d26803e3bd9248011d839fe8d081431320d0e09f90f82487984",
           "lines": 30,
           "heading": "1. 技术栈和源码入口"
         },
@@ -195,15 +195,15 @@
           "id": "microi-client-frontend-002",
           "ordinal": 2,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "794b802f6d332bf124d4b3e1c92e68b785299f4ef5d5b4f58e00ce84bb69488c",
-          "lines": 109,
+          "sha256": "a8b2f0a24201e9ae8312e3b7b48f53f826c4bc56e6be4d00a3fc5992d89235c5",
+          "lines": 111,
           "heading": "2. 表单引擎三层结构"
         },
         {
           "id": "microi-client-frontend-003",
           "ordinal": 4,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "301f766dc1ab1c6b021aa861a76b44844905d432393ab407472f58f00d6283cd",
+          "sha256": "a3e2b822a3c2aacea83d3cae796132786e3be45f3a18ceb621c477b6bd1a2442",
           "lines": 21,
           "heading": "4. 工作流与表单提交"
         },
@@ -211,7 +211,7 @@
           "id": "microi-client-frontend-004",
           "ordinal": 7,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "ab17865c6032884ccd896a0eb62387cf7f89edcf337c024f2251563f3bd0e4d9",
+          "sha256": "d3a1a826c7b1870b83f9b49b58f488adeb7627626bad7462742956ca1719cdb7",
           "lines": 43,
           "heading": "7. 验证建议"
         },
@@ -219,7 +219,7 @@
           "id": "microi-client-frontend-005",
           "ordinal": 3,
           "destination": "microi-client-frontend/references/progressive-01-3-动态按钮系统.md",
-          "sha256": "189ca6438cd0fc58a5bf14bd13a3bad26a9254c766e4a6bed62ef2aeb1879e9d",
+          "sha256": "2c4c3f197bcd921d147b892cb64ccd1b77461f67c0219cfc3107ec6c7c268d88",
           "lines": 42,
           "heading": "3. 动态按钮系统"
         },
@@ -227,7 +227,7 @@
           "id": "microi-client-frontend-006",
           "ordinal": 5,
           "destination": "microi-client-frontend/references/progressive-01-3-动态按钮系统.md",
-          "sha256": "b5d89b5a0b17ffb02579d4512b15468e52b599ddf4573afba85b9e5d3f9f5d49",
+          "sha256": "e92ec7faad68c55a2175580e301c0b2b6a63b90e8e7edba48b8b0073ae53c807",
           "lines": 68,
           "heading": "5. 路由与打开方式"
         },
@@ -235,7 +235,7 @@
           "id": "microi-client-frontend-007",
           "ordinal": 6,
           "destination": "microi-client-frontend/references/progressive-01-3-动态按钮系统.md",
-          "sha256": "573d988999f9721cf7efe7654c203342213728b4f1ce61a718b10815595ae894",
+          "sha256": "fa5d43239311945bd4a004763c0a6fa5295113b24965a73849e0f09d7b73d393",
           "lines": 27,
           "heading": "6. 修改前必查清单"
         },
@@ -243,7 +243,7 @@
           "id": "microi-client-frontend-008",
           "ordinal": 8,
           "destination": "microi-client-frontend/references/progressive-02-8-运行时高频坑复盘.md",
-          "sha256": "8cd14b9e9483cd23cc4ea25411c5c69e015387ade54131252a385c88be3a1a17",
+          "sha256": "75a85c33adc8dcf89f3b1ad3efc004bc9378e1d41ff1eba6512f773ecee2db14",
           "lines": 144,
           "heading": "8. 运行时高频坑复盘"
         },
@@ -251,7 +251,7 @@
           "id": "microi-client-frontend-009",
           "ordinal": 9,
           "destination": "microi-client-frontend/references/progressive-02-8-运行时高频坑复盘.md",
-          "sha256": "b1105375a6b9477eb397a275c67cd7e1074ae14948c41bd594e91deb4a2ba9b0",
+          "sha256": "aec6ac1daf1566f4893c86ab0b12a17dcd156b0f46fa81a7ca387ca59f13fe17",
           "lines": 36,
           "heading": "7.1 登录验证码与 Sys_Config"
         },
@@ -259,7 +259,7 @@
           "id": "microi-client-frontend-010",
           "ordinal": 10,
           "destination": "microi-client-frontend/references/progressive-02-8-运行时高频坑复盘.md",
-          "sha256": "2446aaeadddd95aa22dcd5935c5a9d60b51008bb1e0d5b5b7f6ee01f2fe9dd06",
+          "sha256": "d89bb60734da788a027790c666287db8b6cda862e8f5fb3806543b07b3cce94c",
           "lines": 9,
           "heading": "Microi 前端 SDK 约束"
         },
@@ -267,7 +267,7 @@
           "id": "microi-client-frontend-011",
           "ordinal": 11,
           "destination": "microi-client-frontend/references/progressive-03-vue3-前端微服务宿主规则.md",
-          "sha256": "4272be553eea5fd0ead8c7933b3b5231a6d8501bfed181294d1e5cf5965314d6",
+          "sha256": "850ba16e253014a9d022582155cd3e18bf04dff375e82dd2947ea527bac4342a",
           "lines": 99,
           "heading": "Vue3 前端微服务宿主规则"
         },
@@ -275,7 +275,7 @@
           "id": "microi-client-frontend-012",
           "ordinal": 12,
           "destination": "microi-client-frontend/references/progressive-03-vue3-前端微服务宿主规则.md",
-          "sha256": "4e579132c5176b46e6e9aa61e87982d63fe2c26c639f0ef3832614b2dacfcb3f",
+          "sha256": "77e4f6a9fd4ed647275e9abeee2ea9589271c19af11602db5a73f74950b937bf",
           "lines": 46,
           "heading": "在线 AI 应用与微服务页面协作"
         },
@@ -283,7 +283,7 @@
           "id": "microi-client-frontend-013",
           "ordinal": 13,
           "destination": "microi-client-frontend/references/progressive-03-vue3-前端微服务宿主规则.md",
-          "sha256": "57dc1ce4db6ce0aa4865b3d0ad11293a17e473a9f6bb92a084701ea239056d13",
+          "sha256": "c4054f900b1f6af15ae9ffb483e7571570f9d2aa99a0e674ee0bb9a956f06172",
           "lines": 15,
           "heading": "浏览器访问密钥路由"
         }

@@ -3,13 +3,14 @@
     <component :is="WebOSAppContainer" v-if="isWebOS && WebOSAppContainer && !hideShellForAnonymous" />
     <!-- 经典传统模式（仅当非 WebOS 时渲染，避免 WebOS 异步加载期间闪烁经典传统布局） -->
     <div v-else-if="!isWebOS || hideShellForAnonymous" :class="classObj" class="app-wrapper-microi">
+        <navbar v-if="!hideShellForAnonymous && isHybridNavigation" :hybrid-active-root="hybridNavigation.activeRoot" :hybrid-has-sidebar="showSidebar" @select-navigation-root="selectNavigationRoot" />
         <!-- 左边菜单区域（移动端不显示） -->
-        <sidebar v-if="!hideShellForAnonymous && !isTopNavigation && ShowClassicLeft != 0 && !diyStore.IsPhoneView" class="sidebar-container-microi" :style="GetMenuBg()" />
+        <sidebar v-if="showSidebar" :navigation-routes="isHybridNavigation ? hybridNavigation.sidebarRoutes : null" :show-brand="!isHybridNavigation" class="sidebar-container-microi" :style="GetMenuBg()" />
         <div :class="{ hasTagsView: !hideShellForAnonymous && needTagsView && !diyStore.IsPhoneView, 'mobile-view': diyStore.IsPhoneView, 'anonymous-shell-hidden': hideShellForAnonymous }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
             <!-- 顶部导航区域（移动端不显示） -->
             <div v-if="!hideShellForAnonymous && !diyStore.IsPhoneView" class="classic-workspace" :class="{ 'fixed-header-microi': fixedHeader, 'with-tags': needTagsView }" :style="GetFixedHeaderMicroiStyle()">
                 <!-- 面包屑区域 -->
-                <navbar />
+                <navbar v-if="!isHybridNavigation" />
                 <!-- 页签+内容区域（TagsView 内部已包含 router-view，PC 端内容在这里渲染） -->
                 <tags-view v-if="needTagsView" />
             </div>
@@ -42,6 +43,7 @@ import { loadAppContainer, getAppContainerSync } from "@/utils/webos-detect.js";
 import { isEmbeddedWebosWindowRuntime } from "@/utils/webos-embedded-runtime.js";
 import { DiyCommon } from "@/utils/microi.net.import";
 import { resolveUserNavigationLayout } from '@/utils/user-visual-preferences';
+import { firstNavigationLeaf, navigationTarget, resolveHybridNavigation } from '@/utils/hybrid-navigation';
 
 export default {
     name: "Layout",
@@ -56,6 +58,7 @@ export default {
         TagsView
     },
     mixins: [ResizeMixin],
+    data() { return { selectedNavigationRoot: '' }; },
     setup() {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
@@ -104,8 +107,21 @@ export default {
         };
     },
     computed: {
+        navigationLayout() {
+            return resolveUserNavigationLayout(this.diyStore.GetCurrentUser?.NavigationLayout, this.SysConfig?.NavigationLayout);
+        },
         isTopNavigation() {
-            return !this.diyStore.IsPhoneView && resolveUserNavigationLayout(this.diyStore.GetCurrentUser?.NavigationLayout, this.SysConfig?.NavigationLayout) === 'Top';
+            return !this.diyStore.IsPhoneView && this.navigationLayout === 'Top';
+        },
+        isHybridNavigation() {
+            return !this.diyStore.IsPhoneView && this.navigationLayout === 'TopSide';
+        },
+        hybridNavigation() {
+            return resolveHybridNavigation(this.permission_routes, this.$route.meta?.activeMenu || this.$route.path, this.selectedNavigationRoot);
+        },
+        showSidebar() {
+            return !this.hideShellForAnonymous && !this.diyStore.IsPhoneView && this.ShowClassicLeft != 0
+                && !this.isTopNavigation && (!this.isHybridNavigation || this.hybridNavigation.sidebarRoutes.length > 0);
         },
         isCollapse() {
             return !this.sidebar.opened;
@@ -118,6 +134,7 @@ export default {
                 mobile: this.diyStore.IsPhoneView,
                 'phone-view': this.diyStore.IsPhoneView,
                 'top-navigation-layout': this.isTopNavigation,
+                'hybrid-navigation-layout': this.isHybridNavigation,
                 'desktop-shell': !this.diyStore.IsPhoneView && !this.hideShellForAnonymous
             };
         },
@@ -129,16 +146,34 @@ export default {
             return !token || !user.Id;
         }
     },
+    watch: {
+        '$route.fullPath'() { this.selectedNavigationRoot = ''; },
+        navigationLayout() { this.selectedNavigationRoot = ''; }
+    },
     mounted() {
         var self = this;
     },
     methods: {
+        selectNavigationRoot(root) {
+            this.selectedNavigationRoot = navigationTarget(root);
+            const target = firstNavigationLeaf(root);
+            if (/^(https?:|mailto:|tel:)/i.test(target)) {
+                window.open(target, '_blank', 'noopener,noreferrer');
+            } else if (target !== this.$route.fullPath) {
+                this.$router.push(target).catch(() => {});
+            }
+        },
         handleClickOutside() {
             this.appStore.closeSideBar({ withoutAnimation: false });
         },
         GetMenuBg() {
             var self = this;
             var result = {};
+            if (self.isHybridNavigation) {
+                const top = self.ShowClassicTop != 0 ? '50px' : '0px';
+                result.top = top;
+                result.height = `calc(100% - ${top})`;
+            }
             if (self.SysConfig.MenuWidth) {
                 //这里要判断hideSidebar
                 if (self.classObj.openSidebar) {
@@ -150,8 +185,14 @@ export default {
         GetMainContainerMicroiStyle() {
             var self = this;
             var result = {};
+            if (self.isHybridNavigation) {
+                const top = self.ShowClassicTop != 0 ? '50px' : '0px';
+                // 全局侧栏样式带 #app-microi 优先级；使用动态样式确保混合布局与 Tab 全屏一致。
+                result.height = `calc(100% - ${top})`;
+                result.minHeight = '0px';
+            }
 
-            if (self.hideShellForAnonymous || self.isTopNavigation) {
+            if (self.hideShellForAnonymous || !self.showSidebar) {
                 result["marginLeft"] = "0px";
                 return result;
             }

@@ -1,6 +1,9 @@
 <template>
     <template v-if="visible">
-        <app-link v-if="!children.length || singleLeaf" :to="leafTarget">
+        <el-menu-item v-if="firstLevelOnly" :index="target" @click="$emit('select-root', route)">
+            <item :icon="route.meta?.icon" :title="formatTitle(route.meta?.title || '')" :menu-id="route.meta?.Id" :badge-config="route.meta?.MenuBadgeConfig" />
+        </el-menu-item>
+        <app-link v-else-if="!children.length || singleLeaf" :to="leafTarget">
             <el-menu-item :index="leafTarget">
                 <item :icon="leafMeta?.icon || route.meta?.icon" :title="formatTitle(leafMeta?.title || '')" :menu-id="leafMeta?.Id" :badge-config="leafMeta?.MenuBadgeConfig" />
             </el-menu-item>
@@ -19,7 +22,8 @@ import AppLink from './Sidebar/Link.vue';
 import path from '@/utils/path';
 import { isExternal } from '@/utils/validate';
 import { generateTitle } from '@/utils/i18n';
-const props = defineProps({route:{type:Object,required:true},basePath:{type:String,default:''}});
+const props = defineProps({route:{type:Object,required:true},basePath:{type:String,default:''},firstLevelOnly:Boolean});
+defineEmits(['select-root']);
 const instance = getCurrentInstance();
 const formatTitle = title => generateTitle.call(instance.proxy, title);
 const visible = computed(() => props.route.Display !== 0 && props.route.Display !== '0' && !props.route.hidden && Boolean(props.route.meta));

@@ -14,7 +14,7 @@ namespace Microi.net
     /// Secret 和稳定主体，不创建第二套平台会话；外部身份验证成功后仍由 DiyToken
     /// 承担租户、终端与业务权限。
     /// </summary>
-    public static class SsoSecurity
+    public static partial class SsoSecurity
     {
         public const string InboundDirection = "ExternalToMicroi";
         public const string OutboundDirection = "MicroiToExternal";

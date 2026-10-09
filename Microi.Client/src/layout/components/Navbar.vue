@@ -1,7 +1,7 @@
 <template>
-    <div class="navbar-microi" :style="GetNavbarMicroiStyle()" v-if="ShowClassicTop != 0">
-        <top-navigation v-if="isTopNavigation" />
-        <hamburger v-else id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
+    <div class="navbar-microi" :class="{ 'navbar-microi--themed': isTopNavigation }" :style="GetNavbarMicroiStyle()" v-if="ShowClassicTop != 0">
+        <hamburger v-if="!isTopNavigation || hybridHasSidebar" id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
+        <top-navigation v-if="isTopNavigation" :hybrid="isHybridNavigation" :active-root="hybridActiveRoot" @select-root="$emit('select-navigation-root', $event)" />
 
         <breadcrumb v-if="!isTopNavigation" id="breadcrumb-container" class="breadcrumb-container" />
 
@@ -32,8 +32,6 @@
             <lang-select class="right-menu-item hover-effect" compact />
 
             <ThemeSelect class="right-menu-item hover-effect" />
-
-            <UiDensitySelect class="right-menu-item hover-effect" />
 
             <!-- PC AI助手：与移动端、小程序复用同一机器人和同一接口能力 -->
             <DesktopAiAssistant />
@@ -101,6 +99,9 @@
                                 {{ "个人中心" }}</span
                             >
                         </el-dropdown-item>
+                        <el-dropdown-item @click="OpenChangePassword">
+                            <span><el-icon><Lock /></el-icon> 修改密码</span>
+                        </el-dropdown-item>
                         <!-- <el-dropdown-item v-if="hasWebOS" @click="GotoWebOSDesktop">
                             <span style="display: block">
                                 <el-icon><Grid /></el-icon>
@@ -123,6 +124,7 @@
             <DiyChat v-if="ShowChat && ChatType == '吾码IM'" ref="refDiyChat"></DiyChat>
             <iframe v-if="ShowChat && ChatType == '腾讯IM'" ref="myIframe" id="iframe" :src="src" frameborder="0" width="100%" height="100%" @load="onIframeLoad"></iframe> -->
         </div>
+        <DiyCustomDialog ref="changePasswordDialog" ComponentName="MicroAppDialog" title="修改密码" TitleIcon="fas fa-lock" width="min(600px, calc(100vw - 32px))" BodyHeight="min(480px, calc(100vh - 160px))" OpenType="Dialog" :DataAppend="passwordDialogData" />
     </div>
 </template>
 
@@ -132,7 +134,7 @@ import Hamburger from "@/components/Hamburger";
 import LangSelect from "@/components/LangSelect";
 import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
-import UiDensitySelect from "@/layout/components/UiDensitySelect.vue";
+import DiyCustomDialog from '@/views/form-engine/diy-custom-dialog.vue';
 import BackgroundTaskCenter from "@/layout/components/BackgroundTaskCenter.vue";
 import DesktopAiAssistant from "@/components/DesktopAiAssistant/index.vue";
 import BluetoothPrinterEntry from "@/components/BluetoothPrinterEntry/index.vue";
@@ -145,6 +147,11 @@ import { resolveUserNavigationLayout } from '@/utils/user-visual-preferences';
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
 export default {
+    props: {
+        hybridActiveRoot: { type: String, default: '' },
+        hybridHasSidebar: { type: Boolean, default: false }
+    },
+    emits: ['select-navigation-root'],
     components: {
         TopNavigation,
         Breadcrumb,
@@ -152,7 +159,7 @@ export default {
         LangSelect,
         Search,
         ThemeSelect,
-        UiDensitySelect,
+        DiyCustomDialog,
         BackgroundTaskCenter,
         DesktopAiAssistant,
         BluetoothPrinterEntry
@@ -161,7 +168,9 @@ export default {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
         const userStore = useUserStore();
-        const isTopNavigation = computed(() => !diyStore.IsPhoneView && resolveUserNavigationLayout(diyStore.GetCurrentUser?.NavigationLayout, diyStore.SysConfig?.NavigationLayout) === 'Top');
+        const navigationLayout = computed(() => resolveUserNavigationLayout(diyStore.GetCurrentUser?.NavigationLayout, diyStore.SysConfig?.NavigationLayout));
+        const isTopNavigation = computed(() => !diyStore.IsPhoneView && ['Top', 'TopSide'].includes(navigationLayout.value));
+        const isHybridNavigation = computed(() => !diyStore.IsPhoneView && navigationLayout.value === 'TopSide');
 
         const sidebar = computed(() => appStore.sidebar);
         const device = computed(() => appStore.device);
@@ -180,6 +189,7 @@ export default {
         return {
             diyStore,
             isTopNavigation,
+            isHybridNavigation,
             appStore,
             userStore,
             hasWebOS,
@@ -214,6 +224,9 @@ export default {
         };
     },
     computed: {
+        passwordDialogData() {
+            return { AppKey: 'microi-platform-service', RoutePath: '/personal-settings', Data: { Action: 'ChangePassword' } };
+        },
         WebSocketOnline: function () {
             return this.RealtimeState === "Connected";
         },
@@ -284,6 +297,10 @@ export default {
         }
     },
     methods: {
+        OpenChangePassword() {
+            // 密码与强身份校验沿用官方个人中心，框架只提供同源微服务的标准弹窗入口。
+            this.$refs.changePasswordDialog.Show();
+        },
         HandleRealtimeState(detail) {
             this.RealtimeState = detail?.state || "Disconnected";
             this.RealtimeRetryCount = Number(detail?.retryCount || 0);
@@ -687,6 +704,19 @@ export default {
             }
         }
     }
+}
+
+// 整行沿用侧栏生成的可读主题表面；局部变量同时覆盖图标、搜索入口与登录姓名。
+.navbar-microi--themed {
+    --el-text-color-primary: var(--sidebar-text-color);
+    --el-text-color-regular: var(--sidebar-text-color);
+    --el-text-color-secondary: var(--sidebar-text-color);
+    --el-fill-color-light: var(--sidebar-hover-bg);
+    background: var(--sidebar-bg-gradient);
+    color: var(--sidebar-text-color);
+    :deep(.right-menu-item), :deep(.el-dropdown), :deep(.theme-select-trigger), :deep(.desktop-ai-entry), :deep(.bluetooth-navbar-entry) { color:var(--sidebar-text-color); }
+    :deep(.desktop-ai-entry:hover), :deep(.bluetooth-navbar-entry:hover) { color:var(--sidebar-text-color);background:var(--sidebar-hover-bg); }
+    // 下拉菜单/主题面板 Teleport 到 body，继续使用自己的可读内容表面，不继承顶栏局部配色。
 }
 
 .personal-settings-help {

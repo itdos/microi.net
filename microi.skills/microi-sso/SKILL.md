@@ -58,6 +58,12 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 6. 平台级资源通过官方应用包发布；官方源用 `microi_itdos` 更新并发布，普通目标租户走商城安装/升级任务。
 7. 最终明确已验证与未验证边界，尤其是“配置包已发布”与“运行时代码已部署”的区别。
 
+### 签名异常排查
+
+- 先区分 DiyToken 的 HS256、OIDC 的 RS256、SAML XML 签名和接口引擎 HTTP 响应内部签名，保留脱敏异常类型、TraceId、运行版本与失败请求顺序；截图中的“签名异常”不能直接判定为密钥错误。
+- OIDC 第一次成功、第二次登录或退出失败且异常链包含已释放 RSA 时，检查请求级 RSA 与 IdentityModel 缓存签名器的生命周期。平台请求密钥统一使用 `SsoSecurity.CreateRequestScopedRsaKey`，禁用该密钥的签名器缓存；不能修改全局 `CryptoProviderFactory.Default`、取消验签、轮换 `AuthSecret` 或删除租户证书来掩盖错误。
+- 回归须用实际发布依赖重复加载同一私钥，先复现旧缓存路径失败，再验证连续/并发签名、旧 `id_token_hint` 验签和篡改/错误密钥/issuer/audience 拒绝。后端原子修复没有声明式资源变化时，无需为空升版官方 SSO 应用，但必须独立核对后端渠道与客户部署边界。
+
 ## 官方应用合同
 
 - AppId：`app.microi.sso`

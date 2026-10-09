@@ -11,7 +11,7 @@
         @click="handleFlyoutMenuClick"
         @mouseleave="scheduleCompactClose"
     >
-        <logo v-if="showLogo" :collapse="isCollapse" />
+        <logo v-if="showLogo && showBrand" :collapse="isCollapse" />
         <el-scrollbar wrap-class="scrollbar-wrapper-microi">
             <el-menu
                 class="sidebar-main-menu"
@@ -31,7 +31,7 @@
                     'sidebar-main-menu--flyout': isRightChildExpandMode
                 }"
             >
-                <template v-for="(route, routeIndex) in permission_routes" :key="route.path + '-' + (route.meta && route.meta.title || route.Name || '')">
+                <template v-for="(route, routeIndex) in renderRoutes" :key="route.path + '-' + (route.meta && route.meta.title || route.Name || '')">
                     <sidebar-item
                         v-if="route.Display !== 0"
                         :key="route.path + '-' + (route.meta && route.meta.title || route.Name || '')"
@@ -108,6 +108,10 @@ import { resolveUserMenuChildExpandMode } from "@/utils/user-visual-preferences.
 
 export default {
     components: { SidebarItem, Logo, MenuBottom, MenuItem, ArrowRight },
+    props: {
+        navigationRoutes: { type: Array, default: null },
+        showBrand: { type: Boolean, default: true }
+    },
     setup() {
         const diyStore = useDiyStore();
         const permissionStore = usePermissionStore();
@@ -146,6 +150,7 @@ export default {
         };
     },
     computed: {
+        renderRoutes() { return this.navigationRoutes || this.permission_routes; },
         menuChildExpandMode() {
             return normalizeMenuChildExpandMode(resolveUserMenuChildExpandMode(
                 this.CurrentUser?.MenuChildExpandMode,
@@ -295,7 +300,7 @@ export default {
             const rootElement = event.target.closest?.('.sidebar-menu-node[data-menu-level="0"][data-compact-index]');
             if (!rootElement || !event.currentTarget?.contains(rootElement)) return;
             const routeIndex = Number(rootElement.dataset.compactIndex);
-            const item = this.permission_routes[routeIndex];
+            const item = this.renderRoutes[routeIndex];
             if (!item) return;
             const rootKey = item.meta?.Id || item.path || String(routeIndex);
             this.cancelCompactClose();

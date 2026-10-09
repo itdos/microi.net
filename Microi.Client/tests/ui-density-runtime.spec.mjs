@@ -22,10 +22,12 @@ test("界面密度只允许安全的 90%-110% 五档，并同步字体、控件�
     assert.equal(parseFloat(compact["--mci-touch-target"]), 44, "紧凑模式也不能破坏触屏最小点击区域");
 });
 
-test("顶栏提供全局密度入口，启动时先恢复用户选择", () => {
+test("主题设置统一提供全局密度入口，启动时先恢复用户选择", () => {
     const navbar = readFileSync(new URL("../src/layout/components/Navbar.vue", import.meta.url), "utf8");
     const main = readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
-    assert.match(navbar, /<UiDensitySelect class="right-menu-item hover-effect"\s*\/?>/);
+    const theme = readFileSync(new URL("../src/layout/components/ThemeSelect.vue", import.meta.url), "utf8");
+    assert.doesNotMatch(navbar, /<UiDensitySelect/);
+    assert.match(theme, /<UiDensitySelect\s*\/?>/);
     assert.match(main, /initializeUiDensity\(\)/);
     assert.match(main, /styles\/ui-density\.scss/);
 });
