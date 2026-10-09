@@ -8,7 +8,7 @@
             title="AI助手"
             @click="openAssistant"
         >
-            <el-icon class="desktop-ai-entry__icon" aria-hidden="true"><MagicStick /></el-icon>
+            <MciAiIcon class="desktop-ai-entry__icon" />
         </button>
 
         <el-dialog
@@ -25,7 +25,7 @@
         >
             <template #header>
                 <div class="desktop-ai-dialog__title" data-testid="desktop-ai-dialog-drag-handle">
-                    <el-icon class="desktop-ai-entry__icon" aria-hidden="true"><MagicStick /></el-icon>
+                    <MciAiIcon class="desktop-ai-entry__icon" />
                     <span>
                         <strong>AI助手</strong>
                         <small>拖动标题栏可移动窗口</small>
@@ -42,7 +42,7 @@
 import { computed, ref, watch } from "vue";
 import { useDiyStore } from "@/pinia";
 import AiEngine from "@/views/ai-engine/index.vue";
-import { MagicStick } from "@element-plus/icons-vue";
+import MciAiIcon from '@/components/MciAiIcon.vue';
 import { isMobileAiAssistantEnabled } from "@/components/MobileTabBar/mobile-ai-entry.js";
 
 defineOptions({ name: "DesktopAiAssistant" });

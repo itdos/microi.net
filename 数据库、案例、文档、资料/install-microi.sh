@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Alibaba Cloud Linux 3 / Anolis、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-09-10 05:04:35
+# 版本：v2026-10-09 16:39:24
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -112,7 +112,7 @@ microi_install_ops() {
 }
 
 
-SCRIPT_VERSION="v2026-09-10 05:04:35"
+SCRIPT_VERSION="v2026-10-09 16:39:24"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -2855,7 +2855,8 @@ verify_container_shared_resource_pool() {
 }
 
 # MySQL 与整套 Microi 服务共机部署，缓冲池保留 Redis/Mongo/API/系统空间；
-# CPU 决定连接及 I/O 线程，真实块设备 ROTA 决定 SSD/HDD I/O 参数。
+# CPU 决定 I/O 线程；连接是容量而非同时执行 SQL 的核数，不能仅按 CPU 限至 200。
+# 真实块设备 ROTA 决定 SSD/HDD I/O 参数；内存规划仍优先于推荐连接上限。
 generate_mysql_config() {
   local total_mem_mb="${MICROI_HOST_MEMORY_MB_OVERRIDE:-}"
   local logical_cpus="${MICROI_HOST_LOGICAL_CPUS_OVERRIDE:-}"
@@ -2869,6 +2870,10 @@ generate_mysql_config() {
   local buffer_pool_alignment_mb
   local max_connections
   local memory_connection_cap
+  local resource_memory_mb
+  local service_reserve_mb
+  local connection_memory_budget_mb
+  local log_buffer_mb
   local thread_cache_size
   local table_open_cache
   local io_threads
@@ -2890,20 +2895,24 @@ generate_mysql_config() {
   physical_cores=$(detect_physical_cpu_cores)
   disk_type=$(detect_storage_type "${DATABASE_DATA_DIR:-/}")
 
-  if [ "${total_mem_mb}" -le 2048 ]; then buffer_pool_percent=20
-  elif [ "${total_mem_mb}" -le 4096 ]; then buffer_pool_percent=25
-  elif [ "${total_mem_mb}" -le 8192 ]; then buffer_pool_percent=30
-  elif [ "${total_mem_mb}" -le 16384 ]; then buffer_pool_percent=35
+  # 与真实安装使用的共享父级预算一致；只读生成入口也按宿主 95% 规划。
+  # 已有更小的共享预算必须优先，不能把宿主全部 RAM 当作 MySQL 可用内存。
+  resource_memory_mb=$((total_mem_mb * 95 / 100))
+  if [[ "${MICROI_DOCKER_MEMORY_BUDGET_MB:-}" =~ ^[1-9][0-9]*$ ]] &&
+      [ "${MICROI_DOCKER_MEMORY_BUDGET_MB}" -lt "${resource_memory_mb}" ]; then
+    resource_memory_mb="${MICROI_DOCKER_MEMORY_BUDGET_MB}"
+  fi
+  if [ "${resource_memory_mb}" -le 2048 ]; then buffer_pool_percent=20
+  elif [ "${resource_memory_mb}" -le 4096 ]; then buffer_pool_percent=25
+  elif [ "${resource_memory_mb}" -le 8192 ]; then buffer_pool_percent=30
+  elif [ "${resource_memory_mb}" -le 16384 ]; then buffer_pool_percent=35
   else buffer_pool_percent=45
   fi
-  buffer_pool_mb=$((total_mem_mb * buffer_pool_percent / 100))
+  buffer_pool_mb=$((resource_memory_mb * buffer_pool_percent / 100))
   [ "${buffer_pool_mb}" -lt 128 ] && buffer_pool_mb=128
 
-  memory_connection_cap=$((total_mem_mb / 64))
-  [ "${memory_connection_cap}" -lt 100 ] && memory_connection_cap=100
   max_connections=$((logical_cpus * 25))
-  [ "${max_connections}" -lt 100 ] && max_connections=100
-  [ "${max_connections}" -gt "${memory_connection_cap}" ] && max_connections="${memory_connection_cap}"
+  [ "${max_connections}" -lt 500 ] && max_connections=500
   [ "${max_connections}" -gt 800 ] && max_connections=800
 
   thread_cache_size=$((logical_cpus * 8))
@@ -2930,9 +2939,24 @@ generate_mysql_config() {
   innodb_log_file_mb=$((buffer_pool_mb / 16))
   [ "${innodb_log_file_mb}" -lt 128 ] && innodb_log_file_mb=128
   [ "${innodb_log_file_mb}" -gt 4096 ] && innodb_log_file_mb=4096
-  if [ "${total_mem_mb}" -le 4096 ]; then innodb_log_buffer_size='32M'; tmp_table_size='32M'
-  elif [ "${total_mem_mb}" -le 16384 ]; then innodb_log_buffer_size='64M'; tmp_table_size='64M'
-  else innodb_log_buffer_size='256M'; tmp_table_size='128M'
+  if [ "${resource_memory_mb}" -le 4096 ]; then log_buffer_mb=32; tmp_table_size='32M'
+  elif [ "${resource_memory_mb}" -le 16384 ]; then log_buffer_mb=64; tmp_table_size='64M'
+  else log_buffer_mb=256; tmp_table_size='128M'
+  fi
+  innodb_log_buffer_size="${log_buffer_mb}M"
+  # 至少 30% 留给 API/同机服务，再扣已对齐的 Buffer Pool、日志缓冲、64M key
+  # 缓冲和 256M 固定开销。8M/连接是容量规划估计，临时表/复杂查询仍需实测，
+  # 不能把允许 500 条连接宣称为 500 条重 SQL 同时执行的内存保证。
+  service_reserve_mb=$((resource_memory_mb * 30 / 100))
+  connection_memory_budget_mb=$((resource_memory_mb - service_reserve_mb - buffer_pool_mb - log_buffer_mb - 64 - 256))
+  memory_connection_cap=$((connection_memory_budget_mb / 8))
+  if [ "${memory_connection_cap}" -lt 10 ]; then
+    echo "Microi：错误：MySQL 可用连接内存预算 ${connection_memory_budget_mb}MB 不足，请增加共享资源预算或使用已有数据库。" >&2
+    return 1
+  fi
+  [ "${max_connections}" -gt "${memory_connection_cap}" ] && max_connections="${memory_connection_cap}"
+  if [ "${max_connections}" -lt 500 ]; then
+    echo "Microi：提示：MySQL 内存预算仅允许 ${max_connections} 条连接，低于推荐的 500；请按全部 API 节点、读写池、Quartz 和其它客户端合计设置池上限。" >&2
   fi
 
   case "${disk_type}" in
@@ -2960,7 +2984,7 @@ generate_mysql_config() {
     sync_binlog=100
   fi
 
-  echo "Microi：MySQL 自适应配置：内存 ${total_mem_mb}MB，物理核 ${physical_cores}，逻辑核 ${logical_cpus}，磁盘 ${disk_type}，Buffer Pool ${buffer_pool_mb}MB，最大连接 ${max_connections}" >&2
+  echo "Microi：MySQL 自适应配置：内存 ${total_mem_mb}MB，共享预算 ${resource_memory_mb}MB，物理核 ${physical_cores}，逻辑核 ${logical_cpus}，磁盘 ${disk_type}，Buffer Pool ${buffer_pool_mb}MB，连接预算 ${connection_memory_budget_mb}MB，最大连接 ${max_connections}" >&2
   cat <<MYSQLCNF
 [mysqld]
 # Microi 自适应配置：RAM=${total_mem_mb}MB, physical=${physical_cores}, logical=${logical_cpus}, disk=${disk_type}
@@ -2971,7 +2995,7 @@ max_allowed_packet = 512M
 skip_name_resolve = ON
 sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
 
-# 连接与表缓存（连接数同时受 CPU、内存上限约束）
+# 连接与表缓存（推荐 500、最高 800，内存不足时主动降级；不代表 SQL 并发数）
 max_connections = ${max_connections}
 max_connect_errors = 100000
 thread_cache_size = ${thread_cache_size}

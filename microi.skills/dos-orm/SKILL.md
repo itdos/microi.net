@@ -34,7 +34,9 @@ Dos.ORM 是 Microi.Server 底层 C# ORM。它不是接口引擎里的 `V8.Db`：
 - 创建事务、准备读取器、打开连接、提交/回滚及批处理任一路径抛异常，都必须释放本层拥有的连接；借用外部事务或批处理连接时不能擅自关闭。保留原始异常，不因 Dispose 失败遮盖原始错误。
 - `DbTrans` 提交成功后先归还连接，再执行提交后通知。通知失败不能把已提交事务报告为回滚，也不能自动重放业务 SQL。调用者仍必须使用 `using`，防止业务异常绕过 Commit/Rollback。
 - `DatabasePoolExhausted`、`DatabaseCapacityExceeded`、`DatabaseEndpointUnreachable` 是不同故障；不要把应用池等待、数据库全局连接限制和慢 SQL 混为一谈。
+- 平台未显式配置的 MySQL 业务池上限为 100，最小池保持驱动默认 0，连接串显式值优先；不得因为数据库拒绝连接自动放大池。每节点/租户、独立读写池、Quartz 与外部客户端的容量须合计并保留管理余量。`Connection Lifetime` 是归还时按创建时间淘汰，不能当空闲超时。
 - 可信 C# 宿主通过 `Database.GetConnectionPoolSnapshot()` 读取脱敏状态，`ResetConnectionPool()` 只轮换准确匹配的 MySQL/SQL Server 池，`ProbeConnectionPoolAsync` 用原池执行固定 `SELECT 1`。不使用 `ClearAllPools`，不杀借出的事务，不重放 SQL。
+- 快照的 `MinimumPoolSize/ConnectionLifetimeSeconds` 是配置；`Database.GetConnectionPoolBudgetSnapshot` 按所选池身份去重合计最大/最小池。`CurrentNodeSelectedPools` 不包含其它节点、Quartz、扩展库或外部程序，不是已占用连接；未知驱动合计为 null，无池连接单列且不受池上限限制。
 - `BeginIsolatedConnections()` 仅用于有并发限制的可信应急鉴权作用域，设置无池连接与 5 秒连接/命令超时；未知驱动拒绝。不能给普通业务或 V8 增加绕过限流的开关，不能在此作用域内执行清池或把无池探测冒充原池恢复。
 - AI 在线恢复使用 `microi_manage_system_observability(action=ResetDatabasePools)` 的预览、确认和回读协议，详细决策见 [系统日志/监控](../system-observability/SKILL.md)。需要升级含 `database-pools/v1` 的后端和 MCP；事故恢复本身不要求重启数据库/API。
 

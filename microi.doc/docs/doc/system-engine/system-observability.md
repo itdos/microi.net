@@ -347,6 +347,8 @@ Linux 默认只声明当前 PID 命名空间。`HostProcessesVisible=false/null`
 
 历史查询只扫描有索引的固定时间桶，并对相同租户、范围和 TOP 参数做短 TTL Redis 缓存；5 分钟汇总完成后会同步重建小时／天桶并自然失效缓存。MongoDB 只保存受限的高价值明细，不承担跨月排行榜的全表扫描。功能启用前已经过去的流量不会凭空回填，部署后会从第一个完整汇总桶开始积累。
 
+流量聚合表的 `BucketStartUtc` 与 `LastSeenAtUtc` 使用固定 19 字符 UTC 文本 `yyyy-MM-dd HH:mm:ss`，与历史范围查询保持一致。数据库驱动可能将含微秒的 `DateTime` 参数写成 26 字符，超过官方 `varchar(25)` 字段；后台写入统一格式后无需扩大字段。汇总失败会回滚该桶、保留待重试桶并限速记录警告；这条警告本身不能证明 API 因 `StopHost` 退出，须结合进程退出码和宿主异常记录判断。
+
 ### 后台任务大响应治理
 
 `POST /api/BackgroundTask/List` 是后台任务中心的列表接口，默认每页 15 条、最大 100 条，只返回标题、状态、进度、时间和 `HasLog/HasResult` 等摘要；不再把 `Log`、`Result`、参数、可信用户快照和检查点随每一行重复返回。用户展开某一任务时才按任务所有权调用详情接口，轮询进度只调用轻量状态接口。旧客户端显式请求超大页也会被服务端限制，因此不能再通过页面参数制造数 MB 的任务列表响应。
@@ -543,7 +545,7 @@ IP 治理必须两步执行。第一次不传 `confirmExecution` 只返回 dry-r
 
 包含 `database-pools/v1` 协议的新后端与配套 MCP 支持以下操作。首次使用需要正常升级后端与 MCP；已经运行该协议的节点发生故障时，恢复过程无需重启数据库或 API。此应急协议由框架提供，不依赖商城查询引擎，不需要为它重装【系统日志/监控】应用。
 
-1. 对当前 MCP 连接调用 `microi_manage_system_observability`，参数为 `{"action":"ResetDatabasePools","poolTarget":"Both"}`，获取预览。也可用查询工具 `action=DatabasePools` 查看当前节点的驱动版本、池上限、申请中数量、失败码和退避时间。
+1. 对当前 MCP 连接调用 `microi_manage_system_observability`，参数为 `{"action":"ResetDatabasePools","poolTarget":"Both"}`，获取预览。也可用查询工具 `action=DatabasePools` 查看当前节点的驱动版本、池上限/最小池、连接生命周期、申请中数量、失败码和退避时间。
 2. 使用同一次预览的 `OperationId`、`PoolIds`、`Target` 和 `requiredConfirmation` 调用执行：
 
    ```json
@@ -559,6 +561,18 @@ IP 治理必须两步执行。第一次不传 `confirmExecution` 只返回 dry-r
 3. 调用 `microi_query_system_observability`，传 `{"action":"DatabasePoolRecovery","operationId":"原操作编号"}` 回读。`Pending` 继续等待；`Incomplete` 表示存在未回执节点；`PartialFailure` 表示节点轮换或探测失败。`CompletedForRegisteredNodes` 只表示已注册协议的节点完成，不能代表未升级节点。随后重试原报错的只读业务接口。
 
 恢复只支持当前租户 MySQL、SQL Server 的主库/读库连接池，`Write / Read / Both` 指向相应角色，重复池自动合并。已加载的其它租户共用该池时拒绝；扩展库与其它驱动不在此入口范围内。不会调用全局清池，不杀死借出的事务，不重放业务 SQL，也不自动增大池上限。旧事务归还时由驱动丢弃旧连接；数据库不可达、凭据失效、数据库容量不足或持续泄漏，需要继续处理原始原因。
+
+`Pools[].MinimumPoolSize` 和 `ConnectionLifetimeSeconds` 用于解释连接保留策略。
+`CapacityBudget` 对当前节点所选主/读池按池身份去重，返回配置的最大/最小连接合计；
+主读共用同一池只算一次。`Scope=CurrentNodeSelectedPools` 明确其局部范围，
+未知驱动的合计为 `null`，无池连接单独列入 `NonPooledPoolCount`。
+这些数据不是实际连接占用，也不包含其它节点、Quartz、扩展库或外部程序，
+不能把注册节点数直接乘当前池上限宣称已取得完整集群预算。
+
+默认 MySQL 业务池上限为 100；显式租户连接串优先。新装数据库在内存允许时推荐
+500，低内存主动降低。多个节点与独立池仍须留出管理员/备份余量，不能只提高数据库
+上限来掩盖慢 SQL、长事务或泄漏。排查和安装策略见
+[连接达到上限时的处理](../getting-started/docker-run.md#连接达到上限时的处理)。
 
 应急鉴权仍验证 DiyToken、Redis 中的有效会话以及当前主库管理员权限；访问密钥还必须具备 `mcp:admin`。鉴权连接使用 `Pooling=false`、5 秒连接/命令超时，每节点最多 2 个应急请求。它有独立请求槽，但保留内存和安全防护。Redis 或主库本身不可用、无有效管理员会话时会明确失败，不绕过权限。
 

@@ -52,15 +52,20 @@
 
 管理员也可在【系统账号】表单的“个人设置”页签维护该字段。MCP 维护账号数据时使用同名字段 `DefaultIndexUrl`；留空表示继承系统默认值。
 
-个人设置还支持 `sys_user.ThemeColor`、`ThemeMode`、`CornerStyle` 和 `MenuChildExpandMode`。右上角主题设置与平台个人中心统一调用官方 Managed 接口引擎 `platform-user-update-preferences` 保存：
+个人设置还支持 `sys_user.ThemeColor`、`ThemeMode`、`CornerStyle`、`NavigationLayout` 和 `MenuChildExpandMode`。右上角主题设置与平台个人中心统一调用官方 Managed 接口引擎 `platform-user-update-preferences` 保存：
 
 - `ThemeColor` 留空时继承 `sys_config.ThemeColor`；
 - `ThemeMode` 使用 `light / dark`；
 - `CornerStyle` 使用 `round / square`，默认圆角；
+- `NavigationLayout` 使用 `System / Side / Top / TopSide`，其中 `System` 继承系统设置；
 - `MenuChildExpandMode` 使用 `System / Down / Right`，其中 `System` 继承系统设置；
 - 已安装这些字段时以账号值为准，换设备登录也会恢复；旧租户未安装字段时仅保留浏览器本地兼容行为。
 
-右上角【主题设置 → 边角风格】可在“圆角／直角”之间切换。直角模式即时覆盖框架按钮、输入框、弹窗、页面容器、卡片和 Tab 的边角。安装新版系统账号应用后，选择保存在当前账号并在其它设备恢复；旧租户暂存在当前浏览器。顶栏的通知、搜索、主题、密度、AI、蓝牙及全屏入口使用统一的 40px 触控区域和 20px 线性图标，AI 入口不再依赖图片资源。升级 `Microi.Client` 后生效。
+右上角【主题设置 → 边角风格】可在“圆角／直角”之间切换。直角模式即时覆盖框架按钮、输入框、弹窗、页面容器、卡片和 Tab 的边角。安装新版系统账号应用后，选择保存在当前账号并在其它设备恢复；旧租户暂存在当前浏览器。顶栏的通知、搜索、主题、AI、蓝牙及全屏入口使用统一的 40px 触控区域和 20px 图标；主题入口为齿轮，AI 入口为圆圈内的 AI 字母轮廓。【界面密度】在主题面板内调整。升级 `Microi.Client` 后生效。
+
+`NavigationLayout=TopSide` 使用一级顶部、二级侧栏的布局，仍从当前用户授权路由读取菜单。
+单个子菜单也保留在侧栏；当前一级没有可见子菜单时隐藏侧栏并释放内容宽度。
+二级及更深层继续使用原侧栏的角标、外链、收起和向下/向右展开行为。移动端保持底部导航。
 
 接口引擎只从当前 DiyToken 读取用户 Id 和租户，不接受调用方指定目标用户/租户，也不写账号、手机号、部门、角色、Level、状态、密码、认证因子或登录审计字段。管理员表单中的“个人设置”Tab 应继续用 CollapseGroup 将语言与首页、主题与菜单、桌面外观分组。
 

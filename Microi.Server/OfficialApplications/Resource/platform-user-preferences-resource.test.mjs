@@ -162,6 +162,20 @@ test('inherited presentation values remain explicit and cannot change another ac
   }
 });
 
+test('hybrid layout persists only for the authenticated user and preserves strict enum validation', () => {
+  const { result, updateModel } = run({ NavigationLayout:'TOPSIDE', Id:'other-account', OsClient:'other-tenant' });
+  assert.equal(result.Code, 1);
+  assert.deepEqual(updateModel, { Id:'user-1', NavigationLayout:'TopSide' });
+  assert.equal(run({ NavigationLayout:'TopSide<script>' }).result.Code, 0);
+  assert.equal(run({ NavigationLayout:'TopSide' }, {}).result.Code, 1001);
+  for (const name of ['sys_user', 'sys-config', 'saas-engine']) {
+    const pkg = JSON.parse(fs.readFileSync(path.join(resourceDir, `app.microi.${name}.json`), 'utf8'));
+    const fields = pkg.DiyFields.filter(field => field.Name === 'NavigationLayout');
+    assert.ok(fields.length > 0, name);
+    assert.ok(fields.every(field => JSON.parse(field.Data).some(option => option.Key === 'TopSide')), name);
+  }
+});
+
 test('both framework clients call the Managed ApiEngine instead of a binary-only controller', () => {
   const themeSelect = fs.readFileSync(
     path.resolve(resourceDir, '../../../Microi.Client/src/layout/components/ThemeSelect.vue'),

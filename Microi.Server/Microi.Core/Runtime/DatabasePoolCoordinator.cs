@@ -53,6 +53,8 @@ namespace Microi.net
             {
                 Contract = "database-pools/v1", NodeId, Target = target,
                 Pools = pools.Select(p => p.GetConnectionPoolSnapshot()).ToArray(),
+                // 本节点所选主/读池的容量，仅供规划；不能乘注册节点数伪造集群全量。
+                CapacityBudget = Database.GetConnectionPoolBudgetSnapshot(pools),
                 PoolIds = PoolIds(pools), CanReset = allowed,
                 KnownNodes = nodes.Select(n => n.ToString()).ToArray(),
                 OperationId = Guid.NewGuid().ToString("N"),

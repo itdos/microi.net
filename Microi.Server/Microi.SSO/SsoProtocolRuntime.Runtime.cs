@@ -666,7 +666,9 @@ namespace Microi.net
                 rsa.ImportPkcs8PrivateKey(Convert.FromBase64String(encoded), out _);
                 var parameters = rsa.ExportParameters(false);
                 var kid = SsoSecurity.HashOpaqueToken(Convert.ToBase64String(parameters.Modulus)).Substring(0, 24);
-                var key = new RsaSecurityKey(rsa) { KeyId = kid };
+                // 同一持久化私钥会反复加载为新的请求级 RSA。请求结束会释放材料，
+                // 所以签名与 EndSession 验签都必须禁止缓存引用上一请求的 RSA。
+                var key = SsoSecurity.CreateRequestScopedRsaKey(rsa, kid);
                 return new OidcSigningMaterial
                 {
                     Rsa = rsa,

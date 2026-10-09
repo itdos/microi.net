@@ -93,6 +93,8 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 
 ## 同步与安全边界
 
+- 发布扩展与 CLI/AI Plugin 前检查实际 VSIX：完整清单、字节数、SHA-256 和敏感文件扫描回执保存在 `.tmp/development-tools-releases/<版本>/`；逐字节核对 MCP 输出/构建输入与 Skills 全部文件同源。归档超过 64 MiB 或混入签名资料、凭据、桌面安装包、工具链、apps、upstream、同步目录或 node_modules 时停止，修复误包后复测；断点补发使用同一门禁，不用 `vsce ls` 替代归档检查。npm Token 只绑定官方 HTTPS registry，私有 npmrc 仅引用 `${NPM_TOKEN}`；同时固定 `npm_config_userconfig` / `NPM_CONFIG_USERCONFIG` 与 registry 两种大小写变量，避免外层 `npm run` 的配置遮蔽有效 Token。不输出凭据，不因继承错误重复要求登录；已发布正确制品保留，发行内容变化使用新不可变版本。
+
 - `Microi-V8-Engine/.microi-config.json` 是三端连接配置事实源；未知字段必须保留。
 - CLI、VS Code、Codex 与 DeepSeek Harness 插件可以在同一工作区并存；各端必须复用同一配置/Token/MCP 协议，带版本写入实行较新 provider 优先，禁止旧入口回写降级。`doctor.coexistence` 未通过时准确报告兼容风险并后台修复，但不得因此停止无关工作。
 - 推送前先做远端差异检查。写请求超时只表示结果不确定，使用对应 get 工具短超时回读，禁止盲目重复创建或覆盖。

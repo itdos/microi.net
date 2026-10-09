@@ -198,7 +198,7 @@ bash install-microi.sh --repair-network
 | :--: | ---- |
 | 1 | 执行脚本时会提示选择【公网 IP `g` / 内网 IP `n`】、主租户 `OsClient`（直接 Enter 默认为 `iTdos`）、主数据库类型/版本，以及是否复用已有 MySQL / MinIO |
 | 2 | Docker 环境不存在时脚本会**自动安装** Docker 及 Docker Compose V2 插件 |
-| 3 | 新装 MySQL 的性能配置会根据宿主机内存与 CPU 自适应生成；Docker 层只让吾码 API 与脚本创建的主数据库共享 `microi.slice` 合计硬上限，复用已有 MySQL 时不修改其全局配置且外部 MySQL 不受本机 Slice 约束 |
+| 3 | 新装 MySQL 根据宿主机与共享资源池内存预算生成配置，推荐 `max_connections=500`、最高 800；低内存机器主动降低并提示。Docker 层只让 API 与新建主数据库共享 `microi.slice` 合计硬上限，复用已有 MySQL 时不修改其全局配置 |
 | 4 | 数据库还原后会自动同步 `sys_osclients.OsClient/ClientName` 和 API、Web 编排中的 `OsClient` |
 | 5 | 新装或复用 MinIO 都会创建/复用私有桶和公有桶（默认 `mci-private` / `mci-public`，已有服务可改名），清理私有桶匿名权限、为公有桶开放匿名下载，并把端点、密钥、桶名、SSL 等配置写回 `sys_osclients` |
 | 6 | 根据安装模式选择的访问 IP 和实际端点，自动把 `sys_config.ApiBase` 写为 API 地址，把 `sys_config.FileServer` 写为最终公有桶 HTTP(S) 地址 |
@@ -976,8 +976,8 @@ max_allowed_packet = 512M
 skip_name_resolve = ON
 sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 
-# 连接与表缓存（连接数同时受 CPU、共享父级内存上限约束）
-max_connections = 100
+# 连接与表缓存（此 16GiB 示例推荐 500；低内存按预算降级，最高 800）
+max_connections = 500
 max_connect_errors = 100000
 thread_cache_size = 32
 table_open_cache = 1024
@@ -1062,8 +1062,8 @@ max_allowed_packet = 512M
 skip_name_resolve = ON
 sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
 
-# 连接与表缓存（连接数同时受 CPU、共享父级内存上限约束）
-max_connections = 100
+# 连接与表缓存（此 16GiB 示例推荐 500；低内存按预算降级，最高 800）
+max_connections = 500
 max_connect_errors = 100000
 thread_cache_size = 32
 table_open_cache = 1024
@@ -2109,6 +2109,34 @@ WHERE command != 'Sleep';
 -- 查看连接历史峰值
 SHOW STATUS LIKE 'Max_used_connections';
 ```
+
+### 连接达到上限时的处理
+
+`Too many connections` 是数据库实例总容量不足，`obtaining a connection from the pool`
+是应用连接池借用超时。200 是否过低取决于节点数、池数和其它客户端；几百个 `Sleep`
+可能是正常池复用，不能据此认定泄漏。比较两个业务窗口的新增拒绝次数、历史峰值、
+活跃事务和连接来源，再确定是容量、慢 SQL、长事务还是连接未归还。
+
+新安装器在内存允许时推荐 500，最高 800，不再把低核数直接当连接容量限制。
+它先服从宿主 95% 或更小的共享内存预算，留出 30% 给 API/同机服务，再扣除全局
+缓冲和固定开销，以 8 MiB/连接作容量估计；低内存会降低并显示实际值。
+该估计不保证所有连接同时执行大临时表等重查询，需要结合真实负载验证。
+
+升级框架后，未显式设置的 MySQL 业务池默认上限为 100，最小池为驱动默认的 0；
+显式 `Max Pool Size`、`Min Pool Size` 和 `Connection Lifetime` 保持原值。
+读写池、Quartz、多个租户/节点和其它客户端都可能独立占用同一实例：合计配置上限
+应小于服务器 `max_connections`，并留出管理员、备份和滚动发布余量。例如两节点各有
+100 的业务池和 100 的 Quartz 池，合计 400；另有独立读池时必须继续计入。
+
+在已有 SaaS 主/读数据库连接串中按预算设置池参数，不添加 API 环境开关。
+`Connection Lifetime=300` 是归还时淘汰过龄连接，不是空闲超时。
+MySql.Data 会周期回收空闲连接；设置较大的 `Min Pool Size` 会保留相应连接。
+详见 [Connector/NET 连接池说明](https://dev.mysql.com/doc/connector-net/en/connector-net-connections-pooling.html)。
+
+已有数据库不会随安装器或平台升级自动放大上限。先检查主机内存、连接来源与各节点
+池预算，备份当前数据库配置，再由数据库管理员调整并回读实际值和后续拒绝增量。
+程序不因拒绝连接自动扩容、杀事务或重放 SQL；池故障可以使用
+[MCP 在线连接池诊断与恢复](../system-engine/system-observability.md#连接池耗尽时通过-mcp-在线恢复)。
 
 ---
 
