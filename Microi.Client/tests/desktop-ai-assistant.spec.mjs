@@ -17,12 +17,23 @@ const aiEngineSource = fs.readFileSync(
     path.resolve(testDir, "../src/views/ai-engine/index.vue"),
     "utf8"
 );
+const aiIconSource = fs.readFileSync(
+    path.resolve(testDir, "../src/components/MciAiIcon.vue"),
+    "utf8"
+);
 
-test("PC navbar exposes the same feature-gated robot entry", () => {
+test("PC navbar exposes the feature-gated circular AI letter entry", () => {
     assert.match(navbarSource, /<DesktopAiAssistant\s*\/>/);
     assert.match(desktopSource, /isMobileAiAssistantEnabled\(diyStore\.SysConfig\)/);
+    assert.match(desktopSource, /v-if="aiAssistantEnabled"/);
     assert.match(desktopSource, /data-testid="desktop-ai-entry"/);
-    assert.match(desktopSource, /<el-icon[^>]*><MagicStick\s*\/><\/el-icon>/);
+    assert.match(desktopSource, /import MciAiIcon from ['"]@\/components\/MciAiIcon\.vue['"]/);
+    assert.match(desktopSource, /<MciAiIcon\s+class="desktop-ai-entry__icon"\s*\/>/);
+    assert.doesNotMatch(desktopSource, /MagicStick/);
+    // 实际组件以同一主题色绘制圆框、A的两斜边/横杆和I的上下横杆/竖线，避免退化为空圈或装饰图。
+    assert.match(aiIconSource, /<svg\b[^>]*viewBox="0 0 24 24"[^>]*aria-hidden="true"/);
+    assert.match(aiIconSource, /<circle\b[^>]*cx="12"[^>]*cy="12"[^>]*r="10\.2"[^>]*stroke="currentColor"/);
+    assert.match(aiIconSource, /<path\b[^>]*d="M[\d. ]+M[\d. ]+h[\d.]+M[\d. ]+h[\d.]+M[\d. ]+v[\d.]+M[\d. ]+h[\d.]+"[^>]*stroke="currentColor"/);
     assert.doesNotMatch(desktopSource, /<img\b|assistant-robot\.png/);
     assert.match(desktopSource, /aria-label="打开AI助手"/);
     assert.doesNotMatch(desktopSource, /吾码\s*AI\s*助手|吾码AI助手/);

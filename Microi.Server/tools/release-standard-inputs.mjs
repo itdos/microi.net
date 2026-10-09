@@ -48,7 +48,7 @@ export async function snapshotStandardInputs(root) {
     await walk(folder);
   }
 
-  // Full 的跨工程包装还读取唯一官方清单中的 AI/邮箱/worker，以及抽奖
+  // Full 的服务器包装与前端 Three 回归还读取唯一官方清单中的 AI/邮箱/3D/worker，以及抽奖
   // 契约声明的源与交付输入。只冻结这些已声明文件，不扫描其它应用或复制私有正文。
   const safeRelative = value => typeof value === 'string' && value.length > 0
     && !value.includes('\\') && !path.isAbsolute(value) && !/^[A-Za-z]:/.test(value)
@@ -89,8 +89,8 @@ export async function snapshotStandardInputs(root) {
     if (official.SchemaVersion !== 1 || official.Origin?.ApiBase !== 'https://api.itdos.com'
       || official.Origin?.OsClient !== 'iTdos' || !Array.isArray(official.Applications) || !Array.isArray(official.Repositories))
       throw Error('Invalid official test input source contract');
-    // 当前 Full 实际使用的责任入口；同合同中未执行的独立 3D 应用不扩大冻结范围。
-    for (const appKey of ['microi-ai-cad', 'ai-employee-center', 'mci-email']) {
+    // 只冻结服务器与前端门禁实际使用的责任入口，不遍历其它在线应用。
+    for (const appKey of ['microi-ai-cad', 'ai-employee-center', 'mci-email', 'microi-3d-engine']) {
       const matches = official.Applications.filter(app => app.AppKey === appKey);
       if (matches.length !== 1) throw Error('Declared official test application must have one owner');
       await exactFiles(matches[0]);
