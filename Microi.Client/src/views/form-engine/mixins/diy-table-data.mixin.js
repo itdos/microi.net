@@ -797,6 +797,8 @@ export default {
                 formEngineKey: self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name,
                 tableId: self.TableId,
                 isTableChild: self.IsTableChild(),
+                // zhy：把父表新增/编辑状态交给查询路由，避免未保存父表的 INNER JOIN 过滤子记录。
+                tableChildFormMode: self.TableChildFormMode,
                 tableChildRequiresModuleQuery: tableChildRequiresModuleQuery(self.SysMenuModel, self.TableId)
             });
 
