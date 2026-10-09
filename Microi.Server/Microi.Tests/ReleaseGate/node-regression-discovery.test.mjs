@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {discoverTests} from '../run-node-regressions.mjs';
+import {discoverTests, regressionLogFile, roots} from '../run-node-regressions.mjs';
 
 function fixture(t,files){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-regression-discovery-'));
@@ -31,4 +31,21 @@ test('unknown and browser aggregate children cannot masquerade as Node regressio
  }
  const root=fixture(t,{'empty.test.mjs':'// no responsibility tests\n'});
  assert.throws(()=>discoverTests(root),/Unclassified regression test/);
+});
+
+test('Windows and POSIX responsibility roots write a flat TAP path inside the result directory', t=>{
+ const directory=fixture(t,{});
+ for(const root of ['Microi.Server/OfficialApplications/PlatformService/test','Microi.Server\\OfficialApplications\\PlatformService\\test']){
+  const log=regressionLogFile(directory,root);
+  assert.equal(path.dirname(log),directory);
+  assert.equal(path.basename(log),'Microi.Server-OfficialApplications-PlatformService-test.tap');
+  fs.writeFileSync(log,'original TAP bytes\n');
+  assert.equal(fs.readFileSync(log,'utf8'),'original TAP bytes\n');
+ }
+ assert.equal(roots.at(-1).includes('\\'),false,'discovery summaries use platform-independent relative roots');
+});
+
+test('browser module names inside fixture strings do not omit real Node responsibility tests', t=>{
+ const root=fixture(t,{'actual.test.mjs':"import test from 'node:test';\nconst fixture = \"import test from '@playwright/test';\";\ntest('actual',()=>{});"});
+ assert.deepEqual(discoverTests(root),[path.join(root,'actual.test.mjs')]);
 });
