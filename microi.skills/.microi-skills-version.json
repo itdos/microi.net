@@ -1,6 +1,6 @@
 {
-  "version": "5.8.3",
+  "version": "5.8.5",
   "versionRule": "Microi version uses three numeric parts. Each publish increments the last part; when a part exceeds 9 it carries to the previous part: 1.0.9 -> 1.1.0, 1.9.9 -> 2.0.0.",
   "managedBy": "Microi.Agent/bump-version.js",
-  "updatedAt": "2026-10-06T22:27:09.603Z"
+  "updatedAt": "2026-10-08T15:41:00.798Z"
 }

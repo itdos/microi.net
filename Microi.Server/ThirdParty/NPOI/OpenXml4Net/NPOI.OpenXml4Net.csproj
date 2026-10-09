@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../NPOI.Build.props" />
+  <PropertyGroup>
+    <NpoiSourceModule>openxml4Net</NpoiSourceModule>
+    <AssemblyName>NPOI.OpenXml4Net</AssemblyName>
+    <RootNamespace>NPOI.OpenXml4Net</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="all" />
+    <ProjectReference Include="../Core/NPOI.Core.csproj" />
+  </ItemGroup>
+</Project>
