@@ -1,102 +1,427 @@
 {
-  "description": "Microi吾码企业应用版12张AI场景图及生成提示词，文字和品牌由在线PPT提供。",
+  "schemaVersion": 2,
+  "description": "Microi吾码企业应用版 12 张具体业务 AI 界面概念图的策划 brief 与内置 image_gen 提示词。画面为 AI 生成的产品设计概念，不是实际客户或系统截图。",
+  "revision": "2026-10-09-business-ui-concepts",
+  "sharedArtDirection": "专业 SaaS 产品界面概念图；4:3 横幅，前方具体业务系统界面与后方 Microi吾码表单/模块/流程框架界面构成两窗层次。5–10 度浅透视，深蓝品牌壳子、浅色业务区、蓝绿状态。完整保留屏幕边缘，核心内容清晰；图片使用 contain，不裁切界面窗口。实际工具提示词以 basePrompt 和每页 prompt 为准。",
   "images": [
     {
       "slide": 1,
-      "theme": "企业AI平台",
-      "file": "/images/enterprise-training/ai/slide-01.png",
+      "theme": "企业工作台",
+      "file": "/images/enterprise-training/ai/slide-01-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 01, enterprise AI product platform: a large luminous crystalline AI core floating over a sophisticated futuristic city and connected enterprise buildings, delicate data streams radiate outward, confident impressive premium product-launch mood.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "企业工作台",
+        "businessGoal": "一眼理解平台能够承载日常企业经营和 AI 应用。",
+        "mainScreen": "吾码企业工作台：左导航、应用入口区与待办列表；主内容有订单、客户、审批三类应用入口，右侧 AI 助手针对待办提供一句简短建议。",
+        "secondaryScreens": "侧后方一个小型手机工作台预览，显示相同待办。",
+        "shortLabels": [
+          "Microi吾码",
+          "工作台",
+          "企业应用",
+          "我的待办",
+          "AI 助手"
+        ],
+        "composition": "一张宽幅主工作台占绝大部分，右后方手机仅作多端提示，不让手机抢主画面。",
+        "sourceBoundaries": "平台方向示意，不表示某个客户的正式运行系统。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nEnterprise application overview: front screen “企业工作台” shows three large modules labelled “客户”, “订单”, “审批”, a compact worklist, and a small weekly progress chart. A small integrated assistant card “AI 助手” offers one short action “生成应用”. Rear Microi framework screen shows a simple visual form builder with three tidy input fields and a right property sidebar, conveying how an idea becomes a working enterprise app. Two UI screens feel like a coherent software product family, not science-fiction holograms.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-f78278b8-f52e-4b10-9b4b-3c879bb34897.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-01-ui.png",
+      "assetSha256": "7a9488b16f3799d80363cf1921425c9ada3fef914405a25ee5cf8c3b45777676",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 2,
-      "theme": "经营价值",
-      "file": "/images/enterprise-training/ai/slide-02.png",
+      "theme": "经营驾驶舱",
+      "file": "/images/enterprise-training/ai/slide-02-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 02, business value: scattered abstract paper sheets and disconnected data fragments smoothly transform through a luminous AI lens into a clean coherent glowing operational network of orders, people and business activity, calm confident business-control metaphor.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "经营驾驶舱",
+        "businessGoal": "体现看得见客户订单、协同进度和经营异常。",
+        "mainScreen": "经营驾驶舱：横向订单趋势图、客户与订单状态表、项目进度条；右侧异常列表和待审批队列；关键状态使用蓝绿与少量橙色，图表清晰但不展示收益数字。",
+        "secondaryScreens": "一个小型 AI 分析面板连接趋势图，指向异常定位与办理入口。",
+        "shortLabels": [
+          "Microi吾码",
+          "经营驾驶舱",
+          "订单趋势",
+          "进度与异常",
+          "待审批"
+        ],
+        "composition": "主 dashboard 近乎正视、小角度透视；图表、状态表和待办同屏各有明确空间。",
+        "sourceBoundaries": "全部为界面与图形样例，不创造 ROI 或客户运营结果。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nCEO operating dashboard: front screen “经营看板” has exactly four compact business cards labelled “客户”, “订单”, “进度”, “异常”; below, one believable line chart and a short status table with colored status chips, not a wall of charts. A small assistant card highlights one actionable exception with a short label “待处理”. Rear Microi framework window shows the business module list and an approval record, visually connecting the dashboard to actionable work. This illustrates visible information, orderly collaboration and measurable operation, without invented growth or ROI.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-0a6ced5c-448b-458b-a774-bad476a2a59a.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-02-ui.png",
+      "assetSha256": "40acf1bf0c4735f75a6d954a905b8521db04db3c1839393f6054f48a06fe8d3e",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 3,
-      "theme": "行业产品",
-      "file": "/images/enterprise-training/ai/slide-03.png",
+      "theme": "企业产品组合",
+      "file": "/images/enterprise-training/ai/slide-03-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 03, products and industries: a beautiful unified miniature future industrial world with a garment factory, warehouse, corporate office, construction site, smart park and mobile device arranged naturally around a central AI core, show connected products, elegant architectural diorama.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "企业产品组合",
+        "businessGoal": "用明确的软件界面说明统一平台可组合 ERP、CRM、OA 等产品。",
+        "mainScreen": "统一吾码框架中一个 ERP 订单表为主屏，表头简洁，具有采购/库存/订单状态；旁边两个较小的同风格界面分别是 CRM 商机看板和 OA 审批列表。",
+        "secondaryScreens": "CRM 为三列销售阶段看板，OA 为简洁审批列表；三屏共用同一品牌与导航语言。",
+        "shortLabels": [
+          "Microi吾码",
+          "ERP",
+          "CRM",
+          "OA",
+          "订单",
+          "审批"
+        ],
+        "composition": "三张真实感 SaaS 面板错层排列，中心 ERP 大于两侧界面，层次浅、内容清楚，不做九宫格。",
+        "sourceBoundaries": "产品方向组合，不能标为已交付某客户的一体化系统。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nProduct portfolio: front Microi application hub “应用中心” shows three well spaced product tiles “ERP”, “CRM”, “OA”, each with one miniature meaningful interface preview: ERP purchase/sales order table, CRM opportunity kanban, OA approval list. Rear Microi framework shows a common module library and a shared sidebar, demonstrating reusable foundation for different enterprise products. Include one small phone H5 preview aligned at front-right, using the same three product entries. Three products belong in one front hub, not three giant competing windows. Strong business differentiation, no floating buildings.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-7ad8a3e4-43a6-4f68-949d-04ff43c44efb.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-03-ui.png",
+      "assetSha256": "935354089053c617d4dee96c3820f0344aa2263ae11fdca438d2b2a7ac774a49",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 4,
-      "theme": "服装生产",
-      "file": "/images/enterprise-training/ai/slide-04.png",
+      "theme": "服装 ERP",
+      "file": "/images/enterprise-training/ai/slide-04-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 04, garment ERP case: a magnificent futuristic garment production workshop, robotic fabric cutting and sewing, elegant suspended holographic garment patterns and size contours, folded textiles travel in organized streams around a luminous AI core coordinating orders and production, believable premium industrial detail, not a software screen.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "服装 ERP",
+        "businessGoal": "把服装行业规则表现成订单、尺码和工序业务界面。",
+        "mainScreen": "服装 ERP 订单生产页：主屏有订单状态、动态尺码矩阵（S/M/L）、裁床分包表和工序进度；侧边短标签区分裁剪与缝制进度。",
+        "secondaryScreens": "一个手机界面展示菲票明细列表，保留款号、尺码、数量与对应裁床分包记录；不展示扫码或登记动作。",
+        "shortLabels": [
+          "Microi吾码",
+          "服装 ERP",
+          "尺码矩阵",
+          "裁床分包",
+          "菲票明细"
+        ],
+        "composition": "主尺码表与分包清单占画面中心，手机在右下方浅层叠放，保持字号清楚。",
+        "sourceBoundaries": "仅概念化呈现公开案例描述的动态尺码、裁床分包、菲票明细与移动端能力；不扩写扫码交付事实。不是客户实拍或其真实系统 UI，不绘制客户品牌或收益。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nGarment ERP: the front business window “服装 ERP” clearly shows an order table with small garment thumbnail icons, a compact size allocation matrix headed “尺码”, columns S M L XL, and a lower grouped cutting/bundle allocation section headed “裁床分包”. The rear Microi window shows configurable garment-order form fields and workflow. One small phone at front-right shows “菲票扫码” with a simple scan rectangle and two ticket rows. Focus on translating garment-specific rules into a usable order-production workflow, a real software concept rather than a factory rendering.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-758eab9c-b48b-4fe3-b259-ca54b7a7fa6a.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-04-ui.png",
+      "initialGeneratedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-c13e5c4a-a01b-41d2-8613-6f3288173025.png",
+      "revisions": [
+        {
+          "prompt": "Edit only the small smartphone screen in this Microi enterprise ERP concept illustration. Preserve the two large PC software windows, their garment order/size matrix/cutting bundle tables, all UI positions, 3D perspective, blue/navy colors, window borders, reflections and canvas size. On the smartphone replace the heading “菲票扫码” with the exact short text “菲票明细”. Remove the scan rectangle, scanning beam and all barcode/scan instructions. Replace that upper dark scanning area with a clean pale-blue/white mobile ticket-detail list: two garment thumbnails with short rows for ticket number, style, size and quantity, consistent with the existing lower ticket list. Use a small filter row and “查看详情” controls. The phone should demonstrate MOBILE TICKET VIEWING, with NO scanner, barcode, QR code or workflow registration. Do not add any extra device, title, slogan or new functionality. Keep the full image professional, sharp, and consistent with the existing Microi吾码 framework interface.",
+          "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-27ee4320-778a-4828-a4c1-ce38b3c51c81.png"
+        },
+        {
+          "prompt": "Make ONE tiny text correction in the smartphone of this illustration. In the smartphone list section, replace the small heading currently reading “最近扫描 (2)” / “最近扫码 (2)” with the exact text “菲票列表 (2)”. There must be no 扫码, 扫描, scanner, barcode or QR label anywhere in that phone. Preserve the already-correct main phone title “菲票明细”, both garment ticket cards, their 查看详情 links and all other pixels/design as closely as possible. The two large PC windows and the complete 3D composition must remain unchanged. This phone is ONLY a garment ticket list/viewing screen.",
+          "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-758eab9c-b48b-4fe3-b259-ca54b7a7fa6a.png"
+        }
+      ],
+      "assetSha256": "b0e95a303577a94fc315a13fc278527ae0bbbf995eea453822f065889a7774c9",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 5,
       "theme": "集团协同",
-      "file": "/images/enterprise-training/ai/slide-05.png",
+      "file": "/images/enterprise-training/ai/slide-05-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 05, group collaboration case: three modern manufacturing campuses, office towers and mobile workers linked across a wide night skyline by luminous cyan data bridges leading to one central AI coordination hub, clear sense of many departments and existing systems working together, no invented customer logos.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "集团协同",
+        "businessGoal": "体现已有系统连接、跨库报表与移动审批。",
+        "mainScreen": "集团协同工作台：左部已有系统连接列表与清晰连接状态，中间跨部门经营报表，右部待办和飞书协作入口；导航保留统一吾码壳子。",
+        "secondaryScreens": "手机 OA 审批页，显示审批步骤与通过/退回动作；它与制造协同主屏是不同公开案例能力的概念组合。",
+        "shortLabels": [
+          "Microi吾码",
+          "系统连接",
+          "跨库报表",
+          "飞书协同",
+          "OA 审批"
+        ],
+        "composition": "一个主工作台加一个手机审批界面，以浅透视体现连接与协作，不画工厂建筑或系统能量节点。",
+        "sourceBoundaries": "不把两条公开案例合成同一客户的实际交付；不写 11 以外的系统数量或编造效益。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nGroup coordination and OA: the front Microi business screen “集团协同” shows a neat cross-system report with two blue/green bar series, three branch rows and a small integration list headed “系统连接”, with status dots for ERP, CRM, OA and manufacturing data. A small label “跨库报表” connects the report to its data. The rear Microi framework screen shows a data-source configuration list and a simple approval workflow; no passwords or actual connection strings. One small phone “OA 审批” displays a procurement request with two buttons “同意”, “退回”. The content illustrates reuse of existing systems and mobile approval, not a corporate building skyline.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-a259e8ff-7fe7-4ac1-9c51-3e3c2410835b.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-05-ui.png",
+      "assetSha256": "b7ce0535c7ce94d6737f73f42290af4c60b05265d73689779bea325166e3b9c0",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 6,
-      "theme": "客户与房产服务",
-      "file": "/images/enterprise-training/ai/slide-06.png",
+      "theme": "CRM 与房产服务",
+      "file": "/images/enterprise-training/ai/slide-06-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 06, customer service and real-estate product case: a sophisticated AI service hub connects an elegant modern city skyline, a translucent holographic city map, an approachable customer and business professional, a tasteful mobile device shows abstract light geometry, convey CRM, property services and multiple channels naturally, no screenshots.",
-      "revision": "Remove all typography from the original customer-service AI illustration, preserving people, skyline, holographic city and cyan-violet lighting.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "CRM 与房产服务",
+        "businessGoal": "说明客户管理和对客服务能够在 PC 与移动端协同。",
+        "mainScreen": "CRM 客户服务页：客户列表与销售阶段小看板、最近跟进记录；右侧辅助窗口呈现房源地图、房源卡片和预约动作。",
+        "secondaryScreens": "手机房源详情页包含隐私联系和 VR 看房入口，不画真实电话号码或地址。",
+        "shortLabels": [
+          "Microi吾码",
+          "客户跟进",
+          "房源地图",
+          "隐私联系",
+          "VR 看房"
+        ],
+        "composition": "主 CRM 占画面中心，地图窗口与手机在右侧浅叠，不把画面变成房屋渲染图。",
+        "sourceBoundaries": "CRM 与房地产公开案例能力的概念组合，不宣称它们来自同一个客户。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nCustomer-facing CRM and real-estate service: front Microi business screen “客户服务” shows a compact CRM opportunity kanban with three stages “新客户”, “跟进中”, “已成交”, and an adjacent meaningful property search map “房源地图” with three pins and a selected property card. Rear Microi framework screen shows the configurable customer form and module structure. One small phone has a selected home card, a very small room VR preview and two action buttons “隐私联系”, “VR 看房”. Use example neutral property names only, no actual addresses, phone numbers or company logos. Make it clear that one platform can support PC business management and a client-facing mobile product.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-a1f37cd3-b17f-43dc-bbe6-79c4cf27c5cc.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-06-ui.png",
+      "assetSha256": "39c1639d8f72bd84db8ecd94ede5679353a3300a392f943fbd5922dc8a759540",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 7,
-      "theme": "AI业务闭环",
-      "file": "/images/enterprise-training/ai/slide-07.png",
+      "theme": "业务 Agent",
+      "file": "/images/enterprise-training/ai/slide-07-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 07, AI business execution loop: a radiant AI core is connected along a flowing curved path to a translucent archive of books, a business analyst, a subtle human approval hand hovering over a luminous task object, and completed work flowing into an organized business operation. Clear trustworthy human-guided intelligent workflow, elegant conceptual artwork.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "业务 Agent",
+        "businessGoal": "用一屏清晰说明 AI 从查事实到人工确认后办理的闭环。",
+        "mainScreen": "客户跟进 Agent 工作台：左侧客户事实与来源，中央短建议和待办草稿，右侧人工确认区，底部记录执行状态；状态串联为读取事实、生成草稿、人工确认、记录结果。",
+        "secondaryScreens": "一个小型任务记录浮层，显示确认后进入待办与完成记录；不让聊天气泡占满画面。",
+        "shortLabels": [
+          "Microi吾码",
+          "客户依据",
+          "建议草稿",
+          "人工确认",
+          "执行记录"
+        ],
+        "composition": "主体是业务处理界面，四个阶段形成清晰阅读方向，人工确认区以绿色强调。",
+        "sourceBoundaries": "按 PPT 现有设计示例呈现，不表示平台默认配置即可自动执行全部业务。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nA concrete customer-follow-up business Agent: front Microi screen “客户跟进” shows a five-step execution strip with exact short labels “依据”, “建议”, “待办草稿”, “人工确认”, “执行记录”. Below it, a customer summary with two evidence document chips, a suggested next action, and a realistic draft task card with owner/date/status. The primary action reads “确认执行”; a secondary button reads “转人工”. A small integrated assistant panel explains a short next step. Rear Microi framework screen shows a connected customer module and approval workflow. The picture must make knowledge → suggested decision → authorised action → recorded business result visually obvious, not a generic chat bubble or robot portrait.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-7a811585-d188-45d1-b007-48c8d3a2e76b.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-07-ui.png",
+      "assetSha256": "c565213031e358da6858646bf9eadc477b82e8e0906785e64a9c093765047b5f",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 8,
-      "theme": "平台优势",
-      "file": "/images/enterprise-training/ai/slide-08.png",
+      "theme": "平台搭建",
+      "file": "/images/enterprise-training/ai/slide-08-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 08, platform advantages: a magnificent expandable AI core on a layered technology foundation, modular glass building blocks fit smoothly into one coherent infrastructure, subtle corporate cloud and private data center, connected mobile and computer silhouettes; powerful reusable capabilities without redundant UI panels, futuristic premium product rendering.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "平台搭建",
+        "businessGoal": "用搭建界面体现成熟能力复用、规则扩展和多端交付。",
+        "mainScreen": "低代码表单设计器：左侧少量控件组件、中央整洁表单预览、右侧字段/权限配置；上方有审批与报表的简短模块入口。",
+        "secondaryScreens": "小型 PC 与手机预览界面呈现同一表单，旁边一条简洁审批流程连线。",
+        "shortLabels": [
+          "Microi吾码",
+          "表单设计",
+          "权限",
+          "审批",
+          "报表",
+          "多端预览"
+        ],
+        "composition": "设计器大屏居中，两个辅助预览尺寸小而完整，组件图标清楚，不堆代码与技术列表。",
+        "sourceBoundaries": "平台设计能力概念；不要伪造截图或加入未证实的平台内置功能。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nReusable enterprise platform advantages illustrated through working UI: front Microi “应用设计” screen shows a clear low-code form builder, five tidy editable customer fields, a components palette and a properties inspector. An integrated “AI 助手” panel has the short prompt “创建客户管理” and a generated field proposal with an explicit review/confirm control. Three modest UI tabs “权限”, “审批”, “报表” show that these are reusable platform functions. Rear Microi framework screen is the resulting customer management table preview, and a small phone preview shows the same customer list. Minimal readable interface text; the visuals show building, checking and publishing an enterprise product from a shared foundation.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-e838193d-e6f5-4069-9007-16b36675bb39.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-08-ui.png",
+      "assetSha256": "7a47aae9b1f88808a67636a8f34d6edcb8fd614772abf4dc69ae0cd4feab0b1d",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 9,
-      "theme": "知识与Agent交付",
-      "file": "/images/enterprise-training/ai/slide-09.png",
+      "theme": "知识与 RAG",
+      "file": "/images/enterprise-training/ai/slide-09-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 09, knowledge-grounded Agent delivery: a luminous intelligence sphere absorbs precise light rays from a curated library of floating books and documents, then directs an elegant industrial mechanism completing a real product on a finishing platform, emphasize trusted knowledge becoming reliable work, no words on books or devices.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "知识与 RAG",
+        "businessGoal": "直观说明 AI 必须检索公司知识并提供可核对的依据。",
+        "mainScreen": "知识工作台：左侧公司文档目录和检索筛选，中央检索结果与高亮片段，右侧简短问答及来源引用，底部显示规则或历史记录的证据入口。",
+        "secondaryScreens": "一个小型引用文档阅读窗口与答案来源保持视觉对应。",
+        "shortLabels": [
+          "Microi吾码",
+          "公司知识",
+          "检索结果",
+          "来源引用",
+          "核对依据"
+        ],
+        "composition": "主屏居中，检索片段和答案引用紧邻，避免书本、机器人或能量球隐喻。",
+        "sourceBoundaries": "公司知识检索概念；不暗示未经检验的准确率，也不画敏感公司文档原文。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nCompany knowledge and RAG: front Microi “企业知识” interface has a document directory on the left with policy/contract/product documents, a clear search bar, and a central answer card to a short ordinary query “审批需要哪些材料？”. The answer contains only three concise lines and two visible clickable source chips “审批规范” and “操作手册” with page markers, showing evidence rather than unsupported chatbot output. Rear Microi framework window shows the knowledge-source list with document status and permission groups. A small integrated AI panel shows a retrieved passage and “查看来源”. No giant book sculptures or glowing brains; the knowledge workflow is explained by actual UI elements.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-e3001aba-13da-4118-83c1-49d39ed8a867.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-09-ui.png",
+      "assetSha256": "e3684e74dbcf786397aedd926f7daa923b5f378b8ac3b8ad6304b38cf8794af4",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 10,
-      "theme": "可靠交付与人工接管",
-      "file": "/images/enterprise-training/ai/slide-10.png",
+      "theme": "可靠交付",
+      "file": "/images/enterprise-training/ai/slide-10-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 10, reliable AI and human takeover: a brilliant AI energy core protected by an elegant transparent luminous shield, one light path visibly reconnects after a small interruption, a human operator's hand calmly guides a control ring, subtle secure data vault and backup channels, strong sense of resilience, recovery, authorization and human oversight, not warlike.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "可靠交付",
+        "businessGoal": "让领导看懂任务失败可恢复、输出可校验并有人接管。",
+        "mainScreen": "AI 任务运行工作台：任务列表有正常、待复核、已恢复三种状态；选中任务展示工具调用记录、校验结果和重试/恢复动作；人工接管按钮明确；侧边有权限与日志状态。",
+        "secondaryScreens": "一个紧凑人工复核抽屉，显示待确认内容和接管动作，避免告警占满画面。",
+        "shortLabels": [
+          "Microi吾码",
+          "任务运行",
+          "失败恢复",
+          "输出校验",
+          "人工接管",
+          "权限日志"
+        ],
+        "composition": "任务列表大于详情浮层，细微立体层次即可；状态颜色明确，图像呈现可操作的软件系统。",
+        "sourceBoundaries": "可靠交付设计概念，不编造线上可用率、任务成功率或安全认证。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nReliable enterprise AI operations: front Microi “任务运行” screen has a modest task list with rows labelled “完成”, “执行中”, “待恢复”, “待人工”, and clearly visible action buttons “重试”, “恢复”, “转人工” beside the relevant rows. Right side shows a selected interrupted task with a simple step timeline and the preserved checkpoint. Rear Microi framework window shows role permission settings and a compact execution log, with short tabs “权限”, “日志”. Convey controlled handling of failure and human intervention through operational UI, no flashing catastrophe or magic autonomous machine.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-c5bb537b-aa27-47ef-b1c7-bcd2c969bff9.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-10-ui.png",
+      "assetSha256": "610620da8c2c7c81f1f87f36ea448515d11779c59badbcc2fd0b1f1e01ec1145",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 11,
-      "theme": "效果与成本评估",
-      "file": "/images/enterprise-training/ai/slide-11.png",
+      "theme": "评估与成本",
+      "file": "/images/enterprise-training/ai/slide-11-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 11, business results and cost evaluation: an elegant futuristic executive observatory with a luminous AI analytics sphere, clear abstract rising performance curves, balanced scales of task results and resource use, polished geometric evaluation instruments, calm precise evidence-driven mood, charts are purely abstract and have absolutely no labels or numbers.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "评估与成本",
+        "businessGoal": "说明质量、任务完成和成本需要按固定样本与基线评估。",
+        "mainScreen": "评估 dashboard：固定样本与人工基线对比区，检索/任务/工具结果的简洁图形；下方延迟和 Token 消耗趋势，右侧异常样本分类与复核列表；显式标注示例数据。",
+        "secondaryScreens": "一个小型样本复核窗口连接异常列表，显示通过/复核状态。",
+        "shortLabels": [
+          "Microi吾码",
+          "固定样本",
+          "人工基线",
+          "质量与完成",
+          "成本",
+          "示例数据"
+        ],
+        "composition": "一张清晰数据评估面板，线图与分类列表主次明确，不使用天平、硬币或胜利奖杯。",
+        "sourceBoundaries": "所有数值必须清晰标为示例，不声称实际客户收益、ROI 或已实现改善；样本比较不使用显著营销效果数字。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nAI evaluation and cost control: front Microi “效果评估” dashboard clearly bears the small badge “示例数据”. Show a compact side-by-side fixed sample comparison table, a small task-completion bar chart, a modest token-usage line and a short failure-category list. Use only the short labels “完成率”, “调用成功”, “延迟”, “Token”, “失败样本”; keep ordinary sample values, no dramatic growth/ROI or 100% achievement claims. Rear Microi framework window has an evaluation sample library and test-run history. A business decision maker should see how success, latency and cost can be checked, not a crowded financial terminal.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-87ab3877-47a1-4ae2-8d4c-b4cdc12bd20f.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-11-ui.png",
+      "assetSha256": "7949c2efcefb9c6ed45c24620ce8cf0f1d82988d7e9f8ca927db95c00ed44ceb",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     },
     {
       "slide": 12,
-      "theme": "试点与产品推广",
-      "file": "/images/enterprise-training/ai/slide-12.png",
+      "theme": "试点实施",
+      "file": "/images/enterprise-training/ai/slide-12-ui.png",
       "generator": "built-in image_gen",
-      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 12, pilot to sustainable products: a business leader and small team viewed from behind overlook a stunning future city, a luminous prototype cube grows into a connected constellation of working enterprise buildings along a graceful bright path, AI core provides confident violet/cyan energy, optimistic professional product launch and long-term growth, absolutely no typography.",
-      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+      "brief": {
+        "theme": "试点实施",
+        "businessGoal": "让下一步落地与验收责任变得明确。",
+        "mainScreen": "试点项目看板：选场景、定边界、验结果三列；任务卡简短标明负责人、用户范围、数据权限和验收；侧边清单包括部署与运维责任。",
+        "secondaryScreens": "一个简洁验收检查表浮层，分已确认、待验证与待决策状态。",
+        "shortLabels": [
+          "Microi吾码",
+          "选场景",
+          "定边界",
+          "验结果",
+          "负责人",
+          "验收清单"
+        ],
+        "composition": "主项目看板清晰正视，右侧验收清单小角度错层，强调可执行实施安排，不画握手或城市未来景观。",
+        "sourceBoundaries": "试点方法概念，不显示已经完成的客户项目、虚构进度或承诺周期。"
+      },
+      "prompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\nPractical pilot-to-delivery planning: front Microi “试点实施” screen shows a three-column implementation kanban headed “准备”, “试点”, “验收”, with short cards for “负责人”, “数据权限”, “样本测试”, “业务确认”. A right-hand acceptance checklist has several clear checkboxes and one pending item, avoiding a fake all-green certification. Rear Microi framework window shows a configured small customer application and an approval workflow ready for review; a compact release record shows ordinary states “待确认”, “已发布”. The interface explains choosing one real problem, assigning owners, testing and accepting a pilot before rollout.",
+      "disclosure": "AI 界面概念图，非真实系统或客户截图",
+      "generationStatus": "complete",
+      "generatedPath": "C:\\Users\\Administrator\\.codex\\generated_images\\01a11f00-faff-77d3-b658-aa7d93c9be11\\exec-978d441c-aca7-4583-8302-ef1e90e299a6.png",
+      "publicPath": "D:\\Work\\microi.net.all\\microi.doc\\docs\\public\\images\\enterprise-training\\ai\\slide-12-ui.png",
+      "assetSha256": "30e47100403d3a0e0d38ce50cc5a7b7e06893a0755f8cecb56328ac199256869",
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "visualReview": "passed"
     }
-  ]
+  ],
+  "basePrompt": "Create a polished product explainer illustration for Microi吾码 enterprise software. Category: high-fidelity ui-mockup, generated concept interfaces, NOT a real screenshot. Landscape 4:3 composition. The image is dominated by TWO clearly designed desktop software UI windows: a large front business application window and a slightly offset rear Microi low-code framework window. Subtle 3D perspective only (5–10 degrees), layered solid panels, credible browser chrome, soft shadows, blue edge light, natural screen typography; flat readable contents on the screens. Real product design, not sci-fi fantasy. Consistent Microi platform shell: dark navy top bar with exact short brand “Microi吾码”, pale blue-white work area, slim sidebar with simple icons, a few compact tabs, tidy cards and table rows, accent cyan/blue/green. Front UI should show the specific business workflow below using a FEW large, legible Chinese labels, recognisable controls, realistic charts/tables, and coherent hierarchy. Rear framework UI visibly suggests form/module/approval building in Microi with exact short labels “表单”, “模块”, “流程” where appropriate. Compose two UI windows plus at most one small AI helper card; no huge paragraph, no standalone title/slogan floating outside screens. Deep ink-blue studio background with restrained technical grid, no cosmic nebula, no glowing brain/orb, no robots, no floating factories, no generic city skyline, no abstract particle streams. Keep the key application interface centered, with generous margins so complete window edges fit a 4:3 figure. Business UI is the hero, 3D depth supports it. All data is an illustrative mockup; if numbers appear use small ordinary example figures rather than impressive performance or ROI claims. Do not present customer logos, proprietary company names or certified achievement badges. Output one complete illustration, not a multi-image collage/contact sheet. Scene-specific content:\nAdditional consistency: use exact brand Microi吾码, ordinary illustrative dates in 2026 where a date is needed. Every significant caption belongs INSIDE a screen, no lettering or slogans outside the interface windows. All screen edges fully visible. Make the business controls read as actionable software, not decoration.\n",
+  "generationMode": "built-in imagegen",
+  "generatedCount": 12,
+  "pendingRevisionSlides": [],
+  "reviewedSlides": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "generationStatus": "complete"
 }

@@ -668,6 +668,8 @@ const caseIndustries = [
 
 const deckRef = ref<HTMLElement | null>(null)
 const { isDark } = useData()
+// SSR 无法读取浏览器保存的主题，挂载后再插入主题敏感链接，避免水合保留错误的浅色 href。
+const pptxReady = ref(false)
 const panelCloseRef = ref<HTMLButtonElement | null>(null)
 const thumbnailRailRef = ref<HTMLElement | null>(null)
 const pdfDownloadRef = ref<HTMLAnchorElement | null>(null)
@@ -903,6 +905,7 @@ onMounted(() => {
   isArtifactCapture.value = new URLSearchParams(window.location.search).has('artifact-capture')
   if (isArtifactCapture.value) captureScale.value = Math.min(window.innerWidth / 1600, window.innerHeight / 900)
   handleHashChange()
+  pptxReady.value = true
   scrollActiveThumbnail()
   resetActiveFrameScroll()
   window.addEventListener('keydown', handleKeydown)
@@ -934,7 +937,7 @@ onBeforeUnmount(() => {
         <button type="button" aria-label="切换全屏" title="也可使用浏览器 F11 全屏" @click="toggleFullscreen"><svg v-if="!isFullscreen" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5"/></svg><span>{{ isFullscreen ? '退出' : '全屏' }}</span></button>
         <a ref="pdfDownloadRef" class="is-primary is-dark-pdf" :href="pdfDownloadPaths.dark" download aria-label="下载预生成暗色 PDF" aria-keyshortcuts="P" title="下载暗色 PDF（P）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v5h5M10 15h4M12 11v7m0 0-2-2m2 2 2-2"/></svg><span>暗色 PDF</span></a>
         <a class="is-light-pdf" :href="pdfDownloadPaths.light" download aria-label="下载预生成浅色 PDF" title="下载浅色 PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v5h5M10 15h4M12 11v7m0 0-2-2m2 2 2-2"/></svg><span>浅色 PDF</span></a>
-        <a class="is-pptx" :href="trainingPptxPath(deckVersion, isDark)" download type="application/vnd.openxmlformats-officedocument.presentationml.presentation" :aria-label="`下载${isDark ? '暗色' : '浅色'} PPTX`" :title="`下载${isDark ? '暗色' : '浅色'} PPTX，切换网站主题可选择另一种风格`"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H4zM8 21l4-5 4 5M9 8h3a2 2 0 0 1 0 4H9zm0 0v6"/></svg><span>{{ isDark ? '暗色 PPT' : '浅色 PPT' }}</span></a>
+        <a v-if="pptxReady" class="is-pptx" :href="trainingPptxPath(deckVersion, isDark)" download type="application/vnd.openxmlformats-officedocument.presentationml.presentation" :aria-label="`下载${isDark ? '暗色' : '浅色'} PPTX`" :title="`下载${isDark ? '暗色' : '浅色'} PPTX，切换网站主题可选择另一种风格`"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H4zM8 21l4-5 4 5M9 8h3a2 2 0 0 1 0 4H9zm0 0v6"/></svg><span>{{ isDark ? '暗色 PPT' : '浅色 PPT' }}</span></a>
       </div>
     </header>
 

@@ -142,7 +142,7 @@ test('成功案例的事实回到已有公开案例，产品设计示例保持�
   for (const slide of cases) {
     assert.match(slide.eyebrow, /公开成功案例/u)
     assert.ok(slide.image && slide.image.alt && slide.image.caption, `${slide.id}: the AI illustration needs accessible description`)
-    assert.match(slide.image.caption, /AI\s*场景示意/u, 'an illustration cannot be presented as a customer screenshot')
+    assert.match(slide.image.caption, /AI\s*界面概念图/u, 'an illustration cannot be presented as a customer screenshot')
     for (const source of slide.sources) {
       assert.ok(source.href.startsWith('/case/'), `${slide.id}: a general feature page cannot prove a customer case`)
       assert.ok(fs.existsSync(sourceForUrl(source.href)), source.href)
@@ -163,7 +163,7 @@ test('证据链接与十二张独立 AI 场景图随官网源码完整交付', (
   for (const slide of enterpriseSlides) {
     for (const source of slide.sources) assert.ok(fs.existsSync(sourceForUrl(source.href)), `${slide.id}: broken evidence link ${source.href}`)
     assert.ok(slide.image && slide.image.alt, `${slide.id}: every page needs its own described business image`)
-    assert.match(slide.image.caption, /AI\s*场景示意/u, `${slide.id}: distinguish generated scenes from customer evidence`)
+    assert.match(slide.image.caption, /AI\s*界面概念图/u, `${slide.id}: distinguish generated interfaces from customer evidence`)
     assert.ok(slide.image.src.startsWith('/images/enterprise-training/ai/'), `${slide.id}: AI scenes must be delivered with the site`)
     assert.ok(!paths.has(slide.image.src), `${slide.id}: each page needs a distinct scene`)
     paths.add(slide.image.src)
