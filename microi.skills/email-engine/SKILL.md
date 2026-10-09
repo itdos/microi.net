@@ -5,7 +5,7 @@ description: 开发、安装和使用吾码邮箱系统 mci-email。用于 QQ、
 
 # 吾码邮箱系统
 
-> **Codex 非阻塞自动更新：** 先遵循 [工作区约定](../workspace-conventions/SKILL.md)，通过 `microi update --background --workspace "<工作区绝对路径>" --json` 投递更新检查；当前任务继续执行，不等待更新或重启现有会话。
+> **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
 
 邮箱系统是使用吾码 UI 的独立 Vue 3 微服务，商城 AppKey 为 `mci-email`，
 后台入口为「系统引擎 → 邮箱系统」，菜单路由 `/mci-email`。

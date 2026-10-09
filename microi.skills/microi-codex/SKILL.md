@@ -63,6 +63,8 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 
 ## 非阻塞自动更新（强制）
 
+每次新建或接续吾码任务必须执行 `workspace-conventions` 的版本检查、首次“Microi吾码开发工具版本”播报与后台自动升级，不限模型。先调用 `microi_codex action="profiles"` 读取 `toolchain` 中的当前已加载版本、工作区 Skills 版本和自动更新状态；未知项准确标记，不能把当前进程版本当成全局 CLI 或 npm 最新版。完整强制规范只维护在基础入口。
+
 Codex Router 启动后会异步调用 bundled CLI 的 `microi update --background`。需要了解完整安装/诊断机制时读取同级 `microi-codex-installer/SKILL.md`；更新检查不得发生在用户工作之前，也不得让任务等待。
 
 自动更新会从 npm 官方 registry 升级 CLI，更新 Codex/DeepSeek Harness 插件并重新初始化工作区 AI/MCP。当前 Router、DSH 会话和已经启动的 MCP 继续使用旧版本，不被杀死或强制重载；新版供后续新进程使用。自动更新失败、被占用或用户暂不重载时，只记录/提示并继续当前、正在进行和新建任务；不得要求升级授权，也不得把版本状态当作业务门禁。
