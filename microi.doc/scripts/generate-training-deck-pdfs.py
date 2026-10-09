@@ -1,4 +1,4 @@
-"""Build the two pre-generated Microi training deck PDFs from browser captures.
+"""Build dark/light Microi technical or enterprise deck PDFs from browser captures.
 
 The browser capture folders are intentionally temporary. The automated browser
 captures the deterministic presentation surface at its native 1600x900 size.
@@ -25,17 +25,43 @@ from reportlab.pdfgen import canvas
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = PROJECT_ROOT.parent
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--capture-root", type=Path, default=WORKSPACE_ROOT / ".tmp" / "training-deck" / "pdfs")
+parser.add_argument("--edition", choices=("technical", "enterprise"), default="technical")
+parser.add_argument("--capture-root", type=Path)
 parser.add_argument("--output-root", type=Path, default=WORKSPACE_ROOT / "output" / "pdf")
 arguments = parser.parse_args()
-TEMP_ROOT = arguments.capture_root.resolve()
+EDITION = arguments.edition
+# 两套课件隔离截图、缩略图与下载文件，企业版更新不能重写技术版现有资产。
+default_capture_root = (
+    WORKSPACE_ROOT / ".tmp" / "training-deck-pdf" / "enterprise"
+    if EDITION == "enterprise"
+    else WORKSPACE_ROOT / ".tmp" / "training-deck" / "pdfs"
+)
+TEMP_ROOT = (arguments.capture_root or default_capture_root).resolve()
 PUBLIC_ROOT = PROJECT_ROOT / "docs" / "public" / "downloads"
+thumbnail_directory = "training-deck-enterprise" if EDITION == "enterprise" else "training-deck"
 THUMBNAIL_ROOTS = {
-    "dark": PROJECT_ROOT / "docs" / "public" / "images" / "training-deck" / "thumbs",
-    "light": PROJECT_ROOT / "docs" / "public" / "images" / "training-deck" / "thumbs-light",
+    "dark": PROJECT_ROOT / "docs" / "public" / "images" / thumbnail_directory / "thumbs",
+    "light": PROJECT_ROOT / "docs" / "public" / "images" / thumbnail_directory / "thumbs-light",
 }
 OUTPUT_ROOT = arguments.output_root.resolve()
-SLIDE_COUNT = int(re.search(r"const expectedSlideCount = (\d+)", (PROJECT_ROOT / "docs/.vitepress/theme/components/TrainingSyllabusDeck.vue").read_text(encoding="utf-8")).group(1))
+if EDITION == "enterprise":
+    slide_source = PROJECT_ROOT / "docs/.vitepress/theme/enterprise-training-slides.js"
+    slide_count_pattern = r"(?:export\s+)?const\s+enterpriseSlideCount\s*=\s*(\d+)"
+    PDF_BASENAME = "microi-enterprise-application-training-syllabus"
+    PDF_TITLE = "Microi吾码企业应用培训大纲"
+    PDF_SUBJECT = "企业应用与行业案例：业务价值、关键优势、AI交付、实施路径与效果评估"
+else:
+    slide_source = PROJECT_ROOT / "docs/.vitepress/theme/components/TrainingSyllabusDeck.vue"
+    slide_count_pattern = r"const expectedSlideCount = (\d+)"
+    PDF_BASENAME = "microi-ai-development-framework-training-syllabus"
+    PDF_TITLE = "Microi吾码 AI 开发框架技术培训大纲"
+    PDF_SUBJECT = "功能点培训：30+引擎、邮箱系统、AI数据分析、AI创作、服务器运维面板、MCP、全端交付与企业案例"
+slide_count_match = re.search(slide_count_pattern, slide_source.read_text(encoding="utf-8"))
+if slide_count_match is None:
+    raise RuntimeError(f"{EDITION}: missing declared slide count in {slide_source}")
+SLIDE_COUNT = int(slide_count_match.group(1))
+if SLIDE_COUNT < 1:
+    raise RuntimeError(f"{EDITION}: slide count must be positive")
 PAGE_SIZE = (960, 540)
 CAPTURE_SIZE = (1600, 900)
 MASTER_SIZE = (3840, 2160)
@@ -117,7 +143,7 @@ def build_variant(variant: str, label: str) -> dict[str, object]:
             thumbnail.close()
             masters.append(master)
 
-    filename = f"microi-ai-development-framework-training-syllabus-{variant}.pdf"
+    filename = f"{PDF_BASENAME}-{variant}.pdf"
     public_pdf = PUBLIC_ROOT / filename
     page_pdf_dir = TEMP_ROOT / variant / "pages"
     page_pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -150,9 +176,9 @@ def build_variant(variant: str, label: str) -> dict[str, object]:
         reader = PdfReader(str(page_pdf))
         writer.add_page(reader.pages[0])
     writer.add_metadata({
-        "/Title": f"Microi吾码 AI 开发框架技术培训大纲（{label}）",
+        "/Title": f"{PDF_TITLE}（{label}）",
         "/Author": "Microi吾码",
-        "/Subject": f"{SLIDE_COUNT}页功能点培训：30+引擎、邮箱系统、AI数据分析、AI创作、服务器运维面板、MCP、全端交付与企业案例",
+        "/Subject": f"{SLIDE_COUNT}页{PDF_SUBJECT}",
         "/Creator": "Microi吾码官网预生成培训课件",
     })
     with public_pdf.open("wb") as stream:
@@ -161,6 +187,7 @@ def build_variant(variant: str, label: str) -> dict[str, object]:
     output_pdf = OUTPUT_ROOT / filename
     shutil.copy2(public_pdf, output_pdf)
     return {
+        "edition": EDITION,
         "variant": variant,
         "pages": len(masters),
         "public_pdf": str(public_pdf),
