@@ -51,7 +51,7 @@
 				</view>
 
 				<xjy-customer-contract-totals v-if="showCustomerContractTotals"
-					:state="customerContractTotals" @retry="loadCustomerContractAmounts" />
+					:state="customerContractTotals" collapsible @retry="loadCustomerContractAmounts" />
 
 				<!-- <view v-if="key === 'customers'" class="quick-band">
 					<view class="quick-action" hover-class="quick-action--pressed" @tap="addCustomerVisit">
