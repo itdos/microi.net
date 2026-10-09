@@ -49,7 +49,7 @@ export const packageDefinitions = Object.freeze([
     changeLogContent: '新增隐藏字段 HomeUsageStats 与 Managed 接口 platform-home-overview；访问记录只保存在当前账号，返回结果按实时菜单权限过滤，不采集路由参数或业务页面数据。',
     releaseTime: '2026-09-03 18:00:00',
     capabilities: [
-      'ApiEngine:platform-user-update-preferences@v1.1.1',
+      'ApiEngine:platform-user-update-preferences@v1.1.3',
       'ApiEngine:platform-user-update-profile@v1.0.1',
       'ApiEngine:platform-sys-user-admin@v1.0.2',
       'ApiEngine:platform-user-custom-hook@v1.0.0',
@@ -73,7 +73,7 @@ export const packageDefinitions = Object.freeze([
       'official_account_invitations',
     ],
     engines: [
-      { key: 'platform-user-update-preferences', name: '保存当前用户界面偏好', source: 'platform-user-update-preferences.js', id: '01M0M5KNM0N2GH5T0CZS3JV4DV', version: 'v1.1.1', enableLog: 0 },
+      { key: 'platform-user-update-preferences', name: '保存当前用户界面偏好', source: 'platform-user-update-preferences.js', id: '01M0M5KNM0N2GH5T0CZS3JV4DV', version: 'v1.1.3', enableLog: 0 },
       { key: 'platform-user-update-profile', name: '更新当前用户资料', source: 'platform-user-update-profile.js', id: '019d2a01-9d63-7f91-8c02-000000000001', version: 'v1.0.1', enableLog: 1 },
       { key: 'platform-sys-user-admin', name: '系统账号管理', source: 'platform-sys-user-admin.js', id: '019d2a01-9d63-7f91-8c02-000000000009', version: 'v1.0.4', enableLog: 1 },
       { key: 'platform-user-custom-hook', name: '系统账号个性化扩展', source: 'platform-user-custom-hook.js', id: '019d2a01-9d63-7f91-8c02-000000000002', version: 'v1.0.0', enableLog: 1, stopHttp: 1, ownership: 'Tenant', upgradePolicy: 'CreateIfMissing' },

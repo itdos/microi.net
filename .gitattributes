@@ -6,3 +6,7 @@
 Microi.Server/Microi.Upgrade/Resource/app.microi.bootstrap.json text eol=lf
 Microi.Server/Microi.Upgrade/Resource/import-package.js text eol=lf
 microi.uniapp/resources/xjy/customer-contract-totals/engine.js text eol=lf
+# Canonical V8 release sources must retain the exact LF bytes embedded in official packages.
+Microi.Server/OfficialApplications/Resource/**/*.js text eol=lf
+# Synchronization baselines remain owned by the resource synchronizer.
+Microi.Server/OfficialApplications/Resource/.resource-sync-base/** !text !eol
