@@ -3,7 +3,7 @@ name: v8-mq-mqtt
 description: Microi V8 消息队列与 MQTT 生产指南。用于 V8.MQ.SendMsg、RabbitMQ 消费与幂等，以及内嵌 MQTT Broker、SaaS 租户认证、Topic ACL、TLS、QoS/Retain、七类 V8.MQTT 事件、设备级接口引擎、服务端下行、IoT 数据分层和多节点部署验收。
 ---
 
-> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
+> **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
 
 # Microi V8 消息队列与 MQTT
 
