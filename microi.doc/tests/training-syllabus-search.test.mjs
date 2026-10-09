@@ -20,7 +20,7 @@ test('实际键盘处理器保留 Ctrl+F、Cmd+F、Alt、输入法和 F11 默认
  assert.deepEqual(events,[]);handler({key:'ArrowRight',preventDefault:()=>events.push('prevented')});assert.deepEqual(events,['prevented','next']);
 });
 test('搜索索引来自全部幻灯片正文，导航提供可反复收起和展开的控制',()=>{
- assert.match(component,/slideSearchContent\.value = slideMeta\.map[\s\S]*?textContent/);
+ assert.match(component,/slideSearchContent\.value = slideMeta\.value\.map[\s\S]*?textContent/);
  assert.match(component,/v-for="\{ slide, index \} in visibleSlides"/);
  assert.match(component,/:aria-expanded="!railCollapsed"/);assert.match(component,/@click="railCollapsed = !railCollapsed"/);
  assert.match(component,/v-show="!railCollapsed"/);assert.match(component,/aria-label="搜索标题与内容"/);
