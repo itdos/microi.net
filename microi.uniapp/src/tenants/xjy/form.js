@@ -19,7 +19,8 @@ import { userRoleLevel } from './user-role-level.mjs'
 import {
   V8,
   getUser,
-  getVerifiedCurrentUser
+  getVerifiedCurrentUser,
+  post
 } from '@/utils/request.js'
 import {
   calculateProposalCosts,
@@ -34,6 +35,7 @@ import {
   validateProposalCostInputs
 } from './proposal-cost-model.mjs'
 import { XJY_CUSTOMER_DEFAULT_REGION } from './customer-location.mjs'
+import { installationPositionButtonVisible } from './order-installation-button-visibility.mjs'
 import { proposalCostFieldPresentation } from './proposal-cost-presentation.mjs'
 import {
   PROPOSAL_INSTALLATION_DEFAULT_PEOPLE,
@@ -354,6 +356,27 @@ function isAfterSalesForm(context) {
 
 function isOrderProductForm(context) {
   return String(context.tableName || '').toLowerCase() === ORDER_PRODUCT_TABLE
+}
+
+async function refreshInstallationSelectorVisibility(context) {
+  if (!isOrderProductForm(context)) return
+  const requestId = Number(context.state.installationSelectorVisibilityRequestId || 0) + 1
+  context.state.installationSelectorVisibilityRequestId = requestId
+  context.state.installationSelectorVisible = false
+  const childField = (context.definition?.childFields || []).find((field) => field.Name === 'AnzhuangWZ')
+  const menuId = String(childField?.config?.TableChildSysMenuId || '').trim()
+  if (!menuId) return
+  try {
+    const result = await post('/apiengine/platform-sys-menu?Action=GetSysMenuModel', { Id: menuId })
+    if (requestId === context.state.installationSelectorVisibilityRequestId) {
+      context.state.installationSelectorVisible = Number(result?.Code) === 1 &&
+        installationPositionButtonVisible(result.Data?.PageBtns)
+    }
+  } catch (error) {
+    if (requestId === context.state.installationSelectorVisibilityRequestId) {
+      context.state.installationSelectorVisible = false
+    }
+  }
 }
 
 function isInstallationPositionForm(context) {
@@ -1685,6 +1708,8 @@ export function createState() {
     orderInitialized: false,
     orderValues: {},
     orderSummaryValues: null,
+    installationSelectorVisible: false,
+    installationSelectorVisibilityRequestId: 0,
     orderProductCooperationRequestId: 0,
     installationCodeInitialized: false,
     installationCodeInitializing: false,
@@ -1697,6 +1722,7 @@ export function createState() {
 }
 
 export async function initialize(context) {
+  await refreshInstallationSelectorVisibility(context)
   if (isTerminationForm(context) && context.mode === 'Add' && !context.state.terminationInitialized) {
     context.state.terminationInitialized = true
     const goodsMenu = await findMenu(['订单商品'], ORDER_PRODUCT_TABLE)
@@ -2076,6 +2102,9 @@ export function getFieldPresentation(context, field) {
 
 export function getRelatedPresentation(context, field) {
   if (!field) return {}
+  if (isOrderProductForm(context) && field.Name === 'XuanzeFA') {
+    return { visible: context.state?.installationSelectorVisible === true }
+  }
   if (isCustomerCaseForm(context) && field.Name === 'XuanzeZP') {
     return {
       beforeField: casePhotoField(context.tableName),
@@ -2861,6 +2890,10 @@ export async function beforeSubmit(context) {
 }
 
 export async function refreshDerivedValues(context) {
+  if (isOrderProductForm(context)) {
+    await refreshInstallationSelectorVisibility(context)
+    return {}
+  }
   if (isProposalForm(context)) {
     const years = proposalCostYears(context.form)
     const drafts = childDraftRows(context.form.Id || context.defaultValues?.Id, 'diy_anzhuang_dw')
