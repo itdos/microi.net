@@ -5,6 +5,14 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 
 const source = fs.readFileSync(new URL('./engine.js', import.meta.url), 'utf8')
+// Windows commonly exposes a non-functional Microsoft Store python3 alias.
+// Probe a real Python 3 + sqlite runtime; never replace SQL execution with a mock.
+const pythonCandidates = process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python']
+const python = pythonCandidates.find(executable => {
+  const probe = spawnSync(executable, ['-X', 'utf8', '-c', 'import sqlite3,sys; assert sys.version_info.major == 3; print("sqlite-runtime-ready")'], { encoding: 'utf8', windowsHide: true, timeout: 5000 })
+  return probe.status === 0 && probe.stdout.trim() === 'sqlite-runtime-ready'
+})
+assert.ok(python, 'A real Python 3 sqlite runtime is required for the actual SQL regression.')
 const makeOrder = (Id, KehuID = 'c1', extra = {}) => ({ Id, KehuID, IsDeleted: 0, DingdanZT: '已审批', HetongZT: '未断约', HetongKSSJ: '2026-10-02', HetongJSSJ: '2026-10-02', ...extra })
 const makeProduct = (Id, DingdanID, HezuoFS, Zongjia = 0, LvxinZJ = 0, extra = {}) => ({ Id, DingdanID, HezuoFS, HezuoFSZ: '', Zongjia, LvxinZJ, Shuliang: 7, IsDeleted: 0, ...extra })
 
@@ -67,7 +75,7 @@ function run(options = {}) {
       const query = { AddInParameter(name, value) { assert.ok(!(name in bindings)); bindings[name] = value; return query }, ToArray() {
         queries.push({ sql, bindings })
         if (options.dbFail) throw new Error('数据库不可用')
-        const result = spawnSync('python3', ['-c', sqlite], { input: JSON.stringify({ sql, bindings, ...data }), encoding: 'utf8' })
+        const result = spawnSync(python, ['-X', 'utf8', '-c', sqlite], { input: JSON.stringify({ sql, bindings, ...data }), encoding: 'utf8', windowsHide: true })
         if (result.status !== 0) throw new Error(result.stderr)
         const rows = JSON.parse(result.stdout)
         return options.rows ? options.rows(rows, queries.length) : rows
