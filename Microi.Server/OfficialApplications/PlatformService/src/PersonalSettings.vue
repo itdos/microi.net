@@ -1,11 +1,11 @@
 <template>
-  <main class="settings-page" :data-theme="themeMode">
+  <main class="settings-page" :class="{ 'settings-page--password': passwordOnly }" :data-theme="themeMode">
     <div v-if="loading" class="settings-skeleton" aria-label="正在加载个人设置">
       <div class="sk sk-hero"></div><div class="sk sk-nav"></div><div class="sk sk-panel"></div>
     </div>
 
     <template v-else>
-      <header class="profile-hero">
+      <header v-if="!passwordOnly" class="profile-hero">
         <div class="hero-grid" aria-hidden="true"></div>
         <div class="avatar avatar--hero">
           <img v-if="heroAvatarUrl && !heroAvatarFailed" :src="heroAvatarUrl" alt="" @error="heroAvatarFailed = true" />
@@ -26,7 +26,7 @@
       </div>
 
       <div class="settings-layout">
-        <nav class="settings-nav" aria-label="个人设置分类">
+        <nav v-if="!passwordOnly" class="settings-nav" aria-label="个人设置分类">
           <button v-for="item in tabs" :key="item.id" :class="{ active: activeTab === item.id }" @click.stop="selectTab(item.id)">
             <span class="nav-icon">{{ item.icon }}</span><span><b>{{ item.label }}</b><small>{{ item.hint }}</small></span>
           </button>
@@ -76,8 +76,8 @@
           </template>
 
           <template v-else-if="activeTab === 'security'">
-            <div class="panel-heading"><div><span>安全与登录</span><h2>密码、设备生物识别与严格人脸核验</h2></div><span class="status-chip status-chip--secure">端到端挑战</span></div>
-            <div class="security-grid">
+            <div v-if="!passwordOnly" class="panel-heading"><div><span>安全与登录</span><h2>密码、设备生物识别与严格人脸核验</h2></div><span class="status-chip status-chip--secure">端到端挑战</span></div>
+            <div v-if="!passwordOnly" class="security-grid">
               <article class="security-card" :class="{ enabled: capabilities.HasPasskey }">
                 <div class="security-card__icon">⌁</div><div><b>Passkey / 设备生物识别</b><p>使用 Windows Hello、Face ID、Touch ID 或安全密钥。平台不保存生物特征。</p></div>
                 <span>{{ capabilities.HasPasskey ? '已启用' : '未启用' }}</span>
@@ -192,7 +192,7 @@
                 <label><span>浅色 / 深色</span><select v-model="preference.ThemeMode"><option value="light">浅色</option><option value="dark">深色</option></select></label>
                 <label><span>菜单子级展开方式</span><select v-model="preference.MenuChildExpandMode"><option value="System">跟随系统设置</option><option value="Down">向下展开</option><option value="Right">逐级向右展开</option></select></label>
                 <label><span>边角风格</span><select v-model="preference.CornerStyle"><option value="System">跟随系统设置</option><option value="round">圆角</option><option value="square">直角</option></select></label>
-                <label><span>导航菜单位置</span><select v-model="preference.NavigationLayout"><option value="System">跟随系统设置</option><option value="Side">侧边导航</option><option value="Top">顶部导航</option></select></label>
+                <label><span>导航菜单位置</span><select v-model="preference.NavigationLayout"><option value="System">跟随系统设置</option><option value="Side">侧边导航</option><option value="Top">顶部导航</option><option value="TopSide">顶部 + 侧边导航</option></select></label>
                 <label><span>桌面模式</span><select v-model="preference.DesktopType"><option value="">使用系统默认</option><option value="macos">macOS 风格</option><option value="windows">Windows 风格</option></select></label>
               </div>
             </div>
@@ -233,7 +233,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
 import QRCode from 'qrcode'
 import { configureV8, dispatch, getContext } from './microi.js'
 import { getUserRoleNames } from './personal-settings-user.js'
@@ -259,6 +259,8 @@ import {
 
 const client = configureV8()
 const context = getContext()
+// 同一页面复用密码和强因子流程；DialogData 仅决定展示模式，不决定用户、租户或授权。
+const passwordOnly = context.dialogData?.Action === 'ChangePassword'
 const tabs = [
   { id: 'profile', icon: '◈', label: '个人资料', hint: '名称与组织身份' },
   { id: 'security', icon: '⌾', label: '安全与登录', hint: '密码与二次验证' },
@@ -279,6 +281,8 @@ const privateAvatarFailed = ref(false)
 const publicAvatarFailed = ref(false)
 const heroAvatarFailed = ref(false)
 const password = reactive({ old: '', next: '', confirm: '', totpCode: '' })
+function clearPasswordInputs() { password.old = ''; password.next = ''; password.confirm = ''; password.totpCode = '' }
+onBeforeUnmount(clearPasswordInputs)
 const capabilities = ref({})
 const authenticators = ref([])
 const totpAuthenticators = ref([])
@@ -523,7 +527,7 @@ async function load() {
     preference.DefaultIndexUrl = user.value.DefaultIndexUrl || ''
     preference.ThemeColor = user.value.ThemeColor || context.themeColor || '#409eff'
     preference.CornerStyle = ['round', 'square'].includes(user.value.CornerStyle) ? user.value.CornerStyle : 'System'
-    preference.NavigationLayout = ['Side', 'Top'].includes(user.value.NavigationLayout) ? user.value.NavigationLayout : 'System'
+    preference.NavigationLayout = ['Side', 'Top', 'TopSide'].includes(user.value.NavigationLayout) ? user.value.NavigationLayout : 'System'
     preference.ThemeMode = ['light', 'dark'].includes(String(user.value.ThemeMode || '').toLowerCase())
       ? String(user.value.ThemeMode).toLowerCase()
       : (context.themeMode || 'light')
@@ -549,7 +553,7 @@ async function load() {
     const menuData = menuResult?.Data
     availableMenus.value = (Array.isArray(menuData) ? menuData : (menuData?.List || menuData?.Data || []))
       .filter((item) => item?.Id && Number(item.Display ?? 1) !== 0)
-    if (context.route?.query?.action === 'password') activeTab.value = 'security'
+    if (passwordOnly || context.route?.query?.action === 'password') activeTab.value = 'security'
   } catch (error) {
     showNotice(error?.Msg || error?.message || '个人设置加载失败。', 'error')
   } finally { loading.value = false }
@@ -587,6 +591,7 @@ async function saveProfile() {
 }
 
 async function changePassword() {
+  if (busy.value === 'password') return
   if (!password.old || !password.next) return showNotice('请完整填写当前密码和新密码。', 'error')
   if (password.next.length < 6) return showNotice('新密码长度不能少于 6 位。', 'error')
   if (password.next !== password.confirm) return showNotice('两次输入的新密码不一致。', 'error')
@@ -617,7 +622,7 @@ async function changePassword() {
       _IdentityVerificationTicket: ticket
     })
     if (result?.Code !== 1) throw new Error(result?.Msg || '密码修改失败。')
-    password.old = ''; password.next = ''; password.confirm = ''; password.totpCode = ''
+    clearPasswordInputs()
     showNotice('密码修改成功。为保护账号，建议检查在线终端。')
   } catch (error) { showNotice(error?.Msg || error?.message || '密码修改失败。', 'error') }
   finally { busy.value = '' }
@@ -782,6 +787,11 @@ onMounted(load)
 </script>
 
 <style scoped>
+.settings-page--password { padding:12px;max-width:none; }
+.settings-page--password .settings-layout { display:block; }
+.settings-page--password .settings-panel { padding:0;border:0;background:transparent; }
+.settings-page--password .password-card { margin:0;padding:18px; }
+.settings-page--password .form-grid--password { grid-template-columns:1fr;gap:12px; }
 .settings-page{--accent:v-bind(themeColor);--bg:#f4f7fb;--panel:rgba(255,255,255,.88);--text:#182234;--muted:#6c7a90;--line:rgba(116,133,158,.2);min-height:100vh;padding:clamp(14px,2.4vw,30px);color:var(--text);background:radial-gradient(circle at 0 0,color-mix(in srgb,var(--accent) 15%,transparent),transparent 32%),var(--bg)}
 .settings-page[data-theme="dark"]{--bg:#0d121b;--panel:rgba(23,30,43,.9);--text:#edf4ff;--muted:#98a8bf;--line:rgba(168,185,209,.16)}
 .profile-hero{position:relative;display:flex;align-items:center;gap:18px;min-height:168px;padding:26px clamp(20px,3vw,38px);overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 34%,var(--line));border-radius:24px;color:#fff;background:linear-gradient(122deg,color-mix(in srgb,var(--accent) 78%,#081526),#15223a 72%);box-shadow:0 24px 60px color-mix(in srgb,var(--accent) 19%,transparent)}
