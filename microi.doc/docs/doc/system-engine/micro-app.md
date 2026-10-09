@@ -237,6 +237,14 @@ Microi-V8-Engine/示例服务器 (api.example.com)/Demo.Product.Internal/AI应�
 
 旧版直接平铺在 `Microi-MicroApp/` 下的项目仍会在资源树中以“旧目录”显示，但插件不会擅自移动；所有新建和拉取操作都写入 `Microi-V8-Engine/.../AI应用/{appKey}`。拉取先从 `sys_microistore` 读取应用主数据，再从 `mci_ai_app_file` 读取私有 HDFS 源码，不是读取 `sys_microiservice` 的公有编译产物。离线安装时若未包含源码，微服务仍可运行和预览，但必须回到原开发端或包含源码的服务器拉取。
 
+### 完整源码拉取与大文件
+
+VS Code 插件从开发工具 **5.8.6** 起，将源码清单与完整工程下载分开：先读取私有文件清单，再逐文件下载到临时目录，校验大小、SHA-256 及下载前后的远端清单。已上传的 `tools/node-22/node.exe` 等超过 20 MB 的二进制文件也会完整拉取，不会被当成无需下载的文件过滤。
+
+如果旧插件提示“文件超过单文件读取限制 20971520 bytes”，请更新 **Microi吾码 VS Code 扩展**后重新拉取；该限制属于旧插件的上下文读取方式，不是上传成功后的工程下载容量。已有 `GetApplicationContext` / `GetApplicationFile` 接口的服务端无需为本次修复重新部署。
+
+下载失败、大小/哈希不符或期间其他开发者更新源码时，插件清理临时文件并停止应用，保留本地工程及同步基线。已有本地修改仍按三方差异检查处理，冲突合并后再推送；不得把“拉取成功”理解为允许覆盖他人更新。
+
 ### AI 应用默认前端架构
 
 新建 Web、MicroService、H5，以及整体升级的存量 AI 应用，默认采用 Vue 3 单文件组件、Composition API、Vite 和 TypeScript。这里的 ESM 是浏览器模块标准，Vue 3 + Vite 本身仍以 ESM 组织源码，二者不是互斥选项。这个选择针对吾码生态：与 `Microi.Client`、Microi.UI 和团队既有 Vue 经验一致，方便升级、维护和二次开发；它不代表其它生态只能使用 Vue。
