@@ -30,7 +30,7 @@ function command(pid) {
     }
     for (const executable of ['powershell.exe', 'pwsh.exe']) {
         const result = spawnSync(executable, ['-NoProfile', '-NonInteractive', '-Command',
-            `(Get-CimInstance Win32_Process -Filter "ProcessId=${Number(pid)}").CommandLine`],
+            `[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = [Console]::OutputEncoding; (Get-CimInstance Win32_Process -Filter "ProcessId=${Number(pid)}").CommandLine`],
             { encoding: 'utf8', timeout: 5000, windowsHide: true });
         if (result.status === 0) return result.stdout.trim();
     }
@@ -84,7 +84,7 @@ function verifiedLegacyApi(owner, workspace) {
         if (state(owner.workspace) !== state(workspace)) return false;
         const text = normalized(command(owner.pid));
         if (!/(?:^|\s)--docker-only-hotfix(?:\s|$)/.test(text)) return false;
-        const match = /(?:^|\s)(?:"([^"]*Microi一键编译发布\.sh)"|'([^']*Microi一键编译发布\.sh)'|([^\s"']*Microi一键编译发布\.sh))\s+--docker-only-hotfix(?:\s|$)/.exec(text);
+        const match = /(?:^|\s)(?:"([^"]*Microi一键编译发布\.sh)"|'([^']*Microi一键编译发布\.sh)'|([^\s"']*Microi一键编译发布\.sh))\s+--docker-only-hotfix(?:\s|$)/i.exec(text);
         const entry = match?.[1] || match?.[2] || match?.[3];
         if (!entry) return false;
         let resolved = entry;
