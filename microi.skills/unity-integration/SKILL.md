@@ -3,7 +3,7 @@ name: unity-integration
 description: Microi吾码 Unity、UPM SDK、WebGL、3D 游戏/数字孪生、DiyToken/V8 通讯、AI 应用商城交付与完整验收规范。用于评估或提取 Unity 工具箱，创建 Microi.Unity 包，开发 WebGL 场景，接入 Microi.Client 宿主与 V8 接口，引入可授权素材，发布可安装 AI 应用，或审查 Unity 代码是否错误进入 Microi.Server。
 ---
 
-> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
+> **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
 
 # Microi Unity 完整交付
 

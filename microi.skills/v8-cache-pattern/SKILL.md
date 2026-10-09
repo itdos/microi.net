@@ -3,7 +3,7 @@ name: v8-cache-pattern
 description: Microi V8 Redis 缓存与管理模式。用于读写 V8.Cache、租户缓存命名、TTL 策略、防陈旧数据，以及使用 Redis 管理器页面或 MCP 检索、统计、查看和维护 String、Hash、List、Set、Sorted Set、Stream。
 ---
 
-> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
+> **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
 
 # Microi V8 Redis 缓存模式
 
@@ -118,6 +118,12 @@ var foreignKey = 'Microi:other-tenant:User:' + userId;
 
 - L1：进程内静态 `ConcurrentDictionary<string, CacheEntry>`（每个 API 进程独立）
 - L2：当前租户的 Redis（同一租户各 API 节点共享）
+
+平台 L1 容量淘汰先调用 `ConcurrentDictionary.ToArray()` 取得一致快照，再按过期时间
+排序；禁止直接让 LINQ 对并发字典执行依赖 `Count/CopyTo` 的物化。淘汰与过期清理
+只移除仍是快照旧值的条目，保留扫描后被刷新的新值。登录或接口路由读取在缓存淘汰
+栈出现空引用/数组容量异常时，先核对实际 API 二进制与该内核修复；不要修改业务 V8、
+清空 Redis 或关闭缓存掩盖问题。源码回归、API 加载及线上复测分别记录。
 
 缓存组件读取顺序：L1 命中 → L2 命中并回填 L1 → 返回未命中。它本身不查询
 业务数据库；数据库查询与回填属于调用方的 Cache-Aside 流程。
