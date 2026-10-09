@@ -1326,6 +1326,39 @@ async function inspectCustomerContractTotals(cdp, target) {
   return { source: 'local visual fixture', ...state };
 }
 
+async function testCustomerContractCollapse(cdp, viewport) {
+  const read = async () => (await cdp.send('Runtime.evaluate', {
+    expression: `(() => {
+      const card = document.querySelector('.detail-page .contract-totals');
+      const toggle = card?.querySelector('.contract-totals__toggle');
+      return { height: card?.getBoundingClientRect().height || 0,
+        expanded: toggle?.getAttribute('aria-expanded'),
+        label: toggle?.getAttribute('aria-label'),
+        values: card?.querySelectorAll('.contract-totals__value').length || 0,
+        hint: !!card?.querySelector('.contract-totals__hint') };
+    })()`, returnByValue: true
+  })).result.value;
+  const initial = await read();
+  if (initial.expanded !== 'true' || initial.label !== '收起合同金额' || initial.values !== 5 || !initial.hint) {
+    fail(`Customer contract totals initial expansion failed: ${JSON.stringify(initial)}`);
+  }
+  await cdp.send('Runtime.evaluate', { expression: `document.querySelector('.detail-page .contract-totals__toggle').click()` });
+  await waitForExpression(cdp, `document.querySelector('.detail-page .contract-totals__toggle')?.getAttribute('aria-expanded') === 'false'`);
+  const collapsed = await read();
+  if (collapsed.label !== '展开合同金额' || collapsed.values !== 0 || collapsed.hint || collapsed.height >= initial.height) {
+    fail(`Customer contract totals collapse failed: ${JSON.stringify({ initial, collapsed })}`);
+  }
+  const shot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  fs.writeFileSync(path.join(outputRoot, `customer-detail-collapsed-${viewport.name}.png`), Buffer.from(shot.data, 'base64'));
+  await cdp.send('Runtime.evaluate', { expression: `document.querySelector('.detail-page .contract-totals__toggle').click()` });
+  await waitForExpression(cdp, `document.querySelectorAll('.detail-page .contract-totals__value').length === 5`);
+  const restored = await read();
+  if (restored.expanded !== 'true' || restored.label !== '收起合同金额' || !restored.hint) {
+    fail(`Customer contract totals re-expansion failed: ${JSON.stringify(restored)}`);
+  }
+  console.log(`PASS customer-contract-collapse ${viewport.name} -> default, collapse, re-expand`);
+}
+
 async function testDirectoryCardRefresh(cdp) {
   const refresh = async () => {
     const state = await cdp.send('Runtime.evaluate', {
@@ -1773,6 +1806,7 @@ async function main() {
         if (unexpectedBrowserErrors.length) fail(`Browser error for ${target.name} at ${viewport.name}: ${JSON.stringify(unexpectedBrowserErrors)}`);
         if (fileSize < 12000 || layout.bodyTextLength < 20) fail(`Screenshot appears blank for ${target.name} at ${viewport.name}.`);
         console.log(`PASS ${target.name} ${viewport.name} -> ${screenshotPath}`);
+        if (target.name === 'customer-detail') await testCustomerContractCollapse(cdp, viewport);
         if (target.name === 'home-header') await testHomeHeaderRecovery(cdp, viewport);
         if (target.name === 'directory') {
           await testDirectoryFilters(cdp, viewport);
