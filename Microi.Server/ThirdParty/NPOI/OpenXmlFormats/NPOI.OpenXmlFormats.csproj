@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../NPOI.Build.props" />
+  <PropertyGroup>
+    <NpoiSourceModule>OpenXmlFormats</NpoiSourceModule>
+    <AssemblyName>NPOI.OpenXmlFormats</AssemblyName>
+    <RootNamespace>NPOI.OpenXmlFormats</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="all" />
+    <PackageReference Include="ZString" Version="2.6.0" />
+    <ProjectReference Include="../Core/NPOI.Core.csproj" />
+    <ProjectReference Include="../OpenXml4Net/NPOI.OpenXml4Net.csproj" />
+  </ItemGroup>
+</Project>

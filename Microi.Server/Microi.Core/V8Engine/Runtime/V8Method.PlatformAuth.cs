@@ -22,7 +22,8 @@ namespace Microi.net
             if (denied != null) return denied;
             try
             {
-                var request = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+                // 动态入口在 JSON 边界落为强类型，避免字符串扩展方法进入运行时绑定。
+                JObject request = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
                 var osClient = V8TenantContext.Current.OsClient;
                 var phone = SsoAtomText(request["Phone"], 32);
                 var code = SsoAtomText(request["Code"], 32);
@@ -78,7 +79,7 @@ return 1";
             if (denied != null) return denied;
             try
             {
-                var request = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+                JObject request = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
                 var osClient = V8TenantContext.Current.OsClient;
                 var proof = SsoAtomText(request["Proof"], 256);
                 var phone = SsoAtomText(request["Phone"], 32);
@@ -156,7 +157,7 @@ return 1";
             if (denied != null) return denied;
             try
             {
-                var request = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+                JObject request = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
                 var osClient = V8TenantContext.Current.OsClient;
                 var proof = SsoAtomText(request["Proof"], 256);
                 var userId = SsoAtomText(request["UserId"], 80);

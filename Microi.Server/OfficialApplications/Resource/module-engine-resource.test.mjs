@@ -9,7 +9,7 @@ const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const resource = JSON.parse(fs.readFileSync(path.join(resourceDir, "app.microi.module-engine.json"), "utf8"));
 
 test("module engine package version and physical menu badge columns are current", () => {
-    assert.equal(resource.PackageInfo.Version, "v8.4.3");
+    assert.equal(resource.PackageInfo.Version, "v8.4.4");
     assert.ok(resource.PackageInfo.RequiredPlatformCapabilities.includes("ClientFeature:TagsViewBoundFormDesign"));
     const physicalNames = new Set((resource.PhysicalColumns || []).map((item) => item.COLUMN_NAME));
     for (const name of ["MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema", "DetailCodeShowV8"]) {
@@ -199,4 +199,12 @@ test("sys_menu form tabs have deterministic unique ordering", () => {
     for (const name of ["PageTabs", "MoreBtns", "PageBtns", "BatchSelectMoreBtns", "ExportMoreBtns", "FormBtns"]) {
         assert.equal(field(name).Tab, buttonTabId, `${name} must use the stable button Tab Id`);
     }
+});
+
+
+test("字段权限和拖动排序完整进入可幂等官方资源",()=>{
+ for(const name of ["FieldPermissions","TreeDragSortEnabled","TreeDragSortField"]){assert.ok(field(name));assert.ok(resource.PhysicalColumns.some(c=>c.TABLE_NAME==="sys_menu"&&c.COLUMN_NAME===name));assert.match(resource.DDLStatements[0].DDL,new RegExp(name));}
+ const tabs=configOf(field("DataSourceFieldTabs")).FieldTabs.Tabs;assert.ok(tabs.some(t=>t.FieldNames.includes("FieldPermissions")));
+ const engine=resource.SysApiEngines.find(e=>e.ApiEngineKey==="mci-tree-drag-sort");assert.equal(engine.AllowAnonymous,0);assert.equal(engine.Lock,1);assert.equal(resource.ResourcePolicies.ApiEngines[engine.ApiEngineKey].UpgradePolicy,"Managed");
+ assert.equal(resource.PackageInfo.FieldCount,resource.DiyFields.length);assert.equal(resource.PackageInfo.PhysicalColumnCount,resource.PhysicalColumns.length);
 });

@@ -6,6 +6,24 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { createMcpServer } from './server.js';
 import type { MicroiClient } from './microi-client.js';
 
+test('普通 MCP 宿主初始化也收到跨模型的版本与自动更新基础规则', async () => {
+  const server = createMcpServer({} as MicroiClient, {
+    osClient: 'fixture', apiBaseUrl: 'https://api.example.test', label: '基础入口验收',
+  });
+  const client = new Client({ name: 'ordinary-mcp-host', version: '1.0.0' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  try {
+    assert.match(client.getInstructions() || '', /任何 AI 模型强制读取/);
+    assert.match(client.getInstructions() || '', /Microi吾码开发工具版本/);
+    assert.match(client.getInstructions() || '', /microi update --background/);
+    assert.ok((await client.listTools()).tools.length > 1);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
 test('microi_codex discovers and invokes existing tools through one entry point', async () => {
   let repairedAuditFieldsInput: { tableId?: string; tableName?: string } | undefined;
   const fakeClient = {
@@ -36,6 +54,10 @@ test('microi_codex discovers and invokes existing tools through one entry point'
   ]);
 
   try {
+    const instructions = client.getInstructions() || '';
+    assert.match(instructions, /workspace-conventions\/SKILL\.md/);
+    assert.match(instructions, /microi update --background/);
+    assert.match(instructions, /Microi吾码开发工具版本/);
     const tools = await client.listTools();
     assert.equal(tools.tools.length, 1);
     assert.ok(tools.tools.some(tool => tool.name === 'microi_codex'));

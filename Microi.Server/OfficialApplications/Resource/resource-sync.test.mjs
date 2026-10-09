@@ -85,7 +85,7 @@ test('官方资源发布器允许不降级的补丁版本且保留每项安全�
 test('真实发布候选契约必须在统一 Node 门禁中提前只读通过', () => {
   const result = spawnSync(process.execPath, [resolve(testDirectory, 'refresh-resources.mjs'), '--validate-only'], {encoding:'utf8', windowsHide:true, timeout:30000});
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /Local release candidate contracts passed: 13 resources; read-only/);
+  assert.match(result.stdout, /Local release candidate contracts passed: 14 resources; read-only/);
   const denied = spawnSync(process.execPath, [resolve(testDirectory, 'refresh-resources.mjs'), '--validate-only', '--publish'], {encoding:'utf8', windowsHide:true, timeout:30000});
   assert.notEqual(denied.status, 0);
   assert.match(denied.stderr, /不能与写入或同步参数同时使用/);
@@ -1415,8 +1415,9 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 173);
-  assert.equal(managedCount, 161);
+  assert.equal(seenKeys.size, 174);
+  assert.ok(seenKeys.has('mci-tree-drag-sort'));
+  assert.equal(managedCount, 162);
   assert.ok(seenKeys.has('ai_app_cdn_backfill'), '官方 CDN 维护入口必须随商城包投影');
   for (const key of ['official_sms_login', 'official_account_invitations', 'official_account_licenses']) assert.ok(seenKeys.has(key));
   assert.ok(seenKeys.has('official_password_reset_send_sms'), '找回密码入口必须随官方包投影');

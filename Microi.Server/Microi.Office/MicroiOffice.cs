@@ -206,6 +206,7 @@ namespace Microi.net
                 {
                     fieldList = param.ExcelHeader;
                 }
+                if (param._FieldPermission?.Restricted == true) fieldList = fieldList.Where(x => param._FieldPermission.Visible(x["Name"].Val<string>())).ToList();
 
                 //2022-06-11 只导出前端显示的字段
                 if (!param._SysMenuId.DosIsNullOrWhiteSpace() || !param.ModuleEngineKey.DosIsNullOrWhiteSpace())
@@ -890,6 +891,7 @@ namespace Microi.net
             {
                 fieldList = param.ExcelHeader;
             }
+            if (param._FieldPermission?.Restricted == true) fieldList = fieldList.Where(x => param._FieldPermission.Visible(x["Name"].Val<string>())).ToList();
 
             if (!param._SysMenuId.DosIsNullOrWhiteSpace() || !param.ModuleEngineKey.DosIsNullOrWhiteSpace())
             {
@@ -1946,6 +1948,14 @@ namespace Microi.net
             DiyTableRowParam param,
             List<string> sqlLog)
         {
+            if (param._FieldPermission?.Restricted == true)
+            {
+                foreach (var field in importFieldList)
+                {
+                    var name = field["Name"].Val<string>();
+                    if (!ImportIsProtectedFixedField(name) && !param._FieldPermission.Editable(name) && ImportTryGetFieldValue(row, fixedField, field, out _)) throw new InvalidOperationException("没有导入字段【" + name + "】的编辑权限。");
+                }
+            }
             var existingId = ImportResolveExistingRowId(
                 row, fixedField, uniqueRules, sqlTableName, trans, dbInfo, sqlLog, out var lastSql);
             if (!existingId.DosIsNullOrWhiteSpace())
