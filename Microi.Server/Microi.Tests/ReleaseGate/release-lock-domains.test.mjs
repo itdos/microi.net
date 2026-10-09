@@ -3,13 +3,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { acquireReleaseLock, releaseReleaseLock, assertReleaseAvailable, inspectLocks } from '../../tools/release-lock.mjs';
 
 const tool = fileURLToPath(new URL('../../tools/release-lock.mjs', import.meta.url));
 const manager = fileURLToPath(new URL('../../tools/Microi.LocalProcessManager.ps1', import.meta.url));
 const token = 'test-owner-0000000000000001';
+// Windows 的 PATH 可能先找到 WSL bash；此门禁必须执行正式发布所用的 Git Bash。
+const gitExec = process.platform === 'win32' ? execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim() : '';
+const bash = process.platform === 'win32' ? path.resolve(gitExec, '../../..', 'bin/bash.exe') : 'bash';
+if (process.platform === 'win32') assert.ok(fs.existsSync(bash), 'The release regression requires the actual Git Bash executable.');
 function fixture() { return fs.mkdtempSync(path.join(os.tmpdir(), 'microi-lock-domain-')); }
 function owner(root, name, text) {
     const lock = path.join(root, '.tmp/microi-process-state', name);
@@ -129,7 +133,7 @@ test('actual Bash combined release functions release their original workspace lo
     const original=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
     const start=original.indexOf('release_workspace_lock() {');const end=original.indexOf('\nprepare_release_workspace()',start);
     const target=path.join(root,'Microi.Server/tools');fs.mkdirSync(target,{recursive:true});fs.copyFileSync(tool,path.join(target,'release-lock.mjs'));
-    const run=spawnSync('bash',['-c',`set -e; print_info(){ :; }; print_fail(){ exit 1; }; MICROI_RELEASE_LOCK_HELD=false; ${original.slice(start,end)}
+    const run=spawnSync(bash,['-c',`set -e; print_info(){ :; }; print_fail(){ exit 1; }; MICROI_RELEASE_LOCK_HELD=false; ${original.slice(start,end)}
 BUILD_BACKEND=true; BUILD_CLIENT=true; PUBLISH_DOC=true; MICROI_FULL_ONLY=false; SELECTED_API_PLANS=(); SELECTED_CLIENT_PLANS=(); acquire_workspace_lock; cd /; release_workspace_lock`],{cwd:root,encoding:'utf8',timeout:15000});
     assert.equal(run.status,0,run.stderr);for(const scope of ['api','pc','website'])assert.ok(!fs.existsSync(path.join(root,'.tmp/microi-process-state/'+scope+'-release.lock')));
 }));
@@ -140,7 +144,7 @@ test('actual Agent entry uses only its domain and releases its lock when the des
     fs.mkdirSync(path.join(root,'Microi.Agent/apps/microi-code'),{recursive:true});fs.writeFileSync(path.join(root,'Microi.Agent/apps/microi-code/package.json'),'{}');
     fs.writeFileSync(path.join(root,'Microi.Agent/一键打包Mac.sh'),'#!/bin/bash\nnode Microi.Server/tools/release-lock.mjs status platform "$PWD" >/dev/null\nexit 7\n');
     acquireReleaseLock(root,'api',process.pid,token);
-    const run=spawnSync('bash',[path.join(root,'publish.sh'),'--microi-code','--mac'],{cwd:root,encoding:'utf8',timeout:15000});
+    const run=spawnSync(bash,[path.join(root,'publish.sh'),'--microi-code','--mac'],{cwd:root,encoding:'utf8',timeout:15000});
     assert.equal(run.status,7,run.stderr);assert.ok(!fs.existsSync(path.join(root,'.tmp/microi-process-state/agent-release.lock')),run.stdout+run.stderr);
     assert.ok(fs.existsSync(path.join(root,'.tmp/microi-process-state/api-release.lock')));
 }));
@@ -169,7 +173,7 @@ test('combined Bash acquisition failure releases only locks obtained by that inv
     const target=path.join(root,'Microi.Server/tools');fs.mkdirSync(target,{recursive:true});fs.copyFileSync(tool,path.join(target,'release-lock.mjs'));
     const pc=acquireReleaseLock(root,'pc',process.pid,token);
     const before=fs.readFileSync(path.join(pc.path,'owner.env'),'utf8');
-    const run=spawnSync('bash',['-c',`set -e; print_info(){ :; }; print_fail(){ exit 1; }; MICROI_RELEASE_LOCK_HELD=false; ${original.slice(start,end)}
+    const run=spawnSync(bash,['-c',`set -e; print_info(){ :; }; print_fail(){ exit 1; }; MICROI_RELEASE_LOCK_HELD=false; ${original.slice(start,end)}
 BUILD_BACKEND=true; BUILD_CLIENT=true; PUBLISH_DOC=false; MICROI_FULL_ONLY=false; SELECTED_API_PLANS=(); SELECTED_CLIENT_PLANS=(); acquire_workspace_lock`],{cwd:root,encoding:'utf8',timeout:15000});
     assert.equal(run.status,1);assert.ok(!fs.existsSync(path.join(root,'.tmp/microi-process-state/api-release.lock')));
     assert.equal(fs.readFileSync(path.join(pc.path,'owner.env'),'utf8'),before);
@@ -183,11 +187,12 @@ for(const [scope,flags] of [
     const original=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
     const start=original.indexOf('release_workspace_lock() {'),end=original.indexOf('\nprepare_release_workspace()',start);
     const target=path.join(root,'Microi.Server/tools');fs.mkdirSync(target,{recursive:true});fs.copyFileSync(tool,path.join(target,'release-lock.mjs'));
-    const run=spawnSync('bash',['-c',`set -e; print_info(){ :; }; print_fail(){ exit 1; }; MICROI_RELEASE_LOCK_HELD=false; ${original.slice(start,end)}
+    const run=spawnSync(bash,['-c',`set -e; print_info(){ :; }; print_fail(){ exit 1; }; MICROI_RELEASE_LOCK_HELD=false; ${original.slice(start,end)}
 ${flags}; MICROI_FULL_ONLY=false; SELECTED_API_PLANS=(); SELECTED_CLIENT_PLANS=(); acquire_workspace_lock
 node Microi.Server/tools/release-lock.mjs status ${scope} "$PWD"
 release_workspace_lock`],{cwd:root,encoding:'utf8',timeout:15000});
     assert.equal(run.status,0,run.stderr);
     const active=JSON.parse(run.stdout.split('\n').find(line=>line.startsWith('['))).filter(lock=>lock.exists);
     assert.deepEqual(active.map(lock=>lock.domain),[scope]);
+    assert.equal(active[0].running,true,'The actual shell owner must remain live in the native Node PID namespace.');
 }));
