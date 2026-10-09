@@ -313,6 +313,18 @@ const moduleRows = {
   Diy_Tenant: { rows: [merchantDetail], count: 1, statistics: {} }
 };
 
+const customerDetailTable = {
+  Id: 'visual-table-diy_kehu', Name: 'Diy_Kehu', Description: '我的客户',
+  Tabs: JSON.stringify([
+    { Id: 'customer-basic', Name: '基本信息', Sort: 10, Display: true },
+    { Id: 'customer-contacts', Name: '联系人', Sort: 20, Display: true },
+    { Id: 'customer-visits', Name: '跟进记录', Sort: 30, Display: true },
+    { Id: 'customer-proposals', Name: '需求方案', Sort: 40, Display: true },
+    { Id: 'customer-orders', Name: '订单列表', Sort: 50, Display: true },
+    { Id: 'customer-devices', Name: '设备列表', Sort: 60, Display: true }
+  ])
+};
+
 // 本地视觉替身显式声明授权菜单与表模型，不能把空菜单/统计对象当模块协议。
 const visualMenus = Object.entries(moduleRows).map(([tableName]) => ({
   Id: `visual-menu-${tableName.toLowerCase()}`,
@@ -329,6 +341,7 @@ const visualRowsByTable = {
 };
 function visualTable(tableKey) {
   const normalized = String(tableKey || '').toLowerCase().replace(/^visual-table-/, '');
+  if (normalized === 'diy_kehu') return customerDetailTable;
   if (normalized === 'diy_anli' || normalized === customerCaseTable.Id) return customerCaseTable;
   if (normalized === 'diy_anlice_child' || normalized === casebookCaseTable.Id) return casebookCaseTable;
   if (normalized === 'diy_kehusb' || normalized === deviceIotTable.Id) return deviceIotTable;
@@ -349,7 +362,8 @@ function visualFields(tableKey) {
   return Object.keys(row).filter(name => name !== 'Id').map((Name, index) => ({
     Id: `visual-field-${normalized}-${Name}`, Name, TableName: table.Name,
     Label: labels[Name] || Name, Component: Name === 'Chengshi' ? 'Address' : typeof row[Name] === 'number' ? 'NumberText' : 'Text',
-    Visible: 1, AppVisible: 1, Sort: index + 1, Config: '{}'
+    Visible: 1, AppVisible: 1, Sort: index + 1, Config: '{}',
+    ...(normalized === 'diy_kehu' ? { Tab: ['LianxiR', 'LianxiDH'].includes(Name) ? 'customer-contacts' : 'customer-basic' } : {})
   }));
 }
 function visualCustomerContractTotals(ids) {
@@ -1356,7 +1370,30 @@ async function testCustomerContractCollapse(cdp, viewport) {
   if (restored.expanded !== 'true' || restored.label !== '收起合同金额' || !restored.hint) {
     fail(`Customer contract totals re-expansion failed: ${JSON.stringify(restored)}`);
   }
-  console.log(`PASS customer-contract-collapse ${viewport.name} -> default, collapse, re-expand`);
+  const selectTab = async (label) => {
+    const result = await cdp.send('Runtime.evaluate', {
+      expression: `(() => {
+        const tab = [...document.querySelectorAll('.detail-page .related-tabs__item')]
+          .find(item => item.querySelector('.related-tabs__label')?.innerText === ${JSON.stringify(label)});
+        if (!tab) return false;
+        tab.click();
+        return true;
+      })()`, returnByValue: true
+    });
+    if (!result.result.value) fail(`Customer detail tab was not found: ${label}`);
+  };
+  for (const label of ['联系人', '跟进记录', '需求方案', '订单列表', '设备列表']) {
+    await selectTab(label);
+    await waitForExpression(cdp, `document.querySelector('.detail-page .related-tabs__item--active')?.innerText === ${JSON.stringify(label)} && !document.querySelector('.detail-page .contract-totals')`);
+    if (label === '联系人') {
+      await delay(250);
+      const otherTabShot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+      fs.writeFileSync(path.join(outputRoot, `customer-detail-contacts-${viewport.name}.png`), Buffer.from(otherTabShot.data, 'base64'));
+    }
+  }
+  await selectTab('基本信息');
+  await waitForExpression(cdp, `document.querySelector('.detail-page .related-tabs__item--active')?.innerText === '基本信息' && document.querySelectorAll('.detail-page .contract-totals__value').length === 5`);
+  console.log(`PASS customer-contract-tabs ${viewport.name} -> basic visible, five other tabs hidden, basic restored`);
 }
 
 async function testDirectoryCardRefresh(cdp) {

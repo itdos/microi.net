@@ -50,7 +50,7 @@
 					</view>
 				</view>
 
-				<xjy-customer-contract-totals v-if="showCustomerContractTotals"
+				<xjy-customer-contract-totals v-if="showCustomerContractTotalsOnActiveTab"
 					:state="customerContractTotals" collapsible @retry="loadCustomerContractAmounts" />
 
 				<!-- <view v-if="key === 'customers'" class="quick-band">
@@ -1322,6 +1322,13 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		computed: {
 			showCustomerContractTotals() {
 				return customerContractTotalsSupported(this.moduleConfig.table)
+			},
+			showCustomerContractTotalsOnActiveTab() {
+				if (!this.showCustomerContractTotals) return false
+				// 旧表单没有 Tab 时保留原展示；有 Tab 时只跟随后台“基本信息”的真实 key。
+				if (!this.formTabs.length) return true
+				const basicTab = this.formTabs.find((tab) => String(tab.name || '').trim() === '基本信息')
+				return Boolean(basicTab && basicTab.key === this.activeFormTabKey)
 			},
 			canEditRecord() {
 				return canEditMenuRecord(this.menuId, this.currentUser)
