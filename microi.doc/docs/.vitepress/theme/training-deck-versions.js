@@ -10,6 +10,12 @@ export const trainingPdfPaths = {
   },
 }
 
+// PPTX 与在线正文、PDF 保持同版同主题；未知版本按存量技术版回退。
+export function trainingPptxPath(version, isDark) {
+  const edition = version === 'enterprise' ? 'enterprise' : 'technical'
+  return trainingPdfPaths[edition][isDark ? 'dark' : 'light'].replace(/\.pdf$/u, '.pptx')
+}
+
 export function trainingHash(version, index) {
   return `#${version === 'enterprise' ? 'enterprise-' : ''}slide-${String(index + 1).padStart(2, '0')}`
 }
