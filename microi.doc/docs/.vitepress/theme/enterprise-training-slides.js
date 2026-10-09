@@ -31,7 +31,7 @@ const enterpriseSlideDefinitions = [
       { title: '为什么选择', text: '复用成熟能力，专注业务差异。' },
       { title: '怎样证明', text: '从可验收的试点开始。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-01.png', alt: 'AI 数字企业总览的科技场景示意', caption: 'AI 场景示意 · 数字企业' },
+    image: { src: '/images/enterprise-training/ai/slide-01-ui.png', alt: 'AI 生成的 Microi吾码企业工作台界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 企业工作台' },
     sources: [{ label: '平台概览', href: '/doc/' }, { label: '公开案例', href: '/case/case-index.html' }],
   },
   {
@@ -44,7 +44,7 @@ const enterpriseSlideDefinitions = [
       { title: '转得动', text: '岗位、审批、办理与结果闭环。' },
       { title: '算得清', text: '效率、质量与运行成本。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-02.png', alt: 'AI 经营驾驶舱与业务协同的科技场景示意', caption: 'AI 场景示意 · 经营驾驶舱' },
+    image: { src: '/images/enterprise-training/ai/slide-02-ui.png', alt: 'AI 生成的经营驾驶舱界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 经营驾驶舱' },
     sources: [{ label: '业务建模', href: '/doc/form-engine/form-engine-info.html' }, { label: 'AI 数据分析', href: '/doc/system-engine/ai-data-analysis.html' }],
   },
   {
@@ -57,7 +57,7 @@ const enterpriseSlideDefinitions = [
       { title: '行业软件', text: '制造、工程项目、园区与供应链。' },
       { title: '多端服务', text: 'PC、H5、小程序与 App。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-03.png', alt: '围绕统一平台组合企业产品的 AI 科技场景示意', caption: 'AI 场景示意 · 企业产品星图' },
+    image: { src: '/images/enterprise-training/ai/slide-03-ui.png', alt: 'AI 生成的 ERP、CRM 与 OA 多产品界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 企业产品组合' },
     sources: [{ label: '平台能力', href: '/doc/' }, { label: '行业案例目录', href: '/case/case-index.html' }],
   },
   {
@@ -70,7 +70,7 @@ const enterpriseSlideDefinitions = [
       { title: '动态尺码与裁床分包', text: '' },
       { title: '菲票明细与移动端', text: '' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-04.png', alt: '服装生产与订单协同的 AI 场景示意，并非客户实景', caption: 'AI 场景示意 · 服装生产协同' },
+    image: { src: '/images/enterprise-training/ai/slide-04-ui.png', alt: 'AI 生成的服装 ERP 与移动菲票界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 服装 ERP' },
     sources: [{ label: '服装 ERP 原始案例', href: '/case/erp/erp-case1.html' }],
   },
   {
@@ -83,7 +83,7 @@ const enterpriseSlideDefinitions = [
       { title: '飞书协同与跨库报表', text: '' },
       { title: '国企 OA 移动审批', text: '' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-05.png', alt: '多工厂与集团系统协同的 AI 场景示意，并非客户实景', caption: 'AI 场景示意 · 集团协同枢纽' },
+    image: { src: '/images/enterprise-training/ai/slide-05-ui.png', alt: 'AI 生成的集团跨系统协同与 OA 审批界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 集团协同' },
     sources: [{ label: '集团制造协同', href: '/case/ims/ims-case1.html' }, { label: '集团 / 国企 OA', href: '/case/oa/os-case1.html' }],
   },
   {
@@ -96,7 +96,7 @@ const enterpriseSlideDefinitions = [
       { title: '地图找房、隐私号与 VR', text: '' },
       { title: '官网、App、小程序多端服务', text: '' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-06.png', alt: '客户服务与房地产数字平台的 AI 场景示意，并非客户实景', caption: 'AI 场景示意 · 客户与房产服务' },
+    image: { src: '/images/enterprise-training/ai/slide-06-ui.png', alt: 'AI 生成的 CRM 客户跟进与房源服务界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · CRM 与房产' },
     sources: [{ label: '标准 CRM', href: '/case/crm/crm-case1.html' }, { label: '房地产服务平台', href: '/case/internet/hourse.html' }],
   },
   {
@@ -109,7 +109,7 @@ const enterpriseSlideDefinitions = [
       { title: '生成建议与待办草稿', text: '' },
       { title: '人工确认后办理，记录结果', text: '' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-07.png', alt: '公司知识、AI 建议与人工执行连接的业务闭环示意', caption: 'AI 场景示意 · 从知识到执行' },
+    image: { src: '/images/enterprise-training/ai/slide-07-ui.png', alt: 'AI 生成的客户跟进 Agent 业务闭环界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 业务 Agent' },
     sources: [{ label: '现有 AI 数据分析', href: '/doc/system-engine/ai-data-analysis.html' }, { label: '按项目编排流程', href: '/doc/system-engine/ai-workflow-suite.html' }],
   },
   {
@@ -122,7 +122,7 @@ const enterpriseSlideDefinitions = [
       { title: '灵活扩展', text: '复杂规则、定制页面与系统集成。' },
       { title: '交付可控', text: '多端协作，自建 / SaaS 按版本选择。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-08.png', alt: '可组合平台基座支撑业务产品生长的 AI 科技示意', caption: 'AI 场景示意 · 可扩展能力基座' },
+    image: { src: '/images/enterprise-training/ai/slide-08-ui.png', alt: 'AI 生成的吾码表单搭建与多端预览界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 平台搭建' },
     sources: [{ label: '平台能力', href: '/doc/' }, { label: '版本与授权', href: '/doc/edition-comparison.html' }, { label: '自建部署', href: '/doc/getting-started/docker-run.html' }],
   },
   {
@@ -135,7 +135,7 @@ const enterpriseSlideDefinitions = [
       { title: '找准公司知识', text: 'RAG 是基础，检索不稳就会偏。' },
       { title: '框架熟练不等于交付', text: '会搭流程只是起点。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-09.png', alt: 'AI Agent 从能力组件走向真实业务交付的科技场景示意', caption: 'AI 场景示意 · 从搭建到交付' },
+    image: { src: '/images/enterprise-training/ai/slide-09-ui.png', alt: 'AI 生成的公司知识库与 RAG 引用问答界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 知识与 RAG' },
     sources: [{ label: '公司知识与 AI 能力', href: '/doc/system-engine/ai-engine.html' }, { label: '业务蓝图与流程', href: '/doc/system-engine/ai-workflow-suite.html' }],
   },
   {
@@ -148,7 +148,7 @@ const enterpriseSlideDefinitions = [
       { title: '输出校验，人工接管', text: '' },
       { title: '部署与数据隔离', text: '权限、日志、监控、成本、数据安全。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-10.png', alt: 'AI 任务可靠运行与人工接管的科技场景示意', caption: 'AI 场景示意 · 人机协同与接管' },
+    image: { src: '/images/enterprise-training/ai/slide-10-ui.png', alt: 'AI 生成的任务恢复与人工接管运行界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 可靠交付' },
     sources: [{ label: 'AI 平台治理', href: '/doc/system-engine/ai-platform-governance.html' }, { label: 'MCP 受控交付', href: '/doc/v8-engine/mcp-server.html' }],
   },
   {
@@ -161,7 +161,7 @@ const enterpriseSlideDefinitions = [
       { title: '任务完成率', text: '工具成功率与异常恢复。' },
       { title: '投入可衡量', text: '延迟、Token、人工时间与 Bad Case。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-11.png', alt: 'AI 业务效果、质量与成本评估的科技场景示意', caption: 'AI 场景示意 · 业务评估' },
+    image: { src: '/images/enterprise-training/ai/slide-11-ui.png', alt: 'AI 生成的效果、质量与成本评估界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 评估与成本' },
     sources: [{ label: 'AI 分析与权限', href: '/doc/system-engine/ai-data-analysis.html' }, { label: '运行治理', href: '/doc/system-engine/ai-platform-governance.html' }],
   },
   {
@@ -174,7 +174,7 @@ const enterpriseSlideDefinitions = [
       { title: '定边界', text: '数据、权限、部署与授权。' },
       { title: '验结果', text: '效果、成本与运维责任。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-12.png', alt: '企业从 AI 试点走向可持续产品规模化的科技场景示意', caption: 'AI 场景示意 · 从试点到产品' },
+    image: { src: '/images/enterprise-training/ai/slide-12-ui.png', alt: 'AI 生成的试点实施与验收看板界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 试点实施' },
     sources: [{ label: '开始使用', href: '/doc/getting-started/start-use.html' }, { label: '版本与授权', href: '/doc/edition-comparison.html' }, { label: '更多成功案例', href: '/case/case-index.html' }],
   },
 ]

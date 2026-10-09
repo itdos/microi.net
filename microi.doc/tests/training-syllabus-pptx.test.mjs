@@ -5,8 +5,9 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
 import ts from 'typescript'
-import { parse as parseSfc } from 'vue/compiler-sfc'
+import { parse as parseSfc, compileTemplate } from 'vue/compiler-sfc'
 import * as vue from 'vue'
+import * as serverRenderer from 'vue/server-renderer'
 import * as versions from '../docs/.vitepress/theme/training-deck-versions.js'
 import { enterpriseSlides } from '../docs/.vitepress/theme/enterprise-training-slides.js'
 import { searchTrainingSlides } from '../docs/.vitepress/theme/training-syllabus-search.js'
@@ -49,18 +50,42 @@ function componentRuntime(descriptor) {
   const printed = ts.createPrinter().printFile(ts.factory.updateSourceFile(source, statements))
   const javascript = ts.transpileModule(printed, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText
   const isDark = vue.ref(false)
-  const browser = { location: { hash: '', search: '' }, history: { replaceState() {} }, clearTimeout() {}, setTimeout() { return 0 } }
+  const mountedCallbacks = []
+  const browser = { location: { hash: '', search: '' }, history: { replaceState() {} }, innerWidth: 1600, innerHeight: 900,
+    addEventListener() {}, clearTimeout() {}, setTimeout() { return 0 } }
   class TestElement {}
   const dependencies = {
     ...vue, ...versions, enterpriseSlides, searchTrainingSlides,
-    nextTick: callback => Promise.resolve().then(callback), onMounted() {}, onBeforeUnmount() {},
-    useData: () => ({ isDark }), window: browser, document: {}, Element: TestElement, HTMLElement: TestElement,
+    nextTick: callback => Promise.resolve().then(callback), onMounted: callback => mountedCallbacks.push(callback), onBeforeUnmount() {},
+    useData: () => ({ isDark }), window: browser, document: { getElementById() { return null }, addEventListener() {} }, Element: TestElement, HTMLElement: TestElement,
   }
   // Node 23+ 的 CJS namespace 会额外暴露 `module.exports`；它是元数据而非可注入的 JS 标识符。
   const names = Object.keys(dependencies).filter(name => name !== 'default' && /^[A-Za-z_$][\w$]*$/u.test(name))
   const runtime = new Function(...names, `${javascript}\nreturn { ${[...bindingNames, ...functionNames].join(',')} };`)(...names.map(name => dependencies[name]))
-  const templateScope = new Proxy({ ...dependencies, ...runtime, isDark }, { has: (target, name) => Reflect.has(target, name), get: (target, name) => vue.unref(target[name]) })
-  return { ...runtime, isDark, evaluate: expression => new Function('scope', `with (scope) { return (${expression}); }`)(templateScope) }
+  const templateContext = { ...runtime, isDark, trainingPptxPath: versions.trainingPptxPath }
+  const templateScope = new Proxy({ ...dependencies, ...templateContext }, { has: (target, name) => Reflect.has(target, name), get: (target, name) => vue.unref(target[name]) })
+  return { ...runtime, isDark, templateContext, async mount() { for (const callback of mountedCallbacks) await callback(); await vue.nextTick() },
+    evaluate: expression => new Function('scope', `with (scope) { return (${expression}); }`)(templateScope) }
+}
+
+// 对真实工具栏执行 Vue SSR 编译与渲染，检查输出链接；单纯求值 href 无法发现水合保留旧属性。
+function toolbarRenderer(descriptor) {
+  const toolbar = findElements(descriptor.template.ast, element => attribute(element, 'class')?.split(/\s+/u).includes('mci-training-deck__top-actions'))[0]
+  assert.ok(toolbar, 'the real presentation toolbar must exist')
+  const compiled = compileTemplate({ id: 'training-pptx-toolbar', source: toolbar.loc.source, filename: 'TrainingSyllabusDeck.vue', ssr: true, ssrCssVars: [] })
+  assert.deepEqual(compiled.errors, [])
+  const source = ts.createSourceFile('TrainingToolbarSSR.js', compiled.code, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+  const dependencies = {}
+  for (const statement of source.statements.filter(ts.isImportDeclaration)) {
+    const module = statement.moduleSpecifier.text === 'vue' ? vue : statement.moduleSpecifier.text === 'vue/server-renderer' ? serverRenderer : null
+    assert.ok(module, `unexpected SSR dependency: ${statement.moduleSpecifier.text}`)
+    for (const specifier of statement.importClause.namedBindings.elements) dependencies[specifier.name.text] = module[specifier.propertyName?.text || specifier.name.text]
+  }
+  const statements = source.statements.filter(statement => !ts.isImportDeclaration(statement))
+  const printed = ts.createPrinter().printFile(ts.factory.updateSourceFile(source, statements)).replace(/^export /gmu, '')
+  const names = Object.keys(dependencies)
+  const ssrRender = new Function(...names, `${printed}\nreturn ssrRender;`)(...names.map(name => dependencies[name]))
+  return runtime => serverRenderer.renderToString(vue.createSSRApp({ setup: () => runtime.templateContext, ssrRender }))
 }
 
 // 从 ZIP 中央目录读取真实 OOXML，不把 PK 文件头或扩展名当作已生成 PowerPoint 的证明。
@@ -125,7 +150,7 @@ test('同主题 PPTX 下载解析四个独立目标，未知版本安全回到�
   assert.equal(new Set(artifacts.map(artifact => artifact.url)).size, 4)
 })
 
-test('真实 PPTX 下载按钮跟随课件版本与当前主题，PDF 下载继续保留', () => {
+test('真实 PPTX 下载按钮跟随课件版本与当前主题，PDF 下载继续保留', async () => {
   const component = fs.readFileSync(path.join(projectRoot, 'docs/.vitepress/theme/components/TrainingSyllabusDeck.vue'), 'utf8')
   const { descriptor, errors } = parseSfc(component)
   assert.deepEqual(errors, [])
@@ -139,6 +164,7 @@ test('真实 PPTX 下载按钮跟随课件版本与当前主题，PDF 下载继�
   const href = binding(pptx, 'href')
   assert.ok(href, 'download URLs must react to edition and theme')
   const runtime = componentRuntime(descriptor)
+  await runtime.mount()
   for (const artifact of artifacts) {
     runtime.switchVersion(artifact.version)
     runtime.isDark.value = artifact.dark
@@ -153,6 +179,35 @@ test('真实 PPTX 下载按钮跟随课件版本与当前主题，PDF 下载继�
   assert.equal(runtime.evaluate(href), artifacts[1].url, 'switching back restores the original technical download')
   assert.ok(anchors.some(element => attribute(element, 'aria-label') === '下载预生成暗色 PDF'))
   assert.ok(anchors.some(element => attribute(element, 'aria-label') === '下载预生成浅色 PDF'))
+})
+
+test('SSR 与挂载前不输出 PPTX，首次挂载按实际主题生成链接并保留 PDF', async () => {
+  const component = fs.readFileSync(path.join(projectRoot, 'docs/.vitepress/theme/components/TrainingSyllabusDeck.vue'), 'utf8')
+  const { descriptor, errors } = parseSfc(component)
+  assert.deepEqual(errors, [])
+  const renderToolbar = toolbarRenderer(descriptor)
+  const server = componentRuntime(descriptor)
+  const serverHtml = await renderToolbar(server)
+  assert.doesNotMatch(serverHtml, /class="is-pptx"|\.pptx/u, 'SSR must not freeze a light-theme PPTX href before the client theme is known')
+  for (const initialDark of [true, false]) {
+    const runtime = componentRuntime(descriptor)
+    runtime.isDark.value = initialDark
+    const beforeMount = await renderToolbar(runtime)
+    assert.doesNotMatch(beforeMount, /class="is-pptx"|\.pptx/u, 'the first client render must preserve the SSR absence of the download control')
+    for (const url of Object.values(versions.trainingPdfPaths.technical)) assert.ok(beforeMount.includes(`href="${url}"`), 'both PDF choices remain available before mount')
+    await runtime.mount()
+    const firstMounted = await renderToolbar(runtime)
+    assert.ok(firstMounted.includes(`href="${versions.trainingPptxPath('technical', initialDark)}"`), 'the first inserted button must already target the actual persisted theme')
+    assert.ok(firstMounted.includes(`aria-label="下载${initialDark ? '暗色' : '浅色'} PPTX"`))
+    for (const artifact of artifacts) {
+      runtime.switchVersion(artifact.version)
+      runtime.isDark.value = artifact.dark
+      const html = await renderToolbar(runtime)
+      assert.equal((html.match(/class="is-pptx"/gu) || []).length, 1, 'mount and version/theme changes must keep exactly one PPTX control')
+      assert.ok(html.includes(`href="${artifact.url}"`), 'the rendered export link must follow both state changes')
+      for (const url of Object.values(versions.trainingPdfPaths[artifact.version])) assert.ok(html.includes(`href="${url}"`), 'PDF targets must still follow the selected edition')
+    }
+  }
 })
 
 for (const artifact of artifacts) {
