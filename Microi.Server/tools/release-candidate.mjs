@@ -4,6 +4,7 @@ import {readFile,writeFile,mkdir,lstat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {snapshotReleaseComposition} from './release-composition.mjs';
+import {snapshotStandardInputs} from './release-standard-inputs.mjs';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Agent','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
@@ -59,6 +60,7 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }
  }
+ Object.assign(files,await snapshotStandardInputs(root));
  const privateInputs=await snapshotReleaseComposition(root,options);
  if(privateInputs){
   for(const [key,value]of Object.entries(privateInputs.files)){

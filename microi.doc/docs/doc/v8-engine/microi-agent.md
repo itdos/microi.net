@@ -383,6 +383,8 @@ npx --yes @microi.net/cli@latest codex install --yes
 
 #### 非阻塞自动更新
 
+版本检查和自动升级与“Microi吾码本次工作进度”同属强制基础规范，适用于所有模型和 AI 宿主。每次新建或接续吾码任务，AI 必须读取 `workspace-conventions/SKILL.md`，首次说明用“Microi吾码开发工具版本”报告实际 CLI、官方 `latest`、自动更新状态及 Skills/MCP 同步结果。未知项写“检测中/待回读”，不能猜测版本或把已安装新版说成当前会话已热加载。
+
 VS Code 扩展激活、Codex Router 启动以及任一常规 `microi` 命令都会轻量投递：
 
 ```bash
@@ -390,6 +392,16 @@ microi update --background --workspace "<工作区绝对路径>" --json
 ```
 
 更新器只从 npm 官方 registry 查询和安装 `@microi.net/cli`，随后幂等更新 Codex 插件、检测到的 DeepSeek Harness profile bundle、工作区 AI 指令、Skills 与 MCP，并执行 `doctor` / `codex status` / `dsh status`。运行中的 VS Code Extension Host、CLI、Codex Router、DSH 会话和 MCP 不被终止或强制重载；新版 MCP 写入 `~/.microi/runtime/versions/<version>`，原子切换 `current.json` 后仅供新进程使用。
+
+AI 不能只检查版本或临时运行 `npx @latest` 就声称全局 CLI 已升级。更新后须回读版本、工作区 Skills 与 MCP provider，并重新读取更新后的基础规范与本任务 Skill。尚未配置服务器连接的目录不生成项目 AI/MCP 文件；客户 API、数据库和业务应用的部署继续遵守各自授权边界。
+
+```bash
+microi version --json
+npm view '@microi.net/cli' version --json --prefer-online --registry=https://registry.npmjs.org/
+microi doctor --workspace "<工作区绝对路径>" --json
+```
+
+Codex/DSH 的 `microi_codex action="profiles"` 也会返回 `toolchain`：当前进程 `loadedVersion`、工作区 `workspaceSkillsVersion` 和 `automaticUpdate` 状态。`latestObservedVersion` 必须结合 `checkedAt` 阅读，它是历史检查结果；`appliesToWorkspace=false` 时不能用共享状态证明本目录已同步。缺失、损坏或正在更新均可继续当前工作，待后台回读补齐结果。
 
 断网、权限不足、Windows `EBUSY` 文件占用或宿主暂不支持热更新时，状态写入 `~/.microi/updater/status.json` 并在后台延后重试。界面可以非模态提示“立即重试/查看日志”，但用户不处理也不影响当前、正在进行或新建工作。设置 `microi.automaticUpdates=false` 可显式关闭 VS Code 端自动检查，已有功能仍照常使用。
 

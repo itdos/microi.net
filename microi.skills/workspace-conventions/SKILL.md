@@ -6,7 +6,7 @@ description: 每次 Microi 任务开始前必读的基础规范。用于识别�
 # Microi 工作区全局约定
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=d64145e9e39c0796f680659543d7504871749ea93858938aa31c9884a15a1e79 -->
+<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=de99c1f81724b00065dd3cbbf8f4fd7d13fa35edac26c7fdb71f778529148a6b -->
 ## 任务启动前 Skill 读取规则（强制）
 
 AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端、后端、UniApp、文档、测试或交付任务前，必须先按任务类型读取相关 `microi.skills/**/SKILL.md`。不能等到写代码或出问题后才补读。
@@ -47,11 +47,14 @@ AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端�
 
 ### Microi吾码非阻塞自动更新（强制）
 
-- VS Code 扩展、`@microi.net/cli` 与 Codex 插件默认自动检查和安装更新。任一 Microi 任务开始时可后台投递 `microi update --background --workspace "<工作区绝对路径>" --json`，但不得等待它完成才开始业务分析、MCP 调用、源码修改、构建或发布。
+- 本规范与“Microi吾码工作进度播报规范”同属无条件基础规则，适用于任何 AI 模型与宿主，不限 Codex，也不要求用户提到安装、版本或更新。每次新建或接续 Microi 对话，AI 必须读取本节并检查版本；已有 CLI 时必须投递 `microi update --background --workspace "<工作区绝对路径>" --json`，由更新器去重、节流和重试，不得改写为“可选”“建议更新”或等用户提醒。后台任务与业务工作并行，不得等待更新完成才开始业务分析、MCP 调用、源码修改、构建或发布。
+- `@microi.net/cli` 必须自动升级到 npm 官方 `latest`，并使用新版包重新同步吾码 Skills、AI 宿主规则、插件与 MCP。不能只执行 `npx @latest`、只查询版本或只更新全局 CLI 后就声称完整升级；旧 CLI 缺少 `update` 时按 `microi-codex-installer` 的官方安装恢复路径更新。完全未安装且本次未授权初始化时准确记录缺失，不擅自创建服务器连接。
+- 首次工作过程说明必须包含一次版本播报，以“Microi吾码开发工具版本”开头，报告当前实际 CLI 版本、npm 官方最新版本（含查询时间）、自动更新是否启用及状态、Skills/MCP 是否已同步。读取 `microi version --json` 与后台状态文件，或 MCP `profiles.toolchain`；后者的 `loadedVersion` 只代表当前 MCP 提供者，`latestObservedVersion` 是带时间的历史查询结果，不能冒充全局 CLI 版本或刚刚在线查询的最新版。尚未确认的项必须写“检测中/未知/待回读”，后续回读补齐；禁止猜测、硬编码当前发布号或把 `expectedVersion` 当 npm 最新版。
 - CLI 最新版只从 npm 官方 registry 查询：`npm view '@microi.net/cli' version --json --prefer-online --registry=https://registry.npmjs.org/`；VS Code 扩展只使用官方扩展宿主的自动更新/安装命令。不得使用第三方 registry 或不明镜像冒充官方更新。
-- 后台更新完整闭环包含全局 CLI、`microi@microi-net`、`microi ai init`、`microi doctor` 与 `microi codex status`。`codex install --yes` 的 `--yes` 只兼容旧脚本，不是用户继续工作的授权开关。
+- 后台更新完整闭环包含全局 CLI、已安装宿主的 `microi@microi-net` / DSH bundle，以及已配置连接工作区的 `microi ai init`、`microi doctor`、`microi codex status` / `microi dsh status`。回读全局版本、工作区 Skills bundle/file 版本及 MCP provider 版本，确认不低于本次官方查询版本；较新提供者保留。未安装的宿主安静跳过，未配置连接的目录不生成 AI/MCP 文件。完成后重新读取已更新的基础规范与本任务专项 Skill，并在收尾说明升级或延后结果。`codex install --yes` 的 `--yes` 只兼容旧脚本，不是用户继续工作的授权开关。
 - 当前运行中的 VS Code Extension Host、CLI、Codex Router、MCP 和对话继续使用已加载版本。禁止为了更新终止进程、强制重载、要求立即新建任务或拒绝新工作；新版只在后续新进程或宿主自然重启时接管。
 - npm 官方 registry 无法访问、权限不足、文件被运行中进程占用、安装失败或宿主不能热更新时，必须写入可诊断状态并延后重试。可以非模态提示“立即重试/查看日志”，但用户忽略、关闭或暂不处理时，当前、正在进行和新建的 Microi 工作仍必须继续。
+- 用户明确关闭自动更新或宿主不允许终端执行时，尊重该限制，报告具体未完成项和恢复命令；不能静默宣称已是最新版。自动更新只覆盖开发工具、Skills 和本机 MCP 入口，不授权升级客户 API/数据库、部署容器或安装业务应用；已签名 Microi Agent 安装目录仍通过桌面官方更新渠道升级。
 - 只有任务明确依赖旧版本不存在的具体能力时，才准确说明该能力边界与可用降级方案；不得用“最新版未通过”“尚未授权升级”作为整项任务的失败理由。
 
 <!-- /microi-progressive:chunk -->

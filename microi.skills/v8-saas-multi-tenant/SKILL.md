@@ -1,9 +1,9 @@
 ---
 name: v8-saas-multi-tenant
-description: Microi V8 SaaS 多租户指南。用于处理 OsClient、OsClientType、OsClientNetwork、租户配置、V8.OsClientModel、隔离和租户感知代码。
+description: Microi V8 SaaS 多租户指南。用于处理租户隔离、主租户推广中心、按用户开通推广分享链接、匿名试用空库及 OsClient 三参数配置。
 ---
 
-> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
+> **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
 
 # Microi V8 SaaS 多租户引擎
 
@@ -87,6 +87,33 @@ V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
 - 复用标准 MCP `microi_get_db_schema`、`microi_add_field`、`microi_create_table_index`、`microi_create_engine`、
   `microi_save_engine_code`、`microi_create_module`、`microi_run_engine` 及应用源码/流式发布工具；
   先完整回读、计划和dryRun，再按已授权范围写入。已有推广Hook采用CreateIfMissing，不覆盖。
+
+#### 通过 AI + MCP 为指定用户开通推广链接
+
+用户说“为某个业务员创建推广链接”时，使用现有接口完成配置和签发，不创建一次性维护引擎，也不直接改推广表。先通过 `profiles` 选择用户自己的主租户连接，执行 `microi_get_status` 核对节点、主租户及 Type/Network；普通用户的主租户不固定为官方 iTdos。
+
+1. 用 `microi_get_engine_code` 完整读取 `platform-saas-promotion` 和 `platform-saas-public-trial`，有分页时拼齐并核对完整 SHA-256。再通过 `microi_run_engine` 执行 `{Action:'Bootstrap'}`，读取 `Actor/Users/Settings/Roles`，确认当前会话有创建权限。按准确 Account 或 Id 解析活跃推荐人；姓名重名时先澄清，禁止猜测用户 Id。管理员可以为活跃用户创建，业务员默认只为自己创建。
+2. 执行 `{Action:'Links'}`，先查该推荐人的活动。已有符合请求且启用、未过期的链接可复用，保留其他活动与业务数据。只有平台管理员的 `Actor.CanConfigure=true` 才能配置公开开通。配置缺失且用户已授权启用时，通过 `SaveSettings` 写入真实主租户前端 HTTPS 地址；不要把 API 域名、临时测试端口或别人的平台地址当成 WebBase。仅创建链接不隐含修改已经设定的开通策略。
+
+   ```javascript
+   // microi_run_engine：apiEngineKey='platform-saas-promotion'
+   // params 为下列对象；confirmExecution 使用同一 ApiEngineKey。
+   { Action:'SaveSettings', Enabled:true, WebBase:'https://<主租户前端域名>',
+     TrialDays:14, DailyLimit:20, LinkLimit:50, ManagerRoleIds:[] }
+   ```
+
+   上例为未配置时的默认值。已有试用天数、每日额度、单链接额度和管理角色应从 Bootstrap 回读并保留，除非用户明确要求调整；`ManagerRoleIds` 使用真实角色 Id 数组。保存后再次 Bootstrap 核对本分区配置。
+3. 无合适活动时执行下列请求。`ReferralUserId` 必须来自第 1 步的权威用户目录；业务员额度和试用天数不能超过主租户设定值。
+
+   ```javascript
+   { Action:'CreateLink', Title:'<推广活动名称>', ReferralUserId:'<sys_user.Id>',
+     TrialDays:14, MaxTenants:50, ValidDays:30, Remark:'<可选活动说明>' }
+   ```
+
+   创建超时先按推荐人、活动名称和时间回读 Links，确认是否已创建；禁止盲目重试导致重复活动。取得 `Data.Id` 后执行 `{Action:'ShareLink', Id:'<活动Id>'}`，返回 `Data.Url` 才是可分享地址。不要手拼 `ref=<用户Id>` 或将活动 Id 代替 `LinkToken`；票据绑定推荐人、活动、运行分区、到期时间和版本。切换链接启停状态会撤销旧地址，之后需重新签发。
+4. 回读 Links 核对归属、启用状态、期限、试用天数和额度。在全新、未登录的浏览器 context 打开 `Data.Url`，核对匿名 `platform-saas-public-trial` 的 Bootstrap 成功、表单与图形验证码可用。验收链接不需要实际创建客户租户；只有明确授权开库后才提交真实申请，并按同一 RequestId 回读任务、租户归属和登录地址，保留幂等及精确清理证据。
+
+最终交付可点击的分享地址、推荐人、试用天数、链接到期时间及额度，并区分“链接已可访问”和“客户租户已实际开通”。若接口不存在或平台版本不足，走官方 SaaS 应用与内置微服务更新，不通过临时 SQL 绕过鉴权。
 
 制作空数据库时，角色、账号绑定和权限快照必须作为同一初始模板处理。只保留明确声明的初始角色，按权威角色重建保留账号的 `RoleIds` 与等级；删除业务角色及孤立菜单权限，清空包含源业务菜单的角色权限快照。初始角色缺失、删除或等级不符时停止制作，不得根据账号现有角色列表、角色名称或高等级推测哪些角色应保留。
 

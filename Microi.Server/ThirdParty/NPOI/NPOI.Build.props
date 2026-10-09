@@ -1,0 +1,35 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NpoiSourceRoot>$(MSBuildThisFileDirectory)</NpoiSourceRoot>
+    <NpoiUpstreamSource>$(BaseIntermediateOutputPath)verified-npoi/</NpoiUpstreamSource>
+    <Version>$(MicroiNetVersion)</Version>
+    <AssemblyVersion>2.8.1.0</AssemblyVersion>
+    <FileVersion>2.8.1.0</FileVersion>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(NpoiSourceRoot)npoi.snk</AssemblyOriginatorKeyFile>
+    <IsPackable>true</IsPackable>
+    <PackageId>Microi.$(MSBuildProjectName)</PackageId>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <GeneratePackageOnBuild Condition="'$(Configuration)' == 'Release'">true</GeneratePackageOnBuild>
+    <NoWarn>$(NoWarn);CS0618;SYSLIB0051</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(NpoiSourceRoot)LICENSE" Pack="true" PackagePath="" />
+    <None Include="$(NpoiSourceRoot)provenance.json" Pack="true" PackagePath="" />
+  </ItemGroup>
+  <Target Name="PrepareVerifiedNpoiSource" BeforeTargets="PrepareForBuild">
+    <GetFileHash Files="$(NpoiSourceRoot)upstream-2.8.1.source.zip" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="VerifiedNpoiSource" /></GetFileHash>
+    <Error Condition="'%(VerifiedNpoiSource.FileHash)' != '73BA45659CDE22FE2644F5B5A155B681147728B5B52C38BA4E0A6A832606A90B'" Text="NPOI 上游源码摘要不一致，拒绝构建。" />
+    <Unzip SourceFiles="$(NpoiSourceRoot)upstream-2.8.1.source.zip" DestinationFolder="$(NpoiUpstreamSource)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Compile Include="$(NpoiUpstreamSource)$(NpoiSourceModule)/**/*.cs" Exclude="$(NpoiExcludedSources)" />
+      <Compile Condition="'$(NpoiSourceModule)' != 'main'" Include="$(NpoiUpstreamSource)main/Polyfills.cs" Link="Polyfills.cs" />
+      <EmbeddedResource Condition="'$(NpoiSourceModule)' == 'main'" Include="$(NpoiUpstreamSource)main/Resources/font_metrics.properties" LogicalName="NPOI.Resources.font_metrics.properties" />
+      <EmbeddedResource Condition="'$(NpoiSourceModule)' == 'main'" Include="$(NpoiUpstreamSource)main/Resources/functionMetadata.txt" LogicalName="NPOI.Resources.functionMetadata.txt" />
+      <EmbeddedResource Condition="'$(NpoiSourceModule)' == 'ooxml'" Include="$(NpoiUpstreamSource)ooxml/Resources/presetTableStyles.xml" LogicalName="NPOI.Resources.presetTableStyles.xml" />
+    </ItemGroup>
+  </Target>
+</Project>
