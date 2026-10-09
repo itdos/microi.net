@@ -128,7 +128,8 @@
 <script>
 import { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand, Setting } from "@element-plus/icons-vue";
 import UiDensitySelect from './UiDensitySelect.vue';
-import { computed, watch } from "vue";
+import { computed, reactive, watch } from "vue";
+import { getUserVisualPreferenceSaveSession } from "@/utils/user-visual-preference-save-session.js";
 import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
 import { getCornerStyle, setCornerStyle } from "@/utils/theme-shape.js";
@@ -150,6 +151,17 @@ import {
 
 const DEFAULT_THEME_COLOR = "#409eff";
 
+function getActivePreferenceSaveSession(diyStore, userId) {
+    const token = DiyCommon.getToken(), osClient = DiyCommon.GetOsClient();
+    const claims = DiyCommon.DecodeJwtPayload(token);
+    // 标准续签保留 MicroiSessionId，新登录重新生成；解码仅用于队列归属，
+    // 接口的真实授权仍由服务端 DiyToken 验证，不以本地声明授予权限。
+    const sameActor = String(claims?.UserId || "") === String(userId || "")
+        && String(claims?.OsClient || "").toLowerCase() === String(osClient || "").toLowerCase();
+    const loginSession = sameActor && claims?.MicroiSessionId ? `session:${claims.MicroiSessionId}` : token;
+    return getUserVisualPreferenceSaveSession(diyStore, osClient, userId, reactive, loginSession, DiyCommon.GetApiBase());
+}
+
 export default {
     name: "ThemeSelect",
     components: { Brush, Sunny, Moon, Check, MagicStick, InfoFilled, Grid, Menu, Expand, Setting, UiDensitySelect },
@@ -169,6 +181,12 @@ export default {
         });
         const SysConfig = computed(() => diyStore.SysConfig || {});
         const CurrentUser = computed(() => diyStore.GetCurrentUser || {});
+        const preferenceSaveSession = computed(() => {
+            // 标准 SDK 登录或续签时同步 Pinia.Token；最新凭据读取来自非响应式
+            // localStorage，因此显式依赖 Pinia，确保计算属性随会话变化重算。
+            void diyStore.Token;
+            return getActivePreferenceSaveSession(diyStore, CurrentUser.value?.Id);
+        });
         const themeColor = computed({
             get: () => resolveUserThemeColor(
                 CurrentUser.value,
@@ -184,7 +202,7 @@ export default {
                 applyThemeColor(themeColor.value || DEFAULT_THEME_COLOR);
             }
         );
-        return { diyStore, appStore, settingsStore, themeColor, localThemeColor, SysConfig, CurrentUser };
+        return { diyStore, appStore, settingsStore, themeColor, localThemeColor, SysConfig, CurrentUser, preferenceSaveSession };
     },
     data() {
         return {
@@ -194,14 +212,15 @@ export default {
             cornerOptions: [{value:'System',label:'跟随系统'},{value:'round',label:'圆角'},{value:'square',label:'直角'}],
             navigationOptions: [{value:'System',label:'跟随系统'},{value:'Side',label:'侧边导航'},{value:'Top',label:'顶部导航'},{value:'TopSide',label:'顶部 + 侧边导航'}],
             menuExpandOptions: [{value:'System',label:'跟随系统'},{value:'Down',label:'向下展开'},{value:'Right',label:'向右展开'}],
-            pendingPreferencePatch: {},
-            preferenceSaveTimer: null,
-            preferenceSaveInFlight: false,
-            preferenceSaveState: "saved",
-            preferenceSaveError: ""
+            // 新旧顶栏共用当前账号的保存状态。
         };
     },
     computed: {
+        pendingPreferencePatch: { get() { return this.preferenceSaveSession.pendingPreferencePatch; }, set(value) { this.preferenceSaveSession.pendingPreferencePatch = value; } },
+        preferenceSaveTimer: { get() { return this.preferenceSaveSession.preferenceSaveTimer; }, set(value) { this.preferenceSaveSession.preferenceSaveTimer = value; } },
+        preferenceSaveInFlight: { get() { return this.preferenceSaveSession.preferenceSaveInFlight; }, set(value) { this.preferenceSaveSession.preferenceSaveInFlight = value; } },
+        preferenceSaveState: { get() { return this.preferenceSaveSession.preferenceSaveState; }, set(value) { this.preferenceSaveSession.preferenceSaveState = value; } },
+        preferenceSaveError: { get() { return this.preferenceSaveSession.preferenceSaveError; }, set(value) { this.preferenceSaveSession.preferenceSaveError = value; } },
         cornerPreference() { return normalizeUserCornerStyle(this.CurrentUser?.CornerStyle); },
         navigationPreference() { return normalizeUserNavigationLayout(this.CurrentUser?.NavigationLayout); },
         menuExpandPreference() { return normalizeUserMenuChildExpandMode(this.CurrentUser?.MenuChildExpandMode); },
@@ -241,6 +260,10 @@ export default {
     },
     beforeUnmount() {
         if (this.preferenceSaveTimer) clearTimeout(this.preferenceSaveTimer);
+        this.preferenceSaveTimer = null;
+        // TopSide 切换顶栏挂载位置；卸载前发送最终待保存选择，后续在途请求
+        // 仍使用同一会话队列，避免重建组件清掉尚未发出的防抖保存。
+        void this.flushVisualPreferences();
     },
     watch: {
         "CurrentUser.ThemeMode"() {
@@ -311,6 +334,8 @@ export default {
             this.saveInstalledVisualPreferences(patch);
         },
         saveInstalledVisualPreferences(patch) {
+            const userId = String(this.CurrentUser?.Id || "");
+            if (!userId) return;
             const installedPatch = Object.fromEntries(
                 Object.entries(patch || {}).filter(([key]) => hasInstalledUserPreference(this.CurrentUser, key))
             );
@@ -322,11 +347,11 @@ export default {
             this.preferenceSaveError = "";
             this.scheduleVisualPreferenceFlush();
         },
-        scheduleVisualPreferenceFlush(delay = 250) {
-            if (this.preferenceSaveTimer) clearTimeout(this.preferenceSaveTimer);
-            this.preferenceSaveTimer = setTimeout(() => {
-                this.preferenceSaveTimer = null;
-                void this.flushVisualPreferences();
+        scheduleVisualPreferenceFlush(delay = 250, session = this.preferenceSaveSession) {
+            if (session.preferenceSaveTimer) clearTimeout(session.preferenceSaveTimer);
+            session.preferenceSaveTimer = setTimeout(() => {
+                session.preferenceSaveTimer = null;
+                void this.flushVisualPreferences(session);
             }, delay);
         },
         retryVisualPreferences() {
@@ -336,12 +361,17 @@ export default {
             this.preferenceSaveTimer = null;
             void this.flushVisualPreferences();
         },
-        async flushVisualPreferences() {
-            if (this.preferenceSaveInFlight || !Object.keys(this.pendingPreferencePatch).length) return;
-            const patch = { ...this.pendingPreferencePatch };
-            this.pendingPreferencePatch = {};
-            this.preferenceSaveInFlight = true;
-            this.preferenceSaveState = "saving";
+        async flushVisualPreferences(session = this.preferenceSaveSession) {
+            if (session.preferenceSaveInFlight || !Object.keys(session.pendingPreferencePatch).length) return;
+            const ownsCurrentActor = () => session === getActivePreferenceSaveSession(this.diyStore, this.CurrentUser?.Id);
+            if (!ownsCurrentActor()) {
+                session.pendingPreferencePatch = {};
+                return;
+            }
+            const patch = { ...session.pendingPreferencePatch };
+            session.pendingPreferencePatch = {};
+            session.preferenceSaveInFlight = true;
+            session.preferenceSaveState = "saving";
             let succeeded = false;
             try {
                 const result = await DiyCommon.ApiEngine.Run(
@@ -354,20 +384,20 @@ export default {
                 // RefreshLoginUser may return a scheduled refresh receipt rather
                 // than the login-user projection. Keep the authenticated user
                 // snapshot unless the response identifies this same user.
-                if (result.Data?.Id && String(result.Data.Id) === String(this.CurrentUser?.Id)) {
-                    this.diyStore.setCurrentUser({ ...this.CurrentUser, ...result.Data, ...this.pendingPreferencePatch });
+                if (ownsCurrentActor() && result.Data?.Id && String(result.Data.Id) === session.userId) {
+                    this.diyStore.setCurrentUser({ ...this.CurrentUser, ...result.Data, ...session.pendingPreferencePatch });
                 }
                 succeeded = true;
-                this.preferenceSaveState = Object.keys(this.pendingPreferencePatch).length ? "pending" : "saved";
-                this.preferenceSaveError = "";
+                session.preferenceSaveState = Object.keys(session.pendingPreferencePatch).length ? "pending" : "saved";
+                session.preferenceSaveError = "";
             } catch (error) {
-                this.pendingPreferencePatch = { ...patch, ...this.pendingPreferencePatch };
-                this.preferenceSaveState = "error";
-                this.preferenceSaveError = error?.message || String(error);
-                DiyCommon.Tips(`主题已在当前设备生效，但跨设备保存失败：${error?.message || error}`, false);
+                session.pendingPreferencePatch = { ...patch, ...session.pendingPreferencePatch };
+                session.preferenceSaveState = "error";
+                session.preferenceSaveError = error?.message || String(error);
+                if (ownsCurrentActor()) DiyCommon.Tips(`主题已在当前设备生效，但跨设备保存失败：${error?.message || error}`, false);
             } finally {
-                this.preferenceSaveInFlight = false;
-                if (succeeded && Object.keys(this.pendingPreferencePatch).length) this.scheduleVisualPreferenceFlush();
+                session.preferenceSaveInFlight = false;
+                if (succeeded && Object.keys(session.pendingPreferencePatch).length) this.scheduleVisualPreferenceFlush(250, session);
             }
         }
     }
