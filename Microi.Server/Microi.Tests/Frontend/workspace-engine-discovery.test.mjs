@@ -53,8 +53,9 @@ test('不同分类存在相同 Key 时拒绝任意选择', (t) => {
   write('乙/标题(target-key).js')
   assert.throws(() => find('target-key'), (error) => {
     assert.match(error.message, /^Ambiguous synced xjy ApiEngineKey target-key:/)
-    assert.ok(error.message.includes('甲/标题(target-key).js'))
-    assert.ok(error.message.includes('乙/标题(target-key).js'))
+    // 错误列出本机相对文件路径；Windows 与 Unix 分隔符都须保留两个冲突项。
+    assert.ok(error.message.includes(path.join('甲', '标题(target-key).js')))
+    assert.ok(error.message.includes(path.join('乙', '标题(target-key).js')))
     return true
   })
 })

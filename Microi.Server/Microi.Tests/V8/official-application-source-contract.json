@@ -10,7 +10,7 @@
       "AppKey": "microi-ai-cad",
       "AppId": "01M3GST5C6KFYC6X2TQDBDGZ50",
       "Version": "v1.0.0",
-      "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.default.default/AI应用/microi-ai-cad",
+      "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/microi-ai-cad",
       "SourceManifestHash": "14091c1b7d345e49b9cc363b0d7d83067998599123177365af48f2786b9c1718",
       "ContextSha256": "d31596c9d1a0f99f42880e10964ad7aba328ff5c10caf6316ac93863c29fa010",
       "FileCount": 22,
@@ -126,13 +126,38 @@
           "Size": 269,
           "Sha256": "37d2ebfba794e5d1a4d93c1d1d7d684d74dd7e53c4a298858986eaacb6908cac"
         }
-      ]
+      ],
+      "LocalTestOverlay": {
+        "SchemaVersion": 1,
+        "Path": "package.json",
+        "Field": "scripts.test",
+        "Value": "node --test --test-concurrency=1 tests",
+        "BaseContent": "{\n  \"name\": \"microi-ai-cad\",\n  \"private\": true,\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"engines\": {\n    \"node\": \"^20.19.0 || >=22.12.0\"\n  },\n  \"scripts\": {\n    \"dev\": \"vite --host 0.0.0.0\",\n    \"typecheck\": \"vue-tsc --noEmit\",\n    \"build\": \"npm run typecheck && vite build\",\n    \"preview\": \"vite preview --host 0.0.0.0\"\n  },\n  \"dependencies\": {\n    \"three\": \"0.186.1\",\n    \"vue\": \"3.5.40\"\n  },\n  \"devDependencies\": {\n    \"@types/three\": \"0.186.0\",\n    \"@vitejs/plugin-vue\": \"6.0.8\",\n    \"typescript\": \"5.9.3\",\n    \"vite\": \"7.3.6\",\n    \"vue-tsc\": \"3.3.9\"\n  }\n}\n",
+        "BaseSize": 565,
+        "BaseSha256": "199f2580a0378174544cbdc2fc96fe83b13f11869ed247a09211f5c09c0d335d",
+        "LocalSize": 619,
+        "LocalSha256": "f73ef689e9daf2d8c184e72c1dde830386e37b1f8ab8f0a8561c258b516824e7",
+        "TestFiles": [
+          "tests/plan-engine.test.mjs"
+        ],
+        "LocalSourceBytes": 185308,
+        "LocalSourceManifestHash": "ff30c52bd43609db4ca9c8c272407c06fa36cf56965865c59c7517e5fa453d85"
+      },
+      "OfficialSourceReadback": {
+        "ApiBase": "https://api.itdos.com",
+        "OsClient": "iTdos",
+        "AppId": "01M3GST5C6KFYC6X2TQDBDGZ50",
+        "AppKey": "microi-ai-cad",
+        "At": "2026-10-09T10:04:03.438Z",
+        "SourceManifestHash": "14091c1b7d345e49b9cc363b0d7d83067998599123177365af48f2786b9c1718",
+        "ContextReceiptSha256": "86502a44044c7979dacfde18105853655418c911b81eb4152a02e9823c584ba3"
+      }
     },
     {
       "AppKey": "ai-employee-center",
       "AppId": "01M3F2GZ388EZWSFX43K6AX6FP",
       "Version": "v1.0.0",
-      "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.default.default/AI应用/ai-employee-center",
+      "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/ai-employee-center",
       "SourceManifestHash": "f662366490a2523c8d05d1e02b707b79c07b86f0fed359bee0775b7f52d10175",
       "ContextSha256": "45a66b0fd7ee0e1df7ed178f5f5a4e1e3585477f4f25b2d901e21035a2a609f6",
       "FileCount": 36,
@@ -318,7 +343,34 @@
           "Size": 269,
           "Sha256": "37d2ebfba794e5d1a4d93c1d1d7d684d74dd7e53c4a298858986eaacb6908cac"
         }
-      ]
+      ],
+      "LocalTestOverlay": {
+        "SchemaVersion": 1,
+        "Path": "package.json",
+        "Field": "scripts.test",
+        "Value": "node --test --test-concurrency=1 tests",
+        "BaseContent": "{\n  \"name\": \"ai-employee-center\",\n  \"private\": true,\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"engines\": {\n    \"node\": \"^20.19.0 || >=22.12.0\"\n  },\n  \"scripts\": {\n    \"dev\": \"vite --host 0.0.0.0\",\n    \"typecheck\": \"vue-tsc --noEmit\",\n    \"build\": \"npm run typecheck && vite build\",\n    \"preview\": \"vite preview --host 0.0.0.0\"\n  },\n  \"dependencies\": {\n    \"vue\": \"3.5.40\"\n  },\n  \"devDependencies\": {\n    \"@vitejs/plugin-vue\": \"6.0.8\",\n    \"typescript\": \"5.9.3\",\n    \"vite\": \"7.3.6\",\n    \"vue-tsc\": \"3.3.9\"\n  }\n}\n",
+        "BaseSize": 515,
+        "BaseSha256": "1ca61397765ed5a9a087851bc6ad4dfa9a70ddae337794a0cfb10342a58745ac",
+        "LocalSize": 569,
+        "LocalSha256": "8e1e12214cb2ec8fb6f6627c58e37991c5b2a2bb69d6e33ab0666ddda3568065",
+        "TestFiles": [
+          "tests/context.test.cjs",
+          "tests/draft.test.cjs",
+          "tests/gateway.test.cjs"
+        ],
+        "LocalSourceBytes": 309130,
+        "LocalSourceManifestHash": "c1a1b5cc415e56949bbf11691b93f1890f3e9a6b5faa8f5cf08451b9ec22648d"
+      },
+      "OfficialSourceReadback": {
+        "ApiBase": "https://api.itdos.com",
+        "OsClient": "iTdos",
+        "AppId": "01M3F2GZ388EZWSFX43K6AX6FP",
+        "AppKey": "ai-employee-center",
+        "At": "2026-10-09T10:04:03.451Z",
+        "SourceManifestHash": "f662366490a2523c8d05d1e02b707b79c07b86f0fed359bee0775b7f52d10175",
+        "ContextReceiptSha256": "55a541150358c44272c29b7ac2765aa3bf01dd7b85e0cb959ab196fdb8a54195"
+      }
     },
     {
       "AppKey": "mci-email",
