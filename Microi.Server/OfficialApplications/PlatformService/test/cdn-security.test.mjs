@@ -8,15 +8,21 @@ import {reportRows,csv} from '../src/cdn-model.js'
 const sha=v=>createHash('sha256').update(v).digest('hex')
 const source=readFileSync(new URL('../engines/mci-cdn-core.js',import.meta.url),'utf8')
 function ipBytes(s){if(!isIP(s))throw Error('invalid');if(isIP(s)===4)return s.split('.').map(Number);const [l,r]=s.split('::'),a=l?l.split(':'):[],b=r?r.split(':'):[];const words=r!==undefined?[...a,...Array(8-a.length-b.length).fill('0'),...b]:a;return words.flatMap(x=>[parseInt(x,16)>>8,parseInt(x,16)&255])}
-function setup({cloud=()=>({Code:1,Data:{}}),tenant='t1'}={}){
+function setup({cloud=()=>({Code:1,Data:{}}),tenant='t1',code=source}={}){
  const db={},calls=[],ctx={console,Date,Math,JSON,Error,System:{Net:{IPAddress:{Parse:s=>({GetAddressBytes:()=>ipBytes(s)})}}}}
  const V8={Param:{},OsClient:tenant,CurrentUser:{Account:'admin'},EncryptHelper:{Sha256Hex:sha},Method:{NewGuid:()=>crypto.randomUUID()},ApiEngine:{Run:(key,p)=>{calls.push({key,...p});return cloud(p)}},FormEngine:{
   GetFormData:(t,p)=>{const row=db[t]?.get(p.Id);return row&&row.Tenant===tenant?{Code:1,Data:structuredClone(row)}:{Code:2}},
   GetTableData:(t,p)=>({Code:1,Data:[...(db[t]?.values()||[])].filter(row=>(p._Where||[]).every(([k,op,v])=>op==='='?row[k]===v:op==='In'?v.includes(row[k]):op==='>'?row[k]>v:op==='<='?row[k]<=v:op==='>='?row[k]>=v:op==='<'?row[k]<v:true)).slice(0,p._PageSize)}),
   AddFormData:(t,p)=>{db[t]??=new Map();if(db[t].has(p.Id))return {Code:0,Msg:'duplicate'};db[t].set(p.Id,structuredClone(p));return {Code:1,Data:structuredClone(p)}},
   UptFormData:(t,p)=>{const row=db[t]?.get(p.Id);if(!row)return {Code:0};Object.assign(row,structuredClone(p));return {Code:1,Data:structuredClone(row)}}
- }};ctx.V8=V8;vm.createContext(ctx);vm.runInContext(source.slice(0,source.lastIndexOf('\ntry {\n    var action'))+'\nthis.api={address,addresses,matches,protectedIp,command,rule,cleanConfig,functionChange,fingerprint,snapshotHash,verifies,scanRule,expiry,enqueue,id};',ctx);return {ctx,api:ctx.api,db,calls,V8,put:(t,row)=>V8.FormEngine.AddFormData(t,{Tenant:tenant,...row})}
+ }};ctx.V8=V8;vm.createContext(ctx);
+ // 接口正文允许顶层 return。完整执行函数包装，再从 finally 导出同作用域函数，
+ // 不按换行切掉调度正文，保证 LF/CRLF 都保留实际入口与安全分支。
+ const result=vm.runInContext('(function(){try {\n'+code+'\n} finally {this.api={address,addresses,matches,protectedIp,command,rule,cleanConfig,functionChange,fingerprint,snapshotHash,verifies,scanRule,expiry,enqueue,id};}}).call(this)',ctx);
+ return {ctx,api:ctx.api,result,db,calls,V8,put:(t,row)=>V8.FormEngine.AddFormData(t,{Tenant:tenant,...row})}
 }
+
+test('complete V8 entry preserves top-level return with both LF and CRLF',()=>{for(const eol of ['\n','\r\n']){const s=setup({code:source.replace(/\r?\n/g,eol)});assert.equal(s.result.Code,0);assert.equal(s.result.Msg,'不支持的 CDN 管理动作');assert.equal(typeof s.api.address,'function');assert.equal(s.calls.length,0)}})
 test('IPv4 and expanded IPv6 CIDR matching protects overlapping ranges',()=>{const {api}=setup();assert.equal(api.address('2001:db8::1').value,'2001:0db8:0000:0000:0000:0000:0000:0001');assert.equal(api.matches('2001:db8::2','2001:db8::/32'),true);assert.equal(api.matches('192.0.2.3','192.0.2.0/24'),true);assert.equal(api.matches('192.0.3.3','192.0.2.0/24'),false);assert.equal(api.protectedIp('192.0.2.0/24',['192.0.2.4']),true);assert.throws(()=>api.address('127.1'));assert.throws(()=>api.address('example.com'))})
 test('block defaults protect private networks and incomplete scopes',()=>{const {api}=setup();assert.throws(()=>api.command({Action:'Block',Domain:'example.com',IPList:'10.0.0.1'}),/白名单/);assert.throws(()=>api.command({Action:'GlobalBlock',Domain:'example.com',IPList:'192.0.2.1'}),/ALL_CDN_DOMAINS/);assert.throws(()=>api.command({Action:'RateLimit',Domain:'example.com',Rate:'1k'}),/100k/);assert.throws(()=>api.command({Action:'Block',Domain:'example.com?q=1',IPList:'192.0.2.1'}))})
 const acl=(ip='192.0.2.9',source='off')=>({FunctionName:'ip_black_list_set',ConfigId:7,FunctionArgs:{FunctionArg:[{ArgName:'ip_list',ArgValue:ip},{ArgName:'ip_acl_xfwd',ArgValue:source},{ArgName:'customize_response_status_code',ArgValue:'429'}]}})
