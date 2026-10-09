@@ -1566,6 +1566,15 @@ fi
 # ─── 阶段（条件）: NuGet 推送 ─────────────────────────────
 if [ "$PUSH_NUGET" = true ]; then
 
+    # 验证与上传共用原 find 的完整 NUL 清单，包含嵌套项目和不同 PackageId。
+    # 不能另行枚举一级同名包，路径空格也不能按空白拆分。
+    _nupkg_list_file="$PWD/.tmp/microi-release-gate/nuget-upload-${VERSION}.nul"
+    _nupkg_check_file="$PWD/.tmp/microi-release-gate/nuget-upload-${VERSION}.check.nul"
+    mkdir -p "$(dirname "$_nupkg_list_file")"
+    if ! find Microi.Server -path "*/bin/Release/*.$VERSION.nupkg" -not -name "*.symbols.nupkg" -print0 > "$_nupkg_list_file"; then
+        print_fail "无法读取本次完整 NuGet 待上传清单；禁止上传。"
+    fi
+
     # 安全检查：有加密源码但未加密时禁止推送
     if [ "$HAS_ENCRYPT" = true ] && [ "$DLL_ENCRYPTED" != true ]; then
         print_fail "检测到 Microi.net/Microi.AI/Microi.MCP/Microi.WorkFlow/Microi.Vision 源码但 DLL 未加密，禁止推送未加密的 NuGet 包！"
@@ -1574,25 +1583,34 @@ if [ "$PUSH_NUGET" = true ]; then
         print_fail "NuGet 包中的 DLL 未被替换为加密版本，禁止推送！"
     fi
     if [ "$HAS_ENCRYPT" = true ]; then
-        node Microi.Server/tools/release-encryption.mjs packages "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" || print_fail "实际 NuGet ZIP 中存在未加密/旧 DLL 或缺少闭源 DLL；禁止上传。"
+        node Microi.Server/tools/release-encryption.mjs packages "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_list_file" || print_fail "完整待上传清单的实际 NuGet ZIP 中存在未加密/旧 DLL、遗漏包或缺少闭源 DLL；禁止上传。"
     fi
 
     # 推送 NuGet 包
     print_phase "推送 NuGet 包"
 
-    _nupkg_files=$(find Microi.Server -path "*/bin/Release/*.$VERSION.nupkg" -not -name "*.symbols.nupkg" 2>/dev/null | sort)
-    if [ -z "$_nupkg_files" ]; then
+    if [ ! -s "$_nupkg_list_file" ]; then
         print_warning "未找到版本 $VERSION 的 .nupkg 文件"
     else
         _push_count=0
-        while IFS= read -r _nupkg; do
+        # 首个 push 前再次读取完整实际集合并校验所有包哈希；随后每包再 CAS。
+        if [ "$HAS_ENCRYPT" = true ]; then
+            if ! find Microi.Server -path "*/bin/Release/*.$VERSION.nupkg" -not -name "*.symbols.nupkg" -print0 > "$_nupkg_check_file"; then
+                print_fail "首个上传前无法复核完整 NuGet 清单；禁止上传。"
+            fi
+            node Microi.Server/tools/release-encryption.mjs packages-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_check_file" || print_fail "首个上传前 NuGet 清单或包字节发生变化；禁止全部上传。"
+        fi
+        while IFS= read -r -d '' _nupkg; do
+            if [ "$HAS_ENCRYPT" = true ]; then
+                node Microi.Server/tools/release-encryption.mjs package-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg" || print_fail "当前 NuGet 包未经核验或字节发生变化；禁止上传。"
+            fi
             print_step "推送: $(basename "$_nupkg")"
             if ! dotnet nuget push "$_nupkg" --api-key "$NUGET_API_KEY" --source "$NUGET_SOURCE" --skip-duplicate; then
                 print_fail "NuGet 推送失败: $(basename "$_nupkg")"
             fi
             print_success "$(basename "$_nupkg")"
             ((_push_count++)) || true
-        done <<< "$_nupkg_files"
+        done < "$_nupkg_list_file"
         echo ""
         print_success "共推送 $_push_count 个 NuGet 包"
     fi
