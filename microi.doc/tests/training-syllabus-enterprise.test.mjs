@@ -8,6 +8,7 @@ import { parse as parseSfc } from '@vue/compiler-sfc'
 import { computed, ref } from 'vue'
 import { enterpriseSlideCount, enterpriseSlides, enterpriseSections } from '../docs/.vitepress/theme/enterprise-training-slides.js'
 import { parseTrainingHash, trainingHash, trainingPdfPaths } from '../docs/.vitepress/theme/training-deck-versions.js'
+import * as trainingVersions from '../docs/.vitepress/theme/training-deck-versions.js'
 import { searchTrainingSlides } from '../docs/.vitepress/theme/training-syllabus-search.js'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -17,6 +18,7 @@ const { descriptor, errors } = parseSfc(component)
 assert.deepEqual(errors, [], 'the real presentation component must remain valid Vue source')
 const counts = { technical: 47, enterprise: 12 }
 const slideText = slide => JSON.stringify(slide)
+const audienceCopy = slide => [slide.nav, slide.title, slide.summary, slide.eyebrow, slide.lead, slide.takeaway, ...slide.cards.map(card => `${card.title} ${card.text}`), ...slide.steps, ...slide.metrics.map(metric => `${metric.value} ${metric.label} ${metric.note || ''}`)].join('\n')
 
 function sourceForUrl(url) {
   const pathname = url.split(/[?#]/u)[0]
@@ -72,7 +74,7 @@ function presentationRuntime() {
     nextTick: callback => Promise.resolve().then(callback),
     onMounted() {}, onBeforeUnmount() {},
     useData: () => ({ isDark }),
-    searchTrainingSlides, enterpriseSlides, trainingPdfPaths, parseTrainingHash, trainingHash,
+    ...trainingVersions, searchTrainingSlides, enterpriseSlides, trainingPdfPaths, parseTrainingHash, trainingHash,
     window: browser, document: {}, Element: TestElement, HTMLElement: TestElement,
   }
   const names = Object.keys(dependencies)
@@ -116,20 +118,20 @@ test('12 页经营者课件覆盖产品、公开案例、选型优势与 Agent �
   assert.equal(new Set(enterpriseSlides.map(slide => slide.id)).size, 12)
   assert.deepEqual(enterpriseSlides.map(slide => slide.chapter), Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')))
   for (const slide of enterpriseSlides) {
-    for (const key of ['nav', 'title', 'summary', 'lead', 'takeaway']) assert.ok(slide[key].trim(), `${slide.id}: missing audience-facing ${key}`)
-    assert.ok(slide.cards.length >= 3 && slide.cards.length <= 6, `${slide.id}: keep one conclusion and a readable number of points`)
+    for (const key of ['nav', 'title', 'summary']) assert.ok(slide[key].trim(), `${slide.id}: missing audience-facing ${key}`)
+    assert.ok(slide.cards.length >= 1 && slide.cards.length <= 3, `${slide.id}: the simplified edition needs at most three short points`)
     assert.ok(slide.sources.length, `${slide.id}: decisions and claims need a source`)
     assert.doesNotMatch(slideText(slide), /```|V8\.(?:FormEngine|Db|Http)|SELECT\s+.+FROM/iu, 'this edition should explain business decisions without code lessons')
   }
   assert.deepEqual(enterpriseSections.flatMap(section => section.slideIds), enterpriseSlides.map(slide => slide.id), 'the content outline must include each slide once in presentation order')
-  const corpus = enterpriseSlides.map(slideText).join('\n')
+  const corpus = enterpriseSlides.map(audienceCopy).join('\n')
   for (const topic of [
     /客户.*领导.*经营者/u, /ERP/u, /CRM/u, /SRM/u, /OA/u, /工程|项目/u, /园区|物联/u,
-    /公开成功案例/u, /关键优势|为什么选择/u, /从“会搭 Agent”走向“会交付业务”/u,
-    /业务流程|先拆清/u, /RAG.*基础能力/u, /检索不稳/u, /框架熟练不等于/u,
-    /工具调用失败/u, /任务中断.*恢复/u, /长上下文/u, /输出.*检查/u, /人工.*处理|人工接管/u,
-    /部署.*数据隔离/u, /权限.*日志.*监控.*成本.*数据安全/u, /MCP、多 Agent/u,
-    /任务完成率/u, /工具成功率/u, /检索命中/u, /响应时间/u, /Token/u, /Bad Case/u, /人工处理基线/u,
+    /公开成功案例/u, /关键优势|为什么选择/u, /会搭.*交付|Agent.*交付/u,
+    /业务流程|业务目标|拆.*流程/u, /RAG|知识检索/u, /检索.*(?:稳|准|质量)|找准知识/u, /框架.*(?:交付|产品|可用)/u,
+    /工具.*失败|失败.*兜底/u, /(?:任务|中断).*恢复/u, /上下文/u, /输出.*(?:检查|校验)/u, /人工/u,
+    /部署/u, /隔离/u, /权限/u, /日志/u, /监控/u, /成本/u, /数据安全/u, /MCP/u, /多\s*Agent/u,
+    /任务完成率/u, /工具成功率/u, /检索.*(?:命中|准确|质量)|知识.*正确/u, /响应时间|延迟/u, /Token/u, /Bad Case|错误样例/u, /基线/u,
   ]) assert.match(corpus, topic, `missing business or delivery topic: ${topic}`)
   assert.doesNotMatch(corpus, /提升\s*\d+\s*%|节省\s*\d+\s*%|收益增长\s*\d+/u, 'do not invent quantified customer returns')
 })
@@ -139,7 +141,8 @@ test('成功案例的事实回到已有公开案例，产品设计示例保持�
   assert.equal(cases.length, 3)
   for (const slide of cases) {
     assert.match(slide.eyebrow, /公开成功案例/u)
-    assert.ok(slide.image && slide.image.alt && slide.image.caption, `${slide.id}: case evidence needs a described real screenshot`)
+    assert.ok(slide.image && slide.image.alt && slide.image.caption, `${slide.id}: the AI illustration needs accessible description`)
+    assert.match(slide.image.caption, /AI\s*场景示意/u, 'an illustration cannot be presented as a customer screenshot')
     for (const source of slide.sources) {
       assert.ok(source.href.startsWith('/case/'), `${slide.id}: a general feature page cannot prove a customer case`)
       assert.ok(fs.existsSync(sourceForUrl(source.href)), source.href)
@@ -149,20 +152,28 @@ test('成功案例的事实回到已有公开案例，产品设计示例保持�
   assert.ok(manufacturing, 'retain the published group manufacturing case')
   assert.equal(manufacturing.metrics.find(metric => metric.label.includes('第三方')).value, '11')
   assert.match(fs.readFileSync(sourceForUrl('/case/ims/ims-case1.html'), 'utf8'), /\*\*11\*\*\s*个第三方系统数据库/u)
-  const workflowExample = enterpriseSlides.find(slide => slide.nav === 'AI 进入业务')
-  assert.match(workflowExample.eyebrow, /业务设计示例/u)
+  const workflowExample = enterpriseSlides.find(slide => slide.id === 'enterprise-ai-loop')
+  assert.match(workflowExample.eyebrow, /设计示例/u)
   assert.doesNotMatch(workflowExample.eyebrow, /成功案例/u, 'a proposed AI workflow must not be promoted as a completed customer delivery')
 })
 
-test('课件证据链接与全部案例图片随官网源码完整交付', () => {
+test('证据链接与十二张独立 AI 场景图随官网源码完整交付', () => {
+  const paths = new Set()
+  const images = new Set()
   for (const slide of enterpriseSlides) {
     for (const source of slide.sources) assert.ok(fs.existsSync(sourceForUrl(source.href)), `${slide.id}: broken evidence link ${source.href}`)
-    if (!slide.image) continue
-    assert.ok(slide.image.src.startsWith('/images/enterprise-training/'), `${slide.id}: case media must not depend on remote image availability`)
+    assert.ok(slide.image && slide.image.alt, `${slide.id}: every page needs its own described business image`)
+    assert.match(slide.image.caption, /AI\s*场景示意/u, `${slide.id}: distinguish generated scenes from customer evidence`)
+    assert.ok(slide.image.src.startsWith('/images/enterprise-training/ai/'), `${slide.id}: AI scenes must be delivered with the site`)
+    assert.ok(!paths.has(slide.image.src), `${slide.id}: each page needs a distinct scene`)
+    paths.add(slide.image.src)
     const file = fs.readFileSync(publicFile(slide.image.src))
-    assert.ok(file.length > 1_000, `${slide.id}: a real screenshot must be present`)
+    assert.ok(file.length > 1_000, `${slide.id}: a complete generated image must be present`)
     assert.deepEqual([...file.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${slide.id}: published PNG is invalid`)
+    assert.ok(!images.has(file.toString('base64')), `${slide.id}: do not reuse the same pixels for different scene files`)
+    images.add(file.toString('base64'))
   }
+  assert.equal(paths.size, 12)
 })
 
 test('品牌右侧两按钮真实驱动版本、下载、缩略图、搜索与分享恢复', async () => {
@@ -194,9 +205,9 @@ test('品牌右侧两按钮真实驱动版本、下载、缩略图、搜索与�
   assert.equal(runtime.thumbnailPath(11), '/images/training-deck-enterprise/thumbs-light/slide-12.webp')
   runtime.isDark.value = true
   assert.equal(runtime.thumbnailPath(11), '/images/training-deck-enterprise/thumbs/slide-12.webp')
-  runtime.searchKeyword.value = '工具调用失败'
+  runtime.searchKeyword.value = '上下文'
   assert.equal(runtime.visibleSlides.value.length, 1, 'search the current edition\'s actual indexed body')
-  assert.equal(runtime.visibleSlides.value[0].slide.nav, '可靠交付基本功')
+  assert.equal(runtime.visibleSlides.value[0].slide.id, 'enterprise-agent-reliability')
   runtime.browser.location.hash = '#enterprise-slide-07'
   runtime.handleHashChange()
   assert.equal(runtime.activeIndex.value, 6)

@@ -1,0 +1,102 @@
+{
+  "description": "Microi吾码企业应用版12张AI场景图及生成提示词，文字和品牌由在线PPT提供。",
+  "images": [
+    {
+      "slide": 1,
+      "theme": "企业AI平台",
+      "file": "/images/enterprise-training/ai/slide-01.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 01, enterprise AI product platform: a large luminous crystalline AI core floating over a sophisticated futuristic city and connected enterprise buildings, delicate data streams radiate outward, confident impressive premium product-launch mood.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 2,
+      "theme": "经营价值",
+      "file": "/images/enterprise-training/ai/slide-02.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 02, business value: scattered abstract paper sheets and disconnected data fragments smoothly transform through a luminous AI lens into a clean coherent glowing operational network of orders, people and business activity, calm confident business-control metaphor.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 3,
+      "theme": "行业产品",
+      "file": "/images/enterprise-training/ai/slide-03.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 03, products and industries: a beautiful unified miniature future industrial world with a garment factory, warehouse, corporate office, construction site, smart park and mobile device arranged naturally around a central AI core, show connected products, elegant architectural diorama.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 4,
+      "theme": "服装生产",
+      "file": "/images/enterprise-training/ai/slide-04.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 04, garment ERP case: a magnificent futuristic garment production workshop, robotic fabric cutting and sewing, elegant suspended holographic garment patterns and size contours, folded textiles travel in organized streams around a luminous AI core coordinating orders and production, believable premium industrial detail, not a software screen.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 5,
+      "theme": "集团协同",
+      "file": "/images/enterprise-training/ai/slide-05.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 05, group collaboration case: three modern manufacturing campuses, office towers and mobile workers linked across a wide night skyline by luminous cyan data bridges leading to one central AI coordination hub, clear sense of many departments and existing systems working together, no invented customer logos.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 6,
+      "theme": "客户与房产服务",
+      "file": "/images/enterprise-training/ai/slide-06.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation, no collages of UI cards, no real software screenshots, no readable text, no numbers, no watermark. Depict Microi's powerful AI connecting knowledge, business data and real enterprise work through an elegant luminous AI core. Scene for slide 06, customer service and real-estate product case: a sophisticated AI service hub connects an elegant modern city skyline, a translucent holographic city map, an approachable customer and business professional, a tasteful mobile device shows abstract light geometry, convey CRM, property services and multiple channels naturally, no screenshots.",
+      "revision": "Remove all typography from the original customer-service AI illustration, preserving people, skyline, holographic city and cyan-violet lighting.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 7,
+      "theme": "AI业务闭环",
+      "file": "/images/enterprise-training/ai/slide-07.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 07, AI business execution loop: a radiant AI core is connected along a flowing curved path to a translucent archive of books, a business analyst, a subtle human approval hand hovering over a luminous task object, and completed work flowing into an organized business operation. Clear trustworthy human-guided intelligent workflow, elegant conceptual artwork.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 8,
+      "theme": "平台优势",
+      "file": "/images/enterprise-training/ai/slide-08.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 08, platform advantages: a magnificent expandable AI core on a layered technology foundation, modular glass building blocks fit smoothly into one coherent infrastructure, subtle corporate cloud and private data center, connected mobile and computer silhouettes; powerful reusable capabilities without redundant UI panels, futuristic premium product rendering.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 9,
+      "theme": "知识与Agent交付",
+      "file": "/images/enterprise-training/ai/slide-09.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 09, knowledge-grounded Agent delivery: a luminous intelligence sphere absorbs precise light rays from a curated library of floating books and documents, then directs an elegant industrial mechanism completing a real product on a finishing platform, emphasize trusted knowledge becoming reliable work, no words on books or devices.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 10,
+      "theme": "可靠交付与人工接管",
+      "file": "/images/enterprise-training/ai/slide-10.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 10, reliable AI and human takeover: a brilliant AI energy core protected by an elegant transparent luminous shield, one light path visibly reconnects after a small interruption, a human operator's hand calmly guides a control ring, subtle secure data vault and backup channels, strong sense of resilience, recovery, authorization and human oversight, not warlike.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 11,
+      "theme": "效果与成本评估",
+      "file": "/images/enterprise-training/ai/slide-11.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 11, business results and cost evaluation: an elegant futuristic executive observatory with a luminous AI analytics sphere, clear abstract rising performance curves, balanced scales of task results and resource use, polished geometric evaluation instruments, calm precise evidence-driven mood, charts are purely abstract and have absolutely no labels or numbers.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    },
+    {
+      "slide": 12,
+      "theme": "试点与产品推广",
+      "file": "/images/enterprise-training/ai/slide-12.png",
+      "generator": "built-in image_gen",
+      "prompt": "Use case: stylized-concept. Asset: a unique hero illustration for Microi吾码 enterprise application online presentation. Style: premium futuristic 3D editorial technology art, cinematic blue/cyan and violet light, brushed metal and luminous translucent glass, richly detailed yet clean, striking and cool, professional enterprise audience. Wide 16:9 landscape, subject centered with safe margins, attractive depth and generous separation. This is illustration artwork ONLY, NOT a slide or poster. Absolutely NO typography anywhere: no letters, Chinese, words, digits, captions, logos, brand names or watermark. No real software screenshots. Depict the enterprise platform's powerful AI connecting knowledge, business data and enterprise work through a luminous AI core. Scene for slide 12, pilot to sustainable products: a business leader and small team viewed from behind overlook a stunning future city, a luminous prototype cube grows into a connected constellation of working enterprise buildings along a graceful bright path, AI core provides confident violet/cyan energy, optimistic professional product launch and long-term growth, absolutely no typography.",
+      "disclosure": "AI 场景示意，非客户实拍或系统截图"
+    }
+  ]
+}
