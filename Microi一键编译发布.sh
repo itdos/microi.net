@@ -1918,11 +1918,29 @@ if [ "$PUBLISH_DOC" = true ]; then
     (cd microi.doc/docs/.vitepress && docker build --provenance=false --sbom=false -t microi.doc .)
     print_success "Docker 镜像构建完成"
 
-    print_step "登录 registry.cn-beijing.aliyuncs.com..."
-    if ! printf '%s' 'iTdos#docker.publish' | docker login \
-        --username='admin@itdos.com' --password-stdin registry.cn-beijing.aliyuncs.com; then
-        print_fail "官方网站文档 Docker 镜像仓库登录失败"
+    # 官方网站文档镜像仓库登录：仅更新配置所属地域，另一仓库沿用其受保护的 Docker 凭据。
+    case "${DOCKER_USERNAME:-}" in
+        ""|your-username|YOUR_USERNAME|placeholder|PLACEHOLDER)
+            print_fail "官方网站文档发布缺少有效 Docker Username，请填写受保护发布配置" ;;
+    esac
+    case "${DOCKER_PASSWORD:-}" in
+        ""|your-password|YOUR_PASSWORD|placeholder|PLACEHOLDER)
+            print_fail "官方网站文档发布缺少有效 Docker Password，请填写受保护发布配置" ;;
+    esac
+    case "${DOCKER_REGION:-}" in
+        beijing|hangzhou) _doc_login_registry="registry.cn-${DOCKER_REGION}.aliyuncs.com" ;;
+        *) print_fail "官方网站文档发布配置的 Docker Region 必须对应北京或杭州原有仓库" ;;
+    esac
+    print_step "登录 ${_doc_login_registry}（受保护配置）..."
+    if ! printf '%s' "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin "$_doc_login_registry"; then
+        print_fail "官方网站文档配置所属 Docker 镜像仓库登录失败"
     fi
+    # 两个地域可属于不同账号。禁止用一个地域的凭据覆盖另一个地域的有效登录。
+    for _doc_target in registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest; do
+        if ! docker manifest inspect "$_doc_target" >/dev/null; then
+            print_fail "官方网站文档仓库读取失败：$_doc_target，请检查该地域已有 Docker 凭据和权限"
+        fi
+    done
 
     print_step "推送到北京仓库..."
     docker tag microi.doc registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest

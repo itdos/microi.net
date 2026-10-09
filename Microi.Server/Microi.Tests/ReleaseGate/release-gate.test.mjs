@@ -14,6 +14,89 @@ const gate=source.slice(begin,end);
 const gitExec=process.platform==='win32'?execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim():'';
 const bash=process.platform==='win32'?path.resolve(gitExec,'../../..','bin/bash.exe'):'bash';
 
+for(const scenario of [
+ {name:'configured Hangzhou identity preserves the independent Beijing credential cache',passed:true},
+ {name:'configured Beijing identity preserves the independent Hangzhou credential cache',region:'beijing',passed:true},
+ {name:'missing configured username',user:'',passed:false},
+ {name:'missing configured password',password:'',passed:false},
+ {name:'placeholder configured username',user:'your-username',passed:false},
+ {name:'placeholder configured password',password:'your-password',passed:false},
+ {name:'unsupported configured registry',region:'shanghai',passed:false},
+ {name:'configured registry login denied',denyLogin:true,passed:false},
+ {name:'independent registry cached credential unavailable',cache:false,passed:false}
+])test(`documentation registry credentials: ${scenario.name}`,()=>{
+ const directory=fs.mkdtempSync(path.join(root,'.tmp','docs registry credential '));
+ const password=scenario.password??'fictional-docs-password-$"\'\\\nonly-fixture';
+ const username=scenario.user??'fixture-config-user',region=scenario.region??'hangzhou';
+ fs.writeFileSync(path.join(directory,'Microi一键编译发布配置.json'),JSON.stringify({Region:region,Namespace:'fixture-namespace',Username:username,Password:password}));
+ const reader=source.slice(source.indexOf('json_value() {'),source.indexOf('# 自动递增版本号'));
+ const config=source.slice(source.indexOf('# NuGet 配置'),source.indexOf('# DLL 加密能力检测'));
+ const docsStart=source.indexOf('# ─── 阶段（条件）: 发布官方网站文档');
+ const marker=source.indexOf('# 官方网站文档镜像仓库登录',docsStart);
+ const loginStart=marker>=0?marker:source.indexOf('    print_step "登录 registry.cn-beijing.aliyuncs.com',docsStart);
+ const loginEnd=source.indexOf('    print_success "官方网站文档发布成功"',loginStart);
+ assert.ok(loginStart>docsStart&&loginEnd>loginStart,'Actual documentation login/push branch must exist');
+ try{
+  const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:directory,encoding:'utf8',env:{...process.env,DOC_EXPECTED_USER:username,DOC_EXPECTED_PASSWORD:password},input:`
+print_info(){ :; }; print_step(){ :; }; print_success(){ :; }
+print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
+DOCKER_REGION=hangzhou; DOCKER_NAMESPACE=your-namespace; DOCKER_USERNAME=your-username; DOCKER_PASSWORD=your-password
+${reader}
+${config}
+docker(){
+ local command="$1"; shift
+ if [ "$command" = login ]; then
+  local user='' registry='' stdin=false
+  while [ "$#" -gt 0 ]; do
+   case "$1" in
+    --username|-u) user="$2"; shift 2;;
+    --username=*) user="\${1#*=}"; shift;;
+    --password-stdin) stdin=true; shift;;
+    --password|-p|--password=*) printf 'PASSWORD_ARG_REJECTED\\n' >&2; return 23;;
+    *) registry="$1"; shift;;
+   esac
+  done
+  [ "$stdin" = true ] || return 23
+  local supplied; supplied=$(cat)
+  [ "$user" = "$DOC_EXPECTED_USER" ] && [ "$supplied" = "$DOC_EXPECTED_PASSWORD" ] || return 24
+  [ "$registry" = "registry.cn-$DOCKER_REGION.aliyuncs.com" ] || return 25
+  ${scenario.denyLogin?'return 26':':'}
+  printf '%s\\n' "$registry" >> auth.ok
+  printf 'LOGIN=%s\\n' "$registry"
+ elif [ "$command" = manifest ]; then
+  [ "$1" = inspect ] || return 27
+  local target="$2" configured="registry.cn-$DOCKER_REGION.aliyuncs.com"
+  if [[ "$target" == "$configured/"* ]]; then
+   [ -f auth.ok ] && grep -Fxq "$configured" auth.ok || return 28
+  else
+   ${scenario.cache===false?'return 29':':'}
+  fi
+  printf 'MANIFEST=%s\\n' "$target" >> manifest.ok
+ elif [ "$command" = tag ]; then :
+ elif [ "$command" = push ]; then
+  [ -f manifest.ok ] && grep -Fxq "MANIFEST=$1" manifest.ok || return 30
+  printf 'PUSH=%s\\n' "$1"
+ else return 31; fi
+}
+${source.slice(loginStart,loginEnd)}
+printf 'DOC_COMPLETE\\n'
+`});
+  assert.ifError(run.error);assert.equal(run.status,scenario.passed?0:17,run.stderr);
+  assert.equal(run.stdout.includes('DOC_COMPLETE'),scenario.passed);
+  if(password){
+   assert.equal(run.stdout.includes(password),false,'Password must never enter command output');
+   assert.equal(run.stderr.includes(password),false,'Password must never enter error output');
+  }
+  if(scenario.passed){
+   assert.equal(run.stdout.match(/LOGIN=/g)?.length,1,'Only the configured registry may have its credential cache updated');
+   assert.ok(run.stdout.includes(`LOGIN=registry.cn-${region}.aliyuncs.com`));
+   const targets=['registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest','registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest'];
+   assert.deepEqual(run.stdout.split(/\r?\n/).filter(line=>line.startsWith('PUSH=')).map(line=>line.slice(5)),targets,'Existing channels and push order must be retained');
+   assert.deepEqual(fs.readFileSync(path.join(directory,'manifest.ok'),'utf8').trim().split(/\r?\n/),targets.map(target=>'MANIFEST='+target));
+  }else assert.equal(run.stdout.includes('PUSH='),false,'Credential failures must stop before either upload');
+ }finally{fs.rmSync(directory,{recursive:true,force:true});}
+});
+
 for (const scenario of [
  {name:'open source checkout without closed projects',projects:[],script:false,passed:true,encrypted:false},
  {name:'all five closed projects and encryption script',projects:['Microi.net','Microi.AI','Microi.MCP','Microi.WorkFlow','Microi.Vision'],script:true,passed:true,encrypted:true},
