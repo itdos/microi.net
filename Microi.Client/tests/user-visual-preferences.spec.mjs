@@ -24,6 +24,9 @@ test("navigation placement follows the tenant unless the current user chooses a 
     assert.equal(resolveUserNavigationLayout('', ''), 'Side');
     assert.equal(resolveUserNavigationLayout('Side', 'Top'), 'Side');
     assert.equal(resolveUserNavigationLayout('Top', 'Side'), 'Top');
+    assert.equal(normalizeUserNavigationLayout('TOPSIDE'), 'TopSide');
+    assert.equal(resolveUserNavigationLayout('System', 'TopSide'), 'TopSide');
+    assert.equal(resolveUserNavigationLayout('TopSide', 'Side'), 'TopSide');
 });
 
 test("installed per-user theme values override device-local and system values", () => {

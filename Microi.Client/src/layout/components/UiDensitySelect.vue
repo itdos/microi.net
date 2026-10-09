@@ -1,21 +1,4 @@
 <template>
-    <el-popover
-        placement="bottom-end"
-        :width="320"
-        trigger="click"
-        popper-class="mci-ui-density-popper"
-    >
-        <template #reference>
-            <button
-                type="button"
-                class="ui-density-trigger"
-                :title="`界面密度：${snapshot.name}（${snapshot.scale}%）`"
-                aria-label="调整全局字体与间距"
-            >
-                <el-icon><Operation /></el-icon>
-            </button>
-        </template>
-
         <section class="ui-density-panel" aria-label="界面密度设置">
             <header>
                 <div>
@@ -53,7 +36,6 @@
                 </button>
             </div>
         </section>
-    </el-popover>
 </template>
 
 <script setup>
@@ -90,22 +72,6 @@ onBeforeUnmount(unsubscribe);
 </script>
 
 <style scoped lang="scss">
-.ui-density-trigger {
-    // width: 100%;
-    height: 100%;
-    // min-width: 38px;
-    padding: 0 10px;
-    border: 0;
-    color: var(--el-text-color-regular);
-    background: transparent;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-
-    .el-icon { font-size: 18px; }
-}
-
 .ui-density-panel {
     padding: 4px 2px 2px;
 

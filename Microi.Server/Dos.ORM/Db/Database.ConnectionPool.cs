@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Data.Common;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -18,12 +20,27 @@ namespace Dos.ORM
         public string DriverVersion { get; set; }
         public bool? Pooling { get; set; }
         public long? MaximumPoolSize { get; set; }
+        public long? MinimumPoolSize { get; set; }
+        public long? ConnectionLifetimeSeconds { get; set; }
         public long? ConnectionTimeoutSeconds { get; set; }
         public bool CanReset { get; set; }
         public int Opening { get; set; }
         public long Generation { get; set; }
         public double BackoffSeconds { get; set; }
         public string FailureCode { get; set; }
+    }
+
+    /// <summary>配置容量的只读合计；不是驱动实时占用、服务器上限或跨节点统计。</summary>
+    public sealed class ConnectionPoolBudgetSnapshot
+    {
+        public string Scope { get; set; } = "CurrentNodeSelectedPools";
+        public int SelectedPoolCount { get; set; }
+        public int PooledPoolCount { get; set; }
+        public int NonPooledPoolCount { get; set; }
+        public int UnknownPoolCount { get; set; }
+        public long? ConfiguredMaximumConnections { get; set; }
+        public long? ConfiguredMinimumConnections { get; set; }
+        public string Boundary { get; set; } = "仅合计当前节点所选去重池的配置值，不是已占用连接或服务器 max_connections；其它节点、Quartz、扩展库及外部客户端须另计。无池连接未被此上限限制。";
     }
 
     public sealed partial class Database
@@ -65,9 +82,16 @@ namespace Dos.ORM
         {
             get
             {
+                // 驱动会规范化 User ID/Uid 等别名；原始串哈希会把同一驱动池算两份，
+                // 甚至漏掉跨租户共享池保护。只跟随驱动实际键，不重排参数或猜测等价值。
+                var poolConnectionString = dbProvider.DbProviderFactory is MySqlClientFactory
+                    ? new MySqlConnectionStringBuilder(ConnectionString).ConnectionString
+                    : dbProvider.DbProviderFactory is SqlClientFactory
+                        ? new SqlConnectionStringBuilder(ConnectionString).ConnectionString
+                        : ConnectionString;
                 using (var sha = SHA256.Create())
                     return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(
-                        dbProvider.DbProviderFactory.GetType().FullName + "\0" + ConnectionString))).Replace("-", "").ToLowerInvariant();
+                        dbProvider.DbProviderFactory.GetType().FullName + "\0" + poolConnectionString))).Replace("-", "").ToLowerInvariant();
             }
         }
 
@@ -96,10 +120,35 @@ namespace Dos.ORM
                 DriverVersion = dbProvider.DbProviderFactory.GetType().Assembly.GetName().Version?.ToString(),
                 Pooling = mysql?.Pooling ?? sql?.Pooling,
                 MaximumPoolSize = mysql != null ? (long?)mysql.MaximumPoolSize : sql?.MaxPoolSize,
+                MinimumPoolSize = mysql != null ? (long?)mysql.MinimumPoolSize : sql?.MinPoolSize,
+                ConnectionLifetimeSeconds = mysql != null ? (long?)mysql.ConnectionLifeTime : sql?.LoadBalanceTimeout,
                 ConnectionTimeoutSeconds = mysql != null ? (long?)mysql.ConnectionTimeout : sql?.ConnectTimeout,
                 CanReset = dbProvider.DbProviderFactory is MySqlClientFactory || dbProvider.DbProviderFactory is SqlClientFactory,
                 Opening = Volatile.Read(ref runtime.Opening), Generation = Interlocked.Read(ref runtime.Generation),
                 BackoffSeconds = Math.Ceiling(GetConnectionBackoffRemaining(key).TotalSeconds), FailureCode = failure
+            };
+        }
+
+        /// <summary>
+        /// 按准确池身份去重后合计配置容量，主/读会话共用同一池时只算一次。
+        /// 未知提供程序返回未知总数；无池连接单列，禁止把缺数据解释成零容量。
+        /// </summary>
+        public static ConnectionPoolBudgetSnapshot GetConnectionPoolBudgetSnapshot(IEnumerable<Database> databases)
+        {
+            if (databases == null) throw new ArgumentNullException(nameof(databases));
+            var snapshots = databases.Where(db => db != null).GroupBy(db => db.ConnectionPoolId)
+                .Select(group => group.First().GetConnectionPoolSnapshot()).ToArray();
+            var pooled = snapshots.Where(snapshot => snapshot.Pooling == true).ToArray();
+            var unknown = snapshots.Count(snapshot => !snapshot.Pooling.HasValue
+                || (snapshot.Pooling == true && (!snapshot.MaximumPoolSize.HasValue || !snapshot.MinimumPoolSize.HasValue)));
+            return new ConnectionPoolBudgetSnapshot
+            {
+                SelectedPoolCount = snapshots.Length,
+                PooledPoolCount = pooled.Length,
+                NonPooledPoolCount = snapshots.Count(snapshot => snapshot.Pooling == false),
+                UnknownPoolCount = unknown,
+                ConfiguredMaximumConnections = unknown == 0 ? (long?)pooled.Sum(snapshot => snapshot.MaximumPoolSize.Value) : null,
+                ConfiguredMinimumConnections = unknown == 0 ? (long?)pooled.Sum(snapshot => snapshot.MinimumPoolSize.Value) : null
             };
         }
 

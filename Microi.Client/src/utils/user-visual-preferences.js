@@ -69,13 +69,14 @@ export function resolveUserCornerStyle(user = {}, localStyle = "round", systemSt
 
 export function normalizeUserNavigationLayout(value) {
     const normalized = text(value).toLowerCase();
-    return normalized === 'top' ? 'Top' : normalized === 'side' ? 'Side' : 'System';
+    return normalized === 'topside' ? 'TopSide' : normalized === 'top' ? 'Top' : normalized === 'side' ? 'Side' : 'System';
 }
 
 export function resolveUserNavigationLayout(userValue, systemValue) {
     const personal = normalizeUserNavigationLayout(userValue);
     if (personal !== 'System') return personal;
-    return normalizeUserNavigationLayout(systemValue) === 'Top' ? 'Top' : 'Side';
+    const tenant = normalizeUserNavigationLayout(systemValue);
+    return tenant === 'System' ? 'Side' : tenant;
 }
 
 export function normalizeUserMenuChildExpandMode(value) {
