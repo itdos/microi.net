@@ -45,6 +45,17 @@ AI CAD、AI 员工中心和邮箱的统一 Node 入口使用
 无法分类、零测试、失败、取消、跳过或 todo 均失败关闭。Playwright 文件由真实
 浏览器入口负责，不能混入 Node 单测冒充 E2E。
 
+AI 回归分三层：源码模式条件编译 `Microi.AI.Tests` 的模型协议、租户/身份、
+授权、Schema、媒体任务和 Jint 用例；Resource Node 测试执行真实 Managed AI
+脚本；`Microi.Client/tests/ai-workbench-chat-stream.spec.mjs` 从实际工作台 SFC
+的 AST 提取 `sendChatQuestion → sendChatStream → readChatSse` 闭包，替换网络
+和宿主状态后执行普通/中转对话、UTF-8/CRLF 分片、最终结果、思考文本、
+HTTP/SSE/网络失败、取消和旧文本响应。该文件由上述发现器自动进入 Quick/Full，
+也可通过 `Microi.Client` 的 `npm run test:v8-ai` 定向运行。仅测试 `V8.AI`
+工具模块或检查工作台路由字符串，不能证明实际工作台发送路径可运行。
+这些离线测试使用受控响应，不代表真实供应商推理或线上工作台已验收；
+发布 AI 改动仍须补目标模型的真实 HTTP/SSE 与浏览器对话证据。
+
 内存诊断回归也由 `Microi.Tests` 的 xUnit 用例自动发现。`Fixtures/MemoryDiagnosticsNode`
 只是受统一项目构建的隔离进程夹具，用于线程池耗尽、EventPipe 轮转和 HTTP 宿主，
 不再作为第二个独立测试项目运行。Quick 执行合同断言与脚本基准的结果校验；Full

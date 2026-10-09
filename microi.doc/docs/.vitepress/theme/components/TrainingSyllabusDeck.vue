@@ -2,9 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useData } from 'vitepress'
 import { searchTrainingSlides } from '../training-syllabus-search.js'
+import { enterpriseSlides } from '../enterprise-training-slides.js'
+import { trainingPdfPaths, trainingPptxPath, parseTrainingHash, trainingHash } from '../training-deck-versions.js'
+import EnterpriseTrainingSlide from './EnterpriseTrainingSlide.vue'
 
 type DeckPanel = '' | 'help'
-type SlideKind = 'cover' | 'decision' | 'why' | 'start' | 'atlas' | 'mcp' | 'engine' | 'multi-end' | 'cases' | 'closing'
+type SlideKind = 'cover' | 'decision' | 'why' | 'start' | 'atlas' | 'mcp' | 'engine' | 'multi-end' | 'cases' | 'closing' | 'enterprise'
+type DeckVersion = 'technical' | 'enterprise'
 type EngineDomain = 'build' | 'experience' | 'intelligence' | 'integration'
 
 interface EngineHighlight {
@@ -40,6 +44,7 @@ interface SlideMeta {
   title: string
   summary: string
   engine?: EngineSlide
+  enterprise?: (typeof enterpriseSlides)[number]
 }
 
 interface AtlasGroup {
@@ -98,10 +103,8 @@ const whyAdvantages: WhyAdvantage[] = [
 
 const whyAdvantagesOn = (side: WhyAdvantage['side']) => whyAdvantages.filter(item => item.side === side)
 
-const pdfDownloadPaths = {
-  dark: '/downloads/microi-ai-development-framework-training-syllabus-dark.pdf',
-  light: '/downloads/microi-ai-development-framework-training-syllabus-light.pdf',
-} as const
+const deckVersion = ref<DeckVersion>('technical')
+const pdfDownloadPaths = computed(() => trainingPdfPaths[deckVersion.value])
 
 const engineSlides: EngineSlide[] = [
   {
@@ -590,7 +593,7 @@ const outroSlides: SlideMeta[] = [
   { id: 'closing', chapter: '47', kind: 'closing', nav: '致辞', title: '把 AI 的速度，变成企业可持续交付力', summary: '掌握平台能力，建立可复用、可验证、可演进的 AI 研发方式。' },
 ]
 
-const slideMeta: SlideMeta[] = [
+const technicalSlideMeta: SlideMeta[] = [
   ...introSlides,
   ...engineSlides.map((engine, index) => ({
     id: engine.id,
@@ -605,7 +608,12 @@ const slideMeta: SlideMeta[] = [
 ]
 
 const expectedSlideCount = 47
-if (slideMeta.length !== expectedSlideCount) throw new Error(`培训 PPT 页数异常：${slideMeta.length}/${expectedSlideCount}`)
+if (technicalSlideMeta.length !== expectedSlideCount) throw new Error(`培训 PPT 页数异常：${technicalSlideMeta.length}/${expectedSlideCount}`)
+
+// 共用同一套演示交互，正文与下载资产按受众切换，保留技术版原有链接。
+const slideMeta = computed<SlideMeta[]>(() => deckVersion.value === 'technical'
+  ? technicalSlideMeta
+  : enterpriseSlides.map(slide => ({ ...slide, kind: 'enterprise', enterprise: slide })))
 
 const atlasGroups: AtlasGroup[] = [
   { code: '01', title: 'AI 开发与低代码', entryIds: ['form-engine', 'module-engine', 'v8-engine', 'api-engine', 'workflow-engine', 'template-engine', 'ai-dev-tools', 'mcp-server'] },
@@ -660,6 +668,8 @@ const caseIndustries = [
 
 const deckRef = ref<HTMLElement | null>(null)
 const { isDark } = useData()
+// SSR 无法读取浏览器保存的主题，挂载后再插入主题敏感链接，避免水合保留错误的浅色 href。
+const pptxReady = ref(false)
 const panelCloseRef = ref<HTMLButtonElement | null>(null)
 const thumbnailRailRef = ref<HTMLElement | null>(null)
 const pdfDownloadRef = ref<HTMLAnchorElement | null>(null)
@@ -674,9 +684,9 @@ const notice = ref('')
 const railCollapsed = ref(false)
 const searchKeyword = ref('')
 const slideSearchContent = ref<string[]>([])
-const visibleSlides = computed(() => searchTrainingSlides(slideMeta, slideSearchContent.value, searchKeyword.value))
-const currentSlide = computed(() => slideMeta[activeIndex.value])
-const progress = computed(() => ((activeIndex.value + 1) / slideMeta.length) * 100)
+const visibleSlides = computed(() => searchTrainingSlides(slideMeta.value, slideSearchContent.value, searchKeyword.value))
+const currentSlide = computed(() => slideMeta.value[activeIndex.value])
+const progress = computed(() => ((activeIndex.value + 1) / slideMeta.value.length) * 100)
 
 let wheelLockedUntil = 0
 let wheelAccumulator = 0
@@ -698,7 +708,7 @@ function resetWheelIntent() {
 
 function resetActiveFrameScroll(index = activeIndex.value) {
   nextTick(() => {
-    const slide = slideMeta[index]
+    const slide = slideMeta.value[index]
     const frame = slide ? deckRef.value?.querySelector<HTMLElement>(`#mci-training-${slide.id} .mci-training-slide__frame`) : null
     if (frame) frame.scrollTop = 0
   })
@@ -712,12 +722,12 @@ function announce(message: string) {
 
 function updateHash(index: number) {
   if (typeof window === 'undefined') return
-  const nextHash = `#slide-${padSlide(index)}`
+  const nextHash = trainingHash(deckVersion.value, index)
   if (window.location.hash !== nextHash) window.history.replaceState(null, '', nextHash)
 }
 
 function goTo(index: number, nextDirection?: 'next' | 'prev') {
-  const nextIndex = Math.max(0, Math.min(slideMeta.length - 1, index))
+  const nextIndex = Math.max(0, Math.min(slideMeta.value.length - 1, index))
   if (nextIndex === activeIndex.value) return
   direction.value = nextDirection || (nextIndex > activeIndex.value ? 'next' : 'prev')
   activeIndex.value = nextIndex
@@ -741,7 +751,28 @@ function previousSlide() { goTo(activeIndex.value - 1, 'prev') }
 
 function thumbnailPath(index: number) {
   const themeFolder = isDark.value ? 'thumbs' : 'thumbs-light'
-  return `/images/training-deck/${themeFolder}/slide-${padSlide(index)}.webp`
+  const root = deckVersion.value === 'enterprise' ? 'training-deck-enterprise' : 'training-deck'
+  return `/images/${root}/${themeFolder}/slide-${padSlide(index)}.webp`
+}
+
+function indexSlideContent() {
+  nextTick(() => {
+    slideSearchContent.value = slideMeta.value.map(slide => deckRef.value?.querySelector(`#mci-training-${slide.id}`)?.textContent || '')
+  })
+}
+
+function switchVersion(version: DeckVersion, index = 0) {
+  deckVersion.value = version
+  activeIndex.value = index
+  activePanel.value = ''
+  searchKeyword.value = ''
+  slideSearchContent.value = []
+  pointerStart = null
+  resetWheelIntent()
+  updateHash(index)
+  indexSlideContent()
+  scrollActiveThumbnail()
+  resetActiveFrameScroll(index)
 }
 
 function openPanel(panel: Exclude<DeckPanel, ''>) {
@@ -793,7 +824,7 @@ function handleKeydown(event: KeyboardEvent) {
     goTo(0, 'prev')
   } else if (key === 'End') {
     event.preventDefault()
-    goTo(slideMeta.length - 1, 'next')
+    goTo(slideMeta.value.length - 1, 'next')
   } else if (key.toLowerCase() === 'o') {
     event.preventDefault()
     scrollActiveThumbnail(true)
@@ -861,21 +892,20 @@ function handleFullscreenChange() { isFullscreen.value = document.fullscreenElem
 function handleVisibilityChange() { isPaused.value = document.hidden }
 
 function handleHashChange() {
-  const match = /^#slide-(\d{2})$/u.exec(window.location.hash)
-  if (!match) return
-  const index = Number(match[1]) - 1
-  if (index >= 0 && index < slideMeta.length && index !== activeIndex.value) goTo(index)
+  const target = parseTrainingHash(window.location.hash, { technical: technicalSlideMeta.length, enterprise: enterpriseSlides.length })
+  if (!target) return
+  if (target.version !== deckVersion.value) switchVersion(target.version as DeckVersion, target.index)
+  else if (target.index !== activeIndex.value) goTo(target.index)
 }
 
 onMounted(() => {
   railCollapsed.value = window.innerWidth < 768
-  nextTick(() => {
-    // 全部幻灯片都已渲染：同时索引实际正文、演示步骤与标题，不依赖关键词短清单。
-    slideSearchContent.value = slideMeta.map(slide => deckRef.value?.querySelector(`#mci-training-${slide.id}`)?.textContent || '')
-  })
+  // 每个版本索引实际渲染正文，避免切换后仍搜索另一个版本的内容。
+  indexSlideContent()
   isArtifactCapture.value = new URLSearchParams(window.location.search).has('artifact-capture')
   if (isArtifactCapture.value) captureScale.value = Math.min(window.innerWidth / 1600, window.innerHeight / 900)
   handleHashChange()
+  pptxReady.value = true
   scrollActiveThumbnail()
   resetActiveFrameScroll()
   window.addEventListener('keydown', handleKeydown)
@@ -895,18 +925,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="deckRef" class="mci-training-deck mci-page" data-mci-ui-root="training-syllabus-deck" data-mci-shape="rounded" :data-direction="direction" :class="{ 'is-paused': isPaused, 'is-fullscreen': isFullscreen, 'is-artifact-capture': isArtifactCapture, 'is-rail-collapsed': railCollapsed }" :style="isArtifactCapture ? { '--mci-deck-capture-scale': captureScale } : undefined" role="region" aria-label="Microi吾码 AI 开发框架技术培训幻灯片" @wheel="handleWheel" @pointerdown="handlePointerDown" @pointerup="handlePointerUp" @pointercancel="pointerStart = null">
+  <div ref="deckRef" class="mci-training-deck mci-page" data-mci-ui-root="training-syllabus-deck" data-mci-shape="rounded" :data-version="deckVersion" :data-direction="direction" :class="{ 'is-paused': isPaused, 'is-fullscreen': isFullscreen, 'is-artifact-capture': isArtifactCapture, 'is-rail-collapsed': railCollapsed }" :style="isArtifactCapture ? { '--mci-deck-capture-scale': captureScale } : undefined" role="region" :aria-label="`Microi吾码${deckVersion === 'enterprise' ? '企业应用' : '技术架构'}培训幻灯片`" @wheel="handleWheel" @pointerdown="handlePointerDown" @pointerup="handlePointerUp" @pointercancel="pointerStart = null">
     <div class="mci-training-deck__atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
     <a class="mci-training-deck__skip" href="#mci-training-controls">跳到演示控制</a>
 
     <header class="mci-training-deck__topbar">
-      <button class="mci-training-brand" type="button" aria-label="返回第一张幻灯片" @click="goTo(0, 'prev')"><img src="/icon.png" alt="" aria-hidden="true"><span><strong>Microi吾码</strong><small>AI DEVELOPMENT FRAMEWORK</small></span></button>
+      <div class="mci-training-deck__identity"><button class="mci-training-brand" type="button" aria-label="返回第一张幻灯片" @click="goTo(0, 'prev')"><img src="/icon.png" alt="" aria-hidden="true"><span><strong>Microi吾码</strong><small>AI DEVELOPMENT FRAMEWORK</small></span></button><nav class="mci-training-deck__versions" aria-label="选择培训版本"><button type="button" class="is-technical" :aria-pressed="deckVersion === 'technical'" @click="switchVersion('technical')">技术架构版</button><button type="button" class="is-enterprise" :aria-pressed="deckVersion === 'enterprise'" @click="switchVersion('enterprise')">企业应用版</button></nav></div>
       <div class="mci-training-deck__top-actions" aria-label="演示工具">
         <button type="button" :aria-label="railCollapsed ? '展开导航' : '收起导航'" :aria-expanded="!railCollapsed" aria-controls="mci-training-navigation" :title="railCollapsed ? '展开搜索与导航' : '收起导航，扩大演示区域'" @click="railCollapsed = !railCollapsed"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M5 8h2m-2 4h2m-2 4h2"/></svg><span>导航</span></button>
         <button type="button" aria-label="查看操作帮助" aria-keyshortcuts="H" title="操作帮助（H / ?）" @click="openPanel('help')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 3.2 2.26c-.7.32-1 .76-1 1.49M12 17h.01"/></svg><span>帮助</span></button>
         <button type="button" aria-label="切换全屏" title="也可使用浏览器 F11 全屏" @click="toggleFullscreen"><svg v-if="!isFullscreen" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5"/></svg><span>{{ isFullscreen ? '退出' : '全屏' }}</span></button>
         <a ref="pdfDownloadRef" class="is-primary is-dark-pdf" :href="pdfDownloadPaths.dark" download aria-label="下载预生成暗色 PDF" aria-keyshortcuts="P" title="下载暗色 PDF（P）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v5h5M10 15h4M12 11v7m0 0-2-2m2 2 2-2"/></svg><span>暗色 PDF</span></a>
         <a class="is-light-pdf" :href="pdfDownloadPaths.light" download aria-label="下载预生成浅色 PDF" title="下载浅色 PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v5h5M10 15h4M12 11v7m0 0-2-2m2 2 2-2"/></svg><span>浅色 PDF</span></a>
+        <a v-if="pptxReady" class="is-pptx" :href="trainingPptxPath(deckVersion, isDark)" download type="application/vnd.openxmlformats-officedocument.presentationml.presentation" :aria-label="`下载${isDark ? '暗色' : '浅色'} PPTX`" :title="`下载${isDark ? '暗色' : '浅色'} PPTX，切换网站主题可选择另一种风格`"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H4zM8 21l4-5 4 5M9 8h3a2 2 0 0 1 0 4H9zm0 0v6"/></svg><span>{{ isDark ? '暗色 PPT' : '浅色 PPT' }}</span></a>
       </div>
     </header>
 
@@ -922,7 +953,8 @@ onBeforeUnmount(() => {
     <main class="mci-training-deck__stage" aria-live="off">
       <section v-for="(slide, index) in slideMeta" :key="slide.id" :id="`mci-training-${slide.id}`" class="mci-training-slide" :class="[`is-${slide.id}`, `is-kind-${slide.kind}`, { 'is-active': index === activeIndex }]" :aria-hidden="index === activeIndex ? 'false' : 'true'" :inert="index === activeIndex ? undefined : true" role="group" aria-roledescription="slide" :aria-label="`${index + 1} / ${slideMeta.length}，${slide.title}`">
         <div class="mci-training-slide__frame">
-          <template v-if="slide.kind === 'cover'">
+          <EnterpriseTrainingSlide v-if="slide.kind === 'enterprise' && slide.enterprise" :slide="slide.enterprise" :index="index" @start="nextSlide" />
+          <template v-else-if="slide.kind === 'cover'">
             <div class="mci-deck-cover-copy"><p class="mci-deck-eyebrow mci-deck-reveal">MICROI · ENTERPRISE TECHNICAL TRAINING</p><h1 class="mci-deck-cover-title mci-deck-reveal"><span>Microi吾码</span><strong>AI 开发框架</strong><em>技术培训大纲</em></h1><p class="mci-deck-cover-lead mci-deck-reveal">以功能点为路线，现场完成平台认知、引擎讲解、AI 开发与企业交付。</p><div class="mci-deck-cover-metrics mci-deck-reveal" aria-label="培训核心价值"><span><strong>10×+</strong> Token 更省*</span><span><strong>10×+</strong> AI 开发更快*</span><span><strong>30+</strong> 成熟引擎</span></div><p class="mci-deck-cover-proof mci-deck-reveal">成熟底座承接通用能力，让 AI 专注企业真正有差异的业务。<small>* 典型平台能力高复用场景，实际收益取决于需求与团队基线。</small></p><button class="mci-deck-start mci-deck-reveal mci-screen-only" type="button" @click="nextSlide">开始培训<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></div>
             <div class="mci-deck-core-visual mci-deck-reveal" aria-label="Microi 核心能力示意图"><div class="mci-deck-core-orbit is-outer"><span>30+ ENGINES</span><i></i><i></i></div><div class="mci-deck-core-orbit is-middle"><span>MCP + SKILLS</span><i></i><i></i></div><div class="mci-deck-core-orbit is-inner"><span>V8 RUNTIME</span><i></i></div><div class="mci-deck-core-mark"><img src="/icon.png" alt="Microi吾码"><strong>AI</strong><small>BUILD · RUN · DELIVER</small></div></div>
           </template>
