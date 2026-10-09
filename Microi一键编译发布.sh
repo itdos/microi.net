@@ -94,10 +94,16 @@ if [ "${1:-}" = "--microi-code" ]; then
         exit 1
     fi
     # 桌面安装包只占 Agent 锁，不占平台 Docker/服务锁；退出只释放本次令牌。
+    _agent_owner_pid="${BASHPID:-$$}"
+    if [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* || -n "$WINDIR" ]]; then
+        # MSYS PID 不是 Windows PID；先保存长寿命 shell PID，再读取 ps 的 WINPID，不能取命令替换子 shell 的 process.ppid。
+        _agent_owner_pid=$(LC_ALL=C ps -p "$_agent_owner_pid" | awk -v pid="$_agent_owner_pid" 'NR > 1 && $1 == pid {print $4}')
+        [[ "$_agent_owner_pid" =~ ^[1-9][0-9]*$ ]] || { printf '%s\n' '无法取得当前 Git Bash 的 Windows 持锁 PID，已停止发布。' >&2; exit 1; }
+    fi
     _agent_lock_token=$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')
-    node Microi.Server/tools/release-lock.mjs acquire agent "$PWD" "$$" "$_agent_lock_token"
+    node Microi.Server/tools/release-lock.mjs acquire agent "$PWD" "$_agent_owner_pid" "$_agent_lock_token"
     _agent_workspace="$PWD"
-    trap 'node "$_agent_workspace/Microi.Server/tools/release-lock.mjs" release agent "$_agent_workspace" "$$" "$_agent_lock_token"' EXIT
+    trap 'node "$_agent_workspace/Microi.Server/tools/release-lock.mjs" release agent "$_agent_workspace" "$_agent_owner_pid" "$_agent_lock_token"' EXIT
     case "${1:-}" in
       --mac) bash Microi.Agent/一键打包Mac.sh "${@:2}" ;;
       --win|'') cd Microi.Agent/apps/microi-code && npm ci && npm run typecheck && npm test && npm run package:win ;;
@@ -175,6 +181,10 @@ release_workspace_lock() {
 acquire_workspace_lock() {
     MICROI_RELEASE_WORKSPACE="$PWD"
     MICROI_RELEASE_OWNER_PID="${BASHPID:-$$}"
+    if [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* || -n "$WINDIR" ]]; then
+        MICROI_RELEASE_OWNER_PID=$(LC_ALL=C ps -p "$MICROI_RELEASE_OWNER_PID" | awk -v pid="$MICROI_RELEASE_OWNER_PID" 'NR > 1 && $1 == pid {print $4}')
+        [[ "$MICROI_RELEASE_OWNER_PID" =~ ^[1-9][0-9]*$ ]] || { print_fail '无法取得当前 Git Bash 的 Windows 持锁 PID，已停止发布。'; return 1; }
+    fi
     MICROI_RELEASE_LOCK_TOKEN=$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')
     MICROI_RELEASE_LOCK_DOMAINS=()
     local _requested=() _domain
