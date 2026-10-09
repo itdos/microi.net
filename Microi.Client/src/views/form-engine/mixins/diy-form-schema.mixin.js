@@ -511,6 +511,7 @@ export default {
         },
         GetFieldReadOnly(field) {
             var self = this;
+            if (!self.GetModuleFieldAccess(field).editable) return true;
             //如果按钮设置了预览可点击
             //并且按钮Readonly属性不为true，
             //并且ReadonlyFields不包含此字段

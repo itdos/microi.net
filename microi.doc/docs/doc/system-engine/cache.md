@@ -227,6 +227,11 @@ L1，可以直接为整个 Hash Key 设置 TTL。
 | `UseRedisOnlyMode()` | 不使用 L1 | — | — |
 
 达到容量上限时，当前实现按最早过期时间清理指定比例的条目。
+
+容量排序使用并发字典自身的原子快照，淘汰及过期清理只移除仍为快照旧值的条目，
+不会删除扫描后被请求刷新的新值。旧 API 若在 `AddToLocalCache` 淘汰栈报告空引用
+或数组容量异常，需要升级并加载包含该修复的后端；无需改业务缓存 Key、关闭 L1
+或清空 Redis。源码测试通过与目标 API 已加载修复须分别验收。
 `CurrentEvictionPolicy` 中的 LRU/LFU/FIFO 目前只是预留枚举，不能当作已经实现。
 
 黑名单 `DisabledPatterns` 的优先级高于启用模式。当前 `ShouldUseLocalCache` 对未命中

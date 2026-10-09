@@ -11,6 +11,19 @@ const portableModule = {
   microServiceRoutePath: '/overview',
 };
 
+test('module field permissions preserve identity groups and tree ordering settings', () => {
+  const policy = {Version:1,Enabled:true,DefaultVisible:true,DefaultEditable:false,Rules:[{Users:['user'],Roles:['role'],Departments:['dept'],Jobs:['job'],Fields:[{Name:'Salary',Visible:false,Editable:false}]}]};
+  const normalized = normalizeAllMenuJson({fieldPermissions:policy,treeDragSortEnabled:true,treeDragSortField:'Sort'});
+  assert.deepEqual(normalized.errors,[]);
+  const storedPolicy = normalized.data.FieldPermissions;
+  assert.ok(typeof storedPolicy === 'string', 'FieldPermissions must be stored as JSON text');
+  assert.deepEqual(JSON.parse(storedPolicy),policy);
+  assert.equal(normalized.data.TreeDragSortEnabled,1);assert.equal(normalized.data.TreeDragSortField,'Sort');
+  assert.ok(normalizeAllMenuJson({fieldPermissions:'{invalid'}).errors.length);
+  assert.ok(normalizeAllMenuJson({fieldPermissions:{Version:2,Enabled:true,Rules:[]}}).errors.length);
+  assert.ok(normalizeAllMenuJson({fieldPermissions:{Version:1,Enabled:true,Rules:Array(201).fill({})}}).errors.length);
+});
+
 test('module manifest accepts grouped headers and independent banner switches', () => {
   const normalized = normalizeAllMenuJson({
     tableHeaders: [{ Label: '人数', Fields: ['Total', 'Male', 'Female'] }],

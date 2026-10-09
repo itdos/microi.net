@@ -15,6 +15,7 @@ export default {
         },
         GetFieldIsReadOnly(field) {
             var self = this;
+            if (!self.GetModuleFieldAccess(field).editable) return true;
             if (self.TableChildField.Readonly) {
                 return true;
             }
@@ -39,6 +40,7 @@ export default {
         },
         ColIsConfigured(fieldName) {
             var self = this;
+            if (!self.GetModuleFieldAccess(fieldName).visible) return false;
             const notShowFields = normalizeNotShowFields(self.NotShowFields);
             if (notShowFields.indexOf(fieldName) > -1
                 || notShowFields.findIndex(item => item && (item.Name == fieldName || item.Id == fieldName)) > -1) {
@@ -911,6 +913,7 @@ export default {
                     if (self._runtimeHiddenFields && self._runtimeHiddenFields.length > 0) {
                         tempArr = tempArr.filter(f => !self.IsUserTableColumnHidden(f));
                     }
+                    tempArr = tempArr.filter(field => self.GetModuleFieldAccess(field).visible);
                     self.ShowDiyFieldList = tempArr;
                     return tempArr;
                 } else if (self.DiyFieldList.length > 0) {
@@ -957,6 +960,7 @@ export default {
                     if (self._runtimeHiddenFields && self._runtimeHiddenFields.length > 0) {
                         tempArr = tempArr.filter(f => !self.IsUserTableColumnHidden(f));
                     }
+                    tempArr = tempArr.filter(field => self.GetModuleFieldAccess(field).visible);
                     self.ShowDiyFieldList = tempArr;
                     return tempArr;
                 } else {

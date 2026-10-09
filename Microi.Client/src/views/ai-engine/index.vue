@@ -2876,7 +2876,8 @@ async function sendChatStream(payload, assistantMessage) {
         signal: abortController.signal
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    await readChatSse(response, assistantMessage, options);
+    // 普通对话直接读取流式事件；建模已由独立入口处理，不再传递旧的动作提取选项。
+    await readChatSse(response, assistantMessage);
 }
 
 async function sendSecureDataQuestion(text, assistantMessage) {
@@ -2959,7 +2960,7 @@ async function sendCodeQuestion(text, assistantMessage) {
     await readSse(response, assistantMessage);
 }
 
-async function readChatSse(response, assistantMessage, options = {}) {
+async function readChatSse(response, assistantMessage) {
     if (!response.body) {
         const text = await response.text();
         applyStreamText(assistantMessage, text);
