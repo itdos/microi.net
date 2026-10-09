@@ -54,7 +54,7 @@ export default {
 </script>
 
 <style scoped>
-.contract-totals { margin: 20rpx 24rpx; padding: 24rpx; border: 1rpx solid var(--mci-border-color, #e3edf1); border-radius: 14rpx; background: var(--mci-bg-elevated, #fff); }
+.contract-totals { margin: 20rpx 0rpx; padding: 24rpx; border: 1rpx solid var(--mci-border-color, #e3edf1); border-radius: 14rpx; background: var(--mci-bg-elevated, #fff); }
 .contract-totals__heading { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; min-height: 52rpx; }
 .contract-totals__title { color: var(--mci-text-primary, #18313d); font-size: 27rpx; font-weight: 700; }
 .contract-totals__toggle { display: flex; flex: none; align-items: center; justify-content: center; gap: 10rpx; min-width: 88rpx; min-height: 80rpx; margin: -12rpx -8rpx -12rpx 0; padding: 0 8rpx; border: none; border-radius: 6rpx; color: var(--mci-text-secondary, #647c87); background: transparent; font-size: 22rpx; line-height: normal; }
