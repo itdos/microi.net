@@ -22,7 +22,7 @@ async function fixture(t) {
 }
 
 async function declaredOfficialInputs(root) {
-  const applications = ['microi-ai-cad', 'ai-employee-center', 'mci-email', 'microi-3d-engine'].map(AppKey => ({
+  const applications = ['microi-ai-cad', 'ai-employee-center', 'mci-email', 'microi-3d-engine', 'unused-official-app'].map(AppKey => ({
     AppKey, SourceRoot: 'private-official/' + AppKey, FileCount: 1,
     Files: [{Path: 'src/real-test-input.js', Size: 8, Sha256: 'a'.repeat(64)}]
   }));
@@ -79,11 +79,11 @@ test('契约越界及私有源码目录联接失败关闭', async t => {
   await assert.rejects(snapshotStandardInputs(root), /symbolic link/);
 });
 
-test('两项 AI、邮箱和 worker 的精确声明输入全部冻结，不发现其它应用或未声明文件', async t => {
+test('两项 AI、邮箱、前端 Three 与 worker 的精确声明输入全部冻结，不发现其它应用或未声明文件', async t => {
   const {root} = await fixture(t), inputs = await declaredOfficialInputs(root);
   await fs.writeFile(path.join(root, '.gitignore'), 'private-official/');
   const before = await snapshotStandardInputs(root);
-  const selected = [...inputs.applications.slice(0, 3), ...inputs.repositories];
+  const selected = [...inputs.applications.slice(0, 4), ...inputs.repositories];
   for (const app of selected) {
     const name = app.SourceRoot + '/' + app.Files[0].Path;
     assert.ok(before[name], 'Full actual declared input is frozen: ' + name);
@@ -91,7 +91,7 @@ test('两项 AI、邮箱和 worker 的精确声明输入全部冻结，不发现
     assert.notEqual((await snapshotStandardInputs(root))[name], before[name]);
     await fs.writeFile(path.join(root, name), 'original');
   }
-  const unused = inputs.applications[3];
+  const unused = inputs.applications[4];
   assert.equal(before[unused.SourceRoot + '/' + unused.Files[0].Path], undefined);
   await fs.writeFile(path.join(root, unused.SourceRoot, unused.Files[0].Path), 'unused app changed');
   await fs.writeFile(path.join(root, selected[0].SourceRoot, 'undeclared.js'), 'unrelated');
