@@ -22,12 +22,14 @@ test('theme changes debounce account persistence and keep retry data on failure'
   const source = await read('src/layout/components/ThemeSelect.vue');
 
   assert.match(source, /this\.preferenceSaveState = "pending";[\s\S]*?this\.scheduleVisualPreferenceFlush\(\);/);
-  assert.match(source, /scheduleVisualPreferenceFlush\(delay = 250\)/);
-  assert.match(source, /this\.preferenceSaveState = "saving";/);
+  assert.match(source, /scheduleVisualPreferenceFlush\(delay = 250, session = this\.preferenceSaveSession\)/);
+  assert.match(source, /session\.preferenceSaveState = "saving";/);
   assert.match(source, /ApiEngine\.Run\(\s*"platform-user-update-preferences"/);
-  assert.match(source, /this\.pendingPreferencePatch = \{ \.\.\.patch, \.\.\.this\.pendingPreferencePatch \};/);
-  assert.match(source, /this\.preferenceSaveState = "error";/);
-  assert.match(source, /this\.preferenceSaveState = Object\.keys\(this\.pendingPreferencePatch\)\.length \? "pending" : "saved";/);
+  assert.match(source, /session\.pendingPreferencePatch = \{ \.\.\.patch, \.\.\.session\.pendingPreferencePatch \};/);
+  assert.match(source, /session\.preferenceSaveState = "error";/);
+  assert.match(source, /session\.preferenceSaveState = Object\.keys\(session\.pendingPreferencePatch\)\.length \? "pending" : "saved";/);
+  assert.match(source, /session === getActivePreferenceSaveSession\(this\.diyStore, this\.CurrentUser\?\.Id\)/);
+  assert.match(source, /void diyStore\.Token;[\s\S]*?getActivePreferenceSaveSession/);
 });
 
 test('theme popover header and footer use edge-to-edge semantic surfaces', async () => {
