@@ -120,6 +120,21 @@ if ($Mode -eq "Full") {
 
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 
+# 测试夹具包含真实 node:sqlite 与中文 SQLite 输入。统一使用任务已验证的
+# Node 运行时及 Python UTF-8，防止 Windows PATH/代码页导致假失败；这些变量
+# 仅属于测试进程，不进入生产 API 配置或数据库设置。
+if ($env:MICROI_DESKTOP_NODE_HOME) {
+    $testNodeName = if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') { 'node.exe' } else { 'node' }
+    $testNode = Join-Path $env:MICROI_DESKTOP_NODE_HOME $testNodeName
+    if (-not (Test-Path -LiteralPath $testNode -PathType Leaf)) {
+        throw "Configured test runtime does not contain ${testNodeName}: $env:MICROI_DESKTOP_NODE_HOME"
+    }
+    $env:Path = $env:MICROI_DESKTOP_NODE_HOME + [IO.Path]::PathSeparator + $env:Path
+    Write-Host "Using configured Node test runtime: $(& $testNode --version)"
+}
+$env:PYTHONUTF8 = '1'
+$env:PYTHONIOENCODING = 'utf-8'
+
 # 自动发现平台统一入口、平台内置应用包和 PC 端的 node:test 回归；新增平台测试不依赖手工清单。
 # 独立业务应用、游戏及客户项目使用自己的测试入口，不通过转调文件进入平台 Quick/Full。
 # 真正浏览器/数据库测试仍由下方 Full 环境入口执行，不能伪装成离线单元测试。
@@ -150,8 +165,8 @@ if (Test-Path -LiteralPath $desktopPackage) {
     Push-Location $desktopRoot
     $originalDesktopTestPath = $env:Path
     try {
-        # The desktop Harness tests require Node 24 APIs; the platform Node
-        # regressions above retain their own established runtime and TAP format.
+        # The desktop Harness and real SQLite fixtures share the configured
+        # Node runtime; explicit TAP reporting keeps the summary format stable.
         if ($env:MICROI_DESKTOP_NODE_HOME) {
             $desktopNodeName = if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') { 'node.exe' } else { 'node' }
             $desktopNode = Join-Path $env:MICROI_DESKTOP_NODE_HOME $desktopNodeName

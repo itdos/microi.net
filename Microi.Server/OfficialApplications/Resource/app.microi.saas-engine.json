@@ -49971,13 +49971,13 @@
         "ApplicationType": "MicroService",
         "PackageVersion": "v2.0.21",
         "IncludeSource": false,
-        "PreparedTime": "2026-10-09 16:50:20"
+        "PreparedTime": "2026-10-09 18:08:11"
       },
       "MicroService": {
         "Id": "01KX7M4M9F1KTKBT7YNTP4VH17",
         "ParentId": null,
         "CreateTime": "2026-07-11 11:39:34",
-        "UpdateTime": "2026-10-09 16:50:20",
+        "UpdateTime": "2026-10-09 18:08:11",
         "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
         "UserName": "管理员",
         "IsDeleted": 0,
@@ -49991,12 +49991,12 @@
         "Runtime": "micro-app",
         "BuildVersion": "v2.0.21",
         "EntryPath": "index.html",
-        "AssetManifestJson": "{\"SchemaVersion\":2,\"MsKey\":\"microi-platform-service\",\"BuildVersion\":\"v2.0.21\",\"EntryPath\":\"index.html\",\"StorageMode\":\"db\",\"PublishStatus\":\"Published\",\"VerificationStatus\":\"Verified\",\"RequestId\":\"9ed7d75b42deb79ebd5621ce12a71ad6f5747cb663d65a86c79590ec108e72cb\",\"DeliveryBatchId\":\"database-9ed7d75b42deb79ebd5621ce\",\"SourceManifestHash\":\"d3f9700a030f896bf3021f92fc9241f041497452de8e74141788372a9b06ccb7\",\"RuntimeManifestHash\":\"9ed7d75b42deb79ebd5621ce12a71ad6f5747cb663d65a86c79590ec108e72cb\",\"VerifiedAt\":\"2026-10-09T08:50:20.182Z\",\"PublishedAt\":\"2026-10-09T08:50:20.182Z\",\"Assets\":[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-DQ48kBdv.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/assets/index-DQ48kBdv.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-DQ48kBdv.js\",\"Sha256\":\"86108c190ce3d5c3447ac07061d51b27f6e0ec2f0187c72aca810386114bcfd5\",\"Size\":597360,\"IsEntry\":false},{\"Path\":\"assets/index-Dbnleczj.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/assets/index-Dbnleczj.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-Dbnleczj.css\",\"Sha256\":\"629b61cf2b0813186df1307a9fe9b7dc0b7e869faac10fd95e1c41c32a7e2f83\",\"Size\":221736,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"00d3e1c1409b5020cef822ee17134535c2fe5f12f569a7ebe7a003d01457b5b8\",\"Size\":383,\"IsEntry\":true}]}",
+        "AssetManifestJson": "{\"SchemaVersion\":2,\"MsKey\":\"microi-platform-service\",\"BuildVersion\":\"v2.0.21\",\"EntryPath\":\"index.html\",\"StorageMode\":\"db\",\"PublishStatus\":\"Published\",\"VerificationStatus\":\"Verified\",\"RequestId\":\"9ed7d75b42deb79ebd5621ce12a71ad6f5747cb663d65a86c79590ec108e72cb\",\"DeliveryBatchId\":\"database-9ed7d75b42deb79ebd5621ce\",\"SourceManifestHash\":\"1e1b6ee5841094fc519a7f77c378e4ad86ad0f0b1a7f0b211a7dde9a9e9c5cc3\",\"RuntimeManifestHash\":\"9ed7d75b42deb79ebd5621ce12a71ad6f5747cb663d65a86c79590ec108e72cb\",\"VerifiedAt\":\"2026-10-09T10:08:11.046Z\",\"PublishedAt\":\"2026-10-09T10:08:11.046Z\",\"Assets\":[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-DQ48kBdv.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/assets/index-DQ48kBdv.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-DQ48kBdv.js\",\"Sha256\":\"86108c190ce3d5c3447ac07061d51b27f6e0ec2f0187c72aca810386114bcfd5\",\"Size\":597360,\"IsEntry\":false},{\"Path\":\"assets/index-Dbnleczj.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/assets/index-Dbnleczj.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-Dbnleczj.css\",\"Sha256\":\"629b61cf2b0813186df1307a9fe9b7dc0b7e869faac10fd95e1c41c32a7e2f83\",\"Size\":221736,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"00d3e1c1409b5020cef822ee17134535c2fe5f12f569a7ebe7a003d01457b5b8\",\"Size\":383,\"IsEntry\":true}]}",
         "AssetsJson": "[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-DQ48kBdv.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/assets/index-DQ48kBdv.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-DQ48kBdv.js\",\"Sha256\":\"86108c190ce3d5c3447ac07061d51b27f6e0ec2f0187c72aca810386114bcfd5\",\"Size\":597360,\"IsEntry\":false},{\"Path\":\"assets/index-Dbnleczj.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/assets/index-Dbnleczj.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-Dbnleczj.css\",\"Sha256\":\"629b61cf2b0813186df1307a9fe9b7dc0b7e869faac10fd95e1c41c32a7e2f83\",\"Size\":221736,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.21/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"00d3e1c1409b5020cef822ee17134535c2fe5f12f569a7ebe7a003d01457b5b8\",\"Size\":383,\"IsEntry\":true}]",
         "DistHash": "9ed7d75b42deb79ebd5621ce12a71ad6f5747cb663d65a86c79590ec108e72cb",
         "AssetCount": 4,
         "TotalSize": "840788",
-        "PublishTime": "2026-10-09 16:50:20",
+        "PublishTime": "2026-10-09 18:08:11",
         "SourceDirName": "microi-platform-service",
         "Description": "吾码平台内置微服务，包含系统日志/监控、系统设置、通知中心、AI 治理与应用商城等平台能力。",
         "ApplicationType": "MicroService",
@@ -50014,7 +50014,7 @@
         {
           "Id": "01KX7MMJ87YGBR5EGDCQFTAV4F",
           "CreateTime": "2026-07-11 11:48:16",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50036,7 +50036,7 @@
         {
           "Id": "01M1GNGE3Y1FC6AZW5VZ40SRAV",
           "CreateTime": "2026-09-02 16:59:26",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50058,7 +50058,7 @@
         {
           "Id": "01KX97ZHMHX2N0FXKNGRN23EA0",
           "CreateTime": "2026-07-12 02:45:33",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50080,7 +50080,7 @@
         {
           "Id": "01KXABNS7FXQJA9RXS0YZQVPWD",
           "CreateTime": "2026-07-12 13:09:22",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50102,7 +50102,7 @@
         {
           "Id": "01KXFKK980Z5R7ZZ0YC9FW8NNR",
           "CreateTime": "2026-07-14 14:04:01",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50124,7 +50124,7 @@
         {
           "Id": "01KXZVECA6K94XGMPR34PHM1GB",
           "CreateTime": "2026-07-20 21:28:59",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50146,7 +50146,7 @@
         {
           "Id": "01KYYXF1K4DT636M8PG5JMG3JX",
           "CreateTime": "2026-08-01 23:00:46",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50168,7 +50168,7 @@
         {
           "Id": "01KZE1QMR9ECSKD6SSH9BGN7J8",
           "CreateTime": "2026-08-07 20:03:58",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50190,7 +50190,7 @@
         {
           "Id": "01M0Q426CH7C2QE05B1703FEB4",
           "CreateTime": "2026-08-23 18:53:33",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50217,7 +50217,7 @@
         {
           "Id": "mcimp-4d6a83fb5b62e2fdf7166643e0aa8f",
           "CreateTime": "2026-08-17 04:18:15",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50242,7 +50242,7 @@
         {
           "Id": "mcimp-316005bd6c6da9f1dd6f154b8d9368",
           "CreateTime": "2026-09-06 15:24:39",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50264,7 +50264,7 @@
         {
           "Id": "CDD88892FE52FE2A73C09FEFD4",
           "CreateTime": "2026-09-10 10:23:30",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50290,7 +50290,7 @@
         {
           "Id": "34B2312CB68063853977DD0FFC",
           "CreateTime": "2026-10-06 01:35:30",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -50312,7 +50312,7 @@
         {
           "Id": "439499DA2B58356E5880CC09B0",
           "CreateTime": "2026-10-06 01:35:30",
-          "UpdateTime": "2026-10-09 16:50:20",
+          "UpdateTime": "2026-10-09 18:08:11",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,

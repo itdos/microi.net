@@ -2,3 +2,7 @@
 .githooks/* text eol=lf
 .public-repo-protected-paths text eol=lf
 *.pdf binary
+# Generated bootstrap resources and inline engine contracts use canonical LF bytes.
+Microi.Server/Microi.Upgrade/Resource/app.microi.bootstrap.json text eol=lf
+Microi.Server/Microi.Upgrade/Resource/import-package.js text eol=lf
+microi.uniapp/resources/xjy/customer-contract-totals/engine.js text eol=lf
