@@ -530,8 +530,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				]
 			},
 			activeRelatedTabs() {
-				if (!this.formTabs.length) return this.relatedTabs
-				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
+				return this.relatedTabs.filter((item) =>
+					this.relatedPresentation(item.field).visible !== false &&
+					(!this.formTabs.length || item.field.formTabKey === this.activeFormTabKey))
 			},
 			selectedCustomerPickerId() {
 				const fieldName = this.customerPickerConfig && this.customerPickerConfig.idFieldName
@@ -1058,6 +1059,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				this.form = {
 					...this.form
 				}
+				this.refreshRelatedChildLists()
 			},
 			async handleRelatedCount(payload) {
 				try {
