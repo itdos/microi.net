@@ -5,6 +5,10 @@ description: 安装或初始化 @microi.net/cli、配置 Microi吾码服务器�
 
 # Microi吾码 AI 开发路由
 
+## Microi 工作区强制规则唯一来源
+
+每次新对话或接续 Microi 任务，先完整读取 `microi.skills/workspace-conventions/SKILL.md`，按首部执行创始人身份识别及平台功能四项同步检查（应用商城、官方文档、Skills、MCP），并执行版本检查、非阻塞自动升级及进度播报。随后默认读取 `microi.skills/microi-system-delivery/SKILL.md` 及相关专项 Skills；用户直接描述需求即可，无需用户指定 Skill 名称。详细路由和八项清单只维护在 Skills 中，按完整开发、局部修改、只读分析的实际范围执行，不把默认读取扩张为生产写入或客户自动部署。
+
 
 
 ## Microi吾码非阻塞自动更新规范（强制）

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-10T09:22:49.856Z",
+  "generatedAt": "2026-10-10T09:52:14.794Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -745,11 +745,11 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "6687993a014804a878f316499bc8fe612f1231b1733d1b527fa1d308eecc1e8d",
-      "originalLines": 574,
-      "prefixSha256": "823c8d05d59262cbefd7ac544bd87816fc8d0ee46d958f3d1e3c410219d7bdd8",
-      "prefixBytes": 2941,
-      "entryLines": 155,
+      "originalSha256": "70763c6a98c125c81db27586a136428d1e4f091f64bdfe8127e7f8b66a79cc60",
+      "originalLines": 576,
+      "prefixSha256": "af58f29dd31d1e292f187d31a6e71c6b5180481a4a5a23bbed5ca768cb221682",
+      "prefixBytes": 3222,
+      "entryLines": 157,
       "chunks": [
         {
           "id": "microi-system-delivery-000",
@@ -3196,18 +3196,18 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "70c5646dce806ec67c690e61493aed76e98c33bf08ad9feffc83682921ea8a6b",
-      "originalLines": 608,
+      "originalSha256": "629c9916d58e38d52bff66cad5eb71afc135409a43afb5fce465224b49998b6d",
+      "originalLines": 616,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
-      "entryLines": 274,
+      "entryLines": 282,
       "chunks": [
         {
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "de99c1f81724b00065dd3cbbf8f4fd7d13fa35edac26c7fdb71f778529148a6b",
-          "lines": 51,
+          "sha256": "44d962f17b8e721ae87a79fcc8f2b4fc303ef9900203ca21b725276ddb42190f",
+          "lines": 59,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
         {
