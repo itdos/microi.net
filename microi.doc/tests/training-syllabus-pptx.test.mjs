@@ -11,20 +11,22 @@ import * as serverRenderer from 'vue/server-renderer'
 import * as versions from '../docs/.vitepress/theme/training-deck-versions.js'
 import { enterpriseSlides } from '../docs/.vitepress/theme/enterprise-training-slides.js'
 import { searchTrainingSlides } from '../docs/.vitepress/theme/training-syllabus-search.js'
+import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads.mjs'
+import { trainingDownloads } from '../docs/.vitepress/theme/training-downloads.js'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const publicRoot = path.join(projectRoot, 'docs/public')
 const pptxMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 const artifacts = [
-  { version: 'technical', dark: true, count: 47, url: '/downloads/microi-ai-development-framework-training-syllabus-dark.pptx' },
-  { version: 'technical', dark: false, count: 47, url: '/downloads/microi-ai-development-framework-training-syllabus-light.pptx' },
-  { version: 'enterprise', dark: true, count: 12, url: '/downloads/microi-enterprise-application-training-syllabus-dark.pptx' },
-  { version: 'enterprise', dark: false, count: 12, url: '/downloads/microi-enterprise-application-training-syllabus-light.pptx' },
-]
+  { version: 'technical', dark: true, count: 47, filename: 'microi-ai-development-framework-training-syllabus-dark.pptx' },
+  { version: 'technical', dark: false, count: 47, filename: 'microi-ai-development-framework-training-syllabus-light.pptx' },
+  { version: 'enterprise', dark: true, count: 12, filename: 'microi-enterprise-application-training-syllabus-dark.pptx' },
+  { version: 'enterprise', dark: false, count: 12, filename: 'microi-enterprise-application-training-syllabus-light.pptx' },
+].map(artifact => ({ ...artifact, url: trainingDownloads.find(row => row.legacyPath === `/downloads/${artifact.filename}`).url }))
 
 function artifactPath(url) {
-  assert.match(url, /^\/downloads\/[a-z0-9-]+\.pptx$/u, 'PPTX downloads must use stable local filenames')
-  return path.join(publicRoot, url.slice(1))
+  assert.equal(new URL(url).origin, 'https://static.itdos.com', 'PPTX downloads must use the official CDN')
+  assert.match(new URL(url).pathname, /\/[a-z0-9-]+\.pptx$/u, 'PPTX downloads must retain stable filenames')
+  return verifiedTrainingAssetPath(url)
 }
 
 function findElements(node, predicate) {
@@ -161,6 +163,8 @@ test('真实 PPTX 下载按钮跟随课件版本与当前主题，PDF 下载继�
   assert.ok(label || attribute(pptx, 'aria-label'), 'the export control must have an accessible download name')
   assert.equal(attribute(pptx, 'type'), pptxMime, 'the download declares the PowerPoint MIME type')
   assert.ok(pptx.props.some(prop => prop.type === 6 && prop.name === 'download'))
+  assert.equal(attribute(pptx, 'target'), '_blank', '跨源预览或下载保留当前演示页')
+  assert.match(attribute(pptx, 'rel'), /\bnoopener\b/u)
   const href = binding(pptx, 'href')
   assert.ok(href, 'download URLs must react to edition and theme')
   const runtime = componentRuntime(descriptor)
@@ -179,6 +183,10 @@ test('真实 PPTX 下载按钮跟随课件版本与当前主题，PDF 下载继�
   assert.equal(runtime.evaluate(href), artifacts[1].url, 'switching back restores the original technical download')
   assert.ok(anchors.some(element => attribute(element, 'aria-label') === '下载预生成暗色 PDF'))
   assert.ok(anchors.some(element => attribute(element, 'aria-label') === '下载预生成浅色 PDF'))
+  for (const pdf of anchors.filter(element => /下载预生成.* PDF/u.test(attribute(element, 'aria-label') || ''))) {
+    assert.equal(attribute(pdf, 'target'), '_blank')
+    assert.match(attribute(pdf, 'rel'), /\bnoopener\b/u)
+  }
 })
 
 test('SSR 与挂载前不输出 PPTX，首次挂载按实际主题生成链接并保留 PDF', async () => {

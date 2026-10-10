@@ -3,11 +3,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const staticPdfPaths = [
-  path.join(projectRoot, 'docs/public/downloads/microi-ai-development-framework-training-syllabus-dark.pdf'),
-  path.join(projectRoot, 'docs/public/downloads/microi-ai-development-framework-training-syllabus-light.pdf'),
+  verifiedTrainingAssetPath('/downloads/microi-ai-development-framework-training-syllabus-dark.pdf'),
+  verifiedTrainingAssetPath('/downloads/microi-ai-development-framework-training-syllabus-light.pdf'),
 ]
 const thumbnailRoots = {
   dark: path.join(projectRoot, 'docs/public/images/training-deck/thumbs'),
