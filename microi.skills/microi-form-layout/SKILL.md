@@ -15,8 +15,8 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 
 全局遮罩毛玻璃使用正向开关 `sys_config.FormMaskBlur`：缺失、空值或 `0/false` 默认关闭，只有显式 `1/true` 才开启。表级仍使用负向开关 `diy_table.DisableFormMaskBlur`；全局开启后，某张表显式 `1/true` 可单独关闭。旧全局字段 `sys_config.DisableFormMaskBlur` 只作未升级租户兼容回退，元数据必须设置 `Visible=0`、`AppVisible=0`，不得同时向用户展示两套开关。
 
-表单打开方式与分组是两个独立决策：新表默认 `FormOpenType=Dialog`、
-`FormOpenWidth=80%`。只有约 36 个以上业务字段、至少 2 个大型子表，或同等密度的重型控件
+表单打开方式与分组是两个独立决策：顶层新表默认 `FormOpenType=Dialog`、
+`FormOpenWidth=80%`。完整系统开发的子表宽度按 `microi-system-delivery` 必读清单第 4 项配置：第一层 75%、第二层 70%，再逐层递减 5 个百分点。只有约 36 个以上业务字段、至少 2 个大型子表，或同等密度的重型控件
 才评估 Drawer；不能用 Drawer 代替 Tabs/CollapseGroup 的信息架构。Dialog 统一使用居中、可拖动、
 大圆角弹层；Drawer 贴边且不使用大圆角。
 
@@ -137,7 +137,7 @@ Q1: 核心可见字段数、子表和强任务域？
 V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.ClickFormTab('tabId')` 动态控制 Tab 显隐和默认选中。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-003 sha256=8da3bfbd34b7890c3796c47f71c7f4ccef13f16e5da48c3a0a0e111f22fe150a -->
+<!-- microi-progressive:chunk id=microi-form-layout-003 sha256=582f8b326f05bf2314ebadcb5f47ca45bbb7aa4d06fac288cfbf3918b98d49c2 -->
 ## 5. 必填与禁止
 
 ### 5.1 必填
@@ -151,7 +151,7 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 - 分组/Tab 的字段计数必须基于字段原始可见性（如 `_baseIsShow`），不能把“当前因折叠而隐藏”误判成不可见，否则收起后的分组会错误显示 `0 项`。
 - 表级分组方向完整支持 `TabsPosition=left/top/right/bottom`；每个方向都要检查标题、副标题、动态角标和选中指示线，纵向指示线端点固定为直角。
 - 修改 `diy_table.Tabs` 或 `diy_field.Tab` / `Config.CollapseGroup` / `Config.FieldTabs` 后，必须调用 `microi_refresh_schema_cache`。
-- Tab 内嵌套 CollapseGroup 时，CollapseGroup 必须设 `DefaultCollapsed=true`（默认收起），避免 Tab 内继续被折叠分组抢首屏空间。
+- CollapseGroup（含 Tab 内嵌套）默认设 `DefaultCollapsed=false`，让业务信息直接可见；仅明确非关键、低频信息可设 `true`。不得因嵌套于 Tab 就把所有分组默认收起。
 - 新增布局节点后必须同时回读 `diy_field` 元数据和目标业务表结构，确认没有新增物理业务列；若当前工具不提供仅元数据能力，只报告设计建议，不得绕过后端直接写表。
 
 ### 5.2 禁止

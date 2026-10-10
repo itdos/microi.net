@@ -9,6 +9,23 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 
 本 Skill 来自一次完整业务系统交付复盘。目标是让下一套 OA、ERP、MES、CRM、商城、预约、互联网项目等 Microi 系统少走返工路：先固定事实源，再用 MCP 正确建模，最后用可视化和业务闭环测试证明可交付。
 
+用户只需提供业务需求、目标 MCP 连接及可选需求文件/验收地址，不必重复粘贴长提示词。
+收到“完整开发/交付系统”请求时，必须先读取
+[完整系统开发默认交付清单（原推荐提示词 1–8）](references/progressive-01-标准工作流.md#完整系统开发默认交付清单原推荐提示词-18)，
+逐项执行并记录覆盖结果；不能只交方案、示例或待办。局部修改、只读分析按用户实际范围执行，
+这份默认清单不额外授权生产写入或客户部署。
+
+按本次实际能力读取相关 Skill，不能只读总控入口后凭记忆实现：
+
+| 工作内容 | 相关 Skill |
+|---|---|
+| 需求文档、成熟数据模型、表/字段/索引 | `business-blueprint`、`microi-db-schema`、`microi-form-engine` |
+| 表单宽度、分组、整行控件与视觉 | `microi-form-layout`、`ui-design` |
+| 菜单、PageTabs、统计角标、模块指标、复合列、移动卡片 | `module-engine`、`v8-menu-buttons` |
+| 选项 Key/Label、数据源、状态模板 | `microi-datasource-mapping`、`datasource-engine`、`v8-template-engine` |
+| 业务接口、表单事件、看板与报表 | `v8-crud-api`、`v8-table-event`、`page-engine`、`report-engine` |
+| 真实业务、截图、账号和跨端验收 | `playwright-e2e`；有独立前端时再读相应前端 Skill |
+
 每张由 AI/MCP 创建的业务表都必须同时设计默认表单 Banner，不能只建字段和菜单。完整
 Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选择业务编号/名称标题、
 客户/项目副标题、首个 `ImgUpload`、状态/类型标签和真实数值指标，并写入 `diy_table`
