@@ -1,6 +1,6 @@
 ---
 name: microi-system-delivery
-description: Microi 吾码从自然语言交付完整系统的总控规范。用于通过 MCP、VS Code 插件、V8 引擎、低代码元数据、UniApp/H5、PC 后台和 Playwright E2E 设计、生成、升级、测试、同步或交付完整 Microi 系统。
+description: 已初始化吾码工作区的默认 AI 开发总控入口，用户只描述需求也必须读取，无需指定 Skill 名称。用于通过 MCP、VS Code 插件、V8、低代码、UniApp/H5、PC 后台和 Playwright E2E 开发、修改、分析或交付 Microi 系统，按用户范围路由相关专项 Skills。
 ---
 
 > **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
@@ -9,7 +9,9 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 
 本 Skill 来自一次完整业务系统交付复盘。目标是让下一套 OA、ERP、MES、CRM、商城、预约、互联网项目等 Microi 系统少走返工路：先固定事实源，再用 MCP 正确建模，最后用可视化和业务闭环测试证明可交付。
 
-用户只需提供业务需求、目标 MCP 连接及可选需求文件/验收地址，不必重复粘贴长提示词。
+本 Skill 是已初始化吾码工作区的默认开发总控入口。用户直接描述需求即可，无需指定 Skill 名称；
+目标 MCP 连接可沿用当前项目或唯一已登录连接，需求文件/验收地址按需提供。
+任何吾码开发任务先读本入口与八项清单，再按下表读取相关专项 Skill。
 收到“完整开发/交付系统”请求时，必须先读取
 [完整系统开发默认交付清单（原推荐提示词 1–8）](references/progressive-01-标准工作流.md#完整系统开发默认交付清单原推荐提示词-18)，
 逐项执行并记录覆盖结果；不能只交方案、示例或待办。局部修改、只读分析按用户实际范围执行，

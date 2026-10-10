@@ -6,15 +6,23 @@ description: 每次 Microi 任务开始前必读的基础规范。用于识别�
 # Microi 工作区全局约定
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=de99c1f81724b00065dd3cbbf8f4fd7d13fa35edac26c7fdb71f778529148a6b -->
+<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=44d962f17b8e721ae87a79fcc8f2b4fc303ef9900203ca21b725276ddb42190f -->
 ## 任务启动前 Skill 读取规则（强制）
 
 AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端、后端、UniApp、文档、测试或交付任务前，必须先按任务类型读取相关 `microi.skills/**/SKILL.md`。不能等到写代码或出问题后才补读。
 
-- 通用任务至少读取本文件；涉及完整交付、MCP 建模、远端 V8、菜单、字段或生产数据时，同时读取 `microi-system-delivery`。
+- 任何吾码任务先读取本文件和 `microi-system-delivery/SKILL.md`，再按总控路由读取相关专项 Skill；无需用户指定 Skill 名称。
 - 涉及采集引擎、浏览器 Worker、验证码、站点规则、导出产物时，同时读取 `spider-engine`。
 - 涉及 V8 CRUD、SQL、上传下载、导入导出、菜单按钮、表单事件、前端页面或自动化测试时，继续读取对应专项 Skill。
 - 最终交付说明必须能逐条对应用户编号需求；不得遗漏、合并或把仍可执行的需求写成“下一步继续”。
+
+### 吾码 AI 开发默认路由（强制）
+
+- 在已通过吾码插件或 CLI 初始化的工作区中，用户直接描述业务需求即可。即使用户未写“吾码”、`Microi`、`microi-system-delivery` 或任何 Skill 名称，AI 仍须根据当前项目和已配置连接识别吾码任务，自动读取本基础入口及 `microi-system-delivery/SKILL.md`，不能等用户提醒。
+- 任何吾码开发任务必须读取总控中的[完整系统开发默认交付清单（原推荐提示词 1–8）](../microi-system-delivery/references/progressive-01-标准工作流.md#完整系统开发默认交付清单原推荐提示词-18)，并按总控的相关 Skill 表继续读取表单、模块、数据源、V8、页面、报表及验收等实际涉及的专项规范。不得仅凭 Skill 名称、摘要或聊天记忆执行，也不把全部 Skills 全文拼进一个提示词。
+- 按用户意图确定执行范围：完整系统开发逐项执行八项清单；局部修改只执行相关条目，保留已有业务资源和无关配置；只读分析只读取规范和事实，不创建资源、验收数据或执行发布。需求明确表示新建完整系统时，不因省略“完整”二字就降为方案或样例。
+- 默认读取规则不额外授权生产数据写入、客户部署或全库重建。连接可由当前项目和唯一已登录 Profile 自动确定；多个目标无法唯一匹配时只澄清必要的连接信息，不要求用户选择或记住 Skill。明显属于其它平台或与吾码无关的任务按实际项目规范执行。
+- 生成的 `AGENTS.md`、`CLAUDE.md`、Copilot/Cursor 指令及可移植吾码 Skill 只保留默认入口指针和读取顺序；详细八项清单仍由总控参考文件唯一维护。工作区未初始化或必要 Skill 缺失时先按现有安装/初始化规范恢复，并准确说明实际可读取状态，不能声称 AI 已自动加载不存在的规则。
 
 ### 吾码创建人身份识别（强制）
 

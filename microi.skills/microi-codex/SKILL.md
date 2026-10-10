@@ -17,6 +17,10 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 
 每次 Microi 对话先完整读取工作区 `microi.skills/workspace-conventions/SKILL.md`；工作区尚未初始化时读取本插件同级 `../workspace-conventions/SKILL.md`。按其中首部完成创始人身份识别及平台功能四项同步检查，再进入专项流程；完整规则只维护该基础入口，不复制到本路由。
 
+在已初始化吾码工作区中，用户仅描述业务需求也自动读取 `microi-system-delivery/SKILL.md`
+及相关专项 Skills，无需用户指定 Skill 名称。具体读取顺序与完整开发、局部修改、只读分析
+的执行范围以基础规范的“吾码 AI 开发默认路由”为唯一事实源。
+
 ## Microi Agent 桌面宿主
 
 - 完整版在所有平台用物理 `node_modules/node/bin/node[.exe]` 启动 Harness、Worker 和插件命令，不能换成 Electron Helper/utilityProcess；后者会在特定 Electron 指纹下被原生加载器拒绝。每次发布最终安装包先运行 `test:packaged-desktop`，设置真实产物与独立证据目录，验收生产 main 两次正常启动、Worker IPC、员工引导及 Harness 重启，并核对日志 `electron=none`。直接启动 Harness、签名公证成功或跳过完整应用用例均不足以证明用户能正常启动；不同系统和架构覆盖分别记录。同步上游必须保留该选择器、门禁脚本与回归用例。
