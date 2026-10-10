@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-09T17:35:16.591Z",
+  "generatedAt": "2026-10-10T09:22:49.856Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -316,10 +316,10 @@
       ]
     },
     "microi-form-layout": {
-      "originalSha256": "9bfe00fdab4e6d7a2d0eb540cc7a27989237a39db25ffc1f13580ef486d4ce72",
+      "originalSha256": "8aa4b1223988df95bf6f233362f2eba7540ea4f323fdd20f45680ef3ad0a5bfa",
       "originalLines": 412,
-      "prefixSha256": "afa6362418909c1e8bb1eee33045e1318acf464f7fb5bccc803b79ef233a7623",
-      "prefixBytes": 4241,
+      "prefixSha256": "0f3634988800f3bf2f72771dea8c834d08fdfb4d18dc486305a80d55b548b006",
+      "prefixBytes": 4404,
       "entryLines": 206,
       "chunks": [
         {
@@ -350,7 +350,7 @@
           "id": "microi-form-layout-003",
           "ordinal": 4,
           "destination": "microi-form-layout/SKILL.md",
-          "sha256": "8da3bfbd34b7890c3796c47f71c7f4ccef13f16e5da48c3a0a0e111f22fe150a",
+          "sha256": "582f8b326f05bf2314ebadcb5f47ca45bbb7aa4d06fac288cfbf3918b98d49c2",
           "lines": 29,
           "heading": "5. 必填与禁止"
         },
@@ -745,11 +745,11 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "623f1bfa30623c17fc9bd354a24fedd86ea3d233c455d7df564129e99277b830",
-      "originalLines": 511,
-      "prefixSha256": "2079d7b54e771c17cc0c1f8d72bd3acc53aa792f9dfc9f867b2026d6665147bc",
-      "prefixBytes": 1564,
-      "entryLines": 138,
+      "originalSha256": "6687993a014804a878f316499bc8fe612f1231b1733d1b527fa1d308eecc1e8d",
+      "originalLines": 574,
+      "prefixSha256": "823c8d05d59262cbefd7ac544bd87816fc8d0ee46d958f3d1e3c410219d7bdd8",
+      "prefixBytes": 2941,
+      "entryLines": 155,
       "chunks": [
         {
           "id": "microi-system-delivery-000",
@@ -795,8 +795,8 @@
           "id": "microi-system-delivery-005",
           "ordinal": 2,
           "destination": "microi-system-delivery/references/progressive-01-标准工作流.md",
-          "sha256": "923d8382de89f7c448cd0aa9d672d45339ed9c66a5f57533c408be67f861bca1",
-          "lines": 183,
+          "sha256": "8f34122f08c3cee8f4aed5054c012cb560904442ea080fa2fc3d495b73b53a25",
+          "lines": 229,
           "heading": "标准工作流"
         },
         {
