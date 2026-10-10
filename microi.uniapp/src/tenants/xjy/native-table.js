@@ -125,6 +125,19 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
     return { matched: true, handled: true }
   }
 
+  if (parentTable === 'diy_dingdansp' && fieldName === 'XuanzeFA') {
+    if (!requireParentId(parentId)) return { matched: true, handled: false }
+    const planIds = selected.map((row) => row.Id).filter(Boolean)
+    if (planIds.length !== selected.length) throw new Error('所选方案缺少标识，请刷新后重试')
+    const result = await callApiEngine('selectPlan', {
+      Id: parentId,
+      PlanIds: planIds
+    })
+    if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '安装位置添加失败')
+    uni.$emit('microi:data-changed', { table: 'diy_shebeiwz', parentId })
+    return { matched: true, handled: true }
+  }
+
   if (fieldName === 'XuanzeZP') {
     // 同一个选择器服务客户案例及案例册快照；照片和临时预览必须落在各自的实际字段。
     const photoField = casePhotoField(tableName) || 'Tupian'
