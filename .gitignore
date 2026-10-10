@@ -178,6 +178,9 @@ AI- Project-Temp/
 # 已迁移到官方 CDN 的课件仅保留 URL 和指纹，避免生成副本再次进入公开仓。
 /output/pdf/microi-enterprise-application-training-syllabus-dark.pdf
 /output/pdf/microi-enterprise-application-training-syllabus-light.pdf
+/output/pdf/microi-ai-development-framework-training-syllabus-dark.pdf
+/output/pdf/microi-ai-development-framework-training-syllabus-light.pdf
+/output/pdf/microi-ai-development-framework-training-syllabus.pdf
 /output/pptx/microi-ai-development-framework-training-syllabus-dark.pptx
 /output/pptx/microi-ai-development-framework-training-syllabus-light.pptx
 /output/pptx/microi-enterprise-application-training-syllabus-dark.pptx
