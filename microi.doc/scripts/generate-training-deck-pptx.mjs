@@ -43,7 +43,8 @@ export function parseOptions(argv) {
     url: values['--url'] || 'http://127.0.0.1:61503/doc/about/microi-training-syllabus.html',
     captureRoot: path.resolve(values['--capture-root'] || path.join(workspaceRoot, '.tmp/training-deck-pptx/captures')),
     buildRoot: path.resolve(values['--build-root'] || path.join(workspaceRoot, '.tmp/training-deck-pptx', `build-${Date.now()}`)),
-    outputRoot: path.resolve(values['--output-root'] || path.join(projectRoot, 'docs/public/downloads')),
+    // 大型课件先在忽略目录生成，完成官方 CDN 上传及验签后才更新下载清单。
+    outputRoot: path.resolve(values['--output-root'] || path.join(workspaceRoot, '.tmp/training-deck-downloads/pptx')),
     runtimeNodeModules: values['--runtime-node-modules'] || process.env.RUNTIME_NODE_MODULES || process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES,
     runtimePython: values['--runtime-python'] || process.env.RUNTIME_PYTHON || process.env.CODEX_PRIMARY_RUNTIME_PYTHON,
     skillRoot: values['--skill-root'] || process.env.PRESENTATIONS_SKILL_ROOT,
@@ -71,7 +72,8 @@ async function declaredSlideCount(edition) {
 
 async function sourceFingerprint() {
   const sources = ['components/TrainingSyllabusDeck.vue', 'components/EnterpriseTrainingSlide.vue',
-    'enterprise-training-slides.js', 'styles/training-syllabus-deck.scss', '../config/seo-policy.mjs']
+    'enterprise-training-slides.js', 'training-deck-versions.js', 'training-downloads.js',
+    'styles/training-syllabus-deck.scss', '../config/seo-policy.mjs']
   const digest = createHash('sha256')
   for (const source of sources) {
     digest.update(source)

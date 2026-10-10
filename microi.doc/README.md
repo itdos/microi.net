@@ -31,6 +31,20 @@ npm run build
 
 构建完成后，在 `docs/.vitepress/dist` 目录下，会生成静态文件，可以直接部署到服务器上。
 
+## 培训课件下载与生成
+
+在线课件的九份 PDF/PPTX 由官方 `https://static.itdos.com` CDN 交付，下载清单位于 `docs/.vitepress/theme/training-downloads.js`。每件资源独立绑定真实 URL、字节数和 SHA-256；PDF 与 PPTX 的上传目录不同，不通过更换扩展名推导地址。官网 nginx 的九条精确 301 保留旧 `/downloads/` 地址，未知文件仍返回 404。CDN PDF 可在新窗口预览并保存，不会关闭当前课件。
+
+`npm run test:training-deck` 在执行原有页数、版式、可编辑文字、备注和交互测试前，将清单中的真实 CDN 文件验签到工作区 `.tmp/microi-docs-training-downloads/`。已有缓存仍逐件校验；缺失、错误字节或网络失败均中止，不能跳过测试。离线机器可以用已验签的完整目录准备缓存：
+
+```bash
+npm run prepare:training-downloads -- --seed <已验证课件目录>
+npm run prepare:training-downloads -- --verify-only
+npm run test:training-deck
+```
+
+PDF 与 PPTX 生成器默认输出到工作区 `.tmp/training-deck-downloads/pdf` 和 `.tmp/training-deck-downloads/pptx`，预览缩略图仍按原契约生成。新课件先通过官方 MCP 上传、回读原始字节并验签，再原位更新下载清单和对应的精确跳转。不要把大型下载文件重新写入 `docs/public/downloads` 或提交到 Git；本地生成成功不代表 CDN 或官网已经发布。
+
 ## SEO、AI 搜索与错误页
 
 站点使用对外推广域名 `https://microi.net` 为规范主域，不带 www。文章沿用 `.html` 地址、目录首页使用末尾 `/`。`www.microi.net` 和 `doc.microi.net` 在 nginx 归一到主域；省略 `.html`、多余的末尾 `/` 和 `index.html` 在目标页面存在时通过 301 归一，并保留 query。失效地址返回真实 HTTP 404，同时展示含文档、首页和常用入口的官网错误页。不要将不存在的文档统一跳转到首页。
