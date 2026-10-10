@@ -4,6 +4,7 @@ import test from "node:test";
 // zhy：回归锁定 TableChild 模块关联查询与物理表兼容分支。
 import {
     resolveTableQueryTarget,
+    tableChildParentIsPending,
     tableChildRequiresModuleQuery
 } from "../src/views/form-engine/utils/diy-table-query-target.js";
 
@@ -25,6 +26,11 @@ const onlyOfficeSource = await readFile(
 );
 const tableDataSource = await readFile(
     new URL("../src/views/form-engine/mixins/diy-table-data.mixin.js", import.meta.url),
+    "utf8"
+);
+// zhy：同时锁定 TableChild 组件确实把父表 FormMode 传入表格查询链路。
+const tableChildSource = await readFile(
+    new URL("../src/views/form-engine/diy-field-component/diy-tablechild.vue", import.meta.url),
     "utf8"
 );
 function occurrenceCount(source, value) {
@@ -68,6 +74,7 @@ test("TableChild module query preserves join engine, delegated auth and parent r
             formEngineKey: "child_table",
             tableId: "child-table",
             isTableChild: true,
+            tableChildFormMode: "Edit",
             tableChildRequiresModuleQuery: true
         }
     );
@@ -104,12 +111,70 @@ test("TableChild uses SysMenuId as the module query key when ModuleEngineKey is 
             formEngineKey: "child_table",
             tableId: "child-table",
             isTableChild: true,
+            tableChildFormMode: "View",
             tableChildRequiresModuleQuery: true
         }
     );
 
     assert.equal(request.ModuleEngineKey, "child-menu");
     assert.equal(request.FormEngineKey, undefined);
+});
+
+// zhy：父表新增时尚未落库，关联菜单中的 INNER JOIN 不能阻止已写入的子表记录即时回显。
+test("joined TableChild uses the physical table while its parent form is unsaved", () => {
+    const auth = { ParentRowId: "pending-parent" };
+    const where = [{ Name: "ParentId", Value: "pending-parent", Type: "=" }];
+
+    for (const formMode of ["Add", "Insert", " add ", "INSERT"]) {
+        const request = resolveTableQueryTarget(
+            { ModuleEngineKey: "joined-child-module", _TableChildAuth: auth, _Where: where },
+            {
+                sysMenuId: "joined-child-menu",
+                formEngineKey: "child_table",
+                tableId: "child-table",
+                isTableChild: true,
+                tableChildFormMode: formMode,
+                tableChildRequiresModuleQuery: true
+            }
+        );
+
+        assert.equal(request.ModuleEngineKey, undefined, `${formMode} must avoid the parent join`);
+        assert.equal(request.FormEngineKey, "child_table");
+        assert.strictEqual(request._TableChildAuth, auth);
+        assert.strictEqual(request._Where, where);
+    }
+    assert.match(tableDataSource, /tableChildFormMode:\s*self\.TableChildFormMode/);
+    assert.match(tableChildSource, /:TableChildFormMode="FormMode"/);
+});
+
+// zhy：只允许明确的新增模式进入兼容分支，避免 Edit/View 失去关联字段和权限条件。
+test("only Add and Insert represent an unsaved TableChild parent", () => {
+    assert.equal(tableChildParentIsPending("Add"), true);
+    assert.equal(tableChildParentIsPending(" insert "), true);
+    assert.equal(tableChildParentIsPending("Edit"), false);
+    assert.equal(tableChildParentIsPending("View"), false);
+    assert.equal(tableChildParentIsPending(""), false);
+    assert.equal(tableChildParentIsPending(null), false);
+});
+
+// zhy：父表保存后恢复模块查询，继续返回关联表字段并执行原模块权限条件。
+test("joined TableChild restores its module query after the parent is saved", () => {
+    for (const formMode of ["Edit", "View", ""]) {
+        const request = resolveTableQueryTarget(
+            { ModuleEngineKey: "joined-child-module" },
+            {
+                sysMenuId: "joined-child-menu",
+                formEngineKey: "child_table",
+                tableId: "child-table",
+                isTableChild: true,
+                tableChildFormMode: formMode,
+                tableChildRequiresModuleQuery: true
+            }
+        );
+
+        assert.equal(request.ModuleEngineKey, "joined-child-module");
+        assert.equal(request.FormEngineKey, undefined);
+    }
 });
 
 // zhy：无关联配置的普通 TableChild 保持原物理表路径，防止子菜单数据范围过滤为零条。
@@ -154,6 +219,7 @@ test("ordinary module lists keep their existing ModuleEngineKey behavior", () =>
             formEngineKey: "normal_table",
             tableId: "normal-table",
             isTableChild: false,
+            tableChildFormMode: "Add",
             tableChildRequiresModuleQuery: false
         }
     );
