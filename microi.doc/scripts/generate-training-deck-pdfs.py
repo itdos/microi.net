@@ -12,7 +12,6 @@ import gc
 import argparse
 import hashlib
 import re
-import shutil
 import time
 from pathlib import Path
 
@@ -27,7 +26,8 @@ WORKSPACE_ROOT = PROJECT_ROOT.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--edition", choices=("technical", "enterprise"), default="technical")
 parser.add_argument("--capture-root", type=Path)
-parser.add_argument("--output-root", type=Path, default=WORKSPACE_ROOT / "output" / "pdf")
+# 大文件先写入忽略目录；发布者核验 CDN 字节后更新下载清单，不再写回 Git 跟踪目录。
+parser.add_argument("--output-root", type=Path, default=WORKSPACE_ROOT / ".tmp" / "training-deck-downloads" / "pdf")
 arguments = parser.parse_args()
 EDITION = arguments.edition
 # 两套课件隔离截图、缩略图与下载文件，企业版更新不能重写技术版现有资产。
@@ -37,7 +37,6 @@ default_capture_root = (
     else WORKSPACE_ROOT / ".tmp" / "training-deck" / "pdfs"
 )
 TEMP_ROOT = (arguments.capture_root or default_capture_root).resolve()
-PUBLIC_ROOT = PROJECT_ROOT / "docs" / "public" / "downloads"
 thumbnail_directory = "training-deck-enterprise" if EDITION == "enterprise" else "training-deck"
 THUMBNAIL_ROOTS = {
     "dark": PROJECT_ROOT / "docs" / "public" / "images" / thumbnail_directory / "thumbs",
@@ -103,7 +102,6 @@ def build_variant(variant: str, label: str) -> dict[str, object]:
     raw_dir = TEMP_ROOT / variant / "raw"
     image_dir = TEMP_ROOT / variant / "cropped"
     image_dir.mkdir(parents=True, exist_ok=True)
-    PUBLIC_ROOT.mkdir(parents=True, exist_ok=True)
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     thumbnail_root = THUMBNAIL_ROOTS[variant]
     thumbnail_root.mkdir(parents=True, exist_ok=True)
@@ -144,7 +142,7 @@ def build_variant(variant: str, label: str) -> dict[str, object]:
             masters.append(master)
 
     filename = f"{PDF_BASENAME}-{variant}.pdf"
-    public_pdf = PUBLIC_ROOT / filename
+    output_pdf = OUTPUT_ROOT / filename
     page_pdf_dir = TEMP_ROOT / variant / "pages"
     page_pdf_dir.mkdir(parents=True, exist_ok=True)
     page_pdfs: list[Path] = []
@@ -181,19 +179,16 @@ def build_variant(variant: str, label: str) -> dict[str, object]:
         "/Subject": f"{SLIDE_COUNT}页{PDF_SUBJECT}",
         "/Creator": "Microi吾码官网预生成培训课件",
     })
-    with public_pdf.open("wb") as stream:
+    with output_pdf.open("wb") as stream:
         writer.write(stream)
 
-    output_pdf = OUTPUT_ROOT / filename
-    shutil.copy2(public_pdf, output_pdf)
     return {
         "edition": EDITION,
         "variant": variant,
         "pages": len(masters),
-        "public_pdf": str(public_pdf),
         "output_pdf": str(output_pdf),
-        "bytes": public_pdf.stat().st_size,
-        "sha256": sha256(public_pdf),
+        "bytes": output_pdf.stat().st_size,
+        "sha256": sha256(output_pdf),
         "master_size": Image.open(masters[0]).size,
     }
 

@@ -10,6 +10,7 @@ import { enterpriseSlideCount, enterpriseSlides, enterpriseSections } from '../d
 import { parseTrainingHash, trainingHash, trainingPdfPaths } from '../docs/.vitepress/theme/training-deck-versions.js'
 import * as trainingVersions from '../docs/.vitepress/theme/training-deck-versions.js'
 import { searchTrainingSlides } from '../docs/.vitepress/theme/training-syllabus-search.js'
+import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const publicRoot = path.join(projectRoot, 'docs/public')
@@ -243,7 +244,7 @@ test('企业暗浅 PDF 下载与在线页数匹配，技术版下载仍独立保
   assert.equal(new Set(paths).size, 4, 'no edition or theme may overwrite another download')
   for (const [version, themes] of Object.entries(trainingPdfPaths)) {
     for (const [theme, url] of Object.entries(themes)) {
-      const file = fs.readFileSync(publicFile(url))
+      const file = fs.readFileSync(verifiedTrainingAssetPath(url))
       assert.equal(file.subarray(0, 5).toString('ascii'), '%PDF-', `${version}/${theme}: invalid download`)
       assert.ok(file.length > 250_000, `${version}/${theme}: incomplete slide download`)
       const body = file.toString('latin1')
@@ -252,7 +253,7 @@ test('企业暗浅 PDF 下载与在线页数匹配，技术版下载仍独立保
       assert.equal([...body.matchAll(/\/MediaBox\s*\[\s*0\s+0\s+960\s+540\s*\]/gu)].length, counts[version], `${version}/${theme}: all pages retain 16:9 dimensions`)
     }
   }
-  assert.notEqual(Buffer.compare(fs.readFileSync(publicFile(trainingPdfPaths.enterprise.dark)), fs.readFileSync(publicFile(trainingPdfPaths.enterprise.light))), 0, 'the light PDF must not reuse dark bytes')
+  assert.notEqual(Buffer.compare(fs.readFileSync(verifiedTrainingAssetPath(trainingPdfPaths.enterprise.dark)), fs.readFileSync(verifiedTrainingAssetPath(trainingPdfPaths.enterprise.light))), 0, 'the light PDF must not reuse dark bytes')
 })
 
 test('企业预览完整提供 12 页独立暗浅缩略图，顺序和下载页码一致', () => {

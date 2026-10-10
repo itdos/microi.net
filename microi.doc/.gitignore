@@ -149,3 +149,14 @@ dist/
 *.sw?
 
 .vitepress/dist
+
+# 已迁移到官方 CDN 的培训下载不再进入官网源码或 dist。
+/docs/public/downloads/microi-ai-development-framework-training-syllabus-dark.pdf
+/docs/public/downloads/microi-ai-development-framework-training-syllabus-dark.pptx
+/docs/public/downloads/microi-ai-development-framework-training-syllabus-light.pdf
+/docs/public/downloads/microi-ai-development-framework-training-syllabus-light.pptx
+/docs/public/downloads/microi-ai-development-framework-training-syllabus.pdf
+/docs/public/downloads/microi-enterprise-application-training-syllabus-dark.pdf
+/docs/public/downloads/microi-enterprise-application-training-syllabus-dark.pptx
+/docs/public/downloads/microi-enterprise-application-training-syllabus-light.pdf
+/docs/public/downloads/microi-enterprise-application-training-syllabus-light.pptx
