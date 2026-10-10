@@ -9,7 +9,7 @@ alwaysApply: true
 
 ## Microi 工作区强制规则唯一来源
 
-每次新对话或接续 Microi 任务，先完整读取 `microi.skills/workspace-conventions/SKILL.md`，按首部执行创始人身份识别及平台功能四项同步检查（应用商城、官方文档、Skills、MCP），再读取当前任务所需专项 Skill。完整规则仅维护在该基础入口；本文件与生成模板不复制规则正文，也不把只读任务或官方发布扩张为客户自动部署。
+每次新对话或接续 Microi 任务，先完整读取 `microi.skills/workspace-conventions/SKILL.md`，按首部执行创始人身份识别及平台功能四项同步检查（应用商城、官方文档、Skills、MCP），并执行版本检查、非阻塞自动升级及进度播报。随后默认读取 `microi.skills/microi-system-delivery/SKILL.md` 及相关专项 Skills；用户直接描述需求即可，无需用户指定 Skill 名称。详细路由和八项清单只维护在 Skills 中，按完整开发、局部修改、只读分析的实际范围执行，不把默认读取扩张为生产写入或客户自动部署。
 
 处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，优先参考下列 skill 文件获取模板、约束和验收规范。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
 - @microi.skills/v8-crud-api/SKILL.md — Microi V8 CRUD API 接口引擎开发
