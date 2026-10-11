@@ -90,7 +90,7 @@ test('汇总尚未加载或失败时阻止保存，空商品返回和无效数�
   await termination.bindTerminationOrder(ctx, { Id: 'o1' }, { FormEngine: { GetTableData: async () => ({ Code: 1, Data: [] }) } })
   assert.equal(ctx.state.terminationGoodsReady, true)
 })
-test('订单跳转新增使用后台新增权限，复核后传入订单默认值', async () => {
+test('订单编号隐藏断约快捷入口，保留处理权限和订单默认值', async () => {
   let permission = false
   let opened
   const h = hooks({ findMenu: async () => ({ Id: 'menu' }), canAddMenuRecord: () => permission,
@@ -99,7 +99,7 @@ test('订单跳转新增使用后台新增权限，复核后传入订单默认�
   assert.equal(h.getFieldActions(ctx, { Name: 'DingdanBH' }).length, 0)
   await assert.rejects(h.runFieldAction(ctx, {}, { key: 'xjy-order-termination' }), /新增权限/)
   permission = true
-  assert.equal(h.getFieldActions(ctx, { Name: 'DingdanBH' })[0].label, '断约申请')
+  assert.equal(h.getFieldActions(ctx, { Name: 'DingdanBH' }).length, 0)
   await h.runFieldAction(ctx, {}, { key: 'xjy-order-termination' })
   assert.equal(opened.defaultValues.DingdanID, 'o1')
   assert.equal(opened.menuId, 'menu')
