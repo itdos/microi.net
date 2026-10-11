@@ -23,9 +23,9 @@ test('two actual concurrent SDK builds and package audits use their Full result 
     assert.ok(binary,'PowerShell is required; output isolation regression never skips');
     fs.mkdirSync(path.join(root,'source'));
     const project=path.join(root,'source/fixture.csproj'),harness=path.join(root,'harness.ps1');
-    fs.writeFileSync(project,'<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>');
-    fs.writeFileSync(path.join(root,'source/Source.cs'),'public sealed class IsolationFixture { public int Value => 1; }');
-    fs.writeFileSync(harness,`param([string]$ResultsDirectory,[string]$Project)\n$ErrorActionPreference='Stop'\n$Mode='Full'\n${isolation}\ndotnet build $Project --disable-build-servers -m:1 -nr:false -p:UseSharedCompilation=false -v:quiet\nif ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\ndotnet list $Project package --no-restore\nexit $LASTEXITCODE\n`);
+    fs.writeFileSync(project,'<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup></Project>');
+    fs.writeFileSync(path.join(root,'source/Source.cs'),'using System; Console.WriteLine(AppContext.BaseDirectory); public sealed class IsolationFixture { public int Value => 1; }');
+    fs.writeFileSync(harness,`param([string]$ResultsDirectory,[string]$Project)\n$ErrorActionPreference='Stop'\n$Mode='Full'\n$serverRoot=Join-Path $PSScriptRoot 'source'\n${isolation}\ndotnet build $Project --disable-build-servers -m:1 -nr:false -p:UseSharedCompilation=false -v:quiet\nif ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n$builtDll=@(Get-ChildItem -LiteralPath $env:ArtifactsPath -Filter fixture.dll -File -Recurse)[0].FullName\n$observedBase=(& dotnet $builtDll | Select-Object -Last 1)\nif ($LASTEXITCODE -ne 0 -or -not $observedBase.StartsWith($env:ArtifactsPath,[StringComparison]::OrdinalIgnoreCase)) { throw "SDK output lost workspace link: $observedBase" }\ndotnet list $Project package --no-restore\nexit $LASTEXITCODE\n`);
     try{
         const results=await Promise.all(['api','pc'].map(scope=>run(binary,['-NoProfile','-File',harness,'-ResultsDirectory',path.join(root,scope),'-Project',project],{cwd:root,env:{...process.env,DOTNET_CLI_TELEMETRY_OPTOUT:'1'}})));
         for(const result of results)assert.equal(result.code,0,result.output);

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { calculateBuildMemoryPlan } from '../scripts/build-memory-plan.mjs';
@@ -9,7 +10,7 @@ import {
     modernBuildTargets,
     modernMinifyPipelineVersion
 } from '../scripts/modern-build-pipeline.mjs';
-import { minifyModernOutput } from '../scripts/minify-modern-output.mjs';
+import { minifyModernOutput, renameMinifiedOutput } from '../scripts/minify-modern-output.mjs';
 
 const GB = 1024 ** 3;
 const testDir = path.dirname(fileURLToPath(import.meta.url));
@@ -105,8 +106,67 @@ try {
     assert.equal(typeof classicContext.LoadRate, 'function');
     assert.equal(typeof classicContext.window.LoadRate, 'function');
     assert.equal(legacyOutput, legacySource);
+
+    const retryTarget = path.join(workspaceDir, 'rename-target.js');
+    const retryTemporary = `${retryTarget}.tmp`;
+    await writeFile(retryTarget, 'old output', 'utf8');
+    await writeFile(retryTemporary, 'new output', 'utf8');
+    let retryAttempts = 0;
+    const retryWaits = [];
+    await renameMinifiedOutput(retryTemporary, retryTarget, {
+        platform: 'win32',
+        renameFile: async (...args) => {
+            retryAttempts += 1;
+            if (retryAttempts < 3) {
+                const error = new Error('simulated temporary Windows file lock');
+                error.code = retryAttempts === 1 ? 'EPERM' : 'EBUSY';
+                throw error;
+            }
+            await rename(...args);
+        },
+        wait: async (delayMs) => { retryWaits.push(delayMs); await sleep(delayMs); }
+    });
+    assert.equal(retryAttempts, 3);
+    assert.deepEqual(retryWaits, [40, 80]);
+    assert.equal(await readFile(retryTarget, 'utf8'), 'new output');
+
+    const persistentTarget = path.join(workspaceDir, 'persistent-target.js');
+    const persistentTemporary = `${persistentTarget}.tmp`;
+    await writeFile(persistentTarget, 'original output', 'utf8');
+    await writeFile(persistentTemporary, 'unpublished output', 'utf8');
+    const persistentError = new Error('simulated persistent Windows file lock');
+    persistentError.code = 'EPERM';
+    let persistentAttempts = 0;
+    const persistentWaits = [];
+    await assert.rejects(
+        renameMinifiedOutput(persistentTemporary, persistentTarget, {
+            platform: 'win32',
+            renameFile: async () => { persistentAttempts += 1; throw persistentError; },
+            wait: async (delayMs) => { persistentWaits.push(delayMs); }
+        }),
+        (error) => error === persistentError
+    );
+    assert.equal(persistentAttempts, 6);
+    assert.equal(persistentWaits.length, 5);
+    assert.equal(await readFile(persistentTarget, 'utf8'), 'original output');
+    assert.equal(await readFile(persistentTemporary, 'utf8'), 'unpublished output');
+
+    for (const [platform, code] of [['linux', 'EPERM'], ['win32', 'EIO']]) {
+        let attempts = 0;
+        const unexpectedError = new Error('non-retryable rename failure');
+        unexpectedError.code = code;
+        await assert.rejects(
+            renameMinifiedOutput('source', 'target', {
+                platform,
+                renameFile: async () => { attempts += 1; throw unexpectedError; },
+                wait: async () => { throw new Error('must not wait'); }
+            }),
+            (error) => error === unexpectedError
+        );
+        assert.equal(attempts, 1);
+    }
 } finally {
     await rm(workspaceDir, { recursive: true, force: true });
 }
 
-console.log('PASS modern output minify tests: 16/16');
+console.log('PASS modern output minify tests');

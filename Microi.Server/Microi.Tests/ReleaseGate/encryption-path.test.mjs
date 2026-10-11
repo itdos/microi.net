@@ -1,15 +1,20 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const script = fileURLToPath(new URL('../../Microi.net/License/scripts/encrypt-dll.sh', import.meta.url)).replaceAll('\\', '/');
+// Windows 的裸 bash 可能指向 WSL；路径兼容测试必须使用与正式发布相同的 Git Bash。
+const bash = process.platform === 'win32'
+  ? path.resolve(execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim(), '../../..', 'bin/bash.exe')
+  : 'bash';
 function convert(platform, path, converter = false) {
   const program = `source "$1"
 uname() { printf '%s\\n' "$MICROI_TEST_UNAME"; }
 ${converter ? `cygpath() { test "$1" = '-w'; printf 'native-converter:%s\\n' "$2"; }` : `command() { if [[ "$1" == '-v' && "$2" == 'cygpath' ]]; then return 1; fi; builtin command "$@"; }`}
 to_win_path "$2"`;
-  const result = spawnSync('bash', ['-c', program, 'encryption-path-test', script, path], {
+  const result = spawnSync(bash, ['-c', program, 'encryption-path-test', script, path], {
     encoding: 'utf8', env: { ...process.env, MICROI_TEST_UNAME: platform }, timeout: 10000,
   });
   assert.equal(result.status, 0, result.stderr);
