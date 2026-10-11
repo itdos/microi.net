@@ -16,15 +16,6 @@ const contacts = [
     link: 'https://microi.net',
   },
   {
-    name: '毛总',
-    role: '技术支持大牛、运营',
-    qrCode: 'https://static.itdos.com/upload/img/0260206233219_1777_90.jpeg',
-    avatar: 'https://static.itdos.com/upload/img/1941561_mao_js_1743180526.png',
-    phone: '18892622042',
-    email: 'jiashun.mao@surchin.cn',
-    link: 'https://gitee.com/mao_js',
-  },
-  {
     name: '邓总',
     role: '总经理、商务',
     qrCode: '/contact/dengzong.jpeg',
@@ -34,13 +25,17 @@ const contacts = [
     link: '待补充',
   },
   {
-    name: '唐总',
-    role: '商务',
-    qrCode: '/contact/tangzong.jpeg',
-    avatar: 'https://static.itdos.com/upload/img/ScreenShot_2026-02-07_002607_028.png',
-    phone: '待补充',
-    email: '待补充',
-    link: '待补充',
+    name: '周丽',
+    role: '渠道总监',
+    qrCode: '/contact/zhouli.jpg',
+    wechatProfileImage: true,
+  },
+  {
+    name: '邵经理',
+    role: '销售总监',
+    qrCode: '/contact/shaomanager.jpg',
+    wechatProfileImage: true,
+    phone: '18606865901',
   },
   {
     name: '刘老师',
@@ -59,6 +54,24 @@ const contacts = [
     phone: '待补充',
     email: '待补充',
     link: 'https://lisaisai.blog.csdn.net/?type=blog',
+  },
+  {
+    name: '毛总',
+    role: '技术支持大牛、运营',
+    qrCode: 'https://static.itdos.com/upload/img/0260206233219_1777_90.jpeg',
+    avatar: 'https://static.itdos.com/upload/img/1941561_mao_js_1743180526.png',
+    phone: '18892622042',
+    email: 'jiashun.mao@surchin.cn',
+    link: 'https://gitee.com/mao_js',
+  },
+  {
+    name: '唐总',
+    role: '商务',
+    qrCode: '/contact/tangzong.jpeg',
+    avatar: 'https://static.itdos.com/upload/img/ScreenShot_2026-02-07_002607_028.png',
+    phone: '待补充',
+    email: '待补充',
+    link: '待补充',
   }
 ]
 </script>
