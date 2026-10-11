@@ -1,5 +1,6 @@
 import { readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { transformWithEsbuild } from 'vite';
 import { modernBuildTargets } from './modern-build-pipeline.mjs';
@@ -8,6 +9,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(scriptDir, '..');
 const defaultDistDir = path.join(projectDir, 'bin', 'Release', 'dist');
 const defaultPublicDir = path.join(projectDir, 'public');
+const windowsRenameRetryDelaysMs = [40, 80, 160, 320, 640];
 
 function normalizeRelativePath(filePath) {
     return filePath.split(path.sep).join('/');
@@ -51,6 +53,27 @@ function assertClassicScriptSyntax(source, relativePath) {
         Function(source);
     } catch (error) {
         throw new Error(`public 经典脚本压缩后无法按普通 <script> 解析：${relativePath}；${error.message}`);
+    }
+}
+
+export async function renameMinifiedOutput(temporaryPath, filePath, {
+    renameFile = rename,
+    wait = sleep,
+    platform = process.platform
+} = {}) {
+    for (let attempt = 0; ; attempt += 1) {
+        try {
+            await renameFile(temporaryPath, filePath);
+            return;
+        } catch (error) {
+            // Windows 上杀毒/索引器短暂持有目标文件时，保留临时文件并重试同一次原子替换。
+            // 其它错误及耗尽预算仍失败，不能通过删除目标文件掩盖不完整的构建产物。
+            if (platform !== 'win32' || !['EPERM', 'EBUSY'].includes(error?.code)
+                || attempt >= windowsRenameRetryDelaysMs.length) {
+                throw error;
+            }
+            await wait(windowsRenameRetryDelaysMs[attempt]);
+        }
     }
 }
 
@@ -110,7 +133,7 @@ export async function minifyModernOutput({
         const temporaryPath = `${filePath}.${process.pid}.microi-minify.tmp`;
         try {
             await writeFile(temporaryPath, output, 'utf8');
-            await rename(temporaryPath, filePath);
+            await renameMinifiedOutput(temporaryPath, filePath);
         } finally {
             await rm(temporaryPath, { force: true });
         }

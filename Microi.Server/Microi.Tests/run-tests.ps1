@@ -260,9 +260,36 @@ if ($LASTEXITCODE -ne 0) { throw "File-cabinet Office regression tests failed wi
 # Full 的 restore/build/test/list package 全部继承同一 SDK 输出目录。
 # API 与 PC 可并行 Full，不写对方或长期开发服务的 bin/obj；只修改本 PowerShell 子进程环境。
 if ($Mode -eq 'Full') {
-    $env:ArtifactsPath = [IO.Path]::GetFullPath((Join-Path $ResultsDirectory '.net-artifacts'))
+    $artifactTarget = [IO.Path]::GetFullPath((Join-Path $ResultsDirectory '.net-artifacts'))
+    $workspaceRoot = [IO.Path]::GetFullPath((Split-Path -Parent $serverRoot))
+    $linkRoot = [IO.Path]::GetFullPath((Join-Path $workspaceRoot '.tmp'))
+    if (-not $linkRoot.StartsWith($workspaceRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Full artifact link directory escaped the workspace.'
+    }
+    New-Item -ItemType Directory -Path $artifactTarget -Force | Out-Null
+    New-Item -ItemType Directory -Path $linkRoot -Force | Out-Null
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $targetBytes = [Text.Encoding]::UTF8.GetBytes($artifactTarget.ToUpperInvariant())
+        $targetHash = [BitConverter]::ToString($sha.ComputeHash($targetBytes)).Replace('-', '').ToLowerInvariant()
+    }
+    finally { $sha.Dispose() }
+    $artifactLink = Join-Path $linkRoot ('microi-full-artifacts-' + $targetHash.Substring(0, 24))
+    $linkType = if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') { 'Junction' } else { 'SymbolicLink' }
+    $linkItem = Get-Item -LiteralPath $artifactLink -Force -ErrorAction SilentlyContinue
+    if ($null -eq $linkItem) {
+        # 源码契约测试从 AppContext.BaseDirectory 向上寻找仓库；联接保留仓内路径，实际字节仍落在隔离结果盘。
+        New-Item -ItemType $linkType -Path $artifactLink -Target $artifactTarget -ErrorAction Stop | Out-Null
+        $linkItem = Get-Item -LiteralPath $artifactLink -Force -ErrorAction Stop
+    }
+    $existingTarget = @($linkItem.Target) | Select-Object -First 1
+    if ($linkItem.LinkType -ne $linkType -or [string]::IsNullOrWhiteSpace($existingTarget) -or
+        [IO.Path]::GetFullPath($existingTarget) -ne $artifactTarget) {
+        throw "Full artifact link collision: $artifactLink"
+    }
+    $env:ArtifactsPath = $artifactLink
     $env:UseArtifactsOutput = 'true'
-    Write-Host "Isolated Full build artifacts: $env:ArtifactsPath"
+    Write-Host "Isolated Full build artifacts: $artifactTarget (workspace link: $artifactLink)"
 }
 
 Write-Host "Restoring Microi.Tests with one restore worker..."
