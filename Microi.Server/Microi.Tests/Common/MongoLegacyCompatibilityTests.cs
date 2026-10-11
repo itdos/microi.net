@@ -14,9 +14,9 @@ public class MongoCompatibilitySourceTests
     public void CompatibilityBuild_RetainsPatchedUpstreamAndOnlyChangesTheMinimumProtocol()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root != null && !Directory.Exists(Path.Combine(root.FullName, "Microi.Server", "ThirdParty"))) root = root.Parent;
+        while (root != null && !Directory.Exists(Path.Combine(root.FullName, "Microi.Server", "Microi.MongoDB.Driver"))) root = root.Parent;
         Assert.NotNull(root);
-        var directory = Path.Combine(root.FullName, "Microi.Server", "ThirdParty", "MongoDB.Driver");
+        var directory = Path.Combine(root.FullName, "Microi.Server", "Microi.MongoDB.Driver");
         var manifest = JObject.Parse(File.ReadAllText(Path.Combine(directory, "provenance.json")));
         var archive = Path.Combine(directory, "upstream-3.11.2.source.zip");
         Assert.Equal(manifest["sourceArchiveSha256"]!.ToString(), Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(archive))).ToLowerInvariant());
@@ -26,6 +26,7 @@ public class MongoCompatibilitySourceTests
         var patched = File.ReadAllText(Path.Combine(directory, "WireVersion.Compatibility.cs")).Replace("\r\n", "\n");
         patched = string.Join("\n", patched.Split('\n').Where(line => !line.TrimStart().StartsWith("// Microi 兼容补丁：")));
         Assert.Equal(original.Replace("minWireVersion: Server44", "minWireVersion: Server36"), patched);
+        Assert.Equal("Microi.MongoDB.Driver", typeof(MongoClient).Assembly.GetName().Name);
         Assert.Equal(new Version(3, 11, 2, 0), typeof(MongoClient).Assembly.GetName().Version);
         Assert.Contains("microi-legacy1", typeof(MongoClient).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
         Assert.Equal(3, typeof(BsonDocument).Assembly.GetName().Version!.Major);

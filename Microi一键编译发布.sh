@@ -1610,6 +1610,9 @@ if [ "$PUSH_NUGET" = true ]; then
         print_warning "未找到版本 $VERSION 的 .nupkg 文件"
     else
         _push_count=0
+        # Full 验收之后的构建/打包历时较长；首包和每包上传前都必须确认源码
+        # 仍是经 Full 验收的候选，避免共享工作区漂移后先发布 NuGet。
+        node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "首个 NuGet 上传前候选源码发生变化；禁止上传。"
         # 首个 push 前再次读取完整实际集合并校验所有包哈希；随后每包再 CAS。
         if [ "$HAS_ENCRYPT" = true ]; then
             if ! find Microi.Server -path "*/bin/Release/*.$VERSION.nupkg" -not -name "*.symbols.nupkg" -print0 > "$_nupkg_check_file"; then
@@ -1618,6 +1621,7 @@ if [ "$PUSH_NUGET" = true ]; then
             node Microi.Server/tools/release-encryption.mjs packages-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_check_file" || print_fail "首个上传前 NuGet 清单或包字节发生变化；禁止全部上传。"
         fi
         while IFS= read -r -d '' _nupkg; do
+            node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "当前 NuGet 上传前候选源码发生变化；禁止上传。"
             if [ "$HAS_ENCRYPT" = true ]; then
                 node Microi.Server/tools/release-encryption.mjs package-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg" || print_fail "当前 NuGet 包未经核验或字节发生变化；禁止上传。"
             fi
