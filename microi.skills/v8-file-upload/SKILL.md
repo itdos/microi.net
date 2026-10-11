@@ -93,7 +93,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 使用 i_app_cdn_backfill 的 RepairCommittedCdnAliases 前，必须读取[完整绑定、范围与并发边界](references/cdn-alias-repair.md)。保持默认 DryRun、原始字节哈希与 Base64 摘要分离，并独立回读实际 CDN 字节。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=103f9fba40afae432102e8538ef5889d027b69adcde018cf28ea4521d836adb5 -->
+<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=9402f7173710e8d110392f184119154a50187138ab7d698fce0b73b5f12123e2 -->
 ## 核心 API
 
 | API | 说明 |
@@ -114,7 +114,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 MinIO SDK 7 的复制签名不匹配还可能来自带参数 MIME：SDK 对源 `Content-Type` 签名，却在 HTTP 请求中额外保留 `StringContent` 的默认 MIME。先在独立夹具核对源 MIME、重复头和真实存储返回，再升级后端复制传输修复；不能去掉 `charset`、关闭签名校验或下载后重传来伪造通过。修复后必须同时验证公私桶原始字节、精确 MIME、源元数据及源对象保留，固定入口恢复另覆盖主库权威、真实共享租约、双节点竞争和新进程重跑。取消/超时后保持原请求键，先回读目标再决定是否继续。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-001 sha256=75f69f74c9e9c6799fdddb39d14fa2e831886aa1f9e41a1388e37b7fb620b91e -->
+<!-- microi-progressive:chunk id=v8-file-upload-001 sha256=d535a333639a9005f5d20f25e36e2753a11835380713c1bb063ae618e6cea4af -->
 ## 第三方数据库附件迁移
 
 当第三方表只保存附件路径时，先用 `microi_inspect_external_database` / `microi_query_external_database` 或 `V8.Dbs.<DbKey>` 查询记录。`microi_import_external_attachment` 允许后端已确认的 `Level >= 9999` 当前用户直接提供 HTTP/HTTPS URL、API 节点可读的本机绝对路径或 UNC 路径。
@@ -131,7 +131,7 @@ MinIO SDK 7 的复制签名不匹配还可能来自带参数 MIME：SDK 对源 `
 可信后端 V8 可用 `V8.Http.GetResponse({ Url: url }).RawBytes` 下载，再用 `System.Convert.ToBase64String` 和 `V8.Method.Upload` 上传。该路径同样必须校验域名、大小、Content-Type、后缀和最终重定向目标。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=2aec315a252c2738bc3055dd5840e31e4984c4fc884d9bbf059b585b302b389c -->
+<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=176e9f91705f20416e177d7dbdbd32fb8f81dff6ba0da1a45b533795d187f0e0 -->
 ## 接收前端上传的文件
 
 前端发起文件上传时，平台自动把文件以 base64 形式注入到 `V8.FilesByteBase64`：
@@ -233,7 +233,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 生产 H5 不能只依赖 `uni.uploadFile`。页面从 `uni.chooseImage` 得到的 `tempFiles[0].file`、`tempFiles[0]`、`blob:` / `data:` 临时路径都要传给 `V8.uploadFile`，并设置 `preferFetch:true`；SDK 必须能用 `fetch + FormData` 兜底，否则线上可能报 `未找到 MicroiV8 上传适配器。`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=ba21d592f1927ae9624bd76ba16782b4f3b5ee5356bf8ea4189e854587855b62 -->
+<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=d02dfde4abd2349cd92de1daee129bc08ba42142b5f6229736588cb3e0dbf43c -->
 ## 跨平台文件同步登录会话
 
 文件柜、文件同步等需要连接另一套 Microi API 的工具，必须把远程平台视为独立登录会话：

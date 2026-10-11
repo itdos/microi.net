@@ -1,6 +1,6 @@
 ---
 name: microi-uniapp-frontend
-description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复任何 Microi uni-app/移动端 H5 项目，覆盖上传资源渲染、头像、骨架屏、移动安全区、tabBar、固定底栏和明确业务素材选择。
+description: Microi 吾码 UniApp/H5/App/小程序前端规范。用于创建或维护移动产品，覆盖手机号快捷登录、租户长效会话、统一角色源码、地图接入、资源、安全区、持续动效和真实发布验收。
 ---
 
 > **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
@@ -20,10 +20,10 @@ UniApp/H5/小程序必须通过项目统一 `microi.v8.js` 的 `V8.uploadFile` /
 登录页默认不得展示 ApiBase、OsClient 或调试配置；但用户明确要求、且安装包由 Microi 平台方作为多租户聚合客户端发布时，允许仅在 `APP-PLUS` 登录页提供通用连接器。协议必须使用固定 `https://` / `http://` 下拉框，地址框禁止重复输入协议，HTTPS 默认，HTTP 显示明文风险并二次确认；H5、小程序和客户专属包不得因此自动开放。候选地址先匿名读取 `GetSysConfig`，验证成功后再持久化。真正切换时必须清除旧 DiyToken、用户、SignalR、菜单/元数据/页面缓存，按 `ApiBase + OsClient` 隔离记住的账号及 RSA 密文，并用端点代次拒绝切换前的迟到响应。支持任意 HTTP 时，最终 IPA 必须显式包含 ATS 例外，Android 安装包必须显式包含 cleartext 例外；不需要任意 HTTP 的正式包应保持平台默认安全策略，iOS ATS 例外还必须在 App Store 审核中说明。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-000 sha256=ecb0fc85b5c3b15ac79c9049ca86de8c586d4ce3a6c975255464069d89f87ac4 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-000 sha256=1920cc0ada5d520baa49ce7f0d7949abd6fac1e410b35a4319b8f18f3e9d872e -->
 ## 移动端质量门禁必须先读
 
-创建、重构或修复任何 Microi 移动端项目前，必须同时应用 `microi.skills/microi-mobile-app-quality/SKILL.md`。该 Skill 中的底部导航真实图标、重要按钮图标化、登录 API 校验、微信手机号快捷登录、后台二级菜单和页面动效要求，属于交付验收条件，不是可选优化。
+创建、重构或修复任何 Microi 移动端项目前，必须同时应用 `microi.skills/microi-mobile-app-quality/SKILL.md`，并读取其[首版交付与外部服务验收](../microi-mobile-app-quality/references/mobile-first-delivery.md)。手机号快捷登录、会话续签、导航几何、真实地图、页面动效和公开发布回读从首版纳入需求与测试，不能先交静态占位版，再等待用户逐页指出问题。涉及后台与第三方服务时按实际业务范围执行，既有授权和租户策略优先。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=microi-uniapp-frontend-001 sha256=b195b92de6175b7f184257a0ba3b53b94b8a6aaee7ab42fbb05fe1f5338ba097 -->
@@ -50,12 +50,13 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 仓库必须提供 AI 与人工协作约束文件、租户脚手架、Profile 构建/同步命令和架构检查。平台层改动至少同时构建标准 Profile 与默认交付 Profile；租户视觉改动还要执行多视口截图回归。这样其他同事使用 Codex、Claude、Copilot、Cursor 等工具继续开发时，会先读取相同规则，而不是依赖某次对话记忆。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-002 sha256=b13374ee48e0a938a5b21d0297ff6683a8e6c9eadf3b105e6d0c794bc603cefb -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-002 sha256=1faa6e553ff61b9043ff7608d02518e815f1dcbe2cc56fefb8adff326c5d1f1f -->
 ## H5 预览壳与底部导航强制规则
 
 - H5 的底部安全区采用 CSS `env(safe-area-inset-bottom)` 等浏览器权威值，不能使用 `screenHeight - windowHeight` 或 `screen.height - innerHeight` 推算。App/小程序只读取平台权威 inset；零值正常，禁止用 `inset || guessedFallback` 换成猜测值。验收必须覆盖物理屏幕与浏览器视口不同、非最大化桌面、缩放和移动浏览器工具栏收展。
 
 - 桌面浏览器允许使用 `Microi UniApp H5 Preview` 手机壳帮助用户理解移动端比例。
+- 面向手机的页面在桌面手机壳内仍保持相同的单列布局和移动字号，不能因外窗变宽把地图、主面板或整页拆成桌面两列；业务明确设计的分类双栏另按其独立滚动规范执行。
 - 真机、窄屏浏览器以及 PC DevTools 移动设备仿真必须自动去掉手机壳标题、外边距、圆角、边框和阴影，内容铺满当前可见视口。`767px` 是常用宽度断点，不是手机身份判断；手机横屏/旋转不能因宽度超过它就重新套壳。H5 优先使用动态视口高度并保留旧浏览器兜底，键盘与浏览器栏变化要重新核对可见区域。
 - 桌面手机壳必须约束高度，不能只用 `min-height:100vh` 让内容继续撑长。导航底边贴齐手机壳**内屏**底边，不是浏览器窗口底边；头部和导航不收缩，正文及路由中间包装层使用 `flex:1; min-height:0; min-width:0`。
 - 普通单列壳只有一个正文滚动 owner；流内底栏已占高度，不再给正文叠加整条 tabBar 占位。覆盖式固定底栏由共享布局预留一次实测总高度，包含真实安全区；禁止根容器、正文、占位元素与导航分别重复累加底部间距。双栏列表仅允许明确设计的两块独立滚动区。
@@ -65,18 +66,22 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 - 完整实现与门禁示例见 [H5 手机壳和几何验收](references/progressive-01-移动端分类-双栏列表独立滚动.md#h5-在-pc-浏览器必须自动模拟移动端)。修改共享壳后重跑所有 Tab 与路由，不能只给当前页面补 padding。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-003 sha256=5cedd05cb29746019a92db56a21123718fde23d5d9df4b8064dfc260bc89ee05 -->
-## 登录页与手机号快捷登录
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-003 sha256=68be2d2ac3b9319cca4119b25b3f268bde8576de0093747ae20544cfc81ff102 -->
+## 默认快捷登录、自动注册与长效会话
 
-- 登录页必须是直接登录面，不要默认做“员工登录 / 客户登录”身份 Tab 切换，除非用户明确要求。默认展示系统账号密码登录，同时提供客户手机号快捷登录入口。
+- H5/App 面向用户的默认登录面为“手机号 + 图形验证码 + 短信验证码”，同一个提交动作由服务端判断：已注册登录，未注册按当前租户开放注册策略自动注册并登录。密码登录是次级折叠/备用入口，不先要求选择“登录/注册”或“员工/客户”。企业封闭账号及用户明确指定的登录模型保留其策略；不得为了展示快捷登录而擅自开放注册、启用短信或授予员工角色。
+- 图形验证码先用于服务端校验短信发送，短信码才证明手机号控制权；供应商未配置、余额不足或短信失败时返回可诊断原因，不能以图形码代替短信、使用万能码或返回短信明文。前端倒计时不代替后端限频、过期、用途绑定、一次性消费与重放保护。沿用官网/标准 UniApp 的实际契约，不能照抄界面后猜接口。
+- 默认新账号只获得租户定义的最低用户角色；高级身份申请经后台审核后才升级。多角色用同一源码、同一 DiyToken 和集中 capability 切换工作模式；已审核的服务角色可默认进入工作台，同时保留已授权的普通用户能力。前端模式和角色缓存不能授予接口权限。
 - 账号密码登录必须先检查项目本地 SDK 实际导出，常见是 `V8.Login(param)` 或 `/api/SysUser/Login`。禁止凭空写 `V8.Login.Login(...)` 这类未验证子对象。
 - 登录、接口引擎、FormEngine、上传等所有请求头必须做大小写不敏感去重；`osclient` 只能发送一个运行期值，例如 `demo`，禁止同时传 `OsClient` 与 `osclient` 导致网络面板出现 `demo, demo`。
 - 账号密码登录只有在同时拿到成功码、有效 token 和有效用户 `Id` 时才算成功。Microi 登录 token 可能在响应头 `authorization`，用户信息可能在响应体 `Data`；两者任一缺失都要清理 SDK token、本地用户缓存和 session。
 - 恢复本地会话时必须重新校验 token 和用户 `Id`，禁止出现页面显示 `admin` 但状态仍是“未登录”的半登录状态。
+- DiyToken、用户与稳定 `did` 按 `ApiBase + OsClient` 隔离持久化，使用统一 SDK/session store；存储写入失败不能继续成功导航。移动登录传准确 `_ClientType`，有效期读取子租户 `AccessTokenLifetime`（单位天），实际可能是 20、30 天或其它配置，前端不得硬编码。验收以本次 JWT 的签发/到期时间与服务端配置匹配为准，本地 JWT 解析只作调度，不能代替服务端验签。
+- 默认接入 SDK `startTokenMaintenance()`、`resumeAuthSession(false)` 与 `refreshToken()`：按真实到期窗口以旧换新，每个请求接收响应头 `authorization`，同一运行上下文的并发请求 single-flight。有多标签会话需求时，另按 SDK 实际协议验证跨标签 Token/退出同步及竞态，不能把单实例的刷新 Promise 当作已支持跨标签单飞。前台恢复立即检查，退出、切换账号或租户递增会话代次，拒绝旧请求的 Token/用户回写及迟到失效弹窗。已到期、被吊销或管理员撤销的会话不能因本地仍有 Token 无限延长。完整协议见 [SDK Token 与终端协议](../microi-frontend-sdk/references/progressive-01-token-当前登录用户与当前终端登录协议.md)。
 - 账号密码登录调用 `/api/SysUser/login`、`/api/SysUser/Login` 或 `V8.Login(param)` 前，必须读取 `/apiengine/platform-sys-config` 或 `V8.GetSysConfig(true)`，并根据 `Sys_Config.EnableCaptcha` 决定是否显示图形验证码。判断函数必须兼容 `1`、`true`、`'1'`、`'true'`，不要直接 `!!cfg.EnableCaptcha`。
 - 开启验证码时，页面必须通过 `GET /api/Captcha/GetCaptcha` 获取验证码图片，读取响应头 `captchaid`，提交账号登录时传 `_CaptchaId` 和 `_CaptchaValue`；登录失败后清空输入并刷新验证码。未开启验证码时不显示验证码，不传空验证码字段。
 - 微信小程序手机号快捷登录必须使用 `<button open-type="getPhoneNumber">`，通过 `@getphonenumber` 获取 `detail.code`，并重新调用 `uni.login({ provider:'weixin' })` 获取新的 `LoginCode`。前端不能假设能直接拿到手机号明文。
-- H5/App 可提供手机号输入兜底，但必须确认后端接口支持 `Phone` 登录；微信小程序优先走 `Code + LoginCode`。
+- 微信小程序具备正式授权能力时，手机号授权仍优先走 `Code + LoginCode`；短信输入路径共用同一平台身份与会话，并由实际能力决定备用入口，不能另建平行用户/权限 Token。
 - 登录按钮、去登录按钮、手机号授权按钮必须是图标 + 文案按钮，具备 loading、disabled/pressed 反馈，且原生 button 默认边框要清掉。
 - 体验版授权登录必须保留可诊断错误：请求层归一化 `uni.request.fail.errMsg`、HTTP 状态和接口 `Msg`，登录页用模态框完整展示“阶段 + 原因 + 追踪号”。后端接口引擎按阶段写脱敏系统日志；不能只在前端 catch 后显示固定“手机号登录失败”。
 - 小程序调用手机号快速验证组件的前置页、按钮、弹窗、分享标题和失败提示不得出现“微信”“微信官方”“微信登录”“一键登录”等可能混淆腾讯官方的文案，也不得展示微信官方 Logo、相似绿色气泡图标或仿官方品牌元素。统一使用“手机号快捷登录”“手机号快速验证”等中性业务文案，只展示应用自身品牌 Logo。
