@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-10T09:52:14.794Z",
+  "generatedAt": "2026-10-11T06:44:47.568Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -3196,11 +3196,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "629c9916d58e38d52bff66cad5eb71afc135409a43afb5fce465224b49998b6d",
-      "originalLines": 616,
+      "originalSha256": "9a41b72e5117557f7af7758789f63719eb16372f0e4c1723c4ea5fa59a6775e8",
+      "originalLines": 626,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
-      "entryLines": 282,
+      "entryLines": 284,
       "chunks": [
         {
           "id": "workspace-conventions-000",
@@ -3278,8 +3278,8 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "cb0a9b2286d51e41dfd3c4249f28d4ac57b6736112be3c1f57f8eb405d0631b1",
-          "lines": 36,
+          "sha256": "0343192b5c71d39f9f31a21bccb5046715f1b47d4876ba962b2d5f188c021271",
+          "lines": 38,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },
         {
@@ -3510,8 +3510,8 @@
           "id": "workspace-conventions-038",
           "ordinal": 38,
           "destination": "workspace-conventions/references/progressive-03-cli-与-ide-插件错版共存约定.md",
-          "sha256": "57098466d31d0636bf330fde545daff8cb8e4116ac6ea2efff8abc729fdcef77",
-          "lines": 22,
+          "sha256": "97d43d23dc7e50e2806b9ef41c0d5afce73a3dde0ee0b2c6f3fdb468278ee248",
+          "lines": 30,
           "heading": "CLI 与 IDE 插件错版共存约定"
         }
       ],

@@ -234,7 +234,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - `Microi.net.Api/Controllers` 除五个兼容内核 Controller 与统一旧客户端兼容 Controller 外，只能保留已证明接口引擎无法承担的薄协议 Controller；每个保留项必须同步登记 `api-ownership-catalog.json` 并由结构测试锁定。已完整迁入接口引擎的旧 Controller 必须继续物理删除。
 - `Program.cs` 只保留有说明的插件注册和最薄宿主入口；ASP.NET 组合代码可留在同项目 `Hosting`，可复用业务/运行时逻辑进入 `Microi.Core`、`Microi.net`、`Microi.Upgrade` 或对应插件，禁止通过新建“中转层”掩盖归属问题。
 
-<!-- microi-progressive:chunk id=workspace-conventions-009 sha256=cb0a9b2286d51e41dfd3c4249f28d4ac57b6736112be3c1f57f8eb405d0631b1 -->
+<!-- microi-progressive:chunk id=workspace-conventions-009 sha256=0343192b5c71d39f9f31a21bccb5046715f1b47d4876ba962b2d5f188c021271 -->
 ## 多对话共享工作区变更归属保护（强制）
 
 ### 功能验收后的源码提交与推送（强制）
@@ -244,6 +244,8 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 推送前先获取上游的新提交并安全整合；共享工作区有并行改动时优先在隔离候选中合并，不用整树 stash/reset 覆盖他人成果，不强推共享分支，不绕过仓库 Hook。需要精确回滚时保留独立、说明清楚的功能提交；回滚已推送功能通常使用新的反向提交，不改写共享历史。
 - 正式发布前，候选必须包含此前已交付功能的提交，并完成本任务提交、推送及远端提交号回读，再从该冻结候选构建与发布。仅更新某个说明页面时也要核对整个站点的候选；隔离工作树不能因为没有未提交变更就被当成最新线上功能。发布锁只防并发，不能代替源码完整性检查。
 - 收尾逐仓记录本地提交号、远端分支和回读结果，并区分源码推送、构建发布与真实线上验收。网络、权限、冲突或门禁阻止推送时，保留本地提交、准确报告未推送项并继续完成可独立推进的工作；不得宣称完整交付，也不得为赶进度先发布未交付源码。
+
+- **Git 大文件推送确认（强制）**：每次 Git 推送前检查全部待推送提交中新引入的 Blob；单个达到 10 MiB 或合计达到 50 MiB 时，必须提供路径、实际大小、SHA-256 和目标仓库/分支，取得用户对具体清单的确认后才推送。一般提交推送授权不能代替大文件确认；完整检查、CDN 引用、历史瘦身与失败回执规则见[Git 大文件推送确认](references/progressive-03-cli-与-ide-插件错版共存约定.md#git-大文件推送确认强制)。
 
 同一工作区可能同时被用户、其它 Codex 对话、IDE、自动化任务或外部 Git 操作修改。任务启动前已经存在、或无法用本对话证据严格证明归属的差异，一律视为他人资产并保留；“工作区是脏的”不是清理授权。
 
@@ -277,5 +279,5 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 
 - [references/progressive-01-版本更新日志保护规则-强制.md](references/progressive-01-版本更新日志保护规则-强制.md)：版本更新日志保护规则（强制）；配置文件说明中文优先规则；后端 API 配置白名单与 SaaS 单一事实源（强制）；身份、可逆业务秘密与敏感操作统一规范（强制）；多语言优先约定；后台菜单层级默认规则；后台任务与安全防护约定；业务逻辑优先接口引擎约定；应用商城优先于 Microi.Upgrade（强制）；在线 AI 应用上下文默认发现规则（强制）；VS Code 插件空目录生成规则；Microi 版本号规则；C# dynamic 强类型落地规则；根目录保留文件说明
 - [references/progressive-02-microi-net-api-本地启动约定.md](references/progressive-02-microi-net-api-本地启动约定.md)：Microi.net.Api 本地启动约定；多 AI 对话共享本地服务与发布互斥（强制）；本地租户与测试凭据读取约定；自动化登录约定；V8 远端/本地同步收尾约定；V8 缓存刷新约定；MCP 元数据更新验收约定；MCP 可用性排查约定；MCP 写入超时与降级约定；Codex MCP 单入口约定；.venv Python 环境说明；后端代码改动后的重启验收；MCP 可调用性诊断补充；Windows MCP 控制台闪窗复盘
-- [references/progressive-03-cli-与-ide-插件错版共存约定.md](references/progressive-03-cli-与-ide-插件错版共存约定.md)：CLI 与 IDE 插件错版共存约定
+- [references/progressive-03-cli-与-ide-插件错版共存约定.md](references/progressive-03-cli-与-ide-插件错版共存约定.md)：CLI 与 IDE 插件错版共存约定；Git 大文件推送确认
 <!-- microi-progressive:end -->
