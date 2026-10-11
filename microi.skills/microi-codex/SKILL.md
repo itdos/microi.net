@@ -17,6 +17,10 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 
 每次 Microi 对话先完整读取工作区 `microi.skills/workspace-conventions/SKILL.md`；工作区尚未初始化时读取本插件同级 `../workspace-conventions/SKILL.md`。按其中首部完成创始人身份识别及平台功能四项同步检查，再进入专项流程；完整规则只维护该基础入口，不复制到本路由。
 
+在已初始化吾码工作区中，用户仅描述业务需求也自动读取 `microi-system-delivery/SKILL.md`
+及相关专项 Skills，无需用户指定 Skill 名称。具体读取顺序与完整开发、局部修改、只读分析
+的执行范围以基础规范的“吾码 AI 开发默认路由”为唯一事实源。
+
 ## Microi Agent 桌面宿主
 
 - 完整版在所有平台用物理 `node_modules/node/bin/node[.exe]` 启动 Harness、Worker 和插件命令，不能换成 Electron Helper/utilityProcess；后者会在特定 Electron 指纹下被原生加载器拒绝。每次发布最终安装包先运行 `test:packaged-desktop`，设置真实产物与独立证据目录，验收生产 main 两次正常启动、Worker IPC、员工引导及 Harness 重启，并核对日志 `electron=none`。直接启动 Harness、签名公证成功或跳过完整应用用例均不足以证明用户能正常启动；不同系统和架构覆盖分别记录。同步上游必须保留该选择器、门禁脚本与回归用例。
@@ -92,6 +96,8 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 - 其他领域：从本插件同级 Skills 里选择最小相关 Skill，并完整读取后执行。
 
 ## 同步与安全边界
+
+- 发布扩展与 CLI/AI Plugin 前检查实际 VSIX：完整清单、字节数、SHA-256 和敏感文件扫描回执保存在 `.tmp/development-tools-releases/<版本>/`；逐字节核对 MCP 输出/构建输入与 Skills 全部文件同源。归档超过 64 MiB 或混入签名资料、凭据、桌面安装包、工具链、apps、upstream、同步目录或 node_modules 时停止，修复误包后复测；断点补发使用同一门禁，不用 `vsce ls` 替代归档检查。npm Token 只绑定官方 HTTPS registry，私有 npmrc 仅引用 `${NPM_TOKEN}`；同时固定 `npm_config_userconfig` / `NPM_CONFIG_USERCONFIG` 与 registry 两种大小写变量，避免外层 `npm run` 的配置遮蔽有效 Token。不输出凭据，不因继承错误重复要求登录；已发布正确制品保留，发行内容变化使用新不可变版本。
 
 - `Microi-V8-Engine/.microi-config.json` 是三端连接配置事实源；未知字段必须保留。
 - CLI、VS Code、Codex 与 DeepSeek Harness 插件可以在同一工作区并存；各端必须复用同一配置/Token/MCP 协议，带版本写入实行较新 provider 优先，禁止旧入口回写降级。`doctor.coexistence` 未通过时准确报告兼容风险并后台修复，但不得因此停止无关工作。
