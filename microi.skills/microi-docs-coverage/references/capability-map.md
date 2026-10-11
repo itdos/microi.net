@@ -51,7 +51,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/file-manage.md` | v8-file-upload, microi-client-frontend | 文件柜、公私桶管理、在线预览、回收站、跨平台与 MinIO 同步 |
 | `system-engine/job.md` | job-engine | 调度、后台任务和分布式恢复 |
 | `system-engine/micro-app.md` | microi-microservice, microi-ai-application | 微服务/AI 前端应用的工程架构与交付 |
-| `system-engine/multi-end-client.md` | microi-client-frontend, microi-mobile-app-quality, microi-uniapp-frontend | PC、WebOS、移动自适应、UniApp 与 App 边界 |
+| `system-engine/multi-end-client.md` | microi-client-frontend, microi-mobile-app-quality, microi-uniapp-frontend | PC/WebOS/UniApp/App 边界；统一快捷登录、租户长效会话、地图服务、单列安全区、持续动效与公开交付 |
 | `system-engine/microi-ui.md` | microi-ui | Microi.UI 组件和主题 |
 | `system-engine/message-notification.md` | message-notification | 统一消息通知微服务、原 mic_msgset 多通道配置、MCP/Skills、租户/产品版本与帐号范围、后端重启领取、居中弹窗与 SignalR/轮询恢复 |
 | `system-engine/module-engine.md` | module-engine, v8-menu-buttons, v8-template-engine, microi-mobile-app-quality | 菜单统计、模块指标、复合列、移动卡片、按钮角标和页面入口 |

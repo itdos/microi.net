@@ -1,6 +1,6 @@
 # 空目录标记与远程下载
 
-<!-- microi-progressive:chunk id=v8-file-upload-004 sha256=8f442aab0e56bd2de4b5ebf1b4d7e463524f44393e72318f2b1973030e199d63 -->
+<!-- microi-progressive:chunk id=v8-file-upload-004 sha256=8393c7b2b7ce36e563843f43f42e9a06a8cb69fc7b792930912353d846ee769f -->
 ## 空目录标记的受控恢复
 
 - 只需移除一个目录占位对象时，使用 `V8.HDFS.DeleteObject({FilePathName:'当前租户目录/', Limit:true/false, EmptyDirectoryOnly:true})` 并等待异步结果。必须是当前租户实际有效超级管理员的可信 V8/DiyToken 会话；不能使用参数中的 `_CurrentUser`、访问密钥或临时维护引擎代替授权。

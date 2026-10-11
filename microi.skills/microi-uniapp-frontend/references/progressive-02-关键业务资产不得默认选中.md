@@ -15,14 +15,14 @@
 - 规则同时写在 UI 状态和提交前校验中。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-018 sha256=35f9826cc82000f9cedd3ccaffd8e7718b0efbec75cf12665145f1de4f8a6d23 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-018 sha256=a86b92d7a75cbd5762b78d56efb8f6d91c0170ee180b92a39a22c2508feadcdb -->
 ## 账号角色与会话状态
 
 - Microi 企业移动端默认要从 `sys_user.RoleIds`、`_Roles`、`Roles`、`RoleName`、`Level` 解析内部账号角色，不要只用“是否登录”控制界面。
 - 角色能力必须集中在 Pinia/session store 中计算，例如 `isTechnician`、`isServiceAgent`、`isCustomerAccount`、`canAcceptOrders`、`canManageCustomers`、`canViewReports`。多角色账号取能力并集；只有服务端已确认的 `Level>=9999` 才属于平台超级管理员。前端“超级管理员”角色名只用于展示，不能授予接口权限。
 - 客户账号判断要精确，只把“客户”“客户账号”“客户用户”或明确包含“客户账号”的角色当作客户侧账号；不要把“客户管理”等后台角色误判为客户。
 - 所有页面、底部导航、按钮、未登录提示、头像姓名和角色文本都必须读同一个 session store。页面不能直接读取旧 storage 展示用户名。
-- 客户小程序手机号登录得到的是业务 `CustomerToken`，与员工 `sys_user` token 是两条会话；客户数据必须通过绑定关系过滤，不要把客户账号塞进员工接口绕过权限。
+- 新建手机号登录、自动注册和多角色移动端统一签发平台 DiyToken，数据按真实用户及绑定关系过滤，不能并行创建第二套长期用户/权限 Token。存量已审核的 `CustomerToken` 协议只按原接口兼容并维护隔离，不把它当新项目默认身份体系，也不混用员工接口绕过权限。
 - 登出、登录失败、token 缺失、用户 `Id` 缺失时要统一清理 `Token`、`staffUser/customerUser`、绑定信息和本地 session。
 - 接口引擎登录失败时要把 `Msg` 原样传到统一错误展示层，禁止在 store 或业务 API 包装中覆盖成固定文案；网络错误优先读取 `errMsg/message`，HTTP 错误同时保留状态码。
 - 员工账号登录必须传准确 `_ClientType`；H5、App、微信/支付宝/飞书/抖音小程序均属于移动长效终端，默认读取 SaaS 引擎 `AccessTokenLifetime`（单位天，默认 30 天）。完整 Token 协议以 `microi-frontend-sdk/SKILL.md` 为准。
@@ -117,10 +117,10 @@
 5. 商品详情、公告、协议等富文本使用 `MciRichText` 或遵循同等结构。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-025 sha256=c472359f2f16b287398c0781cb66cbfb98fea99accddbfa078e9f1e9356aa30d -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-025 sha256=48bcf77f20257216ad574a0cf82c32f6835ec4b514bcf9364cf05e22cb84e975 -->
 ## 登录、图标与主题补充规范
 
-- 登录页不要同时铺开两套完整登录系统。H5/App 默认只做一个“账号/手机号 + 密码”表单；微信小程序默认展示 `<button open-type="getPhoneNumber">` 手机号授权登录，账号密码只能作为次级折叠/备用入口。
+- 登录页不同时铺开两套完整登录系统。H5/App 默认手机号、图形验证码、短信验证码统一登录/自动注册，遵守当前租户开放注册策略；密码作为次级备用入口。微信小程序正式能力可用时优先展示 `<button open-type="getPhoneNumber">` 手机号授权登录，仍共用平台 DiyToken。完整流程以入口“默认快捷登录、自动注册与长效会话”为准。
 - 微信小程序手机号授权登录必须使用 `@getphonenumber` 的 `detail.code`，并重新调用 `uni.login({ provider:'weixin' })` 获取新的 `LoginCode`；不要假设前端能拿到手机号明文。
 - 账号密码兜底入口必须跟随 `Sys_Config.EnableCaptcha`：开启时显示验证码图片和输入框，提交 `_CaptchaId/_CaptchaValue`；关闭时完全隐藏且不提交空字段。
 - 登录页、我的页、设置页不要向终端用户展示“当前租户 / OsClient / 移动端版本 / API 地址 / 调试版本”等内部实现块。

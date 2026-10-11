@@ -84,8 +84,8 @@
 | **microi-docs-coverage** | 中文官网文档到 Skills 的能力映射、V8 API 漏项审计和同步流程 | `microi-docs-coverage/SKILL.md` |
 | **microi-solution-quotation** | 生成紧凑的一页式 Microi吾码解决方案、市场预估价、优惠报价与开发周期 Word | `microi-solution-quotation/SKILL.md` |
 | **microi-frontend-sdk** | Vue3/UniApp/H5/PC 前端统一 SDK、Token终端会话/续签、上传、资源 URL、ApiEngine/FormEngine | `microi-frontend-sdk/SKILL.md` |
-| **microi-uniapp-frontend** | Microi UniApp/H5 通用前端规范、安全区、资源解析、骨架屏、主题与页面质量 | `microi-uniapp-frontend/SKILL.md` |
-| **microi-mobile-app-quality** | 移动端质量门禁：登录、验证码、图标、菜单层级、主题、动效、截图验收 | `microi-mobile-app-quality/SKILL.md` |
+| **microi-uniapp-frontend** | UniApp/H5/App/小程序：手机号快捷登录、租户长效会话、多角色源码、资源、安全区与动效 | `microi-uniapp-frontend/SKILL.md` |
+| **microi-mobile-app-quality** | 首版交付门禁：真实登录/地图、手机单列与导航几何、持续动效、后台运营和公开发布验收 | `microi-mobile-app-quality/SKILL.md` |
 | **microi-datasource-mapping** | 数据源 Key/Value 映射、下拉枚举与前后端显示值一致性 | `microi-datasource-mapping/SKILL.md` |
 | **v8-formengine-http** | 移动端/外部系统直接调用 FormEngine HTTP 路由的约定 | `v8-formengine-http/SKILL.md` |
 | **v8-explorer-tree** | VS Code 插件 V8 资源管理器目录规范和本地文件归档 | `v8-explorer-tree/SKILL.md` |
