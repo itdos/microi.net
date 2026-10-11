@@ -17,4 +17,5 @@ microi.skills/**/*.md text eol=lf
 
 microi.skills/.progressive-disclosure-manifest.json text eol=lf
 
-Microi.Server/OfficialApplications/PlatformService/** -text
+Microi.Server/OfficialApplications/PlatformService/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+Microi.Server/OfficialApplications/Resource/app.microi.sys-log.json text eol=lf
