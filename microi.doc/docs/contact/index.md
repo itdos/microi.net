@@ -5,12 +5,12 @@
 <script setup>
 const contacts = [
   {
-    name: 'Anderson.周',
+    name: 'Anderson・周',
 // 暂停个人版销售，保留原文以便恢复
 //     role: 'CTO、个人版售前/售后',
-    role: 'CTO',
+    role: 'CTO/首席技术官',
     qrCode: 'https://static.itdos.com/upload/img/ScreenShot_2026-02-07_011010_5522.jpeg',
-    avatar: 'https://static.itdos.com/upload/img/2026-02-07_000741_083.jpg',
+    avatar: '/contact/anderson-avatar.jpg',
     phone: '-',
     email: '973702@qq.com',
     link: 'https://microi.net',
@@ -21,8 +21,8 @@ const contacts = [
     qrCode: '/contact/dengzong.jpeg',
     avatar: 'https://static.itdos.com/upload/img/026-02-07_002647_346.jpg',
     phone: '13615741649',
-    email: '待补充',
-    link: '待补充',
+    email: '-',
+    link: '-',
   },
   {
     name: '周丽',
@@ -42,17 +42,17 @@ const contacts = [
     role: '商务、合作伙伴',
     qrCode: '/contact/shangwu.jpg',
     avatar: 'https://static.itdos.com/upload/img/ScreenShot_2026-02-07_002607_028.png',
-    phone: '待补充',
-    email: '待补充',
-    link: '待补充',
+    phone: '-',
+    email: '-',
+    link: '-',
   },
   {
     name: '李赛赛',
     role: '技术支持',
     qrCode: '/contact/jishu.jpg',
     avatar: 'https://static.itdos.com/upload/img/ScreenShot_2026-02-07_002607_028.png',
-    phone: '待补充',
-    email: '待补充',
+    phone: '-',
+    email: '-',
     link: 'https://lisaisai.blog.csdn.net/?type=blog',
   },
   {
@@ -69,9 +69,9 @@ const contacts = [
     role: '商务',
     qrCode: '/contact/tangzong.jpeg',
     avatar: 'https://static.itdos.com/upload/img/ScreenShot_2026-02-07_002607_028.png',
-    phone: '待补充',
-    email: '待补充',
-    link: '待补充',
+    phone: '-',
+    email: '-',
+    link: '-',
   }
 ]
 </script>
