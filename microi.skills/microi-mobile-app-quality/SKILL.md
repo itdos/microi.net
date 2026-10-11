@@ -12,7 +12,7 @@ description: Microi 移动端质量门禁，适用于 UniApp/H5/微信小程序�
 自动触发：只要任务涉及 Microi 移动端应用、H5、微信小程序、App 构建、uni-app 项目、登录页、tabbar、首页、我的页、工作台、报告页、视觉重设计或移动端验收，即使用户没有明确点名，也要应用本 skill。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-000 sha256=9f83607349ba6e305c3d2993de8eeceab70c344557e5dfa2a5be964492ef4685 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-000 sha256=285994dc05b3ecd321e88a087d4bf5b98c1798898d1bf6861f35ea067d5aade3 -->
 ## 1. 导航和快捷入口必须使用真实图标
 
 底部导航、首页快捷入口、会员中心快捷项、九宫格操作和悬浮操作，必须在文字上方或旁边显示可识别的图标。
@@ -39,8 +39,20 @@ description: Microi 移动端质量门禁，适用于 UniApp/H5/微信小程序�
 - 主题切换后重新截图底部导航、首页快捷入口和个人中心快捷入口；任何一个图标在圆底上看不清，都算验收失败。
 - UniApp H5 桌面预览可以显示手机壳；真机和浏览器移动设备仿真必须自动去壳并铺满视口。自动化测试要分别断言桌面手机壳存在、移动端手机壳标题隐藏，同时检查所有底部菜单包含真实图标节点。
 
+### 1.0 底部导航必须通过几何门禁
+
+- H5 安全区只采用浏览器提供的 `env(safe-area-inset-bottom)` 等可信来源；禁止把 `screen.height - window.innerHeight`、`screenHeight - windowHeight` 或浏览器工具栏高度当作安全区。桌面非最大化窗口、缩放和手机地址栏收展时，这些差值可能达到数百像素。App/小程序读取平台权威 inset，`0` 是有效值，禁止 `inset || guessedFallback` 把零替换为猜测值。
+
+- 图标存在、页面截图生成和按钮可见都不足以通过验收。必须测量手机壳内屏或移动可见视口、导航外框、每个菜单触摸区与正文滚动区的真实矩形；导航外框底边贴齐所属内屏底边，导航项下方只保留设计间距和真实系统安全区。
+- 桌面手机壳须有明确的可用高度；底部导航贴壳底，不贴浏览器外窗底。手机和移动设备仿真自动去壳；横屏、旋转和宽屏手机不能仅因宽度超过断点就变成桌面预览。
+- 页面壳按“头部不收缩、正文 `flex:1; min-height:0`、导航 `flex-shrink:0`”分配空间。普通单列页只允许一个正文滚动 owner，不能让 body、路由包装层和正文同时滚动；短内容也不能把导航挤到中间或在导航下方留下大块空白。
+- 安全区来自运行时或 CSS `env` 的统一变量，只消费一次。流内导航已占据布局空间时，正文不再预留整条导航高度；覆盖式导航才预留其**实测总高度**，不能同时累加导航高度、固定占位和第二份安全区。桌面无真实手势区时不得伪造几十像素底部 padding。
+- 宽度受限的 H5 手机壳仍可能按浏览器宽度换算 `rpx`，必须检查 `pages.json.globalStyle` 的 `rpxCalcMaxDeviceWidth / rpxCalcBaseDeviceWidth` 和实际构建产物；导航高度、图标和尾部占位不得随 4K 桌面视口放大。`750rpx` 不能充当容器 `100%`。
+- 至少覆盖三个主 Tab（不足三个时覆盖全部）、短内容/空态与长内容滚动到底；桌面正常/矮屏、375px/430px 手机、断点两侧、横竖屏和键盘打开/关闭均须留存矩形断言与**视口截图**。`fullPage` 长图不能证明首屏导航贴底；浏览器缩放视口测试不能冒充真实软键盘或真机验收。
+- 详细布局、矩形断言示例与安全区所有权见 [UniApp 布局与安全区参考](../microi-uniapp-frontend/references/progressive-01-移动端分类-双栏列表独立滚动.md#h5-在-pc-浏览器必须自动模拟移动端)。
+
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-001 sha256=4e1b247852aa9f235a26f756d415ebb9fb922f2fea0569bda1bdc8e0b91c4d1c -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-001 sha256=a5e92f4e6114635b73be59d2a550294bb79dd8c60a3cc2133be16c934e05da8e -->
 ## 1.1 包体资源必须按用途分层
 
 - 构建前扫描图片、音频、视频、字体和第三方资源；公开的大资源优先上传到当前租户 HDFS 公有桶并通过 `sys_config.FileServer`/CDN 引用，敏感资源使用私有桶。
@@ -51,7 +63,7 @@ description: Microi 移动端质量门禁，适用于 UniApp/H5/微信小程序�
 - 迁移到 HDFS/CDN 后必须从构建产物确认原大文件已经消失，并从业务记录/配置回读相对 `Path`；页面要先加载当前租户 `SysConfig.FileServer`，不得以源码硬编码 CDN 域名替代运行期配置。远程资源加载失败时只能回退到轻量本地占位，不得把原大图重新塞回主包。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-002 sha256=b8e83d75588362899921af62996577277ba77b2fab86767317d62607cec80a84 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-002 sha256=470ad2ef6382f8564ca54feb74957701b851d00ca69948b87e347715fa08e6c6 -->
 ## 2. 不要猜测 Microi 前端 SDK 登录接口
 
 编写登录代码前，先检查本地项目 SDK 封装，例如 `src/utils/microi.v8.js`、`src/utils/api.js`，或标准 `microi.uniapp` 登录实现。
@@ -82,7 +94,7 @@ description: Microi 移动端质量门禁，适用于 UniApp/H5/微信小程序�
 - 自动回归覆盖并发引导、去重取消无 `complete`、失败重试、历史重复登录栈、登录成功后返回及业务页继续初始化、旧弹窗迟到和页面销毁；真实开发者工具与真机另验冷启动及分享接收，不能用模拟会话代替授权登录。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-003 sha256=a35f20404acbf61814f9475610f881f7c60effc0ce3bb8797cee300cd3349ba7 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-003 sha256=fec4c841ed7a897643a4c16337dce79a9be22931866af8aa7f888cbae5e72a20 -->
 ## 2.1 登录验证码必须跟随 Sys_Config.EnableCaptcha
 
 PC 端、H5、App、微信小程序或任何自定义前端只要调用 `/api/SysUser/login`、`/api/SysUser/Login` 或 `V8.Login(param)`，都必须先读取 `Sys_Config` 的 `EnableCaptcha` 配置，并按配置决定是否展示和提交图形验证码。
@@ -108,7 +120,7 @@ PC 端、H5、App、微信小程序或任何自定义前端只要调用 `/api/Sy
 - 参考标准实现：`microi.uniapp/src/pages/login/index.vue`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-004 sha256=22bdaf38588f251016e115f1ad15a433e827fb2191041d55ecad42cda94253d1 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-004 sha256=84a0f768af152f584f87643e1037a0ae57261df8947cc59710e1f021b99c287f -->
 ## 3. OsClient 请求头不得重复
 
 Microi 请求只能发送一个不区分大小写的 OsClient 请求头。浏览器、代理或服务端运行时可能把 `OsClient` 和 `osclient` 这类大小写重复键合并成 `demo, demo`，导致租户识别失败。
@@ -130,7 +142,7 @@ Microi 请求只能发送一个不区分大小写的 OsClient 请求头。浏览
 - 微信/支付宝/飞书/抖音等小程序授权登录接口也必须检查，例如 `/apiengine/miniprogram-login`，不得出现 `osclient: demo, demo` 这类合并值。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-005 sha256=1394c7fb8e59b25553e2f9b71ab7f8cf03290b6930c8d8436123bc6048ad2435 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-005 sha256=aefc3f7242a62ac411fa234fe322dd7726a8ed7db4f0d35e01cc364a36e8a335 -->
 ## 3.1 小程序授权登录必须可追踪、可读错误
 
 微信开发者工具的模拟授权与体验版真机调用不是同一条真实链路。手机号授权登录接口必须按阶段诊断，不能只返回“手机号登录失败”。
@@ -149,7 +161,7 @@ Microi 请求只能发送一个不区分大小写的 OsClient 请求头。浏览
 - 体验版真机复测授权登录；不能只以开发者工具模拟成功作为上线依据。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-006 sha256=feb9ba3267bdf1f6394c425b45dd71e19ac4382ae05549d6e1b6b664c6517a19 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-006 sha256=e2446ca4c0fca61d3c748c2f91c585d9da0df9ee9a0170f70d823b0c0745a88e -->
 ## 3.1.1 手机号快速验证前置页不得混淆腾讯官方
 
 - 调用手机号快速验证组件前展示的登录页、弹窗、按钮、说明、分享标题和失败提示中，禁止出现“微信”“微信官方”“微信登录”“一键登录”等可能让用户误认为腾讯官方功能或官方产品的文案。
@@ -158,7 +170,7 @@ Microi 请求只能发送一个不区分大小写的 OsClient 请求头。浏览
 - `build:mp-weixin` 后必须扫描登录页源码和 `dist/build/mp-weixin/pages/login/` 产物中的可见文案，并对手机号快速验证前置页截图；发现混淆词、官方 Logo 或近似元素时阻止上传和提审。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-007 sha256=7598db1fdabfe127c2be7593b83dc3a246b1db852d9c0d4001f849d3e97aa273 -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-007 sha256=15dc4a001ce3bf6f3620b741cf1bf7dd92e4ff8372eeb256f01c5e2aabba8398 -->
 ## 3.2 微信小程序每个页面默认支持分享
 
 小程序项目必须默认支持转发给朋友和分享到朋友圈，不能只给首页或公开页添加分享。登录和权限控制属于访问阶段，不得用来隐藏分享能力。

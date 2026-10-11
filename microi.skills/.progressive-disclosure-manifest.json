@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-11T06:44:47.568Z",
+  "generatedAt": "2026-10-11T06:50:35.266Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -534,25 +534,25 @@
       ]
     },
     "microi-mobile-app-quality": {
-      "originalSha256": "11d6f2aa2d11fef6ee56bd0090f58833ca5c219bcfe631c13da8498330765766",
-      "originalLines": 463,
-      "prefixSha256": "eacdd78a8619f3c1dd4af9f8db1188e9ef75e13384bbdfe6aa93de230a9c431a",
-      "prefixBytes": 1139,
-      "entryLines": 186,
+      "originalSha256": "8917f222767ae3152f8f6a5e5c236a83476fda9f3d0d58f7f477dd856152374f",
+      "originalLines": 486,
+      "prefixSha256": "1b6e68003fe61964c8762088ece3169ca3503f8c0e2f4fbff9f907e03e1131da",
+      "prefixBytes": 1152,
+      "entryLines": 198,
       "chunks": [
         {
           "id": "microi-mobile-app-quality-000",
           "ordinal": 0,
           "destination": "microi-mobile-app-quality/SKILL.md",
-          "sha256": "9f83607349ba6e305c3d2993de8eeceab70c344557e5dfa2a5be964492ef4685",
-          "lines": 27,
+          "sha256": "285994dc05b3ecd321e88a087d4bf5b98c1798898d1bf6861f35ea067d5aade3",
+          "lines": 39,
           "heading": "1. 导航和快捷入口必须使用真实图标"
         },
         {
           "id": "microi-mobile-app-quality-001",
           "ordinal": 1,
           "destination": "microi-mobile-app-quality/SKILL.md",
-          "sha256": "4e1b247852aa9f235a26f756d415ebb9fb922f2fea0569bda1bdc8e0b91c4d1c",
+          "sha256": "a5e92f4e6114635b73be59d2a550294bb79dd8c60a3cc2133be16c934e05da8e",
           "lines": 10,
           "heading": "1.1 包体资源必须按用途分层"
         },
@@ -560,7 +560,7 @@
           "id": "microi-mobile-app-quality-002",
           "ordinal": 2,
           "destination": "microi-mobile-app-quality/SKILL.md",
-          "sha256": "b8e83d75588362899921af62996577277ba77b2fab86767317d62607cec80a84",
+          "sha256": "470ad2ef6382f8564ca54feb74957701b851d00ca69948b87e347715fa08e6c6",
           "lines": 30,
           "heading": "2. 不要猜测 Microi 前端 SDK 登录接口"
         },
@@ -568,7 +568,7 @@
           "id": "microi-mobile-app-quality-003",
           "ordinal": 3,
           "destination": "microi-mobile-app-quality/SKILL.md",
-          "sha256": "a35f20404acbf61814f9475610f881f7c60effc0ce3bb8797cee300cd3349ba7",
+          "sha256": "fec4c841ed7a897643a4c16337dce79a9be22931866af8aa7f888cbae5e72a20",
           "lines": 25,
           "heading": "2.1 登录验证码必须跟随 Sys_Config.EnableCaptcha"
         },
@@ -576,7 +576,7 @@
           "id": "microi-mobile-app-quality-004",
           "ordinal": 4,
           "destination": "microi-mobile-app-quality/SKILL.md",
-          "sha256": "22bdaf38588f251016e115f1ad15a433e827fb2191041d55ecad42cda94253d1",
+          "sha256": "84a0f768af152f584f87643e1037a0ae57261df8947cc59710e1f021b99c287f",
           "lines": 21,
           "heading": "3. OsClient 请求头不得重复"
         },
@@ -584,7 +584,7 @@
           "id": "microi-mobile-app-quality-005",
           "ordinal": 5,
           "destination": "microi-mobile-app-quality/SKILL.md",
-          "sha256": "1394c7fb8e59b25553e2f9b71ab7f8cf03290b6930c8d8436123bc6048ad2435",
+          "sha256": "aefc3f7242a62ac411fa234fe322dd7726a8ed7db4f0d35e01cc364a36e8a335",
           "lines": 18,
           "heading": "3.1 小程序授权登录必须可追踪、可读错误"
         },
@@ -592,7 +592,7 @@
           "id": "microi-mobile-app-quality-006",
           "ordinal": 6,
           "destination": "microi-mobile-app-quality/SKILL.md",
-          "sha256": "feb9ba3267bdf1f6394c425b45dd71e19ac4382ae05549d6e1b6b664c6517a19",
+          "sha256": "e2446ca4c0fca61d3c748c2f91c585d9da0df9ee9a0170f70d823b0c0745a88e",
           "lines": 8,
           "heading": "3.1.1 手机号快速验证前置页不得混淆腾讯官方"
         },
@@ -600,7 +600,7 @@
           "id": "microi-mobile-app-quality-007",
           "ordinal": 7,
           "destination": "microi-mobile-app-quality/SKILL.md",
-          "sha256": "7598db1fdabfe127c2be7593b83dc3a246b1db852d9c0d4001f849d3e97aa273",
+          "sha256": "15dc4a001ce3bf6f3620b741cf1bf7dd92e4ff8372eeb256f01c5e2aabba8398",
           "lines": 17,
           "heading": "3.2 微信小程序每个页面默认支持分享"
         },
@@ -608,7 +608,7 @@
           "id": "microi-mobile-app-quality-008",
           "ordinal": 8,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "765335189d85b558ad29ba73c04d1cf078101ee94819f969195b50440a82106f",
+          "sha256": "8cc961b2ba44763893f3cc09fbfca36668061b6bd75fc8f066904a04622948ff",
           "lines": 20,
           "heading": "4. 重要按钮必须带图标"
         },
@@ -616,7 +616,7 @@
           "id": "microi-mobile-app-quality-009",
           "ordinal": 9,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "e3c66bd92ca059235a7a3b0ece2fdfa598a41eaa149d0ee3a0d24d0d822a9f58",
+          "sha256": "47248f77c0a41a7fd64f6a255d8c9af356b6768e5167c73a48d60b86f1ab9899",
           "lines": 29,
           "heading": "4.1 模块列表优先使用声明式业务卡片"
         },
@@ -624,7 +624,7 @@
           "id": "microi-mobile-app-quality-010",
           "ordinal": 10,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "2ddd560cf3620f8fb7f3cf64d62566206430ee14e6ac380a3023c5b9047b4f46",
+          "sha256": "979733873bd74cd95b0c84988a8d3709f673a813dc212076e4f02e8b376fb492",
           "lines": 20,
           "heading": "5. 首屏文字和浮层不得重叠"
         },
@@ -632,7 +632,7 @@
           "id": "microi-mobile-app-quality-011",
           "ordinal": 11,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "b599e047e6b7a3688e4264a4d4b334e220e9798cbc13326e85a06f52bf20ce12",
+          "sha256": "47a21d62bc04740ed19eea3f7c2c816e4c73b9054de63beb16df12468c6a4363",
           "lines": 19,
           "heading": "5.1 未登录/授权提示必须在可用内容区居中"
         },
@@ -640,15 +640,15 @@
           "id": "microi-mobile-app-quality-012",
           "ordinal": 12,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "a363aaead9b632f3533e2f046f39cf7b579a91b92ef4e33d42f848d5a7538515",
-          "lines": 18,
+          "sha256": "fb7a9bfb6e8be41d472df82edf6238b9d09e6aeabd54eb71bce2a255a50c6326",
+          "lines": 29,
           "heading": "5.2 自定义导航页面必须通过安全区与微信胶囊门禁"
         },
         {
           "id": "microi-mobile-app-quality-013",
           "ordinal": 13,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "207765d0398738f24566763a2481469f4fc63e8a0b5f00abd292fe8a1cdd225a",
+          "sha256": "f4e1f01f3dde22120ecba9131b5c738118c0e4aa8131ea83978f3e1d6b4db289",
           "lines": 8,
           "heading": "5.3 全屏工具页必须遵守返回状态栈"
         },
@@ -656,7 +656,7 @@
           "id": "microi-mobile-app-quality-014",
           "ordinal": 14,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "1451e6ffbb0c0d29d8362e400540e3fa4f9f38a2402a9faf93de4cce7b1c9b4c",
+          "sha256": "eaf8ac0e9edadf382a08951d6c43b9ab561dd2a8ee02fc80048fc843e4656033",
           "lines": 8,
           "heading": "5.4 微信浮动入口必须通过真实事件桥门禁"
         },
@@ -664,7 +664,7 @@
           "id": "microi-mobile-app-quality-015",
           "ordinal": 15,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "8377f92a7456bd68e83867e893f1c9e8eec9edf0bba2a3f434c5bce75a9e2d00",
+          "sha256": "3a65e2da022d493b7d950450a10186d33652ec4225c359d9b3800ef431458525",
           "lines": 27,
           "heading": "6. 后台菜单必须规划为至少两级"
         },
@@ -672,7 +672,7 @@
           "id": "microi-mobile-app-quality-016",
           "ordinal": 16,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "0c1632d28f986156f8d70b2710dc0219de4643b4b9c61771ac544a18f4c355ac",
+          "sha256": "808d3a4d3e7736566e1dd23c287a9316ea851c3ca212ffe283f49e565a7e0a3d",
           "lines": 21,
           "heading": "7. 移动端页面需要动效，但动效必须有用"
         },
@@ -680,7 +680,7 @@
           "id": "microi-mobile-app-quality-017",
           "ordinal": 17,
           "destination": "microi-mobile-app-quality/references/progressive-01-4-重要按钮必须带图标.md",
-          "sha256": "2dcca5305da25f543181ae23550547cb3e3761aebae2843c5fc60e7848153176",
+          "sha256": "15d415351b8e3a7700d56cab2b39079494b06265b7d648636d1e511db1892161",
           "lines": 25,
           "heading": "8. 登录页必须是直接登录界面"
         },
@@ -688,7 +688,7 @@
           "id": "microi-mobile-app-quality-018",
           "ordinal": 18,
           "destination": "microi-mobile-app-quality/references/progressive-02-9-主题切换必须真实且全局生效.md",
-          "sha256": "b6e3138b7f398fad5b03253d07c1eb30e26da5c3df8ff1975117e5a3a282fd58",
+          "sha256": "28b7c339cbf546a91f4f35fce2bc146f052283fad2b6c54d7a8971acde21740a",
           "lines": 36,
           "heading": "9. 主题切换必须真实且全局生效"
         },
@@ -696,7 +696,7 @@
           "id": "microi-mobile-app-quality-019",
           "ordinal": 19,
           "destination": "microi-mobile-app-quality/references/progressive-02-9-主题切换必须真实且全局生效.md",
-          "sha256": "f2ca99aebb70273d991f5142e88bd1e02ff42782df5a8e7e180de297fba0faac",
+          "sha256": "406cf4edff553e80567a6462a68b872d98275358b89ff196df0873f78a2c30a9",
           "lines": 20,
           "heading": "10. 报告/列表详情必须保留用户身份"
         },
@@ -704,7 +704,7 @@
           "id": "microi-mobile-app-quality-020",
           "ordinal": 20,
           "destination": "microi-mobile-app-quality/references/progressive-02-9-主题切换必须真实且全局生效.md",
-          "sha256": "95487284aa5f9b1b3a0fb557845b3400af0355e4b2ebf6abebbef461e8ec8485",
+          "sha256": "c11ddf69390b21893b0bbb7de62592b8af6e9ecee5eb046bbeff99f3782e7493",
           "lines": 32,
           "heading": "11. 角色与权限必须基于 sys_user.RoleIds 建模"
         },
@@ -712,7 +712,7 @@
           "id": "microi-mobile-app-quality-021",
           "ordinal": 21,
           "destination": "microi-mobile-app-quality/references/progressive-02-9-主题切换必须真实且全局生效.md",
-          "sha256": "13405c8ce231e9db8920cd8e1c4e0db26a32c1b5ac967113abee1391985ebfcd",
+          "sha256": "e177d9cc3a9c28603129f42b598d2af72ecf305e934a982ed9801ca0d5a9e73c",
           "lines": 32,
           "heading": "最终交付清单"
         }
@@ -942,17 +942,17 @@
       ]
     },
     "microi-uniapp-frontend": {
-      "originalSha256": "43181255a959523580a72bcd1c0700cd4806530f4957a5644db46fd975654fad",
-      "originalLines": 503,
-      "prefixSha256": "a05c2b8e8c89ba9f401718c6af05ccf66325ddd7228a06786aca4277dbf6bad5",
-      "prefixBytes": 3035,
-      "entryLines": 194,
+      "originalSha256": "67b03858247529b2ac7f760b95cfdbb92110c75814942954d781050426e7740f",
+      "originalLines": 545,
+      "prefixSha256": "68ed26efc8552e482b0256891a3f9fc3bd48294bbc41df737717ed3a194d6303",
+      "prefixBytes": 3056,
+      "entryLines": 200,
       "chunks": [
         {
           "id": "microi-uniapp-frontend-000",
           "ordinal": 0,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "ecb0fc85b5c3b15ac79c9049ca86de8c586d4ce3a6c975255464069d89f87ac4",
+          "sha256": "980d63128f930daa224319aece06ee9a407563f722831790a381b100b44bddeb",
           "lines": 5,
           "heading": "移动端质量门禁必须先读"
         },
@@ -960,7 +960,7 @@
           "id": "microi-uniapp-frontend-001",
           "ordinal": 1,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "b195b92de6175b7f184257a0ba3b53b94b8a6aaee7ab42fbb05fe1f5338ba097",
+          "sha256": "51e5f609e93cf164acb9af45f83a8d713f28fba3d68b22d4331a86e5f5248fc5",
           "lines": 23,
           "heading": "标准产品、视图协议与租户扩展"
         },
@@ -968,15 +968,15 @@
           "id": "microi-uniapp-frontend-002",
           "ordinal": 2,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "76ebf3985d21fbbc5d86093b95bdf348e526e3670da9bb6827b5e1a7184e617b",
-          "lines": 8,
+          "sha256": "b82feb8b7144966aa1223a2087fbf2e3cb59943b3af51d92395646029a1f5343",
+          "lines": 14,
           "heading": "H5 预览壳与底部导航强制规则"
         },
         {
           "id": "microi-uniapp-frontend-003",
           "ordinal": 3,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "5cedd05cb29746019a92db56a21123718fde23d5d9df4b8064dfc260bc89ee05",
+          "sha256": "cf398596130bfa85683b358683631d5056bb3c48a4049214d00a9b26e3a61ec4",
           "lines": 17,
           "heading": "登录页与手机号快捷登录"
         },
@@ -984,7 +984,7 @@
           "id": "microi-uniapp-frontend-004",
           "ordinal": 4,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "cc25e3d896e6f7349a7a7e93b8025ee797bf9810e60214eb95e41d75aa083422",
+          "sha256": "c0e95b3c0fef84be2526e4b902a7c0d980d98217139b0d0b5b5b6fca7145641d",
           "lines": 10,
           "heading": "微信小程序全页面分享"
         },
@@ -992,7 +992,7 @@
           "id": "microi-uniapp-frontend-005",
           "ordinal": 5,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "d6f78d95dc0b0b042f0d0c525a9cb5295a0324f1c70d6f480c93f2e03d315cec",
+          "sha256": "7e002241f968def653a6ddb7934b3a4f185a0cf5fc845dd31d16f2a47d5cd598",
           "lines": 7,
           "heading": "首屏 Hero 与浮动面板验收"
         },
@@ -1000,7 +1000,7 @@
           "id": "microi-uniapp-frontend-006",
           "ordinal": 6,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "a39f7e4fb42c6d290463a9e40eed03235e4afe063d60208b5a3e73a170fbc39f",
+          "sha256": "4ddf2899af481528fd518842ec98aa31ada5e5c0b5dc585c27098b5413b2dd5a",
           "lines": 23,
           "heading": "资源 URL 必须集中解析"
         },
@@ -1008,7 +1008,7 @@
           "id": "microi-uniapp-frontend-007",
           "ordinal": 7,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "3894454672b6bde6f4a7b329103c9418804f4594b7e3505617590ebea5f136ab",
+          "sha256": "bc13da83759030866897991a5192831ee28bb24ad0ff5a5ad9e5c57917520f0d",
           "lines": 15,
           "heading": "移动端大资源优先使用租户 HDFS/CDN"
         },
@@ -1016,7 +1016,7 @@
           "id": "microi-uniapp-frontend-008",
           "ordinal": 8,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "d7b2b5c8ffe5c1dd8f51eb7d5e8368dba6813c2fa25d39dd3fb8f6659922b5b9",
+          "sha256": "d52c69b1f93de27639f47c25916cb6c479465ff0db9e5ef3db81073dd50ebebb",
           "lines": 20,
           "heading": "头像必须异步统一解析"
         },
@@ -1024,7 +1024,7 @@
           "id": "microi-uniapp-frontend-009",
           "ordinal": 9,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "0270fbc5a2ee0d20a4d1d2f2a9c7fc7304e18402d282e1efcf860bd31db9fcb0",
+          "sha256": "20cfb0b95ea827e9cbca1272b27a57a080976fc1fd8db3b4586e0dc5ed13d903",
           "lines": 26,
           "heading": "移动端富文本图文排版"
         },
@@ -1032,15 +1032,15 @@
           "id": "microi-uniapp-frontend-010",
           "ordinal": 10,
           "destination": "microi-uniapp-frontend/references/progressive-01-移动端分类-双栏列表独立滚动.md",
-          "sha256": "2820c6dbc7641b03cb2d3af98f80ca654162fdac7995993be5cb7e25b8e5bdea",
-          "lines": 31,
+          "sha256": "81d5dbf6cae493337a5289d66ef39bb6d6a64a3e3f64c98e228dc77853810986",
+          "lines": 33,
           "heading": "移动端分类/双栏列表独立滚动"
         },
         {
           "id": "microi-uniapp-frontend-011",
           "ordinal": 11,
           "destination": "microi-uniapp-frontend/references/progressive-01-移动端分类-双栏列表独立滚动.md",
-          "sha256": "a28fba298274b738ef9039c6bd6a1707468687e2ae9644a819736374586749e9",
+          "sha256": "fcf60104a95a27645f4b519b19bde6aab55d41f38388c442179533dd4ed8a35a",
           "lines": 37,
           "heading": "数据页必须使用骨架屏 Loading"
         },
@@ -1048,15 +1048,15 @@
           "id": "microi-uniapp-frontend-012",
           "ordinal": 12,
           "destination": "microi-uniapp-frontend/references/progressive-01-移动端分类-双栏列表独立滚动.md",
-          "sha256": "5554c817702cc491937fb2b32f5ba2ce76554a35ef0a2189979ff1d60789ab30",
-          "lines": 19,
+          "sha256": "affb88f7856aa410c7d8dd4efa9a5b804be4721efda013e2319203e490d58f54",
+          "lines": 20,
           "heading": "移动端安全区必须兼容 iOS 与 Android"
         },
         {
           "id": "microi-uniapp-frontend-013",
           "ordinal": 13,
           "destination": "microi-uniapp-frontend/references/progressive-01-移动端分类-双栏列表独立滚动.md",
-          "sha256": "591a8e5a3e33cfcdb102abf56ebc6eeb5c5896d621442c30e734f455d625842c",
+          "sha256": "b6074ef264327e9cc630a9c4136989d6355ed33ba4902098e8ae025661a207ed",
           "lines": 28,
           "heading": "微信自定义组件的点击与拖动事件必须真机链路验收"
         },
@@ -1064,7 +1064,7 @@
           "id": "microi-uniapp-frontend-014",
           "ordinal": 14,
           "destination": "microi-uniapp-frontend/references/progressive-01-移动端分类-双栏列表独立滚动.md",
-          "sha256": "62f20b920f2365d9f2f5062218b10b17aa181ccb3ae5d2260f795e086355f678",
+          "sha256": "201c7dd1b1e923a62319f1402088fa696bb96aa8ca58a8c7f9817a6ecce36e12",
           "lines": 13,
           "heading": "列表型资料页必须提供完整管理动作"
         },
@@ -1072,7 +1072,7 @@
           "id": "microi-uniapp-frontend-015",
           "ordinal": 15,
           "destination": "microi-uniapp-frontend/references/progressive-01-移动端分类-双栏列表独立滚动.md",
-          "sha256": "d8e9280b5127d7dafd4dcb83b22bdb379fef39eac1e2e1b2e37f1c064cfe7fc6",
+          "sha256": "287d085d3651e0eb20b97fadf0ba616e9f4aea9447efda6824612b64309efd27",
           "lines": 11,
           "heading": "移动端资产/奖励流水展示"
         },
@@ -1080,15 +1080,15 @@
           "id": "microi-uniapp-frontend-016",
           "ordinal": 16,
           "destination": "microi-uniapp-frontend/references/progressive-01-移动端分类-双栏列表独立滚动.md",
-          "sha256": "610b00696fd8a1548842974b5551e0e55bc276a3605459947251f508b4ef2ad3",
-          "lines": 75,
+          "sha256": "f1c583f99234a5a82a7c1557658c3ba036020b39d5524466eca0e2b1cdb85988",
+          "lines": 108,
           "heading": "H5 在 PC 浏览器必须自动模拟移动端"
         },
         {
           "id": "microi-uniapp-frontend-017",
           "ordinal": 17,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "f4c3bd827f3349b65dd40c894a51299d32ba7d75ba58a3a81d04aaba6b1733f2",
+          "sha256": "9ef6eaa852b4b29ee01b51a4353685ee97ee219ff5d6da881f3de6371654861f",
           "lines": 12,
           "heading": "关键业务资产不得默认选中"
         },
@@ -1096,7 +1096,7 @@
           "id": "microi-uniapp-frontend-018",
           "ordinal": 18,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "35f9826cc82000f9cedd3ccaffd8e7718b0efbec75cf12665145f1de4f8a6d23",
+          "sha256": "c55461eba07b7763cb7810818574d4660fbaeed65f95e894e0f859aa96b4bbd2",
           "lines": 15,
           "heading": "账号角色与会话状态"
         },
@@ -1104,7 +1104,7 @@
           "id": "microi-uniapp-frontend-019",
           "ordinal": 19,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "72621b385229c3308cbe98dbfa0fb29de95e88d675dad31d9fbe4543b441fdbb",
+          "sha256": "7a258af0c36dd3e82d7f9444043d3b0b9d3bc99f329ff85a167b91594b1a54b1",
           "lines": 14,
           "heading": "数字、主题、上传与消息"
         },
@@ -1112,7 +1112,7 @@
           "id": "microi-uniapp-frontend-020",
           "ordinal": 20,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "6f5c05a725b3325feb889fbb4c97621e247ca9d6eb89970bf9f8602a81177524",
+          "sha256": "2ae732a49279cc7604169a302987d5428ab3b9e8a108ec442813bbd0aea735a0",
           "lines": 13,
           "heading": "图片上传必须支持替换与预览"
         },
@@ -1120,7 +1120,7 @@
           "id": "microi-uniapp-frontend-021",
           "ordinal": 21,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "ad8b543f8e0cd7a20464adb88d456bc21e0451e3f216b1419fa572631543cd49",
+          "sha256": "68367fcd8e3fae5c2e7da8a956fd803b712ea7bdddbc5a595b16c35b4f7c9fd8",
           "lines": 12,
           "heading": "组件复用与页面去重"
         },
@@ -1128,7 +1128,7 @@
           "id": "microi-uniapp-frontend-022",
           "ordinal": 22,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "79b92cb4a1e0b37d786b148a98848fbae3f4424b4d07febc96adbf62ef389431",
+          "sha256": "bf2b295c18b0e848bffb9dd16a3c8fa2c1d022e7f9a344dd100a2305c5e14de1",
           "lines": 16,
           "heading": "验收要求"
         },
@@ -1136,7 +1136,7 @@
           "id": "microi-uniapp-frontend-023",
           "ordinal": 23,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "bdd657712c4a6a12698c619d22c58b43648c3a3ab32ded54f09c3dc7331ad8ab",
+          "sha256": "07c9a59b5b1c165d75648a618039d9627560398a4849da78ea6d1cfa71c4c0de",
           "lines": 12,
           "heading": "Microi 前端 SDK 必须接入"
         },
@@ -1144,7 +1144,7 @@
           "id": "microi-uniapp-frontend-024",
           "ordinal": 24,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "b2b9b1ea707ab4bd114db5838eda185b7b7e375435cdca21effd7be24f996a27",
+          "sha256": "c206d390961681ac6dec722beb96c598efa97a97112744c9fabc6f7eee79e43c",
           "lines": 13,
           "heading": "MCI-UI Mobile 必须优先使用"
         },
@@ -1152,7 +1152,7 @@
           "id": "microi-uniapp-frontend-025",
           "ordinal": 25,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "c472359f2f16b287398c0781cb66cbfb98fea99accddbfa078e9f1e9356aa30d",
+          "sha256": "88463d70885f5a2e0718cbd08acfcbe0fa6f60dc4101f9016af575f9932f3783",
           "lines": 18,
           "heading": "登录、图标与主题补充规范"
         },
@@ -1160,7 +1160,7 @@
           "id": "microi-uniapp-frontend-026",
           "ordinal": 26,
           "destination": "microi-uniapp-frontend/references/progressive-02-关键业务资产不得默认选中.md",
-          "sha256": "67c8816c77d24e6aef77f1706a72330c7a103b58c623178c056a71203e2b43d3",
+          "sha256": "12cab2ca3839d0eee4bebc69648f63b172a793ddeade2c6b0a1108fcad0adc4a",
           "lines": 15,
           "heading": "UniApp 上传路径与 Header 规则"
         }

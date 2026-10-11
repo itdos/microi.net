@@ -2,7 +2,10 @@
   <section v-if="shouldRender" id="ai-apps" class="ai-app-market" aria-labelledby="ai-app-market-title">
     <div class="ai-app-shell">
       <header class="ai-app-heading">
-        <h2 id="ai-app-market-title">{{ copy.apps }}</h2>
+        <div class="ai-app-title-row">
+          <h2 id="ai-app-market-title" aria-describedby="ai-app-run-modes">{{ copy.apps }}</h2>
+          <span id="ai-app-run-modes" class="ai-app-run-modes">{{ copy.runModes }}</span>
+        </div>
         <div class="ai-app-toolbar">
           <div class="ai-app-categories" role="radiogroup" :aria-label="copy.categories">
             <button
@@ -240,7 +243,7 @@ let sentinelCheckFrame = 0
 
 const isEnglish = computed(() => props.locale === 'en-US' || /^\/en(?:\/|$)/.test(route.path || ''))
 const copy = computed(() => isEnglish.value ? {
-  apps: 'AI Apps', categories: 'App categories', sort: 'Sort', sortLabel: 'Sort applications', search: 'Search apps',
+  apps: 'AI Apps', runModes: 'Supports one-click installation, platform menu microservices, microservice dialogs, fully standalone operation, form engine integration, and more', categories: 'App categories', sort: 'Sort', sortLabel: 'Sort applications', search: 'Search apps',
   empty: 'No exact or related application was found.', emptyHelp: 'Tell us what you need. Your text is only submitted after you choose to continue.',
   relatedBadge: 'Related apps', relatedTitle: 'No exact match — these are related runnable apps',
   relatedDescription: 'Matched by role, industry, or workflow. They may not fully satisfy your original requirement.',
@@ -248,7 +251,7 @@ const copy = computed(() => isEnglish.value ? {
   popularDescription: 'These are clearly labeled popular suggestions, not exact search results.',
   describeNeed: 'Describe and generate my software', tryNow: 'Try now', recommended: 'Recommended', loadingMore: 'Loading more applications', retry: 'Loading failed, retry', loadMore: 'Load more applications', finished: 'All applications loaded'
 } : {
-  apps: 'AI 应用', categories: '应用分类', sort: '排序', sortLabel: '应用排序', search: '搜索应用',
+  apps: 'AI应用', runModes: '支持一键安装、平台菜单微服务运行、微服务弹窗运行、完全独立运行、表单引擎集成等多种运行方式', categories: '应用分类', sort: '排序', sortLabel: '应用排序', search: '搜索应用',
   empty: '暂时没有找到精确或相关应用。', emptyHelp: '请描述你要解决的问题；只有点击继续后，需求才会被明确提交。',
   relatedBadge: '相关可用软件', relatedTitle: '没有完全匹配，以下是相关且可运行的软件',
   relatedDescription: '这些候选按行业、角色或流程匹配，可能不能完整替代你原本想找的软件。',
@@ -727,7 +730,10 @@ onBeforeUnmount(() => {
 .ai-app-market { width: 100%; color: #f7f7f7; }
 .ai-app-shell { width: min(1440px, calc(100% - 48px)); margin: 0 auto; padding: 30px 0 96px; }
 .ai-app-heading { margin-bottom: 18px; }
-.ai-app-heading h2 { margin: 0 0 18px; color: #f7f7f7; font-size: 22px; font-weight: 680; letter-spacing: -.02em; }
+.ai-app-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 18px; }
+.ai-app-heading h2 { flex: 0 0 auto; margin: 0; color: #f7f7f7; font-size: 22px; font-weight: 680; letter-spacing: -.02em; }
+.ai-app-run-modes { max-width: 100%; min-width: 0; padding: 5px 10px; border: 1px solid rgba(94, 234, 212, .22); border-radius: 9px; background: rgba(45, 212, 191, .08); color: #99ded3; font-size: 13px; font-weight: 450; line-height: 1.7; overflow-wrap: anywhere; }
+:global(html:not(.dark) .ai-app-run-modes) { border-color: #b9e1d8; background: #e9f6f2; color: #0f766e; }
 .ai-app-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .ai-app-categories { display: flex; flex: 1; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .ai-app-categories::-webkit-scrollbar { display: none; }
