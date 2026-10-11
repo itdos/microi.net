@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-mq-mqtt-002 sha256=e3917adda6454dc4d17672df3afc11def6fbd2f7a77f24b3ac821320d6df7907 -->
+<!-- microi-progressive:chunk id=v8-mq-mqtt-002 sha256=24e28545025cf03d9a91cce8081fbe566e5f8ae56ff2885111238f684c276cd1 -->
 ## V8.MQTT — IoT 物联网
 
 先区分两个边界：MQTT 是设备实时双向通道，RabbitMQ 是服务端异步队列；
@@ -55,7 +55,7 @@ MQTT 通过一个接口引擎处理所有事件，通过 `V8.EventName` 判断�
 | `V8.MQTT.Retain` | 是否为 Retained Message |
 | `V8.MQTT.UserProperties` | MQTT v5 User Properties；没有时为空 |
 
-子租户必须 `MqttEnable=1` 并配置独立 `MqttAccount/MqttPwd`。子租户不能通过 `MqttAllowAnonymous=1` 或 `MqttTopicIsolation=0` 关闭边界；缺少完整凭据时拒绝连接。Topic 统一为 `tenant/{lowerOsClient}/{businessTopic}`，服务端 publish、subscribe、retained、ResponseTopic 都会校验并拒绝其它租户、`$SYS` 系统 Topic 和 `$share` 共享订阅绕过。
+子租户在旧库兼容迁移完成后可使用 `MqttEnable` 空值或 `1` 启用，`0` 关闭，并必须配置独立 `MqttAccount/MqttPwd`。旧租户原空值会在升级时固定为 `0`，不会意外开放。子租户不能通过 `MqttAllowAnonymous=1` 或 `MqttTopicIsolation=0` 关闭边界；缺少完整凭据时拒绝连接。Topic 统一为 `tenant/{lowerOsClient}/{businessTopic}`，服务端 publish、subscribe、retained、ResponseTopic 都会校验并拒绝其它租户、`$SYS` 系统 Topic 和 `$share` 共享订阅绕过。
 
 ### 完整示例
 

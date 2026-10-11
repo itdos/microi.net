@@ -7,9 +7,9 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 
 # Microi 吾码 Playwright E2E 自动化测试
 
-> **2026-05 更新（重要）**：Microi.Agent 插件生成的所有 E2E 产物现已统一隔离到 `<projectRoot>/.microi-e2e/` 目录，**不再**写入 `tests/e2e/`、根目录 `playwright.config.js` 或 `.env.e2e.example`。
+> **2026-05 更新（重要）**：Microi.Agent 插件生成的E2E 配置、用例和帮助器保留在 `<projectRoot>/.microi-e2e/`；运行产物统一输出到 `<gitRoot>/.tmp/microi-e2e/<项目相对路径>/`，**不再**写入 `tests/e2e/`、根目录 `playwright.config.js` 或 `.env.e2e.example`。
 > - `playwright.config.js` 位于 `.microi-e2e/playwright.config.js`，`testDir` 为 `./` （即 `.microi-e2e/specs/`）
-> - 报告路径 `.microi-e2e/report/`，截图 `.microi-e2e/screenshots/`
+> - 报告、截图、trace、video 和 test-results 放在对应 `.tmp/microi-e2e/` 项目子目录
 > - 上下文 `.microi-e2e/.microi-playwright-context.json`
 > - 本文档下方仍有大量 `tests/e2e/...` 写法，均为历史风格示意，**实际生成路径以 `.microi-e2e/` 为准**。手写测试（如 `tests/blueprint-e2e.spec.mjs`）不受影响。
 
@@ -38,7 +38,7 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 不适合把 Playwright 用来替代 V8 单函数调试。单个接口引擎的入参输出优先用 VS Code 插件远程执行、MCP `microi_run_engine` 或后端单元测试。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-002 sha256=495c6f4b8388d94e16372d83c9e3ec3e6972112e03dba0adae413c8ac9d77232 -->
+<!-- microi-progressive:chunk id=playwright-e2e-002 sha256=2e92ff117b1c3b450e988776204ccecd9dd4d6a83bb08d86d32032b467abc174 -->
 ## 临时文件与产物放置规则（必须遵守）
 
 AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测试报告**等，**绝对不能放在工作区根目录**，必须放在以下指定位置：
@@ -47,7 +47,8 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 |------|---------|
 | 一次性 Python/JS/PS1 脚本 | `<workspace-root>/.tmp/` |
 | 诊断截图、调试输出 | `<workspace-root>/.tmp/screenshots/` 或子目录 |
-| E2E 测试产物（Microi.Agent 插件生成） | `<workspace-root>/.microi-e2e/` |
+| E2E 配置、用例、帮助器 | `<projectRoot>/.microi-e2e/` |
+| E2E 截图、报告、trace、video、test-results | `<gitRoot>/.tmp/microi-e2e/<项目相对路径>/` |
 | AI 一次性 Playwright 脚本、截图、日志、报告 | `<workspace-root>/.tmp/`、`<workspace-root>/.tmp/screenshots/`、`<workspace-root>/.tmp/reports/` |
 | 性能测试报告 | `<workspace-root>/.microi-performance/`（仅限此目录） |
 

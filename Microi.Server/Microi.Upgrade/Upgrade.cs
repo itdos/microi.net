@@ -179,44 +179,60 @@ namespace Microi.net
             var results = new List<MicroiUpgradeResult>();
             if (!string.IsNullOrWhiteSpace(CurrentVersion) && (!System.Version.TryParse(CurrentVersion, out var parsed) || parsed.Revision < 0))
                 return new DosResultList<MicroiUpgradeResult>(0, results, "sys_config.ServerVersion格式错误，应为四段数字版本号。");
-            if (!StartVersionStep(CurrentVersion, UpgradeAppStore.Version)) return new DosResultList<MicroiUpgradeResult>(1, results);
+            var recoverAppStore = StartVersionStep(CurrentVersion, UpgradeAppStore.Version);
+            var migrateMqttSwitch = StartVersionStep(CurrentVersion, MqttEnablePolicy.NullMeansEnabledVersion);
+            if (!recoverAppStore && !migrateMqttSwitch) return new DosResultList<MicroiUpgradeResult>(1, results);
             var runtimeInvariantStage = "菜单AppDisplay保护快照";
-            var snapshot = CaptureMenuAppDisplaySnapshot(osClientSecret);
+            var snapshot = recoverAppStore
+                ? CaptureMenuAppDisplaySnapshot(osClientSecret)
+                : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 UpgradeExecutionLeaseContext.ConfirmOwnership();
-                EnsureAuthSecretColumns(osClientSecret);
-                EnsureMicroServiceColumns(osClientSecret);
-                EnsureSecurityLevels(osClientSecret);
-                EnsureMobileVisibilityColumns(osClientSecret);
-                EnsureApiEngineRuntimeColumns(osClientSecret);
-                EnsureLegacyFieldMetadataColumns(osClientSecret);
-                runtimeInvariantStage = "平台运行时接口闭包";
-                await UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(osClientSecret).ConfigureAwait(false);
-                runtimeInvariantStage = "接口引擎字段元数据兼容";
-                await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动恢复前").ConfigureAwait(false);
-                runtimeInvariantStage = "接口引擎缓存写入兼容";
-                await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动恢复前").ConfigureAwait(false);
-                runtimeInvariantStage = "旧菜单配置兼容";
-                await EnsureLegacyMenuDiyConfigCompatibilityAsync(osClientSecret).ConfigureAwait(false);
-                // 持久队列是商城安装更新的必要事实源；不启动备份、调度或其它业务任务。
-                runtimeInvariantStage = "Upgrade21-持久后台任务";
-                var errors = await new Upgrade21().Run(osClientSecret.OsClient).ConfigureAwait(false);
-                if (errors.Count == 0)
+                if (recoverAppStore)
                 {
-                    runtimeInvariantStage = "应用商城安装更新恢复";
-                    errors = await new UpgradeAppStore().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    EnsureAuthSecretColumns(osClientSecret);
+                    EnsureMicroServiceColumns(osClientSecret);
+                    EnsureSecurityLevels(osClientSecret);
+                    EnsureMobileVisibilityColumns(osClientSecret);
+                    EnsureApiEngineRuntimeColumns(osClientSecret);
+                    EnsureLegacyFieldMetadataColumns(osClientSecret);
+                    runtimeInvariantStage = "平台运行时接口闭包";
+                    await UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(osClientSecret).ConfigureAwait(false);
+                    runtimeInvariantStage = "接口引擎字段元数据兼容";
+                    await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动恢复前").ConfigureAwait(false);
+                    runtimeInvariantStage = "接口引擎缓存写入兼容";
+                    await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动恢复前").ConfigureAwait(false);
+                    runtimeInvariantStage = "旧菜单配置兼容";
+                    await EnsureLegacyMenuDiyConfigCompatibilityAsync(osClientSecret).ConfigureAwait(false);
+                    // 持久队列是商城安装更新的必要事实源；不启动备份、调度或其它业务任务。
+                    runtimeInvariantStage = "Upgrade21-持久后台任务";
+                    var errors = await new Upgrade21().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (errors.Count == 0)
+                    {
+                        runtimeInvariantStage = "应用商城安装更新恢复";
+                        errors = await new UpgradeAppStore().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    }
+                    if (errors.Count > 0) throw new InvalidOperationException(string.Join("；", errors));
+                    runtimeInvariantStage = "接口引擎字段元数据复检";
+                    await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动恢复后").ConfigureAwait(false);
+                    runtimeInvariantStage = "接口引擎缓存写入复检";
+                    await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动恢复后").ConfigureAwait(false);
+                    runtimeInvariantStage = "菜单AppDisplay保护恢复";
+                    await RestoreMenuAppDisplaySnapshotAsync(osClientSecret, snapshot).ConfigureAwait(false);
+                    // 只有整个恢复闭包强回读成功才前向保存版本，失败允许在同版本幂等重试。
+                    await PersistServerVersionForwardOnlyAsync(osClientSecret, UpgradeAppStore.Version).ConfigureAwait(false);
+                    UpgradeProgress.WriteLine($"Microi：【自动升级状态】【{osClientSecret.OsClient}】启动、登录与应用商城恢复成功，可选应用请在商城手动安装更新。");
                 }
-                if (errors.Count > 0) throw new InvalidOperationException(string.Join("；", errors));
-                runtimeInvariantStage = "接口引擎字段元数据复检";
-                await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动恢复后").ConfigureAwait(false);
-                runtimeInvariantStage = "接口引擎缓存写入复检";
-                await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动恢复后").ConfigureAwait(false);
-                runtimeInvariantStage = "菜单AppDisplay保护恢复";
-                await RestoreMenuAppDisplaySnapshotAsync(osClientSecret, snapshot).ConfigureAwait(false);
-                // 只有整个恢复闭包强回读成功才前向保存版本，失败允许在同版本幂等重试。
-                await PersistServerVersionForwardOnlyAsync(osClientSecret, UpgradeAppStore.Version).ConfigureAwait(false);
-                UpgradeProgress.WriteLine($"Microi：【自动升级状态】【{osClientSecret.OsClient}】启动、登录与应用商城恢复成功，可选应用请在商城手动安装更新。");
+                if (migrateMqttSwitch)
+                {
+                    runtimeInvariantStage = "MQTT空值开关兼容迁移";
+                    MigrateLegacyMqttNullSwitches(osClientSecret);
+                    await PersistServerVersionForwardOnlyAsync(osClientSecret, MqttEnablePolicy.NullMeansEnabledVersion)
+                        .ConfigureAwait(false);
+                    UpgradeProgress.Complete(MqttEnablePolicy.NullMeansEnabledVersion,
+                        "旧租户 MQTT 空开关已保持关闭，空值默认开启语义就绪。");
+                }
                 return new DosResultList<MicroiUpgradeResult>(1, results);
             }
             catch (Exception ex)
@@ -235,7 +251,9 @@ namespace Microi.net
                 try { await RestoreMenuAppDisplaySnapshotAsync(osClientSecret, snapshot).ConfigureAwait(false); }
                 catch (Exception restoreError) { diagnostic += "；菜单显隐恢复失败：" + SanitizeUpgradeDiagnosticText(restoreError.Message); }
                 var queued = MicroiEngine.QueueSystemLog(osClientSecret.OsClient, "PlatformUpgrade", "TenantMigrationFailed",
-                    "商城恢复失败，ServerVersion未推进", diagnostic, 3, false, UpgradeAppStore.Version);
+                    "版本迁移失败，ServerVersion未推进", diagnostic, 3, false,
+                    runtimeInvariantStage == "MQTT空值开关兼容迁移"
+                        ? MqttEnablePolicy.NullMeansEnabledVersion : UpgradeAppStore.Version);
                 if (!queued) UpgradeProgress.WriteLine("Microi：系统日志队列暂不可用，失败详情已保留在控制台日志：" + diagnostic);
                 return new DosResultList<MicroiUpgradeResult>(0, results, diagnostic);
             }
@@ -1856,6 +1874,44 @@ if (_microiLegacyMenuConfigChanged) {
             return true;
         }
 
+        /// <summary>
+        /// 一次性协议迁移：在版本门打开前把旧库所有 NULL 固定成显式关闭。
+        /// 不覆盖 0/1，也不每次启动遍历租户；执行者持有该数据库的共享升级租约。
+        /// 更新与版本保存各自幂等，失败后可从相同版本重试。
+        /// </summary>
+        private void MigrateLegacyMqttNullSwitches(OsClientSecret osClientSecret)
+        {
+            UpgradeExecutionLeaseContext.ConfirmOwnership();
+            if (osClientSecret?.Db == null
+                || !TableExists(osClientSecret, "sys_osclients")
+                || !ColumnExists(osClientSecret, "sys_osclients", "MqttEnable"))
+            {
+                throw new InvalidOperationException("sys_osclients.MqttEnable 不存在，无法安全迁移 MQTT 开关。");
+            }
+
+            var orm = MicroiEngine.ORM(osClientSecret.Db.Db.DbProvider.DatabaseType);
+            var table = orm.GetTableName("sys_osclients");
+            var field = orm.GetFieldName("MqttEnable");
+            // CONCAT 将兼容旧文本列的空白值转成可比较文本；标准 INT 列的 0/1 不受影响。
+            // Oracle 把空字符串当作 NULL：空白文本 TRIM 后也必须由 IS NULL 捕获。
+            var trimmedValue = $"LTRIM(RTRIM(CONCAT('', {field})))";
+            var legacyBlankPredicate = $"{field} IS NULL OR {trimmedValue} IS NULL OR {trimmedValue} = ''";
+            var affected = osClientSecret.Db
+                .FromSql($"UPDATE {table} SET {field} = @p0 WHERE {legacyBlankPredicate}")
+                .AddInParameter("p0", 0)
+                .ExecuteNonQuery();
+
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            var remaining = osClientSecret.Db
+                .FromSql($"SELECT COUNT(*) FROM {table} WHERE {legacyBlankPredicate}")
+                .ToScalar<int>();
+            if (remaining != 0)
+            {
+                throw new InvalidOperationException("旧库 MQTT 空开关迁移后仍存在 NULL，ServerVersion 不得推进。");
+            }
+            UpgradeProgress.WriteLine($"Microi：【自动升级状态】【{osClientSecret.OsClient}】【MQTT开关】旧空值固定关闭 {affected} 条；明确 0/1 保持原值。");
+        }
+
         private static void AdvanceSuccessfulVersion(ref string currentVersion, string candidateVersion)
         {
             UpgradeProgress.Complete(candidateVersion, "升级点已完成：" + candidateVersion);
@@ -1982,7 +2038,11 @@ if (_microiLegacyMenuConfigChanged) {
 
         private static IReadOnlyList<KeyValuePair<string, string>> GetVersionedUpgradePrograms()
         {
-            return new[] { new KeyValuePair<string, string>("启动与应用商城恢复", UpgradeAppStore.Version) };
+            return new[]
+            {
+                new KeyValuePair<string, string>("启动与应用商城恢复", UpgradeAppStore.Version),
+                new KeyValuePair<string, string>("MQTT空值开关兼容迁移", MqttEnablePolicy.NullMeansEnabledVersion)
+            };
         }
 
         private static string FormatVersionForLog(string version)

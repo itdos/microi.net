@@ -3384,8 +3384,9 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     .AddInParameter("p13", osClient)        // ServerTag
                     .ExecuteNonQuery();
 
-                CopyMainOsClientConfig(mainClient, osClient, newDbConn, clientName, domainName, authSecret);
-                var serviceWarnings = ConfigureTenantServiceCredentials(mainClient, osClient);
+                CopyMainOsClientConfig(mainClient, osClient, osClientType, osClientNetwork,
+                    newDbConn, clientName, domainName, authSecret);
+                var serviceWarnings = ConfigureTenantServiceCredentials(mainClient, osClient, osClientType, osClientNetwork);
 
                 Console.WriteLine($"Microi：【成功】sys_osclients新增租户[{osClient}]记录成功！");
                 var result = new DosResult(1);
@@ -3405,37 +3406,48 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
             }
         }
 
-        private void CopyMainOsClientConfig(OsClientSecret mainClient, string osClient, string newDbConn,
+        private void CopyMainOsClientConfig(OsClientSecret mainClient, string osClient,
+            string osClientType, string osClientNetwork, string newDbConn,
             string clientName, string domainName, string authSecret)
         {
             try
             {
-                const string sourceSql = @"SELECT * FROM sys_osclients
-                        WHERE IsDeleted = 0 AND IsEnable = 1
-                        AND OsClient = @p0 AND OsClientType = @p1 AND OsClientNetwork = @p2
-                        ORDER BY CreateTime DESC";
-                var source = mainClient.Db.FromSql(sourceSql)
-                    .AddInParameter("p0", OsClientDefault.OsClient)
-                    .AddInParameter("p1", OsClientDefault.OsClientType)
-                    .AddInParameter("p2", OsClientDefault.OsClientNetwork)
-                    .First<dynamic>();
-                if (source == null)
-                {
-                    return;
-                }
+                var orm = MicroiEngine.ORM(mainClient.Db.Db.DbProvider.DatabaseType);
+                var table = orm.GetTableName("sys_osclients");
+                var idField = orm.GetFieldName("Id");
+                var scope = $"{orm.GetFieldName("OsClient")} = @ScopeOsClient " +
+                            $"AND {orm.GetFieldName("OsClientType")} = @ScopeType " +
+                            $"AND {orm.GetFieldName("OsClientNetwork")} = @ScopeNetwork " +
+                            $"AND {orm.GetFieldName("IsEnable")} = 1 " +
+                            $"AND ({orm.GetFieldName("IsDeleted")} = 0 OR {orm.GetFieldName("IsDeleted")} IS NULL)";
+                var sources = mainClient.Db.FromSql($"SELECT * FROM {table} WHERE {scope}")
+                    .AddInParameter("ScopeOsClient", OsClientDefault.OsClient)
+                    .AddInParameter("ScopeType", OsClientDefault.OsClientType)
+                    .AddInParameter("ScopeNetwork", OsClientDefault.OsClientNetwork)
+                    .ToList<dynamic>();
+                if (sources.Count != 1)
+                    throw new InvalidOperationException("当前分区的主租户源配置不唯一。");
+                var targetRows = mainClient.Db.FromSql($"SELECT {idField} FROM {table} WHERE {scope}")
+                    .AddInParameter("ScopeOsClient", osClient)
+                    .AddInParameter("ScopeType", osClientType)
+                    .AddInParameter("ScopeNetwork", osClientNetwork)
+                    .ToList<TenantServiceTargetRow>();
+                if (targetRows.Count != 1 || string.IsNullOrWhiteSpace(targetRows[0]?.Id))
+                    throw new InvalidOperationException("新租户目标分区不唯一。");
 
-                var data = JObject.FromObject(source);
+                var data = JObject.FromObject((object)sources[0]);
                 var assignments = new List<string>
                 {
-                    $"{QuoteField("ClientName")} = @ClientName",
-                    $"{QuoteField("DbConn")} = @DbConn",
-                    $"{QuoteField("DbReadConn")} = @DbReadConn",
-                    $"{QuoteField("AuthSecret")} = @AuthSecret",
-                    $"{QuoteField("DomainName")} = @DomainName",
-                    $"{QuoteField("ServerTag")} = @ServerTag",
-                    $"{QuoteField("UpdateTime")} = @UpdateTime"
+                    $"{orm.GetFieldName("ClientName")} = @ClientName",
+                    $"{orm.GetFieldName("DbConn")} = @DbConn",
+                    $"{orm.GetFieldName("DbReadConn")} = @DbReadConn",
+                    $"{orm.GetFieldName("AuthSecret")} = @AuthSecret",
+                    $"{orm.GetFieldName("DomainName")} = @DomainName",
+                    $"{orm.GetFieldName("ServerTag")} = @ServerTag",
+                    $"{orm.GetFieldName("UpdateTime")} = @UpdateTime"
                 };
                 var copyValues = new List<KeyValuePair<string, object>>();
+                var copiedFieldValues = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
                 var sensitiveCopyParameters = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var index = 0;
                 foreach (var prop in data.Properties())
@@ -3446,9 +3458,11 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                         continue;
                     }
                     var paramName = "CopyField" + index++;
-                    assignments.Add($"{QuoteField(prop.Name)} = @{paramName}");
+                    assignments.Add($"{orm.GetFieldName(prop.Name)} = @{paramName}");
                     copyValues.Add(new KeyValuePair<string, object>(paramName,
                         prop.Value.Type == JTokenType.Null ? null : prop.Value.ToString()));
+                    copiedFieldValues[prop.Name] = prop.Value.Type == JTokenType.Null
+                        ? null : prop.Value.ToString();
                     if (TenantConfigurationSecurity.IsSensitiveConfigurationField(prop.Name))
                     {
                         sensitiveCopyParameters.Add(paramName);
@@ -3456,7 +3470,8 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                 }
 
                 var cmd = mainClient.Db.FromSql(
-                    $"UPDATE sys_osclients SET {string.Join(", ", assignments)} WHERE OsClient = @WhereOsClient AND IsDeleted = 0");
+                    $"UPDATE {table} SET {string.Join(", ", assignments)} " +
+                    $"WHERE {idField} = @WhereId AND {scope}");
                 cmd.AddInParameter("ClientName", clientName ?? osClient)
                     .AddSensitiveInParameter("DbConn", newDbConn)
                     .AddSensitiveInParameter("DbReadConn", newDbConn)
@@ -3464,7 +3479,10 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     .AddInParameter("DomainName", domainName)
                     .AddInParameter("ServerTag", osClient)
                     .AddInParameter("UpdateTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
-                    .AddInParameter("WhereOsClient", osClient);
+                    .AddInParameter("WhereId", targetRows[0].Id)
+                    .AddInParameter("ScopeOsClient", osClient)
+                    .AddInParameter("ScopeType", osClientType)
+                    .AddInParameter("ScopeNetwork", osClientNetwork);
 
                 foreach (var item in copyValues)
                 {
@@ -3473,12 +3491,69 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     else
                         cmd.AddInParameter(item.Key, item.Value);
                 }
-                cmd.ExecuteNonQuery();
+                if (cmd.ExecuteNonQuery() > 1)
+                    throw new InvalidOperationException("主租户配置复制影响了多个目标分区。");
+
+                var copiedRows = mainClient.Db.FromSql(
+                        $"SELECT {idField}, {orm.GetFieldName("ClientName")}, {orm.GetFieldName("DbConn")}, " +
+                        $"{orm.GetFieldName("DbReadConn")}, {orm.GetFieldName("AuthSecret")}, " +
+                        $"{orm.GetFieldName("DomainName")}, {orm.GetFieldName("ServerTag")} " +
+                        $"FROM {table} WHERE {idField} = @WhereId AND {scope}")
+                    .AddInParameter("WhereId", targetRows[0].Id)
+                    .AddInParameter("ScopeOsClient", osClient)
+                    .AddInParameter("ScopeType", osClientType)
+                    .AddInParameter("ScopeNetwork", osClientNetwork)
+                    .ToList<CopiedTenantRuntimeRow>();
+                if (copiedRows.Count != 1
+                    || !string.Equals(copiedRows[0].Id, targetRows[0].Id, StringComparison.Ordinal)
+                    || !string.Equals(copiedRows[0].ClientName, clientName ?? osClient, StringComparison.Ordinal)
+                    || !string.Equals(copiedRows[0].DbConn, newDbConn, StringComparison.Ordinal)
+                    || !string.Equals(copiedRows[0].DbReadConn, newDbConn, StringComparison.Ordinal)
+                    || !string.Equals(copiedRows[0].AuthSecret, authSecret, StringComparison.Ordinal)
+                    || !string.Equals(copiedRows[0].DomainName ?? string.Empty, domainName ?? string.Empty, StringComparison.Ordinal)
+                    || !string.Equals(copiedRows[0].ServerTag, osClient, StringComparison.Ordinal))
+                    throw new InvalidOperationException("新租户运行配置复制后强回读不一致。");
+
+                if (copiedFieldValues.Count > 0)
+                {
+                    var copyReadback = mainClient.Db.FromSql(
+                            $"SELECT {string.Join(", ", copiedFieldValues.Keys.Select(orm.GetFieldName))} " +
+                            $"FROM {table} WHERE {idField} = @WhereId AND {scope}")
+                        .AddInParameter("WhereId", targetRows[0].Id)
+                        .AddInParameter("ScopeOsClient", osClient)
+                        .AddInParameter("ScopeType", osClientType)
+                        .AddInParameter("ScopeNetwork", osClientNetwork)
+                        .ToList<dynamic>();
+                    if (copyReadback.Count != 1)
+                        throw new InvalidOperationException("新租户共享配置复制后回读分区不唯一。");
+                    var copiedValues = JObject.FromObject((object)copyReadback[0]);
+                    var isOracle = mainClient.Db.Db.DbProvider.DatabaseType.ToString()
+                        .IndexOf("Oracle", StringComparison.OrdinalIgnoreCase) >= 0;
+                    foreach (var pair in copiedFieldValues)
+                    {
+                        var token = copiedValues.GetValue(pair.Key, StringComparison.OrdinalIgnoreCase);
+                        var actual = token == null || token.Type == JTokenType.Null ? null : token.ToString();
+                        if (!TenantServiceReadbackMatches(pair.Value, actual, isOracle))
+                            throw new InvalidOperationException($"新租户共享配置字段 {pair.Key} 回读不一致。");
+                    }
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: Copy main sys_osclients config failed. OsClient={osClient}, Error={ex.Message}");
+                throw new InvalidOperationException(
+                    $"新租户[{osClient}/{osClientType}/{osClientNetwork}]运行配置复制未通过唯一性与强回读，已停止开通。", ex);
             }
+        }
+
+        public sealed class CopiedTenantRuntimeRow
+        {
+            public string Id { get; set; }
+            public string ClientName { get; set; }
+            public string DbConn { get; set; }
+            public string DbReadConn { get; set; }
+            public string AuthSecret { get; set; }
+            public string DomainName { get; set; }
+            public string ServerTag { get; set; }
         }
 
         /// <summary>
@@ -3486,7 +3561,8 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
         /// 租户账号。RabbitMQ/Elasticsearch 需外部管理 API 真实创建 ACL；当前项目
         /// 没有这两类管理契约，因此留空凭据并明确警告，不伪造已开通状态。
         /// </summary>
-        private List<string> ConfigureTenantServiceCredentials(OsClientSecret mainClient, string osClient)
+        private List<string> ConfigureTenantServiceCredentials(OsClientSecret mainClient, string osClient,
+            string osClientType, string osClientNetwork)
         {
             var warnings = new List<string>();
             var model = mainClient?.OsClientModel;
@@ -3497,16 +3573,53 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     field => field,
                     GetResetTenantServiceValue,
                     StringComparer.OrdinalIgnoreCase);
-            UpdateTenantServiceFields(mainClient, osClient, resetValues);
+            UpdateTenantServiceFields(mainClient, osClient, osClientType, osClientNetwork, resetValues);
 
-            if (IsEnabled(ReadModelValue(model, "MqttEnable")))
+            // 主库权威值与迁移版本共同判定空值；旧库 NULL 仍按关闭处理。
+            // 新租户先重置为 0，再生成独立凭据，最后写入有效开关。
+            try
+            {
+            var mqttMigrationApplied = false;
+            var mainMqttRaw = "0";
+            if (ColumnExists(mainClient.Db, "sys_osclients", "MqttEnable")
+                && ColumnExists(mainClient.Db, "sys_config", "ServerVersion"))
+            {
+                var orm = MicroiEngine.ORM(mainClient.Db.Db.DbProvider.DatabaseType);
+                var configTable = orm.GetTableName("sys_config");
+                var tenantTable = orm.GetTableName("sys_osclients");
+                var versionRows = mainClient.Db
+                    .FromSql($"SELECT {orm.GetFieldName("Id")}, {orm.GetFieldName("ServerVersion")} " +
+                             $"FROM {configTable} WHERE {orm.GetFieldName("IsEnable")} = @p0")
+                    .AddInParameter("p0", 1)
+                    .ToList<MainServerVersionRow>();
+                if (versionRows.Count != 1 || string.IsNullOrWhiteSpace(versionRows[0]?.Id))
+                    throw new InvalidOperationException("主库启用的 sys_config 不唯一，拒绝开通 MQTT 凭据。");
+                mqttMigrationApplied = MqttEnablePolicy.IsMigrationApplied(versionRows[0].ServerVersion);
+                var mainMqttSwitch = mainClient.Db
+                    .FromSql($"SELECT {orm.GetFieldName("MqttEnable")} FROM {tenantTable} " +
+                             $"WHERE {orm.GetFieldName("OsClient")} = @p0 " +
+                             $"AND {orm.GetFieldName("OsClientType")} = @p1 " +
+                             $"AND {orm.GetFieldName("OsClientNetwork")} = @p2 " +
+                             $"AND {orm.GetFieldName("IsEnable")} = @p3 " +
+                             $"AND ({orm.GetFieldName("IsDeleted")} = 0 OR {orm.GetFieldName("IsDeleted")} IS NULL)")
+                    .AddInParameter("p0", mainClient.OsClient)
+                    .AddInParameter("p1", OsClientDefault.OsClientType)
+                    .AddInParameter("p2", OsClientDefault.OsClientNetwork)
+                    .AddInParameter("p3", 1)
+                    .ToList<MainMqttSwitchRow>();
+                if (mainMqttSwitch.Count != 1)
+                    throw new InvalidOperationException("当前运行分区的主租户记录不唯一，拒绝开通 MQTT 凭据。");
+                mainMqttRaw = mainMqttSwitch[0].MqttEnable?.ToString();
+            }
+            if (MqttEnablePolicy.IsEnabled(mainMqttRaw, mqttMigrationApplied))
             {
                 var mqttRequiredFields = new[] { "MqttEnable", "MqttAccount", "MqttPwd" };
                 if (mqttRequiredFields.All(field => ColumnExists(mainClient.Db, "sys_osclients", field)))
                 {
                     var mqttValues = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                     {
-                        ["MqttEnable"] = 1,
+                        ["MqttEnable"] = mqttMigrationApplied && string.IsNullOrWhiteSpace(mainMqttRaw)
+                            ? (object)DBNull.Value : 1,
                         ["MqttAccount"] = TenantConfigurationSecurity.CreateTenantServiceUserName(osClient, "mqtt"),
                         ["MqttPwd"] = TenantConfigurationSecurity.GenerateRandomCredential()
                     };
@@ -3515,11 +3628,49 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                         mqttValues["MqttAllowAnonymous"] = 0;
                     if (ColumnExists(mainClient.Db, "sys_osclients", "MqttTopicIsolation"))
                         mqttValues["MqttTopicIsolation"] = 1;
-                    UpdateTenantServiceFields(mainClient, osClient, mqttValues);
+                    UpdateTenantServiceFields(mainClient, osClient, osClientType, osClientNetwork, mqttValues);
                 }
                 else
                 {
                     warnings.Add("共享 MQTT 已启用，但 sys_osclients 缺少租户 MQTT 凭据字段；MQTT 已对该租户保持禁用。");
+                }
+            }
+            }
+            catch (Exception)
+            {
+                // 其余基础设施仍可开通；MQTT 失败不应把已 INSERT 的新租户变成半成品。
+                // 初始重置为 0 已完成；若最后的凭据写入结果未知，再尽力回写关闭值。
+                try
+                {
+                    var mqttReset = resetValues
+                        .Where(pair => pair.Key.StartsWith("Mqtt", StringComparison.OrdinalIgnoreCase))
+                        .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+                    UpdateTenantServiceFields(mainClient, osClient, osClientType, osClientNetwork, mqttReset);
+                    if (mqttReset.ContainsKey("MqttEnable"))
+                    {
+                        var orm = MicroiEngine.ORM(mainClient.Db.Db.DbProvider.DatabaseType);
+                        var closedCount = mainClient.Db.FromSql(
+                                $"SELECT COUNT(*) FROM {orm.GetTableName("sys_osclients")} " +
+                                $"WHERE {orm.GetFieldName("OsClient")} = @p0 " +
+                                $"AND {orm.GetFieldName("OsClientType")} = @p1 " +
+                                $"AND {orm.GetFieldName("OsClientNetwork")} = @p2 " +
+                                $"AND {orm.GetFieldName("MqttEnable")} = @p3 " +
+                                $"AND ({orm.GetFieldName("IsDeleted")} = 0 OR {orm.GetFieldName("IsDeleted")} IS NULL)")
+                            .AddInParameter("p0", osClient)
+                            .AddInParameter("p1", osClientType)
+                            .AddInParameter("p2", osClientNetwork)
+                            .AddInParameter("p3", 0)
+                            .ToScalar<int>();
+                        if (closedCount != 1) throw new InvalidOperationException("MQTT 关闭回读失败。");
+                    }
+                    warnings.Add("MQTT 主库开关或凭据状态未能确认，新租户已保持禁用（有开关列时回读为 0）；请检查主租户 SaaS 配置后再单独启用。");
+                }
+                catch (Exception)
+                {
+                    throw new InvalidOperationException(
+                        $"租户[{osClient}] MQTT 开通失败且关闭回读未确认；该记录可能已部分写入，" +
+                        "本次开通不得标记成功。请先按 OsClient/Type/Network 核查并设 MqttEnable=0，" +
+                        "确认后再按原开通任务重试。");
                 }
             }
 
@@ -3542,6 +3693,17 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
             return warnings;
         }
 
+        public sealed class MainMqttSwitchRow
+        {
+            public int? MqttEnable { get; set; }
+        }
+
+        public sealed class MainServerVersionRow
+        {
+            public string Id { get; set; }
+            public string ServerVersion { get; set; }
+        }
+
         private static object GetResetTenantServiceValue(string fieldName)
         {
             if (string.Equals(fieldName, "MqttEnable", StringComparison.OrdinalIgnoreCase)
@@ -3555,7 +3717,7 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
         }
 
         private void UpdateTenantServiceFields(OsClientSecret mainClient, string osClient,
-            IDictionary<string, object> values)
+            string osClientType, string osClientNetwork, IDictionary<string, object> values)
         {
             if (values == null || values.Count == 0)
             {
@@ -3570,10 +3732,30 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                 return;
             }
 
-            var assignments = entries.Select((pair, index) => $"{QuoteField(pair.Key)} = @TenantService{index}");
+            var orm = MicroiEngine.ORM(mainClient.Db.Db.DbProvider.DatabaseType);
+            var table = orm.GetTableName("sys_osclients");
+            var idField = orm.GetFieldName("Id");
+            var scopePredicate = $"{orm.GetFieldName("OsClient")} = @TenantServiceOsClient " +
+                                 $"AND {orm.GetFieldName("OsClientType")} = @TenantServiceType " +
+                                 $"AND {orm.GetFieldName("OsClientNetwork")} = @TenantServiceNetwork " +
+                                 $"AND {orm.GetFieldName("IsEnable")} = 1 " +
+                                 $"AND ({orm.GetFieldName("IsDeleted")} = 0 OR {orm.GetFieldName("IsDeleted")} IS NULL)";
+            var targets = mainClient.Db.FromSql($"SELECT {idField} FROM {table} WHERE {scopePredicate}")
+                .AddInParameter("TenantServiceOsClient", osClient)
+                .AddInParameter("TenantServiceType", osClientType)
+                .AddInParameter("TenantServiceNetwork", osClientNetwork)
+                .ToList<TenantServiceTargetRow>();
+            if (targets.Count != 1 || string.IsNullOrWhiteSpace(targets[0]?.Id))
+                throw new InvalidOperationException("租户服务凭据目标分区不唯一，拒绝写入。");
+
+            var assignments = entries.Select((pair, index) => $"{orm.GetFieldName(pair.Key)} = @TenantService{index}");
             var command = mainClient.Db.FromSql(
-                    $"UPDATE sys_osclients SET {string.Join(", ", assignments)} WHERE OsClient = @TenantServiceOsClient AND IsDeleted = 0")
-                .AddInParameter("TenantServiceOsClient", osClient);
+                    $"UPDATE {table} SET {string.Join(", ", assignments)} " +
+                    $"WHERE {idField} = @TenantServiceId AND {scopePredicate}")
+                .AddInParameter("TenantServiceId", targets[0].Id)
+                .AddInParameter("TenantServiceOsClient", osClient)
+                .AddInParameter("TenantServiceType", osClientType)
+                .AddInParameter("TenantServiceNetwork", osClientNetwork);
             for (var index = 0; index < entries.Count; index++)
             {
                 var pair = entries[index];
@@ -3587,7 +3769,45 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     command.AddInParameter("TenantService" + index, value);
                 }
             }
-            command.ExecuteNonQuery();
+            if (command.ExecuteNonQuery() > 1)
+                throw new InvalidOperationException("租户服务凭据更新影响多行，拒绝继续。");
+
+            // MySQL 对值未变化的 UPDATE 可能返回 0，必须以当前分区的强回读为准。
+            var selectedFields = string.Join(", ", entries.Select(pair => orm.GetFieldName(pair.Key)));
+            var readbackRows = mainClient.Db.FromSql(
+                    $"SELECT {selectedFields} FROM {table} WHERE {idField} = @TenantServiceId AND {scopePredicate}")
+                .AddInParameter("TenantServiceId", targets[0].Id)
+                .AddInParameter("TenantServiceOsClient", osClient)
+                .AddInParameter("TenantServiceType", osClientType)
+                .AddInParameter("TenantServiceNetwork", osClientNetwork)
+                .ToList<dynamic>();
+            if (readbackRows.Count != 1)
+                throw new InvalidOperationException("租户服务凭据回读分区不唯一。");
+            var readback = JObject.FromObject((object)readbackRows[0]);
+            var isOracle = mainClient.Db.Db.DbProvider.DatabaseType.ToString()
+                .IndexOf("Oracle", StringComparison.OrdinalIgnoreCase) >= 0;
+            foreach (var pair in entries)
+            {
+                var token = readback.GetValue(pair.Key, StringComparison.OrdinalIgnoreCase);
+                var actual = token == null || token.Type == JTokenType.Null ? null : token.ToString();
+                if (!TenantServiceReadbackMatches(pair.Value, actual, isOracle))
+                    throw new InvalidOperationException($"租户服务字段 {pair.Key} 写入后回读不一致。");
+            }
+        }
+
+        internal static bool TenantServiceReadbackMatches(object expectedValue, string actual, bool isOracle)
+        {
+            // Oracle 将空文本存成 NULL；仅空文本字段允许此等价，0/1 等开关必须严格回读。
+            if (isOracle && expectedValue is string textValue && textValue.Length == 0 && actual == null)
+                return true;
+            var expected = expectedValue == null || expectedValue is DBNull
+                ? null : Convert.ToString(expectedValue, System.Globalization.CultureInfo.InvariantCulture);
+            return string.Equals(expected, actual, StringComparison.Ordinal);
+        }
+
+        public sealed class TenantServiceTargetRow
+        {
+            public string Id { get; set; }
         }
 
         private static string ReadModelValue(JObject model, string fieldName)
@@ -3596,17 +3816,6 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                 .FirstOrDefault(property => string.Equals(property.Name, fieldName, StringComparison.OrdinalIgnoreCase))
                 ?.Value;
             return token == null || token.Type == JTokenType.Null ? string.Empty : token.ToString().Trim();
-        }
-
-        private static bool IsEnabled(string value)
-        {
-            var text = (value ?? string.Empty).Trim();
-            return string.Equals(text, "1", StringComparison.OrdinalIgnoreCase)
-                   || string.Equals(text, "true", StringComparison.OrdinalIgnoreCase)
-                   || string.Equals(text, "yes", StringComparison.OrdinalIgnoreCase)
-                   || string.Equals(text, "on", StringComparison.OrdinalIgnoreCase)
-                   || string.Equals(text, "enabled", StringComparison.OrdinalIgnoreCase)
-                   || string.Equals(text, "是", StringComparison.OrdinalIgnoreCase);
         }
 
         private string QuoteField(string fieldName)

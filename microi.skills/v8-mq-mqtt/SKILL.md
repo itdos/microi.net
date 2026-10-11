@@ -10,7 +10,7 @@ description: Microi V8 消息队列与 MQTT 生产指南。用于 V8.MQ.SendMsg�
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 RabbitMQ 消息队列或 MQTT 物联网协议。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-mq-mqtt-000 sha256=4a6559aed1af036591a04002c6e3311d9f0957fbbabbcafdc4a6bad95dabd843 -->
+<!-- microi-progressive:chunk id=v8-mq-mqtt-000 sha256=bc9ac85a8a0b6af88602e0d5419f6d61b192b5262193f6cb8c8ebd26af7bef25 -->
 ## V8.MQ — RabbitMQ 消息队列
 
 ### 生产消息（后端）
@@ -151,7 +151,7 @@ try {
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-mq-mqtt-001 sha256=dcf641877c01b65104fbd9b7d5022a9b7b656a6461895d499ab06af9d2bb7d0c -->
+<!-- microi-progressive:chunk id=v8-mq-mqtt-001 sha256=5e42facc0cf07b546ec816cd9127126ce5adaaa03d14053991d063922fc5c9fb -->
 ## 注意事项
 
 - MQ 消费者接口引擎通过 `V8.Param.Message` 获取消息，包含 `EventId`、兼容 `Id`、`OsClient`、`Message`、`CurrentUserId`
@@ -174,3 +174,5 @@ try {
 <!-- microi-progressive:end -->
 
 平台级 MQTT 状态与下行发布统一调用 Managed 接口引擎 `platform-mqtt`；该入口只允许当前租户超级管理员，并由 `V8.Method.ManageMqtt` 固定租户边界。普通设备业务仍应创建自己的授权接口引擎。
+
+`sys_osclients.MqttEnable` 的运行语义是空值/`1` 启用、`0` 关闭；旧库空值在兼容迁移中先写为 `0`，避免意外开放。旧部署先升级并启动 API，确认 `sys_config.ServerVersion >= 7.6.16.0` 和旧空值迁移成功，再通过商城更新 SaaS 包与带 `Config.Switch.NullValue=1` 的前端；物理迁移不会自动更新旧租户 UI 元数据。该配置将当前空值显示为开启，但未操作时保留数据库 `NULL`。主租户关停当前节点 Broker；子租户关停由约 30 秒轮询断开当前节点已鉴权连接并清理有可信租户标识的会话/订阅，逐条失败下轮重试；归属不明的旧会话不猜测删除且不得跨租户复用。监听端口/TLS 改动仍需重启，目标设备和多节点结果须分别实测。

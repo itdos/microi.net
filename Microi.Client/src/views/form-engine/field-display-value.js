@@ -1,3 +1,5 @@
+import { normalizeFormSwitchValue } from "../../utils/form-switch-value.js";
+
 const OPTION_COMPONENTS = new Set([
     "Select", "MultipleSelect", "Radio", "Checkbox", "Autocomplete", "Transfer"
 ]);
@@ -243,7 +245,10 @@ export function getFormFieldDisplayValue(form, field, options = {}) {
     const translated = source._BusinessTranslations && source._BusinessTranslations[fieldName];
     const emptyText = options.emptyText === undefined ? "—" : String(options.emptyText);
     if (!isBlank(translated)) return String(translated);
-    if (isBlank(rawValue)) return emptyText;
+    const switchValue = definition.Component === "Switch"
+        ? normalizeFormSwitchValue(rawValue, { Config: config })
+        : null;
+    if (isBlank(rawValue) && switchValue !== 1) return emptyText;
 
     const auxiliary = auxiliaryLabel(source, definition);
     if (!isBlank(auxiliary) && (!rawValue || typeof rawValue !== "object")) return String(auxiliary);
@@ -254,8 +259,7 @@ export function getFormFieldDisplayValue(form, field, options = {}) {
         result = Array.isArray(value) ? value.map(stringifyFallback).filter(Boolean).join(" / ") : stringifyFallback(value);
     } else if (definition.Component === "Switch") {
         const switchConfig = parseObject(config.Switch);
-        const enabled = [true, 1, "1", "true"].includes(rawValue);
-        result = enabled ? (switchConfig.ActiveText || "是") : (switchConfig.InactiveText || "否");
+        result = switchValue === 1 ? (switchConfig.ActiveText || "是") : (switchConfig.InactiveText || "否");
     } else if (TREE_COMPONENTS.has(definition.Component)) {
         result = formatTreeValue(rawValue, definition, config);
     } else if (OPTION_COMPONENTS.has(definition.Component) || config.SelectLabel || config.SelectSaveField) {

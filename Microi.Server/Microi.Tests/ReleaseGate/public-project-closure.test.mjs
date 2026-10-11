@@ -68,15 +68,15 @@ test('Windows 和 Unix csproj 引用解析为同一真实路径，保护目录�
 
 test('公开源码的项目引用形成完整闭包', () => {
   assert.deepEqual(missingProjectReferences(available), []);
-  const driver = 'Microi.Server/ThirdParty/MongoDB.Driver/MongoDB.Driver.Compatibility.csproj';
+  const driver = 'Microi.Server/Microi.MongoDB.Driver/Microi.MongoDB.Driver.csproj';
   const panel = 'Microi.Server/Microi.Panel/Microi.Panel.csproj';
-  for (const required of [driver, panel, 'Microi.Server/ThirdParty/MongoDB.Driver/upstream-3.11.2.source.zip'])
+  for (const required of [driver, panel, 'Microi.Server/Microi.MongoDB.Driver/upstream-3.11.2.source.zip'])
     assert.ok(available.has(required), `Gitee 源码缺少 ${required}`);
 });
 
 test('公开仓缺少 MongoDB 驱动或面板项目时会失败', () => {
   for (const target of [
-    'Microi.Server/ThirdParty/MongoDB.Driver/MongoDB.Driver.Compatibility.csproj',
+    'Microi.Server/Microi.MongoDB.Driver/Microi.MongoDB.Driver.csproj',
     'Microi.Server/Microi.Panel/Microi.Panel.csproj'
   ]) {
     const without = new Set(available); without.delete(target);

@@ -53,6 +53,18 @@ test("empty values and banner compatibility remain deterministic", function () {
     assert.equal(hasFormBannerConfig({ TitleField: "OrderNo" }), true);
 });
 
+test("configured switch displays inherited null as enabled without changing other switches", function () {
+    const inherited = {
+        Name: "MqttEnable", Component: "Switch",
+        Config: '{"Switch":{"NullValue":1,"ActiveText":"开启","InactiveText":"关闭"}}'
+    };
+    assert.equal(getFormFieldDisplayValue({ MqttEnable: null }, inherited), "开启");
+    assert.equal(getFormFieldDisplayValue({}, inherited), "开启");
+    assert.equal(getFormFieldDisplayValue({ MqttEnable: 0 }, inherited), "关闭");
+    assert.equal(getFormFieldDisplayValue({ MqttEnable: 1 }, inherited), "开启");
+    assert.equal(getFormFieldDisplayValue({ MqttEnable: null }, { Name: "MqttEnable", Component: "Switch" }), "—");
+});
+
 test("record heading follows query-column order and skips non-readable controls", function () {
     const fields = [
         { Id: "layout", Name: "Layout", Component: "CollapseGroup" },

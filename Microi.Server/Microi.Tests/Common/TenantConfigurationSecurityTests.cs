@@ -56,6 +56,9 @@ public class TenantConfigurationSecurityTests
             ["TranslateTimeout"] = 120,
             ["BackendLoginRsaPrivateKey"] = "private-key",
             ["BackendAutoUpgradeDisabled"] = 1,
+            ["TcpIngressRulesJson"] = "{\"apiEngineKey\":\"private-device-route\",\"allowedCidrs\":[\"10.0.0.0/8\"]}",
+            ["TcpIngressPort"] = 1885,
+            ["TcpIngressEnable"] = 1,
             ["HDFS"] = "MinIO",
             ["AliOssPublicDomain"] = "https://static.example.com"
         };
@@ -79,6 +82,9 @@ public class TenantConfigurationSecurityTests
         Assert.Null(projection["OcrEndpoint"]);
         Assert.Null(projection["OcrApiKey"]);
         Assert.Null(projection["OcrHeadersJson"]);
+        Assert.Null(projection["TcpIngressRulesJson"]);
+        Assert.Null(projection["TcpIngressPort"]);
+        Assert.Null(projection["TcpIngressEnable"]);
         Assert.Null(projection["TranslateProvider"]);
         Assert.Null(projection["TranslateUrl"]);
         Assert.Null(projection["TranslateApiKey"]);
@@ -416,6 +422,9 @@ public class TenantConfigurationSecurityTests
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("TranslateTimeout"));
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("BackendLoginRsaPrivateKey"));
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("BackendAutoUpgradeDisabled"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("TcpIngressRulesJson"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("TcpIngressPort"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("TcpIngressEnable"));
         Assert.True(TenantConfigurationSecurity.ShouldCopyFromMain("SysTitle"));
     }
 

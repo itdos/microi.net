@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-11T08:20:46.585Z",
+  "generatedAt": "2026-10-11T10:58:19.511Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -1362,11 +1362,11 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "2d10953829afe69ba2df0619ec7d86b56972f832551417aba87043ea45c1826d",
-      "originalLines": 805,
-      "prefixSha256": "850e3df02e4c51188c0b06f99f4e81dcaba92f5422b1a4f88da91d828d23c161",
-      "prefixBytes": 1813,
-      "entryLines": 197,
+      "originalSha256": "c129c3ac1385c3048fbfef29eae361ffec211e065d5700d979562196b35c5c55",
+      "originalLines": 806,
+      "prefixSha256": "5550e83bf4a6a2261ed5a65826a6799a3ad20f2f66b44b9f4308bc1bed6dc75d",
+      "prefixBytes": 1914,
+      "entryLines": 198,
       "chunks": [
         {
           "id": "playwright-e2e-000",
@@ -1388,8 +1388,8 @@
           "id": "playwright-e2e-002",
           "ordinal": 2,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "495c6f4b8388d94e16372d83c9e3ec3e6972112e03dba0adae413c8ac9d77232",
-          "lines": 19,
+          "sha256": "2e92ff117b1c3b450e988776204ccecd9dd4d6a83bb08d86d32032b467abc174",
+          "lines": 20,
           "heading": "临时文件与产物放置规则（必须遵守）"
         },
         {
@@ -2770,17 +2770,17 @@
       ]
     },
     "v8-mq-mqtt": {
-      "originalSha256": "e4e69f3582f2f1b7780d33731310ddc0a142045e7a7f943140a85fbb09277753",
+      "originalSha256": "5a641621f24ccda6aa0e881c2daefae6012d655b55f25c6e170a62f916edf9ea",
       "originalLines": 339,
-      "prefixSha256": "47f1f0de3acd2abd1129754fcf329129358d4d078d07b033d80b5447dc879886",
-      "prefixBytes": 853,
-      "entryLines": 177,
+      "prefixSha256": "68fdfbe24123f9db65e6b926f2d0aab6309032e99b7b24c4024324de36c43201",
+      "prefixBytes": 864,
+      "entryLines": 179,
       "chunks": [
         {
           "id": "v8-mq-mqtt-000",
           "ordinal": 0,
           "destination": "v8-mq-mqtt/SKILL.md",
-          "sha256": "4a6559aed1af036591a04002c6e3311d9f0957fbbabbcafdc4a6bad95dabd843",
+          "sha256": "bc9ac85a8a0b6af88602e0d5419f6d61b192b5262193f6cb8c8ebd26af7bef25",
           "lines": 140,
           "heading": "V8.MQ — RabbitMQ 消息队列"
         },
@@ -2788,7 +2788,7 @@
           "id": "v8-mq-mqtt-001",
           "ordinal": 2,
           "destination": "v8-mq-mqtt/SKILL.md",
-          "sha256": "dcf641877c01b65104fbd9b7d5022a9b7b656a6461895d499ab06af9d2bb7d0c",
+          "sha256": "5e42facc0cf07b546ec816cd9127126ce5adaaa03d14053991d063922fc5c9fb",
           "lines": 14,
           "heading": "注意事项"
         },
@@ -2796,7 +2796,7 @@
           "id": "v8-mq-mqtt-002",
           "ordinal": 1,
           "destination": "v8-mq-mqtt/references/progressive-01-v8-mqtt-iot-物联网.md",
-          "sha256": "e3917adda6454dc4d17672df3afc11def6fbd2f7a77f24b3ac821320d6df7907",
+          "sha256": "24e28545025cf03d9a91cce8081fbe566e5f8ae56ff2885111238f684c276cd1",
           "lines": 176,
           "heading": "V8.MQTT — IoT 物联网"
         }
@@ -3221,57 +3221,57 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "9a41b72e5117557f7af7758789f63719eb16372f0e4c1723c4ea5fa59a6775e8",
+      "originalSha256": "34efc8b07b424fe5ae167cc0cd8d9177e7049766d35e86ed04b724f3e2864f0b",
       "originalLines": 626,
-      "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
-      "prefixBytes": 310,
+      "prefixSha256": "bc8000c13e056ea5b925b3b62776e36c2d874bce6ee0a822c7c135ad938fa34c",
+      "prefixBytes": 317,
       "entryLines": 284,
       "chunks": [
         {
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "44d962f17b8e721ae87a79fcc8f2b4fc303ef9900203ca21b725276ddb42190f",
-          "lines": 59,
+          "sha256": "50dc4a2fdabd022f355bed75c7df3fa94f942507f6aa9bcada4e567872b0faad",
+          "lines": 58,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
         {
           "id": "workspace-conventions-001",
           "ordinal": 1,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "fbe1ea5c5eeefb9d5da222748d61c4215befd9aaf419dd80a1d5a663517ba58a",
-          "lines": 13,
+          "sha256": "8d8dfff420c0cc768bbeb13d94e9f77f52d5002fc61d93dc82d71b3a17f2eaa0",
+          "lines": 12,
           "heading": "Microi吾码工作进度播报规范（强制）"
         },
         {
           "id": "workspace-conventions-002",
           "ordinal": 2,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "3512f626491064504d48119f11cd9f4dde9534b7cb4a88d8bc940892ac99bd9c",
-          "lines": 17,
+          "sha256": "3d4204077c5fcde9e9ef7a3d89b14c44161cb756b04f26e312bba9269285d1a2",
+          "lines": 16,
           "heading": "分布式部署与重启安全规范（强制）"
         },
         {
           "id": "workspace-conventions-003",
           "ordinal": 3,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "66922955adb5ff6198efefd6d4d8d8f6525ef7559663ea034e86e1e45f89eb9f",
-          "lines": 19,
+          "sha256": "550ca6d6c07cd303cc9de1154d45fc6a1792c4313930f55aedc33bf4a2c6492d",
+          "lines": 18,
           "heading": "本地资源与 OOM 保护规范（强制）"
         },
         {
           "id": "workspace-conventions-004",
           "ordinal": 4,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "a12a204339ee40367f4c09d085d818515b0d94c7c0d748d0d455fede6b98a2e4",
-          "lines": 25,
+          "sha256": "b9d892478cba6ae4b4085510ec96acd99adda5160ea1663cc5e1e18fa59689a8",
+          "lines": 29,
           "heading": "临时文件与 AI 产物放置规则（强制）"
         },
         {
           "id": "workspace-conventions-005",
           "ordinal": 5,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "f627ee155b40014af76926b3a432601aa3f6bec5a7eb98ca0540c83fa41f1e5a",
+          "sha256": "6f8452c0803b811589d2ce082b9cfc7c98fa29c4200aae1dda0d9ed416a80d76",
           "lines": 32,
           "heading": "Microi 源码路径速查（工作区根相对路径）"
         },
@@ -3279,7 +3279,7 @@
           "id": "workspace-conventions-006",
           "ordinal": 6,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "fb29cd39fe580e3e38df4c0483e5530f876697418f38b391aa421606c8fc6fe5",
+          "sha256": "6f9ec29af60f5e40469f49a72a400b2aff2976ef53765f530275fae9b0961997",
           "lines": 12,
           "heading": "Skills 通用化原则"
         },
@@ -3287,7 +3287,7 @@
           "id": "workspace-conventions-007",
           "ordinal": 7,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "c23d7942a3b6176b464fe267546c09dcadf990c2c243576c267c644b4502795d",
+          "sha256": "7a3bddeb52ccc86d84a6595a215dfc4c9197377f03413a0c0adaa2584727db36",
           "lines": 11,
           "heading": "Skills 中文优先规则"
         },
@@ -3295,7 +3295,7 @@
           "id": "workspace-conventions-008",
           "ordinal": 8,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "cd38647f4ae3c186e247c06ce44b45e42ce7e664d58fbed82c93595547638a7c",
+          "sha256": "3cf1a2a2d554d25ce675d364b7573f931837a3b41e426a2023ac642f2d4a3ebd",
           "lines": 11,
           "heading": "官方文档原位增补与中文单源规则（强制）"
         },
@@ -3303,7 +3303,7 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "0343192b5c71d39f9f31a21bccb5046715f1b47d4876ba962b2d5f188c021271",
+          "sha256": "6cf6e9d5f34d68d36027d555c4672ff2c75ebd877869307d48a684b5c87d3aee",
           "lines": 38,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },

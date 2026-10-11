@@ -1688,6 +1688,40 @@ return deviceResult;
 - 写入结果不确定时不要盲目自动重试：打印不是天然幂等，重试可能产生重复小票。需要可靠打印时使用业务幂等号、设备回执以及 Job/MQ/outbox 编排。
 - 在 Docker 中，`Host` 是从后端容器视角解析；`localhost` 指容器自身。部署前必须验证容器到设备 IP/端口的实际路由。
 
+### 设备原始 TCP 入站（API 容器内）
+
+`V8.Tcp` 是出站客户端；它不负责接收设备连接。对于只会配置“服务器 IP/域名 + 端口”、持续发送二进制帧并等待同连接应答的设备，`Microi.net.Api` 可启用独立的 TCP 入站监听。此监听与现有 HTTP 接口引擎处于**同一个进程、同一个 API Docker 容器**，但必须使用不同端口：设备填 `主机:TCP端口`，不填 `http://`、`https://` 或 `/apiengine/...`。HTTP 端口和现有其它厂商的 HTTP/MQTT 对接保持不变。
+
+无完整规则时默认不监听。先为主租户安装带 `sys_osclients.TcpIngressEnable`、`TcpIngressPort` 与 `TcpIngressRulesJson` 字段的 SaaS 引擎资源包，再由有权限的主租户管理员配置。`TcpIngressEnable` 为空或 `1` 表示允许按完整规则监听，`0` 明确关闭；空规则不监听，坏规则仅使 TCP 进入 `Faulted`。`TcpIngressPort` 是容器内监听端口，空值回退 `1885`；启停和端口均不包含在规则 JSON 中，也不等于 Docker/CLB 对外端口。运行中的 API 每约 30 秒独立回查主库开关：设 `0` 后下一轮关闭 TCP 监听与会话，HTTP 继续运行；从 `0` 改回空值/`1`，以及修改端口、规则、引擎 Key、CIDR，不会热重绑，必须手工重启现有 API 容器。以下是协议为 `AA333380` 上行、`BB666680` 下行、CRC16/XMODEM 的示例；`osClient`、`apiEngineKey` 和来源网段都应换成经过核实的值：
+
+```json
+{
+  "osClient": "device-tenant",
+  "apiEngineKey": "device-uplink",
+  "allowedCidrs": ["198.51.100.10/32"],
+  "requestHeaderHex": "AA333380",
+  "responseHeaderHex": "BB666680",
+  "tailHex": "FCFF",
+  "lengthOffset": 4,
+  "lengthAdjustment": 4,
+  "correlationOffset": 6,
+  "correlationLength": 10,
+  "maxFrameBytes": 4096,
+  "maxConnections": 100,
+  "idleTimeoutSeconds": 90,
+  "maxQueuedFramesPerConnection": 8,
+  "executionTimeoutSeconds": 5
+}
+```
+
+监听器按 U16 大端长度字段和帧尾重组拆包/粘包，校验 CRC16/XMODEM，然后把一帧十六进制作为 `frameHex` 通过固定 `_InvokeType=Server` 内部调用**固定**接口引擎。接口引擎负责业务解析、写表、幂等与生成 `Data.ResponseFrameHex`；监听器校验应答帧结构、CRC 和设备号/命令关联后，才在原 TCP 连接回写原始字节。业务 `Code=0` 若携带协议定义的合法失败应答，仍可回写；无合法应答则关闭连接，不伪造成功。设备输入不能覆盖租户、引擎 Key、端口或来源策略。启用 TCP 时目标接口引擎必须 `IsEnable=1`、`StopHttp=1`、`AllowAnonymous=0`，不满足则 TCP 局部失败关闭、不监听，而 HTTP API 继续运行；否则旧匿名 HTTP 入口可绕过 TCP 来源限制。CRC 和匿名标志都不是设备身份认证。
+
+上线应分四阶段：先部署并启动新 API 镜像，确认目标租户 `sys_config.ServerVersion >= 7.6.16.0` 且旧 `MqttEnable` 空值已迁为 `0`；新 TCP 包尚未安装时规则为空、不监听，HTTP 继续。再通过商城安装/更新 SaaS 字段并发布配套前端，明确设主租户 `TcpIngressEnable=0`、规则暂留空，让旧 HTTP 和其它设备通道照常运行；物理迁移不会自动更新旧租户的 UI 元数据，不能先发 `NullValue=1` 的包/界面。核实目标接口不再有合法 HTTP 调用后，仅对该接口关闭 HTTP（`StopHttp=1`）与匿名访问（`AllowAnonymous=0`），并验证旧 URL 不可匿名直调；最后填写完整 TCP 规则、配置端口映射和防火墙，将 `TcpIngressEnable` 设为 `1`，重启同一 API 容器并做心跳及业务验收。若目标接口仍被旧 HTTP 设备使用，须先迁移或拆出受控兼容入口，不得直接切换。其它厂商独立的 HTTP/MQTT 接口及端口保持原样，但 API 容器重启期间会短暂中断，需分别回归。
+
+在同一 API Compose service 增加如 `"19011:1885/tcp"` 的端口映射（对外宿主机 19011 → 容器内默认 1885），保留原有 HTTP `1052` 映射；更新包含此能力的 API 镜像并重启。新执行的官方在线一键安装器会在动态 `61600+` 宿主端口段末尾追加 MQTT/TCP 映射，离线安装器默认使用 `7010/7011`；两者都映射至 API 容器内 `1883/1885` 并尝试开放宿主机防火墙，实际服务是否监听仍受 SaaS 配置控制。已有 Compose 不会自动升级映射；若更改主租户 `TcpIngressPort`，须同步更改容器目标端口。当前入站监听仅支持 IPv4，`allowedCidrs` 应为已核实的 IPv4 窄网段。云安全组/防火墙只放行确认过的来源网段；`allowedCidrs` 也必须配置，不能依赖 HTTP 安全白名单。经 CLB 时先验证后端实际看到的源 IP，再配置相应来源规则；CLB TCP 监听不得启用当前不支持的 Proxy Protocol v2。该协议的 CRC 只校验传输完整性，不能认证设备身份。若设备来源 IP 无法约束，必须先解决网络隔离或设备鉴权，不应直接向公网敞开端口。
+
+验收要分层记录：TCP 内部状态须为 `Listening` 且日志明确显示端口已监听（目前没有对外的 TCP 状态 HTTP 端点）；从允许网段先探测端口，再做拆包、粘包、连续心跳回环测试；最后由实体设备验证心跳上行、同连接应答和业务快照。配置、引擎安全位或端口冲突失败仅使 TCP 进入 `Faulted` 并记录失败阶段，HTTP API 保持运行；不能让 HTTP 健康误报为 TCP 就绪。只有端口可连或回环通过，也不能宣称设备网络图标已点亮或生产数据已入库。
+
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
 

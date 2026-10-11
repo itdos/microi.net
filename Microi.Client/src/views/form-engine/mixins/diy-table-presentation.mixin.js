@@ -17,6 +17,7 @@ import { resolveFormPresentationConfig } from "../form-presentation-runtime.js";
 import { migrateLegacyModuleHeroBanner } from "../form-banner-runtime.js";
 import { hasScalarRecordId, ownsRecordWorkbenchRoute } from "@/utils/record-id.js";
 import { requestMenuBadge } from "@/layout/components/Sidebar/menu-badge-batch.js";
+import { hasSwitchNullValueEnabled, normalizeFormSwitchValue } from "@/utils/form-switch-value.js";
 
 function uniqueFields(fields) {
     const seen = new Set();
@@ -423,6 +424,7 @@ export default {
                     && templateValue !== null
                     && templateValue !== "";
             }
+            if (!hasRawValue && field.Component === "Switch" && hasSwitchNullValueEnabled(field)) return true;
             return hasRawValue;
         },
         HasAnyPresentationFieldValue(row, fields) {
@@ -454,7 +456,11 @@ export default {
             }
             return value.trim().slice(0, 1).toUpperCase() || "#";
         },
-        GetPresentationTone(field) {
+        GetPresentationTone(field, row) {
+            if (row && field?.Component === "Switch" && hasSwitchNullValueEnabled(field)
+                && normalizeFormSwitchValue(row[field.AsName || field.Name], field) === 0) {
+                return "neutral";
+            }
             const tone = String(field?.Tone || "").toLowerCase();
             return ["primary", "success", "warning", "danger", "info", "neutral"].includes(tone) ? tone : "neutral";
         },
