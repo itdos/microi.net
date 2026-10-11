@@ -52,8 +52,21 @@ test('service index resolves HTTPS PackagePublish resource and refuses redirect 
  assert.equal(String(await resolvePublishEndpoint(source,mockFetch)),endpoint);
  assert.equal(calls[0].options.redirect,'manual');
  await assert.rejects(()=>resolvePublishEndpoint('http://packages.example.test/v3/index.json',mockFetch),/unsupported-source/);
- await assert.rejects(()=>resolvePublishEndpoint(source,async()=>new Response(null,{status:302})),/service-index-http/);
+ await assert.rejects(()=>resolvePublishEndpoint(source,async()=>new Response(null,{status:302})),/service-index-redirect-without-location/);
  await assert.rejects(()=>resolvePublishEndpoint(source,async()=>new Response(JSON.stringify({resources:[{'@id':'http://push.example.test/api/v2/package','@type':'PackagePublish/2.0.0'}]}),{status:200})),/unsafe-publish-resource/);
+});
+
+test('official NuGet source may redirect its keyless index but cannot redirect the API key to another publisher',async()=>{
+ const calls=[];
+ const fetchImpl=async(url,options)=>{
+  calls.push({url:String(url),options});
+  if(calls.length===1)return new Response(null,{status:302,headers:{Location:'https://nuget.azure.cn/v3/index.json'}});
+  return new Response(JSON.stringify({resources:[{'@id':'https://www.nuget.org/api/v2/package','@type':'PackagePublish/2.0.0'}]}),{status:200});
+ };
+ assert.equal(String(await resolvePublishEndpoint('https://api.nuget.org/v3/index.json',fetchImpl)),'https://www.nuget.org/api/v2/package');
+ assert.equal(calls.length,2);
+ assert.ok(calls.every(call=>call.options.redirect==='manual'&&!('X-NuGet-ApiKey' in call.options.headers)));
+ await assert.rejects(()=>resolvePublishEndpoint('https://api.nuget.org/v3/index.json',async()=>new Response(JSON.stringify({resources:[{'@id':'https://attacker.example.test/api/v2/package','@type':'PackagePublish/2.0.0'}]}),{status:200})),/unexpected-official-publish-resource/);
 });
 
 for(const status of [201,202,409])test(`streamed upload handles HTTP ${status} without exposing key`,async()=>withFixture(async directory=>{

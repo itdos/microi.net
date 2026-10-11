@@ -35,10 +35,22 @@ function requireSafeHttpsUrl(value,code){
 
 export async function resolvePublishEndpoint(source,fetchImpl=fetch){
  const indexUrl=requireSafeHttpsUrl(source,'unsupported-source');
- let response;
- try{
-  response=await fetchImpl(indexUrl,{method:'GET',redirect:'manual',headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
- }catch{throw new PublishError('service-index-unreachable');}
+ let response,indexRequest=indexUrl;
+ // 服务索引不含密钥，允许有限个 HTTPS 跳转（国内网络会把 api.nuget.org 跳到镜像索引）。
+ // 上传请求携带密钥，因此绝不跟随跳转，并额外固定官方发布端点。
+ for(let redirects=0;redirects<=3;redirects+=1){
+  try{
+   response=await fetchImpl(indexRequest,{method:'GET',redirect:'manual',headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
+  }catch{throw new PublishError('service-index-unreachable');}
+  if(![301,302,303,307,308].includes(response.status))break;
+  if(redirects===3)throw new PublishError('service-index-redirect-limit');
+  const location=response.headers.get('location');
+  if(!location)throw new PublishError('service-index-redirect-without-location');
+  let redirectUrl;
+  try{redirectUrl=new URL(location,indexRequest);}catch{throw new PublishError('unsafe-service-index-redirect');}
+  indexRequest=requireSafeHttpsUrl(redirectUrl,'unsafe-service-index-redirect');
+  await response.body?.cancel?.().catch(()=>{});
+ }
  if(response.status!==200)throw new PublishError('service-index-http',response.status);
  let index;
  try{index=await response.json();}catch{throw new PublishError('invalid-service-index');}
@@ -47,7 +59,12 @@ export async function resolvePublishEndpoint(source,fetchImpl=fetch){
   return types.includes('PackagePublish/2.0.0');
  });
  if(typeof resource?.['@id']!=='string')throw new PublishError('publish-resource-missing');
- return requireSafeHttpsUrl(resource['@id'],'unsafe-publish-resource');
+ const endpoint=requireSafeHttpsUrl(resource['@id'],'unsafe-publish-resource');
+ if(indexUrl.hostname==='api.nuget.org'&&
+    !(endpoint.hostname==='www.nuget.org'&&endpoint.port===''&&endpoint.pathname==='/api/v2/package')){
+  throw new PublishError('unexpected-official-publish-resource');
+ }
+ return endpoint;
 }
 
 export function multipartParts(packageFile,packageSize,boundary){
