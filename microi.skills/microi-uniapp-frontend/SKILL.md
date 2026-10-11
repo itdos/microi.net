@@ -20,13 +20,13 @@ UniApp/H5/小程序必须通过项目统一 `microi.v8.js` 的 `V8.uploadFile` /
 登录页默认不得展示 ApiBase、OsClient 或调试配置；但用户明确要求、且安装包由 Microi 平台方作为多租户聚合客户端发布时，允许仅在 `APP-PLUS` 登录页提供通用连接器。协议必须使用固定 `https://` / `http://` 下拉框，地址框禁止重复输入协议，HTTPS 默认，HTTP 显示明文风险并二次确认；H5、小程序和客户专属包不得因此自动开放。候选地址先匿名读取 `GetSysConfig`，验证成功后再持久化。真正切换时必须清除旧 DiyToken、用户、SignalR、菜单/元数据/页面缓存，按 `ApiBase + OsClient` 隔离记住的账号及 RSA 密文，并用端点代次拒绝切换前的迟到响应。支持任意 HTTP 时，最终 IPA 必须显式包含 ATS 例外，Android 安装包必须显式包含 cleartext 例外；不需要任意 HTTP 的正式包应保持平台默认安全策略，iOS ATS 例外还必须在 App Store 审核中说明。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-000 sha256=ecb0fc85b5c3b15ac79c9049ca86de8c586d4ce3a6c975255464069d89f87ac4 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-000 sha256=980d63128f930daa224319aece06ee9a407563f722831790a381b100b44bddeb -->
 ## 移动端质量门禁必须先读
 
 创建、重构或修复任何 Microi 移动端项目前，必须同时应用 `microi.skills/microi-mobile-app-quality/SKILL.md`。该 Skill 中的底部导航真实图标、重要按钮图标化、登录 API 校验、微信手机号快捷登录、后台二级菜单和页面动效要求，属于交付验收条件，不是可选优化。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-001 sha256=b195b92de6175b7f184257a0ba3b53b94b8a6aaee7ab42fbb05fe1f5338ba097 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-001 sha256=51e5f609e93cf164acb9af45f83a8d713f28fba3d68b22d4331a86e5f5248fc5 -->
 ## 标准产品、视图协议与租户扩展
 
 动态表单的组织/树字段优先复用原生 `mci-native-field` 树形下拉与 `native-tree-options.mjs`，无需为小程序把后台 `Department` 改为普通 Select。读取 `Config.<Component>.Multiple/EmitPath`：组织单选叶值保存 Id，多选叶值保存 Id 数组，路径模式保存完整路径/路径数组，数组统一 JSON 序列化。支持祖先展开、搜索、清空、禁用、重试和只读回显；数据源旧模板不能代替当前授权组织树。业务字段联动放租户扩展，不执行任意前端 V8；验收覆盖保存格式、旧数据回显、失败/迟到响应及最近公司祖先联动。
@@ -50,16 +50,22 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 仓库必须提供 AI 与人工协作约束文件、租户脚手架、Profile 构建/同步命令和架构检查。平台层改动至少同时构建标准 Profile 与默认交付 Profile；租户视觉改动还要执行多视口截图回归。这样其他同事使用 Codex、Claude、Copilot、Cursor 等工具继续开发时，会先读取相同规则，而不是依赖某次对话记忆。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-002 sha256=76ebf3985d21fbbc5d86093b95bdf348e526e3670da9bb6827b5e1a7184e617b -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-002 sha256=b82feb8b7144966aa1223a2087fbf2e3cb59943b3af51d92395646029a1f5343 -->
 ## H5 预览壳与底部导航强制规则
 
+- H5 的底部安全区采用 CSS `env(safe-area-inset-bottom)` 等浏览器权威值，不能使用 `screenHeight - windowHeight` 或 `screen.height - innerHeight` 推算。App/小程序只读取平台权威 inset；零值正常，禁止用 `inset || guessedFallback` 换成猜测值。验收必须覆盖物理屏幕与浏览器视口不同、非最大化桌面、缩放和移动浏览器工具栏收展。
+
 - 桌面浏览器允许使用 `Microi UniApp H5 Preview` 手机壳帮助用户理解移动端比例。
-- 真机、窄屏浏览器以及 PC DevTools 移动设备仿真（视口宽度小于等于 `767px`）必须自动去掉手机壳标题、外边距、圆角、边框和阴影，内容铺满 `100vw × 100vh`；不得在手机屏幕里再套一层模拟手机。
+- 真机、窄屏浏览器以及 PC DevTools 移动设备仿真必须自动去掉手机壳标题、外边距、圆角、边框和阴影，内容铺满当前可见视口。`767px` 是常用宽度断点，不是手机身份判断；手机横屏/旋转不能因宽度超过它就重新套壳。H5 优先使用动态视口高度并保留旧浏览器兜底，键盘与浏览器栏变化要重新核对可见区域。
+- 桌面手机壳必须约束高度，不能只用 `min-height:100vh` 让内容继续撑长。导航底边贴齐手机壳**内屏**底边，不是浏览器窗口底边；头部和导航不收缩，正文及路由中间包装层使用 `flex:1; min-height:0; min-width:0`。
+- 普通单列壳只有一个正文滚动 owner；流内底栏已占高度，不再给正文叠加整条 tabBar 占位。覆盖式固定底栏由共享布局预留一次实测总高度，包含真实安全区；禁止根容器、正文、占位元素与导航分别重复累加底部间距。双栏列表仅允许明确设计的两块独立滚动区。
+- 桌面宽度限制不能阻止 `rpx` 按外窗宽度放大。把 `rpxCalcMaxDeviceWidth / rpxCalcBaseDeviceWidth` 与壳宽、断点统一，并从实际产物核验导航/图标高度；填满容器使用 `%` 或 flex，不使用 `750rpx`。
 - AI 应用预览编译器必须为每个底部菜单渲染真实 SVG/本地图标和文字，不能只输出文字、单汉字、emoji 或空白占位。原生 uni-app `tabBar` 仍使用纳入版本管理的本地 PNG `iconPath / selectedIconPath`。
-- 自动化验收必须同时使用桌面视口与移动视口截图：桌面端断言手机壳存在，移动端断言 `.phone-status` 隐藏且 `.phone` 无圆角、无边框、宽高铺满；每个底部菜单的图标元素和文字都必须可见、可点击。
+- 自动化验收不能只断言手机壳或图标节点存在。至少覆盖三个主 Tab 的真实内屏/导航/触摸区矩形、导航下方剩余高度、滚动 owner 和末条内容可达；覆盖桌面矮屏、断点、手机横竖屏、键盘打开与关闭后恢复。使用视口截图，桌面 body 不产生第二条竖向滚动条；真实键盘/安全区另做渠道或真机验收。
+- 完整实现与门禁示例见 [H5 手机壳和几何验收](references/progressive-01-移动端分类-双栏列表独立滚动.md#h5-在-pc-浏览器必须自动模拟移动端)。修改共享壳后重跑所有 Tab 与路由，不能只给当前页面补 padding。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-003 sha256=5cedd05cb29746019a92db56a21123718fde23d5d9df4b8064dfc260bc89ee05 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-003 sha256=cf398596130bfa85683b358683631d5056bb3c48a4049214d00a9b26e3a61ec4 -->
 ## 登录页与手机号快捷登录
 
 - 登录页必须是直接登录面，不要默认做“员工登录 / 客户登录”身份 Tab 切换，除非用户明确要求。默认展示系统账号密码登录，同时提供客户手机号快捷登录入口。
@@ -77,7 +83,7 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 - 微信小程序构建后必须扫描登录页源码以及 `dist/build/mp-weixin/pages/login/` 产物，并截图核对手机号快速验证前置页；命中上述混淆文案、官方图形或近似元素时必须阻止上传和提审，不能只检查按钮主文案而漏掉说明文字、错误弹窗或分享标题。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-004 sha256=cc25e3d896e6f7349a7a7e93b8025ee797bf9810e60214eb95e41d75aa083422 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-004 sha256=c0e95b3c0fef84be2526e4b902a7c0d980d98217139b0d0b5b5b6fca7145641d -->
 ## 微信小程序全页面分享
 
 - 创建或维护 UniApp 微信小程序时，默认把好友转发与朋友圈分享视为页面基础能力；按 `pages.json` 全量路由逐页接入，不等待用户额外提出。
@@ -88,7 +94,7 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 - 验收不能只看首页右上角。用脚本比较 `pages.json` 路由数量与源码/微信构建产物中的两种分享生命周期数量，并在体验版抽测公开页、登录页和受保护详情页。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-005 sha256=d6f78d95dc0b0b042f0d0c525a9cb5295a0324f1c70d6f480c93f2e03d315cec -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-005 sha256=7e002241f968def653a6ddb7934b3a4f185a0cf5fc845dd31d16f2a47d5cd598 -->
 ## 首屏 Hero 与浮动面板验收
 
 - 移动端首屏 Hero 标题必须按真实中文文案调字号和行高，不能为了“震撼”把业务入口标题做得过大，导致一行半、孤字换行或压住按钮。
@@ -96,7 +102,7 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 - 交付前至少检查 375px 与 430px 宽度首屏截图，确认标题、主按钮、次按钮、浮动面板、第二块内容没有重叠、裁切或不美观换行。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-006 sha256=a39f7e4fb42c6d290463a9e40eed03235e4afe063d60208b5a3e73a170fbc39f -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-006 sha256=4ddf2899af481528fd518842ec98aa31ada5e5c0b5dc585c27098b5413b2dd5a -->
 ## 资源 URL 必须集中解析
 
 数据库中的图片、附件、头像、Logo、卡面图、单据图片等字段常见保存形式：
@@ -120,7 +126,7 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 - 第三方占位图、已失效临时地址、空字符串统一清理为空，交给 UI 占位态。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-007 sha256=3894454672b6bde6f4a7b329103c9418804f4594b7e3505617590ebea5f136ab -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-007 sha256=bc13da83759030866897991a5192831ee28bb24ad0ff5a5ad9e5c57917520f0d -->
 ## 移动端大资源优先使用租户 HDFS/CDN
 
 定制 UniApp/H5/小程序中的大图、视频、音频、字体和大型第三方静态文件，默认不要塞进主包。应先确认目标 `OsClient`，通过该租户 MCP/HDFS 上传，再以 `sys_config.FileServer + Path` 的 CDN/公有桶地址引用；合同、证件等敏感资源仍必须使用私有桶和临时签名 URL。
@@ -136,7 +142,7 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 - 原始高清图、视频母版、设计源文件不得继续放在会被 UniApp 收集的 `src/static`、分包目录或其它构建入口中；应移到项目资料/设计源目录。主包仅保留小于门禁的轻量失败占位图和离线关键图标。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-008 sha256=d7b2b5c8ffe5c1dd8f51eb7d5e8368dba6813c2fa25d39dd3fb8f6659922b5b9 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-008 sha256=d52c69b1f93de27639f47c25916cb6c479465ff0db9e5ef3db81073dd50ebebb -->
 ## 头像必须异步统一解析
 
 头像字段比普通图片更容易混合出现上传 JSON、私有路径、相对路径、历史字段名和脏数据。列表页、详情页、业务记录、审批记录、团队/会员卡片、聊天/消息等头像场景都必须走同一个头像解析入口。
@@ -157,7 +163,7 @@ row.OwnerAvatarUrl = await resolveAvatarUrl(rawAvatar);
 禁止在模板中临时拼接文件服务器，禁止每个页面各写一套头像解析，禁止只在能查到关联用户时才解析接口已经返回的头像字段。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-009 sha256=0270fbc5a2ee0d20a4d1d2f2a9c7fc7304e18402d282e1efcf860bd31db9fcb0 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-009 sha256=20cfb0b95ea827e9cbca1272b27a57a080976fc1fd8db3b4586e0dc5ed13d903 -->
 ## 移动端富文本图文排版
 
 商品详情、公告详情、活动说明、文章正文、协议说明等富文本在移动端渲染时，图片和文字不能使用同一套留白规则。
