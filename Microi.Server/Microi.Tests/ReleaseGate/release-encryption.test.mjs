@@ -235,12 +235,23 @@ test('verified NUL list byte changes cannot silently reorder or replace upload i
  }finally{f.dispose();}
 });
 
-for(const mode of ['success','after-scan-byte-drift','after-scan-added-package'])test(`actual find NUL list and production NuGet shell gate ${mode}`,()=>{
+for(const mode of ['success','after-scan-byte-drift','after-scan-added-package','candidate-rejected','candidate-drift-after-first-upload'])test(`actual find NUL list and production NuGet shell gate ${mode}`,()=>{
  const f=pendingFixture();try{
   const nested=path.join(f.server,'Integration Product/nested/bin/Release/Custom.Package.8.5.2.nupkg');fs.mkdirSync(path.dirname(nested),{recursive:true});
   zip(nested,[['tools/mIcRoI.vIsIoN.DLL',fs.readFileSync(path.join(f.directory,'Microi.Vision.dll'))]]);f.files.push(nested);
   const cli=fileURLToPath(new URL('../../tools/release-encryption.mjs',import.meta.url));
   const tool=path.join(f.server,'tools/release-encryption.mjs');fs.mkdirSync(path.dirname(tool),{recursive:true});fs.copyFileSync(cli,tool);
+  for(const name of ['release-candidate.mjs','release-composition.mjs','release-standard-inputs.mjs'])
+   fs.copyFileSync(fileURLToPath(new URL('../../tools/'+name,import.meta.url)),path.join(f.server,'tools',name));
+  const candidateRepos=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Agent','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
+  for(const repo of candidateRepos){const cwd=path.resolve(f.root,repo);fs.mkdirSync(cwd,{recursive:true});execFileSync('git',['init','--quiet'],{cwd});}
+  fs.writeFileSync(path.join(f.root,'.gitignore'),'/evidence.json\n/pending.nul\n/.tmp/\n'+candidateRepos.slice(1).map(repo=>'/'+repo+'/').join('\n')+'\n');
+  const candidate=path.join(f.root,'.tmp/verified-candidate.json'),probe=path.join(f.root,'candidate-source.txt');
+  fs.writeFileSync(probe,'accepted source');
+  const environment={...process.env};
+  for(const key of ['MICROI_RELEASE_COMPOSITION_FILE','CustomAfterMicrosoftCommonTargets','PrivateRulesProject','ApprovedRulesBootstrapSource','MicroiCoreProject'])delete environment[key];
+  execFileSync(process.execPath,[path.join(f.server,'tools/release-candidate.mjs'),'capture',candidate],{cwd:f.root,env:environment});
+  if(mode==='candidate-rejected')fs.appendFileSync(probe,' changed before first upload');
   const source=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
   const begin=source.indexOf('# ─── 阶段（条件）: NuGet 推送'),end=source.indexOf('# ─── 阶段（条件）: 推送 Docker 镜像',begin);
   assert.ok(begin>0&&end>begin);
@@ -248,15 +259,23 @@ for(const mode of ['success','after-scan-byte-drift','after-scan-added-package']
   const gitExec=process.platform==='win32'?execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim():'';
   const bash=process.platform==='win32'?path.resolve(gitExec,'../../..','bin/bash.exe'):'bash';
   const extra=path.join(path.dirname(f.files[0]),'Extra Product.8.5.2.nupkg');
-  const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:f.root,encoding:'utf8',input:`
+  const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:f.root,env:environment,encoding:'utf8',input:`
 print_phase(){ :; }; print_step(){ :; }; print_success(){ :; }; print_warning(){ :; }
 print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
 PUSH_NUGET=true; HAS_ENCRYPT=true; DLL_ENCRYPTED=true; NUPKG_REPLACED=true
 VERSION=8.5.2; PUBLISH_DIR=${quote(f.directory)}; MICROI_ENCRYPTION_RECEIPT=${quote(f.file)}
 MICROI_RELEASE_GATE_DIR="$PWD/.tmp/microi-release-gate"
+MICROI_RELEASE_CANDIDATE=${quote(candidate)}
 CONFIG_FILE=private-config.json
 node(){
- if [[ "$1" == *secure-nuget-push.mjs ]]; then printf 'UPLOAD_REACHED=%s\\n' "$*"; return 0; fi
+ if [[ "$1" == *release-candidate.mjs && "$2" == verify ]]; then
+  printf 'CANDIDATE_VERIFY_REACHED=%s\\n' "$3"
+ fi
+ if [[ "$1" == *secure-nuget-push.mjs ]]; then
+  printf 'UPLOAD_REACHED=%s\\n' "$*"
+  ${mode==='candidate-drift-after-first-upload'?`printf changed >> ${quote(probe)}`:':'}
+  return 0
+ fi
  ${quote(process.execPath)} "$@"; local result=$?
  if [ "$result" -eq 0 ] && [ "\$2" = packages ]; then
   ${mode==='after-scan-byte-drift'?`printf changed > ${quote(f.files[0])}`:mode==='after-scan-added-package'?`cp ${quote(f.files[0])} ${quote(extra)}`:':'}
@@ -266,8 +285,16 @@ node(){
 ${source.slice(begin,end)}
 `});
   assert.ifError(run.error);
-  if(mode==='success'){assert.equal(run.status,0,run.stderr);assert.equal(run.stdout.match(/UPLOAD_REACHED=/g)?.length,6);}
-  else{assert.equal(run.status,17,run.stderr);assert.equal(run.stdout.includes('UPLOAD_REACHED='),false);assert.match(run.stderr,/首个上传前 NuGet 清单或包字节发生变化/);}
+  if(mode==='success'){
+   assert.equal(run.status,0,run.stderr);
+   assert.equal(run.stdout.match(/CANDIDATE_VERIFY_REACHED=/g)?.length,7,'首包和每包上传前均需复核候选源码');
+   assert.equal(run.stdout.match(/UPLOAD_REACHED=/g)?.length,6);
+  }else{
+   assert.equal(run.status,17,run.stderr);
+   assert.equal(run.stdout.match(/CANDIDATE_VERIFY_REACHED=/g)?.length,mode==='candidate-drift-after-first-upload'?3:1);
+   assert.equal(run.stdout.match(/UPLOAD_REACHED=/g)?.length??0,mode==='candidate-drift-after-first-upload'?1:0);
+   assert.match(run.stderr,mode==='candidate-rejected'?/首个 NuGet 上传前候选源码发生变化/:mode==='candidate-drift-after-first-upload'?/当前 NuGet 上传前候选源码发生变化/:/首个上传前 NuGet 清单或包字节发生变化/);
+  }
  }finally{f.dispose();}
 });
 
