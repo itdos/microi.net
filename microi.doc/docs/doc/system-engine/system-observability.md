@@ -30,6 +30,53 @@
 
 ![系统日志/监控总览](/images/system-observability/overview-navigation.png)
 
+
+## 受信规则安装诊断
+
+规则调用被拒绝时，使用现有 MCP 查询 `action=Snapshot`，查看 `FixedStepRuntime`。
+协议为 `fixed-step-installation/v1`，只返回已认证租户在当前节点的编译登记与最近安装尝试。
+需要部署包含该诊断的后端；更新 MCP 或应用页面不能安装原生规则。
+
+| 字段/状态 | 如何判断 |
+|---|---|
+| `Available=false` 或字段不存在 | 当前后端未提供诊断，不能推断规则已安装 |
+| `Registrations=[]` | 当前节点没有为本租户编译登记的规则；检查实际部署组合 |
+| `ApiAssemblyFileSha256`、`AssemblyFileSha256` | 初始化时固定程序集文件的摘要；与实际发布制品比对，不返回磁盘路径 |
+| `Pending` | 编译登记存在，尚无完成的注册尝试 |
+| `RegistrationFailed`、`ErrorCode` | 保持关闭；错误码只来自固定验证白名单，未知异常为 `RegistrationFailed` |
+| `DependencyIdentity`、`DependencyFailureReason` | `DependencyHashMismatch` 时，可信校验器记录失败的程序集完整名称；原因区分 `MissingFile / MissingManifest / InvalidManifestHash / ContentMismatch`，旧后端可能不提供 |
+| `DependencyExpectedSha256`、`DependencyActualSha256` | 有效审批清单的期望摘要与实际文件摘要；缺清单或清单摘要无效时不读取文件摘要，不返回路径 |
+| `CatalogRegistered` | 本进程曾完成目录注册；继续通过真实调用核验当前主库审批与发布指针 |
+
+`Attempts`、`LastAttemptUtc` 和 `LastRegisteredUtc` 用于判断后台重试与信息新鲜度。
+读取快照不执行规则工厂、不查询审批、不触发安装，也不返回 SQL、配置、Token 或异常正文。
+`AuthorizationProof=false`：目录状态不能代替主库权限、撤销检查、房间调用或多节点验收。
+依赖诊断只接受实际校验器产生的有界记录，不采用调用方的异常正文或 `Exception.Data`；
+成功后清除旧失败信息。发现摘要不一致时核对发布镜像、审批清单和该节点的实际依赖，
+不可为恢复调用而跳过校验或从未经审核的请求值更新审批。
+生成依赖清单时沿用正式 API 的 `.deps.json`、`.runtimeconfig.json` 与目标平台的解析方式。
+例如 Linux 实际加载 `runtimes/unix` 或 `runtimes/linux` 下的 DLL 时，根目录同名通用文件的摘要不能替代它；
+发布门禁须按完整 `publish/runtimes/.../*.dll` 相对路径核验实际制品，继续拒绝路径穿越、重复路径与摘要差异。
+
+### 后台固定步调度
+
+同一管理员 `Snapshot` 还返回 `FixedStepPump`（`fixed-step-pump/v1`）。后台调用没有
+HTTP 请求记录；安装状态为 `CatalogRegistered` 不能证明后台正在推进。
+
+| 字段 | 如何判断 |
+|---|---|
+| `LoopState / LastWakeUtc` | 区分未启动、运行、停止和故障，核对当前节点的唤醒时间 |
+| `OwnedRooms / ActiveDispatches` | 仅当前租户的本机唤醒提示与在途数量，不代表主库租约或全站容量 |
+| `Rooms[].LocalState / LocalLeaseRemainingMs` | 本机状态及保守剩余时间；过期、停止的历史记录剩余时间为零 |
+| `Dispatches / Committed / Unknown` | 已安排调用及收到的提交/未知响应计数；提交仍需主库 checkpoint 独立回读 |
+| `LastOutcome / LastResultCode / LastErrorCode` | 白名单错误类别，如 `LoginRequired`、预算拒绝、陈旧租约、取消或异常；不返回错误正文 |
+
+摘要最多保留 128 个房间、每租户 16 个，节点重启后可丢失。移除本机提示不会立即抹掉
+最近失败；淘汰或字段缺失表示缺证，不能解释成零错误。快照不包含请求号、fence、
+Token、参数、异常栈或磁盘路径，也不触发规则工厂、审批查询和安装。
+
+`Unknown` 继续保留原 RequestId；观察摘要不能重新提交新请求、重置房间时间或跳过
+DB 租约。后端升级后才提供这些字段，现有 MCP 的 `Snapshot` 参数不变。
 ## API 排队与容器重建后的事故证据
 
 升级包含 `critical-incidents/mysql-v1` 的 API，并安装新版【系统日志/监控】应用后，

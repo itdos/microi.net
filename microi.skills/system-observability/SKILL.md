@@ -9,6 +9,19 @@ description: Microi 系统日志/监控查询、诊断与治理规范。用于�
 
 本 Skill 用于读取、解释、扩展和验收 Microi 的统一【系统日志/监控】能力。它不授权查看其它租户、绕过菜单/平台管理员权限，或把当前节点样本扩写成全局结论。
 
+
+## 受信规则安装诊断
+
+- 后台固定步没有 HTTP 请求记录，不能用 HTTP 日志缺项证明后台正常。沿用 `Snapshot` 读取 `FixedStepPump`（`fixed-step-pump/v1`），先核 `Available / LoopState / LastWakeUtc`，再看当前租户的 `OwnedRooms / ActiveDispatches / Rooms`。旧后端缺项表示不可用，需要部署后端，MCP 更新不能补足。
+- 房间摘要记录本机状态、保守剩余租约、安排次数、提交/未知响应计数及白名单 `LastErrorCode / LastResultCode`。记录最多全节点 128 个、每租户 16 个，移除后保留最近失败，重启或淘汰可缺证。`Committed` 是响应分类，仍须独立回读主库 checkpoint；本地时间和 `AuthorizationProof=false` 不能授予权限、保证 20Hz 或证明多节点验收。
+- `LoginRequired` 时核对实际后端是否正确识别固定 Managed 协议，不给后台添加伪造用户或开放匿名权限。未知结果继续原 RequestId；诊断不返回请求号、fence、Token、自由错误文本、参数或异常栈，也不触发工厂、安装和审批读取。现有管理员入口与 MCP 参数不变，本功能无需新增商城资源。
+- 规则可信原子拒绝时先用现有 `microi_query_system_observability` 查询 `action=Snapshot`，读取 `FixedStepRuntime`（`fixed-step-installation/v1`）。后端部署才会提供诊断，MCP 更新不能安装程序集。
+- 只观察当前已认证租户、当前节点。`Available=false`/字段缺失表示不可用；`Registrations=[]` 表示本租户没有编译登记，不能伪造参数、放宽白名单或添加维护引擎排错。
+- 比对初始化时的 `ApiAssemblyFileSha256`、`AssemblyFileSha256` 与实际发布制品；不返回文件路径。`Pending` 尚无完成尝试；`RegistrationFailed` 用固定 `ErrorCode` 和时间/次数排错，未知异常只报通用失败码。
+- `DependencyHashMismatch` 时读取可信校验器的 `DependencyIdentity / DependencyFailureReason / DependencyExpectedSha256 / DependencyActualSha256`。原因限定 `MissingFile / MissingManifest / InvalidManifestHash / ContentMismatch`；缺清单或摘要无效不读取文件摘要，旧后端字段可能缺失。异常正文与 `Exception.Data` 不能伪造此记录；成功后清除旧失败。核对实际镜像与已审核审批，不能跳过依赖校验或从未经审核的请求值更新审批。
+- 依赖清单必须沿用正式 API 的 `.deps.json / .runtimeconfig.json` 和目标平台解析；Linux 实际加载 `runtimes/unix` 或 `runtimes/linux` 的 DLL 时，根目录同名通用摘要不能替代。发布门禁按完整 `publish/runtimes/.../*.dll` 路径验签，继续拒绝穿越、重复路径与 hash 差异；独立探针自己的解析上下文不能代替正式 API。
+- `CatalogRegistered` 只证明本进程曾完成注册，`AuthorizationProof=false`。真实调用继续回读主库审批、来源与撤销；目录状态不是当前授权或商业/多节点验收。查询不执行工厂、不读取审批、不触发安装，不暴露 SQL、配置、Token 或异常正文。
+- 该只读节点输出不新增商城声明式资源或 MCP 参数；沿用管理员鉴权与 `Snapshot` 工具，不扩展业务写入。
 ## 大权限对象与 SQL 参数处理回归
 - 浏览器 Pinia 持久化应按已选字段独立深度监听，缓存序列化片段；非持久化的时钟/加载状态不得触发完整权限遍历，主题变化不得重新序列化用户。权限嵌套修改、登录退出、显式保存、恢复钩子、失败恢复和 dispose 必须回归，嵌入 WebOS 窗口保持只读存储边界。前端镜像验收与后端分开记录。
 待办的多项只读计数由内部 `IFormEngineReadOnlyCountRuntime` 在一个批次中拥有一份独立身份；业务参数不能提供非空 `_CurrentUser`，每项仍经过原表单查询与租户/角色/数据范围检查，事务内顺序执行。抄送分页及可能执行行 V8 的 CRUD 保留独立身份。私有文件 HTTP 原子可接收本次 DiyToken 验证后独占的身份，后台可信上下文仍复制；资源引用、权限、审计和 `Limit=true` 不变。上述优化需要更新后端镜像，不能靠修改 V8 参数来启用或跳过鉴权。

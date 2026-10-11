@@ -14,7 +14,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 `SysConfig.HideSystemLicenseVersion` 缺省关闭，标签可点击跳转 `/license`，不能因一次请求失败永久消失。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-client-frontend-000 sha256=9b949c68b0867fc1ecf2e6cb1fd1bec45d22c01ad3be63485e0376d0183d1795 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-000 sha256=ea9cdd10772c42cc8202aa50ed3f8bec0a41588b16539b2968f256c7ee05cd3a -->
 ## 单行文本插槽按钮约定
 
 - `diy-input.vue` 的插槽按钮行为存储在 `diy_field.Config.SlotButtonV8Code`。
@@ -27,7 +27,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=112177bb326f8d26803e3bd9248011d839fe8d081431320d0e09f90f82487984 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=83fb9902ca2edddfc8b72de9578f28a6a7df5cadb2626e5ffb0321d62caa0bb0 -->
 ## 1. 技术栈和源码入口
 
 ### 详情评论与代码版本的按需读取
@@ -58,7 +58,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=bcb1222e9884f134d9902ed4937e6cb2753e5d3ed37096229efd99646320a4bc -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=e754c23d671b87018bad97d26f901ad6c313912625bbb6f9404c1d4c806154fd -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -171,7 +171,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-003 sha256=a3e2b822a3c2aacea83d3cae796132786e3be45f3a18ceb621c477b6bd1a2442 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-003 sha256=301f766dc1ab1c6b021aa861a76b44844905d432393ab407472f58f00d6283cd -->
 ## 4. 工作流与表单提交
 
 工作流相关文件：
@@ -193,7 +193,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=d3a1a826c7b1870b83f9b49b58f488adeb7627626bad7462742956ca1719cdb7 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=ab17865c6032884ccd896a0eb62387cf7f89edcf337c024f2251563f3bd0e4d9 -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）

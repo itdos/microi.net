@@ -70,6 +70,11 @@ HTTP/SSE/网络失败、取消和旧文本响应。该文件由上述发现器�
 `MICROI_TEST_MONGO_CURRENT` 与专用测试库 `MICROI_MEMORY_TEST_CONN`；未单独提供
 MySQL 连接时复用 Full 的 `MICROI_TEST_SCHEDULE_MYSQL` 专用库。
 
+Full 的 SDK 输出统一位于本次结果目录 `.net-artifacts`。`run-tests.ps1` 只为当前测试
+进程绑定 `MICROI_TEST_REPOSITORY_ROOT`；源码定位以真实 `.csproj` 为标记，不能把
+隔离输出中同名的项目目录当成源码。内存诊断仍在独立子进程执行，并按当前测试
+程序集的 Configuration 与输出布局选定唯一夹具 DLL；产物缺失时失败，不借用旧 Debug。
+
 `Microi一键编译发布.sh` 在发布后端、构建前端或仅推送镜像时自动调用 `Full`：先取得发布锁，
 保持已加载候选源码的共享服务供测试使用，通过后再停止服务、改版本及发布。
 PC/API 镜像候选仍覆盖根仓及六个闭源子仓的源码与内置资源；独立 `microi.uniapp`

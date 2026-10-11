@@ -13,6 +13,7 @@ const extractHelper = name => {
   return match[0];
 };
 const buildStage = source.match(/var uploadedBuild = \[\];[\s\S]*?pruneApplicationAssets\(appId, expectedApplicationPaths\);/)[0];
+const sourceStage = source.match(/var uploadedSource = \[\];[\s\S]*?(?=\n\s*\/\/ PACKAGE_RUNTIME_VERSION_SEPARATION_V1)/)[0];
 const chunkHelpers = source.slice(source.indexOf('var applicationAssetChunkMaxFiles ='), source.indexOf('var installUser ='));
 const helperNames = [
   'normalizeApplicationPath', 'applicationFileName', 'applicationFileDir', 'applicationFileType',
@@ -23,7 +24,7 @@ const helperNames = [
 test('the released marketplace package contains the same asset recovery fixes as the standalone importer', () => {
   const importer = packageModel.SysApiEngines.find(engine => engine.ApiEngineKey === 'import-microi-store-package');
   assert.equal(importer.ApiV8Code.replace(/\r\n/g, '\n'), source);
-  for (const marker of ['RUNTIME_CONTEXT_ASSET_RESUME_V1', 'APPLICATION_ASSET_DISTINCT_PROGRESS_V1', 'APPLICATION_ASSET_NO_PROGRESS_GUARD_V1', 'APPLICATION_ASSET_METADATA_READ_REQUIRED_V1', 'APPLICATION_ASSET_STABLE_APP_ID_V1', 'APPLICATION_ASSET_CURRENT_ROWS_V1', 'APPLICATION_ASSET_PRIMARY_WRITE_READBACK_V1']) {
+  for (const marker of ['RUNTIME_CONTEXT_ASSET_RESUME_V1', 'APPLICATION_ASSET_DISTINCT_PROGRESS_V1', 'APPLICATION_ASSET_NO_PROGRESS_GUARD_V1', 'APPLICATION_ASSET_METADATA_READ_REQUIRED_V1', 'APPLICATION_ASSET_STABLE_APP_ID_V1', 'APPLICATION_ASSET_CURRENT_ROWS_V1', 'APPLICATION_ASSET_PRIMARY_WRITE_READBACK_V1', 'APPLICATION_ASSET_SOURCE_BUILD_CURSOR_V1']) {
     assert.ok(importer.ApiV8Code.includes(marker), marker);
   }
 });
@@ -376,3 +377,171 @@ for (const dialect of ['mysql', 'sqlserver', 'oracle']) {
     assert.match(sql, dialect === 'sqlserver' ? /TOP \(20001\)/ : dialect === 'oracle' ? /FETCH FIRST 20001 ROWS ONLY/ : /LIMIT 20001/);
   });
 }
+
+// 源码和运行文件必须在同一次安装中切换，并跨 Bundle 恢复；分别测试两个阶段会漏掉游标回退。
+function createCombinedInstaller({ bundleCount = 1, resumeInstall = true, corruptCopy = false } = {}) {
+  const rows = {}, objects = new Map(), uploads = [], visits = [], reads = [];
+  let checkpoint = {};
+  const key = value => String(value).replace(/^\/+/, '');
+  const bundles = Array.from({ length: bundleCount }, (_, i) => ({
+    id: `combined-${i}`,
+    sources: [asset('src/main.ts', `source-${i}`), asset('index.html', `<html>原始源码-${i}</html>`)],
+    builds: [asset('index.html', `<html><head></head><body>runtime-${i}</body></html>`), asset('app.js', `runtime-${i}`)]
+  }));
+  const run = () => {
+    const ctx = {
+      bundles, resumeInstall, backgroundChunkingEnabled: true, backgroundCheckpoint: structuredClone(checkpoint),
+      stats: { ApplicationBuildAssets: 0, ApplicationBuildAssetsReused: 0, ApplicationSourceFiles: 0, ApplicationSourceFilesReused: 0 },
+      firstTextParam: values => values.find(value => value !== undefined && value !== null && String(value).trim()) || '',
+      getUploadedHdfsPath: result => result.Data.FilePathName,
+      buildPersistentCheckpoint: (phase, index, extra) => ({ Phase: phase, Index: index, ...extra }),
+      reportProgress() {}, pruneApplicationAssets() {},
+      existingFor: appId => Object.fromEntries(Object.values(rows).filter(row => row.AppId === appId).map(row => [row.FilePath.toLowerCase(), structuredClone(row)])),
+      upsertApplicationRow(table, where, row) {
+        assert.equal(table, 'mci_ai_app_file');
+        rows[`${row.AppId}:${row.FilePath.toLowerCase()}`] = { ...row, Id: `${row.AppId}:${row.FilePath}` };
+        return { Code: 1 };
+      },
+      V8: {
+        Param: { ApplicationAssetChunkMaxFiles: 1 }, OsClient: 'target', SysConfig: { ApiBase: 'https://target.example/api' },
+        EncryptHelper: { Sha256Hex: value => sha256(Buffer.from(value)) },
+        Base64: { StringToBase64: value => Buffer.from(value).toString('base64') },
+        Method: {
+          Upload(options) {
+            const [name, base64] = Object.entries(options.FilesByteBase64)[0];
+            const objectKey = key(`target/${options.Path}/upload-${uploads.length}/${name}`);
+            objects.set(objectKey, Buffer.from(base64, 'base64'));
+            uploads.push({ path: objectKey, private: options.Limit });
+            return { Code: 1, Data: { FilePathName: `/${objectKey}` } };
+          },
+          ObjectExist: options => ({ Code: 1, Data: objects.has(key(options.FilePathName)) }),
+          GetObjectSha256(options) {
+            const bytes = objects.get(key(options.FilePathName));
+            assert.ok(bytes, options.FilePathName);
+            reads.push(options.FilePathName);
+            return { Code: 1, Data: { Sha256: sha256(bytes), Size: bytes.length } };
+          },
+          CopyObject(options) {
+            const bytes = objects.get(key(options.FilePathName));
+            assert.ok(bytes);
+            objects.set(key(options.Path), corruptCopy ? Buffer.from('damaged') : bytes);
+            return { Code: 1 };
+          },
+          MoveObject(options) {
+            const bytes = objects.get(key(options.FilePathName));
+            assert.ok(bytes);
+            objects.set(key(options.Path), bytes);
+            objects.delete(key(options.FilePathName));
+            return { Code: 1 };
+          }
+        }
+      },
+      System: {
+        Convert: { FromBase64String: value => Buffer.from(value, 'base64'), ToBase64String: value => Buffer.from(value).toString('base64') },
+        Text: { Encoding: { UTF8: { GetString: value => Buffer.from(value).toString('utf8'), GetBytes: value => Buffer.from(value) } } }
+      }
+    };
+    const helpers = [...helperNames, 'privateSourceFileMetadata', 'getPrivateSourceBaselineRoot', 'canonicalizePrivateSourceAsset'].map(extractHelper).join('\n');
+    vm.runInNewContext(`${helpers}\n${chunkHelpers}\nresult=(function(){
+      for(var bundleIndex=0;bundleIndex<bundles.length;bundleIndex++){
+        var item=bundles[bundleIndex],appId=item.id,appKey=item.id,appName=item.id,appType='MicroService';
+        var app={},bundle={},expectedApplicationPaths={},sourceFiles=item.sources,buildAssets=item.builds;
+        var sourceRoot=getPrivateSourceBaselineRoot(appId,sourceFiles),buildRoot='micro-app/'+appKey+'/v1.0.0';
+        var existingApplicationAssets=existingFor(appId),inlineRuntimeBuild=false;
+        ${sourceStage}\n totalBundleAssets+=buildAssets.length;\n${buildStage}
+      }return {Complete:true};})();`, ctx);
+    if (ctx.result.Data?.BackgroundTask) checkpoint = structuredClone(ctx.result.Data.BackgroundTask.Checkpoint);
+    visits.push({ ...checkpoint, Complete: ctx.result.Complete === true });
+    return ctx.result;
+  };
+  const finish = () => {
+    for (let i = 0; i < 24; i++) if (run().Complete) return;
+    assert.fail(`combined asset installation did not finish: ${JSON.stringify(visits)}`);
+  };
+  const verify = () => {
+    for (const row of Object.values(rows)) {
+      const bytes = objects.get(key(row.HdfsPath));
+      assert.ok(bytes, row.HdfsPath);
+      assert.equal(row.ContentHash, sha256(bytes));
+      assert.equal(row.Size, bytes.length);
+    }
+  };
+  return { run, finish, verify, rows, objects, uploads, visits, reads, bundles, get checkpoint() { return checkpoint; } };
+}
+
+for (const bundleCount of [1, 2]) {
+  test(`combined source/build ${bundleCount} bundle(s) finish with one distinct file per fresh worker slice`, () => {
+    const installer = createCombinedInstaller({ bundleCount });
+    installer.finish();
+    assert.equal(installer.visits.length, 4 * bundleCount);
+    assert.equal(installer.uploads.length, 4 * bundleCount);
+    assert.equal(Object.keys(installer.rows).length, 4 * bundleCount);
+    installer.verify();
+  });
+}
+
+test('combined source/build preserves legacy ResumeInstall=false callers and replays without extra uploads', () => {
+  const installer = createCombinedInstaller({ resumeInstall: false });
+  installer.finish();
+  const count = installer.uploads.length;
+  installer.finish();
+  assert.equal(installer.uploads.length, count);
+  installer.verify();
+});
+
+test('combined source/build resumes a BuildRepair cursor without re-reading the committed source prefix', () => {
+  const installer = createCombinedInstaller();
+  installer.run();installer.run();installer.run();
+  assert.equal(installer.checkpoint.AssetKind, 'Build');
+  installer.checkpoint.AssetKind = 'BuildRepair';
+  const reads = installer.reads.length;
+  installer.finish();
+  assert.equal(installer.reads.length, reads);
+  assert.equal(installer.uploads.length, 4);
+});
+
+test('combined source/build changed source manifest requires a new private root despite a Build cursor', () => {
+  const installer = createCombinedInstaller();
+  installer.run();installer.run();
+  const oldPath = installer.rows['combined-0:src/main.ts'].HdfsPath;
+  installer.bundles[0].sources[0] = asset('src/main.ts', 'changed source');
+  installer.finish();
+  assert.notEqual(installer.rows['combined-0:src/main.ts'].HdfsPath, oldPath);
+  assert.ok(installer.objects.has(oldPath.replace(/^\//, '')), 'old private objects remain recoverable');
+  installer.verify();
+});
+
+for (const field of ['ContentHash', 'Size']) {
+  test(`combined source/build repairs damaged committed source ${field} once`, () => {
+    const installer = createCombinedInstaller();
+    installer.run();installer.run();
+    installer.rows['combined-0:src/main.ts'][field] = field === 'Size' ? 999 : 'bad-hash';
+    installer.finish();
+    assert.equal(installer.uploads.length, 5);
+    installer.verify();
+  });
+}
+
+test('combined source/build rejects another tenant private path even with a completed Source cursor', () => {
+  const installer = createCombinedInstaller();
+  installer.run();installer.run();
+  installer.rows['combined-0:src/main.ts'].HdfsPath = installer.rows['combined-0:src/main.ts'].HdfsPath.replace('/target/', '/another/');
+  assert.throws(() => installer.run(), /PRIVATE_SOURCE_OBJECT_IDENTITY_INVALID/);
+  assert.equal(installer.checkpoint.AssetKind, 'Build');
+});
+
+test('combined source/build unknown future bundle cursor cannot bypass private object byte verification', () => {
+  const installer = createCombinedInstaller();
+  installer.run();installer.run();
+  installer.checkpoint.BundleIndex = 1;
+  installer.checkpoint.AssetKind = 'Unknown';
+  installer.objects.set(installer.rows['combined-0:src/main.ts'].HdfsPath.replace(/^\//, ''), Buffer.from('damaged'));
+  assert.throws(() => installer.run(), /PRIVATE_SOURCE_OBJECT_BYTES_MISMATCH/);
+});
+
+test('combined source/build failed private copy does not persist metadata or advance the cursor', () => {
+  const installer = createCombinedInstaller({ corruptCopy: true });
+  assert.throws(() => installer.run(), /PRIVATE_SOURCE_OBJECT_BYTES_MISMATCH/);
+  assert.deepEqual(installer.checkpoint, {});
+  assert.equal(Object.keys(installer.rows).length, 0);
+});

@@ -476,6 +476,7 @@ if (verifyOnly) {
   assertRelease(observabilityBundles.length === 1, '系统日志/监控必须携带唯一共享运行包');
   validateEmbeddedBundle(observabilityBundles[0], '系统日志/监控');
   execFileSync(process.execPath, [resolve(scriptDirectory, 'configure-system-observability-package.mjs'), '--verify-only'], { windowsHide: true, stdio: 'pipe' });
+  execFileSync(process.execPath, [resolve(scriptDirectory, 'build-bootstrap-package.mjs'), '--check'], { windowsHide: true, stdio: 'pipe' });
   process.stdout.write(JSON.stringify({
     verified: true,
     releaseContractPath,
@@ -696,6 +697,7 @@ for (const key of ['Version', 'ChangeLog', 'ChangeHistory', 'ChangeLogs']) {
 }
 await writeFile(observabilitySourcePath, `${JSON.stringify(observabilitySource, null, 2)}\n`, 'utf8');
 execFileSync(process.execPath, [resolve(scriptDirectory, 'configure-system-observability-package.mjs'), '--refresh-candidate'], { windowsHide: true, stdio: 'pipe' });
+execFileSync(process.execPath, [resolve(scriptDirectory, 'build-bootstrap-package.mjs')], { windowsHide: true, stdio: 'pipe' });
 process.stdout.write(JSON.stringify({
   releaseContractPath,
   applicationRoot,

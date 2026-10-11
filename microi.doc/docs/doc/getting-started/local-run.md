@@ -165,8 +165,12 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 后端 DLL 加密在 macOS/Linux 使用原生绝对路径；仅 Git Bash、MSYS 或 Cygwin 转换 Windows 路径，优先使用 `cygpath`，避免把 `/Users`、`/usr` 误识别为盘符。路径修复应先在隔离构建副本上验证五个 DLL 的实际加密和指纹，然后重新执行一键脚本的 Full、加密及最终产物冒烟。
 
+加密脚本被 `source` 引入以测试路径函数时不执行发行入口。SQLite 回归使用真实解释器及隔离标准库：Windows 选择 `python`，避免 `python3` 命中商店占位程序；其它系统使用 `python3`。包投影和 Manifest 内联源码使用 Git 指定的 LF 字节；官方资源目录中全部 JavaScript 接口、表事件和 Hook 模板也按 LF 检出，保持与包正文及声明摘要完全一致，不修改断言来忽略换行差异。缺少已发布的运行产物时，可以从相同版本的包正文按大小与 SHA-256 恢复制品，但恢复记录不能替代源码构建证据。
+
 在线 AI 使用的 MCP 按依赖锁干净安装、编译和裁剪，再完整复制生产运行目录。生产命令的链接解析为真实文件并保留执行权限，使临时目录清理后命令仍可运行；损坏、越界和循环链接提前拒绝，重新打包不保留旧依赖。制品门禁继续拒绝符号链接，不能通过放宽门禁解决打包错误。
 
+
+平台内置微服务的 Vue 生产样式标识和源码清单都依赖原始文件字节。其唯一源码目录通过 Git 属性禁用自动换行转换，按提交记录原样检出；不要按操作系统把整份源码改写为 CRLF 或 LF。新工作树需从锁定依赖真实构建 `dist`，再同时核对内嵌运行文件和源码清单。运行文件完全相同而源码清单漂移时，仍须用原始打包器修复清单并重新验收，不能删除校验或把旧包还原当作本轮构建通过。打包器写入完整包后自动刷新最小启动恢复投影，继续使用原生成器白名单；`--verify-only` 同时校验恢复 JSON 与导入脚本，漂移时拒绝且不改写文件。完整包、恢复投影和源码清单一致后再冻结 Full 候选。
 前端构建在 macOS 使用有界 `vm_stat` 探针，按当前页大小统计空闲页与可回收文件页，不把文件缓存误判为构建占用，也不叠加匿名非活动页、压缩页或已包含的预读页。探针失败或格式未知时回退到原生空闲内存并继续执行保守门禁；Windows/Linux 保持原统计方式。启动余量、95% 暂停、90% 恢复及连续五秒稳定要求不变，不能靠跳过内存保护完成正式发布。可回收页的口径参考 [Apple 内核内存说明](https://github.com/apple-oss-distributions/xnu/blob/main/doc/vm/memorystatus_notify.md)。
 
 每个新增或修复都要补回归测试：C# 测试进入 `Microi.Server/Microi.Tests`；该入口自动发现测试项目、应用包 Resource 与前端 `Microi.Client/tests` 的确定性 Node 用例。真实浏览器和数据库仍使用 Full 的隔离环境入口，不能把 skipped 当作通过。
@@ -177,8 +181,26 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 `files` 列出项目、组合 targets、静态审批代码等文件；`directories` 列出应用自己的规则源码目录。契约原始正文和这些输入逐文件加入 Full 候选，新增、删除或修改均触发重新验收；禁止越界路径和符号链接，`bin/obj/dist` 等生成目录不作为源码。`artifacts` 使用 `{ "path":"publish/ApprovedRules.dll", "sha256":"<后台审批的实际DLL哈希>" }` 描述获批制品，最终 API 发布目录必须逐项匹配，缺失或不同均阻止捕获和推送。普通无私有组合的发布和 PC 制品沿用既有门禁。这些变量只供构建，不是生产 API 设置，也不授予 V8/MCP/HTTP 任意加载代码的权限。
 
+发行组合的进程环境只绑定工具所在的工作区。临时测试仓库或其它源码根须显式传递自己的环境，不能继承另一发行任务的私有路径；显式配置错误仍立即失败。
+
+Skills 的渐进披露清单校验原始 UTF-8 字节。根 `.gitattributes` 固定 `microi.skills` Markdown 与清单为 LF，避免 Windows checkout 改变摘要。拉取后运行 `node microi.skills/scripts/validate-progressive-disclosure.mjs` 验证完整正文；确实修改规则时，仅对已审阅的 Skill 使用 `refresh-progressive-disclosure.mjs <名称>` 更新清单，再同步插件与后端知识快照。不要用批量重签摘要掩盖未审阅的正文变化。
+
+私有原生规则的依赖审批必须核对实际目标 Linux CLR 中的完整程序集引用链，不能用 Windows 框架文件或“某次业务调用未使用”代替。发行缺少、身份冲突或哈希不匹配时，保持失败关闭并修复依赖交付。例如 Oracle Core 23.26.300 声明引用 Azure、Kerberos、OCI、ConfigFile、AWS、GCP 六个扩展，Dos.ORM 同时引用六份同版本官方包，由 NuGet 交付它们及其传递依赖；`ProviderDependencyDeliveryTests` 只验证真实 CLR 装载，不连接 Oracle 或云服务。修复后重新运行目标运行时依赖验证、Full 及最终镜像回读，不在 V8 或生产配置中提供任意 DLL 装载入口。包说明见 [Oracle Azure 扩展](https://www.nuget.org/packages/Oracle.ManagedDataAccess.Azure/23.26.300) 和 [Oracle OCI 扩展](https://www.nuget.org/packages/Oracle.ManagedDataAccess.Oci/23.26.300)。
+
+依赖统一也要覆盖存量模块：MongoDB 兼容构建与 NuGet 包声明共同使用 DnsClient 1.7.0，以满足 Azure 配置提供者的版本下界；MongoDB 3.6/7 的真实验收仍由 Full 执行。OCI 带有独立强名称的旧密码学程序集，微信支付继续使用 BouncyCastle.Cryptography 2.6.2；测试通过显式程序集别名断言原来的认证标签篡改异常，避免同名类型导致编译歧义，不改变运行时密码学协议。
+
+Oracle AWS 扩展的实际程序集还引用 SQS，尽管其 NuGet 清单只列出 S3、SecretsManager。Dos.ORM 显式交付 [AWSSDK.SQS 4.0.100.15](https://www.nuget.org/packages/AWSSDK.SQS/4.0.100.15)，HDFS 的 AWS Core 引用同步至其下界 4.0.102.8，避免旧直接引用触发包降级。Oracle 回归递归验证完整扩展引用链并保留 512 个程序集预算；不访问 AWS 或申请凭据。
+
+System.Drawing.Common 的 .NET 10 支持程序集还引用 System.Formats.Nrbf；该文件不在 ASP.NET Core 共享框架内，Dos.Common 显式交付同版本官方 NuGet 包，并由上述回归验证引用与文件。Windows GDI 的运行平台限制不变；Linux 图像处理继续使用 SkiaSharp。依赖可解析不等于在 Linux 执行 Windows 绘图 API。
+
 共享源码持续变化时，可将完整候选源码及依赖保存到独立发布目录，在那里运行同一 Full 和一键发布脚本。专用测试服务使用独立端口，并通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口，默认仍为 61501、61500。进程管理器继续检查 PID、命令行和工作区归属；原工作区服务不受影响。这两个变量仅用于发布脚本，不是生产 API 配置。
 
+
+Windows Git Bash 的 MSYS PID 与 Windows 原生 PID 不同。一键发布先用真实 `ps` 的 `WINPID` 映射登记 API、PC、官网或 Agent 发布锁，退出时用同一个原生 PID 和令牌释放。映射缺失、重复或进程已退出均停止发布；不借用其它存活进程。旧 API 热修复归属检查以 UTF-8 读取中文入口，并核对实际工作区路径，不仅依赖锁中的标签。
+
+进程管理器在 PowerShell 5 和 7 中显式设置 UTF-8 控制台与管道输出，避免 Git Bash
+继承 Windows 旧代码页后出现中文诊断乱码。编码不影响锁校验和停止范围；修复后仍须
+通过真实 PowerShell、Git Bash 回归及完整 Full，不能通过忽略错误文字来放行。
 API、PC 框架、官网和 Microi Agent 各自使用 `.tmp/microi-process-state/` 下的 `api-release.lock`、`pc-release.lock`、`website-release.lock`、`agent-release.lock`，可以同时发布；同类发布互斥。合并发布只取得所选产品的锁，部分取得失败会撤回本次已取得的锁。API 服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`，或通过进程管理器 `AssertServiceStart -ReleaseScope api|pc|all` 检查。Windows 发布准备按相同范围清理：API 处理后端及 Release DLL，PC 处理 Vite，官网不停止二者。
 
 PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与依赖审计统一使用本次结果目录的 `.net-artifacts`，并行发布使用独立结果目录、测试服务/端口及隔离租户。官网的全部源码、主题、测试和依赖由官网发布验收，不影响 PC/API 的候选一致性；共享 SDK、Skills、MCP 与发布工具仍受候选保护。共享版本和跨产品改动应先准备并冻结，再并行发布。资源排队按实际并行阶段预算之和与系统余量判断，不再因无关产品占用一个全局窗口而等待。 macOS/Linux 的进程管理器同时识别项目 `bin/` 和当前工作区 `.tmp/microi-release-gate/日期-时间-PID/.net-artifacts/bin/Microi.net.Api/debug|release/` 下的规范 API apphost；后者仍要求 API 项目 CWD 精确一致，其它工作区、任意输出目录、路径越界或无法回读身份均拒绝停止。

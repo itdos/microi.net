@@ -38,12 +38,18 @@ public sealed class TrustedRulesCatalog
         lock(gate){var key=Key(copy.Tenant,copy.RegistrationId);if(entries.ContainsKey(key))throw new InvalidOperationException("RegistrationImmutable");entries.Add(key,new Entry{Approval=copy,Factory=fixedFactory,Assembly=type.Assembly,Revalidate=revalidate});}
     }
     internal IDeterministicRules Create(InvocationContext context,string id,bool projection,string rulesVersion,string layout)
+        => AuthorizeFactory(context,id,projection,rulesVersion,layout)();
+    // 只准备本次调用的固定工厂；主库授权不缓存，规则构造仍由内核计入计算预算。
+    internal Func<IDeterministicRules> AuthorizeFactory(InvocationContext context,string id,bool projection,string rulesVersion,string layout)
     {
         Entry entry;lock(gate){if(!entries.TryGetValue(Key(context.Tenant,id),out entry!))throw new InvalidOperationException("RegistrationNotFound");}
         entry.Revalidate?.Invoke();
         if(context.EngineKey!=(projection?entry.Approval.ProjectionEngineKey:entry.Approval.TickEngineKey))throw new InvalidOperationException("UntrustedEngine");
         if(entry.Approval.RulesVersion!=rulesVersion||entry.Approval.LayoutId!=layout)throw new InvalidOperationException("RulesMismatch");
-        var rules=entry.Factory();if(rules==null||rules.GetType().FullName!=entry.Approval.EntryType||rules.GetType().Assembly!=entry.Assembly)throw new InvalidOperationException("InvalidFactory");return rules;
+        return ()=>
+        {
+            var rules=entry.Factory();if(rules==null||rules.GetType().FullName!=entry.Approval.EntryType||rules.GetType().Assembly!=entry.Assembly)throw new InvalidOperationException("InvalidFactory");return rules;
+        };
     }
     public string TickEngine(string tenant,string registrationId){Entry entry;lock(gate){if(!entries.TryGetValue(Key(tenant,registrationId),out entry!))throw new InvalidOperationException("RegistrationNotFound");}entry.Revalidate?.Invoke();return entry.Approval.TickEngineKey;}
     public string[] AllowedEngineKeys(string tenant,string registrationId){Entry entry;lock(gate){if(!entries.TryGetValue(Key(tenant,registrationId),out entry!))return Array.Empty<string>();}entry.Revalidate?.Invoke();return new[]{entry.Approval.TickEngineKey,entry.Approval.ProjectionEngineKey};}

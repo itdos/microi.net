@@ -177,6 +177,12 @@ namespace Microi.net
                     RequestCpuBoundary = "请求耗时和并发用于归因，不代表逐请求 CPU 采样；多节点需分别查看。"
                 },
                 RequestRuntime = SystemObservabilityService.GetSnapshot(window, top),
+                // 复用已完成的管理员/租户鉴权。快照不触发审批回读、规则工厂或安装，目录状态不是授权证明。
+                FixedStepRuntime = MicroiEngine.TryGetService<Microi.FixedStep.FixedStepInstallationDiagnostics>()?.Snapshot(osClient)
+                    ?? new Microi.FixedStep.FixedStepInstallationSnapshot(),
+                // 后台调用不是 HTTP 请求；同租户有界摘要只能在上方管理员鉴权之后读取。
+                FixedStepPump = MicroiEngine.TryGetService<Microi.FixedStep.BoundedTickCoordinator>()?.Snapshot(osClient)
+                    ?? new Microi.FixedStep.FixedStepPumpSnapshot(),
                 Host = host,
                 Docker = includeDocker ? SystemMonitorLogic.GetDockerStats() : null,
                 Queue = queue == null ? null : new

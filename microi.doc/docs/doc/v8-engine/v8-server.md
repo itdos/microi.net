@@ -20,6 +20,16 @@
 
 `StopHttp`、允许匿名调用和接口角色限制约束的是外部 HTTP 入口。`V8.ApiEngine.Run` 属于可信服务端调用，不经过 HTTP 门禁。因此，被其它接口引擎复用的敏感业务仍必须在被调用引擎内部校验当前用户、业务状态和数据范围；能够编辑接口引擎、数据源、Job 或后端事件的账号属于“服务端代码执行”信任边界，只应授予高权限管理员。
 
+
+同租户嵌套调用未提供身份时，运行时从本次重新验证的 DiyToken 恢复
+`V8.CurrentUser` 的独立副本，无须给 `V8.ApiEngine.Run` 的业务参数补传用户。
+子脚本修改身份副本不会改变共享登录态。跨租户公开调用继续清空原租户身份；
+匿名调用不会获得登录身份，可信后台任务仍使用服务端恢复的任务身份。
+已有 Controller 的受控身份投影保持兼容，客户端 `_CurrentUser` 仍被入口覆盖或移除。
+
+此行为须部署包含修复的后端镜像，单独保存接口脚本不能更新运行时。
+升级验收应使用普通账号的真实 HTTP 外层接口调用内部引擎，并覆盖匿名、
+跨租户、后台任务和会话吊销；离线参数回归不能替代实际 HTTP 验收。
 外部客户端推荐直接向动态路由发送 JSON：
 
 ```http
@@ -291,6 +301,14 @@ await renewLease();
 
 ### 受信固定步长规则运行时（后端安装候选）
 
+平台固定 Managed 协议作用域只绑定当前租户与指定接口引擎，并在可信运行入口消费。
+此类调用无玩家用户，不要求伪造 DiyToken，也不注入匿名玩家标识；普通 HTTP、普通
+嵌套调用、错误租户/引擎以及已消费或释放的作用域仍执行原有身份与写入限制。
+参数中的 `TrustedPump` 等标记不能建立此作用域。后端升级才修复此行为，保存脚本不能替代。
+
+管理员可用既有 `Snapshot` 查询 `FixedStepPump` 节点摘要，区分循环、调用失败与过期；
+本机观察不是主库提交或授权证明。字段与诊断步骤见[系统日志/监控](../system-engine/system-observability.md)。
+
 需要持续模拟的应用可由现有 API 的通用宿主承载；业务路由、DiyToken、房间成员、主库事务、inbox、checkpoint 和结算仍由 Managed 接口引擎处理。该能力需要正式后端安装，保存 V8 代码或创建任务不会自动安装原子。规则程序集与应用适配属于私有应用发行包，不把业务 Domain 放入平台通用源码，也不增加业务 Controller。
 
 ```js
@@ -311,6 +329,30 @@ if (identity.Code !== 1) return identity;
 
 固定规则步长为 50ms，单批最多追赶4步、处理64条指令；进程最多2个计算、同租户最多1个，超额快速拒绝。50ms 是目标唤醒间隔，实际延迟和容量须实测。Job 的秒级任务负责恢复扫描与补偿，不能冒充20Hz连续步。未知提交必须用原 RequestId 和原语义重试；同一事务行锁下读取 DB 时间、验证租约/fence/CAS后才持久化并ACK。本机排程只保存有限唤醒提示，不能作为共享权威事实。
 
+
+单批规则计算预算为 100ms，规则工厂、完整检查点恢复、各步推进和捕获共用该预算。每批仍从主库核验批准来源和撤销状态；这一可信授权等待单独计时，不计作规则计算，但仍消耗原总租约。授权结束后、构造规则前再次检查取消和租约，不能缓存授权、延长租约或给每个阶段重新分配预算。离线注入授权延迟只验证计时边界；实际 HTTP 延迟、冷启动和服务器负载仍需线上验收。
+
+升级后端后，管理员可用既有 `microi_query_system_observability` 的 `Snapshot` 读取
+`FixedStepRuntime.CoreAssemblyFileSha256` 和 `Registrations[]` 的计算预算见证。
+`ComputeBudgetFailureCount` 是当前节点累计次数；`LastComputeBudgetFailureUtc`、
+`LastComputeBudgetPhase` 及 `LastComputeBudgetComputeMilliseconds` /
+`LastComputeBudgetAuthorizationMilliseconds` / `LastComputeBudgetTotalMilliseconds`
+记录最后一次真实拒绝。旧后端缺少字段表示尚不支持，不能解释为零次失败。
+
+| 固定阶段值 | 超时检测所在的计算边界 |
+| --- | --- |
+| `InputValidation` | 信封、指令排序与哈希校验 |
+| `RuleFactory` | 已批准的固定规则工厂 |
+| `RestoreState` | 完整恢复与绑定核验 |
+| `ApplyCommand` | 应用收件箱指令 |
+| `AdvanceTick` | 确定性规则步推进 |
+| `CaptureState` | 捕获新检查点 |
+
+这些时间是单调时钟的累计墙上耗时，包含调度或 GC 等影响；计算时间扣除可信授权等待。
+阶段值只说明在哪个边界检测到总预算耗尽，不能当作该函数独自耗时或生产根因。
+见证只保留于最多 64 个编译部署绑定，不保存房间、玩家、指令、自由异常或秘密；
+管理员查询仍按当前租户隔离。节点重启会清零，跨节点需分别读取；它不是持久日志、
+审批、数据库提交、健康或商业验收证明。普通错误码、取消、租约和 100ms 预算保持不变。
 审批资源由应用商城声明式安装，原生代码另外经过后台发行审批。私有应用编译组合固定 tenant/registration/入口与审批摘要，主库审批须同时匹配已安装版本、V3 Completed来源hash、真实DLL及依赖闭包。运行中撤销、卸载、软删来源或主库不可用均失败关闭。首批提供者限定同租户与MySQL；其它来源/方言不静默降级。没有任意DLL路径、URL或Type的V8/MCP注册入口，原生程序集也不是不可信代码沙箱。
 
 普通租户的编译证明默认 `TenantInstallation`，保留真实 Installed 回执及旧摘要。官方同租户发布源禁止安装自己，只能由后端发行组合明确固定 `OfficialPublishedSnapshot`：`InstallRecordId` 绑定 `mic_data_version.Id`，原始 `Data` 的UTF-8 SHA-256另固定于编译回执并参与独立审批摘要。该类别与快照摘要不从Param或自由表字段选择、不新增表字段、不伪造Installed。受信官方身份、当前Published/审批有效指针、Verified包hash/size/HDFS、不可变快照、V3 Completed源码hash及实际DLL依赖须全部匹配；当前状态变化、软删或主库不可用下次调用立即拒绝，旧历史存在不足以授权。跨租户仍拒绝，结构发布不等于后端安装或代码审批。审批表纳入通用强制管理员清单，普通用户即使误授表/菜单权限仍不得改授权状态；V8Limit和ReadPrimary不是写权限。

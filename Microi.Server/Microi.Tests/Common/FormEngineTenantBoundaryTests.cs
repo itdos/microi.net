@@ -266,8 +266,7 @@ public class FormEngineTenantBoundaryTests
             "sys_log", "sys_servernode", "mic_ai", "mic_email_server", "wx_mp", "mci_database_backup",
             "mci_background_task", "mci_file_remote_connection", "mci_redis_connection", "mci_license_server",
             "mci_platform_reminder", "mci_platform_reminder_batch", "mci_platform_reminder_target", "mci_platform_reminder_receipt",
-            "mci_user_access_key", "mci_security_access_log", "mci_security_attack_event", "mci_security_ip_block", "mci_runtime_incident",
-            "mci_runtime_installation",
+            "mci_user_access_key", "mci_security_access_log", "mci_security_attack_event", "mci_security_ip_block", "mci_runtime_incident", "mci_runtime_installation",
             "mci_spider_account", "mci_spider_profile", "mci_spider_rule",
             "mci_ai_app", "mci_ai_app_file", "mci_ai_app_version", "mci_ai_data_domain", "mci_ai_role_policy"
         };
@@ -339,12 +338,16 @@ public class FormEngineTenantBoundaryTests
         Assert.True(InvokeTableChildContextValidation(chain));
     }
 
-    [Fact]
-    public async Task AnonymousClient_CannotReadProtectedTable_ButKeepsOrdinaryAnonymousPolicy()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AnonymousClient_CannotReadProtectedTable_ButKeepsOrdinaryAnonymousPolicy(bool hasMenuMetadata)
     {
-        var engine = new AnonymousFieldPermissionFormEngine(new FormEngineAuthorizationSnapshot());
+        using var metadata = new AnonymousModuleMetadataFixture(hasMenuMetadata);
+        var engine = new FormEngine();
         var param = new DiyTableRowParam
         {
+            OsClient = metadata.Tenant,
             _InvokeType = InvokeType.Client.ToString(),
             _IsAnonymous = true
         };
@@ -364,35 +367,26 @@ public class FormEngineTenantBoundaryTests
             param,
             new JObject { ["Id"] = "ordinary-id", ["Name"] = "diy_customer" },
             "Read"));
+        Assert.NotEmpty(metadata.Statements);
     }
 
     [Fact]
-    public async Task AnonymousClient_UsesAuthoritativeFieldPolicyAndIgnoresAuthenticatedSnapshot()
+    public async Task AnonymousClient_CannotProbeHiddenFieldUnderModulePermissions()
     {
-        var snapshot = new FormEngineAuthorizationSnapshot
-        {
-            FieldPermissionMenus = new List<FormEngineAuthorizationMenuSnapshot>
-            {
-                new()
-                {
-                    Id = "anonymous-menu", DiyTableId = "ordinary-id",
-                    FieldPermissions = "{\"Version\":1,\"Enabled\":true,\"Rules\":[{\"Everyone\":true,\"Fields\":[{\"Name\":\"Secret\",\"Visible\":false,\"Editable\":false}]}]}"
-                }
-            }
-        };
-        var engine = new AnonymousFieldPermissionFormEngine(snapshot);
+        using var metadata = new AnonymousModuleMetadataFixture(true,
+            "{\"Version\":1,\"Enabled\":true,\"DefaultVisible\":false,\"DefaultEditable\":false,\"Rules\":[]}");
         var param = new DiyTableRowParam
         {
-            _InvokeType = InvokeType.Client.ToString(), _IsAnonymous = true,
-            _SysMenuId = "unrelated-menu",
-            _AuthorizationSnapshot = new FormEngineAuthorizationSnapshot { UserLevel = DiyCommon.MaxRoleLevel }
+            OsClient = metadata.Tenant,
+            _InvokeType = InvokeType.Client.ToString(),
+            _IsAnonymous = true,
+            _SearchEqual = new Dictionary<string, string> { ["Salary"] = "fixture-value" }
         };
-        var table = new JObject { ["Id"] = "ordinary-id", ["Name"] = "diy_customer" };
-        Assert.True(await InvokeClientAuthorization(engine, param, table, "Read"));
-        Assert.False(param._FieldPermission.Visible("Secret"));
-        param._OrderBy = "Secret";
-        Assert.False(await InvokeClientAuthorization(engine, param, table, "Read"));
-        Assert.Equal(2, engine.LoadCount);
+        Assert.False(await InvokeClientAuthorization(new FormEngine(), param,
+            new JObject { ["Id"] = "ordinary-id", ["Name"] = "diy_customer" }, "Read"));
+        Assert.NotNull(param._FieldPermission);
+        Assert.False(param._FieldPermission.Visible("Salary"));
+        Assert.Contains(metadata.Statements, sql => sql.Contains("FROM sys_menu", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1821,7 +1815,13 @@ public class FormEngineTenantBoundaryTests
 
         Assert.Equal(a, b);
         Assert.NotEqual(a, otherTenant);
+        // v4 增加逐用户字段/岗位权限，不能复用历史 v2 的角色共享快照。
         Assert.Contains(":Snapshot:v4:", a);
+        Assert.Contains(":7:shared:", a);
+        var userA = FormEngineAuthorizationCache.BuildSnapshotKey("tenant-a", "7", new[] { "role-a" }, "user-a");
+        var userB = FormEngineAuthorizationCache.BuildSnapshotKey("tenant-a", "7", new[] { "role-a" }, "user-b");
+        Assert.NotEqual(userA, userB);
+        Assert.NotEqual(a, userA);
     }
 
     [Theory]
@@ -2087,18 +2087,6 @@ public class FormEngineTenantBoundaryTests
             EnforcementCount++;
             LastRequestedOsClient = osClient;
             return string.Empty;
-        }
-    }
-
-    private sealed class AnonymousFieldPermissionFormEngine : FormEngine
-    {
-        private readonly FormEngineAuthorizationSnapshot snapshot;
-        public int LoadCount { get; private set; }
-        public AnonymousFieldPermissionFormEngine(FormEngineAuthorizationSnapshot snapshot) => this.snapshot = snapshot;
-        protected override FormEngineAuthorizationSnapshot LoadAnonymousFieldPermissionSnapshot(string osClient)
-        {
-            LoadCount++;
-            return snapshot;
         }
     }
 

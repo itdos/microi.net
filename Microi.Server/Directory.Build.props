@@ -1,4 +1,8 @@
 <Project>
+  <!-- Keep the API configuration when a frozen private project is outside the platform solution. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Microi.net.Api' and '$(PrivateRulesProject)' != ''">
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
+  </PropertyGroup>
   <PropertyGroup>
     <!--
       两套解决方案必须代表两种真实交付拓扑：公开 Microi.net.sln 固定消费 NuGet，

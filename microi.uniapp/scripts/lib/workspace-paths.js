@@ -56,7 +56,8 @@ function findSyncedXjyEngine(projectRoot, apiEngineKey, workspaceRoot = findWork
   }
   visit(engineRoot)
   if (matches.length !== 1) {
-    const detail = matches.map((file) => path.relative(engineRoot, file)).sort().join(', ')
+    // 错误详情用稳定的仓库相对路径，Windows 与 Unix 都能定位同一冲突，不能按宿主顺序择一。
+    const detail = matches.map((file) => path.relative(engineRoot, file).replaceAll('\\', '/')).sort().join(', ')
     throw new Error(matches.length
       ? `Ambiguous synced xjy ApiEngineKey ${apiEngineKey}: ${detail}`
       : `Synced xjy ApiEngineKey ${apiEngineKey} not found under ${engineRoot}; run the official microi pull api first`)

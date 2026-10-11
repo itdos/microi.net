@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-005 sha256=2c4c3f197bcd921d147b892cb64ccd1b77461f67c0219cfc3107ec6c7c268d88 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-005 sha256=189ca6438cd0fc58a5bf14bd13a3bad26a9254c766e4a6bed62ef2aeb1879e9d -->
 ## 3. 动态按钮系统
 
 按钮配置来自 `sys_menu`：
@@ -45,7 +45,7 @@ V8.Result = V8.Form.Status == '待审核';
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-006 sha256=e92ec7faad68c55a2175580e301c0b2b6a63b90e8e7edba48b8b0073ae53c807 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-006 sha256=b5d89b5a0b17ffb02579d4512b15468e52b599ddf4573afba85b9e5d3f9f5d49 -->
 ## 5. 路由与打开方式
 
 登录首页支持“用户 > 系统 > 首个可访问菜单”的三级优先级：
@@ -114,7 +114,7 @@ Page 模式要特别注意：
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-007 sha256=fa5d43239311945bd4a004763c0a6fa5295113b24965a73849e0f09d7b73d393 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-007 sha256=573d988999f9721cf7efe7654c203342213728b4f1ce61a718b10815595ae894 -->
 ## 6. 修改前必查清单
 
 ### `diy-table` 嵌入分页条数

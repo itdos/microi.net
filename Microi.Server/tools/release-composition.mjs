@@ -60,8 +60,9 @@ export async function snapshotReleaseComposition(root,options={}){
   normalizedProperties[key]=entry.key;
  }
  const seenArtifacts=new Set(),artifacts=contract.artifacts.map(row=>{
-  // 私有审批中的实际 DLL hash 必须与最终 publish 内容一致；不能重新签名另一份构建结果。
-  if(!row||Object.keys(row).sort().join(',')!=='path,sha256'||typeof row.path!=='string'||!/^publish\/[A-Za-z0-9_.-]+\.dll$/.test(row.path)||!/^([a-f0-9]{64})$/.test(row.sha256))throw Error('Invalid private approved artifact');
+  // 按实际 publish 相对路径验签，包括 RID 目录；目录段不可为 . / ..、空段、盘符或反斜线。
+  // 根目录同名通用 DLL 不能替代 Unix/Linux 平台 DLL，也不能重新签名另一份构建结果。
+  if(!row||Object.keys(row).sort().join(',')!=='path,sha256'||typeof row.path!=='string'||!/^publish\/(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*[A-Za-z0-9_.-]+\.dll$/.test(row.path)||!/^([a-f0-9]{64})$/.test(row.sha256))throw Error('Invalid private approved artifact');
   if(seenArtifacts.has(row.path.toLowerCase()))throw Error('Duplicate private approved artifact');seenArtifacts.add(row.path.toLowerCase());
   return {...row};
  }).sort((a,b)=>a.path.localeCompare(b.path));
