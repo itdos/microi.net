@@ -387,6 +387,27 @@ print_divider() {
     echo -e "  ${DIM}────────────────────────────────────────────────────────${NC}"
 }
 
+# 发布进程专用输出目录。空间紧张时可指向其它盘的绝对路径；不进入生产 API 配置。
+# 默认目录保持兼容，所有候选、Full 结果和制品回执必须位于同一位置。
+MICROI_RELEASE_GATE_DIR="${MICROI_RELEASE_GATE_DIR:-$PWD/.tmp/microi-release-gate}"
+if is_windows_shell && [[ "$MICROI_RELEASE_GATE_DIR" =~ ^[A-Za-z]:[\\/] ]]; then
+    command -v cygpath >/dev/null 2>&1 || print_fail "无法转换 Windows 发布结果目录；请使用 Git Bash 绝对路径。"
+    MICROI_RELEASE_GATE_DIR=$(cygpath -u "$MICROI_RELEASE_GATE_DIR")
+fi
+case "$MICROI_RELEASE_GATE_DIR" in
+    /|/[A-Za-z]|/[A-Za-z]/) print_fail "发布结果目录不能是文件系统或盘符根目录。" ;;
+    /*) ;;
+    *) print_fail "MICROI_RELEASE_GATE_DIR 必须是绝对路径。" ;;
+esac
+if ! mkdir -p "$MICROI_RELEASE_GATE_DIR"; then
+    print_fail "无法创建发布结果目录。"
+fi
+MICROI_RELEASE_GATE_DIR=$(cd "$MICROI_RELEASE_GATE_DIR" && pwd -P)
+if [ "$MICROI_RELEASE_GATE_DIR" = / ] || [[ "$MICROI_RELEASE_GATE_DIR" =~ ^/[A-Za-z]$ ]]; then
+    print_fail "发布结果目录不能是文件系统或盘符根目录。"
+fi
+export MICROI_RELEASE_GATE_DIR
+
 # 直接启动前端构建守护器，避免 Git Bash + nvm-windows 的 npm POSIX 包装器
 # 在异常关闭时留下多层 bash/npm 残留进程。
 # Interrupted runs may leave an owner-verified stale lock. Recover it before
@@ -608,17 +629,13 @@ print_success "解决方案: $(basename "$SLN_FILE")"
 # NuGet 配置
 CONFIG_FILE="Microi一键编译发布配置.json"
 HAS_NUGET=false
-NUGET_API_KEY=""
-NUGET_SOURCE="https://api.nuget.org/v3/index.json"
 if [ -f "$CONFIG_FILE" ]; then
-    NUGET_API_KEY=$(json_value "ApiKey" "$CONFIG_FILE")
-    _source_val=$(json_value "Source" "$CONFIG_FILE")
-    if [ -n "$_source_val" ]; then NUGET_SOURCE="$_source_val"; fi
-    if [ -n "$NUGET_API_KEY" ] && [ "$NUGET_API_KEY" != "your-nuget-api-key-here" ]; then
+    # 私有密钥仅在受信任的 Node 上传进程中读取；shell 不持有、也不作为子进程参数。
+    if node Microi.Server/tools/secure-nuget-push.mjs probe "$CONFIG_FILE" >/dev/null; then
         HAS_NUGET=true
-        print_success "NuGet 配置: 已加载（ApiKey 已配置）"
+        print_success "NuGet 配置: 已校验（私有密钥由安全推送进程读取）"
     else
-        print_info "NuGet 配置: $CONFIG_FILE 存在但 ApiKey 未填写，跳过 NuGet 推送"
+        print_info "NuGet 配置: 不可用，跳过 NuGet 推送"
     fi
 
     # 从配置文件加载 Docker 私有凭据（覆盖脚本顶部的默认值）
@@ -647,7 +664,7 @@ fi
 # DLL 加密能力检测
 HAS_ENCRYPT=false
 ENCRYPT_SCRIPT="Microi.Server/Microi.net/License/scripts/encrypt-dll.sh"
-MICROI_ENCRYPTION_RECEIPT="$PWD/.tmp/microi-release-gate/api-encryption.json"
+MICROI_ENCRYPTION_RECEIPT="$MICROI_RELEASE_GATE_DIR/api-encryption.json"
 # 闭源源码存在时只能进入完整加密链，缺项目或缺工具都不是开源模式。
 # 在任何编译/上传之前失败，避免 HAS_ENCRYPT=false 让后续门禁失效。
 _closed_source_count=0
@@ -1088,7 +1105,7 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
         fi
     fi
     print_phase "发布前全量自动化测试（失败即停止）"
-    MICROI_RELEASE_CANDIDATE="$PWD/.tmp/microi-release-gate/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
+    MICROI_RELEASE_CANDIDATE="$MICROI_RELEASE_GATE_DIR/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
     if ! node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
         print_fail "无法记录七个仓库的候选源码；已停止发布。"
     fi
@@ -1101,7 +1118,7 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
     fi
     if ! "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
         -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode Full -Configuration Release -SolutionPath "$SLN_FILE" \
-        -ResultsDirectory "$PWD/.tmp/microi-release-gate/$(date +%Y%m%d-%H%M%S)-$$"; then
+        -ResultsDirectory "$MICROI_RELEASE_GATE_DIR/$(date +%Y%m%d-%H%M%S)-$$"; then
         print_fail "全量测试未通过；本次版本仅在本地准备，已停止官方应用资源写入和平台发布。请修复后重跑，禁止跳过失败用例。"
     fi
     if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
@@ -1568,8 +1585,8 @@ if [ "$PUSH_NUGET" = true ]; then
 
     # 验证与上传共用原 find 的完整 NUL 清单，包含嵌套项目和不同 PackageId。
     # 不能另行枚举一级同名包，路径空格也不能按空白拆分。
-    _nupkg_list_file="$PWD/.tmp/microi-release-gate/nuget-upload-${VERSION}.nul"
-    _nupkg_check_file="$PWD/.tmp/microi-release-gate/nuget-upload-${VERSION}.check.nul"
+    _nupkg_list_file="$MICROI_RELEASE_GATE_DIR/nuget-upload-${VERSION}.nul"
+    _nupkg_check_file="$MICROI_RELEASE_GATE_DIR/nuget-upload-${VERSION}.check.nul"
     mkdir -p "$(dirname "$_nupkg_list_file")"
     if ! find Microi.Server -path "*/bin/Release/*.$VERSION.nupkg" -not -name "*.symbols.nupkg" -print0 > "$_nupkg_list_file"; then
         print_fail "无法读取本次完整 NuGet 待上传清单；禁止上传。"
@@ -1605,7 +1622,8 @@ if [ "$PUSH_NUGET" = true ]; then
                 node Microi.Server/tools/release-encryption.mjs package-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg" || print_fail "当前 NuGet 包未经核验或字节发生变化；禁止上传。"
             fi
             print_step "推送: $(basename "$_nupkg")"
-            if ! dotnet nuget push "$_nupkg" --api-key "$NUGET_API_KEY" --source "$NUGET_SOURCE" --skip-duplicate; then
+            # Package CAS 仍在每包上传前执行；此进程直接按 V3 服务索引上传，密钥不进 argv。
+            if ! node Microi.Server/tools/secure-nuget-push.mjs push "$_nupkg" "$CONFIG_FILE"; then
                 print_fail "NuGet 推送失败: $(basename "$_nupkg")"
             fi
             print_success "$(basename "$_nupkg")"
@@ -1749,7 +1767,7 @@ docker_push_plan() {
         print_fail "构建目录不存在: $build_dir"
     fi
 
-    local receipt="$PWD/.tmp/microi-release-gate/${plan_type}-artifact.json"
+    local receipt="$MICROI_RELEASE_GATE_DIR/${plan_type}-artifact.json"
     local receipt_mode=verify
     if { [ "$plan_type" = api ] && [ "$PUBLISH_BACKEND" = true ]; } || { [ "$plan_type" = client ] && [ "$BUILD_CLIENT" = true ]; }; then
         receipt_mode=capture
