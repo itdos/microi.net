@@ -61,7 +61,9 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
   }
  }
  Object.assign(files,await snapshotStandardInputs(root));
- const privateInputs=await snapshotReleaseComposition(root,options);
+ // Implicit composition belongs only to this actual workspace; explicit foreign contracts still fail.
+ const compositionOptions={...options,environment:options.environment??(path.resolve(root)===workspace?process.env:{})};
+ const privateInputs=await snapshotReleaseComposition(root,compositionOptions);
  if(privateInputs){
   for(const [key,value]of Object.entries(privateInputs.files)){
    if(Object.hasOwn(files,key)&&files[key]!==value)throw Error(`Private composition source collision: ${key}`);

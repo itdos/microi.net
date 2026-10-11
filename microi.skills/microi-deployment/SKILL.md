@@ -45,14 +45,32 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 
 私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，实际镜像和部署仍需独立回读。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
 
+Windows Git Bash 发布锁必须把当前 Shell 的 MSYS PID 经真实 `ps` 的 `WINPID` 映射成 Windows 原生 PID，再以原生 PID 和唯一令牌登记、释放；映射失败或持有者退出立即停止，不借用其它进程。中文旧热修复入口通过 PowerShell UTF-8 命令行与精确工作区路径核验，不能只看标签或因大小写规范化误拒绝已核验入口。API、PC、官网和 Agent 仍各自互斥，实际 Bash 与原生宿主回归必须通过后重新 Full。
+
+PowerShell 5/7 进程管理入口同时固定 UTF-8 控制台与管道输出；脚本有 UTF-8 BOM
+不代表错误流编码正确。用真实子进程强制继承旧代码页，核对非零拒绝状态、完整中文
+诊断和无非法 UTF-8；保留原锁与进程归属断言，再重新 Full。
+
 macOS 前端构建使用有界 `vm_stat` 探针，根据真实页大小读取空闲页与可回收文件页；匿名非活动页、压缩页和已包含的预读页不叠加。探针失败时回退原生空闲内存，Windows/Linux 保持既有方式；启动余量、95% 暂停与90%恢复及五秒稳定门禁均保留。统计错误应修正探针，正式发布保留内存门禁及共享进程；修复发布逻辑后重新 Full。
 
 DLL 加密脚本只在 Git Bash、MSYS 或 Cygwin 中转换 Windows 路径，优先使用 `cygpath`；macOS/Linux 必须保留原生绝对路径，不能把 `/Users` 或 `/usr` 误认为盘符。修复时先对隔离的构建副本执行原加密器，核对五个目标 DLL 的实际哈希变化及加密指纹，再由一键脚本重新执行 Full、加密和最终产物冒烟；不得以专项测试替代发布门禁。
+
+加密脚本被 `source` 引入时只提供函数，不执行发行入口。SQLite 回归使用真实解释器及隔离标准库，Windows 选择 `python`，其它宿主使用 `python3`；不能用假解释器或跳过 SQL 断言。字节契约下的包投影、内联源码以及官方资源目录的全部 JavaScript 接口、表事件和 Hook 模板均按 Git 的 LF 规则检出，不能忽略原始字节差异来通过测试。缺少发行运行产物时，可按同版本包正文的大小与 SHA-256 恢复；明确标记为制品恢复，不能报告为新的源码构建。
 
 只要检测到闭源项目源码，就必须具备完整的五项目加密链；源码不完整、加密脚本缺失都要硬失败，不能降级为 `HAS_ENCRYPT=false` 的开源模式。一键脚本由 `release-encryption.mjs` 保存五个实际 DLL 的加密前后 SHA-256，并要求每个 DLL 字节改变且匹配原加密器指纹。上传 NuGet 前检查真实 ZIP 中所有闭源 DLL；上传后端 Docker 前从不启动、不联网的临时容器读取实际镜像内五个 DLL，与加密回执逐字节哈希核对。缺回执、明文重编译覆盖、包或镜像中的旧 DLL 均阻止上传；最终渠道仍需独立回读，不以本地检查代替已发布证据。
 
 在线 AI 的 MCP 运行目录必须由已锁定依赖干净安装、编译和裁剪后完整复制。生产命令的符号链接应解析为真实文件并保留执行权限，不能依赖即将清理的临时目录；损坏、越界或循环链接在替换旧运行目录前失败，重新打包清除旧依赖残留。保留制品门禁对符号链接的拒绝规则，专项验证使用同一复制逻辑并核对清理临时目录后命令仍可运行；修复打包逻辑后重新 Full。
 
+
+私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，实际镜像和部署仍需独立回读。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
+
+组合环境只属于发行工具所在工作区；临时测试仓库和其它源码根显式传递自己的环境。不得把主发行环境传入隔离夹具，也不得吞掉显式错误组合；实际 CLI 继续严格验证全部四项属性。
+
+原生依赖审批在目标 Linux CLR 中验证完整程序集引用链及实际字节哈希。驱动扩展也属于交付依赖：Oracle Core 23.26.300 同时交付同版本 Azure、Kerberos、OCI、ConfigFile、AWS、GCP 六个官方扩展及传递依赖，以 `ProviderDependencyDeliveryTests` 验证真实装载，不连接云服务。缺文件、身份冲突和哈希变化继续失败关闭；先复现并修复包装，再重新 Full 和镜像回读，禁止跳过未执行的依赖或开放 V8/MCP 任意装载。
+
+包清单不能代替真实程序集引用：Oracle AWS 扩展还引用清单未声明的 AWSSDK.SQS，Dos.ORM 显式交付官方 4.0.100.15 包，并由 NuGet 统一 AWS Core。回归递归检查扩展引用链，仍保留 512 个程序集预算；诊断集中列出缺失项，正式验证继续拒绝缺失和身份冲突。
+
+System.Drawing.Common 的 .NET 10 支持库引用 System.Formats.Nrbf，Dos.Common 显式交付同版本官方包；该文件不能从 WindowsDesktop 共享框架复制来冒充 Linux 制品。通过真实引用装载回归和 Linux 依赖验证，保留 Windows GDI 平台限制，Linux 绘图使用既有 SkiaSharp。
 | 场景 | 推荐入口 |
 |---|---|
 | 生产 Linux、快速安装、可滚动升级 | Docker/Compose |
@@ -152,6 +170,7 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
 - API 启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`；官网/Agent 不阻塞二者。旧全局锁仅在真实命令入口和状态目录证明 API 热修复或 Agent 归属后缩小阻塞范围，未知锁仍阻塞，不能删除活跃锁。
 - Windows 发布前调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease -ReleaseScope api|pc|all`。API 仅处理匹配工作区的后端与 Release DLL；PC 仅处理匹配的 Vite；官网不清理二者。禁止按进程名全机清理。
 - PC/API 各自保留完整 Full 门禁；Full 的 restore/build/test/package audit 输出统一隔离到本次结果目录 `.net-artifacts`。并行验收使用独立结果目录、测试服务/端口及隔离租户；共享版本与跨产品源码先冻结，测试期间不得修改。资源排队依据为当前并行阶段预算之和与系统余量，不使用单一全局发布窗口。
+- 测试进程的 `MICROI_TEST_REPOSITORY_ROOT` 必须绑定本轮源码工作区；源码定位核对真实项目文件，不能把 SDK 产物中的同名目录当成源码。内存诊断保留子进程隔离，只使用当前 Configuration 和当前输出布局对应的夹具 DLL，缺失即失败，禁止借用旧 Debug 产物。诊断守护器的调用参数与报告路径必须属于同一次尝试，历史报告不可用于本轮放行。
 - Vite 以相对 `node_modules/vite/bin/vite.js` 启动且父进程退出时，命令行可能没有绝对工作区路径。
   进程管理器只能把只读回读到的 CWD 精确等于当前 `Microi.Client` 作为补充证据；读取失败、
   CWD 属于其它目录或仅检测到孤儿状态时仍须失败关闭。回归同时覆盖当前工作区可精确停止、

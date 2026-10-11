@@ -83,3 +83,41 @@ test('无私有组合的旧候选与制品保持原有门禁语义',async()=>{
   const after={...before,composition:{schema:1}};assert.deepEqual(changedCandidate(before,after),['<private-build-composition>']);
  }finally{await cleanup(f.root);}
 });
+
+test('其它工作区的进程级组合不能污染临时仓库；显式错误组合仍失败关闭',async()=>{
+ const f=await fixture(),previous=process.env.MICROI_RELEASE_COMPOSITION_FILE;
+ try{
+  process.env.MICROI_RELEASE_COMPOSITION_FILE=path.join(path.dirname(f.root),'another-workspace','composition.json');
+  const isolated=await snapshotCandidate(f.root,['.']);assert.equal(isolated.composition,undefined);
+  await assert.rejects(snapshotCandidate(f.root,['.'],{environment:{MICROI_RELEASE_COMPOSITION_FILE:process.env.MICROI_RELEASE_COMPOSITION_FILE}}),/escapes/);
+  const explicit=await snapshotCandidate(f.root,['.'],f.options);assert.equal(explicit.composition.schema,1);
+ }finally{if(previous===undefined)delete process.env.MICROI_RELEASE_COMPOSITION_FILE;else process.env.MICROI_RELEASE_COMPOSITION_FILE=previous;await cleanup(f.root);}
+});
+
+test('Linux 平台目录的已审批 DLL 按完整发布路径验签，根目录同名文件不能替代',async()=>{
+ const f=await fixture(),name='publish/runtimes/unix/lib/net8.0/System.Data.SqlClient.dll';
+ try{
+  f.composition.artifacts=[{path:name,sha256:'a'.repeat(64)}];await writeFile(path.join(f.root,f.manifest),JSON.stringify(f.composition));
+  const candidate=await snapshotCandidate(f.root,['.'],f.options),files={'Dockerfile':'recipe','publish/api.dll':'api',[name]:'a'.repeat(64),'publish/System.Data.SqlClient.dll':'b'.repeat(64)};
+  const receipt={schema:1,gate:'Full',candidate,files};assert.doesNotThrow(()=>verifyArtifact(receipt,candidate,files));
+  for(const value of [undefined,'b'.repeat(64)]){const changed={...files};if(value===undefined)delete changed[name];else changed[name]=value;assert.throws(()=>verifyArtifact({...receipt,files:changed},candidate,changed),/Private approved artifact/);}
+ }finally{await cleanup(f.root);}
+});
+
+test('嵌套审批制品仍拒绝路径穿越、空段、混合分隔符与发布目录外路径',async()=>{
+ const f=await fixture();
+ try{
+  for(const name of ['publish/../Rules.dll','publish/runtimes/../../Rules.dll','publish/./Rules.dll','publish//Rules.dll','publish/runtimes\\unix/Rules.dll','publish/C:/Rules.dll','/publish/Rules.dll','other/Rules.dll','publish/runtimes/%2e%2e/Rules.dll']){
+   f.composition.artifacts=[{path:name,sha256:'a'.repeat(64)}];await writeFile(path.join(f.root,f.manifest),JSON.stringify(f.composition));
+   await assert.rejects(snapshotCandidate(f.root,['.'],f.options),/Invalid private approved artifact/);
+  }
+ }finally{await cleanup(f.root);}
+});
+
+test('嵌套审批制品保持大小写重复拒绝，不能登记两份同一路径摘要',async()=>{
+ const f=await fixture(),name='publish/runtimes/linux/lib/net8.0/System.DirectoryServices.Protocols.dll';
+ try{
+  f.composition.artifacts=[{path:name,sha256:'a'.repeat(64)},{path:name.replace('linux','LINUX'),sha256:'b'.repeat(64)}];await writeFile(path.join(f.root,f.manifest),JSON.stringify(f.composition));
+  await assert.rejects(snapshotCandidate(f.root,['.'],f.options),/Duplicate private approved artifact/);
+ }finally{await cleanup(f.root);}
+});

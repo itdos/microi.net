@@ -67,6 +67,17 @@ public class BackendReleaseGateTests
         var route = $"apiengine/mci-system-observability-query--OsClient--{Uri.EscapeDataString(settings.OsClient)}--";
         var body = new JsonObject { ["Action"] = "Snapshot", ["IncludeHost"] = true, ["IncludeDocker"] = false, ["WindowMinutes"] = 1 };
         var result = await PostAndRequireSuccessAsync(client, route, body);
+        // 使用同一真实DiyToken/Managed/HTTP入口；读取节点目录不能变成规则授权或泄露其它租户的自由参数。
+        var native = JObject.Parse(result.ToJsonString())["Data"]?["FixedStepRuntime"];
+        Assert.NotNull(native);
+        Assert.Equal("fixed-step-installation/v1",native["Protocol"]?.Value<string>());
+        Assert.True(native["Available"]?.Value<bool>());
+        Assert.True(native["CurrentNodeOnly"]?.Value<bool>());
+        Assert.False(native["AuthorizationProof"]?.Value<bool>());
+        Assert.Matches("^[a-f0-9]{64}$",native["ApiAssemblyFileSha256"]?.Value<string>()??"");
+        var registrations=Assert.IsType<JArray>(native["Registrations"]);
+        Assert.InRange(registrations.Count,0,64);
+        Assert.All(registrations,row=>{Assert.Null(row["AssemblyPath"]);Assert.Null(row["Exception"]);Assert.Null(row["Sql"]);});
         var samples = JObject.Parse(result.ToJsonString())["Data"]?["Host"]?["Processes"];
         Assert.NotNull(samples);
         Assert.Equal("process-resources/v1", samples["Protocol"]?.Value<string>());
@@ -93,6 +104,7 @@ public class BackendReleaseGateTests
         using var denied = await anonymous.PostAsJsonAsync(route, body, TestContext.Current.CancellationToken);
         var deniedText = await denied.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.DoesNotContain("process-resources/v1", deniedText, StringComparison.Ordinal);
+        Assert.DoesNotContain("fixed-step-installation/v1",deniedText,StringComparison.Ordinal);
     }
 
     [Theory]

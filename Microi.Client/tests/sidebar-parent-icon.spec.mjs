@@ -10,7 +10,7 @@ const sidebar = fs.readFileSync(path.join(clientRoot, "src/layout/components/Sid
 const item = fs.readFileSync(path.join(clientRoot, "src/layout/components/Sidebar/Item.vue"), "utf8");
 
 test("only rendered parent menus opt in to the persistent icon surface", () => {
-    const leafBranch = sidebarItem.split('<el-menu-item\n            v-else-if="flyoutMode')[0];
+    const leafBranch = sidebarItem.split(/<el-menu-item\r?\n            v-else-if="flyoutMode/)[0];
     assert.doesNotMatch(leafBranch, /:is-parent=/);
     assert.equal((sidebarItem.match(/:is-parent="true"/g) || []).length, 2);
     assert.match(sidebar, /:is-parent="node\.hasChildren"/);

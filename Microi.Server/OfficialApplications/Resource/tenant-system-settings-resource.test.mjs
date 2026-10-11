@@ -142,7 +142,7 @@ test('disabled templates remain manageable while Managed V8 receives only a boun
   assert.match(listBranch, /HasSecret:\s*isSecret\s*&&\s*flag\(secretState\[text\(item\.Id\)\],\s*false\)/)
 
   const securityProjection = tenantSettingsFacadeSource.match(
-    /public DosResult GetTenantSystemSettingsSecurityProjection\(\)[\s\S]*?\n        \}\n\n        private static DosResult ResolveTrustedManagedCurrentUser/,
+    /public DosResult GetTenantSystemSettingsSecurityProjection\(\)[\s\S]*?\r?\n        \}\r?\n\r?\n        private static DosResult ResolveTrustedManagedCurrentUser/,
   )?.[0] || ''
   assert.ok(securityProjection)
   assert.match(securityProjection, /\["SecretStateById"\]\s*=\s*secretStateById/)

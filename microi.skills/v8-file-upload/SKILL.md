@@ -88,8 +88,12 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 官网客户端读取私有文件统一调用 `/apiengine/platform-private-file-url`，提交 `FilePathName` 或有界 `FilePathNames`，并按资源类型提供权威定位参数：普通表单字段使用 `FormEngineKey + FormDataId + FieldId + SysMenuId`；用户头像使用 `ResourceKind=UserAvatar + ResourceId=用户Id`；菜单/部门导入模板分别使用 `MenuImportTemplate`、`DeptImportTemplate` 与对应记录 Id。CAD 私有派生预览使用 `ResourceKind=FormFieldDerivedPreview`，除表单四元组外必须同时提交字段中保存的 `OriginalFilePathName` 和单个派生 `FilePathName`；后端只接受同目录同 basename 的 DWG→`_preview.dxf`、STEP/STP→`_preview.stl` 唯一映射，并在对象存在后签名。文件柜对象使用 `ResourceKind=FileManagerObject`，`ResourceId` 必须与单个 `FilePathName` 大小写精确相同，并提交能力探针返回的当前租户权威 `SysMenuId`；此类签名只允许平台超级管理员 DiyToken 会话，访问密钥和普通菜单用户一律拒绝。后端会从权威字段或对象存储重新读取并精确匹配路径；管理员也不能只传裸路径绕过对象引用，普通客户端禁止换取私有文件原始 Byte/Stream。旧 `/api/HDFS/GetPrivateFileUrl` 与 `/api/HDFS/MallFileUrl` 只保留令牌格式兼容并转发同一 Managed 接口，新代码不得继续引用。
 
+## 已提交应用的 CDN 特殊字符别名修复（强制）
+
+使用 i_app_cdn_backfill 的 RepairCommittedCdnAliases 前，必须读取[完整绑定、范围与并发边界](references/cdn-alias-repair.md)。保持默认 DryRun、原始字节哈希与 Base64 摘要分离，并独立回读实际 CDN 字节。
+
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=9402f7173710e8d110392f184119154a50187138ab7d698fce0b73b5f12123e2 -->
+<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=103f9fba40afae432102e8538ef5889d027b69adcde018cf28ea4521d836adb5 -->
 ## 核心 API
 
 | API | 说明 |
@@ -110,7 +114,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 MinIO SDK 7 的复制签名不匹配还可能来自带参数 MIME：SDK 对源 `Content-Type` 签名，却在 HTTP 请求中额外保留 `StringContent` 的默认 MIME。先在独立夹具核对源 MIME、重复头和真实存储返回，再升级后端复制传输修复；不能去掉 `charset`、关闭签名校验或下载后重传来伪造通过。修复后必须同时验证公私桶原始字节、精确 MIME、源元数据及源对象保留，固定入口恢复另覆盖主库权威、真实共享租约、双节点竞争和新进程重跑。取消/超时后保持原请求键，先回读目标再决定是否继续。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-001 sha256=d535a333639a9005f5d20f25e36e2753a11835380713c1bb063ae618e6cea4af -->
+<!-- microi-progressive:chunk id=v8-file-upload-001 sha256=75f69f74c9e9c6799fdddb39d14fa2e831886aa1f9e41a1388e37b7fb620b91e -->
 ## 第三方数据库附件迁移
 
 当第三方表只保存附件路径时，先用 `microi_inspect_external_database` / `microi_query_external_database` 或 `V8.Dbs.<DbKey>` 查询记录。`microi_import_external_attachment` 允许后端已确认的 `Level >= 9999` 当前用户直接提供 HTTP/HTTPS URL、API 节点可读的本机绝对路径或 UNC 路径。
@@ -127,7 +131,7 @@ MinIO SDK 7 的复制签名不匹配还可能来自带参数 MIME：SDK 对源 `
 可信后端 V8 可用 `V8.Http.GetResponse({ Url: url }).RawBytes` 下载，再用 `System.Convert.ToBase64String` 和 `V8.Method.Upload` 上传。该路径同样必须校验域名、大小、Content-Type、后缀和最终重定向目标。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=176e9f91705f20416e177d7dbdbd32fb8f81dff6ba0da1a45b533795d187f0e0 -->
+<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=2aec315a252c2738bc3055dd5840e31e4984c4fc884d9bbf059b585b302b389c -->
 ## 接收前端上传的文件
 
 前端发起文件上传时，平台自动把文件以 base64 形式注入到 `V8.FilesByteBase64`：
@@ -229,7 +233,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 生产 H5 不能只依赖 `uni.uploadFile`。页面从 `uni.chooseImage` 得到的 `tempFiles[0].file`、`tempFiles[0]`、`blob:` / `data:` 临时路径都要传给 `V8.uploadFile`，并设置 `preferFetch:true`；SDK 必须能用 `fetch + FormData` 兜底，否则线上可能报 `未找到 MicroiV8 上传适配器。`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=d02dfde4abd2349cd92de1daee129bc08ba42142b5f6229736588cb3e0dbf43c -->
+<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=ba21d592f1927ae9624bd76ba16782b4f3b5ee5356bf8ea4189e854587855b62 -->
 ## 跨平台文件同步登录会话
 
 文件柜、文件同步等需要连接另一套 Microi API 的工具，必须把远程平台视为独立登录会话：
@@ -243,42 +247,9 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 验收至少覆盖：登录成功显示身份、退出后 Token 清空、历史连接一键重连、删除连接、密文落库、服务重启后仍可解密、目标平台缺少能力接口时的升级提示。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-004 sha256=8393c7b2b7ce36e563843f43f42e9a06a8cb69fc7b792930912353d846ee769f -->
-## 空目录标记的受控恢复
-
-- 只需移除一个目录占位对象时，使用 `V8.HDFS.DeleteObject({FilePathName:'当前租户目录/', Limit:true/false, EmptyDirectoryOnly:true})` 并等待异步结果。必须是当前租户实际有效超级管理员的可信 V8/DiyToken 会话；不能使用参数中的 `_CurrentUser`、访问密钥或临时维护引擎代替授权。
-- HTTP/MCP 必须使用专用 `/api/HDFS/DeleteEmptyDirectoryMarker` / `microi_delete_empty_directory_marker`，显式选择桶并保留末尾 `/`。旧后端缺路由、非标准结果或成功缺少 `DeletionMode=EmptyDirectoryMarkerOnly` / `VerifiedAbsent=true` 均停止，绝不回退普通递归删除。
-- MCP 默认 dry run；执行 `confirmExecution` 精确等于 `filePathName`。旧 `/api/HDFS/DeleteObject` 不能作为缺少专用路由时的回退。路径拒绝租户根、跨租户、未知绝对前缀、URL、通配符与穿越。原始列表必须完整、大小明确为零，供应商只删精确标记 key，再完整回读；不允许前缀批量删除、忽略续页或把缺失 Size 默认成零。
-- 这不是零字节对象 CAS，也不证明历史 NoPUT。同 key 版本替换没有跨供应商统一条件 DELETE；执行前必须隔离原请求并排除活跃写入。保留历史/当前证据的区别；未知结果先只读回查，不换请求键、不清其它对象、不自动再次 PUT。
-
-## 下载远程文件并存到 HDFS
-
-```javascript
-// 1) 下载远程图片
-var resp = V8.Http.GetResponse({ Url: V8.Param.imageUrl });
-if (resp.StatusCode !== 200) return { Code: 0, Msg: '下载失败' };
-
-// 2) 转 base64 后上传到 HDFS
-var base64 = System.Convert.ToBase64String(resp.RawBytes);
-var fileName = V8.Method.NewGuid() + '.png';
-
-var upResult = V8.Method.Upload({
-  FilesByteBase64: { [fileName]: base64 },
-  Limit: false,
-  Path: '/imported',
-  OsClient: V8.OsClient
-});
-
-return upResult;
-```
-
-> 在 V8/Jint 中避免把 `resp.RawBytes` 直接塞进 `FilesByte`；序列化时可能变成数字/浮点数组，导致 `Unexpected token when reading bytes`。更稳的是 `System.Convert.ToBase64String(resp.RawBytes)` 后使用 `FilesByteBase64`。
-
-移动端公开图片优先使用 `.jpg` / `.png` / `.webp`。如果上传 `.svg`，必须确认对象存储返回正确 `Content-Type: image/svg+xml`，否则浏览器可能拦截或不渲染。
-
-<!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）
 仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
 - [references/progressive-01-公有桶-vs-私有桶.md](references/progressive-01-公有桶-vs-私有桶.md)：公有桶 vs 私有桶；接口直接响应文件（下载/导出）；通过 URL 列表批量下载并入库
 - [references/progressive-02-office-文件在线编辑版本号规则.md](references/progressive-02-office-文件在线编辑版本号规则.md)：Office 文件在线编辑版本号规则；ImgUpload / FileUpload 字段值兼容规则；安全注意
+- 处理空目录标记或远程下载前，读取[完整存储边界](references/progressive-03-空目录标记与远程下载.md)。
 <!-- microi-progressive:end -->

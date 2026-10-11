@@ -46,7 +46,12 @@ public static class InstallationVerifier
         while(pending.Count>0)
         {
             var assembly=pending.Dequeue();if(!seen.Add(assembly.FullName!))continue;
-            if(string.IsNullOrEmpty(assembly.Location)||!receipt.DependencyClosureSha256.TryGetValue(assembly.FullName!,out var expected)||!IsHash(expected)||TrustedRulesCatalog.Hash(File.ReadAllBytes(assembly.Location))!=expected)throw new InvalidOperationException("DependencyHashMismatch");
+            // 保持先验证清单再读文件的原顺序；排错只增加可信身份/hash，不对未批准依赖读文件或放宽拒绝。
+            if(string.IsNullOrEmpty(assembly.Location))throw DependencyHashDiagnostics.Failure(assembly.FullName,null,null,"MissingFile");
+            if(!receipt.DependencyClosureSha256.TryGetValue(assembly.FullName!,out var expected))throw DependencyHashDiagnostics.Failure(assembly.FullName,null,null,"MissingManifest");
+            if(!IsHash(expected))throw DependencyHashDiagnostics.Failure(assembly.FullName,null,null,"InvalidManifestHash");
+            var actual=TrustedRulesCatalog.Hash(File.ReadAllBytes(assembly.Location));
+            if(actual!=expected)throw DependencyHashDiagnostics.Failure(assembly.FullName,expected,actual,"ContentMismatch");
             foreach(var name in assembly.GetReferencedAssemblies())
             {
                 // netstandard引用System.Runtime 4.x实际可绑定net10的10.x；验证实际载入身份+hash，不能把声明版本当文件身份。

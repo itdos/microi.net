@@ -1,6 +1,8 @@
+extern alias BouncyCastleCurrent;
+
 using Jint;
 using Microi.net;
-using Org.BouncyCastle.Crypto;
+using BouncyCastleCurrent::Org.BouncyCastle.Crypto;
 
 namespace Microi.Tests.Common;
 

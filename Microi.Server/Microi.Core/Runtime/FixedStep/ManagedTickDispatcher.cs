@@ -22,19 +22,28 @@ public sealed class ManagedTickDispatcher : IManagedTickDispatcher
             var parameters=new JObject { ["OsClient"]=request.Tenant,["_InvokeType"]="Client",["Action"]="Advance",["RoomId"]=request.RoomId,["RequestId"]=request.RequestId };
             var raw=await MicroiEngine.ManagedCompatibilityApiEngine.RunManagedCompatibilityAsync(request.EngineKey,parameters,null,null,cancellationToken).ConfigureAwait(false);
             var result=JsonHelper.ToJObject((object)raw);
-            if(result==null||(int?)result["Code"]!=1)
+            return InterpretResult(result,request);
+        }
+    }
+
+    /// <summary>保留原提交与未知语义；诊断只记录固定类别，绝不返回 Msg、DataAppend 或请求内容。</summary>
+    internal static TickDispatchResult InterpretResult(JObject result,TickDispatch request)
+    {
+            int parsedCode;
+            int? resultCode=result!=null&&int.TryParse((string)result["Code"],out parsedCode)?parsedCode:(int?)null;
+            if(result==null||resultCode!=1)
             {
-                var code=(string)result?["Msg"];
-                if(code=="StalePumpBinding"||code=="StaleLease"||code=="RoomUnavailable"||code=="MultiplayerNotConfigured")return new TickDispatchResult{Status=DispatchStatus.StaleLease};
-                return new TickDispatchResult{Status=DispatchStatus.Unknown};
+                var message=result?["Msg"]?.Type==JTokenType.String?(string)result["Msg"]:"";
+                var code=resultCode==1001?"LoginRequired":resultCode==1002?"AuthenticationDenied":TickDispatchDiagnosticCodes.Safe(message);
+                if(message=="StalePumpBinding"||message=="StaleLease"||message=="RoomUnavailable"||message=="MultiplayerNotConfigured")return new TickDispatchResult{Status=DispatchStatus.StaleLease,DiagnosticCode=code,ResultCode=resultCode};
+                return new TickDispatchResult{Status=DispatchStatus.Unknown,DiagnosticCode=result==null?"EmptyManagedResponse":code,ResultCode=resultCode};
             }
             var data=result["Data"] as JObject;
-            if(data==null)return new TickDispatchResult{Status=DispatchStatus.Unknown};
-            if((string)data["Status"]=="StaleLease")return new TickDispatchResult{Status=DispatchStatus.StaleLease};
-            if((bool?)data["Committed"]!=true||(string)data["RequestId"]!=request.RequestId||(string)data["RoomEpoch"]!=request.RoomEpoch)return new TickDispatchResult{Status=DispatchStatus.Unknown};
+            if(data==null)return new TickDispatchResult{Status=DispatchStatus.Unknown,DiagnosticCode="MalformedManagedResponse",ResultCode=resultCode};
+            if((string)data["Status"]=="StaleLease")return new TickDispatchResult{Status=DispatchStatus.StaleLease,DiagnosticCode="StaleLease",ResultCode=resultCode};
+            if((bool?)data["Committed"]!=true||(string)data["RequestId"]!=request.RequestId||(string)data["RoomEpoch"]!=request.RoomEpoch)return new TickDispatchResult{Status=DispatchStatus.Unknown,DiagnosticCode="ReceiptMismatch",ResultCode=resultCode};
             var ttl=(long?)data["LeaseRemainingMs"]??0;
-            return new TickDispatchResult{Status=ttl>0?DispatchStatus.Committed:DispatchStatus.StaleLease,LeaseRemainingMs=ttl};
-        }
+            return new TickDispatchResult{Status=ttl>0?DispatchStatus.Committed:DispatchStatus.StaleLease,LeaseRemainingMs=ttl,DiagnosticCode=ttl>0?"":"StaleLease",ResultCode=resultCode};
     }
 }
 }

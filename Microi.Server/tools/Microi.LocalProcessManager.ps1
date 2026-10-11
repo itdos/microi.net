@@ -16,6 +16,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Preserve full Chinese diagnostics in native PowerShell and Git Bash pipes.
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Console]::OutputEncoding
 $isWindowsHost = $env:OS -eq 'Windows_NT'
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
