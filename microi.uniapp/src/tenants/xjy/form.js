@@ -10,7 +10,7 @@ import {
 import { findMenu, formatRegion, openForm } from '@/platform/business-runtime.js'
 import { canAddMenuRecord } from '@/platform/menu-permission.js'
 import {
-  TERMINATION_TABLE, TERMINATION_MENU_ID, terminationFromOrder,
+  TERMINATION_TABLE, terminationFromOrder,
   terminationOrderValues, bindTerminationOrder
 } from './contract-termination.mjs'
 import { normalizeUploadItems } from '@/platform/display.js'
@@ -1063,6 +1063,14 @@ function normalizeFollowupContactSelection(context, rows, requireNames = false) 
     throw new Error('联系人信息不完整，请重新选择联系人')
   }
   if (normalized.length) context.patchForm({ [contactName]: normalized })
+  return normalized
+}
+
+function isEffectiveFollowupVisit(contacts) {
+  // 与后台联系人字段事件保持同一口径：任一所选联系人在决策链上即为有效拜访。
+  return contacts.some((contact) =>
+    contact.GuanjianJCR === '关键决策人' || contact.GuanjianJCR === '决策线'
+  )
 }
 
 function selectedCustomer(context, payload = {}) {
@@ -1206,7 +1214,12 @@ async function loadFollowupContacts(context, customerId, clearSelection = false)
     }
     contactFields.forEach((field) => setLocalFieldOptions(field, rows))
     // zhy：联系人按平台对象数组契约保存数据源返回的完整行；兼容历史纯 Id 数组。
-    normalizeFollowupContactSelection(context, rows)
+    const selectedContacts = normalizeFollowupContactSelection(context, rows)
+    if (isFollowupAdd(context)) {
+      context.patchForm({
+        [fieldName(context, FOLLOWUP_FIELDS.effective, '是否有效拜访')]: isEffectiveFollowupVisit(selectedContacts)
+      })
+    }
   } catch (error) {
     contactFields.forEach((field) => {
       setLocalFieldOptions(field, [])
@@ -1224,7 +1237,7 @@ async function loadFollowupContacts(context, customerId, clearSelection = false)
 }
 
 function initializeFollowup(context) {
-  // zhy：新增跟进默认填充当前用户、当前时分、有效拜访及待审批状态。
+  // 新增跟进只预填人员、时间和审批状态；有效拜访由所选联系人决定。
   const user = currentUserOption()
   const updates = {}
   const userName = fieldName(context, FOLLOWUP_FIELDS.user, '跟进人')
@@ -1237,9 +1250,9 @@ function initializeFollowup(context) {
   if (!String((context.defaultValues || {})[timeName] || '').trim()) {
     updates[timeName] = currentMinuteTimestamp()
   }
-  if (!Object.prototype.hasOwnProperty.call(context.defaultValues || {}, effectiveName)) {
-    updates[effectiveName] = true
-  }
+  updates[effectiveName] = isEffectiveFollowupVisit(
+    normalizeFollowupContactSelection(context, [], false)
+  )
   context.patchForm({
     ...updates,
     ...followupApprovalDefaultValues({
@@ -2225,10 +2238,14 @@ export function getFieldActions(context, field) {
     return [{ key: 'xjy-termination-order-detail', label: field.Label || '查看订单详情', icon: '▤',
       disabled: !context.form.DingdanID }]
   }
+  // 订单下方已有断约申请关联面板及新增入口，暂时隐藏编号字段上的重复按钮。
+  // 若以后恢复快捷入口，需同时恢复 TERMINATION_MENU_ID 的导入。
+  /*
   if (isOrderForm(context) && context.mode === 'View' && name === 'dingdanbh' &&
     canAddMenuRecord(TERMINATION_MENU_ID, getUser() || {})) {
     return [{ key: 'xjy-order-termination', label: '断约申请', icon: '▤', position: 'label' }]
   }
+  */
   if (isCheckinEditable(context) &&
     (name === visitTargetNameField(context).toLowerCase() || label === '拜访对象')) {
     return [{
@@ -2501,6 +2518,20 @@ export async function handleFieldSelect(context, payload) {
       return { handled: true }
     }
   }
+  if (isFollowupForm(context) && payload?.multiple &&
+    String(payload.field?.Name || '').toLowerCase() === FOLLOWUP_FIELDS.contacts.toLowerCase()) {
+    // 原生多选先发 change 再发 select；使用本次事件值与原始行，避免读取上一次的联系人。
+    const contactField = findField(context, FOLLOWUP_FIELDS.contacts, '联系人')
+    const optionRows = (contactField?.options || []).map((option) => option.raw).filter(Boolean)
+    const selectedRows = Array.isArray(payload.raw) ? payload.raw : []
+    const values = Array.isArray(payload.value) ? payload.value : []
+    const contacts = values.map((value) => contactSubmitValue(value, selectedRows.concat(optionRows))).filter(Boolean)
+    context.patchForm({
+      [fieldName(context, FOLLOWUP_FIELDS.contacts, '联系人')]: contacts,
+      [fieldName(context, FOLLOWUP_FIELDS.effective, '是否有效拜访')]: isEffectiveFollowupVisit(contacts)
+    })
+    return { handled: true }
+  }
   if (isFollowupForm(context) && payload && !payload.multiple) {
     // zhy：用户切换客户后同步客户 Id，清空旧联系人并重新加载该客户的联系人。
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
@@ -2518,6 +2549,7 @@ export async function handleFieldSelect(context, payload) {
         [targetNameField]: targetName,
         [customerIdName]: context.state.followupCustomerId
       })
+      context.patchForm({ [fieldName(context, FOLLOWUP_FIELDS.effective, '是否有效拜访')]: false })
       await loadFollowupContacts(context, context.state.followupCustomerId, true)
       return { handled: true }
     }

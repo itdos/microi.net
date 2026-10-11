@@ -49,3 +49,9 @@
 回退时先停用六个新增角色按钮权限，再恢复 `shouhoudd_authorize_flow_action`、`shouhoudd_flow_capabilities`、`task_acceptance`、`shouhoudd_pingjia`、`shouhou_yanshou`、`Diy_ShouhouDD.SubmitBeforeServerV8` 的本次版本，并停用新接口 `shouhoudd_follow_up`；最后回退小程序本次页面/能力代码并核对线上菜单与角色授权。逐项恢复前必须备份当前资源，不能只撤销前端代码；历史验收、评价、日志与消息不能自动撤销。
 
 本迭代已通过 `npm run check:ui` 和更新后的 `npm run check:task-post-service-permission`（含六项隔离、旧入口拦截及 Vue 模板编译），线上回读确认六个按钮、五个客服/主管/经理角色的两项客服验收授权、专用接口和表单服务端守卫。`cs新版tab` 任务只做了线上只读及拒绝路径验证，未改变其验收或评价。由于当前构建机器物理内存仅余约 1.7 GB，本迭代没有再次执行完整微信小程序构建或上传发布；这两项需在资源充足后补验收，不能把上文上一迭代的构建结果当作本迭代的构建结果。
+
+## 返工来源唯一索引修复（2026-10-10）
+
+`ReworkSourceTaskId` 仅在客户验收失败生成返工任务时填写。普通任务的空字符串曾占用 `uq_shouhou_rework_source_task`，使第二次写入空字符串时报唯一键冲突。`Diy_ShouhouDD.SubmitBeforeServerV8` 已更新到 `v1.0.4`：普通新增将该字段设为 `NULL`，普通编辑保留原返工关联并将历史空值规范为 `NULL`。接口引擎的服务端新增默认不触发表单事件，因此数据库约束也必须兼容空字符串。
+
+当前租户使用 MySQL 5.7：物理表新增虚拟生成列 `ReworkSourceTaskIdUnique = NULLIF(ReworkSourceTaskId, '')`，先在该列创建唯一索引 `uq_shouhou_rework_source_nonblank` 并回读，再删除旧索引。这样普通任务的 `NULL` 或 `''` 都不占唯一名额，非空原任务 ID 仍只能关联一条返工任务。原有唯一的一条空字符串已按 Id 精确修正为 `NULL`；回读时 28146 条任务该字段均为 `NULL`。用一条带标记的空字符串任务验证新增成功后，已按精确 Id 和标记物理删除。其他环境升级须按相同先建后删顺序检查实际列、索引和数据，不可只删除旧唯一索引。
