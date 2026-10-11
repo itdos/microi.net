@@ -173,6 +173,11 @@ MCP 建模只使用：
 开关用 `int`。不得生成 `datetime/date/timestamp/float/double/boolean/bool/string/text/nvarchar`。
 前端设计器 JSON 中的历史默认类型不能覆盖服务器建模规则。
 
+可空 `Switch` 默认仍将空值按关闭显示；仅当后端明确定义“空值视为启用”时，
+给该字段设置 `Config.Switch.NullValue=1`。此时编辑控件与列表/卡片将空值显示为开启，
+但未触碰控件的表单模型保留原始 `NULL`，显式切换才提交 `0/1`；不要为了视觉状态
+设置 `DefaultValue=1` 或在表单加载时回写旧记录。其它 `Switch` 保持原行为。
+
 ## 选项字段
 
 `Select`、`MultipleSelect`、`Radio`、`Checkbox` 没有数据源时会显示空选项：

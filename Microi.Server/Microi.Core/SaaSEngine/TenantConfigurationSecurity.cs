@@ -129,7 +129,9 @@ namespace Microi.net
                 "WeChatMiniProgramEncodingAESKey",
                 "FaceApiKey",
                 "ChanjetOAuthState", "ChanjetAesKey", "ChanjetAppKey",
-                "WeChatTemplateAppSecret"
+                "WeChatTemplateAppSecret",
+                // TCP 入站监听端口与路由是主租户控制面策略，不进入可编辑 V8。
+                "TcpIngressEnable", "TcpIngressPort", "TcpIngressRulesJson"
             };
 
         private static readonly string[] StableSigningKeyFields =
@@ -152,7 +154,9 @@ namespace Microi.net
                 "DbConn", "DbType", "DbReadConn", "DbReadType", "DbMongoConnection",
                 "AuthSecret", "AuthSecretRotateVersion", "DomainName", "ServerTag",
                 "OwnerUserId", "OwnerPhone",
-                "LicenseProductType", "LicenseExpirationDate"
+                "LicenseProductType", "LicenseExpirationDate",
+                // 新租户不能继承主租户的监听端口和设备路由。
+                "TcpIngressEnable", "TcpIngressPort", "TcpIngressRulesJson"
             };
 
         private static readonly HashSet<string> SysConfigNeverCopyFieldSet =

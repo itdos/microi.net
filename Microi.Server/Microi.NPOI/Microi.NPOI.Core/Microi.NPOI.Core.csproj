@@ -2,7 +2,7 @@
   <Import Project="../NPOI.Build.props" />
   <PropertyGroup>
     <NpoiSourceModule>main</NpoiSourceModule>
-    <AssemblyName>NPOI.Core</AssemblyName>
+    <AssemblyName>Microi.NPOI.Core</AssemblyName>
     <RootNamespace>NPOI</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

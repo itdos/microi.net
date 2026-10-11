@@ -197,7 +197,7 @@ export default {
         modelValue: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = normalizeFormSwitchValue(newVal);
+                self.ModelValue = normalizeFormSwitchValue(newVal, self.field);
                 // 标记初始化已完成
                 if (self.isInitializing) {
                     self.$nextTick(() => {
@@ -209,7 +209,7 @@ export default {
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = normalizeFormSwitchValue(self.ModelProps);
+                self.ModelValue = normalizeFormSwitchValue(self.ModelProps, self.field);
                 // 标记初始化已完成
                 if (self.isInitializing) {
                     self.$nextTick(() => {
@@ -328,14 +328,14 @@ export default {
         GetFieldValue(field, form) {
             var self = this;
             if (field.AsName) {
-                return normalizeFormSwitchValue(form[field.AsName]);
+                return normalizeFormSwitchValue(form[field.AsName], field);
             }
-            return normalizeFormSwitchValue(form[field.Name]);
+            return normalizeFormSwitchValue(form[field.Name], field);
         },
         //必须
         ModelChangeMethods(item) {
             var self = this;
-            self.ModelValue = normalizeFormSwitchValue(item);
+            self.ModelValue = normalizeFormSwitchValue(item, self.field);
             self.$emit("ModelChange", self.ModelValue);
             self.$emit("update:modelValue", self.ModelValue);
         },

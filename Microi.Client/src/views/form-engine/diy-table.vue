@@ -713,7 +713,7 @@
                                                 v-for="lineField in GetListColumnLines(field)"
                                                 :key="'line-' + field.Id + '-' + lineField.Id"
                                                 class="module-composite-line"
-                                                :class="'is-' + GetPresentationTone(lineField)"
+                                                :class="'is-' + GetPresentationTone(lineField, scope.row)"
                                                 :style="GetPresentationFieldStyle(lineField)"
                                             >
                                                 <fa-icon v-if="lineField.Icon" :icon="lineField.Icon" />
@@ -736,7 +736,7 @@
                                                 <span
                                                     v-else
                                                     class="module-composite-chip"
-                                                    :class="'is-' + GetPresentationTone(trailingField)"
+                                                    :class="'is-' + GetPresentationTone(trailingField, scope.row)"
                                                     :style="GetPresentationFieldStyle(trailingField)"
                                                 >
                                                     <fa-icon v-if="trailingField.Icon" :icon="trailingField.Icon" />
@@ -1163,7 +1163,7 @@
                                                                 @open-table-child="OpenTableChildCell"
                                                                 @open-detail="OpenSpecialCellDetail"
                                                             />
-                                                            <span v-else class="card-title-tag" :class="'is-' + GetPresentationTone(tagField)" :style="GetPresentationFieldStyle(tagField)">
+                                                            <span v-else class="card-title-tag" :class="'is-' + GetPresentationTone(tagField, item)" :style="GetPresentationFieldStyle(tagField)">
                                                                 <fa-icon v-if="tagField.Icon" :icon="tagField.Icon" />
                                                                 {{ GetPresentationFieldValue(item, tagField) }}
                                                             </span>
@@ -1235,7 +1235,7 @@
                                                     v-show="HasPresentationFieldValue(item, rightField)"
                                                     :key="'right-' + rightField.Id"
                                                     class="card-right-field"
-                                                    :class="['is-' + GetPresentationTone(rightField), rightField.DisplayStyle ? 'is-' + rightField.DisplayStyle.toLowerCase() : '']"
+                                                    :class="['is-' + GetPresentationTone(rightField, item), rightField.DisplayStyle ? 'is-' + rightField.DisplayStyle.toLowerCase() : '']"
                                                     :style="GetPresentationFieldStyle(rightField)"
                                                 >
                                                     <span v-if="rightField.ShowLabel !== false" class="card-right-label">{{ rightField.Label }}</span>
@@ -1316,7 +1316,7 @@
                                         <div v-if="HasAnyPresentationFieldValue(item, CardMetaFieldList)" class="card-meta-row">
                                             <template v-for="metaField in CardMetaFieldList" :key="'meta-' + metaField.Id">
                                                 <template v-if="HasPresentationFieldValue(item, metaField)">
-                                                    <span class="card-meta-item" :class="'is-' + GetPresentationTone(metaField)" :style="GetPresentationFieldStyle(metaField)">
+                                                    <span class="card-meta-item" :class="'is-' + GetPresentationTone(metaField, item)" :style="GetPresentationFieldStyle(metaField)">
                                                         <fa-icon v-if="metaField.Icon" :icon="metaField.Icon" />
                                                         <span v-if="metaField.ShowLabel">{{ metaField.Label }} </span>
                                                         <span v-if="isMuban(metaField, { row: item })" v-safe-html:template="item[metaField.Name + '_TmpEngineResult']"></span>
@@ -1362,7 +1362,7 @@
                                                                 @open-table-child="OpenTableChildCell"
                                                                 @open-detail="OpenSpecialCellDetail"
                                                             />
-                                                            <span v-else class="card-bottom-tag" :class="'is-' + GetPresentationTone(tagField)" :style="GetPresentationFieldStyle(tagField)">
+                                                            <span v-else class="card-bottom-tag" :class="'is-' + GetPresentationTone(tagField, item)" :style="GetPresentationFieldStyle(tagField)">
                                                                 <fa-icon v-if="tagField.Icon" :icon="tagField.Icon" />
                                                                 <span v-if="tagField.ShowLabel">{{ tagField.Label }} </span>{{ GetPresentationFieldValue(item, tagField) }}
                                                             </span>

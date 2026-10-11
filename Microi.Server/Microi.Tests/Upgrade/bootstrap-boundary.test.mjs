@@ -69,6 +69,24 @@ test('恢复元数据、物理列和建表声明保持闭合', () => {
   }
 });
 
+test('启动包投影 SaaS 开关与 TCP 字段元数据，但不写租户配置值', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(upgrade, 'Resource/app.microi.bootstrap.json')));
+  const table = pkg.DiyTables.find(row => row.Name.toLowerCase() === 'sys_osclients');
+  assert.ok(table);
+  const byName = new Map(pkg.DiyFields.filter(field => field.TableId === table.Id).map(field => [field.Name, field]));
+  for (const name of ['MqttEnable', 'TcpIngressEnable']) {
+    const field = byName.get(name);
+    assert.equal(field.Component, 'Switch');
+    assert.equal(JSON.parse(field.Config).Switch.NullValue, 1);
+    assert.equal(Object.hasOwn(field, 'DefaultValue'), false);
+  }
+  for (const name of ['TcpIngressPort', 'TcpIngressRulesJson']) {
+    assert.ok(byName.has(name));
+    assert.ok(pkg.PhysicalColumns.some(column => column.TABLE_NAME.toLowerCase() === 'sys_osclients' && column.COLUMN_NAME === name));
+  }
+  assert.equal(pkg.DataSets.length, 0);
+});
+
 test('空旧库先创建声明表，再执行其索引，包括首个 DDL 分片', async () => {
   const {buildBootstrapPackage} = await import('../../OfficialApplications/Resource/build-bootstrap-package.mjs');
   const pkg = buildBootstrapPackage();

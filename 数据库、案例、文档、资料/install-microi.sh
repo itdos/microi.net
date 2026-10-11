@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Alibaba Cloud Linux 3 / Anolis、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-10-09 16:39:24
+# 版本：v2026-10-11 18:05:28
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -22,10 +22,11 @@
 # 端口分配规则：
 #   默认从 61600 开始寻找连续端口块，候选起点冲突时每次 +1，最多递增 100 次
 #   61600 高于 Linux 默认临时端口上限 60999；实际临时端口范围仍以宿主机 ip_local_port_range 为准
-#   第 1 个端口分配给 Web，第 2 个分配给 API；默认新装基础组件（含 OCR）占 8 个端口
+#   第 1 个端口分配给 Web，第 2 个分配给 API；MQTT/TCP 排在所有已选组件之后，不改变既有服务端口顺序
 #   默认顺序: Web, API, 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console, OCR
 #   复用已有 MySQL 时去掉主数据库端口；复用已有 MinIO 时去掉其 API/Console 两个端口
 #   LibreTranslate（默认安装）排在 OCR 之后；已停用的 Ollama/Qdrant 端口保留在所有推荐组件之后
+#   MQTT/TCP 最后分配宿主端口，分别映射同一 API 容器的 1883/1885；SaaS 开关只控制监听，不动态修改 Docker 映射。
 # ============================================================
 
 set -e
@@ -112,7 +113,7 @@ microi_install_ops() {
 }
 
 
-SCRIPT_VERSION="v2026-10-09 16:39:24"
+SCRIPT_VERSION="v2026-10-11 18:05:28"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -3982,6 +3983,7 @@ fi
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   PORT_LABELS+=("Ollama" "Qdrant-HTTP" "Qdrant-gRPC")
 fi
+PORT_LABELS+=("MQTT(microi-install-api)" "TCP(microi-install-api)")
 PORT_COUNT=${#PORT_LABELS[@]}
 
 check_port_in_use() {
@@ -4103,6 +4105,10 @@ else
   QDRANT_HTTP_PORT=""
   QDRANT_GRPC_PORT=""
 fi
+MQTT_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+TCP_INGRESS_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
 
 echo ''
 echo 'Microi：端口分配方案：'
@@ -4132,10 +4138,12 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
   printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
 fi
+printf '  %-18s %s\n' "MQTT:"          "${MQTT_PORT} -> API容器1883（SaaS控制监听）"
+printf '  %-18s %s\n' "TCP入站:"       "${TCP_INGRESS_PORT} -> API容器1885（SaaS控制监听）"
 echo '------------------------------------------------------------------'
 
-ALL_PORTS="${VUE_PORT} ${API_PORT}"
-FIREWALL_PORTS="${VUE_PORT} ${API_PORT}"
+ALL_PORTS="${VUE_PORT} ${API_PORT} ${MQTT_PORT} ${TCP_INGRESS_PORT}"
+FIREWALL_PORTS="${VUE_PORT} ${API_PORT} ${MQTT_PORT} ${TCP_INGRESS_PORT}"
 if [ "${DATABASE_SERVICE_MODE}" = 'managed' ]; then
   ALL_PORTS="${ALL_PORTS} ${DATABASE_PORT}"
   FIREWALL_PORTS="${FIREWALL_PORTS} ${DATABASE_PORT}"
@@ -5182,6 +5190,29 @@ ensure_runtime_main_tenant() {
   echo "Microi：主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} 已唯一就绪，JWT AuthSecret 已持久化；自定义恢复库中的原有子租户保持不变 ✓"
 }
 
+# 仅官方数据库包的新装默认开启 MQTT。自定义恢复库的旧租户配置绝不覆盖。
+enable_mqtt_for_official_install() {
+  [ "${SQL_SOURCE_MODE}" = 'official' ] || return 0
+  local table='' left='' right='' literal_prefix='' update_sql='' verify_sql='' readback=''
+  case "${DATABASE_CHOICE}" in
+    1|2) table='sys_osclients'; left='`'; right='`' ;;
+    3) table='[dbo].[sys_osclients]'; left='['; right=']'; literal_prefix='N' ;;
+    5|6) table='"sys_osclients"'; left='"'; right='"' ;;
+  esac
+  update_sql="UPDATE ${table} SET ${left}MqttEnable${right}=1 WHERE ${left}OsClient${right}=${literal_prefix}'${OS_CLIENT}' AND ${left}OsClientType${right}=${literal_prefix}'${RUNTIME_OS_CLIENT_TYPE}' AND ${left}OsClientNetwork${right}=${literal_prefix}'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(${left}IsEnable${right},0)=1 AND COALESCE(${left}IsDeleted${right},0)=0;"
+  verify_sql="SELECT 'MICROI_FRESH_MQTT_DEFAULT_READY' AS Marker FROM ${table} WHERE ${left}OsClient${right}=${literal_prefix}'${OS_CLIENT}' AND ${left}OsClientType${right}=${literal_prefix}'${RUNTIME_OS_CLIENT_TYPE}' AND ${left}OsClientNetwork${right}=${literal_prefix}'${RUNTIME_OS_CLIENT_NETWORK}' AND ${left}MqttEnable${right}=1 AND COALESCE(${left}IsEnable${right},0)=1 AND COALESCE(${left}IsDeleted${right},0)=0 GROUP BY ${left}OsClient${right},${left}OsClientType${right},${left}OsClientNetwork${right} HAVING COUNT(*)=1;"
+  if ! database_exec_sql "${update_sql}" > /dev/null; then
+    echo 'Microi：错误：官方新装主租户 MQTT 默认启用失败。' >&2
+    return 1
+  fi
+  readback=$(database_exec_sql "${verify_sql}" 2>&1 || true)
+  if ! printf '%s\n' "${readback}" | grep -q 'MICROI_FRESH_MQTT_DEFAULT_READY'; then
+    echo 'Microi：错误：官方新装主租户 MQTT 默认启用回读失败。' >&2
+    return 1
+  fi
+  echo 'Microi：官方新装主租户 MQTT 默认启用并已回读；仍须配置凭据或显式允许匿名连接 ✓'
+}
+
 if { [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; } \
   && [ "${DATABASE_SERVICE_MODE}" = 'managed' ]; then
   echo 'Microi：配置 MySQL 远程访问权限...'
@@ -5377,6 +5408,7 @@ echo 'Microi：定时任务已全部暂停并回读一致 ✓'
 echo "Microi：核对并初始化 SaaS 主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK}..."
 INSTALL_CURRENT_STAGE="步骤6/11 核对并初始化 SaaS 主租户"
 ensure_runtime_main_tenant
+enable_mqtt_for_official_install
 
 cleanup_database_import_temp
 echo 'Microi：数据库导入临时文件已清理；外部服务受限凭据将在整次安装退出时清理 ✓'
@@ -6205,6 +6237,8 @@ ${APP_API_EXTRA_HOSTS}
     privileged: true
     ports:
       - "${API_PORT}:80"
+      - "${MQTT_PORT}:1883/tcp"
+      - "${TCP_INGRESS_PORT}:1885/tcp"
     environment:
       - OsClient=${OS_CLIENT}
       - OsClientType=${RUNTIME_OS_CLIENT_TYPE}
@@ -6615,6 +6649,8 @@ else
   echo ""
 fi
 echo "API:         容器 microi-install-api,        端口 ${API_PORT}"
+echo "MQTT:        同一 API 容器，宿主端口 ${MQTT_PORT} -> 容器 1883/tcp（是否监听由 SaaS 开关决定）"
+echo "TCP入站:     同一 API 容器，宿主端口 ${TCP_INGRESS_PORT} -> 容器 1885/tcp（需完整规则）"
 echo "Client:      容器 microi-install-client,        端口 ${VUE_PORT}"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-app/"
 echo ""

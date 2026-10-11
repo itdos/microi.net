@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Microi.net
@@ -9,6 +9,7 @@ namespace Microi.net
         {
             try
             {
+                services.AddSingleton<MqttEnableState>();
                 services.AddSingleton<IMicroiMQTT, MicroiMQTT>();
                 services.AddHostedService<MicroiMqttHostedService>();
                 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【MQTT】插件成功！");

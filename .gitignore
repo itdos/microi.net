@@ -185,3 +185,11 @@ AI- Project-Temp/
 /output/pptx/microi-ai-development-framework-training-syllabus-light.pptx
 /output/pptx/microi-enterprise-application-training-syllabus-dark.pptx
 /output/pptx/microi-enterprise-application-training-syllabus-light.pptx
+
+# 本地交付与推广资料、测试输出及一次性 payload 不进入公开源码
+/output/
+/.agents/skills/yixiaoer/
+/payload.json
+/skills-lock.json
+**/.microi-e2e/artifacts/
+**/.tmp/

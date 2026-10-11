@@ -9,6 +9,8 @@ namespace Microi.net
     {
         Task StartServerAsync(OsClientSecret osclientModel = null);
         Task StopServerAsync();
+        /// <summary>按当前权威开关断开本节点已禁用租户的现有连接，不停止其它租户的 Broker。</summary>
+        Task DisconnectDisabledTenantsAsync();
         /// <summary>
         /// 旧版原生发布入口。由于没有可验证的租户上下文，实现必须拒绝调用。
         /// </summary>

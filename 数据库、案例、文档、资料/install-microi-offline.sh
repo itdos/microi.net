@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 离线安装脚本
 # 功能与在线安装完全一致，但所有资源从本地加载
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：2026-04-01
+# 版本：2026-10-11
 # ============================================================
 
 set -e
@@ -333,8 +333,8 @@ generate_random_data_dir() {
   echo "${dir}"
 }
 
-PORT_COUNT=10
-PORT_LABELS=("MySQL" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "Ollama" "Qdrant-HTTP" "Qdrant-gRPC" "API" "Web")
+PORT_COUNT=12
+PORT_LABELS=("MySQL" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "Ollama" "Qdrant-HTTP" "Qdrant-gRPC" "API" "Web" "MQTT" "TCP入站")
 
 check_port_in_use() {
   local port="$1"
@@ -353,7 +353,7 @@ check_port_in_use() {
   return 1
 }
 
-echo 'Microi：开始按规则分配端口（从 7000 开始顺序 +1，共 10 个端口）'
+echo "Microi：开始按规则分配端口（从 7000 开始顺序 +1，共 ${PORT_COUNT} 个端口）"
 echo ''
 
 PORT_BASE=7000
@@ -398,6 +398,8 @@ QDRANT_HTTP_PORT=$((PORT_BASE + 6))
 QDRANT_GRPC_PORT=$((PORT_BASE + 7))
 API_PORT=$((PORT_BASE + 8))
 VUE_PORT=$((PORT_BASE + 9))
+MQTT_PORT=$((PORT_BASE + 10))
+TCP_INGRESS_PORT=$((PORT_BASE + 11))
 
 echo ''
 echo 'Microi：端口分配方案：'
@@ -412,9 +414,11 @@ printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
 printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
 printf '  %-18s %s\n' "API:"           "${API_PORT}"
 printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
+printf '  %-18s %s\n' "MQTT:"          "${MQTT_PORT} -> API容器1883（SaaS控制监听）"
+printf '  %-18s %s\n' "TCP入站:"       "${TCP_INGRESS_PORT} -> API容器1885（SaaS控制监听）"
 echo '------------------------------------------------------------------'
 
-ALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT} ${API_PORT} ${VUE_PORT}"
+ALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT} ${API_PORT} ${VUE_PORT} ${MQTT_PORT} ${TCP_INGRESS_PORT}"
 
 echo ''
 echo '[步骤3/11] 端口分配完成 ✓'
@@ -1134,6 +1138,8 @@ services:
     privileged: true
     ports:
       - "${API_PORT}:80"
+      - "${MQTT_PORT}:1883/tcp"
+      - "${TCP_INGRESS_PORT}:1885/tcp"
     environment:
       - OsClient=iTdos
       - OsClientType=Product
@@ -1263,6 +1269,8 @@ echo "             数据目录: /microi/qdrant/storage"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-qdrant/"
 echo ""
 echo "API:         容器 microi-install-api,        端口 ${API_PORT}"
+echo "MQTT:        同一 API 容器，宿主端口 ${MQTT_PORT} -> 容器 1883/tcp（是否监听由 SaaS 开关决定）"
+echo "TCP入站:     同一 API 容器，宿主端口 ${TCP_INGRESS_PORT} -> 容器 1885/tcp（需完整规则）"
 echo "Client:      容器 microi-install-client,        端口 ${VUE_PORT}"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-app/"
 echo ""

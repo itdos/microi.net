@@ -11,7 +11,7 @@
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>$(NpoiSourceRoot)npoi.snk</AssemblyOriginatorKeyFile>
     <IsPackable>true</IsPackable>
-    <PackageId>Microi.$(MSBuildProjectName)</PackageId>
+    <PackageId>$(MSBuildProjectName)</PackageId>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <GeneratePackageOnBuild Condition="'$(Configuration)' == 'Release'">true</GeneratePackageOnBuild>
     <NoWarn>$(NoWarn);CS0618;SYSLIB0051</NoWarn>

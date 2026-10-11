@@ -13,11 +13,13 @@ namespace Microi.net
     internal sealed class MicroiMqttHostedService : BackgroundService
     {
         private readonly IMicroiMQTT _mqtt;
+        private readonly MqttEnableState _enableState;
         private readonly IHostApplicationLifetime _lifetime;
 
-        public MicroiMqttHostedService(IMicroiMQTT mqtt, IHostApplicationLifetime lifetime)
+        public MicroiMqttHostedService(IMicroiMQTT mqtt, MqttEnableState enableState, IHostApplicationLifetime lifetime)
         {
             _mqtt = mqtt;
+            _enableState = enableState;
             _lifetime = lifetime;
         }
 
@@ -37,21 +39,39 @@ namespace Microi.net
 
             var osClient = OsClient.GetConfigOsClient();
             if (osClient.DosIsNullOrWhiteSpace()) osClient = OsClientDefault.OsClient;
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                var client = OsClient.GetClient(osClient);
-                if (client?.OsClientModel?["MqttEnable"].Val<int>() != 1) return;
+                try
+                {
+                    var client = OsClient.GetClient(osClient);
+                    _enableState.Refresh(client);
+                    if (!_enableState.IsEnabled(osClient))
+                    {
+                        if (_mqtt.IsRunning) await _mqtt.StopServerAsync().ConfigureAwait(false);
+                    }
+                    else if (!_mqtt.IsRunning)
+                    {
+                        await _mqtt.StartServerAsync(client).ConfigureAwait(false);
+                        if (_mqtt.IsRunning)
+                            Console.WriteLine("Microi：【成功】【MQTT】插件启动成功！");
+                    }
+                    if (_mqtt.IsRunning)
+                        await _mqtt.DisconnectDisabledTenantsAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _enableState.DisableAll();
+                    if (_mqtt.IsRunning) await _mqtt.StopServerAsync().ConfigureAwait(false);
+                    MqttStartupDiagnostics.Report(osClient, "HostedRefreshFailed",
+                        MqttStartupDiagnostics.Describe(ex, 1883));
+                }
 
-                await _mqtt.StartServerAsync(client).ConfigureAwait(false);
-                if (_mqtt.IsRunning)
-                    Console.WriteLine("Microi：【成功】【MQTT】插件启动成功！");
-                // StartServerAsync 的失败分支已同时输出具体原因、解决方案和系统日志。
+                try { await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken).ConfigureAwait(false); }
+                catch (TaskCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             }
-            catch (Exception ex)
-            {
-                MqttStartupDiagnostics.Report(osClient, "HostedStartupFailed",
-                    MqttStartupDiagnostics.Describe(ex, 1883));
-            }
+
+            _enableState.DisableAll();
+            if (_mqtt.IsRunning) await _mqtt.StopServerAsync().ConfigureAwait(false);
         }
     }
 }

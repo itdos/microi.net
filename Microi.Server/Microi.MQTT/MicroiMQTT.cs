@@ -14,6 +14,7 @@ using MQTTnet;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
+using MQTTnet.Server.Disconnecting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -26,6 +27,13 @@ namespace Microi.net
     /// </summary>
     public class MicroiMQTT : IMicroiMQTT
     {
+        private readonly MqttEnableState _enableState;
+
+        public MicroiMQTT(MqttEnableState enableState)
+        {
+            _enableState = enableState ?? throw new ArgumentNullException(nameof(enableState));
+        }
+
         private MqttServer _mqttServer;
         public bool IsRunning { get; private set; }
 
@@ -51,6 +59,9 @@ namespace Microi.net
         private static readonly ConcurrentDictionary<string, string> _clientApiEngineCache
             = new ConcurrentDictionary<string, string>();
         private static readonly object _clientRegistrationSync = new object();
+        // 断开期间保留 ClientId，防止另一个租户趁旧连接退出时复用同一 Id 被误断开。
+        private static readonly HashSet<string> _clientIdsPendingAdministrativeDisconnect
+            = new HashSet<string>(StringComparer.Ordinal);
         private const char ClientKeySeparator = '\u001f';
         private const string InternalSenderPrefix = "__microi_internal__:";
         private const string TenantSessionItemKey = "Microi.MQTT.OsClient";
@@ -348,6 +359,8 @@ namespace Microi.net
             var connectionToken = Guid.NewGuid().ToString("N");
             lock (_clientRegistrationSync)
             {
+                if (_clientIdsPendingAdministrativeDisconnect.Contains(clientId))
+                    return false;
                 if (TryGetConnectedTenant(clientId, out existedTenant)
                     && !string.Equals(existedTenant, normalizedTenant, StringComparison.OrdinalIgnoreCase))
                 {
@@ -432,10 +445,10 @@ namespace Microi.net
             catch { return false; }
         }
 
-        private static bool IsMqttEnabled(OsClientSecret clientModel)
-            => clientModel?.OsClientModel?["MqttEnable"]?.Val<int>() == 1;
+        private bool IsMqttEnabled(OsClientSecret clientModel)
+            => clientModel != null && _enableState.IsEnabled(clientModel.OsClient);
 
-        private static string EnsureMqttTenantEnabled(string osClient)
+        private string EnsureMqttTenantEnabled(string osClient)
         {
             if (!TryResolveTenant(osClient, out var normalizedTenant, out var clientModel))
                 throw new InvalidOperationException("未找到 MQTT 租户配置。");
@@ -498,7 +511,9 @@ namespace Microi.net
             try
             {
                 if (!TryResolveTenant(osClient, out var normalizedTenant, out var clientModel)
-                    || !IsMqttEnabled(clientModel))
+                    || (!IsMqttEnabled(clientModel)
+                        && !(string.Equals(eventName, "StopServer", StringComparison.Ordinal)
+                             && _enableState.WasEnabledBeforeRefresh(normalizedTenant))))
                 {
                     WriteMqttDiagnostic(osClient, "TenantConfigurationMissing", "MQTT V8 事件未找到租户配置", $"Event={eventName}", 2, mqttParam?.ClientId);
                     return null;
@@ -665,7 +680,10 @@ namespace Microi.net
                 try
                 {
                     var mqttApiEngine = item.Value.OsClientModel?["MqttApiEngine"]?.Val<string>();
-                    if (IsMqttEnabled(item.Value) && !mqttApiEngine.DosIsNullOrWhiteSpace())
+                    var lifecycleEnabled = string.Equals(eventName, "StopServer", StringComparison.Ordinal)
+                        ? _enableState.WasEnabledBeforeRefresh(item.Value?.OsClient)
+                        : IsMqttEnabled(item.Value);
+                    if (lifecycleEnabled && !mqttApiEngine.DosIsNullOrWhiteSpace())
                     {
                         var key = item.Key;
                         // 每个租户独立 mqttParam，避免共享引用
@@ -864,15 +882,18 @@ namespace Microi.net
         /// <summary>
         /// 服务启停时为所有启用 MQTT 的租户各写一条 mci_mqtt_log 记录（ClientId/Topic 留空）。
         /// </summary>
-        private static async Task WriteServerLifecycleLogAsync(string type, string message)
+        private async Task WriteServerLifecycleLogAsync(string type, string message)
         {
             var snapshot = OsClient.ClientList.ToArray();
             var tasks = new List<Task>(snapshot.Length);
             foreach (var item in snapshot)
             {
-                // 仅对显式启用 MQTT 且配置了事件引擎的租户写日志。
+                // StopServer 使用本次停机前的快照；Refresh(0)/DisableAll 后仍须写停机日志。
                 var mqttApiEngine = item.Value.OsClientModel?["MqttApiEngine"]?.Val<string>();
-                if (!IsMqttEnabled(item.Value) || mqttApiEngine.DosIsNullOrWhiteSpace()) continue;
+                var lifecycleEnabled = string.Equals(type, LogTypeServerStop, StringComparison.Ordinal)
+                    ? _enableState.WasEnabledBeforeRefresh(item.Value?.OsClient)
+                    : IsMqttEnabled(item.Value);
+                if (!lifecycleEnabled || mqttApiEngine.DosIsNullOrWhiteSpace()) continue;
                 tasks.Add(WriteMqttLogAsync(item.Key, type, null, null, message));
             }
             if (tasks.Count > 0) await Task.WhenAll(tasks);
@@ -883,7 +904,7 @@ namespace Microi.net
         #region MQTT事件处理
 
         // 连接验证：解析租户 → 验证凭据 → 注册ClientId映射
-        private Task OnValidateConnection(ValidatingConnectionEventArgs args)
+        private async Task OnValidateConnection(ValidatingConnectionEventArgs args)
         {
             try
             {
@@ -891,7 +912,7 @@ namespace Microi.net
                 {
                     WriteMqttDiagnostic(OsClientDefault.OsClient, "ConnectionRejected", "MQTT 连接被拒绝", "ClientId 为空或包含非法字符。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 // 优先级：MQTT v5 OsClient > Username 租户前缀 > ClientId 租户前缀 > 精确主租户账号兼容。
@@ -908,7 +929,7 @@ namespace Microi.net
                     {
                         WriteMqttDiagnostic(OsClientDefault.OsClient, "UnknownTenantRejected", "MQTT 未知租户连接被拒绝", $"OsClient={explicitTenant}", 3, args.ClientId);
                         args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
-                        return Task.CompletedTask;
+                        return;
                     }
                 }
 
@@ -935,7 +956,7 @@ namespace Microi.net
                     if (!string.Equals(osClient, userPrefixTenant, StringComparison.OrdinalIgnoreCase))
                     {
                         args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
-                        return Task.CompletedTask;
+                        return;
                     }
                     effectiveUserName = args.UserName.Substring(userPrefixLength + 1);
                 }
@@ -956,7 +977,7 @@ namespace Microi.net
                     && !string.Equals(osClient, clientPrefixTenant, StringComparison.OrdinalIgnoreCase))
                 {
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 // 兼容没有传 OsClient/前缀的旧主租户客户端：只有用户名精确等于主租户 MqttAccount 才能选中主租户。
@@ -976,14 +997,14 @@ namespace Microi.net
                 {
                     WriteMqttDiagnostic(OsClientDefault.OsClient, "TenantResolutionFailed", "MQTT 连接未解析到租户，已拒绝", "请求未携带可识别的租户信息。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 if (!IsMqttEnabled(clientModel))
                 {
                     WriteMqttDiagnostic(osClient, "DisabledTenantRejected", "未启用 MQTT 的租户连接被拒绝", "租户未启用 MQTT。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 var mqttPwd = clientModel.OsClientModel?["MqttPwd"]?.Val<string>();
@@ -996,7 +1017,7 @@ namespace Microi.net
                 {
                     WriteMqttDiagnostic(osClient, "IncompleteCredentialRejected", "MQTT 子租户凭据不完整，已拒绝连接", "子租户必须配置独立账号和密码。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 if (isChildTenant)
@@ -1014,7 +1035,7 @@ namespace Microi.net
                     {
                         WriteMqttDiagnostic(osClient, "CredentialCollisionRejected", "MQTT 子租户凭据与其它租户重复，已拒绝连接", "检测到跨租户账号或密码重复。", 3, args.ClientId);
                         args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
-                        return Task.CompletedTask;
+                        return;
                     }
                 }
 
@@ -1025,21 +1046,42 @@ namespace Microi.net
                     {
                         WriteMqttDiagnostic(osClient, "CredentialRejected", "MQTT 用户名或密码不匹配，已拒绝连接", "凭据验证失败。", 3, args.ClientId);
                         args.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
-                        return Task.CompletedTask;
+                        return;
                     }
                 }
                 else if (!IsAnonymousAllowed(osClient, clientModel))
                 {
                     WriteMqttDiagnostic(osClient, "AnonymousRejected", "MQTT 匿名连接未启用，已拒绝连接", "租户未配置完整凭据且未启用 MqttAllowAnonymous。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
-                    return Task.CompletedTask;
+                    return;
+                }
+
+                // MQTTnet 持久会话按全局 ClientId 恢复。即使旧连接已断开，
+                // 也不能让另一个租户凭自身正确口令复用它的旧订阅和 SessionItems。
+                var server = _mqttServer;
+                if (server == null)
+                {
+                    args.ReasonCode = MqttConnectReasonCode.ServerUnavailable;
+                    return;
+                }
+                var existingSessions = await server.GetSessionsAsync().ConfigureAwait(false);
+                foreach (var session in existingSessions.Where(item =>
+                             string.Equals(item.Id, args.ClientId, StringComparison.Ordinal)))
+                {
+                    var sessionTenant = session.Items?[TenantSessionItemKey]?.ToString();
+                    if (IsSessionTenantCompatible(sessionTenant, osClient)) continue;
+                    WriteMqttDiagnostic(osClient, "PersistentSessionTenantCollisionRejected",
+                        "MQTT ClientId 持久会话归属与当前租户不一致，已拒绝连接",
+                        "请更换 ClientId 或清理旧会话。", 3, args.ClientId);
+                    args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
+                    return;
                 }
 
                 if (!TryRegisterConnectedClient(osClient, args.ClientId, args.SessionItems, out var existedOsClient))
                 {
                     WriteMqttDiagnostic(osClient, "ClientTenantCollisionRejected", "MQTT ClientId 跨租户冲突，已拒绝连接", $"ExistingOsClient={existedOsClient}", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 args.ReasonCode = MqttConnectReasonCode.Success;
@@ -1049,8 +1091,12 @@ namespace Microi.net
                 WriteMqttDiagnostic(OsClientDefault.OsClient, "ConnectionValidationFailed", "MQTT 连接验证异常", ex.ToString(), 3, args.ClientId);
                 args.ReasonCode = MqttConnectReasonCode.UnspecifiedError;
             }
-            return Task.CompletedTask;
         }
+
+        internal static bool IsSessionTenantCompatible(string sessionTenant, string requestedTenant)
+            => !string.IsNullOrWhiteSpace(sessionTenant)
+               && !string.IsNullOrWhiteSpace(requestedTenant)
+               && string.Equals(sessionTenant, requestedTenant, StringComparison.OrdinalIgnoreCase);
 
         // 客户端连接事件：触发对应租户的Connected V8事件
         private async Task OnClientConnected(ClientConnectedEventArgs args)
@@ -1261,21 +1307,119 @@ namespace Microi.net
 
         #endregion
 
+        public async Task DisconnectDisabledTenantsAsync()
+        {
+            var server = _mqttServer;
+            if (server == null || !IsRunning) return;
+
+            // 连接表在验证 CONNECT 时登记；只使用该可信路由，绝不按未经鉴权的 ClientId 前缀猜租户。
+            var candidates = new List<KeyValuePair<string, string>>();
+            lock (_clientRegistrationSync)
+            {
+                foreach (var item in _connectedClients)
+                {
+                    if (item.Value?.OsClient == null || _enableState.IsEnabled(item.Value.OsClient)) continue;
+                    var separator = item.Key.IndexOf(ClientKeySeparator);
+                    if (separator < 0 || separator == item.Key.Length - 1) continue;
+                    var clientId = item.Key.Substring(separator + 1);
+                    if (!_clientIdsPendingAdministrativeDisconnect.Add(clientId)) continue;
+                    candidates.Add(new KeyValuePair<string, string>(clientId, item.Value.OsClient));
+                }
+            }
+
+            foreach (var candidate in candidates)
+            {
+                try
+                {
+                    await server.DisconnectClientAsync(candidate.Key,
+                        new MqttServerClientDisconnectOptions
+                        {
+                            ReasonCode = MqttDisconnectReasonCode.AdministrativeAction
+                        }).ConfigureAwait(false);
+                    // MQTT 持久会话可能保留旧订阅。断开后删除该 ClientId 的会话，
+                    // 避免将来重新启用租户时恢复过期订阅。
+                    var sessions = await server.GetSessionsAsync().ConfigureAwait(false);
+                    foreach (var session in sessions.Where(item =>
+                                 string.Equals(item.Id, candidate.Key, StringComparison.Ordinal)))
+                    {
+                        var sessionTenant = session.Items?[TenantSessionItemKey]?.ToString();
+                        if (string.Equals(sessionTenant, candidate.Value, StringComparison.OrdinalIgnoreCase))
+                            await session.DeleteAsync().ConfigureAwait(false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteMqttDiagnostic(candidate.Value, "DisabledTenantDisconnectFailed",
+                        "MQTT 已关闭租户连接断开失败，下轮继续尝试", ex.Message, 3, candidate.Key);
+                }
+                finally
+                {
+                    lock (_clientRegistrationSync)
+                        _clientIdsPendingAdministrativeDisconnect.Remove(candidate.Key);
+                }
+            }
+
+            // 断开回调可能先清掉连接表；逐轮清理仍归属于禁用租户的离线持久会话。
+            // 没有可信租户标识的历史会话不能按 ClientId 猜测归属，保留以免误删其它租户。
+            try
+            {
+                var sessions = await server.GetSessionsAsync().ConfigureAwait(false);
+                foreach (var session in sessions)
+                {
+                    var sessionTenant = session.Items?[TenantSessionItemKey]?.ToString();
+                    if (string.IsNullOrWhiteSpace(session.Id)
+                        || string.IsNullOrWhiteSpace(sessionTenant)
+                        || _enableState.IsEnabled(sessionTenant)
+                        || !session.DisconnectedTimestamp.HasValue)
+                        continue;
+
+                    lock (_clientRegistrationSync)
+                    {
+                        if (_clientIdsPendingAdministrativeDisconnect.Contains(session.Id)
+                            || (TryGetConnectedTenant(session.Id, out var activeTenant)
+                                && !string.Equals(activeTenant, sessionTenant, StringComparison.OrdinalIgnoreCase)))
+                            continue;
+                        _clientIdsPendingAdministrativeDisconnect.Add(session.Id);
+                    }
+                    try
+                    {
+                        await session.DeleteAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        WriteMqttDiagnostic(sessionTenant, "DisabledTenantSessionDeleteFailed",
+                            "MQTT 已关闭租户持久会话删除失败，下轮继续尝试", ex.Message, 3, session.Id);
+                    }
+                    finally
+                    {
+                        lock (_clientRegistrationSync)
+                            _clientIdsPendingAdministrativeDisconnect.Remove(session.Id);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "DisabledTenantSessionSweepFailed",
+                    "MQTT 已关闭租户会话清理失败，下轮继续尝试", ex.Message, 3);
+            }
+        }
+
         public async Task StopServerAsync()
         {
-            if (_mqttServer == null || !IsRunning) return;
+            var server = _mqttServer;
+            if (server == null || !IsRunning) return;
 
             try
             {
                 // 修正：先解绑事件并停止 Broker（Broker 停止后客户端自动断开），最后再触发 StopServer V8 事件
-                _mqttServer.ValidatingConnectionAsync -= OnValidateConnection;
-                _mqttServer.ClientConnectedAsync -= OnClientConnected;
-                _mqttServer.ClientDisconnectedAsync -= OnClientDisconnected;
-                _mqttServer.InterceptingPublishAsync -= OnMessageReceived;
-                _mqttServer.InterceptingSubscriptionAsync -= OnInterceptingSubscription;
-                _mqttServer.RetainedMessageChangedAsync -= OnRetainedMessageChanged;
+                server.ValidatingConnectionAsync -= OnValidateConnection;
+                server.ClientConnectedAsync -= OnClientConnected;
+                server.ClientDisconnectedAsync -= OnClientDisconnected;
+                server.InterceptingPublishAsync -= OnMessageReceived;
+                server.InterceptingSubscriptionAsync -= OnInterceptingSubscription;
+                server.RetainedMessageChangedAsync -= OnRetainedMessageChanged;
 
-                await _mqttServer.StopAsync();
+                await server.StopAsync();
                 IsRunning = false;
                 _connectedClients.Clear();
                 _clientApiEngineCache.Clear();
@@ -1287,6 +1431,17 @@ namespace Microi.net
             catch (Exception ex)
             {
                 WriteMqttDiagnostic(OsClientDefault.OsClient, "BrokerStopFailed", "MQTT Broker 停止异常", ex.ToString(), 3);
+            }
+            finally
+            {
+                try { server.Dispose(); }
+                finally
+                {
+                    if (ReferenceEquals(_mqttServer, server)) _mqttServer = null;
+                    IsRunning = false;
+                    _connectedClients.Clear();
+                    _clientApiEngineCache.Clear();
+                }
             }
         }
     }

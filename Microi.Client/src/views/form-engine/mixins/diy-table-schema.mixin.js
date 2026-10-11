@@ -5,6 +5,7 @@ import { selectTableDataSourceFields } from "./table-field-data-source.js";
 import { tableAuditPreferenceKey, tableFieldPreferenceKey } from "../utils/user-table-column-preference.js";
 import { normalizeNotShowFields } from "../utils/not-show-fields.js";
 import { resolveDevComponentRenderSource } from "@/utils/framework-presentation.js";
+import { hasSwitchNullValueEnabled, normalizeFormSwitchValue } from "@/utils/form-switch-value.js";
 
 export default {
     methods: {
@@ -655,6 +656,15 @@ export default {
             var cfg = self._EnsureTableFieldConfig(field);
             if (!self.DiyCommon.IsNull(cfg.TextApend)) {
                 fuheWZ = " " + cfg.TextApend;
+            }
+
+            // 配置空值继承的开关在表单、列表和卡片中保持同一显示语义。
+            // 只格式化显式声明 NullValue=1 的字段，不改变旧 Switch 的原始值展示。
+            if (field.Component === "Switch" && hasSwitchNullValueEnabled({ Config: cfg })) {
+                var switchConfig = cfg.Switch || {};
+                return (normalizeFormSwitchValue(rawValue, { Config: cfg }) === 1
+                    ? (switchConfig.ActiveText || "已开启")
+                    : (switchConfig.InactiveText || "已关闭")) + fuheWZ;
             }
 
             var formattedValue = null;

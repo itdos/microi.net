@@ -53,6 +53,8 @@ services.AddMicroiCaptcha();
 services.AddMicroiJob(host.DatabaseConnection, host.DatabaseTypeName);
 // 注册 API 宿主传输层、MVC、鉴权、实时通信、压缩与 Swagger。
 services.AddMicroiApiTransport(builder, host.RedisConnection, host.ServerVersion);
+// 原始 TCP 是与 HTTP 独立的宿主传输端口；仅主租户明确配置后监听，业务仍由接口引擎处理。
+services.AddMicroiTcpIngress();
 
 Console.WriteLine("Microi：【成功】Microi所有初始化成功！");
 await builder.RunMicroiApiAsync(host);

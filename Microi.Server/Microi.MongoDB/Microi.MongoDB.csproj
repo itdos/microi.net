@@ -31,8 +31,8 @@
       <Pack>True</Pack>
       <PackagePath></PackagePath>
     </None>
-    <None Include="../ThirdParty/MongoDB.Driver/LICENSE.md" Pack="true" PackagePath="licenses/MongoDB.Driver.LICENSE.md" />
-    <None Include="../ThirdParty/MongoDB.Driver/provenance.json" Pack="true" PackagePath="licenses/MongoDB.Driver.provenance.json" />
+    <None Include="../Microi.MongoDB.Driver/LICENSE.md" Pack="true" PackagePath="licenses/MongoDB.Driver.LICENSE.md" />
+    <None Include="../Microi.MongoDB.Driver/provenance.json" Pack="true" PackagePath="licenses/MongoDB.Driver.provenance.json" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Resource\" />
@@ -48,7 +48,7 @@
   
   <ItemGroup>
     <PackageReference Include="MongoDB.Bson" Version="3.11.2" />
-    <ProjectReference Include="../ThirdParty/MongoDB.Driver/MongoDB.Driver.Compatibility.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../Microi.MongoDB.Driver/Microi.MongoDB.Driver.csproj" PrivateAssets="all" />
     <!-- 兼容程序集随 Microi.MongoDB 发布，不能声明一个并不存在的官方预发布 NuGet。
          保留其真实外部依赖，让以后正式 NuGet 消费者同样能还原完整运行闭包。 -->
     <PackageReference Include="DnsClient" Version="1.7.0" />
@@ -69,7 +69,7 @@
   </PropertyGroup>
   <Target Name="IncludeMongoCompatibilityAssembly" DependsOnTargets="ResolveReferences">
     <ItemGroup>
-      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Filename)' == 'MongoDB.Driver'" />
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Filename)' == 'Microi.MongoDB.Driver'" />
     </ItemGroup>
   </Target>
 </Project>
