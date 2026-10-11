@@ -71,7 +71,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/unity-integration.md` | unity-integration, v8-api-config, microi-client-frontend | Unity UPM、WebGL/Windows、多人租约、公屏、DiyToken 与 V8 通讯边界 |
 | `system-engine/visualization-engine.md` | page-engine, microi-ui | 3D、CAD、goView 与数据大屏能力边界 |
 | `system-engine/wf-engine.md` | v8-workflow | 工作流设计和事件 |
-| `v8-engine/ai-apiengine.md` | ai-engine, v8-api-config | AI 辅助接口引擎开发 |
+| `v8-engine/ai-apiengine.md` | ai-engine, v8-api-config, microi-system-delivery | AI 编程与短提示词；完整开发默认清单覆盖原推荐提示词 1–8 |
 | `v8-engine/api-engine.md` | v8-api-config, v8-utilities | 接口上下文、配置、分布式锁续租和调用 |
 | `v8-engine/apiengine-index.md` | v8-crud-api, v8-api-config | 接口引擎实战和规范 |
 | `v8-engine/form-engine.md` | v8-crud-api, v8-formengine-http, module-engine, microi-form-engine | FormEngine API、HTTP、原生查询身份/统计范围与按表主库策略 |
