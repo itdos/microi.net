@@ -56,10 +56,35 @@ public sealed class ApiEngineNestedIdentityTests
     {
         var request = new JObject { ["OsClient"] = "tenant-a", ["_InvokeType"] = "Client", ["_CurrentUser"] = User("ordinary-user", 0) };
         request["_CurrentUser"]!["ControllerProjection"] = "kept";
-        var result = await Run(Authenticated(), request);
+        var fixture = Authenticated();
+        var probe = Activator.CreateInstance(ProbeType.Value, fixture)!;
+        ProbeType.Value.GetMethod("BindHandoff")!.Invoke(probe, new object[] { request });
+        var result = await Invoke(probe, request, null, false);
         Assert.Equal("kept", result["_CurrentUser"]?["ControllerProjection"]?.Value<string>());
         Assert.Equal("Client", result["_InvokeType"]?.Value<string>());
         Assert.Equal(0, result["_CurrentUser"]?["Level"]?.Value<int>());
+        Assert.Equal(0, fixture.TokenReads);
+    }
+
+    [Fact]
+    public async Task UnboundSameTenantIdentity_CannotElevateTheValidatedToken()
+    {
+        var fixture = Authenticated();
+        var request = new JObject { ["OsClient"] = "tenant-a", ["_CurrentUser"] = User("forged-admin", 9999) };
+        request["_CurrentUser"]!["RoleIds"] = new JArray("admin-role");
+        var result = await Run(fixture, request);
+        Assert.Equal("ordinary-user", result["_CurrentUser"]?["Id"]?.Value<string>());
+        Assert.Equal(0, result["_CurrentUser"]?["Level"]?.Value<int>());
+        Assert.Empty(Assert.IsType<JArray>(result["_CurrentUser"]?["RoleIds"]));
+        Assert.Equal(1, fixture.TokenReads);
+    }
+
+    [Fact]
+    public async Task ParameterIdentityWithoutToken_IsRemovedRatherThanInventingAUser()
+    {
+        var result = await Run(new NestedIdentityFixture(), new JObject { ["_CurrentUser"] = User("forged-admin", 9999) });
+        Assert.Null(result["_CurrentUser"]);
+        Assert.Equal("header-tenant", result["OsClient"]?.Value<string>());
     }
 
     [Theory]
