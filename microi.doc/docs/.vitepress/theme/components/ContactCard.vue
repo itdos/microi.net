@@ -3,12 +3,12 @@
     <div class="contact-grid">
       <div v-for="person in contacts" :key="person.name" class="contact-card">
         <div class="card-inner">
-          <div class="qr-code">
+          <div class="qr-code" :class="{ 'wechat-profile-image': person.wechatProfileImage }">
             <img :src="person.qrCode" :alt="person.name" data-fancybox="gallery" />
           </div>
           <div class="card-content">
             <div class="name-section">
-              <div class="avatar">
+              <div class="avatar" :class="{ 'wechat-profile-image': person.wechatProfileImage }">
                 <img :src="person.avatar || person.qrCode" :alt="person.name" />
               </div>
               <div class="name-info">
@@ -54,6 +54,7 @@ interface Contact {
   name: string;
   role: string;
   qrCode: string;
+  wechatProfileImage?: boolean;
   avatar?: string;
   phone?: string;
   email?: string;
@@ -118,6 +119,53 @@ defineProps<{
 
 .qr-code img:hover {
   transform: scale(1.05);
+}
+
+/* 微信分享图保留原始文件与二维码像素，仅在页面中裁切二维码和头像的可视区域。 */
+.qr-code.wechat-profile-image {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 6px solid #fff;
+  box-sizing: content-box;
+  background: #fff;
+}
+
+.qr-code.wechat-profile-image img {
+  position: absolute;
+  width: 296px;
+  /* 官网页面通用图片样式限制 max-width，此处须保留截图的裁切比例。 */
+  max-width: none !important;
+  height: auto;
+  left: -48px;
+  top: -104px;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.avatar.wechat-profile-image {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 2px solid var(--vp-c-brand);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.avatar.wechat-profile-image img {
+  position: absolute;
+  width: 370px;
+  max-width: none !important;
+  height: auto;
+  left: -60px;
+  top: -40px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .card-content {
@@ -226,6 +274,18 @@ defineProps<{
   .qr-code img {
     width: 180px;
     height: 180px;
+  }
+
+  .qr-code.wechat-profile-image {
+    width: 180px;
+    height: 180px;
+  }
+
+  .qr-code.wechat-profile-image img {
+    width: 266.4px;
+    height: auto;
+    left: -43.2px;
+    top: -93.6px;
   }
 }
 </style>
