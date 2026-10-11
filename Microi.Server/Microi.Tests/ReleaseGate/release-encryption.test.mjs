@@ -253,9 +253,10 @@ print_phase(){ :; }; print_step(){ :; }; print_success(){ :; }; print_warning(){
 print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
 PUSH_NUGET=true; HAS_ENCRYPT=true; DLL_ENCRYPTED=true; NUPKG_REPLACED=true
 VERSION=8.5.2; PUBLISH_DIR=${quote(f.directory)}; MICROI_ENCRYPTION_RECEIPT=${quote(f.file)}
-NUGET_API_KEY=fixture; NUGET_SOURCE=fixture
-dotnet(){ printf 'UPLOAD_REACHED=%s\\n' "$*"; }
+MICROI_RELEASE_GATE_DIR="$PWD/.tmp/microi-release-gate"
+CONFIG_FILE=private-config.json
 node(){
+ if [[ "$1" == *secure-nuget-push.mjs ]]; then printf 'UPLOAD_REACHED=%s\\n' "$*"; return 0; fi
  ${quote(process.execPath)} "$@"; local result=$?
  if [ "$result" -eq 0 ] && [ "\$2" = packages ]; then
   ${mode==='after-scan-byte-drift'?`printf changed > ${quote(f.files[0])}`:mode==='after-scan-added-package'?`cp ${quote(f.files[0])} ${quote(extra)}`:':'}

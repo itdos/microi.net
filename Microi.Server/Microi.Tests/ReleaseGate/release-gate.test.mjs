@@ -40,6 +40,7 @@ for(const scenario of [
   const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:directory,encoding:'utf8',env:{...process.env,DOC_EXPECTED_USER:username,DOC_EXPECTED_PASSWORD:password},input:`
 print_info(){ :; }; print_step(){ :; }; print_success(){ :; }
 print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
+node(){ if [ "$2" = probe ]; then return 0; fi; command node "$@"; }
 DOCKER_REGION=hangzhou; DOCKER_NAMESPACE=your-namespace; DOCKER_USERNAME=your-username; DOCKER_PASSWORD=your-password
 ${reader}
 ${config}
@@ -139,6 +140,36 @@ test('release JSON reader handles numeric ports, escaped strings, BOM and nested
    assert.ifError(run.error);assert.equal(run.status,0,run.stderr);assert.equal(run.stdout,expected);
   }
  }finally{fs.unlinkSync(filename);fs.rmdirSync(directory);}
+});
+
+test('release-only gate directory override is absolute, keeps defaults and relocates every receipt',()=>{
+ const setup=source.slice(source.indexOf('# 发布进程专用输出目录'),source.indexOf('# 直接启动前端构建守护器'));
+ assert.match(setup,/MICROI_RELEASE_GATE_DIR="\$\{MICROI_RELEASE_GATE_DIR:-\$PWD\/\.tmp\/microi-release-gate\}"/);
+ const directory=fs.mkdtempSync(path.join(root,'.tmp','release gate path '));
+ const custom=path.join(directory,'external gate with spaces');
+ try{
+  for(const [value,passed] of [[custom,true],['relative-gate',false]]){
+   const env={...process.env,MICROI_RELEASE_GATE_DIR:value};
+   const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:directory,encoding:'utf8',env,input:`
+print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
+is_windows_shell(){ ${process.platform==='win32'?'return 0':'return 1'}; }
+${setup}
+printf 'GATE_DIR=%s\\n' "$MICROI_RELEASE_GATE_DIR"
+`});
+   assert.ifError(run.error);assert.equal(run.status,passed?0:17,run.stderr);
+   assert.equal(run.stdout.includes('GATE_DIR='),passed);
+  }
+  assert.ok(fs.statSync(custom).isDirectory());
+  assert.equal(fs.existsSync(path.join(directory,'relative-gate')),false);
+  for(const marker of [
+   'MICROI_ENCRYPTION_RECEIPT="$MICROI_RELEASE_GATE_DIR/api-encryption.json"',
+   'MICROI_RELEASE_CANDIDATE="$MICROI_RELEASE_GATE_DIR/candidate-',
+   '-ResultsDirectory "$MICROI_RELEASE_GATE_DIR/',
+   '_nupkg_list_file="$MICROI_RELEASE_GATE_DIR/',
+   '_nupkg_check_file="$MICROI_RELEASE_GATE_DIR/',
+   'local receipt="$MICROI_RELEASE_GATE_DIR/'
+  ])assert.ok(source.includes(marker),marker);
+ }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
 
 test('same-version Docker hotfix keeps full gates and excludes version and remote-resource publication',()=>{
@@ -245,7 +276,7 @@ test('selected versions are frozen before Full and every publication still waits
  const version=source.indexOf('# ─── 阶段（条件）: 更新版本号'),capture=source.indexOf('release-candidate.mjs capture');
  assert.ok(version>0&&version<begin&&begin<capture,'Full must test the selected release version, not the preceding version');
  assert.ok(source.indexOf('# 前端资源预检必须发生')<version,'Resource preflight must still precede version preparation');
- for(const marker of ['refresh-resources.mjs --publish','dotnet nuget push']){
+ for(const marker of ['refresh-resources.mjs --publish','secure-nuget-push.mjs push']){
    const offset=source.indexOf(marker);assert.ok(offset>end,`${marker} must follow the full-test gate`);
  }
  assert.equal(source.match(/print_step "更新 Directory\.Build\.props/g)?.length,1,'Selected version preparation must not execute twice');
