@@ -29,6 +29,7 @@ const contacts = [
     role: '渠道总监',
     qrCode: '/contact/zhouli.jpg',
     wechatProfileImage: true,
+    phone: '15869363069',
   },
   {
     name: '邵经理',
