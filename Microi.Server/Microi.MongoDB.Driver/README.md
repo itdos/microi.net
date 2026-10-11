@@ -13,7 +13,7 @@
 
 ## 源码拉取与 NU1105 排查
 
-`Microi.MongoDB.Driver.csproj`、`upstream-3.11.2.source.zip` 和 `Microi.Panel/Microi.Panel.csproj` 都属于根公开仓的普通文件。若还原提示找不到这两个项目文件，先在根仓检查 `git rev-parse HEAD`、`git ls-files Microi.Server/ThirdParty/MongoDB.Driver/MongoDB.Driver.Compatibility.csproj Microi.Server/Microi.Panel/Microi.Panel.csproj` 与磁盘上的实际文件。`git ls-files` 有记录但磁盘缺失时，检查本地 sparse checkout、下载/解压结果或防护软件；仓库记录也缺失时，拉取 Gitee `master` 最新提交或重新完整克隆。公开源码使用 `Microi.Server/Microi.net.sln`，它从 NuGet 获取独立闭源组件；不要把创建人内部的 `Microi.Anderson.sln` 当作公开构建入口。
+`Microi.MongoDB.Driver.csproj`、`upstream-3.11.2.source.zip` 和 `Microi.Panel/Microi.Panel.csproj` 都属于根公开仓的普通文件。若还原提示找不到这两个项目文件，先在根仓检查 `git rev-parse HEAD`、`git ls-files Microi.Server/Microi.MongoDB.Driver/MongoDB.Driver.Compatibility.csproj Microi.Server/Microi.Panel/Microi.Panel.csproj` 与磁盘上的实际文件。`git ls-files` 有记录但磁盘缺失时，检查本地 sparse checkout、下载/解压结果或防护软件；仓库记录也缺失时，拉取 Gitee `master` 最新提交或重新完整克隆。公开源码使用 `Microi.Server/Microi.net.sln`，它从 NuGet 获取独立闭源组件；不要把创建人内部的 `Microi.Anderson.sln` 当作公开构建入口。
 
 统一回归入口中的 `ReleaseGate/public-project-closure.test.mjs` 会扫描根仓跟踪的公开项目引用，并在驱动或面板项目缺失时失败。此检查只验证源码包完整性，不代替 MongoDB 3.6/7.x 的真实数据库兼容验收。
 
