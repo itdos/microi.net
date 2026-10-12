@@ -39,6 +39,25 @@ export function assertSourceUnchanged(expected, actual) {
   for (const name of sourceFiles) if (expected[name] !== actual[name]) throw new Error(`个人中心构建期间源码变化：${name}；请重建后发布。`);
 }
 
+export function assertCandidatePublished(git) {
+  // 两个既有官方远端均可交付源码；必须向实际服务器回读分支，不能仅凭本地 tracking ref 放行。
+  const refs = git(['for-each-ref', '--format=%(refname)', '--contains', 'HEAD', 'refs/remotes/origin/', 'refs/remotes/github-microi.net/']).split('\n').filter(Boolean);
+  for (const ref of refs) {
+    const match = /^refs\/remotes\/(origin|github-microi\.net)\/(.+)$/.exec(ref);
+    if (!match || match[2] === 'HEAD') continue;
+    try {
+      const expected = git(['rev-parse', ref]);
+      const remoteRef = `refs/heads/${match[2]}`;
+      const advertised = git(['ls-remote', '--exit-code', match[1], remoteRef]).split(/\r?\n/).some(line => {
+        const [hash, name] = line.trim().split(/\s+/);
+        return /^[a-f0-9]{40}$/.test(hash) && hash === expected && name === remoteRef;
+      });
+      if (advertised) return ref;
+    } catch { /* 单个官方远端不可达时，继续独立核验另一个官方远端。 */ }
+  }
+  throw new Error('候选提交尚未在 origin 或 github-microi.net 的实际远端分支核验发布。');
+}
+
 function main() {
   const source = Object.fromEntries(sourceFiles.map(name => [name, fs.readFileSync(path.join(project, name))]));
   validatePortalSource(source[sourceFiles[0]].toString(), source[sourceFiles[1]].toString(), source[sourceFiles[2]].toString());
@@ -52,8 +71,8 @@ function main() {
       if (sha(committed) !== hashes[name]) throw new Error(`发布源码尚未提交：${name}`);
     }
     // 冻结候选通常为 detached HEAD；检查远端分支包含该提交，不能要求候选另建发布分支。
-    const delivered = git(['for-each-ref', '--format=%(refname)', '--contains', 'HEAD', 'refs/remotes/origin/']).split('\n').filter(ref => ref && !ref.endsWith('/HEAD'));
-    if (!delivered.length) throw new Error('候选提交尚未推送到 origin 的任何分支。');
+    const delivered = assertCandidatePublished(git);
+    console.log(`候选源码远端回读通过：${delivered}`);
   }
   const snapshot = path.resolve(project, '../.tmp/microi-doc-build/account-portal-source.json');
   if (!process.argv.includes('--dist')) {
