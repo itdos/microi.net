@@ -1,0 +1,64 @@
+--- a/dns_sync_ip.js
++++ b/dns_sync_ip.js
+@@ -0,0 +1,8 @@
++/*
++ * V8 ApiEngine
++ * ApiEngineKey: dns_sync_ip
++ * Version: v1.0.1
++ * Function:
++ * - 定时读取固定公网客户端IP服务后按原有目标同步DNS；上游HTTP状态、正文、业务码及公网IPv4校验失败时在任何DNS写入前返回。CheckIpOnly=true/1仅验证当前API节点公网IP，不写DNS、缓存或清理日志；保留既有目标、凭据和缓存规则。
++ */
++
+@@ -11,10 +19,41 @@
+-//修改为从阿里云服务器获取IP
+-// var clientIPResult = V8.Method.GetClientIP();
+-var clientIPResult = V8.Http.Post({
+-  Url : 'https://api.nbweixin.cn/apiengine/get-client-ip'
+-});
+-clientIPResult = JSON.parse(clientIPResult);
+-if(clientIPResult.Code != 1){
+-  return clientIPResult;
+-}
+-var newIP = clientIPResult.Data;
++// 只从固定服务读取当前 API 的公网出口地址；失败时不得把空正文或代理内网地址写入 DNS。
++var clientIPResponse;
++try {
++  clientIPResponse = V8.Http.GetResponse({
++    Url: 'https://api.jifulii.com/apiengine/get-client-ip',
++    Headers: { osclient: 'xjy', apiengine: '1', 'Cache-Control': 'no-cache' },
++    Timeout: 15
++  });
++} catch (_) {
++  return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_TRANSPORT]' };
++}
++if (!clientIPResponse || !(Number(clientIPResponse.StatusCode) >= 200 && Number(clientIPResponse.StatusCode) < 300)) {
++  return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_HTTP_' + (clientIPResponse ? Number(clientIPResponse.StatusCode) || 0 : 0) + ']' };
++}
++var clientIPResult;
++try {
++  var clientIPContent = String(clientIPResponse.Content || '').trim();
++  if (!clientIPContent || clientIPContent.length > 4096) return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_BODY]' };
++  clientIPResult = JSON.parse(clientIPContent);
++} catch (_) {
++  return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_JSON]' };
++}
++if (!clientIPResult || Number(clientIPResult.Code) !== 1 || typeof clientIPResult.Data !== 'string') {
++  return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_RESULT]' };
++}
++var newIP = clientIPResult.Data.trim();
++// A 记录只接受规范的公网 IPv4，拒绝私网、回环、链路本地、文档与组播等特殊网段。
++function isPublicIPv4(value) {
++  if (!/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(value)) return false;
++  var octets = value.split('.').map(Number), a = octets[0], b = octets[1], c = octets[2];
++  if (octets.some(function(x) { return x > 255; })) return false;
++  return !(a === 0 || a === 10 || a === 127 || a >= 224 ||
++    (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
++    (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
++    (a === 192 && b === 0 && (c === 0 || c === 2)) ||
++    (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
++    (a === 203 && b === 0 && c === 113));
++}
++if (!isPublicIPv4(newIP)) return { Code: 0, Msg: '获取公网IP失败[INVALID_PUBLIC_IPV4]' };
++// 只读验收在任何 DNS 调用、缓存写入和日志清理前返回，便于核验生产节点出口。
++if (V8.Param.CheckIpOnly === true || V8.Param.CheckIpOnly === '1') return { Code: 1, Data: newIP, Msg: '公网IP只读校验成功' };
+
