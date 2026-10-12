@@ -214,7 +214,8 @@ for (const page of [nativeForm, moduleDetail, businessDetail]) {
   }
 }
 if (!businessCard.includes('card-bottom__links') ||
-  !businessCard.includes('查看详情') ||
+  businessCard.includes('查看详情') ||
+  !businessCard.includes('@tap="$emit(\'open\', row)"') ||
   !businessCard.includes('showActionMenu') ||
   !businessCard.includes("this.$emit('action'")) {
   fail('shared business card must preserve list row actions and detail navigation')

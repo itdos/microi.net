@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
+import './test-iot-empty-snapshot.mjs'
+
+const require = createRequire(import.meta.url)
+const { findSyncedXjyEngine } = require('./lib/workspace-paths.js')
+const projectRoot = fileURLToPath(new URL('..', import.meta.url))
+const readEngine = (key) => fs.readFileSync(findSyncedXjyEngine(projectRoot, key), 'utf8')
 
 function read(relativeUrl) {
   return fs.readFileSync(new URL(relativeUrl, import.meta.url), 'utf8')
@@ -13,13 +21,10 @@ const mallDetail = read('../src/pages/mall/detail.vue')
 const casebook = read('../src/pages/native/casebook.vue')
 const joinForm = read('../src/components/mci-join-form/mci-join-form.vue')
 const business = read('../src/tenants/xjy/business.js')
-const engineRoot = '../../Microi-V8-Engine/%E9%9B%86%E7%A6%8F%E9%B2%A4%E5%B9%B3%E5%8F%B0%20(api.jifulii.com)/xjy.Product.Internal/%E6%8E%A5%E5%8F%A3%E5%BC%95%E6%93%8E/'
-const businessRoot = engineRoot + '%E9%9B%86%E7%A6%8F%E9%B2%A4%E4%B8%9A%E5%8A%A1/'
-const uncategorizedRoot = engineRoot + '%E6%9C%AA%E5%88%86%E7%B1%BB/'
-const pointsEngine = read(businessRoot + '%E7%A7%AF%E5%88%86%E5%95%86%E5%9F%8E%E5%85%91%E6%8D%A2(xjy-integral-mall).js')
-const pdfEngine = read(businessRoot + '%E6%A1%88%E4%BE%8B%E5%86%8CPDF%E5%AF%BC%E5%87%BA(xjy-casebook-export-pdf).js')
-const snapshotEngine = read(businessRoot + '%E5%AE%A2%E6%88%B7%E8%AE%BE%E5%A4%87IoT%E5%BF%AB%E7%85%A7(xjy-device-iot-snapshot).js')
-const callbackEngine = read(uncategorizedRoot + '%5B%E4%B8%87%E8%83%BD%E6%9D%BF%5D%E6%8E%A5%E6%94%B6%E6%95%B0%E6%8D%AE(iot-receive-universal-board-data).js')
+const pointsEngine = readEngine('xjy-integral-mall')
+const pdfEngine = readEngine('xjy-casebook-export-pdf')
+const snapshotEngine = readEngine('xjy-device-iot-snapshot')
+const callbackEngine = readEngine('iot-receive-universal-board-data')
 
 assert.match(profile, /pointsMall:\s*true/)
 assert.match(profile, /casebookPdf:\s*true/)

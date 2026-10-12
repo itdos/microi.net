@@ -1,6 +1,6 @@
 <template>
   <view class="contract-totals" :class="{ 'contract-totals--compact': compact, 'contract-totals--collapsed': collapsible && !expanded }">
-    <view class="contract-totals__heading">
+    <view v-if="!compact || collapsible" class="contract-totals__heading">
       <text class="contract-totals__title">合同金额</text>
       <button v-if="collapsible" class="contract-totals__toggle" :aria-expanded="expanded"
         :aria-label="(expanded ? '收起' : '展开') + '合同金额'"

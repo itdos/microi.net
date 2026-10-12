@@ -62,8 +62,7 @@
           </view>
           <view class="data-card__foot">
             <text>{{ cardBottomText(row) }}</text>
-            <view class="data-card__links">
-              <text class="data-card__detail" @tap.stop="openDetail(row)">查看详情</text>
+            <view v-if="rowActions(row).length" class="data-card__links">
               <view v-if="rowActions(row).length" class="data-card__more" hover-class="data-card__more--pressed"
                 @tap.stop="openActionMenu(row)">
                 <view class="more-icon" aria-hidden="true"><view></view><view></view><view></view></view>
@@ -431,7 +430,6 @@ export default {
 .data-card__foot, .data-card__links, .data-card__more, .more-icon { display: flex; align-items: center; }
 .data-card__foot { justify-content: space-between; gap: 16rpx; min-height: 64rpx; padding: 8rpx 16rpx 8rpx 24rpx; border-top: 1px solid #edf2f4; color: #98a7ac; font-size: 21rpx; }
 .data-card__links { flex: 0 0 auto; gap: 8rpx; }
-.data-card__detail { padding: 14rpx 10rpx; color: #087da8; }
 .data-card__more { min-width: 102rpx; height: 64rpx; justify-content: center; gap: 8rpx; border-radius: 8px; color: #526d78; }
 .data-card__more--pressed { background: #edf5f8; }
 .more-icon { gap: 4rpx; }

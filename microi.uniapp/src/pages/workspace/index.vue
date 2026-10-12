@@ -56,6 +56,10 @@
       @refresherrefresh="refreshAll"
     >
       <view class="home-content">
+        <!-- #ifdef MP-WEIXIN -->
+        <!-- 暂时隐藏首页公众号关注栏，保留组件代码以便后续恢复。 -->
+        <!-- <official-account class="home-official-account" /> -->
+        <!-- #endif -->
         <!-- 权限未确定时只展示不可点击的结构占位，不泄露未授权菜单或借用上一账号内容。 -->
         <view v-if="homeMenuLoading" class="home-loading" aria-label="工作台加载中">
           <view class="section-heading home-loading__heading">

@@ -19,10 +19,14 @@ const businessActions = read('src/pages/business/utils/xjy-row-actions.js')
 
 assert.doesNotMatch(moduleList, /class="action-row"/, '通用列表不能把删除等次要操作直接平铺在卡片中')
 assert.doesNotMatch(businessCard, /class="card-actions"/, '业务卡片不能把删除等次要操作直接平铺在卡片中')
-assert.match(moduleList, /data-card__detail[\s\S]*?data-card__more/, '通用卡片右下角必须先显示查看详情，再显示更多')
-assert.match(businessCard, /detail-link[\s\S]*?more-link/, '业务卡片右下角必须先显示查看详情，再显示更多')
-assert.doesNotMatch(businessCard, /查看详情\s*›/, '业务卡片查看详情右侧不能显示箭头')
-assert.doesNotMatch(moduleList, /查看详情\s*›/, '通用卡片查看详情右侧不能显示箭头')
+assert.doesNotMatch(moduleList, /查看详情|data-card__detail/, '通用表单列表卡片底部不能显示查看详情')
+assert.doesNotMatch(businessCard, /查看详情|detail-link/, '业务列表及子表共用卡片底部不能显示查看详情')
+assert.doesNotMatch(relatedList, /collection-card__foot|collectionFooterLabel/, '集合样式子表卡片不能保留底部详情提示')
+assert.match(moduleList, /hover-class="data-card--pressed" @tap="openDetail\(row\)"/, '通用列表必须保留点击卡片打开详情')
+assert.match(businessCard, /class="data-card"[^>]*@tap="\$emit\('open', row\)"/, '业务及子表卡片必须保留点击卡片打开详情')
+assert.match(moduleList, /@tap\.stop="openActionMenu\(row\)"/, '通用卡片更多操作不能触发详情跳转')
+assert.match(businessCard, /@tap\.stop="showActionMenu"/, '业务及子表卡片更多操作不能触发详情跳转')
+assert.match(relatedList, /hover-class="collection-card--pressed" @tap="openDetail\(row\)"/, '集合样式子表必须保留点击卡片打开详情')
 assert.match(moduleList, /showRowActionSheet\(actions/, '通用卡片更多入口必须使用统一操作面板')
 assert.match(businessCard, /showRowActionSheet\(actions/, '业务卡片更多入口必须使用统一操作面板')
 
@@ -37,7 +41,7 @@ assert.match(actions, /params\.ModuleEngineKey/, '动作参数必须补齐模块
 assert.match(businessActions, /canDeleteMenuRecord\(menuId, user\)/, '定制业务删除也必须复用菜单删除权限')
 assert.match(relatedList, /appendStandardDeleteAction\(nativeActions\.concat\(configuredViewActions\)/,
   '客户详情及新增编辑页的关联 Tab 必须自动补充标准删除动作')
-assert.match(relatedList, /getBusinessRowActions\(this\.moduleKey, row, this\.currentUser, this\.menuId \|\| this\.childMenuId\)/,
+assert.match(relatedList, /getBusinessRowActions\(this\.moduleKey, row, this\.currentUser, this\.menuId \|\| this\.childMenuId, \{ menu: this\.menu, tableChildAuth: this\.tableChildAuth \}\)/,
   '关联 Tab 的定制删除动作必须校验子菜单删除权限')
 assert.match(relatedList, /tableChildAuth:\s*this\.tableChildAuth/,
   '关联 Tab 删除必须携带完整 TableChild 权限链')

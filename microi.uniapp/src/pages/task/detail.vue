@@ -98,6 +98,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
 import { canEditMenuRecord } from '@/platform/menu-permission.js'
+import { getTaskCardActions, taskNativeAction } from '@/tenants/xjy/task-card-actions.mjs'
 import { callApiEngine, findMenu, formatDateTime, openForm } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
 import { buildTaskTimeline, formatTaskLoadError } from '@/tenants/xjy/task-detail-presentation.mjs'
@@ -129,7 +130,7 @@ export default {
       id: '', task: {}, devices: [], taskCapabilities: [], merchantAcceptanceEnabled: true, customerAcceptanceEnabled: true, evaluationEnabled: true, capabilityError: '', currentUser: {}, loading: true, refreshing: false,
       stale: false, error: '', submitting: false, assignVisible: false, usersLoading: false, users: [],
       assignMode: 'service', supportReason: '',
-      metadataDefinition: null, taskMenuId: '', customerMenuId: '', expandedMetadata: {},
+      metadataDefinition: null, taskMenuId: '', taskMenu: null, pendingCardAction: '', customerMenuId: '', expandedMetadata: {},
       selectedUser: null, userKeyword: '', userSearchTimer: null, userLoadRequestId: 0, timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
       rejectVisible: false, rejectMode: 'merchant', rejectReason: '', evaluateVisible: false,
       evaluation: { rate: 5, deviceRate: 5, staffRate: 5, tags: [], content: '' },
@@ -222,14 +223,26 @@ export default {
   onLoad(options) {
     this.id = decodeURIComponent(options.id || '')
     this.currentUser = getUser() || {}
+    this.pendingCardAction = String(options.rowAction || '')
     // 仅进入任务页时初始化；预览返回触发 onShow 刷新时保留用户的展开状态。
     this.expandedMetadata = {}
-    this.loadAll()
+    this.loadAll(Boolean(this.pendingCardAction)).then(() => this.consumeCardAction())
   },
   onShow() { if (!this.loading && this.id) this.loadAll(true, false) },
   onUnload() { clearTimeout(this.userSearchTimer) },
   methods: {
     taskStateClass,
+    async consumeCardAction() {
+      const buttonId = this.pendingCardAction
+      this.pendingCardAction = ''
+      if (!buttonId || this.error) return
+      // 列表链接不能授予操作权限；进入详情后按最新菜单、任务状态和服务端流程能力再次核对。
+      const allowed = getTaskCardActions(this.task, this.taskMenu || {}, this.currentUser)
+        .some((entry) => entry.__viewAction.ButtonId === buttonId)
+      const nativeAction = allowed ? taskNativeAction(buttonId, this.task) : ''
+      if (!nativeAction) { uni.showToast({ title: '当前账号或任务状态不支持此操作', icon: 'none' }); return }
+      await this.runBottomAction(nativeAction)
+    },
     canRunTaskAction(action) { return this.taskCapabilities.includes(action) },
     async loadAll(refresh = false, showLoading = true) {
       if (!this.id) { this.error = '缺少任务编号'; this.loading = false; return }
@@ -275,6 +288,7 @@ export default {
         this.evaluationEnabled = capabilities.evaluationEnabled !== false
         this.metadataDefinition = definition || null
         this.taskMenuId = menuContext.taskMenu && menuContext.taskMenu.Id || ''
+        this.taskMenu = menuContext.taskMenu || null
         this.customerMenuId = menuContext.customerMenu && menuContext.customerMenu.Id || ''
         this.stale = taskResult.stale
       } catch (error) {

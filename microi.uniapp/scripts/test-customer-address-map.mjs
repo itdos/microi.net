@@ -2,13 +2,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import vm from 'node:vm'
+import { iotFormPresentation } from '../src/tenants/xjy/iot-form-presentation.mjs'
 
 // 执行真实租户展示钩子，避免只检查经纬度字段却漏掉地图挂载状态。
 const source = readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')
   .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*/g, '')
   .replace(/export default\s+/, 'const exported = ')
   .replace(/export\s+(?=(?:async\s+)?function\s)/g, '')
-const hooks = vm.runInNewContext(`${source}; exported`)
+const hooks = vm.runInNewContext(`${source}; exported`, { iotFormPresentation })
 
 function addressContext(mode = 'View', form = {}) {
   return { tableName: 'diy_kehudz', mode, form, state: hooks.createState() }

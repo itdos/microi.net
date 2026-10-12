@@ -2,6 +2,7 @@ import { callApiEngine, openForm } from '@/platform/business-runtime.js'
 import { V8, getUser } from '@/utils/request.js'
 import { removeCachePrefix } from '@/platform/cache.js'
 import { canDeleteMenuRecord } from '@/platform/menu-permission.js'
+import { getTaskCardActions } from '@/tenants/xjy/task-card-actions.mjs'
 import {
   createDeviceQrCodeAdapters,
   generateDeviceQrCode
@@ -167,7 +168,8 @@ export async function openInstallationPositionDevice(row = {}) {
   return deviceResult.Data
 }
 
-export function getBusinessRowActions(key, row = {}, user = getUser() || {}, menuId = '') {
+export function getBusinessRowActions(key, row = {}, user = getUser() || {}, menuId = '', context = {}) {
+  if (key === 'tasks') return getTaskCardActions(row, context.menu || { Id: menuId }, user, context)
   const actions = []
   if (key === 'orders' && sameTenant(row, user)) {
     const state = String(row.DingdanZT || '')
