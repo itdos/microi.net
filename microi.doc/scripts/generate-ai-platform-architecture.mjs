@@ -22,7 +22,8 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const workspaceRoot = path.resolve(repoRoot, '..')
-const outputDir = path.join(repoRoot, 'docs', 'public', 'images')
+// 新图只在忽略目录生成；官方 MCP 上传并回读后才推进 CDN 清单与公开文本元数据。
+const outputDir = path.join(workspaceRoot, '.tmp', 'microi-docs-images-generated', 'architecture')
 const svgPath = path.join(outputDir, 'microi-ai-platform-architecture.svg')
 const pngPath = path.join(outputDir, 'microi-ai-platform-architecture-1920x1080.png')
 const png4kPath = path.join(outputDir, 'microi-ai-platform-architecture-3840x2160.png')
@@ -263,7 +264,7 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
 fs.mkdirSync(outputDir, { recursive: true })
 fs.writeFileSync(svgPath, svg, 'utf8')
 
-// 官网 CDN 对旧静态路径使用一年 immutable 缓存：页面引用版本化文件避开旧对象，原文件名继续保留给历史链接。
+// 同时生成版本名与存量别名供上传映射使用；不得将二进制副本重新写回 docs/public/images。
 fs.copyFileSync(svgPath, versionedSvgPath)
 
 const require = createRequire(import.meta.url)

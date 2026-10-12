@@ -1,0 +1,269 @@
+# 🖨️ 打印引擎
+
+打印引擎用于在线设计并调用业务打印模板；先通过预览了解模板效果，再根据打印入口与终端类型选择服务端模板或蓝牙直连方案。
+
+标签机/小票机需要 TSC/TSPL、CPCL、ESC/POS、BLE 或 Android SPP 时，请使用独立的[蓝牙打印机](/doc/system-engine/bluetooth-printer)能力。它支持原有佳博 GP-M322 V8 零改动兼容 ZICOX CC4；Print Engine 的 `PageObj`/`PrintObj` 不能直接作为打印机原生命令发送。
+
+前端微服务需要打开平台普通打印预览时，通过 `microi.host.v1` 的
+`openPlatformPrint` 宿主动作传入 `mic_print.Id` 与当前租户同源的接口引擎数据地址；
+不要跨 iframe 访问父页面组件。该动作不是蓝牙代理，不发送 BLE/SPP 字节。完整参数、
+安全校验和“普通打印/蓝牙打印”选择见
+[蓝牙打印机：微服务同时提供普通打印与蓝牙打印](/doc/system-engine/bluetooth-printer#微服务同时提供普通打印与蓝牙打印)。
+
+> **在线制作打印模板，支持多种打印场景**
+
+---
+
+## 📸 预览图
+
+![打印引擎预览](https://file.microi.net/upload/img/csdn/6da046aeb97348f38412c01f51ee4e00.png#pic_center)
+
+
+![打印模板在线设计器](https://file.microi.net/upload/img/csdn/4e9f38b6897c4f258f3ca28a2b6534be.png#pic_center)
+
+
+## 打印引擎
+>* 之前吾码平台已支持在本地制作word导出打印模板，但并不能在线制作，并且打印前需要先导出word文件到本地后才能打印，因为诞生了吾码打印引擎
+>* 所有控件均支持数据源配置，可通过[**接口引擎**](https://microi.blog.csdn.net/article/details/143968454)来提供数据源
+
+## 试用地址
+>Microi吾码打印引擎：[https://microi.net/print-engine](https://microi.net/print-engine)
+
+>表结构,不管哪种方式集成,如果要持久化,那必须准备一张数据表,格式如下
+```json
+{
+    Id: '', //打印模板ID
+    Title: '', //模板标题
+    Number: '', //模板编号
+    Desc: '', //模板描述
+    DataApi: '', //数据接口
+    PageObj: {} //页面json对象,存储自行转字符串
+    PrintObj: {}, //动态打印对象,存储自行转字符串
+}
+```
+## npm组件集成方式
+### 绑定文本与格式化函数
+
+`text`、`longText` 的 `options.formatter` 使用
+`function(title, value, options, templateData)`：第一参数是标题，第二参数才是
+`field` 绑定的数据；文本控件还可能传第五个 `target`。表格单元格使用
+`formatter2(value, row, index, options)`，第一参数就是当前单元格值，第二参数是业务行，第三参数是列索引；不要把列索引当作业务行，也不要混用文本与表格签名。
+
+```javascript
+// 放入 options.formatter 的函数源码；业务文本必须编码后再进入打印 HTML。
+const formatter = function (title, value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
+```
+
+表格列应使用 `function(value){ return escapeText(value); }` 这一形式。验收必须检查实际打印 iframe 的商品、数量、单价及金额单元格；表头、合计正确并不能证明明细正确，设计画布的 testData 也不能作为实际打印数据。
+
+金额由业务后端计算并作为字符串传入，打印层不要转为 JavaScript `Number` 求和。
+更新已有模板时保留模板 `Id`，保存后回读 `PageObj`、`PrintObj`，再验证实际数据预览。
+多页表格需检查明细完整、续页表头、末页合计及条款；独立 PDF 正确不能代替平台宿主的
+真实打印预览验收。这是现有渲染器的调用合同，修正模板即可，无需后端协议升级。
+
+>超简单,一个Vue页面搞定,实在掏不出页面连路由都没有用App页面也行 通过组件方式集成到项目内,不会污染项目,而且升级扩展都是独立的,主打一个互不干扰,距离产生美.
+
+>npm i microi-printengine@latest
+
+>必须是Vue3 + Vite 项目, 任意页面即可集成 ,以下代码是集成demo
+::: details 展开查看 JavaScript 代码（56 行）
+```javascript
+<template>
+  <!-- 打印设计器 -->
+  <printDesigner :remoteObj="remoteObj" />
+</template>
+<script setup>
+  
+//引入组件
+import { printDesigner, EventBus, usePrintEngineStore } from 'microi-printengine' 
+//引入样式
+import 'microi-printengine/style.css' 
+
+//本地组件
+import { createPinia } from 'pinia'
+import { onMounted, onBeforeUnmount, ref } from 'vue'
+
+
+//状态机传参,npm包没包把pinia打包进去,正所谓巧妇难为无米之炊,给她传一个完事
+const pinia = createPinia()
+const printEngineStore = usePrintEngineStore(pinia)
+
+//传入数据,这个数据不知道什么格式,可以在设计器拖拽几个组件查看下页面JSON ,和渲染JSON一毛一样的
+const remoteObj = ref({})
+
+//模拟加载远程数据
+const loadFormData = () => {}
+
+onMounted(() => {
+  
+  //如果需要token,设置token,该token一经接收即刻存入pinia状态机,每次调用接口通过拦截器自动处理token头,无需每次手动写,持久化用的localStorage ,可以F12查看
+  printEngineStore.setToken('')
+  
+  //下面这一大串监听,其实也可以写到一个事件里,通过key value 键值对来区分,暂时先这么着吧
+  
+  //监听保存页面JSON事件
+  EventBus.on('savePrintJson', (savePrintJson) => {
+    console.log('savePrintJson', savePrintJson)
+  })
+
+})
+
+//销毁
+onBeforeUnmount(() => {
+  EventBus.off('savePrintJson')
+})
+</script>
+
+<style>
+.dark {
+  background: #252525;
+  color: white;
+}
+.light {
+  background-color: white;
+  color: black;
+}
+</style>
+```
+:::
+
+## iframe模式集成方式
+>这种模式说白了就是百搭,把低代码设计器当成一个在线工具,它是无状态的,不依赖任何前端和后端,高内聚低耦合,可集成任意平台.假以时日自定义扩展组件有上百个时,完全可以独当一面成为一方霸主,独立产品. 平台集成使用Iframe,把页面设计器嵌入到自己页面中,通过postMessage方式与父页面进行通信,父页面可以获取到设计器生成的页面JSON,也可以把token传给设计器
+
+>数据通信使用 postMessage 方式
+>父页面(对接平台)通过 postMessage 向子页面发送数据,这里主要传token ,子页面(页面设计引擎组件) 使用 window.addEventListener 监听并接收数据
+
+```javascript
+//设计引擎调用
+<template>
+<iframe ref="myIframe" id="iframe" src="https://www.nbweixin.cn/autoprint/"  frameborder="0" style="width: 100%; height: 100%"></iframe>
+</template>
+methods: {
+ sendMessageToIframe() {
+      const iframe = this.$refs.myIframe;
+      // 要发送的数据
+      const dataToSend = {
+        printEngineToken: "token 值"
+      };
+      // 使用 postMessage 发送数据给 iframe
+      iframe.contentWindow.postMessage(dataToSend, "*");
+  }
+ }
+```
+## Vue3组合式 集成demo
+::: details 展开查看 JavaScript 代码（107 行）
+```javascript
+<template>
+  <div v-loading="loading" class="iframe-container">
+    <iframe
+      ref="myIframe"
+      id="iframe"
+      :src="src"
+      frameborder="0"
+      width="100%"
+      height="730px"
+      @load="onIframeLoad"
+    ></iframe>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+const loading = ref(true)
+const src = ref('https://www.nbweixin.cn/autoprint/')
+
+const myIframe = ref(null)
+
+//模拟数据库数据
+const demoObj = {
+  Id: '001',
+  Title: '测试打印模板',
+  Number: '001',
+  Desc: '这是一个初始的默认测试模板,你应该按照这个格式建表',
+  DataApi: '',
+  PageObj: {
+    panels: [
+      {
+        index: 0,
+        name: 1,
+        paperType: 'A4',
+        height: 297,
+        width: 210,
+        paperHeader: 0,
+        paperFooter: 841.8897637795277,
+        printElements: [
+          {
+            options: {
+              left: 351,
+              top: 100.5,
+              height: 9.75,
+              width: 120,
+              field: 'keytext_01',
+              testData: '当你看到我的时候,就表示你成功了',
+              title: '传参测试',
+              qid: 'keytext',
+            },
+            printElementType: {
+              title: '键值文本',
+              type: 'text',
+            },
+          },
+        ],
+        paperNumberContinue: true,
+        watermarkOptions: {},
+        panelLayoutOptions: {},
+      },
+    ],
+  },
+  PrintObj: {},
+}
+
+// 监听 iframe 是否加载完成
+const onIframeLoad = () => {
+  console.log('Iframe 已加载完成')
+  loading.value = false
+  sendMessageToIframe()
+}
+
+const sendMessageToIframe = () => {
+  // 要发送的数据
+  const dataToSend = {
+    iframeToken: 'token_iframetest',
+    iframeFormData: JSON.stringify(demoObj),
+  }
+  // 使用 postMessage 发送数据给 iframe
+  myIframe.value.contentWindow.postMessage(dataToSend, '*')
+}
+
+//监听iframe 内部透传事件
+let printengineEvent = null
+printengineEvent = function (event) {
+  if (event.data) {
+    switch (event.data.key) {
+      //保存页面json
+      case 'savePrintJson':
+        console.log('已接到到来自iframe消息,savePrintJson', event.data.value)
+        let obj = JSON.parse(event.data.value)
+        console.log(obj)
+        break
+      default:
+        break
+    }
+  }
+}
+window.addEventListener('message', printengineEvent)
+onMounted(() => {})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('message', printengineEvent)
+})
+</script>
+
+<style lang="scss" scoped></style>
+```
+:::
+

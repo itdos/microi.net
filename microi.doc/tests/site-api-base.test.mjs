@@ -25,6 +25,6 @@ test('production website never keeps a localhost API base', () => {
 test('official website keeps ApiEngine URL stable and sends OsClient outside the path', () => {
   assert.equal(
     buildSiteApiEngineUrl(OFFICIAL_MICROI_API_BASE, 'send-sms-reg', 'iTdos'),
-    'https://api.itdos.com/apiengine/send-sms-reg'
+    'https://api.microi.net/apiengine/send-sms-reg'
   )
 })

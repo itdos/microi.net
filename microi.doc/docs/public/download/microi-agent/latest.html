@@ -22,14 +22,18 @@
       const channel = mac ? 'latest-mac.yml' : 'latest.yml'
       const message = document.getElementById('message')
       try {
-        const response = await fetch('https://api.itdos.com/microi-code/updates/latest/' + channel, { cache: 'no-store' })
+        const response = await fetch('https://api.microi.net/microi-code/updates/latest/' + channel, { cache: 'no-store' })
         if (!response.ok) throw new Error('HTTP ' + response.status)
         const yaml = await response.text()
         const urls = Array.from(yaml.matchAll(/^\s*-\s*url:\s*(https:\/\/\S+)\s*$/gm), match => match[1])
-        const target = urls.find(url => url.endsWith(mac ? '.dmg' : '.exe'))
-        if (!target || new URL(target).hostname !== 'static.itdos.com') throw new Error('更新清单中没有可信安装包')
+        const rawTarget = urls.find(url => url.endsWith(mac ? '.dmg' : '.exe'))
+        if (!rawTarget) throw new Error('更新清单中没有可信安装包')
+        const target = new URL(rawTarget)
+        if (target.protocol !== 'https:' || target.port || target.username || target.password || target.search || target.hash) throw new Error('更新清单中没有可信安装包')
+        if (target.hostname === 'static.itdos.com') target.hostname = 'file.microi.net'
+        if (target.hostname !== 'file.microi.net') throw new Error('更新清单中没有可信安装包')
         message.textContent = '正在前往吾码 CDN 下载…'
-        location.replace(target)
+        location.replace(target.href)
       } catch (error) {
         message.textContent = '暂时无法读取最新版下载地址：' + String(error.message || error) + '。请稍后重试。'
       }

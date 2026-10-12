@@ -91,18 +91,18 @@ test('Unity 桃源立即体验使用固定永久壳而不是不可变版本产�
   // 调用真实解析器保留旧入口契约；通用解析取代字面量映射后，测试不应依赖源码写法。
   const stableEntry = resolveStableApplicationEntry({
     AppKey: 'microi-unity-taoyuan', ApplicationType: 'MicroService',
-    PreviewUrl: 'https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-unity-taoyuan/releases/v1.0.0/requests/build/assets/index.html'
+    PreviewUrl: 'https://api.microi.net/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-unity-taoyuan/releases/v1.0.0/requests/build/assets/index.html'
   })
   assert.equal(
     stableEntry,
-    'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current'
+    'https://file.microi.net/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current'
   )
   assert.doesNotMatch(stableEntry, /\/releases\/|\/requests\/|\/versions\/|v\d+\.\d+\.\d+/i)
   const migrated = resolveStableApplicationEntry({
     AppKey: 'microi-unity-taoyuan', ApplicationType: 'MicroService',
     PublicPublishPath: '/itdos/micro-app/microi-unity-taoyuan/index.html'
-  }, 'https://microi.net', { fileServer: 'https://static.itdos.com', osClient: 'iTdos' })
-  assert.equal(migrated, 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html')
+  }, 'https://microi.net', { fileServer: 'https://file.microi.net', osClient: 'iTdos' })
+  assert.equal(migrated, 'https://file.microi.net/itdos/micro-app/microi-unity-taoyuan/index.html')
   assert.doesNotMatch(migrated, /\/releases\/|\/requests\/|\/versions\//i)
 })
 
@@ -156,12 +156,12 @@ test('官网保留已发布固定 CDN 入口，源码改动期间仍展示上一
       PublicPublishPath: '/itdos/micro-app/draft-app/index.html' }
   ]
   const result = new Function('V8', engineSource)({
-    Param: {}, SysConfig: { FileServer: 'https://static.itdos.com' },
+    Param: {}, SysConfig: { FileServer: 'https://file.microi.net' },
     FormEngine: { GetTableData: () => ({ Code: 1, Data: rows, DataCount: rows.length }) }
   })
   assert.deepEqual(result.Data.map(item => item.AppKey), ['committed-app'])
   assert.equal(result.Data[0].PreviewUrl,
-    'https://static.itdos.com/itdos/micro-app/committed-app/index.html')
+    'https://file.microi.net/itdos/micro-app/committed-app/index.html')
 })
 
 test('平台应用分类兼容旧名称，筛选不混入其它业务分类或私有应用', () => {

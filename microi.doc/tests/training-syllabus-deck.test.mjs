@@ -4,6 +4,8 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads.mjs'
+import { docAssets } from '../docs/.vitepress/theme/doc-assets.js'
+import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const staticPdfPaths = [
@@ -11,8 +13,8 @@ const staticPdfPaths = [
   verifiedTrainingAssetPath('/downloads/microi-ai-development-framework-training-syllabus-light.pdf'),
 ]
 const thumbnailRoots = {
-  dark: path.join(projectRoot, 'docs/public/images/training-deck/thumbs'),
-  light: path.join(projectRoot, 'docs/public/images/training-deck/thumbs-light'),
+  dark: '/images/training-deck/thumbs/',
+  light: '/images/training-deck/thumbs-light/',
 }
 
 function read(relativePath) {
@@ -118,7 +120,10 @@ test('presentation covers the complete technical learning path', () => {
   assert.match(component, /:href="entry\.href" target="_blank"/)
   assert.match(component, /href="\/case\/case-index\.html" target="_blank"/)
   assert.doesNotMatch(engineBlock, /id: 'datasource-engine'/u)
-  assert.doesNotMatch(component, /https?:\/\//u, 'the deck should not depend on remote media')
+  // 图片已按用户要求迁入 CDN；只允许清单绑定的原件，仍拒绝任意远程媒体依赖。
+  const declaredUrls = new Set(docAssets.map(asset => asset.url))
+  const remoteReferences = [...component.matchAll(/https?:\/\/[^\s"'<>]+/gu)].map(match => match[0])
+  for (const reference of remoteReferences) assert.ok(declaredUrls.has(reference), `undeclared remote media dependency: ${reference}`)
 })
 
 test('slide 03 presents a compact, persuasive Microi enterprise advantage matrix', () => {
@@ -204,20 +209,23 @@ test('pre-generated dark and light PDFs are published as stable high-quality dow
 
 test('the preview rail publishes a complete thumbnail set for each theme', () => {
   for (const [theme, root] of Object.entries(thumbnailRoots)) {
-    const files = fs.readdirSync(root).filter(name => /^slide-\d{2}\.webp$/u.test(name)).sort()
+    const thumbnails = docAssets.filter(asset => asset.legacyPath.startsWith(root)
+      && /^slide-\d{2}\.webp$/u.test(path.posix.basename(asset.legacyPath)))
+      .sort((left, right) => left.legacyPath.localeCompare(right.legacyPath))
+    const files = thumbnails.map(asset => path.posix.basename(asset.legacyPath))
     assert.equal(files.length, 47, `${theme} theme should contain all 47 thumbnails`)
     assert.equal(files[0], 'slide-01.webp')
     assert.equal(files.at(-1), 'slide-47.webp')
     for (const name of files) {
-      const file = fs.readFileSync(path.join(root, name))
+      const file = fs.readFileSync(verifiedDocAssetPath(`${root}${name}`, docAssets))
       assert.ok(file.length > 1_000, `${theme}/${name} should be a real rendered preview`)
       assert.equal(file.subarray(0, 4).toString('ascii'), 'RIFF')
       assert.equal(file.subarray(8, 12).toString('ascii'), 'WEBP')
     }
   }
 
-  const darkFirst = fs.readFileSync(path.join(thumbnailRoots.dark, 'slide-01.webp'))
-  const lightFirst = fs.readFileSync(path.join(thumbnailRoots.light, 'slide-01.webp'))
+  const darkFirst = fs.readFileSync(verifiedDocAssetPath(`${thumbnailRoots.dark}slide-01.webp`, docAssets))
+  const lightFirst = fs.readFileSync(verifiedDocAssetPath(`${thumbnailRoots.light}slide-01.webp`, docAssets))
   assert.notEqual(Buffer.compare(darkFirst, lightFirst), 0, 'light thumbnails must not reuse dark pixels')
 })
 
@@ -252,8 +260,8 @@ test('every internal training and case link resolves to a published source page'
     let sourcePath
     if (/^\/(?:doc|case)\/.*\.html$/u.test(pathname)) {
       sourcePath = path.join(projectRoot, 'docs', pathname.replace(/^\//u, '').replace(/\.html$/u, '.md'))
-    } else if (pathname.startsWith('/images/')) {
-      sourcePath = path.join(projectRoot, 'docs/public', pathname.replace(/^\//u, ''))
+    } else if (pathname.startsWith('/images/') || pathname.startsWith('https://file.microi.net/itdos/official-docs/images/')) {
+      sourcePath = verifiedDocAssetPath(pathname, docAssets)
     } else {
       continue
     }

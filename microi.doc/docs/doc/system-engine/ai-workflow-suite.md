@@ -1,0 +1,123 @@
+# 🧠 AI 工作流、业务蓝图、状态机与流程挖掘
+
+Microi吾码当前有多种“流程”能力。它们解决的问题不同，不能都当作审批流使用。
+
+## 📸 预览图
+
+<div class="mci-doc-screenshot-grid">
+  <figure>
+    <img src="https://file.microi.net/itdos/official-docs/images/4a380f5ec34ce68a55f3fe19310f00cd9e10e64fd11570cddd42122b350480db/202610/ai-workflow-relationship-graph.jpg" alt="Microi吾码 AI 工作流系统关系图，展示菜单、数据表、接口和流程之间的关联" data-fancybox="ai-workflow-suite-preview">
+    <figcaption>系统关系图：按资源类型探索当前租户的菜单、数据表、接口与流程依赖。</figcaption>
+  </figure>
+  <figure>
+    <img src="https://file.microi.net/itdos/official-docs/images/e16b76fa6657da10f3a14ec5abe8a847f2bc7e4cc6777168829931a87ae9d181/202610/ai-workflow-designer.jpg" alt="Microi吾码 AI 工作流设计器，展示业务节点、数据表、接口引擎和质量门禁编排" data-fancybox="ai-workflow-suite-preview">
+    <figcaption>业务流程设计：通过可视化节点编排数据、AI 生成、质量门禁与发布步骤。</figcaption>
+  </figure>
+</div>
+
+| 能力 | 解决的问题 | 核心数据/源码 |
+|---|---|---|
+| 审批工作流 v4 | 人员审批、会签、退回、抄送、条件路线 | `wf_flowdesign`、`wf_node`、`wf_line`；`Microi.Client/src/views/workflow/` |
+| AI 工作流 | 把表、字段、菜单、接口、V8 调用和审批流组织成可理解的系统关系图 | `Microi.AI/AiWorkflowService.cs`；`src/views/ai-workflow/` |
+| 业务架构蓝图 | 持久化业务域、系统、模块、表、接口、页面和流程之间的架构关系，并校验引用漂移 | `sys_blueprint*`；`src/views/blueprint/` |
+| 状态机 | 约束一条业务数据允许从什么状态跳到什么状态 | `sys_state_machine`、`sys_state_transition`、`sys_state_history` |
+| 自动化流 | 用 DAG 编排 HTTP、SQL、接口引擎、邮件、MQ、条件、延时等自动步骤 | `sys_flow_design`、`sys_flow_run`；`src/views/flow-engine/` |
+| 流程挖掘 | 从实际审批运行数据中分析路径、耗时、SLA 与瓶颈 | `V8McpLogic.ProcessMining.cs`；`src/views/process-mining/` |
+
+## AI 工作流
+
+AI 工作流会读取当前租户的表、菜单、接口引擎、V8 调用与工作流资源，形成可搜索的关系图。它适合回答：
+
+- 一个菜单最终依赖哪些表和接口？
+- 修改某个接口引擎可能影响哪些页面或流程？
+- 如何从一段业务描述生成初始系统关系图？
+- 如何保存一份可继续审阅的系统级 AI 工作流？
+
+前端入口为 `/ai-workflow`，服务端统一调用 Managed 接口引擎
+`/apiengine/platform-ai-workflow`，用 `Action=Overview/NodeDetail/GenerateFromPrompt/List/Get/Save/Delete`
+区分动作。接口由应用商城升级，C# 仅保留图谱计算原子能力；所有请求都重新绑定当前登录身份与
+OsClient，并要求当前租户超级管理员，它不是允许匿名读取整个租户结构的拓扑接口。
+
+关系图不会在页面打开时自动读取整个租户。管理员点击“加载概览”后，默认只请求轻量节点，并按
+资源类型公平截取最多 240 个节点；服务端允许的上限为 600。完整资源正文通过节点详情按需读取，
+避免大租户把数万张表、字段和接口一次性序列化并交给 X6 渲染。页面会同时显示“已渲染 / 可用”
+数量以及截断提示，搜索无命中时返回空图，不再回退成全量图。
+
+## 业务架构蓝图
+
+蓝图面向长期架构治理，不只是画图。设计器支持业务、系统、模块、表、接口、页面、流程等节点，多层切换、连线、自动布局、撤销/重做和版本维护。
+
+每次保存会维护蓝图历史与反向引用关系。发布或大改前执行蓝图验证，可以发现被删除或改名的表、接口、页面与流程引用。AI 使用时建议遵循：
+
+1. `microi_list_blueprints` 查找现有蓝图。
+2. `microi_get_blueprint` 读取当前架构事实。
+3. `microi_list_blueprint_history` 读取当前哈希；需要审计时用 `microi_get_blueprint_history`、`microi_compare_blueprint_versions` 或 `microi_export_blueprint`。
+4. 完成系统变更后调用 `microi_validate_blueprint`。
+5. 只有蓝图内容确实变化时才用 `microi_save_blueprint` 更新，并保留历史。
+6. 恢复旧设计时用 `microi_rollback_blueprint`，同时传 `ExpectedCurrentHash`；回滚会创建新版本而不是删除历史。
+
+历史快照使用稳定 JSON 哈希。保存和回滚在同一数据库事务中更新当前蓝图、历史和反向引用；并发哈希不一致时失败关闭，避免多人或多个 AI 静默覆盖。
+
+蓝图不会代替数据库权限、菜单权限或应用商城版本。它描述架构关系，真实资源仍由各引擎与数据库负责。
+
+## 状态机
+
+状态机与审批流互补：审批流回答“谁来审批”，状态机回答“这条数据能否从 A 进入 B”。一个状态机绑定业务表与状态字段，并定义：
+
+- 状态集合与初始状态；
+- `FromState → ToState` 合法跃迁；
+- 可选 `ConditionV8` 条件；
+- 可执行跃迁的角色；
+- 跃迁成功后触发的 `ActionApiEngineKey`；
+- 每次变更的历史记录。
+
+运行时通过 `TransitionState` 读取当前状态、匹配规则、校验身份，更新业务表并写入 `sys_state_history`。调用方仍需传真实业务记录 Id，不能由前端直接覆盖状态字段来绕过跃迁。历史静态列表路由 `/state-machine/list` 已下线；设计器源码仍保留，待以独立应用或菜单资源正式交付后再开放入口。
+
+## 自动化流
+
+自动化流使用 X6 设计器生成 JSON DAG。当前执行器支持的主要节点包括：
+
+- `start` / `end` / `set` / `log`；
+- `http` / `sql` / `apiengine`；
+- `email` / `mq`；
+- `if` / `delay`。
+
+每次运行创建 `sys_flow_run` 记录，保存输入、输出、步骤日志、耗时和错误。历史静态列表路由 `/flow-engine/list` 已下线；设计器源码仍保留，待以独立应用或菜单资源正式交付后再开放入口。
+
+::: warning 运行边界
+自动化流节点可以调用外部 HTTP、SQL、接口引擎、邮件和消息队列，属于可能产生副作用的运行能力。上线前应为业务副作用设计稳定幂等键，限制 SQL 与目标地址，并覆盖重复投递、超时和节点重启场景。设计器保存成功不等于真实业务链路已经验收。
+:::
+
+## 流程挖掘
+
+流程挖掘读取实际审批运行记录，而不是根据设计图猜测性能。当前提供：
+
+- 流程总览与实例统计；
+- 实际路径与热门路径；
+- SLA 超时实例；
+- 节点平均耗时与瓶颈分析；
+- 指定流程与日期区间筛选。
+
+历史静态入口 `/process-mining` 已下线。分析能力与服务端实现仍保留，待以独立应用或菜单资源正式交付后再开放入口。分析结果适合用于优化节点、审批人配置与 SLA，但不能仅凭平均耗时自动删除控制节点。
+
+同样，历史 `/blueprint/list` 静态入口已下线。业务蓝图、状态机、自动化流和流程挖掘是四种不同能力，不能再把这些路径统一指向 `/ai-workflow`；需要启用时应分别打包、配置菜单并验收。
+
+## 如何选择
+
+| 场景 | 推荐能力 |
+|---|---|
+| 请假、合同、采购需要多人审批 | [审批工作流 v4](/doc/system-engine/wf-engine) |
+| 订单只允许“待支付 → 已支付 → 已发货” | 状态机 |
+| 支付后要调用接口、发消息、写日志 | 接口引擎；步骤较多时使用自动化流 |
+| 想让 AI 理解现有系统依赖 | AI 工作流 |
+| 需要保存并校验业务架构 | 业务架构蓝图 |
+| 想知道审批到底卡在哪个节点 | 流程挖掘 |
+
+## 上线验收
+
+1. 使用非管理员角色验证菜单、表和接口权限。
+2. 对状态机覆盖合法跃迁、非法跃迁、并发重复请求与历史记录。
+3. 对自动化流覆盖每种节点失败、重试、超时、重复投递与外部服务不可用。
+4. 对审批流覆盖同一实例的多路线、退回、撤回、会签和消息通知。
+5. 至少用两个 API/Worker 节点连接同一数据库与 Redis 验证幂等和恢复。
+6. 用真实运行数据核对流程挖掘结果，不能只看空白演示图。

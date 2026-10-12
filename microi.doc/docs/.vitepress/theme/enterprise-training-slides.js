@@ -31,7 +31,7 @@ const enterpriseSlideDefinitions = [
       { title: '为什么选择', text: '复用成熟能力，专注业务差异。' },
       { title: '怎样证明', text: '从可验收的试点开始。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-01-ui.png', alt: 'AI 生成的 Microi吾码企业工作台界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 企业工作台' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/7a9488b16f3799d80363cf1921425c9ada3fef914405a25ee5cf8c3b45777676/202610/slide-01-ui.png', alt: 'AI 生成的 Microi吾码企业工作台界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 企业工作台' },
     sources: [{ label: '平台概览', href: '/doc/' }, { label: '公开案例', href: '/case/case-index.html' }],
   },
   {
@@ -44,7 +44,7 @@ const enterpriseSlideDefinitions = [
       { title: '转得动', text: '岗位、审批、办理与结果闭环。' },
       { title: '算得清', text: '效率、质量与运行成本。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-02-ui.png', alt: 'AI 生成的经营驾驶舱界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 经营驾驶舱' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/40acf1bf0c4735f75a6d954a905b8521db04db3c1839393f6054f48a06fe8d3e/202610/slide-02-ui.png', alt: 'AI 生成的经营驾驶舱界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 经营驾驶舱' },
     sources: [{ label: '业务建模', href: '/doc/form-engine/form-engine-info.html' }, { label: 'AI 数据分析', href: '/doc/system-engine/ai-data-analysis.html' }],
   },
   {
@@ -57,7 +57,7 @@ const enterpriseSlideDefinitions = [
       { title: '行业软件', text: '制造、工程项目、园区与供应链。' },
       { title: '多端服务', text: 'PC、H5、小程序与 App。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-03-ui.png', alt: 'AI 生成的 ERP、CRM 与 OA 多产品界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 企业产品组合' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/935354089053c617d4dee96c3820f0344aa2263ae11fdca438d2b2a7ac774a49/202610/slide-03-ui.png', alt: 'AI 生成的 ERP、CRM 与 OA 多产品界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 企业产品组合' },
     sources: [{ label: '平台能力', href: '/doc/' }, { label: '行业案例目录', href: '/case/case-index.html' }],
   },
   {
@@ -70,7 +70,7 @@ const enterpriseSlideDefinitions = [
       { title: '动态尺码与裁床分包', text: '' },
       { title: '菲票明细与移动端', text: '' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-04-ui.png', alt: 'AI 生成的服装 ERP 与移动菲票界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 服装 ERP' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/b0e95a303577a94fc315a13fc278527ae0bbbf995eea453822f065889a7774c9/202610/slide-04-ui.png', alt: 'AI 生成的服装 ERP 与移动菲票界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 服装 ERP' },
     sources: [{ label: '服装 ERP 原始案例', href: '/case/erp/erp-case1.html' }],
   },
   {
@@ -83,7 +83,7 @@ const enterpriseSlideDefinitions = [
       { title: '飞书协同与跨库报表', text: '' },
       { title: '国企 OA 移动审批', text: '' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-05-ui.png', alt: 'AI 生成的集团跨系统协同与 OA 审批界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 集团协同' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/b7ce0535c7ce94d6737f73f42290af4c60b05265d73689779bea325166e3b9c0/202610/slide-05-ui.png', alt: 'AI 生成的集团跨系统协同与 OA 审批界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 集团协同' },
     sources: [{ label: '集团制造协同', href: '/case/ims/ims-case1.html' }, { label: '集团 / 国企 OA', href: '/case/oa/os-case1.html' }],
   },
   {
@@ -96,7 +96,7 @@ const enterpriseSlideDefinitions = [
       { title: '地图找房、隐私号与 VR', text: '' },
       { title: '官网、App、小程序多端服务', text: '' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-06-ui.png', alt: 'AI 生成的 CRM 客户跟进与房源服务界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · CRM 与房产' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/39c1639d8f72bd84db8ecd94ede5679353a3300a392f943fbd5922dc8a759540/202610/slide-06-ui.png', alt: 'AI 生成的 CRM 客户跟进与房源服务界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · CRM 与房产' },
     sources: [{ label: '标准 CRM', href: '/case/crm/crm-case1.html' }, { label: '房地产服务平台', href: '/case/internet/hourse.html' }],
   },
   {
@@ -109,7 +109,7 @@ const enterpriseSlideDefinitions = [
       { title: '生成建议与待办草稿', text: '' },
       { title: '人工确认后办理，记录结果', text: '' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-07-ui.png', alt: 'AI 生成的客户跟进 Agent 业务闭环界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 业务 Agent' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/c565213031e358da6858646bf9eadc477b82e8e0906785e64a9c093765047b5f/202610/slide-07-ui.png', alt: 'AI 生成的客户跟进 Agent 业务闭环界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 业务 Agent' },
     sources: [{ label: '现有 AI 数据分析', href: '/doc/system-engine/ai-data-analysis.html' }, { label: '按项目编排流程', href: '/doc/system-engine/ai-workflow-suite.html' }],
   },
   {
@@ -122,7 +122,7 @@ const enterpriseSlideDefinitions = [
       { title: '灵活扩展', text: '复杂规则、定制页面与系统集成。' },
       { title: '交付可控', text: '多端协作，自建 / SaaS 按版本选择。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-08-ui.png', alt: 'AI 生成的吾码表单搭建与多端预览界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 平台搭建' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/7a47aae9b1f88808a67636a8f34d6edcb8fd614772abf4dc69ae0cd4feab0b1d/202610/slide-08-ui.png', alt: 'AI 生成的吾码表单搭建与多端预览界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 平台搭建' },
     sources: [{ label: '平台能力', href: '/doc/' }, { label: '版本与授权', href: '/doc/edition-comparison.html' }, { label: '自建部署', href: '/doc/getting-started/docker-run.html' }],
   },
   {
@@ -135,7 +135,7 @@ const enterpriseSlideDefinitions = [
       { title: '找准公司知识', text: 'RAG 是基础，检索不稳就会偏。' },
       { title: '框架熟练不等于交付', text: '会搭流程只是起点。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-09-ui.png', alt: 'AI 生成的公司知识库与 RAG 引用问答界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 知识与 RAG' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/e3684e74dbcf786397aedd926f7daa923b5f378b8ac3b8ad6304b38cf8794af4/202610/slide-09-ui.png', alt: 'AI 生成的公司知识库与 RAG 引用问答界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 知识与 RAG' },
     sources: [{ label: '公司知识与 AI 能力', href: '/doc/system-engine/ai-engine.html' }, { label: '业务蓝图与流程', href: '/doc/system-engine/ai-workflow-suite.html' }],
   },
   {
@@ -148,7 +148,7 @@ const enterpriseSlideDefinitions = [
       { title: '输出校验，人工接管', text: '' },
       { title: '部署与数据隔离', text: '权限、日志、监控、成本、数据安全。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-10-ui.png', alt: 'AI 生成的任务恢复与人工接管运行界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 可靠交付' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/610620da8c2c7c81f1f87f36ea448515d11779c59badbcc2fd0b1f1e01ec1145/202610/slide-10-ui.png', alt: 'AI 生成的任务恢复与人工接管运行界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 可靠交付' },
     sources: [{ label: 'AI 平台治理', href: '/doc/system-engine/ai-platform-governance.html' }, { label: 'MCP 受控交付', href: '/doc/v8-engine/mcp-server.html' }],
   },
   {
@@ -161,7 +161,7 @@ const enterpriseSlideDefinitions = [
       { title: '任务完成率', text: '工具成功率与异常恢复。' },
       { title: '投入可衡量', text: '延迟、Token、人工时间与 Bad Case。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-11-ui.png', alt: 'AI 生成的效果、质量与成本评估界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 评估与成本' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/7949c2efcefb9c6ed45c24620ce8cf0f1d82988d7e9f8ca927db95c00ed44ceb/202610/slide-11-ui.png', alt: 'AI 生成的效果、质量与成本评估界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 评估与成本' },
     sources: [{ label: 'AI 分析与权限', href: '/doc/system-engine/ai-data-analysis.html' }, { label: '运行治理', href: '/doc/system-engine/ai-platform-governance.html' }],
   },
   {
@@ -174,7 +174,7 @@ const enterpriseSlideDefinitions = [
       { title: '定边界', text: '数据、权限、部署与授权。' },
       { title: '验结果', text: '效果、成本与运维责任。' },
     ],
-    image: { src: '/images/enterprise-training/ai/slide-12-ui.png', alt: 'AI 生成的试点实施与验收看板界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 试点实施' },
+    image: { src: 'https://file.microi.net/itdos/official-docs/images/30e47100403d3a0e0d38ce50cc5a7b7e06893a0755f8cecb56328ac199256869/202610/slide-12-ui.png', alt: 'AI 生成的试点实施与验收看板界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 试点实施' },
     sources: [{ label: '开始使用', href: '/doc/getting-started/start-use.html' }, { label: '版本与授权', href: '/doc/edition-comparison.html' }, { label: '更多成功案例', href: '/case/case-index.html' }],
   },
 ]

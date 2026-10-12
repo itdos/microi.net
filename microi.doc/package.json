@@ -12,6 +12,9 @@
 	"homepage": "https://microi.net/",
 	"scripts": {
 		"generate:architecture": "node scripts/generate-ai-platform-architecture.mjs",
+		"prepare:doc-assets": "node scripts/prepare-doc-assets.mjs",
+		"test:doc-assets": "node --test tests/doc-assets.test.mjs tests/doc-assets-manifest.test.mjs",
+		"precheck:content": "npm run prepare:doc-assets && npm run test:doc-assets",
 		"check:links": "node scripts/check-dead-links.mjs",
 		"check:sidebar": "node scripts/check-sidebar-coverage.mjs && node --test tests/sidebar-system-engine-grouping.test.mjs",
 		"check:repositories": "node scripts/check-open-source-links.mjs",
@@ -35,7 +38,7 @@
 		"test:ai-capability-docs": "node --test tests/ai-capability-docs.test.mjs",
 		"test:homepage": "node --test tests/homepage-positioning.test.mjs",
 		"prepare:training-downloads": "node scripts/prepare-training-downloads.mjs",
-		"pretest:training-deck": "npm run prepare:training-downloads",
+		"pretest:training-deck": "npm run prepare:doc-assets && npm run prepare:training-downloads",
 		"test:training-deck": "node --test --test-concurrency=1 tests/training-syllabus-deck.test.mjs tests/training-syllabus-search.test.mjs tests/training-syllabus-enterprise.test.mjs tests/training-syllabus-pptx.test.mjs tests/training-downloads.test.mjs",
 		"generate:training-pptx": "node scripts/generate-training-deck-pptx.mjs",
 		"test:architecture": "node --test tests/ai-platform-architecture.test.mjs",

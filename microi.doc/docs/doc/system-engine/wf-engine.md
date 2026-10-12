@@ -1,0 +1,194 @@
+# 🔄 流程引擎、工作流引擎
+
+> **Microi吾码第四版工作流引擎，支持条件分支、多级审批、并行审批、V8 事件等**
+
+---
+
+## 📌 前言
+> **第一版**：博主在2008年工作时接手前同事基于微软WWF开发的工作流引擎，开发十余个国企、事业单位OA系统、ERP系统等
+
+> **第二版**：博主在2012年参与ccflow工作流引擎的二次开发、bug修复，曾是ccflow论坛超级版主，当时使用微软SelverLight技术（可惜被淘汰）。ccflow的老板周总也是咱前辈，目前开源ccflow工作流引擎仍在维护中，强烈推荐关注
+
+> **第三版**：博主在2014年使用微软最新`WWF`自主研发`第三版工作流引擎`，配合AvalonJs + UEditor开发`低代码平台`，应用数十家国企、事业单位、计量单位
+
+> **第四版：博主在2018年使用Microi吾码`表单引擎`驱动`工作流引擎`，采用.NET core + Vue完全自研`第4代工作流引擎`（由于微软WWF不支持.net core，因此自研）**
+
+
+## 吾码第四代工作流引擎优势
+>* [流程属性]、[节点属性]均由[表单引擎]驱动，灵活性更强
+>* 具有丰富的前端V8事件、后端V8事件，满足复杂的业务需求，如调用V8函数发送`邮件、短信、微信`通知，如调用`FormEngine`、`ApiEngine`实现复杂的业务逻辑
+>* [流程引擎]与业务表单`完全解耦`，方便集成第三方表单、二次开发。即使没有表单，[流程引擎]也能靠一个`FromData`JSON数据来跑流程
+>* 流程设计器支持可视化配置与二次开发
+>* 目前已经在数百家客户中应用流程业务管理
+
+## 预览图
+![流程设计器与流程预览](https://file.microi.net/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
+## 流程引擎相关物理表说明
+>* **WF_FlowDesign**：流程图设计表，一个流程图对应一条数据
+>* **WF_Node**：流程节点属性表
+>* **WF_Line**：流程条件（线）属性表
+>* **WF_Flow**：流程实例表，发起一个流程，就会生成一条实例数据，一条实例数据对应WF_Work表N条工作数据
+>* **WF_Work**：流程工作待办表，如发起一个流程实例，产生了3个待办，会写入3条WF_Work数据
+>* **WF_History**：流程轨迹表，详细记录流程每一步、每个人的所有操作，如同意、拒绝、撤回等
+
+## 用 AI / MCP 创建可运行的审批流程
+
+本页介绍的是 `wf_*` 审批工作流，区别于 [AI 工作流](/doc/system-engine/ai-workflow-suite)。
+AI 建模应先读取当前租户的 `wf_flowdesign`、`wf_node`、`wf_line`、`sys_menu`、
+目标业务表和人员/角色数据；不同租户的 Id 不能直接复制。
+
+| 位置 | 必要配置 | 检查点 |
+|---|---|---|
+| 流程定义 `wf_flowdesign` | `FlowName`、`TableId=diy_table.Id`、`IsEnable=1` | 流程启用且业务表真实存在；可选分类、描述、排序、流程起止 V8、发起角色。 |
+| 节点 `wf_node` | 稳定 `Id`、`NodeName`、`NodeType`、`PositionLeft/Top` | 类型为 `Start/Auto/Business/Approve/Countersign/End/AutoEnd`；坐标如 `320px`，不同节点不能叠放。 |
+| 人工节点 | `Users/Roles/Depts/BindJobs` 之一，或明确的同部门/上游选人策略 | 四个绑定字段为 `[{"Id":"当前租户 Id","Name":"显示名"}]` JSON；`End` 是人工结束，自动结束用 `AutoEnd`。 |
+| 连线 `wf_line` | `FromNodeId`、`ToNodeId`、`LineName` | 端点存在、从开始节点可达，标题为“起点 到 终点”。多出线在源节点 `LineValueV8` 设 `V8.NextNodeId` 或 `V8.LineValue`。 |
+| 模块 `sys_menu` | `OpenType="WorkFlow"`、`FlowDesignId`、`DiyTableId` | 关联已启用的流程真实 Id；模块表与流程 `TableId` 一致。 |
+
+节点还可配置 `AllowSelectUsers`（上游手选下节点接收人）、`AllowAddUsers`、
+`AllowRecall`、`AllowHandOver`、`HideHandOverSelect`、`BackNodes`、`Timeout`、
+`CopyUsers`、`SameDeptApprove`、`FieldsConfig`/`FieldsConfigComponent`、
+`StartV8`/`StartV8Server`、`EndV8`/`EndV8Server`、`LineValueV8`。
+流程定义另有 `Roles`、`StartV8`、`EndV8`、`JsonData` 和预览等配置；
+连线还有 `LineValue`、兼容 `V8Code`。这些字段的实际类型以当前租户
+`microi_get_db_schema` 回读为准，不要为让校验通过随意填空字符串。
+
+```json
+{
+  "workflows": [{
+    "FlowDesign": { "FlowName": "费用审批", "table": "Biz_Expense", "IsEnable": 1 },
+    "Nodes": [
+      { "Id": "start", "NodeName": "发起", "NodeType": "Start" },
+      { "Id": "finance", "NodeName": "财务审批", "NodeType": "Approve",
+        "Roles": [{ "Id": "<从当前租户角色查询>", "Name": "财务" }] },
+      { "Id": "end", "NodeName": "完成", "NodeType": "AutoEnd" }
+    ],
+    "Lines": [
+      { "Id": "l1", "FromNodeId": "start", "ToNodeId": "finance" },
+      { "Id": "l2", "FromNodeId": "finance", "ToNodeId": "end" }
+    ]
+  }],
+  "modules": [{ "name": "费用申请", "table": "Biz_Expense",
+    "openType": "WorkFlow", "flowName": "费用审批" }]
+}
+```
+
+先运行 `microi_plan_system`、`microi_check_workflow_package`；分支流程再用
+`microi_test_workflow_condition` 测样例表单。生成器会给缺少坐标的节点按拓扑
+补像素位置，并在同包模块保存后写入真实 `FlowDesignId`。保存后回读三张定义表与
+`sys_menu`，再用真实发起人和审批人完成发起、处理、历史、流程图和模块入口测试。
+结构检查无法证明当前人员仍有效或实际待办可到达，必须做运行时验收。
+
+### 人员配置与业务快照
+
+通过 MCP 或应用包配置节点人员时，`WF_Node.Users` 保存的是 JSON 对象数组：
+
+```json
+[{"Id":"实际用户Id","Name":"审核人"}]
+```
+
+原生引擎按 `List<IdName>` 读取该字段，不接受 `['用户Id']` 形式的字符串数组。显示名称不承担授权，审批动作仍需核对当前用户、角色和当前待办。前端事件的 `V8.WF.ForceSelectUsers` 继续使用其既有字符串数组格式，两者不能互换。
+
+自动结束节点使用 `NodeType=AutoEnd`。结束事件及历史中的 `ApprovalType` 可能继承上一人工节点的 `Agree`；需要“两人独立审批”等规则时，只统计配置中的人工审批节点，不能把自动结束历史算作第三位审核人。
+
+原生 `CancelFlow` 可能将请求 `FormData` 写回流程实例，未传时可成为 `{}`。业务系统需要在取消后恢复冻结单据，应核对服务端保存的快照摘要或同一实例的唯一原始提交历史，并复核表单归属、发起人、版本、金额和待办已清空。不要根据取消请求传入的状态或金额批准单据。退回、取消和重新发起必须分别验证；恢复草稿之后应创建新的流程实例。
+
+`CancelFlow(WFParam)` 当前使用独立事务，不支持 `StartWork/SendWork` 的共享事务参数。自定义页面应依次完成服务端核验、原生取消、业务终态复核，不能在持有流程行锁的接口事务中再次调用取消。取消请求中断或响应未知时，先查询实际终态，再决定是否恢复草稿。
+
+原生同一审批阶段可能存在未办理的并列工作。`CloseOtherWork` 会把同一实例、同一来源节点的其它待办置为 `OtherDone`，这些接收人没有因此完成审批，也不会生成审批历史。终态恢复只能把这种工作绑定到同阶段唯一真实 `Agree` 历史及其 `Done` 工作：实体、实例、定义、来源节点、审批节点必须完整一致，接收人不得等于真正办理人，且不能出现该并列工作的办理历史。真正开始提交和两位独立审批工作仍须 `Done`；任意其它 `OtherDone`、待办、取消、撤回或模糊绑定均应拒绝。不能把未办理接收人计为审核人，也不能仅因其恰好是作者便误认作者已经自审。
+
+## V8事件
+### V8事件顺序
+>1. 用户点击发起流程或处理工作
+>2. 表单进入V8事件（前端）
+>3. 用户点击【提交】按钮
+>4. **节点开始V8事件（前端）**
+>5. 表单提交前V8事件（前端）
+>6. 表单提交前V8事件（后端）
+>7. 表单提交后V8事件（后端）
+>8. 表单提交后V8事件（前端）
+>9. 调用后端处理工作接口
+>10. **条件判断V8（后端）**
+>10. **节点开始V8事件（后端）**
+>11. **节点结束V8事件（后端）**
+>12. **节点结束V8事件（前端）**
+
+### 所有事件可访问的内置函数
+>* **V8.WF.ApprovalType**：用户点击的审批类型，字符串。可能的值：`Agree`（同意）、`Disagree`（拒绝）、`Recall`（撤回）、`Auto`（发起流程(开始节点)/业务节点/自动结束节点）
+>* **V8.WF.ApprovalIdea**：用户填写的审批意见，字符串
+>* **V8.WF.AddUsers**：用户添加的审批人，数组
+>* **V8.WF.SelectUsers**：用户选择的审批人，数组
+>* **V8.WF.CurrentFlowDesign**：当前流程设计图实体，object类型
+>* **V8.WF.CurrentNode**：当前节点实体，object类型
+>* **V8.WF.BackNodeId**：如果用户点击的是拒绝，并且选择了退回到哪个节点，这就是那个节点Id
+
+### 节点开始V8事件（前端）
+>* 可使用所有前端V8函数
+```javascript
+if(V8.Form.Money > 1000){
+  V8.Tips('金额不能大于1000！', false);//前端提示
+  V8.Result= false;//阻止表单和流程提交
+  return;
+}
+//金额加1
+V8.Form.Money = V8.Form.Money + 1;
+//强制指定下一节点审批人
+V8.WF.ForceSelectUsers=['userid'];
+//这里可以还执行大部分V8内置函数，如同步接口请求等
+```
+### 节点开始V8事件（后端）
+>* 可使用所有后端V8函数
+>* 可使用V8.Result = { Code : 0, Msg : '阻止流程提交' }; 进行回滚事务、阻止流程提交
+
+### 条件判断V8事件（后端）
+>* 可使用所有后端V8函数
+```javascript
+//这里赋值的V8.LineValue，就是[条件属性]设置的[条件值]
+if(V8.Form.Money <= 100){
+  V8.LineValue = 1;
+}else{
+  V8.LineValue = 2;
+}
+```
+### 节点结束V8事件（前端）
+>* 可使用所有前端V8函数
+>* **V8.WF.WorkResult**：流程执行成功后返回的数据，如发送到了哪个节点、哪些审批人
+
+### 节点结束V8事件（后端）
+>* 可使用所有后端V8函数
+>* **V8.WF.NextNode**：访问下一节点实体
+>* **V8.WF.NextTodoUsers**：访问接收人，格式：[{Id:'',Name:''}]
+
+
+
+## 功能介绍
+### 我的待办
+>* 获取WF_Work表中，待我处理的工作。
+### 我发起的
+>* 获取WF_Flow表中，我发起的流程实例。
+### 我处理的
+>* 获取WF_Work表中，我处理过的工作。
+>* 之所以不从WF_Flow表中获取我处理的工作，是为了实现每个节点的字段权限控制，同时为了实现撤回功能。
+### 抄送我的
+>* 获取WF_History表中，抄送过给我的工作。
+>* 之所以不从WF_Flow表中获取抄送过给我的工作，是为了实现每个节点的字段权限控制。
+### 我相关的
+>* 获取WF_Work表中，我接收过的待办工作，但不是由我处理的工作。
+### 所有实例
+>* 管理员权限，获取WF_Flow表中，所有人发起的所有流程实例（非工作）
+### 撤回
+>* A节点提交到B节点后，在B节点审批之前，A节点提交人可随时主动撤回到自己手上，重新编辑表单数据并重新提交。
+>* B节点审批后，A节点无法再撤回，但B节点可以在C节点审批之前撤回到自己B节点手上。
+>* A节点实再想撤回，只有找C节点拒绝并退回到A节点。
+>* 注意：撤回时，也会执行节点开始V8、结束V8。
+>* 将来也可以在流程属性中增加提交人可以随时任意撤回
+
+## 相关V8
+```javascript
+//在前端V8中执行，将某条数据打开Form表单并可以发起流程，第三个object参数若不传，即为查看流程
+V8.OpenFormWF(V8.Form, 'Edit', {
+	//StartWork：发起流程，ViewWork：查看流程。当为ViewWork时，可以不传FlowDesignId
+    WorkType:'StartWork',
+    FlowDesignId:'',//流程图Id
+});
+```

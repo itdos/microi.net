@@ -1,0 +1,579 @@
+# 🌐 SaaS 引擎
+
+> **承载所有租户的核心独立开发配置，一套程序驱动 N 个租户**
+
+---
+
+## 📌 介绍
+
+- SaaS 引擎作为平台的亮点之一，承载所有租户的核心独立开发配置
+- 平台默认是 SaaS 模式，部署时必须指定 `OsClient`、`OsClientType`、`OsClientNetwork`
+- 每个租户一个独立数据库，可在主库 `sys_osclients` 表中配置独立的数据库连接、MongoDB、Redis、MQ、阿里云、MinIO 等
+>* 一套程序驱动N个租户数据库，而不必每个租户再部署一套docker程序
+>* 本地二次开发`一键切换租户数据库`、`环境`
+>* `主库`即部署平台时`环境变量`或`appsettings.json`中配置的`数据库连接字符串[OsClientDbConn]`
+>* 所有的 **SaaS 路由与部署控制面配置** 以主库 `sys_osclients` 为准，租户库不维护第二份 `sys_osclients` 数据；当前租户自己的业务设置则保存在其租户库的 `sys_config` / `mci_system_setting`，不要与控制面混为一谈
+
+## 官方应用职责边界
+
+SaaS 引擎官方应用继续负责租户发现、公开启动配置、语言包、私有文件授权和租户开通。旧版 UniApp 使用的 `microi-init` 也由该应用以 Managed 策略继续交付：匿名请求只能获得公开系统设置；只有原始 DiyToken 在后端重新验证、用户与请求租户一致后，才返回当前用户和其角色允许的菜单。菜单通过仅绑定该固定 ApiEngineKey 的 `GetLegacyInitMenuTree` 可信原子复用 `SysMenuLogic` 权威角色过滤，不能借匿名 FormEngine 直读 `sys_menu`。域名解析到其它租户时只返回目标 `OsClient` 提示客户端重新初始化，不能在当前匿名 V8 上下文中跨租户读取配置。
+
+其中 `platform-create-tenant` 属于 `app.microi.saas-engine`：接口引擎先调用 `platform-runtime-custom-hook` 的 Before 阶段，再由绑定固定 ApiEngineKey 的可信原子从当前 DiyToken 派生所有者、手机号、姓名和密码材料。租户创建成功后，即使 After Hook 或审计暂时失败，也返回成功和告警，避免客户端重复创建。
+
+系统账号与系统设置已经采用独立单一所有权：
+
+| 官方应用 | 唯一拥有的接口引擎 |
+| --- | --- |
+| `app.microi.sys_user`（系统账号） | `platform-user-update-preferences`、`platform-user-update-profile`、`platform-user-custom-hook` |
+| `app.microi.sys-config`（系统设置） | `platform-tenant-system-settings`、`platform-system-settings-custom-hook` |
+| `app.microi.saas-engine`（SaaS引擎） | `microi-init`、`platform-create-tenant`、`platform-runtime-custom-hook` 及 SaaS 启动/租户运行时能力 |
+
+基础 SaaS 空库包与独立应用可以同时交付同一能力所需的表、字段或初始化模板，以分别覆盖新租户和存量租户；同一个 Managed ApiEngineKey 则只能有一个官方包所有者。SaaS、应用商城和独立应用之间不得复制这些 Key，否则更新顺序会造成官方代码互相覆盖。旧 Controller 路由只承担旧客户端兼容转发，不再承载业务编排。
+
+### 空数据库的已安装应用版本
+
+官方主库执行“一键制作主库空数据库”时，SaaS 应用 v8.2.1 起会对既有平台应用逐包回读，校验包大小、SHA-256 与商城／包内版本，再将版本基线写入隔离的临时空库。`AppVersion`、`AppVersionInstall` 和 `PackageVersion` 保持一致，安装结果保存所用包的版本和哈希；不会改写源主库安装历史，也不会为尚未安装的应用创建安装记录。配套新版后端还会在导出前直接读取临时库，基线不一致时拒绝发布。
+
+SaaS 应用 v8.2.2 起，服务重启后即使后台任务租约先到期、数据库发布租约稍后到期，也会保留 Prepare 检查点并每隔 30 秒继续等待。此处理只适用于宿主明确确认“当前任务未修改临时数据库”的发布锁占用；等待时不会清理另一任务的临时库，真正的复制、脱敏或发布错误仍会失败关闭。
+
+因此，新用户导入该空库后，不会仅因继承了官方主库旧的提供商基线而被提示更新。空库生成之后官方另有新版本发布时，正常更新提醒仍会出现。任务成功结果包含七种数据库包的下载地址、大小和 SHA-256；后台任务入队不等于制作完成，需等待成功终态。
+
+### 空数据库导入兼容性
+
+SaaS 应用 v8.3.30 将非索引的配置文本列调整为 `mediumtext`，避免 MySQL 8
+严格模式创建 SaaS 宽表时出现 `Row size too large`，同时保留主键、租户标识和已有配置值。
+更新主库结构后，必须重新执行空库制作，旧 ZIP 不会自动变化。
+
+配套后端的 PostgreSQL 导出使用显式 `E'…'` 字符串，转义反斜杠、引号及换行。
+V8 代码中的正则、Windows 路径和多行注释不再依赖导入连接的
+`standard_conforming_strings` 设置；空字符串与 `NULL` 分别保留，长代码不会截断。
+下载新版 ZIP 后，在空的目标数据库中完整执行 SQL；验收应核对表数、行数和 V8 代码哈希，
+不能仅以客户端显示“执行完成”判定成功。
+
+### 标准业务应用的清理范围
+
+SaaS应用v8.3.18起，空库规则同时识别标准CRM、CMS、OA、进销存及公共往来、商品目录的责任表与接口。即使应用尚处于开发阶段、只有运行版本而未完成商城制包，也会根据固定业务前缀发现当前主库物理表，清除临时空库中的对应DIY元数据和业务数据；物理清单读取失败时停止制作。
+
+菜单清理包含“AI应用”整棵树、标准产品根菜单和历史生成批次目录；平台“AI助手”仍保留。应用商城、微服务和运行资产继续按既有归属规则清理。清理接口只返回SQL，制作任务将其应用到隔离的临时空库；不得把返回SQL直接执行于正在使用的源主库。更新规则不等于重新生成了公开空库ZIP，实际成品仍须等待制作任务成功并核对下载摘要。
+
+v8.3.19进一步清理上述业务表关联的流程定义、节点及连线，以及业务接口关联的打印模板和标准应用页面；清理顺序先解析归属，再删除接口和表元数据，保留平台引擎结构与其它模板。
+
+v8.3.20将界面、打印和流程引擎的五张基础表纳入清理器自身的结构保护白名单。普通应用引用这些表中的模板，不代表拥有整张平台表；空库仅移除属于业务应用的模板和流程记录。
+
+v8.3.22同时按业务应用Id清理`sys_microistore_package`中的HDFS包索引，再移除商城主记录，保留平台包索引；该表纳入物理存在性发现与平台结构白名单，旧库没有该表时跳过此语句。完整包保存在HDFS，数据库及版本快照只保存指针。清理空库索引不会删除HDFS上的已发布安装包文件。
+
+v8.3.36 起，新空库仅保留“超级管理员”和“演示角色”。`admin`、`demo` 的角色绑定按初始模板重建，业务角色、角色权限快照及已删除菜单的权限引用一起清理。初始角色缺失、已删除或等级异常时停止制作，避免产出无法正常登录的模板。
+
+历史安装记录必须能对应空库保留的平台应用：优先核对 `StoreId`，没有 `StoreId` 的旧记录再按非空 `AppId` 核对稳定身份。空身份、孤立记录及已删除版本记录不会进入新空库；应用名称相似或仅带平台前缀不足以证明归属。这些操作只作用于临时副本，源主库账号、业务权限、安装历史和 HDFS 文件保持原样。升级后需重新制作空库，并验收新租户登录和角色权限。
+
+v8.3.37 同时将组织树重建为“默认组织／默认部门”，清除源租户的业务部门和旧版账号关系记录，并把保留账号的部门绑定归到默认部门。初始组织模板缺失或已删除时停止制作。新租户验收需要检查组织树、角色列表和账号部门，确认没有继承源租户的测试部门；这不会修改源主库的组织、账号或业务关系。
+
+## SaaS 推广中心与客户自主开通
+
+更新后端、前端以及 SaaS 引擎应用后，在“系统引擎 → SaaS推广中心”管理推广成果。
+内置微服务 `microi-platform-service` 提供独立的 `/saas-promotion` 页面，左侧切换推广总览、
+租户台账、试用跟进、团队统计、推广链接和开通配置。
+
+业务员只需获得推广中心菜单权限，即可查看 `sys_osclients.ReferralUserId` 等于本人
+`sys_user.Id` 的子租户。平台管理员可查看全部；管理员在“开通配置”选择的主租户管理角色，
+还须获得菜单权限，才能查看团队全局数据。只有平台管理员可以修改公开开通和管理角色配置。
+历史租户没有推荐人时显示“未分配”，由管理者核对后明确分配，不按同名、手机号或创建人自动认领。
+
+台账提供状态、推荐人、创建时间和关键词筛选，支持 CSV 导出、租户详情、跟进记录、下次跟进时间
+及转化状态。表单、字段、接口、菜单、用户、角色、部门、工作流、界面、数据源、任务、微服务和
+已安装应用版本从目标租户主库只读聚合；缺表、连接失败和未支持的数据库显示未知或不可用。
+当前聚合支持 MySQL/MariaDB，一次最多20个租户，最多4个库并行，缓存60秒，主动刷新间隔至少15秒。
+总览与团队页按20套分批汇总全部授权租户，显示每个指标的可读覆盖数及最早采集时间；不可读数据不按0计入。
+详情显示真实采集时间。近7/30天登录用户和日期分布使用用户最近一次登录时间，不能当作历史登录次数。
+试用期限按 UTC 计算，用于业务跟进；试用结束不会替代平台许可或自动停用租户。
+
+失败申请可由原推荐人或授权管理者在“推广链接”的申请列表恢复。恢复沿用原请求与加密数据库检查点，最多执行三次，不能重新接管其它数据库或重置已有账号密码。公开空库先通过主租户启动地址访问，独立域名保持未绑定，后续由管理员绑定。
+
+### 用 AI 为业务员创建分享链接
+
+连接自己的主租户 MCP 后，可以直接描述：“为账号 `<业务员账号>` 创建一个推广链接，客户免登录开通空库，试用 14 天，活动有效期 30 天。”AI 会核对活跃推荐人、已有活动和当前开通配置，再通过 `platform-saas-promotion` 的 `CreateLink` 与 `ShareLink` 返回实际签发的地址；业务员默认只能为自己创建，管理员可以指定其他活跃用户。账号重名或权限不足时必须先处理，不能猜测推荐人。
+
+首次使用时，平台管理员在“开通配置”启用公开开通，填写实际主租户前端的 HTTPS 地址、试用天数和开通额度。已有配置和活动会保留。分享地址包含绑定推荐人、活动和运行分区的签名票据，单独拼接用户 Id 不能开通；停用或重新启用活动后，需重新取得分享地址。交付时使用全新未登录浏览器验证表单和图形验证码；只有明确要求开通客户租户时才提交申请。详细 MCP 请求与超时回读步骤已随吾码 Skills、CLI 和 VS Code 插件提供。
+
+### 开通配置与专属推广链接
+
+平台管理员在推广中心配置公开空库开通开关、主租户 Web 地址、默认试用天数、每日开通上限和
+链接默认额度。这些配置存放在当前主租户运行分区的 `sys_osclients`，不会复制给子租户。
+默认关闭公开开通；Web 使用 HTTPS，本地验收允许 localhost HTTP。还需维护启用系统配置的真实
+`ApiBase`。本功能继续使用标准空库开通链路，不接受客户提供的数据库连接、SQL模板、角色或权限。
+
+业务员创建推广活动后，可复制开通地址或下载二维码。地址示例：
+
+```text
+https://main.example.com/?OsClient=main#/micro-app/microi-platform-service/saas-trial?ref=USER_ID&link=SIGNED_CAPABILITY
+```
+
+客户无需登录，填写系统名称、租户唯一标识、联系人、联系电话、至少10位管理员密码和图形验证码。
+`ref` 必须与服务器签发且仍有效的 `link` 一致；修改推荐人参数不会改变归属。链接有有效期和额度，
+停用或更新状态会撤销旧分享地址。停用推荐人后，其链接也不可继续开通。
+
+提交时保存稳定 UUID，密码以平台单向哈希进入受认证加密保护的持久开通票据，不写入网址或日志。
+后台任务只持有限开通能力，不伪装管理员。刷新页面可通过独立的进度票据继续查询；相同申请编号和
+相同信息不会重复开库，信息不同则拒绝。数据库 DDL 前持久化加密账号检查点，节点中断后恢复同一任务；
+部分空库导入可重复执行，已完成导入不重置租户数据库。验证码、每日额度、链接额度与来源网络额度在服务器校验。
+开通成功后显示新租户 `admin` 账号及安全启动地址，密码由客户自行保管；独立域名需另行绑定。
+
+推广资源由 SaaS 应用唯一拥有：`platform-saas-promotion`、`platform-saas-public-trial` 和
+`platform-saas-public-trial-worker` 为 Managed；`platform-saas-promotion-hook` 为 CreateIfMissing，
+提供 `BeforeCreateLink / Assign / UpdateFollowup` 扩展事件，升级保留既有租户 Hook。
+Hook 不接收密码、能力票据或数据库连接。公开页面只开放固定主租户、固定应用及 `/saas-trial`；
+匿名查询不能解析系统设置等其它微服务页面。
+
+主租户现有 V8.FormEngine 可以显式选择子租户；这是部署控制面能力，不代表每个主租户业务员自动
+拥有全部子租户权限。推广接口在服务器重新验证当前账号、角色、菜单和推荐归属，只返回限定统计。
+子租户的 V8.FormEngine 请求其它租户时仍被强制约束到当前租户。
+
+## 为子租户配置系统提醒
+
+主租户管理员统一进入“系统引擎 → 消息通知”，新增试用到期、维护公告和定时提醒，并选择单个、多个或全部子租户。数据保存在平台提醒表中。
+
+<!-- 暂停个人版销售，保留原文以便恢复
+在 SaaS 引擎 `/#/osclients` 编辑子租户的“租户授权”Tab，可设置 `LicenseProductType`（个人版或企业版）和 `LicenseExpirationDate`（UTC）。两项留空继承主租户授权。只有已部署有效授权的主租户超级管理员可设置：企业版主授权可授予个人版或企业版，个人版主授权仅可授予个人版；子租户到期时间须晚于当前时间且不超过主授权。后端在实际写入与运行时均校验上限；主授权降级、到期后子租户也不能保留超出主授权的权限。
+-->
+在 SaaS 引擎 `/#/osclients` 编辑子租户的“租户授权”Tab，可设置 `LicenseProductType` 和 `LicenseExpirationDate`（UTC）。两项留空继承主租户授权。只有已部署有效授权的主租户超级管理员可设置；子租户授权等级不得超过主授权，期限须晚于当前时间且不超过主授权。后端在实际写入与运行时均校验上限；主授权降级、到期后子租户也不能保留超出主授权的权限。
+
+子租户期限独立触发主租户“消息通知 → 授权到期提醒”中的策略，官方主授权提醒仍独立检查。此功能需升级平台前后端及 SaaS 引擎、消息通知应用。官方签发帐号的 `sys_user.LicenseExpirationDate` 未设置表示永久有效，仍受帐号可签发版本约束；明确设置了到期时间时，签发期限不能超过该时间。
+
+SaaS 引擎中已移除提醒相关的行、页面和批量按钮，以及表单提醒 Tab 和嵌入组件。接收范围仍以当前部署的 `OsClientType + OsClientNetwork` 为准，不跨其它部署环境。
+
+先保存草稿、预览，再发布；仅保存不会发送。每条提醒可配置标题、内容、图标、有效期、仅一次或每次进入/刷新；试用提醒的到期时间由管理员填写，不改变 License 或登录权限。详细规则、接口和升级要求见[消息通知的“平台提醒”](./message-notification#平台提醒-公告-试用到期与定时弹窗)。
+
+## `OsClient`
+>* OsClient 值即为 `SaaS引擎Key`，用于确定租户，值可自定义，建议使用全小写字母，例如 `tenant_a`、`tenant_demo`、`demo01`。
+
+## `OsClientType`
+>* OsClientType值为`SaaS引擎环境类型`，值自定义，如`正式环境`、`测试环境`、`外帐环境`等
+>* 如填写`Product`，代表`正式环境`，那么此条数据的`数据库连接字符串`、`MongoDB`、`Redis`均应填写`正式环境`的配置
+>* 如填写`Dev`，代表`测试环境`，那么此条数据的`数据库连接字符串`、`MongoDB`、`Redis`均应填写`测试环境`的配置
+
+## `OsClientNetwork`
+>* OsClientNetwork值为`SaaS引擎网络类型`，值自定义，如`内网`、`外网`等
+>* 如填写`Internal`，代表`内网环境`，那么此条数据的`数据库连接字符串`、`MongoDB`、`Redis`中的IP均应填写`内网环境`的IP
+>* 如填写`Internet`，代表`公网环境`，那么此条数据的`数据库连接字符串`、`MongoDB`、`Redis`中的IP均应填写`公网环境`的IP
+
+## 程序必须指定以上3个参数
+>* 本地二次开发修改`OsClient` `OsClientType` `OsClientNetwork`三个值轻松切换`不同租户`的`不同环境`
+>* 在主库`sys_osclients`表中，`OsClient` + `OsClientType` + `OsClientNetwork`三个字段同时唯一，如同时存在以下3条数据是支持的：
+>* 当`OsClient`="microi"，`OsClientType`="Product"，`OsClientNetwork`="Internal，`DbConn`="Data Source=192.168.1.11;Database=microi"时，代表使用了`内网IP`+`正式环境数据库`
+>* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internal"，`DbConn=`"Data Source=192.168.1.11;Database=microi_dev"时，代表使用了`内网IP`+`测试环境数据库`
+>* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internet"，`DbConn`="Data Source=59.110.139.95;Database=microi_dev"时，代表使用了`公网IP`+`测试环境数据库`
+
+空库脱敏脚本 v1.5.8 会只读组织机构表的真实物理列；旧库没有 `ParentName` 时，中性组织初始化只写 `ParentId`。字段发现失败会停止制作，不修改主库结构，不发布不完整空库包。该修复随 SaaS 引擎应用 v8.4.14 交付。
+
+SaaS 引擎 v8.4.15 的脱敏脚本 v1.5.9 先将平台微服务的商城行 Id 与兼容 AppKey 写入带主键的临时保留集合，再清理应用文件和版本。此步骤只在隔离副本执行，保留结果与旧脚本一致，避免 MySQL 5.7 对带 OR 的删除关联反复扫描。
+
+### 租户未找到、缓存恢复与运行登记
+
+新增老数据库租户时，先填写可写的主库连接 `DbConn`；仅填写 `DbReadConn` 不能完成升级。JWT 密钥由后端生成并持久保存，页面只显示配置状态，无需手工填写。
+
+执行“升级租户数据库”后，应等待通知中心任务成功。旧库内置应用含定时任务时，新版后端先提交表、接口和菜单，再幂等注册任务并回读，全部成功后才确认安装版本。中途失败可修复后重试；不要手工提高 `ServerVersion`，也不要绕过后台任务限制。该兼容修复需要更新后端镜像。
+
+从旧 SQL 还原时，启动恢复包必须先建表再建索引。新版后端修正了恢复包中 `mic_data_version` 等表的 DDL 顺序；应用商城安装器 v3.0.6 同时兼容历史包中索引早于建表的情况，只按当前包声明补齐缺失表并强回读，不改动持久任务的分片检查点顺序。缺少建表声明或执行失败仍会停止升级，`ServerVersion` 不越过失败步骤。先更新后端镜像，再更新“应用商城”并重试原租户升级；不会重导 SQL 或清空租户业务数据。
+
+升级早期的接口引擎缓存重建直接读取租户主库的物理接口表，无需等待完整表单元数据恢复，也不会触发客户查询替换或数据过滤事件。缓存只包含启用且未删除的接口，并隔离冲突路由。失败任务分别报告字段、缓存和旧菜单配置阶段，系统日志保留不含参数值和连接配置的调用栈，便于定位后安全重试。
+
+“未找到 OsClient”应先核对 API 部署的三个参数与主库登记是否一致。例如，租户只有 `Product / Internet` 登记时，`Product / Internal` 节点不能直接使用它。新版运行时在本节点和共享缓存都未找到租户时，会按当前环境、当前网络从主库重新加载一次；同一节点上的并发加载会合并，加载期间的递归调用也会被阻止。该恢复过程不切换网络，也不会启用已禁用或已删除的租户。
+
+对于历史自助开通租户缺少部署网络登记的情况，更新包含该能力的后端平台，并安装 SaaS 引擎应用 v8.1.3 或更高版本后，主租户超级管理员可调用 Managed 接口 `platform-tenant-runtime-registration`。先检查计划：
+
+```js
+{ TenantKey: 'tenant_demo', TargetNetwork: 'Internal', Apply: false }
+```
+
+确认目标节点能够连接原租户数据库后，再提交：
+
+```js
+{ TenantKey: 'tenant_demo', TargetNetwork: 'Internal', Apply: true,
+  Confirm: 'REGISTER:tenant_demo:Internal' }
+```
+
+目标网络必须已有唯一、启用的主租户登记，来源必须是同环境下唯一、启用且有所有者的自助租户。后端用分布式租约、确定的记录 Id 和写入后回读保证重复请求不重复创建；已有目标登记（包括禁用或删除记录）不会被覆盖。原数据库和数据库凭据保持不变，共享 Redis、对象存储等基础设施由目标网络主租户继承。完成后调用 `clear-saas-engine-cache` 刷新目标租户，并从实际访问域名验证系统配置与登录页面。
+
+个人中心按租户 Key 合并不同网络登记，额度也按独立租户计数。查看管理员密码仍先核验当前 DiyToken 与租户所有者关系，再解析目标租户；现代单向密码哈希不能还原原文，不能通过补登记或缓存恢复绕过这一限制。
+
+历史空库还可能带有 `admin.PwdEncode=V8`，而开通器只更新了实际为 DES 的密码密文。新版开通器会同步写入可验证的密码编码；未知自定义编码保持原规则。对于这类存量错标记录，SaaS 应用 v8.1.4 提供 `platform-tenant-admin-credential-repair`：先传 `{ TenantKey: 'tenant_demo', Apply: false }` 预检，确认 `CanRepair=true` 后再传 `Apply:true` 与 `Confirm:'REPAIR-ENCODING:tenant_demo'`。可信后端验证 DES 解密再加密的结果完全一致，并以原密文和原编码作条件，只把编码标记改为 DES；密码内容不会变化，也不会返回给修复接口。该操作仍要求主租户超级管理员与支持该能力的新版后端。真正的自定义算法、单向哈希以及并发改密后的记录不会被误修复。
+
+## 安全、脱敏与平台级配置
+
+`sys_osclients` 包含数据库、认证、Redis、对象存储、MQ/MQTT、搜索等基础设施机密，不能通过普通 FormEngine、前端 V8 或接口返回整行数据。
+
+- `V8.OsClientModel` / `V8.ClientModel` 是当前租户的独立脱敏副本，不包含数据库连接、`AuthSecret`、Redis、对象存储、MQ/MQTT、搜索凭据。
+- 浏览器 `V8.SysConfig` 是 `sys_config` 的脱敏副本，不包含 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code`、`ServerPrivateSettings` 和疑似 Password/Secret/Token/Key/Connection 字段。
+- 存量项目可能在 `sys_osclients` 扩展微信、支付、ERP 等业务密钥；新增配置应迁移到当前租户库的 `mci_system_setting`，由受控后端使用，禁止把整个配置对象或具体密钥返回前端。
+- 普通帐号即使拥有 Token 或错误配置了菜单/高级表权限，也不能通过通用 FormEngine 访问 SaaS 配置、接口引擎、菜单角色、任务、数据源等管理员专用平台表。相关控制面管理接口会用当前租户主库复核活动用户及有效管理员角色，要求 `Level >= 9999`；请求体自报管理员身份无效。
+- 主租户由运行环境中的 `OsClient` 或 `AppSettings:OsClient` 决定，不应在业务代码中写死为 `master`、`iTdos` 或其它固定值。
+
+数据库、Redis、主租户标识等启动基础设施仍由安装编排中的少量基础参数提供；普通业务和运行参数统一由 SaaS 引擎主租户或系统设置管理，未填写时使用代码安全默认值。子租户只能在平台允许的字段上配置自身额度，不能抬高节点级硬边界。文件上传业务值按当前租户 `sys_osclients` → 代码默认值解析，最终仍受 API 固定接收硬顶和反向代理边界保护。配置保存后应走 SaaS 引擎的共享缓存刷新流程并回读验证；监听端口、TLS 和 TCP 规则等需要重启的例外见下文。
+
+`MqttEnable` 与 `TcpIngressEnable` 是可空 `int` 开关：空值/`1` 按各自完整安全配置允许启用，`0` 明确关闭。两个字段的表单 `Switch` 都设置了 `Config.Switch.NullValue=1`，因此当前空值会显示为开启，但未切换时保存仍保留数据库 `NULL`；显式切换才写入 `0/1`，其它开关不采用这项投影。MQTT 旧库原空值在兼容迁移中先持久化为 `0`，不会因升级意外开放；全新官方数据库通过在线一键安装时仅对主租户显式设 `MqttEnable=1`，自定义旧库不覆盖，离线包数据库应核实并按需人工设 `1`。MQTT 没有完整独立凭据的租户仍拒绝连接。
+
+旧部署的发布顺序必须是：先部署并启动新 API，确认目标租户 `sys_config.ServerVersion >= 7.6.16.0` 且旧 MQTT 空值已迁为 `0`；再通过应用商城安装/更新官方 SaaS 包，最后发布带 `NullValue=1` 的新前端。迁移前的旧后端仍把空值当关闭，若先更新包或界面会误显示为开启。一次性物理迁移不会自动更新旧租户的字段表单元数据；bootstrap 启动恢复包也不会批量升级所有已安装的可选应用。
+
+主租户 `MqttEnable=0` 后，当前 Broker 节点约 30 秒内停止监听；子租户 `MqttEnable=0` 后，当前节点约 30 秒内拒绝新连接、管理断开已鉴权关联的连接，并清理有可信租户标识的持久会话/订阅，单条失败记录后下轮重试。归属不明的旧会话不猜测删除、不得跨租户复用，须运营核查。MQTT 开关重新启用由下一轮刷新处理，监听端口/TLS 改动仍需重启节点。多节点并非共享 Broker，须分别核实；见 [MQTT 引擎](./mqtt-engine.md)。
+
+原始 TCP 设备入站由主租户 `sys_osclients.TcpIngressEnable`、`TcpIngressPort` 与 `TcpIngressRulesJson` 管理：开关空值/1 允许按完整规则监听、0 明确关闭，端口为空时容器内默认 `1885`，规则为空时不监听；规则固定租户、接口引擎及来源网段，不包含启停或端口。子租户值不继承也不控制宿主监听。
+
+运行中独立每约 30 秒回查主库开关，设为 `0` 后下一轮关闭 TCP 监听及现有会话，HTTP API 和其它接口保持运行；从 `0` 改回空值/1 或修改端口、规则、Key、CIDR，则须手工重启现有 API 容器才能重新监听。
+
+上线时按上述顺序先启用新 API 并确认 MQTT 迁移，再通过商城安装 SaaS 字段、发布新前端，明确设置 `TcpIngressEnable=0`；确认目标引擎没有合法旧 HTTP 调用后，将该引擎设为 `StopHttp=1`、`AllowAnonymous=0`，再填写规则、设 `TcpIngressEnable=1` 并重启同一 API 容器。新执行的一键安装器会映射设备宿主机端口至 API 容器 1885；已有编排须手动补，例如 `19011:1885/tcp`，云安全组/CLB 须另行配置。配置/端口失败只使 TCP 进入 `Faulted`。必须确认 TCP `Listening` 状态、监听日志、端口和心跳，不能以 HTTP 健康代替。具体 JSON、帧校验和安全验收见[后端 V8 的设备原始 TCP 入站](../v8-engine/v8-server.md)。
+
+### 为全部子租户维护平台应用
+
+主租户 `Level >= 9999` 的超级管理员可在 SaaS 引擎页面点击【一键为所有子租户安装/更新所有平台应用】。按钮只在当前后端运行环境的主租户显示；服务端还会再次核验主租户身份、当前持久任务租约和管理员快照，不能通过伪造 `OsClient`、目标租户或用户等级调用。
+
+系统按 `OsClientType + OsClientNetwork` 当前运行环境读取主库 `sys_osclients`，选择已启用、未删除的租户并排除主租户。平台会先创建一个编排任务，再为每个子租户创建一个独立的【安装/更新全部平台应用】持久后台任务。子任务的进度、成功或失败结果都保存在主租户任务表，并实时显示在主租户右上角通知中心。父任务按全部子任务的真实平均进度汇总，`Current/Total` 固定使用百分比口径；只有全部子任务成功后父任务才成功，不能以“任务已入队”冒充 99% 或 100%。
+
+应用商城 `v8.2.5` 的导入器在字段主键规划阶段批量读取当前分片，常见 32 个字段仅需两次查询；重复自然键和超限结果仍回退单条校验，不改变冲突映射及检查点恢复规则。新版后端按持久化就绪时间为同一租户的安装、备份和空库制作任务安排维护名额，避免持续安装分片饿死重启后待恢复的任务；业务任务仍保留独立名额。
+
+同一套平台可能同时部署 `Product/Internal`、`Product/Internet` 等多个运行分区。一次父任务只覆盖发起节点当前的 `OsClientType + OsClientNetwork` 分区，不能把某个分区的“全部成功”当成整个平台已经收敛。事故恢复和正式验收必须先回读每个活跃分区的目标租户清单与精确数量，再从该分区对应的主租户节点分别执行，等待父任务及全部子任务进入成功终态；随后每个分区都要使用新的幂等键立即复跑一次，并确认零安装／零更新。禁止通过临时修改租户 `OsClientNetwork`、借用另一分区任务或只检查公开首页来绕过分区控制面。
+
+当新版前端已上线、历史租户缺少 `platform-sys-menu` 或 `platform-sys-config` 等启动接口时，受信控制面可使用 `MaintenanceScope=StartupDependencies`，并把目标严格限定为应用商城与 SaaS 引擎两个唯一官方资源所有者。大范围事故可再启用 `StartupDependencyBootstrapOnly=true`：子任务必须仍由持久后台任务、有效 fencing token 和权威租户目录发起，入队后在 `Pending` 状态原子写入并强回读精确范围；工作器从官方不可变 HDFS 包补齐一项菜单接口与六项 SaaS 运行门面，逐项物理回读 Key、地址、版本、启用/匿名/HTTP 标志和官方源码标记，七项一致后立即成功。只自举不会写入应用安装版本，也不会替代后续正常应用更新；租户改码、软删除、稳定 Id 或地址冲突一律失败关闭。普通“一键维护全部平台应用”、未携带该受信标志的既有任务以及客户自有接口源码均保持原流程。
+
+上述七项是跨大量历史子租户时使用的事故恢复范围。平台 8.5.2 起，后端启动和旧库版本升级只消费 `app.microi.bootstrap.json` 的登录与应用商城恢复契约：当前投影包含 21 张基础表、24 个接口及商城最小菜单祖先链。SSO、AI、消息等可选应用通过商城正常安装或更新，不随每次启动重跑历史迁移；完整官方应用包仍保持独立交付。恢复包按依赖顺序先建表再建索引，逐项物理回读通过后才推进版本。租户已经存在的 `CreateIfMissing` 记录（包括禁用、软删除或大小写变体）仍由租户维护，启动过程不会覆盖。
+
+所有子租户任务会立即创建，便于主租户查看完整队列；实际安装器通过配置租户 Redis 的跨租户并发租约串行执行，避免多个共享物理库的子租户同时修改表结构而互相死锁。安装分片和应用检查点均幂等，单个子任务使用 8 次连续失败重试预算以覆盖短时数据库死锁和 API 滚动重启；任一分片成功写入检查点后，重试次数和陈旧错误会清零，避免长任务把相隔很久的瞬时错误累计为失败。连续失败超过上限仍会失败关闭并在通知中心保留原始错误，不会无限重试。分片队列按“下一次可运行时间，再按创建时间”轮转，尚未执行的子租户会先获得首个分片，不会被较早创建的长任务长期饥饿。商城权威包读取使用完整 HTTP 响应，并对空响应做只读、有界、退避重试；安装写入不会自动重放。
+
+每个子任务只安装未安装的平台应用并更新有新版本的平台应用，已是最新版的应用会幂等跳过。任务标题包含目标租户名称与 `OsClient`，便于定位。投递前平台会幂等补齐旧空库缺失的生成实体物理列，并对 `import-microi-store-package`、`bulk-import-microi-store-packages` 两个固定核心工作器做受控刷新：仅当目标版本严格落后且源码可识别为官方谱系时更新；同版本异构、较新版本或无法识别的租户代码会拒绝覆盖并在父任务中直接显示租户、阶段和原因。历史记录的物理 `Version` 为空时只允许从标准源码头 `Version: vX.Y.Z` 回退比较。
+
+### 主库控制面与租户业务设置的分工
+
+子租户运行时不是“所有配置都从主租户数据库读取”。平台先用主库 `sys_osclients` 找到目标租户的数据库、Redis、MongoDB、MinIO、MQ 等部署路由；建立租户上下文以后，`sys_config` 与 `mci_system_setting` 都从目标租户自己的数据库读取。
+
+| 配置类型 | 事实源 | 子租户能否自行维护 |
+|---|---|---|
+| 数据库连接、Redis、MongoDB、MinIO、MQ/MQTT、搜索、签名与部署信任链 | 主库 `sys_osclients` | 否，只能由平台控制面维护 |
+| 系统标题、主题、公开地址、登录入口显示等浏览器公开配置 | 子租户库 `sys_config` 实体字段 | 按系统设置权限维护 |
+| 登录/OAuth 等能力与显示开关 | 子租户库 `sys_config` 实体字段 | 按系统设置权限维护 |
+| OAuth ClientId/ClientSecret、RP/Origin/Issuer、供应商地址与第三方私密参数 | 子租户库 `mci_system_setting` | 是，仅租户超级管理员维护 |
+
+`mci_system_setting` 只属于后端私密执行面，历史 `IsPublic` 字段已停用，普通值与 Secret 都不会下发浏览器。是否启用、是否显示等公开开关不得放入该表；历史开关仅作新版 `sys_config` 字段缺失时的兼容回退。后端接口引擎/后端 V8 事件通过 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 按当前租户读取私密参数，Secret 由可信后端解密；该独立节点避免动态 Key 覆盖 `sys_config` 实体字段。后端使用私密值时禁止整体返回节点，Secret 还禁止写入日志、审计或前端可读字段。
+
+Secret 的列表接口只返回“已配置”状态；显示原文需要租户超级管理员先完成 Passkey、Authenticator 或严格人脸二次验证，原文响应禁止缓存并在前端 30 秒后清除，审计只记录 Key/记录 Id/结果，不记录明文。登录方式的完整配置见 [登录方式、Passkey、Authenticator、第三方登录与严格人脸验证](../more/identity-verification)。
+
+### 存量协议网关的租户绑定配置
+
+畅捷通消息回调与旧微信公众号 OAuth 属于仍需 C# 完成解密、验签、一次性 State 和重定向校验的协议边界。为兼容已经存在于 SaaS 引擎【后端运行配置】Tab 的字段，它们继续按**请求对应的 `sys_osclients` 租户行**读取，不使用主租户通用 `AppSettings` / RuntimeConfigurationReader，也不会回退其它租户：
+
+| 网关 | `sys_osclients` 字段 |
+|---|---|
+| 微信 OAuth 重定向策略 | `OAuthReturnUrlOrigins` |
+| 畅捷通 OAuth / 消息回调 | `ChanjetOAuthState`、`ChanjetAesKey`、`ChanjetAppKey` |
+| 历史微信模板消息配置 | `WeChatTemplateAppId`、`WeChatTemplateAppSecret`、`WeChatTemplateId`、`WeChatMiniProgramAppId` |
+
+新登记的畅捷通回调地址应使用 `?OsClient=租户Key`；历史未带参数的单租户回调只兼容当前部署主租户。微信公众号绑定入口以 DiyToken 中的租户为权威，回调以 Redis 一次性票据内的租户为权威，参数中的 `OsClient` / `o` 不能覆盖该可信上下文。绝对返回地址必须精确命中当前租户配置的 HTTPS Origin，站内相对路由继续支持。
+
+`OAuthReturnUrlOrigins` 和 AppId/TemplateId 属于非秘密策略/标识；`OAuthState`、AES Key、AppKey、AppSecret 不会进入 `V8.OsClientModel` 或前端配置，并按 Secret 规则在审计中掩码。整组字段都按租户独立配置且不会复制给新租户。修改 SaaS 租户行后须使用平台保存/刷新链路更新共享 Redis 与本节点租户快照，协议网关每次请求读取最新快照，不保留第二份静态缓存。新的 OAuth/第三方业务集成仍应优先使用当前租户库 `mci_system_setting` 与 Managed 接口引擎，不再扩展这组兼容字段。
+
+### 微信小程序内容安全配置
+
+在 SaaS 引擎当前租户的【微信】Tab 配置以下字段：
+
+| 字段 | 用途 |
+|---|---|
+| `WeChatMiniProgramAppId` | 小程序 AppId |
+| `WeChatMiniProgramAppSecret` | 小程序 AppSecret |
+| `WeChatMiniProgramMessageToken` | 微信消息推送 Token（令牌） |
+| `WeChatMiniProgramAESKey` | 微信消息推送 EncodingAESKey（消息加密密钥，43 位） |
+
+Token 与 AESKey 必须和微信公众平台填写的值完全一致。推荐在微信后台使用不含 QueryString 的地址：
+
+```text
+https://你的API域名/api/WeChatContentSecurity/Callback--OsClient--你的OsClient--
+```
+
+服务端也支持 `/api/WeChatContentSecurity/Callback?OsClient=你的OsClient`，但不使用历史缩写 `?o=`。C# 只读取上述敏感配置完成协议验签/解密，解密后的脱敏事件交给应用商城“微信小程序内容安全”中的官方核心接口；租户业务写入和附加日志维护在 `mci-wechat-content-callback-extension`，保存即生效。
+
+### CORS 兼容规则
+
+主租户 `sys_osclients.CorsAllowOrigins` 为空时，平台默认允许任意来源跨域，兼容本地开发、独立前端、H5 和存量租户；只有配置来源后才按精确来源或 `https://*.example.com` 这类通配符收紧。SaaS 引擎主租户字段 `CorsAllowAnyWhenUnconfigured` 可调整未配置时的兼容开关，默认值为允许。
+
+CORS 不是鉴权边界。即使默认允许跨域，服务端仍会校验 Token、`OsClient`、菜单/表权限、数据范围和保护表基线。平台会暴露 `authorization`、`osclient`、`did` 等续签所需响应 Header。
+
+### 租户文件上传配置
+
+Upgrade16/Upgrade35 会在 `sys_osclients` 增加以下可空字段，并将容易误解的旧正向开关迁移为负向开关：
+
+| 字段 | 说明 |
+|---|---|
+| `DisableFileUpload` | 关闭文件上传；默认关闭即允许，只有开启才禁止 |
+| `FileUploadMaxFileMB` | 单文件上限 MB |
+| `FileUploadMaxRequestMB` | 单次全部文件上限 MB |
+| `FileUploadMaxCount` | 单次文件数 |
+| `FileUploadDailyUserQuotaMB` | 单帐号 UTC 日额度 MB |
+| `FileUploadDailyTenantQuotaMB` | 单租户 UTC 日额度 MB |
+
+这些字段未填写时使用平台代码默认值，可以按租户提高或降低；旧 `FileUploadEnabled` 在新版表单隐藏，只供尚未创建 `DisableFileUpload` 物理字段的滚动升级节点兼容。平台固定灾难保护、API HTTP/Multipart 接收硬顶以及反向代理上限不接受租户覆盖。帐号与租户日额度由共享 Redis 原子统计，Redis 不可用时上传失败关闭。完整说明见 [分布式存储与文件安全](../more/hdfs)。
+
+## 基础配置
+>* 支持数据库读写分离，支持指定存储介质
+
+![SaaS 引擎基础配置](https://file.microi.net/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
+
+## 阿里云配置
+>* 如果未使用MinIO，即可使用阿里云的OSS+CDN
+
+![SaaS 引擎阿里云 OSS 配置](https://file.microi.net/upload/img/csdn/0e4da43b35394de7867cfa5425697476.png#pic_center)
+
+## MinIO配置
+>* 如果未使用阿里云OSS，则可以使用MinIO
+>* 值得注意的是，MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题。
+>* 比如说博主的反向代理配置文件
+::: details 展开查看 Shell 命令（88 行）
+```shell
+proxy_cache_path /www/wwwroot/static.example.com/proxy_cache_dir levels=1:2 keys_zone=static_example_com_cache:20m inactive=1d max_size=5g;
+server {
+    listen 80;
+    listen 443 quic;
+    listen 443 ssl;
+    http2 on;
+    server_name static.example.com;
+    index index.php index.html index.htm default.php default.htm default.html;
+    root /www/wwwroot/static.example.com;
+    #CERT-APPLY-CHECK--START
+    # 用于SSL证书申请时的文件验证相关配置 -- 请勿删除
+    include /www/server/panel/vhost/nginx/well-known/static.example.com.conf;
+    #CERT-APPLY-CHECK--END
+    #SSL-START SSL相关配置，请勿删除或修改下一行带注释的404规则
+    #error_page 404/404.html;
+    ssl_certificate    /www/server/panel/vhost/cert/static.example.com/fullchain.pem;
+    ssl_certificate_key    /www/server/panel/vhost/cert/static.example.com/privkey.pem;
+    ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
+    ssl_ciphers EECDH+CHACHA20:EECDH+CHACHA20-draft:EECDH+AES128:RSA+AES128:EECDH+AES256:RSA+AES256:EECDH+3DES:RSA+3DES:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    add_header Strict-Transport-Security "max-age=31536000";
+    error_page 497  https://$host$request_uri;
+    #SSL-END
+    #REDIRECT START
+    #REDIRECT END
+    #ERROR-PAGE-START  错误页配置，可以注释、删除或修改
+    #error_page 404 /404.html;
+    #error_page 502 /502.html;
+    #ERROR-PAGE-END
+    #PHP-INFO-START  PHP引用配置，可以注释或修改
+    include enable-php-00.conf;
+    #PHP-INFO-END
+    #IP-RESTRICT-START 限制访问ip的配置，IP黑白名单
+    #IP-RESTRICT-END
+    #BASICAUTH START
+    #BASICAUTH END
+    #SUB_FILTER START
+    #SUB_FILTER END
+    #GZIP START
+    #GZIP END
+    #GLOBAL-CACHE START
+    #GLOBAL-CACHE END
+    #WEBSOCKET-SUPPORT START
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+    #WEBSOCKET-SUPPORT END
+    #PROXY-CONF-START
+    location ^~ / {
+      proxy_pass http://localhost:1010;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Real-Port $remote_port;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Port $server_port;
+      proxy_set_header REMOTE-HOST $remote_addr;
+      proxy_connect_timeout 60s;
+      proxy_send_timeout 600s;
+      proxy_read_timeout 600s;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+    }
+    #PROXY-CONF-END
+    #SERVER-BLOCK START
+    #SERVER-BLOCK END
+    #禁止访问的文件或目录
+    location ~ ^/(\.user.ini|\.htaccess|\.git|\.env|\.svn|\.project|LICENSE|README.md)
+    {
+        return 404;
+    }
+    #一键申请SSL证书验证目录相关设置
+    location /.well-known{
+        allow all;
+    }
+    #禁止在证书验证目录放入敏感文件
+    if ( $uri ~ "^/\.well-known/.*\.(php|jsp|py|js|css|lua|ts|go|zip|tar\.gz|rar|7z|sql|bak)$" ) {
+        return 403;
+    }
+    #LOG START
+    access_log  /www/wwwlogs/static.example.com.log;
+    error_log  /www/wwwlogs/static.example.com.error.log;
+    #LOG END
+}
+```
+:::
+
+
+![SaaS 引擎 MinIO 配置](https://file.microi.net/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
+
+## Redis配置
+>* 支持哨兵模式
+
+![SaaS 引擎 Redis 配置](https://file.microi.net/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
+
+### SaaS 运行缓存刷新与扩展库加载
+
+`sys_osclients` 配置只应在平台启动、管理员保存 SaaS 配置或显式调用租户刷新能力时同步到进程内存与共享 Redis。普通表单查询、V8 执行、字段设计器保存不代表 SaaS 配置发生变化，不应持续输出“更新 OsClient / 缓存 OsClient 配置到 Redis”。
+
+- `microi_database` 的扩展库列表使用三态处理：尚未加载、已加载且为空、已加载且有数据。空列表是有效结果，不会在每次 V8 执行时重复查询或发布租户配置。
+- 扩展库会话按 Key 延迟初始化：列出目录或执行主库 CRUD 不会连接全部扩展库。一条未配置完成的扩展库不会阻断其它数据库；真正访问该 Key 时仍校验其类型与连接，并返回带当前租户和 Key 的错误，不会回退到主库或其它租户。
+- 创建数据库会话、初始化 `V8.Dbs` 等运行态动作只更新当前节点的可丢失本地对象，不向 Redis 发布配置变更；真正的配置更新才发布共享缓存通知。
+- 多节点收到共享缓存失效通知后只清理本节点缓存并按需回源，不能把收到的通知再次发布。配置更新仍须在数据库事务完成后发布，并按 `OsClient` 精确失效。
+- 表单设计器批量保存字段会在外层完成一次平台管理员授权，在同一事务内更新字段元数据，结束后只清理一次字段/授权缓存。字段数量较多但没有物理列改名或改类型时，不应出现按字段数重复的 SaaS 刷新日志。
+
+若终端连续出现成百上千条上述日志，先检查是否把“已加载但无扩展库”误判为未加载，或是否在循环内逐条调用完整 FormEngine 更新管线；不要通过关闭 Redis Pub/Sub 掩盖问题。
+
+### Redis 管理器
+
+平台内置 Redis 管理页面：`#/mci-redis-manager`。页面采用连接/数据库树、Key 空间树、SCAN 列表和内容编辑器三栏布局，可查看服务器与内存统计，并维护 String、Hash、List、Set、Sorted Set；Stream 支持分页只读。Hash、集合等内容统一使用吾码代码编辑器展示和格式化 JSON。
+
+- Redis 管理属于平台控制面，只允许 `Level >= 9999` 的平台超级管理员。未登录或普通角色即使知道路由也不能读取统计、扫描 Key 或执行写操作。
+- 支持当前租户连接和后端已经保存的连接。额外连接保存于主租户 `mci_redis_connection`，按 `TenantOsClient` 隔离；密码由后端保护且不会返回前端。
+- `temporary` 临时连接以及匿名输入任意 Host、用户名、密码直接管理 Redis 的旧模式已经禁止。登录系统不可用时应通过服务器受控运维通道排障，不能重新开放匿名 Redis 管理。
+- Key 查询使用非阻塞 `SCAN` 游标分页，支持按模式搜索、类型/TTL/内存查看、单个与批量删除、重命名、TTL 设置和 JSON 内容覆盖；不支持任意命令、Lua、`FLUSHALL` 或 `FLUSHDB`。
+- 修改集合内容时，后端会先完整校验 JSON，再替换原 Key；删除和覆盖操作会显示确认提示。生产环境仍应优先按 `Microi:{OsClient}:...` 前缀缩小检索范围。
+
+Microi MCP 同步提供 `microi_redis_statistics`、`microi_redis_list_keys`、`microi_redis_get_key`、`microi_redis_delete_keys`、`microi_redis_replace_value`、`microi_redis_rename_key`、`microi_redis_set_ttl`。MCP 默认操作当前 `OsClient` 的租户 Redis；额外连接只传管理页保存后的 `connectionId`，不得把 Redis 密码写入 MCP 参数或日志。所有写操作都要求 `confirmExecution` 明确确认。
+
+## MQ消息队列配置
+>* 支持集群模式
+
+![SaaS 引擎 MQ 集群配置](https://file.microi.net/upload/img/csdn/c171c8510a2b452980c3f020048b9d53.png#pic_center)
+
+## 搜索引擎配置
+>* 目前仅支持ES搜索引擎，支持分词搜索，将来可能扩展其它搜索引擎
+
+![SaaS 引擎 Elasticsearch 配置](https://file.microi.net/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
+
+## 接口引擎区分saas租户
+>* 用户访问一个接口引擎的自定义接口地址，如：(https://api.microi.net/apiengine/test1)[https://api.microi.net/apiengine/test1]，默认是走主库的接口引擎
+>* 假设租户A和租户B均有一个【/apiengine/test1】接口，则有多种方式来区分访问：
+>* 1、在访问【/apiengine/test1】接口时，传入对应用户的token，平台会根据token识别到OsClient值以访问对应的saas租户数据库
+>* 2、在访问【/apiengine/test1】接口时，没有token就是匿名访问，则通过增加Url参数来区别，如：/apiengine/test1?OsClient=tenant_demo
+>* 3、某些特殊情况可能无法使用Url参数，如微信支付回调，则可以通过特殊格式来实现传入OsClient值以区分saas租户数据库，如：/apiengine/test1--OsClient--tenant_demo--
+
+::: warning Token 不能跨租户继承身份
+当 URL 指定的目标 `OsClient` 与 Token 所属租户不一致时，平台不会把原登录身份带到目标租户。目标接口只有明确开启匿名调用时才能按匿名边界执行；不能通过修改 QueryString 或特殊 URL 格式，把租户 A 的管理员身份带入租户 B。
+:::
+
+```js
+//示例代码
+var appid = V8.OsClientModel.MiniProgramAppId;//小程序 appid
+var privateKey = V8.OsClientModel.WxPayPrivateKey;//私书私有key
+var notify_url = V8.SysConfig.ApiBase + `/apiengine/wxpay-notify--OsClient--${V8.OsClient}--`;//用户支付成功后回调地址，由接口引擎实现
+var jsapiUrl = 'https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi';//腾讯官方下单地址，固定url
+var jsapiUrlSimple = '/v3/pay/transactions/jsapi';//腾讯官方下单地址，固定url
+var currentUser = V8.CurrentUser;
+```
+
+示例中的租户业务密钥只允许在后端 V8 中使用，禁止返回前端、写入日志或把整个 `V8.OsClientModel` 作为接口结果。
+
+## 添加SaaS租户、SaaS数据库开库
+
+开库属于高权限、跨数据库操作，建议通过平台受控租户开通流程或接口引擎编排的原子能力完成，并保留操作人、目标 `OsClient`、数据库、执行结果和回读记录。不要在普通业务接口中直接拼接建库 SQL。
+
+创建租户使用后端编排的 `OsClientDbConn` 管理连接开库和创建独立账号。仅有某个业务库权限的账号通常无法完成此操作；出现 `Access denied ... to database 'mysql'`、`CREATE command denied` 等错误时，应将该配置改为已具备开库、`CREATE USER`、目标库授权（`GRANT OPTION`）及账号存在性查询权限的管理账号，例如已正确授权的 `root`，更新编排并重启后端，再从创建页面重试。不要通过手工还原 SQL 或修改业务表绕过开通流程。
+
+创建页面会显示当前连接的主机、端口、账号、失败阶段和处理方法；“原始错误详情”保留数据库驱动异常及异常链供开发人员排查，连接密码会脱敏。若原始错误为 `using password: YES` 的登录拒绝，应先核对密码和账号允许连接的来源，而不是一概归因为开库权限。
+
+新租户记录插入后若 MQTT 关闭配置写入或回读失败，开通返回失败。普通开通流程会尝试补偿回滚，可能已删除本次记录和库；公开试用等路径可能保留检查点，回滚失败也可能留下残余。先查看该次任务的回滚结果；若提示未完全成功或状态未知，由管理员在主库按 `OsClient + OsClientType + OsClientNetwork` 核查唯一记录，确认任何残留记录的 `MqttEnable=0`、没有可用 MQTT 凭据，再核对目标租户库和业务开通状态，按原任务恢复。不要盲目重试、直接手删记录或暴露凭据明文。
+
+历史 ZIP 还原后会由程序执行版本升级。旧菜单表中仍为整数类型的可选关联字段（如 `ReportId`），由商城导入器依据实际列类型将空字符串写为 `NULL`，保留原有非空值，避免 MySQL 严格模式中断升级；无需手工改表或修改 SQL 备份包。
+
+### 1、规划租户身份与数据库
+
+- 提前确定唯一的 `OsClient`、`OsClientType`、`OsClientNetwork`，不要复用已有租户 Key。
+- 使用官方支持的 empty/demo 模板或受控开库能力创建数据库。目标数据库使用独立最小权限帐号，只授权当前租户库。
+- 数据库连接、用户名、密码、`AuthSecret`、Redis、对象存储、MQ/MQTT、搜索等凭据不要写入文档、日志、截图或前端。
+- 初始化后暂停模板中的业务 Job，并按新租户实际需要逐个启用；不要让复制来的任务立即影响生产业务。
+
+### 2、在主库 SaaS 引擎创建独立记录
+
+::: danger 不要复制整条主租户配置
+主租户记录包含身份、数据库、认证、Redis、对象存储、MQ/MQTT、搜索等机密。直接使用“复制”并只修改 `OsClient`，容易让新租户继承主租户数据库或管理员凭据，造成跨租户访问。
+:::
+
+- 优先使用【新增】或受控租户开通流程，显式填写新租户的身份、数据库和域名。
+- 即使界面复制仅作为草稿，也必须在保存前清空并重新生成租户身份、数据库、认证、Redis、对象存储、MQ/MQTT、搜索等敏感字段；共享基础设施的管理密钥不能持久化到子租户记录。
+- RabbitMQ 使用独立 user/vhost/ACL，MQTT 使用独立帐号，Search 使用只允许 `{osClient}_*` 的 API Key。外部资源尚未创建时保持不可用并失败关闭，不能回退主租户管理员凭据。
+- 保存后刷新 SaaS 引擎共享缓存，分别回读 `OsClient`、域名、数据库类型、启用状态和脱敏后的运行配置。不要以“保存成功”或“重启容器”代替回读。
+- 通过新租户 `admin` 登录，验证 Token 只属于新租户、基础菜单可见、FormEngine 不会访问主租户数据、文件/缓存/队列/Topic/索引均使用新租户命名空间。
+
+### 3、上传 ZIP、观察还原进度与判断任务状态
+
+自定义数据库包分为“文件上传”和“数据库还原”两个阶段，两个百分比不能混为一谈：
+
+| 阶段 | 页面会显示什么 | 完成标志 |
+|---|---|---|
+| ZIP 上传 | 已上传字节、文件总量、上传百分比和分片会话；默认按 16MB 分片，暂停后再次提交可断点续传 | 私有文件路径已经生成，并成功提交后台任务 |
+| 数据库还原与租户初始化 | 固定 13 步总进度、当前步骤、总百分比、已用时、预计剩余时间、服务端心跳和执行记录 | 后台任务进入 `Succeeded`，且租户、数据库、管理员与运行配置均已回读 |
+
+进入第 2 步时，页面最初可能显示 `2 / 13`（约 16%）。这只是“正在校验并还原数据库 ZIP”阶段的起点，不代表任务卡死。大库导入期间，总百分比会根据真实 SQL 读取量在该阶段内继续推进；状态文字会显示 ZIP/SQL 已读取字节、总字节、SQL 百分比、已执行语句数、当前批次、语句类型、平均吞吐和动态预计剩余时间。
+
+执行记录采用有界输出：数据库导入只在阶段变化和 SQL 每跨过约 5% 时追加一条记录，不会为几十万条语句逐条写日志；页面最多渲染最近 200 条，其余记录折叠提示，避免大数据导入拖慢浏览器。状态仅在距上次更新约 2 秒或新增约 16MB 数据时刷新，短时间内百分比不变并不能单独证明任务停止。
+
+判断任务是否仍在执行时，应综合查看服务端心跳、已读取字节、已执行语句数、批次和当前消息。不要因为第 2 步耗时较长就刷新后重复创建同一租户。任务失败、取消或中断时，页面会保留最后真实进度、执行记录和错误原因；只有后台任务成功终态才能按创建成功处理。
+
+#### 官网个人中心、邀请注册与系统授权
+
+吾码官网个人中心按用途分为账户概览、我的系统、创建系统、系统授权、邀请关系、AI 工作台和账户设置。概览提供入口；系统页管理云端租户；AI 密钥、对话与消费记录集中在 AI 工作台。
+
+创建页向 `platform-background-task` 提交 `Action: 'RunApiEngine'`、`TargetApiEngineKey: 'official_create_tenant_worker'`，并在 `Param` 中传租户 Key、名称及进度标识。队列目标必须与底层开通原子校验的工作器 Key 一致，不能改为兼容提交器。路由调度器与后台目标必须分别传递，不能用请求正文的 `ApiEngineKey` 覆盖调度路由。每次创建仍需要绑定本次租户 Key 的 Gitee OAuth/Star 一次性验证；历史 Star 标记不能代替本次授权。
+
+Gitee OAuth 仅申请 `user_info` 来确认当前 Gitee 身份，Star 状态通过公开 Star 页面分页校验，不需要项目写入、公钥、Webhook、组织、企业或邮箱权限。应用创建者还需在 Gitee 的「第三方应用 → 我的应用」中将该应用登记权限收窄为 `user_info`：仅在授权 URL 中传 `scope=user_info`，不能保证 Gitee 授权页取消其它登记权限的默认勾选。上线验收须核对实际授权页，而非仅检查请求 URL。
+
+邀请关系页提供个人邀请链接。新用户通过该链接完成短信验证及注册后，`official_sms_login` 才绑定 `sys_user.InviterUserId` 和服务端生成的 `InvitationPath`；已有账号不会重新绑定，也不能通过前端指定用户 Id、路径或上级来修改归属。注册使用 `platform_auth_sms_login` 的原子验证码消费和密码哈希；密码登录复用 `platform-sys-user-session`，成功后继续签发 DiyToken。
+
+`official_account_invitations` 根据当前登录身份按分支加载邀请树，每页 30 人。节点显示公开头像、帐号、姓名、注册时间及最后登录官网时间；后者使用独立的 `LastWebsiteLoginTime`，不会把管理后台的 `LastLoginTime` 当作官网登录。新字段首次启用前没有历史数据时显示“暂无记录”。只有本人及本人的后代节点可展开；不会返回私有头像、密码或权限数据。
+
+系统授权页通过 `official_account_licenses` 分页查询本人 `ApplyUserId` 对应的 `diy_license`，与框架 `/#/license` 共用个人版及企业版授权申请记录，显示审核、撤销、到期和更新服务状态。历史记录没有申请人身份时，应由管理员核对归属，不能仅按同名或手机号自动认领。接口不返回授权签名正文或密钥。SaaS 引擎和系统账号应用更新会交付邀请字段及接口；SaaS 引擎同时携带授权记录表结构，不覆盖已有授权业务数据。
+
+#### 长任务分布式锁与续租边界
+
+租户开通由平台可信持久后台任务执行。可信任务的单次 Redis 租期最多 60 秒，正常运行时由持有者令牌持续续租，业务执行预算与失联恢复窗口分别计算；当前 SaaS 数据库开库最长保护边界为 12 小时，因此长任务不会仅因短租约自然到期而失败，节点退出后也无需等待原来 20 分钟或一小时的执行预算才能恢复。显式更长的执行预算继续保留对应保护边界。浏览器或普通 HTTP 请求即使伪造 `_BackgroundTaskId`，也不能取得可信后台身份或开启自动续租。
+
+自动续租不是无限运行，也不会掩盖真实故障。出现持有者令牌不匹配、锁已过期、Redis 所有权/续租确认失败，或到达最长租约时，任务会失败关闭并停止继续推进；业务写入仍须使用幂等键、状态机、检查点和 fencing token，不能只依赖锁保证“只执行一次”。详细开发规则见 [接口引擎的分布式锁](../v8-engine/api-engine#分布式锁)，上传大小、反向代理和断点续传配置见 [Docker 安装](../getting-started/docker-run)。
+
+### 4、自定义域名绑定与 ESA 两阶段就绪
+
+通过阿里云 ESA 为租户自动创建 CNAME 时，必须把“控制面记录已创建”和“数据面 HTTPS 已可用”作为两个独立结果展示、记录和验收：
+
+| 阶段 | 通过条件 | 不能证明的事项 |
+|---|---|---|
+| ESA 控制面记录已创建 | 创建/更新调用成功，并强回读记录名、记录类型、目标值、代理状态和源站配置与请求一致 | 不能证明 ESA 节点能连到源站，也不能证明证书、Host/SNI 或租户页面正确 |
+| 数据面 HTTPS 已可用 | 从公网实际请求租户域名，DNS 已进入 ESA，ESA 回源成功，TLS 链有效，并得到真实的非 5xx HTTP 响应 | 仅有 CNAME、控制台“已启用”、TCP 可连接或源站本机访问成功都不算 Ready |
+
+因此，域名创建接口即使返回“记录已创建”，前端也只能显示控制面阶段成功；必须继续轮询有上限的数据面检查。只有真实 HTTPS GET 返回非 5xx，且页面/公开配置解析出的 `OsClient`、系统标题和 API 地址属于目标租户，才能标记域名就绪。不要把 DNS 查询成功、ESA 记录存在或单次端口探测直接折算成 Ready。
+
+#### ESA 522 的含义与回源白名单
+
+`HTTP 522` 表示 ESA 节点在规定时间内无法与源站建立连接，通常是 ESA 回源 IP 被拦截、源站 80/443 未监听、网络路由异常或源站过载；它不是“CNAME 创建失败”。排查时按以下顺序处理：
+
+1. 在 ESA 控制台目标站点的【安全防护 → 源站防护】同时复制**当前生效**回源 CIDR 清单和**最新待启用**清单，规范化 IPv4/IPv6 CIDR 后计算 `最新 - 当前` 差集。先把差集补入全部防护层，并在切换窗口保留 `当前 ∪ 最新`；确认最新清单已启用且访问稳定后，才可按需移除不再使用的旧段。不得把易变化的 ESA IP 段硬编码到吾码源码或应用包。
+2. 对实际使用的源站 TCP 端口放行上述 CIDR。源站同时提供 HTTP 跳转和 HTTPS 回源时，80、443 都要放行；只开放其中一项时，ESA 回源协议和端口必须与其一致。逐层检查 ECS 安全组入方向、阿里云云防火墙、宝塔/安全狗等面板或安全软件、主机 `firewalld` / `nftables` / `iptables` / `ufw`，任何一层拦截都会产生 522。使用阿里云云防火墙联动时应开启 ESA 的“自动启用最新回源 IP 列表”，但仍要核对宝塔和主机防火墙等非联动层。
+3. 在源站确认 nginx/Ingress 和 Docker 端口映射确实监听 80/443，并绕过 ESA 使用正确的源站域名、Host 与 SNI 做一次直连检查；不要把另一个 ESA 加速域名配置成源站，避免回源循环。
+4. HTTPS 回源时，源站 nginx 的 `ssl_certificate` 必须使用站点证书加中间证书组成的 `fullchain.pem`，不能只发送叶子证书。边缘证书正常不代表源站证书链正常；应使用 `openssl s_client -servername` 检查源站实际发送的证书链。
+5. 最后从源站网络之外重新访问租户域名并检查 ESA/源站日志。只有真实请求不再返回 5xx，且内容属于目标租户，才能完成数据面验收。阿里云的动态清单与处理步骤以 [ESA 源站防护](https://help.aliyun.com/zh/edge-security-acceleration/esa/user-guide/origin-protection) 和 [522 源站连接超时](https://help.aliyun.com/zh/edge-security-acceleration/esa/support/522-error-origin-connection-timeout) 的当前说明为准。
+
+域名链路失败不等于租户创建失败。若租户数据库已经正确导入、主库 `sys_osclients` 唯一记录正确，并且绕过自定义域名后能按目标 `OsClient` 登录和回读系统设置，应保留租户、数据库、后台任务与审计记录，只修复 DNS、ESA、网络、反向代理或证书链后重试数据面验收。不得仅因 522、证书错误或域名尚未传播就删除并重新导入数百 MB/GB 的数据库；只有权威回读证明租户或数据库本身错误且无法幂等恢复时，才进入明确的清理流程。
+
+完整的一键安装反向代理、证书链和命令级检查见 [Docker 安装](../getting-started/docker-run)。
+
+### 5、做反向代理
+>* 假设主库的访问地址是【192.168.1.11:1001】，此时需要nginx新增一个反向代理【192.168.1.11:1002】到1001端口，此时则可以直接访问【192.168.1.11:1002】saas库
+>* 类似的例子【https://os.itdos.com】就是主库，而【web.microi.net】就是其中saas库之一
+
+完整平台授权、CORS、SSRF、登录 RSA、Token 和升级兼容规则见 [平台安全与兼容基线](../more/security)。

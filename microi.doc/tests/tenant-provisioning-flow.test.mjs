@@ -61,7 +61,7 @@ test('Gitee authorization requests only user_info even when the caller supplies 
     Param: { TenantKey: 'testtenant', ReturnUrl: 'https://microi.net/profile.html#/create', Scope: 'projects keys emails' },
     OsClientModel: {
       Id: 'main-config', GiteeStarRequired: 1, GiteeOAuthClientId: 'public-client-id',
-      GiteeOAuthRedirectUri: 'https://api.itdos.com/apiengine/gitee-callback-v1',
+      GiteeOAuthRedirectUri: 'https://api.microi.net/apiengine/gitee-callback-v1',
       GiteeRepositoryOwner: 'ITdos', GiteeRepositoryName: 'microi.net'
     },
     Cache: { Get: key => entries.get(key), Set: (key, value) => entries.set(key, value) },

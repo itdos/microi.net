@@ -5,6 +5,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as sass from 'sass';
+import { docAssets, getDocAssetUrl } from '../docs/.vitepress/theme/doc-assets.js';
+import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(projectRoot, '..');
@@ -71,11 +73,11 @@ test('MicroService guide explains all four runtime entries with real case images
     'menu-packing-workbench.jpg',
   ];
   for (const image of images) {
-    const relativePath = `microi.doc/docs/public/images/microservice-cases/${image}`;
-    const absolutePath = path.join(repositoryRoot, relativePath);
-    assert.ok(fs.existsSync(absolutePath), `${relativePath} must exist`);
-    assert.ok(fs.statSync(absolutePath).size > 100_000, `${relativePath} must contain the real screenshot`);
-    assert.ok(guide.includes(`/images/microservice-cases/${image}`));
+    const legacyPath = `/images/microservice-cases/${image}`;
+    const absolutePath = verifiedDocAssetPath(legacyPath, docAssets);
+    assert.ok(fs.existsSync(absolutePath), `${legacyPath} verified cache must exist`);
+    assert.ok(fs.statSync(absolutePath).size > 100_000, `${legacyPath} must contain the real screenshot`);
+    assert.ok(guide.includes(getDocAssetUrl(legacyPath)));
   }
 });
 

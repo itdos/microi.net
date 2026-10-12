@@ -1,4 +1,4 @@
-export const OFFICIAL_MICROI_API_BASE = 'https://api.itdos.com'
+export const OFFICIAL_MICROI_API_BASE = 'https://api.microi.net'
 export const LOCAL_MICROI_API_BASE = 'https://localhost:61501'
 
 function normalizeApiBase(value) {

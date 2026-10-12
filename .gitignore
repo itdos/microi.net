@@ -193,3 +193,8 @@ AI- Project-Temp/
 /skills-lock.json
 **/.microi-e2e/artifacts/
 **/.tmp/
+
+# 官网图片由官方 MCP 和内容指纹清单交付；保留小型架构审计 metadata。
+/microi.doc/docs/public/api_plugins/**
+/microi.doc/docs/public/images/**
+!/microi.doc/docs/public/images/microi-ai-platform-architecture.manifest.json

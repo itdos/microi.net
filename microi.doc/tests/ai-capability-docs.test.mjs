@@ -4,6 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { docAssets, getDocAssetUrl } from '../docs/.vitepress/theme/doc-assets.js'
+import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspaceRoot = path.resolve(projectRoot, '..')
@@ -13,7 +15,7 @@ function read(relativePath) {
 }
 
 function readAsset(relativePath) {
-  return fs.readFileSync(path.join(projectRoot, 'docs/public', relativePath))
+  return fs.readFileSync(verifiedDocAssetPath(`/${relativePath}`, docAssets))
 }
 
 function sha256(buffer) {
@@ -65,7 +67,7 @@ test('the data-analysis page publishes exactly three original screenshots in one
     '/images/ai-data-analysis/monthly-business-overview.png',
     '/images/ai-data-analysis/sales-activity-analysis.png',
     '/images/ai-data-analysis/customer-follow-up-activity-analysis.png',
-  ])
+  ].map(getDocAssetUrl))
   assert.equal([...gallery.matchAll(/<figure>/gu)].length, 3)
   assert.equal([...gallery.matchAll(/data-fancybox="ai-data-analysis-originals"/gu)].length, 3)
   assert.equal([...gallery.matchAll(/<figcaption>/gu)].length, 3)
@@ -109,7 +111,7 @@ test('the creation training page mirrors all 29 current image tools and media bo
     'HDFS',
   ]) assert.ok(page.includes(phrase), `creation training is missing boundary: ${phrase}`)
 
-  assert.match(page, /src="\/images\/ai-creative-studio\/capability-overview\.png"/u)
+  assert.ok(page.includes(`src="${getDocAssetUrl('/images/ai-creative-studio/capability-overview.png')}"`))
   assert.match(page, /data-fancybox="ai-creative-studio-original"/u)
 })
 

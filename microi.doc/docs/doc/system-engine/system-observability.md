@@ -1,0 +1,670 @@
+# 🛰️ 系统日志/监控
+
+> 【系统日志/监控】把原系统日志、系统监控和安全日志菜单收口为一个可安装、可升级、可由 AI 查询的可观测性控制台。它用于回答三个最重要的问题：系统现在是否健康、资源消耗来自哪里、异常流量由谁通过什么接口产生。
+
+![系统日志/监控网络流量驾驶舱](https://file.microi.net/itdos/official-docs/images/f39f7203a248adb50ffc7e168ab363d42bc286521f28bd389ea19ebc2778ee30/202610/traffic-cockpit.png)
+
+## 功能亮点
+
+- **日志仍是第一入口**：首个 Tab 提供日志总数、错误、警告、慢 SQL、慢执行、异常统计，支持组合筛选、搜索、每页 15 条默认分页和完整详情。
+- **从现象追到根因**：热点接口按窗口总耗时贡献排序，同时展示请求数、平均/P95、异常率、活动请求与 W3C TraceId 时间线。
+- **网络流量可归因**：同时展示网卡/容器累计与窗口增量、HTTP 请求体/响应体字节、未归因残差，并按接口、IP、帐号/匿名、租户和内容类型排名。
+- **高价值异常留证**：普通高频样本只留短窗口内存；错误、慢请求、大文件和可疑传输通过有界队列异步写 MongoDB；长期趋势写入 MySQL 固定时间桶。
+- **运行态一屏诊断**：覆盖进程 CPU/内存/线程/GC、主机、磁盘、网卡、Docker 容器、日志队列、正在执行与最近完成请求。
+- **安全数据与治理**：统一查看安全访问、攻击事件、活动封禁，并在核对代理/NAT 后封禁或解封 IP；所有动作复核权限并写审计。
+- **主题化驾驶舱**：界面跟随平台主题，异常标红并给出原因/方案；持续动效仅使用低成本属性，在页面隐藏或“减少动态效果”时自动暂停。
+- **AI 原生**：MCP 提供统一只读查询和有确认门的 IP 治理工具；能力目录、参数上限、权限与真实数据边界均可机器读取。
+
+## 八个功能页
+
+| Tab | 主要能力 | 典型问题 |
+|---|---|---|
+| 系统日志 | 统计卡、类型/级别/月/关键字筛选、详情、Trace | 为什么报错、哪条 SQL 慢、参数和堆栈是什么 |
+| 网络流量 | 收发总量、HTTP 归因、残差、趋势、五类 TOP、大文件/可疑样本 | 30GB 接收和 9GB 发送是什么、谁发的、发给谁 |
+| 运行诊断 | 请求率、并发、错误率、P95、热点接口/IP、自动建议 | CPU 高时最值得先查什么 |
+| 请求与接口 | 正在执行、最近完成、TraceId、状态与耗时 | 是否有长请求或并发堆积 |
+| 系统监控 | 进程、主机、磁盘、网卡、Docker、队列 | 是 CPU、GC、内存、磁盘还是容器问题 |
+| 内存与事故 | 执行分配、代码哈希、对象类型/调用栈、跨节点事故历史 | 哪个接口或 V8 事件在异常分配，进程退出前在执行什么 |
+| 安全数据 | 访问、攻击、IP 封锁与解封 | 是否被扫描/攻击、是否需要处置某个 IP |
+| 应用日志 | 当前 API 进程环形日志尾部、搜索和脱敏 | 服务端最近输出了什么 |
+
+![系统日志/监控总览](https://file.microi.net/itdos/official-docs/images/615a5e23c17e996ccf5509dd3f316546614d2ee886ec97f66e5f635fdd400e1b/202610/overview-navigation.jpg)
+
+
+## 受信规则安装诊断
+
+规则调用被拒绝时，使用现有 MCP 查询 `action=Snapshot`，查看 `FixedStepRuntime`。
+协议为 `fixed-step-installation/v1`，只返回已认证租户在当前节点的编译登记与最近安装尝试。
+需要部署包含该诊断的后端；更新 MCP 或应用页面不能安装原生规则。
+
+| 字段/状态 | 如何判断 |
+|---|---|
+| `Available=false` 或字段不存在 | 当前后端未提供诊断，不能推断规则已安装 |
+| `Registrations=[]` | 当前节点没有为本租户编译登记的规则；检查实际部署组合 |
+| `ApiAssemblyFileSha256`、`AssemblyFileSha256` | 初始化时固定程序集文件的摘要；与实际发布制品比对，不返回磁盘路径 |
+| `Pending` | 编译登记存在，尚无完成的注册尝试 |
+| `RegistrationFailed`、`ErrorCode` | 保持关闭；错误码只来自固定验证白名单，未知异常为 `RegistrationFailed` |
+| `DependencyIdentity`、`DependencyFailureReason` | `DependencyHashMismatch` 时，可信校验器记录失败的程序集完整名称；原因区分 `MissingFile / MissingManifest / InvalidManifestHash / ContentMismatch`，旧后端可能不提供 |
+| `DependencyExpectedSha256`、`DependencyActualSha256` | 有效审批清单的期望摘要与实际文件摘要；缺清单或清单摘要无效时不读取文件摘要，不返回路径 |
+| `CatalogRegistered` | 本进程曾完成目录注册；继续通过真实调用核验当前主库审批与发布指针 |
+
+`Attempts`、`LastAttemptUtc` 和 `LastRegisteredUtc` 用于判断后台重试与信息新鲜度。
+读取快照不执行规则工厂、不查询审批、不触发安装，也不返回 SQL、配置、Token 或异常正文。
+`AuthorizationProof=false`：目录状态不能代替主库权限、撤销检查、房间调用或多节点验收。
+依赖诊断只接受实际校验器产生的有界记录，不采用调用方的异常正文或 `Exception.Data`；
+成功后清除旧失败信息。发现摘要不一致时核对发布镜像、审批清单和该节点的实际依赖，
+不可为恢复调用而跳过校验或从未经审核的请求值更新审批。
+生成依赖清单时沿用正式 API 的 `.deps.json`、`.runtimeconfig.json` 与目标平台的解析方式。
+例如 Linux 实际加载 `runtimes/unix` 或 `runtimes/linux` 下的 DLL 时，根目录同名通用文件的摘要不能替代它；
+发布门禁须按完整 `publish/runtimes/.../*.dll` 相对路径核验实际制品，继续拒绝路径穿越、重复路径与摘要差异。
+
+### 后台固定步调度
+
+同一管理员 `Snapshot` 还返回 `FixedStepPump`（`fixed-step-pump/v1`）。后台调用没有
+HTTP 请求记录；安装状态为 `CatalogRegistered` 不能证明后台正在推进。
+
+| 字段 | 如何判断 |
+|---|---|
+| `LoopState / LastWakeUtc` | 区分未启动、运行、停止和故障，核对当前节点的唤醒时间 |
+| `OwnedRooms / ActiveDispatches` | 仅当前租户的本机唤醒提示与在途数量，不代表主库租约或全站容量 |
+| `Rooms[].LocalState / LocalLeaseRemainingMs` | 本机状态及保守剩余时间；过期、停止的历史记录剩余时间为零 |
+| `Dispatches / Committed / Unknown` | 已安排调用及收到的提交/未知响应计数；提交仍需主库 checkpoint 独立回读 |
+| `LastOutcome / LastResultCode / LastErrorCode` | 白名单错误类别，如 `LoginRequired`、预算拒绝、陈旧租约、取消或异常；不返回错误正文 |
+
+摘要最多保留 128 个房间、每租户 16 个，节点重启后可丢失。移除本机提示不会立即抹掉
+最近失败；淘汰或字段缺失表示缺证，不能解释成零错误。快照不包含请求号、fence、
+Token、参数、异常栈或磁盘路径，也不触发规则工厂、审批查询和安装。
+
+`Unknown` 继续保留原 RequestId；观察摘要不能重新提交新请求、重置房间时间或跳过
+DB 租约。后端升级后才提供这些字段，现有 MCP 的 `Snapshot` 参数不变。
+## API 排队与容器重建后的事故证据
+
+升级包含 `critical-incidents/mysql-v1` 的 API，并安装新版【系统日志/监控】应用后，
+关键事故保存到当前租户主库的 `mci_runtime_incident`。不要求 API 能写容器外目录。
+普通日志仍使用 MongoDB；完整分配栈仍由诊断文件与 MongoDB 保存。
+
+| 入口/字段 | 如何判断 |
+|---|---|
+| `Memory.RequestWaits.Groups` | 按租户、接口、阶段和外部目标汇总；`Gate:V8Tenant` 表示等待本租户名额 |
+| `Samples / Recent` | 查看 TraceId、执行 Id、当前等待时长或完成结果；注册溢出及省略计数必须同时核对 |
+| 事故 `WaitEvidence` | 保留并发峰值、最长等待样本和 `WorstThreadPoolFrame`；恢复后的空快照不抹掉现场。各分组按自己的 `ObservedAtUtc` 判断，不能相加为同时发生的总数 |
+| `Evidence.CriticalStorage` | `Scope=CurrentNodeAllLoadedTenants` 表示当前节点全部已加载租户的写库状态；`AcknowledgedWrites`、`LastAcknowledgedAtUtc` 是节点级确认，必须读回当前租户的 MySQL 事故验证归属；`Pending` 不是已保存 |
+| `MemoryIncidents.RelationalStorage` | MySQL 查询状态独立于 MongoDB；Mongo 不可用仍可查已确认关键证据 |
+| `StorageKind=MySqlCriticalEvidence` | 当前详情来自 MySQL，`RawStacksStoredHere=false`；检查 `EvidenceTruncated` |
+
+外部目标只保存协议、主机、端口和路径 SHA-256，不保存查询、路径明文、请求头、正文或凭据。
+`AwaitingHttpCompletion` 包含连接、服务端处理和接收，不能直接断言是 DNS、TCP 或对方内部故障。
+Admission 数量与 HTTP 调用数量不能相加成线程数。持续等待 10 秒只触发留证，600 秒默认超时和显式长超时不变。
+
+采样与 MySQL 写入各使用独立线程。数据库最多两个并发无池连接，连接/命令各 2 秒；
+写入失败按租户退避 10 秒，避免同一故障数据库的每条记录重复占用连接等待。待写队列最多 64 个事故，每租户最多 8 个并合并新快照；全局满时优先从占用最多的租户释放旧快照，让新租户仍可留证。`RetryingTenants` 表示退避中的租户数量，`DroppedSnapshots` 包含容量替换或拒绝，未确认文件仍可重放。单条关键证据最多 256 KiB；
+持久目录中的事故由独立写库线程每 10 秒分批重放，使用单独的 MySQL 版本确认文件；Mongo 的写入确认不代替 MySQL 确认。重启后继续补写，`SpoolReplayError` 表示本地重放异常。
+每租户保留 14 天或最新 512 条。记录带租户幂等键和版本，旧节点重放不能覆盖较新证据。
+新表和索引由官方应用包安装，运行时不自动建表；`MySqlError:1146` 时先检查应用是否已更新。
+当前关系库后备支持 MySQL，其他驱动明确报告不支持，继续保留既有 Mongo/WAL 通路。
+
+**持久化边界**：API 容器重建不会删除 MySQL 已确认记录。尚在内存队列、MySQL 与 Mongo
+同时不可用、数据库自身磁盘丢失或采样前强杀仍可能缺证；这不等于零丢失保证。
+没有持久日志卷时，原始 EventPipe 片段仍会丢失，不能把关键证据称为完整调用栈。
+
+## 内存吃满与异常退出定位
+
+“内存与事故”使用独立于 V8 资源限制的诊断采集。`V8Limit=0/false` 继续允许复杂业务执行，采集器不会终止脚本，也不会替业务设置内存或语句限额。仅打开前端页面、升级微服务或开启 V8 限制，都不能代替升级包含诊断运行时的 API。
+
+执行开始时记录租户、接口 Key、表名、事件名、执行/父执行 Id、W3C TraceId 和脚本 SHA-256；不保存脚本正文和业务参数。HTTP、接口引擎内部调用、表单 V8、工作流节点、Job 和 MQTT 的执行入口均可产生身份。尚未返回的执行也进入周期检查点，不再只依赖 `finally` 中的完成日志。数据筛选事件的身份由实际执行入口决定，不能把浏览器前端 V8 的内存当成服务器内存。
+
+| 证据 | 能回答什么 | 不能据此断言什么 |
+|---|---|---|
+| 执行独占/含子调用累计分配 | 哪个执行链产生大量托管对象 | 分配量不等于存活量或该接口独占 RSS，父子不能相加 |
+| 独立 EventPipe 分配样本与 CLR 栈 | 对象类型、分配方法及关联的接口/V8 事件和代码版本 | 采样不是完整堆；CLR 栈不保证给出 JavaScript 行号 |
+| API RSS、托管堆、分配率、GC、宿主余量、cgroup | 托管分配、整体宿主压力、容器上限、OOM kill 计数的区别 | API 只占宿主一部分不代表宿主安全；拿不到的指标显示不可用 |
+| MongoDB 驻留内存、WiredTiger 缓存、日志库存储 | Mongo 进程 RAM、缓存和磁盘空间分别多大 | 日志库 22 GB 磁盘占用不等于 Mongo 进程用了 22 GB 内存 |
+| 事故检查点和重启恢复 | 重启前尚在运行的执行、最后压力与分配栈 | “未正常退出”不能单独证明 OOM；需结合 cgroup/内核退出证据 |
+
+默认每 2 秒保留一次检查点，实时压力窗口约 2 分钟。宿主余量不足、cgroup 达到 80%、RSS 快速增长、高分配率、OOM kill 计数变化或磁盘空间不足会产生诊断事故；这些阈值仅触发留证，不拒绝业务。独立采集器每段最长采集 15 秒，主体达到 16 MiB 时提前收尾，单段硬上限为 64 MiB；保留最近两段，加上正在写入的一段最多 192 MiB。EventPipe 缓冲固定为 64 MiB，解析工作在受限子进程执行，故障会退避重试并在页面显示降级。
+
+完整 API 的收尾元数据实测约 35 MiB，原 16/32 MiB 缓冲出现丢事件，64 MiB 缓冲的对应验证未丢事件。微软说明 rundown 是恢复动态方法栈所需的收尾数据，大应用的文件体积会明显增加，因此不能用小型测试宿主代替完整平台验收；截断、缺栈和丢事件仍须如实展示。[EventPipe 采集配置说明](https://source.dot.net/Microsoft.Diagnostics.NETCore.Client/DiagnosticsClient/EventPipeSessionConfiguration.cs.html)
+
+事故先原子写入 API 内容根目录下的 `logs/memory-diagnostics`，然后异步写入当前租户 MongoDB 日志库的 `memory_incidents`。共享事故默认保留 14 天；本机历史有 256 MiB 预算，活动采集片段另受固定上限约束。多节点使用全局事故 Id 幂等补传，旧版本不能覆盖新证据。列表最多 50 条，只读摘要；详情按事故 Id 单独读取，执行身份和栈按可信租户过滤。Mongo 不可用时本机仍可留证，恢复后自动补传；另一节点只能看到已经上传的共享历史。
+
+整个容器退出、独立采集器也来不及完成解析时，重启后会在受限子进程中尝试最后两个原始片段。未写完的尾段可能保留接口身份和对象类型，却缺少方法栈；恢复时保留这部分证据，再补充前一完整片段，缺失栈、丢事件和截断状态仍明确显示。Linux 进程身份使用内核启动标识识别 PID 复用，持久卷清理避开仍被 API、采集器或解析器持有的片段。
+
+**上线必须核对**：API 发布目录包含 `diagnostics/Microi.MemoryDiagnostics.dll` 和依赖；进程允许本机 .NET 诊断连接；`logs` 挂载可写持久卷；页面中的采集器心跳新鲜、丢事件/溢出/存储错误可见。容器重建若丢掉本机卷，尚未补传的证据无法恢复。持久卷无法写入、整机断电、启动初期崩溃、极快 OOM 或长时间线程调度阻塞都可能扩大两秒窗口，不能承诺零丢失。
+
+发生问题时先读取 `Memory` 的采集质量和压力，再打开 `MemoryIncidents` → `MemoryIncident`，沿 Key、事件名、代码哈希和 Trace 查当时版本的业务逻辑。如果 RSS 持续上升但分配样本没有相应热点，应考虑长期存活对象、缓存保留、非托管内存或外部数据库进程；这些情况仍需受控堆分析或数据库侧证据，不能把分配榜第一名自动宣布为根因。
+
+```json
+{"action":"microi_query_system_observability","params":{"action":"Memory"}}
+```
+
+```json
+{"action":"microi_query_system_observability","params":{"action":"MemoryIncidents"}}
+```
+
+```json
+{"action":"microi_query_system_observability","params":{"action":"MemoryIncident","incidentId":"0123456789abcdef0123456789abcdef"}}
+```
+
+### 先检查证据是否完整
+
+`Memory` 是当前节点视角；`MemoryIncidents` 合并当前租户的共享历史与本机记录。先核对 `NodeId`、`BootId`、`BuildVersion` 和 UTC 时间，再解释排行。接口返回 `Code=1` 只表示查询成功，不代表采集器或存储健康。
+
+| 检查位置 | 正常时应看到 | 异常时如何解释 |
+|---|---|---|
+| `Collector.Status/Fresh/SampledAtUtc` | 正在采集，心跳新鲜 | `Fresh=false` 或时间陈旧时，不能用空榜证明没有异常分配 |
+| `Collector.Error/LastCaptureError` | 没有持续错误 | 检查 API 是否带采集器、诊断通道和子进程启动权限 |
+| `Collector.LostEvents/OverflowSamples/UnattributedEstimatedBytes` | 结合窗口检查遗漏与无归属量 | 非零表示归因有缺口；无归属分配不能硬算给某个接口 |
+| `Executions.RegistryOverflowCount` | 活动执行登记未溢出 | 发生溢出时，执行列表不是所有活动请求的完整清单 |
+| `Evidence.LocalStorageError/DroppedUnuploadedFiles` | 无写盘错误、无未上传记录被预算淘汰 | 磁盘满或卷不可写会损失证据，应优先处理留证条件 |
+| `Evidence.SharedStorageError/PendingUploads` | 共享写入正常，积压能够回落 | Mongo 不可用时先读本机；其它节点看不到尚未补传的记录 |
+| 事故 `Stacks` 与 `Evidence.StackQuality` | 样本、缺失栈、截断和丢事件均可检查 | 硬退出尾段可能只有对象类型/执行身份；缺栈不等于没有分配 |
+
+事故列表/详情均从 `Data.Items` 读取。详情的 `Items` 为空表示在当前租户、节点与共享存储可见范围内没有找到该记录；不是“该时刻系统没有故障”。`incidentId` 必须来自列表的 `Id`，不接收文件路径，也不通过参数切换到其它租户。
+
+### 自动留证的触发条件
+
+下表是当前内置诊断阈值，**只触发记录和采样，不中断业务，也不打开 V8 内存保护**。这些阈值不是新的接口数据量限制。
+
+| 事故 Trigger | 触发条件 |
+|---|---|
+| `HostMemoryPressure` | 宿主可用内存低于 2 GiB 与总内存 10% 两者中的较小值 |
+| `ContainerMemoryPressure` | 可读取的 cgroup 内存使用达到有效上限的 80% |
+| `RapidRssGrowth` | 相较约 10 秒前，API RSS 增长至少 256 MiB |
+| `HighAllocationRate` | 托管分配率达到 128 MiB/s |
+| `SustainedThreadPoolBacklog` | 间隔约 10 秒的两次采样均有至少 64 个排队工作项，且线程池线程数达到 CPU 数两倍与 16 中的较大值；仅表示持续积压，不单独证明线程池饥饿 |
+| `SustainedRequestGateWait` | 间隔约 10 秒的两次采样均有共享请求槽等待，且当前全局或 V8 全局槽已满；可直接检查同帧 `Pressure*` 字段 |
+| `CgroupOomKillObserved` | cgroup 的 OOM kill 计数增加；仍需核对具体被杀进程 |
+| `DiskSpacePressure` | 诊断目录所在磁盘可用空间低于 256 MiB |
+
+当前压力窗口最多 60 帧，正常每 2 秒采样。持续事故合并更新，压力消退超过 60 秒或单次记录超过 5 分钟后封存。采集与解析进程另有内存和运行时限，诊断故障会显示降级；不能把这套有界采集当成持续全量性能分析器。
+
+`Memory.Current` 和事故 `Current`/`Frames` 另记录 `ThreadPoolThreads`、`ThreadPoolPendingWorkItems`、`ThreadPoolCompletedWorkItems`、`ThreadPoolAvailableWorkers`、`ThreadPoolMaxWorkers`。结合请求排队、外部 HTTP 耗时和 CPU 同窗分析；单帧队列值不足以断言线程池饥饿。
+
+同一采样帧还记录 `PressureGlobalActive/Limit/Waiting` 与 `PressureV8GlobalActive/Limit/Waiting`。先看共享业务槽、V8 槽是否满额或有人等待，再与当时的租户执行链对应；这些是当前节点的瞬时值，不能把某个租户的执行片段数直接当成它占用的槽位数。
+
+请求槽按单接口、单租户、共享 V8、全局的顺序获取：某租户在自身槽前排队时，不占用其它租户共用的 V8/全局槽。V8.Http 未显式填写超时时仍保持 600 秒；共享槽保护不能靠缩短所有业务调用的默认超时实现。
+
+### 人工与 AI 共用的定位步骤
+
+1. **确认采集条件**：执行 `Capabilities` → `Memory`，记录节点、版本、时间、采集质量、存储错误和主机/cgroup 余量。
+2. **找事故窗口**：查询 `MemoryIncidents`，以发生时间与 `Trigger` 选择 `Id`，再调用 `MemoryIncident`。重启后优先读历史，不能仅看已恢复正常的当前内存。
+3. **关联真实执行**：从执行记录和分配样本读取接口 Key、表与事件、工作流节点、执行/父执行 Id、脚本哈希和 TraceId。父调用的含子调用分配不能与子调用重复相加。
+4. **核对当时源码**：通过 MCP 获取对应接口引擎或 V8 事件源码及版本记录。当前源码哈希不同于事故记录时，先找事故发生时版本，不能拿今天的代码冒充当时执行内容。
+5. **检查分配路径**：沿对象类型与 CLR 栈，结合 `Trace`、慢 SQL、请求字节、循环、逐行查询、大对象序列化和缓存写入，建立可验证的原因假设。浏览器 V8 事件要追到其调用的后端 API。
+6. **验证保留和压力来源**：若 RSS 持续增长而分配热点不匹配，继续查存活对象、缓存、非托管内存，以及 Mongo/MySQL 等独立进程。采样不能代替受控堆分析或数据库执行计划。
+7. **修复后对照复测**：相同业务数据、并发和窗口下比较返回结果、分配率、托管堆、RSS、GC、P95/P99 与错误率。先验证业务正确，再判断是否消除了异常增长。
+
+当“机器资源正常但多租户 API 超时”时，先测固定宿主存活检查，再看 `Memory.Current` 的共享槽占用/等待与线程池排队；读取对应 `MemoryIncident.Frames` 确认事故当时是否满额，结合租户执行链定位长耗时接口。若长接口依赖外部 HTTP，从 API 服务器对目标地址做有界连通测试，并检查该接口的显式超时和前端重试频率。只有槽位满额与等待同窗出现，才能把共享闸门拥堵定为已证实；否则继续查路由、数据库池、网络和客户端中断，不以 CPU/内存正常推断 API 正常。
+
+最终诊断应分别列出“已证实的事实、最可能原因、缺失证据、修复与复测结果”。证据完整时有较高机会缩小到具体接口或事件；准确定位长期存活对象或某一行 JavaScript，仍取决于事故类型与补充分析。定位概率属于条件性的工程判断，不能用一次演练结果推导通用成功率或承诺 100%。
+
+### MCP 与后端版本不匹配时
+
+| 现象 | 含义与处理 |
+|---|---|
+| MCP 的 `describe_tool` 没有三个 Memory 动作，或参数报 `invalid_enum_value` | 当前进程加载的是旧 MCP。更新 `@microi.net/cli`/吾码插件与工作区 AI 配置；已运行会话继续工作，新版本在后续新进程生效 |
+| 专用工具支持 Memory，但返回“不支持的系统观测动作” | 核对目标 API 二进制及 `mci-system-observability-query` 引擎；不能用开启 `V8Limit` 解决版本缺失 |
+| 返回“当前后端未安装内存诊断运行时” | API 没有注册诊断运行时；仅更新 MCP 或前端微服务无法补足 |
+| `Collector` 持续不可用 | 检查发布目录中的 `diagnostics` 依赖、诊断通道和子进程；页面可用不等于分配采集可用 |
+| Mongo 异常但本机记录可读 | 按本机证据继续分析，并修复共享补传；保留卷恢复前不要清理原始片段 |
+
+优先使用专用 MCP 工具。旧进程缺少新动作、而标准 `microi_run_engine` 仍可调用时，可临时只读执行固定引擎 `mci-system-observability-query`，参数使用 `Action=Memory/MemoryIncidents/MemoryIncident` 和列表返回的 `IncidentId`。这仍受同一租户和后端权限校验；禁止为绕过限制创建临时维护引擎、执行任意 SQL、修改 Token 或取消权限验证。
+
+后端框架、商城微服务与查询引擎、MCP/CLI、文档/Skills 是独立交付项。验收要分别记录版本与真实回读；“源码已修改”“npm 已发布”“页面已更新”均不能代替目标服务器采集心跳和事故查询验收。
+
+## 两项性能数据如何理解
+
+### 选项查询的 1,001 行，不是通用查询上限
+
+“物化”指数据库返回的一行被转换成 .NET 对象，并放入内存集合。这次修复只覆盖**字段 SQL 选项查询**：该入口原本最多向选项控件返回 1,000 项，却先把整个结果集转成对象，再截取前 1,000 项。
+
+现在只物化最多 1,001 行：前 1,000 行仍作为选项返回，第 1,001 行只判断结果是否超限、是否需要提示“数据过长”。SQL 排序与前 1,000 项的返回语义保持一致。
+
+| 调用 | 本次是否新增 1,001 行上限 |
+|---|---|
+| 字段 SQL 选项查询 `GetDiyFieldSqlData` / `GetFieldsData` 中的选项加载 | 是，只限制此处的对象物化；实际选项仍最多 1,000 项 |
+| `V8.Db.FromSql(sql).ToArray()` / `.ToList()` | 否，按原 SQL 和执行方法工作 |
+| `V8.FormEngine.GetTableData('xxx', {})` | 否，仍按原有查询、分页、权限和既有约束工作 |
+
+例如以下通用业务查询没有被这项修复改成“最多 1,001 条”：
+
+```javascript
+// FromSql 构造查询，ToArray 才执行并生成结果。
+var rows = V8.Db.FromSql('select * from xxxx').ToArray();
+// 不新增 1,001 行限制；空条件不是建议的生产批量读取方式。
+var result = V8.FormEngine.GetTableData('xxx', {});
+```
+
+这不是对任意 SQL 自动追加 `LIMIT 1001`。数据库仍可能扫描、排序或计算很多行；本次验证的是客户端对象物化和分配减少，不代表 SQL 扫描量、传输量或数据库 CPU 按同样比例下降。大量选项仍应使用搜索、分页、合适索引和精简字段。
+
+隔离 MySQL 测试使用 **20,000 行测试数据**：托管分配从 49,203,016 字节（约 49.2 MB）降至 2,490,952 字节（约 2.49 MB），减少约 94.9%；排序与连接复用验证通过。20,000 行是测试规模，不表示每次线上事故都读取了同样行数，也不表示整台服务器内存下降 94.9%。
+
+### 纯 JavaScript 循环约 22% 开销与优化
+
+**下面的 22% 是早期逐语句诊断实现的历史测量，不是优化后实现的固定成本。** 2026-09-08 的源码优化已移除诊断专用的 Jint `Constraint`，改用执行边界记录和后台身份刷新；目标服务器需要部署配套的后端与采集器后才会生效。
+
+一次隔离微基准执行 200,000 次累加循环，两组都预热 3 次，再交替测量 10 轮。对照组只运行 Jint；观测组增加执行诊断检查，两组均未开启 V8 业务资源限制。
+
+| 指标 | 结果 |
+|---|---:|
+| 对照耗时中位数 | 24.2282 ms |
+| 增加观测后的耗时中位数 | 29.4760 ms |
+| 单次差值 | 5.2478 ms |
+| 相对耗时增加 `(29.4760 / 24.2282 - 1) × 100%` | 21.66%，约 22% |
+
+原因是解释器在语句执行路径增加诊断检查：每次检查有方法调用、计数和分支成本；每累计 2,048 次检查再读时钟，到约 200 ms 间隔时更新执行观测心跳。虽然不是每条语句都完整采样，检查入口本身仍有成本，纯计算循环会突出这项开销。
+
+**这个结果表示该循环用时增加约 5.25 ms。** 它不是服务器 CPU 使用率增加 22 个百分点，不是内存增加 22%，也不是所有 HTTP 接口一律变慢 22%。数据库、网络和 I/O 的时间占比因业务而异，真实端到端开销必须测量。
+
+该测试不包含独立 EventPipe 采集/解析、完整 HTTP 链路与生产并发，不能当作整套监控的总成本或上限。诊断检查用于给长循环留执行身份和分配线索，不设置终止条件；不能把它解释为默认打开了 V8 内存保护。
+
+#### 优化后哪些工作同步，哪些在后台
+
+- **执行边界同步记录**：进入、退出、异常、异步上下文切换时，记录当前执行身份并结算当前线程的累计分配。这些操作不逐条写 MongoDB，不在每条 JS 语句前检查。
+- **后台刷新身份**：单个独立后台线程约每 200 ms 刷新业务线程身份，避免业务线程池耗尽时定时回调也停摆；事件携带原始操作系统线程 Id 和递增版本。采集器中途启动或会话轮换后可重新关联长循环，过期身份不会覆盖较新的调用或复活已结束调用。身份注册表有 10,000 条上限。
+- **独立采样与存储**：对象分配和方法栈继续由独立 EventPipe 采集器获取；本机检查点和 MongoDB 补传继续在后台执行。
+
+**后台刷新身份不代表业务取得进展，也不能跨线程读取“当前线程累计分配量”。** 长循环尚未经过下一个执行边界时，上方执行累计值可以暂时滞后，应结合对象类型分配样本查看实时变化。采样值、已结算累计值和存活内存不能互相替代；未归属样本和事件丢失继续显式报告。
+
+最终微基准仍使用 200,000 次累加，各预热 10 次、平衡执行顺序测量 60 轮。优化组使用**同一个平台引擎实例**交替启用/省略诊断作用域，计入身份进入、退出和分配结算成本，以排除不同实例布局差异；平台引擎与裸 Jint 的绝对时间不直接比较。
+
+| 优化后同配置对比 | 关闭执行诊断的中位数 | 启用边界记录与后台刷新 | 中位数差值 |
+|---|---:|---:|---:|
+| Windows 本地测试 | 24.6168 ms | 24.3032 ms | −0.3136 ms，约 −1.27%，属于测量波动，不能据此宣称加速 |
+| Linux 容器，2 CPU / 2 GiB 上限 | 28.7750 ms | 28.8427 ms | +0.0677 ms，约 +0.24% |
+
+这次有限样本中，Windows P95 为 31.1117 → 30.1709 ms，Linux P95 为 34.3232 → 35.4739 ms。调度与 GC 波动仍存在，不能承诺线上固定低于某个百分比或宣称零开销。两组均关闭 V8 业务资源限制，性能微基准不包含 EventPipe 与生产 HTTP；EventPipe 的正确性另以 Windows/Linux 两租户持续执行、延后接入、会话轮换、线程池耗尽与离线栈解析测试验证。
+
+MCP 的 `Memory` 动作保持不变。排查优化版时可补查 `Executions.ObservationMode`、`IdentityRegistryOverflowCount`、`NativeThreadIdentityUnavailableCount`、`IdentityRefreshFailureCount`，以及 `Collector.BackgroundIdentityRefreshes`、`ObservedIdentityProtocolVersion`、`RejectedStaleIdentityMarkers`。缺少这些字段可能是旧版后端，不能自动按零故障解释。
+
+## 本次内存诊断完善覆盖哪些问题
+
+| 完善项 | 对事故定位的作用 |
+|---|---|
+| HTTP Trace 统一为 W3C 标识，日志、流量和执行链共用 | 避免把服务器请求流水号当成 TraceId，导致关联查询断裂 |
+| 活动请求总数与展示样本上限分开，明确截断状态 | 高并发时仍能判断真实堆积量，不把只展示的少量请求当成全部 |
+| HTTP、接口引擎嵌套调用、表单/工作流事件、Job、MQTT 执行身份 | 关联具体资源、父子执行、代码版本与 Trace |
+| 长循环心跳、异步执行归属与运行中检查点 | 尚未返回或来不及执行完成日志时仍有定位线索 |
+| 独立分配采样、对象类型与 CLR 栈 | 从“某接口内存高”继续追到实际分配路径 |
+| 持久记录、Mongo 幂等补传、跨节点历史和租户过滤 | 共享存储短暂故障或进程重启后继续查询事故 |
+| Linux 进程启动身份、采集租约、最后两个片段恢复 | 处理 PID 复用、容器改名/强杀与未完成尾段；保留缺栈状态 |
+| 有界队列/记录/原始片段和轻量摘要查询 | 约束监控自身的内存、磁盘与查询成本 |
+| 字段选项读取时提前停止物化 | 修复已验证的过量对象分配，同时保留业务选项语义 |
+
+这些功能帮助定位和验证根因，不替代业务修复。上线后至少演练一次“长执行中退出 → 重启 → 查询事故详情”，同时核对正确租户、代码身份、采集质量和持久卷；生产环境不应直接通过制造真实 OOM 来验收。
+
+## 系统日志
+
+系统日志默认显示 15 条，可切换 30、50、100 或 200 条。搜索和筛选在服务端执行，不会只过滤当前页。统计区域保留：
+
+| 指标 | 含义 |
+|---|---|
+| 日志总数 | 当前月份与筛选条件下的总数 |
+| 错误日志 | `Level` 为错误的日志 |
+| 警告日志 | 风险、降级或需要关注但未必失败的日志 |
+| 慢 SQL | 数据库执行时间超过阈值的 SQL 日志 |
+| 慢执行 | 接口、V8、任务或外部依赖执行过慢 |
+| 异常 | Exception、运行时异常或平台保护事件 |
+
+点击任意行会打开平台级弹窗，遮罩整个系统框架。详情可包含日志级别、类型、耗时、用户、IP、Api、AppId、请求方法、客户端、节点、环境、TraceId、标题、内容、参数、其它信息、可执行 SQL 与 Trace 时间线。敏感键值在可信后端递归脱敏后才返回。
+
+标题与副标题最多显示两行；完整内容通过详情查看。错误、长耗时和可疑流量会标红，悬停可查看常见原因与处置建议，例如：
+
+- 慢 SQL：检查执行计划、索引、分页、返回字段、排序/Join 与锁等待。
+- 慢执行：检查外部接口、逐行 I/O、大对象序列化、线程池与接口引擎循环。
+- 异常：沿 Trace 时间线先处理第一个根因，避免调用方无界重试。
+- 大流量：检查无分页响应、轮询、下载/上传、压缩、Range、CDN 与对象存储直传。
+
+## CPU 与热点接口怎么解释
+
+热点接口的“耗时占比”表示它在选定窗口内贡献的请求总耗时比例，适合排序定位。例如某接口占 36%，说明先检查它最划算，但这不等于该接口精确消耗了 36% CPU。数据库等待、外部 HTTP、锁等待和序列化都会拉高请求耗时。
+
+“进程 CPU（多核原始）”允许超过 100%。例如 `247.7%` 表示进程当时约使用 `2.477` 个逻辑核，并不等于整台服务器已经使用 247.7%；判断节点是否过载应优先看按逻辑处理器数归一化后的进程 CPU，再结合主机 CPU、请求率、活动请求、GC 和 P95。控制台把归一化 CPU 作为主指标，同时保留原始值和等效核心数用于容量分析。
+
+排查顺序：
+
+1. 记录当前节点、窗口、进程 CPU/内存、业务请求率、活动请求、P95 与错误率。
+2. 查看热点接口和来源 IP，区分“少量超慢”与“高频中等耗时”。
+3. 打开正在执行/最近完成请求，复制 TraceId。
+4. 在系统日志详情和 Trace 时间线定位首个慢步骤、SQL、外部调用或异常。
+5. 对同一接口以相同负载复测；同时看 P50/P95/P99、RPS、错误率、CPU、内存和分配率。
+
+需要规范压测时参阅项目内 `microi.skills/performance-testing/SKILL.md`。
+
+
+### 按同一请求拆分等待时间
+
+支持 `request-latency/v1` 的后端在 MCP `Snapshot` 的 `RequestRuntime.RecentRequests[].Latency` 返回顺序阶段 `BeforeActionMs / ActionMs / AfterActionMs`，并提供鉴权、身份读取/清理/隔离、在线终端、Redis 读取/解码、数据库打开/执行的次数与累计耗时。`Trace` 的 `RuntimeRequests` 返回当前租户、当前节点最近 500 个请求中匹配的最多 20 条记录；记录被淘汰或节点重启后不可用，不能把空结果当作零耗时。
+
+- 顺序阶段覆盖进入观测中间件后至响应处理返回；不含此前的代理、浏览器连接排队或网络时间。
+- `Parts` 是包含子调用的累计墙钟耗时，可能嵌套或并行，不能相加，也不是 CPU。`DatabaseOpen` 含连接打开保护与驱动连接池等待；`DatabaseCommand` 含命令执行/日志、但 Reader 模式不含后续行读取。
+- `FormAuthorization` 记录表权限检查；其内部 `AuthorizationVersion` 单独记录从租户 Redis 读取授权版本的时间。后者使用原生 Redis 连接，不应因为通用 `RedisRead` 很小就认定所有授权缓存访问都很快。
+- 浏览器必须分别记录 `requestStart`（请求发出前时间）、`responseStart-requestStart`（首字节等待）、`responseEnd-responseStart`（接收响应）。总耗时减首字节等待不能直接称作下载耗时。用每次唯一的 W3C TraceId 对齐服务端，不能只凭相近时间配对。
+- `RequestRuntime.RuntimeIntervals` 保留最近 30 个约 1 秒的同窗样本：进程原始 CPU、主机 CPU 执行/I/O wait/steal、GC 暂停、线程池积压、采样线程唤醒延迟和可读取的 cgroup CPU 节流时间。缺字段或 null 表示不可用；唤醒延迟可能同时包含 GC 和调度停顿，不能据此宣称宿主机故障。
+- Linux 的 `CpuUsagePercent` 按真正执行时间计算；I/O 等待另列 `IoWaitPercent`，虚拟化资源等待另列 `CpuStealPercent`。旧版本把 I/O 等待计入 CPU，不能用旧百分比直接证明 CPU 计算饱和。I/O wait 是内核估计，仍需结合实际 SQL、连接等待和同窗请求阶段判断。
+
+这些指标通过现有管理员查询协议追加返回，不新增配置、表、菜单或接口引擎。升级后端即可由现有 MCP 读取；不需要重装商城数据库资源。计量不保存请求/响应正文、SQL、缓存 Key 或登录凭据。
+
+后端会将 HTTP Controller 已验证的身份一次性交给同次接口引擎，减少重复读取、复制与扫描大型权限对象。交接不进入 JSON，不跨请求缓存；参数复制、切换租户、身份投影变化和重复调用仍走原验证流程。历史登录数据的嵌套敏感字段仍完整清理，`PrintSqlToPage` 可继续开启。验收应对齐 Trace 中的 Identity 次数、分配率及 GC 暂停，而不能只比较重启前后的单次耗时。
+
+V8 的 AI 代理在创建时立即保存不可变身份快照，首次调用 AI 时才构造完整可变 JSON 树。没有调用 AI 的普通接口和事件不再为代理预先深复制整份权限树；脚本修改 `V8.CurrentUser` 不会改变此前固定的身份。快照保留全部权限、JSON 数值/日期等类型及注解，二进制值独立复制。
+
+`Memory.HelperProcesses` 分别返回当前 API 管理的 `Collector`（采集器）和 `RecoveryAnalyzer`（事故恢复解析器）的 PID、启动时间、RSS、累计 CPU 及两次查询间的 CPU 使用率。它用于区分 API 与诊断子进程的成本，不是 NAS 的完整进程列表。首次查询、进程重建或指标不可用时 CPU 为 `null`；不能解释成零开销。
+
+管理员通过 `POST /apiengine/mci-system-observability-query` 传入 `{ "Action": "Snapshot", "IncludeHost": true, "IncludeDocker": false }`，或通过 MCP `microi_query_system_observability` 传入 `{ "action": "Snapshot", "includeHost": true }`，可读取 `Data.Host.Processes`（`process-resources/v1`）。后端每 5 秒采样，返回 CPU、RSS/Swap 和磁盘读写速率三组前 10 名，并保留最近 12 次样本。请求只读缓存，不执行 `top/ps`；不返回命令行、环境变量或凭据。需升级包含此协议的后端；已有查询引擎和 MCP 参数兼容。
+
+进程 CPU 的 100% 表示一个核心，多核进程可以超过 100%。首次采样、PID 重用、计数重置或无权读取均返回 `null`，结合 `Fresh`、`ObservedCount`、`UnreadableOrExitedCount` 和各项 `UnavailableCount` 判断缺口。RSS 含共享页，不能把所有进程 RSS 相加当作独占内存。
+
+CPU 与 I/O 分别按每个进程实际读取计数器的时间计算，返回 `CpuWindowSeconds / IoWindowSeconds`；顶层 `WindowSeconds` 表示扫描周期。若扫描被 GC 或调度延迟，不能用扫描开始时刻计算后面才读到的计数，否则会夸大占用率。单次读取被超过 250 ms 的长暂停打断时返回缺值。此修复随后端升级生效，旧后端长扫描的异常 CPU 尖峰需要重新采样核验。
+
+Linux 默认只声明当前 PID 命名空间。`HostProcessesVisible=false/null` 时不能把排行称作 NAS 全部进程；只有部署方提供固定只读挂载 `/proc:/host/proc:ro` 后，API 才从该视图采样并标注 `HostProcMount`。镜像自动更新不会自动增加挂载；无需为了这个只读功能开放 SSH、Docker socket 或特权容器。Docker 查询不可用仅表示当前 API 无法访问 CLI/守护进程，不表示宿主没有 Docker。
+
+`Data.Host.DiskIO.Devices` 按真实 sysfs 分区标记区分整盘，保留 `sata1`、`nvme0n1`、`md0`、`dm-0` 等数字结尾设备。每个设备返回读写速率、IOPS、BusyPercent、AwaitMs 和未完成 I/O 数；磁盘采样使用独立时间窗。汇总只累加物理整盘，不能再与 RAID/映射层相加；首次采样或重置的速率为 `null`。
+
+菜单访问统计只更新已授权菜单对应的当前用户 `HomeUsageStats`，不再通过通用用户更新流程使整个租户的权限/菜单缓存失效。真实权限变更继续失效缓存。菜单接口向可信原子传递业务参数时也不再重复投影内部 `_CurrentUser`；可信身份仍由后端独立验证。对应托管接口随所属官方应用升级。
+
+文件私有 URL 和后台任务接口同样只向可信原子投影业务参数，保留文件、任务权限以及个性化 Hook；分别随【SaaS 引擎】和【应用商城】应用升级。后端接口日志在序列化前排除顶层内部 `_CurrentUser`，使用日志本身的 UserId/UserName 记录调用人；业务参数、嵌套字段、异常与慢日志继续保留。这样可避免每次日志先展开数千条内部权限再截断，`PrintSqlToPage` 保持原功能。日志优化需升级后端镜像。
+
+登录身份权限异常膨胀时，先比对 sys_rolelimit 的有效行与 IsDeleted=1 历史行。原生权限快照与菜单授权编辑只加载有效权限，IsDeleted 为 NULL 的存量记录仍有效；没有该列的旧表保持兼容，新增列后立即采用过滤，元数据或查询异常不回退为全量授权。该修复需要更新后端镜像；已有登录缓存通过正常重新登录或 RefreshToken 刷新，不删除权限历史，不改变 DiyToken、角色/数据范围或 PrintSqlToPage。用真实数据库回归旧表、新列、撤销权限、无权限角色、注入参数和查询失败，不能仅凭身份体积下降宣称请求耗时已经恢复。
+
+接口引擎构造脚本参数时，顶层 `_CurrentUser` 属于宿主保留身份，不再复制到 `V8.Param`；脚本读取已认证身份应使用 `V8.CurrentUser`。权限树仍保留完整内容，身份验证、令牌撤销、访问密钥范围、跨租户检查和独立脚本快照保持执行；嵌套业务对象中同名字段仍保留。实时通知检测只读取成功结果的 Code 与 DataAppend，避免为了检查不存在的事件而序列化整份用户/列表/文件 Data；事件字段白名单、大小限制、提交后发送和订阅权限不变。两项优化都需要更新后端镜像。
+
+批量计数的性能排查应同时看 Identity 的次数：`GetTableDataCountBatch` 在一次批次内复用一份已经验证且脱离共享缓存的只读身份，避免每个计数项都深复制完整权限树。每项仍独立执行表权限和数据范围检查；跨批次重新验证令牌/访问密钥，普通增删改的逐项身份隔离保持原语义。该优化不关闭角标或 `PrintSqlToPage`。
+
+`RoutingMs` 是 `BeforeActionMs` 内的路由阶段，不应再次相加；观测中间件位于路由解析之前，包含动态路由的缓存与查询等待。
+
+### 从宿主进程继续定位数据库负载
+
+当宿主排行显示 `mysqld` 持续占用多个核心时，继续使用已授权的 MCP 数据库只读查询，核对 `performance_schema.events_statements_summary_by_digest` 两次采样的执行次数、累计耗时和扫描行数差值，并检查真实索引与事务/锁等待。用规范化 SQL 摘要即可定位查询形状，避免输出业务参数。累计查询耗时允许因并行而超过采样窗口，它不是 CPU 核时间。
+
+页面 Trace 中的几条 SQL 很快，不能排除后台任务把同一数据库或 NAS 压满。例如定时任务运行时间刷新若产生大量 `mic_data_version` 快照，且旧库缺少 `(TableId,TableRowId,CreateTime)`，读取最新版本和计数会重复扫描历史。应同时修复索引和运行态写入路径，保留配置版本与用户需要的 SQL 展示；修复后再对比同窗宿主 CPU、查询摘要及实际页面。
+
+### 热点榜时间范围
+
+右上角“5 分钟”表示实时诊断采样窗口，不是系统只保存 5 分钟。全局时间范围支持：实时 5 分钟、今天、昨天、近 3 天、近 7 天、近 15 天、近 30 天、近 3 个月、近 6 个月和近 1 年。选择历史范围后，热点接口、流量趋势、来源 IP、帐号、租户和内容类型使用同一时间边界，避免不同卡片口径不一致。
+
+| 查询跨度 | 汇总粒度 | 默认保留 | 用途 |
+|---|---:|---:|---|
+| 实时窗口 | 内存分钟桶 | 当前进程有界窗口 | 找正在发生的慢请求、并发和流量突增 |
+| 约 48 小时内 | MySQL 5 分钟桶 | 48 小时 | 今天、昨天和近 3 天的细粒度回放 |
+| 约 45 天内 | MySQL 小时桶 | 45 天 | 7／15／30 天趋势和接口排行 |
+| 更长历史 | MySQL 天桶 | 400 天 | 3／6 个月和 1 年容量趋势 |
+
+![近30天统计范围与系统日志首屏](https://file.microi.net/itdos/official-docs/images/864e22616ebd40b45c8c8415890fbb06f3744123ec7d1028747f61908d1788bb/202610/history-range-and-logs.jpg)
+
+历史查询只扫描有索引的固定时间桶，并对相同租户、范围和 TOP 参数做短 TTL Redis 缓存；5 分钟汇总完成后会同步重建小时／天桶并自然失效缓存。MongoDB 只保存受限的高价值明细，不承担跨月排行榜的全表扫描。功能启用前已经过去的流量不会凭空回填，部署后会从第一个完整汇总桶开始积累。
+
+流量聚合表的 `BucketStartUtc` 与 `LastSeenAtUtc` 使用固定 19 字符 UTC 文本 `yyyy-MM-dd HH:mm:ss`，与历史范围查询保持一致。数据库驱动可能将含微秒的 `DateTime` 参数写成 26 字符，超过官方 `varchar(25)` 字段；后台写入统一格式后无需扩大字段。汇总失败会回滚该桶、保留待重试桶并限速记录警告；这条警告本身不能证明 API 因 `StopHost` 退出，须结合进程退出码和宿主异常记录判断。
+
+### 后台任务大响应治理
+
+`POST /api/BackgroundTask/List` 是后台任务中心的列表接口，默认每页 15 条、最大 100 条，只返回标题、状态、进度、时间和 `HasLog/HasResult` 等摘要；不再把 `Log`、`Result`、参数、可信用户快照和检查点随每一行重复返回。用户展开某一任务时才按任务所有权调用详情接口，轮询进度只调用轻量状态接口。旧客户端显式请求超大页也会被服务端限制，因此不能再通过页面参数制造数 MB 的任务列表响应。
+
+## 网络流量：知道“谁、从哪来、通过什么、传了多少”
+
+网络驾驶舱分三层展示数据，避免把容器 NetIO 误解为用户下载量：
+
+| 层次 | 能回答什么 | 不能回答什么 |
+|---|---|---|
+| 网卡/容器累计与窗口增量 | API 节点或容器总体收发规模与速率 | 不能直接归属到某个用户或 HTTP 接口 |
+| HTTP 可归因字节 | 接口、IP、帐号/匿名、租户、内容类型的请求体/响应体字节 | 不包含 TLS/HTTP 头、重传和非 HTTP 通信 |
+| 未归因残差 | 提醒还有数据库、Redis、Mongo、MQ、对象存储、外部 HTTP 或协议开销需要查 | 不能强行算给某个帐号、IP 或接口 |
+
+### 五类流量排名
+
+- **Endpoint**：定位大响应、无分页接口、重复轮询、上传/下载路由。
+- **IP**：定位高频来源和可疑外部地址；封禁前确认可信代理和 NAT。
+- **User**：授权完成后按帐号聚合，未携带有效身份统一标记“匿名”。
+- **Tenant**：共享 API 节点按请求租户聚合。
+- **ContentType**：识别 JSON 大响应、二进制下载、表单上传等资源类型。
+
+系统只对大文件、错误、慢请求或可疑传输保留有界明细，包括清洗后的接口、IP、帐号/匿名、租户、内容类型、收发字节、状态、耗时和 TraceId；不保存文件内容、请求正文或响应正文。
+
+### 发现异常后的建议
+
+| 现象 | 常见原因 | 优先措施 |
+|---|---|---|
+| 单接口响应字节很大 | 无分页、字段过多、重复数据、文件走 API | 分页/选择字段、压缩、对象存储直传、Range/CDN |
+| 匿名上传或可疑样本 | 接口匿名开放、鉴权失效、扫描攻击 | 核对业务、关闭匿名、限流、文件类型/大小校验、必要时封禁 |
+| HTTP 很低但容器 NetIO 很高 | DB/Redis/Mongo/MQ/对象存储/外部 HTTP | 对照连接与依赖指标、反向代理和对象存储日志 |
+| 同一 IP 高频小请求 | 轮询、爬虫、攻击、错误重试 | 缓存/SignalR、退避、速率限制、核对后封禁 |
+| 4xx/5xx 大响应 | 错误页/堆栈过大、调用方反复失败 | 缩小错误响应、按 Trace 修根因、限制重试 |
+
+## 存储与性能架构
+
+```text
+HTTP 热路径
+  ├─ 原子计数 + 有界分钟桶（内存，当前节点）
+  ├─ TOP N 维度聚合（接口/IP/帐号/租户/内容类型）
+  └─ 仅高价值样本 → 有界日志队列 → MongoDB 批量写入
+
+后台汇总
+  ├─ 5 分钟固定桶 + 确定性幂等键 → MySQL 批量 upsert
+  ├─ 小时桶（45 天）/ 天桶（400 天）→ 幂等重建
+  └─ 热点查询 → 租户隔离 Redis 短缓存
+```
+
+设计约束：
+
+- 请求线程不逐条同步写 MySQL/MongoDB，也不序列化完整请求或响应。
+- 队列、维度基数、明细大小和保留时间都有硬上限；故障时走 spool/WAL，不创建无界内存队列。
+- 历史趋势直接读取 MySQL 汇总，不能每次扫描 MongoDB 明细重新统计。
+- Redis 只用于短期热点结果、限流或租约；Key 必须包含租户和查询摘要，写入后主动失效，并保留短 TTL。
+- 非重要高频日志适合 MongoDB；长期统计、治理记录和可索引汇总适合 MySQL。
+
+## 权限、隐私与作用域
+
+- 系统观测敏感数据和 IP 治理只允许平台可观测性管理员，通常要求 `Level >= 9999`，最终以服务端权威判定为准。
+- 不记录 QueryString、Cookie、Authorization、Token、密码、Secret、API Key、请求正文或响应正文。
+- 文件只记录经过清洗且有长度上限的名称/扩展名/数量/字节。
+- `Snapshot`、活动请求、应用日志、进程和 Docker 数据是当前节点视角；多节点需要逐节点采集或接入统一遥测平台。
+- Windows 宿主机网卡计数可能包含同机其它进程；Linux 容器网络命名空间更接近容器边界，但仍包含全部协议和依赖通信。
+
+## AI / MCP 调用
+
+### CDN 监控 / 分析 / 安全
+
+在同一个【系统日志/监控】微服务中打开【CDN监控/分析/安全】。首期对接阿里云，包含加速域名同步、带宽趋势、12 类运营报表、SLS 的 IP / URL / Referer / IP 与资源交叉排行、CSV 导出、域名 IP 封禁与解封、下载限速、Referer 黑名单、规则与操作回执。
+
+在当前租户【系统设置 → 安全与服务接入】保存私密项 `Integration.Cdn.Aliyun.AccessKeyId`、`Integration.Cdn.Aliyun.AccessKeySecret`。后端依次选择完整的 CDN 专用凭据、租户 DNS 私密凭据、当前租户 SaaS 的兼容 DNS 凭据；半组配置报错，不能混用不同来源。密钥不会返回浏览器、写入审计或进入安装包。SLS 可独立配置 `Integration.Cdn.Aliyun.Sls.AccessKeyId`、`Integration.Cdn.Aliyun.Sls.AccessKeySecret`。
+
+- **历史 TOP**：先定制运营报表，再按时间范围查询。未订阅与无流量是不同状态；未开通时不能用空列表证明过去没有流量。报表流量列保留云端原始单位。参见[运营报表 API](https://help.aliyun.com/zh/cdn/developer-reference/api-cdn-2018-05-10-createcdnsubtask)。
+- **报表范围**：IP 排行可按地区筛选，区域和运营商分布支持中国内地/境外选择；域名排行按云账号统计。各类报表仅传入其支持的参数，不统一附加空 Area、HttpCode 或无关域名筛选。
+- **日志分析**：配置域名对应的 SLS 地域、Project、Logstore，完成实时日志投递和 `domain`、`remote_ip`、`uri`、`refer_domain`、`response_size`、`return_code` 字段索引。流量使用字节，IP 使用 TCP 连接来源 `remote_ip`，URL 不带查询参数。SLS 查询可能计费。
+- **安全操作**：先预览当前云端配置和作用范围，再确认提交。请求号幂等，云端配置变化时要求重新预览；超时或结果不明先回读，不能盲目重试。分钟、小时、天、自定义秒数和永久封禁均可用。限速指每个请求的下载速度，至少 `100k`，不是边缘 QPS 限制。
+- **全账号封禁**：海量 IP 服务须向阿里云申请开通，影响账号下全部 CDN 域名，界面单独确认作用范围；它不是单域名黑名单的替代名称。参见[海量封禁接口](https://help.aliyun.com/zh/cdn/developer-reference/api-cdn-2018-05-10-setcdnfulldomainsblockip)。
+- **自动规则**：默认停用、观察模式；开启自动执行还需要域名总开关。支持流量/请求次数、固定阈值，或历史窗口 P95 × 倍数并叠加绝对下限，以及连续命中、冷却时间、单轮 IP 上限、小时操作上限与白名单。仅使用 SLS 完整窗口；日志滞后、流量字段缺失或动态基线不足时不封禁。每条规则有错峰调度和独立租约。
+- **到期回收**：`mci-cdn-security-tick` 每分钟处理持久化操作和到期解封；只回收应用新增的 IP，保留原有黑名单，有重叠封禁时延长持有期。停用规则不会停用已提交封禁的到期回收。调度停止会推迟解封，需在任务引擎核对状态和最近运行时间。
+
+管理员通过现有 MCP `microi_run_engine` 调用 `mci-cdn-manager`，无需第二套 Token。例如：
+
+```json
+{
+  "action": "microi_run_engine",
+  "params": {
+    "apiEngineKey": "mci-cdn-manager",
+    "params": { "Action": "Capabilities" },
+    "confirmExecution": "mci-cdn-manager"
+  }
+}
+```
+
+只读动作有 `Domains`、`Trend`、`Reports`、`ReportList`、`Sls`、`Configs`、`Config`、`Rules`、`Operations`；写入流程为 `Preview` → `Submit`，保留返回的 `Command/BeforeHash/ExpiresAt/PreviewToken` 并提供稳定 `RequestKey`，结果不明使用 `Reconcile`。后台 `mci-cdn-core`、`mci-cdn-aliyun`、`mci-cdn-worker` 禁止 HTTP 直调。业务资源由【系统日志/监控】包托管，微服务沿用统一平台应用，不新增重复商城条目。
+
+CMS 历史公有媒体撤稿使用专门的 `RefreshCmsMedia` 与 `CmsRefreshStatus`。先查 `Capabilities` 中的 `CmsMediaRefresh/CmsRefreshTaskReadback`；管理员提交时只传原 `RendId` 和原 `CmsTaskId`。服务端从当前租户的已撤回衍生、已确认源删除的撤销任务和可信 `FileServer` 计算唯一旧 URL，不接受客户端 URL、目录、查询参数、云密钥或自定义云端入口。
+
+云刷新之前，接口将稳定请求键、任务前快照、执行租约与 `CloudWriteStarted` 写入独立的 `mci_cdn_operation`。返回未知或 HTTP 超时后保留原操作 `Id`，只调用 `CmsRefreshStatus` 回读原任务；不能用新请求键再次刷新。供应商任务全部 `Complete/100%`、原 URL 严格返回 `404`，且 CMS 再次确认源对象不存在，才允许原撤销任务完成。仅源删除、隐藏图片、供应商受理或带随机参数的 URL 返回 404 都不满足此验收。CMS 私有代理媒体继续按批准引用和当前权限读取，撤回后禁止代理读取；浏览器已下载或保存的副本无法召回。
+
+阿里云刷新通常需约 5～6 分钟传播。本入口每次只刷新一个经过权威 CMS 记录校验的文件，禁止目录和正则刷新。阿里云默认文件刷新额度为每日 10,000 条，刷新 API 上限为 50 QPS，任务查询上限为 5 QPS；刷新本身不单独收费，重新回源仍可能产生对象存储请求与流量费用。具体额度和费用以云账号为准。参见[文件刷新 API](https://www.alibabacloud.com/help/en/cdn/developer-reference/api-cdn-2018-05-10-refreshobjectcaches)、[刷新任务查询](https://www.alibabacloud.com/help/en/cdn/developer-reference/api-cdn-2018-05-10-describerefreshtasks)和[刷新与预热说明](https://help.aliyun.com/zh/cdn/user-guide/refresh-and-prefetch/)。
+
+安装包不包含任何云密钥、客户规则、SLS 项目或测试封禁。高访问 IP 可能是共享出口、合法下载或升级程序重复请求；应结合 IP 与资源交叉排行确认原因，不能仅依据 TOP 名次判定攻击。
+
+连接 Microi MCP 后，先发现能力：
+
+```json
+{
+  "action": "microi_query_system_observability",
+  "params": { "action": "Capabilities" }
+}
+```
+
+查询最近 24 小时接口流量：
+
+```json
+{
+  "action": "microi_query_system_observability",
+  "params": {
+    "action": "TrafficHistory",
+    "dimensionType": "Endpoint",
+    "hours": 24,
+    "pageIndex": 1,
+    "pageSize": 15
+  }
+}
+```
+
+查询统一历史驾驶舱（支持 `today/yesterday/3d/7d/15d/30d/3m/6m/1y`）：
+
+```json
+{
+  "action": "microi_query_system_observability",
+  "params": {
+    "action": "HistoricalDashboard",
+    "range": "30d",
+    "top": 10
+  }
+}
+```
+
+分页定位近 7 天的上传、大文件和可疑传输（MongoDB 只保存脱敏元数据，不保存正文或文件内容）：
+
+```json
+{
+  "action": "microi_query_system_observability",
+  "params": {
+    "action": "TrafficDetails",
+    "rangeKey": "7d",
+    "transferAction": "Upload",
+    "pageIndex": 1,
+    "pageSize": 15
+  }
+}
+```
+
+查询日志：
+
+```json
+{
+  "action": "microi_query_system_observability",
+  "params": {
+    "action": "Logs",
+    "keyword": "超时",
+    "level": 3,
+    "searchMonth": "202608",
+    "pageIndex": 1,
+    "pageSize": 15
+  }
+}
+```
+
+IP 治理必须两步执行。第一次不传 `confirmExecution` 只返回 dry-run；核对后再传精确确认值：
+
+```json
+{
+  "action": "microi_manage_system_observability",
+  "params": {
+    "action": "BlockIp",
+    "ip": "203.0.113.10",
+    "blockMinutes": 30,
+    "reason": "核对后确认为异常高频访问",
+    "confirmExecution": "BlockIp:203.0.113.10"
+  }
+}
+```
+
+完整 AI 决策、存储、权限、扩展和验收规范见 `microi.skills/system-observability/SKILL.md`。
+
+## 安装与升级
+
+### 连接池耗尽时通过 MCP 在线恢复
+
+`obtaining a connection from the pool` 表示应用进程没有及时借到驱动连接。MySQL 的 `max_connections`、应用池的 `MaximumPoolSize`、正在执行 SQL 的数量是不同指标；少量 `Sleep`、低 CPU 或数据库重启都不能证明应用池已经恢复。
+
+包含 `database-pools/v1` 协议的新后端与配套 MCP 支持以下操作。首次使用需要正常升级后端与 MCP；已经运行该协议的节点发生故障时，恢复过程无需重启数据库或 API。此应急协议由框架提供，不依赖商城查询引擎，不需要为它重装【系统日志/监控】应用。
+
+1. 对当前 MCP 连接调用 `microi_manage_system_observability`，参数为 `{"action":"ResetDatabasePools","poolTarget":"Both"}`，获取预览。也可用查询工具 `action=DatabasePools` 查看当前节点的驱动版本、池上限/最小池、连接生命周期、申请中数量、失败码和退避时间。
+2. 使用同一次预览的 `OperationId`、`PoolIds`、`Target` 和 `requiredConfirmation` 调用执行：
+
+   ```json
+   {
+     "action": "ResetDatabasePools",
+     "poolTarget": "Both",
+     "operationId": "预览中的32位编号",
+     "poolIds": ["预览中的64位池摘要"],
+     "confirmExecution": "ResetDatabasePools:预览中的32位编号"
+   }
+   ```
+
+3. 调用 `microi_query_system_observability`，传 `{"action":"DatabasePoolRecovery","operationId":"原操作编号"}` 回读。`Pending` 继续等待；`Incomplete` 表示存在未回执节点；`PartialFailure` 表示节点轮换或探测失败。`CompletedForRegisteredNodes` 只表示已注册协议的节点完成，不能代表未升级节点。随后重试原报错的只读业务接口。
+
+恢复只支持当前租户 MySQL、SQL Server 的主库/读库连接池，`Write / Read / Both` 指向相应角色，重复池自动合并。已加载的其它租户共用该池时拒绝；扩展库与其它驱动不在此入口范围内。不会调用全局清池，不杀死借出的事务，不重放业务 SQL，也不自动增大池上限。旧事务归还时由驱动丢弃旧连接；数据库不可达、凭据失效、数据库容量不足或持续泄漏，需要继续处理原始原因。
+
+`Pools[].MinimumPoolSize` 和 `ConnectionLifetimeSeconds` 用于解释连接保留策略。
+`CapacityBudget` 对当前节点所选主/读池按池身份去重，返回配置的最大/最小连接合计；
+主读共用同一池只算一次。`Scope=CurrentNodeSelectedPools` 明确其局部范围，
+未知驱动的合计为 `null`，无池连接单独列入 `NonPooledPoolCount`。
+这些数据不是实际连接占用，也不包含其它节点、Quartz、扩展库或外部程序，
+不能把注册节点数直接乘当前池上限宣称已取得完整集群预算。
+
+默认 MySQL 业务池上限为 100；显式租户连接串优先。新装数据库在内存允许时推荐
+500，低内存主动降低。多个节点与独立池仍须留出管理员/备份余量，不能只提高数据库
+上限来掩盖慢 SQL、长事务或泄漏。排查和安装策略见
+[连接达到上限时的处理](../getting-started/docker-run.md#连接达到上限时的处理)。
+
+应急鉴权仍验证 DiyToken、Redis 中的有效会话以及当前主库管理员权限；访问密钥还必须具备 `mcp:admin`。鉴权连接使用 `Pooling=false`、5 秒连接/命令超时，每节点最多 2 个应急请求。它有独立请求槽，但保留内存和安全防护。Redis 或主库本身不可用、无有效管理员会话时会明确失败，不绕过权限。
+
+预览票据有效 2 分钟；同租户每 60 秒最多接受一次恢复；命令处理期限 90 秒，回执保留 10 分钟。HTTP 超时后必须用原编号查询，不能生成新编号自动重试；过期编号不会重新执行。多节点通过共享 Redis 传递命令并回读各节点回执，节点自动注册，无需新增环境变量。`Opening` 是连接申请数，不是驱动内部已借出连接数；`SELECT 1` 成功也不是完整业务验收。
+
+【系统日志/监控】由框架底层能力和应用商城资源共同组成：
+
+1. 先升级 Microi 框架到兼容版本（最低 v7.5.8，推荐当前最新版）。
+2. 在【应用商城】安装或更新【系统日志/监控】应用。
+3. 应用包会交付数据表、字段、索引/DDL、Managed 接口引擎、菜单、微服务全部源码和编译产物。
+4. 刷新登录态后进入菜单，确认八个 Tab、默认 15 条分页、日志详情、网络历史、内存事故与安全数据。
+5. 通过 MCP 查询 `Capabilities` 和 `Snapshot`，确认 AI 工具、权限和目标租户均正确。
+
+只更新框架不会自动替代租户已安装的商城应用；只更新应用也不能补齐旧后端缺失的可信原子能力。
+
+## 大权限菜单与 SQL 参数处理的性能诊断
+
+若浏览器长任务落在 Pinia 深度遍历或 `JSON.stringify`，同时观察请求发出前的排队时间。核心状态持久化按已选字段独立监听和复用序列化片段；时钟、加载状态等非持久化变化不再扫描权限树，主题更新也不重新序列化用户。权限对象的嵌套修改、登录/退出、显式保存与存储恢复仍同步到原 `microi.net` 格式；需要更新前端镜像。嵌入式 WebOS 窗口继续只保留内存态。
+待办的多项只读计数由内部 `IFormEngineReadOnlyCountRuntime` 在一个批次中拥有一份独立身份；业务参数不能提供非空 `_CurrentUser`，每项仍经过原表单查询与租户/角色/数据范围检查，事务内顺序执行。抄送分页及可能执行行 V8 的 CRUD 保留独立身份。私有文件 HTTP 原子可接收本次 DiyToken 验证后独占的身份，后台可信上下文仍复制；资源引用、权限、审计和 `Limit=true` 不变。上述优化需要更新后端镜像，不能靠修改 V8 参数来启用或跳过鉴权。
+
+若分配栈落在 `FromSection.formatSql → String.Replace`，还需检查 ORM 结果缓存键：这条路径独立于 `PrintSqlToPage`，即使页面 SQL 很短，也可能因内部权限快照的大型 IN 查询产生大量临时字符串。缓存键现已复用单次参数扫描，保留普通值文本及查询参数，不重复替换参数前缀、字面量或替换值中的参数文本。普通 HTTP 表单请求只转交本次验证后独立身份的所有权；批量行和有其它 JSON 持有者的身份仍复制，业务 V8 与跨请求隔离不变。
+
+菜单或待办接口突然变慢时，先关联 Trace 与内存事故中的实际分配栈。`DbProvider.PrepareCommand`、SQL 展示中的反复正则替换和 `DynamicToDiyTableRowParam` 中的权限树复制，属于应用处理开销；不能把它们直接归为数据库执行慢。累计分配也不能当成驻留内存或泄漏量。
+
+后端的 SQL 参数替换使用单次扫描，保留参数边界、字符串与注释；`PrintSqlToPage` 继续展示完整可执行 SQL，慢日志使用同一处理器并在生成时限制长度。表单参数转换只保留一份独立身份树，不把 `_CurrentUser` 混入业务 `_RowModel/_FormData`，也不修改调用方对象。修复需更新包含这些改动的后端 Docker 镜像；只更新商城应用不会替换后端程序集。
+
+如果 SQL 执行只有几毫秒而多种接口仍一起变慢，还应检查公共鉴权的用户投影分配。角色基础权限读取现在直接检查 `_Roles`，不再为 `OnlyGet` 检查复制整份表/菜单权限树；显式 Bearer 请求也避免在同一过滤器里重复加载并复制有效身份。签名、有效期、安全版本、租户一致性、Redis 活动令牌、历史敏感字段清理及访问密钥撤销和范围检查全部保留。7,403 条权限的回归样本中，旧角色检查单独分配约 8.2 MB；该样本不是整机内存降幅，也不能代替部署后的真实页面复测。
+
+SaaS 引擎应用同时提供工作角标的失败处理：原生统计已经失败时直接返回错误，不继续重跑一整套兼容查询；旧后端缺少原生方法或工作流插件时仍使用兼容实现。验收应保持 `PrintSqlToPage` 开启，分别对比冷启动、稳定调用和真实页面并发请求的耗时与分配，确认菜单、列表、五类工作统计和权限隔离均正确。
+
+## 验收清单
+
+- [ ] 系统日志是第一个 Tab，统计、筛选、搜索、15 条默认分页和详情可用。
+- [ ] 详情弹窗遮罩完整平台框架，内容脱敏，标题/副标题最多两行。
+- [ ] 错误、长耗时和可疑流量标红，悬停可看到原因与解决方案。
+- [ ] 热点接口、活动请求、Trace、进程、主机、Docker、队列、应用日志可回读。
+- [ ] 网卡/容器、HTTP 归因和未归因残差分层展示，边界文案真实。
+- [ ] Endpoint/IP/User/Tenant/ContentType 排名可按今天、昨天、3／7／15／30 天、3／6 个月和 1 年查询。
+- [ ] 5 分钟、小时、天三级 MySQL 汇总可分页查询，重复汇总保持幂等，历史查询不扫描 MongoDB 明细。
+- [ ] 后台任务列表默认 15 条且不含日志、结果、参数、可信用户和检查点；详情与状态按需读取。
+- [ ] MongoDB 故障不阻塞业务请求，MySQL 固定桶重复汇总保持幂等。
+- [ ] V8 限制关闭时仍能采集执行分配；500 个活动请求的真实数量和截断样本分开显示。
+- [ ] 独立采集器在线且健康；Mongo 故障、强杀、重启/容器改名后，事故从持久卷恢复并可由另一节点读取，旧重放不覆盖新证据。
+- [ ] 分配量/存活量/RSS、Mongo RAM/磁盘空间和未知退出原因都有明确边界，采集丢失或不可用不会显示为健康。
+- [ ] MCP 能发现查询/治理工具，Trace 缺参拦截，IP 治理先 dry-run 再精确确认并审计。
+- [ ] 主题、深色、移动端、减少动态效果和低配设备渲染均通过检查。
+
+底层 V8 原子方法签名见[V8 后端函数：系统日志/监控可信原子](../v8-engine/v8-server)。

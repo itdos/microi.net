@@ -1,0 +1,478 @@
+# 📂 分布式存储
+
+> 平台分布式存储支持 **阿里云 OSS/CDN**、**MinIO**、**亚马逊 S3**，基于 SaaS 引擎配置，不同租户可使用不同存储方案。
+
+---
+
+## 📖 介绍
+
+| 特性 | 说明 |
+|---|---|
+| 支持存储 | 阿里云 OSS/CDN、MinIO、亚马逊 S3 |
+| 配置驱动 | 基于 SaaS 引擎，不同租户可独立配置 |
+| 可扩展 | 由表单引擎驱动，可自由扩展腾讯云、华为云等 |
+| 源码位置 | [GitHub · Microi.HDFS](https://github.com/itdos/microi.net/tree/master/Microi.Server/Microi.HDFS) / [Gitee · Microi.HDFS](https://gitee.com/ITdos/microi.net/tree/master/Microi.Server/Microi.HDFS) |
+
+---
+
+## PC 与小程序图片互通
+
+图片控件按字段 `Config.ImgUpload.Multiple` 保存单图对象或多图数组，`MaxCount` 只限制多图数量。历史单元素数组在单图控件中仍可读取。
+
+上传请求携带字段授权上下文和 `Limit`，真实桶由后端校验；上传成功后保留实际 `Limit` 与稳定 `Path`，临时签名地址只用于运行时预览。历史图片没有 `Limit` 时按字段配置取址；图片明确为私有时必须授权签名，不能因字段当前为公有而拼接公有 `FileServer`。因此图片互通需要同时更新 PC 前端和小程序客户端，已有私有照片无需改成公有文件。
+
+## 旧移动端上传返回兼容
+
+更新支持此功能的后端 Docker 镜像（8.3.4 及以上）并安装新版“系统设置”应用后，在
+**系统设置 → 开发配置 → 接口、文件与运行环境** 开启“兼容平台旧版本”。
+字段为 `CompatiblePlatformOldVersion`，默认关闭；空值与缺失字段也按关闭处理。
+
+`POST /api/HDFS/upload` 保留 `Code/Data` 信封。关闭兼容时，单文件返回对象，
+`Multiple=true` 返回数组；开启后，单文件（包括 `Multiple=false`）也统一返回一项数组。
+每个文件对象仍保留新版属性，并额外补充以下旧属性：
+
+| 旧属性 | 来源或含义 |
+|---|---|
+| `url`、`path`、`id` | 对应本次上传的 `Url`、`Path`、`Id` |
+| `name` | 不含最后一个扩展名的文件名，例如 `前.jpg` 返回 `前` |
+| `size` | 实际展示文件的 `Size`，不是压缩前体积 |
+| `type` | 图片 `image`、视频 `video`、音频 `audio`、其它 `file` |
+| `duration` | 已有时长，未提供时为 `0` |
+| `uploading`、`progress` | 上传成功后分别为 `false`、`100` |
+
+旧地址优先执行 `platform-hdfs-upload` 接口引擎；只有当前租户主库确认地址、别名及固定
+Key 均不存在时，才执行编译的安全上传兜底。引擎被禁用、禁止 HTTP、无权限、数据库异常
+或执行失败都会直接返回错误，不会再次上传。`/api/Upload` 与
+`/apiengine/platform-hdfs-upload` 复用同一入口。
+
+长期定制返回请编辑 `platform-hdfs-upload-hook`。该 Hook 只在首次缺失时创建，应用更新
+保留租户代码；主接口是 Managed 资源，重新安装会恢复官方正文。Hook 示例：
+
+```javascript
+var result = JSON.parse(JSON.stringify(V8.Param.Result));
+var rows = Array.isArray(result.Data) ? result.Data : [result.Data];
+for (var i = 0; i < rows.length; i++) rows[i].BusinessTag = 'custom';
+return { Code: 1, UploadResult: result };
+```
+
+先做 JSON 转换，避免 Jint 将 .NET 包装对象误判为数组或普通对象，导致自定义属性没有写入每个文件。
+
+兼容开关只改变成功返回的字段，不改变公私桶、目录授权、裁剪、配额或内容安全策略。
+私有文件的 `url` 沿用本次短期授权地址；需要长期匿名访问时，仍须按下文配置公有上传权限。
+
+## 🔐 上传与私有文件安全
+
+::: warning 登录不等于文件授权
+Token 只用于确认用户和租户。普通帐号不能因为持有 Token 就任意选择公有桶、列目录、读取私有桶裸路径或调用文件管理接口；标准表单字段是否写入公有桶，由服务端回读该字段的“禁止匿名访问”配置后决定。
+:::
+
+### 表单字段如何决定公有桶或私有桶
+
+表单设计器中 `ImgUpload`（图片上传）、`FileUpload`（文件上传）和 `RichText`（富文本）的 **禁止匿名访问** 是字段级存储策略，不是超级管理员专属权限：
+
+| 字段权威配置 | 服务端实际策略 | 典型用途 |
+|---|---|---|
+| 未勾选“禁止匿名访问”（`Limit=false`） | 公有桶，可通过稳定公共地址访问 | 商品图片、官网内容、公开附件 |
+| 勾选“禁止匿名访问”（`Limit=true`） | 私有桶，读取时重新校验业务权限并签发短效地址 | 合同、内部资料、个人文件 |
+
+普通用户只要拥有当前菜单和表对应的新增或编辑动作权限，也可以按字段配置上传到公有桶。2026 年 7 月曾有一版安全加固把所有非超级管理员的交互式上传统一改成私有桶，这会覆盖字段设计器的合法配置，属于过度收紧；现已改为“客户端提供上下文、后端权威回查”。
+
+PC 表单的图片、文件和富文本上传会提交 `FormEngineKey + FieldId + SysMenuId`；编辑已有记录时还会提交 `FormDataId`，TableChild 会附带父子授权上下文。服务端随后：
+
+1. 按新增或编辑动作校验当前用户、角色、菜单、表和动作权限；
+2. 从当前租户重新读取 `diy_field.Component` 与 `diy_field.Config`；
+3. 只允许 `ImgUpload → img`、`FileUpload → file`、`RichText → editor` 三种对应目录；
+4. 用字段中的 `Limit` 覆盖请求值，再返回实际 `Limit` 和可用预览地址。
+
+因此篡改浏览器请求里的 `Limit=false`、`Path`、`FieldId` 或菜单 Id 都不能绕过授权。没有完整、可验证字段上下文的普通 HTTP/旧自定义上传，默认限制到私有安全目录；需要兼容旧客户端的固定业务目录时，由管理员配置下文的目录授权，不要求逐个修改旧客户端。老 `ImgUpload` / `FileUpload` 字段没有保存 `Limit` 时兼容为未勾选，即公有桶；老 `RichText` 字段没有上传配置时默认私有，避免升级后意外公开正文附件。
+
+微信小程序内容安全流程是额外的强制收紧：待审图片即使属于公有字段，也必须先进入私有隔离区，审核通过后才允许写入业务字段；是否最终转为公共发布资产，仍需经过受控发布流程。图片裁剪或压缩保留的 `_origin` 原图也始终写入私有桶。
+
+### 旧移动端、定制页面的目录与角色授权
+
+后端 **v8.2.8+** 支持普通系统设置 `sys_config.HdfsUploadRules`。更新官方“系统设置”应用后，在 **系统设置 → 开发配置 → 接口、文件与运行环境 → 文件上传权限** 中维护规则。这是普通配置，不是后端私有设置或密钥；规则是否能被读取不构成授权，只有管理员维护的规则和后端读取的有效角色才构成授权事实。
+
+| 规则列 | 填写方式 |
+|---|---|
+| 允许目录 `Path` | 相对业务目录或通配符，如 `files/{inspection,quality}/**`；不要填域名、桶名或租户前缀。区分大小写，兼容首尾 `/`；通配符需后端 v8.2.9+ |
+| 授权角色Id数组 `RoleIds` | 如 `["角色Id1","角色Id2"]`；使用角色管理中的真实 Id，不是角色名称 |
+| 所有登录用户 `AllAuthenticated` | 仅该目录确需所有有效登录用户上传时打开；打开后可不填角色 |
+| 包含子目录 `IncludeSubdirectories` | 默认关闭；打开后也允许已匹配目录下的全部子目录。不改变目录层级边界；规则已用尾部 `/**` 时无需再打开 |
+| 允许公有文件 `AllowPublic` | 默认关闭。只有打开且请求明确为 `Limit=false` 才写公有桶；请求私有时始终保持私有 |
+
+例如，只允许指定角色向一个既有目录及其子目录上传公开图片：
+
+```json
+[
+  {
+    "Path": "files/inspection",
+    "RoleIds": ["替换为真实角色Id"],
+    "AllAuthenticated": false,
+    "IncludeSubdirectories": true,
+    "AllowPublic": true
+  }
+]
+```
+
+排查“普通用户只能上传到平台预定义的文件目录”时，先在浏览器网络面板查看失败请求实际提交的 `Path`、`Limit`，检查是否把同一目录同时作为 `Path` 和 `path` 两个 multipart 字段提交。客户端应只提交一个 `Path`；修复后的后端会合并值相同的重复字段，值不同时明确拒绝。确认请求目录后再添加最小授权，避免为了绕过重复参数导致的误判而扩大规则。系统设置保存沿用共享缓存失效机制，下一次上传重新读取规则，无需重启；已经完成的上传不会被追溯删除。规则为空、未命中或被删除时，恢复原有 `file / img / avatar / editor` 私有安全目录策略。最多 128 条规则，错误规则在新版表单引擎保存时会被拒绝。
+
+规则只适用于**没有表单字段上下文**的已登录交互式上传，不改变标准字段上传的表/菜单/行授权；半套字段上下文仍拒绝。它不授予文件读取、删除、列目录、应用发布或跨租户权限；实际上传路径不能是根目录、包含通配符、穿越路径、`micro-app`、`ai-app*`、`app-store`、数据库备份和 `_origin` 等保留路径。即使管理员配置 `**`，这些保护仍优先执行。访问密钥会话不能借此获取目录权限。租户停用上传、内容检测、大小、数量及每日配额限制仍然生效，头像、待审图片及原图不会因此转为公有。
+
+应用包只增加可空字段与界面，不附带业务授权数据，更新应用不会覆盖租户已经配置的规则。不要为了快速修复而提高普通用户等级，也不要删除后端目录校验。
+
+应用需要初始化专用私有上传目录时，应由应用自己的 Managed 接口在当前租户管理员首次运行时执行：从目标租户的权威角色映射取得角色 Id，锁定唯一启用的系统配置，逐项保留既有 JSON 规则和未知属性，只追加缺失的应用私有前缀。配置比较交换、角色映射、初始化任务和租户 Hook 必须共享事务；失败全部回滚，缓存只在提交后失效。同一初始化任务重放不再次修改配置，管理员后来删除或禁用的规则不能被重放恢复。安装包的说明文件并不代表导入器已自动执行初始化步骤；真实入口和验收结果应明确记录。
+
+#### 目录通配符（后端 v8.2.9+）
+
+可组合以下格式，一行即可覆盖一组业务目录。规则只匹配请求的 `Path` 目录，不匹配上传文件名，也不匹配服务端后来追加的年月目录。
+
+| 格式 | 示例 | 匹配含义 |
+|---|---|---|
+| `*` | `files/inspect*` | 当前层内零个或多个字符，例如 `files/inspection`；不跨 `/` |
+| `**` | `files/**` | 零个或多个目录层级，包括 `files` 本身及任意深度子目录 |
+| 中间 `**` | `files/**/photos` | 匹配 `files/photos`、`files/a/b/photos`；`**` 必须独占一层 |
+| `?` | `workshop/line?` | 当前层内一个字符，例如 `line1`，不匹配 `line12` |
+| `[abc]` / `[a-z]` | `files/202[0-9]` | 字符集合或范围，例如 `files/2026` |
+| `[!abc]` / `[^abc]` | `files/[!0-9]*` | 首字符不在该集合内，例如 `files/photos`，不匹配 `files/9photos` |
+| `{A,B}` | `files/{inspection,quality}/**` | 任一候选分支及其子目录；可嵌套、可与其它格式组合 |
+
+`*` 单独使用只匹配一级业务目录；`**` 单独使用会匹配全部非保留业务目录，范围较大，应优先选择明确的业务前缀并绑定最小角色。多个命中的有效角色规则按授权并集处理：任一匹配规则允许公有且请求 `Limit=false` 时可公开；请求 `Limit=true`、头像、待审图片仍保持私有。
+
+单条规则最多 512 个字符，花括号最多嵌套 4 层、展开 32 个候选、4096 个字符令牌。非法括号、倒序范围、空分支、`ab**`、`***` 会在保存时被拒绝。匹配使用有界动态规划，不执行正则表达式、SQL `%`/`_` 通配或脚本；不支持反斜杠转义。服务端仅对解析后的语法做有界缓存，不缓存权限判定，角色与系统设置仍从当前租户的共享权限/配置缓存读取。
+
+升级顺序：先更新全部后端节点到 v8.2.9+，再启用通配规则；v8.2.8 只支持精确目录和“包含子目录”，与新节点混用时可能拒绝新语法。旧移动端请求格式无需变化。
+
+### 图片默认压缩与私有原图
+
+`ImgUpload`、PC、UniApp/H5/小程序和普通 MCP 图片上传在未传 `Preview` 时默认开启压缩。平台展示图默认控制在约 `500 KB` 以内，最长边不超过 `1920 px`；字段设计器的新图片字段同样默认开启。只有明确传入 `Preview=false` 才关闭压缩，旧移动端漏传参数不会关闭。
+
+压缩前，后端会先把原始字节保存到当前租户 HDFS 私有桶的同名 `_origin` 对象，再使用跨平台图片库生成展示图并写入目标公有或私有位置。因此对外页面加载的是几百 KB 的展示图，原始高清图仍只在私有桶保留。上传结果的 `Size` 表示展示图实际体积，`OriginalSize` 用于管理员审计。
+
+### 表单引擎裁剪原图协议
+
+`ImgUpload.Crop.Enabled=true` 时，PC 前端在同一个 `multipart/form-data` 请求中传入两份同名数据：普通 `file` 是裁剪结果，`MicroiOriginalFile` 是裁剪前未改动原图，并传入 `CropEnabled=true`。该特殊字段是平台内部协议，业务 V8 不应手工伪造。
+
+`Crop.Enabled` 只决定“上传前裁剪”的默认状态。表单用户关闭运行时开关或在裁剪工作台点击“不裁剪直接上传”时，不传 `CropEnabled/MicroiOriginalFile`，继续走普通图片上传协议；若 `Preview` 开启或缺失，普通压缩链路仍会先把原始字节保存在私有 `_origin` 对象中。
+
+后端会核对两者一一同名，并将裁剪图与原图的字节数一起计入单次大小和每日配额。写入顺序固定为“原图写入私有 `_origin` 对象 → 可选压缩裁剪图 → 写入业务展示图”。原图写入失败时必须失败关闭，不得先发布裁剪图。返回的 `Cropped=true` 和 `OriginalStored=true` 只表示服务端执行结果，不暴露原图对象路径。
+
+### 富文本附件的长期引用
+
+`RichText.Limit=false` 用于官网公告、商品详情等公开正文：图片、视频和附件写入公有桶，正文保存可长期访问的公有 URL。`Limit=true` 用于内部内容：正文只保存 `/__microi_richtext_private__/...` 稳定对象标识，不保存对象存储签名 URL、审计代理 Ticket 或 DiyToken。
+
+查看或编辑已有记录时，富文本组件从真实 `img/video/source.src` 和 `a.href` 收集稳定标识，携带 `FormEngineKey + FormDataId + FieldId + SysMenuId` 调用 `/apiengine/platform-private-file-url`。后端重新校验用户、租户、菜单、表、行、字段以及正文中的精确引用，再返回本次页面使用的短效审计代理 URL；关闭后重新打开会换取新地址，因此短效地址过期不会污染数据库内容。历史正文直接保存 FileServer URL 时，后端只对真实媒体属性中的精确同路径引用提供兼容，不把普通文字、`data-href/data-src` 或脚本标签当作授权依据。
+
+::: warning 私有富文本不能直接匿名发布
+外部网站没有当前后台记录的菜单与行权限上下文，不能解析私有标识。需要匿名展示的文章应在表单设计器中取消 RichText 的“禁止匿名访问”；有新增或编辑权限的普通用户随后也会按该字段的权威配置上传到公有桶。仅修改请求参数不能改变存储策略。
+:::
+
+### 需要立即撤回的公开媒体
+
+公开桶链接适合长期公开资源，删除源对象并不能证明 CDN 缓存已经失效。需要撤稿后使旧链接停止返回字节的媒体，应保存在私有桶，由专用业务接口根据当前租户、真实批准版本及其精确媒体引用授权，再返回受限的图片字节。接口不能接受任意对象路径，不能把签名 URL 或重定向当作撤回保证；读取前后均应复核批准、发布、许可和撤回状态，并返回 `Cache-Control: no-store`。接口外部地址只包含稳定的业务记录标识，不携带 Token 或私有存储路径。
+
+撤回先在共享数据库事务中使公开授权失效并记录稳定请求键的待办，提交后再执行对象删除；存储结果未知时按原请求键探查和续作，禁止重新上传。历史公开 URL 只有在实际 CDN 失效任务完成、缓存入口独立回读旧 URL 不再返回媒体字节后，才能记作撤回完成。没有该能力或证据时应保留“源对象已删除，CDN 撤回未确认”的状态，不能用隐藏页面、`Offline` 或源站 `404` 替代验收。已经被第三方下载的副本不属于本系统可以撤回的范围。
+
+::: warning 压缩失败不会发布原图
+图片解码、压缩或编码失败时接口直接返回错误；平台不会再静默把几十 MB 的未压缩原图上传到公开桶。历史大图迁移也必须先补齐私有原图、上传新展示图、更新并回读全部业务引用，确认无引用后才能删除旧公有对象。
+:::
+
+### 微信小程序图片与资料内容安全
+
+微信小程序中的头像及其它用户图片统一通过 `V8.uploadFile` 上传；多图组件使用 `V8.uploadFiles`，最多并发上传 3 张，并通过受管接口引擎 `mci-wechat-content-status-batch` 合并查询本人最多 20 条审核状态。小程序运行时 SDK 为每次上传获取独立的一次性 `wx.login` code，后端把图片保存在私有隔离区，并调用微信 `mediaCheckAsync`；只有异步回调明确返回 `pass` 后，SDK 才把对应文件值写入表单。单张失败不影响其它已通过图片，轮询采用有限次数、总超时和退避间隔，不允许无限请求。`review`、`risky`、回调超时、配置缺失或 Redis 故障均失败关闭。用户侧只提示“你发布的内容含违规信息，请修改后重试”，不得显示命中标签、策略或概率。
+
+个人资料保存还会在服务端再次核对审核记录、图片路径和提交人，并用 `msgSecCheck` 检查姓名、实名和个人简介。因此不能通过跳过前端轮询或直接请求 `UptSysUser` 绕过检测。
+
+SaaS 引擎“微信小程序”Tab 提供以下租户配置；它们属于敏感配置，不得写入 `appsettings.json`、环境变量、UniApp 源码、接口引擎或日志。相关字段应随官方应用商城资源交付，不再为此新增 `Microi.Upgrade` 定制迁移：
+
+| SaaS 引擎字段 | 说明 |
+|---|---|
+| `WeChatMiniProgramAppId` | 当前小程序 AppId |
+| `WeChatMiniProgramAppSecret` | 当前小程序 AppSecret，仅后端读取 |
+| `WeChatMiniProgramMessageToken` | 微信消息推送签名 Token |
+| `WeChatMiniProgramAESKey` | 可选；兼容／安全模式回调解密密钥（EncodingAESKey，43 位） |
+
+在微信公众平台配置小程序消息推送 URL：
+
+```text
+https://<API公网域名>/api/WeChatContentSecurity/Callback--OsClient--<OsClient>--
+```
+
+如果第三方设置页确认支持查询参数，也可以使用 `/api/WeChatContentSecurity/Callback?OsClient=<OsClient>`；禁止使用 `?o=`。Token 必须与 `WeChatMiniProgramMessageToken` 完全一致；可先使用明文模式，启用兼容或安全模式时同时填写 EncodingAESKey。API 域名必须是微信可访问的 HTTPS 地址，负载均衡后的所有节点连接同一 Redis。接入依据见微信官方 [`mediaCheckAsync`](https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/sec-check/security.mediaCheckAsync.html) 与 [`msgSecCheck`](https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/sec-check/security.msgSecCheck.html) 文档。
+
+### 租户动态限制、灾难保护上限与每日配额
+
+普通 HTTP、FormEngine、V8 和移动端上传入口共用服务端限制。上传限制分为三层：租户业务配置、平台独立灾难保护上限、HTTP 请求解析上限。表单字段的“禁止匿名访问”只决定公有桶或私有桶，不能放大文件大小、数量、每日配额或 HTTP 上限。受能力鉴权的 AI 应用资产协议 v3 使用下文独立的断点续传链路。
+
+业务值只按 `sys_osclients` 当前租户 → 代码默认值解析，管理员无需维护额外环境变量或修改 `appsettings.json`：
+
+| SaaS 引擎字段 | 代码默认值 |
+|---|---:|
+| `DisableFileUpload` | `false`（关闭，即允许上传） |
+| `FileUploadMaxFileMB` | 500 MB |
+| `FileUploadMaxRequestMB` | 500 MB |
+| `FileUploadMaxCount` | 10 |
+| `FileUploadDailyUserQuotaMB` | 2048 MB |
+| `FileUploadDailyTenantQuotaMB` | 20480 MB |
+
+业务值最终再与平台代码中的固定灾难保护上限取较小值：单文件 2048 MB、单次总量 2048 MB、单次 100 个文件、帐号和租户日额度各 10 TB。这些硬上限不是安装配置项，普通租户不能放大。管理员可以把单文件与单次总量配置为 1024 MB 或 2048 MB；空值使用 500 MB 默认值。
+
+Kestrel HTTP 正文和 Multipart 接收硬顶统一为 2048 MB，普通表单单值硬顶为 128 MB；它们是所有租户共享的安全边界，不要求安装者再配置环境变量。租户业务配置仍负责其自身的最终额度，反向代理还必须允许请求进入 API。
+
+#### nginx 413 与大文件上传
+
+`413 Content Too Large` 如果响应正文是 nginx 的 HTML，表示请求尚未进入吾码 API，SaaS 引擎缓存、HDFS Controller 和全局异常处理都没有机会执行。实际可上传大小是“nginx → Kestrel HTTP → Multipart → 租户单文件/单次额度 → Absolute 灾难保护”各层上限的最小值。禁止只提高 `sys_osclients.FileUploadMaxFileMB`，也禁止用 `client_max_body_size 0` 关闭网关保护。
+
+例如需要让普通 multipart 上传覆盖平台 2 GB 硬顶，应在 **API 域名的 nginx `server` 块**中配置：
+
+```nginx
+# 支持平台2GB硬顶，并为multipart封装留出余量；禁止配置为0取消保护
+client_max_body_size 2112m;
+
+# 慢速大文件上传的请求体读取空闲超时
+client_body_timeout 600s;
+
+# 避免 nginx 先把整个大文件重复缓冲到本机磁盘；HDFS/API 仍执行自身校验。
+proxy_request_buffering off;
+
+# 分块请求关闭缓冲时使用HTTP/1.1，并给上游读写保留足够时间
+proxy_http_version 1.1;
+proxy_connect_timeout 60s;
+proxy_send_timeout 600s;
+proxy_read_timeout 600s;
+
+# nginx 自己拒绝的请求无法进入 ASP.NET Core，需在代理层保持吾码 DosResult 合约。
+error_page 413 = @microi_upload_too_large;
+location @microi_upload_too_large {
+    default_type application/json;
+    charset utf-8;
+    add_header Cache-Control "no-store" always;
+    # 跨域部署时，此处必须显式复用正常API代理的CORS白名单/include；不能依赖后端补响应头。
+    return 200 '{"Code":0,"Data":null,"Msg":"上传请求在进入吾码 HDFS 前已超过反向代理请求体上限。SaaS 引擎上传额度不能放大 nginx/Kestrel/Multipart 上限；请运维同步提高各层上限后重试。","DataAppend":{"ErrorType":"UploadRequestTooLarge","Layer":"ReverseProxy"}}';
+}
+```
+
+这些 `proxy_*` 指令可放在 API 域名的 `server` 层供代理 `location` 继承，也可合并进现有的 `location ^~ /`；不要新建第二个重复 location。`proxy_request_buffering off` 只关闭 nginx 预缓冲，不能用响应方向的 `proxy_buffering off` 代替，也不会绕过 API/HDFS 校验。
+
+修改 nginx 后先执行 `nginx -t`，成功后再 reload。吾码普通上传 API 已内置 2048 MB HTTP/Multipart 接收硬顶；无需增加上传相关环境变量。普通单请求仍不能突破平台固定的单文件 2048 MB、单次总量 2048 MB 灾难保护上限。AI 应用资产协议 v3 与 SaaS 租户数据库 ZIP 协议每次只发送一个有界原始分片，不继承整文件单请求上限。若前面还有 CDN、WAF、负载均衡或 Ingress，还要同步检查这些上游的请求体和空闲超时限制。
+
+##### 创建租户数据库 ZIP
+
+创建 SaaS 租户时，数据库 ZIP 不再走整包 `/api/HDFS/UniappUpload`：
+
+- 平台先创建与租户、用户、文件大小和摘要绑定的上传会话，再以默认 16 MB（服务端允许 1–32 MB）原始分片上传；每片与整包都做 SHA-256 强回读。
+- 刷新页面、网络断开或浏览器重开后，重新选择同一文件会读取服务器状态并只补传缺失分片。单片接口接收上限为 64 MB，所以常见 100 MB 代理上限不会阻断 500 MB、1 GB 或 2 GB 的逻辑文件。
+- 完成合并后，租户开通服务从私有 HDFS 临时文件流式解压并执行 SQL，避免 ZIP 与解压后的脚本同时驻留内存；连续 `INSERT` / `REPLACE` 按最多 500 条或 1 MB 使用有界事务批次执行。
+- 通知中心不会按数据行写日志，而是限频更新读取量、批次、语句数、吞吐和预计剩余时间，并仅在阶段变化或每 5% 进度追加一条有界执行记录。
+
+请求进入吾码 API 后，如果 Kestrel 或 Multipart 再触发超限，全局异常处理会返回 HTTP 200、`Code=0`、`DataAppend.ErrorType=UploadRequestTooLarge`，并在响应头给出 `X-Microi-Upload-Max-Request-MB` 与 `X-Microi-Upload-Max-Multipart-MB`，方便定位实际生效的 API 启动配置。
+
+Upgrade16/Upgrade35 会在 `sys_osclients` 为每个租户补齐下列现行可空字段：
+
+| SaaS 引擎字段 | 作用 | 空值行为 |
+|---|---|---|
+| `DisableFileUpload` | 是否关闭当前租户交互式上传 | 空值/无效值/`0` 均为不关闭，即允许上传 |
+| `FileUploadMaxFileMB` | 单文件大小 | 使用代码默认值 |
+| `FileUploadMaxRequestMB` | 单次全部文件大小 | 使用代码默认值 |
+| `FileUploadMaxCount` | 单次文件数量 | 使用代码默认值 |
+| `FileUploadDailyUserQuotaMB` | 单帐号每日额度 | 使用平台默认额度 |
+| `FileUploadDailyTenantQuotaMB` | 单租户每日额度 | 使用平台默认额度 |
+
+租户配置可以高于代码业务默认值，但普通上传不能突破平台固定灾难保护、HTTP/Multipart/Form 解析上限以及反向代理限制。`DisableFileUpload=1` 会停止该租户普通上传和应用资产断点续传，而不是关闭安全检查；协议 v3 只移除产品级字节上限，不绕过身份、能力、版本、哈希和审计。修改 SaaS 引擎配置后应通过平台现有的租户重载流程刷新共享 Redis 配置，使所有 API 节点生效。
+
+#### “当前租户已停用文件上传”如何处理
+
+新版以 `DisableFileUpload` 为事实源：缺列以外的空值、无法解析或 `0/false` 都表示允许上传，只有 `1/true` 才禁止。仅当运行节点尚未升级、物理表没有新字段时，才回退读取旧 `FileUploadEnabled`。因此看到“当前租户已关闭文件上传”时，先检查实际生效记录的负向开关，不要先把问题归因于 MinIO/HDFS。
+
+1. 在 SaaS 引擎查询目标 `OsClient`，同时核对当前后端进程的 `OsClientType`、`OsClientNetwork`。同一租户存在内网、外网或开发/生产多条记录时，只修改当前服务器实际命中的启用记录，不能凭租户名称批量覆盖其它环境。
+2. 将该记录的 `DisableFileUpload` 关闭为 `0` 并保存。返回结果中的 `DataAppend.ConfigField=DisableFileUpload`、`DataAppend.ExpectedValue=0`、`DataAppend.OsClient` 可用于确认目标。
+3. 等待 SaaS 配置重载和共享 Redis 发布订阅完成；多 API 节点应全部收到同一版本，不能只清某个节点的进程内缓存。
+4. 分别用一个很小的公有图片和一个私有文件做真实上传、读取测试。若错误变成 endpoint、bucket、签名或 `Invalid URI`，再按 MinIO/HDFS 配置排查；不要继续修改开关，也不要删除每日配额 Redis Key。
+
+平台超级管理员也可按下文 MCP 流程精确更新，但写入前后都要回读同一组 `OsClient + OsClientType + OsClientNetwork` 数据。禁止为了消除提示而把所有租户、所有网络环境无差别改为允许。
+
+帐号与租户额度使用共享 Redis 原子预留，适用于多 API 节点；Redis 不可用时上传失败关闭，不会降级成无限上传。额度按 UTC 日期统计，为避免并发重试绕过限制，上传后续失败也不退回已预留额度。反向代理、Ingress/IIS 还应设置不高于平台配置的请求体限制。
+
+每日配额用于阻断短时间滥用，不等于租户全生命周期容量上限。生产对象存储还必须按租户或桶配置独立的总容量/账单告警与生命周期规则，并定期以对象存储实际用量对账；否则用户即使每天都低于应用配额，长期累计仍可能消耗大量空间。应用层 Redis 计数不能代替存储提供方的硬容量边界。
+
+#### 通过 MCP 调整租户上传配额
+
+平台超级管理员可以通过标准 MCP 工具修改 `sys_osclients` 中的六项租户业务配置，无需编写临时 SQL 或清空 Redis。容量字段单位均为 MB，例如 20 GB 应写为 `20480`。
+
+1. 先调用 `microi_get_table_data` 查询 `sys_osclients`，按目标 `OsClient` 和 `IsEnable=1` 筛选，并回读 `Id`、`OsClientType`、`OsClientNetwork` 以及六个 `FileUpload*` 字段。
+2. 同一租户可能同时存在 `Internal`、`Internet` 等多条启用记录。对每条记录调用 `microi_update_form_data`，传入 `tableName: "sys_osclients"`、包含 `Id` 的字段补丁以及 `confirmExecution: "sys_osclients"`，避免负载均衡节点读取到不同配置。
+3. 再次调用 `microi_get_table_data` 逐条回读。FormEngine 保存 `sys_osclients` 后会触发 SaaS 运行配置重载；等待重载完成后，用一次真实小文件上传验证错误提示中的有效额度或上传结果。
+
+示例字段补丁：
+
+```json
+{
+  "Id": "<sys_osclients.Id>",
+  "FileUploadDailyUserQuotaMB": 20480,
+  "FileUploadDailyTenantQuotaMB": 20480
+}
+```
+
+提高配额不会清零当日已经预留的字节数，而是立即按“新上限减去今日已用量”计算剩余额度。每日计数按 UTC 日期切换（北京时间每日 08:00 进入新的 UTC 统计日）；失败上传为防重试绕过也不会退回预留额度。除非用户明确授权事故处置，AI 不得删除共享 Redis 配额 Key。平台固定灾难保护、Kestrel/Multipart/Form 和反向代理限制不能通过租户侧 `sys_osclients` 或普通 MCP 表单更新突破。
+
+#### AI 应用编译产物流式发布
+
+Web、UniApp 和 MicroService 的真实编译目录应使用 MCP 工具 `microi_publish_application_directory_stream` 发布。该链路不会把文件转为 Base64，也不会让文件体进入接口引擎/Jint：
+
+1. MCP 在本机按文件流计算 SHA-256，先拒绝符号链接、`.git`、`node_modules`、密钥/环境文件和超过 20000 个文件的异常目录；协议 v3 不设置 Microi 产品级文件/目录字节上限。
+2. 不超过 128 MiB 的文件兼容旧版单请求；更大文件自动创建确定性断点会话，默认以 16 MiB `application/octet-stream` 分片发送。每片校验精确 `Content-Length`、SHA-256，并从 HDFS 写后回读。
+3. 所有文件写完后，MCP 只提交路径、大小和摘要清单到 `/api/V8Engine/FinalizeApplicationStreamPublish`。API 回读不可变版本对象与完整性标记，再用对象存储服务端 `CopyObject` 投影到公开的版本目录；私有源码按同样相对目录保留最新版与历史快照。
+4. 固定根的非入口资源先切换，`index.html` 最后切换；同一应用使用跨节点分布式锁串行发布。随后刷新被覆写的 CDN 固定路径并等待刷新任务完成，从 CDN 回读入口及引用资源，才更新商城体验地址。
+
+```text
+公有桶历史版本：{tenant}/micro-app/{appKey}/v1.2.3/index.html
+公有桶稳定地址：{tenant}/micro-app/{appKey}/index.html
+私有桶源码版本：{tenant}/micro-app/{appKey}/v1.2.3/{sourceFile}
+私有桶最新源码：{tenant}/micro-app/{appKey}/{sourceFile}
+```
+
+Web、UniApp 与 MicroService 均采用该目录；官网体验地址是 `https://file.microi.net/{tenant}/micro-app/{appKey}/index.html`。v3 内部不可变对象键仍可作为校验源，不作为官网链接；CDN 直接读取公有桶，不承担动态版本解析。数据库只保存路径、大小、SHA-256、版本和路由等元数据。失败后可用相同版本和摘要安全重试；历史目录若已有不同字节则拒绝覆盖。
+
+v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在数据库中使用以 `/` 开头的对象路径，发布完成态检查依赖该路径；官网接口和后台工作台通过租户 `FileServer` 生成完整的 CDN 体验链接。不要为了统一展示而直接将这些内部字段改成绝对 URL。
+
+使用官方 `static.itdos.com` 时，发布端从当前租户“系统设置 → 安全与服务接入”的 `Integration.Cdn.Aliyun.AccessKeyId/AccessKeySecret` 读取 CDN 凭据；旧租户可沿用 `Integration.Dns.Aliyun.*` 或 SaaS 配置中的 `AlidnsKeyId/AlidnsKeySecret`。密钥必须成对配置，并具备阿里云 CDN 刷新与任务查询权限。刷新提交只会返回任务号，发布器需等任务全部为 `Complete` 且从 CDN 按大小、SHA-256 回读成功后才确认发布；凭据缺失或任务失败时会保留可恢复状态。阿里云默认每天有 URL 刷新配额，批量迁移前应核对当日配额与已用量。
+
+迁移存量应用时，旧历史对象可能已缺失。只有商城编译包、仍可访问的当前体验路由或本地归档中的原始字节与冻结发布清单的大小、SHA-256 完全一致，才可补齐；无法恢复的历史版本保持原记录并列入待补清单。当前版本独立校验通过后可以先切换固定体验入口，不能把缺失的历史目录当成已归档版本。
+
+几十 MB 不是 Jint 的固定内存上限，HDFS 本身也没有这种限制。旧发布流程的问题是先把二进制扩成约 `4/3` 大小的 Base64，再经 JSON、Jint 字符串和多层复制产生累计分配。普通小型 V8 上传可继续使用 `V8.Method.Upload`；真实编译目录和大型资产必须使用协议 v3。5 GiB 文件默认是 320 片，网络或进程重启后查询远端状态并只补缺片。每个会话在 `mci_ai_app_file` 以 `StorageScope=ApplicationAssetMultipartSession` 保留，管理员可从“系统引擎 → 超大文件上传记录”查看字节进度、分片数、心跳、错误与恢复建议。最终能力由协议技术边界、对象存储、磁盘、网关和网络共同决定，而不是普通表单的整文件上限。
+
+调用示例：
+
+```json
+{
+  "appIdOrKey": "microi-developer-toolbox",
+  "versionNo": "v1.1.0",
+  "directory": "D:/build/microi-developer-toolbox/dist",
+  "entryPath": "index.html",
+  "confirmExecution": "microi-developer-toolbox"
+}
+```
+
+标准表单字段上传按本页前述权威字段配置选择公有桶或私有桶，普通用户无需成为超级管理员；后端会把目录固定为控件对应的 `file`、`img` 或 `editor`。没有可验证字段上下文、也未命中系统设置目录授权的普通交互式上传，仍强制写入私有桶，并且只能使用 `file`、`img`、`avatar`、`editor` 四个安全一级目录。管理员可通过前述 `HdfsUploadRules` 显式授权其它业务目录及公有上传；绝对路径和 `..` 等非法路径始终拒绝。公有上传不等于信任客户端参数，而是服务端确认字段权限或当前用户的目录授权后作出的决定。
+
+接口引擎、后端表单 V8 和平台内部任务调用 `V8.Method.Upload` 属于可信服务端普通上传，可以由业务代码选择安全路径和公私有桶，但仍受全局文件数量、单文件和单次总量硬限制。只有应用资产协议 v3 具有独立断点与无产品字节上限语义；浏览器、移动端和普通 HTTP 客户端不能通过伪造 `_TrustedServerInvocation`、`Limit` 或 `Path` 获得这种信任。
+
+#### 已提交应用的 CDN 特殊字符别名修复
+
+对象键、清单逻辑路径和浏览器 URL 是三个不同的值。例如，逻辑文件名 `asset@subasset.json` 对应的公开对象键应保留 `@`，浏览器 URL 可将它编码为 `%40`；若对象键本身含字面量 `%40`，访问这个旧对象的 URL 则需写成 `%2540`。不能把 URL 编码结果直接当作新的对象键，也不能在 HDFS 中对所有对象键统一反解码，否则会改变存量对象的身份。
+
+当已提交的协议 v3 应用出现这类 CDN 投影缺口时，可由当前租户平台超级管理员通过受管接口引擎 `ai_app_cdn_backfill` 的 `Action=RepairCommittedCdnAliases` 补充别名。它只复制经过验证的既有公有对象，不接收文件体，不修改清单，也不删除或重命名原编码对象。v3 内部不可变对象、完整性标记、请求身份和运行清单摘要保持原样。
+
+调用前必须回读当前商城记录与版本完整记录，并冻结以下参数；不得仅凭 AppKey 或上次运行的缓存值发起修复：
+
+| 参数 | 绑定要求 |
+|---|---|
+| `AppId`、`ConfirmAppId` | 同一精确应用 Id；当前用户仍须满足 `Level >= 9999` |
+| `ExpectedAppKey`、`ExpectedVersionId`、`ExpectedVersionNo` | 当前应用及版本归属 |
+| `ExpectedRequestId`、`ExpectedRequestFingerprint`、`ExpectedRuntimeManifestHash` | 该版本协议 v3 请求身份与完整运行清单摘要 |
+| `ExpectedCommittedPublishVersionId`、`ExpectedCommittedRuntimeManifestHash` | 商城当前已提交版本指针及摘要 |
+| `ExpectedCurrentVersion`、`ExpectedPublishFence`、`ExpectedPublishRowVersion` | 当前版本号计数、发布栅栏和行版本，使用规范十进制字符串，避免大整数精度丢失 |
+| `DryRun` | 默认 `true`，只检查绑定与对象摘要；仅显式 `false` 执行复制 |
+| `AliasStart`、`AliasCount` | 默认分别为 0、1；`AliasStart` 索引冻结清单内符合范围的原始 `@` JSON 列表；`AliasCount` 为 1–5，不是全部资产的分页大小 |
+
+服务端同时核对当前活动指针、版本归属、协议、版本 `FencingToken`、派生的 `ReleasePrefix`，以及商城和版本的发布状态；两者状态只接受 `ProjectionPending`、`RepairRequired` 或 `Completed`。完整清单按平台既定的 ordinal 路径排序，以 `Path<TAB>Sha256<TAB>Size`、行间 LF、末尾无 LF 和 UTF-8 重新计算 SHA-256，后续回读还须确认冻结清单字符串未变。
+
+允许补齐的路径仅为 `assets/<bundle>/import/<两位十六进制>/<文件名>@<子资源>.json`，且必须是非入口、公有运行 JSON，单文件不超过 1 MiB。清单中出现不支持的 `@` 路径时整次拒绝，不静默跳过。私有或源码资源、百分号转义、绝对路径、目录穿越、自定义桶或目标路径、调用方上传内容均不属于此动作。
+
+该维护动作还要求完整运行清单使用安全 ASCII 相对路径、恰好一个入口、最多 20000 项、单项不超过 2 GiB、合计不超过 4 GiB。这是此小范围修复动作的校验边界，不改变协议 v3 正常流式发布的容量语义。
+
+对每个冻结逻辑路径 `P`，复制路径由服务端按当前租户推导，均使用 `Limit:false`：
+
+| 用途 | 对象键 |
+|---|---|
+| 保留的既有来源 | `{tenant}/micro-app/{AppKey}/{VersionNo}/{P 中的 @ 替换为字面量 %40}` |
+| 版本目录别名 | `{tenant}/micro-app/{AppKey}/{VersionNo}/{原始 P}` |
+| 固定目录别名 | `{tenant}/micro-app/{AppKey}/{原始 P}` |
+
+传给存储原子的必须是租户内对象路径，不能用 HTTPS 来源 URL 代替。每个资产最多产生版本目录和固定目录两次复制，因此一批最多 5 个资产、10 次复制。执行前先检查整批来源和目标：`Sha256` 是对象原始物理字节的摘要，与 `Size` 一同绑定冻结清单；`WireSha256` 是这些字节转为 Base64 文本后的历史兼容摘要，只校验摘要格式及来源、目标之间的一致性，不能要求它等于清单的原始字节摘要。已有目标字节相同则跳过，任何目标字节不同则整批拒绝，不覆盖。每次复制前后再次核对摘要和最新发布绑定。
+
+`CopyObject` 当前没有原子的 create-if-absent/禁止覆盖参数，响应会明确返回 `AtomicCreateOnly:false`。前置检查能拒绝已观察到的冲突，不能消除“检查后、复制前”另一个写入者改动目标的窗口。修复期间不能有另一发布者或任意写入者竞争同一固定路径；既有后台投影可继续写入同一冻结版本的相同字节。指针、活动版本、栅栏、行版本或清单发生变化时，停止当前流程，核对已产生的副作用并重新取得契约，不能只替换预期参数强行续跑。
+
+建议按以下顺序执行：
+
+1. 回读当前绑定，对最多 5 个资产执行 `DryRun:true`，检查返回的来源、目标、摘要和大小。
+2. 使用同一组冻结绑定及游标执行 `DryRun:false`，记录 `Attempted`、`Copied`、`RequiresReadback` 和 `NextAliasStart`。
+3. 独立从版本及固定 CDN URL 回读实际字节、大小和 SHA-256。超时、未知结果或 `Code=0` 不能证明对象未写入；先回读已尝试路径，再决定是否重试。数据库事务回滚不能撤销 OSS 复制。
+4. 下一批重新回读当前事实并核对契约，再使用返回的 `NextAliasStart`。全部别名核对后，由原发布后台继续完成 CDN 刷新、公开回读和状态收敛。
+
+此动作不刷新 CDN、不推进提交指针、不修改发布状态，也不将 `ProjectionPending/RepairRequired` 强制改成 `Completed`。复制成功不能代替刷新任务完成、公网字节一致和真实浏览器资源加载验收；旧 404 缓存也需通过原发布刷新流程处理。
+
+### 私有文件必须绑定业务记录
+
+普通用户调用 `/apiengine/platform-private-file-url` 时，除文件相对路径外必须提交：
+
+| 参数 | 说明 |
+|---|---|
+| `FormEngineKey` | 文件所属表名或表 Id |
+| `FormDataId` | 文件所属业务记录 Id |
+| `FieldId` | 保存该文件引用的 `FileUpload` / `ImgUpload` 字段 Id |
+| `SysMenuId` | 当前用户实际进入的菜单 Id |
+
+服务端依次校验：Token 与 `OsClient` 一致、用户拥有该菜单、菜单绑定目标表、菜单数据范围允许读取该记录、字段属于该表且是文件字段、字段值确实引用所请求路径。任一步失败都不会退回裸路径签名 URL；普通用户也不能直接获取私有文件的 `Byte` / `Stream`。私有文件链接仍为短期后端票据，不能持久化临时 URL。
+
+接口引擎和后端表单 V8 可以在可信服务端上下文中调用 `V8.Method.GetPrivateFileUrl({ FilePathName })`。这不表示浏览器也能只传路径签名；普通客户端始终必须携带上表中的完整业务上下文。
+
+文件列表、移动、重命名、删除、覆盖上传等管理接口仅允许 `Level >= 9999` 的平台超级管理员。业务用户删除附件应通过受保护的表单/业务接口完成，由服务端核对记录权限和字段引用后处理对象存储，不能直接开放文件管理 API。
+
+富文本编辑器的远程图片抓取 `catchimage` 默认关闭，避免把平台变成任意 URL 下载器或内网探测代理。业务若需要采集远程资源，应使用单独的受控接口，并实现域名白名单、DNS/IP 校验、禁止跳转、超时、响应体上限和文件头校验。
+
+### 仅删除空目录标记
+
+事故恢复只需移除一个目录占位对象时，使用专用 `POST /api/HDFS/DeleteEmptyDirectoryMarker`，显式传 `FilePathName`（保留末尾 `/`）与 `Limit`（`true` 私有桶、`false` 公有桶）。服务端读取 JSON 后强制 `EmptyDirectoryOnly=true`；客户端传 `false` 也不能改成递归删除。旧后端缺少该路由时必须停止，不能回退 `/api/HDFS/DeleteObject`。
+
+此操作只允许当前租户仍然有效的平台超级管理员 DiyToken 会话；访问密钥、普通帐号、撤权用户、未知绝对路径、URL、通配符、路径穿越和租户根均被拒绝。平台用当前租户配置固定供应商与桶，完整核验原始对象列表和零字节大小，只删除精确标记 key；不调用前缀批量删除。非空目录、缺失大小、未知分页、权限失败和删除后无法确认空前缀都返回失败。标记已不存在时也需完整回读才返回幂等成功，成功正文须含 `DeletionMode=EmptyDirectoryMarkerOnly` 与 `VerifiedAbsent=true`。
+
+标准 MCP `microi_delete_empty_directory_marker` 默认仅产生本地 dry run；执行参数 `confirmExecution` 必须精确等于 `filePathName`。删除结果未知时保留原 key，先回读，不能自动换键或再次上传。
+
+该能力不是“零字节条件删除 CAS”，也不证明历史从未 PUT。供应商 SDK 没有统一的条件 DELETE；若同 key 在核验后被其它写入替换，无法保证只删除旧版本。因此执行前必须隔离原业务请求、排除活跃写入，并单独保留历史 NoPUT 或受控恢复的证据。并发新写入的后代不会被删除，但会使删除后回读失败。
+
+#### 升级兼容说明
+
+- 历史公有文件不会因升级自动迁移；先复制到租户私有桶、回读核验，再停止旧公有访问。数据库继续保存租户内相对路径，不保存对象存储密钥或真实签名 URL。
+- 旧页面只传 `FilePathName` 获取私有地址，升级后普通帐号会失败。应补齐 `FormEngineKey`、`FormDataId`、`FieldId`、`SysMenuId`，不要把接口改回匿名或给普通角色开放文件管理权限。
+- 旧版标准表单无需修改字段值；升级 PC 前端和 API 后，上传组件会自动补齐字段上下文，后端继续以原字段“禁止匿名访问”配置为准。若只升级 API 而仍使用旧前端，缺少字段上下文且没有管理员目录授权的普通上传会安全降级到私有桶。
+- 旧自定义上传若只传 `Limit=false` 和多级 `Path`，可在普通系统设置中按角色配置 `HdfsUploadRules`，无需逐个修改客户端；新代码仍优先补齐可验证的表单字段上下文。无论哪种方式，都不能只把客户端参数当作公开授权。
+- 上线前至少用“普通用户 + 超级管理员 × 公有字段 + 私有字段 × 新增 + 编辑”验证实际对象桶、返回 `Limit` 和读取方式，并覆盖越权、配额耗尽、Redis 故障和多节点并发；不能仅以“上传成功”作为安全验收。
+- Upgrade16 的六个字段全部可空，空值继续使用平台默认/硬上限，因此老租户升级不会被强制停用上传。升级完成后应回读字段元数据和租户配置，并刷新 SaaS 运行缓存。
+
+完整平台保护表、登录会话、CORS、SSRF 和升级基线见 [平台安全与兼容基线](./security)。
+
+---
+
+## ⚙️ 步骤一：指定存储方式
+
+在 **【系统设置】→【开发配置】** 中指定存储方式。系统设置由表单引擎驱动，可在表单设计中自由扩展更多自定义存储方式。
+
+![存储方式配置](https://file.microi.net/upload/img/csdn/5f7e4c8a6b824c51b1c50de50827abdd.png#pic_center)
+
+---
+
+## ☁️ 阿里云 OSS + CDN
+
+在 **【SaaS 引擎】→【Aliyun】** 处配置相关参数：
+
+![阿里云OSS配置](https://file.microi.net/upload/img/csdn/dd353af2971c4057b3d47c1f3ad9d81c.png#pic_center)
+
+---
+
+## 📦 MinIO
+
+在 **【SaaS 引擎】→【MinIO】** 处配置相关参数：
+
+服务端复制对象会保留源文件和原 MIME、元数据。旧后端的 MinIO SDK 7 对带 `charset` 的 MIME 可能构造重复 `Content-Type`，造成复制签名不匹配；升级后端复制传输修复即可，无需修改租户密钥、源对象 MIME 或关闭签名校验。恢复时保留原请求键，先回读目标字节数和 SHA-256，再继续；公有应用还需独立验证 CDN 字节。复制取消或超时后不要直接重试，目标可能已写入。
+
+> 💡 安装 MinIO 方法见：[Docker 部署文档](https://microi.blog.csdn.net/article/details/143576299)
+
+![MinIO配置](https://file.microi.net/upload/img/csdn/0bde20907de743f5b051036546837afa.png#pic_center)
+
+---
+
+## 🌍 亚马逊 S3
+
+> 📌 首先请熟悉亚马逊 S3：[亚马逊 S3 入门](https://blog.csdn.net/qq973702/article/details/143648974)
+
+平台使用 MinIO SDK 驱动亚马逊 S3，后续将补充详细配置说明。
