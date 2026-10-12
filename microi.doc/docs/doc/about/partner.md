@@ -2,7 +2,7 @@
 
 > **加入 Microi吾码生态，共同推动低代码平台发展**
 
-![合伙人](https://static.itdos.com/upload/img/csdn/e7ad67f4d9d7421c9dcf6fb49d637e18.png#pic_center)
+![合伙人](https://file.microi.net/upload/img/csdn/e7ad67f4d9d7421c9dcf6fb49d637e18.png#pic_center)
 
 ---
 
@@ -72,10 +72,10 @@
 
 ## 📸 公司相关照片
 
-![公司前台](https://static.itdos.com/upload/img/csdn/7b68764268b84a559521f2c13c9b49ed.jpeg#pic_center)
-![公司团队](https://static.itdos.com/upload/img/csdn/a7973e787f16416c90c4e398f57f3a5e.jpeg#pic_center)
-![公司阳台](https://static.itdos.com/upload/img/csdn/da2afeb3d25346b58a1e36c0813181e5.jpeg#pic_center)
-![公司融资海报](https://static.itdos.com/upload/img/csdn/57a04e9b5dc34cf1a4b2ef00682511b4.png#pic_center)
-![随拍 Microi吾码奖项](https://static.itdos.com/upload/img/csdn/6a90558b44fe4c75a74f12cc77992508.jpeg#pic_center)
-![随拍 Microi吾码限定茶](https://static.itdos.com/upload/img/csdn/6b6c0ca20a3b4fe1acdbf9d846c94229.jpeg#pic_center)
+![公司前台](https://file.microi.net/upload/img/csdn/7b68764268b84a559521f2c13c9b49ed.jpeg#pic_center)
+![公司团队](https://file.microi.net/upload/img/csdn/a7973e787f16416c90c4e398f57f3a5e.jpeg#pic_center)
+![公司阳台](https://file.microi.net/upload/img/csdn/da2afeb3d25346b58a1e36c0813181e5.jpeg#pic_center)
+![公司融资海报](https://file.microi.net/upload/img/csdn/57a04e9b5dc34cf1a4b2ef00682511b4.png#pic_center)
+![随拍 Microi吾码奖项](https://file.microi.net/upload/img/csdn/6a90558b44fe4c75a74f12cc77992508.jpeg#pic_center)
+![随拍 Microi吾码限定茶](https://file.microi.net/upload/img/csdn/6b6c0ca20a3b4fe1acdbf9d846c94229.jpeg#pic_center)
 

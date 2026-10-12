@@ -19,7 +19,7 @@
 
 Specify the storage method in **[System Settings] → [Development Configuration]**. The system settings are driven by the form engine, and you can freely expand more custom storage methods in the form design.
 
-![存储方式配置](https://static.itdos.com/upload/img/csdn/5f7e4c8a6b824c51b1c50de50827abdd.png#pic_center)
+![存储方式配置](https://file.microi.net/upload/img/csdn/5f7e4c8a6b824c51b1c50de50827abdd.png#pic_center)
 
 ---
 
@@ -27,7 +27,7 @@ Specify the storage method in **[System Settings] → [Development Configuration
 
 Configure related parameters in **[SaaS Engine] → [Aliyun]**:
 
-![阿里云OSS配置](https://static.itdos.com/upload/img/csdn/dd353af2971c4057b3d47c1f3ad9d81c.png#pic_center)
+![阿里云OSS配置](https://file.microi.net/upload/img/csdn/dd353af2971c4057b3d47c1f3ad9d81c.png#pic_center)
 
 ---
 
@@ -37,7 +37,7 @@ Configure relevant parameters in **[SaaS Engine] → [MinIO]**:
 
 >💡See [Docker deployment documentation] for how to install MinIO (https://microi.blog.csdn.net/article/details/143576299)
 
-![MinIO配置](https://static.itdos.com/upload/img/csdn/0bde20907de743f5b051036546837afa.png#pic_center)
+![MinIO配置](https://file.microi.net/upload/img/csdn/0bde20907de743f5b051036546837afa.png#pic_center)
 
 ---
 

@@ -4,6 +4,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { docAssets, getDocAssetUrl } from '../docs/.vitepress/theme/doc-assets.js'
+import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
+import { architectureAssetBaseName } from '../scripts/ai-platform-architecture-data.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = relativePath => fs.readFileSync(path.join(projectRoot, relativePath), 'utf8')
@@ -29,7 +32,7 @@ test('platform introduction raw HTML cases join one Fancybox gallery', () => {
     assert.match(image, /data-fancybox="platform-preview"/)
     assert.match(image, /alt="[^"]+"/)
   }
-  assert.match(index, /microi-ai-platform-architecture-\d{4}\.\d{2}\.\d{2}\.\d+\.svg/)
+  assert.ok(index.includes(getDocAssetUrl(`/images/${architectureAssetBaseName}.svg`)), 'architecture preview must use the versioned, verified original')
 })
 
 test('MicroService cases share Fancybox and use equal half-width desktop columns', () => {
@@ -64,7 +67,7 @@ test('system settings, API engine and form fields show original screenshots in s
     const content = read(file)
     assert.ok(content.indexOf('mci-doc-screenshot-grid') < content.indexOf('\n## ', content.indexOf('mci-doc-screenshot-grid') + 1), `${file} preview should precede the detailed body`)
     assert.equal((content.match(new RegExp(`data-fancybox="${gallery}"`, 'g')) || []).length, 2)
-    for (const image of images) assert.match(content, new RegExp(`/images/product-screenshots/${image.replace('.', '\\.')}`))
+    for (const image of images) assert.ok(content.includes(getDocAssetUrl(`/images/product-screenshots/${image}`)))
   }
   assert.doesNotMatch(read('docs/doc/v8-engine/api-engine.md'), /microi-apiengine-20260208\.jpg/)
 })
@@ -83,7 +86,7 @@ test('Bluetooth printer previews use the shared two-column gallery before the co
 
   assert.ok(preview > 0 && preview < conclusion, 'Bluetooth printer preview should precede the conclusion')
   assert.equal((gallery.match(/data-fancybox="bluetooth-printer-preview"/g) || []).length, 4)
-  for (const file of expected) assert.match(gallery, new RegExp(`/images/product-screenshots/${file.replace('.', '\\.')}`))
+  for (const file of expected) assert.ok(gallery.includes(getDocAssetUrl(`/images/product-screenshots/${file}`)))
 })
 
 test('system engine preview nodes keep the requested screenshot mapping and order', () => {
@@ -109,7 +112,7 @@ test('system engine preview nodes keep the requested screenshot mapping and orde
     assert.equal((section.match(new RegExp(`data-fancybox="${group}"`, 'g')) || []).length, images.length)
     let previous = -1
     for (const image of images) {
-      const position = section.indexOf(`/images/product-screenshots/${image}`)
+      const position = section.indexOf(getDocAssetUrl(`/images/product-screenshots/${image}`))
       assert.ok(position > previous, `${file} should keep ${image} in the requested order`)
       previous = position
     }
@@ -148,7 +151,7 @@ test('copied product screenshots preserve the exact original bytes supplied for 
     ,['microi-code-task-workspace.png', '8fe962bbfd025ac068db1b9fcac003eaa7e2d3f670da191981f380b005f744cb']
   ])
   for (const [file, digest] of expected) {
-    const image = fs.readFileSync(path.join(projectRoot, 'docs/public/images/product-screenshots', file))
+    const image = fs.readFileSync(verifiedDocAssetPath(`/images/product-screenshots/${file}`, docAssets))
     assert.equal(createHash('sha256').update(image).digest('hex'), digest, file)
   }
 })
@@ -168,7 +171,7 @@ test('platform preview precedes searchable architecture, AI efficiency, role and
       assert.ok(content.search(pattern) > preview, `${label} should appear after preview`)
     }
     assert.doesNotMatch(content, /microi-apiengine-20260208\.jpg/)
-    assert.match(content, /product-screenshots\/api-engine-ai-copilot\.png/)
+    assert.ok(content.includes(getDocAssetUrl('/images/product-screenshots/api-engine-ai-copilot.png')))
   }
 })
 

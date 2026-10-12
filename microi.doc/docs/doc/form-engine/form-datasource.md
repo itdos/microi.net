@@ -4,14 +4,14 @@
 
 > **表单控件数据源目前支持多种模式**
 
-![表单控件数据源配置总览](https://static.itdos.com/upload/img/csdn/04a0857b9c684fa7b2c06d080f3824f7.png#pic_center)
+![表单控件数据源配置总览](https://file.microi.net/upload/img/csdn/04a0857b9c684fa7b2c06d080f3824f7.png#pic_center)
 
 ## 普通数据源
 >目前普通数据暂时只支持Value一种形式
 >平台正在扩展Key-Value形式的普通数据源
 >这样就不需要一定用接口引擎、Sql数据源来实现Key-Value的数据绑定了
 
-![普通数据源配置](https://static.itdos.com/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)
+![普通数据源配置](https://file.microi.net/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)
 ## 类型化接口引擎
 
 新版本已将原数据源引擎合并到接口引擎。创建接口引擎时选择 `DataSourceType`（V8、SQL、JSON 或 API），并统一在 `ApiV8Code` 中维护内容；代码编辑器会随类型切换 JavaScript、SQL、JSON 或纯文本语言模式。
@@ -25,7 +25,7 @@
 >* Sql数据源支持在Sql中使用【\$CurrentUser.字段名\$】相关变量，如【\$CurrentUser.Id\$、\$CurrentUser.Account\$】等
 >* **由于sys_user表也由表单引擎驱动，因此您在表单设计中为sys_user表新增的任何字段，均能在【\$CurrentUser.字段名\$】中访问，如您添加了一个字段[Wife]，可以【\$CurrentUser.Wife\$】访问**
 
-![SQL 数据源配置](https://static.itdos.com/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)
+![SQL 数据源配置](https://file.microi.net/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)
 ## 通过其它字段来动态绑定数据源
 >* 比如说您在表单中先选择了下拉框控件【部门（Dept）】，然后在下拉框控件【联系人（Contact）】仅绑定选择当前部门的人员数据
 >* 此时只需要给【联系人】的数据源配置为空即可

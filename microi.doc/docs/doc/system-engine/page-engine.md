@@ -6,8 +6,8 @@
 
 ## 📸 预览图
 
-![界面引擎预览1](https://static.itdos.com/upload/img/csdn/8d07494649c34c7981495bdb28551451.png#pic_center)
-![界面引擎预览2](https://static.itdos.com/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
+![界面引擎预览1](https://file.microi.net/upload/img/csdn/8d07494649c34c7981495bdb28551451.png#pic_center)
+![界面引擎预览2](https://file.microi.net/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
 
 ## 界面引擎
 >* 实际项目开发中，往往【**表单引擎表格**】并不能满足客户领导的需求，因此诞生了Microi吾码界面引擎

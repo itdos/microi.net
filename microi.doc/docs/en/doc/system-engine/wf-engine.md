@@ -22,7 +22,7 @@
 > * Process business management has been applied in hundreds of customers
 
 ## Preview image
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
 # Description of physical tables related to the process engine
 >* **WF_FlowDesign**：Flowchart design table, a flowchart corresponds to a piece of data.
 >* **Workflow Node**：Process Node Attribute Table

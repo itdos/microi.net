@@ -13,7 +13,7 @@ Download and install the **Hosting Bundle** and **ASP. NET Core Runtime 9.x x64*
 ::: tip download address
 https://dotnet.microsoft.com/en-us/download/dotnet/9.0
 :::
-![在这里插入图片描述](https://static.itdos.com/upload/editor/image/202211/6380477367466977006970663.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/editor/image/202211/6380477367466977006970663.png#pic_center)
 
 ---
 
@@ -22,12 +22,12 @@ https://dotnet.microsoft.com/en-us/download/dotnet/9.0
 - Download address: https://www.iis.net/downloads/microsoft/web-deploy
 - Select [Typical Installation] when installing
 - It is recommended to check whether the IIS module has`AspNetCoreModuleV2`Module
-![安装 Web Deploy](https://static.itdos.com/upload/editor/image/202211/6380477378879752132167332.png#pic_center)
+![安装 Web Deploy](https://file.microi.net/upload/editor/image/202211/6380477378879752132167332.png#pic_center)
 
 ::: warning Service Check
 Ensure that the following two services are in the [Running] state and the startup type is configured as [Automatic] (some Windows Server 2016 can be skipped). If a service startup error is encountered, it is recommended to restart the server operating system.
 :::
-![服务检查](https://static.itdos.com/upload/editor/image/202211/6380485239954922151314394.png#pic_center)
+![服务检查](https://file.microi.net/upload/editor/image/202211/6380485239954922151314394.png#pic_center)
 
 ---
 
@@ -46,16 +46,16 @@ This step is the basic operation, can be Baidu search.
 | Installation Type | Select **Server only** |
 Screenshot of the installation steps (the interface of the installation package downloaded at different times may be slightly different):
 
-![安装步骤1](https://static.itdos.com/upload/editor/image/202211/6380369903514717805320923.png#pic_center)
+![安装步骤1](https://file.microi.net/upload/editor/image/202211/6380369903514717805320923.png#pic_center)
 
 Click [Add] on the right]:
 
-![安装步骤2](https://static.itdos.com/upload/editor/image/202211/6380369903553471386628081.png#pic_center)
-![安装步骤3](https://static.itdos.com/upload/editor/image/202211/6380369903578114162396094.png#pic_center)
-![安装步骤4](https://static.itdos.com/upload/editor/image/202211/6380369903608305376252952.png#pic_center)
-![安装步骤5](https://static.itdos.com/upload/editor/image/202211/6380369903728321578376962.png#pic_center)
-![安装步骤6](https://static.itdos.com/upload/editor/image/202211/6380369903727997722580803.png#pic_center)
-![安装步骤7](https://static.itdos.com/upload/editor/image/202211/6380369903749410369636717.png#pic_center)
+![安装步骤2](https://file.microi.net/upload/editor/image/202211/6380369903553471386628081.png#pic_center)
+![安装步骤3](https://file.microi.net/upload/editor/image/202211/6380369903578114162396094.png#pic_center)
+![安装步骤4](https://file.microi.net/upload/editor/image/202211/6380369903608305376252952.png#pic_center)
+![安装步骤5](https://file.microi.net/upload/editor/image/202211/6380369903728321578376962.png#pic_center)
+![安装步骤6](https://file.microi.net/upload/editor/image/202211/6380369903727997722580803.png#pic_center)
+![安装步骤7](https://file.microi.net/upload/editor/image/202211/6380369903749410369636717.png#pic_center)
 **Post-installation configuration:**
 
 a) Release the MySQL port in the firewall
@@ -81,11 +81,11 @@ C) use Navicat to connect to MySQL, create a database (code using`utf8mb4`/`utf8
 | Project | Explanation |
 | :-- | :-- |
 | GitHub Download | https://github.com/microsoftarchive/redis/releases |
-| iTdos mirror | https://static.itdos.com/soft/redis-x64-3.0.504.msi |
+| iTdos mirror | https://file.microi.net/soft/redis-x64-3.0.504.msi |
 Screenshot of installation steps:
 
-![安装 Redis 1](https://static.itdos.com/upload/editor/image/202211/6380377615195291607333151.png#pic_center)
-![安装 Redis 2](https://static.itdos.com/upload/editor/image/202211/6380377615193259492630058.png#pic_center)
+![安装 Redis 1](https://file.microi.net/upload/editor/image/202211/6380377615195291607333151.png#pic_center)
+![安装 Redis 2](https://file.microi.net/upload/editor/image/202211/6380377615193259492630058.png#pic_center)
 
 **Post-Installation Configuration:**
 
@@ -103,22 +103,22 @@ Edit the installation directory`redis.windows-service.conf`:
 | :-- | :-- |
 | Recommended version | 4.2.23(4.4.17 Win Server 2012 R2 not supported) |
 | Official Download | https://www.mongodb.com/try/download/community |
-| iTdos image | https://static.itdos.com/soft/mongodb-win32-x86_64-2012plus-4.2.23-signed.msi |
-![安装 MongoDB 1](https://static.itdos.com/upload/editor/image/202211/6380377827464317905833519.png#pic_center)
-![安装 MongoDB 2](https://static.itdos.com/upload/editor/image/202211/6380377818853432765738119.png#pic_center)
+| iTdos image | https://file.microi.net/soft/mongodb-win32-x86_64-2012plus-4.2.23-signed.msi |
+![安装 MongoDB 1](https://file.microi.net/upload/editor/image/202211/6380377827464317905833519.png#pic_center)
+![安装 MongoDB 2](https://file.microi.net/upload/editor/image/202211/6380377818853432765738119.png#pic_center)
 
 Select **Custom**:
 
-![安装 MongoDB 3](https://static.itdos.com/upload/editor/image/202211/6380377818884792517096417.png#pic_center)
-![安装 MongoDB 4](https://static.itdos.com/upload/editor/image/202211/6380377818904712359053021.png#pic_center)
+![安装 MongoDB 3](https://file.microi.net/upload/editor/image/202211/6380377818884792517096417.png#pic_center)
+![安装 MongoDB 4](https://file.microi.net/upload/editor/image/202211/6380377818904712359053021.png#pic_center)
 
 Use the default **Run service as Network Service user**:
 
-![安装 MongoDB 5](https://static.itdos.com/upload/editor/image/202211/6380377818932506997802046.png#pic_center)
+![安装 MongoDB 5](https://file.microi.net/upload/editor/image/202211/6380377818932506997802046.png#pic_center)
 
 Remove the check box for **Install MongoDB Compass**. Access after installation`localhost:27017`The following interface appears to indicate a successful installation:
 
-![安装成功](https://static.itdos.com/upload/editor/image/202211/6380377916760887465029633.png#pic_center)
+![安装成功](https://file.microi.net/upload/editor/image/202211/6380377916760887465029633.png#pic_center)
 **Set account password:**
 
 Enter the MongoDB installation directory`bin`directory to execute cmd:
@@ -135,13 +135,13 @@ db.auth('root', '你的密码')  # 返回 1 表示正确
 ### seven️⃣Install MinIO Distributed Storage
 
 Official website Download: https://min.io/download#/windows (on an exe program)
-![下载 MinIO](https://static.itdos.com/upload/editor/image/202211/6380406928638277002335189.png#pic_center)
+![下载 MinIO](https://file.microi.net/upload/editor/image/202211/6380406928638277002335189.png#pic_center)
 
 **Deployment steps:**
 
 1. To put`minio.exe`into a directory, such`D:\Microi\Minio\minio.exe`
-2. Download [WinSW-net461.exe](https://static.itdos.com/soft/WinSW-net461.exe), put it in the same directory and rename it`minio-server.exe`
-3. Download the [minio-server.xml](https://static.itdos.com/soft/minio-server.xml) configuration file and put it in the same directory.
+2. Download [WinSW-net461.exe](https://file.microi.net/soft/WinSW-net461.exe), put it in the same directory and rename it`minio-server.exe`
+3. Download the [minio-server.xml](https://file.microi.net/soft/minio-server.xml) configuration file and put it in the same directory.
 4. cmd entry`minio.exe`Directory, execute:
 
 ```bash
@@ -164,7 +164,7 @@ Create two buckets:`itdos-public`(the configuration permission is public),`itdos
 
 ### eight️⃣Install the IIS environment
 
-![服务器管理](https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6383125155877365101931668_origin.png/20230925/iis.png#pic_center)
+![服务器管理](https://file.microi.net/itdos/itdos/upload/editor/image/202309/6383125155877365101931668_origin.png/20230925/iis.png#pic_center)
 
 1. Open the server management interface
 2. Manage → Add Roles and Functions → Server Roles → Check **Web Server (IIS)** Check All (except FTP Server Module)
@@ -172,8 +172,8 @@ Create two buckets:`itdos-public`(the configuration permission is public),`itdos
 
 IIS management interface:
 
-![打开 IIS](https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6383125179476379767066462_origin.png/20230925/打开iis.png#pic_center)
-![管理界面](https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6383125180836250262781416_origin.png/20230925/IIS管理界面.png#pic_center)
+![打开 IIS](https://file.microi.net/itdos/itdos/upload/editor/image/202309/6383125179476379767066462_origin.png/20230925/打开iis.png#pic_center)
+![管理界面](https://file.microi.net/itdos/itdos/upload/editor/image/202309/6383125180836250262781416_origin.png/20230925/IIS管理界面.png#pic_center)
 
 ---
 
@@ -186,7 +186,7 @@ IIS management interface:
 ### ⚙️ Deploy microi-api backend interface system
 
 1. Open the root directory`appsettings.json`, modify`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbConn`four parameters
-![配置文件](https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6383124995671143943939168_origin.png/20230925/auth.png#pic_center)
+![配置文件](https://file.microi.net/itdos/itdos/upload/editor/image/202309/6383124995671143943939168_origin.png/20230925/auth.png#pic_center)
 
 2. Run cmd or PowerShell in the same directory:
 
@@ -215,4 +215,4 @@ sc create microi-api binPath="C:\Microi\Microi.net.Auth\net10.0\Microi.net.Api.e
 ::: warning Attention
 the figure is for reference only. please fill in the real client name and api address.
 :::
-![在这里插入图片描述](https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6383124964739859058076187_origin.png/20230925/os-html.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/itdos/itdos/upload/editor/image/202309/6383124964739859058076187_origin.png/20230925/os-html.png#pic_center)

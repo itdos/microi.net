@@ -67,7 +67,7 @@ class FixedDate extends Date {
 test('uses the official iTdos API Engine endpoint instead of querying NuGet from every browser', async () => {
   assert.equal(
     NUGET_STATS_ENDPOINT,
-    'https://api.itdos.com/apiengine/official_nuget_stats?OsClient=iTdos'
+    'https://api.microi.net/apiengine/official_nuget_stats?OsClient=iTdos'
   )
 
   const source = await readFile(new URL('../docs/.vitepress/theme/utils/nuget-downloads.js', import.meta.url), 'utf8')

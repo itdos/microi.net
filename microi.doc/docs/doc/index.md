@@ -6,7 +6,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 <div align="center">
 
-<img src="https://static.itdos.com/upload/img/microi-red-256.png" alt="Microi吾码" width="120" />
+<img src="https://file.microi.net/upload/img/microi-red-256.png" alt="Microi吾码" width="120" />
 
 # Microi 吾码
 
@@ -17,10 +17,10 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 <p class="mci-doc-home-actions"><a class="mci-doc-home-action" href="/doc/about/microi-training-syllabus.html">查看培训大纲 <span aria-hidden="true">→</span></a></p>
 
 <p style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;">
-  <img src="https://static.itdos.com/upload/img/NET-10.svg" alt=".NET 10" />
-  <img src="https://static.itdos.com/upload/img/Vue-2_3-4FC08D.svg" alt="Vue 2 与 Vue 3" />
-  <img src="https://static.itdos.com/openclaw/preview/license-MIT-orange.svg" alt="MIT 开源协议" />
-  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://static.itdos.com/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="加入吾码 QQ 交流群" /></a>
+  <img src="https://file.microi.net/upload/img/NET-10.svg" alt=".NET 10" />
+  <img src="https://file.microi.net/upload/img/Vue-2_3-4FC08D.svg" alt="Vue 2 与 Vue 3" />
+  <img src="https://file.microi.net/openclaw/preview/license-MIT-orange.svg" alt="MIT 开源协议" />
+  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://file.microi.net/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="加入吾码 QQ 交流群" /></a>
 </p>
 
 🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
@@ -36,7 +36,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 ## Microi吾码 AI平台 架构图
 
-[![Microi吾码 AI平台 架构图](/images/microi-ai-platform-architecture-2026.09.04.1.svg)](/images/microi-ai-platform-architecture-2026.09.04.1.svg)
+[![Microi吾码 AI平台 架构图](https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg)](https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg)
 
 > 点击图片可在弹层中放大、缩小和拖动查看。图中以 V8 引擎为在线运行核心，优先展示 AI、低代码、数据集成、自动化、平台治理与多端交付等 30+ 成熟系统引擎；治理细节继续参见 [AI 平台治理中心](/doc/system-engine/ai-platform-governance)。
 
@@ -44,47 +44,47 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 <table class="mci-doc-preview-gallery">
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%" data-fancybox="platform-preview"/></td>
+    <td colspan="3" align="center"><img src="https://file.microi.net/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="/images/product-screenshots/microi-code-ai-center-dark.jpg" alt="Microi Agent 深色 AI 能力中心" data-fancybox="platform-preview"/></td>
-    <td><img src="/images/product-screenshots/microi-code-home-light.jpg" alt="Microi Agent 浅色首页" data-fancybox="platform-preview"/></td>
-    <td><img src="/images/product-screenshots/microi-code-task-workspace.png" alt="Microi Agent 真实任务工作区" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/4183113555b18a3931e1be86465361d261a5b61de0a7e91bda6d37ade58318be/202610/microi-code-ai-center-dark.jpg" alt="Microi Agent 深色 AI 能力中心" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/6db16fb52a020e31ab520211cd3bbf446dc335abeaab4677921ef7acd16310b8/202610/microi-code-home-light.jpg" alt="Microi Agent 浅色首页" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/8fe962bbfd025ac068db1b9fcac003eaa7e2d3f670da191981f380b005f744cb/202610/microi-code-task-workspace.png" alt="Microi Agent 真实任务工作区" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="/images/product-screenshots/webos-api-engine-workspace.jpg" alt="Microi WebOS 接口引擎与主题设置界面" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面" data-fancybox="platform-preview"/></td>
-    <td><img src="/images/product-screenshots/api-engine-ai-copilot.png" alt="Microi 接口引擎与 AI 编程助手界面" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/2ea4a3c6b6d192f427a934b5d0abfe0ab07e472e154473785165212d3b2d2ad0/202610/webos-api-engine-workspace.jpg" alt="Microi WebOS 接口引擎与主题设置界面" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/4b8c65fb7393794400f2562093f5d6f7ea71cd0899b6c22959c89bc04839347e/202610/api-engine-ai-copilot.png" alt="Microi 接口引擎与 AI 编程助手界面" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png" alt="应用商城" data-fancybox="platform-preview"/></td>
-    <td><img src="/images/product-screenshots/api-engine-ai-copilot.png" alt="接口引擎与 AI 编程" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" alt="AI 应用开发" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/应用商城.png" alt="应用商城" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/4b8c65fb7393794400f2562093f5d6f7ea71cd0899b6c22959c89bc04839347e/202610/api-engine-ai-copilot.png" alt="接口引擎与 AI 编程" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" alt="AI 应用开发" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" alt="V8 引擎本地 AI 编程连接配置" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" alt="V8 引擎本地 AI 编程运行调试" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程VSCode插件.png" alt="Microi VS Code 插件" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/V8引擎本地AI编程连接配置.png" alt="V8 引擎本地 AI 编程连接配置" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/V8引擎本地AI编程运行调试.png" alt="V8 引擎本地 AI 编程运行调试" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/V8引擎本地AI编程VSCode插件.png" alt="Microi VS Code 插件" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" alt="模块引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/表单引擎.png" alt="表单引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/界面引擎.png" alt="界面引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" alt="模块引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/表单引擎.png" alt="表单引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/界面引擎.png" alt="界面引擎" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/数据大屏.png" alt="数据大屏" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/打印引擎.png" alt="打印引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png" alt="AI 数据分析" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/数据大屏.png" alt="数据大屏" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/打印引擎.png" alt="打印引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/AI数据分析.png" alt="AI 数据分析" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" alt="工作流引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="/images/product-screenshots/mobile-bluetooth-print-specification.jpg" alt="移动端微服务蓝牙打印规格选择" data-fancybox="platform-preview"/></td>
-    <td><img src="/images/product-screenshots/mobile-ai-assistant.jpg" alt="移动端 AI 助手" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" alt="工作流引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/1bbb036c8314f5e0eed1d68ae0278d6d4dc355809f30f7db0880558495a43ec1/202610/mobile-bluetooth-print-specification.jpg" alt="移动端微服务蓝牙打印规格选择" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/fdf568794496b20e5549fd927dda701b04fbfd7b44f9ccfe622dc11775288609/202610/mobile-ai-assistant.jpg" alt="移动端 AI 助手" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg" alt="移动端扫一扫" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接" data-fancybox="platform-preview"/></td>
-    <td><img src="/images/product-screenshots/mobile-workbench.jpg" alt="移动端工作台与模块菜单" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/移动端-扫一扫.jpg" alt="移动端扫一扫" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接" data-fancybox="platform-preview"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/b9c76a2b9f2c811cc19e8ce302ae1e5df9a6583ee54660880229212fbe532e94/202610/mobile-workbench.jpg" alt="移动端工作台与模块菜单" data-fancybox="platform-preview"/></td>
   </tr>
 </table>
 
@@ -400,13 +400,13 @@ Microi.net/
 
 <p align="center">
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank">
-    <img src="https://static.itdos.com/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="点击加入 QQ 交流群" />
+    <img src="https://file.microi.net/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="点击加入 QQ 交流群" />
   </a>
 </p>
 
 <p align="center">
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank">
-    <img src="https://static.itdos.com/openclaw/preview/qq-qun2.jpg" alt="扫码加入 QQ 交流群" style="max-width: 260px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.18);" />
+    <img src="https://file.microi.net/openclaw/preview/qq-qun2.jpg" alt="扫码加入 QQ 交流群" style="max-width: 260px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.18);" />
   </a>
 </p>
 

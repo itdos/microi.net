@@ -12,8 +12,8 @@ outline: [2, 3]
     <h1>让 Unity 场景，成为<br><em>可安装的吾码应用</em></h1>
     <p class="unity-doc-lead">Unity 负责实时 3D，Microi.Unity 负责浏览器桥接，V8 接口引擎负责身份、权限与数据。游戏、数字孪生、展厅，都沿用同一条交付链。</p>
     <div class="unity-doc-actions">
-      <a class="is-primary" href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线进入桃源</a>
-      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/v1.4.4/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.4.exe">下载 Windows v1.4.4</a>
+      <a class="is-primary" href="https://file.microi.net/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线进入桃源</a>
+      <a href="https://file.microi.net/itdos/micro-app/microi-unity-taoyuan/v1.4.4/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.4.exe">下载 Windows v1.4.4</a>
       <a href="#五分钟接入">五分钟接入</a>
     </div>
     <div class="unity-doc-badges" aria-label="核心能力">
@@ -21,7 +21,7 @@ outline: [2, 3]
     </div>
   </div>
   <figure class="unity-doc-hero__visual">
-    <img src="/images/microi-unity-taoyuan-heroine.png" alt="晨雾桃园山谷中的原创古风女主" />
+    <img src="https://file.microi.net/itdos/official-docs/images/4656e512512e968b63586567e32c366da990e415704f7e7427cfb3c5ffe6e5ed/202610/microi-unity-taoyuan-heroine.png" alt="晨雾桃园山谷中的原创古风女主" />
     <figcaption><b>桃源云梦</b><span>原创 Unity WebGL 样板</span></figcaption>
   </figure>
 </section>
@@ -94,7 +94,7 @@ Microi 已有大屏 Unity 加载能力与项目级工具。现在补齐的是公
 
 <section class="unity-doc-app">
   <div class="unity-doc-app__poster">
-    <img src="/images/microi-unity-taoyuan-heroine.png" alt="桃源云梦应用预览" />
+    <img src="https://file.microi.net/itdos/official-docs/images/4656e512512e968b63586567e32c366da990e415704f7e7427cfb3c5ffe6e5ed/202610/microi-unity-taoyuan-heroine.png" alt="桃源云梦应用预览" />
   </div>
   <div class="unity-doc-app__body">
     <p class="unity-doc-eyebrow">MICROI AI APPLICATION · WEBGL + WINDOWS</p>
@@ -110,8 +110,8 @@ Microi 已有大屏 Unity 加载能力与项目级工具。现在补齐的是公
       <li><b>租户可扩展</b><span>保存后 Hook 首次创建，官方升级永不覆盖</span></li>
     </ul>
     <div class="unity-doc-actions">
-      <a class="is-primary" href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线游玩</a>
-      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/v1.4.4/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.4.exe">Windows v1.4.4 本地版</a>
+      <a class="is-primary" href="https://file.microi.net/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线游玩</a>
+      <a href="https://file.microi.net/itdos/micro-app/microi-unity-taoyuan/v1.4.4/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.4.exe">Windows v1.4.4 本地版</a>
       <a href="/apps.html">前往 AI 应用列表</a>
       <a href="/app-detail.html?app=microi-unity-taoyuan">应用详情</a>
     </div>

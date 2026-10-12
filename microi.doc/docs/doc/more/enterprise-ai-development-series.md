@@ -9,7 +9,7 @@
 
 ## 01 · 先从系统架构师的角度思考
 
-![01 · 先从系统架构师的角度思考的AI概念封面](https://static.itdos.com/itdos/promotion/2026/09/26/enterprise-ai-series-01/20260926/01M3ENM49ZPNPPXBB78V1H4YD6-01-cover.jpg)
+![01 · 先从系统架构师的角度思考的AI概念封面](https://file.microi.net/itdos/promotion/2026/09/26/enterprise-ai-series-01/20260926/01M3ENM49ZPNPPXBB78V1H4YD6-01-cover.jpg)
 
 **企业使用WorkBuddy/Codex/DeepSeek Harness的正确姿势系列AI教程-01**
 
@@ -24,7 +24,7 @@
 
 ## 02 · 表单引擎：从控件到业务闭环
 
-![02 · 表单引擎：从控件到业务闭环的AI概念封面](https://static.itdos.com/itdos/promotion/2026/09/26/enterprise-ai-series-02/20260926/01M3ENN0X36TAK38MXF7JD5QQS-01-cover.jpg)
+![02 · 表单引擎：从控件到业务闭环的AI概念封面](https://file.microi.net/itdos/promotion/2026/09/26/enterprise-ai-series-02/20260926/01M3ENN0X36TAK38MXF7JD5QQS-01-cover.jpg)
 
 **企业使用WorkBuddy/Codex/DeepSeek Harness的正确姿势系列AI教程-02-表单引擎**
 
@@ -39,7 +39,7 @@
 
 ## 03 · 模块引擎：把业务表变成企业模块
 
-![03 · 模块引擎的 AI 概念封面](https://static.itdos.com/itdos/promotion/2026/09/27/企业ai开发教程03-模块引擎/202609/企业ai开发教程03-模块引擎-690fbc12b6c9-03-cover.png)
+![03 · 模块引擎的 AI 概念封面](https://file.microi.net/itdos/promotion/2026/09/27/企业ai开发教程03-模块引擎/202609/企业ai开发教程03-模块引擎-690fbc12b6c9-03-cover.png)
 
 **企业使用WorkBuddy/Codex/DeepSeek Harness的正确姿势系列AI教程-03-模块引擎**
 
@@ -54,7 +54,7 @@ AI 能很快写出一个列表页，企业真正需要的却是同一份业务�
 
 ## 04 · 接口引擎：把业务规则放进可信 API
 
-![04 · 接口引擎的 AI 概念封面](https://static.itdos.com/itdos/promotion/2026/09/27/企业ai开发教程04-接口引擎/202609/企业ai开发教程04-接口引擎-4eaa87fab880-04-cover.png)
+![04 · 接口引擎的 AI 概念封面](https://file.microi.net/itdos/promotion/2026/09/27/企业ai开发教程04-接口引擎/202609/企业ai开发教程04-接口引擎-4eaa87fab880-04-cover.png)
 
 **企业使用WorkBuddy/Codex/DeepSeek Harness的正确姿势系列AI教程-04-接口引擎**
 

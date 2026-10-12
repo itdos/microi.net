@@ -8,7 +8,7 @@ import {
 
 const desktopWindow = { matchMedia: () => ({ matches: false }) }
 const mobileWindow = { matchMedia: () => ({ matches: true }) }
-const target = 'https://static.itdos.com/itdos/ai-app-publish/smart-business-card/index.html'
+const target = 'https://file.microi.net/itdos/ai-app-publish/smart-business-card/index.html'
 
 test('audited historical shell-less UniApps use the compatibility shell on desktop', () => {
   assert.equal(LEGACY_UNIAPP_WITHOUT_DESKTOP_SHELL.length, 21)

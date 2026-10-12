@@ -9,12 +9,12 @@
         <div class="ai-cad-actions">
           <a class="primary" href="/app-detail.html?app=microi-ai-cad">查看 AI 应用 <span aria-hidden="true">↗</span></a>
           <a class="secondary" href="#ai-cad-gallery">浏览 4K 截图 <span aria-hidden="true">↓</span></a>
-          <a class="secondary" href="https://static.itdos.com/itdos/mcp/assets/ai-cad/plugin/202609/MicroiAiCad_Addin-v1_0_0.zip" target="_blank" rel="noopener noreferrer">下载插件包 <span aria-hidden="true">↘</span></a>
+          <a class="secondary" href="https://file.microi.net/itdos/mcp/assets/ai-cad/plugin/202609/MicroiAiCad_Addin-v1_0_0.zip" target="_blank" rel="noopener noreferrer">下载插件包 <span aria-hidden="true">↘</span></a>
         </div>
         <p class="ai-cad-disclosure">当前展示的是工作台示例界面。SolidWorks 插件已完成本地构建，真实建模与出图仍待安装有许可证的 SolidWorks 后验收。</p>
       </div>
       <figure class="ai-cad-hero-visual">
-        <img src="/images/ai-cad/01-modeling.png" width="3840" height="2160" alt="吾码 AI CAD 工作台 4K 截图：自然语言建模指令、零部件结构和参数化三维示意预览" />
+        <img src="https://file.microi.net/itdos/official-docs/images/2819bee0d35bc33f48103f0960c1f46704bd1f5fd8baa248295464f46457ff85/202610/01-modeling.png" width="3840" height="2160" alt="吾码 AI CAD 工作台 4K 截图：自然语言建模指令、零部件结构和参数化三维示意预览" />
         <figcaption>工作台示例 · 3840 × 2160 · 预览模型为参数化示意</figcaption>
       </figure>
     </section>
@@ -33,7 +33,7 @@
       <div class="ai-cad-section-head"><span class="ai-cad-eyebrow">PRODUCT GALLERY</span><h2 id="ai-cad-gallery-title">五张 4K 工作台截图</h2><p>以下图片均来自真实渲染的示例工作台，显示设计计划与参数化示意；不是 SolidWorks 软件内截图或已验证的生产图纸。点击图片可查看原始 3840 × 2160 像素。</p></div>
       <div class="ai-cad-gallery-grid">
         <figure v-for="shot in gallery" :key="shot.file">
-          <a :href="'/images/ai-cad/' + shot.file" target="_blank" rel="noopener noreferrer" :aria-label="'查看 ' + shot.title + ' 4K 原图'"><img :src="'/images/ai-cad/' + shot.file" :alt="shot.alt" width="3840" height="2160" loading="lazy" /></a>
+          <a :href="getDocAssetUrl('/images/ai-cad/' + shot.file)" target="_blank" rel="noopener noreferrer" :aria-label="'查看 ' + shot.title + ' 4K 原图'"><img :src="getDocAssetUrl('/images/ai-cad/' + shot.file)" :alt="shot.alt" width="3840" height="2160" loading="lazy" /></a>
           <figcaption><span>{{ shot.number }}</span><strong>{{ shot.title }}</strong><small>{{ shot.caption }}</small></figcaption>
         </figure>
       </div>
@@ -47,6 +47,7 @@
 </template>
 
 <script setup lang="ts">
+import { getDocAssetUrl } from '../doc-assets.js'
 const gallery = [
   { number: '02', file: '02-assembly.png', title: '装配结构', caption: '零件实例与坐标预览', alt: '吾码 AI CAD 4K 截图：联轴器装配结构、实例坐标和参数化三维示意' },
   { number: '03', file: '03-bom.png', title: 'BOM 清单', caption: '设计阶段数量预览', alt: '吾码 AI CAD 4K 截图：零件名称、材料、规格和设计阶段 BOM 数量' },

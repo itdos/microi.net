@@ -2,7 +2,7 @@
 
 > 【系统日志/监控】把原系统日志、系统监控和安全日志菜单收口为一个可安装、可升级、可由 AI 查询的可观测性控制台。它用于回答三个最重要的问题：系统现在是否健康、资源消耗来自哪里、异常流量由谁通过什么接口产生。
 
-![系统日志/监控网络流量驾驶舱](/images/system-observability/traffic-cockpit.png)
+![系统日志/监控网络流量驾驶舱](https://file.microi.net/itdos/official-docs/images/f39f7203a248adb50ffc7e168ab363d42bc286521f28bd389ea19ebc2778ee30/202610/traffic-cockpit.png)
 
 ## 功能亮点
 
@@ -28,7 +28,7 @@
 | 安全数据 | 访问、攻击、IP 封锁与解封 | 是否被扫描/攻击、是否需要处置某个 IP |
 | 应用日志 | 当前 API 进程环形日志尾部、搜索和脱敏 | 服务端最近输出了什么 |
 
-![系统日志/监控总览](/images/system-observability/overview-navigation.png)
+![系统日志/监控总览](https://file.microi.net/itdos/official-docs/images/615a5e23c17e996ccf5509dd3f316546614d2ee886ec97f66e5f635fdd400e1b/202610/overview-navigation.jpg)
 
 
 ## 受信规则安装诊断
@@ -390,7 +390,7 @@ Linux 默认只声明当前 PID 命名空间。`HostProcessesVisible=false/null`
 | 约 45 天内 | MySQL 小时桶 | 45 天 | 7／15／30 天趋势和接口排行 |
 | 更长历史 | MySQL 天桶 | 400 天 | 3／6 个月和 1 年容量趋势 |
 
-![近30天统计范围与系统日志首屏](/images/system-observability/history-range-and-logs.png)
+![近30天统计范围与系统日志首屏](https://file.microi.net/itdos/official-docs/images/864e22616ebd40b45c8c8415890fbb06f3744123ec7d1028747f61908d1788bb/202610/history-range-and-logs.jpg)
 
 历史查询只扫描有索引的固定时间桶，并对相同租户、范围和 TOP 参数做短 TTL Redis 缓存；5 分钟汇总完成后会同步重建小时／天桶并自然失效缓存。MongoDB 只保存受限的高价值明细，不承担跨月排行榜的全表扫描。功能启用前已经过去的流量不会凭空回填，部署后会从第一个完整汇总桶开始积累。
 

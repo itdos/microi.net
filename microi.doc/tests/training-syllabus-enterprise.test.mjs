@@ -11,9 +11,10 @@ import { parseTrainingHash, trainingHash, trainingPdfPaths } from '../docs/.vite
 import * as trainingVersions from '../docs/.vitepress/theme/training-deck-versions.js'
 import { searchTrainingSlides } from '../docs/.vitepress/theme/training-syllabus-search.js'
 import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads.mjs'
+import { docAssets, getDocAssetUrl } from '../docs/.vitepress/theme/doc-assets.js'
+import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const publicRoot = path.join(projectRoot, 'docs/public')
 const component = fs.readFileSync(path.join(projectRoot, 'docs/.vitepress/theme/components/TrainingSyllabusDeck.vue'), 'utf8')
 const { descriptor, errors } = parseSfc(component)
 assert.deepEqual(errors, [], 'the real presentation component must remain valid Vue source')
@@ -28,12 +29,7 @@ function sourceForUrl(url) {
   return path.join(projectRoot, 'docs', pathname.slice(1).replace(/\.html$/u, '.md'))
 }
 
-function publicFile(url) {
-  assert.ok(url.startsWith('/') && !url.startsWith('//'), `asset must use a stable local path: ${url}`)
-  const result = path.resolve(publicRoot, `.${url}`)
-  assert.ok(result.startsWith(`${publicRoot}${path.sep}`), `asset escaped public root: ${url}`)
-  return result
-}
+const imageFile = reference => verifiedDocAssetPath(reference, docAssets)
 
 function elements(node, predicate) {
   const result = []
@@ -76,6 +72,7 @@ function presentationRuntime() {
     onMounted() {}, onBeforeUnmount() {},
     useData: () => ({ isDark }),
     ...trainingVersions, searchTrainingSlides, enterpriseSlides, trainingPdfPaths, parseTrainingHash, trainingHash,
+    getDocAssetUrl, docAssets,
     window: browser, document: {}, Element: TestElement, HTMLElement: TestElement,
   }
   const names = Object.keys(dependencies)
@@ -165,10 +162,11 @@ test('证据链接与十二张独立 AI 场景图随官网源码完整交付', (
     for (const source of slide.sources) assert.ok(fs.existsSync(sourceForUrl(source.href)), `${slide.id}: broken evidence link ${source.href}`)
     assert.ok(slide.image && slide.image.alt, `${slide.id}: every page needs its own described business image`)
     assert.match(slide.image.caption, /AI\s*界面概念图/u, `${slide.id}: distinguish generated interfaces from customer evidence`)
-    assert.ok(slide.image.src.startsWith('/images/enterprise-training/ai/'), `${slide.id}: AI scenes must be delivered with the site`)
+    const asset = docAssets.find(row => row.url === slide.image.src)
+    assert.ok(asset?.legacyPath.startsWith('/images/enterprise-training/ai/'), `${slide.id}: AI scenes must bind the site's verified official CDN assets`)
     assert.ok(!paths.has(slide.image.src), `${slide.id}: each page needs a distinct scene`)
     paths.add(slide.image.src)
-    const file = fs.readFileSync(publicFile(slide.image.src))
+    const file = fs.readFileSync(imageFile(slide.image.src))
     assert.ok(file.length > 1_000, `${slide.id}: a complete generated image must be present`)
     assert.deepEqual([...file.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${slide.id}: published PNG is invalid`)
     assert.ok(!images.has(file.toString('base64')), `${slide.id}: do not reuse the same pixels for different scene files`)
@@ -203,9 +201,9 @@ test('品牌右侧两按钮真实驱动版本、下载、缩略图、搜索与�
   assert.equal(runtime.slideMeta.value.length, 12)
   assert.equal(runtime.browser.location.hash, '#enterprise-slide-01')
   assert.deepEqual(runtime.pdfDownloadPaths.value, trainingPdfPaths.enterprise)
-  assert.equal(runtime.thumbnailPath(11), '/images/training-deck-enterprise/thumbs-light/slide-12.webp')
+  assert.equal(runtime.thumbnailPath(11), getDocAssetUrl('/images/training-deck-enterprise/thumbs-light/slide-12.webp'))
   runtime.isDark.value = true
-  assert.equal(runtime.thumbnailPath(11), '/images/training-deck-enterprise/thumbs/slide-12.webp')
+  assert.equal(runtime.thumbnailPath(11), getDocAssetUrl('/images/training-deck-enterprise/thumbs/slide-12.webp'))
   runtime.searchKeyword.value = '上下文'
   assert.equal(runtime.visibleSlides.value.length, 1, 'search the current edition\'s actual indexed body')
   assert.equal(runtime.visibleSlides.value[0].slide.id, 'enterprise-agent-reliability')
@@ -226,7 +224,7 @@ test('品牌右侧两按钮真实驱动版本、下载、缩略图、搜索与�
   assert.equal(runtime.activeIndex.value, 46)
   assert.equal(runtime.searchKeyword.value, '')
   assert.deepEqual(runtime.pdfDownloadPaths.value, trainingPdfPaths.technical)
-  assert.equal(runtime.thumbnailPath(46), '/images/training-deck/thumbs/slide-47.webp')
+  assert.equal(runtime.thumbnailPath(46), getDocAssetUrl('/images/training-deck/thumbs/slide-47.webp'))
   new Function('switchVersion', directive(technicalButton, 'on', 'click'))(runtime.switchVersion)
   assert.equal(runtime.activeIndex.value, 0)
 
@@ -259,11 +257,12 @@ test('企业暗浅 PDF 下载与在线页数匹配，技术版下载仍独立保
 test('企业预览完整提供 12 页独立暗浅缩略图，顺序和下载页码一致', () => {
   const rendered = {}
   for (const [theme, folder] of [['dark', 'thumbs'], ['light', 'thumbs-light']]) {
-    const root = publicFile(`/images/training-deck-enterprise/${folder}`)
-    const files = fs.readdirSync(root).filter(name => /^slide-\d{2}\.webp$/u.test(name)).sort()
+    const prefix = `/images/training-deck-enterprise/${folder}/`
+    const files = docAssets.filter(asset => asset.legacyPath.startsWith(prefix))
+      .map(asset => path.posix.basename(asset.legacyPath)).filter(name => /^slide-\d{2}\.webp$/u.test(name)).sort()
     assert.deepEqual(files, Array.from({ length: 12 }, (_, index) => `slide-${String(index + 1).padStart(2, '0')}.webp`))
     rendered[theme] = files.map(name => {
-      const bytes = fs.readFileSync(path.join(root, name))
+      const bytes = fs.readFileSync(imageFile(`${prefix}${name}`))
       assert.ok(bytes.length > 1_000, `${theme}/${name}: empty preview`)
       assert.equal(bytes.subarray(0, 4).toString('ascii'), 'RIFF')
       assert.equal(bytes.subarray(8, 12).toString('ascii'), 'WEBP')

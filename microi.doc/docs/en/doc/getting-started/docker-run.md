@@ -493,7 +493,7 @@ services:
       - /usr/share/fonts:/usr/share/fonts
     environment:
       - OsClient=
-      - ApiBase=https://api.itdos.com
+      - ApiBase=https://api.microi.net
     ports:
       - "1001:80"
     logging:
@@ -513,7 +513,7 @@ services:
       - /usr/share/fonts:/usr/share/fonts
     environment:
       - OsClient=
-      - ApiBase=https://api.itdos.com
+      - ApiBase=https://api.microi.net
     ports:
       - "1002:80"
     logging:
@@ -533,7 +533,7 @@ services:
       - /usr/share/fonts:/usr/share/fonts
     environment:
       - OsClient=
-      - ApiBase=https://api.itdos.com
+      - ApiBase=https://api.microi.net
     ports:
       - "1003:80"
     logging:

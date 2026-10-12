@@ -181,8 +181,8 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 > * The source code of the exported ExportExcel() method is publicly available in the [Microi.Office] plug-in source code
 
 ### Rendering
-<img src="https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" style="margin: 5px;">
+<img src="https://file.microi.net/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" style="margin: 5px;">
+<img src="https://file.microi.net/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" style="margin: 5px;">
 
 ### Replacing an Export Interface with the Interface Engine
 ::: details Expand to view JavaScript code (49 lines)
@@ -311,7 +311,7 @@ if(filesByteBase64){
 }
 
 var downResult = V8.Http.GetResponse({
-  Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
+  Url : 'https://file.microi.net/itdos/img/20230623/WechatIMG21753.png'
 });
 var imgByte = downResult.RawBytes;
 //不建议使用调用接口的方式，性能较差，虽然也是可以的

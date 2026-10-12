@@ -585,11 +585,11 @@ Microi.UI 的移动端目标不是把后台页面缩小到手机里，而是让�
 
 <section class="mci-ui-case-gallery">
   <figure>
-    <img src="/images/microi-ui/pattern-showcase-desktop.svg" alt="吾码UI六种设计模式桌面端原创案例">
+    <img src="https://file.microi.net/itdos/official-docs/images/237f61c78f4122b12c06c9e6c566c836fc0d68e1eb1a4d2ec8822243f76ad108/202610/pattern-showcase-desktop.svg" alt="吾码UI六种设计模式桌面端原创案例">
     <figcaption><b>桌面端</b><span>1440px：首屏锚点、两列模式卡片与稳定内容宽度。</span></figcaption>
   </figure>
   <figure class="is-mobile">
-    <img src="/images/microi-ui/pattern-showcase-mobile.svg" alt="吾码UI六种设计模式移动端原创案例">
+    <img src="https://file.microi.net/itdos/official-docs/images/81165a6e0f31ff8bd8f5ed0e4b2171a5dbc895f66a236503496ceeec2adbbf00/202610/pattern-showcase-mobile.svg" alt="吾码UI六种设计模式移动端原创案例">
     <figcaption><b>移动端</b><span>390px：单列重排、满宽主操作、安全间距与无横向滚动。</span></figcaption>
   </figure>
 </section>

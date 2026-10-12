@@ -2,14 +2,14 @@
 
 > **Form control data sources currently support multiple modes**
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/04a0857b9c684fa7b2c06d080f3824f7.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/04a0857b9c684fa7b2c06d080f3824f7.png#pic_center)
 
 ## Common Data Source
 > Currently, only one form of Value is supported for ordinary data.
 > Platform is extending the common data source in the form of Key-Value
 > in this way, there is no need to use interface engine, data source engine and SQL data source to implement Key-Value data binding
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)
 ## Data Source Engine
 > this is very simple, select the corresponding custom data source engine can be
 
@@ -20,7 +20,7 @@
 > * SQL data sources support the use of [\$CurrentUser in SQL. Field name \$] related variables, such as [\$CurrentUser. Id\$, \$CurrentUser. Account\$】 etc.
 >* **Because sys_user tables are also driven by the form engine, any fields you add to sys_user table in the form design can be CurrentUser in [\$. Access it using the field name \$]. For example, if you have added a field [Wife], you can use [\$CurrentUser. Wife\$】 Access**
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)
 ## Dynamically bind data sources through other fields
 > * for example, you first select the drop-down box control [department (Dept)] in the form, and then bind only the personnel data of the current department in the drop-down box control [contact (Contact)]
 > * at this time, you only need to configure the data source of [contact] as empty

@@ -26,7 +26,7 @@ SELECT * FROM diy_table WHERE `Name` IN ('diy_lang', 'diy_project') AND IsDelete
 
 Select all data → right mouse button → **Copy** → **Insert statement**:
 
-![提取INSERT语句](https://static.itdos.com/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)
+![提取INSERT语句](https://file.microi.net/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)
 
 ### Step 3: Execute in the B database
 

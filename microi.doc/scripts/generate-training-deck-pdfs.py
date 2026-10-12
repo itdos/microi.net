@@ -39,8 +39,8 @@ default_capture_root = (
 TEMP_ROOT = (arguments.capture_root or default_capture_root).resolve()
 thumbnail_directory = "training-deck-enterprise" if EDITION == "enterprise" else "training-deck"
 THUMBNAIL_ROOTS = {
-    "dark": PROJECT_ROOT / "docs" / "public" / "images" / thumbnail_directory / "thumbs",
-    "light": PROJECT_ROOT / "docs" / "public" / "images" / thumbnail_directory / "thumbs-light",
+    "dark": WORKSPACE_ROOT / ".tmp" / "microi-docs-images-generated" / thumbnail_directory / "thumbs",
+    "light": WORKSPACE_ROOT / ".tmp" / "microi-docs-images-generated" / thumbnail_directory / "thumbs-light",
 }
 OUTPUT_ROOT = arguments.output_root.resolve()
 if EDITION == "enterprise":

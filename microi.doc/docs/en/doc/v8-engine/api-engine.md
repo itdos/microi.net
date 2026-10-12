@@ -17,7 +17,7 @@
 [[FormEngine Usage]](https://microi.net/doc/v8-engine/form-engine) [[Where Conditional Usage]](https://microi.net/doc/v8-engine/where)
 :::
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg)
+![在这里插入图片描述](https://file.microi.net/upload/img/microi-apiengine-20260208.jpg)
 
 ```js
 //获取一个数据列表
@@ -159,7 +159,7 @@ return `<html>
 
 //支持直接响应文件，如：图片、Office文档等等
 var downResult = V8.Http.GetResponse({
-  Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
+  Url : 'https://file.microi.net/itdos/img/20230623/WechatIMG21753.png'
 });
 var imgByte = downResult.RawBytes;
 V8.Result = {
@@ -195,10 +195,10 @@ V8.Result = {
 > * When allowing anonymous calls is enabled, there is no need to pass in token, but note that access **V8.CurrentUser** in V8 engine is {}
 
 ### Response File
-> the test access interface engine address will download the picture directly:[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)
+> the test access interface engine address will download the picture directly:[https://api.microi.net/apiengine/test_response_file?OsClient=iTdos](https://api.microi.net/apiengine/test_response_file?OsClient=iTdos)
 ```javascript
 var downResult = V8.Http.GetResponse({
-  Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
+  Url : 'https://file.microi.net/itdos/img/20230623/WechatIMG21753.png'
 });
 var imgByte = downResult.RawBytes;
 return {

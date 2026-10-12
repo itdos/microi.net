@@ -11,11 +11,11 @@
 
 ## 工作台预览
 
-![吾码邮箱系统的三栏阅读工作台，展示验收测试邮件与附件](/images/email/email-workspace-4k.png)
+![吾码邮箱系统的三栏阅读工作台，展示验收测试邮件与附件](https://file.microi.net/itdos/official-docs/images/bd741832fcd4366a3c6c1237269e77689f4e462fbf73c46cb69a4ce0e0098636/202610/email-workspace-4k.png)
 
 *3840 × 2160 实际界面截图。示例内容为自发自收测试邮件。点击图片查看原图。*
 
-![吾码邮箱系统的写信界面，包含收件人、主题、正文和附件](/images/email/email-compose-4k.png)
+![吾码邮箱系统的写信界面，包含收件人、主题、正文和附件](https://file.microi.net/itdos/official-docs/images/09af8318b7912f3e831eec0323e232a0a92420ccae9281d7aeb7d705dcffb434/202610/email-compose-4k.png)
 
 *写信、保存草稿和附件操作在同一个工作台完成。*
 

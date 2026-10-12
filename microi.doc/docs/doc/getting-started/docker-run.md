@@ -54,7 +54,7 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 
 ### 📸 预览图
 
-![Microi吾码 Docker Compose 一键安装终端预览](/images/getting-started/docker-one-click-install-terminal.jpg)
+![Microi吾码 Docker Compose 一键安装终端预览](https://file.microi.net/itdos/official-docs/images/ae8e25597e5b2394dc25c14ef7c5b780107fcf54161e6ad2547a6066cb5023fb/202610/docker-one-click-install-terminal.jpg)
 
 ### 🛡️ 宿主机 CPU / 内存保护
 
@@ -310,8 +310,8 @@ node Microi.Server/tools/dependency-images.mjs verify
 ```bash
 # 下载制作脚本和离线安装脚本
 # 官方 GitHub 镜像（源码浏览）：https://github.com/itdos/microi.net
-curl -sSO https://static.itdos.com/install/microi-offline-prepare.sh
-curl -sSO https://static.itdos.com/install/install-microi-offline.sh
+curl -sSO https://file.microi.net/install/microi-offline-prepare.sh
+curl -sSO https://file.microi.net/install/install-microi-offline.sh
 curl -sSO https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh
 sed -i 's/\r$//' microi-offline-prepare.sh install-microi-offline.sh install-microi.sh
 
@@ -1351,7 +1351,7 @@ services:
       - /usr/share/fonts:/usr/share/fonts
     environment:
       - OsClient=
-      - ApiBase=https://api.itdos.com
+      - ApiBase=https://api.microi.net
     ports:
       - "1001:80"
     logging:

@@ -22,7 +22,7 @@ SELECT * FROM diy_table WHERE `Name` IN ('diy_lang', 'diy_project') AND IsDelete
 
 选中所有数据 → 鼠标右键 → **复制为** → **Insert 语句**：
 
-![提取INSERT语句](https://static.itdos.com/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)
+![提取INSERT语句](https://file.microi.net/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)
 
 ### 步骤 3：在 B 数据库执行
 

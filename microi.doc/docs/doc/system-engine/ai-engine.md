@@ -17,7 +17,7 @@ Microi 吾码在线 AI 引擎已内置“**大模型关键词扩展 → 当前�
 
 <div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--single">
   <figure>
-    <img src="/images/product-screenshots/ai-engine-creation-center.jpg" alt="Microi吾码 AI 创作中心，展示智能助手、视觉创作、声音创作及完整图像工具目录" data-fancybox="ai-engine-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/5c936f0ef9f2166a2ef26d37b31fc65f2b943117959c2cc0d6b6845eeec8461d/202610/ai-engine-creation-center.jpg" alt="Microi吾码 AI 创作中心，展示智能助手、视觉创作、声音创作及完整图像工具目录" data-fancybox="ai-engine-preview">
     <figcaption>AI 创作中心：从自然语言想法出发，统一进入对话、图像、视频、声音与模型能力。</figcaption>
   </figure>
 </div>
@@ -52,11 +52,11 @@ AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Mic
 
 因此，准确说法是“核心在线 AI 需要**由吾码官方签发的有效服务器 License**”，而不是“每次调用都必须在线请求官网授权”。只下载源码或安装包、复制 `Microi.AI.dll`、把租户名改成 `iTdos`，都不能自行签发有效 License。
 
-官方中转站还要经过第二层账号授权：租户使用官网签发的 `sk-microi-*` ApiKey 请求 `https://api.itdos.com/v1`，官网按账号校验额度并计量。服务器 License 不能代替中转 ApiKey，中转 ApiKey 也不能把本地 `Chat/NL2SQL/NL2V8` 变成已授权状态。
+官方中转站还要经过第二层账号授权：租户使用官网签发的 `sk-microi-*` ApiKey 请求 `https://api.microi.net/v1`，官网按账号校验额度并计量。服务器 License 不能代替中转 ApiKey，中转 ApiKey 也不能把本地 `Chat/NL2SQL/NL2V8` 变成已授权状态。
 
 `ProxyChat`、`ProxyChatStream`、头像生成和 OpenAI 兼容 `/v1/chat/completions` 现在也在 `AiProxyService` 领域层读取同一服务器 License；不是只靠页面隐藏。`/v1/models`、套餐、订单和用量属于发现/账户管理接口，不触发模型推理，仍可用于配置与购买流程。中转调用在服务器 License 之外还会继续校验登录态或 `sk-microi-*` 及账号额度。
 
-`MicroiAI` 与 `AiProxyService` 只接受 `Microi.net` 中封闭的 `MicroiFeatureLicense` 实现；宿主仅重新注册另一个 `IMicroiFeatureLicense` 不会把 AI 变成已授权。签发客户端地址固定为 `https://api.itdos.com`，私钥目录从编译、NuGet 和发布内容中排除；签发服务还会核对私钥对应公钥必须与内嵌官方信任根一致。
+`MicroiAI` 与 `AiProxyService` 只接受 `Microi.net` 中封闭的 `MicroiFeatureLicense` 实现；宿主仅重新注册另一个 `IMicroiFeatureLicense` 不会把 AI 变成已授权。签发客户端地址固定为 `https://api.microi.net`，私钥目录从编译、NuGet 和发布内容中排除；签发服务还会核对私钥对应公钥必须与内嵌官方信任根一致。
 
 上述保证针对未被篡改的官方二进制与正常部署。拥有服务器管理员权限的人仍可以替换或修改程序集、改变机器指令，任何纯本地 DRM 都无法从理论上抵抗这种物理控制；但这不等于其能够“伪造 License”。没有官方私钥时，生成的文件不能通过未修改节点内嵌官方公钥的 RSA 验签，也不能拿去给其它正常吾码节点使用。
 
@@ -266,7 +266,7 @@ MiniMax 当前采用异步流程：创建任务返回 `task_id`，查询成功�
 ### 配置边界
 
 - MiniMax Token Plan Key 与按量 API Key 是两套独立凭据。把实际使用的 Key 配置到现有服务器端 AI Provider/ApiKey 受保护数据中，不要放进前端、V8 源码、Compose 环境变量或 API `AppSettings`。
-- 租户优先使用已启用的 MiniMax 直连 Provider，官方 API Base 必须是 `https://api.minimaxi.com`。直连不可用时可以使用现有 `Microi.AI中转站` 配置，Base 固定为 `https://api.itdos.com/v1`；系统拒绝把视频请求转发到其它 Host。
+- 租户优先使用已启用的 MiniMax 直连 Provider，官方 API Base 必须是 `https://api.minimaxi.com`。直连不可用时可以使用现有 `Microi.AI中转站` 配置，Base 固定为 `https://api.microi.net/v1`；系统拒绝把视频请求转发到其它 Host。
 - 当前 Token Plan 使用统一用量条、5 小时滚动窗口和周窗口，实际剩余额度以控制台为准；服务端不把“每天 2 条”或“每天 3 条”硬编码成供应商权威配额。若运营工作区明确要求每日最多 3 条，可以增加更保守的业务门禁，并在界面中明确它不是 MiniMax 官方剩余额度。
 - 当前官方模型边界：`MiniMax-Hailuo-2.3` 支持文生/图生；`MiniMax-Hailuo-2.3-Fast` 只支持图生并要求首帧；首尾帧使用 `MiniMax-Hailuo-02`。Hailuo 2.3 清晰优先使用 6 秒 / 1080P，时长优先使用 10 秒 / 768P，两者不能同时最大；安全默认值仍为 6 秒 / 768P。
 
@@ -332,7 +332,7 @@ Content-Type: application/json
 
 `mic_ai` 中的 `Microi.AI中转站` 是官方 OpenAI 兼容入口：
 
-- Endpoint：`https://api.itdos.com/v1`
+- Endpoint：`https://api.microi.net/v1`
 - ApiKey：在吾码官网个人中心生成；创建 SaaS 独立数据库时会自动写入新租户
 - 中转模型：由吾码官方 `mic_ai.IsRelayModel = 1` 的启用模型组成，用户在 AI 对话界面选择
 - 鉴权与计量：官方服务按 ApiKey 关联官网账号，按每次请求的输入/输出 Token 扣减并记录明细

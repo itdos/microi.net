@@ -191,7 +191,7 @@ SQL 联查的授权关系如果位于父事务已有的 RR 快照中，仍可能
 ### 移动端 uni-app 调用示例
 
 ```javascript
-const BASE = 'https://api.itdos.com';
+const BASE = 'https://api.microi.net';
 const OS_CLIENT = runtimeConfig.osClient;
 function formEngineGet(table, where = {}) {
   return new Promise((resolve, reject) => {

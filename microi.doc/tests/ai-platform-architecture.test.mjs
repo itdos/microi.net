@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
 import test from 'node:test'
+import { docAssets, getDocAssetUrl } from '../docs/.vitepress/theme/doc-assets.js'
+import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
 import {
   architectureData,
   architectureAssetBaseName,
@@ -16,12 +18,13 @@ import {
 const docsRoot = resolve(import.meta.dirname, '..')
 const workspaceRoot = resolve(docsRoot, '..')
 const imagesRoot = resolve(docsRoot, 'docs/public/images')
-const svgPath = resolve(imagesRoot, 'microi-ai-platform-architecture.svg')
-const pngPath = resolve(imagesRoot, 'microi-ai-platform-architecture-1920x1080.png')
-const png4kPath = resolve(imagesRoot, 'microi-ai-platform-architecture-3840x2160.png')
-const versionedSvgPath = resolve(imagesRoot, `${architectureAssetBaseName}.svg`)
-const versionedPngPath = resolve(imagesRoot, `${architectureAssetBaseName}-1920x1080.png`)
-const versionedPng4kPath = resolve(imagesRoot, `${architectureAssetBaseName}-3840x2160.png`)
+const architectureFile = name => verifiedDocAssetPath(`/images/${name}`, docAssets)
+const svgPath = architectureFile('microi-ai-platform-architecture.svg')
+const pngPath = architectureFile('microi-ai-platform-architecture-1920x1080.png')
+const png4kPath = architectureFile('microi-ai-platform-architecture-3840x2160.png')
+const versionedSvgPath = architectureFile(`${architectureAssetBaseName}.svg`)
+const versionedPngPath = architectureFile(`${architectureAssetBaseName}-1920x1080.png`)
+const versionedPng4kPath = architectureFile(`${architectureAssetBaseName}-3840x2160.png`)
 const manifestPath = resolve(imagesRoot, 'microi-ai-platform-architecture.manifest.json')
 const sourceHash = createHash('sha256').update(JSON.stringify(architectureData)).digest('hex')
 
@@ -79,7 +82,7 @@ test('资产清单锁定数据源哈希、尺寸和每个输出文件内容', as
   assert.equal(manifest.uniqueFeatureLabels, architectureFeatureLabels().length)
   assert.equal(manifest.outputs.length, 6)
   for (const output of manifest.outputs) {
-    const file = await readFile(resolve(imagesRoot, output.file))
+    const file = await readFile(architectureFile(output.file))
     const canonicalFile = output.format === 'svg'
       ? Buffer.from(normalizeTextEol(file.toString('utf8')), 'utf8')
       : file
@@ -101,15 +104,15 @@ test('README 与官网首页共享同一份机器可读能力索引和架构图�
   assert.ok(normalizeTextEol(readme).includes(generatedMarkdown))
   assert.equal((index.match(/MICROI_ARCHITECTURE_CAPABILITIES:START/g) || []).length, 1)
   assert.equal((readme.match(/MICROI_ARCHITECTURE_CAPABILITIES:START/g) || []).length, 1)
-  assert.ok(index.includes(`](/images/${architectureAssetBaseName}.svg)`))
-  assert.ok(readme.includes(`](./microi.doc/docs/public/images/${architectureAssetBaseName}-3840x2160.png)`))
+  assert.ok(index.includes(`](${getDocAssetUrl(`/images/${architectureAssetBaseName}.svg`)})`))
+  assert.ok(readme.includes(`](${getDocAssetUrl(`/images/${architectureAssetBaseName}-3840x2160.png`)})`))
   assert.doesNotMatch(index, /\]\(\/images\/microi-ai-platform-architecture\.svg\)/)
   assert.doesNotMatch(readme, /\[!\[[^\]]*架构图[^\]]*\]\([^\n]+\)\]\([^\n]+\)/)
 })
 
 test('源码架构页直接展示同一份 SVG 系统架构图', async () => {
   const sourceArchitecture = await readFile(resolve(docsRoot, 'docs/doc/getting-started/source-code-architecture.md'), 'utf8')
-  assert.ok(sourceArchitecture.includes(`](/images/${architectureAssetBaseName}.svg)`))
+  assert.ok(sourceArchitecture.includes(`](${getDocAssetUrl(`/images/${architectureAssetBaseName}.svg`)})`))
   assert.doesNotMatch(sourceArchitecture, /\]\(\/images\/microi-ai-platform-architecture\.svg\)/)
   assert.match(sourceArchitecture, /30\+ 系统引擎/)
 })

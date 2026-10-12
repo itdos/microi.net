@@ -1,16 +1,16 @@
 <div align="center">
 
-<img src="https://static.itdos.com/upload/img/microi-red-256.png" alt="Microi" width="120" />
+<img src="https://file.microi.net/upload/img/microi-red-256.png" alt="Microi" width="120" />
 
 # Microi
 
 # Open Source AI Low-Code Platform with Deep V8 Engine Integration
 
 <p style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;">
-  <img src="https://static.itdos.com/upload/img/NET-10.svg" />
-  <img src="https://static.itdos.com/upload/img/Vue-2_3-4FC08D.svg" />
-  <img src="https://static.itdos.com/openclaw/preview/license-MIT-orange.svg" />
-  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://static.itdos.com/openclaw/preview/QQ交流群-51050055-12B7F5.svg" /></a>
+  <img src="https://file.microi.net/upload/img/NET-10.svg" />
+  <img src="https://file.microi.net/upload/img/Vue-2_3-4FC08D.svg" />
+  <img src="https://file.microi.net/openclaw/preview/license-MIT-orange.svg" />
+  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://file.microi.net/openclaw/preview/QQ交流群-51050055-12B7F5.svg" /></a>
 </p>
 
 🔥 AI Local V8 Engine Programming (VS Code Copilot / Cursor / Claude + MCP + Skills), AI Online Programming, AI Data Analysis<br>
@@ -45,35 +45,35 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 
 <table>
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="width:100%"/></td>
+    <td colspan="3" align="center"><img src="https://file.microi.net/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="width:100%"/></td>
   </tr>
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" style="width:100%"/></td>
+    <td colspan="3" align="center"><img src="https://file.microi.net/upload/img/microi-apiengine-20260208.jpg" style="width:100%"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/应用商城.png"/></td>
+    <td><img src="https://file.microi.net/upload/img/microi-apiengine-20260208.jpg"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程VSCode插件.png"/></td>
+    <td><img src="https://file.microi.net/upload/img/V8引擎本地AI编程连接配置.png"/></td>
+    <td><img src="https://file.microi.net/upload/img/V8引擎本地AI编程运行调试.png"/></td>
+    <td><img src="https://file.microi.net/upload/img/V8引擎本地AI编程VSCode插件.png"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/表单引擎.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/界面引擎.png"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/表单引擎.png"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/界面引擎.png"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/数据大屏.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/打印引擎.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/数据大屏.png"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/打印引擎.png"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/AI数据分析.png"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg"/></td>
+    <td><img src="https://file.microi.net/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg"/></td>
   </tr>
 </table>
 
@@ -253,13 +253,13 @@ Welcome to join the official QQ discussion group to communicate with the develop
 
 <p align="center">
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank">
-    <img src="https://static.itdos.com/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="Join QQ Group" />
+    <img src="https://file.microi.net/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="Join QQ Group" />
   </a>
 </p>
 
 <p align="center">
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank">
-    <img src="https://static.itdos.com/openclaw/preview/qq-qun2.jpg" alt="Scan to join QQ Group" style="max-width: 260px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.18);" />
+    <img src="https://file.microi.net/openclaw/preview/qq-qun2.jpg" alt="Scan to join QQ Group" style="max-width: 260px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.18);" />
   </a>
 </p>
 

@@ -9,10 +9,10 @@
 <p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
 
 <p>
-  <img src="./microi.doc/docs/public/images/readme/dotnet-10.png" alt=".NET 10" width="87" height="20" />
-  <img src="./microi.doc/docs/public/images/readme/vue-2-3.png" alt="Vue 2 / Vue 3" width="77" height="20" />
-  <img src="./microi.doc/docs/public/images/readme/license-mit.png" alt="MIT License" width="78" height="20" />
-  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="./microi.doc/docs/public/images/readme/qq-group-51050055.png" alt="QQ 交流群 51050055" width="126" height="20" /></a>
+  <img src="https://file.microi.net/itdos/official-docs/images/195af5bd303326f190653fea141666165db0b16d498bdec2efbaed67f6a05f60/202610/dotnet-10.png" alt=".NET 10" width="87" height="20" />
+  <img src="https://file.microi.net/itdos/official-docs/images/f72a5ebe4e2d00839326c77c4e1b9cb4f2881fc956fa0fb1ae9a9b6a2e9a35aa/202610/vue-2-3.png" alt="Vue 2 / Vue 3" width="77" height="20" />
+  <img src="https://file.microi.net/itdos/official-docs/images/c0c5056dbf923977f266c75451fd236d6f0161d36d68f4c56a63c6c006cbee8e/202610/license-mit.png" alt="MIT License" width="78" height="20" />
+  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://file.microi.net/itdos/official-docs/images/6d388db7bce415624b4e7ee96ea7c5e6bf0b8c978aa50bb52522495def05c674/202610/qq-group-51050055.png" alt="QQ 交流群 51050055" width="126" height="20" /></a>
 </p>
 
 开源 AI 开发框架：`.NET 10 + Vue 3 + Redis`，融合 30+ 成熟引擎、AI 低代码、微服务与 V8 引擎。<br>
@@ -31,7 +31,7 @@
 
 ## Microi吾码 AI平台 架构图
 
-![Microi吾码 AI平台 架构图](./microi.doc/docs/public/images/microi-ai-platform-architecture-2026.09.04.1-3840x2160.png)
+![Microi吾码 AI平台 架构图](https://file.microi.net/itdos/official-docs/images/602f2635aa82ae8c2ac921f5e61f74fdcfed7949c272e9bc613013bc8039b056/202610/microi-ai-platform-architecture-2026_09_04_1-3840x2160.png)
 
 > 图片为 3840 × 2160 PNG 高清版；架构以 V8 引擎为在线运行核心，优先展示 AI、低代码、数据集成、自动化、平台治理与多端交付等 30+ 成熟系统引擎。
 
@@ -42,18 +42,18 @@
     <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%"/></td>
   </tr>
   <tr>
-    <td><img src="./microi.doc/docs/public/images/product-screenshots/microi-code-ai-center-dark.jpg" alt="Microi Code 深色 AI 能力中心"/></td>
-    <td><img src="./microi.doc/docs/public/images/product-screenshots/microi-code-home-light.jpg" alt="Microi Code 浅色首页"/></td>
-    <td><img src="./microi.doc/docs/public/images/product-screenshots/microi-code-task-workspace.png" alt="Microi Code 真实任务工作区"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/4183113555b18a3931e1be86465361d261a5b61de0a7e91bda6d37ade58318be/202610/microi-code-ai-center-dark.jpg" alt="Microi Code 深色 AI 能力中心"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/6db16fb52a020e31ab520211cd3bbf446dc335abeaab4677921ef7acd16310b8/202610/microi-code-home-light.jpg" alt="Microi Code 浅色首页"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/8fe962bbfd025ac068db1b9fcac003eaa7e2d3f670da191981f380b005f744cb/202610/microi-code-task-workspace.png" alt="Microi Code 真实任务工作区"/></td>
   </tr>
   <tr>
-    <td><img src="./microi.doc/docs/public/images/product-screenshots/webos-api-engine-workspace.jpg" alt="Microi WebOS 接口引擎与主题设置界面"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/2ea4a3c6b6d192f427a934b5d0abfe0ab07e472e154473785165212d3b2d2ad0/202610/webos-api-engine-workspace.jpg" alt="Microi WebOS 接口引擎与主题设置界面"/></td>
     <td><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面"/></td>
-    <td><img src="./microi.doc/docs/public/images/product-screenshots/api-engine-ai-copilot.png" alt="Microi 接口引擎与 AI 编程助手界面"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/4b8c65fb7393794400f2562093f5d6f7ea71cd0899b6c22959c89bc04839347e/202610/api-engine-ai-copilot.png" alt="Microi 接口引擎与 AI 编程助手界面"/></td>
   </tr>
   <tr>
     <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png" alt="应用商城"/></td>
-    <td><img src="./microi.doc/docs/public/images/product-screenshots/api-engine-ai-copilot.png" alt="接口引擎与 AI 编程"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/4b8c65fb7393794400f2562093f5d6f7ea71cd0899b6c22959c89bc04839347e/202610/api-engine-ai-copilot.png" alt="接口引擎与 AI 编程"/></td>
     <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" alt="AI 应用开发"/></td>
   </tr>
   <tr>
@@ -73,13 +73,13 @@
   </tr>
   <tr>
     <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" alt="工作流引擎"/></td>
-    <td><img src="./microi.doc/docs/public/images/product-screenshots/mobile-bluetooth-print-specification.jpg" alt="移动端微服务蓝牙打印规格选择"/></td>
-    <td><img src="./microi.doc/docs/public/images/product-screenshots/mobile-ai-assistant.jpg" alt="移动端 AI 助手"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/1bbb036c8314f5e0eed1d68ae0278d6d4dc355809f30f7db0880558495a43ec1/202610/mobile-bluetooth-print-specification.jpg" alt="移动端微服务蓝牙打印规格选择"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/fdf568794496b20e5549fd927dda701b04fbfd7b44f9ccfe622dc11775288609/202610/mobile-ai-assistant.jpg" alt="移动端 AI 助手"/></td>
   </tr>
   <tr>
     <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg" alt="移动端扫一扫"/></td>
     <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接"/></td>
-    <td><img src="./microi.doc/docs/public/images/product-screenshots/mobile-workbench.jpg" alt="移动端工作台与模块菜单"/></td>
+    <td><img src="https://file.microi.net/itdos/official-docs/images/b9c76a2b9f2c811cc19e8ce302ae1e5df9a6583ee54660880229212fbe532e94/202610/mobile-workbench.jpg" alt="移动端工作台与模块菜单"/></td>
   </tr>
 </table>
 
@@ -381,7 +381,7 @@ Microi.net/
 
 <p align="center">
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank">
-    <img src="./microi.doc/docs/public/images/readme/qq-group-51050055.png" alt="点击加入 QQ 交流群" width="126" height="20" />
+    <img src="https://file.microi.net/itdos/official-docs/images/6d388db7bce415624b4e7ee96ea7c5e6bf0b8c978aa50bb52522495def05c674/202610/qq-group-51050055.png" alt="点击加入 QQ 交流群" width="126" height="20" />
   </a>
 </p>
 

@@ -12,34 +12,34 @@ AI 员工中心为一人公司提供按岗位分工的 AI 团队：你给出目�
 
 <div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--single">
   <figure>
-    <img src="/images/ai-employee-center/workbench-4k.png" width="3840" height="2160" loading="lazy" alt="AI 员工中心工作台，展示十个在岗员工、待验收成果和目标到验收的三步工作链" data-fancybox="ai-employee-center-4k">
+    <img src="https://file.microi.net/itdos/official-docs/images/f1f601f615ac9194b8af90d2273aff7b9b1690f7d40df0c646360f88c90a392f/202610/workbench-4k.png" width="3840" height="2160" loading="lazy" alt="AI 员工中心工作台，展示十个在岗员工、待验收成果和目标到验收的三步工作链" data-fancybox="ai-employee-center-4k">
     <figcaption>工作台：十岗团队、任务进度和需要负责人处理的成果集中呈现。</figcaption>
   </figure>
 </div>
 
 <div class="mci-doc-screenshot-grid">
   <figure>
-    <img src="/images/ai-employee-center/ten-employees-4k.png" width="3840" height="2160" loading="lazy" alt="AI 员工页面，展示项目经理、人事主管、软件测试、财务专员等岗位卡片和派发任务入口" data-fancybox="ai-employee-center-4k">
+    <img src="https://file.microi.net/itdos/official-docs/images/4621058be8cfdc9b7792a50d05efa381995992bffe5aa5afc6accc40debe6b98/202610/ten-employees-4k.png" width="3840" height="2160" loading="lazy" alt="AI 员工页面，展示项目经理、人事主管、软件测试、财务专员等岗位卡片和派发任务入口" data-fancybox="ai-employee-center-4k">
     <figcaption>岗位分工：各岗位都有职责、主要交付物和独立派发入口。</figcaption>
   </figure>
   <figure>
-    <img src="/images/ai-employee-center/task-board-4k.png" width="3840" height="2160" loading="lazy" alt="任务协作页面，展示任务搜索、员工、执行状态和查看或验收入口" data-fancybox="ai-employee-center-4k">
+    <img src="https://file.microi.net/itdos/official-docs/images/55c591b20c1cabb2af55ea61460386f5cc6f2c96e39723af9dad6dd3b5df73bf/202610/task-board-4k.png" width="3840" height="2160" loading="lazy" alt="任务协作页面，展示任务搜索、员工、执行状态和查看或验收入口" data-fancybox="ai-employee-center-4k">
     <figcaption>任务协作：按任务名称和状态查找执行记录，区分云端 AI 与小龙虾 Agent。</figcaption>
   </figure>
   <figure>
-    <img src="/images/ai-employee-center/create-task-4k.png" width="3840" height="2160" loading="lazy" alt="创建任务弹窗，展示任务名称、负责员工、工作目标、验收标准、参考资料、执行方式和前置任务" data-fancybox="ai-employee-center-4k">
+    <img src="https://file.microi.net/itdos/official-docs/images/a966b840000d7a4ff0ad1ac86aa3379f3463c17b650ac7325fe3c36e54480aff/202610/create-task-4k.png" width="3840" height="2160" loading="lazy" alt="创建任务弹窗，展示任务名称、负责员工、工作目标、验收标准、参考资料、执行方式和前置任务" data-fancybox="ai-employee-center-4k">
     <figcaption>创建任务：先写清目标、资料和验收标准，再选择执行方式与前置成果。</figcaption>
   </figure>
   <figure>
-    <img src="/images/ai-employee-center/review-board-4k.png" width="3840" height="2160" loading="lazy" alt="成果验收页面，展示小龙虾员工与云端 AI 的待验收任务和人工验收入口" data-fancybox="ai-employee-center-4k">
+    <img src="https://file.microi.net/itdos/official-docs/images/7c72b258cd361f465337852a0affa88b7448bae775de8895fa6190c40608059a/202610/review-board-4k.png" width="3840" height="2160" loading="lazy" alt="成果验收页面，展示小龙虾员工与云端 AI 的待验收任务和人工验收入口" data-fancybox="ai-employee-center-4k">
     <figcaption>成果验收：模型提交的是待审核成果，只有负责人确认后才解锁后续任务。</figcaption>
   </figure>
   <figure>
-    <img src="/images/ai-employee-center/autonomous-goals-4k.png" width="3840" height="2160" loading="lazy" alt="自治目标与预算页面，展示每日 Token 上限、预算用量、自治开关和目标创建入口" data-fancybox="ai-employee-center-4k">
+    <img src="https://file.microi.net/itdos/official-docs/images/968138d082735f941b2f240aeeefe8c9ef5fa4ba37717dd51599574352b7eef5/202610/autonomous-goals-4k.png" width="3840" height="2160" loading="lazy" alt="自治目标与预算页面，展示每日 Token 上限、预算用量、自治开关和目标创建入口" data-fancybox="ai-employee-center-4k">
     <figcaption>自治目标：动态调整每日 Token 上限，按目标开启或暂停自主拆解。</figcaption>
   </figure>
   <figure>
-    <img src="/images/ai-employee-center/execution-nodes-4k.png" width="3840" height="2160" loading="lazy" alt="执行节点页面，展示小龙虾连接说明和运行节点列表" data-fancybox="ai-employee-center-4k">
+    <img src="https://file.microi.net/itdos/official-docs/images/435c2f5295be4f51f9f4ed9da076a2694f555f3ecc3440d88087e04e6a40351b/202610/execution-nodes-4k.png" width="3840" height="2160" loading="lazy" alt="执行节点页面，展示小龙虾连接说明和运行节点列表" data-fancybox="ai-employee-center-4k">
     <figcaption>执行节点：本机小龙虾运行受限 Agent，任务和成果由吾码统一管理。</figcaption>
   </figure>
 </div>

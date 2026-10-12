@@ -26,7 +26,7 @@ Microi code for developers, using the traditional development thinking process t
 - A physical table can be associated with multiple [Report Engines] to design reports.
 :::
 
-<img src="https://static.itdos.com/upload/img/csdn/9ae60bcfddfb3ed574297e510c4d358b.jpeg" style="margin: 5px;">
+<img src="https://file.microi.net/upload/img/csdn/9ae60bcfddfb3ed574297e510c4d358b.jpeg" style="margin: 5px;">
 
 ---
 

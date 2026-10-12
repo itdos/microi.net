@@ -47,6 +47,6 @@ ORDER BY CreateTime DESC
 
 ## 📖 介绍
 
-![成功案例架构](https://static.itdos.com/upload/img/csdn/QQ20250311-170448@2x.png)
+![成功案例架构](https://file.microi.net/upload/img/csdn/QQ20250311-170448@2x.png)
 
 

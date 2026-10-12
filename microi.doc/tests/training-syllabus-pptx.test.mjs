@@ -13,6 +13,7 @@ import { enterpriseSlides } from '../docs/.vitepress/theme/enterprise-training-s
 import { searchTrainingSlides } from '../docs/.vitepress/theme/training-syllabus-search.js'
 import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads.mjs'
 import { trainingDownloads } from '../docs/.vitepress/theme/training-downloads.js'
+import { docAssets, getDocAssetUrl } from '../docs/.vitepress/theme/doc-assets.js'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pptxMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
@@ -24,7 +25,7 @@ const artifacts = [
 ].map(artifact => ({ ...artifact, url: trainingDownloads.find(row => row.legacyPath === `/downloads/${artifact.filename}`).url }))
 
 function artifactPath(url) {
-  assert.equal(new URL(url).origin, 'https://static.itdos.com', 'PPTX downloads must use the official CDN')
+  assert.equal(new URL(url).origin, 'https://file.microi.net', 'PPTX downloads must use the official CDN')
   assert.match(new URL(url).pathname, /\/[a-z0-9-]+\.pptx$/u, 'PPTX downloads must retain stable filenames')
   return verifiedTrainingAssetPath(url)
 }
@@ -57,7 +58,7 @@ function componentRuntime(descriptor) {
     addEventListener() {}, clearTimeout() {}, setTimeout() { return 0 } }
   class TestElement {}
   const dependencies = {
-    ...vue, ...versions, enterpriseSlides, searchTrainingSlides,
+    ...vue, ...versions, enterpriseSlides, searchTrainingSlides, docAssets, getDocAssetUrl,
     nextTick: callback => Promise.resolve().then(callback), onMounted: callback => mountedCallbacks.push(callback), onBeforeUnmount() {},
     useData: () => ({ isDark }), window: browser, document: { getElementById() { return null }, addEventListener() {} }, Element: TestElement, HTMLElement: TestElement,
   }

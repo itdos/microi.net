@@ -10,19 +10,19 @@
 
 <div class="mci-doc-screenshot-grid">
   <figure>
-    <img src="/images/product-screenshots/bluetooth-printer-output-gp-m322.jpg" alt="蓝牙打印机输出主构件二维码标签实拍" data-fancybox="bluetooth-printer-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/f0349a8a0c493a7c602916b49dee773e4000a006fa0781e0a09f19455c2a02f2/202610/bluetooth-printer-output-gp-m322.jpg" alt="蓝牙打印机输出主构件二维码标签实拍" data-fancybox="bluetooth-printer-preview">
     <figcaption>主构件二维码标签实机打印结果。</figcaption>
   </figure>
   <figure>
-    <img src="/images/product-screenshots/bluetooth-printer-output-test-page.jpg" alt="蓝牙打印机输出业务标签与 Microi 测试页实拍" data-fancybox="bluetooth-printer-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/c70f7520d92a245292eb31ce851c9c81f6ef2fd0a8df9d21fc7aaef32d4d029b/202610/bluetooth-printer-output-test-page.jpg" alt="蓝牙打印机输出业务标签与 Microi 测试页实拍" data-fancybox="bluetooth-printer-preview">
     <figcaption>业务标签与 Microi 蓝牙打印测试结果。</figcaption>
   </figure>
   <figure>
-    <img src="/images/product-screenshots/mobile-bluetooth-settings.jpg" alt="Microi 移动端蓝牙连接入口和已连接设备状态" data-fancybox="bluetooth-printer-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/2490856187ccf8ae2235d5193306a6388cb90ab121d6c31f6f9a9cfc4db8b5e0/202610/mobile-bluetooth-settings.jpg" alt="Microi 移动端蓝牙连接入口和已连接设备状态" data-fancybox="bluetooth-printer-preview">
     <figcaption>移动端查看当前蓝牙打印机及连接状态。</figcaption>
   </figure>
   <figure>
-    <img src="/images/product-screenshots/mobile-bluetooth-print-specification.jpg" alt="Microi 移动端微服务选择蓝牙打印规格" data-fancybox="bluetooth-printer-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/1bbb036c8314f5e0eed1d68ae0278d6d4dc355809f30f7db0880558495a43ec1/202610/mobile-bluetooth-print-specification.jpg" alt="Microi 移动端微服务选择蓝牙打印规格" data-fancybox="bluetooth-printer-preview">
     <figcaption>微服务内选择 75×60 mm 或 100×60 mm 打印规格。</figcaption>
   </figure>
 </div>

@@ -183,8 +183,8 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 >* 导出的ExportExcel()方法源码公开在【Microi.Office】插件源码中
 
 ### 效果图
-<img src="https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" alt="接口引擎配置示例" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" alt="接口引擎运行结果" style="margin: 5px;">
+<img src="https://file.microi.net/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" alt="接口引擎配置示例" style="margin: 5px;">
+<img src="https://file.microi.net/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" alt="接口引擎运行结果" style="margin: 5px;">
 
 ### 使用接口引擎替换导出接口
 
@@ -528,7 +528,7 @@ if(filesByteBase64){
 }
 
 var downResult = V8.Http.GetResponse({
-  Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
+  Url : 'https://file.microi.net/itdos/img/20230623/WechatIMG21753.png'
 });
 var imgByte = downResult.RawBytes;
 //不建议使用调用接口的方式，性能较差，虽然也是可以的

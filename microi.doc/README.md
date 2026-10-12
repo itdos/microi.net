@@ -33,7 +33,7 @@ npm run build
 
 ## 培训课件下载与生成
 
-在线课件的九份 PDF/PPTX 由官方 `https://static.itdos.com` CDN 交付，下载清单位于 `docs/.vitepress/theme/training-downloads.js`。每件资源独立绑定真实 URL、字节数和 SHA-256；PDF 与 PPTX 的上传目录不同，不通过更换扩展名推导地址。官网 nginx 的九条精确 301 保留旧 `/downloads/` 地址，未知文件仍返回 404。CDN PDF 可在新窗口预览并保存，不会关闭当前课件。
+在线课件的九份 PDF/PPTX 由官方 `https://file.microi.net` CDN 交付，下载清单位于 `docs/.vitepress/theme/training-downloads.js`。每件资源独立绑定真实 URL、字节数和 SHA-256；PDF 与 PPTX 的上传目录不同，不通过更换扩展名推导地址。官网 nginx 的九条精确 301 保留旧 `/downloads/` 地址，未知文件仍返回 404。CDN PDF 可在新窗口预览并保存，不会关闭当前课件。
 
 `npm run test:training-deck` 在执行原有页数、版式、可编辑文字、备注和交互测试前，将清单中的真实 CDN 文件验签到工作区 `.tmp/microi-docs-training-downloads/`。已有缓存仍逐件校验；缺失、错误字节或网络失败均中止，不能跳过测试。离线机器可以用已验签的完整目录准备缓存：
 
@@ -43,7 +43,13 @@ npm run prepare:training-downloads -- --verify-only
 npm run test:training-deck
 ```
 
-PDF 与 PPTX 生成器默认输出到工作区 `.tmp/training-deck-downloads/pdf` 和 `.tmp/training-deck-downloads/pptx`，预览缩略图仍按原契约生成。新课件先通过官方 MCP 上传、回读原始字节并验签，再原位更新下载清单和对应的精确跳转。不要把大型下载文件重新写入 `docs/public/downloads` 或提交到 Git；本地生成成功不代表 CDN 或官网已经发布。
+PDF 与 PPTX 生成器默认输出到工作区 `.tmp/training-deck-downloads/pdf` 和 `.tmp/training-deck-downloads/pptx`；架构图和课件缩略图默认生成到 `.tmp/microi-docs-images-generated/`。新课件和图片先通过官方 MCP 上传、回读原始字节并验签，再原位更新交付清单和对应的精确跳转。不要把大型下载文件或预览图片重新写入 `docs/public/` 或提交到 Git；本地生成成功不代表 CDN 或官网已经发布。
+
+官网图片的唯一交付清单为 `docs/.vitepress/theme/doc-assets.js`，每张图片绑定实际 CDN 地址、字节数、SHA-256 和 MIME。Markdown 使用这些真实地址，动态图库通过 `getDocAssetUrl` 查询旧路由映射，不猜测上传后的年月或文件名。`images/microi-ai-platform-architecture.manifest.json` 只保留架构图生成的文本审计数据。
+
+`npm run prepare:doc-assets` 把清单中的图片下载验签到工作区 `.tmp/microi-docs-images/`，构建和格式测试复用该缓存；缺失、损坏或 CDN 响应不符都会失败。可以用 `--seed <包含 images/api_plugins 旧路由层级的目录>` 准备离线缓存，再用 `--verify-only` 重新核验。原始图片不保存在源码的 `public/images` 或 `public/api_plugins` 中。
+
+官网公开资源使用 `https://file.microi.net`，官网 API 使用 `https://api.microi.net`；它们分别是原 CDN 和 API 的官方域名别名，路径及租户协议保持原样。本地 API 覆盖仍受开发环境与 loopback 限制，不影响正式站的官方 API 默认地址。
 
 ## SEO、AI 搜索与错误页
 

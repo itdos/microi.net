@@ -16,98 +16,98 @@ outline: [2, 3]
 
 <div class="mci-doc-screenshot-grid">
   <figure>
-    <a href="/images/digital-human-live/live-preview-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看数字人本机播报预览 4K 原图">
-      <img src="/images/digital-human-live/live-preview-4k.png" width="3840" height="2160" loading="lazy" alt="数字人直播本机 WebRTC 播报预览：演示人像、已连接画面、中文话术、生成速度与播报队列" />
+    <a href="https://file.microi.net/itdos/official-docs/images/5b4c324cc11ae8fed34a3d791e28b4425e625e5308ffb25d20baa81047a8fec7/202610/live-preview-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看数字人本机播报预览 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/5b4c324cc11ae8fed34a3d791e28b4425e625e5308ffb25d20baa81047a8fec7/202610/live-preview-4k.png" width="3840" height="2160" loading="lazy" alt="数字人直播本机 WebRTC 播报预览：演示人像、已连接画面、中文话术、生成速度与播报队列" />
     </a>
     <figcaption>本机实测播报：演示人像经 MuseTalk 口型生成后由 WebRTC 送入工作台；不代表 OBS 实时来源或外部平台已开播。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/motion-workbench-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看照片驱动与 AI 换脸工作台 4K 原图">
-      <img src="/images/digital-human-live/motion-workbench-4k.png" width="3840" height="2160" loading="lazy" alt="照片驱动与 AI 换脸工作台：两种模式、源照片、驱动视频、素材授权和本机生成入口" />
+    <a href="https://file.microi.net/itdos/official-docs/images/240ebed235b400536b104a76482beb5d2b8770912100aaefef20483765f35756/202610/motion-workbench-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看照片驱动与 AI 换脸工作台 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/240ebed235b400536b104a76482beb5d2b8770912100aaefef20483765f35756/202610/motion-workbench-4k.png" width="3840" height="2160" loading="lazy" alt="照片驱动与 AI 换脸工作台：两种模式、源照片、驱动视频、素材授权和本机生成入口" />
     </a>
     <figcaption>照片驱动工作台：选择已授权照片与视频，在吾码账号和本机配对通过后提交任务。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/motion-face-result-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看本机视频换脸结果 4K 原图">
-      <img src="/images/digital-human-live/motion-face-result-4k.png" width="3840" height="2160" loading="lazy" alt="视频换脸实际结果：演示女像面部跟随男像驱动视频，男像头发衣服背景保留，页面显示速度与下载入口" />
+    <a href="https://file.microi.net/itdos/official-docs/images/c423c3f58ca897b06b22f2cf4ba327f32271c16bda11b2185fa58259af639674/202610/motion-face-result-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看本机视频换脸结果 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/c423c3f58ca897b06b22f2cf4ba327f32271c16bda11b2185fa58259af639674/202610/motion-face-result-4k.png" width="3840" height="2160" loading="lazy" alt="视频换脸实际结果：演示女像面部跟随男像驱动视频，男像头发衣服背景保留，页面显示速度与下载入口" />
     </a>
     <figcaption>只换脸实测：保留驱动视频的身体、衣服与背景；面部边缘在当前轻量算法下可见。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/motion-body-result-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看照片人物与服装动作结果 4K 原图">
-      <img src="/images/digital-human-live/motion-body-result-4k.png" width="3840" height="2160" loading="lazy" alt="照片人物与服装动作实际结果：演示女像及金色服装按驱动视频姿态进行二维形变" />
+    <a href="https://file.microi.net/itdos/official-docs/images/d6723792920b06658cd031fef5a268d4b70471a5e56734d1e9d8913a351aebd1/202610/motion-body-result-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看照片人物与服装动作结果 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/d6723792920b06658cd031fef5a268d4b70471a5e56734d1e9d8913a351aebd1/202610/motion-body-result-4k.png" width="3840" height="2160" loading="lazy" alt="照片人物与服装动作实际结果：演示女像及金色服装按驱动视频姿态进行二维形变" />
     </a>
     <figcaption>人像与衣服动作实测：照片中的人像和金色衣服随驱动姿态形变；半身照片无法还原未拍到的下半身。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/motion-live-face-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看摄像头实时换脸预览 4K 原图">
-      <img src="/images/digital-human-live/motion-live-face-4k.png" width="3840" height="2160" loading="lazy" alt="摄像头实时换脸预览：测试摄像头帧经本机 WebSocket 处理后显示在页面画布" />
+    <a href="https://file.microi.net/itdos/official-docs/images/686d60cb0bc83498e84467028123ca582df41f2048a70bae371e0e65cc7db887/202610/motion-live-face-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看摄像头实时换脸预览 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/686d60cb0bc83498e84467028123ca582df41f2048a70bae371e0e65cc7db887/202610/motion-live-face-4k.png" width="3840" height="2160" loading="lazy" alt="摄像头实时换脸预览：测试摄像头帧经本机 WebSocket 处理后显示在页面画布" />
     </a>
     <figcaption>摄像头实时预览：自动化使用测试视频作为虚拟摄像头；麦克风和 OBS 窗口采集需分别配置。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/motion-live-body-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看摄像头实时人物与服饰动作 4K 原图">
-      <img src="/images/digital-human-live/motion-live-body-4k.png" width="3840" height="2160" loading="lazy" alt="摄像头实时人物与衣服动作预览：测试摄像头帧驱动演示照片里的金色礼服人物" />
+    <a href="https://file.microi.net/itdos/official-docs/images/b12a67d27335d4cc4a3553e018d7c0634cce1d1067696c4988958861046cbd50/202610/motion-live-body-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看摄像头实时人物与服饰动作 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/b12a67d27335d4cc4a3553e018d7c0634cce1d1067696c4988958861046cbd50/202610/motion-live-body-4k.png" width="3840" height="2160" loading="lazy" alt="摄像头实时人物与衣服动作预览：测试摄像头帧驱动演示照片里的金色礼服人物" />
     </a>
     <figcaption>实时人物与衣服动作：虚拟摄像头逐帧输入，本机返回合成视频帧；服饰形变仍受单张照片视角限制。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/obs-recorded-body-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看 OBS 实际录制的人像与服装动作 4K 帧">
-      <img src="/images/digital-human-live/obs-recorded-body-4k.png" width="3840" height="2160" loading="lazy" alt="OBS 媒体来源录制的照片人物与金色衣服动作视频实际帧，竖向人物居中，左右为黑色画布" />
+    <a href="https://file.microi.net/itdos/official-docs/images/926f5fc1d68e0f695743ed0bf40cbbd0fc6bde45f120dc329edec4a033f72f4d/202610/obs-recorded-body-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看 OBS 实际录制的人像与服装动作 4K 帧">
+      <img src="https://file.microi.net/itdos/official-docs/images/926f5fc1d68e0f695743ed0bf40cbbd0fc6bde45f120dc329edec4a033f72f4d/202610/obs-recorded-body-4k.png" width="3840" height="2160" loading="lazy" alt="OBS 媒体来源录制的照片人物与金色衣服动作视频实际帧，竖向人物居中，左右为黑色画布" />
     </a>
     <figcaption>OBS 媒体来源实录：本机生成片段循环输入 OBS 后录制，显示人像与衣服动作；不是直播平台推流截图。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/studio-workbench-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看数字人直播工作台 4K 原图">
-      <img src="/images/digital-human-live/studio-workbench-4k.png" width="3840" height="2160" loading="lazy" alt="数字人直播工作台：话术播报、观众问答、直播队列、模型生成速度与 OBS 输出入口" />
+    <a href="https://file.microi.net/itdos/official-docs/images/6c3cdca4fb492ec4e6d07664c4bed5e81d5921d6582f52519c82b1f15fc8b2d2/202610/studio-workbench-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看数字人直播工作台 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/6c3cdca4fb492ec4e6d07664c4bed5e81d5921d6582f52519c82b1f15fc8b2d2/202610/studio-workbench-4k.png" width="3840" height="2160" loading="lazy" alt="数字人直播工作台：话术播报、观众问答、直播队列、模型生成速度与 OBS 输出入口" />
     </a>
     <figcaption>直播工作台：播报控制、队列、模型指标和本机输出入口；截图时尚未配对。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/local-setup-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看本机设置 4K 原图">
-      <img src="/images/digital-human-live/local-setup-4k.png" width="3840" height="2160" loading="lazy" alt="本机设置：配对码输入、人像授权、OBS 接入说明和 Qwen3、MeloTTS、MuseTalk 模型组合" />
+    <a href="https://file.microi.net/itdos/official-docs/images/a2b5f873cae25fd202224af28e0b10975df9252217e30d2999dc5e5c27fe2742/202610/local-setup-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看本机设置 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/a2b5f873cae25fd202224af28e0b10975df9252217e30d2999dc5e5c27fe2742/202610/local-setup-4k.png" width="3840" height="2160" loading="lazy" alt="本机设置：配对码输入、人像授权、OBS 接入说明和 Qwen3、MeloTTS、MuseTalk 模型组合" />
     </a>
     <figcaption>本机设置：配对、人像授权与 OBS 地址；截图没有展示配对码或人像。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/script-library-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看直播话术界面演示 4K 原图">
-      <img src="/images/digital-human-live/script-library-4k.png" width="3840" height="2160" loading="lazy" alt="直播话术界面演示：开场、产品介绍和收尾三条示例话术卡片，含状态、分类和编辑入口" />
+    <a href="https://file.microi.net/itdos/official-docs/images/95fb843be216c171eea392f89ffbdb016026bf24f3be11b0f7bb2ad2c2256d4f/202610/script-library-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看直播话术界面演示 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/95fb843be216c171eea392f89ffbdb016026bf24f3be11b0f7bb2ad2c2256d4f/202610/script-library-4k.png" width="3840" height="2160" loading="lazy" alt="直播话术界面演示：开场、产品介绍和收尾三条示例话术卡片，含状态、分类和编辑入口" />
     </a>
     <figcaption>直播话术：状态、分类、搜索与带到工作台；使用隔离的示例数据。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/knowledge-library-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看问答知识界面演示 4K 原图">
-      <img src="/images/digital-human-live/knowledge-library-4k.png" width="3840" height="2160" loading="lazy" alt="问答知识界面演示：本机推理费用、OBS 接入和直播平台推流三条示例问答" />
+    <a href="https://file.microi.net/itdos/official-docs/images/0b2b1c7a384e377f2b2f8391c62dc7a8f9bbc4ae7ed99c2eb16449dec73cf637/202610/knowledge-library-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看问答知识界面演示 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/0b2b1c7a384e377f2b2f8391c62dc7a8f9bbc4ae7ed99c2eb16449dec73cf637/202610/knowledge-library-4k.png" width="3840" height="2160" loading="lazy" alt="问答知识界面演示：本机推理费用、OBS 接入和直播平台推流三条示例问答" />
     </a>
     <figcaption>问答知识：常见问题、标准答复与启用状态；使用隔离的示例数据。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/phone-live-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看手机摄像头连接及本机换脸桌面 4K 原图">
-      <img src="/images/digital-human-live/phone-live-4k.png" width="3840" height="2160" loading="lazy" alt="桌面端手机摄像头连接码、已连接状态及本机二维换脸预览；浏览器虚拟摄像头测试" />
+    <a href="https://file.microi.net/itdos/official-docs/images/5cf238df6790bf37a9400b0cea607249cf98fd166aceede33b481ea95124e1f1/202610/phone-live-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看手机摄像头连接及本机换脸桌面 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/5cf238df6790bf37a9400b0cea607249cf98fd166aceede33b481ea95124e1f1/202610/phone-live-4k.png" width="3840" height="2160" loading="lazy" alt="桌面端手机摄像头连接码、已连接状态及本机二维换脸预览；浏览器虚拟摄像头测试" />
     </a>
     <figcaption>手机链路桌面端：同局域网 WebRTC 帧进入本机换脸服务；测试使用浏览器虚拟摄像头，二维脸部边缘仍有明显瑕疵。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/phone-connection-portrait-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看手机摄像头竖屏连接 4K 原图">
-      <img src="/images/digital-human-live/phone-connection-portrait-4k.png" width="2160" height="3840" loading="lazy" alt="竖屏手机摄像头页面显示一次性连接码、授权确认、已连接电脑和虚拟摄像头预览" />
+    <a href="https://file.microi.net/itdos/official-docs/images/060111b42b68a940c6321082c4122f10e23eae6cebc6135360533ffd42b724b2/202610/phone-connection-portrait-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看手机摄像头竖屏连接 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/060111b42b68a940c6321082c4122f10e23eae6cebc6135360533ffd42b724b2/202610/phone-connection-portrait-4k.png" width="2160" height="3840" loading="lazy" alt="竖屏手机摄像头页面显示一次性连接码、授权确认、已连接电脑和虚拟摄像头预览" />
     </a>
     <figcaption>手机端交互：连接码、素材授权和视频预览均已自动化验证；此图为窄屏浏览器模拟，尚非实体手机验收。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/neural-portrait-phone-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看神经网络头像与手机摄像头链路 4K 原图">
-      <img src="/images/digital-human-live/neural-portrait-phone-4k.png" width="3840" height="2160" loading="lazy" alt="本机 LivePortrait 神经网络头像预览，浏览器模拟手机摄像头经局域网 WebRTC 驱动" />
+    <a href="https://file.microi.net/itdos/official-docs/images/a454544e063d6391ad265df82da89db36dea11cf3ed99fe98a5534db4c9e01e3/202610/neural-portrait-phone-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看神经网络头像与手机摄像头链路 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/a454544e063d6391ad265df82da89db36dea11cf3ed99fe98a5534db4c9e01e3/202610/neural-portrait-phone-4k.png" width="3840" height="2160" loading="lazy" alt="本机 LivePortrait 神经网络头像预览，浏览器模拟手机摄像头经局域网 WebRTC 驱动" />
     </a>
     <figcaption>神经网络头像本机实测：手机端为浏览器虚拟摄像头，驱动帧经 WebRTC 到电脑再由本机模型生成；源照片的头发与服装保留，v0.4.1 短片任务约 6.85 fps。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/obs-neural-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看 OBS 录制神经网络头像的 4K 原图">
-      <img src="/images/digital-human-live/obs-neural-4k.png" width="3840" height="2160" loading="lazy" alt="OBS 媒体来源接收本机生成的神经网络头像片段，3840×2160 画布内的人像与左右黑边" />
+    <a href="https://file.microi.net/itdos/official-docs/images/2be1c92257facaac4324dd1807b314df178ba1c3ae60cb443d3804b92b868d15/202610/obs-neural-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看 OBS 录制神经网络头像的 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/2be1c92257facaac4324dd1807b314df178ba1c3ae60cb443d3804b92b868d15/202610/obs-neural-4k.png" width="3840" height="2160" loading="lazy" alt="OBS 媒体来源接收本机生成的神经网络头像片段，3840×2160 画布内的人像与左右黑边" />
     </a>
     <figcaption>OBS 神经头像片段实录：v0.4.1 本机模型完成 2 秒素材后，OBS 媒体来源循环播放并录制 7.83 秒；仅证明片段捕获，尚未证明实时窗口接入或外部推流。</figcaption>
   </figure>
   <figure>
-    <a href="/images/digital-human-live/obs-browser-live-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看 OBS 浏览器来源实时接收数字人播报的 4K 原图">
-      <img src="/images/digital-human-live/obs-browser-live-4k.png" width="3840" height="2160" loading="lazy" alt="OBS 浏览器来源经本机 WebRTC 接收数字人中文播报，4K 录像中人像正在开口，左右为黑色画布" />
+    <a href="https://file.microi.net/itdos/official-docs/images/5e4d8e352bc74b86656739d7e9701b96898e57d03f6608dee7b2c1f984353258/202610/obs-browser-live-4k.png" data-fancybox="digital-human-live-4k" aria-label="查看 OBS 浏览器来源实时接收数字人播报的 4K 原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/5e4d8e352bc74b86656739d7e9701b96898e57d03f6608dee7b2c1f984353258/202610/obs-browser-live-4k.png" width="3840" height="2160" loading="lazy" alt="OBS 浏览器来源经本机 WebRTC 接收数字人中文播报，4K 录像中人像正在开口，左右为黑色画布" />
     </a>
     <figcaption>OBS 浏览器来源实录：v0.4.2 修复同源配对后，本机 WebRTC 连接数为 1；这帧取自带非静音音轨的 16.67 秒 OBS 录像，而非循环 MP4 来源。</figcaption>
   </figure>

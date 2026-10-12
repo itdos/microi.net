@@ -21,7 +21,7 @@
 ---
 
 ## 📸System screenshot
-![CRM系统截图](https://static.itdos.com/upload/img/csdn/174326525ae54cd1a943e403422f6104.png#pic_center)
-![CRM功能界面](https://static.itdos.com/upload/img/csdn/a67a8e8ff56a49dd9170cd8daa4fa9cc.png#pic_center)
-![CRM列表页面](https://static.itdos.com/upload/img/csdn/62cc7966da2d4791924a633596b9ee8f.png#pic_center)
-![CRM移动端](https://static.itdos.com/upload/img/csdn/2dc41f6ac2824e4694840ff67dd0cb30.jpeg#pic_center)
+![CRM系统截图](https://file.microi.net/upload/img/csdn/174326525ae54cd1a943e403422f6104.png#pic_center)
+![CRM功能界面](https://file.microi.net/upload/img/csdn/a67a8e8ff56a49dd9170cd8daa4fa9cc.png#pic_center)
+![CRM列表页面](https://file.microi.net/upload/img/csdn/62cc7966da2d4791924a633596b9ee8f.png#pic_center)
+![CRM移动端](https://file.microi.net/upload/img/csdn/2dc41f6ac2824e4694840ff67dd0cb30.jpeg#pic_center)

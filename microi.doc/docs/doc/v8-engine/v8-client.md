@@ -484,8 +484,8 @@ V8.ShowFormTab('tabName（在表单属性中配置的Tab名称）')
 >* 自定义 HTML 仅用于简单、一次性的可信展示，如下图所示：
 <table>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/v8-confirm-tips.png" alt="V8 确认提示框默认样式"/></td>
-    <td><img src="https://static.itdos.com/upload/img/v8-confirm-tips-2.png" alt="V8 确认提示框自定义样式"/></td>
+    <td><img src="https://file.microi.net/upload/img/v8-confirm-tips.png" alt="V8 确认提示框默认样式"/></td>
+    <td><img src="https://file.microi.net/upload/img/v8-confirm-tips-2.png" alt="V8 确认提示框自定义样式"/></td>
   </tr>
 </table>
 

@@ -6,15 +6,15 @@ Microi吾码 AI 平台治理中心把门户、身份、权限、配置、功能�
 
 <div class="mci-doc-screenshot-grid">
   <figure>
-    <img src="/images/product-screenshots/ai-platform-governance-observability.jpg" alt="Microi吾码 AI 平台治理中心可观测与告警页面，展示活动告警、Trace 时间线和日志生命周期策略" data-fancybox="ai-platform-governance-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/24a426757a9d5c3fc496d259ca08f2affc45e0af38475b6eee6203e545676650/202610/ai-platform-governance-observability.jpg" alt="Microi吾码 AI 平台治理中心可观测与告警页面，展示活动告警、Trace 时间线和日志生命周期策略" data-fancybox="ai-platform-governance-preview">
     <figcaption>可观测与告警：统一查看活动告警、W3C Trace 与日志生命周期。</figcaption>
   </figure>
   <figure>
-    <img src="/images/product-screenshots/ai-platform-governance-health.jpg" alt="Microi吾码 AI 平台治理中心运行快照，展示治理闭环、待关注事项和 AI 调用记录" data-fancybox="ai-platform-governance-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/25f53ad2e5ef659d3eefdabf2120fb1c58aa17906061a406014b10230b427014/202610/ai-platform-governance-health.jpg" alt="Microi吾码 AI 平台治理中心运行快照，展示治理闭环、待关注事项和 AI 调用记录" data-fancybox="ai-platform-governance-preview">
     <figcaption>运行快照：汇总治理闭环、待关注资产与最近 AI 调用证据。</figcaption>
   </figure>
   <figure>
-    <img src="/images/product-screenshots/ai-platform-governance-overview.jpg" alt="Microi吾码 AI 平台治理中心治理总览，展示正式 AI 资产、治理覆盖率和纳管列表" data-fancybox="ai-platform-governance-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/8a2b446d0f0d1b7ef4eb40f7f79dd1658207376a9d45a7b61c4111ef9a428c4f/202610/ai-platform-governance-overview.jpg" alt="Microi吾码 AI 平台治理中心治理总览，展示正式 AI 资产、治理覆盖率和纳管列表" data-fancybox="ai-platform-governance-preview">
     <figcaption>治理总览：从正式资产发现、覆盖率评估到预览并纳管形成控制闭环。</figcaption>
   </figure>
 </div>
@@ -417,7 +417,7 @@ Completed → RollingBack → RolledBack
 
 官方应用 Key：`ai-platform-studio`。
 
-- 官方发布使用绑定 `https://api.itdos.com`、`OsClient=iTdos` 的 `microi_itdos`。
+- 官方发布使用绑定 `https://api.microi.net`、`OsClient=iTdos` 的 `microi_itdos`。
 - 发布请求版本、资产准备版本与包内 `PackageInfo.Version` 必须完全相同；菜单、表和接口选择从当前包正文持久化，禁止回退到最新版本或旧选择。
 - 57 个核心接口使用 `Managed`；目标 `Local != Base` 时整包冲突回滚，不静默覆盖客户代码。
 - 7 个 Hook 使用 `CreateIfMissing`；首次创建后永不覆盖。

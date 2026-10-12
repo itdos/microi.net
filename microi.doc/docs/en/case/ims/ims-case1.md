@@ -26,14 +26,14 @@
 
 ## 📸System screenshot
 
-![制造协同系统界面](https://static.itdos.com/upload/img/csdn/15e6381172324784b1c6ffb1fb8b1c65.png#pic_center)
+![制造协同系统界面](https://file.microi.net/upload/img/csdn/15e6381172324784b1c6ffb1fb8b1c65.png#pic_center)
 
 ### 📋More than 200 tables
 
-![200余张物理表](https://static.itdos.com/upload/img/csdn/8dd357af4d9e47c0bdb967cf012fbc6f.png#pic_center)
+![200余张物理表](https://file.microi.net/upload/img/csdn/8dd357af4d9e47c0bdb967cf012fbc6f.png#pic_center)
 
 ### ⚙Over 300 interface engines
 
-![300余个接口引擎](https://static.itdos.com/upload/img/csdn/e5b3169f3e844d7bbd63866158d3e9b9.png#pic_center)
+![300余个接口引擎](https://file.microi.net/upload/img/csdn/e5b3169f3e844d7bbd63866158d3e9b9.png#pic_center)
 
 

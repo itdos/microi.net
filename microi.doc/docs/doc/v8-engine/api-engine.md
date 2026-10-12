@@ -43,11 +43,11 @@ return result;
 
 <div class="mci-doc-screenshot-grid">
   <figure>
-    <img src="/images/product-screenshots/api-engine-detail.jpg" alt="Microi吾码接口引擎编辑界面，展示接口配置、响应类型、附件、超时、调用限制与修改历史" data-fancybox="api-engine-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/0de281a1146fb310f0617c8c30182db637f994e7e24f4766a2528b9cfb083fe5/202610/api-engine-detail.jpg" alt="Microi吾码接口引擎编辑界面，展示接口配置、响应类型、附件、超时、调用限制与修改历史" data-fancybox="api-engine-preview">
     <figcaption>接口配置：响应类型、调用策略、附件、超时与修改历史集中在同一编辑工作台。</figcaption>
   </figure>
   <figure>
-    <img src="/images/product-screenshots/api-engine-ai-copilot.png" alt="Microi吾码接口引擎暗色代码编辑器与 AI 编程助手，展示平台接口列表、V8 代码和智能编程面板" data-fancybox="api-engine-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/4b8c65fb7393794400f2562093f5d6f7ea71cd0899b6c22959c89bc04839347e/202610/api-engine-ai-copilot.png" alt="Microi吾码接口引擎暗色代码编辑器与 AI 编程助手，展示平台接口列表、V8 代码和智能编程面板" data-fancybox="api-engine-preview">
     <figcaption>AI 编程：接口定义、V8 代码、版本与 AI 编程助手同屏协作，保存后在线生效。</figcaption>
   </figure>
 </div>
@@ -189,7 +189,7 @@ return `<html>
 
 //支持直接响应文件，如：图片、Office文档等等
 var downResult = V8.Http.GetResponse({
-  Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
+  Url : 'https://file.microi.net/itdos/img/20230623/WechatIMG21753.png'
 });
 var imgByte = downResult.RawBytes;
 V8.Result = {
@@ -243,10 +243,10 @@ V8.Result = {
 
 平台会校验常见图片和 PDF 的文件头，避免把非 PDF 内容伪装成 `application/pdf` 导致浏览器无法预览。比如 PDF 必须以 `%PDF-` 开头；如果远程系统返回的是业务容器格式、错误页、登录页等内容，接口会返回 JSON 错误，方便排查。
 
-测试访问接口引擎地址：[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)
+测试访问接口引擎地址：[https://api.microi.net/apiengine/test_response_file?OsClient=iTdos](https://api.microi.net/apiengine/test_response_file?OsClient=iTdos)
 ```javascript
 var downResult = V8.Http.GetResponse({
-  Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
+  Url : 'https://file.microi.net/itdos/img/20230623/WechatIMG21753.png'
 });
 var imgByte = downResult.RawBytes;
 return {

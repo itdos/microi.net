@@ -6,7 +6,7 @@
 
 <div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--single">
   <figure>
-    <img src="/images/product-screenshots/vision-engine-workbench.jpg" alt="Microi吾码视觉引擎识别工作台，展示图片与摄像头输入、识别结果和最近识别记录" data-fancybox="vision-engine-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/6c9157277957b8f66ea9ed3975e331263750d33ab38fb5195469c20783bd742a/202610/vision-engine-workbench.jpg" alt="Microi吾码视觉引擎识别工作台，展示图片与摄像头输入、识别结果和最近识别记录" data-fancybox="vision-engine-preview">
     <figcaption>识别工作台：支持图片上传、摄像头取帧、样本匹配、AI 回退与结果追踪。</figcaption>
   </figure>
 </div>

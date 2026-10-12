@@ -22,7 +22,7 @@
 >* 目前已经在数百家客户中应用流程业务管理
 
 ## 预览图
-![流程设计器与流程预览](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
+![流程设计器与流程预览](https://file.microi.net/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
 ## 流程引擎相关物理表说明
 >* **WF_FlowDesign**：流程图设计表，一个流程图对应一条数据
 >* **WF_Node**：流程节点属性表

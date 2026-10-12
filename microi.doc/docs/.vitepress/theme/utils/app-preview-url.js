@@ -148,7 +148,7 @@ export function resolveStableApplicationEntry(application = {}, baseUrl = 'https
     return `${fileServer}${projectedPath}`
   }
   if (applicationKey === 'microi-unity-taoyuan' && !hasProjectedEntry) {
-    return 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current'
+    return 'https://file.microi.net/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current'
   }
   for (const candidate of applicationUrlCandidates(application)) {
     const stableUrl = canonicalStableUrl(candidate, baseUrl, runtime, applicationKey)

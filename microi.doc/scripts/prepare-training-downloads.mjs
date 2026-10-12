@@ -30,7 +30,7 @@ export function validateTrainingDownloads(assets = trainingDownloads) {
     if (!expectedNames.includes(name) || asset.legacyPath !== `/downloads/${name}` || names.has(name)) throw new Error('培训下载旧地址重复或不在精确清单内')
     if (!Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 || !/^[a-f0-9]{64}$/u.test(asset.sha256 || '')) throw new Error('培训下载缺少有效字节数或 SHA-256')
     const url = new URL(asset.url)
-    if (url.origin !== 'https://static.itdos.com' || url.username || url.password || url.search || url.hash || urls.has(asset.url)
+    if (url.origin !== 'https://file.microi.net' || url.username || url.password || url.search || url.hash || urls.has(asset.url)
       || !url.pathname.startsWith(`/itdos/official-docs/downloads/${asset.sha256}/`) || path.posix.basename(url.pathname) !== name) throw new Error('培训下载必须绑定官方 CDN 的独立内容指纹地址')
     const mimeType = name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     if (asset.mimeType !== mimeType) throw new Error('培训下载 MIME 类型与真实文件类型不符')

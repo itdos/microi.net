@@ -177,7 +177,7 @@
           />
           <details class="portal-detail"><summary>接入信息与 Token 额度</summary><ProfileAiSummary
             :api-key="aiApiKey"
-            :endpoint="aiApiEndpoint || 'https://api.itdos.com/v1'"
+            :endpoint="aiApiEndpoint || 'https://api.microi.net/v1'"
             :total="relayToken.GiftTokens"
             :used="relayToken.UsedTokens"
             :remaining="relayToken.RemainingTokens"
@@ -370,7 +370,7 @@ const relayToken = ref({
   RemainingTokens: 100000
 })
 const aiApiKey = ref('')
-const aiApiEndpoint = ref('https://api.itdos.com/v1')
+const aiApiEndpoint = ref('https://api.microi.net/v1')
 const relayUsageLogs = ref([])
 const aiUsagePageIndex = ref(1)
 const aiUsagePageSize = ref(20)
@@ -1230,7 +1230,7 @@ async function refreshAiApiKey() {
     }
     if (result.Code === 1 && result.Data) {
       aiApiKey.value = result.Data.AiApiKey || ''
-      aiApiEndpoint.value = result.Data.Endpoint || 'https://api.itdos.com/v1'
+      aiApiEndpoint.value = result.Data.Endpoint || 'https://api.microi.net/v1'
     } else if (result.Msg) {
       profileError.value = localizeServerMessage(result.Msg)
     }

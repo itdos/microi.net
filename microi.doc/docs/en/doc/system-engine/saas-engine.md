@@ -37,12 +37,12 @@
 ## Basic Configuration
 > * Support database read and write separation, support specified storage media
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
 
 ## Alibaba Cloud configuration
 > * If MinIO is not used, Alibaba Cloud's OSS CDN can be used
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0e4da43b35394de7867cfa5425697476.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/0e4da43b35394de7867cfa5425697476.png#pic_center)
 
 ## MinIO Configuration
 > * If you are not using Alibaba Cloud OSS, you can use MinIO
@@ -142,25 +142,25 @@ server {
 :::
 
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
 
 ## Redis Configuration
 > * Support Sentinel mode
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
 
 ## MQ message queue configuration
 > * Support cluster mode
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/c171c8510a2b452980c3f020048b9d53.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/c171c8510a2b452980c3f020048b9d53.png#pic_center)
 
 ## Search Engine Configuration
 > * Currently, only ES search engine is supported, and word segmentation search is supported. Other search engines may be expanded in the future.
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
 
 ## interface engine differentiates saas tenants
-> * the user accesses a custom interface address of an interface engine, such as:(https:// api.itdos.com/apiengine/test1)[https://api.itdos.com/apiengine/test1],默认是走主库的接口引擎
+> * the user accesses a custom interface address of an interface engine, such as:(https:// api.itdos.com/apiengine/test1)[https://api.microi.net/apiengine/test1],默认是走主库的接口引擎
 > * Assuming that tenant A and tenant B both have a [/apiengine/test1] interface, there are multiple ways to distinguish access:
 > * 1. when accessing the [/apiengine/test1] interface, pass in the token of the corresponding user, and the platform will identify the OsClient value according to the token to access the corresponding saas tenant database
 > * 2. when accessing the [/apiengine/test1] interface, anonymous access is made without token, which is distinguished by adding Url parameters, such as:/apiengine/test1?OsClient = veken

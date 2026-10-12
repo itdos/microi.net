@@ -330,7 +330,7 @@ Web、UniApp 和 MicroService 的真实编译目录应使用 MCP 工具 `microi_
 私有桶最新源码：{tenant}/micro-app/{appKey}/{sourceFile}
 ```
 
-Web、UniApp 与 MicroService 均采用该目录；官网体验地址是 `https://static.itdos.com/{tenant}/micro-app/{appKey}/index.html`。v3 内部不可变对象键仍可作为校验源，不作为官网链接；CDN 直接读取公有桶，不承担动态版本解析。数据库只保存路径、大小、SHA-256、版本和路由等元数据。失败后可用相同版本和摘要安全重试；历史目录若已有不同字节则拒绝覆盖。
+Web、UniApp 与 MicroService 均采用该目录；官网体验地址是 `https://file.microi.net/{tenant}/micro-app/{appKey}/index.html`。v3 内部不可变对象键仍可作为校验源，不作为官网链接；CDN 直接读取公有桶，不承担动态版本解析。数据库只保存路径、大小、SHA-256、版本和路由等元数据。失败后可用相同版本和摘要安全重试；历史目录若已有不同字节则拒绝覆盖。
 
 v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在数据库中使用以 `/` 开头的对象路径，发布完成态检查依赖该路径；官网接口和后台工作台通过租户 `FileServer` 生成完整的 CDN 体验链接。不要为了统一展示而直接将这些内部字段改成绝对 URL。
 
@@ -447,7 +447,7 @@ v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在
 
 在 **【系统设置】→【开发配置】** 中指定存储方式。系统设置由表单引擎驱动，可在表单设计中自由扩展更多自定义存储方式。
 
-![存储方式配置](https://static.itdos.com/upload/img/csdn/5f7e4c8a6b824c51b1c50de50827abdd.png#pic_center)
+![存储方式配置](https://file.microi.net/upload/img/csdn/5f7e4c8a6b824c51b1c50de50827abdd.png#pic_center)
 
 ---
 
@@ -455,7 +455,7 @@ v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在
 
 在 **【SaaS 引擎】→【Aliyun】** 处配置相关参数：
 
-![阿里云OSS配置](https://static.itdos.com/upload/img/csdn/dd353af2971c4057b3d47c1f3ad9d81c.png#pic_center)
+![阿里云OSS配置](https://file.microi.net/upload/img/csdn/dd353af2971c4057b3d47c1f3ad9d81c.png#pic_center)
 
 ---
 
@@ -467,7 +467,7 @@ v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在
 
 > 💡 安装 MinIO 方法见：[Docker 部署文档](https://microi.blog.csdn.net/article/details/143576299)
 
-![MinIO配置](https://static.itdos.com/upload/img/csdn/0bde20907de743f5b051036546837afa.png#pic_center)
+![MinIO配置](https://file.microi.net/upload/img/csdn/0bde20907de743f5b051036546837afa.png#pic_center)
 
 ---
 

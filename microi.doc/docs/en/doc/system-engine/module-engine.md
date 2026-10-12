@@ -2,7 +2,7 @@
 
 > **Including module configuration, data source configuration, interface replacement, dynamic button and other configurations**
 
-![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
+![module-engine](https://file.microi.net/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## Module Configuration
 ## How to open it
 ### **Diy**

@@ -7,7 +7,7 @@ description: 通过吾码 AI 应用和接口引擎生成受限设计计划，在
 
 吾码 AI CAD 将自然语言需求转为可审阅的参数计划，再由 **SolidWorks 软件内的桌面插件**执行建模。设计人员可以从同一个示例查看零件、装配、BOM、工艺草案和二维工程图的交付流程。
 
-当前发布的是 **v1.0.0 技术预览**：[打开 AI 应用](/app-detail.html?app=microi-ai-cad)、[查看产品展示页](/ai-cad.html)、[下载 SolidWorks 插件包](https://static.itdos.com/itdos/mcp/assets/ai-cad/plugin/202609/MicroiAiCad_Addin-v1_0_0.zip)。插件已完成本地构建；本机尚未安装获许可的 SolidWorks，因此软件内自动建模、装配、出图及文件回读仍待真实运行验收。
+当前发布的是 **v1.0.0 技术预览**：[打开 AI 应用](/app-detail.html?app=microi-ai-cad)、[查看产品展示页](/ai-cad.html)、[下载 SolidWorks 插件包](https://file.microi.net/itdos/mcp/assets/ai-cad/plugin/202609/MicroiAiCad_Addin-v1_0_0.zip)。插件已完成本地构建；本机尚未安装获许可的 SolidWorks，因此软件内自动建模、装配、出图及文件回读仍待真实运行验收。
 
 ## 工作流程
 
@@ -25,11 +25,11 @@ description: 通过吾码 AI 应用和接口引擎生成受限设计计划，在
 以下为已渲染的 **3840 × 2160 工作台示例界面**，展示设计计划和参数化示意。它们不是 SolidWorks 软件内截图，也不表示生产图纸已经通过软件验收。点击图片可查看原图。
 
 <div class="mci-doc-screenshot-grid">
-  <figure><a href="/images/ai-cad/01-modeling.png" target="_blank" rel="noopener noreferrer"><img src="/images/ai-cad/01-modeling.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K 建模工作台：自然语言需求、参数计划和三维示意模型"></a><figcaption>自然语言建模与参数计划。</figcaption></figure>
-  <figure><a href="/images/ai-cad/02-assembly.png" target="_blank" rel="noopener noreferrer"><img src="/images/ai-cad/02-assembly.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K 装配工作台：联轴器零件实例及装配结构示意"></a><figcaption>零件实例与装配结构。</figcaption></figure>
-  <figure><a href="/images/ai-cad/03-bom.png" target="_blank" rel="noopener noreferrer"><img src="/images/ai-cad/03-bom.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K BOM 工作台：零件名称、材料、规格及数量预览"></a><figcaption>设计阶段 BOM 清单。</figcaption></figure>
-  <figure><a href="/images/ai-cad/04-process.png" target="_blank" rel="noopener noreferrer"><img src="/images/ai-cad/04-process.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K 工艺工作台：可审阅的加工工序草案"></a><figcaption>加工工艺草案。</figcaption></figure>
-  <figure><a href="/images/ai-cad/05-drawing.png" target="_blank" rel="noopener noreferrer"><img src="/images/ai-cad/05-drawing.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K 图纸工作台：二维视图示意及关联工程图输出流程"></a><figcaption>二维工程图输出流程。</figcaption></figure>
+  <figure><a href="https://file.microi.net/itdos/official-docs/images/2819bee0d35bc33f48103f0960c1f46704bd1f5fd8baa248295464f46457ff85/202610/01-modeling.png" target="_blank" rel="noopener noreferrer"><img src="https://file.microi.net/itdos/official-docs/images/2819bee0d35bc33f48103f0960c1f46704bd1f5fd8baa248295464f46457ff85/202610/01-modeling.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K 建模工作台：自然语言需求、参数计划和三维示意模型"></a><figcaption>自然语言建模与参数计划。</figcaption></figure>
+  <figure><a href="https://file.microi.net/itdos/official-docs/images/d556dda6f93b05401cd235a6127ea092325f185593b928db87602629b388b41b/202610/02-assembly.png" target="_blank" rel="noopener noreferrer"><img src="https://file.microi.net/itdos/official-docs/images/d556dda6f93b05401cd235a6127ea092325f185593b928db87602629b388b41b/202610/02-assembly.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K 装配工作台：联轴器零件实例及装配结构示意"></a><figcaption>零件实例与装配结构。</figcaption></figure>
+  <figure><a href="https://file.microi.net/itdos/official-docs/images/db9aacb16a0b4d5f5f168e2b8589f368db2def4dd090546b911321c03a279bfb/202610/03-bom.png" target="_blank" rel="noopener noreferrer"><img src="https://file.microi.net/itdos/official-docs/images/db9aacb16a0b4d5f5f168e2b8589f368db2def4dd090546b911321c03a279bfb/202610/03-bom.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K BOM 工作台：零件名称、材料、规格及数量预览"></a><figcaption>设计阶段 BOM 清单。</figcaption></figure>
+  <figure><a href="https://file.microi.net/itdos/official-docs/images/f2fbab5248685a687eb7248216fadd2158df3633a49a51110af47837177694db/202610/04-process.png" target="_blank" rel="noopener noreferrer"><img src="https://file.microi.net/itdos/official-docs/images/f2fbab5248685a687eb7248216fadd2158df3633a49a51110af47837177694db/202610/04-process.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K 工艺工作台：可审阅的加工工序草案"></a><figcaption>加工工艺草案。</figcaption></figure>
+  <figure><a href="https://file.microi.net/itdos/official-docs/images/592d6d51e95fd66fa46fefa7dcaa08f8e20c2847c0b3486654eb2ea27994d231/202610/05-drawing.png" target="_blank" rel="noopener noreferrer"><img src="https://file.microi.net/itdos/official-docs/images/592d6d51e95fd66fa46fefa7dcaa08f8e20c2847c0b3486654eb2ea27994d231/202610/05-drawing.png" width="3840" height="2160" loading="lazy" alt="吾码 AI CAD 4K 图纸工作台：二维视图示意及关联工程图输出流程"></a><figcaption>二维工程图输出流程。</figcaption></figure>
 </div>
 
 ## 验收边界

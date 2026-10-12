@@ -14,6 +14,7 @@ import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { SITE_URL } from '../docs/.vitepress/config/seo-policy.mjs'
+import { loadDocAssets, prepareDocAssets, verifiedDocAssetPath } from './prepare-doc-assets.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspaceRoot = path.dirname(projectRoot)
@@ -72,21 +73,27 @@ async function declaredSlideCount(edition) {
 
 async function sourceFingerprint() {
   const sources = ['components/TrainingSyllabusDeck.vue', 'components/EnterpriseTrainingSlide.vue',
-    'enterprise-training-slides.js', 'training-deck-versions.js', 'training-downloads.js',
+    'enterprise-training-slides.js', 'training-deck-versions.js', 'training-downloads.js', 'doc-assets.js',
     'styles/training-syllabus-deck.scss', '../config/seo-policy.mjs']
   const digest = createHash('sha256')
   for (const source of sources) {
     digest.update(source)
     digest.update(await fs.readFile(path.join(projectRoot, 'docs/.vitepress/theme', source)))
   }
-  const enterpriseSource = await fs.readFile(path.join(projectRoot, 'docs/.vitepress/theme/enterprise-training-slides.js'), 'utf8')
-  const scenarioImages = [...enterpriseSource.matchAll(/src:\s*'([^']+)'/g)].map(match => match[1])
+  const { enterpriseSlides } = await import('../docs/.vitepress/theme/enterprise-training-slides.js')
+  const scenarioImages = enterpriseSlides.map(slide => slide.image?.src)
   if (scenarioImages.length !== await declaredSlideCount('enterprise') || new Set(scenarioImages).size !== scenarioImages.length) throw new Error('企业课件必须逐页绑定不同的场景图片')
-  // 场景图片字节与正文一起冻结，不能在源码不变时复用已经替换图片的旧捕获。
-  for (const image of scenarioImages.sort()) {
-    if (!image.startsWith('/images/')) throw new Error(`企业场景图片不是本地公开资产：${image}`)
-    digest.update(image)
-    digest.update(await fs.readFile(path.join(projectRoot, 'docs/public', image.slice(1))))
+  const assets = await loadDocAssets()
+  const scenes = scenarioImages.map(image => {
+    const asset = assets.find(row => row.url === image || row.legacyPath === image)
+    if (!asset?.legacyPath.startsWith('/images/enterprise-training/ai/')) throw new Error(`企业场景图片未绑定官方已验证清单：${image}`)
+    return asset
+  })
+  await prepareDocAssets({ assets, only: scenes.map(asset => asset.legacyPath) })
+  // CDN URL 与原始图片字节一起冻结；缓存亦逐件验签，不把 URL 本身当作内容事实。
+  for (const asset of scenes.sort((left, right) => left.legacyPath.localeCompare(right.legacyPath))) {
+    digest.update(asset.legacyPath)
+    digest.update(await fs.readFile(verifiedDocAssetPath(asset.legacyPath, assets)))
   }
   return digest.digest('hex')
 }

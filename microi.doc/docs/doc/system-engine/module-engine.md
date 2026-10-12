@@ -2,7 +2,7 @@
 
 > **包含模块配置、数据源配置、接口替换、动态按钮等配置**
 
-![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
+![module-engine](https://file.microi.net/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## 模块配置
 
 ### 审批工作流打开方式

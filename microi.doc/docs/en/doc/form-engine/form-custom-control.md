@@ -15,7 +15,7 @@
 
 Customer requirements: Data statistics are displayed at the top of the customer details, and each statistic is automatically scrolled to the corresponding sub-table position after clicking:
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
 ---
 
 ## 📸Example 2 (Custom Components)
@@ -24,7 +24,7 @@ There are two special components to the listing information:
 1. Choose several rooms, several halls and several guards
 2. Obtain the building after selecting the community → Obtain the unit after selecting the building → Obtain the room number after selecting the unit
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
 
 ## Implementation steps
 ## 1. Create a custom vue component in the source code of Microi Code Framework
@@ -194,5 +194,5 @@ export default {
 ```
 :::
 ## 2. Drag the form design into a [Custom Component] and fill in the component path
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
+![在这里插入图片描述](https://file.microi.net/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
 ## 3. Just publish the front-end project

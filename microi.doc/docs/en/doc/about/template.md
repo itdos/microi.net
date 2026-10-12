@@ -22,7 +22,7 @@
 ---
 
 ## 📸Platform preview image
-<img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">
+<img src="https://file.microi.net/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">
 
 ```js
 这里插入文章正文

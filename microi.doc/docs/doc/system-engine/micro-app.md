@@ -36,19 +36,19 @@
 
 <div class="micro-app-case-grid">
   <figure class="micro-app-case">
-    <img src="/images/product-screenshots/microservice-crm-customer-map.png" alt="威讯 CRM 客户地图微服务嵌入吾码后台菜单，展示客户分布、聚合点位与附近客户列表" data-fancybox="micro-app-cases">
+    <img src="https://file.microi.net/itdos/official-docs/images/dcf2f6a25884c9c032ccb5439a7fa7d0c2f6c52b7960adc9cc2afc03658a4bc4/202610/microservice-crm-customer-map.png" alt="威讯 CRM 客户地图微服务嵌入吾码后台菜单，展示客户分布、聚合点位与附近客户列表" data-fancybox="micro-app-cases">
     <figcaption><span>案例 1 · 菜单路由</span><strong>CRM 客户地图</strong><small>地图、客户分类、距离检索与业务导航在同一微服务页面完成，并保留吾码菜单、页签和登录态。</small></figcaption>
   </figure>
   <figure class="micro-app-case">
-    <img src="/images/microservice-cases/open-app-dialog.png" alt="数据库定时备份微服务通过 V8.OpenAppDialog 在吾码 SaaS 引擎中弹层打开" data-fancybox="micro-app-cases">
+    <img src="https://file.microi.net/itdos/official-docs/images/5b6c224b84cd272061102de632f2f41167776960f2b0933b48931d8dd3c30a89/202610/open-app-dialog.png" alt="数据库定时备份微服务通过 V8.OpenAppDialog 在吾码 SaaS 引擎中弹层打开" data-fancybox="micro-app-cases">
     <figcaption><span>案例 2 · 弹层</span><strong>数据库定时备份</strong><small>在 SaaS 引擎列表上方打开指定微服务路由；背景页面、菜单和登录态均保留。</small></figcaption>
   </figure>
   <figure class="micro-app-case">
-    <img src="/images/microservice-cases/menu-production-counter.jpg" alt="生产计数报工工作台作为吾码平台菜单中的微服务路由打开" data-fancybox="micro-app-cases">
+    <img src="https://file.microi.net/itdos/official-docs/images/3ab84eff173308423d155157b13f986ac64cfbe31671db5b88eccc373f23c317/202610/menu-production-counter.jpg" alt="生产计数报工工作台作为吾码平台菜单中的微服务路由打开" data-fancybox="micro-app-cases">
     <figcaption><span>案例 3 · 菜单路由</span><strong>生产计数报工工作台</strong><small>深色大屏式工作台直接占据菜单内容区，宿主导航仍可正常使用。</small></figcaption>
   </figure>
   <figure class="micro-app-case">
-    <img src="/images/microservice-cases/menu-packing-workbench.jpg" alt="成品打包工作台作为吾码平台菜单中的另一个微服务路由打开" data-fancybox="micro-app-cases">
+    <img src="https://file.microi.net/itdos/official-docs/images/4acf55745d5274f2ec23383150c97356df9d52790ba3b886c0ad3edb0c8cff74/202610/menu-packing-workbench.jpg" alt="成品打包工作台作为吾码平台菜单中的另一个微服务路由打开" data-fancybox="micro-app-cases">
     <figcaption><span>案例 4 · 菜单路由</span><strong>成品打包工作台</strong><small>一个 MicroService 可以维护多个页面，并让不同菜单直达各自 RoutePath。</small></figcaption>
   </figure>
 </div>

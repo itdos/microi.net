@@ -35,8 +35,8 @@ pageClass: mci-ai-creative-studio-page
 ## 创作工作台原图
 
 <figure class="mci-ai-creative-overview">
-  <a href="/images/ai-creative-studio/capability-overview.png" data-fancybox="ai-creative-studio-original" aria-label="查看 AI 创作空间完整原图">
-    <img src="/images/ai-creative-studio/capability-overview.png" width="1905" height="1233" alt="Microi吾码 AI 创作空间及 29 项图像工具总览" />
+  <a href="https://file.microi.net/itdos/official-docs/images/6babe1f45815d5ac150ea21136f9dd20dc7f5f4b079e1af26546d9d167566590/202610/capability-overview.png" data-fancybox="ai-creative-studio-original" aria-label="查看 AI 创作空间完整原图">
+    <img src="https://file.microi.net/itdos/official-docs/images/6babe1f45815d5ac150ea21136f9dd20dc7f5f4b079e1af26546d9d167566590/202610/capability-overview.png" width="1905" height="1233" alt="Microi吾码 AI 创作空间及 29 项图像工具总览" />
   </a>
   <figcaption>AI 创作空间原图：AI 对话、数据分析、AI 图片、AI 视频、AI 音乐与模型扩展共同组成统一入口。</figcaption>
 </figure>

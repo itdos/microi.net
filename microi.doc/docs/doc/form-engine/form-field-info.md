@@ -8,11 +8,11 @@
 
 <div class="mci-doc-screenshot-grid">
   <figure>
-    <img src="/images/product-screenshots/form-field-image-upload-settings.jpg" alt="Microi吾码表单设计器的图片上传字段设置弹窗，展示上传、多图、压缩、裁剪与 V8 扩展配置" data-fancybox="form-field-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/0e554ede46e8b9b6f13e1834eec28a7718ed5d1cd32180f1a1f13fb445a10791/202610/form-field-image-upload-settings.jpg" alt="Microi吾码表单设计器的图片上传字段设置弹窗，展示上传、多图、压缩、裁剪与 V8 扩展配置" data-fancybox="form-field-preview">
     <figcaption>控件专项配置：图片上传、多图、压缩、原图保留、裁剪与 V8 扩展集中维护。</figcaption>
   </figure>
   <figure>
-    <img src="/images/product-screenshots/form-field-text-settings.jpg" alt="Microi吾码表单设计器的单行文本字段设置弹窗，展示图标、复合文字、插槽按钮和 V8 事件" data-fancybox="form-field-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/824bb1072ad7c320c3cf878853c62e8eddc7a02281d7862467e69111554df4a9/202610/form-field-text-settings.jpg" alt="Microi吾码表单设计器的单行文本字段设置弹窗，展示图标、复合文字、插槽按钮和 V8 事件" data-fancybox="form-field-preview">
     <figcaption>字段交互配置：显示、复合文字、插槽按钮、失焦与键盘 V8 事件在暗色主题下完整呈现。</figcaption>
   </figure>
 </div>

@@ -5,6 +5,7 @@ import { searchTrainingSlides } from '../training-syllabus-search.js'
 import { enterpriseSlides } from '../enterprise-training-slides.js'
 import { trainingPdfPaths, trainingPptxPath, parseTrainingHash, trainingHash } from '../training-deck-versions.js'
 import EnterpriseTrainingSlide from './EnterpriseTrainingSlide.vue'
+import { getDocAssetUrl } from '../doc-assets.js'
 
 type DeckPanel = '' | 'help'
 type SlideKind = 'cover' | 'decision' | 'why' | 'start' | 'atlas' | 'mcp' | 'engine' | 'multi-end' | 'cases' | 'closing' | 'enterprise'
@@ -752,7 +753,7 @@ function previousSlide() { goTo(activeIndex.value - 1, 'prev') }
 function thumbnailPath(index: number) {
   const themeFolder = isDark.value ? 'thumbs' : 'thumbs-light'
   const root = deckVersion.value === 'enterprise' ? 'training-deck-enterprise' : 'training-deck'
-  return `/images/${root}/${themeFolder}/slide-${padSlide(index)}.webp`
+  return getDocAssetUrl(`/images/${root}/${themeFolder}/slide-${padSlide(index)}.webp`)
 }
 
 function indexSlideContent() {
@@ -985,7 +986,7 @@ onBeforeUnmount(() => {
 
           <template v-else-if="slide.kind === 'atlas'">
             <header class="mci-training-slide__heading mci-deck-reveal"><div><p class="mci-deck-eyebrow">05 · 30+ ENGINE ATLAS</p><h2>{{ slide.title }}</h2><p>{{ slide.summary }}</p></div><span>{{ padSlide(index) }}</span></header>
-            <div class="mci-atlas-layout"><a class="mci-atlas-architecture mci-deck-reveal" href="/images/microi-ai-platform-architecture-2026.09.04.1.svg" target="_blank" rel="noopener noreferrer" aria-label="新窗口打开 Microi吾码 AI 平台完整架构图"><picture><source srcset="/images/microi-ai-platform-architecture-2026.09.04.1-3840x2160.png 3840w, /images/microi-ai-platform-architecture-2026.09.04.1-1920x1080.png 1920w"><img src="/images/microi-ai-platform-architecture-2026.09.04.1-1920x1080.png" alt="Microi吾码 AI 平台 30+ 引擎系统架构图"></picture><span>打开 SVG 高清架构图 ↗</span></a><div class="mci-atlas-directory"><article v-for="(group, groupIndex) in atlasGroups" :key="group.code" class="mci-atlas-domain mci-deck-reveal" :style="{ '--mci-deck-order': groupIndex }"><header><span>{{ group.code }}</span><strong>{{ group.title }}</strong></header><div><a v-for="entry in entriesInAtlasGroup(group)" :key="entry.id" :href="entry.href" target="_blank" rel="noopener noreferrer">{{ entry.nav }}<i>↗</i></a></div></article></div></div>
+            <div class="mci-atlas-layout"><a class="mci-atlas-architecture mci-deck-reveal" href="https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg" target="_blank" rel="noopener noreferrer" aria-label="新窗口打开 Microi吾码 AI 平台完整架构图"><picture><source srcset="https://file.microi.net/itdos/official-docs/images/602f2635aa82ae8c2ac921f5e61f74fdcfed7949c272e9bc613013bc8039b056/202610/microi-ai-platform-architecture-2026_09_04_1-3840x2160.png 3840w, https://file.microi.net/itdos/official-docs/images/7778c91966c765fff13c40d2d49afdb8dbf9ac5565e679e29aba6b54aba16823/202610/microi-ai-platform-architecture-1920x1080.png 1920w"><img src="https://file.microi.net/itdos/official-docs/images/7778c91966c765fff13c40d2d49afdb8dbf9ac5565e679e29aba6b54aba16823/202610/microi-ai-platform-architecture-1920x1080.png" alt="Microi吾码 AI 平台 30+ 引擎系统架构图"></picture><span>打开 SVG 高清架构图 ↗</span></a><div class="mci-atlas-directory"><article v-for="(group, groupIndex) in atlasGroups" :key="group.code" class="mci-atlas-domain mci-deck-reveal" :style="{ '--mci-deck-order': groupIndex }"><header><span>{{ group.code }}</span><strong>{{ group.title }}</strong></header><div><a v-for="entry in entriesInAtlasGroup(group)" :key="entry.id" :href="entry.href" target="_blank" rel="noopener noreferrer">{{ entry.nav }}<i>↗</i></a></div></article></div></div>
           </template>
 
           <template v-else-if="slide.kind === 'mcp'">

@@ -37,20 +37,20 @@ pageClass: mci-ai-data-analysis-page
 
 <div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--three mci-ai-analysis-gallery" data-preview-columns="3">
   <figure>
-    <a href="/images/ai-data-analysis/monthly-business-overview.png" data-fancybox="ai-data-analysis-originals" aria-label="查看本月经营数据概览原图">
-      <img src="/images/ai-data-analysis/monthly-business-overview.png" width="743" height="1590" loading="lazy" alt="手机端 AI 助手生成本月经营数据概览" />
+    <a href="https://file.microi.net/itdos/official-docs/images/77be6bdfa2eecf7a0f02553efa30c35d413993925125894a8a067f609540a6ab/202610/monthly-business-overview.png" data-fancybox="ai-data-analysis-originals" aria-label="查看本月经营数据概览原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/77be6bdfa2eecf7a0f02553efa30c35d413993925125894a8a067f609540a6ab/202610/monthly-business-overview.png" width="743" height="1590" loading="lazy" alt="手机端 AI 助手生成本月经营数据概览" />
     </a>
     <figcaption>经营概览：汇总客户、合同订单与跟进记录，先给核心结论，再展开关键指标。</figcaption>
   </figure>
   <figure>
-    <a href="/images/ai-data-analysis/sales-activity-analysis.png" data-fancybox="ai-data-analysis-originals" aria-label="查看销售活跃度分析原图">
-      <img src="/images/ai-data-analysis/sales-activity-analysis.png" width="764" height="1611" loading="lazy" alt="手机端 AI 经营分析展示销售活跃度与改进建议" />
+    <a href="https://file.microi.net/itdos/official-docs/images/79fac1f948c62189514d0fed32de3190a3c00130e0e908b6fa2da5480d48dc75/202610/sales-activity-analysis.png" data-fancybox="ai-data-analysis-originals" aria-label="查看销售活跃度分析原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/79fac1f948c62189514d0fed32de3190a3c00130e0e908b6fa2da5480d48dc75/202610/sales-activity-analysis.png" width="764" height="1611" loading="lazy" alt="手机端 AI 经营分析展示销售活跃度与改进建议" />
     </a>
     <figcaption>团队分析：识别人员活跃度、区域差异与跟进质量，并形成可行动的改进建议。</figcaption>
   </figure>
   <figure>
-    <a href="/images/ai-data-analysis/customer-follow-up-activity-analysis.png" data-fancybox="ai-data-analysis-originals" aria-label="查看客户跟进活跃度分析原图">
-      <img src="/images/ai-data-analysis/customer-follow-up-activity-analysis.png" width="771" height="1614" loading="lazy" alt="手机端 AI 经营分析展示客户跟进活跃度指标" />
+    <a href="https://file.microi.net/itdos/official-docs/images/ccec441f0f15b02fc51710def3039f5945603c5334cea6b68169fee8b17ba338/202610/customer-follow-up-activity-analysis.png" data-fancybox="ai-data-analysis-originals" aria-label="查看客户跟进活跃度分析原图">
+      <img src="https://file.microi.net/itdos/official-docs/images/ccec441f0f15b02fc51710def3039f5945603c5334cea6b68169fee8b17ba338/202610/customer-follow-up-activity-analysis.png" width="771" height="1614" loading="lazy" alt="手机端 AI 经营分析展示客户跟进活跃度指标" />
     </a>
     <figcaption>专项追问：围绕客户跟进方式、关键人接触率等指标继续下钻，定位成交效率问题。</figcaption>
   </figure>

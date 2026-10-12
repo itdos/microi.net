@@ -26,8 +26,8 @@
 ---
 
 ## 📸 产品截图
-![房地产平台-PC官网](https://static.itdos.com/upload/img/csdn/22e4c2c07c26414daf97ca71e22765dd.png#pic_center)
-![房地产平台-管理后台](https://static.itdos.com/upload/img/csdn/6e6fb6199dd0467ebbc62c9fc1bee790.png#pic_center)
-![房地产平台-房源列表](https://static.itdos.com/upload/img/csdn/8f85afeabd9d4b8f904c501da800ecc3.png#pic_center)
-![房地产平台-移动端](https://static.itdos.com/upload/img/csdn/ac83c155ccc44726907eb90577514ffc.jpeg#pic_center)
-![房地产平台-地图找房](https://static.itdos.com/upload/img/csdn/dac6239ca3394770800bdd0f4e3f8dca.png#pic_center)
+![房地产平台-PC官网](https://file.microi.net/upload/img/csdn/22e4c2c07c26414daf97ca71e22765dd.png#pic_center)
+![房地产平台-管理后台](https://file.microi.net/upload/img/csdn/6e6fb6199dd0467ebbc62c9fc1bee790.png#pic_center)
+![房地产平台-房源列表](https://file.microi.net/upload/img/csdn/8f85afeabd9d4b8f904c501da800ecc3.png#pic_center)
+![房地产平台-移动端](https://file.microi.net/upload/img/csdn/ac83c155ccc44726907eb90577514ffc.jpeg#pic_center)
+![房地产平台-地图找房](https://file.microi.net/upload/img/csdn/dac6239ca3394770800bdd0f4e3f8dca.png#pic_center)

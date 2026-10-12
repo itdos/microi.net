@@ -6,11 +6,11 @@ Microi吾码当前有多种“流程”能力。它们解决的问题不同，�
 
 <div class="mci-doc-screenshot-grid">
   <figure>
-    <img src="/images/product-screenshots/ai-workflow-relationship-graph.jpg" alt="Microi吾码 AI 工作流系统关系图，展示菜单、数据表、接口和流程之间的关联" data-fancybox="ai-workflow-suite-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/4a380f5ec34ce68a55f3fe19310f00cd9e10e64fd11570cddd42122b350480db/202610/ai-workflow-relationship-graph.jpg" alt="Microi吾码 AI 工作流系统关系图，展示菜单、数据表、接口和流程之间的关联" data-fancybox="ai-workflow-suite-preview">
     <figcaption>系统关系图：按资源类型探索当前租户的菜单、数据表、接口与流程依赖。</figcaption>
   </figure>
   <figure>
-    <img src="/images/product-screenshots/ai-workflow-designer.jpg" alt="Microi吾码 AI 工作流设计器，展示业务节点、数据表、接口引擎和质量门禁编排" data-fancybox="ai-workflow-suite-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/e16b76fa6657da10f3a14ec5abe8a847f2bc7e4cc6777168829931a87ae9d181/202610/ai-workflow-designer.jpg" alt="Microi吾码 AI 工作流设计器，展示业务节点、数据表、接口引擎和质量门禁编排" data-fancybox="ai-workflow-suite-preview">
     <figcaption>业务流程设计：通过可视化节点编排数据、AI 生成、质量门禁与发布步骤。</figcaption>
   </figure>
 </div>

@@ -30,8 +30,8 @@ test('培训下载分别使用已经发布的官方 PDF 与 PPTX CDN 地址', ()
     for (const dark of [true, false]) {
       const pdf = new URL(trainingPdfPaths[edition][dark ? 'dark' : 'light'])
       const pptx = new URL(trainingPptxPath(edition, dark))
-      assert.equal(pdf.origin, 'https://static.itdos.com')
-      assert.equal(pptx.origin, 'https://static.itdos.com')
+      assert.equal(pdf.origin, 'https://file.microi.net')
+      assert.equal(pptx.origin, 'https://file.microi.net')
       assert.notEqual(pdf.pathname.split('/')[4], pptx.pathname.split('/')[4], '独立上传对象使用各自的内容指纹，不能由 PDF 后缀猜测 PPTX')
     }
   }
@@ -39,7 +39,7 @@ test('培训下载分别使用已经发布的官方 PDF 与 PPTX CDN 地址', ()
 
 test('旧培训下载路径由真实官网 nginx 精确跳转，不能复制大文件或兜底为 HTML', () => {
   const conf = fs.readFileSync(path.join(projectRoot, 'docs/.vitepress/default.conf'), 'utf8')
-  const rules = [...conf.matchAll(/location = (\/downloads\/[a-z0-9-]+\.(?:pdf|pptx)) \{\s*return 301 (https:\/\/static\.itdos\.com\/[^;]+);\s*\}/gu)]
+  const rules = [...conf.matchAll(/location = (\/downloads\/[a-z0-9-]+\.(?:pdf|pptx)) \{\s*return 301 (https:\/\/file\.microi\.net\/[^;]+);\s*\}/gu)]
   assert.equal(rules.length, 9, '九个存量下载地址都必须保留精确的服务端跳转')
   assert.equal(new Set(rules.map(match => match[1])).size, 9)
   for (const asset of trainingDownloads) assert.ok(rules.some(match => match[1] === asset.legacyPath && match[2] === asset.url), `旧地址必须跳转到同一份已验签原件：${asset.legacyPath}`)
@@ -65,12 +65,12 @@ test('九件清单绑定原始字节，18 页旧别名和四套当前课件分�
 
 test('清单拒绝非官方、错误指纹、缺项、重复项与未声明下载地址', () => {
   const alter = patch => trainingDownloads.map((asset, index) => index === 0 ? { ...asset, ...patch } : asset)
-  assert.throws(() => validateTrainingDownloads(alter({ url: first.url.replace('static.itdos.com', 'example.invalid') })), /官方 CDN/u)
+  assert.throws(() => validateTrainingDownloads(alter({ url: first.url.replace('file.microi.net', 'example.invalid') })), /官方 CDN/u)
   assert.throws(() => validateTrainingDownloads(alter({ url: first.url.replace(first.sha256, '0'.repeat(64)) })), /官方 CDN/u)
   assert.throws(() => validateTrainingDownloads(alter({ url: `${first.url}?token=unknown` })), /官方 CDN/u)
   assert.throws(() => validateTrainingDownloads(trainingDownloads.slice(1)), /九件/u)
   assert.throws(() => validateTrainingDownloads([first, ...trainingDownloads.slice(0, 8)]), /重复/u)
-  assert.throws(() => verifiedTrainingAssetPath('https://static.itdos.com/unknown.pdf'), /未在已验证清单/u)
+  assert.throws(() => verifiedTrainingAssetPath('https://file.microi.net/unknown.pdf'), /未在已验证清单/u)
   assert.throws(() => verifiedTrainingAssetPath(first.url, path.join(projectRoot, 'docs/public/downloads')), /工作区 .tmp/u)
 })
 

@@ -138,7 +138,7 @@ Give AI a standard opening statement (copy the template below) and describe your
 
 ### Example effect
 
-<img src="https://static.itdos.com/upload/img/csdn/20260111144339_165_557.png" style="margin: 5px;height:500px;">
+<img src="https://file.microi.net/upload/img/csdn/20260111144339_165_557.png" style="margin: 5px;height:500px;">
 
 > **Case 1**：An interface engine for batch scheduling. After describing the business logic, it is completed through * * 2~3 rounds of dialogue * *, with 100% accuracy.
 >
@@ -218,8 +218,8 @@ After the knowledge base is generated, you open any in VS Code.`.js`file, the AI
 | Line-by-line debugging | Right-click →'Microi: Remote Line-by-Line Debuging', support breakpoint/Step Over/variable observation |
 | Push Save | Automatically synchronize to the database when the file is saved, no need to compile and publish |
 
-<img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" style="margin: 5px;">
+<img src="https://file.microi.net/upload/img/V8引擎本地AI编程连接配置.png" style="margin: 5px;">
+<img src="https://file.microi.net/upload/img/V8引擎本地AI编程运行调试.png" style="margin: 5px;">
 
 ### Update AI knowledge base individually
 
@@ -307,7 +307,7 @@ No matter in online or local mode, AI should be clearly told: * * Please find th
 - The second session can directly use the first generated`db.json`, as efficient as the multi-session write interface.
 :::
 
-<img src="https://static.itdos.com/upload/img/csdn/20260111144339_165_557.png" style="margin: 5px;height:500px;">
+<img src="https://file.microi.net/upload/img/csdn/20260111144339_165_557.png" style="margin: 5px;height:500px;">
 
 ---
 
@@ -985,7 +985,7 @@ try {
 ```
 :::
 
-<img src="https://static.itdos.com/upload/img/csdn/ScreenShot_2026-01-11_224257_197.png" style="margin: 5px;height:600px;">
+<img src="https://file.microi.net/upload/img/csdn/ScreenShot_2026-01-11_224257_197.png" style="margin: 5px;height:600px;">
 
 ## Describe business logic 2
 ::: details Expand View Code (41 lines)

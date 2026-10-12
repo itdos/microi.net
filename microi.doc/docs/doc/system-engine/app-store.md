@@ -6,7 +6,7 @@
 
 <div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--single">
   <figure>
-    <img src="/images/product-screenshots/app-store-marketplace.jpg" alt="Microi吾码应用商城，展示商城来源、应用筛选、安装状态和平台应用卡片" data-fancybox="app-store-preview">
+    <img src="https://file.microi.net/itdos/official-docs/images/05e5376bd878b6029a55a6b23fe394531c14364e9dee033a06019e70c1e7ea3a/202610/app-store-marketplace.jpg" alt="Microi吾码应用商城，展示商城来源、应用筛选、安装状态和平台应用卡片" data-fancybox="app-store-preview">
     <figcaption>应用市场：统一筛选平台应用、微服务、Web 与 UniApp，并查看安装和更新状态。</figcaption>
   </figure>
 </div>

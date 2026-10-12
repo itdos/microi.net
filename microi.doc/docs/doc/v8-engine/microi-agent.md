@@ -37,13 +37,13 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 
 ## 安装、签名与平台兼容
 
-页面顶部的 Windows 与 macOS 按钮使用固定的 latest 入口，每次点击均从官方更新清单取得当前安装包地址。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.itdos.com/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.itdos.com/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.itdos.com/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
+页面顶部的 Windows 与 macOS 按钮使用固定的 latest 入口，每次点击均从官方更新清单取得当前安装包地址。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.microi.net/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.microi.net/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.microi.net/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
 
 **Windows 与 macOS 1.3.6 已开放下载**：修复完整应用正常启动误用 Electron Helper 导致 Harness 原生加载器拒绝的问题。Harness、Worker 与插件命令统一使用包内独立 Node；最终签名 Mac 应用已验收正常启动、重启和再次打开。吾码员工、MCP、Skills、对话编辑与撤回继续保留。macOS Universal 已签名公证；官网 Windows EXE 仍为未签名公开测试，Windows 原生安装、启动另行验收。
 
-**Windows 1.3.7 安装修复候选**：如果 1.3.6 在升级时提示“新版本目录切换失败”，日志显示 `enable staged directory win32=5`，请退出正在运行的 Agent，下载 [1.3.7 Windows x64 安装修复候选](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-x64-setup.exe)，安装到原目录。无需先删除工作区、会话或配置。本次增加短暂占用重试和同盘文件迁移回退；迁移中途失败按逐项记录恢复，保留旧程序、暂存文件与未知冲突文件。单凭错误 5 无法确定拒绝操作的进程或策略，不直接归因于杀毒软件。
+**Windows 1.3.7 安装修复候选**：如果 1.3.6 在升级时提示“新版本目录切换失败”，日志显示 `enable staged directory win32=5`，请退出正在运行的 Agent，下载 [1.3.7 Windows x64 安装修复候选](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-x64-setup.exe)，安装到原目录。无需先删除工作区、会话或配置。本次增加短暂占用重试和同盘文件迁移回退；迁移中途失败按逐项记录恢复，保留旧程序、暂存文件与未知冲突文件。单凭错误 5 无法确定拒绝操作的进程或策略，不直接归因于杀毒软件。
 
-安装后可下载 [一键原生验收工具](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-native-acceptance.zip)，解压并双击 `一键验收.cmd`。它自动回读安装后的全部文件 SHA-256，运行六项真实 NSIS 故障回归，再从完整产品主入口启动两次，检查 Worker 与 Harness 重启；结果 ZIP 位于工具 `result` 目录，失败也会保存证明。工具只导出证明 JSON 和测试截屏，不导出测试 Profile 或凭据。**当前六项 NSIS 夹具已在 Wine 通过，Windows 原生升级与启动仍待验收；自动更新 latest 暂保持 1.3.6，macOS 签名公证版仍为 1.3.6。**
+安装后可下载 [一键原生验收工具](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-native-acceptance.zip)，解压并双击 `一键验收.cmd`。它自动回读安装后的全部文件 SHA-256，运行六项真实 NSIS 故障回归，再从完整产品主入口启动两次，检查 Worker 与 Harness 重启；结果 ZIP 位于工具 `result` 目录，失败也会保存证明。工具只导出证明 JSON 和测试截屏，不导出测试 Profile 或凭据。**当前六项 NSIS 夹具已在 Wine 通过，Windows 原生升级与启动仍待验收；自动更新 latest 暂保持 1.3.6，macOS 签名公证版仍为 1.3.6。**
 
 **Windows 启动恢复说明**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
 
@@ -118,7 +118,7 @@ Microi Agent 没有重新实现 dsh-desktop。内部源码仓库使用四层结�
 
 补丁无法重放、测试失败或界面验收不通过时都不会推进上游基线。每次同步都要按补丁意图清单重新验证登录、AI 中转、LicenseType、服务器连接、AI 列表、数据分析、插件安装、功能区、关于页、移动连接、Windows/macOS 构建和更新源。
 
-吾码桌面业务优先通过 `microi_itdos` 接口引擎实现，接口引擎实在缺少所需底层原子能力时才修改后端源码。当前账号版本直接读取现有 `platform-current-user` 返回的 `sys_user.LicenseType`；更新目录由 `https://api.itdos.com/microi-code/updates/` 下的匿名接口引擎提供，安装包二进制由 HDFS 流式上传。Windows/macOS 安装包内置固定版本并校验过 SHA-256 的 cloudflared，互联网连接不再在首次使用时从 GitHub 临时下载约 50 MB 可执行文件。
+吾码桌面业务优先通过 `microi_itdos` 接口引擎实现，接口引擎实在缺少所需底层原子能力时才修改后端源码。当前账号版本直接读取现有 `platform-current-user` 返回的 `sys_user.LicenseType`；更新目录由 `https://api.microi.net/microi-code/updates/` 下的匿名接口引擎提供，安装包二进制由 HDFS 流式上传。Windows/macOS 安装包内置固定版本并校验过 SHA-256 的 cloudflared，互联网连接不再在首次使用时从 GitHub 临时下载约 50 MB 可执行文件。
 
 “关于”页面、安装包和源码长期保留以下声明：Microi Agent 基于 dsh-desktop 与 DeepSeek Harness 二次开发；dsh-desktop `Copyright (c) 2026 DataElement`，按 MIT License 使用，并保留 [dsh-desktop 仓库链接](https://github.com/dataelement/dsh-desktop) 与 [DeepSeek Harness 仓库链接](https://github.com/deepseek-ai/deepseek-harness)。吾码新增的账号、AI 中转站、服务器连接、MCP、Skills、AI 能力和数据分析属于 Microi Agent 的差异层。
 
@@ -796,8 +796,8 @@ npm run publish:cli:resume
 ## 使用截图
 
 <p align="center">
-  <img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" width="49%" alt="Microi 连接配置">
-  <img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" width="49%" alt="Microi 运行调试">
+  <img src="https://file.microi.net/upload/img/V8引擎本地AI编程连接配置.png" width="49%" alt="Microi 连接配置">
+  <img src="https://file.microi.net/upload/img/V8引擎本地AI编程运行调试.png" width="49%" alt="Microi 运行调试">
 </p>
 
 ## 常见问题
@@ -883,7 +883,7 @@ npm run publish:cli:resume
 - **纠正此前验收范围**：1.3.5 的打包测试直接启动了包内 Node，未覆盖完整应用正常入口，因此不能证明用户正常打开应用成功。新增永久保护的完整应用门禁；最终签名 macOS 包在 Intel Mac 上两次启动、真实 Worker IPC、员工连接引导及 Harness 重启通过。Apple Silicon 原生和 Windows 真机运行仍需独立验收。
 - **二开保护与回归**：固定 Node 选择器、正式入口用例和发布门禁纳入三方同步保护；1,764 项回归通过（10 项平台条件跳过），类型检查、生产构建和界面回归通过。历史故障、旧安装包、商店渠道和用户工作区保持原有更新规则。
 - **新版发布**：macOS Universal DMG/ZIP 已签名公证；Windows x64 EXE 为未签名公开测试。共 7 个 CDN 文件完整回读，大小与 SHA256/SHA512 一致；永久下载入口与自动更新指向 1.3.6。
-- [1.3.6 Windows 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.6/latest.yml) · [macOS 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.6/latest-mac.yml)。
+- [1.3.6 Windows 固定更新清单](https://api.microi.net/microi-code/updates/archive/1.3.6/latest.yml) · [macOS 固定更新清单](https://api.microi.net/microi-code/updates/archive/1.3.6/latest-mac.yml)。
 
 
 ### v1.3.5 - (2026-10-05)
@@ -892,7 +892,7 @@ npm run publish:cli:resume
 - **对话与权限兼容**：编辑/撤回适配新版会话选择、显式持有和分叉协议；上下键历史与 `/microi` 继续可用；同级沙盒权限请求直接沿用当前模式，真正提升权限仍要求有效模式与非空理由。
 - **构建与二开保护**：33 份补丁在干净安装中重放；PPT 使用可从源码重建的 16 模板、192 预览管线；Office 按目标系统和 Mac 架构隔离，避免混入宿主二进制。回归、真实界面与安装包验证结果记录在内部发行证明中；Windows 客户设备原生安装和启动仍需独立验收。
 - **验收与发行**：1,757 项回归通过，10 项平台条件跳过；13 项界面回归、1 项实际安装包原生组件及 Harness 首页验收通过。另完成安装包启动恢复、私有管道 HTTP/WebSocket 和独立 Worker 验收；Mac 构建辅助门禁定向检查 6 项通过。Windows EXE、Mac DMG/ZIP、两份更新清单及发行资料共 7 个 CDN 文件已完整回读，大小、SHA-256 与 SHA-512 均与本地一致。
-- [1.3.5 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.5/latest.yml)与 [macOS 清单](https://api.itdos.com/microi-code/updates/archive/1.3.5/latest-mac.yml)。历史安装包与版本清单继续保留。
+- [1.3.5 固定更新清单](https://api.microi.net/microi-code/updates/archive/1.3.5/latest.yml)与 [macOS 清单](https://api.microi.net/microi-code/updates/archive/1.3.5/latest-mac.yml)。历史安装包与版本清单继续保留。
 
 
 版本、日期和条目格式沿用[平台更新日志](/doc/about/update-log.html)。安装包版本与 CLI 版本分别管理；历史故障、修复尝试和客户验证边界继续保留。
@@ -913,11 +913,11 @@ npm run publish:cli:resume
 
 | 文件 | 大小 | SHA256 |
 | --- | --- | --- |
-| [Universal DMG](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-mac-universal.dmg) | 381,574,856 字节 | `d54a27349627fd9015319d4239ddd120bb9a3d1b3960676be02bec2402d5c5c6` |
-| [Universal ZIP](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-mac-universal.zip) | 426,242,249 字节 | `967739c2e8f72e81f6dfe6478c9a7f8dfff8dfa857e25caf22c0312ac4048f74` |
-| [Windows x64 EXE](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-windows-x64-setup.exe) | 155,006,058 字节 | `f220d69e9f4cebc3f05c7e79a031a9cabbd71fce0ccad33d54c775dbadf3b7b3` |
+| [Universal DMG](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-mac-universal.dmg) | 381,574,856 字节 | `d54a27349627fd9015319d4239ddd120bb9a3d1b3960676be02bec2402d5c5c6` |
+| [Universal ZIP](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-mac-universal.zip) | 426,242,249 字节 | `967739c2e8f72e81f6dfe6478c9a7f8dfff8dfa857e25caf22c0312ac4048f74` |
+| [Windows x64 EXE](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.4/requests/36d7514bcc6974cc16784b436931668d866a26bc41aef185093c074d8dd04cdc/assets/Microi-Agent-1.3.4-windows-x64-setup.exe) | 155,006,058 字节 | `f220d69e9f4cebc3f05c7e79a031a9cabbd71fce0ccad33d54c775dbadf3b7b3` |
 
-- [Windows 1.3.4 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.4/latest.yml) · [macOS 1.3.4 固定更新清单](https://api.itdos.com/microi-code/updates/archive/1.3.4/latest-mac.yml)。历史版本继续保留。
+- [Windows 1.3.4 固定更新清单](https://api.microi.net/microi-code/updates/archive/1.3.4/latest.yml) · [macOS 1.3.4 固定更新清单](https://api.microi.net/microi-code/updates/archive/1.3.4/latest-mac.yml)。历史版本继续保留。
 
 ### Windows 商店 v1.3.3 已发布 - (2026-10-03)
 
@@ -935,7 +935,7 @@ npm run publish:cli:resume
 
 - **开放最新 Windows 测试下载**：官网永久入口、最新更新清单、版本目录与官方下载资源均已更新为 Windows x64 1.3.2；旧版本及 macOS Universal 1.3.2 签名公证文件继续保留。下载资源应用采用独立的 v1.3.3 发布记录，桌面程序版本为 1.3.2。
 - **保留验证边界**：1022 项回归通过、10 项平台条件跳过，生产构建及 MacBook 上真实私有管道 HTTP、Cookie 和 WebSocket 验证通过；**客户 Windows 原生安装及启动仍待确认**。EXE 未签名，Microsoft Store 免费签名仍待账号和应用审核。
-- **下载与校验**：[Windows x64 测试安装包](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.3/requests/f111516a6830ae292ea8e9211a7f2ea764215983872309e25da56d054f9c3296/assets/Microi-Agent-1.3.2-windows-x64-setup.exe)，154,982,105 字节；SHA256：`e83b901c911d78e2e03d1feb018e51709f76ca20650ef7fd10cdcac7b8b4cf47`。[Windows 1.3.2 更新清单归档](https://api.itdos.com/microi-code/updates/archive/1.3.2/latest.yml)。发布后已完整下载并核对大小、SHA256 和 SHA512。
+- **下载与校验**：[Windows x64 测试安装包](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.3/requests/f111516a6830ae292ea8e9211a7f2ea764215983872309e25da56d054f9c3296/assets/Microi-Agent-1.3.2-windows-x64-setup.exe)，154,982,105 字节；SHA256：`e83b901c911d78e2e03d1feb018e51709f76ca20650ef7fd10cdcac7b8b4cf47`。[Windows 1.3.2 更新清单归档](https://api.microi.net/microi-code/updates/archive/1.3.2/latest.yml)。发布后已完整下载并核对大小、SHA256 和 SHA512。
 
 ### v1.3.2 - (2026-10-01)
 
@@ -946,12 +946,12 @@ npm run publish:cli:resume
 
 | 文件 | 用途 | 大小 |
 | --- | --- | --- |
-| [Universal DMG](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.dmg) | 手动安装 | 380,707,421 字节 |
-| [Universal ZIP](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.zip) | 自动更新 | 424,992,762 字节 |
+| [Universal DMG](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.dmg) | 手动安装 | 380,707,421 字节 |
+| [Universal ZIP](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.2/requests/68e890672ce07a22a0296500c4ec88a6d62ee0d91729729279dc8348a6ee1e77/assets/Microi-Agent-1.3.2-mac-universal.zip) | 自动更新 | 424,992,762 字节 |
 
 - DMG SHA256：`2bb4ba682de125cfefae90251527ff48b97d8ce504f0f1f4110998e661f9d675`。
 - ZIP SHA256：`7726972144f5b118faaf81fe1b023da174b67c92b789a131e2bc1aeb31ffef62`。
-- [1.3.2 macOS 更新清单归档](https://api.itdos.com/microi-code/updates/archive/1.3.2/latest-mac.yml)。
+- [1.3.2 macOS 更新清单归档](https://api.microi.net/microi-code/updates/archive/1.3.2/latest-mac.yml)。
 
 ### 开发工具 v5.8.0 - (2026-10-01)
 
@@ -963,7 +963,7 @@ npm run publish:cli:resume
 - **合并另一台电脑的端口修复**：合并 GitLab master 提交 `084e075`，保留双方代码及开发工具 5.7.8。本机 Harness 与手机配对监听避开浏览器禁止端口；自动命中时最多重选 32 次，显式配置禁止端口立即报错，真实占用和权限错误继续保留。
 - **保留回环连接恢复和二开**：继续保留 1.3.0 的受限 IPv6 回环恢复、双通道实际 HTTP 验证、监听诊断、吾码品牌、工作区、会话与本机配置；1.3.0 安装包保持归档，macOS Universal 1.2.2 签名发行与清单保持原样。
 - **重新测试并构建**：合并后类型检查、生产构建通过，串行 Vitest 1018 项通过、10 项按平台条件跳过。真实 Harness/Chromium 通过 8 项检查，普通/安全模式共四次冷启动约 4.3–11.9 秒；构建前后 1484 个源码和资源输入哈希一致。**客户 Windows 原生安装与启动仍待确认**。
-- **Windows 下载与校验**：通过 `microi_itdos` 发布官方下载应用 v1.3.1；本包未签名，安装包 154,956,328 字节，SHA-256 为 `2d76b5d148ea8d26da41d1877a95293837737cee36d95cc80df091befc1feb3c`。[不可变 EXE](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.1/requests/f9f26f0bea6edc7ca0113fcd90b06026d6ea61ba7138e25bfbed1502d7d34c87/assets/Microi-Agent-1.3.1-windows-x64-setup.exe)与[更新清单归档](https://api.itdos.com/microi-code/updates/archive/1.3.1/latest.yml)可独立校验。
+- **Windows 下载与校验**：通过 `microi_itdos` 发布官方下载应用 v1.3.1；本包未签名，安装包 154,956,328 字节，SHA-256 为 `2d76b5d148ea8d26da41d1877a95293837737cee36d95cc80df091befc1feb3c`。[不可变 EXE](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.1/requests/f9f26f0bea6edc7ca0113fcd90b06026d6ea61ba7138e25bfbed1502d7d34c87/assets/Microi-Agent-1.3.1-windows-x64-setup.exe)与[更新清单归档](https://api.microi.net/microi-code/updates/archive/1.3.1/latest.yml)可独立校验。
 
 ### v1.3.0 - (2026-10-01)
 
@@ -971,7 +971,7 @@ npm run publish:cli:resume
 - **补齐监听与版本诊断**：日志记录实际应用版本、平台、监听地址、地址族及子进程内 HTTP 自检。探测不发送 Cookie、不跟随重定向，不把启动地址中的 Token 写入新增诊断。IPv6 不可用时保留明确错误，不无限循环或误导用户卸载插件。
 - **保留二开与并发成果**：合并 GitLab master 的 1.2.9 修复及交接记录，保留本机 Skills 同步；保护新增运行代码、依赖补丁与回归文件，继续保留工作区、会话、账号、品牌及 MCP。官网下载永久 latest 入口，版本日志移至本页最下方；同期已发布的 macOS Universal 1.2.2 签名发行与清单继续保留。
 - **完成开发验收**：类型检查与生产构建通过，串行 Vitest 1013 项通过、10 项按平台条件跳过；真实 Harness 与 Chromium 覆盖普通/安全模式各自的 Node 失败和 IPv4 双通道失败，共四次冷启动。该真实页面验收在 MacBook 上执行，**客户 Windows 原生安装与启动仍待确认**。
-- **发布 Windows x64 安装包**：通过 `microi_itdos` 发布官方下载应用 v1.3.0，安装包 154,963,108 字节，SHA-256 为 `3a269fb188d526d33eb48334788e7c6a16bf20795d252ecfbace24e9d0956b63`。本包未签名；[不可变 EXE](https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.0/requests/4d8c1107cf309fa37a27405166cba140ef1d3f04011116badaa229f1580d206c/assets/Microi-Agent-1.3.0-windows-x64-setup.exe)与[更新清单归档](https://api.itdos.com/microi-code/updates/archive/1.3.0/latest.yml)可独立校验。
+- **发布 Windows x64 安装包**：通过 `microi_itdos` 发布官方下载应用 v1.3.0，安装包 154,963,108 字节，SHA-256 为 `3a269fb188d526d33eb48334788e7c6a16bf20795d252ecfbace24e9d0956b63`。本包未签名；[不可变 EXE](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.0/requests/4d8c1107cf309fa37a27405166cba140ef1d3f04011116badaa229f1580d206c/assets/Microi-Agent-1.3.0-windows-x64-setup.exe)与[更新清单归档](https://api.microi.net/microi-code/updates/archive/1.3.0/latest.yml)可独立校验。
 
 ### v1.2.9 - (2026-10-01)
 
@@ -1066,9 +1066,9 @@ npm run publish:cli:resume
 
 | 文件 | 用途 | 大小 |
 | --- | --- | --- |
-| [Universal DMG](https://static.itdos.com/itdos/micro-app/microi-code-downloads/v1.2.2/Microi-Agent-1.2.2-mac-universal.dmg) | 手动安装 | 380,982,170 字节 |
-| [Universal ZIP](https://static.itdos.com/itdos/micro-app/microi-code-downloads/v1.2.2/Microi-Agent-1.2.2-mac-universal.zip) | 自动更新 | 425,475,466 字节 |
+| [Universal DMG](https://file.microi.net/itdos/micro-app/microi-code-downloads/v1.2.2/Microi-Agent-1.2.2-mac-universal.dmg) | 手动安装 | 380,982,170 字节 |
+| [Universal ZIP](https://file.microi.net/itdos/micro-app/microi-code-downloads/v1.2.2/Microi-Agent-1.2.2-mac-universal.zip) | 自动更新 | 425,475,466 字节 |
 
 - DMG SHA-256：`273cb60b06d032e9f3f7951ade0d50c96e978b160a3eee0de28efc9ed8c9a3e4`
 - ZIP SHA-256：`577f637fad51837b46f604edf09dafec09a6cccb0574e88bee35ae61875e9a24`
-- [1.2.2 更新清单归档](https://api.itdos.com/microi-code/updates/archive/1.2.2/latest-mac.yml)。旧版未签名安装包继续保留在版本记录中。
+- [1.2.2 更新清单归档](https://api.microi.net/microi-code/updates/archive/1.2.2/latest-mac.yml)。旧版未签名安装包继续保留在版本记录中。

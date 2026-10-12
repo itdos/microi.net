@@ -38,11 +38,25 @@ function joinBase(base, path) {
   return normalizedBase ? `${normalizedBase}/${path.replace(/^\/+/, '')}` : path
 }
 
+// 官方服务可能继续返回旧域名；只迁移无签名参数的公开 HTTPS 地址。
+// 私有签名 URL 的 Host 可能参与签名，必须保留原件。
+export function resolveOfficialPublicFileAlias(value) {
+  try {
+    const url = new URL(value)
+    if (url.protocol === 'https:' && url.hostname === 'static.itdos.com'
+      && !url.port && !url.username && !url.password && !url.search && !url.hash) {
+      url.hostname = 'file.microi.net'
+      return url.href
+    }
+  } catch { /* 相对路径由调用者按租户文件服务解析。 */ }
+  return value
+}
+
 export function resolveUploadedResourceUrl(value, runtime = {}) {
   const path = normalizeUploadPath(value)
   if (!path) return ''
-  if (/^(?:https?:|data:|blob:)/i.test(path)) return path
-  if (/^\/\//.test(path)) return `https:${path}`
+  if (/^(?:https?:|data:|blob:)/i.test(path)) return resolveOfficialPublicFileAlias(path)
+  if (/^\/\//.test(path)) return resolveOfficialPublicFileAlias(`https:${path}`)
 
   const apiBase = String(runtime.apiBase || runtime.baseUrl || '').trim()
   // /file/ 和协议 v3 的 /micro-app/v3/ 都是 API 动态解析路由，不是
