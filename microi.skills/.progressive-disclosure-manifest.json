@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-12T19:47:27.467Z",
+  "generatedAt": "2026-10-12T21:56:37.756Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2770,17 +2770,17 @@
       ]
     },
     "v8-mq-mqtt": {
-      "originalSha256": "5a641621f24ccda6aa0e881c2daefae6012d655b55f25c6e170a62f916edf9ea",
+      "originalSha256": "d5dff494f91a38acc3cbc188272be262c0403e8177b4101c5100590f3e320947",
       "originalLines": 339,
-      "prefixSha256": "68fdfbe24123f9db65e6b926f2d0aab6309032e99b7b24c4024324de36c43201",
-      "prefixBytes": 864,
+      "prefixSha256": "47f1f0de3acd2abd1129754fcf329129358d4d078d07b033d80b5447dc879886",
+      "prefixBytes": 853,
       "entryLines": 179,
       "chunks": [
         {
           "id": "v8-mq-mqtt-000",
           "ordinal": 0,
           "destination": "v8-mq-mqtt/SKILL.md",
-          "sha256": "bc9ac85a8a0b6af88602e0d5419f6d61b192b5262193f6cb8c8ebd26af7bef25",
+          "sha256": "4a6559aed1af036591a04002c6e3311d9f0957fbbabbcafdc4a6bad95dabd843",
           "lines": 140,
           "heading": "V8.MQ — RabbitMQ 消息队列"
         },
@@ -2788,7 +2788,7 @@
           "id": "v8-mq-mqtt-001",
           "ordinal": 2,
           "destination": "v8-mq-mqtt/SKILL.md",
-          "sha256": "5e42facc0cf07b546ec816cd9127126ce5adaaa03d14053991d063922fc5c9fb",
+          "sha256": "dcf641877c01b65104fbd9b7d5022a9b7b656a6461895d499ab06af9d2bb7d0c",
           "lines": 14,
           "heading": "注意事项"
         },
@@ -2796,7 +2796,7 @@
           "id": "v8-mq-mqtt-002",
           "ordinal": 1,
           "destination": "v8-mq-mqtt/references/progressive-01-v8-mqtt-iot-物联网.md",
-          "sha256": "24e28545025cf03d9a91cce8081fbe566e5f8ae56ff2885111238f684c276cd1",
+          "sha256": "7deedee3e9e4459b26236d70baac1ca909ba31e1c9e53e8e475c60a394c0b487",
           "lines": 176,
           "heading": "V8.MQTT — IoT 物联网"
         }
@@ -2811,11 +2811,11 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "3215b5a1ec3a2db5c939423f8a2f576841b83e686bd6d17827aec9bafa97479c",
-      "originalLines": 541,
-      "prefixSha256": "ae7c8a8186001cdf9fd0a932afa703574a7838b925a339b1f2c1f6b3f53450d6",
-      "prefixBytes": 5046,
-      "entryLines": 225,
+      "originalSha256": "a779644767d44205075cd7000eda92a867b52be1470783ac3ac3535c2aa13fa7",
+      "originalLines": 544,
+      "prefixSha256": "f1fd47e9e779cd5bc0987c6ee1dc6e3c698551c954c8fd7878114edbb8994e86",
+      "prefixBytes": 5557,
+      "entryLines": 228,
       "chunks": [
         {
           "id": "v8-security-000",

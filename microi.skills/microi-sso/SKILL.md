@@ -20,6 +20,7 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 Microi 登录调用官方 OIDC 身份服务：官方端按每个部署登记独立公共客户端、`ClientAuthMethod=none`、
 精确回调、PKCE S256 与 nonce；客户端侧不创建普通 `diy_sso` 连接或共享 ClientSecret。
 官方客户端实例与用户绑定不是平台应用包种子，登记和真实授权验收须独立记录。
+公共客户端逐次确认、`prompt=none` 错误与不消费请求的 Preview 规则见 [references/outbound.md](references/outbound.md)。
 
 ## 先读取什么
 
