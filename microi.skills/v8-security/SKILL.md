@@ -25,6 +25,9 @@ Microi 官方账号登录属于固定外部 Provider `Microi`，复用个人中�
 官方校验客户端、精确回调、授权码期限和 verifier，本地校验一次性 state、Bearer 类型及非空稳定 UserInfo `sub`，
 按 `Microi + sub` 精确绑定当前租户既有本地用户，不按邮箱/昵称认领、不自动授予角色。
 官方普通账号不能因此读取本地租户业务数据；未绑定、解绑、用户停用均拒绝登录。
+官方公共客户端每次明确确认授权，即使已有 Provider Session；调用方删改 prompt 不能绕过。
+`prompt=none` 返回 `interaction_required` 与已校验的 redirect/state；`Preview=true` 只读授权卡片、不消费请求、不签发 code，确认时才原子消费。
+Preview 和确认均重验当前客户端、回调及 Scope；账号变化通过 `ExpectedUserId` 拒绝，授权身份始终来自当前 DiyToken。完整边界与回归见 `../microi-sso/references/outbound.md`。
 应用包交付 `sys_config` 字段、私有空模板与 Managed 绑定白名单，不包含官方客户端实例或用户绑定；
 先升级前后端和系统设置/SaaS 应用，再登记客户端并真实验证绑定、登录、解绑及隐藏入口。
 通用 MCP Schema、字段、私密配置、接口引擎与商城工具足够完成配置，无需新增 Microi 专用管理工具。
