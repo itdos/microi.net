@@ -22,6 +22,39 @@ public sealed class SsoCanonicalEndpointTests
     }
 
     [Theory]
+    [InlineData(null, true, "consent")]
+    [InlineData("", true, "consent")]
+    [InlineData("none", true, "interaction_required")]
+    [InlineData("login", true, "consent")]
+    [InlineData("select_account", true, "consent")]
+    [InlineData("none consent", true, "consent")]
+    [InlineData("consent", true, "consent")]
+    [InlineData(null, false, "consent")]
+    [InlineData("none", false, "interaction_required")]
+    public void PublicClient_AlwaysRequiresExplicitConsent_RegardlessOfCallerPromptOrProviderSession(
+        string? prompt, bool hasProviderSession, string expected)
+    {
+        Assert.Equal(expected, Invoke("ResolveOidcAuthorizationInteraction", CurrentClient(), prompt, hasProviderSession));
+    }
+
+    [Theory]
+    [InlineData("client_secret_basic", null, true, "authorize")]
+    [InlineData("client_secret_basic", "none", true, "authorize")]
+    [InlineData("client_secret_basic", "consent", true, "consent")]
+    [InlineData("client_secret_basic", null, false, "consent")]
+    [InlineData("client_secret_basic", "none", false, "login_required")]
+    [InlineData("client_secret_post", null, true, "authorize")]
+    [InlineData("client_secret_post", "none", true, "authorize")]
+    [InlineData("client_secret_post", "consent", true, "consent")]
+    public void ConfidentialClient_PreservesExistingProviderSessionAndExplicitConsentBehavior(
+        string method, string? prompt, bool hasProviderSession, string expected)
+    {
+        var client = CurrentClient();
+        client.ClientAuthMethod = method;
+        Assert.Equal(expected, Invoke("ResolveOidcAuthorizationInteraction", client, prompt, hasProviderSession));
+    }
+
+    [Theory]
     [InlineData(true, "openid profile email", "openid profile email", true)]
     [InlineData(true, "email openid profile", "openid profile email", true)]
     [InlineData(true, "openid profile email", "openid profile", false)]

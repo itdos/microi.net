@@ -280,8 +280,8 @@ namespace Microi.net
             var pending = NewPendingAuthorization(tenant.Data, connection, client_id, redirect_uri,
                 string.Join(" ", scopes), state, nonce, code_challenge);
             var session = await GetProviderSessionAsync(tenant.Data).ConfigureAwait(false);
-            // 显式 consent 必须展示目标与最小资料范围，不能因已有 OP 会话而跳过确认。
-            if (session != null && !string.Equals(prompt, "consent", StringComparison.Ordinal))
+            var interaction = ResolveOidcAuthorizationInteraction(connection, prompt, session != null);
+            if (interaction == "authorize")
             {
                 var redirect = await CompletePendingAuthorizationAsync(pending, session.CurrentUser,
                     session.AuthTime).ConfigureAwait(false);
@@ -289,13 +289,27 @@ namespace Microi.net
                     ? Redirect(redirect.Data)
                     : OidcError(redirect_uri, state, "server_error", redirect.Msg);
             }
-            if (string.Equals(prompt, "none", StringComparison.Ordinal))
-                return OidcError(redirect_uri, state, "login_required", "Microi sign-in is required");
+            if (interaction != "consent")
+                return OidcError(redirect_uri, state, interaction,
+                    interaction == "interaction_required" ? "explicit consent is required" : "Microi sign-in is required");
             var requestId = SsoSecurity.NewOpaqueValue();
             var saved = await Cache(tenant.Data).StringSetAsync(AuthorizationRequestKey(tenant.Data, requestId),
                 JsonConvert.SerializeObject(pending), AuthorizationRequestLifetime, When.NotExists).ConfigureAwait(false);
             if (!saved) return OidcError(redirect_uri, state, "temporarily_unavailable", "authorization state failed");
             return Redirect(BuildFrontendAuthorizationUrl(tenant.Data, requestId));
+        }
+
+        private static string ResolveOidcAuthorizationInteraction(
+            SsoConnectionOptions client, string prompt, bool hasProviderSession)
+        {
+            // 公开客户端不能靠删改 prompt 跳过官方确认；Authorize 已强制本次 PKCE。
+            // 公开客户端的 prompt=none 返回交互错误，私密客户端继续复用已有 OP 会话。
+            var requiresConsent = string.Equals(client?.ClientAuthMethod, "none", StringComparison.Ordinal);
+            if (hasProviderSession && !requiresConsent && !string.Equals(prompt, "consent", StringComparison.Ordinal))
+                return "authorize";
+            if (string.Equals(prompt, "none", StringComparison.Ordinal))
+                return requiresConsent ? "interaction_required" : "login_required";
+            return "consent";
         }
 
         public async Task<IActionResult> Token(string OsClient)
