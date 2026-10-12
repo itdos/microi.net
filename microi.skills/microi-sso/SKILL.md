@@ -16,7 +16,10 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 - 修改 `diy_sso`、SSO 登录页、OIDC/SAML/CAS 接口引擎端点、Claim/角色映射或旧 Token SSO。
 - 发布、安装、升级或验收官方商城应用 `app.microi.sso`。
 
-固定 Gitee、微信、GitHub 登录与 Passkey/TOTP 仍以 `v8-security` 为主；当需求是可配置企业身份联邦时转到本 Skill。
+固定 Microi、Gitee、微信、GitHub 登录与 Passkey/TOTP 仍以 `v8-security` 为主；当需求是可配置企业身份联邦时转到本 Skill。
+Microi 登录调用官方 OIDC 身份服务：官方端按每个部署登记独立公共客户端、`ClientAuthMethod=none`、
+精确回调、PKCE S256 与 nonce；客户端侧不创建普通 `diy_sso` 连接或共享 ClientSecret。
+官方客户端实例与用户绑定不是平台应用包种子，登记和真实授权验收须独立记录。
 
 ## 先读取什么
 

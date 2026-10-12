@@ -17,7 +17,7 @@ using StackExchange.Redis;
 namespace Microi.net
 {
     /// <summary>
-    /// Gitee、微信开放平台扫码和 GitHub 登录的最小协议网关。
+    /// Microi 官方帐号、Gitee、微信开放平台扫码和 GitHub 登录的最小协议网关。
     /// 外部身份只负责证明已绑定主体，最终平台会话始终由 DiyToken 签发。
     /// </summary>
     public sealed class ExternalLoginRuntime : IPlatformApiRuntime
@@ -89,6 +89,9 @@ namespace Microi.net
             public string RedirectUri { get; set; }
             public string CreatedAt { get; set; }
             public string ExpiresAt { get; set; }
+            public string ClientId { get; set; }
+            public string CodeVerifier { get; set; }
+            public string Nonce { get; set; }
         }
 
         private sealed class ExternalProfile
@@ -112,7 +115,9 @@ namespace Microi.net
             if (provider == null || !provider.Enabled)
                 return Json(new DosResult(0, null, "当前租户未启用该登录方式。"));
             if (!provider.Configured)
-                return Json(new DosResult(0, null, "该登录方式尚未完成 ClientId/Secret 配置。"));
+                return Json(new DosResult(0, null, provider.Key == "Microi"
+                    ? "请先登记本系统的 Microi 登录应用并配置 ClientId。"
+                    : "该登录方式尚未完成 ClientId/Secret 配置。"));
 
             var mode = string.Equals(request?.Mode, "Bind", StringComparison.OrdinalIgnoreCase) ? "Bind" : "Login";
             string userId = null;
@@ -142,13 +147,19 @@ namespace Microi.net
                 ReturnOrigin = returnOrigin,
                 RedirectUri = redirectUri,
                 CreatedAt = now.ToString("O"),
-                ExpiresAt = now.Add(StateLifetime).ToString("O")
+                ExpiresAt = now.Add(StateLifetime).ToString("O"),
+                ClientId = provider.ClientId,
+                // PKCE 私有材料只放租户共享 Redis；不能进入浏览器、V8 参数或日志。
+                CodeVerifier = provider.Key == "Microi" ? SsoSecurity.CreatePkceVerifier() : null,
+                Nonce = provider.Key == "Microi" ? SsoSecurity.NewOpaqueValue() : null
             };
             var written = await MicroiEngine.CacheTenant.Cache(osClient).GetIDatabase()
                 .StringSetAsync(StateKey(osClient, stateValue), JsonConvert.SerializeObject(state), StateLifetime, When.NotExists)
                 .ConfigureAwait(false);
             if (!written) return Json(new DosResult(0, null, "外部登录安全状态创建失败，请重试。"));
-            var authorizeUrl = BuildAuthorizeUrl(provider, redirectUri, stateValue);
+            var authorizeUrl = provider.Key == "Microi"
+                ? BuildMicroiAuthorizeUrl(provider, redirectUri, stateValue, state.CodeVerifier, state.Nonce)
+                : BuildAuthorizeUrl(provider, redirectUri, stateValue);
             return Json(new DosResult(1, new
             {
                 Provider = provider.Key,
@@ -183,11 +194,13 @@ namespace Microi.net
             }
 
             var provider = ExternalLoginProviderCatalog.ResolveOne(OsClient, Provider);
-            if (provider == null || !provider.Configured)
+            if (provider == null || !provider.Configured
+                || (provider.Key == "Microi" && (!FixedEquals(provider.ClientId, stateModel.ClientId)
+                    || string.IsNullOrWhiteSpace(stateModel.CodeVerifier))))
                 return PopupResult(stateModel.ReturnOrigin, Provider, false, "登录方式已停用或配置已变更。", null);
             try
             {
-                var profile = await ExchangeProfileAsync(provider, code, stateModel.RedirectUri).ConfigureAwait(false);
+                var profile = await ExchangeProfileAsync(provider, code, stateModel.RedirectUri, stateModel.CodeVerifier).ConfigureAwait(false);
                 if (profile == null || profile.Subject.DosIsNullOrWhiteSpace())
                     return PopupResult(stateModel.ReturnOrigin, Provider, false, "外部平台未返回可绑定的用户身份。", null);
                 if (stateModel.Mode == "Bind")
@@ -270,6 +283,7 @@ namespace Microi.net
                     ["OsClient"] = OsClient,
                     ["UserId"] = userId,
                     ["Provider"] = provider.Key,
+                    ["ClientId"] = provider.ClientId,
                     ["ExpiresAt"] = DateTimeOffset.UtcNow.Add(LoginTicketLifetime).ToString("O")
                 };
                 var saved = await MicroiEngine.CacheTenant.Cache(OsClient).GetIDatabase()
@@ -307,6 +321,10 @@ namespace Microi.net
             {
                 return Json(new DosResult(0, null, "外部登录票据不存在、已过期或已使用。"));
             }
+            // 回调成功与票据消费可发生在不同节点；期间停用供应商必须立即阻止登录。
+            var currentProvider = ExternalLoginProviderCatalog.ResolveOne(osClient, payload["Provider"]?.ToString());
+            if (!IsProviderTicketValid(currentProvider, payload))
+                return Json(new DosResult(0, null, "登录方式已停用或配置已变更。"));
             var user = await GetEnabledUserForTokenAsync(osClient, payload["UserId"]?.ToString()).ConfigureAwait(false);
             if (user == null) return Json(new DosResult(0, null, "系统用户不存在或已停用。"));
             QueueAudit(osClient, user["Id"]?.ToString(), "ExternalLogin", true, payload["Provider"]?.ToString(), null);
@@ -363,7 +381,8 @@ namespace Microi.net
         private async Task<ExternalProfile> ExchangeProfileAsync(
             ExternalLoginProviderOptions provider,
             string code,
-            string redirectUri)
+            string redirectUri,
+            string codeVerifier = null)
         {
             var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(20);
@@ -399,23 +418,50 @@ namespace Microi.net
             var form = new Dictionary<string, string>
             {
                 ["client_id"] = provider.ClientId,
-                ["client_secret"] = provider.ClientSecret,
                 ["code"] = code,
                 ["redirect_uri"] = redirectUri
             };
-            if (provider.Key == "Gitee") form["grant_type"] = "authorization_code";
+            if (provider.Key == "Microi")
+            {
+                // 官方标准公开客户端：Secret 不出服务端、不共享，授权码与本次 PKCE 绑定。
+                _ = SsoSecurity.CreatePkceChallenge(codeVerifier);
+                form["grant_type"] = "authorization_code";
+                form["code_verifier"] = codeVerifier;
+            }
+            else
+            {
+                form["client_secret"] = provider.ClientSecret;
+                if (provider.Key == "Gitee") form["grant_type"] = "authorization_code";
+            }
             using (var tokenRequest = new HttpRequestMessage(HttpMethod.Post, provider.TokenEndpoint))
             {
                 tokenRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 tokenRequest.Content = new FormUrlEncodedContent(form);
                 var tokenJson = await ReadJsonAsync(client, tokenRequest).ConfigureAwait(false);
                 accessToken = tokenJson["access_token"]?.ToString();
+                if (provider.Key == "Microi" && !string.Equals(tokenJson["token_type"]?.ToString(), "Bearer", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("MicroiTokenTypeInvalid");
             }
             if (accessToken.DosIsNullOrWhiteSpace()) throw new InvalidOperationException("OAuthTokenExchangeFailed");
             using var profileRequest = new HttpRequestMessage(HttpMethod.Get, provider.UserInfoEndpoint);
             profileRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
             profileRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             var user = await ReadJsonAsync(client, profileRequest).ConfigureAwait(false);
+            if (provider.Key == "Microi")
+            {
+                // 主体只信任固定官方 UserInfo 的 sub，不能按昵称、邮箱、账号自动绑定。
+                var subject = user["sub"]?.Type == JTokenType.String ? user["sub"].ToString() : null;
+                if (string.IsNullOrWhiteSpace(subject) || subject.Length > 512)
+                    throw new InvalidOperationException("MicroiSubjectInvalid");
+                return new ExternalProfile
+                {
+                    Subject = subject,
+                    AccountName = user["preferred_username"]?.ToString(),
+                    DisplayName = user["name"]?.ToString() ?? user["preferred_username"]?.ToString(),
+                    Email = user["email"]?.ToString(),
+                    Avatar = user["picture"]?.ToString()
+                };
+            }
             return new ExternalProfile
             {
                 Subject = user["id"]?.ToString(),
@@ -477,6 +523,21 @@ namespace Microi.net
                         + "&state=" + Uri.EscapeDataString(state);
             return provider.AuthorizationEndpoint + "?" + query
                    + (provider.Key == "WeChat" ? "#wechat_redirect" : string.Empty);
+        }
+
+        private static string BuildMicroiAuthorizeUrl(ExternalLoginProviderOptions provider, string redirectUri,
+            string state, string codeVerifier, string nonce)
+        {
+            return BuildAuthorizeUrl(provider, redirectUri, state)
+                   + "&code_challenge=" + Uri.EscapeDataString(SsoSecurity.CreatePkceChallenge(codeVerifier))
+                   + "&code_challenge_method=S256&nonce=" + Uri.EscapeDataString(nonce)
+                   + "&prompt=consent";
+        }
+
+        private static bool IsProviderTicketValid(ExternalLoginProviderOptions provider, JObject payload)
+        {
+            return provider?.Configured == true && payload != null
+                   && (provider.Key != "Microi" || FixedEquals(provider.ClientId, payload["ClientId"]?.ToString()));
         }
 
         private string ResolveReturnOrigin(string requested)

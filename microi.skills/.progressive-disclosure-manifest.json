@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-11T10:58:19.511Z",
+  "generatedAt": "2026-10-12T19:47:27.467Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2811,11 +2811,11 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "a5c5927a37fdd2547dcc7ed1941f4320613fb6414e0f4310d4490a1f5bb84a4e",
-      "originalLines": 527,
-      "prefixSha256": "e6bd4da404004b3012d17b6a389b62c320002b8b2fa3d88cc6e6e52ae55f4763",
-      "prefixBytes": 3432,
-      "entryLines": 211,
+      "originalSha256": "3215b5a1ec3a2db5c939423f8a2f576841b83e686bd6d17827aec9bafa97479c",
+      "originalLines": 541,
+      "prefixSha256": "ae7c8a8186001cdf9fd0a932afa703574a7838b925a339b1f2c1f6b3f53450d6",
+      "prefixBytes": 5046,
+      "entryLines": 225,
       "chunks": [
         {
           "id": "v8-security-000",

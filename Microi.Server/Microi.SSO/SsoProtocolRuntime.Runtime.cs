@@ -160,6 +160,32 @@ namespace Microi.net
                    && expires > DateTimeOffset.UtcNow;
         }
 
+        private static bool IsExpectedAuthorizationUser(string expectedUserId, string currentUserId) =>
+            string.IsNullOrWhiteSpace(expectedUserId) || SsoSecurity.FixedEquals(expectedUserId, currentUserId);
+
+        private static bool IsOutboundScopeAllowed(string requested, IReadOnlyList<string> allowed)
+        {
+            var normalized = SsoSecurity.NormalizeScopes(requested, allowed, requireOpenId: true);
+            var original = (requested ?? string.Empty).Split(new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal);
+            // 必须完整集合仍获允许；不得过滤后继续使用旧 payload.Scope 签发已撤回资料。
+            return normalized.Count > 0 && new HashSet<string>(normalized, StringComparer.Ordinal).SetEquals(original);
+        }
+
+        private static bool IsCurrentOutboundGrantAllowed(
+            SsoConnectionOptions client, string clientId, string scope) =>
+            client?.Enabled == true && client.IsOutbound && client.Protocol == "OIDC"
+            && SsoSecurity.FixedEquals(client.ClientId, clientId)
+            && IsOutboundScopeAllowed(scope, client.Scopes);
+
+        private static bool IsOutboundAuthorizationCodeAllowed(
+            SsoConnectionOptions client, string clientId, string redirectUri, string scope,
+            string requestedRedirectUri) =>
+            IsCurrentOutboundGrantAllowed(client, clientId, scope)
+            && SsoSecurity.FixedEquals(redirectUri, requestedRedirectUri)
+            && SsoSecurity.IsExactRedirectUriAllowed(redirectUri, client.RedirectUris,
+                client.AllowLoopbackRedirectUri);
+
         private static bool IsOpaque(string value)
         {
             if (value.DosIsNullOrWhiteSpace() || value.Length < 20 || value.Length > 256) return false;
@@ -190,13 +216,59 @@ namespace Microi.net
             });
         }
 
-        private string BuildProviderIssuer(string osClient) =>
-            $"{Request.Scheme}://{Request.Host}{Request.PathBase}/sso/{Uri.EscapeDataString(osClient)}".TrimEnd('/');
+        private string BuildProviderIssuer(string osClient)
+        {
+            var config = TenantSystemSettingsSecurity.LoadTenantSysConfigSnapshot(osClient);
+            return BuildProviderIssuer(config["ApiBase"]?.ToString(), Request.Scheme,
+                       Request.Host.Value, Request.PathBase.Value, osClient)
+                   ?? throw new InvalidOperationException("SSO 公网 ApiBase 必须是有效的 HTTPS 地址。");
+        }
+
+        // 代理内部 HTTP 和 Host 不是对外身份标识。权威 ApiBase 同时决定 Discovery、
+        // id_token issuer 和协议端点；空配置的旧部署保留直接 HTTPS/本机 HTTP 兼容。
+        private static string BuildProviderIssuer(string configuredApiBase, string requestScheme,
+            string requestHost, string requestPathBase, string osClient)
+        {
+            var root = ResolveCanonicalProviderBase(configuredApiBase, requestScheme, requestHost, requestPathBase);
+            return root == null ? null : root + "/sso/" + Uri.EscapeDataString(osClient);
+        }
+
+        private static string ResolveCanonicalProviderBase(string configuredApiBase, string requestScheme,
+            string requestHost, string requestPathBase)
+        {
+            var configured = (configuredApiBase ?? string.Empty).Trim();
+            var value = configured.Length > 0 ? configured : $"{requestScheme}://{requestHost}{requestPathBase}";
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query)
+                || !string.IsNullOrEmpty(uri.Fragment)
+                || !(uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback))
+                return null;
+            return uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
+        }
 
         private string BuildFrontendAuthorizationUrl(string osClient, string requestId)
         {
-            var root = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/";
-            return root + "?OsClient=" + Uri.EscapeDataString(osClient)
+            var config = TenantSystemSettingsSecurity.LoadTenantSysConfigSnapshot(osClient);
+            return BuildFrontendAuthorizationUrl(config["ApiBase"]?.ToString(), Request.Scheme,
+                       Request.Host.Value, Request.PathBase.Value, osClient, requestId)
+                   ?? throw new InvalidOperationException("SSO 公网 ApiBase 必须是有效的 HTTPS 地址。");
+        }
+
+        private static string BuildFrontendAuthorizationUrl(string configuredApiBase, string requestScheme,
+            string requestHost, string requestPathBase, string osClient, string requestId)
+        {
+            var root = ResolveCanonicalProviderBase(configuredApiBase, requestScheme, requestHost, requestPathBase);
+            if (root == null) return null;
+            // 只把已配置的官方租户引向官网，不允许客户端 Host/代理头把其它部署变成官方身份源。
+            if (!string.IsNullOrWhiteSpace(configuredApiBase)
+                && string.Equals(osClient, "iTdos", StringComparison.OrdinalIgnoreCase)
+                && Uri.TryCreate(root, UriKind.Absolute, out var configured)
+                && configured.Scheme == Uri.UriSchemeHttps
+                && configured.IsDefaultPort
+                && (string.Equals(configured.Host, "api.microi.net", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(configured.Host, "api.itdos.com", StringComparison.OrdinalIgnoreCase)))
+                return "https://microi.net/microi-authorize.html?request=" + Uri.EscapeDataString(requestId);
+            return root + "/?OsClient=" + Uri.EscapeDataString(osClient)
                    + "#/sso-authorize?request=" + Uri.EscapeDataString(requestId);
         }
 
@@ -430,7 +502,8 @@ namespace Microi.net
             var client = await FindOutboundClientAsync(pending.OsClient, "OIDC", pending.ClientId).ConfigureAwait(false);
             if (client == null
                 || !SsoSecurity.IsExactRedirectUriAllowed(pending.RedirectUri, client.RedirectUris,
-                    client.AllowLoopbackRedirectUri))
+                    client.AllowLoopbackRedirectUri)
+                || !IsOutboundScopeAllowed(pending.Scope, client.Scopes))
                 return new DosResult<string>(0, null, "OIDC 客户端或回调地址已变更。");
             var code = SsoSecurity.NewOpaqueValue(48);
             var now = DateTimeOffset.UtcNow;

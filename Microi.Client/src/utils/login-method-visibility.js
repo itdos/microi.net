@@ -1,6 +1,7 @@
 export const LOGIN_METHOD_DISABLED_SETTINGS = Object.freeze({
     Passkey: "DisableLoginPasskey",
     Totp: "DisableLoginAuthenticator",
+    Microi: "DisableLoginMicroi",
     Gitee: "DisableLoginGitee",
     WeChat: "DisableLoginWeChat",
     GitHub: "DisableLoginGitHub"
@@ -9,6 +10,7 @@ export const LOGIN_METHOD_DISABLED_SETTINGS = Object.freeze({
 const LEGACY_LOGIN_METHOD_DISPLAY_SETTINGS = Object.freeze({
     Passkey: ["LoginPasskeyDisplay", "Login.Passkey.Display"],
     Totp: ["LoginAuthenticatorDisplay", "Login.Authenticator.Display"],
+    Microi: ["LoginMicroiDisplay", "Login.Microi.Display"],
     Gitee: ["LoginGiteeDisplay", "Login.Gitee.Display"],
     WeChat: ["LoginWeChatDisplay", "Login.WeChat.Display"],
     GitHub: ["LoginGitHubDisplay", "Login.GitHub.Display"]

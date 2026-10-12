@@ -24,9 +24,10 @@ namespace Microi.net
         public string TokenEndpoint { get; set; }
         public string UserInfoEndpoint { get; set; }
         public int Sort { get; set; }
+        // Microi 使用每个部署独立登记的公开客户端与 PKCE，不下发全平台共用 Secret。
         public bool Configured => Enabled
                                   && !string.IsNullOrWhiteSpace(ClientId)
-                                  && !string.IsNullOrWhiteSpace(ClientSecret);
+                                  && (Key == "Microi" || !string.IsNullOrWhiteSpace(ClientSecret));
     }
 
     public static class ExternalLoginProviderCatalog
@@ -42,6 +43,9 @@ namespace Microi.net
 
             return new[]
             {
+                Create(sysConfig, settings, model, "Microi", "Microi 登录", "使用 microi.net 官方帐号登录已绑定的本系统帐号", "oauth", "microi", 25,
+                    "https://api.microi.net/sso/iTdos/authorize", "https://api.microi.net/sso/iTdos/token",
+                    "https://api.microi.net/sso/iTdos/userinfo", "openid profile email", null, null),
                 Create(sysConfig, settings, model, "Gitee", "Gitee 登录", "使用已绑定的 Gitee 身份安全登录", "oauth", "gitee", 30,
                     "https://gitee.com/oauth/authorize", "https://gitee.com/oauth/token", "https://gitee.com/api/v5/user",
                     "user_info", "GiteeOAuthClientId", "GiteeOAuthClientSecret"),

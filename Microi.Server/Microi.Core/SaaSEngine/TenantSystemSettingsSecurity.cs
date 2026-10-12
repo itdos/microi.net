@@ -55,11 +55,13 @@ namespace Microi.net
                 "Login.Gitee.Enabled",
                 "Login.WeChat.Enabled",
                 "Login.GitHub.Enabled",
+                "Login.Microi.Enabled",
                 "Login.Passkey.Display",
                 "Login.Authenticator.Display",
                 "Login.Gitee.Display",
                 "Login.WeChat.Display",
-                "Login.GitHub.Display"
+                "Login.GitHub.Display",
+                "Login.Microi.Display"
             };
 
         /// <summary>

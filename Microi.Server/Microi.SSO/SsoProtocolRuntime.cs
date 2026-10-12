@@ -63,6 +63,8 @@ namespace Microi.net
         {
             public string OsClient { get; set; }
             public string RequestId { get; set; }
+            public bool Preview { get; set; }
+            public string ExpectedUserId { get; set; }
         }
 
         private sealed class InboundState
@@ -174,7 +176,9 @@ namespace Microi.net
                     actionResult = await CompleteAuthorization(new CompleteAuthorizationRequest
                     {
                         OsClient = ParamText(parameters, "OsClient"),
-                        RequestId = ParamText(parameters, "RequestId")
+                        RequestId = ParamText(parameters, "RequestId"),
+                        Preview = parameters.Value<bool?>("Preview") == true,
+                        ExpectedUserId = ParamText(parameters, "ExpectedUserId")
                     }).ConfigureAwait(false);
                     break;
                 case "OidcCallback":
@@ -389,23 +393,52 @@ namespace Microi.net
 
         public async Task<JsonResult> CompleteAuthorization(CompleteAuthorizationRequest request)
         {
+            SetNoStore();
             var token = await RequireUserTokenAsync().ConfigureAwait(false);
             if (token.Code != 1) return Json(token);
             if (request != null && !request.OsClient.DosIsNullOrWhiteSpace()
                 && !string.Equals(request.OsClient, token.Data.OsClient, StringComparison.OrdinalIgnoreCase))
                 return Json(new DosResult(0, null, "禁止跨租户完成 SSO 授权。"));
             if (!IsOpaque(request?.RequestId)) return Json(new DosResult(0, null, "SSO 授权请求无效。"));
+            // 新授权卡片绑定用户看到的帐号；旧自部署前端省略此值仍保留兼容。
+            // 真正授权身份始终取 DiyToken，客户端期望值只能收紧，不能指定授权用户。
+            if (!IsExpectedAuthorizationUser(request.ExpectedUserId, token.Data.CurrentUser["Id"]?.ToString()))
+                return Json(new DosResult(0, null, "当前官方帐号已变更，请重新打开授权页面确认。"));
             AuthorizationRequestState pending = null;
             try
             {
-                var raw = await Cache(token.Data.OsClient)
-                    .StringGetDeleteAsync(AuthorizationRequestKey(token.Data.OsClient, request.RequestId))
-                    .ConfigureAwait(false);
+                // 预览只读取授权卡片，确认时才原子消费；刷新页面不会提前使请求失效。
+                var key = AuthorizationRequestKey(token.Data.OsClient, request.RequestId);
+                var raw = request.Preview
+                    ? await Cache(token.Data.OsClient).StringGetAsync(key).ConfigureAwait(false)
+                    : await Cache(token.Data.OsClient).StringGetDeleteAsync(key).ConfigureAwait(false);
                 if (raw.HasValue) pending = JsonConvert.DeserializeObject<AuthorizationRequestState>(raw.ToString());
             }
             catch { }
             if (!IsValidPending(pending, token.Data.OsClient))
                 return Json(new DosResult(0, null, "SSO 授权请求不存在、已过期或已使用。"));
+            if (request.Preview)
+            {
+                var client = await FindOutboundClientAsync(token.Data.OsClient, pending.Protocol, pending.ClientId)
+                    .ConfigureAwait(false);
+                if (client == null || pending.Protocol != "OIDC"
+                    || !SsoSecurity.IsExactRedirectUriAllowed(pending.RedirectUri, client.RedirectUris,
+                        client.AllowLoopbackRedirectUri)
+                    || !IsOutboundScopeAllowed(pending.Scope, client.Scopes))
+                    return Json(new DosResult(0, null, "OIDC 客户端或回调地址已变更。"));
+                // 白名单投影不包含 code_challenge、nonce、state、DiyToken 或客户端秘密。
+                return Json(new DosResult(1, new
+                {
+                    RequestId = request.RequestId,
+                    ClientName = client.Name,
+                    CurrentUserId = token.Data.CurrentUser["Id"]?.ToString(),
+                    CurrentAccount = token.Data.CurrentUser["Account"]?.ToString(),
+                    CurrentName = token.Data.CurrentUser["Name"]?.ToString(),
+                    RedirectUri = pending.RedirectUri,
+                    Scopes = (pending.Scope ?? string.Empty).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries),
+                    pending.ExpiresAt
+                }));
+            }
             await EstablishProviderSessionAsync(token.Data).ConfigureAwait(false);
             var redirect = await CompletePendingAuthorizationAsync(pending, token.Data.CurrentUser,
                 DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ConfigureAwait(false);

@@ -9,6 +9,7 @@ import AiCadLanding from "./components/AiCadLanding.vue";
 import AppDetail from "./components/AppDetail.vue";
 import UserBar from "./components/UserBar.vue";
 import LoginPage from "./components/LoginPage.vue";
+import MicroiAuthorizePage from "./components/MicroiAuthorizePage.vue";
 import ProfilePage from "./components/ProfilePage.vue";
 import ProfileLocaleSwitch from "./components/ProfileLocaleSwitch.vue";
 import MciNugetStats from "./components/MciNugetStats.vue";
@@ -98,6 +99,7 @@ export default {
         DefaultTheme.enhanceApp(ctx);
         ctx.app.component('ContactCard', ContactCard);
         ctx.app.component('LoginPage', LoginPage);
+        ctx.app.component('MicroiAuthorizePage', MicroiAuthorizePage);
         ctx.app.component('ProfilePage', ProfilePage);
         ctx.app.component('AiStudioHome', AiStudioHome);
         ctx.app.component('AiCadLanding', AiCadLanding);
