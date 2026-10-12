@@ -120,6 +120,9 @@ const privateProjectFile = path.join(output, 'project.private.config.json')
 const subPackages = app.subPackages || app.subpackages || []
 const subRoots = subPackages.map((item) => String(item.root || '').replace(/^\/+|\/+$/g, '')).filter(Boolean)
 const allFiles = walk(output)
+for (const relative of ['static/app-icons', 'static/privacy.html', 'static/service.html']) {
+  if (fs.existsSync(path.join(output, relative))) failures.push(`App-only resource must not be included in mini-program output: ${relative}`)
+}
 const mainFiles = allFiles.filter((file) => {
   const rel = relative(file)
   return !subRoots.some((rootPath) => rel === rootPath || rel.startsWith(`${rootPath}/`))

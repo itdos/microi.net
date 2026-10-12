@@ -38,9 +38,14 @@ assert(
   fs.readFileSync(path.join(root, 'src/pages/profile/index.vue'), 'utf8').includes("event && event.from === 'button'"),
   'Profile invitation must be limited to its explicit share buttons'
 )
-assert(shareSource.includes("cancelText: '继续查看'"), 'Follow prompt must allow immediate access')
+assert(!shareSource.includes('maybePromptFollow') && !shareSource.includes('欢迎查看分享内容'), 'Opening a shared page must not show an automatic follow prompt')
 assert(shareSource.includes('wx.openOfficialAccountProfile'), 'Follow action must support the direct official-account profile API when configured')
 assert(!shareSource.includes('fail: () => { uni.navigateTo({ url: OFFICIAL_ACCOUNT_PATH }) }'), 'Follow action must not silently fall back to an unsupported component page')
+const workspacePage = fs.readFileSync(path.join(root, 'src/pages/workspace/index.vue'), 'utf8')
+// 首页关注栏暂时隐藏，保留注释代码便于恢复；专用关注页仍单独验证。
+assert(/<!--\s*<official-account\b[^>]*\/>\s*-->/.test(workspacePage), '首页必须保留已注释的公众号关注组件')
+const workspaceTemplate = workspacePage.slice(0, workspacePage.indexOf('<script')).replace(/<!--[\s\S]*?-->/g, '')
+assert(!/<official-account\b/.test(workspaceTemplate), '首页模板不得渲染公众号关注栏')
 const officialAccountPage = fs.readFileSync(path.join(root, 'src/pages/native/official-account.vue'), 'utf8')
 assert(officialAccountPage.includes('@tap="openProfile"'), 'Official-account page must expose a direct follow button')
 assert(officialAccountPage.includes('openOfficialAccountProfile'), 'Official-account page must use the direct profile API')
@@ -57,7 +62,6 @@ for (const key of ['platform', 'business', 'service', 'mall', 'news', 'invite'])
 }
 
 let currentPage = null
-const queuedTimers = []
 const modals = []
 const navigations = []
 const officialAccountCalls = []
@@ -78,7 +82,6 @@ const sandbox = {
     login(options) { options.success({ code: 'wx-test-login-code' }) },
     openOfficialAccountProfile(options) { officialAccountCalls.push(options) }
   },
-  setTimeout(callback) { queuedTimers.push(callback); return queuedTimers.length },
   testToken: '',
   testUser: {},
   postCalls,
@@ -86,7 +89,7 @@ const sandbox = {
   globalThis: null
 }
 sandbox.globalThis = sandbox
-vm.runInNewContext(`${executable}\nglobalThis.shareTest = { buildFriendShare, buildTimelineShare, getOfficialAccountUsername, warmOfficialAccountConfig, openOfficialAccountProfile, maybePromptFollow, maybeRedirectSharedReceiver };`, sandbox)
+vm.runInNewContext(`${executable}\nglobalThis.shareTest = { buildFriendShare, buildTimelineShare, getOfficialAccountUsername, warmOfficialAccountConfig, openOfficialAccountProfile, maybeRedirectSharedReceiver, shareMixin };`, sandbox)
 
 function verify(route, options, expectedQuery) {
   currentPage = { route, options }
@@ -110,60 +113,35 @@ verify('pages/message/chat', { id: 'chat-1', name: 'Private User', type: 'privat
 verify('pages/message/index', {}, 'fromShare=1')
 
 async function verifySharedReceiverFlow() {
-currentPage = { route: 'pages/business/detail', options: {} }
-sandbox.shareTest.maybePromptFollow()
-assert(queuedTimers.length === 0, 'Normal page entry must not show a follow prompt')
-currentPage = { route: 'pages/business/detail', options: { fromShare: '1' } }
-sandbox.shareTest.maybePromptFollow()
-assert(queuedTimers.length === 1, 'Shared page entry must schedule one follow prompt')
-queuedTimers.shift()()
-await new Promise((resolve) => setImmediate(resolve))
-assert(modals.length === 0, 'An already-following receiver must not see the follow prompt')
-assert(postCalls.length === 1 && postCalls[0].url === '/apiengine/xjy-share-official-account' && postCalls[0].data.Action === 'Status' && postCalls[0].data.LoginCode === 'wx-test-login-code', 'Follow status must use the backend projection and a fresh WeChat login code')
-assert(sandbox.shareTest.getOfficialAccountUsername() === 'gh_1234567890', 'The native follow API must use the backend-provided original ID')
-
-sandbox.testBackend = { Code: 1, Data: { Username: 'gh_1234567890', FollowStatus: 'unknown' } }
-sandbox.shareTest.maybePromptFollow()
-queuedTimers.shift()()
-await new Promise((resolve) => setImmediate(resolve))
-assert(modals.length === 0, 'An unknown follow status must not cause a false prompt')
-
-sandbox.testBackend = { Code: 1, Data: { Username: 'gh_1234567890', FollowStatus: 'not_followed' } }
-sandbox.shareTest.maybePromptFollow()
-queuedTimers.shift()()
-await new Promise((resolve) => setImmediate(resolve))
-assert(modals.length === 1 && modals[0].cancelText === '继续查看', 'Shared receiver must be able to continue immediately')
-assert(modals[0].confirmText === '一键关注', 'Shared receiver must get a one-click follow action')
-modals[0].success({ confirm: true })
-assert(officialAccountCalls.length === 1 && officialAccountCalls[0].username === 'gh_1234567890', 'Follow action must open the backend-selected official-account profile')
-sandbox.shareTest.maybePromptFollow()
-assert(modals.length === 1, 'Follow prompt must not repeat during the same session')
-
-officialAccountCalls[0].fail({ errMsg: 'openOfficialAccountProfile:fail test' })
-assert(modals.length === 2 && modals[1].title === '打开公众号失败', 'Native API failure must be surfaced to the user')
-
+currentPage = { route: 'pages/news/detail', options: { id: 'news-1', fromShare: '1' } }
+sandbox.shareTest.shareMixin.onShow()
+assert(modals.length === 0 && postCalls.length === 0, 'Opening a public shared page must not prompt or check follow status')
 const navigationCountAfterFollow = navigations.length
 
-currentPage = { route: 'pages/news/detail', options: { id: 'news-1', fromShare: '1' } }
 sandbox.shareTest.maybeRedirectSharedReceiver()
 assert(navigations.length === navigationCountAfterFollow, 'Public shared pages must remain accessible without login')
 currentPage = { route: 'pages/business/detail', options: { key: 'customers', id: 'customer-1', fromShare: '1' } }
 sandbox.shareTest.maybeRedirectSharedReceiver()
 assert(navigations.length === navigationCountAfterFollow + 1, 'Private shared pages must route a guest to login')
 assert(decodeURIComponent(navigations[navigationCountAfterFollow]).includes('/pages/business/detail?key=customers&id=customer-1&fromShare=1'), 'Login must retain the original shared route')
-assert(queuedTimers.length === 0, 'Shared login must use the global navigation guard instead of an independent timeout lock')
 sandbox.testToken = 'valid-token'
 sandbox.testUser = { Id: 'user-1' }
-sandbox.shareTest.maybeRedirectSharedReceiver()
+sandbox.shareTest.shareMixin.onShow()
 assert(navigations.length === navigationCountAfterFollow + 1, 'An authenticated receiver must remain on the shared page')
+assert(modals.length === 0 && postCalls.length === 0, 'Opening a private shared page must not prompt or check follow status')
 sandbox.testBackend = { Code: 1, Data: { Username: 'gh_1234567890', FollowStatus: 'followed' } }
-await sandbox.shareTest.warmOfficialAccountConfig(true)
-assert(postCalls[postCalls.length - 1].auth === true, 'Authenticated follow checks must send the current DiyToken')
+await sandbox.shareTest.warmOfficialAccountConfig()
+assert(postCalls.length === 1 && postCalls[0].url === '/apiengine/xjy-share-official-account' && postCalls[0].data.Action === 'Config' && postCalls[0].auth === true, 'Explicit account page must load the tenant-scoped account configuration')
+assert(sandbox.shareTest.getOfficialAccountUsername() === 'gh_1234567890', 'The native follow API must use the backend-provided original ID')
+sandbox.shareTest.openOfficialAccountProfile()
+assert(officialAccountCalls.length === 1 && officialAccountCalls[0].username === 'gh_1234567890', 'Explicit follow action must open the backend-selected official-account profile')
+officialAccountCalls[0].fail({ errMsg: 'openOfficialAccountProfile:fail test' })
+assert(modals.length === 1 && modals[0].title === '打开公众号失败', 'Native API failure must be surfaced to the user')
 sandbox.testBackend = { Code: 0, Msg: 'backend unavailable' }
 await sandbox.shareTest.warmOfficialAccountConfig(true)
 assert(sandbox.shareTest.getOfficialAccountUsername() === '', 'An unavailable backend must invalidate a stale account ID')
 sandbox.shareTest.openOfficialAccountProfile()
-assert(modals.length === 3 && modals[2].title === '暂时无法关注公众号', 'Missing backend configuration must show an actionable error')
+assert(modals.length === 2 && modals[1].title === '暂时无法关注公众号', 'Missing backend configuration must show an actionable error')
 
 process.stdout.write(`Share policy check passed: ${routes.length} direct page hooks, current routes, current-page screenshots, and sensitive-query filtering.\n`)
 }

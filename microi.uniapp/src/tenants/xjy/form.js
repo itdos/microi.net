@@ -16,6 +16,7 @@ import {
 import { normalizeUploadItems } from '@/platform/display.js'
 import { userOrganizationValues } from './user-organization.mjs'
 import { userRoleLevel } from './user-role-level.mjs'
+import { iotFormPresentation } from './iot-form-presentation.mjs'
 import {
   V8,
   getUser,
@@ -1955,6 +1956,8 @@ export async function handleRelatedCount(context, payload = {}) {
 }
 
 export function getPresentation(context) {
+  const iotPresentation = iotFormPresentation(context)
+  if (iotPresentation) return iotPresentation
   if (isCustomerCaseView(context)) {
     // zhy：首页案例与案例册快照在查看态共用宣传册式编排；差异字段在租户层映射，平台仍只消费通用协议。
     return {

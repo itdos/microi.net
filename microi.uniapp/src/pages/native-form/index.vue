@@ -10,7 +10,7 @@
 
 		<view v-else-if="error" class="form-state">
 			<text class="form-state__icon">!</text>
-			<text class="form-state__title">表单加载失败</text>
+			<text class="form-state__title">{{ errorTitle }}</text>
 			<text class="form-state__text">{{ error }}</text>
 			<view class="mci-btn form-state__button" hover-class="mci-btn--pressed" @tap="loadForm(true)">
 				<text>重新加载</text></view>
@@ -425,6 +425,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				pageDisposed: false,
 				stale: false,
 				error: '',
+				errorTitle: '表单加载失败',
 				defaultValues: {},
 				stayAfterAdd: false,
 				showRelated: true,
@@ -855,6 +856,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				this.loading = true
 				this.embeddedRelatedMore = {}
 				this.error = ''
+				this.errorTitle = '表单加载失败'
 				try {
 					if (this.mode === 'Edit' && this.rowId && isFormEngineRecordAdapter(this.recordAdapter) && !this.tableChildAuth) {
 						// URL 的 mode/menuId 由客户端传入，普通记录编辑必须回到当前授权菜单重新核对。
@@ -907,6 +909,13 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					if (loadId !== this.formLoadId) return
 					manifest = resolvedManifest
 					this.viewManifest = manifest
+					// 仅记录查询的 Code=2 进入空状态；权限和网络错误继续显示原有失败提示。
+					if (rowResult && Number(rowResult.Code) === 2) {
+						const emptyRecord = getTenantFormPresentation(this.tenantFormContext()).emptyRecord || {}
+						this.errorTitle = emptyRecord.title || '暂无数据'
+						this.error = emptyRecord.message || '这条记录不存在或已删除。'
+						return
+					}
 					if ((this.rowId || !isFormEngineRecordAdapter(this.recordAdapter)) &&
 						(!rowResult || Number(rowResult.Code) !== 1)) throw new Error((rowResult && rowResult
 						.Msg) || '数据不存在')

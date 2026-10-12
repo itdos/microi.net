@@ -331,6 +331,7 @@ const visualMenus = Object.entries(moduleRows).map(([tableName]) => ({
   Name: ({ Diy_Kehu: '我的客户', Diy_ShouhouDD: '售后任务', Diy_Dingdan: '合同订单', Diy_KehuSB: '设备列表', Diy_Tenant: '商家' })[tableName],
   DiyTableId: `visual-table-${tableName.toLowerCase()}`, DiyTableName: tableName,
   ModuleEngineKey: tableName, Display: 1, AppDisplay: 1,
+  MoreBtns: tableName === 'Diy_ShouhouDD' ? [{ Id: '3e66f489-6817-4a70-bf40-26a922fd3d51', Name: '完成', ShowRow: true }] : [],
   MobileListFields: ({ Diy_Kehu: ['KehuMC', 'Zhuangtai', 'KehuLX', 'FuzeR'], Diy_Tenant: ['TenantName', 'LianxiR', 'LianxiRDH', 'Chengshi'] })[tableName] || [],
   CardTitleTagFields: [], CardBottomTagFields: [], DefaultOrderBy: 'CreateTime'
 }));
@@ -458,7 +459,8 @@ const targets = [
   },
   {
     name: 'customers', route: '/#/pages/business/list?key=customers', selector: '.list-page',
-    required: ['.summary-strip', '.data-card', '.period-tabs']
+    required: ['.summary-strip', '.data-card', '.period-tabs'],
+    forbiddenSelectors: ['.contract-totals__title']
   },
   {
     name: 'customer-detail', route: '/#/pages/business/detail?key=customers&id=customer-001', selector: '.detail-page',
@@ -498,8 +500,14 @@ const targets = [
   },
   {
     name: 'task-list', route: '/#/pages/task/list', selector: '.task-page',
-    required: ['.mci-page-shell__title', '.state-card', '.period-chip', '.task-card'],
-    expectedText: ['售后任务', '去年']
+    required: ['.mci-page-shell__title', '.state-card', '.period-chip', '.task-card', '.task-card__phone .icon-action', '.task-card__actions'],
+    expectedText: ['售后任务', '去年', '客户联系人', '客户电话', '设备数量', '2 台', '更多'],
+    forbiddenText: ['进入任务']
+  },
+  {
+    name: 'task-list-actions', route: '/#/pages/task/list', selector: '.task-page',
+    clickSelector: '.task-card__actions', afterSelector: '.uni-actionsheet_toggle .uni-actionsheet__menu',
+    required: ['.uni-actionsheet_toggle .uni-actionsheet__menu'], expectedText: ['完成', '编辑'], forbiddenText: ['删除']
   },
   {
     name: 'order-approval', route: '/#/pages/business/detail?key=orders&id=order-001', selector: '.detail-page',
@@ -535,6 +543,12 @@ const targets = [
     clickSelector: '.related-tabs__item:nth-child(2)', afterSelector: '.join-form__snapshot',
     required: ['.related-tabs', '.join-form__snapshot', '.join-form__section', '.join-form__metric'],
     expectedText: ['IoT物联网', '设备已绑定，以下为最近一次物联网快照', '在线', '纯水 TDS', '滤芯 1 剩余']
+  },
+  {
+    name: 'device-iot-empty', route: '/#/pages/native-form/index?table=diy_yuelong_device&id=device-001&mode=View&title=查看IoT物联网', selector: '.native-form-page',
+    required: ['.form-state', '.form-state__button'],
+    expectedText: ['暂无物联网快照', '该设备尚未收到物联网数据，请稍后再查看。', '重新加载'],
+    forbiddenText: ['表单加载失败', 'NoExistData', '表名：', 'WHERE', '<br>']
   },
   {
     name: 'recruitment-detail', route: '/#/pages/business/detail?key=recruitment&id=recruit-001', selector: '.detail-page',
@@ -820,11 +834,16 @@ function buildMockResponse(request) {
   mockRequestLog.push({ url, body, table, time: Date.now() });
 
   if (request.method === 'OPTIONS') return { status: 204, body: '' };
+  if (apiEngineKey === 'xjy-module-presentation-stats' && Array.isArray(body.TaskCardIds)) {
+    return { Code: 1, Data: { TaskDeviceCounts: Object.fromEntries(body.TaskCardIds.map(id => [id, 2])) } };
+  }
   if (apiEngineKey === 'xjy-customer-contract-totals') {
     if (!body.CustomerSysMenuId || !Array.isArray(body.CustomerIds) || !body.CustomerIds.length) return { Code: 0, Msg: '测试合同金额请求缺少客户菜单或客户编号' };
     return visualCustomerContractTotals(body.CustomerIds);
   }
-  if (apiEngineKey === 'platform-current-user') return { Code: 1, Data: { ...sysUserRow, TenantId: 'tenant-xjy', Level: 10 } };
+  if (apiEngineKey === 'platform-current-user') return { Code: 1, Data: { ...sysUserRow, TenantId: 'tenant-xjy', Level: 10,
+    _RoleLimits: [{ Type: 'Menu', FkId: 'visual-menu-diy_shouhoudd', Permission: [{ Name: 'Edit' }, { Name: '3e66f489-6817-4a70-bf40-26a922fd3d51' }] }]
+  } };
   if (lowerUrl.includes('gettabledatatree') && String(table).toLowerCase() === 'sys_dept') return {
     Code: 1, Data: [{ Id: 'dept-sales', Name: '业务部' }, { Id: 'dept-service', Name: '服务部' }], DataCount: 2
   };
@@ -920,6 +939,10 @@ function buildMockResponse(request) {
   }
   if (lowerUrl.includes('getformdata') && (table === 'Diy_KehuSB' || lowerUrl.includes('diy_kehusb'))) {
     return { Code: 1, Data: deviceDetail };
+  }
+  if (lowerUrl.includes('getformdata') && String(table).toLowerCase() === 'diy_yuelong_device') {
+    // 重现线上暂无快照响应，验证页面不会把查询条件当作业务文案显示。
+    return { Code: 2, Data: null, Msg: "NoExistData <br>表名：diy_yuelong_device<br>条件： WHERE A.Id='device-001' AND A.IsDeleted <> 1" };
   }
   if (lowerUrl.includes('getformdata') && (table === 'Diy_Kehu' || lowerUrl.includes('diy_kehu'))) {
     if (body.Id === privateCustomerDetail.Id) return { Code: 1, Data: privateCustomerDetail };
@@ -1302,7 +1325,8 @@ async function setLoggedInState(cdp) {
   const user = {
     Id: 'user-001', Account: 'admin', Name: '张服务', Phone: '13900001234',
     RoleName: '售后服务工程师', TenantId: 'tenant-xjy', TenantName: '集福鲤杭州运营中心',
-    DeptId: 'dept-service', DeptName: '客户服务部', Level: 10
+    DeptId: 'dept-service', DeptName: '客户服务部', Level: 10,
+    _RoleLimits: [{ Type: 'Menu', FkId: 'visual-menu-diy_shouhoudd', Permission: [{ Name: 'Edit' }, { Name: '3e66f489-6817-4a70-bf40-26a922fd3d51' }] }]
   };
   await cdp.send('Runtime.evaluate', {
     expression: `localStorage.setItem('microi_token', 'xjy-visual-token'); localStorage.setItem('microi_user', ${JSON.stringify(JSON.stringify(user))});`,

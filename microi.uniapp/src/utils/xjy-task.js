@@ -58,6 +58,10 @@ const TASK_MAP_SELECT_FIELDS = [
   'ShouhouLX', 'Zhuangtai', 'ShouhouRY', 'ShouhouRYID',
   'YujiSHSJ', 'KehuDT_Lat', 'KehuDT_Lng'
 ]
+const TASK_CARD_SELECT_FIELDS = [...TASK_MAP_SELECT_FIELDS,
+  'ZhuangtaiZ', 'ShebeiSL', 'JiedanSJ', 'ShangmenSJ', 'FinishTime', 'Neirong',
+  'HouxuFZR', 'HouxuFZRID', 'TenantId', 'Pingjia', 'ZhuipingNR'
+]
 
 const TASK_PERMISSION_ID = 'aab7df97-4009-4d9f-89f7-ed30e5eba3fb'
 const TASK_TABLE = 'Diy_ShouhouDD'
@@ -111,6 +115,7 @@ export function normalizeTask(row = {}) {
     customer: formatFieldValue(row.KehuMC, '', { empty: '' }),
     contact: formatFieldValue(row.KehuLXRR || row.LianxiR, '', { empty: '' }),
     phone: row.KehuDH || row.LianxiDH || '',
+    deviceCount: row.deviceCount ?? null,
     address: `${formatRegion(row.Chengshi)}${row.Dizhi || ''}`,
     type: formatFieldValue(row.Leixing || row.ShouhouLX || '售后服务', '', { empty: '' }),
     state: formatFieldValue(row.Zhuangtai, '', { empty: '' }),
@@ -169,7 +174,7 @@ export async function loadTasks(options = {}) {
     _OrderByType: options.orderType || 'ASC',
     _Where: where
   }
-  if (options.includeCoordinates === true) payload._SelectFields = TASK_MAP_SELECT_FIELDS
+  payload._SelectFields = options.includeCoordinates === true ? TASK_MAP_SELECT_FIELDS : TASK_CARD_SELECT_FIELDS
   const menuId = await taskMenuId(options.refresh === true)
   if (menuId) payload._SysMenuId = menuId
   const key = `task:list:${taskIdentity()}:${JSON.stringify(payload)}`
@@ -183,11 +188,33 @@ export async function loadTasks(options = {}) {
   })
   const result = ensureSuccess(cached.data, '任务加载失败')
   return {
-    rows: (result.Data || []).map(normalizeTask),
+    rows: options.includeCoordinates === true ? (result.Data || []).map(normalizeTask)
+      : await hydrateTaskCardRows((result.Data || []).map(normalizeTask), options.refresh === true, menuId),
     count: Number(result.DataCount || 0),
     append: result.DataAppend || {},
     stale: cached.stale === true
   }
+}
+
+export async function hydrateTaskCardRows(rows = [], refresh = false, menuId = '') {
+  if (!rows.length) return rows
+  const ids = [...new Set(rows.map((row) => String(row.Id || row.id || '')).filter(Boolean))]
+  const counts = {}
+  try {
+    const resolvedMenuId = menuId || await taskMenuId(refresh)
+    if (!resolvedMenuId) throw new Error('未找到售后任务菜单')
+    // 每批任务一次授权查询和一次 GROUP BY，不按卡片逐台查询，也不把空快照当成零台。
+    for (let start = 0; start < ids.length; start += 100) {
+      const batch = ids.slice(start, start + 100)
+      const result = ensureSuccess(await callApiEngine('xjy-module-presentation-stats', {
+        SysMenuId: resolvedMenuId, TaskCardIds: batch
+      }), '任务设备数量读取失败')
+      Object.assign(counts, result.Data && result.Data.TaskDeviceCounts || {})
+    }
+  } catch (error) {
+    return rows.map((row) => ({ ...row, deviceCount: null }))
+  }
+  return rows.map((row) => ({ ...row, deviceCount: counts[String(row.Id || row.id || '')] ?? null }))
 }
 
 function buildTaskStatisticsPayload(filters = {}) {
@@ -343,6 +370,7 @@ export async function loadTaskFilterConfig(refresh = false) {
       storage: 'region'
     },
     menuId: String(menu.Id),
+    menu,
     moduleEngineKey: menu.ModuleEngineKey || TASK_TABLE
   }
 }

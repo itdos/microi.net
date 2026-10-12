@@ -160,9 +160,6 @@
               <text>+{{ collectionPhotos(row).length - 3 }}</text>
             </view>
           </view>
-          <view class="collection-card__foot">
-            <text>{{ collectionFooterLabel }}</text><text>›</text>
-          </view>
         </view>
       </template>
       <template v-else-if="isProposalInstallationQuickMode">
@@ -212,7 +209,7 @@
       <template v-else-if="moduleKey === 'tasks'">
         <mci-task-card v-for="(row, index) in displayedRows" :key="row.Id || index"
           :item="taskCardRow(row)" :index="index" :state-class="taskStatusClass(row)"
-          @open="openDetail" @phone="callPhone" />
+          :actions="rowActions(row)" @open="openDetail" @phone="callPhone" @action="triggerRowAction" />
       </template>
       <template v-else-if="isProposalInstallationContext && !isPreview">
         <view v-for="(row, index) in displayedRows" :key="row.Id || index"
@@ -497,6 +494,7 @@ import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
+import { hydrateTaskCardRows, normalizeTask } from '@/utils/xjy-task.js'
 import MciNativeField from '@/components/mci-native-field/mci-native-field.vue'
 import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 import {
@@ -696,7 +694,6 @@ export default {
       return this.field.Label || this.fieldConfig.TableChildSysMenuName || this.table?.Description || this.field.Name || '关联数据'
     },
     isCollectionCardLayout() { return String(this.presentation.layout || '').toLowerCase() === 'collection-cards' },
-    collectionFooterLabel() { return this.presentation.footerLabel || '查看详情' },
     collectionPickerConfig() {
       const picker = this.presentation && this.presentation.picker
       return picker && typeof picker === 'object' ? picker : {}
@@ -1941,7 +1938,9 @@ export default {
         const combinedRows = uniqueRowsById(reset ? incomingRows : [...this.rows, ...incomingRows])
         const combinedSourceCount = reset ? incomingRows.length : this.rows.length + incomingRows.length
         this.duplicateRowCount += Math.max(0, combinedSourceCount - combinedRows.length)
-        this.rows = combinedRows
+        const hydratedRows = this.moduleKey === 'tasks' ? await hydrateTaskCardRows(combinedRows, refresh) : combinedRows
+        if (!isCurrent() || requestId < this.appliedRequestId) return
+        this.rows = hydratedRows
         this.count = Math.max(this.rows.length, Number(result.count || 0) - this.duplicateRowCount)
         this.finished = this.rows.length >= this.count || incomingRows.length < pageSize
         if (!this.finished) this.pageIndex += 1
@@ -2493,15 +2492,18 @@ export default {
     taskCardRow(row) {
       return {
         ...row,
+        ...normalizeTask(row),
         customer: row.KehuMC || row.customer || '',
         no: row.ShouhouFWBH || row.no || '',
         state: row.Zhuangtai || row.state || '',
         type: row.Leixing || row.type || '售后',
         content: row.Neirong || row.content || '',
         planTimeText: formatDateTime(row.YujiSHSJ || row.planTime),
-        address: row.XiangxiDZ || row.address || '',
+        address: row.XiangxiDZ || normalizeTask(row).address || row.address || '',
         serviceUser: row.ShouhouRY || row.serviceUser || '',
-        phone: row.LianxiDH || row.phone || ''
+        contact: row.KehuLXRR || row.LianxiR || row.contact || '',
+        phone: row.KehuDH || row.LianxiDH || row.phone || '',
+        deviceCount: row.deviceCount ?? null
       }
     },
     taskStatusClass(row) {
@@ -2513,7 +2515,7 @@ export default {
     },
     rowActions(row) {
       const nativeActions = this.moduleKey
-        ? getBusinessRowActions(this.moduleKey, row, this.currentUser, this.menuId || this.childMenuId)
+        ? getBusinessRowActions(this.moduleKey, row, this.currentUser, this.menuId || this.childMenuId, { menu: this.menu, tableChildAuth: this.tableChildAuth })
         : []
       const nativeKeys = new Set(nativeActions.map((action) => String(action.key || '').toLowerCase()))
       const configuredViewActions = (this.config.actionSchema || [])
@@ -2904,8 +2906,6 @@ export default {
 .collection-card__photos { position: relative; display: grid; grid-template-columns: repeat(3, 112rpx); gap: 10rpx; margin-top: 14rpx; }
 .collection-card__photos image, .collection-card__photo-more { width: 112rpx; height: 88rpx; border-radius: 6rpx; background: #e9eff1; }
 .collection-card__photo-more { position: absolute; right: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(24,54,64,.74); font-size: 23rpx; }
-.collection-card__foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14rpx; padding-top: 13rpx; border-top: 1rpx solid #edf2f4; color: #84979e; font-size: 20rpx; }
-.collection-card__foot text:last-child { margin-left: 18rpx; color: #0b82ba; font-size: 30rpx; }
 .collection-picker-mask { position: fixed; inset: 0; z-index: 10020; display: flex; align-items: flex-end; width: 100vw; height: 100vh; overflow: hidden; background: rgba(16,35,43,.44); }
 .collection-picker-sheet { box-sizing: border-box; width: 100%; height: min(78vh, 1120rpx); display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; overflow: hidden; border-radius: 16rpx 16rpx 0 0; background: #fff; animation: collection-sheet-up 180ms ease-out; }
 .collection-picker-handle { width: 72rpx; height: 7rpx; margin: 12rpx auto 2rpx; border-radius: 4rpx; background: #d6e1e5; }

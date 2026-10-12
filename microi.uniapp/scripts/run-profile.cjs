@@ -27,15 +27,15 @@ try {
   exitCode = typeof result.status === 'number' ? result.status : 1
   if (result.error) throw result.error
 
-  if (exitCode === 0 && action === 'build' && platform === 'mp-weixin' && profileId === 'xjy') {
-    const finalize = spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'finalize-wechat-build.js')], {
+  if (exitCode === 0 && action === 'build' && platform === 'mp-weixin') {
+    const finalize = spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'finalize-wechat-build.js'), profileId], {
       cwd: projectRoot,
       env,
       stdio: 'inherit'
     })
     exitCode = typeof finalize.status === 'number' ? finalize.status : 1
     if (finalize.error) throw finalize.error
-    if (exitCode === 0) {
+    if (exitCode === 0 && profileId === 'xjy') {
       const shareCheck = spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'check-built-share-hooks.cjs')], {
         cwd: projectRoot,
         env,

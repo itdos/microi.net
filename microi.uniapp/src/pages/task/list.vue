@@ -89,7 +89,8 @@
           <view v-if="isFocusedTask(item)" class="task-focus-label"><text>本次报修</text></view>
           <mci-task-card
             :item="taskCardItem(item)" :index="index"
-            :state-class="taskStateClass(item.state)" @open="openTask" @phone="callPhone"
+            :actions="taskRowActions(item)" :state-class="taskStateClass(item.state)"
+            @open="openTask" @phone="callPhone" @action="triggerTaskRowAction"
           />
         </view>
         <mci-skeleton v-if="loading" type="list" :rows="1" compact />
@@ -167,6 +168,8 @@ import { readListEntryPeriod } from '@/platform/list-entry-period.mjs'
 import { buildListFilterWhere, hasListFilterValue, validateListFilters } from '@/platform/list-filter-fields.mjs'
 import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
+import { getTaskCardActions } from '@/tenants/xjy/task-card-actions.mjs'
+import { executeViewAction } from '@/platform/view-actions.js'
 import {
   TASK_DATE_FIELDS,
   TASK_PERIODS,
@@ -230,6 +233,8 @@ export default {
       searchTimer: null,
       taskListSessionKey: '',
       currentUser: {},
+      taskMenu: null,
+      actionSubmitting: false,
       taskMenuId: '',
       taskPermissionReady: false,
       focusTaskId: '',
@@ -330,6 +335,7 @@ export default {
         this.taskFilterFields = config.filterFields || []
         this.cityFilterField = config.cityFilterField || this.cityFilterField
         this.taskMenuId = config.menuId || this.taskMenuId
+        this.taskMenu = config.menu || this.taskMenu
         this.taskModuleEngineKey = config.moduleEngineKey || 'Diy_ShouhouDD'
         const availableKeys = new Set(this.taskFilterFields.map((field) => field.key))
         this.filterValues = Object.fromEntries(Object.entries(this.filterValues || {}).filter(([key]) => availableKeys.has(key)))
@@ -343,8 +349,10 @@ export default {
       this.currentUser = getUser() || {}
       try {
         const menu = await findMenu(['售后订单', '售后任务'], 'Diy_ShouhouDD', refresh)
+        this.taskMenu = menu || null
         this.taskMenuId = String(menu && menu.Id || '')
       } catch (error) {
+        this.taskMenu = null
         this.taskMenuId = ''
       } finally {
         this.taskPermissionReady = true
@@ -536,6 +544,25 @@ export default {
       return {
         ...item,
         planTimeText: this.formatTime(item.planTime)
+      }
+    },
+    taskRowActions(item) {
+      return getTaskCardActions(item, this.taskMenu || {}, this.currentUser)
+    },
+    async triggerTaskRowAction(action, item) {
+      if (this.actionSubmitting || !action || !item) return
+      this.actionSubmitting = true
+      try {
+        await this.loadTaskCreatePermission(true)
+        const currentAction = this.taskRowActions(item).find((entry) => entry.key === action.key)
+        if (!currentAction) { uni.showToast({ title: '当前账号无权执行此操作', icon: 'none' }); return }
+        if (currentAction.__viewAction.ActionType === 'Navigate') this.mciMarkDetailReturn()
+        await executeViewAction(currentAction.__viewAction, {
+          form: item, user: this.currentUser, menu: this.taskMenu, tableName: 'Diy_ShouhouDD',
+          refreshData: () => this.loadData(true, true)
+        })
+      } finally {
+        this.actionSubmitting = false
       }
     },
     search() {
