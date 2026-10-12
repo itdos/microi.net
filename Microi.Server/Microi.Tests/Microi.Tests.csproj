@@ -87,6 +87,7 @@
     <Compile Remove="Common\FormEngineSqlIdentitySnapshotTests.cs" />
     <Compile Remove="Common\FormEngineReadPrimaryTests.cs" />
     <Compile Remove="Common\FormEngineDecimalInvariantTests.cs" />
+    <Compile Remove="Common\FormEngineSearchFieldFormatTests.cs" />
     <Compile Remove="Common\TokenRotationSecurityTests.cs" />
     <Compile Remove="Common\DataSourceEngineAuthorizationTests.cs" />
     <Compile Remove="Common\TenantEngineIsolationTests.cs" />
