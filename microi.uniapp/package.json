@@ -80,7 +80,7 @@
     "check:task-scan-submit": "node --test scripts/test-task-scan-submit-guard.mjs",
     "check:task-map-coordinate-permission": "node scripts/check-task-map-coordinate-permission.mjs",
     "check:task-flow-capabilities": "node --test scripts/test-task-flow-capabilities.mjs scripts/test-task-detail-presentation.mjs scripts/test-service-record-view.mjs scripts/test-task-type-policy.mjs",
-    "check:task-list-visibility": "node --test scripts/test-task-list-visibility.mjs",
+    "check:task-list-visibility": "node --test scripts/test-task-list-visibility.mjs scripts/test-task-card-actions.mjs",
     "check:performance-stats-navigation": "node --test scripts/test-performance-stats-navigation.mjs",
     "check:task-post-service-permission": "npm run check:task-flow-capabilities && node --test scripts/test-task-responsibility.mjs scripts/test-task-rework-source.mjs scripts/test-task-feedback-media-context.mjs scripts/test-task-action-permissions.mjs scripts/test-task-assignee-search.mjs",
     "check:list-loading": "node --test scripts/list-loading.test.mjs",

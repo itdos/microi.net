@@ -21,6 +21,11 @@ function check(condition, message) {
   if (!condition) failures.push(message)
 }
 
+// Git 在 Windows 上可能检出 CRLF；仅统一换行，全文和租户内容仍须严格一致。
+function readGeneratedSource(file) {
+  return fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
+}
+
 function findArtifact(artifacts, ...relativePath) {
   const expectedTarget = path.resolve(projectRoot, ...relativePath)
   return artifacts.find((artifact) => path.resolve(artifact.target) === expectedTarget)
@@ -137,30 +142,30 @@ check(
   '默认 xjy Profile 不得保留 standard 的 Android 明文 HTTP 例外'
 )
 check(
-  fs.readFileSync(path.join(projectRoot, 'src', 'generated', 'active-profile.js'), 'utf8') === generatedProfileSource(xjyProfile),
+  readGeneratedSource(path.join(projectRoot, 'src', 'generated', 'active-profile.js')) === generatedProfileSource(xjyProfile),
   '默认 active-profile.js 必须由 xjy Profile 生成'
 )
 check(fs.existsSync(activeTabBarPath), '默认 active-tabbar.js 必须存在')
 if (fs.existsSync(activeTabBarPath)) {
   check(
-    fs.readFileSync(activeTabBarPath, 'utf8') === generatedActiveTabBarSource(xjyProfile, xjyPages),
+    readGeneratedSource(activeTabBarPath) === generatedActiveTabBarSource(xjyProfile, xjyPages),
     '默认 active-tabbar.js 必须由 xjy Profile 的 pages.json 生成'
   )
 }
 check(
-  fs.readFileSync(path.join(projectRoot, 'src', 'generated', 'tenant-business.js'), 'utf8') === generatedTenantSource(xjyProfile),
+  readGeneratedSource(path.join(projectRoot, 'src', 'generated', 'tenant-business.js')) === generatedTenantSource(xjyProfile),
   '默认 tenant-business.js 必须指向 xjy'
 )
 check(
-  fs.readFileSync(path.join(projectRoot, 'src', 'generated', 'tenant-native-table.js'), 'utf8') === generatedTenantNativeTableSource(xjyProfile),
+  readGeneratedSource(path.join(projectRoot, 'src', 'generated', 'tenant-native-table.js')) === generatedTenantNativeTableSource(xjyProfile),
   '默认 tenant-native-table.js 必须指向 xjy'
 )
 check(
-  fs.readFileSync(path.join(projectRoot, 'src', 'generated', 'tenant-form.js'), 'utf8') === generatedTenantFormSource(xjyProfile),
+  readGeneratedSource(path.join(projectRoot, 'src', 'generated', 'tenant-form.js')) === generatedTenantFormSource(xjyProfile),
   '默认 tenant-form.js 必须指向 xjy'
 )
 check(
-  fs.readFileSync(path.join(projectRoot, 'src', 'generated', 'tenant-runtime.js'), 'utf8') === generatedTenantRuntimeSource(xjyProfile),
+  readGeneratedSource(path.join(projectRoot, 'src', 'generated', 'tenant-runtime.js')) === generatedTenantRuntimeSource(xjyProfile),
   '默认 tenant-runtime.js 必须指向 xjy'
 )
 

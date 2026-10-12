@@ -105,7 +105,8 @@ test('真实分享守卫被去重取消且无 complete 后，下一次仍可发�
   harness.runtime.navigateTo({ url: '/pages/login/index' })
   const source = readFileSync(new URL('../src/utils/share.js', import.meta.url), 'utf8')
   const start = source.indexOf('export function maybeRedirectSharedReceiver()')
-  const end = source.indexOf('let followPromptShown', start)
+  const end = source.indexOf('export default', start)
+  assert.ok(start >= 0 && end > start, '真实分享登录守卫及其导出边界必须存在')
   const shareGuard = vm.runInNewContext(`(${source.slice(start, end).trim().replace(/^export function/, 'function')})`, {
     getCurrentPages: () => harness.pages, getUser: () => ({}), getToken: () => '',
     SHARE_WITHOUT_LOGIN: new Set(), buildFriendShare: () => ({ path: pageLocation(sharedPage) }),
