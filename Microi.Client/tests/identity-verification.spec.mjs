@@ -215,6 +215,107 @@ test("外部登录通过弹窗回传一次性票据并最终换取 DiyToken 登�
     }
 });
 
+async function withMicroiLoginPopup(run) {
+    const oldWindow = globalThis.window;
+    const oldScreen = globalThis.screen;
+    const listeners = new Map();
+    const calls = [];
+    const popup = {
+        closed: false,
+        document: { title: "" },
+        location: { replace(url) { popup.authorizeUrl = url; } },
+        resizeTo() {},
+        close() { this.closed = true; }
+    };
+    const notify = (overrides = {}) => listeners.get("message")?.({
+        source: popup,
+        origin: "https://tenant-api.example.com",
+        data: { type: "microi-external-login", provider: "Microi", success: true, ticket: "microi-ticket" },
+        ...overrides
+    });
+    const diyCommon = {
+        GetDid: () => "tenant-device",
+        PostAsync: async (url, payload) => {
+            calls.push({ url, payload });
+            if (url.endsWith("/Begin")) return { Code: 1, Data: {
+                AuthorizeUrl: "https://api.microi.net/sso/iTdos/oidc/authorize?state=opaque&code_challenge=pkce",
+                CallbackUrl: "https://tenant-api.example.com/api/ExternalLogin/Callback?OsClient=tenant-a&Provider=Microi"
+            } };
+            return { Code: 1, Data: { Id: "local-bound-user" }, DataAppend: { LoginMethod: "External:Microi" } };
+        }
+    };
+    try {
+        Object.defineProperty(globalThis, "screen", { configurable: true, value: { width: 1440, height: 900 } });
+        Object.defineProperty(globalThis, "window", { configurable: true, value: {
+            location: { origin: "https://tenant.example.com", href: "https://tenant.example.com/#/login" },
+            outerWidth: 1440, outerHeight: 900,
+            open: () => popup,
+            addEventListener: (name, handler) => listeners.set(name, handler),
+            removeEventListener: (name, handler) => {
+                if (listeners.get(name) === handler) listeners.delete(name);
+            }
+        } });
+        await run({ diyCommon, popup, calls, listeners, notify });
+    } finally {
+        Object.defineProperty(globalThis, "window", { configurable: true, value: oldWindow });
+        Object.defineProperty(globalThis, "screen", { configurable: true, value: oldScreen });
+    }
+}
+
+test("Microi 官方登录只把一次性票据交给当前租户换取本地会话", async () => {
+    await withMicroiLoginPopup(async ({ diyCommon, popup, calls, listeners, notify }) => {
+        const resultPromise = runExternalLogin({ diyCommon, osClient: "tenant-a", provider: "Microi", clientType: "Mobile" });
+        await new Promise(setImmediate);
+        assert.match(popup.authorizeUrl, /^https:\/\/api\.microi\.net\//);
+        notify();
+        const result = await resultPromise;
+        assert.equal(result.Data.Id, "local-bound-user");
+        assert.equal(result.DataAppend.LoginMethod, "External:Microi");
+        assert.deepEqual(calls.map((call) => call.url), ["/api/ExternalLogin/Begin", "/api/ExternalLogin/CompleteLogin"]);
+        assert.deepEqual(calls[0].payload, { OsClient: "tenant-a", Provider: "Microi", Mode: "Login", ReturnOrigin: "https://tenant.example.com" });
+        assert.deepEqual(calls[1].payload, { OsClient: "tenant-a", Ticket: "microi-ticket", Did: "tenant-device", _ClientType: "Mobile" });
+        assert.equal(listeners.size, 0);
+    });
+});
+
+test("Microi 绑定完成后保留当前账号并拒绝非回调弹窗的伪造消息", async () => {
+    await withMicroiLoginPopup(async ({ diyCommon, popup, calls, listeners, notify }) => {
+        const resultPromise = runExternalLogin({ diyCommon, osClient: "tenant-a", provider: "Microi", mode: "Bind" });
+        await new Promise(setImmediate);
+        for (const invalid of [
+            { source: {} },
+            { origin: "https://evil.example.com" },
+            { origin: "https://api.microi.net" },
+            { data: { type: "microi-external-login", provider: "Gitee", success: true, ticket: "forged-ticket" } },
+            { data: { type: "unrelated", provider: "Microi", success: true, ticket: "forged-ticket" } }
+        ]) {
+            notify(invalid);
+            await new Promise(setImmediate);
+            assert.equal(calls.length, 1);
+            assert.equal(listeners.has("message"), true);
+        }
+        notify({ source: popup });
+        const result = await resultPromise;
+        assert.equal(result.Code, 1);
+        assert.equal(calls[0].payload.Mode, "Bind");
+        assert.equal(calls.length, 1);
+        assert.equal(listeners.size, 0);
+    });
+});
+
+test("Microi 授权失败会清理弹窗并且不尝试签发本地会话", async () => {
+    await withMicroiLoginPopup(async ({ diyCommon, popup, calls, listeners, notify }) => {
+        const resultPromise = runExternalLogin({ diyCommon, osClient: "tenant-a", provider: "Microi" });
+        await new Promise(setImmediate);
+        const rejection = assert.rejects(resultPromise, /用户取消授权/);
+        notify({ data: { type: "microi-external-login", provider: "Microi", success: false, message: "用户取消授权" } });
+        await rejection;
+        assert.equal(calls.length, 1);
+        assert.equal(popup.closed, true);
+        assert.equal(listeners.size, 0);
+    });
+});
+
 test("客户端入口、V8 挂载和个人设置路由保持同一契约", async () => {
     const [login, navbar, mobileProfile, form, table, helper, app, router] = await Promise.all([
         readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8"),

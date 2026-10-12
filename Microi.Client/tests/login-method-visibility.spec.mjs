@@ -7,13 +7,32 @@ import {
     isLoginMethodDisplayEnabled
 } from "../src/utils/login-method-visibility.js";
 
-test("five canonical login methods remain visible for missing and empty settings", function () {
-    assert.deepEqual(DEFAULT_LOGIN_METHOD_KEYS, ["Passkey", "Totp", "Gitee", "WeChat", "GitHub"]);
+test("six canonical login methods remain visible for missing and empty settings", function () {
+    assert.deepEqual(DEFAULT_LOGIN_METHOD_KEYS, ["Passkey", "Totp", "Microi", "Gitee", "WeChat", "GitHub"]);
     for (const methodKey of DEFAULT_LOGIN_METHOD_KEYS) {
         assert.equal(isLoginMethodDisplayEnabled({}, methodKey), true);
         assert.equal(isLoginMethodDisplayEnabled({ [LOGIN_METHOD_DISABLED_SETTINGS[methodKey]]: "" }, methodKey), true);
         assert.equal(isLoginMethodDisplayEnabled({ [LOGIN_METHOD_DISABLED_SETTINGS[methodKey]]: 0 }, methodKey), true);
     }
+});
+
+test("Microi 登录使用独立关闭开关并保持旧显示配置兼容", function () {
+    assert.equal(LOGIN_METHOD_DISABLED_SETTINGS.Microi, "DisableLoginMicroi");
+    for (const value of [1, "1", true, "true"]) {
+        assert.equal(isLoginMethodDisplayEnabled({ DisableLoginMicroi: value }, "Microi"), false);
+    }
+    assert.equal(isLoginMethodDisplayEnabled({ DisableLoginGitee: 1 }, "Microi"), true);
+    assert.equal(isLoginMethodDisplayEnabled({ DisableLoginMicroi: 1 }, "Gitee"), true);
+    assert.equal(isLoginMethodDisplayEnabled({ LoginMicroiDisplay: 0 }, "Microi"), false);
+    assert.equal(isLoginMethodDisplayEnabled({ "Login.Microi.Display": "false" }, "Microi"), false);
+    assert.equal(isLoginMethodDisplayEnabled({ DisableLoginMicroi: 0, LoginMicroiDisplay: 0 }, "Microi"), true);
+});
+
+test("Microi 登录复用外部登录入口并使用独立品牌标记", function () {
+    const login = readFileSync(new URL("../src/views/login/index.vue", import.meta.url), "utf8");
+    assert.match(login, /key: "Microi", name: "Microi 登录"[\s\S]*?glyph: "M", tone: "microi"/);
+    assert.match(login, /\.login-method-bubble\.is-microi\s*\{/);
+    assert.doesNotMatch(login, /五种常用登录方式/);
 });
 
 test("only an explicitly enabled close switch hides a login method", function () {

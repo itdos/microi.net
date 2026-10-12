@@ -166,10 +166,10 @@
 
           <template v-else-if="activeTab === 'external'">
             <div class="panel-heading"><div><span>外部账号</span><h2>绑定常用平台身份用于免密码登录</h2></div><span class="status-chip status-chip--secure">OAuth 一次性状态</span></div>
-            <div v-if="!externalProviders.length" class="empty-state"><b>当前租户尚未提供外部登录方式</b><p>超级管理员可在“系统设置 → 安全与服务接入”中配置 Gitee、微信开放平台或 GitHub。</p></div>
+            <div v-if="!externalProviders.length" class="empty-state"><b>当前租户尚未提供外部登录方式</b><p>超级管理员可在“系统设置 → 安全与服务接入”中接入 Microi 官方账号、Gitee、微信开放平台或 GitHub。</p></div>
             <div v-else class="external-grid">
               <article v-for="provider in externalProviders" :key="provider.Key" class="external-card" :class="{ connected: bindingByProvider[String(provider.Key).toLowerCase()] }">
-                <div class="external-card__icon">{{ provider.Key === 'WeChat' ? '微' : provider.Key === 'GitHub' ? 'GH' : 'G' }}</div>
+                <div class="external-card__icon">{{ externalProviderGlyph(provider.Key) }}</div>
                 <div><b>{{ provider.Name }}</b><p>{{ provider.Description }}</p></div>
                 <template v-if="bindingByProvider[String(provider.Key).toLowerCase()]">
                   <small>已绑定 {{ bindingByProvider[String(provider.Key).toLowerCase()].DisplayName || bindingByProvider[String(provider.Key).toLowerCase()].AccountName || '外部身份' }}</small>
@@ -237,6 +237,7 @@ import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
 import QRCode from 'qrcode'
 import { configureV8, dispatch, getContext } from './microi.js'
 import { getUserRoleNames } from './personal-settings-user.js'
+import { externalProviderGlyph } from './external-provider-presentation.js'
 import {
   beginTotpEnrollment,
   bindExternalIdentity,
@@ -265,7 +266,7 @@ const tabs = [
   { id: 'profile', icon: '◈', label: '个人资料', hint: '名称与组织身份' },
   { id: 'security', icon: '⌾', label: '安全与登录', hint: '密码与二次验证' },
   { id: 'authenticators', icon: '⌁', label: '验证器', hint: 'Passkey 与动态口令' },
-  { id: 'external', icon: '◇', label: '外部账号', hint: 'Gitee、微信等绑定' },
+  { id: 'external', icon: '◇', label: '外部账号', hint: 'Microi、Gitee、微信等绑定' },
   { id: 'preferences', icon: '◇', label: '偏好与终端', hint: '首页和在线设备' }
 ]
 const loading = ref(true)

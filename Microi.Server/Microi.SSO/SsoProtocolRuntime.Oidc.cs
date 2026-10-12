@@ -280,7 +280,8 @@ namespace Microi.net
             var pending = NewPendingAuthorization(tenant.Data, connection, client_id, redirect_uri,
                 string.Join(" ", scopes), state, nonce, code_challenge);
             var session = await GetProviderSessionAsync(tenant.Data).ConfigureAwait(false);
-            if (session != null)
+            // 显式 consent 必须展示目标与最小资料范围，不能因已有 OP 会话而跳过确认。
+            if (session != null && !string.Equals(prompt, "consent", StringComparison.Ordinal))
             {
                 var redirect = await CompletePendingAuthorizationAsync(pending, session.CurrentUser,
                     session.AuthTime).ConfigureAwait(false);
@@ -324,6 +325,9 @@ namespace Microi.net
             if (payload == null) return OAuthError("invalid_token", "access token is invalid or expired", 401);
             if (!SsoSecurity.FixedEquals(payload.OsClient, tenant.Data))
                 return OAuthError("invalid_token", "token tenant does not match", 401);
+            var client = await FindOutboundClientAsync(tenant.Data, "OIDC", payload.ClientId).ConfigureAwait(false);
+            if (!IsCurrentOutboundGrantAllowed(client, payload.ClientId, payload.Scope))
+                return OAuthError("invalid_token", "client grant is disabled or has changed", 401);
             var user = await GetEnabledUserAsync(payload.OsClient, payload.UserId).ConfigureAwait(false);
             if (user == null) return OAuthError("invalid_token", "user is disabled", 401);
             var claims = await BuildOutboundClaimsAsync(payload.OsClient, user, payload.Subject, payload.Scope)
@@ -449,8 +453,8 @@ namespace Microi.net
             catch { }
             if (payload == null || !DateTimeOffset.TryParse(payload.ExpiresAt, out var expires)
                 || expires <= DateTimeOffset.UtcNow
-                || !SsoSecurity.FixedEquals(payload.ClientId, client.ClientId)
-                || !SsoSecurity.FixedEquals(payload.RedirectUri, form["redirect_uri"].ToString())
+                || !IsOutboundAuthorizationCodeAllowed(client, payload.ClientId, payload.RedirectUri,
+                    payload.Scope, form["redirect_uri"].ToString())
                 || !SsoSecurity.VerifyPkceS256(form["code_verifier"].ToString(), payload.CodeChallenge))
                 return OAuthError("invalid_grant", "authorization code is invalid, expired or already used", 400);
             var user = await GetEnabledUserAsync(osClient, payload.UserId).ConfigureAwait(false);
@@ -492,6 +496,7 @@ return raw",
             }
             if (payload.TokenType != "refresh_token"
                 || !SsoSecurity.FixedEquals(payload.ClientId, client.ClientId)
+                || !IsCurrentOutboundGrantAllowed(client, payload.ClientId, payload.Scope)
                 || !DateTimeOffset.TryParse(payload.ExpiresAt, out var expires)
                 || expires <= DateTimeOffset.UtcNow
                 || await Cache(osClient).KeyExistsAsync(RefreshFamilyRevokedKey(osClient, payload.FamilyId)).ConfigureAwait(false))

@@ -22,6 +22,7 @@ const customSiteShells = new Map([
   ['ai-cad.md', 'AI CAD 产品页'],
   ['profile.md', '用户中心'],
   ['login.md', '登录页'],
+  ['microi-authorize.md', 'Microi 登录授权页'],
   ['contact/index.md', '联系页'],
 ]);
 const MAX_PROSE_BLOCK_CHARACTERS = 700;

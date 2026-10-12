@@ -15,6 +15,20 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 
 外部登录回调优先按当前有效 `sys_config.ApiBase` 的公网 HTTPS 地址与路径前缀生成，不能从前端参数或未受信 `X-Forwarded-*` Header 获取。反向代理终止 TLS 时，容器的 HTTP Scheme 不能代替该地址；供应商控制台登记值须与真实 Begin 返回的 `CallbackUrl` 一致。配置不允许账号密码、查询参数或片段；未配置时仅兼容直接 HTTPS 或本机 HTTP，无效配置失败关闭。协议验收必须覆盖外部 HTTPS、内部 HTTP 与公网路径前缀，不能只测试本机请求。
 
+Microi 官方账号登录属于固定外部 Provider `Microi`，复用个人中心外部账号绑定与本租户 DiyToken。
+先核对 `sys_config.MicroiLoginEnabled`（默认 `0`）和 `DisableLoginMicroi`（缺失/空值/`0` 显示，显式 `1` 隐藏），
+再读取 `Login.Microi.ClientId` 私有配置。每个部署在官方身份服务登记独立公共客户端，
+`ClientAuthMethod=none`、PKCE S256、nonce、精确回调；不生成、配置或分发共享 ClientSecret。
+`Login.Microi.Scope` 默认 `openid profile email`，Name/Description 可配置；四项模板默认停用且仅供后端。
+端点固定为 `https://api.microi.net/sso/iTdos/authorize`、`/token`、`/userinfo`，
+不能从租户参数替换为任意主机。此入口使用 OAuth 2.0 授权码、PKCE S256 与官方 UserInfo，不读取或信任 `id_token`；
+官方校验客户端、精确回调、授权码期限和 verifier，本地校验一次性 state、Bearer 类型及非空稳定 UserInfo `sub`，
+按 `Microi + sub` 精确绑定当前租户既有本地用户，不按邮箱/昵称认领、不自动授予角色。
+官方普通账号不能因此读取本地租户业务数据；未绑定、解绑、用户停用均拒绝登录。
+应用包交付 `sys_config` 字段、私有空模板与 Managed 绑定白名单，不包含官方客户端实例或用户绑定；
+先升级前后端和系统设置/SaaS 应用，再登记客户端并真实验证绑定、登录、解绑及隐藏入口。
+通用 MCP Schema、字段、私密配置、接口引擎与商城工具足够完成配置，无需新增 Microi 专用管理工具。
+
 微信网站扫码登录先读取当前租户能力、`WeChatLoginEnabled` 和私密设置元信息，
 再核对开放平台已审核网站应用的微信登录权限与授权回调域名。
 `Login.WeChat.ClientId` 保存 AppID，`Login.WeChat.ClientSecret` 通过专用密钥工具保存，
