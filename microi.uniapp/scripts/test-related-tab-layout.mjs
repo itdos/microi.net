@@ -8,7 +8,7 @@ const child = key => ({ key, type: 'child', field: { Name: key } })
 const pages = ['business/detail', 'native-form/index', 'module/detail']
 
 for (const route of pages) {
-  const source = readFileSync(new URL(`../src/pages/${route}.vue`, import.meta.url), 'utf8')
+  const source = readFileSync(new URL(`../src/pages/${route}.vue`, import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   const body = source.match(/standaloneListMode\(\)\s*\{([^}]+)\}/)[1]
   const compute = vm.runInNewContext(`(function () { ${body} })`, { isStandaloneChildLayout })
   const state = (groups, relations, extra = {}) => ({
@@ -42,7 +42,7 @@ test('embedded groups retain their own preview layout and never lock the whole f
 })
 
 test('business detail reloads a blank tab with its menu authorization context', () => {
-  const source = readFileSync(new URL('../src/pages/business/detail.vue', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../src/pages/business/detail.vue', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   assert.match(source, /loadNativeFormDefinition\(this\.moduleConfig\.table, false, \{\s*menuId: this\.menuId\s*\}\)/)
   assert.match(source, /loadNativeFormDefinition\(this\.moduleConfig\.table, true, \{\s*menuId: this\.menuId\s*\}\)/)
   const body = source.match(/selectFormTab\(tab\)\s*\{([\s\S]*?)\n\s*\},\n\s*async refreshEmptyFormTab/)[1]

@@ -178,7 +178,7 @@ function getWechatLoginCode() {
   })
 }
 
-/** Request the public ID and the server-verified follow status before prompting. */
+/** Request the public ID and the server-verified follow status when needed. */
 export function warmOfficialAccountConfig(forceStatusCheck = false) {
   // #ifdef MP-WEIXIN
   const apiEngineKey = cleanQueryValue(appConfig.shareOfficialAccountApiEngineKey)
@@ -277,7 +277,7 @@ export function openOfficialAccountProfile() {
 export function buildSharePayload(vm, pagePath) {
   const route = getRouteInfo(vm, pagePath)
   const policy = getPolicy(route.path)
-  // 分享标记仅用于接收者的自愿关注提示；业务定位参数仍由每页白名单筛选。
+  // 分享标记供接收者恢复登录后原页面；业务定位参数仍由每页白名单筛选。
   const pickedQuery = pickQuery(route.query, policy.allowedQuery)
   const forcedQuery = typeof policy.forceQuery === 'function' ? policy.forceQuery(pickedQuery) : (policy.forceQuery || {})
   const safeQuery = {
@@ -359,40 +359,6 @@ export function maybeRedirectSharedReceiver() {
   // #endif
 }
 
-let followPromptShown = false
-let followPromptTimer = null
-
-export function maybePromptFollow() {
-  // #ifdef MP-WEIXIN
-  if (followPromptShown || followPromptTimer || typeof getCurrentPages !== 'function') return
-  const pages = getCurrentPages()
-  const current = pages && pages.length ? pages[pages.length - 1] : null
-  if (!current || String(current.options && current.options.fromShare || '') !== '1') return
-  if (/^pages\/(login|privacy|about)\//.test(current.route || '') || current.route === 'pages/native/official-account') return
-
-  followPromptTimer = setTimeout(() => {
-    warmOfficialAccountConfig(true).then((status) => {
-      followPromptTimer = null
-      const activePages = getCurrentPages()
-      const active = activePages && activePages.length ? activePages[activePages.length - 1] : null
-      if (!active || active.route !== current.route || String(active.options && active.options.fromShare || '') !== '1') return
-      // An unknown identity or failed WeChat check must never be treated as unfollowed.
-      if (status !== 'not_followed' || !getOfficialAccountUsername()) return
-      followPromptShown = true
-      uni.showModal({
-        title: '欢迎查看分享内容',
-        content: '你可以继续查看此页面。点击“一键关注”将打开关联公众号主页，关注后可接收平台资讯。',
-        cancelText: '继续查看',
-        confirmText: '一键关注',
-        success: (result) => {
-          if (result.confirm) openOfficialAccountProfile()
-        }
-      })
-    })
-  }, 1200)
-  // #endif
-}
-
 export default {
   onLoad() {
     enableShareMenu(this)
@@ -400,7 +366,6 @@ export default {
   onShow() {
     enableShareMenu(this)
     maybeRedirectSharedReceiver()
-    maybePromptFollow()
   },
   onShareAppMessage() {
     return buildFriendShare(this)

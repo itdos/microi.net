@@ -31,10 +31,9 @@
 
     <slot />
 
-    <view class="card-bottom">
+    <view v-if="time || actions.length" class="card-bottom">
       <text>{{ time }}</text>
-      <view class="card-bottom__links">
-        <text class="detail-link" @tap.stop="$emit('open', row)">查看详情</text>
+      <view v-if="actions.length" class="card-bottom__links">
         <view v-if="actions.length" class="more-link" hover-class="more-link--pressed" @tap.stop="showActionMenu">
           <view class="more-icon" aria-hidden="true"><view></view><view></view><view></view></view>
           <text>更多</text>
@@ -113,8 +112,7 @@ export default {
 .card-summary { display: -webkit-box; max-height: 108rpx; margin-top: 12rpx; overflow: hidden; color: #607b87; font-size: 23rpx; line-height: 36rpx; text-overflow: ellipsis; white-space: pre-wrap; word-break: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .card-bottom { justify-content: space-between; margin-top: 14rpx; padding-top: 14rpx; border-top: 1rpx solid #edf3f5; color: #9aabb2; font-size: 21rpx; }
 .card-bottom__links { flex: 0 0 auto; gap: 8rpx; }
-.detail-link { color: #0b86d4; }
-.detail-link, .more-link { padding: 12rpx 8rpx; }
+.more-link { padding: 12rpx 8rpx; }
 .more-link { min-width: 92rpx;  justify-content: center; gap: 8rpx; border-radius: 8rpx; color: #526d78; }
 .more-link--pressed { background: #edf5f8; }
 .more-icon { gap: 4rpx; }

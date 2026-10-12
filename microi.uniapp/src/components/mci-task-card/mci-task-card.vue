@@ -14,33 +14,53 @@
 
     <view class="task-card__content">
       <text v-if="item.content" class="task-card__summary">{{ item.content }}</text>
+      <view class="task-card__line"><text class="line-icon">人</text><text class="line-label">客户联系人</text><text class="line-value">{{ item.contact || '未填写' }}</text></view>
+      <view class="task-card__line">
+        <text class="line-icon">☎</text><text class="line-label">客户电话</text>
+        <view class="task-card__phone">
+          <text class="line-value">{{ item.phone || '未填写' }}</text>
+          <view v-if="item.phone" class="icon-action" hover-class="icon-action--pressed" @tap.stop="$emit('phone', item.phone)"><text>☎</text></view>
+        </view>
+      </view>
       <view class="task-card__line"><text class="line-icon">◷</text><text class="line-label">计划服务</text><text class="line-value">{{ item.planTimeText || '暂未安排' }}</text></view>
       <view class="task-card__line"><text class="line-icon">⌖</text><text class="line-label">服务地址</text><text class="line-value">{{ item.address || '暂无地址' }}</text></view>
       <view class="task-card__line"><text class="line-icon">人</text><text class="line-label">服务人员</text><text class="line-value">{{ item.serviceUser || '待领取/指派' }}</text></view>
+      <view class="task-card__line"><text class="line-icon">▦</text><text class="line-label">设备数量</text><text class="line-value">{{ deviceCountText }}</text></view>
     </view>
 
     <view class="task-card__bottom">
       <text class="task-card__tag">{{ item.type }}</text>
-      <view class="task-card__actions">
-        <view v-if="item.phone" class="icon-action" @tap.stop="$emit('phone', item.phone)"><text>☎</text></view>
-        <text class="task-card__detail">进入任务</text><text class="task-card__arrow">›</text>
+      <view v-if="actions.length" class="task-card__actions" hover-class="task-card__actions--pressed" @tap.stop="showActionMenu">
+        <view class="more-icon" aria-hidden="true"><view></view><view></view><view></view></view><text>更多</text>
       </view>
     </view>
   </view>
 </template>
 
 <script>
+import { showRowActionSheet } from '@/platform/row-action-sheet.js'
+
 export default {
   name: 'MciTaskCard',
   props: {
     item: { type: Object, required: true },
     index: { type: Number, default: 0 },
-    stateClass: { type: String, default: '' }
+    stateClass: { type: String, default: '' },
+    actions: { type: Array, default: () => [] }
   },
-  emits: ['open', 'phone'],
+  emits: ['open', 'phone', 'action'],
   computed: {
     shortType() {
       return String(this.item.type || '服务').slice(0, 2)
+    },
+    deviceCountText() {
+      const value = this.item.deviceCount
+      return value !== null && value !== undefined && value !== '' ? `${value} 台` : '未获取'
+    }
+  },
+  methods: {
+    showActionMenu() {
+      showRowActionSheet(this.actions, (action) => this.$emit('action', action, this.item))
     }
   }
 }
@@ -63,15 +83,18 @@ export default {
 .status-pill--danger { color: #c6452e; background: #fff0ed; }
 .task-card__content { padding: 0 22rpx 17rpx; }
 .task-card__summary { display: -webkit-box; margin-bottom: 14rpx; overflow: hidden; color: #405f69; font-size: 24rpx; line-height: 1.55; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.task-card__line { display: grid; grid-template-columns: 34rpx 116rpx minmax(0,1fr); align-items: start; min-height: 43rpx; }
+.task-card__line { display: grid; grid-template-columns: 34rpx 140rpx minmax(0,1fr); align-items: center; min-height: 48rpx; }
 .line-icon { color: #18a6b8; font-size: 20rpx; }
 .line-label { color: #82969e; font-size: 22rpx; }
 .line-value { overflow: hidden; color: #385660; font-size: 22rpx; text-overflow: ellipsis; white-space: nowrap; }
 .task-card__bottom { min-height: 70rpx; display: flex; align-items: center; justify-content: space-between; padding: 0 20rpx 0 22rpx; border-top: 1px solid #edf2f4; background: #fbfcfd; }
 .task-card__tag { padding: 5rpx 11rpx; border-radius: 5px; color: #765322; background: #fff5e6; font-size: 19rpx; }
-.task-card__actions { display: flex; align-items: center; color: #087da8; }
-.icon-action { width: 58rpx; height: 58rpx; display: flex; align-items: center; justify-content: center; margin-right: 8rpx; border-radius: 50%; color: #0d839b; background: #e9f8fa; font-size: 27rpx; }
-.task-card__detail { font-size: 22rpx; font-weight: 600; }
-.task-card__arrow { margin-left: 5rpx; font-size: 34rpx; }
+.task-card__phone { display: flex; align-items: center; min-width: 0; gap: 12rpx; }
+.icon-action { flex: none; width: 56rpx; height: 56rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #0d839b; background: #e9f8fa; font-size: 27rpx; }
+.icon-action--pressed { opacity: .65; }
+.task-card__actions { display: flex; align-items: center; justify-content: center; min-width: 100rpx; min-height: 64rpx; gap: 8rpx; border-radius: 6rpx; color: #526d78; font-size: 22rpx; }
+.task-card__actions--pressed { background: #edf5f8; }
+.more-icon { display: flex; gap: 4rpx; }
+.more-icon > view { width: 6rpx; height: 6rpx; border-radius: 50%; background: currentColor; }
 @media (prefers-reduced-motion: reduce) { .task-card { transition: none; } }
 </style>

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import test from 'node:test'
+import { iotFormPresentation } from '../src/tenants/xjy/iot-form-presentation.mjs'
 
 // 执行实际页面生命周期、导航与提交方法；只替换平台和网络边界，不写真实业务数据。
 const source = fs.readFileSync(new URL('../src/pages/native-form/index.vue', import.meta.url), 'utf8')
@@ -28,6 +29,7 @@ function setup(overrides = {}) {
     isFormEngineRecordAdapter: value => value === 'form-engine',
     createChildDraftSession() {}, disposeChildDraftSession() {}, disposeTenantForm() {},
     createTenantFormState: () => ({}), refreshTenantFormDerivedValues: async () => {},
+    getTenantFormPresentation: context => iotFormPresentation(context) || {},
     loadModuleViewManifest: async () => ({}), compileFormConfig: () => ({}),
     loadNativeFormRecordDefinition: async () => ({ fields: [{ Name: 'Title' }], groups: [] }),
     scopeNativeFormDefinition: value => value, applyNativeFormViewDefinition: value => value,
@@ -327,6 +329,55 @@ test('详情刷新失败停留详情显示错误，重新加载后恢复；不�
   await detail.loadForm(true)
   assert.equal(detail.error, '')
   assert.equal(detail.form.Title, '回读标题')
+})
+
+for (const code of [2, '2']) {
+  test(`IoT快照不存在（Code=${JSON.stringify(code)}）显示业务提示，隐藏原始表名和SQL条件`, async () => {
+    const app = setup({ loadNativeFormRecord: async () => ({
+      Code: code, Data: null,
+      Msg: "NoExistData <br>表名：diy_yuelong_device<br>条件： WHERE A.Id='row-1' AND A.IsDeleted <> 1"
+    }) })
+    const detail = app.createPage({ table: 'DIY_YUELONG_DEVICE' })
+    await tick()
+    assert.equal(detail.errorTitle, '暂无物联网快照')
+    assert.equal(detail.error, '该设备尚未收到物联网数据，请稍后再查看。')
+    assert.equal(detail.loading, false)
+    assert.equal(app.calls.saves.length, 0)
+    assert.equal(app.stack.at(-1), detail)
+  })
+}
+
+test('普通记录不存在使用通用空提示，权限拒绝仍显示失败原因', async () => {
+  let result = { Code: 2, Msg: 'NoExistData <br>表名：Cases<br>条件： WHERE Id=1' }
+  const app = setup({ loadNativeFormRecord: async () => result })
+  const detail = app.createPage()
+  await tick()
+  assert.equal(detail.errorTitle, '暂无数据')
+  assert.equal(detail.error, '这条记录不存在或已删除。')
+  result = { Code: 0, Msg: '没有查看权限' }
+  detail.tableName = 'diy_yuelong_device'
+  await detail.loadForm(true)
+  assert.equal(detail.errorTitle, '表单加载失败')
+  assert.equal(detail.error, '没有查看权限')
+})
+
+test('暂无快照后重新加载可恢复真实记录，后续网络失败不残留空状态标题', async () => {
+  let result = { Code: 2, Data: null, Msg: 'NoExistData' }
+  const app = setup({ loadNativeFormRecord: async () => {
+    if (result instanceof Error) throw result
+    return result
+  } })
+  const detail = app.createPage({ table: 'diy_yuelong_device' })
+  await tick()
+  assert.equal(detail.errorTitle, '暂无物联网快照')
+  result = { Code: 1, Data: { Id: 'row-1', Title: '已上报快照' } }
+  await detail.loadForm(true)
+  assert.equal(detail.error, '')
+  assert.equal(detail.form.Title, '已上报快照')
+  result = new Error('网络暂时不可用')
+  await detail.loadForm(true)
+  assert.equal(detail.errorTitle, '表单加载失败')
+  assert.equal(detail.error, '网络暂时不可用')
 })
 
 test('系统返回同样清理保存计时器，不会延迟退出来源详情', async () => {
