@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-12T21:56:37.756Z",
+  "generatedAt": "2026-10-12T22:17:37.250Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -3221,7 +3221,7 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "a08bcda3b48b6eeb194d01e30b2c45ffdc37539b3406cd2c37fb150a7737893b",
+      "originalSha256": "97e7fe55a12fced58ee289b4f26d3ea6de27a98acb2141a2107ce976a061679b",
       "originalLines": 626,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
@@ -3303,7 +3303,7 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "0343192b5c71d39f9f31a21bccb5046715f1b47d4876ba962b2d5f188c021271",
+          "sha256": "43bdb1476a7751fbc251c933ccfbd1710c9269dec3e7e4b541cdaeea37d200f1",
           "lines": 38,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },
