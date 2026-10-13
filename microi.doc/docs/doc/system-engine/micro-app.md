@@ -526,7 +526,7 @@ OsClientNetwork 默认读取当前环境值但允许手工修改。页面使用 
 http://localhost:61500/?OsClient=iTdos&ApiBase=https%3A%2F%2Fapi.example.com#/micro-app/iTdos/microi-official/saas-tenant/create
 ```
 
-历史 `/micro-app/{MsKey}/{RoutePath}` 仍可使用，显式保存的旧菜单地址会保留。新地址的 OsClient 取自当前服务器连接或可信宿主，并必须与当前运行时、已登录 Token 的租户一致；不一致时拒绝加载，不会把第一段租户名当作 AppKey，也不能通过 URL 切换租户。带租户的主站菜单路由与下文不带 `#` 的 API 静态入口属于不同协议。
+历史 `/micro-app/{AppKey}/{RoutePath}`（AppKey 也称 MsKey）仍可使用，显式保存的旧菜单地址会保留。新地址的 OsClient 取自当前服务器连接或可信宿主，并必须与当前运行时、已登录 Token 的租户一致；已识别的租户坐标不一致时拒绝加载，URL 不会切换当前登录租户。带租户的主站菜单路由与下文不带 `#` 的 API 静态入口属于不同协议。
 
 同一微服务可以绑定多个菜单。宿主会为每个运行实例生成独立名称，避免切换页面时出现 `app name conflict`。
 
