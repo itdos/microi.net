@@ -240,6 +240,7 @@
 
 <script setup>
 import { DiyCommon } from "@/utils/diy.common.js";
+import { buildMicroAppFriendlyPath } from "@/router/micro-app-route.js";
 import { ref, computed, reactive, onMounted, watch } from 'vue';
 import BluetoothPrinterEntry from '@/components/BluetoothPrinterEntry/index.vue';
 import { useRouter } from 'vue-router';
@@ -424,7 +425,7 @@ const confirmServerUrl = () => {
 
 const openPersonalSettings = (action = '') => {
     router.push({
-        path: '/micro-app/microi-platform-service/personal-settings',
+        path: buildMicroAppFriendlyPath({ osClient: DiyCommon.GetOsClient(), appKey: 'microi-platform-service', routePath: '/personal-settings' }),
         query: { section: 'security', action }
     }).catch(() => {});
 };

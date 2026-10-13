@@ -11,7 +11,7 @@ import {
 } from '../src/views/webos/utils/desktop-menu-layout.js';
 import { isWebosImageSource } from '../src/views/webos/utils/icon-source.js';
 import {
-    WEBOS_PERSONAL_CENTER_PATH,
+    getWebosPersonalCenterPath,
     openWebosPersonalCenter,
 } from '../src/views/webos/utils/navigation.js';
 
@@ -99,9 +99,9 @@ test('WebOS image detection keeps Icon ahead of IconClass for URL variants and p
 
 test('all WebOS personal-center entries use the classic-shell micro-app route', async () => {
     const pushed = [];
-    await openWebosPersonalCenter({ push: path => { pushed.push(path); return Promise.resolve(); } });
-    assert.equal(WEBOS_PERSONAL_CENTER_PATH, '/micro-app/microi-platform-service/personal-settings');
-    assert.deepEqual(pushed, [WEBOS_PERSONAL_CENTER_PATH]);
+    await openWebosPersonalCenter({ push: path => { pushed.push(path); return Promise.resolve(); } }, 'loctek');
+    assert.equal(getWebosPersonalCenterPath('loctek'), '/micro-app/loctek/microi-platform-service/personal-settings');
+    assert.deepEqual(pushed, [getWebosPersonalCenterPath('loctek')]);
 
     for (const sourcePath of [
         'src/views/webos/components/Toolbar.vue',

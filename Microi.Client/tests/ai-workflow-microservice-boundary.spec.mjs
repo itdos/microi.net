@@ -27,6 +27,6 @@ test("Redis keeps the authenticated shell and AI workflow is an external MicroSe
         assert.equal(router.includes(`path: "${route}"`), false, `${route} must be provided by the published MicroService`);
     }
 
-    assert.match(router, /redirect:\s*"\/micro-app\/microi-ai-workflow\/relationship"/);
+    assert.match(router, /beforeEnter:[\s\S]*?waitForPlatformBootstrap\(\)[\s\S]*?buildMicroAppFriendlyPath\([\s\S]*?appKey: "microi-ai-workflow", routePath: "\/relationship"/);
     await assert.rejects(access(path.join(clientRoot, "src/views/ai-workflow")));
 });
