@@ -102,6 +102,10 @@
   <!-- Copy the actual referenced executable output, including runtime/dependency
        files, into this test build. SDK artifacts output does not use bin/Config/tfm. -->
   <Target Name="CopyMemoryDiagnosticsFixture" AfterTargets="Build">
+    <!-- 解决方案可能把未列入配置映射的引用构建为 Debug；先构建本次配置，
+         再查询其真实输出路径，保证全新 Release 目录和隔离 artifacts 路径均可复制。 -->
+    <MSBuild Projects="$(MSBuildProjectDirectory)/Fixtures/MemoryDiagnosticsNode/Microi.MemoryDiagnostics.Fixture.csproj"
+             Targets="Build" BuildInParallel="false" Properties="Configuration=$(Configuration)" />
     <MSBuild Projects="$(MSBuildProjectDirectory)/Fixtures/MemoryDiagnosticsNode/Microi.MemoryDiagnostics.Fixture.csproj"
              Targets="GetTargetPath" BuildInParallel="false" Properties="Configuration=$(Configuration)">
       <Output TaskParameter="TargetOutputs" ItemName="_MemoryDiagnosticsFixtureTarget" />
