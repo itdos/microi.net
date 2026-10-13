@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {snapshotStandardInputs} from '../../tools/release-standard-inputs.mjs';
+import {snapshotCandidate, changedCandidate} from '../../tools/release-candidate.mjs';
+import {execFileSync} from 'node:child_process';
 
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(tmpdir(), 'microi-standard-candidate-'));
@@ -164,4 +166,67 @@ test('公共 checkout 没有独立夹具时保留原兼容边界', async t => {
   await fs.rm(path.join(root, 'private-official'), {recursive: true});
   await fs.rm(path.join(root, 'private-lottery'), {recursive: true});
   assert.deepEqual(await snapshotStandardInputs(root), {});
+});
+
+async function founderFixture(t) {
+  const root = await fs.mkdtemp(path.join(tmpdir(), 'microi-founder-solution-'));
+  t.after(() => fs.rm(root, {recursive: true, force: true}));
+  execFileSync('git', ['init', '--quiet'], {cwd: root});
+  await fs.writeFile(path.join(root, '.gitignore'), 'Microi.Server/Microi.Anderson.sln\n');
+  const server = path.join(root, 'Microi.Server'), project = 'Microi.Core/Microi.Core.csproj';
+  await fs.mkdir(path.dirname(path.join(server, project)), {recursive: true});
+  await fs.writeFile(path.join(server, project), '<Project />');
+  const declaration = (type, target) => 'Project("{' + type + '}") = "Core", "' + target + '", "{00000000-0000-0000-0000-000000000001}"\nEndProject\n';
+  const type = '9A19103F-16F7-4668-BE54-9A1E7A4F7556';
+  const body = 'Microsoft Visual Studio Solution File, Format Version 12.00\n'
+    + declaration('2150E333-8FDC-42A3-9474-1A3956D46DE8', 'Plugins') + declaration(type, project.replaceAll('/', '\\'));
+  return {root, server, project, declaration, type, body, file: path.join(server, 'Microi.Anderson.sln')};
+}
+
+test('被忽略的创建人方案即使无标准产品契约也冻结，出现、消失及等长字节漂移均被实际候选拒绝', async t => {
+  const f = await founderFixture(t), name = 'Microi.Server/Microi.Anderson.sln';
+  const absent = await snapshotCandidate(f.root, ['.']);
+  await fs.writeFile(f.file, f.body); const present = await snapshotCandidate(f.root, ['.']);
+  assert.deepEqual(changedCandidate(absent, present), [name]);
+  assert.ok((await snapshotStandardInputs(f.root))[name]);
+  await fs.writeFile(f.file, f.body.replace('Plugins', 'Folders'));
+  assert.deepEqual(changedCandidate(present, await snapshotCandidate(f.root, ['.'])), [name]);
+  await fs.rm(f.file);
+  assert.deepEqual(changedCandidate(present, await snapshotCandidate(f.root, ['.'])), [name]);
+});
+
+test('创建人方案拒绝绝对、外部、未知、重复及无法解析的项目路径', async t => {
+  const f = await founderFixture(t), header = 'Microsoft Visual Studio Solution File, Format Version 12.00\n';
+  for (const target of ['../Microi.Core/Microi.Core.csproj', '/outside.csproj', 'C:\\outside.csproj', '\\\\server\\outside.csproj', 'C:outside.csproj', 'unknown/unknown.csproj', 'Microi.Core/../Microi.Core/Microi.Core.csproj']) {
+    await fs.writeFile(f.file, header + f.declaration(f.type, target));
+    await assert.rejects(snapshotStandardInputs(f.root), /Unsafe/);
+  }
+  await fs.writeFile(f.file, f.body + f.declaration(f.type, f.project));
+  await assert.rejects(snapshotStandardInputs(f.root), /duplicate/);
+  await fs.writeFile(f.file, header + 'Project("broken declaration")\n');
+  await assert.rejects(snapshotStandardInputs(f.root), /Malformed/);
+  await fs.writeFile(f.file, header + f.declaration('00000000-0000-0000-0000-000000000000', f.project));
+  await assert.rejects(snapshotStandardInputs(f.root), /Unsafe/);
+});
+
+test('合法方案首部BOM和空白不改变解析，但其原始字节变化仍进入指纹', async t => {
+  const f = await founderFixture(t), name = 'Microi.Server/Microi.Anderson.sln';
+  await fs.writeFile(f.file, f.body); const before = await snapshotStandardInputs(f.root);
+  await fs.writeFile(f.file, '\uFEFF\r\n' + f.body);
+  const after = await snapshotStandardInputs(f.root);
+  assert.ok(after[name]); assert.notEqual(after[name], before[name]);
+});
+
+test('创建人方案文件或项目目录联接、缺失项目均失败关闭', async t => {
+  const f = await founderFixture(t);
+  await fs.writeFile(f.file, f.body); await fs.rm(path.join(f.server, f.project));
+  await assert.rejects(snapshotStandardInputs(f.root), /ENOENT/);
+  await fs.writeFile(path.join(f.server, f.project), '<Project />');
+  const renamed = path.join(f.root, 'actual.sln'); await fs.writeFile(renamed, f.body);
+  await fs.rm(f.file); await fs.symlink(renamed, f.file, 'file');
+  await assert.rejects(snapshotStandardInputs(f.root), /symbolic links/);
+  await fs.rm(f.file); await fs.writeFile(f.file, f.body);
+  const source = path.join(f.root, 'linked-project'); await fs.mkdir(source); await fs.writeFile(path.join(source, 'Microi.Core.csproj'), '<Project />');
+  await fs.rm(path.join(f.server, 'Microi.Core'), {recursive: true}); await fs.symlink(source, path.join(f.server, 'Microi.Core'), 'dir');
+  await assert.rejects(snapshotStandardInputs(f.root), /symbolic link/);
 });

@@ -2,13 +2,54 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 
+// 创建人方案被公开根仓忽略，但一键入口优先选择它；只冻结这个固定方案的原始字节，
+// 不按方案内容复制闭源目录，也不提供任意外部项目的装配入口。
+async function snapshotFounderSolution(root) {
+  const name = 'Microi.Server/Microi.Anderson.sln', file = path.join(root, name);
+  let stat;
+  try { stat = await fs.lstat(file); }
+  catch (error) { if (error.code === 'ENOENT') return {}; throw error; }
+  if (!stat.isFile() || stat.isSymbolicLink()) throw Error('Founder solution must be a regular file without symbolic links');
+  const server = path.join(root, 'Microi.Server');
+  if ((await fs.lstat(server)).isSymbolicLink()) throw Error('Founder solution directory uses a symbolic link');
+  const bytes = await fs.readFile(file), text = bytes.toString('utf8').replace(/^\uFEFF/, '').trimStart();
+  if (bytes.length > 1024 * 1024 || !text.startsWith('Microsoft Visual Studio Solution File,')) throw Error('Invalid founder solution format');
+  const allowed = new Set([
+    'Microi.net.Api', 'Microi.WeChat', 'Microi.Captcha', 'Microi.OCR', 'Microi.Vision', 'Dos.ORM', 'Dos.Common',
+    'Microi.Office', 'Microi.HDFS', 'Microi.Cache', 'Microi.SearchEngine', 'Microi.MQ', 'Microi.Job', 'Microi.Spider',
+    'Microi.V8Engine', 'Microi.AI', 'Microi.MCP', 'Microi.MQTT', 'Microi.Core', 'Microi.Upgrade', 'Microi.MongoDB',
+    'Microi.Translate', 'Microi.Tests', 'Microi.SSO', 'Microi.net', 'Microi.WorkFlow',
+  ].map(project => project + '/' + project + '.csproj'));
+  const folders = '2150E333-8FDC-42A3-9474-1A3956D46DE8', types = new Set(['9A19103F-16F7-4668-BE54-9A1E7A4F7556', 'FAE04EC0-301F-11D3-BF4B-00C04F79EFBC']);
+  const seen = new Set();
+  for (const line of text.split(/\r?\n/)) {
+    if (!/^\s*Project\s*\(/.test(line)) continue;
+    const match = /^\s*Project\("\{([A-Fa-f0-9-]{36})\}"\)\s*=\s*"[^"\r\n]+",\s*"([^"\r\n]+)",\s*"\{[A-Fa-f0-9-]{36}\}"\s*$/.exec(line);
+    if (!match) throw Error('Malformed founder solution Project declaration');
+    if (match[1].toUpperCase() === folders) continue; // 方案文件夹是虚拟节点，不能作为可执行项目读取。
+    const project = match[2].replaceAll('\\', '/');
+    if (!types.has(match[1].toUpperCase()) || !allowed.has(project) || seen.has(project)) throw Error('Unsafe or duplicate founder solution project path');
+    seen.add(project);
+    let current = server;
+    for (const part of project.split('/')) {
+      current = path.join(current, part);
+      const item = await fs.lstat(current);
+      if (item.isSymbolicLink()) throw Error('Founder solution project uses a symbolic link');
+    }
+    if (!(await fs.lstat(current)).isFile()) throw Error('Founder solution project must be a regular file');
+  }
+  if (!seen.size) throw Error('Founder solution must declare an approved project');
+  return {[name]: createHash('sha256').update(bytes).digest('hex')};
+}
+
 // Full 读取的标准产品责任源码按唯一契约冻结，即使它们被根公开仓忽略。
 // 只记录指纹，不把这些私有文件暂存或复制进公开仓。
 export async function snapshotStandardInputs(root) {
+  const founder = await snapshotFounderSolution(root);
   const contractPath = path.join(root, 'AI-Project/标准产品套件/source-contract.json');
   let bytes;
   try { bytes = await fs.readFile(contractPath); }
-  catch (error) { if (error.code === 'ENOENT') return {}; throw error; }
+  catch (error) { if (error.code === 'ENOENT') return founder; throw error; }
   const contract = JSON.parse(bytes.toString('utf8'));
   if (contract.schemaVersion !== 1 || contract.target?.apiBase !== 'https://api.itdos.com'
     || String(contract.target?.osClient).toLowerCase() !== 'itdos'
@@ -27,7 +68,7 @@ export async function snapshotStandardInputs(root) {
     return full;
   }
   await inside(path.relative(root, contractPath));
-  const files = {}, hash = data => createHash('sha256').update(data).digest('hex');
+  const files = {...founder}, hash = data => createHash('sha256').update(data).digest('hex');
   const skipped = new Set(['.git', 'node_modules', 'dist', 'bin', 'obj', 'TestResults', '__pycache__', '.resource-sync-base']);
   files[path.relative(root, contractPath).replaceAll('\\', '/')] = hash(bytes);
   const keys = new Set();
