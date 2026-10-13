@@ -3,7 +3,8 @@ import test from 'node:test'
 import vm from 'node:vm'
 import { readFileSync } from 'node:fs'
 import * as readApi from '../src/platform/configured-read-api.mjs'
-import * as minuteApi from '../src/pages/business/components/minute-range.mjs'
+import * as filters from '../src/platform/list-filter-fields.mjs'
+import { dateFilterSpec } from '../src/platform/list-filter-date.mjs'
 import { buildListApiEnginePayload, listApiEnginePresentationKey, normalizeListApiEngineResponse } from '../src/platform/list-api-engine.mjs'
 
 const plain = value => JSON.parse(JSON.stringify(value))
@@ -21,11 +22,19 @@ function related(overrides = {}) {
   return sandbox.component
 }
 
-function minuteControls() {
-  const source = readFileSync(new URL('../src/pages/business/components/log-minute-range.vue', import.meta.url), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1]
-  const sandbox = { ...readApi, ...minuteApi, themeMixin: {} }
-  vm.runInNewContext(stripImports(source).replace('export default', 'globalThis.component ='), sandbox)
-  return sandbox.component
+function reportControls(config = {}) {
+  const toasts = [], queries = []
+  const component = related({ ...filters, dateFilterSpec, clearTimeout, uni: { showToast: value => toasts.push(value.title) } })
+  const fields = filters.compileModuleFilterFields([{ Id: 'report-time', Name: 'RecordTime', Label: '上报时间', DisplayType: 'Out' }],
+    [{ Id: 'report-time', Name: 'RecordTime', Label: '上报时间', Component: 'DateTime', Type: 'varchar(25)', config }], { includeInline: true })
+  const state = { ...component.data(), ...component.methods,
+    config: { monthField: 'LogMonth', timeRangeField: 'RecordTime', filterFields: fields },
+    currentQueryMonth: '2026-10', currentUser: {}, queryMonth: '2026-10',
+    refreshFilteredRows: async () => queries.push(plain(state.buildFilterWhere())) }
+  for (const key of ['filterFields', 'activeFilterCount']) {
+    Object.defineProperty(state, key, { get: () => component.computed[key].call(state) })
+  }
+  return { state, toasts, queries }
 }
 
 test('子表预览优先使用配置的查询接口并保留父子范围', async () => {
@@ -97,57 +106,69 @@ test('月份默认、历史月份及格式验证', () => {
   assert.throws(() => readApi.queryMonthValue('2026-13'), /有效/)
 })
 
-test('分钟范围包含结束分钟全部秒数，支持同分钟、单侧条件及月底进位', () => {
-  const same = minuteApi.minuteRangeWhere('RecordTime', '2026-10', { startDate: '2026-10-13', startTime: '14:39', endDate: '2026-10-13', endTime: '14:39' })
-  assert.deepEqual(same, [{ Name: 'RecordTime', Type: '>=', Value: '2026-10-13 14:39:00' }, { Name: 'RecordTime', Type: '<', Value: '2026-10-13 14:40:00' }])
-  assert.deepEqual(minuteApi.minuteRangeWhere('RecordTime', '2026-10', {}), [])
-  assert.equal(minuteApi.minuteRangeWhere('RecordTime', '2026-12', { endDate: '2026-12-31', endTime: '23:59' })[0].Value, '2027-01-01 00:00:00')
-  assert.deepEqual(minuteApi.queryMonthDateBounds('2028-02'), { first: '2028-02-01', last: '2028-02-29' })
+test('上报时间复用后台字段，虚拟时间默认到分钟并尊重显式精度', () => {
+  const { state } = reportControls()
+  assert.equal(state.filterFields.length, 1)
+  assert.equal(state.filterFields[0].label, '上报时间')
+  assert.equal(state.filterFields[0].date.timeColumns, 2)
+  assert.equal(reportControls({ DateTimeType: 'date' }).state.filterFields[0].date.timeColumns, 0)
+  state.config.filterFields = []
+  assert.equal(state.filterFields.length, 0)
 })
 
-test('跨月、倒序、非法日期、秒级或未完整选择的时间范围不发请求', () => {
-  for (const draft of [
-    { startDate: '2026-09-30', startTime: '14:30' },
-    { startDate: '2026-10-13', startTime: '14:40', endDate: '2026-10-13', endTime: '14:30' },
-    { startDate: '2026-10-00', startTime: '14:30' },
-    { startDate: '2026-10-13', startTime: '25:00' },
-    { startDate: '2026-10-13', startTime: '14:30:00' },
-    { startDate: '2026-10-13' }
-  ]) assert.throws(() => minuteApi.minuteRangeWhere('RecordTime', '2026-10', draft))
-  assert.throws(() => minuteApi.minuteRangeWhere('RecordTime', '2026-02', { startDate: '2026-02-29', startTime: '14:30' }), /日期/)
+test('后台时间条件转换完整边界并自动选择历史月份，结束包含整分钟', () => {
+  const { state } = reportControls()
+  state.filterValues = { RecordTime: { start: '2026-09-13 14:39', end: '2026-09-13 14:39' } }
+  assert.deepEqual(plain(state.buildFilterWhere()), [
+    { Name: 'RecordTime', Type: '>=', Value: '2026-09-13 14:39:00' },
+    { Name: 'RecordTime', Type: '<', Value: '2026-09-13 14:40:00' },
+    { Name: 'LogMonth', Type: '=', Value: '202609' }
+  ])
+  state.filterValues = { RecordTime: { end: '2026-09-30 23:59' } }
+  assert.equal(state.buildFilterWhere()[0].Value, '2026-10-01 00:00:00')
+  assert.equal(state.buildFilterWhere()[1].Value, '202609')
+  const day = reportControls({ DateTimeType: 'date' }).state
+  day.filterValues = { RecordTime: { start: '2026-10-13', end: '2026-10-13' } }
+  assert.equal(day.buildFilterWhere()[0].Value, '2026-10-13 00:00:00')
 })
 
-test('时间草稿在点击查询后生效，重置保持月份，切换月份清空范围', async () => {
-  const component = minuteControls()
-  const listComponent = related({ buildListFilterWhere: () => [] })
-  let queries = 0
-  const list = { ...listComponent.data(), ...listComponent.methods, config: { monthField: 'LogMonth', timeRangeField: 'RecordTime' },
-    queryMonth: '2026-10', selectedQueryMonth: '2026-10', rows: [row], count: 51, currentUser: {}, filterFields: [],
-    refreshFilteredRows: async () => 'refreshed' }
-  const context = { ...component.data(), ...component.methods, field: 'RecordTime', month: '2026-10',
-    $emit: (event, where) => { assert.equal(event, 'query'); queries++; list.setQueryTimeRange(where) } }
-  context.changeQueryTime('start', 'Date', { detail: { value: '2026-10-13' } })
-  context.changeQueryTime('start', 'Time', { detail: { value: '14:39' } })
-  context.changeQueryTime('end', 'Date', { detail: { value: '2026-10-13' } })
-  context.changeQueryTime('end', 'Time', { detail: { value: '14:39' } })
-  assert.equal(queries, 0)
-  await context.applyQueryTime()
-  assert.equal(queries, 1)
-  assert.equal(list.count, 0)
-  assert.equal(list.rows.length, 0)
-  assert.equal(list.buildFilterWhere().length, 3)
-  assert.equal(list.buildFilterWhere()[2].Value, '2026-10-13 14:40:00')
-  await context.resetQueryTime()
-  assert.equal(list.queryMonth, '2026-10')
-  assert.equal(list.buildFilterWhere().length, 1)
-  context.queryTimeDraft = { startDate: '2026-11-01', startTime: '14:39' }
-  await context.applyQueryTime()
-  assert.equal(queries, 2)
-  assert.match(context.queryTimeError, /所选月份/)
-  await list.changeQueryMonth({ detail: { value: '2026-09' } })
-  component.watch.month.call(context)
-  assert.deepEqual(plain(context.queryTimeDraft), {})
-  assert.deepEqual(plain(list.queryTimeWhere), [])
+test('弹窗草稿确认后查询，取消不生效，重置清空条件', async () => {
+  const { state, queries } = reportControls()
+  state.openAdvancedFilters()
+  state.filterDraft = { RecordTime: { start: '2026-10-13 14:39', end: '2026-10-13 14:39' } }
+  state.closeAdvancedFilters()
+  assert.equal(queries.length, 0)
+  assert.deepEqual(plain(state.filterValues), {})
+  state.openAdvancedFilters()
+  assert.deepEqual(plain(state.filterDraft), {})
+  state.filterDraft = { RecordTime: { start: '2026-10-13 14:39', end: '2026-10-13 14:39' } }
+  await state.applyAdvancedFilters()
+  assert.equal(queries.length, 1)
+  assert.equal(state.filterOpen, false)
+  state.openAdvancedFilters()
+  state.resetAdvancedFilters()
+  assert.equal(queries.length, 1)
+  assert.equal(state.filterValues.RecordTime.start, '2026-10-13 14:39')
+  await state.resetSearch()
+  assert.deepEqual(plain(state.filterValues), {})
+  assert.deepEqual(queries[1], [{ Name: 'LogMonth', Type: '=', Value: '202610' }])
+})
+
+test('跨月、未来、倒序、无效或不完整的上报时间不发请求', async () => {
+  for (const range of [
+    { start: '2026-09-30 23:59', end: '2026-10-01 00:00' },
+    { start: '2026-11-01 00:00' },
+    { start: '2026-10-13 14:40', end: '2026-10-13 14:30' },
+    { start: '2026-02-29 00:00' }, { start: '2026-10-13 25:00' }, { start: '2026-10-13' }
+  ]) {
+    const { state, queries, toasts } = reportControls()
+    state.openAdvancedFilters()
+    state.filterDraft = { RecordTime: range }
+    await state.applyAdvancedFilters()
+    assert.equal(queries.length, 0)
+    assert.equal(toasts.length, 1)
+    assert.equal(state.filterOpen, true)
+  }
 })
 
 test('切换分钟范围后，旧请求不能覆盖新列表、总数或错误', async () => {
@@ -160,7 +181,7 @@ test('切换分钟范围后，旧请求不能覆盖新列表、总数或错误',
     buildFilterWhere: () => [], buildKeywordFilterWhere: () => [], relatedSelectFields: () => [],
     hydrateProposalInstallationPointRows: async rows => rows, hydrateCollectionRows: async rows => rows }
   const task = context.loadData(true)
-  context.queryTimeWhere = [{ Name: 'RecordTime', Type: '>=', Value: '2026-10-13 14:30:00' }]
+  context.filterValues = { RecordTime: { start: '2026-10-13 14:30' } }
   context.rows = [{ Id: 'new-query' }]
   context.count = 1
   resolveOld({ rows: [row], count: 51 })
