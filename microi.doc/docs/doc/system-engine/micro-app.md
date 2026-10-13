@@ -67,7 +67,7 @@
     <span class="micro-app-mode-icon" aria-hidden="true">▦</span>
     <p class="micro-app-eyebrow">MENU ROUTE</p>
     <h3>平台菜单直开</h3>
-    <p>后台菜单使用 <code>OpenType=MicroService</code>，URL 指向 <code>/micro-app/{AppKey}/{RoutePath}</code>，直接打开应用内的指定路由。</p>
+    <p>后台菜单使用 <code>OpenType=MicroService</code>，URL 指向 <code>/micro-app/{OsClient}/{AppKey}/{RoutePath}</code>，直接打开应用内的指定路由。</p>
     <strong>适合：</strong><span>生产工作台、驾驶舱、复杂双栏页面、全屏业务操作。</span>
   </article>
   <article class="is-dialog">
@@ -343,7 +343,7 @@ VS Code 插件从开发工具 **5.8.6** 起，将源码清单与完整工程下�
 
 路径应稳定且以 `/` 开头。删除清单中的旧页面后再次推送，在线路由也会随清单同步。
 
-页面从历史内置 Vue 组件迁移到前端微服务时，可在路由顶层或 `meta` 中声明 `LegacyMenuUrls`、`LegacyComponentPaths`。插件会统一写入 `sys_microiservice_page.RouteMetaJson`，菜单接口据此把旧菜单瞬时映射到微服务宿主，不会覆盖客户的 `sys_menu`。前端同时注册旧菜单 URL、`/micro-app/{MsKey}/{route}` 和 `/micro-app/{Id}/{route}`；因此菜单可以继续显示旧地址，新旧书签也能打开同一页面，路由迁移不要求一次性切断旧入口。
+页面从历史内置 Vue 组件迁移到前端微服务时，可在路由顶层或 `meta` 中声明 `LegacyMenuUrls`、`LegacyComponentPaths`。插件会统一写入 `sys_microiservice_page.RouteMetaJson`，菜单接口据此把旧菜单瞬时映射到微服务宿主，不会覆盖客户的 `sys_menu`。前端同时支持带租户的 `/micro-app/{OsClient}/{MsKey}/{route}`、旧菜单 URL、历史 `/micro-app/{MsKey}/{route}` 和 `/micro-app/{Id}/{route}`；因此菜单可以继续显示旧地址，新旧书签也能打开同一页面，路由迁移不要求一次性切断旧入口。
 
 ### 本地调试建议
 
@@ -369,7 +369,7 @@ window.__MICROI_RUNTIME_ENDPOINT__
 然后在另一个独立浏览器上下文打开本地源码，URL 参数权重最高：
 
 ```text
-http://localhost:61500/?OsClient={编码后的租户}&ApiBase={编码后的API地址}#/micro-app/{MsKey}/{RoutePath}
+http://localhost:61500/?OsClient={编码后的租户}&ApiBase={编码后的API地址}#/micro-app/{OsClient}/{MsKey}/{RoutePath}
 ```
 
 每个并行的 `ApiBase + OsClient` 必须使用独立 `browser.newContext()`、浏览器 Profile 或独立
@@ -508,23 +508,25 @@ OsClientNetwork 默认读取当前环境值但允许手工修改。页面使用 
 3. 选择该微服务中的页面。
 4. 系统回填 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath`、`Url` 和 `ComponentPath=/micro-app/host`。
 
-菜单友好地址通常为：
+新菜单友好地址统一为：
 
 ```text
-/micro-app/{MsKey}/{RoutePath}
+/micro-app/{OsClient}/{MsKey}/{RoutePath}
 ```
 
 浏览器中的主站路由为：
 
 ```text
-/#/micro-app/{MsKey}/{RoutePath}
+/#/micro-app/{OsClient}/{MsKey}/{RoutePath}
 ```
 
 例如：
 
 ```text
-http://localhost:61500/?OsClient=iTdos&ApiBase=https%3A%2F%2Fapi.example.com#/micro-app/microi-official/saas-tenant/create
+http://localhost:61500/?OsClient=iTdos&ApiBase=https%3A%2F%2Fapi.example.com#/micro-app/iTdos/microi-official/saas-tenant/create
 ```
+
+历史 `/micro-app/{MsKey}/{RoutePath}` 仍可使用，显式保存的旧菜单地址会保留。新地址的 OsClient 取自当前服务器连接或可信宿主，并必须与当前运行时、已登录 Token 的租户一致；不一致时拒绝加载，不会把第一段租户名当作 AppKey，也不能通过 URL 切换租户。带租户的主站菜单路由与下文不带 `#` 的 API 静态入口属于不同协议。
 
 同一微服务可以绑定多个菜单。宿主会为每个运行实例生成独立名称，避免切换页面时出现 `app name conflict`。
 
@@ -844,7 +846,7 @@ function closePage() {
 
 ### 微服务内部菜单只切内容区
 
-`navigate`、`replaceTab` 是**吾码主框架级**导航，用于离开当前微服务、打开另一个后台菜单或替换当前顶部 Tab；不能拿它们实现微服务自己左侧菜单的 `/overview`、`/portal` 等内部页面切换。吾码顶部 Tab 以主框架的 `$route.fullPath` 标识页面，内部菜单若调用 `replaceTab('/micro-app/{AppKey}/{RoutePath}')`，会改变主框架路由并卸载、重挂整个微服务，因此微服务左侧栏、顶部栏和已加载状态都会重新初始化。
+`navigate`、`replaceTab` 是**吾码主框架级**导航，用于离开当前微服务、打开另一个后台菜单或替换当前顶部 Tab；不能拿它们实现微服务自己左侧菜单的 `/overview`、`/portal` 等内部页面切换。吾码顶部 Tab 以主框架的 `$route.fullPath` 标识页面，内部菜单若调用 `replaceTab('/micro-app/{OsClient}/{AppKey}/{RoutePath}')`，会改变主框架路由并卸载、重挂整个微服务，因此微服务左侧栏、顶部栏和已加载状态都会重新初始化。
 
 内部页面应由子应用自己的 Vue Router、状态机或 iframe 内 Hash 管理，保持主框架 Tab 路由不变。页面较多时用异步组件，并把 `Suspense`/骨架屏放在右侧内容容器内；这样导航栏持续可用，只替换内容区：
 
@@ -1030,7 +1032,7 @@ window.microApp.dispatch({
 
 普通应用安装到另一个租户时，平台不会直接引用发布者的 HDFS 地址，而是把私有源码和公有构建文件重新上传到安装者自己的 HDFS，再写入目标租户的运行时和路由。因此发布者使用 MinIO、安装者使用阿里云 OSS 或其他已支持存储时，也可以完成迁移。
 
-声明“同时发布源码”的包若实际没有源码，生成或安装必须失败；目标租户写入私有 HDFS 后还要回读 `mci_ai_app_file`，不能返回“安装成功”后才在工作台显示无源码。原开发服务器已有可运行原生组件菜单时，重复制作或验证安装包不得把它改写成微服务菜单；目标端需要迁移的菜单才绑定 `/micro-app/host`，并把 `Url` 写成包含稳定 `MsKey` 的 `/micro-app/{MsKey}/{route}`。微服务友好路由优先使用 `MsKey`，后端同时兼容历史服务 `Id` 路由；前端把旧菜单 URL、`MsKey` 路由和 `Id` 路由绑定到同一宿主组件，三种地址可并存。
+声明“同时发布源码”的包若实际没有源码，生成或安装必须失败；目标租户写入私有 HDFS 后还要回读 `mci_ai_app_file`，不能返回“安装成功”后才在工作台显示无源码。原开发服务器已有可运行原生组件菜单时，重复制作或验证安装包不得把它改写成微服务菜单；目标端需要迁移的菜单才绑定 `/micro-app/host`，并把新 `Url` 写成包含当前租户和稳定 `MsKey` 的 `/micro-app/{OsClient}/{MsKey}/{route}`，显式旧地址继续保留。微服务友好路由优先使用 `MsKey`，后端同时兼容历史服务 `Id` 路由；前端把旧菜单 URL、`MsKey` 路由和 `Id` 路由绑定到同一宿主组件，这些地址可并存。
 
 #### 仅共享编译运行产物
 
@@ -1088,6 +1090,18 @@ AI 应用工作台“发布应用商城”
 - 发布后的 active 文件清单与本地构建完全一致；旧 `dist/` 元数据已可逆归档，Private、非 `dist/` 及其它应用文件未受影响。
 
 ## 常见问题
+
+### 带租户菜单提示微服务不存在
+
+例如主站地址 `/#/micro-app/loctek/microi-3d-engine/designer` 应调用 `MicroApp/Resolve`，参数为 `OsClient=loctek`、`AppKey=microi-3d-engine`、`RoutePath=/designer`。若实际 AppKey 是 loctek、RoutePath 是 `/microi-3d-engine/designer`，说明宿主仍按旧格式拆分了新地址，应更新 PC 前端镜像并刷新浏览器缓存；已有双格式兼容的宿主无需批量改旧菜单。后端不根据 `AppKey===OsClient` 猜测和重写应用身份。
+
+### 流式发布提示门禁表或索引缺失
+
+`mci_app_stream_gate_transition` 和发布门禁相关列/索引由应用商城责任包维护。更新目标租户的应用商城责任包，通过已有“升级租户数据库”入口核验责任包安装，安装完成后回读物理表、列及唯一索引，再重新盘点源码、版本和发布基线。不要执行已退役 Upgrade25，也不要手动 reset 锁、fence、Storage 或 active/committed 指针。`dry-run` 不应切换运行版本；“旧运行版本未切换”还可能来自资产校验失败或真实 CAS 漂移，应按原始错误和回读结果分别处理。
+
+### PublicPublishPath 没有租户前缀
+
+先检查 `sys_microiservice.StorageMode`。`microi-platform-service` 等受信任平台启动包使用 `StorageMode=db、MsUrl=db` 从目标租户数据库内联产物运行，安装器可将 `PublicPublishPath` 保存为 `micro-app/{AppKey}/{Version}`；该值没有租户前缀不等于缺文件。不要直接补前缀或切换为 file。普通 file 应用应核对 `AssetsJson/AssetManifestJson` 内每项 `HdfsPath/FilePathName`、当前租户 `FileServer` 与实际对象，按正常重新安装或发布流程修复；单改商城展示字段不能证明运行入口恢复。
 
 ### 页面空白
 

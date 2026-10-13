@@ -40,7 +40,7 @@ OsClient 仍为空时调用域名租户解析接口或从已经成功的请求�
 确认后用本地 `Microi.Client` 宿主复现，查询参数位于 `#` 之前并具有最高优先级：
 
 ```text
-http://localhost:61500/?OsClient=tenant-a&ApiBase=https%3A%2F%2Fapi.example.com#/micro-app/example-app/projects
+http://localhost:61500/?OsClient=tenant-a&ApiBase=https%3A%2F%2Fapi.example.com#/micro-app/tenant-a/example-app/projects
 ```
 
 同源页面会共享 Pinia/localStorage、Token、CurrentUser、ApiBase 和 OsClient。每组不同的
@@ -93,17 +93,19 @@ http://localhost:61500/?OsClient=tenant-a&ApiBase=https%3A%2F%2Fapi.example.com#
 一个真实文件。`sourceFiles` 只保留没有本地目录时的旧调用兼容。
 
 真实构建目录一律使用逐文件 multipart 流：默认/硬上限为 20,000 文件、总计 20GB，
-文件体不进入 JSON、Base64 或 Jint。`StorageMode=db` 的 256 文件/5MB 仅用于小型
-应急恢复，不能作为大项目发布器。发布器必须持久化同一交付批次的
+文件体不进入 JSON、Base64 或 Jint。普通应用 `StorageMode=db` 的 256 文件/5MB 仅用于小型
+应急恢复，不能作为大项目发布器。受信任平台启动包显式声明 `Source=NotIncluded + Build=DatabaseOnly` 时可按相同边界长期从当前租户数据库运行；其 `PublicPublishPath` 无租户前缀不代表静态资源丢失，先核对 StorageMode、MsUrl 与完整内联字节。发布器必须持久化同一交付批次的
 `DeliveryBatchId`、`SourceManifestHash`、`RuntimeManifestHash`。
 
 ## 菜单路由
 
-友好路由：
+新生成的友好路由统一带当前租户：
 
 ```text
-/micro-app/{MsKey}/{RoutePath}
+/micro-app/{OsClient}/{MsKey}/{RoutePath}
 ```
+
+历史 `/micro-app/{MsKey}/{RoutePath}` 继续兼容，不覆盖用户显式保存的旧 URL。OsClient 来自当前选定服务器连接或可信宿主；显式路径租户必须匹配当前运行时与已登录 Token，不能通过 URL、Manifest 或项目文件切换租户。解析后必须分别回读 AppKey 与内部 RoutePath，不能把 OsClient 传成 AppKey。
 
 菜单配置：
 
@@ -268,6 +270,8 @@ function openPlatformPrint(printId, businessId) {
   `V8.Print`，不能把原生命令字节传给 `openPlatformPrint`。
 
 ## 版本与回滚
+
+缺少 `mci_app_stream_gate_transition` 或发布门禁列/索引时，更新目标租户的应用商城责任包，并从现有“升级租户数据库”入口核验责任包安装。安装完成后回读物理表、列及唯一索引，再重新冻结发布基线；不要执行已退役 Upgrade25 或手动 reset 发布锁/指针。CAS 冲突应重新读取当前版本和源码清单，不能通过清空 Storage 预期值强制覆盖。
 
 - 每个发布版本保存入口、文件清单、哈希和页面清单。
 - 新旧版本资源路径可共存，运行时切换版本后再清理旧产物。

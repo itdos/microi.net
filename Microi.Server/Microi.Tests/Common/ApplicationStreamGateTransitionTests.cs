@@ -78,7 +78,7 @@ public sealed class ApplicationStreamGateTransitionTests
     }
 
     [Fact]
-    public void Upgrade25Readiness_RequiresFiveTableColumnContractAndSevenIndexes()
+    public void ApplicationPackageReadiness_RequiresFiveTableColumnContractAndSevenIndexes()
     {
         Assert.Equal(5, V8McpLogic.RequiredApplicationStreamGateTransitionColumns.Count);
         Assert.Equal(7, V8McpLogic.RequiredApplicationStreamGateTransitionIndexes.Count);

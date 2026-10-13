@@ -1,8 +1,9 @@
+import { buildMicroAppFriendlyPath } from "./micro-app-route.js";
+
 function normalizeRoutePath(value, fallback = "/") {
     const routePath = String(value || fallback).trim() || fallback;
     return routePath.startsWith("/") ? routePath : "/" + routePath;
 }
-
 function encodeMicroRouteSuffix(value) {
     const routePath = normalizeRoutePath(value);
     if (routePath === "/") return "";
@@ -53,13 +54,19 @@ export function buildMicroAppRouteAliases({
     primaryPath,
     friendlyPath,
     serviceId,
+    osClient,
+    appKey,
     routePath
 }) {
     const primary = normalizeRoutePath(primaryPath);
     const suffix = encodeMicroRouteSuffix(routePath);
     const candidates = [friendlyPath];
+    if (appKey) {
+        candidates.push(`/micro-app/${encodeURIComponent(String(appKey))}${suffix ? "/" + suffix : ""}`);
+    }
     if (serviceId) {
         candidates.push(`/micro-app/${encodeURIComponent(String(serviceId))}${suffix ? "/" + suffix : ""}`);
+        if (osClient) candidates.push(buildMicroAppFriendlyPath({ osClient, appKey: serviceId, routePath }));
     }
 
     const aliases = [];

@@ -38,6 +38,8 @@ export function buildBootstrapPackage() {
     }
     for (const column of pkg.PhysicalColumns || []) if (bootstrapTables.includes(column.TABLE_NAME.toLowerCase())) columns.set(`${column.TABLE_NAME.toLowerCase()}/${column.COLUMN_NAME}`, column);
     for (const row of pkg.DDLStatements || []) {
+      // 门禁转换是可选操作，不能将旧索引或数据冲突扩大为登录和商城启动障碍。
+      if (row.ApplicationStreamGateContract === true) continue;
       if (!bootstrapTables.includes(row.TableName.toLowerCase())) continue;
       const index = row.DDL.match(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+[`\[]?([^`\]\s]+)/i);
       const identity = `${row.TableName.toLowerCase()}/${index ? index[1] : 'table'}`;

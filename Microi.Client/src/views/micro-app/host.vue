@@ -92,6 +92,7 @@ import MicroAppRuntimeError from "./runtime-error.vue";
 import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 import { hasRenderableMicroAppContent, shouldAutoRecoverMicroApp } from "./render-health.js";
 import { resolveSaasPublicTrialHostConfig } from "./saas-public-trial-route.js";
+import { parseMicroAppPath as parseMicroAppRoute, assertMicroAppTenant } from "@/router/micro-app-route.js";
 import {
     createMicroAppHostCapabilities,
     createMicroAppHostActionResult,
@@ -139,48 +140,11 @@ function normalizeMicroRoutePath(value) {
     return routePath.startsWith("/") ? routePath : "/" + routePath;
 }
 
-function parseMicroAppPath(value) {
-    const result = {
-        appKey: "",
-        version: "",
-        routePath: "",
-        isEntryUrl: false,
-        isFriendlyRoute: false
-    };
-    if (DiyCommon.IsNull(value)) return result;
-
-    const rawUrl = safeDecode(value).trim();
-    let parsedUrl = null;
-    try {
-        parsedUrl = new URL(rawUrl, window.location.origin);
-    } catch (error) {
-        parsedUrl = null;
-    }
-
-    const pathname = (parsedUrl ? parsedUrl.pathname : rawUrl.split(/[?#]/)[0]).replace(/\/+$/, "");
-    const segments = pathname.split("/").filter(Boolean);
-    if (segments[0] !== "micro-app") return result;
-
-    const indexHtmlIndex = segments.findIndex((segment) => segment.toLowerCase() === "index.html");
-    if (indexHtmlIndex > -1) {
-        result.isEntryUrl = true;
-        result.appKey = safeDecode(segments[2] || "");
-        if (indexHtmlIndex > 3) {
-            result.version = safeDecode(segments[3] || "");
-        }
-    } else {
-        result.isFriendlyRoute = true;
-        result.appKey = safeDecode(segments[1] || "");
-        result.routePath = normalizeMicroRoutePath(segments.slice(2).map(safeDecode).join("/"));
-    }
-
-    if (parsedUrl) {
-        const version = parsedUrl.searchParams.get("v") || parsedUrl.searchParams.get("version") || "";
-        if (!result.version && version) result.version = safeDecode(version);
-        const routePath = parsedUrl.searchParams.get("microRoute") || parsedUrl.searchParams.get("routePath") || "";
-        if (routePath) result.routePath = normalizeMicroRoutePath(routePath);
-    }
-
+function parseMicroAppPath(value, options = {}) {
+    const result = parseMicroAppRoute(value, {
+        osClient: DiyCommon.GetOsClient(), origin: window.location.origin, ...options
+    });
+    assertMicroAppTenant(result, DiyCommon.GetOsClient());
     return result;
 }
 
@@ -1287,6 +1251,11 @@ export default {
                 name: this.ownedRouteName
             };
             const meta = this.ownedRouteMeta || {};
+            const routePathConfig = parseMicroAppPath(route.path || "", {
+                appKeyHint: meta.MicroServiceKey || meta.MsKey || meta.AppKey || "",
+                routePathHint: meta.MicroServiceRoutePath || meta.RoutePath || "",
+                format: meta.microAppRouteFormat || "auto"
+            });
             const publicTrialConfig = resolveSaasPublicTrialHostConfig(meta);
             if (publicTrialConfig) return publicTrialConfig;
             const query = this.ownedRouteQuery || {};
@@ -1297,11 +1266,20 @@ export default {
             };
 
             let microAppUrl = safeDecode(all.src || all.url || meta.MicroAppUrl || meta.Url || "");
-            const urlApiEngineId = all.urlApiEngineId || meta.MicroAppUrlApiEngineId || meta.UrlApiEngineId || "";
+            let urlApiEngineId = all.urlApiEngineId || meta.MicroAppUrlApiEngineId || meta.UrlApiEngineId || "";
             let appKey = all.appKey || all.AppKey || all.key || meta.MicroServiceKey || meta.MsKey || meta.AppKey || "";
-            let version = all.version || all.Version || "";
+            let version = all.version || all.Version || all.v || "";
             let microRoutePath = safeDecode(all.microRoute || all.routePath || meta.MicroServiceRoutePath || meta.RoutePath || "");
-            const routePathConfig = parseMicroAppPath(route.path || "");
+
+            if (routePathConfig.isTenantScoped) {
+                // 显式租户/应用坐标以路径为准，查询串和旧菜单元数据不能改选
+                // 另一应用、页面、运行地址或地址接口引擎。
+                appKey = routePathConfig.appKey;
+                microRoutePath = routePathConfig.routePath || "/";
+                microAppUrl = "";
+                urlApiEngineId = "";
+                if (!version) version = routePathConfig.version;
+            }
 
             if (!appKey && routePathConfig.appKey) {
                 appKey = routePathConfig.appKey;
