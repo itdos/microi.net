@@ -9,6 +9,8 @@ import Layout from "@/layout";
 // 若这里使用动态 import，发布切换或首次冷启动时一旦路由 chunk 加载失败，
 // RouterView 只会留下空容器，连微服务宿主自己的诊断/自愈都无法运行。
 import MicroAppHost from "@/views/micro-app/host.vue";
+import { buildMicroAppFriendlyPath } from "./micro-app-route.js";
+import { waitForPlatformBootstrap } from "@/utils/runtime-endpoint-query.js";
 export const constantRoutes = [
     {
         path: "/redirect",
@@ -176,6 +178,15 @@ export const constantRoutes = [
         ]
     },
     {
+        path: "/micro-app/:osClient/microi-platform-service/saas-trial",
+        component: Layout,
+        hidden: true,
+        children: [{ path: "", name: "saas_public_trial_scoped", component: MicroAppHost,
+            meta: { title: "开通试用", anonymous: true, hideShellForAnonymous: true,
+                saasPublicTrial: true, microAppRouteFormat: "scoped", microAppFriendlyRoute: true, microAppHost: true,
+                microAppCacheMode: "runtime-keep-alive", keepAlive: false } }]
+    },
+    {
         path: "/micro-app/microi-platform-service/saas-trial",
         component: Layout,
         hidden: true,
@@ -188,6 +199,16 @@ export const constantRoutes = [
     // 必须在首次解析 URL 时就存在；若等 GetSysMenuStep 后才动态注入，冷启动会先
     // 得到一个没有匹配组件的路由，菜单或网络稍有抖动就只剩空 RouterView。
     // 登录守卫仍会拦截匿名用户，宿主 Resolve(RequirePage=true) 继续复核页面事实。
+    {
+        path: "/micro-app/:osClient/:appKey/:microPath(.*)*",
+        component: Layout,
+        hidden: true,
+        children: [{ path: "", name: "micro_app_tenant_friendly", component: MicroAppHost,
+            // 旧应用/页面深链接也可能命中此规则，必须由共享解析器结合可信租户和
+            // 菜单坐标消歧，不能直接使用此时可能错位的 router.params。
+            meta: { title: "微服务", microAppFriendlyRoute: true, microAppHost: true,
+                microAppCacheMode: "runtime-keep-alive", keepAlive: false } }]
+    },
     {
         path: "/micro-app/:appKey/:microPath(.*)*",
         component: Layout,
@@ -347,7 +368,10 @@ export const asyncRoutes = [
     {
         path: "/ai-workflow",
         hidden: true,
-        redirect: "/micro-app/microi-ai-workflow/relationship"
+        beforeEnter: async to => {
+            if (!(await waitForPlatformBootstrap())) return false;
+            return { path: buildMicroAppFriendlyPath({ osClient: DiyCommon.GetOsClient(), appKey: "microi-ai-workflow", routePath: "/relationship" }), query: to.query, hash: to.hash, replace: true };
+        }
     },
     {
         path: "/mic-ai-app/:appId",
@@ -365,7 +389,10 @@ export const asyncRoutes = [
     {
         path: "/blueprint/designer/:id",
         hidden: true,
-        redirect: to => `/micro-app/microi-ai-workflow/designer/${encodeURIComponent(String(to.params.id || ""))}`
+        beforeEnter: async to => {
+            if (!(await waitForPlatformBootstrap())) return false;
+            return { path: buildMicroAppFriendlyPath({ osClient: DiyCommon.GetOsClient(), appKey: "microi-ai-workflow", routePath: `/designer/${encodeURIComponent(String(to.params.id || ""))}` }), query: to.query, hash: to.hash, replace: true };
+        }
     },
     {
         path: "/state-machine/designer/:id",

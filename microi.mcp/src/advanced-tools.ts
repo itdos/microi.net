@@ -2648,6 +2648,19 @@ function normalizeManifestMicroServiceRoutePath(value: string): string {
   return routePath;
 }
 
+/** Build the default host route from the selected, authenticated MCP context. */
+export function buildMicroServiceMenuUrl(osClient: string, appKey: string, routePath: string): string {
+  const tenant = String(osClient || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$/u.test(tenant)) {
+    throw new Error('生成微服务菜单地址需要当前 MCP 连接的合法 OsClient');
+  }
+  const normalizedRoute = normalizeManifestMicroServiceRoutePath(routePath);
+  const encodedRoute = normalizedRoute === '/'
+    ? ''
+    : `/${normalizedRoute.slice(1).split('/').map((segment) => encodeURIComponent(segment)).join('/')}`;
+  return `/micro-app/${encodeURIComponent(tenant)}/${encodeURIComponent(appKey)}${encodedRoute}`;
+}
+
 /**
  * Resolve a portable Manifest MicroService reference to the tenant-specific
  * sys_microiservice/sys_microiservice_page ids before any system writes begin.
@@ -2655,6 +2668,7 @@ function normalizeManifestMicroServiceRoutePath(value: string): string {
 export async function resolveMicroServiceModuleBinding(
   client: Pick<MicroiClient, 'getMicroService'>,
   module: JsonRecord,
+  osClient: string,
 ): Promise<JsonRecord | undefined> {
   const openType = getString(module, 'openType', 'OpenType');
   const microServiceKey = getString(module, 'microServiceKey', 'MicroServiceKey');
@@ -2706,15 +2720,12 @@ export async function resolveMicroServiceModuleBinding(
     throw new Error(`MicroServicePageId 已过期：Manifest=${explicitPageId}，当前租户=${pageId}`);
   }
 
-  const encodedRoute = routePath === '/'
-    ? ''
-    : `/${routePath.slice(1).split('/').map((segment) => encodeURIComponent(segment)).join('/')}`;
   return {
     IsMicroiService: 1,
     OpenType: openType.toLowerCase() === 'codeform' ? 'CodeForm' : 'MicroService',
     ComponentName: getString(module, 'componentName', 'ComponentName') || 'MicroService',
     ComponentPath: getString(module, 'componentPath', 'ComponentPath') || '/micro-app/host',
-    Url: getString(module, 'url', 'Url') || `/micro-app/${encodeURIComponent(microServiceKey)}${encodedRoute}`,
+    Url: getString(module, 'url', 'Url') || buildMicroServiceMenuUrl(osClient, microServiceKey, routePath),
     MicroServiceId: serviceId,
     MicroServicePageId: pageId,
     MicroServiceRoutePath: routePath,
@@ -3235,7 +3246,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
         // A missing app/page must fail closed without leaving a partially generated system.
         for (let moduleIndex = 0; moduleIndex < manifestModules.length; moduleIndex += 1) {
           try {
-            microServiceBindings[moduleIndex] = await resolveMicroServiceModuleBinding(client, manifestModules[moduleIndex]);
+            microServiceBindings[moduleIndex] = await resolveMicroServiceModuleBinding(client, manifestModules[moduleIndex], osClient);
           } catch (error) {
             return textResult(JSON.stringify({
               ok: false,

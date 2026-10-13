@@ -350,6 +350,12 @@ export function validateOfficialPackageInstallContracts(name, content) {
   }
 
   if (name === 'app.microi.saas-engine.json') assertLicenseLayoutPhysicalClosure(packageModel);
+  const gateAuditTable = 'mci_app_stream_gate_transition';
+  if ((packageModel.DiyTables || []).some(row => String(row.Name || '').toLowerCase() === gateAuditTable)
+      || (packageModel.DiyFields || []).some(row => String(row.TableName || '').toLowerCase() === gateAuditTable)
+      || (packageModel.DataSets || []).some(row => String(row.TableName || '').toLowerCase() === gateAuditTable)) {
+    throw new Error(`${name} 应用流式发布审计台账只允许物理结构，禁止 DIY 元数据或种子数据`);
+  }
   for (const column of Array.isArray(packageModel.PhysicalColumns) ? packageModel.PhysicalColumns : []) {
     const tableName = String(column?.TABLE_NAME ?? column?.TableName ?? '').toLowerCase();
     // UNUSED_WORKFLOW_PHYSICAL_SCHEMA_V1：防止发布母库已安装插件掩盖空库依赖。
@@ -364,7 +370,9 @@ export function validateOfficialPackageInstallContracts(name, content) {
     if (column.SQLSERVER_UNICODE !== undefined) {
       const type = String(column.COLUMN_TYPE ?? column.ColumnType ?? column.Type ?? '').trim();
       const owned = (packageModel.DiyTables || []).some(table =>
-        String(table.Name || table.TableName || '').toLowerCase() === tableName);
+        String(table.Name || table.TableName || '').toLowerCase() === tableName)
+        || (tableName === 'mci_app_stream_gate_transition' && (packageModel.DDLStatements || []).some(row =>
+          String(row.TableName || '').toLowerCase() === tableName && /^\s*CREATE\s+TABLE\b/i.test(row.DDL)));
       if (column.SQLSERVER_UNICODE !== true || !owned || !/^(?:n?(?:var)?char|(?:tiny|medium|long|n)?text)\b/i.test(type)) {
         throw new Error(`${name} 物理字段 ${tableName}.${columnName} 的 SQLSERVER_UNICODE 必须为 true 且仅声明包拥有的文本列`);
       }

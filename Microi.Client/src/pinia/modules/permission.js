@@ -6,6 +6,7 @@ import Layout from "@/layout";
 import { DiyOsClient } from "@/utils/itdos.osclient";
 import _ from "underscore";
 import { buildMicroAppRouteAliases, resolveMicroAppMenuPaths } from "@/router/micro-app-route-alias";
+import { buildMicroAppFriendlyPath, parseMicroAppPath, assertMicroAppTenant } from "@/router/micro-app-route.js";
 import {
     hasConfiguredModuleMetrics,
     hasConfiguredPageTabs
@@ -165,69 +166,26 @@ function normalizeMicroRoutePath(value) {
     return routePath.startsWith("/") ? routePath : "/" + routePath;
 }
 
-function encodeMicroRoutePath(value) {
-    const routePath = normalizeMicroRoutePath(value);
-    if (routePath === "/") return "";
-    return routePath
-        .split("/")
-        .filter(Boolean)
-        .map((part) => encodeURIComponent(part))
-        .join("/");
-}
-
-function parseMicroAppUrl(value) {
-    const result = {
-        appKey: "",
-        routePath: "",
-        version: "",
-        isEntryUrl: false,
-        isFriendlyRoute: false
-    };
-    if (DiyCommon.IsNull(value)) return result;
-
-    const rawUrl = safeDecode(value).trim();
-    let parsedUrl = null;
-    try {
-        parsedUrl = new URL(rawUrl, window.location.origin);
-    } catch (error) {
-        parsedUrl = null;
-    }
-
-    const pathname = (parsedUrl ? parsedUrl.pathname : rawUrl.split(/[?#]/)[0]).replace(/\/+$/, "");
-    const segments = pathname.split("/").filter(Boolean);
-    if (segments[0] !== "micro-app") return result;
-
-    const indexHtmlIndex = segments.findIndex((segment) => segment.toLowerCase() === "index.html");
-    if (indexHtmlIndex > -1) {
-        result.isEntryUrl = true;
-        result.appKey = safeDecode(segments[2] || "");
-        if (indexHtmlIndex > 3) {
-            result.version = safeDecode(segments[3] || "");
-        }
-    } else {
-        result.isFriendlyRoute = true;
-        result.appKey = safeDecode(segments[1] || "");
-        result.routePath = normalizeMicroRoutePath(segments.slice(2).map(safeDecode).join("/"));
-    }
-
-    if (parsedUrl) {
-        const routePath = parsedUrl.searchParams.get("microRoute") || parsedUrl.searchParams.get("routePath") || "";
-        if (routePath) result.routePath = normalizeMicroRoutePath(routePath);
-    }
-
+function parseMicroAppUrl(value, item = {}) {
+    const result = parseMicroAppPath(value, {
+        osClient: DiyCommon.GetOsClient(),
+        appKeyHint: item.MicroServiceKey || item.MsKey || item.AppKey || "",
+        routePathHint: item.MicroServiceRoutePath || "",
+        origin: window.location.origin
+    });
+    assertMicroAppTenant(result, DiyCommon.GetOsClient());
     return result;
 }
 
 function buildMicroAppMenuPath(item) {
-    const parsedUrl = parseMicroAppUrl(item.Url);
+    const parsedUrl = parseMicroAppUrl(item.Url, item);
     const appKey = item.MicroServiceKey || item.MsKey || item.AppKey || parsedUrl.appKey || DiyCommon.GuidRemoveSing(item.MicroServiceId || item.Id);
     const routePath = normalizeMicroRoutePath(item.MicroServiceRoutePath || parsedUrl.routePath || "/");
-    const encodedRoutePath = encodeMicroRoutePath(routePath);
-    return `/micro-app/${encodeURIComponent(appKey)}${encodedRoutePath ? "/" + encodedRoutePath : ""}`;
+    return buildMicroAppFriendlyPath({ osClient: DiyCommon.GetOsClient(), appKey, routePath });
 }
 
 function appendMicroAppMeta(meta, item) {
-    const friendlyConfig = parseMicroAppUrl(item.MicroAppFriendlyUrl || "");
+    const friendlyConfig = parseMicroAppUrl(item.MicroAppFriendlyUrl || "", item);
     const resolvedAppKey = item.MicroServiceKey
         || item.MsKey
         || item.AppKey
@@ -391,6 +349,8 @@ function buildLeafRoute(item) {
             primaryPath: routePath,
             friendlyPath: item.MicroAppFriendlyUrl,
             serviceId: item.MicroServiceId,
+            osClient: DiyCommon.GetOsClient(),
+            appKey: item.MicroServiceKey || item.MsKey || item.AppKey || parseMicroAppUrl(item.MicroAppFriendlyUrl, item).appKey,
             routePath: item.MicroServiceRoutePath
         });
         if (aliases.length) {
@@ -457,7 +417,7 @@ function MenuBuild(result, data, isFater) {
                     item.Url = normalizeIframeRouteUrl(item.Url);
                 }
             } else if (isMicroAppMenu(item)) {
-                const parsedMicroAppUrl = parseMicroAppUrl(item.Url);
+                const parsedMicroAppUrl = parseMicroAppUrl(item.Url, item);
                 item.MicroAppUrl = parsedMicroAppUrl.isEntryUrl || item.Url?.startsWith("http://") || item.Url?.startsWith("https://") ? item.Url : "";
                 item.MicroAppUrlApiEngineId = item.UrlApiEngineId;
                 item.MicroServiceRoutePath = normalizeMicroRoutePath(item.MicroServiceRoutePath || parsedMicroAppUrl.routePath || "/");

@@ -1,0 +1,3687 @@
+import { z } from 'zod';
+import { normalizePageJsonObj, normalizePrintObj, normalizePrintPageObj } from './design-engine.js';
+import { buildFileUploadConfig } from './file-upload-config.js';
+const WF_MARKER_BEGIN = '/* MICROI_WF_LINE_CONDITION_JSON';
+const WF_MARKER_END = 'MICROI_WF_LINE_CONDITION_JSON */';
+const jsonRecordSchema = z.record(z.unknown());
+function textResult(text, isError = false) {
+    return { content: [{ type: 'text', text }], isError };
+}
+function asRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+function asArray(value) {
+    return Array.isArray(value) ? value.map(asRecord).filter((item) => Object.keys(item).length > 0) : [];
+}
+function getArray(record, ...keys) {
+    for (const key of keys) {
+        const value = record[key];
+        if (Array.isArray(value))
+            return asArray(value);
+    }
+    return [];
+}
+function getString(record, ...keys) {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'string' && value.trim())
+            return value.trim();
+        if (typeof value === 'number' || typeof value === 'boolean')
+            return String(value);
+    }
+    return '';
+}
+function getNumber(record, ...keys) {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'number')
+            return value;
+        if (typeof value === 'string' && value.trim() && !Number.isNaN(Number(value)))
+            return Number(value);
+    }
+    return undefined;
+}
+function getStringArray(record, ...keys) {
+    for (const key of keys) {
+        const value = record[key];
+        if (Array.isArray(value)) {
+            return value.map((item) => typeof item === 'string' ? item : getString(asRecord(item), 'name', 'Name', 'id', 'Id')).filter(Boolean);
+        }
+        if (typeof value === 'string' && value.trim())
+            return value.split(/[,，;；]/).map((item) => item.trim()).filter(Boolean);
+    }
+    return [];
+}
+function getValue(record, ...keys) {
+    for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(record, key))
+            return record[key];
+    }
+    return undefined;
+}
+function normalizeKey(value) {
+    return value.trim().toLowerCase();
+}
+function fieldLookupKey(tableRef, fieldRef) {
+    return `${normalizeKey(tableRef)}::${normalizeKey(fieldRef)}`;
+}
+function isSystemFieldName(value) {
+    return ['Id', 'CreateTime', 'UpdateTime', 'CreateUserId', 'CreateUserName', 'UpdateUserId', 'UpdateUserName', 'OsClient', 'IsDeleted']
+        .some((name) => name.toLowerCase() === value.toLowerCase());
+}
+function jsonArrayOrSplit(value) {
+    const trimmed = value.trim();
+    if (!trimmed)
+        return [];
+    if (trimmed.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed))
+                return parsed;
+        }
+        catch {
+            // Fall through to loose splitting.
+        }
+    }
+    return trimmed.split(/[,;\n\uFF0C\uFF1B\u3001]+/).map((item) => item.trim()).filter(Boolean);
+}
+function getFieldRefs(record, ...keys) {
+    for (const key of keys) {
+        const value = getValue(record, key);
+        if (value === undefined || value === null || value === '')
+            continue;
+        const values = Array.isArray(value) ? value : (typeof value === 'string' ? jsonArrayOrSplit(value) : [value]);
+        return values.map((item) => {
+            if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+                return { ref: String(item).trim() };
+            }
+            const source = asRecord(item);
+            return {
+                ref: getString(source, 'field', 'Field', 'fieldName', 'FieldName', 'name', 'Name', 'id', 'Id', 'fieldId', 'FieldId'),
+                asName: getString(source, 'asName', 'AsName', 'alias', 'Alias') || undefined,
+                type: getString(source, 'type', 'Type') || undefined,
+                displayType: getString(source, 'displayType', 'DisplayType') || undefined,
+                displaySelect: typeof source.displaySelect === 'boolean'
+                    ? source.displaySelect
+                    : (typeof source.DisplaySelect === 'boolean' ? source.DisplaySelect : undefined),
+                equal: typeof source.equal === 'boolean'
+                    ? source.equal
+                    : (typeof source.Equal === 'boolean' ? source.Equal : undefined),
+            };
+        }).filter((item) => item.ref);
+    }
+    return [];
+}
+function createFieldLookup() {
+    return { byTableAndRef: new Map(), fieldsByTable: new Map() };
+}
+function addFieldMeta(lookup, meta) {
+    const tableRefs = [meta.tableId, meta.tableName].filter(Boolean);
+    const fieldRefs = [meta.id, meta.name, meta.label].filter(Boolean);
+    for (const tableRef of tableRefs) {
+        for (const fieldRef of fieldRefs)
+            lookup.byTableAndRef.set(fieldLookupKey(tableRef, fieldRef), meta);
+        const key = normalizeKey(tableRef);
+        const existing = lookup.fieldsByTable.get(key) || [];
+        if (!existing.some((item) => item.id === meta.id || normalizeKey(item.name) === normalizeKey(meta.name))) {
+            existing.push(meta);
+            lookup.fieldsByTable.set(key, existing);
+        }
+    }
+}
+function findFieldMeta(lookup, tableRef, ref) {
+    if (!tableRef || !ref)
+        return undefined;
+    return lookup.byTableAndRef.get(fieldLookupKey(tableRef, ref));
+}
+function getFieldsForTable(lookup, tableRef) {
+    return lookup.fieldsByTable.get(normalizeKey(tableRef)) || [];
+}
+function systemFieldMeta(tableId, tableName, fieldName) {
+    return {
+        id: fieldName,
+        name: fieldName,
+        label: fieldName,
+        tableId,
+        tableName,
+        tableDescription: tableName,
+        component: 'Text',
+        type: 'varchar(255)',
+    };
+}
+function compactObject(record) {
+    return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && value !== null && value !== ''));
+}
+function randomId() {
+    const now = Date.now().toString(36).toUpperCase().padStart(10, '0');
+    const random = Math.random().toString(36).slice(2, 18).toUpperCase().padEnd(16, '0');
+    return `${now}${random}`.slice(0, 26);
+}
+function unwrapList(data) {
+    if (Array.isArray(data))
+        return asArray(data);
+    const record = asRecord(data);
+    if (Array.isArray(record.List))
+        return asArray(record.List);
+    if (Array.isArray(record.Data))
+        return asArray(record.Data);
+    return [];
+}
+function apiText(title, response) {
+    const lines = [
+        `## ${title}`,
+        `- Code: ${response.Code}`,
+        response.Msg ? `- Message: ${response.Msg}` : '',
+        '',
+        '```json',
+        JSON.stringify(response.Data ?? {}, null, 2),
+        '```',
+    ].filter(Boolean);
+    return textResult(lines.join('\n'), response.Code !== 1);
+}
+function parseJsonInput(value, fallback) {
+    if (typeof value !== 'string')
+        return value ?? fallback;
+    if (!value.trim())
+        return fallback;
+    try {
+        return JSON.parse(value);
+    }
+    catch {
+        return value;
+    }
+}
+function stringifyConfig(value) {
+    if (value === undefined || value === null || value === '')
+        return undefined;
+    return typeof value === 'string' ? value : JSON.stringify(value);
+}
+export function analyzeBackgroundWorkload(buttonInput, options = {}) {
+    const button = asRecord(buttonInput);
+    const workload = asRecord(button.Workload ?? button.workload ?? button.BackgroundWorkload ?? button.backgroundWorkload);
+    const reasons = [];
+    const expectedSeconds = getNumber(workload, 'ExpectedSeconds', 'expectedSeconds') ?? 0;
+    const expectedItems = getNumber(workload, 'ExpectedItems', 'expectedItems', 'EstimatedRows', 'estimatedRows') ?? 0;
+    const fanOut = getNumber(workload, 'FanOutOperations', 'fanOutOperations', 'FanOut', 'fanOut') ?? 0;
+    const externalCalls = getNumber(workload, 'ExternalCalls', 'externalCalls') ?? 0;
+    if (expectedSeconds >= 120)
+        reasons.push(`预计耗时 ${expectedSeconds}s >= 120s`);
+    if (expectedItems >= 500)
+        reasons.push(`预计处理 ${expectedItems} 条 >= 500 条`);
+    if (fanOut >= 1000)
+        reasons.push(`预计扇出 ${fanOut} 个子操作 >= 1000`);
+    if (externalCalls >= 100)
+        reasons.push(`预计外部调用 ${externalCalls} 次 >= 100 次`);
+    if (getBoolean(workload, 'UnknownTotal', 'unknownTotal') === true)
+        reasons.push('总工作量未知且可能长时间运行');
+    const v8Code = getString(button, 'V8Code', 'v8Code');
+    const semanticText = [
+        getString(button, 'Name', 'name'),
+        getString(button, 'ApiEngineKey', 'apiEngineKey'),
+        v8Code,
+    ].join(' ');
+    // Opening a management page is navigation, not the long-running operation named by that page.
+    // For example, “数据库定时备份” opens a settings/records micro-app; the user starts the
+    // durable task from inside that page. Treating the navigation button as a queued ApiEngine
+    // action both blocks valid menu updates and can accidentally bypass the intended confirmation UI.
+    const isNavigationOnly = /\bV8\.OpenAppDialog\s*\(/i.test(v8Code)
+        && !/\bV8\.(?:ApiEngine\.RunBackground|Method\.QueueBackgroundTask)\s*\(/i.test(v8Code);
+    if (options.inferActionSemantics !== false
+        && !isNavigationOnly
+        && /(批量.{0,4}(导入|生成|修复|处理)|安装|初始化|全量同步|数据迁移|数据库备份|批量任务)/i.test(semanticText)) {
+        reasons.push('动作语义属于典型长任务');
+    }
+    return { required: reasons.length > 0, reasons };
+}
+export function analyzeClientChunking(buttonInput) {
+    const button = asRecord(buttonInput);
+    const workload = asRecord(button.Workload ?? button.workload ?? button.BackgroundWorkload ?? button.backgroundWorkload);
+    const mode = getString(workload, 'ExecutionMode', 'executionMode').trim().toLowerCase();
+    const declared = getBoolean(workload, 'ClientChunked', 'clientChunked') === true
+        || mode === 'clientchunked'
+        || mode === 'clientsequential';
+    const maxItemsPerChunk = getNumber(workload, 'MaxItemsPerChunk', 'maxItemsPerChunk') ?? 0;
+    const resumable = getBoolean(workload, 'Resumable', 'resumable') === true;
+    return {
+        declared,
+        valid: declared && maxItemsPerChunk > 0 && resumable,
+        maxItemsPerChunk,
+        resumable,
+    };
+}
+const OFFICIAL_STORE_API_BASE = 'https://api.itdos.com';
+const OFFICIAL_STORE_OSCLIENT = 'iTdos';
+export function buildStoreApplicationBackgroundRequest(input) {
+    const storeId = String(input.storeId || '').trim();
+    const storeVersionId = String(input.storeVersionId || '').trim();
+    const requestId = String(input.requestId || '').trim();
+    if (!/^[A-Za-z0-9:._-]{1,100}$/u.test(storeId)) {
+        throw new Error('storeId 只能包含字母、数字、冒号、点、下划线和连字符，长度 1-100。');
+    }
+    if (!/^[A-Za-z0-9:._-]{8,100}$/u.test(requestId)) {
+        throw new Error('requestId 必须是调用方保存并在重试时复用的稳定幂等 Id，长度 8-100。');
+    }
+    if (storeVersionId && !/^[A-Za-z0-9:._-]{1,100}$/u.test(storeVersionId)) {
+        throw new Error('storeVersionId 只能包含字母、数字、冒号、点、下划线和连字符，长度 1-100。');
+    }
+    const rawStoreApiBase = String(input.storeApiBase || OFFICIAL_STORE_API_BASE).trim();
+    let storeUrl;
+    try {
+        storeUrl = new URL(rawStoreApiBase);
+    }
+    catch {
+        throw new Error('storeApiBase 必须是有效的 HTTP/HTTPS 服务根地址。');
+    }
+    if (storeUrl.protocol !== 'https:'
+        || storeUrl.username
+        || storeUrl.password
+        || (storeUrl.pathname && storeUrl.pathname !== '/')
+        || storeUrl.search
+        || storeUrl.hash
+        || storeUrl.origin !== OFFICIAL_STORE_API_BASE) {
+        throw new Error(`storeApiBase 仅允许吾码官方商城 ${OFFICIAL_STORE_API_BASE}，且不能包含凭据、路径、查询、片段或自定义端口。`);
+    }
+    const storeApiBase = OFFICIAL_STORE_API_BASE;
+    const storeOsClient = String(input.storeOsClient || OFFICIAL_STORE_OSCLIENT).trim();
+    if (storeOsClient.toLowerCase() !== OFFICIAL_STORE_OSCLIENT.toLowerCase()) {
+        throw new Error(`storeOsClient 仅允许吾码官方商城租户 ${OFFICIAL_STORE_OSCLIENT}。`);
+    }
+    const operationText = input.operation === 'update' ? '更新' : '安装';
+    return {
+        ApiEngineKey: 'import-microi-store-package',
+        Title: `${operationText}应用：${String(input.appName || input.appId || storeId).trim()}`,
+        // STORE_APPLICATION_MCP_IDENTIFIER_ONLY_V1: never carry Package/AppPakcet/Form/Row.
+        Param: compactObject({
+            StoreId: storeId,
+            StoreVersionId: storeVersionId || undefined,
+            AppId: input.appId,
+            AppName: input.appName,
+            AppVersion: input.appVersion,
+            StoreApiBase: storeApiBase,
+            StoreOsClient: storeOsClient,
+            InstallParentSysMenuId: input.installParentSysMenuId,
+            ResumeInstall: input.resumeInstall !== false,
+            InstallAction: input.operation === 'update' ? 'Update' : 'Install',
+            InstallOperationId: requestId,
+        }),
+        Options: {
+            IdempotencyKey: `mcp:store:${input.operation}:${storeId}:${requestId}`,
+            ConcurrencyKey: 'import-microi-store-package',
+            MaxAttempts: 3,
+            RetryOnFailure: true,
+        },
+    };
+}
+function normalizeMenuJsonArray(fieldName, raw) {
+    const errors = [];
+    const warnings = [];
+    if (raw === undefined || raw === null || raw === '')
+        return { ok: true, value: undefined, errors, warnings };
+    let arr;
+    try {
+        arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    }
+    catch (error) {
+        return { ok: false, errors: [`${fieldName} 不是合法 JSON 数组：${error instanceof Error ? error.message : String(error)}`], warnings };
+    }
+    if (!Array.isArray(arr))
+        return { ok: false, errors: [`${fieldName} 必须是 JSON 数组`], warnings };
+    const ids = new Set();
+    const normalized = arr.map((item, index) => {
+        const button = asRecord(item);
+        const name = getString(button, 'Name', 'name');
+        if (!name)
+            errors.push(`${fieldName}[${index}].Name 不能为空`);
+        // PageTabs describe filters/navigation. Their names and V8 filter literals (for example,
+        // "待安装") are not action semantics and must not be inferred as background work.
+        // Explicit Workload thresholds are still evaluated for every field, including PageTabs.
+        const workloadAnalysis = analyzeBackgroundWorkload(button, {
+            inferActionSemantics: fieldName !== 'PageTabs',
+        });
+        const clientChunking = analyzeClientChunking(button);
+        let runBackground = button.RunBackground ?? button.runBackground ?? button.BackgroundTask ?? button.backgroundTask ?? button.IsBackgroundTask ?? button.isBackgroundTask;
+        const apiEngineKey = getString(button, 'ApiEngineKey', 'apiEngineKey');
+        if (workloadAnalysis.required && runBackground !== true) {
+            if (clientChunking.declared && !clientChunking.valid) {
+                errors.push(`${fieldName}[${index}] 声明客户端分片时必须设置 Workload.MaxItemsPerChunk > 0 且 Workload.Resumable=true`);
+            }
+            else if (clientChunking.valid) {
+                warnings.push(`${fieldName}[${index}] 已声明客户端可恢复分片，单片最多 ${clientChunking.maxItemsPerChunk} 条；保留前端分片执行：${workloadAnalysis.reasons.join('；')}`);
+            }
+            else if (apiEngineKey) {
+                runBackground = true;
+                warnings.push(`${fieldName}[${index}] 已识别为长任务并自动启用 RunBackground：${workloadAnalysis.reasons.join('；')}`);
+            }
+            else {
+                errors.push(`${fieldName}[${index}] 已识别为长任务，但缺少 ApiEngineKey：${workloadAnalysis.reasons.join('；')}`);
+            }
+        }
+        const backgroundTaskOptions = asRecord(button.BackgroundTaskOptions ?? button.backgroundTaskOptions);
+        if (runBackground === true) {
+            if (!getString(backgroundTaskOptions, 'IdempotencyKey', 'idempotencyKey')
+                && !getStringArray(backgroundTaskOptions, 'IdempotencyKeyFields', 'idempotencyKeyFields').length) {
+                warnings.push(`${fieldName}[${index}] 后台任务未配置 IdempotencyKey 或 IdempotencyKeyFields；涉及写操作时必须补稳定业务幂等键`);
+            }
+            if (getString(backgroundTaskOptions, 'BusinessTable', 'businessTable')
+                && (!getString(backgroundTaskOptions, 'BusinessStatusField', 'businessStatusField')
+                    || !getString(backgroundTaskOptions, 'BusinessTaskIdField', 'businessTaskIdField'))) {
+                warnings.push(`${fieldName}[${index}] 已关联业务表，但缺少 BusinessStatusField/BusinessTaskIdField`);
+            }
+        }
+        const targetSysMenuId = getString(button, 'TargetSysMenuId', 'targetSysMenuId');
+        const hasRelatedModule = fieldName === 'PageTabs' && !!targetSysMenuId;
+        if (!getString(button, 'V8Code', 'v8Code') && !getString(button, 'Url', 'url') && !(runBackground && apiEngineKey) && !hasRelatedModule) {
+            errors.push(`${fieldName}[${index}] 必须配置 V8Code、Url、关联模块 TargetSysMenuId，或后台任务 ApiEngineKey`);
+        }
+        const id = getString(button, 'Id', 'id') || randomId();
+        if (!getString(button, 'Id', 'id'))
+            warnings.push(`${fieldName}[${index}] 未传 Id，已自动生成 ${id}`);
+        if (ids.has(id))
+            errors.push(`${fieldName} 中存在重复 Id：${id}`);
+        ids.add(id);
+        const codeShow = getString(button, 'V8CodeShow', 'v8CodeShow');
+        if (codeShow && !codeShow.includes('V8.Result')) {
+            warnings.push(`${fieldName}[${index}].V8CodeShow 建议显式赋值 V8.Result=true/false`);
+        }
+        return compactObject({
+            ...button,
+            Id: id,
+            Sort: getNumber(button, 'Sort', 'sort') ?? index * 10,
+            Name: name,
+            Icon: getString(button, 'Icon', 'icon') || undefined,
+            BtnStyle: getString(button, 'BtnStyle', 'btnStyle') || undefined,
+            IsVisible: button.IsVisible ?? button.isVisible ?? true,
+            ShowRow: fieldName === 'MoreBtns' ? (button.ShowRow ?? button.showRow ?? true) : (button.ShowRow ?? button.showRow),
+            V8CodeShow: codeShow || undefined,
+            V8Code: getString(button, 'V8Code', 'v8Code') || undefined,
+            Url: getString(button, 'Url', 'url') || undefined,
+            RunBackground: runBackground === undefined ? undefined : !!runBackground,
+            BackgroundTask: button.BackgroundTask ?? button.backgroundTask ?? undefined,
+            IsBackgroundTask: button.IsBackgroundTask ?? button.isBackgroundTask ?? undefined,
+            ApiEngineKey: apiEngineKey || undefined,
+            Workload: Object.keys(asRecord(button.Workload ?? button.workload)).length
+                ? asRecord(button.Workload ?? button.workload)
+                : undefined,
+            BackgroundTaskOptions: Object.keys(backgroundTaskOptions).length ? backgroundTaskOptions : undefined,
+            TargetSysMenuId: targetSysMenuId || undefined,
+        });
+    });
+    return { ok: errors.length === 0, value: JSON.stringify(normalized), errors, warnings };
+}
+function validTableHeaderGroup(value, depth = 0) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 3)
+        return false;
+    const group = value;
+    const label = String(group.Label ?? group.label ?? '').trim();
+    if (!label || label.length > 80)
+        return false;
+    const fields = group.Fields ?? group.fields;
+    const children = group.Children ?? group.children;
+    if (Array.isArray(fields) && fields.length > 0 && children === undefined) {
+        return fields.length <= 64 && fields.every(field => typeof field === 'string' && field.trim().length > 0 && field.length <= 128);
+    }
+    return fields === undefined && Array.isArray(children) && children.length > 0
+        && children.length <= 32 && children.every(child => validTableHeaderGroup(child, depth + 1));
+}
+export function normalizeAllMenuJson(data) {
+    const result = { ...data };
+    const errors = [];
+    const warnings = [];
+    if (data.DiyConfig !== undefined || data.diyConfig !== undefined) {
+        errors.push('DiyConfig 已废弃；请新增专用物理字段，并通过 diy_field 元数据暴露配置控件。跨端视图请使用 sys_menu.ViewSchema。');
+        delete result.DiyConfig;
+        delete result.diyConfig;
+    }
+    const fieldMap = {
+        MoreBtns: ['MoreBtns', 'moreBtns'],
+        FormBtns: ['FormBtns', 'formBtns'],
+        BatchSelectMoreBtns: ['BatchSelectMoreBtns', 'batchSelectMoreBtns'],
+        PageTabs: ['PageTabs', 'pageTabs'],
+        ExportMoreBtns: ['ExportMoreBtns', 'exportMoreBtns'],
+        PageBtns: ['PageBtns', 'pageBtns'],
+    };
+    for (const [canonical, keys] of Object.entries(fieldMap)) {
+        const key = keys.find((candidate) => data[candidate] !== undefined);
+        if (!key)
+            continue;
+        const normalized = normalizeMenuJsonArray(canonical, data[key]);
+        errors.push(...normalized.errors);
+        warnings.push(...normalized.warnings);
+        if (normalized.ok && normalized.value !== undefined)
+            result[canonical] = normalized.value;
+    }
+    const numericAliases = [
+        ['TreeDragSortEnabled', 'treeDragSortEnabled'],
+        ['MenuBadgeEnabled', 'menuBadgeEnabled'],
+        ['HideTableBanner', 'hideTableBanner'],
+        ['HideFormBanner', 'hideFormBanner'],
+        ['EnableViewSchema', 'enableViewSchema'],
+        ['ViewConfigVersion', 'viewConfigVersion'],
+    ];
+    for (const [canonical, alias] of numericAliases) {
+        if (data[canonical] === undefined && data[alias] === undefined)
+            continue;
+        const raw = data[canonical] ?? data[alias];
+        const value = canonical !== 'ViewConfigVersion' && typeof raw === 'boolean'
+            ? (raw ? 1 : 0)
+            : getNumber(data, canonical, alias);
+        if (value !== undefined)
+            result[canonical] = (canonical.endsWith('Enabled') || canonical.endsWith('Banner')) ? (value === 1 ? 1 : 0) : value;
+        delete result[alias];
+    }
+    const headerKey = ['TableHeaders', 'tableHeaders'].find((candidate) => data[candidate] !== undefined);
+    if (headerKey) {
+        try {
+            const groups = typeof data[headerKey] === 'string' ? JSON.parse(data[headerKey]) : data[headerKey];
+            if (!Array.isArray(groups) || groups.length > 32 || groups.some(group => !validTableHeaderGroup(group))) {
+                errors.push('TableHeaders 必须为最多 32 个分组的数组，每组包含 Label 和 Fields 或 Children 数组。');
+            }
+            else {
+                result.TableHeaders = JSON.stringify(groups);
+            }
+        }
+        catch {
+            errors.push('TableHeaders 必须是合法 JSON 数组。');
+        }
+        delete result.tableHeaders;
+    }
+    const stringAliases = [
+        ['TreeDragSortField', 'treeDragSortField'],
+        ['MenuBadgeApiEngineKey', 'menuBadgeApiEngineKey'],
+        ['ViewSchemaVersion', 'viewSchemaVersion'],
+    ];
+    for (const [canonical, alias] of stringAliases) {
+        if (data[canonical] === undefined && data[alias] === undefined)
+            continue;
+        result[canonical] = getString(data, canonical, alias);
+        delete result[alias];
+    }
+    const permissionKey = ['FieldPermissions', 'fieldPermissions'].find(key => data[key] !== undefined);
+    if (permissionKey) {
+        try {
+            const value = typeof data[permissionKey] === 'string' ? JSON.parse(data[permissionKey]) : data[permissionKey];
+            if (!value || typeof value !== 'object' || Array.isArray(value) || (value.Enabled && (value.Version !== 1 || !Array.isArray(value.Rules) || value.Rules.length > 200)))
+                errors.push('FieldPermissions 必须为字段权限 v1 配置对象。');
+            else
+                result.FieldPermissions = JSON.stringify(value);
+        }
+        catch {
+            errors.push('FieldPermissions 必须是合法 JSON 对象。');
+        }
+        delete result.fieldPermissions;
+    }
+    const viewSchemaKey = ['ViewSchema', 'viewSchema'].find((candidate) => data[candidate] !== undefined);
+    if (viewSchemaKey) {
+        const normalized = normalizeViewSchemaJson(data[viewSchemaKey]);
+        errors.push(...normalized.errors);
+        warnings.push(...normalized.warnings);
+        delete result.viewSchema;
+        if (normalized.value !== undefined)
+            result.ViewSchema = normalized.value;
+    }
+    return { data: result, errors, warnings };
+}
+function getBoolean(record, ...keys) {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'boolean')
+            return value;
+        if (typeof value === 'number')
+            return value !== 0;
+        if (typeof value === 'string' && value.trim()) {
+            const normalized = value.trim().toLowerCase();
+            if (['true', '1', 'yes'].includes(normalized))
+                return true;
+            if (['false', '0', 'no'].includes(normalized))
+                return false;
+        }
+    }
+    return undefined;
+}
+function validateTableV8Limit(record, path, errors, warnings) {
+    const rawPositive = getValue(record, 'v8Limit', 'V8Limit');
+    const rawLegacy = getValue(record, 'v8Unlimited', 'V8Unlimited');
+    if ((rawPositive === undefined || rawPositive === null || rawPositive === '')
+        && (rawLegacy === undefined || rawLegacy === null || rawLegacy === ''))
+        return undefined;
+    const hasPositive = rawPositive !== undefined && rawPositive !== null && rawPositive !== '';
+    const value = hasPositive
+        ? getBoolean(record, 'v8Limit', 'V8Limit')
+        : getEngineV8Limit(record);
+    if (value === undefined) {
+        errors.push(`${path}.v8Limit 必须是 boolean 或 0/1`);
+        return undefined;
+    }
+    if (hasPositive && rawLegacy !== undefined) {
+        const legacyLimit = getBoolean(record, 'v8Unlimited', 'V8Unlimited');
+        if (legacyLimit !== undefined && value !== !legacyLimit) {
+            errors.push(`${path}.v8Limit 与兼容字段 v8Unlimited 的语义冲突`);
+        }
+    }
+    else if (rawLegacy !== undefined) {
+        warnings.push(`${path}.v8Unlimited 已弃用；表单引擎请改用正向字段 v8Limit（false=不限，true=启用限制）`);
+    }
+    return value;
+}
+export function buildGenerateSystemValidationPayload(results, validation) {
+    return {
+        ok: validation.Code === 1 && asRecord(validation.Data).Passed !== false,
+        results,
+        validation: {
+            Code: validation.Code,
+            Msg: validation.Msg ?? null,
+            Data: validation.Data ?? null,
+        },
+    };
+}
+function getEngineV8Limit(record) {
+    const positive = getBoolean(record, 'v8Limit', 'V8Limit');
+    if (positive !== undefined)
+        return positive;
+    const legacy = getBoolean(record, 'v8Unlimited', 'V8Unlimited');
+    return legacy === undefined ? undefined : !legacy;
+}
+function validateEngineV8Limit(record, path, errors, warnings) {
+    const rawPositive = getValue(record, 'v8Limit', 'V8Limit');
+    const rawLegacy = getValue(record, 'v8Unlimited', 'V8Unlimited');
+    if ((rawPositive === undefined || rawPositive === null || rawPositive === '')
+        && (rawLegacy === undefined || rawLegacy === null || rawLegacy === ''))
+        return undefined;
+    const hasPositive = rawPositive !== undefined && rawPositive !== null && rawPositive !== '';
+    const value = hasPositive
+        ? getBoolean(record, 'v8Limit', 'V8Limit')
+        : getEngineV8Limit(record);
+    if (value === undefined) {
+        errors.push(`${path}.v8Limit 必须是 boolean 或 0/1`);
+        return undefined;
+    }
+    if (hasPositive && rawLegacy !== undefined) {
+        const legacyLimit = getBoolean(record, 'v8Unlimited', 'V8Unlimited');
+        if (legacyLimit !== undefined && value !== !legacyLimit) {
+            errors.push(`${path}.v8Limit 与兼容字段 v8Unlimited 的语义冲突`);
+        }
+    }
+    else if (rawLegacy !== undefined) {
+        warnings.push(`${path}.v8Unlimited 已弃用；接口引擎请改用正向字段 v8Limit（false=不限，true=启用限制）`);
+    }
+    return value;
+}
+const VIEW_SCHEMA_SCENES = ['Detail', 'Edit', 'List', 'Card'];
+const VIEW_SCHEMA_DEVICES = ['PC', 'Mobile', 'All'];
+const VIEW_SCHEMA_ACTION_TYPES = [
+    'ApiEngine', 'OpenDetail', 'OpenList', 'OpenForm', 'Navigate',
+    'Dial', 'Scan', 'Map', 'Refresh', 'Back', 'Copy',
+];
+const VIEW_SCHEMA_EXECUTABLE_KEYS = new Set([
+    'v8code', 'v8codeshow', 'script', 'javascript', 'eval', 'onclick', 'function',
+]);
+function canonicalValue(value, allowed) {
+    const source = String(value ?? '').trim().toLowerCase();
+    return allowed.find((item) => item.toLowerCase() === source) || '';
+}
+function findRecordValue(record, ...keys) {
+    const names = new Set(keys.map((key) => key.toLowerCase()));
+    const entry = Object.entries(record).find(([key]) => names.has(key.toLowerCase()));
+    return entry?.[1];
+}
+function findExecutableKey(value, path = 'ViewSchema') {
+    if (Array.isArray(value)) {
+        for (let index = 0; index < value.length; index += 1) {
+            const found = findExecutableKey(value[index], `${path}[${index}]`);
+            if (found)
+                return found;
+        }
+        return '';
+    }
+    if (!value || typeof value !== 'object')
+        return '';
+    for (const [key, child] of Object.entries(value)) {
+        if (VIEW_SCHEMA_EXECUTABLE_KEYS.has(key.toLowerCase()))
+            return `${path}.${key}`;
+        const found = findExecutableKey(child, `${path}.${key}`);
+        if (found)
+            return found;
+    }
+    return '';
+}
+function validateViewActions(value, path, depth = 0) {
+    if (value === undefined || value === null)
+        return [];
+    if (depth > 4)
+        return [`${path} 的 SuccessActions 嵌套不能超过 4 层`];
+    if (!Array.isArray(value))
+        return [`${path} 必须是 JSON 数组`];
+    if (value.length > 50)
+        return [`${path} 最多允许 50 个动作`];
+    const errors = [];
+    value.forEach((rawAction, index) => {
+        const action = asRecord(rawAction);
+        if (!Object.keys(action).length) {
+            errors.push(`${path}[${index}] 必须是 JSON 对象`);
+            return;
+        }
+        const actionType = canonicalValue(findRecordValue(action, 'ActionType', 'Type'), VIEW_SCHEMA_ACTION_TYPES);
+        if (!actionType) {
+            errors.push(`${path}[${index}].ActionType 不受支持`);
+            return;
+        }
+        if (actionType === 'ApiEngine' && !getString(action, 'ApiEngineKey', 'apiEngineKey')) {
+            errors.push(`${path}[${index}] 使用 ApiEngine 时必须配置 ApiEngineKey`);
+        }
+        const successActions = findRecordValue(action, 'SuccessActions');
+        errors.push(...validateViewActions(successActions, `${path}[${index}].SuccessActions`, depth + 1));
+    });
+    return errors;
+}
+export function normalizeViewSchemaJson(raw) {
+    const errors = [];
+    const warnings = [];
+    if (raw === undefined || raw === null || raw === '') {
+        return { ok: true, value: undefined, errors, warnings };
+    }
+    let schema = raw;
+    try {
+        if (typeof schema === 'string')
+            schema = JSON.parse(schema);
+        if (typeof schema === 'string')
+            schema = JSON.parse(schema);
+    }
+    catch (error) {
+        return {
+            ok: false,
+            errors: [`ViewSchema 不是合法 JSON：${error instanceof Error ? error.message : String(error)}`],
+            warnings,
+        };
+    }
+    if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+        return { ok: false, errors: ['ViewSchema 必须是 JSON 对象'], warnings };
+    }
+    const executableKey = findExecutableKey(schema);
+    if (executableKey) {
+        errors.push(`ViewSchema 不允许包含可执行前端脚本字段：${executableKey}`);
+    }
+    const schemaRecord = schema;
+    const views = findRecordValue(schemaRecord, 'Views');
+    if (views !== undefined && !Array.isArray(views)) {
+        errors.push('ViewSchema.Views 必须是 JSON 数组');
+    }
+    else if (Array.isArray(views)) {
+        if (views.length > 100)
+            errors.push('ViewSchema.Views 最多允许 100 个视图');
+        views.forEach((rawView, viewIndex) => {
+            const view = asRecord(rawView);
+            if (!Object.keys(view).length) {
+                errors.push(`ViewSchema.Views[${viewIndex}] 必须是 JSON 对象`);
+                return;
+            }
+            if (!canonicalValue(findRecordValue(view, 'Scene'), VIEW_SCHEMA_SCENES)) {
+                errors.push(`ViewSchema.Views[${viewIndex}].Scene 不受支持`);
+            }
+            const rawDevice = findRecordValue(view, 'Device');
+            if (rawDevice !== undefined && !canonicalValue(rawDevice, VIEW_SCHEMA_DEVICES)) {
+                errors.push(`ViewSchema.Views[${viewIndex}].Device 不受支持`);
+            }
+            let layout = findRecordValue(view, 'Layout', 'LayoutJson');
+            if (typeof layout === 'string') {
+                try {
+                    layout = JSON.parse(layout);
+                }
+                catch (error) {
+                    errors.push(`ViewSchema.Views[${viewIndex}].Layout 不是合法 JSON`);
+                    return;
+                }
+            }
+            if (layout === undefined || layout === null)
+                return;
+            const layoutRecord = asRecord(layout);
+            if (!Object.keys(layoutRecord).length && (typeof layout !== 'object' || Array.isArray(layout))) {
+                errors.push(`ViewSchema.Views[${viewIndex}].Layout 必须是 JSON 对象`);
+                return;
+            }
+            errors.push(...validateViewActions(findRecordValue(layoutRecord, 'Actions', 'ActionSchema'), `ViewSchema.Views[${viewIndex}].Layout.Actions`));
+            const blocks = findRecordValue(layoutRecord, 'Blocks', 'Sections');
+            if (blocks !== undefined && !Array.isArray(blocks)) {
+                errors.push(`ViewSchema.Views[${viewIndex}].Layout.Blocks 必须是 JSON 数组`);
+            }
+            else if (Array.isArray(blocks)) {
+                if (blocks.length > 100) {
+                    errors.push(`ViewSchema.Views[${viewIndex}].Layout.Blocks 最多允许 100 个区块`);
+                }
+                blocks.forEach((rawBlock, blockIndex) => {
+                    const block = asRecord(rawBlock);
+                    errors.push(...validateViewActions(findRecordValue(block, 'Actions'), `ViewSchema.Views[${viewIndex}].Layout.Blocks[${blockIndex}].Actions`));
+                });
+            }
+        });
+    }
+    else {
+        warnings.push('ViewSchema.Views 为空，客户端将使用现有模块和表单配置。');
+    }
+    const value = JSON.stringify(schema);
+    if (Buffer.byteLength(value, 'utf8') > 512 * 1024) {
+        errors.push('ViewSchema 不能超过 512KB');
+    }
+    return { ok: errors.length === 0, value, errors, warnings };
+}
+function buildFieldConfig(sourceType, options) {
+    const warnings = [];
+    const type = sourceType.toLowerCase();
+    if (type === 'fileupload')
+        return { config: buildFileUploadConfig(options), warnings };
+    if (type === 'keyvalue') {
+        const raw = getString(options, 'data', 'options');
+        const rows = raw
+            ? raw.split(/[,，;；\n]/).map((item) => item.trim()).filter(Boolean).map((item) => {
+                const [key, label] = item.split('|');
+                return { Key: (key || '').trim(), Value: (label || key || '').trim() };
+            })
+            : asArray(options.items).map((item) => ({ Key: getString(item, 'Key', 'key'), Value: getString(item, 'Value', 'label', 'name') }));
+        return {
+            data: JSON.stringify(rows),
+            config: { DataSource: 'KeyValue', SelectLabel: 'Value', SelectSaveField: 'Key', SelectSaveFormat: 'Text', EnableSearch: false, DataSourceSqlRemote: false },
+            warnings,
+        };
+    }
+    if (type === 'data') {
+        const raw = getString(options, 'data', 'options');
+        const rows = raw ? raw.split(/[,，;；\n]/).map((item) => item.trim()).filter(Boolean) : (Array.isArray(options.items) ? options.items : []);
+        return { data: JSON.stringify(rows), config: { DataSource: 'Data', SelectSaveFormat: 'Text', EnableSearch: false, DataSourceSqlRemote: false }, warnings };
+    }
+    if (type === 'sql') {
+        const sql = getString(options, 'sql', 'Sql');
+        if (!sql)
+            warnings.push('SQL 数据源缺少 sql');
+        return {
+            config: {
+                DataSource: 'Sql', Sql: sql, SelectLabel: getString(options, 'selectLabel', 'SelectLabel') || 'Name',
+                SelectSaveField: getString(options, 'selectSaveField', 'SelectSaveField') || 'Id',
+                DataSourceSqlRemote: options.dataSourceSqlRemote ?? options.DataSourceSqlRemote ?? true,
+                EnableSearch: options.enableSearch ?? options.EnableSearch ?? true,
+            },
+            warnings,
+        };
+    }
+    if (type === 'apiengine') {
+        const apiEngineKey = getString(options, 'apiEngineKey', 'DataSourceApiEngineKey');
+        if (!apiEngineKey)
+            warnings.push('接口引擎数据源缺少 apiEngineKey');
+        return { config: { DataSource: 'ApiEngine', DataSourceApiEngineKey: apiEngineKey, SelectLabel: getString(options, 'selectLabel') || 'name', SelectSaveField: getString(options, 'selectSaveField') || 'id' }, warnings };
+    }
+    if (type === 'datasource') {
+        const dataSourceId = getString(options, 'dataSourceId', 'DataSourceId');
+        if (!dataSourceId)
+            warnings.push('数据源引擎配置缺少 dataSourceId');
+        return { config: { DataSource: 'DataSource', DataSourceId: dataSourceId, SelectLabel: getString(options, 'selectLabel') || 'Name', SelectSaveField: getString(options, 'selectSaveField') || 'Id' }, warnings };
+    }
+    if (type === 'autonumber') {
+        return { config: { AutoNumberFixed: getString(options, 'prefix', 'AutoNumberFixed'), AutoNumberLength: getNumber(options, 'length', 'AutoNumberLength') ?? 4 }, warnings };
+    }
+    if (type === 'datetime') {
+        return { config: { DateTimeType: getString(options, 'dateTimeType', 'DateTimeType') || 'datetime' }, warnings };
+    }
+    if (type === 'joinform') {
+        const tableId = getString(options, 'tableId');
+        const tableName = getString(options, 'tableName');
+        const joinFieldName = getString(options, 'joinFieldName');
+        if (!tableId && !tableName)
+            warnings.push('JoinForm 缺少 tableId/tableName，禁止保存未解析目标表的配置');
+        if (!joinFieldName)
+            warnings.push('JoinForm 缺少 joinFieldName；该字段必须是当前主表中保存目标记录 Id 的真实字段名');
+        return { config: { JoinForm: compactObject({ TableId: tableId, TableName: tableName, JoinFieldName: joinFieldName }) }, warnings };
+    }
+    warnings.push(`未知 sourceType: ${sourceType}，已返回空配置`);
+    return { config: {}, warnings };
+}
+function toSearchFieldModel(meta, ref) {
+    const component = componentKey(meta);
+    return compactObject({
+        Id: meta.id,
+        AsName: ref?.asName || '',
+        Name: meta.name,
+        Label: meta.label || meta.name,
+        TableId: meta.tableId,
+        TableName: meta.tableName,
+        TableDescription: meta.tableDescription || meta.tableName,
+        DisplayType: ref?.displayType || (EXACT_SEARCH_COMPONENTS.has(component) || isDateField(meta) || component === 'numbertext' ? 'In' : 'Out'),
+        DisplaySelect: ref?.displaySelect ?? ['opentable', 'joinform', 'department', 'selecttree'].includes(component),
+        Equal: ref?.equal ?? (EXACT_SEARCH_COMPONENTS.has(component) || component === 'numbertext' ? true : undefined),
+        IsVisible: true,
+    });
+}
+function resolveFieldRefs(lookup, tableId, tableName, refs, context) {
+    return refs.map((ref) => {
+        const meta = findFieldMeta(lookup, tableId, ref.ref)
+            || findFieldMeta(lookup, tableName, ref.ref)
+            || (isSystemFieldName(ref.ref) ? systemFieldMeta(tableId, tableName, ref.ref) : undefined);
+        if (!meta)
+            throw new Error(`${context}: unknown field "${ref.ref}" on table "${tableName || tableId}"`);
+        return { meta, ref };
+    });
+}
+function getExplicitJsonString(record, ...keys) {
+    for (const key of keys) {
+        const value = getValue(record, key);
+        if (value === undefined || value === null || value === '')
+            continue;
+        return typeof value === 'string' ? value : JSON.stringify(value);
+    }
+    return '';
+}
+const TECHNICAL_FIELD_NAMES = new Set([
+    'id', 'osclient', 'isdeleted', 'createuserid', 'updateuserid', 'deleteuserid',
+    'tenantid', 'storeid', 'userid', 'userids', 'roleid', 'roleids', 'parentid',
+    'parentids', 'class', 'code', 'enname', 'endescription',
+]);
+const LAYOUT_COMPONENTS = new Set([
+    'button', 'divider', 'collapsegroup', 'tabs', 'alert', 'statictext', 'html', 'devcomponent',
+]);
+const HEAVY_LIST_COMPONENTS = new Set([
+    'textarea', 'richtext', 'codeeditor', 'jsontable', 'imgupload', 'fileupload',
+    'tablechild', 'map', 'maparea', 'jointable', 'opentable', 'treecheckbox', 'transfer',
+]);
+const SEARCHABLE_COMPONENTS = new Set([
+    'text', 'textarea', 'select', 'multipleselect', 'radio', 'checkbox', 'datetime',
+    'date', 'numbertext', 'autonumber', 'switch', 'department', 'address', 'cascader',
+    'selecttree', 'opentable', 'joinform', 'autocomplete', 'taginput',
+]);
+const EXACT_SEARCH_COMPONENTS = new Set([
+    'select', 'multipleselect', 'radio', 'checkbox', 'switch', 'department', 'selecttree',
+    'opentable', 'joinform', 'cascader',
+]);
+function lower(value) {
+    return (value || '').trim().toLowerCase();
+}
+function fieldText(field) {
+    return `${field.name || ''} ${field.label || ''} ${field.component || ''} ${field.type || ''}`.toLowerCase();
+}
+function hasKeyword(text, keywords) {
+    return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+function componentKey(field) {
+    return lower(field.component || 'Text');
+}
+function isLayoutField(field) {
+    return LAYOUT_COMPONENTS.has(componentKey(field));
+}
+function isHeavyListField(field) {
+    return HEAVY_LIST_COMPONENTS.has(componentKey(field));
+}
+function isIdLikeField(field) {
+    const name = field.name || '';
+    const normalized = lower(name).replace(/[_\-\s]+/g, '');
+    if (TECHNICAL_FIELD_NAMES.has(normalized))
+        return true;
+    if (/^(.*id|.*ids|.*idlist|.*guid)$/.test(normalized) && !/idcard|identity|cardid/.test(normalized))
+        return true;
+    if (/Id$|ID$|Ids$|IDs$|Guid$/u.test(name) && !/IdCard|IDCard|Identity|CardId/u.test(name))
+        return true;
+    return false;
+}
+function shouldHideInMenuList(field) {
+    if (isSystemFieldName(field.name) && !['CreateTime', 'UpdateTime', 'UserName'].some((name) => name.toLowerCase() === field.name.toLowerCase()))
+        return true;
+    if (isIdLikeField(field))
+        return true;
+    if (isLayoutField(field))
+        return true;
+    if (isHeavyListField(field))
+        return true;
+    return componentKey(field).includes('hidden');
+}
+function uniqueFields(fields) {
+    const seen = new Set();
+    return fields.filter((field) => {
+        const key = field.id || field.name;
+        if (!key || seen.has(key))
+            return false;
+        seen.add(key);
+        return true;
+    });
+}
+function rankedFields(fields, score) {
+    return fields
+        .map((field, index) => ({ field, index, score: score(field) }))
+        .sort((a, b) => b.score - a.score || a.index - b.index)
+        .map((item) => item.field);
+}
+function isNumericField(field) {
+    const type = lower(field.type);
+    return componentKey(field) === 'numbertext'
+        || type.startsWith('decimal')
+        || type === 'int'
+        || type === 'bigint';
+}
+function isDateField(field) {
+    const text = fieldText(field);
+    return componentKey(field) === 'datetime' || hasKeyword(text, ['time', 'date', '日期', '时间']);
+}
+function defaultSearchRef(meta) {
+    const component = componentKey(meta);
+    const exact = EXACT_SEARCH_COMPONENTS.has(component) || component === 'numbertext' || component === 'rate' || component === 'progress';
+    return {
+        ref: meta.name,
+        displayType: exact || isDateField(meta) ? 'In' : 'Out',
+        displaySelect: ['opentable', 'joinform', 'department', 'selecttree'].includes(component),
+        equal: exact ? true : undefined,
+    };
+}
+function searchFieldScore(field) {
+    const text = fieldText(field);
+    let score = 0;
+    if (hasKeyword(text, ['name', 'title', 'no', 'code', 'account', 'phone', 'mobile', 'email', '名称', '标题', '编号', '账号', '电话', '手机', '邮箱']))
+        score += 50;
+    if (hasKeyword(text, ['status', 'state', 'type', 'category', 'level', 'class', '状态', '类型', '分类', '等级']))
+        score += 45;
+    if (hasKeyword(text, ['customer', 'member', 'user', 'owner', '负责人', '客户', '会员', '用户', '联系人']))
+        score += 35;
+    if (isDateField(field))
+        score += 25;
+    if (isNumericField(field) && !hasKeyword(text, ['phone', 'mobile', 'tel', '电话', '手机']))
+        score += 15;
+    if (componentKey(field) === 'textarea')
+        score -= 25;
+    return score;
+}
+function listFieldScore(field) {
+    const text = fieldText(field);
+    let score = 0;
+    if (hasKeyword(text, ['name', 'title', 'no', 'code', '名称', '标题', '编号']))
+        score += 70;
+    if (hasKeyword(text, ['status', 'state', 'type', 'category', '状态', '类型', '分类']))
+        score += 45;
+    if (hasKeyword(text, ['customer', 'member', 'user', 'owner', 'phone', 'mobile', '客户', '会员', '用户', '负责人', '电话', '手机']))
+        score += 35;
+    if (hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', 'qty', '金额', '价格', '总额', '数量', '积分', '余额']))
+        score += 30;
+    if (isDateField(field))
+        score += 15;
+    if (componentKey(field) === 'autonumber')
+        score += 55;
+    return score;
+}
+function defaultHiddenFields(fields) {
+    return uniqueFields(fields.filter(shouldHideInMenuList));
+}
+function defaultListFields(fields) {
+    const businessFields = fields.filter((field) => !shouldHideInMenuList(field));
+    const source = businessFields.length ? businessFields : fields;
+    return uniqueFields(rankedFields(source, listFieldScore)).slice(0, Math.min(12, source.length));
+}
+function defaultSearchFields(fields) {
+    const candidates = fields.filter((field) => !shouldHideInMenuList(field) && SEARCHABLE_COMPONENTS.has(componentKey(field)));
+    const ranked = rankedFields(candidates, searchFieldScore).filter((field) => searchFieldScore(field) > 0);
+    return uniqueFields((ranked.length ? ranked : candidates)).slice(0, Math.min(8, candidates.length));
+}
+function defaultSortFields(fields) {
+    const candidates = fields.filter((field) => !shouldHideInMenuList(field) && (isDateField(field) || isNumericField(field) || lower(field.name) === 'sort'));
+    return uniqueFields(rankedFields(candidates, (field) => {
+        const text = fieldText(field);
+        if (hasKeyword(text, ['update', '修改']))
+            return 80;
+        if (hasKeyword(text, ['create', '创建']))
+            return 75;
+        if (lower(field.name) === 'sort')
+            return 70;
+        if (hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', '金额', '价格', '数量']))
+            return 60;
+        return 20;
+    })).slice(0, Math.min(8, candidates.length));
+}
+function defaultStatisticsFields(fields) {
+    const blocked = ['phone', 'mobile', 'tel', 'status', 'state', 'sort', 'rate', 'level', '电话', '手机', '状态', '排序', '等级'];
+    const candidates = fields.filter((field) => {
+        const text = fieldText(field);
+        return !shouldHideInMenuList(field)
+            && isNumericField(field)
+            && !hasKeyword(text, blocked)
+            && hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', 'qty', 'score', 'point', 'balance', '金额', '价格', '总额', '数量', '积分', '余额', '面积', '重量']);
+    });
+    return uniqueFields(rankedFields(candidates, (field) => hasKeyword(fieldText(field), ['amount', 'money', 'price', 'total', '金额', '价格', '总额']) ? 80 : 40)).slice(0, 6);
+}
+function defaultMobileFields(fields) {
+    const candidates = defaultListFields(fields);
+    const title = rankedFields(candidates, (field) => hasKeyword(fieldText(field), ['name', 'title', 'no', 'code', '名称', '标题', '编号']) ? 100 : 0)[0];
+    const tags = rankedFields(candidates.filter((field) => field !== title), (field) => hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', '状态', '类型', '分类']) ? 80 : 0);
+    const rest = candidates.filter((field) => field !== title && !tags.slice(0, 1).includes(field));
+    return uniqueFields([title, ...tags.slice(0, 1), ...rest].filter(Boolean)).slice(0, 4);
+}
+function defaultCardTitleFields(fields) {
+    return rankedFields(defaultListFields(fields), (field) => hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'level', '状态', '类型', '分类', '等级']) ? 100 : 0)
+        .filter((field) => hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'level', '状态', '类型', '分类', '等级']))
+        .slice(0, 2);
+}
+function defaultCardBottomFields(fields) {
+    return rankedFields(defaultListFields(fields), (field) => {
+        const text = fieldText(field);
+        if (hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', 'qty', '积分', '余额', '金额', '价格', '数量']))
+            return 90;
+        if (isDateField(field))
+            return 60;
+        return 0;
+    }).filter((field) => {
+        const text = fieldText(field);
+        return isDateField(field) || hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', 'qty', '积分', '余额', '金额', '价格', '数量']);
+    }).slice(0, 3);
+}
+function presentationFieldMeta(value, index = 0) {
+    const field = asRecord(value);
+    const name = getString(field, 'name', 'Name');
+    if (!name)
+        return null;
+    return {
+        id: getString(field, 'id', 'Id') || name,
+        name,
+        label: getString(field, 'label', 'Label') || name,
+        tableId: getString(field, 'tableId', 'TableId'),
+        tableName: getString(field, 'tableName', 'TableName'),
+        tableDescription: getString(field, 'tableDescription', 'TableDescription'),
+        component: getString(field, 'component', 'Component') || 'Text',
+        type: getString(field, 'type', 'Type') || 'varchar(500)',
+    };
+}
+/** Stable semantic list width used when AI/Manifest callers omit TableWidth. */
+export function inferTableColumnWidth(value) {
+    const field = presentationFieldMeta(value);
+    if (!field)
+        return 150;
+    const text = fieldText(field);
+    const component = componentKey(field);
+    if (['richtext', 'textarea', 'address', 'map', 'maparea', 'fileupload', 'imgupload'].includes(component)
+        || hasKeyword(text, ['address', 'remark', 'description', 'content', '地址', '备注', '说明', '内容', '附件', '图片']))
+        return 240;
+    if (hasKeyword(text, ['name', 'title', 'subject', 'customer', 'company', '名称', '标题', '主题', '客户', '企业']))
+        return 200;
+    if (isDateField(field))
+        return 170;
+    if (isNumericField(field))
+        return 140;
+    if (component === 'autonumber' || hasKeyword(text, ['phone', 'mobile', 'email', 'code', 'number', '编号', '单号', '电话', '手机', '邮箱']))
+        return 160;
+    if (EXACT_SEARCH_COMPONENTS.has(component) || hasKeyword(text, ['status', 'state', 'type', 'category', '状态', '类型', '分类']))
+        return 130;
+    return 150;
+}
+function presentationDescriptor(field, extras = {}) {
+    return {
+        Name: field.name,
+        Label: field.label || field.name,
+        ...extras,
+    };
+}
+function takeUnusedPresentationFields(candidates, count, used) {
+    const result = [];
+    for (const field of candidates) {
+        if (!field?.name || used.has(lower(field.name)))
+            continue;
+        used.add(lower(field.name));
+        result.push(field);
+        if (result.length >= count)
+            break;
+    }
+    return result;
+}
+/**
+ * Minimum production-ready List/Card presentation for every visible bound module.
+ * It intentionally contains no Detail/Edit views, so EnableViewSchema remains a
+ * custom-form switch only. Metrics are real field aggregates/list counts; never random.
+ */
+export function buildDefaultModulePresentation(moduleName, rawFields, tableDescription = '') {
+    const fields = rawFields.map(presentationFieldMeta).filter(Boolean);
+    const visible = defaultListFields(fields);
+    const title = String(moduleName || tableDescription || fields[0]?.tableDescription || fields[0]?.tableName || '业务模块').trim();
+    const descriptionSource = String(tableDescription || fields[0]?.tableDescription || '').trim();
+    const description = descriptionSource && descriptionSource !== title
+        ? descriptionSource
+        : `${title}的业务数据、进度与关键指标`;
+    const primary = rankedFields(visible, (field) => {
+        const text = fieldText(field);
+        if (hasKeyword(text, ['title', 'subject', '标题', '主题']))
+            return 150;
+        if (hasKeyword(text, ['name', '名称']))
+            return 130;
+        if (componentKey(field) === 'autonumber' || hasKeyword(text, ['no', 'code', 'number', '编号', '单号', '编码']))
+            return 110;
+        return listFieldScore(field);
+    })[0] || visible[0];
+    const statusCandidates = rankedFields(visible.filter((field) => field !== primary), (field) => (hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'stage', '状态', '类型', '分类', '阶段']) ? 100 : 0)).filter((field) => hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'stage', '状态', '类型', '分类', '阶段']));
+    const numericCandidates = defaultStatisticsFields(fields).filter((field) => field !== primary);
+    const dateCandidates = rankedFields(fields.filter(isDateField), (field) => hasKeyword(fieldText(field), ['create', '创建']) ? 100 : 50);
+    const lineCandidates = rankedFields(visible.filter((field) => field !== primary
+        && !statusCandidates.includes(field)
+        && !numericCandidates.includes(field)), (field) => {
+        const text = fieldText(field);
+        if (hasKeyword(text, ['customer', 'member', 'user', 'owner', 'contact', '客户', '会员', '用户', '负责人', '联系人']))
+            return 90;
+        if (isDateField(field))
+            return 70;
+        return listFieldScore(field);
+    }).slice(0, 1);
+    const trailingFields = uniqueFields([...statusCandidates.slice(0, 1), ...numericCandidates.slice(0, 1)]);
+    const requiredFields = uniqueFields([primary, ...lineCandidates, ...trailingFields].filter(Boolean))
+        .map((field) => field.name);
+    const compositeWidth = primary
+        ? Math.min(520, Math.max(340, inferTableColumnWidth(primary) + (lineCandidates.length * 28) + (trailingFields.length * 70)))
+        : 0;
+    const metricVisuals = [
+        { Icon: 'fas fa-chart-column', Tone: 'primary' },
+        { Icon: 'fas fa-calculator', Tone: 'success' },
+    ];
+    const metrics = numericCandidates.slice(0, 2).map((field, index) => ({
+        Key: `Aggregate:${field.name}`,
+        Label: `${field.label || field.name}合计`,
+        Source: 'Field',
+        Field: field.name,
+        ...metricVisuals[index],
+    }));
+    metrics.push({
+        Key: 'DataCount',
+        Label: '筛选结果',
+        Source: 'DataCount',
+        Icon: 'fas fa-layer-group',
+        Tone: 'info',
+    });
+    if (metrics.length < 3) {
+        metrics.push({
+            Key: 'PageCount',
+            Label: '本页展示',
+            Source: 'PageCount',
+            Icon: 'fas fa-list-check',
+            Tone: 'warning',
+        });
+    }
+    const used = new Set(primary ? [lower(primary.name)] : []);
+    const cardSubtitle = takeUnusedPresentationFields(lineCandidates, 1, used);
+    const cardStatus = takeUnusedPresentationFields(statusCandidates, 1, used);
+    const cardTop = takeUnusedPresentationFields(statusCandidates, 1, used);
+    const cardRight = takeUnusedPresentationFields(numericCandidates, 1, used);
+    const cardMeta = takeUnusedPresentationFields(dateCandidates, 2, used);
+    const cardContent = takeUnusedPresentationFields(visible, 2, used);
+    const cardBottom = takeUnusedPresentationFields([...numericCandidates, ...dateCandidates], 2, used);
+    const hero = {
+        Title: title,
+        Description: description,
+        Metrics: metrics,
+    };
+    return {
+        Views: [
+            {
+                Key: 'auto-list-pc',
+                Scene: 'List',
+                Device: 'PC',
+                Priority: 100,
+                Layout: {
+                    Hero: hero,
+                    List: {
+                        Density: 'Compact',
+                        Columns: primary ? [{
+                                Key: `composite:${primary.name}`,
+                                Field: primary.name,
+                                Lines: lineCandidates.map((field) => presentationDescriptor(field, { Icon: isDateField(field) ? 'fas fa-clock' : 'fas fa-circle-info', Tone: 'info' })),
+                                TrailingFields: trailingFields.map((field) => presentationDescriptor(field, {
+                                    Icon: statusCandidates.includes(field) ? 'fas fa-circle-check' : 'fas fa-coins',
+                                    Tone: statusCandidates.includes(field) ? 'success' : 'warning',
+                                    DisplayStyle: statusCandidates.includes(field) ? 'Tag' : 'Text',
+                                })),
+                                RequiredFields: requiredFields,
+                                Align: 'Left',
+                                MinWidth: compositeWidth,
+                            }] : [],
+                    },
+                },
+            },
+            {
+                Key: 'auto-card-mobile',
+                Scene: 'Card',
+                Device: 'Mobile',
+                Priority: 100,
+                Layout: {
+                    Hero: { ...hero, Metrics: metrics.map((metric) => ({ ...metric })) },
+                    Card: {
+                        Preset: 'Business',
+                        AvatarTextField: primary?.name || '',
+                        TitleField: primary?.name || '',
+                        SubtitleFields: cardSubtitle.map((field) => presentationDescriptor(field, { Icon: 'fas fa-circle-info', Tone: 'info' })),
+                        StatusFields: cardStatus.map((field) => presentationDescriptor(field, { DisplayStyle: 'Tag', Icon: 'fas fa-circle-check', Tone: 'success' })),
+                        TopFields: cardTop.map((field) => presentationDescriptor(field, { DisplayStyle: 'Tag', Icon: 'fas fa-tag', Tone: 'primary' })),
+                        RightFields: cardRight.map((field) => presentationDescriptor(field, { Icon: 'fas fa-coins', Tone: 'danger', FontWeight: '700' })),
+                        Fields: cardContent.map((field) => presentationDescriptor(field)),
+                        MetaFields: cardMeta.map((field) => presentationDescriptor(field, { Icon: 'fas fa-clock', Tone: 'info' })),
+                        BottomFields: cardBottom.map((field) => presentationDescriptor(field, { Icon: isDateField(field) ? 'fas fa-calendar' : 'fas fa-chart-simple', Tone: 'warning' })),
+                        HideIndex: true,
+                        ShowCreateTime: cardMeta.length === 0,
+                        ShowUpdateTime: false,
+                    },
+                },
+            },
+        ],
+    };
+}
+function defaultOrderByFromFields(fields, tableId, tableName) {
+    const candidates = fields.length ? fields : [systemFieldMeta(tableId, tableName, 'CreateTime')];
+    const field = candidates.find((item) => lower(item.name) === 'createtime')
+        || candidates.find((item) => lower(item.name) === 'updatetime')
+        || candidates.find((item) => lower(item.name) === 'sort');
+    if (!field)
+        return undefined;
+    return JSON.stringify([{ Id: field.id, Name: field.name, Type: lower(field.name) === 'sort' ? 'ASC' : 'DESC', Sort: 0 }]);
+}
+function buildDefaultOrderBy(module, lookup, tableId, tableName) {
+    const canonical = getValue(module, 'DefaultOrderBy');
+    if (canonical !== undefined && canonical !== null && canonical !== '') {
+        return typeof canonical === 'string' ? canonical : JSON.stringify(canonical);
+    }
+    const natural = getValue(module, 'defaultOrderBy');
+    if (natural !== undefined && natural !== null && natural !== '') {
+        const refs = Array.isArray(natural) || (typeof natural === 'string' && natural.trim().startsWith('['))
+            ? getFieldRefs({ value: natural }, 'value')
+            : [{ ref: String(natural).trim(), type: 'DESC' }];
+        return JSON.stringify(resolveFieldRefs(lookup, tableId, tableName, refs, 'module.defaultOrderBy').map(({ meta, ref }, index) => ({
+            Id: meta.id,
+            Name: meta.name,
+            Type: ref.type || 'DESC',
+            Sort: index,
+        })));
+    }
+    const refs = getFieldRefs(module, 'orderBy', 'OrderBy', 'defaultSort', 'DefaultSort', 'sortBy', 'SortBy');
+    if (!refs.length)
+        return undefined;
+    return JSON.stringify(resolveFieldRefs(lookup, tableId, tableName, refs, 'module.defaultOrderBy').map(({ meta, ref }, index) => ({
+        Id: meta.id,
+        Name: meta.name,
+        Type: ref.type || 'DESC',
+        Sort: index,
+    })));
+}
+function resolveModuleFields(module, lookup, tableId, tableName) {
+    if (!tableId && !tableName)
+        return {};
+    const tableFields = getFieldsForTable(lookup, tableId).length ? getFieldsForTable(lookup, tableId) : getFieldsForTable(lookup, tableName);
+    const output = {};
+    const searchRefs = getFieldRefs(module, 'searchFields', 'SearchFields', 'searchFieldNames', 'SearchFieldNames');
+    const resolvedSearch = searchRefs.length
+        ? resolveFieldRefs(lookup, tableId, tableName, searchRefs, 'module.searchFields')
+        : defaultSearchFields(tableFields).map((meta) => ({ meta, ref: defaultSearchRef(meta) }));
+    if (!getExplicitJsonString(module, 'searchFieldIds', 'SearchFieldIds') && resolvedSearch.length) {
+        output.SearchFieldIds = JSON.stringify(resolvedSearch.map(({ meta, ref }) => toSearchFieldModel(meta, ref)));
+    }
+    const listRefs = getFieldRefs(module, 'listFields', 'ListFields', 'tableFields', 'TableFields', 'columns', 'Columns');
+    const resolvedList = listRefs.length
+        ? resolveFieldRefs(lookup, tableId, tableName, listRefs, 'module.listFields')
+        : defaultListFields(tableFields).map((meta) => ({ meta, ref: { ref: meta.name } }));
+    if (!getExplicitJsonString(module, 'tableDiyFieldIds', 'TableDiyFieldIds') && resolvedList.length) {
+        output.TableDiyFieldIds = JSON.stringify(resolvedList.map(({ meta }) => meta.id));
+    }
+    if (!getExplicitJsonString(module, 'selectFields', 'SelectFields') && resolvedList.length) {
+        output.SelectFields = JSON.stringify(resolvedList.map(({ meta, ref }) => toSearchFieldModel(meta, ref)));
+    }
+    const listFieldConfigs = [
+        { canonical: 'SortFieldIds', explicitKeys: ['sortFieldIds', 'SortFieldIds'], refKeys: ['sortFields', 'SortFields'] },
+        { canonical: 'NotShowFields', explicitKeys: ['notShowFields', 'NotShowFields'], refKeys: ['hiddenFields', 'HiddenFields', 'notShowFieldsByName', 'NotShowFieldsByName'] },
+        { canonical: 'InTableEditFields', explicitKeys: ['inTableEditFields', 'InTableEditFields'], refKeys: ['editableFields', 'EditableFields', 'inTableEditFieldsByName', 'InTableEditFieldsByName'] },
+        { canonical: 'MobileListFields', explicitKeys: ['mobileListFields', 'MobileListFields'], refKeys: ['mobileFields', 'MobileFields'], objectArray: true },
+        { canonical: 'CardTitleTagFields', explicitKeys: ['cardTitleTagFields', 'CardTitleTagFields'], refKeys: ['cardTitleFields', 'CardTitleFields'], objectArray: true },
+        { canonical: 'CardBottomTagFields', explicitKeys: ['cardBottomTagFields', 'CardBottomTagFields'], refKeys: ['cardBottomFields', 'CardBottomFields'], objectArray: true },
+    ];
+    for (const item of listFieldConfigs) {
+        if (getExplicitJsonString(module, ...item.explicitKeys))
+            continue;
+        const refs = getFieldRefs(module, ...item.refKeys);
+        const defaultByCanonical = {
+            SortFieldIds: defaultSortFields(tableFields),
+            NotShowFields: defaultHiddenFields(tableFields),
+            MobileListFields: defaultMobileFields(tableFields),
+            CardTitleTagFields: defaultCardTitleFields(tableFields),
+            CardBottomTagFields: defaultCardBottomFields(tableFields),
+            InTableEditFields: [],
+        };
+        if (!refs.length && !defaultByCanonical[item.canonical]?.length)
+            continue;
+        const resolved = refs.length
+            ? resolveFieldRefs(lookup, tableId, tableName, refs, `module.${item.canonical}`)
+            : defaultByCanonical[item.canonical].map((meta) => ({ meta, ref: { ref: meta.name } }));
+        output[item.canonical] = JSON.stringify(item.objectArray
+            ? resolved.map(({ meta, ref }) => toSearchFieldModel(meta, ref))
+            : resolved.map(({ meta }) => meta.id));
+    }
+    const statisticsRefs = getFieldRefs(module, 'statisticsFieldNames', 'StatisticsFieldNames', 'statFields', 'StatFields');
+    if (!getExplicitJsonString(module, 'statisticsFields', 'StatisticsFields')) {
+        const resolvedStatistics = statisticsRefs.length
+            ? resolveFieldRefs(lookup, tableId, tableName, statisticsRefs, 'module.statisticsFields')
+            : defaultStatisticsFields(tableFields).map((meta) => ({ meta, ref: { ref: meta.name, type: 'Sum' } }));
+        if (resolvedStatistics.length)
+            output.StatisticsFields = JSON.stringify(resolvedStatistics.map(({ meta, ref }) => ({
+                Id: meta.id,
+                Type: ref.type || 'Sum',
+            })));
+    }
+    const defaultOrderBy = buildDefaultOrderBy(module, lookup, tableId, tableName)
+        || (getExplicitJsonString(module, 'DefaultOrderBy', 'defaultOrderBy') ? undefined : defaultOrderByFromFields(tableFields, tableId, tableName));
+    if (defaultOrderBy)
+        output.DefaultOrderBy = defaultOrderBy;
+    return output;
+}
+function populateFieldLookupFromSchema(lookup, schemaData, tableIdByName) {
+    const tables = asArray(asRecord(schemaData).Tables);
+    for (const table of tables) {
+        const tableId = getString(table, 'Id', 'id');
+        const tableName = getString(table, 'Name', 'name');
+        if (!tableId || !tableName)
+            continue;
+        tableIdByName?.set(tableName.toLowerCase(), tableId);
+        const fieldsValue = getValue(table, '_Fields', 'Fields', 'fields');
+        const fields = Array.isArray(fieldsValue) ? asArray(fieldsValue) : [];
+        for (const field of fields) {
+            const id = getString(field, 'Id', 'id');
+            const name = getString(field, 'Name', 'name');
+            if (!id || !name)
+                continue;
+            addFieldMeta(lookup, {
+                id,
+                name,
+                label: getString(field, 'Label', 'label') || name,
+                tableId,
+                tableName,
+                tableDescription: getString(table, 'Description', 'description') || tableName,
+                component: getString(field, 'Component', 'component') || 'Text',
+                type: getString(field, 'Type', 'type') || 'varchar(255)',
+            });
+        }
+    }
+}
+function tableFieldComponent(field) {
+    return lower(getString(field, 'component', 'Component') || 'Text');
+}
+function tableFieldText(field) {
+    return `${getString(field, 'name', 'Name')} ${getString(field, 'label', 'Label')} ${getString(field, 'component', 'Component')}`.toLowerCase();
+}
+function autoTableTabForField(field, index) {
+    const text = tableFieldText(field);
+    const component = tableFieldComponent(field);
+    if (['imgupload', 'fileupload', 'richtext', 'codeeditor', 'jsontable', 'tablechild', 'map', 'maparea', 'textarea'].includes(component)
+        || hasKeyword(text, ['remark', 'note', 'content', 'file', 'image', 'attach', 'map', '备注', '说明', '内容', '附件', '图片', '地图'])) {
+        return 'attachment';
+    }
+    if (hasKeyword(text, ['phone', 'mobile', 'email', 'address', 'city', 'contact', '联系人', '电话', '手机', '邮箱', '地址', '城市'])) {
+        return 'contact';
+    }
+    if (hasKeyword(text, ['status', 'state', 'type', 'category', 'amount', 'money', 'price', 'count', 'date', 'time', '状态', '类型', '分类', '金额', '价格', '数量', '时间', '日期'])) {
+        return 'business';
+    }
+    return index < 8 ? 'basic' : 'extra';
+}
+function buildDefaultTableLayout(table) {
+    const fields = getArray(table, 'fields', 'Fields');
+    const explicitTabs = getValue(table, 'tabs', 'Tabs');
+    const fieldTabs = new Map();
+    const column = getNumber(table, 'column', 'Column') ?? (fields.length > 6 ? 2 : undefined);
+    if (explicitTabs !== undefined && explicitTabs !== null && explicitTabs !== '')
+        return { fieldTabs, column };
+    const nonLayoutFields = fields.filter((field) => !LAYOUT_COMPONENTS.has(tableFieldComponent(field)));
+    if (nonLayoutFields.length <= 12)
+        return { fieldTabs, column };
+    const labels = {
+        basic: { Name: '基础信息', Icon: 'fas fa-id-card', Sort: 10 },
+        contact: { Name: '联系信息', Icon: 'fas fa-address-book', Sort: 20 },
+        business: { Name: '业务信息', Icon: 'fas fa-briefcase', Sort: 30 },
+        attachment: { Name: '附件备注', Icon: 'fas fa-paperclip', Sort: 40 },
+        extra: { Name: '扩展信息', Icon: 'fas fa-layer-group', Sort: 50 },
+    };
+    const used = new Set();
+    nonLayoutFields.forEach((field, index) => {
+        const fieldName = getString(field, 'name', 'Name');
+        if (!fieldName || getString(field, 'tab', 'Tab'))
+            return;
+        const tabId = autoTableTabForField(field, index);
+        fieldTabs.set(fieldName, tabId);
+        used.add(tabId);
+    });
+    const ordered = ['basic', 'contact', 'business', 'attachment', 'extra'].filter((tabId) => used.has(tabId));
+    return {
+        tabs: ordered.map((tabId) => ({ Id: tabId, Name: labels[tabId].Name, Icon: labels[tabId].Icon, Sort: labels[tabId].Sort })),
+        fieldTabs,
+        column,
+    };
+}
+export function buildPlan(manifest) {
+    const errors = [];
+    const warnings = [];
+    const plan = [];
+    const roles = getArray(manifest, 'roles', 'Roles');
+    const tables = getArray(manifest, 'tables', 'Tables');
+    const engines = getArray(manifest, 'engines', 'Engines');
+    const modules = getArray(manifest, 'modules', 'Modules');
+    const events = getArray(manifest, 'events', 'Events');
+    const dataSources = getArray(manifest, 'dataSources', 'DataSources');
+    const pages = getArray(manifest, 'pages', 'Pages');
+    const printTemplates = getArray(manifest, 'printTemplates', 'PrintTemplates');
+    const workflows = getArray(manifest, 'workflows', 'Workflows');
+    const jobs = getArray(manifest, 'jobs', 'Jobs');
+    const permissions = getArray(manifest, 'permissions', 'Permissions');
+    const manifestFieldsByTable = new Map();
+    const manifestEngineKeys = new Set(engines.map((engine) => getString(engine, 'apiEngineKey', 'ApiEngineKey').toLowerCase()).filter(Boolean));
+    if (!tables.length && !engines.length && !modules.length && !pages.length) {
+        warnings.push('Manifest 未声明 tables/engines/modules/pages，可能不是完整系统计划');
+    }
+    const relationValidation = validateManifestFieldRelations(manifest);
+    errors.push(...relationValidation.errors);
+    warnings.push(...relationValidation.warnings);
+    roles.forEach((item) => plan.push(`save_role ${getString(item, 'name', 'Name')}`));
+    tables.forEach((table, tableIndex) => {
+        const name = getString(table, 'name', 'Name');
+        if (!name)
+            errors.push(`tables[${tableIndex}].name 不能为空`);
+        validateTableV8Limit(table, `tables[${tableIndex}]`, errors, warnings);
+        const readPrimary = getValue(table, 'readPrimary', 'ReadPrimary');
+        if (readPrimary !== undefined && readPrimary !== null && readPrimary !== 0 && readPrimary !== 1)
+            errors.push(`tables[${tableIndex}].readPrimary 必须是 null、0 或 1`);
+        if (Object.hasOwn(table, 'readPrimary') && Object.hasOwn(table, 'ReadPrimary')
+            && table.readPrimary !== table.ReadPrimary)
+            errors.push(`tables[${tableIndex}].readPrimary 与 ReadPrimary 不一致`);
+        plan.push(`create_table ${name || `(index ${tableIndex})`}`);
+        const layout = buildDefaultTableLayout(table);
+        if (layout.tabs?.length) {
+            warnings.push(`table ${name || `(index ${tableIndex})`} has many fields; generator will create diy_table.Tabs and assign empty field Tab values automatically`);
+        }
+        if (name)
+            manifestFieldsByTable.set(name.toLowerCase(), new Set());
+        getArray(table, 'fields', 'Fields').forEach((field, fieldIndex) => {
+            const fieldName = getString(field, 'name', 'Name');
+            const label = getString(field, 'label', 'Label');
+            if (!fieldName)
+                errors.push(`tables[${tableIndex}].fields[${fieldIndex}].name 不能为空`);
+            if (!label)
+                errors.push(`tables[${tableIndex}].fields[${fieldIndex}].label 不能为空`);
+            if (name && fieldName)
+                manifestFieldsByTable.get(name.toLowerCase())?.add(fieldName.toLowerCase());
+            if (name && label)
+                manifestFieldsByTable.get(name.toLowerCase())?.add(label.toLowerCase());
+            plan.push(`add_field ${name}.${fieldName}`);
+        });
+        const bannerPatch = buildDefaultFormBanner(table);
+        plan.push(`configure_form_banner ${name || `(index ${tableIndex})`}`);
+        const knownBannerFields = manifestFieldsByTable.get(name.toLowerCase()) || new Set();
+        const validateBannerField = (fieldName, path) => {
+            if (fieldName && !knownBannerFields.has(fieldName.toLowerCase()) && !isSystemFieldName(fieldName)) {
+                errors.push(`${path} references unknown field "${fieldName}" on table "${name}"`);
+            }
+        };
+        validateBannerField(getString(bannerPatch, 'FormBannerTitleField'), `tables[${tableIndex}].formBanner.titleField`);
+        validateBannerField(getString(bannerPatch, 'FormBannerSubtitleField'), `tables[${tableIndex}].formBanner.subtitleField`);
+        validateBannerField(getString(bannerPatch, 'FormBannerImageField'), `tables[${tableIndex}].formBanner.imageField`);
+        validateBannerField(getString(bannerPatch, 'FormBannerBackgroundField'), `tables[${tableIndex}].formBanner.backgroundField`);
+        const bannerTags = bannerDescriptorArray(JSON.parse(getString(bannerPatch, 'FormBannerTagFields') || '[]'));
+        bannerTags.forEach((item, position) => {
+            const fieldName = typeof item === 'string' ? item : getString(asRecord(item), 'Field', 'field', 'Name', 'name');
+            validateBannerField(fieldName, `tables[${tableIndex}].formBanner.tagFields[${position}]`);
+        });
+        const bannerMetrics = bannerDescriptorArray(JSON.parse(getString(bannerPatch, 'FormBannerMetrics') || '[]'));
+        bannerMetrics.forEach((item, position) => {
+            const metric = asRecord(item);
+            const fieldName = typeof item === 'string' ? item : getString(metric, 'Field', 'field', 'Name', 'name');
+            validateBannerField(fieldName, `tables[${tableIndex}].formBanner.metrics[${position}]`);
+            const apiEngineKey = getString(metric, 'ApiEngineKey', 'apiEngineKey');
+            if (apiEngineKey && !manifestEngineKeys.has(apiEngineKey.toLowerCase())) {
+                warnings.push(`tables[${tableIndex}].formBanner.metrics[${position}] references ApiEngineKey "${apiEngineKey}" not declared in this manifest; it must already exist in the target tenant`);
+            }
+        });
+        const indexableFields = new Set(getArray(table, 'fields', 'Fields')
+            // TableChild/布局控件只有元数据。DevComponent显式绑定物理类型时例外，
+            // 与后端IsNotRealDataField的兼容语义保持一致。
+            .filter((field) => {
+            const component = tableFieldComponent(field);
+            const virtual = ['opentable', 'phonesms', 'tablechild', 'button', 'divider',
+                'collapsegroup', 'tabs', 'alert', 'statictext', 'html'];
+            return !virtual.includes(component)
+                && (component !== 'devcomponent' || !!getString(field, 'type', 'Type'));
+        })
+            .map((field) => getString(field, 'name', 'Name').toLowerCase())
+            .filter(Boolean));
+        // 固定物理列必须与后端 DiyCommon.FixedDiyField 一致。独立租户库不自动
+        // 创建 OsClient；把路由参数当物理列会使本地计划通过、远端建索引失败。
+        ['id', 'createtime', 'updatetime', 'userid', 'username', 'isdeleted'].forEach((field) => indexableFields.add(field));
+        getArray(table, 'indexes', 'Indexes').forEach((index, indexPosition) => {
+            const columns = getStringArray(index, 'columns', 'Columns');
+            if (!columns.length) {
+                errors.push(`tables[${tableIndex}].indexes[${indexPosition}].columns 至少需要一个字段`);
+            }
+            for (const column of columns) {
+                if (!indexableFields.has(column.toLowerCase())) {
+                    errors.push(`tables[${tableIndex}].indexes[${indexPosition}] references unknown physical field "${column}" on table "${name}"`);
+                }
+            }
+            if (columns.some((column, position) => columns.findIndex((other) => other.toLowerCase() === column.toLowerCase()) !== position)) {
+                errors.push(`tables[${tableIndex}].indexes[${indexPosition}] 包含重复字段`);
+            }
+            plan.push(`create_index ${name}.${getString(index, 'name', 'Name') || columns.join('_')}`);
+        });
+    });
+    dataSources.forEach((item) => plan.push(`save_data_source ${getString(item, 'dataSourceKey', 'DataSourceKey')}`));
+    engines.forEach((item, engineIndex) => {
+        const key = getString(item, 'apiEngineKey', 'ApiEngineKey');
+        if (!key)
+            errors.push(`engines[${engineIndex}].apiEngineKey 不能为空`);
+        validateEngineV8Limit(item, `engines[${engineIndex}]`, errors, warnings);
+        plan.push(`upsert_engine ${key}`);
+    });
+    events.forEach((item) => plan.push(`save_event ${getString(item, 'formEngineKey', 'FormEngineKey')}/${getString(item, 'eventType', 'EventType')}`));
+    modules.forEach((item) => {
+        const normalized = normalizeAllMenuJson(item);
+        errors.push(...normalized.errors);
+        warnings.push(...normalized.warnings);
+        const tableRef = getString(item, 'table', 'tableName', 'diyTableName', 'DiyTableName');
+        const moduleName = getString(item, 'name', 'Name');
+        const openType = getString(item, 'openType', 'OpenType');
+        if (openType.toLowerCase() === 'workflow') {
+            const flowName = getString(item, 'flowName', 'FlowName');
+            const flowId = getString(item, 'flowDesignId', 'FlowDesignId');
+            if (!flowName && !flowId)
+                errors.push(`modules.${moduleName || '(unnamed)'}.flowName 或 flowDesignId 必须指向已启用流程`);
+            if (flowName && !workflows.some((workflow) => getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign), 'FlowName', 'flowName') === flowName)) {
+                errors.push(`modules.${moduleName || '(unnamed)'}.flowName ${flowName} 未在本次 workflows 中声明；现有流程请使用 flowDesignId`);
+            }
+            const targetFlow = workflows.find((workflow) => getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign), 'FlowName', 'flowName') === flowName);
+            if (targetFlow) {
+                const design = asRecord(targetFlow.FlowDesign ?? targetFlow.flowDesign);
+                if (getNumber(design, 'IsEnable', 'isEnable') === 0 || getValue(design, 'IsEnable', 'isEnable') === false) {
+                    errors.push(`modules.${moduleName || '(unnamed)'}.flowName ${flowName} 指向禁用流程`);
+                }
+                const moduleTable = getString(item, 'table', 'tableName', 'diyTableName', 'DiyTableName');
+                const flowTable = getString(design, 'table', 'tableName', 'diyTableName', 'DiyTableName');
+                if (moduleTable && flowTable && moduleTable.toLowerCase() !== flowTable.toLowerCase()) {
+                    errors.push(`modules.${moduleName || '(unnamed)'} 的 table 与流程 ${flowName} 的业务表不一致`);
+                }
+            }
+            if (!getString(item, 'diyTableId', 'DiyTableId', 'table', 'tableName', 'diyTableName', 'DiyTableName')) {
+                errors.push(`modules.${moduleName || '(unnamed)'} 必须绑定与流程相同的 diy_table`);
+            }
+        }
+        const microServiceKey = getString(item, 'microServiceKey', 'MicroServiceKey');
+        const microServiceRoutePath = getString(item, 'microServiceRoutePath', 'MicroServiceRoutePath');
+        const isMicroService = ['microservice', 'codeform'].includes(openType.toLowerCase())
+            || Boolean(getNumber(item, 'isMicroiService', 'IsMicroiService') === 1
+                || microServiceKey
+                || microServiceRoutePath
+                || getString(item, 'microServiceId', 'MicroServiceId')
+                || getString(item, 'microServicePageId', 'MicroServicePageId'));
+        if (isMicroService) {
+            if (!microServiceKey)
+                errors.push(`modules.${moduleName || '(unnamed)'}.microServiceKey 不能为空`);
+            if (!microServiceRoutePath)
+                errors.push(`modules.${moduleName || '(unnamed)'}.microServiceRoutePath 不能为空`);
+            if (microServiceRoutePath) {
+                try {
+                    normalizeManifestMicroServiceRoutePath(microServiceRoutePath);
+                }
+                catch (error) {
+                    errors.push(`modules.${moduleName || '(unnamed)'}.microServiceRoutePath ${error instanceof Error ? error.message : String(error)}`);
+                }
+            }
+            plan.push(`resolve_microservice_binding ${microServiceKey || '(missing)'}${microServiceRoutePath || '/(missing)'}`);
+        }
+        if (tableRef && manifestFieldsByTable.has(tableRef.toLowerCase())) {
+            const fields = manifestFieldsByTable.get(tableRef.toLowerCase()) || new Set();
+            const fieldGroups = [
+                ['listFields', getFieldRefs(item, 'listFields', 'ListFields', 'tableFields', 'TableFields', 'columns', 'Columns')],
+                ['searchFields', getFieldRefs(item, 'searchFields', 'SearchFields', 'searchFieldNames', 'SearchFieldNames')],
+                ['sortFields', getFieldRefs(item, 'sortFields', 'SortFields')],
+                ['hiddenFields', getFieldRefs(item, 'hiddenFields', 'HiddenFields', 'notShowFieldsByName', 'NotShowFieldsByName')],
+                ['mobileFields', getFieldRefs(item, 'mobileFields', 'MobileFields')],
+            ];
+            for (const [groupName, refs] of fieldGroups) {
+                for (const ref of refs) {
+                    if (!fields.has(ref.ref.toLowerCase()) && !isSystemFieldName(ref.ref)) {
+                        errors.push(`modules.${moduleName || tableRef}.${groupName} references unknown field "${ref.ref}" on table "${tableRef}"`);
+                    }
+                }
+            }
+        }
+        if (tableRef && !getFieldRefs(item, 'listFields', 'ListFields', 'tableFields', 'TableFields', 'columns', 'Columns').length && !getExplicitJsonString(item, 'TableDiyFieldIds', 'SelectFields')) {
+            warnings.push(`module ${moduleName || tableRef} has no listFields; generator will use the first business fields from ${tableRef}`);
+        }
+        plan.push(`create_or_update_module ${getString(item, 'name', 'Name')}`);
+    });
+    permissions.forEach((item) => plan.push(`set_permission ${getString(item, 'roleId', 'RoleId') || 'admin'}`));
+    pages.forEach((item, pageIndex) => {
+        const normalizedPage = normalizePageJsonObj(item.json ?? item.JsonObj ?? item.JsonStr ?? item);
+        errors.push(...normalizedPage.errors.map((error) => `pages[${pageIndex}]: ${error}`));
+        warnings.push(...normalizedPage.warnings.map((warning) => `pages[${pageIndex}]: ${warning}`));
+        plan.push(`save_page ${getString(item, 'title', 'Title')}`);
+    });
+    printTemplates.forEach((item, printIndex) => {
+        const page = normalizePrintPageObj(item.PageObj ?? item.pageObj);
+        const data = normalizePrintObj(item.PrintObj ?? item.printObj);
+        errors.push(...page.errors.map((error) => `printTemplates[${printIndex}].PageObj: ${error}`));
+        warnings.push(...page.warnings.map((warning) => `printTemplates[${printIndex}].PageObj: ${warning}`));
+        errors.push(...data.errors.map((error) => `printTemplates[${printIndex}].PrintObj: ${error}`));
+        warnings.push(...data.warnings.map((warning) => `printTemplates[${printIndex}].PrintObj: ${warning}`));
+        plan.push(`save_print_template ${getString(item, 'title', 'Title')}`);
+    });
+    workflows.forEach((item, workflowIndex) => {
+        const check = validateWorkflowPackage(item);
+        errors.push(...check.errors.map((error) => `workflows[${workflowIndex}]: ${error}`));
+        warnings.push(...check.warnings.map((warning) => `workflows[${workflowIndex}]: ${warning}`));
+        plan.push(`save_workflow ${getString(asRecord(item.FlowDesign ?? item.flowDesign ?? item), 'FlowName', 'flowName', 'name')}`);
+    });
+    jobs.forEach((item) => plan.push(`save_job ${getString(item, 'jobName', 'JobName')}`));
+    return { plan, errors, warnings };
+}
+function getWorkflowParts(workflow) {
+    return {
+        flow: asRecord(workflow.FlowDesign ?? workflow.flowDesign ?? workflow),
+        nodes: getArray(workflow, 'Nodes', 'nodes'),
+        lines: getArray(workflow, 'Lines', 'lines'),
+    };
+}
+function getNodeId(node) {
+    return getString(node, 'Id', 'id', 'NodeId', 'nodeId');
+}
+function getNodeName(node) {
+    return getString(node, 'NodeName', 'nodeName', 'Name', 'name');
+}
+function getNodeType(node) {
+    return getString(node, 'NodeType', 'nodeType', 'Type', 'type');
+}
+function isStartNode(node) {
+    return getNodeType(node) === 'Start';
+}
+function isEndNode(node) {
+    return ['End', 'AutoEnd'].includes(getNodeType(node));
+}
+const workflowNodeTypes = new Set(['Start', 'Auto', 'Business', 'End', 'AutoEnd', 'Countersign', 'Approve']);
+const workflowManualNodeTypes = new Set(['Approve', 'Countersign', 'End']);
+const workflowBindingFields = ['Users', 'Roles', 'Depts', 'BindJobs'];
+const workflowReferenceFields = [...workflowBindingFields, 'CopyUsers'];
+function workflowBinding(node, field, errors) {
+    const value = getValue(node, field, field[0].toLowerCase() + field.slice(1));
+    if (value === undefined || value === null || value === '')
+        return [];
+    let parsed = value;
+    if (typeof value === 'string') {
+        try {
+            parsed = JSON.parse(value);
+        }
+        catch {
+            parsed = null;
+        }
+    }
+    if (!Array.isArray(parsed) || parsed.some((item) => !getString(asRecord(item), 'Id') || !getString(asRecord(item), 'Name', 'JobName'))) {
+        errors.push(`节点 ${getNodeName(node) || getNodeId(node)}.${field} 必须是 [{Id,Name}] 数组；不能使用角色名或 Id 字符串`);
+        return [];
+    }
+    return parsed.map((item) => ({ Id: getString(item, 'Id'), Name: getString(item, 'Name', 'JobName') }));
+}
+function workflowBackNodes(node, nodeById, errors) {
+    const raw = getValue(node, 'BackNodes', 'backNodes');
+    if (raw === undefined || raw === null || raw === '')
+        return '[]';
+    let parsed = raw;
+    if (typeof raw === 'string') {
+        try {
+            parsed = JSON.parse(raw);
+        }
+        catch {
+            parsed = null;
+        }
+    }
+    if (!Array.isArray(parsed)) {
+        errors.push(`节点 ${getNodeName(node) || getNodeId(node)}.BackNodes 必须是节点 Id 或 {Id,NodeName} 数组`);
+        return '[]';
+    }
+    const normalized = parsed.map((item) => {
+        const id = typeof item === 'string' ? item : getString(asRecord(item), 'Id');
+        if (!nodeById.has(id))
+            errors.push(`节点 ${getNodeName(node) || getNodeId(node)}.BackNodes 引用了不存在的节点 ${id}`);
+        const referenced = nodeById.get(id);
+        return { Id: id, NodeName: referenced ? getNodeName(referenced) : getString(asRecord(item), 'NodeName') };
+    });
+    return JSON.stringify(normalized);
+}
+function workflowCoordinate(node, field, errors) {
+    const raw = getValue(node, field, field[0].toLowerCase() + field.slice(1));
+    if (raw === undefined || raw === null || raw === '')
+        return undefined;
+    const match = /^(\d+(?:\.\d+)?)(?:px)?$/.exec(String(raw).trim());
+    if (!match || Number(match[1]) > 100000) {
+        errors.push(`节点 ${getNodeName(node) || getNodeId(node)}.${field} 必须是非负像素坐标`);
+        return undefined;
+    }
+    return Number(match[1]);
+}
+function workflowLayout(nodes, lines, errors) {
+    const byId = new Map(nodes.map((node) => [getNodeId(node), node]));
+    const depth = new Map();
+    const queue = nodes.filter(isStartNode).map(getNodeId);
+    queue.forEach((id) => depth.set(id, 0));
+    while (queue.length) {
+        const id = queue.shift();
+        for (const line of lines.filter((item) => getString(item, 'FromNodeId', 'fromNodeId') === id)) {
+            const next = getString(line, 'ToNodeId', 'toNodeId');
+            if (!byId.has(next) || depth.has(next))
+                continue;
+            depth.set(next, (depth.get(id) || 0) + 1);
+            queue.push(next);
+        }
+    }
+    const rows = new Map();
+    const occupied = new Set();
+    return nodes.map((node, index) => {
+        const layer = depth.get(getNodeId(node)) ?? index;
+        const row = rows.get(layer) || 0;
+        rows.set(layer, row + 1);
+        const left = workflowCoordinate(node, 'PositionLeft', errors) ?? (80 + layer * 260);
+        const top = workflowCoordinate(node, 'PositionTop', errors) ?? (120 + row * 150);
+        const point = `${left}:${top}`;
+        if (occupied.has(point))
+            errors.push(`节点 ${getNodeName(node) || getNodeId(node)} 与其它节点坐标重叠`);
+        occupied.add(point);
+        const result = { ...node, PositionLeft: `${left}px`, PositionTop: `${top}px` };
+        for (const field of workflowReferenceFields)
+            result[field] = JSON.stringify(workflowBinding(node, field, errors));
+        result.BackNodes = workflowBackNodes(node, byId, errors);
+        return result;
+    });
+}
+export function validateWorkflowPackage(workflow) {
+    const errors = [];
+    const warnings = [];
+    const { flow, nodes, lines } = getWorkflowParts(workflow);
+    const flowName = getString(flow, 'FlowName', 'flowName', 'Name', 'name');
+    const flowTableId = getString(flow, 'TableId', 'tableId');
+    const flowTableRef = getString(flow, 'table', 'tableName', 'TableName', 'diyTableName', 'DiyTableName');
+    // 安装母版只在显式禁用时允许尚未绑定租户审批人；不把 false/null/缺省当作禁用。
+    // 仅放宽“绑定不能为空”，结构检查及保存时的真实租户引用核验仍全部执行。
+    const disabledTemplate = Object.prototype.hasOwnProperty.call(flow, 'IsEnable')
+        && (flow.IsEnable === 0 || flow.IsEnable === '0');
+    const nodeById = new Map();
+    const outgoing = new Map();
+    const incoming = new Map();
+    if (!flowName)
+        errors.push('FlowDesign.FlowName 不能为空');
+    workflowBinding(flow, 'Roles', errors);
+    if (!nodes.length)
+        errors.push('Nodes 至少需要包含开始、审批/业务、结束节点');
+    if (!lines.length)
+        errors.push('Lines 至少需要连接开始到下一节点');
+    if (!flowTableId && !flowTableRef)
+        warnings.push('流程未绑定业务 diy_table；若要通过模块引擎打开流程，必须绑定同一业务表');
+    nodes.forEach((node, index) => {
+        const id = getNodeId(node);
+        const name = getNodeName(node);
+        if (!id)
+            errors.push(`Nodes[${index}].Id/NodeId 不能为空`);
+        if (!name)
+            errors.push(`Nodes[${index}].NodeName 不能为空`);
+        if (!workflowNodeTypes.has(getNodeType(node)))
+            errors.push(`Nodes[${index}].NodeType 必须是 Start/Auto/Business/End/AutoEnd/Countersign/Approve`);
+        if (id) {
+            if (nodeById.has(id))
+                errors.push(`节点 Id 重复：${id}`);
+            nodeById.set(id, node);
+        }
+    });
+    lines.forEach((line, index) => {
+        const id = getString(line, 'Id', 'id', 'LineId', 'lineId') || `(index ${index})`;
+        const fromNodeId = getString(line, 'FromNodeId', 'fromNodeId');
+        const toNodeId = getString(line, 'ToNodeId', 'toNodeId');
+        if (!fromNodeId)
+            errors.push(`Lines[${index}].FromNodeId 不能为空`);
+        if (!toNodeId)
+            errors.push(`Lines[${index}].ToNodeId 不能为空`);
+        if (fromNodeId && !nodeById.has(fromNodeId))
+            errors.push(`连线 ${id} 的 FromNodeId 不存在：${fromNodeId}`);
+        if (toNodeId && !nodeById.has(toNodeId))
+            errors.push(`连线 ${id} 的 ToNodeId 不存在：${toNodeId}`);
+        if (fromNodeId === toNodeId && fromNodeId)
+            warnings.push(`连线 ${id} 指向自身，请确认是否为有意循环`);
+        if (fromNodeId)
+            outgoing.set(fromNodeId, [...(outgoing.get(fromNodeId) || []), line]);
+        if (toNodeId)
+            incoming.set(toNodeId, [...(incoming.get(toNodeId) || []), line]);
+    });
+    const startNodes = nodes.filter(isStartNode);
+    const endNodes = nodes.filter(isEndNode);
+    if (startNodes.length !== 1)
+        errors.push(`需要且仅需要 1 个开始节点，当前 ${startNodes.length} 个`);
+    if (endNodes.length < 1)
+        errors.push('至少需要 1 个结束节点');
+    const normalizedNodes = workflowLayout(nodes, lines, errors);
+    nodes.forEach((node) => {
+        const id = getNodeId(node);
+        const name = getNodeName(node) || id;
+        if (!id)
+            return;
+        const outLines = outgoing.get(id) || [];
+        const inLines = incoming.get(id) || [];
+        if (!isStartNode(node) && inLines.length === 0)
+            warnings.push(`节点 ${name} 没有入线`);
+        if (!isEndNode(node) && outLines.length === 0)
+            warnings.push(`节点 ${name} 没有出线`);
+        if (workflowManualNodeTypes.has(getNodeType(node))) {
+            const bindings = workflowBindingFields.flatMap((field) => workflowBinding(node, field, []));
+            const selectedByPrevious = inLines.some((line) => {
+                const predecessor = nodeById.get(getString(line, 'FromNodeId', 'fromNodeId')) || {};
+                return getNumber(predecessor, 'AllowSelectUsers', 'allowSelectUsers') === 1
+                    || getValue(predecessor, 'AllowSelectUsers', 'allowSelectUsers') === true;
+            });
+            if (!bindings.length && !selectedByPrevious && !disabledTemplate) {
+                errors.push(`人工节点 ${name} 未绑定 Users/Roles/Depts/BindJobs，且上游节点没有手动选人策略；SameDeptApprove 仅筛选候选人，不能独立指定审批人`);
+            }
+        }
+        if (outLines.length > 1) {
+            const conditionCode = getString(node, 'LineValueV8', 'lineValueV8', 'V8Code', 'v8Code');
+            if (!conditionCode)
+                warnings.push(`节点 ${name} 有 ${outLines.length} 条出线，建议配置 LineValueV8，并优先用 V8.NextNodeId 指定下一节点`);
+        }
+    });
+    const visited = new Set(startNodes.map(getNodeId));
+    const pending = [...visited];
+    while (pending.length) {
+        const current = pending.shift();
+        for (const line of outgoing.get(current) || []) {
+            const next = getString(line, 'ToNodeId', 'toNodeId');
+            if (!visited.has(next) && nodeById.has(next)) {
+                visited.add(next);
+                pending.push(next);
+            }
+        }
+    }
+    for (const node of nodes)
+        if (getNodeId(node) && !visited.has(getNodeId(node)))
+            errors.push(`节点 ${getNodeName(node)} 从开始节点不可达`);
+    if (endNodes.length && !endNodes.some((node) => visited.has(getNodeId(node))))
+        errors.push('结束节点从开始节点不可达');
+    return {
+        ok: errors.length === 0,
+        errors,
+        warnings,
+        summary: {
+            flowName,
+            tableId: flowTableId,
+            table: flowTableRef,
+            nodeCount: nodes.length,
+            lineCount: lines.length,
+            positions: normalizedNodes.map((node) => ({ id: getNodeId(node), left: node.PositionLeft, top: node.PositionTop })),
+            startNodes: startNodes.map((node) => ({ id: getNodeId(node), name: getNodeName(node) })),
+            endNodes: endNodes.map((node) => ({ id: getNodeId(node), name: getNodeName(node) })),
+        },
+    };
+}
+function extractWorkflowVisualConfig(code) {
+    const beginIndex = code.indexOf(WF_MARKER_BEGIN);
+    if (beginIndex < 0)
+        return null;
+    const jsonStart = beginIndex + WF_MARKER_BEGIN.length;
+    const endIndex = code.indexOf(WF_MARKER_END, jsonStart);
+    if (endIndex < 0)
+        return null;
+    try {
+        return asRecord(JSON.parse(code.slice(jsonStart, endIndex).trim()));
+    }
+    catch {
+        return null;
+    }
+}
+function isEmptyValue(value) {
+    return value === null || value === undefined || String(value).trim() === '';
+}
+function compareWorkflowRule(rule, formData) {
+    const field = getString(rule, 'field', 'Field');
+    const operator = getString(rule, 'operator', 'Operator') || 'eq';
+    const expected = getValue(rule, 'value', 'Value');
+    const actual = field ? formData[field] : undefined;
+    const actualText = actual == null ? '' : String(actual);
+    const expectedText = expected == null ? '' : String(expected);
+    if (operator === 'empty')
+        return isEmptyValue(actual);
+    if (operator === 'notEmpty')
+        return !isEmptyValue(actual);
+    if (operator === 'contains')
+        return actualText.includes(expectedText);
+    if (operator === 'notContains')
+        return !actualText.includes(expectedText);
+    if (operator === 'startsWith')
+        return actualText.startsWith(expectedText);
+    if (operator === 'endsWith')
+        return expectedText === '' || actualText.endsWith(expectedText);
+    if (['gt', 'gte', 'lt', 'lte'].includes(operator)) {
+        const left = Number(actual);
+        const right = Number(expected);
+        if (Number.isNaN(left) || Number.isNaN(right))
+            return false;
+        if (operator === 'gt')
+            return left > right;
+        if (operator === 'gte')
+            return left >= right;
+        if (operator === 'lt')
+            return left < right;
+        return left <= right;
+    }
+    if (operator === 'ne')
+        return actualText !== expectedText;
+    return actualText === expectedText;
+}
+function testWorkflowVisualCondition(input) {
+    const workflow = asRecord(input.workflow);
+    const formData = asRecord(input.formData);
+    let code = getString(input, 'lineValueV8Code', 'LineValueV8', 'code');
+    if (!code && Object.keys(workflow).length > 0) {
+        const { nodes } = getWorkflowParts(workflow);
+        const nodeId = getString(input, 'nodeId', 'NodeId');
+        const node = (nodeId ? nodes.find((item) => getNodeId(item) === nodeId) : nodes.find(isStartNode) || nodes[0]) || {};
+        code = getString(node, 'LineValueV8', 'lineValueV8', 'V8Code', 'v8Code');
+    }
+    const config = extractWorkflowVisualConfig(code);
+    const routes = getArray(config || {}, 'routes', 'Routes');
+    if (!config || routes.length === 0) {
+        return { ok: false, selectedRoute: null, warnings: ['未找到图形条件标记，MCP 不执行任意手写 V8；请用图形条件生成 LineValueV8 后再测试。'] };
+    }
+    const defaultRoute = routes.find((route) => !!getValue(route, 'isDefault', 'IsDefault')) || null;
+    for (const route of routes) {
+        if (route === defaultRoute)
+            continue;
+        const rules = getArray(route, 'rules', 'Rules').filter((rule) => getString(rule, 'field', 'Field'));
+        if (rules.length === 0)
+            continue;
+        const match = getString(route, 'match', 'Match') === 'any'
+            ? rules.some((rule) => compareWorkflowRule(rule, formData))
+            : rules.every((rule) => compareWorkflowRule(rule, formData));
+        if (match) {
+            return { ok: true, selectedRoute: route, assignment: buildWorkflowAssignment(route), source: 'matched' };
+        }
+    }
+    return { ok: !!defaultRoute, selectedRoute: defaultRoute, assignment: defaultRoute ? buildWorkflowAssignment(defaultRoute) : null, source: defaultRoute ? 'default' : 'none' };
+}
+function buildWorkflowAssignment(route) {
+    const lineValue = getString(route, 'lineValue', 'LineValue');
+    const toNodeId = getString(route, 'toNodeId', 'ToNodeId');
+    return lineValue ? { LineValue: lineValue } : { NextNodeId: toNodeId };
+}
+export function workflowPayload(workflow, tableIdByName) {
+    const { flow, nodes, lines } = getWorkflowParts(workflow);
+    const nextFlow = { ...flow };
+    const roleErrors = [];
+    nextFlow.Roles = JSON.stringify(workflowBinding(flow, 'Roles', roleErrors));
+    if (roleErrors.length)
+        throw new Error(roleErrors.join('；'));
+    const tableRef = getString(flow, 'table', 'tableName', 'TableName', 'diyTableName', 'DiyTableName');
+    if (!getString(nextFlow, 'TableId', 'tableId') && tableRef) {
+        const resolvedTableId = tableIdByName.get(tableRef.toLowerCase());
+        if (!resolvedTableId)
+            throw new Error(`流程业务表 ${tableRef} 在当前租户不存在`);
+        nextFlow.TableId = resolvedTableId;
+    }
+    const nodeNameById = new Map();
+    const nextNodes = nodes.map((node, index) => {
+        const id = getNodeId(node) || `wf_node_${index + 1}_${randomId().slice(0, 8)}`;
+        const nextNode = { ...node, Id: id };
+        const name = getNodeName(nextNode);
+        if (name)
+            nodeNameById.set(id, name);
+        return nextNode;
+    });
+    const nextLines = lines.map((line, index) => {
+        const fromNodeId = getString(line, 'FromNodeId', 'fromNodeId');
+        const toNodeId = getString(line, 'ToNodeId', 'toNodeId');
+        const lineName = getString(line, 'LineName', 'lineName') || `${nodeNameById.get(fromNodeId) || fromNodeId || '当前节点'} 到 ${nodeNameById.get(toNodeId) || toNodeId || '下一节点'}`;
+        return { ...line, Id: getString(line, 'Id', 'id', 'LineId', 'lineId') || `wf_line_${index + 1}_${randomId().slice(0, 8)}`, LineName: lineName };
+    });
+    const layoutErrors = [];
+    const laidOutNodes = workflowLayout(nextNodes, nextLines, layoutErrors);
+    if (layoutErrors.length)
+        throw new Error(layoutErrors.join('；'));
+    return { FlowDesign: nextFlow, Nodes: laidOutNodes, Lines: nextLines };
+}
+async function verifyWorkflowReferences(client, payload) {
+    const references = [
+        { table: 'sys_user', field: 'Users', owners: getArray(payload, 'Nodes') },
+        { table: 'sys_user', field: 'CopyUsers', owners: getArray(payload, 'Nodes') },
+        { table: 'sys_role', field: 'Roles', owners: [asRecord(payload.FlowDesign), ...getArray(payload, 'Nodes')] },
+        { table: 'sys_dept', field: 'Depts', owners: getArray(payload, 'Nodes') },
+        { table: 'diy_job', field: 'BindJobs', owners: getArray(payload, 'Nodes') },
+    ];
+    const errors = [];
+    for (const reference of references) {
+        const ids = [...new Set(reference.owners.flatMap((owner) => {
+                try {
+                    return asArray(JSON.parse(getString(owner, reference.field) || '[]')).map((item) => getString(item, 'Id')).filter(Boolean);
+                }
+                catch {
+                    errors.push(`${reference.field} 不是有效 JSON`);
+                    return [];
+                }
+            }))];
+        for (let offset = 0; offset < ids.length; offset += 100) {
+            const batch = ids.slice(offset, offset + 100);
+            try {
+                const response = await client.getTableData(reference.table, {
+                    _Where: [['Id', 'In', batch]], _SelectFields: ['Id'], _PageIndex: 1, _PageSize: batch.length + 1,
+                });
+                if (response.Code !== 1)
+                    throw new Error(response.Msg || `Code=${response.Code}`);
+                const found = new Set(unwrapList(response.Data).map((row) => getString(row, 'Id')));
+                for (const id of batch)
+                    if (!found.has(id))
+                        errors.push(`${reference.field} 引用了当前租户不存在的 ${reference.table}.Id=${id}`);
+            }
+            catch (error) {
+                errors.push(`${reference.field} 无法核对当前租户 ${reference.table}：${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+    }
+    return errors;
+}
+async function audit(client, action, target, payload) {
+    try {
+        await client.writeAuditLog(action, target, JSON.stringify(payload).slice(0, 6000));
+    }
+    catch (error) {
+        console.error('[microi-mcp] audit log failed:', error instanceof Error ? error.message : String(error));
+    }
+}
+async function upsertEngine(client, engine) {
+    const apiEngineKey = getString(engine, 'apiEngineKey', 'ApiEngineKey');
+    const apiName = getString(engine, 'apiName', 'ApiName', 'name', 'Name') || apiEngineKey;
+    const category = getString(engine, 'category', 'Category') || 'AI生成';
+    const rawCode = getValue(engine, 'code', 'Code', 'ApiV8Code');
+    const codeProvided = typeof rawCode === 'string';
+    const code = codeProvided ? String(rawCode) : '';
+    const v8Limit = getEngineV8Limit(engine);
+    const existing = await client.getEngineCode(apiEngineKey);
+    if (existing.Code === 1) {
+        if (!codeProvided && v8Limit !== undefined) {
+            return client.updateEngineRuntimeLimit(apiEngineKey, v8Limit);
+        }
+        if (!codeProvided) {
+            return {
+                Code: 1,
+                Data: {
+                    ApiEngineKey: apiEngineKey,
+                    V8Limit: Number(existing.Data?.V8Limit || 0),
+                    Skipped: true,
+                },
+                Msg: '接口引擎已存在，Manifest 未提供 code 或 V8Limit，保持原配置',
+            };
+        }
+        return client.saveEngineCode(apiEngineKey, code, {
+            functionDescription: getString(engine, 'functionDescription', 'FunctionDescription') || undefined,
+            changeSummary: getString(engine, 'changeSummary', 'ChangeSummary') || undefined,
+            v8Limit,
+        });
+    }
+    return client.createEngine({
+        ApiEngineKey: apiEngineKey,
+        ApiName: apiName,
+        Category: category,
+        Code: code,
+        V8Limit: v8Limit === undefined ? undefined : (v8Limit ? 1 : 0),
+        functionDescription: getString(engine, 'functionDescription', 'FunctionDescription') || undefined,
+        changeSummary: getString(engine, 'changeSummary', 'ChangeSummary') || undefined,
+    });
+}
+function modulePayload(module, tableIdByName, moduleIdByName, fieldLookup) {
+    const tableRef = getString(module, 'table', 'tableName', 'diyTableName', 'DiyTableName');
+    const normalized = normalizeAllMenuJson(module);
+    if (normalized.errors.length)
+        throw new Error(normalized.errors.join('\n'));
+    const diyTableId = getString(module, 'diyTableId', 'DiyTableId') || (tableRef ? tableIdByName.get(tableRef.toLowerCase()) : '');
+    const tableName = tableRef || getString(module, 'DiyTableName', 'diyTableName');
+    const resolvedFields = fieldLookup ? resolveModuleFields(module, fieldLookup, diyTableId || '', tableName) : {};
+    const display = getNumber(module, 'display', 'Display') ?? 1;
+    const appDisplay = getNumber(module, 'appDisplay', 'AppDisplay') ?? 1;
+    const openType = getString(module, 'openType', 'OpenType') || 'Diy';
+    let effectiveViewSchema = normalized.data.ViewSchema;
+    if (!effectiveViewSchema
+        && fieldLookup
+        && diyTableId
+        && (display === 1 || appDisplay === 1)
+        && lower(openType) === 'diy') {
+        const tableFields = getFieldsForTable(fieldLookup, diyTableId).length
+            ? getFieldsForTable(fieldLookup, diyTableId)
+            : getFieldsForTable(fieldLookup, tableName);
+        if (tableFields.length) {
+            const generated = buildDefaultModulePresentation(getString(module, 'name', 'Name'), tableFields, tableFields[0]?.tableDescription || tableName);
+            const normalizedGenerated = normalizeViewSchemaJson(generated);
+            if (!normalizedGenerated.ok)
+                throw new Error(normalizedGenerated.errors.join('\n'));
+            effectiveViewSchema = normalizedGenerated.value;
+        }
+    }
+    const payload = compactObject({
+        ...normalized.data,
+        ...resolvedFields,
+        Name: getString(module, 'name', 'Name'),
+        DiyTableId: diyTableId,
+        ParentId: getString(module, 'parentId', 'ParentId') || (moduleIdByName ? moduleIdByName.get(getString(module, 'parentName', 'ParentName').toLowerCase()) : undefined),
+        ComponentName: getString(module, 'componentName', 'ComponentName'),
+        ComponentPath: getString(module, 'componentPath', 'ComponentPath'),
+        Display: display,
+        AppDisplay: appDisplay,
+        HasChild: getNumber(module, 'hasChild', 'HasChild'),
+        OpenType: openType,
+        FlowDesignId: getString(module, 'flowDesignId', 'FlowDesignId'),
+        Url: getString(module, 'url', 'Url'),
+        Sort: getNumber(module, 'sort', 'Sort'),
+        Icon: getString(module, 'icon', 'Icon'),
+        SearchFieldIds: getExplicitJsonString(module, 'searchFieldIds', 'SearchFieldIds') || resolvedFields.SearchFieldIds,
+        TableDiyFieldIds: getExplicitJsonString(module, 'tableDiyFieldIds', 'TableDiyFieldIds') || resolvedFields.TableDiyFieldIds,
+        SelectFields: getExplicitJsonString(module, 'selectFields', 'SelectFields') || resolvedFields.SelectFields,
+        TableHeaders: getExplicitJsonString(module, 'tableHeaders', 'TableHeaders'),
+        HideTableBanner: typeof (module.hideTableBanner ?? module.HideTableBanner) === 'boolean'
+            ? ((module.hideTableBanner ?? module.HideTableBanner) ? 1 : 0)
+            : getNumber(module, 'hideTableBanner', 'HideTableBanner'),
+        HideFormBanner: typeof (module.hideFormBanner ?? module.HideFormBanner) === 'boolean'
+            ? ((module.hideFormBanner ?? module.HideFormBanner) ? 1 : 0)
+            : getNumber(module, 'hideFormBanner', 'HideFormBanner'),
+        DefaultOrderBy: getExplicitJsonString(module, 'DefaultOrderBy') || resolvedFields.DefaultOrderBy,
+        SqlWhere: getString(module, 'sqlWhere', 'SqlWhere'),
+        SqlJoin: getString(module, 'sqlJoin', 'SqlJoin'),
+        JoinTables: getExplicitJsonString(module, 'joinTables', 'JoinTables'),
+        SortFieldIds: getExplicitJsonString(module, 'sortFieldIds', 'SortFieldIds') || resolvedFields.SortFieldIds,
+        NotShowFields: getExplicitJsonString(module, 'notShowFields', 'NotShowFields') || resolvedFields.NotShowFields,
+        StatisticsFields: getExplicitJsonString(module, 'statisticsFields', 'StatisticsFields') || resolvedFields.StatisticsFields,
+        InTableEdit: getNumber(module, 'inTableEdit', 'InTableEdit'),
+        InTableEditFields: getExplicitJsonString(module, 'inTableEditFields', 'InTableEditFields') || resolvedFields.InTableEditFields,
+        MobileListFields: getExplicitJsonString(module, 'mobileListFields', 'MobileListFields') || resolvedFields.MobileListFields,
+        CardTitleTagFields: getExplicitJsonString(module, 'cardTitleTagFields', 'CardTitleTagFields') || resolvedFields.CardTitleTagFields,
+        CardBottomTagFields: getExplicitJsonString(module, 'cardBottomTagFields', 'CardBottomTagFields') || resolvedFields.CardBottomTagFields,
+        MenuBadgeEnabled: getNumber(module, 'menuBadgeEnabled', 'MenuBadgeEnabled'),
+        MenuBadgeApiEngineKey: getString(module, 'menuBadgeApiEngineKey', 'MenuBadgeApiEngineKey'),
+        EnableViewSchema: getNumber(module, 'enableViewSchema', 'EnableViewSchema') ?? 0,
+        ViewSchemaVersion: getString(module, 'viewSchemaVersion', 'ViewSchemaVersion') || (effectiveViewSchema ? '1.0' : undefined),
+        ViewConfigVersion: getNumber(module, 'viewConfigVersion', 'ViewConfigVersion') ?? (effectiveViewSchema ? 1 : undefined),
+        ViewSchema: effectiveViewSchema,
+        IsMicroiService: getNumber(module, 'isMicroiService', 'IsMicroiService'),
+        MicroServiceId: getString(module, 'microServiceId', 'MicroServiceId'),
+        MicroServicePageId: getString(module, 'microServicePageId', 'MicroServicePageId'),
+        MicroServiceRoutePath: getString(module, 'microServiceRoutePath', 'MicroServiceRoutePath'),
+        MicroServiceKey: getString(module, 'microServiceKey', 'MicroServiceKey'),
+    });
+    return payload;
+}
+function buildDefaultFormOpen(table) {
+    const explicitType = getString(table, 'formOpenType', 'FormOpenType');
+    const explicitWidth = getString(table, 'formOpenWidth', 'FormOpenWidth');
+    if (explicitType)
+        return { type: explicitType, width: explicitWidth || '80%' };
+    const fields = getArray(table, 'fields', 'Fields');
+    const businessFields = fields.filter((field) => !LAYOUT_COMPONENTS.has(tableFieldComponent(field)));
+    const childTableCount = businessFields.filter((field) => tableFieldComponent(field) === 'tablechild').length;
+    const heavyCount = businessFields.filter((field) => [
+        'tablechild', 'richtext', 'codeeditor', 'jsontable', 'imgupload', 'fileupload', 'map', 'maparea', 'devcomponent'
+    ].includes(tableFieldComponent(field))).length;
+    const requiresDrawer = businessFields.length >= 36
+        || childTableCount >= 2
+        || (businessFields.length >= 28 && childTableCount >= 1)
+        || heavyCount >= 7;
+    return { type: requiresDrawer ? 'Drawer' : 'Dialog', width: explicitWidth || '80%' };
+}
+function normalizeRelationCardinality(value) {
+    const normalized = value.trim().toLowerCase().replace(/\s+/gu, '').replace(/[×＊*]/gu, ':');
+    if (['1:1', 'one:one', 'one-to-one', 'onetoone'].includes(normalized))
+        return '1:1';
+    if (['n:1', 'many:one', 'many-to-one', 'manytoone'].includes(normalized))
+        return 'N:1';
+    if (['1:n', 'one:many', 'one-to-many', 'onetomany'].includes(normalized))
+        return '1:N';
+    return '';
+}
+function getManifestRelationContract(field) {
+    const raw = getValue(field, 'relation', 'Relation');
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+        return undefined;
+    const relation = asRecord(raw);
+    return {
+        cardinality: normalizeRelationCardinality(getString(relation, 'cardinality', 'Cardinality')),
+        targetTable: getString(relation, 'targetTable', 'TargetTable', 'table', 'Table'),
+        joinFieldName: getString(relation, 'joinFieldName', 'JoinFieldName', 'foreignKey', 'ForeignKey'),
+        childForeignKey: getString(relation, 'childForeignKey', 'ChildForeignKey', 'foreignKey', 'ForeignKey'),
+        childModule: getString(relation, 'childModule', 'ChildModule', 'module', 'Module'),
+        primaryTableFieldName: getString(relation, 'primaryTableFieldName', 'PrimaryTableFieldName') || 'Id',
+    };
+}
+const FORM_BANNER_LAYOUT_COMPONENTS = new Set([
+    'collapsegroup', 'tabs', 'divider', 'empty', 'alert', 'statictext', 'html', 'button',
+]);
+const FORM_BANNER_TAG_COMPONENTS = new Set([
+    'select', 'multipleselect', 'radio', 'checkbox', 'switch', 'cascader', 'selecttree', 'department',
+]);
+const FORM_BANNER_NUMBER_COMPONENTS = new Set(['numbertext', 'slider', 'rate', 'progress']);
+function bannerFieldText(field) {
+    return `${getString(field, 'name', 'Name')} ${getString(field, 'label', 'Label')} ${getString(field, 'description', 'Description')}`.toLowerCase();
+}
+function bannerFieldScore(field, keywords, fallback) {
+    const text = bannerFieldText(field);
+    const matched = keywords.findIndex((keyword) => text.includes(keyword));
+    return matched >= 0 ? 100 - matched : fallback;
+}
+function isBannerNumericField(field) {
+    if (FORM_BANNER_TAG_COMPONENTS.has(tableFieldComponent(field)))
+        return false;
+    if (FORM_BANNER_NUMBER_COMPONENTS.has(tableFieldComponent(field)))
+        return true;
+    return /^(tinyint|smallint|mediumint|int|bigint|decimal|numeric|float|double|real)(\b|\()/iu
+        .test(getString(field, 'type', 'Type'));
+}
+function isMeaningfulBannerMetricField(field) {
+    if (!isBannerNumericField(field))
+        return false;
+    const text = bannerFieldText(field);
+    if (/(^|\s|_)(id|ids)(\s|_|$)|sort|order|latitude|longitude|phone|mobile|enabled?|disabled?|visible|deleted|status|state|type|category|version|timeout|retry|limit|pagesize|page size|offset|loaded|load count|record count|data count|排序|经度|纬度|电话|手机|启用|禁用|显示|删除|状态|类型|分类|版本|超时|重试|限制|分页|本页|加载|记录数/iu.test(text))
+        return false;
+    return hasKeyword(text, [
+        'amount', 'money', 'price', 'total', 'count', 'quantity', 'number', 'score', 'rate', 'progress',
+        'budget', 'cost', 'fee', 'tax', 'discount', 'income', 'expense', 'balance', 'point', 'weight',
+        'volume', 'area', 'duration', 'hour', 'day',
+        '金额', '总额', '价格', '数量', '个数', '积分', '比例', '进度', '余额', '预算', '成本', '费用',
+        '税额', '折扣', '收入', '支出', '重量', '体积', '面积', '时长', '工时', '天数', '评分', '完成度',
+    ]);
+}
+function bannerDescriptorArray(value) {
+    if (Array.isArray(value))
+        return value;
+    if (typeof value !== 'string' || !value.trim())
+        return [];
+    return jsonArrayOrSplit(value);
+}
+/** 字符串空值是设计者明确关闭字段；省略/null 才允许兼容推断，不能被旧大小写别名覆盖。 */
+function configuredBannerField(source, keys, fallback) {
+    for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(source, key) && typeof source[key] === 'string') {
+            return String(source[key]).trim();
+        }
+    }
+    return fallback();
+}
+/** 生成 diy_table 的 Banner 语义配置；保留显式空字段与空数组，只有未选择时按真实字段推断。 */
+export function buildDefaultFormBanner(table) {
+    const fields = getArray(table, 'fields', 'Fields').filter((field) => {
+        const name = getString(field, 'name', 'Name');
+        const visible = getNumber(field, 'visible', 'Visible');
+        return Boolean(name)
+            && visible !== 0
+            && !isSystemFieldName(name)
+            && !FORM_BANNER_LAYOUT_COMPONENTS.has(tableFieldComponent(field));
+    });
+    const explicitValue = getValue(table, 'formBanner', 'FormBanner');
+    const explicit = asRecord(explicitValue);
+    const ranked = (score) => fields
+        .map((field, index) => ({ field, index, score: score(field, index) }))
+        .filter((item) => item.score > 0)
+        .sort((left, right) => right.score - left.score || left.index - right.index)
+        .map((item) => item.field);
+    const titleField = configuredBannerField(explicit, ['titleField', 'TitleField'], () => getString(ranked((field, index) => {
+        let score = bannerFieldScore(field, ['title', 'name', 'subject', 'code', 'no', 'number', '标题', '名称', '主题', '编号', '单号', '编码'], 20 - index);
+        if (tableFieldComponent(field) === 'autonumber')
+            score += 50;
+        else if (tableFieldComponent(field) === 'text')
+            score += 20;
+        if (FORM_BANNER_TAG_COMPONENTS.has(tableFieldComponent(field)) || isBannerNumericField(field))
+            score -= 80;
+        return score;
+    })[0] || {}, 'name', 'Name'));
+    const subtitleField = configuredBannerField(explicit, ['subtitleField', 'SubtitleField'], () => getString(ranked((field, index) => {
+        const name = getString(field, 'name', 'Name');
+        if (name === titleField || isBannerNumericField(field) || tableFieldComponent(field) === 'imgupload')
+            return 0;
+        return bannerFieldScore(field, [
+            'subtitle', 'customer', 'client', 'project', 'company', 'category', 'type', 'date', 'contact',
+            '副标题', '客户', '项目', '公司', '单位', '分类', '类型', '日期', '联系人', '说明',
+        ], 12 - index) + (['text', 'select', 'radio', 'datetime', 'department', 'selecttree'].includes(tableFieldComponent(field)) ? 18 : 0);
+    })[0] || {}, 'name', 'Name'));
+    const imageField = configuredBannerField(explicit, ['imageField', 'ImageField'], () => getString(fields.find((field) => ['imgupload', 'imageupload'].includes(tableFieldComponent(field))) || {}, 'name', 'Name'));
+    const tagValue = getValue(explicit, 'tagFields', 'TagFields', 'tags', 'Tags');
+    const tags = tagValue !== undefined
+        ? bannerDescriptorArray(tagValue)
+        : ranked((field, index) => FORM_BANNER_TAG_COMPONENTS.has(tableFieldComponent(field))
+            ? bannerFieldScore(field, ['status', 'state', 'stage', 'type', 'category', 'level', '状态', '阶段', '类型', '分类', '级别'], 30 - index)
+            : 0)
+            .slice(0, 3)
+            .map((field) => ({
+            Key: getString(field, 'name', 'Name'),
+            Field: getString(field, 'name', 'Name'),
+            Label: getString(field, 'label', 'Label') || getString(field, 'name', 'Name'),
+        }));
+    const metricValue = getValue(explicit, 'metrics', 'Metrics');
+    const metrics = metricValue !== undefined
+        ? bannerDescriptorArray(metricValue)
+        : ranked((field) => {
+            if (!isMeaningfulBannerMetricField(field))
+                return 0;
+            return bannerFieldScore(field, [
+                'amount', 'money', 'price', 'total', 'count', 'quantity', 'number', 'score', 'rate', 'progress',
+                'budget', 'cost', 'fee', 'tax', 'discount', 'income', 'expense', 'balance', 'point', 'weight',
+                '金额', '总额', '价格', '数量', '个数', '积分', '比例', '进度', '余额', '预算', '成本', '费用',
+            ], 0);
+        }).slice(0, 3).map((field) => ({
+            Key: getString(field, 'name', 'Name'),
+            Field: getString(field, 'name', 'Name'),
+            Label: getString(field, 'label', 'Label') || getString(field, 'name', 'Name'),
+            Auto: true,
+        }));
+    const enabled = getBoolean(explicit, 'enabled', 'Enabled');
+    const result = {
+        FormBannerEnabled: enabled === false ? 0 : 1,
+        FormBannerTitleField: titleField,
+        FormBannerSubtitleField: subtitleField,
+        FormBannerImageField: imageField,
+        FormBannerIcon: getString(explicit, 'icon', 'Icon') || 'far fa-file-alt',
+        FormBannerBackgroundField: configuredBannerField(explicit, ['backgroundField', 'BackgroundField'], () => ''),
+        FormBannerTagFields: JSON.stringify(tags),
+    };
+    const hasChildRelation = fields.some((field) => tableFieldComponent(field) === 'tablechild'
+        || getManifestRelationContract(field)?.cardinality === '1:N');
+    // A child-only table intentionally leaves the column null so the runtime can
+    // discover authorized child counts/SUM values. Explicit [] still disables it.
+    if (metricValue !== undefined || metrics.length > 0 || !hasChildRelation) {
+        result.FormBannerMetrics = JSON.stringify(metrics);
+    }
+    return result;
+}
+/**
+ * 旧后端可能忽略尚未升级的 Banner 物理列，而基础结构验收仍返回 Passed。
+ * 只读核对生成器实际写入的语义字段，不安装、不改数据库，也不掩盖服务端原错误。
+ */
+async function validateSystemWithBanner(client, manifest) {
+    const validation = await client.validateLowCodeSystem(manifest);
+    if (validation.Code !== 1)
+        return validation;
+    const data = asRecord(validation.Data);
+    const errors = Array.isArray(data.Errors) ? [...data.Errors] : [];
+    const tables = getArray(manifest, 'tables', 'Tables');
+    // 每批有界，使用实际表名条件；不能以未筛选或分页截断的回读证明配置存在。
+    for (let offset = 0; offset < tables.length; offset += 100) {
+        const batch = tables.slice(offset, offset + 100).map(table => ({
+            name: getString(table, 'name', 'Name'), patch: {
+                ...buildDefaultFormBanner(table),
+                ...(getValue(table, 'readPrimary', 'ReadPrimary') !== undefined
+                    ? { ReadPrimary: getValue(table, 'readPrimary', 'ReadPrimary') } : {}),
+            },
+        }));
+        const fields = [...new Set(batch.flatMap(item => Object.keys(item.patch)))];
+        let rows;
+        try {
+            const readback = await client.getTableData('diy_table', {
+                _Where: [['Name', 'In', batch.map(item => item.name)]],
+                _SelectFields: ['Id', 'Name', ...fields], _PageIndex: 1, _PageSize: batch.length + 1,
+            });
+            if (readback.Code !== 1)
+                throw new Error('readback');
+            rows = unwrapList(readback.Data);
+        }
+        catch {
+            errors.push('表单 Banner 回读失败；请检查平台升级与元数据读取权限，再重新验收。');
+            continue;
+        }
+        for (const item of batch) {
+            const matched = rows.filter(row => getString(row, 'Name').toLowerCase() === item.name.toLowerCase());
+            if (matched.length !== 1) {
+                errors.push(`表 ${item.name} 的 Banner 元数据应唯一，回读数量为 ${matched.length}。`);
+                continue;
+            }
+            const saved = matched[0];
+            const mismatch = Object.entries(item.patch).filter(([key, value]) => !Object.hasOwn(saved, key) || String(saved[key] ?? '') !== String(value ?? ''));
+            if (mismatch.length)
+                errors.push(`表 ${item.name} 的 Banner 配置回读不一致：${mismatch.map(([key]) => key).join(', ')}；缺少物理字段时需先完成平台升级，再配置和验收。`);
+        }
+    }
+    if (errors.length || data.Passed === false)
+        return {
+            ...validation, Code: 0, Msg: validation.Msg || '低代码系统配置验收未通过',
+            Data: { ...data, Passed: false, Errors: errors },
+        };
+    return validation;
+}
+function parseConfigRecord(value) {
+    if (typeof value === 'string') {
+        if (!value.trim())
+            return {};
+        try {
+            return asRecord(JSON.parse(value));
+        }
+        catch {
+            return {};
+        }
+    }
+    return asRecord(value);
+}
+function moduleTableRef(module) {
+    return getString(module, 'table', 'tableName', 'diyTableName', 'DiyTableName');
+}
+/**
+ * Validate the portable relation contract before any Manifest write occurs.
+ * Runtime ids in raw Config are deliberately not trusted: they are resolved
+ * from table/module names after the tenant resources exist.
+ */
+export function validateManifestFieldRelations(manifest) {
+    const errors = [];
+    const warnings = [];
+    const tables = getArray(manifest, 'tables', 'Tables');
+    const modules = getArray(manifest, 'modules', 'Modules');
+    const tableByName = new Map();
+    const moduleByName = new Map();
+    for (const table of tables) {
+        const name = getString(table, 'name', 'Name');
+        if (name)
+            tableByName.set(normalizeKey(name), table);
+    }
+    for (const module of modules) {
+        const name = getString(module, 'name', 'Name');
+        if (name)
+            moduleByName.set(normalizeKey(name), module);
+    }
+    tables.forEach((table, tableIndex) => {
+        const tableName = getString(table, 'name', 'Name');
+        const currentFields = getArray(table, 'fields', 'Fields');
+        const currentFieldNames = new Set(currentFields.map((field) => normalizeKey(getString(field, 'name', 'Name'))).filter(Boolean));
+        currentFields.forEach((field, fieldIndex) => {
+            const component = normalizeKey(getString(field, 'component', 'Component'));
+            if (component !== 'joinform' && component !== 'tablechild')
+                return;
+            const path = `tables[${tableIndex}].fields[${fieldIndex}]`;
+            const fieldName = getString(field, 'name', 'Name');
+            const relation = getManifestRelationContract(field);
+            if (!relation) {
+                errors.push(`${path} (${tableName}.${fieldName}) 使用 ${component === 'joinform' ? 'JoinForm' : 'TableChild'} 时必须声明 portable relation；禁止直接写入租户 Id 或未初始化 Config`);
+                return;
+            }
+            if (!relation.cardinality) {
+                errors.push(`${path}.relation.cardinality 仅允许 1:1、N:1 或 1:N`);
+            }
+            if (!relation.targetTable) {
+                errors.push(`${path}.relation.targetTable 不能为空`);
+                return;
+            }
+            if (normalizeKey(relation.targetTable) === normalizeKey(tableName)) {
+                errors.push(`${path} 关联目标 ${relation.targetTable} 与当前表相同；JoinForm/TableChild 禁止自关联`);
+            }
+            const targetTable = tableByName.get(normalizeKey(relation.targetTable));
+            if (!targetTable) {
+                errors.push(`${path}.relation.targetTable 引用未在 Manifest tables 中声明的表 "${relation.targetTable}"；完整系统生成必须声明目标表以完成前置校验`);
+                return;
+            }
+            if (component === 'joinform') {
+                if (relation.cardinality !== '1:1' && relation.cardinality !== 'N:1') {
+                    errors.push(`${path} 的 JoinForm 只允许 1:1 或 N:1；1:N 明细必须改用 TableChild`);
+                }
+                if (!relation.joinFieldName) {
+                    errors.push(`${path}.relation.joinFieldName 不能为空，且必须指向当前主表中保存目标记录 Id 的字段`);
+                }
+                else if (!currentFieldNames.has(normalizeKey(relation.joinFieldName))) {
+                    errors.push(`${path}.relation.joinFieldName 引用当前表不存在的字段 "${relation.joinFieldName}"`);
+                }
+                else if (normalizeKey(relation.joinFieldName) === normalizeKey(fieldName)) {
+                    errors.push(`${path}.relation.joinFieldName 不能指向 JoinForm 组件字段自身`);
+                }
+                return;
+            }
+            if (relation.cardinality !== '1:N') {
+                errors.push(`${path} 的 TableChild 只允许 1:N；1:1/N:1 应使用 JoinForm`);
+            }
+            const targetFields = getArray(targetTable, 'fields', 'Fields');
+            const targetFieldNames = new Set(targetFields.map((item) => normalizeKey(getString(item, 'name', 'Name'))).filter(Boolean));
+            if (!relation.childForeignKey) {
+                errors.push(`${path}.relation.childForeignKey 不能为空`);
+            }
+            else if (!targetFieldNames.has(normalizeKey(relation.childForeignKey))) {
+                errors.push(`${path}.relation.childForeignKey 引用子表 ${relation.targetTable} 不存在的字段 "${relation.childForeignKey}"`);
+            }
+            if (!relation.childModule) {
+                errors.push(`${path}.relation.childModule 不能为空`);
+            }
+            else {
+                const childModule = moduleByName.get(normalizeKey(relation.childModule));
+                if (!childModule) {
+                    errors.push(`${path}.relation.childModule 引用不存在的模块 "${relation.childModule}"`);
+                }
+                else {
+                    if (normalizeKey(moduleTableRef(childModule)) !== normalizeKey(relation.targetTable)) {
+                        errors.push(`${path}.relation.childModule 必须绑定子表 ${relation.targetTable}`);
+                    }
+                    if (getNumber(childModule, 'display', 'Display') !== 0
+                        || getNumber(childModule, 'appDisplay', 'AppDisplay') !== 0
+                        || getNumber(childModule, 'hasChild', 'HasChild') !== 0) {
+                        errors.push(`${path}.relation.childModule 必须显式设置 display=0、appDisplay=0、hasChild=0`);
+                    }
+                }
+            }
+            // 索引匹配真实隔离方式：显式声明租户列的共享表使用租户+外键，
+            // 默认独立租户库使用外键。不能为了满足计划要求让应用虚构租户列。
+            const childIndexPrefix = targetFieldNames.has('osclient')
+                ? ['osclient', normalizeKey(relation.childForeignKey)]
+                : [normalizeKey(relation.childForeignKey)];
+            const indexMatches = getArray(targetTable, 'indexes', 'Indexes').some((index) => {
+                const columns = getStringArray(index, 'columns', 'Columns').map(normalizeKey);
+                return childIndexPrefix.every((column, position) => columns[position] === column);
+            });
+            if (relation.childForeignKey && !indexMatches) {
+                const displayPrefix = targetFieldNames.has('osclient')
+                    ? `OsClient, ${relation.childForeignKey}` : relation.childForeignKey;
+                errors.push(`${path} 的子表 ${relation.targetTable} 必须声明以 (${displayPrefix}) 开头的索引`);
+            }
+        });
+    });
+    return { errors, warnings };
+}
+export function resolveManifestRelationConfig(field, currentTableName, tableIdByName, moduleIdByName) {
+    const component = normalizeKey(getString(field, 'component', 'Component'));
+    const relation = getManifestRelationContract(field);
+    if (!relation || (component !== 'joinform' && component !== 'tablechild')) {
+        throw new Error(`${currentTableName}.${getString(field, 'name', 'Name')} 缺少有效 relation`);
+    }
+    const targetTableId = tableIdByName.get(normalizeKey(relation.targetTable));
+    if (!targetTableId)
+        throw new Error(`无法解析关联目标表 ${relation.targetTable} 的当前租户 diy_table.Id`);
+    const base = parseConfigRecord(getValue(field, 'config', 'Config'));
+    if (component === 'joinform') {
+        return {
+            ...base,
+            JoinForm: {
+                ...asRecord(base.JoinForm),
+                TableId: targetTableId,
+                TableName: relation.targetTable,
+                JoinFieldName: relation.joinFieldName,
+            },
+        };
+    }
+    const childModuleId = moduleIdByName.get(normalizeKey(relation.childModule));
+    if (!childModuleId)
+        throw new Error(`无法解析隐藏子表模块 ${relation.childModule} 的当前租户 sys_menu.Id`);
+    return {
+        ...base,
+        TableChildTableId: targetTableId,
+        TableChildSysMenuId: childModuleId,
+        TableChildSysMenuName: relation.childModule,
+        TableChildFkFieldName: relation.childForeignKey,
+        TableChild: {
+            ...asRecord(base.TableChild),
+            PrimaryTableFieldName: relation.primaryTableFieldName,
+        },
+    };
+}
+function normalizeManifestMicroServiceRoutePath(value) {
+    let routePath = String(value || '').trim().replace(/\\/gu, '/');
+    if (!routePath)
+        return '/';
+    if (!routePath.startsWith('/'))
+        routePath = `/${routePath}`;
+    routePath = routePath.replace(/\/{2,}/gu, '/');
+    if (routePath.length > 1)
+        routePath = routePath.replace(/\/+$/gu, '');
+    if (!/^\/(?:[A-Za-z0-9][A-Za-z0-9_-]*(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)*)?$/u.test(routePath)
+        || routePath.includes('..')) {
+        throw new Error(`不合法：${value}`);
+    }
+    return routePath;
+}
+/** Build the default host route from the selected, authenticated MCP context. */
+export function buildMicroServiceMenuUrl(osClient, appKey, routePath) {
+    const tenant = String(osClient || '').trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$/u.test(tenant)) {
+        throw new Error('生成微服务菜单地址需要当前 MCP 连接的合法 OsClient');
+    }
+    const normalizedRoute = normalizeManifestMicroServiceRoutePath(routePath);
+    const encodedRoute = normalizedRoute === '/'
+        ? ''
+        : `/${normalizedRoute.slice(1).split('/').map((segment) => encodeURIComponent(segment)).join('/')}`;
+    return `/micro-app/${encodeURIComponent(tenant)}/${encodeURIComponent(appKey)}${encodedRoute}`;
+}
+/**
+ * Resolve a portable Manifest MicroService reference to the tenant-specific
+ * sys_microiservice/sys_microiservice_page ids before any system writes begin.
+ */
+export async function resolveMicroServiceModuleBinding(client, module, osClient) {
+    const openType = getString(module, 'openType', 'OpenType');
+    const microServiceKey = getString(module, 'microServiceKey', 'MicroServiceKey');
+    const rawRoutePath = getString(module, 'microServiceRoutePath', 'MicroServiceRoutePath');
+    const explicitServiceId = getString(module, 'microServiceId', 'MicroServiceId');
+    const explicitPageId = getString(module, 'microServicePageId', 'MicroServicePageId');
+    const isMicroService = ['microservice', 'codeform'].includes(openType.toLowerCase())
+        || Boolean(getNumber(module, 'isMicroiService', 'IsMicroiService') === 1
+            || microServiceKey
+            || rawRoutePath
+            || explicitServiceId
+            || explicitPageId);
+    if (!isMicroService)
+        return undefined;
+    if (openType.toLowerCase() === 'codeform' && !getString(module, 'diyTableId', 'DiyTableId', 'table', 'tableName', 'diyTableName', 'DiyTableName')) {
+        throw new Error('CodeForm 菜单必须绑定真实 diy_table，供表单代码获取菜单与表权限上下文');
+    }
+    if (!microServiceKey || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(microServiceKey)) {
+        throw new Error(`MicroService 菜单缺少合法的 microServiceKey：${microServiceKey || '(empty)'}`);
+    }
+    if (!rawRoutePath)
+        throw new Error('MicroService 菜单缺少 microServiceRoutePath');
+    const routePath = normalizeManifestMicroServiceRoutePath(rawRoutePath);
+    const detailResult = await client.getMicroService(microServiceKey);
+    if (!detailResult || detailResult.Code !== 1) {
+        throw new Error(`无法解析微服务 ${microServiceKey}：${detailResult?.Msg || '接口无返回'}`);
+    }
+    const detail = asRecord(detailResult.Data);
+    const service = asRecord(detail.Service);
+    const serviceId = getString(service, 'Id', 'id');
+    const savedServiceKey = getString(service, 'MsKey', 'MicroServiceKey', 'AppKey');
+    if (!serviceId || savedServiceKey.toLowerCase() !== microServiceKey.toLowerCase()) {
+        throw new Error(`微服务 ${microServiceKey} 的运行元数据不完整或业务键不一致`);
+    }
+    if (explicitServiceId && explicitServiceId !== serviceId) {
+        throw new Error(`MicroServiceId 已过期：Manifest=${explicitServiceId}，当前租户=${serviceId}`);
+    }
+    const pages = Array.isArray(detail.Pages) ? detail.Pages.map(asRecord) : [];
+    const page = pages.find((item) => {
+        const candidate = getString(item, 'RoutePath', 'routePath', 'Path', 'path');
+        if (!candidate)
+            return false;
+        try {
+            return normalizeManifestMicroServiceRoutePath(candidate) === routePath;
+        }
+        catch {
+            return false;
+        }
+    });
+    const pageId = page ? getString(page, 'Id', 'id') : '';
+    if (!pageId)
+        throw new Error(`微服务 ${microServiceKey} 不存在可用页面 ${routePath}`);
+    if (explicitPageId && explicitPageId !== pageId) {
+        throw new Error(`MicroServicePageId 已过期：Manifest=${explicitPageId}，当前租户=${pageId}`);
+    }
+    return {
+        IsMicroiService: 1,
+        OpenType: openType.toLowerCase() === 'codeform' ? 'CodeForm' : 'MicroService',
+        ComponentName: getString(module, 'componentName', 'ComponentName') || 'MicroService',
+        ComponentPath: getString(module, 'componentPath', 'ComponentPath') || '/micro-app/host',
+        Url: getString(module, 'url', 'Url') || buildMicroServiceMenuUrl(osClient, microServiceKey, routePath),
+        MicroServiceId: serviceId,
+        MicroServicePageId: pageId,
+        MicroServiceRoutePath: routePath,
+        MicroServiceKey: microServiceKey,
+    };
+}
+function rolePayload(role) {
+    return compactObject({
+        ...role,
+        Id: getString(role, 'Id', 'roleId', 'RoleId') || undefined,
+        Name: getString(role, 'Name', 'name'),
+        Level: getNumber(role, 'Level', 'level'),
+        Sort: getNumber(role, 'Sort', 'sort'),
+        Remark: getString(role, 'Remark', 'remark', 'description'),
+        DeptIds: getString(role, 'DeptIds', 'deptIds'),
+        BaseLimit: getString(role, 'BaseLimit', 'baseLimit'),
+    });
+}
+export function dataSourcePayload(dataSource) {
+    const dataSourceType = getString(dataSource, 'DataSourceType', 'dataSourceType') || 'V8';
+    const normalizedType = dataSourceType.trim().toUpperCase();
+    const legacyCode = normalizedType.includes('SQL')
+        ? getString(dataSource, 'SqlDataSource', 'sqlDataSource', 'sql')
+        : (normalizedType.includes('JSON') || dataSourceType.includes('普通'))
+            ? stringifyConfig(dataSource.JsonDataSource ?? dataSource.jsonDataSource
+                ?? dataSource.NormalDataSource ?? dataSource.normalDataSource ?? dataSource.json)
+            : normalizedType.includes('API')
+                ? getString(dataSource, 'ApiDataSource', 'apiDataSource')
+                : getString(dataSource, 'V8DataSource', 'v8DataSource');
+    const payload = compactObject({
+        ...dataSource,
+        Id: getString(dataSource, 'Id', 'dataSourceId', 'DataSourceId') || undefined,
+        DataSourceName: getString(dataSource, 'DataSourceName', 'dataSourceName', 'name', 'Name'),
+        DataSourceKey: getString(dataSource, 'DataSourceKey', 'dataSourceKey'),
+        DataSourceType: dataSourceType,
+        ApiV8Code: getString(dataSource, 'ApiV8Code', 'apiV8Code', 'code') || legacyCode,
+        TestParam: stringifyConfig(dataSource.TestParam ?? dataSource.testParam),
+        DataSourceRole: getString(dataSource, 'DataSourceRole', 'dataSourceRole'),
+        AllowAnonymous: getNumber(dataSource, 'AllowAnonymous', 'allowAnonymous'),
+        IsEnable: getNumber(dataSource, 'IsEnable', 'isEnable') ?? 1,
+    });
+    for (const legacyField of [
+        'SqlDataSource', 'sqlDataSource', 'sql',
+        'V8DataSource', 'v8DataSource',
+        'JsonDataSource', 'jsonDataSource', 'json',
+        'NormalDataSource', 'normalDataSource',
+        'ApiDataSource', 'apiDataSource',
+    ])
+        delete payload[legacyField];
+    return payload;
+}
+function printTemplatePayload(template) {
+    const page = normalizePrintPageObj(template.PageObj ?? template.pageObj);
+    if (!page.ok || !page.json)
+        throw new Error(`printTemplates.${getString(template, 'Title', 'title') || '(untitled)'} PageObj invalid: ${page.errors.join('; ')}`);
+    const printObj = normalizePrintObj(template.PrintObj ?? template.printObj);
+    if (!printObj.ok || !printObj.json)
+        throw new Error(`printTemplates.${getString(template, 'Title', 'title') || '(untitled)'} PrintObj invalid: ${printObj.errors.join('; ')}`);
+    return compactObject({
+        ...template,
+        Id: getString(template, 'Id', 'printId', 'PrintId') || undefined,
+        Title: getString(template, 'Title', 'title'),
+        Number: getString(template, 'Number', 'number'),
+        Desc: getString(template, 'Desc', 'desc', 'description'),
+        DataApi: getString(template, 'DataApi', 'dataApi'),
+        PageObj: page.json,
+        PrintObj: printObj.json,
+    });
+}
+function jobPayload(job) {
+    return compactObject({
+        ...job,
+        Id: getString(job, 'Id', 'jobId', 'JobId') || undefined,
+        JobName: getString(job, 'JobName', 'jobName', 'name', 'Name'),
+        CronExpression: getString(job, 'CronExpression', 'cronExpression', 'cron'),
+        JobType: getString(job, 'JobType', 'jobType') || '1',
+        ApiEngineKey: getString(job, 'ApiEngineKey', 'apiEngineKey'),
+        JobParam: stringifyConfig(job.JobParam ?? job.jobParam ?? job.params),
+        JobDesc: getString(job, 'JobDesc', 'jobDesc', 'description'),
+        CronDesc: getString(job, 'CronDesc', 'cronDesc'),
+        DllName: getString(job, 'DllName', 'dllName'),
+        JobPath: getString(job, 'JobPath', 'jobPath'),
+    });
+}
+function isManifestRelationField(field) {
+    const component = normalizeKey(getString(field, 'component', 'Component'));
+    return component === 'joinform' || component === 'tablechild';
+}
+function manifestFieldPayload(table, field, tableId, tableLayout, resolvedConfig) {
+    const configSource = asRecord(field.configSource ?? field.ConfigSource);
+    const generatedConfig = getString(configSource, 'sourceType')
+        ? buildFieldConfig(getString(configSource, 'sourceType'), configSource)
+        : undefined;
+    return compactObject({
+        TableId: tableId,
+        Name: getString(field, 'name', 'Name'),
+        Label: getString(field, 'label', 'Label'),
+        Type: getString(field, 'type', 'Type') || (isManifestRelationField(field) ? 'mediumtext' : ''),
+        Component: getString(field, 'component', 'Component'),
+        Visible: getNumber(field, 'visible', 'Visible') ?? 1,
+        AppVisible: getNumber(field, 'appVisible', 'AppVisible') ?? 1,
+        Tab: getString(field, 'tab', 'Tab') || tableLayout.fieldTabs.get(getString(field, 'name', 'Name')),
+        TableWidth: getNumber(field, 'tableWidth', 'TableWidth') ?? inferTableColumnWidth(field),
+        Sort: getNumber(field, 'sort', 'Sort'),
+        Readonly: getNumber(field, 'readonly', 'Readonly'),
+        NotEmpty: getNumber(field, 'notEmpty', 'NotEmpty'),
+        Unique: getNumber(field, 'unique', 'Unique'),
+        DefaultValue: getString(field, 'defaultValue', 'DefaultValue'),
+        Placeholder: getString(field, 'placeholder', 'Placeholder'),
+        FormWidth: getNumber(field, 'formWidth', 'FormWidth'),
+        Data: generatedConfig?.data ?? getString(field, 'data', 'Data'),
+        Config: resolvedConfig !== undefined
+            ? JSON.stringify(resolvedConfig)
+            : (generatedConfig ? JSON.stringify(generatedConfig.config) : stringifyConfig(field.config ?? field.Config)),
+        Description: getString(field, 'description', 'Description'),
+        Encrypt: getNumber(field, 'encrypt', 'Encrypt'),
+        InTableEdit: getNumber(field, 'inTableEdit', 'InTableEdit'),
+    });
+}
+export function manifestGuide(osClient) {
+    const confirmTarget = osClient || 'EXECUTE';
+    return {
+        osClient,
+        workflow: [
+            'Call microi_get_db_schema first to inspect existing tables.',
+            'Call microi_get_manifest_schema to draft a manifest from the user requirement.',
+            'Call microi_plan_system with the manifest and fix all errors.',
+            'Call microi_generate_system with dryRun=true.',
+            `Call microi_generate_system with dryRun=false and confirmExecution="${confirmTarget}" only after the user confirms writes.`,
+            'Call microi_validate_system after generation if you need an independent validation pass.',
+        ],
+        manifestShape: {
+            name: 'System name',
+            roles: [{ name: 'Admin', level: 999 }],
+            tables: [{
+                    name: 'Biz_Order',
+                    description: 'Order main table',
+                    v8Limit: false,
+                    readPrimary: null,
+                    tabs: [{ Id: 'basic', Name: 'Basic Info', Sort: 10 }, { Id: 'business', Name: 'Business Info', Sort: 20 }],
+                    formBanner: {
+                        enabled: true,
+                        titleField: 'OrderNo',
+                        subtitleField: 'CustomerName',
+                        imageField: '',
+                        icon: 'far fa-file-alt',
+                        backgroundField: '',
+                        tagFields: [{ Field: 'Status', Label: 'Status' }],
+                        metrics: [
+                            { Field: 'Amount', Label: 'Order Amount', Prefix: '¥', Icon: 'fas fa-coins' },
+                            { Key: 'Pending', Label: 'Pending', ApiEngineKey: 'biz_order_metrics', ValuePath: 'Data.Pending', RefreshSeconds: 30 },
+                        ],
+                    },
+                    fields: [
+                        { name: 'OrderNo', label: 'Order No', type: 'varchar(50)', component: 'AutoNumber', tab: 'basic', configSource: { sourceType: 'AutoNumber', prefix: 'ORD', length: 6 }, notEmpty: 1, unique: 1, tableWidth: 160, sort: 10 },
+                        { name: 'CustomerName', label: 'Customer', type: 'varchar(100)', component: 'Text', tab: 'basic', notEmpty: 1, tableWidth: 160, sort: 20 },
+                        { name: 'OwnerName', label: 'Owner', type: 'varchar(100)', component: 'Text', tab: 'basic', tableWidth: 150, sort: 30 },
+                        { name: 'Amount', label: 'Order Amount', type: 'decimal(18,2)', component: 'NumberText', tab: 'business', tableWidth: 140, sort: 40 },
+                        { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', tab: 'business', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, tableWidth: 130, sort: 50 },
+                    ],
+                    indexes: [
+                        { name: 'uk_biz_order_no', columns: ['OrderNo'], unique: true, purpose: '独立租户库内订单号唯一；共享表须显式声明并校验租户物理列' },
+                        { name: 'ix_biz_order_status_time', columns: ['Status', 'CreateTime'], unique: false, purpose: '按状态及创建时间查询' },
+                    ],
+                }],
+            engines: [
+                { apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', v8Limit: false, code: "return { Code: 1, Data: V8.Param };" },
+                {
+                    apiEngineKey: 'biz_order_metrics',
+                    apiName: 'Order metrics',
+                    category: 'Biz_Order',
+                    code: [
+                        "var result = V8.FormEngine.GetTableData('Biz_Order', {",
+                        "  _Where: [['Status', '=', 'Submitted']],",
+                        "  _SelectFields: ['Id'],",
+                        "  _PageIndex: 1,",
+                        "  _PageSize: 1",
+                        "});",
+                        "if (result.Code !== 1) return result;",
+                        "var count = result.DataCount || 0;",
+                        "return { Code: 1, Data: { Value: count, Pending: count } };",
+                    ].join('\n'),
+                },
+            ],
+            events: [{ formEngineKey: 'Biz_Order', eventType: 'SubmitBeforeServerV8', code: "if (!V8.Form.OrderNo) return { Code: 0, Msg: 'OrderNo required' };" }],
+            modules: [{
+                    name: 'Orders',
+                    table: 'Biz_Order',
+                    icon: 'Document',
+                    listFields: ['OrderNo', 'CustomerName', 'OwnerName', 'Amount', 'Status', 'CreateTime'],
+                    searchFields: ['OrderNo', 'CustomerName', 'Status'],
+                    sortFields: ['CreateTime'],
+                    defaultOrderBy: [{ field: 'CreateTime', type: 'DESC' }],
+                    menuBadgeEnabled: 1,
+                    menuBadgeApiEngineKey: 'biz_order_metrics',
+                    enableViewSchema: 1,
+                    viewSchemaVersion: '1.0',
+                    viewConfigVersion: 1,
+                    viewSchema: {
+                        Views: [
+                            {
+                                Scene: 'List',
+                                Device: 'PC',
+                                Priority: 100,
+                                Layout: {
+                                    Hero: {
+                                        Title: 'Orders',
+                                        Description: 'Track order value, pending work and current filtered results',
+                                        Metrics: [
+                                            { Key: 'pending', Label: 'Pending', ApiEngineKey: 'biz_order_metrics', ValuePath: 'Data.Pending', Icon: 'fas fa-clock', Tone: 'warning' },
+                                            { Key: 'amount', Label: 'Order Amount', Source: 'Field', Field: 'Amount', Icon: 'fas fa-coins', Tone: 'success' },
+                                            { Key: 'records', Label: 'Filtered Results', Source: 'DataCount', Icon: 'fas fa-layer-group', Tone: 'info' },
+                                        ],
+                                    },
+                                    List: {
+                                        Density: 'Comfortable',
+                                        Columns: [{
+                                                Field: 'OrderNo',
+                                                Lines: [{ Name: 'CustomerName', Label: 'Customer', ShowLabel: true, Tone: 'info' }],
+                                                TrailingFields: [{ Name: 'Status', DisplayStyle: 'Tag' }, { Name: 'Amount', Icon: 'fas fa-coins', Tone: 'warning' }],
+                                                RequiredFields: ['CustomerName', 'Status', 'Amount'],
+                                                MinWidth: 380,
+                                            }],
+                                    },
+                                },
+                            },
+                            {
+                                Scene: 'Detail',
+                                Device: 'All',
+                                Priority: 100,
+                                Layout: {
+                                    Hero: { Title: 'Order Detail', TitleField: 'OrderNo', StatusField: 'Status' },
+                                    Blocks: [{ Type: 'ResponsiveSection', Title: 'Order Info', Fields: ['OrderNo', 'CustomerName', 'Status'] }],
+                                },
+                            },
+                            {
+                                Scene: 'Card',
+                                Device: 'Mobile',
+                                Priority: 100,
+                                Layout: {
+                                    Card: {
+                                        AvatarTextField: 'CustomerName',
+                                        TitleField: 'OrderNo',
+                                        SubtitleFields: ['CustomerName'],
+                                        StatusFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                                        TopFields: [],
+                                        RightFields: [{ Name: 'Amount', Format: 'currency', Tone: 'danger' }],
+                                        Fields: [{ Name: 'OwnerName', Label: 'Owner' }],
+                                        MetaFields: [{ Name: 'CreateTime', Label: 'Created At', Format: 'datetime' }],
+                                        BottomFields: [],
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                    moreBtns: [{ Name: 'Submit', BtnStyle: 'primary', V8CodeShow: "V8.Result=V8.Form.Status=='Draft';", V8Code: "var r=await V8.ApiEngine.Run({ApiEngineKey:'biz_order_submit',Id:V8.Form.Id});V8.Result=r;" }],
+                }],
+            permissions: [{ roleId: 'admin', moduleNames: ['Orders'] }],
+            dataSources: [],
+            pages: [{
+                    title: 'Operations Dashboard',
+                    number: 'page_operations_dashboard',
+                    routePath: '/page/operations-dashboard',
+                    JsonObj: {
+                        formConfig: { gutter: 0, mask: false, drag: false, hover: false, shadow: true, link: true, dark: false, dynamicStyle: { padding: '12px 0 0 0', backgroundColor: '#f3f4f6', opacity: 1 } },
+                        wrapperList: [
+                            { type: 'pannel', label: 'Card', wrapperOption: { span: 24, height: 180, titleOption: { hidden: true, title: 'Core Metrics' } }, widgetList: [] },
+                        ],
+                    },
+                }],
+            printTemplates: [{
+                    title: 'Business Print Template',
+                    number: 'print_business_template',
+                    PageObj: {
+                        panels: [
+                            { index: 0, name: 'A4 Template', paperType: 'A4', height: 297, width: 210, paperHeader: 0, paperFooter: 841.8897637795277, printElements: [] },
+                        ],
+                    },
+                    PrintObj: {},
+                }],
+            workflows: [{
+                    FlowDesign: { FlowName: 'Order approval', TableId: '<Biz_Order table id or tableName-resolved id>', IsEnable: 1 },
+                    Nodes: [
+                        { Id: 'start', NodeName: '发起人', NodeType: 'Start', AllowSelectUsers: 0, PositionLeft: '80px', PositionTop: '160px', LineValueV8: '' },
+                        { Id: 'manager', NodeName: '部门经理审批', NodeType: 'Approve', Roles: [{ Id: '<从 microi_list_roles 查询>', Name: '部门经理' }], AllowSelectUsers: 0, PositionLeft: '320px', PositionTop: '160px' },
+                        { Id: 'end', NodeName: '结束', NodeType: 'AutoEnd', PositionLeft: '560px', PositionTop: '160px' },
+                    ],
+                    Lines: [
+                        { Id: 'line_start_manager', FromNodeId: 'start', ToNodeId: 'manager', LineName: '发起人 到 部门经理审批', LineValue: '' },
+                        { Id: 'line_manager_end', FromNodeId: 'manager', ToNodeId: 'end', LineName: '部门经理审批 到 结束', LineValue: '' },
+                    ],
+                }],
+            jobs: [],
+        },
+        workflowModuleExample: { name: '订单审批', table: 'Biz_Order', openType: 'WorkFlow', flowName: 'Order approval', display: 1, appDisplay: 1 },
+        relationExamples: {
+            joinForm: {
+                parentStorageField: { name: 'CustomerId', label: 'Customer Id', type: 'varchar(50)', component: 'Text', visible: 0, appVisible: 0 },
+                displayField: {
+                    name: 'CustomerProfile', label: 'Customer Profile', type: 'mediumtext', component: 'JoinForm', formWidth: 24,
+                    relation: { cardinality: 'N:1', targetTable: 'Biz_Customer', joinFieldName: 'CustomerId' },
+                },
+            },
+            tableChild: {
+                parentField: {
+                    name: 'OrderItems', label: 'Order Items', type: 'mediumtext', component: 'TableChild', formWidth: 24,
+                    relation: { cardinality: '1:N', targetTable: 'Biz_OrderItem', childForeignKey: 'OrderId', childModule: 'Order Items (hidden)', primaryTableFieldName: 'Id' },
+                },
+                childForeignKeyField: { name: 'OrderId', label: 'Order Id', type: 'varchar(50)', component: 'Text', visible: 0, appVisible: 0 },
+                childIndex: { name: 'ix_biz_orderitem_order', columns: ['OrderId'], unique: false },
+                hiddenChildModule: { name: 'Order Items (hidden)', table: 'Biz_OrderItem', display: 0, appDisplay: 0, hasChild: 0 },
+            },
+        },
+        naturalFieldKeys: {
+            tables: {
+                tabs: 'diy_table.Tabs form groups. When omitted and the table has more than 12 business fields, generator creates Basic/Contact/Business/Attachment/Extra tabs and assigns empty field tab values.',
+                formBanner: 'diy_table 的 Banner 语义配置，使用 enabled/titleField/subtitleField/imageField/icon/backgroundField/tagFields/metrics，不写 sys_menu。省略时按真实类型推断业务标题、客户或项目副标题、首个图片、最多3个标签和3个业务指标。字段绑定显式空字符串表示不绑定，省略/null 才允许推断；空字符串优先于旧大小写别名。Id/排序/启用/状态/版本/本页数量不得充当指标。TableChild 可省略 metrics，由运行时按完整授权子表统计；显式 [] 关闭推断。跨表指标支持 ApiEngineKey + ValuePath + ParamMap + RefreshSeconds。',
+                column: 'Form column count. Omit to use 2 columns for generated systems unless the user asks for a single-column form.',
+                formOpenType: 'Default Dialog. Use Drawer only for extremely large forms (roughly 36+ business fields, 2+ child tables, or similarly heavy content).',
+                formOpenWidth: 'Default 80% for generated Dialog forms. Preserve an explicit business-specific width.',
+                indexes: '物理索引按columns顺序及unique声明，通过microi_create_table_index或Manifest创建。独立租户库不自动创建OsClient列，子表索引以真实外键开头；只有显式声明OsClient物理列的共享表才以OsClient+外键开头。固定列为Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted，TableChild与布局控件不能索引。',
+                v8Limit: 'Default false. Missing/null/false means no per-execution Jint budgets; true enables timeout, statement, recursion and allocation limits for this table\'s backend V8 events. Legacy v8Unlimited is accepted only as an inverted compatibility alias.',
+                readPrimary: 'null/0 keeps the existing read replica default; 1 routes native rows/count/sum/tree/export to this table database writer. Omit to preserve existing metadata. Explicit DbTrans remains unchanged and may retain an older RR snapshot. Requires the backend capability and official form-engine ReadPrimary field.',
+            },
+            engines: {
+                v8Limit: 'Default false. false means no Jint per-execution budget; true applies this engine\'s configured timeout, statement, allocation and recursion limits. Omit to preserve an existing engine setting during upsert.',
+            },
+            fields: {
+                component: 'Use the real Microi component name. Available controls include Text, Textarea, NumberText, DateTime, Select, MultipleSelect, Radio, Checkbox, Switch, Rate, Progress, Slider, ColorPicker, AutoNumber, Divider, CollapseGroup, Tabs, Alert, StaticText, Html, RichText, CodeEditor, JsonTable, ImgUpload, FileUpload, Autocomplete, TagInput, Transfer, Cascader, Address, Department, SelectTree, TreeCheckbox, OpenTable, JoinTable, JoinForm, TableChild, Map, MapArea, Qrcode, FontAwesome, DevComponent.',
+                tab: 'Assign a field to a diy_table.Tabs Id/Name. For many fields, prefer table-level Tabs; use CollapseGroup or field component Tabs only when an in-page section needs collapsible or nested grouping.',
+                relation: 'Required for JoinForm/TableChild. Use {cardinality:"1:1"|"N:1",targetTable,joinFieldName} for JoinForm, or {cardinality:"1:N",targetTable,childForeignKey,childModule,primaryTableFieldName:"Id"} for TableChild. Names are resolved to tenant ids only after resources exist; raw ids are not portable.',
+            },
+            modules: {
+                workflow: '流程模块设置 openType=WorkFlow，并用 flowName 引用同一 Manifest 内已启用流程；生成后自动写入 sys_menu.FlowDesignId。引用现有流程时传精确 flowDesignId。模块 table/diyTableId 必须与 wf_flowdesign.TableId 相同。',
+                table: 'Bind by table name. The generator resolves the table Id after create/refresh schema.',
+                hasChild: 'For a hidden TableChild carrier module set display=0, appDisplay=0 and hasChild=0 explicitly.',
+                microServiceKey: 'Portable sys_microiservice.MsKey reference for openType=MicroService or CodeForm. CodeForm must also bind a diyTableId/table. The generator resolves the tenant-specific MicroServiceId before any writes.',
+                microServiceRoutePath: 'Portable sys_microiservice_page.RoutePath reference such as /overview. The generator resolves and verifies MicroServicePageId before any writes.',
+                listFields: 'Field names/labels/ids for grid columns. Produces TableDiyFieldIds and SelectFields. When omitted, generator chooses title/no/status/person/amount/time fields.',
+                tableHeaders: 'Optional multilevel grid header groups, for example [{Label:"人数（人）",Fields:["Total","Male","Female"]}]. Fields must be visible, consecutive listFields. Nested groups use Children. Stored in sys_menu.TableHeaders; omitted keeps one header row.',
+                hideTableBanner: 'Set to 1 to hide the module grid top Banner and skip its metric API calls; omitted/0 keeps the Banner.',
+                hideFormBanner: 'Set to 1 to hide the module form top Banner and skip its metric API calls; omitted/0 keeps the Banner.',
+                searchFields: 'Field names/labels/ids for search controls. Produces SearchFieldIds object array. When omitted, generator chooses title/no/status/type/category/person/time fields.',
+                sortFields: 'Field names/labels/ids for sortable fields. Produces SortFieldIds. When omitted, generator chooses date/time, Sort and numeric business fields.',
+                hiddenFields: 'Field names/labels/ids to hide. Produces NotShowFields. When omitted, generator hides Id-like fields, foreign keys, system fields and layout/large controls.',
+                editableFields: 'Field names/labels/ids for in-table editing. Produces InTableEditFields.',
+                mobileFields: 'Field names/labels/ids for mobile card list. Produces MobileListFields. When omitted, generator picks 3-4 compact title/status/summary fields.',
+                cardTitleFields: 'Field names/labels/ids for card title tags. Produces CardTitleTagFields. When omitted, generator picks status/type/category fields.',
+                cardBottomFields: 'Field names/labels/ids for card bottom tags. Produces CardBottomTagFields. When omitted, generator picks amount/count/date fields.',
+                statisticsFields: 'Field names/labels/ids for table footer statistics. When omitted, generator sums amount/price/count/point/balance numeric fields.',
+                menuBadgeEnabled: 'Set to 1 for important menus that need a sidebar statistic badge.',
+                menuBadgeApiEngineKey: 'API engine used by the sidebar statistic badge. Return {Code:1,Data:{Value:number}}; keep the query tenant-scoped and inexpensive.',
+                enableViewSchema: 'Set to 1 only when Detail/Edit should use custom form views. Configured List/Card presentation is always applied and does not depend on this switch.',
+                viewSchemaVersion: 'Optional protocol version. Blank or omitted values resolve to 1.0.',
+                viewConfigVersion: 'Optional monotonic configuration version. Omitted values resolve to 1 and later changes increment it.',
+                viewSchema: 'Versioned Detail/Edit/List/Card layouts for PC/Mobile/All. Every visible bound module gets generated List/Card defaults when omitted, but AI must still business-tune Hero metrics, composite columns and mobile regions. Layout.List supports multi-line columns and trailing fields; Layout.Card supports top/right/body/meta/bottom field groups. The full declarative object is preserved. Use ActionSchema only; never place arbitrary client V8Code in mobile actions.',
+            },
+        },
+        rules: [
+            'Use table and field names in manifests; do not ask the user for diy_field ids.',
+            'Every generated business table must have a useful compact theme-colored dark-gradient form Banner. Put its configuration in tables[].formBanner/diy_table, not in modules/sys_menu. Prefer a business number/name title, a customer/project subtitle, real option tags and at most 3 business-semantic current-record or authorized full-child metrics; exclude technical numbers and never fabricate statistics.',
+            'JoinForm只用于1:1/N:1，通过真实父表Id字段引用不同表。1:N使用TableChild，声明子表、真实外键、隐藏子菜单及外键索引；共享表显式含OsClient物理列时改为(OsClient,foreignKey)索引。不得虚构租户列或传未解析的Config。',
+            'Put business logic in API engines and call them from menu button V8Code.',
+            'For workflow manifests, include exactly one start node, at least one end node, valid FromNodeId/ToNodeId lines, and stable LineName values in the form "{from node} 到 {to node}".',
+            'For multi-route workflow nodes, generate LineValueV8 with the visual condition marker and prefer assigning V8.NextNodeId; then call microi_check_workflow_package and microi_test_workflow_condition before microi_save_workflow_package.',
+            'Use parameterized V8.Db SQL or V8.FormEngine CRUD in engine/event code.',
+            'Interface engines use positive v8Limit semantics: false/default means no Jint per-execution budget; true enables the configured limits. Process resident-memory, cancellation, concurrency, permissions and database protections remain active in both modes.',
+            'Leave diy_field.FormWidth null/omitted for normal fields; use formWidth: 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.',
+            'Do not leave sys_menu list configuration empty. If the user does not specify it, rely on the generator defaults for NotShowFields, SearchFieldIds, SortFieldIds, StatisticsFields, MobileListFields, CardTitleTagFields and CardBottomTagFields.',
+            'Every visible bound business module must have a compact Hero title, a real business subtitle and 2-4 meaningful dynamic metrics. Prefer pending/overdue/amount/capacity/risk aggregates; DataCount/PageCount are truthful fallback only. Never generate random or fabricated statistics.',
+            'Give every list field a semantic TableWidth. Build at least one PC composite column with a reasonable MinWidth, remove its Lines/TrailingFields from standalone columns, and configure mobile title/subtitle/top/status/right/body/meta/bottom regions without repeating the same field.',
+            'Use sidebar menu badges only for a small set of actionable important menus. Add PageTabs and More/Page/Form/Batch/Export button badges when their counts help the workflow; batch one statistics API and never issue N+1 requests.',
+            'EnableViewSchema controls Detail/Edit custom forms only. List/Card presentation and generated Hero/metrics remain active when it is 0.',
+            'Do not use diy_table.DiyConfig, diy_field.DiyConfig or sys_menu.DiyConfig for new configuration. Add dedicated physical columns and expose them through DIY metadata.',
+            'For forms with many fields, use diy_table.Tabs first. Use CollapseGroup for optional/secondary sections and field component Tabs for nested in-page grouping.',
+            'Open generated forms in an 80% Dialog by default. Use Drawer only for extremely large forms with many fields, multiple TableChild controls, or comparable heavy content; never make Drawer the blanket module default.',
+            'Use dryRun=true until the user explicitly asks to write.',
+            'For Page Engine pages, save only the JsonObj layer to mic_page.JsonObj: {formConfig, wrapperList}. Do not wrap it in formData.',
+            'Page Engine defaults: formConfig.themeMode=system, density=compact, wrapperOption.heightMode=content; reserve fixed only for explicit fixed canvases. Use platform colour variables and statistic widgetParams[24].value=summary/detail for compact reference dashboards. Verify light/dark visuals and real data separately.',
+            'For Print Engine templates, PageObj must be a hiprint object with panels[].printElements; PrintObj is sample/runtime data.',
+            'For natural-language UI or print design, prefer microi_build_page_design or microi_build_print_template_design, then save after confirmation.',
+        ],
+    };
+}
+export function registerAdvancedTools(server, client, context) {
+    const osClient = context.osClient;
+    const systemConfirmTarget = osClient || 'EXECUTE';
+    server.tool('microi_get_manifest_schema', 'Return the recommended full-system manifest schema for natural-language Microi generation, including field-name based module configuration.', {}, async () => textResult(JSON.stringify(manifestGuide(osClient), null, 2)));
+    server.tool('microi_validate_menu_buttons', 'Validate and normalize sys_menu button/tab JSON arrays (MoreBtns/FormBtns/BatchSelectMoreBtns/PageTabs/ExportMoreBtns/PageBtns). Returns canonical JSON strings with generated Id/Sort/default visibility.', {
+        moreBtns: z.unknown().optional(),
+        formBtns: z.unknown().optional(),
+        batchSelectMoreBtns: z.unknown().optional(),
+        pageTabs: z.unknown().optional(),
+        exportMoreBtns: z.unknown().optional(),
+        pageBtns: z.unknown().optional(),
+    }, async (input) => {
+        const normalized = normalizeAllMenuJson(input);
+        return textResult(JSON.stringify({ ok: normalized.errors.length === 0, ...normalized }, null, 2), normalized.errors.length > 0);
+    });
+    server.tool('microi_build_field_config', `Build and validate Microi diy_field Data/Config JSON for option controls, SQL/APIEngine/DataSource sources, JoinForm, AutoNumber and DateTime. OsClient: ${osClient}`, {
+        sourceType: z.enum(['Data', 'KeyValue', 'Sql', 'ApiEngine', 'DataSource', 'AutoNumber', 'JoinForm', 'DateTime', 'FileUpload']).describe('Config source type. FileUpload 的 options 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance，均为 boolean，默认 false；ConfigurableRoleIds 是最多 100 个真实角色 Id 的数组，默认 [] 允许所有角色，非空时仅可新增其中角色的附件授权。启用角色权限自动 Limit=true。'),
+        options: jsonRecordSchema.optional().describe('Source options, such as data/options, sql, apiEngineKey, dataSourceId, tableId, prefix, length'),
+    }, async ({ sourceType, options }) => {
+        const built = buildFieldConfig(sourceType, options || {});
+        return textResult(JSON.stringify({ ok: built.warnings.length === 0, ...built, configJson: JSON.stringify(built.config) }, null, 2));
+    });
+    server.tool('microi_plan_system', 'Create a dry-run execution plan for a full low-code system manifest. This performs local structural validation only and does not write to Microi.', { manifest: jsonRecordSchema.describe('System manifest with tables, engines, modules, permissions, pages, dataSources, printTemplates, workflows, jobs') }, async ({ manifest }) => {
+        const plan = buildPlan(manifest);
+        return textResult(JSON.stringify({ ok: plan.errors.length === 0, dryRun: true, ...plan }, null, 2), plan.errors.length > 0);
+    });
+    server.tool('microi_check_workflow_package', '保存前检查 wf_flowdesign + wf_node + wf_line 的拓扑、节点类型、Id、连线、开始/结束节点及多路线配置。只有 FlowDesign.IsEnable 显式为 0 或 "0" 的禁用安装母版允许人工节点空绑定；启用或省略仍要求人员策略。任何非空绑定必须为 Id/Name 对象，保存时继续回读当前租户真实引用。', { workflow: jsonRecordSchema.describe('Workflow package with FlowDesign, Nodes and Lines') }, async ({ workflow }) => {
+        const check = validateWorkflowPackage(workflow);
+        return textResult(JSON.stringify(check, null, 2), !check.ok);
+    });
+    server.tool('microi_test_workflow_condition', 'Test a workflow LineValueV8 generated by the visual condition designer against sample formData. For safety this only evaluates Microi visual-condition marker JSON, not arbitrary hand-written V8.', {
+        workflow: jsonRecordSchema.optional().describe('Optional workflow package; when provided the tool reads the selected node LineValueV8'),
+        nodeId: z.string().optional().describe('Node Id whose LineValueV8 should be tested. If omitted, uses the start node or first node.'),
+        lineValueV8Code: z.string().optional().describe('Direct LineValueV8 JavaScript code containing MICROI_WF_LINE_CONDITION_JSON marker'),
+        formData: jsonRecordSchema.optional().describe('Sample business form data used for rule evaluation'),
+    }, async (input) => textResult(JSON.stringify(testWorkflowVisualCondition(input), null, 2)));
+    server.tool('microi_validate_system', `Validate that a generated low-code system exists on Microi server after generation. OsClient: ${osClient}`, { manifest: jsonRecordSchema.describe('The same manifest used by microi_generate_system') }, async ({ manifest }) => {
+        try {
+            const plan = buildPlan(manifest);
+            if (plan.errors.length > 0) {
+                return textResult(JSON.stringify({
+                    ok: false,
+                    failedAt: 'manifestPreflight',
+                    errors: plan.errors,
+                    warnings: plan.warnings,
+                }, null, 2), true);
+            }
+            const result = await validateSystemWithBanner(client, manifest);
+            return apiText('Low-Code System Validation', result);
+        }
+        catch (error) {
+            return textResult(`Error: ${error instanceof Error ? error.message : String(error)}`, true);
+        }
+    });
+    server.tool('microi_generate_system', `Generate a complete Microi low-code system from a manifest. Supports dryRun execution plans and post-generation validation. Writes require confirmExecution="${systemConfirmTarget}". OsClient: ${osClient}`, {
+        manifest: jsonRecordSchema.describe('System manifest with tables, fields, dataSources, engines, events, modules, permissions, pages, printTemplates, workflows and jobs'),
+        dryRun: z.boolean().optional().describe('Default true. When true, only returns an execution plan.'),
+        confirmExecution: z.string().optional().describe(`Required when dryRun=false. Must equal "${systemConfirmTarget}".`),
+    }, async ({ manifest, dryRun = true, confirmExecution }) => {
+        const plan = buildPlan(manifest);
+        if (plan.errors.length > 0)
+            return textResult(JSON.stringify({ ok: false, ...plan }, null, 2), true);
+        if (dryRun)
+            return textResult(JSON.stringify({ ok: true, dryRun: true, ...plan }, null, 2));
+        if (confirmExecution !== systemConfirmTarget) {
+            return textResult(`写入已拦截：请重新调用并传 confirmExecution="${systemConfirmTarget}"。\n\n${JSON.stringify({ plan: plan.plan, warnings: plan.warnings }, null, 2)}`, true);
+        }
+        const results = [];
+        const tableIdByName = new Map();
+        const moduleIdByName = new Map();
+        const roleIdByName = new Map();
+        const flowIdByName = new Map();
+        const fieldLookup = createFieldLookup();
+        const manifestModules = getArray(manifest, 'modules', 'Modules');
+        const microServiceBindings = [];
+        try {
+            // Resolve every portable microservice reference before the first write.
+            // A missing app/page must fail closed without leaving a partially generated system.
+            for (let moduleIndex = 0; moduleIndex < manifestModules.length; moduleIndex += 1) {
+                try {
+                    microServiceBindings[moduleIndex] = await resolveMicroServiceModuleBinding(client, manifestModules[moduleIndex], osClient);
+                }
+                catch (error) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'resolveMicroServiceModule',
+                        module: getString(manifestModules[moduleIndex], 'name', 'Name'),
+                        error: error instanceof Error ? error.message : String(error),
+                        results,
+                    }, null, 2), true);
+                }
+            }
+            await audit(client, 'microi_generate_system:start', getString(manifest, 'name', 'Name') || 'manifest', manifest);
+            for (const role of getArray(manifest, 'roles', 'Roles')) {
+                const payload = rolePayload(role);
+                const response = await client.saveRole(payload);
+                const roleName = getString(payload, 'Name');
+                results.push({ step: 'saveRole', roleName, response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'saveRole', role: payload, response, results }, null, 2), true);
+                const roleId = getString(asRecord(response.Data), 'Id', 'RoleId');
+                if (roleName && roleId)
+                    roleIdByName.set(roleName.toLowerCase(), roleId);
+            }
+            const manifestTables = getArray(manifest, 'tables', 'Tables');
+            const deferredRelationFields = [];
+            // Phase 1: create every table first. Relation fields must never be
+            // materialized while target tables still have unresolved tenant ids.
+            for (const table of manifestTables) {
+                const tableName = getString(table, 'name', 'Name');
+                const tableLayout = buildDefaultTableLayout(table);
+                const formOpen = buildDefaultFormOpen(table);
+                const response = await client.createTable(tableName, getString(table, 'description', 'Description'), {
+                    Tabs: stringifyConfig(table.tabs ?? table.Tabs ?? tableLayout.tabs),
+                    IsTree: getNumber(table, 'isTree', 'IsTree'),
+                    ReadPrimary: getValue(table, 'readPrimary', 'ReadPrimary'),
+                    Column: getNumber(table, 'column', 'Column') ?? tableLayout.column ?? 2,
+                    FormOpenType: formOpen.type,
+                    FormOpenWidth: formOpen.width,
+                    V8Limit: getEngineV8Limit(table) === undefined
+                        ? undefined
+                        : (getEngineV8Limit(table) ? 1 : 0),
+                });
+                results.push({ step: 'createTable', tableName, response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'createTable', tableName, response, results }, null, 2), true);
+                const tableId = getString(asRecord(response.Data), 'TableId', 'Id');
+                if (!tableId)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'resolveCreatedTableId', tableName, response, results }, null, 2), true);
+                tableIdByName.set(tableName.toLowerCase(), tableId);
+            }
+            // Phase 2: create ordinary/storage fields for all tables. JoinForm and
+            // TableChild are deferred until their complete dependency graph exists.
+            for (const table of manifestTables) {
+                const tableName = getString(table, 'name', 'Name');
+                const tableId = tableIdByName.get(tableName.toLowerCase()) || '';
+                const tableLayout = buildDefaultTableLayout(table);
+                for (const field of getArray(table, 'fields', 'Fields')) {
+                    if (isManifestRelationField(field)) {
+                        deferredRelationFields.push({ table, field, tableId, tableName, tableLayout });
+                        continue;
+                    }
+                    const fieldPayload = manifestFieldPayload(table, field, tableId, tableLayout);
+                    const addResponse = await client.addField(fieldPayload);
+                    results.push({ step: 'addField', tableName, fieldName: getString(field, 'name', 'Name'), response: addResponse });
+                    if (addResponse.Code !== 1)
+                        return textResult(JSON.stringify({ ok: false, failedAt: 'addField', tableName, field, response: addResponse, results }, null, 2), true);
+                    const fieldId = getString(asRecord(addResponse.Data), 'FieldId', 'Id');
+                    const fieldName = getString(fieldPayload, 'Name');
+                    if (fieldId && fieldName) {
+                        addFieldMeta(fieldLookup, {
+                            id: fieldId,
+                            name: fieldName,
+                            label: getString(fieldPayload, 'Label') || fieldName,
+                            tableId,
+                            tableName,
+                            tableDescription: getString(table, 'description', 'Description') || tableName,
+                            component: getString(fieldPayload, 'Component') || 'Text',
+                            type: getString(fieldPayload, 'Type') || 'varchar(255)',
+                        });
+                    }
+                }
+                for (const index of getArray(table, 'indexes', 'Indexes')) {
+                    const columns = getStringArray(index, 'columns', 'Columns');
+                    const indexName = getString(index, 'name', 'Name');
+                    const indexResponse = await client.createTableIndex({
+                        TableName: tableName,
+                        IndexName: indexName || undefined,
+                        Columns: columns,
+                        Unique: getBoolean(index, 'unique', 'Unique') ?? false,
+                    });
+                    results.push({
+                        step: 'createTableIndex',
+                        tableName,
+                        indexName: indexName || columns.join('_'),
+                        response: indexResponse,
+                    });
+                    if (indexResponse.Code !== 1) {
+                        return textResult(JSON.stringify({
+                            ok: false,
+                            failedAt: 'createTableIndex',
+                            tableName,
+                            index,
+                            response: indexResponse,
+                            results,
+                        }, null, 2), true);
+                    }
+                }
+                const bannerPatch = buildDefaultFormBanner(table);
+                const bannerResponse = await client.updateTable({ Id: tableId, ...bannerPatch });
+                results.push({ step: 'configureFormBanner', tableName, banner: bannerPatch, response: bannerResponse });
+                if (bannerResponse.Code !== 1) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'configureFormBanner',
+                        tableName,
+                        banner: bannerPatch,
+                        response: bannerResponse,
+                        results,
+                    }, null, 2), true);
+                }
+            }
+            const schemaResponse = await client.getDbSchema();
+            results.push({ step: 'refreshDbSchemaBeforeModules', response: { Code: schemaResponse.Code, Msg: schemaResponse.Msg, Summary: asRecord(asRecord(schemaResponse.Data).Summary) } });
+            if (schemaResponse.Code === 1) {
+                populateFieldLookupFromSchema(fieldLookup, schemaResponse.Data, tableIdByName);
+            }
+            else {
+                plan.warnings.push(`Could not refresh schema before module field resolution: ${schemaResponse.Msg || schemaResponse.Code}`);
+            }
+            for (const dataSource of getArray(manifest, 'dataSources', 'DataSources')) {
+                const payload = dataSourcePayload(dataSource);
+                const response = await client.saveDataSource(payload);
+                results.push({ step: 'saveDataSource', key: getString(payload, 'DataSourceKey'), response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'saveDataSource', dataSource: payload, response, results }, null, 2), true);
+            }
+            for (const engine of getArray(manifest, 'engines', 'Engines')) {
+                const response = await upsertEngine(client, engine);
+                results.push({ step: 'upsertEngine', apiEngineKey: getString(engine, 'apiEngineKey', 'ApiEngineKey'), response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'upsertEngine', engine, response, results }, null, 2), true);
+            }
+            for (const event of getArray(manifest, 'events', 'Events')) {
+                const response = await client.saveEventCode(getString(event, 'formEngineKey', 'FormEngineKey'), getString(event, 'eventType', 'EventType'), getString(event, 'code', 'Code', 'V8Code'));
+                results.push({ step: 'saveEvent', event, response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'saveEvent', event, response, results }, null, 2), true);
+            }
+            for (let moduleIndex = 0; moduleIndex < manifestModules.length; moduleIndex += 1) {
+                const module = manifestModules[moduleIndex];
+                const payload = {
+                    ...modulePayload(module, tableIdByName, moduleIdByName, fieldLookup),
+                    ...(microServiceBindings[moduleIndex] || {}),
+                };
+                const response = await client.createModule(payload);
+                results.push({ step: 'createModule', moduleName: payload.Name, response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'createModule', module: payload, response, results }, null, 2), true);
+                const moduleId = getString(asRecord(response.Data), 'ModuleId', 'Id');
+                if (moduleId && typeof payload.Name === 'string')
+                    moduleIdByName.set(payload.Name.toLowerCase(), moduleId);
+            }
+            // Phase 3: resolve portable relation names to current-tenant ids only
+            // after every target table and hidden TableChild carrier module exists.
+            for (const deferred of deferredRelationFields) {
+                let resolvedConfig;
+                try {
+                    resolvedConfig = resolveManifestRelationConfig(deferred.field, deferred.tableName, tableIdByName, moduleIdByName);
+                }
+                catch (error) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'resolveRelationConfig',
+                        tableName: deferred.tableName,
+                        fieldName: getString(deferred.field, 'name', 'Name'),
+                        error: error instanceof Error ? error.message : String(error),
+                        results,
+                    }, null, 2), true);
+                }
+                const fieldPayload = manifestFieldPayload(deferred.table, deferred.field, deferred.tableId, deferred.tableLayout, resolvedConfig);
+                const addResponse = await client.addField(fieldPayload);
+                results.push({
+                    step: 'addRelationField',
+                    tableName: deferred.tableName,
+                    fieldName: getString(deferred.field, 'name', 'Name'),
+                    response: addResponse,
+                });
+                if (addResponse.Code !== 1) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'addRelationField',
+                        tableName: deferred.tableName,
+                        field: deferred.field,
+                        response: addResponse,
+                        results,
+                    }, null, 2), true);
+                }
+                // Idempotent reruns must repair stale/broken relation metadata instead
+                // of treating an existing field name as proof that its Config is valid.
+                const responseData = asRecord(addResponse.Data);
+                if (getBoolean(responseData, 'Skipped') === true) {
+                    const repairResponse = await client.updateField(compactObject({
+                        Id: getString(responseData, 'FieldId', 'Id'),
+                        TableId: deferred.tableId,
+                        Name: getString(fieldPayload, 'Name'),
+                        Label: getString(fieldPayload, 'Label'),
+                        Component: getString(fieldPayload, 'Component'),
+                        Config: getString(fieldPayload, 'Config'),
+                        FormWidth: getNumber(fieldPayload, 'FormWidth'),
+                    }));
+                    results.push({
+                        step: 'repairRelationField',
+                        tableName: deferred.tableName,
+                        fieldName: getString(deferred.field, 'name', 'Name'),
+                        response: repairResponse,
+                    });
+                    if (repairResponse.Code !== 1) {
+                        return textResult(JSON.stringify({
+                            ok: false,
+                            failedAt: 'repairRelationField',
+                            tableName: deferred.tableName,
+                            field: deferred.field,
+                            response: repairResponse,
+                            results,
+                        }, null, 2), true);
+                    }
+                }
+            }
+            if (deferredRelationFields.length > 0) {
+                const relationSchemaResponse = await client.getDbSchema();
+                results.push({
+                    step: 'refreshDbSchemaAfterRelations',
+                    response: {
+                        Code: relationSchemaResponse.Code,
+                        Msg: relationSchemaResponse.Msg,
+                        Summary: asRecord(asRecord(relationSchemaResponse.Data).Summary),
+                    },
+                });
+                if (relationSchemaResponse.Code !== 1) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'refreshDbSchemaAfterRelations',
+                        response: relationSchemaResponse,
+                        results,
+                    }, null, 2), true);
+                }
+                populateFieldLookupFromSchema(fieldLookup, relationSchemaResponse.Data, tableIdByName);
+            }
+            for (const permission of getArray(manifest, 'permissions', 'Permissions')) {
+                const roleName = getString(permission, 'roleName', 'RoleName', 'name', 'Name');
+                const roleId = getString(permission, 'roleId', 'RoleId') || (roleName ? roleIdByName.get(roleName.toLowerCase()) : '') || 'admin';
+                const explicitMenuIds = getStringArray(permission, 'menuIds', 'MenuIds');
+                const moduleNames = getStringArray(permission, 'moduleNames', 'ModuleNames');
+                const menuIds = explicitMenuIds.length
+                    ? explicitMenuIds
+                    : moduleNames.map((name) => moduleIdByName.get(name.toLowerCase()) || '').filter(Boolean);
+                const response = await client.setRolePermission(roleId, menuIds);
+                results.push({ step: 'setRolePermission', roleId, menuIds, response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'setRolePermission', permission, response, results }, null, 2), true);
+            }
+            for (const page of getArray(manifest, 'pages', 'Pages')) {
+                const normalizedPage = normalizePageJsonObj(page.json ?? page.JsonObj ?? page.JsonStr ?? page);
+                if (!normalizedPage.ok || !normalizedPage.json) {
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'savePage:normalize', page, errors: normalizedPage.errors, warnings: normalizedPage.warnings, results }, null, 2), true);
+                }
+                const response = await client.savePageEngine({
+                    PageId: getString(page, 'pageId', 'PageId', 'Id') || undefined,
+                    Title: getString(page, 'title', 'Title'),
+                    Number: getString(page, 'number', 'Number') || undefined,
+                    Desc: getString(page, 'desc', 'Desc') || undefined,
+                    JsonStr: normalizedPage.json,
+                    RoutePath: getString(page, 'routePath', 'RoutePath') || undefined,
+                    ComponentPath: getString(page, 'componentPath', 'ComponentPath') || undefined,
+                });
+                results.push({ step: 'savePage', title: getString(page, 'title', 'Title'), response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'savePage', page, response, results }, null, 2), true);
+            }
+            for (const template of getArray(manifest, 'printTemplates', 'PrintTemplates')) {
+                const payload = printTemplatePayload(template);
+                const response = await client.savePrintTemplate(payload);
+                results.push({ step: 'savePrintTemplate', title: getString(payload, 'Title'), response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'savePrintTemplate', template: payload, response, results }, null, 2), true);
+            }
+            for (const workflow of getArray(manifest, 'workflows', 'Workflows')) {
+                const payload = workflowPayload(workflow, tableIdByName);
+                const referenceErrors = await verifyWorkflowReferences(client, payload);
+                if (referenceErrors.length)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'saveWorkflowPackage:references', errors: referenceErrors, results }, null, 2), true);
+                const response = await client.saveWorkflowPackage(payload);
+                results.push({ step: 'saveWorkflowPackage', workflow: getString(asRecord(payload.FlowDesign ?? payload.flowDesign ?? payload), 'FlowName', 'flowName'), response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'saveWorkflowPackage', workflow: payload, response, results }, null, 2), true);
+                const flowName = getString(asRecord(payload.FlowDesign), 'FlowName');
+                const flowId = getString(asRecord(response.Data), 'FlowDesignId');
+                if (flowName && flowId)
+                    flowIdByName.set(flowName, flowId);
+            }
+            for (const module of manifestModules) {
+                if (getString(module, 'openType', 'OpenType').toLowerCase() !== 'workflow')
+                    continue;
+                const moduleName = getString(module, 'name', 'Name');
+                const flowName = getString(module, 'flowName', 'FlowName');
+                if (!flowName)
+                    continue;
+                const flowId = flowIdByName.get(flowName);
+                const moduleId = moduleIdByName.get(moduleName.toLowerCase());
+                if (!flowId || !moduleId)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'bindWorkflowModule', moduleName, flowName, results }, null, 2), true);
+                const response = await client.updateModule({ ModuleId: moduleId, OpenType: 'WorkFlow', FlowDesignId: flowId });
+                results.push({ step: 'bindWorkflowModule', moduleName, flowName, flowId, response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'bindWorkflowModule', moduleName, flowName, response, results }, null, 2), true);
+            }
+            for (const job of getArray(manifest, 'jobs', 'Jobs')) {
+                const payload = jobPayload(job);
+                const response = await client.saveJob(payload);
+                results.push({ step: 'saveJob', jobName: getString(payload, 'JobName'), response });
+                if (response.Code !== 1)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'saveJob', job: payload, response, results }, null, 2), true);
+            }
+            const validation = await validateSystemWithBanner(client, manifest);
+            await audit(client, 'microi_generate_system:finish', getString(manifest, 'name', 'Name') || 'manifest', { results, validation });
+            // Keep the complete validation envelope. Persisted rollout recovery
+            // evidence must retain Code/Msg so a validator-only compatibility path
+            // can distinguish one known server defect from arbitrary failures.
+            return textResult(JSON.stringify(buildGenerateSystemValidationPayload(results, validation), null, 2), validation.Code !== 1);
+        }
+        catch (error) {
+            return textResult(`Error: ${error instanceof Error ? error.message : String(error)}\n\n${JSON.stringify({ results }, null, 2)}`, true);
+        }
+    });
+    server.tool('microi_list_roles', `List roles for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Roles', await client.listRoles(keyword)));
+    server.tool('microi_save_role', `Create or update a role for OsClient ${osClient}.`, { role: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ role, confirmExecution }) => {
+        const payload = rolePayload(role);
+        const name = getString(payload, 'Name');
+        if (confirmExecution !== name && confirmExecution !== 'EXECUTE')
+            return textResult(`写入已拦截：请传 confirmExecution="${name}" 或 "EXECUTE"。`, true);
+        await audit(client, 'microi_save_role', name, payload);
+        return apiText('Save Role', await client.saveRole(payload));
+    });
+    server.tool('microi_list_modules', `List menu modules for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Modules', await client.listModules(keyword)));
+    server.tool('microi_get_module', `Get one menu module by ModuleId for OsClient ${osClient}.`, { moduleId: z.string() }, async ({ moduleId }) => apiText('Module Detail', await client.getModule(moduleId)));
+    server.tool('microi_update_module', `Incrementally update an existing menu module, including FieldPermissions v1 (Rules with Users/Roles/Departments/Jobs and Fields.Visible/Editable), TreeDragSortEnabled/TreeDragSortField, TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
+        const normalized = normalizeAllMenuJson(module);
+        if (normalized.errors.length)
+            return textResult(JSON.stringify(normalized, null, 2), true);
+        const target = getString(module, 'moduleId', 'ModuleId', 'Id') || getString(module, 'name', 'Name');
+        if (confirmExecution !== target && confirmExecution !== 'EXECUTE')
+            return textResult(`写入已拦截：请传 confirmExecution="${target}" 或 "EXECUTE"。`, true);
+        await audit(client, 'microi_update_module', target, normalized.data);
+        return apiText('Update Module', await client.updateModule(normalized.data));
+    });
+    server.tool('microi_upsert_engine', `Create an API engine if missing, otherwise update only the supplied code and/or v8Limit setting. Omitted v8Limit preserves the current value; omitted code never clears existing source. v8Limit=false/default means unrestricted Jint per-execution budgets; true enables the configured runtime limits. OsClient ${osClient}.`, { engine: jsonRecordSchema.describe('Fields include apiEngineKey, apiName, category, code and optional boolean v8Limit'), confirmExecution: z.string().optional() }, async ({ engine, confirmExecution }) => {
+        const key = getString(engine, 'apiEngineKey', 'ApiEngineKey');
+        if (!key)
+            return textResult('ApiEngineKey 不能为空', true);
+        if (confirmExecution !== key && confirmExecution !== 'EXECUTE')
+            return textResult(`写入已拦截：请传 confirmExecution="${key}" 或 "EXECUTE"。`, true);
+        await audit(client, 'microi_upsert_engine', key, engine);
+        return apiText('Upsert Engine', await upsertEngine(client, engine));
+    });
+    server.tool('microi_list_data_sources', `List typed API engines that replace legacy sys_datasource rows for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Data Sources', await client.listDataSources(keyword)));
+    server.tool('microi_save_data_source', `Create or update a typed sys_apiengine data source. Put SQL, V8 JavaScript or JSON in ApiV8Code; legacy SqlDataSource/V8DataSource/JsonDataSource inputs are accepted only as compatibility aliases and are not persisted. OsClient ${osClient}.`, { dataSource: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ dataSource, confirmExecution }) => {
+        const payload = dataSourcePayload(dataSource);
+        const key = getString(payload, 'DataSourceKey');
+        if (confirmExecution !== key && confirmExecution !== 'EXECUTE')
+            return textResult(`写入已拦截：请传 confirmExecution="${key}" 或 "EXECUTE"。`, true);
+        await audit(client, 'microi_save_data_source', key, payload);
+        return apiText('Save Data Source', await client.saveDataSource(payload));
+    });
+    server.tool('microi_run_data_source', `Run a typed API-engine data source through the legacy-compatible key contract. May have side effects if its V8 code writes data. OsClient ${osClient}.`, { dataSourceKey: z.string(), params: jsonRecordSchema.optional(), confirmExecution: z.string().optional() }, async ({ dataSourceKey, params, confirmExecution }) => {
+        if (confirmExecution !== dataSourceKey && confirmExecution !== 'EXECUTE')
+            return textResult(`执行已拦截：请传 confirmExecution="${dataSourceKey}" 或 "EXECUTE"。`, true);
+        await audit(client, 'microi_run_data_source', dataSourceKey, params || {});
+        return apiText('Run Data Source', await client.runDataSource(dataSourceKey, params));
+    });
+    server.tool('microi_list_print_templates', `List print engine templates for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Print Templates', await client.listPrintTemplates(keyword)));
+    server.tool('microi_save_print_template', `Create or update a mic_print print template. OsClient ${osClient}.`, { template: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ template, confirmExecution }) => {
+        const payload = printTemplatePayload(template);
+        const title = getString(payload, 'Title');
+        if (confirmExecution !== title && confirmExecution !== 'EXECUTE')
+            return textResult(`写入已拦截：请传 confirmExecution="${title}" 或 "EXECUTE"。`, true);
+        await audit(client, 'microi_save_print_template', title, payload);
+        return apiText('Save Print Template', await client.savePrintTemplate(payload));
+    });
+    server.tool('microi_save_workflow_package', `在当前租户 ${osClient} 一次保存 wf_flowdesign + wf_node + wf_line。显式 IsEnable=0 或 "0" 的禁用安装母版可保持空人员绑定，仍检查全部拓扑和绑定格式；任何已填写的用户、角色、部门、岗位均须当前租户真实回读，假占位 Id 或引用回读失败会拒绝保存。启用或省略 IsEnable 仍强制人工节点人员策略。`, { workflow: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ workflow, confirmExecution }) => {
+        const name = getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign ?? workflow), 'FlowName', 'flowName', 'name');
+        const check = validateWorkflowPackage(workflow);
+        if (!check.ok)
+            return textResult(JSON.stringify(check, null, 2), true);
+        if (confirmExecution !== name && confirmExecution !== 'EXECUTE')
+            return textResult(`写入已拦截：请传 confirmExecution="${name}" 或 "EXECUTE"。`, true);
+        const tableIdByName = new Map();
+        if (getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign), 'table', 'tableName')) {
+            const schema = await client.getDbSchema();
+            if (schema.Code !== 1)
+                return apiText('Read workflow table schema', schema);
+            for (const table of asArray(asRecord(schema.Data).Tables)) {
+                const name = getString(table, 'Name');
+                const id = getString(table, 'Id');
+                if (name && id)
+                    tableIdByName.set(name.toLowerCase(), id);
+            }
+        }
+        let payload;
+        try {
+            payload = workflowPayload(workflow, tableIdByName);
+        }
+        catch (error) {
+            return textResult(error instanceof Error ? error.message : String(error), true);
+        }
+        const referenceErrors = await verifyWorkflowReferences(client, payload);
+        if (referenceErrors.length)
+            return textResult(JSON.stringify({ ok: false, errors: referenceErrors }, null, 2), true);
+        await audit(client, 'microi_save_workflow_package', name, workflow);
+        return apiText('Save Workflow Package', await client.saveWorkflowPackage(payload));
+    });
+    server.tool('microi_save_job', `Create or update a scheduled job. For ApiEngine jobs use JobType="1" and ApiEngineKey. OsClient ${osClient}.`, { job: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ job, confirmExecution }) => {
+        const payload = jobPayload(job);
+        const name = getString(payload, 'JobName');
+        if (confirmExecution !== name && confirmExecution !== 'EXECUTE')
+            return textResult(`写入已拦截：请传 confirmExecution="${name}" 或 "EXECUTE"。`, true);
+        await audit(client, 'microi_save_job', name, payload);
+        return apiText('Save Job', await client.saveJob(payload));
+    });
+    server.tool('microi_query_job_runtime', `Read current-node Quartz diagnostics or monthly execution logs for the authenticated tenant ${osClient}. Diagnostics never triggers or re-registers a job. Logs use MongoDB; HistoryLogs retains relational history. Cursor pagination returns HasMore, not an exact total. Backend administrator checks remain mandatory; a running scheduler is not proof of execution.`, {
+        action: z.enum(['Diagnostics', 'Logs', 'HistoryLogs']),
+        jobName: z.string().min(1).max(100),
+        searchMonth: z.string().regex(/^\d{4}(0[1-9]|1[0-2])$/).optional(),
+        pageSize: z.number().int().min(1).max(100).optional(),
+        beforeLogTime: z.string().max(50).optional(),
+        beforeLogId: z.string().max(100).optional(),
+    }, async ({ action, jobName, searchMonth, pageSize, beforeLogTime, beforeLogId }) => {
+        if (action !== 'Diagnostics' && !searchMonth)
+            return textResult('日志查询必须指定 searchMonth（yyyyMM）。', true);
+        if (Boolean(beforeLogTime) !== Boolean(beforeLogId))
+            return textResult('翻页必须同时提供 beforeLogTime 和 beforeLogId。', true);
+        return apiText('Job Runtime', await client.executeEngine('platform-schedule-job', {
+            Action: action, JobName: jobName, SearchMonth: searchMonth, PageSize: pageSize ?? 20,
+            BeforeLogTime: beforeLogTime, BeforeLogId: beforeLogId,
+        }));
+    });
+    server.tool('microi_list_database_backup_tenants', `List the enabled MySQL tenants eligible for database backup on the current backend runtime. The server strictly filters sys_osclients by its own OsClientType and OsClientNetwork and never returns connection strings. OsClient ${osClient}.`, {}, async () => (apiText('Database Backup Tenants', await client.listDatabaseBackupTenants())));
+    server.tool('microi_run_database_backup', `Queue a durable database backup task for the current backend runtime. Omit tenantOsClients to back up every eligible tenant; when provided, every key must be in microi_list_database_backup_tenants. idempotencyKey is caller-generated and must be reused after timeout or any uncertain response. The server serializes execution with a renewable Redis lease and uploads only to the main tenant private HDFS. OsClient ${osClient}.`, {
+        tenantOsClients: z.array(z.string().regex(/^[A-Za-z0-9._-]{1,100}$/)).min(1).max(2000).optional(),
+        retainCount: z.number().int().min(1).max(100).optional(),
+        idempotencyKey: z.string().regex(/^[A-Za-z0-9:._-]{8,128}$/).describe('Stable caller request id; reuse the exact value for uncertain retries'),
+        confirmExecution: z.literal('DATABASE_BACKUP').optional(),
+    }, async ({ tenantOsClients, retainCount, idempotencyKey, confirmExecution }) => {
+        if (confirmExecution !== 'DATABASE_BACKUP') {
+            return textResult('执行已拦截：请传 confirmExecution="DATABASE_BACKUP"。', true);
+        }
+        const payload = {
+            TenantOsClients: tenantOsClients,
+            RetainCount: retainCount ?? 7,
+            IdempotencyKey: idempotencyKey,
+            SelectionMode: tenantOsClients === undefined ? 'AllEligible' : 'Selected',
+        };
+        await audit(client, 'microi_run_database_backup', payload.SelectionMode, payload);
+        return apiText('Run Database Backup', await client.runDatabaseBackup({
+            tenantOsClients,
+            retainCount,
+            idempotencyKey,
+        }));
+    });
+    const storeApplicationSchema = {
+        storeId: z.string().regex(/^[A-Za-z0-9:._-]{1,100}$/).describe('商城 sys_microistore 记录 Id'),
+        storeVersionId: z.string().regex(/^[A-Za-z0-9:._-]{1,100}$/).optional()
+            .describe('可选：mic_data_version 不可变完整包快照 Id，用于发布升版后的精确恢复'),
+        requestId: z.string().regex(/^[A-Za-z0-9:._-]{8,100}$/).describe('调用方生成并在不确定重试时复用的稳定幂等 Id'),
+        appId: z.string().max(100).optional(),
+        appName: z.string().max(200).optional(),
+        appVersion: z.string().max(50).optional(),
+        installParentSysMenuId: z.string().max(100).optional(),
+        resumeInstall: z.boolean().optional(),
+        confirmExecution: z.string().optional().describe('真实执行时必须精确等于 storeId'),
+    };
+    const registerStoreApplicationTool = (toolName, operation) => {
+        const operationText = operation === 'update' ? '更新' : '安装';
+        server.tool(toolName, `${operationText}一个应用商城应用到当前 MCP 绑定租户 ${osClient}。任务只传 StoreId、可选不可变 StoreVersionId 和商城源定位信息，由服务端持久队列调用 import-microi-store-package；首次调用不传 confirmExecution 只返回预检，真实执行后必须轮询后台任务至 Succeeded。`, storeApplicationSchema, async (input) => {
+            let request;
+            try {
+                request = buildStoreApplicationBackgroundRequest({
+                    operation,
+                    storeId: input.storeId,
+                    storeVersionId: input.storeVersionId,
+                    requestId: input.requestId,
+                    appId: input.appId,
+                    appName: input.appName,
+                    appVersion: input.appVersion,
+                    installParentSysMenuId: input.installParentSysMenuId,
+                    resumeInstall: input.resumeInstall,
+                });
+            }
+            catch (error) {
+                return textResult(error instanceof Error ? error.message : String(error), true);
+            }
+            if (input.confirmExecution !== input.storeId) {
+                return textResult(JSON.stringify({
+                    DryRun: true,
+                    Operation: operation,
+                    TargetOsClient: osClient,
+                    Request: request,
+                    Confirmation: `确认后传 confirmExecution="${input.storeId}"`,
+                    NextStep: '真实提交后轮询右上角后台任务/共享任务表至 Succeeded，再做远端资源与 UI 验收。',
+                }, null, 2));
+            }
+            await audit(client, toolName, input.storeId, {
+                Operation: operation,
+                StoreId: input.storeId,
+                StoreVersionId: request.Param.StoreVersionId,
+                StoreApiBase: request.Param.StoreApiBase,
+                StoreOsClient: request.Param.StoreOsClient,
+                IdempotencyKey: request.Options.IdempotencyKey,
+            });
+            return apiText(`${operationText}商城应用`, await client.runBackgroundApiEngine({
+                apiEngineKey: request.ApiEngineKey,
+                title: request.Title,
+                param: request.Param,
+                options: request.Options,
+            }));
+        });
+    };
+    registerStoreApplicationTool('microi_install_store_application', 'install');
+    registerStoreApplicationTool('microi_update_store_application', 'update');
+}
+//# sourceMappingURL=advanced-tools.js.map
