@@ -298,6 +298,10 @@ D:/Work/microi.net.all/.tmp/xjy-uniapp-visual/
 
 ## 发布前检查
 
+设备详情提供同一行的关联、解除及新增三个原生小按钮，尺寸与预览商品、生成二维码一致。各自读取平台对应字段的 `BindRole`、显隐设置和设备菜单编辑权限。新增还要求 IoT 菜单新增权限；解除需确认，未关联时禁用。关联与解除携带真实菜单并触发表单服务端事件，新增表单沿用合同所属商家默认值，不自动建立关联。点击操作时重新读取字段权限，后台修改角色无需重新编译客户端。
+
+定向回归：`node --test scripts/test-device-detail-actions.mjs`；手机截图回归：`XJY_VISUAL_TARGET=device-detail npm run visual:xjy`（PowerShell 使用 `$env:XJY_VISUAL_TARGET='device-detail'`）。
+
 - 在微信开发者工具导入 `dist/build/mp-weixin`，点击“编译”。
 - 如果开发者工具曾打开旧产物并出现 `module is not defined`，先执行“工具 -> 清除缓存 -> 清除编译缓存”，再重新编译；后续生产构建已自动写入完整模块编译配置。
 - 在“详情 -> 本地设置”中确认环境和域名校验策略符合当前发布环境。
