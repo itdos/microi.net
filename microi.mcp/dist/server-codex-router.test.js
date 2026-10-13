@@ -3,6 +3,51 @@ import test from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer } from './server.js';
+test('MicroService module dry run uses the selected tenant and preserves explicit legacy URLs', async () => {
+    const server = createMcpServer({}, {
+        osClient: 'loctek', apiBaseUrl: 'https://api.example.test', label: 'tenant route test',
+    });
+    const client = new Client({ name: 'microservice-route-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+        for (const explicitUrl of [undefined, '/micro-app/microi-3d-engine/designer']) {
+            const result = await client.callTool({ name: 'microi_create_module', arguments: {
+                    name: '3D engine', openType: 'MicroService', microServiceId: 'service-1',
+                    microServicePageId: 'page-1', microServiceKey: 'microi-3d-engine',
+                    microServiceRoutePath: '/designer', ...(explicitUrl ? { url: explicitUrl } : {}),
+                } });
+            assert.notEqual(result.isError, true, JSON.stringify(result.content));
+            const text = result.content.find(item => item.type === 'text');
+            assert.ok(text && text.type === 'text');
+            const preview = JSON.parse(text.text);
+            assert.equal(preview.dryRun, true);
+            assert.equal(preview.module.Url, explicitUrl || '/micro-app/loctek/microi-3d-engine/designer');
+        }
+    }
+    finally {
+        await client.close();
+        await server.close();
+    }
+});
+test('普通 MCP 宿主初始化也收到跨模型的版本与自动更新基础规则', async () => {
+    const server = createMcpServer({}, {
+        osClient: 'fixture', apiBaseUrl: 'https://api.example.test', label: '基础入口验收',
+    });
+    const client = new Client({ name: 'ordinary-mcp-host', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+        assert.match(client.getInstructions() || '', /任何 AI 模型强制读取/);
+        assert.match(client.getInstructions() || '', /Microi吾码开发工具版本/);
+        assert.match(client.getInstructions() || '', /microi update --background/);
+        assert.ok((await client.listTools()).tools.length > 1);
+    }
+    finally {
+        await client.close();
+        await server.close();
+    }
+});
 test('microi_codex discovers and invokes existing tools through one entry point', async () => {
     let repairedAuditFieldsInput;
     const fakeClient = {
@@ -31,6 +76,10 @@ test('microi_codex discovers and invokes existing tools through one entry point'
         client.connect(clientTransport),
     ]);
     try {
+        const instructions = client.getInstructions() || '';
+        assert.match(instructions, /workspace-conventions\/SKILL\.md/);
+        assert.match(instructions, /microi update --background/);
+        assert.match(instructions, /Microi吾码开发工具版本/);
         const tools = await client.listTools();
         assert.equal(tools.tools.length, 1);
         assert.ok(tools.tools.some(tool => tool.name === 'microi_codex'));

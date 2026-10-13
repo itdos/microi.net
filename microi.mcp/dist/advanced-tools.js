@@ -451,6 +451,7 @@ export function normalizeAllMenuJson(data) {
             result[canonical] = normalized.value;
     }
     const numericAliases = [
+        ['TreeDragSortEnabled', 'treeDragSortEnabled'],
         ['MenuBadgeEnabled', 'menuBadgeEnabled'],
         ['HideTableBanner', 'hideTableBanner'],
         ['HideFormBanner', 'hideFormBanner'],
@@ -461,7 +462,7 @@ export function normalizeAllMenuJson(data) {
         if (data[canonical] === undefined && data[alias] === undefined)
             continue;
         const raw = data[canonical] ?? data[alias];
-        const value = (canonical === 'HideTableBanner' || canonical === 'HideFormBanner') && typeof raw === 'boolean'
+        const value = canonical !== 'ViewConfigVersion' && typeof raw === 'boolean'
             ? (raw ? 1 : 0)
             : getNumber(data, canonical, alias);
         if (value !== undefined)
@@ -485,6 +486,7 @@ export function normalizeAllMenuJson(data) {
         delete result.tableHeaders;
     }
     const stringAliases = [
+        ['TreeDragSortField', 'treeDragSortField'],
         ['MenuBadgeApiEngineKey', 'menuBadgeApiEngineKey'],
         ['ViewSchemaVersion', 'viewSchemaVersion'],
     ];
@@ -493,6 +495,20 @@ export function normalizeAllMenuJson(data) {
             continue;
         result[canonical] = getString(data, canonical, alias);
         delete result[alias];
+    }
+    const permissionKey = ['FieldPermissions', 'fieldPermissions'].find(key => data[key] !== undefined);
+    if (permissionKey) {
+        try {
+            const value = typeof data[permissionKey] === 'string' ? JSON.parse(data[permissionKey]) : data[permissionKey];
+            if (!value || typeof value !== 'object' || Array.isArray(value) || (value.Enabled && (value.Version !== 1 || !Array.isArray(value.Rules) || value.Rules.length > 200)))
+                errors.push('FieldPermissions 必须为字段权限 v1 配置对象。');
+            else
+                result.FieldPermissions = JSON.stringify(value);
+        }
+        catch {
+            errors.push('FieldPermissions 必须是合法 JSON 对象。');
+        }
+        delete result.fieldPermissions;
     }
     const viewSchemaKey = ['ViewSchema', 'viewSchema'].find((candidate) => data[candidate] !== undefined);
     if (viewSchemaKey) {
@@ -2597,11 +2613,23 @@ function normalizeManifestMicroServiceRoutePath(value) {
     }
     return routePath;
 }
+/** Build the default host route from the selected, authenticated MCP context. */
+export function buildMicroServiceMenuUrl(osClient, appKey, routePath) {
+    const tenant = String(osClient || '').trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$/u.test(tenant)) {
+        throw new Error('生成微服务菜单地址需要当前 MCP 连接的合法 OsClient');
+    }
+    const normalizedRoute = normalizeManifestMicroServiceRoutePath(routePath);
+    const encodedRoute = normalizedRoute === '/'
+        ? ''
+        : `/${normalizedRoute.slice(1).split('/').map((segment) => encodeURIComponent(segment)).join('/')}`;
+    return `/micro-app/${encodeURIComponent(tenant)}/${encodeURIComponent(appKey)}${encodedRoute}`;
+}
 /**
  * Resolve a portable Manifest MicroService reference to the tenant-specific
  * sys_microiservice/sys_microiservice_page ids before any system writes begin.
  */
-export async function resolveMicroServiceModuleBinding(client, module) {
+export async function resolveMicroServiceModuleBinding(client, module, osClient) {
     const openType = getString(module, 'openType', 'OpenType');
     const microServiceKey = getString(module, 'microServiceKey', 'MicroServiceKey');
     const rawRoutePath = getString(module, 'microServiceRoutePath', 'MicroServiceRoutePath');
@@ -2656,15 +2684,12 @@ export async function resolveMicroServiceModuleBinding(client, module) {
     if (explicitPageId && explicitPageId !== pageId) {
         throw new Error(`MicroServicePageId 已过期：Manifest=${explicitPageId}，当前租户=${pageId}`);
     }
-    const encodedRoute = routePath === '/'
-        ? ''
-        : `/${routePath.slice(1).split('/').map((segment) => encodeURIComponent(segment)).join('/')}`;
     return {
         IsMicroiService: 1,
         OpenType: openType.toLowerCase() === 'codeform' ? 'CodeForm' : 'MicroService',
         ComponentName: getString(module, 'componentName', 'ComponentName') || 'MicroService',
         ComponentPath: getString(module, 'componentPath', 'ComponentPath') || '/micro-app/host',
-        Url: getString(module, 'url', 'Url') || `/micro-app/${encodeURIComponent(microServiceKey)}${encodedRoute}`,
+        Url: getString(module, 'url', 'Url') || buildMicroServiceMenuUrl(osClient, microServiceKey, routePath),
         MicroServiceId: serviceId,
         MicroServicePageId: pageId,
         MicroServiceRoutePath: routePath,
@@ -3129,7 +3154,7 @@ export function registerAdvancedTools(server, client, context) {
             // A missing app/page must fail closed without leaving a partially generated system.
             for (let moduleIndex = 0; moduleIndex < manifestModules.length; moduleIndex += 1) {
                 try {
-                    microServiceBindings[moduleIndex] = await resolveMicroServiceModuleBinding(client, manifestModules[moduleIndex]);
+                    microServiceBindings[moduleIndex] = await resolveMicroServiceModuleBinding(client, manifestModules[moduleIndex], osClient);
                 }
                 catch (error) {
                     return textResult(JSON.stringify({
@@ -3475,7 +3500,7 @@ export function registerAdvancedTools(server, client, context) {
     });
     server.tool('microi_list_modules', `List menu modules for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Modules', await client.listModules(keyword)));
     server.tool('microi_get_module', `Get one menu module by ModuleId for OsClient ${osClient}.`, { moduleId: z.string() }, async ({ moduleId }) => apiText('Module Detail', await client.getModule(moduleId)));
-    server.tool('microi_update_module', `Incrementally update an existing menu module, including TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
+    server.tool('microi_update_module', `Incrementally update an existing menu module, including FieldPermissions v1 (Rules with Users/Roles/Departments/Jobs and Fields.Visible/Editable), TreeDragSortEnabled/TreeDragSortField, TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
         const normalized = normalizeAllMenuJson(module);
         if (normalized.errors.length)
             return textResult(JSON.stringify(normalized, null, 2), true);
