@@ -85,7 +85,14 @@ test('官网 mode6 固定兼容 pnpm 且 frozen 安装失败后不执行构建�
   const end = publish.indexOf('    node microi.doc/scripts/check-account-portal.mjs --dist', start);
   assert.ok(start > 0 && end > start);
   const section = publish.slice(start, end);
-  const shell = process.platform === 'win32' ? path.resolve(path.dirname(execFileSync('where.exe', ['git'], { encoding: 'utf8' }).trim().split(/\r?\n/)[0]), '../bin/bash.exe') : 'bash';
+  const gitPaths = process.platform === 'win32' ? execFileSync('where.exe', ['git'], { encoding: 'utf8' }).trim().split(/\r?\n/) : [];
+  // Git Bash prepends mingw64/bin; PowerShell normally resolves Git/cmd.
+  // Resolve the real bundled bash in either environment, never WSL's shim.
+  const shell = process.platform === 'win32' ? gitPaths.flatMap(git => [
+    path.resolve(path.dirname(git), '../bin/bash.exe'),
+    path.resolve(path.dirname(git), '../../bin/bash.exe'),
+  ]).find(candidate => fs.existsSync(candidate)) : 'bash';
+  assert.ok(shell, 'Git for Windows bundled Bash must be available');
   for (const fail of [false, true]) {
     const setup = `set -e\nset -o pipefail\nprint_step(){ :; }\nprint_info(){ :; }\nprint_fail(){ echo "$*"; exit 1; }\npnpm(){ echo 11.25.0; }\nnpx(){ printf 'EXEC:%s\\n' "$*"; ${fail ? 'return 37;' : 'return 0;'} }\n`;
     const result = spawnSync(shell, ['-c', setup + section], { cwd: root, encoding: 'utf8' });
