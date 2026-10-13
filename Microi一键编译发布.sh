@@ -84,12 +84,13 @@ run_with_timeout() {
     fi
 }
 
-# Microi Code 使用独立内部 GitLab 仓库；桌面构建不进入平台 Docker/NuGet 发布流程。
-# bash Microi一键编译发布.sh --microi-code [--win|--mac] [--arm64|--x64]
-if [ "${1:-}" = "--microi-code" ]; then
+# Microi Agent 使用独立内部 GitLab 仓库；桌面构建不进入平台 Docker/NuGet 发布流程。
+# --microi-code 保留为兼容别名，所有桌面入口统一使用官方 DeepSeek 源码装配。
+# bash Microi一键编译发布.sh --microi-agent [--win|--mac] [--arm64|--x64]
+if [ "${1:-}" = "--microi-agent" ] || [ "${1:-}" = "--microi-code" ]; then
     cd "$(dirname "$0")"
     shift
-    if [ ! -f "Microi.Agent/apps/microi-code/package.json" ]; then
+    if [ ! -f "Microi.Agent/apps/official-desktop/package.json" ]; then
         printf '%s\n' '缺少内部 Microi.Agent 仓库。请从公司 GitLab 克隆；禁止加入根公开仓库。' >&2
         exit 1
     fi
@@ -106,8 +107,11 @@ if [ "${1:-}" = "--microi-code" ]; then
     trap 'node "$_agent_workspace/Microi.Server/tools/release-lock.mjs" release agent "$_agent_workspace" "$_agent_owner_pid" "$_agent_lock_token"' EXIT
     case "${1:-}" in
       --mac) bash Microi.Agent/一键打包Mac.sh "${@:2}" ;;
-      --win|'') cd Microi.Agent/apps/microi-code && npm ci && npm run typecheck && npm test && npm run package:win ;;
-      *) printf '%s\n' 'Microi Code 仅支持 --win 或 --mac。' >&2; exit 1 ;;
+      --win|'')
+        command -v powershell.exe >/dev/null 2>&1 || { printf '%s\n' 'Windows 安装包必须在 Windows 本机构建；Mac 请使用 --mac。' >&2; exit 1; }
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File Microi.Agent/一键打包Windows.ps1 "${@:2}"
+        ;;
+      *) printf '%s\n' 'Microi Agent 仅支持 --win 或 --mac。' >&2; exit 1 ;;
     esac
     exit $?
 fi
@@ -1911,24 +1915,31 @@ if [ "$PUBLISH_DOC" = true ]; then
     # 个人中心必须属于已推送的候选提交；隔离旧工作树不能再覆盖已交付的页面。
     node microi.doc/scripts/check-account-portal.mjs --require-committed
 
-    # 自动检测可用的包管理器（优先 pnpm，其次 npm，最后 yarn）
-    DOC_PKG_MGR=""
-    if command -v pnpm &>/dev/null; then
-        DOC_PKG_MGR="pnpm"
-    elif command -v npm &>/dev/null; then
-        DOC_PKG_MGR="npm run"
-    elif command -v yarn &>/dev/null; then
-        DOC_PKG_MGR="yarn"
+    # 依赖版本以官网声明/既有锁为准；禁止全局 pnpm 升级时重写发布锁文件。
+    DOC_PNPM_VERSION="$(node --input-type=module -e '
+      import fs from "node:fs";
+      const pkg = JSON.parse(fs.readFileSync("microi.doc/package.json", "utf8"));
+      const declared = /^pnpm@(\d+\.\d+\.\d+)(?:\+.*)?$/.exec(pkg.packageManager || "");
+      if (pkg.packageManager && !declared) throw new Error("官网 packageManager 必须固定 pnpm 精确版本");
+      const lock = fs.readFileSync("microi.doc/pnpm-lock.yaml", "utf8");
+      const version = declared?.[1] || (/^lockfileVersion:\s*[\x27\x22]?6\.0[\x27\x22]?\s*$/m.test(lock) ? "8.15.9" : "");
+      if (!version) throw new Error("官网锁文件没有可验证的 pnpm 版本，请先维护 packageManager");
+      process.stdout.write(version);
+    ')"
+    if command -v pnpm &>/dev/null && [ "$(pnpm --version)" = "$DOC_PNPM_VERSION" ]; then
+        DOC_PKG_CMD=(pnpm)
+    elif command -v npx &>/dev/null; then
+        DOC_PKG_CMD=(npx --yes "pnpm@$DOC_PNPM_VERSION")
     else
-        print_fail "未找到 pnpm / npm / yarn，请先安装 Node.js: https://nodejs.org"
+        print_fail "官网发布需要 pnpm@$DOC_PNPM_VERSION 或 npx，请先安装 Node.js: https://nodejs.org"
     fi
-    print_info "使用包管理器: ${DOC_PKG_MGR%% *}"
+    print_info "使用包管理器: pnpm@$DOC_PNPM_VERSION"
 
-    print_step "安装依赖（如需）..."
-    (cd microi.doc && ${DOC_PKG_MGR%% *} install --frozen-lockfile 2>/dev/null || ${DOC_PKG_MGR%% *} install) || true
+    print_step "按锁文件安装依赖..."
+    (cd microi.doc && "${DOC_PKG_CMD[@]}" install --frozen-lockfile)
 
     print_step "构建 VitePress 文档..."
-    (cd microi.doc && $DOC_PKG_MGR docs:build)
+    (cd microi.doc && "${DOC_PKG_CMD[@]}" run docs:build)
     node microi.doc/scripts/check-account-portal.mjs --dist --require-committed
     print_success "VitePress 构建完成"
 

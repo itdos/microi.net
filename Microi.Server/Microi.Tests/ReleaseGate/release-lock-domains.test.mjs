@@ -137,14 +137,14 @@ test('actual Bash combined release functions release their original workspace lo
 BUILD_BACKEND=true; BUILD_CLIENT=true; PUBLISH_DOC=true; MICROI_FULL_ONLY=false; SELECTED_API_PLANS=(); SELECTED_CLIENT_PLANS=(); acquire_workspace_lock; cd /; release_workspace_lock`],{cwd:root,encoding:'utf8',timeout:15000});
     assert.equal(run.status,0,run.stderr);for(const scope of ['api','pc','website'])assert.ok(!fs.existsSync(path.join(root,'.tmp/microi-process-state/'+scope+'-release.lock')));
 }));
-test('actual Agent entry uses only its domain and releases its lock when the desktop build fails',()=>withFixture(root=>{
+for (const entry of ['--microi-agent','--microi-code']) test(`actual Agent entry ${entry} uses only its domain and releases its lock when the desktop build fails`,()=>withFixture(root=>{
     const original=fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url));
     fs.copyFileSync(original,path.join(root,'publish.sh'));
     const target=path.join(root,'Microi.Server/tools');fs.mkdirSync(target,{recursive:true});fs.copyFileSync(tool,path.join(target,'release-lock.mjs'));
-    fs.mkdirSync(path.join(root,'Microi.Agent/apps/microi-code'),{recursive:true});fs.writeFileSync(path.join(root,'Microi.Agent/apps/microi-code/package.json'),'{}');
+    fs.mkdirSync(path.join(root,'Microi.Agent/apps/official-desktop'),{recursive:true});fs.writeFileSync(path.join(root,'Microi.Agent/apps/official-desktop/package.json'),'{}');
     fs.writeFileSync(path.join(root,'Microi.Agent/一键打包Mac.sh'),'#!/bin/bash\nnode Microi.Server/tools/release-lock.mjs status platform "$PWD" >/dev/null\nexit 7\n');
     acquireReleaseLock(root,'api',process.pid,token);
-    const run=spawnSync(bash,[path.join(root,'publish.sh'),'--microi-code','--mac'],{cwd:root,encoding:'utf8',timeout:15000});
+    const run=spawnSync(bash,[path.join(root,'publish.sh'),entry,'--mac'],{cwd:root,encoding:'utf8',timeout:15000});
     assert.equal(run.status,7,run.stderr);assert.ok(!fs.existsSync(path.join(root,'.tmp/microi-process-state/agent-release.lock')),run.stdout+run.stderr);
     assert.ok(fs.existsSync(path.join(root,'.tmp/microi-process-state/api-release.lock')));
 }));
