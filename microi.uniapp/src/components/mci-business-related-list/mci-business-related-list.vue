@@ -58,16 +58,16 @@
       </template>
     </view>
 
-    <view v-if="!isPreview && config.monthField" class="query-month-row">
+    <view v-if="!isPreview && config.monthField && !config.timeRangeField" class="query-month-row">
       <text>{{ config.monthLabel || '查询月份' }}</text>
       <picker mode="date" fields="month" :value="selectedQueryMonth" :end="currentQueryMonth"
         @change="changeQueryMonth">
         <view class="query-month-picker"><text>{{ selectedQueryMonth }}</text><text>▾</text></view>
       </picker>
     </view>
-    <slot v-if="!isPreview" name="time-filter" :config="config" :month="selectedQueryMonth"></slot>
-    <view v-if="!isPreview && config.searchable !== false" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
-      <view class="search-input-wrap">
+    <view v-if="!isPreview && (config.searchable !== false || filterFields.length)" class="search-row"
+      :class="{ 'search-row--simple': !filterFields.length, 'search-row--filters-only': config.searchable === false }">
+      <view v-if="config.searchable !== false" class="search-input-wrap">
         <input v-model="keyword" class="search-input" type="text" confirm-type="search"
           :placeholder="`搜索${config.title || sectionTitle}`"
           :adjust-position="false" :hold-keyboard="true" :cursor-spacing="16"
@@ -76,11 +76,15 @@
           <text>×</text>
         </view>
       </view>
-      <view v-if="filterFields.length" class="filter-button" :class="{ active: activeFilterCount > 0 }"
-        @tap="openAdvancedFilters">
-        <text>筛选</text><text v-if="activeFilterCount">{{ activeFilterCount }}</text>
+      <view v-else class="filter-summary" hover-class="filter-control--pressed" @tap="openAdvancedFilters">
+        <text>{{ filterFields[0].label }}{{ activeFilterCount ? '已筛选' : '筛选' }}</text>
       </view>
-      <view class="search-button" @tap="resetSearch"><text>重置</text></view>
+      <view v-if="filterFields.length" class="filter-button" :class="{ active: activeFilterCount > 0 }"
+        hover-class="filter-control--pressed" @tap="openAdvancedFilters">
+        <text v-if="config.searchable === false" class="filter-symbol">≡</text>
+        <text>筛选</text><text v-if="activeFilterCount" class="filter-count">{{ activeFilterCount }}</text>
+      </view>
+      <view class="search-button" hover-class="filter-control--pressed" @tap="resetSearch"><text>重置</text></view>
     </view>
 
     <view v-if="!isPreview && relatedMetrics.length" class="related-metrics">
@@ -89,7 +93,7 @@
         <view class="related-metric__value">
           <text>{{ metric.value }}</text><text>{{ metric.unit }}</text>
         </view>
-        <text class="related-metric__label">{{ config.timeRangeField && queryTimeWhere.length && metric.key === 'total' ? '筛选结果' : metric.label }}</text>
+        <text class="related-metric__label">{{ config.timeRangeField && activeFilterCount && metric.key === 'total' ? '筛选结果' : metric.label }}</text>
       </view>
     </view>
 
@@ -357,7 +361,7 @@
     <root-portal v-if="filterOpen && !isPreview">
     <!-- #endif -->
       <view class="filter-mask" @tap="closeAdvancedFilters" @touchmove.stop.prevent="noop">
-      <view class="filter-sheet" @tap.stop @touchmove.stop>
+      <view class="filter-sheet" :class="{ 'filter-sheet--compact': config.searchable === false && filterFields.length <= 2 }" @tap.stop @touchmove.stop>
         <view class="filter-sheet__head">
           <view><text>更多筛选</text><text>{{ config.title }} · {{ activeFilterCount }} 项已选</text></view>
           <view class="filter-sheet__close" @tap="closeAdvancedFilters"><text>×</text></view>
@@ -496,6 +500,7 @@ import {
 import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
 import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines, moduleProjectionFields } from '@/platform/card-field-policy.mjs'
 import { buildListFilterWhere, compileModuleFilterFields, hasListFilterValue, mergeModuleFilterFields, validateListFilters } from '@/platform/list-filter-fields.mjs'
+import { dateFilterSpec } from '@/platform/list-filter-date.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
 import { resolveListReadApi, queryMonthValue } from '@/platform/configured-read-api.mjs'
 import { tableChildRequiresModuleQuery } from '@/platform/table-child-query-target.mjs'
@@ -643,7 +648,6 @@ export default {
       error: '',
       keyword: '',
       queryMonth: '',
-      queryTimeWhere: [],
       filterOpen: false,
       filterValues: {},
       filterDraft: {},
@@ -920,7 +924,12 @@ export default {
         canAddMenuRecord(this.menuId || this.childMenuId, this.currentUser)
       )
     },
-    filterFields() { return this.config.filterFields || [] },
+    filterFields() {
+      // 虚拟日志时间虽登记为文本列，查询接口需要完整时间边界；字段与显式精度仍由后台决定。
+      return (this.config.filterFields || []).map(field => field.field === this.config.timeRangeField && field.type === 'date-range'
+        ? { ...field, columnType: 'datetime', date: field.config?.DateTimeType ? field.date : dateFilterSpec('datetime_hhmm') }
+        : field)
+    },
     filterFormData() { return this.childFkField ? { [this.childFkField]: this.relationValue } : {} },
     relatedMetricDefinitions() {
       if (this.config.relatedMetrics?.length) return this.config.relatedMetrics
@@ -1876,8 +1885,8 @@ export default {
       if (!this.relationValue || !this.config.table || (this.loading && !reset) || (!reset && this.finished)) return
       const relationValue = this.relationValue
       const queryMonth = this.queryMonth
-      const timeRangeKey = JSON.stringify(this.queryTimeWhere || [])
-      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && queryMonth === this.queryMonth && timeRangeKey === JSON.stringify(this.queryTimeWhere || [])
+      const filterKey = JSON.stringify(this.filterValues || {})
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && queryMonth === this.queryMonth && filterKey === JSON.stringify(this.filterValues || {})
       // 首次进入、返回刷新和真实增删改才回读摘要；搜索、筛选、翻页沿用当前摘要。
       const latestSummaryTask = refreshSummary ? this.loadLatestRecordSummary() : null
       const requestId = ++this.loadRequestId
@@ -2085,7 +2094,7 @@ export default {
         table: this.config.table || this.table?.Name || '',
         title: this.config.title || this.sectionTitle || '',
         count: Number.isFinite(count) && count > 0 ? Math.floor(count) : 0,
-        filtered: Boolean(String(this.keyword || '').trim() || this.activeFilterCount || this.queryTimeWhere?.length)
+        filtered: Boolean(String(this.keyword || '').trim() || this.activeFilterCount)
       })
     },
     loadMore() { this.loadData(false) },
@@ -2134,23 +2143,20 @@ export default {
     },
     buildFilterWhere() {
       const where = buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser)
-      if (this.config.monthField) where.push({ Name: this.config.monthField, Type: '=', Value: queryMonthValue(this.queryMonth) })
-      if (this.config.timeRangeField) where.push(...(this.queryTimeWhere || []))
+      if (this.config.monthField) {
+        // 月份只用于后端分片定位，从用户选择的上报时间推导，不再作为重复筛选项显示。
+        const field = this.filterFields?.find(item => item.field === this.config.timeRangeField)
+        const range = this.filterValues?.[field?.key] || {}
+        const month = String(range.start || range.end || '').slice(0, 7)
+        where.push({ Name: this.config.monthField, Type: '=', Value: queryMonthValue(month || this.queryMonth) })
+      }
       return where
     },
     changeQueryMonth(event) {
       const month = String(event?.detail?.value || '')
       try { queryMonthValue(month) } catch (error) { this.error = error.message; return }
       this.queryMonth = month
-      this.queryTimeWhere = []
       this.rows = []
-      return this.refreshFilteredRows()
-    },
-    setQueryTimeRange(where) {
-      this.queryTimeWhere = where
-      this.rows = []
-      this.count = 0
-      this.metricValues = { total: 0 }
       return this.refreshFilteredRows()
     },
     buildKeywordFilterWhere() {
@@ -2169,7 +2175,17 @@ export default {
     closeAdvancedFilters() { this.filterOpen = false },
     resetAdvancedFilters() { this.filterDraft = {} },
     applyAdvancedFilters() {
-      const error = validateListFilters(this.filterFields, this.filterDraft)
+      let error = validateListFilters(this.filterFields, this.filterDraft)
+      if (!error && this.config.timeRangeField && this.config.monthField) {
+        const field = this.filterFields.find(item => item.field === this.config.timeRangeField)
+        const range = this.filterDraft[field?.key] || {}
+        const month = String(range.start || range.end || '').slice(0, 7)
+        if (month) {
+          try { queryMonthValue(month) } catch (invalid) { error = invalid.message }
+          if (range.start && range.end && range.start.slice(0, 7) !== range.end.slice(0, 7)) error = '上报时间请在同一个月内选择'
+          if (month > this.currentQueryMonth) error = '不能查询未来月份'
+        }
+      }
       if (error) {
         uni.showToast({ title: error, icon: 'none' })
         return
@@ -3181,7 +3197,7 @@ export default {
   font-size: 24rpx;
 }
 .filter-button.active { color: #0b86d4; font-weight: 650; }
-.filter-button > text:last-child:not(:first-child) { min-width: 28rpx; height: 28rpx; margin-left: 5rpx; padding: 0 4rpx; border-radius: 14rpx; color: #fff; background: #e94b2c; font-size: 18rpx; line-height: 28rpx; text-align: center; }
+.filter-count { min-width: 28rpx; height: 28rpx; margin-left: 5rpx; padding: 0 4rpx; border-radius: 14rpx; color: #fff; background: #e94b2c; font-size: 18rpx; line-height: 28rpx; text-align: center; }
 .search-button {
   display: flex;
   align-items: center;

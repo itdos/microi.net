@@ -1,0 +1,235 @@
+# Microi 原生动态小程序架构
+
+## 目标
+
+本仓库同时承担两件事：
+
+1. 提供可供所有 Microi 项目安装、品牌化和扩展的标准原生小程序产品。
+2. 保持集福鲤 `xjy` 已交付的小程序页面、售后闭环、视觉与性能不退化。
+
+实现方式不是复制两套工程，而是“标准内核 + Profile + 租户插件”。标准
+Profile 使用通用模块目录、动态列表、动态详情和动态表单；集福鲤 Profile
+在这些能力之上保留商城、资讯、售后任务和专属业务页面。
+
+## 四层结构
+
+### 动态表单的组织与树形选择
+
+`mci-native-field` 通过 `src/platform/native-tree-options.mjs` 将 `Department`、`Cascader`、`SelectTree`、`TreeCheckbox` 的嵌套或平铺数据接入公用树形下拉，支持展开、检索、单选、多选、清空和只读回显。树控件优先读取对应 `Config.<Component>.Multiple`，不使用普通下拉的 `MultipleSelect` 覆盖。
+
+`Department` 固定使用 `Id/Name/_Child`，从当前授权的组织树读取数据，不依赖字段中的旧模板组织。`EmitPath=false` 保存节点 Id（多选为 Id 数组）；`EmitPath=true` 保存完整路径（多选为路径数组）。数组统一序列化为 JSON，保持 PC 后台契约。打开时展开已有选择的祖先，搜索保留完整路径；加载失败可重试，缺少父级或循环关系拒绝生成错误路径。表单使用真实数据值，筛选区仍使用独立的筛选包装值。
+
+客户的部门名称、编码和公司信息联动维护在租户 `form.js` 与 `user-organization.mjs` 中，不执行任意前端 V8。回归测试通过 `npm run check:controls` 执行。
+
+表单多选字段在关闭下拉时，于输入框下方显示全部已选标签。每项提供独立移除按钮，点击不打开下拉，立即同步表单值、勾选草稿和 `select` 事件；其余完整对象或组织路径保持原样。只读字段不提供移除入口，筛选区保留已有标签列表，避免重复渲染。浮层仅以输入框自身作为定位锚点，不把下方标签高度计入。
+
+集福鲤员工信息的角色联动由租户扩展 `user-role-level.mjs` 显式实现，遵循后台 RoleIds 值变更规则：Level 取完整已选角色集合的最大非负级别，空选择为 0。勾选、取消勾选、独立标签删除和清空共用 `handleFieldSelect`，仅回填当前表单实际存在的 Level 字段；不执行后台任意前端 V8，也不额外查询受保护角色表。
+
+### 业务主列表与详情关联列表的筛选控件
+
+`pages/business/list` 与 `mci-business-related-list` 通过 `mci-list-filter-field` 统一渲染业务主列表、客户/订单详情关联列表及“查看更多”列表的筛选字段。字段来源为 `sys_menu.SearchFieldIds` 与 `diy_field`；后台查询配置优先，本地扩展筛选遇到同名后台字段时按后台组件和 Config 重新编译。
+
+- `DisplayType: Out` 只表示 PC 外部搜索区的位置，移动端收进弹窗并保留原查询配置，不能丢弃后用本地预设补回。主列表继续单独处理 Line；详情关联列表没有外部或行内筛选区，In/Out/Line 都使用同一弹窗，Hide、IsVisible、字段可见性和角色限制仍生效。
+- Radio/Select 的表单存储与查询选择方式独立。既有 SearchFieldIds 项配置 DisplayType 或 DisplaySelect 时，兼容平台查询区的复选组/多选下拉语义；`DisplaySelect` 仅决定呈现，缺省也不丢失已配置的查询模式。`SearchMultiple: true/false` 可显式覆盖。纯字段 Id 或没有查询模式配置的 Radio/Select 保留表单默认单选；本地扩展的 SearchMultiple/multiple 可显式配置查询多选。单值字段查询多个候选值生成 `In`，不会改变表单保存结构。
+- Select、MultipleSelect、Checkbox 复用 `mci-native-field` 的检索、分页、勾选和标签交互。筛选选中值携带标签与原始值，发送条件前移除 UI 包装。单值使用 `=`，单值字段显式查询多选使用 `In`，JSON 数组按元素或对象标识生成分组 `Like`。配置 SelectSaveField 的 Checkbox/MultipleSelect 同时兼容字段值数组和历史整行对象数组；不以显示文字替代 Id。
+- 本地扩展声明 `overrideSearchMultiple: true` 时，只覆盖同名后台筛选的多选属性，保留后台控件、存储方式、数据源和显隐限制。顶部状态按钮用字段选项文字展示，查询继续传原始值；数值 `0` 是有效条件，不能当作“全部状态”。
+- Switch 为全部、是、否；全部不生成条件，0 保留。DateTime 读取 DateTimeType，年/月/日/小时/分钟/秒分别显示对应选择器；结束边界采用下一精度单位的开区间，物理日期列与文本日期列分别格式化。
+- Address 保留省、市、区名称数组，省、市筛选生成完整 JSON 路径前缀；“全部”只代表不限制后续层级，不发送为具体地区值。
+- 地区滚轮统一使用 `mci-region-picker`，动态表单、列表、关联记录选择弹窗及原生页面共用同一行为。`profiles/<id>/profile.cjs` 的 `config.defaultRegion` 可配置空值首次打开的位置；确认前不写入业务值，取消重开恢复已选值，异步回填和已有数据优先。关联记录选择器的 `presentation.filters` 使用 `type: 'address'` 即可接入同样的省市区查询。
+- Cascader/Department 遵守 Multiple 与 EmitPath；SelectTree/TreeCheckbox 保留节点值和父子关系。Children、ParentField、Disabled、Leaf、Lazy、ParentChildLinkage 按配置解释，懒加载透传 `_ParentValue`。若需限制查询可选层级，可在 SearchFieldIds 项显式添加 `SearchLeafOnly: true` 或 `SearchSelectableLevels: [2, 3]`（根为第 1 层）。它们是移动查询扩展项，不是新增物理字段。缺父级或循环数据提示错误，不能拼造路径。
+- 弹窗使用独立草稿；关闭放弃本次选择，重置清空草稿，查看结果校验后才替换生效条件。该组件不运行表单提交、必填和字段写入事件。
+
+关联列表始终保留父记录外键和 `_TableChildAuth` 完整授权链。远程选项分页与树懒加载通过原生字段接口携带菜单、父子授权和子表外键上下文。筛选外壳使用微信 root-portal / H5 Teleport，避免详情滚动容器裁剪。
+
+此改动不迁移线上字段配置，不改变独立售后任务和商城筛选。
+
+### 1. 平台层
+
+`src/platform/`、`src/components/mci-*`、`src/pages/module/` 和
+`src/pages/native-form/` 只表达通用能力：
+
+- 鉴权请求、菜单授权上下文和数据权限。
+- `sys_menu` 模块发现及 List/Card/Detail/Edit 视图协议。
+- `diy_table/diy_field` 字段、控件、顺序、分组、数据源和校验。
+- ActionSchema 白名单、缓存、显示兼容、上传、富文本和安全区。
+
+平台层禁止出现租户表名、字段名、品牌文案、租户素材和定制路由。
+
+列表首屏在进入页面或打开远程选择器的当帧即进入骨架态，菜单与元数据等待也属于初次加载；只有当前请求成功完成且确实没有记录才显示空态。请求失败结束骨架并提供错误与重试入口，不能解释为没有数据。恢复非空缓存或刷新、分页时保留可读记录，列表底部使用 `mci-skeleton` 的 `compact` 模式提示后续加载；尚未完成请求的空缓存不能提前结束骨架。
+
+分类切换、远程搜索与分页使用请求代次保护，迟到结果不能覆盖新筛选或结束新请求的骨架，失败分页可重新请求同一页。共享骨架颜色由主题令牌控制，并兼容减少动态效果设置。`scripts/list-loading.test.mjs` 通过可控慢请求、失败和并发请求执行真实页面方法，覆盖成功空数据、缓存恢复、重试及选择器首开等状态。
+
+### 2. 视图协议层
+
+`sys_menu` 负责一个业务入口的列表、卡片、详情和编辑视图。同一菜单可用
+物理字段保存版本化 `ViewSchema`：
+
+- `EnableViewSchema`
+- `ViewSchema`
+- `ViewSchemaVersion`
+- `ViewConfigVersion`
+
+Schema 支持 `Detail/Edit/List/Card`、`PC/Mobile/All`、角色选择、Hero、
+MetricStrip、ActionGrid、ResponsiveSection、字段布局和安全 ActionSchema。
+没有 ViewSchema 时必须回退到 `sys_menu` 的移动字段配置及完整
+`diy_field` 表单，不能白屏。
+
+`diy_table/diy_field/sys_menu.DiyConfig` 已废弃。任何新配置都必须使用
+DIY 元数据和明确的物理字段。
+
+### 3. 租户插件层
+
+每个租户至少有四个适配器：
+
+```text
+src/tenants/<tenant>/
+|- business.js
+|- runtime.js
+|- form.js
+`- native-table.js
+```
+
+- `business.js`：专属业务分组、卡片预设和角色展示。
+- `runtime.js`：专属首页统计、扫码和页面跳转。
+- `form.js`：字段联动、定位、提交前后扩展。
+- `native-table.js`：复杂子表和关联表选择规则。
+
+售后接单、扫码、定位、拍照、地图和打卡等适合原生化的流程可以增加租户
+页面；这些页面仍应调用后端 ApiEngine 和表单服务端事件，不在客户端复制
+事务逻辑。定制详情可组合硬编码 Hero/流程区和动态元数据分组，新增后台字段
+会自动进入折叠区。
+
+集福鲤客户合同金额由 `src/tenants/xjy/customer-contract-totals.mjs` 与租户组件
+共同适配，客户列表和详情共用 `xjy-customer-contract-totals` 只读聚合接口。
+同页批量传入 `CustomerIds` 和真实 `CustomerSysMenuId`，服务端负责授权、合同
+状态、有效期、合作方式及设备/滤芯金额归类；前端不逐客户查询订单，也不从
+`DingdanJE` 拆分合同类型。返回 `Data.Customers[id]` 的 `Rental.Current/All`、
+`Buyout.All`、`AnnualFilter.Current/All`，分别展示当前有效期和全部合同金额。
+`Scope`、`CurrentDefinition` 是可选口径说明。
+
+金额状态只挂在列表行副本的 `__xjyContractTotals`，不回写客户业务字段或 SDK
+查询缓存。真实零金额展示 `¥0.00`；权限、网络、响应缺失或部分值缺失展示
+“未获取”并提供重试，不能用零掩盖失败。金额加载属于列表首屏加载过程，
+迟到响应不能覆盖新搜索；详情金额重试使用独立请求代次。确定性回归由统一
+入口发现 `Microi.Server/Microi.Tests/UniApp/customer-contract-totals.test.mjs`。
+
+### 4. Profile 层
+
+`profiles/<id>/profile.cjs` 管理 OsClient、API、文件服务、品牌、功能开关和
+路由；同目录的 `pages.json`、`manifest.json` 决定真实编译范围。
+
+`scripts/run-profile.cjs` 在构建子进程中生成 `src/generated/*` 桥接并在结束
+后恢复。仓库默认生成物必须始终指向 `xjy`，以保证同事直接运行原命令得到
+当前交付版。
+
+通用 App 使用可选的 `microi` Profile。与现有页面同名而交互不同的源码仅在
+该 Profile 构建期间从 `profiles/microi/overrides/src/` 临时激活；新平台模块、
+组件和路由仍放在共享 `src/`。构建结束必须恢复默认 xjy 源文件，且不能并行
+运行多个 Profile 构建。隔离层的使用与逐步共用规则见
+`profiles/microi/README.md`。
+
+## 动态更新链路
+
+1. 登录后读取当前角色可见的 `sys_menu`。
+2. 根据 `DiyTableId` 批量解析表名，并读取菜单的移动列、搜索列、统计列、
+   卡片列和 ViewSchema。
+3. `diy_table/diy_field` 生成原生字段定义、分组、关联控件和数据源。
+4. 表单指纹由表更新时间、Tabs、字段 Id/更新时间/顺序/显隐/组件组成。
+5. 元数据统一通过 `V8.FormEngine.GetDiyTableModel/GetDiyFieldList` 访问
+   FormEngine 服务端缓存入口；页面和控件禁止使用普通 CRUD 直查受保护的
+   `diy_table/diy_field`。
+6. 客户端按 30 秒窗口复核缓存元数据并计算指纹；指纹未变复用本地定义，
+   变化时写入新版本缓存。网络失败时使用最近的版本化缓存。
+7. 列表、详情和编辑请求携带真实 `_SysMenuId`；后端仍是最终权限边界。
+
+列表查询优先使用授权菜单的 `SelectApi`，表级 `ApiReplace.Select` 提供查询回退及单条详情读取。
+`src/platform/configured-read-api.mjs` 统一解析配置，并通过当前 SDK 请求同源接口；子表继续携带
+完整 `_TableChildAuth` 与父子外键条件。接口配置缺失时沿用普通 FormEngine/模块查询；
+配置接口失败时显示原错误，不能转查物理空表后伪装成暂无记录。
+接口返回的虚拟记录 Id 必须原样传到详情，月份等分区信息由后端解析。
+租户只读日志在业务插件中声明 `readOnly`、`monthField` 与受支持的查询能力；通用组件提供
+月份选择和分页，详情仅查看，列表总量复用接口 `DataCount`。普通表的新增、编辑和删除保持原权限契约。
+
+配置 `timeRangeField` 后，关联列表直接使用后台 `SearchFieldIds` 的时间字段，在统一筛选弹窗内选择，
+不再增加独立的月份、开始日期和结束日期控件。未配置精度的虚拟日志时间默认到分钟，显式 `DateTimeType` 优先。
+筛选草稿只在点击查看结果后生效，关闭取消草稿，重置清空筛选；月份按上报时间自动推导，未筛选时查询当月。
+开始条件为 `>= 所选分钟:00`，结束条件为 `< 下一分钟:00`，完整包含结束分钟；当前接口跨月范围需分月查询。
+虚拟文本时间按完整时间边界发送，缓存与迟到响应均按已生效范围隔离。
+服务端在存储层过滤后统一计数和分页，不对已分页列表做前端筛选；普通关联列表无需配置此能力。
+
+因此后台新增字段、修改顺序、显隐、组件或数据源后，不需要重新发布小程序。
+只有新增原生能力、专属页面或客户端动作类型时才需要发版。
+
+## 特殊记录适配器
+
+只读目录可以声明 `metadataApiEngineKey`，由安全接口返回 `{ Menu, Table, Fields }`
+展示投影。`configuredModuleEngineKey` 或 `configuredMenuId` 必须精确匹配当前用户
+的授权模块，避免同名菜单被错误采用。接口只返回可公开的字段元数据和静态选项，
+不返回设计 SQL、V8 或秘密字段；人员数据仍由接口控制范围。
+
+通用列表据此编译 `MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields`
+和安全的 `Card-Mobile` 视图，并将真实 `_SysMenuId`、`_SelectFields` 传回列表接口。
+角色/部门等关联显示可以使用行内 `_CardDisplay` 名称映射，同时保留原始 Id。
+每次进入和下拉刷新回读配置，列表缓存按菜单版本、字段定义和字段集隔离；
+授权或配置读取失败时清空旧列表并提供重试入口。
+
+`src/platform/form-record-adapter.js` 负责少数不能直接复用普通菜单 CRUD 的
+安全域。默认 `form-engine` 适配器继续携带真实菜单上下文；`current-user`
+适配器读取当前 Token 对应的本人资料，并只提交服务端允许的自助字段。
+
+新增适配器时必须同时满足：
+
+- 普通业务适配器的表单结构仍来自缓存元数据，不得复制一套硬编码控件。
+- 系统能力适配器可以声明后端白名单允许的最小静态字段集，但不能借此查询
+  受保护系统表或暴露角色、部门、状态等管理字段。
+- 数据范围由后端 Token、角色和数据权限决定，不能信任客户端传入的用户 Id。
+- 不得伪造 `_SysMenuId`，也不得把特殊适配器当作绕过 FormEngine 权限的通道。
+- 平台通用适配器放 `src/platform/`；单租户业务行为优先放租户插件或 ApiEngine。
+
+## 动态与定制的选择
+
+优先级如下：
+
+1. 普通 CRUD：直接使用标准动态模块页。
+2. 只需改变视觉组合：配置 ViewSchema。
+3. 需要后端业务动作：配置 ActionSchema 调用 ApiEngine。
+4. 需要相机、扫码、定位或复杂流程：增加租户页面或租户扩展。
+5. 平台普遍需要的能力：先升级版本化标准协议，再由所有租户复用。
+
+禁止在平台组件里根据 OsClient 写条件分支，也禁止把任意 PC 前端 V8 下载到
+小程序执行。
+
+## 多人和 AI 协作
+
+仓库根目录的 `AGENTS.md` 是权威约束，同时提供 Claude、Copilot 和 Cursor
+入口文件。架构检查会阻止以下回归：
+
+- 平台动态渲染器出现集福鲤表名、字段名或品牌文案。
+- 标准 Profile 丢失动态模块路由，或错误包含租户业务分包。
+- Profile 缺少租户扩展合同。
+- 平台使用 `DiyConfig`、`eval`、`new Function` 或任意前端 V8。
+- 默认生成桥接不再指向集福鲤。
+
+同事开发时应从 `npm run tenant:create -- ...` 创建新租户，不复制修改 xjy。
+提交前先运行架构与双 Profile 构建；多人同时修改生成文件时，以 Profile
+源文件为准重新生成默认 xjy 桥接，不手工解决生成内容。
+
+## 验收矩阵
+
+平台层变更至少验证：
+
+```bash
+npm run check:architecture
+npm run check:ui
+npm run build:mp-weixin:standard
+npm run build:mp-weixin
+```
+
+集福鲤详情、任务、商城或视觉变更还需：
+
+```bash
+npm run build:h5
+npm run visual:xjy
+```
+
+自动化不能替代真机相机、定位、文件选择、支付和破坏性售后状态流转验收。
