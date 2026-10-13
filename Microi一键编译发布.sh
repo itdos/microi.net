@@ -1221,10 +1221,11 @@ if [ "$BUILD_BACKEND" = true ]; then
         echo ""
     fi
 
-    print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false"
+    print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:ShouldUnsetParentConfigurationAndPlatform=false"
     echo ""
     _BUILD_LOG="$(mktemp /tmp/microi-build.XXXXXX.log)"
-    if ! dotnet build "$SLN_FILE" -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false 2>&1 | tee "$_BUILD_LOG"; then
+    # 方案外的 NPOI 等引用同样必须产出 Release，不能被 SDK 回退成 Debug。
+    if ! dotnet build "$SLN_FILE" -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:ShouldUnsetParentConfigurationAndPlatform=false 2>&1 | tee "$_BUILD_LOG"; then
         echo ""
         echo -e "  ${RED}───── 编译错误摘要（最后30行）─────${NC}"
         grep -E "error |Error |FAILED" "$_BUILD_LOG" 2>/dev/null | tail -20 || tail -30 "$_BUILD_LOG"
@@ -1280,8 +1281,17 @@ if [ "$PUSH_NUGET" = true ] || { [ "$HAS_ENCRYPT" = true ] && [ "$DEPLOY_MODE" =
     if [ -f "${_MICROI_NET_PROJECT:-}" ]; then
         dotnet pack "$_MICROI_NET_PROJECT" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee "$_PACK_LOG" || _PACK_FAILED=1
     fi
-    # Solution-level Pack asks output-group targets to resolve project references. Keep that
-    # traversal read-only so it cannot re-enter Build while --no-build is active.
+    # NPOI 五个工程由 Office 引用，但不在两套平台方案中；SDK Pack 只读取引用版本，
+    # 不会递归生成它们的包。按依赖顺序显式打包，继续复用本次 Release 编译产物。
+    for _npoi_project in \
+        Microi.NPOI.Core/Microi.NPOI.Core.csproj \
+        Microi.NPOI.OpenXml4Net/Microi.NPOI.OpenXml4Net.csproj \
+        Microi.NPOI.OpenXmlFormats/Microi.NPOI.OpenXmlFormats.csproj \
+        Microi.NPOI.OOXML/Microi.NPOI.OOXML.csproj \
+        Microi.NPOI.csproj; do
+        dotnet pack "Microi.Server/Microi.NPOI/$_npoi_project" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
+    done
+    # 方案 Pack 的输出组目标仍需解析引用，禁止该遍历重新进入 Build。
     dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
     if [ "$_PACK_FAILED" -ne 0 ]; then
         echo ""
@@ -1603,6 +1613,7 @@ if [ "$PUSH_NUGET" = true ]; then
     if [ "$HAS_ENCRYPT" = true ] && [ "$NUPKG_REPLACED" != true ]; then
         print_fail "NuGet 包中的 DLL 未被替换为加密版本，禁止推送！"
     fi
+    node Microi.Server/tools/release-nuget-closure.mjs Microi.Server "$VERSION" "$_nupkg_list_file" || print_fail "本次 NuGet 包正文的版本或平台依赖闭包不完整；禁止上传。"
     if [ "$HAS_ENCRYPT" = true ]; then
         node Microi.Server/tools/release-encryption.mjs packages "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_list_file" || print_fail "完整待上传清单的实际 NuGet ZIP 中存在未加密/旧 DLL、遗漏包或缺少闭源 DLL；禁止上传。"
     fi

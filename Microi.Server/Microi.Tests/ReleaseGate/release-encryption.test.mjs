@@ -51,7 +51,7 @@ function pendingFixture(){
  verifyEncrypted(directory,file);
  const files=projects.map(project=>{
   const filename=path.join(server,project,'bin/Release',`${project}.8.5.2.nupkg`);fs.mkdirSync(path.dirname(filename),{recursive:true});
-  zip(filename,[['lib/net10.0/'+project+'.dll',fs.readFileSync(path.join(directory,project+'.dll'))]]);return filename;
+  zip(filename,[[project+'.nuspec',`<package><metadata><id>${project}</id><version>8.5.2</version></metadata></package>`],['lib/net10.0/'+project+'.dll',fs.readFileSync(path.join(directory,project+'.dll'))]]);return filename;
  });
  const list=path.join(root,'pending.nul');
  const writeList=(entries=files)=>fs.writeFileSync(list,Buffer.from(entries.join('\0')+'\0'));
@@ -235,13 +235,14 @@ test('verified NUL list byte changes cannot silently reorder or replace upload i
  }finally{f.dispose();}
 });
 
-for(const mode of ['success','after-scan-byte-drift','after-scan-added-package','candidate-rejected','candidate-drift-after-first-upload'])test(`actual find NUL list and production NuGet shell gate ${mode}`,()=>{
+for(const mode of ['success','after-scan-byte-drift','after-scan-added-package','candidate-rejected','candidate-drift-after-first-upload','missing-platform-dependency'])test(`actual find NUL list and production NuGet shell gate ${mode}`,()=>{
  const f=pendingFixture();try{
   const nested=path.join(f.server,'Integration Product/nested/bin/Release/Custom.Package.8.5.2.nupkg');fs.mkdirSync(path.dirname(nested),{recursive:true});
-  zip(nested,[['tools/mIcRoI.vIsIoN.DLL',fs.readFileSync(path.join(f.directory,'Microi.Vision.dll'))]]);f.files.push(nested);
+  zip(nested,[['Custom.Package.nuspec','<package><metadata><id>Custom.Package</id><version>8.5.2</version></metadata></package>'],['tools/mIcRoI.vIsIoN.DLL',fs.readFileSync(path.join(f.directory,'Microi.Vision.dll'))]]);f.files.push(nested);
+  if(mode==='missing-platform-dependency')zip(f.files[0],[['Microi.net.nuspec','<package><metadata><id>Microi.net</id><version>8.5.2</version><dependencies><dependency id="Microi.NPOI" version="8.5.2"/></dependencies></metadata></package>'],['lib/net10.0/Microi.net.dll',fs.readFileSync(path.join(f.directory,'Microi.net.dll'))]]);
   const cli=fileURLToPath(new URL('../../tools/release-encryption.mjs',import.meta.url));
   const tool=path.join(f.server,'tools/release-encryption.mjs');fs.mkdirSync(path.dirname(tool),{recursive:true});fs.copyFileSync(cli,tool);
-  for(const name of ['release-candidate.mjs','release-composition.mjs','release-standard-inputs.mjs'])
+  for(const name of ['release-candidate.mjs','release-composition.mjs','release-standard-inputs.mjs','release-nuget-closure.mjs'])
    fs.copyFileSync(fileURLToPath(new URL('../../tools/'+name,import.meta.url)),path.join(f.server,'tools',name));
   const candidateRepos=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Agent','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
   for(const repo of candidateRepos){const cwd=path.resolve(f.root,repo);fs.mkdirSync(cwd,{recursive:true});execFileSync('git',['init','--quiet'],{cwd});}
@@ -291,9 +292,9 @@ ${source.slice(begin,end)}
    assert.equal(run.stdout.match(/UPLOAD_REACHED=/g)?.length,6);
   }else{
    assert.equal(run.status,17,run.stderr);
-   assert.equal(run.stdout.match(/CANDIDATE_VERIFY_REACHED=/g)?.length,mode==='candidate-drift-after-first-upload'?3:1);
+   assert.equal(run.stdout.match(/CANDIDATE_VERIFY_REACHED=/g)?.length??0,mode==='missing-platform-dependency'?0:mode==='candidate-drift-after-first-upload'?3:1);
    assert.equal(run.stdout.match(/UPLOAD_REACHED=/g)?.length??0,mode==='candidate-drift-after-first-upload'?1:0);
-   assert.match(run.stderr,mode==='candidate-rejected'?/首个 NuGet 上传前候选源码发生变化/:mode==='candidate-drift-after-first-upload'?/当前 NuGet 上传前候选源码发生变化/:/首个上传前 NuGet 清单或包字节发生变化/);
+   assert.match(run.stderr,mode==='missing-platform-dependency'?/本次 NuGet 包正文的版本或平台依赖闭包不完整/:mode==='candidate-rejected'?/首个 NuGet 上传前候选源码发生变化/:mode==='candidate-drift-after-first-upload'?/当前 NuGet 上传前候选源码发生变化/:/首个上传前 NuGet 清单或包字节发生变化/);
   }
  }finally{f.dispose();}
 });
