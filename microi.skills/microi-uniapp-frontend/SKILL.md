@@ -26,7 +26,7 @@ UniApp/H5/小程序必须通过项目统一 `microi.v8.js` 的 `V8.uploadFile` /
 创建、重构或修复任何 Microi 移动端项目前，必须同时应用 `microi.skills/microi-mobile-app-quality/SKILL.md`，并读取其[首版交付与外部服务验收](../microi-mobile-app-quality/references/mobile-first-delivery.md)。手机号快捷登录、会话续签、导航几何、真实地图、页面动效和公开发布回读从首版纳入需求与测试，不能先交静态占位版，再等待用户逐页指出问题。涉及后台与第三方服务时按实际业务范围执行，既有授权和租户策略优先。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-001 sha256=ce7f36d1d7c3e3c6d10572da2cf29b783a5fcf043dc5568e9caed5e42bff5469 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-001 sha256=082ee15575a5119cbeae7354aa96aed52b0993a67babea81a0afd05f4d941f5d -->
 ## 标准产品、视图协议与租户扩展
 
 动态表单的组织/树字段优先复用原生 `mci-native-field` 树形下拉与 `native-tree-options.mjs`，无需为小程序把后台 `Department` 改为普通 Select。读取 `Config.<Component>.Multiple/EmitPath`：组织单选叶值保存 Id，多选叶值保存 Id 数组，路径模式保存完整路径/路径数组，数组统一 JSON 序列化。支持祖先展开、搜索、清空、禁用、重试和只读回显；数据源旧模板不能代替当前授权组织树。业务字段联动放租户扩展，不执行任意前端 V8；验收覆盖保存格式、旧数据回显、失败/迟到响应及最近公司祖先联动。
@@ -44,9 +44,11 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 - 表单元数据必须通过 `V8.FormEngine.GetDiyTableModel/GetDiyFieldList` 访问当前 FormEngine 缓存入口，并携带真实菜单授权上下文；页面和控件不得用普通 `GetFormData/GetTableData` 直查受保护的 `diy_table/diy_field`，也不得散落裸元数据接口 URL。
 - ViewSchema 未配置、配置不完整或网络暂时失败时，必须回退到菜单移动字段和完整 `diy_field` 定义；定制详情还必须把未显式编排的新字段追加到折叠分组，不能静默丢字段。
 - 列表、详情、编辑和保存请求应携带真实授权 `_SysMenuId`；客户端不能自行声明角色、数据范围或表权限，服务端仍是最终权限边界。
+- 动态列表和子表必须读取授权菜单的 `SelectApi`，单条详情读取表级 `ApiReplace.Select`；接口缺失时沿用普通查询，接口失败时保留错误，不能回退到空物理表伪装暂无数据。子表继续传完整 `_TableChildAuth`、父子外键条件和分页参数；虚拟记录 Id 原样传递，分区月份由后端解析。接口地址只允许当前 API 同源，并委托已配置 SDK 处理租户与续签。只读日志的月份字段和支持的筛选能力由租户插件声明，普通表编辑权限保持原契约；验收覆盖预览、分页、详情、历史月份、跨设备拒绝及普通子表。
 - 原生详情进入编辑后，取消丢弃未保存字段并返回同一详情/Tab，保存成功后回读服务端结果并通知来源列表刷新；直接新增/编辑仍返回来源列表。验收覆盖系统返回、保存/子表失败、迟到响应和权限撤销，不能用重复压入详情页替代原实例恢复。
 - IoT/关联快照的“记录不存在”应展示业务空状态并隐藏表名/SQL，权限与网络失败仍保留真实错误；未知遥测使用占位值，零值和离线不能被当作缺失。依赖租户 V8 的契约测试从授权同步目录按唯一 ApiEngineKey 定位，测试前核验源码完整性与哈希，不靠旧分类文件夹名定位或跳过缺失依赖。
 - 小程序不得下载或执行任意前端 V8，不得使用 `eval/new Function`。字段显隐和联动使用白名单声明式规则，按钮使用 ActionSchema，复杂事务和校验进入 ApiEngine 或后端表单事件。
+- 分片日志可配置分钟范围查询：日期和时分草稿在点击查询后生效，开始包含、结束使用下一分钟的排他上界；月份切换清空范围，重置保留月份。服务端校验月内日历边界后在存储层统一过滤、计数和分页，列表缓存及迟到响应按已生效范围隔离，不能只筛选当前页。
 - ActionSchema 只能描述文字、图标、颜色、确认提示、参数映射、ApiEngineKey、原生 ActionType 和成功后的刷新/跳转；扫码、定位、拍照、拨号、导航等由受控原生适配器执行。
 
 仓库必须提供 AI 与人工协作约束文件、租户脚手架、Profile 构建/同步命令和架构检查。平台层改动至少同时构建标准 Profile 与默认交付 Profile；租户视觉改动还要执行多视口截图回归。这样其他同事使用 Codex、Claude、Copilot、Cursor 等工具继续开发时，会先读取相同规则，而不是依赖某次对话记忆。

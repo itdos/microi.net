@@ -10,6 +10,7 @@ import {
   selectAuthorizedMenu
 } from '@/platform/menu-resolution.mjs'
 import { buildListApiEnginePayload, listApiEnginePresentationKey, normalizeListApiEngineResponse } from '@/platform/list-api-engine.mjs'
+import { resolveListReadApi, requestReadApi } from '@/platform/configured-read-api.mjs'
 import tenantRuntime from '@/generated/tenant-runtime.js'
 
 const TABLE_CACHE_KEY = 'microi_diy_table_ids_v2'
@@ -177,11 +178,13 @@ export async function loadModuleRows(moduleConfig, options = {}) {
   const pageIndex = Number(options.pageIndex || 1)
   const pageSize = Number(options.pageSize || moduleConfig.pageSize || 15)
   const listApiEngineKey = String(moduleConfig.listApiEngineKey || '').trim()
-  if (listApiEngineKey) {
+  const selectApi = resolveListReadApi(moduleConfig)
+  if (selectApi || listApiEngineKey) {
     const periodRange = buildPeriodRange(options.period, options.customRange)
     const payload = buildListApiEnginePayload(moduleConfig, { ...options, pageIndex, pageSize }, periodRange)
+    if (selectApi) payload.FormEngineKey = moduleConfig.table
     const requestKey = [
-      'api-engine-list', currentIdentityKey(), listApiEngineKey,
+      'api-engine-list', currentIdentityKey(), selectApi || listApiEngineKey,
       listApiEnginePresentationKey(moduleConfig, payload),
       pageIndex, pageSize, payload.Keyword,
       payload._OrderBy, payload._OrderByType,
@@ -190,7 +193,9 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     ].join(':')
     const cached = await cachedRequest(
       requestKey,
-      () => V8.ApiEngine.Run(listApiEngineKey, payload, { checkCode: false }),
+      () => selectApi
+        ? requestReadApi(V8, selectApi, payload)
+        : V8.ApiEngine.Run(listApiEngineKey, payload, { checkCode: false }),
       {
         maxAge: Number(options.cacheAge ?? (pageIndex === 1 ? 45 * 1000 : 10 * 1000)),
         refresh: options.refresh === true,
@@ -441,7 +446,7 @@ export async function canOpenBusinessEntry(key, refresh = false) {
   return Boolean(menu && menu.Id)
 }
 
-export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null, draftRelation = '' }) {
+export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null, readWhere = null, draftRelation = '' }) {
   if (!requireLogin()) return
   if (!table) {
     uni.showToast({ title: '未配置业务表单', icon: 'none' })
@@ -478,6 +483,7 @@ export async function openForm({ table, rowId = '', mode = 'View', title = '', m
   if (moduleEngineKey) params.push(`moduleEngineKey=${encodeURIComponent(moduleEngineKey)}`)
   if (draftRelation) params.push(`draftRelation=${encodeURIComponent(draftRelation)}`)
   if (tableChildAuth) params.push(`tableChildAuth=${encodeURIComponent(JSON.stringify(tableChildAuth))}`)
+  if (Array.isArray(readWhere) && readWhere.length) params.push(`readWhere=${encodeURIComponent(JSON.stringify(readWhere))}`)
   if (defaultValues && Object.keys(defaultValues).length) params.push(`defaults=${encodeURIComponent(JSON.stringify(defaultValues))}`)
   if (fieldNames && fieldNames.length) params.push(`fields=${encodeURIComponent(JSON.stringify(fieldNames))}`)
   if (excludeFieldNames && excludeFieldNames.length) params.push(`excludeFields=${encodeURIComponent(JSON.stringify(excludeFieldNames))}`)

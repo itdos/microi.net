@@ -58,7 +58,15 @@
       </template>
     </view>
 
-    <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
+    <view v-if="!isPreview && config.monthField" class="query-month-row">
+      <text>{{ config.monthLabel || '查询月份' }}</text>
+      <picker mode="date" fields="month" :value="selectedQueryMonth" :end="currentQueryMonth"
+        @change="changeQueryMonth">
+        <view class="query-month-picker"><text>{{ selectedQueryMonth }}</text><text>▾</text></view>
+      </picker>
+    </view>
+    <slot v-if="!isPreview" name="time-filter" :config="config" :month="selectedQueryMonth"></slot>
+    <view v-if="!isPreview && config.searchable !== false" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
       <view class="search-input-wrap">
         <input v-model="keyword" class="search-input" type="text" confirm-type="search"
           :placeholder="`搜索${config.title || sectionTitle}`"
@@ -81,7 +89,7 @@
         <view class="related-metric__value">
           <text>{{ metric.value }}</text><text>{{ metric.unit }}</text>
         </view>
-        <text class="related-metric__label">{{ metric.label }}</text>
+        <text class="related-metric__label">{{ config.timeRangeField && queryTimeWhere.length && metric.key === 'total' ? '筛选结果' : metric.label }}</text>
       </view>
     </view>
 
@@ -489,6 +497,7 @@ import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/mod
 import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines, moduleProjectionFields } from '@/platform/card-field-policy.mjs'
 import { buildListFilterWhere, compileModuleFilterFields, hasListFilterValue, mergeModuleFilterFields, validateListFilters } from '@/platform/list-filter-fields.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
+import { resolveListReadApi, queryMonthValue } from '@/platform/configured-read-api.mjs'
 import { tableChildRequiresModuleQuery } from '@/platform/table-child-query-target.mjs'
 import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
 import { V8, getUser, post } from '@/utils/request.js'
@@ -633,6 +642,8 @@ export default {
       finished: false,
       error: '',
       keyword: '',
+      queryMonth: '',
+      queryTimeWhere: [],
       filterOpen: false,
       filterValues: {},
       filterDraft: {},
@@ -690,6 +701,14 @@ export default {
     childTableId() { return this.fieldConfig.TableChildTableId || '' },
     childMenuId() { return this.fieldConfig.TableChildSysMenuId || '' },
     childFkField() { return this.fieldConfig.TableChildFkFieldName || '' },
+    readonlyList() {
+      return this.config.readOnly === true || ['true', '1'].includes(String(this.field.Readonly ?? this.field.ReadOnly ?? '').toLowerCase())
+    },
+    currentQueryMonth() {
+      const month = queryMonthValue()
+      return `${month.slice(0, 4)}-${month.slice(4)}`
+    },
+    selectedQueryMonth() { return this.queryMonth || this.currentQueryMonth },
     sectionTitle() {
       return this.field.Label || this.fieldConfig.TableChildSysMenuName || this.table?.Description || this.field.Name || '关联数据'
     },
@@ -894,6 +913,7 @@ export default {
     },
     canAdd() {
       return Boolean(
+        !this.readonlyList &&
         this.relationValue &&
         this.childFkField &&
         this.config.table &&
@@ -1567,6 +1587,7 @@ export default {
           ...matched.config,
           ...platformCardConfig,
           menu,
+          tableModel: this.table,
           table: this.table.Name,
           tableId: this.table.Id,
           menuId: this.menuId,
@@ -1854,7 +1875,9 @@ export default {
       }
       if (!this.relationValue || !this.config.table || (this.loading && !reset) || (!reset && this.finished)) return
       const relationValue = this.relationValue
-      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue
+      const queryMonth = this.queryMonth
+      const timeRangeKey = JSON.stringify(this.queryTimeWhere || [])
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && queryMonth === this.queryMonth && timeRangeKey === JSON.stringify(this.queryTimeWhere || [])
       // 首次进入、返回刷新和真实增删改才回读摘要；搜索、筛选、翻页沿用当前摘要。
       const latestSummaryTask = refreshSummary ? this.loadLatestRecordSummary() : null
       const requestId = ++this.loadRequestId
@@ -1874,7 +1897,7 @@ export default {
           ...keywordWhere
         ]
         let result
-        if (this.requiresModuleAssociationQuery()) {
+        if (resolveListReadApi(this.config) || this.requiresModuleAssociationQuery()) {
           // 关联字段必须由模块引擎执行 SqlJoin/SelectFields；授权仍只依赖完整
           // _TableChildAuth，并保留父子外键条件，不重新附加子菜单数据范围。
           result = await loadModuleRows({
@@ -1942,6 +1965,7 @@ export default {
         if (!isCurrent() || requestId < this.appliedRequestId) return
         this.rows = hydratedRows
         this.count = Math.max(this.rows.length, Number(result.count || 0) - this.duplicateRowCount)
+        if (this.config.monthField && this.config.readOnly) this.metricValues = { total: this.count }
         this.finished = this.rows.length >= this.count || incomingRows.length < pageSize
         if (!this.finished) this.pageIndex += 1
         if (notifyCount) this.emitDataCount()
@@ -1970,6 +1994,8 @@ export default {
     async loadRelatedMetrics(refresh = false) {
       if (this.componentDisposed) return
       if (this.proposalDraftGroup) return
+      // 月度只读列表直接使用同一次日志查询的总数，避免再查空的物理表及重复请求。
+      if (this.config.monthField && this.config.readOnly) return
       const metrics = this.relatedMetricDefinitions
       if (!metrics.length || !this.relationValue || !this.config.table) return
       const relationValue = this.relationValue
@@ -1992,7 +2018,7 @@ export default {
             where.push({ Name: metric.monthField, Type: '>=', Value: range.start })
             where.push({ Name: metric.monthField, Type: '<', Value: range.end })
           }
-          if (metric.aggregateField || moduleAssociationQuery) {
+          if (metric.aggregateField || moduleAssociationQuery || resolveListReadApi(this.config)) {
             const summary = await loadModuleRows(this.config, {
               pageIndex: 1,
               pageSize: 1,
@@ -2059,7 +2085,7 @@ export default {
         table: this.config.table || this.table?.Name || '',
         title: this.config.title || this.sectionTitle || '',
         count: Number.isFinite(count) && count > 0 ? Math.floor(count) : 0,
-        filtered: Boolean(String(this.keyword || '').trim() || this.activeFilterCount)
+        filtered: Boolean(String(this.keyword || '').trim() || this.activeFilterCount || this.queryTimeWhere?.length)
       })
     },
     loadMore() { this.loadData(false) },
@@ -2107,7 +2133,25 @@ export default {
       }
     },
     buildFilterWhere() {
-      return buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser)
+      const where = buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser)
+      if (this.config.monthField) where.push({ Name: this.config.monthField, Type: '=', Value: queryMonthValue(this.queryMonth) })
+      if (this.config.timeRangeField) where.push(...(this.queryTimeWhere || []))
+      return where
+    },
+    changeQueryMonth(event) {
+      const month = String(event?.detail?.value || '')
+      try { queryMonthValue(month) } catch (error) { this.error = error.message; return }
+      this.queryMonth = month
+      this.queryTimeWhere = []
+      this.rows = []
+      return this.refreshFilteredRows()
+    },
+    setQueryTimeRange(where) {
+      this.queryTimeWhere = where
+      this.rows = []
+      this.count = 0
+      this.metricValues = { total: 0 }
+      return this.refreshFilteredRows()
     },
     buildKeywordFilterWhere() {
       return buildKeywordWhere(
@@ -2514,6 +2558,7 @@ export default {
       return 'status-pill--todo'
     },
     rowActions(row) {
+      if (this.readonlyList) return []
       const nativeActions = this.moduleKey
         ? getBusinessRowActions(this.moduleKey, row, this.currentUser, this.menuId || this.childMenuId, { menu: this.menu, tableChildAuth: this.tableChildAuth })
         : []
@@ -2805,7 +2850,7 @@ export default {
         return
       }
       const requestedMode = String(this.presentation.openMode || 'View')
-      const mode = requestedMode === 'Edit' && canEditMenuRecord(this.menuId || this.childMenuId, this.currentUser)
+      const mode = !this.readonlyList && requestedMode === 'Edit' && canEditMenuRecord(this.menuId || this.childMenuId, this.currentUser)
         ? 'Edit'
         : 'View'
       openForm({
@@ -2816,6 +2861,7 @@ export default {
         menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
         tableChildAuth: this.tableChildAuth,
+        readWhere: [{ Name: this.childFkField, Type: '=', Value: this.relationValue }],
         includeRelated: true
       })
     },
@@ -2878,6 +2924,9 @@ export default {
 </script>
 
 <style scoped>
+.query-month-row { display: flex; align-items: center; gap: 20rpx; padding: 18rpx 24rpx; color: #526575; font-size: 24rpx; background: #fff; }
+.query-month-row picker { flex: 1; }
+.query-month-picker { display: flex; justify-content: space-between; align-items: center; min-height: 64rpx; padding: 0 20rpx; border: 1px solid #dce6ed; border-radius: 8rpx; color: #243e50; background: #f7fafc; }
 .related-business-list { position: relative; min-height: 180rpx; padding: 18rpx 22rpx calc(118rpx + var(--mci-safe-bottom)); background: var(--mci-bg-base, #f4f8fa); }
 .related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
 .related-business-list--section { padding-top: 0; padding-bottom: 22rpx; border: 1rpx solid var(--mci-border, #e6edf0); border-radius: 16rpx; overflow: hidden; background: var(--mci-bg-card, #fff); }
