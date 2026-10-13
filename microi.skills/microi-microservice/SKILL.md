@@ -44,7 +44,7 @@ description: Microi 前端微服务 MicroService 开发与交付指南。用于�
 - `sys_microiservice`：已发布运行时。
 - `sys_microiservice_page`：页面路由。
 - 编译后的 HTML/JS/CSS/图片放公有 HDFS，源码不公开。
-- 官方应用的独立体验入口统一为 `https://static.itdos.com/{OsClient小写}/micro-app/{AppKey}/index.html`，公有桶固定根承载最新版编译文件、`/{Version}/` 承载不可变历史编译文件；私有桶采用相同相对目录承载对应源码文件。宿主内部的 `/micro-app/{AppKey}/{RoutePath}` 是菜单路由，不是对外 CDN 体验地址。发布后核对 CDN 刷新完成、入口及资源可访问、业务 API 仍指向目标租户。
+- 官方应用的独立体验入口统一为 `https://static.itdos.com/{OsClient小写}/micro-app/{AppKey}/index.html`，公有桶固定根承载最新版编译文件、`/{Version}/` 承载不可变历史编译文件；私有桶采用相同相对目录承载对应源码文件。宿主内部的新菜单路由统一为 `/micro-app/{OsClient}/{AppKey}/{RoutePath}`，历史 `/micro-app/{AppKey}/{RoutePath}` 继续兼容；菜单路由与对外 CDN 体验地址分别验收。发布后核对 CDN 刷新完成、入口及资源可访问、业务 API 仍指向目标租户。
 
 不能从 `sys_microiservice` 公有产物反推完整源码，也不把大 JS/CSS 长期塞数据库 JSON。
 
@@ -83,7 +83,7 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
   `window.__MICROI_RUNTIME_ENDPOINT__`；旧版回退读取页面全局、同源缓存和域名解析，禁止猜
   ApiBase/OsClient。
 - 在新的独立 context 打开
-  `http://localhost:61500/?OsClient=<encoded>&ApiBase=<encoded>#/micro-app/{MsKey}/{RoutePath}`。
+  `http://localhost:61500/?OsClient=<encoded>&ApiBase=<encoded>#/micro-app/{OsClient}/{MsKey}/{RoutePath}`。
   两个 URL 参数是当前页面最高优先级；初始化后回读同一个运行时对象确认命中目标。
 - 同源普通窗口共享 Token、CurrentUser、ApiBase、OsClient。并行不同目标必须一组目标一个
   Playwright `browser.newContext()` 或独立浏览器 Profile；多个无痕窗口不保证彼此隔离。
@@ -122,6 +122,7 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 创建/更新元数据：`microi_create_microservice`。
 - 同步私有源码：`microi_sync_microservice_source`；本地工程必须优先传 `directory`，不构造 Base64 文件数组。
 - 真实编译目录优先 `microi_publish_application_directory_stream` 流式发布。
+- v3 提示 `mci_app_stream_gate_transition` 或发布门禁列/索引缺失时，先更新目标租户的应用商城责任包，并通过现有“升级租户数据库”入口核验责任包安装；安装完成后回读物理门禁结构及唯一索引，再重新盘点发布基线。不执行已退役 Upgrade25，不手动 reset 锁、fence、Storage 或 active/committed 指针；缺少结构与真正 CAS 漂移分别诊断。
 - `changeSummary` 是最多 2000 字符的版本说明文本，不能传对象；v3 在首次 stage 创建版本时存入 `mci_ai_app_version.ChangeSummary`，后续同请求重放和恢复保留原说明。历史节点若发布完成但摘要仍为空，应报告后端版本缺口，不得把编译文件验证成功等同于日志验收通过。
 - 每次创建、修改、升级或重新发布微服务，必须先为目标精确 `AppVersion` 在 `sys_microistore_changelog` 写入完整日志，再同步源码、stage、finalize 或制作商城包。日志必须关联真实 `StoreId`，包含 `Title / ChangeType / Content / ReleaseTime`；流式发布显式传入与日志含义一致的非空 `changeSummary`。发布后同时回读商城日志、`mci_ai_app_version.ChangeSummary` 与包内 `PackageInfo.ChangeLog`；缺失或版本不一致必须失败关闭。
 - 发布动作必须明确区分两种模式：默认“源码+编译产物”先把完整工程同步到私有桶并逐文件回读 SHA-256，再把 `dist` 流式发布到公有桶；显式“仅编译产物”只更新公有桶，必须在界面中告知其他用户仍会拉取上一次私有源码，禁止暗示源码已同步。
@@ -140,6 +141,7 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 服务器暂未部署修复且普通应用产物很小时，可把 `StorageMode=db` 与内联 `ContentBase64` 作为短期恢复手段；必须明确记录为临时方案。修复部署后重新流式发布到公有 HDFS，并恢复 `StorageMode=file`。只有上一条满足严格资源策略的受信任平台启动应用允许长期保留小型数据库产物；禁止借此把普通或大体积 JS/CSS 长期放进数据库 JSON。
 - 子租户发布时，源码、版本资产、回读验签、页面与缓存全部绑定当前 Token 的 `OsClient`；禁止回退到主租户或宿主服务器默认租户。切换前必须由当前 API 节点通过该子租户 HDFS 配置读回每个版本文件并校验大小/SHA-256。
 - CDN 同一不可变对象返回 200 而 API 稳定入口返回 404 时，先检查 API 读取到的当前租户 `FileServer`（含公有桶路径）和已提交 `ReleasePrefix`，不能把默认域名回退当作恢复。配置读取必须将 dynamic 数据显式转为 object/JObject，再调用扩展方法；缺失或无效配置失败关闭。
+- `microi-platform-service` 等受信任 DatabaseOnly 平台包以 `sys_microiservice.StorageMode=db / MsUrl=db` 和内联已验签字节为运行事实。安装后的 `PublicPublishPath=micro-app/{AppKey}/{Version}` 可以没有租户前缀；不能仅凭该字段补前缀或强改为 file。普通 file 应用则核对每项 HdfsPath/FilePathName、当前租户 FileServer 与真实对象。
 - HTML/JS/CSS 被对象存储标为 `application/octet-stream` 时，文件字节可能完全正确。新上传统一设置对象 MIME；运行网关只对已提交资产的空/二进制通用标签按文件路径归一，保留类型兼容、HTML 完整性、大小、哈希及 `nosniff`。需更新全部 API 节点；旧对象的 CDN 直接入口另需修正元数据或正常发布新版本，不能把 API 兼容称为 CDN 已修复。
 
 ### 宿主路由查询参数
@@ -157,7 +159,7 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 
 ### 独立、菜单、弹层与表单嵌入四种入口
 
-- 同一发布物必须支持：直接打开独立运行、`sys_menu` 使用 `/micro-app/{AppKey}/{RoutePath}` 打开指定路由、`V8.OpenAppDialog` 按 AppKey/RoutePath 以 Dialog 或 Drawer 打开、表单 `DevComponent` 按组件路径别名嵌入指定 RoutePath。
+- 同一发布物必须支持：直接打开独立运行、`sys_menu` 使用 `/micro-app/{OsClient}/{AppKey}/{RoutePath}` 打开指定路由、`V8.OpenAppDialog` 按 AppKey/RoutePath 以 Dialog 或 Drawer 打开、表单 `DevComponent` 按组件路径别名嵌入指定 RoutePath。
 - 表单嵌入时，在 `microi.routes.json` 的目标页面声明稳定、唯一的 `LegacyComponentPaths`；字段 `Config.DevComponentPath` 与其归一化后匹配。主前端存在同路径 Vue 文件时本地组件优先；不存在时 `DynamicComponentCache` 才交给 MicroService 组件宿主。新项目使用不与 `/src/views` 真实文件冲突的虚拟路径，历史字段无需逐租户改配置。
 - 组件宿主必须下发 `componentMode=true`、可序列化的 `componentData`、当前路由和权限上下文；子应用用 `dev-component:resize` 同步 80～1600px 高度，用 `dev-component:event` 回传 `update:modelValue`、`CallbackFormValueChange`、`FormSet` 或 `ParentFormSet`。禁止依赖父页面 DOM、Vue 实例、函数或 `ParentV8` 跨 iframe 传递。
 - 菜单路由必须同时回读并传入 `SysMenuId`、`ModuleEngineKey`、`DiyTableId`；弹层与表单组件默认继承调用菜单，也允许跨模块时显式传真实授权模块。宿主统一下发 `{ sysMenuId, moduleEngineKey, diyTableId }` 的 `permissionContext`。
@@ -309,7 +311,7 @@ window.addEventListener('appstate-change', (event) => {
 
 ### 首次挂载、iframe 交互与接口契约
 
-- `/micro-app/:appKey/:microPath(.*)*` 是平台协议路由，不是租户菜单。它必须在首轮 URL 解析前作为宿主固定路由注册，且宿主组件要进入首屏主包；不能等登录后的菜单请求或异步路由注入，否则直接打开、书签或浏览器刷新会先命中空 `RouterView`，网络抖动时就表现为“刷新一次才出现”。页面是否存在仍由 `MicroApp/Resolve(RequirePage=true)` 和登录守卫校验，固定注册路由不授予菜单或数据权限。
+- `/micro-app/{OsClient}/{AppKey}/{RoutePath}` 与历史 `/micro-app/{AppKey}/{RoutePath}` 都是平台协议路由，不是租户菜单。显式租户必须与当前运行时、已登录 Token 的租户一致；不一致时拒绝加载，不能把错误租户当作 AppKey 或重新解释为历史路由。新生成地址只使用当前选定连接/可信宿主的 OsClient，Manifest、项目文件或 URL 自报租户不能切换会话；用户显式提供的历史菜单 URL 保留。两类路由必须在首轮 URL 解析前作为宿主固定路由注册，且宿主组件要进入首屏主包；不能等登录后的菜单请求或异步路由注入，否则直接打开、书签或浏览器刷新会先命中空 `RouterView`，网络抖动时就表现为“刷新一次才出现”。页面是否存在仍由 `MicroApp/Resolve(RequirePage=true)` 和登录守卫校验，固定注册路由不授予菜单或数据权限。
 - `micro-app` 的 `mounted` 生命周期只表示容器和脚本执行流程完成，不能单独证明子框架已经在 `#app` 渲染出可见内容。宿主给每次解析和重挂载分别下发 `hostGeneration`、`hostMountAttempt`；子应用在 Vue/React 根节点挂载并完成 `nextTick + requestAnimationFrame` 后用 `forceDispatch` 回传 `micro-app:ready`。宿主只接受与当前解析世代、挂载尝试都一致的就绪事件，再复核 `micro-app-body`、`#app` 的非空内容、可见样式以及非零宽高；`micro-app-body` 尚未创建必须判为“仍未渲染”，绝不能当成未知但成功。超时只自动销毁重建一次，第二次失败显示稳定诊断，禁止让白屏永久停留在 `mounted` 状态。
 - iframe 内的 pointer/click 不会冒泡到宿主 document。子应用应在捕获阶段发送 `micro-app:interaction`，宿主再广播统一的“关闭全局浮层”事件。`@micro-zoe/micro-app` EventCenter 会去重内容相同的普通 dispatch，连续交互事件必须使用 `forceDispatch`；否则只能收到第一次点击。宿主的 Select/Popover 等浮层若 teleport 到 `body`，收到通知后还要显式执行组件的 click-outside/close 路径并清理搜索值和焦点，不能只依赖 `blur`。
 - 调接口时以真实 `DosResult.Data` DTO 为准，不能仅凭界面名称猜成数组。例如在线终端接口返回的是用户视图对象 `{ Terminals: [...] }`，前端应读取 `Data.Terminals`，只把 `Data` 直接数组作为旧版兼容；列表 key 优先使用 `ConnectionId`、`DeviceClientId` 等稳定标识。修复前先沿 Controller → Service → 序列化对象 → 子应用解析完整核对契约，避免为正确的后端响应另写一个平行接口。

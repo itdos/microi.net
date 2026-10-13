@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildPlan, normalizeAllMenuJson, resolveMicroServiceModuleBinding } from './advanced-tools.js';
+import { buildMicroServiceMenuUrl, buildPlan, normalizeAllMenuJson, resolveMicroServiceModuleBinding } from './advanced-tools.js';
 
 const portableModule = {
   name: 'AI平台治理工作台',
@@ -69,7 +69,7 @@ test('portable MicroService menu resolves tenant-specific service and page ids',
         },
       };
     },
-  }, portableModule);
+  }, { ...portableModule, osClient: 'untrusted-manifest-tenant' }, 'loctek');
 
   assert.equal(requestedKey, 'ai-platform-studio');
   assert.deepEqual(binding, {
@@ -77,7 +77,7 @@ test('portable MicroService menu resolves tenant-specific service and page ids',
     OpenType: 'MicroService',
     ComponentName: 'MicroService',
     ComponentPath: '/micro-app/host',
-    Url: '/micro-app/ai-platform-studio/overview',
+    Url: '/micro-app/loctek/ai-platform-studio/overview',
     MicroServiceId: 'service-current-tenant',
     MicroServicePageId: 'page-overview-current-tenant',
     MicroServiceRoutePath: '/overview',
@@ -99,11 +99,31 @@ test('CodeForm menu keeps its table binding and resolves a published Vue page', 
         Pages: [{ Id: 'page-1', RoutePath: '/forms/biz_order' }],
       } };
     },
-  }, codeForm);
+  }, codeForm, 'iTdos');
   assert.equal(binding?.OpenType, 'CodeForm');
   assert.equal(binding?.MicroServicePageId, 'page-1');
   await assert.rejects(
-    resolveMicroServiceModuleBinding({ getMicroService: async () => ({ Code: 1, Msg: 'ok', Data: {} }) }, { ...codeForm, table: '' }),
+    resolveMicroServiceModuleBinding({ getMicroService: async () => ({ Code: 1, Msg: 'ok', Data: {} }) }, { ...codeForm, table: '' }, 'iTdos'),
     /必须绑定真实 diy_table/,
   );
+});
+
+test('MicroService default menu routes require the selected tenant and preserve nested paths', () => {
+  assert.equal(buildMicroServiceMenuUrl('iTdos', 'microi-platform-service', '/'), '/micro-app/iTdos/microi-platform-service');
+  assert.equal(buildMicroServiceMenuUrl('loctek', 'loctek-custom-pages', '/orders/edit'), '/micro-app/loctek/loctek-custom-pages/orders/edit');
+  assert.throws(() => buildMicroServiceMenuUrl('', 'demo', '/'), /合法 OsClient/);
+  assert.throws(() => buildMicroServiceMenuUrl('loctek/other', 'demo', '/'), /合法 OsClient/);
+});
+
+test('Manifest MicroService binding keeps an explicitly supplied legacy URL', async () => {
+  const client = { getMicroService: async () => ({ Code: 1, Msg: 'ok', Data: {
+    Service: { Id: 'service-1', MsKey: 'ai-platform-studio' },
+    Pages: [{ Id: 'page-1', RoutePath: '/overview' }],
+  } }) };
+  for (const urlField of ['url', 'Url']) {
+    const binding = await resolveMicroServiceModuleBinding(client, {
+      ...portableModule, [urlField]: '/micro-app/ai-platform-studio/overview',
+    }, 'loctek');
+    assert.equal(binding?.Url, '/micro-app/ai-platform-studio/overview');
+  }
 });

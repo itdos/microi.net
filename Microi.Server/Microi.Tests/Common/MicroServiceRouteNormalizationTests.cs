@@ -5,6 +5,30 @@ namespace Microi.Tests.Common;
 
 public class MicroServiceRouteNormalizationTests
 {
+    [Theory]
+    [InlineData("RouteGateMain20261013", "route-probe", "/", "/micro-app/RouteGateMain20261013/route-probe")]
+    [InlineData("iTdos", "MixedCaseApp", "/designer/details", "/micro-app/iTdos/MixedCaseApp/designer/details")]
+    [InlineData("tenant a", "app+key", "/设备 A/%E5%88%86%E7%BB%84?mode=edit#detail", "/micro-app/tenant%20a/app%2Bkey/%E8%AE%BE%E5%A4%87%20A/%E5%88%86%E7%BB%84?mode=edit#detail")]
+    public void GeneratedPageMenuUrlUsesTrustedTenantAndEscapesCoordinates(string osClient, string appKey, string routePath, string expected)
+    {
+        Assert.Equal(expected, V8McpLogic.ResolveMicroServicePageMenuUrl(osClient, appKey, routePath));
+    }
+
+    [Theory]
+    [InlineData("/legacy/custom-page")]
+    [InlineData("/micro-app/legacy-key/designer?record=1")]
+    [InlineData("")]
+    public void ExplicitPageMenuUrlRemainsUnchanged(string explicitMenuUrl)
+    {
+        Assert.Equal(explicitMenuUrl, V8McpLogic.ResolveMicroServicePageMenuUrl("trusted-tenant", "app", "/designer", explicitMenuUrl));
+    }
+
+    [Fact]
+    public void GeneratedPageMenuUrlCannotGuessMissingTenant()
+    {
+        Assert.Throws<ArgumentException>(() => V8McpLogic.ResolveMicroServicePageMenuUrl("", "app", "/designer"));
+    }
+
     [Fact]
     public void DocumentedLowerCaseRouteManifestKeysAreRecognized()
     {

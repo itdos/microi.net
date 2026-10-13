@@ -38,6 +38,7 @@ export type { PreparedMcpOcrInput, PreparedMcpTranslateFileInput } from './docum
 import {
   buildDefaultFormBanner,
   buildDefaultModulePresentation,
+  buildMicroServiceMenuUrl,
   inferTableColumnWidth,
   normalizeAllMenuJson,
   normalizeViewSchemaJson,
@@ -7741,7 +7742,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       hasChild: z.number().optional().describe('Whether this menu has visible child menus. A hidden TableChild carrier module MUST set 0.'),
       openType: z.string().optional().describe('Open type. Default: "Diy". Options include "Diy", "WorkFlow", "Url", "Page", "MicroService", "CodeForm". WorkFlow requires diyTableId and flowDesignId for an enabled flow bound to the same table.'),
       flowDesignId: z.string().optional().describe('Required when openType=WorkFlow: wf_flowdesign.Id of an enabled flow bound to diyTableId.'),
-      url: z.string().optional().describe('Menu route. MicroService menus normally use /micro-app/{MicroServiceKey}/{routePath}.'),
+      url: z.string().optional().describe('Menu route. MicroService defaults to /micro-app/{current OsClient}/{MicroServiceKey}/{routePath}. An explicit existing URL is preserved.'),
       sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
       icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
       menuBadgeEnabled: z.number().optional().describe('Show a dynamic statistic badge beside this sidebar menu (1=yes, 0=no). Important menus with actionable counts should normally enable it.'),
@@ -7829,10 +7830,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           effectiveOpenType = isCodeForm ? 'CodeForm' : 'MicroService';
           effectiveComponentName = componentName || 'MicroService';
           effectiveComponentPath = componentPath || '/micro-app/host';
-          const encodedRoute = routePath === '/'
-            ? ''
-            : '/' + routePath.slice(1).split('/').map(segment => encodeURIComponent(segment)).join('/');
-          effectiveUrl = url || `/micro-app/${encodeURIComponent(String(microServiceKey))}${encodedRoute}`;
+          effectiveUrl = url || buildMicroServiceMenuUrl(osClient, String(microServiceKey), routePath);
         }
         let effectiveViewSchema = viewSchema;
         const autoPresentationEligible = Boolean(diyTableId)
