@@ -1,0 +1,296 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { createMcpServer } from './server.js';
+test('MicroService module dry run uses the selected tenant and preserves explicit legacy URLs', async () => {
+    const server = createMcpServer({}, {
+        osClient: 'loctek', apiBaseUrl: 'https://api.example.test', label: 'tenant route test',
+    });
+    const client = new Client({ name: 'microservice-route-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+        for (const explicitUrl of [undefined, '/micro-app/microi-3d-engine/designer']) {
+            const result = await client.callTool({ name: 'microi_create_module', arguments: {
+                    name: '3D engine', openType: 'MicroService', microServiceId: 'service-1',
+                    microServicePageId: 'page-1', microServiceKey: 'microi-3d-engine',
+                    microServiceRoutePath: '/designer', ...(explicitUrl ? { url: explicitUrl } : {}),
+                } });
+            assert.notEqual(result.isError, true, JSON.stringify(result.content));
+            const text = result.content.find(item => item.type === 'text');
+            assert.ok(text && text.type === 'text');
+            const preview = JSON.parse(text.text);
+            assert.equal(preview.dryRun, true);
+            assert.equal(preview.module.Url, explicitUrl || '/micro-app/loctek/microi-3d-engine/designer');
+        }
+    }
+    finally {
+        await client.close();
+        await server.close();
+    }
+});
+test('普通 MCP 宿主初始化也收到跨模型的版本与自动更新基础规则', async () => {
+    const server = createMcpServer({}, {
+        osClient: 'fixture', apiBaseUrl: 'https://api.example.test', label: '基础入口验收',
+    });
+    const client = new Client({ name: 'ordinary-mcp-host', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+        assert.match(client.getInstructions() || '', /任何 AI 模型强制读取/);
+        assert.match(client.getInstructions() || '', /Microi吾码开发工具版本/);
+        assert.match(client.getInstructions() || '', /microi update --background/);
+        assert.ok((await client.listTools()).tools.length > 1);
+    }
+    finally {
+        await client.close();
+        await server.close();
+    }
+});
+test('microi_codex discovers and invokes existing tools through one entry point', async () => {
+    let repairedAuditFieldsInput;
+    const fakeClient = {
+        getStatus: async () => ({
+            Code: 1,
+            Data: { OsClient: 'junchi', Online: true },
+        }),
+        repairFixedAuditFields: async (input) => {
+            repairedAuditFieldsInput = input;
+            return {
+                Code: 1,
+                Data: { TableName: input.tableName, Repaired: 6 },
+            };
+        },
+    };
+    const server = createMcpServer(fakeClient, {
+        osClient: 'junchi',
+        apiBaseUrl: 'https://api.chongstech.com',
+        label: '宁波鸿地',
+        codexMode: true,
+    });
+    const client = new Client({ name: 'microi-router-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([
+        server.connect(serverTransport),
+        client.connect(clientTransport),
+    ]);
+    try {
+        const instructions = client.getInstructions() || '';
+        assert.match(instructions, /workspace-conventions\/SKILL\.md/);
+        assert.match(instructions, /microi update --background/);
+        assert.match(instructions, /Microi吾码开发工具版本/);
+        const tools = await client.listTools();
+        assert.equal(tools.tools.length, 1);
+        assert.ok(tools.tools.some(tool => tool.name === 'microi_codex'));
+        const resources = await client.listResources();
+        assert.ok(resources.resources.some(resource => resource.uri === 'microi://codex/status'));
+        assert.ok(resources.resources.some(resource => resource.uri === 'microi://codex/tools'));
+        const templates = await client.listResourceTemplates();
+        assert.ok(templates.resourceTemplates.some(template => template.uriTemplate === 'microi://codex/action/{action}/{params}'));
+        const resourceStatus = await client.readResource({
+            uri: 'microi://codex/action/microi_get_status/%7B%7D',
+        });
+        const firstResourceContent = resourceStatus.contents[0];
+        const resourceStatusText = firstResourceContent && 'text' in firstResourceContent
+            ? firstResourceContent.text
+            : '';
+        assert.match(resourceStatusText, /junchi/);
+        const catalog = await client.callTool({
+            name: 'microi_codex',
+            arguments: { action: 'list_tools', params: { keyword: 'status' } },
+        });
+        const catalogText = catalog.content[0]?.type === 'text' ? catalog.content[0].text : '';
+        assert.match(catalogText, /microi_get_status/);
+        const databaseCatalog = await client.callTool({
+            name: 'microi_codex',
+            arguments: { action: 'list_tools', params: { keyword: 'database' } },
+        });
+        const databaseCatalogText = databaseCatalog.content[0]?.type === 'text'
+            ? databaseCatalog.content[0].text
+            : '';
+        assert.match(databaseCatalogText, /microi_inspect_external_database/);
+        assert.match(databaseCatalogText, /microi_execute_external_database/);
+        assert.match(databaseCatalogText, /microi_save_database_connection/);
+        const indexCatalog = await client.callTool({
+            name: 'microi_codex',
+            arguments: { action: 'list_tools', params: { keyword: 'index' } },
+        });
+        const indexCatalogText = indexCatalog.content[0]?.type === 'text'
+            ? indexCatalog.content[0].text
+            : '';
+        assert.match(indexCatalogText, /microi_get_table_indexes/);
+        assert.match(indexCatalogText, /microi_create_table_index/);
+        assert.match(indexCatalogText, /microi_drop_table_index/);
+        const auditCatalog = await client.callTool({
+            name: 'microi_codex',
+            arguments: { action: 'list_tools', params: { keyword: 'audit' } },
+        });
+        const auditCatalogText = auditCatalog.content[0]?.type === 'text'
+            ? auditCatalog.content[0].text
+            : '';
+        assert.match(auditCatalogText, /microi_repair_audit_fields/);
+        const auditRepair = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_repair_audit_fields',
+                params: { tableName: 'biz_order' },
+            },
+        });
+        const auditRepairText = auditRepair.content[0]?.type === 'text'
+            ? auditRepair.content[0].text
+            : '';
+        assert.equal(auditRepair.isError, undefined);
+        assert.equal(repairedAuditFieldsInput?.tableName, 'biz_order');
+        assert.equal(repairedAuditFieldsInput?.tableId, undefined);
+        assert.match(auditRepairText, /"Repaired": 6/);
+        const blockedIndexCreate = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_create_table_index',
+                params: {
+                    tableName: 'biz_order',
+                    columns: ['OsClient', 'OrderNo'],
+                    unique: true,
+                },
+            },
+        });
+        const blockedIndexCreateText = blockedIndexCreate.content[0]?.type === 'text'
+            ? blockedIndexCreate.content[0].text
+            : '';
+        assert.equal(blockedIndexCreate.isError, true);
+        assert.match(blockedIndexCreateText, /confirmExecution="biz_order"/);
+        const administrativeSqlDryRun = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_execute_external_database',
+                params: {
+                    dbKey: 'erp_sqlserver',
+                    mode: 'NonQuery',
+                    sql: 'DROP TABLE audit_example',
+                },
+            },
+        });
+        const administrativeSqlDryRunText = administrativeSqlDryRun.content[0]?.type === 'text'
+            ? administrativeSqlDryRun.content[0].text
+            : '';
+        assert.match(administrativeSqlDryRunText, /"dryRun": true/);
+        assert.match(administrativeSqlDryRunText, /"sqlSha256": "[a-f0-9]{64}"/);
+        assert.doesNotMatch(administrativeSqlDryRunText, /DROP TABLE/);
+        const saveDryRun = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_save_database_connection',
+                params: {
+                    dbKey: 'erp_sqlserver',
+                    databaseType: 'SqlServer',
+                    connectionString: 'Server=db.example;User Id=admin;Password=top-secret;',
+                },
+            },
+        });
+        const saveDryRunText = saveDryRun.content[0]?.type === 'text' ? saveDryRun.content[0].text : '';
+        assert.match(saveDryRunText, /"dryRun": true/);
+        assert.doesNotMatch(saveDryRunText, /top-secret|db\.example|admin/);
+        const attachmentDryRun = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_import_external_attachment',
+                params: {
+                    sourceUrl: 'https://files.example.com/invoice.pdf?token=signed-secret',
+                    headers: { Authorization: 'Bearer header-secret' },
+                },
+            },
+        });
+        const attachmentDryRunText = attachmentDryRun.content[0]?.type === 'text'
+            ? attachmentDryRun.content[0].text
+            : '';
+        assert.match(attachmentDryRunText, /https:\/\/files\.example\.com\/\[REDACTED\]/);
+        assert.doesNotMatch(attachmentDryRunText, /invoice\.pdf|signed-secret|header-secret/);
+        const localAttachmentDryRun = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_import_external_attachment',
+                params: {
+                    sourcePath: '\\\\fileserver\\finance-secret\\annual-report-500mb.zip',
+                },
+            },
+        });
+        const localAttachmentDryRunText = localAttachmentDryRun.content[0]?.type === 'text'
+            ? localAttachmentDryRun.content[0].text
+            : '';
+        assert.match(localAttachmentDryRunText, /LOCAL_OR_UNC_SOURCE/);
+        assert.doesNotMatch(localAttachmentDryRunText, /annual-report-500mb\.zip|finance-secret|fileserver/);
+        const status = await client.callTool({
+            name: 'microi_codex',
+            arguments: { action: 'microi_get_status', params: {} },
+        });
+        const statusText = status.content[0]?.type === 'text' ? status.content[0].text : '';
+        assert.match(statusText, /junchi/);
+        const invalid = await client.callTool({
+            name: 'microi_codex',
+            arguments: { action: 'microi_get_table_data', params: {} },
+        });
+        const invalidText = invalid.content[0]?.type === 'text' ? invalid.content[0].text : '';
+        assert.equal(invalid.isError, true);
+        assert.match(invalidText, /Invalid tool parameters/);
+    }
+    finally {
+        await client.close();
+        await server.close();
+    }
+});
+test('microi_codex executes the same CRM table, field, menu and API-engine writes as local Microi.Agent', async () => {
+    const writes = [];
+    const fakeClient = {
+        createTable: async (name, description) => {
+            writes.push({ kind: 'table', value: { name, description } });
+            return { Code: 1, Data: { TableId: 'crm-table-id' } };
+        },
+        addField: async (field) => {
+            writes.push({ kind: 'field', value: field });
+            return { Code: 1 };
+        },
+        getFieldList: async () => ({ Code: 1, Data: [] }),
+        createModule: async (module) => {
+            writes.push({ kind: 'module', value: module });
+            return { Code: 1, Data: { ModuleId: 'crm-module-id' } };
+        },
+        createEngine: async (engine) => {
+            writes.push({ kind: 'engine', value: engine });
+            return { Code: 1, Data: { Id: 'crm-engine-id' } };
+        },
+    };
+    const server = createMcpServer(fakeClient, {
+        osClient: 'iTdos', apiBaseUrl: 'http://localhost:61501',
+        label: 'CRM test', codexMode: true,
+    });
+    const client = new Client({ name: 'online-ai-crm-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+        const invoke = async (action, params) => client.callTool({ name: 'microi_codex', arguments: { action, params } });
+        const table = await invoke('microi_create_table', { name: 'Crm_Customer', description: '客户信息' });
+        const field = await invoke('microi_add_field', {
+            tableId: 'crm-table-id', name: 'CustomerName', label: '客户名称', type: 'varchar(200)', component: 'Text',
+        });
+        const module = await invoke('microi_create_module', {
+            name: '客户管理', diyTableId: 'crm-table-id', confirmExecution: '客户管理',
+        });
+        const engine = await invoke('microi_create_engine', {
+            apiEngineKey: 'crm-customer-summary', apiName: 'CRM 客户汇总',
+            code: 'return { Code: 1, Data: { Count: 0 } };',
+        });
+        for (const result of [table, field, module, engine])
+            assert.notEqual(result.isError, true, JSON.stringify(result.content));
+        assert.deepEqual(writes.map(write => write.kind), ['table', 'field', 'module', 'engine']);
+        assert.equal(writes[1].value.TableId, 'crm-table-id');
+        assert.equal(writes[2].value.DiyTableId, 'crm-table-id');
+        assert.equal(writes[2].value.Display, 1);
+        assert.equal(writes[2].value.AppDisplay, 1);
+    }
+    finally {
+        await client.close();
+        await server.close();
+    }
+});
+//# sourceMappingURL=server-codex-router.test.js.map
