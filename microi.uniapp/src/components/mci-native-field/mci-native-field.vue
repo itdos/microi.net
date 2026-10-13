@@ -390,7 +390,7 @@ export default {
     isOptionComponent() { return OPTION_COMPONENTS.has(this.component) },
     isDropdownOption() { return this.isOptionComponent && this.component !== 'Radio' },
     hasRemoteOptions() { return !!this.optionLoader || isRemoteNativeFieldOptions(this.field) },
-    isRichDisplay() { return !!this.modelValue && (['RichText', 'Html'].includes(this.component) || isHtmlValue(this.modelValue)) },
+    isRichDisplay() { return !!this.modelValue && !['Textarea', 'CodeEditor', 'JsonTable'].includes(this.component) && (['RichText', 'Html'].includes(this.component) || isHtmlValue(this.modelValue)) },
     readonlyScrollable() { return this.readonly && Number(this.readonlyMaxLines) > 0 },
     readonlyScrollStyle() {
       // zhy：只设置最大高度，未超过 11 行的短内容仍保持自然高度。

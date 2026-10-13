@@ -21,6 +21,7 @@
 				</view>
 			</view>
 			<mci-business-related-list
+				ref="relatedList"
 				v-else-if="field"
 				:field="field"
 				:parent-id="parentId"
@@ -33,7 +34,12 @@
 				:relation-value-override="relationValue"
 				:batch-entry-mode="batchEntryMode"
 				@title-change="handleTitleChange"
-			/>
+			>
+        <template #time-filter="{ config, month }">
+          <log-minute-range v-if="config.timeRangeField" :field="config.timeRangeField" :month="month"
+            @query="applyTimeRange" />
+        </template>
+      </mci-business-related-list>
 		</scroll-view>
 	</view>
 </template>
@@ -43,6 +49,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import { themeMixin } from '@/utils/theme.js'
 	import { loadNativeFormDefinition, loadNativeTableModel } from '@/platform/native-form.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
+  import LogMinuteRange from './components/log-minute-range.vue'
 
 	function decodeOption(value) {
 		let text = value === undefined || value === null ? '' : String(value)
@@ -63,7 +70,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
   onShareAppMessage() { return buildFriendShare(this, 'pages/business/related-list') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/business/related-list') },
 		name: 'BusinessRelatedListPage',
-		components: { MciBusinessRelatedList },
+		components: { MciBusinessRelatedList, LogMinuteRange },
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -131,6 +138,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				this.contextLoading = false
 				this.contextError = ''
 			},
+      applyTimeRange(where) { return this.$refs.relatedList?.setQueryTimeRange(where) },
 			async restoreContext() {
 				if (this.field) {
 					this.contextLoading = false

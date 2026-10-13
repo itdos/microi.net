@@ -64,7 +64,7 @@
     "check:checkin-photo-upload": "node --test scripts/test-checkin-photo-upload.mjs",
     "check:message-role-filter": "node --test scripts/test-message-role-filter.mjs",
     "check:module-search-filters": "node --test scripts/test-module-search-filters.mjs scripts/test-native-module-fields.mjs scripts/test-list-filter-selector.mjs scripts/test-related-list-filters.mjs",
-    "check:list-api-engine": "node scripts/test-list-api-engine.mjs",
+    "check:list-api-engine": "node scripts/test-list-api-engine.mjs && node --test scripts/test-configured-read-api.mjs",
     "check:platform-api-engine-migration": "node --test scripts/test-platform-api-engine-migration.mjs",
     "check:casebook-case-detail": "node --test scripts/test-casebook-case-detail.mjs",
     "check:xjy-points-pdf-iot": "node scripts/check-xjy-points-pdf-iot.mjs",

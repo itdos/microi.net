@@ -21,7 +21,7 @@ assert.match(related, /_TableChildAuth: this\.tableChildAuth/,
   '统计查询必须携带完整 TableChild 授权链')
 assert.match(related, /Promise\.all\(metrics\.map/,
   '同一 Tab 的多个统计指标应并行加载')
-assert.match(related, /if \(metric\.aggregateField \|\| moduleAssociationQuery\)[\s\S]*?loadModuleRows\(this\.config,[\s\S]*?statisticsFieldValue\(summary\.append, metric\.aggregateField, 0\)/,
+assert.match(related, /if \(metric\.aggregateField \|\| moduleAssociationQuery \|\| resolveListReadApi\(this\.config\)\)[\s\S]*?loadModuleRows\(this\.config,[\s\S]*?statisticsFieldValue\(summary\.append, metric\.aggregateField, 0\)/,
   '金额等汇总指标必须使用模块引擎的服务端全量 StatisticsFields')
 assert.match(related, /handleDataChanged[\s\S]*?loadRelatedMetrics\(true\)/,
   '子表增删改后必须刷新统计')
