@@ -8,6 +8,16 @@ import {verifyBusinessNotificationConfiguration} from './message-notification-co
 import {verifyLicenseExpiryPresentation} from './license-expiry.e2e.mjs';
 const {chromium}=createRequire(new URL('../../../Microi.Client/package.json',import.meta.url))('playwright');
 
+export function browserProxyFromEnvironment(environment=process.env) {
+ const value=environment.https_proxy||environment.HTTPS_PROXY||environment.http_proxy||environment.HTTP_PROXY;
+ if(!value?.trim())return undefined;
+ let proxy;try{proxy=new URL(value);}catch{throw new Error('Invalid configured browser HTTP proxy');}
+ assert.ok(['http:','https:'].includes(proxy.protocol)&&!proxy.username&&!proxy.password
+  &&!proxy.search&&!proxy.hash&&proxy.pathname==='/', 'Invalid configured browser HTTP proxy');
+ // 浏览器与发布进程使用同一已配置代理；隔离测试 API 和前端始终直连。
+ return {server:proxy.origin,bypass:'localhost,127.0.0.1,[::1]'};
+}
+
 // 此专项使用真实登录和真实接口，只发送给测试账号本人；失败也撤回本次创建的规则。
 // 独立执行需 MICROI_TEST_ALLOW_WRITES=YES 及统一 FullStack 登录环境。
 async function runtime(page,Action,params={}) {
@@ -136,7 +146,7 @@ if(typeof process!=='undefined'&&process.argv[1]&&import.meta.url===pathToFileUR
  const required=name=>{const value=process.env[name]?.trim();if(!value)throw Error('需要 '+name);return value;};
  assert.equal(required('MICROI_TEST_ALLOW_WRITES'),'YES');
  const apiBase=required('MICROI_TEST_API_BASE'),tenant=required('MICROI_TEST_OSCLIENT');
- const browser=await chromium.launch({headless:true,...(process.platform==='win32'?{channel:'msedge'}:{})});
+ const browser=await chromium.launch({headless:true,...(process.platform==='win32'?{channel:'msedge'}:{}),proxy:browserProxyFromEnvironment()});
  try {
   const context=await browser.newContext({ignoreHTTPSErrors:new URL(apiBase).hostname==='localhost',viewport:{width:1440,height:1000}});
   const page=await context.newPage();page.setDefaultTimeout(30000);
