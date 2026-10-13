@@ -16,6 +16,8 @@ using Microi.net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -158,9 +160,12 @@ namespace Microi.net
         {
             if (sourceContext == null) throw new InvalidOperationException("SSO 协议原子缺少 HTTP 上下文。");
             parameters ??= new JObject();
-            var capture = await CreateCaptureContextAsync(sourceContext).ConfigureAwait(false);
-            _controllerContext = new ControllerContext { HttpContext = capture };
+            return await CaptureProtocolResponseAsync(
+                sourceContext, () => ExecuteProtocolOperationAsync(operation, parameters)).ConfigureAwait(false);
+        }
 
+        private async Task<IActionResult> ExecuteProtocolOperationAsync(string operation, JObject parameters)
+        {
             IActionResult actionResult;
             switch ((operation ?? string.Empty).Trim())
             {
@@ -280,7 +285,18 @@ namespace Microi.net
                 default:
                     throw new InvalidOperationException("不支持的 SSO 协议原子：" + operation);
             }
+            return actionResult;
+        }
 
+        // 协议处理与 MVC 执行共用这一捕获路径，真实响应仍由接口引擎事务成功后发布。
+        private async Task<JObject> CaptureProtocolResponseAsync(
+            HttpContext sourceContext, Func<Task<IActionResult>> actionFactory)
+        {
+            var capture = await CreateCaptureContextAsync(sourceContext).ConfigureAwait(false);
+            // RedirectResult 的真实 MVC 执行器需要 RouteData；补全独立上下文，不注册协议 Controller。
+            _controllerContext = new ControllerContext(
+                new ActionContext(capture, new RouteData(), new ControllerActionDescriptor()));
+            var actionResult = await actionFactory().ConfigureAwait(false);
             await actionResult.ExecuteResultAsync(_controllerContext).ConfigureAwait(false);
             capture.Response.Body.Position = 0;
             string body;
