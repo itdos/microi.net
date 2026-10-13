@@ -31,6 +31,8 @@
 - SAML：签名错、过期、Audience/Destination/InResponseTo 错、Request/Assertion 重放、错误证书、未授权 ACS。
 - CAS：ticket 重放、service 不同、过期 ticket、错误租户、CAS 失败响应。
 - 通用：跨租户连接、停用用户、停用连接、SSRF 私网/回环、访问密钥会话授权、匿名读取 `diy_sso`。
+- 公共 OIDC 客户端：已有 Provider Session 时分别验证缺失、none、其它 prompt；缺失/其它交互请求仍须逐次确认，`prompt=none` 仅返回 `interaction_required` 与已校验的 redirect/state，不能直接取得 code。机密客户端既有 Session 自动授权流程保持兼容。
+- 授权卡片：重复 Preview 均成功且不消费 RequestId，只返回白名单上下文；随后明确确认才能取得 code，再次确认失败。Preview/确认之间停用客户端、更换回调或收紧 Scope 必须即时拒绝；官方账号变化时 `ExpectedUserId` 不匹配必须拒绝。
 
 ## 结论措辞
 
