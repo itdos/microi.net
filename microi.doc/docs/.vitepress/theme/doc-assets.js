@@ -1861,6 +1861,20 @@ export const docAssets = Object.freeze([
     "bytes": 7624,
     "sha256": "7226ba2c8772077321ced06de661928842c9c3eaa884402794da0bb056324c8a",
     "mimeType": "image/webp"
+  },
+  {
+    "legacyPath": "/images/microi-agent-official-home-1.3.8.png",
+    "url": "https://file.microi.net/itdos/official-docs/images/6c27e653b8a68b6f4d5b09360f45863172c29b847be38f5ddcb125b57cb21db4/202610/microi-agent-official-home-1_3_8-original.png",
+    "bytes": 96273,
+    "sha256": "6c27e653b8a68b6f4d5b09360f45863172c29b847be38f5ddcb125b57cb21db4",
+    "mimeType": "image/png"
+  },
+  {
+    "legacyPath": "/images/microi-agent-eleven-role-group-1.3.8.png",
+    "url": "https://file.microi.net/itdos/official-docs/images/33b0c344000de33eee566bedb7df85930d109ddfc20367301205fe821ce6b86d/202610/microi-agent-eleven-role-group-1_3_8-original.png",
+    "bytes": 148337,
+    "sha256": "33b0c344000de33eee566bedb7df85930d109ddfc20367301205fe821ce6b86d",
+    "mimeType": "image/png"
   }
 ].map(asset => Object.freeze(asset)))
 
