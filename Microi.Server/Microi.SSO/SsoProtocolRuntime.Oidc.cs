@@ -261,6 +261,8 @@ namespace Microi.net
             string code_challenge_method,
             string prompt)
         {
+            SetNoStore();
+            // 授权跳转可能包含一次性 requestId/code，错误响应同样不能被浏览器或代理缓存。
             var tenant = ResolveAnonymousTenant(OsClient);
             if (tenant.Code != 1) return OidcError(null, state, "invalid_request", "tenant is invalid");
             var connection = await FindOutboundClientAsync(tenant.Data, "OIDC", client_id).ConfigureAwait(false);
