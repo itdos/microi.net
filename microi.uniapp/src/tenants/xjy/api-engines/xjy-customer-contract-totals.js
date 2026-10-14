@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: xjy-customer-contract-totals
- * Version: v1.1.0
+ * Version: v1.1.2
  * Function:
- * - 只读汇总客户合同金额；顶部租赁、买断和包年换芯均累加授权且符合筛选客户的已有金额，历史缺失只返回待核对提示，租赁和换芯按有效期开关切换，买断累计。
+ * - 只读汇总客户合同金额；PC和小程序按当前菜单权限及完整搜索条件累加已有金额，租赁和换芯支持有效期切换，买断始终累计；缺失金额附待核对项数，不清空合计、不回写业务数据。
  */
 
 var API_BASE = 'https://api.jifulii.com';
@@ -43,6 +43,10 @@ function readAuthorizedPage(table, menuId, where, page, headers, filters) {
   if (filters) {
     payload._Keyword = String(filters._Keyword || '');
     if (filters._SearchDateTime) payload._SearchDateTime = filters._SearchDateTime;
+    // PC 的列搜索和高级筛选与客户列表使用同一授权入口，不丢失任何统计范围条件。
+    if (filters._Search) payload._Search = filters._Search;
+    if (filters._SearchEqual) payload._SearchEqual = filters._SearchEqual;
+    if (filters._SearchNumber) payload._SearchNumber = filters._SearchNumber;
     payload._SelectFields = ['Id', 'Zhuangtai'];
   }
   if (menuId) payload._SysMenuId = menuId;
@@ -165,7 +169,9 @@ try {
   var customerIds, authorizedCustomers, statusCounts = Object.create(null);
   if (summaryMode) {
     var filters = V8.Param.Filters || {};
-    var validOnly = !(filters.ValidOnly === false || String(filters.ValidOnly) === 'false' || String(filters.ValidOnly) === '0');
+    // PC Hero保留顶层ParamMap，小程序使用Filters；明确的Filters参数优先兼容旧客户端。
+    var validity = filters.ValidOnly === undefined || filters.ValidOnly === null ? V8.Param.ValidOnly : filters.ValidOnly;
+    var validOnly = !(validity === false || String(validity) === 'false' || String(validity) === '0');
     var baseFilters = filters.BadgeFilters || filters;
     var summaryCustomers = readSummaryCustomers(customerMenuId, baseFilters, headers);
     statusCounts.All = summaryCustomers.length;

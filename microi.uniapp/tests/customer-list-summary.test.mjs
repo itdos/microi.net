@@ -71,6 +71,25 @@ test('关闭有效期包含过期与断约合同，买断保持累计', () => {
   assert.deepEqual(result.Data.Metrics, { rental: '350.30', buyout: '220.20', annualFilter: '35.03' })
 })
 
+test('PC 顶层有效期参数支持关闭，小程序 Filters 参数优先且默认仍开启', () => {
+  for (const ValidOnly of [false, 'false', 0, '0']) {
+    const { result } = execute({ Summary: true, SysMenuId: 'customer-menu', ValidOnly, Filters: {} })
+    assert.equal(result.Data.ValidOnly, false)
+    assert.equal(result.Data.Metrics.annualFilter, '35.03')
+    assert.equal(result.Data.Metrics.buyout, '220.20')
+  }
+  assert.equal(execute({ Summary: true, SysMenuId: 'customer-menu', ValidOnly: false, Filters: { ValidOnly: true } }).result.Data.ValidOnly, true)
+  assert.equal(execute({ Summary: true, SysMenuId: 'customer-menu', ValidOnly: true, Filters: { ValidOnly: false } }).result.Data.ValidOnly, false)
+  assert.equal(execute({ Summary: true, SysMenuId: 'customer-menu', Filters: {} }).result.Data.ValidOnly, true)
+})
+
+test('PC 文本、等值、时间和数值筛选全部传递至客户菜单授权查询', () => {
+  const filters = { _Search: { KehuMC: '学校' }, _SearchEqual: { FuzeRID: 'user1' }, _SearchNumber: { Renshu: { Min: 100, Max: 500 } }, _SearchDateTime: { CreateTime: ['2026-01-01', '2026-12-31'] } }
+  const { requests } = execute({ Summary: true, SysMenuId: 'customer-menu', Filters: filters })
+  for (const key of Object.keys(filters)) assert.deepEqual(requests[0][key], filters[key])
+  assert.equal(requests[0]._SysMenuId, 'customer-menu')
+})
+
 test('状态切换影响金额，角标保留全部状态，关键词/日期/高级筛选经过普通授权查询', () => {
   const filters = { SelectedStatus: '目标客户', _Keyword: '学校', _SearchDateTime: { CreateTime: ['2026-01-01', '2026-12-31'] }, _Where: [{ Name: 'FuzeRID', Type: '=', Value: 'user1' }] }
   const { result, requests } = execute({ Summary: true, SysMenuId: 'customer-menu', Filters: filters })
