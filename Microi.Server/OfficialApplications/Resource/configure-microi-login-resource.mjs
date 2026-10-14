@@ -104,26 +104,27 @@ function configureBinding(pkg, source) {
   const engine = pkg.SysApiEngines.find(item => item.ApiEngineKey === key);
   if (!engine || pkg.ResourcePolicies.ApiEngines[key]?.UpgradePolicy !== 'Managed') throw new Error('Microi 登录缺少官方托管绑定接口');
   engine.ApiV8Code = source;
-  engine.Version = 'v1.1.0';
-  const history = '2026-10-13 v1.1.0 支持 Microi 官方稳定主体绑定，保持可信协议、唯一绑定与未绑定拒绝边界。';
+  engine.Version = 'v1.1.1';
+  const history = '2026-10-14 v1.1.1 本人列表与解绑通过一次性可信宿主调用进入内部引擎，并在租户 Hook 前消费授权；保持 StopHttp、当前用户及绑定归属校验。';
   if (!String(engine.ChangeHistory || '').includes(history)) engine.ChangeHistory = `${history}\n${engine.ChangeHistory || ''}`;
   const capabilities = pkg.PackageInfo.RequiredPlatformCapabilities || [];
   pkg.PackageInfo.RequiredPlatformCapabilities = [...new Set([
     ...capabilities.filter(item => !String(item).startsWith(`ApiEngine:${key}@`)),
-    `ApiEngine:${key}@v1.1.0`,
+    `ApiEngine:${key}@v1.1.1`,
   ])];
 }
 
-function configureRelease(pkg, version, content) {
+function configureRelease(pkg, version, content, options = {}) {
   const info = pkg.PackageInfo;
   const selectedVersion = selectMonotonicPackageVersion(info.Version, version);
   // 较新包的发布元数据归其原有功能，不能被历史生成器降级或改写。
   if (selectedVersion === version) {
     info.Version = version;
-    info.ChangeLog = { Version: version, Title: 'Microi 官方账号登录与绑定', ChangeType: 'Feature', Content: content, ReleaseTime: releaseTime };
-    const line = `${releaseTime.slice(0, 10)} ${version} ${content}`;
+    const timestamp = options.releaseTime || releaseTime;
+    info.ChangeLog = { Version: version, Title: options.title || 'Microi 官方账号登录与绑定', ChangeType: options.changeType || 'Feature', Content: content, ReleaseTime: timestamp };
+    const line = `${timestamp.slice(0, 10)} ${version} ${content}`;
     if (Array.isArray(info.ChangeHistory)) {
-      if (!info.ChangeHistory.some(item => item.Version === version)) info.ChangeHistory.unshift({ Version: version, Date: releaseTime.slice(0, 10), Description: content });
+      if (!info.ChangeHistory.some(item => item.Version === version)) info.ChangeHistory.unshift({ Version: version, Date: timestamp.slice(0, 10), Description: content });
     } else if (!String(info.ChangeHistory || '').split(/\r?\n/).includes(line)) {
       info.ChangeHistory = `${line}\n${info.ChangeHistory || ''}`;
     }
@@ -145,7 +146,8 @@ export function configureMicroiLoginPackages(models, bindingSource) {
   configurePrivateTemplates(saas);
   configureBinding(saas, bindingSource);
   configureRelease(sysConfig, 'v8.4.9', '系统设置新增 Microi 登录能力与关闭入口开关，默认不启用；每个部署使用独立公共 ClientId、PKCE S256 与精确官方回调登记，无需 ClientSecret，保留已有租户配置。需同步更新平台前后端。');
-  configureRelease(saas, 'v8.4.21', '新增 Microi 官方登录的后端私有空配置模板并扩展可信外部身份绑定；不携带客户端实例、官方账号或用户绑定，不自动创建本地账号。系统设置列同步进入空库快照，需同步更新平台前后端。');
+  saas.PackageInfo.ServerMinVersion = selectMonotonicPackageVersion(saas.PackageInfo.ServerMinVersion, '8.5.10');
+  configureRelease(saas, 'v8.4.23', '修复外部账号列表和解绑被内部 StopHttp 边界阻断；已认证本人由可信宿主建立当前租户的一次性授权，并在租户 Hook 前消费。内部引擎仍禁止 HTTP，保留绑定归属校验，不携带客户端实例或用户绑定。需部署相应后端修复。', { releaseTime: '2026-10-14 14:25:00', title: '外部账号列表与解绑可信调用修复', changeType: 'Fix' });
   return models;
 }
 

@@ -83,6 +83,11 @@ Microi 登录让独立服务器部署的吾码使用在 [microi.net](https://mic
 
 官方端必须先部署支持 `Preview` 的新版后端，再发布官网授权页；旧后端会忽略该参数，把首屏预览当作完成授权并消费请求。
 
+外部账号列表与解绑需要后端 **8.5.10 或更高版本**，以及 **SaaS引擎 v8.4.23 或更高版本**。
+如果本人已登录，但个人中心提示“此接口已禁止http调用”，请配套升级后端与应用包；
+内部绑定接口 `platform-external-login-binding` 应保持 `StopHttp=1`，不要通过开放该接口绕过错误。
+公开入口验证本人 DiyToken 后，使用一次性内部协议授权调用绑定业务；租户 Hook 执行前该授权即已消费。
+
 官方端点固定为 `https://api.microi.net/sso/iTdos/authorize`、`/token`、`/userinfo`，
 此入口使用 OAuth 2.0 授权码、PKCE S256 与官方 UserInfo：官方服务校验客户端、精确回调、授权码期限和 verifier，
 本地后端校验一次性 state，再通过固定 HTTPS 端点兑换 Bearer Token、读取稳定 `sub` 并查找有效绑定。
