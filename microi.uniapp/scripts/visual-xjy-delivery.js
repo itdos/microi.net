@@ -340,6 +340,11 @@ const visualMenus = Object.entries(moduleRows).map(([tableName]) => ({
   MobileListFields: ({ Diy_Kehu: ['KehuMC', 'Zhuangtai', 'KehuLX', 'FuzeR'], Diy_Tenant: ['TenantName', 'LianxiR', 'LianxiRDH', 'Chengshi'] })[tableName] || [],
   CardTitleTagFields: [], CardBottomTagFields: [], DefaultOrderBy: 'CreateTime'
 }));
+// 客户列表视觉测试读取与平台配置同一份指标定义，验证真实协议而非前端硬编码指标。
+const customerListMetrics = JSON.parse(fs.readFileSync(path.join(root, 'profiles/xjy/metadata/customer-list-statistics.json'), 'utf8')).metrics;
+const customerVisualMenu = visualMenus.find(item => item.DiyTableName === 'Diy_Kehu');
+customerVisualMenu.ViewSchema = JSON.stringify({ SchemaVersion: '1.0', Views: [{ Key: 'customer:list', Scene: 'List', Device: 'All', Enabled: true,
+  Layout: { Hero: { Metrics: customerListMetrics }, Search: { StatusOptions: ['目标客户', '意向客户', '合作客户', '断约客户', '非目标客户'], PeriodField: 'CreateTime' } } }] });
 const visualRowsByTable = {
   diy_kehu: customerDetail, diy_shouhoudd: taskDetail, diy_dingdan: orderDetail,
   diy_kehusb: deviceDetail, diy_iot_device: moduleRows.diy_iot_device.rows[0], diy_tenant: merchantDetail, diy_xiansuo: leadDetail,
@@ -772,6 +777,7 @@ function httpJson(url) {
         try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
       });
     });
+    request.setTimeout(5000, () => request.destroy(new Error('Browser debugger HTTP request timed out')));
     request.once('error', reject);
   });
 }
@@ -817,8 +823,12 @@ function connectCdp(wsUrl) {
     socket.addEventListener('open', () => resolve({
       send(method, params = {}) {
         const messageId = ++id;
-        socket.send(JSON.stringify({ id: messageId, method, params }));
-        return new Promise((sendResolve, sendReject) => pending.set(messageId, { resolve: sendResolve, reject: sendReject }));
+        return new Promise((sendResolve, sendReject) => {
+          // 浏览器退出或调试协议失联必须结束测试，不能无限占用测试进程。
+          const timer = setTimeout(() => { pending.delete(messageId); sendReject(new Error(`Browser command timed out: ${method}`)); }, 20000);
+          pending.set(messageId, { resolve: value => { clearTimeout(timer); sendResolve(value); }, reject: error => { clearTimeout(timer); sendReject(error); } });
+          socket.send(JSON.stringify({ id: messageId, method, params }));
+        });
       },
       on(method, listener) {
         const items = listeners.get(method) || [];
@@ -844,6 +854,22 @@ function connectCdp(wsUrl) {
   });
 }
 
+async function inspectCustomerListSummary(cdp) {
+  await waitForExpression(cdp, `document.querySelector('.status-item__badge')?.innerText === '45' && document.querySelectorAll('.summary-metric').length === 4`);
+  const evaluate = async expression => (await cdp.send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+  const before = await evaluate(`({ checked: document.querySelector('.customer-valid-switch').getAttribute('aria-checked'),
+    labels: [...document.querySelectorAll('.summary-metric__label')].map(node => node.innerText),
+    values: [...document.querySelectorAll('.summary-metric__value')].map(node => node.innerText),
+    badges: [...document.querySelectorAll('.status-item__badge')].map(node => node.innerText) })`);
+  if (before.checked !== 'true' || JSON.stringify(before.labels) !== JSON.stringify(['租赁总价', '买断总价', '包年换芯总价', '预期交易金额']) || before.badges.some(value => !/^\d+$/.test(value))) fail(`客户统计默认状态不正确: ${JSON.stringify(before)}`);
+  await evaluate(`document.querySelector('.customer-valid-switch').click()`);
+  await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'false' && document.querySelector('.summary-metric__value').innerText.includes('23.8')`);
+  const after = await evaluate(`[...document.querySelectorAll('.summary-metric__value')].map(node => node.innerText)`);
+  if (before.values[0] === after[0] || before.values[2] === after[2] || before.values[1] !== after[1] || before.values[3] !== after[3]) fail(`客户有效期开关口径不正确: ${JSON.stringify({before, after})}`);
+  await evaluate(`document.querySelector('.customer-valid-switch').click()`);
+  await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'true' && document.querySelector('.summary-metric__value').innerText.includes('12.8')`);
+}
+
 function parsePostData(value) {
   if (!value) return {};
   try { return JSON.parse(value); } catch (error) {}
@@ -864,6 +890,8 @@ function buildMockResponse(request) {
     return { Code: 1, Data: { TaskDeviceCounts: Object.fromEntries(body.TaskCardIds.map(id => [id, 2])) } };
   }
   if (apiEngineKey === 'xjy-customer-contract-totals') {
+    if (body.Summary === true) return { Code: 1, Data: { Metrics: { rental: body.Filters?.ValidOnly === false ? '238000.00' : '128000.00', buyout: '68000.00', annualFilter: body.Filters?.ValidOnly === false ? '16800.00' : '6800.00' },
+      StatusCounts: { All: 45, 目标客户: 10, 意向客户: 5, 合作客户: 30 }, IncompleteMetrics: {} } };
     if (!body.CustomerSysMenuId || !Array.isArray(body.CustomerIds) || !body.CustomerIds.length) return { Code: 0, Msg: '测试合同金额请求缺少客户菜单或客户编号' };
     return visualCustomerContractTotals(body.CustomerIds);
   }
@@ -1902,6 +1930,7 @@ async function main() {
         const layout = await inspectLayout(cdp, target, viewport);
         const waterMotion = await verifyHeroVideo(cdp, target);
         const customerContractTotals = await inspectCustomerContractTotals(cdp, target);
+        if (target.name === 'customers') await inspectCustomerListSummary(cdp);
         const deviceIoTActions = await inspectDeviceIoTActions(cdp, target);
         const fileName = `${target.name}-${viewport.name}.png`;
         const screenshotPath = path.join(outputRoot, fileName);
