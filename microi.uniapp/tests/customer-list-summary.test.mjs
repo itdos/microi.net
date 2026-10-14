@@ -135,6 +135,15 @@ test('客户端显示已有买断合计，金额异常仅附提示，不用横�
   assert.match(result.warning, /买断.*1项.*待核对/)
 })
 
+test('客户端保留租赁与换芯已获取金额，并明确提示合计不含缺失项', async () => {
+  const result = await loadCustomerListSummary({ menuId: 'customer-menu', validOnly: false, run: async () => ({ Code: 1, Data: { Metrics: { rental: '200.00', buyout: '9000.00', annualFilter: '1520.00' }, StatusCounts: { All: 2 }, IncompleteMetrics: { rental: 2, annualFilter: 1 } } }) })
+  assert.equal(result.metrics.rental, '200.00')
+  assert.equal(result.metrics.annualFilter, '1520.00')
+  assert.match(result.warning, /租赁2项待核对，合计仅含已获取金额/)
+  assert.match(result.warning, /换芯1项待核对，合计仅含已获取金额/)
+  assert.equal(result.statusCounts.All, 2)
+})
+
 test('统计客户端单次调用且传递有效期、快捷状态与基础筛选', async () => {
   const calls = []
   const result = await loadCustomerListSummary({ menuId: 'customer-menu', validOnly: false, selectedStatus: '目标客户', filters: { _Keyword: '学校' }, run: async (key, params) => {
@@ -207,8 +216,11 @@ function executeProductSql(product, params = { Summary: true, SysMenuId: 'custom
     database.exec('CREATE TABLE Diy_Dingdan (Id TEXT,KehuID TEXT,DingdanZT TEXT,HetongZT TEXT,HetongKSSJ TEXT,HetongJSSJ TEXT,IsDeleted INTEGER); CREATE TABLE Diy_DingdanSP (Id TEXT,DingdanID TEXT,HezuoFS TEXT,HezuoFSZ TEXT,Zongjia REAL,LvxinZJ REAL,ShebeiSJDJ REAL,Shuliang INTEGER,ShijiJG REAL,IsDeleted INTEGER)')
     const insertOrder = database.prepare('INSERT INTO Diy_Dingdan VALUES (?,?,?,?,?,?,0)')
     for (const order of orders) insertOrder.run(order.Id, order.KehuID, order.DingdanZT, order.HetongZT, order.HetongKSSJ, order.HetongJSSJ)
-    const values = { Id: 'p1', DingdanID: 'o1', HezuoFS: '买断+包年换芯', HezuoFSZ: '4', Zongjia: null, LvxinZJ: 1020, ShebeiSJDJ: 4500, Shuliang: 2, ShijiJG: 9600, ...product }
-    database.prepare('INSERT INTO Diy_DingdanSP VALUES (?,?,?,?,?,?,?,?,?,0)').run(...['Id','DingdanID','HezuoFS','HezuoFSZ','Zongjia','LvxinZJ','ShebeiSJDJ','Shuliang','ShijiJG'].map(key => values[key]))
+    const insertProduct = database.prepare('INSERT INTO Diy_DingdanSP VALUES (?,?,?,?,?,?,?,?,?,0)')
+    for (const item of Array.isArray(product) ? product : [product]) {
+      const values = { Id: 'p1', DingdanID: 'o1', HezuoFS: '买断+包年换芯', HezuoFSZ: '4', Zongjia: null, LvxinZJ: 1020, ShebeiSJDJ: 4500, Shuliang: 2, ShijiJG: 9600, ...item }
+      insertProduct.run(...['Id','DingdanID','HezuoFS','HezuoFSZ','Zongjia','LvxinZJ','ShebeiSJDJ','Shuliang','ShijiJG'].map(key => values[key]))
+    }
     return execute(params, { query: (sql, bindings) => database.prepare(sql).all(bindings) }).result
   } finally { database.close() }
 }
@@ -238,4 +250,37 @@ test('设备单价或数量也缺失时附带待核对提示，不使用含耗�
     assert.equal(result.Data.Metrics.buyout, '0.00')
     assert.equal(result.Data.IncompleteMetrics.buyout, 1)
   }
+})
+
+test('关闭有效期后历史换芯金额缺失不清空合计，已知过期和断约金额正常累加', () => {
+  const products = [
+    { Id: 'current', DingdanID: 'o1', LvxinZJ: 1020 },
+    { Id: 'expired', DingdanID: 'o2', LvxinZJ: 500 },
+    { Id: 'terminated-missing', DingdanID: 'o3', Zongjia: 31800, LvxinZJ: null }
+  ]
+  const current = executeProductSql(products)
+  const all = executeProductSql(products, { Summary: true, SysMenuId: 'customer-menu', Filters: { ValidOnly: false } })
+  assert.equal(current.Code, 1)
+  assert.equal(all.Code, 1)
+  assert.equal(current.Data.Metrics.annualFilter, '1020.00')
+  assert.equal(all.Data.Metrics.annualFilter, '1520.00')
+  assert.ok(Number(all.Data.Metrics.annualFilter) >= Number(current.Data.Metrics.annualFilter))
+  assert.equal(current.Data.IncompleteMetrics.annualFilter, 0)
+  assert.equal(all.Data.IncompleteMetrics.annualFilter, 1)
+  assert.equal(all.Data.Metrics.buyout, current.Data.Metrics.buyout)
+  const restricted = executeProductSql(products, { Summary: true, SysMenuId: 'customer-menu', Filters: { ValidOnly: false, SelectedStatus: '合作客户' } })
+  assert.equal(restricted.Data.Metrics.annualFilter, '1520.00')
+  assert.equal(restricted.Data.IncompleteMetrics.annualFilter, 0)
+})
+
+test('历史租赁缺失金额也只附提示，已有金额仍累加；全缺失时明确标记不完整', () => {
+  const result = executeProductSql([
+    { Id: 'known-rental', DingdanID: 'o1', HezuoFS: '租赁', Zongjia: 200 },
+    { Id: 'missing-rental', DingdanID: 'o2', HezuoFS: '租赁', Zongjia: null }
+  ], { Summary: true, SysMenuId: 'customer-menu', Filters: { ValidOnly: false } })
+  assert.equal(result.Data.Metrics.rental, '200.00')
+  assert.equal(result.Data.IncompleteMetrics.rental, 1)
+  const missing = executeProductSql({ LvxinZJ: null })
+  assert.equal(missing.Data.Metrics.annualFilter, '0.00')
+  assert.equal(missing.Data.IncompleteMetrics.annualFilter, 1)
 })

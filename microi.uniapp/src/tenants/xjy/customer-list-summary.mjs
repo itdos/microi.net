@@ -14,11 +14,12 @@ export async function loadCustomerListSummary({ menuId, filters = {}, selectedSt
   const warnings = []
   if (!metrics || !statusCounts || !Number.isInteger(statusCounts.All) || statusCounts.All < 0) throw new Error('客户统计响应不完整')
   for (const key of ['rental', 'buyout', 'annualFilter']) {
-    if (key === 'buyout' && metrics[key] !== null && Number.isInteger(incomplete[key]) && incomplete[key] > 0) {
-      warnings.push(`买断${incomplete[key]}项待核对，合计仅含已获取金额`)
+    const label = { rental: '租赁', buyout: '买断', annualFilter: '换芯' }[key]
+    if (metrics[key] !== null && Number.isInteger(incomplete[key]) && incomplete[key] > 0) {
+      warnings.push(`${label}${incomplete[key]}项待核对，合计仅含已获取金额`)
     }
     if (metrics[key] === null && Number.isInteger(incomplete[key]) && incomplete[key] > 0) {
-      warnings.push(`${{ rental: '租赁', buyout: '买断', annualFilter: '换芯' }[key]}${incomplete[key]}项金额待核对`)
+      warnings.push(`${label}${incomplete[key]}项金额待核对`)
       metrics[key] = '-'
       continue
     }

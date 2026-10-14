@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: xjy-customer-contract-totals
- * Version: v1.0.8
+ * Version: v1.1.0
  * Function:
- * - 只读汇总客户卡片合同金额。顶部买断直接累加客户菜单权限与当前筛选范围内全部客户的Buyout.All，包括零值；缺失金额仅返回待核对提示，不把整项合计设为空。租赁和换芯支持有效期切换，历史买断空总价按完整设备单价乘数量兼容计算，不回写业务数据。
+ * - 只读汇总客户合同金额；顶部租赁、买断和包年换芯均累加授权且符合筛选客户的已有金额，历史缺失只返回待核对提示，租赁和换芯按有效期开关切换，买断累计。
  */
 
 var API_BASE = 'https://api.jifulii.com';
@@ -265,10 +265,10 @@ try {
   }
   if (summaryMode) {
     var scope = validOnly ? 'Current' : 'All';
-    // 顶部买断仅累加同一客户卡片契约的Buyout.All，包含全量授权客户及零值。
+    // 顶部金额累加同一客户卡片契约的对应金额，包含全量授权客户及零值。
     // 已获取金额继续显示；缺失记录的数量另行返回提示，不用空值覆盖整项合计。
     return { Code: 1, Data: {
-      Metrics: { rental: invalidMetrics.rental ? null : sumMoney(customers, 'Rental', scope), buyout: sumMoney(customers, 'Buyout', 'All'), annualFilter: invalidMetrics.annualFilter ? null : sumMoney(customers, 'AnnualFilter', scope) },
+      Metrics: { rental: sumMoney(customers, 'Rental', scope), buyout: sumMoney(customers, 'Buyout', 'All'), annualFilter: sumMoney(customers, 'AnnualFilter', scope) },
       IncompleteMetrics: invalidMetrics,
       BuyoutCustomerCount: customerIds.length,
       StatusCounts: statusCounts, AsOf: today, ValidOnly: validOnly,

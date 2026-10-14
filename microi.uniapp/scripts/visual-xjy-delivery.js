@@ -866,8 +866,12 @@ async function inspectCustomerListSummary(cdp) {
   await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'false' && document.querySelector('.summary-metric__value').innerText.includes('23.8')`);
   const after = await evaluate(`[...document.querySelectorAll('.summary-metric__value')].map(node => node.innerText)`);
   if (before.values[0] === after[0] || before.values[2] === after[2] || before.values[1] !== after[1] || before.values[3] !== after[3]) fail(`客户有效期开关口径不正确: ${JSON.stringify({before, after})}`);
+  const warning = await evaluate(`document.querySelector('.customer-statistics-hint').innerText`);
+  if (!after[2].includes('1.68') || warning !== '换芯1项待核对，合计仅含已获取金额') fail(`历史换芯缺失不应覆盖已有合计: ${JSON.stringify({ after, warning })}`);
   await evaluate(`document.querySelector('.customer-valid-switch').click()`);
   await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'true' && document.querySelector('.summary-metric__value').innerText.includes('12.8')`);
+  const restoredHint = await evaluate(`document.querySelector('.customer-statistics-hint').innerText`);
+  if (restoredHint !== '买断按全部合同累计') fail(`切回有效期后残留历史金额提示: ${restoredHint}`);
 }
 
 function parsePostData(value) {
@@ -891,7 +895,7 @@ function buildMockResponse(request) {
   }
   if (apiEngineKey === 'xjy-customer-contract-totals') {
     if (body.Summary === true) return { Code: 1, Data: { Metrics: { rental: body.Filters?.ValidOnly === false ? '238000.00' : '128000.00', buyout: '68000.00', annualFilter: body.Filters?.ValidOnly === false ? '16800.00' : '6800.00' },
-      StatusCounts: { All: 45, 目标客户: 10, 意向客户: 5, 合作客户: 30 }, IncompleteMetrics: {} } };
+      StatusCounts: { All: 45, 目标客户: 10, 意向客户: 5, 合作客户: 30 }, IncompleteMetrics: { annualFilter: body.Filters?.ValidOnly === false ? 1 : 0 } } };
     if (!body.CustomerSysMenuId || !Array.isArray(body.CustomerIds) || !body.CustomerIds.length) return { Code: 0, Msg: '测试合同金额请求缺少客户菜单或客户编号' };
     return visualCustomerContractTotals(body.CustomerIds);
   }
