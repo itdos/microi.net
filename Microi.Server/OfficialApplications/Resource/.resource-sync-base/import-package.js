@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.10
+ * Version: v3.0.11
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
@@ -36,10 +36,20 @@ function isEmptySharedTablePrerequisite(dataSet) {
 
 // RUNTIME_APPROVAL_DATASET_DENY_V1：表结构可由官方包安装，授权数据不可由任何安装包种入。
 function validateRuntimeApprovalData(packageModel) {
+    var auditMetadata = [packageModel.DiyTables || [], packageModel.DiyFields || []];
+    for (var auditKind = 0; auditKind < auditMetadata.length; auditKind++) {
+        for (var auditIndex = 0; auditIndex < auditMetadata[auditKind].length; auditIndex++) {
+            var auditResource = auditMetadata[auditKind][auditIndex] || {};
+            if (String(auditResource.TableName || auditResource.Name || '').toLowerCase() === 'mci_app_stream_gate_transition')
+                throw new Error('应用流式发布审计台账禁止创建可写 DIY 元数据');
+        }
+    }
     var sets = (packageModel || {}).DataSets || [];
     if (typeof sets === 'string') sets = JSON.parse(sets);
     for (var i = 0; i < sets.length; i++) {
         var dataSet = sets[i] || {};
+        if (String(dataSet.TableName || '').toLowerCase() === 'mci_app_stream_gate_transition')
+            throw new Error('应用流式发布门禁审计数据禁止通过应用包新增、更新或恢复');
         if (String(dataSet.TableName || '').toLowerCase() === 'mci_runtime_installation'
             && !isEmptySharedTablePrerequisite(dataSet))
             throw new Error('后台规则审批数据禁止通过应用包新增、更新或恢复；只允许严格零行依赖。');
@@ -5494,6 +5504,67 @@ try {
         return rows && rows.length > 0 && getScalarCount(rows[0], ['ObjectCount', 'OBJECTCOUNT', 'objectcount']) > 0;
     };
 
+    // PACKAGE_DECLARED_INDEX_DEFINITION_V1：同名索引不能证明唯一性、键列顺序
+    // 和 SQL Server 的 NULL 过滤条件符合当前声明，必须独立读取物理定义。
+    var declaredPackageIndex = function (tableName, indexName) {
+        var matches = [];
+        for (var indexDefinition = 0; indexDefinition < allDdlStatements.length; indexDefinition++) {
+            var item = allDdlStatements[indexDefinition];
+            var info = classifyDdlStatement(item.DDL, item.TableName);
+            if (info.Kind == 'index' && String(info.TableName).toLowerCase() == tableName.toLowerCase()
+                && String(info.IndexName).toLowerCase() == indexName.toLowerCase()) matches.push(item);
+        }
+        if (matches.length > 1) throw new Error('应用包索引存在重复声明：' + tableName + '.' + indexName);
+        if (!matches.length) return null;
+        var definition = matches[0], columnMatch = String(definition.DDL).match(/\(([^)]+)\)/);
+        if (!columnMatch) throw new Error('应用包索引缺少键列：' + tableName + '.' + indexName);
+        var columns = columnMatch[1].split(',').map(function (column) {
+            var name = String(column).replace(/[`"\[\]]/g, '').trim();
+            if (!isSafeIdentifier(name)) throw new Error('应用包索引仅支持完整升序键列：' + tableName + '.' + indexName);
+            return name;
+        });
+        var filter = definition.SqlServerFilterColumn;
+        if (filter !== undefined && (typeof filter != 'string' || !isSafeIdentifier(filter)
+            || columns.indexOf(filter) < 0)) throw new Error('SqlServerFilterColumn必须是声明索引的安全键列');
+        return { Columns: columns, Unique: /^\s*CREATE\s+UNIQUE\s+INDEX/i.test(definition.DDL)
+            || /\bADD\s+UNIQUE\s+(?:INDEX|KEY)\b/i.test(definition.DDL), Filter: filter || '' };
+    };
+
+    var requireDeclaredPackageIndexDefinition = function (tableName, indexName, expected) {
+        var sql = runtimeIsSqlServer
+            ? 'SELECT c.name AS ColumnName,ic.key_ordinal AS SeqInIndex,i.is_unique AS IsUnique,i.is_disabled AS IsDisabled,i.is_hypothetical AS IsHypothetical,'
+                + 'ic.is_descending_key AS IsDescending,ic.is_included_column AS IsIncluded,i.filter_definition AS FilterDefinition '
+                + 'FROM sys.indexes i INNER JOIN sys.tables t ON t.object_id=i.object_id '
+                + 'INNER JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id '
+                + 'INNER JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id '
+                + 'WHERE LOWER(t.name)=LOWER(@p0) AND LOWER(i.name)=LOWER(@p1) ORDER BY ic.key_ordinal'
+            : 'SELECT COLUMN_NAME AS ColumnName,SEQ_IN_INDEX AS SeqInIndex,NON_UNIQUE AS NonUnique,'
+                + 'SUB_PART AS SubPart,INDEX_TYPE AS IndexType,COLLATION AS SortOrder '
+                + 'FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=DATABASE() '
+                + 'AND LOWER(TABLE_NAME)=LOWER(@p0) AND LOWER(INDEX_NAME)=LOWER(@p1) ORDER BY SEQ_IN_INDEX';
+        var rows = V8.Db.FromSql(sql).AddInParameter('@p0', tableName).AddInParameter('@p1', indexName).ToArray();
+        var valid = rows && rows.length == expected.Columns.length;
+        var expectedFilter = expected.Filter ? (expected.Filter + 'ISNOTNULL').toUpperCase() : '';
+        for (var keyIndex = 0; valid && keyIndex < rows.length; keyIndex++) {
+            var row = rows[keyIndex];
+            valid = Number(row.SeqInIndex) == keyIndex + 1
+                && String(row.ColumnName || '').toLowerCase() == expected.Columns[keyIndex].toLowerCase();
+            if (runtimeIsSqlServer) {
+                var actualFilter = String(row.FilterDefinition || '').replace(/[\[\]"`\s()]/g, '').toUpperCase();
+                valid = valid && Number(row.IsUnique) == (expected.Unique ? 1 : 0)
+                    && Number(row.IsDisabled) == 0 && Number(row.IsHypothetical) == 0
+                    && Number(row.IsDescending) == 0 && Number(row.IsIncluded) == 0 && actualFilter == expectedFilter;
+            } else {
+                valid = valid && Number(row.NonUnique) == (expected.Unique ? 0 : 1)
+                    && (row.SubPart === null || row.SubPart === undefined)
+                    && String(row.IndexType || '').toUpperCase() == 'BTREE'
+                    && String(row.SortOrder || 'A').toUpperCase() == 'A';
+            }
+        }
+        if (!valid) throw new Error('应用包索引定义冲突：' + tableName + '.' + indexName
+            + '；请核对历史索引，安装器不会覆盖或删除现有索引与业务数据');
+    };
+
     var ddlIndexExists = function (tableName, indexName) {
         if (!isSafeIdentifier(tableName) || !isSafeIdentifier(indexName)) return false;
         var indexExistsSql = runtimeIsSqlServer
@@ -5505,7 +5576,10 @@ try {
         var rows = V8.Db.FromSql(indexExistsSql).AddInParameter('@p0', tableName)
             .AddInParameter('@p1', indexName)
             .ToArray();
-        return rows && rows.length > 0 && getScalarCount(rows[0], ['ObjectCount', 'OBJECTCOUNT', 'objectcount']) > 0;
+        var exists = rows && rows.length > 0 && getScalarCount(rows[0], ['ObjectCount', 'OBJECTCOUNT', 'objectcount']) > 0;
+        var expected = declaredPackageIndex(tableName, indexName);
+        if (exists && expected) requireDeclaredPackageIndexDefinition(tableName, indexName, expected);
+        return exists;
     };
 
     // MySQL 严格模式不允许把历史 varchar 空字符串直接改成 int/decimal。
@@ -5953,6 +6027,12 @@ try {
         var tables = Package.DiyTables || [];
         for (var tableIndex = 0; tableIndex < tables.length; tableIndex++) {
             if (String(tables[tableIndex].Name || tables[tableIndex].TableName || '').toLowerCase() == expected) return true;
+        }
+        // 安全台账故意不提供可写的 DIY 元数据，归属由固定物理建表声明证明。
+        if (expected == 'mci_app_stream_gate_transition') {
+            return (Package.DDLStatements || []).some(function (item) {
+                return String(item.TableName).toLowerCase() == expected && /^\s*CREATE\s+TABLE\b/i.test(item.DDL);
+            });
         }
         return false;
     };
@@ -6577,10 +6657,12 @@ try {
             }
             var isUniqueIndex = /^\s*CREATE\s+UNIQUE\s+INDEX/i.test(ddlText)
                 || /\bADD\s+UNIQUE\s+(?:INDEX|KEY)\b/i.test(ddlText);
+            var declaredIndex = declaredPackageIndex(ddlInfo.TableName, ddlInfo.IndexName);
             V8.Db.FromSql(
                 'CREATE ' + (isUniqueIndex ? 'UNIQUE ' : '') + 'INDEX '
                 + quotePhysicalIdentifier(ddlInfo.IndexName) + ' ON '
                 + quotePhysicalIdentifier(ddlInfo.TableName) + ' (' + indexColumns.join(',') + ')'
+                + (declaredIndex && declaredIndex.Filter ? ' WHERE ' + quotePhysicalIdentifier(declaredIndex.Filter) + ' IS NOT NULL' : '')
             ).ExecuteNonQuery();
             return;
         }
@@ -6693,6 +6775,12 @@ try {
 
         var ddlInfo = classifyDdlStatement(ddlItem.DDL, ddlItem.TableName);
         ensureDeclaredIndexTable(ddlInfo);
+        // 旧租户的表可能尚无 V3 索引列；先按当前包补齐声明列，再建立可选门禁索引。
+        if (ddlInfo.Kind == 'index' && ddlItem.ApplicationStreamGateContract === true) {
+            var gateIndexTables = {};
+            gateIndexTables[String(ddlInfo.TableName).toLowerCase()] = true;
+            syncPhysicalColumnsFromPackage(gateIndexTables);
+        }
         var ddlLogKey = ddlInfo.TableName + (ddlInfo.IndexName ? '_' + ddlInfo.IndexName : '_' + i);
         var alreadyExists = ddlInfo.Kind == 'table'
             ? ddlTableExists(ddlInfo.TableName)
@@ -10336,7 +10424,8 @@ try {
         'sys_role': true, 'sys_rolelimit': true, 'sys_osclients': true,
         'sys_config': true, 'sys_apiengine': true, 'sys_token': true,
         'sys_userlogin': true, 'sys_microistore': true,
-        'mci_runtime_installation': true // 后台代码审批是独立可信动作，禁止应用数据包种入/恢复授权。
+        'mci_runtime_installation': true, // 后台代码审批是独立可信动作，禁止应用数据包种入/恢复授权。
+        'mci_app_stream_gate_transition': true
     };
     var isSafeDataTableName = function (name) {
         return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(name || ''));
