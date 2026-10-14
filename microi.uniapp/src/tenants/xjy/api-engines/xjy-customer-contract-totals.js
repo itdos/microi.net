@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: xjy-customer-contract-totals
- * Version: v1.0.4
+ * Version: v1.0.6
  * Function:
- * - 只读批量汇总当前账号可见客户的合同商品金额。CustomerIds最多50项用于卡片；Summary=true按客户菜单和Filters汇总列表金额与状态数量，默认仅有效期内租赁/换芯，买断始终累计。历史缺失金额只使对应列表指标不可用，状态与其它完整指标照常返回；客户卡片继续严格校验。
+ * - 只读批量汇总授权客户的合同商品金额，支持客户卡片与列表总价、状态角标和有效期筛选。历史买断总价为空时按完整的设备实际单价乘数量计算（已有总价与零价优先，不包含耗材、不回写合同）。缺少单价或数量时仅对应列表指标待核对；客户卡片保持完整金额校验。
  */
 
 var API_BASE = 'https://api.jifulii.com';
@@ -223,6 +223,10 @@ try {
     var current = currentIds.length ? 'x.DingdanID IN (' + placeholders(currentIds, bindings) + ')' : '1=0';
     // 标签优先；仅标签为空时兼容当前租户真实字典 1/2/3/4/5/ShiJi。
     var kind = "CASE WHEN TRIM(COALESCE(p.HezuoFS,''))<>'' THEN TRIM(p.HezuoFS) WHEN p.HezuoFSZ='1' THEN '买断' WHEN p.HezuoFSZ='2' THEN '租赁' WHEN p.HezuoFSZ='3' THEN '包年换芯' WHEN p.HezuoFSZ='4' THEN '买断+包年换芯' WHEN p.HezuoFSZ='5' THEN '赠送' WHEN p.HezuoFSZ='ShiJi' THEN '试机' ELSE '未知合作方式' END";
+    // 历史买断商品有保存总价为空、实际设备单价和数量完整的记录。
+    // 依照字段定义在decimal SQL中还原设备金额，保留已有总价（包括0）；
+    // ShijiJG含耗材，不能替代设备单价，也不能使用整份订单金额填补商品金额。
+    var equipmentTotal = "CASE WHEN p.Zongjia IS NOT NULL THEN p.Zongjia WHEN (" + kind + ") IN ('买断','买断+包年换芯') AND p.ShebeiSJDJ IS NOT NULL AND p.Shuliang IS NOT NULL AND p.ShebeiSJDJ>=0 AND p.Shuliang>=0 THEN ROUND(p.ShebeiSJDJ*p.Shuliang,2) ELSE NULL END";
     var sql = "SELECT x.KehuID," +
       "SUM(CASE WHEN x.Kind='租赁' THEN x.Zongjia ELSE 0 END) AS RentalAll," +
       "SUM(CASE WHEN x.Kind='租赁' AND (" + current + ") THEN x.Zongjia ELSE 0 END) AS RentalCurrent," +
@@ -237,7 +241,7 @@ try {
       "SUM(CASE WHEN x.Kind NOT IN ('租赁','买断','包年换芯','买断+包年换芯','赠送','试机') AND (" + current + ") THEN 1 ELSE 0 END) AS UnknownCurrentCount," +
       "SUM(CASE WHEN x.Kind NOT IN ('租赁','买断','包年换芯','买断+包年换芯','赠送','试机') THEN 1 ELSE 0 END) AS UnknownCount," +
       "SUM(CASE WHEN (x.Kind IN ('租赁','买断','买断+包年换芯') AND x.Zongjia IS NULL) OR (x.Kind IN ('包年换芯','买断+包年换芯') AND x.LvxinZJ IS NULL) THEN 1 ELSE 0 END) AS MissingAmountCount " +
-      "FROM (SELECT o.KehuID,p.DingdanID,p.Zongjia,p.LvxinZJ," + kind + " AS Kind FROM Diy_DingdanSP p INNER JOIN Diy_Dingdan o ON o.Id=p.DingdanID WHERE COALESCE(p.IsDeleted,0)=0 AND COALESCE(o.IsDeleted,0)=0 AND o.Id IN (" + allowedIn + ") AND o.KehuID IN (" + relatedIn + ") AND o.DingdanZT IN ('已审批','已到期')) x GROUP BY x.KehuID";
+      "FROM (SELECT o.KehuID,p.DingdanID," + equipmentTotal + " AS Zongjia,p.LvxinZJ," + kind + " AS Kind FROM Diy_DingdanSP p INNER JOIN Diy_Dingdan o ON o.Id=p.DingdanID WHERE COALESCE(p.IsDeleted,0)=0 AND COALESCE(o.IsDeleted,0)=0 AND o.Id IN (" + allowedIn + ") AND o.KehuID IN (" + relatedIn + ") AND o.DingdanZT IN ('已审批','已到期')) x GROUP BY x.KehuID";
     var totals = queryRows(sql, bindings);
     var seenCustomers = Object.create(null);
     for (var t = 0; t < totals.length; t++) {

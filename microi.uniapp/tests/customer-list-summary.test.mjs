@@ -4,6 +4,7 @@ import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { DatabaseSync } from 'node:sqlite'
 import { loadCustomerListSummary } from '../src/tenants/xjy/customer-list-summary.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -36,6 +37,7 @@ function execute(params, options = {}) {
       const bindings = {}
       const query = { AddInParameter: (name, value) => { bindings[name] = value; return query }, ToArray: () => {
         sqlCalls.push({ sql, bindings })
+        if (options.query) return options.query(sql, bindings)
         const selected = orders.filter(order => Object.values(bindings).includes(order.Id))
         if (sql.startsWith('SELECT o.Id')) return selected
         const currentMatch = sql.match(/x\.DingdanID IN \(([^)]+)\)/)
@@ -173,4 +175,44 @@ test('真实列表失败不保留旧统计，重试恢复零值角标和正确�
   await page.loadPlatformStatistics({}, 1)
   assert.equal(page.customerStatusCount('All'), 0)
   assert.equal(page.metricValues.rental, '0.00')
+})
+
+// 执行接口实际生成的聚合SQL，避免仅用替身金额掩盖历史空总价的兼容问题。
+function executeProductSql(product, params = { Summary: true, SysMenuId: 'customer-menu', Filters: {} }) {
+  const database = new DatabaseSync(':memory:')
+  try {
+    database.exec('CREATE TABLE Diy_Dingdan (Id TEXT,KehuID TEXT,DingdanZT TEXT,HetongZT TEXT,HetongKSSJ TEXT,HetongJSSJ TEXT,IsDeleted INTEGER); CREATE TABLE Diy_DingdanSP (Id TEXT,DingdanID TEXT,HezuoFS TEXT,HezuoFSZ TEXT,Zongjia REAL,LvxinZJ REAL,ShebeiSJDJ REAL,Shuliang INTEGER,ShijiJG REAL,IsDeleted INTEGER)')
+    const insertOrder = database.prepare('INSERT INTO Diy_Dingdan VALUES (?,?,?,?,?,?,0)')
+    for (const order of orders) insertOrder.run(order.Id, order.KehuID, order.DingdanZT, order.HetongZT, order.HetongKSSJ, order.HetongJSSJ)
+    const values = { Id: 'p1', DingdanID: 'o1', HezuoFS: '买断+包年换芯', HezuoFSZ: '4', Zongjia: null, LvxinZJ: 1020, ShebeiSJDJ: 4500, Shuliang: 2, ShijiJG: 9600, ...product }
+    database.prepare('INSERT INTO Diy_DingdanSP VALUES (?,?,?,?,?,?,?,?,?,0)').run(...['Id','DingdanID','HezuoFS','HezuoFSZ','Zongjia','LvxinZJ','ShebeiSJDJ','Shuliang','ShijiJG'].map(key => values[key]))
+    return execute(params, { query: (sql, bindings) => database.prepare(sql).all(bindings) }).result
+  } finally { database.close() }
+}
+
+test('历史买断总价为空时按不含耗材的设备实际单价乘数量计算，顶部和卡片一致', () => {
+  const summary = executeProductSql({})
+  assert.equal(summary.Code, 1)
+  assert.equal(summary.Data.Metrics.buyout, '9000.00')
+  assert.equal(summary.Data.Metrics.annualFilter, '1020.00')
+  assert.equal(summary.Data.IncompleteMetrics.buyout, 0)
+  const card = executeProductSql({}, { CustomerIds: ['c1'], CustomerSysMenuId: 'customer-menu' })
+  assert.equal(card.Code, 1)
+  assert.equal(card.Data.Customers.c1.Buyout.All, '9000.00')
+})
+
+test('已有设备总价及零价优先，不能被备用单价覆盖或再次乘数量', () => {
+  assert.equal(executeProductSql({ Zongjia: 8000 }).Data.Metrics.buyout, '8000.00')
+  assert.equal(executeProductSql({ Zongjia: 0 }).Data.Metrics.buyout, '0.00')
+  assert.equal(executeProductSql({ ShebeiSJDJ: 0 }).Data.Metrics.buyout, '0.00')
+  assert.equal(executeProductSql({ ShebeiSJDJ: 4500.125, Shuliang: 1 }).Data.Metrics.buyout, '4500.13')
+})
+
+test('设备单价或数量也缺失时仍待核对，不用含耗材的商品价格或订单总价替代', () => {
+  for (const product of [{ ShebeiSJDJ: null }, { Shuliang: null }, { Shuliang: -1 }]) {
+    const result = executeProductSql(product)
+    assert.equal(result.Code, 1)
+    assert.equal(result.Data.Metrics.buyout, null)
+    assert.equal(result.Data.IncompleteMetrics.buyout, 1)
+  }
 })
