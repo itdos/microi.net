@@ -1366,6 +1366,11 @@ export function createMicroiV8(options = {}) {
     return /\.(?:jpe?g|png|gif|bmp|webp)(?:$|[?#])/i.test(name);
   }
 
+  function isContentSecurityImageUpload(filePath, options = {}) {
+    // preview=false 只表示保留文件原件，不能让文件控件选择的图片脱离审核开关。
+    return isImageUpload(filePath, { ...options, preview: options.preview === true ? true : undefined });
+  }
+
   async function compressClientImage(filePath, options = {}) {
     const runtimeUni = getUni();
     if (!isWeChatMiniProgramRuntime() || options.clientCompress === false ||
@@ -1414,7 +1419,7 @@ export function createMicroiV8(options = {}) {
     );
     delete uploadData.path;
 
-    const isWeChatImage = isWeChatMiniProgramRuntime() && options.contentSecurity !== false && isImageUpload(filePath, options);
+    const isWeChatImage = isWeChatMiniProgramRuntime() && options.contentSecurity !== false && isContentSecurityImageUpload(filePath, options);
     const securityEnabled = isWeChatImage && (typeof imageSecurityPolicy === 'boolean'
       ? imageSecurityPolicy : await getImageContentSecurityPolicy());
     const requiresContentSecurity = isWeChatImage && securityEnabled;
@@ -1551,7 +1556,7 @@ export function createMicroiV8(options = {}) {
 
     let contentSecuritySessionId = String(options.contentSecuritySessionId || '');
     const hasWeChatImages = isWeChatMiniProgramRuntime() && options.contentSecurity !== false &&
-      entries.some((entry) => isImageUpload(entry.filePath, { ...options, file: entry.file, fileName: entry.fileName }));
+      entries.some((entry) => isContentSecurityImageUpload(entry.filePath, { ...options, file: entry.file, fileName: entry.fileName }));
     const imageSecurityPolicy = hasWeChatImages ? await getImageContentSecurityPolicy() : false;
     if (hasWeChatImages && imageSecurityPolicy && !contentSecuritySessionId) {
       try {
