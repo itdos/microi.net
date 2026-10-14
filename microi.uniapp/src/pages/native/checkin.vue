@@ -448,6 +448,42 @@ export default {
         if (failedCount) {
           uni.showToast({ title: `${failedCount} 张照片上传失败，请点击重试`, icon: 'none' })
         }
+        // 延后审核只结束文件传输；仍需后台读取结果，才能撤下本页的待审遮罩。
+        this.monitorPhotoReviews(batch)
+      }
+    },
+    async monitorPhotoReviews(batch) {
+      const reviews = batch.map((source) => this.photos.find((photo) => photo.clientId === source.clientId))
+        .filter((photo) => photo && photo.uploadState === 'checking' && photo.uploadedData && photo.uploadedData.ContentSecurityReviewId)
+        .map((photo) => ({ clientId: photo.clientId, reviewId: String(photo.uploadedData.ContentSecurityReviewId) }))
+      if (!reviews.length || !this.photoUploadActive) return
+      const currentPhoto = (review) => this.photos.find((photo) => photo.clientId === review.clientId &&
+        photo.uploadState === 'checking' && photo.uploadedData &&
+        String(photo.uploadedData.ContentSecurityReviewId) === review.reviewId)
+      try {
+        const response = await V8.waitForContentSecurityBatch(reviews.map((review) => review.reviewId), {
+          isCancelled: () => !this.photoUploadActive,
+          isReviewCancelled: (reviewId) => !reviews.some((review) => review.reviewId === reviewId && currentPhoto(review))
+        })
+        if (!this.photoUploadActive) return
+        const statuses = new Map((response.Items || []).map((item) => [String(item.ReviewId), String(item.Status)]))
+        for (const review of reviews) {
+          // 删除或重试可能保留同一个 clientId；还必须核对审核 Id，拒绝旧请求回写新照片。
+          const photo = currentPhoto(review)
+          if (!photo) continue
+          const returned = statuses.get(review.reviewId)
+          const status = ['Passed', 'Rejected', 'Error', 'Timeout'].includes(returned) ? returned : 'Error'
+          updateCheckinPhotoUploadState(photo, status, {
+            data: { ...photo.uploadedData, ContentSecurityStatus: status },
+            error: { Msg: status === 'Rejected' ? '照片未通过安全检测，请替换后重试' : '照片安全检测未完成，请重试' }
+          })
+        }
+      } catch (error) {
+        if (!this.photoUploadActive || (error && error.Cancelled)) return
+        for (const review of reviews) {
+          const photo = currentPhoto(review)
+          if (photo) updateCheckinPhotoUploadState(photo, 'error', { error })
+        }
       }
     },
     async ensurePhotoUploadsReady() {
