@@ -347,8 +347,11 @@ namespace Microi.net
                     item.Enabled,
                     Configured = item.Configured
                 }).ToList();
-            var result = await ManagedApiEngineCompatibility.RunAsync(
+            // 此调用进入 StopHttp 内部引擎；已验证的本人会话只获得当前租户的一次性宿主授权。
+            // List 在进入可编辑租户 Hook 前消费授权，不能把绑定协议权限留给嵌套脚本。
+            var result = await ManagedApiEngineCompatibility.RunTrustedProtocolAsync(
                 BindingApiEngineKey,
+                token.Data.OsClient,
                 new JObject
                 {
                     ["Action"] = "List",
@@ -363,8 +366,10 @@ namespace Microi.net
         {
             var token = await RequireUserTokenAsync().ConfigureAwait(false);
             if (token.Code != 1) return Json(token);
-            var rawResult = await ManagedApiEngineCompatibility.RunAsync(
+            // 解绑继续由接口引擎校验当前用户与绑定归属；这里仅建立不可伪造的内部调用上下文。
+            var rawResult = await ManagedApiEngineCompatibility.RunTrustedProtocolAsync(
                 BindingApiEngineKey,
+                token.Data.OsClient,
                 new JObject
                 {
                     ["Action"] = "Revoke",

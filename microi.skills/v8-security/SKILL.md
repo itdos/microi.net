@@ -32,6 +32,12 @@ Preview 和确认均重验当前客户端、回调及 Scope；账号变化通过
 先升级前后端和系统设置/SaaS 应用，再登记客户端并真实验证绑定、登录、解绑及隐藏入口。
 通用 MCP Schema、字段、私密配置、接口引擎与商城工具足够完成配置，无需新增 Microi 专用管理工具。
 
+外部账号的列表与解绑同样必须先验证本人 DiyToken，再由可信宿主以精确租户和 Managed Key
+调用 `RunTrustedProtocolAsync`；绑定业务在进入租户 Hook 前消费 `RequireManagedProtocolContext`。
+不能仅因已有 `CurrentUser` 就放开 StopHttp，也不能把尚未消费的协议授权交给可编辑 Hook。
+列表/解绑提示“此接口已禁止http调用”时，配套检查后端不低于 8.5.10、SaaS引擎不低于 v8.4.23，
+保持内部绑定接口 `StopHttp=1`，并验收匿名、伪造可信参数、跨用户解绑及 Hook 重入均被拒绝。
+
 微信网站扫码登录先读取当前租户能力、`WeChatLoginEnabled` 和私密设置元信息，
 再核对开放平台已审核网站应用的微信登录权限与授权回调域名。
 `Login.WeChat.ClientId` 保存 AppID，`Login.WeChat.ClientSecret` 通过专用密钥工具保存，

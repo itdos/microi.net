@@ -7,7 +7,7 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
-/* V8 ApiEngine | ApiEngineKey: platform-external-login-binding | Version: v1.1.0 */
+/* V8 ApiEngine | ApiEngineKey: platform-external-login-binding | Version: v1.1.1 */
 /* Security metadata: StopHttp=1, AllowAnonymous=0, Lock=1（阻止并发外部主体双绑） */
 
 var param = V8.Param || {};
@@ -93,6 +93,9 @@ function getBindingByUserProvider(userId, provider) {
 }
 
 if (action === 'List') {
+  // 本人会话由可信后端验证；在租户 Hook 前消费内部授权，禁止 Hook 借用其伪造 Bind。
+  var listTrust = requireTrustedProtocol();
+  if (listTrust) return listTrust;
   var listAuth = requireCurrentUser();
   if (listAuth) return listAuth;
   var currentUserId = text(V8.CurrentUser.Id, 100);
@@ -157,6 +160,8 @@ if (action === 'List') {
 }
 
 if (action === 'Revoke') {
+  var revokeTrust = requireTrustedProtocol();
+  if (revokeTrust) return revokeTrust;
   var revokeAuth = requireCurrentUser();
   if (revokeAuth) return revokeAuth;
   var revokeId = text(param.Id, 100);

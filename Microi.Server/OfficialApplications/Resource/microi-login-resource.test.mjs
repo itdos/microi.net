@@ -96,16 +96,22 @@ test('Microi client templates have no shared credential or public projection and
   assert.equal(microiRows.find(item => item.ConfigKey === 'Login.Microi.Scope').ConfigValue, 'openid profile email');
 });
 
-function runBinding(param, { currentUser = { Id: 'local-user' }, trusted = true, existing = null, databaseFailure = false } = {}) {
+function runBinding(param, { currentUser = { Id: 'local-user' }, trusted = true, existing = null, databaseFailure = false, hookReentry = false } = {}) {
   const writes = [];
   const reads = [];
   const hooks = [];
+  let protocolCalls = 0;
   const result = vm.runInNewContext(`(function(){${bindingSource}\n})()`, {
     DateNow: () => '2026-10-13 12:00:00',
     V8: {
       Param: param, CurrentUser: currentUser,
-      Method: { RequireManagedProtocolContext: () => ({ Code: trusted ? 1 : 0 }), NewGuid: () => 'new-binding' },
-      ApiEngine: { Run(key, value) { hooks.push({ key, value }); return { Code: 1 }; } },
+      Method: { RequireManagedProtocolContext: () => ({ Code: trusted && ++protocolCalls === 1 ? 1 : 0 }), NewGuid: () => 'new-binding' },
+      ApiEngine: { Run(key, value) {
+        const hook = { key, value, protocolAlreadyConsumed: protocolCalls === 1 };
+        if (hookReentry) hook.reentryCode = trusted && ++protocolCalls === 1 ? 1 : 0;
+        hooks.push(hook);
+        return { Code: 1 };
+      } },
       FormEngine: {
         GetTableData: () => ({ Code: 1, Data: [] }),
         GetFormData(table, query) {
@@ -119,8 +125,72 @@ function runBinding(param, { currentUser = { Id: 'local-user' }, trusted = true,
       },
     },
   });
-  return { result, reads, writes, hooks };
+  return { result, reads, writes, hooks, protocolCalls };
 }
+
+test('List and Revoke reject an untrusted caller before reading data or entering tenant hooks', () => {
+  for (const action of ['List', 'Revoke']) {
+    const attempt = runBinding({ Action: action, Id: 'owned-binding' }, { trusted: false });
+    assert.equal(attempt.result.Code, 0, action);
+    assert.equal(attempt.reads.length, 0, action);
+    assert.equal(attempt.writes.length, 0, action);
+    assert.equal(attempt.hooks.length, 0, action);
+  }
+});
+
+test('authenticated List and owned Revoke consume one host grant before tenant hooks', () => {
+  for (const action of ['List', 'Revoke']) {
+    const attempt = runBinding({ Action: action, Id: 'owned-binding' }, {
+      existing: { Id: 'owned-binding', ProviderKey: 'Microi', BoundUserId: 'local-user' },
+    });
+    assert.equal(attempt.result.Code, 1, action);
+    assert.equal(attempt.protocolCalls, 1, action);
+    assert.ok(attempt.hooks.length > 0, action);
+    assert.ok(attempt.hooks.every(hook => hook.protocolAlreadyConsumed), action);
+  }
+});
+
+test('a tenant hook cannot reuse the List or Revoke host grant for a nested binding operation', () => {
+  for (const action of ['List', 'Revoke']) {
+    const attempt = runBinding({ Action: action, Id: 'owned-binding' }, {
+      existing: { Id: 'owned-binding', ProviderKey: 'Microi', BoundUserId: 'local-user' }, hookReentry: true,
+    });
+    assert.equal(attempt.result.Code, 1, action);
+    assert.ok(attempt.hooks.length > 0, action);
+    assert.ok(attempt.hooks.every(hook => hook.reentryCode === 0), action);
+  }
+});
+
+test('trusted binding lists and revokes still require a current local user', () => {
+  for (const action of ['List', 'Revoke']) {
+    const attempt = runBinding({ Action: action, Id: 'owned-binding' }, { currentUser: null });
+    assert.equal(attempt.result.Code, 1001, action);
+    assert.equal(attempt.hooks.length, 0, action);
+    assert.equal(attempt.reads.length, 0, action);
+    assert.equal(attempt.writes.length, 0, action);
+  }
+});
+
+test('revoke queries include the authenticated owner and do not mutate an absent binding', () => {
+  const attempt = runBinding({ Action: 'Revoke', Id: 'another-users-binding' });
+  assert.equal(attempt.result.Code, 0);
+  assert.equal(attempt.reads[0].query.Id, 'another-users-binding');
+  assert.deepEqual(Array.from(attempt.reads[0].query._Where[0]), ['BoundUserId', '=', 'local-user']);
+  assert.equal(attempt.hooks.length, 0);
+  assert.equal(attempt.writes.length, 0);
+});
+
+test('external authenticated binding actions enter exact tenant host scopes while retaining token and ownership checks', () => {
+  const runtime = fs.readFileSync(new URL('../../Microi.SSO/ExternalLogin/ExternalLoginRuntime.cs', import.meta.url), 'utf8');
+  for (const [method, end] of [['ListBindings', 'RevokeBinding'], ['RevokeBinding', 'private']]) {
+    const start = runtime.indexOf(`public async Task<object> ${method}(`);
+    const section = runtime.slice(start, method === 'ListBindings' ? runtime.indexOf('public async Task<object> RevokeBinding(', start) : runtime.indexOf('\n        private ', start));
+    assert.ok(start >= 0, method);
+    assert.match(section, /RequireUserTokenAsync\(\)/, method);
+    assert.match(section, /if \(token.Code != 1\) return Json\(token\)/, method);
+    assert.match(section, /RunTrustedProtocolAsync\(\s*BindingApiEngineKey,\s*token.Data.OsClient,/, method);
+  }
+});
 
 test('personal external identities include Microi while excluding unknown providers', () => {
   const { result } = runBinding({ Action: 'List', Providers: [
