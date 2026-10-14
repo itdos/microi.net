@@ -21,8 +21,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
-    <!-- SSO 的 SAML2/XML 签名链使用 .NET 10.0.10；显式统一测试宿主的密码学基包，避免加载 10.0.2/10.0.10 两套程序集。 -->
-    <PackageReference Include="Microsoft.Bcl.Cryptography" Version="10.0.10" />
+    <!-- SSO 的 SAML2/XML 签名链使用 .NET 10.0.13；显式统一测试宿主的密码学基包，避免加载 10.0.2/10.0.13 两套程序集。 -->
+    <PackageReference Include="Microsoft.Bcl.Cryptography" Version="10.0.13" />
     <!-- OCI has a legacy assembly with overlapping namespaces; keep modern payment assertions explicit. -->
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" Aliases="BouncyCastleCurrent" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />

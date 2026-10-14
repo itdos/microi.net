@@ -51,6 +51,8 @@
     <PackageReference Include="System.Reflection.Primitives" Version="4.3.0">
     </PackageReference>
     <PackageReference Include="MySql.Data" Version="9.7.0" />
+    <!-- MySql.Data 传递引用 PKCS 8.0.1；使用 8.0 安全回补，保留 netstandard2.1 依赖兼容。 -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.300" />
     <!-- The Core provider references these extension assemblies; ship matching versions for CLR dependency verification. -->
     <PackageReference Include="Oracle.ManagedDataAccess.Azure" Version="23.26.300" />

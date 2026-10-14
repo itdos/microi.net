@@ -9,6 +9,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Microi.MemoryDiagnostics.Fixture" />
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.23" />
+    <!-- TraceEvent 诊断链携带旧版 PKCS；显式统一安全补丁，同时保护诊断工具及其测试夹具。 -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <PackageReference Include="Microsoft.Diagnostics.NETCore.Client" Version="0.2.731102" />
   </ItemGroup>
 </Project>
