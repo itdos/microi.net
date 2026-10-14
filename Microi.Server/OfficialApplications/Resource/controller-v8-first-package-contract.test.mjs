@@ -149,12 +149,29 @@ function assertOfficialPair({
 test('message-notification and Store selected ApiEngine key sets stay exact and policy-closed', () => {
   assertPackageKeyClosure(messagePackage, MESSAGE_SELECTED_API_ENGINE_KEYS);
   assertPackageKeyClosure(storePackage, STORE_SELECTED_API_ENGINE_KEYS);
-  // 本次候选携带 Microi 登录界面升级，版本与真实包日志同步，精确键集合继续逐项锁定。
+  // 已发布的商城门禁结构修复保持原有接口键集合，版本与不可变包及日志同步。
   assert.equal(messagePackage.PackageInfo.Version, 'v8.3.17');
   assert.equal(messagePackage.PackageInfo.ChangeLog?.Version, messagePackage.PackageInfo.Version);
-  assert.equal(storePackage.PackageInfo.Version, 'v8.5.12');
+  assert.equal(storePackage.PackageInfo.Version, 'v8.5.13');
   assert.equal(storePackage.PackageInfo.ChangeLog?.Version, storePackage.PackageInfo.Version);
   assert.match(String(storePackage.PackageInfo.ChangeHistory || ''), /v7\.7\.27/);
+});
+
+test('application stream physical ledger and export helper belong only to the Store package', () => {
+  const helperOwners = [];
+  for (const packageModel of officialPackages) {
+    const name = packageModel.PackageInfo.Name;
+    const ownsStore = name === storePackage.PackageInfo.Name;
+    for (const item of packageModel.SysApiEngines || []) {
+      if (String(item.ApiV8Code).includes('/* APPLICATION_STREAM_GATE_PHYSICAL_EXPORT_V1'))
+        helperOwners.push({ package: name, key: item.ApiEngineKey });
+    }
+    assert.equal((packageModel.DDLStatements || []).filter(item => item.ApplicationStreamGateContract === true).length,
+      ownsStore ? 8 : 0, `${name}: 发布门禁物理结构归属`);
+    assert.equal((packageModel.PhysicalColumns || []).filter(item => item.TABLE_NAME === 'mci_app_stream_gate_transition').length,
+      ownsStore ? 20 : 0, `${name}: 审计物理列归属`);
+  }
+  assert.deepEqual(helperOwners, [{ package: storePackage.PackageInfo.Name, key: 'export-microi-store-package' }]);
 });
 
 test('official package ApiEngine stable identities are globally unique', () => {

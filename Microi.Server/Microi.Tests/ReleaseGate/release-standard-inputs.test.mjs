@@ -318,6 +318,48 @@ test('公共checkout即使有uniapp reader，没有中央产品合同也不强�
   assert.deepEqual(await snapshotStandardInputs(root), {});
 });
 
+const settingsReader = 'Microi.Server/OfficialApplications/Resource/tenant-system-settings-resource.test.mjs';
+const tenantSmsSource = 'Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js';
+async function smsFixture(t) {
+  const fixtureData = await fixture(t), {root, contract, file} = fixtureData;
+  const original = path.join(root, contract.sourceParent);
+  contract.sourceParent = 'Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用';
+  await fs.mkdir(path.dirname(path.join(root, contract.sourceParent)), {recursive: true});
+  await fs.rename(original, path.join(root, contract.sourceParent));
+  await fs.writeFile(file, JSON.stringify(contract));
+  return fixtureData;
+}
+
+test('系统设置实际reader只追加固定主租户短信正文，真实候选拒绝忽略源码漂移', async t => {
+  const {root} = await smsFixture(t), absent = await snapshotStandardInputs(root);
+  assert.equal(absent[tenantSmsSource], undefined);
+  await fs.mkdir(path.dirname(path.join(root, settingsReader)), {recursive: true});
+  await fs.writeFile(path.join(root, settingsReader), 'actual tracked reader');
+  await fs.mkdir(path.dirname(path.join(root, tenantSmsSource)), {recursive: true});
+  await fs.writeFile(path.join(root, tenantSmsSource), 'canonical SMS source');
+  const standard = await snapshotStandardInputs(root);
+  assert.ok(standard[tenantSmsSource]);
+  assert.equal(standard[settingsReader], undefined, 'reader由原tracked候选冻结，不重复加入standard清单');
+  assert.equal(Object.keys(standard).length, Object.keys(absent).length + 1);
+  execFileSync('git', ['init', '--quiet'], {cwd: root});
+  await fs.writeFile(path.join(root, '.gitignore'), 'private-products/\nprivate-requirements/\nMicroi-V8-Engine/\n');
+  const before = await snapshotCandidate(root, ['.']);
+  await fs.appendFile(path.join(root, tenantSmsSource), '\nchanged');
+  assert.deepEqual(changedCandidate(before, await snapshotCandidate(root, ['.'])), [tenantSmsSource]);
+});
+
+test('系统设置短信正文缺失不能回退别租户，正文联接失败关闭', async t => {
+  const {root} = await smsFixture(t);
+  await fs.mkdir(path.dirname(path.join(root, settingsReader)), {recursive: true});
+  await fs.writeFile(path.join(root, settingsReader), 'actual tracked reader');
+  const other = path.join(root, tenantSmsSource.replace('/iTdos.Product.Internal/', '/other.Product.Internal/'));
+  await fs.mkdir(path.dirname(other), {recursive: true}); await fs.writeFile(other, 'other tenant SMS');
+  await assert.rejects(snapshotStandardInputs(root), /ENOENT/);
+  const canonical = path.join(root, tenantSmsSource);
+  await fs.mkdir(path.dirname(canonical), {recursive: true}); await fs.symlink(other, canonical, 'file');
+  await assert.rejects(snapshotStandardInputs(root), /symbolic link/);
+});
+
 async function founderFixture(t) {
   const root = await fs.mkdtemp(path.join(tmpdir(), 'microi-founder-solution-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));

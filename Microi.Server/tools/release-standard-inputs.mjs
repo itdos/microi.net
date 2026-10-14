@@ -237,5 +237,13 @@ export async function snapshotStandardInputs(root) {
       await addInput(path.relative(root, names[0]));
     }
   }
+  // 系统设置回归直接比较主租户短信母版正文；固定该输入，不遍历其它接口或租户。
+  let settingsReaderExists = false;
+  try { await fs.lstat(path.join(root, 'Microi.Server/OfficialApplications/Resource/tenant-system-settings-resource.test.mjs')); settingsReaderExists = true; }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (settingsReaderExists) {
+    const tenantSource = path.dirname(await inside(declaredRelative(contract.sourceParent)));
+    await addInput(path.relative(root, path.join(tenantSource, '接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js')));
+  }
   return files;
 }
