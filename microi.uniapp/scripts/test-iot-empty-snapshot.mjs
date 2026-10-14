@@ -28,6 +28,8 @@ function snapshot({ provider = '', telemetry = null, yunque = null, filters = []
           if (sql.includes('FROM diy_iot_device')) return iot
           if (sql.includes('FROM diy_yuelong_device')) return telemetry
           if (sql.includes('FROM diy_yunque_device ')) return yunque
+          // 正式接口已增加独立展示快照回退；本组场景没有展示快照，仍应验证空值而非模拟数值。
+          if (sql.includes('FROM diy_xjy_iot_demo_snapshot')) return null
           throw new Error(`意外查询：${sql}`)
         },
         ToArray() { assert.ok(sql.includes('FROM diy_yunque_device_filter')); return filters }
@@ -58,7 +60,7 @@ for (const provider of ['xinjiyuan', 'yuelong', 'yunque', '']) {
     if (provider) assert.equal(value(result, 'IoT设备编号'), 'vendor-code')
     if (provider === 'xinjiyuan') assert.equal(value(result, '冰水温度'), '--')
     if (provider === 'yunque') assert.equal(value(result, '报警状态'), '--')
-    assert.ok(queries.length <= 3, '空快照不额外查滤芯、不写库')
+    assert.ok(queries.length <= 4, '空快照最多增加一次独立展示快照回查，不额外查滤芯、不写库')
   })
 }
 
