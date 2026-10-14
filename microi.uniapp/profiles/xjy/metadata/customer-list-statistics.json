@@ -1,0 +1,116 @@
+{
+  "moduleId": "af4ee06b-0226-4472-bb43-c9c058225606",
+  "table": "Diy_Kehu",
+  "statisticsFields": [
+    {
+      "Id": "2c6e70da-a3ad-41a6-bf1c-7b03fb17c519",
+      "Type": "Sum",
+      "Label": "预期交易金额",
+      "Name": "YuqiJYJE",
+      "TableDescription": "客户",
+      "TableName": "Diy_Kehu",
+      "TableId": "9c5e803b-1906-4368-bca1-0dc9823b5510"
+    },
+    {
+      "Id": "01KW8Q869PRWEVGNRYQSBRA3Z3",
+      "Label": "客户数量",
+      "Name": "KehuSL",
+      "AsName": "",
+      "TableDescription": "客户",
+      "TableName": "Diy_Kehu",
+      "TableId": "9c5e803b-1906-4368-bca1-0dc9823b5510",
+      "Type": "Sum"
+    },
+    {
+      "Id": "fb06bfe9-1448-42de-af5f-7248b7528245",
+      "Type": "Sum",
+      "Label": "订单数量",
+      "Name": "DingdanSL",
+      "TableId": "9c5e803b-1906-4368-bca1-0dc9823b5510"
+    },
+    {
+      "Id": "e76d5ff2-ad15-4ef1-8195-7e0b74ed3a69",
+      "Type": "Sum",
+      "Name": "lease",
+      "Label": "租赁总价",
+      "TableId": "9c5e803b-1906-4368-bca1-0dc9823b5510",
+      "TableName": "Diy_Kehu"
+    },
+    {
+      "Id": "4f934066-4e7f-4045-abf8-ce941e802737",
+      "Type": "Sum"
+    },
+    {
+      "Id": "c8669865-07a9-43c1-8a17-a844dce3dfac",
+      "Type": "Sum"
+    },
+    {
+      "Id": "1b7f6d69-8698-4655-987c-d921a4441354",
+      "Name": "buyOut",
+      "Label": "买断总价",
+      "Type": "Sum",
+      "TableId": "9c5e803b-1906-4368-bca1-0dc9823b5510",
+      "TableName": "Diy_Kehu"
+    },
+    {
+      "Id": "ab81949b-dbee-49eb-b6f4-05c57c390bc9",
+      "Name": "changeXin",
+      "Label": "包年换芯总价",
+      "Type": "Sum",
+      "TableId": "9c5e803b-1906-4368-bca1-0dc9823b5510",
+      "TableName": "Diy_Kehu"
+    }
+  ],
+  "metrics": [
+    {
+      "Key": "rental",
+      "Label": "租赁总价",
+      "Source": "ApiEngine",
+      "ApiEngineKey": "xjy-customer-contract-totals",
+      "ValuePath": "Data.Metrics.rental",
+      "ParamMap": {
+        "Summary": true
+      },
+      "Format": "money",
+      "Tone": "primary",
+      "Icon": "fas fa-file-contract"
+    },
+    {
+      "Key": "buyout",
+      "Label": "买断总价",
+      "Source": "ApiEngine",
+      "ApiEngineKey": "xjy-customer-contract-totals",
+      "ValuePath": "Data.Metrics.buyout",
+      "ParamMap": {
+        "Summary": true
+      },
+      "Format": "money",
+      "Tone": "success",
+      "Icon": "fas fa-shopping-cart"
+    },
+    {
+      "Key": "annualFilter",
+      "Label": "包年换芯总价",
+      "Source": "ApiEngine",
+      "ApiEngineKey": "xjy-customer-contract-totals",
+      "ValuePath": "Data.Metrics.annualFilter",
+      "ParamMap": {
+        "Summary": true
+      },
+      "Format": "money",
+      "Tone": "warning",
+      "Icon": "fas fa-sync-alt"
+    },
+    {
+      "Key": "sum",
+      "Label": "预期交易金额",
+      "Source": "Field",
+      "Field": "YuqiJYJE",
+      "Format": "money",
+      "Tone": "info",
+      "Icon": "fas fa-chart-line"
+    }
+  ],
+  "engineKey": "xjy-customer-contract-totals",
+  "notes": "平台客户管理列表Hero使用这些指标；金额读取实时授权合同商品，客户主表累计字段用于平台统计列。"
+}
