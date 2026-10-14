@@ -78,6 +78,9 @@ function createClient(requestAdapter) {
     osClient: 'tenant',
     maxConcurrent: 8,
     requestAdapter: async (request) => {
+      if (request.data && request.data.Action === 'Policy') {
+        return { statusCode: 200, data: { Code: 1, Data: { ImageContentSecurityEnabled: true } } }
+      }
       if (request.url.includes('mci-wechat-content-status-batch') &&
         request.data && request.data.Action === 'CreateUploadSession') {
         return {
