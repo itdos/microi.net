@@ -120,3 +120,19 @@ test('文件与视频保持普通上传，不读取图片审核策略', async ()
     assert.ok(runtime.calls.uploads.every(item => /HDFS\/UniappUpload/.test(item.url)))
   } finally { runtime.cleanup() }
 })
+
+for (const enabled of [false, true]) {
+  test(`文件控件选中的图片遵循审核开关（${enabled ? '开启' : '关闭'}），保留不压缩参数`, async () => {
+    const runtime = setup({ enabled })
+    try {
+      const results = await runtime.client.uploadFiles([{ filePath: 'wxfile://opaque', name: 'attachment.jpg' }], {
+        preview: false, path: 'file'
+      })
+      assert.equal(results[0].Code, 1)
+      assert.equal(runtime.calls.policy, 1)
+      assert.equal(runtime.calls.login, enabled ? 1 : 0)
+      assert.equal(runtime.calls.uploads[0].formData.Preview, 'false')
+      assert.match(runtime.calls.uploads[0].url, /apiengine\/mci-wechat-content-status-batch/)
+    } finally { runtime.cleanup() }
+  })
+}
