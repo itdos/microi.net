@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { platformServiceSourcePath } from "./helpers/platform-service-source.mjs";
+import { buildMicroAppFriendlyPath, parseMicroAppPath } from "../src/router/micro-app-route.js";
 import {
     IdentityVerification,
     createPasswordChangeActionHash,
@@ -341,8 +342,44 @@ test("客户端入口、V8 挂载和个人设置路由保持同一契约", async
     assert.match(login, /LoginWithExternal/);
     assert.match(login, /LoginWithTotp/);
     assert.match(login, /LoginWithFace/);
-    assert.match(navbar, /microi-platform-service\/personal-settings/);
-    assert.match(mobileProfile, /microi-platform-service\/personal-settings/);
+    assert.match(navbar, /import \{ buildMicroAppFriendlyPath \} from ['"]@\/router\/micro-app-route\.js['"]/);
+    assert.match(mobileProfile, /import \{ buildMicroAppFriendlyPath \} from ['"]@\/router\/micro-app-route\.js['"]/);
+    const navbarMethod = navbar.match(/^\s{8}OpenPersonalSettings\(\) \{([\s\S]*?)^\s{8}\},/m);
+    const mobileMethod = mobileProfile.match(/^const openPersonalSettings = \(([^)]*)\) => \{([\s\S]*?)^\};/m);
+    assert.ok(navbarMethod, "必须执行真实 PC 个人设置入口");
+    assert.ok(mobileMethod, "必须执行真实移动端个人设置入口");
+    const openNavbarSettings = new Function("buildMicroAppFriendlyPath", navbarMethod[1]);
+    const createMobileSettings = new Function("buildMicroAppFriendlyPath", "DiyCommon", "router",
+        `return (${mobileMethod[1]}) => {${mobileMethod[2]}};`);
+    // 从真实入口取当前租户并执行共享路由，避免只匹配已被 helper 拆开的字符串。
+    for (const tenant of ["iTdos", "loctek", "租户 A/#"]) {
+        let tenantReads = 0;
+        const diyCommon = { GetOsClient: () => { tenantReads++; return tenant; } };
+        const desktopCalls = [], mobileCalls = [];
+        openNavbarSettings.call({ DiyCommon: diyCommon, $router: {
+            push: value => { desktopCalls.push(value); return Promise.resolve(); }
+        } }, buildMicroAppFriendlyPath);
+        const openMobileSettings = createMobileSettings(buildMicroAppFriendlyPath, diyCommon, {
+            push: value => { mobileCalls.push(value); return Promise.resolve(); }
+        });
+        openMobileSettings();
+        openMobileSettings("ChangePassword");
+        const expectedPath = `/micro-app/${encodeURIComponent(tenant)}/microi-platform-service/personal-settings`;
+        assert.deepEqual(desktopCalls, [expectedPath]);
+        assert.deepEqual(mobileCalls, [
+            { path: expectedPath, query: { section: "security", action: "" } },
+            { path: expectedPath, query: { section: "security", action: "ChangePassword" } }
+        ]);
+        assert.equal(tenantReads, 3, "每次入口必须读取当前租户");
+        for (const route of [desktopCalls[0], ...mobileCalls.map(call => call.path)]) {
+            const parsed = parseMicroAppPath(route, { osClient: tenant });
+            assert.equal(parsed.isTenantScoped, true);
+            assert.equal(parsed.osClient, tenant);
+            assert.equal(parsed.appKey, "microi-platform-service");
+            assert.equal(parsed.routePath, "/personal-settings");
+        }
+    }
+    assert.match(router, /path: "\/micro-app\/:osClient\/:appKey\/:microPath\(\.\*\)\*"[\s\S]*?component: MicroAppHost/);
     assert.match(form, /initV8IdentityVerification/);
     assert.match(table, /initV8IdentityVerification/);
     assert.match(helper, /ConsumeIdentityVerificationTicket/);
