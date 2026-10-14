@@ -97,12 +97,29 @@ test('空列表是真实零；授权失败、非法菜单、截断和超限失�
   assert.equal(execute({ Summary: true, SysMenuId: 'another-menu' }).result.Code, 0)
 })
 
-test('历史未知商品影响买断指标，不阻断状态和有效期内租赁/换芯，也不返回伪零', () => {
+test('缺失商品只提示待核对，买断合计继续累加已有逐客户金额', () => {
   const { result } = execute({ Summary: true, SysMenuId: 'customer-menu', Filters: {} }, { unknown: true })
-  assert.equal(result.Data.Metrics.buyout, null)
+  assert.equal(result.Data.Metrics.buyout, '220.20')
+  assert.equal(result.Data.IncompleteMetrics.buyout, 2)
   assert.equal(result.Data.Metrics.rental, '100.10')
   assert.equal(result.Data.StatusCounts.All, 2)
   assert.equal(execute({ CustomerIds: ['c1'], CustomerSysMenuId: 'customer-menu' }, { unknown: true }).result.Code, 0)
+})
+
+test('顶部累加权限内所有客户的卡片买断值，含零值客户及多个分页；范围变化同步影响合计', () => {
+  const visible = [...customers, ...Array.from({ length: 80 }, (_, index) => ({ Id: `zero-${index}`, Zhuangtai: '目标客户' }))]
+  const summary = execute({ Summary: true, SysMenuId: 'customer-menu', Filters: {} }, { customers: visible }).result
+  let cents = 0
+  for (let offset = 0; offset < visible.length; offset += 50) {
+    const cards = execute({ CustomerIds: visible.slice(offset, offset + 50).map(row => row.Id), CustomerSysMenuId: 'customer-menu' }, { customers: visible }).result
+    assert.equal(cards.Code, 1)
+    for (const customer of Object.values(cards.Data.Customers)) cents += Math.round(Number(customer.Buyout.All) * 100)
+  }
+  assert.equal(summary.Data.Metrics.buyout, (cents / 100).toFixed(2))
+  assert.equal(summary.Data.BuyoutCustomerCount, 82)
+  const restricted = execute({ Summary: true, SysMenuId: 'customer-menu', Filters: {} }, { customers: [customers[1]] }).result
+  assert.equal(restricted.Data.Metrics.buyout, '20.00')
+  assert.equal(restricted.Data.BuyoutCustomerCount, 1)
 })
 
 test('客户端展示已有状态角标和完整金额，缺失金额显示待核对', async () => {
@@ -110,6 +127,12 @@ test('客户端展示已有状态角标和完整金额，缺失金额显示待�
   assert.equal(result.metrics.buyout, '-')
   assert.match(result.warning, /买断3项金额待核对/)
   assert.equal(result.statusCounts.All, 2)
+})
+
+test('客户端显示已有买断合计，金额异常仅附提示，不用横线覆盖', async () => {
+  const result = await loadCustomerListSummary({ menuId: 'customer-menu', run: async () => ({ Code: 1, Data: { Metrics: { rental: '100.10', buyout: '9000.00', annualFilter: '10.01' }, StatusCounts: { All: 20 }, IncompleteMetrics: { buyout: 1 } } }) })
+  assert.equal(result.metrics.buyout, '9000.00')
+  assert.match(result.warning, /买断.*1项.*待核对/)
 })
 
 test('统计客户端单次调用且传递有效期、快捷状态与基础筛选', async () => {
@@ -208,11 +231,11 @@ test('已有设备总价及零价优先，不能被备用单价覆盖或再次�
   assert.equal(executeProductSql({ ShebeiSJDJ: 4500.125, Shuliang: 1 }).Data.Metrics.buyout, '4500.13')
 })
 
-test('设备单价或数量也缺失时仍待核对，不用含耗材的商品价格或订单总价替代', () => {
+test('设备单价或数量也缺失时附带待核对提示，不使用含耗材价格替代已获取金额合计', () => {
   for (const product of [{ ShebeiSJDJ: null }, { Shuliang: null }, { Shuliang: -1 }]) {
     const result = executeProductSql(product)
     assert.equal(result.Code, 1)
-    assert.equal(result.Data.Metrics.buyout, null)
+    assert.equal(result.Data.Metrics.buyout, '0.00')
     assert.equal(result.Data.IncompleteMetrics.buyout, 1)
   }
 })
