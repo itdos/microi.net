@@ -11,10 +11,14 @@ public class FieldOptionTreePageIntegrationTests
 
     // 按数据行判定依赖，SQL Server 的显式例外不能连带跳过 MySQL 的真实查询断言。
     [Theory]
-    [InlineData("MySql", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
-    [InlineData("SqlServer", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [InlineData("MySql")]
+    [InlineData("SqlServer")]
     public void LargeSourcePagesInDatabaseAndKeepsLookupInsideSourceFilter(string provider)
     {
+        // 在运行时按 provider 判定，避免 xUnit 3.2.2 InlineData 丢失逐行跳过条件。
+        Assert.SkipUnless(provider == "MySql" ? HasMySqlFixture : HasSqlServerFixture,
+            provider == "MySql" ? "Requires an isolated MySQL fixture" : "Requires an isolated SQL Server fixture");
+
         var connection = Environment.GetEnvironmentVariable(provider == "MySql" ? "MICROI_UPGRADE_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;
         Assert.Contains("127.0.0.1", connection);
         Assert.Contains("Database=upgrade_fixture", connection, StringComparison.OrdinalIgnoreCase);

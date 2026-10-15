@@ -49,7 +49,8 @@ public class MarketplaceMetadataBootstrapIntegrationTests
             Assert.Equal("char(36)", Convert.ToString(database.FromSql("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='diy_field' AND COLUMN_NAME='Id'").ToScalar()));
             var originalCollation = Convert.ToString(database.FromSql("SELECT COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='diy_field' AND COLUMN_NAME='Id'").ToScalar());
             var client = new OsClientSecret { OsClient = "bootstrap_fixture", Db = database, DbRead = database };
-            database.FromSql("ALTER TABLE diy_field ADD CONSTRAINT reject_partial_bootstrap CHECK (Name <> 'Name')").ExecuteNonQuery();
+            // MySQL 5.7 不执行 CHECK；保持同一 Name 写入故障点和全部事务回滚断言。
+            database.FromSql("CREATE TRIGGER reject_partial_bootstrap BEFORE INSERT ON diy_field FOR EACH ROW BEGIN IF NEW.Name = 'Name' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'fixture rejects partial bootstrap'; END IF; END").ExecuteNonQuery();
             await Assert.ThrowsAnyAsync<Exception>(() => UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(client));
             Assert.Equal(1, Convert.ToInt32(database.FromSql("SELECT COUNT(1) FROM diy_table").ToScalar()));
             Assert.Equal(2, Convert.ToInt32(database.FromSql("SELECT COUNT(1) FROM diy_field").ToScalar()));
@@ -60,7 +61,7 @@ public class MarketplaceMetadataBootstrapIntegrationTests
             Assert.Equal("", Convert.ToString(database.FromSql("SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='diy_table' AND COLUMN_NAME='DataBaseId'").ToScalar()));
             Assert.Equal("char(36)", Convert.ToString(database.FromSql("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='customer_orders' AND COLUMN_NAME='Id'").ToScalar()));
             Assert.Empty(cache.Cleared);
-            database.FromSql("ALTER TABLE diy_field DROP CHECK reject_partial_bootstrap").ExecuteNonQuery();
+            database.FromSql("DROP TRIGGER reject_partial_bootstrap").ExecuteNonQuery();
             await UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(client);
             Assert.Equal(3, Convert.ToInt32(database.FromSql("SELECT COUNT(1) FROM diy_table").ToScalar()));
             Assert.Equal("保留客户表", Convert.ToString(database.FromSql("SELECT Description FROM diy_table WHERE Name='customer_orders'").ToScalar()));

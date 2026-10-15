@@ -17,10 +17,14 @@ public sealed class RoleLimitActiveSnapshotTests
 
     // 保留两种 provider 的同一测试主体；授权 SQL Server 未执行时，MySQL 行仍单独执行。
     [Theory]
-    [InlineData("MySql", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
-    [InlineData("SqlServer", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [InlineData("MySql")]
+    [InlineData("SqlServer")]
     public async Task RealRoleLoader_ExcludesDeletedGrantsAndRetainsLegacyNulls(string providerName)
     {
+        // 在运行时按 provider 判定，避免 xUnit 3.2.2 InlineData 丢失逐行跳过条件。
+        Assert.SkipUnless(providerName == "MySql" ? HasMySqlFixture : HasSqlServerFixture,
+            providerName == "MySql" ? "Requires an isolated MySQL fixture" : "Requires an isolated SQL Server fixture");
+
         var tenant = "role_snapshot_" + Guid.NewGuid().ToString("N");
         var mysql = providerName == "MySql";
         var type = mysql ? DatabaseType.MySql : DatabaseType.SqlServer;

@@ -13,7 +13,7 @@ const evidence={source:'explicit-human-message',scope:'SQLServer integration onl
   messageId:'00000000-0000-4000-8000-000000000003',reason:'用户明确只允许 SQL Server 集成用例未执行'};
 function receipt(){return {schemaVersion:1,kind:'microi-sqlserver-integration-exemption',issuedAt:'2026-10-15T00:00:00.000Z',
   authorization:{...evidence},sourceHead:current.sourceHead,sourceFiles:{...current.sourceFiles},caseNames:[...SQL_SERVER_CASES]};}
-function suite(tests){return {tests,counters:{total:tests.length,passed:tests.filter(x=>x.outcome==='Passed').length,
+function suite(tests){return {tests,counters:{total:tests.length,executed:tests.filter(x=>x.outcome==='Passed').length,passed:tests.filter(x=>x.outcome==='Passed').length,
   notExecuted:tests.filter(x=>x.outcome==='NotExecuted').length,failed:0,error:0,timeout:0,aborted:0}};}
 function outcomes(){return {quick:suite([{testName:'existingQuick',outcome:'Passed'}]),
   full:suite([...Array.from({length:38},(_,i)=>({testName:'existingFull-'+i,outcome:'Passed'})),
@@ -47,13 +47,32 @@ test('only exact24 SQL rows are N/A and all remaining full cases execute',()=>{
   assert.equal(value.accepted,true);assert.equal(value.originalZeroSkipFull,false);
   assert.equal(value.quickPassed,1);assert.equal(value.fullStackPassed,44);assert.equal(value.sqlServerNotExecuted,24);
 });
+test('synthetic authorized outcomes accept VSTest zero skip counters with exact executed rows',()=>{
+  // 这是明确的合成 24 行契约夹具，不把六行 SDK 子集冒充授权 Full。
+  const value=outcomes();value.full.counters.notExecuted=0;
+  const result=validateSqlServerOutcomes(value,authorized());
+  assert.equal(result.sqlServerNotExecuted,24);assert.equal(result.mysqlCompanionPassed,6);
+});
+for(const [name,change]of [
+  ['too few executed',value=>value.full.counters.executed--],
+  ['too many executed',value=>value.full.counters.executed++],
+  ['missing executed',value=>delete value.full.counters.executed],
+  ['partial nonzero skip counter',value=>value.full.counters.notExecuted=1],
+  ['excess nonzero skip counter',value=>value.full.counters.notExecuted=25],
+])test('SQL exception rejects '+name,()=>{
+  const value=outcomes();change(value);assert.throws(()=>validateSqlServerOutcomes(value,authorized()),/不一致/);
+});
+test('VSTest zero skip counters do not authorize unknown skipped rows',()=>{
+  const value=outcomes();value.full.counters.notExecuted=0;value.full.tests.at(-1).testName='Unknown.UnexecutedCase';
+  assert.throws(()=>validateSqlServerOutcomes(value,authorized()),/24个/);
+});
 test('SQL exception cannot silently skip a MySQL row',()=>{
   const value=outcomes();value.full.tests.at(-1).testName='Dos.Common.Tests.FieldOptionTreePageIntegrationTests.LargeSourcePagesInDatabaseAndKeepsLookupInsideSourceFilter(provider: "MySql")';
   assert.throws(()=>validateSqlServerOutcomes(value,authorized()),/24个/);
 });
 test('SQL exception rejects omission of a companion MySQL case even with24 valid SQL skips',()=>{
   const value=outcomes();value.full.tests=value.full.tests.filter(row=>row.testName!==MYSQL_COMPANION_CASES[0]);
-  value.full.counters.total--;value.full.counters.passed--;
+  value.full.counters.total--;value.full.counters.passed--;value.full.counters.executed--;
   assert.throws(()=>validateSqlServerOutcomes(value,authorized()),/6个混合 MySQL/);
 });
 test('SQL exception rejects a missing SQL row or a broader24-count shortcut',()=>{
@@ -168,8 +187,13 @@ test('real mixed database theories keep all6 MySQL rows separate from SQL Server
   for(const name of ['FieldOptionTreePageIntegrationTests','RoleLimitActiveSnapshotTests','TenantJwtPersistenceIntegrationTests']){
     const source=fs.readFileSync(new URL('../Common/'+name+'.cs',import.meta.url),'utf8');
     assert.doesNotMatch(source,/\[Theory\(Skip\s*=/);
+    const provider=name==='FieldOptionTreePageIntegrationTests'?'provider':'providerName';
+    // 条件在测试入口求值，既保留六个 MySQL 行，也不改变授权 SQL Server 行名称。
+    assert.match(source,new RegExp('Assert\\.SkipUnless\\('+provider+' == "MySql" \\? HasMySqlFixture : HasSqlServerFixture,'));
+    assert.match(source,new RegExp(provider+' == "MySql" \\? "Requires an isolated MySQL fixture" : "Requires an isolated SQL Server fixture"'));
+    assert.ok(source.indexOf('Assert.SkipUnless(')<source.indexOf('Environment.GetEnvironmentVariable(',source.indexOf('Assert.SkipUnless(')));
     for(const row of source.matchAll(/\[InlineData\("(MySql|SqlServer)"[^\r\n]*\]/g)){
-      assert.match(row[0],row[1]==='MySql'?/SkipUnless = nameof\(HasMySqlFixture\)/:/SkipUnless = nameof\(HasSqlServerFixture\)/);
+      assert.doesNotMatch(row[0],/\bSkip(?:Unless|When)?\s*=/);
       if(row[1]==='MySql')mysql++;else sqlServer++;
     }
   }
