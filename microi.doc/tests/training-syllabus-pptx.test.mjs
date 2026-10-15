@@ -9,6 +9,7 @@ import { parse as parseSfc, compileTemplate } from 'vue/compiler-sfc'
 import * as vue from 'vue'
 import * as serverRenderer from 'vue/server-renderer'
 import * as versions from '../docs/.vitepress/theme/training-deck-versions.js'
+import { trainingPreviewPath } from '../docs/.vitepress/theme/training-previews.js'
 import { enterpriseSlides } from '../docs/.vitepress/theme/enterprise-training-slides.js'
 import { searchTrainingSlides } from '../docs/.vitepress/theme/training-syllabus-search.js'
 import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads.mjs'
@@ -58,7 +59,7 @@ function componentRuntime(descriptor) {
     addEventListener() {}, clearTimeout() {}, setTimeout() { return 0 } }
   class TestElement {}
   const dependencies = {
-    ...vue, ...versions, enterpriseSlides, searchTrainingSlides, docAssets, getDocAssetUrl,
+    ...vue, ...versions, enterpriseSlides, searchTrainingSlides, docAssets, getDocAssetUrl, trainingPreviewPath,
     nextTick: callback => Promise.resolve().then(callback), onMounted: callback => mountedCallbacks.push(callback), onBeforeUnmount() {},
     useData: () => ({ isDark }), window: browser, document: { getElementById() { return null }, addEventListener() {} }, Element: TestElement, HTMLElement: TestElement,
   }
@@ -153,35 +154,13 @@ test('同主题 PPTX 下载解析四个独立目标，未知版本安全回到�
   assert.equal(new Set(artifacts.map(artifact => artifact.url)).size, 4)
 })
 
-test('真实 PPTX 下载按钮跟随课件版本与当前主题，PDF 下载继续保留', async () => {
+test('当前课件仅展示本次预生成 PDF，不展示历史版本 PPTX 下载', () => {
   const component = fs.readFileSync(path.join(projectRoot, 'docs/.vitepress/theme/components/TrainingSyllabusDeck.vue'), 'utf8')
   const { descriptor, errors } = parseSfc(component)
   assert.deepEqual(errors, [])
   const anchors = findElements(descriptor.template.ast, element => element.tag === 'a')
   const pptx = anchors.find(element => attribute(element, 'class')?.split(/\s+/u).includes('is-pptx'))
-  assert.ok(pptx, 'the presentation toolbar must provide its own PPTX download')
-  const label = binding(pptx, 'aria-label')
-  assert.ok(label || attribute(pptx, 'aria-label'), 'the export control must have an accessible download name')
-  assert.equal(attribute(pptx, 'type'), pptxMime, 'the download declares the PowerPoint MIME type')
-  assert.ok(pptx.props.some(prop => prop.type === 6 && prop.name === 'download'))
-  assert.equal(attribute(pptx, 'target'), '_blank', '跨源预览或下载保留当前演示页')
-  assert.match(attribute(pptx, 'rel'), /\bnoopener\b/u)
-  const href = binding(pptx, 'href')
-  assert.ok(href, 'download URLs must react to edition and theme')
-  const runtime = componentRuntime(descriptor)
-  await runtime.mount()
-  for (const artifact of artifacts) {
-    runtime.switchVersion(artifact.version)
-    runtime.isDark.value = artifact.dark
-    assert.equal(runtime.evaluate(href), artifact.url)
-    const accessibleName = label ? runtime.evaluate(label) : attribute(pptx, 'aria-label')
-    assert.match(accessibleName, /下载.*PPTX/u)
-    assert.ok(accessibleName.includes(artifact.dark ? '暗色' : '浅色') || accessibleName.includes('当前主题'), 'the accessible label must describe the selected theme')
-    assert.equal(runtime.slideMeta.value.length, artifact.count, 'download and online deck must describe the same edition')
-  }
-  runtime.switchVersion('technical')
-  runtime.isDark.value = false
-  assert.equal(runtime.evaluate(href), artifacts[1].url, 'switching back restores the original technical download')
+  assert.equal(pptx, undefined, '历史 PPTX 只能保留旧地址兼容，不能冒充当前企业版课件')
   assert.ok(anchors.some(element => attribute(element, 'aria-label') === '下载预生成暗色 PDF'))
   assert.ok(anchors.some(element => attribute(element, 'aria-label') === '下载预生成浅色 PDF'))
   for (const pdf of anchors.filter(element => /下载预生成.* PDF/u.test(attribute(element, 'aria-label') || ''))) {
@@ -190,7 +169,7 @@ test('真实 PPTX 下载按钮跟随课件版本与当前主题，PDF 下载继�
   }
 })
 
-test('SSR 与挂载前不输出 PPTX，首次挂载按实际主题生成链接并保留 PDF', async () => {
+test('SSR、挂载及版本切换均只输出对应版本的两份 PDF', async () => {
   const component = fs.readFileSync(path.join(projectRoot, 'docs/.vitepress/theme/components/TrainingSyllabusDeck.vue'), 'utf8')
   const { descriptor, errors } = parseSfc(component)
   assert.deepEqual(errors, [])
@@ -205,22 +184,17 @@ test('SSR 与挂载前不输出 PPTX，首次挂载按实际主题生成链接�
     assert.doesNotMatch(beforeMount, /class="is-pptx"|\.pptx/u, 'the first client render must preserve the SSR absence of the download control')
     for (const url of Object.values(versions.trainingPdfPaths.technical)) assert.ok(beforeMount.includes(`href="${url}"`), 'both PDF choices remain available before mount')
     await runtime.mount()
-    const firstMounted = await renderToolbar(runtime)
-    assert.ok(firstMounted.includes(`href="${versions.trainingPptxPath('technical', initialDark)}"`), 'the first inserted button must already target the actual persisted theme')
-    assert.ok(firstMounted.includes(`aria-label="下载${initialDark ? '暗色' : '浅色'} PPTX"`))
-    for (const artifact of artifacts) {
-      runtime.switchVersion(artifact.version)
-      runtime.isDark.value = artifact.dark
+    for (const edition of ['technical', 'enterprise']) {
+      runtime.switchVersion(edition)
       const html = await renderToolbar(runtime)
-      assert.equal((html.match(/class="is-pptx"/gu) || []).length, 1, 'mount and version/theme changes must keep exactly one PPTX control')
-      assert.ok(html.includes(`href="${artifact.url}"`), 'the rendered export link must follow both state changes')
-      for (const url of Object.values(versions.trainingPdfPaths[artifact.version])) assert.ok(html.includes(`href="${url}"`), 'PDF targets must still follow the selected edition')
+      assert.doesNotMatch(html, /class="is-pptx"|\.pptx/u, '当前页面不能展示历史版本下载')
+      for (const url of Object.values(versions.trainingPdfPaths[edition])) assert.ok(html.includes(`href="${url}"`), 'PDF targets must follow the selected edition')
     }
   }
 })
 
 for (const artifact of artifacts) {
-  test(`${artifact.version}/${artifact.dark ? 'dark' : 'light'} PPTX 真实包含 ${artifact.count} 页可编辑文字、讲者备注与有效引用`, () => {
+  test(`历史兼容 ${artifact.version}/${artifact.dark ? 'dark' : 'light'} PPTX 仍包含 ${artifact.count} 页原始文字、讲者备注与有效引用`, () => {
     const file = fs.readFileSync(artifactPath(artifact.url))
     const archive = openPptx(file)
     const slides = archive.names.filter(name => /^ppt\/slides\/slide\d+\.xml$/u.test(name))
@@ -249,7 +223,7 @@ for (const artifact of artifacts) {
       const text = nativeText(slide)
       assert.ok(text.length > 10, `slide ${index} cannot be only a flattened image`)
       assert.ok(nativeText(archive.xml(`ppt/notesSlides/notesSlide${index}.xml`)).length > 10, `slide ${index} has no usable speaker notes`)
-      if (artifact.version === 'enterprise') assert.ok(text.includes(enterpriseSlides[index - 1].title.replace(/\s+/gu, '')), `slide ${index} must keep its actual enterprise title editable`)
+      // 旧 URL 兼容的是历史包；新企业版成功案例课件不再与历史 12 页标题比较。
     }
   })
 }

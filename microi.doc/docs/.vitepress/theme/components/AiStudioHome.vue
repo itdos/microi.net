@@ -57,6 +57,11 @@
       <p v-if="chatError" class="ai-studio-error" role="alert">{{ chatError }}</p>
       <div class="ai-studio-summary" ref="summaryArea" :class="{ 'is-motion-paused': motionPaused }" aria-label="Microi 平台价值与开发路径">
         <div class="ai-studio-summary__actions">
+          <a class="is-start" href="/profile.html#/overview">
+            <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M4 12h11m0 0-4-4m4 4-4 4"/></svg>
+            <span>{{ copy.getStartedAction }}</span>
+          </a>
           <a class="is-primary" :href="locale === 'en-US' ? '/en/doc/about/microi-training-syllabus' : '/doc/about/microi-training-syllabus'">
             <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h10.5A2.5 2.5 0 0 1 18 7v12.5H7.5A2.5 2.5 0 0 1 5 17V4.5Z"/><path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H18M9 8h5"/></svg>
@@ -129,7 +134,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   titleLeadParts: ['Open-source AI', 'development framework'],
   titleEmphasisLines: ['30+ mature engines'],
   lead: 'AI low-code, microservices, and the V8 engine share one delivery path. In high-reuse business scenarios, AI development can use 10×+ fewer tokens and move 10×+ faster.',
-  primaryAction: 'Training syllabus', secondaryAction: 'Microi Agent',
+  getStartedAction: 'Get started', primaryAction: 'Training syllabus', secondaryAction: 'Microi Agent',
   proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
   proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '30+ mature engines'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
@@ -163,7 +168,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   titleLeadParts: ['开源 AI', '开发框架'],
   titleEmphasisLines: ['30+ 成熟引擎'],
   lead: '融合 AI 低代码、微服务与 V8 引擎；在平台能力高度复用的典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，更快交付企业应用。',
-  primaryAction: '培训大纲', secondaryAction: 'Microi Agent',
+  getStartedAction: '开始使用', primaryAction: '培训大纲', secondaryAction: 'Microi Agent',
   proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
   proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '30+ 成熟引擎'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',

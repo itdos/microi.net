@@ -1,0 +1,21 @@
+/* 手机始终显示有文字的翻页动作，内容在独立画布内滚动，不靠隐藏手势发现导航。 */
+.mci-training-mobile-pager { display:none; }
+.mci-training-image-dialog { position:absolute;inset:0;z-index:80;display:flex;flex-direction:column;background:rgba(3,8,16,.97);color:#f8fafc; }
+.mci-training-image-dialog header { display:flex;align-items:center;gap:12px;padding:15px 22px;flex-shrink:0; }
+.mci-training-image-dialog header p { margin:0!important;flex:1;min-width:0;font-size:14px;line-height:1.5;color:#f8fafc!important; }
+.mci-training-image-dialog header button,.mci-training-image-dialog header a { display:inline-flex;align-items:center;justify-content:center;min-height:44px;white-space:nowrap;border:1px solid #64748b;border-radius:8px;padding:8px 13px;color:#fff!important;background:#172033;font-size:13px;text-decoration:none!important; }
+.mci-training-image-dialog button:focus-visible,.mci-training-image-dialog a:focus-visible { outline:3px solid #55d8e6;outline-offset:2px; }
+.mci-training-image-dialog__canvas { min-height:0;flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:10px 20px 20px; }
+.mci-training-image-dialog__canvas img { display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;cursor:zoom-in; }
+.mci-training-image-dialog__canvas.is-zoomed { display:block; }.mci-training-image-dialog__canvas.is-zoomed img { max-width:none;max-height:none;min-width:100%;height:auto;cursor:zoom-out; }
+@media(max-width:767px) {
+ .mci-training-deck:not(.is-artifact-capture) .mci-training-deck__controls { height:calc(68px + env(safe-area-inset-bottom));padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:block;left:0;z-index:20;border-top:1px solid var(--mci-deck-line-strong); }
+ .mci-training-deck:not(.is-artifact-capture) .mci-training-deck__controls>.mci-training-deck__chapter,.mci-training-deck:not(.is-artifact-capture) .mci-training-deck__controls>.mci-training-deck__progress,.mci-training-deck:not(.is-artifact-capture) .mci-training-deck__controls>.mci-training-deck__counter { display:none; }
+ .mci-training-mobile-pager { display:grid;grid-template-columns:96px minmax(0,1fr) 96px;gap:7px;align-items:center;width:100%;height:100%; }
+ .mci-training-mobile-pager button,.mci-training-mobile-pager select { width:100%;min-height:46px;border:1px solid var(--mci-deck-line-strong);border-radius:10px;background:var(--mci-deck-surface-strong);color:var(--mci-deck-text);font-size:13px;font-weight:700; }
+ .mci-training-mobile-pager button:last-child { background:var(--mci-deck-primary);color:white; }.mci-training-mobile-pager button:disabled { opacity:.4; }.mci-training-mobile-pager label { min-width:0; }.mci-training-mobile-pager select { padding:0 8px;text-overflow:ellipsis; }
+ .mci-training-deck:not(.is-artifact-capture) .mci-training-deck__stage { bottom:calc(68px + env(safe-area-inset-bottom)); }
+ .mci-training-deck:not(.is-artifact-capture) .mci-training-slide__frame { overflow-y:auto;overscroll-behavior:contain;justify-content:flex-start; }
+ .mci-training-image-dialog header { flex-wrap:wrap;gap:7px;padding:10px; }.mci-training-image-dialog header p{flex-basis:100%;font-size:12px;}.mci-training-image-dialog header button,.mci-training-image-dialog header a { flex:1;padding:7px;font-size:12px; }
+ .mci-training-image-dialog__canvas { padding:0 8px 12px; }
+}
