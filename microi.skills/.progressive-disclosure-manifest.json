@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-11T10:58:19.511Z",
+  "generatedAt": "2026-10-13T10:06:19.793Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -960,11 +960,11 @@
       ]
     },
     "microi-uniapp-frontend": {
-      "originalSha256": "4e6d4e3f4c20d380f7a556f7db6640510da52f49b109505a6ee5535527640fc1",
-      "originalLines": 552,
+      "originalSha256": "ddcc488e18b193f9e26e22484a4d900f1c1155015345d1953e9521a4cb9e243d",
+      "originalLines": 554,
       "prefixSha256": "55f2799d872b4b9682449adf2e554003eb8642c111af262cacf42265b99dd5f5",
       "prefixBytes": 3040,
-      "entryLines": 207,
+      "entryLines": 209,
       "chunks": [
         {
           "id": "microi-uniapp-frontend-000",
@@ -978,8 +978,8 @@
           "id": "microi-uniapp-frontend-001",
           "ordinal": 1,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "ce7f36d1d7c3e3c6d10572da2cf29b783a5fcf043dc5568e9caed5e42bff5469",
-          "lines": 25,
+          "sha256": "5d3fe408d73474b25414ae370e94503aa6f0b05a419c4dd758ad7f9e58905fc8",
+          "lines": 27,
           "heading": "标准产品、视图协议与租户扩展"
         },
         {

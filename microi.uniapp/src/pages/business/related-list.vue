@@ -21,6 +21,7 @@
 				</view>
 			</view>
 			<mci-business-related-list
+				ref="relatedList"
 				v-else-if="field"
 				:field="field"
 				:parent-id="parentId"
@@ -33,7 +34,8 @@
 				:relation-value-override="relationValue"
 				:batch-entry-mode="batchEntryMode"
 				@title-change="handleTitleChange"
-			/>
+			>
+      </mci-business-related-list>
 		</scroll-view>
 	</view>
 </template>
@@ -290,4 +292,21 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		.context-skeleton__card view,
 		.nav-button { animation: none; transition: none; }
 	}
+</style>
+
+<!-- 样式随独立列表分包加载；弹窗经 Teleport/root-portal 提升后仍匹配专用状态类。 -->
+<style>
+:global(.search-row--filters-only) { align-items: center; gap: 14rpx; }
+:global(.search-row--filters-only .filter-summary) { min-width: 0; height: 72rpx; display: flex; align-items: center; padding: 0 20rpx; border: 1rpx solid var(--mci-border-color, #dce8ed); border-radius: 12rpx; color: var(--mci-text-secondary, #607a85); background: var(--mci-bg-base, #f4f8fa); font-size: 24rpx; }
+:global(.search-row--filters-only .filter-summary text) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:global(.related-business-list .search-row--filters-only .filter-button) { display: flex; flex-direction: row; gap: 8rpx; padding: 0 6rpx; }
+:global(.search-row--filters-only .search-button) { min-width: 70rpx; color: var(--mci-color-primary, #087da8); font-size: 24rpx; }
+:global(.filter-control--pressed) { opacity: .65; }
+:global(.search-row--filters-only .filter-symbol) { font-size: 30rpx; line-height: 1; }
+:global(.filter-mask .filter-sheet.filter-sheet--compact) { height: auto; grid-template-rows: auto auto auto; }
+:global(.filter-mask .filter-sheet--compact .filter-sheet__scroll) { height: 360rpx; }
+:global(.filter-mask .filter-sheet--compact .filter-sheet__head) { min-height: 100rpx; }
+:global(.filter-mask .filter-sheet--compact .filter-sheet__footer view) { display: flex; align-items: center; justify-content: center; line-height: 1; }
+:global(.filter-mask .filter-sheet--compact .filter-sheet__footer view:first-child) { border: 1rpx solid var(--mci-border-color, #dce8ed); background: var(--mci-bg-base, #f4f8fa); color: var(--mci-text-secondary, #536e79); }
+:global(.filter-mask .filter-sheet--compact .filter-sheet__footer view:last-child) { background: var(--mci-color-primary, #087da8); }
 </style>
