@@ -50,13 +50,31 @@ function payload(totalDownloads) {
   ] }
 }
 
+// 固定完整 owner 侧栏，与分页包卡片的数字分开；夹具同时放置误导数字防止取首个匹配。
+function galleryHtml({ owner = 'ITdos', packageCount = 2, totalDownloads = 12100000,
+  canonical = `https://www.nuget.org/profiles/${owner}` } = {}) {
+  const countText = typeof totalDownloads === 'number' ? totalDownloads.toLocaleString('en-US') : totalDownloads
+  return `<!doctype html><html><head><link rel="canonical" href="${canonical}"></head><body>
+    <span>999,999,999 total downloads</span>
+    <aside class="profile-details col-md-3"><img alt="avatar" />
+      <div class="statistics">
+        <div class="statistic"><div class="value">${packageCount}</div><div class="description">Packages</div></div>
+        <div class="statistic"><div class="value">${countText}</div><div class="description">Total downloads of packages</div></div>
+      </div>
+    </aside>
+    <div class="profile-title"><h1>${owner}&nbsp;</h1></div>
+    <ul><li class="package">444,444 total downloads</li></ul>
+  </body></html>`
+}
+
 // 真实 HTTP 的调用方式与上下文由宿主强制写入；业务参数中的身份字段不能替代它们。
 function execute({
   params = { Action: 'Snapshot' }, user = {}, httpContext = { Request: {} },
   rows = [dailyRow()], cacheStats = null,
   endpoints = [{ totalDownloads: 12000000 }, { totalDownloads: 12100000 }],
   databaseReadFails = false, databaseWriteFails = false, cacheWriteSucceeds = true,
-  cacheReadThrows = false, cacheWriteThrows = false
+  cacheReadThrows = false, cacheWriteThrows = false,
+  gallery = {}, galleryStatus = 200, galleryContent = undefined, galleryError = null
 } = {}) {
   const events = []
   const databaseRows = rows.map(row => ({ ...row }))
@@ -121,6 +139,12 @@ function execute({
     Http: {
       GetResponse(request) {
         events.push({ kind: 'http:get', url: request.Url })
+        if (request.Url === 'https://www.nuget.org/profiles/ITdos') {
+          assert.ok(request.Timeout > 0 && request.Timeout <= 10)
+          assert.equal(request.Headers.Accept, 'text/html')
+          if (galleryError) throw new Error(galleryError)
+          return { StatusCode: galleryStatus, Content: galleryContent ?? galleryHtml(gallery) }
+        }
         const endpoint = endpoints[endpointIndex++] || { status: 503 }
         if (endpoint.error) throw new Error(endpoint.error)
         return {
@@ -241,14 +265,14 @@ test('a real scheduled job parses its JSON JobParam and persists before writing 
   const cacheWrite = execution.events.findIndex(event => event.kind === 'cache:set')
   assert.ok(write >= 0 && cacheWrite > write)
   assert.equal(execution.databaseRows.at(-1).StatDate, '2026-10-13')
-  assert.equal(execution.databaseRows.at(-1).SuccessfulEndpoints, 2)
+  assert.equal(execution.databaseRows.at(-1).SuccessfulEndpoints, 1)
 })
 
 test('an authenticated administrator may explicitly refresh', ENGINE_TEST_OPTIONS, () => {
   const execution = execute({ user: ADMIN, params: { Action: 'Refresh', LockScope: 'NuGetOfficialRefresh' } })
   assert.equal(execution.result.Code, 1)
   assert.equal(execution.result.Data.didRefresh, true)
-  assert.equal(execution.events.filter(event => event.kind === 'http:get').length, 2)
+  assert.equal(execution.events.filter(event => event.kind === 'http:get').length, 3)
 })
 
 test('an administrator with the wrong refresh scope fails before external calls', ENGINE_TEST_OPTIONS, () => {
@@ -265,9 +289,9 @@ test('duplicate scheduled delivery within five minutes reuses the confirmed succ
   assert.equal(execution.events.filter(event => ['http:get', 'db:add', 'db:update', 'cache:set'].includes(event.kind)).length, 0)
 })
 
-test('both upstream failures return Code 0 and retain the last successful snapshot', ENGINE_TEST_OPTIONS, () => {
+test('Gallery failure returns Code 0 and retains the last successful snapshot', ENGINE_TEST_OPTIONS, () => {
   const before = dailyRow()
-  const execution = execute({ httpContext: null, params: JOB_PARAM, rows: [before], endpoints: [{ status: 0 }, { status: 503 }] })
+  const execution = execute({ httpContext: null, params: JOB_PARAM, rows: [before], galleryStatus: 503 })
   assert.equal(execution.result.Code, 0)
   assert.equal(execution.result.Data.totalDownloads, before.TotalDownloads)
   assert.equal(execution.result.Data.didRefresh, false)
@@ -276,31 +300,33 @@ test('both upstream failures return Code 0 and retain the last successful snapsh
   assert.equal(execution.events.filter(event => ['cache:set', 'db:add', 'db:update'].includes(event.kind)).length, 0)
 })
 
-test('one healthy official node is sufficient and counts only that successful endpoint', ENGINE_TEST_OPTIONS, () => {
+test('one failed Search node does not replace the authoritative Gallery source', ENGINE_TEST_OPTIONS, () => {
   const execution = execute({ httpContext: null, params: JOB_PARAM, endpoints: [{ error: 'network timeout' }, { totalDownloads: 12100000 }] })
   assert.equal(execution.result.Code, 1)
   assert.equal(execution.result.Data.totalDownloads, 12100000)
   assert.equal(execution.result.Data.successfulEndpoints, 1)
+  assert.equal(execution.result.Data.searchSuccessfulEndpoints, 1)
 })
 
-test('malformed upstream JSON is isolated to its endpoint', ENGINE_TEST_OPTIONS, () => {
+test('malformed Search JSON is isolated to its diagnostic endpoint', ENGINE_TEST_OPTIONS, () => {
   const execution = execute({ httpContext: null, params: JOB_PARAM, endpoints: [{ content: '{' }, { totalDownloads: 12100000 }] })
   assert.equal(execution.result.Code, 1)
   assert.equal(execution.result.Data.totalDownloads, 12100000)
   assert.equal(execution.result.Data.successfulEndpoints, 1)
+  assert.equal(execution.result.Data.searchSuccessfulEndpoints, 1)
 })
 
-test('a successful lower regional observation preserves the historical maximum with an honest new timestamp', ENGINE_TEST_OPTIONS, () => {
+test('a successful lower Gallery observation preserves the historical maximum with an honest new timestamp', ENGINE_TEST_OPTIONS, () => {
   const before = dailyRow(15000000)
   const execution = execute({ httpContext: null, params: JOB_PARAM, rows: [before] })
   assert.equal(execution.result.Code, 1)
   assert.equal(execution.result.Data.totalDownloads, 15000000)
   assert.equal(execution.result.Data.didRefresh, true)
-  assert.equal(execution.result.Data.source, 'nuget-official-api-high-water')
+  assert.equal(execution.result.Data.source, 'nuget-official-gallery-high-water')
   assert.equal(execution.result.Data.queriedAt, FIXED_NOW)
   assert.equal(execution.databaseRows.at(-1).TotalDownloads, 15000000)
   assert.equal(execution.databaseRows.at(-1).QueriedAt, FIXED_NOW)
-  assert.equal(execution.databaseRows.at(-1).SuccessfulEndpoints, 2)
+  assert.equal(execution.databaseRows.at(-1).SuccessfulEndpoints, 1)
 })
 
 test('a later successful refresh updates its existing UTC daily row rather than adding another', ENGINE_TEST_OPTIONS, () => {
@@ -351,9 +377,103 @@ test('an existing higher successful Redis value remains protected when the offic
   assert.equal(execution.result.Data.queriedAt, FIXED_NOW)
 })
 
-test('an empty store with both endpoints down reports a failed refresh without fabricating a snapshot', ENGINE_TEST_OPTIONS, () => {
-  const execution = execute({ httpContext: null, params: JOB_PARAM, rows: [], endpoints: [{ status: 0 }, { status: 0 }] })
+test('an empty store with Gallery down reports a failed refresh without fabricating a snapshot', ENGINE_TEST_OPTIONS, () => {
+  const execution = execute({ httpContext: null, params: JOB_PARAM, rows: [], galleryStatus: 0 })
   assert.equal(execution.result.Code, 0)
   assert.equal(execution.result.Data, null)
   assert.equal(execution.databaseRows.length, 0)
+})
+
+test('fresh Gallery full-owner totals replace stale Search counts and ignore misleading package-card numbers', () => {
+  const execution = execute({ httpContext: null, params: JOB_PARAM,
+    gallery: { packageCount: 48, totalDownloads: 11884826 },
+    endpoints: [{ totalDownloads: 11449429 }, { totalDownloads: 11690488 }]
+  })
+  assert.equal(execution.result.Code, 1)
+  assert.equal(execution.result.Data.source, 'nuget-official-gallery')
+  assert.equal(execution.result.Data.packageCount, 48)
+  assert.equal(execution.result.Data.totalDownloads, 11884826)
+  assert.equal(execution.result.Data.observedTotalDownloads, 11884826)
+  assert.equal(execution.result.Data.searchTotalDownloads, 11690488)
+  assert.equal(execution.result.Data.searchSuccessfulEndpoints, 2)
+  assert.equal(execution.result.Data.searchLagDetected, true)
+  assert.equal(execution.databaseRows.at(-1).TotalDownloads, 11884826)
+})
+
+test('Gallery failure cannot be hidden by successful but stale Search responses', () => {
+  const before = dailyRow()
+  const execution = execute({ httpContext: null, params: JOB_PARAM, rows: [before],
+    galleryError: 'network timeout', endpoints: [{ totalDownloads: 11449429 }, { totalDownloads: 11690488 }]
+  })
+  assert.equal(execution.result.Code, 0)
+  assert.equal(execution.result.Data.queriedAt, before.QueriedAt)
+  assert.equal(execution.result.Data.refreshFailed, true)
+  assert.deepEqual(execution.databaseRows, [before])
+  assert.equal(execution.events.filter(event => ['db:add', 'db:update', 'cache:set'].includes(event.kind)).length, 0)
+})
+
+test('both Search diagnostic nodes can fail without invalidating a validated Gallery observation', () => {
+  const execution = execute({ httpContext: null, params: JOB_PARAM,
+    gallery: { totalDownloads: 11884826 }, endpoints: [{ status: 0 }, { status: 503 }]
+  })
+  assert.equal(execution.result.Code, 1)
+  assert.equal(execution.result.Data.totalDownloads, 11884826)
+  assert.equal(execution.result.Data.successfulEndpoints, 1)
+  assert.equal(execution.result.Data.searchSuccessfulEndpoints, 0)
+  assert.equal(execution.result.Data.searchTotalDownloads, null)
+  assert.equal(execution.databaseRows.at(-1).Source, 'nuget-official-gallery')
+})
+
+test('a larger Search diagnostic total never overrides the official Gallery sidebar statistic', () => {
+  const execution = execute({ httpContext: null, params: JOB_PARAM,
+    gallery: { totalDownloads: 11884826 }, endpoints: [{ totalDownloads: 20000000 }, { totalDownloads: 21000000 }]
+  })
+  assert.equal(execution.result.Code, 1)
+  assert.equal(execution.result.Data.totalDownloads, 11884826)
+  assert.equal(execution.result.Data.searchTotalDownloads, 21000000)
+  assert.equal(execution.result.Data.searchLagDetected, false)
+})
+
+for (const [name, content] of [
+  ['wrong canonical owner', galleryHtml({ canonical: 'https://www.nuget.org/profiles/another-owner' })],
+  ['wrong profile heading owner', galleryHtml({ owner: 'another-owner', canonical: 'https://www.nuget.org/profiles/ITdos' })],
+  ['missing owner sidebar', galleryHtml().replace('profile-details', 'other-sidebar')],
+  ['missing owner total label', galleryHtml().replace('Total downloads of packages', 'Downloads')],
+  ['CAPTCHA page with unrelated numeric text', '<html><head><title>CAPTCHA</title></head><body>48 packages and 99,999,999 total downloads require verification</body></html>'],
+  ['incomplete statistics markup', galleryHtml().replace('</aside>', '')],
+  ['oversized HTML response', `${' '.repeat(1048576)}${galleryHtml()}`],
+  ['malformed thousands grouping', galleryHtml({ totalDownloads: '11,88,4826' })],
+  ['zero packages', galleryHtml({ packageCount: 0 })],
+  ['zero downloads', galleryHtml({ totalDownloads: 0 })],
+  ['negative downloads', galleryHtml({ totalDownloads: -1 })],
+  ['fractional downloads', galleryHtml({ totalDownloads: 11884826.5 })],
+  ['unsafe integer downloads', galleryHtml({ totalDownloads: '9007199254740992' })],
+  ['implausible owner package count', galleryHtml({ packageCount: 1000001 })]
+]) {
+  test(`invalid Gallery ${name} fails closed and retains the previous snapshot`, () => {
+    const before = dailyRow()
+    const execution = execute({ httpContext: null, params: JOB_PARAM, rows: [before], galleryContent: content })
+    assert.equal(execution.result.Code, 0)
+    assert.equal(execution.result.Data.totalDownloads, before.TotalDownloads)
+    assert.equal(execution.result.Data.queriedAt, before.QueriedAt)
+    assert.deepEqual(execution.databaseRows, [before])
+    assert.equal(execution.events.filter(event => ['db:add', 'db:update', 'cache:set'].includes(event.kind)).length, 0)
+  })
+}
+
+test('duplicate owner-total labels are rejected instead of choosing an arbitrary statistic', () => {
+  const duplicate = '<div class="statistic"><div class="value">22,222,222</div><div class="description">Total downloads of packages</div></div>'
+  const content = galleryHtml().replace('<div class="statistics">', `<div class="statistics">${duplicate}`)
+  const execution = execute({ httpContext: null, params: JOB_PARAM, galleryContent: content })
+  assert.equal(execution.result.Code, 0)
+  assert.equal(execution.events.filter(event => ['db:add', 'db:update', 'cache:set'].includes(event.kind)).length, 0)
+})
+
+test('HTTP business parameters cannot override the trusted Gallery URL or owner', () => {
+  const execution = execute({ user: ADMIN, params: { Action: 'Refresh', LockScope: 'NuGetOfficialRefresh',
+    Url: 'https://example.com', ProfileUrl: 'https://example.com', Owner: 'another-owner', Headers: { Accept: 'application/json' }
+  } })
+  assert.equal(execution.result.Code, 1)
+  assert.equal(execution.events.find(event => event.kind === 'http:get').url, 'https://www.nuget.org/profiles/ITdos')
+  assert.equal(execution.result.Data.owner, 'ITdos')
 })

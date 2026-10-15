@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: official_nuget_stats
- * Version: v1.0.5
+ * Version: v1.0.7
  * Function:
- * - 官网只读 NuGet 最近成功数据库快照；每三小时由可信定时任务刷新，成功写入后更新兼容缓存，失败保留原快照并明确记为失败。
+ * - 官网只读 NuGet 最近成功数据库快照；每三小时采集官方 Gallery owner 侧栏全量总计，Search 仅作诊断对照，采集失败保留原快照。
  */
 
 var OWNER = "ITdos";
@@ -190,7 +190,10 @@ function responseData(stats, stage, options) {
     didRefresh: options.didRefresh === true,
     refreshFailed: options.refreshFailed === true,
     refreshIntervalSeconds: REFRESH_INTERVAL_SECONDS,
-    observedTotalDownloads: options.observedTotalDownloads === undefined ? null : options.observedTotalDownloads
+    observedTotalDownloads: options.observedTotalDownloads === undefined ? null : options.observedTotalDownloads,
+    searchSuccessfulEndpoints: asNumber(options.searchSuccessfulEndpoints),
+    searchTotalDownloads: options.searchTotalDownloads === undefined ? null : options.searchTotalDownloads,
+    searchLagDetected: options.searchLagDetected === true
   };
 }
 
@@ -210,7 +213,104 @@ function ownerMatches(value) {
   return false;
 }
 
-// 从单个 NuGet 官方搜索节点汇总 owner 名下去重包下载量。
+// 只读取 NuGet 官方 owner 侧栏统计；包卡片分页、搜索索引和其它页面数字不进入主汇总。
+function htmlAttribute(tag, name) {
+  var match = new RegExp("(?:^|\\s)" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')", "i").exec(tag);
+  return match ? String(match[1] === undefined ? match[2] : match[1]) : "";
+}
+
+// 使用有界 HTML 中已验证的 class 定位整块元素，计数嵌套同名标签，避免用首个 </div> 截断侧栏。
+function htmlBlocksByClass(html, tagName, className) {
+  var result = [];
+  var opening = new RegExp("<" + tagName + "\\b[^>]*>", "gi");
+  var match;
+  while ((match = opening.exec(html)) !== null) {
+    var classes = htmlAttribute(match[0], "class").split(/\s+/);
+    if (classes.indexOf(className) < 0) continue;
+    var tags = new RegExp("<\\/?" + tagName + "\\b[^>]*>", "gi");
+    tags.lastIndex = opening.lastIndex;
+    var depth = 1;
+    var token;
+    while ((token = tags.exec(html)) !== null) {
+      depth += /^<\//.test(token[0]) ? -1 : 1;
+      if (depth !== 0) continue;
+      result.push(html.substring(opening.lastIndex, token.index));
+      opening.lastIndex = tags.lastIndex;
+      break;
+    }
+    if (depth !== 0) throw new Error("NuGet Gallery HTML block is incomplete");
+  }
+  return result;
+}
+
+function galleryText(value) {
+  return String(value || "").replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;|&#160;|&#xA0;/gi, " ").trim();
+}
+
+function galleryInteger(value) {
+  var text = galleryText(value);
+  if (!/^(?:[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)$/.test(text)) {
+    throw new Error("NuGet Gallery statistic is not a positive integer");
+  }
+  var number = Number(text.replace(/,/g, ""));
+  if (!isFinite(number) || Math.floor(number) !== number || number > 9007199254740991) {
+    throw new Error("NuGet Gallery statistic exceeds safe integer range");
+  }
+  return number;
+}
+
+function parseOfficialGalleryStats(content) {
+  var html = String(content || "");
+  if (html.length < 100 || html.length > 1048576) throw new Error("NuGet Gallery HTML size is invalid");
+  var canonicalLinks = [];
+  var links = html.match(/<link\b[^>]*>/gi) || [];
+  for (var i = 0; i < links.length; i++) {
+    if (htmlAttribute(links[i], "rel").toLowerCase() === "canonical") {
+      canonicalLinks.push(htmlAttribute(links[i], "href"));
+    }
+  }
+  if (canonicalLinks.length !== 1 || canonicalLinks[0].toLowerCase() !== PROFILE_URL.toLowerCase()) {
+    throw new Error("NuGet Gallery owner canonical URL is invalid");
+  }
+  var titles = htmlBlocksByClass(html, "div", "profile-title");
+  var ownerTitle = titles.length === 1 && /<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/i.exec(titles[0]);
+  if (!ownerTitle || galleryText(ownerTitle[1]).toLowerCase() !== OWNER.toLowerCase()) {
+    throw new Error("NuGet Gallery profile owner is invalid");
+  }
+  var sidebars = htmlBlocksByClass(html, "aside", "profile-details");
+  if (sidebars.length !== 1) throw new Error("NuGet Gallery owner sidebar is missing or ambiguous");
+  var statistics = htmlBlocksByClass(sidebars[0], "div", "statistics");
+  if (statistics.length !== 1) throw new Error("NuGet Gallery owner statistics are missing or ambiguous");
+  var records = htmlBlocksByClass(statistics[0], "div", "statistic");
+  var found = {};
+  for (var j = 0; j < records.length; j++) {
+    var values = htmlBlocksByClass(records[j], "div", "value");
+    var descriptions = htmlBlocksByClass(records[j], "div", "description");
+    if (values.length !== 1 || descriptions.length !== 1) throw new Error("NuGet Gallery statistic structure is invalid");
+    var label = galleryText(descriptions[0]).toLowerCase();
+    if (label !== "packages" && label !== "total downloads of packages") continue;
+    if (Object.prototype.hasOwnProperty.call(found, label)) throw new Error("NuGet Gallery statistic is ambiguous");
+    found[label] = galleryInteger(values[0]);
+  }
+  var packageCount = found["packages"];
+  var totalDownloads = found["total downloads of packages"];
+  if (!packageCount || packageCount > 1000000 || !totalDownloads) throw new Error("NuGet Gallery full owner statistics are invalid");
+  return { packageCount: packageCount, totalDownloads: totalDownloads };
+}
+
+function fetchOfficialGalleryStats() {
+  var response = V8.Http.GetResponse({
+    Url: PROFILE_URL,
+    Timeout: 10,
+    Headers: { Accept: "text/html", "Accept-Language": "en-US", "Cache-Control": "no-cache", Pragma: "no-cache" }
+  });
+  var statusCode = asNumber(response && response.StatusCode);
+  if (statusCode < 200 || statusCode >= 300) throw new Error("NuGet Gallery returned HTTP " + statusCode);
+  return parseOfficialGalleryStats(response && response.Content);
+}
+
+// 从单个 NuGet 官方搜索节点汇总 owner 名下去重包下载量；只作诊断对照。
 function fetchEndpointStats(endpoint) {
   var response = V8.Http.GetResponse({
     Url: endpoint,
@@ -254,8 +354,8 @@ function fetchEndpointStats(endpoint) {
   return { packageCount: packageCount, totalDownloads: total };
 }
 
-// 从多个官方节点选取下载量更高的一份，容忍索引区域间短时延迟。
-function fetchOfficialStats() {
+// Search 下载统计可能长期落后 Gallery，只用于解释源差异，不能替代 Gallery 成功。
+function fetchOfficialSearchStats() {
   var successful = [];
   for (var i = 0; i < SEARCH_ENDPOINTS.length; i++) {
     try {
@@ -278,6 +378,31 @@ function fetchOfficialStats() {
     cachedAt: timestamp,
     successfulEndpoints: successful.length
   });
+}
+
+// Gallery 侧栏统计覆盖全部 owner 包；不能用首 20 个包或分页卡片之和混用其统计口径。
+function fetchOfficialStats() {
+  var gallery = fetchOfficialGalleryStats();
+  var timestamp = nowIso();
+  var search = null;
+  try {
+    search = fetchOfficialSearchStats();
+  } catch (error) {
+    console.log("NuGet Search cross-check unavailable");
+  }
+  var stats = normalizeStats({
+    packageCount: gallery.packageCount,
+    totalDownloads: gallery.totalDownloads,
+    queriedAt: timestamp,
+    cachedAt: timestamp,
+    successfulEndpoints: 1,
+    source: "nuget-official-gallery"
+  });
+  stats.searchSuccessfulEndpoints = search ? search.successfulEndpoints : 0;
+  stats.searchTotalDownloads = search ? search.totalDownloads : null;
+  stats.searchLagDetected = !!search && search.totalDownloads < gallery.totalDownloads;
+  if (stats.searchLagDetected) console.log("NuGet Search download total is below the Gallery owner statistic");
+  return stats;
 }
 
 // HttpContext 由宿主设置，HTTP 参数不能伪造后台任务身份。
@@ -342,9 +467,9 @@ try {
   var cached = readCachedStats();
   var highWater = higherStats(database, cached);
   if (highWater && highWater.totalDownloads > refreshed.totalDownloads) {
-    // 官方区域索引回退时保留累计最高值，但查询时间、包数和成功节点仍记录本次真实查询。
+    // Gallery 统计回退时保留累计最高值，但查询时间、包数和成功来源仍记录本次真实采集。
     refreshed.totalDownloads = highWater.totalDownloads;
-    refreshed.source = "nuget-official-api-high-water";
+    refreshed.source = "nuget-official-gallery-high-water";
   }
 
   // 先检查事务内写入结果，再更新兼容缓存；最终提交由宿主在 Code=1 后完成。
@@ -357,7 +482,10 @@ try {
       cacheState: redisWritten ? "updated" : "database-only",
       databaseState: "persisted",
       didRefresh: true,
-      observedTotalDownloads: observedTotalDownloads
+      observedTotalDownloads: observedTotalDownloads,
+      searchSuccessfulEndpoints: refreshed.searchSuccessfulEndpoints,
+      searchTotalDownloads: refreshed.searchTotalDownloads,
+      searchLagDetected: refreshed.searchLagDetected
     }),
     Msg: "NuGet 官方汇总已持久化为最新快照"
   };
