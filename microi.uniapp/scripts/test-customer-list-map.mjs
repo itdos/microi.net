@@ -6,13 +6,14 @@ const listSource = fs.readFileSync(new URL('../src/pages/business/list.vue', imp
 const mapSource = fs.readFileSync(new URL('../src/pages/task/map.vue', import.meta.url), 'utf8')
 
 test('客户列表搜索栏左侧提供客户地图入口', () => {
-  assert.match(listSource, /v-if="key === 'customers'" class="list-map-entry"/)
+  assert.match(listSource, /v-if="showCustomerMap" class="list-map-entry"/)
+  assert.match(listSource, /showCustomerMap\(\)[\s\S]*?=== 'diy_kehu'/)
   assert.match(listSource, /src="\/static\/xjy\/business\/customerMap\.png"/)
   assert.match(listSource, /@tap="openCustomerMap"/)
 })
 
 test('设备列表搜索栏左侧复用首页设备地图入口', () => {
-  assert.match(listSource, /'search-row--map': key === 'customers' \|\| key === 'devices'/)
+  assert.match(listSource, /'search-row--map': showCustomerMap \|\| key === 'devices'/)
   assert.match(listSource, /v-else-if="key === 'devices'" class="list-map-entry"/)
   assert.match(listSource, /src="\/static\/xjy\/business\/eqpMap\.png"/)
   assert.match(listSource, /@tap="openDeviceMap"/)
@@ -28,15 +29,15 @@ test('客户地图携带当前列表全部筛选条件', () => {
   assert.match(listSource, /mode=customer&filters=\$\{encodeURIComponent\(JSON\.stringify\(filters\)\)\}/)
 })
 
-test('客户列表地图默认15公里且最大可调整到300公里', () => {
+test('客户列表地图默认15公里并共用扩展半径与省市区筛选', () => {
   assert.match(mapSource, /radius: 15/)
-  assert.match(mapSource, /rangeMax\(\) \{ return \(this\.mode === 'task' \|\| this\.hasListCustomerFilters\) \? 300 : 50 \}/)
+  assert.match(mapSource, /rangeMax\(\) \{ return MAP_RADIUS_OPTIONS.length - 1 \}/)
   assert.match(mapSource, /:max="rangeMax"/)
   assert.match(mapSource, /async loadFilteredCustomers\(\)/)
   assert.match(mapSource, /uni\.getLocation\(\{ type: 'gcj02', isHighAccuracy: true/)
-  assert.match(mapSource, /buildMapRangeBounds\(this\.latitude, this\.longitude, radius\)/)
-  assert.match(mapSource, /mapDistanceKm\(this\.latitude, this\.longitude, latitude, longitude\) <= radius/)
-  assert.match(mapSource, /changeRadius\(event\)[\s\S]*?this\.loadFilteredCustomers\(\)/)
+  assert.match(mapSource, /buildMapRangeBounds\(latitude, longitude, radius\)/)
+  assert.match(mapSource, /scope\.regional \|\|[\s\S]*?mapDistanceKm\(scope\.latitude, scope\.longitude, latitude, longitude\) <= scope\.radius/)
+  assert.match(mapSource, /changeRadius\(event\)[\s\S]*?this\.reload\(\)/)
 })
 
 test('客户地图范围查询始终经过真实菜单权限且不直接展示附近接口结果', () => {
