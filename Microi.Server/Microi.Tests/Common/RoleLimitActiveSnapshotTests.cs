@@ -12,12 +12,13 @@ namespace Microi.Tests.Common;
 [Trait("Category", "FullStack")]
 public sealed class RoleLimitActiveSnapshotTests
 {
-    public static bool HasFixtures => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_MYSQL_TEST_CONN"))
-        && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
+    public static bool HasMySqlFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_MYSQL_TEST_CONN"));
+    public static bool HasSqlServerFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
 
-    [Theory(Skip = "Requires isolated local database fixtures", SkipUnless = nameof(HasFixtures))]
-    [InlineData("MySql")]
-    [InlineData("SqlServer")]
+    // 保留两种 provider 的同一测试主体；授权 SQL Server 未执行时，MySQL 行仍单独执行。
+    [Theory]
+    [InlineData("MySql", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
+    [InlineData("SqlServer", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
     public async Task RealRoleLoader_ExcludesDeletedGrantsAndRetainsLegacyNulls(string providerName)
     {
         var tenant = "role_snapshot_" + Guid.NewGuid().ToString("N");
