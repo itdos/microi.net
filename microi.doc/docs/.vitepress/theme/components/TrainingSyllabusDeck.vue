@@ -676,12 +676,17 @@ function commonKind(slide: SlideMeta): 'cover' | 'decision' | 'why' | 'closing' 
 const previewImage = ref<{ src: string; alt: string } | null>(null)
 const imageZoom = ref(false)
 const previewCloseRef = ref<HTMLButtonElement | null>(null)
+const previewDialogRef = ref<HTMLDialogElement | null>(null)
 let previewFocus: HTMLElement | null = null
 function openPreview(image: { src: string; alt: string }) {
   previewFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
   previewImage.value = image
   imageZoom.value = false
-  nextTick(() => previewCloseRef.value?.focus())
+  // 原生顶层弹层脱离课件的裁切和层叠上下文，手机上也能覆盖站点导航。
+  nextTick(() => {
+    previewDialogRef.value?.showModal()
+    previewCloseRef.value?.focus()
+  })
 }
 function closePreview() {
   previewImage.value = null
@@ -1060,10 +1065,10 @@ onBeforeUnmount(() => {
         <button type="button" :disabled="activeIndex === slideMeta.length - 1" @click="nextSlide">下一页 →</button>
       </nav><div class="mci-training-deck__chapter"><span>{{ currentSlide.chapter }}</span><div><strong>{{ currentSlide.nav }}</strong><small>{{ currentSlide.title }}</small></div></div><div class="mci-training-deck__progress" aria-label="幻灯片进度"><i :style="{ transform: `scaleX(${progress / 100})` }"></i></div><div class="mci-training-deck__counter"><strong>{{ padSlide(activeIndex) }}</strong><span>/ {{ slideMeta.length }}</span></div></footer>
     <div class="mci-training-deck__sr-status" aria-live="polite">第 {{ activeIndex + 1 }} 页，共 {{ slideMeta.length }} 页：{{ currentSlide.title }}</div><Transition name="mci-deck-toast"><div v-if="notice" class="mci-training-deck__toast" role="status">{{ notice }}</div></Transition>
-    <div v-if="previewImage" class="mci-training-image-dialog mci-screen-only" role="dialog" aria-modal="true" aria-label="全屏图片查看" @click.self="closePreview">
+    <dialog v-if="previewImage" ref="previewDialogRef" class="mci-training-image-dialog mci-screen-only" role="dialog" aria-modal="true" aria-label="全屏图片查看" @cancel.prevent="closePreview" @click.self="closePreview">
       <header><p>{{ previewImage.alt }}</p><button type="button" @click="imageZoom = !imageZoom">{{ imageZoom ? '适应屏幕' : '放大查看' }}</button><a :href="previewImage.src" target="_blank" rel="noopener noreferrer">打开原图 ↗</a><button ref="previewCloseRef" type="button" aria-label="关闭全屏图片" @click="closePreview">关闭 ×</button></header>
       <div class="mci-training-image-dialog__canvas" :class="{ 'is-zoomed': imageZoom }" @click.self="closePreview"><img :src="previewImage.src" :alt="previewImage.alt" @click="imageZoom = !imageZoom"></div>
-    </div>
+    </dialog>
     <div v-if="activePanel" class="mci-training-deck__overlay mci-screen-only" role="presentation" @click.self="closePanel"><section class="mci-training-deck__panel" role="dialog" aria-modal="true" aria-labelledby="mci-deck-help-title"><header><div><p>MICROI PRESENTATION</p><h2 id="mci-deck-help-title">演示操作</h2></div><button ref="panelCloseRef" type="button" aria-label="关闭" @click="closePanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div class="mci-training-deck__help"><article><kbd>←</kbd><kbd>→</kbd><span><strong>上一页 / 下一页</strong><small>也支持 ↑ ↓、PageUp / PageDown</small></span></article><article><kbd>Space</kbd><span><strong>继续演示</strong><small>空格键进入下一页</small></span></article><article><kbd>Home</kbd><kbd>End</kbd><span><strong>首尾跳转</strong><small>快速回到封面或致辞页</small></span></article><article><kbd>O</kbd><span><strong>缩略图导航</strong><small>聚焦左侧当前页预览</small></span></article><article><kbd>F11</kbd><span><strong>浏览器全屏</strong><small>Ctrl+F / ⌘F 保留浏览器搜索；左侧可搜索标题和内容</small></span></article><article><kbd>P</kbd><span><strong>下载暗色 PDF</strong><small>顶栏可直接选择暗色或浅色高质量版</small></span></article><article><span class="mci-training-deck__gesture">↔</span><span><strong>鼠标 / 触控</strong><small>滚轮、两侧按钮或横向拖动切页</small></span></article><article><span class="mci-training-deck__gesture">↗</span><span><strong>现场讲解</strong><small>所有功能入口均在新窗口打开官方文档</small></span></article></div></section></div>
   </div>
 </template>

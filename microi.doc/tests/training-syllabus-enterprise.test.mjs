@@ -99,7 +99,7 @@ function presentationRuntime() {
     trainingPreviewPath,
     window: browser, document, Element: TestElement, HTMLElement: TestElement,
   }
-  const runtime = scriptRuntime(descriptor, dependencies, 'deckVersion, activeIndex, activePanel, searchKeyword, slideSearchContent, slideMeta, visibleSlides, currentSlide, pdfDownloadPaths, deckRef, isDark, switchVersion, nextSlide, previousSlide, goTo, thumbnailPath, handleHashChange, handleKeydown, commonKind, previewImage, imageZoom, previewCloseRef, openPreview, closePreview, railCollapsed, indexSlideContent, progress, handleWheel, handlePointerDown, handlePointerUp')
+  const runtime = scriptRuntime(descriptor, dependencies, 'deckVersion, activeIndex, activePanel, searchKeyword, slideSearchContent, slideMeta, visibleSlides, currentSlide, pdfDownloadPaths, deckRef, isDark, switchVersion, nextSlide, previousSlide, goTo, thumbnailPath, handleHashChange, handleKeydown, commonKind, previewImage, imageZoom, previewCloseRef, previewDialogRef, openPreview, closePreview, railCollapsed, indexSlideContent, progress, handleWheel, handlePointerDown, handlePointerUp')
   runtime.deckRef.value = {
     querySelector(selector) {
       const index = enterpriseSlides.findIndex(item => selector === `#mci-training-${item.id}`)
@@ -341,8 +341,13 @@ test('企业目录跳转、手机翻页和原图弹层驱动组件真实状态�
   runtime.document.activeElement = originalFocus
   runtime.previewCloseRef.value = new runtime.TestElement()
   for (const asset of trainingCaseAssets) {
+    // 模拟每次 v-if 新挂载的原生 dialog，验证真实 openPreview 进入顶层模态层。
+    const modal = { open: false, showCalls: 0, showModal() { this.open = true; this.showCalls += 1 }, close() { this.open = false }, querySelectorAll() { return [] } }
+    runtime.previewDialogRef.value = modal
     new Function('$emit', 'asset', directive(galleryButton, 'on', 'click'))(emit, asset)
     await runtime.flush()
+    assert.equal(modal.open, true)
+    assert.equal(modal.showCalls, 1)
     assert.deepEqual(runtime.previewImage.value, { src: asset.url, alt: asset.alt })
     assert.equal(runtime.previewCloseRef.value.focused, true)
     runtime.imageZoom.value = true
@@ -362,6 +367,8 @@ test('企业目录跳转、手机翻页和原图弹层驱动组件真实状态�
   assert.equal(directive(parentPreview, 'on', 'jump'), 'goTo')
   assert.equal(directive(parentPreview, 'on', 'preview'), 'openPreview')
   const dialog = elements(descriptor.template.ast, node => attribute(node, 'aria-label') === '全屏图片查看')[0]
+  assert.equal(dialog.tag, 'dialog', 'native modal top layer must cover the site navigation as well as the deck')
+  assert.equal(attribute(dialog, 'ref'), 'previewDialogRef')
   assert.equal(attribute(dialog, 'role'), 'dialog')
   assert.equal(attribute(dialog, 'aria-modal'), 'true')
 })
