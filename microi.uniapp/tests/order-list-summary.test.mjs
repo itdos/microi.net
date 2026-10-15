@@ -30,7 +30,7 @@ const products = [
 
 function execute(params = {}, options = {}) {
   const db = new DatabaseSync(':memory:')
-  const requests = [], queries = []
+  const requests = [], queries = [], urls = []
   db.exec('CREATE TABLE Diy_Dingdan (Id TEXT,DingdanZT TEXT,HetongZT TEXT,HetongKSSJ TEXT,HetongJSSJ TEXT,DingdanJE REAL,IsDeleted INTEGER); CREATE TABLE Diy_DingdanSP (Id TEXT,DingdanID TEXT,HezuoFS TEXT,HezuoFSZ TEXT,Zongjia REAL,LvxinZJ REAL,ShebeiSJDJ REAL,Shuliang INTEGER,IsDeleted INTEGER)')
   const insert = db.prepare('INSERT INTO Diy_Dingdan VALUES(?,?,?,?,?,?,0)')
   for (const row of options.orders || orders) insert.run(...row)
@@ -39,9 +39,11 @@ function execute(params = {}, options = {}) {
   const V8 = { Param: { SysMenuId: menuId, ...params }, OsClient: options.osClient || 'xjy', CurrentUser: options.anonymous ? null : {Id:'user'},
     Method: {GetCurrentToken:()=>({CurrentUser:{Id:'user'},OsClient:'xjy',Token:'fixture'})},
     Http:{PostResponse:request=>{
-      const body = JSON.parse(request.PostParamString); requests.push(body)
+      const body = JSON.parse(request.PostParamString); requests.push(body); urls.push(request.Url)
+      if (body._TableChildAuth && options.invalidChildAuth) return {StatusCode:200,Content:JSON.stringify({Code:0,Msg:'父记录无权访问'})}
       if (options.denied) return {StatusCode:200,Content:JSON.stringify({Code:0,Msg:'没有菜单权限'})}
       let visible = (options.orders || orders).filter(row=>row[0] !== 'hidden')
+      if (body._TableChildAuth) visible = visible.filter(row => ['active','pending'].includes(row[0]))
       if (body._Keyword === 'none') visible = []
       if (body._Where?.length) visible = visible.filter(row => row[0] === 'active')
       const offset = (body._PageIndex - 1) * body._PageSize
@@ -51,7 +53,7 @@ function execute(params = {}, options = {}) {
   }
   try {
     const result = vm.runInNewContext(`(function(){${source}\n})()`,{V8,DateNow:()=> '2026-10-15'})
-    return {result:JSON.parse(JSON.stringify(result)),requests,queries}
+    return {result:JSON.parse(JSON.stringify(result)),requests,queries,urls}
   } finally {db.close()}
 }
 
@@ -69,6 +71,22 @@ test('关闭后包括过期、断约、未来合同；买断累计值不变，�
   const {result}=execute({Filters:{ValidOnly:false}})
   assert.equal(result.Code,1,result.Msg)
   assert.deepEqual(result.Data.Metrics,{rental:'1200.00',buyout:'400.00',annualFilter:'60.00',sum:'21000.00'})
+})
+
+test('关联订单统计通过完整父子授权查询，仅汇总当前客户，不要求独立子菜单权限',()=>{
+  const auth={ParentRowId:'customer-A',ParentFieldId:'order-field',Parent:{ParentRowId:'ancestor'}}
+  const params={_TableChildAuth:auth,Filters:{SelectedStatus:'待审批'}}
+  const {result,requests,queries,urls}=execute({...params,SysMenuId:''})
+  assert.equal(result.Code,1,result.Msg)
+  assert.deepEqual(result.Data.StatusCounts,{All:2,已审批:1,待审批:1})
+  assert.equal(result.Data.Metrics.sum,'5000.00')
+  assert.deepEqual(requests[0]._TableChildAuth,auth)
+  assert.equal(requests[0]._SysMenuId,undefined)
+  assert.equal(requests[0].ModuleEngineKey,menuId)
+  assert.equal(urls[0],'https://api.jifulii.com/apiengine/platform-module-data')
+  assert.ok(queries.every(q=>!Object.values(q.bindings).includes('hidden')))
+  const denied=execute(params,{invalidChildAuth:true})
+  assert.equal(denied.result.Code,0);assert.equal(denied.queries.length,0)
 })
 
 test('快捷状态只改变金额；其余状态角标不消失，状态零值可见',()=>{
