@@ -6,6 +6,15 @@ export var PROPOSAL_AFTER_COST_FIELDS = [
   'HezuoHYSZCBMD', 'HezuoHYSSBSLMD', 'HezuoHYSZCBAllMD', 'ShisuanNSMD', 'DuonianLJCBMD'
 ];
 
+// 预计合作金额只镜像主表累计成本，保留原精度、空值和零值；裁剪响应缺少原字段时不覆盖已有值。
+export function proposalCooperationAmounts(form) {
+  form = form || {};
+  var values = {};
+  if (typeof form.DuonianLJCBAfter !== 'undefined') values.YujihezuoJEZL = form.DuonianLJCBAfter;
+  if (typeof form.DuonianLJCBMD !== 'undefined') values.YujihezuoJEMD = form.DuonianLJCBMD;
+  return values;
+}
+
 // 空值与零元报价分开，未维护价格不能作为免费设备参加比价。
 export function costPresent(value) {
   return value !== null && value !== undefined && String(value).trim() !== '';
@@ -126,6 +135,9 @@ export function aggregateInstallationPointCosts(points, years) {
   // 主表历史单台字段保留兼容，但含义改为全部点位合计，不再计算虚构的平均型号。
   result.HezuoHYSZCB = result.HezuoHYSZCBAll;
   result.HezuoHYSZCBMD = result.HezuoHYSZCBAllMD;
+  // 两个展示字段仅写父方案，不能加入点位计算字段清单后误写入子表。
+  var amounts = proposalCooperationAmounts(result);
+  for (var name in amounts) result[name] = amounts[name];
   return result;
 }
 
