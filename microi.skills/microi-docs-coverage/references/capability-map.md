@@ -69,7 +69,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/vision-engine.md` | vision-engine, ai-engine, microi-microservice, app-store, v8-security | ONNX 视觉特征、租户样本匹配、异步 AI 回退、摄像头帧、人脸治理、微服务与商城交付 |
 | `system-engine/translate-engine.md` | translate-engine | 多语言与翻译供应商 |
 | `system-engine/unity-integration.md` | unity-integration, v8-api-config, microi-client-frontend | Unity UPM、WebGL/Windows、多人租约、公屏、DiyToken 与 V8 通讯边界 |
-| `system-engine/visualization-engine.md` | page-engine, microi-ui | 3D、CAD、goView 与数据大屏能力边界 |
+| `system-engine/visualization-engine.md` | page-engine, microi-ui, microi-microservice | 3D、LIS 型材库、CAD、goView 与数据大屏能力边界及微服务交付 |
 | `system-engine/wf-engine.md` | v8-workflow | 工作流设计和事件 |
 | `v8-engine/ai-apiengine.md` | ai-engine, v8-api-config, microi-system-delivery | AI 编程与短提示词；完整开发默认清单覆盖原推荐提示词 1–8 |
 | `v8-engine/api-engine.md` | v8-api-config, v8-utilities | 接口上下文、配置、分布式锁续租和调用 |

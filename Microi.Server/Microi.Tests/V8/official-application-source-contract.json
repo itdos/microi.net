@@ -627,12 +627,12 @@
     {
       "AppKey": "microi-3d-engine",
       "AppId": "01M1H0CFADBMHHQM4HEVJQM1ZC",
-      "Version": "v1.9.0",
+      "Version": "v1.10.0",
       "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.default.default/AI应用/microi-3d-engine",
-      "SourceManifestHash": "cb53c425e437289d0931989c7a456feb539e46f5e2cd647ac11157405632a42c",
-      "ContextSha256": "dad88cd8beec2ff7e98b35192677e8a72947dbf69d56843fedf52eef7cfb26f2",
-      "FileCount": 32,
-      "SourceBytes": 290388,
+      "SourceManifestHash": "0b0452bbadd808bf70bf32f7d407dfb6be8f6a99f0e7a9a31d8febbc787ef6ac",
+      "ContextSha256": "368cf883c30bb8473fb0d4429d2e58932fbfbd7c69f7eb40e8f8102d916cc887",
+      "FileCount": 43,
+      "SourceBytes": 390116,
       "Files": [
         {
           "Path": ".gitignore",
@@ -641,8 +641,8 @@
         },
         {
           "Path": ".microi-micro-app.json",
-          "Size": 493,
-          "Sha256": "a68c0e01f098c0e012a8cc1ea439f7daee2830b8f97494b095293e97d9c374fb"
+          "Size": 494,
+          "Sha256": "5175e9c95b298e0875d83cd5fbc4aff62623bb7c47dca9204132bb2e169b42e9"
         },
         {
           "Path": "index.html",
@@ -656,18 +656,18 @@
         },
         {
           "Path": "package-lock.json",
-          "Size": 59324,
-          "Sha256": "bfa11afd6481d3d0f3f4fa13b47eb92becbab3d4b953f915aa586f1ed735bde0"
+          "Size": 59326,
+          "Sha256": "45b7956d9f6019f3b71b964efb2e10e84a781a781b57a1b1b91cad1fbba95571"
         },
         {
           "Path": "package.json",
-          "Size": 655,
-          "Sha256": "a0f84829deeab9913c25544e2dc7c9407e3c91711928fa3b472a380f517ac184"
+          "Size": 653,
+          "Sha256": "43cbc158bc2082153bd37cb72b269cf9ec1382976234cc9e3ce463f5e1941bab"
         },
         {
           "Path": "src/App.vue",
-          "Size": 7169,
-          "Sha256": "e55e0348fa5bccc62e0818aee399379b89f46b0bf66ba39b1a0bcb0717e7a943"
+          "Size": 8543,
+          "Sha256": "f24d0d7725fe386701fa1d7277da540aeebe143bf444f6d6d9bce9932a2678fa"
         },
         {
           "Path": "src/auth.ts",
@@ -710,6 +710,11 @@
           "Sha256": "2a70e616ddc39b77f5f4939e48bc6c5c578e5de109e1e0c7cbb99706307830e5"
         },
         {
+          "Path": "src/three-engine/components/LisCatalogPanel.vue",
+          "Size": 8739,
+          "Sha256": "cf9c26b699f02b4e2d1a9e54f48df46477201e570ad95cdce5fbb6cc468da33a"
+        },
+        {
           "Path": "src/three-engine/components/PresetGallery.vue",
           "Size": 3319,
           "Sha256": "a20a8b8349ef627aeb829122f1c81c0e085afd74a1bab2770802df1b5cf060a5"
@@ -726,23 +731,28 @@
         },
         {
           "Path": "src/three-engine/components/Toolbar.vue",
-          "Size": 4670,
-          "Sha256": "26f2444da2c429f6ff16b8dbb69589270aa719b9600b2815b3a6eea478305fe1"
+          "Size": 5039,
+          "Sha256": "964920dc834110018540f2b1e4d913159eab4ba50c9a2535bc97998b72fc2cf5"
         },
         {
           "Path": "src/three-engine/components/Viewport.vue",
-          "Size": 5392,
-          "Sha256": "cfe712aac5c02e4c8cdedd46738cb13b9d20d7e734fab3fdb292d5968f361f18"
+          "Size": 5421,
+          "Sha256": "e8094407151d173ec3ca51d07c022851192e4cc6e3bc82944daf014c02a429a8"
         },
         {
           "Path": "src/three-engine/core/CameraPath.js",
           "Size": 7947,
-          "Sha256": "de2130ae16cd463f01c6b2c9e0c1a5b49939734c04c19beacc759bed4ed721b8"
+          "Sha256": "baa68835023a78cc620872314a4cdc0791222462ff7d91ca96221a996d88218a"
         },
         {
           "Path": "src/three-engine/core/Engine.js",
-          "Size": 36939,
-          "Sha256": "c0b1ea34e089a83bf1732cb4918b7e5b22a397d2afebc36ed9010c7c92c814fe"
+          "Size": 41972,
+          "Sha256": "ef9aad6beec0d9439de3dd31d55f366c084f7e7142690c668426e8ea477bcdd4"
+        },
+        {
+          "Path": "src/three-engine/core/LisScene.js",
+          "Size": 4748,
+          "Sha256": "9ba61f6b0c22a141ab64060ab4cf3a94cd304ddbba4aefa9fdb73aa7228ae093"
         },
         {
           "Path": "src/three-engine/core/MaterialManager.js",
@@ -751,8 +761,8 @@
         },
         {
           "Path": "src/three-engine/core/ModelExploder.js",
-          "Size": 3121,
-          "Sha256": "019fbb9b38aa8005fc5b4ee87f274302d955693e4821221c0c2a594486b42e42"
+          "Size": 3271,
+          "Sha256": "640e2d191196d96be710be53f1d2b0d9076c192cee0cae2e637c3ea5ebc10733"
         },
         {
           "Path": "src/three-engine/core/ModelLoader.js",
@@ -765,19 +775,64 @@
           "Sha256": "fb36924fb3ebb52401f7633223d57b357f58d466b460972e9615e85290c5f1fc"
         },
         {
+          "Path": "src/three-engine/core/SceneConfig.js",
+          "Size": 12588,
+          "Sha256": "a01e3b81733a730aa18d42d86e348713f744002c919cbace193a3385dcf748bc"
+        },
+        {
+          "Path": "src/three-engine/core/lis/geometry.js",
+          "Size": 8246,
+          "Sha256": "32e645d5aebe2fe598ac8fe3286c00977740077e3784891af8a207e93bae7ba3"
+        },
+        {
+          "Path": "src/three-engine/core/lis/index.js",
+          "Size": 267,
+          "Sha256": "45ece360300f368360f510afd4970b62e4b55abd6a8ea7720e909a62f6cd5de0"
+        },
+        {
+          "Path": "src/three-engine/core/lis/parser.js",
+          "Size": 14584,
+          "Sha256": "00eaea268da49d55718b48ddc0c4076e5e41f0637b95473c6b80b2779e0fbe1c"
+        },
+        {
+          "Path": "src/three-engine/core/lis/support.js",
+          "Size": 4412,
+          "Sha256": "6c54d9294810831b98ec72fd13cd5d8d62cc289e4895e33fc409af27e83c2bb6"
+        },
+        {
           "Path": "src/three-engine/designer.vue",
-          "Size": 12167,
-          "Sha256": "75e79d2d02862ec95c76c989f8d72c35f1a62f254786d46987ce54ac8d51150f"
+          "Size": 17244,
+          "Sha256": "65890fc5dd2ccbecd1aee124f1a99a36b06299fbc7b54b11c3ecf91892c1f216"
         },
         {
           "Path": "src/three-engine/renderer.vue",
-          "Size": 7876,
-          "Sha256": "4fe379c2f93b1a2ebb353a228163e2767803ffc509532698b7d2c924e9584b0f"
+          "Size": 7820,
+          "Sha256": "0848d56b359608f2f7c1bf674dd760639d116d664a062115e5fcfbb138cbc81f"
         },
         {
           "Path": "src/utils/microi.v8.js",
           "Size": 73622,
           "Sha256": "e1503fec0a0bc0077efc6429b4f16a9e2ba3e7e1188a7b5587a7aa1b1788fda0"
+        },
+        {
+          "Path": "tests/lis-import.test.mjs",
+          "Size": 12783,
+          "Sha256": "98b8795f25517174a478dc468479b94967e81c9f504db2650cd8c2fbc015ba11"
+        },
+        {
+          "Path": "tests/lis-scene.test.mjs",
+          "Size": 6981,
+          "Sha256": "d0754ef8d2ac135ca5a1d161c379abdb84350695c31ec8ded1199e958175beb8"
+        },
+        {
+          "Path": "tests/model-exploder.test.mjs",
+          "Size": 3054,
+          "Sha256": "8d4b035434de5370b31d528f806c71befd885e29f8e4040a8257f9dcb66fb89f"
+        },
+        {
+          "Path": "tests/scene-config.test.mjs",
+          "Size": 11349,
+          "Sha256": "7117bc3e7754729ab68a6cf347d1ede4ae8222e7aab8582a22e471492dbf5445"
         },
         {
           "Path": "tests/scene-contract.test.mjs",
@@ -794,7 +849,16 @@
           "Size": 269,
           "Sha256": "37d2ebfba794e5d1a4d93c1d1d7d684d74dd7e53c4a298858986eaacb6908cac"
         }
-      ]
+      ],
+      "OfficialSourceReadback": {
+        "ApiBase": "https://api.itdos.com",
+        "OsClient": "iTdos",
+        "AppId": "01M1H0CFADBMHHQM4HEVJQM1ZC",
+        "AppKey": "microi-3d-engine",
+        "At": "2026-10-15T03:12:57.239Z",
+        "SourceManifestHash": "0b0452bbadd808bf70bf32f7d407dfb6be8f6a99f0e7a9a31d8febbc787ef6ac",
+        "ContextReceiptSha256": "368cf883c30bb8473fb0d4429d2e58932fbfbd7c69f7eb40e8f8102d916cc887"
+      }
     }
   ],
   "Repositories": [
