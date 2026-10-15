@@ -109,7 +109,10 @@ function checkedSuite(suite,name){
   check(rows.every(row=>typeof row.testName==='string'&&['Passed','NotExecuted'].includes(row.outcome)),
     '测试失败、取消或未知结果不能被 SQL Server 例外接受：'+name);
   const skipped=rows.filter(row=>row.outcome==='NotExecuted'),passed=rows.length-skipped.length;
-  check(Number(counters.total)===rows.length&&Number(counters.passed)===passed&&Number(counters.notExecuted)===skipped.length,
+  // VSTest 的 xUnit 适配器可能把 notExecuted 留为 0；逐行结果仍是跳过名单的唯一依据。
+  // total/passed/executed 必须同时吻合原始行，不能用兼容计数字段掩盖失败或遗漏。
+  check(Number(counters.total)===rows.length&&Number(counters.passed)===passed&&Number(counters.executed)===passed
+    &&[0,skipped.length].includes(Number(counters.notExecuted)),
     'TRX 用例明细与统计不一致：'+name);
   for(const key of ['failed','error','timeout','aborted','inconclusive','passedButRunAborted','notRunnable','disconnected','inProgress','pending'])
     check(Number(counters[key]??0)===0,'SQL Server 例外不能接受异常统计：'+name+'/'+key);

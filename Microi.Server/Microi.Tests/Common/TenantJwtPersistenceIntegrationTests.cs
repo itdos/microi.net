@@ -17,16 +17,20 @@ public sealed class TenantJwtPersistenceIntegrationTests
 
     // SQL Server 例外只对应它的四个数据行，MySQL 四种存量密钥状态的断言必须照常运行。
     [Theory]
-    [InlineData("MySql", null, Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
-    [InlineData("MySql", "", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
-    [InlineData("MySql", " \t ", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
-    [InlineData("MySql", "short", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
-    [InlineData("SqlServer", null, Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
-    [InlineData("SqlServer", "", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
-    [InlineData("SqlServer", " \t ", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
-    [InlineData("SqlServer", "short", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [InlineData("MySql", null)]
+    [InlineData("MySql", "")]
+    [InlineData("MySql", " \t ")]
+    [InlineData("MySql", "short")]
+    [InlineData("SqlServer", null)]
+    [InlineData("SqlServer", "")]
+    [InlineData("SqlServer", " \t ")]
+    [InlineData("SqlServer", "short")]
     public async Task NewlyAddedTenant_PersistsWeakKeyAndConvergesCompetingRefreshes(string providerName, string? previousSecret)
     {
+        // 在运行时按 provider 判定，避免 xUnit 3.2.2 InlineData 丢失逐行跳过条件。
+        Assert.SkipUnless(providerName == "MySql" ? HasMySqlFixture : HasSqlServerFixture,
+            providerName == "MySql" ? "Requires an isolated MySQL fixture" : "Requires an isolated SQL Server fixture");
+
         var databaseName = "jwt_persist_" + Guid.NewGuid().ToString("N");
         var mysql = providerName == "MySql";
         var type = mysql ? DatabaseType.MySql : DatabaseType.SqlServer;
