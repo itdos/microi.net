@@ -3221,8 +3221,8 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "b40b04537557c18ed8a07f9b43cfd4916446f01af551f22496f4ae2176e088d1",
-      "originalLines": 627,
+      "originalSha256": "9d5816443b34c6ca71a3b0c15c729acbfd7762deba8572d8d5831648cf3ca0c0",
+      "originalLines": 638,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
       "entryLines": 285,
@@ -3538,6 +3538,14 @@
           "sha256": "1dd79589434568ac963b144f4278707e4836bf477181b5e7a3a82c0275d3189e",
           "lines": 30,
           "heading": "CLI 与 IDE 插件错版共存约定"
+        },
+        {
+          "id": "workspace-conventions-039",
+          "ordinal": 39,
+          "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
+          "sha256": "8cfc7d1e2a6a0a766845c79775efe8c7fb15ef805a47e8bc1965128e348f3062",
+          "lines": 12,
+          "heading": "本地测试程序与依赖生命周期（强制）"
         }
       ],
       "references": [
@@ -3563,6 +3571,7 @@
         {
           "path": "references/progressive-02-microi-net-api-本地启动约定.md",
           "headings": [
+            "本地测试程序与依赖生命周期（强制）",
             "Microi.net.Api 本地启动约定",
             "多 AI 对话共享本地服务与发布互斥（强制）",
             "本地租户与测试凭据读取约定",

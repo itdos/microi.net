@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=workspace-conventions-038 sha256=0000000000000000000000000000000000000000000000000000000000000000 -->
+<!-- microi-progressive:chunk id=workspace-conventions-039 sha256=8cfc7d1e2a6a0a766845c79775efe8c7fb15ef805a47e8bc1965128e348f3062 -->
 ## 本地测试程序与依赖生命周期（强制）
 
 - 启动前盘点当前源码/Vite/API、数据库、Redis、MongoDB、MinIO、端口及其归属。健康且适用的开发/测试服务优先复用；已有服务不满足时，优先直接启动本地源码，或把本轮编译产物复制到任务隔离目录启动，避免锁住共享构建输出。登记实际源码、配置来源、PID、创建时间、工作目录和监听端口；不能启动另一份旧 DLL 冒充当前候选。
