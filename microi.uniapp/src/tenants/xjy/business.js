@@ -320,6 +320,14 @@ export const businessModules = {
       ] }
     ]
   }),
+  iotCommunicationLogs: native({
+    title: 'IoT设备通讯日志', table: 'diy_iot_communication_log', menuAliases: ['IoT设备通讯日志'],
+    // 日志由MongoDB接口按设备和月份读取；它不支持通用关键词检索或人工增删改。
+    readOnly: true, searchable: false, monthField: 'LogMonth', timeRangeField: 'RecordTime',
+    titleField: 'RecordTime', defaultOrderBy: 'CreateTime', defaultOrderType: 'DESC',
+    lines: [{ label: 'IoT厂商', field: 'Provider' }, { label: 'IoT设备编号', field: 'DeviceCode' }, { label: '事件类型', field: 'EventType' }],
+    relatedMetrics: [{ key: 'total', label: '通讯记录', tone: 'neutral' }]
+  }),
   serviceRecords: native({
     // 该入口是已完成售后任务视图，不是 diy_ServiceRecord 汇总档案；禁止复用“服务记录表”别名，
     // 避免菜单树只返回 DiyTableId 时误绑到 /fuwujilub，导致两个入口请求同一个模块。

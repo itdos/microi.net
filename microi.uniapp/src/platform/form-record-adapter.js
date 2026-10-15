@@ -13,6 +13,7 @@ import {
 } from '@/platform/native-form.js'
 import { readChildDraft, writeChildDraft } from '@/platform/child-form-drafts.mjs'
 import { mergeCurrentUserAfterProfileSave } from '@/platform/current-user-profile.mjs'
+import { readFormRecord } from '@/platform/configured-read-api.mjs'
 
 const DEFAULT_ADAPTER = 'form-engine'
 const CURRENT_USER_ADAPTER = 'current-user'
@@ -65,11 +66,9 @@ async function attachWeChatContentSecurityLoginCode(payload) {
 async function loadFormEngineRecord(context) {
   if (!context.rowId) return null
   if (context.draftRelation) return { Code: 1, Data: readChildDraft(context.draftRelation, context.tableName, context.rowId) }
-  return V8.FormEngine.GetFormData(context.tableName, {
-    Id: context.rowId,
-    ...(context.menuId ? { _SysMenuId: context.menuId } : {}),
-    ...(context.tableChildAuth ? { _TableChildAuth: context.tableChildAuth } : {})
-  })
+  // 先复用本次加载的元数据，按表级 Select 读取虚拟记录；普通表沿用 FormEngine。
+  const definition = context.definition || await (context.definitionPromise || loadFormEngineDefinition(context))
+  return readFormRecord(V8, { ...context, definition })
 }
 
 async function saveFormEngineRecord(context) {

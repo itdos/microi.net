@@ -914,6 +914,11 @@ export async function saveNativeForm(tableName, rowId, form, fields, extraValues
 
 export function fieldDisplayValue(field, value) {
   if (value === null || value === undefined || value === '') return '-'
+  // 长文本与代码字段保留完整正文，不能把通讯报文等JSON压缩成前三个值的标签摘要。
+  if (['Textarea', 'CodeEditor', 'JsonTable'].includes(field.component)) {
+    const parsedText = parseJson(value, value)
+    return parsedText && typeof parsedText === 'object' ? JSON.stringify(parsedText, null, 2) : String(value)
+  }
   if (field.component === 'Switch') return value === true || value === 1 || value === '1' ? '是' : '否'
   const config = field.config || parseJson(field.Config, {}) || {}
   const preferredKeys = [config.SelectLabel, config.LabelField, config.SelectSaveField].filter(Boolean)

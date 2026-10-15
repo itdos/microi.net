@@ -21,6 +21,74 @@ test("standard view resolves stored option ids to labels", function () {
     assert.equal(getFormFieldDisplayValue({ Status: '{"Id":"draft","Name":"草稿"}' }, field), "草稿");
 });
 
+test("只读详情按保存字段解析占位对象及历史 JSON 对象", function () {
+    const field = {
+        Name: "Category", Component: "Select",
+        Config: { DataSource: "Sql", SelectSaveFormat: "Text", SelectSaveField: "Key", SelectLabel: "Value" },
+        Data: [{ Key: "category-a", Value: "分类甲" }]
+    };
+    const form = { Category: { Key: "category-a", Value: "category-a" } };
+    const before = JSON.stringify({ form, field });
+    assert.equal(getFormFieldDisplayValue(form, field), "分类甲");
+    assert.equal(getFormFieldDisplayValue({ Category: JSON.stringify(form.Category) }, field), "分类甲");
+    assert.equal(JSON.stringify({ form, field }), before, "名称解析不能改写保存值或选项");
+});
+
+test("异步选项加载后详情和标题更新名称且保留原保存值", function () {
+    const field = {
+        Name: "Category", Component: "Select",
+        Config: { SelectSaveField: "Key", SelectLabel: "Value" }, Data: []
+    };
+    const form = { Category: { Key: "category-a", Value: "category-a" } };
+    assert.equal(getFormFieldDisplayValue(form, field), "category-a");
+    field.Data = [{ Key: "category-a", Value: "分类甲" }];
+    assert.equal(getFormFieldDisplayValue(form, field), "分类甲");
+    assert.equal(getFormRecordDisplayTitle(form, [field], [field]), "分类甲");
+    assert.equal(form.Category.Key, "category-a");
+    assert.equal(form.Category.Value, "category-a");
+});
+
+test("当前选项名称优先于保存对象中的旧名称", function () {
+    const field = {
+        Name: "Category", Component: "Select",
+        Config: { SelectSaveField: "Code", SelectLabel: "Title" },
+        Data: [{ Code: "a", Title: "当前名称" }]
+    };
+    assert.equal(getFormFieldDisplayValue({ Category: { Code: "a", Title: "历史名称" } }, field), "当前名称");
+});
+
+test("占位对象只能按身份匹配选项不能借用另一选项的同名标签", function () {
+    const field = {
+        Name: "Category", Component: "Select",
+        Config: { SelectSaveField: "Key", SelectLabel: "Value" },
+        Data: [{ Key: "a", Value: "b" }, { Key: "b", Value: "分类乙" }]
+    };
+    assert.equal(getFormFieldDisplayValue({ Category: { Key: "b", Value: "b" } }, field), "分类乙");
+    assert.equal(getFormFieldDisplayValue({ Category: { Key: "missing", Value: "b" } }, field), "b");
+});
+
+test("多选占位对象和数字零均可回显且未知值保持可见", function () {
+    const field = {
+        Name: "Category", Component: "MultipleSelect",
+        Config: '{"SelectSaveField":"Key","SelectLabel":"Value"}',
+        Data: [{ Key: "a", Value: "分类甲" }, { Key: 0, Value: "零类别" }]
+    };
+    const form = { Category: [{ Key: "a", Value: "a" }, { Key: 0, Value: 0 }, "missing"] };
+    assert.equal(getFormFieldDisplayValue(form, field), "分类甲、零类别、missing");
+});
+
+test("选项不可用时保留已有名称和历史纯文本兼容", function () {
+    const field = {
+        Name: "Category", Component: "Select",
+        Config: { SelectSaveField: "Key", SelectLabel: "Value" },
+        Data: [{ Key: "a", Value: "分类甲" }]
+    };
+    assert.equal(getFormFieldDisplayValue({ Category: { Key: "removed", Value: "历史分类" } }, field), "历史分类");
+    assert.equal(getFormFieldDisplayValue({ Category: "分类甲" }, field), "分类甲");
+    field.Data = [];
+    assert.equal(getFormFieldDisplayValue({ Category: { Key: "a", Value: "已知名称" } }, field), "已知名称");
+});
+
 test("standard view recursively resolves department and tree ids", function () {
     const field = {
         Name: "DeptId",

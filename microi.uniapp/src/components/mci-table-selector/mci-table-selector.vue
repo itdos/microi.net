@@ -1,5 +1,6 @@
 <template>
   <view class="selector-field" :class="{ 'selector-field--compact': compact, 'selector-field--primary': presentation.tone === 'primary' }">
+    <slot name="trigger" :open="openSelector" :disabled="readonly || submitting">
     <view class="selector-field__button" :class="{ disabled: readonly }" hover-class="selector-field__pressed" @tap="openSelector">
       <view class="selector-field__icon"><view v-if="presentation.icon === 'images'" class="selector-field__images"><view></view></view><text v-else>＋</text></view>
       <view class="selector-field__copy">
@@ -8,9 +9,13 @@
       </view>
       <text class="selector-field__arrow">›</text>
     </view>
+    </slot>
 
+    <!-- #ifdef H5 -->
+    <teleport to="body">
+    <!-- #endif -->
     <root-portal v-if="visible">
-      <view class="selector-mask" @tap="closeSelector">
+      <view class="selector-mask" :style="portalTokenStyle" @tap="closeSelector">
         <view class="selector-panel" @tap.stop>
         <view class="selector-panel__handle"></view>
         <view class="selector-panel__header">
@@ -68,7 +73,7 @@
         </view>
         </view>
       </view>
-      <view v-if="filterVisible" class="selector-mask selector-mask--filters" @tap="closeFilters">
+      <view v-if="filterVisible" class="selector-mask selector-mask--filters" :style="portalTokenStyle" @tap="closeFilters">
         <view class="selector-panel selector-panel--filters" :class="{ 'selector-panel--filters-expanded': filterFields.length > 3 }" @tap.stop>
           <view class="selector-panel__handle"></view>
           <view class="selector-panel__header">
@@ -126,11 +131,15 @@
         </view>
       </view>
     </root-portal>
+    <!-- #ifdef H5 -->
+    </teleport>
+    <!-- #endif -->
   </view>
 </template>
 
 <script>
 import { V8, post } from '@/utils/request.js'
+import { getMciTokenStyle } from '@/utils/theme.js'
 import { fieldDisplayValue, loadNativeFormDefinition, loadNativeTableModel } from '@/platform/native-form.js'
 import { loadGrantedMenuDefinition } from '@/platform/module-registry.js'
 import {
@@ -169,7 +178,8 @@ export default {
     parentMenuId: { type: String, default: '' },
     readonly: { type: Boolean, default: false },
     presentation: { type: Object, default: () => ({}) },
-    compact: { type: Boolean, default: false }
+    compact: { type: Boolean, default: false },
+    submitSelection: { type: Function, default: null }
   },
   emits: ['change'],
   data() {
@@ -201,6 +211,8 @@ export default {
     }
   },
   computed: {
+    // H5 弹层挂到 body 后重新带入主题与安全区；小程序继续使用 root-portal。
+    portalTokenStyle() { return getMciTokenStyle() },
     config() { return (this.field.config && this.field.config.OpenTable) || {} },
     targetMenuId() { return this.config.SysMenuId || this.config.ModuleId || '' },
     multiple() { return this.config.MultipleSelect !== false },
@@ -484,7 +496,9 @@ export default {
       if (this.submitting || !this.selectedRows.length) return
       this.submitting = true
       try {
-        const result = await submitOpenTableSelection({
+        // 定制原生动作复用选择器，保持默认字段回填链路及取消行为。
+        const submit = this.submitSelection || submitOpenTableSelection
+        const result = await submit({
           tableName: this.parentTable,
           parentId: this.parentId,
           field: this.field,

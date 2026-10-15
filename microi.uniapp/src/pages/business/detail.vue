@@ -108,6 +108,9 @@
 							:class="{ expanded: isSectionExpanded(section, sectionIndex) }">›</text>
 					</view>
 					<view v-if="isSectionExpanded(section, sectionIndex)" class="field-list section-body-enter">
+						<XjyDeviceIoTActions v-if="key === 'devices' && section.key === deviceActionSectionKey"
+							:definition="definition || {}" :form="detail" :menu-id="menuId" :user="currentUser"
+							@saved="loadDetail(false)" />
 						<view v-if="section.selectorTabs.length" class="section-selector-grid">
 							<mci-table-selector v-for="relatedTab in section.selectorTabs" :key="relatedTab.key"
 								:field="relatedTab.field" :parent-table="moduleConfig.table"
@@ -432,6 +435,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 	import { customerCaseChildField } from '@/tenants/xjy/native-table.js'
 	import XjyCustomerContractTotals from '@/tenants/xjy/components/customer-contract-totals.vue'
+	import XjyDeviceIoTActions from '@/tenants/xjy/components/device-iot-actions.vue'
+	import { isDeviceIoTSelector } from '@/tenants/xjy/device-iot-actions.mjs'
 	import { customerContractTotalsSupported, loadCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
 	import {
 		canGenerateDeviceQrCode,
@@ -1274,7 +1279,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/business/detail') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/business/detail') },
-		components: { MciBusinessRelatedList, XjyCustomerContractTotals },
+		components: { MciBusinessRelatedList, XjyCustomerContractTotals, XjyDeviceIoTActions },
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -1488,7 +1493,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 							this.isEmbeddedChildRelated(item) && item.field.layoutGroupKey === group.key
 						),
 						selectorTabs: this.activeRelatedTabs.filter((item) =>
-							this.isEmbeddedOpenTableRelated(item) && item.field.layoutGroupKey === group.key
+							this.isEmbeddedOpenTableRelated(item) && item.field.layoutGroupKey === group.key &&
+							!isDeviceIoTSelector(this.moduleConfig.table, item.field)
 						),
 						source: group.source,
 						description: group.description || '',
@@ -2307,7 +2313,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				return item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey)
 			},
 			isEmbeddedRelated(item) {
-				return this.isEmbeddedChildRelated(item) || this.isEmbeddedOpenTableRelated(item)
+				return isDeviceIoTSelector(this.moduleConfig.table, item?.field) ||
+					this.isEmbeddedChildRelated(item) || this.isEmbeddedOpenTableRelated(item)
 			},
 			callPhone(phone) {
 				if (phone) uni.makePhoneCall({
