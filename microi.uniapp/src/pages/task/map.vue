@@ -1,7 +1,15 @@
 <template>
   <mci-page-shell class="map-page" :style="mciTokenStyle" :title="pageTitle" :subtitle="pageSubtitle" @back="goBack">
     <template #right><view class="refresh-action" hover-class="refresh-action--pressed" @tap="reload"><text>↻</text></view></template>
-    <view v-if="mode === 'task' || !taskId" class="range-band"><text>范围</text><slider class="range-slider" :value="radius" min="1" :max="rangeMax" step="1" active-color="#087DA8" background-color="#dce7eb" block-size="18" @change="changeRadius" /><text>{{ radius }} km</text></view>
+    <view v-if="mode === 'task' || !taskId" class="range-band">
+      <mci-region-picker class="map-region" :model-value="mapRegion" :allow-all-provinces="true" @change="changeRegion">
+        <view class="map-region__trigger"><text>{{ regionLabel }}</text><view class="map-region__arrow" aria-hidden="true"><view class="map-region__chevron"></view></view></view>
+      </mci-region-picker>
+      <text v-if="isRegionScope" class="region-scope-hint">区域内不限距离</text>
+      <slider v-else class="range-slider" :value="radiusIndex" min="0" :max="rangeMax" step="1" active-color="#087DA8" background-color="#dce7eb" block-size="18" @change="changeRadius" />
+      <view v-if="isRegionScope" class="nearby-action" @tap="useNearby">查附近</view>
+      <text v-else>{{ radius }} km</text>
+    </view>
     <view v-else class="status-legend"><view><text class="status-dot unfinished"></text><text>未完成设备</text></view><view><text class="status-dot complete"></text><text>已完成设备</text></view></view>
     <view class="map-wrap">
       <view v-if="loading" class="map-loading"><mci-skeleton type="detail" :rows="4" /><text>正在获取位置与数据</text></view>
@@ -78,6 +86,8 @@ import { V8 } from '@/utils/request.js'
 import { callApiEngine, canOpenBusinessEntry, findMenu, loadModuleRows, openForm } from '@/platform/business-runtime.js'
 import { getBusinessModule } from '@/platform/business.js'
 import { loadAllTaskDevices, loadTasks } from '@/utils/xjy-task.js'
+import MciRegionPicker from '@/components/mci-region-picker/mci-region-picker.vue'
+import { MAP_RADIUS_OPTIONS, mapRegionWhere, mapRegionLabel } from '@/tenants/xjy/map-scope.mjs'
 
 const MODE_META = {
   task: { title: '任务地图', entity: '任务', action: '查看任务详情' },
@@ -97,11 +107,13 @@ const CUSTOMER_MAP_SELECT_FIELDS = [
 function buildMapRangeBounds(latitude, longitude, radiusKm) {
   const latitudeDelta = radiusKm / 111.32
   const longitudeDelta = radiusKm / (111.32 * Math.max(Math.cos(latitude * Math.PI / 180), 0.01))
+  // 坐标列兼容历史 varchar 存储；范围必须绑定数值，避免大半径跨经度位数时按文本比较。
+  // toFixed 返回字符串，保留精度后显式转回 Number，确保 JSON 请求中的 Value 仍是数值。
   return {
-    minLatitude: (latitude - latitudeDelta).toFixed(7),
-    maxLatitude: (latitude + latitudeDelta).toFixed(7),
-    minLongitude: (longitude - longitudeDelta).toFixed(7),
-    maxLongitude: (longitude + longitudeDelta).toFixed(7)
+    minLatitude: Number((latitude - latitudeDelta).toFixed(7)),
+    maxLatitude: Number((latitude + latitudeDelta).toFixed(7)),
+    minLongitude: Number((longitude - longitudeDelta).toFixed(7)),
+    maxLongitude: Number((longitude + longitudeDelta).toFixed(7))
   }
 }
 
@@ -154,20 +166,25 @@ export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/task/map') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/task/map') },
   mixins: [themeMixin],
+  components: { MciRegionPicker },
   data() {
     return {
       mode: 'device', customerId: '', taskId: '', taskType: '', radius: 15, latitude: 30.2741, longitude: 120.1551,
+      mapRegion: [], mapRequestId: 0,
       taskFilters: {}, deviceFilters: {}, customerFilters: {}, rows: [], markers: [], markerGroups: [], selected: null, selectedGroup: [], loading: true, contactsLoading: false, contacts: []
     }
   },
   computed: {
     meta() { return MODE_META[this.mode] || MODE_META.device },
     hasListCustomerFilters() { return this.mode === 'customer' && this.customerFilters.fromList === true },
-    rangeMax() { return (this.mode === 'task' || this.hasListCustomerFilters) ? 300 : 50 },
+    rangeMax() { return MAP_RADIUS_OPTIONS.length - 1 },
+    radiusIndex() { return Math.max(0, MAP_RADIUS_OPTIONS.indexOf(this.radius)) },
+    isRegionScope() { return this.mapRegion.length > 0 },
+    regionLabel() { return mapRegionLabel(this.mapRegion) },
     pageTitle() { return this.meta.title },
     entityLabel() { return this.meta.entity },
     positionedTaskCount() { return this.markerGroups.reduce((total, group) => total + group.rows.length, 0) },
-    pageSubtitle() { return this.mode === 'task' ? `${this.positionedTaskCount}/${this.rows.length} 个任务有坐标 · ${this.markers.length} 个位置` : (this.taskId ? `${this.positionedTaskCount}/${this.rows.length} 台设备有位置 · ${this.markers.length} 个位置` : (this.hasListCustomerFilters ? `${this.positionedTaskCount}/${this.rows.length} 个客户有坐标 · ${this.markers.length} 个位置` : (this.markers.length ? `附近 ${this.markers.length} 个${this.entityLabel}` : `按现场位置查找${this.entityLabel}`))) },
+    pageSubtitle() { return this.mode === 'task' ? `${this.positionedTaskCount}/${this.rows.length} 个任务有坐标 · ${this.markers.length} 个位置` : (this.taskId ? `${this.positionedTaskCount}/${this.rows.length} 台设备有位置 · ${this.markers.length} 个位置` : (this.hasListCustomerFilters ? `${this.positionedTaskCount}/${this.rows.length} 个客户有坐标 · ${this.markers.length} 个位置` : (this.isRegionScope ? `${this.regionLabel} · ${this.markers.length} 个${this.entityLabel}` : (this.markers.length ? `附近 ${this.markers.length} 个${this.entityLabel}` : `按现场位置查找${this.entityLabel}`)))) },
     emptyText() { return this.mode === 'task' ? '当前范围内暂无可查看的售后任务' : (this.taskId ? '本任务设备暂无有效定位' : (this.hasListCustomerFilters ? '当前筛选到的客户暂无有效坐标' : `当前范围内暂无${this.entityLabel}`)) },
     selectedTitle() { return this.mode === 'device' ? (this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 台任务设备` : (this.selected.ShebeiMC || this.selected.ShangpinMC || this.selected.KehuMC || '客户设备')) : (this.mode === 'task' ? (this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 个售后任务` : (this.selected.customer || this.selected.KehuMC || '售后任务')) : (this.mode === 'customer' && this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 个客户` : (this.selected.KehuMC || '客户'))) },
     selectedSubtitle() { return this.mode === 'device' ? (this.selectedGroup.length > 1 ? '位于同一安装坐标，请选择设备' : (this.selected.ShebeiBH || this.selected.ShebeiXH || '')) : (this.mode === 'task' ? (this.selectedGroup.length > 1 ? '位于同一服务坐标，请选择任务' : ([this.selected.no, this.selected.type].filter(Boolean).join(' · '))) : (this.mode === 'customer' ? (this.selectedGroup.length > 1 ? '位于同一客户坐标，请选择客户' : (this.selected.XiangxiDZ || this.selected.LianxiR || '')) : ([this.selected.Chengshi, this.selected.XiangxiDZ].filter(Boolean).join(' ') || this.selected.LianxiR || ''))) },
@@ -190,6 +207,7 @@ export default {
     if (this.taskFilters.customerId) this.customerId = String(this.taskFilters.customerId)
     this.ensureMapAccessAndReload()
   },
+  onUnload() { this.mapRequestId += 1 },
   methods: {
     requiresDeviceMapAccess() {
       return this.mode === 'device' && !this.taskId
@@ -273,7 +291,8 @@ export default {
       if (this.markers.length) { this.latitude = this.markers[0].latitude; this.longitude = this.markers[0].longitude }
     },
     async authorizedCustomerModule(selectFields = CUSTOMER_MAP_SELECT_FIELDS, preferredMenuId = '') {
-      const customerModule = getBusinessModule('customers')
+      const moduleKey = this.customerFilters.moduleKey === 'cooperativeCustomers' ? 'cooperativeCustomers' : 'customers'
+      const customerModule = getBusinessModule(moduleKey)
       const table = customerModule.table || 'Diy_Kehu'
       // preferredMenuId 为空时，自动查找当前用户有权限的客户菜单
       const menu = await findMenu(customerModule.menuAliases || [], table, false, preferredMenuId || '')
@@ -386,12 +405,25 @@ export default {
       }
     },
     async loadCustomerDevices() {
+      const requestId = ++this.mapRequestId
       this.loading = true
+      this.applyRows([])
       try {
+        const scope = await this.resolveMapScope()
+        if (requestId !== this.mapRequestId) return
+        if (scope.regional) {
+          // 客户设备没有独立城市字段，行政区与通用设备地图一样使用所属客户的城市。
+          const customerConfig = await this.authorizedCustomerModule(['Id'])
+          if (!customerConfig) throw new Error('当前账号无权查看该客户区域')
+          const customers = await this.loadAuthorizedCustomerRows(customerConfig, {
+            extraWhere: [{ Name: 'Id', Type: '=', Value: this.customerId }, ...scope.where], refresh: true
+          })
+          if (requestId !== this.mapRequestId || !customers.length) return
+        }
         const deviceModule = getBusinessModule('devices')
         const menu = await findMenu(deviceModule.menuAliases || [], deviceModule.table || 'Diy_KehuSB', false)
         if (!menu || !menu.Id) throw new Error('当前账号无权查看该客户设备')
-        const result = await loadModuleRows({
+        const rows = await this.loadAuthorizedCustomerRows({
           ...deviceModule,
           ModuleEngineKey: 'Diy_KehuSB',
           menuId: String(menu.Id),
@@ -403,9 +435,13 @@ export default {
           pageSize: 500,
           refresh: true
         })
-        this.applyRows(await this.withCustomerCoordinateDefaults(result.rows))
-      } catch (error) { uni.showToast({ title: error.message || '设备加载失败', icon: 'none' }) }
-      finally { this.loading = false }
+        const devices = await this.withCustomerCoordinateDefaults(rows)
+        if (requestId !== this.mapRequestId) return
+        this.applyRows(devices.filter(device => this.scopeContains(scope, device)))
+      } catch (error) {
+        if (requestId === this.mapRequestId) uni.showToast({ title: error.message || '设备加载失败', icon: 'none' })
+      }
+      finally { if (requestId === this.mapRequestId) this.loading = false }
     },
     async loadTaskDevices() {
       this.loading = true
@@ -450,21 +486,13 @@ export default {
       finally { this.loading = false }
     },
     async loadTaskMap() {
+      const requestId = ++this.mapRequestId
       this.loading = true
+      this.applyRows([])
       try {
-        const position = await new Promise((resolve, reject) => {
-          uni.getLocation({ type: 'gcj02', isHighAccuracy: true, success: resolve, fail: reject })
-        })
-        this.latitude = Number(position.latitude)
-        this.longitude = Number(position.longitude)
-        const radius = Number(this.radius)
-        const bounds = buildMapRangeBounds(this.latitude, this.longitude, radius)
-        const rangeWhere = [
-          { Name: 'KehuDT_Lat', Type: '>=', Value: bounds.minLatitude },
-          { Name: 'KehuDT_Lat', Type: '<=', Value: bounds.maxLatitude },
-          { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
-          { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
-        ]
+        const scope = await this.resolveMapScope()
+        if (requestId !== this.mapRequestId) return
+        const rangeWhere = scope.where
         const baseExtraWhere = Array.isArray(this.taskFilters.extraWhere) ? this.taskFilters.extraWhere : []
         const tasksById = new Map()
         const pageSize = 300
@@ -480,6 +508,7 @@ export default {
               includeCoordinates: true, extraWhere,
               refresh: refreshTaskMenu && pageIndex === 1
             })
+            if (requestId !== this.mapRequestId) return
             refreshTaskMenu = false
             tasks.push(...result.rows)
             count = result.count
@@ -491,44 +520,37 @@ export default {
 
         // 新任务直接使用任务坐标；历史无坐标任务仍由任务模块先做菜单与行权限过滤。
         await loadScopedTasks([...baseExtraWhere, ...rangeWhere])
-        await loadScopedTasks([...baseExtraWhere, ...TASK_COORDINATE_MISSING_WHERE])
+        if (requestId !== this.mapRequestId) return
+        // 行政区已包含历史无坐标任务，只需在附近模式额外补查后再按真实距离过滤。
+        if (!scope.regional) await loadScopedTasks([...baseExtraWhere, ...TASK_COORDINATE_MISSING_WHERE])
 
         const coordinateResult = await this.withAuthorizedTaskCoordinateDefaults([...tasksById.values()])
-        const visibleTasks = coordinateResult.rows.filter((task) => {
-          const latitude = Number(task.KehuDT_Lat)
-          const longitude = Number(task.KehuDT_Lng)
-          return validMapCoordinate(latitude, longitude) &&
-            mapDistanceKm(this.latitude, this.longitude, latitude, longitude) <= radius
-        })
+        if (requestId !== this.mapRequestId) return
+        const visibleTasks = coordinateResult.rows.filter(task => this.scopeContains(scope, task))
         this.applyRows(visibleTasks)
         if (coordinateResult.fallbackFailed) {
           uni.showToast({ title: '部分历史任务暂时无定位', icon: 'none' })
         }
       } catch (error) {
+        if (requestId !== this.mapRequestId) return
         const message = String(error && (error.errMsg || error.message) || '')
         const locationDenied = /getLocation:fail auth deny|location permission|定位权限/i.test(message)
         uni.showToast({ title: locationDenied ? '请授权定位后重试' : (message || '任务地图加载失败'), icon: 'none' })
       }
-      finally { this.loading = false }
+      finally { if (requestId === this.mapRequestId) this.loading = false }
     },
     async loadFilteredCustomers() {
+      const requestId = ++this.mapRequestId
       this.loading = true
+      this.applyRows([])
       try {
-        const position = await new Promise((resolve, reject) => {
-          uni.getLocation({ type: 'gcj02', isHighAccuracy: true, success: resolve, fail: reject })
-        })
-        this.latitude = Number(position.latitude)
-        this.longitude = Number(position.longitude)
+        const scope = await this.resolveMapScope()
+        if (requestId !== this.mapRequestId) return
         const filters = this.customerFilters || {}
-        const radius = Number(this.radius)
-        const bounds = buildMapRangeBounds(this.latitude, this.longitude, radius)
-        const rangeWhere = [
-          { Name: 'KehuDT_Lat', Type: '>=', Value: bounds.minLatitude },
-          { Name: 'KehuDT_Lat', Type: '<=', Value: bounds.maxLatitude },
-          { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
-          { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
-        ]
-        const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS)
+        const rangeWhere = scope.where
+        const menuId = String(filters.menuId || '').trim()
+        if (!menuId) throw new Error('当前账号无权查看客户地图')
+        const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS, menuId)
         if (!config) {
           uni.showToast({ title: '当前账号无权查看客户地图', icon: 'none' })
           return
@@ -553,24 +575,21 @@ export default {
             ],
             refresh: true
           })
+          if (requestId !== this.mapRequestId) return
           if (!result.rows.length) break
           customers.push(...result.rows)
           count = result.count
           pageIndex += 1
         } while (customers.length < count)
-        this.applyRows(customers.filter((customer) => {
-          const latitude = Number(customer.KehuDT_Lat)
-          const longitude = Number(customer.KehuDT_Lng)
-          return Number.isFinite(latitude) && latitude !== 0 &&
-            Number.isFinite(longitude) && longitude !== 0 &&
-            mapDistanceKm(this.latitude, this.longitude, latitude, longitude) <= radius
-        }))
+        if (requestId !== this.mapRequestId) return
+        this.applyRows(customers.filter(customer => this.scopeContains(scope, customer)))
       } catch (error) {
+        if (requestId !== this.mapRequestId) return
         const message = String(error && (error.errMsg || error.message) || '')
         const locationDenied = /getLocation:fail auth deny|location permission|定位权限/i.test(message)
         uni.showToast({ title: locationDenied ? '请授权定位后重试' : (message || '客户地图加载失败'), icon: 'none' })
       }
-      finally { this.loading = false }
+      finally { if (requestId === this.mapRequestId) this.loading = false }
     },
     reload() {
       if (this.mode === 'task') { this.loadTaskMap(); return }
@@ -579,65 +598,79 @@ export default {
       if (this.customerId && this.mode === 'device') { this.loadCustomerDevices(); return }
       this.loadNearby()
     },
+    async resolveMapScope() {
+      const region = this.mapRegion.slice()
+      if (region.length) return { regional: true, region, where: mapRegionWhere(region) }
+      const radius = Number(this.radius)
+      const position = await new Promise((resolve, reject) => {
+        uni.getLocation({ type: 'gcj02', isHighAccuracy: true, success: resolve, fail: reject })
+      })
+      const latitude = Number(position.latitude), longitude = Number(position.longitude)
+      const bounds = buildMapRangeBounds(latitude, longitude, radius)
+      return { regional: false, latitude, longitude, radius, where: [
+        { Name: 'KehuDT_Lat', Type: '>=', Value: bounds.minLatitude },
+        { Name: 'KehuDT_Lat', Type: '<=', Value: bounds.maxLatitude },
+        { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
+        { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
+      ] }
+    },
+    scopeContains(scope, row) {
+      const { latitude, longitude } = this.coordinates(row)
+      return validMapCoordinate(latitude, longitude) && (scope.regional ||
+        mapDistanceKm(scope.latitude, scope.longitude, latitude, longitude) <= scope.radius)
+    },
     async loadNearby() {
       if (this.taskId && this.mode === 'device') { this.loadTaskDevices(); return }
       if (this.customerId && this.mode === 'device') { this.loadCustomerDevices(); return }
+      const requestId = ++this.mapRequestId
       this.loading = true
-      uni.getLocation({
-        type: 'gcj02', isHighAccuracy: true,
-        success: async (position) => {
-          this.latitude = Number(position.latitude); this.longitude = Number(position.longitude)
-          try {
-            if (this.mode === 'customer') {
-              // 客户地图：必须走菜单鉴权，后端根据 _SysMenuId 自动过滤数据范围
-              const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS)
-              if (!config) {
-                uni.showToast({ title: '当前账号无权查看客户地图', icon: 'none' })
-                return
-              }
-              const radius = Number(this.radius)
-              const bounds = buildMapRangeBounds(this.latitude, this.longitude, radius)
-              const rangeWhere = [
-                { Name: 'KehuDT_Lat', Type: '>=', Value: bounds.minLatitude },
-                { Name: 'KehuDT_Lat', Type: '<=', Value: bounds.maxLatitude },
-                { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
-                { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
-              ]
-              const customers = []
-              let pageIndex = 1, count = 0
-              do {
-                const result = await loadModuleRows(config, {
-                  pageIndex, pageSize: 500, extraWhere: rangeWhere, refresh: true
-                })
-                if (!result.rows.length) break
-                customers.push(...result.rows)
-                count = result.count
-                pageIndex++
-              } while (customers.length < count)
-              this.applyRows(customers.filter(c => {
-                const lat = Number(c.KehuDT_Lat), lng = Number(c.KehuDT_Lng)
-                return Number.isFinite(lat) && lat !== 0 &&
-                  Number.isFinite(lng) && lng !== 0 &&
-                  mapDistanceKm(this.latitude, this.longitude, lat, lng) <= radius
-              }))
-            } else {
-              // 设备地图：仍走原有接口引擎
-              const engine = 'get_location_shebei-v2'
-              const result = await callApiEngine(engine, { Km: Number(this.radius), Latitude: this.latitude, Longitude: this.longitude })
-              if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || `${this.entityLabel}加载失败`)
-              this.applyRows(result.Data || [])
-            }
-          } catch (error) { uni.showToast({ title: error.message || `${this.entityLabel}加载失败`, icon: 'none' }) }
-        },
-        fail: () => uni.showToast({ title: '请授权定位后重试', icon: 'none' }),
-        complete: () => { this.loading = false }
-      })
+      this.applyRows([])
+      try {
+        const scope = await this.resolveMapScope()
+        if (requestId !== this.mapRequestId) return
+        if (!scope.regional) { this.latitude = scope.latitude; this.longitude = scope.longitude }
+        if (this.mode === 'customer') {
+          const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS)
+          if (!config) throw new Error('当前账号无权查看客户地图')
+          const customers = await this.loadAuthorizedCustomerRows(config, { extraWhere: scope.where, refresh: true })
+          if (requestId !== this.mapRequestId) return
+          this.applyRows(customers.filter(customer => this.scopeContains(scope, customer)))
+        } else {
+          // 行政区域由原设备接口在现有租户/责任权限内过滤，不能改走无权限的全表查询。
+          const devices = []
+          let pageIndex = 1, hasMore = false
+          do {
+            const result = await callApiEngine('get_location_shebei-v2', {
+              ...(scope.regional ? { Scope: 'region', Region: JSON.stringify(scope.region) }
+                : { Km: scope.radius, Latitude: scope.latitude, Longitude: scope.longitude }),
+              PageIndex: pageIndex, PageSize: 500
+            })
+            if (requestId !== this.mapRequestId) return
+            if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '地图加载失败')
+            if (scope.regional && Number(result.DataAppend?.ScopeProtocol) !== 1) throw new Error('请先升级设备地图区域查询接口')
+            devices.push(...(result.Data || []))
+            hasMore = result.DataAppend?.HasMore === true && (result.Data || []).length > 0
+            pageIndex += 1
+          } while (hasMore)
+          this.applyRows(devices)
+        }
+      } catch (error) {
+        if (requestId !== this.mapRequestId) return
+        const message = String(error && (error.errMsg || error.message) || '')
+        uni.showToast({ title: /getLocation:fail|location permission/i.test(message) ? '请授权定位后重试' : (message || '地图加载失败'), icon: 'none' })
+      } finally { if (requestId === this.mapRequestId) this.loading = false }
+    },
+    changeRegion(event) {
+      this.mapRegion = event.detail.value
+      this.reload()
+    },
+    useNearby() {
+      this.mapRegion = []
+      this.reload()
     },
     changeRadius(event) {
-      this.radius = Number(event.detail.value || 15)
-      if (this.mode === 'task') { this.loadTaskMap(); return }
-      if (this.hasListCustomerFilters) { this.loadFilteredCustomers(); return }
-      if (!this.customerId) this.loadNearby()
+      this.radius = MAP_RADIUS_OPTIONS[Number(event.detail.value)] || 15
+      this.reload()
     },
     async selectMarker(event) {
       const index = Number(event.detail.markerId)
@@ -700,9 +733,16 @@ export default {
 .map-page { height: 100vh; overflow: hidden; }
 .refresh-action { display: flex; align-items: center; justify-content: center; width: 64rpx; height: 64rpx; border-radius: 50%; color: #087da8; font-size: 37rpx; transition: transform .18s ease; }
 .refresh-action--pressed { transform: rotate(90deg); }
-.range-band { box-sizing: border-box; display: grid; grid-template-columns: 70rpx minmax(0,1fr) 90rpx; align-items: center; height: 86rpx; padding: 0 24rpx; border-bottom: 1rpx solid #e2ebee; background: #fff; color: #55727c; font-size: 22rpx; }
+.range-band { box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 270rpx) minmax(0,1fr) 100rpx; gap: 14rpx; align-items: center; height: 86rpx; padding: 0 24rpx; border-bottom: 1rpx solid #e2ebee; background: #fff; color: #55727c; font-size: 22rpx; }
 .range-band > text:last-child { color: #087da8; font-weight: 700; text-align: right; }
 .range-slider { margin: 0; }
+.map-region { min-width: 0; }
+.map-region__trigger { display: flex; align-items: center; gap: 10rpx; min-height: 64rpx; color: #087da8; line-height: 1.4; }
+.map-region__trigger text:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-region__arrow { display: flex; flex: none; align-items: center; justify-content: center; width: 24rpx; height: 24rpx; }
+.map-region__chevron { width: 12rpx; height: 12rpx; border-right: 2rpx solid currentColor; border-bottom: 2rpx solid currentColor; transform: translateY(-3rpx) rotate(45deg); }
+.region-scope-hint { color: #71858d; font-size: 20rpx; }
+.nearby-action { color: #087da8; font-weight: 700; text-align: right; }
 .task-map-summary { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; height: 86rpx; padding: 0 24rpx; border-bottom: 1rpx solid #e2ebee; background: #fff; color: #617982; font-size: 21rpx; }
 .task-map-summary text:first-child { color: #087da8; font-weight: 700; }
 .status-legend { box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 42rpx; height: 86rpx; border-bottom: 1rpx solid #e2ebee; background: #fff; color: #617982; font-size: 21rpx; }.status-legend view { display: flex; align-items: center; gap: 10rpx; }.status-dot { width: 18rpx; height: 18rpx; border-radius: 50%; }.status-dot.unfinished { background: #e5484d; }.status-dot.complete { background: #0091eb; }

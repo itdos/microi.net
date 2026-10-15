@@ -10,7 +10,7 @@
       </button>
     </view>
     <template v-if="!collapsible || expanded">
-      <text class="contract-totals__hint">当前有效合同期内 / 所有合同累计</text>
+      <text v-if="!compact" class="contract-totals__hint">当前有效合同期内 / 所有合同累计</text>
       <view v-if="state.status === 'loading'" class="contract-totals__loading" aria-label="合同金额加载中" aria-busy="true">
         <view v-for="item in 3" :key="item"></view>
       </view>
