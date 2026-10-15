@@ -345,6 +345,10 @@ const customerListMetrics = JSON.parse(fs.readFileSync(path.join(root, 'profiles
 const customerVisualMenu = visualMenus.find(item => item.DiyTableName === 'Diy_Kehu');
 customerVisualMenu.ViewSchema = JSON.stringify({ SchemaVersion: '1.0', Views: [{ Key: 'customer:list', Scene: 'List', Device: 'All', Enabled: true,
   Layout: { Hero: { Metrics: customerListMetrics }, Search: { StatusOptions: ['目标客户', '意向客户', '合作客户', '断约客户', '非目标客户'], PeriodField: 'CreateTime' } } }] });
+const orderListMetrics = JSON.parse(fs.readFileSync(path.join(root, 'profiles/xjy/metadata/order-list-statistics.json'), 'utf8')).metrics;
+const orderVisualMenu = visualMenus.find(item => item.DiyTableName === 'Diy_Dingdan');
+orderVisualMenu.ViewSchema = JSON.stringify({ SchemaVersion: '1.0', Views: [{ Key: 'order:list', Scene: 'List', Device: 'All', Enabled: true,
+  Layout: { Hero: { Metrics: orderListMetrics }, Search: { StatusOptions: ['待审批', '已审批', '已驳回', '待审批作废', '已作废', '已到期'], PeriodField: 'CreateTime' } } }] });
 const visualRowsByTable = {
   diy_kehu: customerDetail, diy_shouhoudd: taskDetail, diy_dingdan: orderDetail,
   diy_kehusb: deviceDetail, diy_iot_device: moduleRows.diy_iot_device.rows[0], diy_tenant: merchantDetail, diy_xiansuo: leadDetail,
@@ -523,6 +527,12 @@ const targets = [
     name: 'task-list-actions', route: '/#/pages/task/list', selector: '.task-page',
     clickSelector: '.task-card__actions', afterSelector: '.uni-actionsheet_toggle .uni-actionsheet__menu',
     required: ['.uni-actionsheet_toggle .uni-actionsheet__menu'], expectedText: ['完成', '编辑'], forbiddenText: ['删除']
+  },
+  {
+    name: 'order-list', route: '/#/pages/business/list?key=orders', selector: '.list-page',
+    required: ['.summary-strip', '.status-item__badge', '.customer-valid-switch'],
+    expectedText: ['租赁总价', '买断总价', '包年换芯总价', '订单金额合计', '仅有效期内'],
+    forbiddenText: ['本月合同订单']
   },
   {
     name: 'order-approval', route: '/#/pages/business/detail?key=orders&id=order-001', selector: '.detail-page',
@@ -874,6 +884,26 @@ async function inspectCustomerListSummary(cdp) {
   if (restoredHint !== '买断按全部合同累计') fail(`切回有效期后残留历史金额提示: ${restoredHint}`);
 }
 
+async function inspectOrderListSummary(cdp, viewport) {
+  await waitForExpression(cdp, `document.querySelector('.status-item__badge')?.innerText === '28' && document.querySelectorAll('.summary-metric').length === 4`);
+  const evaluate = async expression => (await cdp.send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+  const read = () => evaluate(`({checked:document.querySelector('.customer-valid-switch').getAttribute('aria-checked'),values:[...document.querySelectorAll('.summary-metric__value')].map(n=>n.innerText),badges:[...document.querySelectorAll('.status-item__badge')].map(n=>n.innerText)})`);
+  const before = await read();
+  if (before.checked !== 'true' || before.badges.length !== 7 || before.badges.some(value => !/^\d+$/.test(value))) fail(`订单角标或默认开关错误: ${JSON.stringify(before)}`);
+  await evaluate(`document.querySelector('.customer-valid-switch').click()`);
+  await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'false' && document.querySelector('.summary-metric__value').innerText.includes('23.8')`);
+  const after = await read();
+  if (before.values[0] === after.values[0] || before.values[2] === after.values[2] || before.values[3] !== after.values[3] || before.values[1] !== after.values[1]) fail(`订单有效期口径错误: ${JSON.stringify({before,after})}`);
+  const shot = await cdp.send('Page.captureScreenshot', { format:'png', captureBeyondViewport:false });
+  fs.writeFileSync(path.join(outputRoot, `order-list-all-${viewport.name}.png`),Buffer.from(shot.data,'base64'));
+  await evaluate(`document.querySelectorAll('.status-item')[2].click()`);
+  await waitForExpression(cdp, `document.querySelector('.status-item.active')?.innerText.includes('已审批') && !document.querySelector('.summary-metric__value').innerText.includes('--')`);
+  const filtered = await read();
+  if (JSON.stringify(filtered.badges) !== JSON.stringify(before.badges)) fail('订单状态切换丢失其它状态角标');
+  await evaluate(`document.querySelectorAll('.status-item')[0].click();document.querySelector('.customer-valid-switch').click()`);
+  await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'true' && document.querySelector('.summary-metric__value').innerText.includes('12.8')`);
+}
+
 function parsePostData(value) {
   if (!value) return {};
   try { return JSON.parse(value); } catch (error) {}
@@ -890,6 +920,11 @@ function buildMockResponse(request) {
   mockRequestLog.push({ url, body, table, time: Date.now() });
 
   if (request.method === 'OPTIONS') return { status: 204, body: '' };
+  if (apiEngineKey === 'xjy-order-contract-totals') {
+    const valid = body.Filters?.ValidOnly !== false;
+    return { Code:1, Data:{ Metrics:{rental:valid?'128000':'238000',buyout:'4700000',annualFilter:valid?'6800':'16800',sum:'1268000'},
+      StatusCounts:{All:28,'待审批':6,'已审批':14,'已驳回':1,'待审批作废':0,'已作废':2,'已到期':5},IncompleteMetrics:{},ValidOnly:valid } };
+  }
   if (apiEngineKey === 'xjy-module-presentation-stats' && Array.isArray(body.TaskCardIds)) {
     return { Code: 1, Data: { TaskDeviceCounts: Object.fromEntries(body.TaskCardIds.map(id => [id, 2])) } };
   }
@@ -1935,6 +1970,7 @@ async function main() {
         const waterMotion = await verifyHeroVideo(cdp, target);
         const customerContractTotals = await inspectCustomerContractTotals(cdp, target);
         if (target.name === 'customers') await inspectCustomerListSummary(cdp);
+        if (target.name === 'order-list') await inspectOrderListSummary(cdp, viewport);
         const deviceIoTActions = await inspectDeviceIoTActions(cdp, target);
         const fileName = `${target.name}-${viewport.name}.png`;
         const screenshotPath = path.join(outputRoot, fileName);

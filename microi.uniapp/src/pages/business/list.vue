@@ -64,16 +64,16 @@
 
       <scroll-view v-if="statusOptions.length" class="status-scroll" scroll-x :show-scrollbar="false">
         <view class="status-tabs">
-          <view class="status-item" :class="{ active: status === '', 'status-item--counted': showCustomerContractTotals }" @tap="changeStatus('')">
-            <text>全部状态</text><text v-if="showCustomerContractTotals" class="status-item__badge">{{ customerStatusCount('All') }}</text>
+          <view class="status-item" :class="{ active: status === '', 'status-item--counted': showContractListSummary }" @tap="changeStatus('')">
+            <text>全部状态</text><text v-if="showContractListSummary" class="status-item__badge">{{ customerStatusCount('All') }}</text>
           </view>
           <view
             v-for="item in statusOptions"
             :key="item"
             class="status-item"
-            :class="{ active: String(status) === String(item), 'status-item--counted': showCustomerContractTotals }"
+            :class="{ active: String(status) === String(item), 'status-item--counted': showContractListSummary }"
             @tap="changeStatus(item)"
-          ><text>{{ statusOptionLabel(item) }}</text><text v-if="showCustomerContractTotals" class="status-item__badge">{{ customerStatusCount(item) }}</text></view>
+          ><text>{{ statusOptionLabel(item) }}</text><text v-if="showContractListSummary" class="status-item__badge">{{ customerStatusCount(item) }}</text></view>
         </view>
       </scroll-view>
     </view>
@@ -100,7 +100,7 @@
       </view>
     </view>
 
-    <view v-if="showCustomerContractTotals && !metadataError" class="customer-statistics-tools">
+    <view v-if="showContractListSummary && !metadataError" class="customer-statistics-tools">
       <view class="customer-valid-switch" role="switch" :aria-checked="customerValidOnly" @tap="toggleCustomerValidity">
         <view class="mine-switch__track" :class="{ active: customerValidOnly }"><view class="mine-switch__thumb"></view></view>
         <text>仅有效期内</text>
@@ -301,6 +301,7 @@ import MciRestrictedRecordCard from '@/components/mci-restricted-record-card/mci
 import XjyCustomerContractTotals from '@/tenants/xjy/components/customer-contract-totals.vue'
 import { CUSTOMER_CONTRACT_TOTALS_ENGINE, customerContractTotalsSupported, hydrateCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
 import { loadCustomerListSummary } from '@/tenants/xjy/customer-list-summary.mjs'
+import { ORDER_CONTRACT_TOTALS_ENGINE, orderContractTotalsSupported, loadOrderListSummary } from '@/tenants/xjy/order-list-summary.mjs'
 import {
   formatDateTime,
   formatFieldValue,
@@ -418,6 +419,12 @@ export default {
   computed: {
     showCustomerContractTotals() {
       return customerContractTotalsSupported(this.config.table || this.baseConfig.table)
+    },
+    showOrderContractSummary() {
+      return orderContractTotalsSupported(this.config.table || this.baseConfig.table)
+    },
+    showContractListSummary() {
+      return this.showCustomerContractTotals || this.showOrderContractSummary
     },
     canAddRecord() {
       return canAddMenuRecord(this.menuId, this.currentUser)
@@ -848,14 +855,16 @@ export default {
     },
     async loadPlatformStatistics(options, requestId) {
       const metrics = this.config.statisticsMetrics || []
-      if (this.showCustomerContractTotals && metrics.some(metric => metric.apiEngineKey === CUSTOMER_CONTRACT_TOTALS_ENGINE)) {
+      const summaryEngine = this.showOrderContractSummary ? ORDER_CONTRACT_TOTALS_ENGINE : CUSTOMER_CONTRACT_TOTALS_ENGINE
+      if ((this.showCustomerContractTotals || this.showOrderContractSummary) && metrics.some(metric => metric.apiEngineKey === summaryEngine)) {
         const summaryRequestId = ++this.customerStatisticsRequestId
         this.metricLoading = true
         this.customerStatisticsError = ''
         this.customerStatusCounts = {}
         this.metricValues = {}
         try {
-          const result = await loadCustomerListSummary({
+          const loadSummary = this.showOrderContractSummary ? loadOrderListSummary : loadCustomerListSummary
+          const result = await loadSummary({
             menuId: this.menuId,
             filters: buildModuleFilterPayload(this.config, { ...options, status: '' }),
             selectedStatus: options.status,
@@ -870,7 +879,7 @@ export default {
         } catch (error) {
           if (requestId !== this.loadRequestId || summaryRequestId !== this.customerStatisticsRequestId) return
           this.customerStatisticsError = error.message || '金额统计加载失败'
-          this.metricValues = { rental: '-', buyout: '-', annualFilter: '-' }
+          this.metricValues = { rental: '-', buyout: '-', annualFilter: '-', ...(this.showOrderContractSummary ? { sum: '-' } : {}) }
         } finally {
           if (requestId === this.loadRequestId && summaryRequestId === this.customerStatisticsRequestId) this.metricLoading = false
         }
