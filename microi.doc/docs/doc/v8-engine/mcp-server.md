@@ -4,6 +4,8 @@ Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 A
 
 源码随主仓库开放：[GitHub](https://github.com/itdos/microi.net/tree/master/microi.mcp) / [Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.mcp)。普通用户推荐通过 [VS Code 插件或 CLI](/doc/v8-engine/vs-code-plugin) 使用内置版本，无需单独克隆。
 
+本文的精确读取、Manifest 会话引用及上下文载荷计量需要开发工具 **5.9.7 或以上**。升级后由新启动的 MCP 进程接管；正在运行的旧进程继续当前工作。以实际工具发现结果核对参数，完整系统和局部修改都继续执行相应质量与验收规范。
+
 ## 当前能力面
 
 按 2026-08-30 当前源码扫描，`microi.mcp/src` 中可识别 **140 个 `microi_*` 工具注册项**。数量会随版本增长，运行时应以 `tools/list`，或 Codex 单入口的 `list_tools` / `describe_tool` 返回为准。
@@ -115,6 +117,8 @@ action=microi_get_db_schema, params={...}
 
 ## 从自然语言生成系统
 
+质量优先于 token、耗时和回复长度。完整系统仍须执行原八项、菜单先行、业务/经营/领导报表及真实验收；局部修改先确认目标、当前版本和依赖，范围不清时扩大读取，不能依据一页摘要猜测修改。
+
 标准顺序是：
 
 1. `microi_get_db_schema`：读取已有表，避免重复建模。
@@ -126,6 +130,37 @@ action=microi_get_db_schema, params={...}
 7. `microi_validate_system`：独立回读表、字段、接口、菜单、页面、打印、流程等结果。
 
 Manifest 支持角色、表、索引、数据源、接口引擎、事件、菜单、权限、页面、打印模板、工作流和任务。常规表单字段不要默认写 `FormWidth=24`；整行控件才使用整行宽度。绑定表的菜单应同时补齐 PC/移动列、搜索列、隐藏列、排序、统计与卡片字段。
+
+### 精确读取与完整性
+
+新版读取工具先返回可遍历的摘要，减少无关信息。首次完整开发必须盘点全部相关资源，并读取字段/关系详情；摘要不等于完整结构，不能因为没有在第一页看到资源就重复创建。
+
+| 工具 | 精确读取方式 | 必须检查 |
+|---|---|---|
+| `microi_get_db_schema` | 默认表目录；`detail:"fields"`、`tableNames`、`fieldNames` 获取目标结构；查询通过受保护 FormEngine 下推 | `Paging.hasMore/nextCursor`、`Completeness`；过滤范围与权限 |
+| `microi_list_applications` | 默认应用摘要；`keyword/appType` 筛选；显式 `includeFiles:true` 才带文件清单 | 返回集合的上游完整性声明，不能把目录摘要当全租户事实 |
+| `microi_get_application_context` | 按应用获取文件清单，使用 `filePaths/pathKeyword` 选择文件；按需 `includeContents:true` | 分页、逐文件错误和是否实际读取正文 |
+| `microi_get_application_file` | `startLine/endLine` 读取行范围，`query` 做纯文本搜索；`detail:"full"` 明确读取全文 | `ReadSummary.completeFile`、源码哈希；片段不可替代全文覆盖 |
+
+分页游标绑定当前连接、查询条件和资源快照；改变身份、过滤条件或源码后应重新开始读取。二进制默认返回引用，不将大型 Base64 塞进模型上下文；显式全文请求继续受读取上限约束。错误、未知完整性和截断都需要补读，不能当成完整成功。
+
+### Manifest 引用与原有调用兼容
+
+较大 Manifest 可在 `microi_plan_system` 一次提交正文并传 `detail:"summary"` 获取 `manifestRef/manifestHash`，后续用同一引用完成 dry-run、执行和独立验收；原有直接提交 `manifest` 的方式继续支持。小正文可以继续直接传输，不为使用引用增加无意义往返。
+
+```json
+{"action":"microi_generate_system","params":{"manifestRef":"<本会话返回的引用>","manifestHash":"<原始内容哈希>","dryRun":true,"detail":"summary"}}
+```
+
+实际执行仍需要 `dryRun:false` 和目标租户的 `confirmExecution`，重新运行结构检查及当前权限校验。引用是当前 MCP 会话的传输优化，不是授权、分布式状态或持久任务；过期、凭据变化和进程重启后重传已核对正文。写入结果未知时先回读，不盲目重放。
+
+正文调用默认保留完整回执；引用调用默认摘要，保留错误、警告、资源状态和完整验证结果。通过现有 `microi_plan_system` 的 `action:"read_result" + resultRef` 可取回完整证据。部分成功、验证失败和未知结果不能被摘要成“完成”。
+
+### 可测量的节省
+
+`microi_get_context_metrics` 返回当前 MCP 会话中已验证工具参数与回执的 UTF-8 字节、调用数、错误数和耗时，不存源码或凭据。它不包含模型历史、协议外层和供应商 Usage，不能当作 token 账单。
+
+仓库提供 `microi.mcp/scripts/evaluate-context-efficiency.mjs`：使用 `--baseline`、`--candidate`、`--output` 导入脱敏计量和验收摘要。只有同任务、同模型、同验收契约且全部通过时才输出可比较的节省比例；供应商输入、缓存输入、输出、推理和费用缺失时明确显示未知。离线载荷对比不代表完整项目的实际 token 或工期改善倍数。
 
 模块 `modules[].tableHeaders` 可配置合并表头，例如 `[{"Label":"人数（人）","Fields":["Total","Male","Female"]}]`；字段名须与相邻的可见表格列一致。嵌套分组使用 `Children`。设置 `hideTableBanner: 1` 或 `hideFormBanner: 1` 可分别关闭顶部列表和表单 Banner，省略或设为 `0` 则保持显示。已有模块可用 `microi_update_module` 更新 `TableHeaders`、`HideTableBanner`、`HideFormBanner` 并回读，完整字段说明见[模块引擎](/doc/system-engine/module-engine.html)。
 
