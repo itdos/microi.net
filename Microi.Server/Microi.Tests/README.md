@@ -47,6 +47,15 @@ AI CAD、AI 员工中心和邮箱的统一 Node 入口使用
   真实 Redis 配置即时生效、并发跳过日志去重及新旧 Quartz 共库调度测试也属于
   Full，不属于无外部依赖的 Quick；所需配置在任何构建前检查，缺失即失败。
 
+MongoDB 实库回归默认使用当前 MCP 对应的实际服务端版本，不固定要求 3.6/7 两套服务。
+先只读探测 `buildInfo.version`，通过测试进程变量 `MICROI_TEST_MONGO_CURRENT` 提供隔离连接、
+`MICROI_TEST_MONGO_CURRENT_VERSION` 提供精确版本（例如当前 MCP 探测为 `5.0.5`）。实测必须
+与该版本完全一致，并输出实际版本；认证、日志幂等去重、游标分页、租户隔离及 update/delete/list
+断言全部执行，不能用 ping 替代。除非特殊兼容问题必须验证旧版，否则不要求另建服务或再次询问固定矩阵。
+特殊矩阵额外显式传入 `MICROI_TEST_MONGO_LEGACY` 与 `MICROI_TEST_MONGO_LEGACY_VERSION`，
+两项必须成对、版本必须精确，且不能与当前端点重复（`localhost` 与 `127.0.0.1` 视为同一主机）。
+报告只声明实际覆盖版本，单一 5.0.5 实测不代表覆盖 3.6 或 7。
+
 `run-node-regressions.mjs` 自动发现本测试目录、`OfficialApplications/Resource` 和
 `Microi.Client/tests` 的确定性 Node 测试；新增文件无需再维护手工清单。
 无法分类、零测试、失败、取消、跳过或 todo 均失败关闭。Playwright 文件由真实

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-15T02:33:52.105Z",
+  "generatedAt": "2026-10-15T12:35:25.935Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,7 +763,7 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "8b1076e37002e3c115c51bb26103b311e6c02e793dc371bd8982ec0241de45eb",
+      "originalSha256": "1863eea393f9f59d2c8394676ed5b67c80e85fa5f7629193b67330662d75bdb4",
       "originalLines": 578,
       "prefixSha256": "af58f29dd31d1e292f187d31a6e71c6b5180481a4a5a23bbed5ca768cb221682",
       "prefixBytes": 3222,
@@ -773,7 +773,7 @@
           "id": "microi-system-delivery-000",
           "ordinal": 0,
           "destination": "microi-system-delivery/SKILL.md",
-          "sha256": "bdbc78e88e50c53a3bd29eeb76ce34e3fed8eec5f4ba16371417d2aeee9c2fbe",
+          "sha256": "04f08fdc316d253f167e26923066e134763ab129dd830f833c762214613c607f",
           "lines": 13,
           "heading": "交付总原则"
         },
@@ -2239,11 +2239,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "17a89900aeaa4f0c85479311d8b740904b1d36864422b97591e13c29307e49be",
-      "originalLines": 677,
-      "prefixSha256": "bf5b6d1f23b6bd77022ab7e6af536f39655590e53e509c328a89d367e9683875",
-      "prefixBytes": 16588,
-      "entryLines": 256,
+      "originalSha256": "982b4f0632c6f69ee6e266e3367c82ded81a463aaf8b64684154f3be97745512",
+      "originalLines": 679,
+      "prefixSha256": "0744abbee9d6074905f96afc8e97d93fb9324063aebc30b3e22164224b978aad",
+      "prefixBytes": 17144,
+      "entryLines": 258,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -3221,7 +3221,7 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "9d5816443b34c6ca71a3b0c15c729acbfd7762deba8572d8d5831648cf3ca0c0",
+      "originalSha256": "968aedcd9fd9572ccdbf378cdfc5d9ee6e19f8445551e95e594851177593b4d5",
       "originalLines": 638,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
@@ -3231,7 +3231,7 @@
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "e8e784198efa6cd233fa9da3be0292cd6c68cea2c10e35f8f94eaacd1d381033",
+          "sha256": "09810cd14d0b03a9b52469a851f851bb18f41aa8aad4ccdb4a59a97b006aa128",
           "lines": 58,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
