@@ -88,10 +88,17 @@ function treeChildren(node, field, config) {
 function findOption(value, field, config) {
     const expected = valueCandidates(value, config);
     if (!expected.length) return null;
+    const identityKeys = uniqueKeys([config.SelectSaveField, "Key", "key", "Id", "id"]);
+    const identity = objectValue(value, identityKeys);
     const visit = (items) => {
         for (const item of Array.isArray(items) ? items : []) {
             const candidates = valueCandidates(item, config);
-            if (expected.some((left) => candidates.some((right) => valuesEqual(left, right)))) return item;
+            // 对象已有保存标识时只按该标识回显，避免占位文字误匹配另一选项的名称。
+            // 纯文本继续兼容历史直接保存显示名称的记录。
+            const matched = !isBlank(identity)
+                ? valuesEqual(identity, item && typeof item === "object" ? objectValue(item, identityKeys) : item)
+                : expected.some((left) => candidates.some((right) => valuesEqual(left, right)));
+            if (matched) return item;
             const child = visit(treeChildren(item, field, config));
             if (child) return child;
         }
@@ -113,12 +120,14 @@ function stringifyFallback(value) {
 
 function formatSingle(value, field, config) {
     if (isBlank(value)) return "";
+    // 表单初始化会把文本 Key 同时填入显示字段作为占位；选项异步加载后应优先取当前名称。
+    // 只计算展示文字，不修改表单值；选项缺失时保留对象原有名称以兼容历史和远程搜索。
+    const matched = findOption(value, field, config);
+    if (matched) return optionLabel(matched, config);
     if (value && typeof value === "object" && !Array.isArray(value)) {
         const direct = optionLabel(value, config);
         if (direct) return direct;
     }
-    const matched = findOption(value, field, config);
-    if (matched) return optionLabel(matched, config);
     return stringifyFallback(value);
 }
 

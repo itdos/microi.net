@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
+import { resolveListReadApi, queryMonthValue } from '../src/platform/configured-read-api.mjs'
 
 const source = fs.readFileSync(new URL('../src/components/mci-business-related-list/mci-business-related-list.vue', import.meta.url), 'utf8')
 const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
@@ -17,6 +18,7 @@ function deferred() {
 
 function setup(overrides = {}) {
   const sandbox = {
+    resolveListReadApi, queryMonthValue,
     getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     uni: { $off() {} }, clearTimeout,
     loadNativeTableModel: async () => ({ Id: 'table-1', Name: 'Related' }),

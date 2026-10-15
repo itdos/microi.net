@@ -4,6 +4,7 @@ import test from 'node:test'
 import vm from 'node:vm'
 import { buildListApiEnginePayload } from '../src/platform/list-api-engine.mjs'
 import { tableChildQueryMode, tableChildRequiresModuleQuery } from '../src/platform/table-child-query-target.mjs'
+import { resolveListReadApi, requestReadApi } from '../src/platform/configured-read-api.mjs'
 
 test('TableChild 只在存在模块关联配置时切换到模块查询', () => {
   const tableId = 'service-goods-table'
@@ -51,6 +52,7 @@ test('platform-module-data 的 TableChild 请求只使用授权链，不叠加�
     .replace(/export /g, '')
   const requests = []
   const sandbox = {
+    resolveListReadApi, requestReadApi,
     getUser: () => ({ Id: 'user-1' }),
     requiresAuthorizedMenuContext: () => false,
     cachedRequest: async (key, task) => ({ data: await task(), stale: false }),

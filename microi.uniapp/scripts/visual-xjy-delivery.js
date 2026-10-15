@@ -164,7 +164,8 @@ const deviceDetail = {
   DingdanID: 'order-001', DingdanSPID: 'order-product-001', DingdanBH: 'DD202512080032', AnzhuangWZ: '教学楼一层饮水间', TenantName: '集福鲤杭州运营中心',
   FuwuKSSJ: '2026-08-01', FuwuJSSJ: '2029-07-31', ZuijinFWSJ: '2026-06-18', ZhibaoSJ: '2028-07-31',
   ShebeiEWM: 'iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAAAklEQVR4AewaftIAAANMSURBVO3BUW5jwREEwawG73/lsn4NaxbYwVs2ZWVE+gVpySAtGqRFg7RokBYN0qJBWvTiD5Lw07XlJAk32nKShJO23EjCT9eW7wzSokFaNEiLBmnRIC0apEUvLrXlUyTht2rLp0jC3xqkRYO0aJAWDdKiQVo0SIte/ANJeFpbPkUSTtryKZLwtLY8aZAWDdKiQVo0SIsGadEgLXrxi7XlJAknbTlJwklb9N8GadEgLRqkRYO0aJAWDdKiF79YEp7WlpMknLTlNxqkRYO0aJAWDdKiQVo0SIte/ANt+QnacpKEG0n4FG35dIO0aJAWDdKiQVo0SIsGadGLS0n46ZJw0paTJJy05SQJT0vCTzZIiwZp0SAtGqRFg7RokBalX9D/SMI7teU3GqRFg7RokBYN0qJBWjRIi178QRJO2nIjCf/P2nKShJMknLTlRhJO2nKShKe15TuDtGiQFg3SokFaNEiLBmnRiz9oy40knLTlRhJO2vJOSXhaW06S8LQk3GjLkwZp0SAtGqRFg7RokBYN0qL0CxeScNKWkyS8U1tuJOGkLe+UhBttuZGEp7XlO4O0aJAWDdKiQVo0SIsGaVH6hYcl4UZb3ikJ79SWpyXhRltOknDSlicN0qJBWjRIiwZp0SAtGqRF6RcuJOGd2nKShJO23EjCSVueloQbbfkUSThpy3cGadEgLRqkRYO0aJAWDdKi9Au/VBJO2nIjCTfa8rQkvFNb/tYgLRqkRYO0aJAWDdKiQVqUfuEgCT9dW06ScKMtN5Jwoy0nSbjRlk8wSIsGadEgLRqkRYO0aJAWvbjUlk+RhHdKwtPacpKEpyXhaW35W4O0aJAWDdKiQVo0SIsGadGLfyAJT2vLp2jLSRLeqS03knDSlpMknCThpC3fGaRFg7RokBYN0qJBWjRIi17oW235FG35FG150iAtGqRFg7RokBYN0qJBWvTiF2vLSRJO2nLSlqcl4aQtJ0k4actJEp7Wlu8M0qJBWjRIiwZp0SAtGqRFL/6BtujvJOFGEm4k4RMM0qJBWjRIiwZp0SAtGqRFLy4l4adLwo0k3GjLjbacJOFGWz7BIC0apEWDtGiQFg3SokFalH5BWjJIiwZp0SAtGqRFg7ToP+ea+ToAFk9hAAAAAElFTkSuQmCC',
-  Beizhu: '设备运行正常，下次保养前检查滤芯余量。', CreateTime: '2026-01-08 11:30:00'
+  Beizhu: '设备运行正常，下次保养前检查滤芯余量。', CreateTime: '2026-01-08 11:30:00',
+  IoTDeviceId: 'iot-001', IoTDeviceNames: '新纪源 / IOT-0068 / 校园直饮机'
 };
 
 const deviceIotTable = {
@@ -178,9 +179,12 @@ const deviceIotTable = {
 };
 
 const deviceIotFields = [
+  { Id: 'iot-link-field', TableName: 'Diy_KehuSB', Name: 'XuanzeIoT', Label: '关联IoT物联网设备', Component: 'OpenTable', Visible: 1, AppVisible: 1, Sort: 31, Tab: 'device-basic', BindRole: '["role-iot"]', Config: '{"OpenTable":{"SysMenuId":"visual-menu-diy_iot_device","TableName":"diy_iot_device","TableId":"visual-table-diy_iot_device","MultipleSelect":false}}' },
+  { Id: 'iot-unlink-field', TableName: 'Diy_KehuSB', Name: 'JiechuIoT', Label: '解除IoT关联', Component: 'Button', Visible: 1, AppVisible: 1, Sort: 32, Tab: 'device-basic', BindRole: '["role-iot"]', Config: '{}' },
+  { Id: 'iot-create-field', TableName: 'Diy_KehuSB', Name: 'XinzengIoT', Label: '新增IoT物联网设备', Component: 'Button', Visible: 1, AppVisible: 1, Sort: 33, Tab: 'device-basic', BindRole: '["role-iot"]', Config: '{}' },
   { Id: 'device-no', TableName: 'Diy_KehuSB', Name: 'ShebeiBH', Label: '设备编号', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 10, Tab: 'device-basic', Config: '{}' },
   { Id: 'device-name', TableName: 'Diy_KehuSB', Name: 'ShangpinMC', Label: '设备名称', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 20, Tab: 'device-basic', Config: '{}' },
-  { Id: 'device-qrcode', TableName: 'Diy_KehuSB', Name: 'ShebeiEWM', Label: '设备二维码', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 30, Tab: 'device-basic', Readonly: true, Config: '{}' },
+  { Id: 'device-qrcode', TableName: 'Diy_KehuSB', Name: 'ShebeiEWM', Label: '设备二维码', Component: 'Qrcode', Visible: 1, AppVisible: 1, Sort: 30, Tab: 'device-basic', Readonly: true, Config: '{}' },
   { Id: 'device-iot-join', TableName: 'Diy_KehuSB', Name: 'JoinForm184', Label: 'IoT物联网', Component: 'JoinForm', Visible: 1, AppVisible: 1, Sort: 100, Tab: 'device-iot', Config: JSON.stringify({ JoinForm: { TableId: 'table-yuelong-device', TableName: 'diy_yuelong_device', TableLabel: '跃龙物联网设备', JoinFieldName: 'Id', FormMode: 'View', SnapshotApiEngineKey: 'xjy-device-iot-snapshot' } }) }
 ];
 
@@ -310,6 +314,7 @@ const moduleRows = {
   Diy_ShouhouDD: { rows: [taskDetail], count: 7, statistics: {} },
   Diy_Dingdan: { rows: [], count: 28, statistics: { DingdanJE: 1268000 } },
   Diy_KehuSB: { rows: [], count: 143, statistics: {} },
+  diy_iot_device: { rows: [{ Id: 'iot-001', Provider: 'xinjiyuan', DeviceCode: 'IOT-0068', DeviceName: '校园直饮机', Enabled: 1, TenantId: 'tenant-xjy' }], count: 1, statistics: {} },
   Diy_Tenant: { rows: [merchantDetail], count: 1, statistics: {} }
 };
 
@@ -328,16 +333,21 @@ const customerDetailTable = {
 // 本地视觉替身显式声明授权菜单与表模型，不能把空菜单/统计对象当模块协议。
 const visualMenus = Object.entries(moduleRows).map(([tableName]) => ({
   Id: `visual-menu-${tableName.toLowerCase()}`,
-  Name: ({ Diy_Kehu: '我的客户', Diy_ShouhouDD: '售后任务', Diy_Dingdan: '合同订单', Diy_KehuSB: '设备列表', Diy_Tenant: '商家' })[tableName],
+  Name: ({ Diy_Kehu: '我的客户', Diy_ShouhouDD: '售后任务', Diy_Dingdan: '合同订单', Diy_KehuSB: '设备列表', Diy_Tenant: '商家', diy_iot_device: 'IoT物联网设备' })[tableName],
   DiyTableId: `visual-table-${tableName.toLowerCase()}`, DiyTableName: tableName,
   ModuleEngineKey: tableName, Display: 1, AppDisplay: 1,
   MoreBtns: tableName === 'Diy_ShouhouDD' ? [{ Id: '3e66f489-6817-4a70-bf40-26a922fd3d51', Name: '完成', ShowRow: true }] : [],
   MobileListFields: ({ Diy_Kehu: ['KehuMC', 'Zhuangtai', 'KehuLX', 'FuzeR'], Diy_Tenant: ['TenantName', 'LianxiR', 'LianxiRDH', 'Chengshi'] })[tableName] || [],
   CardTitleTagFields: [], CardBottomTagFields: [], DefaultOrderBy: 'CreateTime'
 }));
+// 客户列表视觉测试读取与平台配置同一份指标定义，验证真实协议而非前端硬编码指标。
+const customerListMetrics = JSON.parse(fs.readFileSync(path.join(root, 'profiles/xjy/metadata/customer-list-statistics.json'), 'utf8')).metrics;
+const customerVisualMenu = visualMenus.find(item => item.DiyTableName === 'Diy_Kehu');
+customerVisualMenu.ViewSchema = JSON.stringify({ SchemaVersion: '1.0', Views: [{ Key: 'customer:list', Scene: 'List', Device: 'All', Enabled: true,
+  Layout: { Hero: { Metrics: customerListMetrics }, Search: { StatusOptions: ['目标客户', '意向客户', '合作客户', '断约客户', '非目标客户'], PeriodField: 'CreateTime' } } }] });
 const visualRowsByTable = {
   diy_kehu: customerDetail, diy_shouhoudd: taskDetail, diy_dingdan: orderDetail,
-  diy_kehusb: deviceDetail, diy_tenant: merchantDetail, diy_xiansuo: leadDetail,
+  diy_kehusb: deviceDetail, diy_iot_device: moduleRows.diy_iot_device.rows[0], diy_tenant: merchantDetail, diy_xiansuo: leadDetail,
   diy_zhaopin: recruitmentDetail, diy_needrelease: demandDetail, diy_anlice: casebookDetail
 };
 function visualTable(tableKey) {
@@ -357,6 +367,11 @@ function visualFields(tableKey) {
   if (normalized === 'diy_anli') return customerCaseFields;
   if (normalized === 'diy_anlice_child') return casebookCaseFields;
   if (normalized === 'diy_kehusb') return deviceIotFields;
+  if (normalized === 'diy_iot_device') return [
+    { Id: 'iot-code', Name: 'DeviceCode', Label: 'IoT设备编号', Component: 'Text', Visible: 1, AppVisible: 1, Config: '{}' },
+    { Id: 'iot-name', Name: 'DeviceName', Label: '设备名称', Component: 'Text', Visible: 1, AppVisible: 1, Config: '{}' },
+    { Id: 'iot-provider', Name: 'Provider', Label: 'IoT厂商', Component: 'Radio', Visible: 1, AppVisible: 1, Config: '{}', Data: 'xinjiyuan|新纪源,yuelong|跃龙（万能板）,yunque|云雀（世虹）' }
+  ];
   const row = visualRowsByTable[normalized];
   if (!row) return [];
   const labels = { KehuMC: '客户名称', TenantName: '商家名称', LianxiR: '联系人', LianxiRDH: '联系电话', LianxiDH: '联系电话', KehuLX: '客户类型', FuzeR: '负责人', Chengshi: '城市', Zhuangtai: '状态', DingdanBH: '订单编号', DingdanJE: '订单金额' };
@@ -517,7 +532,23 @@ const targets = [
   {
     name: 'device-detail', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
     required: ['.hero-band', '.info-band', '.native-control__qrcode', '.device-section-actions', '.device-section-action--preview', '.device-section-action--qrcode', '.bottom-actions'],
-    expectedText: ['预览商品详情', '生成设备二维码']
+    expectedText: ['预览商品详情', '生成设备二维码', '关联IoT设备', '解除IoT关联', '新增IoT设备'],
+    requireDeviceIoTActions: true
+  },
+  {
+    name: 'device-iot-select', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
+    clickSelector: '.device-iot-action--link', afterSelector: '.selector-panel',
+    required: ['.selector-panel', '.selector-search', '.selector-row'], expectedText: ['IOT-0068', '校园直饮机']
+  },
+  {
+    name: 'device-iot-create', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
+    clickSelector: '.device-iot-action--create', afterSelector: '.native-form-page', selectorAfterClick: '.native-form-page',
+    required: ['.native-form-page', '.form-section'], expectedText: ['IoT设备编号', 'IoT厂商', '保存']
+  },
+  {
+    name: 'device-iot-unlink-confirm', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
+    clickSelector: '.device-iot-action--unlink', afterSelector: '.uni-modal',
+    required: ['.uni-modal'], expectedText: ['解除 IoT 关联', '确认解除']
   },
   {
     name: 'device-product-preview', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
@@ -746,6 +777,7 @@ function httpJson(url) {
         try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
       });
     });
+    request.setTimeout(5000, () => request.destroy(new Error('Browser debugger HTTP request timed out')));
     request.once('error', reject);
   });
 }
@@ -791,8 +823,12 @@ function connectCdp(wsUrl) {
     socket.addEventListener('open', () => resolve({
       send(method, params = {}) {
         const messageId = ++id;
-        socket.send(JSON.stringify({ id: messageId, method, params }));
-        return new Promise((sendResolve, sendReject) => pending.set(messageId, { resolve: sendResolve, reject: sendReject }));
+        return new Promise((sendResolve, sendReject) => {
+          // 浏览器退出或调试协议失联必须结束测试，不能无限占用测试进程。
+          const timer = setTimeout(() => { pending.delete(messageId); sendReject(new Error(`Browser command timed out: ${method}`)); }, 20000);
+          pending.set(messageId, { resolve: value => { clearTimeout(timer); sendResolve(value); }, reject: error => { clearTimeout(timer); sendReject(error); } });
+          socket.send(JSON.stringify({ id: messageId, method, params }));
+        });
       },
       on(method, listener) {
         const items = listeners.get(method) || [];
@@ -818,6 +854,26 @@ function connectCdp(wsUrl) {
   });
 }
 
+async function inspectCustomerListSummary(cdp) {
+  await waitForExpression(cdp, `document.querySelector('.status-item__badge')?.innerText === '45' && document.querySelectorAll('.summary-metric').length === 4`);
+  const evaluate = async expression => (await cdp.send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+  const before = await evaluate(`({ checked: document.querySelector('.customer-valid-switch').getAttribute('aria-checked'),
+    labels: [...document.querySelectorAll('.summary-metric__label')].map(node => node.innerText),
+    values: [...document.querySelectorAll('.summary-metric__value')].map(node => node.innerText),
+    badges: [...document.querySelectorAll('.status-item__badge')].map(node => node.innerText) })`);
+  if (before.checked !== 'true' || JSON.stringify(before.labels) !== JSON.stringify(['租赁总价', '买断总价', '包年换芯总价', '预期交易金额']) || before.badges.some(value => !/^\d+$/.test(value))) fail(`客户统计默认状态不正确: ${JSON.stringify(before)}`);
+  await evaluate(`document.querySelector('.customer-valid-switch').click()`);
+  await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'false' && document.querySelector('.summary-metric__value').innerText.includes('23.8')`);
+  const after = await evaluate(`[...document.querySelectorAll('.summary-metric__value')].map(node => node.innerText)`);
+  if (before.values[0] === after[0] || before.values[2] === after[2] || before.values[1] !== after[1] || before.values[3] !== after[3]) fail(`客户有效期开关口径不正确: ${JSON.stringify({before, after})}`);
+  const warning = await evaluate(`document.querySelector('.customer-statistics-hint').innerText`);
+  if (!after[2].includes('1.68') || warning !== '换芯1项待核对，合计仅含已获取金额') fail(`历史换芯缺失不应覆盖已有合计: ${JSON.stringify({ after, warning })}`);
+  await evaluate(`document.querySelector('.customer-valid-switch').click()`);
+  await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'true' && document.querySelector('.summary-metric__value').innerText.includes('12.8')`);
+  const restoredHint = await evaluate(`document.querySelector('.customer-statistics-hint').innerText`);
+  if (restoredHint !== '买断按全部合同累计') fail(`切回有效期后残留历史金额提示: ${restoredHint}`);
+}
+
 function parsePostData(value) {
   if (!value) return {};
   try { return JSON.parse(value); } catch (error) {}
@@ -838,11 +894,16 @@ function buildMockResponse(request) {
     return { Code: 1, Data: { TaskDeviceCounts: Object.fromEntries(body.TaskCardIds.map(id => [id, 2])) } };
   }
   if (apiEngineKey === 'xjy-customer-contract-totals') {
+    if (body.Summary === true) return { Code: 1, Data: { Metrics: { rental: body.Filters?.ValidOnly === false ? '238000.00' : '128000.00', buyout: '68000.00', annualFilter: body.Filters?.ValidOnly === false ? '16800.00' : '6800.00' },
+      StatusCounts: { All: 45, 目标客户: 10, 意向客户: 5, 合作客户: 30 }, IncompleteMetrics: { annualFilter: body.Filters?.ValidOnly === false ? 1 : 0 } } };
     if (!body.CustomerSysMenuId || !Array.isArray(body.CustomerIds) || !body.CustomerIds.length) return { Code: 0, Msg: '测试合同金额请求缺少客户菜单或客户编号' };
     return visualCustomerContractTotals(body.CustomerIds);
   }
   if (apiEngineKey === 'platform-current-user') return { Code: 1, Data: { ...sysUserRow, TenantId: 'tenant-xjy', Level: 10,
-    _RoleLimits: [{ Type: 'Menu', FkId: 'visual-menu-diy_shouhoudd', Permission: [{ Name: 'Edit' }, { Name: '3e66f489-6817-4a70-bf40-26a922fd3d51' }] }]
+    _Roles: [{ Id: 'role-iot' }],
+    _RoleLimits: [{ Type: 'Menu', FkId: 'visual-menu-diy_shouhoudd', Permission: [{ Name: 'Edit' }, { Name: '3e66f489-6817-4a70-bf40-26a922fd3d51' }] },
+      { Type: 'Menu', FkId: 'visual-menu-diy_kehusb', Permission: [{ Name: 'Edit' }] },
+      { Type: 'Menu', FkId: 'visual-menu-diy_iot_device', Permission: [{ Name: 'Add' }] }]
   } };
   if (lowerUrl.includes('gettabledatatree') && String(table).toLowerCase() === 'sys_dept') return {
     Code: 1, Data: [{ Id: 'dept-sales', Name: '业务部' }, { Id: 'dept-service', Name: '服务部' }], DataCount: 2
@@ -915,6 +976,9 @@ function buildMockResponse(request) {
     const pageIndex = Math.max(1, Number(body._PageIndex || 1));
     const pageSize = Math.max(1, Number(body._PageSize || 20));
     return { Code: 1, Data: customers.slice((pageIndex - 1) * pageSize, pageIndex * pageSize), DataCount: customers.length };
+  }
+  if (lowerUrl.includes('gettabledata') && String(table).toLowerCase() === 'diy_iot_device') {
+    return { Code: 1, Data: moduleRows.diy_iot_device.rows, DataCount: 1 };
   }
   if (lowerUrl.includes('gettabledata') && String(table).toLowerCase() === 'diy_field') {
     return { Code: 1, Data: sysUserFields, DataCount: sysUserFields.length };
@@ -1326,7 +1390,10 @@ async function setLoggedInState(cdp) {
     Id: 'user-001', Account: 'admin', Name: '张服务', Phone: '13900001234',
     RoleName: '售后服务工程师', TenantId: 'tenant-xjy', TenantName: '集福鲤杭州运营中心',
     DeptId: 'dept-service', DeptName: '客户服务部', Level: 10,
-    _RoleLimits: [{ Type: 'Menu', FkId: 'visual-menu-diy_shouhoudd', Permission: [{ Name: 'Edit' }, { Name: '3e66f489-6817-4a70-bf40-26a922fd3d51' }] }]
+    _Roles: [{ Id: 'role-iot' }],
+    _RoleLimits: [{ Type: 'Menu', FkId: 'visual-menu-diy_shouhoudd', Permission: [{ Name: 'Edit' }, { Name: '3e66f489-6817-4a70-bf40-26a922fd3d51' }] },
+      { Type: 'Menu', FkId: 'visual-menu-diy_kehusb', Permission: [{ Name: 'Edit' }] },
+      { Type: 'Menu', FkId: 'visual-menu-diy_iot_device', Permission: [{ Name: 'Add' }] }]
   };
   await cdp.send('Runtime.evaluate', {
     expression: `localStorage.setItem('microi_token', 'xjy-visual-token'); localStorage.setItem('microi_user', ${JSON.stringify(JSON.stringify(user))});`,
@@ -1360,6 +1427,29 @@ async function inspectCustomerContractTotals(cdp, target) {
       state.groups[0].labels.join('|') !== expectedLabels.join('|') || state.groups[2].labels.join('|') !== expectedLabels.join('|') ||
       state.groups.flatMap(group => group.values).some(value => !/^¥[\d,]+\.\d{2}$/.test(value)) || state.clipped.length) {
     fail(`Customer contract totals render failed: ${JSON.stringify(state)}`);
+  }
+  return { source: 'local visual fixture', ...state };
+}
+
+async function inspectDeviceIoTActions(cdp, target) {
+  if (!target.requireDeviceIoTActions) return null;
+  await waitForSelector(cdp, '.device-iot-action--link');
+  const result = await cdp.send('Runtime.evaluate', {
+    expression: `(() => {
+      const root = document.querySelector('.device-iot-actions');
+      const buttons = [...root.querySelectorAll('.device-iot-action')].map(button => {
+        const rect = button.getBoundingClientRect(), style = getComputedStyle(button);
+        return { text: button.innerText, top: rect.top, width: rect.width, height: rect.height,
+          color: style.color, background: style.backgroundColor,
+          clipped: button.scrollWidth > button.clientWidth + 2 };
+      });
+      return { buttons, duplicateSelectors: document.querySelectorAll('.section-selector-grid .selector-field, .standalone-related-panel .selector-field').length };
+    })()`, returnByValue: true
+  });
+  const state = result.result.value;
+  if (state.buttons.length !== 3 || state.duplicateSelectors !== 0 || Math.max(...state.buttons.map(button => button.top)) - Math.min(...state.buttons.map(button => button.top)) > 1 || state.buttons.some(button => button.height < 30 || button.clipped ||
+      button.color === button.background || button.color === 'rgba(0, 0, 0, 0)')) {
+    fail(`Device IoT action geometry/color failed: ${JSON.stringify(state)}`);
   }
   return { source: 'local visual fixture', ...state };
 }
@@ -1844,6 +1934,8 @@ async function main() {
         const layout = await inspectLayout(cdp, target, viewport);
         const waterMotion = await verifyHeroVideo(cdp, target);
         const customerContractTotals = await inspectCustomerContractTotals(cdp, target);
+        if (target.name === 'customers') await inspectCustomerListSummary(cdp);
+        const deviceIoTActions = await inspectDeviceIoTActions(cdp, target);
         const fileName = `${target.name}-${viewport.name}.png`;
         const screenshotPath = path.join(outputRoot, fileName);
         // Prime Chromium's compositor after rapid full-page navigations. Without
@@ -1860,7 +1952,7 @@ async function main() {
         const unexpectedBrowserErrors = routeErrors.filter((item) => !allowedPatterns.some((pattern) => item.text.includes(pattern)));
         const result = {
           target: target.name, viewport: viewport.name, screenshotPath, fileSize, layout,
-          waterMotion, customerContractTotals, browserErrors: unexpectedBrowserErrors, expectedBrowserErrors
+          waterMotion, customerContractTotals, deviceIoTActions, browserErrors: unexpectedBrowserErrors, expectedBrowserErrors
         };
         report.push(result);
         if (!layout || !layout.ok) fail(`Layout check failed for ${target.name} at ${viewport.name}: ${JSON.stringify(layout)}`);

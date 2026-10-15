@@ -317,6 +317,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		setUser
 	} from '@/utils/request.js'
 	import { canEditMenuRecord } from '@/platform/menu-permission.js'
+	import { isReadOnlyTable } from '@/platform/configured-read-api.mjs'
 	import { findMenu } from '@/platform/business-runtime.js'
 	import { buildFormSubsections } from '@/platform/form-subsections.mjs'
 	import { isStandaloneChildLayout } from '@/platform/related-tab-layout.mjs'
@@ -401,6 +402,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	}
 
 	export default {
+    // 路由查询参数不能透传到根页面壳并覆盖已解码的中文标题。
+    inheritAttrs: false,
   onShareAppMessage() { return buildFriendShare(this, 'pages/native-form/index') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/native-form/index') },
 		components: { MciBusinessRelatedList, MciCustomerPicker, MciPosterDetail, MciVisitTargetFields },
@@ -435,6 +438,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				recordAdapter: 'form-engine',
 				moduleEngineKey: '',
 				tableChildAuth: null,
+				readWhere: [],
 				tenantFormState: {},
 				viewManifest: null,
 				// zhy: 记录当前打开下拉框的字段名。
@@ -461,8 +465,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			}
 		},
 		computed: {
+			recordReadOnly() { return isReadOnlyTable(this.tableName, businessModules) },
 			canEditRecord() {
-				return canEditMenuRecord(this.menuId, getUser() || {})
+				return !this.recordReadOnly && canEditMenuRecord(this.menuId, getUser() || {})
 			},
 			detailPosterPresentation() {
 				if (this.mode !== 'View') return null
@@ -495,7 +500,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				}))
 			},
 			isEditableMode() {
-				return this.mode === 'Add' || this.mode === 'Edit'
+				return !this.recordReadOnly && (this.mode === 'Add' || this.mode === 'Edit')
 			},
 			relationParentId() {
 				return this.rowId || this.draftRowId || ''
@@ -607,6 +612,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			}
 			this.moduleEngineKey = decodeURIComponent(options.moduleEngineKey || '')
 			this.tableChildAuth = parseJson(decodeURIComponent(options.tableChildAuth || ''), null)
+			this.readWhere = parseJson(decodeURIComponent(options.readWhere || ''), []) || []
 			this.tenantFormState = createTenantFormState(this.tenantFormContext())
 			this.refreshTenantFloatingActionMetrics()
 			this.loadForm()
@@ -845,6 +851,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				return this.embeddedRelatedForGroup(group).filter((item) => item.type === 'openTable')
 			},
 			async loadForm(refresh = false) {
+				if (this.recordReadOnly) this.mode = 'View'
 				// zhy: 每次加载分配递增编号，仅允许最后一次请求更新表单。
 				const loadId = ++this.formLoadId
 				this.openSelectorField = ''
@@ -895,6 +902,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					const rowPromise = (this.rowId || !isFormEngineRecordAdapter(this.recordAdapter))
 						? loadNativeFormRecord({
 							...context,
+							definitionPromise,
+							readWhere: this.readWhere,
 							adapter: this.recordAdapter,
 							tableName: this.tableName,
 							rowId: this.rowId,
@@ -1319,6 +1328,10 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				return group.fields.some((field) => field.Name === this.openSelectorField)
 			},
 			async submit() {
+				if (this.recordReadOnly) {
+					uni.showToast({ title: '此记录只支持查看', icon: 'none' })
+					return
+				}
 				if (this.saving || this.saveReturnTimer) return
 				if (!['Add', 'Edit'].includes(this.mode) || (this.mode === 'Edit' && this.rowId &&
 					isFormEngineRecordAdapter(this.recordAdapter) && !this.tableChildAuth &&
