@@ -340,12 +340,16 @@ if ($Mode -eq "Full") {
     dotnet restore $solution --disable-parallel --force-evaluate -m:1 -nr:false -p:BuildInParallel=false -v:minimal
     if ($LASTEXITCODE -ne 0) { throw "Solution restore failed with exit code $LASTEXITCODE." }
 
+    # 与一键发布使用同一 Release 重建图，覆盖方案外引用的 Clean/Build 顺序；
+    # 保留父配置，不能靠预备 Release 文件或回退 Debug 掩盖引用产物缺失。
     dotnet build $solution `
         -c $Configuration `
         --no-restore `
+        --no-incremental `
         --disable-build-servers `
         -m:1 `
         -p:UseSharedCompilation=false `
+        -p:ShouldUnsetParentConfigurationAndPlatform=false `
         -v:minimal
     if ($LASTEXITCODE -ne 0) { throw "Solution build failed with exit code $LASTEXITCODE." }
 

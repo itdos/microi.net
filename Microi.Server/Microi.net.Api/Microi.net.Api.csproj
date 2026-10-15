@@ -190,14 +190,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="../Microi.MemoryDiagnostics/ProcessStartIdentity.cs" Link="Hosting/ProcessStartIdentity.cs" />
+    <!-- 独立诊断进程不装入 API 托管堆；真实项目依赖统一 Clean/Build 顺序，
+         避免解决方案 Rebuild 先裸 Build、后被测试夹具 Clean 清掉引用程序集。 -->
+    <ProjectReference Include="../Microi.MemoryDiagnostics/Microi.MemoryDiagnostics.csproj" ReferenceOutputAssembly="false"
+                      GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained;PublishDir;OutputPath;BaseOutputPath" />
   </ItemGroup>
-  <!-- 独立进程负责分配采样与栈解析，避免把重型诊断依赖装入 API 的托管堆。 -->
-  <Target Name="BuildMemoryDiagnosticsHelper" BeforeTargets="BeforeBuild">
-    <MSBuild Projects="$(MSBuildProjectDirectory)/../Microi.MemoryDiagnostics/Microi.MemoryDiagnostics.csproj"
-             Targets="Restore;Build" BuildInParallel="false"
-             Properties="Configuration=$(Configuration);UseSharedCompilation=false"
-             RemoveProperties="RuntimeIdentifier;SelfContained;PublishDir;OutputPath;BaseOutputPath" />
-  </Target>
   <Target Name="CopyMemoryDiagnosticsHelper" AfterTargets="Build">
     <ItemGroup>
       <MemoryDiagnosticsFiles Include="$(MSBuildProjectDirectory)/../Microi.MemoryDiagnostics/bin/$(Configuration)/net10.0/**/*"
