@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-11T10:58:19.511Z",
+  "generatedAt": "2026-10-14T07:04:55.711Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2770,17 +2770,17 @@
       ]
     },
     "v8-mq-mqtt": {
-      "originalSha256": "5a641621f24ccda6aa0e881c2daefae6012d655b55f25c6e170a62f916edf9ea",
+      "originalSha256": "d5dff494f91a38acc3cbc188272be262c0403e8177b4101c5100590f3e320947",
       "originalLines": 339,
-      "prefixSha256": "68fdfbe24123f9db65e6b926f2d0aab6309032e99b7b24c4024324de36c43201",
-      "prefixBytes": 864,
+      "prefixSha256": "47f1f0de3acd2abd1129754fcf329129358d4d078d07b033d80b5447dc879886",
+      "prefixBytes": 853,
       "entryLines": 179,
       "chunks": [
         {
           "id": "v8-mq-mqtt-000",
           "ordinal": 0,
           "destination": "v8-mq-mqtt/SKILL.md",
-          "sha256": "bc9ac85a8a0b6af88602e0d5419f6d61b192b5262193f6cb8c8ebd26af7bef25",
+          "sha256": "4a6559aed1af036591a04002c6e3311d9f0957fbbabbcafdc4a6bad95dabd843",
           "lines": 140,
           "heading": "V8.MQ — RabbitMQ 消息队列"
         },
@@ -2788,7 +2788,7 @@
           "id": "v8-mq-mqtt-001",
           "ordinal": 2,
           "destination": "v8-mq-mqtt/SKILL.md",
-          "sha256": "5e42facc0cf07b546ec816cd9127126ce5adaaa03d14053991d063922fc5c9fb",
+          "sha256": "dcf641877c01b65104fbd9b7d5022a9b7b656a6461895d499ab06af9d2bb7d0c",
           "lines": 14,
           "heading": "注意事项"
         },
@@ -2796,7 +2796,7 @@
           "id": "v8-mq-mqtt-002",
           "ordinal": 1,
           "destination": "v8-mq-mqtt/references/progressive-01-v8-mqtt-iot-物联网.md",
-          "sha256": "24e28545025cf03d9a91cce8081fbe566e5f8ae56ff2885111238f684c276cd1",
+          "sha256": "7deedee3e9e4459b26236d70baac1ca909ba31e1c9e53e8e475c60a394c0b487",
           "lines": 176,
           "heading": "V8.MQTT — IoT 物联网"
         }
@@ -2811,11 +2811,11 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "a5c5927a37fdd2547dcc7ed1941f4320613fb6414e0f4310d4490a1f5bb84a4e",
-      "originalLines": 527,
-      "prefixSha256": "e6bd4da404004b3012d17b6a389b62c320002b8b2fa3d88cc6e6e52ae55f4763",
-      "prefixBytes": 3432,
-      "entryLines": 211,
+      "originalSha256": "1ac817c6dba82a11f10a592e7ab8a07bf17bad335c5d3022320e8dba9c9ef75c",
+      "originalLines": 550,
+      "prefixSha256": "5cee41a4d3765eb7052d2d7c2acc48195a4e0596e218e88cfe18f239d2b58152",
+      "prefixBytes": 6158,
+      "entryLines": 234,
       "chunks": [
         {
           "id": "v8-security-000",
@@ -3221,7 +3221,7 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "a08bcda3b48b6eeb194d01e30b2c45ffdc37539b3406cd2c37fb150a7737893b",
+      "originalSha256": "97e7fe55a12fced58ee289b4f26d3ea6de27a98acb2141a2107ce976a061679b",
       "originalLines": 626,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
@@ -3303,7 +3303,7 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "0343192b5c71d39f9f31a21bccb5046715f1b47d4876ba962b2d5f188c021271",
+          "sha256": "43bdb1476a7751fbc251c933ccfbd1710c9269dec3e7e4b541cdaeea37d200f1",
           "lines": 38,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },

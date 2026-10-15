@@ -261,6 +261,8 @@ namespace Microi.net
             string code_challenge_method,
             string prompt)
         {
+            SetNoStore();
+            // 授权跳转可能包含一次性 requestId/code，错误响应同样不能被浏览器或代理缓存。
             var tenant = ResolveAnonymousTenant(OsClient);
             if (tenant.Code != 1) return OidcError(null, state, "invalid_request", "tenant is invalid");
             var connection = await FindOutboundClientAsync(tenant.Data, "OIDC", client_id).ConfigureAwait(false);
@@ -280,7 +282,8 @@ namespace Microi.net
             var pending = NewPendingAuthorization(tenant.Data, connection, client_id, redirect_uri,
                 string.Join(" ", scopes), state, nonce, code_challenge);
             var session = await GetProviderSessionAsync(tenant.Data).ConfigureAwait(false);
-            if (session != null)
+            var interaction = ResolveOidcAuthorizationInteraction(connection, prompt, session != null);
+            if (interaction == "authorize")
             {
                 var redirect = await CompletePendingAuthorizationAsync(pending, session.CurrentUser,
                     session.AuthTime).ConfigureAwait(false);
@@ -288,13 +291,27 @@ namespace Microi.net
                     ? Redirect(redirect.Data)
                     : OidcError(redirect_uri, state, "server_error", redirect.Msg);
             }
-            if (string.Equals(prompt, "none", StringComparison.Ordinal))
-                return OidcError(redirect_uri, state, "login_required", "Microi sign-in is required");
+            if (interaction != "consent")
+                return OidcError(redirect_uri, state, interaction,
+                    interaction == "interaction_required" ? "explicit consent is required" : "Microi sign-in is required");
             var requestId = SsoSecurity.NewOpaqueValue();
             var saved = await Cache(tenant.Data).StringSetAsync(AuthorizationRequestKey(tenant.Data, requestId),
                 JsonConvert.SerializeObject(pending), AuthorizationRequestLifetime, When.NotExists).ConfigureAwait(false);
             if (!saved) return OidcError(redirect_uri, state, "temporarily_unavailable", "authorization state failed");
             return Redirect(BuildFrontendAuthorizationUrl(tenant.Data, requestId));
+        }
+
+        private static string ResolveOidcAuthorizationInteraction(
+            SsoConnectionOptions client, string prompt, bool hasProviderSession)
+        {
+            // 公开客户端不能靠删改 prompt 跳过官方确认；Authorize 已强制本次 PKCE。
+            // 公开客户端的 prompt=none 返回交互错误，私密客户端继续复用已有 OP 会话。
+            var requiresConsent = string.Equals(client?.ClientAuthMethod, "none", StringComparison.Ordinal);
+            if (hasProviderSession && !requiresConsent && !string.Equals(prompt, "consent", StringComparison.Ordinal))
+                return "authorize";
+            if (string.Equals(prompt, "none", StringComparison.Ordinal))
+                return requiresConsent ? "interaction_required" : "login_required";
+            return "consent";
         }
 
         public async Task<IActionResult> Token(string OsClient)
@@ -324,6 +341,9 @@ namespace Microi.net
             if (payload == null) return OAuthError("invalid_token", "access token is invalid or expired", 401);
             if (!SsoSecurity.FixedEquals(payload.OsClient, tenant.Data))
                 return OAuthError("invalid_token", "token tenant does not match", 401);
+            var client = await FindOutboundClientAsync(tenant.Data, "OIDC", payload.ClientId).ConfigureAwait(false);
+            if (!IsCurrentOutboundGrantAllowed(client, payload.ClientId, payload.Scope))
+                return OAuthError("invalid_token", "client grant is disabled or has changed", 401);
             var user = await GetEnabledUserAsync(payload.OsClient, payload.UserId).ConfigureAwait(false);
             if (user == null) return OAuthError("invalid_token", "user is disabled", 401);
             var claims = await BuildOutboundClaimsAsync(payload.OsClient, user, payload.Subject, payload.Scope)
@@ -449,8 +469,8 @@ namespace Microi.net
             catch { }
             if (payload == null || !DateTimeOffset.TryParse(payload.ExpiresAt, out var expires)
                 || expires <= DateTimeOffset.UtcNow
-                || !SsoSecurity.FixedEquals(payload.ClientId, client.ClientId)
-                || !SsoSecurity.FixedEquals(payload.RedirectUri, form["redirect_uri"].ToString())
+                || !IsOutboundAuthorizationCodeAllowed(client, payload.ClientId, payload.RedirectUri,
+                    payload.Scope, form["redirect_uri"].ToString())
                 || !SsoSecurity.VerifyPkceS256(form["code_verifier"].ToString(), payload.CodeChallenge))
                 return OAuthError("invalid_grant", "authorization code is invalid, expired or already used", 400);
             var user = await GetEnabledUserAsync(osClient, payload.UserId).ConfigureAwait(false);
@@ -492,6 +512,7 @@ return raw",
             }
             if (payload.TokenType != "refresh_token"
                 || !SsoSecurity.FixedEquals(payload.ClientId, client.ClientId)
+                || !IsCurrentOutboundGrantAllowed(client, payload.ClientId, payload.Scope)
                 || !DateTimeOffset.TryParse(payload.ExpiresAt, out var expires)
                 || expires <= DateTimeOffset.UtcNow
                 || await Cache(osClient).KeyExistsAsync(RefreshFamilyRevokedKey(osClient, payload.FamilyId)).ConfigureAwait(false))

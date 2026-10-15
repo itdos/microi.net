@@ -335,7 +335,7 @@
                                     <span class="login-methods-empty__icon" aria-hidden="true">!</span>
                                     <span>
                                         <strong>常用登录方式暂未开放</strong>
-                                        <small v-if="LoginMethodItems.length">五种常用登录方式均已隐藏，下方仍可使用系统已启用的其他验证方式。</small>
+                                        <small v-if="LoginMethodItems.length">常用登录方式均已隐藏，下方仍可使用系统已启用的其他验证方式。</small>
                                         <small v-else>请使用账号密码登录，或联系系统管理员开启至少一种登录方式。</small>
                                     </span>
                                 </div>
@@ -829,6 +829,7 @@ export default {
                 });
             }
             const externalDefaults = [
+                { key: "Microi", name: "Microi 登录", description: "使用 Microi 官方账号授权登录", glyph: "M", tone: "microi" },
                 { key: "Gitee", name: "Gitee", description: "使用 Gitee 账号授权登录", glyph: "G", tone: "gitee" },
                 { key: "WeChat", name: "微信", description: "使用微信开放平台扫码登录", glyph: "微", tone: "wechat" },
                 { key: "GitHub", name: "GitHub", description: "使用 GitHub 账号授权登录", glyph: "GH", tone: "github" }
@@ -3619,6 +3620,7 @@ export default {
 .login-method-bubble.is-passkey { --bubble-accent: #5b8cff; }
 .login-method-bubble.is-totp { --bubble-accent: #9b63e8; }
 .login-method-bubble.is-face { --bubble-accent: #16a7a0; }
+.login-method-bubble.is-microi { --bubble-accent: #2376f3; }
 .login-method-bubble.is-gitee { --bubble-accent: #c71d23; }
 .login-method-bubble.is-wechat { --bubble-accent: #07c160; }
 .login-method-bubble.is-github { --bubble-accent: #59636e; }
@@ -3662,6 +3664,14 @@ export default {
     color: var(--el-text-color-secondary);
     font-size: 11px;
     line-height: 1.55;
+}
+
+.login-method-bubble.is-microi .login-method-bubble-icon {
+    background: linear-gradient(145deg, #1d66d8, #1554bd);
+}
+
+.login-method-bubble.is-microi .login-method-bubble-copy small {
+    color: var(--el-text-color-regular);
 }
 
 .login-method-bubble-status {

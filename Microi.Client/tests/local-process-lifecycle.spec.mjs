@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import fs from 'node:fs';
+import os from 'node:os';
+import { randomUUID } from 'node:crypto';
 import net from 'node:net';
 import path from 'node:path';
 import test from 'node:test';
@@ -49,22 +51,30 @@ async function waitForExit(child, timeoutMs = 10000) {
     ]);
 }
 
-const fixtureParent = path.join(repoRoot, '.tmp');
-const ownedFixtures = new Set();
+// Full 的深层相对树保持不变；使用物理系统临时根，避免候选工作区长前缀超过 Win32 启动路径限制。
+const fixtureParent = fs.realpathSync(os.tmpdir());
+const ownedFixtures = new Map();
+const ownerFile = '.microi-process-lifecycle-owner.json';
 
 function createFixture() {
-    fs.mkdirSync(fixtureParent, { recursive: true });
     const root = fs.mkdtempSync(path.join(fixtureParent, 'microi-process-lifecycle-'));
-    ownedFixtures.add(root);
+    const owner = { kind: 'microi-process-lifecycle-fixture', pid: process.pid, root, nonce: randomUUID() };
+    fs.writeFileSync(path.join(root, ownerFile), JSON.stringify(owner), { flag: 'wx', mode: 0o600 });
+    ownedFixtures.set(root, owner);
     return root;
 }
 
 function removeFixture(root) {
     assert.ok(ownedFixtures.has(root), '只能回收本用例创建的目录');
-    assert.equal(path.dirname(path.resolve(root)), path.resolve(fixtureParent));
+    assert.equal(path.dirname(path.resolve(root)), fixtureParent);
     assert.ok(path.basename(root).startsWith('microi-process-lifecycle-'));
-    // Windows can release an exited executable's file handle slightly after
-    // the process exit event. Retry only this test-owned fixture directory.
+    assert.equal(fs.lstatSync(root).isSymbolicLink(), false, '夹具根必须是物理目录');
+    assert.equal(fs.realpathSync(root), path.resolve(root));
+    const marker = path.join(root, ownerFile);
+    assert.equal(fs.lstatSync(marker).isSymbolicLink(), false, '所有权标记必须是普通文件');
+    assert.equal(fs.lstatSync(marker).isFile(), true);
+    assert.deepEqual(JSON.parse(fs.readFileSync(marker, 'utf8')), ownedFixtures.get(root), '夹具所有权标记必须仍属于本用例');
+    // 已退出的 Windows 可执行文件句柄可能稍后才释放；只重试回收经过所有权校验的本用例根。
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     ownedFixtures.delete(root);
 }
@@ -84,7 +94,7 @@ function prepareCopiedRuntime(source, destination) {
 function runProcessManager(workspaceRoot, action, frontendPort, backendPort = 61501, releaseScope = 'all') {
     // StopBackend 会同时清理所选工作区的 Release 进程；测试绝不能指向真实源码工作区。
     assert.notEqual(path.resolve(workspaceRoot), repoRoot);
-    assert.ok(path.resolve(workspaceRoot).startsWith(path.resolve(fixtureParent) + path.sep));
+    assert.ok([...ownedFixtures.keys()].some(root => path.resolve(workspaceRoot).startsWith(root + path.sep)), '进程管理器只能操作本用例已登记的夹具工作区');
     return spawnSync(process.platform === 'win32' ? 'powershell.exe' : 'pwsh', [
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',

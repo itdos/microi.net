@@ -118,10 +118,20 @@ AI 接入畅捷通等第三方服务时，应先使用 `microi_manage_server_pri
 | `ExternalLoginEnabled` | `1` | 内置第三方登录总开关 |
 | `FaceVerificationEnabled` | `0` | 独立 Face Gateway 严格人脸与活体能力 |
 | `GiteeLoginEnabled` / `WeChatLoginEnabled` / `GitHubLoginEnabled` | `0` | 对应内置外部登录能力 |
+| `MicroiLoginEnabled` | `0` | 使用 `microi.net` 注册的官方账号登录已绑定本地账号；每部署独立公共 ClientId + PKCE，无需 Secret |
 
 新字段显式值优先；字段尚未安装或值为空时，运行时才读取旧 `mci_system_setting` Key，再回退到存量 `sys_osclients` / 安全默认值。这样旧租户升级后不会被突然改值，但升级完成后的唯一配置入口始终是公开系统设置。
 
-运行时只读取 `IsEnable=1` 且未删除的系统配置；历史停用或软删除记录不会覆盖登录开关。若存在多条有效配置，按修改时间从新到旧、Id 从小到大读取第一条。开启第三方登录后还需要在“安全与服务接入”保存并启用对应 ClientId/AppID 和 Secret，用户须先绑定第三方身份。
+运行时只读取 `IsEnable=1` 且未删除的系统配置；历史停用或软删除记录不会覆盖登录开关。若存在多条有效配置，按修改时间从新到旧、Id 从小到大读取第一条。开启 Gitee、微信或 GitHub 登录后，还需要在“安全与服务接入”保存并启用对应 ClientId/AppID 和 Secret，用户须先绑定第三方身份。
+
+### Microi 官方账号接入
+
+Microi 登录使用固定的官方 OIDC 身份服务。每个部署先单独登记公共客户端（`ClientAuthMethod=none`、PKCE S256、nonce）
+和精确回调，再启用 `Login.Microi.ClientId`，Scope 使用 `openid profile email`；不配置或共享 ClientSecret。
+官方应用包仅提供默认停用的 ClientId、Scope、Name、Description 模板，不包含客户实例或用户绑定。
+用户先在个人中心绑定本人官方账号，之后才能登录；完整步骤见[Microi 官方账号登录](./identity-verification#microi-login)。
+
+### 回调与存量升级
 
 外部登录回调优先使用当前有效 `sys_config.ApiBase` 的公网 HTTPS 地址，保留其中的路径前缀，再追加 `/api/ExternalLogin/Callback?OsClient=<租户>&Provider=<供应商>`。反向代理在外部终止 TLS、后端接收 HTTP 时，仍使用该 HTTPS 地址；供应商控制台登记的回调须与它一致。`ApiBase` 不得包含账号密码、查询参数或片段。未配置 `ApiBase` 的旧租户可回退直接 HTTPS 或本机 HTTP 请求地址，其它无效地址会拒绝发起授权。此行为需更新后端，应用包中的配置字段无需新增。
 
@@ -170,7 +180,7 @@ var clientSecret = privateSettings['Login.Gitee.ClientSecret'];
 
 `FormMaskBlur` 是全局正向开关：缺失、空值或 `0/false` 默认关闭遮罩毛玻璃，只有显式 `1/true` 才开启。平台统一 Dialog、图片裁剪、字段配置、业务弹窗和 Element Plus MessageBox 都必须从同一运行时读取该值，页面不得再用静态 CSS 默认开启毛玻璃。表级 `diy_table.DisableFormMaskBlur` 仍是负向开关；全局开启后，某张表显式配置 `1/true` 可单独关闭。旧 `sys_config.DisableFormMaskBlur` 只用于未升级租户的前端兼容回退，字段元数据必须在 PC 与移动端隐藏。
 
-登录页入口统一使用 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub` 五个负向开关，字段标签分别为“关闭生物登录入口”“关闭Authenticator登录入口”“关闭Gitee登录入口”“关闭微信登录入口”“关闭GitHub登录入口”。它们缺失、空值或 `0/false` 时默认显示入口，只有显式 `1/true` 才关闭；旧 `Login*Display` 字段仅作兼容回退并隐藏。`DisableAiAssistant` 同样保持负向开关语义。
+登录页入口统一使用 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginMicroi`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub` 六个负向开关，字段标签分别为“关闭生物登录入口”“关闭Authenticator登录入口”“关闭Microi登录入口”“关闭Gitee登录入口”“关闭微信登录入口”“关闭GitHub登录入口”。它们缺失、空值或 `0/false` 时默认显示入口，只有显式 `1/true` 才关闭；旧 `Login*Display` 字段仅作兼容回退并隐藏。Microi 能力默认关闭，入口可见不代表已启用或已配置。`DisableAiAssistant` 同样保持负向开关语义。
 
 AI 助手只保留“关闭AI助手图标”一个设置项：`DisableAiAssistant=1/true` 表示隐藏图标，`0/false` 表示显示。旧版“显示AI助手图标”（`IsShowAiAssistant`）已从官方母版字段元数据和新版系统设置安装包移除，不再作为新项目配置入口。已有数据库的旧物理列可保留供尚未升级的定制客户端兼容；字段 Id 可能曾被新开关复用，维护旧租户时须先按表名与字段名定位，不能直接套用旧 Id 删除。
 

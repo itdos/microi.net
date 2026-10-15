@@ -1,14 +1,56 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+
+// 创建人方案被公开根仓忽略，但一键入口优先选择它；只冻结这个固定方案的原始字节，
+// 不按方案内容复制闭源目录，也不提供任意外部项目的装配入口。
+async function snapshotFounderSolution(root) {
+  const name = 'Microi.Server/Microi.Anderson.sln', file = path.join(root, name);
+  let stat;
+  try { stat = await fs.lstat(file); }
+  catch (error) { if (error.code === 'ENOENT') return {}; throw error; }
+  if (!stat.isFile() || stat.isSymbolicLink()) throw Error('Founder solution must be a regular file without symbolic links');
+  const server = path.join(root, 'Microi.Server');
+  if ((await fs.lstat(server)).isSymbolicLink()) throw Error('Founder solution directory uses a symbolic link');
+  const bytes = await fs.readFile(file), text = bytes.toString('utf8').replace(/^\uFEFF/, '').trimStart();
+  if (bytes.length > 1024 * 1024 || !text.startsWith('Microsoft Visual Studio Solution File,')) throw Error('Invalid founder solution format');
+  const allowed = new Set([
+    'Microi.net.Api', 'Microi.WeChat', 'Microi.Captcha', 'Microi.OCR', 'Microi.Vision', 'Dos.ORM', 'Dos.Common',
+    'Microi.Office', 'Microi.HDFS', 'Microi.Cache', 'Microi.SearchEngine', 'Microi.MQ', 'Microi.Job', 'Microi.Spider',
+    'Microi.V8Engine', 'Microi.AI', 'Microi.MCP', 'Microi.MQTT', 'Microi.Core', 'Microi.Upgrade', 'Microi.MongoDB',
+    'Microi.Translate', 'Microi.Tests', 'Microi.SSO', 'Microi.net', 'Microi.WorkFlow',
+  ].map(project => project + '/' + project + '.csproj'));
+  const folders = '2150E333-8FDC-42A3-9474-1A3956D46DE8', types = new Set(['9A19103F-16F7-4668-BE54-9A1E7A4F7556', 'FAE04EC0-301F-11D3-BF4B-00C04F79EFBC']);
+  const seen = new Set();
+  for (const line of text.split(/\r?\n/)) {
+    if (!/^\s*Project\s*\(/.test(line)) continue;
+    const match = /^\s*Project\("\{([A-Fa-f0-9-]{36})\}"\)\s*=\s*"[^"\r\n]+",\s*"([^"\r\n]+)",\s*"\{[A-Fa-f0-9-]{36}\}"\s*$/.exec(line);
+    if (!match) throw Error('Malformed founder solution Project declaration');
+    if (match[1].toUpperCase() === folders) continue; // 方案文件夹是虚拟节点，不能作为可执行项目读取。
+    const project = match[2].replaceAll('\\', '/');
+    if (!types.has(match[1].toUpperCase()) || !allowed.has(project) || seen.has(project)) throw Error('Unsafe or duplicate founder solution project path');
+    seen.add(project);
+    let current = server;
+    for (const part of project.split('/')) {
+      current = path.join(current, part);
+      const item = await fs.lstat(current);
+      if (item.isSymbolicLink()) throw Error('Founder solution project uses a symbolic link');
+    }
+    if (!(await fs.lstat(current)).isFile()) throw Error('Founder solution project must be a regular file');
+  }
+  if (!seen.size) throw Error('Founder solution must declare an approved project');
+  return {[name]: createHash('sha256').update(bytes).digest('hex')};
+}
 
 // Full 读取的标准产品责任源码按唯一契约冻结，即使它们被根公开仓忽略。
 // 只记录指纹，不把这些私有文件暂存或复制进公开仓。
 export async function snapshotStandardInputs(root) {
+  const founder = await snapshotFounderSolution(root);
   const contractPath = path.join(root, 'AI-Project/标准产品套件/source-contract.json');
   let bytes;
   try { bytes = await fs.readFile(contractPath); }
-  catch (error) { if (error.code === 'ENOENT') return {}; throw error; }
+  catch (error) { if (error.code === 'ENOENT') return founder; throw error; }
   const contract = JSON.parse(bytes.toString('utf8'));
   if (contract.schemaVersion !== 1 || contract.target?.apiBase !== 'https://api.itdos.com'
     || String(contract.target?.osClient).toLowerCase() !== 'itdos'
@@ -27,13 +69,23 @@ export async function snapshotStandardInputs(root) {
     return full;
   }
   await inside(path.relative(root, contractPath));
-  const files = {}, hash = data => createHash('sha256').update(data).digest('hex');
+  const files = {...founder}, hash = data => createHash('sha256').update(data).digest('hex');
   const skipped = new Set(['.git', 'node_modules', 'dist', 'bin', 'obj', 'TestResults', '__pycache__', '.resource-sync-base']);
+  const safeRelative = value => typeof value === 'string' && value.length > 0
+    && !value.includes('\\') && !path.isAbsolute(value) && !/^[A-Za-z]:/.test(value)
+    && value.split('/').every(part => part && part !== '.' && part !== '..');
+  function declaredRelative(value) {
+    if (!safeRelative(value)) throw Error('Unsafe declared source: a relative path is required');
+    return value;
+  }
   files[path.relative(root, contractPath).replaceAll('\\', '/')] = hash(bytes);
   const keys = new Set();
+  const requirementsRoot = await inside(declaredRelative(contract.requirementsRoot));
   for (const app of contract.applications) {
     if (!/^[a-z0-9][a-z0-9_-]*$/.test(app.appKey) || keys.has(app.appKey)) throw Error('Invalid standard application identity');
     keys.add(app.appKey);
+    // Full 直接读取各应用声明的需求正文；共享文档按同一路径自然去重，不扫描其它项目资料。
+    await addInput(path.relative(root, path.join(requirementsRoot, declaredRelative(app.requirements))));
     const folder = await inside(path.join(contract.sourceParent, app.appKey));
     async function walk(directory) {
       for (const name of (await fs.readdir(directory)).sort()) {
@@ -50,13 +102,6 @@ export async function snapshotStandardInputs(root) {
 
   // Full 的服务器包装与前端 Three 回归还读取唯一官方清单中的 AI/邮箱/3D/worker，以及抽奖
   // 契约声明的源与交付输入。只冻结这些已声明文件，不扫描其它应用或复制私有正文。
-  const safeRelative = value => typeof value === 'string' && value.length > 0
-    && !value.includes('\\') && !path.isAbsolute(value) && !/^[A-Za-z]:/.test(value)
-    && value.split('/').every(part => part && part !== '.' && part !== '..');
-  function declaredRelative(value) {
-    if (!safeRelative(value)) throw Error('Unsafe declared source: a relative path is required');
-    return value;
-  }
   async function addInput(value) {
     const full = await inside(value);
     if (!(await fs.lstat(full)).isFile()) throw Error('Declared source must be a regular file');
@@ -97,7 +142,28 @@ export async function snapshotStandardInputs(root) {
     }
     const repositories = official.Repositories.filter(item => item.RepositoryKey === 'microi.openclaw');
     if (repositories.length !== 1) throw Error('Declared official test repository must have one owner');
-    await exactFiles(repositories[0]);
+    const repository = repositories[0], repositoryRoot = await inside(declaredRelative(repository.SourceRoot));
+    // 每次 capture/verify 都核验真实独立仓身份；仅在父根仓中找到同一个 HEAD 不能冒充 worker 来源。
+    let gitMetadata;
+    try { gitMetadata = await fs.lstat(path.join(repositoryRoot, '.git')); }
+    catch (error) { if (error.code === 'ENOENT') throw Error('Official worker requires its own independent Git repository'); throw error; }
+    if (gitMetadata.isSymbolicLink() || (!gitMetadata.isDirectory() && !gitMetadata.isFile()))
+      throw Error('Official worker independent Git metadata must not use a symbolic link');
+    if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(repository.GitCommit || '')) throw Error('Invalid official worker GitCommit');
+    const gitTop = execFileSync('git', ['rev-parse', '--show-toplevel'], {cwd: repositoryRoot, encoding: 'utf8', timeout: 10000, windowsHide: true}).trim();
+    if ((await fs.realpath(gitTop)) !== (await fs.realpath(repositoryRoot))) throw Error('Official worker repository root differs from declared SourceRoot');
+    let workspaceHasGit = false;
+    try { await fs.lstat(path.join(root, '.git')); workspaceHasGit = true; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (workspaceHasGit) {
+      const commonDirectory = async cwd => fs.realpath(path.resolve(cwd,
+        execFileSync('git', ['rev-parse', '--git-common-dir'], {cwd, encoding: 'utf8', timeout: 10000, windowsHide: true}).trim()));
+      if ((await commonDirectory(root)) === (await commonDirectory(repositoryRoot)))
+        throw Error('Official worker requires independent Git metadata instead of the workspace repository');
+    }
+    const head = execFileSync('git', ['rev-parse', '--verify', 'HEAD^{commit}'], {cwd: repositoryRoot, encoding: 'utf8', timeout: 10000, windowsHide: true}).trim();
+    if (head !== repository.GitCommit) throw Error('Official worker HEAD differs from declared GitCommit');
+    await exactFiles(repository);
   }
   const lottery = await optionalContract('Microi.Server/Microi.Tests/V8/event-lottery-release.json');
   if (lottery) {
@@ -120,6 +186,12 @@ export async function snapshotStandardInputs(root) {
     for (const value of [sourceContract, deliveryContract]) {
       if (value.schemaVersion !== 2 || value.applicationKey !== lottery.AppKey) throw Error('Invalid lottery declared package inputs');
     }
+    // manifest 是实际安装正文的入口；引擎文件即使未重复列入 sourceFiles，也必须按 manifest 声明冻结。
+    const manifest = JSON.parse((await addInput(path.relative(root, path.join(applicationRoot, 'manifest.json')))).toString('utf8'));
+    if (manifest.schemaVersion !== 2 || manifest.app?.key !== lottery.AppKey || !Array.isArray(manifest.engines))
+      throw Error('Invalid lottery manifest source ownership');
+    for (const engine of manifest.engines)
+      await addInput(path.relative(root, path.join(applicationRoot, declaredRelative(engine?.sourceFile))));
     // SourceRoot 的完整源码和外侧 helper/scenarios 已在两份版本化包合同中精确列出。
     // 不遍历 appParent，避免把 build、恢复点、凭据或其它独立测试意外纳入。
     await addDeclaredList(sourceRoot, sourceContract.sourceFiles);
@@ -136,6 +208,42 @@ export async function snapshotStandardInputs(root) {
       deliveryTests.add(relative.toLowerCase());
       await addInput(path.relative(root, full));
     }
+  }
+  // 仅中央产品 Full 中实际存在的两个消费者启用此依赖；固定同步 profile 与精确 Key，不发现其它租户。
+  const readers = [
+    ['microi.uniapp/scripts/test-directory-card-config.mjs', ['get-sysUser-list']],
+    ['microi.uniapp/scripts/test-task-assignee-search.mjs', ['get-sysUser-list', 'shouhoudd_zhipai']],
+  ], engineKeys = new Set();
+  for (const [reader, requiredKeys] of readers) {
+    try { await fs.lstat(path.join(root, reader)); }
+    catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+    await addInput(reader);
+    for (const key of requiredKeys) engineKeys.add(key);
+  }
+  if (engineKeys.size) {
+    const engineRoot = await inside('Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎');
+    const matches = new Map([...engineKeys].map(key => [key, []]));
+    async function findDeclaredEngines(directory) {
+      for (const entry of (await fs.readdir(directory, {withFileTypes: true})).sort((a, b) => a.name.localeCompare(b.name))) {
+        const full = path.join(directory, entry.name);
+        if (entry.isDirectory()) await findDeclaredEngines(full);
+        else if (entry.isFile()) for (const key of engineKeys)
+          if (entry.name.endsWith('(' + key + ').js')) matches.get(key).push(full);
+      }
+    }
+    await findDeclaredEngines(engineRoot);
+    for (const [key, names] of matches) {
+      if (names.length !== 1) throw Error(names.length ? 'Ambiguous synced xjy test ApiEngineKey: ' + key : 'Synced xjy test ApiEngineKey not found: ' + key);
+      await addInput(path.relative(root, names[0]));
+    }
+  }
+  // 系统设置回归直接比较主租户短信母版正文；固定该输入，不遍历其它接口或租户。
+  let settingsReaderExists = false;
+  try { await fs.lstat(path.join(root, 'Microi.Server/OfficialApplications/Resource/tenant-system-settings-resource.test.mjs')); settingsReaderExists = true; }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (settingsReaderExists) {
+    const tenantSource = path.dirname(await inside(declaredRelative(contract.sourceParent)));
+    await addInput(path.relative(root, path.join(tenantSource, '接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js')));
   }
   return files;
 }

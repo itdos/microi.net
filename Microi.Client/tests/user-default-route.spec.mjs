@@ -38,7 +38,7 @@ test("signed-in users save their own route through the platform service and logi
   const personalSettings = readPlatformServiceSource("src/PersonalSettings.vue");
   const preferencesEngine = await readFile(new URL("../../Microi.Server/OfficialApplications/Resource/platform-user-update-preferences.js", import.meta.url), "utf8");
   assert.match(navbarSource, /OpenPersonalSettings/);
-  assert.match(navbarSource, /\/micro-app\/microi-platform-service\/personal-settings/);
+  assert.match(navbarSource, /buildMicroAppFriendlyPath\([\s\S]*?appKey: "microi-platform-service", routePath: "\/personal-settings"/);
   assert.match(personalSettings, /client\.ApiEngine\.Run\('platform-user-update-preferences'/);
   assert.match(personalSettings, /DefaultIndexUrl: preference\.DefaultIndexUrl/);
   assert.match(personalSettings, /登录时仍会按当前菜单权限检查并自动回退/);

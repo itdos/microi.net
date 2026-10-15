@@ -144,6 +144,7 @@ import { hasWebOS } from "@/utils/webos-detect.js";
 import { getRealtimeStatusText } from "@/utils/realtime-connection.js";
 import TopNavigation from './TopNavigation.vue';
 import { resolveUserNavigationLayout } from '@/utils/user-visual-preferences';
+import { buildMicroAppFriendlyPath } from '@/router/micro-app-route.js';
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
 export default {
@@ -307,7 +308,7 @@ export default {
             this.RealtimeRetryDelay = detail?.retryDelay ?? null;
         },
         OpenPersonalSettings() {
-            this.$router.push("/micro-app/microi-platform-service/personal-settings").catch(() => {});
+            this.$router.push(buildMicroAppFriendlyPath({ osClient: this.DiyCommon.GetOsClient(), appKey: "microi-platform-service", routePath: "/personal-settings" })).catch(() => {});
         },
         toggleBrowserFullScreen() {
             if (!document.fullscreenElement) {

@@ -39,6 +39,17 @@ export function assertSourceUnchanged(expected, actual) {
   for (const name of sourceFiles) if (expected[name] !== actual[name]) throw new Error(`个人中心构建期间源码变化：${name}；请重建后发布。`);
 }
 
+export function assertCommittedSource(source, git) {
+  for (const [name, bytes] of Object.entries(source)) {
+    // Compare Git's committed representation, including the configured clean
+    // filters. A legitimate CRLF checkout must not fail this text-source gate.
+    // Raw source/build hashes remain unchanged and still detect byte drift.
+    const committed = git(['rev-parse', `HEAD:microi.doc/${name}`]);
+    const candidate = git(['hash-object', `--path=${name}`, '--stdin'], bytes);
+    if (candidate !== committed) throw new Error(`发布源码尚未提交：${name}`);
+  }
+}
+
 export function assertCandidatePublished(git) {
   // 两个既有官方远端均可交付源码；必须向实际服务器回读分支，不能仅凭本地 tracking ref 放行。
   const refs = git(['for-each-ref', '--format=%(refname)', '--contains', 'HEAD', 'refs/remotes/origin/', 'refs/remotes/github-microi.net/']).split('\n').filter(Boolean);
@@ -62,14 +73,11 @@ function main() {
   const source = Object.fromEntries(sourceFiles.map(name => [name, fs.readFileSync(path.join(project, name))]));
   validatePortalSource(source[sourceFiles[0]].toString(), source[sourceFiles[1]].toString(), source[sourceFiles[2]].toString());
   const hashes = Object.fromEntries(Object.entries(source).map(([name, value]) => [name, sha(value)]));
-  const git = args => execFileSync('git', args, { cwd: project, encoding: 'utf8' }).trim();
+  const git = (args, input) => execFileSync('git', args, { cwd: project, encoding: 'utf8', ...(input === undefined ? {} : { input }) }).trim();
   const commit = git(['rev-parse', 'HEAD']);
   if (process.argv.includes('--require-committed')) {
     // 全站发布会覆盖其它页面，个人中心不能只存在于共享工作区的未提交差异中。
-    for (const name of sourceFiles) {
-      const committed = execFileSync('git', ['show', `HEAD:microi.doc/${name}`], { cwd: project });
-      if (sha(committed) !== hashes[name]) throw new Error(`发布源码尚未提交：${name}`);
-    }
+    assertCommittedSource(source, git);
     // 冻结候选通常为 detached HEAD；检查远端分支包含该提交，不能要求候选另建发布分支。
     const delivered = assertCandidatePublished(git);
     console.log(`候选源码远端回读通过：${delivered}`);

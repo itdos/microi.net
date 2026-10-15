@@ -18,7 +18,10 @@ test('pool recovery MCP previews, confirms, preserves idempotency and reads node
     const fakeClient = {
         querySystemObservability: async (query) => {
             queries.push(query);
-            return { Code: 1, Data: { OperationId: id, PoolIds: pools, Target: 'Read', State: 'Pending' } };
+            return { Code: 1, Data: { OperationId: id, PoolIds: pools, Target: 'Read', State: 'Pending',
+                    Pools: [{ PoolId: pools[0], MaximumPoolSize: 100, MinimumPoolSize: 0, ConnectionLifetimeSeconds: 300 }],
+                    CapacityBudget: { Scope: 'CurrentNodeSelectedPools', SelectedPoolCount: 1, ConfiguredMaximumConnections: 100,
+                        ConfiguredMinimumConnections: 0, NonPooledPoolCount: 0, UnknownPoolCount: 0 } } };
         },
         manageSystemObservability: async (command) => {
             writes.push(command);
@@ -37,6 +40,11 @@ test('pool recovery MCP previews, confirms, preserves idempotency and reads node
         const preview = await call('microi_manage_system_observability', { action: 'ResetDatabasePools', poolTarget: 'Read' });
         assert.equal(preview.isError, undefined);
         assert.match(toolText(preview), new RegExp(`ResetDatabasePools:${id}`));
+        const budgetRead = await call('microi_query_system_observability', { action: 'DatabasePools', poolTarget: 'Read' });
+        const budgetData = JSON.parse(toolText(budgetRead)).Data;
+        assert.deepEqual(budgetData.CapacityBudget, { Scope: 'CurrentNodeSelectedPools', SelectedPoolCount: 1,
+            ConfiguredMaximumConnections: 100, ConfiguredMinimumConnections: 0, NonPooledPoolCount: 0, UnknownPoolCount: 0 });
+        assert.equal(budgetData.Pools[0].ConnectionLifetimeSeconds, 300);
         assert.equal(writes.length, 0);
         const invalid = await call('microi_manage_system_observability', { action: 'ResetDatabasePools', confirmExecution: 'wrong' });
         assert.equal(invalid.isError, true);

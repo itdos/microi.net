@@ -7,7 +7,7 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
-/* V8 ApiEngine | ApiEngineKey: platform-external-login-binding | Version: v1.0.0 */
+/* V8 ApiEngine | ApiEngineKey: platform-external-login-binding | Version: v1.1.1 */
 /* Security metadata: StopHttp=1, AllowAnonymous=0, Lock=1（阻止并发外部主体双绑） */
 
 var param = V8.Param || {};
@@ -57,7 +57,9 @@ function runRuntimeHook(stage, details) {
 
 function normalizeProvider(value) {
   var provider = text(value, 40);
-  return provider === 'Gitee' || provider === 'GitHub' || provider === 'WeChat' ? provider : '';
+  // Microi 官方稳定 sub 与其它供应商一样，必须经过可信协议上下文后才能绑定；
+  // 这里只扩展固定目录，不接受任意 Provider 或按邮箱自动认领本地账号。
+  return provider === 'Gitee' || provider === 'GitHub' || provider === 'WeChat' || provider === 'Microi' ? provider : '';
 }
 
 function getBindingBySubject(provider, subject, includeDisabled) {
@@ -91,6 +93,9 @@ function getBindingByUserProvider(userId, provider) {
 }
 
 if (action === 'List') {
+  // 本人会话由可信后端验证；在租户 Hook 前消费内部授权，禁止 Hook 借用其伪造 Bind。
+  var listTrust = requireTrustedProtocol();
+  if (listTrust) return listTrust;
   var listAuth = requireCurrentUser();
   if (listAuth) return listAuth;
   var currentUserId = text(V8.CurrentUser.Id, 100);
@@ -155,6 +160,8 @@ if (action === 'List') {
 }
 
 if (action === 'Revoke') {
+  var revokeTrust = requireTrustedProtocol();
+  if (revokeTrust) return revokeTrust;
   var revokeAuth = requireCurrentUser();
   if (revokeAuth) return revokeAuth;
   var revokeId = text(param.Id, 100);

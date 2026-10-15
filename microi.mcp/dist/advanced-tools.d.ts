@@ -79,11 +79,13 @@ export declare function validateManifestFieldRelations(manifest: JsonRecord): {
     warnings: string[];
 };
 export declare function resolveManifestRelationConfig(field: JsonRecord, currentTableName: string, tableIdByName: Map<string, string>, moduleIdByName: Map<string, string>): JsonRecord;
+/** Build the default host route from the selected, authenticated MCP context. */
+export declare function buildMicroServiceMenuUrl(osClient: string, appKey: string, routePath: string): string;
 /**
  * Resolve a portable Manifest MicroService reference to the tenant-specific
  * sys_microiservice/sys_microiservice_page ids before any system writes begin.
  */
-export declare function resolveMicroServiceModuleBinding(client: Pick<MicroiClient, 'getMicroService'>, module: JsonRecord): Promise<JsonRecord | undefined>;
+export declare function resolveMicroServiceModuleBinding(client: Pick<MicroiClient, 'getMicroService'>, module: JsonRecord, osClient: string): Promise<JsonRecord | undefined>;
 export declare function dataSourcePayload(dataSource: JsonRecord): JsonRecord;
 export declare function manifestGuide(osClient: string | undefined): JsonRecord;
 export declare function registerAdvancedTools(server: McpServer, client: MicroiClient, context: McpServerContext): void;

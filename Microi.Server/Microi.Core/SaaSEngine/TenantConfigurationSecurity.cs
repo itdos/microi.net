@@ -196,11 +196,13 @@ namespace Microi.net
                 "GiteeLoginEnabled",
                 "WeChatLoginEnabled",
                 "GitHubLoginEnabled",
+                "MicroiLoginEnabled",
                 "DisableLoginPasskey",
                 "DisableLoginAuthenticator",
                 "DisableLoginGitee",
                 "DisableLoginWeChat",
-                "DisableLoginGitHub"
+                "DisableLoginGitHub",
+                "DisableLoginMicroi"
             };
 
         public static IReadOnlyCollection<string> SharedInfrastructureFields =>

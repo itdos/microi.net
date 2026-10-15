@@ -36,4 +36,8 @@ Client Secret 轮换动作只显示一次明文，持久化 PBKDF2-SHA256 哈希
 
 ## 授权页面
 
-第三方发起 Authorize/SAML/CAS 登录后，若没有有效 Provider Session，先跳到吾码登录页；登录成功回到一次性 handoff。页面必须说明目标系统、请求 Scope 和退出影响。即使后续加入 Consent，仍不能把第三方请求的任意 Scope 自动映射为吾码管理员能力。
+OIDC 公共客户端 `ClientAuthMethod=none` 每次授权都必须由用户在官方页面明确确认；已有 Provider Session 也不能自动返回 code，调用方删除或修改 prompt 不能绕过确认。`prompt=none` 返回 `interaction_required`，只向已校验的精确 redirect URI 回传错误与 state，不签发 code，也不强行打开确认页。缺失 prompt 或其它受支持的交互请求进入 opaque RequestId 确认流程；机密客户端保留既有 Provider Session 自动授权及显式 consent 行为。
+
+`CompleteAuthorization` 的 `Preview=true` 只在当前交互式 DiyToken 下读取授权卡片，校验当前客户端启用状态、精确回调和 Scope，返回当前官方账号、目标系统、回调、Scope 与有效期的白名单投影。重复 Preview 不消费 RequestId，不返回 code、state、nonce、PKCE challenge、DiyToken 或客户端秘密；真正确认时才原子消费请求并再次校验客户端配置。账号确认使用 `ExpectedUserId` 收紧校验，授权身份始终来自当前 DiyToken，不能由页面指定。
+
+没有有效 Provider Session 的交互请求先跳到吾码登录页，登录成功回到一次性 handoff。页面必须说明目标系统、当前官方账号、请求 Scope 和退出影响；任何第三方请求的 Scope 都不能自动映射为吾码管理员能力。上线验收须实际重复 Preview、再确认取得 code，不能用 HTTP 200 或旧 API 忽略 Preview 后直接消费请求的结果代替协议证据。

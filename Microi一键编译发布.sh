@@ -84,12 +84,13 @@ run_with_timeout() {
     fi
 }
 
-# Microi Code 使用独立内部 GitLab 仓库；桌面构建不进入平台 Docker/NuGet 发布流程。
-# bash Microi一键编译发布.sh --microi-code [--win|--mac] [--arm64|--x64]
-if [ "${1:-}" = "--microi-code" ]; then
+# Microi Agent 使用独立内部 GitLab 仓库；桌面构建不进入平台 Docker/NuGet 发布流程。
+# --microi-code 保留为兼容别名，所有桌面入口统一使用官方 DeepSeek 源码装配。
+# bash Microi一键编译发布.sh --microi-agent [--win|--mac] [--arm64|--x64]
+if [ "${1:-}" = "--microi-agent" ] || [ "${1:-}" = "--microi-code" ]; then
     cd "$(dirname "$0")"
     shift
-    if [ ! -f "Microi.Agent/apps/microi-code/package.json" ]; then
+    if [ ! -f "Microi.Agent/apps/official-desktop/package.json" ]; then
         printf '%s\n' '缺少内部 Microi.Agent 仓库。请从公司 GitLab 克隆；禁止加入根公开仓库。' >&2
         exit 1
     fi
@@ -106,8 +107,11 @@ if [ "${1:-}" = "--microi-code" ]; then
     trap 'node "$_agent_workspace/Microi.Server/tools/release-lock.mjs" release agent "$_agent_workspace" "$_agent_owner_pid" "$_agent_lock_token"' EXIT
     case "${1:-}" in
       --mac) bash Microi.Agent/一键打包Mac.sh "${@:2}" ;;
-      --win|'') cd Microi.Agent/apps/microi-code && npm ci && npm run typecheck && npm test && npm run package:win ;;
-      *) printf '%s\n' 'Microi Code 仅支持 --win 或 --mac。' >&2; exit 1 ;;
+      --win|'')
+        command -v powershell.exe >/dev/null 2>&1 || { printf '%s\n' 'Windows 安装包必须在 Windows 本机构建；Mac 请使用 --mac。' >&2; exit 1; }
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File Microi.Agent/一键打包Windows.ps1 "${@:2}"
+        ;;
+      *) printf '%s\n' 'Microi Agent 仅支持 --win 或 --mac。' >&2; exit 1 ;;
     esac
     exit $?
 fi
@@ -1217,10 +1221,11 @@ if [ "$BUILD_BACKEND" = true ]; then
         echo ""
     fi
 
-    print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false"
+    print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:ShouldUnsetParentConfigurationAndPlatform=false"
     echo ""
     _BUILD_LOG="$(mktemp /tmp/microi-build.XXXXXX.log)"
-    if ! dotnet build "$SLN_FILE" -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false 2>&1 | tee "$_BUILD_LOG"; then
+    # 方案外的 NPOI 等引用同样必须产出 Release，不能被 SDK 回退成 Debug。
+    if ! dotnet build "$SLN_FILE" -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:ShouldUnsetParentConfigurationAndPlatform=false 2>&1 | tee "$_BUILD_LOG"; then
         echo ""
         echo -e "  ${RED}───── 编译错误摘要（最后30行）─────${NC}"
         grep -E "error |Error |FAILED" "$_BUILD_LOG" 2>/dev/null | tail -20 || tail -30 "$_BUILD_LOG"
@@ -1276,8 +1281,17 @@ if [ "$PUSH_NUGET" = true ] || { [ "$HAS_ENCRYPT" = true ] && [ "$DEPLOY_MODE" =
     if [ -f "${_MICROI_NET_PROJECT:-}" ]; then
         dotnet pack "$_MICROI_NET_PROJECT" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee "$_PACK_LOG" || _PACK_FAILED=1
     fi
-    # Solution-level Pack asks output-group targets to resolve project references. Keep that
-    # traversal read-only so it cannot re-enter Build while --no-build is active.
+    # NPOI 五个工程由 Office 引用，但不在两套平台方案中；SDK Pack 只读取引用版本，
+    # 不会递归生成它们的包。按依赖顺序显式打包，继续复用本次 Release 编译产物。
+    for _npoi_project in \
+        Microi.NPOI.Core/Microi.NPOI.Core.csproj \
+        Microi.NPOI.OpenXml4Net/Microi.NPOI.OpenXml4Net.csproj \
+        Microi.NPOI.OpenXmlFormats/Microi.NPOI.OpenXmlFormats.csproj \
+        Microi.NPOI.OOXML/Microi.NPOI.OOXML.csproj \
+        Microi.NPOI.csproj; do
+        dotnet pack "Microi.Server/Microi.NPOI/$_npoi_project" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
+    done
+    # 方案 Pack 的输出组目标仍需解析引用，禁止该遍历重新进入 Build。
     dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
     if [ "$_PACK_FAILED" -ne 0 ]; then
         echo ""
@@ -1599,6 +1613,7 @@ if [ "$PUSH_NUGET" = true ]; then
     if [ "$HAS_ENCRYPT" = true ] && [ "$NUPKG_REPLACED" != true ]; then
         print_fail "NuGet 包中的 DLL 未被替换为加密版本，禁止推送！"
     fi
+    node Microi.Server/tools/release-nuget-closure.mjs Microi.Server "$VERSION" "$_nupkg_list_file" || print_fail "本次 NuGet 包正文的版本或平台依赖闭包不完整；禁止上传。"
     if [ "$HAS_ENCRYPT" = true ]; then
         node Microi.Server/tools/release-encryption.mjs packages "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_list_file" || print_fail "完整待上传清单的实际 NuGet ZIP 中存在未加密/旧 DLL、遗漏包或缺少闭源 DLL；禁止上传。"
     fi
@@ -1788,7 +1803,7 @@ docker_push_plan() {
     local _docker_build_ok=false
     local _docker_build_attempt=1
     while [ "$_docker_build_attempt" -le 3 ]; do
-        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0.13" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             _docker_build_ok=true
             break
         fi
@@ -1800,7 +1815,7 @@ docker_push_plan() {
     done
     if [ "$_docker_build_ok" != true ]; then
         print_warning "远端基础镜像连续拉取失败，尝试使用 Docker 本地缓存完成本次构建..."
-        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0.13" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             print_warning "已使用本地缓存的基础镜像完成构建；发布后请关注远端 Registry 连通性。"
         else
             print_fail "Docker 镜像构建失败，远端拉取和本地缓存均不可用: $local_image"
@@ -1911,24 +1926,31 @@ if [ "$PUBLISH_DOC" = true ]; then
     # 个人中心必须属于已推送的候选提交；隔离旧工作树不能再覆盖已交付的页面。
     node microi.doc/scripts/check-account-portal.mjs --require-committed
 
-    # 自动检测可用的包管理器（优先 pnpm，其次 npm，最后 yarn）
-    DOC_PKG_MGR=""
-    if command -v pnpm &>/dev/null; then
-        DOC_PKG_MGR="pnpm"
-    elif command -v npm &>/dev/null; then
-        DOC_PKG_MGR="npm run"
-    elif command -v yarn &>/dev/null; then
-        DOC_PKG_MGR="yarn"
+    # 依赖版本以官网声明/既有锁为准；禁止全局 pnpm 升级时重写发布锁文件。
+    DOC_PNPM_VERSION="$(node --input-type=module -e '
+      import fs from "node:fs";
+      const pkg = JSON.parse(fs.readFileSync("microi.doc/package.json", "utf8"));
+      const declared = /^pnpm@(\d+\.\d+\.\d+)(?:\+.*)?$/.exec(pkg.packageManager || "");
+      if (pkg.packageManager && !declared) throw new Error("官网 packageManager 必须固定 pnpm 精确版本");
+      const lock = fs.readFileSync("microi.doc/pnpm-lock.yaml", "utf8");
+      const version = declared?.[1] || (/^lockfileVersion:\s*[\x27\x22]?6\.0[\x27\x22]?\s*$/m.test(lock) ? "8.15.9" : "");
+      if (!version) throw new Error("官网锁文件没有可验证的 pnpm 版本，请先维护 packageManager");
+      process.stdout.write(version);
+    ')"
+    if command -v pnpm &>/dev/null && [ "$(pnpm --version)" = "$DOC_PNPM_VERSION" ]; then
+        DOC_PKG_CMD=(pnpm)
+    elif command -v npx &>/dev/null; then
+        DOC_PKG_CMD=(npx --yes "pnpm@$DOC_PNPM_VERSION")
     else
-        print_fail "未找到 pnpm / npm / yarn，请先安装 Node.js: https://nodejs.org"
+        print_fail "官网发布需要 pnpm@$DOC_PNPM_VERSION 或 npx，请先安装 Node.js: https://nodejs.org"
     fi
-    print_info "使用包管理器: ${DOC_PKG_MGR%% *}"
+    print_info "使用包管理器: pnpm@$DOC_PNPM_VERSION"
 
-    print_step "安装依赖（如需）..."
-    (cd microi.doc && ${DOC_PKG_MGR%% *} install --frozen-lockfile 2>/dev/null || ${DOC_PKG_MGR%% *} install) || true
+    print_step "按锁文件安装依赖..."
+    (cd microi.doc && "${DOC_PKG_CMD[@]}" install --frozen-lockfile)
 
     print_step "构建 VitePress 文档..."
-    (cd microi.doc && $DOC_PKG_MGR docs:build)
+    (cd microi.doc && "${DOC_PKG_CMD[@]}" run docs:build)
     node microi.doc/scripts/check-account-portal.mjs --dist --require-committed
     print_success "VitePress 构建完成"
 

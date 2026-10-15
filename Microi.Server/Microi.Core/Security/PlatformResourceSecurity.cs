@@ -112,6 +112,8 @@ namespace Microi.net
             "mci_runtime_incident",
             // 原生规则审批是执行授权；误授普通表权限不得恢复 Status/RevokedAt。
             "mci_runtime_installation",
+            // 流式发布门禁的可信转换动作拥有该物理审计台账。
+            "mci_app_stream_gate_transition",
             "mci_security_ip_block",
             "mci_spider_account",
             "mci_spider_profile",

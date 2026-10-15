@@ -78,6 +78,8 @@
   <ItemGroup>
     <!-- DiyToken 保持为平台会话体系；Fido2 只负责标准 WebAuthn/Passkey 验签，不引入 ASP.NET Identity。 -->
     <PackageReference Include="Fido2" Version="4.0.1" />
+    <!-- Fido2 传递引用旧版 PKCS；固定同主版本安全补丁，保持既有 Passkey 验签行为。 -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="10.0.10" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.21.0" />
@@ -89,7 +91,7 @@
     <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="10.2.3" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="10.0.10" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.10" />
     <!-- Senparc.Weixin.AspNet still declares the removed 0.2.0 baseline; pin the compatible stable packages NuGet already selects. -->

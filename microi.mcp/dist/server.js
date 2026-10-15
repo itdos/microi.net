@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { registerServerPrivateSettingsTools } from './server-private-settings-tools.js';
 import { buildMcpOcrResult, decodeMcpTranslatedFile, OCR_MAX_BASE64_CHARACTERS, prepareMcpOcrInput, prepareMcpTranslateFileInput, saveMcpTranslatedFile, TRANSLATE_INLINE_RESULT_BYTES, TRANSLATE_MAX_BASE64_CHARACTERS, } from './document-inputs.js';
 export { buildMcpOcrResult, decodeMcpTranslatedFile, prepareMcpOcrInput, prepareMcpTranslateFileInput, } from './document-inputs.js';
-import { buildDefaultFormBanner, buildDefaultModulePresentation, inferTableColumnWidth, normalizeAllMenuJson, normalizeViewSchemaJson, registerAdvancedTools, } from './advanced-tools.js';
+import { buildDefaultFormBanner, buildDefaultModulePresentation, buildMicroServiceMenuUrl, inferTableColumnWidth, normalizeAllMenuJson, normalizeViewSchemaJson, registerAdvancedTools, } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
 import { registerEmailTools } from './email-tools.js';
 import { registerMessageNotificationTools } from './message-notification-tools.js';
@@ -2757,6 +2757,11 @@ function buildInstructions(ctx) {
 - API Server: ${ctx.apiBaseUrl}
 - OsClient (tenant): ${ctx.osClient}
 
+## Microi吾码基础规范（任何 AI 模型强制读取）
+每次新建或接续吾码任务，必须先完整读取工作区 microi.skills/workspace-conventions/SKILL.md；未初始化时读取已安装吾码插件中的 skills/workspace-conventions/SKILL.md。进度播报和非阻塞自动更新都是无条件基础规则，不能等用户提醒。
+首次工作说明以“Microi吾码开发工具版本”报告实际 CLI 版本、npm 官方 latest（附查询时间）、自动更新与 Skills/MCP 同步状态；用 microi version --json 回读 CLI，用 npm 官方 registry 查询 latest。未知项写检测中，不得把本 MCP 协议版本或 expectedVersion 当成 CLI/npm 最新版。
+已有 CLI 时必须投递 microi update --background --workspace "<工作区绝对路径>" --json，自动升级 @microi.net/cli 并同步 Skills、AI 规则和 MCP。更新失败延后重试并准确报告，不阻断当前工作、不强制重载、不终止正在运行的 MCP；用户明确关闭或宿主无执行权限时报告限制，签名桌面安装目录通过桌面官方渠道更新。完整执行及验收规则以基础入口为准。
+
 IMPORTANT: This server ONLY manages OsClient tenant "${ctx.osClient}". "${ctx.label || ctx.osClient}" is only a display name. When the user specifies a different tenant name, do NOT use this server.
 THIRD-PARTY SECRETS: For App Secret, client_secret, API keys or credentials such as Chanjet, FIRST inspect microi_manage_server_private_secret (List) and reuse System Settings > Security and Service Access. Save through that tool only when authorized, then read back HasSecret/IsSecret/IsEnabled. Backend V8 uses the existing protected settings capability. Do not invent environment variables, hardcode secrets, or block integration merely because the existing protected setting has not yet been populated. Never return plaintext or ciphertext values.
 PAGE DESIGN: Dashboards default to themeMode=system, density=compact and wrapper heightMode=content. Use native summary/detail statistic appearances and platform colour variables. Match reference panel proportions and verify light/dark screenshots; do not turn one-line metrics into large fixed-height colour blocks.
@@ -4999,7 +5004,7 @@ export function createMcpServer(client, context) {
         ip: z.string().max(100).optional().describe('TrafficDetails client IP filter.'),
         userId: z.string().max(100).optional().describe('TrafficDetails authenticated user-id filter.'),
         endpoint: z.string().max(500).optional().describe('TrafficDetails normalized endpoint or /apiengine/{key} filter.'),
-        poolTarget: z.enum(['Both', 'Write', 'Read']).optional().describe('DatabasePools: 当前租户主/读池，默认 Both；独立应急鉴权，不依赖业务池。需要支持 database-pools/v1 的 API。'),
+        poolTarget: z.enum(['Both', 'Write', 'Read']).optional().describe('DatabasePools: 当前租户主/读池，默认 Both；回读最大/最小池、生命周期及 CapacityBudget 的当前节点所选去重池配置合计，不是实际占用或集群全量，Quartz/其它节点/扩展库/外部客户端须另计。独立应急鉴权，需要 database-pools/v1 的 API。'),
         operationId: z.string().regex(/^[0-9a-f]{32}$/u).optional().describe('DatabasePoolRecovery: 恢复操作编号，回读各节点状态；Pending/Incomplete 不代表已恢复。'),
     }, async ({ action, keyword, type, category, source, level, levelMin, searchMonth, pageIndex, pageSize, windowMinutes, windowSeconds, top, includeHost, includeDocker, traceId, incidentId, serviceName, apiEngineKey, name, lines, kind, status, dimensionType, rangeKey, hours, observedOsClient, transferAction, ip, userId, endpoint, poolTarget, operationId, }) => {
         try {
@@ -6768,7 +6773,7 @@ export function createMcpServer(client, context) {
         hasChild: z.number().optional().describe('Whether this menu has visible child menus. A hidden TableChild carrier module MUST set 0.'),
         openType: z.string().optional().describe('Open type. Default: "Diy". Options include "Diy", "WorkFlow", "Url", "Page", "MicroService", "CodeForm". WorkFlow requires diyTableId and flowDesignId for an enabled flow bound to the same table.'),
         flowDesignId: z.string().optional().describe('Required when openType=WorkFlow: wf_flowdesign.Id of an enabled flow bound to diyTableId.'),
-        url: z.string().optional().describe('Menu route. MicroService menus normally use /micro-app/{MicroServiceKey}/{routePath}.'),
+        url: z.string().optional().describe('Menu route. MicroService defaults to /micro-app/{current OsClient}/{MicroServiceKey}/{routePath}. An explicit existing URL is preserved.'),
         sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
         icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
         menuBadgeEnabled: z.number().optional().describe('Show a dynamic statistic badge beside this sidebar menu (1=yes, 0=no). Important menus with actionable counts should normally enable it.'),
@@ -6849,10 +6854,7 @@ export function createMcpServer(client, context) {
                 effectiveOpenType = isCodeForm ? 'CodeForm' : 'MicroService';
                 effectiveComponentName = componentName || 'MicroService';
                 effectiveComponentPath = componentPath || '/micro-app/host';
-                const encodedRoute = routePath === '/'
-                    ? ''
-                    : '/' + routePath.slice(1).split('/').map(segment => encodeURIComponent(segment)).join('/');
-                effectiveUrl = url || `/micro-app/${encodeURIComponent(String(microServiceKey))}${encodedRoute}`;
+                effectiveUrl = url || buildMicroServiceMenuUrl(osClient, String(microServiceKey), routePath);
             }
             let effectiveViewSchema = viewSchema;
             const autoPresentationEligible = Boolean(diyTableId)

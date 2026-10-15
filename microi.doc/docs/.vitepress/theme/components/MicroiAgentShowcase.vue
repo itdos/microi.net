@@ -17,21 +17,16 @@
           </div>
         </div>
         <p class="microi-code-store-install"><a href="https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge" target="_blank" rel="noopener noreferrer">微软签名 EXE 在线安装器 <span aria-hidden="true">↗</span></a><span>商店版 1.3.3 · Windows 10 2004+ / 11 · x64 · 需联网</span></p>
-        <p class="microi-code-store-note">官网 Windows 完整版 1.3.6 EXE 未签名；在线安装器安装微软签名商店版。macOS 1.3.6 DMG 已签名、公证，Mac 商店尚未开放下载。</p>
-        <aside class="microi-code-repair-candidate" aria-label="Windows 安装修复候选">
-          <strong>Windows 安装修复</strong>
-          <p>1.3.6 升级目录切换失败时，可安装 1.3.7 候选复测。保留原目录与配置；Windows 真机验收待完成。</p>
-          <div><a href="https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-x64-setup.exe" target="_blank" rel="noopener noreferrer">Windows 1.3.7 安装修复候选 ↗</a><a href="https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-native-acceptance.zip" target="_blank" rel="noopener noreferrer">一键原生验收工具 ↗</a></div>
-        </aside>
+        <p class="microi-code-store-note">下载按钮实时显示各平台已发布版本，并始终下载 latest。官网 Windows 完整 EXE 当前未签名；微软签名在线安装器提供商店版。macOS 已发布 DMG 的签名与公证状态见版本记录，Mac 商店尚未开放下载。</p>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
           <li><strong>原生能力</strong><span>MCP · Skills · Harness</span></li>
         </ul>
       </div>
-      <a class="microi-code-hero__visual" href="https://file.microi.net/itdos/official-docs/images/7438d971a1fd01845ce23d23e5681ca7a3870d6a6d9811b382f333d292f6b435/202610/microi-code-ai-remove-light.png" data-fancybox="microi-code-gallery">
-        <img src="https://file.microi.net/itdos/official-docs/images/7438d971a1fd01845ce23d23e5681ca7a3870d6a6d9811b382f333d292f6b435/202610/microi-code-ai-remove-light.png" alt="Microi Agent AI 图像处理工作台">
-        <span><strong>29 项图像能力</strong><small>参数、上传、任务与结果都在桌面端完成</small></span>
+      <a class="microi-code-hero__visual" :href="screenshots[0].src" data-fancybox="microi-code-gallery">
+        <img :src="screenshots[0].src" :alt="screenshots[0].alt">
+        <span><strong>官方桌面 · 吾码能力</strong><small>29 项图像工具 · 项目群与十一岗协作</small></span>
       </a>
     </div>
 
@@ -76,7 +71,7 @@
 
     <footer class="microi-code-credit">
       <div><span>OPEN SOURCE FOUNDATION</span><strong>尊重上游，持续演进</strong></div>
-      <p>Microi Agent 基于 <a href="https://github.com/dataelement/dsh-desktop" target="_blank" rel="noopener noreferrer">dsh-desktop</a> 与 <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener noreferrer">DeepSeek Harness</a> 二次开发，保留 DataElement 的 MIT 版权声明。</p>
+      <p>Microi Agent 基于 <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener noreferrer">DeepSeek Harness 官方桌面源码</a> 二次开发。吾码业务作为独立差异层维护；历史派生模块保留 <a href="https://github.com/dataelement/dsh-desktop" target="_blank" rel="noopener noreferrer">dsh-desktop</a> 的 DataElement MIT 版权声明。</p>
     </footer>
   </section>
 </template>
@@ -84,12 +79,13 @@
 <script setup>
 import { computed, h, onMounted, reactive, ref } from 'vue'
 import { installerFromYaml } from '../utils/microi-agent-download.mjs'
+import { getDocAssetUrl } from '../doc-assets.js'
 
 const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true', fill }, [h('path', { d: path })])
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
 
 // 更新清单由 iTdos 接口引擎发布；版本发布后官网源码无需随之改动。
-const liveVersions = reactive({ windows: '1.3.6', mac: '1.3.6' })
+const liveVersions = reactive({ windows: '', mac: '' })
 // 下载按钮始终使用永久入口；点击时由官方清单选择当前安装包，首屏不依赖异步请求。
 const downloadUrls = reactive({
   windows: 'https://microi.net/download/microi-agent/latest.html?platform=windows',
@@ -103,7 +99,7 @@ onMounted(async () => {
   await Promise.all([
     fetch(UPDATE_BASE + 'latest.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => { if (installerFromYaml(yaml, 'windows')) liveVersions.windows = versionFromYaml(yaml) || liveVersions.windows }).catch(() => {}),
     fetch(UPDATE_BASE + 'latest-mac.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => {
-      liveVersions.mac = versionFromYaml(yaml) || liveVersions.mac
+      if (installerFromYaml(yaml, 'mac')) liveVersions.mac = versionFromYaml(yaml) || liveVersions.mac
     }).catch(() => {})
   ])
 })
@@ -132,13 +128,15 @@ const mac = {
 }
 
 const screenshots = [
-  { src: 'https://file.microi.net/itdos/official-docs/images/4183113555b18a3931e1be86465361d261a5b61de0a7e91bda6d37ade58318be/202610/microi-code-ai-center-dark.jpg', alt: 'Microi Agent 深色 AI 能力中心', title: 'AI 能力中心', caption: '能力与来源清晰分层' },
-  { src: 'https://file.microi.net/itdos/official-docs/images/6db16fb52a020e31ab520211cd3bbf446dc335abeaab4677921ef7acd16310b8/202610/microi-code-home-light.jpg', alt: 'Microi Agent 浅色首页', title: '首页入口', caption: '7 项主能力与 29 项图像工具' },
-  { src: 'https://file.microi.net/itdos/official-docs/images/8fe962bbfd025ac068db1b9fcac003eaa7e2d3f670da191981f380b005f744cb/202610/microi-code-task-workspace.png', alt: 'Microi Agent 任务工作区', title: '真实任务', caption: '轨迹、文件与后台任务统一查看' },
-  { src: 'https://file.microi.net/itdos/official-docs/images/7438d971a1fd01845ce23d23e5681ca7a3870d6a6d9811b382f333d292f6b435/202610/microi-code-ai-remove-light.png', alt: 'Microi Agent AI 消除功能', title: '原生工作台', caption: '上传、参数、生成与下载闭环' }
+  { src: getDocAssetUrl('/images/microi-agent-official-home-1.3.9.png'), alt: 'Microi Agent 1.3.9 官方桌面首页', title: '官方桌面首页', caption: '官方工作区与 29 项图像工具' },
+  { src: getDocAssetUrl('/images/microi-agent-eleven-role-group-1.3.9.png'), alt: 'Microi Agent 1.3.9 十一岗项目群真实模型回复', title: 'AI 员工项目群', caption: '十一岗位 · 分别绑定模型 · 需求材料共享' },
+  { src: 'https://file.microi.net/itdos/official-docs/images/8fe962bbfd025ac068db1b9fcac003eaa7e2d3f670da191981f380b005f744cb/202610/microi-code-task-workspace.png', alt: 'Microi Agent 历史任务工作区', title: '历史任务工作区', caption: '历史界面 · 轨迹、文件与后台任务' },
+  { src: 'https://file.microi.net/itdos/official-docs/images/7438d971a1fd01845ce23d23e5681ca7a3870d6a6d9811b382f333d292f6b435/202610/microi-code-ai-remove-light.png', alt: 'Microi Agent 历史 AI 消除功能', title: '图像能力示例', caption: '历史界面 · 上传、参数、生成与下载' }
 ]
 
 const releases = [
+  { version: '1.3.9', platform: 'Windows x64', note: '吾码登录与恢复 · 工作区优先 · 历史需求共享 · 十一岗真实模型与持续连接验收通过 · 未签名', url: 'https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.4.0/requests/9e5b8e3d0c468efe0f0777583dd1111654d46d473050af76bf53fc60ea6f7a1a/assets/Microi-Agent-1.3.9-windows-x64-setup.exe', sha256: 'b6a76a4e72ac889682a6f68ca07cf58e737ad33c0ea2543c66c693aa352baa47' },
+  { version: '1.3.8', platform: 'Windows x64', note: '官方桌面宿主 · 十一岗项目群 · 首次使用与连接恢复修复见 1.3.9 · 未签名', url: 'https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.9/requests/bc6c637f7d4fbc3f069000c4d6e8d6b3bc402a533d37f6a2e7f4367aaa2fd2d8/assets/Microi-Agent-1.3.8-windows-x64-setup.exe', sha256: '745e59b54bba6b576c91d261a323c1dcf45ce89a9ea2f5f23c4060bc10438e0e' },
   { version: '1.3.7', platform: "Windows x64 候选", note: "安装目录切换修复 · 未签名测试候选 · 六项 Wine NSIS 回归通过 · Windows 原生待验收", url: "https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-x64-setup.exe", sha256: "91a5ab8d9a29382347020a0ff3e43536c0ed26d800a5d192b11fef4317853ad2" },
   { version: '1.3.6', platform: "macOS Universal", note: "启动修复 · 签名公证 · Intel 完整应用启动、重启已验收 · macOS 13.5+", url: "https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.6/requests/5f22ed5595421f9c10db4bb5930d7df17b33dc6ba6ba54a70c366c374f00f247/assets/Microi-Agent-1.3.6-mac-universal.dmg", sha256: "5d1e38ae2e4ddadf460a880daf0f2b61f352779d9943e4f584cba6f07c6fc76c" },
   { version: '1.3.6', platform: "macOS Universal ZIP", note: "启动修复自动更新包 · 已签名公证 · macOS 13.5+", url: "https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.6/requests/5f22ed5595421f9c10db4bb5930d7df17b33dc6ba6ba54a70c366c374f00f247/assets/Microi-Agent-1.3.6-mac-universal.zip", sha256: "fa450561060efee3bc5ff660cd89397c1c8a508b892ede0776e1fec1f8d43831" },

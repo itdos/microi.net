@@ -1,6 +1,6 @@
 # 🛡️ 登录方式、Passkey、Authenticator、第三方登录与严格人脸验证
 
-Microi 吾码的身份验证增强方案采用“**DiyToken 会话与权限体系 + WebAuthn/Passkey + 标准 TOTP Authenticator + Gitee/微信/GitHub 外部身份 + 可选严格人脸网关 + 一次性步进验证票据**”。登录页的【登录方式】按钮会以主题化气泡面板展示当前租户可用方式；无论使用哪一种方式，最终都只签发吾码 DiyToken，不会用 ASP.NET Identity 替换现有用户、权限或 Token 体系，也不会把指纹、人脸模板、Authenticator 密钥、OAuth ClientSecret 或登录权限判断放到前端。
+Microi 吾码的身份验证增强方案采用“**DiyToken 会话与权限体系 + WebAuthn/Passkey + 标准 TOTP Authenticator + Microi/Gitee/微信/GitHub 外部身份 + 可选严格人脸网关 + 一次性步进验证票据**”。登录页的【登录方式】按钮会以主题化气泡面板展示当前租户可用方式；无论使用哪一种方式，最终都只签发吾码 DiyToken，不会用 ASP.NET Identity 替换现有用户、权限或 Token 体系，也不会把指纹、人脸模板、Authenticator 密钥、OAuth ClientSecret 或登录权限判断放到前端。
 
 ## 一、选型与是否需要额外 Docker
 
@@ -9,6 +9,7 @@ Microi 吾码的身份验证增强方案采用“**DiyToken 会话与权限体�
 | Windows Hello、Touch ID、Face ID、Android 屏幕锁 | WebAuthn / Passkey | 登录、改密确认、敏感操作二次验证 | **不需要**。浏览器调用系统认证器，API 只保存公钥凭据 |
 | USB/NFC 安全密钥 | WebAuthn / FIDO2 | 无密码登录、高安全岗位 | **不需要** |
 | Microsoft Authenticator、Google Authenticator 等 | 标准 TOTP（RFC 6238） | 账号 + 6 位动态口令登录、改密确认、敏感操作二次验证 | **不需要**。服务端只保存认证加密后的 TOTP 密钥 |
+| Microi 登录 | OIDC 授权码 + PKCE S256 | 自部署吾码复用 `microi.net` 注册的官方账号，登录已绑定的本地账号 | **不需要**。每个部署单独登记公共客户端与精确回调，无需 ClientSecret |
 | Gitee、微信开放平台、GitHub | OAuth 2.0 / 微信网站应用扫码协议 | 已绑定外部身份后的免密码登录 | **不需要**。只需在租户系统设置中填写平台应用凭据 |
 | 服务端严格人脸 + 活体检测 | `Microi Face Gateway v1` 对接云厂商或私有模型服务 | 必须由服务端统一判定的人脸场景 | **通常需要独立服务**；可以是云 API 网关，也可以是额外 Docker/集群 |
 
@@ -57,14 +58,46 @@ H5、AI 应用等可复用 `send-sms-reg`（图形校验后发信）与 `platfor
 
 ### 3. Gitee、微信扫码与 GitHub 登录
 
-1. 租户管理员在【系统设置 → 登录与身份】创建并启用对应 Provider 的 `ClientId` 与 `ClientSecret`。
+1. 租户管理员在【系统设置 → 安全与服务接入】创建并启用对应 Provider 的 `ClientId` 与 `ClientSecret`。
 2. 用户先使用原有方式登录，在【个人中心 → 外部账号】绑定自己的 Gitee、微信或 GitHub 身份。
 3. 此后登录页点击【登录方式】中的对应气泡，浏览器通过独立授权窗口完成 OAuth/扫码授权；回调只向原始可信 Origin 回传 90 秒、一次性登录票据。
 4. 后端根据 `Provider + ProviderSubject` 查找当前租户的有效绑定，重新读取仍启用的 `sys_user`，再签发标准 DiyToken。
 
 未绑定的外部身份不会自动创建吾码用户，也不会按邮箱或昵称猜测账号归属。Provider 的授权、换 Token 和用户信息端点固定在后端白名单中，租户只能配置开关、名称、说明、Scope、ClientId 与 ClientSecret，不能把 OAuth code 或 Secret 改送到任意地址。
 
-本节的 Gitee、微信和 GitHub 是平台内置、端点固定的个人外部身份登录。企业自建身份中心、Keycloak/ADFS/Entra ID、双向 OIDC、SAML2 或 CAS 不在这里配置，请使用 [SSO 身份联邦](./sso)。
+本节的 Microi、Gitee、微信和 GitHub 是平台内置、端点固定的个人外部身份登录。企业自建身份中心、Keycloak/ADFS/Entra ID、双向 OIDC、SAML2 或 CAS 请使用 [SSO 身份联邦](./sso)。
+
+### 3.1 Microi 官方账号登录 {#microi-login}
+
+Microi 登录让独立服务器部署的吾码使用在 [microi.net](https://microi.net/) 注册的官方账号完成身份验证。
+本地租户仍保留自己的用户、角色与业务数据；用户须先绑定本人账号，官方账号不会自动获得本地权限。
+
+1. 更新平台前端、后端及官方“系统设置”“SaaS引擎”应用包。每个部署在官方身份服务单独登记一个公共 `ClientId`，
+   认证方式为 `none`，要求 PKCE S256 与 nonce；回调必须与当前租户【开始授权】返回的 `CallbackUrl` 精确一致。
+2. 在【系统设置 → 安全与服务接入】保存并启用 `Login.Microi.ClientId`；Scope 使用 `openid profile email`。
+   Microi 登录不需要 `ClientSecret`，官方包也不分发公共密钥、已登记客户端或用户绑定。
+3. 打开 `sys_config.MicroiLoginEnabled`。用户先用本地账号登录，在【个人中心 → 外部账号】选择 Microi，
+   在官方授权窗口登录并确认绑定；完成后可退出本地账号，再通过【登录方式 → Microi 登录】登录。
+4. 需要隐藏入口时，在【系统设置 → 界面风格 → 登录界面与入口】开启【关闭Microi登录入口】
+   （`DisableLoginMicroi=1`）；停止该能力使用 `MicroiLoginEnabled=0`。
+
+官方端必须先部署支持 `Preview` 的新版后端，再发布官网授权页；旧后端会忽略该参数，把首屏预览当作完成授权并消费请求。
+
+外部账号列表与解绑需要后端 **8.5.10 或更高版本**，以及 **SaaS引擎 v8.4.23 或更高版本**。
+如果本人已登录，但个人中心提示“此接口已禁止http调用”，请配套升级后端与应用包；
+内部绑定接口 `platform-external-login-binding` 应保持 `StopHttp=1`，不要通过开放该接口绕过错误。
+公开入口验证本人 DiyToken 后，使用一次性内部协议授权调用绑定业务；租户 Hook 执行前该授权即已消费。
+
+官方端点固定为 `https://api.microi.net/sso/iTdos/authorize`、`/token`、`/userinfo`，
+此入口使用 OAuth 2.0 授权码、PKCE S256 与官方 UserInfo：官方服务校验客户端、精确回调、授权码期限和 verifier，
+本地后端校验一次性 state，再通过固定 HTTPS 端点兑换 Bearer Token、读取稳定 `sub` 并查找有效绑定。
+本入口不读取或信任 `id_token`；需要验证 ID Token 的通用 OIDC 联邦请使用 SSO 模块。
+昵称和邮箱只作为展示资料，不用于自动认领账号；未绑定、已停用或已解绑的身份均不能登录。
+每个部署的 `ClientId` 对应独立的 pairwise `sub`；更换 `ClientId` 后需要重新绑定，不能按邮箱迁移或认领旧绑定。
+
+生产回调只允许 HTTPS，不使用通配符；本机 HTTP 仅用于受控开发且仍须单独登记。
+官方绑定与登录的真实验收需完成一次授权回调、退出后登录、解绑拒绝和隐藏入口检查。
+应用包发布、离线协议测试或接口返回成功均不能替代该闭环，也不会自动替客户部署前后端。
 
 ### 4. 修改密码
 
@@ -159,12 +192,13 @@ return V8.FormEngine.UptFormData('payment_order', {
 | `sys_config.ExternalLoginEnabled` | Bool / 浏览器公开 | 第三方登录总开关 | `1` |
 | `sys_config.FaceVerificationEnabled` | Bool / 浏览器公开 | 严格人脸入口 | `0` |
 | `sys_config.GiteeLoginEnabled` / `WeChatLoginEnabled` / `GitHubLoginEnabled` | Bool / 浏览器公开 | 对应外部登录能力 | `0` |
-| `sys_config.DisableLoginPasskey` 等五个实体字段 | Bool / 浏览器公开 | 关闭对应登录入口；缺失、空值或 `0` 默认显示，显式 `1` 才关闭 | `0` |
+| `sys_config.MicroiLoginEnabled` | Bool / 浏览器公开 | Microi 官方账号登录；每个部署需先单独登记公共客户端 | `0` |
+| `sys_config.DisableLoginPasskey` 等六个实体字段 | Bool / 浏览器公开 | 关闭对应登录入口；缺失、空值或 `0` 默认显示，显式 `1` 才关闭 | `0` |
 | `Login.{Provider}.ClientId` | String / 服务端私有 | OAuth 应用 ClientId | 无 |
-| `Login.{Provider}.ClientSecret` | String / Secret | OAuth 应用 ClientSecret | 无 |
+| `Login.{Provider}.ClientSecret` | String / Secret | Gitee、WeChat、GitHub 的 OAuth 应用 ClientSecret；Microi 无此项 | 无 |
 | `Login.{Provider}.Name` / `.Description` / `.Scope` | String / 服务端私有 | 名称、简介和授权 Scope | 平台安全默认值 |
 
-`{Provider}` 目前支持 `Gitee`、`WeChat`、`GitHub`。回调地址由后端按当前 API 域名固定生成：`/api/ExternalLogin/Callback?OsClient={租户}&Provider={Provider}`，应把【开始授权】接口返回的 `CallbackUrl` 原样登记到第三方平台。生产环境必须使用 HTTPS；`localhost` 仅用于受控开发。RP ID、Origin 或第三方回调域名配错时，浏览器/供应商会正确拒绝验证。
+`{Provider}` 目前支持 `Microi`、`Gitee`、`WeChat`、`GitHub`。回调地址由后端按当前 API 域名固定生成：`/api/ExternalLogin/Callback?OsClient={租户}&Provider={Provider}`，应把【开始授权】接口返回的 `CallbackUrl` 原样登记到第三方平台。生产环境必须使用 HTTPS；`localhost` 仅用于受控开发。RP ID、Origin 或第三方回调域名配错时，浏览器/供应商会正确拒绝验证。
 
 ### 微信网站应用扫码登录
 
@@ -184,7 +218,9 @@ return V8.FormEngine.UptFormData('payment_order', {
 本地后端生成的 `localhost` 回调不能代替开放平台已登记的公网域名。
 自动化验证授权参数、拒绝路径与普通登录后，还须用真实微信完成一次绑定和扫码登录验收。
 
-五个浏览器公开字段完整名称为 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub`。旧 `LoginPasskeyDisplay`、`LoginAuthenticatorDisplay`、`LoginGiteeDisplay`、`LoginWeChatDisplay`、`LoginGitHubDisplay` 只用于兼容尚未升级的租户，不再作为新配置入口。旧 `mci_system_setting` 的 `Login.*.Enabled` / `Security.PasswordChange.RequireStepUp` 同样只在对应新实体字段缺失或为空时回退读取；新版“安全与服务接入”不再显示、保存或删除这些迁移项。
+### 入口显示与存量兼容
+
+六个浏览器公开字段完整名称为 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginMicroi`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub`。旧 `LoginPasskeyDisplay`、`LoginAuthenticatorDisplay`、`LoginGiteeDisplay`、`LoginWeChatDisplay`、`LoginGitHubDisplay` 只用于兼容尚未升级的租户，不再作为新配置入口。旧 `mci_system_setting` 的 `Login.*.Enabled` / `Security.PasswordChange.RequireStepUp` 同样只在对应新实体字段缺失或为空时回退读取；新版“安全与服务接入”不再显示、保存或删除这些迁移项。
 
 基础空库应用 `app.microi.saas-engine` 会幂等安装身份表、动态私密设置表、外部身份表、公开系统设置字段和平台内置微服务。存量租户的增量能力由独立“系统账号” `app.microi.sys_user` 与“系统设置” `app.microi.sys-config` 安装：前者唯一拥有用户偏好/资料 Managed 接口与用户 Hook，后者唯一拥有租户私密设置 Managed 接口与设置 Hook；这些接口不再复制到 SaaS 或应用商城包。安装器不会覆盖租户已有明确选择。运行时只在新字段缺失或为空时读取历史 `mci_system_setting` / `sys_osclients` 值；管理员一旦保存新字段，`sys_config` 就成为能力开关的唯一事实源。
 
@@ -197,7 +233,7 @@ return V8.FormEngine.UptFormData('payment_order', {
 - `mci_identity_face`：人脸供应商、不透明主体引用、登记和验证状态；不保存人脸原图或模板。
 - `mci_identity_totp`：认证加密后的 TOTP 密钥、用途策略、最近接受计数器和状态；列表、日志和 API 不返回明文密钥。
 - `mci_system_setting`：当前租户后端私密业务设置、Secret 密文、来源和排序；不保存公开配置或部署级连接配置。
-- `mci_user_external_identity`：吾码用户与 Gitee/微信/GitHub 不透明主体标识的绑定；不会保存第三方 access token。
+- `mci_user_external_identity`：本地吾码用户与 Microi/Gitee/微信/GitHub 不透明主体标识的绑定；不会保存第三方 access token。
 
 `CredentialIdHash` 必须有唯一索引，登记还会使用租户隔离的分布式租约；唯一约束与幂等检查共同防止双节点重复登记。challenge 保存到共享 Redis 五分钟，敏感操作票据保存两分钟并使用原子 `GETDEL` 消费，不能用进程内字典代替。
 

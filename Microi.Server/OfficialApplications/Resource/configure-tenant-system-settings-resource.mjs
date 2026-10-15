@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readFile, writeFile } from 'node:fs/promises'
+import { microiLoginSettingTemplates } from './configure-microi-login-resource.mjs'
 
 const packageUrl = new URL('./app.microi.saas-engine.json', import.meta.url)
 const storePackageUrl = new URL('./app.microi.store.json', import.meta.url)
@@ -64,6 +65,7 @@ const template = (id, key, value, valueType, description, sort, isSecret = false
 })
 
 const templates = [
+  ...microiLoginSettingTemplates.map(row => structuredClone(row)),
   template('4df93e43-f6bb-4bf0-b3b7-51d724921001', 'Login.Authenticator.Issuer', 'Microi', 'String', 'TOTP Authenticator 的租户签发者名称', 200),
   template('4df93e43-f6bb-4bf0-b3b7-51d724921002', 'Login.Passkey.RpId', '', 'String', 'Passkey RP ID，仅填写当前登录域名', 210),
   template('4df93e43-f6bb-4bf0-b3b7-51d724921003', 'Login.Passkey.Origins', '[]', 'Json', '允许使用 Passkey 的完整 HTTPS Origin 列表', 220),
