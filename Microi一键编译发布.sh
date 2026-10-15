@@ -1301,8 +1301,9 @@ if [ "$PUSH_NUGET" = true ] || { [ "$HAS_ENCRYPT" = true ] && [ "$DEPLOY_MODE" =
     echo ""
     _PACK_LOG="$(mktemp /tmp/microi-pack.XXXXXX.log)"
     _PACK_FAILED=0
+    # Pack 与 Release 编译保持相同配置，避免方案外项目引用被 SDK 重置为 Debug。
     if [ -f "${_MICROI_NET_PROJECT:-}" ]; then
-        dotnet pack "$_MICROI_NET_PROJECT" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee "$_PACK_LOG" || _PACK_FAILED=1
+        dotnet pack "$_MICROI_NET_PROJECT" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false -p:ShouldUnsetParentConfigurationAndPlatform=false 2>&1 | tee "$_PACK_LOG" || _PACK_FAILED=1
     fi
     # NPOI 五个工程由 Office 引用，但不在两套平台方案中；SDK Pack 只读取引用版本，
     # 不会递归生成它们的包。按依赖顺序显式打包，继续复用本次 Release 编译产物。
@@ -1312,10 +1313,10 @@ if [ "$PUSH_NUGET" = true ] || { [ "$HAS_ENCRYPT" = true ] && [ "$DEPLOY_MODE" =
         Microi.NPOI.OpenXmlFormats/Microi.NPOI.OpenXmlFormats.csproj \
         Microi.NPOI.OOXML/Microi.NPOI.OOXML.csproj \
         Microi.NPOI.csproj; do
-        dotnet pack "Microi.Server/Microi.NPOI/$_npoi_project" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
+        dotnet pack "Microi.Server/Microi.NPOI/$_npoi_project" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false -p:ShouldUnsetParentConfigurationAndPlatform=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
     done
     # 方案 Pack 的输出组目标仍需解析引用，禁止该遍历重新进入 Build。
-    dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
+    dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false -p:ShouldUnsetParentConfigurationAndPlatform=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
     if [ "$_PACK_FAILED" -ne 0 ]; then
         echo ""
         echo -e "  ${RED}───── Pack 错误摘要─────${NC}"
