@@ -52,6 +52,39 @@ AI CAD、AI 员工中心和邮箱的统一 Node 入口使用
 无法分类、零测试、失败、取消、跳过或 todo 均失败关闭。Playwright 文件由真实
 浏览器入口负责，不能混入 Node 单测冒充 E2E。
 
+### 显式 SQL Server 集成例外
+
+默认 `Full` 仍要求 SQL Server 配置及零跳过。只有用户明确授权 SQL Server 未覆盖时，
+才接受测试专用授权回执；它不能用于跳过 MySQL、MongoDB、Quick、浏览器或其它失败。
+`ReleaseGate/sqlserver-exemption.mjs` 固定精确24个 SQL Server 数据用例，三个混合
+数据库 Theory 按 provider 数据行判断依赖，MySQL 的6个数据用例仍执行完整断言。
+
+执行任务先回读人类授权，再在最终源码提交和冻结后生成 UTF-8 JSON 回执。回执必须包含
+`schemaVersion:1`、`kind:"microi-sqlserver-integration-exemption"`、`issuedAt`、
+真实 `sourceHead`、固定责任文件 `sourceFiles` 摘要、完整 `caseNames`，以及
+`authorization` 中的 `source:"explicit-human-message"`、
+`scope:"SQLServer integration only"`、真实 `threadId/turnId/messageId` 与非空原因。
+源码绑定和24用例名单直接使用导出的 `currentSqlServerSource(候选根)` 与
+`SQL_SERVER_CASES`，不能手工扩大例外名单或复用旧 HEAD 的回执。回执保存在任务临时目录，
+执行方另行固定回执 SHA-256；回执正文不包含连接密码、Token 或其它秘密。
+
+```powershell
+# 此文件由执行任务依据已回读的人类授权生成，不由 Full 自动创建或默认发现。
+$receipt = '<授权回执绝对路径>'
+$receiptSha256 = (Get-FileHash -LiteralPath $receipt -Algorithm SHA256).Hash.ToLowerInvariant()
+Remove-Item Env:MICROI_UPGRADE_SQLSERVER_TEST_CONN -ErrorAction SilentlyContinue
+.\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Full `
+  -SqlServerExemptionReceipt $receipt -SqlServerExemptionSha256 $receiptSha256
+```
+
+原一键发布入口通过测试进程变量 `MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT` 与
+`MICROI_TEST_SQLSERVER_EXEMPTION_SHA256` 传入相同回执；两项缺一、源码漂移、名单不符、
+任何未授权跳过或失败均拒绝。独立回读重新解析本轮同一物理目录下的规范 TRX，核对 XML
+完成状态、全部用例与统计，拒绝改写 JSON 投影、旧目录或链接替换。结果目录保留原 TRX、`sqlserver-exemption-outcomes.json`
+和 `sqlserver-exemption-result.json`，一键脚本在候选一致性检查前再次核验这些指纹。
+报告必须写“已执行用例通过，SQL Server 24项未覆盖”，不得称为原零跳过 Full；
+没有显式回执的运行保持原严格行为。此例外不授权新建 Docker 依赖或写入业务数据库。
+
 AI 回归分三层：源码模式条件编译 `Microi.AI.Tests` 的模型协议、租户/身份、
 授权、Schema、媒体任务和 Jint 用例；Resource Node 测试执行真实 Managed AI
 脚本；`Microi.Client/tests/ai-workbench-chat-stream.spec.mjs` 从实际工作台 SFC
@@ -69,6 +102,9 @@ HTTP/SSE/网络失败、取消和旧文本响应。该文件由上述发现器�
 还执行身份刷新、栈轮转、MongoDB 事故重放和有界 MySQL 查询。后两者分别使用
 `MICROI_TEST_MONGO_CURRENT` 与专用测试库 `MICROI_MEMORY_TEST_CONN`；未单独提供
 MySQL 连接时复用 Full 的 `MICROI_TEST_SCHEDULE_MYSQL` 专用库。
+连接共享 MongoDB 时，父进程为真实 Mongo/HTTP 夹具生成 `mci_mem_<随机UUID>` 租户并传给
+子进程，保留原请求协议与断言。收尾先确认子进程退出，再用独立有界取消令牌清理仅本轮
+已知租户对应的 `sys_log_` 数据库；不枚举或清理其它共享 MongoDB 数据。
 
 Full 的 SDK 输出统一位于本次结果目录 `.net-artifacts`。`run-tests.ps1` 只为当前测试
 进程绑定 `MICROI_TEST_REPOSITORY_ROOT`；源码定位以真实 `.csproj` 为标记，不能把

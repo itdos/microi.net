@@ -164,11 +164,14 @@ printf 'GATE_DIR=%s\\n' "$MICROI_RELEASE_GATE_DIR"
   for(const marker of [
    'MICROI_ENCRYPTION_RECEIPT="$MICROI_RELEASE_GATE_DIR/api-encryption.json"',
    'MICROI_RELEASE_CANDIDATE="$MICROI_RELEASE_GATE_DIR/candidate-',
-   '-ResultsDirectory "$MICROI_RELEASE_GATE_DIR/',
+   '_full_test_results="$MICROI_RELEASE_GATE_DIR/',
    '_nupkg_list_file="$MICROI_RELEASE_GATE_DIR/',
    '_nupkg_check_file="$MICROI_RELEASE_GATE_DIR/',
    'local receipt="$MICROI_RELEASE_GATE_DIR/'
   ])assert.ok(source.includes(marker),marker);
+  assert.ok(gate.includes('-ResultsDirectory "$_full_test_results"'));
+  for(const file of ['sqlserver-exemption-outcomes.json','sqlserver-exemption-result.json'])
+   assert.ok(gate.includes('"$_full_test_results/'+file+'"'),'SQL Server exception evidence must use the same isolated result directory');
  }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
 
@@ -217,6 +220,7 @@ print_success(){ :; }
 print_fail(){ exit 1; }
 pwsh(){ printf 'TEST_ARGUMENTS=%s\\n' "$*"; return ${scenario.exit}; }
 node(){ printf 'CANDIDATE_ARGUMENTS=%s\\n' "$*"; return 0; }
+unset MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT MICROI_TEST_SQLSERVER_EXEMPTION_SHA256
 PUBLISH_BACKEND=${scenario.backend}
 MICROI_FULL_ONLY=${scenario.fullOnly||false}
 BUILD_CLIENT=${scenario.client}
@@ -229,6 +233,31 @@ printf 'PUBLICATION_REACHED\\n'
  assert.equal(result.stdout.includes('PUBLICATION_REACHED'),scenario.passed);
  assert.equal(result.stdout.includes('TEST_ARGUMENTS='),scenario.called);
  if(scenario.called)assert.match(result.stdout,/-Mode Full -Configuration Release/);
+});
+
+for(const scenario of [
+ {name:'complete pinned SQL Server exception uses the original gate and accepts its verified result',receipt:'/fixture/explicit receipt.json',sha:'a'.repeat(64),verifyExit:0,passed:true,called:true},
+ {name:'missing SQL Server receipt hash cannot start the Full gate',receipt:'/fixture/explicit receipt.json',sha:'',verifyExit:0,passed:false,called:false},
+ {name:'missing SQL Server receipt cannot start the Full gate',receipt:'',sha:'a'.repeat(64),verifyExit:0,passed:false,called:false},
+ {name:'SQL Server exception result rejection prevents publication',receipt:'/fixture/explicit receipt.json',sha:'a'.repeat(64),verifyExit:19,passed:false,called:true},
+])test(scenario.name,()=>{
+ const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',env:{...process.env,
+  MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:scenario.receipt,MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:scenario.sha},input:`
+print_phase(){ :; }; print_success(){ :; }; print_fail(){ exit 1; }
+pwsh(){ printf 'TEST_ARGUMENTS=%s\\n' "$*"; return 0; }
+node(){ if [ "$2" = verify-result ]; then printf 'SQL_RESULT_VERIFIED\\n'; return ${scenario.verifyExit}; fi; return 0; }
+PUBLISH_BACKEND=true; MICROI_FULL_ONLY=false; BUILD_CLIENT=false; PLATFORM_DOCKER_SELECTED=false
+${gate}
+printf 'PUBLICATION_REACHED\\n'
+`});
+ assert.ifError(result.error);assert.equal(result.status,scenario.passed?0:1,result.stderr);
+ assert.equal(result.stdout.includes('PUBLICATION_REACHED'),scenario.passed);
+ assert.equal(result.stdout.includes('TEST_ARGUMENTS='),scenario.called);
+ if(scenario.called){
+  assert.ok(result.stdout.includes('-SqlServerExemptionReceipt '+scenario.receipt));
+  assert.ok(result.stdout.includes('-SqlServerExemptionSha256 '+scenario.sha));
+  assert.ok(result.stdout.includes('SQL_RESULT_VERIFIED'));
+ }
 });
 
 test('prebuilt artifacts require Full source provenance and are rechecked before every push',()=>{

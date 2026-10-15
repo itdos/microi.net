@@ -6,12 +6,13 @@ namespace Dos.Common.Tests;
 [Trait("Category", "FullStack")]
 public class FieldOptionTreePageIntegrationTests
 {
-    public static bool HasFixtures => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN"))
-        && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
+    public static bool HasMySqlFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN"));
+    public static bool HasSqlServerFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
 
-    [Theory(Skip = "Requires isolated local MySQL and SQL Server fixtures", SkipUnless = nameof(HasFixtures))]
-    [InlineData("MySql")]
-    [InlineData("SqlServer")]
+    // 按数据行判定依赖，SQL Server 的显式例外不能连带跳过 MySQL 的真实查询断言。
+    [Theory]
+    [InlineData("MySql", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
+    [InlineData("SqlServer", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
     public void LargeSourcePagesInDatabaseAndKeepsLookupInsideSourceFilter(string provider)
     {
         var connection = Environment.GetEnvironmentVariable(provider == "MySql" ? "MICROI_UPGRADE_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;

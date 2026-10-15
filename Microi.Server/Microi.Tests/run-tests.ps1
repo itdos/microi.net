@@ -9,6 +9,10 @@ param(
 
     [string]$SolutionPath = "",
 
+    [string]$SqlServerExemptionReceipt = "",
+
+    [string]$SqlServerExemptionSha256 = "",
+
     [ValidateSet("Bind", "Unit", "Core", "Acme", "Plugins", "Legacy", "Linux", "Verify")]
     [string]$PanelStage = "Verify",
 
@@ -40,6 +44,19 @@ $solution = if ([string]::IsNullOrWhiteSpace($SolutionPath)) {
     (Resolve-Path -LiteralPath $SolutionPath).Path
 }
 $project = Join-Path $testRoot "Microi.Tests.csproj"
+$sqlServerExemptionEnabled = -not [string]::IsNullOrWhiteSpace($SqlServerExemptionReceipt) -or -not [string]::IsNullOrWhiteSpace($SqlServerExemptionSha256)
+$sqlServerExemptionGate = Join-Path $testRoot 'ReleaseGate/sqlserver-exemption.mjs'
+if ($sqlServerExemptionEnabled) {
+    # 用户只授权 SQL Server 集成例外；回执必须绑定当前源码和精确24个数据用例，不能变成默认跳过入口。
+    if ($Mode -ne 'Full' -or [string]::IsNullOrWhiteSpace($SqlServerExemptionReceipt) -or [string]::IsNullOrWhiteSpace($SqlServerExemptionSha256)) {
+        throw 'An explicit SQL Server exemption requires Full mode, a receipt path and its SHA-256.'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:MICROI_UPGRADE_SQLSERVER_TEST_CONN)) {
+        throw 'An explicit SQL Server exemption must not retain a SQL Server connection.'
+    }
+    node $sqlServerExemptionGate verify-authorization $SqlServerExemptionReceipt $SqlServerExemptionSha256 (Split-Path -Parent $serverRoot)
+    if ($LASTEXITCODE -ne 0) { throw 'The source-bound SQL Server authorization receipt was rejected.' }
+}
 
 if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
     $ResultsDirectory = Join-Path $testRoot "TestResults"
@@ -96,7 +113,6 @@ if ($Mode -eq "Full") {
         "MICROI_TEST_CHILD_OSCLIENT"
         "MICROI_TEST_CHILD_TOKEN"
         "MICROI_UPGRADE_TEST_CONN"
-        "MICROI_UPGRADE_SQLSERVER_TEST_CONN"
         "MICROI_TEST_SCHEDULE_REDIS"
         "MICROI_TEST_SCHEDULE_MYSQL"
         "MICROI_TEST_MONGO_LEGACY"
@@ -107,6 +123,7 @@ if ($Mode -eq "Full") {
         "MICROI_TEST_CHILD_ACCOUNT"
         "MICROI_TEST_CHILD_PASSWORD"
     )
+    if (-not $sqlServerExemptionEnabled) { $required += "MICROI_UPGRADE_SQLSERVER_TEST_CONN" }
     $missing = @($required | Where-Object {
         [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
     })
@@ -412,11 +429,33 @@ if ($Mode -eq "Full") {
     if ($LASTEXITCODE -ne 0) { throw "NuGet deprecation audit failed with exit code $LASTEXITCODE." }
 }
 
+$sqlServerOutcomes = @{}
 foreach ($name in @("microi-quick.trx") + $(if ($Mode -eq "Full") { @("microi-full-stack.trx") } else { @() })) {
-    [xml]$report = Get-Content -LiteralPath (Join-Path $ResultsDirectory $name) -Raw
-    $counters = $report.TestRun.ResultSummary.Counters
-    if ([int]$counters.total -le 0 -or [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0 -or [int]$counters.passed -ne [int]$counters.total) {
-        throw "Release gate requires non-empty test results with no failures or skips: $name"
+    if ($sqlServerExemptionEnabled) {
+        # 与独立回读共用禁用外部实体的原始 XML 投影，JSON 明细仍需逐项回核真实 TRX。
+        $trxFile = (Resolve-Path -LiteralPath (Join-Path $ResultsDirectory $name)).Path
+        $suite = if ($name -eq 'microi-quick.trx') { 'quick' } else { 'full' }
+        $sqlServerOutcomes[$suite] = & (Join-Path $testRoot 'ReleaseGate/read-sqlserver-trx.ps1') -TrxFile $trxFile | ConvertFrom-Json
+    }
+    else {
+        [xml]$report = Get-Content -LiteralPath (Join-Path $ResultsDirectory $name) -Raw
+        $counters = $report.TestRun.ResultSummary.Counters
+        if ([int]$counters.total -le 0 -or [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0 -or [int]$counters.passed -ne [int]$counters.total) {
+            throw "Release gate requires non-empty test results with no failures or skips: $name"
+        }
     }
 }
-Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory"
+if ($sqlServerExemptionEnabled) {
+    $outcomesFile = Join-Path (Resolve-Path -LiteralPath $ResultsDirectory).Path 'sqlserver-exemption-outcomes.json'
+    $resultFile = Join-Path (Resolve-Path -LiteralPath $ResultsDirectory).Path 'sqlserver-exemption-result.json'
+    $outcomesStream = [System.IO.File]::Open($outcomesFile, [System.IO.FileMode]::CreateNew)
+    try {
+        $outcomesBytes = [System.Text.UTF8Encoding]::new($false).GetBytes(($sqlServerOutcomes | ConvertTo-Json -Depth 8))
+        $outcomesStream.Write($outcomesBytes, 0, $outcomesBytes.Length)
+    }
+    finally { $outcomesStream.Dispose() }
+    node $sqlServerExemptionGate verify-outcomes $SqlServerExemptionReceipt $SqlServerExemptionSha256 (Split-Path -Parent $serverRoot) $outcomesFile $resultFile
+    if ($LASTEXITCODE -ne 0) { throw 'Only the precise authorized SQL Server cases may be unexecuted.' }
+    Write-Host "Microi.Tests Full gate accepted with user-authorized SQL Server exemption: 24 not executed. Results: $ResultsDirectory"
+}
+else { Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory" }

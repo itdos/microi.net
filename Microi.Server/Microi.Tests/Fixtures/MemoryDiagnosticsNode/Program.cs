@@ -57,11 +57,16 @@ if (args.FirstOrDefault() == "serve")
 {
     var root = Path.GetFullPath(args[1]);
     Directory.CreateDirectory(root);
-    Environment.SetEnvironmentVariable("OsClient", "memorytesta");
+    // 父进程生成并保留同一轮的两个租户，故障退出后仍可只清理已知的随机 Mongo 命名空间。
+    var tenantA = FixtureMongoTenant(args[2]);
+    var tenantB = FixtureMongoTenant(args[3]);
+    if (!tenantA.EndsWith("_a", StringComparison.Ordinal) || tenantB != tenantA[..^2] + "_b")
+        throw new InvalidOperationException("Memory fixture tenants must share one parent-owned nonce.");
+    Environment.SetEnvironmentVariable("OsClient", tenantA);
     var unusedSql = new Dos.ORM.DbSession(Dos.ORM.DatabaseType.MySql, "Server=127.0.0.1;Port=1;Database=unused;User ID=unused;");
     var mongoConnection = Environment.GetEnvironmentVariable("MICROI_TEST_MONGO_CURRENT")
         ?? throw new InvalidOperationException("MICROI_TEST_MONGO_CURRENT is required for the isolated HTTP fixture.");
-    foreach (var tenant in new[] { "memorytesta", "memorytestb" })
+    foreach (var tenant in new[] { tenantA, tenantB })
         OsClient.ClientList[tenant] = new OsClientSecret { OsClient = tenant, Db = unusedSql, DbRead = unusedSql,
             OsClientModel = new JObject { ["Id"] = tenant, ["DbMongoConnection"] = mongoConnection } };
     var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = root });
@@ -74,19 +79,19 @@ if (args.FirstOrDefault() == "serve")
     app.UseMiddleware<SystemObservabilityMiddleware>();
     app.MapGet("/trace", (HttpContext context) =>
     {
-        ExecutionObservation.Annotate(tenant: "memorytesta", key: "probe-trace");
+        ExecutionObservation.Annotate(tenant: tenantA, key: "probe-trace");
         return new { RequestId = context.TraceIdentifier, TraceId = MicroiTraceContext.RequestTraceId(context), ExecutionId = ExecutionObservation.CurrentExecutionId };
     });
-    app.MapGet("/memory", async (IMemoryDiagnosticsRuntime runtime) => (await runtime.QueryAsync("memory", "memorytesta", "", default)).ToString());
+    app.MapGet("/memory", async (IMemoryDiagnosticsRuntime runtime) => (await runtime.QueryAsync("memory", tenantA, "", default)).ToString());
     app.MapGet("/incidents/{tenant}", async (string tenant, IMemoryDiagnosticsRuntime runtime) => (await runtime.QueryAsync("memoryincidents", tenant, "", default)).ToString());
     app.MapGet("/incident/{tenant}/{id}", async (string tenant, string id, IMemoryDiagnosticsRuntime runtime) => (await runtime.QueryAsync("memoryincident", tenant, id, default)).ToString());
     app.MapGet("/allocate", async (HttpContext context) =>
     {
-        ExecutionObservation.Annotate(tenant: "memorytesta", key: "probe-batch");
+        ExecutionObservation.Annotate(tenant: tenantA, key: "probe-batch");
         using var apiTrace = MicroiTraceContext.StartActivity("probe-api");
-        using var api = ExecutionObservation.Enter("ApiEngine", "probe-batch", "memorytesta");
+        using var api = ExecutionObservation.Enter("ApiEngine", "probe-batch", tenantA);
         using var v8Trace = MicroiTraceContext.StartActivity("probe-v8");
-        using var script = ExecutionObservation.Enter("V8", "probe-batch", "memorytesta", "test_orders", "SubmitAfterServerV8", "var rows = []; /* allocation probe */");
+        using var script = ExecutionObservation.Enter("V8", "probe-batch", tenantA, "test_orders", "SubmitAfterServerV8", "var rows = []; /* allocation probe */");
         var retained = new List<byte[]>();
         for (var i = 0; i < 192; i++) { var bytes = new byte[2 * 1024 * 1024]; bytes[0] = 1; retained.Add(bytes); }
         ExecutionObservation.Pulse();
@@ -263,7 +268,7 @@ if (args.Length > 1 && args[1] == "mongo")
 {
     Check("Mongo replay is monotonic and resident memory is available", () =>
     {
-        var tenant = "memoryrepositorytest";
+        var tenant = FixtureMongoTenant(args[2]);
         var unusedSql = new Dos.ORM.DbSession(Dos.ORM.DatabaseType.MySql, "Server=127.0.0.1;Port=1;Database=unused;User ID=unused;");
         var mongoConnection = Environment.GetEnvironmentVariable("MICROI_TEST_MONGO_CURRENT")
             ?? throw new InvalidOperationException("MICROI_TEST_MONGO_CURRENT is required for the Mongo regression.");
@@ -292,4 +297,11 @@ Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { Passed = resul
 static void ProbeAllocation()
 {
     var bytes = new byte[1024 * 1024]; bytes[0] = 1; GC.KeepAlive(bytes);
+}
+
+static string FixtureMongoTenant(string tenant)
+{
+    if (!System.Text.RegularExpressions.Regex.IsMatch(tenant, @"\Amci_mem_[a-f0-9]{32}(?:_[ab])?\z"))
+        throw new ArgumentException("Only a parent-owned random memory fixture tenant is allowed.", nameof(tenant));
+    return tenant;
 }

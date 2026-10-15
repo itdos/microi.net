@@ -12,18 +12,19 @@ namespace Microi.Tests.Common;
 [Trait("Category", "FullStack")]
 public sealed class TenantJwtPersistenceIntegrationTests
 {
-    public static bool HasFixtures => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_MYSQL_TEST_CONN"))
-        && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
+    public static bool HasMySqlFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_MYSQL_TEST_CONN"));
+    public static bool HasSqlServerFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
 
-    [Theory(Skip = "Requires isolated local database fixtures", SkipUnless = nameof(HasFixtures))]
-    [InlineData("MySql", null)]
-    [InlineData("MySql", "")]
-    [InlineData("MySql", " \t ")]
-    [InlineData("MySql", "short")]
-    [InlineData("SqlServer", null)]
-    [InlineData("SqlServer", "")]
-    [InlineData("SqlServer", " \t ")]
-    [InlineData("SqlServer", "short")]
+    // SQL Server 例外只对应它的四个数据行，MySQL 四种存量密钥状态的断言必须照常运行。
+    [Theory]
+    [InlineData("MySql", null, Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
+    [InlineData("MySql", "", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
+    [InlineData("MySql", " \t ", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
+    [InlineData("MySql", "short", Skip = "Requires an isolated MySQL fixture", SkipUnless = nameof(HasMySqlFixture))]
+    [InlineData("SqlServer", null, Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [InlineData("SqlServer", "", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [InlineData("SqlServer", " \t ", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [InlineData("SqlServer", "short", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
     public async Task NewlyAddedTenant_PersistsWeakKeyAndConvergesCompetingRefreshes(string providerName, string? previousSecret)
     {
         var databaseName = "jwt_persist_" + Guid.NewGuid().ToString("N");
