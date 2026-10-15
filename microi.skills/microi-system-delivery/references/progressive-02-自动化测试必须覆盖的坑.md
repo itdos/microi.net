@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=4b999e29e04c192319690a886ba25bb8952d5cc1910db8fa151b583d599b2be5 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=1dd7c9face286616c392ece855acac7d1a3358afbad904a4ff6da5f10c0a8e01 -->
 ## 自动化测试必须覆盖的坑
 
 ### 后端统一测试与发布门禁
@@ -24,6 +24,7 @@
   `MICROI_TEST_ALLOW_WRITES=YES`。只有用户明确授权时才可对真实租户执行；
   真实租户默认只做登录和只读烟测，写入必须限定到名称/说明明确为自动化
   测试用途的专用表，并使用唯一前缀、`finally` 清理和清理回读。
+- Full 的本地程序与依赖按 `../../workspace-conventions/SKILL.md` 的“本地测试程序与依赖生命周期”执行：优先复用健康的本地源码程序、隔离目录中的编译产物和同组既有依赖，以租户、数据库或命名空间隔离测试，不按任务重复创建 Docker/Compose。每次测试成功、失败、取消或因资源不足暂停时，都结束本次自有测试进程并收回新建临时容器，独立回读进程、端口和容器状态；既有共享服务保持原状。这些生命周期要求不减少 Full 的用例、断言或发布门禁。
 - Full 至少覆盖完整 Release 构建、FormEngine 单条/批量/按条件 CRUD、
   查询和计数、ApiEngine GET/JSON POST、API 实际启动与健康检查、真实登录、
   匿名系统配置脱敏、清理回读、NuGet 漏洞/弃用审计。NuGet 全面升级后不能
@@ -38,6 +39,7 @@
 - 即使 Full 通过，涉及定时任务、消息消费、共享缓存、迁移或滚动发布时，
   仍需两个节点连接同一 Redis/数据库，覆盖重复投递、锁持有者退出、
   Redis/MongoDB 短暂故障、响应前重启和新旧版本共存。
+  两节点默认是两个本机源码或编译产物程序进程连接同组依赖，不等于两套 Docker 环境；破坏性故障测试仅作用于明确归属的隔离资源，不能停止复用的共享数据库或缓存。
 
 ### 登录与账号密码
 

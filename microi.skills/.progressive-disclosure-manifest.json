@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-14T07:04:55.711Z",
+  "generatedAt": "2026-10-15T02:33:52.105Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,8 +763,8 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "70763c6a98c125c81db27586a136428d1e4f091f64bdfe8127e7f8b66a79cc60",
-      "originalLines": 576,
+      "originalSha256": "8b1076e37002e3c115c51bb26103b311e6c02e793dc371bd8982ec0241de45eb",
+      "originalLines": 578,
       "prefixSha256": "af58f29dd31d1e292f187d31a6e71c6b5180481a4a5a23bbed5ca768cb221682",
       "prefixBytes": 3222,
       "entryLines": 157,
@@ -821,8 +821,8 @@
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "4b999e29e04c192319690a886ba25bb8952d5cc1910db8fa151b583d599b2be5",
-          "lines": 129,
+          "sha256": "1dd7c9face286616c392ece855acac7d1a3358afbad904a4ff6da5f10c0a8e01",
+          "lines": 131,
           "heading": "自动化测试必须覆盖的坑"
         },
         {
@@ -1362,11 +1362,11 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "c129c3ac1385c3048fbfef29eae361ffec211e065d5700d979562196b35c5c55",
-      "originalLines": 806,
+      "originalSha256": "b437da7ac5c22847c9f6f6f6c0ad67aab590f8d54901d5df9c141dd07705888d",
+      "originalLines": 807,
       "prefixSha256": "5550e83bf4a6a2261ed5a65826a6799a3ad20f2f66b44b9f4308bc1bed6dc75d",
       "prefixBytes": 1914,
-      "entryLines": 198,
+      "entryLines": 199,
       "chunks": [
         {
           "id": "playwright-e2e-000",
@@ -1388,7 +1388,7 @@
           "id": "playwright-e2e-002",
           "ordinal": 2,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "2e92ff117b1c3b450e988776204ccecd9dd4d6a83bb08d86d32032b467abc174",
+          "sha256": "5874137c92e16fd5cc729fd9c23d051caa3e64438fc7bee1d717ae9c5a0f2a90",
           "lines": 20,
           "heading": "临时文件与产物放置规则（必须遵守）"
         },
@@ -1428,8 +1428,8 @@
           "id": "playwright-e2e-007",
           "ordinal": 8,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "6d285a719a85ce3f2c887b292c08cc69d9632964c341269f0f61bb2fdc403fac",
-          "lines": 41,
+          "sha256": "ee40e4f023e1da07269f9ebb82522720c4f014cfc9500885db09778dd819b9a6",
+          "lines": 42,
           "heading": "服务自启动纪律（必做）"
         },
         {
@@ -3221,11 +3221,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "97e7fe55a12fced58ee289b4f26d3ea6de27a98acb2141a2107ce976a061679b",
-      "originalLines": 626,
+      "originalSha256": "b40b04537557c18ed8a07f9b43cfd4916446f01af551f22496f4ae2176e088d1",
+      "originalLines": 627,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
-      "entryLines": 284,
+      "entryLines": 285,
       "chunks": [
         {
           "id": "workspace-conventions-000",
@@ -3255,8 +3255,8 @@
           "id": "workspace-conventions-003",
           "ordinal": 3,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "a3388a2f929f7316d2726fb09698732002fb19494682b6cc59220671bb106100",
-          "lines": 18,
+          "sha256": "7e7a88134f51f7e5712e9a41cfe516bae45ea8e9cb418a93cc39adeff3f3cbb4",
+          "lines": 19,
           "heading": "本地资源与 OOM 保护规范（强制）"
         },
         {
