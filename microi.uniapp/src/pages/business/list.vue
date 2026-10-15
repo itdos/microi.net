@@ -7,8 +7,8 @@
         <view class="nav-icon nav-icon--placeholder" aria-hidden="true"></view>
       </view>
 
-      <view class="search-row" :class="{ 'search-row--simple': !filterFields.length, 'search-row--map': key === 'customers' || key === 'devices' }">
-        <view v-if="key === 'customers'" class="list-map-entry" hover-class="list-map-entry--pressed" @tap="openCustomerMap">
+      <view class="search-row" :class="{ 'search-row--simple': !filterFields.length, 'search-row--map': showCustomerMap || key === 'devices' }">
+        <view v-if="showCustomerMap" class="list-map-entry" hover-class="list-map-entry--pressed" @tap="openCustomerMap">
           <image src="/static/xjy/business/customerMap.png" mode="aspectFit" />
           <text>客户地图</text>
         </view>
@@ -417,6 +417,9 @@ export default {
     }
   },
   computed: {
+    showCustomerMap() {
+      return String(this.config.table || this.baseConfig.table || '').toLowerCase() === 'diy_kehu'
+    },
     showCustomerContractTotals() {
       return customerContractTotalsSupported(this.config.table || this.baseConfig.table)
     },
@@ -566,6 +569,7 @@ export default {
       const sort = this.selectedSort()
       const filters = {
         fromList: true,
+        moduleKey: this.key,
         menuId: this.menuId,
         keyword: this.keyword.trim(),
         period: this.period,

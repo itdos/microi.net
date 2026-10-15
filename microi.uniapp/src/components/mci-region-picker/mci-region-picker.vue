@@ -11,13 +11,13 @@ import { createRegionPickerState, updateRegionPickerState, regionPickerSelection
 
 export default {
   name: 'MciRegionPicker',
-  props: { modelValue: { type: Array, default: () => [] } },
+  props: { modelValue: { type: Array, default: () => [] }, allowAllProvinces: { type: Boolean, default: false } },
   emits: ['update:modelValue', 'change'],
-  data() { return { region: createRegionPickerState(this.modelValue, appConfig.defaultRegion) } },
+  data() { return { region: createRegionPickerState(this.modelValue, this.allowAllProvinces ? ['全部', '全部', '全部'] : appConfig.defaultRegion, this.allowAllProvinces) } },
   watch: { modelValue: { deep: true, handler() { this.resetRegion() } } },
   methods: {
     // 滚轮草稿不写入业务值；取消或重新打开时回到已选值，空值才采用 Profile 默认地区。
-    resetRegion() { this.region = createRegionPickerState(this.modelValue, appConfig.defaultRegion) },
+    resetRegion() { this.region = createRegionPickerState(this.modelValue, this.allowAllProvinces ? ['全部', '全部', '全部'] : appConfig.defaultRegion, this.allowAllProvinces) },
     changeColumn(event) { this.region = updateRegionPickerState(this.region, event.detail.column, event.detail.value) },
     confirmRegion(event) {
       const value = regionPickerSelection(this.region, event.detail.value)
