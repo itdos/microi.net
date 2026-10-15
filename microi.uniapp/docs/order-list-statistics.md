@@ -9,3 +9,7 @@
 PC 复用客户管理的页面级有效期按钮，只修改当前页面四项 Hero 指标的 `ParamMap.ValidOnly` 并普通刷新，不保存全局菜单或用户选择。小程序开关位于金额统计下方；切换只刷新统计，保留列表、关键词和分页，迟到请求不能覆盖新结果。
 
 配置来源为 `profiles/xjy/metadata/order-list-statistics.json` 与 `order-validity-button.json`，接口及按钮源码归 `src/tenants/xjy/`。工作区 V8 文件为远端同步镜像。验收执行 `npm run check:order-list-summary`、`npm run check:customer-list-summary`、小程序/H5 构建及 `XJY_VISUAL_TARGET=order-list npm run visual:xjy`。视觉脚本为明确的本地替身；真实金额与权限另经同租户 MCP/HTTP 只读验收。
+
+客户详情 `pages/business/detail` 的订单列表 Tab 同步使用上述四项金额定义，状态按钮显示当前客户范围内的全部及六种状态数量。搜索及高级筛选同时作用于列表、状态数量和金额；快捷状态筛选列表及金额，保留其它状态数量。“仅有效期内”默认开启，仅刷新金额并保留列表分页，重置恢复全部状态和默认开关。完整列表与预览区分别展示，联系人等其它关联 Tab 保持原指标。
+
+关联统计提交当前客户外键和完整 `_TableChildAuth`，由 `platform-module-data` 重新验证父记录、关联字段和授权链后返回可见订单 Id，再复用既有金额汇总。授权失败或响应不完整时显示错误与未知值并允许重试；不把失败显示为零金额，不将独立合同订单菜单的数据范围叠加到父记录委托授权。回归执行 `node --test tests/related-order-summary.test.mjs tests/order-list-summary.test.mjs`，视觉目标为 `customer-orders`。

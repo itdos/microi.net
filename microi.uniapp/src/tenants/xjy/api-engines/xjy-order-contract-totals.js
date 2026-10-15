@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: xjy-order-contract-totals
- * Version: v1.0.2
+ * Version: v1.0.4
  * Function:
- * - 按合同订单菜单权限和完整筛选只读汇总状态、合同商品与订单金额；有效期口径沿用客户管理。
+ * - 按合同订单菜单或父记录子表授权和完整筛选只读汇总状态、合同商品与订单金额；有效期口径沿用客户管理。
  */
 
 var API_BASE = 'https://api.jifulii.com';
@@ -22,17 +22,25 @@ function trustedHeaders() {
 }
 
 // 分页是整个筛选范围的有界批量读取，非逐客户/逐订单查询；截断、重复、总数变化均失败关闭。
-function authorizedOrders(menuId, filters, headers) {
+function authorizedOrders(menuId, filters, headers, tableChildAuth) {
   var rows = [], seen = Object.create(null), total = -1;
   for (var page = 1; page <= MAX_ORDERS / PAGE_SIZE + 1; page++) {
     var payload = { FormEngineKey: 'Diy_Dingdan', _SysMenuId: menuId,
       _Where: filters._Where || [], _Keyword: String(filters._Keyword || ''),
       _SelectFields: ['Id', 'DingdanZT'], _PageIndex: page, _PageSize: PAGE_SIZE,
       _OrderBy: 'Id', _OrderByType: 'asc', _IsTree: false };
+    // 与关联列表使用同一子表模块入口：服务端核验父记录和外键，不能叠加独立菜单范围。
+    // 原始授权链仅交给普通 Client 入口验证，绝不能直接凭客户端父记录 Id 查询数据库。
+    if (tableChildAuth) {
+      delete payload._SysMenuId;
+      payload._TableChildAuth = tableChildAuth;
+      payload.ModuleEngineKey = MENU_ID;
+      payload.Action = 'GetTableData';
+    }
     for (var key of ['_Search', '_SearchEqual', '_SearchDateTime', '_SearchNumber']) {
       if (filters[key]) payload[key] = filters[key];
     }
-    var response = V8.Http.PostResponse({ Url: API_BASE + '/api/FormEngine/GetTableData',
+    var response = V8.Http.PostResponse({ Url: API_BASE + (tableChildAuth ? '/apiengine/platform-module-data' : '/api/FormEngine/GetTableData'),
       Headers: headers, ParamType: 'json', PostParamString: JSON.stringify(payload), Timeout: 10 });
     if (!response || Number(response.StatusCode) < 200 || Number(response.StatusCode) >= 300 || !Number.isFinite(Number(response.StatusCode)) || response.ErrorMessage) throw new Error('订单统计授权读取失败');
     var result;
@@ -88,11 +96,12 @@ function cents(value) {
 
 try {
   var menuId = String(V8.Param.SysMenuId || V8.Param._SysMenuId || '').trim();
-  if (menuId !== MENU_ID) throw new Error('缺少有效合同订单菜单授权上下文');
+  var tableChildAuth = V8.Param._TableChildAuth;
+  if ((!tableChildAuth && menuId !== MENU_ID) || (tableChildAuth && menuId && menuId !== MENU_ID)) throw new Error('缺少有效合同订单菜单授权上下文');
   var filters = V8.Param.Filters || {};
   var validity = filters.ValidOnly === undefined || filters.ValidOnly === null ? V8.Param.ValidOnly : filters.ValidOnly;
   var validOnly = !(validity === false || String(validity) === 'false' || String(validity) === '0');
-  var rows = authorizedOrders(menuId, filters.BadgeFilters || filters, trustedHeaders());
+  var rows = authorizedOrders(menuId, filters.BadgeFilters || filters, trustedHeaders(), tableChildAuth);
   var statusCounts = Object.create(null), selectedIds = [], selected = Object.create(null);
   statusCounts.All = rows.length;
   var selectedStatus = String(filters.SelectedStatus || '');

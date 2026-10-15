@@ -86,7 +86,10 @@ test('登录后权限尚未返回时不展示未经确认的菜单，游客保�
 test('实际首页目录的全部入口均绑定后台菜单权限，包括原生页面和接口列表', () => {
   const source = stripImports(read('src/tenants/xjy/business.js'))
     .replace(/export default/g, 'const exported =').replace(/export (?=(?:async )?function|const)/g, '')
-  const catalog = vm.runInNewContext(`${source}; exported`, { appConfig: { cdnAssets: { scan: 'scan.png' } } })
+  const catalog = vm.runInNewContext(`${source}; exported`, {
+    appConfig: { cdnAssets: { scan: 'scan.png' } },
+    orderListStatistics: JSON.parse(read('profiles/xjy/metadata/order-list-statistics.json'))
+  })
   for (const group of catalog.businessGroups) {
     for (const item of group.items) {
       const config = catalog.getBusinessModule(item.key)

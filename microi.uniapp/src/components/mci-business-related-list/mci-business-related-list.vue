@@ -87,7 +87,16 @@
       <view class="search-button" hover-class="filter-control--pressed" @tap="resetSearch"><text>重置</text></view>
     </view>
 
-    <view v-if="!isPreview && relatedMetrics.length" class="related-metrics">
+    <scroll-view v-if="showRelatedSummary && config.statusOptions?.length" class="related-status-scroll" scroll-x :show-scrollbar="false">
+      <view class="related-status-tabs">
+        <view v-for="item in ['', ...config.statusOptions]" :key="item" class="related-status-item"
+          :class="{ active: relatedStatus === item }" @tap="changeRelatedStatus(item)">
+          <text>{{ item || '全部状态' }}</text><text class="related-status-badge">{{ relatedStatusCount(item) }}</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view v-if="!isPreview && relatedMetrics.length" class="related-metrics" :class="{ 'related-metrics--summary': showRelatedSummary }">
       <view v-for="metric in relatedMetrics" :key="metric.key" class="related-metric"
         :class="`related-metric--${metric.tone || 'neutral'}`">
         <view class="related-metric__value">
@@ -95,6 +104,15 @@
         </view>
         <text class="related-metric__label">{{ config.timeRangeField && activeFilterCount && metric.key === 'total' ? '筛选结果' : metric.label }}</text>
       </view>
+    </view>
+
+    <view v-if="showRelatedSummary" class="related-summary-tools">
+      <view class="related-valid-switch" role="switch" :aria-checked="relatedValidOnly" @tap="toggleRelatedValidity">
+        <view class="related-valid-track" :class="{ active: relatedValidOnly }"><view></view></view>
+        <text>仅有效期内</text>
+      </view>
+      <text class="related-summary-hint">{{ relatedSummaryError || config.relatedSummary.hint }}</text>
+      <text v-if="relatedSummaryError" class="related-summary-retry" @tap="loadRelatedMetrics(true)">重试</text>
     </view>
 
     <view v-if="proposalInstallationBatchAvailable" class="proposal-batch-tools">
@@ -505,6 +523,7 @@ import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js
 import { resolveListReadApi, queryMonthValue } from '@/platform/configured-read-api.mjs'
 import { tableChildRequiresModuleQuery } from '@/platform/table-child-query-target.mjs'
 import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
+import { loadRelatedListSummary, formatRelatedSummaryMoney } from '@/platform/related-list-summary.mjs'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
@@ -671,6 +690,10 @@ export default {
       metricLoading: false,
       metricRequestId: 0,
       metricValues: {},
+      relatedStatus: '',
+      relatedValidOnly: true,
+      relatedStatusCounts: {},
+      relatedSummaryError: '',
       listBodyHeight: 0,
       layoutMeasureTimers: [],
       proposalPointSavingId: '',
@@ -935,13 +958,16 @@ export default {
       if (this.config.relatedMetrics?.length) return this.config.relatedMetrics
       return [{ key: 'total', label: `${this.config.title || this.sectionTitle}总量`, tone: 'neutral' }]
     },
+    showRelatedSummary() {
+      return !this.isPreview && Boolean(this.config.relatedSummary?.apiEngineKey)
+    },
     relatedMetrics() {
       return this.relatedMetricDefinitions.map((metric) => {
         const raw = this.metricValues[metric.key]
         const loading = this.metricLoading && (raw === undefined || raw === null)
         return {
           ...metric,
-          value: loading ? '—' : this.formatRelatedMetric(raw, metric),
+          value: loading || (this.showRelatedSummary && raw == null) ? '—' : this.formatRelatedMetric(raw, metric),
           unit: loading ? '' : (metric.unit !== undefined ? metric.unit : (metric.format === 'compactMoney' ? '' : '条'))
         }
       })
@@ -1004,6 +1030,12 @@ export default {
     relationValue: {
       immediate: true,
       handler(value) {
+        this.relatedStatus = ''
+        this.relatedValidOnly = true
+        this.relatedStatusCounts = {}
+        this.metricValues = {}
+        this.relatedSummaryError = ''
+        this.metricRequestId += 1
         if (!value) {
           this.latestSummaryRequestId += 1
           this.latestSummaryRow = null
@@ -1013,6 +1045,7 @@ export default {
           this.loading = false
         } else if (this.config.table) {
           this.loadData(true, false, false, true)
+          this.loadRelatedMetrics()
         }
       }
     }
@@ -1029,6 +1062,7 @@ export default {
     this.componentDisposed = true
     this.initializeRequestId += 1
     this.latestSummaryRequestId += 1
+    this.metricRequestId += 1
     this.presentationRequestId += 1
     uni.$off('microi:data-changed', this.handleDataChanged)
     clearTimeout(this.searchTimer)
@@ -1638,6 +1672,7 @@ export default {
       presentationFields.forEach((name) => {
         if (menuConfig[name] !== undefined) next[name] = menuConfig[name]
       })
+      if (next.relatedSummary) next.statusOptions = [...new Set([...(this.config.statusOptions || []), ...(menuConfig.statusOptions || [])])]
       // 与普通业务列表保持一致：后台菜单字段完整接管卡片后不再使用租户摘要占位。
       next.summaryField = ''
       this.config = next
@@ -1752,7 +1787,9 @@ export default {
         })
         if (dynamic.statusFromViewSchema) {
           merged.statusField = dynamic.statusField || ''
-          merged.statusOptions = dynamic.statusOptions || []
+          merged.statusOptions = merged.relatedSummary
+            ? [...new Set([...(merged.statusOptions || []), ...(dynamic.statusOptions || [])])]
+            : (dynamic.statusOptions || [])
         }
         merged.selectFields = [...new Set([
           ...(merged.selectFields || []),
@@ -1885,8 +1922,8 @@ export default {
       if (!this.relationValue || !this.config.table || (this.loading && !reset) || (!reset && this.finished)) return
       const relationValue = this.relationValue
       const queryMonth = this.queryMonth
-      const filterKey = JSON.stringify(this.filterValues || {})
-      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && queryMonth === this.queryMonth && filterKey === JSON.stringify(this.filterValues || {})
+      const filterKey = JSON.stringify([this.keyword, this.filterValues || {}, this.relatedStatus])
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && queryMonth === this.queryMonth && filterKey === JSON.stringify([this.keyword, this.filterValues || {}, this.relatedStatus])
       // 首次进入、返回刷新和真实增删改才回读摘要；搜索、筛选、翻页沿用当前摘要。
       const latestSummaryTask = refreshSummary ? this.loadLatestRecordSummary() : null
       const requestId = ++this.loadRequestId
@@ -1900,10 +1937,14 @@ export default {
       try {
         const pageSize = this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15)
         const keywordWhere = this.buildKeywordFilterWhere()
+        // 卡片展示可不设状态标签，统计筛选仍使用租户声明的业务状态字段。
+        const statusField = this.config.relatedSummary?.statusField || this.config.statusField
         const extraWhere = [
           { Name: this.childFkField, Type: '=', Value: this.relationValue },
           ...this.buildFilterWhere(),
-          ...keywordWhere
+          ...keywordWhere,
+          ...(this.relatedStatus && this.config.relatedSummary?.apiEngineKey && statusField
+            ? [{ Name: statusField, Type: '=', Value: this.relatedStatus }] : [])
         ]
         let result
         if (resolveListReadApi(this.config) || this.requiresModuleAssociationQuery()) {
@@ -1994,6 +2035,7 @@ export default {
       return { start, end }
     },
     formatRelatedMetric(value, metric) {
+      if (this.config.relatedSummary?.apiEngineKey && metric.format === 'compactMoney') return formatRelatedSummaryMoney(value)
       const numeric = Number(value || 0)
       if (metric.format !== 'compactMoney') return Number.isFinite(numeric) ? Math.floor(numeric) : 0
       const absolute = Math.abs(numeric)
@@ -2003,13 +2045,15 @@ export default {
     async loadRelatedMetrics(refresh = false) {
       if (this.componentDisposed) return
       if (this.proposalDraftGroup) return
+      if (this.isPreview && this.config.relatedSummary?.apiEngineKey) return
       // 月度只读列表直接使用同一次日志查询的总数，避免再查空的物理表及重复请求。
       if (this.config.monthField && this.config.readOnly) return
       const metrics = this.relatedMetricDefinitions
-      if (!metrics.length || !this.relationValue || !this.config.table) return
+      if (!metrics.length || !this.relationValue || !this.childFkField || !this.config.table) return
       const relationValue = this.relationValue
       const requestId = ++this.metricRequestId
-      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && requestId === this.metricRequestId
+      const filterKey = JSON.stringify([this.keyword, this.filterValues, this.relatedStatus, this.relatedValidOnly])
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && requestId === this.metricRequestId && filterKey === JSON.stringify([this.keyword, this.filterValues, this.relatedStatus, this.relatedValidOnly])
       this.metricLoading = true
       const range = this.monthRange()
       const keywordWhere = this.buildKeywordFilterWhere()
@@ -2018,6 +2062,31 @@ export default {
         ...this.buildFilterWhere(),
         ...keywordWhere
       ]
+      if (this.config.relatedSummary?.apiEngineKey && !this.isPreview) {
+        this.metricValues = {}
+        this.relatedStatusCounts = {}
+        this.relatedSummaryError = ''
+        try {
+          const result = await loadRelatedListSummary({
+            config: this.config, menuId: this.menuId, tableChildAuth: this.tableChildAuth,
+            filters: { _Where: [...(this.config.fixedWhere || []), ...activeWhere], _Keyword: keywordWhere.length ? '' : this.keyword.trim() },
+            selectedStatus: this.relatedStatus, validOnly: this.relatedValidOnly,
+            run: (key, params) => V8.ApiEngine.Run(key, params, { checkCode: false })
+          })
+          if (!isCurrent()) return
+          this.metricValues = result.metrics
+          this.relatedStatusCounts = result.statusCounts
+          this.relatedSummaryError = result.warning
+        } catch (error) {
+          if (isCurrent()) this.relatedSummaryError = error.message || '关联金额统计加载失败'
+        } finally {
+          if (isCurrent()) {
+            this.metricLoading = false
+            this.scheduleListBodyMeasure()
+          }
+        }
+        return
+      }
       const moduleAssociationQuery = this.requiresModuleAssociationQuery()
       try {
         const values = {}
@@ -2078,7 +2147,23 @@ export default {
       this.filterValues = {}
       this.filterDraft = {}
       this.filterOpen = false
+      this.relatedStatus = ''
+      this.relatedValidOnly = true
       return this.refreshFilteredRows()
+    },
+    relatedStatusCount(status) {
+      const value = this.relatedStatusCounts[status || 'All']
+      return value === undefined ? (this.metricLoading || this.relatedSummaryError ? '—' : 0) : value
+    },
+    changeRelatedStatus(status) {
+      if (this.relatedStatus === status) return
+      this.relatedStatus = status
+      return this.refreshFilteredRows()
+    },
+    toggleRelatedValidity() {
+      this.relatedValidOnly = !this.relatedValidOnly
+      // 仅重算金额，不清空列表、关键词或已加载分页。
+      return this.loadRelatedMetrics(true)
     },
     clearKeyword() {
       if (!this.keyword) return
@@ -3052,6 +3137,26 @@ export default {
 .related-metric--success .related-metric__value { color: #008660; }
 .related-metric--primary { border-color: #d8e5fa; background: #f2f7ff; }
 .related-metric--primary .related-metric__value { color: #1768d8; }
+.related-status-scroll { flex: none; width: 100%; margin: 0 0 16rpx; white-space: nowrap; }
+.related-status-tabs { display: inline-flex; gap: 12rpx; padding: 16rpx 8rpx 4rpx 0; }
+.related-status-item { position: relative; flex: none; min-width: 110rpx; height: 54rpx; padding: 0 28rpx 0 18rpx; border: 1rpx solid #dce8ed; border-radius: 12rpx; color: #68838f; background: #fff; font-size: 22rpx; line-height: 54rpx; text-align: center; }
+.related-status-item.active { border-color: #0b86d4; color: #0b86d4; background: #edf7fc; font-weight: 600; }
+.related-status-badge { position: absolute; top: -14rpx; right: -6rpx; min-width: 30rpx; padding: 0 8rpx; border-radius: 18rpx; color: #47758b; background: #e8f3f9; font-size: 18rpx; font-weight: 600; line-height: 28rpx; }
+.related-status-item.active .related-status-badge { color: #fff; background: #0b86d4; }
+.related-metrics--summary { flex: none; gap: 6rpx; margin: 0 0 12rpx; padding: 16rpx 10rpx; border-radius: 14rpx; background: linear-gradient(110deg, #0b86d4, #16a3ad 62%, #2aaf80); }
+.related-metrics--summary .related-metric { min-width: 0; padding: 14rpx 4rpx; border: 1rpx solid rgba(255,255,255,.2); border-radius: 8rpx; background: rgba(255,255,255,.12); }
+.related-metrics--summary .related-metric__value { color: #fff; }
+.related-metrics--summary .related-metric__value > text:first-child { font-size: 28rpx; }
+.related-metrics--summary .related-metric__label { color: rgba(255,255,255,.9); font-size: 18rpx; }
+.related-summary-tools { flex: none; display: flex; align-items: center; gap: 10rpx; min-height: 44rpx; margin-bottom: 14rpx; }
+.related-valid-switch { display: flex; flex: none; align-items: center; gap: 8rpx; color: #527282; font-size: 22rpx; }
+.related-valid-track { width: 48rpx; height: 28rpx; padding: 2rpx; box-sizing: border-box; border-radius: 20rpx; background: #c9d8df; transition: background .15s; }
+.related-valid-track > view { width: 24rpx; height: 24rpx; border-radius: 50%; background: #fff; transition: transform .15s; }
+.related-valid-track.active { background: #0b86d4; }
+.related-valid-track.active > view { transform: translateX(20rpx); }
+.related-summary-hint { flex: 1; min-width: 0; color: #788e99; font-size: 19rpx; overflow-wrap: anywhere; }
+.related-summary-retry { flex: none; color: #0b86d4; font-size: 22rpx; }
+@media (prefers-reduced-motion: reduce) { .related-valid-track, .related-valid-track > view { transition: none; } }
 .latest-record-summary { flex: none; margin-bottom: 16rpx; padding: 16rpx 20rpx 20rpx; border: 1rpx solid var(--mci-border-color, #e1eaf0); border-radius: 12rpx; background: var(--mci-bg-card, #fff); }
 .latest-record-summary__head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; min-height: 52rpx; margin-bottom: 10rpx; color: var(--mci-text-primary, #263e49); font-size: 24rpx; font-weight: 600; }
 .latest-record-summary--collapsed { padding-bottom: 16rpx; }
