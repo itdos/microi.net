@@ -11,9 +11,10 @@ description: 已初始化吾码工作区的默认 AI 开发总控入口，用户
 
 本 Skill 是已初始化吾码工作区的默认开发总控入口。用户直接描述需求即可，无需指定 Skill 名称；
 目标 MCP 连接可沿用当前项目或唯一已登录连接，需求文件/验收地址按需提供。
-任何吾码开发任务先读本入口与八项清单，再按下表读取相关专项 Skill。
+任何吾码开发任务先读本入口、八项清单及其增补要求，再按下表读取相关专项 Skill。
 收到“完整开发/交付系统”请求时，必须先读取
 [完整系统开发默认交付清单（原推荐提示词 1–8）](references/progressive-01-标准工作流.md#完整系统开发默认交付清单原推荐提示词-18)，
+并完整读取同一参考文件的[菜单先行与经营报表增补要求](references/progressive-01-标准工作流.md#菜单先行与经营报表增补要求强制)，
 逐项执行并记录覆盖结果；不能只交方案、示例或待办。局部修改、只读分析按用户实际范围执行，
 这份默认清单不额外授权生产写入或客户部署。
 
@@ -23,10 +24,19 @@ description: 已初始化吾码工作区的默认 AI 开发总控入口，用户
 |---|---|
 | 需求文档、成熟数据模型、表/字段/索引 | `business-blueprint`、`microi-db-schema`、`microi-form-engine` |
 | 表单宽度、分组、整行控件与视觉 | `microi-form-layout`、`ui-design` |
-| 菜单、PageTabs、统计角标、模块指标、复合列、移动卡片 | `module-engine`、`v8-menu-buttons` |
+| 菜单骨架、AI 开发中占位、逐菜单切换、PageTabs、模块展示 | `module-engine`、`v8-menu-buttons` |
 | 选项 Key/Label、数据源、状态模板 | `microi-datasource-mapping`、`datasource-engine`、`v8-template-engine` |
-| 业务接口、表单事件、看板与报表 | `v8-crud-api`、`v8-table-event`、`page-engine`、`report-engine` |
+| 业务接口、表单事件 | `v8-crud-api`、`v8-table-event` |
+| 业务统计、老板经营、领导管理看板及明细报表 | `page-engine`、`report-engine`、`datasource-engine` |
 | 真实业务、截图、账号和跨端验收 | `playwright-e2e`；有独立前端时再读相应前端 Skill |
+
+完整开发按“需求与现状分析 → 菜单和报表规划 → 独立骨架 Manifest 检查与 dry-run →
+授权落地菜单骨架 → 分阶段实现最终资源并独立预验收 → 保持菜单身份切换 → 原入口最终验收”推进。
+仅用户可见的新业务/报表叶菜单先指向共享 AI 开发中组件（`IsMicroiService=0`），
+保留独立业务 URL、标题和菜单身份；隐藏数据/授权载体维持原绑定，骨架不预绑定不存在资源。
+候选预验收不依赖仍占位的原 URL，切换失败精确恢复本菜单原绑定并列为未完成；
+详情按增补要求及 `module-engine` 执行。经营、领导和业务统计看板默认基于界面引擎，
+不能以列表角标或占位页替代。局部改动只处理范围内菜单/报表，只读分析不创建占位资源。
 
 每张由 AI/MCP 创建的业务表都必须同时设计默认表单 Banner，不能只建字段和菜单。完整
 Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选择业务编号/名称标题、
@@ -132,7 +142,7 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 - 订单状态角标只给需要处理的状态，不给“全部/已完成/已取消”等静态分类堆数字。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=9a226a70ef240ce83151c140d002253dccbf7efa63653f61c8825f2b69c1c7d3 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=cc8ef54619f2f7a1dc3ba4268d02cbe678c855ba17e2d9e9ed3251ac0dc35e18 -->
 ## 交付完成定义
 
 一次 Microi 全系统交付只有同时满足以下条件才算完成：
@@ -145,6 +155,8 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 6. 后端和前端服务可自动启动。
 7. Playwright 账号登录、接口契约、网络守卫、业务闭环、截图复核均通过。
 8. 生成或修改的通用经验已写回 microi.skills，且不能包含项目专属措辞；不能只写本地 memory、聊天记录或项目临时文档。
+9. 菜单树包含范围内全部业务与报表入口；每个本次新增可见业务/报表叶菜单已从开发中占位切换到验收通过的真实页面，菜单 Id、业务 URL、层级、排序与权限关联保持正确。仍有占位或阻塞的菜单逐项标为未完成。
+10. 基于界面引擎的业务统计、老板经营与领导管理报表已接通当前租户真实业务数据；指标口径、筛选/时间、权限、穿透、空/失败状态与明细对账均有证据。
 
 <!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）

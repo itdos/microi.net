@@ -3290,6 +3290,7 @@ function buildInstructions(ctx: McpServerContext): string {
 
 ## Microi吾码基础规范（任何 AI 模型强制读取）
 每次新建或接续吾码任务，必须先完整读取工作区 microi.skills/workspace-conventions/SKILL.md；未初始化时读取已安装吾码插件中的 skills/workspace-conventions/SKILL.md。进度播报和非阻塞自动更新都是无条件基础规则，不能等用户提醒。
+随后默认完整读取 microi.skills/microi-system-delivery/SKILL.md、microi.skills/microi-system-delivery/references/progressive-01-标准工作流.md 中的原 1–8 及后续增补，再按总控读取相关专项 Skills；用户无需指定 Skill 名称。实现前先报告已读取的文件路径及本次适用的交付清单，按完整开发、局部修改、只读分析的实际范围执行，不额外授权生产写入或客户部署。文件缺失时按安装规范执行 microi ai init --workspace "<工作区绝对路径>" 恢复；宿主无本地文件/终端能力或未取得完整正文时不能声称已自动加载，也不能把仅连通 MCP 等同于已读取交付规则。
 首次工作说明以“Microi吾码开发工具版本”报告实际 CLI 版本、npm 官方 latest（附查询时间）、自动更新与 Skills/MCP 同步状态；用 microi version --json 回读 CLI，用 npm 官方 registry 查询 latest。未知项写检测中，不得把本 MCP 协议版本或 expectedVersion 当成 CLI/npm 最新版。
 已有 CLI 时必须投递 microi update --background --workspace "<工作区绝对路径>" --json，自动升级 @microi.net/cli 并同步 Skills、AI 规则和 MCP。更新失败延后重试并准确报告，不阻断当前工作、不强制重载、不终止正在运行的 MCP；用户明确关闭或宿主无执行权限时报告限制，签名桌面安装目录通过桌面官方渠道更新。完整执行及验收规则以基础入口为准。
 

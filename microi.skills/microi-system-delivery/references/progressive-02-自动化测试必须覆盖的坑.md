@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=1dd7c9face286616c392ece855acac7d1a3358afbad904a4ff6da5f10c0a8e01 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=bc1fbdecb428b0a94d04d55d22e5c14f61354097cbaa2a059574f47fb41f5bdc -->
 ## 自动化测试必须覆盖的坑
 
 ### 后端统一测试与发布门禁
@@ -69,8 +69,8 @@
 ### 网络与接口契约
 
 - 拦截全部请求，404、5xx、CORS/ORB、图片加载失败、字符串 `null`、空响应、非 JSON 全部失败。
-- 页面出现“请求失败”“网络错误”“开发中”“待开发”“null”等文案，默认失败。
-- 扫描源码禁止残留 `开发中|待开发`。
+- 页面出现“请求失败”“网络错误”“null”等文案默认失败；最终业务入口出现“开发中”“待开发”判为未交付。菜单骨架阶段的预期占位可验证菜单身份、布局和动画，但不计已完成业务功能。
+- 最终交付业务源码禁止残留 `开发中|待开发`；精确排除平台共享 `ai-engine/developing.vue` 及其专属占位测试，不扩大到业务页面或其它源码。
 - 所有 `callEngine('xxx')` 必须有接口契约测试覆盖：HTTP ok、标准 DosResult、必要字段非空。
 
 ### 真实业务闭环

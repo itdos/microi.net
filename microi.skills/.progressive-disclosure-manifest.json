@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-15T02:33:52.105Z",
+  "generatedAt": "2026-10-15T13:02:33.451Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,11 +763,11 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "8b1076e37002e3c115c51bb26103b311e6c02e793dc371bd8982ec0241de45eb",
-      "originalLines": 578,
-      "prefixSha256": "af58f29dd31d1e292f187d31a6e71c6b5180481a4a5a23bbed5ca768cb221682",
-      "prefixBytes": 3222,
-      "entryLines": 157,
+      "originalSha256": "7d4f5c47b6684a6d5cc3f2b4b051c21e1286ab5e91842dd4716422adfdc8e03c",
+      "originalLines": 628,
+      "prefixSha256": "be8886df24f891da364663ea8c4bfc010fba5505094347e4a97166c6e45fe2eb",
+      "prefixBytes": 4329,
+      "entryLines": 169,
       "chunks": [
         {
           "id": "microi-system-delivery-000",
@@ -805,23 +805,23 @@
           "id": "microi-system-delivery-004",
           "ordinal": 6,
           "destination": "microi-system-delivery/SKILL.md",
-          "sha256": "9a226a70ef240ce83151c140d002253dccbf7efa63653f61c8825f2b69c1c7d3",
-          "lines": 14,
+          "sha256": "cc8ef54619f2f7a1dc3ba4268d02cbe678c855ba17e2d9e9ed3251ac0dc35e18",
+          "lines": 16,
           "heading": "交付完成定义"
         },
         {
           "id": "microi-system-delivery-005",
           "ordinal": 2,
           "destination": "microi-system-delivery/references/progressive-01-标准工作流.md",
-          "sha256": "8f34122f08c3cee8f4aed5054c012cb560904442ea080fa2fc3d495b73b53a25",
-          "lines": 229,
+          "sha256": "32039bfdbd18bb97f3f93974ace75169c9d90df4c0702ff76134f1c9a9282912",
+          "lines": 267,
           "heading": "标准工作流"
         },
         {
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "1dd7c9face286616c392ece855acac7d1a3358afbad904a4ff6da5f10c0a8e01",
+          "sha256": "bc1fbdecb428b0a94d04d55d22e5c14f61354097cbaa2a059574f47fb41f5bdc",
           "lines": 131,
           "heading": "自动化测试必须覆盖的坑"
         },
@@ -1214,11 +1214,11 @@
       ]
     },
     "page-engine": {
-      "originalSha256": "08c2b53b016199e5495dae60e71a74b391d5f6923f66a95e002d2fd7a0df1b1b",
-      "originalLines": 455,
-      "prefixSha256": "78b807d6e6d56642b9a5a848d9fafa0a869eb43411a98a61aab36d058c4b6b86",
-      "prefixBytes": 4181,
-      "entryLines": 207,
+      "originalSha256": "fce0a98e8b3b81ccf98cb20d5c93f0b53cfdab7da5050c7c2e94444d65e9aa48",
+      "originalLines": 476,
+      "prefixSha256": "6ae3962d142c190a5ba8a958d749759b6a4fd8266e6f965d4b6f726d7a6350f7",
+      "prefixBytes": 6255,
+      "entryLines": 228,
       "chunks": [
         {
           "id": "page-engine-000",
@@ -1362,7 +1362,7 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "b437da7ac5c22847c9f6f6f6c0ad67aab590f8d54901d5df9c141dd07705888d",
+      "originalSha256": "2fd541de20b3517dc9442e635872e609b2708c7aedc1c5fb6477cf5ad9a649a3",
       "originalLines": 807,
       "prefixSha256": "5550e83bf4a6a2261ed5a65826a6799a3ad20f2f66b44b9f4308bc1bed6dc75d",
       "prefixBytes": 1914,
@@ -1532,7 +1532,7 @@
           "id": "playwright-e2e-020",
           "ordinal": 20,
           "destination": "playwright-e2e/references/progressive-03-microi-helper-模板.md",
-          "sha256": "a267a39f5fe3dab714c5275759f7bdd1b6150990fa00555e07c091aee5795a29",
+          "sha256": "63b5c2374f7e011a927ebd751d01c50e2d54d9e746d4d47ddd1665779a4487b9",
           "lines": 48,
           "heading": "完整业务验收门槛"
         },
@@ -3221,7 +3221,7 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "9d5816443b34c6ca71a3b0c15c729acbfd7762deba8572d8d5831648cf3ca0c0",
+      "originalSha256": "4e688b7924efd2bd4b33adf9303b0df0f8f571825fa28f5f7e6de78254c4e4d4",
       "originalLines": 638,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
@@ -3231,7 +3231,7 @@
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "e8e784198efa6cd233fa9da3be0292cd6c68cea2c10e35f8f94eaacd1d381033",
+          "sha256": "0a0d942217e3235455fa81ab7ffb421d7610e49adc29053aac0b74f6b49d644c",
           "lines": 58,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
