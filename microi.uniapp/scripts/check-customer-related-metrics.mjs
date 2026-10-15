@@ -29,7 +29,6 @@ assert.match(related, /handleDataChanged[\s\S]*?loadRelatedMetrics\(true\)/,
 for (const [key, labels] of [
   ['contacts', ['在职', '本月联系人', '联系人总量']],
   ['visits', ['有效跟进', '本月跟进', '跟进总量']],
-  ['orders', ['待审批', '已审批', '订单总额', '本月订单']],
   ['devices', ['待安装', '使用中', '本月设备', '设备总量']],
   ['proposals', ['场所点位数量合计', '本月客户方案', '方案总量']],
   ['tasks', ['进行中', '已完结', '应收金额合计', '本月售后任务']],
@@ -43,6 +42,11 @@ for (const [key, labels] of [
   assert.match(moduleSource, /relatedMetrics:\s*\[/, `${key} 必须配置客户详情统计`)
   labels.forEach((label) => assert.ok(moduleSource.includes(`label: '${label}'`), `${key} 缺少“${label}”指标`))
 }
+
+const orderMetrics = JSON.parse(fs.readFileSync(path.join(root, 'profiles/xjy/metadata/order-list-statistics.json'), 'utf8'))
+assert.deepEqual(orderMetrics.metrics.map(metric => metric.Label), ['租赁总价', '买断总价', '包年换芯总价', '订单金额合计'])
+assert.match(business, /orders: native\(\{[\s\S]*?relatedSummary: \{ apiEngineKey: orderListStatistics.engineKey[\s\S]*?relatedMetrics: orderListStatistics.metrics.map/,
+  '订单关联统计必须复用主列表四项金额定义和批量接口')
 
 assert.match(business, /proposals:[\s\S]*?aggregateField: 'ChangsuoDWSL'[\s\S]*?monthField: 'YujiHZSJ'/,
   '客户方案统计必须复用平台场所点位汇总和预计合作时间口径')

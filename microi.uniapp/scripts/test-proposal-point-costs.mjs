@@ -9,6 +9,7 @@ import {
   calculateCurrentProposalCosts, calculateInstallationPointCosts,
   aggregateInstallationPointCosts, proposalCostYears, validateProposalCostInputs
 } from '../src/tenants/xjy/proposal-cost-model.mjs'
+import { calculateProposalCosts, proposalInheritedValues } from '../src/tenants/xjy/proposal-calculation.js'
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // 测试使用隔离生成物，既不依赖未提交的租户同步目录，也不覆盖已回读的线上版本。
@@ -18,6 +19,67 @@ const points = [
   { Id: 'a', AnzhuangdianweiId: 'plan', ShebeiSL: 2, Renshu: 100, ShebeiDJZL: 1200, ShebeiDJ: 6000, GenghuanLXJG: 300 },
   { Id: 'b', AnzhuangdianweiId: 'plan', ShebeiSL: 3, Renshu: 60, ShebeiDJZL: 900, ShebeiDJ: 5000, GenghuanLXJG: 200 }
 ]
+
+test('预计合作金额逐项跟随主表累计成本，重算年数和删除点位后同步更新', () => {
+  for (const rows of [points, points.slice(1), []]) {
+    for (const years of [5, 7]) {
+      const summary = aggregateInstallationPointCosts(rows, years)
+      assert.equal(summary.YujihezuoJEZL, summary.DuonianLJCBAfter)
+      assert.equal(summary.YujihezuoJEMD, summary.DuonianLJCBMD)
+    }
+  }
+  const point = calculateInstallationPointCosts(points[0], 5)
+  assert.ok(!('YujihezuoJEZL' in point) && !('YujihezuoJEMD' in point), '新字段仅属于父方案，不能写入点位表')
+})
+
+test('预计合作金额区分空报价与零元报价，不保留上次计算结果', () => {
+  for (const price of [null, 0]) {
+    const summary = aggregateInstallationPointCosts([{ ShebeiSL: 1, ShebeiDJZL: price, ShebeiDJ: price }], 5)
+    assert.equal(summary.YujihezuoJEZL, price)
+    assert.equal(summary.YujihezuoJEMD, price)
+  }
+})
+
+test('小程序初始化和提交前按原字段覆盖展示金额，新方案不继承旧金额', () => {
+  for (const value of ['47200.00', 0, null, '']) {
+    const result = calculateProposalCosts({ DuonianLJCBAfter: value, DuonianLJCBMD: value,
+      YujihezuoJEZL: 999, YujihezuoJEMD: 999 })
+    assert.equal(result.YujihezuoJEZL, value)
+    assert.equal(result.YujihezuoJEMD, value)
+  }
+  const inherited = proposalInheritedValues({ YujihezuoJEZL: 47200, YujihezuoJEMD: 33600, Renshu: 10 })
+  assert.ok(!('YujihezuoJEZL' in inherited) && !('YujihezuoJEMD' in inherited))
+  assert.equal(inherited.Renshu, 10)
+})
+
+test('历史记录只在读取结果补齐预计合作金额，不执行数据库更新，也不覆盖裁剪查询中的有效值', () => {
+  const source = eventSource('diy_kehufaxx', '需求方案', 'DataFilterV8', '后端数据处理V8事件')
+  for (const value of ['47200', 0, null, '']) {
+    const v8 = { Form: { DuonianLJCBAfter: value, DuonianLJCBMD: value, YujihezuoJEZL: 999, YujihezuoJEMD: 999 } }
+    runEvent(source, v8)
+    assert.equal(v8.Form.YujihezuoJEZL, value)
+    assert.equal(v8.Form.YujihezuoJEMD, value)
+  }
+  const partial = { Form: { YujihezuoJEZL: '47200', YujihezuoJEMD: '33600' } }
+  runEvent(source, partial)
+  assert.equal(partial.Form.YujihezuoJEZL, '47200')
+  assert.equal(partial.Form.YujihezuoJEMD, '33600')
+})
+
+test('平台字段事件同步直接赋值，新增展示字段配置为只读', () => {
+  const patches = JSON.parse(fs.readFileSync(path.join(project, 'resources/xjy/proposal-costs/cooperation-amount-patches.json'), 'utf8'))[0].fieldList
+  for (const [source, target] of [['DuonianLJCBAfter', 'YujihezuoJEZL'], ['DuonianLJCBMD', 'YujihezuoJEMD']]) {
+    const field = patches.find(field => field.name === source)
+    assert.equal(JSON.parse(field.config).V8Code, field.v8Code)
+    assert.equal(patches.find(field => field.name === target).readonly, 1)
+    for (const value of ['47200.00', 0, null, '']) {
+      const form = { [source]: value, [target]: 999 }
+      runEvent(field.v8Code, { LoadMode: 'Run', ThisValue: value, Form: form, FormSet(name, value) { form[name] = value } })
+      assert.equal(form[target], value)
+    }
+    runEvent(field.v8Code, { LoadMode: 'Design' })
+  }
+})
 
 test('PC 点位行内保存及详情返回均通过低代码事件刷新主表比价信息', () => {
   const parent = fs.readFileSync(path.join(engineRoot, '表单引擎/需求方案（diy_kehufaxx）/表单V8事件/前端表单进入V8事件（InFormV8）.js'), 'utf8')
@@ -243,6 +305,8 @@ test('点位删除后只写父方案合作后派生字段，并共享原事务',
   assert.equal(result.Code, 1)
   assert.equal(written.ChangsuoDWSL, 1)
   assert.equal(written.DuonianLJCBAfter, 23220)
+  assert.equal(written.YujihezuoJEZL, written.DuonianLJCBAfter)
+  assert.equal(written.YujihezuoJEMD, written.DuonianLJCBMD)
   assert.ok(!('DangqianYDCB' in written))
   assert.ok(!('Renshu' in written))
 })
@@ -250,7 +314,7 @@ test('点位删除后只写父方案合作后派生字段，并共享原事务',
 test('主表改年数批量重算子表且拒绝伪造总费用', () => {
   let updates
   const tx = transaction()
-  const v8 = { Form: { Id: 'plan', HesuanNS: 7, DuonianLJCBMD: 1 }, OldForm: { Id: 'plan', Renshu: 100, DangqianYSFS: '直饮机', DangqianYSSBSL: 1 }, DbTrans: tx, FormSubmitAction: 'Upt', FormEngine: {
+  const v8 = { Form: { Id: 'plan', HesuanNS: 7, DuonianLJCBMD: 1, YujihezuoJEZL: 1, YujihezuoJEMD: 1 }, OldForm: { Id: 'plan', Renshu: 100, DangqianYSFS: '直饮机', DangqianYSSBSL: 1 }, DbTrans: tx, FormSubmitAction: 'Upt', FormEngine: {
     UptTableData(rows, db) { assert.ok(rows.every(row => row.FormEngineKey === 'diy_anzhuang_dw')); assert.equal(db, tx); updates = rows; return { Code: 1 } }
   } }
   const result = runEvent(eventSource('diy_kehufaxx', '需求方案', 'SubmitBeforeServerV8', '后端表单提交前V8事件'), v8)
@@ -258,6 +322,9 @@ test('主表改年数批量重算子表且拒绝伪造总费用', () => {
   assert.equal(updates.length, 2)
   assert.ok(updates.every(row => row.ShisuanNS === 7 && row.ShisuanNSMD === 7))
   assert.equal(v8.Form.DuonianLJCBMD, 71688)
+  assert.equal(v8.Form.YujihezuoJEZL, v8.Form.DuonianLJCBAfter)
+  assert.equal(v8.Form.YujihezuoJEMD, v8.Form.DuonianLJCBMD)
+  assert.ok(updates.every(row => !('YujihezuoJEZL' in row) && !('YujihezuoJEMD' in row)))
 })
 
 test('服务器 Insert 动作首次保存无需锁尚未存在的父记录，Delete 不重算已删除方案', () => {

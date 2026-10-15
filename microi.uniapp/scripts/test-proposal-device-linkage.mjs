@@ -5,6 +5,7 @@ import test from 'node:test'
 import * as installation from '../src/tenants/xjy/proposal-installation-points.mjs'
 import * as costs from '../src/tenants/xjy/proposal-cost-model.mjs'
 import * as calculation from '../src/tenants/xjy/proposal-calculation.js'
+import { proposalCostFieldPresentation } from '../src/tenants/xjy/proposal-cost-presentation.mjs'
 
 const plain = (value) => JSON.parse(JSON.stringify(value))
 const read = (file) => fs.readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
@@ -31,7 +32,7 @@ function runtime({ draft = false, failure = false } = {}) {
       return { Code: 1, Data: [{ CostFields: costs.aggregateInstallationPointCosts([saved, other], params.Years) }] }
     } }
   }
-  const scope = { ...installation, ...costs, ...calculation, V8, console, setTimeout, clearTimeout,
+  const scope = { ...installation, ...costs, ...calculation, proposalCostFieldPresentation, V8, console, setTimeout, clearTimeout,
     getUser: () => ({}), childDraftRows: () => group?.rows || null,
     findChildDraftGroup: () => null }
   const hooks = vm.runInNewContext(stripImports(read('tenants/xjy/form.js'))
@@ -54,6 +55,21 @@ function runtime({ draft = false, failure = false } = {}) {
 
 const selection = { value: 'FY-150K', raw: { Id: 'product-2', ShangpinMC: '饮水设备',
   Xianjia: 3200, ZulinXJ: 180, GenghuanLXJG: 260 } }
+
+test('小程序父表实际钩子在草稿汇总、直接变更和提交时同步预计合作金额', async () => {
+  const { hooks, parent } = runtime({ draft: true })
+  await hooks.refreshDerivedValues(parent)
+  assert.equal(parent.form.YujihezuoJEZL, parent.form.DuonianLJCBAfter)
+  assert.equal(parent.form.YujihezuoJEMD, parent.form.DuonianLJCBMD)
+  parent.form.DuonianLJCBAfter = '47200.00'
+  await hooks.handleFieldChange(parent, { field: { Name: 'DuonianLJCBAfter' }, value: '47200.00' })
+  assert.equal(parent.form.YujihezuoJEZL, '47200.00')
+  parent.form.YujihezuoJEZL = 1
+  const values = await hooks.beforeSubmit(parent)
+  assert.equal(values.YujihezuoJEZL, '47200.00')
+  assert.equal(values.YujihezuoJEMD, parent.form.DuonianLJCBMD)
+  assert.equal(hooks.getFieldPresentation(parent, { Name: 'YujihezuoJEZL', Component: 'Text' }).readonly, true)
+})
 
 test('新增点位默认 10 人；显式 0、编辑、详情和重复初始化保留用户人数', async () => {
   const { hooks } = runtime()

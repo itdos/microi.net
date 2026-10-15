@@ -1,4 +1,4 @@
-import { calculateCurrentProposalCosts, PROPOSAL_AFTER_COST_FIELDS } from './proposal-cost-model.mjs'
+import { calculateCurrentProposalCosts, proposalCooperationAmounts, PROPOSAL_AFTER_COST_FIELDS } from './proposal-cost-model.mjs'
 
 // zhy：客户方案默认值与成本计算集中在本模块，供小程序新增/编辑表单复用。
 export const PROPOSAL_DEFAULT_VALUES = Object.freeze({
@@ -29,7 +29,9 @@ export const PROPOSAL_CALCULATION_FIELDS = new Set([
   'HezuoHYSSBSL',
   'ShisuanNS',
   'HezuoHYSSBSLMD',
-  'ShisuanNSMD'
+  'ShisuanNSMD',
+  'DuonianLJCBAfter',
+  'DuonianLJCBMD'
 ].map((name) => name.toLowerCase()))
 
 function numberValue(value) {
@@ -63,6 +65,8 @@ export function isProposalCalculationField(fieldName) {
 export function proposalInheritedValues(source = {}) {
   const excludedFields = new Set([
     ...PROPOSAL_AFTER_COST_FIELDS,
+    'YujihezuoJEZL',
+    'YujihezuoJEMD',
     'Id',
     'CreateTime',
     'UpdateTime',
@@ -88,5 +92,8 @@ export function proposalInheritedValues(source = {}) {
 
 export function calculateProposalCosts(form = {}) {
   // 主表只算现状；合作后费用只能来自点位汇总，不能用历史主表设备字段覆盖。
-  return Object.fromEntries(Object.entries(calculateCurrentProposalCosts(form)).map(([key, value]) => [key, fixed(value)]))
+  return {
+    ...Object.fromEntries(Object.entries(calculateCurrentProposalCosts(form)).map(([key, value]) => [key, fixed(value)])),
+    ...proposalCooperationAmounts(form)
+  }
 }
