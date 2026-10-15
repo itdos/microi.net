@@ -1,0 +1,15 @@
+{
+  "moduleId": "fc56123e-cfa1-4690-a6a4-929f202a817b",
+  "button": {
+    "Id": "96886804-23e9-4d97-96a8-dcf2162d8cb1",
+    "Sort": -10,
+    "Name": "仅有效期内：开启",
+    "Icon": "fas fa-toggle-on",
+    "BtnStyle": "primary",
+    "IsVisible": true,
+    "V8CodeShow": "return V8.ClientType === 'PC';",
+    "Url": ""
+  },
+  "v8Source": "src/tenants/xjy/module-buttons/order-validity-toggle.js",
+  "defaultValidOnly": true
+}
