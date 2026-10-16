@@ -27,7 +27,10 @@ public sealed class SelectedDependencyVersionTests
 
         var address = Environment.GetEnvironmentVariable("MICROI_TEST_SCHEDULE_REDIS")!;
         ScheduleFixtureGuard.ValidateRedisEndpoint(address);
-        using var redis = await ConnectionMultiplexer.ConnectAsync(address);
+        var options = ConfigurationOptions.Parse(address);
+        // INFO 只读，但客户端将其归类为管理命令；运输代理继续禁止管理写入及越界 SELECT。
+        options.AllowAdmin = true;
+        using var redis = await ConnectionMultiplexer.ConnectAsync(options);
         await ScheduleFixtureGuard.VerifyRedisOwnerAsync(address, redis.GetDatabase());
         var server = redis.GetServer(redis.GetEndPoints().Single());
         var information = await server.InfoAsync("server");
