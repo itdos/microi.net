@@ -1,15 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
+import {createMatrixPlan} from './release-test-matrix.mjs';
 
 const source=fs.readFileSync(new URL('../Common/MongoLegacyCompatibilityTests.cs',import.meta.url),'utf8');
 const runner=fs.readFileSync(new URL('../run-tests.ps1',import.meta.url),'utf8');
 
 test('default Full requires the detected current Mongo endpoint and exact version',()=>{
-  const required=runner.slice(runner.indexOf('$required = @('),runner.indexOf('$missing = @('));
-  assert.match(required,/"MICROI_TEST_MONGO_CURRENT"/);
-  assert.match(required,/"MICROI_TEST_MONGO_CURRENT_VERSION"/);
-  assert.doesNotMatch(required,/"MICROI_TEST_MONGO_LEGACY"/);
+  const fixture={apiBase:'http://127.0.0.1:63971/',peerApiBase:'http://127.0.0.1:63972/',osClient:'FullMain_123',childOsClient:'FullChild_123'};
+  const matrix={schemaVersion:1,observedAt:'2026-10-16T09:00:00.000Z',target:{profile:'microi_demo',apiBase:'https://api.example.com',osClient:'demo'},dependencies:{mysql:{version:'5.7.44'},redis:{version:'7.4.2'},mongo:{version:'5.0.5'},storage:{provider:'Aliyun'},sqlServer:null},fixture};
+  const environment={MICROI_TEST_API_BASE:fixture.apiBase,MICROI_TEST_PEER_API_BASE:fixture.peerApiBase,MICROI_TEST_OSCLIENT:fixture.osClient,MICROI_TEST_CHILD_OSCLIENT:fixture.childOsClient,MICROI_TEST_MONGO_CURRENT_VERSION:'5.0.5'};
+  const {requiredEnvironment}=createMatrixPlan(matrix,environment);
+  assert.ok(requiredEnvironment.includes('MICROI_TEST_MONGO_CURRENT'));
+  assert.ok(requiredEnvironment.includes('MICROI_TEST_MONGO_CURRENT_VERSION'));
+  assert.equal(requiredEnvironment.some(name=>name.startsWith('MICROI_TEST_MONGO_LEGACY')),false);
+  assert.match(runner,/\$required = @\(\$matrixPlan\.requiredEnvironment\)/);
   assert.match(source,/\[MemberData\(nameof\(MongoServers\)\)\]/);
   assert.doesNotMatch(source,/\[InlineData\("MICROI_TEST_MONGO_(?:LEGACY|CURRENT)"/);
 });
