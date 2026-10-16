@@ -692,8 +692,8 @@ const targets = [
   {
     name: 'order-list', route: '/#/pages/business/list?key=orders', selector: '.list-page',
     required: ['.summary-strip', '.status-item__badge', '.customer-valid-switch'],
-    expectedText: ['租赁总价', '买断总价', '包年换芯总价', '订单金额合计', '仅有效期内'],
-    forbiddenText: ['本月合同订单']
+    expectedText: ['合同订单', '租赁总价', '买断总价', '包年换芯总价', '订单金额合计', '仅有效期内'],
+    forbiddenText: ['本月合同订单', '合同订单相关续签订单']
   },
   {
     name: 'order-approval', route: '/#/pages/business/detail?key=orders&id=order-001', selector: '.detail-page',
@@ -1317,7 +1317,15 @@ function buildMockResponse(request) {
   if (lowerUrl.includes('getformdata') && String(table).toLowerCase() === 'sys_user') {
     return { Code: 1, Data: sysUserRow };
   }
-  if (lowerUrl.includes('getsysmenustep')) return { Code: 1, Data: visualMenus };
+  if (lowerUrl.includes('getsysmenustep')) {
+    // 复现生产的主菜单无表名、隐藏续签子表排前；首页必须仍按精确业务别名进入主订单。
+    const menus = visualMenus.map(menu => menu.DiyTableName === 'Diy_Dingdan'
+      ? { ...menu, DiyTableName: '' }
+      : menu.DiyTableName === 'diy_dingdanxq_relation'
+        ? { ...menu, Name: '合同订单相关续签订单', Display: 0, AppDisplay: 0 } : menu);
+    const related = menus.filter(menu => menu.DiyTableName === 'diy_dingdanxq_relation');
+    return { Code: 1, Data: [...related, ...menus.filter(menu => menu.DiyTableName !== 'diy_dingdanxq_relation')] };
+  }
   if (apiEngineKey === 'type-tongji') {
     return {
       Code: 1,
