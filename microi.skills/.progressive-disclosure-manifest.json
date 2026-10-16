@@ -763,8 +763,8 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "d4bab6bfdc9b9d5e4d2a9ced4ece6bf68f9c86c943988529b005ce0eed6482cc",
-      "originalLines": 628,
+      "originalSha256": "5c70d405c7be421715eb2dd260b272733fc4426591528814e67b7a2e5e32ff83",
+      "originalLines": 646,
       "prefixSha256": "be8886df24f891da364663ea8c4bfc010fba5505094347e4a97166c6e45fe2eb",
       "prefixBytes": 4329,
       "entryLines": 169,
@@ -821,8 +821,8 @@
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "bc1fbdecb428b0a94d04d55d22e5c14f61354097cbaa2a059574f47fb41f5bdc",
-          "lines": 131,
+          "sha256": "3c429fa01c7c8b077ccb8bceca59ad0274f7b83e7989e2f21a861dd0e54f11aa",
+          "lines": 149,
           "heading": "自动化测试必须覆盖的坑"
         },
         {
@@ -1362,11 +1362,11 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "2fd541de20b3517dc9442e635872e609b2708c7aedc1c5fb6477cf5ad9a649a3",
-      "originalLines": 807,
-      "prefixSha256": "5550e83bf4a6a2261ed5a65826a6799a3ad20f2f66b44b9f4308bc1bed6dc75d",
-      "prefixBytes": 1914,
-      "entryLines": 199,
+      "originalSha256": "d48252ddcd363ab11c564bf448d2bdd0336a531327ef909bbc8fbb9cc7b34cfa",
+      "originalLines": 809,
+      "prefixSha256": "95075494656694f0912b7449b57333794ca437a5b2ee97d80b1b452aa8154392",
+      "prefixBytes": 2492,
+      "entryLines": 201,
       "chunks": [
         {
           "id": "playwright-e2e-000",
@@ -3221,18 +3221,18 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "d95463a4b2a4cae3ad322db7878a39d48feb8666255b54d9d2523d48c6bb61db",
-      "originalLines": 638,
+      "originalSha256": "347085aeef939e8e91e9d0aedfe1208c5a147d234c16887c2af3ac026d73a9f5",
+      "originalLines": 640,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
-      "entryLines": 285,
+      "entryLines": 287,
       "chunks": [
         {
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "164c8870cc7e7ffa37c8889372c8962760aa04bb386fcf9368be7c4d231fdca6",
-          "lines": 58,
+          "sha256": "105657a606c31b5c06e3834c1d29d613d9456f04225e729ba92e69049053c074",
+          "lines": 60,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
         {

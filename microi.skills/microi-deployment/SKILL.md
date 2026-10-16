@@ -20,6 +20,12 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 - 文件/对象存储：`../v8-file-upload/SKILL.md`
 - 数据库模型：`../microi-db-schema/SKILL.md`
 
+## 发布测试范围
+
+常规发布按用户指定 MCP 的实际 MySQL、MongoDB 版本、Redis 和生效 MinIO 或 OSS/HDFS 选择测试矩阵；SQL Server 真实服务与兼容专项仅在用户明确指定解决 SQL Server 问题时执行，不作为每轮发布的默认前置条件，也无需反复申请免测。本文中的“Full/重新 Full”均指当前选定矩阵，已选必测项仍须全部通过。
+
+选择、旧脚本冲突处理及结果记录统一读取 [发布测试矩阵](../microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md#按指定-mcp-选择发布测试矩阵) 和 `../workspace-conventions/SKILL.md`；实际目标未使用的提供商不能被虚构为已验证。
+
 ## 先确认部署类型
 
 ### 吾码服务器运维面板 Microi.Panel

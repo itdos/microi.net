@@ -15,6 +15,8 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 
 `E2E` 是 `End-to-End`，中文通常叫"端到端测试"。它强调从用户入口开始，穿过前端页面、接口引擎、表单引擎、权限、缓存、数据库等真实链路，验证一条业务路径是否真的可交付。
 
+真实依赖与发布范围沿用 `../workspace-conventions/SKILL.md` 的“平台回归与独立应用测试归属”：常规验证指定 MCP 实际使用的 MySQL、MongoDB、Redis 和 MinIO 或 OSS/HDFS，不要求额外 SQL Server 环境；仅用户明确指定 SQL Server 问题时才做其专项。按 [发布测试矩阵](../microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md#按指定-mcp-选择发布测试矩阵) 记录实际覆盖，保留正常登录、业务闭环与资源收尾，不以连接成功代替真实读写验收。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=playwright-e2e-000 sha256=a6ef528a2a940fd0f58efaee6b73eb5dbc159db93d95afedf41c7b8642536d18 -->
 ## 是否需要 `-e2e` 后缀
