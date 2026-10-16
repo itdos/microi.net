@@ -72,15 +72,55 @@ test('未知滤芯费用不当作免费；合法零价保留，负数、NaN、�
   }
 })
 
-test('不同客户、点位、人数、水温需求及缺少需求信息均不混排', () => {
+test('不同客户、点位数量、人数、水温需求及缺少需求信息均不混排', () => {
   for (const changed of [row('B', { CustomerId: 'other' }), row('B', { CustomerId: '' }),
-    row('B', {}, [{ ...point, Renshu: 20 }]), row('B', {}, [{ ...point, AnzhuangCS: '另一场所' }]),
+    row('B', {}, [{ ...point, Renshu: 20 }]), row('B', {}, [point, point]),
     row('B', {}, [{ ...point, ShuiwenYQ: '["冰水"]' }]), row('B', {}, [])]) {
     const result = compare([row('A'), changed])
     assert.equal(result.EligiblePlanCount, 1)
     assert.equal(changed.CostReview.RentalEligible, false)
     assert.ok(changed.CostReview.ScopeReasons.length)
   }
+})
+
+test('场所名称只作展示：改名、重名、空名和点位倒序均允许同需求方案比价', () => {
+  const left = [10, 20, 30].map((Renshu, i) => ({ ...point, Renshu, AnzhuangCS: `测试点位${i + 1}` }))
+  const right = [...left].reverse().map((p, i) => ({ ...p, AnzhuangCS: i ? '批量新增点位' : '' }))
+  const rows = [row('A', {}, left), row('B', {}, right)]
+  const result = compare(rows)
+  assert.equal(result.EligiblePlanCount, 2)
+  assert.equal(result.Status, 'ready')
+  assert.ok(rows.every(item => !item.CostReview.ScopeReasons.length))
+})
+
+test('取消场所名校验后仍按每点需求匹配，不能只比较总人数或去重点位', () => {
+  const reference = [10, 20].map(Renshu => ({ ...point, Renshu }))
+  const redistributed = [15, 15].map(Renshu => ({ ...point, Renshu }))
+  const changed = row('B', {}, redistributed)
+  assert.equal(compare([row('A', {}, reference), changed]).EligiblePlanCount, 1)
+  assert.match(changed.CostReview.ScopeReasons.join(''), /各点位人数或已填用水要求/)
+  const warm = { ...point, ShuiwenYQ: '["温水"]' }
+  const hot = { ...point, ShuiwenYQ: '["开水"]' }
+  assert.equal(compare([row('A', {}, [warm, warm, hot]), row('B', {}, [warm, hot, hot])]).EligiblePlanCount, 1)
+})
+
+test('点位数量变化给出独立原因，不受场所名称是否相同影响', () => {
+  const changed = row('B', {}, [point, point])
+  compare([row('A'), changed])
+  assert.ok(changed.CostReview.ScopeReasons.includes('安装点位数量与需求基准不一致'))
+})
+
+test('多选需求兼容Key对象和原始Key数组，忽略对象元数据及顺序', () => {
+  const left = [{ ...point, ShuiwenYQ: '[{"Key":"2","Value":"温开水","Id":"old","UpdateTime":"old"},{"Key":"3","Value":"开水"}]' }]
+  for (const ShuiwenYQ of ['["3","2"]', [{ Key: '3', Value: '开水' }, { Key: '2', Value: '温开水', Id: 'new' }]]) {
+    assert.equal(compare([row('A', {}, left), row('B', {}, [{ ...point, ShuiwenYQ }])]).EligiblePlanCount, 2)
+  }
+})
+
+test('不同多选Key不会因对象被转换为同一文本而错误参与推荐', () => {
+  const left = [{ ...point, ShuiwenYQ: '[{"Key":"2","Value":"温开水"}]' }]
+  const right = [{ ...point, ShuiwenYQ: '[{"Key":"3","Value":"开水"}]' }]
+  assert.equal(compare([row('A', {}, left), row('B', {}, right)]).EligiblePlanCount, 1)
 })
 
 test('不同设备数量和型号允许比较，点位与多选需求的顺序不影响同一需求判断', () => {
@@ -116,6 +156,19 @@ function runEngine(input, { plans, points = [], allowed = plans, user = { Id: 'u
 }
 const plans = [{ Id: 'A', KehuID: 'customer', FanganMC: '方案A', HesuanNS: 5 }, { Id: 'B', KehuID: 'customer', FanganMC: '方案B', HesuanNS: 10 }]
 const storedPoints = plans.map(plan => ({ ...point, Id: `point-${plan.Id}`, AnzhuangdianweiId: plan.Id }))
+
+test('生成后的正式接口允许截图中的三点位改名，保留完整成本和排名', () => {
+  const points = plans.flatMap((plan, index) => [0, 1, 2].map(i => ({ ...point,
+    Renshu: 10, ShebeiSL: 1, Id: `${plan.Id}-${i}`, AnzhuangdianweiId: plan.Id,
+    AnzhuangCS: index ? (i ? '测试新批量配置安装点位功能' : '测试点位1') : `测试点位${i + 1}`,
+    ShuiwenYQ: '[{"Key":"2","Value":"温开水"}]' })))
+  const { result, reads } = runEngine({ Ids: ['A', 'B'], Years: 5, RequirementsConfirmed: true }, { plans, points })
+  assert.equal(result.Code, 1)
+  assert.equal(reads, 3)
+  assert.equal(result.DataAppend.Comparison.EligiblePlanCount, 2)
+  assert.equal(result.DataAppend.Comparison.Status, 'ready')
+  assert.ok(result.Data.every(item => item.PeopleCount === 30 && item.PointCount === 3 && item.CostReview.RentalRank === 1))
+})
 
 test('真实接口按所选基准统一年数，保留旧Data契约且仅进行三次批量读取', () => {
   const { result, reads, bindings } = runEngine({ Ids: ['B', 'A'], RequirementsConfirmed: true }, { plans, points: storedPoints })
