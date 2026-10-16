@@ -13,3 +13,5 @@
 专项回归入口：`npm run check:xjy-order-renewal`。导航、表单 hooks 和生命周期用例覆盖新增、微调、重入、失败重试、分页、金额、来源保护及沿用设备。服务端事务与 IoT 保护回归位于客户业务源码自身的 `tests/order-renewal-draft-proxy.test.cjs`，不放入平台后端测试。界面验收使用 `npm run visual:xjy` 的本地模拟接口，正式合同保存、审批及真实设备操作仍需实际账号验收。
 
 本次未修改 `Microi.Client`、`Microi.Server` 或数据库结构。业务引擎已通过集福鲤 MCP 同步并全量回读：`xjy-order-renewal-context v1.0.4`、`xjy-order-renewal v1.0.3`；2026-10-16 的插件同口径 `sync status --scope api` 为 0 差异。小程序源码和编译产物需要重新加载或通过微信渠道发布后才会替换旧页面。
+
+首页“我的订单”始终进入主订单菜单。详情页的“相关订单”使用隐藏关系菜单，其 `DiyTableName`、移动字段和 `DiyTableId` 必须对应 `diy_dingdanxq_relation`。2026-10-16 排查发现关系菜单误写主表名，造成首页标题和永久表 Id 缓存串入子表；已纠正该菜单元数据。客户端改为按授权菜单当前快照推导表 Id，同表优先精确业务别名，显式子表菜单 Id 仍保留；菜单缓存升级为 v3 并按 API、租户、账号隔离。`check:menu-resolution` 同时覆盖污染旧缓存、刷新和两个入口各自的授权查询。

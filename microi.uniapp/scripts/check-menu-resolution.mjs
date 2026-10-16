@@ -132,3 +132,5 @@ assert.equal(
 )
 
 console.log('菜单权限上下文解析检查通过')
+
+await import('./test-business-menu-isolation.mjs')
