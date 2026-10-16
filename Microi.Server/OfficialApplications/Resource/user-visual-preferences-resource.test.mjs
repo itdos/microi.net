@@ -20,7 +20,7 @@ test('SaaS package delivers per-user visual preferences with safe legacy default
   assert.ok(fields.every(Boolean));
   assert.ok(fields.every(field => field.Tab === '01KGFAYTX109WCP98XJZP395VY'));
   assert.equal(fields.find(field => field.Name === 'ThemeColor').DefaultValue, '');
-  assert.equal(fields.find(field => field.Name === 'ThemeMode').DefaultValue, 'light');
+  assert.equal(fields.find(field => field.Name === 'ThemeMode').DefaultValue, 'System', '新增账号继承租户显示模式，不能把浅色固化为个人覆盖');
   assert.equal(fields.find(field => field.Name === 'MenuChildExpandMode').DefaultValue, 'System');
   assert.deepEqual(
     JSON.parse(fields.find(field => field.Name === 'MenuChildExpandMode').Data).map(item => item.Key),
