@@ -297,7 +297,7 @@ const engineFile = path.join(target, '接口引擎/客户管理/客户方案一�
 const engine = `/*
  * V8 ApiEngine
  * ApiEngineKey: xjy_compare_customer_proposals
- * Version: v1.1.3
+ * Version: v1.1.4
  * 功能说明：
  * - 读取授权方案的全部点位，统一年数计算租赁和买断成本；人工确认设备适配后，校验同一客户及已填需求和完整报价，返回成本排名、并列推荐、节省金额与排除原因；兼容单方案预览，不写库。
  */

@@ -1,11 +1,24 @@
 // 只比较已授权方案的经济性；人工确认设备适配不替代接口权限或设备性能验收。
-export function proposalComparisonText(value) {
-  if (value === null || value === undefined) return '';
-  var text = String(value).trim();
-  if (text.charAt(0) === '[') {
-    try { return JSON.stringify(JSON.parse(text).map(String).sort()); } catch (error) { /* 历史普通文本按原值比较。 */ }
+function proposalComparisonValue(value) {
+  if (Array.isArray(value)) return JSON.stringify(value.map(proposalComparisonValue).sort());
+  if (value && typeof value === 'object') {
+    // 多选字段可能保存字典对象或原始Key；用稳定选项标识比较，避免所有对象都变成[object Object]。
+    var identityFields = ['Key', 'Id', 'Value', 'Name'];
+    for (var i = 0; i < identityFields.length; i++) {
+      var identity = value[identityFields[i]];
+      if (identity !== null && identity !== undefined && typeof identity !== 'object' && String(identity).trim() !== '') return proposalComparisonValue(identity);
+    }
+    // 未识别的对象保留完整结构，不能把不同需求静默折叠成同一个值。
+    return JSON.stringify(Object.keys(value).sort().map(function(key) { return [key, proposalComparisonValue(value[key])]; }));
   }
-  return text.replace(/\s+/g, ' ');
+  return value === null || value === undefined ? '' : String(value).trim().replace(/\s+/g, ' ');
+}
+
+export function proposalComparisonText(value) {
+  if (typeof value === 'string' && /^[\[{]/.test(value.trim())) {
+    try { return proposalComparisonValue(JSON.parse(value)); } catch (error) { /* 历史普通文本按原值比较。 */ }
+  }
+  return proposalComparisonValue(value);
 }
 
 // 空报价与零元报价严格分开，拒绝布尔值、数组及不能用分精确表达的超大金额。
@@ -16,10 +29,10 @@ export function proposalComparisonNumber(value, positiveInteger) {
     (!positiveInteger || (number >= 1 && Math.floor(number) === number));
 }
 
-// 需求特征不包含设备型号、数量及价格，允许通过不同设备组合满足同一份已填需求。
+// 场所名仅用于展示；按每点需求排序保留重复次数，允许改名、重名及不同设备组合，不能只核对总人数。
 export function proposalRequirementSignature(locations) {
   return JSON.stringify((locations || []).map(function(point) {
-    return JSON.stringify(['AnzhuangCS', 'Renshu', 'ShuizhiYQ', 'DashuiFS', 'JiareFS', 'ShuiwenYQ', 'GaofengSDKSL'].map(function(key) {
+    return JSON.stringify(['Renshu', 'ShuizhiYQ', 'DashuiFS', 'JiareFS', 'ShuiwenYQ', 'GaofengSDKSL'].map(function(key) {
       if ((key === 'Renshu' || key === 'GaofengSDKSL') && proposalComparisonNumber(point[key])) return String(Number(point[key]));
       return proposalComparisonText(point[key]);
     }));
@@ -54,10 +67,10 @@ export function buildProposalCostRecommendation(rows, options) {
     if (!row.CustomerId || !reference.CustomerId) scope.push('未关联客户，无法核对是否属于同一需求');
     else if (row.CustomerId !== reference.CustomerId) scope.push('与需求基准不属于同一客户');
     if (!locations.length) scope.push('未配置安装点位');
-    if (proposalRequirementSignature(locations) !== signature) scope.push('点位、人数或已填用水要求与需求基准不一致');
+    if (reference && locations.length !== (reference.Locations || []).length) scope.push('安装点位数量与需求基准不一致');
+    else if (proposalRequirementSignature(locations) !== signature) scope.push('各点位人数或已填用水要求与需求基准不一致');
     for (var j = 0; j < locations.length; j++) {
       var point = locations[j], label = '点位' + (j + 1) + '（' + (point.AnzhuangCS || '未填写场所') + '）';
-      if (!proposalComparisonText(point.AnzhuangCS)) scope.push(label + '缺少安装场所');
       if (!proposalComparisonNumber(point.Renshu, true)) scope.push(label + '用水人数须为正整数');
       if (!proposalComparisonNumber(point.ShebeiSL, true)) scope.push(label + '设备数量须为正整数');
       if (point.GaofengSDKSL !== null && point.GaofengSDKSL !== undefined && String(point.GaofengSDKSL).trim() !== '' && !proposalComparisonNumber(point.GaofengSDKSL)) scope.push(label + '高峰开水量须为有效非负数');
