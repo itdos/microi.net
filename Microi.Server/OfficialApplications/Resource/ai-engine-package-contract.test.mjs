@@ -282,9 +282,9 @@ test('generated AI and system-account package JSON files are idempotent with exa
       file: 'app.microi.sys_user.json',
       counts: {
         TableCount: 3,
-        FieldCount: 98, // 界面偏好及正式官网邀请路径、邀请人和最后登录时间。
+        FieldCount: 103, // 新增五项个人界面偏好，保留正式邀请与账号字段。
         DDLCount: 4, // 正式邀请人索引随账号表交付。
-        PhysicalColumnCount: 359,
+        PhysicalColumnCount: 364,
         ApiEngineCount: 9,
         DataSetCount: 0,
         DataRowCount: 0,
