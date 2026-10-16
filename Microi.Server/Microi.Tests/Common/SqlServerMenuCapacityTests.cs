@@ -54,6 +54,7 @@ public sealed class SqlServerMenuCapacityTests
     [InlineData(DatabaseType.SqlServer, Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
     [InlineData(DatabaseType.SqlServer9, Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
     [Trait("Category", "FullStack")]
+    [Trait("DatabaseProvider", "SqlServer")]
     public async Task LegacyMenuMigrationWidensBeforeBackfillAndKeepsConstraintsAcrossRestart(DatabaseType provider)
     {
         var connection = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN")!);

@@ -58,6 +58,7 @@ public sealed class DatabasePoolRecoveryIntegrationTests
     }
 
     [Fact(Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [Trait("DatabaseProvider", "SqlServer")]
     public async Task RealSqlServer_RotationRecoversPool_AndPreservesBorrowedTransaction()
     {
         var raw = Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN");

@@ -188,12 +188,11 @@ test('real mixed database theories keep all6 MySQL rows separate from SQL Server
     const source=fs.readFileSync(new URL('../Common/'+name+'.cs',import.meta.url),'utf8');
     assert.doesNotMatch(source,/\[Theory\(Skip\s*=/);
     const provider=name==='FieldOptionTreePageIntegrationTests'?'provider':'providerName';
-    // 条件在测试入口求值，既保留六个 MySQL 行，也不改变授权 SQL Server 行名称。
-    assert.match(source,new RegExp('Assert\\.SkipUnless\\('+provider+' == "MySql" \\? HasMySqlFixture : HasSqlServerFixture,'));
-    assert.match(source,new RegExp(provider+' == "MySql" \\? "Requires an isolated MySQL fixture" : "Requires an isolated SQL Server fixture"'));
-    assert.ok(source.indexOf('Assert.SkipUnless(')<source.indexOf('Environment.GetEnvironmentVariable(',source.indexOf('Assert.SkipUnless(')));
+    assert.doesNotMatch(source,/Assert\.SkipUnless\(/);
+    assert.match(source,/Assert\.False\(string\.IsNullOrWhiteSpace\(connection\)/);
     for(const row of source.matchAll(/\[InlineData\("(MySql|SqlServer)"[^\r\n]*\]/g)){
       assert.doesNotMatch(row[0],/\bSkip(?:Unless|When)?\s*=/);
+      assert.ok(row[0].includes('Traits = new[] { "DatabaseProvider", "'+row[1]+'" }'));
       if(row[1]==='MySql')mysql++;else sqlServer++;
     }
   }

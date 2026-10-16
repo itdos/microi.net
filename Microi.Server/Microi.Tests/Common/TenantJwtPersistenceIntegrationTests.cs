@@ -12,29 +12,23 @@ namespace Microi.Tests.Common;
 [Trait("Category", "FullStack")]
 public sealed class TenantJwtPersistenceIntegrationTests
 {
-    public static bool HasMySqlFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_MYSQL_TEST_CONN"));
-    public static bool HasSqlServerFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
-
-    // SQL Server 例外只对应它的四个数据行，MySQL 四种存量密钥状态的断言必须照常运行。
+    // 每个提供商保留四种存量密钥边界，提供商过滤不能连带排除 MySQL 数据行。
     [Theory]
-    [InlineData("MySql", null)]
-    [InlineData("MySql", "")]
-    [InlineData("MySql", " \t ")]
-    [InlineData("MySql", "short")]
-    [InlineData("SqlServer", null)]
-    [InlineData("SqlServer", "")]
-    [InlineData("SqlServer", " \t ")]
-    [InlineData("SqlServer", "short")]
+    [InlineData("MySql", null, Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("MySql", "", Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("MySql", " \t ", Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("MySql", "short", Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("SqlServer", null, Traits = new[] { "DatabaseProvider", "SqlServer" })]
+    [InlineData("SqlServer", "", Traits = new[] { "DatabaseProvider", "SqlServer" })]
+    [InlineData("SqlServer", " \t ", Traits = new[] { "DatabaseProvider", "SqlServer" })]
+    [InlineData("SqlServer", "short", Traits = new[] { "DatabaseProvider", "SqlServer" })]
     public async Task NewlyAddedTenant_PersistsWeakKeyAndConvergesCompetingRefreshes(string providerName, string? previousSecret)
     {
-        // 在运行时按 provider 判定，避免 xUnit 3.2.2 InlineData 丢失逐行跳过条件。
-        Assert.SkipUnless(providerName == "MySql" ? HasMySqlFixture : HasSqlServerFixture,
-            providerName == "MySql" ? "Requires an isolated MySQL fixture" : "Requires an isolated SQL Server fixture");
-
         var databaseName = "jwt_persist_" + Guid.NewGuid().ToString("N");
         var mysql = providerName == "MySql";
         var type = mysql ? DatabaseType.MySql : DatabaseType.SqlServer;
         var connection = Environment.GetEnvironmentVariable(mysql ? "MICROI_UPGRADE_MYSQL_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;
+        Assert.False(string.IsNullOrWhiteSpace(connection), "所选提供商缺少隔离连接：" + providerName);
         string WithDatabase(string name)
         {
             if (mysql) { var b = new MySqlConnectionStringBuilder(connection); Assert.Equal("127.0.0.1", b.Server); Assert.Equal("upgrade_fixture", b.Database); b.Database = name; return b.ConnectionString; }

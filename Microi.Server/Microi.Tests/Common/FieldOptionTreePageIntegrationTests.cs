@@ -6,20 +6,14 @@ namespace Dos.Common.Tests;
 [Trait("Category", "FullStack")]
 public class FieldOptionTreePageIntegrationTests
 {
-    public static bool HasMySqlFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN"));
-    public static bool HasSqlServerFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
-
-    // 按数据行判定依赖，SQL Server 的显式例外不能连带跳过 MySQL 的真实查询断言。
+    // 逐数据行带提供商标识；未选 SQL Server 不影响仍必测的 MySQL 查询与权限断言。
     [Theory]
-    [InlineData("MySql")]
-    [InlineData("SqlServer")]
+    [InlineData("MySql", Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("SqlServer", Traits = new[] { "DatabaseProvider", "SqlServer" })]
     public void LargeSourcePagesInDatabaseAndKeepsLookupInsideSourceFilter(string provider)
     {
-        // 在运行时按 provider 判定，避免 xUnit 3.2.2 InlineData 丢失逐行跳过条件。
-        Assert.SkipUnless(provider == "MySql" ? HasMySqlFixture : HasSqlServerFixture,
-            provider == "MySql" ? "Requires an isolated MySQL fixture" : "Requires an isolated SQL Server fixture");
-
         var connection = Environment.GetEnvironmentVariable(provider == "MySql" ? "MICROI_UPGRADE_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;
+        Assert.False(string.IsNullOrWhiteSpace(connection), "所选提供商缺少隔离连接：" + provider);
         Assert.Contains("127.0.0.1", connection);
         Assert.Contains("Database=upgrade_fixture", connection, StringComparison.OrdinalIgnoreCase);
         var db = MicroiORMExtensions.CreateDbSession(connection, provider == "MySql" ? DatabaseType.MySql : DatabaseType.SqlServer);

@@ -9,6 +9,7 @@ namespace Microi.Tests.Common;
 
 [Collection("TenantContextGlobal")]
 [Trait("Category", "FullStack")]
+[Trait("DatabaseProvider", "SqlServer")]
 public class StartupDependencySqlServerIntegrationTests
 {
     public static bool HasSqlServerTestConnection => !string.IsNullOrWhiteSpace(

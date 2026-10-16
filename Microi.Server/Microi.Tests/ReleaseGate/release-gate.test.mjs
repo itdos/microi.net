@@ -170,8 +170,8 @@ printf 'GATE_DIR=%s\\n' "$MICROI_RELEASE_GATE_DIR"
    'local receipt="$MICROI_RELEASE_GATE_DIR/'
   ])assert.ok(source.includes(marker),marker);
   assert.ok(gate.includes('-ResultsDirectory "$_full_test_results"'));
-  for(const file of ['sqlserver-exemption-outcomes.json','sqlserver-exemption-result.json'])
-   assert.ok(gate.includes('"$_full_test_results/'+file+'"'),'SQL Server exception evidence must use the same isolated result directory');
+  for(const file of ['release-test-matrix.json','release-test-matrix-outcomes.json','release-test-matrix-result.json'])
+   assert.ok(gate.includes('"$_full_test_results/'+file+'"'),'Full matrix evidence must use the same isolated result directory');
  }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
 
@@ -235,29 +235,34 @@ printf 'PUBLICATION_REACHED\\n'
  if(scenario.called)assert.match(result.stdout,/-Mode Full -Configuration Release/);
 });
 
-for(const scenario of [
- {name:'complete pinned SQL Server exception uses the original gate and accepts its verified result',receipt:'/fixture/explicit receipt.json',sha:'a'.repeat(64),verifyExit:0,passed:true,called:true},
- {name:'missing SQL Server receipt hash cannot start the Full gate',receipt:'/fixture/explicit receipt.json',sha:'',verifyExit:0,passed:false,called:false},
- {name:'missing SQL Server receipt cannot start the Full gate',receipt:'',sha:'a'.repeat(64),verifyExit:0,passed:false,called:false},
- {name:'SQL Server exception result rejection prevents publication',receipt:'/fixture/explicit receipt.json',sha:'a'.repeat(64),verifyExit:19,passed:false,called:true},
-])test(scenario.name,()=>{
+for(const [receipt,sha]of [['/fixture/explicit receipt.json','a'.repeat(64)],['/fixture/explicit receipt.json',''],['','a'.repeat(64)]])
+test('retired SQL Server skip exemption cannot start Full or publication '+Boolean(receipt)+'/'+Boolean(sha),()=>{
  const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',env:{...process.env,
-  MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:scenario.receipt,MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:scenario.sha},input:`
+  MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:receipt,MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:sha},input:`
 print_phase(){ :; }; print_success(){ :; }; print_fail(){ exit 1; }
 pwsh(){ printf 'TEST_ARGUMENTS=%s\\n' "$*"; return 0; }
-node(){ if [ "$2" = verify-result ]; then printf 'SQL_RESULT_VERIFIED\\n'; return ${scenario.verifyExit}; fi; return 0; }
+node(){ return 0; }
 PUBLISH_BACKEND=true; MICROI_FULL_ONLY=false; BUILD_CLIENT=false; PLATFORM_DOCKER_SELECTED=false
 ${gate}
 printf 'PUBLICATION_REACHED\\n'
 `});
- assert.ifError(result.error);assert.equal(result.status,scenario.passed?0:1,result.stderr);
- assert.equal(result.stdout.includes('PUBLICATION_REACHED'),scenario.passed);
- assert.equal(result.stdout.includes('TEST_ARGUMENTS='),scenario.called);
- if(scenario.called){
-  assert.ok(result.stdout.includes('-SqlServerExemptionReceipt '+scenario.receipt));
-  assert.ok(result.stdout.includes('-SqlServerExemptionSha256 '+scenario.sha));
-  assert.ok(result.stdout.includes('SQL_RESULT_VERIFIED'));
- }
+ assert.ifError(result.error);assert.equal(result.status,1,result.stderr);
+ assert.equal(result.stdout.includes('PUBLICATION_REACHED'),false);
+ assert.equal(result.stdout.includes('TEST_ARGUMENTS='),false);
+});
+
+test('matrix readback rejection prevents publication after a successful Full process',()=>{
+ const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',input:`
+print_phase(){ :; }; print_success(){ :; }; print_fail(){ exit 1; }
+pwsh(){ return 0; }
+node(){ case "$1" in *release-test-matrix.mjs) return 23;; *) return 0;; esac; }
+unset MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT MICROI_TEST_SQLSERVER_EXEMPTION_SHA256
+PUBLISH_BACKEND=true; MICROI_FULL_ONLY=false; BUILD_CLIENT=false; PLATFORM_DOCKER_SELECTED=false
+${gate}
+printf 'PUBLICATION_REACHED\\n'
+`});
+ assert.ifError(result.error);assert.equal(result.status,1,result.stderr);
+ assert.equal(result.stdout.includes('PUBLICATION_REACHED'),false);
 });
 
 test('prebuilt artifacts require Full source provenance and are rechecked before every push',()=>{
@@ -314,7 +319,10 @@ test('selected versions are frozen before Full and every publication still waits
 test('real schedule stores belong to Full and their settings fail fast before builds',()=>{
  const runner=fs.readFileSync(path.join(root,'Microi.Server/Microi.Tests/run-tests.ps1'),'utf8');
  const preflight=runner.slice(runner.indexOf('if ($Mode -eq "Full")'),runner.indexOf('New-Item -ItemType Directory'));
- for(const name of ['MICROI_TEST_SCHEDULE_REDIS','MICROI_TEST_SCHEDULE_MYSQL'])assert.ok(preflight.includes(name),name);
+ const matrix=fs.readFileSync(path.join(root,'Microi.Server/Microi.Tests/ReleaseGate/release-test-matrix.mjs'),'utf8');
+ assert.match(preflight,/node \$matrixTool freeze/u);
+ assert.match(preflight,/\$required = @\(\$matrixPlan\.requiredEnvironment\)/u);
+ for(const name of ['MICROI_TEST_SCHEDULE_REDIS','MICROI_TEST_SCHEDULE_MYSQL'])assert.ok(matrix.includes(name),name);
  for(const name of ['MicroiTaskSchedulingCacheTests','MicroiTaskSchedulingSharedStoreTests']){
   const fixture=fs.readFileSync(path.join(root,'Microi.Server/Microi.Tests/Common',name+'.cs'),'utf8');
   assert.match(fixture,/\[Trait\("Category", "FullStack"\)\]/);

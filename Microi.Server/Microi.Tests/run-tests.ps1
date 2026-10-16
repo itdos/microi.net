@@ -9,6 +9,8 @@ param(
 
     [string]$SolutionPath = "",
 
+    [string]$TestMatrixFile = $env:MICROI_TEST_MATRIX_FILE,
+
     [string]$SqlServerExemptionReceipt = "",
 
     [string]$SqlServerExemptionSha256 = "",
@@ -44,23 +46,14 @@ $solution = if ([string]::IsNullOrWhiteSpace($SolutionPath)) {
     (Resolve-Path -LiteralPath $SolutionPath).Path
 }
 $project = Join-Path $testRoot "Microi.Tests.csproj"
-$sqlServerExemptionEnabled = -not [string]::IsNullOrWhiteSpace($SqlServerExemptionReceipt) -or -not [string]::IsNullOrWhiteSpace($SqlServerExemptionSha256)
-$sqlServerExemptionGate = Join-Path $testRoot 'ReleaseGate/sqlserver-exemption.mjs'
-if ($sqlServerExemptionEnabled) {
-    # 用户只授权 SQL Server 集成例外；回执必须绑定当前源码和精确24个数据用例，不能变成默认跳过入口。
-    if ($Mode -ne 'Full' -or [string]::IsNullOrWhiteSpace($SqlServerExemptionReceipt) -or [string]::IsNullOrWhiteSpace($SqlServerExemptionSha256)) {
-        throw 'An explicit SQL Server exemption requires Full mode, a receipt path and its SHA-256.'
-    }
-    if (-not [string]::IsNullOrWhiteSpace($env:MICROI_UPGRADE_SQLSERVER_TEST_CONN)) {
-        throw 'An explicit SQL Server exemption must not retain a SQL Server connection.'
-    }
-    node $sqlServerExemptionGate verify-authorization $SqlServerExemptionReceipt $SqlServerExemptionSha256 (Split-Path -Parent $serverRoot)
-    if ($LASTEXITCODE -ne 0) { throw 'The source-bound SQL Server authorization receipt was rejected.' }
+if (-not [string]::IsNullOrWhiteSpace($SqlServerExemptionReceipt) -or -not [string]::IsNullOrWhiteSpace($SqlServerExemptionSha256)) {
+    throw 'SQL Server skip exemptions are retired. Full requires a frozen dependency matrix with selected providers and zero skips.'
 }
 
 if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
     $ResultsDirectory = Join-Path $testRoot "TestResults"
 }
+$ResultsDirectory = [IO.Path]::GetFullPath($ResultsDirectory)
 
 if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') {
     $os = Get-CimInstance Win32_OperatingSystem
@@ -103,28 +96,29 @@ if ($freeBytes -lt $reserveBytes) {
 }
 
 if ($Mode -eq "Full") {
-    $required = @(
-        "MICROI_TEST_API_BASE",
-        "MICROI_TEST_PEER_API_BASE",
-        "MICROI_TEST_OSCLIENT",
-        "MICROI_TEST_TOKEN",
-        "MICROI_TEST_FORM_ENGINE_KEY",
-        "MICROI_TEST_API_ENGINE_KEY"
-        "MICROI_TEST_CHILD_OSCLIENT"
-        "MICROI_TEST_CHILD_TOKEN"
-        "MICROI_UPGRADE_TEST_CONN"
-        "MICROI_TEST_SCHEDULE_REDIS"
-        "MICROI_TEST_SCHEDULE_MYSQL"
-        "MICROI_TEST_MONGO_CURRENT"
-        "MICROI_TEST_MONGO_CURRENT_VERSION"
-        "MICROI_TEST_FRONTEND_BASE"
-        "MICROI_TEST_ACCOUNT"
-        "MICROI_TEST_PASSWORD"
-        "MICROI_TEST_CHILD_ACCOUNT"
-        "MICROI_TEST_CHILD_PASSWORD"
-    )
-    if (-not $sqlServerExemptionEnabled) { $required += "MICROI_UPGRADE_SQLSERVER_TEST_CONN" }
-    $missing = @($required | Where-Object {
+    $stagedRuntime = -not [string]::IsNullOrWhiteSpace($env:MICROI_TEST_RUNTIME_READY_FILE)
+    if ($stagedRuntime -ne (-not [string]::IsNullOrWhiteSpace($env:MICROI_TEST_RUNTIME_ENVIRONMENT_FILE)) -or
+        $stagedRuntime -ne (-not [string]::IsNullOrWhiteSpace($env:MICROI_TEST_RUNTIME_BUILD_FILE))) {
+        throw 'Staged Full requires ready, final-build and private environment paths together.'
+    }
+    if ($stagedRuntime -and ((Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_READY_FILE) -or (Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_BUILD_FILE))) {
+        throw 'Staged Full requires new signal files; previous runtime/build receipts cannot be reused.'
+    }
+    if ([string]::IsNullOrWhiteSpace($TestMatrixFile)) {
+        throw 'Full requires MICROI_TEST_MATRIX_FILE with the verified MCP dependency versions and isolated fixture coordinates.'
+    }
+    $matrixTool = Join-Path $testRoot 'ReleaseGate/release-test-matrix.mjs'
+    $matrixReceipt = Join-Path $ResultsDirectory 'release-test-matrix.json'
+    # 常规矩阵由实际 MCP 依赖选择；未选提供商标记不适用，不能靠旧连接扩张或靠跳过放行。
+    $matrixJson = node $matrixTool freeze $TestMatrixFile $matrixReceipt
+    if ($LASTEXITCODE -ne 0) { throw 'Full dependency matrix validation failed before test execution.' }
+    $matrixPlan = $matrixJson | ConvertFrom-Json
+    $env:MICROI_TEST_MATRIX_FILE = $TestMatrixFile
+    $required = @($matrixPlan.requiredEnvironment)
+    # A staged runtime can obtain tokens only after this exact Full build. Every
+    # other prerequisite still fails before restore/build; no test is deferred.
+    $prebuildRequired = @($required | Where-Object { -not ($stagedRuntime -and $_ -in @('MICROI_TEST_TOKEN', 'MICROI_TEST_CHILD_TOKEN')) })
+    $missing = @($prebuildRequired | Where-Object {
         [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
     })
     if ($missing.Count -gt 0) {
@@ -356,12 +350,25 @@ if ($Mode -eq "Full") {
     # 低提交额度的正式发布机可在重型构建完成后再启动双 API 与前端。
     # 未设置该变量时保持原有行为；设置时必须由受控发布包装器写入就绪文件。
     if ($env:MICROI_TEST_RUNTIME_READY_FILE) {
+        $stagedTool = Join-Path $testRoot 'ReleaseGate/staged-full-runtime.mjs'
+        node $stagedTool announce $artifactTarget $matrixReceipt $env:MICROI_TEST_RUNTIME_BUILD_FILE
+        if ($LASTEXITCODE -ne 0) { throw 'The final Full build could not be bound to its staged runtime.' }
         Write-Host "Waiting for staged Full runtime: $env:MICROI_TEST_RUNTIME_READY_FILE"
-        $runtimeDeadline = (Get-Date).AddMinutes(3)
+        $runtimeDeadline = (Get-Date).AddMinutes(10)
         while (-not (Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_READY_FILE)) {
+            if ($env:MICROI_TEST_RUNTIME_FAILED_FILE -and (Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_FAILED_FILE)) {
+                throw 'Owned staged runtime failed; inspect the task runtime failure receipt.'
+            }
             if ((Get-Date) -ge $runtimeDeadline) { throw 'Timed out waiting for the staged Full runtime.' }
             Start-Sleep -Milliseconds 500
         }
+        $freshTokensJson = node $stagedTool verify-ready $env:MICROI_TEST_RUNTIME_BUILD_FILE $env:MICROI_TEST_RUNTIME_READY_FILE $env:MICROI_TEST_RUNTIME_ENVIRONMENT_FILE
+        if ($LASTEXITCODE -ne 0) { throw 'Staged runtime identity, final DLL fingerprint or fresh login was rejected.' }
+        $freshTokens = $freshTokensJson | ConvertFrom-Json
+        $env:MICROI_TEST_TOKEN = $freshTokens.MICROI_TEST_TOKEN
+        $env:MICROI_TEST_CHILD_TOKEN = $freshTokens.MICROI_TEST_CHILD_TOKEN
+        $missingAfterRuntime = @($required | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) })
+        if ($missingAfterRuntime.Count -gt 0) { throw "Full runtime is missing prerequisites: $($missingAfterRuntime -join ', ')" }
     }
 
     Write-Host "Running isolated-tenant FormEngine and ApiEngine full-stack tests..."
@@ -369,7 +376,7 @@ if ($Mode -eq "Full") {
         -c $Configuration `
         --no-build `
         --no-restore `
-        --filter "Category=FullStack" `
+        --filter $matrixPlan.fullFilter `
         --results-directory $ResultsDirectory `
         --logger "trx;LogFileName=microi-full-stack.trx" `
         -m:1
@@ -390,6 +397,19 @@ if ($Mode -eq "Full") {
     Write-Host "Validating platform reminders with real login, receipts, withdrawal and polling fallback..."
     node (Join-Path $testRoot 'FullStack\platform-reminders.e2e.mjs') $ResultsDirectory
     if ($LASTEXITCODE -ne 0) { throw "Platform-reminder browser release gate failed with exit code $LASTEXITCODE." }
+
+    Write-Host 'Validating search selection labels in real Element Plus at desktop and 4K resolutions...'
+    $clientRoot = Join-Path (Split-Path -Parent $serverRoot) 'Microi.Client'
+    $geometryReport = Join-Path $ResultsDirectory 'search-select-label-geometry.json'
+    Push-Location $clientRoot
+    try {
+        node (Join-Path $clientRoot 'node_modules/@playwright/test/cli.js') test tests/search-select-label-geometry.e2e.spec.mjs --workers=1 --reporter=json --output (Join-Path $ResultsDirectory 'search-select-label-geometry') | Out-File -LiteralPath $geometryReport -Encoding utf8
+        if ($LASTEXITCODE -ne 0) { throw 'Search selection label browser release gate failed.' }
+        $geometry = Get-Content -LiteralPath $geometryReport -Raw | ConvertFrom-Json
+        if ($geometry.stats.expected -lt 2 -or $geometry.stats.unexpected -ne 0 -or $geometry.stats.skipped -ne 0 -or $geometry.stats.flaky -ne 0) {
+            throw 'Search selection label browser release gate requires desktop and 4K cases without failures or skips.'
+        }
+    } finally { Pop-Location }
 
     Write-Host "Auditing vulnerable and deprecated NuGet dependencies..."
     $vulnerabilityJson = dotnet list $solution package `
@@ -433,33 +453,17 @@ if ($Mode -eq "Full") {
     if ($LASTEXITCODE -ne 0) { throw "NuGet deprecation audit failed with exit code $LASTEXITCODE." }
 }
 
-$sqlServerOutcomes = @{}
 foreach ($name in @("microi-quick.trx") + $(if ($Mode -eq "Full") { @("microi-full-stack.trx") } else { @() })) {
-    if ($sqlServerExemptionEnabled) {
-        # 与独立回读共用禁用外部实体的原始 XML 投影，JSON 明细仍需逐项回核真实 TRX。
-        $trxFile = (Resolve-Path -LiteralPath (Join-Path $ResultsDirectory $name)).Path
-        $suite = if ($name -eq 'microi-quick.trx') { 'quick' } else { 'full' }
-        $sqlServerOutcomes[$suite] = & (Join-Path $testRoot 'ReleaseGate/read-sqlserver-trx.ps1') -TrxFile $trxFile | ConvertFrom-Json
-    }
-    else {
-        [xml]$report = Get-Content -LiteralPath (Join-Path $ResultsDirectory $name) -Raw
-        $counters = $report.TestRun.ResultSummary.Counters
-        if ([int]$counters.total -le 0 -or [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0 -or [int]$counters.passed -ne [int]$counters.total) {
-            throw "Release gate requires non-empty test results with no failures or skips: $name"
-        }
+    [xml]$report = Get-Content -LiteralPath (Join-Path $ResultsDirectory $name) -Raw
+    $counters = $report.TestRun.ResultSummary.Counters
+    if ([int]$counters.total -le 0 -or [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0 -or [int]$counters.passed -ne [int]$counters.total) {
+        throw "Release gate requires non-empty test results with no failures or skips: $name"
     }
 }
-if ($sqlServerExemptionEnabled) {
-    $outcomesFile = Join-Path (Resolve-Path -LiteralPath $ResultsDirectory).Path 'sqlserver-exemption-outcomes.json'
-    $resultFile = Join-Path (Resolve-Path -LiteralPath $ResultsDirectory).Path 'sqlserver-exemption-result.json'
-    $outcomesStream = [System.IO.File]::Open($outcomesFile, [System.IO.FileMode]::CreateNew)
-    try {
-        $outcomesBytes = [System.Text.UTF8Encoding]::new($false).GetBytes(($sqlServerOutcomes | ConvertTo-Json -Depth 8))
-        $outcomesStream.Write($outcomesBytes, 0, $outcomesBytes.Length)
-    }
-    finally { $outcomesStream.Dispose() }
-    node $sqlServerExemptionGate verify-outcomes $SqlServerExemptionReceipt $SqlServerExemptionSha256 (Split-Path -Parent $serverRoot) $outcomesFile $resultFile
-    if ($LASTEXITCODE -ne 0) { throw 'Only the precise authorized SQL Server cases may be unexecuted.' }
-    Write-Host "Microi.Tests Full gate accepted with user-authorized SQL Server exemption: 24 not executed. Results: $ResultsDirectory"
+if ($Mode -eq 'Full') {
+    $matrixOutcomes = Join-Path $ResultsDirectory 'release-test-matrix-outcomes.json'
+    & (Join-Path $testRoot 'ReleaseGate/read-release-matrix-trx.ps1') -ResultsDirectory $ResultsDirectory -OutputFile $matrixOutcomes
+    node $matrixTool verify $matrixReceipt $matrixOutcomes (Join-Path $ResultsDirectory 'release-test-matrix-result.json')
+    if ($LASTEXITCODE -ne 0) { throw 'Selected Full matrix has missing provider cases, source drift, or invalid storage/cleanup evidence.' }
 }
-else { Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory" }
+Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory"

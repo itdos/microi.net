@@ -5,6 +5,7 @@ using Microi.net;
 namespace Microi.Tests.ORM.Compatibility;
 
 [Trait("Category", "FullStack")]
+[Trait("DatabaseProvider", "SqlServer")]
 public sealed class SqlServerColumnDescriptionIntegrationTests
 {
     public static bool HasSqlServerTestConnection => !string.IsNullOrWhiteSpace(

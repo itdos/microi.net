@@ -12,23 +12,17 @@ namespace Microi.Tests.Common;
 [Trait("Category", "FullStack")]
 public sealed class RoleLimitActiveSnapshotTests
 {
-    public static bool HasMySqlFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_MYSQL_TEST_CONN"));
-    public static bool HasSqlServerFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
-
-    // 保留两种 provider 的同一测试主体；授权 SQL Server 未执行时，MySQL 行仍单独执行。
+    // 由冻结矩阵选择具体提供商；被选中但缺连接时必须失败，不能产生可被误收的跳过。
     [Theory]
-    [InlineData("MySql")]
-    [InlineData("SqlServer")]
+    [InlineData("MySql", Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("SqlServer", Traits = new[] { "DatabaseProvider", "SqlServer" })]
     public async Task RealRoleLoader_ExcludesDeletedGrantsAndRetainsLegacyNulls(string providerName)
     {
-        // 在运行时按 provider 判定，避免 xUnit 3.2.2 InlineData 丢失逐行跳过条件。
-        Assert.SkipUnless(providerName == "MySql" ? HasMySqlFixture : HasSqlServerFixture,
-            providerName == "MySql" ? "Requires an isolated MySQL fixture" : "Requires an isolated SQL Server fixture");
-
         var tenant = "role_snapshot_" + Guid.NewGuid().ToString("N");
         var mysql = providerName == "MySql";
         var type = mysql ? DatabaseType.MySql : DatabaseType.SqlServer;
         var connection = Environment.GetEnvironmentVariable(mysql ? "MICROI_UPGRADE_MYSQL_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;
+        Assert.False(string.IsNullOrWhiteSpace(connection), "所选提供商缺少隔离连接：" + providerName);
         string WithDatabase(string name)
         {
             if (mysql) { var builder = new MySqlConnectionStringBuilder(connection); Assert.Equal("127.0.0.1", builder.Server); builder.Database = name; return builder.ConnectionString; }

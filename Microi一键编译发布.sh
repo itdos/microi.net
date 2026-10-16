@@ -1121,43 +1121,30 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
         print_fail "缺少 PowerShell，无法执行 Microi.Tests Full 发布门禁。"
     fi
     _full_test_results="$MICROI_RELEASE_GATE_DIR/$(date +%Y%m%d-%H%M%S)-$$"
-    _sqlserver_exemption_args=()
-    # 测试专用显式例外必须同时给出授权回执和 SHA；默认发行继续要求原零跳过 Full。
+    # 常规 Full 必须使用本轮已观测依赖矩阵；历史跳过例外不能作为发布入口。
     if [ -n "${MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:-}${MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:-}" ]; then
-        [ -n "${MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:-}" ] && [ -n "${MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:-}" ] \
-            || print_fail "SQL Server 例外缺少明确授权回执或 SHA-256。"
-        _sqlserver_exemption_args=(-SqlServerExemptionReceipt "$MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT" -SqlServerExemptionSha256 "$MICROI_TEST_SQLSERVER_EXEMPTION_SHA256")
+        print_fail "SQL Server 跳过例外已停用；请使用冻结依赖矩阵及零跳过 Full。"
     fi
     if ! "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
         -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode Full -Configuration Release -SolutionPath "$SLN_FILE" \
-        -ResultsDirectory "$_full_test_results" "${_sqlserver_exemption_args[@]}"; then
+        -ResultsDirectory "$_full_test_results"; then
         print_fail "全量测试未通过；本次版本仅在本地准备，已停止官方应用资源写入和平台发布。请修复后重跑，禁止跳过失败用例。"
     fi
-    if [ ${#_sqlserver_exemption_args[@]} -gt 0 ]; then
-        if ! node Microi.Server/Microi.Tests/ReleaseGate/sqlserver-exemption.mjs verify-result \
-            "$MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT" "$MICROI_TEST_SQLSERVER_EXEMPTION_SHA256" . \
-            "$_full_test_results/sqlserver-exemption-outcomes.json" "$_full_test_results/sqlserver-exemption-result.json"; then
-            print_fail "SQL Server 显式例外的源码、精确用例或原始 TRX 证据无效；已停止发布。"
-        fi
+    if ! node Microi.Server/Microi.Tests/ReleaseGate/release-test-matrix.mjs verify \
+        "$_full_test_results/release-test-matrix.json" "$_full_test_results/release-test-matrix-outcomes.json" \
+        "$_full_test_results/release-test-matrix-result.json"; then
+        print_fail "Full 依赖矩阵、原始 TRX、浏览器或实际存储回执无效；已停止发布。"
     fi
     if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
         print_fail "验收期间源码发生变化；必须重新加载最终候选并重跑 Full。"
     fi
-    if [ ${#_sqlserver_exemption_args[@]} -gt 0 ]; then
-        print_success "Microi.Tests Full 已按用户明确 SQL Server 例外验收；24项未执行，其余原门禁通过。"
-    else
-        print_success "Microi.Tests Full 全量回归通过"
-    fi
+    print_success "Microi.Tests Full 冻结矩阵全量回归通过"
 fi
 
 # 插件发行修复等需要复验 Full，但不能重新生成或覆盖已成功发布的不可变平台制品。
 # 复用上方 PC/API 范围锁、候选冻结、完整用例及漂移检查；不提供跳过或放宽门禁的路径。
 if [ "$MICROI_FULL_ONLY" = true ]; then
-    if [ ${#_sqlserver_exemption_args[@]} -gt 0 ]; then
-        print_success "已按用户 SQL Server 例外完成候选验收（24项未覆盖）；未升版、未改写发行目录、未上传 NuGet/Docker/官网或官方应用。"
-    else
-        print_success "完整 Full 及候选一致性验收完成；未升版、未改写发行目录、未上传 NuGet/Docker/官网或官方应用。"
-    fi
+    print_success "完整 Full 及候选一致性验收完成；未升版、未改写发行目录、未上传 NuGet/Docker/官网或官方应用。"
     exit 0
 fi
 
