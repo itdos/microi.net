@@ -146,12 +146,6 @@ if ($env:MICROI_DESKTOP_NODE_HOME) {
 $env:PYTHONUTF8 = '1'
 $env:PYTHONIOENCODING = 'utf-8'
 
-# 自动发现平台统一入口、平台内置应用包和 PC 端的 node:test 回归；新增平台测试不依赖手工清单。
-# 独立业务应用、游戏及客户项目使用自己的测试入口，不通过转调文件进入平台 Quick/Full。
-# 真正浏览器/数据库测试仍由下方 Full 环境入口执行，不能伪装成离线单元测试。
-node (Join-Path $testRoot 'run-node-regressions.mjs') $ResultsDirectory
-if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with exit code $LASTEXITCODE." }
-
 # 创始人工作区中的 Microi Code 桌面应用以自身 package.json 的 Vitest 入口为
 # 单一事实源。公开仓不带该闭源目录，因此只在应用存在时纳入统一门禁；Vitest
 # 默认对零用例和失败用例返回非零，禁止把空的历史 tests/ 目录视作通过。
@@ -196,6 +190,12 @@ if (Test-Path -LiteralPath $desktopPackage) {
         Pop-Location
     }
 }
+
+# 创始人桌面子门禁先失败即停，避免已知桌面问题在平台回归结束后才暴露。
+# 所有平台 Node、.NET、双 API 和真实浏览器检查仍在同一次完整 Full 中执行。
+# 自动发现平台统一入口、平台内置应用包和 PC 端的 node:test 回归；新增测试不依赖手工清单。
+node (Join-Path $testRoot 'run-node-regressions.mjs') $ResultsDirectory
+if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with exit code $LASTEXITCODE." }
 
 $v8Test = Join-Path $testRoot "V8\empty-database-sanitization.test.mjs"
 $v8Repository = Join-Path (Split-Path -Parent $serverRoot) "Microi-V8-Engine"
