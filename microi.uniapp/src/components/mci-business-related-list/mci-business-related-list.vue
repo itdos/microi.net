@@ -520,6 +520,7 @@ import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines, modulePr
 import { buildListFilterWhere, compileModuleFilterFields, hasListFilterValue, mergeModuleFilterFields, validateListFilters } from '@/platform/list-filter-fields.mjs'
 import { dateFilterSpec } from '@/platform/list-filter-date.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
+import { deleteTenantRelatedRecord, loadTenantRelatedRows, resolveRelatedFormNavigation } from '@/platform/native-table.js'
 import { resolveListReadApi, queryMonthValue } from '@/platform/configured-read-api.mjs'
 import { tableChildRequiresModuleQuery } from '@/platform/table-child-query-target.mjs'
 import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
@@ -719,7 +720,9 @@ export default {
       collectionSourceMenuId: '',
       collectionSelectedIds: [],
       collectionAdding: false,
-      collectionDeletingId: ''
+      collectionDeletingId: '',
+      relatedFormTarget: null,
+      relatedFormOpening: false
     }
   },
   computed: {
@@ -944,7 +947,7 @@ export default {
         this.relationValue &&
         this.childFkField &&
         this.config.table &&
-        canAddMenuRecord(this.menuId || this.childMenuId, this.currentUser)
+        canAddMenuRecord(this.relatedFormTarget ? this.relatedFormTarget.menuId : (this.menuId || this.childMenuId), this.currentUser)
       )
     },
     filterFields() {
@@ -1636,6 +1639,9 @@ export default {
           menuId: this.menuId,
           moduleEngineKey: menu?.ModuleEngineKey || menu?.Id || ''
         }
+        const relatedFormTarget = await resolveRelatedFormNavigation({ ...this.relatedFormContext('Add'), resolveOnly: true })
+        if (!isCurrent()) return
+        this.relatedFormTarget = relatedFormTarget
         // 卡片只配置了部分状态时，不能覆盖关联统计所需的完整状态选项。
         if (this.config.relatedSummary) {
           this.config.statusOptions = [...new Set([...(matched.config.statusOptions || []), ...(platformCardConfig.statusOptions || [])])]
@@ -1950,8 +1956,12 @@ export default {
           ...(this.relatedStatus && this.config.relatedSummary?.apiEngineKey && statusField
             ? [{ Name: statusField, Type: '=', Value: this.relatedStatus }] : [])
         ]
-        let result
-        if (resolveListReadApi(this.config) || this.requiresModuleAssociationQuery()) {
+        let result = await loadTenantRelatedRows({
+          ...this.relatedFormContext('View'), pageIndex: this.pageIndex, pageSize,
+          keyword: this.keyword.trim(), extraWhere, filterWhere: this.buildFilterWhere(), refresh
+        })
+        if (!isCurrent()) return
+        if (!result && (resolveListReadApi(this.config) || this.requiresModuleAssociationQuery())) {
           // 关联字段必须由模块引擎执行 SqlJoin/SelectFields；授权仍只依赖完整
           // _TableChildAuth，并保留父子外键条件，不重新附加子菜单数据范围。
           result = await loadModuleRows({
@@ -1967,7 +1977,7 @@ export default {
             tableChildAuth: this.tableChildAuth,
             tableChildModuleQuery: true
           })
-        } else if (this.tableChildAuth) {
+        } else if (!result && this.tableChildAuth) {
           // zhy：TableChild 列表必须通过表单引擎携带完整父子授权链查询。
           // ModuleEngine 的子菜单数据范围会把已经正确绑定的孙表记录过滤成 0 条；
           // 此处不传子菜单 Id，由后端按 _TableChildAuth 逐层校验并用外键条件限定数据。
@@ -1988,7 +1998,7 @@ export default {
             rows: Array.isArray(response.Data) ? response.Data : [],
             count: Number(response.DataCount || 0)
           }
-        } else {
+        } else if (!result) {
           result = await loadModuleRows(this.config, {
             pageIndex: this.pageIndex,
             pageSize,
@@ -2664,6 +2674,10 @@ export default {
     },
     rowActions(row) {
       if (this.readonlyList) return []
+      if (this.relatedFormTarget) {
+        return canEditMenuRecord(this.relatedFormTarget.menuId, this.currentUser)
+          ? [{ key: 'related-target-edit', label: '编辑', tone: 'default' }] : []
+      }
       const nativeActions = this.moduleKey
         ? getBusinessRowActions(this.moduleKey, row, this.currentUser, this.menuId || this.childMenuId, { menu: this.menu, tableChildAuth: this.tableChildAuth })
         : []
@@ -2691,6 +2705,10 @@ export default {
     },
     async triggerRowAction(action, row) {
       if (!action || !row || this.actionSubmitting) return
+      if (action.key === 'related-target-edit') {
+        await this.openTenantRelatedForm('Edit', row)
+        return
+      }
       if (action.__viewAction) {
         this.actionSubmitting = true
         try {
@@ -2703,6 +2721,9 @@ export default {
             },
             tableName: this.config.table,
             tableChildAuth: this.tableChildAuth,
+            deleteRecord: (context) => deleteTenantRelatedRecord({
+              ...this.relatedFormContext('Delete', row), ...context, readonly: this.readonlyList
+            }),
             refreshData: () => Promise.all([
               this.loadData(true, true, true),
               this.loadRelatedMetrics(true)
@@ -2836,12 +2857,42 @@ export default {
       if (this.moduleKey === 'contacts' && !result.Guid70) result.Guid70 = relationshipId()
       return result
     },
+    relatedFormContext(action, row = null) {
+      return {
+        action, row, field: this.field, tableName: this.config.table,
+        menuId: this.menuId || this.childMenuId, parentTableName: this.parentTableName,
+        parentId: this.parentId, parentForm: this.parentForm, parentMode: this.parentMode,
+        tableChildAuth: this.tableChildAuth
+      }
+    },
+    async openTenantRelatedForm(action, row = null) {
+      if (this.relatedFormOpening) return true
+      this.relatedFormOpening = true
+      try {
+        const target = await resolveRelatedFormNavigation(this.relatedFormContext(action, row))
+        if (!target) return false
+        if (action === 'Add' && !canAddMenuRecord(target.menuId, this.currentUser)) {
+          throw new Error('当前账号没有新增权限')
+        }
+        if (action === 'Edit' && !canEditMenuRecord(target.menuId, this.currentUser)) {
+          throw new Error('当前账号没有编辑权限')
+        }
+        if (!this.componentDisposed) await openForm(target)
+        return true
+      } catch (error) {
+        uni.showToast({ title: error.message || error.Msg || '打开业务表单失败', icon: 'none' })
+        return true
+      } finally {
+        this.relatedFormOpening = false
+      }
+    },
     async openAdd() {
       if (this.proposalPointSavingId) return
       if (!this.canAdd) {
         uni.showToast({ title: '当前账号没有新增权限', icon: 'none' })
         return
       }
+      if (this.relatedFormTarget && await this.openTenantRelatedForm('Add')) return
       if (this.collectionPickerEnabled) {
         this.openCollectionPicker()
         return
@@ -2908,8 +2959,9 @@ export default {
         includeRelated: true
       })
     },
-    openDetail(row) {
+    async openDetail(row) {
       if (!row?.Id) return
+      if (this.relatedFormTarget && await this.openTenantRelatedForm('View', row)) return
       if (this.moduleKey === 'tasks') {
         uni.navigateTo({ url: `/pages/task/detail?id=${encodeURIComponent(row.Id)}` })
         return

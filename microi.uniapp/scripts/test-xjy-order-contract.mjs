@@ -114,7 +114,10 @@ test('订单新增和编辑保存均保留用户修改后的人员快照，不�
       Form: form,
       OldForm: { ...form },
       Param: {},
-      DbTrans: {},
+      DbTrans: {
+        // 普通历史订单未登记草稿、未初始化续签；后端现在通过事务查询权威标志。
+        FromSql: () => ({ AddInParameter() { return this }, First: () => null })
+      },
       CurrentUser: { TenantId: 'tenant-1', TenantName: '测试商家' },
       FormEngine: {
         GetFormData: () => ({ Code: 1, Data: {
@@ -148,6 +151,16 @@ test('商品接口返回新订单商品快照，新增订单可在父表保存�
     },
     CurrentUser: { TenantId: 'tenant-1', TenantName: '测试商家' },
     DbTrans: {},
+    ApiEngine: {
+      Run: (key, params, tx) => {
+        assert.equal(key, 'xjy-order-draft-context')
+        assert.equal(params.Action, 'Product')
+        assert.equal(params.DingdanID, 'draft-order-1')
+        assert.equal(params.KehuID, 'customer-1')
+        assert.equal(tx, v8.DbTrans)
+        return { Code: 1, Data: { IsDraft: true } }
+      }
+    },
     FormEngine: {
       GetTableData: (query) => {
         productFilterQueries.push(query)
