@@ -927,6 +927,26 @@ async function inspectRelatedOrderSummary(cdp, viewport) {
   const read = () => evaluate(`({ checked:document.querySelector('.related-valid-switch').getAttribute('aria-checked'), labels:[...document.querySelectorAll('.related-metrics--summary .related-metric__label')].map(n=>n.innerText), values:[...document.querySelectorAll('.related-metrics--summary .related-metric__value')].map(n=>n.innerText), badges:[...document.querySelectorAll('.related-status-badge')].map(n=>n.innerText) })`);
   const before = await read();
   if (before.checked !== 'true' || before.badges.length !== 7 || JSON.stringify(before.labels) !== JSON.stringify(['租赁总价','买断总价','包年换芯总价','订单金额合计'])) fail(`客户订单统计默认状态错误: ${JSON.stringify(before)}`);
+  // 状态保持单行，末尾终态可横向滑动到达；金额沿用独立浅色卡片。
+  const presentation = await evaluate(`(() => {
+    const strip = document.querySelector('.related-status-scroll').getBoundingClientRect();
+    const statuses = [...document.querySelectorAll('.related-status-item')].map(node => {
+      const rect = node.getBoundingClientRect();
+      return { text: node.firstElementChild.innerText, top: rect.top, width: rect.width };
+    });
+    const last = document.querySelector('.related-status-item:last-child');
+    last.scrollIntoView({ block: 'nearest', inline: 'end', behavior: 'instant' });
+    const lastRect = last.getBoundingClientRect();
+    const endReachable = lastRect.left >= strip.left - 1 && lastRect.right <= strip.right + 1;
+    document.querySelector('.related-status-item').scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'instant' });
+    const metrics = document.querySelector('.related-metrics');
+    return { statuses, endReachable, background: getComputedStyle(metrics).backgroundImage,
+      cards: [...metrics.querySelectorAll('.related-metric')].map(node => getComputedStyle(node).backgroundColor) };
+  })()`);
+  if (presentation.statuses.length !== 7 || !presentation.endReachable ||
+    presentation.statuses.some(item => item.width <= 0 || Math.abs(item.top - presentation.statuses[0].top) > 1) ||
+    !['已作废', '已到期'].every(status => presentation.statuses.some(item => item.text === status))) fail(`客户订单状态须单行展示且可横向滑动到末项: ${JSON.stringify(presentation)}`);
+  if (presentation.background !== 'none' || new Set(presentation.cards).size !== 4) fail(`客户订单统计未保留原浅色卡片: ${JSON.stringify(presentation)}`);
   const start = mockRequestLog.length;
   await evaluate(`document.querySelector('.related-valid-switch').click()`);
   await waitForExpression(cdp, `document.querySelector('.related-metrics--summary .related-metric__value').innerText.includes('23.80')`);
