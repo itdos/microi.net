@@ -1,10 +1,65 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,mkdir,rm} from 'node:fs/promises';
+import {mkdtemp,writeFile,mkdir,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {snapshotCandidate,changedCandidate} from '../../tools/release-candidate.mjs';
+
+async function smokeFixture(t){
+ const root=await mkdtemp(path.join(tmpdir(),'microi-release-smoke-'));
+ t.after(()=>rm(root,{recursive:true,force:true}));
+ execFileSync('git',['init','--quiet'],{cwd:root});
+ const api='Microi.Server/Microi.net.Api';
+ await mkdir(path.join(root,api),{recursive:true});
+ await writeFile(path.join(root,'.gitignore'),`${api}/.microi-local\n${api}/appsettings.*.json\n.tmp/\n`);
+ const marker=path.join(root,api,'.microi-local'),config=path.join(root,api,'appsettings.IsolatedSmoke.json');
+ await writeFile(marker,'IsolatedSmoke\n');
+ await writeFile(config,JSON.stringify({AppSettings:{OsClient:'IsolatedSmoke',OsClientDbConn:'private-fixture-secret'}}));
+ return {root,api,marker,config};
+}
+
+test('ignored local smoke marker and exact selected configuration are frozen without disclosing secrets',async t=>{
+ const f=await smokeFixture(t),before=await snapshotCandidate(f.root,['.']);
+ assert.match(before.files[`${f.api}/.microi-local`],/^[a-f0-9]{64}$/);
+ assert.match(before.files[`${f.api}/appsettings.IsolatedSmoke.json`],/^[a-f0-9]{64}$/);
+ assert.doesNotMatch(JSON.stringify(before),/private-fixture-secret/);
+ await writeFile(f.config,JSON.stringify({AppSettings:{OsClient:'IsolatedSmoke',OsClientDbConn:'changed-fixture-secret'}}));
+ assert.deepEqual(changedCandidate(before,await snapshotCandidate(f.root,['.'])),[`${f.api}/appsettings.IsolatedSmoke.json`]);
+});
+
+test('local smoke marker appearance and removal cannot evade an earlier Full candidate',async t=>{
+ const f=await smokeFixture(t);await rm(f.marker);
+ const absent=await snapshotCandidate(f.root,['.']);
+ await writeFile(f.marker,'IsolatedSmoke\n');
+ const present=await snapshotCandidate(f.root,['.']);
+ assert.deepEqual(changedCandidate(absent,present),[`${f.api}/.microi-local`,`${f.api}/appsettings.IsolatedSmoke.json`]);
+ await rm(f.marker);assert.deepEqual(changedCandidate(present,await snapshotCandidate(f.root,['.'])),[`${f.api}/.microi-local`,`${f.api}/appsettings.IsolatedSmoke.json`]);
+});
+
+test('missing, malformed or non-whitelisted smoke configuration and unsafe environment names fail closed',async t=>{
+ const f=await smokeFixture(t);
+ await rm(f.config);await assert.rejects(snapshotCandidate(f.root,['.']),/smoke|local environment/i);
+ await writeFile(f.config,'{bad json');await assert.rejects(snapshotCandidate(f.root,['.']),/smoke|local environment/i);
+ await writeFile(f.config,JSON.stringify({AppSettings:{OsClient:'IsolatedSmoke',ExtraBusinessSwitch:1}}));
+ await assert.rejects(snapshotCandidate(f.root,['.']),/AppSettings/);
+ for(const value of ['', '..', '../outside', 'a/b', 'a\\b', 'a\nb']){
+  await writeFile(f.marker,value);await assert.rejects(snapshotCandidate(f.root,['.']),/local environment/i);
+ }
+});
+
+test('smoke configuration links and linked parent directories cannot escape the candidate',async t=>{
+ const f=await smokeFixture(t),privateRoot=path.join(f.root,'.tmp');await mkdir(privateRoot);
+ const outside=path.join(privateRoot,'outside.json');await writeFile(outside,'{}');
+ await rm(f.config);await symlink(outside,f.config,'file');
+ await assert.rejects(snapshotCandidate(f.root,['.']),/link|regular file/i);
+ await rm(f.config);await writeFile(f.config,'{}');
+ await rm(path.join(f.root,f.api),{recursive:true,force:true});
+ await writeFile(path.join(privateRoot,'.microi-local'),'IsolatedSmoke');
+ await writeFile(path.join(privateRoot,'appsettings.IsolatedSmoke.json'),'{}');
+ await symlink(privateRoot,path.join(f.root,f.api),'junction');
+ await assert.rejects(snapshotCandidate(f.root,['.']),/link|directory/i);
+});
 
 test('only documented plugin build timestamps are ignored; versions, hashes and executable source stay guarded',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'microi-release-candidate-'));

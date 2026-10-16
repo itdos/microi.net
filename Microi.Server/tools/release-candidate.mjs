@@ -41,6 +41,33 @@ function candidateBytes(key,bytes){
  return JSON.stringify(metadata);
 }
 
+// 一键脚本在最终加密冒烟时消费本地环境标记及其选中的配置；它们即使被
+// Git 忽略也必须绑定 Full。回执只保存原始字节哈希，绝不序列化连接凭据。
+async function snapshotLocalSmokeInputs(root){
+ const api='Microi.Server/Microi.net.Api',markerName=api+'/.microi-local';
+ const files={[markerName]:null};
+ let marker;
+ try{marker=await lstat(path.join(root,markerName));}catch(error){if(error.code==='ENOENT')return files;throw error;}
+ for(const directory of ['Microi.Server',api]){
+  const stat=await lstat(path.join(root,directory));
+  if(stat.isSymbolicLink()||!stat.isDirectory())throw Error('Local smoke environment parent must be a real directory: '+directory);
+ }
+ if(marker.isSymbolicLink()||!marker.isFile())throw Error('Local smoke environment marker must be a regular file');
+ const markerBytes=await readFile(path.join(root,markerName)),environment=markerBytes.toString('utf8').trim();
+ if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(environment)||environment==='.'||environment==='..')throw Error('Unsafe local environment name for smoke configuration');
+ const configName=api+'/appsettings.'+environment+'.json';
+ let configStat;
+ try{configStat=await lstat(path.join(root,configName));}catch(error){if(error.code==='ENOENT')throw Error('Local smoke environment configuration is missing: '+configName);throw error;}
+ if(configStat.isSymbolicLink()||!configStat.isFile())throw Error('Local smoke configuration must be a regular file');
+ const configBytes=await readFile(path.join(root,configName));
+ let config;try{config=JSON.parse(configBytes.toString('utf8').replace(/^\uFEFF/,''));}catch{throw Error('Local smoke environment configuration is invalid JSON');}
+ const allowed=new Set(['OsClient','OsClientType','OsClientNetwork','OsClientDbType','OsClientDbConn','OsClientRedisHost','OsClientRedisPort','OsClientRedisPwd','OsClientRedisDataBase','OsClientDbMongoConn']);
+ if(!config.AppSettings||typeof config.AppSettings!=='object'||Array.isArray(config.AppSettings)||typeof config.AppSettings.OsClient!=='string'||!config.AppSettings.OsClient.trim()||Object.keys(config.AppSettings).some(key=>!allowed.has(key)))throw Error('Local smoke AppSettings must contain an OsClient and only approved bootstrap keys');
+ files[markerName]=createHash('sha256').update(markerBytes).digest('hex');
+ files[configName]=createHash('sha256').update(configBytes).digest('hex');
+ return files;
+}
+
 export async function snapshotCandidate(root=workspace,repos=repositories,options={}){
  const files={};
  for(const repository of repos){
@@ -61,6 +88,7 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
   }
  }
  Object.assign(files,await snapshotStandardInputs(root));
+ Object.assign(files,await snapshotLocalSmokeInputs(root));
  // Implicit composition belongs only to this actual workspace; explicit foreign contracts still fail.
  const compositionOptions={...options,environment:options.environment??(path.resolve(root)===workspace?process.env:{})};
  const privateInputs=await snapshotReleaseComposition(root,compositionOptions);
