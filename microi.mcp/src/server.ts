@@ -1,11 +1,16 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import crypto from 'node:crypto';
+import { ToolPayloadMetrics } from './tool-metrics.js';
 import fs from 'node:fs';
 import { isIP } from 'node:net';
 import path from 'node:path';
 import { z } from 'zod';
 import { registerServerPrivateSettingsTools } from './server-private-settings-tools.js';
+import {
+  applicationSummary, buildSchemaRead, buildSourceRead, createContextReadScope, createReadIdentityGuard,
+  exactNames, isTextSourceFile, readPage, record, sortedRecords, sourceFileMetadata,
+} from './context-reading.js';
 import type {
   ApiResponse,
   MicroiClient,
@@ -2953,13 +2958,18 @@ function toolResultResourceText(result: CallToolResult): string {
   }, null, 2);
 }
 
-function bufferToolRegistrationsByPriority(server: McpServer): BufferedToolRegistry {
+function bufferToolRegistrationsByPriority(server: McpServer, metrics: ToolPayloadMetrics): BufferedToolRegistry {
   const mutableServer = server as unknown as { tool: (...args: unknown[]) => unknown };
   const originalTool = mutableServer.tool.bind(server);
   const buffered: BufferedToolRegistration[] = [];
 
   mutableServer.tool = (...args: unknown[]): unknown => {
     const name = typeof args[0] === 'string' ? args[0] : '';
+    // 单入口与原生工具共用同一计量包装；排除外层 dispatcher，避免重复计算。
+    const handler = args.at(-1);
+    if (typeof handler === 'function' && name !== 'microi_codex' && name !== 'microi_get_context_metrics') {
+      args[args.length - 1] = (...callArgs: unknown[]) => metrics.measure(name, callArgs[0], () => handler(...callArgs));
+    }
     buffered.push({ name, args, index: buffered.length });
     return undefined;
   };
@@ -3282,7 +3292,8 @@ function normalizeFieldType(type?: string): string {
 /**
  * 构建 MCP Server instructions（让 AI 了解此 MCP 服务器的身份和系统知识）
  */
-function buildInstructions(ctx: McpServerContext): string {
+/** 历史完整知识保留作兼容参考，不再在每次 MCP initialize 中重复注入；责任 Skills 是当前规则单源。 */
+function buildLegacyInstructions(ctx: McpServerContext): string {
   return `This MCP server manages a Microi (吾码) low-code platform instance.
 - Server Name: ${ctx.label || ctx.osClient}
 - API Server: ${ctx.apiBaseUrl}
@@ -3581,12 +3592,54 @@ MCP 后端会自动解析 \`data\` 字符串并构建正确的 \`Config\` JSON�
 | iframe | 内嵌页面 |`;
 }
 
+/** 初始化只下发路由与不可省略的边界；具体 API/示例在选定任务后按责任 Skill 和工具描述读取。 */
+function buildInstructions(ctx: McpServerContext): string {
+  return `Microi吾码 MCP：${ctx.label || ctx.osClient}
+绑定 API：${ctx.apiBaseUrl}
+绑定 OsClient：${ctx.osClient}；OsClientType：${ctx.osClientType || '(未设置)'}；OsClientNetwork：${ctx.osClientNetwork || '(未设置)'}。
+显示名称不是租户身份。读写前核对用户目标与此连接；不得用本连接操作另一服务器/租户，多个连接不能混用。
+
+## Microi吾码基础规范（任何 AI 模型强制读取）
+每次新建或接续吾码任务，先完整读取 microi.skills/workspace-conventions/SKILL.md，再读取 microi.skills/microi-system-delivery/SKILL.md，按任务范围读取责任 Skills；未初始化时使用已安装吾码插件同名入口。
+完整系统必须完整读取 microi.skills/microi-system-delivery/references/progressive-01-标准工作流.md 中的原 1–8 及后续增补，逐项实现和记录证据。用户无需记住 Skill 名称。实现前报告已读取的文件路径和本次适用交付清单；局部修改和只读分析不扩大为完整系统重建、生产写入或客户部署。
+规则缺失时按安装规范恢复 microi ai init --workspace "<工作区绝对路径>"；未读到正文或宿主无文件能力时不能声称已自动加载。连接可用不等于规则已读取。
+首次说明以“Microi吾码开发工具版本”报告实际 CLI 版本、npm 官方 latest（附查询时间）、自动更新与 Skills/MCP 同步状态；用 microi version --json 与 npm 官方 registry 回读，未知项明确检测中。
+已有 CLI 必须投递 microi update --background --workspace "<工作区绝对路径>" --json；失败延后重试，不阻断当前工作、不终止 MCP 或强制重载。遵守用户关闭更新和宿主权限。进度播报按基础入口执行，估算不能冒充账单计量。
+
+## 质量优先的任务范围与读取
+按 microi.skills/microi-system-delivery/references/context-quality.md 执行质量优先的上下文策略；省 token 不得降低准确性或交付覆盖。
+完整开发保留完整需求、成熟建模、约束/索引、选项关联、数据日志/评论/版本、表单 Banner、布局、复合列/移动卡片、权限、真实指标、业务闭环与截图要求。先读取表目录摘要，再按相关业务表 detail=fields 获取字段；摘要、分页和搜索片段不能当作完整模型或源码。
+局部修改先确定目标资源及依赖：字段/事件/接口/菜单/数据源/页面/角色/调用链；按依赖闭包扩大读取，遇到同名资源、跨表事务、影响不明或失败必须继续查证，不能为省字节猜字段、跳过检查或删减验收。纯代码应用、游戏或硬件集成按实际需求读取专项规则，不机械增加无关低代码资源。
+写入保留现有授权、确认参数、幂等、事务、权限、审计、失败语义与远端回读；超时先回读，不能盲目重试。服务器与租户边界不得通过省略上下文绕过。
+
+## 完整交付不可省略的两项增补
+菜单先行：先规划完整菜单树及逐菜单页面/角色，再在授权范围落地新菜单骨架；占位只用于新的可见业务/报表叶菜单，隐藏数据载体与存量功能保持正确绑定。候选真实页面先预验收，再更新同一菜单的真实资源绑定，保留菜单 Id、URL、层级、排序、权限与关联；刷新菜单/旧缓存，通过原入口最终验收。占位页不得报已完成。
+报表默认覆盖需求相关的业务运营、老板经营与领导管理三类 Page Engine 分析；明确定义真实数据源、口径、角色/部门范围与筛选，配合 report-engine 提供明细/导出。禁止随机数、本页合计或错误伪装零值；覆盖穿透明细对账、时间边界、零/空/失败、跨租户拒绝和电脑/移动/明暗截图。原 1–8 与两项增补共同执行，不相互替代。
+
+## 工具与知识按需发现
+microi_codex action=list_tools 支持 keyword、pageSize、cursor、maxChars；按领域发现工具，对不熟悉工具调用 describe_tool 查看完整参数。工具返回 Paging.hasMore=true 时，用相同筛选及 nextCursor 继续；连接/快照变化游标失败后重读。工具结果中的完整性和错误字段必须保留，详细回执可按证据引用读取。
+应用开发先 microi_list_applications 摘要发现，再对目标调用 microi_get_application_context 选择文件；microi_get_application_file 支持行范围与纯文本搜索。二进制默认引用，需要正文时显式 detail=full。部分源码不能覆盖保存成完整源码。
+业务模型/字段→business-blueprint、microi-db-schema、microi-form-engine、microi-form-layout；菜单/按钮→module-engine、v8-menu-buttons；接口/事件/SQL→v8-crud-api、v8-table-event、v8-sql-query；统计/页面→page-engine、report-engine、datasource-engine；独立前端→microi-ai-application 及对应前端 Skill；验收→playwright-e2e；平台资源升级→app-store。
+优先低代码 CRUD/事件，其次接口引擎；仅缺底层原子时扩展 V8，协议/可信鉴权/密钥隔离/运行时内核才进入 C#。第三方秘密先发现 microi_manage_server_private_secret，授权保存并回读 HasSecret/IsSecret/IsEnabled，绝不返回秘密明文/密文或增加业务环境变量。
+完成时按用户条目报告实现、测试、截图与未覆盖项，区分本地源码、远端资源、制品发布和客户部署；没有真实验收不得报完成。`;
+}
+
 /**
  * 创建 MCP Server 并注册所有工具
  * @param client - Microi API 客户端
  * @param context - 服务器上下文（OsClient、API地址），用于在 instructions 中标识身份
  */
 export function createMcpServer(client: MicroiClient, context: McpServerContext): McpServer {
+  // 每个连接使用独立游标签名，真实会话变化后旧游标失效；不缓存任何凭据或业务正文。
+  const contextReadScope = createContextReadScope(() => typeof client.getContextIdentity === 'function'
+    ? client.getContextIdentity()
+    : JSON.stringify([context.apiBaseUrl, context.osClient, context.osClientType, context.osClientNetwork]));
+  const readResult = (response: ApiResponse, data: unknown = response.Data, maxChars = 32_000) => {
+    const payload = { ...response, Data: data };
+    const text = JSON.stringify(payload);
+    if (response.Code === 1 && text.length > maxChars + 8_000) throw new Error(`响应超过本次预算 ${maxChars} 字符；请缩小读取范围或显式提高 maxChars。未返回截断结果。`);
+    return { content: [{ type: 'text' as const, text }], ...(response.Code !== 1 ? { isError: true } : {}) };
+  };
   const { osClient } = context;
 
   // 协议层名称保持 ASCII；中文业务名只放在 UTF-8 instructions 中用于显示。
@@ -3596,27 +3649,34 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     { name: serverName, version: '1.0.0' },
     { instructions: buildInstructions(context) },
   );
-  const toolRegistry = bufferToolRegistrationsByPriority(server);
+  const toolMetrics = new ToolPayloadMetrics();
+  const toolRegistry = bufferToolRegistrationsByPriority(server, toolMetrics);
+  server.tool('microi_get_context_metrics',
+    'Read current-session tool payload bytes, calls and errors without content or secrets. These metrics are not provider tokens, billing or model-history measurements.',
+    {}, async () => ({ content: [{ type: 'text' as const, text: JSON.stringify(toolMetrics.snapshot()) }] }));
 
   server.tool(
     'microi_codex',
     `Codex-compatible single entry point for all Microi tools on OsClient "${osClient}". Use action="list_tools" with optional params.keyword to discover tools, action="describe_tool" with params.name to inspect exact arguments, or pass any existing Microi tool name such as microi_get_status, microi_get_db_schema, microi_get_table_data, microi_get_module, microi_update_module, microi_get_engine_code, or microi_save_engine_code. The dispatcher reuses the original tool validation, write confirmation, audit, and readback logic.`,
     {
       action: z.string().describe('list_tools | describe_tool | an existing microi_* tool name'),
-      params: jsonRecordSchema.optional().describe('Arguments for the selected action. Use {keyword?} for list_tools and {name} for describe_tool.'),
+      params: jsonRecordSchema.optional().describe('Arguments for the selected action. list_tools accepts keyword?, pageSize? (1-200, default 20), cursor?, maxChars?; describe_tool accepts name and returns complete argument descriptions.'),
     },
     async ({ action, params }) => {
       try {
         if (action === 'list_tools') {
           const keyword = getStringField(params, 'keyword', 'Keyword');
           const tools = toolRegistry.list(keyword);
+          const page = readPage(contextReadScope, { action: 'tools', keyword }, tools, record(params));
           return {
             content: [{
               type: 'text',
               text: JSON.stringify({
                 count: tools.length,
                 keyword: keyword || null,
-                tools,
+                tools: page.items,
+                Paging: page.Paging,
+                Completeness: { descriptionsComplete: true, allToolsIncluded: page.Paging.completeSelection },
                 next: 'Call action="describe_tool" with params.name before invoking an unfamiliar write tool.',
               }, null, 2),
             }],
@@ -3679,7 +3739,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         uri: uri.href,
         mimeType: 'application/json',
         text: JSON.stringify({
-          tools: toolRegistry.list(),
+          ...(() => { const page = readPage(contextReadScope, { action: 'tools', keyword: '' }, toolRegistry.list()); return { tools: page.items, Paging: page.Paging }; })(),
           actionTemplate: 'microi://codex/action/{action}/{params}',
           params: 'URI-encoded JSON object. Example: microi://codex/action/microi_get_status/%7B%7D',
         }, null, 2),
@@ -4766,26 +4826,23 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_get_db_schema',
-    `Get database table structures for OsClient "${osClient}". Returns table names, field names, MySQL column types, labels. ALWAYS call this first before creating tables or adding fields to understand the existing data model.`,
+    `Read the database model for OsClient "${osClient}". Defaults to a bounded table summary without fields. Use tableNames for exact tables, tableName for partial name/label search, detail="fields" and optional fieldNames for field types and relation references. Config/Data/KeyValue/events are not included: use microi_get_field_list before editing controls or resolving their full dependencies. Follow Paging.nextCursor with the same filters until hasMore=false. Query/permissions remain enforced by the protected FormEngine.`,
     {
       tableName: z.string().optional().describe('Filter tables by name (case-insensitive partial match). Omit to get all tables.'),
+      tableNames: z.array(z.string().min(1)).min(1).max(200).optional().describe('Exact table names; applied together with tableName when both are present.'),
+      fieldNames: z.array(z.string().min(1)).min(1).max(200).optional().describe('Exact field names for detail=fields.'),
+      detail: z.enum(['summary', 'fields']).optional().default('summary'),
+      pageSize: z.number().int().min(1).max(200).optional().default(20),
+      cursor: z.string().max(1024).optional(),
+      maxChars: z.number().int().min(1000).max(512000).optional().default(32000),
     },
-    async ({ tableName }) => {
+    async (options) => {
       try {
-        const result = await client.getDbSchema();
-        if (result.Code !== 1) {
-          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
-        }
-
-        let tables = result.Data?.Tables || [];
-        if (tableName) {
-          const keyword = tableName.toLowerCase();
-          tables = tables.filter(
-            (t) => t.Name.toLowerCase().includes(keyword) || (t.Description && t.Description.toLowerCase().includes(keyword)),
-          );
-        }
-
-        return { content: [{ type: 'text', text: formatDbTables(tables) }] };
+        const assertReadIdentity = createReadIdentityGuard(contextReadScope.identity);
+        const result = await client.getDbSchema(options);
+        if (result.Code !== 1) return readResult(result);
+        assertReadIdentity();
+        return readResult(result, buildSchemaRead(contextReadScope, record(result.Data), options), options.maxChars);
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }
@@ -8064,19 +8121,32 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_list_applications',
-    `List every online AI application for OsClient "${osClient}" across Web, UniApp and MicroService, including each app's complete source-file manifest by default. AI agents should call this at the beginning of application/page work so they understand existing apps before creating duplicates. For complex custom dialogs/pages, prefer extending an existing MicroService or creating one with microi_create_microservice + microi_sync_microservice_source; do not embed large HTML in V8.ConfirmTips.`,
+    `Discover online AI applications for OsClient "${osClient}" across Web, UniApp and MicroService. Defaults to paged application summaries without file manifests. Filter by keyword/type, follow Paging.nextCursor, then use microi_get_application_context for the selected app. Explicit includeFiles=true retains file discovery; detail=full retains full returned app metadata. For complex pages prefer an existing MicroService over HTML embedded in V8.ConfirmTips.`,
     {
       appType: z.enum(['Web', 'UniApp', 'MicroService']).optional().describe('Optional exact application type filter.'),
       keyword: z.string().optional().describe('Optional case-insensitive search across name, AppKey, type and description.'),
-      includeFiles: z.boolean().optional().default(true).describe('Include the complete file manifest for every app. Defaults to true.'),
+      includeFiles: z.boolean().optional().default(false).describe('Explicitly include file manifests for matched applications. Defaults to false; prefer selected-app context.'),
+      detail: z.enum(['summary', 'full']).optional().default('summary'),
+      pageSize: z.number().int().min(1).max(200).optional().default(20),
+      cursor: z.string().max(1024).optional(),
+      maxChars: z.number().int().min(1000).max(512000).optional().default(32000),
     },
-    async ({ appType, keyword, includeFiles }) => {
+    async ({ appType, keyword, includeFiles, detail, ...paging }) => {
       try {
-        const result = await client.listApplications({ AppType: appType, Keyword: keyword, IncludeFiles: includeFiles !== false });
-        if (result.Code !== 1) {
-          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
-        }
-        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        const assertReadIdentity = createReadIdentityGuard(contextReadScope.identity);
+        const result = await client.listApplications({ AppType: appType, Keyword: keyword, IncludeFiles: includeFiles === true });
+        if (result.Code !== 1) return readResult(result);
+        assertReadIdentity();
+        const data = record(result.Data);
+        const apps = sortedRecords(data.Applications, app => String(app.AppKey || app.Id)).map(app => {
+          const projected = detail === 'full' ? { ...app } : applicationSummary(app);
+          if (includeFiles) projected.Files = Array.isArray(app.Files) ? app.Files.map(sourceFileMetadata) : [];
+          return projected;
+        });
+        const page = readPage(contextReadScope, { action: 'apps', appType, keyword, includeFiles, detail }, apps, paging);
+        return readResult(result, { ...data, Applications: page.items, Paging: page.Paging, Completeness: {
+          filesIncluded: includeFiles === true, metadataSummary: detail !== 'full', sourceCompleteness: 'backend-list-limit-5000-not-reported',
+        } }, paging.maxChars);
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }
@@ -8088,36 +8158,75 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_get_application_context',
-    `Get one Web, UniApp or MicroService application by Id/AppKey for OsClient "${osClient}". It returns metadata and the full file manifest by default without embedding source bodies; set includeContents=true only when the complete source is actually needed, or use microi_get_application_file for one exact file. MicroService responses also include sys_microiservice runtime/pages.`,
+    `Read one application's paged file manifest for OsClient "${osClient}". Defaults to summary metadata and no source bodies. Select filePaths or pathKeyword; includeContents=true loads only selected text files on this page. Binary files remain references. Follow Paging.nextCursor with identical filters. Read a large file through microi_get_application_file with line/search options; detail=full explicitly returns full application/runtime metadata.`,
     {
       appIdOrKey: z.string().describe('sys_microistore.Id or AppKey.'),
       includeContents: z.boolean().optional().default(false).describe('Read private HDFS source contents. Defaults to false; prefer microi_get_application_file for targeted reads.'),
       maxFileBytes: z.number().int().positive().optional().describe('Maximum bytes read per source file. Default 2MB.'),
-      maxTotalBytes: z.number().int().positive().optional().describe('Maximum total bytes read for this app. Default 50MB.'),
+      maxTotalBytes: z.number().int().positive().optional().describe('Maximum total UTF-8 bytes read on this selected file page. Default 2MB.'),
+      filePaths: z.array(z.string().min(1)).min(1).max(200).optional().describe('Exact relative file paths. Omit to discover the file manifest in pages.'),
+      pathKeyword: z.string().max(1000).optional().describe('Case-insensitive partial file-path filter.'),
+      detail: z.enum(['summary', 'full']).optional().default('summary'),
+      pageSize: z.number().int().min(1).max(200).optional().default(20),
+      cursor: z.string().max(1024).optional(),
+      maxChars: z.number().int().min(1000).max(512000).optional().default(32000),
     },
-    async ({ appIdOrKey, includeContents, maxFileBytes, maxTotalBytes }) => {
+    async ({ appIdOrKey, includeContents, maxFileBytes, maxTotalBytes, filePaths, pathKeyword, detail, ...paging }) => {
       try {
+        const assertReadIdentity = createReadIdentityGuard(contextReadScope.identity);
         const result = await client.getApplicationContext({
           AppIdOrKey: appIdOrKey,
-          IncludeContents: includeContents === true,
-          ...(maxFileBytes ? { MaxFileBytes: maxFileBytes } : {}),
-          ...(maxTotalBytes ? { MaxTotalBytes: maxTotalBytes } : {}),
+          IncludeContents: false,
         });
-        if (result.Code !== 1) {
-          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        if (result.Code !== 1) return readResult(result);
+        assertReadIdentity();
+        const data = record(result.Data);
+        const files = sortedRecords(data.Files, file => String(file.FilePath || file.Path)).map(sourceFileMetadata);
+        const paths = exactNames(filePaths);
+        const keyword = (pathKeyword || '').toLowerCase();
+        const missingPaths = paths.filter(value => !files.some(file => String(file.FilePath || file.Path).toLowerCase() === value));
+        if (missingPaths.length) return readResult({ ...result, Code: 2, Msg: '部分指定源码路径不存在，未读取正文。', Data: { Application: applicationSummary(data.Application), MissingFilePaths: missingPaths } });
+        const selected = files.filter(file => (!paths.length || paths.includes(String(file.FilePath || file.Path).toLowerCase())) && (!keyword || String(file.FilePath || file.Path).toLowerCase().includes(keyword)));
+        const page = readPage(contextReadScope, { action: 'app-files', appIdOrKey, paths, keyword, includeContents, detail, sourceManifestHash: data.SourceManifestHash }, selected, paging);
+        const outputFiles: Record<string, any>[] = [];
+        let scheduledBytes = 0;
+        for (const file of page.items) {
+          const filePath = String(file.FilePath || file.Path || '');
+          if (!includeContents || !isTextSourceFile(file, filePath) || file.IsDirectory === 1) {
+            outputFiles.push(includeContents && file.IsDirectory !== 1 ? { ...file, FileReference: { appIdOrKey, filePath, detail: 'full' } } : file); continue;
+          }
+          const size = Number(file.Size || 0);
+          if (!Number.isFinite(size) || size < 0 || scheduledBytes + size > (maxTotalBytes ?? 2 * 1024 * 1024)) {
+            outputFiles.push({ ...file, ContentSkipped: true, ContentReadError: '所选文件超过本页总读取预算，请用单文件读取。' }); continue;
+          }
+          const response = await client.getApplicationFile({ AppIdOrKey: appIdOrKey, FilePath: filePath, IncludeContents: true, MaxFileBytes: maxFileBytes ?? 2 * 1024 * 1024 });
+          if (response.Code !== 1) return readResult(response);
+          assertReadIdentity();
+          const actual = record(record(response.Data).File);
+          scheduledBytes += typeof actual.Content === 'string' ? Buffer.byteLength(actual.Content, 'utf8') : size;
+          if (scheduledBytes > (maxTotalBytes ?? 2 * 1024 * 1024)) outputFiles.push({ ...sourceFileMetadata(actual), ContentSkipped: true, ContentReadError: '实际正文超过总读取预算，请用单文件读取。' });
+          else outputFiles.push(actual.FileByteBase64 ? sourceFileMetadata(actual) : actual);
         }
-        const data = result.Data as Record<string, unknown>;
-        const files = Array.isArray(data?.Files) ? data.Files as Array<Record<string, unknown>> : [];
-        const contentErrorCount = files.filter(file => typeof file?.ContentReadError === 'string' && file.ContentReadError).length;
+        const contentErrorCount = outputFiles.filter(file => file.ContentReadError || file.ContentSkipped).length;
+        const bodyCount = outputFiles.filter(file => typeof file.Content === 'string').length;
         const payload = {
           ...data,
+          Application: detail === 'full' ? data.Application : applicationSummary(data.Application),
+          Runtime: detail === 'full' ? data.Runtime : (data.Runtime ? { Included: false, Next: 'Use detail=full for complete runtime/pages metadata.' } : null),
+          Files: outputFiles,
+          IncludedContents: bodyCount > 0,
+          ContentsComplete: includeContents === true && selected.length === files.length && page.Paging.completeSelection && bodyCount === files.length && contentErrorCount === 0,
+          ContentErrorCount: contentErrorCount,
+          ReturnedFileCount: outputFiles.length,
+          Paging: page.Paging,
+          Completeness: { allFilesSelected: selected.length === files.length, contentsRequested: includeContents, contentsIncluded: bodyCount, sourceManifestHash: data.SourceManifestHash ?? null, metadataSummary: detail !== 'full', scope: 'returned-backend-file-manifest', sourceCompleteness: 'not-reported-by-backend' },
           McpReadSummary: {
             RequestedContents: includeContents === true,
-            ContentsComplete: includeContents !== true || contentErrorCount === 0,
+            ContentsComplete: includeContents === true && selected.length === files.length && page.Paging.completeSelection && bodyCount === files.length && contentErrorCount === 0,
             ContentErrorCount: contentErrorCount,
           },
         };
-        return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
+        return readResult(result, payload, paging.maxChars);
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }
@@ -8129,24 +8238,36 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_get_application_file',
-    `Read one exact source file from a Web, UniApp or MicroService online AI application for OsClient "${osClient}". Text code is returned as UTF-8 Content; binary files are returned as FileByteBase64.`,
+    `Read one exact source file for OsClient "${osClient}". Defaults to bounded text lines; use startLine/endLine or literal query, and follow Paging.nextCursor with the same options. Binary defaults to metadata and an explicit full-read reference; detail=full preserves whole text/Base64 compatibility within the requested budget. Partial reads are never complete source for replacement.`,
     {
       appIdOrKey: z.string().describe('sys_microistore.Id or AppKey.'),
       filePath: z.string().describe('Exact relative source path from the application file manifest.'),
       maxFileBytes: z.number().int().positive().optional().describe('Maximum bytes read. Default 10MB.'),
+      detail: z.enum(['text', 'metadata', 'full']).optional().default('text'),
+      startLine: z.number().int().positive().optional().describe('First one-based line, inclusive.'),
+      endLine: z.number().int().positive().optional().describe('Last one-based line, inclusive.'),
+      query: z.string().min(1).max(1000).optional().describe('Literal source-text search. Results are line-numbered matches, never executable code.'),
+      caseSensitive: z.boolean().optional().default(false),
+      pageSize: z.number().int().min(1).max(200).optional().default(200),
+      cursor: z.string().max(1024).optional(),
+      maxChars: z.number().int().min(1000).max(512000).optional().default(16000),
     },
-    async ({ appIdOrKey, filePath, maxFileBytes }) => {
+    async ({ appIdOrKey, filePath, maxFileBytes, ...options }) => {
       try {
-        const result = await client.getApplicationFile({
+        const assertReadIdentity = createReadIdentityGuard(contextReadScope.identity);
+        const metadata = await client.getApplicationFile({
           AppIdOrKey: appIdOrKey,
           FilePath: filePath,
-          IncludeContents: true,
-          ...(maxFileBytes ? { MaxFileBytes: maxFileBytes } : {}),
+          IncludeContents: false,
         });
-        if (result.Code !== 1) {
-          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
-        }
-        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        if (metadata.Code !== 1) return readResult(metadata);
+        assertReadIdentity();
+        const file = record(record(metadata.Data).File);
+        const needsContents = options.detail === 'full' || (options.detail !== 'metadata' && isTextSourceFile(file, filePath) && file.IsDirectory !== 1);
+        const result = needsContents ? await client.getApplicationFile({ AppIdOrKey: appIdOrKey, FilePath: filePath, IncludeContents: true, MaxFileBytes: maxFileBytes ?? 10 * 1024 * 1024 }) : metadata;
+        if (result.Code !== 1) return readResult(result);
+        assertReadIdentity();
+        return readResult(result, buildSourceRead(contextReadScope, appIdOrKey, filePath, record(result.Data), options), options.maxChars);
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }
