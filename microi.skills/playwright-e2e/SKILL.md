@@ -38,7 +38,7 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 不适合把 Playwright 用来替代 V8 单函数调试。单个接口引擎的入参输出优先用 VS Code 插件远程执行、MCP `microi_run_engine` 或后端单元测试。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-002 sha256=2e92ff117b1c3b450e988776204ccecd9dd4d6a83bb08d86d32032b467abc174 -->
+<!-- microi-progressive:chunk id=playwright-e2e-002 sha256=5874137c92e16fd5cc729fd9c23d051caa3e64438fc7bee1d717ae9c5a0f2a90 -->
 ## 临时文件与产物放置规则（必须遵守）
 
 AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测试报告**等，**绝对不能放在工作区根目录**，必须放在以下指定位置：
@@ -54,7 +54,7 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 
 **禁止在根目录创建的文件类型**：`*.mjs`、`*.py`、`*.ps1`、`*.sh`（一次性脚本）、`*.png`、`screenshots/`、`node_modules/`（无 package.json 时）、`obj/`（非 .NET 项目文件）、`dark-mode-*/`、`test-*/` 等临时目录。
 
-`.tmp/` 目录已在 `.gitignore` 中排除，AI 可以在此自由创建临时文件。任务完成后如无价值可以不清理，也可以整体删除该目录。
+`.tmp/` 目录已在 `.gitignore` 中排除，AI 可以在此创建临时文件。收尾清理只允许针对已确认归属的本任务子目录；删除前核对解析后的绝对路径、所有权和保留价值，不得整体删除共享 `.tmp/` 或其它任务的产物。临时文件保留不等于允许保留测试进程或容器。
 
 **2026-06 强制补充**：AI 手写的一次性 Playwright 验证脚本、运行日志、截图和报告只能写到工作区根目录 `.tmp/`。不要写到 `Microi.Client/`、`Microi.Server/`、`microi.doc/` 或其它子项目目录，即使这些目录已有 `tests/` 目录也不例外。只有 Microi.Agent 插件正式初始化的可复用 E2E 工程，才使用 `.microi-e2e/`。
 
@@ -140,20 +140,21 @@ PW_HOME_PATH=/#/pages/index/index
 不要只说“代码已编译”或“需要用户自己重启后端”；除非用户明确要求不要中断当前服务，否则 AI 要主动完成重启。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=6d285a719a85ce3f2c887b292c08cc69d9632964c341269f0f61bb2fdc403fac -->
+<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=ee40e4f023e1da07269f9ebb82522720c4f014cfc9500885db09778dd819b9a6 -->
 ## 服务自启动纪律（必做）
 
 执行自动化测试、截图巡检、接口引擎回读、`/apiengine/{key}` 验收时，如果本地后端或前端不可达，不能把 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听当作任务终点。必须先自动启动所需服务，再继续完整验证。
 
 同一工作区有多个 AI 对话时，服务自启动还必须遵守共享生命周期：
 
+- 先执行 `../workspace-conventions/SKILL.md` 的“本地测试程序与依赖生命周期”统一规则：优先复用健康的本地源码程序、隔离目录中的编译产物和同组既有依赖，不按测试任务重复创建 Docker/Compose。需要双节点时启动两个本机程序进程连接同组依赖，不等于建立两套 Docker 环境。
 - API 服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 服务使用 `assert pc`。Playwright `webServer`、自愈脚本或 AI 只在对应范围发布时等待；官网/Agent 发布不阻塞 `61500/61501`。同时启动前后端时分别检查两项。旧锁仅在真实进程证明所属范围后缩小阻塞范围，未知锁继续保护，不得删除活跃锁。
 - 端口健康且 PID/命令行属于当前工作区时直接复用，不得每个对话都无条件“先杀再启动”。
   必须重载源码时才串行重启，并在状态播报中说明旧/新 PID。
 - 本地长期后端使用项目目录中的 `dotnet run --launch-profile Microi.net.Api`，禁止把
   `bin/Release/net10.0` 或 `bin/Release/publish` 的 DLL 作为长期测试服务，否则会锁住
   一键发布的 Release 输出。
-- 一次性测试要关闭自己创建的 browser/context 和临时 webServer。VS Code 持有的
+- 每次测试成功、失败、取消或因资源不足暂停时，都必须结束本次创建的 browser/context、临时 webServer 及其它自有测试进程；按统一规则收回新建临时容器，并独立回读进程、监听端口和容器状态确认无残留。复用的既有共享服务保持原状。VS Code 持有的
   `playwright test-server` 与用户 Edge/Chrome 不属于孤儿清理；禁止按进程名结束所有
   `node/dotnet/chrome/msedge`。
 - 只读盘点或精确停止使用 `Microi.Server/tools/Microi.LocalProcessManager.ps1` 的

@@ -1636,6 +1636,10 @@ export default {
           menuId: this.menuId,
           moduleEngineKey: menu?.ModuleEngineKey || menu?.Id || ''
         }
+        // 卡片只配置了部分状态时，不能覆盖关联统计所需的完整状态选项。
+        if (this.config.relatedSummary) {
+          this.config.statusOptions = [...new Set([...(matched.config.statusOptions || []), ...(platformCardConfig.statusOptions || [])])]
+        }
         this.emitTitleChange()
         this.applyMenuSearchFields(menu?.SearchFieldIds || [])
         if (this.waitingForParentSave) {
@@ -3138,16 +3142,12 @@ export default {
 .related-metric--primary { border-color: #d8e5fa; background: #f2f7ff; }
 .related-metric--primary .related-metric__value { color: #1768d8; }
 .related-status-scroll { flex: none; width: 100%; margin: 0 0 16rpx; white-space: nowrap; }
-.related-status-tabs { display: inline-flex; gap: 12rpx; padding: 16rpx 8rpx 4rpx 0; }
+.related-status-tabs { display: inline-flex; flex-wrap: nowrap; gap: 12rpx; padding: 16rpx 8rpx 4rpx 0; }
 .related-status-item { position: relative; flex: none; min-width: 110rpx; height: 54rpx; padding: 0 28rpx 0 18rpx; border: 1rpx solid #dce8ed; border-radius: 12rpx; color: #68838f; background: #fff; font-size: 22rpx; line-height: 54rpx; text-align: center; }
 .related-status-item.active { border-color: #0b86d4; color: #0b86d4; background: #edf7fc; font-weight: 600; }
 .related-status-badge { position: absolute; top: -14rpx; right: -6rpx; min-width: 30rpx; padding: 0 8rpx; border-radius: 18rpx; color: #47758b; background: #e8f3f9; font-size: 18rpx; font-weight: 600; line-height: 28rpx; }
 .related-status-item.active .related-status-badge { color: #fff; background: #0b86d4; }
-.related-metrics--summary { flex: none; gap: 6rpx; margin: 0 0 12rpx; padding: 16rpx 10rpx; border-radius: 14rpx; background: linear-gradient(110deg, #0b86d4, #16a3ad 62%, #2aaf80); }
-.related-metrics--summary .related-metric { min-width: 0; padding: 14rpx 4rpx; border: 1rpx solid rgba(255,255,255,.2); border-radius: 8rpx; background: rgba(255,255,255,.12); }
-.related-metrics--summary .related-metric__value { color: #fff; }
-.related-metrics--summary .related-metric__value > text:first-child { font-size: 28rpx; }
-.related-metrics--summary .related-metric__label { color: rgba(255,255,255,.9); font-size: 18rpx; }
+.related-metrics--summary { flex: none; }
 .related-summary-tools { flex: none; display: flex; align-items: center; gap: 10rpx; min-height: 44rpx; margin-bottom: 14rpx; }
 .related-valid-switch { display: flex; flex: none; align-items: center; gap: 8rpx; color: #527282; font-size: 22rpx; }
 .related-valid-track { width: 48rpx; height: 28rpx; padding: 2rpx; box-sizing: border-box; border-radius: 20rpx; background: #c9d8df; transition: background .15s; }

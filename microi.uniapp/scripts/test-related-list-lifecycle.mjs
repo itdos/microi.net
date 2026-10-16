@@ -46,6 +46,28 @@ function setup(overrides = {}) {
   return { context, unmount: () => component.beforeUnmount.call(context) }
 }
 
+for (const withSummary of [true, false]) {
+  test(`initial card metadata preserves complete summary statuses only when configured: ${withSummary}`, async () => {
+    const allStatuses = ['待审批', '已审批', '已驳回', '待审批作废', '已作废', '已到期']
+    const cardStatuses = allStatuses.slice(0, 4)
+    const { context } = setup({
+      findMenu: async () => ({ Id: 'menu-1' }),
+      loadNativeModuleFields: async () => [],
+      createMenuModuleDefinition: () => ({ statusOptions: cardStatuses })
+    })
+    context.resolveBusinessModule = () => ({ key: 'related', config: {
+      statusOptions: allStatuses,
+      ...(withSummary ? { relatedSummary: { apiEngineKey: 'summary' } } : {})
+    } })
+    context.loadPresentationConfig = async () => {}
+    context.loadData = async () => {}
+    context.loadRelatedMetrics = async () => {}
+    await context.initialize()
+    assert.equal(context.error, '')
+    assert.deepEqual(Array.from(context.config.statusOptions), withSummary ? allStatuses : cardStatuses)
+  })
+}
+
 for (const stage of ['table', 'definition', 'menu']) {
   test(`switching tabs while ${stage} loads stops the old initialization chain`, async () => {
     const gate = deferred()
