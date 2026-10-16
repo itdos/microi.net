@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$ProcessIds, [Parameter(Mandatory)][string]$WorkspaceRoot)
+param([Parameter(Mandatory)][string]$ProcessIds, [Parameter(Mandatory)][string]$WorkspaceRoot, [switch]$AllowMissing)
 $ErrorActionPreference = 'Stop'
 $isWindowsHost = $env:OS -eq 'Windows_NT'
 if ($isWindowsHost) {
@@ -16,6 +16,7 @@ $rows = @(foreach ($processIdText in $ProcessIds.Split(',')) {
     $processId = [int]$processIdText
     if ($isWindowsHost) {
         $process = Get-CimInstance Win32_Process -Filter "ProcessId=$processId"
+        if ($null -eq $process -and $AllowMissing) { continue }
         if ($null -eq $process -or -not $process.CommandLine -or -not $process.ExecutablePath) { throw 'Owned runtime process is unavailable.' }
         [ordered]@{
             pid = [int]$process.ProcessId; parentPid = [int]$process.ParentProcessId

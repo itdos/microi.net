@@ -465,5 +465,11 @@ if ($Mode -eq 'Full') {
     & (Join-Path $testRoot 'ReleaseGate/read-release-matrix-trx.ps1') -ResultsDirectory $ResultsDirectory -OutputFile $matrixOutcomes
     node $matrixTool verify $matrixReceipt $matrixOutcomes (Join-Path $ResultsDirectory 'release-test-matrix-result.json')
     if ($LASTEXITCODE -ne 0) { throw 'Selected Full matrix has missing provider cases, source drift, or invalid storage/cleanup evidence.' }
+    if ($env:MICROI_TEST_RUNTIME_READY_FILE) {
+        # 先独立确认双 API/Vite 已退出并释放 DLL，保留原桥供加密后冒烟；禁止与 PrepareRelease 争抢进程。
+        $transportReady = Join-Path (Split-Path -Parent $env:MICROI_TEST_RUNTIME_BUILD_FILE) 'transport-only-ready.json'
+        node $stagedTool verify-transport-only $env:MICROI_TEST_RUNTIME_BUILD_FILE $env:MICROI_TEST_RUNTIME_READY_FILE $transportReady (Join-Path $ResultsDirectory 'release-test-matrix-result.json')
+        if ($LASTEXITCODE -ne 0) { throw 'Owned runtimes did not exit or the same-attempt native bridges are unavailable before PrepareRelease.' }
+    }
 }
 Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory"
