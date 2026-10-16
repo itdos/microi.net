@@ -18,6 +18,7 @@ function deferred() {
 
 function setup(overrides = {}) {
   const sandbox = {
+    loadTenantRelatedRows: async () => null, resolveRelatedFormNavigation: async () => null,
     resolveListReadApi, queryMonthValue,
     getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     uni: { $off() {} }, clearTimeout,

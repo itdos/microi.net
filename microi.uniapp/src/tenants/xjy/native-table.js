@@ -1,5 +1,5 @@
 import { V8, getUser } from '@/utils/request.js'
-import { callApiEngine } from '@/platform/business-runtime.js'
+import { callApiEngine, findMenu } from '@/platform/business-runtime.js'
 import { parseJson } from '@/platform/native-form.js'
 import { addTaskDevices } from '@/utils/xjy-task.js'
 import { casePhotoField } from './case-form.mjs'
@@ -10,6 +10,85 @@ const AFTER_SALES_PHOTO_FIELDS = {
   JieguoTP: '59274024-77b5-4c6e-82f3-472947321073',
   PingjiaST: '5b372a6a-32b9-42a1-8375-be991e90d74f',
   ZhuipingT: '9f4f1382-5a2a-44ed-893f-f18fe4dbe833'
+}
+
+const ORDER_TABLE = 'Diy_Dingdan'
+const ORDER_RENEWAL_RELATION_TABLE = 'diy_dingdanxq_relation'
+const ORDER_DRAFT_CHILDREN = new Set(['diy_dingdansp', 'diy_shebeiwz', 'diy_dingdansphc'])
+// 通用元数据可能保留隐藏审计列；草稿代理只提交业务输入，位置摘要由原生事件维护。
+const ORDER_DRAFT_OMITTED_FIELDS = new Set([
+  'createtime', 'updatetime', 'userid', 'username', 'isdeleted',
+  'createuserid', 'updateuserid', 'osclient', 'shebeiazwz', 'shebeiazwzarr'
+])
+
+export async function resolveRelatedFormNavigation(context = {}) {
+  if (String(context.tableName || '').toLowerCase() !== ORDER_RENEWAL_RELATION_TABLE ||
+    String(context.parentTableName || '').toLowerCase() !== ORDER_TABLE.toLowerCase()) return null
+  const menu = await findMenu(['合同订单', '订单'], ORDER_TABLE)
+  const target = { table: ORDER_TABLE, menuId: menu?.Id || '', menuAliases: ['合同订单', '订单'],
+    includeRelated: true, tableChildAuth: null, readWhere: null }
+  if (context.resolveOnly) return target
+  if (!target.menuId) throw new Error('当前账号没有合同订单权限')
+  const action = String(context.action || 'View')
+  if (action === 'Add') {
+    const sourceId = String(context.parentId || context.parentForm?.Id || '')
+    if (!sourceId || String(context.parentMode || '').toLowerCase() === 'add') {
+      throw new Error('请先保存原订单后再新增续签订单')
+    }
+    const result = await callApiEngine('xjy-order-renewal', { Action: 'Preview', SourceOrderId: sourceId })
+    if (!result || Number(result.Code) !== 1 || !result.Data?.Defaults) {
+      throw new Error(result?.Msg || '原订单资料读取失败')
+    }
+    return { ...target, mode: 'Add', title: '新增续签订单', defaultValues: result.Data.Defaults }
+  }
+  const rowId = String(context.row?.XQDingdanID || '')
+  if (!rowId) throw new Error('续签订单关联已失效，请刷新后重试')
+  return { ...target, rowId, mode: action === 'Edit' ? 'Edit' : 'View',
+    title: action === 'Edit' ? '编辑续签订单' : '续签订单详情' }
+}
+
+export async function loadRelatedRows(context = {}) {
+  const table = String(context.tableName || '').toLowerCase()
+  if (!ORDER_DRAFT_CHILDREN.has(table)) return null
+  const parentTable = String(context.parentTableName || '').toLowerCase()
+  if (parentTable !== 'diy_dingdan' && parentTable !== 'diy_dingdansp') return null
+  const orderId = parentTable === 'diy_dingdan'
+    ? (context.parentId || context.parentForm?.Id)
+    : context.parentForm?.DingdanID
+  if (!orderId) return null
+  const result = await callApiEngine('xjy-order-renewal', {
+    Action: 'DraftRows', TableName: context.tableName, ParentId: context.parentId,
+    DingdanID: orderId, _PageIndex: context.pageIndex || 1, _PageSize: context.pageSize || 15,
+    _Keyword: String(context.keyword || '').trim(),
+    _Where: Array.isArray(context.filterWhere) ? context.filterWhere : []
+  })
+  if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '订单草稿明细读取失败')
+  if (result.DataAppend?.UseNativeQuery === true) return null
+  return { rows: Array.isArray(result.Data) ? result.Data : [], count: Number(result.DataCount || 0) }
+}
+
+async function draftRecordAction(context, action, extra = {}) {
+  if (!ORDER_DRAFT_CHILDREN.has(String(context.tableName || '').toLowerCase())) return null
+  const result = await callApiEngine('xjy-order-renewal', {
+    Action: action, TableName: context.tableName, Id: context.rowId || context.values?.Id || '', ...extra
+  })
+  if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '订单明细处理失败')
+  return result.DataAppend?.UseNativeQuery === true ? null : result
+}
+
+export async function loadFormRecord(context = {}) {
+  return draftRecordAction(context, 'DraftRecord')
+}
+
+export async function saveFormRecord(context = {}) {
+  const values = Object.fromEntries(Object.entries(context.values || {})
+    .filter(([name]) => !ORDER_DRAFT_OMITTED_FIELDS.has(name.toLowerCase())))
+  return draftRecordAction(context, 'DraftSave', { Form: values })
+}
+
+export async function deleteRelatedRecord(context = {}) {
+  if (context.readonly === true) throw new Error('此列表只支持查看')
+  return draftRecordAction(context, 'DraftDelete')
 }
 
 export function customerCaseChildField(parentTableName, field) {
@@ -190,6 +269,11 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
 }
 
 export default {
+  resolveRelatedFormNavigation,
+  loadRelatedRows,
+  loadFormRecord,
+  saveFormRecord,
+  deleteRelatedRecord,
   customerCaseChildField,
   appendOpenTableWhere,
   validateOpenTableContext,

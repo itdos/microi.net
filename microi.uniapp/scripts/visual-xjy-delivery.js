@@ -3,6 +3,7 @@ const http = require('http');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const WebSocketClient = globalThis.WebSocket || require('ws');
+const { randomUUID } = require('node:crypto');
 const { findWorkspaceRoot } = require('./lib/workspace-paths');
 
 const root = path.resolve(__dirname, '..');
@@ -157,6 +158,96 @@ const orderDetail = {
   HetongKSSJ: '2026-08-01', HetongJSSJ: '2029-07-31', FuwuKSSJ: '2026-08-01', FuwuJSSJ: '2029-07-31',
   BaoyangZQ: 3, ShuizhiJCZQ: 6, ShouhouRY: '张服务', ShouhouRYDH: '13900001234', CreateTime: '2026-07-15 09:20:00'
 };
+
+// 独立本地续签夹具：合同与商品快照可变，真实设备身份和 IoT 绑定始终保留。
+const renewalSourceOrder = { ...orderDetail, Id: 'visual-renewal-source-order-001', DingdanBH: 'HT-RENEW-001',
+  DingdanZT: '已审批', DingdanZTZ: 2, XinLDD: '老客户新增订单',
+  HetongKSSJ: '2026-08-01', HetongJSSJ: '2027-07-31', FuwuKSSJ: '2026-08-01', FuwuJSSJ: '2027-07-31' };
+const renewalSourceProduct = { Id: 'visual-renewal-source-product-001', DingdanID: renewalSourceOrder.Id,
+  KehuID: renewalSourceOrder.KehuID, ShangpinID: 'product-001', ShangpinMC: '校园直饮机续约服务',
+  ShebeiBH: 'JFL-S600', HezuoFS: '买断+包年换芯', Shuliang: 1, ShebeiSJDJ: 1200, Xianjia: 1200,
+  Zongjia: 1200, ShijiJG: 1200, LvxinSJDJ: 360, LvxinZJ: 360, LvxinYJ: 360 };
+const renewalSourcePosition = { Id: 'visual-renewal-source-position-001', DingdanID: renewalSourceOrder.Id,
+  DingdanSPID: renewalSourceProduct.Id, ShangpinID: 'product-001', ShangpinXH: 'JFL-S600',
+  ShangpinBH: 'SB-HZ-2026-0068', AnzhuangWZ: '教学楼一层饮水间', Renshu: 30,
+  IoTDeviceId: 'iot-001', IoTDeviceNames: '新纪源 / IOT-0068 / 校园直饮机',
+  AnzhuangWZ_Lng: '120.18', AnzhuangWZ_Lat: '30.19' };
+const visualOrderDrafts = new Map();
+const renewalChildRows = { diy_dingdansp: new Map(), diy_shebeiwz: new Map(), diy_dingdansphc: new Map() };
+
+function renewalDefaults() {
+  return { ...renewalSourceOrder, Id: undefined, DingdanBH: '', HetongBH: '', DingdanZT: '待审批', DingdanZTZ: 1,
+    XinLDD: '老客户续签订单', XQDingdanID: renewalSourceOrder.Id, XQDingdanBH: renewalSourceOrder.DingdanBH,
+    RenewalInitialized: 1, RenewalTermMonths: null, ShifouXYAZ: 0,
+    HetongKSSJ: '2027-08-01', HetongJSSJ: '2028-07-31', FuwuKSSJ: '2027-08-01', FuwuJSSJ: '2028-07-31' };
+}
+
+function orderDraftMock(key, body) {
+  const action = String(body.Action || '');
+  if (key === 'xjy-order-draft') {
+    const id = String(body.DingdanID || '');
+    if (!id) return { Code: 0, Msg: '本地夹具缺少订单 Id' };
+    let draft = visualOrderDrafts.get(id);
+    if (action === 'Begin') {
+      if (!draft) { draft = { Id: id, Status: 'Active', KehuID: body.KehuID || '', source: '' }; visualOrderDrafts.set(id, draft); }
+    } else if (!draft) return { Code: 0, Msg: '本地订单草稿不存在' };
+    if (action === 'Cancel') {
+      draft.Status = 'Cancelled';
+      Object.values(renewalChildRows).forEach(rows => rows.forEach((row, childId) => { if (row.DingdanID === id) rows.delete(childId); }));
+    } else if (!['Begin', 'Touch'].includes(action)) return { Code: 0, Msg: `本地未声明的草稿动作：${action}` };
+    return { Code: 1, Data: { Id: id, Status: draft.Status } };
+  }
+  if (key !== 'xjy-order-renewal') return null;
+  if (action === 'Preview') {
+    if (body.SourceOrderId !== renewalSourceOrder.Id) return { Code: 0, Msg: '本地续签来源不存在' };
+    return { Code: 1, Data: { Defaults: renewalDefaults() } };
+  }
+  if (action === 'Initialize') {
+    const draft = visualOrderDrafts.get(String(body.DingdanID || ''));
+    if (!draft || draft.Status !== 'Active' || body.SourceOrderId !== renewalSourceOrder.Id) return { Code: 0, Msg: '本地续签草稿或来源无效' };
+    const already = Boolean(draft.source);
+    if (!already) {
+      draft.source = renewalSourceOrder.Id;
+      const productId = randomUUID();
+      const positionId = randomUUID();
+      renewalChildRows.diy_dingdansp.set(productId, { ...renewalSourceProduct, Id: productId, DingdanID: draft.Id,
+        RenewalSourceSPID: renewalSourceProduct.Id, RenewalChargeMode: 'Service', ShebeiSJDJ: 0, Zongjia: 0, ShijiJG: 0 });
+      renewalChildRows.diy_shebeiwz.set(positionId, { ...renewalSourcePosition, Id: positionId, DingdanID: draft.Id,
+        DingdanSPID: productId, DeviceUseType: 'Reuse', ReuseKehuSBID: 'device-001', SourcePositionID: renewalSourcePosition.Id });
+    }
+    return { Code: 1, Data: { Defaults: renewalDefaults(), AlreadyInitialized: already, SkippedDevices: [] } };
+  }
+  const table = String(body.TableName || '').toLowerCase();
+  const rows = renewalChildRows[table];
+  if (!rows) return { Code: 0, Msg: '本地草稿子表未声明' };
+  if (action === 'DraftRows') {
+    const draft = visualOrderDrafts.get(String(body.DingdanID || ''));
+    if (!draft) return { Code: 1, Data: [], DataCount: 0, DataAppend: { UseNativeQuery: true } };
+    if (draft.Status !== 'Active') return { Code: 0, Msg: '本地订单草稿已关闭' };
+    const matches = [...rows.values()].filter(row => row.DingdanID === draft.Id &&
+      (!body.ParentId || (table === 'diy_dingdansp' ? row.DingdanID : row.DingdanSPID) === body.ParentId) &&
+      (!body._Keyword || JSON.stringify(row).includes(body._Keyword)));
+    const size = Number(body._PageSize || 15), start = (Number(body._PageIndex || 1) - 1) * size;
+    return { Code: 1, Data: matches.slice(start, start + size), DataCount: matches.length };
+  }
+  const id = String(body.Id || body.Form?.Id || '');
+  const existing = rows.get(id);
+  const values = body.Form || {};
+  const product = table === 'diy_dingdansp' ? null : renewalChildRows.diy_dingdansp.get(values.DingdanSPID || existing?.DingdanSPID);
+  const orderId = existing?.DingdanID || product?.DingdanID || values.DingdanID;
+  const draft = visualOrderDrafts.get(String(orderId || ''));
+  if (!draft) return { Code: 1, DataAppend: { UseNativeQuery: true } };
+  if (draft.Status !== 'Active') return { Code: 0, Msg: '本地订单草稿已关闭' };
+  if (action === 'DraftRecord') return existing ? { Code: 1, Data: existing } : { Code: 0, Msg: '本地明细不存在' };
+  if (action === 'DraftSave') {
+    if (!id) return { Code: 0, Msg: '本地新增明细缺少 Id' };
+    const saved = { ...existing, ...values, Id: id, DingdanID: draft.Id };
+    rows.set(id, saved);
+    return { Code: 1, Data: saved };
+  }
+  if (action === 'DraftDelete') { rows.delete(id); return { Code: 1, Data: { Id: id } }; }
+  return { Code: 0, Msg: `本地未声明的续签动作：${action}` };
+}
 
 const deviceDetail = {
   Id: 'device-001', ShebeiBH: 'SB-HZ-2026-0068', ShangpinMC: '集福鲤校园直饮机', ShebeiXH: 'JFL-S600',
@@ -313,6 +404,10 @@ const moduleRows = {
   Diy_Kehu: { rows: customers, count: customers.length, statistics: { YuqiJYJE: 571000 } },
   Diy_ShouhouDD: { rows: [taskDetail], count: 7, statistics: {} },
   Diy_Dingdan: { rows: [orderDetail, { ...orderDetail, Id: 'order-002', DingdanBH: 'DD202512080033', DingdanZT: '已审批' }], count: 28, statistics: { DingdanJE: 1268000 } },
+  Diy_DingdanSP: { rows: [renewalSourceProduct], count: 1, statistics: {} },
+  diy_shebeiwz: { rows: [renewalSourcePosition], count: 1, statistics: {} },
+  diy_dingdansphc: { rows: [], count: 0, statistics: {} },
+  diy_dingdanxq_relation: { rows: [], count: 0, statistics: {} },
   Diy_KehuSB: { rows: [], count: 143, statistics: {} },
   diy_iot_device: { rows: [{ Id: 'iot-001', Provider: 'xinjiyuan', DeviceCode: 'IOT-0068', DeviceName: '校园直饮机', Enabled: 1, TenantId: 'tenant-xjy' }], count: 1, statistics: {} },
   Diy_Tenant: { rows: [merchantDetail], count: 1, statistics: {} }
@@ -333,7 +428,8 @@ const customerDetailTable = {
 // 本地视觉替身显式声明授权菜单与表模型，不能把空菜单/统计对象当模块协议。
 const visualMenus = Object.entries(moduleRows).map(([tableName]) => ({
   Id: `visual-menu-${tableName.toLowerCase()}`,
-  Name: ({ Diy_Kehu: '我的客户', Diy_ShouhouDD: '售后任务', Diy_Dingdan: '合同订单', Diy_KehuSB: '设备列表', Diy_Tenant: '商家', diy_iot_device: 'IoT物联网设备' })[tableName],
+  Name: ({ Diy_Kehu: '我的客户', Diy_ShouhouDD: '售后任务', Diy_Dingdan: '合同订单', Diy_KehuSB: '设备列表', Diy_Tenant: '商家', diy_iot_device: 'IoT物联网设备',
+    Diy_DingdanSP: '订单商品', diy_shebeiwz: '订单商品安装位置', diy_dingdansphc: '订单耗材', diy_dingdanxq_relation: '合同订单相关续签订单' })[tableName],
   DiyTableId: `visual-table-${tableName.toLowerCase()}`, DiyTableName: tableName,
   ModuleEngineKey: tableName, Display: 1, AppDisplay: 1,
   MoreBtns: tableName === 'Diy_ShouhouDD' ? [{ Id: '3e66f489-6817-4a70-bf40-26a922fd3d51', Name: '完成', ShowRow: true }] : [],
@@ -352,7 +448,8 @@ orderVisualMenu.ViewSchema = JSON.stringify({ SchemaVersion: '1.0', Views: [{ Ke
 const visualRowsByTable = {
   diy_kehu: customerDetail, diy_shouhoudd: taskDetail, diy_dingdan: orderDetail,
   diy_kehusb: deviceDetail, diy_iot_device: moduleRows.diy_iot_device.rows[0], diy_tenant: merchantDetail, diy_xiansuo: leadDetail,
-  diy_zhaopin: recruitmentDetail, diy_needrelease: demandDetail, diy_anlice: casebookDetail
+  diy_zhaopin: recruitmentDetail, diy_needrelease: demandDetail, diy_anlice: casebookDetail,
+  diy_dingdansp: renewalSourceProduct, diy_shebeiwz: renewalSourcePosition
 };
 function visualTable(tableKey) {
   const normalized = String(tableKey || '').toLowerCase().replace(/^visual-table-/, '');
@@ -371,6 +468,12 @@ function visualFields(tableKey) {
   if (normalized === 'diy_anli') return customerCaseFields;
   if (normalized === 'diy_anlice_child') return casebookCaseFields;
   if (normalized === 'diy_kehusb') return deviceIotFields;
+  if (normalized === 'diy_dingdanxq_relation') return [
+    { Id: 'renewal-relation-id', Name: 'XQDingdanID', Label: '续签订单Id', Component: 'Text', Visible: 0, AppVisible: 0, Config: '{}' },
+    ...['DingdanBH', 'KehuMC', 'DingdanZT', 'HetongKSSJ', 'HetongJSSJ'].map((Name, index) => ({
+      Id: `renewal-relation-${Name}`, Name, Label: Name, Component: 'Text', Visible: 1, AppVisible: 1, Readonly: 1, Sort: index + 1, Config: '{}'
+    }))
+  ];
   if (normalized === 'diy_iot_device') return [
     { Id: 'iot-code', Name: 'DeviceCode', Label: 'IoT设备编号', Component: 'Text', Visible: 1, AppVisible: 1, Config: '{}' },
     { Id: 'iot-name', Name: 'DeviceName', Label: '设备名称', Component: 'Text', Visible: 1, AppVisible: 1, Config: '{}' },
@@ -378,7 +481,13 @@ function visualFields(tableKey) {
   ];
   const row = visualRowsByTable[normalized];
   if (!row) return [];
-  const labels = { KehuMC: '客户名称', TenantName: '商家名称', LianxiR: '联系人', LianxiRDH: '联系电话', LianxiDH: '联系电话', KehuLX: '客户类型', FuzeR: '负责人', Chengshi: '城市', Zhuangtai: '状态', DingdanBH: '订单编号', DingdanJE: '订单金额' };
+  const labels = { KehuMC: '客户名称', TenantName: '商家名称', LianxiR: '联系人', LianxiRDH: '联系电话', LianxiDH: '联系电话', KehuLX: '客户类型', FuzeR: '负责人', Chengshi: '城市', Zhuangtai: '状态', DingdanBH: '订单编号', DingdanJE: '订单金额',
+    HetongBH: '合同编号', DingdanZT: '订单状态', XinLDD: '订单类型', DingdanHZFS: '合作方式', XiadanRQ: '下单日期',
+    YujiSKSJ: '预计收款时间', YewuY: '业务员', YewuYDH: '业务员电话', BaoyangZQ: '保养周期', ShuizhiJCZQ: '水质检测周期',
+    ShouhouRY: '售后人员', ShouhouRYDH: '售后人员电话', ShangpinMC: '设备名称', ShangpinXH: '设备型号',
+    ShebeiBH: '设备型号', HezuoFS: '合作方式', Shuliang: '设备数量', ShebeiSJDJ: '设备实际单价', LvxinSJDJ: '滤芯服务单价',
+    LvxinZJ: '滤芯服务总价', LvxinYJ: '滤芯服务原价', Xianjia: '设备原单价', Zongjia: '设备总价', ShijiJG: '商品实际价格',
+    Renshu: '人数', AnzhuangWZ_Lng: '安装位置经度', AnzhuangWZ_Lat: '安装位置纬度' };
   const fields = Object.keys(row).filter(name => name !== 'Id').map((Name, index) => ({
     Id: `visual-field-${normalized}-${Name}`, Name, TableName: table.Name,
     Label: labels[Name] || Name, Component: Name === 'Chengshi' ? 'Address' : typeof row[Name] === 'number' ? 'NumberText' : 'Text',
@@ -388,7 +497,49 @@ function visualFields(tableKey) {
   if (normalized === 'diy_kehu') fields.push({ Id: 'visual-customer-orders', Name: 'Orders', Label: '订单列表', Component: 'TableChild', Visible: 1, AppVisible: 1, Sort: 100, Tab: 'customer-orders', Config: JSON.stringify({
     TableChildTableId: 'visual-table-diy_dingdan', TableChildSysMenuId: 'visual-menu-diy_dingdan', TableChildSysMenuName: '合同订单', TableChildFkFieldName: 'KehuID', TableChild: { PrimaryTableFieldName: 'Id' }
   }) });
+  if (normalized === 'diy_dingdan') {
+    const dateLabels = { HetongKSSJ: '合同开始时间', HetongJSSJ: '合同结束时间', FuwuKSSJ: '服务开始时间', FuwuJSSJ: '服务结束时间' };
+    fields.forEach(field => {
+      if (dateLabels[field.Name]) Object.assign(field, { Label: dateLabels[field.Name], Component: 'DateTime', Readonly: 0, Config: '{"DateTimeType":"date"}' });
+      if (['DingdanZTZ', 'KehuID'].includes(field.Name)) Object.assign(field, { Visible: 0, AppVisible: 0 });
+    });
+    fields.push(...[
+      { Name: 'XQDingdanID', Label: '原订单Id', Visible: 0 },
+      { Name: 'RenewalInitialized', Label: '已初始化', Visible: 0 },
+      { Name: 'XQDingdanBH', Label: '原订单编号', Visible: 1, Readonly: 1 }
+    ].map((field, index) => ({ Id: `visual-order-${field.Name}`, Component: 'Text', Sort: 70 + index,
+      Config: '{}', AppVisible: field.Visible, ...field })));
+    fields.push(visualChildField('ShangpinSZ', '商品列表', 'Diy_DingdanSP', 'DingdanID', 100));
+    fields.push(visualChildField('XiangguanDD', '相关订单', 'diy_dingdanxq_relation', 'ParentDingdanID', 110));
+  }
+  if (normalized === 'diy_dingdansp') {
+    fields.forEach(field => { if (field.Name.endsWith('ID')) Object.assign(field, { Visible: 0, AppVisible: 0 }); });
+    fields.push(...[
+      { Name: 'RenewalSourceSPID', Label: '来源商品Id', Visible: 0 },
+      { Name: 'RenewalChargeMode', Label: '本次收费范围', Visible: 1, Component: 'Select',
+        Data: '[{"Key":"Service","Value":"仅服务或换芯"},{"Key":"Original","Value":"按商品合作方式"}]', Config: '{"SelectSaveField":"Key","SelectLabel":"Value"}' }
+    ].map((field, index) => ({ Id: `visual-product-${field.Name}`, Component: 'Text', Sort: 50 + index,
+      Config: '{}', AppVisible: field.Visible, ...field })));
+    fields.push(visualChildField('AnzhuangWZ', '安装位置', 'diy_shebeiwz', 'DingdanSPID', 100));
+  }
+  if (normalized === 'diy_shebeiwz') {
+    fields.forEach(field => {
+      if (field.Name.endsWith('ID') || field.Name === 'IoTDeviceId') Object.assign(field, { Visible: 0, AppVisible: 0 });
+      if (field.Name === 'AnzhuangWZ') field.Label = '安装位置';
+      if (field.Name === 'ShangpinBH') { field.Label = '设备编号'; field.Readonly = 1; }
+      if (field.Name === 'IoTDeviceNames') { field.Label = '已关联IoT设备'; field.Readonly = 1; }
+    });
+    fields.push(...['DeviceUseType', 'ReuseKehuSBID', 'SourcePositionID'].map(Name => ({ Id: `visual-position-${Name}`,
+      Name, Component: 'Text', Visible: 0, AppVisible: 0, Config: '{}' })));
+  }
   return fields;
+}
+
+function visualChildField(Name, Label, table, foreignKey, Sort) {
+  return { Id: `visual-child-${Name}`, Name, Label, Component: 'TableChild', Visible: 1, AppVisible: 1, Sort,
+    Config: JSON.stringify({ TableChildTableId: `visual-table-${table.toLowerCase()}`,
+      TableChildSysMenuId: `visual-menu-${table.toLowerCase()}`, TableChildSysMenuName: Label,
+      TableChildFkFieldName: foreignKey, TableChild: { PrimaryTableFieldName: 'Id', FieldRelations: [['DingdanID', 'DingdanID'], ['ShangpinID', 'ShangpinID']] } }) };
 }
 function visualCustomerContractTotals(ids) {
   // 固定测试金额，只证明五项显示和排版；真实金额核对由独立线上验收完成。
@@ -548,6 +699,12 @@ const targets = [
     name: 'order-approval', route: '/#/pages/business/detail?key=orders&id=order-001', selector: '.detail-page',
     clickSelector: '.bottom-actions .action-button--primary', afterSelector: '.approval-opinion',
     required: ['.hero-band', '.dialog-panel', '.approval-opinion'], expectedText: ['审批通过', '资料完整']
+  },
+  {
+    name: 'order-renewal-create', route: `/#/pages/business/detail?key=orders&id=${renewalSourceOrder.Id}`, selector: '.detail-page',
+    selectorAfterClick: '.native-form-page', required: ['.native-form', '.form-section', '.form-actions'],
+    expectedText: ['新增续签订单', '合同开始时间', '服务结束时间', '商品列表', '校园直饮机续约服务'],
+    renewalFlow: true
   },
   {
     name: 'device-detail', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
@@ -983,6 +1140,7 @@ function buildMockResponse(request) {
   mockRequestLog.push({ url, body, table, time: Date.now() });
 
   if (request.method === 'OPTIONS') return { status: 204, body: '' };
+  if (apiEngineKey === 'xjy-order-draft' || apiEngineKey === 'xjy-order-renewal') return orderDraftMock(apiEngineKey, body);
   if (apiEngineKey === 'xjy-order-contract-totals') {
     const valid = body.Filters?.ValidOnly !== false;
     if (body._TableChildAuth) {
@@ -1035,6 +1193,14 @@ function buildMockResponse(request) {
       const state = (body._Where || []).find(w => w.Name === 'DingdanZT' && w.Type === '=')?.Value;
       const rows = state ? result.rows.filter(row => row.DingdanZT === state) : result.rows;
       return { Code:1, Data:rows, DataCount:rows.length, DataAppend:{StatisticsFields:{}} };
+  }
+  if (Object.prototype.hasOwnProperty.call(renewalChildRows, String(table).toLowerCase()) &&
+    (lowerUrl.includes('gettabledata') || apiEngineKey === 'platform-module-data')) {
+    const source = moduleRows[table] || Object.entries(moduleRows).find(([name]) => name.toLowerCase() === String(table).toLowerCase())?.[1];
+    const equalities = (Array.isArray(body._Where) ? body._Where : []).map(condition => Array.isArray(condition)
+      ? { Name: condition[0], Type: condition[1], Value: condition[2] } : condition).filter(condition => condition.Type === '=');
+    const matches = (source?.rows || []).filter(row => equalities.every(condition => String(row[condition.Name] ?? '') === String(condition.Value ?? '')));
+    return { Code: 1, Data: matches, DataCount: matches.length };
   }
   if (lowerUrl.includes('moduleengine/gettabledata') || apiEngineKey === 'platform-module-data') {
     const result = moduleRows[table] || { rows: [], count: 0, statistics: {} };
@@ -1106,6 +1272,7 @@ function buildMockResponse(request) {
     return { Code: 1, Data: { Id: 'order-product-001', ShangpinID: 'product-001' } };
   }
   if (lowerUrl.includes('getformdata') && (table === 'Diy_Dingdan' || lowerUrl.includes('diy_dingdan'))) {
+    if (body.Id === renewalSourceOrder.Id) return { Code: 1, Data: renewalSourceOrder };
     return { Code: 1, Data: orderDetail };
   }
   if (lowerUrl.includes('getformdataanonymous') && String(table).toLowerCase() === 'diy_shangpin') {
@@ -1495,7 +1662,7 @@ async function testPeriodFiltersAndRefresh(cdp, appPort) {
   console.log(`PASS period-filter-refresh -> business 2/9, task type counts, 去年, refresh completion, full title.`);
 }
 
-async function setLoggedInState(cdp) {
+async function setLoggedInState(cdp, options = {}) {
   const user = {
     Id: 'user-001', Account: 'admin', Name: '张服务', Phone: '13900001234',
     RoleName: '售后服务工程师', TenantId: 'tenant-xjy', TenantName: '集福鲤杭州运营中心',
@@ -1505,6 +1672,11 @@ async function setLoggedInState(cdp) {
       { Type: 'Menu', FkId: 'visual-menu-diy_kehusb', Permission: [{ Name: 'Edit' }] },
       { Type: 'Menu', FkId: 'visual-menu-diy_iot_device', Permission: [{ Name: 'Add' }] }]
   };
+  if (options.renewal) {
+    ['diy_dingdan', 'diy_dingdansp', 'diy_shebeiwz', 'diy_dingdansphc'].forEach(table => user._RoleLimits.push({
+      Type: 'Menu', FkId: `visual-menu-${table}`, Permission: ['Read', 'Add', 'Edit', 'Del']
+    }));
+  }
   await cdp.send('Runtime.evaluate', {
     expression: `localStorage.setItem('microi_token', 'xjy-visual-token'); localStorage.setItem('microi_user', ${JSON.stringify(JSON.stringify(user))});`,
     returnByValue: true
@@ -1867,6 +2039,68 @@ async function verifyHeroVideo(cdp, target) {
   return { before, after };
 }
 
+async function testOrderRenewalFlow(cdp, viewport) {
+  const start = mockRequestLog.length;
+  const helpers = `
+    function proxy(node, predicate) { let item = node && node.__vueParentComponent; while (item) { if (item.proxy && predicate(item.proxy)) return item.proxy; item = item.parent; } return null; }
+    function page() { return proxy([...document.querySelectorAll('.native-form-page')].at(-1), item => typeof item.tenantFormContext === 'function'); }
+    function related(name) { for (const node of [...document.querySelectorAll('.related-business-list')].reverse()) { const item = proxy(node, candidate => candidate.field && candidate.field.Name === name && typeof candidate.openAdd === 'function'); if (item) return item; } return null; }
+    function field(name) { const current = page(); if (!current) return null; for (const node of current.$el.querySelectorAll('.native-control')) { const item = proxy(node, candidate => candidate.field && candidate.field.Name === name && typeof candidate.changeDate === 'function'); if (item) return item; } return null; }
+  `;
+  const evaluate = async body => {
+    const result = await cdp.send('Runtime.evaluate', { expression: `(async () => { ${helpers} ${body} })()`, awaitPromise: true, returnByValue: true });
+    if (result.exceptionDetails) fail(`续签本地流程脚本失败：${result.exceptionDetails.exception?.description || result.exceptionDetails.text}`);
+    return result.result.value;
+  };
+  const wait = body => waitForExpression(cdp, `(() => { ${helpers} return ${body}; })()`);
+  const capture = async suffix => {
+    const shot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    const screenshotPath = path.join(outputRoot, `order-renewal-${suffix}-${viewport.name}.png`);
+    fs.writeFileSync(screenshotPath, Buffer.from(shot.data, 'base64'));
+    return screenshotPath;
+  };
+
+  await wait(`related('XiangguanDD')?.canAdd === true`);
+  await evaluate(`const control = related('XiangguanDD').$el.querySelector('.preview-action--add'); if (!control) throw new Error('相关订单新增按钮不存在'); control.click();`);
+  await wait(`page()?.tableName === 'Diy_Dingdan' && page()?.mode === 'Add' && page()?.tenantFormState.orderDraftReady === true && !page()?.error`);
+  const initial = await evaluate(`const current = page(); const names = ['HetongKSSJ','HetongJSSJ','FuwuKSSJ','FuwuJSSJ']; return { table:current.tableName, mode:current.mode, id:current.draftRowId, source:current.form.XQDingdanID, dates:names.map(name => { const control=field(name); return { name, editable:Boolean(control && !control.readonly && control.$el.querySelector('uni-picker')), value:current.form[name] }; }) };`);
+  if (initial.table !== 'Diy_Dingdan' || initial.mode !== 'Add' || initial.source !== renewalSourceOrder.Id || initial.dates.some(item => !item.editable)) {
+    fail(`续签未打开真实可编辑完整合同：${JSON.stringify(initial)}`);
+  }
+  // 通过实际原生字段的日期回调发出更新事件，覆盖页面联动，不能只改页面数据伪装可编辑。
+  await evaluate(`for (const [name,value] of [['HetongKSSJ','2027-08-03'],['HetongJSSJ','2028-08-02'],['FuwuKSSJ','2027-08-03'],['FuwuJSSJ','2028-08-02']]) { field(name).changeDate({detail:{value}}); await page().$nextTick(); } field('FuwuKSSJ').$el.scrollIntoView({block:'center'});`);
+  const datesScreenshot = await capture('dates-editable');
+  await wait(`related('ShangpinSZ')?.rows?.length === 1`);
+  await evaluate(`const card=related('ShangpinSZ').$el.querySelector('.data-card'); if(!card)throw new Error('继承商品卡片不存在'); card.click();`);
+  await wait(`page()?.tableName === 'Diy_DingdanSP' && page()?.mode === 'View' && !page()?.loading && !page()?.error`);
+  const product = await evaluate(`return { id:page().form.Id, source:page().form.RenewalSourceSPID, scope:page().form.RenewalChargeMode, hardware:page().form.ShebeiSJDJ };`);
+  if (!product.id || product.id === renewalSourceProduct.Id || product.source !== renewalSourceProduct.Id || product.scope !== 'Service' || Number(product.hardware) !== 0) fail(`商品未按续签复制：${JSON.stringify(product)}`);
+  await evaluate(`page().$el.querySelector('.edit-command').click();`);
+  await wait(`page()?.tableName === 'Diy_DingdanSP' && page()?.mode === 'Edit' && !page()?.loading && !page()?.error`);
+  await evaluate(`const control=field('LvxinSJDJ'); if(!control || control.readonly)throw new Error('续签滤芯费用不可编辑'); const input=control.$el.querySelector('input'); if(!input)throw new Error('滤芯费用输入框不存在'); input.value='380'; input.dispatchEvent(new Event('input',{bubbles:true})); await page().$nextTick(); page().$el.querySelector('.form-actions__primary').click();`);
+  await wait(`page()?.tableName === 'Diy_DingdanSP' && page()?.mode === 'View' && Number(page()?.form.LvxinSJDJ) === 380 && !page()?.loading`);
+  await wait(`related('AnzhuangWZ')?.rows?.length === 1`);
+  await evaluate(`const card=related('AnzhuangWZ').$el.querySelector('.data-card'); if(!card)throw new Error('继承安装位置卡片不存在'); card.click();`);
+  await wait(`page()?.tableName === 'diy_shebeiwz' && page()?.mode === 'View' && !page()?.loading && !page()?.error`);
+  const position = await evaluate(`return { id:page().form.Id, source:page().form.SourcePositionID, device:page().form.ReuseKehuSBID, number:page().form.ShangpinBH, iot:page().form.IoTDeviceId };`);
+  if (!position.id || position.id === renewalSourcePosition.Id || position.source !== renewalSourcePosition.Id || position.device !== 'device-001' || position.number !== renewalSourcePosition.ShangpinBH || position.iot !== 'iot-001') fail(`沿用设备身份或IoT绑定不一致：${JSON.stringify(position)}`);
+  await evaluate(`page().$el.querySelector('.edit-command').click();`);
+  await wait(`page()?.tableName === 'diy_shebeiwz' && page()?.mode === 'Edit' && !page()?.loading && !page()?.error`);
+  await evaluate(`const control=field('AnzhuangWZ'); if(!control || control.readonly)throw new Error('续签安装位置不可编辑'); const input=control.$el.querySelector('input'); input.value='教学楼一层饮水间（续签微调）'; input.dispatchEvent(new Event('input',{bubbles:true})); await page().$nextTick(); page().$el.querySelector('.form-actions__primary').click();`);
+  await wait(`page()?.tableName === 'diy_shebeiwz' && page()?.mode === 'View' && page()?.form.AnzhuangWZ === '教学楼一层饮水间（续签微调）' && !page()?.loading`);
+  await delay(1600);
+  const positionScreenshot = await capture('position-inherited');
+  await evaluate(`for(let index=0;index<4;index++){const current=page();if(current?.tableName==='Diy_Dingdan')return true;current.goBack();await new Promise(resolve=>setTimeout(resolve,350));}throw new Error('未返回续签合同录入页');`);
+  await wait(`page()?.tableName === 'Diy_Dingdan' && page()?.mode === 'Add' && !page()?.loading`);
+  const final = await evaluate(`const current=page();return { start:current.form.HetongKSSJ,end:current.form.HetongJSSJ,serviceStart:current.form.FuwuKSSJ,serviceEnd:current.form.FuwuJSSJ };`);
+  if (final.start !== '2027-08-03' || final.end !== '2028-08-02' || final.serviceStart !== final.start || final.serviceEnd !== final.end) fail(`返回明细后丢失合同日期微调：${JSON.stringify(final)}`);
+  const saves = mockRequestLog.slice(start).filter(item => item.body.Action === 'DraftSave').map(item => item.body);
+  if (!saves.some(item => String(item.TableName).toLowerCase() === 'diy_dingdansp') || !saves.some(item => item.TableName === 'diy_shebeiwz')) fail('商品或点位微调未通过草稿服务保存');
+  if (mockRequestLog.slice(start).some(item => /iot.*bind|bind.*iot/i.test(item.url))) fail('续签微调错误触发真实IoT绑定接口');
+  return { source: 'local isolated API fixture', orderId: initial.id, product, position, dates: final,
+    datesScreenshot, positionScreenshot, draftSaves: saves.length };
+}
+
 function waitForProcessExit(child, timeoutMs = 2500) {
   if (!child || child.exitCode !== null) return Promise.resolve();
   return new Promise((resolve) => {
@@ -1892,6 +2126,7 @@ async function main() {
   let navigationViewport = null;
   let completed = false;
   const browserErrors = [];
+  let browserStartupLog = '';
   let currentContext = 'startup';
 
   try {
@@ -1902,9 +2137,12 @@ async function main() {
     browser = spawn(browserPath, [
       `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`,
       '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-      '--disable-background-networking', '--hide-scrollbars', 'about:blank'
-    ], { stdio: 'ignore' });
-    cdp = await connectCdp(await waitForDebugger(debugPort));
+      '--disable-background-networking', '--disable-extensions', '--renderer-process-limit=1',
+      '--hide-scrollbars', 'about:blank'
+    ], { stdio: ['ignore', 'ignore', 'pipe'] });
+    browser.stderr.on('data', chunk => { browserStartupLog = (browserStartupLog + chunk.toString()).slice(-4000); });
+    try { cdp = await connectCdp(await waitForDebugger(debugPort)); }
+    catch (error) { throw new Error(`Browser debugger connection failed (${browserPath}, exit=${browser.exitCode}): ${error?.message || String(error)}; ${browserStartupLog}`); }
     await cdp.send('Page.enable');
     await cdp.send('Runtime.enable');
     cdp.on('Runtime.exceptionThrown', (event) => {
@@ -1950,7 +2188,7 @@ async function main() {
             returnByValue: true
           });
         } else {
-          await setLoggedInState(cdp);
+          await setLoggedInState(cdp, { renewal: target.renewalFlow === true });
         }
         const route = target.route.startsWith('/#') ? target.route.slice(1) : target.route;
         const safe = viewport.safe || {};
@@ -1969,6 +2207,7 @@ async function main() {
         await cdp.send('Page.navigate', { url: `http://127.0.0.1:${appPort}/?visual=${Date.now()}&${safeQuery}${route}` });
         await waitForSelector(cdp, target.selector);
         await delay(900);
+        const renewalFlow = target.renewalFlow ? await testOrderRenewalFlow(cdp, viewport) : null;
         if (target.invokeMethod) {
           const invocation = await cdp.send('Runtime.evaluate', {
             expression: `(async () => {
@@ -2064,13 +2303,20 @@ async function main() {
         const unexpectedBrowserErrors = routeErrors.filter((item) => !allowedPatterns.some((pattern) => item.text.includes(pattern)));
         const result = {
           target: target.name, viewport: viewport.name, screenshotPath, fileSize, layout,
-          waterMotion, customerContractTotals, deviceIoTActions, browserErrors: unexpectedBrowserErrors, expectedBrowserErrors
+          waterMotion, customerContractTotals, deviceIoTActions, renewalFlow, browserErrors: unexpectedBrowserErrors, expectedBrowserErrors
         };
         report.push(result);
         if (!layout || !layout.ok) fail(`Layout check failed for ${target.name} at ${viewport.name}: ${JSON.stringify(layout)}`);
         if (unexpectedBrowserErrors.length) fail(`Browser error for ${target.name} at ${viewport.name}: ${JSON.stringify(unexpectedBrowserErrors)}`);
         if (fileSize < 12000 || layout.bodyTextLength < 20) fail(`Screenshot appears blank for ${target.name} at ${viewport.name}.`);
         console.log(`PASS ${target.name} ${viewport.name} -> ${screenshotPath}`);
+        if (renewalFlow) {
+          await cdp.send('Runtime.evaluate', { expression: `(() => {let item=[...document.querySelectorAll('.native-form-page')].at(-1).__vueParentComponent;while(item && !(item.proxy && typeof item.proxy.goBack==='function' && item.proxy.tableName==='Diy_Dingdan'))item=item.parent;if(!item)throw new Error('续签取消页不存在');item.proxy.goBack();})()`, returnByValue: true });
+          const deadline = Date.now() + 5000;
+          while (visualOrderDrafts.get(renewalFlow.orderId)?.Status !== 'Cancelled' && Date.now() < deadline) await delay(50);
+          if (visualOrderDrafts.get(renewalFlow.orderId)?.Status !== 'Cancelled') fail('本地续签取消没有释放服务器草稿');
+          renewalFlow.cancelled = true;
+        }
         if (target.name === 'customer-detail') await testCustomerContractCollapse(cdp, viewport);
         if (target.name === 'home-header') await testHomeHeaderRecovery(cdp, viewport);
         if (target.name === 'directory') {
