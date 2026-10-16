@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-15T13:18:54.992Z",
+  "generatedAt": "2026-10-16T10:07:03.043Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,11 +169,11 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "c1fffc7d42a7943c31d32569355be5796c3dc2dab90c51bcf8a1b6cf5044a7bb",
-      "originalLines": 706,
+      "originalSha256": "55ca4a8abe9c6eb884c547b48ff581cc8d4bb03c29336939c65e0ae9056197db",
+      "originalLines": 712,
       "prefixSha256": "19308dd1a04397f764cc5ab4fefe76093704564592396ce00482d28e952537b7",
       "prefixBytes": 1400,
-      "entryLines": 248,
+      "entryLines": 254,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
@@ -195,8 +195,8 @@
           "id": "microi-client-frontend-002",
           "ordinal": 2,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "e754c23d671b87018bad97d26f901ad6c313912625bbb6f9404c1d4c806154fd",
-          "lines": 112,
+          "sha256": "34b6dd5233aac8325da15be3dc3c6a866dbbe77fd93288d5b2ad194d646fcf08",
+          "lines": 118,
           "heading": "2. 表单引擎三层结构"
         },
         {
@@ -960,11 +960,11 @@
       ]
     },
     "microi-uniapp-frontend": {
-      "originalSha256": "ddcc488e18b193f9e26e22484a4d900f1c1155015345d1953e9521a4cb9e243d",
-      "originalLines": 554,
+      "originalSha256": "f3836deef4b4652d5f1df9907a10a573d1c99359ebb712ca86f9e7020f634836",
+      "originalLines": 558,
       "prefixSha256": "55f2799d872b4b9682449adf2e554003eb8642c111af262cacf42265b99dd5f5",
       "prefixBytes": 3040,
-      "entryLines": 209,
+      "entryLines": 213,
       "chunks": [
         {
           "id": "microi-uniapp-frontend-000",
@@ -978,8 +978,8 @@
           "id": "microi-uniapp-frontend-001",
           "ordinal": 1,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "5d3fe408d73474b25414ae370e94503aa6f0b05a419c4dd758ad7f9e58905fc8",
-          "lines": 27,
+          "sha256": "acfd8dd91195e7930896bd54e6ae7ce3d3982bdeb0d674d98337878eab1a5e82",
+          "lines": 31,
           "heading": "标准产品、视图协议与租户扩展"
         },
         {
@@ -3225,7 +3225,7 @@
       "originalLines": 640,
       "prefixSha256": "b2c13c455cf052093f78881170151d3fb56c25cda2f837c9f6abc0c29e67fd30",
       "prefixBytes": 310,
-      "entryLines": 287,
+      "entryLines": 285,
       "chunks": [
         {
           "id": "workspace-conventions-000",

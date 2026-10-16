@@ -44,6 +44,14 @@
 
 模块的 `DetailCodeShowV8`、`DelCodeShowV8` 分别控制平台内置【详情】与【删除】行按钮。例如定制微服务已承担查看入口时，可设 `DetailCodeShowV8` 为 `V8.Result = false;`，再在 `MoreBtns` 添加【打开普通表单】按钮，用 `V8.OpenAnyForm({ TableName: '表名', Id: V8.Form.Id, FormMode: 'View', DialogType: 'Dialog' })` 保留原生表单入口。删除按钮可按业务状态设 `V8.Result = ['Draft', 'Rejected'].includes(String(V8.Form.ApprovalStatus || 'Draft'));`。前端显隐不能代替服务端删除权限和状态校验。
 
+### 更多功能与多选搜索
+
+数据列表的【更多功能】采用与【更多搜索】一致的简约次级按钮样式，主操作仍保持原有语义。模块设计中开启【隐藏更多功能】时，`sys_menu.HideMoreFunctions=1` 隐藏当前模块的这个入口；缺少字段、空值或 `0` 保留显示。嵌入列表还可通过 `PropsHideMoreFunctions=true` 仅隐藏当前实例，两个条件任一开启即隐藏。
+
+通过 MCP 的 `microi_update_module` 更新模块对象中的 `HideMoreFunctions`，写后回读同一模块并检查真实页面。此开关不删除 `MoreBtns`、`PageBtns`、`FormBtns` 等业务按钮，也不能代替角色权限；已有租户需更新模块引擎官方应用及 PC 前端。
+
+多选下拉搜索保留至少一个已选项的可读文字，多余选择可折叠为数量并用浮层查看完整标签。文字标签、内部 Key、清除操作和最终筛选条件保持一致，不能把空白标签或只有删除叉号视为已正确回显；应在窄搜索栏以及 90%–110% 密度下分别验证选择、清除和查询。
+
 ### 用户级登录后首页
 
 每个系统账号都可在 PC 右上角头像菜单的【个人设置】中选择“登录后首页”。设置保存在 `sys_user.DefaultIndexUrl`，而系统级默认首页仍保存在 `sys_config.DefaultIndexUrl`。
@@ -52,16 +60,20 @@
 
 管理员也可在【系统账号】表单的“个人设置”页签维护该字段。MCP 维护账号数据时使用同名字段 `DefaultIndexUrl`；留空表示继承系统默认值。
 
-个人设置还支持 `sys_user.ThemeColor`、`ThemeMode`、`CornerStyle`、`NavigationLayout` 和 `MenuChildExpandMode`。右上角主题设置与平台个人中心统一调用官方 Managed 接口引擎 `platform-user-update-preferences` 保存：
+个人设置还支持 `sys_user.ThemeColor`、`ThemeMode`、`CornerStyle`、`NavigationLayout`、`MenuChildExpandMode`、`UiDensityScale`、`DisableGradient`、`DisableShadow`、`DisableButtonIcon` 和 `LoginStyle`。右上角主题设置与平台个人中心统一调用官方 Managed 接口引擎 `platform-user-update-preferences` 保存：
 
 - `ThemeColor` 留空时继承 `sys_config.ThemeColor`；
 - `ThemeMode` 使用 `light / dark`；
 - `CornerStyle` 使用 `round / square`，默认圆角；
 - `NavigationLayout` 使用 `System / Side / Top / TopSide`，其中 `System` 继承系统设置；
 - `MenuChildExpandMode` 使用 `System / Down / Right`，其中 `System` 继承系统设置；
+- `UiDensityScale` 使用 `90 / 95 / 100 / 105 / 110`，个人 `null` 继承系统密度；
+- 三个 `Disable*` 字段的个人 `null` 继承系统，`0/1` 显式覆盖；`LoginStyle` 使用 `System / Original / Minimal / Split / Console`；
 - 已安装这些字段时以账号值为准，换设备登录也会恢复；旧租户未安装字段时仅保留浏览器本地兼容行为。
 
 右上角【主题设置 → 边角风格】可在“圆角／直角”之间切换。直角模式即时覆盖框架按钮、输入框、弹窗、页面容器、卡片和 Tab 的边角。安装新版系统账号应用后，选择保存在当前账号并在其它设备恢复；旧租户暂存在当前浏览器。顶栏的通知、搜索、主题、AI、蓝牙及全屏入口使用统一的 40px 触控区域和 20px 图标；主题入口为齿轮，AI 入口为圆圈内的 AI 字母轮廓。【界面密度】在主题面板内调整。升级 `Microi.Client` 后生效。
+
+主题面板【恢复默认】清除个人覆盖并恢复租户全局配置；全局为空才采用平台默认值。全局字段、密度生效范围、三项装饰开关、登录模板以及顶栏 `HideFrameworkFunctions` 的完整说明见[系统设置](../more/sys-config#全局主题与个人设置)。
 
 `NavigationLayout=TopSide` 使用一级顶部、二级侧栏的布局，仍从当前用户授权路由读取菜单。
 单个子菜单也保留在侧栏；当前一级没有可见子菜单时隐藏侧栏并释放内容宽度。

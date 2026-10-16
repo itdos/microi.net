@@ -17,6 +17,16 @@ description: Microi 模块引擎与 sys_menu 配置指南。用于创建或修�
 代码字段是否显示按钮由各字段 `Config.CodeEditor.DisplayMode` 决定，禁止按 `sys_menu` 表名强制覆盖；
 未配置时默认 `Inline`，需要紧凑按钮的字段显式保存 `Dialog`。
 
+列表【更多功能】使用与【更多搜索】一致的次级按钮样式。模块物理字段
+`sys_menu.HideMoreFunctions` 对应【隐藏更多功能】，只有明确 `1/true` 隐藏当前模块入口，
+缺失/空/0 保持显示；嵌入页 `PropsHideMoreFunctions=true` 同样可隐藏当前实例。
+通过 `microi_update_module` 的 module 对象维护同名字段，写后回读并发布模块引擎官方应用，
+不得把新配置写入废弃 `DiyConfig`。开关不删除 MoreBtns/PageBtns/FormBtns，也不能替代后端权限。
+
+多选搜索必须显示可读的选项 Label；折叠时至少保留首个标签，其余可用数量和浮层呈现。
+不得仅因 DOM 有文字就判定回显成功，需验证窄搜索槽位中的真实宽度、90~110 密度、选项
+Key/Label 映射、清除与查询条件一致；不能为修复显示改动实际查询 Key 或业务数据源。
+
 ## 必读参考
 
 - 字段、打开方式、查询配置、ViewSchema 和接口替换：

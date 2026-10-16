@@ -58,7 +58,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=e754c23d671b87018bad97d26f901ad6c313912625bbb6f9404c1d4c806154fd -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=34b6dd5233aac8325da15be3dc3c6a866dbbe77fd93288d5b2ad194d646fcf08 -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -159,14 +159,20 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 - 边角风格先读取当前用户 `CornerStyle`：`round/square` 显式覆盖；空值或 `System` 继承租户 `sys_config.CornerStyle`，租户空值默认为圆角。不得把空个人值提前归一为 `round`，否则会阻断租户直角设置。
 - 桌面经典布局使用 `NavigationLayout=Side/Top/TopSide`，个人空值或 `System` 继承租户，租户空值为侧边导航。`TopSide` 将一级放顶部，当前一级的二级及更深菜单复用原侧栏；单个子菜单仍留在侧栏，无可见子菜单时隐藏侧栏并释放内容宽度。侧栏仍支持收起及 `MenuChildExpandMode=System/Down/Right`。顶部导航复用当前权限路由、角标与外链，空间不足收纳到更多菜单；移动端仍采用底部导航。当前路由与一级归属由 `hybrid-navigation.js` 统一投影，禁止修改共享权限树。
-- 顶部导航整行（含功能图标和账号姓名）使用主题运行时的 `--sidebar-*` 可读表面与前景；主题面板和业务弹层保留自身语义表面。主题入口为齿轮，界面密度在同一主题面板调整且仅保存在当前设备；AI 入口使用圆圈内 AI 字母 SVG，不能回退魔法棒或图片。
+- 顶部导航整行（含功能图标和账号姓名）使用主题运行时的 `--sidebar-*` 可读表面与前景；主题面板和业务弹层保留自身语义表面。主题入口为齿轮，界面密度在同一主题面板调整，已安装 `sys_user.UiDensityScale` 时保存当前账号、个人空值继承 `sys_config.UiDensityScale`，旧租户才使用按租户/账号隔离的设备回退；AI 入口使用圆圈内 AI 字母 SVG，不能回退魔法棒或图片。
 - 头像菜单【修改密码】使用标准 `DiyCustomDialog + MicroAppDialog` 打开现有平台服务 `/personal-settings`，仅传 `Data.Action=ChangePassword` 选择密码展示模式；不能用宿主输入决定目标账号/租户，不新建密码旁路。当前密码校验、Passkey/TOTP/严格人脸一次性票据与提交继续复用个人中心，成功或卸载清除密码输入。定向回归使用 `hybrid-navigation.spec.mjs`、`password-dialog.spec.mjs` 和个人偏好资源测试。
 - 桌面壳层使用视口高度与可收缩的 flex 内容区，只有路由内容滚动，导航和 Tab 不随页面滚动；移动端仍保留文档滚动。用户入口含头像与姓名，不能使用纯图标的固定 flex 宽度；异步图表须在真实 DOM 挂载后观察尺寸变化，避免侧边/顶部导航切换后撑破卡片。
 - 主题色、浅色/深色、菜单子级展开方式等需要“换设备仍生效”的选择必须保存到当前 DiyToken 用户的 `sys_user` 白名单字段；`localStorage` 只作为未安装新字段租户和匿名启动阶段的兼容回退，不能作为跨设备事实源。
 - 已安装用户偏好字段时优先级固定为“当前用户显式值 → 租户 `sys_config` → 平台安全默认”；个人菜单值 `System` 表示继承租户配置。不得让上一位用户的浏览器本地主题覆盖下一位已登录用户。
+- 主题面板的主题色、亮暗模式、边角、导航、菜单展开、密度、三个装饰开关及登录风格均有同名系统全局默认，不新建重复字段。`framework-appearance.js` 统一应用运行状态；渲染继承值不能写成个人选择。`UiDensityScale` 安全范围为 90~110、步长 5，覆盖表单标签/普通控件、系统设置表单、侧栏、表格、Tab 与 Teleport 弹层；富文本、代码、地图和子表保持内容高度，触屏最小目标仍为 44px。
+- 【恢复默认】沿原保存队列把 `ThemeMode/ThemeColor` 清空、`CornerStyle/NavigationLayout/MenuChildExpandMode/LoginStyle` 写 `System`、`UiDensityScale/DisableGradient/DisableShadow/DisableButtonIcon` 写 `null`，只作用当前用户。同时清旧设备回退与本身份缓存；不能修改 `sys_config` 或把平台默认值写成个人覆盖。开关 `0` 与 `null` 语义不同：`0` 可覆盖全局 `1`，`null` 继承全局。
+- `DisableGradient/DisableShadow/DisableButtonIcon` 同时支持个人与租户默认，根标识分别为 `data-mci-disable-gradient/shadow/button-icon`。去装饰仍保留输入边界、键盘焦点、加载指示与纯图标操作。登录样式 `LoginStyle=Original/Minimal/Split/Console` 复用一套业务 mixin 与表单，不复制验证码、SSO、强认证、协议及回跳逻辑；匿名读取当前租户默认或本匿名上下文明确预览，不能读取上一账号的个人值。
+- `sys_config.HideFrameworkFunctions` 只控制顶栏入口，固定 Key 为 `Chat/BackgroundTasks/Search/Language/Theme/AI/Bluetooth/SystemStyle/FullScreen`，账号头像姓名始终保留。它与控制移动端等范围的原 AI 禁用开关独立，也不能代替功能权限。所有入口提供 `data-framework-function` 便于验收，未知 Key 忽略。
+- 新增全局开关 CSS 必须检查编译后选择器；scoped 中 `:global(html[attr]) .child` 会丢失后代范围，禁止用它隐藏装饰。使用独立非 scoped 且有完整登录/框架作用域的样式，或将完整选择器放进 `:global(...)`；必须断言开启全部开关时根 html、body、框架与弹层仍可见。
 - 自助保存优先使用官方 `Managed` 接口引擎，由 `V8.CurrentUser.Id` 与 `V8.OsClient` 推导用户和租户，并在服务端构造固定白名单更新对象；接口参数禁止决定目标 Id/OsClient，也禁止写入 Account、Phone、Tenant、Dept、Role、Level、State、Pwd、认证因子和登录审计字段。只有缺少可复用可信原子能力时才新增 C# DTO/端点。保存成功后调用 `V8.Method.RefreshLoginUser` 刷新登录缓存，并让微服务宿主重新同步 `CurrentUser`。
 - 右上角即时切换可以乐观应用并短防抖保存；远端保存失败时保留当前设备效果并明确提示。个人中心和右上角必须调用同一个应用包交付的白名单接口引擎（当前为 `platform-user-update-preferences`），不能分别形成两套字段、枚举或优先级。
 - 导航切入或退出 `TopSide` 会重建顶栏组件；卸载前必须发送尚未保存的偏好，在途请求与后续选择共用按 store、API 地址、租户、账号和登录会话隔离的运行时队列。新顶栏继承失败状态和重试数据，旧响应不能覆盖更新的选择或跨账号合并队列；标准续签保留 `MicroiSessionId` 时也保留最终待保存选择，计算属性显式依赖 Pinia.Token。JWT 解码仅用于本地队列归属，服务端仍通过标准 DiyToken 验证授权；不得将会话凭据写入偏好存储、日志或响应。使用真实 Vue computed 和组件生命周期回归 `theme-select-autosave-lifecycle.spec.mjs` 验证卸载、在途合并、失败重试、续签及账号/租户/会话切换。
+- 主题回归同时执行 `framework-appearance.spec.mjs`、`ui-density-runtime.spec.mjs` 与 `theme-select-autosave-lifecycle.spec.mjs`；真实浏览器至少验证 4K 系统设置与左菜单在 90/110 两档的尺寸变化、全局/个人继承与恢复、全部顶栏隐藏后账号仍在，以及装饰关闭后的亮暗和焦点可见性。
 
 ---
 
