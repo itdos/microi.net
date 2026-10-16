@@ -91,6 +91,9 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 
 ## 功能路由
 
+- 质量优先的上下文策略读取 `microi-system-delivery/references/context-quality.md`。完整系统读全原八项及增补；局部修改读取目标与依赖，歧义扩大。`microi_get_db_schema` 默认目录摘要，字段写入前使用 `detail:"fields"` 并遍历 `Paging.nextCursor`；应用清单和文件片段同样检查完整性，不能把摘要作为覆盖正文。
+- 较大 Manifest 在 `microi_plan_system` 首次提交正文并传 `detail:"summary"` 获取 `manifestRef/manifestHash` 复用，执行与验收仍校验当前身份；引用过期、重启或凭据变化时重新提交正文，写入未知先回读。`microi_get_context_metrics` 只报告当前 MCP 工具载荷字节、调用和错误，不能冒充供应商 token/费用。外部宿主的历史摘要和缓存由宿主管理。
+
 - 连接、登录、拉取、推送、差异和 AI 初始化：使用 bundled CLI 的 `profile`、`auth`、`pull`、`push`、`sync status`、`ai init`、`mcp init`、`doctor`。
 - 接口引擎、表单事件、模块、字段、工作流和数据库结构：先用 `action="list_tools"` / `describe_tool`，再调用对应原始 `microi_*` 工具。写工具必须保留确认口令、审计与回读。
 - 远程执行与调试：读取 `v8-debugging/SKILL.md`。Codex 用“获取源码 → 远程执行 → 定位堆栈/日志 → 最小补丁 → 再执行”的结构化循环代替 VS Code DAP 的可视化逐行面板；不得把未执行的源码检查称为真机调试成功。
