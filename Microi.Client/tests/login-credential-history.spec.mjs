@@ -1,3 +1,4 @@
+import { readLoginSourceSync } from "./helpers/login-source.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -163,7 +164,7 @@ test("login wallpapers normalize Microi paths and avoid the current image when r
 });
 
 test("login SFC wires branding, remembered accounts, classic default, and AI motion", () => {
-    const component = readFileSync(new URL("../src/views/login/index.vue", import.meta.url), "utf8");
+    const component = readLoginSourceSync();
 
     assert.match(component, /v-model="RememberPassword"/);
     assert.match(component, /class="remember-password-label">记住密码/);

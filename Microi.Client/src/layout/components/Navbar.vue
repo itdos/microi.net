@@ -12,7 +12,7 @@
             </div>
 
             <!-- 聊天图标 -->
-            <div v-if="ShowChat" class="right-menu-item hover-effect" @click="SwitchDiyChatShow()">
+            <div v-if="ShowChat && showFrameworkFunction('Chat')" data-framework-function="Chat" class="right-menu-item hover-effect" @click="SwitchDiyChatShow()">
                 <el-tooltip :content="RealtimeStatusText" placement="bottom" popper-class="mci-realtime-tooltip">
                     <span class="chat-realtime-indicator" :class="`is-${RealtimeState.toLowerCase()}`">
                         <el-badge class="mci-header-badge" :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount"
@@ -25,22 +25,22 @@
             </div>
 
             <!-- 搜索 -->
-            <BackgroundTaskCenter />
+            <BackgroundTaskCenter v-if="showFrameworkFunction('BackgroundTasks')" data-framework-function="BackgroundTasks" />
 
-            <search id="header-search" class="right-menu-item hover-effect" />
+            <search v-if="showFrameworkFunction('Search')" data-framework-function="Search" id="header-search" class="right-menu-item hover-effect" />
 
-            <lang-select class="right-menu-item hover-effect" compact />
+            <lang-select v-if="showFrameworkFunction('Language')" data-framework-function="Language" class="right-menu-item hover-effect" compact />
 
-            <ThemeSelect class="right-menu-item hover-effect" />
+            <ThemeSelect v-if="showFrameworkFunction('Theme')" data-framework-function="Theme" class="right-menu-item hover-effect" />
 
             <!-- PC AI助手：与移动端、小程序复用同一机器人和同一接口能力 -->
-            <DesktopAiAssistant />
+            <DesktopAiAssistant v-if="showFrameworkFunction('AI')" data-framework-function="AI" />
 
             <!-- 蓝牙打印机：PC 与平板共用全局连接状态 -->
-            <BluetoothPrinterEntry />
+            <BluetoothPrinterEntry v-if="showFrameworkFunction('Bluetooth')" data-framework-function="Bluetooth" />
 
             <!-- 切换界面风格 -->
-            <el-dropdown v-if="hasWebOS" trigger="hover">
+            <el-dropdown v-if="hasWebOS && showFrameworkFunction('SystemStyle')" data-framework-function="SystemStyle" trigger="hover">
                 <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
                     <el-icon class="menu-icon"><Monitor /></el-icon>
                 </a>
@@ -72,7 +72,7 @@
             </el-dropdown>
 
             <!-- 浏览器全屏 -->
-            <div class="right-menu-item hover-effect" role="button" tabindex="0" @click="toggleBrowserFullScreen" @keydown.enter.prevent="toggleBrowserFullScreen" :title="isBrowserFullScreen ? '退出全屏' : '全屏'">
+            <div v-if="showFrameworkFunction('FullScreen')" data-framework-function="FullScreen" class="right-menu-item hover-effect" role="button" tabindex="0" @click="toggleBrowserFullScreen" @keydown.enter.prevent="toggleBrowserFullScreen" :title="isBrowserFullScreen ? '退出全屏' : '全屏'">
                 <el-icon class="menu-icon"><FullScreen v-if="!isBrowserFullScreen" /><Close v-else /></el-icon>
             </div>
 
@@ -144,6 +144,7 @@ import { hasWebOS } from "@/utils/webos-detect.js";
 import { getRealtimeStatusText } from "@/utils/realtime-connection.js";
 import TopNavigation from './TopNavigation.vue';
 import { resolveUserNavigationLayout } from '@/utils/user-visual-preferences';
+import { normalizeHiddenFrameworkFunctions } from '@/utils/framework-appearance.js';
 import { buildMicroAppFriendlyPath } from '@/router/micro-app-route.js';
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
@@ -298,6 +299,9 @@ export default {
         }
     },
     methods: {
+        showFrameworkFunction(key) {
+            return !normalizeHiddenFrameworkFunctions(this.SysConfig?.HideFrameworkFunctions).includes(key);
+        },
         OpenChangePassword() {
             // 密码与强身份校验沿用官方个人中心，框架只提供同源微服务的标准弹窗入口。
             this.$refs.changePasswordDialog.Show();

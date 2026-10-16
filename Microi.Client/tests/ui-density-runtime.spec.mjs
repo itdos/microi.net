@@ -27,7 +27,7 @@ test("主题设置统一提供全局密度入口，启动时先恢复用户选�
     const main = readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
     const theme = readFileSync(new URL("../src/layout/components/ThemeSelect.vue", import.meta.url), "utf8");
     assert.doesNotMatch(navbar, /<UiDensitySelect/);
-    assert.match(theme, /<UiDensitySelect\s*\/?>/);
+    assert.match(theme, /<UiDensitySelect\s[^>]*@change="changeDensity"/);
     assert.match(main, /initializeUiDensity\(\)/);
     assert.match(main, /styles\/ui-density\.scss/);
 });

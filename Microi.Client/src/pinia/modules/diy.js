@@ -93,7 +93,9 @@ export const useDiyStore = defineStore("diy", {
         ShowClassicLeft: 1,
         IsTabFullScreen: false,
         _beforeFullScreen: { ShowClassicTop: 1, ShowClassicLeft: 1 },
-        themeColor: getLocalThemeColor()
+        themeColor: getLocalThemeColor(),
+        // 登录模板的即时预览值由框架主题解析器派生，不作为另一份持久化事实源。
+        loginStyle: ''
     }),
 
     getters: {

@@ -4,16 +4,21 @@ import test from 'node:test';
 import * as preferences from '../src/utils/user-visual-preferences.js';
 import {getUserVisualPreferenceSaveSession} from '../src/utils/user-visual-preference-save-session.js';
 import {computed, reactive, watch} from '../node_modules/vue/index.mjs';
+import { APPEARANCE_RESET } from '../src/utils/framework-appearance.js';
+import { createI18n } from 'vue-i18n';
+import { platformUiMessages } from '../src/lang/platform-ui.js';
 
 const sfc = readFileSync(new URL('../src/layout/components/ThemeSelect.vue', import.meta.url), 'utf8');
 const script = sfc.match(/<script>([\s\S]*?)<\/script>/)[1]
   .replace(/import\s+[\s\S]*?\s+from\s+["'][^"']+["'];/g, '')
   .replace('export default', 'const component =');
-const componentFactory = new Function('DiyCommon', 'preferences', 'getUserVisualPreferenceSaveSession', 'setTimeout', 'clearTimeout', 'bindings', `
+const componentFactory = new Function('DiyCommon', 'preferences', 'getUserVisualPreferenceSaveSession', 'setTimeout', 'clearTimeout', 'bindings', 'APPEARANCE_RESET', `
   const {computed, reactive, watch} = bindings;
   const useDiyStore = () => bindings.store, useAppStore = () => ({}), useSettingsStore = () => ({}), applyThemeColor = () => {};
   const Brush={}, Sunny={}, Moon={}, Check={}, MagicStick={}, InfoFilled={}, Grid={}, Menu={}, Expand={}, Setting={}, UiDensitySelect={};
   const {hasInstalledUserPreference, normalizeUserNavigationLayout, normalizeUserMenuChildExpandMode, resolveUserThemeColor} = preferences;
+  const saveLocalAppearance = (_store, patch) => patch, applyFrameworkAppearance = () => {};
+  const clearLocalAppearance = store => store.setThemeColor('');
   ${script}
   return component;
 `);
@@ -28,9 +33,9 @@ function instance(run = async () => ({Code: 1})) {
     DecodeJwtPayload(token) {try{return JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString('utf8'));}catch{return null;}},
     ApiEngine: {async Run(key, patch) {calls.push({key, patch: {...patch}}); return await run(patch);}}, Tips(message) {errors.push(message);}};
   const component = componentFactory(common, preferences, getUserVisualPreferenceSaveSession,
-    callback => {timers.set(++timerId, callback); return timerId;}, id => timers.delete(id), {computed,reactive,watch,store});
+    callback => {timers.set(++timerId, callback); return timerId;}, id => timers.delete(id), {computed,reactive,watch,store}, APPEARANCE_RESET);
   const mount = () => {
-    const current = {diyStore: store};
+    const current = {diyStore: store, $t: createI18n({legacy:false,locale:'zh-CN',messages:platformUiMessages}).global.t};
     const setup = component.setup();
     Object.defineProperty(current, 'CurrentUser', {get: () => store.user});
     Object.defineProperty(current, 'preferenceSaveSession', {get: () => setup.preferenceSaveSession.value});
@@ -52,6 +57,20 @@ for (const layout of ['Side', 'Top', 'TopSide']) {
     assert.equal(fixture.current.preferenceSaveState, 'saved');
   });
 }
+
+test('恢复默认将所有已安装个人项写回继承值，并通过原队列保存最终状态', async () => {
+  const fixture = instance();
+  fixture.current.diyStore.setCurrentUser({ ...fixture.current.CurrentUser, ...APPEARANCE_RESET, UiDensityScale: 90, DisableGradient: 1, DisableShadow: 0, LoginStyle: 'Console' });
+  fixture.current.applyResolvedThemeMode = () => {};
+  fixture.current.applyResolvedCornerStyle = () => {};
+  fixture.current.resetVisualPreferences();
+  await fixture.advance();
+  assert.deepEqual(fixture.calls, [{ key: 'platform-user-update-preferences', patch: { ...APPEARANCE_RESET } }]);
+  assert.equal(fixture.current.CurrentUser.UiDensityScale, null);
+  assert.equal(fixture.current.CurrentUser.DisableGradient, null);
+  assert.equal(fixture.current.CurrentUser.LoginStyle, 'System');
+  assert.equal(fixture.current.preferenceSaveState, 'saved');
+});
 test('rapid layout changes coalesce the last selection before remount without duplicate writes', async () => {
   const fixture = instance();
   for (const layout of ['Side', 'Top', 'TopSide']) fixture.current.changeNavigationLayout(layout);

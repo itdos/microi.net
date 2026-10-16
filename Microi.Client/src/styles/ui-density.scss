@@ -26,6 +26,71 @@ body > .el-popper {
     font-size: var(--el-font-size-base, 13px);
 }
 
+/* 历史组件的 scoped px 覆盖了 Element 变量。只归一框架的普通控件和
+ * 几何槽位，不缩放整个画布，因此富文本、地图、代码和子表仍保持自身高度。 */
+html[data-mci-ui-density] body {
+    .el-form-item__label,
+    .el-form-item__content,
+    .el-input__inner,
+    .el-select__placeholder,
+    .el-select__selected-item,
+    .el-textarea__inner,
+    .el-checkbox__label,
+    .el-radio__label,
+    .el-dropdown-menu__item,
+    .el-pagination,
+    .el-table .cell {
+        font-size: var(--mci-ui-base-font) !important;
+    }
+    .el-form-item { margin-bottom: var(--mci-ui-form-gap) !important; }
+    .el-form-item__label {
+        line-height: var(--mci-ui-label-height) !important;
+        min-height: var(--mci-ui-label-height);
+    }
+    .el-form-item__content { line-height: var(--mci-ui-label-height); }
+    .el-input__wrapper,
+    .el-select__wrapper,
+    .el-input-number,
+    .el-date-editor.el-input,
+    .el-date-editor.el-input__wrapper {
+        min-height: var(--mci-ui-control-height) !important;
+        box-sizing: border-box;
+    }
+    .el-input__inner { height: var(--mci-ui-control-height) !important; line-height: var(--mci-ui-control-height) !important; }
+    .el-button { font-size: var(--mci-ui-base-font) !important; }
+    .el-button:not(.is-circle):not(.is-text):not(.is-link) { min-height: var(--mci-ui-control-height); }
+    .el-tabs__item { height: var(--mci-ui-tab-height) !important; line-height: var(--mci-ui-tab-height) !important; font-size: var(--mci-ui-base-font) !important; }
+    .el-table .el-table__cell { padding-block: var(--mci-ui-table-cell-padding) !important; }
+    .el-card__body { padding: var(--mci-space-4); }
+    .el-dialog__body { padding: var(--mci-ui-dialog-padding); }
+    .el-dropdown-menu__item { line-height: var(--mci-ui-control-height); }
+
+    .sidebar-container-microi .el-menu-item,
+    .sidebar-container-microi .el-sub-menu__title,
+    .el-menu--popup .el-menu-item,
+    .el-menu--popup .el-sub-menu__title {
+        height: var(--mci-ui-menu-height) !important;
+        min-height: var(--mci-ui-menu-height) !important;
+        line-height: var(--mci-ui-menu-height) !important;
+        font-size: var(--mci-ui-base-font) !important;
+    }
+    .sidebar-container-microi .menu-title { font-size: var(--mci-ui-base-font) !important; }
+
+    .diy-form-workbench-toolbar,
+    .diy-form-workbench-body,
+    .diy-form-workbench-navigation,
+    .diy-form-page-header { gap: var(--mci-space-3); }
+    .diy-form-workbench-title { font-size: var(--mci-text-lg) !important; }
+    .diy-form-workbench-toolbar { padding: var(--mci-space-3) var(--mci-space-4); }
+    .itdos-diy-form .container-form-item { padding-block: calc(var(--mci-space-1) / 2); }
+    .itdos-diy-form .el-form--label-left .el-form-item__label,
+    .itdos-diy-form .el-form--label-right .el-form-item__label { margin-bottom: 0 !important; }
+}
+
+@media (max-width: 768px) {
+    html[data-mci-ui-density] body .el-button:not(.is-text):not(.is-link) { min-height: var(--mci-touch-target, 44px); }
+}
+
 @media (prefers-reduced-motion: no-preference) {
     html[data-mci-ui-density] body,
     html[data-mci-ui-density] #app {

@@ -1,3 +1,4 @@
+import { readLoginSourceSync } from "./helpers/login-source.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -319,7 +320,7 @@ test("Microi 授权失败会清理弹窗并且不尝试签发本地会话", asyn
 
 test("客户端入口、V8 挂载和个人设置路由保持同一契约", async () => {
     const [login, navbar, mobileProfile, form, table, helper, app, router] = await Promise.all([
-        readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8"),
+        readLoginSourceSync(),
         readFile(new URL("../src/layout/components/Navbar.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/mobile/profile.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/form-engine/diy-form.vue", import.meta.url), "utf8"),
@@ -393,7 +394,7 @@ test("客户端入口、V8 挂载和个人设置路由保持同一契约", async
 });
 
 test("Authenticator 免密码登录使用独立安全弹层并兼顾移动端与无障碍", async () => {
-    const login = await readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8");
+    const login = readLoginSourceSync();
 
     assert.match(login, /class="totp-login-shell"/);
     assert.match(login, /modal-class="totp-login-modal"/);
@@ -413,7 +414,7 @@ test("Authenticator 免密码登录使用独立安全弹层并兼顾移动端与
 
 test("登录方式弹层、宿主浮层收起和个人中心公开头像保持完整契约", async () => {
     const [login, headerSearch, host, microAppMain, personalSettings, profileController] = await Promise.all([
-        readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8"),
+        readLoginSourceSync(),
         readFile(new URL("../src/components/HeaderSearch/index.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/micro-app/host.vue", import.meta.url), "utf8"),
         readFile(platformServiceSourcePath("src/main.js"), "utf8"),
