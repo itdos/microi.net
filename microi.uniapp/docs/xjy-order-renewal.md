@@ -10,6 +10,8 @@
 
 关闭未保存页面会取消本页面草稿；保存成功后以原生主表事务的 Commit 为准，客户端不再调用 Cancel。离线或取消请求失败时由既有服务端过期回收处理。
 
+从“相关订单”打开真实合同表单时，来源组件通过 `openForm.events` 订阅原生表单的 `native-form:record-saved` 通知。合同保存成功即重新读取来源关系列表及统计，不依赖保存表与关系快照表同名，也不在客户端伪造关系数据。原生表单进入时固定来源事件通道，避免 H5 打开商品、安装位置等嵌套表单后，保存通知发往已变化的当前路由。取消不触发保存刷新；组件已销毁或父记录、关系表已变化时丢弃旧回调。2026-10-16 已只读确认用户新增的 `O2026100003` 及关系快照均已落库，此次仅修复客户端刷新通知。`check:native-form-return` 覆盖返回与跨表刷新，`XJY_VISUAL_TARGET=order-renewal-save` 覆盖实际日期/商品/位置调整后的保存和自动返回。
+
 专项回归入口：`npm run check:xjy-order-renewal`。导航、表单 hooks 和生命周期用例覆盖新增、微调、重入、失败重试、分页、金额、来源保护及沿用设备。服务端事务与 IoT 保护回归位于客户业务源码自身的 `tests/order-renewal-draft-proxy.test.cjs`，不放入平台后端测试。界面验收使用 `npm run visual:xjy` 的本地模拟接口，正式合同保存、审批及真实设备操作仍需实际账号验收。
 
 本次未修改 `Microi.Client`、`Microi.Server` 或数据库结构。业务引擎已通过集福鲤 MCP 同步并全量回读：`xjy-order-renewal-context v1.0.4`、`xjy-order-renewal v1.0.3`；2026-10-16 的插件同口径 `sync status --scope api` 为 0 差异。小程序源码和编译产物需要重新加载或通过微信渠道发布后才会替换旧页面。

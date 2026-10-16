@@ -2868,6 +2868,9 @@ export default {
     async openTenantRelatedForm(action, row = null) {
       if (this.relatedFormOpening) return true
       this.relatedFormOpening = true
+      const relationValue = this.relationValue
+      const table = this.config.table
+      const isCurrent = () => !this.componentDisposed && this.relationValue === relationValue && this.config.table === table
       try {
         const target = await resolveRelatedFormNavigation(this.relatedFormContext(action, row))
         if (!target) return false
@@ -2877,7 +2880,18 @@ export default {
         if (action === 'Edit' && !canEditMenuRecord(target.menuId, this.currentUser)) {
           throw new Error('当前账号没有编辑权限')
         }
-        if (!this.componentDisposed) await openForm(target)
+        if (isCurrent()) {
+          await openForm({
+            ...target,
+            events: {
+              // 业务表单可能保存另一张表；只在保存成功后回读来源关系，不能依赖目标表名相同。
+              'native-form:record-saved': () => {
+                if (!isCurrent()) return
+                this.refreshData()
+              }
+            }
+          })
+        }
         return true
       } catch (error) {
         uni.showToast({ title: error.message || error.Msg || '打开业务表单失败', icon: 'none' })
