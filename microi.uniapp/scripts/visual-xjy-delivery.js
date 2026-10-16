@@ -174,6 +174,40 @@ const renewalSourcePosition = { Id: 'visual-renewal-source-position-001', Dingda
   AnzhuangWZ_Lng: '120.18', AnzhuangWZ_Lat: '30.19' };
 const visualOrderDrafts = new Map();
 const renewalChildRows = { diy_dingdansp: new Map(), diy_shebeiwz: new Map(), diy_dingdansphc: new Map() };
+const visualRenewalOrders = new Map();
+const visualRenewalRelations = new Map();
+
+function resetRenewalFixture() {
+  visualOrderDrafts.clear();
+  visualRenewalOrders.clear();
+  visualRenewalRelations.clear();
+  Object.values(renewalChildRows).forEach(rows => rows.clear());
+}
+
+function visualEqualityConditions(where) {
+  return (Array.isArray(where) ? where : []).map(condition => Array.isArray(condition)
+    ? { Name: condition[0], Type: condition[1], Value: condition[2] } : condition)
+    .filter(condition => condition && condition.Type === '=');
+}
+
+function saveVisualRenewalOrder(body) {
+  const values = body._RowModel || {};
+  const id = String(values.Id || body.Id || '');
+  const draft = visualOrderDrafts.get(id);
+  if (!draft || draft.Status !== 'Active' || draft.source !== renewalSourceOrder.Id ||
+    values.XQDingdanID !== renewalSourceOrder.Id || Number(values.RenewalInitialized) !== 1) {
+    return { Code: 0, Msg: '本地续签保存缺少有效草稿或来源' };
+  }
+  const order = { ...renewalDefaults(), ...values, Id: id, DingdanBH: 'HT-RENEW-SAVED-001' };
+  visualRenewalOrders.set(id, order);
+  // 模拟主订单事务同时提交关系快照；刷新验收只读取服务端查询结果，不向页面插入假行。
+  const relation = { Id: id, ParentDingdanID: renewalSourceOrder.Id, XQDingdanID: id,
+    DingdanBH: order.DingdanBH, KehuMC: order.KehuMC, XinLDD: order.XinLDD, DingdanZT: order.DingdanZT,
+    DingdanJE: order.DingdanJE, HetongKSSJ: order.HetongKSSJ, HetongJSSJ: order.HetongJSSJ, XiadanRQ: order.XiadanRQ };
+  visualRenewalRelations.set(relation.Id, relation);
+  draft.Status = 'Committed';
+  return { Code: 1, Data: order };
+}
 
 function renewalDefaults() {
   return { ...renewalSourceOrder, Id: undefined, DingdanBH: '', HetongBH: '', DingdanZT: '待审批', DingdanZTZ: 1,
@@ -223,6 +257,7 @@ function orderDraftMock(key, body) {
   if (action === 'DraftRows') {
     const draft = visualOrderDrafts.get(String(body.DingdanID || ''));
     if (!draft) return { Code: 1, Data: [], DataCount: 0, DataAppend: { UseNativeQuery: true } };
+    if (draft.Status === 'Committed') return { Code: 1, Data: [], DataCount: 0, DataAppend: { UseNativeQuery: true } };
     if (draft.Status !== 'Active') return { Code: 0, Msg: '本地订单草稿已关闭' };
     const matches = [...rows.values()].filter(row => row.DingdanID === draft.Id &&
       (!body.ParentId || (table === 'diy_dingdansp' ? row.DingdanID : row.DingdanSPID) === body.ParentId) &&
@@ -237,6 +272,7 @@ function orderDraftMock(key, body) {
   const orderId = existing?.DingdanID || product?.DingdanID || values.DingdanID;
   const draft = visualOrderDrafts.get(String(orderId || ''));
   if (!draft) return { Code: 1, DataAppend: { UseNativeQuery: true } };
+  if (draft.Status === 'Committed') return { Code: 1, DataAppend: { UseNativeQuery: true } };
   if (draft.Status !== 'Active') return { Code: 0, Msg: '本地订单草稿已关闭' };
   if (action === 'DraftRecord') return existing ? { Code: 1, Data: existing } : { Code: 0, Msg: '本地明细不存在' };
   if (action === 'DraftSave') {
@@ -707,6 +743,12 @@ const targets = [
     renewalFlow: true
   },
   {
+    name: 'order-renewal-save', route: `/#/pages/business/detail?key=orders&id=${renewalSourceOrder.Id}`, selector: '.detail-page',
+    required: ['.related-business-list', '.related-data-list .data-card'],
+    expectedText: ['合同订单详情', '相关订单', 'HT-RENEW-SAVED-001'],
+    forbiddenText: ['暂无合同订单相关续签订单'], renewalFlow: true, renewalSave: true
+  },
+  {
     name: 'device-detail', route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
     required: ['.hero-band', '.info-band', '.native-control__qrcode', '.device-section-actions', '.device-section-action--preview', '.device-section-action--qrcode', '.bottom-actions'],
     expectedText: ['预览商品详情', '生成设备二维码', '关联IoT设备', '解除IoT关联', '新增IoT设备'],
@@ -1141,6 +1183,7 @@ function buildMockResponse(request) {
 
   if (request.method === 'OPTIONS') return { status: 204, body: '' };
   if (apiEngineKey === 'xjy-order-draft' || apiEngineKey === 'xjy-order-renewal') return orderDraftMock(apiEngineKey, body);
+  if (lowerUrl.includes('/formengine/addformdata') && String(table).toLowerCase() === 'diy_dingdan') return saveVisualRenewalOrder(body);
   if (apiEngineKey === 'xjy-order-contract-totals') {
     const valid = body.Filters?.ValidOnly !== false;
     if (body._TableChildAuth) {
@@ -1191,15 +1234,24 @@ function buildMockResponse(request) {
   if (table === 'Diy_Dingdan' && body._TableChildAuth && (lowerUrl.includes('gettabledata') || apiEngineKey === 'platform-module-data')) {
       const result = moduleRows.Diy_Dingdan;
       const state = (body._Where || []).find(w => w.Name === 'DingdanZT' && w.Type === '=')?.Value;
-      const rows = state ? result.rows.filter(row => row.DingdanZT === state) : result.rows;
+      const pool = [...result.rows, ...visualRenewalOrders.values()];
+      const rows = state ? pool.filter(row => row.DingdanZT === state) : pool;
       return { Code:1, Data:rows, DataCount:rows.length, DataAppend:{StatisticsFields:{}} };
+  }
+  if (String(table).toLowerCase() === 'diy_dingdanxq_relation' &&
+    (lowerUrl.includes('gettabledata') || apiEngineKey === 'platform-module-data')) {
+    const equalities = visualEqualityConditions(body._Where);
+    const matches = [...visualRenewalRelations.values()].filter(row => equalities.every(condition =>
+      String(row[condition.Name] ?? '') === String(condition.Value ?? '')));
+    return { Code: 1, Data: matches, DataCount: matches.length };
   }
   if (Object.prototype.hasOwnProperty.call(renewalChildRows, String(table).toLowerCase()) &&
     (lowerUrl.includes('gettabledata') || apiEngineKey === 'platform-module-data')) {
     const source = moduleRows[table] || Object.entries(moduleRows).find(([name]) => name.toLowerCase() === String(table).toLowerCase())?.[1];
-    const equalities = (Array.isArray(body._Where) ? body._Where : []).map(condition => Array.isArray(condition)
-      ? { Name: condition[0], Type: condition[1], Value: condition[2] } : condition).filter(condition => condition.Type === '=');
-    const matches = (source?.rows || []).filter(row => equalities.every(condition => String(row[condition.Name] ?? '') === String(condition.Value ?? '')));
+    const equalities = visualEqualityConditions(body._Where);
+    const committed = [...renewalChildRows[String(table).toLowerCase()].values()]
+      .filter(row => visualOrderDrafts.get(row.DingdanID)?.Status === 'Committed');
+    const matches = [...(source?.rows || []), ...committed].filter(row => equalities.every(condition => String(row[condition.Name] ?? '') === String(condition.Value ?? '')));
     return { Code: 1, Data: matches, DataCount: matches.length };
   }
   if (lowerUrl.includes('moduleengine/gettabledata') || apiEngineKey === 'platform-module-data') {
@@ -1273,6 +1325,7 @@ function buildMockResponse(request) {
   }
   if (lowerUrl.includes('getformdata') && (table === 'Diy_Dingdan' || lowerUrl.includes('diy_dingdan'))) {
     if (body.Id === renewalSourceOrder.Id) return { Code: 1, Data: renewalSourceOrder };
+    if (visualRenewalOrders.has(body.Id)) return { Code: 1, Data: visualRenewalOrders.get(body.Id) };
     return { Code: 1, Data: orderDetail };
   }
   if (lowerUrl.includes('getformdataanonymous') && String(table).toLowerCase() === 'diy_shangpin') {
@@ -2047,7 +2100,7 @@ async function verifyHeroVideo(cdp, target) {
   return { before, after };
 }
 
-async function testOrderRenewalFlow(cdp, viewport) {
+async function testOrderRenewalFlow(cdp, viewport, options = {}) {
   const start = mockRequestLog.length;
   const helpers = `
     function proxy(node, predicate) { let item = node && node.__vueParentComponent; while (item) { if (item.proxy && predicate(item.proxy)) return item.proxy; item = item.parent; } return null; }
@@ -2069,6 +2122,8 @@ async function testOrderRenewalFlow(cdp, viewport) {
   };
 
   await wait(`related('XiangguanDD')?.canAdd === true`);
+  if (options.save) await evaluate(`const source=related('XiangguanDD'); window.__renewalSourceRelated=source; window.__renewalRefreshTrace=[];
+    const refresh=source.refreshData; source.refreshData=function(...args){window.__renewalRefreshTrace.push({disposed:this.componentDisposed,relation:this.relationValue,table:this.config?.table,parentId:this.parentId,time:Date.now()}); return refresh.apply(this,args);};`);
   await evaluate(`const control = related('XiangguanDD').$el.querySelector('.preview-action--add'); if (!control) throw new Error('相关订单新增按钮不存在'); control.click();`);
   await wait(`page()?.tableName === 'Diy_Dingdan' && page()?.mode === 'Add' && page()?.tenantFormState.orderDraftReady === true && !page()?.error`);
   const initial = await evaluate(`const current = page(); const names = ['HetongKSSJ','HetongJSSJ','FuwuKSSJ','FuwuJSSJ']; return { table:current.tableName, mode:current.mode, id:current.draftRowId, source:current.form.XQDingdanID, dates:names.map(name => { const control=field(name); return { name, editable:Boolean(control && !control.readonly && control.$el.querySelector('uni-picker')), value:current.form[name] }; }) };`);
@@ -2105,8 +2160,54 @@ async function testOrderRenewalFlow(cdp, viewport) {
   const saves = mockRequestLog.slice(start).filter(item => item.body.Action === 'DraftSave').map(item => item.body);
   if (!saves.some(item => String(item.TableName).toLowerCase() === 'diy_dingdansp') || !saves.some(item => item.TableName === 'diy_shebeiwz')) fail('商品或点位微调未通过草稿服务保存');
   if (mockRequestLog.slice(start).some(item => /iot.*bind|bind.*iot/i.test(item.url))) fail('续签微调错误触发真实IoT绑定接口');
-  return { source: 'local isolated API fixture', orderId: initial.id, product, position, dates: final,
+  const result = { source: 'local isolated API fixture', orderId: initial.id, product, position, dates: final,
     datesScreenshot, positionScreenshot, draftSaves: saves.length };
+  if (!options.save) return result;
+
+  const sourceRowsBeforeSave = await evaluate(`return related('XiangguanDD')?.rows?.length || 0;`);
+  if (sourceRowsBeforeSave !== 0 || visualRenewalRelations.size !== 0) fail('续签保存前关系夹具应为空');
+  const saveStart = mockRequestLog.length;
+  await evaluate(`const current=page(); const channel=current.getOpenerEventChannel?.(); const source=window.__renewalSourceRelated;
+    window.__renewalSaveContext={channelOwnKeys:channel ? Object.getOwnPropertyNames(channel) : [],
+      eventKeys:channel ? Object.fromEntries(Object.getOwnPropertyNames(channel).filter(key=>channel[key] && typeof channel[key]==='object').map(key=>[key,Object.keys(channel[key])])) : {},
+      source:source ? {disposed:source.componentDisposed,relation:source.relationValue,table:source.config?.table,parentId:source.parentId,uid:source.$?.uid} : null};`);
+  await evaluate(`const button=page().$el.querySelector('.form-actions__primary'); if(!button)throw new Error('合同保存按钮不存在'); button.click();`);
+  // 保存必须走完整原生表单、真实保存事件和自动返回；不手动刷新原详情，也不伪造 data-changed。
+  try {
+    await wait(`!document.querySelector('.native-form-page') && location.hash.includes('/pages/business/detail') && related('XiangguanDD')?.rows?.some(row=>row.XQDingdanID === ${JSON.stringify(initial.id)})`);
+  } catch (error) {
+    // 失败证据只包含本地隔离夹具，保留提交参数和页面状态以区分表单校验、保存协议与刷新失败。
+    const pageState = await evaluate(`const current=page(); return { hash:location.hash, nativeFormCount:document.querySelectorAll('.native-form-page').length,
+      current:current ? { table:current.tableName, mode:current.mode, rowId:current.rowId, draftRowId:current.draftRowId,
+        error:current.error, saving:current.saving, form:current.form, tenantState:current.tenantFormState,
+        fields:(current.definition?.fields || []).map(item=>({Name:item.Name,NotEmpty:item.NotEmpty,Readonly:item.Readonly,editable:item.editable,component:item.component})) } : null,
+      related:[...document.querySelectorAll('.related-business-list')].map(node=>{const item=proxy(node,candidate=>candidate.field && typeof candidate.openAdd==='function');return item ? {name:item.field.Name,parentId:item.parentId,rows:item.rows,error:item.error,loading:item.loading,text:node.innerText} : null;}),
+      originalSource:(()=>{const source=window.__renewalSourceRelated; const live=related('XiangguanDD'); return source ? {disposed:source.componentDisposed,relation:source.relationValue,
+        table:source.config?.table,parentId:source.parentId,uid:source.$?.uid,liveUid:live?.$?.uid,isCurrent:source===live,
+        rows:source.rows?.map(row=>({...row})),error:source.error,loading:source.loading} : null;})(),
+      saveContext:window.__renewalSaveContext,refreshTrace:window.__renewalRefreshTrace,
+      toasts:[...document.querySelectorAll('uni-toast,.uni-toast,.uni-modal')].map(node=>node.innerText), bodyText:document.body.innerText.slice(-6000) };`);
+    fs.writeFileSync(path.join(outputRoot, 'renewal-save-debug.json'), JSON.stringify({ viewport:viewport.name, error:error.message,
+      pageState, requests:mockRequestLog.slice(saveStart), orders:[...visualRenewalOrders.values()],
+      relations:[...visualRenewalRelations.values()], drafts:[...visualOrderDrafts.values()] }, null, 2));
+    await capture('save-failed');
+    throw error;
+  }
+  const saved = visualRenewalOrders.get(initial.id);
+  const parentRelation = await evaluate(`const current=related('XiangguanDD'); current.$el.scrollIntoView({block:'center'}); return { parentId:current.parentId, rows:current.rows.map(row=>({Id:row.Id,XQDingdanID:row.XQDingdanID,ParentDingdanID:row.ParentDingdanID})), text:current.$el.innerText };`);
+  const formalSaves = mockRequestLog.slice(saveStart).filter(item => /\/formengine\/addformdata/i.test(item.url) && String(item.table).toLowerCase() === 'diy_dingdan');
+  const relationReads = mockRequestLog.slice(saveStart).filter(item => String(item.table).toLowerCase() === 'diy_dingdanxq_relation' &&
+    /gettabledata|platform-module-data/i.test(item.url));
+  if (formalSaves.length !== 1 || !saved || saved.HetongKSSJ !== final.start || saved.HetongJSSJ !== final.end ||
+    visualOrderDrafts.get(initial.id)?.Status !== 'Committed') fail(`续签主合同未正确提交：${JSON.stringify({ saved, saves: formalSaves.length })}`);
+  if (parentRelation.parentId !== renewalSourceOrder.Id || parentRelation.rows.length !== 1 ||
+    parentRelation.rows[0].XQDingdanID !== initial.id || !parentRelation.text.includes(saved.DingdanBH) || !relationReads.length) {
+    fail(`保存返回后原订单相关列表未从服务端刷新：${JSON.stringify({ parentRelation, reads: relationReads.length })}`);
+  }
+  if (mockRequestLog.slice(start).some(item => /iot.*bind|bind.*iot/i.test(`${item.url} ${item.body.ApiEngineKey || ''}`))) fail('续签保存错误触发 IoT 绑定接口');
+  await delay(1600);
+  return { ...result, committed: true, relatedOrderId: parentRelation.rows[0].XQDingdanID,
+    orderNumber: saved.DingdanBH, relationReads: relationReads.length, returnScreenshot: await capture('saved-return') };
 }
 
 function waitForProcessExit(child, timeoutMs = 2500) {
@@ -2187,6 +2288,7 @@ async function main() {
         color: { r: 244, g: 248, b: 250, a: 1 }
       });
       for (const target of activeTargets) {
+        if (target.renewalFlow) resetRenewalFixture();
         if (target.name === 'directory') directoryCardRevision = 1;
         currentContext = `${target.name}/${viewport.name}`;
         const errorStart = browserErrors.length;
@@ -2215,7 +2317,7 @@ async function main() {
         await cdp.send('Page.navigate', { url: `http://127.0.0.1:${appPort}/?visual=${Date.now()}&${safeQuery}${route}` });
         await waitForSelector(cdp, target.selector);
         await delay(900);
-        const renewalFlow = target.renewalFlow ? await testOrderRenewalFlow(cdp, viewport) : null;
+        const renewalFlow = target.renewalFlow ? await testOrderRenewalFlow(cdp, viewport, { save: target.renewalSave === true }) : null;
         if (target.invokeMethod) {
           const invocation = await cdp.send('Runtime.evaluate', {
             expression: `(async () => {
@@ -2318,13 +2420,14 @@ async function main() {
         if (unexpectedBrowserErrors.length) fail(`Browser error for ${target.name} at ${viewport.name}: ${JSON.stringify(unexpectedBrowserErrors)}`);
         if (fileSize < 12000 || layout.bodyTextLength < 20) fail(`Screenshot appears blank for ${target.name} at ${viewport.name}.`);
         console.log(`PASS ${target.name} ${viewport.name} -> ${screenshotPath}`);
-        if (renewalFlow) {
+        if (renewalFlow && !renewalFlow.committed) {
           await cdp.send('Runtime.evaluate', { expression: `(() => {let item=[...document.querySelectorAll('.native-form-page')].at(-1).__vueParentComponent;while(item && !(item.proxy && typeof item.proxy.goBack==='function' && item.proxy.tableName==='Diy_Dingdan'))item=item.parent;if(!item)throw new Error('续签取消页不存在');item.proxy.goBack();})()`, returnByValue: true });
           const deadline = Date.now() + 5000;
           while (visualOrderDrafts.get(renewalFlow.orderId)?.Status !== 'Cancelled' && Date.now() < deadline) await delay(50);
           if (visualOrderDrafts.get(renewalFlow.orderId)?.Status !== 'Cancelled') fail('本地续签取消没有释放服务器草稿');
           renewalFlow.cancelled = true;
         }
+        if (renewalFlow) resetRenewalFixture();
         if (target.name === 'customer-detail') await testCustomerContractCollapse(cdp, viewport);
         if (target.name === 'home-header') await testHomeHeaderRecovery(cdp, viewport);
         if (target.name === 'directory') {

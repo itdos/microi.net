@@ -433,7 +433,7 @@ export async function canOpenBusinessEntry(key, refresh = false) {
   return Boolean(menu && menu.Id)
 }
 
-export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null, readWhere = null, draftRelation = '' }) {
+export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null, readWhere = null, draftRelation = '', events = {} }) {
   if (!requireLogin()) return
   if (!table) {
     uni.showToast({ title: '未配置业务表单', icon: 'none' })
@@ -475,7 +475,7 @@ export async function openForm({ table, rowId = '', mode = 'View', title = '', m
   if (fieldNames && fieldNames.length) params.push(`fields=${encodeURIComponent(JSON.stringify(fieldNames))}`)
   if (excludeFieldNames && excludeFieldNames.length) params.push(`excludeFields=${encodeURIComponent(JSON.stringify(excludeFieldNames))}`)
   if (readonlyFieldNames && readonlyFieldNames.length) params.push(`readonlyFields=${encodeURIComponent(JSON.stringify(readonlyFieldNames))}`)
-  uni.navigateTo({ url: `/pages/native-form/index?${params.join('&')}` })
+  uni.navigateTo({ url: `/pages/native-form/index?${params.join('&')}`, events })
 }
 
 export async function openLowCodeMenu(moduleConfig) {
