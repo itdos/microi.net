@@ -7,11 +7,11 @@ import {snapshotStandardInputs} from '../../tools/release-standard-inputs.mjs';
 import {snapshotCandidate, changedCandidate} from '../../tools/release-candidate.mjs';
 import {execFileSync} from 'node:child_process';
 
-async function fixture(t) {
+async function fixture(t, {sourceParent = 'private-products'} = {}) {
   const root = await fs.mkdtemp(path.join(tmpdir(), 'microi-standard-candidate-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));
   const applications = Array.from({length: 6}, (_, i) => ({appKey: 'app-' + i, requirements: i < 2 ? 'shared.md' : 'app-' + i + '.md'}));
-  const contract = {schemaVersion: 1, sourceParent: 'private-products', requirementsRoot: 'private-requirements', target: {apiBase: 'https://api.itdos.com', osClient: 'iTdos'}, applications};
+  const contract = {schemaVersion: 1, sourceParent, requirementsRoot: 'private-requirements', target: {apiBase: 'https://api.itdos.com', osClient: 'iTdos'}, applications};
   const file = path.join(root, 'AI-Project/标准产品套件/source-contract.json');
   await fs.mkdir(path.dirname(file), {recursive: true});
   await fs.writeFile(file, JSON.stringify(contract));
@@ -321,13 +321,9 @@ test('公共checkout即使有uniapp reader，没有中央产品合同也不强�
 const settingsReader = 'Microi.Server/OfficialApplications/Resource/tenant-system-settings-resource.test.mjs';
 const tenantSmsSource = 'Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js';
 async function smsFixture(t) {
-  const fixtureData = await fixture(t), {root, contract, file} = fixtureData;
-  const original = path.join(root, contract.sourceParent);
-  contract.sourceParent = 'Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用';
-  await fs.mkdir(path.dirname(path.join(root, contract.sourceParent)), {recursive: true});
-  await fs.rename(original, path.join(root, contract.sourceParent));
-  await fs.writeFile(file, JSON.stringify(contract));
-  return fixtureData;
+  // Build at the final contract path. Relocating the freshly written tree adds
+  // a Windows directory-handle race without exercising a candidate invariant.
+  return fixture(t, {sourceParent: 'Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用'});
 }
 
 test('系统设置实际reader只追加固定主租户短信正文，真实候选拒绝忽略源码漂移', async t => {
