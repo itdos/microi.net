@@ -312,7 +312,7 @@ const news = [
 const moduleRows = {
   Diy_Kehu: { rows: customers, count: customers.length, statistics: { YuqiJYJE: 571000 } },
   Diy_ShouhouDD: { rows: [taskDetail], count: 7, statistics: {} },
-  Diy_Dingdan: { rows: [], count: 28, statistics: { DingdanJE: 1268000 } },
+  Diy_Dingdan: { rows: [orderDetail, { ...orderDetail, Id: 'order-002', DingdanBH: 'DD202512080033', DingdanZT: '已审批' }], count: 28, statistics: { DingdanJE: 1268000 } },
   Diy_KehuSB: { rows: [], count: 143, statistics: {} },
   diy_iot_device: { rows: [{ Id: 'iot-001', Provider: 'xinjiyuan', DeviceCode: 'IOT-0068', DeviceName: '校园直饮机', Enabled: 1, TenantId: 'tenant-xjy' }], count: 1, statistics: {} },
   Diy_Tenant: { rows: [merchantDetail], count: 1, statistics: {} }
@@ -345,6 +345,10 @@ const customerListMetrics = JSON.parse(fs.readFileSync(path.join(root, 'profiles
 const customerVisualMenu = visualMenus.find(item => item.DiyTableName === 'Diy_Kehu');
 customerVisualMenu.ViewSchema = JSON.stringify({ SchemaVersion: '1.0', Views: [{ Key: 'customer:list', Scene: 'List', Device: 'All', Enabled: true,
   Layout: { Hero: { Metrics: customerListMetrics }, Search: { StatusOptions: ['目标客户', '意向客户', '合作客户', '断约客户', '非目标客户'], PeriodField: 'CreateTime' } } }] });
+const orderListMetrics = JSON.parse(fs.readFileSync(path.join(root, 'profiles/xjy/metadata/order-list-statistics.json'), 'utf8')).metrics;
+const orderVisualMenu = visualMenus.find(item => item.DiyTableName === 'Diy_Dingdan');
+orderVisualMenu.ViewSchema = JSON.stringify({ SchemaVersion: '1.0', Views: [{ Key: 'order:list', Scene: 'List', Device: 'All', Enabled: true,
+  Layout: { Hero: { Metrics: orderListMetrics }, Search: { StatusOptions: ['待审批', '已审批', '已驳回', '待审批作废', '已作废', '已到期'], PeriodField: 'CreateTime' } } }] });
 const visualRowsByTable = {
   diy_kehu: customerDetail, diy_shouhoudd: taskDetail, diy_dingdan: orderDetail,
   diy_kehusb: deviceDetail, diy_iot_device: moduleRows.diy_iot_device.rows[0], diy_tenant: merchantDetail, diy_xiansuo: leadDetail,
@@ -375,12 +379,16 @@ function visualFields(tableKey) {
   const row = visualRowsByTable[normalized];
   if (!row) return [];
   const labels = { KehuMC: '客户名称', TenantName: '商家名称', LianxiR: '联系人', LianxiRDH: '联系电话', LianxiDH: '联系电话', KehuLX: '客户类型', FuzeR: '负责人', Chengshi: '城市', Zhuangtai: '状态', DingdanBH: '订单编号', DingdanJE: '订单金额' };
-  return Object.keys(row).filter(name => name !== 'Id').map((Name, index) => ({
+  const fields = Object.keys(row).filter(name => name !== 'Id').map((Name, index) => ({
     Id: `visual-field-${normalized}-${Name}`, Name, TableName: table.Name,
     Label: labels[Name] || Name, Component: Name === 'Chengshi' ? 'Address' : typeof row[Name] === 'number' ? 'NumberText' : 'Text',
     Visible: 1, AppVisible: 1, Sort: index + 1, Config: '{}',
     ...(normalized === 'diy_kehu' ? { Tab: ['LianxiR', 'LianxiDH'].includes(Name) ? 'customer-contacts' : 'customer-basic' } : {})
   }));
+  if (normalized === 'diy_kehu') fields.push({ Id: 'visual-customer-orders', Name: 'Orders', Label: '订单列表', Component: 'TableChild', Visible: 1, AppVisible: 1, Sort: 100, Tab: 'customer-orders', Config: JSON.stringify({
+    TableChildTableId: 'visual-table-diy_dingdan', TableChildSysMenuId: 'visual-menu-diy_dingdan', TableChildSysMenuName: '合同订单', TableChildFkFieldName: 'KehuID', TableChild: { PrimaryTableFieldName: 'Id' }
+  }) });
+  return fields;
 }
 function visualCustomerContractTotals(ids) {
   // 固定测试金额，只证明五项显示和排版；真实金额核对由独立线上验收完成。
@@ -484,6 +492,12 @@ const targets = [
     forbiddenText: ['移入公海']
   },
   {
+    name: 'customer-orders', route: '/#/pages/business/detail?key=customers&id=customer-001', selector: '.detail-page',
+    clickSelector: '.related-tabs__item:nth-child(5)', afterSelector: '.related-status-scroll',
+    required: ['.related-status-scroll', '.related-metrics--summary', '.related-valid-switch', '.related-list-body'],
+    expectedText: ['租赁总价', '买断总价', '包年换芯总价', '订单金额合计', '仅有效期内']
+  },
+  {
     name: 'customer-private-detail', route: '/#/pages/business/detail?key=customers&id=customer-private-001', selector: '.detail-page',
     required: ['.hero-band', '.bottom-actions .action-button', '.contract-totals'],
     expectedText: ['移入公海'],
@@ -523,6 +537,12 @@ const targets = [
     name: 'task-list-actions', route: '/#/pages/task/list', selector: '.task-page',
     clickSelector: '.task-card__actions', afterSelector: '.uni-actionsheet_toggle .uni-actionsheet__menu',
     required: ['.uni-actionsheet_toggle .uni-actionsheet__menu'], expectedText: ['完成', '编辑'], forbiddenText: ['删除']
+  },
+  {
+    name: 'order-list', route: '/#/pages/business/list?key=orders', selector: '.list-page',
+    required: ['.summary-strip', '.status-item__badge', '.customer-valid-switch'],
+    expectedText: ['租赁总价', '买断总价', '包年换芯总价', '订单金额合计', '仅有效期内'],
+    forbiddenText: ['本月合同订单']
   },
   {
     name: 'order-approval', route: '/#/pages/business/detail?key=orders&id=order-001', selector: '.detail-page',
@@ -874,6 +894,59 @@ async function inspectCustomerListSummary(cdp) {
   if (restoredHint !== '买断按全部合同累计') fail(`切回有效期后残留历史金额提示: ${restoredHint}`);
 }
 
+async function inspectOrderListSummary(cdp, viewport) {
+  await waitForExpression(cdp, `document.querySelector('.status-item__badge')?.innerText === '28' && document.querySelectorAll('.summary-metric').length === 4`);
+  const evaluate = async expression => (await cdp.send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+  const read = () => evaluate(`({checked:document.querySelector('.customer-valid-switch').getAttribute('aria-checked'),values:[...document.querySelectorAll('.summary-metric__value')].map(n=>n.innerText),badges:[...document.querySelectorAll('.status-item__badge')].map(n=>n.innerText)})`);
+  const before = await read();
+  if (before.checked !== 'true' || before.badges.length !== 7 || before.badges.some(value => !/^\d+$/.test(value))) fail(`订单角标或默认开关错误: ${JSON.stringify(before)}`);
+  await evaluate(`document.querySelector('.customer-valid-switch').click()`);
+  await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'false' && document.querySelector('.summary-metric__value').innerText.includes('23.8')`);
+  const after = await read();
+  if (before.values[0] === after.values[0] || before.values[2] === after.values[2] || before.values[3] !== after.values[3] || before.values[1] !== after.values[1]) fail(`订单有效期口径错误: ${JSON.stringify({before,after})}`);
+  const shot = await cdp.send('Page.captureScreenshot', { format:'png', captureBeyondViewport:false });
+  fs.writeFileSync(path.join(outputRoot, `order-list-all-${viewport.name}.png`),Buffer.from(shot.data,'base64'));
+  await evaluate(`document.querySelectorAll('.status-item')[2].click()`);
+  await waitForExpression(cdp, `document.querySelector('.status-item.active')?.innerText.includes('已审批') && !document.querySelector('.summary-metric__value').innerText.includes('--')`);
+  const filtered = await read();
+  if (JSON.stringify(filtered.badges) !== JSON.stringify(before.badges)) fail('订单状态切换丢失其它状态角标');
+  await evaluate(`document.querySelectorAll('.status-item')[0].click();document.querySelector('.customer-valid-switch').click()`);
+  await waitForExpression(cdp, `document.querySelector('.customer-valid-switch').getAttribute('aria-checked') === 'true' && document.querySelector('.summary-metric__value').innerText.includes('12.8')`);
+}
+
+async function inspectRelatedOrderSummary(cdp, viewport) {
+  const evaluate = async expression => (await cdp.send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+  try {
+    await waitForExpression(cdp, `document.querySelector('.related-status-badge')?.innerText === '2' && document.querySelectorAll('.related-data-list .data-card').length === 2`);
+  } catch (error) {
+    const shot = await cdp.send('Page.captureScreenshot', { format:'png', captureBeyondViewport:false });
+    fs.writeFileSync(path.join(outputRoot, `customer-orders-failed-${viewport.name}.png`), Buffer.from(shot.data,'base64'));
+    const state = await evaluate(`({ text:document.querySelector('.related-business-list')?.innerText, badges:[...document.querySelectorAll('.related-status-badge')].map(n=>n.innerText), cards:document.querySelectorAll('.related-data-list .data-card').length })`);
+    fail(`客户订单初始渲染失败: ${JSON.stringify({state,requests:mockRequestLog.filter(r=>r.body._TableChildAuth || r.url.includes('xjy-order-contract-totals')).slice(-5)})}`);
+  }
+  const read = () => evaluate(`({ checked:document.querySelector('.related-valid-switch').getAttribute('aria-checked'), labels:[...document.querySelectorAll('.related-metrics--summary .related-metric__label')].map(n=>n.innerText), values:[...document.querySelectorAll('.related-metrics--summary .related-metric__value')].map(n=>n.innerText), badges:[...document.querySelectorAll('.related-status-badge')].map(n=>n.innerText) })`);
+  const before = await read();
+  if (before.checked !== 'true' || before.badges.length !== 7 || JSON.stringify(before.labels) !== JSON.stringify(['租赁总价','买断总价','包年换芯总价','订单金额合计'])) fail(`客户订单统计默认状态错误: ${JSON.stringify(before)}`);
+  const start = mockRequestLog.length;
+  await evaluate(`document.querySelector('.related-valid-switch').click()`);
+  await waitForExpression(cdp, `document.querySelector('.related-metrics--summary .related-metric__value').innerText.includes('23.80')`);
+  const after = await read();
+  if (before.values[1] !== after.values[1] || before.values[3] !== after.values[3]) fail('客户订单有效期开关改变买断或订单金额');
+  const listRequests = mockRequestLog.slice(start).filter(request => request.body._TableChildAuth && (request.url.includes('platform-module-data') || request.url.includes('GetTableData')));
+  if (listRequests.length) fail(`客户订单有效期开关重新加载列表: ${JSON.stringify(listRequests)}`);
+  await evaluate(`document.querySelectorAll('.related-status-item')[1].click()`);
+  try {
+    await waitForExpression(cdp, `document.querySelectorAll('.related-data-list .data-card').length === 1 && document.querySelector('.related-metrics--summary .related-metric__value').innerText.trim() === '¥0'`);
+  } catch (error) {
+    fail(`客户订单状态筛选失败: ${JSON.stringify({view:await read(),requests:mockRequestLog.filter(r=>r.body._TableChildAuth).slice(-3)})}`);
+  }
+  if (JSON.stringify((await read()).badges) !== JSON.stringify(before.badges)) fail('客户订单切换状态丢失其它状态数量');
+  await evaluate(`document.querySelector('.related-business-list .search-button').click()`);
+  await waitForExpression(cdp, `document.querySelector('.related-valid-switch').getAttribute('aria-checked') === 'true' && document.querySelectorAll('.related-data-list .data-card').length === 2`);
+  const shot = await cdp.send('Page.captureScreenshot', { format:'png', captureBeyondViewport:false });
+  fs.writeFileSync(path.join(outputRoot, `customer-orders-verified-${viewport.name}.png`), Buffer.from(shot.data,'base64'));
+}
+
 function parsePostData(value) {
   if (!value) return {};
   try { return JSON.parse(value); } catch (error) {}
@@ -890,6 +963,17 @@ function buildMockResponse(request) {
   mockRequestLog.push({ url, body, table, time: Date.now() });
 
   if (request.method === 'OPTIONS') return { status: 204, body: '' };
+  if (apiEngineKey === 'xjy-order-contract-totals') {
+    const valid = body.Filters?.ValidOnly !== false;
+    if (body._TableChildAuth) {
+      if (body._TableChildAuth.ParentRowId !== 'customer-001' || !body.Filters?._Where?.some(w => w.Name === 'KehuID' && w.Value === 'customer-001')) return { Code:0, Msg:'缺少当前客户授权和外键' };
+      const pending = body.Filters.SelectedStatus === '待审批';
+      return { Code:1, Data:{ Metrics:{rental:pending?'0':valid?'128000':'238000',buyout:pending?'0':'40000',annualFilter:pending?'0':valid?'6800':'16800',sum:pending?'268000':body.Filters.SelectedStatus?'268000':'536000'},
+        StatusCounts:{All:2,'待审批':1,'已审批':1,'已驳回':0,'待审批作废':0,'已作废':0,'已到期':0},IncompleteMetrics:{} } };
+    }
+    return { Code:1, Data:{ Metrics:{rental:valid?'128000':'238000',buyout:'4700000',annualFilter:valid?'6800':'16800',sum:'1268000'},
+      StatusCounts:{All:28,'待审批':6,'已审批':14,'已驳回':1,'待审批作废':0,'已作废':2,'已到期':5},IncompleteMetrics:{},ValidOnly:valid } };
+  }
   if (apiEngineKey === 'xjy-module-presentation-stats' && Array.isArray(body.TaskCardIds)) {
     return { Code: 1, Data: { TaskDeviceCounts: Object.fromEntries(body.TaskCardIds.map(id => [id, 2])) } };
   }
@@ -925,6 +1009,12 @@ function buildMockResponse(request) {
   if (lowerUrl.includes('formengine/getdiyfieldlist')) {
     const fields = visualFields(table || body.TableId);
     return { Code: 1, Data: fields, DataCount: fields.length };
+  }
+  if (table === 'Diy_Dingdan' && body._TableChildAuth && (lowerUrl.includes('gettabledata') || apiEngineKey === 'platform-module-data')) {
+      const result = moduleRows.Diy_Dingdan;
+      const state = (body._Where || []).find(w => w.Name === 'DingdanZT' && w.Type === '=')?.Value;
+      const rows = state ? result.rows.filter(row => row.DingdanZT === state) : result.rows;
+      return { Code:1, Data:rows, DataCount:rows.length, DataAppend:{StatisticsFields:{}} };
   }
   if (lowerUrl.includes('moduleengine/gettabledata') || apiEngineKey === 'platform-module-data') {
     const result = moduleRows[table] || { rows: [], count: 0, statistics: {} };
@@ -1935,6 +2025,8 @@ async function main() {
         const waterMotion = await verifyHeroVideo(cdp, target);
         const customerContractTotals = await inspectCustomerContractTotals(cdp, target);
         if (target.name === 'customers') await inspectCustomerListSummary(cdp);
+        if (target.name === 'order-list') await inspectOrderListSummary(cdp, viewport);
+        if (target.name === 'customer-orders') await inspectRelatedOrderSummary(cdp, viewport);
         const deviceIoTActions = await inspectDeviceIoTActions(cdp, target);
         const fileName = `${target.name}-${viewport.name}.png`;
         const screenshotPath = path.join(outputRoot, fileName);

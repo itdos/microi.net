@@ -1,0 +1,59 @@
+{
+  "moduleId": "fc56123e-cfa1-4690-a6a4-929f202a817b",
+  "table": "Diy_Dingdan",
+  "engineKey": "xjy-order-contract-totals",
+  "metrics": [
+    {
+      "Key": "rental",
+      "Label": "租赁总价",
+      "Tone": "primary",
+      "Icon": "fas fa-file-contract",
+      "Source": "ApiEngine",
+      "ApiEngineKey": "xjy-order-contract-totals",
+      "ValuePath": "Data.Metrics.rental",
+      "ParamMap": {
+        "ValidOnly": true
+      },
+      "Format": "money"
+    },
+    {
+      "Key": "buyout",
+      "Label": "买断总价",
+      "Tone": "success",
+      "Icon": "fas fa-shopping-cart",
+      "Source": "ApiEngine",
+      "ApiEngineKey": "xjy-order-contract-totals",
+      "ValuePath": "Data.Metrics.buyout",
+      "ParamMap": {
+        "ValidOnly": true
+      },
+      "Format": "money"
+    },
+    {
+      "Key": "annualFilter",
+      "Label": "包年换芯总价",
+      "Tone": "warning",
+      "Icon": "fas fa-sync-alt",
+      "Source": "ApiEngine",
+      "ApiEngineKey": "xjy-order-contract-totals",
+      "ValuePath": "Data.Metrics.annualFilter",
+      "ParamMap": {
+        "ValidOnly": true
+      },
+      "Format": "money"
+    },
+    {
+      "Key": "sum",
+      "Label": "订单金额合计",
+      "Tone": "info",
+      "Icon": "fas fa-yen-sign",
+      "Source": "ApiEngine",
+      "ApiEngineKey": "xjy-order-contract-totals",
+      "ValuePath": "Data.Metrics.sum",
+      "ParamMap": {
+        "ValidOnly": true
+      },
+      "Format": "money"
+    }
+  ]
+}

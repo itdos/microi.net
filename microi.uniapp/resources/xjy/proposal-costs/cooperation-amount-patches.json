@@ -1,0 +1,30 @@
+[
+  {
+    "tableId": "29727579-7deb-42c7-b883-cd393f16095a",
+    "tableName": "diy_kehufaxx",
+    "fieldList": [
+      {
+        "id": "333a3b10-28d7-40e7-8f2a-ae2c32bb3d0e",
+        "name": "DuonianLJCBAfter",
+        "v8Code": "if (V8.LoadMode === 'Design') return;\nV8.FormSet('YujihezuoJEZL', V8.ThisValue);",
+        "config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"Sql\":\"\",\"EnableSearch\":false,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"V8Code\":\"if (V8.LoadMode === 'Design') return;\\nV8.FormSet('YujihezuoJEZL', V8.ThisValue);\",\"V8CodeBlur\":\"\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"元\",\"TextApendPosition\":\"right\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"DataSourceApiEngineKey\":\"\",\"Unique\":{\"Type\":\"Alone\"}}"
+      },
+      {
+        "id": "01M4Z6ZWTXBXXVA45DTXB8ZYNW",
+        "name": "YujihezuoJEZL",
+        "readonly": 1
+      },
+      {
+        "id": "48cf8d41-8133-4494-8701-a84b5fa44b46",
+        "name": "DuonianLJCBMD",
+        "v8Code": "if (V8.LoadMode === 'Design') return;\nV8.FormSet('YujihezuoJEMD', V8.ThisValue);",
+        "config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"Sql\":\"\",\"EnableSearch\":false,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"V8Code\":\"if (V8.LoadMode === 'Design') return;\\nV8.FormSet('YujihezuoJEMD', V8.ThisValue);\",\"V8CodeBlur\":\"\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"元\",\"TextApendPosition\":\"right\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"DataSourceApiEngineKey\":\"\",\"Unique\":{\"Type\":\"Alone\"}}"
+      },
+      {
+        "id": "01M4Z6XR3QVNBG28F4EP66021W",
+        "name": "YujihezuoJEMD",
+        "readonly": 1
+      }
+    ]
+  }
+]

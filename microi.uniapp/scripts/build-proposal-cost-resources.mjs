@@ -12,10 +12,10 @@ const target = outputFlag >= 0
 const common = fs.readFileSync(path.join(project, 'src/tenants/xjy/proposal-cost-model.mjs'), 'utf8').replace(/^export /gm, '')
 const header = (table, type, version, description) => `/*\n * V8 Event\n * TableKey: ${table}\n * EventType: ${type}\n * Version: ${version}\n * 功能说明：\n * - ${description}\n */\n`
 const descriptors = []
-function event(table, label, type, eventLabel, version, description, body) {
+function event(table, label, type, eventLabel, version, description, body, includeCommon = true) {
   const file = path.join(target, '表单引擎', `${label}（${table}）`, '表单V8事件', `${eventLabel}（${type}）.js`)
   fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, header(table, type, version, description) + common + '\n' + body.trim() + '\n')
+  fs.writeFileSync(file, header(table, type, version, description) + (includeCommon ? common + '\n' : '') + body.trim() + '\n')
   descriptors.push({ formEngineKey: table, eventType: type, file, description })
 }
 
@@ -186,6 +186,8 @@ if (typeof window.CalcHezuohou === 'function') {
 event('diy_kehufaxx', '需求方案', 'InFormV8', '前端表单进入V8事件', 'v1.0.0',
   '保留合作前原公式及新增方案继承规则；合作后仅刷新全部点位汇总，所有试算年数统一使用主表年数。', `
 if (V8.LoadMode === 'Design') return;
+var cooperationAmounts = proposalCooperationAmounts(V8.Form);
+for (var amountName in cooperationAmounts) V8.FormSet(amountName, cooperationAmounts[amountName]);
 // 新增只继承现状输入，不继承上一方案的点位汇总或设备报价。
 if (V8.FormMode === 'Add' && V8.Form.KehuID) {
   var previous = await V8.FormEngine.GetTableData('diy_kehufaxx', {
@@ -280,6 +282,13 @@ window.RefreshProposalAfterPointSaved = function (pointV8, expectedFields) {
 window.CalcHezuoqian();
 await V8.RefreshProposalPointCosts();
 `)
+
+event('diy_kehufaxx', '需求方案', 'DataFilterV8', '后端数据处理V8事件', 'v1.0.0',
+  '读取需求方案时按累计成本补齐预计合作金额；仅修改返回数据，不回写历史记录，不覆盖未返回原字段的裁剪查询。', `
+// 查看历史记录时即时展示同口径金额，数据库持久化仍由正常保存和点位汇总负责。
+if (typeof V8.Form.DuonianLJCBAfter !== 'undefined') V8.Form.YujihezuoJEZL = V8.Form.DuonianLJCBAfter;
+if (typeof V8.Form.DuonianLJCBMD !== 'undefined') V8.Form.YujihezuoJEMD = V8.Form.DuonianLJCBMD;
+`, false)
 
 const engineFile = path.join(target, '接口引擎/客户管理/客户方案一键比价(xjy_compare_customer_proposals).js')
 const engine = `/*
