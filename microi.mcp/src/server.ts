@@ -6251,7 +6251,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       readonly: z.number().optional().describe('Is readonly (1=yes, 0=no). Default: 0'),
       notEmpty: z.number().optional().describe('Required field validation (1=required, 0=optional). Default: 0'),
       unique: z.number().optional().describe('Unique constraint (1=unique, 0=allow duplicates). Default: 0'),
-      defaultValue: z.string().optional().describe('Default value for the field'),
+      defaultValue: z.string().nullish().describe('Default value for the field. null or omitted means unset; empty and other strings are preserved without coercion.'),
       placeholder: z.string().optional().describe('Placeholder text shown in form input'),
       formWidth: z.number().nullable().optional().describe('Field width in form grid columns (1-24). Default: null/omitted for normal fields. Use 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.'),
       data: z.string().optional().describe('Options data source for Select/MultipleSelect/Radio/Checkbox components. REQUIRED for these four components. Format: "key1|label1,key2|label2" (KeyValue, recommended — e.g. "1|启用,0|禁用", "male|男,female|女") — backend stores key, displays label. Or simple "v1,v2,v3" (same value for both). Backend auto-builds the Config JSON. For SQL/ApiEngine/DataSource sources, use the config parameter instead.'),
@@ -6278,7 +6278,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           Sort: sort ?? nextSortFor(tableId),
           Readonly: readonlyVal,
           NotEmpty: notEmpty, Unique: unique,
-          DefaultValue: defaultValue, Placeholder: placeholder,
+          DefaultValue: defaultValue ?? undefined, Placeholder: placeholder,
           FormWidth: formWidth, Data: data, Config: config,
           Description: description, Encrypt: encrypt, InTableEdit: inTableEdit,
         });
@@ -6867,7 +6867,15 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     async ({ tableName, tableId }) => {
       try {
         if (!tableName && !tableId) {
-          return { content: [{ type: 'text', text: 'Error: tableName or tableId is required.' }], isError: true };
+          // 此分支已明确在HTTP前终止；原生入口也需保留同一可信未执行事实，不能由请求计数推测。
+          return notExecuted({
+            content: [{ type: 'text', text: JSON.stringify({
+              errorCode: 'FIELD_LOCATOR_REQUIRED',
+              message: 'Provide tableId or tableName (camelCase) to locate the table; neither was supplied.',
+            }) }],
+            isError: true,
+            _meta: { microiExecution: { state: 'notExecuted' } },
+          });
         }
         const result = await client.getFieldList(tableName, tableId);
         if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
