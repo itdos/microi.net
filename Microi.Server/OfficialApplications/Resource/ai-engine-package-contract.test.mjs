@@ -271,7 +271,7 @@ test('generated AI and system-account package JSON files are idempotent with exa
         TableCount: 17,
         FieldCount: 250,
         DDLCount: 17,
-        PhysicalColumnCount: 526,
+        PhysicalColumnCount: 529,
         ApiEngineCount: 4,
         DataSetCount: 1,
         DataRowCount: 6,
@@ -282,9 +282,9 @@ test('generated AI and system-account package JSON files are idempotent with exa
       file: 'app.microi.sys_user.json',
       counts: {
         TableCount: 3,
-        FieldCount: 103, // 新增五项个人界面偏好，保留正式邀请与账号字段。
+        FieldCount: 107, // 个人侧栏与角色树宽度、折叠四字段保留正式邀请与账号字段。
         DDLCount: 4, // 正式邀请人索引随账号表交付。
-        PhysicalColumnCount: 364,
+        PhysicalColumnCount: 371,
         ApiEngineCount: 9,
         DataSetCount: 0,
         DataRowCount: 0,
@@ -299,6 +299,39 @@ test('generated AI and system-account package JSON files are idempotent with exa
       assert.equal(source.PackageInfo[name], value, `${expectation.file} ${name}`);
     }
   }
+});
+
+test('AI regeneration retains existing physical column order and appends a missing runtime column once', () => {
+  const source = JSON.parse(fs.readFileSync(path.join(resourceRoot, aiDefinition.file), 'utf8'));
+  const missing = source.PhysicalColumns.find(row => row.TABLE_NAME === 'mic_sub_provider' && row.COLUMN_NAME === 'Name');
+  assert.ok(missing);
+  const input = structuredClone(source);
+  input.PhysicalColumns = input.PhysicalColumns.filter(row => !(row.TABLE_NAME === missing.TABLE_NAME && row.COLUMN_NAME === missing.COLUMN_NAME));
+  const identities = rows => rows.map(row => `${row.TABLE_NAME}:${row.COLUMN_NAME}`);
+  const regenerated = configurePackageModel(input, aiDefinition);
+  assert.deepEqual(identities(regenerated.PhysicalColumns.slice(0, -1)), identities(source.PhysicalColumns.filter(row => !(row.TABLE_NAME === missing.TABLE_NAME && row.COLUMN_NAME === missing.COLUMN_NAME))));
+  assert.deepEqual(regenerated.PhysicalColumns.at(-1), missing);
+  assert.equal(regenerated.PhysicalColumns.length, source.PhysicalColumns.length);
+  assert.deepEqual(configurePackageModel(structuredClone(regenerated), aiDefinition), regenerated);
+});
+
+test('account regeneration preserves equivalent source bytes and replaces changed managed code', () => {
+  const source = JSON.parse(fs.readFileSync(path.join(resourceRoot, sysUserDefinition.file), 'utf8'));
+  const key = 'platform-user-update-preferences';
+  const original = source.SysApiEngines.find(row => row.ApiEngineKey === key);
+  assert.ok(original);
+  const input = structuredClone(source);
+  input.SysApiEngines.find(row => row.ApiEngineKey === key).ApiV8Code = original.ApiV8Code.replace(/\r\n?/g, '\n').trimEnd();
+  const equivalentBytes = input.SysApiEngines.find(row => row.ApiEngineKey === key).ApiV8Code;
+  const regenerated = configurePackageModel(input, sysUserDefinition);
+  assert.equal(regenerated.SysApiEngines.find(row => row.ApiEngineKey === key).ApiV8Code, equivalentBytes);
+  assert.equal(regenerated.SysApiEngines.find(row => row.ApiEngineKey === key).Version, 'v1.1.7');
+  assert.ok(regenerated.PackageInfo.RequiredPlatformCapabilities.includes('ApiEngine:platform-user-update-preferences@v1.1.7'));
+  const changed = structuredClone(source);
+  changed.SysApiEngines.find(row => row.ApiEngineKey === key).ApiV8Code += '\nreturn { Code: 0, Msg: "changed managed code" };';
+  const replaced = configurePackageModel(changed, sysUserDefinition).SysApiEngines.find(row => row.ApiEngineKey === key).ApiV8Code;
+  assert.equal(replaced.trimEnd(), original.ApiV8Code.replace(/\r\n?/g, '\n').trimEnd());
+  assert.doesNotMatch(replaced, /changed managed code/);
 });
 
 test('system-account regeneration retains the ninth official invitation engine and its actual access contract', () => {
