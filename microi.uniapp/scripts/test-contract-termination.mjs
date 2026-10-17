@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import test from 'node:test'
 import * as termination from '../src/tenants/xjy/contract-termination.mjs'
+import * as renewal from '../src/tenants/xjy/order-renewal.mjs'
 
 function context(mode = 'Add', defaults = {}) {
   const ctx = { tableName: termination.TERMINATION_TABLE, mode, defaultValues: defaults, form: {}, state: {}, menuId: 'termination-menu' }
@@ -13,7 +14,7 @@ function hooks(scope = {}) {
   const source = fs.readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')
     .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*/g, '')
     .replace(/export default/g, 'const exported =').replace(/export (?=(?:async )?function|const)/g, '')
-  return vm.runInNewContext(`${source}; exported`, { ...termination, ...scope, console, setTimeout, clearTimeout })
+  return vm.runInNewContext(`${source}; exported`, { ...termination, ...renewal, ...scope, console, setTimeout, clearTimeout })
 }
 test('订单文本/结构值及多商品数量总价按后台口径汇总', () => {
   assert.deepEqual(termination.terminationOrderValues({ Id: 'o1', DingdanBH: 'DD1', KehuMC: { KehuMC: '学校' }, AllDingdanHZFS: '租赁' }),

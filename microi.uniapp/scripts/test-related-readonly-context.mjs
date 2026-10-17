@@ -21,7 +21,8 @@ test('子表元数据沿用父子授权链，不把未授权子菜单当成独�
 
 function related(sandbox = {}) {
   const script = read('../src/components/mci-business-related-list/mci-business-related-list.vue').match(/<script>([\s\S]*?)<\/script>/)[1]
-  const context = { getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {}, ...sandbox }
+  const context = { getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
+    loadTenantRelatedRows: async () => null, resolveRelatedFormNavigation: async () => null, ...sandbox }
   vm.runInNewContext(stripImports(script).replace('export default', 'globalThis.component ='), context)
   return context.component
 }

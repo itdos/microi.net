@@ -134,7 +134,7 @@ test('公开接口引擎返回标准 DosResult', async ({ request }) => {
 6. 退出登录能清理 Token 并回到登录页。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-020 sha256=a267a39f5fe3dab714c5275759f7bdd1b6150990fa00555e07c091aee5795a29 -->
+<!-- microi-progressive:chunk id=playwright-e2e-020 sha256=63b5c2374f7e011a927ebd751d01c50e2d54d9e746d4d47ddd1665779a4487b9 -->
 ## 完整业务验收门槛
 
 当用户要求“完整测试”“全面测试”“不要让我手工测出接口 null/404/权限漏洞”时，不能只生成浅冒烟。至少补齐以下测试文件：
@@ -157,9 +157,9 @@ tests/e2e/
 4. UI 点击不能只断言 toast；必须用 `page.waitForResponse()` 捕捉对应接口，并验证响应体。
 5. 任何 FormEngine HTTP 路由必须使用 `/api/formengine/{action}-{table}`，不要生成 `/formengine/{table}/{action}`。
 6. ApiEngine 使用稳定路径 `/apiengine/{ApiEngineKey}`，并通过唯一的 `osclient` Header 传租户；JSON/Form Body 可冗余携带 `OsClient`。普通 POST/PUT/PATCH/DELETE 禁止追加 `--OsClient--...--`。仅第三方回调或无法设置 Header/Form/Query 的 GET/HEAD 才允许特殊路径。
-7. 页面级测试必须把 `请求失败`、`网络错误`、`null`、`待开发`、`开发中` 当成失败信号；这些文案如果出现在页面或 toast 中，说明功能未交付或接口契约错误。
+7. 最终业务页面级测试必须把 `请求失败`、`网络错误`、`null`、`待开发`、`开发中` 当成失败信号；最终菜单入口或业务 toast 出现占位文案仍表示未交付。菜单骨架阶段另用专门用例验收共享开发中页的菜单身份、布局、动画和权限，该阶段允许预期占位文案，但不算业务功能交付通过，不能套用此例外放过最终业务页面。
 8. 新增、保存、结算、转赠、确认、上传等按钮不能只弹“成功/待开发”toast；必须调用真实业务接口，并通过后端查询验证状态变化。
-9. 源码守卫可作为兜底：递归扫描 `src/**/*.vue`、`src/**/*.js`，禁止残留 `待开发|开发中` 占位文案。
+9. 源码守卫可作为兜底：递归扫描最终业务源码 `src/**/*.vue`、`src/**/*.js`，禁止残留 `待开发|开发中` 占位文案。平台共享 `Microi.Client/src/views/ai-engine/developing.vue` 及其专门占位验收用例可以按已核验的精确文件加入白名单；不得排除整个 `ai-engine`、`src` 或业务目录，也不得用源码白名单豁免最终菜单仍指向占位页的失败。
 10. 新建或更新 ApiEngine 后必须用 HTTP 路径复测一次；只用 `microi_run_engine` 通过不够，因为 HTTP 调用还受 `IsEnable`、`StopHttp`、`AllowAnonymous` 和动态路由缓存影响。
 11. 每个移动端项目都要有“接口清单驱动”的契约测试：静态扫描或维护清单覆盖所有 `callEngine('xxx')`，逐个 HTTP 调用并断言不是 404、不是空响应、不是字符串 `null`，且必须是标准 DosResult。
 12. 写业务闭环时必须准备可重复测试数据并清理：例如抢购要“创建测试挂单 → 调用抢购 → 验证订单 → 删除测试订单/挂单/提货卡”，购物车要“加入购物车 → 结算 → 验证订单/购物车状态 → 删除测试订单”。

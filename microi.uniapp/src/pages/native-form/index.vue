@@ -424,6 +424,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				saving: false,
 				openingEdit: false,
 				refreshAfterEdit: false,
+				notifyOpenerSaved: null,
 				saveReturnTimer: null,
 				pageDisposed: false,
 				stale: false,
@@ -587,6 +588,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			}
 		},
 		onLoad(options) {
+			// 打开嵌套表单后 H5 当前路由会变化；进入时固定本页来源，保存时不能再取子页面的通道。
+			const opener = this.getOpenerEventChannel?.()
+			this.notifyOpenerSaved = () => opener?.emit?.('native-form:record-saved')
 			this.tableName = decodeURIComponent(options.table || '')
 			this.menuId = decodeURIComponent(options.menuId || '')
 			this.fileMenuId = decodeURIComponent(options.fileMenuId || '')
@@ -1395,7 +1399,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					}
 					const currentUser = getUser() || {}
 					// 主表落库即标记来源详情失效；即使后续子表或租户钩子失败，返回也要显示真实数据。
-					this.getOpenerEventChannel?.()?.emit?.('native-form:record-saved')
+					this.notifyOpenerSaved?.()
 					try {
 						await flushChildDrafts(this.draftRowId, this.rowId, V8.FormEngine,
 							{ ...this.form, Id: this.rowId }, buildTableChildDefaultValues)

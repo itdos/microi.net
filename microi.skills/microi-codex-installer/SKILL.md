@@ -132,7 +132,7 @@ microi codex status --json
 microi dsh status --json
 ```
 
-不得用单独的 `microi mcp init` 代替完整 AI 重新初始化；`ai init` 已默认包含 MCP 更新。只有诊断表明 MCP 仍有明确残留问题时，才追加 `microi mcp init` 做定向恢复。初始化写入采用幂等/原子方式，不终止已启动的 MCP；当前进程继续旧版本，新进程读取新版本。
+完整初始化优先使用 `microi ai init`，它默认包含 MCP 更新；旧版单独 `microi mcp init` 只配置连接，必须补 `ai init`。新版 MCP 初始化联动同一 AI 注入器，同时补齐 Skills 和宿主规则，仍保留用户自定义或已跟踪入口；不能把初始化成功解释为模型已读全部规则。开工应按基础规范回报实际读取的总控和完整清单。初始化写入采用幂等/原子方式，不终止已启动的 MCP；当前进程继续旧版本，新进程读取新版本。
 
 开发者从可信本地源码验收时，可以显式指定 marketplace 源：
 
