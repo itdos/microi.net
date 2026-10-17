@@ -2,10 +2,15 @@ using System.Data;
 using System.Data.Common;
 using System.Reflection;
 using Dos.ORM;
+using Microi.net;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json.Linq;
 using static Dos.ORM.Tests.Db.ConnectionOwnershipTests;
 
 namespace Microi.Tests.ORM;
 
+[Collection("TenantContextGlobal")]
 public sealed class DdlExecutionObservationTests
 {
     private static Database Database() => new(new FaultProvider(new FaultFactory()));
@@ -26,6 +31,47 @@ public sealed class DdlExecutionObservationTests
         Assert.Equal(new[] { "submitted", "executed" }, scope.Events.Select(x => x.State));
         Assert.All(scope.Events, item => Assert.Equal(command.CommandText, item.Statement));
         Assert.All(scope.Events, item => Assert.False(item.TransactionPending));
+    }
+
+    [Fact]
+    public void ActualIndexCommandRecordsOnlyItsRealExecutionWithoutCommitClaim()
+    {
+        using var scope = DdlExecutionObservation.Begin();
+        using var command = new RecordingCommand { CommandText = "CREATE UNIQUE INDEX idx_actual_name ON test_actual (Name)" };
+        Assert.Equal(7, Execute(Database(), command));
+        Assert.Equal(1, command.Calls);
+        Assert.Equal(new[] { "submitted", "executed" }, scope.Events.Select(item => item.State));
+        Assert.All(scope.Events, item => Assert.Equal(command.CommandText, item.Statement));
+        Assert.All(scope.Events, item => Assert.False(item.TransactionPending));
+    }
+
+    [Fact]
+    public async Task IndexEndpointHonorsExistingRequestAuthorizationFailureWithoutDdlAppend()
+    {
+        var accessorField = typeof(DiyHttpContext).GetField("_httpContextAccessor", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var oldAccessor = accessorField.GetValue(null);
+        var oldContext = (oldAccessor as IHttpContextAccessor)?.HttpContext;
+        var accessor = new HttpContextAccessor();
+        var context = new DefaultHttpContext();
+        var errorKey = (string)typeof(PlatformAdministratorRequestAuthorization)
+            .GetField("PermissionErrorItemKey", BindingFlags.Static | BindingFlags.NonPublic)!.GetRawConstantValue()!;
+        // 模拟可信鉴权过滤器已拒绝本请求；不伪造管理员或注入数据库/Token。
+        context.Items[errorKey] = "fixture permission denied";
+        try
+        {
+            accessor.HttpContext = context;
+            DiyHttpContext.Configure(accessor);
+            var response = Assert.IsType<OkObjectResult>(await new V8McpEndpointService(context).CreateTableIndex(new JObject
+            {
+                ["TableName"] = "test_actual", ["IndexName"] = "idx_actual_name", ["Columns"] = new JArray("Name"),
+                ["CaptureDdl"] = true,
+            }));
+            var result = JObject.FromObject(response.Value!);
+            Assert.Equal(0, result.Value<int>("Code"));
+            Assert.Equal("fixture permission denied", result.Value<string>("Msg"));
+            Assert.True(result["DataAppend"] == null || result["DataAppend"]!.Type == JTokenType.Null);
+        }
+        finally { accessor.HttpContext = oldContext; accessorField.SetValue(null, oldAccessor); }
     }
 
     [Fact]

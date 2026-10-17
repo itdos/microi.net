@@ -4,6 +4,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 type Scope = { requests: number; mutationStarted: boolean; validationRejected: boolean; sequence: number; report: (message: string, progress: number) => Promise<void> };
 const active = new AsyncLocalStorage<Scope>();
 const readRoute = /\/(?:Get|List|Query|Inspect|Validate|Check)[A-Za-z]+$/i;
+const ddlReceiptRoutes = new Set(['/api/V8Engine/CreateTable', '/api/V8Engine/AddField', '/api/V8Engine/CreateTableIndex']);
 
 /** 只能在可信 dispatcher/明确的写前校验分支调用；不能凭“没看到请求”推断未写入。 */
 export function notExecuted(result: CallToolResult): CallToolResult {
@@ -31,7 +32,7 @@ export async function reportOperation(path: string, method: string, completed = 
 /** 只接收已鉴权 MCP 端点的 ORM 回执；不从模型参数或推测的 SQL 生成事件。 */
 export async function reportDdlEvents(path: string, response: unknown): Promise<void> {
   const scope = active.getStore();
-  if (!scope || !/\/(CreateTable|AddField)$/.test(path) || !response || typeof response !== 'object') return;
+  if (!scope || !ddlReceiptRoutes.has(path) || !response || typeof response !== 'object') return;
   const append = (response as { DataAppend?: { DdlEvents?: unknown[]; DdlEventsDropped?: number } }).DataAppend;
   for (const raw of (Array.isArray(append?.DdlEvents) ? append.DdlEvents : []).slice(0, 128)) {
     const item = raw as { Id?: unknown; Statement?: unknown; State?: unknown; TransactionPending?: unknown; ObservedAtUtc?: unknown };

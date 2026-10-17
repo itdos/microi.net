@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 const active = new AsyncLocalStorage();
 const readRoute = /\/(?:Get|List|Query|Inspect|Validate|Check)[A-Za-z]+$/i;
+const ddlReceiptRoutes = new Set(['/api/V8Engine/CreateTable', '/api/V8Engine/AddField', '/api/V8Engine/CreateTableIndex']);
 /** 只能在可信 dispatcher/明确的写前校验分支调用；不能凭“没看到请求”推断未写入。 */
 export function notExecuted(result) {
     const scope = active.getStore();
@@ -28,7 +29,7 @@ export async function reportOperation(path, method, completed = false) {
 /** 只接收已鉴权 MCP 端点的 ORM 回执；不从模型参数或推测的 SQL 生成事件。 */
 export async function reportDdlEvents(path, response) {
     const scope = active.getStore();
-    if (!scope || !/\/(CreateTable|AddField)$/.test(path) || !response || typeof response !== 'object')
+    if (!scope || !ddlReceiptRoutes.has(path) || !response || typeof response !== 'object')
         return;
     const append = response.DataAppend;
     for (const raw of (Array.isArray(append?.DdlEvents) ? append.DdlEvents : []).slice(0, 128)) {
