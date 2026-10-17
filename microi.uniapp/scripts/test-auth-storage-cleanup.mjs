@@ -23,6 +23,7 @@ test('退出登录清除可重建的账号与平台缓存', () => {
     xjy_ai_model_selection: 'cached',
     'microi_mobile_menu_tree_v2:user-a': 'cached',
     'microi_mobile_menu_tree_v2:user-b': 'cached',
+    'microi_mobile_menu_tree_v3:api|tenant|user-a': 'cached',
     microi_did: 'stable-device',
     mci_login_preferences_v2: 'remembered-account',
     mci_theme: 'preferred-theme',
@@ -39,6 +40,7 @@ test('退出登录清除可重建的账号与平台缓存', () => {
   assert.equal(storage.values.has('xjy_ai_model_selection'), false)
   assert.equal(storage.values.has('microi_mobile_menu_tree_v2:user-a'), false)
   assert.equal(storage.values.has('microi_mobile_menu_tree_v2:user-b'), false)
+  assert.equal(storage.values.has('microi_mobile_menu_tree_v3:api|tenant|user-a'), false)
   assert.equal(storage.values.get('microi_did'), 'stable-device')
   assert.equal(storage.values.get('mci_login_preferences_v2'), 'remembered-account')
   assert.equal(storage.values.get('mci_theme'), 'preferred-theme')
@@ -47,6 +49,7 @@ test('退出登录清除可重建的账号与平台缓存', () => {
 
 test('缓存 Key 识别只命中明确的可重建数据', () => {
   assert.equal(isAuthScopedStorageCacheKey('microi_mobile_menu_tree_v2:user-a'), true)
+  assert.equal(isAuthScopedStorageCacheKey('microi_mobile_menu_tree_v3:api|tenant|user-a'), true)
   assert.equal(isAuthScopedStorageCacheKey('microi_diy_table_ids_v2'), true)
   assert.equal(isAuthScopedStorageCacheKey('microi_did'), false)
   assert.equal(isAuthScopedStorageCacheKey('mci_login_preferences_v2'), false)
