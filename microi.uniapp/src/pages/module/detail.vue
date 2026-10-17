@@ -103,6 +103,7 @@
 import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 import { themeMixin } from '@/utils/theme.js'
 import { V8, getUser } from '@/utils/request.js'
+import { readFormRecord } from '@/platform/configured-read-api.mjs'
 import { formatFieldValue, openForm } from '@/platform/business-runtime.js'
 import { normalizeUploadItems, publicAssetUrl } from '@/platform/display.js'
 import { fieldDisplayValue } from '@/platform/native-form.js'
@@ -254,9 +255,11 @@ export default {
       try {
         this.config = await loadModuleDefinition(this.menuId, refresh)
         const [rowResult, manifest] = await Promise.all([
-          V8.FormEngine.GetFormData(this.config.table, {
-            Id: this.rowId,
-            _SysMenuId: this.config.menuId
+          readFormRecord(V8, {
+            tableName: this.config.table,
+            rowId: this.rowId,
+            menuId: this.config.menuId,
+            definition: this.config.definition
           }),
           loadModuleViewManifest(this.config, {
             scene: 'Detail',

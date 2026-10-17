@@ -42,6 +42,7 @@ function indexByName(rows, name) {
 }
 
 function citiesFor(province) {
+  if (!province || province.name === REGION_ALL_VALUE) return [ALL_OPTION]
   const key = String(province && (province.province || province.code.slice(0, 2)) || '')
   const rows = CITIES_BY_PROVINCE[key] || []
   if (!rows.length && DIRECT_MUNICIPALITY_CODES.has(key)) {
@@ -56,33 +57,37 @@ function areasFor(city) {
   return [ALL_OPTION, ...(AREAS_BY_CITY[city.code.slice(0, 4)] || [])]
 }
 
-export function createRegionPickerState(value = [], defaultValue = []) {
+export function createRegionPickerState(value = [], defaultValue = [], allowAllProvinces = false) {
+  const provinces = allowAllProvinces ? [ALL_OPTION, ...PROVINCES] : PROVINCES
   const selection = normalizeRegionSelection(value)
   const [provinceName, cityName, districtName] = selection.length ? selection : normalizeRegionSelection(defaultValue)
-  const provinceIndex = indexByName(PROVINCES, provinceName)
-  const province = PROVINCES[provinceIndex]
+  const provinceIndex = indexByName(provinces, provinceName)
+  const province = provinces[provinceIndex]
   const cities = citiesFor(province)
   const cityIndex = indexByName(cities, cityName)
   const areas = areasFor(cities[cityIndex])
   const districtIndex = indexByName(areas, districtName)
   return {
-    columns: [PROVINCES, cities, areas],
+    allowAllProvinces,
+    columns: [provinces, cities, areas],
     indexes: [provinceIndex, cityIndex, districtIndex]
   }
 }
 
 export function updateRegionPickerState(state, column, value) {
+  const allowAllProvinces = state?.allowAllProvinces === true
+  const provinces = allowAllProvinces ? [ALL_OPTION, ...PROVINCES] : PROVINCES
   const current = state && Array.isArray(state.indexes) ? state.indexes : [0, 0, 0]
   let [provinceIndex, cityIndex, districtIndex] = current
   const changedColumn = Number(column)
 
   if (changedColumn === 0) {
-    provinceIndex = safeIndex(value, PROVINCES)
+    provinceIndex = safeIndex(value, provinces)
     cityIndex = 0
     districtIndex = 0
   } else {
-    provinceIndex = safeIndex(provinceIndex, PROVINCES)
-    const cities = citiesFor(PROVINCES[provinceIndex])
+    provinceIndex = safeIndex(provinceIndex, provinces)
+    const cities = citiesFor(provinces[provinceIndex])
     if (changedColumn === 1) {
       cityIndex = safeIndex(value, cities)
       districtIndex = 0
@@ -93,13 +98,14 @@ export function updateRegionPickerState(state, column, value) {
     }
   }
 
-  const province = PROVINCES[provinceIndex]
+  const province = provinces[provinceIndex]
   const cities = citiesFor(province)
   cityIndex = safeIndex(cityIndex, cities)
   const areas = areasFor(cities[cityIndex])
   districtIndex = safeIndex(districtIndex, areas)
   return {
-    columns: [PROVINCES, cities, areas],
+    allowAllProvinces,
+    columns: [provinces, cities, areas],
     indexes: [provinceIndex, cityIndex, districtIndex]
   }
 }

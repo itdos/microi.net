@@ -7,8 +7,8 @@
         <view class="nav-icon nav-icon--placeholder" aria-hidden="true"></view>
       </view>
 
-      <view class="search-row" :class="{ 'search-row--simple': !filterFields.length, 'search-row--map': key === 'customers' || key === 'devices' }">
-        <view v-if="key === 'customers'" class="list-map-entry" hover-class="list-map-entry--pressed" @tap="openCustomerMap">
+      <view class="search-row" :class="{ 'search-row--simple': !filterFields.length, 'search-row--map': showCustomerMap || key === 'devices' }">
+        <view v-if="showCustomerMap" class="list-map-entry" hover-class="list-map-entry--pressed" @tap="openCustomerMap">
           <image src="/static/xjy/business/customerMap.png" mode="aspectFit" />
           <text>客户地图</text>
         </view>
@@ -64,14 +64,16 @@
 
       <scroll-view v-if="statusOptions.length" class="status-scroll" scroll-x :show-scrollbar="false">
         <view class="status-tabs">
-          <view class="status-item" :class="{ active: status === '' }" @tap="changeStatus('')">全部状态</view>
+          <view class="status-item" :class="{ active: status === '', 'status-item--counted': showContractListSummary }" @tap="changeStatus('')">
+            <text>全部状态</text><text v-if="showContractListSummary" class="status-item__badge">{{ customerStatusCount('All') }}</text>
+          </view>
           <view
             v-for="item in statusOptions"
             :key="item"
             class="status-item"
-            :class="{ active: String(status) === String(item) }"
+            :class="{ active: String(status) === String(item), 'status-item--counted': showContractListSummary }"
             @tap="changeStatus(item)"
-          >{{ statusOptionLabel(item) }}</view>
+          ><text>{{ statusOptionLabel(item) }}</text><text v-if="showContractListSummary" class="status-item__badge">{{ customerStatusCount(item) }}</text></view>
         </view>
       </scroll-view>
     </view>
@@ -96,6 +98,15 @@
           </view>
         </view>
       </view>
+    </view>
+
+    <view v-if="showContractListSummary && !metadataError" class="customer-statistics-tools">
+      <view class="customer-valid-switch" role="switch" :aria-checked="customerValidOnly" @tap="toggleCustomerValidity">
+        <view class="mine-switch__track" :class="{ active: customerValidOnly }"><view class="mine-switch__thumb"></view></view>
+        <text>仅有效期内</text>
+      </view>
+      <text class="customer-statistics-hint">{{ customerStatisticsError || '买断按全部合同累计' }}</text>
+      <text v-if="customerStatisticsError" class="customer-statistics-retry" @tap="loadPlatformStatistics(buildCurrentListOptions(true), loadRequestId)">重试</text>
     </view>
 
     <view v-if="key === 'proposals'" class="proposal-compare-tools">
@@ -288,7 +299,9 @@ import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vu
 import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 import MciRestrictedRecordCard from '@/components/mci-restricted-record-card/mci-restricted-record-card.vue'
 import XjyCustomerContractTotals from '@/tenants/xjy/components/customer-contract-totals.vue'
-import { customerContractTotalsSupported, hydrateCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
+import { CUSTOMER_CONTRACT_TOTALS_ENGINE, customerContractTotalsSupported, hydrateCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
+import { loadCustomerListSummary } from '@/tenants/xjy/customer-list-summary.mjs'
+import { ORDER_CONTRACT_TOTALS_ENGINE, orderContractTotalsSupported, loadOrderListSummary } from '@/tenants/xjy/order-list-summary.mjs'
 import {
   formatDateTime,
   formatFieldValue,
@@ -361,6 +374,10 @@ export default {
       dataAppend: {},
       metricValues: {},
       metricLoading: false,
+      customerValidOnly: true,
+      customerStatusCounts: {},
+      customerStatisticsError: '',
+      customerStatisticsRequestId: 0,
       pageIndex: 1,
       // 菜单和元数据同样属于首屏请求，不能等列表接口开始后才进入加载态。
       loading: true,
@@ -400,8 +417,17 @@ export default {
     }
   },
   computed: {
+    showCustomerMap() {
+      return String(this.config.table || this.baseConfig.table || '').toLowerCase() === 'diy_kehu'
+    },
     showCustomerContractTotals() {
       return customerContractTotalsSupported(this.config.table || this.baseConfig.table)
+    },
+    showOrderContractSummary() {
+      return orderContractTotalsSupported(this.config.table || this.baseConfig.table)
+    },
+    showContractListSummary() {
+      return this.showCustomerContractTotals || this.showOrderContractSummary
     },
     canAddRecord() {
       return canAddMenuRecord(this.menuId, this.currentUser)
@@ -543,6 +569,7 @@ export default {
       const sort = this.selectedSort()
       const filters = {
         fromList: true,
+        moduleKey: this.key,
         menuId: this.menuId,
         keyword: this.keyword.trim(),
         period: this.period,
@@ -660,6 +687,9 @@ export default {
         count: this.count,
         dataAppend: { ...this.dataAppend },
         metricValues: { ...this.metricValues },
+        customerValidOnly: this.customerValidOnly,
+        customerStatusCounts: { ...this.customerStatusCounts },
+        customerStatisticsError: this.customerStatisticsError,
         pageIndex: this.pageIndex,
         finished: this.finished,
         filterValues: { ...this.filterValues },
@@ -803,6 +833,9 @@ export default {
           this.dataAppend = {}
           this.periodCounts = {}
           this.metricValues = {}
+          this.customerStatusCounts = {}
+          this.customerStatisticsError = ''
+          this.customerStatisticsRequestId += 1
           this.count = 0
           this.finished = true
           return false
@@ -826,6 +859,36 @@ export default {
     },
     async loadPlatformStatistics(options, requestId) {
       const metrics = this.config.statisticsMetrics || []
+      const summaryEngine = this.showOrderContractSummary ? ORDER_CONTRACT_TOTALS_ENGINE : CUSTOMER_CONTRACT_TOTALS_ENGINE
+      if ((this.showCustomerContractTotals || this.showOrderContractSummary) && metrics.some(metric => metric.apiEngineKey === summaryEngine)) {
+        const summaryRequestId = ++this.customerStatisticsRequestId
+        this.metricLoading = true
+        this.customerStatisticsError = ''
+        this.customerStatusCounts = {}
+        this.metricValues = {}
+        try {
+          const loadSummary = this.showOrderContractSummary ? loadOrderListSummary : loadCustomerListSummary
+          const result = await loadSummary({
+            menuId: this.menuId,
+            filters: buildModuleFilterPayload(this.config, { ...options, status: '' }),
+            selectedStatus: options.status,
+            validOnly: this.customerValidOnly,
+            run: (key, params) => V8.ApiEngine.Run(key, params, { checkCode: false })
+          })
+          // 开关与搜索可同时发起请求；只接收最新统计，避免旧口径迟到覆盖。
+          if (requestId !== this.loadRequestId || summaryRequestId !== this.customerStatisticsRequestId) return
+          this.metricValues = result.metrics
+          this.customerStatusCounts = result.statusCounts
+          this.customerStatisticsError = result.warning
+        } catch (error) {
+          if (requestId !== this.loadRequestId || summaryRequestId !== this.customerStatisticsRequestId) return
+          this.customerStatisticsError = error.message || '金额统计加载失败'
+          this.metricValues = { rental: '-', buyout: '-', annualFilter: '-', ...(this.showOrderContractSummary ? { sum: '-' } : {}) }
+        } finally {
+          if (requestId === this.loadRequestId && summaryRequestId === this.customerStatisticsRequestId) this.metricLoading = false
+        }
+        return
+      }
       const hasRemoteMetrics = metrics.some((metric) => {
         return String(metric.source || '').toLowerCase() === 'apiengine' && metric.apiEngineKey
       })
@@ -864,6 +927,9 @@ export default {
         this.finished = false
         this.metricValues = {}
         this.metricLoading = false
+        this.customerStatisticsRequestId += 1
+        this.customerStatusCounts = {}
+        this.customerStatisticsError = ''
       }
       this.loading = true
       this.error = ''
@@ -976,6 +1042,7 @@ export default {
       this.filterOpen = false
       this.expandedFilterKey = ''
       this.period = 'all'
+      this.customerValidOnly = true
       if (this.showMineSwitch) this.mineOnly = true
       this.status = ''
       this.customStart = ''
@@ -1015,6 +1082,15 @@ export default {
       if (this.status === value) return
       this.status = value
       this.loadData(true)
+    },
+    customerStatusCount(value) {
+      const count = this.customerStatusCounts[String(value)]
+      if (count === undefined && this.customerStatusCounts.All === undefined && this.customerStatisticsError) return '-'
+      return count === undefined ? (this.customerStatusCounts.All === undefined ? '--' : 0) : count
+    },
+    toggleCustomerValidity() {
+      this.customerValidOnly = !this.customerValidOnly
+      this.loadPlatformStatistics(this.buildCurrentListOptions(true), this.loadRequestId)
     },
     statusOptionLabel(value) {
       const field = this.field(this.config.statusField)
@@ -1700,6 +1776,7 @@ export default {
 }
 
 .status-item {
+  position: relative;
   flex: 0 0 auto;
   min-width: 110rpx;
   height: 54rpx;
@@ -1711,6 +1788,33 @@ export default {
   line-height: 54rpx;
   text-align: center;
 }
+
+.status-item--counted { margin-top: 12rpx; padding-right: 28rpx; }
+.status-item__badge {
+  position: absolute;
+  top: -14rpx;
+  right: -6rpx;
+  min-width: 30rpx;
+  padding: 0 8rpx;
+  border-radius: 18rpx;
+  background: #e8f3f9;
+  color: #47758b;
+  font-size: 18rpx;
+  line-height: 28rpx;
+  font-weight: 600;
+}
+.status-item.active .status-item__badge { background: #0b86d4; color: #fff; }
+.customer-statistics-tools {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-shrink: 0;
+  margin: -4rpx 24rpx 14rpx;
+  min-height: 44rpx;
+}
+.customer-valid-switch { display: flex; align-items: center; gap: 10rpx; color: #527282; font-size: 22rpx; flex-shrink: 0; }
+.customer-statistics-hint { min-width: 0; color: #788e99; font-size: 19rpx; }
+.customer-statistics-retry { flex-shrink: 0; color: #0b86d4; font-size: 22rpx; }
 
 .status-item.active {
   border-color: #0b86d4;

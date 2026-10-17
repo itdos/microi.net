@@ -1,4 +1,5 @@
 import appConfig from '@/config.js'
+import orderListStatistics from '../../../profiles/xjy/metadata/order-list-statistics.json'
 
 const asset = (path) => `/static/xjy/${path}`
 
@@ -232,12 +233,11 @@ export const businessModules = {
   orders: native({
     title: '合同订单', table: 'Diy_Dingdan', menuAliases: ['合同订单', '订单管理', '我的订单'],
     titleField: 'KehuMC', statusField: 'DingdanZT', tagFields: ['XinLDD', 'DingdanHZFS'],
-    relatedMetrics: [
-      { key: 'pending', label: '待审批', where: [{ Name: 'DingdanZT', Type: '=', Value: '待审批' }], tone: 'warning' },
-      { key: 'approved', label: '已审批', where: [{ Name: 'DingdanZT', Type: '=', Value: '已审批' }], tone: 'success' },
-      { key: 'amount', label: '订单总额', aggregateField: 'DingdanJE', format: 'compactMoney', tone: 'primary' },
-      { key: 'month', label: '本月订单', monthField: 'CreateTime', tone: 'neutral' }
-    ],
+    // 主列表和关联 Tab 使用同一份金额定义，避免后续只更新一个入口。
+    relatedSummary: { apiEngineKey: orderListStatistics.engineKey, statusField: 'DingdanZT', hint: '订单金额按筛选统计，买断含已到期金额' },
+    relatedMetrics: orderListStatistics.metrics.map(metric => ({
+      key: metric.Key, label: metric.Label, tone: metric.Tone, format: 'compactMoney', unit: ''
+    })),
     lines: [
       { label: '客户名称', field: 'KehuMC' },
       { label: '订单金额', field: 'DingdanJE', format: 'money' },
@@ -319,6 +319,14 @@ export const businessModules = {
         { label: '服务结束时间较近', value: 'service-end', field: 'FuwuJSSJ', order: 'ASC' }
       ] }
     ]
+  }),
+  iotCommunicationLogs: native({
+    title: 'IoT设备通讯日志', table: 'diy_iot_communication_log', menuAliases: ['IoT设备通讯日志'],
+    // 日志由MongoDB接口按设备和月份读取；它不支持通用关键词检索或人工增删改。
+    readOnly: true, searchable: false, monthField: 'LogMonth', timeRangeField: 'RecordTime',
+    titleField: 'RecordTime', defaultOrderBy: 'CreateTime', defaultOrderType: 'DESC',
+    lines: [{ label: 'IoT厂商', field: 'Provider' }, { label: 'IoT设备编号', field: 'DeviceCode' }, { label: '事件类型', field: 'EventType' }],
+    relatedMetrics: [{ key: 'total', label: '通讯记录', tone: 'neutral' }]
   }),
   serviceRecords: native({
     // 该入口是已完成售后任务视图，不是 diy_ServiceRecord 汇总档案；禁止复用“服务记录表”别名，

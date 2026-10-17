@@ -317,6 +317,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		setUser
 	} from '@/utils/request.js'
 	import { canEditMenuRecord } from '@/platform/menu-permission.js'
+	import { isReadOnlyTable } from '@/platform/configured-read-api.mjs'
 	import { findMenu } from '@/platform/business-runtime.js'
 	import { buildFormSubsections } from '@/platform/form-subsections.mjs'
 	import { isStandaloneChildLayout } from '@/platform/related-tab-layout.mjs'
@@ -401,6 +402,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	}
 
 	export default {
+    // 路由查询参数不能透传到根页面壳并覆盖已解码的中文标题。
+    inheritAttrs: false,
   onShareAppMessage() { return buildFriendShare(this, 'pages/native-form/index') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/native-form/index') },
 		components: { MciBusinessRelatedList, MciCustomerPicker, MciPosterDetail, MciVisitTargetFields },
@@ -421,6 +424,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				saving: false,
 				openingEdit: false,
 				refreshAfterEdit: false,
+				notifyOpenerSaved: null,
 				saveReturnTimer: null,
 				pageDisposed: false,
 				stale: false,
@@ -435,6 +439,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				recordAdapter: 'form-engine',
 				moduleEngineKey: '',
 				tableChildAuth: null,
+				readWhere: [],
 				tenantFormState: {},
 				viewManifest: null,
 				// zhy: 记录当前打开下拉框的字段名。
@@ -461,8 +466,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			}
 		},
 		computed: {
+			recordReadOnly() { return isReadOnlyTable(this.tableName, businessModules) },
 			canEditRecord() {
-				return canEditMenuRecord(this.menuId, getUser() || {})
+				return !this.recordReadOnly && canEditMenuRecord(this.menuId, getUser() || {})
 			},
 			detailPosterPresentation() {
 				if (this.mode !== 'View') return null
@@ -495,7 +501,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				}))
 			},
 			isEditableMode() {
-				return this.mode === 'Add' || this.mode === 'Edit'
+				return !this.recordReadOnly && (this.mode === 'Add' || this.mode === 'Edit')
 			},
 			relationParentId() {
 				return this.rowId || this.draftRowId || ''
@@ -582,6 +588,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			}
 		},
 		onLoad(options) {
+			// 打开嵌套表单后 H5 当前路由会变化；进入时固定本页来源，保存时不能再取子页面的通道。
+			const opener = this.getOpenerEventChannel?.()
+			this.notifyOpenerSaved = () => opener?.emit?.('native-form:record-saved')
 			this.tableName = decodeURIComponent(options.table || '')
 			this.menuId = decodeURIComponent(options.menuId || '')
 			this.fileMenuId = decodeURIComponent(options.fileMenuId || '')
@@ -607,6 +616,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			}
 			this.moduleEngineKey = decodeURIComponent(options.moduleEngineKey || '')
 			this.tableChildAuth = parseJson(decodeURIComponent(options.tableChildAuth || ''), null)
+			this.readWhere = parseJson(decodeURIComponent(options.readWhere || ''), []) || []
 			this.tenantFormState = createTenantFormState(this.tenantFormContext())
 			this.refreshTenantFloatingActionMetrics()
 			this.loadForm()
@@ -845,6 +855,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				return this.embeddedRelatedForGroup(group).filter((item) => item.type === 'openTable')
 			},
 			async loadForm(refresh = false) {
+				if (this.recordReadOnly) this.mode = 'View'
 				// zhy: 每次加载分配递增编号，仅允许最后一次请求更新表单。
 				const loadId = ++this.formLoadId
 				this.openSelectorField = ''
@@ -895,6 +906,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					const rowPromise = (this.rowId || !isFormEngineRecordAdapter(this.recordAdapter))
 						? loadNativeFormRecord({
 							...context,
+							definitionPromise,
+							readWhere: this.readWhere,
 							adapter: this.recordAdapter,
 							tableName: this.tableName,
 							rowId: this.rowId,
@@ -1319,6 +1332,10 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				return group.fields.some((field) => field.Name === this.openSelectorField)
 			},
 			async submit() {
+				if (this.recordReadOnly) {
+					uni.showToast({ title: '此记录只支持查看', icon: 'none' })
+					return
+				}
 				if (this.saving || this.saveReturnTimer) return
 				if (!['Add', 'Edit'].includes(this.mode) || (this.mode === 'Edit' && this.rowId &&
 					isFormEngineRecordAdapter(this.recordAdapter) && !this.tableChildAuth &&
@@ -1382,7 +1399,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					}
 					const currentUser = getUser() || {}
 					// 主表落库即标记来源详情失效；即使后续子表或租户钩子失败，返回也要显示真实数据。
-					this.getOpenerEventChannel?.()?.emit?.('native-form:record-saved')
+					this.notifyOpenerSaved?.()
 					try {
 						await flushChildDrafts(this.draftRowId, this.rowId, V8.FormEngine,
 							{ ...this.form, Id: this.rowId }, buildTableChildDefaultValues)

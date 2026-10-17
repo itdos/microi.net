@@ -1,0 +1,15 @@
+{
+  "moduleId": "af4ee06b-0226-4472-bb43-c9c058225606",
+  "button": {
+    "Id": "5b8f5887-344a-4d68-a38e-af78d66d7db8",
+    "Sort": -10,
+    "Name": "仅有效期内：开启",
+    "Icon": "fas fa-toggle-on",
+    "BtnStyle": "primary",
+    "IsVisible": true,
+    "V8CodeShow": "return V8.ClientType === 'PC';",
+    "Url": ""
+  },
+  "v8Source": "src/tenants/xjy/module-buttons/customer-validity-toggle.js",
+  "defaultValidOnly": true
+}

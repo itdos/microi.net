@@ -19,21 +19,21 @@
         <view class="hero-band__meta"><view><text>{{ task.type || '-' }}</text><text>服务类型</text></view><view><text>{{ task.serviceUser || '待领取' }}</text><text>服务人员</text></view><view><text>{{ completedDeviceCount }}/{{ devices.length }}</text><text>设备完成</text></view></view>
       </view>
 
-      <scroll-view class="timeline-scroll" scroll-x :show-scrollbar="false">
+      <view class="timeline-scroll">
         <view class="timeline-row">
           <view v-for="(step, index) in timeline" :key="step.name" class="timeline-step" :class="{ active: step.active, current: step.current, skipped: step.skipped }">
             <view class="timeline-step__line"></view><view class="timeline-step__dot"><text v-if="step.active">✓</text></view><text class="timeline-step__name">{{ step.name }}</text><text class="timeline-step__time">{{ step.time || '—' }}</text>
           </view>
         </view>
-      </scroll-view>
+      </view>
 
-      <scroll-view class="timeline-scroll service-time-scroll" scroll-x :show-scrollbar="false">
+      <view class="timeline-scroll service-time-scroll">
         <view class="timeline-row service-time-row">
           <view v-for="item in timeRows" :key="item.field" class="timeline-step service-time-step" :class="{ active: !!task[item.field], current: item.field === currentTimeField, editable: canEditWorkTime(item.field) }" hover-class="service-time-step--pressed" @tap="editTime(item)">
             <view class="timeline-step__line"></view><view class="timeline-step__dot"><text v-if="task[item.field]">✓</text></view><text class="timeline-step__name">{{ item.label }}</text><text class="timeline-step__time">{{ formatTime(task[item.field]) || '暂未填写' }}</text>
           </view>
         </view>
-      </scroll-view>
+      </view>
       <view class="timeline-divider"></view>
 
       <view class="action-band" :class="{ 'action-band--two': quickActions.length === 2, 'action-band--four': quickActions.length === 4 }">
@@ -499,15 +499,16 @@ export default {
 .hero-band__meta { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin-top: 34rpx; }
 .hero-band__meta view { min-width: 0; padding: 0 12rpx; border-right: 1px solid rgba(255,255,255,.24); text-align: center; }.hero-band__meta view:last-child { border-right: none; }
 .hero-band__meta text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.hero-band__meta text:first-child { font-size: 25rpx; font-weight: 700; }.hero-band__meta text:last-child { margin-top: 6rpx; color: rgba(255,255,255,.65); font-size: 19rpx; }
-.timeline-scroll { width: 100%; border-bottom: 1px solid #e5edef; background: #fff; white-space: nowrap; }
-.timeline-row { display: inline-flex; padding: 22rpx 25rpx 18rpx; }
-.timeline-step { position: relative; width: 144rpx; text-align: center; }
+.timeline-scroll { width: 100%; border-bottom: 1px solid #e5edef; background: #fff; }
+/* 各阶段按容器宽度均分，避免固定宽度把末尾状态和完成时间挤出手机屏幕。 */
+.timeline-row { display: flex; width: 100%; padding: 22rpx 16rpx 18rpx; box-sizing: border-box; }
+.timeline-step { position: relative; flex: 1; min-width: 0; text-align: center; }
 .timeline-step__line { position: absolute; top: 15rpx; left: 0; width: 100%; height: 3rpx; background: #dfe8eb; }.timeline-step:first-child .timeline-step__line { left: 50%; width: 50%; }.timeline-step:last-child .timeline-step__line { width: 50%; }
 .timeline-step__dot { position: relative; z-index: 1; width: 31rpx; height: 31rpx; margin: 0 auto; border: 4rpx solid #fff; border-radius: 50%; color: #fff; background: #c9d5d9; box-shadow: 0 0 0 2rpx #c9d5d9; font-size: 16rpx; line-height: 31rpx; box-sizing: border-box; }
 .timeline-step.active .timeline-step__line, .timeline-step.active .timeline-step__dot { background: #087da8; }.timeline-step.active .timeline-step__dot { box-shadow: 0 0 0 2rpx #087da8; }.timeline-step.current .timeline-step__dot { box-shadow: 0 0 0 5rpx rgba(8,125,168,.18); }
-.timeline-step__name, .timeline-step__time { display: block; }.timeline-step__name { margin-top: 10rpx; color: #66808a; font-size: 20rpx; }.timeline-step.active .timeline-step__name { color: #24505f; font-weight: 650; }.timeline-step__time { margin-top: 4rpx; color: #9aaab0; font-size: 17rpx; }
+.timeline-step__name, .timeline-step__time { display: block; padding: 0 3rpx; white-space: normal; overflow-wrap: break-word; line-height: 1.35; }.timeline-step__name { margin-top: 10rpx; color: #66808a; font-size: 20rpx; }.timeline-step.active .timeline-step__name { color: #24505f; font-weight: 650; }.timeline-step__time { margin-top: 4rpx; color: #9aaab0; font-size: 17rpx; }
 .timeline-step.skipped .timeline-step__dot { background: #e8eef0; box-shadow: 0 0 0 2rpx #c5d0d4; }.timeline-step.skipped .timeline-step__time { color: #78909a; }
-.service-time-scroll { border-top: 10rpx solid #f1f6f8; border-bottom: 0; }.service-time-row { padding-top: 25rpx; }.service-time-step { width: 176rpx; padding: 0 4rpx 5rpx; border-radius: 8px; box-sizing: border-box; transition: background .16s ease, transform .16s ease; }.service-time-step.editable { cursor: pointer; }.service-time-step--pressed { background: #edf7fa; transform: scale(.985); }.service-time-step .timeline-step__name { white-space: nowrap; }.service-time-step .timeline-step__time { min-height: 44rpx; padding: 0 3rpx; white-space: normal; line-height: 1.35; }.timeline-divider { height: 14rpx; border-top: 1px solid #e5edef; border-bottom: 1px solid #e5edef; background: #f1f6f8; box-sizing: border-box; }
+.service-time-scroll { border-top: 10rpx solid #f1f6f8; border-bottom: 0; }.service-time-row { padding-top: 25rpx; }.service-time-step { padding: 0 0 5rpx; border-radius: 8px; box-sizing: border-box; transition: background .16s ease, transform .16s ease; }.service-time-step.editable { cursor: pointer; }.service-time-step--pressed { background: #edf7fa; transform: scale(.985); }.service-time-step .timeline-step__time { min-height: 44rpx; }.timeline-divider { height: 14rpx; border-top: 1px solid #e5edef; border-bottom: 1px solid #e5edef; background: #f1f6f8; box-sizing: border-box; }
 .action-band { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 18rpx 12rpx; background: #fff; }
 .action-band--two { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .action-band--four { grid-template-columns: repeat(4,minmax(0,1fr)); }

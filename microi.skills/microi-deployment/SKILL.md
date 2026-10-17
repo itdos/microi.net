@@ -76,7 +76,9 @@ System.Drawing.Common 的 .NET 10 支持库引用 System.Formats.Nrbf，Dos.Comm
 | 生产 Linux、快速安装、可滚动升级 | Docker/Compose |
 | 无互联网环境 | 在联网机制作离线包，再在目标机校验并安装 |
 | Windows 传统环境 | IIS + .NET Hosting Bundle + 独立依赖 |
-| 开发/调试 | 后端源码 + 前端 Vite，本地依赖或隔离容器 |
+| 开发/调试 | 复用健康服务，或启动后端源码/隔离目录中的编译产物 + 前端 Vite；优先共用已授权开发/测试依赖 |
+
+本地测试遵循 `../workspace-conventions/SKILL.md` 的“本地测试程序与依赖生命周期”：不能按 AI 任务或双节点测试默认新建整套 Docker/Compose；每轮结束均收回自建进程和获准创建的临时容器，既有共享服务保持原状态。
 
 本地 `Microi.Client` 默认读取 `src/config.json` 的 `ApiBaseDev`，也允许在 `#` 前通过 URL 参数
 临时指定运行目标：
@@ -130,7 +132,7 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
 - LibreTranslate 属于一键安装默认组件：安装选择空输入按 `1` 处理，语言套餐空输入按基础套餐 `1` 处理；因此用户一路按 Enter 使用官方推荐组合。只有明确输入 `0` 才跳过，提示、端口预算、官网文档和静态回归测试必须一致。
 - OCR 的 Upgrade29 与 LibreTranslate 的 Upgrade31 字段门禁只在对应附加服务部署检查通过后回读，每秒一次、最多 15 秒；首轮成功就继续，超时快速关闭对应能力并提示镜像/迁移版本，不得退回 5 分钟空等，也不得直接创建字段绕过平台升级。附加能力门禁失败不得中断已通过完整升级链和 readiness 的核心平台。
 - 官方 API/Web 使用浮动 `latest` 时，生成的 Compose 必须设置 `pull_policy: always` 或在启动前显式拉取并核对，不能因宿主机已有同名镜像就复用旧版本；测试专用本机镜像覆盖必须明确使用 `never`，避免误访问或覆盖远端镜像。
-- 端口、密码和数据目录全部生成后，安装器必须注册统一的失败收尾：数据库、缓存、存储、API/Web、完整升级链或 API liveness/readiness 等核心后段错误保留原始非零退出码，并输出标题为“安装未完成”的恢复汇总，列出已生成端口、凭据、目录、失败阶段和全部容器状态。OCR/LibreTranslate 的网络、镜像、容器或 SaaS 配置失败只记录附加能力警告、保持对应能力未启用并继续核心安装。两种结果都不得把 `Running` 当 readiness，也不得绕过 Upgrade29/Upgrade31 或完整升级链门禁。
+- 端口、密码和数据目录全部生成后，安装器必须注册统一的失败收尾：数据库、缓存、存储、API/Web、完整升级链或 API liveness/readiness 等核心后段错误保留原始非零退出码，并输出标题为“安装未完成”的恢复汇总，列出已生成端口、受限凭据文件位置与脱敏状态、目录、失败阶段和全部容器状态。OCR/LibreTranslate 的网络、镜像、容器或 SaaS 配置失败只记录附加能力警告、保持对应能力未启用并继续核心安装。两种结果都不得把 `Running` 当 readiness，也不得绕过 Upgrade29/Upgrade31 或完整升级链门禁。
 - 从客户/旧库恢复安装时，安装器只按 `OsClient + OsClientType + OsClientNetwork + IsEnable + IsDeleted` 处理目标主租户：0 条时幂等创建最小可运行记录，1 条时原位复用，超过 1 条失败关闭。禁止把所有活动 `sys_osclients` 批量改成输入的 OsClient；新记录不得落库 `DbConn/DbReadConn/DbMongoConnection` 或 Redis 主机、端口、密码，这些继续由十项编排启动配置提供。MinIO、OCR 等安装值随后只更新这个精确三元组并回读唯一性。
 
 ### 复盘：普通帐号运行安装器直到步骤 5 才因 `/microi/compose` 权限失败
@@ -165,7 +167,7 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
 
 - 健康开发服务默认复用；需要重载源码时串行重启。长期后端只从项目目录执行
   `dotnet run --launch-profile Microi.net.Api`，禁止直接运行 `bin/Release/net10.0`
-  或 `bin/Release/publish` 作为 E2E 服务。
+  或 `bin/Release/publish` 作为长期 E2E 服务。一次性测试本轮编译/发布产物时，复制到任务隔离目录启动，并登记身份、端口与最终收尾，避免占用共享 Release 输出。
 - API、PC、官网、Agent 分别使用 `api-release.lock`、`pc-release.lock`、`website-release.lock`、`agent-release.lock`，可并行发布；同类发布互斥。合并发布只取得所选产品的锁，部分取得失败时释放本次已取得的锁。
 - API 启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`；官网/Agent 不阻塞二者。旧全局锁仅在真实命令入口和状态目录证明 API 热修复或 Agent 归属后缩小阻塞范围，未知锁仍阻塞，不能删除活跃锁。
 - Windows 发布前调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease -ReleaseScope api|pc|all`。API 仅处理匹配工作区的后端与 Release DLL；PC 仅处理匹配的 Vite；官网不清理二者。禁止按进程名全机清理。
@@ -179,7 +181,7 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
   `Microi.net.Api/bin/Release/net10.0` DLL。只结束 `VBCSCompiler` 不能解决正在运行的
   `.NET Host` 对业务 DLL 的锁定。
 - Edge/Chrome 用户浏览器、VS Code 的 Playwright Test Server、MCP/语言服务 Node、
-  数据库和 Redis 不属于发布清理范围。人工查看使用进程管理器的 `-Action Status`。
+  既有或借用的数据库和 Redis 不属于发布清理范围；本轮新建临时依赖仍须按基础规范收尾。人工查看使用进程管理器的 `-Action Status`。
 - PowerShell 7 下的 macOS/Linux 进程管理使用真实端口、命令行、精确大小写 CWD 和启动时间回读；身份不明或 PID 复用时失败关闭，只结束已核验根进程的后代。无扩展名 `Microi.net.Api` apphost 须采用规范绝对可执行路径，精确位于当前 API 项目的 `bin/` 下，且 CWD 精确等于项目目录；非规范路径、同名外部程序、读取失败均拒绝。身份函数回归进入 Full，实际停止能力仍需自有进程与端口验收。专项回归必须在自有目录、端口和真实进程中证明当前工作区可停止、外部工作区保留，以及原始文件锁诊断；不允许为了跨平台放宽跳过门禁。
 
 ## 一键发布产物边界与缓存

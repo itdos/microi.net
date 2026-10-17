@@ -1145,6 +1145,22 @@ export function createMicroiV8(options = {}) {
   }
 
   const CONTENT_SECURITY_BATCH_ENGINE = 'mci-wechat-content-status-batch';
+
+  async function getImageContentSecurityPolicy() {
+    const result = await apiEngineRun(CONTENT_SECURITY_BATCH_ENGINE, {
+      Action: 'Policy'
+    }, { checkCode: false, silentError: true });
+    // 旧接口尚无 Policy 动作时保留强制审核；读取失败不能被当作管理员关闭。
+    const message = String(result && result.Msg || '');
+    if (result && Number(result.Code) === 0 &&
+      ['不支持的微信内容安全动作。', '接口引擎不存在'].includes(message)) return true;
+    if (result && Number(result.Code) === 2 && /NoExistData/i.test(message)) return true;
+    const enabled = result && result.Data && result.Data.ImageContentSecurityEnabled;
+    if (!result || Number(result.Code) !== 1 || typeof enabled !== 'boolean') {
+      throw result || { Code: 0, Msg: '图片安全校验配置读取失败，请稍后重试。' };
+    }
+    return enabled;
+  }
   const CONTENT_SECURITY_TERMINAL = new Set(['Passed', 'Rejected', 'Error', 'Timeout', 'Cancelled']);
 
   function contentSecurityError(status) {
@@ -1350,6 +1366,11 @@ export function createMicroiV8(options = {}) {
     return /\.(?:jpe?g|png|gif|bmp|webp)(?:$|[?#])/i.test(name);
   }
 
+  function isContentSecurityImageUpload(filePath, options = {}) {
+    // preview=false 只表示保留文件原件，不能让文件控件选择的图片脱离审核开关。
+    return isImageUpload(filePath, { ...options, preview: options.preview === true ? true : undefined });
+  }
+
   async function compressClientImage(filePath, options = {}) {
     const runtimeUni = getUni();
     if (!isWeChatMiniProgramRuntime() || options.clientCompress === false ||
@@ -1379,7 +1400,7 @@ export function createMicroiV8(options = {}) {
   }
 
   // 文件上传同时支持 uni.uploadFile 与浏览器 fetch/FormData。
-  async function uploadFileInternal(filePath, options = {}, deferContentSecurity = false) {
+  async function uploadFileInternal(filePath, options = {}, deferContentSecurity = false, imageSecurityPolicy) {
     const runtimeUni = getUni();
     const action = options.action || (options.anonymous ? 'UniappUploadAnonymous' : 'UniappUpload');
     const rawFormData = options.formData || {};
@@ -1398,9 +1419,14 @@ export function createMicroiV8(options = {}) {
     );
     delete uploadData.path;
 
-    const requiresContentSecurity = isWeChatMiniProgramRuntime() &&
-      options.contentSecurity !== false && isImageUpload(filePath, options);
-    const useV8ContentSecurityUpload = requiresContentSecurity && !!options.contentSecuritySessionId;
+    const isWeChatImage = isWeChatMiniProgramRuntime() && options.contentSecurity !== false && isContentSecurityImageUpload(filePath, options);
+    const securityEnabled = isWeChatImage && (typeof imageSecurityPolicy === 'boolean'
+      ? imageSecurityPolicy : await getImageContentSecurityPolicy());
+    const requiresContentSecurity = isWeChatImage && securityEnabled;
+    // 关闭审核也经过服务端受控上传：服务端重新读取开关，客户端不能伪造关闭。
+    const ordinaryImageUpload = isWeChatImage && !securityEnabled;
+    const useV8ContentSecurityUpload = ordinaryImageUpload || (requiresContentSecurity && !!options.contentSecuritySessionId);
+    if (ordinaryImageUpload) uploadData.Action = 'Upload';
     if (requiresContentSecurity) {
       uploadData.ContentSecurityRequired = 'true';
       uploadData.ContentSecurityScene = String(options.contentSecurityScene || 1);
@@ -1479,7 +1505,7 @@ export function createMicroiV8(options = {}) {
       if (options.silentError !== true) toast(error.Msg);
       throw error;
     }
-    if (requiresContentSecurity) {
+    if (requiresContentSecurity && data.ContentSecurityEnabled !== false) {
       if (!data.ContentSecurityReviewId || !['Pending', 'Passed', 'Rejected', 'Error'].includes(data.ContentSecurityStatus)) {
         const error = { Code: 0, Msg: '内容安全检测暂不可用，请稍后重试。' };
         if (options.silentError !== true) toast(error.Msg);
@@ -1530,8 +1556,9 @@ export function createMicroiV8(options = {}) {
 
     let contentSecuritySessionId = String(options.contentSecuritySessionId || '');
     const hasWeChatImages = isWeChatMiniProgramRuntime() && options.contentSecurity !== false &&
-      entries.some((entry) => isImageUpload(entry.filePath, { ...options, file: entry.file, fileName: entry.fileName }));
-    if (hasWeChatImages && !contentSecuritySessionId) {
+      entries.some((entry) => isContentSecurityImageUpload(entry.filePath, { ...options, file: entry.file, fileName: entry.fileName }));
+    const imageSecurityPolicy = hasWeChatImages ? await getImageContentSecurityPolicy() : false;
+    if (hasWeChatImages && imageSecurityPolicy && !contentSecuritySessionId) {
       try {
         // 同一批图片只执行一次 wx.login 和 jscode2session；旧后端不支持时自动退回逐图 code。
         contentSecuritySessionId = await createContentSecurityUploadSession();
@@ -1579,7 +1606,7 @@ export function createMicroiV8(options = {}) {
             contentSecuritySessionId,
             clientImageCompressed: prepared.compressed,
             silentError: true
-          }, true);
+          }, true, imageSecurityPolicy);
           if (isItemCancelled(entry.index)) {
             outcomes[entry.index] = { Code: 0, Error: contentSecurityError('Cancelled') };
             continue;

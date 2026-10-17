@@ -27,18 +27,23 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 - 桌面包内置技能目录；干净工作区输入 `/microi` 可发现吾码入口，再读取基础规范与专项技能。查不到时先核对当前桌面版本及内置技能资源，不要求用户复制开发机目录，也不要把 MCP 工具名当成斜杠技能名。
 - 对话输入框上下键回填成功提交的提示词，向下可恢复未发送草稿。菜单、输入法候选、选区和多行正常光标移动优先；不要在用户编辑文本时强行覆盖草稿。
 - 消息编辑/撤回通过真实会话分叉到该消息之前的已完成轮次；原会话和已经执行的文件修改保留。撤回将消息恢复为草稿，编辑则重新发送；这不是撤销文件系统。图片随草稿恢复，无法安全恢复的文件附件明确拒绝，不能静默删除附件或只改屏幕文字而保留旧模型上下文。
-- AI 员工桌面工作台提供十岗、任务草稿、执行、成果审阅、已验收依赖、目标和预算。云端执行复用员工中心；本机执行使用显式受限 OpenClaw Agent 与已有 Gateway。Harness 的会话/技能/定时能力不能证明 OpenClaw 的渠道、Gateway、设备节点与全部 cron 语义已完整内置。相关配置和验收读取 `ai-engine/references/ai-employees.md`。
+- AI 员工按项目群协作，十个岗位加技术总监共十一个岗位，可分别选择桌面已配置模型；原任务、成果审阅、目标和预算仍从「任务与验收」进入。群与任务共用用户明确选择并已登录的吾码 MCP，不能默认切到官方账号或首个客户。数据、运行与验收记录归所选租户；未安装员工中心或权限不足必须明确提示，不能擅自向所有客户安装。Harness 的会话/技能/定时能力不能证明完整 OpenClaw 已内置。相关执行边界读取 `ai-engine/references/ai-employees.md`。
+- 员工群消息先持久提交 SQL 消息、运行与 outbox，再返回短确认；后台用稳定 Mongo `_id` 同步并按授权游标分页读取，失败明确显示 SQL 兜底，不能把未确认发送或模型排队当完成。旧历史只在当前群管理者显式操作后分批迁移。SignalR 使用通用 `/api-engine-realtime` 和群授权，只传版本提示；断线重连后重新授权并按游标回读，不将推送当持久记录。Token 留在桌面 Worker，切换 MCP/用户/群时清理旧订阅及迟到响应。最终安装包须实测详情、模型选择保存、短确认、Mongo 回读及断线恢复。
+- Mongo 附件投影保存规范四字段数组的 JSON 字符串，读回仍核对完整消息摘要，不能只比较顶层 ContentHash。冲突先用同源、当前群管理权限限定的只读审计；旧嵌套字段已丢失时不可猜测解码或跳过摘要。派生投影修复仅限 SQL 正文摘要与 outbox 一致、原 outbox 独占租约仍有效、Mongo 同 Message/Group/Owner、时间/序号及其余非附件字段匹配、已知缺陷形态明确的记录；只更新派生附件字段并完整回读核对，不把固定 Id 更新宣称为 Mongo 原子 CAS。未知冲突保留 SQL 兜底，不改业务消息或模型运行、不扫描所有租户。
+- 同一桌面实例的多个 Worker 必须共享本机模型容量预准入，在领取云端任务前取得名额；RPC 超时不等于模型终态，结果未知时停止自动重放并保留核对入口。
+- 员工模型以 16,384 Token 为本功能默认且最高请求预算，不代表厂商输出能力；通过官方 prepareCall 同时冻结路由、能力和派发，按配置中的显式请求上限及剩余上下文收紧，保留用户 thinking/reasoning 控件。max-tokens 表示输出截断，必须记录 Uncertain 并等待核对，不能当完整成果或自动重试；预算不足应在派发前明确拒绝。
+- 员工新运行只允许从用户所选且有效的 MCP 完整身份与当前显式项目群领取；未选群不自动领取其它群，切换连接或群后停止旧范围的新领取。已开始运行按原范围安全收尾，已保存的加密成果重报保留；不能因离群丢弃结果或重放结果未知的模型调用。
 
 - 桌面与手机配对的本机 HTTP 监听必须避开 Fetch 标准禁止端口。系统自动分配的端口也可能不可浏览器访问；只有浏览器允许的真实监听端口才能进入配对 URL。自动命中禁止端口时关闭监听再有界重选，显式配置禁止端口须报错；权限和占用错误仍保留原错误，不改变系统动态端口范围、不绕过浏览器安全策略。同步上游时保护共同端口选择器、配对监听与对应回归。
 
-- 同步上游前读取内部源码根目录 `.microi-upstream.json`、`同步dsh-desktop上游.md` 与维护交接记录；分别核对 dsh-desktop 提交、Harness 官方 tag/提交、npm 版本与锁定 integrity。三方比较和补丁意图迁移、干净 `npm ci`、回归及真实界面验收通过后才能推进基线。禁止用整目录覆盖或删除补丁来通过同步。Harness 的同级权限请求应直接使用当前有效模式；提升权限必须填写非空理由，普通调用不要附带这两个升级字段。
-- Microi Agent 是内部仓库中的独立桌面发行物，直接基于 DataElement/dsh-desktop 与 DeepSeek Harness 二次开发，内置固定版本的 Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
-- 官方 AI 登录只走桌面账号窗口，固定 `https://api.itdos.com`、`OsClient=iTdos`，使用当前用户的中转 Key 和额度。不要让用户把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
+- 1.3.8 起生产宿主为 DeepSeek 官方桌面。同步前读取内部源码根目录 `同步DeepSeek官方上游.md`、`apps/official-desktop/upstream.lock.json` 与维护交接记录；核对官方提交、归档 SHA、版本与完整锁。保留原始快照、自有层和精确接缝，干净安装、回归及真实包验收后才能推进基线。`同步dsh-desktop上游.md` 仅用于历史派生模块，不得恢复退役宿主或 PPT 模式。
+- Microi Agent 是内部仓库中的独立桌面发行物，基于 DeepSeek Harness 官方桌面源码及独立吾码差异层，内置固定 Harness、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。历史 DataElement 派生模块及许可证仍保留。
+- 官方 AI 登录只走吾码桌面账号窗口，在受支持的 `https://api.microi.net` / `https://api.itdos.com`、`OsClient=iTdos` 使用本人的中转 Key 和额度；它是员工业务 MCP 之外的可选计费来源。不要把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
 - 业务连接在「服务器连接（MCP）」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
 - macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
 - 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
-- 桌面 UI 沿用 dsh-desktop 的设计系统；首页保留 dsh 原生会话区，并在下方用无外层卡片边框、无整块背景的差异层完整展示吾码 AI 大类与 29 项图像工具。工具 Id、名称和分类以 `Microi.Client/src/views/ai-engine/ai-image-tool-directory.js` 为事实源，点击时在「Microi吾码」主面板打开原生三栏工作台，禁止跳转浏览器页面；模型来源可选当前对话模型、吾码官方中转站或已登录服务器连接。服务器连接入口和“预览版”不重复放进首页。AI 数据分析明确使用 `microi_run_engine` 调用 `mci_ai_data_assistant`，不能改成绕过 MCP 的直接数据库访问。
-- Microi Agent 左侧「功能区」动态读取 dsh 的 `settings.section` 注册表，并在主界面 `main` 面板中渲染原设置组件；第一项「Microi吾码」合并官方账号和吾码 AI，第二项为「服务器连接（MCP）」，之后提供 AI 员工、采集引擎、环境与服务管理入口，再接 dsh 原生设置。功能区与工作区可拖动调高，默认无滚动条；首页/聊天页不显示虚假选中态。底部入口显示「关于 v版本号」及 `LicenseType` 版本标签，连接手机入口保持同一行。品牌显示 `Microi Agent` 与 `HARNESS` 标签，新安装默认浅色，用户仍可切换浅色/深色。
+- 桌面 UI 通过官方 slots 接入吾码面板，首页保留官方会话区及吾码 AI 大类与 29 项图像工具。工具目录以 `Microi.Client/src/views/ai-engine/ai-image-tool-directory.js` 为事实源，点击在「Microi吾码」主面板使用；模型来源可选当前对话模型、吾码官方中转或已登录业务连接。AI 数据分析通过同源 MCP 调用 `mci_ai_data_assistant`。1.4.0 起不挂载旧 dsh-desktop PPT 模式、模板 dock 或独立菜单；普通 Office 技能、用户文件与历史不删除。
+- 左侧工作区位于功能区上方；功能区用官方注册表接入插件、自动化任务、审查、吾码账号与 AI、服务器连接（MCP）、AI 员工、采集及环境服务管理，独立滚动且窄屏可达。底部「关于 v版本号」与连接手机同一行；意见反馈显示吾码官网及 QQ 群 51050055，不跳 DeepSeek 登录。自定义应用 Logo/名称只改变桌面本机品牌。默认浅色并支持深色。
 - 桌面安装包版本从 `1.0.0` 开始，使用吾码三段十进制进位规则。正式新版本先在发布源码中执行 `version:bump`，核对并提交三个版本文件；Mac 拉取后使用 `bash ./一键打包Mac.sh` 在临时 Git 工作树中打包当前已提交版本，默认不再升版，失败也不能把生成文件留在原检出目录。`--current` 仅作旧命令兼容；同版本本地重打包不得覆盖已公开的不可变产物。测试、类型检查和普通 Web 构建不升版。
 - Windows 安装包的构建成功、Authenticode 签名、SmartScreen/商店信任、HDFS 上传与 CDN 回读是不同证据；双击 `一键打包Windows.cmd` 时自动探测 Microsoft Artifact Signing 或本机可信证书，没有凭据则继续生成明确标记的未签名包，显式 `-Signing Signed` 才失败关闭。签名必须先覆盖安装器及独立执行文件，再计算发布 SHA256。macOS 默认 `bash ./一键打包Mac.sh` 同样自动探测并在无凭据时生成未签名包；`--signed` 是正式门禁，必须在缺少证书或公证钥匙串时失败，并通过 `codesign`、`spctl`、`stapler validate` 后才标记已签名公证。
 - Harness 本机探测必须以独立硬计时器约束 TCP 连接和响应头，Node 失败后用 Chromium 复核。两个通道在认证地址公布后连续连接失败时，仅重启一次到 IPv6 `::1`；IPv6 也必须实际取得有效 HTTP 响应，不得伪造就绪、绑定所有网卡或关闭鉴权。普通模式与安全模式使用同一规则，500 响应不得触发网络回退或算作就绪。日志同时记录桌面版本、实际监听地址和进程内 HTTP 自检；探测不带凭据、不跟随重定向、不输出自检 Token。恢复日志只去除缓冲区之间的重叠，不能用全局 Set 删除重试中的相同超时。发布运行 `scripts/verify-harness-startup.mjs`，以包内 Node/Harness、真实 Chromium 页面验证普通与安全模式、Node 超时回退、IPv4 双通道受阻后 IPv6 鉴权和双通道真实无响应的有界失败。Mac 验收与 Windows 真机、安装升级、客户设备验收分别记录。
@@ -85,6 +90,9 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 4. 登录会在真实终端中隐式输入密码；不要把密码写入命令、日志、Skill、MCP 参数或工作区文件。Token 继续写入 `Microi-V8-Engine/.microi-mcp-tokens.json`，并按 API、OsClient、Type、Network 四段身份隔离。
 
 ## 功能路由
+
+- 质量优先的上下文策略读取 `microi-system-delivery/references/context-quality.md`。完整系统读全原八项及增补；局部修改读取目标与依赖，歧义扩大。`microi_get_db_schema` 默认目录摘要，字段写入前使用 `detail:"fields"` 并遍历 `Paging.nextCursor`；应用清单和文件片段同样检查完整性，不能把摘要作为覆盖正文。
+- 较大 Manifest 在 `microi_plan_system` 首次提交正文并传 `detail:"summary"` 获取 `manifestRef/manifestHash` 复用，执行与验收仍校验当前身份；引用过期、重启或凭据变化时重新提交正文，写入未知先回读。`microi_get_context_metrics` 只报告当前 MCP 工具载荷字节、调用和错误，不能冒充供应商 token/费用。外部宿主的历史摘要和缓存由宿主管理。
 
 - 连接、登录、拉取、推送、差异和 AI 初始化：使用 bundled CLI 的 `profile`、`auth`、`pull`、`push`、`sync status`、`ai init`、`mcp init`、`doctor`。
 - 接口引擎、表单事件、模块、字段、工作流和数据库结构：先用 `action="list_tools"` / `describe_tool`，再调用对应原始 `microi_*` 工具。写工具必须保留确认口令、审计与回读。

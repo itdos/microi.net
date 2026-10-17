@@ -5,6 +5,7 @@ import test from 'node:test'
 import * as filters from '../src/platform/list-filter-fields.mjs'
 import { appendSystemAuditFields, moduleProjectionFields } from '../src/platform/card-field-policy.mjs'
 import { tableChildRequiresModuleQuery } from '../src/platform/table-child-query-target.mjs'
+import { resolveListReadApi, queryMonthValue } from '../src/platform/configured-read-api.mjs'
 
 const read = (name) => fs.readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8')
 const source = read('components/mci-business-related-list/mci-business-related-list.vue')
@@ -25,6 +26,8 @@ function related() {
     try { return JSON.parse(value) } catch (error) { return fallback }
   }
   const definition = component(source, {
+    loadTenantRelatedRows: async () => null, resolveRelatedFormNavigation: async () => null,
+    resolveListReadApi, queryMonthValue,
     ...filters, appendSystemAuditFields, moduleProjectionFields, parseJson, tableChildRequiresModuleQuery, getUser: () => ({}), clearTimeout,
     MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     uni: { showToast: (value) => toasts.push(value.title) },

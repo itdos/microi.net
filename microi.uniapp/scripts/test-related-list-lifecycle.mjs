@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
+import { resolveListReadApi, queryMonthValue } from '../src/platform/configured-read-api.mjs'
 
 const source = fs.readFileSync(new URL('../src/components/mci-business-related-list/mci-business-related-list.vue', import.meta.url), 'utf8')
 const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
@@ -17,6 +18,8 @@ function deferred() {
 
 function setup(overrides = {}) {
   const sandbox = {
+    loadTenantRelatedRows: async () => null, resolveRelatedFormNavigation: async () => null,
+    resolveListReadApi, queryMonthValue,
     getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     uni: { $off() {} }, clearTimeout,
     loadNativeTableModel: async () => ({ Id: 'table-1', Name: 'Related' }),
@@ -42,6 +45,28 @@ function setup(overrides = {}) {
     hydrateCollectionRows: async (rows) => rows
   }
   return { context, unmount: () => component.beforeUnmount.call(context) }
+}
+
+for (const withSummary of [true, false]) {
+  test(`initial card metadata preserves complete summary statuses only when configured: ${withSummary}`, async () => {
+    const allStatuses = ['待审批', '已审批', '已驳回', '待审批作废', '已作废', '已到期']
+    const cardStatuses = allStatuses.slice(0, 4)
+    const { context } = setup({
+      findMenu: async () => ({ Id: 'menu-1' }),
+      loadNativeModuleFields: async () => [],
+      createMenuModuleDefinition: () => ({ statusOptions: cardStatuses })
+    })
+    context.resolveBusinessModule = () => ({ key: 'related', config: {
+      statusOptions: allStatuses,
+      ...(withSummary ? { relatedSummary: { apiEngineKey: 'summary' } } : {})
+    } })
+    context.loadPresentationConfig = async () => {}
+    context.loadData = async () => {}
+    context.loadRelatedMetrics = async () => {}
+    await context.initialize()
+    assert.equal(context.error, '')
+    assert.deepEqual(Array.from(context.config.statusOptions), withSummary ? allStatuses : cardStatuses)
+  })
 }
 
 for (const stage of ['table', 'definition', 'menu']) {

@@ -10,21 +10,19 @@ import {
   selectAuthorizedMenu
 } from '@/platform/menu-resolution.mjs'
 import { buildListApiEnginePayload, listApiEnginePresentationKey, normalizeListApiEngineResponse } from '@/platform/list-api-engine.mjs'
+import { resolveListReadApi, requestReadApi } from '@/platform/configured-read-api.mjs'
 import tenantRuntime from '@/generated/tenant-runtime.js'
 
-const TABLE_CACHE_KEY = 'microi_diy_table_ids_v2'
-const MENU_CACHE_KEY = 'microi_mobile_menu_tree_v2'
-let tableIdCache = null
+const MENU_CACHE_KEY = 'microi_mobile_menu_tree_v3'
 let menuTreeCache = null
 
 export function resetBusinessRuntimeCache() {
-  tableIdCache = null
   menuTreeCache = null
 }
 
 function currentIdentityKey() {
   const user = getUser() || {}
-  return String(user.Id || user.Account || 'guest')
+  return [appConfig.apiBase || '', appConfig.osClient || '', user.Id || user.Account || 'guest'].join('|')
 }
 
 export const PERIOD_OPTIONS = [
@@ -177,11 +175,13 @@ export async function loadModuleRows(moduleConfig, options = {}) {
   const pageIndex = Number(options.pageIndex || 1)
   const pageSize = Number(options.pageSize || moduleConfig.pageSize || 15)
   const listApiEngineKey = String(moduleConfig.listApiEngineKey || '').trim()
-  if (listApiEngineKey) {
+  const selectApi = resolveListReadApi(moduleConfig)
+  if (selectApi || listApiEngineKey) {
     const periodRange = buildPeriodRange(options.period, options.customRange)
     const payload = buildListApiEnginePayload(moduleConfig, { ...options, pageIndex, pageSize }, periodRange)
+    if (selectApi) payload.FormEngineKey = moduleConfig.table
     const requestKey = [
-      'api-engine-list', currentIdentityKey(), listApiEngineKey,
+      'api-engine-list', currentIdentityKey(), selectApi || listApiEngineKey,
       listApiEnginePresentationKey(moduleConfig, payload),
       pageIndex, pageSize, payload.Keyword,
       payload._OrderBy, payload._OrderByType,
@@ -190,7 +190,9 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     ].join(':')
     const cached = await cachedRequest(
       requestKey,
-      () => V8.ApiEngine.Run(listApiEngineKey, payload, { checkCode: false }),
+      () => selectApi
+        ? requestReadApi(V8, selectApi, payload)
+        : V8.ApiEngine.Run(listApiEngineKey, payload, { checkCode: false }),
       {
         maxAge: Number(options.cacheAge ?? (pageIndex === 1 ? 45 * 1000 : 10 * 1000)),
         refresh: options.refresh === true,
@@ -348,29 +350,19 @@ export async function loadHomeSummary(options = {}) {
 
 export async function resolveDiyTableId(tableName, refresh = false) {
   if (!tableName) return ''
-  if (!tableIdCache) tableIdCache = readStorage(TABLE_CACHE_KEY, {})
-  const cacheKey = String(tableName).toLowerCase()
-  const cachedTableId = tableIdCache[cacheKey]
-  if (!refresh && typeof cachedTableId === 'string' && cachedTableId) return cachedTableId
-  if (!refresh && cachedTableId && cachedTableId.missing &&
-    Date.now() - Number(cachedTableId.time || 0) < 30 * 1000) return ''
-
   const menus = flattenMenus(await loadMenuTree(refresh))
+  return menuTableId(menus, tableName)
+}
+
+function menuTableId(menus, tableName) {
   const normalizedName = String(tableName).toLowerCase()
   const direct = menus.find((menu) =>
     String(menu.DiyTableName || menu.TableName || menu.DiyTable?.Name || menu._DiyTable?.Name || '').toLowerCase() === normalizedName
   )
   // 菜单树没有携带表名时不能靠逐菜单 GetDiyTableModel 猜测。调用方应把已经
   // 授权读取到的 tableId 传给 findMenu，既确定又不会越过真实菜单上下文。
-  const id = direct ? String(direct.DiyTableId || '') : ''
-  if (id) {
-    tableIdCache[cacheKey] = id
-  } else {
-    // 短负缓存避免同一批关联组件在菜单未配置时连续重试。
-    tableIdCache[cacheKey] = { missing: true, time: Date.now() }
-  }
-  writeStorage(TABLE_CACHE_KEY, tableIdCache)
-  return id
+  // 从本次授权菜单快照推导，禁止恢复旧的永久表Id映射，避免误识别后跨页面持续串表。
+  return direct ? String(direct.DiyTableId || '') : ''
 }
 
 function flattenMenus(items, output = []) {
@@ -408,7 +400,7 @@ export async function loadMenuTree(refresh = false) {
 
 export async function findMenu(aliases = [], tableName = '', refresh = false, menuId = '', tableId = '') {
   const menus = flattenMenus(await loadMenuTree(refresh))
-  const resolvedTableId = tableId || (tableName ? await resolveDiyTableId(tableName, refresh) : '')
+  const resolvedTableId = tableId || (tableName ? menuTableId(menus, tableName) : '')
   return selectAuthorizedMenu(menus, {
     aliases,
     tableName,
@@ -419,7 +411,7 @@ export async function findMenu(aliases = [], tableName = '', refresh = false, me
 
 export async function findPreferredMenu(aliases = [], tableName = '', refresh = false) {
   const menus = flattenMenus(await loadMenuTree(refresh))
-  const resolvedTableId = tableName ? await resolveDiyTableId(tableName, refresh) : ''
+  const resolvedTableId = tableName ? menuTableId(menus, tableName) : ''
   return selectAuthorizedMenu(menus, {
     aliases,
     tableName,
@@ -441,7 +433,7 @@ export async function canOpenBusinessEntry(key, refresh = false) {
   return Boolean(menu && menu.Id)
 }
 
-export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null, draftRelation = '' }) {
+export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null, readWhere = null, draftRelation = '', events = {} }) {
   if (!requireLogin()) return
   if (!table) {
     uni.showToast({ title: '未配置业务表单', icon: 'none' })
@@ -478,11 +470,12 @@ export async function openForm({ table, rowId = '', mode = 'View', title = '', m
   if (moduleEngineKey) params.push(`moduleEngineKey=${encodeURIComponent(moduleEngineKey)}`)
   if (draftRelation) params.push(`draftRelation=${encodeURIComponent(draftRelation)}`)
   if (tableChildAuth) params.push(`tableChildAuth=${encodeURIComponent(JSON.stringify(tableChildAuth))}`)
+  if (Array.isArray(readWhere) && readWhere.length) params.push(`readWhere=${encodeURIComponent(JSON.stringify(readWhere))}`)
   if (defaultValues && Object.keys(defaultValues).length) params.push(`defaults=${encodeURIComponent(JSON.stringify(defaultValues))}`)
   if (fieldNames && fieldNames.length) params.push(`fields=${encodeURIComponent(JSON.stringify(fieldNames))}`)
   if (excludeFieldNames && excludeFieldNames.length) params.push(`excludeFields=${encodeURIComponent(JSON.stringify(excludeFieldNames))}`)
   if (readonlyFieldNames && readonlyFieldNames.length) params.push(`readonlyFields=${encodeURIComponent(JSON.stringify(readonlyFieldNames))}`)
-  uni.navigateTo({ url: `/pages/native-form/index?${params.join('&')}` })
+  uni.navigateTo({ url: `/pages/native-form/index?${params.join('&')}`, events })
 }
 
 export async function openLowCodeMenu(moduleConfig) {

@@ -19,6 +19,8 @@ function isBoundToRequestedTable(menu, tableName, tableId) {
   const boundName = menuTableName(menu).toLowerCase()
   const boundId = normalize(menu && menu.DiyTableId)
 
+  if (requestedName && boundName && boundName !== requestedName) return false
+
   if (requestedId) {
     if (boundId) return boundId === requestedId
     return Boolean(requestedName && boundName === requestedName)
@@ -37,7 +39,7 @@ function isConfirmedTableBinding(menu, tableName, tableId) {
   const boundName = menuTableName(menu).toLowerCase()
   const boundId = normalize(menu && menu.DiyTableId)
 
-  if (requestedId) return boundId === requestedId || (!boundId && Boolean(requestedName && boundName === requestedName))
+  if (requestedId) return isBoundToRequestedTable(menu, tableName, tableId)
   if (requestedName) return Boolean(boundName && boundName === requestedName)
   return true
 }
@@ -73,7 +75,6 @@ export function selectAuthorizedMenu(menus = [], options = {}) {
   const tableName = normalize(options.tableName)
   const tableId = normalize(options.tableId)
   const menuId = normalize(options.menuId)
-  const preferAliases = options.preferAliases === true
 
   if (menuId) {
     const explicitMenu = menus.find((menu) => normalize(menu && menu.Id) === menuId)
@@ -82,7 +83,8 @@ export function selectAuthorizedMenu(menus = [], options = {}) {
     }
   }
 
-  if (preferAliases) {
+  // 同表可以有多个业务视图；明确的业务别名必须优先，不能被排序靠前的隐藏子表抢占。
+  if (aliases.length) {
     const preferredAlias = findByAliasOrder(menus, aliases, (menu, alias) =>
       normalize(menu && menu.Name) === alias &&
       isBoundToRequestedTable(menu, tableName, tableId)
@@ -91,7 +93,8 @@ export function selectAuthorizedMenu(menus = [], options = {}) {
   }
 
   if (tableId) {
-    const tableMatch = menus.find((menu) => normalize(menu && menu.DiyTableId) === tableId)
+    const tableMatch = menus.find((menu) => normalize(menu && menu.DiyTableId) === tableId &&
+      isBoundToRequestedTable(menu, tableName, tableId))
     if (tableMatch) return tableMatch
   }
 
@@ -104,7 +107,8 @@ export function selectAuthorizedMenu(menus = [], options = {}) {
   if (tableName) {
     const normalizedTableName = tableName.toLowerCase()
     const tableNameMatch = menus.find((menu) =>
-      menuTableName(menu).toLowerCase() === normalizedTableName
+      menuTableName(menu).toLowerCase() === normalizedTableName &&
+      isBoundToRequestedTable(menu, tableName, tableId)
     )
     if (tableNameMatch) return tableNameMatch
   }

@@ -10,12 +10,15 @@ const target = outputFlag >= 0
   ? path.resolve(process.argv[outputFlag + 1])
   : path.join(workspace, 'Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal')
 const common = fs.readFileSync(path.join(project, 'src/tenants/xjy/proposal-cost-model.mjs'), 'utf8').replace(/^export /gm, '')
+const recommendation = fs.readFileSync(path.join(project, 'src/tenants/xjy/proposal-cost-recommendation.mjs'), 'utf8').replace(/^export /gm, '')
+const engineOnly = process.argv.includes('--engine-only')
 const header = (table, type, version, description) => `/*\n * V8 Event\n * TableKey: ${table}\n * EventType: ${type}\n * Version: ${version}\n * 功能说明：\n * - ${description}\n */\n`
 const descriptors = []
-function event(table, label, type, eventLabel, version, description, body) {
+function event(table, label, type, eventLabel, version, description, body, includeCommon = true) {
+  if (engineOnly) return
   const file = path.join(target, '表单引擎', `${label}（${table}）`, '表单V8事件', `${eventLabel}（${type}）.js`)
   fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, header(table, type, version, description) + common + '\n' + body.trim() + '\n')
+  fs.writeFileSync(file, header(table, type, version, description) + (includeCommon ? common + '\n' : '') + body.trim() + '\n')
   descriptors.push({ formEngineKey: table, eventType: type, file, description })
 }
 
@@ -186,6 +189,8 @@ if (typeof window.CalcHezuohou === 'function') {
 event('diy_kehufaxx', '需求方案', 'InFormV8', '前端表单进入V8事件', 'v1.0.0',
   '保留合作前原公式及新增方案继承规则；合作后仅刷新全部点位汇总，所有试算年数统一使用主表年数。', `
 if (V8.LoadMode === 'Design') return;
+var cooperationAmounts = proposalCooperationAmounts(V8.Form);
+for (var amountName in cooperationAmounts) V8.FormSet(amountName, cooperationAmounts[amountName]);
 // 新增只继承现状输入，不继承上一方案的点位汇总或设备报价。
 if (V8.FormMode === 'Add' && V8.Form.KehuID) {
   var previous = await V8.FormEngine.GetTableData('diy_kehufaxx', {
@@ -281,19 +286,38 @@ window.CalcHezuoqian();
 await V8.RefreshProposalPointCosts();
 `)
 
+event('diy_kehufaxx', '需求方案', 'DataFilterV8', '后端数据处理V8事件', 'v1.0.0',
+  '读取需求方案时按累计成本补齐预计合作金额；仅修改返回数据，不回写历史记录，不覆盖未返回原字段的裁剪查询。', `
+// 查看历史记录时即时展示同口径金额，数据库持久化仍由正常保存和点位汇总负责。
+if (typeof V8.Form.DuonianLJCBAfter !== 'undefined') V8.Form.YujihezuoJEZL = V8.Form.DuonianLJCBAfter;
+if (typeof V8.Form.DuonianLJCBMD !== 'undefined') V8.Form.YujihezuoJEMD = V8.Form.DuonianLJCBMD;
+`, false)
+
 const engineFile = path.join(target, '接口引擎/客户管理/客户方案一键比价(xjy_compare_customer_proposals).js')
 const engine = `/*
  * V8 ApiEngine
  * ApiEngineKey: xjy_compare_customer_proposals
- * Version: v1.0.2
+ * Version: v1.1.4
  * 功能说明：
- * - 读取授权需求方案的全部点位，返回点位租赁和买断合计；支持单方案页面刷新、统一年数预览及多方案比价，不写入现状成本。
+ * - 读取授权方案的全部点位，统一年数计算租赁和买断成本；人工确认设备适配后，校验同一客户及已填需求和完整报价，返回成本排名、并列推荐、节省金额与排除原因；兼容单方案预览，不写库。
  */
 ${common}
-var ids = V8.Param.Ids || V8.Param.ids || [];
+${recommendation}
+// 仅规范化有界业务参数，宿主数组转为纯 JSON 后再验证，不能信任客户端传入的方案数据。
+var input = JSON.parse(JSON.stringify({ Ids: V8.Param.Ids || V8.Param.ids || [], Years: V8.Param.Years,
+  ReferenceId: V8.Param.ReferenceId, RequirementsConfirmed: V8.Param.RequirementsConfirmed }));
+var ids = input.Ids;
 if (!V8.CurrentUser || !V8.CurrentUser.Id) return { Code: 0, Msg: '请先登录' };
-if (!ids || ids.length < 1 || ids.length > 50) return { Code: 0, Msg: '请选择 1 至 50 个方案进行比价' };
-if (costPresent(V8.Param.Years) && validateProposalCostInputs({ HesuanNS: V8.Param.Years }, false)) return { Code: 0, Msg: '试算年数必须是正整数' };
+if (!Array.isArray(ids) || ids.length < 1 || ids.length > 50) return { Code: 0, Msg: '请选择 1 至 50 个方案进行比价' };
+var uniqueIds = [];
+for (var n = 0; n < ids.length; n++) {
+  if (typeof ids[n] !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(ids[n])) return { Code: 0, Msg: '方案标识无效' };
+  if (uniqueIds.indexOf(ids[n]) < 0) uniqueIds.push(ids[n]);
+}
+ids = uniqueIds;
+if (costPresent(input.Years) && (!proposalComparisonNumber(input.Years, true) || Number(input.Years) > 100)) return { Code: 0, Msg: '试算年数须为1至100的整数' };
+if (input.RequirementsConfirmed !== null && typeof input.RequirementsConfirmed !== 'undefined' && typeof input.RequirementsConfirmed !== 'boolean') return { Code: 0, Msg: '请确认所选方案是否满足实际需求' };
+if (costPresent(input.ReferenceId) && ids.indexOf(input.ReferenceId) < 0) return { Code: 0, Msg: '需求基准须为本次所选方案' };
 var plansResult = V8.FormEngine.GetTableData('diy_kehufaxx', {
   _SysMenuId: 'd242a6ec-6773-4307-9ffd-3f4ce47736fa',
   _Where: [['Id','In',ids]], _PageIndex: 1, _PageSize: 50,
@@ -301,22 +325,29 @@ var plansResult = V8.FormEngine.GetTableData('diy_kehufaxx', {
 });
 if (!plansResult || plansResult.Code != 1) return plansResult;
 var plans = JSON.parse(JSON.stringify(plansResult.Data || []));
-if (!plans.length) return { Code: 0, Msg: '需求方案不存在或无权查看' };
+if (plans.length !== ids.length) return { Code: 0, Msg: '部分方案不存在或无权查看，请重新选择' };
 // 只查询已获准返回的父记录，绑定参数批量读全部点位，避免 1000 条截断和逐方案 N+1。
 var placeholders = [], byParent = {};
 for (var i = 0; i < plans.length; i++) { placeholders.push('@p' + i); byParent[String(plans[i].Id)] = []; }
 // 菜单列表可能裁剪到列表列；权限筛选完成后只补读这些已授权方案的计算输入。
-var planQuery = V8.Db.FromSql('SELECT Id,FanganMC,YujiHZSJ,Renshu,DangqianYSFS,TongzhuangSDJ,DangqianYSSBSL,HesuanNS,ShisuanNS,ShisuanNSMD,Paixu FROM diy_kehufaxx WHERE IsDeleted=0 AND Id IN (' + placeholders.join(',') + ')');
+var planQuery = V8.Db.FromSql('SELECT Id,FanganMC,KehuID,YujiHZSJ,Renshu,DangqianYSFS,TongzhuangSDJ,DangqianYSSBSL,HesuanNS,ShisuanNS,ShisuanNSMD,Paixu FROM diy_kehufaxx WHERE IsDeleted=0 AND Id IN (' + placeholders.join(',') + ')');
 for (var p = 0; p < plans.length; p++) planQuery = planQuery.AddInParameter('@p' + p, plans[p].Id);
-plans = planQuery.ToArray();
+plans = JSON.parse(JSON.stringify(planQuery.ToArray()));
+if (plans.length !== ids.length) return { Code: 0, Msg: '方案已变化，请重新选择后比价' };
+// 保留用户选择顺序，以显式基准或首个方案的年数统一重算，不按各方案历史年数混排。
+plans.sort(function(a, b) { return ids.indexOf(String(a.Id)) - ids.indexOf(String(b.Id)); });
+var referenceId = input.ReferenceId || ids[0], referencePlan = null;
+for (var rp = 0; rp < plans.length; rp++) if (String(plans[rp].Id) === referenceId) referencePlan = plans[rp];
+var comparisonYears = costPresent(input.Years) ? Number(input.Years) : proposalCostYears(referencePlan);
+if (!proposalComparisonNumber(comparisonYears, true) || comparisonYears > 100) comparisonYears = 5;
 var query = V8.Db.FromSql('SELECT Id,AnzhuangdianweiId,AnzhuangCS,ShebeiXH,ShebeiMC,ShebeiSL,Renshu,ShebeiDJZL,ShebeiDJ,GenghuanLXJG,ShuizhiYQ,DashuiFS,JiareFS,ShuiwenYQ,GaofengSDKSL,IsDeleted FROM diy_anzhuang_dw WHERE IsDeleted=0 AND AnzhuangdianweiId IN (' + placeholders.join(',') + ') ORDER BY Paixu,Id');
 for (var p = 0; p < plans.length; p++) query = query.AddInParameter('@p' + p, plans[p].Id);
-var points = query.ToArray();
+var points = JSON.parse(JSON.stringify(query.ToArray()));
 for (var j = 0; j < points.length; j++) if (byParent[String(points[j].AnzhuangdianweiId)]) byParent[String(points[j].AnzhuangdianweiId)].push(points[j]);
 var output = [];
 for (var k = 0; k < plans.length; k++) {
   var plan = plans[k], rows = byParent[String(plan.Id)];
-  var years = costPresent(V8.Param.Years) ? Number(V8.Param.Years) : proposalCostYears(plan);
+  var years = comparisonYears;
   var costs = aggregateInstallationPointCosts(rows, years);
   var currentForm = {};
   for (var field in plan) currentForm[field] = plan[field];
@@ -333,7 +364,7 @@ for (var k = 0; k < plans.length; k++) {
     locations.push(location);
   }
   output.push({
-    Id: plan.Id, FanganMC: plan.FanganMC || '需求方案', YujiHZSJ: plan.YujiHZSJ,
+    Id: plan.Id, CustomerId: plan.KehuID || '', FanganMC: plan.FanganMC || '需求方案', YujiHZSJ: plan.YujiHZSJ,
     PointCount: rows.length, DeviceCount: costs.HezuoHYSSBSL, PeopleCount: people,
     RentalPriceTotal: costs.HezuoHFWCB, BuyoutPriceTotal: costs.ShebeiMDCBDT, FilterPriceTotal: costRound(filter),
     CurrentAnnualCost: current.DangqianYSZCBAll, CurrentMultiYearCost: current.DuonianLJCB,
@@ -342,7 +373,8 @@ for (var k = 0; k < plans.length; k++) {
     Years: years, CostFields: costs, Locations: locations
   });
 }
-return { Code: 1, Data: output, DataCount: output.length };
+var comparison = buildProposalCostRecommendation(output, { Years: comparisonYears, ReferenceId: referenceId, RequirementsConfirmed: input.RequirementsConfirmed });
+return { Code: 1, Data: output, DataCount: output.length, DataAppend: { Comparison: comparison } };
 `
 fs.mkdirSync(path.dirname(engineFile), { recursive: true })
 fs.writeFileSync(engineFile, engine)
@@ -350,5 +382,5 @@ descriptors.push({ apiEngineKey: 'xjy_compare_customer_proposals', file: engineF
 const report = outputFlag >= 0 ? target : path.join(workspace, '.tmp/proposal-point-costs')
 fs.mkdirSync(report, { recursive: true })
 fs.writeFileSync(path.join(report, 'resources.json'), JSON.stringify(descriptors, null, 2))
-updatePointFieldRefreshPatches()
+if (!engineOnly) updatePointFieldRefreshPatches()
 console.log(JSON.stringify({ resources: descriptors.length, report }))

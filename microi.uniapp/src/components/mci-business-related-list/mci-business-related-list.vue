@@ -58,8 +58,16 @@
       </template>
     </view>
 
-    <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
-      <view class="search-input-wrap">
+    <view v-if="!isPreview && config.monthField && !config.timeRangeField" class="query-month-row">
+      <text>{{ config.monthLabel || '查询月份' }}</text>
+      <picker mode="date" fields="month" :value="selectedQueryMonth" :end="currentQueryMonth"
+        @change="changeQueryMonth">
+        <view class="query-month-picker"><text>{{ selectedQueryMonth }}</text><text>▾</text></view>
+      </picker>
+    </view>
+    <view v-if="!isPreview && (config.searchable !== false || filterFields.length)" class="search-row"
+      :class="{ 'search-row--simple': !filterFields.length, 'search-row--filters-only': config.searchable === false }">
+      <view v-if="config.searchable !== false" class="search-input-wrap">
         <input v-model="keyword" class="search-input" type="text" confirm-type="search"
           :placeholder="`搜索${config.title || sectionTitle}`"
           :adjust-position="false" :hold-keyboard="true" :cursor-spacing="16"
@@ -68,21 +76,43 @@
           <text>×</text>
         </view>
       </view>
-      <view v-if="filterFields.length" class="filter-button" :class="{ active: activeFilterCount > 0 }"
-        @tap="openAdvancedFilters">
-        <text>筛选</text><text v-if="activeFilterCount">{{ activeFilterCount }}</text>
+      <view v-else class="filter-summary" hover-class="filter-control--pressed" @tap="openAdvancedFilters">
+        <text>{{ filterFields[0].label }}{{ activeFilterCount ? '已筛选' : '筛选' }}</text>
       </view>
-      <view class="search-button" @tap="resetSearch"><text>重置</text></view>
+      <view v-if="filterFields.length" class="filter-button" :class="{ active: activeFilterCount > 0 }"
+        hover-class="filter-control--pressed" @tap="openAdvancedFilters">
+        <text v-if="config.searchable === false" class="filter-symbol">≡</text>
+        <text>筛选</text><text v-if="activeFilterCount" class="filter-count">{{ activeFilterCount }}</text>
+      </view>
+      <view class="search-button" hover-class="filter-control--pressed" @tap="resetSearch"><text>重置</text></view>
     </view>
 
-    <view v-if="!isPreview && relatedMetrics.length" class="related-metrics">
+    <scroll-view v-if="showRelatedSummary && config.statusOptions?.length" class="related-status-scroll" scroll-x :show-scrollbar="false">
+      <view class="related-status-tabs">
+        <view v-for="item in ['', ...config.statusOptions]" :key="item" class="related-status-item"
+          :class="{ active: relatedStatus === item }" @tap="changeRelatedStatus(item)">
+          <text>{{ item || '全部状态' }}</text><text class="related-status-badge">{{ relatedStatusCount(item) }}</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view v-if="!isPreview && relatedMetrics.length" class="related-metrics" :class="{ 'related-metrics--summary': showRelatedSummary }">
       <view v-for="metric in relatedMetrics" :key="metric.key" class="related-metric"
         :class="`related-metric--${metric.tone || 'neutral'}`">
         <view class="related-metric__value">
           <text>{{ metric.value }}</text><text>{{ metric.unit }}</text>
         </view>
-        <text class="related-metric__label">{{ metric.label }}</text>
+        <text class="related-metric__label">{{ config.timeRangeField && activeFilterCount && metric.key === 'total' ? '筛选结果' : metric.label }}</text>
       </view>
+    </view>
+
+    <view v-if="showRelatedSummary" class="related-summary-tools">
+      <view class="related-valid-switch" role="switch" :aria-checked="relatedValidOnly" @tap="toggleRelatedValidity">
+        <view class="related-valid-track" :class="{ active: relatedValidOnly }"><view></view></view>
+        <text>仅有效期内</text>
+      </view>
+      <text class="related-summary-hint">{{ relatedSummaryError || config.relatedSummary.hint }}</text>
+      <text v-if="relatedSummaryError" class="related-summary-retry" @tap="loadRelatedMetrics(true)">重试</text>
     </view>
 
     <view v-if="proposalInstallationBatchAvailable" class="proposal-batch-tools">
@@ -349,7 +379,7 @@
     <root-portal v-if="filterOpen && !isPreview">
     <!-- #endif -->
       <view class="filter-mask" @tap="closeAdvancedFilters" @touchmove.stop.prevent="noop">
-      <view class="filter-sheet" @tap.stop @touchmove.stop>
+      <view class="filter-sheet" :class="{ 'filter-sheet--compact': config.searchable === false && filterFields.length <= 2 }" @tap.stop @touchmove.stop>
         <view class="filter-sheet__head">
           <view><text>更多筛选</text><text>{{ config.title }} · {{ activeFilterCount }} 项已选</text></view>
           <view class="filter-sheet__close" @tap="closeAdvancedFilters"><text>×</text></view>
@@ -488,9 +518,13 @@ import {
 import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
 import { appendSystemAuditFields, cardFieldKey, filterVisibleCardLines, moduleProjectionFields } from '@/platform/card-field-policy.mjs'
 import { buildListFilterWhere, compileModuleFilterFields, hasListFilterValue, mergeModuleFilterFields, validateListFilters } from '@/platform/list-filter-fields.mjs'
+import { dateFilterSpec } from '@/platform/list-filter-date.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
+import { deleteTenantRelatedRecord, loadTenantRelatedRows, resolveRelatedFormNavigation } from '@/platform/native-table.js'
+import { resolveListReadApi, queryMonthValue } from '@/platform/configured-read-api.mjs'
 import { tableChildRequiresModuleQuery } from '@/platform/table-child-query-target.mjs'
 import { childDraftGroup } from '@/platform/child-form-drafts.mjs'
+import { loadRelatedListSummary, formatRelatedSummaryMoney } from '@/platform/related-list-summary.mjs'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
@@ -633,6 +667,7 @@ export default {
       finished: false,
       error: '',
       keyword: '',
+      queryMonth: '',
       filterOpen: false,
       filterValues: {},
       filterDraft: {},
@@ -656,6 +691,10 @@ export default {
       metricLoading: false,
       metricRequestId: 0,
       metricValues: {},
+      relatedStatus: '',
+      relatedValidOnly: true,
+      relatedStatusCounts: {},
+      relatedSummaryError: '',
       listBodyHeight: 0,
       layoutMeasureTimers: [],
       proposalPointSavingId: '',
@@ -681,7 +720,9 @@ export default {
       collectionSourceMenuId: '',
       collectionSelectedIds: [],
       collectionAdding: false,
-      collectionDeletingId: ''
+      collectionDeletingId: '',
+      relatedFormTarget: null,
+      relatedFormOpening: false
     }
   },
   computed: {
@@ -690,6 +731,14 @@ export default {
     childTableId() { return this.fieldConfig.TableChildTableId || '' },
     childMenuId() { return this.fieldConfig.TableChildSysMenuId || '' },
     childFkField() { return this.fieldConfig.TableChildFkFieldName || '' },
+    readonlyList() {
+      return this.config.readOnly === true || ['true', '1'].includes(String(this.field.Readonly ?? this.field.ReadOnly ?? '').toLowerCase())
+    },
+    currentQueryMonth() {
+      const month = queryMonthValue()
+      return `${month.slice(0, 4)}-${month.slice(4)}`
+    },
+    selectedQueryMonth() { return this.queryMonth || this.currentQueryMonth },
     sectionTitle() {
       return this.field.Label || this.fieldConfig.TableChildSysMenuName || this.table?.Description || this.field.Name || '关联数据'
     },
@@ -894,17 +943,26 @@ export default {
     },
     canAdd() {
       return Boolean(
+        !this.readonlyList &&
         this.relationValue &&
         this.childFkField &&
         this.config.table &&
-        canAddMenuRecord(this.menuId || this.childMenuId, this.currentUser)
+        canAddMenuRecord(this.relatedFormTarget ? this.relatedFormTarget.menuId : (this.menuId || this.childMenuId), this.currentUser)
       )
     },
-    filterFields() { return this.config.filterFields || [] },
+    filterFields() {
+      // 虚拟日志时间虽登记为文本列，查询接口需要完整时间边界；字段与显式精度仍由后台决定。
+      return (this.config.filterFields || []).map(field => field.field === this.config.timeRangeField && field.type === 'date-range'
+        ? { ...field, columnType: 'datetime', date: field.config?.DateTimeType ? field.date : dateFilterSpec('datetime_hhmm') }
+        : field)
+    },
     filterFormData() { return this.childFkField ? { [this.childFkField]: this.relationValue } : {} },
     relatedMetricDefinitions() {
       if (this.config.relatedMetrics?.length) return this.config.relatedMetrics
       return [{ key: 'total', label: `${this.config.title || this.sectionTitle}总量`, tone: 'neutral' }]
+    },
+    showRelatedSummary() {
+      return !this.isPreview && Boolean(this.config.relatedSummary?.apiEngineKey)
     },
     relatedMetrics() {
       return this.relatedMetricDefinitions.map((metric) => {
@@ -912,7 +970,7 @@ export default {
         const loading = this.metricLoading && (raw === undefined || raw === null)
         return {
           ...metric,
-          value: loading ? '—' : this.formatRelatedMetric(raw, metric),
+          value: loading || (this.showRelatedSummary && raw == null) ? '—' : this.formatRelatedMetric(raw, metric),
           unit: loading ? '' : (metric.unit !== undefined ? metric.unit : (metric.format === 'compactMoney' ? '' : '条'))
         }
       })
@@ -975,6 +1033,12 @@ export default {
     relationValue: {
       immediate: true,
       handler(value) {
+        this.relatedStatus = ''
+        this.relatedValidOnly = true
+        this.relatedStatusCounts = {}
+        this.metricValues = {}
+        this.relatedSummaryError = ''
+        this.metricRequestId += 1
         if (!value) {
           this.latestSummaryRequestId += 1
           this.latestSummaryRow = null
@@ -984,6 +1048,7 @@ export default {
           this.loading = false
         } else if (this.config.table) {
           this.loadData(true, false, false, true)
+          this.loadRelatedMetrics()
         }
       }
     }
@@ -1000,6 +1065,7 @@ export default {
     this.componentDisposed = true
     this.initializeRequestId += 1
     this.latestSummaryRequestId += 1
+    this.metricRequestId += 1
     this.presentationRequestId += 1
     uni.$off('microi:data-changed', this.handleDataChanged)
     clearTimeout(this.searchTimer)
@@ -1567,10 +1633,18 @@ export default {
           ...matched.config,
           ...platformCardConfig,
           menu,
+          tableModel: this.table,
           table: this.table.Name,
           tableId: this.table.Id,
           menuId: this.menuId,
           moduleEngineKey: menu?.ModuleEngineKey || menu?.Id || ''
+        }
+        const relatedFormTarget = await resolveRelatedFormNavigation({ ...this.relatedFormContext('Add'), resolveOnly: true })
+        if (!isCurrent()) return
+        this.relatedFormTarget = relatedFormTarget
+        // 卡片只配置了部分状态时，不能覆盖关联统计所需的完整状态选项。
+        if (this.config.relatedSummary) {
+          this.config.statusOptions = [...new Set([...(matched.config.statusOptions || []), ...(platformCardConfig.statusOptions || [])])]
         }
         this.emitTitleChange()
         this.applyMenuSearchFields(menu?.SearchFieldIds || [])
@@ -1608,6 +1682,7 @@ export default {
       presentationFields.forEach((name) => {
         if (menuConfig[name] !== undefined) next[name] = menuConfig[name]
       })
+      if (next.relatedSummary) next.statusOptions = [...new Set([...(this.config.statusOptions || []), ...(menuConfig.statusOptions || [])])]
       // 与普通业务列表保持一致：后台菜单字段完整接管卡片后不再使用租户摘要占位。
       next.summaryField = ''
       this.config = next
@@ -1722,7 +1797,9 @@ export default {
         })
         if (dynamic.statusFromViewSchema) {
           merged.statusField = dynamic.statusField || ''
-          merged.statusOptions = dynamic.statusOptions || []
+          merged.statusOptions = merged.relatedSummary
+            ? [...new Set([...(merged.statusOptions || []), ...(dynamic.statusOptions || [])])]
+            : (dynamic.statusOptions || [])
         }
         merged.selectFields = [...new Set([
           ...(merged.selectFields || []),
@@ -1854,7 +1931,9 @@ export default {
       }
       if (!this.relationValue || !this.config.table || (this.loading && !reset) || (!reset && this.finished)) return
       const relationValue = this.relationValue
-      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue
+      const queryMonth = this.queryMonth
+      const filterKey = JSON.stringify([this.keyword, this.filterValues || {}, this.relatedStatus])
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && queryMonth === this.queryMonth && filterKey === JSON.stringify([this.keyword, this.filterValues || {}, this.relatedStatus])
       // 首次进入、返回刷新和真实增删改才回读摘要；搜索、筛选、翻页沿用当前摘要。
       const latestSummaryTask = refreshSummary ? this.loadLatestRecordSummary() : null
       const requestId = ++this.loadRequestId
@@ -1868,13 +1947,21 @@ export default {
       try {
         const pageSize = this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15)
         const keywordWhere = this.buildKeywordFilterWhere()
+        // 卡片展示可不设状态标签，统计筛选仍使用租户声明的业务状态字段。
+        const statusField = this.config.relatedSummary?.statusField || this.config.statusField
         const extraWhere = [
           { Name: this.childFkField, Type: '=', Value: this.relationValue },
           ...this.buildFilterWhere(),
-          ...keywordWhere
+          ...keywordWhere,
+          ...(this.relatedStatus && this.config.relatedSummary?.apiEngineKey && statusField
+            ? [{ Name: statusField, Type: '=', Value: this.relatedStatus }] : [])
         ]
-        let result
-        if (this.requiresModuleAssociationQuery()) {
+        let result = await loadTenantRelatedRows({
+          ...this.relatedFormContext('View'), pageIndex: this.pageIndex, pageSize,
+          keyword: this.keyword.trim(), extraWhere, filterWhere: this.buildFilterWhere(), refresh
+        })
+        if (!isCurrent()) return
+        if (!result && (resolveListReadApi(this.config) || this.requiresModuleAssociationQuery())) {
           // 关联字段必须由模块引擎执行 SqlJoin/SelectFields；授权仍只依赖完整
           // _TableChildAuth，并保留父子外键条件，不重新附加子菜单数据范围。
           result = await loadModuleRows({
@@ -1890,7 +1977,7 @@ export default {
             tableChildAuth: this.tableChildAuth,
             tableChildModuleQuery: true
           })
-        } else if (this.tableChildAuth) {
+        } else if (!result && this.tableChildAuth) {
           // zhy：TableChild 列表必须通过表单引擎携带完整父子授权链查询。
           // ModuleEngine 的子菜单数据范围会把已经正确绑定的孙表记录过滤成 0 条；
           // 此处不传子菜单 Id，由后端按 _TableChildAuth 逐层校验并用外键条件限定数据。
@@ -1911,7 +1998,7 @@ export default {
             rows: Array.isArray(response.Data) ? response.Data : [],
             count: Number(response.DataCount || 0)
           }
-        } else {
+        } else if (!result) {
           result = await loadModuleRows(this.config, {
             pageIndex: this.pageIndex,
             pageSize,
@@ -1942,6 +2029,7 @@ export default {
         if (!isCurrent() || requestId < this.appliedRequestId) return
         this.rows = hydratedRows
         this.count = Math.max(this.rows.length, Number(result.count || 0) - this.duplicateRowCount)
+        if (this.config.monthField && this.config.readOnly) this.metricValues = { total: this.count }
         this.finished = this.rows.length >= this.count || incomingRows.length < pageSize
         if (!this.finished) this.pageIndex += 1
         if (notifyCount) this.emitDataCount()
@@ -1961,6 +2049,7 @@ export default {
       return { start, end }
     },
     formatRelatedMetric(value, metric) {
+      if (this.config.relatedSummary?.apiEngineKey && metric.format === 'compactMoney') return formatRelatedSummaryMoney(value)
       const numeric = Number(value || 0)
       if (metric.format !== 'compactMoney') return Number.isFinite(numeric) ? Math.floor(numeric) : 0
       const absolute = Math.abs(numeric)
@@ -1970,11 +2059,15 @@ export default {
     async loadRelatedMetrics(refresh = false) {
       if (this.componentDisposed) return
       if (this.proposalDraftGroup) return
+      if (this.isPreview && this.config.relatedSummary?.apiEngineKey) return
+      // 月度只读列表直接使用同一次日志查询的总数，避免再查空的物理表及重复请求。
+      if (this.config.monthField && this.config.readOnly) return
       const metrics = this.relatedMetricDefinitions
-      if (!metrics.length || !this.relationValue || !this.config.table) return
+      if (!metrics.length || !this.relationValue || !this.childFkField || !this.config.table) return
       const relationValue = this.relationValue
       const requestId = ++this.metricRequestId
-      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && requestId === this.metricRequestId
+      const filterKey = JSON.stringify([this.keyword, this.filterValues, this.relatedStatus, this.relatedValidOnly])
+      const isCurrent = () => !this.componentDisposed && relationValue === this.relationValue && requestId === this.metricRequestId && filterKey === JSON.stringify([this.keyword, this.filterValues, this.relatedStatus, this.relatedValidOnly])
       this.metricLoading = true
       const range = this.monthRange()
       const keywordWhere = this.buildKeywordFilterWhere()
@@ -1983,6 +2076,31 @@ export default {
         ...this.buildFilterWhere(),
         ...keywordWhere
       ]
+      if (this.config.relatedSummary?.apiEngineKey && !this.isPreview) {
+        this.metricValues = {}
+        this.relatedStatusCounts = {}
+        this.relatedSummaryError = ''
+        try {
+          const result = await loadRelatedListSummary({
+            config: this.config, menuId: this.menuId, tableChildAuth: this.tableChildAuth,
+            filters: { _Where: [...(this.config.fixedWhere || []), ...activeWhere], _Keyword: keywordWhere.length ? '' : this.keyword.trim() },
+            selectedStatus: this.relatedStatus, validOnly: this.relatedValidOnly,
+            run: (key, params) => V8.ApiEngine.Run(key, params, { checkCode: false })
+          })
+          if (!isCurrent()) return
+          this.metricValues = result.metrics
+          this.relatedStatusCounts = result.statusCounts
+          this.relatedSummaryError = result.warning
+        } catch (error) {
+          if (isCurrent()) this.relatedSummaryError = error.message || '关联金额统计加载失败'
+        } finally {
+          if (isCurrent()) {
+            this.metricLoading = false
+            this.scheduleListBodyMeasure()
+          }
+        }
+        return
+      }
       const moduleAssociationQuery = this.requiresModuleAssociationQuery()
       try {
         const values = {}
@@ -1992,7 +2110,7 @@ export default {
             where.push({ Name: metric.monthField, Type: '>=', Value: range.start })
             where.push({ Name: metric.monthField, Type: '<', Value: range.end })
           }
-          if (metric.aggregateField || moduleAssociationQuery) {
+          if (metric.aggregateField || moduleAssociationQuery || resolveListReadApi(this.config)) {
             const summary = await loadModuleRows(this.config, {
               pageIndex: 1,
               pageSize: 1,
@@ -2043,7 +2161,23 @@ export default {
       this.filterValues = {}
       this.filterDraft = {}
       this.filterOpen = false
+      this.relatedStatus = ''
+      this.relatedValidOnly = true
       return this.refreshFilteredRows()
+    },
+    relatedStatusCount(status) {
+      const value = this.relatedStatusCounts[status || 'All']
+      return value === undefined ? (this.metricLoading || this.relatedSummaryError ? '—' : 0) : value
+    },
+    changeRelatedStatus(status) {
+      if (this.relatedStatus === status) return
+      this.relatedStatus = status
+      return this.refreshFilteredRows()
+    },
+    toggleRelatedValidity() {
+      this.relatedValidOnly = !this.relatedValidOnly
+      // 仅重算金额，不清空列表、关键词或已加载分页。
+      return this.loadRelatedMetrics(true)
     },
     clearKeyword() {
       if (!this.keyword) return
@@ -2107,7 +2241,22 @@ export default {
       }
     },
     buildFilterWhere() {
-      return buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser)
+      const where = buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser)
+      if (this.config.monthField) {
+        // 月份只用于后端分片定位，从用户选择的上报时间推导，不再作为重复筛选项显示。
+        const field = this.filterFields?.find(item => item.field === this.config.timeRangeField)
+        const range = this.filterValues?.[field?.key] || {}
+        const month = String(range.start || range.end || '').slice(0, 7)
+        where.push({ Name: this.config.monthField, Type: '=', Value: queryMonthValue(month || this.queryMonth) })
+      }
+      return where
+    },
+    changeQueryMonth(event) {
+      const month = String(event?.detail?.value || '')
+      try { queryMonthValue(month) } catch (error) { this.error = error.message; return }
+      this.queryMonth = month
+      this.rows = []
+      return this.refreshFilteredRows()
     },
     buildKeywordFilterWhere() {
       return buildKeywordWhere(
@@ -2125,7 +2274,17 @@ export default {
     closeAdvancedFilters() { this.filterOpen = false },
     resetAdvancedFilters() { this.filterDraft = {} },
     applyAdvancedFilters() {
-      const error = validateListFilters(this.filterFields, this.filterDraft)
+      let error = validateListFilters(this.filterFields, this.filterDraft)
+      if (!error && this.config.timeRangeField && this.config.monthField) {
+        const field = this.filterFields.find(item => item.field === this.config.timeRangeField)
+        const range = this.filterDraft[field?.key] || {}
+        const month = String(range.start || range.end || '').slice(0, 7)
+        if (month) {
+          try { queryMonthValue(month) } catch (invalid) { error = invalid.message }
+          if (range.start && range.end && range.start.slice(0, 7) !== range.end.slice(0, 7)) error = '上报时间请在同一个月内选择'
+          if (month > this.currentQueryMonth) error = '不能查询未来月份'
+        }
+      }
       if (error) {
         uni.showToast({ title: error, icon: 'none' })
         return
@@ -2514,6 +2673,11 @@ export default {
       return 'status-pill--todo'
     },
     rowActions(row) {
+      if (this.readonlyList) return []
+      if (this.relatedFormTarget) {
+        return canEditMenuRecord(this.relatedFormTarget.menuId, this.currentUser)
+          ? [{ key: 'related-target-edit', label: '编辑', tone: 'default' }] : []
+      }
       const nativeActions = this.moduleKey
         ? getBusinessRowActions(this.moduleKey, row, this.currentUser, this.menuId || this.childMenuId, { menu: this.menu, tableChildAuth: this.tableChildAuth })
         : []
@@ -2541,6 +2705,10 @@ export default {
     },
     async triggerRowAction(action, row) {
       if (!action || !row || this.actionSubmitting) return
+      if (action.key === 'related-target-edit') {
+        await this.openTenantRelatedForm('Edit', row)
+        return
+      }
       if (action.__viewAction) {
         this.actionSubmitting = true
         try {
@@ -2553,6 +2721,9 @@ export default {
             },
             tableName: this.config.table,
             tableChildAuth: this.tableChildAuth,
+            deleteRecord: (context) => deleteTenantRelatedRecord({
+              ...this.relatedFormContext('Delete', row), ...context, readonly: this.readonlyList
+            }),
             refreshData: () => Promise.all([
               this.loadData(true, true, true),
               this.loadRelatedMetrics(true)
@@ -2686,12 +2857,56 @@ export default {
       if (this.moduleKey === 'contacts' && !result.Guid70) result.Guid70 = relationshipId()
       return result
     },
+    relatedFormContext(action, row = null) {
+      return {
+        action, row, field: this.field, tableName: this.config.table,
+        menuId: this.menuId || this.childMenuId, parentTableName: this.parentTableName,
+        parentId: this.parentId, parentForm: this.parentForm, parentMode: this.parentMode,
+        tableChildAuth: this.tableChildAuth
+      }
+    },
+    async openTenantRelatedForm(action, row = null) {
+      if (this.relatedFormOpening) return true
+      this.relatedFormOpening = true
+      const relationValue = this.relationValue
+      const table = this.config.table
+      const isCurrent = () => !this.componentDisposed && this.relationValue === relationValue && this.config.table === table
+      try {
+        const target = await resolveRelatedFormNavigation(this.relatedFormContext(action, row))
+        if (!target) return false
+        if (action === 'Add' && !canAddMenuRecord(target.menuId, this.currentUser)) {
+          throw new Error('当前账号没有新增权限')
+        }
+        if (action === 'Edit' && !canEditMenuRecord(target.menuId, this.currentUser)) {
+          throw new Error('当前账号没有编辑权限')
+        }
+        if (isCurrent()) {
+          await openForm({
+            ...target,
+            events: {
+              // 业务表单可能保存另一张表；只在保存成功后回读来源关系，不能依赖目标表名相同。
+              'native-form:record-saved': () => {
+                if (!isCurrent()) return
+                this.refreshData()
+              }
+            }
+          })
+        }
+        return true
+      } catch (error) {
+        uni.showToast({ title: error.message || error.Msg || '打开业务表单失败', icon: 'none' })
+        return true
+      } finally {
+        this.relatedFormOpening = false
+      }
+    },
     async openAdd() {
       if (this.proposalPointSavingId) return
       if (!this.canAdd) {
         uni.showToast({ title: '当前账号没有新增权限', icon: 'none' })
         return
       }
+      if (this.relatedFormTarget && await this.openTenantRelatedForm('Add')) return
       if (this.collectionPickerEnabled) {
         this.openCollectionPicker()
         return
@@ -2758,8 +2973,9 @@ export default {
         includeRelated: true
       })
     },
-    openDetail(row) {
+    async openDetail(row) {
       if (!row?.Id) return
+      if (this.relatedFormTarget && await this.openTenantRelatedForm('View', row)) return
       if (this.moduleKey === 'tasks') {
         uni.navigateTo({ url: `/pages/task/detail?id=${encodeURIComponent(row.Id)}` })
         return
@@ -2805,7 +3021,7 @@ export default {
         return
       }
       const requestedMode = String(this.presentation.openMode || 'View')
-      const mode = requestedMode === 'Edit' && canEditMenuRecord(this.menuId || this.childMenuId, this.currentUser)
+      const mode = !this.readonlyList && requestedMode === 'Edit' && canEditMenuRecord(this.menuId || this.childMenuId, this.currentUser)
         ? 'Edit'
         : 'View'
       openForm({
@@ -2816,6 +3032,7 @@ export default {
         menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
         tableChildAuth: this.tableChildAuth,
+        readWhere: [{ Name: this.childFkField, Type: '=', Value: this.relationValue }],
         includeRelated: true
       })
     },
@@ -2878,6 +3095,9 @@ export default {
 </script>
 
 <style scoped>
+.query-month-row { display: flex; align-items: center; gap: 20rpx; padding: 18rpx 24rpx; color: #526575; font-size: 24rpx; background: #fff; }
+.query-month-row picker { flex: 1; }
+.query-month-picker { display: flex; justify-content: space-between; align-items: center; min-height: 64rpx; padding: 0 20rpx; border: 1px solid #dce6ed; border-radius: 8rpx; color: #243e50; background: #f7fafc; }
 .related-business-list { position: relative; min-height: 180rpx; padding: 18rpx 22rpx calc(118rpx + var(--mci-safe-bottom)); background: var(--mci-bg-base, #f4f8fa); }
 .related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
 .related-business-list--section { padding-top: 0; padding-bottom: 22rpx; border: 1rpx solid var(--mci-border, #e6edf0); border-radius: 16rpx; overflow: hidden; background: var(--mci-bg-card, #fff); }
@@ -2987,6 +3207,22 @@ export default {
 .related-metric--success .related-metric__value { color: #008660; }
 .related-metric--primary { border-color: #d8e5fa; background: #f2f7ff; }
 .related-metric--primary .related-metric__value { color: #1768d8; }
+.related-status-scroll { flex: none; width: 100%; margin: 0 0 16rpx; white-space: nowrap; }
+.related-status-tabs { display: inline-flex; flex-wrap: nowrap; gap: 12rpx; padding: 16rpx 8rpx 4rpx 0; }
+.related-status-item { position: relative; flex: none; min-width: 110rpx; height: 54rpx; padding: 0 28rpx 0 18rpx; border: 1rpx solid #dce8ed; border-radius: 12rpx; color: #68838f; background: #fff; font-size: 22rpx; line-height: 54rpx; text-align: center; }
+.related-status-item.active { border-color: #0b86d4; color: #0b86d4; background: #edf7fc; font-weight: 600; }
+.related-status-badge { position: absolute; top: -14rpx; right: -6rpx; min-width: 30rpx; padding: 0 8rpx; border-radius: 18rpx; color: #47758b; background: #e8f3f9; font-size: 18rpx; font-weight: 600; line-height: 28rpx; }
+.related-status-item.active .related-status-badge { color: #fff; background: #0b86d4; }
+.related-metrics--summary { flex: none; }
+.related-summary-tools { flex: none; display: flex; align-items: center; gap: 10rpx; min-height: 44rpx; margin-bottom: 14rpx; }
+.related-valid-switch { display: flex; flex: none; align-items: center; gap: 8rpx; color: #527282; font-size: 22rpx; }
+.related-valid-track { width: 48rpx; height: 28rpx; padding: 2rpx; box-sizing: border-box; border-radius: 20rpx; background: #c9d8df; transition: background .15s; }
+.related-valid-track > view { width: 24rpx; height: 24rpx; border-radius: 50%; background: #fff; transition: transform .15s; }
+.related-valid-track.active { background: #0b86d4; }
+.related-valid-track.active > view { transform: translateX(20rpx); }
+.related-summary-hint { flex: 1; min-width: 0; color: #788e99; font-size: 19rpx; overflow-wrap: anywhere; }
+.related-summary-retry { flex: none; color: #0b86d4; font-size: 22rpx; }
+@media (prefers-reduced-motion: reduce) { .related-valid-track, .related-valid-track > view { transition: none; } }
 .latest-record-summary { flex: none; margin-bottom: 16rpx; padding: 16rpx 20rpx 20rpx; border: 1rpx solid var(--mci-border-color, #e1eaf0); border-radius: 12rpx; background: var(--mci-bg-card, #fff); }
 .latest-record-summary__head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; min-height: 52rpx; margin-bottom: 10rpx; color: var(--mci-text-primary, #263e49); font-size: 24rpx; font-weight: 600; }
 .latest-record-summary--collapsed { padding-bottom: 16rpx; }
@@ -3132,7 +3368,7 @@ export default {
   font-size: 24rpx;
 }
 .filter-button.active { color: #0b86d4; font-weight: 650; }
-.filter-button > text:last-child:not(:first-child) { min-width: 28rpx; height: 28rpx; margin-left: 5rpx; padding: 0 4rpx; border-radius: 14rpx; color: #fff; background: #e94b2c; font-size: 18rpx; line-height: 28rpx; text-align: center; }
+.filter-count { min-width: 28rpx; height: 28rpx; margin-left: 5rpx; padding: 0 4rpx; border-radius: 14rpx; color: #fff; background: #e94b2c; font-size: 18rpx; line-height: 28rpx; text-align: center; }
 .search-button {
   display: flex;
   align-items: center;
