@@ -100,6 +100,7 @@ namespace Microi.net
             "System.RuntimeTypeHandle",
             "System.Environment",                       // 含 Exit/FailFast/SetEnvironmentVariable
             "System.GC",                                // 防止 GC.Collect 等扰乱 GC
+            "Dos.ORM.DdlExecutionDiagnostics",           // 仅可信 CLR 调用者可观察 DDL
         };
 
         /// <summary>

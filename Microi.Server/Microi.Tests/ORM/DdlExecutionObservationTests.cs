@@ -19,6 +19,38 @@ public sealed class DdlExecutionObservationTests
     private static Task<int> ExecuteAsync(Database db, DbCommand command) => (Task<int>)typeof(Database)
         .GetMethod("DoExecuteNonQueryAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(db, new object[] { command })!;
 
+    [Fact]
+    public void PublishedMcpFacadeKeepsDetachedReadOnlyExecutionSnapshots()
+    {
+        using var scope = DdlExecutionDiagnostics.Begin();
+        var before = scope.Events;
+        using var command = new RecordingCommand { CommandText = "CREATE TABLE facade_actual (Id int)" };
+        Assert.Equal(7, Execute(Database(), command));
+        Assert.Empty(before);
+        Assert.Equal(new[] { "submitted", "executed" }, scope.Events.Select(item => item.State));
+        Assert.Equal(0, scope.Dropped);
+        Assert.Throws<NotSupportedException>(() => ((IList<DdlExecutionDiagnostics.EventSnapshot>)scope.Events).Clear());
+        Assert.All(scope.Events, item => Assert.False(item.TransactionPending));
+    }
+
+    [Fact]
+    public void PublishedMcpFacadeAndNestedSnapshotAreHiddenByRealJintResolver()
+    {
+        var resolver = (Jint.Runtime.Interop.TypeResolver)typeof(V8Engine)
+            .GetField("_safeTypeResolver", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+        using var engine = new Jint.Engine(options => options.AllowClr(typeof(DdlExecutionDiagnostics).Assembly).SetTypeResolver(resolver));
+        using var scope = DdlExecutionDiagnostics.Begin();
+        using var command = new RecordingCommand { CommandText = "CREATE TABLE hidden_actual (Id int)" };
+        Execute(Database(), command);
+        engine.SetValue("scope", scope);
+        engine.SetValue("snapshot", scope.Events[0]);
+        Assert.Equal("undefined", engine.Evaluate("typeof importNamespace('Dos.ORM').DdlExecutionDiagnostics.Begin").AsString());
+        Assert.Equal("undefined", engine.Evaluate("typeof scope.Events").AsString());
+        Assert.Equal("undefined", engine.Evaluate("typeof scope.Dropped").AsString());
+        Assert.Equal("undefined", engine.Evaluate("typeof snapshot.Statement").AsString());
+        Assert.Equal(2, scope.Events.Count);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
