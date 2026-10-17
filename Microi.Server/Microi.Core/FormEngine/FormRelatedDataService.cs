@@ -55,13 +55,17 @@ namespace Microi.net
 
             // 菜单/表授权不代表当前父记录可读。必须走真实 Client Get，执行父表
             // ServerDataV8 的行授权；不能用只选 Id 或 Count 探针跳过它。
+            var normalizedType = relatedType?.ToLowerInvariant();
+            // 评论/角标不需要历史字段观察，保持这些高频路径原有的读取与内存成本。
+            var historyProjection = normalizedType == "datalog" || normalizedType == "dataversion"
+                ? new FormHistoryReadProjection(parentParam) : null;
+            parentParam._HistoryProjection = historyProjection;
             var parentResult = await MicroiEngine.FormEngine.GetFormDataAsync(parentParam);
             if (parentResult == null || parentResult.Code != 1 || parentResult.Data == null)
             {
                 return new DosResult(0, null, DiyMessage.GetLang(osClient, "NoAuth", lang));
             }
 
-            var normalizedType = relatedType?.ToLowerInvariant();
             if (normalizedType != "counts" && normalizedType != "datalog"
                 && normalizedType != "datacomment" && normalizedType != "dataversion")
             {
@@ -132,20 +136,24 @@ namespace Microi.net
                 return await WriteCommentAsync(param, parentParam, BuildRelatedParam("diy_comment", "TableRowId",
                     new List<string> { "Id", commentParentField, "TableRowId", "Content", "ParentCommentId", "UserId", "UserName" }), commentParentField);
 
-            // 列表仍不读取 Data。只有代码管理表的当前有效管理员能按版本 Id 查看白名单代码字段。
-            // 普通用户的当前行脱敏投影不能升级为历史原文权限，基础设施/密码表也不开放历史秘密。
+            // 正文权限独立于父记录读取：实时主库管理员 + 原 Client 管线观察结果。
+            // 不重跑任意 V8，也不把当前被掩码/删除/改写的字段升级为历史原文权限。
             var versionId = param["VersionId"].Val<string>()?.Trim();
+            var logId = param["LogId"].Val<string>()?.Trim();
             string codeTableName = null;
-            if (normalizedType == "dataversion")
+            if (normalizedType == "dataversion" || normalizedType == "datalog")
             {
                 var tableResult = await MicroiEngine.FormEngine.GetDiyTable(parentParam.TableId, osClient, lang);
                 if (tableResult?.Code == 1 && tableResult.Data != null)
                     codeTableName = JObject.FromObject((object)tableResult.Data)["Name"].Val<string>();
-                var canReadCode = V8CodeVersionService.IsSupportedTable(codeTableName)
+                var canReadHistory = !string.IsNullOrWhiteSpace(codeTableName)
+                    && historyProjection?.IsComplete == true
                     && parentParam._CurrentUser?["_AccessKeySession"].Val<bool>() != true
                     && PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(osClient, parentParam._CurrentUser);
-                append["HistoryContentMode"] = canReadCode ? "OnDemand" : "MetadataOnly";
-                if (!string.IsNullOrEmpty(versionId) && !canReadCode)
+                append["HistoryContentMode"] = canReadHistory ? "OnDemand" : "MetadataOnly";
+                append["HistoryContentKind"] = V8CodeVersionService.IsSupportedTable(codeTableName) ? "Code" : "Data";
+                if (((normalizedType == "dataversion" && !string.IsNullOrEmpty(versionId))
+                    || (normalizedType == "datalog" && !string.IsNullOrEmpty(logId))) && !canReadHistory)
                     return new DosResult(0, null, DiyMessage.GetLang(osClient, "NoAuth", lang));
             }
 
@@ -153,6 +161,12 @@ namespace Microi.net
             // 查询阶段即排除历史正文、自由文本标题/备注和人员信息，避免在返回前才脱敏。
             var logParam = BuildRelatedParam("microi_datalog", "DataId", new List<string> { "Id", "Type", "CreateTime" });
             var versionParam = BuildRelatedParam("mic_data_version", "TableRowId", new List<string> { "Id", "Action", "Version", "CreateTime" });
+            if (normalizedType == "datalog" && !string.IsNullOrEmpty(logId))
+            {
+                ((JArray)logParam._Where).Add(new JArray("Id", "=", logId));
+                logParam._PageSize = 1;
+                logParam._SelectFields.Add("Content");
+            }
             if (normalizedType == "dataversion" && !string.IsNullOrEmpty(versionId))
             {
                 ((JArray)versionParam._Where).Add(new JArray("Id", "=", versionId));
@@ -197,9 +211,22 @@ namespace Microi.net
                 if (result.Data == null || result.Data.Count != 1)
                     return new DosResult(2, null, "此版本不存在或不属于当前记录。");
                 var row = JObject.FromObject((object)result.Data[0]);
-                var data = V8CodeVersionService.ProjectReadableCodeSnapshot(codeTableName, row["Data"], parentTableRowId);
-                if (data == null) return new DosResult(0, null, "此版本没有可读取的代码快照。");
+                var data = V8CodeVersionService.IsSupportedTable(codeTableName)
+                    ? historyProjection.ProjectCode(codeTableName, row["Data"])
+                    : historyProjection.ProjectSnapshot(codeTableName, row["Data"]);
+                if (data == null) return new DosResult(0, null, "此版本没有当前权限可读取的字段快照。");
                 row["Data"] = data.ToString(Formatting.None);
+                result.Data = new List<dynamic> { row };
+                append["HistoryContentMode"] = "Authorized";
+            }
+            if (result.Code == 1 && normalizedType == "datalog" && !string.IsNullOrEmpty(logId))
+            {
+                if (result.Data == null || result.Data.Count != 1)
+                    return new DosResult(2, null, "此日志不存在或不属于当前记录。");
+                var row = JObject.FromObject((object)result.Data[0]);
+                var changes = historyProjection.ProjectLog(codeTableName, row["Content"]);
+                if (changes == null) return new DosResult(0, null, "此日志没有可读取的字段变更。");
+                row["Content"] = changes.ToString(Formatting.None);
                 result.Data = new List<dynamic> { row };
                 append["HistoryContentMode"] = "Authorized";
             }

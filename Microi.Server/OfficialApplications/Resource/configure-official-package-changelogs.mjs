@@ -10,67 +10,74 @@ const webosIconDataSetContent = `${webosIconContent} SaaS 基础包新增 99 条
 
 export const officialPackageChangeLogDefinitions = Object.freeze({
   "app.microi.form-engine.json": Object.freeze({
-  "version": "v7.7.2",
-  "title": "旧客户端接口引擎保存兼容",
+  "version": "v7.7.7",
+  "title": "关联记录历史与模块标题物理兼容",
   "changeType": "Fix",
-  "content": "接口引擎修改历史子表的空字符串占位在前后端保存事件中规范为0，避免旧版客户端将空串写入 ChangeHistoryRows 整数列；保留现有路由校验、历史明细及业务代码。",
-  "releaseTime": "2026-09-06 12:30:00"
+  "content": "补齐三个模块标题共享列。配套平台前后端支持当前管理员按需读取安全字段历史、日志展开及跨记录清理；普通用户、访问密钥、掩码与敏感字段权限保持。应用包本身不替换平台二进制。",
+  "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.module-engine.json": Object.freeze({
-  "version": "v8.4.4",
-  "title": "字段权限与树形拖动排序",
+  "version": "v8.4.6",
+  "title": "评论日志版本 Tab 自定义文字",
   "changeType": "Feature",
-  "content": "新增角色、人员、部门与岗位的字段可见/可编辑权限设计器，表单引擎校验读取、筛选、统计、导出和写入；树形模块可按指定数值字段拖动排序，接口引擎将旧、新父级全部同级按间隔10重排，维护祖先链并拒绝循环、过期快照与越权写入。需配套更新平台。",
-  "releaseTime": "2026-10-07 06:00:00"
+  "content": "新增 DataCommentTitle、DataLogTitle、DataVersionTitle 三个模块字段及可空 varchar(100) 物理列；留空使用原标签，自定义文字同步作用于页签和工具栏。保留现有模块和租户值，需配套新版平台前端与 MCP。",
+  "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.store.json": Object.freeze({
-  "version": "v8.2.5",
-  "title": "批量租户字段映射规划查询优化",
+  "version": "v8.5.14",
+  "title": "共享模块标题物理快照",
   "changeType": "Fix",
-  "content": "导入器 v2.8.4 将当前字段映射分片的自然键和主键读取合并为两次有界参数化查询；重复自然键与超限结果回退原有单条校验，保留软删除、主键冲突、检查点复用和租户隔离，减少所有子租户安装平台应用时的重复查询。",
-  "releaseTime": "2026-09-07 03:00:00"
+  "content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
+  "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.saas-engine.json": Object.freeze({
-  "version": "v8.2.3",
-  "title": "空数据库邮件与运行历史脱敏",
+  "version": "v8.4.25",
+  "title": "布局偏好及模块标题新租户快照",
   "changeType": "Fix",
-  "content": "主库空数据库保留邮件与视觉能力的表结构，但清空邮件账户、邮件内容、同步日志、接口代码历史及视觉请求、主体、样本等运行数据；补齐导出前零残留门禁，避免将持续新增的业务与历史数据交付到新租户。官方可在同一发布租约下撤回固定的七种空库文件。",
-  "releaseTime": "2026-09-07 04:10:00"
+  "content": "新租户账号快照补齐侧栏与角色树宽度、折叠四字段，并同步三个模块标题可空列；保留租户连接、密钥、现有偏好和业务数据。",
+  "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.sso.json": Object.freeze({
-  "version": "v7.6.0",
-  "title": "恢复 SSO 完整历史更新说明",
+  "version": "v8.3.6",
+  "title": "共享模块标题物理快照",
   "changeType": "Fix",
-  "content": "从已提交的 v7.5.10 官方源码恢复八条被错误字符串化的历史更新记录，保留 v7.5.11 的可选工作流依赖修复；本次只修复发行元数据，不改变 SSO 引擎、表、字段、菜单、权限、协议或租户配置。",
-  "releaseTime": "2026-09-06 19:50:00"
+  "content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
+  "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.sys_user.json": Object.freeze({
-  "version": "v8.4.9",
-  "title": "系统账号卡片与历史状态显示优化",
+  "version": "v8.4.12",
+  "title": "个人侧栏与角色树布局偏好",
   "changeType": "Feature",
-  "content": "系统账号卡片使用统一头像、姓名与状态层次，补齐字段标签并移除无说明的权限等级数字；历史状态2纳入禁用标签、筛选和真实统计。新版客户端区分卡片与背景，适配浅色、深色和手机。",
-  "releaseTime": "2026-10-07 06:00:00"
+  "content": "新增个人侧栏及角色树宽度、折叠四字段；托管偏好接口 v1.1.7 仅保存当前可信用户且保留个性化 Hook，宽度限整数160至600、空值恢复默认。同步三个模块标题共享列；需配套新版平台前端。",
+  "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.sys-config.json": Object.freeze({
-  "version": "v6.4.0",
-  "title": "全局函数库与日期基础能力",
+  "version": "v8.4.11",
+  "title": "共享模块标题物理快照",
   "changeType": "Fix",
-  "content": "新增系统设置全局函数子表及前后端 DateNow/DateFormat/DateAdd 六条幂等种子；按目标启用配置绑定外键，不覆盖已有全局代码或函数源码；运行时按租户缓存，真实提交后跨节点失效。需配套更新后端。",
-  "releaseTime": "2026-09-06 12:30:00"
+  "content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
+  "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.message-notification.json": Object.freeze({
-  "version": "v1.0.16",
-  "title": "基础应用可选工作流依赖修复",
+  "version": "v8.3.18",
+  "title": "共享模块标题物理快照",
   "changeType": "Fix",
-  "content": "修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。",
-  "releaseTime": "2026-09-05 19:16:00"
+  "content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
+  "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.ai-engine.json": Object.freeze({
-  "version": "v7.7.3",
-  "title": "音乐持久任务与原结果恢复",
+  "version": "v7.7.4",
+  "title": "共享模块标题物理快照",
   "changeType": "Fix",
-  "content": "音乐生成改用持久后台任务和原任务轮询，浏览器停止等待或刷新不会取消后台生成；保存官方 Music3 事件编号与完成文件地址，断流或下载失败可恢复原结果且不重新作曲。失败与不确定状态保留诊断，图片和音乐中转等待任务合并限流并预留供应商执行槽。需同步更新平台 Core、AI、API、前端及使用的吾码中转节点；应用包不会替换二进制，未保存回执的历史请求不自动重发。保留租户模型、密钥、策略与会话数据。",
-  "releaseTime": "2026-09-08 15:30:00"
+  "content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
+  "releaseTime": "2026-10-17 20:17:35"
+}),
+  "app.microi.sys-log.json": Object.freeze({
+  "version": "v8.4.13",
+  "title": "共享模块标题物理快照",
+  "changeType": "Fix",
+  "content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
+  "releaseTime": "2026-10-17 20:17:35"
 })
 });
 

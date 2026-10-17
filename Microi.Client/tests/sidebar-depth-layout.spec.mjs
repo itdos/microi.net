@@ -38,7 +38,10 @@ test("expanded sidebar keeps nested menus full width and reserves text space", (
 });
 
 test("truncated menu labels expose the complete accessible title", () => {
-    assert.match(item, /class="menu-title" :title="title" :aria-label="title"/);
+    // 完整名称仍可读，但框架标题改为可主题化的 Tooltip，避免浏览器原生气泡。
+    assert.match(item, /class="menu-title" :aria-label="title"/);
+    assert.match(item, /<el-tooltip v-if="title && titleTooltip" :content="title"[^>]*popper-class="mci-menu-title-tooltip"/);
+    assert.doesNotMatch(item, /class="menu-title"[^>]*:title=/);
 });
 
 test("configured menu badges expose their business meaning in a hover tooltip", () => {

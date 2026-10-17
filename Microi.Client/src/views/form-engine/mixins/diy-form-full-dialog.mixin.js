@@ -5,9 +5,14 @@ import { normalizeFormOpenMode } from '../form-open-mode.js';
 
 export default {
     methods: {
+        GetFormRelatedIdentity() {
+            return JSON.stringify([this.DiyCommon?.GetApiBase?.(), this.DiyCommon?.GetOsClient?.(), this.TableId, this.TableName, this.TableRowId,
+                this.SysMenuId || this.SysMenuModel?.Id, this.FormRelatedGeneration || 0]);
+        },
         // ========== 打开详情（核心方法，以diy-table.vue为准） ==========
         OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
+            self.ResetFormRelatedData?.();
             formMode = normalizeFormOpenMode(formMode, tableRowModel?.Id);
             formTrace("diy-form-full:open-detail", {
                 tableId: self.TableId,
@@ -81,12 +86,15 @@ export default {
 
             // token 机制：防止旧请求覆盖新结果
             var token = ++self._DataLogLoadToken;
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
+            var current = () => !self._isDestroyed && token === self._DataLogLoadToken
+                && identity === (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]));
             self.DataLogListLoading = true;
             self.GetFormRelatedData(
                 "DataLog",
                 async function (result) {
                     // 旧请求被新请求覆盖，丢弃
-                    if (token !== self._DataLogLoadToken) return;
+                    if (!current()) return;
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
                             await Promise.all(result.Data.map(async (item) => {
@@ -105,6 +113,7 @@ export default {
                                         || self.DiyCommon.GetServerPath("./static/img/icon/personal.png")
                                     : self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
                             }));
+                            if (!current()) return;
                             self.DataLogList = result.Data;
                             self.FormRelatedCounts.DataLog = Number(result.DataCount ?? result.Data.length) || 0;
                         } else {
@@ -112,13 +121,14 @@ export default {
                             self.FormRelatedCounts.DataLog = 0;
                         }
                     } finally {
-                        self.DataLogListLoading = false;
+                        if (current()) self.DataLogListLoading = false;
                     }
                 }
             );
         },
         GetFormRelatedData(relatedType, callback, extra = {}) {
             var self = this;
+            var identity = self.GetFormRelatedIdentity();
             var parentFormEngineKey = (self.CurrentDiyTableModel && (self.CurrentDiyTableModel.Id || self.CurrentDiyTableModel.Name))
                 || self.TableId
                 || self.TableName;
@@ -131,7 +141,11 @@ export default {
                     ParentTableRowId: self.TableRowId,
                     _SysMenuId: self.SysMenuId || (self.SysMenuModel && self.SysMenuModel.Id) || ""
                 },
-                callback
+                function (result) {
+                    // 异步详情 Promise 也必须结束；仅交付无正文的失效信号，各调用方再核归属。
+                    return callback(!self._isDestroyed && identity === self.GetFormRelatedIdentity()
+                        ? result : { Code: 0, _StaleFormRelatedData: true });
+                }
             );
         },
         LoadFormRelatedCounts() {
@@ -142,7 +156,9 @@ export default {
                 self.FormRelatedCounts = { DataLog: 0, DataComment: 0, DataVersion: 0 };
                 return;
             }
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
             self.GetFormRelatedData("Counts", function (result) {
+                if (self._isDestroyed || identity !== (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]))) return;
                 if (!result || result.Code != 1 || !result.Data) return;
                 self.FormRelatedCounts = {
                     DataLog: Number(result.Data.DataLog) || 0,
@@ -178,15 +194,20 @@ export default {
             }
 
             var token = ++self._DataVersionLoadToken;
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
+            var current = () => !self._isDestroyed && token === self._DataVersionLoadToken
+                && identity === (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]));
             self.DataVersionListLoading = true;
             self.GetFormRelatedData(
                 "DataVersion",
                 function (result) {
-                    if (token !== self._DataVersionLoadToken) return;
+                    if (!current()) return;
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
                             result.Data.forEach(function (item) {
                                 item.HistoryContentMode = result.DataAppend?.HistoryContentMode;
+                                item.HistoryContentKind = result.DataAppend?.HistoryContentKind;
+                                item.__RelatedRecordIdentity = identity;
                                 if (item.HistoryContentMode === "MetadataOnly") delete item.Data;
                             });
                             self.DataVersionList = result.Data;
@@ -196,7 +217,7 @@ export default {
                             self.FormRelatedCounts.DataVersion = 0;
                         }
                     } finally {
-                        self.DataVersionListLoading = false;
+                        if (current()) self.DataVersionListLoading = false;
                     }
                 }
             );

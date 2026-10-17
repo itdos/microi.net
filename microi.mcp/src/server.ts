@@ -2,6 +2,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import crypto from 'node:crypto';
 import { ToolPayloadMetrics } from './tool-metrics.js';
+import { withOperationProgress, notExecuted } from './operation-progress.js';
 import fs from 'node:fs';
 import { isIP } from 'node:net';
 import path from 'node:path';
@@ -2997,26 +2998,26 @@ function bufferToolRegistrationsByPriority(server: McpServer, metrics: ToolPaylo
     invoke: async (name, params = {}) => {
       const registration = findRegistration(name);
       if (!registration || registration.name === 'microi_codex') {
-        return {
+        return notExecuted({
           content: [{ type: 'text', text: `Unknown Microi action: ${name}. Call action="list_tools" to discover available tools.` }],
           isError: true,
-        };
+        });
       }
       const handler = registration.args[registration.args.length - 1] as
         | ((args: Record<string, unknown>, extra: Record<string, never>) => CallToolResult | Promise<CallToolResult>)
         | undefined;
       if (typeof handler !== 'function') {
-        return {
+        return notExecuted({
           content: [{ type: 'text', text: `Microi action has no callable handler: ${registration.name}` }],
           isError: true,
-        };
+        });
       }
       const shape = getToolShape(registration);
       let validatedParams: Record<string, unknown> = params;
       if (shape) {
         const parsed = z.object(shape).safeParse(params);
         if (!parsed.success) {
-          return {
+          return notExecuted({
             content: [{
               type: 'text',
               text: JSON.stringify({
@@ -3026,7 +3027,7 @@ function bufferToolRegistrationsByPriority(server: McpServer, metrics: ToolPaylo
               }, null, 2),
             }],
             isError: true,
-          };
+          });
         }
         validatedParams = parsed.data;
       }
@@ -3662,7 +3663,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       action: z.string().describe('list_tools | describe_tool | an existing microi_* tool name'),
       params: jsonRecordSchema.optional().describe('Arguments for the selected action. list_tools accepts keyword?, pageSize? (1-200, default 20), cursor?, maxChars?; describe_tool accepts name and returns complete argument descriptions.'),
     },
-    async ({ action, params }) => {
+    async ({ action, params }, extra) => {
       try {
         if (action === 'list_tools') {
           const keyword = getStringField(params, 'keyword', 'Keyword');
@@ -3693,7 +3694,10 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           }
           return { content: [{ type: 'text', text: JSON.stringify(detail, null, 2) }] };
         }
-        return await toolRegistry.invoke(action, params);
+        return await withOperationProgress(() => toolRegistry.invoke(action, params), async (message, progress) => {
+          const progressToken = extra._meta?.progressToken;
+          if (progressToken !== undefined) await extra.sendNotification({ method: 'notifications/progress', params: { progressToken, progress, message } });
+        });
       } catch (e: unknown) {
         return {
           content: [{ type: 'text', text: `Microi dispatcher failed: ${e instanceof Error ? e.message : String(e)}` }],

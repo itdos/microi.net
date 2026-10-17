@@ -110,7 +110,7 @@ test('system-account package exclusively owns admin, preferences, profile and it
   const packageName = 'app.microi.sys_user.json'
   const packageModel = readPackage(packageName)
   assert.equal(packageModel.PackageInfo?.Name, '系统账号')
-  assert.equal(packageModel.PackageInfo?.Version, 'v8.4.11')
+  assert.equal(packageModel.PackageInfo?.Version, 'v8.4.12')
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
     ?.includes('ApiEngine:platform-sys-user-admin@v1.0.2'))
 
@@ -126,10 +126,10 @@ test('system-account package exclusively owns admin, preferences, profile and it
 
   // 版本断言同时锁定本次导航偏好能力，避免只升包版本却遗漏真实托管正文。
   const preferences = packageModel.SysApiEngines.find(item => item.ApiEngineKey === 'platform-user-update-preferences')
-  assert.equal(preferences.Version, 'v1.1.5')
+  assert.equal(preferences.Version, 'v1.1.7')
   assert.match(preferences.ApiV8Code, /layoutRaw === 'topside' \? 'TopSide'/)
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities
-    .includes('ApiEngine:platform-user-update-preferences@v1.1.5'))
+    .includes('ApiEngine:platform-user-update-preferences@v1.1.7'))
 
   const admin = packageModel.SysApiEngines.find(item => item.ApiEngineKey === 'platform-sys-user-admin')
   assert.equal(admin.Version, 'v1.0.4')

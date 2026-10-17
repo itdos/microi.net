@@ -1,7 +1,7 @@
 <template>
     <div id="diy-table" class="pluginPage" style="margin-top: 10px;">
-        <el-row :gutter="20">
-            <el-col :span="5" :xs="24">
+        <div class="mci-role-split">
+            <MciResizablePane :width="roleTreeWidthPreference" :collapsed="roleTreeCollapsedPreference" :label="$t('Msg.Org')" @commit="savePanelLayout({ RoleTreeWidth: $event })" @update:collapsed="savePanelLayout({ RoleTreeCollapsed: $event ? 1 : 0 })">
                 <el-card class="box-card">
                     <template #header
                         ><div class="clearfix">
@@ -21,8 +21,8 @@
                         ></el-tree>
                     </div>
                 </el-card>
-            </el-col>
-            <el-col :span="19" :xs="24">
+            </MciResizablePane>
+            <div class="mci-role-split__main">
                 <el-card class="box-card no-padding-body">
                     <el-form :model="SearchModel" inline @submit.prevent class="keyword-search mr-2">
                         <el-form-item :label="$t('Msg.Keyword')">
@@ -66,8 +66,8 @@
                         @current-change="CurrentChange"
                     />
                 </el-card>
-            </el-col>
-        </el-row>
+            </div>
+        </div>
         <el-dialog draggable :width="'75%'" :modal-append-to-body="false" v-model="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
             <el-form :model="CurrentSysRoleModel" label-width="100px">
                 <el-row :gutter="20">
@@ -263,10 +263,14 @@ import { useDiyStore } from "@/pinia";
 import SysroleMenuPermissionRow from "./components/sysrole-menu-permission-row.vue";
 import SysroleTablePermission from "./components/sysrole-table-permission.vue";
 import { setRoleMenuChecked } from "./utils/sysrole-menu-permission";
+import MciResizablePane from '@/components/MciResizablePane/index.vue';
+import PanelLayoutMixin from '@/utils/panel-layout.mixin.js';
 export default {
     name: "sys_role",
+    mixins: [PanelLayoutMixin],
     components: {
         SysroleMenuPermissionRow,
+        MciResizablePane,
         SysroleTablePermission
     },
     directives: {},
@@ -937,6 +941,10 @@ export default {
 </script>
 
 <style lang="scss">
+.mci-role-split { display:flex;gap:14px;min-width:0; }
+.mci-role-split__main { flex:1;min-width:0; }
+.mci-role-split .mci-resizable-pane__content > .el-card { height:100%; }
+@media(max-width:768px) { .mci-role-split { flex-direction:column; } .mci-role-split > .mci-resizable-pane { width:100% !important; } .mci-role-split > .mci-resizable-pane.is-collapsed { min-height:44px; } }
 .avatar-uploader .el-upload {
     border: 1px dashed #d9d9d9;
     border-radius: 6px;

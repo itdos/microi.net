@@ -1,15 +1,15 @@
 <template>
     <template v-if="visible">
         <el-menu-item v-if="firstLevelOnly" :index="target" @click="$emit('select-root', route)">
-            <item :icon="route.meta?.icon" :title="formatTitle(route.meta?.title || '')" :menu-id="route.meta?.Id" :badge-config="route.meta?.MenuBadgeConfig" />
+            <item :title-tooltip="false" :icon="route.meta?.icon" :title="formatTitle(route.meta?.title || '')" :menu-id="route.meta?.Id" :badge-config="route.meta?.MenuBadgeConfig" />
         </el-menu-item>
         <app-link v-else-if="!children.length || singleLeaf" :to="leafTarget">
             <el-menu-item :index="leafTarget">
-                <item :icon="leafMeta?.icon || route.meta?.icon" :title="formatTitle(leafMeta?.title || '')" :menu-id="leafMeta?.Id" :badge-config="leafMeta?.MenuBadgeConfig" />
+                <item :title-tooltip="false" :icon="leafMeta?.icon || route.meta?.icon" :title="formatTitle(leafMeta?.title || '')" :menu-id="leafMeta?.Id" :badge-config="leafMeta?.MenuBadgeConfig" />
             </el-menu-item>
         </app-link>
         <el-sub-menu v-else :index="target" popper-class="mci-top-navigation-popup" :teleported="true">
-            <template #title><item :icon="route.meta?.icon" :title="formatTitle(route.meta?.title || '')" :menu-id="route.meta?.Id" :badge-config="route.meta?.MenuBadgeConfig" /></template>
+            <template #title><item :title-tooltip="false" :icon="route.meta?.icon" :title="formatTitle(route.meta?.title || '')" :menu-id="route.meta?.Id" :badge-config="route.meta?.MenuBadgeConfig" /></template>
             <top-navigation-item v-for="child in children" :key="child.path || child.meta?.Id" :route="child" :base-path="target" />
         </el-sub-menu>
     </template>

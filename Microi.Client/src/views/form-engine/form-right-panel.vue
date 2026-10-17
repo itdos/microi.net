@@ -27,7 +27,7 @@
                 <template #label>
                     <span class="tab-label">
                         <el-icon><Document /></el-icon>
-                        <span>{{ $t ? $t('Msg.DataLog') || '日志' : '日志' }}</span>
+                        <span>{{ GetRelatedTitle('DataLog') }}</span>
                         <span class="mci-tab-badge">{{ GetRelatedCount('DataLog') }}</span>
                     </span>
                 </template>
@@ -35,7 +35,7 @@
                     <div class="panel-toolbar">
                         <div class="panel-toolbar-title">
                             <el-icon><Document /></el-icon>
-                            <span>{{ $t ? $t('Msg.DataLog') || '日志' : '日志' }}</span>
+                            <span>{{ GetRelatedTitle('DataLog') }}</span>
                         </div>
                         <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
                             <el-button
@@ -63,6 +63,8 @@
                                 <div class="log-card">
                                     <div class="log-title">{{ item.Title || GetVersionActionText(item.Type) }}</div>
                                     <div v-if="item.HistoryContentMode === 'MetadataOnly'" class="history-availability-note">仅显示操作记录，历史字段原文未开放。</div>
+                                    <el-button v-if="item.HistoryContentMode === 'OnDemand'" size="small" text type="primary" :loading="item.ContentLoading" @click="$emit('read-data-log', item)">查看变更</el-button>
+                                    <div v-if="item.HistoryContentMode === 'Authorized' && (!item.Content || item.Content.length === 0)" class="history-availability-note">此记录没有当前权限可读的字段变更。</div>
                                     <div
                                         v-for="log in item.Content"
                                         :key="'datalog_content_' + log.Name"
@@ -106,7 +108,7 @@
                 <template #label>
                     <span class="tab-label">
                         <el-icon><ChatDotRound /></el-icon>
-                        <span>{{ $t ? $t('Msg.DataComment') || '评论' : '评论' }}</span>
+                        <span>{{ GetRelatedTitle('DataComment') }}</span>
                         <span class="mci-tab-badge">{{ GetRelatedCount('DataComment') }}</span>
                     </span>
                 </template>
@@ -114,7 +116,7 @@
                     <div class="panel-toolbar">
                         <div class="panel-toolbar-title">
                             <el-icon><ChatDotRound /></el-icon>
-                            <span>{{ $t ? $t('Msg.DataComment') || '评论' : '评论' }}</span>
+                            <span>{{ GetRelatedTitle('DataComment') }}</span>
                         </div>
                         <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
                             <el-button
@@ -222,7 +224,7 @@
                 <template #label>
                     <span class="tab-label">
                         <el-icon><Clock /></el-icon>
-                        <span>{{ $t ? $t('Msg.DataVersion') : '版本' }}</span>
+                        <span>{{ GetRelatedTitle('DataVersion') }}</span>
                         <span class="mci-tab-badge">{{ GetRelatedCount('DataVersion') }}</span>
                     </span>
                 </template>
@@ -230,7 +232,7 @@
                     <div class="panel-toolbar">
                         <div class="panel-toolbar-title">
                             <el-icon><Clock /></el-icon>
-                            <span>{{ $t ? $t('Msg.DataVersion') : '版本' }}</span>
+                            <span>{{ GetRelatedTitle('DataVersion') }}</span>
                         </div>
                         <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
                             <el-button
@@ -270,7 +272,7 @@
                                         {{ $t ? $t('Msg.Load') : '加载' }}
                                     </el-button>
                                 </div>
-                                <div v-else class="history-availability-note">当前权限可查看版本记录，原文需代码管理权限。</div>
+                                <div v-else class="history-availability-note">当前权限可查看版本记录；历史正文需管理员权限，敏感或已脱敏字段不会开放。</div>
                             </div>
                         </div>
                         <div v-else-if="!dataVersionListLoading" class="panel-empty">
@@ -315,6 +317,9 @@ export default {
         enableDataLog: { type: Boolean, default: false },
         enableDataComment: { type: Boolean, default: false },
         enableDataVersion: { type: Boolean, default: false },
+        dataLogTitle: { type: String, default: "" },
+        dataCommentTitle: { type: String, default: "" },
+        dataVersionTitle: { type: String, default: "" },
         dataLogList: { type: Array, default: () => [] },
         dataLogListLoading: { type: Boolean, default: false },
         dataCommentList: { type: Array, default: () => [] },
@@ -399,6 +404,14 @@ export default {
         this.EnsureActiveTab();
     },
     methods: {
+        GetRelatedTitle(type) {
+            const custom = this[{ DataLog: "dataLogTitle", DataComment: "dataCommentTitle", DataVersion: "dataVersionTitle" }[type]];
+            if (typeof custom === "string" && custom.trim()) return custom.trim();
+            const fallback = { DataLog: "日志", DataComment: "评论", DataVersion: "版本" }[type];
+            const key = "Msg." + type;
+            const translated = this.$t ? this.$t(key) : "";
+            return translated && translated !== key ? translated : fallback;
+        },
         GetRelatedCount(type) {
             if (this.relatedCounts?.[type] === null) return "—";
             var value = Number(this.relatedCounts && this.relatedCounts[type]);

@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-user-update-preferences
- * Version: v1.1.5
+ * Version: v1.1.7
  * Function:
- * - 仅允许当前 DiyToken 用户保存自己的首页、主题、边角、导航、菜单展开与桌面偏好；空值或 System 跟随租户设置。
+ * - 仅允许当前 DiyToken 用户保存自己的首页、主题、边角、导航、菜单展开、面板宽度/折叠与桌面偏好；空值或 System 跟随租户设置。
  */
 
 if (!V8.CurrentUser || !V8.CurrentUser.Id) {
@@ -102,6 +102,32 @@ if (hasAppearanceValue('UiDensityScale')) {
     return fail('界面密度只能为90、95、100、105、110，空值继承系统设置。');
   }
   updateModel.UiDensityScale = density;
+  updateCount++;
+}
+
+// 布局仅保存整数像素与三态折叠值；目标账号始终来自可信 DiyToken，视口临时裁剪不写入这里。
+var layoutWidths = ['SidebarWidth', 'RoleTreeWidth'];
+for (var widthIndex = 0; widthIndex < layoutWidths.length; widthIndex++) {
+  var widthName = layoutWidths[widthIndex];
+  if (!hasAppearanceValue(widthName)) continue;
+  if (param[widthName] !== null && typeof param[widthName] === 'object') return fail('面板宽度必须为整数像素或空值。');
+  var widthText = text(param[widthName]);
+  var widthValue = widthText === '' ? null : Number(widthText);
+  if (widthValue !== null && (!isFinite(widthValue) || widthValue % 1 !== 0 || widthValue < 160 || widthValue > 600)) {
+    return fail('面板宽度只能为160至600之间的整数像素，空值恢复默认。');
+  }
+  updateModel[widthName] = widthValue;
+  updateCount++;
+}
+var layoutCollapsedFields = ['SidebarCollapsed', 'RoleTreeCollapsed'];
+for (var collapsedIndex = 0; collapsedIndex < layoutCollapsedFields.length; collapsedIndex++) {
+  var collapsedName = layoutCollapsedFields[collapsedIndex];
+  if (!hasAppearanceValue(collapsedName)) continue;
+  if (param[collapsedName] !== null && typeof param[collapsedName] === 'object') return fail('面板收起状态只能为0、1或空值。');
+  var collapsedText = text(param[collapsedName]);
+  var collapsedFlag = normalizeFlag(param[collapsedName]);
+  if (collapsedText !== '' && !collapsedFlag.ok) return fail('面板收起状态只能为0、1或空值。');
+  updateModel[collapsedName] = collapsedText === '' ? null : collapsedFlag.value;
   updateCount++;
 }
 
@@ -238,7 +264,7 @@ function comparablePreference(name, value) {
     var appearanceNormalized = normalizeFlag(value);
     return appearanceNormalized.ok ? String(appearanceNormalized.value) : text(value);
   }
-  if (name === 'RandomDesktopBg' || name === 'OpenTreeMenu') {
+  if (name === 'RandomDesktopBg' || name === 'OpenTreeMenu' || layoutCollapsedFields.indexOf(name) >= 0) {
     var normalized = normalizeFlag(value);
     return normalized.ok ? String(normalized.value) : text(value);
   }

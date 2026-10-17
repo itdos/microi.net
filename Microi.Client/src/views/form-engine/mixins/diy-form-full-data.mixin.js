@@ -226,10 +226,12 @@ export default {
                 submitData.ParentCommentId = self.ReplyComment.Id;
             }
             self.BtnLoading = true;
+            var recordIdentity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
             self.DiyCommon.Post(
                 "/api/FormEngine/AddFormComment",
                 submitData,
                 function (result) {
+                    if (self._isDestroyed || recordIdentity !== (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]))) return;
                     if (result.Code == 1) {
                         self._CommentSubmission = null;
                         self.CommentContent = "";
@@ -466,11 +468,14 @@ export default {
                 return;
             }
             var token = ++self._DataCommentLoadToken;
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
+            var current = () => !self._isDestroyed && token === self._DataCommentLoadToken
+                && identity === (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]));
             self.DataCommentListLoading = true;
             self.GetFormRelatedData(
                 "DataComment",
                 async function (result) {
-                    if (token !== self._DataCommentLoadToken) return;
+                    if (!current()) return;
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
                             await Promise.all(result.Data.map(async (item) => {
@@ -492,6 +497,7 @@ export default {
                                     item.ReplyToContent = self.GetCommentPlainText(item.ReplyToContent);
                                 }
                             }));
+                            if (!current()) return;
                             self.DataCommentList = result.Data;
                             self.FormRelatedCounts.DataComment = Number(result.DataCount ?? result.Data.length) || 0;
                             self.FormRelatedCounts.DataCommentUnavailableReason = "";
@@ -503,10 +509,32 @@ export default {
                             self.FormRelatedCounts.DataCommentUnavailableMessage = result?.DataAppend?.DataCommentUnavailableMessage || result?.Msg || "评论读取失败，请稍后重试。";
                         }
                     } finally {
-                        self.DataCommentListLoading = false;
+                        if (current()) self.DataCommentListLoading = false;
                     }
                 }
             );
+        },
+        async EnsureDataLogContent(item) {
+            if (!item || item.HistoryContentMode !== "OnDemand") return null;
+            var identity = this.GetFormRelatedIdentity?.() ?? JSON.stringify([this.TableId, this.TableRowId, this.SysMenuId]);
+            var result = await new Promise(resolve => this.GetFormRelatedData("DataLog", resolve, { LogId: item.Id }));
+            if (this._isDestroyed || identity !== (this.GetFormRelatedIdentity?.() ?? JSON.stringify([this.TableId, this.TableRowId, this.SysMenuId]))) return null;
+            if (result?.Code !== 1 || result.DataAppend?.HistoryContentMode !== "Authorized" || result.Data?.length !== 1) {
+                this.DiyCommon.Tips(result?.Msg || "日志内容读取失败，请稍后重试。", false);
+                return null;
+            }
+            return result.Data[0];
+        },
+        async LoadDataLogContent(item) {
+            if (item.ContentLoading) return;
+            item.ContentLoading = true;
+            try {
+                var detail = await this.EnsureDataLogContent(item);
+                if (!detail) return;
+                try { item.Content = typeof detail.Content === "string" ? JSON.parse(detail.Content) : detail.Content; }
+                catch { item.Content = []; }
+                item.HistoryContentMode = "Authorized";
+            } finally { item.ContentLoading = false; }
         },
         ParseDataVersionData(versionItem) {
             var self = this;
@@ -527,17 +555,19 @@ export default {
         },
         async EnsureDataVersionContent(versionItem) {
             if (!versionItem || versionItem.HistoryContentMode === "MetadataOnly") return null;
+            if (versionItem.__RelatedRecordIdentity && versionItem.__RelatedRecordIdentity !== this.GetFormRelatedIdentity?.()) return null;
             if (versionItem.HistoryContentMode !== "OnDemand") return versionItem;
             var rowId = this.TableRowId;
             var tableId = this.TableId;
+            var identity = this.GetFormRelatedIdentity?.();
             // 每次用户点击都重新鉴权读取一条；不把历史正文装入列表或长期缓存。
             var result = await new Promise(resolve => this.GetFormRelatedData("DataVersion", resolve, { VersionId: versionItem.Id }));
-            if (rowId !== this.TableRowId || tableId !== this.TableId) return null;
+            if (this._isDestroyed || rowId !== this.TableRowId || tableId !== this.TableId || identity !== this.GetFormRelatedIdentity?.()) return null;
             if (result?.Code !== 1 || result.DataAppend?.HistoryContentMode !== "Authorized" || result.Data?.length !== 1) {
                 this.DiyCommon.Tips(result?.Msg || "版本内容读取失败，请稍后重试。", false);
                 return null;
             }
-            return { ...result.Data[0], HistoryContentMode: "Authorized" };
+            return { ...result.Data[0], HistoryContentMode: "Authorized", HistoryContentKind: result.DataAppend.HistoryContentKind, __RelatedRecordIdentity: identity };
         },
         GetDataVersionPreviewFormRef() {
             var self = this;
@@ -563,7 +593,10 @@ export default {
         },
         async PreviewDataVersion(versionItem) {
             var self = this;
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
+            if (versionItem?.__RelatedRecordIdentity && versionItem.__RelatedRecordIdentity !== identity) return;
             if (versionItem?.HistoryContentMode === "OnDemand") versionItem = await self.EnsureDataVersionContent(versionItem);
+            if (self._isDestroyed || identity !== (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]))) return;
             var data = self.ParseDataVersionData(versionItem);
             if (!data) return;
             data.Id = self.TableRowId || data.Id;
@@ -659,7 +692,10 @@ export default {
         },
         async DiffDataVersion(versionItem) {
             var self = this;
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
+            if (versionItem?.__RelatedRecordIdentity && versionItem.__RelatedRecordIdentity !== identity) return;
             if (versionItem?.HistoryContentMode === "OnDemand") versionItem = await self.EnsureDataVersionContent(versionItem);
+            if (self._isDestroyed || identity !== (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]))) return;
             var versionData = self.ParseDataVersionData(versionItem);
             if (!versionData) return;
             var currentData = self.GetCurrentDataVersionFormData();
@@ -669,7 +705,10 @@ export default {
         },
         async LoadDataVersionToForm(versionItem) {
             var self = this;
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
+            if (versionItem?.__RelatedRecordIdentity && versionItem.__RelatedRecordIdentity !== identity) return false;
             if (versionItem?.HistoryContentMode === "OnDemand") versionItem = await self.EnsureDataVersionContent(versionItem);
+            if (self._isDestroyed || identity !== (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]))) return false;
             var data = self.ParseDataVersionData(versionItem);
             if (!data) return false;
             data.Id = self.TableRowId || data.Id;

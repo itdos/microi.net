@@ -502,6 +502,17 @@ export function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; erro
   const result = { ...data };
   const errors: string[] = [];
   const warnings: string[] = [];
+  for (const name of ['DataLogTitle', 'DataCommentTitle', 'DataVersionTitle']) {
+    const alias=name[0].toLowerCase()+name.slice(1);
+    if(data[name]===undefined&&data[alias]===undefined)continue;
+    const raw=data[name]!==undefined?data[name]:data[alias];
+    if(raw!==null&&typeof raw!=='string')errors.push(name+' 必须为文字或空值。');
+    else {
+      const title=typeof raw==='string'?raw.trim():'';
+      if(title.length>100)errors.push(name+' 最多100个字符。');else result[name]=title;
+    }
+    delete result[alias];
+  }
   if (data.DiyConfig !== undefined || data.diyConfig !== undefined) {
     errors.push('DiyConfig 已废弃；请新增专用物理字段，并通过 diy_field 元数据暴露配置控件。跨端视图请使用 sys_menu.ViewSchema。');
     delete result.DiyConfig;
@@ -3654,7 +3665,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
   });
   server.tool('microi_list_modules', `List menu modules for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Modules', await client.listModules(keyword)));
   server.tool('microi_get_module', `Get one menu module by ModuleId for OsClient ${osClient}.`, { moduleId: z.string() }, async ({ moduleId }) => apiText('Module Detail', await client.getModule(moduleId)));
-  server.tool('microi_update_module', `Incrementally update an existing menu module, including FieldPermissions v1 (Rules with Users/Roles/Departments/Jobs and Fields.Visible/Editable), TreeDragSortEnabled/TreeDragSortField, TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
+  server.tool('microi_update_module', `Incrementally update an existing menu module, including FieldPermissions v1 (Rules with Users/Roles/Departments/Jobs and Fields.Visible/Editable), TreeDragSortEnabled/TreeDragSortField, TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. DataLogTitle/DataCommentTitle/DataVersionTitle 自定义表单右侧日志/评论/版本文字，最多100字符，空值恢复默认名称，需先升级模块引擎应用。OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
     const normalized = normalizeAllMenuJson(module);
     if (normalized.errors.length) return textResult(JSON.stringify(normalized, null, 2), true);
     const target = getString(module, 'moduleId', 'ModuleId', 'Id') || getString(module, 'name', 'Name');

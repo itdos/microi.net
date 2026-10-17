@@ -274,7 +274,7 @@
                         />
                     </el-col>
                     <el-col v-if="ShowDesktopFormRight" :span="5" class="page-right-col">
-                        <FormRightPanel
+                        <FormRightPanel :key="[TableId, TableRowId, SysMenuId, FormRelatedGeneration].join(':')"
                             ref="formRightPanel"
                             v-model="FormRightType"
                             v-model:commentContent="CommentContent"
@@ -283,6 +283,9 @@
                             :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                             :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
                             :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
+                            :dataLogTitle="SysMenuModel.DataLogTitle || ''"
+                            :dataCommentTitle="SysMenuModel.DataCommentTitle || ''"
+                            :dataVersionTitle="SysMenuModel.DataVersionTitle || ''"
                             :dataLogList="DataLogList"
                             :dataLogListLoading="DataLogListLoading"
                             :dataCommentList="DataCommentList"
@@ -304,6 +307,7 @@
                             @callback-get-form-data="CallbackGetFormData"
                             @callback-field-set="CallbackFieldSet"
                             @refresh-data-log="LoadDataLog"
+                            @read-data-log="LoadDataLogContent"
                             @refresh-data-comment="LoadDataComment"
                             @refresh-data-version="LoadDataVersion"
                             @preview-data-version="PreviewDataVersion"
@@ -672,7 +676,7 @@
                     />
                 </el-col>
                 <el-col v-if="ShowDesktopFormRight" :span="5" class="page-right-col diy-form-right-panel-col" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
-                    <FormRightPanel
+                    <FormRightPanel :key="[TableId, TableRowId, SysMenuId, FormRelatedGeneration].join(':')"
                         ref="formRightPanel"
                         v-model="FormRightType"
                         v-model:commentContent="CommentContent"
@@ -681,6 +685,9 @@
                         :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                         :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
                         :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
+                            :dataLogTitle="SysMenuModel.DataLogTitle || ''"
+                            :dataCommentTitle="SysMenuModel.DataCommentTitle || ''"
+                            :dataVersionTitle="SysMenuModel.DataVersionTitle || ''"
                         :dataLogList="DataLogList"
                         :dataLogListLoading="DataLogListLoading"
                         :dataCommentList="DataCommentList"
@@ -702,6 +709,7 @@
                         @callback-get-form-data="CallbackGetFormData"
                         @callback-field-set="CallbackFieldSet"
                         @refresh-data-log="LoadDataLog"
+                            @read-data-log="LoadDataLogContent"
                         @refresh-data-comment="LoadDataComment"
                         @refresh-data-version="LoadDataVersion"
                         @preview-data-version="PreviewDataVersion"
@@ -1086,7 +1094,7 @@
                     />
                 </el-col>
                 <el-col v-if="ShowDesktopFormRight" :span="5" class="page-right-col diy-form-right-panel-col" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
-                    <FormRightPanel
+                    <FormRightPanel :key="[TableId, TableRowId, SysMenuId, FormRelatedGeneration].join(':')"
                         ref="formRightPanel"
                         v-model="FormRightType"
                         v-model:commentContent="CommentContent"
@@ -1095,6 +1103,9 @@
                         :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                         :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
                         :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
+                            :dataLogTitle="SysMenuModel.DataLogTitle || ''"
+                            :dataCommentTitle="SysMenuModel.DataCommentTitle || ''"
+                            :dataVersionTitle="SysMenuModel.DataVersionTitle || ''"
                         :dataLogList="DataLogList"
                         :dataLogListLoading="DataLogListLoading"
                         :dataCommentList="DataCommentList"
@@ -1116,6 +1127,7 @@
                         @callback-get-form-data="CallbackGetFormData"
                         @callback-field-set="CallbackFieldSet"
                         @refresh-data-log="LoadDataLog"
+                            @read-data-log="LoadDataLogContent"
                         @refresh-data-comment="LoadDataComment"
                         @refresh-data-version="LoadDataVersion"
                         @preview-data-version="PreviewDataVersion"
@@ -1222,7 +1234,7 @@
                     {{ $t('Msg.WorkflowInfo') }}
                 </span>
             </template>
-            <FormRightPanel
+            <FormRightPanel :key="[TableId, TableRowId, SysMenuId, FormRelatedGeneration].join(':')"
                 ref="formRightPanelMobile"
                 v-model="FormRightType"
                 v-model:commentContent="CommentContent"
@@ -1231,6 +1243,9 @@
                 :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                 :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
                 :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
+                            :dataLogTitle="SysMenuModel.DataLogTitle || ''"
+                            :dataCommentTitle="SysMenuModel.DataCommentTitle || ''"
+                            :dataVersionTitle="SysMenuModel.DataVersionTitle || ''"
                 :dataLogList="DataLogList"
                 :dataLogListLoading="DataLogListLoading"
                 :dataCommentList="DataCommentList"
@@ -1253,6 +1268,7 @@
                 @callback-get-form-data="CallbackGetFormData"
                 @callback-field-set="CallbackFieldSet"
                 @refresh-data-log="LoadDataLog"
+                            @read-data-log="LoadDataLogContent"
                 @refresh-data-comment="LoadDataComment"
                 @refresh-data-version="LoadDataVersion"
                 @preview-data-version="PreviewDataVersion"
@@ -1424,7 +1440,7 @@ export default {
     computed: {
         CodeVersionPreviewFields() {
             // 按需接口只返回已授权的代码字段；局部快照不渲染为空白的整张配置表单。
-            if (this.PreviewDataVersionItem?.HistoryContentMode !== "Authorized") return [];
+            if (this.PreviewDataVersionItem?.HistoryContentMode !== "Authorized" || this.PreviewDataVersionItem?.HistoryContentKind === "Data") return [];
             return Object.entries(this.PreviewDataVersionData || {})
                 .filter(([name]) => name !== "Id" && !name.startsWith("__"))
                 .map(([name, code]) => ({

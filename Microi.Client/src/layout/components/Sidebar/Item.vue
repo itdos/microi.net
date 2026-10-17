@@ -6,7 +6,10 @@
         <el-icon v-else class="sub-el-icon svg-icon" :class="{ 'mci-sidebar-parent-icon': isParent }">
             <List />
         </el-icon>
-        <span v-if="title" class="menu-title" :title="title" :aria-label="title">{{ title }}</span>
+        <el-tooltip v-if="title && titleTooltip" :content="title" placement="right" :show-after="450" popper-class="mci-menu-title-tooltip">
+            <span class="menu-title" :aria-label="title">{{ title }}</span>
+        </el-tooltip>
+        <span v-else-if="title" class="menu-title" :aria-label="title">{{ title }}</span>
         <el-tooltip
             v-if="badgeText !== null && badgeConfigModel.Tooltip"
             :content="badgeConfigModel.Tooltip"
@@ -20,14 +23,12 @@
                 :aria-label="`${title}统计 ${badgeRawValue}，${badgeConfigModel.Tooltip}`"
             >{{ badgeText }}</span>
         </el-tooltip>
-        <span
-            v-else-if="badgeText !== null"
+        <el-tooltip v-else-if="badgeText !== null" :content="`${title}：${badgeRawValue}`" placement="right" popper-class="mci-menu-badge-tooltip"><span
             class="menu-stat-badge"
             :class="'is-' + badgeConfigModel.Tone"
             :style="badgeConfigModel.Color ? { backgroundColor: badgeConfigModel.Color } : undefined"
-            :title="`${title}：${badgeRawValue}`"
             :aria-label="`${title}统计 ${badgeRawValue}`"
-        >{{ badgeText }}</span>
+        >{{ badgeText }}</span></el-tooltip>
     </div>
 </template>
 
@@ -59,6 +60,10 @@ export default {
         title: {
             type: String,
             default: ""
+        },
+        titleTooltip: {
+            type: Boolean,
+            default: true
         },
         isParent: {
             type: Boolean,
@@ -185,10 +190,10 @@ export default {
 
 .sub-el-icon {
     color: currentColor;
-    width: 20px;
-    height: 20px;
-    min-width: 20px;
-    min-height: 20px;
+    width: var(--mci-ui-menu-icon-size, 18px);
+    height: var(--mci-ui-menu-icon-size, 18px);
+    min-width: var(--mci-ui-menu-icon-size, 18px);
+    min-height: var(--mci-ui-menu-icon-size, 18px);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -198,7 +203,7 @@ export default {
     &.mci-sidebar-parent-icon::before {
         content: '';
         position: absolute;
-        inset: -7px;
+        inset: calc(-1 * var(--mci-ui-menu-icon-inset, 4px));
         border-radius: 50%;
         background: color-mix(in srgb, currentColor 12%, transparent);
         pointer-events: none;

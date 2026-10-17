@@ -41,6 +41,11 @@ test('普通 MCP 宿主初始化也收到跨模型的版本与自动更新基础
         assert.match(client.getInstructions() || '', /任何 AI 模型强制读取/);
         assert.match(client.getInstructions() || '', /Microi吾码开发工具版本/);
         assert.match(client.getInstructions() || '', /microi update --background/);
+        assert.match(client.getInstructions() || '', /microi-system-delivery\/SKILL\.md/);
+        assert.match(client.getInstructions() || '', /microi-system-delivery\/references\/progressive-01-标准工作流\.md/);
+        assert.match(client.getInstructions() || '', /原 1–8.*后续增补/);
+        assert.match(client.getInstructions() || '', /已读取的文件路径.*交付清单/s);
+        assert.match(client.getInstructions() || '', /不能声称已自动加载/);
         assert.ok((await client.listTools()).tools.length > 1);
     }
     finally {

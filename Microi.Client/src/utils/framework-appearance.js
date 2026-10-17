@@ -5,7 +5,7 @@ import { setCornerStyle } from './theme-shape.js';
 
 export const APPEARANCE_SWITCHES = Object.freeze(['DisableGradient', 'DisableShadow', 'DisableButtonIcon']);
 export const FRAMEWORK_FUNCTIONS = Object.freeze(['Chat', 'BackgroundTasks', 'Search', 'Language', 'Theme', 'AI', 'Bluetooth', 'SystemStyle', 'FullScreen']);
-export const APPEARANCE_RESET = Object.freeze({ ThemeMode: '', ThemeColor: '', CornerStyle: 'System', NavigationLayout: 'System', MenuChildExpandMode: 'System', UiDensityScale: null, DisableGradient: null, DisableShadow: null, DisableButtonIcon: null, LoginStyle: 'System' });
+export const APPEARANCE_RESET = Object.freeze({ ThemeMode: '', ThemeColor: '', CornerStyle: 'System', NavigationLayout: 'System', MenuChildExpandMode: 'System', UiDensityScale: null, DisableGradient: null, DisableShadow: null, DisableButtonIcon: null, LoginStyle: 'System', SidebarWidth: null, RoleTreeWidth: null, SidebarCollapsed: null, RoleTreeCollapsed: null });
 export function getAppearanceWatchValues(store) {
     const user = store.GetCurrentUser || {}, system = store.SysConfig || {};
     // 只订阅外观标量，避免主题监听深遍历大型角色权限和其它系统配置。

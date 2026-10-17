@@ -17,10 +17,11 @@
         top: 0;
         bottom: 0;
         left: 0;
-        z-index: 1; // PC端侧边栏不需要太高的z-index，避免遮挡弹窗等
-        overflow: hidden;
+        z-index: 2; // 仅高于主内容以保留边缘拖拽命中，仍低于导航弹层与业务对话框。
+        overflow: visible;
         display: flex;
         flex-direction: column;
+        .sidebar-menu-content { height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden; }
         // reset element-ui css
         .horizontal-collapse-transition {
             transition:
@@ -37,7 +38,7 @@
             right: 0px;
         }
 
-        > .el-scrollbar {
+        .sidebar-menu-content > .el-scrollbar {
             flex: 1 1 auto;
             min-height: 0;
             height: auto;

@@ -1,12 +1,12 @@
 <template>
     <div class="forklift-management left-right-page">
-        <el-row :gutter="10" class="main-container left-right-layout" v-if="ShowRowView">
-            <el-col v-if="!diyStore.IsPhoneView" :span="colData.Left" class="left-right-col left-tree-col">
+        <el-row :gutter="isRoleTreeLayout ? 0 : 10" class="main-container left-right-layout" :class="{ 'role-tree-layout': isRoleTreeLayout }" v-if="ShowRowView">
+            <component :is="isRoleTreeLayout ? 'MciResizablePane' : 'el-col'" v-if="!diyStore.IsPhoneView" v-bind="leftPanelProps" class="left-right-col left-tree-col" @commit="isRoleTreeLayout && savePanelLayout({ RoleTreeWidth: $event })" @update:collapsed="isRoleTreeLayout && savePanelLayout({ RoleTreeCollapsed: $event ? 1 : 0 })">
                 <el-card class="box-card left-tree-card">
                     <LeftView :LeftTreeData="LeftTreeData" @LeftViewClick="LeftViewClick" @ShowRightClick="ShowRightClick"></LeftView>
                 </el-card>
-            </el-col>
-            <el-col :span="diyStore.IsPhoneView ? 24 : colData.Right" class="left-right-col right-table-col">
+            </component>
+            <el-col :span="diyStore.IsPhoneView || isRoleTreeLayout ? 24 : colData.Right" class="left-right-col right-table-col">
                 <el-card class="products-card right-content-card">
                     <div class="mobile-tree-toolbar" v-if="diyStore.IsPhoneView">
                         <el-button circle type="primary" @click="MobileTreeDrawer = true" title="打开项目目录" aria-label="打开项目目录">
@@ -67,6 +67,8 @@ import { computed, defineAsyncComponent } from "vue";
 import { useDiyStore } from "@/pinia";
 import LeftView from "@/views/form-engine/left-right/LeftView.vue";
 import RightView from "@/views/form-engine/left-right/RightView.vue";
+import MciResizablePane from "@/components/MciResizablePane/index.vue";
+import PanelLayoutMixin from "@/utils/panel-layout.mixin.js";
 
 // 🔥 改为异步导入，避免循环依赖和初始化顺序问题
 const DiyTableRowlist = defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"));
@@ -75,8 +77,10 @@ export default {
     components: {
         LeftView,
         RightView,
-        DiyTableRowlist
+        DiyTableRowlist,
+        MciResizablePane
     },
+    mixins: [PanelLayoutMixin],
     setup() {
         const diyStore = useDiyStore();
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
@@ -112,7 +116,15 @@ export default {
             MobileTreeTitle: "全部项目"
         };
     },
-    computed: {},
+    computed: {
+        // 使用服务端菜单投影的表名识别角色模块，避免把中文标题或路由别名当作身份。
+        isRoleTreeLayout() { return String(this.$route.meta?.DiyTableName || "").toLowerCase() === "sys_role"; },
+        leftPanelProps() {
+            return this.isRoleTreeLayout
+                ? { width: this.roleTreeWidthPreference, collapsed: this.roleTreeCollapsedPreference, label: this.$t("Msg.Org") }
+                : { span: this.colData.Left };
+        }
+    },
     created() {
         this.getPageConfigureItems();
     },
@@ -305,6 +317,10 @@ export default {
 .left-right-layout {
     align-items: stretch;
 }
+
+.role-tree-layout { gap: 10px;flex-wrap: nowrap; }
+.role-tree-layout > .right-table-col { flex: 1;min-width: 0;max-width: none; }
+.role-tree-layout > .left-tree-col { flex: 0 0 auto; }
 
 .left-right-col {
     height: 100%;
@@ -586,8 +602,8 @@ export default {
     }
 
     .mobile-tree-toolbar .el-button {
-        width: 34px;
-        height: 34px;
+        width: var(--mci-touch-target, 44px);
+        height: var(--mci-touch-target, 44px);
         padding: 0;
         margin: 0;
         pointer-events: auto;

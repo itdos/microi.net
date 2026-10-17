@@ -61,6 +61,16 @@ html[data-mci-ui-density] body {
     .el-button:not(.is-circle):not(.is-text):not(.is-link) { min-height: var(--mci-ui-control-height); }
     .el-tabs__item { height: var(--mci-ui-tab-height) !important; line-height: var(--mci-ui-tab-height) !important; font-size: var(--mci-ui-base-font) !important; }
     .el-table .el-table__cell { padding-block: var(--mci-ui-table-cell-padding) !important; }
+    // 普通行不再被历史 scoped 38/40px 行高撑大；复合列、图片和多行内容仍自然撑高。
+    .diy-table .el-table th .cell,
+    .diy-table .el-table td .cell { line-height: var(--mci-ui-table-line-height) !important; }
+    .diy-table .el-table th.el-table__cell { height: var(--mci-ui-table-header-height) !important; }
+    // 无角标的普通操作行不额外留顶部空槽；角标仍在固定列内部保留安全区。
+    .diy-table .diy-table-action-content { padding-block: 0 !important; }
+    .diy-table .diy-table-action-content:has(.button-stat-badge) { padding-top: calc(6px * var(--mci-ui-scale)) !important; }
+    @media (min-width: 769px) {
+        .diy-table .diy-table-action-content > .el-button { height: var(--mci-ui-control-height) !important;min-height: var(--mci-ui-control-height) !important; }
+    }
     .el-card__body { padding: var(--mci-space-4); }
     .el-dialog__body { padding: var(--mci-ui-dialog-padding); }
     .el-dropdown-menu__item { line-height: var(--mci-ui-control-height); }
@@ -75,6 +85,11 @@ html[data-mci-ui-density] body {
         font-size: var(--mci-ui-base-font) !important;
     }
     .sidebar-container-microi .menu-title { font-size: var(--mci-ui-base-font) !important; }
+    .sidebar-container-microi .el-menu-item,
+    .sidebar-container-microi .el-sub-menu__title { margin-block: var(--mci-ui-menu-row-gap) !important; }
+    .sidebar-container-microi .sub-el-icon,
+    .mci-top-navigation .sub-el-icon,
+    .mci-top-navigation-popup .sub-el-icon { font-size: var(--mci-ui-menu-icon-size) !important; }
 
     .diy-form-workbench-toolbar,
     .diy-form-workbench-body,

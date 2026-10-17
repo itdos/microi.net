@@ -374,6 +374,10 @@ printEngineEn.literal = printEngineLiteralEn;
 
 // 框架外观与登录视觉文案共用三种前端兜底，租户语言继续由既有词库覆盖。
 const appearanceZhCn = {
+    "collapsePanel": "收起{label}",
+    "expandPanel": "展开{label}",
+    "panelWidth": "{label}宽度",
+
     "reset": "恢复默认",
     "inheritHint": "恢复默认后跟随系统设置。",
     "followSystem": "跟随系统",
@@ -419,6 +423,10 @@ const appearanceZhCn = {
     "deviceSaveFailed": "主题已在当前设备生效，但跨设备保存失败：{message}"
 };
 const appearanceZhTw = {
+    "collapsePanel": "收起{label}",
+    "expandPanel": "展開{label}",
+    "panelWidth": "{label}寬度",
+
     "reset": "恢復預設",
     "inheritHint": "恢復預設後跟隨系統設定。",
     "followSystem": "跟隨系統",
@@ -464,6 +472,10 @@ const appearanceZhTw = {
     "deviceSaveFailed": "主題已在目前裝置生效，但跨裝置儲存失敗：{message}"
 };
 const appearanceEn = {
+    "collapsePanel": "Collapse {label}",
+    "expandPanel": "Expand {label}",
+    "panelWidth": "{label} width",
+
     "reset": "Restore defaults",
     "inheritHint": "Defaults follow the system settings.",
     "followSystem": "Follow system",

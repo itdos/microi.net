@@ -7,6 +7,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { createGzip } from 'node:zlib';
 import { API } from './api-paths.js';
+import { reportOperation, reportDdlEvents } from './operation-progress.js';
 import { createReadIdentityGuard } from './context-reading.js';
 import { resolveMcpDid } from './mcp-did.js';
 import {
@@ -1320,6 +1321,7 @@ export class MicroiClient {
     let text: string;
     const jsonBody = method === 'POST' ? JSON.stringify(body ?? {}) : undefined;
     try {
+      await reportOperation(reqPath, method);
       const fetchResponse = await fetch(url, {
         method,
         headers,
@@ -1342,7 +1344,7 @@ export class MicroiClient {
         );
       }
 
-      if (options.allowNativeFallback === false) {
+      if (options.allowNativeFallback === false || (method === 'POST' && options.allowNativeFallback !== true)) {
         throw new MicroiTransportError(
           `${operationName} 网络请求失败：fetch=${error instanceof Error ? error.message : String(error)}；`
           + '已禁用非幂等传输重放',
@@ -1426,6 +1428,8 @@ export class MicroiClient {
     } catch {
       throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
     }
+    await reportDdlEvents(reqPath, parsed);
+    await reportOperation(reqPath, method, true);
 
     // Microi 历史版本可能用 Code=1001/1002、ReasonCode 或签名失败文本表达身份失效。
     if (isAuthenticationFailureResponse(parsed) && authRecoveryStage !== 'credential-token') {
