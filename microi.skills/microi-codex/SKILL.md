@@ -36,7 +36,7 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 
 - 桌面与手机配对的本机 HTTP 监听必须避开 Fetch 标准禁止端口。系统自动分配的端口也可能不可浏览器访问；只有浏览器允许的真实监听端口才能进入配对 URL。自动命中禁止端口时关闭监听再有界重选，显式配置禁止端口须报错；权限和占用错误仍保留原错误，不改变系统动态端口范围、不绕过浏览器安全策略。同步上游时保护共同端口选择器、配对监听与对应回归。
 
-- 1.3.8 起生产宿主为 DeepSeek 官方桌面。同步前读取内部源码根目录 `同步DeepSeek官方上游.md`、`apps/official-desktop/upstream.lock.json` 与维护交接记录；核对官方提交、归档 SHA、版本与完整锁。保留原始快照、自有层和精确接缝，干净安装、回归及真实包验收后才能推进基线。`同步dsh-desktop上游.md` 仅用于历史派生模块，不得恢复退役宿主或 PPT 模式。
+- 1.3.8 起生产宿主为 DeepSeek 官方桌面。同步前读取内部源码根目录 `同步DeepSeek官方上游.md`、`apps/official-desktop/upstream.lock.json` 与维护交接记录；核对官方提交、归档 SHA、版本与完整锁。保留原始快照、自有层和精确接缝，干净安装、回归及真实包验收后才能推进基线。旧 `同步dsh-desktop上游.md` 已删除；历史派生模块只按发行快照追溯，不得恢复退役宿主或 PPT 模式。
 - Microi Agent 是内部仓库中的独立桌面发行物，基于 DeepSeek Harness 官方桌面源码及独立吾码差异层，内置固定 Harness、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。历史 DataElement 派生模块及许可证仍保留。
 - 官方 AI 登录只走吾码桌面账号窗口，在受支持的 `https://api.microi.net` / `https://api.itdos.com`、`OsClient=iTdos` 使用本人的中转 Key 和额度；它是员工业务 MCP 之外的可选计费来源。不要把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
 - 业务连接在「服务器连接（MCP）」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
@@ -62,7 +62,7 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 - Windows 1.3.7 修复候选针对新版 stage 启用时 Win32=5 的单次失败：对 5/32/33 有限重试，再仅在成功新建的目标目录内做同盘文件重命名；以固定 UTF-16 日志记录迁移意图，部分失败逐项搬回，已有目标、未知文件与旧备份均不覆盖。回滚 EOF 和短记录必须停止，目录枚举句柄先关闭再删除空目录。真实 NSIS 回归覆盖短暂/持续错误 5、中途错误 5、文件冲突和未知目标；Wine 结果与 Windows 原生覆盖升级/全部文件哈希/最终程序启动分别报告。
 - Windows 1.2.9 起本机启动探测必须使用覆盖 TCP 连接和响应头的硬超时；Harness 输出认证地址后，Node 请求失败可使用实际渲染页面的 Chromium 网络通道回退，严格限制为本次 `http://127.0.0.1:端口/`、不带凭据、不跟随重定向。记录两个通道的真实错误；只有响应正常且存在本次认证信息才可启动页面。恢复日志只能去除缓冲区之间的重叠，不能用全局 Set 删除重试中的相同超时。发布必须运行 `scripts/verify-harness-startup.mjs`，使用发布包内 Node/Harness 验证普通与安全模式、注入 Node 超时后由真实 Chromium 渲染新会话控件，以及双通道真实不响应的有界失败；本机验证不能称为客户设备已通过。
 - 桌面平台 Worker 必须在真实安装包内验证 IPC 与 Windows DPAPI。旧保险库只有成功解密且明文为零字节时才允许迁移为空文档；损坏或其他 Windows 用户的保险库保留原文件并返回具体错误。启动初始化拒绝不能让 Node 服务退出；单元测试、安装成功与真实桌面账号/AI 员工页面联调是三个独立验收层。
-- dsh-desktop 升级必须遵循 `Microi.Agent/同步dsh-desktop上游.md` 的三方同步流程和补丁意图清单；`microi/`、`packages/microi-code-*` 与桥接代码是永久保护区，普通上游文件使用三方比较，补丁必须经 `npm ci` 重放。关于页、NOTICE、MIT License、DataElement 版权与两个上游仓库链接不得删除。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
+- Microi Agent 的生产桌面使用 DeepSeek 官方源码，升级唯一入口为 `Microi.Agent/同步DeepSeek官方上游.md`。锁定官方 commit 和归档哈希，重放独立 overlay、桥接、客户端插件及云应用契约；吾码源码保护区、VS Code/CLI/MCP 与商店通道不能被上游覆盖。历史 dsh 桌面快照只作旧发行追溯和保留业务模块的来源，不再作为生产同步入口。用户「关于」可以只展示 Microi Agent、版本、吾码官网和支持入口；第三方许可证与版权声明继续在安装包的 NOTICE/LICENSE 中保留，不能因简化关于弹窗而删除法律材料。停止或退出后的任务保留历史，当前 SDK 的跨进程历史仅供查看，需新建任务引用继续。
 
 ### 默认中文输出
 
