@@ -30,6 +30,26 @@ test('agent release history stays at the end of the guide and preserves both pla
   assert.match(history, /客户 Windows 原生安装与启动仍待确认/)
 })
 
+test('Agent history starts with both formally released Windows archives and their guide checksums', () => {
+  const component = read('docs/.vitepress/theme/components/MicroiAgentShowcase.vue')
+  const guide = read('docs/doc/v8-engine/microi-agent.md')
+  const catalog = component.match(/const releases = \[([\s\S]*?)\n\]/)?.[1] || ''
+  const entries = [...catalog.matchAll(/\{ version: '([^']+)', platform: '([^']+)', note: '([^']+)', url: '([^']+)', sha256: '([a-f0-9]{64})' \}/g)]
+  assert.deepEqual(entries.slice(0, 2).map(entry => [entry[1], entry[2]]), [['1.4.1', 'Windows x64'], ['1.4.0', 'Windows x64']])
+  for (const [version, hash] of [['1.4.1', '03bfb220f43c95000f1b8e6df2e02595589792cc5ef23b823c24a052b54a1c32'], ['1.4.0', '5f39653d339a56056a1967cfcc79622ea4830fa0040761ad272135b0036cf014']]) {
+    const matches = entries.filter(entry => entry[1] === version && entry[2] === 'Windows x64')
+    assert.equal(matches.length, 1, 'each released Windows archive appears exactly once')
+    const entry = matches[0], url = new URL(entry[4])
+    assert.equal(entry[5], hash)
+    assert.match(url.pathname, new RegExp('/releases/v[0-9.]+/requests/[a-f0-9]{64}/assets/Microi-Agent-' + version.replaceAll('.', '\\.') + '-windows-x64-setup\\.exe$'))
+    assert.equal(url.search, ''); assert.equal(url.hash, ''); assert.ok(['static.itdos.com', 'file.microi.net'].includes(url.hostname))
+    assert.ok(guide.includes(entry[4]) && guide.includes(hash), 'download archive and checksum match the published guide')
+    assert.match(entry[3], /未签名/)
+  }
+  assert.match(catalog, /version: '1\.3\.9'/)
+  assert.match(catalog, /version: '1\.3\.6', platform: "macOS Universal"/)
+})
+
 test('homepage presents Microi as an open-source AI development framework', () => {
   const component = read('docs/.vitepress/theme/components/AiStudioHome.vue')
   const microiCodeShowcase = read('docs/.vitepress/theme/components/MicroiAgentShowcase.vue')
