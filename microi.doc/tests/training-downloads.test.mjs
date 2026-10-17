@@ -48,9 +48,8 @@ test('旧培训下载路径由真实官网 nginx 精确跳转，不能复制大�
   assert.doesNotMatch(conf, /location\s+(?:\^~\s+)?\/downloads\/\s*\{/u, '不得把未知下载路径统一代理到 CDN 或首页')
 })
 
-test('九件清单绑定原始字节，18 页旧别名和四套当前课件分别保留', () => {
+test('九件清单逐件绑定原始字节，18 页旧别名与历史 PPTX 保持兼容', () => {
   assert.equal(validateTrainingDownloads().length, 9)
-  assert.equal(trainingDownloads.reduce((sum, asset) => sum + asset.bytes, 0), 152_833_138)
   for (const asset of trainingDownloads) {
     const file = fs.readFileSync(verifiedTrainingAssetPath(asset.url))
     assert.equal(file.length, asset.bytes)
@@ -61,6 +60,25 @@ test('九件清单绑定原始字节，18 页旧别名和四套当前课件分�
   assert.equal(legacy.subarray(0, 5).toString('ascii'), '%PDF-')
   assert.equal([...legacy.toString('latin1').matchAll(/\/Type\s*\/Page(?=[\s/])/gu)].length, 18)
   assert.match(legacy.toString('latin1'), /\/Count\s+18\b/u)
+})
+
+test('当前四份 PDF 页数与47页技术版/10页企业版一致并包含原生字体映射', () => {
+  for (const edition of ['technical', 'enterprise']) for (const theme of ['dark', 'light']) {
+    const bytes = fs.readFileSync(verifiedTrainingAssetPath(trainingPdfPaths[edition][theme]))
+    const content = bytes.toString('latin1')
+    assert.equal(bytes.subarray(0, 5).toString('ascii'), '%PDF-')
+    assert.equal([...content.matchAll(/\/Type\s*\/Page(?=[\s/])/gu)].length, edition === 'technical' ? 47 : 10)
+    assert.match(content, /\/ToUnicode\b/u, '当前 PDF 必须保留可选择中文的字体映射，不能只是整页截图')
+    assert.match(content, /\/Outlines\b/u, '完整课件应保留逐页 PDF 书签')
+  }
+})
+
+test('企业版 PDF 控制下载体积并支持首屏分段加载，避免回退到原图重绘版本', () => {
+  for (const theme of ['dark', 'light']) {
+    const bytes = fs.readFileSync(verifiedTrainingAssetPath(trainingPdfPaths.enterprise[theme]))
+    assert.ok(bytes.length <= 8 * 1024 * 1024, `${theme}: 阅读版不能重新嵌入数十MB原图和透明装饰`)
+    assert.match(bytes.subarray(0, 2048).toString('latin1'), /\/Linearized\s+1\b/u, '线性化字典必须处于文件开头，配合CDN Range先显示首屏')
+  }
 })
 
 test('清单拒绝非官方、错误指纹、缺项、重复项与未声明下载地址', () => {

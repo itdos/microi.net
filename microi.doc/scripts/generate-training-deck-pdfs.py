@@ -1,4 +1,7 @@
-"""Build dark/light Microi technical or enterprise deck PDFs from browser captures.
+"""Legacy raster converter for archived browser captures.
+
+Current training releases use ``npm run generate:training-pdfs`` so Chinese
+remains selectable and the complete real screenshot galleries remain embedded.
 
 The browser capture folders are intentionally temporary. The automated browser
 captures the deterministic presentation surface at its native 1600x900 size.

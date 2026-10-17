@@ -7,8 +7,7 @@ const NUGET_PROFILE_URL = 'https://www.nuget.org/profiles/ITdos'
 const NUGET_OWNER = 'ITdos'
 const NUGET_STATS_ENGINE_KEY = 'official_nuget_stats'
 const OS_CLIENT = 'iTdos'
-const CACHE_REQUEST_TIMEOUT_MS = 4500
-const REFRESH_REQUEST_TIMEOUT_MS = 16000
+const SNAPSHOT_REQUEST_TIMEOUT_MS = 4500
 export const NUGET_LOCAL_STORAGE_KEY = 'microi:public-stats:nuget-itdos:v1'
 
 export const NUGET_STATS_ENDPOINT = `${buildSiteApiEngineUrl(
@@ -33,7 +32,6 @@ export const NUGET_FALLBACK_STATS = Object.freeze({
   isLive: false
 })
 
-let sharedCacheRequest
 let sharedStatsRequest
 
 function asNonNegativeInteger(value, fallback = 0) {
@@ -47,8 +45,12 @@ export function normalizeNugetStatsPayload(value, expectedStage = '') {
   const owner = String(value.owner || '').trim()
   const packageCount = asNonNegativeInteger(value.packageCount)
   const totalDownloads = asNonNegativeInteger(value.totalDownloads)
+  const queriedAt = String(value.queriedAt || '')
   if (owner.toLowerCase() !== NUGET_OWNER.toLowerCase()) throw new Error('Unexpected NuGet owner')
   if (!packageCount || !totalDownloads) throw new Error('NuGet stats payload is invalid')
+  if (!queriedAt || !Number.isFinite(new Date(queriedAt).getTime())) {
+    throw new Error('NuGet snapshot time is invalid')
+  }
 
   const stage = String(value.stage || expectedStage || 'cache').toLowerCase()
   const refreshFailed = value.refreshFailed === true
@@ -57,7 +59,7 @@ export function normalizeNugetStatsPayload(value, expectedStage = '') {
     packageCount,
     totalDownloads,
     profileUrl: NUGET_PROFILE_URL,
-    queriedAt: String(value.queriedAt || ''),
+    queriedAt,
     cachedAt: String(value.cachedAt || value.queriedAt || ''),
     successfulEndpoints: asNonNegativeInteger(value.successfulEndpoints),
     stage,
@@ -68,7 +70,9 @@ export function normalizeNugetStatsPayload(value, expectedStage = '') {
       : asNonNegativeInteger(value.ageSeconds),
     didRefresh: value.didRefresh === true,
     refreshFailed,
-    isLive: stage === 'current' && !refreshFailed
+    refreshIntervalSeconds: asNonNegativeInteger(value.refreshIntervalSeconds, 10800),
+    // 官网只展示定时任务已保存的快照，兼容旧响应也不能标成实时采集结果。
+    isLive: false
   }
 }
 
@@ -88,11 +92,14 @@ function snapshotTime(value) {
 export function preferHigherNugetStats(current, candidate) {
   if (!current) return candidate || null
   if (!candidate) return current
+  // 优先成功采集时间；官方修正下载量时，旧浏览器高水位不能锁住更旧的快照。
+  const currentTime = snapshotTime(current)
+  const candidateTime = snapshotTime(candidate)
+  if (candidateTime !== currentTime) return candidateTime > currentTime ? candidate : current
   if (candidate.totalDownloads !== current.totalDownloads) {
     return candidate.totalDownloads > current.totalDownloads ? candidate : current
   }
-  if (candidate.stage === 'current' && current.stage !== 'current') return candidate
-  return snapshotTime(candidate) > snapshotTime(current) ? candidate : current
+  return current.stage === 'fallback' ? candidate : current
 }
 
 export function loadLocalNugetStats({ storage } = {}) {
@@ -137,7 +144,7 @@ export function persistLocalNugetStats(value, { storage } = {}) {
   }
 }
 
-async function requestNugetStats(action, {
+async function requestNugetStats({
   fetchImpl = globalThis.fetch,
   timeoutMs
 } = {}) {
@@ -156,8 +163,8 @@ async function requestNugetStats(action, {
           apiengine: '1'
         },
         body: JSON.stringify({
-          Action: action,
-          LockScope: action === 'Refresh' ? 'NuGetOfficialRefresh' : 'NuGetCacheRead'
+          Action: 'Snapshot',
+          LockScope: 'NuGetSnapshotRead'
         }),
         signal: controller?.signal
       })
@@ -166,7 +173,7 @@ async function requestNugetStats(action, {
       }
       const result = await response.json()
       if (Number(result?.Code) !== 1) throw new Error(result?.Msg || 'NuGet stats request failed')
-      return normalizeNugetStatsPayload(result.Data, action === 'Cache' ? 'cache' : 'current')
+      return normalizeNugetStatsPayload(result.Data, 'snapshot')
     })()
 
     const deadline = new Promise((_, reject) => {
@@ -181,31 +188,22 @@ async function requestNugetStats(action, {
   }
 }
 
-export function loadCachedNugetStats({ fetchImpl = globalThis.fetch } = {}) {
-  if (!sharedCacheRequest) {
-    sharedCacheRequest = requestNugetStats('Cache', {
-      fetchImpl,
-      timeoutMs: CACHE_REQUEST_TIMEOUT_MS
-    }).catch(error => {
-      sharedCacheRequest = undefined
-      throw error
-    })
-  }
-  return sharedCacheRequest
-}
-
-export function loadNugetOwnerStats({ fetchImpl = globalThis.fetch } = {}) {
+export function loadNugetSnapshot({ fetchImpl = globalThis.fetch } = {}) {
   if (!sharedStatsRequest) {
-    sharedStatsRequest = requestNugetStats('Refresh', {
+    // 同页组件仅合并进行中的读取；下一次挂载重新读取，避免 SPA 长期停在旧快照。
+    sharedStatsRequest = requestNugetStats({
       fetchImpl,
-      timeoutMs: REFRESH_REQUEST_TIMEOUT_MS
-    }).catch(error => {
+      timeoutMs: SNAPSHOT_REQUEST_TIMEOUT_MS
+    }).finally(() => {
       sharedStatsRequest = undefined
-      throw error
     })
   }
   return sharedStatsRequest
 }
+
+// 保留历史调用方导出名，内部统一为无外部采集副作用的快照读取。
+export const loadCachedNugetStats = loadNugetSnapshot
+export const loadNugetOwnerStats = loadNugetSnapshot
 
 export function formatCompactDownloads(totalDownloads, locale = 'zh-CN') {
   const total = Number(totalDownloads)
@@ -219,6 +217,5 @@ export function formatCompactDownloads(totalDownloads, locale = 'zh-CN') {
 }
 
 export function __resetNugetStatsRequestForTests() {
-  sharedCacheRequest = undefined
   sharedStatsRequest = undefined
 }

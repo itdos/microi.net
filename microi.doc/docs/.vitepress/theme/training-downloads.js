@@ -1,10 +1,10 @@
-// 只记录已通过官方上传与公共 CDN 原始字节回读的课件；PDF/PPTX 独立绑定，禁止猜测上传目录。
+// 只记录已通过官方上传与公共 CDN 原始字节回读的课件；历史 PPTX/18页别名只保留旧地址兼容。
 export const trainingDownloads = Object.freeze([
   {
     "legacyPath": "/downloads/microi-ai-development-framework-training-syllabus-dark.pdf",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/04feed5a2e28d38aaad87627ce0fdf9e077395caa83728b3d14dc5a406273433/202610/microi-ai-development-framework-training-syllabus-dark.pdf",
-    "bytes": 42309668,
-    "sha256": "04feed5a2e28d38aaad87627ce0fdf9e077395caa83728b3d14dc5a406273433",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/aac6b44d391fbdb7a469a7ebe64cd12243ed4c65d0c5035f7320ac8d40f4086b/202610/microi-ai-development-framework-training-syllabus-dark.pdf",
+    "bytes": 32053552,
+    "sha256": "aac6b44d391fbdb7a469a7ebe64cd12243ed4c65d0c5035f7320ac8d40f4086b",
     "mimeType": "application/pdf"
   },
   {
@@ -16,9 +16,9 @@ export const trainingDownloads = Object.freeze([
   },
   {
     "legacyPath": "/downloads/microi-ai-development-framework-training-syllabus-light.pdf",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/0dfea7953cd3c6931049fe3c0cb500ab87e7933551443e985572a9b91a88f44b/202610/microi-ai-development-framework-training-syllabus-light.pdf",
-    "bytes": 42413594,
-    "sha256": "0dfea7953cd3c6931049fe3c0cb500ab87e7933551443e985572a9b91a88f44b",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/4bb54cb1709abe89a62b90fc509aeb4e15b560e2be34717cd92bb8a9eb83d3ec/202610/microi-ai-development-framework-training-syllabus-light.pdf",
+    "bytes": 32434496,
+    "sha256": "4bb54cb1709abe89a62b90fc509aeb4e15b560e2be34717cd92bb8a9eb83d3ec",
     "mimeType": "application/pdf"
   },
   {
@@ -37,9 +37,9 @@ export const trainingDownloads = Object.freeze([
   },
   {
     "legacyPath": "/downloads/microi-enterprise-application-training-syllabus-dark.pdf",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/da2c2b7983cfd47a8157fc65b7c8ef8338cfbf46057e64188b1f4d8ee70df7d5/202610/microi-enterprise-application-training-syllabus-dark.pdf",
-    "bytes": 14286097,
-    "sha256": "da2c2b7983cfd47a8157fc65b7c8ef8338cfbf46057e64188b1f4d8ee70df7d5",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/f1265a2c5bb09c61e5bff58332eecdd7402dd557b419f9b3653787c6c85df7c8/202610/microi-enterprise-application-training-syllabus-dark.pdf",
+    "bytes": 5362198,
+    "sha256": "f1265a2c5bb09c61e5bff58332eecdd7402dd557b419f9b3653787c6c85df7c8",
     "mimeType": "application/pdf"
   },
   {
@@ -51,9 +51,9 @@ export const trainingDownloads = Object.freeze([
   },
   {
     "legacyPath": "/downloads/microi-enterprise-application-training-syllabus-light.pdf",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/f650bf228698dbf3dcdfad2b291c036932ba4111d7fda8f088d93000f5c6a209/202610/microi-enterprise-application-training-syllabus-light.pdf",
-    "bytes": 14518889,
-    "sha256": "f650bf228698dbf3dcdfad2b291c036932ba4111d7fda8f088d93000f5c6a209",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/e669d908e01b42c92c47f7e930453339eea0395903d6d60feb0153d647926a77/202610/microi-enterprise-application-training-syllabus-light.pdf",
+    "bytes": 5585305,
+    "sha256": "e669d908e01b42c92c47f7e930453339eea0395903d6d60feb0153d647926a77",
     "mimeType": "application/pdf"
   },
   {

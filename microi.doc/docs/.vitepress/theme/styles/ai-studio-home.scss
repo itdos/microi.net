@@ -1274,6 +1274,8 @@ html:not(.dark) .ai-studio-brand {
 }
 
 .ai-studio-summary {
+  --mci-home-start-start: #12574b;
+  --mci-home-start-end: #176454;
   --mci-home-training-start: #87380f;
   --mci-home-training-end: #9c4219;
   --mci-home-agent-start: #164093;
@@ -1294,9 +1296,9 @@ html.dark .ai-studio-summary {
 
 .ai-studio-summary__actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  width: min(560px, 100%);
+  width: min(780px, 100%);
   margin: 0 auto 18px;
 }
 
@@ -1329,6 +1331,14 @@ html.dark .ai-studio-summary {
   box-shadow: 0 5px 18px color-mix(in srgb, var(--mci-home-action-start) 18%, transparent);
   animation: mciHomeActionFlow 8s linear infinite;
   transition: transform .2s ease;
+}
+
+.ai-studio-summary__actions a.is-start {
+  --mci-home-action-start: var(--mci-home-start-start);
+  --mci-home-action-end: var(--mci-home-start-end);
+  --mci-home-flow-bright: #7de4ba;
+  --mci-home-flow-mid: #26ac87;
+  animation-delay: -4s;
 }
 
 .ai-studio-summary__actions a.is-agent {
@@ -1477,7 +1487,9 @@ html.dark .ai-studio-summary {
 @media (max-width: 767px) {
   .ai-studio-stage { width: min(100% - 28px, 620px); padding-bottom: 16px; }
   .ai-studio-summary { margin-top: 18px; }
-  .ai-studio-summary__actions { gap: 10px; margin-bottom: 16px; }
+  /* 手机保留三项入口的阅读与触摸宽度，主行动先独占一行。 */
+  .ai-studio-summary__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .ai-studio-summary__actions a.is-start { grid-column: 1 / -1; }
   .ai-studio-summary__actions a { min-height: 44px; padding: 0 12px; gap: 8px; font-size: 15px; }
   .ai-studio-summary__actions svg { width: 18px; height: 18px; }
   .ai-studio-summary__path { padding: 14px; }
