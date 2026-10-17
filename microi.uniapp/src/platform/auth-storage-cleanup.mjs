@@ -9,7 +9,8 @@ const AUTH_CACHE_EXACT_KEYS = Object.freeze([
 ])
 
 const AUTH_CACHE_PREFIXES = Object.freeze([
-  'microi_mobile_menu_tree_v2:'
+  'microi_mobile_menu_tree_v2:',
+  'microi_mobile_menu_tree_v3:'
 ])
 
 export function isAuthScopedStorageCacheKey(key) {

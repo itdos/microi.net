@@ -14,6 +14,9 @@ import {
 import { readChildDraft, writeChildDraft } from '@/platform/child-form-drafts.mjs'
 import { mergeCurrentUserAfterProfileSave } from '@/platform/current-user-profile.mjs'
 import { readFormRecord } from '@/platform/configured-read-api.mjs'
+import { loadTenantFormRecord, saveTenantFormRecord } from '@/platform/native-table.js'
+import { serializeNativeTreeValue } from '@/platform/native-tree-options.mjs'
+import { removeCachePrefix } from '@/platform/cache.js'
 
 const DEFAULT_ADAPTER = 'form-engine'
 const CURRENT_USER_ADAPTER = 'current-user'
@@ -66,6 +69,8 @@ async function attachWeChatContentSecurityLoginCode(payload) {
 async function loadFormEngineRecord(context) {
   if (!context.rowId) return null
   if (context.draftRelation) return { Code: 1, Data: readChildDraft(context.draftRelation, context.tableName, context.rowId) }
+  const tenantResult = await loadTenantFormRecord(context)
+  if (tenantResult !== null && tenantResult !== undefined) return ensureSuccess(tenantResult, '数据读取失败')
   // 先复用本次加载的元数据，按表级 Select 读取虚拟记录；普通表沿用 FormEngine。
   const definition = context.definition || await (context.definitionPromise || loadFormEngineDefinition(context))
   return readFormRecord(V8, { ...context, definition })
@@ -82,6 +87,19 @@ async function saveFormEngineRecord(context) {
       }
     })
     return { Code: 1, Data: writeChildDraft(context.draftRelation, context.tableName, context.rowId, values) }
+  }
+  const validationError = validateNativeForm(context.form, context.fields)
+  if (validationError) throw new Error(validationError)
+  const values = { ...(context.extraValues || {}) }
+  ;(context.fields || []).forEach((field) => {
+    if (!field.editable || context.form[field.Name] === undefined) return
+    values[field.Name] = serializeNativeTreeValue(field, normalizeValue(field, context.form[field.Name]))
+  })
+  const tenantResult = await saveTenantFormRecord({ ...context, values })
+  if (tenantResult !== null && tenantResult !== undefined) {
+    ensureSuccess(tenantResult, '保存失败')
+    removeCachePrefix('module:')
+    return tenantResult
   }
   return saveNativeForm(
     context.tableName,

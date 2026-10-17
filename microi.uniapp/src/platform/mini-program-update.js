@@ -16,7 +16,7 @@ export const MINI_PROGRAM_UPDATE_STATUS = Object.freeze({
 
 const VERSION_STORAGE_KEY = `mci:${appConfig.profileId || 'default'}:runtime-version`
 const VERSION_SENSITIVE_STORAGE_KEYS = ['microi_diy_table_ids_v2', 'sys_config_cache', 'SysConfig']
-const VERSION_SENSITIVE_STORAGE_PREFIXES = ['microi_mobile_menu_tree_v2:']
+const VERSION_SENSITIVE_STORAGE_PREFIXES = ['microi_mobile_menu_tree_v2:', 'microi_mobile_menu_tree_v3:']
 const listeners = new Set()
 
 let updateManager = null
