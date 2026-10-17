@@ -17,6 +17,7 @@ const response = { Code: 1, Data: [row], DataCount: 51, DataAppend: { Storage: '
 function related(overrides = {}) {
   const source = readFileSync(new URL('../src/components/mci-business-related-list/mci-business-related-list.vue', import.meta.url), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1]
   const sandbox = { getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
+    loadTenantRelatedRows: async () => null, resolveRelatedFormNavigation: async () => null,
     ...readApi, ...overrides }
   vm.runInNewContext(stripImports(source).replace('export default', 'globalThis.component ='), sandbox)
   return sandbox.component
@@ -215,7 +216,8 @@ test('模块列表执行配置地址，分页及缓存保留完整设备授权�
 test('表单适配器复用已授权定义，以替换接口读取日志详情', async () => {
   const calls = []
   const source = readFileSync(new URL('../src/platform/form-record-adapter.js', import.meta.url), 'utf8')
-  const sandbox = { ...readApi, V8: { post: async (url, payload) => { calls.push({ url, payload }); return { Code: 1, Data: row } } } }
+  const sandbox = { ...readApi, loadTenantFormRecord: async () => null,
+    V8: { post: async (url, payload) => { calls.push({ url, payload }); return { Code: 1, Data: row } } } }
   vm.runInNewContext(stripImports(source).replace(/export default[\s\S]*$/, '').replace(/export /g, ''), sandbox)
   const result = await sandbox.loadNativeFormRecord({ tableName: 'communication', rowId: row.Id, tableChildAuth: auth,
     readWhere: [{ Name: 'DeviceId', Type: '=', Value: 'device-1' }],

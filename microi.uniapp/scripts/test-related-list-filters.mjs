@@ -26,6 +26,7 @@ function related() {
     try { return JSON.parse(value) } catch (error) { return fallback }
   }
   const definition = component(source, {
+    loadTenantRelatedRows: async () => null, resolveRelatedFormNavigation: async () => null,
     resolveListReadApi, queryMonthValue,
     ...filters, appendSystemAuditFields, moduleProjectionFields, parseJson, tableChildRequiresModuleQuery, getUser: () => ({}), clearTimeout,
     MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},

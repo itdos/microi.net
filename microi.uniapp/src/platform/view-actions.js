@@ -118,6 +118,10 @@ async function runAction(action, context) {
       const tableName = action.TableName || params.FormEngineKey || params.TableName || context.tableName
       const id = params.Id || context.form && context.form.Id
       if (!tableName || !id) throw new Error('删除操作缺少表名或数据编号')
+      if (typeof context.deleteRecord === 'function') {
+        const delegated = await context.deleteRecord({ tableName, rowId: id, params })
+        if (delegated !== null && delegated !== undefined) return delegated
+      }
       return V8.FormEngine.DelFormData({
         ...params,
         FormEngineKey: tableName,

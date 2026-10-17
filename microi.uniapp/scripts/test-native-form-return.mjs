@@ -12,7 +12,7 @@ const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
 const clone = (value) => JSON.parse(JSON.stringify(value))
 const tick = () => new Promise(resolve => setImmediate(resolve))
 
-function setup(overrides = {}) {
+function setup(overrides = {}, pageScript = script) {
   const calls = { reads: [], saves: [], events: [], toasts: [], navigation: [], tabs: [] }
   const timers = new Map()
   const rows = { 'row-1': { Id: 'row-1', Title: '原始标题', Nested: { value: '原值' } } }
@@ -74,7 +74,7 @@ function setup(overrides = {}) {
       if (stack.at(-1).mode) component.onShow.call(stack.at(-1))
     }
   }
-  component = vm.runInNewContext(`${script}; component`, sandbox)
+  component = vm.runInNewContext(`${pageScript}; component`, sandbox)
   function createPage(query = {}, events = {}) {
     const page = {
       ...component.data(), ...component.methods,
@@ -143,6 +143,36 @@ test('保存成功回到详情并回读服务端结果，仍发送原有列表�
   assert.equal(app.calls.events[0].name, 'microi:data-changed')
   assert.equal(app.calls.events[0].event.id, 'row-1')
   assert.equal(app.calls.saves.length, 1)
+})
+
+async function saveAfterOpenerChannelChanges(pageScript = script) {
+  const notifications = { source: 0, child: 0, lateReads: 0 }
+  const app = setup({}, pageScript)
+  const parent = app.createPage({ mode: 'Edit' }, {
+    'native-form:record-saved': () => { notifications.source += 1 }
+  })
+  await tick()
+  // H5 返回嵌套同路由表单后，动态路由上的通道可能已改变；必须保留页面初次打开的来源。
+  parent.getOpenerEventChannel = () => {
+    notifications.lateReads += 1
+    return { emit: name => { if (name === 'native-form:record-saved') notifications.child += 1 } }
+  }
+  parent.form.Title = '嵌套编辑返回后保存'
+  await parent.submit()
+  assert.equal(app.calls.saves.length, 1)
+  return notifications
+}
+
+test('旧的延迟获取通道确实会把主表保存通知错误发给子表来源', async () => {
+  // 仅恢复实际提交方法原先的延迟读取语句，隔离重现通道变化造成的通知丢失。
+  const previous = script.replace('this.notifyOpenerSaved?.()',
+    "this.getOpenerEventChannel?.()?.emit?.('native-form:record-saved')")
+  assert.notEqual(previous, script, '应准确恢复修复前的通知语句')
+  assert.deepEqual(await saveAfterOpenerChannelChanges(previous), { source: 0, child: 1, lateReads: 1 })
+})
+
+test('嵌套子表返回导致动态通道变化后，主表保存仍通知初始来源而非子表', async () => {
+  assert.deepEqual(await saveAfterOpenerChannelChanges(), { source: 1, child: 0, lateReads: 0 })
 })
 
 test('编辑保留授权菜单、上传菜单、字段范围、关联表及适配器参数，中文和特殊字符正确往返', async () => {
