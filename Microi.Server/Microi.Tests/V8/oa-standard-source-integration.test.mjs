@@ -8,7 +8,25 @@ const {buildPlan,registerAdvancedTools}=await import(pathToFileURL(join(workspac
 test('完整 Manifest 仅显式禁用的空绑定母模板由同源 planner 接受，商业发行门禁仍关闭',()=>{for(const value of [0,'0']){const template=structuredClone(manifest);for(const workflow of template.workflows)workflow.FlowDesign.IsEnable=value;const p=buildPlan(template);assert.ok(p.plan.length>500);assert.deepEqual(p.errors,[]);assert.equal(template.design.releaseReady,false);assert.ok(template.workflows.every(workflow=>workflow.Nodes.filter(node=>node.NodeType==='Approve').every(node=>JSON.parse(node.Users||'[]').length===0&&JSON.parse(node.Roles||'[]').length===0)));}});
 test('启用、省略或非严格零的母模板必须拒绝未绑定人工节点',()=>{for(const value of [1,undefined,false,null,'00']){const template=structuredClone(manifest);for(const workflow of template.workflows){if(value===undefined)delete workflow.FlowDesign.IsEnable;else workflow.FlowDesign.IsEnable=value;}const p=buildPlan(template);assert.equal(p.errors.length,9);for(const name of ['行政审批','财务审批','财务复核','经营复核','知识审核','主管审核','行政复核','人事复核'])assert.ok(p.errors.some(error=>error.includes(`人工节点 ${name} 未绑定 Users/Roles/Depts/BindJobs`)));}});
 test('禁用模板仍由同源 planner 拒绝非法绑定结构和拓扑',()=>{for(const kind of ['binding','topology']){const bad=structuredClone(manifest);const flow=bad.workflows[0];if(kind==='binding')flow.Nodes.find(node=>node.NodeType==='Approve').Users='not-valid-json';else flow.Lines[0].ToNodeId='nonexistent-node';assert.ok(buildPlan(bad).errors.length>0,kind);}});
-test('同源 generate dryRun 的禁用空绑定成功、启用和省略失败且始终零远端调用',async()=>{let calls=0;const handlers=new Map();const server={tool:(name,description,schema,handler)=>handlers.set(name,handler)};const client=new Proxy({},{get(){calls++;throw new Error('dryRun 不应访问远端客户端');}});registerAdvancedTools(server,client,{osClient:'iTdos'});for(const value of [0,'0',1,undefined]){const template=structuredClone(manifest);for(const workflow of template.workflows){if(value===undefined)delete workflow.FlowDesign.IsEnable;else workflow.FlowDesign.IsEnable=value;}const result=await handlers.get('microi_generate_system')({manifest:template,dryRun:true});const data=JSON.parse(result.content[0].text);const disabled=value===0||value==='0';assert.equal(Boolean(result.isError),!disabled);assert.equal(data.ok,disabled);assert.deepEqual(data.errors,buildPlan(template).errors);if(!disabled)assert.ok(data.errors.every(error=>error.includes('未绑定 Users/Roles/Depts/BindJobs')));assert.equal(calls,0);}});
+test('同源 generate dryRun 的禁用空绑定成功、启用和省略失败且始终零远端调用',async()=>{
+ let calls=0,identityReads=0;
+ const handlers=new Map(),server={tool:(name,description,schema,handler)=>handlers.set(name,handler)};
+ // 身份指纹由真实客户端在本地同步计算；只放行此方法，远端能力的任何属性读取仍立即失败。
+ const localIdentity=()=>{identityReads++;return 'oa-dry-run-local-identity';};
+ const client=new Proxy({},{get(_target,property){if(property==='getContextIdentity')return localIdentity;calls++;throw new Error('dryRun 不应访问远端客户端');}});
+ registerAdvancedTools(server,client,{osClient:'iTdos'});
+ for(const value of [0,'0',1,undefined]){
+  const template=structuredClone(manifest);
+  for(const workflow of template.workflows){if(value===undefined)delete workflow.FlowDesign.IsEnable;else workflow.FlowDesign.IsEnable=value;}
+  const previousIdentityReads=identityReads;
+  const result=await handlers.get('microi_generate_system')({manifest:template,dryRun:true});
+  const data=JSON.parse(result.content[0].text),disabled=value===0||value==='0';
+  assert.equal(Boolean(result.isError),!disabled);assert.equal(data.ok,disabled);
+  assert.deepEqual(data.errors,buildPlan(template).errors);
+  if(!disabled)assert.ok(data.errors.every(error=>error.includes('未绑定 Users/Roles/Depts/BindJobs')));
+  assert.equal(calls,0);assert.ok(identityReads>previousIdentityReads,'每次 dryRun 仍检查本地身份');
+ }
+});
 test('删除子表外键或索引时 planner 失败，证明验证能捕捉历史裸 JSON 子表缺陷',()=>{for(const mode of ['field','index']){const bad=structuredClone(manifest);const parent=bad.tables.find(t=>t.fields.some(f=>f.component==='TableChild'));const relation=parent.fields.find(f=>f.component==='TableChild').relation;const child=bad.tables.find(t=>t.name===relation.targetTable);if(mode==='field')child.fields=child.fields.filter(f=>f.name!==relation.childForeignKey);else child.indexes=[];assert.ok(buildPlan(bad).errors.length>0);}});
 
 test('工作项示例使用真实 ReceiverId/WorkState/Todo 且明确列，旧 TodoUserId/Status/Pending 被识别为错误',()=>{
