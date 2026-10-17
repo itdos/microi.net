@@ -58,7 +58,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=e754c23d671b87018bad97d26f901ad6c313912625bbb6f9404c1d4c806154fd -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=299d7e415b36a0d59f8645ee8a690b26e1e0d2132d63c6aca1b1071423c93512 -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -148,8 +148,8 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 ### 框架来源标识与水印（强制）
 
-- 微服务和定制组件的来源标识必须由 Microi.Client 宿主统一渲染，子应用不得各自实现。来源标识是框架内置的常驻可发现能力，不得再创建 `RenderSourceBadgeMode`、自动收起、全局关闭等租户配置。
-- `V8.OpenAppDialog` / Drawer 等标准弹层的来源标识放在标题文字之后，始终显示且不提供关闭按钮；菜单/整页微服务由 `micro-app/host.vue` 在内容区右上角直接渲染，必须提供只作用于当前页面实例的手动关闭按钮，切换实例后恢复显示。不得依赖外围路由组件猜测菜单微服务，避免动态路由元数据不同步导致漏标。
+- 微服务和定制组件的来源标识必须由 Microi.Client 宿主统一渲染，子应用不得各自实现。微服务来源入口只向当前登录用户 `Level >= 9999` 展示，普通用户、未知或非法等级、受限访问密钥会话不显示标签、关闭按钮及源码详情；不从账号名称、`_IsAdmin` 或子应用元数据推断权限。定制组件的原有来源展示保持兼容，不新增 `RenderSourceBadgeMode`、自动收起或全局关闭配置。
+- `V8.OpenAppDialog` / Drawer 等标准弹层的来源标识放在标题文字之后，不提供关闭按钮；菜单/整页微服务由 `micro-app/host.vue` 在内容区右上角直接渲染，管理员可手动关闭当前页面实例的标识，切换实例或账号后恢复。当前用户等级降低后立即隐藏入口并关闭已展开详情；这只控制来源辅助工具，不能改变业务菜单、关闭 Tab、弹层或后端源码/MCP 鉴权。不得依赖外围路由组件猜测菜单微服务。修改时运行 `tests/microservice-source-badge-permission.spec.mjs` 与既有来源及宿主契约回归。
 - 来源标识必须使用可点击的 `button` 语义与 `cursor:pointer`。点击后用可拖动、居中、亮/暗色适配的大圆角 Element Plus 弹层展示 AppKey、PageKey、应用内/框架路由、版本、源码定位、运行入口、发布/挂载状态和租户坐标，并生成可复制的 MCP 修改指令；公开详情不得包含 DiyToken、访问密钥、私有配置或用户敏感字段。
 - 框架水印覆盖 `100vw × 100vh` 且固定 `pointer-events:none`。开启后内容空值默认 `$SysTitle$ - $UserName$`（用户名为空回退账号）、方向默认 `DiagonalUp`、密度默认 `Comfortable`、字号空值/0 默认 14，透明度空值/0 默认 30；亮色、深色、弹层、键盘和减少动态效果模式都要验收。
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-17T19:58:45.480Z",
+  "generatedAt": "2026-10-17T21:29:20.259Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,7 +169,7 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "c1fffc7d42a7943c31d32569355be5796c3dc2dab90c51bcf8a1b6cf5044a7bb",
+      "originalSha256": "71e56bd6d2478a30c8311d3bc440aea717d7c4e6c0b3a54f309a0fe23714c4f7",
       "originalLines": 706,
       "prefixSha256": "19308dd1a04397f764cc5ab4fefe76093704564592396ce00482d28e952537b7",
       "prefixBytes": 1400,
@@ -195,7 +195,7 @@
           "id": "microi-client-frontend-002",
           "ordinal": 2,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "e754c23d671b87018bad97d26f901ad6c313912625bbb6f9404c1d4c806154fd",
+          "sha256": "299d7e415b36a0d59f8645ee8a690b26e1e0d2132d63c6aca1b1071423c93512",
           "lines": 112,
           "heading": "2. 表单引擎三层结构"
         },

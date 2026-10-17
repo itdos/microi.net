@@ -152,6 +152,13 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 
 ## 菜单、弹窗与表单嵌入
 
+宿主统一渲染的“微服务”来源入口、关闭标识按钮和源码定位详情只向当前登录用户
+`Level >= 9999` 展示；普通用户、未知/非法等级和受限访问密钥会话保持隐藏。
+子应用不得自画该标签或通过元数据指定用户等级。管理员关闭仅作用当前页面实例，
+切换页面/账号后恢复，等级降低时同步隐藏并关闭详情；正常业务运行、关闭 Tab 和
+弹窗回调不受影响，后端源码读取及 MCP 操作继续单独鉴权。升级 Microi.Client
+前端后生效，无需修改应用包、页面或菜单资源。
+
 菜单 `OpenType=MicroService` 时一次绑定 `MicroServiceId`、
 `MicroServicePageId`、`MicroServiceRoutePath`、`MicroServiceKey`。
 完整系统 Manifest 不得固化不同租户会变化的两个 Id；模块声明 `openType=MicroService`、`microServiceKey` 和 `microServiceRoutePath` 即可，由 `microi_generate_system` 在任何写入前回读 `sys_microiservice/sys_microiservice_page`，解析并校验当前租户的 `MicroServiceId/MicroServicePageId`。微服务或页面不存在时必须在首个写操作前失败，不能留下半套系统。

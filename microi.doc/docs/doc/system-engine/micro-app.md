@@ -1,0 +1,1194 @@
+# 微服务（前端微应用）
+
+<div class="mci-micro-app-page" aria-hidden="true"></div>
+
+<section class="micro-app-hero">
+  <div class="micro-app-hero__copy">
+    <p class="micro-app-eyebrow">MICROI · VUE 3 · AI DELIVERY</p>
+    <h2>一个工程，四种运行方式</h2>
+    <p>吾码 MicroService 是面向定制业务界面的前端微应用体系。同一份发布物既能独立运行，也能作为后台菜单完整页面、表单引擎定制组件，或由 <code>V8.OpenAppDialog</code> 打开指定路由。</p>
+    <div class="micro-app-hero__actions">
+      <a href="#四种运行方式">查看运行方式</a>
+      <a class="is-secondary" href="https://microi.net/apps.html" target="_blank" rel="noreferrer">浏览 AI 应用案例 ↗</a>
+    </div>
+  </div>
+  <div class="micro-app-hero__facts" aria-label="微服务核心能力">
+    <article><span>01</span><strong>独立运行</strong><small>同一套帐号、租户与动态验证码</small></article>
+    <article><span>02</span><strong>菜单直开</strong><small>一个应用可按路由绑定多个菜单</small></article>
+    <article><span>03</span><strong>弹层打开</strong><small>Dialog / Drawer 与业务回调</small></article>
+    <article><span>04</span><strong>表单嵌入</strong><small>定制组件加载指定业务路由</small></article>
+  </div>
+</section>
+
+::: tip 先理解这里的“微服务”
+本文的 `MicroService` 是可独立构建和发布的前端微应用，不等同于 .NET、Java 后端微服务。页面和交互放在 MicroService；事务、权限校验与可信数据写入继续放在接口引擎或后端原子能力中。
+:::
+
+吾码官网 [AI 应用广场](https://microi.net/apps.html) 中的大部分 AI 应用均采用 MicroService 实现。这样既能独立展示和访问，也能无缝嵌入吾码菜单、表单与业务弹层，而不必把每个定制页面都打进 `Microi.Client` 主包。
+
+例如，[星河现场·旗舰抽奖互动平台](https://microi.net/app-detail.html?app=event-lottery-studio)（`event-lottery-studio`）可从官网应用卡片直接体验。未登录用户可查看应用首页；创建抽奖项目或凭加入码参与时，先使用吾码账号登录。没有账号可从应用中的“注册账号”前往吾码官网完成手机号验证和密码设置，再返回应用登录。正式开奖、中奖记录和领奖核销由服务端接口引擎处理；彩排结果不写入正式中奖表。官方应用包包含后台菜单、业务表、接口引擎和微服务运行资产，租户安装与官网集中体验是两个独立入口。
+
+该应用的活动流程为：创建草稿 → 配置奖项与公开规则 → 导入名单或分享加入码 → 发布 → 签到 → 固化本轮资格 → 服务端抽取 → 揭晓 → 凭码领奖与核销。主持台可分页管理参与者、设置发布前的公开权重、排除不合格人员、授权或停用主持人／审计员／核销员。正式规则发布后锁定；当前轮次准备或抽取后，必须先揭晓或取消，再准备下一轮。支持公平随机与公开权重，未实现的保底或任意自定义规则会明确拒绝。每批名单最多 500 人、单轮资格最多 10000 人、单轮中奖最多 500 人。
+
+本应用 v1.1.2 适用于 MySQL 租户，要求平台 v8.5.0 或更新版本及应用资产 v3 发布协议；不支持的数据库类型会在执行业务 SQL 前明确拒绝。更新时先升级平台，再从应用商城更新此应用。安装后从“旗舰抽奖互动 → 抽奖工作台”直接打开 `/studio`，复用宿主当前租户与 DiyToken，无需在应用里再次输入密码。该菜单按应用 Key 与路由声明，由安装器解析本租户的运行服务及页面，不固定官方租户 Id。应用包中的 `Managed` 网关会同步修复后的事务、权限与随机实现，保留活动业务数据；新领奖码由后端按租户和接口绑定保护，无需手工配置 `LotteryClaimKey`。存量 AES 领奖码仍需保留原租户密钥以兼容读取。CSV 离线名单的中奖者，由 Owner 或 ClaimStaff 在揭晓后核验身份并发放现场凭证；真实账号中奖者仍从“我的奖品”领取凭证。现场凭证仅临时显示并自动清除，发放审计不保存明文。彩排初始化与页面切换会丢弃旧请求，迟到响应不会覆盖用户已经选择的舞台。安装到目标租户后核对实际 API 指向该租户，并走完创建、参与、揭晓与核销流程。
+
+## 真实案例：同一能力融入不同业务位置
+
+<div class="micro-app-case-grid">
+  <figure class="micro-app-case">
+    <img src="https://file.microi.net/itdos/official-docs/images/dcf2f6a25884c9c032ccb5439a7fa7d0c2f6c52b7960adc9cc2afc03658a4bc4/202610/microservice-crm-customer-map.png" alt="威讯 CRM 客户地图微服务嵌入吾码后台菜单，展示客户分布、聚合点位与附近客户列表" data-fancybox="micro-app-cases">
+    <figcaption><span>案例 1 · 菜单路由</span><strong>CRM 客户地图</strong><small>地图、客户分类、距离检索与业务导航在同一微服务页面完成，并保留吾码菜单、页签和登录态。</small></figcaption>
+  </figure>
+  <figure class="micro-app-case">
+    <img src="https://file.microi.net/itdos/official-docs/images/5b6c224b84cd272061102de632f2f41167776960f2b0933b48931d8dd3c30a89/202610/open-app-dialog.png" alt="数据库定时备份微服务通过 V8.OpenAppDialog 在吾码 SaaS 引擎中弹层打开" data-fancybox="micro-app-cases">
+    <figcaption><span>案例 2 · 弹层</span><strong>数据库定时备份</strong><small>在 SaaS 引擎列表上方打开指定微服务路由；背景页面、菜单和登录态均保留。</small></figcaption>
+  </figure>
+  <figure class="micro-app-case">
+    <img src="https://file.microi.net/itdos/official-docs/images/3ab84eff173308423d155157b13f986ac64cfbe31671db5b88eccc373f23c317/202610/menu-production-counter.jpg" alt="生产计数报工工作台作为吾码平台菜单中的微服务路由打开" data-fancybox="micro-app-cases">
+    <figcaption><span>案例 3 · 菜单路由</span><strong>生产计数报工工作台</strong><small>深色大屏式工作台直接占据菜单内容区，宿主导航仍可正常使用。</small></figcaption>
+  </figure>
+  <figure class="micro-app-case">
+    <img src="https://file.microi.net/itdos/official-docs/images/4acf55745d5274f2ec23383150c97356df9d52790ba3b886c0ad3edb0c8cff74/202610/menu-packing-workbench.jpg" alt="成品打包工作台作为吾码平台菜单中的另一个微服务路由打开" data-fancybox="micro-app-cases">
+    <figcaption><span>案例 4 · 菜单路由</span><strong>成品打包工作台</strong><small>一个 MicroService 可以维护多个页面，并让不同菜单直达各自 RoutePath。</small></figcaption>
+  </figure>
+</div>
+
+## 四种运行方式
+
+<div class="micro-app-mode-grid">
+  <article class="is-independent">
+    <span class="micro-app-mode-icon" aria-hidden="true">↗</span>
+    <p class="micro-app-eyebrow">STANDALONE</p>
+    <h3>独立运行</h3>
+    <p>直接打开微服务地址。若浏览器已有有效登录态则自动进入；否则显示吾码帐号密码登录。验证码是否出现由当前租户 <code>EnableCaptcha</code> 动态决定。</p>
+    <strong>适合：</strong><span>官网 AI 应用、外部入口、专用工作台、独立演示。</span>
+  </article>
+  <article class="is-menu">
+    <span class="micro-app-mode-icon" aria-hidden="true">▦</span>
+    <p class="micro-app-eyebrow">MENU ROUTE</p>
+    <h3>平台菜单直开</h3>
+    <p>后台菜单使用 <code>OpenType=MicroService</code>，URL 指向 <code>/micro-app/{OsClient}/{AppKey}/{RoutePath}</code>，直接打开应用内的指定路由。</p>
+    <strong>适合：</strong><span>生产工作台、驾驶舱、复杂双栏页面、全屏业务操作。</span>
+  </article>
+  <article class="is-dialog">
+    <span class="micro-app-mode-icon" aria-hidden="true">◫</span>
+    <p class="micro-app-eyebrow">OPEN APP DIALOG</p>
+    <h3>弹层打开</h3>
+    <p>在前端 V8 事件中调用 <code>V8.OpenAppDialog</code>，按 AppKey 和 RoutePath 打开 Dialog 或 Drawer，并通过回调返回结果。</p>
+    <strong>适合：</strong><span>复杂配置、分步操作、跨表选择、详情工作台。</span>
+  </article>
+  <article class="is-component">
+    <span class="micro-app-mode-icon" aria-hidden="true">▤</span>
+    <p class="micro-app-eyebrow">FORM COMPONENT</p>
+    <h3>表单引擎中引用</h3>
+    <p>表单字段使用 <code>DevComponent</code>，通过稳定的 <code>DevComponentPath</code> 别名匹配微服务页面，并在表单当前位置加载该页面的 <code>RoutePath</code>。</p>
+    <strong>适合：</strong><span>表单内嵌看板、联动工作区、复杂选择器、租户专属业务区域。</span>
+  </article>
+</div>
+
+### 一句话选择
+
+| 你的需求 | 首选能力 | 原因 |
+|---|---|---|
+| 只是“是否继续” | `V8.ConfirmTips` | 无需引入完整页面。 |
+| 普通新增、编辑、详情 | 表单引擎 / `V8.OpenAnyForm` | 权限、字段与校验已经标准化。 |
+| 已内置在主前端的组件 | `V8.OpenDialog` | 直接复用 `Microi.Client` 组件。 |
+| 表单中固定嵌入复杂业务区域 | `DevComponent` + MicroService 路由 | 与表单同屏，复用登录态、表单数据和权限上下文，又能独立发布。 |
+| 复杂弹层，有联动、表格、上传或分步操作 | MicroService + `V8.OpenAppDialog` | 独立组件化开发，仍保留平台上下文。 |
+| 完整工作台或同一应用多个业务页面 | MicroService + 菜单路由 | 可让多个菜单分别打开不同内部路由。 |
+| 需要独立访问、独立版本、AI 维护与商城交付 | MicroService | 一个工程覆盖四种入口和独立发布。 |
+
+### 管理员来源工具
+
+菜单、弹窗和表单嵌入中的“微服务”图标、文字及源码定位详情，仅向当前登录用户
+`Level >= 9999` 展示。普通用户和受限访问密钥会话不显示这些辅助入口，业务页面、
+顶部页签关闭及弹窗操作仍按原权限正常使用。
+
+管理员可关闭菜单页右上角当前实例的来源标识，切换页面或账号后恢复；用户等级降低时，
+入口及已打开的来源详情同步隐藏。此行为随 `Microi.Client` 前端升级生效，无需改动微服务
+应用包或菜单；实际源码读取、MCP 修改和发布继续由后端独立鉴权。
+
+## 整体架构
+
+<div class="micro-app-flow" aria-label="微服务从开发到运行的流程">
+  <article><span>1</span><strong>在线 AI / MCP / VS Code</strong><small>创建或维护 Vue 3 源码</small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>2</span><strong>私有源码与版本</strong><small>租户隔离、文件清单与哈希</small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>3</span><strong>构建与发布</strong><small>不可变版本资产和路由清单</small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>4</span><strong>独立 / 菜单 / 弹层 / 表单</strong><small>四种入口复用同一发布物</small></article>
+</div>
+
+### 核心数据边界
+
+| 数据 | 存储与职责 |
+|---|---|
+| 应用主数据 `sys_microistore` | 统一保存平台应用、Web、UniApp、MicroService 的名称、类型、分类、发布、预览和统计。 |
+| 私有源码 `mci_ai_app_file` | 保存源码文件清单；实际内容进入当前租户私有 HDFS。 |
+| 版本 `mci_ai_app_version` | 保存构建版本、状态、预览地址和变更说明。 |
+| 运行时 `sys_microiservice` | 保存 `MsKey`、版本、入口、构建清单、文件列表和发布时间。 |
+| 页面路由 `sys_microiservice_page` | 一个微服务可包含多个页面，是菜单、弹层与表单定制组件 RoutePath 的事实源。 |
+| 菜单 `sys_menu` | `OpenType=MicroService` 时绑定微服务及其具体页面。 |
+
+源码与构建产物必须分开：源码默认进入私有存储；编译后的 HTML、JS、CSS、图片和字体进入公有发布存储供浏览器加载。不要把大体积 JS/CSS 作为内联 JSON 长期保存在数据库字段里。
+
+## 在线使用：AI 应用工作台
+
+适合快速创建页面、让 AI 迭代代码、在线修复小问题、预览和发布。
+
+### 创建微服务
+
+1. 登录吾码后台，进入 `AI 引擎` 的 `AI 应用`。
+2. 点击 `新建微服务`。
+3. 填写应用名称、应用 Key 和需求描述。
+4. 建议开启 `生成骨架`，系统会生成可运行的基础源码。
+5. 创建后自动进入开发工作台。
+
+应用 Key 是运行时唯一标识，对应 `sys_microistore.AppKey` 和 `sys_microiservice.MsKey`。建议使用稳定的英文、数字、`-`、`_` 组合，例如 `microi-official`，不要因为页面名称变化而反复修改 AppKey。
+
+一个范围较大的应用应使用一个稳定的微服务承载多个页面。例如“吾码官网微服务”可以包含 SaaS 租户管理、安装向导、运维工具等页面，不必为每一个弹窗新建一个微服务。
+
+### 编辑、预览和发布
+
+工作台提供以下能力：
+
+| 操作 | 用途 |
+|---|---|
+| `源码树` | 查看应用全部目录和文件。 |
+| `保存源码` | 在线保存当前文件到私有 HDFS。 |
+| `运行/发布` | 生成在线预览，并同步微服务运行元数据。 |
+| `预览视图` | 在工作台内查看最新运行效果。 |
+| `版本记录` | 查看构建版本、状态、预览地址和创建时间。 |
+| `下载源码ZIP` | 下载当前私有源码，供备份或本地继续开发。 |
+| `下载编译ZIP` | 下载最新编译产物。 |
+| `制作离线包` | 生成可在无外网环境安装的 `.microi-app.json` 应用包。 |
+| `发布应用商城` | 将私有源码、最新构建产物和运行时信息发布到应用商城。 |
+
+推荐在线流程：
+
+```text
+创建微服务 → AI 生成或人工编辑 → 保存源码 → 运行/发布
+           → 预览验收 → 制作离线包或发布应用商城
+```
+
+在线编辑适合快速迭代；依赖较多、需要完整 Vite 插件、单元测试或长期多人协作时，建议使用 VS Code 本地工程。
+
+## 本地使用：Microi VS Code 插件
+
+适合完整 Vue/Vite 工程开发、依赖管理、本地调试、正式构建和批量源码维护。
+
+### 准备工作
+
+1. 安装 Microi 吾码 VS Code 插件。
+2. 打开工作区并执行吾码初始化。
+3. 配置目标服务器的 `ApiBaseUrl`、`OsClient`，并登录目标租户。
+4. 在吾码资源管理器中选择对应服务器。
+
+### 常用命令
+
+可以在吾码资源树或 VS Code 命令面板中执行：
+
+| 命令 | 作用 |
+|---|---|
+| `创建前端微服务` | 创建 Vue/Vite 工程、安装依赖，并注册微服务草稿。 |
+| `拉取服务器前端微服务` | 从当前租户的在线 AI 应用私有 HDFS 拉取完整源码；只有运行产物、未保存源码的应用会明确拒绝拉取。 |
+| `构建前端微服务` | 清理 `dist`，执行 `npm run build`，校验入口文件。 |
+| `推送前端微服务到数据库` | 上传已有 `dist`，更新运行时、版本和页面路由。 |
+| `构建并推送前端微服务` | 构建、上传产物、同步路由，并尝试把源码同步到在线 AI 应用。 |
+| `同步微服务源码到在线 AI 应用` | 仅把本地源码同步到在线 AI 应用的私有 HDFS。 |
+
+正式交付优先使用 `构建并推送前端微服务`。推送时系统会基于服务端当前版本自动生成下一个版本，首次通常是 `v1.0.0`，并更新 `BuildVersion`、`EntryPath`、构建清单、文件哈希、文件数量和发布时间。
+
+插件创建项目后会自动安装依赖。需要独立启动本地开发服务器时，也可以进入项目目录执行：
+
+```bash
+npm install
+npm run dev
+```
+
+本地独立运行用于页面开发；Token、OsClient、菜单信息和弹窗数据只有放入吾码宿主后才是完整的，因此不能用独立预览代替最终验收。
+
+### 本地项目结构
+
+```text
+Microi-V8-Engine/
+  示例服务器 (api.example.com)/
+    Demo.Product.Internal/
+      AI应用/
+        microi-official/
+          .microi-micro-app.json
+          microi.routes.json
+          package.json
+          package-lock.json
+          tsconfig.json
+          vite.config.ts
+          index.html
+          src/
+            main.ts
+            App.vue
+            components/
+            pages/
+            composables/
+            domain/
+            services/
+            platform/
+              microi.ts
+```
+
+目录隔离规则为 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}`。因此不同服务器或租户即使存在相同 `appKey`，也不会覆盖同一份本地源码。
+
+同一个租户可以创建多个微服务，例如：
+
+```text
+Microi-V8-Engine/示例服务器 (api.example.com)/Demo.Product.Internal/AI应用/demo-official
+Microi-V8-Engine/示例服务器 (api.example.com)/Demo.Product.Internal/AI应用/platform-service
+```
+
+旧版直接平铺在 `Microi-MicroApp/` 下的项目仍会在资源树中以“旧目录”显示，但插件不会擅自移动；所有新建和拉取操作都写入 `Microi-V8-Engine/.../AI应用/{appKey}`。拉取先从 `sys_microistore` 读取应用主数据，再从 `mci_ai_app_file` 读取私有 HDFS 源码，不是读取 `sys_microiservice` 的公有编译产物。离线安装时若未包含源码，微服务仍可运行和预览，但必须回到原开发端或包含源码的服务器拉取。
+
+### 完整源码拉取与大文件
+
+VS Code 插件从开发工具 **5.8.6** 起，将源码清单与完整工程下载分开：先读取私有文件清单，再逐文件下载到临时目录，校验大小、SHA-256 及下载前后的远端清单。已上传的 `tools/node-22/node.exe` 等超过 20 MB 的二进制文件也会完整拉取，不会被当成无需下载的文件过滤。
+
+如果旧插件提示“文件超过单文件读取限制 20971520 bytes”，请更新 **Microi吾码 VS Code 扩展**后重新拉取；该限制属于旧插件的上下文读取方式，不是上传成功后的工程下载容量。已有 `GetApplicationContext` / `GetApplicationFile` 接口的服务端无需为本次修复重新部署。
+
+下载失败、大小/哈希不符或期间其他开发者更新源码时，插件清理临时文件并停止应用，保留本地工程及同步基线。已有本地修改仍按三方差异检查处理，冲突合并后再推送；不得把“拉取成功”理解为允许覆盖他人更新。
+
+### AI 应用默认前端架构
+
+新建 Web、MicroService、H5，以及整体升级的存量 AI 应用，默认采用 Vue 3 单文件组件、Composition API、Vite 和 TypeScript。这里的 ESM 是浏览器模块标准，Vue 3 + Vite 本身仍以 ESM 组织源码，二者不是互斥选项。这个选择针对吾码生态：与 `Microi.Client`、Microi.UI 和团队既有 Vue 经验一致，方便升级、维护和二次开发；它不代表其它生态只能使用 Vue。
+
+- 使用 `<script setup lang="ts">`、严格类型检查和提交到源码库的 lockfile；`vite.config.ts` 必须设置 `base: './'`，以兼容 HDFS、CDN 和嵌入式相对路径。
+- 页面与组件放 `components/pages`，生命周期用例放 `composables`，纯业务规则放 `domain`，接口引擎、实时通信和音频适配放 `services`，Token、OsClient 与宿主桥接放 `platform`。
+- 只有多个可分享页面时才引入 Vue Router；只有跨页面或跨组件共享复杂状态时才引入 Pinia。不要为了“看起来主流”无条件增加大型依赖。
+- 页面不得散装拼接 `/apiengine`、Token 或文件地址，应通过统一的 Microi SDK/认证桥和薄服务层调用。生产配置不得写死 localhost、租户或密钥。
+- 默认质量门为 `vue-tsc --noEmit`、单元测试、生产构建、产物敏感信息扫描，以及 PC/移动真实浏览器验收。仅用 Vue 挂载旧 HTML、但仍由命令式 DOM 控制页面，不算完成架构迁移。
+- UniApp 继续使用 Vue 3 + TypeScript 的官方 Vite 工具链并遵守 UniApp 跨端规范；Canvas/WebGL 游戏的高频渲染循环保持独立，Vue 负责登录、大厅、房间、设置、HUD 和结算界面。
+- 正式流式发布采用两阶段协议：先回读并冻结应用的 `CurrentVersion`、`AppVersion`，stage 上传并验签不可变版本资产，finalize 同时提交 `ExpectedCurrentVersion`、`ExpectedAppVersion` 做条件切换。任何一项缺失或远端状态已变化都必须重新盘点，不能用旧任务覆盖新版本。
+- v3 发布请求还绑定初始 fence、应用行版本及 active/committed 指针。stage 完成后只更新回读到的版本行 `ExpectedVersionRowVersion`。若提交后回执仍为 `ProjectionPending`，先回读后台投影状态，再原样重放首次 finalize 请求取得幂等回执；不要将提交后的新 fence 或指针替换到旧请求中。发布成功需同时证明 `Completed=true`、稳定入口和全部 CDN 文件哈希一致。
+
+### 3D 现场体验与音频控制
+
+星河现场抽奖应用从 `v1.2.0` 起使用 Three.js 呈现五种立体舞台。参与者通过活动入口领取个人票券、签到并等待正式揭晓；本人中奖后可进入“我的奖品”领取。舞台中的星尘、卡片和纸屑只表现现场气氛，中奖资格、随机选择、库存和领奖仍由接口引擎确认。
+
+从 `v1.3.0` 起，项目工作台和主持台采用吾码 UI 的左侧导航、右侧配置布局。主持人通过“舞台与声音”编辑现场标题和副标题；默认标题为“Microi抽奖互动平台”，发布后也可修改展示文字，正式资格规则与开奖结果保持原值。
+
+主持人分享的参与端链接及投影大屏默认铺满浏览器视口运行 Three.js，票券、音频和规则作为覆盖层操作。需要隐藏浏览器工具栏时，点击页面的“全屏”按钮。未发布活动显示正常候场画面，不开放报名，也不返回私有名单、奖项、规则或结果；主持人正式发布后，已打开的候场页会自动进入现场。活动结束后显示结束提示，网络失败则单独提供重连。
+
+| 入口 | 可操作内容 | 保存范围 |
+| --- | --- | --- |
+| 主持台“舞台与声音”及“调音” | 编辑标题、副标题；切换三首内置配乐、上传自定义音乐、保存默认曲目和音量 | 活动创建人保存后供本活动各端使用 |
+| 大屏、彩排及参与端的“调音” | 播放/暂停、静音、分别调节背景音乐和音效 | 当前设备；不会修改资格或其他设备的声音 |
+| 参与者票券 | 本人编号、签到状态、公开开奖进度、中奖反馈 | 真实参与记录；刷新后恢复 |
+
+自定义音乐支持 MP3、WAV、M4A、OGG，每首不超过 12 MB、15 分钟，每个活动最多 12 首。上传前校验可解码音频，服务端重新校验身份、文件头、大小和活动归属，只允许活动创建人登记曲目。请使用拥有现场播放权的音乐。
+
+浏览器首次操作前不会自动发声。点击“播放”或参与、彩排按钮后启用声音；隐藏页面或切换宿主页签会暂停声音、轮询和 3D 动画。减少动态模式展示静态舞台，WebGL 不可用时展示轻量海报，报名、正式开奖和领奖继续可用。
+
+升级平台后，在应用商城更新该应用。安装包携带原创配乐、编译产物和可维护源码；既有活动无需迁移，默认使用内置曲目。自定义音乐保存在当前租户的文件服务与活动配置中，不进入官方发行包。
+
+### 5GB 级应用资产：不进 AI 上下文
+
+<div class="micro-app-guard-grid">
+  <article class="is-success"><span>自动选择</span><strong>大于 128 MiB 使用协议 v3</strong><p>MCP 与 <code>@microi.net/cli</code> 共用客户端，默认按 16 MiB 原始字节分片，不走 Base64。</p></article>
+  <article class="is-success"><span>可恢复</span><strong>重启后只补缺失分片</strong><p>会话由租户、应用、版本、路径和摘要确定；逐片与整文件都从 HDFS 回读验签。</p></article>
+  <article><span>无产品字节上限</span><strong>容量由真实基础设施决定</strong><p>吾码不再设置文件/目录业务字节上限；协议、对象存储、磁盘、网关和网络仍需满足。</p></article>
+  <article><span>全程留痕</span><strong>系统引擎 → 超大文件上传记录</strong><p>管理员可查看阶段、字节/分片进度、心跳、错误、恢复建议和最终状态。</p></article>
+</div>
+
+例如 5 GiB 文件会生成 320 个 16 MiB 分片。失败或超时时不能盲目重发完整文件，应先查询远端会话；同摘要已完成时幂等返回，不允许用同一版本覆盖为不同内容。
+
+原生 HTML/JavaScript 仅适用于用户明确要求、目标环境不能构建，或一次性且无状态的极小静态页；交付时必须记录例外原因与后续升级路径。
+
+`.microi-micro-app.json` 是插件识别项目的依据：
+
+```json
+{
+  "schemaVersion": 1,
+  "runtime": "micro-app",
+  "appKey": "microi-official",
+  "name": "吾码官网微服务",
+  "osClient": "iTdos",
+  "apiBaseUrl": "http://localhost:1988",
+  "entry": "index.html",
+  "distDir": "dist",
+  "routeManifest": "microi.routes.json",
+  "version": "v1.0.0",
+  "createdAt": "2026-07-11 10:00:00"
+}
+```
+
+不要把同一个项目的 `appKey` 改成另一个已存在应用的 Key，否则会覆盖对应运行时记录。
+
+### 路由清单
+
+微服务必须维护 `microi.routes.json`。插件以该文件为事实源同步 `sys_microiservice_page`，不要从 Vue 源码中猜测路由。
+
+```json
+[
+  {
+    "path": "/",
+    "name": "home",
+    "title": "微服务首页",
+    "sort": 0,
+    "isHome": true
+  },
+  {
+    "path": "/saas-tenant/create",
+    "name": "saas-tenant-create",
+    "title": "创建空数据库 SaaS 租户",
+    "sort": 10
+  },
+  {
+    "path": "/system-tools",
+    "name": "system-tools",
+    "title": "系统工具",
+    "sort": 20,
+    "LegacyMenuUrls": ["/legacy/system-tools"],
+    "LegacyComponentPaths": ["/custom/pages/system-tools/index"]
+  }
+]
+```
+
+路径应稳定且以 `/` 开头。删除清单中的旧页面后再次推送，在线路由也会随清单同步。
+
+页面从历史内置 Vue 组件迁移到前端微服务时，可在路由顶层或 `meta` 中声明 `LegacyMenuUrls`、`LegacyComponentPaths`。插件会统一写入 `sys_microiservice_page.RouteMetaJson`，菜单接口据此把旧菜单瞬时映射到微服务宿主，不会覆盖客户的 `sys_menu`。前端同时支持带租户的 `/micro-app/{OsClient}/{MsKey}/{route}`、旧菜单 URL、历史 `/micro-app/{MsKey}/{route}` 和 `/micro-app/{Id}/{route}`；因此菜单可以继续显示旧地址，新旧书签也能打开同一页面，路由迁移不要求一次性切断旧入口。
+
+### 本地调试建议
+
+- 独立运行时可使用本地模拟上下文，但最终必须在吾码宿主中验收。
+- 不要把 Token、OsClient 或正式 API 地址硬编码进源码。
+- 调用吾码接口时使用模板自带的 `src/microi.js` 或 `src/utils/microi.v8.js`。
+- `vite.config.js` 的资源基础路径必须适配微应用托管，避免构建后静态资源请求到主站根目录。
+
+#### 从线上页面自动识别目标并在本地复现
+
+处理“线上微服务异常、需要用本地 `Microi.Client` 源码复现”时，AI 应先在一次性独立浏览器
+上下文打开线上地址，等待吾码主框架初始化，再读取：
+
+```js
+window.__MICROI_RUNTIME_ENDPOINT__
+```
+
+该对象只公开当前 `apiBase`、`osClient`、来源和浏览器隔离提示，不包含 Token。旧版线上主框架
+没有该对象时，再依次读取线上 URL 参数、`window.ApiBase/window.OsClient`、同源 localStorage
+中的 `microi.net.ApiBase/OsClient`；仍无法确定租户时通过线上域名的租户解析接口或已成功请求
+确认，禁止根据系统名称猜测。
+
+然后在另一个独立浏览器上下文打开本地源码，URL 参数权重最高：
+
+```text
+http://localhost:61500/?OsClient={编码后的租户}&ApiBase={编码后的API地址}#/micro-app/{OsClient}/{MsKey}/{RoutePath}
+```
+
+每个并行的 `ApiBase + OsClient` 必须使用独立 `browser.newContext()`、浏览器 Profile 或独立
+`--user-data-dir`。同源普通窗口共享 Token、CurrentUser、ApiBase 和 OsClient；多个无痕窗口也
+可能属于同一个临时会话，因此不能把“开了无痕”当作三个以上并行租户的充分隔离。完整规则见
+[源码本地运行：指定或切换 ApiBase 与 OsClient](../getting-started/local-run#指定或切换-apibase-与-osclient)。
+
+## AI 对话与 MCP 使用
+
+配置好目标租户的 Microi MCP 后，AI 可以读取当前所有 Web、UniApp、MicroService 应用及其文件，再决定扩展已有应用还是创建新应用。
+
+### AI 应遵循的默认顺序
+
+```text
+1. microi_list_applications：先盘点现有应用和文件清单
+2. microi_get_application_context：先读元数据与必要的小文件
+3. 已有本地工程时直接修改文件，不把整个目录塞进 AI 上下文
+4. 优先在合适的现有微服务中增加页面
+5. 没有合适应用时才创建新的微服务
+6. microi_sync_microservice_source 只传本地 directory，先 dry-run 清单
+7. 构建产物使用目录流式发布，发布后检查运行时、路由和真实页面
+```
+
+这一步非常重要。若不先盘点应用，AI 容易重复创建范围过小的微服务，或在 V8 按钮中继续拼接大量 HTML；若让 AI 自己读取、编码和分段整个源码目录，又会浪费大量时间与上下文。
+
+### 应用发现工具
+
+| MCP 工具 | 关键参数 | 说明 |
+|---|---|---|
+| `microi_list_applications` | `appType?`、`keyword?`、`includeFiles?` | 列出当前租户全部在线应用；`includeFiles` 默认 `true`。 |
+| `microi_get_application_context` | `appIdOrKey`、`includeContents?`、`maxFileBytes?`、`maxTotalBytes?` | 获取应用、文件清单和源码；默认读取内容，默认单文件 2MB、总计 50MB。微服务还返回运行时和页面。 |
+| `microi_get_application_file` | `appIdOrKey`、`filePath`、`maxFileBytes?` | 精确读取一个源码文件；默认上限 10MB，文本返回 UTF-8，二进制返回 Base64。 |
+| `microi_get_microservice` | `msKey` | 查看已发布微服务的版本、入口、构建清单和页面。 |
+
+### 创建与发布工具
+
+| MCP 工具 | 关键参数 | 说明 |
+|---|---|---|
+| `microi_create_microservice` | `microService`、`confirmExecution?` | 创建或更新 `sys_microiservice` 元数据，不上传源码或构建文件。 |
+| `microi_sync_microservice_source` | `microService`、`directory?`、`sourceFiles?`、`replace?`、`confirmExecution?` | **本地工程首选 `directory`**。MCP 在进程内扫描、哈希和读取源码，模型不接触文件字节；`sourceFiles` 仅保留旧调用兼容。 |
+| `microi_publish_microservice` | `microService`、`assets`、`routes?`、`confirmExecution?` | 上传构建产物，更新运行时并同步 `sys_microiservice_page`。 |
+| `microi_publish_application_directory_stream` | `appIdOrKey`、`directory`、`versionNo`、`changeSummary`、v3 冻结参数 | 正式编译目录使用二进制流；分别执行 `stage` 与 `finalize` 并回读完成状态。 |
+
+发布前为应用精确版本写入商城更新日志，并显式传入含义一致的 `changeSummary`（最多 2000 字符的文本）。支持摘要持久化的 v3 后端在首次 stage 创建版本时保存 `mci_ai_app_version.ChangeSummary`，重试和恢复不会覆盖原说明，也不会因此改变既有发布指纹。旧节点若显示发布完成但摘要为空，仍需升级后端并核对日志；编译文件验证通过不能代替版本说明验收。
+
+三个写入工具在未传 `confirmExecution` 时只返回 dry-run，不会真正写入。AI 应先展示将要创建的 AppKey、文件数、路由和版本，确认无误后再传入任意非空确认文本执行。
+
+### 源码同步不要再手工拆文件
+
+<div class="micro-app-guard-grid">
+  <article class="is-danger"><span>不要这样做</span><strong>读取 Base64 → 切成 48KB → 反复上传</strong><p>不要创建 <code>.sync-seg-*</code>、<code>sync-source-files.json</code>，也不要因为单个源码超过 AI 工具读取上限就拆坏真实工程。</p></article>
+  <article class="is-success"><span>正确做法</span><strong>把本地项目绝对目录交给 MCP</strong><p>MCP 自己排除依赖与构建目录、计算清单和哈希、读取普通文件；例如 93KB 的 <code>microi.v8.js</code> 仍然是一个完整源码文件。</p></article>
+</div>
+
+先 dry-run 查看文件清单：
+
+```json
+{
+  "microService": {
+    "MsKey": "demo-device-ops",
+    "MsName": "设备运维微服务"
+  },
+  "directory": "D:\\Microi-V8-Engine\\Demo\\AI应用\\demo-device-ops",
+  "replace": true
+}
+```
+
+确认清单后再补 `confirmExecution`。目录模式会自动排除 `node_modules`、`dist`、`build`、`coverage`、缓存与版本库目录，并在上传前拒绝 `.env`、证书和密钥文件。dry-run 会返回文件数、总字节数、文件哈希、清单哈希以及 `aiContextFileBytes=0`。
+
+::: warning 旧版兼容边界
+只有调用方手里本来就只有内存文件时才使用 `sourceFiles`。这条兼容路径仍要求每个文件提供相对路径和内容；它不是本地工程的推荐方式，也不能用人工切片来规避上下文限制。
+:::
+
+### 怎样向 AI 描述需求
+
+高质量描述应明确以下内容：
+
+- 目标 MCP 和 `OsClient`。
+- 是扩展已有应用，还是没有合适应用时才允许新建。
+- 应用范围、AppKey、页面名称和内部路由。
+- 页面字段、布局、校验、权限和交互。
+- 调用哪个接口引擎，参数和返回值是什么。
+- 作为菜单打开、Dialog 打开还是 Drawer 打开。
+- 成功、取消、失败时宿主应执行什么动作。
+- 验收地址、测试账号和预期结果。
+
+#### 示例一：先盘点再扩展现有微服务
+
+```text
+请使用 microi_demo，先调用 microi_list_applications 获取当前全部 Web、UniApp、
+MicroService 应用和文件清单，再读取最适合承载“官方系统工具”的应用完整源码。
+优先在已有“吾码官网微服务”中新增页面，不要创建只包含一个弹窗的新微服务。
+
+新增路由 /saas-tenant/create，页面用于创建空数据库 SaaS 租户，包含 OsClient、
+系统名称、admin 密码、OsClientType、OsClientNetwork、域名、归属手机号。
+OsClientNetwork 默认读取当前环境值但允许手工修改。页面使用 Drawer，宽度 960px，
+提交调用接口引擎 create-empty-saas-tenant，成功后 dispatch app-dialog:success。
+
+先读取现有文件并给出修改清单和 dry-run，确认后再写入、发布并做真实浏览器验收。
+```
+
+#### 示例二：创建新的微服务
+
+```text
+请使用 microi_demo。先检查当前在线应用，确认没有适合的设备运维微服务后，
+创建 AppKey 为 `demo-device-ops`、名称为“设备运维微服务”的 MicroService。
+包含 /、/device/detail、/work-order/create 三个路由，使用 Vue3 + Element Plus，
+通过宿主 token 和 osClient 调用吾码接口，不允许把 token 写进 URL。
+先 dry-run，确认后同步源码、发布构建产物和路由，并返回菜单绑定方式。
+```
+
+#### 示例三：修复已有页面
+
+```text
+请先调用 microi_get_application_context 读取 microi-official 的全部源码，
+定位 /saas-tenant/create 在窄屏下右侧内容看不全的问题。
+只修改现有应用，不更换 AppKey；保持原有接口和回调协议。
+修复后运行/发布，并验证 1366×768 与 1920×1080 两种尺寸。
+```
+
+#### 示例四：交付到应用商城
+
+```text
+请检查当前微服务源码、最新构建版本和路由是否完整，生成应用离线包，
+并发布到 sys_microistore。ApplicationType 必须为 MicroService。
+安装包必须同时包含私有源码、公有构建文件、sys_microiservice 运行时和页面路由。
+在目标租户安装后，验证 HDFS 重传成功、菜单可打开、SDK 请求携带目标租户身份。
+```
+
+## 绑定为后台菜单
+
+在 `sys_menu` 创建或编辑菜单：
+
+1. 打开方式选择 `微服务（MicroService）`。
+2. 选择目标微服务。
+3. 选择该微服务中的页面。
+4. 系统回填 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath`、`Url` 和 `ComponentPath=/micro-app/host`。
+
+新菜单友好地址统一为：
+
+```text
+/micro-app/{OsClient}/{MsKey}/{RoutePath}
+```
+
+浏览器中的主站路由为：
+
+```text
+/#/micro-app/{OsClient}/{MsKey}/{RoutePath}
+```
+
+例如：
+
+```text
+http://localhost:61500/?OsClient=iTdos&ApiBase=https%3A%2F%2Fapi.example.com#/micro-app/iTdos/microi-official/saas-tenant/create
+```
+
+历史 `/micro-app/{AppKey}/{RoutePath}`（AppKey 也称 MsKey）仍可使用，显式保存的旧菜单地址会保留。新地址的 OsClient 取自当前服务器连接或可信宿主，并必须与当前运行时、已登录 Token 的租户一致；已识别的租户坐标不一致时拒绝加载，URL 不会切换当前登录租户。带租户的主站菜单路由与下文不带 `#` 的 API 静态入口属于不同协议。
+
+同一微服务可以绑定多个菜单。宿主会为每个运行实例生成独立名称，避免切换页面时出现 `app name conflict`。
+
+菜单加载时还会把当前 `SysMenuId`、`ModuleEngineKey`、`DiyTableId` 作为 `permissionContext` 传给子应用。微服务调用表单引擎时应使用被授权的模块 Key；不能把表名当成模块 Key，也不能删除权限参数来“解决”无权限提示。
+
+`sys_microiservice_page` 作为隐藏子表菜单时，应设置 `Display=0`、`AppDisplay=0`、`HasChild=0`。若错误开启“是否有子集”，上级微服务菜单可能被识别成只能展开的父菜单。
+
+## 在表单引擎中引用
+
+吾码支持把已发布 MicroService 的某个路由，作为表单引擎的“定制组件”（`DevComponent`）直接嵌入新增、编辑或详情表单。它使用平台内置的微应用宿主，不需要手写 iframe，也不需要把租户定制页面编译进 `Microi.Client` 主包。
+
+<div class="micro-app-component-flow" aria-label="表单引擎加载微服务路由的流程">
+  <article><span>表单字段</span><strong>选择定制组件</strong><small><code>Component=DevComponent</code></small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>稳定别名</span><strong>配置组件路径</strong><small><code>DevComponentPath</code></small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>页面清单</span><strong>匹配微服务路由</strong><small><code>LegacyComponentPaths</code></small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>表单宿主</span><strong>加载 RoutePath</strong><small>继承登录态与权限上下文</small></article>
+</div>
+
+### 1. 在路由清单声明组件路径别名
+
+为需要嵌入表单的页面设置稳定、唯一的 `LegacyComponentPaths`。名称用于兼容历史定制组件，也可作为新微服务页面的表单组件别名：
+
+```json
+[
+  {
+    "path": "/quality/inspection-board",
+    "name": "quality-inspection-board",
+    "title": "质量检验看板",
+    "LegacyComponentPaths": [
+      "/micro-app-components/quality-inspection-board"
+    ]
+  }
+]
+```
+
+发布后，插件会把该声明写入 `sys_microiservice_page.RouteMetaJson`。页面必须处于启用状态，`path` 才是最终加载的微服务 `RoutePath`。
+
+### 2. 在表单设计器配置定制组件
+
+拖入“定制组件”，填写组件名称和同一个路径别名。等价字段配置如下：
+
+```json
+{
+  "Component": "DevComponent",
+  "FormWidth": 24,
+  "Config": {
+    "DevComponentName": "QualityInspectionMicroApp",
+    "DevComponentPath": "/micro-app-components/quality-inspection-board"
+  }
+}
+```
+
+`DevComponentName` 只需在当前页面保持稳定；`DevComponentPath` 必须与微服务页面的 `LegacyComponentPaths` 匹配。路径会统一忽略 `@/views`、`/src/views`、`.vue`、`/index` 和大小写差异，但新项目仍建议按示例使用不与真实 Vue 文件冲突的虚拟路径。
+
+::: tip 本地组件优先，微服务自动接管
+如果 `Microi.Client/src/views` 中存在该路径的 Vue 组件，表单继续加载本地组件；只有本地源码不存在时，平台才查询已发布页面并切换到 MicroService 宿主。因此历史字段无需逐租户改配置，新项目也能用独立发布的微服务承载复杂组件。
+:::
+
+### 3. 接收表单上下文并回传结果
+
+子应用通过宿主数据读取当前表单的可序列化上下文：
+
+```js
+const hostData = window.microApp?.getData?.() || {};
+
+console.log(hostData.componentMode);       // true
+console.log(hostData.componentData);       // FormData、字段、行 Id、只读状态等
+console.log(hostData.microRoute);          // 当前微服务 RoutePath
+console.log(hostData.permissionContext);   // 当前菜单、模块与表权限上下文
+```
+
+Vue 实例、函数、循环引用和 `ParentV8` 不会跨 iframe 传递；业务交互应使用可序列化数据与事件协议。内容高度或字段值变化时，由子应用主动通知宿主：
+
+```js
+// 内容渲染完成后同步实际高度，宿主会限制在 80～1600px。
+window.microApp?.dispatch?.({
+  type: 'dev-component:resize',
+  height: 520
+});
+
+// 回写当前定制字段的值。
+window.microApp?.dispatch?.({
+  type: 'dev-component:event',
+  event: 'update:modelValue',
+  args: [{ inspectionStatus: 'passed' }]
+});
+```
+
+需要联动父表单时，也可通过 `dev-component:event` 上报 `CallbackFormValueChange`、`FormSet` 或 `ParentFormSet`，参数放在 `args` 数组中。应先在 Add、Edit、View、只读和窄屏模式分别验证，不要依赖父页面 DOM、Vue 实例或未序列化的回调函数。
+
+<div class="micro-app-note-strip"><strong>权限边界</strong><span>组件入口会复用当前 DiyToken、OsClient，并传入 <code>permissionContext</code>；这只帮助微服务选择正确的模块调用上下文，不会额外授予权限。出现“没权限”时应核对当前菜单的 <code>ModuleEngineKey</code> 与角色授权，不能改成匿名接口。</span></div>
+
+## 在 V8 中弹出复杂页面
+
+页面按钮、行按钮或表单按钮可以调用 `V8.OpenAppDialog`：
+
+```js
+V8.OpenAppDialog({
+    AppKey: 'microi-official',
+    RoutePath: '/saas-tenant/create',
+    Title: '创建空数据库 SaaS 租户',
+    TitleIcon: 'fas fa-database',
+    Width: 'min(960px, calc(100vw - 32px))',
+    OpenType: 'Drawer',
+    Data: {
+        source: 'osclients'
+    },
+    // 可省略；默认继承当前调用菜单。跨模块操作时应显式传目标授权模块。
+    ModuleEngineKey: 'authorized-module-key',
+    OnSuccess: function (data) {
+        V8.Tips('创建任务已提交', true);
+        V8.RefreshTable({ _PageIndex: -1 });
+    },
+    OnCancel: function (data) {
+        console.log('用户取消', data);
+    },
+    OnError: function (error) {
+        V8.Tips(error.message || '应用加载失败', false);
+    }
+});
+```
+
+| 参数 | 必传 | 默认值 | 说明 |
+|---|---|---|---|
+| `AppKey` | 是 | - | 对应 `sys_microiservice.MsKey`，应用必须已发布。 |
+| `RoutePath` | 否 | `/` | 微服务内部路由；`MicroRoute` 是兼容别名。 |
+| `Version` | 否 | 当前版本 | 指定构建版本；不传则读取 `BuildVersion`。 |
+| `Title` | 否 | `应用` | 标题。 |
+| `TitleIcon` | 否 | `fas fa-window-maximize` | 标题图标 class。 |
+| `Width` | 否 | `min(920px, calc(100vw - 32px))` | 支持 px、%、vw、`min(...)`。 |
+| `OpenType` | 否 | `Dialog` | `Dialog` 或 `Drawer`。 |
+| `Data` | 否 | `{}` | 传给子应用的可序列化业务数据。 |
+| `SysMenuId` | 否 | 当前调用菜单 | 传给子应用的菜单权限上下文。 |
+| `ModuleEngineKey` | 否 | 当前调用模块 | 目标模块引擎 Key；跨模块调用时建议显式传入。 |
+| `DiyTableId` | 否 | 当前调用表 | 目标表 Id，仅作上下文；后端仍按 Token 与模块权限校验。 |
+| `OnSuccess` | 否 | - | 成功回调，执行后自动关闭。 |
+| `OnCancel` | 否 | - | 取消回调，执行后自动关闭。 |
+| `OnError` | 否 | - | 加载失败或子应用上报错误时执行，不自动关闭。 |
+
+回调函数应放在顶层，不要放进 `Data`。完整 API 文档参见 [V8.OpenAppDialog](/doc/v8-engine/v8-client.html#v8-openappdialog)。
+
+### 统一 Dialog 视觉与边界
+
+微服务自行实现的 Dialog 应复用吾码统一弹层语言：20–24px 大圆角并默认上下左右居中；页头左侧依次显示语义图标、英文眉题、大字标题和可选副标题，右上关闭按钮带可辨识底色并垂直居中；内容区使用连续柔和背景与整齐栅格；页脚右侧提供带图标的大号关闭、保存按钮。PC 标题栏可拖动，但必须按弹层真实宽高约束四边并在窗口缩放后重新约束，不能把内容拖出视口。
+
+通过 Teleport 把弹层挂到宿主 `body` 时，弹层根节点还要同步微服务的 `data-mci-ui-root`、主题与必要 CSS token。只在原应用祖先上声明变量会导致弹层脱离作用域，出现玻璃遮罩、颜色或圆角失真。
+
+## 独立运行：平台登录、动态验证码与权限
+
+新生成的 MicroService 默认具备独立访问认证门，不再假定所有页面都只会嵌入吾码后台。
+
+<div class="micro-app-auth-flow">
+  <article><span>已有宿主</span><strong>复用吾码 Token</strong><small>菜单与弹层入口不重复登录</small></article>
+  <i>或</i>
+  <article><span>独立访问</span><strong>读取租户配置</strong><small><code>V8.GetSysConfig(true)</code></small></article>
+  <i>→</i>
+  <article><span>按需显示</span><strong>帐号、密码、验证码</strong><small><code>EnableCaptcha</code> 动态控制</small></article>
+  <i>→</i>
+  <article><span>登录成功</span><strong>进入业务路由</strong><small>Token 由统一 SDK 保存与轮换</small></article>
+</div>
+
+验证码开启时，页面请求 `/api/Captcha/GetCaptcha?OsClient={当前租户}`，读取响应头 `captchaid`，并在 `V8.Login` 中提交 `_CaptchaId` 与 `_CaptchaValue`。`EnableCaptcha` 兼容布尔值、数字 `1` 和字符串 `true/1/yes/on`；关闭时不渲染验证码控件，也不提交验证码字段。
+
+### 为什么仍然会提示“没权限”
+
+登录成功只说明身份有效，不代表用户自动拥有所有模块权限。按下面顺序排查，禁止通过移除权限校验、改用匿名接口或硬编码管理员 Token 处理：
+
+1. **先看身份**：独立访问是否已经登录，接口请求是否携带当前租户 `osclient` 与最新 `Authorization`。
+2. **再看目标模块**：FormEngine 调用是否传入真实、已授权的 `ModuleEngineKey`，而不是表名或空字符串。
+3. **再看宿主上下文**：菜单、弹层或组件入口是否收到 `permissionContext.sysMenuId/moduleEngineKey/diyTableId`。
+4. **最后看角色授权**：当前用户角色是否拥有目标菜单、表权限、按钮权限与数据范围。
+
+<div class="micro-app-note-strip"><strong>安全边界</strong><span><code>permissionContext</code> 用于让子应用选择正确的模块调用上下文，不是授权凭证。真正的权限仍由后端依据 DiyToken、租户、角色、菜单、表和数据范围校验。</span></div>
+
+## 子应用接收宿主上下文
+
+宿主通过 micro-app data 传入运行环境：
+
+```js
+const hostData = window.microApp?.getData?.() || {};
+
+console.log(hostData.apiBase);
+console.log(hostData.osClient);
+console.log(hostData.token);
+console.log(hostData.permissionContext);
+console.log(hostData.appKey);
+console.log(hostData.version);
+console.log(hostData.microRoute);
+console.log(hostData.hostCapabilities);
+console.log(hostData.cache);
+console.log(hostData.dialog);
+console.log(hostData.dialogData);
+```
+
+| 字段 | 说明 |
+|---|---|
+| `apiBase` | 当前吾码后端地址。 |
+| `osClient` | 当前租户。 |
+| `token` | 当前登录 Token。 |
+| `menuId` | 当前菜单 Id；弹层默认继承调用菜单。 |
+| `moduleEngineKey` | 当前或显式指定的模块引擎 Key。 |
+| `diyTableId` | 当前或显式指定的表 Id。 |
+| `permissionContext` | `{ sysMenuId, moduleEngineKey, diyTableId }` 的规范对象。 |
+| `appKey` | 当前微服务 AppKey。 |
+| `version` | 实际构建版本。 |
+| `microRoute` | 当前内部路由。 |
+| `hostCapabilities` | 菜单型微服务可调用的吾码宿主协议、模式和动作清单；弹窗型微服务不提供 Tab 动作。 |
+| `cache` | 菜单型微服务的运行时缓存上下文，包含 `mode/state/instanceName/stateEvent`；弹窗和表单嵌入不承诺页签保活。 |
+| `dialog` | 由 `OpenAppDialog` 打开时为 `true`。 |
+| `dialogData` | 宿主传入的 `Data`。 |
+| `route` | 菜单宿主包含 `path`、`fullPath`、`query`、`microRoute` 和 `microRoutePath`；其它宿主按入口提供。 |
+
+使用模板自带 SDK 初始化上下文：
+
+```js
+import { configureMicroiV8 } from './microi';
+
+const V8 = configureMicroiV8();
+
+const result = await V8.ApiEngine.Run('get-device-detail', {
+  Id: hostData.dialogData.Id
+});
+```
+
+不要把 Token 拼接进 URL。SDK 会把运行时 Token 放入 `Authorization`，并携带当前 `osclient` 请求头。
+
+### 宿主路由查询参数
+
+嵌入微服务的 iframe 地址与宿主地址隔离，不能仅通过子应用 location.hash 读取站点、业务Id等查询参数。菜单宿主下发 microRoute 及 route.query；应用应合并自身白名单参数，保留完整路径和查询参数，并监听宿主数据变化。同一路径的查询参数变化也应刷新业务数据、取消旧请求，主题或尺寸快照不得覆盖应用内部导航。弹窗可从 microRoute 查询串或 dialogData 读取声明参数；独立访问才回退自身hash。
+
+生成宿主页面链接时使用可信上下文的 webBase、apiBase 与 osClient，不猜测父窗口地址，不把Token写入URL。验收覆盖嵌入冷启动、同路径换参数、独立入口、无效参数和跨请求迟到响应。
+
+## 菜单页签保活与单一缓存所有者
+
+菜单型微服务采用“**Vue 外层不缓存宿主，micro-app 运行时独占子应用缓存**”的单一所有者模型：主框架路由仍设置 `keepAlive:false`，避免 Vue `KeepAlive` 与微应用运行时同时缓存同一个页面；真正的表单输入、表格筛选、内部路由、滚动位置和组件状态由 `<micro-app keep-alive>` 保留。因此，`keepAlive:false` 不等于每次重新加载微服务，它只是明确 Vue 外层不能再拥有第二份生命周期。
+
+宿主以“租户 + AppKey + 主框架 `fullPath` + 发布版本/入口”的指纹生成稳定实例名，不把 Token 或查询参数原文暴露到 DOM。菜单 Id 不参与实例名，因为友好路由首屏可能先于动态菜单元数据完成；权限上下文补齐前后必须仍命中同一个运行时。当前策略最多保留 5 个菜单微服务实例，超过后只淘汰最久未使用的隐藏实例；被淘汰的顶部 Tab 仍保留，再次进入时冷启动。下列场景会精确销毁对应实例并清除运行时数据：
+
+- 关闭当前 Tab、关闭其它 Tab、关闭全部 Tab，或顶部访问记录达到上限并淘汰旧 Tab；
+- 退出登录、Token 重置、切换角色；
+- 同一路由解析到新的发布版本或入口地址；
+- 宿主检测到已挂载页面没有真实可见 DOM，并执行一次受限自愈重建。
+
+平台对上述销毁统一调用 `unmountApp(name,{destroy:true,clearData:true})`，确保组件实例、沙箱、事件监听和通信数据一并释放，而不是只从 Vue 的 `KeepAlive` 名单中删除。
+
+从隐藏状态恢复时，宿主会重新同步 Token、OsClient、权限、主题、路由和可用视口，并再次检查可见 DOM。子应用同时会收到原生 `appstate-change` 事件，必须用它暂停和恢复轮询、WebSocket、观察器、图表测量等昂贵任务；启动和停止函数应保持幂等：
+
+```js
+function syncHostContext() {
+  const context = window.microApp?.getData?.() || {};
+  configureMicroiV8(context);
+  // 按项目需要同步 theme、permissionContext、hostViewport。
+}
+
+function pauseBackgroundWork() {
+  stopPolling();
+  disconnectBusinessSocket();
+}
+
+function resumeBackgroundWork() {
+  syncHostContext();
+  startPollingOnce();
+  connectBusinessSocketOnce();
+  requestAnimationFrame(() => resizeChartsAndVirtualLists());
+}
+
+window.addEventListener('appstate-change', (event) => {
+  const state = event.detail?.appState;
+  if (state === 'afterhidden') pauseBackgroundWork();
+  if (state === 'aftershow') resumeBackgroundWork();
+});
+
+window.microApp?.addDataListener?.((data) => {
+  if (data?.type === 'host:resume') syncHostContext();
+});
+```
+
+不要在 `afterhidden` 中清空用户输入或内部路由，也不要在 `aftershow` 无条件重复注册定时器和监听器。静态 JS/CSS 仍由浏览器和 CDN 按版本缓存；运行时 LRU 只决定是否保留该页签的内存状态。
+
+`hostCapabilities.lifecycle` 会声明当前契约：`cacheOwner=micro-app`、`cacheMode=runtime-keep-alive`、`maxCachedTabs=5`，以及 `beforeshow / aftershow / afterhidden` 三个状态。AI 创建或修改菜单微服务时，应自动生成上述生命周期适配；弹窗型和表单嵌入型页面仍按打开/关闭生命周期处理，不套用菜单页签缓存。
+
+## 子应用调用吾码主框架能力
+
+通过后台菜单打开的微服务会收到 `hostCapabilities.protocol=microi.host.v1`。子应用不能直接访问主框架的 Pinia、Vue Router、打印组件或 DOM；路由、页签与平台普通打印等能力应统一通过 micro-app 的 `dispatch` 发送宿主动作：
+
+```js
+function callMicroiHost(action, data = {}) {
+  const context = window.microApp?.getData?.() || {};
+  const capabilities = context.hostCapabilities;
+  if (!capabilities?.actions?.includes(action)) {
+    throw new Error(`当前宿主不支持 ${action}`);
+  }
+
+  const requestId = `host-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  window.microApp.dispatch({
+    type: capabilities.requestType || 'micro-app:host-action',
+    action,
+    requestId,
+    data
+  });
+  return requestId;
+}
+```
+
+截图中的【关闭】按钮可以直接这样实现：
+
+```js
+function closePage() {
+  callMicroiHost('closeTab');
+}
+```
+
+该动作与吾码顶部 Tab 的【关闭】使用同一份 `TagsView` 状态：移除当前页签并切换到最后一个可用页签。固定页签和系统中的最后一个页签不会被关闭，宿主会显示明确提示。
+
+### 微服务内部菜单只切内容区
+
+`navigate`、`replaceTab` 是**吾码主框架级**导航，用于离开当前微服务、打开另一个后台菜单或替换当前顶部 Tab；不能拿它们实现微服务自己左侧菜单的 `/overview`、`/portal` 等内部页面切换。吾码顶部 Tab 以主框架的 `$route.fullPath` 标识页面，内部菜单若调用 `replaceTab('/micro-app/{OsClient}/{AppKey}/{RoutePath}')`，会改变主框架路由并卸载、重挂整个微服务，因此微服务左侧栏、顶部栏和已加载状态都会重新初始化。
+
+内部页面应由子应用自己的 Vue Router、状态机或 iframe 内 Hash 管理，保持主框架 Tab 路由不变。页面较多时用异步组件，并把 `Suspense`/骨架屏放在右侧内容容器内；这样导航栏持续可用，只替换内容区：
+
+```vue
+<main class="micro-content">
+  <Suspense :timeout="0">
+    <template #default>
+      <component :is="activeComponent" :key="currentRoute" />
+    </template>
+    <template #fallback><ContentSkeleton /></template>
+  </Suspense>
+</main>
+
+<script setup>
+import { computed, defineAsyncComponent, ref } from 'vue';
+
+const currentRoute = ref('/overview');
+const pages = {
+  '/overview': defineAsyncComponent(() => import('./pages/OverviewPage.vue')),
+  '/portal': defineAsyncComponent(() => import('./pages/PortalPage.vue'))
+};
+const activeComponent = computed(() => pages[currentRoute.value] || pages['/overview']);
+
+function navigateMicroRoute(path) {
+  currentRoute.value = path;
+  history.pushState({}, '', `#${path}`); // 只改变子应用自身地址
+}
+</script>
+```
+
+微服务 CSS 即使当前使用 iframe，也必须能在非 iframe/sandbox 策略变化时安全运行：主题变量和通用控件规则挂在 AppKey 唯一根容器（例如 `[data-mci-ui-root="your-app-key"]`）下，不能只用会被宿主或其它应用共同命中的裸 `[data-mci-ui-root]`；禁止用 `:root`、`html`、`body`、裸 `*`、裸 `button` 改写宿主。背景网格等装饰层使用根容器内的 `position:absolute`，禁止 `position:fixed; inset:0` 覆盖吾码左侧菜单。宿主容器同时使用 paint containment 作为第二道边界，但不能替代子应用样式命名空间。
+
+菜单型微服务遵守“单一纵向滚动所有者”契约：外层宿主只负责可用区尺寸并隐藏自身溢出，`<micro-app>` 边界提供框架兜底滚动。普通长页面只需让内容自然增高，超出可用区时由框架显示一条滚动条；如果子应用需要内部 sticky 工具栏或虚拟列表，则把自己的滚动容器约束为 `height: var(--micro-app-available-height)`（或等价的确定高度）并设置 `overflow-y:auto`，此时内容不会再溢出 `<micro-app>`，框架兜底条会自动消失，只保留子应用的一条。仅在自动高度元素上写 `overflow:auto` 不算真正的自适应滚动容器，也不会制造第二条滚动条。
+
+自动化验收至少断言：点击微服务内部菜单时主框架 URL/Tab 不变、微服务左栏 DOM 不重建、骨架屏只出现在内容区；吾码左上角 Logo 可见，主菜单不出现来自子应用的网格线、按钮或主题样式；浏览器前进/后退能恢复子应用内部页面。
+
+### 支持的宿主动作
+
+| `action` | `data` 示例 | 行为 |
+|---|---|---|
+| `closeTab` | `{}` | 关闭当前吾码 Tab；不能关闭固定 Tab 或最后一个 Tab。 |
+| `navigate` | `{ path:'/mic-project', query:{ id:'01H...' } }` | 打开或激活一个当前用户可访问的站内路由，原 Tab 保留。 |
+| `replaceTab` | `{ path:'/mic-project' }` | 用目标站内路由替换当前 Tab，并移除旧 Tab。 |
+| `back` | `{}` | 返回吾码站内的上一个路由；没有站内历史时回到系统首页。 |
+| `forward` | `{}` | 前进到下一个吾码站内路由；没有可前进历史时不跳转。 |
+| `reloadTab` | `{}` | 重新解析入口并重载当前微服务；顶部 Tab 右键【刷新】也会重载微服务。 |
+| `setTabTitle` | `{ title:'成品打包完成' }` | 修改当前 Tab 标题，最长 80 个字符。 |
+| `showMessage` | `{ message:'保存成功', messageType:'success' }` | 使用吾码主框架消息提示；类型支持 `success / warning / error / info`，只接受纯文本。 |
+| `openPlatformPrint` | `{ printId:'mic-print-id', dataApi:'https://api.example.com/apiengine/get-print-data?OsClient=tenant-a', title:'普通打印' }` | 打开吾码 Print Engine 普通打印预览；不发送蓝牙原生命令。 |
+
+微服务需要提供“普通打印”时，不要直接访问 `window.parent` 或复制平台打印弹窗。应先用
+宿主下发的 `apiBase/osClient` 构造同源数据地址，再调用打印桥：
+
+```js
+const host = window.microApp?.getData?.() || {};
+const dataApi = new URL('/apiengine/get-print-data', host.apiBase);
+dataApi.searchParams.set('OsClient', host.osClient);
+dataApi.searchParams.set('Id', currentBusinessId);
+
+const printRequestId = callMicroiHost('openPlatformPrint', {
+  printId: currentPrintTemplateId, // mic_print.Id
+  dataApi: dataApi.toString(),
+  title: '普通打印'
+});
+```
+
+`printId` 只接受 1～128 位字母、数字、下划线或连字符。`dataApi` 必须是绝对 HTTP(S)
+地址，和当前 `apiBase` 同源，路径以 `/apiengine/` 开头，并明确携带与当前页面一致的
+`OsClient`；禁止把 Token 或帐号密码写入 URL。宿主结果中的 `accepted:true` 只表示
+Print Engine 预览已经打开，不代表浏览器已经打印或打印机已经出纸。
+
+`openPlatformPrint` 是平台普通打印桥，不是 BLE/SPP 蓝牙代理。标签机原生命令与设备连接
+继续遵守[蓝牙打印机](/doc/system-engine/bluetooth-printer)说明；独立运行时没有宿主能力，
+应隐藏/禁用该按钮或使用应用自己的独立预览方案。
+
+常用组合示例：
+
+```js
+// 打开另一个吾码菜单，当前微服务 Tab 继续保留
+callMicroiHost('navigate', {
+  path: '/mic-project-list',
+  query: { projectId: '01H...' }
+});
+
+// 把当前微服务 Tab 替换为订单详情
+callMicroiHost('replaceTab', {
+  path: '/diy/form-page/order-table/01H...',
+  query: { SysMenuId: 'order-menu-id' }
+});
+
+callMicroiHost('back');
+callMicroiHost('setTabTitle', { title: '成品打包 · HD26001' });
+callMicroiHost('showMessage', { message: '保存成功', messageType: 'success' });
+```
+
+路由动作只接受以 `/` 开头的吾码站内地址，也接受 `{ name, params, query, hash }` 路由对象；外部 URL、协议相对地址、反斜杠路径以及登录/访问密钥/内部重定向路由会被拒绝。目标路由仍须存在于当前登录用户加载后的路由表，并继续经过主框架路由守卫；该桥接不会扩大菜单或数据权限。
+
+若提供 `requestId`，宿主会尽力通过 data listener 返回结果：
+
+```js
+window.microApp?.addDataListener?.((payload) => {
+  if (payload?.type !== 'micro-app:host-action-result') return;
+  if (!payload.success) {
+    console.warn(payload.error?.code, payload.error?.message);
+  }
+});
+```
+
+`closeTab`、`navigate`、`replaceTab` 会卸载或切换当前子应用，结果事件只能视为尽力通知，业务流程不能依赖它持久化数据。应先等待业务接口成功，再发出关闭或跳转动作。
+
+> `hostCapabilities.mode=tab` 只出现在菜单型微服务宿主。通过 `V8.OpenAppDialog` 打开的页面应继续使用下节的 `app-dialog:success / app-dialog:cancel / app-dialog:error`；不要在弹窗中调用 `closeTab` 代替关闭弹窗。
+
+## 子应用向弹窗返回结果
+
+```js
+// 成功：触发 OnSuccess 并关闭
+window.microApp.dispatch({
+  type: 'app-dialog:success',
+  data: { taskId: '01H...', osClient: 'customer_a' }
+});
+
+// 取消：触发 OnCancel 并关闭
+window.microApp.dispatch({
+  type: 'app-dialog:cancel',
+  data: { reason: 'user-cancel' }
+});
+
+// 失败：触发 OnError，弹窗保持打开
+window.microApp.dispatch({
+  type: 'app-dialog:error',
+  data: { message: 'OsClient 已存在' }
+});
+```
+
+同时兼容 `success`、`cancel`、`error` 简写类型。
+
+## 构建产物访问与版本
+
+当前版本入口可以使用：
+
+```text
+/micro-app/{OsClient}/{AppKey}/index.html
+```
+
+该地址会重定向到实际版本入口：
+
+```text
+/micro-app/{OsClient}/{AppKey}/{BuildVersion}/{EntryPath}
+```
+
+例如：
+
+```text
+/micro-app/iTdos/microi-official/v1.0.3/index.html
+```
+
+版本化地址有利于浏览器和 CDN 缓存。发布新版本后应让页面引用新的 `BuildVersion`，不要覆盖旧版本 URL 后期待浏览器自动失效。
+
+## 应用商城、离线包与跨 HDFS 安装
+
+在线 AI 工作台可以直接制作离线包或发布到 `sys_microistore`。应用商城中两个容易混淆的字段是：
+
+| 字段 | 说明 |
+|---|---|
+| `ApplicationType` | 运行时应用类型：普通平台包兼容 `Regular / Platform`，独立应用使用 `Web / UniApp / MicroService`。新建普通离线包默认 `Regular`，既有商城平台应用和通知仍可能为 `Platform`。 |
+| `Category` | 游戏、企业应用、办公、教育、行业应用、平台能力等业务分类。 |
+| `PublisherType` | 官方应用或社区应用来源；仅作为搜索字段，不再拆分一级页签。 |
+
+### 普通应用与平台启动包的存储边界
+
+微服务应用包应包含：
+
+- `sys_microistore` 应用信息。
+- 私有源码文件及内容。
+- 最新公有构建产物。
+- `sys_microiservice` 运行时信息。
+- `sys_microiservice_page` 页面路由。
+- 包版本、来源租户和必要的基础元数据。
+
+#### 普通应用
+
+应用商城“配置应用包”中的“同时发布源码 ZIP”只控制私有源码是否随包交付；无论是否勾选，真正的离线包都必须包含可验证的最新运行产物。因此未携带源码的应用仍应可以运行和预览，只是不能在目标服务器继续在线开发。平台自有的打包接口必须自带时间格式化回退，不得依赖客户“系统设置”的全局 `DateNow`，更不能为了补函数覆盖客户维护的全局 V8。
+
+普通应用安装到另一个租户时，平台不会直接引用发布者的 HDFS 地址，而是把私有源码和公有构建文件重新上传到安装者自己的 HDFS，再写入目标租户的运行时和路由。因此发布者使用 MinIO、安装者使用阿里云 OSS 或其他已支持存储时，也可以完成迁移。
+
+声明“同时发布源码”的包若实际没有源码，生成或安装必须失败；目标租户写入私有 HDFS 后还要回读 `mci_ai_app_file`，不能返回“安装成功”后才在工作台显示无源码。原开发服务器已有可运行原生组件菜单时，重复制作或验证安装包不得把它改写成微服务菜单；目标端需要迁移的菜单才绑定 `/micro-app/host`，并把新 `Url` 写成包含当前租户和稳定 `MsKey` 的 `/micro-app/{OsClient}/{MsKey}/{route}`，显式旧地址继续保留。微服务友好路由优先使用 `MsKey`，后端同时兼容历史服务 `Id` 路由；前端把旧菜单 URL、`MsKey` 路由和 `Id` 路由绑定到同一宿主组件，这些地址可并存。
+
+#### 仅共享编译运行产物
+
+Web 应用若只交付公有运行产物，可显式采用
+`RuntimeAssetsOnly=true + IncludeSource=false`。此模式只接受协议 v3 中已验证、
+已提交的 `SharedPublicRuntime`；不复制构建文件，也不在目标租户安装业务表、
+接口引擎或数据。它与普通包的“不包含源码”选项、平台启动包的 `DatabaseOnlyBuild`
+分别处理，省略开关时保持原有行为。
+
+请求和既有商城行的资源选择必须为空，不能用此模式静默抛弃上一版资源。
+发布仍需先检查资源快照，再绑定同一摘要发布，最后下载实际包核验源码与资源均为零。
+完整条件与 MCP 调用顺序见 [应用商城：仅共享编译运行产物](./app-store.md#仅共享编译运行产物)。
+
+#### 受信任的平台启动包
+
+受信任的平台启动包可以显式采用 `Source=NotIncluded + Build=DatabaseOnly + StorageMode=db`。它只携带编译产物，最多 256 个文件、5MB，逐文件 Base64、大小和 SHA-256 必须回读一致；该模式可作为 `microi-platform-service` 一类小型内置能力的长期启动与恢复介质，不要求目标租户先具备 HDFS。它不是普通应用的容量替代品，也不能携带可编辑源码、私钥或租户秘密。
+
+因此，若目标租户 HDFS 未配置、不可访问或上传失败，普通应用安装、源码同步、上传和文件预览应终止并显示明确错误，不能只写数据库记录后留下无法打开的页面；平台内置 `DatabaseOnly` 运行产物和通知中心恢复入口仍应可用。HDFS/CDN 若作为平台内置运行产物的镜像，只有逐文件回读并与同一 `RuntimeManifestHash` 一致后才可启用，失败时继续使用数据库权威产物。
+
+离线交付流程：
+
+```text
+AI 应用工作台“制作离线包”
+  → 下载 .microi-app.json
+  → 目标租户应用商城“安装离线包”
+  → 后台任务重传 HDFS、安装运行时和页面
+  → 绑定/检查菜单并验收
+```
+
+在线商城流程：
+
+```text
+AI 应用工作台“发布应用商城”
+  → sys_microistore.ApplicationType=MicroService
+  → 目标租户应用商城安装
+  → 下载官方应用包并重传到目标 HDFS
+```
+
+## 上线验收清单
+
+- 已确认 `sys_microistore.AppKey` 与 `sys_microiservice.MsKey` 一致。
+- 普通应用的源码在私有 HDFS、构建产物在公有 HDFS；受信任 `DatabaseOnly` 平台启动包明确记录为数据库运行产物且不携带源码。
+- `BuildVersion`、`EntryPath`、`AssetManifestJson` 和构建文件清单完整。
+- `microi.routes.json` 与 `sys_microiservice_page` 一致。
+- 菜单绑定了正确的 `MicroServiceId`、`MicroServicePageId` 和路由。
+- 表单嵌入场景中，字段 `DevComponentPath` 能匹配页面 `LegacyComponentPaths`；指定路由、自动高度、字段值回写以及 Add/Edit/View/只读模式均已验证。
+- 目标端需要迁移的 `LegacyMenuUrls/LegacyComponentPaths` 菜单已绑定 `/micro-app/host`，且旧菜单 URL、稳定 `MsKey` 路由和历史服务 `Id` 路由均能打开同一页面；原开发服务器仍可运行的原生组件菜单保持不变。
+- 真实主站 URL 不携带 Token，页面仍能调用需要登录的接口。
+- Dialog 的成功、取消、失败回调都已测试。
+- 同一微服务的多个菜单至少连续往返切换 8 轮，不出现 `app name conflict`、白屏、永久骨架屏或菜单内容串页。
+- 缓存范围内返回旧 Tab 时，表单输入、筛选、内部路由和滚动位置保持；打开第 6 个菜单实例后，最久未使用的隐藏实例被淘汰且再次进入可正常冷启动。
+- 关闭当前/其它/全部 Tab 以及退出登录后，对应微应用实例已销毁；恢复页签后 Token、OsClient、权限、主题和可用视口均为当前值。
+- 目标分辨率下没有横向溢出、遮挡或右侧内容看不全。
+- 普通应用在商城安装后使用目标租户自己的 HDFS 文件地址；`DatabaseOnly` 平台启动包使用同租户数据库稳定入口。
+- 发布后的 active 文件清单与本地构建完全一致；旧 `dist/` 元数据已可逆归档，Private、非 `dist/` 及其它应用文件未受影响。
+
+## 常见问题
+
+### 带租户菜单提示微服务不存在
+
+例如主站地址 `/#/micro-app/loctek/microi-3d-engine/designer` 应调用 `MicroApp/Resolve`，参数为 `OsClient=loctek`、`AppKey=microi-3d-engine`、`RoutePath=/designer`。若实际 AppKey 是 loctek、RoutePath 是 `/microi-3d-engine/designer`，说明宿主仍按旧格式拆分了新地址，应更新 PC 前端镜像并刷新浏览器缓存；已有双格式兼容的宿主无需批量改旧菜单。后端不根据 `AppKey===OsClient` 猜测和重写应用身份。
+
+### 流式发布提示门禁表或索引缺失
+
+`mci_app_stream_gate_transition` 和发布门禁相关列/索引由应用商城责任包维护。更新目标租户的应用商城责任包，通过已有“升级租户数据库”入口核验责任包安装，安装完成后回读物理表、列及唯一索引，再重新盘点源码、版本和发布基线。不要执行已退役 Upgrade25，也不要手动 reset 锁、fence、Storage 或 active/committed 指针。`dry-run` 不应切换运行版本；“旧运行版本未切换”还可能来自资产校验失败或真实 CAS 漂移，应按原始错误和回读结果分别处理。
+
+### PublicPublishPath 没有租户前缀
+
+先检查 `sys_microiservice.StorageMode`。`microi-platform-service` 等受信任平台启动包使用 `StorageMode=db、MsUrl=db` 从目标租户数据库内联产物运行，安装器可将 `PublicPublishPath` 保存为 `micro-app/{AppKey}/{Version}`；该值没有租户前缀不等于缺文件。不要直接补前缀或切换为 file。普通 file 应用应核对 `AssetsJson/AssetManifestJson` 内每项 `HdfsPath/FilePathName`、当前租户 `FileServer` 与实际对象，按正常重新安装或发布流程修复；单改商城展示字段不能证明运行入口恢复。
+
+### 页面空白
+
+先检查菜单动态路由是否带有 `MicroAppUrl`、`MicroServiceRoutePath` 等 meta，以及 `ComponentPath` 是否为 `/micro-app/host`。若首次进入正常、连续切换后无数据、永久骨架屏或白屏，而刷新恢复，应继续检查缓存所有权：Vue 外层宿主必须 `keepAlive:false`，`<micro-app>` 才能使用原生 `keep-alive`；不能同时缓存两层，也不能给不同顶部 Tab 复用同一个固定实例名。宿主还应在恢复时强制同步上下文并复核真实可见 DOM。若宿主把菜单 Id 当成 AppKey，通常是菜单绑定字段不完整。
+
+控制台若只出现 `chrome-extension://... Failed to fetch dynamically imported module`，先用无扩展浏览器或无痕窗口复测；该地址属于浏览器扩展，不足以单独证明微服务产物加载失败。真正的微服务资源错误应能对应到 `/micro-app/{OsClient}/{AppKey}/{BuildVersion}/...` 或实际发布域名，并结合 Network 状态码、宿主诊断信息和可见 DOM 判断。
+
+首次打开时，宿主分别检查资源下载和页面渲染：资源下载最多等待 60 秒，资源齐备后的 `beforemount` 才开始 12 秒渲染检查。下载超过 12 秒但仍在正常进行时，不会提前销毁微服务。下载停滞或脚本始终没有渲染内容时仍只自动重建一次，最终显示诊断信息；成功仍以真实可见内容为准。此修复需要更新 PC 框架镜像。
+
+### 切回页签后状态丢失或出现双重生命周期
+
+不要把菜单微服务的主框架 `meta.keepAlive` 改回 `true`。正确做法是保留 Vue 外层 `keepAlive:false`，由平台 `<micro-app keep-alive>` 单独保活，并让子应用监听 `appstate-change`。若第 6 个及之后的实例重新进入时冷启动，这是受控 LRU 淘汰，不是缓存失效；若 5 个以内也总是冷启动，则检查实例名是否随时间随机变化、入口 URL 是否被追加了每次不同的参数，以及子应用是否在 `afterhidden` 主动清空状态。
+
+### 页面或静态资源 404
+
+依次检查：
+
+1. `sys_microiservice` 是否存在且启用。
+2. `BuildVersion` 和 `EntryPath` 是否正确。
+3. `AssetManifestJson` 是否包含请求文件。
+4. 构建产物是否已上传到公有 HDFS。
+5. Vite 构建的资源基础路径是否适配 `/micro-app/...`。
+
+协议 v3 还需检查当前租户 `sys_config.FileServer`（包含公有桶路径）及已提交版本的
+`ReleasePrefix / AssetManifestJson`。CDN 文件返回 200、API 运行入口返回 404 时，
+先确认 API 实际读取的是同一租户文件域名和对象路径；不要重复发布或切换到其它租户。
+运行网关读取配置失败时应返回存储不可用，不再静默使用平台默认文件域名。
+
+### 入口文件存在，但提示 HTML 无效或脚本类型错误
+
+文件内容正确仍可能被错误的 HTTP `Content-Type` 阻止加载。浏览器需要以下类型：
+
+| 文件 | 正确响应类型 |
+| --- | --- |
+| `.html / .htm` | `text/html` |
+| `.js / .mjs` | `text/javascript` |
+| `.css` | `text/css` |
+| `.json / .map` | `application/json` |
+| `.wasm` | `application/wasm` |
+
+框架上传时统一设置 MinIO、S3、OSS 的对象类型，OSS 分片上传也在初始化时设置。
+历史对象若返回 `application/octet-stream`，API 网关按已提交清单中的文件路径归一类型；
+HTML 仍须通过完整文档、大小和 SHA-256 校验，存储 XML 错误页继续拒绝，`nosniff` 保留。
+明确不兼容的类型不会被当成合法页面。
+
+此修复需要更新全部 API 节点。旧对象的 CDN 直接入口仍需通过存储管理修正类型，
+或按正常发布流程生成新版本；API 网关兼容不会修改对象元数据或清除 CDN 缓存。
+普通应用的 `StorageMode=db` 只作应急恢复，文件链路验收通过后恢复 `file` 模式。
+
+### SDK 提示登录身份已过期
+
+确认子应用使用宿主传入的运行时 Token，并执行 `setToken(ctx.token)` 或模板的 `configureMicroiV8()`。不要只读取子应用自身 localStorage，也不要把 Token 放到 URL。
+
+### `app name conflict`
+
+不要在子应用中自行注册固定的宿主实例名。吾码宿主会按页面/弹窗实例生成唯一 name；若使用自定义宿主，也必须让 name 包含菜单或实例维度。
+
+### 后台选择微服务页面没有数据
+
+检查 `sys_microiservice_page` 是否已有当前微服务的路由数据；重新推送项目可以按 `microi.routes.json` 同步页面。
+
+### 表单定制组件提示“组件未找到”
+
+依次检查：微服务及页面是否已发布并启用、字段 `DevComponentPath` 是否能与页面 `LegacyComponentPaths` 归一化后匹配、当前主前端是否存在同路径本地 Vue 组件，以及当前账号是否能读取目标微服务页面。若组件能打开但接口提示无权限，再核对宿主菜单的 `ModuleEngineKey`、`DiyTableId` 和角色授权。
+
+### MCP 查询不到应用
+
+先确认 MCP 连接的服务器、`OsClient` 和登录账号是否正确。若提示 Token 失效，应重新登录或刷新 MCP 会话；不要把鉴权失败误判为应用不存在。
+
+### 在线修改后本地还是旧代码
+
+在线源码和本地目录是两个工作副本。在线修改后可下载源码 ZIP，再与本地 Git 工作区合并；本地修改后执行 `同步微服务源码到在线 AI 应用`。多人同时编辑前应先约定主工作副本，避免互相覆盖。
+
+### 商城安装时 HDFS 失败
+
+检查目标租户的 HDFS 类型、Endpoint、Bucket、访问密钥、私有/公有桶权限和网络连通性。普通应用安装过程必须能按包策略写入私有源码和公有构建产物；不要因为平台内置 `DatabaseOnly` 页面可以打开，就把对象存储检查误判为通过。反过来，HDFS 故障也不应让 `microi-platform-service`、应用商城页面和通知中心恢复入口一起失效。
+
+### 本地商城源被安全策略拦截
+
+服务端可能把访问 `localhost`、内网 IP 的远程商城源识别为 SSRF 风险。开发环境应通过受控配置明确允许可信地址，生产环境不要为了测试直接关闭全局 SSRF 防护。
