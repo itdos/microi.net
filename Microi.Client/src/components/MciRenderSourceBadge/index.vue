@@ -129,7 +129,8 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
-import { normalizeRenderSourceType } from "@/utils/framework-presentation.js";
+import { useDiyStore } from "@/pinia";
+import { isExplicitlyEnabled, normalizeRenderSourceType } from "@/utils/framework-presentation.js";
 
 const props = defineProps({
     type: { type: String, default: "" },
@@ -141,11 +142,24 @@ const props = defineProps({
 
 const emit = defineEmits(["dismiss"]);
 const { t } = useI18n();
+const diyStore = useDiyStore();
 const dismissed = ref(false);
 const detailsVisible = ref(false);
 
 const sourceType = computed(() => normalizeRenderSourceType(props.type));
-const visible = computed(() => Boolean(sourceType.value) && !dismissed.value);
+const canInspectMicroservice = computed(() => {
+    // 来源/源码定位是宿主管理员工具；只读取当前登录用户，不接受应用参数或账号名称代替等级。
+    // 此处仅控制入口可见性，实际源码与 MCP 操作仍由后端独立鉴权；访问密钥会话保持控制面隔离。
+    const currentUser = diyStore.GetCurrentUser;
+    const rawLevel = currentUser?.Level;
+    if (isExplicitlyEnabled(currentUser?._AccessKeySession)
+        || !["number", "string"].includes(typeof rawLevel)) return false;
+    const level = Number(rawLevel);
+    return Number.isFinite(level) && level >= 9999;
+});
+const visible = computed(() => Boolean(sourceType.value)
+    && (sourceType.value !== "microservice" || canInspectMicroservice.value)
+    && !dismissed.value);
 const label = computed(() => sourceType.value === "microservice" ? t("Msg.MicroService") : t("Msg.CustomComponent"));
 const openDetailsLabel = computed(() => `${t("Msg.OpenRenderSourceDetails")} · ${label.value}`);
 const dismissLabel = computed(() => `${t("Msg.DismissRenderSourceBadge")} · ${label.value}`);
@@ -262,7 +276,11 @@ async function copyAiPrompt() {
 }
 
 watch(
-    () => [props.instanceKey, props.type],
+    () => [
+        props.instanceKey,
+        props.type,
+        ...(sourceType.value === "microservice" ? [diyStore.GetCurrentUser?.Id, canInspectMicroservice.value] : [])
+    ],
     () => {
         dismissed.value = false;
         detailsVisible.value = false;
