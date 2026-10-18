@@ -1,0 +1,225 @@
+# MCI-DESIGN
+
+> 本文件是 Microi吾码官方网站的设计契约。首页或全站视觉结构变化时，必须同步评审本契约、主题源码与桌面/移动截图。
+
+```yaml
+contract:
+  version: 1
+  project: Microi吾码官方网站
+  mode: brand-narrative
+  intent: 像一张清晰的企业软件工程控制台，让访问者快速理解产品定位、开发路径与可信证据
+
+tokens:
+  color:
+    canvas: var(--mci-ai-page-bg)
+    surface: var(--mci-ai-surface)
+    surfaceSolid: var(--mci-ai-surface-solid)
+    surfaceSoft: var(--mci-ai-surface-soft)
+    textPrimary: var(--mci-ai-text)
+    textSecondary: var(--mci-ai-text-soft)
+    textMuted: var(--mci-ai-text-muted)
+    primary: var(--mci-ai-primary)
+    primaryStrong: var(--mci-ai-primary-strong)
+    cool: var(--mci-ai-cool)
+    trainingStart: var(--mci-home-training-start)
+    trainingEnd: var(--mci-home-training-end)
+    agentStart: var(--mci-home-agent-start)
+    agentEnd: var(--mci-home-agent-end)
+    actionText: var(--mci-home-action-text)
+    pathViolet: var(--mci-home-path-violet)
+    pathBlue: var(--mci-home-path-blue)
+    pathTeal: var(--mci-home-path-teal)
+    danger: var(--mci-color-danger, "#D92D20")
+  typography:
+    display: { size: "clamp(44px, 5.1vw, 62px)", lineHeight: 1.08, weight: 860 }
+    h1Mobile: { size: "clamp(34px, 10.2vw, 46px)", lineHeight: 1.12, weight: 860 }
+    h2: { size: "clamp(30px, 3.5vw, 44px)", lineHeight: 1.22, weight: 760 }
+    body: { size: 15px, lineHeight: 1.75, weight: 400 }
+    meta: { size: 12px, lineHeight: 1.6, weight: 650 }
+  spacing:
+    micro: 4px
+    compact: 8px
+    control: 12px
+    card: 24px
+    section: 72px
+    pageDesktop: 24px
+    pageMobile: 14px
+  shape:
+    control: var(--mci-radius-lg, 12px)
+    card: 24px
+    heroMap: 20px
+    pill: var(--mci-radius-pill, 999px)
+  elevation:
+    card: var(--mci-ai-shadow-soft)
+    map: var(--mci-ai-shadow)
+
+components:
+  heroAction:
+    minHeight: 46px
+    states:
+      default: { trainingGradient: ["{tokens.color.trainingStart}", "{tokens.color.trainingEnd}"], agentGradient: ["{tokens.color.agentStart}", "{tokens.color.agentEnd}"], text: "{tokens.color.actionText}" }
+      hover: { lift: -2px }
+      focus: { outline: "{tokens.color.primary}" }
+      pressed: { scale: 0.98 }
+      loading: { preserveWidth: true }
+      disabled: { opacity: 0.38 }
+  developmentMap:
+    background: "{tokens.color.surface}"
+    radius: "{tokens.shape.heroMap}"
+    padding: "16px 20px"
+    states:
+      default: { elevation: "{tokens.elevation.map}" }
+      hover: { elevation: "{tokens.elevation.map}" }
+      focus: { outline: "{tokens.color.primary}" }
+      selected: { border: "{tokens.color.primary}" }
+      success: { accent: "{tokens.color.cool}" }
+  aiChat:
+    background: "{tokens.color.surfaceSolid}"
+    radius: 20px
+    states:
+      default: { border: var(--mci-ai-line-strong) }
+      focus: { outline: "{tokens.color.primary}" }
+      loading: { preserveLayout: true }
+      empty: { showPrompt: true }
+      error: { showRecovery: true }
+      disabled: { showLoginReason: true }
+
+omissions:
+  - rule: backgroundVideo
+    reason: 定位与开发路径应在无媒体资源时仍立即可读，避免首屏依赖大文件
+  - rule: webglHero
+    reason: 架构关系用可访问 DOM 表达，低性能设备与搜索引擎获得相同信息
+```
+
+## 1. 产品概览与目标用户
+
+- 首要用户：企业软件负责人、架构师、专业开发者、低代码开发者与技术决策者。
+- 首要任务：在 3 秒内判断 Microi吾码是什么、为何适合中大型应用、如何开始。
+- 用户进入后第一眼必须理解：吾码是开源 AI 开发框架，以 30+ 成熟引擎融合 AI 低代码、微服务、V8 与专业源码，形成连续开发路径。
+- 成功结果与衡量方式：首屏定位可复述，主操作可直接到达培训大纲或下载已验证的 Microi Code 安装包；开发路径图无需阅读长文即可理解。
+- 关键设备与使用环境：1440/1920 桌面为主，兼容 390px 手机、亮色/暗色和 200% 浏览器缩放。
+
+## 2. 视觉性格与情绪目标
+
+- 主情绪：可信。
+- 具体视觉隐喻：夜间工程控制台——精确边界、清晰分层、暖橙色学习入口、蓝色 Agent 入口与三条清晰的开发路径。
+- 辅助气质：克制、敏捷。
+- 选择理由：企业开发平台应让复杂能力看起来有秩序，而不是用功能文字墙证明强大。
+- 明确不采用的视觉语言：随机光球、彩虹渐变、纯聊天工具首屏、营销卡片无限堆叠。
+
+## 3. 颜色
+
+- 页面底色与表面关系：画布使用低对比结构网格；地图、价值带和 AI 输入区使用逐级抬升的表面色。
+- 学习入口使用暖橙渐变，Agent 入口使用深蓝渐变；稳定的白色文字覆盖流光。三条路径使用紫、蓝、青语义色区分，亮暗主题分别提供足够对比度。品牌主色继续用于登录等既有操作。
+- 成功 / 警告 / 危险 / 信息色语义：沿用 MCI-UI 语义 token，不把装饰色当状态色。
+- 明亮与暗黑主题的对比策略：暗色使用更亮的红色强调，亮色使用更深的品牌红；正文不依赖透明渐变文字。
+- 透明表面的叠加底色：只叠加在 `--mci-ai-page-bg` 或 `--mci-ai-surface-soft` 上；不支持透明时退回实体表面。
+
+## 4. 字体
+
+| 角色 | 字号 / 行高 / 字重 | 用途 | 禁止 |
+| --- | --- | --- | --- |
+| Display | `clamp(44px, 5.1vw, 62px)` / 1.08 / 860 | 首页定位 | 超过三行、渐变透明字 |
+| H1 Mobile | `clamp(34px, 10.2vw, 46px)` / 1.12 / 860 | 手机首屏定位 | 小于 34px 导致失去视觉锚点 |
+| H2 | `clamp(30px, 3.5vw, 44px)` / 1.22 / 760 | 区块论点 | 与正文同权 |
+| Body | 15–19px / 1.75 / 400 | 价值说明 | 超过 70 字符的无分段长行 |
+| Meta | 10–12px / 1.6 / 650–800 | 层级、编号、事实标签 | 承载关键业务结论 |
+
+## 5. 布局与间距
+
+- Desktop：12 列，最大宽度 1320px；AI Studio 先以居中单列建立入口，两个入口独立占一行，统一能力面板使用三列开发路径。
+- Tablet：8 列，768–1050px 保持紧凑三列路径，文案居中，面板保持完整宽度。
+- Mobile：4 列，左右安全间距 14px；开发模式从三列变为三段纵向层级。
+- 内部紧凑间距：8–16px；相邻元数据保持同一视觉组。
+- 区域与页面留白：AI Studio 桌面上间距 104px、平板 40px、手机 32px，叠加平板/手机导航占位后与桌面保持相近的标题位置；能力带与 NuGet 证据区保持 28px 桌面间隔，禁止一处过疏、一处相贴。
+- NuGet 数据说明到 AI 应用标题保持 24px 间距：NuGet 底部 16px，首页应用区顶部 8px；桌面与手机使用同一紧凑节奏。
+
+## 6. 层级、材质与形状
+
+- 深度来自：色调层、细边框、结构网格与环境阴影；玻璃只用于导航等小面积区域。
+- 20–26px 卡片圆角表达完整平台，8–12px 控件圆角表达精确工具感；AI Studio 品牌标识保留金色圆点、暖金描边和完整胶囊轮廓。
+- 页面 / 卡片 / 浮层的层级关系：画布 < 融合优势的开发路径面板 / AI 输入区 < 独立入口行 < 导航。
+- 低性能与不支持透明效果时的降级：实体表面、无扫光、无模糊；信息结构不变。
+
+## 7. 组件与状态
+
+| 组件 | Default | Hover / Focus / Pressed | Loading | Empty / Error | Disabled | Selected / Success |
+| --- | --- | --- | --- | --- | --- | --- |
+| 主按钮 | 培训大纲为暖橙色、Microi Agent 为蓝色，图标加文字 | 上浮 2px、3px 焦点环、按压 0.98 | 保持宽度 | - | 0.38 透明度 | - |
+| 开发路径图 | 三层关系可读 | 可见边界与焦点 | 静态内容无需加载 | 无脚本仍完整显示 | - | V8 层用品牌色强调 |
+| AI 输入区 | 实体抬升表面 | 快捷按钮与发送按钮三态完整 | 思考点动效 | 错误文案和重试路径 | 未登录显示原因与登录按钮 | 登录后恢复输入 |
+| 应用 / NuGet 数据 | 复用现有组件契约 | 保留键盘焦点 | 贴合最终几何的骨架 | 明确重试，不循环请求 | - | 成功后展示可信数据 |
+
+## 8. 页面模式与信息架构
+
+1. 互动入口：Microi AI Studio 以原有金色胶囊品牌标识开场，先表达“复用成熟引擎、贯通低代码到源码、聚焦业务增量”，再承接需求输入。
+2. 独立入口行：培训大纲与 Microi Agent 两项操作在同一行居中并排，桌面按钮高 46px、手机高 44px，整行最大宽 560px，分别进入培训大纲和 Agent 产品页；具体安装包的平台、架构与版本由 Agent 产品页承载。
+3. 核心任务：将“30+ 成熟引擎开箱即用、Token 更省 10 倍+、速度提升 10 倍+”分别融入 AI 低代码、V8、微服务三条紧凑路径，桌面面板约 180px 高，与 NuGet 数据卡接近。小图标、优势色与结构网格建立层次。
+4. 证据：NuGet 官方采用数据与公开应用。
+5. 最终行动：快速开始、源码架构、应用体验。
+
+- 主模式：品牌叙事。
+- 辅助能力：动态首屏、真实产品流程。
+
+## 9. 动效与媒体
+
+- 0—120ms：结构网格、AI Studio 品牌标识和登录入口可读。
+- 120—360ms：平台定位文案与按钮稳定呈现。
+- 360—800ms：开发路径图进入；不阻塞 CTA 或 AI 入口。
+- 循环动效：两个入口使用 8 秒底色流动、7 秒低亮度整面渐变，每个按钮内部散布 12 颗 2–3px 白色微粒，各自按 6.4–9.7 秒的错开相位缓慢漂浮与闪烁；Agent 保留蓝色底与蓝紫渐变，培训大纲使用橙金色。不加上下白色光带或中心遮罩，微粒位于标签下方，底色与渐变保持白字可读；路径面板为 9 秒低频扫光。只动画 transform、opacity、background-position，离开视口或切到后台时暂停；不依赖动画传达文字信息。
+- 图片比例与 `object-fit`：应用商城沿用固定预览比例；首屏不依赖图片。
+- `prefers-reduced-motion` 与静态降级：关闭扫光、思考点和过渡，保留最终布局。
+
+## 10. 响应式与安全区
+
+| 宽度 | 栅格 | 导航 | 主操作 | 内容重排 |
+| --- | --- | --- | --- | --- |
+| 390 | 4 列 | VitePress 手机导航，44px 以上触控区 | 两个入口保持并排、完整可读 | 三条开发路径与各自优势纵向排列 |
+| 768 | 8 列 | 紧凑导航 | 独立入口行并排 | 首屏单列，地图保持横向三层 |
+| 1440 | 12 列 | 浮动玻璃导航 | 独立入口行居中并排 | 统一面板的三条路径各自融合优势 |
+
+## 11. 可访问性、性能与降级
+
+- 键盘顺序与可见焦点：AI 输入 / 登录 → 主 CTA → 次 CTA → 实测链接 → 后续数据与应用操作；焦点环不被裁切。
+- 正文、状态与交互对比度：正文按实际表面满足 WCAG AA；大标题至少 3:1。
+- 触控目标：移动端主要操作不小于 44px。
+- 首屏资源预算：无首屏远程图、视频、Canvas 或 WebGL 阻塞。
+- 网络失败、媒体失败与离线策略：首屏定位与路径图完全静态；远程数据组件使用现有缓存、骨架和手动重试。
+- 骨架屏、空态、错误态与恢复路径：NuGet 与应用商城按组件契约处理；AI 未登录与打开失败均提供明确恢复路径。
+
+## 12. 应当与禁止
+
+### 应当
+
+- 用“低代码 → V8 → 专业源码”的关系图代替功能目录。
+- 把“开源 AI 开发框架”作为唯一主定位，以“30+ 成熟引擎、AI 低代码、微服务、V8 引擎”解释能力组成。
+- AI Studio 标题先讲结果与差异，再讲如何选择开发层，避免写成使用说明。
+- 让每个按钮、数字和公开应用都能到达真实页面或数据源。
+
+### 禁止
+
+- 宣传低代码会替代专业开发，或把高代码与低代码描述成只能二选一。
+- 在首屏堆几十项功能、多个同权 CTA 或无法复现的绝对效率承诺。
+- 用抽象光球、持续模糊、背景视频或 3D 装饰遮挡产品关系。
+
+## 有意省略
+
+| 规则 | 省略理由 | 替代方案 |
+| --- | --- | --- |
+| 首屏产品截图 | 平台价值是多层开发关系，单一后台截图会缩窄认知 | 使用可访问的开发路径图，应用截图放入应用商城证据区 |
+| 首屏动态远程数据 | 首屏定位必须离线可读 | NuGet 与应用列表放在后续证据区并保留骨架、缓存和重试 |
+
+## 验收清单
+
+404 错误态采用“真实产品流程”模式：用户首先看到清楚的迷路提示和“前往官方文档”主操作，再提供首页、快速开始和 V8 参考入口。复用官网 `--mci-site-*` 表面、文字、边框与品牌 token，卡片最大宽度 800px，移动端单列；不回显可能含隐私的 URL/query，不使用远程图片或持续动画。错误状态必须同时保持 HTTP 404、可读的静态正文、键盘焦点和 `prefers-reduced-motion` 降级，中英文按钮使用同一组件。
+
+- [ ] 机器块能解析，核心章节顺序正确，无重复或近似拼写章节。
+- [ ] 所有 `{路径}` 引用存在且无循环；无未说明的孤立 token。
+- [ ] 首屏在 3 秒内说清产品、对象和主操作。
+- [ ] 默认、加载、空、错误、禁用、权限、成功状态可验证。
+- [ ] 390 / 768 / 1440 无横向滚动、遮挡和错位。
+- [ ] 明亮、暗黑主题均有足够对比度。
+- [ ] 所有可点击元素有 hover、focus、pressed 和真实结果。
+- [ ] 动效尊重 `prefers-reduced-motion`。
+- [ ] 契约差异与实现差异同时评审，没有意外删除或语义漂移。
+- [ ] 所有图片、字体、模型和代码资产来源合法且可离线构建。

@@ -1,0 +1,794 @@
+# 📦 模块引擎
+
+> **包含模块配置、数据源配置、接口替换、动态按钮等配置**
+
+![module-engine](https://file.microi.net/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
+## 模块配置
+
+### 审批工作流打开方式
+
+模块【打开方式】选择 `WorkFlow` 时，【关联流程引擎】保存的是
+`sys_menu.FlowDesignId`，必须指向已启用的 `wf_flowdesign.Id`；模块
+`DiyTableId` 与流程 `TableId` 必须是同一张业务表。通过 MCP 的完整 Manifest
+创建新流程与模块时，模块可设置 `openType:"WorkFlow"` 和
+`flowName:"同包流程名称"`，生成器会回填当前租户的流程 Id。
+关联已有流程时使用精确 `flowDesignId`，不能填流程名称或跨租户 Id。
+
+交付时回读 `OpenType/FlowDesignId/DiyTableId`，从模块打开表单发起真实
+记录，并检查审批人的待办、流程图和历史。节点坐标与人员绑定规则见
+[工作流引擎](/doc/system-engine/wf-engine)。
+
+### 菜单图标
+
+侧栏的 CSS/组件图标配置在 `sys_menu.IconClass`，图片字段 `Icon` 不能代替它。优先选择已注册的 Element Plus 图标名，如客户用 `UserFilled`、日程用 `Calendar`、仓储用 `Box`、办公用 `OfficeBuilding`；FontAwesome 名称必须在当前前端兼容映射内，否则会显示默认文档图标。
+
+为每个菜单选择符合业务的图标。没有相关图标时，从可用图标集合随机选择并保存，避免全部菜单相同，也避免每次刷新改变。MCP 使用 `microi_update_module` 的 `module.IconClass` 更新，回读字段后还需在实际侧栏检查；发布应用时一并打包，保证安装后保留。
+
+### 统计列的字段映射
+
+通过 MCP Manifest 配置金额或数量统计时，按字段名填写 `statFields: ['Amount', 'Quantity']`
+（也支持 `statisticsFieldNames`），由 MCP 转换为当前租户的字段 Id。
+原生 `StatisticsFields` 则保存 `[{"Id":"真实字段Id","Type":"Sum"}]`，不能直接写
+`["Amount"]`，否则列表可能有数据而汇总为空。配置后应检查真实列表的
+`DataAppend.StatisticsFields` 和页面汇总，并验证撤销权限后统计也受数据范围限制。
+
+### 导入与导出按钮显示条件
+
+更新“模块引擎”应用后，在模块设计的【按钮】分组配置 `ImportCodeShowV8`、`ExportCodeShowV8`。
+例如 `V8.Result = false;` 隐藏对应按钮，`V8.Result = V8.CurrentUser.Account === 'admin';`
+按当前用户控制显示。角色原有导入、导出权限仍然生效，显示条件不能赋予后端权限。
+代码字段可在表单设计器中选 `DisplayMode=Inline/Dialog`；默认内联，按钮文案支持
+`ButtonText="当前{{charCount}}字代码、{{lineCount}}行代码"`。
+
+### 详情与删除按钮显示条件
+
+模块的 `DetailCodeShowV8`、`DelCodeShowV8` 分别控制平台内置【详情】与【删除】行按钮。例如定制微服务已承担查看入口时，可设 `DetailCodeShowV8` 为 `V8.Result = false;`，再在 `MoreBtns` 添加【打开普通表单】按钮，用 `V8.OpenAnyForm({ TableName: '表名', Id: V8.Form.Id, FormMode: 'View', DialogType: 'Dialog' })` 保留原生表单入口。删除按钮可按业务状态设 `V8.Result = ['Draft', 'Rejected'].includes(String(V8.Form.ApprovalStatus || 'Draft'));`。前端显隐不能代替服务端删除权限和状态校验。
+
+### 用户级登录后首页
+
+每个系统账号都可在 PC 右上角头像菜单的【个人设置】中选择“登录后首页”。设置保存在 `sys_user.DefaultIndexUrl`，而系统级默认首页仍保存在 `sys_config.DefaultIndexUrl`。
+
+登录跳转优先级固定为：当前用户 `sys_user.DefaultIndexUrl` → 系统 `sys_config.DefaultIndexUrl` → 登录接口返回的菜单首页 → 当前用户第一个可访问模块。个人值支持 `/route`、`#/route`、`/#/route`，保存时统一规范为站内路由；外部网址、登录页和访问密钥兑换页不能保存。客户端会用当前动态菜单再次校验权限，菜单被撤权或删除时自动回退，不会停在 404 或空白页。
+
+管理员也可在【系统账号】表单的“个人设置”页签维护该字段。MCP 维护账号数据时使用同名字段 `DefaultIndexUrl`；留空表示继承系统默认值。
+
+个人设置还支持 `sys_user.ThemeColor`、`ThemeMode`、`CornerStyle`、`NavigationLayout` 和 `MenuChildExpandMode`。右上角主题设置与平台个人中心统一调用官方 Managed 接口引擎 `platform-user-update-preferences` 保存：
+
+- `ThemeColor` 留空时继承 `sys_config.ThemeColor`；
+- `ThemeMode` 使用 `light / dark`；
+- `CornerStyle` 使用 `round / square`，默认圆角；
+- `NavigationLayout` 使用 `System / Side / Top / TopSide`，其中 `System` 继承系统设置；
+- `MenuChildExpandMode` 使用 `System / Down / Right`，其中 `System` 继承系统设置；
+- 已安装这些字段时以账号值为准，换设备登录也会恢复；旧租户未安装字段时仅保留浏览器本地兼容行为。
+
+右上角【主题设置 → 边角风格】可在“圆角／直角”之间切换。直角模式即时覆盖框架按钮、输入框、弹窗、页面容器、卡片和 Tab 的边角。安装新版系统账号应用后，选择保存在当前账号并在其它设备恢复；旧租户暂存在当前浏览器。顶栏的通知、搜索、主题、AI、蓝牙及全屏入口使用统一的 40px 触控区域和 20px 图标；主题入口为齿轮，AI 入口为圆圈内的 AI 字母轮廓。【界面密度】在主题面板内调整。升级 `Microi.Client` 后生效。
+
+`NavigationLayout=TopSide` 使用一级顶部、二级侧栏的布局，仍从当前用户授权路由读取菜单。
+单个子菜单也保留在侧栏；当前一级没有可见子菜单时隐藏侧栏并释放内容宽度。
+二级及更深层继续使用原侧栏的角标、外链、收起和向下/向右展开行为。移动端保持底部导航。
+
+接口引擎只从当前 DiyToken 读取用户 Id 和租户，不接受调用方指定目标用户/租户，也不写账号、手机号、部门、角色、Level、状态、密码、认证因子或登录审计字段。管理员表单中的“个人设置”Tab 应继续用 CollapseGroup 将语言与首页、主题与菜单、桌面外观分组。
+
+### 系统账号官方应用与个性化 Hook
+
+系统账号相关的可变业务编排由独立官方应用 `app.microi.sys_user` 交付：
+
+| 接口引擎 | 职责 |
+| --- | --- |
+| `platform-user-update-preferences` | 保存当前用户首页、主题、菜单和桌面白名单偏好 |
+| `platform-user-update-profile` | 保存当前用户昵称、邮箱、语言和经可信原子校验的头像路径 |
+| `platform-user-custom-hook` | 租户自行维护的 CreateIfMissing 个性化扩展 |
+
+前两个接口是 Managed 官方代码，安装、更新或重新安装“系统账号”会恢复官方源码，不能直接追加租户逻辑。个性化逻辑只写入 `platform-user-custom-hook`；它首次安装时默认直接返回 `{ Code: 1 }`，之后官方升级不覆盖。Hook 只接收阶段、当前用户 Id 和变更字段名等安全最小投影，不接收密码、Token、角色、组织或 Secret。
+
+旧 `/api/SysUser/UpdateMyDefaultIndexUrl` 与 `/api/SysUser/UpdateCurrentProfile` 仅作为旧客户端兼容桥，固定转发上述 Managed 接口。密码哈希/重置、DiyToken、管理员查看历史密码、访问密钥和认证因子仍是可信 C# 边界，不能为了“全 V8”把密钥或通用改密能力暴露给接口引擎。
+
+## 左侧菜单统计角标
+
+对库存预警、待审批、未读消息、待回款等需要用户持续关注的菜单，可在模块引擎配置：
+
+| 物理字段 | 说明 |
+| --- | --- |
+| `MenuBadgeEnabled` | 是否在左侧菜单右侧显示统计角标；默认关闭。 |
+| `MenuBadgeApiEngineKey` | 统计接口引擎 Key；开启角标时必填。 |
+| `MenuBadgeTooltip` | 鼠标移入数字角标时显示的业务说明；建议明确统计对象、用户范围以及“待办/未读/总数”等口径。 |
+
+前端按菜单调用一次接口引擎，并携带 `_SysMenuId`、`SysMenuId`、`OsClient`。接口使用统一返回协议：
+
+```js
+// MenuBadgeApiEngineKey = inventory_warning_badge
+var countResult = V8.FormEngine.GetTableDataCount('diy_product', {
+  _Where: [['Stock', '<', 10]]
+});
+return {
+  Code: 1,
+  Data: { Value: Number(countResult.Data || 0) }
+};
+```
+
+`Data.Value=0` 时默认不显示，超过 99 显示 `99+`；统计失败只隐藏角标，不阻断菜单导航。客户端对同一用户、菜单和接口结果做短缓存并定时刷新。接口引擎必须继续执行当前租户和当前用户的数据权限，不能为了统计总数改成匿名接口或绕开模块权限。
+
+官方基础菜单的说明口径如下：接口引擎为“当前租户接口引擎总数”，我的工作为“当前登录用户的待办任务数与未读抄送数之和”，系统账号为“当前租户系统账号总数”。自定义角标也应使用同样具体的说明，不能只写“数量”或“统计值”。未配置 `MenuBadgeTooltip` 的历史菜单继续显示原有的“菜单名：原始数字”标题，不影响兼容。
+
+以下菜单通常应主动考虑角标：待办/待审批、库存或余额预警、未读消息、逾期合同、待付款/待回款、失败任务。普通资料维护、低频设置、无明确行动含义的总数不建议配置，以免侧栏充满噪声。
+
+## 跨端统一视图
+
+跨端视图属于模块引擎，因为同一张表可能被多个 `sys_menu` 以不同角色、业务场景和卡片样式复用。配置保存在 `sys_menu` 的专用物理字段中，不放在 SaaS 引擎、`diy_table` 或 `DiyConfig`：
+
+| 物理字段 | 说明 |
+| --- | --- |
+| `EnableViewSchema` | `1` 启用 Detail/Edit 自定义表单视图；不控制 List/Card 展示配置。 |
+| `ViewSchemaVersion` | 可选的协议语义版本；为空时默认 `1.0`。 |
+| `ViewConfigVersion` | 可选的配置递增版本；为空时默认 `1`，后续变更自动递增。 |
+| `ViewSchema` | Detail、Edit、List、Card 的版本化 JSON。 |
+
+所有顶层 PC 数据模块默认使用紧凑的新列表外观，即使 `EnableViewSchema=0`，也会显示以模块名称为标题的模块头部；子表、关联表和嵌入表不会重复显示。模块头部在**页面多 Tab（PageTabs）上方**渲染，固定信息层级为“模块标题/副标题/动态指标 → 页面多 Tab → 查询与表格”。无指标时头部高度为 `44px`，含指标时为 `58px`，连同区块间距的总纵向占用约为 `50px / 64px`，不能为了视觉效果挤占低分辨率电脑的表格首屏。`Scene=List/Card` 的标题与统计、PC 复合列和移动端卡片只要存在有效配置就直接生效；`EnableViewSchema` 仅控制 `Scene=Detail/Edit` 的自定义表单视图。移动端继续由固定导航栏显示模块名，只有配置了动态指标时才追加指标区，避免重复标题和空白占位。
+
+模块头部只允许一次性入场和一次性轻量光效，不得使用持续循环的位移、呼吸、渐变或阴影动画。所有动效必须支持 `prefers-reduced-motion: reduce`：命中时关闭动画与过渡，保证低性能终端、无障碍用户和长时间停留页面不会卡顿。
+
+模块引擎表单的“跨端视图”页签提供“模块展示设计器”，可视化配置标题与指标、PC 复合列和移动卡片，并提供独立的“自定义表单视图 JSON”编辑 Detail/Edit。高级 JSON 保留完整协议、角色优先级和未知扩展字段。设计器保存时会同步 `EnableViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion` 和 `ViewSchema`；两个版本字段允许为空，读取时使用上述默认值。
+
+`diy_table.DiyConfig`、`diy_field.DiyConfig`、`sys_menu.DiyConfig` 均已废弃。旧字段只保留历史读取兼容，新功能必须增加专用物理列，并通过 `diy_field` 元数据提供设计控件。
+
+### 视图结构
+
+```json
+{
+  "Views": [
+    {
+      "Key": "customer-detail",
+      "Scene": "Detail",
+      "Device": "All",
+      "RoleIds": [],
+      "Priority": 10,
+      "Layout": {
+        "Hero": {
+          "TitleField": "KehuMC",
+          "ImageField": "Logo",
+          "StatusField": "KehuHZ",
+          "MetaField": "KehuLX",
+          "Metrics": [
+            { "Label": "设备", "Field": "ShebeiSL", "Suffix": "台" }
+          ]
+        },
+        "Actions": [
+          {
+            "Key": "orders",
+            "Label": "合同订单",
+            "ActionType": "OpenList",
+            "ModuleEngineKey": "orders",
+            "ParamMap": { "KehuID": "$form.Id" }
+          }
+        ],
+        "Blocks": [
+          {
+            "Key": "basic",
+            "Type": "ResponsiveSection",
+            "Title": "客户信息",
+            "Columns": 3,
+            "DefaultExpanded": true,
+            "Fields": ["KehuMC", "KehuLX", "LianxiDH"]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+- `Scene`：`Detail`、`Edit`、`List`、`Card`。
+- `Device`：`PC`、`Mobile`、`All`。
+- `RoleIds`：空数组表示所有已获模块权限的角色；配置角色后优先选择角色专属视图。
+- `Priority`：同场景、同终端命中多个视图时选择优先级更高者。
+- 没有新视图、配置损坏或客户端暂不支持某个区块时，必须回退到现有 `sys_menu + diy_table + diy_field` 渲染，不能白屏。
+
+### 列表页模块标题与动态指标
+
+`Scene=List` 的 `Layout.Hero` 可以配置模块眉题、标题、说明和最多 6 个动态指标。指标来源有三类：`Source="DataCount"` 读取当前筛选条件下的总记录数，`Source="PageCount"` 读取本页已加载记录数，配置 `Field` 时读取列表返回的 `StatisticsFields`，配置 `ApiEngineKey + ValuePath` 时调用接口引擎。`DataCount/PageCount` 是前端已有列表结果，不产生额外统计请求：
+
+```json
+{
+  "Key": "purchase-list",
+  "Scene": "List",
+  "Device": "PC",
+  "Priority": 10,
+  "Layout": {
+    "Hero": {
+      "Eyebrow": "PURCHASE CONTRACT",
+      "Title": "采购合同",
+      "Description": "统一查看合同金额、付款与入库状态",
+      "Metrics": [
+        {
+          "Key": "totalCount",
+          "Label": "总记录数",
+          "Source": "DataCount",
+          "Suffix": "条",
+          "Tone": "primary"
+        },
+        {
+          "Key": "contractCount",
+          "Label": "数量",
+          "ApiEngineKey": "purchase_contract_stats",
+          "ValuePath": "Data.ContractCount",
+          "Tone": "primary",
+          "DefaultValue": 0,
+          "RefreshSeconds": 60
+        },
+        {
+          "Key": "unpaidAmount",
+          "Label": "未付款",
+          "ApiEngineKey": "purchase_contract_stats",
+          "ValuePath": "Data.UnpaidAmount",
+          "Prefix": "¥",
+          "Tone": "danger"
+        }
+      ]
+    }
+  }
+}
+```
+
+相同 `ApiEngineKey` 的指标会合并为一次请求；接口收到 `MetricKeys` 和当前模块、表、租户及筛选上下文，应该一次返回全部值：
+
+```js
+return {
+  Code: 1,
+  Data: {
+    ContractCount: 176,
+    UnpaidAmount: 13971000
+  }
+};
+```
+
+列表首次加载、筛选、翻页和刷新后会同步刷新指标；配置 `RefreshSeconds` 时还会按最短周期刷新。禁止每个指标或每一行各查一次数据库；同一模块的指标应由一个聚合接口批量计算。模块 Hero 始终位于 PageTabs 上方；是否配置 PageTabs 都不能改变该顺序或重复渲染标题。
+
+### PC 复合列：多行值与右侧状态
+
+`Scene=List` 的 `Layout.List.Columns` 可把一个查询列声明为复合列。`Field` 是主字段，`Lines` 在下方显示多个附加字段，`TrailingFields` 在右侧显示图标、状态或预警：
+
+```json
+{
+  "List": {
+    "Density": "Comfortable",
+    "Columns": [
+      {
+        "Field": "ContractName",
+        "MinWidth": 260,
+        "Lines": [
+          { "Name": "Signer", "Label": "签约", "ShowLabel": true, "Tone": "info" },
+          { "Name": "CustomerName", "Icon": "fas fa-building", "Color": "#64748b" }
+        ],
+        "TrailingFields": [
+          { "Name": "StockWarning", "Icon": "fas fa-triangle-exclamation", "Tone": "danger" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+字段声明支持 `Label`、`ShowLabel`、`Icon`、`Tone`、`Color`、`Prefix`、`Suffix`、`FontWeight` 和 `AsName`。若该 `diy_field` 配置了【表格 V8 模板引擎】，主值、附加行和右侧字段都会复用净化后的模板结果。运行时会把引用字段并入 `_SelectFields`；自定义查询接口仍必须识别该参数并返回这些字段。
+
+### 移动端业务卡片
+
+`Scene=Card, Device=Mobile` 的 `Layout.Card` 支持头像、顶部标签、标题、副标题、右侧金额/状态、正文、元信息和底部标签：
+
+```json
+{
+  "Key": "sales-contract-mobile",
+  "Scene": "Card",
+  "Device": "Mobile",
+  "Layout": {
+    "Card": {
+      "Preset": "Business",
+      "AvatarTextField": "CustomerName",
+      "TitleField": "ContractName",
+      "TopFields": [
+        { "Name": "DeliveryStatus", "DisplayStyle": "Tag", "Tone": "warning" },
+        { "Name": "Category", "DisplayStyle": "Tag", "Tone": "success" }
+      ],
+      "SubtitleFields": ["CustomerName", "OwnerName"],
+      "RightFields": [
+        { "Name": "Amount", "Prefix": "¥", "Tone": "primary", "FontWeight": "700" },
+        { "Name": "UnpaidAmount", "Prefix": "未 ¥", "Tone": "danger" }
+      ],
+      "Fields": ["SignDate"],
+      "MetaFields": ["ContractNo", "CreateUserName"],
+      "BottomFields": [
+        { "Name": "AttachmentCount", "Icon": "fas fa-paperclip", "ShowLabel": true }
+      ],
+      "HideIndex": true,
+      "ShowCreateTime": true
+    }
+  }
+}
+```
+
+未配置 Card 视图时继续兼容 `MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields`。移动端卡片会保留至少 40 至 44px 的触控目标、清晰的选择状态和底部批量操作条；不要通过业务定制 CSS 写死表名、菜单名或字段名。
+
+卡片字段引用配置 `ShowLabel=true` 时，移动端会优先使用字段对象显式配置的 `Label`；未显式配置时，从当前模块已授权加载的 `diy_field.Label` 自动补充。`ShowLabel=false` 明确隐藏标签，未配置 `ShowLabel` 时继续兼容历史显式 `Label` 行为。
+
+小程序列表卡片内容区按实际配置字段展示，不再固定截取前四行；空值和与标题、状态、顶部标签重复的字段仍按客户端去重规则隐藏。
+
+仅使用旧式 `MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields` 时，小程序以这三组配置作为卡片字段顺序的事实源：优先采用配置项自身的 `Label`，并将三组字段全部并入列表查询，避免底部字段因不在普通列表列中而缺失。此时旧的跨端 ViewSchema 不再覆盖卡片标题、正文和标签区域；底部字段无值时仍不渲染，并回退显示创建/更新时间。
+
+### 按钮统计角标
+
+`PageTabs`、`MoreBtns`、`PageBtns`、`BatchSelectMoreBtns`、`ExportMoreBtns`、`FormBtns` 的对象都可增加：
+
+```json
+{
+  "Id": "01K...",
+  "Name": "附件",
+  "ShowRow": true,
+  "BadgeEnabled": true,
+  "BadgeApiEngineKey": "contract_button_counts",
+  "BadgeValuePath": "Data.Rows.{RowId}.01K...",
+  "BadgeTone": "primary",
+  "BadgeMax": 99,
+  "BadgeShowZero": false
+}
+```
+
+前端按当前页的 `Ids`、`ButtonKeys` 和 `SysMenuId`，以“每个不同接口引擎一次请求”的方式批量取数。若不配置 `BadgeValuePath`，推荐返回：
+
+```js
+return {
+  Code: 1,
+  Data: {
+    Buttons: { '01K...': 12 },
+    Rows: {
+      'row-id-1': { '01K...': 2 },
+      'row-id-2': { '01K...': 0 }
+    }
+  }
+};
+```
+
+`Buttons` 用于 PageTabs 和页面级按钮，Key 优先使用稳定 `Id`；`Rows` 用于行按钮。行按钮配置 `BadgeField` 时直接读取当前行已查询字段；PageTabs/页面按钮配置 `BadgeField` 时读取模块 `StatisticsFields` 的页面汇总值，因此还要把该字段加入模块“统计列”。这两种字段模式都不调用接口引擎。严禁在每一行渲染时单独调用统计接口；附件、日志、子表等数量应一次批量聚合。接口失败时只隐藏角标，不阻断页签切换、按钮点击或列表加载。
+
+### 标准视图区块
+
+数据控件继续由 `diy-field-component` 负责，例如 Text、Select、ImgUpload、Map、RichText。以下区块不代表数据库字段，独立存放在 `form-view-blocks`：
+
+| 区块 | 用途 |
+| --- | --- |
+| `EntityHero` | 背景、图片、标题、副标题、状态徽标与关键指标。 |
+| `MetricStrip` | 字段值、关联数量、聚合结果或接口引擎指标。 |
+| `ActionGrid` | 图标化快捷入口和业务动作。 |
+| `ResponsiveSection` | PC 1 至 4 列、移动端单列的详情分组与折叠。 |
+
+详情模式使用只读详情渲染器，不把所有字段伪装成禁用输入框；编辑模式继续复用完整表单控件、校验、数据源和后端表单事件。未被视图区块显式引用的 PC 字段必须进入兜底分组，保证字段完整度不低于原表单。
+
+### 跨端动作
+
+小程序不会下载或执行 `V8Code`。跨端按钮使用声明式动作：
+
+- `ActionType`：`ApiEngine`、`OpenDetail`、`OpenList`、`OpenForm`、`Navigate`、`Dial`、`Scan`、`Map`、`Refresh`、`Back`、`Copy`。
+- `ParamMap`：支持 `$form.Field`、`$user.Field`、`$menu.Field` 白名单绑定。
+- `VisibleWhen`：字段、操作符和值组成的声明式显隐条件，不使用 `eval`。
+- `Confirm`、`SuccessMessage`、`SuccessActions`：确认、成功提示和后续刷新/跳转。
+- 涉及校验、事务、跨表写入和数据权限的逻辑必须放到接口引擎或 `SubmitBeforeServerV8` / `SubmitAfterServerV8`。
+
+PC 可继续兼容历史按钮 V8，但跨端视图只向小程序输出规范化后的安全动作。客户端调用时携带当前授权模块的真实 `_SysMenuId`；接口引擎仍在服务端可信执行链中运行。
+
+## 打开方式
+### **Diy**
+>* 以表单引擎渲染，打开是一个表格
+
+### **CodeForm**
+
+由表单设计器生成独立 Vue 3 页面，在已构建并发布的 MicroService 中运行。菜单仍绑定原 `DiyTableId`，同时填写 `MicroServiceId`、`MicroServicePageId`、`MicroServiceKey` 和 `MicroServiceRoutePath`；宿主将真实 `sysMenuId` 传给页面，生成页以 `_SysMenuId` 调用 FormEngine。不能用未发布的源码或无权限的直链替代菜单入口。
+
+```json
+{
+  "OpenType": "CodeForm",
+  "DiyTableId": "原表 Id",
+  "MicroServiceKey": "microi-generated-forms",
+  "MicroServiceRoutePath": "/forms/biz_order"
+}
+```
+
+MCP Manifest 可通过 `microServiceKey + microServiceRoutePath` 解析当前租户的两个微服务 Id；使用 `microi_create_module` 时需传入已回读的 `microServiceId` 和 `microServicePageId`。升级模块引擎官方应用后才会出现该选项。设计器保存 Vue 源码后，还需构建、发布微服务，再切换菜单；已有人工作码时需手工合并，设计器不会覆盖。
+
+### **Component**
+>* 以定制vue组件打开，需要填写定制组件路径
+
+### **Iframe**
+>* 以iframe模式打开
+```
+//如要打开百度，则需要设置url地址为：/iframe/https://baidu.com
+//可以在地址中跟上系统当前登录用户的token值，如：/iframe/https://baidu.com?token=$V8.CurrentToken$
+```
+#### 地址接口引擎
+>* 当打开方式选择为**Iframe**时，可选择动态返回地址的接口引擎，以实现第三方系统的单点登录
+::: details 展开查看 JavaScript 代码（22 行）
+```js
+//先取缓存
+var cacheTokenKey = `Microi:${V8.OsClient}:IotToken-meslogin-jwlrd`;
+var cacheToken = V8.Cache.Get(cacheTokenKey);
+if(cacheToken){
+  return { Code : 1, Data : 'https://第三方系统apibase/mg-ui/#/auto-login?token=' + cacheToken }
+}
+var result = V8.Http.Post({
+  Url : 'https://第三方系统apibase/api/third/findAccessToken',
+  PostParam : {
+    userName : '账号',
+    password : '密码',
+  },
+  // ParamType : 'json',
+})
+var resultObj = JSON.parse(result);
+if(resultObj.code == 0 && resultObj.data && resultObj.data.token)//表示成功
+{
+  //缓存token
+  V8.Cache.Set(cacheTokenKey, resultObj.data.token, '3.00:00:00');//缓存3天
+  return { Code : 1, Data : 'https://第三方系统apibase/mg-ui/#/auto-login?token=' + resultObj.data.token};
+}
+return { Code : 0, Data : resultObj, Msg : result };
+```
+:::
+
+### **SecondMenu**
+>* 含子菜单的上级菜单
+
+后台侧栏会自动给有可见子菜单的父级图标加一层轻微的圆形背景（`50%` 圆角）；叶子菜单图标保持无背景。该效果随当前侧栏文字色适配租户主题色及浅色／深色模式，无需增加菜单字段或单独配置。使用新版 `Microi.Client` 前端即可看到，单独安装或更新应用商城资源不会替换旧版前端样式。
+
+### **Report**
+>* 虚拟报表
+
+## 树形+表格（左右结构）
+
+适用于“左侧按项目、分类或组织导航，右侧显示关联数据列表/表单”的业务页面。目标菜单使用组件模式：
+
+```json
+{
+  "ComponentName": "树形+表格",
+  "ComponentPath": "/diy/left-right/LeftTreeJoinRightForm"
+}
+```
+
+页面配置保存在 `diy_LeftJoinRightView`。同一菜单应只有一条有效配置，保存前按【关联菜单】回读并复用，避免重复配置造成命中不确定。
+
+### 核心配置
+
+| 配置项 | 说明 |
+| --- | --- |
+| `GuanlianCD`（关联菜单） | 当前右侧业务菜单链，末级为当前菜单 `sys_menu.Id`。 |
+| `ShuxingGLCD`（树形关联菜单） | 左侧主数据菜单链。 |
+| `GuanlianBD`（关联表单） | 左侧主表，例如 `xiangmuguanli`。 |
+| `FubiaoGLZD`（父表关联字段） | 左表关联键，通常为 `Id`。 |
+| `ZibiaoGLZD`（子表关联字段） | 右表外键，例如 `XiangmuID`、`ProjectId`；必须以实时表结构为准。 |
+| `GuanlianPPLJ`（关联匹配逻辑） | 普通主外键使用 `=`。 |
+| `ZuobianZSZJ` / `YoubianZSZJ` | 左侧通常为 `树形控件`；右侧可选 `表格`、`表单`、`表单/表格`。 |
+| `ShuxianSZDM`（树显示字段名） | 必须和初始化 V8 返回对象的属性名一致。 |
+| `ChushiHDM`（初始化代码） | 读取 `V8.Form._PageIndex/_PageSize/inputText` 获取左树当前页，最终返回 `Data` 和 `DataCount`。 |
+| `ZuoyouXSZB`（左右显示占比） | 24 栅格比例，例如 `6/18`，`/` 是必要分隔符。 |
+| `ShubiaoT` | 左侧标题。 |
+| `ShumoHSS`、`ShuxiaLSS`、`ShusouSAN`、`ShushuaX` | 模糊搜索、搜索字段下拉、搜索按钮、刷新按钮。 |
+| `ShudingJXZ`、`ShuxinZ`、`ShubianJ`、`ShushanC` | 顶级新增、节点新增、编辑、删除；仅在业务允许时开启。 |
+| `ShujieDDJSJ`、`JiedianANXSSJ` | 节点点击事件、节点按钮显示事件 V8。 |
+| `YincangBSF` | 节点值命中时隐藏右侧区域。 |
+| `TanchuangLX`、`TanchuangDX` | 树节点维护弹窗类型与大小。 |
+| `LanjiaZ`、`LanjiaZDM` | 大数据树懒加载开关与代码。 |
+
+左树也必须分页。组件默认每页 20 条，允许切换 10/20/50/100 条；搜索会回到第一页。初始化代码示例：
+
+```js
+var form = V8.Form || {};
+var pageIndex = Math.max(1, parseInt(form._PageIndex || 1, 10));
+var pageSize = Math.min(100, Math.max(1, parseInt(form._PageSize || 20, 10)));
+var keyword = String(form.inputText || '').trim();
+var query = {
+    _SelectFields: ['Id', 'Code', 'Name'],
+    _OrderBy: 'CreateTime',
+    _OrderByType: 'DESC',
+    _PageIndex: pageIndex,
+    _PageSize: pageSize
+};
+
+if (keyword) {
+    query._Where = [
+        ['Code', 'Like', keyword],
+        ['OR', 'Name', 'Like', keyword]
+    ];
+}
+
+var result = await V8.FormEngine.GetTableData('xiangmuguanli', query);
+
+if (result.Code !== 1) {
+    V8.Result = result;
+    return;
+}
+
+V8.Result = {
+    Code: 1,
+    Data: (result.Data || []).map(function (item) {
+        return {
+            Id: item.Id,
+            TreeTitle: [item.Code, item.Name].filter(Boolean).join(' '),
+            Code: item.Code,
+            Name: item.Name
+        };
+    }),
+    DataCount: Number(result.DataCount || 0),
+    PageIndex: pageIndex,
+    PageSize: pageSize
+};
+```
+
+此时配置 `ShuxianSZDM=TreeTitle`、`FubiaoGLZD=Id`。右侧表格根据 `ZibiaoGLZD = 当前节点.Id` 查询；点击【全部】时清除关联条件。
+
+加载期间组件显示“正在加载项目...”，不会先显示“暂无数据”；并发搜索/翻页只接受最后一次请求结果，避免旧页覆盖新页。禁止用大 `_PageSize` 一次拉取完整项目表。
+
+### 移动端与验收
+
+- 手机端不把左树堆在数据列表顶部。右侧列表占满页面，顶部“项目目录”按钮从左侧打开宽度 `88%`、高度 100% 的树形抽屉。
+- 抽屉带遮罩、关闭按钮并支持点击遮罩或 Esc 关闭；选择节点后自动关闭，同时保留筛选结果。
+- 左树在抽屉内独立滚动，搜索、分页、每页条数切换均可操作。
+- 禁止用固定高度或祖先 `overflow:hidden` 截断卡片、分页、底部按钮。
+- 至少验证桌面 1440x900 与手机 390x844：20 条分页、切换每页条数、搜索、节点筛选、全部、刷新、抽屉打开/关闭、右侧新增自动写入外键，以及树和列表都能滚动到底。
+
+## 数据源配置
+>* **关联表**：join哪些表，设置表的别名
+
+>* **查询列**：select哪些字段
+
+>* **多级表头**：`sys_menu.TableHeaders` 填写 JSON 数组；每组 `Label` 为合并表头标题，`Fields` 为当前可见且连续的查询列字段名。例如：
+
+```json
+[
+  { "Label": "人数（人）", "Fields": ["Total", "Male", "Female"] },
+  { "Label": "学历（人）", "Fields": ["Master", "Bachelor"] }
+]
+```
+
+分组内可再使用 `Children` 建立更深层表头。未配置或 JSON 错误、字段重复、列不连续时保留普通单层表头，防止数据列错位。排序、筛选、行操作仍使用原字段。需要模块引擎官方应用 v8.4.3 和支持 `ModuleMultiHeaderV1` 的新版客户端；AI 可在 Manifest 的 `modules[].tableHeaders` 中填写同样的数组。
+
+如需三级表头，可用 `[{"Label":"人员","Children":[{"Label":"人数（人）","Fields":["Total","Male","Female"]},{"Label":"学历（人）","Fields":["Master","Bachelor"]}]}]`。`Children` 中每个子组仍需 `Label` 和 `Fields`（或继续嵌套 `Children`），所有底层字段在实际表格中必须连续。
+
+模块引擎【更多配置】新增两个独立开关：`HideTableBanner` 对应“关闭表格顶部 Banner 区域”，`HideFormBanner` 对应“关闭表单顶部 Banner 区域”。默认均为关闭，即两个 Banner 正常显示。开启后对应 Banner 不渲染，其专属统计接口也不会执行；按钮角标等其它功能接口保持正常。AI 可在 Manifest 模块中传 `hideTableBanner: 1` 或 `hideFormBanner: 1`。这些开关仅控制当前模块，不修改 `diy_table.FormPresentation` 的共享配置。
+
+>* **不显示列**：有些id字段select后不需要显示在表格上
+
+### 字段权限
+
+在【数据源 → 字段权限】开启控制后，可以按角色、人员、部门、岗位建立权限组，并逐列设置“可见”和“可编辑”。岗位选择平台 `diy_job` 的 `JobName`，根据用户 `sys_user.Jobs` 中的岗位 Id 匹配，独立于角色 `RoleIds`；部门同时匹配用户主部门和关联部门。同一组中选择多个对象表示任一对象匹配；选择“所有用户”表示普通用户均匹配。
+
+默认权限作用于未被权限组覆盖的字段；多个匹配组对同一字段的限制取交集，因此任一组禁止查看或编辑，该字段就会被隐藏或只读。隐藏字段同时禁止编辑。平台超级管理员保留管理权限，普通角色、人员、部门和岗位按配置执行。
+
+字段权限作用于表格、卡片、表单和表内编辑，也由 FormEngine 在查询、筛选、排序、统计、导出、写入和导入时校验。隐藏字段不会出现在返回数据中；利用隐藏字段筛选或排序、写入只读字段会被拒绝。客户端不传菜单时，后端仍按该表已启用的模块字段限制校验。匿名读取仍须满足表单原有匿名策略，并按主库中的字段限制执行；匿名请求不会继承已登录管理员的字段权限。可信服务端业务引擎保留其原有权限边界。
+
+配置存储在 `sys_menu.FieldPermissions`，协议为 `Version:1`。规则包含 `Everyone`、`Roles`、`Users`、`Departments`、`Jobs` 和 `Fields`；授权对象数组保存 Id，字段项为 `{ "Name": "Salary", "Visible": true, "Editable": false }`。默认使用可视化设计器配置，避免遗漏字段或写入错误 JSON。查询返回的 `DataAppend.FieldAccess` 仅包含当前用户的最终字段能力，不暴露权限组名单。需要模块引擎官方应用 v8.4.4 及对应新版平台。
+
+### 树形拖动排序
+
+表单为树形数据时，在【数据源 → 更多】开启【拖动排序】，并选择一个已注册的数值型【拖动排序字段】，例如 `Sort`。当前用户还需有该模块的编辑权限。拖动行前的排序手柄到目标行上半部、下半部或中部，分别表示移到目标之前、之后或成为目标的子级；拖到顶部根级区域可移为根节点。也可聚焦手柄后使用 `Alt + ↑/↓` 调整同级顺序。
+
+内置接口引擎 `mci-tree-drag-sort` 负责业务排序。每次移动会把受影响的旧父级、新父级下全部同级记录重排为 `10、20、30…`，同时维护父级、祖先链和有无子级标记。不能把节点移入自身或后代；界面过期、目标消失或任一受影响记录无编辑权限时，整次移动回滚并提示刷新。排序不受当前页或筛选结果的截断影响。
+
+配置存储在 `sys_menu.TreeDragSortEnabled` 和 `TreeDragSortField`。Manifest 对应 `treeDragSortEnabled`、`treeDragSortField`。表、字段和父级结构只能从服务端模块配置解析，接口不能指定任意表名或排序列。此功能由模块引擎官方应用 v8.4.4 和新版平台共同交付。
+
+>* **可排序列**：哪些字段可以排序
+
+>* **默认排序列**：默认多字段排序
+
+>* **可搜索列**：哪些字段可以被搜索
+
+>* **统计列**：哪些字段需要统计
+
+>* **开启表内编辑**：开启表内编辑后，还需设置可编辑列
+
+>* **Join关联**：自由编写关联表的条件
+
+>* **Where条件**：自由编写where条件，实现权限控制
+示例[每个人只能查看自己的数据，或者上级可以查看同部门下级的数据]：
+
+(A.UserId = '$CurrentUser.Id$' OR (B.Level > $CurrentUser.Level$ AND B.DeptCode LIKE '$CurrentUser.DeptCode$%'))
+
+注意：默认选择的DIY表已经占用了表别名A。
+
+可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$、$yyyy$、$yyyy-MM$（日期格式依次类推）
+
+>* **导入模板**：提前做好导入模板让用户下载
+
+通用【导入】弹层默认宽度为页面的 80%，支持 `.xls`、`.xlsx` 和 `.csv`；CSV 会自动识别 UTF-8/GBK 编码及常见分隔符。选择文件后先自动识别工作表、单行/多级表头、数据起止行和字段映射，再按每页 15 条预览；用户确认后才正式上传导入。即使一个字段也未匹配，数据预览仍展示识别范围内的全部源列、源行，未匹配列头以红色提示；若识别可信度低，可人工指定表头/数据行范围并逐列映射。
+
+【列映射】之后的【原始工作簿】页签直接渲染完整源文件，用于核对所有工作表、复杂/合并表头、图片、说明文字、样式及原始数据，不受当前表字段是否匹配影响。CSV 会以识别后的编码和分隔符转换为只读表格后完整预览。模板发布前仍应使用真实文件验收。
+
+部分 OpenPyXL 或第三方工具生成的 `.xlsx` 会用等价的 DrawingML 默认命名空间保存图片。前端只对预览副本做命名空间兼容规范化，以保证锚定图片可渲染；用户确认后上传和服务端复核的始终是未经改写的原始文件。
+
+>* **表格分页序号递增**：非第一页序号继承页码
+
+## 接口替换
+>* **查询接口替换**
+>* 所有的接口替换地址均支持$ApiBase$、$CsClient$变量，自动从系统设置中获取
+
+>* **[新增]模式**
+>支持**弹窗**和**表内**
+
+>* **导入接口替换**
+::: details 展开查看 JavaScript 代码（53 行）
+```js
+//可以使用接口引擎实现导入接口，一旦替换了导入接口，那么导入进度（redis）也一定要设置
+if(!V8.Param.TableId){
+    return { Code : 0, Message : '必须指定一个TableId，以标记正在导入哪张表！' }
+}
+//判断当前表是否正在导入中，防止重复导入
+var isImportingKey = `Microi:${V8.OsClient}:ImportTableDataStart:${V8.Param.TableId}`;
+var importStepKey = `Microi:${V8.OsClient}:ImportTableDataStep:${V8.Param.TableId}`;
+var importStepList = [];
+if(V8.Cache.Get(isImportingKey) == '1'){
+    return { Code : 0, Message : '注意：有数据正在导入！请导入结束后再操作。若进度异常，请联系系统管理员！' }
+}
+V8.Cache.Set(isImportingKey, '1');//标记正在导入
+
+//写进度
+importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + '：正在读取文件数据...');
+V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
+
+// 获取弹层确认后的解析范围，并在服务端按原文件重新解析
+var filesByteBase64 = V8.FilesByteBase64;
+var base64String = Object.values(filesByteBase64)[0];
+var importMeta = JSON.parse(V8.Param._ImportMetaJson || '{}');
+var errorPolicy = V8.Param._ImportErrorPolicy || importMeta.ErrorPolicy || 'RollbackAll';
+if (errorPolicy !== 'RollbackAll' && errorPolicy !== 'ContinueOnError') {
+  V8.Cache.Set(isImportingKey, '0');
+  return { Code: 0, Msg: '不支持的导入错误处理策略' };
+}
+var dataList = V8.Office.ExcelToList({
+  FileByteBase64: base64String,
+  FileType: importMeta.FileType || V8.Param._ImportFileType,
+  FileName: V8.Param._ImportFileName,
+  SheetIndex: importMeta.SheetIndex == null ? 0 : importMeta.SheetIndex,
+  HeaderStartRow: importMeta.HeaderStartRow,
+  HeaderEndRow: importMeta.HeaderEndRow,
+  DataStartRow: importMeta.DataStartRow,
+  DataEndRow: importMeta.DataEndRow,
+  Columns: importMeta.Columns || []
+});
+if (dataList.Code !== 1) return dataList;
+// CSV 由服务端独立识别编码和分隔符；可与浏览器元数据交叉复核
+if (importMeta.FileType === 'csv' && dataList.DataAppend) {
+  if (importMeta.Encoding && importMeta.Encoding !== dataList.DataAppend.Encoding) {
+    return { Code: 0, Msg: 'CSV 编码复核不一致，请重新上传后确认预览。' };
+  }
+  if (importMeta.Delimiter && importMeta.Delimiter.replace('\t', '\\t') !== dataList.DataAppend.Delimiter) {
+    return { Code: 0, Msg: 'CSV 分隔符复核不一致，请重新上传后确认预览。' };
+  }
+}
+dataList.Data.forEach(item => {
+  item.AAA = 111;
+});
+
+//写进度
+importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + "：已读取【" + dataList.Data.length + "】条数据！");
+importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：已导入【0】条数据...`);
+V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
+
+var errorList = [];
+var successCount = 0;
+for (var index = 0; index < dataList.Data.length; index++) {
+  var item = dataList.Data[index];
+  try {
+    // 示例只演示策略控制。正式接口必须先从 diy_field 权威配置重算唯一规则：
+    // 每个 Alone 字段各自判断，全部 All 字段共同判断；命中同一 Id 修改，否则新增。
+    var writeResult = V8.FormEngine.AddFormData('tableName', item, V8.DbTrans);
+    if (!writeResult || writeResult.Code != 1) {
+      throw new Error((writeResult && writeResult.Msg) || '导入失败');
+    }
+    successCount++;
+  } catch (error) {
+    var rowError = { ExcelRow: item._ExcelRow || index + 1, Msg: error.message || String(error) };
+    errorList.push(rowError);
+    importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：第【${rowError.ExcelRow}】行失败：${rowError.Msg}`);
+    if (errorPolicy === 'RollbackAll') {
+      V8.Cache.Set(isImportingKey, '0');
+      V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
+      return { Code: 0, Msg: rowError.Msg, Data: { Added: 0, Updated: 0, Failed: 1, Errors: errorList } };
+    }
+  }
+  //写进度（覆盖进度行）
+  importStepList[2] = DateNow('yyyy-MM-dd HH:mm:ss') + `：已处理【${index + 1}】条，成功【${successCount}】条，失败【${errorList.length}】条...`;
+  V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
+}
+//写进度
+importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：导入结束，成功【${successCount}】条，失败【${errorList.length}】条。`);
+V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
+V8.Cache.Set(isImportingKey, '0');//取消标记正在导入
+return { Code: 1, Data: { Added: successCount, Updated: 0, Failed: errorList.length, Errors: errorList } };
+```
+:::
+
+上例中的 `AddFormData` 仅用于展示错误策略，不是完整 Upsert。正式自定义导入必须读取当前 `diy_table/diy_field` 权威配置：每个 `Unique=1 + Config.Unique.Type=Alone` 字段是一条独立规则，全部 `Type=All` 字段组成一条组合规则；任一完整规则命中同一 Id 后按 Id 调用 `UptFormData`，均未命中才 `AddFormData`。不同规则命中不同 Id、或一条规则命中多条数据时必须按行报错。弹层传入的 `_ImportUniqueRulesJson` 只用于用户提示和诊断，不能替代服务端重算。
+
+`RollbackAll` 返回 `Code:0` 由平台整体回滚；`ContinueOnError` 捕获行错误后最终返回 `Code:1` 让成功行提交。接口引擎中禁止手动 `Commit/Rollback`。如果底层数据库异常已使事务失效，必须先做整批预校验或使用独立幂等行操作，不能伪报继续成功。
+
+>* **导入进度接口替换**
+```js
+if(!V8.Param.TableId){
+    return { Code : 0, Message : '必须指定一个TableId，以标记要获取哪张表的导入进度！' }
+}
+//获取进度
+var importStepStr = V8.Cache.Get(`Microi:${V8.OsClient}:ImportTableDataStep:${V8.Param.TableId}`);
+return { Code ：1, Data : JSON.parse(importStepStr) };
+```
+
+>* **导出接口替换**：见相关文章：
+>[Microi吾码-自定义导出Excel](https://microi.blog.csdn.net/article/details/143619083)
+>[micori吾码-使用接口引擎实现自定义导出excel](https://microi.blog.csdn.net/article/details/143849425)
+
+## 动态按钮
+>* **表单更多按钮**
+
+>* **行更多按钮**
+
+>* **更多导出按钮**
+
+>* **批量选择更多按钮**
+添加至少一个批量选择更多按钮后，数据列表会自动打开批量勾选功能
+```js
+//批量删除数据
+var selectData = V8.SelectedData;
+if(selectData.length == 0){
+  V8.Tips('请选择要删除的数据！', false);
+  return;
+}
+V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, async function(){
+  var ids = selectData.map(item => { return item.Id });
+  var result = await V8.FormEngine.DelFormData('diy_order', {
+    Ids : ids
+  });
+  if(result.Code != 1){
+    V8.Tips('删除失败：' + result.Msg, false);
+    return;
+  }
+  V8.Tips('删除成功！');
+  V8.RefreshTable({ _PageIndex : 1 })
+});
+```
+
+>* **页面更多按钮**
+
+>* **页面多Tab**
+
+页面多Tab支持两种动态模式：
+
+页面多 Tab 位于模块 Hero 下方、查询工具栏上方；Hero 与页签不能互换顺序。这样切换筛选页签时模块名称和全局指标保持稳定，页签只表达当前模块的数据分组。
+
+- 不配置【关联模块】：在当前模块执行 `V8Code`，通常使用 `V8.SearchSet(...)` 切换筛选条件。
+- 配置【关联模块】：保存目标 `sys_menu.Id` 到 `TargetSysMenuId`。点击后在当前 `diy-table` 实例内重新加载目标模块的 `sys_menu / diy_table / diy_field`，入口路由、面包屑、顶部访问标签和模块 Hero 保持不变，URL 只替换 `Tab` 查询参数。目标菜单可以设置 `Display=0、AppDisplay=0` 隐藏导航入口，但仍需给当前角色分配菜单权限；未授权目标不会因页签关联而绕过菜单和表权限。
+
+在【模块设计 → 按钮 → 页面多Tab】中，【关联模块】列使用可搜索的菜单树展示模块名称并保存目标 Id。跨表页签的隐藏目标菜单应统一挂在入口菜单下面，设置 `ParentId=入口菜单Id、Display=0、AppDisplay=0、HasChild=0、PageTabs=[]`；入口菜单保持 `HasChild=0`，因此仍可直接点击打开，不会被隐藏子项变成只能展开的目录。
+
+每个 PageTab 还可配置 `BadgeEnabled` 和 `BadgeApiEngineKey` 显示数字角标；`BadgeValuePath` 可直接指定返回路径，例如 `Data.Buttons.pending-tab`。同一接口引擎会按页签合并调用，并收到 `ButtonKeys`、当前筛选条件和模块上下文，适合“待办 12 / 已完成 86 / 异常 3”这类可行动统计。若使用 `BadgeField`，它读取模块“统计列”的页面汇总值；不要在 Tab 的 `V8Code` 中再次单独请求数量。
+
+关联模块适合一个业务入口下不同页签分别使用不同 `diy_table`、字段、列表模板、查询接口替换或按钮配置的场景。PageTabs 只需由入口模块维护一组；目标模块负责各自的表、字段、查询和按钮配置，不得重复复制同一组 PageTabs。运行时会保留入口 PageTabs 的显隐、角标与 Hero，并用请求版本号丢弃快速切换产生的旧响应；不要在前端 mixin 中按菜单名或表名写死数据源。
+
+顶层列表首次读取模块配置、以及跨模块 PageTabs 切换期间，会显示与最终几何尺寸一致的骨架：模块标题/副标题与指标使用 `44px / 62px` 两档，已配置 PageTabs 时同时保留页签、工具栏和列表区域。骨架使用当前主题变量并遵守 `prefers-reduced-motion`；不能先渲染空白标题或空 Tab，再靠整页路由重建造成纵向跳动。
+
+```json
+[
+  {
+    "Id": "01K...",
+    "Sort": 10,
+    "Name": "本地记录",
+    "TargetSysMenuId": "目标sys_menu.Id",
+    "IsVisible": true,
+    "BadgeEnabled": true,
+    "BadgeApiEngineKey": "module_tab_counts",
+    "BadgeValuePath": "Data.Buttons.01K...",
+    "BadgeTone": "danger",
+    "BadgeRefreshSeconds": 60
+  }
+]
+```
+
+## 平台支持的URL参数
+>* ShowClassicTop：若设置为0，则不显示经典顶部内容。默认值为1
+>* ShowClassicLeft：若设置为0，则不显示经典左侧菜单。默认值为1
+>* FormDataId：数据列表默认打开哪一条数据
+```js
+https://os.itdos.com/#/notice?ShowClassicTop=0&ShowClassicLeft=0&FormDataId=b8348d26-b395-4313-b97d-6e41f9ff5270
+```
