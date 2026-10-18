@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import ts from 'typescript';
 import {searchTrainingSlides} from '../docs/.vitepress/theme/training-syllabus-search.js';
 const component=fs.readFileSync(new URL('../docs/.vitepress/theme/components/TrainingSyllabusDeck.vue',import.meta.url),'utf8');
 test('搜索匹配标题、导航、实际正文，多个词同时匹配且不改变页码',()=>{
@@ -13,11 +14,22 @@ test('搜索匹配标题、导航、实际正文，多个词同时匹配且不�
 });
 test('实际键盘处理器保留 Ctrl+F、Cmd+F、Alt、输入法和 F11 默认行为',()=>{
  const start=component.indexOf('function handleKeydown('),end=component.indexOf('function handleWheel(',start);
- assert.ok(start>=0&&end>start);const code=component.slice(start,end).replace('event: KeyboardEvent','event');
+ assert.ok(start>=0&&end>start);const code=ts.transpileModule(component.slice(start,end),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
  const events=[];const action=name=>()=>events.push(name);
- const handler=new Function('activePanel','isInteractiveTarget','nextSlide','previousSlide','goTo','scrollActiveThumbnail','openPanel','downloadPdf','closePanel','slideMeta',code+';return handleKeydown;')({value:''},target=>target==='input',action('next'),action('previous'),action('go'),action('overview'),action('help'),action('pdf'),action('close'),[{},{}]);
- for(const event of [{key:'f',ctrlKey:true},{key:'f',metaKey:true},{key:'F11'},{key:'f'},{key:'ArrowDown',altKey:true},{key:'ArrowDown',isComposing:true},{key:'ArrowDown',target:'input'}])handler({...event,preventDefault:()=>events.push('prevented')});
+ const activePanel={value:''},previewImage={value:null};
+ const dependencies={activePanel,previewImage,deckRef:{value:null},document:{activeElement:null},closePreview:action('close-preview'),isInteractiveTarget:target=>target==='input',nextSlide:action('next'),previousSlide:action('previous'),goTo:(...args)=>events.push(['go',...args]),scrollActiveThumbnail:action('overview'),openPanel:action('help'),downloadPdf:action('pdf'),closePanel:action('close'),slideMeta:{value:Array.from({length:10},()=>({}))}};
+ const handler=new Function(...Object.keys(dependencies),code+';return handleKeydown;')(...Object.values(dependencies));
+ for(const event of [{key:'f',ctrlKey:true},{key:'f',metaKey:true},{key:'F11'},{key:'f'},{key:'p',ctrlKey:true},{key:'ArrowDown',altKey:true},{key:'ArrowDown',isComposing:true},{key:'ArrowDown',defaultPrevented:true},{key:'ArrowDown',target:'input'}])handler({...event,preventDefault:()=>events.push('prevented')});
  assert.deepEqual(events,[]);handler({key:'ArrowRight',preventDefault:()=>events.push('prevented')});assert.deepEqual(events,['prevented','next']);
+ events.length=0;
+ for(const key of ['ArrowDown','PageDown',' ','ArrowLeft','ArrowUp','PageUp','Home','End','o','h','?','p'])handler({key,preventDefault:()=>events.push('prevented')});
+ assert.deepEqual(events,['prevented','next','prevented','next','prevented','next','prevented','previous','prevented','previous','prevented','previous','prevented',['go',0,'prev'],'prevented',['go',9,'next'],'prevented','overview','prevented','help','prevented','help','prevented','pdf']);
+ events.length=0;previewImage.value={src:'image',alt:'preview'};
+ handler({key:'ArrowRight',preventDefault:()=>events.push('prevented')});assert.deepEqual(events,[]);
+ handler({key:'Escape',preventDefault:()=>events.push('prevented')});assert.deepEqual(events,['prevented','close-preview']);
+ events.length=0;previewImage.value=null;activePanel.value='help';
+ handler({key:'ArrowRight',preventDefault:()=>events.push('prevented')});assert.deepEqual(events,[]);
+ handler({key:'Escape',preventDefault:()=>events.push('prevented')});assert.deepEqual(events,['prevented','close']);
 });
 test('搜索索引来自全部幻灯片正文，导航提供可反复收起和展开的控制',()=>{
  assert.match(component,/slideSearchContent\.value = slideMeta\.value\.map[\s\S]*?textContent/);

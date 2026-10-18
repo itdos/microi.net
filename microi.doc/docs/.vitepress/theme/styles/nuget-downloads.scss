@@ -3,7 +3,8 @@
   --mci-nuget-accent-strong: #004880;
   --mci-nuget-surface: rgba(255, 255, 255, .9);
   --mci-nuget-text: var(--mci-site-ink, #171923);
-  --mci-nuget-muted: var(--mci-site-muted, #64748b);
+  // 浅色渐变会降低小字对比度，向正文色收紧而不改变站点主题。
+  --mci-nuget-muted: color-mix(in srgb, var(--mci-site-muted, #64748b) 85%, var(--mci-site-ink, #171923));
   --mci-nuget-success: #087a45;
   --mci-nuget-success-soft: rgba(8, 122, 69, .09);
   --mci-nuget-warning: #956000;
@@ -183,7 +184,16 @@
 
 .mci-nuget-stats__metric small {
   margin-top: 3px;
-  opacity: .78;
+  opacity: 1;
+}
+
+.mci-nuget-stats__updated-at {
+  display: block;
+  margin-top: 7px;
+  color: var(--mci-nuget-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
 }
 
 .mci-nuget-stats__status {
@@ -254,31 +264,31 @@
   height: 2px;
 }
 
-.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__card::after {
+.mci-nuget-stats[data-state="snapshot-loading"] .mci-nuget-stats__card::after {
   opacity: .58;
   animation: mciNugetSyncSweep 1.75s var(--mci-ease-smooth, ease-in-out) infinite;
 }
 
-.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__icon::after {
+.mci-nuget-stats[data-state="snapshot-loading"] .mci-nuget-stats__icon::after {
   animation: mciNugetIconSignal 1.35s ease-out infinite;
 }
 
-.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__status {
+.mci-nuget-stats[data-state="snapshot-loading"] .mci-nuget-stats__status {
   border-color: color-mix(in srgb, var(--mci-nuget-accent) 48%, transparent);
   background: color-mix(in srgb, var(--mci-nuget-accent) 13%, transparent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--mci-nuget-accent) 7%, transparent);
 }
 
-.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__status::before {
+.mci-nuget-stats[data-state="snapshot-loading"] .mci-nuget-stats__status::before {
   opacity: .7;
   animation: mciNugetStatusSweep 1.25s ease-in-out infinite;
 }
 
-.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__status-orbit {
+.mci-nuget-stats[data-state="snapshot-loading"] .mci-nuget-stats__status-orbit {
   animation: mciNugetOrbit 1.05s linear infinite;
 }
 
-.mci-nuget-stats[data-state="live"] .mci-nuget-stats__status {
+.mci-nuget-stats[data-state="snapshot"] .mci-nuget-stats__status {
   border-color: color-mix(in srgb, var(--mci-nuget-success) 32%, transparent);
   background: var(--mci-nuget-success-soft);
   color: var(--mci-nuget-success);
@@ -337,6 +347,11 @@
   --mci-nuget-surface: rgba(31, 31, 31, .94);
   --mci-nuget-text: #f7f7f7;
   --mci-nuget-muted: #a7a7a7;
+  // 首页卡片在浅色模式中也保持深色表面，状态色必须与卡片底色成对。
+  --mci-nuget-success: #58d695;
+  --mci-nuget-success-soft: rgba(88, 214, 149, .11);
+  --mci-nuget-warning: #f2c96d;
+  --mci-nuget-warning-soft: rgba(242, 201, 109, .1);
   width: min(1120px, calc(100% - 40px));
   margin: 0 auto 16px;
 }
@@ -353,6 +368,11 @@
 .mci-nuget-stats--home .mci-nuget-stats__metric strong,
 .mci-nuget-stats--home .mci-nuget-stats__arrow {
   color: #a8d8ff;
+}
+
+.mci-nuget-stats--home .mci-nuget-stats__meta {
+  // 说明文字在卡片外，跟随页面明暗底色，不能继承深色卡片内的浅灰字。
+  color: color-mix(in srgb, var(--mci-site-muted, #64748b) 65%, var(--mci-site-ink, #171923));
 }
 
 .mci-nuget-stats--sidebar {
@@ -414,6 +434,10 @@
   margin-top: 7px;
   padding: 0 8px;
   font-size: 9px;
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__updated-at {
+  grid-column: 1 / -1;
 }
 
 .mci-nuget-stats--sidebar .mci-nuget-stats__metric small,
@@ -507,6 +531,10 @@
     grid-column: 1 / -1;
     justify-self: start;
     margin-left: 0;
+  }
+
+  .mci-nuget-stats__updated-at {
+    grid-column: 1 / -1;
   }
 
   .mci-nuget-stats__meta {

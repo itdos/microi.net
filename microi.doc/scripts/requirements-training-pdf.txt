@@ -1,0 +1,8 @@
+# PDF阅读性能优化器；安装到专用runtime/venv，不进入生产API依赖。
+# 安装：python -m pip install -r microi.doc/scripts/requirements-training-pdf.txt
+# 回归：python -B -m unittest discover -s microi.doc/tests -p test_training_pdf_optimizer.py -v
+# 优化：python -B microi.doc/scripts/optimize-training-deck-pdf.py --input 原件.pdf --output .tmp/候选.pdf
+PyMuPDF>=1.28.2,<2
+pikepdf>=10.17.0,<11
+Pillow>=11,<14
+pypdf>=6.10,<7

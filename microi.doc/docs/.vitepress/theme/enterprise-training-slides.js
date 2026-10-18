@@ -1,202 +1,62 @@
-// 企业版只讲业务价值、公开案例与交付决策；同一份数据供在线演示、搜索和两种主题 PDF 使用。
-// 案例引用沿用官网公开称谓和原始能力描述，不推断客户收益，也不把产品方向写成已交付案例。
-/**
- * @typedef {object} EnterpriseSlideDraft
- * @property {string} id
- * @property {string} chapter
- * @property {'enterprise'} kind
- * @property {'cover'|'cards'|'case'|'flow'|'closing'} layout
- * @property {string} nav
- * @property {string} title
- * @property {string} summary
- * @property {string} eyebrow
- * @property {string} [lead]
- * @property {Array<{title:string,text:string,label?:string}>} [cards]
- * @property {string[]} [steps]
- * @property {Array<{value:string,label:string,note?:string}>} [metrics]
- * @property {string} [takeaway]
- * @property {Array<{label:string,href:string}>} [sources]
- * @property {{src:string,alt:string,caption:string}|null} [image]
- */
+import { trainingCaseAssets } from './training-case-assets.js'
 
-/** @type {EnterpriseSlideDraft[]} */
-const enterpriseSlideDefinitions = [
-  {
-    id: 'enterprise-opening', chapter: '01', kind: 'enterprise', layout: 'cover', nav: '企业应用开场',
-    title: '让企业的想法，成为可用的产品',
-    summary: 'Microi吾码 · AI 驱动的企业应用平台',
-    eyebrow: '企业应用版 · 面向客户、领导与经营者',
-    cards: [
-      { title: '能做什么', text: '企业系统、行业软件与 AI 应用。' },
-      { title: '为什么选择', text: '复用成熟能力，专注业务差异。' },
-      { title: '怎样证明', text: '从可验收的试点开始。' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/7a9488b16f3799d80363cf1921425c9ada3fef914405a25ee5cf8c3b45777676/202610/slide-01-ui.png', alt: 'AI 生成的 Microi吾码企业工作台界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 企业工作台' },
-    sources: [{ label: '平台概览', href: '/doc/' }, { label: '公开案例', href: '/case/case-index.html' }],
-  },
-  {
-    id: 'enterprise-business-value', chapter: '02', kind: 'enterprise', layout: 'cards', nav: '企业为什么需要',
-    title: '老板要的，是业务跑起来',
-    summary: '让信息可见、协同有序、投入可衡量。',
-    eyebrow: '从经营问题出发',
-    cards: [
-      { title: '看得见', text: '客户、订单、进度与异常。' },
-      { title: '转得动', text: '岗位、审批、办理与结果闭环。' },
-      { title: '算得清', text: '效率、质量与运行成本。' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/40acf1bf0c4735f75a6d954a905b8521db04db3c1839393f6054f48a06fe8d3e/202610/slide-02-ui.png', alt: 'AI 生成的经营驾驶舱界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 经营驾驶舱' },
-    sources: [{ label: '业务建模', href: '/doc/form-engine/form-engine-info.html' }, { label: 'AI 数据分析', href: '/doc/system-engine/ai-data-analysis.html' }],
-  },
-  {
-    id: 'enterprise-product-map', chapter: '03', kind: 'enterprise', layout: 'cards', nav: '能做什么产品',
-    title: '一个底座，做出多种产品',
-    summary: '按真实业务需求组合与扩展。',
-    eyebrow: '产品方向 · 从内部管理到对外服务',
-    cards: [
-      { title: '企业管理', text: 'ERP、CRM、SRM、OA、进销存。' },
-      { title: '行业软件', text: '制造、工程项目、园区与供应链。' },
-      { title: '多端服务', text: 'PC、H5、小程序与 App。' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/935354089053c617d4dee96c3820f0344aa2263ae11fdca438d2b2a7ac774a49/202610/slide-03-ui.png', alt: 'AI 生成的 ERP、CRM 与 OA 多产品界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 企业产品组合' },
-    sources: [{ label: '平台能力', href: '/doc/' }, { label: '行业案例目录', href: '/case/case-index.html' }],
-  },
-  {
-    id: 'enterprise-garment-case', chapter: '04', kind: 'enterprise', layout: 'case', nav: '案例 · 服装 ERP',
-    title: '服装 ERP：让行业规则落地',
-    summary: '客户研发团队开发，吾码官方支持。',
-    eyebrow: '公开成功案例 · 制造业',
-    cards: [
-      { title: '订单与生产协同', text: '' },
-      { title: '动态尺码与裁床分包', text: '' },
-      { title: '菲票明细与移动端', text: '' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/b0e95a303577a94fc315a13fc278527ae0bbbf995eea453822f065889a7774c9/202610/slide-04-ui.png', alt: 'AI 生成的服装 ERP 与移动菲票界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 服装 ERP' },
-    sources: [{ label: '服装 ERP 原始案例', href: '/case/erp/erp-case1.html' }],
-  },
-  {
-    id: 'enterprise-group-case', chapter: '05', kind: 'enterprise', layout: 'case', nav: '案例 · 集团协同',
-    title: '集团协同：连接已有投入',
-    summary: 'A 股公司制造协同与国企 OA 公开案例。',
-    eyebrow: '公开成功案例 · 集团与国企',
-    metrics: [{ value: '11', label: '第三方系统数据库', note: '集团制造协同案例' }],
-    cards: [
-      { title: '飞书协同与跨库报表', text: '' },
-      { title: '国企 OA 移动审批', text: '' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/b7ce0535c7ce94d6737f73f42290af4c60b05265d73689779bea325166e3b9c0/202610/slide-05-ui.png', alt: 'AI 生成的集团跨系统协同与 OA 审批界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 集团协同' },
-    sources: [{ label: '集团制造协同', href: '/case/ims/ims-case1.html' }, { label: '集团 / 国企 OA', href: '/case/oa/os-case1.html' }],
-  },
-  {
-    id: 'enterprise-service-case', chapter: '06', kind: 'enterprise', layout: 'case', nav: '案例 · 客户服务',
-    title: '让产品直接服务客户',
-    summary: '标准 CRM 与房地产服务平台公开案例。',
-    eyebrow: '公开成功案例 · 商业与服务',
-    cards: [
-      { title: 'CRM 配置同步 PC 与 H5', text: '' },
-      { title: '地图找房、隐私号与 VR', text: '' },
-      { title: '官网、App、小程序多端服务', text: '' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/39c1639d8f72bd84db8ecd94ede5679353a3300a392f943fbd5922dc8a759540/202610/slide-06-ui.png', alt: 'AI 生成的 CRM 客户跟进与房源服务界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · CRM 与房产' },
-    sources: [{ label: '标准 CRM', href: '/case/crm/crm-case1.html' }, { label: '房地产服务平台', href: '/case/internet/hourse.html' }],
-  },
-  {
-    id: 'enterprise-ai-loop', chapter: '07', kind: 'enterprise', layout: 'flow', nav: 'AI 进入业务',
-    title: '让 AI 回答，变成业务结果',
-    summary: '设计示例：哪些客户需要优先跟进？',
-    eyebrow: '业务设计示例 · 客户跟进',
-    cards: [
-      { title: '查到有权访问的事实', text: '' },
-      { title: '生成建议与待办草稿', text: '' },
-      { title: '人工确认后办理，记录结果', text: '' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/c565213031e358da6858646bf9eadc477b82e8e0906785e64a9c093765047b5f/202610/slide-07-ui.png', alt: 'AI 生成的客户跟进 Agent 业务闭环界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 业务 Agent' },
-    sources: [{ label: '现有 AI 数据分析', href: '/doc/system-engine/ai-data-analysis.html' }, { label: '按项目编排流程', href: '/doc/system-engine/ai-workflow-suite.html' }],
-  },
-  {
-    id: 'enterprise-advantages', chapter: '08', kind: 'enterprise', layout: 'cards', nav: '吾码关键优势',
-    title: '通用能力复用，业务持续生长',
-    summary: '把重复建设的时间，留给产品差异。',
-    eyebrow: '为什么选择 · 吾码关键优势',
-    cards: [
-      { title: '成熟能力', text: '表单、权限、审批、报表与通知。' },
-      { title: '灵活扩展', text: '复杂规则、定制页面与系统集成。' },
-      { title: '交付可控', text: '多端协作，自建 / SaaS 按版本选择。' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/7a47aae9b1f88808a67636a8f34d6edcb8fd614772abf4dc69ae0cd4feab0b1d/202610/slide-08-ui.png', alt: 'AI 生成的吾码表单搭建与多端预览界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 平台搭建' },
-    sources: [{ label: '平台能力', href: '/doc/' }, { label: '版本与授权', href: '/doc/edition-comparison.html' }, { label: '自建部署', href: '/doc/getting-started/docker-run.html' }],
-  },
-  {
-    id: 'enterprise-agent-delivery', chapter: '09', kind: 'enterprise', layout: 'cards', nav: 'Agent 交付经验',
-    title: '2026：从会搭 Agent，到会交付',
-    summary: '企业为具体问题买单。',
-    eyebrow: '项目经验 · 企业购买的是结果',
-    cards: [
-      { title: '拆清业务流程', text: '聚焦知识查询、客服、销售与分析。' },
-      { title: '找准公司知识', text: 'RAG 是基础，检索不稳就会偏。' },
-      { title: '框架熟练不等于交付', text: '会搭流程只是起点。' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/e3684e74dbcf786397aedd926f7daa923b5f378b8ac3b8ad6304b38cf8794af4/202610/slide-09-ui.png', alt: 'AI 生成的公司知识库与 RAG 引用问答界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 知识与 RAG' },
-    sources: [{ label: '公司知识与 AI 能力', href: '/doc/system-engine/ai-engine.html' }, { label: '业务蓝图与流程', href: '/doc/system-engine/ai-workflow-suite.html' }],
-  },
-  {
-    id: 'enterprise-agent-reliability', chapter: '10', kind: 'enterprise', layout: 'cards', nav: 'AI 像软件一样交付',
-    title: '可靠的 AI，能把工作接住',
-    summary: 'MCP、多 Agent 先练基本功。',
-    eyebrow: '项目经验 · 可靠交付基本功',
-    cards: [
-      { title: '失败兜底，任务恢复', text: '工具调用与长上下文可控。' },
-      { title: '输出校验，人工接管', text: '' },
-      { title: '部署与数据隔离', text: '权限、日志、监控、成本、数据安全。' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/610620da8c2c7c81f1f87f36ea448515d11779c59badbcc2fd0b1f1e01ec1145/202610/slide-10-ui.png', alt: 'AI 生成的任务恢复与人工接管运行界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 可靠交付' },
-    sources: [{ label: 'AI 平台治理', href: '/doc/system-engine/ai-platform-governance.html' }, { label: 'MCP 受控交付', href: '/doc/v8-engine/mcp-server.html' }],
-  },
-  {
-    id: 'enterprise-pilot-evaluation', chapter: '11', kind: 'enterprise', layout: 'flow', nav: '试点与验收',
-    title: '效果与成本，用证据说话',
-    summary: '用固定样本，对比人工处理基线。',
-    eyebrow: '验收方法 · 指标先约定',
-    cards: [
-      { title: '知识准确', text: '检索准确率与答案依据。' },
-      { title: '任务完成率', text: '工具成功率与异常恢复。' },
-      { title: '投入可衡量', text: '延迟、Token、人工时间与 Bad Case。' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/7949c2efcefb9c6ed45c24620ce8cf0f1d82988d7e9f8ca927db95c00ed44ceb/202610/slide-11-ui.png', alt: 'AI 生成的效果、质量与成本评估界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 评估与成本' },
-    sources: [{ label: 'AI 分析与权限', href: '/doc/system-engine/ai-data-analysis.html' }, { label: '运行治理', href: '/doc/system-engine/ai-platform-governance.html' }],
-  },
-  {
-    id: 'enterprise-next-step', chapter: '12', kind: 'enterprise', layout: 'closing', nav: '决策与下一步',
-    title: '从一个值得落地的产品开始',
-    summary: '把 AI 的速度，变成企业的交付力。',
-    eyebrow: '下一步 · 一起把业务做成产品',
-    cards: [
-      { title: '选场景', text: '业务负责人、首批用户与流程。' },
-      { title: '定边界', text: '数据、权限、部署与授权。' },
-      { title: '验结果', text: '效果、成本与运维责任。' },
-    ],
-    image: { src: 'https://file.microi.net/itdos/official-docs/images/30e47100403d3a0e0d38ce50cc5a7b7e06893a0755f8cecb56328ac199256869/202610/slide-12-ui.png', alt: 'AI 生成的试点实施与验收看板界面概念图，非真实系统或客户截图', caption: 'AI 界面概念图 · 试点实施' },
-    sources: [{ label: '开始使用', href: '/doc/getting-started/start-use.html' }, { label: '版本与授权', href: '/doc/edition-comparison.html' }, { label: '更多成功案例', href: '/case/case-index.html' }],
-  },
+// 企业版按真实交付案例组织；前三页和致辞复用技术版组件，避免两份优势文案漂移。
+const definitions = [
+  { id:'enterprise-opening', nav:'企业版开场', commonKind:'cover', title:'Microi吾码 AI 开发框架', summary:'以成功案例为路线，现场了解平台、行业实践与企业交付。' },
+  { id:'enterprise-framework', nav:'框架/系统架构重要性', commonKind:'decision', title:'企业研发，为什么要先选一套开源 AI 开发框架？', summary:'选对成熟系统底座，让 AI 的开发速度成为可持续的产品能力。' },
+  { id:'enterprise-why', nav:'为什么选择吾码？', commonKind:'why', title:'为什么选择吾码？', summary:'AI 原生、企业级、全生命周期——通用能力复用，业务灵活生长。' },
+  { id:'enterprise-case-overview', nav:'成功案例总览', layout:'overview', title:'看见行业，才看见平台的可能', summary:'从上千人工厂到数字世界，同一套系统底座承接不同业务。', eyebrow:'04 / INDUSTRY IN ACTION',
+    cards:[
+      {title:'大型MES',text:'中大型工厂与上市公司 · 15+ MES交付',label:'01 / MANUFACTURING',target:4,glyph:'MES',accent:'cyan'},
+      {title:'数字孪生/IoT物联网',text:'AI建模 · 三维场景 · 实时设备通信',label:'02 / DIGITAL TWIN',target:5,glyph:'3D',accent:'blue'},
+      {title:'OA/ERP',text:'国企与集团办公 · 100余家服装工厂',label:'03 / OPERATIONS',target:6,glyph:'ERP',accent:'green'},
+      {title:'游戏',text:'玩家数据管理 · 实时通信 · 商用交付',label:'04 / INTERACTIVE',target:7,glyph:'PLAY',accent:'purple'},
+      {title:'更多成功案例',text:'500余套软件 · 跨行业持续应用',label:'05 / BEYOND',target:8,glyph:'500+',accent:'amber'},
+    ], takeaway:'点击行业，直接进入对应案例；也可使用底部上一页、下一页逐页介绍。' },
+  { id:'enterprise-mes', nav:'大型MES', layout:'case', group:'mes', title:'大型MES，走进上千人工厂', summary:'已交付中大型工厂、上市公司MES 15+；让计划、执行与追溯在同一平台闭环。', eyebrow:'05 / MANUFACTURING EXECUTION', metric:'15+',metricLabel:'中大型工厂 / 上市公司MES交付',
+    cards:[
+      {title:'从订单到现场',text:'工艺流程 · 采购协同 · 计划排产（APS）· 生产派工 · 车间管理 · BOM'},
+      {title:'从质量到资源',text:'质量管理 · 仓储管理 · 设备管理 · 设备机联 · 模具管理 · 能耗管理'},
+      {title:'从执行到经营',text:'计件工资 · 全链路追溯 · 报表看板 · 移动端现场流程办公 · 蓝牙打印'},
+      {title:'系统打通，持续调整',text:'金蝶 / 用友流程对接打通；实施、交付人员可在线调整业务配置。'},
+    ],takeaway:'业务发生变化，实施与交付人员在线调整，让工业软件持续贴合工厂。' },
+  { id:'enterprise-iot', nav:'数字孪生/IoT物联网', layout:'case', group:'iot', title:'从真实现场，到实时数字世界', summary:'AI驱动场景构建，30+引擎驱动业务，IoT实时通信连接设备与运营。', eyebrow:'06 / DIGITAL TWIN & IOT', metric:'AI + 3D',metricLabel:'照片 / 视频 → AI建模 → 三维呈现',
+    cards:[
+      {title:'前端呈现',text:'AI + Blender / CAD / 3ds Max + Three.js / Unity，构建数字孪生与交互场景。'},
+      {title:'照片、视频直接起步',text:'无需人工从零绘图、建模，只需照片 / 视频完成AI建模，再按现场精度与交付要求校验。'},
+      {title:'实时设备通信',text:'后端由系统架构30+引擎驱动；IoT支持Socket、MQTT、TCP透传等多种实时通信方式。'},
+      {title:'现场设备与网关',text:'采用主流Zigbee、RS-485等通信方式，支持Modbus等协议，连接物理现场。'},
+    ],takeaway:'场景、设备、数据与业务流程，进入同一条实时链路。' },
+  { id:'enterprise-oaerp', nav:'OA/ERP', layout:'case', group:'oaerp', title:'组织协同与行业经营，一体贯通', summary:'多家国企、集团公司OA办公系统，以及服装、电器和轻量级ERP实践。', eyebrow:'07 / OFFICE & ENTERPRISE RESOURCE', metric:'100余家',metricLabel:'慈溪服装工厂已应用 · SaaS引擎模式',
+    cards:[
+      {title:'国企与集团OA',text:'已应用于多家国企、集团公司，承接日常办公、流程审批与跨岗位协同。'},
+      {title:'服装ERP',text:'慈溪服装工厂已应用100余家，基于SaaS引擎模式，复用行业能力并保持租户隔离。'},
+      {title:'电器ERP',text:'面向电器行业的订单、采购、生产与经营流程，根据实际业务持续扩展。'},
+      {title:'轻量级ERP',text:'从核心经营流程起步，随企业规模与管理深度逐步生长。'},
+    ],takeaway:'一套成熟底座，既承接集团协同，也服务行业化SaaS。' },
+  { id:'enterprise-games', nav:'游戏', layout:'case', group:'games', title:'让游戏创意，快速进入可交付产品', summary:'吾码系统架构非常适合游戏服务器端的玩家数据管理与实时通信。', eyebrow:'08 / GAME BACKEND & REALTIME', metric:'几天',metricLabel:'范围明确的类CS / 棋牌游戏交付周期',
+    cards:[
+      {title:'玩家数据管理',text:'以成熟系统架构管理玩家账号、业务数据与运营后台。'},
+      {title:'实时通信技术',text:'连接游戏客户端与服务端，支撑实时消息和互动业务。'},
+      {title:'快速商业交付',text:'复用系统架构与现成能力，范围明确的类CS、棋牌游戏可在几天内开发为可商用交付产品。'},
+    ],takeaway:'把时间留给玩法与体验；实际周期随玩法、素材、联机规模和验收范围变化。' },
+  { id:'enterprise-more', nav:'更多成功案例', layout:'universe', title:'跨越行业边界，连接更多可能', summary:'吾码在其它领域共计交付500余套软件，持续把业务想法变成真实系统。', eyebrow:'09 / ONE PLATFORM · MANY WORLDS', metric:'500+',metricLabel:'其它领域软件交付',
+    sectors:['CRM客户关系','CMS内容管理','B2C商城','酒店管理','财税服务','考试系统','售后系统','企业服务平台','商会管理','互联网平台','园区与公共服务','物流与供应链','教育教务','农业牧场','资产管理'],
+    takeaway:'对某个领域感兴趣？欢迎参观成功案例，与我们一起深入了解实际业务。',sources:[{label:'参观成功案例',href:'/case/case-index.html'},{label:'联系吾码',href:'/contact/'}] },
+  { id:'enterprise-closing', nav:'致辞', commonKind:'closing', title:'把 AI 的速度，变成企业可持续交付力', summary:'从今天开始，少重复造轮子，多创造真正有差异的业务价值。' },
 ]
 
-// 保持所有页面键一致，避免 Vue 模板按布局推导出互不兼容的可选联合类型。
-export const enterpriseSlides = enterpriseSlideDefinitions.map(slide => ({
-  ...slide,
-  lead: slide.lead || '',
-  cards: slide.cards || [],
-  steps: slide.steps || [],
-  metrics: slide.metrics || [],
-  takeaway: slide.takeaway || '',
-  sources: slide.sources || [],
-  image: slide.image || null,
+export const enterpriseSlides = definitions.map((slide,index)=>({
+  ...slide, chapter:String(index+1).padStart(2,'0'),kind:'enterprise',
+  commonKind:slide.commonKind||'',layout:slide.layout||'common',eyebrow:slide.eyebrow||'',
+  lead:'',cards:slide.cards||[],steps:[],metrics:[],image:null,sources:slide.sources||[],takeaway:slide.takeaway||'',sectors:slide.sectors||[],
+  metric:slide.metric||'',metricLabel:slide.metricLabel||'',
+  gallery:trainingCaseAssets.filter(asset=>asset.group===slide.group),
 }))
-
-export const enterpriseSlideCount = 12
-if (enterpriseSlides.length !== enterpriseSlideCount) throw new Error('企业应用版 PPT 必须包含 12 页')
-
-export const enterpriseSections = [
-  { id: 'enterprise-value', title: '价值与产品', slideIds: ['enterprise-opening', 'enterprise-business-value', 'enterprise-product-map'] },
-  { id: 'enterprise-cases', title: '真实行业案例', slideIds: ['enterprise-garment-case', 'enterprise-group-case', 'enterprise-service-case'] },
-  { id: 'enterprise-delivery', title: 'AI 与交付优势', slideIds: ['enterprise-ai-loop', 'enterprise-advantages', 'enterprise-agent-delivery', 'enterprise-agent-reliability'] },
-  { id: 'enterprise-action', title: '验收与决策', slideIds: ['enterprise-pilot-evaluation', 'enterprise-next-step'] },
+export const enterpriseSlideCount=10
+export const enterpriseSections=[
+  {id:'enterprise-platform',title:'平台与选型',slideIds:definitions.slice(0,3).map(s=>s.id)},
+  {id:'enterprise-cases',title:'成功案例',slideIds:definitions.slice(3,9).map(s=>s.id)},
+  {id:'enterprise-closing',title:'致辞',slideIds:['enterprise-closing']},
 ]
+if(enterpriseSlides.length!==enterpriseSlideCount)throw new Error('企业版必须包含10页')

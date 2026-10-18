@@ -6,16 +6,14 @@ import { fileURLToPath } from 'node:url'
 import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads.mjs'
 import { docAssets } from '../docs/.vitepress/theme/doc-assets.js'
 import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
+import { trainingPreviewAssets, trainingPreviewPath } from '../docs/.vitepress/theme/training-previews.js'
+import * as commonContent from '../docs/.vitepress/theme/common-training-content.js'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const staticPdfPaths = [
   verifiedTrainingAssetPath('/downloads/microi-ai-development-framework-training-syllabus-dark.pdf'),
   verifiedTrainingAssetPath('/downloads/microi-ai-development-framework-training-syllabus-light.pdf'),
 ]
-const thumbnailRoots = {
-  dark: '/images/training-deck/thumbs/',
-  light: '/images/training-deck/thumbs-light/',
-}
 
 function read(relativePath) {
   return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8')
@@ -38,6 +36,7 @@ test('training syllabus route mounts the dedicated HTML presentation', () => {
 
 test('presentation covers the complete technical learning path', () => {
   const component = read('docs/.vitepress/theme/components/TrainingSyllabusDeck.vue')
+  const sharedSource = component + read('docs/.vitepress/theme/components/CommonTrainingSlide.vue') + read('docs/.vitepress/theme/common-training-content.js')
   const engineBlock = /const engineSlides: EngineSlide\[\] = \[([\s\S]*?)\r?\n\]\r?\n\r?\n\/\/ 这些是官网左侧导航中的关键交付入口/u.exec(component)?.[1] || ''
   const engineCount = [...engineBlock.matchAll(/^\s+id: '[^']+'/gmu)].length
   const supplementalBlock = /const atlasSupplementalEntries: AtlasEntry\[\] = \[([\s\S]*?)\r?\n\]/u.exec(component)?.[1] || ''
@@ -106,9 +105,9 @@ test('presentation covers the complete technical learning path', () => {
     '园区与公共服务',
     '专业服务',
     '物流与农业',
-  ]) assert.ok(component.includes(phrase), `missing syllabus topic: ${phrase}`)
+  ]) assert.ok(sharedSource.includes(phrase), `missing syllabus topic: ${phrase}`)
 
-  assert.match(component, /典型平台能力高复用场景，实际收益取决于需求与团队基线/)
+  assert.match(sharedSource, /典型平台能力高复用场景[，；]实际收益取决于需求与团队基线/)
   assert.match(component, /class="mci-engine-slide-title"[\s\S]*\{\{ slide\.engine\.nav \}\}[\s\S]*\{\{ slide\.title \}\}/u)
   assert.match(component, /const atlasEntryIds = atlasGroups\.flatMap/u)
   assert.doesNotMatch(component, /nav: '视觉识别'/u)
@@ -128,30 +127,35 @@ test('presentation covers the complete technical learning path', () => {
 
 test('slide 03 presents a compact, persuasive Microi enterprise advantage matrix', () => {
   const component = read('docs/.vitepress/theme/components/TrainingSyllabusDeck.vue')
-  const advantageBlock = /const whyAdvantages: WhyAdvantage\[\] = \[([\s\S]*?)\r?\n\]/u.exec(component)?.[1] || ''
-  const advantageCount = [...advantageBlock.matchAll(/^\s+no: '\d{2}'/gmu)].length
-
-  assert.equal(advantageCount, 8)
+  const shared = read('docs/.vitepress/theme/components/CommonTrainingSlide.vue')
+  const content = read('docs/.vitepress/theme/common-training-content.js')
+  assert.equal(commonContent.trainingWhyAdvantages.length, 8)
+  assert.equal(new Set(commonContent.trainingWhyAdvantages.map(advantage => advantage.code)).size, 8)
   for (const phrase of [
-    "nav: '为什么选择吾码？'",
-    "title: '为什么选择吾码？'",
-    '一句话，<em>开发大型企业应用</em>',
-    '零代码 AI 对话',
+    '一句话，开发大型企业应用',
+    '0 代码自然语言',
+    '系统灵活性做到极致',
+    '表单引擎图片 / 文件上传',
+    '模块引擎列、搜索、按钮、卡片',
+    'V8 引擎 AI 编程',
+    '无需编译发布',
     '跨平台全端',
-    '高性能底座',
+    '高性能',
     '分布式原生',
     '插件化引擎',
-    '微服务扩展',
+    '微服务定制',
     '全自动化测试',
     '企业级治理',
     "['AI 对话建模', '自动实现', '全自动测试', '受控发布', '运行治理']",
-    "['开源可控', 'SaaS 多租户', '多数据库', '全端统一']",
-    '零代码提速，工程化不设上限',
-  ]) assert.ok(component.includes(phrase), `missing slide 03 advantage: ${phrase}`)
-
-  assert.match(component, /whyAdvantagesOn\('left'\)/u)
-  assert.match(component, /whyAdvantagesOn\('right'\)/u)
-  assert.match(component, /aria-label="从需求到运行治理的五步闭环"/u)
+    '0 代码提速，工程化不设上限',
+    '1189', '万+', '截止2026年10月16日',
+  ]) assert.ok((shared + content).includes(phrase), `missing slide 03 advantage: ${phrase}`)
+  assert.match(component, /nav: '为什么选择吾码？'/u)
+  assert.match(component, /<CommonTrainingSlide v-if="commonKind\(slide\)"/u)
+  assert.match(shared, /v-for="advantage in trainingWhyAdvantages"/u)
+  assert.match(shared, /aria-label="企业交付闭环"/u)
+  assert.match(shared, /aria-label="全屏查看 Microi吾码系统架构图"/u)
+  assert.match(shared, /@click="\$emit\('preview', trainingArchitectureImage\)"/u)
   assert.doesNotMatch(component, /吾码绝对优势/u)
 })
 
@@ -176,7 +180,7 @@ test('presentation supports mouse, keyboard, fullscreen, thumbnail navigation, a
     'mci-training-deck__rail',
     'mci-training-deck__thumbnail',
     "const { isDark } = useData()",
-    "isDark.value ? 'thumbs' : 'thumbs-light'",
+    'trainingPreviewPath(deckVersion.value, index, isDark.value)',
     ':src="thumbnailPath(index)"',
     'pdfDownloadPaths',
     'downloadPdf()',
@@ -208,24 +212,24 @@ test('pre-generated dark and light PDFs are published as stable high-quality dow
 })
 
 test('the preview rail publishes a complete thumbnail set for each theme', () => {
-  for (const [theme, root] of Object.entries(thumbnailRoots)) {
-    const thumbnails = docAssets.filter(asset => asset.legacyPath.startsWith(root)
-      && /^slide-\d{2}\.webp$/u.test(path.posix.basename(asset.legacyPath)))
-      .sort((left, right) => left.legacyPath.localeCompare(right.legacyPath))
+  assert.equal(trainingPreviewAssets.length, 114, '47 technical + 10 enterprise pages each have two newly rendered themes')
+  for (const theme of ['dark', 'light']) {
+    const thumbnails = trainingPreviewAssets.filter(asset => asset.edition === 'technical' && asset.theme === theme).sort((left, right) => left.index - right.index)
     const files = thumbnails.map(asset => path.posix.basename(asset.legacyPath))
     assert.equal(files.length, 47, `${theme} theme should contain all 47 thumbnails`)
     assert.equal(files[0], 'slide-01.webp')
     assert.equal(files.at(-1), 'slide-47.webp')
-    for (const name of files) {
-      const file = fs.readFileSync(verifiedDocAssetPath(`${root}${name}`, docAssets))
-      assert.ok(file.length > 1_000, `${theme}/${name} should be a real rendered preview`)
+    for (const asset of thumbnails) {
+      assert.equal(trainingPreviewPath('technical', asset.index - 1, theme === 'dark'), asset.url)
+      const file = fs.readFileSync(verifiedDocAssetPath(asset.url, trainingPreviewAssets))
+      assert.ok(file.length > 1_000, `${theme}/${asset.index} should be a real rendered preview`)
       assert.equal(file.subarray(0, 4).toString('ascii'), 'RIFF')
       assert.equal(file.subarray(8, 12).toString('ascii'), 'WEBP')
     }
   }
 
-  const darkFirst = fs.readFileSync(verifiedDocAssetPath(`${thumbnailRoots.dark}slide-01.webp`, docAssets))
-  const lightFirst = fs.readFileSync(verifiedDocAssetPath(`${thumbnailRoots.light}slide-01.webp`, docAssets))
+  const darkFirst = fs.readFileSync(verifiedDocAssetPath(trainingPreviewPath('technical', 0, true), trainingPreviewAssets))
+  const lightFirst = fs.readFileSync(verifiedDocAssetPath(trainingPreviewPath('technical', 0, false), trainingPreviewAssets))
   assert.notEqual(Buffer.compare(darkFirst, lightFirst), 0, 'light thumbnails must not reuse dark pixels')
 })
 

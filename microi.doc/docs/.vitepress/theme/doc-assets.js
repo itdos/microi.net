@@ -1875,7 +1875,21 @@ export const docAssets = Object.freeze([
     "bytes": 148337,
     "sha256": "33b0c344000de33eee566bedb7df85930d109ddfc20367301205fe821ce6b86d",
     "mimeType": "image/png"
-  }
+  },
+{
+  "legacyPath": "/images/microi-agent-official-home-1.3.9.png",
+  "url": "https://file.microi.net/itdos/official-docs/images/3fa366e45e7c4c60e56600e950ca48a346c3d644cd38b85a8996854ab9e17ead/202610/microi-agent-official-home-1_3_9-original.png",
+  "bytes": 81510,
+  "sha256": "3fa366e45e7c4c60e56600e950ca48a346c3d644cd38b85a8996854ab9e17ead",
+  "mimeType": "image/png"
+},
+{
+  "legacyPath": "/images/microi-agent-eleven-role-group-1.3.9.png",
+  "url": "https://file.microi.net/itdos/official-docs/images/e8afdabedf686969efef16c0e49c8067783a04882582bcde0411ecd2e21e9e1a/202610/microi-agent-eleven-role-group-1_3_9-original.png",
+  "bytes": 151766,
+  "sha256": "e8afdabedf686969efef16c0e49c8067783a04882582bcde0411ecd2e21e9e1a",
+  "mimeType": "image/png"
+}
 ].map(asset => Object.freeze(asset)))
 
 const assetsByLegacyPath = new Map(docAssets.map(asset => [asset.legacyPath, asset]))

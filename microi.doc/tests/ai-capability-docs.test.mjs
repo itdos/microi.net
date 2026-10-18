@@ -124,6 +124,6 @@ test('the 47-slide syllabus retains both AI training pages and the server panel 
   assert.match(component, /entryIds: \['app-store', 'ai-engine', 'ai-data-analysis', 'ai-creative-studio', 'ai-workflow-suite'/u)
   assert.match(component, /id: 'server-panel'[\s\S]*?href: '\/doc\/server-panel\/overview\.html'/u)
   assert.match(component, /const expectedSlideCount = 47/u)
-  assert.match(source, /47 页交互式 HTML PPT/u)
-  assert.match(source, /38 个逐项功能页/u)
+  assert.match(source, /47\s*页完整培训/u)
+  assert.match(source, /38\s*个功能专题/u)
 })
