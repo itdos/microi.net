@@ -44,14 +44,6 @@
 
 模块的 `DetailCodeShowV8`、`DelCodeShowV8` 分别控制平台内置【详情】与【删除】行按钮。例如定制微服务已承担查看入口时，可设 `DetailCodeShowV8` 为 `V8.Result = false;`，再在 `MoreBtns` 添加【打开普通表单】按钮，用 `V8.OpenAnyForm({ TableName: '表名', Id: V8.Form.Id, FormMode: 'View', DialogType: 'Dialog' })` 保留原生表单入口。删除按钮可按业务状态设 `V8.Result = ['Draft', 'Rejected'].includes(String(V8.Form.ApprovalStatus || 'Draft'));`。前端显隐不能代替服务端删除权限和状态校验。
 
-### 表单右侧标签文字
-
-模块设计的【替换】页签可以配置 `[日志]文字替换`、`[评论]文字替换`、`[版本]文字替换`，
-分别保存到 `sys_menu.DataLogTitle`、`DataCommentTitle`、`DataVersionTitle`。留空恢复当前语言的
-“日志／评论／版本”，最多100字符；只改变当前模块的标签和侧栏标题，角标数量、业务内容及权限不变。
-桌面页面、弹窗、抽屉和移动端使用同一配置。通过 MCP 使用 `microi_update_module` 的同名字段，
-写后回读；已有租户先更新模块引擎应用及 PC 前端。
-
 ### 更多功能与多选搜索
 
 数据列表的【更多功能】采用与【更多搜索】一致的简约次级按钮样式，主操作仍保持原有语义。模块设计中开启【隐藏更多功能】时，`sys_menu.HideMoreFunctions=1` 隐藏当前模块的这个入口；缺少字段、空值或 `0` 保留显示。嵌入列表还可通过 `PropsHideMoreFunctions=true` 仅隐藏当前实例，两个条件任一开启即隐藏。

@@ -155,4 +155,3 @@ test('other targets continue through unchanged legacy branch', () => {
   const call=new Function('item','result','newIP','syncVerifiedNetItDosRecord',netBranchSource+"\nreturn 'legacy';");
   let result={Data:{}};assert.equal(call({Key:'git.itdos.net'},result,'115.215.240.3',()=>{throw Error('wrong target');}),'legacy');assert.deepEqual(result,{Data:{}});
 });
-
