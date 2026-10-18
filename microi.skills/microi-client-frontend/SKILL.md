@@ -204,7 +204,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=ab17865c6032884ccd896a0eb62387cf7f89edcf337c024f2251563f3bd0e4d9 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=c122ac25dd00abc7af5751c6db50fe5f9fed29a9979f454ba9a23209d25dbaca -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）
