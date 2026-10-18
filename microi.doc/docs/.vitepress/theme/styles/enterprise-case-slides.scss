@@ -37,3 +37,27 @@
  .mci-enterprise-gallery { flex:0 0 auto;min-height:auto;grid-auto-rows:max-content;align-content:start; }
  .mci-enterprise-gallery figure { overflow:visible;height:auto; }
 }
+
+/* 在线体验始终可见，独立链接不触发图片预览；轻量截图区保持行业主视觉。 */
+.mci-case-image { position:relative;min-height:0; }
+.mci-enterprise-gallery .mci-case-experience { position:absolute;right:9px;bottom:9px;z-index:2;display:inline-flex;align-items:center;min-height:36px;padding:6px 13px;border:1px solid #7fe8ff;border-radius:9px;background:#075c71;color:#fff!important;font-size:13px;font-weight:750;line-height:1.3;text-decoration:none!important;box-shadow:0 3px 14px #001f3e66; }
+.mci-case-image:has(.mci-case-experience) button>span { right:auto;left:6px; }
+.mci-case-experience:focus-visible { outline:3px solid var(--mci-deck-cyan);outline-offset:3px; }
+.mci-more-case-gallery { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px; }
+.mci-more-case-gallery figure { margin:0!important;min-width:0;border:0!important;padding:0!important; }
+.mci-more-case-gallery button { position:relative;display:block;width:100%;height:120px;overflow:hidden;border:1px solid var(--mci-deck-line-strong);border-radius:12px;background:var(--mci-deck-surface); }
+.mci-more-case-gallery img { display:block;width:100%!important;height:100%!important;max-height:none!important;object-fit:contain!important;margin:0!important; }
+.mci-more-case-gallery button>span { position:absolute;right:8px;bottom:6px;background:#14223c;color:white;padding:0 5px;border-radius:4px; }
+.mci-more-case-gallery figcaption { margin:5px 0 0!important;padding:0!important;text-align:center;font-size:12px!important;line-height:1.5!important;color:var(--mci-deck-text-soft); }
+.mci-enterprise-cases.is-universe { gap:18px; }
+.is-universe .mci-industry-universe { min-height:250px;gap:30px; }
+.is-universe .mci-industry-universe-core { max-width:280px; }
+.is-universe .mci-industry-cloud { gap:10px; }
+.is-universe .mci-industry-cloud>span { min-height:43px;padding:8px 12px; }
+.mci-industry-universe-footer { padding-top:14px; }
+.mci-industry-universe-footer p { color:var(--mci-deck-text);font-size:clamp(20px,1.8vw,29px);font-weight:700;line-height:1.4!important; }
+.mci-industry-universe-footer p strong { display:block;color:var(--mci-deck-cyan);font-size:clamp(25px,2.5vw,40px);font-weight:850;line-height:1.3!important; }
+.mci-industry-universe-footer p small { display:block;margin-top:5px;color:var(--mci-deck-text-soft);font-size:16px;font-weight:400;line-height:1.4!important; }
+.mci-industry-universe-footer nav { display:flex;gap:10px;flex-wrap:wrap; }
+@media(min-width:1101px) { .is-enterprise-more .mci-training-slide__frame{padding-block:28px}.is-universe .mci-industry-universe-core{max-width:250px}.mci-industry-universe-footer p small{line-height:1.4}.mci-training-deck.is-artifact-capture .mci-enterprise-cases.is-universe{gap:16px}.mci-training-deck.is-artifact-capture .mci-industry-universe-footer p strong{font-size:36px} }
+@media(max-width:767px) { .mci-more-case-gallery{grid-template-columns:1fr;gap:14px}.mci-more-case-gallery button{height:auto;aspect-ratio:16/9}.mci-enterprise-gallery .mci-case-experience{right:4px;bottom:4px;min-height:36px;font-size:12px;padding:5px 8px}.is-universe .mci-industry-universe{gap:18px}.mci-industry-universe-footer p strong{font-size:28px} }

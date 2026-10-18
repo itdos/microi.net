@@ -149,7 +149,7 @@ test('slide 03 presents a compact, persuasive Microi enterprise advantage matrix
     "['AI 对话建模', '自动实现', '全自动测试', '受控发布', '运行治理']",
     '0 代码提速，工程化不设上限',
     '1189', '万+', '截止2026年10月16日',
-  ]) assert.ok((shared + content).includes(phrase), `missing slide 03 advantage: ${phrase}`)
+  ]) assert.ok((shared.replace(/<[^>]+>/gu, '') + content).includes(phrase), `missing slide 03 advantage: ${phrase}`)
   assert.match(component, /nav: '为什么选择吾码？'/u)
   assert.match(component, /<CommonTrainingSlide v-if="commonKind\(slide\)"/u)
   assert.match(shared, /v-for="advantage in trainingWhyAdvantages"/u)

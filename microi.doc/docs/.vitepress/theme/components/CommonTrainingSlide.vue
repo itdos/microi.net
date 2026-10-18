@@ -95,7 +95,7 @@ const coverRoute = computed(() => isEnterprise.value
           <!-- 架构图保留原始 SVG；预览交由演示稿统一弹层，PDF 直接使用此缩略图。 -->
           <button class="mci-common-architecture" type="button" aria-label="全屏查看 Microi吾码系统架构图" @click="$emit('preview', trainingArchitectureImage)"><img :src="trainingArchitectureImage.src" :alt="trainingArchitectureImage.alt" decoding="sync"><span class="mci-screen-only">点击全屏查看 <i aria-hidden="true">⤢</i></span></button>
           <div class="mci-common-download-proof"><span>微软 NuGet 下载量</span><strong>1189<span>万+</span></strong><small>截止2026年10月16日</small></div>
-          <p class="mci-common-why__promise">一句话，开发大型企业应用<br><strong>0 代码提速，工程化不设上限</strong></p>
+          <p class="mci-common-why__promise"><span>一句话，</span><span>开发大型企业应用</span><strong>0 代码提速，工程化不设上限</strong></p>
         </aside>
       </div>
       <ol class="mci-common-delivery" aria-label="企业交付闭环"><li v-for="(stage, stageIndex) in trainingDeliveryStages" :key="stage"><i>{{ String(stageIndex + 1).padStart(2, '0') }}</i><span>{{ stage }}</span></li></ol>
