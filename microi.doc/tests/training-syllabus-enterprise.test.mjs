@@ -16,6 +16,7 @@ import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads
 import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
 import * as commonContent from '../docs/.vitepress/theme/common-training-content.js'
 import { trainingCaseAssets } from '../docs/.vitepress/theme/training-case-assets.js'
+import { trainingEngineAssets } from '../docs/.vitepress/theme/training-engine-assets.js'
 import { trainingPreviewAssets, trainingPreviewPath } from '../docs/.vitepress/theme/training-previews.js'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -23,6 +24,31 @@ const component = fs.readFileSync(path.join(projectRoot, 'docs/.vitepress/theme/
 const { descriptor, errors } = parseSfc(component)
 assert.deepEqual(errors, [], 'the real presentation component must remain valid Vue source')
 const counts = { technical: 47, enterprise: 10 }
+
+test('体验链接准确覆盖指定七图，技术引擎配图全部使用已验签的轻量CDN资源', () => {
+  const linked = trainingCaseAssets.filter(asset => asset.experienceUrl)
+  assert.equal(linked.length, 7)
+  assert.deepEqual(linked.map(asset => [asset.fileName, asset.experienceUrl]), [
+    ['microi-enterprise-iot-01.png', 'https://static.itdos.com/itdos/micro-app/warehouse-strategy-twin/index.html'],
+    ['microi-enterprise-iot-02.png', 'https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html'],
+    ['microi-enterprise-iot-03.png', 'https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html'],
+    ['microi-enterprise-games-01.png', 'https://microi.net/apps.html?category=game'],
+    ['microi-enterprise-games-02.png', 'https://static.itdos.com/itdos/micro-app/microi-unity-cs/index.html'],
+    ['microi-enterprise-games-03.png', 'https://static.itdos.com/itdos/micro-app/gomoku-3d-cocos-arena/index.html'],
+    ['microi-enterprise-games-04.png', 'https://static.itdos.com/itdos/micro-app/xiangqi-3d-cocos-arena/index.html'],
+  ])
+  const ids = [...component.matchAll(/id: '([^']+)', domain:/gu)].map(match => match[1])
+  assert.equal(ids.length, 38)
+  assert.deepEqual(Object.keys(trainingEngineAssets).sort(), ids.sort())
+  for (const assets of Object.values(trainingEngineAssets)) for (const asset of assets) {
+    assert.ok(asset.bytes > 1000 && asset.bytes < 1000000)
+    assert.match(asset.url, /^https:\/\/file\.microi\.net\/itdos\/official-docs\/images\//u)
+    assert.ok(asset.url.includes(asset.sha256))
+    assert.equal(asset.mimeType, 'image/jpeg')
+    assert.ok(Date.parse(asset.verifiedAt))
+    if (asset.kind === 'diagram') assert.ok(asset.alt.includes('非系统截图'))
+  }
+})
 const slideText = slide => JSON.stringify(slide)
 
 function sourceForUrl(url) {
@@ -152,7 +178,7 @@ test('10 页企业版依用户顺序覆盖平台、系统选型和五类行业�
     [5, ['AI + Blender / CAD / 3ds Max + Three.js / Unity', '无需人工从零绘图、建模', '照片 / 视频完成AI建模', '30+引擎', 'Socket', 'MQTT', 'TCP透传', '设备与网关', 'Zigbee', 'RS-485', 'Modbus']],
     [6, ['多家国企', '集团公司', 'OA办公系统', '服装ERP', '慈溪服装工厂', '100余家', 'SaaS引擎模式', '电器ERP', '轻量级ERP']],
     [7, ['游戏服务器端', '玩家数据管理', '实时通信', '类CS', '棋牌游戏', '几天', '可商用交付产品']],
-    [8, ['500余套软件', 'CRM客户关系', 'CMS内容管理', 'B2C商城', '酒店管理', '财税服务', '考试系统', '售后系统', '企业服务平台', '商会管理', '互联网平台', '欢迎参观成功案例']],
+    [8, ['500余套软件', 'CRM客户关系', 'CMS内容管理', 'B2C商城', '酒店管理', '财税服务', '考试系统', '售后系统', '企业服务平台', '商会管理', '互联网平台', '欢迎联系我们参观更多成功案例']],
   ])
   for (const [index, phrases] of requirements) for (const phrase of phrases) assert.ok(enterpriseBodies[index].includes(phrase), `${enterpriseSlides[index].nav}: missing requirement ${phrase}`)
 })
@@ -178,20 +204,21 @@ test('两版前三页和致辞复用真实组件，完整重现用户要求的�
   assert.equal(commonContent.trainingArchitectureImage.src, 'https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg')
 })
 
-test('四类案例展示全部22张已验签原图，公开链接保留且概念图彻底退出企业正文', () => {
+test('四类案例保留21张原图、移除指定OA图，并补充3张更多行业案例', () => {
   const cases = enterpriseSlides.filter(slide => slide.layout === 'case')
   assert.equal(cases.length, 4)
-  assert.equal(trainingCaseAssets.length, 22)
-  assert.equal(new Set(trainingCaseAssets.map(asset => asset.url)).size, 22)
-  assert.equal(new Set(trainingCaseAssets.map(asset => asset.sha256)).size, 22)
-  assert.deepEqual(cases.flatMap(slide => slide.gallery), trainingCaseAssets)
-  assert.deepEqual(cases.map(slide => slide.gallery.length), [5, 6, 7, 4], 'each industry retains every supplied original')
-  assert.equal(enterpriseSlides[8].gallery.length, 0, 'the cross-industry visual page should not need screenshots')
+  assert.equal(trainingCaseAssets.length, 24)
+  assert.equal(new Set(trainingCaseAssets.map(asset => asset.url)).size, 24)
+  assert.equal(new Set(trainingCaseAssets.map(asset => asset.sha256)).size, 24)
+  assert.deepEqual(cases.flatMap(slide => slide.gallery), trainingCaseAssets.filter(asset => asset.group !== 'more'))
+  assert.deepEqual(cases.map(slide => slide.gallery.length), [5, 6, 6, 4])
+  assert.equal(enterpriseSlides[8].gallery.length, 3)
+  assert.ok(!trainingCaseAssets.some(asset => asset.fileName === 'microi-enterprise-oaerp-05.png'))
   for (const asset of trainingCaseAssets) {
     assert.ok(asset.bytes > 1000)
     assert.match(asset.sha256, /^[a-f0-9]{64}$/u)
     assert.match(asset.mimeType, /^image\/(jpeg|png|webp)$/u)
-    assert.ok(asset.alt.includes('系统实景截图'))
+    assert.ok(asset.alt.length > 5)
     assert.ok(asset.verifiedAt && Number.isFinite(Date.parse(asset.verifiedAt)))
     const url = new URL(asset.url)
     assert.equal(url.origin, 'https://file.microi.net')

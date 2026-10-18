@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T13:44:19.162Z",
+  "generatedAt": "2026-10-18T13:45:36.185Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2259,11 +2259,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "982b4f0632c6f69ee6e266e3367c82ded81a463aaf8b64684154f3be97745512",
-      "originalLines": 679,
-      "prefixSha256": "0744abbee9d6074905f96afc8e97d93fb9324063aebc30b3e22164224b978aad",
-      "prefixBytes": 17144,
-      "entryLines": 258,
+      "originalSha256": "d58c8f3925ec00a977e2aac248083e1cadacc8ec397a8aacb9b37290b177f628",
+      "originalLines": 683,
+      "prefixSha256": "a99216c137f7c72e553628428c80bf20cd53fa48752cbbc5b5c84c8e570d2d58",
+      "prefixBytes": 18006,
+      "entryLines": 262,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -3241,11 +3241,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "7ff61ef82889d18f7a5688131772bafb9a62ce20597f6bb7ac229c6a2bf1259e",
-      "originalLines": 666,
-      "prefixSha256": "e8011e605a1a3912bc0c9bdc8139af72fe78442a8b6e54d4c6acd5af99938064",
-      "prefixBytes": 5771,
-      "entryLines": 134,
+      "originalSha256": "f625e2ba8916647ff803d8efc907f1caa16b7758a24ebdaba5ce05ca7f5d4158",
+      "originalLines": 675,
+      "prefixSha256": "1eb3e3e8c90844f9119091af2cf4562b33ed7e15d676bd2d1193c688c261720f",
+      "prefixBytes": 7897,
+      "entryLines": 143,
       "chunks": [
         {
           "id": "workspace-conventions-000",
@@ -3323,7 +3323,7 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/references/progressive-04-工作区与平台专项保障.md",
-          "sha256": "9ef3509bf1efdf2b04cce46f8f517ad5779de428d007cee08ce6fe41f1f9daa9",
+          "sha256": "ceadb81367650d31297df3d59ab3fa826d26cdf3dce68775860dcfe7b7e3ad28",
           "lines": 38,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },
@@ -3555,7 +3555,7 @@
           "id": "workspace-conventions-038",
           "ordinal": 38,
           "destination": "workspace-conventions/references/progressive-03-cli-与-ide-插件错版共存约定.md",
-          "sha256": "1dd79589434568ac963b144f4278707e4836bf477181b5e7a3a82c0275d3189e",
+          "sha256": "5dbfb261596e9c61fcc330adca7a1ff40a3a1508cd89be3c7b10410e591aa557",
           "lines": 30,
           "heading": "CLI 与 IDE 插件错版共存约定"
         },

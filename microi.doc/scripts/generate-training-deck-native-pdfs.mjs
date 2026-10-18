@@ -1,5 +1,5 @@
 /**
- * 按真实 Vue 课件逐页生成 PDF，技术版保留原生视觉，企业版使用轻量视觉层与可搜索文字层。
+ * 按真实 Vue 课件逐页生成 PDF，两版均使用轻量视觉层与可搜索文字层。
  * 所有浏览器、截图、分片和输出都属于 .tmp；下载清单仅在 CDN 验签后更新。
  * 一次只使用一个浏览器页面，避免四套课件并发渲染挤占共享工作区内存。
  */
@@ -22,7 +22,7 @@ const names = Object.freeze({
 
 export function parseNativePdfOptions(argv) {
   const values = new Map()
-  const allowed = new Set(['--url', '--edition', '--theme', '--capture-root', '--output-root', '--runtime-node-modules', '--runtime-python', '--channel', '--slides'])
+  const allowed = new Set(['--url', '--edition', '--theme', '--capture-root', '--output-root', '--runtime-node-modules', '--runtime-python', '--channel', '--executable-path', '--slides'])
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index]
     if (!allowed.has(key) || values.has(key) || !argv[index + 1] || argv[index + 1].startsWith('--')) throw new Error(`无效或重复参数：${key}`)
@@ -46,6 +46,7 @@ export function parseNativePdfOptions(argv) {
     runtimeNodeModules: values.get('--runtime-node-modules') || process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES,
     runtimePython: values.get('--runtime-python') || process.env.CODEX_PRIMARY_RUNTIME_PYTHON || 'python',
     channel: values.get('--channel') || 'msedge',
+    executablePath: values.get('--executable-path'),
     slides,
   }
 }
@@ -57,9 +58,9 @@ export function assertTrainingTemporaryPath(target) {
   return absolute
 }
 
-/** 企业默认扁平复杂视觉；先验收临时候选，再写最终输出，原始合并件仍供追溯。 */
+/** 两版默认扁平复杂视觉；先验收临时候选，再写最终输出，原始合并件仍供追溯。 */
 export async function finalizeNativeTrainingPdf({ edition, nativeResult, outputPath, captureDirectory, runtimePython }, execute = spawnSync) {
-  if (edition !== 'enterprise') return nativeResult
+  if (!['enterprise', 'technical'].includes(edition)) throw new Error('未知培训版本')
   await assertRegularTemporaryPath(outputPath)
   if (path.extname(outputPath).toLowerCase() !== '.pdf') throw new Error('企业 PDF 最终输出必须使用 .pdf 扩展名')
   await assertRegularTemporaryPath(nativeResult.path)
@@ -69,7 +70,7 @@ export async function finalizeNativeTrainingPdf({ edition, nativeResult, outputP
   const optimizerSha256 = createHash('sha256').update(await fs.readFile(optimizerSource)).digest('hex')
   const candidatePath = path.join(captureDirectory, `optimized-${randomUUID()}.pdf`)
   const optimized = execute(runtimePython, ['-X', 'utf8', optimizerSource, '--input', nativeResult.path, '--output', candidatePath],
-    { encoding: 'utf8', windowsHide: true, timeout: 180000, maxBuffer: 1024 * 1024,
+    { encoding: 'utf8', windowsHide: true, timeout: 600000, maxBuffer: 1024 * 1024,
       env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } })
   if (optimized.status !== 0) throw new Error(`企业 PDF 轻量视觉/文字验收失败：${optimized.stderr || optimized.stdout || optimized.error}`)
   const receipt = JSON.parse(optimized.stdout.trim())
@@ -166,7 +167,7 @@ async function inspectActiveSlide() {
     await image.decode()
     if (!image.complete || image.naturalWidth < 1 || image.naturalHeight < 1) throw new Error(`图片解码失败：${image.currentSrc || image.src}`)
     const rectangle = image.getBoundingClientRect()
-    if (image.closest('.mci-enterprise-gallery')) {
+    if (image.closest('.mci-enterprise-gallery, .mci-more-case-gallery, .mci-engine-gallery')) {
       // 图像矩形在画布内仍可能被 figure/button 裁掉；验证每个实际裁切祖先。
       for (let ancestor = image.parentElement; ancestor && ancestor !== active; ancestor = ancestor.parentElement) {
         const style = getComputedStyle(ancestor)
@@ -177,7 +178,7 @@ async function inspectActiveSlide() {
     }
     return { src: image.currentSrc || image.src, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight,
       left: rectangle.left, top: rectangle.top, width: rectangle.width, height: rectangle.height,
-      gallery: Boolean(image.closest('.mci-enterprise-gallery')), objectFit: getComputedStyle(image).objectFit }
+      gallery: Boolean(image.closest('.mci-enterprise-gallery, .mci-more-case-gallery, .mci-engine-gallery')), objectFit: getComputedStyle(image).objectFit }
   }))
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   const bounds = deck.getBoundingClientRect()
@@ -222,7 +223,7 @@ export async function generateNativeTrainingPdfs(options) {
   const canvasModule = await runtimeModule(options.runtimeNodeModules, '@napi-rs/canvas')
   const canvasApi = canvasModule.createCanvas ? canvasModule : canvasModule.default
   const sourceSha256 = await nativePdfSourceFingerprint()
-  const browser = await chromium.launch({ channel: options.channel, headless: true, args: ['--disable-dev-shm-usage', '--renderer-process-limit=2'] })
+  const browser = await chromium.launch({ ...(options.executablePath ? { executablePath: options.executablePath } : { channel: options.channel }), headless: true, args: ['--disable-dev-shm-usage', '--renderer-process-limit=2', '--js-flags=--max-old-space-size=512'] })
   console.log(JSON.stringify({ stage: 'browser-started', pid: process.pid, startedAt: new Date().toISOString(), sourceSha256 }))
   const results = []
   const previews = []
@@ -260,6 +261,7 @@ export async function generateNativeTrainingPdfs(options) {
           /* PDF 只需要原图缩略排列。序号图注会在固定槽位外被正文 figure 规则裁切，
              隐藏重复标签并让按钮使用槽位高度，确保 contain 的完整原图没有第二层裁切。 */
           .mci-training-deck .mci-enterprise-gallery figure { border:0!important; padding:0!important; min-height:0!important; }
+          .mci-training-deck .mci-enterprise-gallery .mci-case-image { height:100%!important; min-height:0!important; }
           .mci-training-deck .mci-enterprise-gallery button { height:100%!important; aspect-ratio:auto!important; box-sizing:border-box!important; }
           .mci-training-deck .mci-enterprise-gallery img { width:100%!important; height:100%!important; max-height:none!important; margin:0!important; object-fit:contain!important; box-sizing:border-box!important; }
           .mci-training-deck .mci-enterprise-gallery figcaption { display:none!important; }` })
@@ -290,8 +292,8 @@ export async function generateNativeTrainingPdfs(options) {
         await page.close()
         const filename = `${names[edition]}-${theme}${options.slides ? '-sample' : ''}.pdf`
         const outputPath = path.join(options.outputRoot, filename)
-        // 企业先保留原生合并件作为视觉/字序比对基准，再生成轻量下载件。
-        const nativeOutputPath = edition === 'enterprise' ? path.join(directory, 'native-merged.pdf') : outputPath
+        // 两版都保留原生合并件作为视觉/字序比对基准，避免技术版配图增加后再次出现卡顿。
+        const nativeOutputPath = path.join(directory, 'native-merged.pdf')
         const manifest = { schema: 'native-training-pdf.v1', edition, theme, dimensions, sourceSha256, expectedPageCount: selected.length, outputPath: nativeOutputPath, slides }
         const manifestPath = path.join(directory, 'manifest.json')
         await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2))

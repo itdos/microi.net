@@ -58,7 +58,9 @@ export const trainingCaseAssets = [
     "bytes": 724372,
     "sha256": "0d3450ac0c04e7a3f99c74cce5a3489245e63895ff1ef5ed5970cb3fdc6bf507",
     "mimeType": "image/png",
-    "verifiedAt": "2026-10-15T18:35:44.338Z"
+    "verifiedAt": "2026-10-15T18:35:44.338Z",
+    "experienceLabel": "在线体验",
+    "experienceUrl": "https://static.itdos.com/itdos/micro-app/warehouse-strategy-twin/index.html"
   },
   {
     "group": "iot",
@@ -68,7 +70,9 @@ export const trainingCaseAssets = [
     "bytes": 5340990,
     "sha256": "95c4ca635c92db2f87fa30f9a594afa28d3d6ae533d14bb691dca98c6a19e64c",
     "mimeType": "image/png",
-    "verifiedAt": "2026-10-15T18:35:46.548Z"
+    "verifiedAt": "2026-10-15T18:35:46.548Z",
+    "experienceLabel": "在线体验",
+    "experienceUrl": "https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html"
   },
   {
     "group": "iot",
@@ -78,7 +82,9 @@ export const trainingCaseAssets = [
     "bytes": 2001938,
     "sha256": "0317e16e5fbc60eaa3bdb0e775041cf1fa02b55b0282e4b3f0158bc6ef0e587a",
     "mimeType": "image/png",
-    "verifiedAt": "2026-10-15T18:35:49.574Z"
+    "verifiedAt": "2026-10-15T18:35:49.574Z",
+    "experienceLabel": "在线体验",
+    "experienceUrl": "https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html"
   },
   {
     "group": "iot",
@@ -152,16 +158,6 @@ export const trainingCaseAssets = [
   },
   {
     "group": "oaerp",
-    "fileName": "microi-enterprise-oaerp-05.png",
-    "alt": "OAERP系统实景截图 5",
-    "url": "https://file.microi.net/itdos/official-docs/images/b0c49cc1b8f3f31e1412763c503cfa9a9c1cf6c7252e9482601f348948a2f933/202610/microi-enterprise-oaerp-05.png",
-    "bytes": 481516,
-    "sha256": "b0c49cc1b8f3f31e1412763c503cfa9a9c1cf6c7252e9482601f348948a2f933",
-    "mimeType": "image/png",
-    "verifiedAt": "2026-10-15T18:36:04.987Z"
-  },
-  {
-    "group": "oaerp",
     "fileName": "microi-enterprise-oaerp-06.png",
     "alt": "OAERP系统实景截图 6",
     "url": "https://file.microi.net/itdos/official-docs/images/3c673477d4ad842d47e5993cf3022f078757887e7eace762ddcd10dafc1f0b30/202610/microi-enterprise-oaerp-06.png",
@@ -188,7 +184,9 @@ export const trainingCaseAssets = [
     "bytes": 2472244,
     "sha256": "9e92ce7e59225533f0cd60e30397a4c4ce8f2c08e993d4ec2d498d22c42aedf6",
     "mimeType": "image/png",
-    "verifiedAt": "2026-10-15T18:36:07.996Z"
+    "verifiedAt": "2026-10-15T18:36:07.996Z",
+    "experienceLabel": "在线查看",
+    "experienceUrl": "https://microi.net/apps.html?category=game"
   },
   {
     "group": "games",
@@ -198,7 +196,9 @@ export const trainingCaseAssets = [
     "bytes": 7768260,
     "sha256": "c98b144d75b1bd917cca7d06835b2148c5a8fbe3ad1d5ef99d4f231e00118f33",
     "mimeType": "image/png",
-    "verifiedAt": "2026-10-15T18:36:10.818Z"
+    "verifiedAt": "2026-10-15T18:36:10.818Z",
+    "experienceLabel": "在线体验",
+    "experienceUrl": "https://static.itdos.com/itdos/micro-app/microi-unity-cs/index.html"
   },
   {
     "group": "games",
@@ -208,7 +208,9 @@ export const trainingCaseAssets = [
     "bytes": 8513389,
     "sha256": "742ed4584a011427cf1a69287d1fb39b42820c672392d6632deef85e6911cd53",
     "mimeType": "image/png",
-    "verifiedAt": "2026-10-15T18:36:14.114Z"
+    "verifiedAt": "2026-10-15T18:36:14.114Z",
+    "experienceLabel": "在线体验",
+    "experienceUrl": "https://static.itdos.com/itdos/micro-app/gomoku-3d-cocos-arena/index.html"
   },
   {
     "group": "games",
@@ -218,6 +220,44 @@ export const trainingCaseAssets = [
     "bytes": 9470990,
     "sha256": "db68ce9e71caecb5ef8a28fbd20b1b8b04ca39c6a78f98ce0c2223474170eda5",
     "mimeType": "image/png",
-    "verifiedAt": "2026-10-15T18:36:21.293Z"
+    "verifiedAt": "2026-10-15T18:36:21.293Z",
+    "experienceLabel": "在线体验",
+    "experienceUrl": "https://static.itdos.com/itdos/micro-app/xiangqi-3d-cocos-arena/index.html"
+  },
+  {
+    "group": "more",
+    "alt": "CRM · 客户关系管理",
+    "fileName": "microi-training-more-crm.jpg",
+    "bytes": 694492,
+    "width": 3840,
+    "height": 2271,
+    "url": "https://file.microi.net/itdos/official-docs/images/cd54b282e74fcbf7c295656970183cf592d2fef583c6a39775595172393628c2/202610/microi-training-more-crm.jpg",
+    "sha256": "cd54b282e74fcbf7c295656970183cf592d2fef583c6a39775595172393628c2",
+    "mimeType": "image/jpeg",
+    "verifiedAt": "2026-10-18T11:59:36.602Z"
+  },
+  {
+    "group": "more",
+    "alt": "互联网 · 房地产平台",
+    "fileName": "microi-training-more-property.jpg",
+    "bytes": 941063,
+    "width": 3840,
+    "height": 2273,
+    "url": "https://file.microi.net/itdos/official-docs/images/1d94dac3fa4435b6ed2118fbc1da95e500b933a7f70b854fd47bad8ca538d03d/202610/microi-training-more-property.jpg",
+    "sha256": "1d94dac3fa4435b6ed2118fbc1da95e500b933a7f70b854fd47bad8ca538d03d",
+    "mimeType": "image/jpeg",
+    "verifiedAt": "2026-10-18T11:59:38.824Z"
+  },
+  {
+    "group": "more",
+    "alt": "行业服务 · 物性数据平台",
+    "fileName": "microi-training-more-material.jpg",
+    "bytes": 658372,
+    "width": 3840,
+    "height": 2272,
+    "url": "https://file.microi.net/itdos/official-docs/images/c0324ed6615aa62cdeaf9993f452124e8fa00cb920c098c5fbfd5b77d87e5e04/202610/microi-training-more-material.jpg",
+    "sha256": "c0324ed6615aa62cdeaf9993f452124e8fa00cb920c098c5fbfd5b77d87e5e04",
+    "mimeType": "image/jpeg",
+    "verifiedAt": "2026-10-18T11:59:41.053Z"
   }
 ]
