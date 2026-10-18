@@ -60,7 +60,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=6f225c91bf18c467f30f3ff93c8929a4ea6f6914addaf677226bb92a123e4472 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=80fada0b0e3e878147bbdcb2017879611a5149324f5bc60cccfa42eb75f2135c -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -183,7 +183,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 - 自助保存优先使用官方 `Managed` 接口引擎，由 `V8.CurrentUser.Id` 与 `V8.OsClient` 推导用户和租户，并在服务端构造固定白名单更新对象；接口参数禁止决定目标 Id/OsClient，也禁止写入 Account、Phone、Tenant、Dept、Role、Level、State、Pwd、认证因子和登录审计字段。只有缺少可复用可信原子能力时才新增 C# DTO/端点。保存成功后调用 `V8.Method.RefreshLoginUser` 刷新登录缓存，并让微服务宿主重新同步 `CurrentUser`。
 - 右上角即时切换可以乐观应用并短防抖保存；远端保存失败时保留当前设备效果并明确提示。个人中心和右上角必须调用同一个应用包交付的白名单接口引擎（当前为 `platform-user-update-preferences`），不能分别形成两套字段、枚举或优先级。
 - 导航切入或退出 `TopSide` 会重建顶栏组件；卸载前必须发送尚未保存的偏好，在途请求与后续选择共用按 store、API 地址、租户、账号和登录会话隔离的运行时队列。新顶栏继承失败状态和重试数据，旧响应不能覆盖更新的选择或跨账号合并队列；标准续签保留 `MicroiSessionId` 时也保留最终待保存选择，计算属性显式依赖 Pinia.Token。JWT 解码仅用于本地队列归属，服务端仍通过标准 DiyToken 验证授权；不得将会话凭据写入偏好存储、日志或响应。使用真实 Vue computed 和组件生命周期回归 `theme-select-autosave-lifecycle.spec.mjs` 验证卸载、在途合并、失败重试、续签及账号/租户/会话切换。
-- 主题回归同时执行 `framework-appearance.spec.mjs`、`ui-density-runtime.spec.mjs` 与 `theme-select-autosave-lifecycle.spec.mjs`；真实浏览器至少验证 4K 系统设置与左菜单在 90/110 两档的尺寸变化、全局/个人继承与恢复、全部顶栏隐藏后账号仍在，以及装饰关闭后的亮暗和焦点可见性。
+- 主题回归同时执行 `framework-appearance.spec.mjs`、`ui-density-runtime.spec.mjs` 与 `theme-select-autosave-lifecycle.spec.mjs`；真实浏览器默认使用一个常规桌面 CSS 视口（优先用户实际视口，否则 1920×1080），验证系统设置与左菜单在 90/110 两档的尺寸变化、全局/个人继承与恢复、全部顶栏隐藏后账号仍在，以及装饰关闭后的亮暗和焦点可见性。只有用户明确要求或缺陷涉及超宽屏时才追加 4K，不把截图文件像素尺寸当作浏览器 CSS 视口。
 
 ---
 

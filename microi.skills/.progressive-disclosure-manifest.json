@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T16:12:48.368Z",
+  "generatedAt": "2026-10-18T18:09:39.262Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,7 +169,7 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "0c0f0d8312d20af4d14d85d0f152df8e40e07cead4ab6c65aef9ad522333a0cc",
+      "originalSha256": "123473e9b345c971f21277aa55d01bbcacd8c9e11152d29c0c22263473637ea8",
       "originalLines": 725,
       "prefixSha256": "9c59063f7561713a30d5433fcaba7d9976b790758634f2a95bf827f251d7da4a",
       "prefixBytes": 1415,
@@ -195,7 +195,7 @@
           "id": "microi-client-frontend-002",
           "ordinal": 2,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "6f225c91bf18c467f30f3ff93c8929a4ea6f6914addaf677226bb92a123e4472",
+          "sha256": "80fada0b0e3e878147bbdcb2017879611a5149324f5bc60cccfa42eb75f2135c",
           "lines": 127,
           "heading": "2. 表单引擎三层结构"
         },
@@ -1382,17 +1382,17 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "08fa9ee0ede063b47e1dbbef01c3eb7091fd587c1e730d777a8bb91471286710",
-      "originalLines": 811,
-      "prefixSha256": "8d16d336d4efd8b7295944b286a64dfb7107ad75694c91348c654e5fa0f67773",
-      "prefixBytes": 3089,
-      "entryLines": 203,
+      "originalSha256": "4d2bdb53447bf8bfca376f2861dd6828b4c07b3511503d5ab2bdb7eb1934f83e",
+      "originalLines": 813,
+      "prefixSha256": "f691ccb80a94c5e34216ed442e750c814cbc3c2f860d6ad69dc4349ec286e8e5",
+      "prefixBytes": 3679,
+      "entryLines": 205,
       "chunks": [
         {
           "id": "playwright-e2e-000",
           "ordinal": 0,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "a6ef528a2a940fd0f58efaee6b73eb5dbc159db93d95afedf41c7b8642536d18",
+          "sha256": "f04614f276c139cfa50b9e46e89857675c6dc5e7cf0cfbfde76d6e6dbe9746c9",
           "lines": 9,
           "heading": "是否需要 `-e2e` 后缀"
         },
@@ -1400,7 +1400,7 @@
           "id": "playwright-e2e-001",
           "ordinal": 1,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "b3970a9a4603447651520667c05ab4ecfae01b65b3f752e9f318007c5e2699c1",
+          "sha256": "703786ae7a5a52cb39664f1c82de7fb7aa7dfece511046d3757da64918c23063",
           "lines": 11,
           "heading": "适用范围"
         },
@@ -1408,7 +1408,7 @@
           "id": "playwright-e2e-002",
           "ordinal": 2,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "5874137c92e16fd5cc729fd9c23d051caa3e64438fc7bee1d717ae9c5a0f2a90",
+          "sha256": "acef3e589cf11f3c197ee0b0ccf56d96b3f286263d54161b3c260e07c2090ed0",
           "lines": 20,
           "heading": "临时文件与产物放置规则（必须遵守）"
         },
@@ -1416,7 +1416,7 @@
           "id": "playwright-e2e-003",
           "ordinal": 3,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "247ddb9017c174f0daa88d1f6e4220c5530b79c5ac976e61e128ed8bd0aa1fea",
+          "sha256": "69b8842a221a0de60f8605c5059deee391be0f16f0b6cbc5ddfb3cfd210268db",
           "lines": 20,
           "heading": "标准目录"
         },
@@ -1424,7 +1424,7 @@
           "id": "playwright-e2e-004",
           "ordinal": 4,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "f71fe44f7d5753b93804dac958ea8205cddcaee25188a8417b33770e305c46ed",
+          "sha256": "4f5e11baf4651c11b5f9819a0b4f33ce2590db1733d4db72814bd1a25daf56ff",
           "lines": 21,
           "heading": "必备环境变量"
         },
@@ -1432,7 +1432,7 @@
           "id": "playwright-e2e-005",
           "ordinal": 5,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "a66696c3263f060d0b7be309a527fca6a9bad95dd534eabbe84f1b6539770d8e",
+          "sha256": "51567cea5fca434f9b031fef0871454100cf4715dfb65695dc1722bd275399be",
           "lines": 24,
           "heading": "本地测试账号自动发现"
         },
@@ -1440,7 +1440,7 @@
           "id": "playwright-e2e-006",
           "ordinal": 6,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "6aeefebda3a9e598564c53c2f8028a4ccefe2291c4c7c7ae4781ca15fb5d0697",
+          "sha256": "88e1002cae934acd2de5af2f77f371a9ea152a525eecf11b49fe182b16a56044",
           "lines": 12,
           "heading": "后端改动后的 E2E 前置动作"
         },
@@ -1448,7 +1448,7 @@
           "id": "playwright-e2e-007",
           "ordinal": 8,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "acd4d4aeaf79f4d3af7fee7cdd72b01b0cec10a83c252a132b29f258a3c468bf",
+          "sha256": "948194cce3a29cfec216546acab77314ccaa1c0afad3cbcfd6b426a94f36d4ac",
           "lines": 42,
           "heading": "服务自启动纪律（必做）"
         },
