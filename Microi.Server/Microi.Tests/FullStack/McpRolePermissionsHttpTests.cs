@@ -22,7 +22,8 @@ public sealed class McpRolePermissionsHttpTests
         var role = "mcp-role-" + suffix; var readerRole = "mcp-read-" + suffix;
         var tableNames = new[] { "mcp_gate_a_" + suffix, "mcp_gate_b_" + suffix };
         var tables = new List<string>(); var modules = new List<string>();
-        var account = "mcp_" + suffix; var password = "McP!" + Guid.NewGuid().ToString("N");
+        // 遵守平台默认 6–20 位密码策略，避免角色权限验收在创建账号阶段提前终止。
+        var account = "mcp_" + suffix; var password = "McP!9" + Guid.NewGuid().ToString("N")[..15];
         var userId = ""; var token = ""; var did = "McpRoleHttp-" + suffix;
         var adminToken = Required("MICROI_TEST_TOKEN"); var adminDid = Required("MICROI_TEST_DID");
 

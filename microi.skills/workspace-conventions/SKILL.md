@@ -28,7 +28,7 @@ description: 每次 Microi 任务开始前必读的基础规范。用于识别�
 工作区保护始终有效：保留他人差异与共享进程，临时产物只放根 `.tmp/`，闭源源码只从独立内部仓提交。修改/提交前读取 [共享工作区与 Git 保障](references/progressive-04-工作区与平台专项保障.md#多对话共享工作区变更归属保护强制)；启动构建、测试服务或浏览器前读取同文件资源/OOM规则并检查现有资源。后端/任务/权限变更读取分布式与安全章节；平台源码定位、文档和 Skills 修改读取对应章节。平台能力四项检查仍固定保留在本入口。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=2c66790657eec4f021ccd2533cb811c6eafcc47fe23e5f62b135aae298f26bbf -->
+<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=aca51a9aec956dd31d4865eeb25b3d33452106b363659970773b40b48d22e346 -->
 ## 任务启动前 Skill 读取规则（强制）
 
 AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端、后端、UniApp、文档、测试或交付任务前，必须先按任务类型读取相关 `microi.skills/**/SKILL.md`。不能等到写代码或出问题后才补读。
@@ -89,7 +89,7 @@ AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端�
 - 用户明确关闭自动更新或宿主不允许终端执行时，尊重该限制，报告具体未完成项和恢复命令；不能静默宣称已是最新版。自动更新只覆盖开发工具、Skills 和本机 MCP 入口，不授权升级客户 API/数据库、部署容器或安装业务应用；已签名 Microi Agent 安装目录仍通过桌面官方更新渠道升级。
 - 只有任务明确依赖旧版本不存在的具体能力时，才准确说明该能力边界与可用降级方案；不得用“最新版未通过”“尚未授权升级”作为整项任务的失败理由。
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-001 sha256=8d8dfff420c0cc768bbeb13d94e9f77f52d5002fc61d93dc82d71b3a17f2eaa0 -->
+<!-- microi-progressive:chunk id=workspace-conventions-001 sha256=c3db79fb5f6f00a6ea619f7129f1e81259efe899256a5100f9c84a5b5dca58f4 -->
 ## Microi吾码工作进度播报规范（强制）
 
 AI 在任何新建或已有对话中处理 Microi吾码任务并向用户输出工作过程记录时，必须默认执行本规范，无需用户再次提醒：
