@@ -1,5 +1,9 @@
 # AI 引擎与 Microi.AI 中转站
 
+## 会话历史按需加载
+
+首页嵌入 AI 助手时不预取历史正文。打开历史列表后，由 `platform-ai-runtime` 的 `ListConversationSummaries` 按页返回标题、时间及归档状态；选择会话后，才用 `GetConversationRecords` 分页获取该会话的问答、思考过程和附件。两项动作始终绑定当前登录用户及会话来源，不接受请求指定其他用户。需同时更新 PC 框架和“AI助手”应用 v7.7.5 或更高版本。
+
 ::: tip 推荐部署方式：默认不安装向量组件
 Microi 吾码在线 AI 引擎已内置“**大模型关键词扩展 → 当前用户权限范围内的 Schema 关键词检索 → 精确表/字段回读 → SQL 安全校验与执行**”。对常见的 500～1200 张表、1 万～1.5 万个字段，无需部署 **Ollama + nomic-embed-text + Qdrant** 也能完成 AI 数据分析，启动更快、资源占用更低、实时 Schema 更准确。
 

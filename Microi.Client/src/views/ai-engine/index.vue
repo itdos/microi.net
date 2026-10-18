@@ -87,6 +87,7 @@
                             </button>
                         </el-tooltip>
                     </div>
+                    <el-button v-if="historyNextPage" :loading="historyLoading" @click="loadHistory(true)">加载更早的对话</el-button>
                     <el-empty
                         v-if="!filteredConversations.length && !historyLoading"
                         :image-size="70"
@@ -787,6 +788,7 @@
 </template>
 
 <script setup>
+import { readAiHistoryPage, readAiConversation } from "@/utils/ai-conversation-history";
 import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useDiyStore } from "@/pinia";
@@ -894,6 +896,8 @@ const historyKeyword = ref("");
 const historyView = ref("active");
 const historyActionLoading = ref("");
 const conversations = ref([]);
+const historyNextPage = ref(null);
+let historyLoaded = false;
 const messages = ref([]);
 const currentConversationId = ref(makeId("chat"));
 const currentConversationSource = ref(SOURCE);
@@ -1143,8 +1147,9 @@ onMounted(async () => {
     const tasks = [loadAiModels(), loadAiEngineMeta(), loadSecureAssistantBootstrap()];
     if (isAiAdmin.value) tasks.push(loadPlatformStats());
     await Promise.all(tasks);
-    await loadHistory();
+    // 首页嵌入态不预取历史；用户打开历史面板后再读取摘要。
 });
+watch(showHistorySidebar, visible => { if (visible && !historyLoaded) void loadHistory(); });
 
 onBeforeUnmount(() => stopVideoPolling());
 
@@ -1505,60 +1510,23 @@ async function loadPlatformStats() {
     }
 }
 
-async function loadHistory() {
+async function loadHistory(append = false) {
+    if (historyLoading.value || (append && !historyNextPage.value)) return;
     historyLoading.value = true;
     try {
-        const unified = [];
-        const grouped = new Map();
-        try {
-            const result = await DiyCommon.FormEngine.GetTableData("mic_ai_record", {
-                _Where: currentUser.value?.Id ? [["UserId", "=", currentUser.value.Id]] : [],
-                _OrderBy: "CreateTime",
-                _OrderByType: "DESC",
-                _PageSize: 500
-            });
-            if (isOk(result)) {
-                (getData(result) || []).forEach((row) => {
-                    const record = parseRecord(row.Content);
-                    if (!record || record.Source !== SOURCE || !record.ConversationId) return;
-                    record.__rowId = row.Id;
-                    record.CreatedAt = record.CreatedAt || row.CreateTime || "";
-                    record.Archived = record.Archived === true || Number(record.Archived || 0) === 1;
-                    const recordTimestamp = toTimestamp(record.CreatedAt);
-                    if (!grouped.has(record.ConversationId)) {
-                        grouped.set(record.ConversationId, {
-                            id: record.ConversationId,
-                            key: `${SOURCE}:${record.ConversationId}`,
-                            source: SOURCE,
-                            title: record.Title || firstLine(record.Content) || "新对话",
-                            lastTime: formatHistoryTime(record.CreatedAt) || record.Time || "",
-                            lastTimestamp: recordTimestamp,
-                            archived: false,
-                            records: []
-                        });
-                    }
-                    const group = grouped.get(record.ConversationId);
-                    group.records.push(record);
-                    group.archived = group.archived || record.Archived;
-                    if (recordTimestamp > group.lastTimestamp) {
-                        group.lastTimestamp = recordTimestamp;
-                        group.lastTime = formatHistoryTime(record.CreatedAt) || record.Time || "";
-                    }
-                    if (record.Role === "user" && (!group.title || group.title === "新对话")) {
-                        group.title = firstLine(record.Content);
-                    }
-                });
-            }
-        } catch (error) {
-            console.warn("[AiAssistant] load workbench history failed", error);
+        const unified = append ? [...conversations.value] : [];
+        const data = await readAiHistoryPage(DiyCommon, SOURCE, append ? historyNextPage.value : 1);
+        historyNextPage.value = data.HasMore ? data.NextPage : null;
+        for (const item of data.Conversations || []) {
+            const key = `${SOURCE}:${item.Id}`;
+            const existing = unified.find(row => row.key === key);
+            if (existing) { existing.archived = existing.archived || item.Archived; continue; }
+            unified.push({ id: item.Id, key, source: SOURCE, title: item.Title || '新对话',
+                lastTime: formatHistoryTime(item.LastTime), lastTimestamp: toTimestamp(item.LastTime),
+                archived: Boolean(item.Archived), records: null });
         }
-        unified.push(...Array.from(grouped.values())
-            .map((item) => ({
-                ...item,
-                records: item.records.sort((a, b) => toTimestamp(a.CreatedAt) - toTimestamp(b.CreatedAt))
-            })));
 
-        if (secureAssistantAvailable.value) {
+        if (!append && secureAssistantAvailable.value) {
             try {
                 const data = await listMobileAiConversations(DiyCommon);
                 const secureItems = (Array.isArray(data.Conversations) ? data.Conversations : []).map((item) => ({
@@ -1578,6 +1546,9 @@ async function loadHistory() {
             }
         }
         conversations.value = unified.sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+        historyLoaded = true;
+    } catch (error) {
+        ElMessage.error(error?.message || "历史读取失败，请重试");
     } finally {
         historyLoading.value = false;
     }
@@ -1601,6 +1572,7 @@ function firstLine(text) {
 
 function newConversation() {
     cancelRequest();
+    historyLoading.value = false;
     historyView.value = "active";
     semanticMode.value = "auto";
     resolvedMode.value = "chat";
@@ -1633,7 +1605,9 @@ async function setConversationArchived(item, archived) {
         }
         return;
     }
-    const records = (item.records || []).filter((record) => record.__rowId);
+    let records;
+    try { records = (await readAiConversation(DiyCommon, SOURCE, item.id)).filter(record => record.__rowId); }
+    catch (error) { ElMessage.error(error?.message || "会话读取失败"); return; }
     if (!records.length) {
         ElMessage.warning("该对话暂无可归档记录");
         return;
@@ -1707,8 +1681,10 @@ async function selectConversation(item) {
     if (item.source === SECURE_DATA_SOURCE) {
         semanticMode.value = "secure-data";
         historyLoading.value = true;
+        messages.value = [];
         try {
             const data = await listMobileAiMessages(DiyCommon, item.id);
+            if (!isCurrentConversation(item)) return;
             messages.value = normalizeMobileAiMessages(data).map((record) => ({
                 id: record.id,
                 role: record.role,
@@ -1729,14 +1705,21 @@ async function selectConversation(item) {
             }));
             scrollToBottom();
         } catch (error) {
-            ElMessage.error(error?.message || "安全数据对话加载失败");
+            if (isCurrentConversation(item)) ElMessage.error(error?.message || "安全数据对话加载失败");
         } finally {
-            historyLoading.value = false;
+            if (isCurrentConversation(item)) historyLoading.value = false;
         }
         return;
     }
     if (semanticMode.value === "secure-data") semanticMode.value = "auto";
-    messages.value = (item.records || []).map((record) => {
+    historyLoading.value = true;
+    messages.value = [];
+    let records;
+    try { records = await readAiConversation(DiyCommon, SOURCE, item.id); }
+    catch (error) { if (isCurrentConversation(item)) ElMessage.error(error?.message || "会话读取失败"); return; }
+    finally { if (isCurrentConversation(item)) historyLoading.value = false; }
+    if (!isCurrentConversation(item)) return;
+    messages.value = records.map((record) => {
         const role = record.Role || "assistant";
         const content = normalizeLoadedMessageContent(record, role);
         return {
@@ -3179,7 +3162,8 @@ async function saveMessage(message, strict = false) {
         if (!isOk(result)) throw new Error(result?.Msg || "会话记录保存失败");
         if (!message.__rowId) message.__rowId = getData(result)?.Id || "";
         if (strict && !message.__rowId) throw new Error("会话记录未返回 Id，建模写入已停止");
-        await loadHistory();
+        historyLoaded = false;
+        if (showHistorySidebar.value) await loadHistory();
     } catch (error) {
         console.warn("[AiEngine] save message failed", error);
         if (strict) throw error;

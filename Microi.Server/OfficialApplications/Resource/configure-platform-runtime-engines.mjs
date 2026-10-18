@@ -207,7 +207,7 @@ const engines = [
     history: '2026-08-25 v1.0.0 将语言词条包迁移为匿名 Managed 接口引擎。'
   },
   {
-    key: 'platform-current-user', name: '平台当前用户', file: 'platform-current-user.js',
+    key: 'platform-current-user', name: '平台当前用户', file: 'platform-current-user.js', version: 'v1.0.1', version: 'v1.0.1',
     id: '019d2a01-9d63-7f91-8c01-000000000005', enableLog: 0,
     history: '2026-08-25 v1.0.0 将当前用户自省迁移为鉴权 Managed 接口引擎，直接返回可信 V8.CurrentUser。'
   },
