@@ -68,6 +68,7 @@ export function configureV8() {
   V8.configure?.({
     apiBase: context.apiBase,
     osClient: context.osClient,
+    fileServer: context.fileServer,
     appendOsClientQuery: false,
     onTokenChanged: notifyHostTokenChanged
   })

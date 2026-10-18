@@ -17,7 +17,7 @@
           <p>{{ user.Account }} · {{ user.DeptName || '未设置部门' }}</p>
         </div>
         <div class="security-score" :title="securitySummary">
-          <strong>{{ securityScore }}</strong><span>安全评分</span>
+          <strong>{{ sectionsLoaded.security ? securityScore : '—' }}</strong><span>安全评分</span>
         </div>
       </header>
 
@@ -33,7 +33,9 @@
         </nav>
 
         <section class="settings-panel">
-          <template v-if="activeTab === 'profile'">
+          <div v-if="sectionLoading" role="status" aria-live="polite">正在加载{{ tabs.find(item => item.id === activeTab)?.label }}…</div>
+          <div v-else-if="sectionError" role="alert"><p>{{ sectionError }}</p><button class="secondary" @click="selectTab(activeTab)">重新加载</button></div>
+          <template v-else-if="activeTab === 'profile'">
             <div class="panel-heading"><div><span>个人资料</span><h2>让协作伙伴更容易认出你</h2></div><span class="status-chip">DiyToken 身份</span></div>
             <div class="form-grid">
               <label><span>登录账号</span><input :value="user.Account" disabled /><small>账号由管理员维护</small></label>
@@ -296,6 +298,10 @@ const externalProviders = ref([])
 const externalBindings = ref([])
 const terminals = ref([])
 const availableMenus = ref([])
+const sectionsLoaded = reactive({})
+const sectionLoading = ref(false)
+const sectionError = ref('')
+const sectionRequests = new Map()
 const preference = reactive({
   DefaultIndexUrl: '',
   ThemeColor: '#409eff',
@@ -333,7 +339,7 @@ const initials = computed(() => String(user.value.Name || user.value.Account || 
 const heroAvatarUrl = computed(() => privateAvatarUrl.value || publicAvatarUrl.value)
 const roleNames = computed(() => getUserRoleNames(user.value))
 const securityScore = computed(() => Math.min(100, 50 + (capabilities.value.HasPasskey ? 20 : 0) + (capabilities.value.HasTotp ? 15 : 0) + (capabilities.value.HasFace ? 15 : 0)))
-const securitySummary = computed(() => `${capabilities.value.HasPasskey ? '已' : '未'}启用 Passkey，${capabilities.value.HasTotp ? '已' : '未'}启用 Authenticator，${capabilities.value.HasFace ? '已' : '未'}登记严格人脸`)
+const securitySummary = computed(() => sectionsLoaded.security ? `${capabilities.value.HasPasskey ? '已' : '未'}启用 Passkey，${capabilities.value.HasTotp ? '已' : '未'}启用 Authenticator，${capabilities.value.HasFace ? '已' : '未'}登记严格人脸` : '进入安全与登录后查看安全评分')
 const bindingByProvider = computed(() => Object.fromEntries(externalBindings.value.map((item) => [String(item.Provider || '').toLowerCase(), item])))
 
 function showNotice(text, type = 'success') {
@@ -342,8 +348,49 @@ function showNotice(text, type = 'success') {
   showNotice.timer = window.setTimeout(() => { notice.text = '' }, 5000)
 }
 
-function selectTab(tabId) {
+async function selectTab(tabId) {
   activeTab.value = tabId
+  sectionError.value = ''
+  sectionLoading.value = !sectionsLoaded[tabId] && tabId !== 'profile'
+  try { await loadSection(tabId) }
+  catch (error) {
+    // 未取得安全配置时显示可重试错误，不能把加载失败伪装成尚未配置认证器。
+    if (activeTab.value === tabId) sectionError.value = error?.Msg || error?.message || '加载失败，请重试。'
+  }
+  finally { if (activeTab.value === tabId) sectionLoading.value = false }
+}
+
+function loadSection(tabId) {
+  if (tabId === 'profile' || sectionsLoaded[tabId]) return Promise.resolve()
+  if (sectionRequests.has(tabId)) return sectionRequests.get(tabId)
+  const request = (async () => {
+    if (tabId === 'security') capabilities.value = await loadCapabilities(client, context.osClient)
+    if (tabId === 'authenticators') {
+      const [, keys, totp] = await Promise.all([loadSection('security'), listPasskeys(client), listTotpAuthenticators(client)])
+      authenticators.value = Array.isArray(keys) ? keys : []
+      totpAuthenticators.value = Array.isArray(totp) ? totp : []
+    }
+    if (tabId === 'external') {
+      const result = await listExternalBindings(client)
+      externalProviders.value = result?.Providers || []
+      externalBindings.value = result?.Bindings || []
+    }
+    if (tabId === 'preferences') {
+      const [terminalResult, menuResult] = await Promise.all([
+        client.post('/apiengine/platform-online-terminal', { Action: 'Mine' }),
+        client.post('/api/SysMenu/GetSysMenuStep', {})
+      ])
+      if (terminalResult?.Code !== 1 || menuResult?.Code !== 1) throw new Error(terminalResult?.Msg || menuResult?.Msg || '偏好信息加载失败。')
+      const terminalData = terminalResult?.Data
+      terminals.value = Array.isArray(terminalData) ? terminalData : (terminalData?.Terminals || [])
+      const menuData = menuResult?.Data
+      availableMenus.value = (Array.isArray(menuData) ? menuData : (menuData?.List || menuData?.Data || []))
+        .filter(item => item?.Id && Number(item.Display ?? 1) !== 0)
+    }
+    sectionsLoaded[tabId] = true
+  })().finally(() => sectionRequests.delete(tabId))
+  sectionRequests.set(tabId, request)
+  return request
 }
 
 function askConfirmation(title, message) {
@@ -370,7 +417,7 @@ async function refreshAvatarUrls() {
   try {
     privateAvatarUrl.value = await client.resolveFileUrl(user.value.Avatar)
   } catch (_) {
-    privateAvatarUrl.value = client.assetUrl(user.value.Avatar)
+    privateAvatarUrl.value = ''
   }
 }
 
@@ -521,15 +568,7 @@ async function uploadDesktopBackground(event) {
 async function load() {
   loading.value = true
   try {
-    const [userResult, capabilityResult, keyResult, totpResult, externalResult, terminalResult, menuResult] = await Promise.all([
-      client.post('/api/SysUser/RefreshLoginUser', {}).catch(() => client.post('/api/SysUser/GetCurrentUser', {})),
-      loadCapabilities(client, context.osClient),
-      listPasskeys(client).catch(() => []),
-      listTotpAuthenticators(client).catch(() => []),
-      listExternalBindings(client).catch(() => ({ Providers: [], Bindings: [] })),
-      client.post('/apiengine/platform-online-terminal', { Action: 'Mine' }).catch(() => ({ Data: { Terminals: [] } })),
-      client.post('/api/SysMenu/GetSysMenuStep', {}).catch(() => ({ Data: [] }))
-    ])
+    const userResult = await client.post('/apiengine/platform-current-user', { View: 'PersonalSettings' })
     if (userResult?.Code !== 1) throw new Error(userResult?.Msg || '当前用户加载失败。')
     user.value = userResult.Data || {}
     profile.Name = user.value.Name || ''
@@ -538,7 +577,8 @@ async function load() {
     profile.Lang = user.value.Lang || 'zh-CN'
     profile.Avatar = client.extractUploadPath(user.value.Avatar)
     profile.PublicAvatar = client.extractUploadPath(user.value.PublicAvatar)
-    await refreshAvatarUrls()
+    // 图片授权不阻挡资料首屏；失败保留文字头像，不猜测私有文件的公有地址。
+    void refreshAvatarUrls()
     preference.DefaultIndexUrl = user.value.DefaultIndexUrl || ''
     preference.ThemeColor = user.value.ThemeColor || context.themeColor || '#409eff'
     preference.CornerStyle = ['round', 'square'].includes(user.value.CornerStyle) ? user.value.CornerStyle : 'System'
@@ -556,19 +596,8 @@ async function load() {
     preference.RandomDesktopBg = asEnabled(user.value.RandomDesktopBg)
     preference.OpenTreeMenu = asEnabled(user.value.OpenTreeMenu)
     preference.DesktopDockMenu = parseMenuIds(user.value.DesktopDockMenu)
-    capabilities.value = capabilityResult || {}
-    authenticators.value = Array.isArray(keyResult) ? keyResult : []
-    totpAuthenticators.value = Array.isArray(totpResult) ? totpResult : []
-    externalProviders.value = Array.isArray(externalResult?.Providers) ? externalResult.Providers : []
-    externalBindings.value = Array.isArray(externalResult?.Bindings) ? externalResult.Bindings : []
-    const terminalData = terminalResult?.Data
-    terminals.value = Array.isArray(terminalData)
-      ? terminalData
-      : (Array.isArray(terminalData?.Terminals) ? terminalData.Terminals : [])
-    const menuData = menuResult?.Data
-    availableMenus.value = (Array.isArray(menuData) ? menuData : (menuData?.List || menuData?.Data || []))
-      .filter((item) => item?.Id && Number(item.Display ?? 1) !== 0)
-    if (passwordOnly || context.route?.query?.action === 'password') activeTab.value = 'security'
+    if (passwordOnly || context.route?.query?.action === 'password') void selectTab('security')
+    else if (activeTab.value !== 'profile') void selectTab(activeTab.value)
   } catch (error) {
     showNotice(error?.Msg || error?.message || '个人设置加载失败。', 'error')
   } finally { loading.value = false }
@@ -612,6 +641,7 @@ async function changePassword() {
   if (password.next !== password.confirm) return showNotice('两次输入的新密码不一致。', 'error')
   busy.value = 'password'
   try {
+    await loadSection('security')
     const encodedOld = utf8Base64(password.old)
     const encodedNew = utf8Base64(password.next)
     let ticket = ''
