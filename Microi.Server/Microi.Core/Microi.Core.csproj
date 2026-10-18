@@ -22,9 +22,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，核心库。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>8.5.10</Version>
-    <AssemblyVersion>8.5.10</AssemblyVersion>
-    <FileVersion>8.5.10</FileVersion>
+    <Version>8.5.13</Version>
+    <AssemblyVersion>8.5.13</AssemblyVersion>
+    <FileVersion>8.5.13</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -50,7 +50,7 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.21.0" />
     <PackageReference Include="MongoDB.Bson" Version="3.11.2" />
     <!-- Pin the fixed XML signature implementation for legacy ASP.NET Core 2.x transitive dependencies. -->
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <!-- MQTTnet 5.x only targets net8.0+; 4.3.7 is the latest netstandard2.1-compatible release. -->
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
     <PackageReference Include="StackExchange.Redis" Version="3.0.17" />

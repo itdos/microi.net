@@ -270,9 +270,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { configureV8, dispatch, getContext, subscribeContext } from './microi.js'
 import { marketplaceHtmlToText, sanitizeMarketplaceHtml } from './safe-html.js'
-import './marketplace.css'
-import './marketplace-modal.css'
-import './marketplace-compact.css'
+
+
+
 
 const client = configureV8()
 const context = reactive(getContext())
@@ -468,3 +468,9 @@ watch(anyModalOpen,visible=>{syncModalDocumentScrollLock(visible);publishHostOve
 onMounted(async()=>{window.addEventListener('resize',clampOpenDialogs);unsubscribeContext=subscribeContext(next=>Object.assign(context,next),false);hostDataListener=data=>{if(String(data?.type||'').toLowerCase()==='micro-app:form-saved')loadApps(1)};window.microApp?.addDataListener?.(hostDataListener);await loadSources();await loadApps(1);void refreshSourceStats()})
 onBeforeUnmount(()=>{window.removeEventListener('resize',clampOpenDialogs);syncModalDocumentScrollLock(false);unsubscribeContext?.();if(hostDataListener)window.microApp?.removeDataListener?.(hostDataListener);if(confirmResolver)confirmResolver(false);dispatch('micro-app:host-action',{action:'setGlobalOverlay',requestId:`store-overlay-close-${Date.now()}`,visible:false,lockScroll:false,promote:false,silent:true},{force:true})})
 </script>
+
+<style scoped src="./marketplace.css"></style>
+
+<style scoped src="./marketplace-modal.css"></style>
+
+<style scoped src="./marketplace-compact.css"></style>

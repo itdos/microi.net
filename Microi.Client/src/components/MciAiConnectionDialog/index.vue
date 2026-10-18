@@ -1,9 +1,12 @@
 <template>
     <div class="ai-connection-entry">
-        <button type="button" class="runtime-version-button" data-testid="runtime-version" @click="visible = true">{{ text }}</button>
+        <button v-if="canManageMcp" type="button" class="runtime-version-button" data-testid="runtime-version" @click="visible = true">{{ text }}</button>
+        <span v-else class="runtime-version-button is-display-only" data-testid="runtime-version">{{ text }}</span>
         <button v-if="!hideEdition" type="button" class="runtime-version-button platform-edition-button" :class="{ 'is-expiring': countdown }" data-testid="platform-edition" @click="router.push('/license')">{{ edition || '授权版本' }}<span v-if="countdown"> {{ countdown }}</span></button>
     </div>
-    <el-dialog v-model="visible" title="开发工具连接" width="min(760px, 92vw)" class="ai-connection-dialog" append-to-body draggable destroy-on-close>
+    <el-dialog v-if="canManageMcp" v-model="visible" title="开发工具连接" width="min(1040px, 94vw)" class="ai-connection-dialog" append-to-body draggable destroy-on-close>
+        <el-tabs v-model="activeTab">
+        <el-tab-pane label="连接 AI 工具" name="connection">
         <div class="ai-connection-details">
             <div><span>ApiBase</span><code>{{ apiBase }}</code></div>
             <div><span>OsClient</span><code>{{ osClient }}</code></div>
@@ -11,24 +14,32 @@
         <p class="ai-connection-intro">将下面这段说明复制给 Codex、WorkBuddy 等 AI 工具，即可安装 CLI 并初始化 MCP 和工作区 AI 配置。</p>
         <pre class="ai-connection-prompt">{{ promptPreview }}</pre>
         <p class="ai-connection-note">复制时生成独立开发工具 Token，权限与当前账号一致，按服务器的开发终端期限有效。可在在线终端中单独踢下线；账号密码无需提供给 AI。</p>
+        </el-tab-pane>
+        <el-tab-pane label="角色 AI 开发权限" name="roles" lazy><MciMcpRolePermissions/></el-tab-pane>
+        </el-tabs>
         <template #footer>
             <el-button @click="visible = false">关闭</el-button>
-            <el-button type="primary" :loading="copying" @click="copyConnection">一键复制给 AI</el-button>
+            <el-button v-if="activeTab==='connection'" type="primary" :loading="copying" @click="copyConnection">一键复制给 AI</el-button>
         </template>
     </el-dialog>
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDiyStore } from '@/pinia/modules/diy';
 import { ElMessage } from 'element-plus';
 import { DiyCommon } from '@/utils/diy.common';
 import { buildAiConnectionPrompt, copyConnectionText } from '@/utils/ai-connection.js';
 import { platformEditionLabel, hideSystemLicenseVersion, licenseCountdown } from '@/utils/platform-edition.js';
+import MciMcpRolePermissions from '@/components/MciMcpRolePermissions/index.vue';
+import { isMcpAdministrator } from '@/utils/mcp-role-permissions';
 defineProps({ text: { type: String, required: true } });
 const visible = ref(false), copying = ref(false), sessionEdition = ref('');
 const diyStore = useDiyStore(), router = useRouter();
+const activeTab = ref('connection');
+const canManageMcp = computed(() => isMcpAdministrator(diyStore.GetCurrentUser));
+watch(canManageMcp, allowed => { if (!allowed) visible.value = false; });
 const edition = computed(() => sessionEdition.value || platformEditionLabel(diyStore.SysConfig?.PlatformEdition));
 const expiration = ref(''), clock = ref(Date.now());
 const countdown = computed(() => licenseCountdown(expiration.value, clock.value));
@@ -59,11 +70,12 @@ async function loadEdition() {
 onMounted(() => { void loadEdition(); clockTimer = setInterval(() => { clock.value = Date.now(); }, 1000); });
 onBeforeUnmount(() => { disposed = true; clearTimeout(editionRetry); clearInterval(clockTimer); });
 async function copyConnection() {
-    if (copying.value) return;
+    if (copying.value || !canManageMcp.value) return;
     copying.value = true;
     try {
         const result = await sessionAction('CreateCliSession');
         if (result?.Code !== 1 || !result.Data?.Token) throw new Error(result?.Msg || '请更新平台与 SaaS 应用后重试。');
+        if (!canManageMcp.value || disposed) return;
         await copyConnectionText(buildAiConnectionPrompt({ ApiBase: apiBase.value, OsClient: osClient.value, Token: result.Data.Token, Did: result.Data.Did }));
         ElMessage.success('已复制，可粘贴给 AI。此开发工具会话可单独撤销。');
     } catch (error) { ElMessage.error(error.message || '复制失败，请重试。'); }
@@ -75,16 +87,17 @@ async function copyConnection() {
 .ai-connection-entry { display:flex; align-items:center; gap:6px; flex:none; margin:0 18px 0 12px; }
 .runtime-version-button { cursor:pointer; color:var(--el-color-primary); border:1px solid var(--el-color-primary-light-7); border-radius:999px; background:var(--el-color-primary-light-9); font:inherit; font-size:11px; padding:2px 9px; white-space:nowrap; }
 .runtime-version-button:hover { background:var(--el-color-primary-light-8); }
+.runtime-version-button.is-display-only { cursor:default; }
 .platform-edition-button.is-expiring { color:var(--el-color-danger); border-color:var(--el-color-danger-light-7); background:var(--el-color-danger-light-9); font-variant-numeric:tabular-nums; }
 .runtime-version-button:focus-visible { outline:2px solid var(--el-color-primary); outline-offset:3px; }
 .ai-connection-details { display:grid; grid-template-columns:2fr 1fr; gap:12px; }
-.ai-connection-details>div { padding:14px 16px; border-radius:14px; background:var(--el-fill-color-light); min-width:0; }
+.ai-connection-details>div { padding:calc(14px * var(--mci-ui-scale,1)) calc(16px * var(--mci-ui-scale,1)); border-radius:var(--el-border-radius-base); background:var(--el-fill-color-light); min-width:0; }
 .ai-connection-details span { display:block; color:var(--el-text-color-secondary); margin-bottom:6px; font-size:12px; }
 .ai-connection-details code { overflow-wrap:anywhere; color:var(--el-text-color-primary); }
-.ai-connection-intro { line-height:1.8; margin:20px 0 12px; }
-.ai-connection-prompt { white-space:pre-wrap; overflow-wrap:anywhere; padding:18px; border:1px solid var(--el-border-color-light); border-radius:16px; line-height:1.8; font:inherit; background:var(--el-fill-color-lighter); }
+.ai-connection-intro { line-height:1.8; margin:calc(16px * var(--mci-ui-scale,1)) 0 calc(12px * var(--mci-ui-scale,1)); }
+.ai-connection-prompt { white-space:pre-wrap; overflow-wrap:anywhere; padding:calc(14px * var(--mci-ui-scale,1)); border:1px solid var(--el-border-color-light); border-radius:var(--el-border-radius-base); line-height:1.6; font:inherit; background:var(--el-fill-color-lighter); }
 .ai-connection-note { color:var(--el-text-color-secondary); font-size:12px; line-height:1.8; }
 </style>
 <style>
-.el-dialog.ai-connection-dialog { border-radius:24px; padding:24px; }
+.el-dialog.ai-connection-dialog { border-radius:var(--mci-radius-lg,16px); padding:calc(16px * var(--mci-ui-scale,1)); }
 </style>

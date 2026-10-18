@@ -75,6 +75,7 @@
 </template>
 
 <script>
+import { getMicroAppAppearance } from "@/utils/micro-app-appearance.js";
 import { DiyCommon } from "@/utils/diy.common";
 import { defineAsyncComponent } from "vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
@@ -306,6 +307,7 @@ export default {
                 themePrimaryText: this.runtimeThemeTokens.primaryText || this.runtimeThemeColor || "#409eff",
                 themeColorStrong: this.runtimeThemeTokens.primaryStrong || this.runtimeThemeColor || "#337ecc",
                 themeTokens: { ...this.runtimeThemeTokens },
+                uiDensity: this.runtimeThemeTokens.uiDensity,
                 systemStyle: this.diyStore.SystemStyle || "Classic",
                 systemTitle: this.diyStore.SysConfig?.SysTitle || this.diyStore.SysConfig?.SysShortTitle || DiyCommon.GetOsClient(),
                 systemShortTitle: this.diyStore.SysConfig?.SysShortTitle || "",
@@ -1211,6 +1213,7 @@ export default {
             const nextMode = root.classList.contains("dark") ? "dark" : "light";
             const nextColor = this.resolveRuntimeThemeColor();
             const nextTokens = {
+                ...getMicroAppAppearance(root),
                 palette: root.getAttribute("data-mci-palette") || "custom",
                 onPrimary: styles.getPropertyValue("--mci-text-on-primary").trim() || "#ffffff",
                 primaryText: styles.getPropertyValue("--mci-color-primary-on-surface").trim()
@@ -1238,7 +1241,7 @@ export default {
             this.syncRuntimeTheme(false);
             if (typeof MutationObserver === "undefined") return;
             this.themeObserver = new MutationObserver(() => this.syncRuntimeTheme(true));
-            this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme", "data-mci-palette"] });
+            this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme", "data-mci-palette", "data-mci-ui-density", "data-mci-corner-style", "data-mci-disable-gradient", "data-mci-disable-shadow", "data-mci-disable-button-icon"] });
         },
         stopThemeContract() {
             this.themeObserver?.disconnect?.();

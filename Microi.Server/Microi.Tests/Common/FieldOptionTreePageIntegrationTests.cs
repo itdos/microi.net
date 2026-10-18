@@ -6,15 +6,14 @@ namespace Dos.Common.Tests;
 [Trait("Category", "FullStack")]
 public class FieldOptionTreePageIntegrationTests
 {
-    public static bool HasFixtures => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN"))
-        && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
-
-    [Theory(Skip = "Requires isolated local MySQL and SQL Server fixtures", SkipUnless = nameof(HasFixtures))]
-    [InlineData("MySql")]
-    [InlineData("SqlServer")]
+    // 逐数据行带提供商标识；未选 SQL Server 不影响仍必测的 MySQL 查询与权限断言。
+    [Theory]
+    [InlineData("MySql", Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("SqlServer", Traits = new[] { "DatabaseProvider", "SqlServer" })]
     public void LargeSourcePagesInDatabaseAndKeepsLookupInsideSourceFilter(string provider)
     {
         var connection = Environment.GetEnvironmentVariable(provider == "MySql" ? "MICROI_UPGRADE_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;
+        Assert.False(string.IsNullOrWhiteSpace(connection), "所选提供商缺少隔离连接：" + provider);
         Assert.Contains("127.0.0.1", connection);
         Assert.Contains("Database=upgrade_fixture", connection, StringComparison.OrdinalIgnoreCase);
         var db = MicroiORMExtensions.CreateDbSession(connection, provider == "MySql" ? DatabaseType.MySql : DatabaseType.SqlServer);

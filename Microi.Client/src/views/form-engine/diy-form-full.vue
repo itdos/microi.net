@@ -274,7 +274,7 @@
                         />
                     </el-col>
                     <el-col v-if="ShowDesktopFormRight" :span="5" class="page-right-col">
-                        <FormRightPanel
+                        <FormRightPanel :key="[TableId, TableRowId, SysMenuId, FormRelatedGeneration].join(':')"
                             ref="formRightPanel"
                             v-model="FormRightType"
                             v-model:commentContent="CommentContent"
@@ -283,6 +283,9 @@
                             :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                             :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
                             :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
+                            :dataLogTitle="SysMenuModel.DataLogTitle || ''"
+                            :dataCommentTitle="SysMenuModel.DataCommentTitle || ''"
+                            :dataVersionTitle="SysMenuModel.DataVersionTitle || ''"
                             :dataLogList="DataLogList"
                             :dataLogListLoading="DataLogListLoading"
                             :dataCommentList="DataCommentList"
@@ -304,6 +307,7 @@
                             @callback-get-form-data="CallbackGetFormData"
                             @callback-field-set="CallbackFieldSet"
                             @refresh-data-log="LoadDataLog"
+                            @read-data-log="LoadDataLogContent"
                             @refresh-data-comment="LoadDataComment"
                             @refresh-data-version="LoadDataVersion"
                             @preview-data-version="PreviewDataVersion"
@@ -672,7 +676,7 @@
                     />
                 </el-col>
                 <el-col v-if="ShowDesktopFormRight" :span="5" class="page-right-col diy-form-right-panel-col" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
-                    <FormRightPanel
+                    <FormRightPanel :key="[TableId, TableRowId, SysMenuId, FormRelatedGeneration].join(':')"
                         ref="formRightPanel"
                         v-model="FormRightType"
                         v-model:commentContent="CommentContent"
@@ -681,6 +685,9 @@
                         :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                         :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
                         :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
+                            :dataLogTitle="SysMenuModel.DataLogTitle || ''"
+                            :dataCommentTitle="SysMenuModel.DataCommentTitle || ''"
+                            :dataVersionTitle="SysMenuModel.DataVersionTitle || ''"
                         :dataLogList="DataLogList"
                         :dataLogListLoading="DataLogListLoading"
                         :dataCommentList="DataCommentList"
@@ -702,6 +709,7 @@
                         @callback-get-form-data="CallbackGetFormData"
                         @callback-field-set="CallbackFieldSet"
                         @refresh-data-log="LoadDataLog"
+                            @read-data-log="LoadDataLogContent"
                         @refresh-data-comment="LoadDataComment"
                         @refresh-data-version="LoadDataVersion"
                         @preview-data-version="PreviewDataVersion"
@@ -1086,7 +1094,7 @@
                     />
                 </el-col>
                 <el-col v-if="ShowDesktopFormRight" :span="5" class="page-right-col diy-form-right-panel-col" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
-                    <FormRightPanel
+                    <FormRightPanel :key="[TableId, TableRowId, SysMenuId, FormRelatedGeneration].join(':')"
                         ref="formRightPanel"
                         v-model="FormRightType"
                         v-model:commentContent="CommentContent"
@@ -1095,6 +1103,9 @@
                         :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                         :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
                         :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
+                            :dataLogTitle="SysMenuModel.DataLogTitle || ''"
+                            :dataCommentTitle="SysMenuModel.DataCommentTitle || ''"
+                            :dataVersionTitle="SysMenuModel.DataVersionTitle || ''"
                         :dataLogList="DataLogList"
                         :dataLogListLoading="DataLogListLoading"
                         :dataCommentList="DataCommentList"
@@ -1116,6 +1127,7 @@
                         @callback-get-form-data="CallbackGetFormData"
                         @callback-field-set="CallbackFieldSet"
                         @refresh-data-log="LoadDataLog"
+                            @read-data-log="LoadDataLogContent"
                         @refresh-data-comment="LoadDataComment"
                         @refresh-data-version="LoadDataVersion"
                         @preview-data-version="PreviewDataVersion"
@@ -1222,7 +1234,7 @@
                     {{ $t('Msg.WorkflowInfo') }}
                 </span>
             </template>
-            <FormRightPanel
+            <FormRightPanel :key="[TableId, TableRowId, SysMenuId, FormRelatedGeneration].join(':')"
                 ref="formRightPanelMobile"
                 v-model="FormRightType"
                 v-model:commentContent="CommentContent"
@@ -1231,6 +1243,9 @@
                 :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                 :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
                 :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
+                            :dataLogTitle="SysMenuModel.DataLogTitle || ''"
+                            :dataCommentTitle="SysMenuModel.DataCommentTitle || ''"
+                            :dataVersionTitle="SysMenuModel.DataVersionTitle || ''"
                 :dataLogList="DataLogList"
                 :dataLogListLoading="DataLogListLoading"
                 :dataCommentList="DataCommentList"
@@ -1253,6 +1268,7 @@
                 @callback-get-form-data="CallbackGetFormData"
                 @callback-field-set="CallbackFieldSet"
                 @refresh-data-log="LoadDataLog"
+                            @read-data-log="LoadDataLogContent"
                 @refresh-data-comment="LoadDataComment"
                 @refresh-data-version="LoadDataVersion"
                 @preview-data-version="PreviewDataVersion"
@@ -1424,7 +1440,7 @@ export default {
     computed: {
         CodeVersionPreviewFields() {
             // 按需接口只返回已授权的代码字段；局部快照不渲染为空白的整张配置表单。
-            if (this.PreviewDataVersionItem?.HistoryContentMode !== "Authorized") return [];
+            if (this.PreviewDataVersionItem?.HistoryContentMode !== "Authorized" || this.PreviewDataVersionItem?.HistoryContentKind === "Data") return [];
             return Object.entries(this.PreviewDataVersionData || {})
                 .filter(([name]) => name !== "Id" && !name.startsWith("__"))
                 .map(([name, code]) => ({
@@ -1651,7 +1667,7 @@ export default {
                     dialogId: this.DialogType === "Drawer" ? "ShowFieldFormDrawer" : "ShowFieldForm",
                     source: "WorkspaceRecordSwitch"
                 });
-                if (this.FormMode === "View") this.LoadFormRelatedCounts();
+                // 关联计数等待字段表元数据和记录回调，避免沿用上一张表的功能开关提前请求。
             } finally {
                 this.WorkspaceRecordSwitching = false;
             }
@@ -2021,6 +2037,8 @@ export default {
             } else if (param.TableRowId) {
                 tableRowModel.Id = param.TableRowId;
             }
+            // Init 先读取菜单、OpenDetail 才切换 TableRowId；在这段间隙使用即将打开的记录身份。
+            self._sysMenuOpeningRowId = tableRowModel.Id || "";
 
             var formMode = param.FormMode;
             var isDefaultOpen = param.IsDefaultOpen;
@@ -2029,8 +2047,10 @@ export default {
 
             self.$nextTick(async function () {
                 if (self._isDestroyed || initRequestToken !== self._formFullInitRequestToken) { return; }
+                var menuIdentity = self.GetSysMenuModelIdentity();
                 await self.EnsureSysMenuModel();
-                if (self._isDestroyed || initRequestToken !== self._formFullInitRequestToken) { return; }
+                if (self._isDestroyed || initRequestToken !== self._formFullInitRequestToken
+                    || menuIdentity !== self.GetSysMenuModelIdentity()) { return; }
                 self.OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
             });
         },
@@ -2535,31 +2555,82 @@ export default {
         },
 
         // ========== 全新页面模式：表单数据回调（兼容diy-form-page.vue的逻辑） ==========
-        async EnsureSysMenuModel() {
+        GetSysMenuModelIdentity() {
+            return JSON.stringify([this.DiyCommon?.GetApiBase?.(), this.DiyCommon?.GetOsClient?.(),
+                this.SysMenuId, this.TableId || this.TableName,
+                this._sysMenuOpeningRowId ?? this.TableRowId,
+                this.TableChildAuth || null, this._formFullInitRequestToken || 0, this._sysMenuCloseGeneration || 0]);
+        },
+        async EnsureSysMenuModel(options = {}) {
             var self = this;
             if (self.DiyCommon.IsNull(self.SysMenuId)) {
-                return;
+                return false;
             }
-            if (!self.DiyCommon.IsNull(self.SysMenuModel) && self.SysMenuModel.Id == self.SysMenuId) {
-                return;
+            var identity = self.GetSysMenuModelIdentity();
+            var current = () => !self._isDestroyed && identity === self.GetSysMenuModelIdentity();
+            if (self._sysMenuModelIdentity === identity
+                && !self.DiyCommon.IsNull(self.SysMenuModel) && self.SysMenuModel.Id == self.SysMenuId) {
+                return true;
             }
-            var result = await self.DiyCommon.PostAsync("/api/FormEngine/GetSysMenuModel", {
-                Id: self.SysMenuId
-            });
-            if (self.DiyCommon.Result(result)) {
-                self.DiyCommon.ForConvertSysMenu(result.Data);
-                self.SysMenuModel = result.Data;
-            }
+            if (self._sysMenuModelRequest?.identity === identity) return self._sysMenuModelRequest.promise;
+            // 表单回调属于同一次打开，不应自动重放刚失败的菜单请求或再弹一次提示。
+            // 默认调用仍允许重试；重新打开、切换记录/父授权上下文也都会产生新身份。
+            if (options.retryFailed === false && self._sysMenuModelFailedIdentity === identity) return false;
+            self.SysMenuModel = {};
+            var request = { identity, promise: null };
+            self._sysMenuModelRequest = request;
+            request.promise = (async function () {
+                try {
+                    var result = await self.DiyCommon.PostAsync("/api/FormEngine/GetSysMenuModel", {
+                        Id: self.SysMenuId,
+                        _TableChildAuth: self.TableChildAuth || undefined
+                    }, null, null, null, { suppressErrorNotification: true });
+                    // 菜单按钮也受父记录委托约束，旧记录/旧父链的响应与提示都不能落到新表单。
+                    if (!current()) return false;
+                    if (self.DiyCommon.Result(result)) {
+                        self.DiyCommon.ForConvertSysMenu(result.Data);
+                        self.SysMenuModel = result.Data;
+                        self._sysMenuModelIdentity = identity;
+                        self._sysMenuModelFailedIdentity = null;
+                        return true;
+                    }
+                    self._sysMenuModelFailedIdentity = identity;
+                    return false;
+                } catch (error) {
+                    if (current()) {
+                        self._sysMenuModelFailedIdentity = identity;
+                        self.DiyCommon.Tips(error?.message || "读取菜单失败，请稍后重试。", false);
+                    }
+                    return false;
+                } finally {
+                    if (self._sysMenuModelRequest === request) self._sysMenuModelRequest = null;
+                }
+            })();
+            return request.promise;
         },
         CallbackSetFormData(formData) {
             var self = this;
+            var expectedRowId = self._sysMenuOpeningRowId ?? self.TableRowId;
+            if (expectedRowId && formData?.Id
+                && String(expectedRowId).toLowerCase() !== String(formData.Id).toLowerCase()) {
+                // 记录切换时旧 DiyForm 可能稍晚才回传；不能把旧行当成新授权上下文的表单。
+                return Promise.resolve();
+            }
             self.CurrentRowModel = formData;
             self.CallbackSetFormDataFinish = true;
             self.$emit("CallbackSetFormData", formData || {});
-
-            self.EnsureSysMenuModel().then(async function () {
-                await self.HandlerBtnsAsync(self.SysMenuModel.FormBtns, self.CurrentRowModel, {});
+            var identity = self.GetSysMenuModelIdentity();
+            return self.EnsureSysMenuModel({ retryFailed: false }).then(async function (loaded) {
+                if (!loaded || self._isDestroyed || identity !== self.GetSysMenuModelIdentity()
+                    || self.CurrentRowModel !== formData) return;
+                await self.HandlerBtnsAsync(self.SysMenuModel.FormBtns, formData, {});
             });
+        },
+        CallbackSetDiyTableModel(model) {
+            // DiyForm 先回传记录、再回传表元数据；在后一个真实回调按开关读取计数。
+            // 覆盖 mixin 中的赋值方法，避免初始空模型或上一张表的配置触发错误请求。
+            this.CurrentDiyTableModel = model;
+            this.LoadFormRelatedCounts();
         },
 
         // ========== 页面模式专用：异步版本的HandlerBtns ==========

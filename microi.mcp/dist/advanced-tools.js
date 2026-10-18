@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { normalizePageJsonObj, normalizePrintObj, normalizePrintPageObj } from './design-engine.js';
 import { buildFileUploadConfig } from './file-upload-config.js';
+import { bindManifestExecutionClient, ManifestContextStore } from './manifest-context.js';
 const WF_MARKER_BEGIN = '/* MICROI_WF_LINE_CONDITION_JSON';
 const WF_MARKER_END = 'MICROI_WF_LINE_CONDITION_JSON */';
 const jsonRecordSchema = z.record(z.unknown());
@@ -427,6 +428,22 @@ export function normalizeAllMenuJson(data) {
     const result = { ...data };
     const errors = [];
     const warnings = [];
+    for (const name of ['DataLogTitle', 'DataCommentTitle', 'DataVersionTitle']) {
+        const alias = name[0].toLowerCase() + name.slice(1);
+        if (data[name] === undefined && data[alias] === undefined)
+            continue;
+        const raw = data[name] !== undefined ? data[name] : data[alias];
+        if (raw !== null && typeof raw !== 'string')
+            errors.push(name + ' 必须为文字或空值。');
+        else {
+            const title = typeof raw === 'string' ? raw.trim() : '';
+            if (title.length > 100)
+                errors.push(name + ' 最多100个字符。');
+            else
+                result[name] = title;
+        }
+        delete result[alias];
+    }
     if (data.DiyConfig !== undefined || data.diyConfig !== undefined) {
         errors.push('DiyConfig 已废弃；请新增专用物理字段，并通过 diy_field 元数据暴露配置控件。跨端视图请使用 sys_menu.ViewSchema。');
         delete result.DiyConfig;
@@ -2814,12 +2831,13 @@ export function manifestGuide(osClient) {
     return {
         osClient,
         workflow: [
-            'Call microi_get_db_schema first to inspect existing tables.',
-            'Call microi_get_manifest_schema to draft a manifest from the user requirement.',
-            'Call microi_plan_system with the manifest and fix all errors.',
-            'Call microi_generate_system with dryRun=true.',
-            `Call microi_generate_system with dryRun=false and confirmExecution="${confirmTarget}" only after the user confirms writes.`,
-            'Call microi_validate_system after generation if you need an independent validation pass.',
+            '先按实际任务范围读取现有表结构；完整新系统须盘点相关资源，局部修改从明确目标和依赖开始，不能凭摘要猜字段。',
+            '根据真实需求与本协议整理完整或局部 Manifest，保持原有业务、权限、表单、菜单和验收质量。',
+            '调用 microi_plan_system 修正全部错误。较大或需要跨四阶段重复传输的 Manifest 可传 detail=summary 获取 manifestRef/hash；很小的正文沿用默认全文更省。',
+            '调用 microi_generate_system dryRun=true，使用同一完整正文或仍有效的 manifestRef/hash；每次仍重新检查结构。',
+            `在用户已授权的写入范围内调用 microi_generate_system dryRun=false、confirmExecution="${confirmTarget}"；引用不代替授权、当前身份或服务端权限。`,
+            '生成后继续 microi_validate_system 做独立真实回读；摘要保留全部错误/警告和验收结果，完整回执可用 microi_plan_system action=read_result + resultRef 读取。',
+            '引用只在当前 MCP 会话、身份和短 TTL 内有效。过期、重启或身份/Token 变化后重传正文；执行期间身份变化立即停止，已完成或未知写入先回读，禁止自动重放。',
         ],
         manifestShape: {
             name: 'System name',
@@ -3077,6 +3095,36 @@ export function manifestGuide(osClient) {
 export function registerAdvancedTools(server, client, context) {
     const osClient = context.osClient;
     const systemConfirmTarget = osClient || 'EXECUTE';
+    // 引用只属于本次 MCP 注册会话；不能跨 client、身份或进程充当写入授权。
+    const identityClient = client;
+    const manifestContexts = new ManifestContextStore(typeof identityClient.getContextIdentity === 'function'
+        ? () => identityClient.getContextIdentity() : undefined);
+    const manifestInputSchema = {
+        manifest: jsonRecordSchema.optional().describe('完整 Manifest 正文；首次传入，后续可用本会话 manifestRef。变更正文须重新计划。'),
+        manifestRef: z.string().max(128).optional().describe('同连接、同身份、短 TTL 的不可变 Manifest 引用；失效后重传正文，未知写入先回读。'),
+        manifestHash: z.string().regex(/^[a-f0-9]{64}$/).optional().describe('可选 SHA256，必须与引用或正文一致；不能覆盖引用内容。'),
+        detail: z.enum(['summary', 'full']).optional().describe('summary 返回紧凑回执，完整证据可用 resultRef 读取。旧正文调用默认 full；引用调用默认 summary。'),
+    };
+    const withManifest = async (input, run, writesRequested = false) => {
+        let failedAt = 'manifestContext';
+        try {
+            const resolved = manifestContexts.resolve(input);
+            failedAt = 'manifestExecution';
+            const execution = bindManifestExecutionClient(client, manifestContexts, resolved);
+            // 每次调用继续运行原有 preflight、确认、服务端鉴权和真实验收，不复用“已通过”状态。
+            const raw = await run(resolved.manifest, execution.client);
+            const result = execution.failure ? textResult(JSON.stringify({
+                ok: false, failedAt: 'executionIdentity', identityFailure: execution.failure,
+                previousResult: raw, executionState: writesRequested ? 'notCompletedDoNotReplay' : 'validationNotCompleted',
+            }), true) : raw;
+            return manifestContexts.finish(result, resolved, input, writesRequested);
+        }
+        catch (error) {
+            return textResult(JSON.stringify({ ok: false, failedAt, error: error instanceof Error ? error.message : String(error),
+                ...(writesRequested && failedAt === 'manifestExecution' ? { executionState: 'notCompletedDoNotReplay' } : {}),
+            }), true);
+        }
+    };
     server.tool('microi_get_manifest_schema', 'Return the recommended full-system manifest schema for natural-language Microi generation, including field-name based module configuration.', {}, async () => textResult(JSON.stringify(manifestGuide(osClient), null, 2)));
     server.tool('microi_validate_menu_buttons', 'Validate and normalize sys_menu button/tab JSON arrays (MoreBtns/FormBtns/BatchSelectMoreBtns/PageTabs/ExportMoreBtns/PageBtns). Returns canonical JSON strings with generated Id/Sort/default visibility.', {
         moreBtns: z.unknown().optional(),
@@ -3096,9 +3144,23 @@ export function registerAdvancedTools(server, client, context) {
         const built = buildFieldConfig(sourceType, options || {});
         return textResult(JSON.stringify({ ok: built.warnings.length === 0, ...built, configJson: JSON.stringify(built.config) }, null, 2));
     });
-    server.tool('microi_plan_system', 'Create a dry-run execution plan for a full low-code system manifest. This performs local structural validation only and does not write to Microi.', { manifest: jsonRecordSchema.describe('System manifest with tables, engines, modules, permissions, pages, dataSources, printTemplates, workflows, jobs') }, async ({ manifest }) => {
-        const plan = buildPlan(manifest);
-        return textResult(JSON.stringify({ ok: plan.errors.length === 0, dryRun: true, ...plan }, null, 2), plan.errors.length > 0);
+    server.tool('microi_plan_system', '创建完整或局部 Manifest 的只读结构计划。首次传 manifest + detail=summary 获得 manifestRef/hash，后续 dry-run/生成/验收复用引用，仍逐次重新检查。action=read_result 按 resultRef 读取本会话完整回执，不执行写入。', { ...manifestInputSchema, action: z.enum(['plan', 'read_result']).optional(), resultRef: z.string().max(128).optional() }, async (input) => {
+        if (input.action === 'read_result') {
+            if (!input.resultRef || input.manifest !== undefined || input.manifestRef !== undefined)
+                return textResult('读取回执须仅传 action=read_result、resultRef 和可选 manifestHash。', true);
+            try {
+                return manifestContexts.readResult(input.resultRef, input.manifestHash);
+            }
+            catch (error) {
+                return textResult(error instanceof Error ? error.message : String(error), true);
+            }
+        }
+        if (input.resultRef !== undefined)
+            return textResult('resultRef 只用于 action=read_result。', true);
+        return withManifest(input, async (manifest) => {
+            const plan = buildPlan(manifest);
+            return textResult(JSON.stringify({ ok: plan.errors.length === 0, dryRun: true, ...plan }, null, 2), plan.errors.length > 0);
+        });
     });
     server.tool('microi_check_workflow_package', '保存前检查 wf_flowdesign + wf_node + wf_line 的拓扑、节点类型、Id、连线、开始/结束节点及多路线配置。只有 FlowDesign.IsEnable 显式为 0 或 "0" 的禁用安装母版允许人工节点空绑定；启用或省略仍要求人员策略。任何非空绑定必须为 Id/Name 对象，保存时继续回读当前租户真实引用。', { workflow: jsonRecordSchema.describe('Workflow package with FlowDesign, Nodes and Lines') }, async ({ workflow }) => {
         const check = validateWorkflowPackage(workflow);
@@ -3110,7 +3172,7 @@ export function registerAdvancedTools(server, client, context) {
         lineValueV8Code: z.string().optional().describe('Direct LineValueV8 JavaScript code containing MICROI_WF_LINE_CONDITION_JSON marker'),
         formData: jsonRecordSchema.optional().describe('Sample business form data used for rule evaluation'),
     }, async (input) => textResult(JSON.stringify(testWorkflowVisualCondition(input), null, 2)));
-    server.tool('microi_validate_system', `Validate that a generated low-code system exists on Microi server after generation. OsClient: ${osClient}`, { manifest: jsonRecordSchema.describe('The same manifest used by microi_generate_system') }, async ({ manifest }) => {
+    server.tool('microi_validate_system', `真实回读验收生成系统，支持同会话 manifestRef/hash，仍检查 Banner 和服务端完整验收结果；Passed=false 为失败。OsClient: ${osClient}`, manifestInputSchema, async (input) => withManifest(input, async (manifest, client) => {
         try {
             const plan = buildPlan(manifest);
             if (plan.errors.length > 0) {
@@ -3122,17 +3184,22 @@ export function registerAdvancedTools(server, client, context) {
                 }, null, 2), true);
             }
             const result = await validateSystemWithBanner(client, manifest);
+            if ((input.detail ?? (input.manifestRef ? 'summary' : 'full')) === 'summary') {
+                const ok = result.Code === 1 && asRecord(result.Data).Passed !== false;
+                return textResult(JSON.stringify({ ok, validation: result }), !ok);
+            }
             return apiText('Low-Code System Validation', result);
         }
         catch (error) {
             return textResult(`Error: ${error instanceof Error ? error.message : String(error)}`, true);
         }
-    });
-    server.tool('microi_generate_system', `Generate a complete Microi low-code system from a manifest. Supports dryRun execution plans and post-generation validation. Writes require confirmExecution="${systemConfirmTarget}". OsClient: ${osClient}`, {
-        manifest: jsonRecordSchema.describe('System manifest with tables, fields, dataSources, engines, events, modules, permissions, pages, printTemplates, workflows and jobs'),
+    }));
+    server.tool('microi_generate_system', `从 Manifest 正文或同会话不可变 manifestRef/hash 生成系统。每次重做结构检查和真实验收；引用不代替授权。dryRun 默认 true，真实写入仍要求 confirmExecution="${systemConfirmTarget}"；失败或写入未知时先回读，不能盲目重放。OsClient: ${osClient}`, {
+        ...manifestInputSchema,
         dryRun: z.boolean().optional().describe('Default true. When true, only returns an execution plan.'),
         confirmExecution: z.string().optional().describe(`Required when dryRun=false. Must equal "${systemConfirmTarget}".`),
-    }, async ({ manifest, dryRun = true, confirmExecution }) => {
+    }, async (input) => withManifest(input, async (manifest, client) => {
+        const { dryRun = true, confirmExecution } = input;
         const plan = buildPlan(manifest);
         if (plan.errors.length > 0)
             return textResult(JSON.stringify({ ok: false, ...plan }, null, 2), true);
@@ -3483,12 +3550,14 @@ export function registerAdvancedTools(server, client, context) {
             // Keep the complete validation envelope. Persisted rollout recovery
             // evidence must retain Code/Msg so a validator-only compatibility path
             // can distinguish one known server defect from arbitrary failures.
-            return textResult(JSON.stringify(buildGenerateSystemValidationPayload(results, validation), null, 2), validation.Code !== 1);
+            const payload = buildGenerateSystemValidationPayload(results, validation);
+            payload.warnings = plan.warnings;
+            return textResult(JSON.stringify(payload, null, 2), payload.ok !== true);
         }
         catch (error) {
             return textResult(`Error: ${error instanceof Error ? error.message : String(error)}\n\n${JSON.stringify({ results }, null, 2)}`, true);
         }
-    });
+    }, input.dryRun === false));
     server.tool('microi_list_roles', `List roles for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Roles', await client.listRoles(keyword)));
     server.tool('microi_save_role', `Create or update a role for OsClient ${osClient}.`, { role: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ role, confirmExecution }) => {
         const payload = rolePayload(role);
@@ -3500,7 +3569,7 @@ export function registerAdvancedTools(server, client, context) {
     });
     server.tool('microi_list_modules', `List menu modules for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Modules', await client.listModules(keyword)));
     server.tool('microi_get_module', `Get one menu module by ModuleId for OsClient ${osClient}.`, { moduleId: z.string() }, async ({ moduleId }) => apiText('Module Detail', await client.getModule(moduleId)));
-    server.tool('microi_update_module', `Incrementally update an existing menu module, including FieldPermissions v1 (Rules with Users/Roles/Departments/Jobs and Fields.Visible/Editable), TreeDragSortEnabled/TreeDragSortField, TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
+    server.tool('microi_update_module', `Incrementally update an existing menu module, including FieldPermissions v1 (Rules with Users/Roles/Departments/Jobs and Fields.Visible/Editable), TreeDragSortEnabled/TreeDragSortField, TableHeaders multirow groups [{Label,Fields:[visible consecutive field names]}], HideTableBanner/HideFormBanner (1 hides the corresponding top Banner), MenuBadgeEnabled/MenuBadgeApiEngineKey, ViewSchema, and button/tab JSON. DataLogTitle/DataCommentTitle/DataVersionTitle 自定义表单右侧日志/评论/版本文字，最多100字符，空值恢复默认名称，需先升级模块引擎应用。OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for TableHeaders/MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
         const normalized = normalizeAllMenuJson(module);
         if (normalized.errors.length)
             return textResult(JSON.stringify(normalized, null, 2), true);

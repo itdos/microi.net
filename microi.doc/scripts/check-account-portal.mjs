@@ -69,18 +69,33 @@ export function assertCandidatePublished(git) {
   throw new Error('候选提交尚未在 origin 或 github-microi.net 的实际远端分支核验发布。');
 }
 
+export function releaseSourceProvenance(source, git) {
+  assertCommittedSource(source, git);
+  // 不将网络、认证、配额错误转换成制品发布失败；也不把本地 tracking ref 当作交付回执。
+  return { SourceCommit: git(['rev-parse', 'HEAD']), SourceDelivery: { Status: 'not-verified' } };
+}
+
 function main() {
   const source = Object.fromEntries(sourceFiles.map(name => [name, fs.readFileSync(path.join(project, name))]));
   validatePortalSource(source[sourceFiles[0]].toString(), source[sourceFiles[1]].toString(), source[sourceFiles[2]].toString());
   const hashes = Object.fromEntries(Object.entries(source).map(([name, value]) => [name, sha(value)]));
-  const git = (args, input) => execFileSync('git', args, { cwd: project, encoding: 'utf8', ...(input === undefined ? {} : { input }) }).trim();
+  const git = (args, input) => execFileSync('git', args, { cwd: project, encoding: 'utf8', timeout: 30000, ...(input === undefined ? {} : { input }) }).trim();
   const commit = git(['rev-parse', 'HEAD']);
+  const provenance = process.argv.includes('--require-committed')
+    ? releaseSourceProvenance(source, git)
+    : { SourceCommit: commit, SourceDelivery: { Status: 'not-verified' } };
   if (process.argv.includes('--require-committed')) {
-    // 全站发布会覆盖其它页面，个人中心不能只存在于共享工作区的未提交差异中。
-    assertCommittedSource(source, git);
-    // 冻结候选通常为 detached HEAD；检查远端分支包含该提交，不能要求候选另建发布分支。
-    const delivered = assertCandidatePublished(git);
-    console.log(`候选源码远端回读通过：${delivered}`);
+    // 源码必须在本地候选中完整提交；远端交付单独记录，不阻塞合格制品。
+    try { git(['diff', '--quiet', 'HEAD', '--', ':(top)microi.doc']); }
+    catch { throw new Error('官网构建输入存在未提交改动，请先冻结本地候选。'); }
+    const untracked = git(['ls-files', '--others', '--exclude-standard', '--', ':(top)microi.doc']);
+    if (untracked) throw new Error('官网构建输入包含未提交的新文件，请先核对归属并提交。');
+    console.log('官网本地候选提交检查通过；Git 远端交付由独立回执记录。');
+  }
+  if (process.argv.includes('--verify-source-delivery')) {
+    try { provenance.SourceDelivery = { Status: 'verified', Ref: assertCandidatePublished(git) }; }
+    catch { provenance.SourceDelivery = { Status: 'pending' }; }
+    console.log(`源码远端交付状态：${provenance.SourceDelivery.Status}（不影响制品门禁）。`);
   }
   const snapshot = path.resolve(project, '../.tmp/microi-doc-build/account-portal-source.json');
   if (!process.argv.includes('--dist')) {
@@ -96,7 +111,7 @@ function main() {
   if (!themeRef) throw new Error('profile.html 没有引用可验证的主题包。');
   const theme = fs.readFileSync(path.join(dist, themeRef.slice(1)));
   validatePortalBundle(theme.toString());
-  const manifest = { SchemaVersion: 1, SourceCommit: commit, Routes: portalRoutes, SourceSha256: hashes, Files: { '/profile.html': sha(html), [themeRef]: sha(theme), '/login.html': sha(fs.readFileSync(path.join(dist, 'login.html'))) } };
+  const manifest = { SchemaVersion: 2, ...provenance, Routes: portalRoutes, SourceSha256: hashes, Files: { '/profile.html': sha(html), [themeRef]: sha(theme), '/login.html': sha(fs.readFileSync(path.join(dist, 'login.html'))) } };
   fs.writeFileSync(path.join(dist, 'account-portal-release.json'), JSON.stringify(manifest, null, 2) + '\n');
   console.log('个人中心产物检查通过；已生成公开哈希回读清单 account-portal-release.json。');
 }

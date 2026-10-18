@@ -51,7 +51,11 @@ description: Microi AI 引擎、MiniMax 图片/音乐/视频生成与预览、�
 
 在线 `/#/mic-ai-engine` 的低代码建模模式使用本地 Microi.Agent 同一份 `microi.mcp` 工具目录：先 `list_tools`/`describe_tool`，再执行表、字段、菜单、接口引擎、Manifest 系统编排、删除等原 MCP 工具。用户在对话中明确要求写入时自动执行，不需要网页按钮；明确“只规划、不执行”时只调用只读工具。前端仅向 `Level >= 9999` 开放建模入口；服务端进入模式和每次工具调用前都以当前 DiyToken、主库账号及有效角色复核。工具原有确认值、审计和回读规则继续生效；超时或结果不确定时停止，不自动重试写操作。商城包不替换平台前后端程序。
 
-建模对话使用非流式 `/api/Ai/Chat` 获取服务端 MCP 工具循环最终答案和工具名称/状态；普通对话保持流式。完整系统先调用 `microi_get_db_schema`、`microi_get_manifest_schema`、`microi_plan_system`，用 `microi_generate_system(dryRun=true)` 验证，再按用户明确创建请求调用 `dryRun=false` 并用 `microi_validate_system` 回读。模型提交的参数由原 MCP Schema 校验，不能在前端绕过。
+建模工作台使用 `/api/Ai/ChatStream` 接收真实模型增量和 `agent/receipt/message/error/done` 事件；每轮工具、请求与 DDL 阶段持续显示。等待心跳只表示请求尚未返回，不能冒充完成百分比或隐藏推理原文。只公开经过授权的执行摘要，不向浏览器发送完整工具参数、原始返回、密钥或连接串。非流式 Chat 兼容入口继续返回最终结果。完整系统先调用 `microi_get_db_schema`、`microi_get_manifest_schema`、`microi_plan_system`，用 `microi_generate_system(dryRun=true)` 验证，再按用户明确创建请求调用 `dryRun=false` 并用 `microi_validate_system` 回读；原 MCP Schema 与确认规则不变。
+
+MCP 可信写前校验分支确认未执行时标记 `notExecuted`，保留安全的参数位置和错误码，同一动作最多允许模型修正一次参数；不能仅凭未看到 HTTP 请求就推断未写入。发出写请求后断线或工具报错保留 `uncertain`，停止后续写入。已知表、字段和 Manifest 使用精确只读工具核对；回读返回不等于原写入成功，也不授权重放。普通 POST 网络失败不得通过另一 HTTP 传输自动重发；已有稳定 RequestId 的专用资产协议按自身契约执行。浏览器提前断流、取消或错误时保留已收到的文本、步骤与失败回执，不能把正在执行的工具保存为成功。
+
+建表和新增字段的 DDL 来自已鉴权 MCP 端点开启的内部 ORM observer，在真实 DbCommand 执行前、返回或失败时记录安全语句，不从模型计划推测。字面量、默认值、注释及含歧义的双引号段隐藏，只返回有界 TABLE/INDEX DDL，不返回 DML 值。`submitted/executed/failed` 与 `TransactionPending` 是数据库执行阶段，不等于最终事务提交；截断必须标明。局部 HTTPS 联调只使用系统证书链与 localhost 名称验证通过的公开链，专属 Node 临时 CA 文件严格限权并在退出后清理；不关闭 TLS、不导出服务端私钥。
 
 在线工具网关仅转发当前请求的真实 DiyToken 与租户到同版 MCP，不创建服务账号或提权 Token；不继承宿主其它凭据。每次调用前复核当前管理员权限，模型只能提出调用建议，MCP 继续负责参数 Schema、写操作确认、幂等、审计和权威回读。对浏览器本地文件，先通过受控上传取得服务器可读内容，不能把客户端路径当作 API 节点路径。
 

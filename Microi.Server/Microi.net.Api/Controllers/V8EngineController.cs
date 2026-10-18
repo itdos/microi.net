@@ -562,6 +562,13 @@ namespace Microi.net.Api
         {
             return await Mcp.AdministerTableData(param);
         }
+
+        [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
+        public async Task<IActionResult> McpFormData([FromBody] JObject param)
+        {
+            return await Mcp.McpFormData(param);
+        }
         #endregion
 
 

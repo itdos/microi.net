@@ -15,6 +15,7 @@ public sealed class StartupPhysicalContractTests
 
     [Fact(Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
     [Trait("Category", "FullStack")]
+    [Trait("DatabaseProvider", "SqlServer")]
     public void LegacyLoginSchema_IsRepairedRegardlessOfRecordedVersion_AndPreservesRows()
     {
         var connection = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN")!);

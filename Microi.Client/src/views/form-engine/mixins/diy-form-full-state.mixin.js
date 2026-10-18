@@ -1,5 +1,25 @@
 export default {
     methods: {
+        ResetFormRelatedData() {
+            // 同一表单实例会切换记录；使所有旧响应失效后再清空列表、编辑器和历史弹窗。
+            this.FormRelatedGeneration = (this.FormRelatedGeneration || 0) + 1;
+            for (const name of ["DataLog", "DataComment", "DataVersion"]) {
+                this["_" + name + "LoadToken"] = (this["_" + name + "LoadToken"] || 0) + 1;
+                this[name + "List"] = [];
+                this[name + "ListLoading"] = false;
+            }
+            this.FormRelatedCounts = { DataLog: 0, DataComment: 0, DataVersion: 0 };
+            this.CommentContent = "";
+            this.ReplyComment = null;
+            if (this._CommentSubmission) this.BtnLoading = false;
+            this._CommentSubmission = null;
+            this.ShowDataVersionPreviewDialog = false;
+            this.PreviewDataVersionItem = null;
+            this.PreviewDataVersionData = {};
+            this.ShowDataVersionDiffDialog = false;
+            this.DataVersionDiffItem = null;
+            this.DataVersionDiffRows = [];
+        },
         ParseRouteDefaultValues(route) {
             var query = route && route.query ? route.query : {};
             var rawValue = query.DefaultValues;
@@ -27,8 +47,15 @@ export default {
     watch: {
         TableRowId(newValue, oldValue) {
             if (newValue !== oldValue) {
+                this.ResetFormRelatedData();
                 this.showDesktopRightPanel = false;
             }
+        },
+        TableId(newValue, oldValue) {
+            if (newValue !== oldValue) this.ResetFormRelatedData();
+        },
+        SysMenuId(newValue, oldValue) {
+            if (newValue !== oldValue) this.ResetFormRelatedData();
         },
         // 监听路由变化，在页面模式下重新初始化表单
         $route: {
@@ -220,6 +247,7 @@ export default {
                 DataComment: 0,
                 DataVersion: 0
             },
+            FormRelatedGeneration: 0,
             CommentContent: "",
             ReplyComment: null,
             ShowDataVersionPreviewDialog: false,

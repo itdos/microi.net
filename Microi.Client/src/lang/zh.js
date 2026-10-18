@@ -651,6 +651,13 @@ export default {
         ImportHeaderRangeInvalid: "表头起始行不能大于表头结束行。",
         ImportDataRangeInvalid: "数据起始行必须位于表头之后，且不能大于数据结束行。",
         ImportUploadFailed: "文件上传或导入请求失败",
+        ImportInputCount: "处理行数：{count}",
+        ImportAddedCount: "新增：{count}",
+        ImportUpdatedCount: "修改：{count}",
+        ImportFailedCount: "失败：{count}",
+        ImportStillProcessing: "导入接口仍在处理中，正在等待结果，请勿重复提交。",
+        ImportMethodNotAllowed: "导入请求被服务器拒绝（HTTP 405），请检查导入接口地址及网关是否允许 POST。",
+        ImportGatewayError: "导入接口返回了网关错误页面{status}，请先核对导入结果，避免重复提交。",
         
         // DIY表单设计相关
         CopyField: "复制字段",

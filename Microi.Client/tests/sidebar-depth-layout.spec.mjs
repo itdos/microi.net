@@ -37,15 +37,17 @@ test("expanded sidebar keeps nested menus full width and reserves text space", (
     assert.match(sidebar, /width: calc\(100% - 16px\)/);
 });
 
-test("truncated menu labels expose the complete accessible title", () => {
-    assert.match(item, /class="menu-title" :title="title" :aria-label="title"/);
+test("menu labels retain accessible names without native or Element hover tips", () => {
+    // 菜单悬浮仅负责导航；完整名称仍提供给读屏，不重新引入用户要求移除的提示层。
+    assert.match(item, /class="menu-title" :aria-label="title"/);
+    assert.doesNotMatch(item, /<el-tooltip\b/);
+    assert.doesNotMatch(item, /class="menu-title"[^>]*:title=/);
 });
 
-test("configured menu badges expose their business meaning in a hover tooltip", () => {
+test("menu badge meaning remains accessible without a hover tooltip", () => {
     assert.match(item, /badgeConfigModel\.Tooltip/);
-    assert.match(item, /<el-tooltip[\s\S]*:content="badgeConfigModel\.Tooltip"/);
-    assert.match(item, /popper-class="mci-menu-badge-tooltip"/);
-    assert.match(item, /统计 \$\{badgeRawValue\}，\$\{badgeConfigModel\.Tooltip\}/);
+    assert.match(item, /:aria-label="`\$\{title\}统计 \$\{badgeRawValue\}\$\{badgeConfigModel\.Tooltip/);
+    assert.doesNotMatch(item, /<el-tooltip\b|\s:title=/);
 });
 
 test("menu badge tooltip uses a real left-pointing triangle instead of a rotated square", () => {

@@ -25,7 +25,13 @@ test('release base images and mirror copies retain full upstream manifests',()=>
  assert.match(source,/--force-recursive/);assert.doesNotMatch(source,/['"]--platform['"]/);
  assert.match(source,/--pass-stdin/);assert.match(source,/expected!==digest/);
  const api=fs.readFileSync(new URL('Microi.Server/Microi.net.Api/bin/Release/Dockerfile',root),'utf8');
- assert.match(api,/microios\/dotnet-aspnet:10\.0/);assert.doesNotMatch(api,/FROM mcr\./);
+ assert.match(api,/microios\/dotnet-aspnet:10\.0\.13(?:\r?\n|$)/);assert.doesNotMatch(api,/FROM mcr\./);
+ const runtime=fs.readFileSync(new URL('Microi.Server/Microi.net.Api/Dockerfile.runtime',root),'utf8');
+ assert.match(runtime,/microios\/dotnet-aspnet:10\.0\.13(?:\r?\n|$)/);
+ const aspnet=manifest.images.filter(image=>image.scopes.includes('api-runtime'));
+ assert.equal(aspnet.length,1);assert.equal(aspnet[0].name,'dotnet-aspnet:10.0.13');
+ assert.equal(aspnet[0].source,'mcr.microsoft.com/dotnet/aspnet:10.0.13');
  const release=fs.readFileSync(new URL('Microi一键编译发布.sh',root),'utf8');
  assert.match(release,/--mirror-dependencies/);assert.match(release,/MICROI_ASPNET_IMAGE=\$\{DOCKER_REGISTRY\}\/\$\{DOCKER_NAMESPACE\}/);
+ assert.equal([...release.matchAll(/MICROI_ASPNET_IMAGE=\$\{DOCKER_REGISTRY\}\/\$\{DOCKER_NAMESPACE\}\/dotnet-aspnet:10\.0\.13"/g)].length,2);
 });

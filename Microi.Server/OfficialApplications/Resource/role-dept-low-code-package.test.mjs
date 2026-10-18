@@ -15,8 +15,8 @@ function sourceHash(value) {
 test("SaaS engine declares every changed legacy managed-engine baseline", () => {
   const fixtures = {
     admin_get_empty_database_sanitization_sql: {
-      // SaaS v8.4.15 的 v1.5.9 物化平台运行时保留身份；历史兼容基线保持原值。
-      current: "5520896cf87e96e113eccffd648b46ef005761076837dd225b198edb15aeb7df",
+      // 保留已从官方 v8.4.29 包独立下载验真的 v1.6.5 正文；历史兼容基线保持原值。
+      current: "8de621c6dd9acedc94d595de6c1597ac3a7058543b1b25bb742d6cb4a9777514",
       base: "e4a57b281874338cea6cf7f324f4eaac766040f9f42ee56ea998f21d23d9471a",
       compatible: [
         "a9fdf1568db3de5401c7d8341adf241e1ffd10a47790934795f17bef37399d80",
@@ -63,8 +63,10 @@ test("SaaS engine delivers role and department management as low-code tree-table
   assert.ok(roleTable);
   assert.ok(departmentTable);
   assert.ok(roleLimitTable);
-  assert.match(roleTable.SubmitBeforeServerV8, /Version: v1\.1\.0/u);
-  assert.match(roleTable.SubmitAfterServerV8, /Version: v1\.0\.3/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /Version: v1\.2\.0/u);
+  assert.match(roleTable.SubmitAfterServerV8, /Version: v1\.1\.0/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /hasOwnProperty.call\(details, 'Mcp'\)/u);
+  assert.match(roleTable.SubmitAfterServerV8, /SaveMcpRolePermissions/u);
   assert.match(roleTable.SubmitBeforeServerV8, /GetDirectTableGrantPolicies/u);
   assert.match(roleTable.SubmitBeforeServerV8, /parentLimit = \{ Id: parentId, Permission: '\["Read"\]' \}/u);
   assert.match(roleTable.SubmitBeforeServerV8, /isRootMenuParentId/u);

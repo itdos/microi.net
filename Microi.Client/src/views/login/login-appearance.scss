@@ -1,0 +1,43 @@
+/* 独立全局样式仅作用于登录页及其 Teleport 弹层，避免 scoped :global 丢弃后代选择器。 */
+/* 用户明确关闭装饰时，保持壁纸、输入框、焦点及认证进度可用。 */
+html[data-mci-disable-gradient="true"] #divLogin {
+    --mci-login-button-gradient: var(--mci-login-primary);
+    --mci-login-card-surface: var(--mci-login-primary);
+    --mci-login-card-surface-mobile: var(--mci-login-primary);
+    --mci-login-card-glow: transparent;
+    --mci-login-input-bg: var(--el-fill-color-blank, #ffffff);
+    --mci-login-input-bg-hover: var(--el-fill-color-blank, #ffffff);
+    .login-wallpaper-vignette, .login-button-energy, .login-system-logo-ring { display: none; }
+    &::after { display: none; }
+    .mci-login-console-grid { display: none; }
+    .login-button, .identity-login-button, .identity-login-button__icon { background: var(--mci-login-primary) !important; color: var(--mci-login-on-primary) !important; }
+    .identity-login-button__copy small, .identity-login-button__arrow { color: inherit; }
+    .divLoginCenter::before, .login-button::before, .login-button::after, .identity-login-button::before { display: none; }
+    &[data-login-style="Console"] { --mci-login-input-bg: #101d30; --mci-login-input-bg-hover: #15253c; }
+}
+
+html[data-mci-disable-gradient="true"] {
+    .totp-submit-button { background: var(--mci-color-primary, var(--el-color-primary)) !important; }
+    .totp-submit-shine, .totp-login-aurora, .login-methods-aurora { display: none; }
+    .login-methods-panel, .login-method-bubble, .login-method-bubble-icon { background-image: none !important; }
+}
+
+html[data-mci-disable-shadow="true"] #divLogin {
+    &, &::before, &::after, *, *::before, *::after { box-shadow: none !important; text-shadow: none !important; }
+    .login-input-param .el-input__wrapper { border: 1px solid var(--el-border-color); }
+    .login-input-param .el-input__wrapper.is-focus { outline: 2px solid var(--mci-login-primary); outline-offset: 1px; }
+}
+
+html[data-mci-disable-shadow="true"] {
+    .login-methods-panel, .login-method-bubble, .totp-submit-button, .totp-cancel-button { box-shadow: none !important; }
+}
+
+html[data-mci-disable-button-icon="true"] #divLogin {
+    .login-button-content > .el-icon:not(.is-loading), .login-appearance-button > .el-icon, .identity-login-button__icon:not(:has(.is-loading)) { display: none !important; }
+    .identity-login-button { grid-template-columns: minmax(0, 1fr) 12px; }
+    .bottomTips a > .el-icon, .bottomTips .el-button .el-icon { display: none !important; }
+    /* 窄屏原来只留图标；关闭图标后恢复短文案，避免出现空白按钮。 */
+    .login-appearance-button { width: auto; padding-inline: 10px; }
+    .login-appearance-button span { position: static; width: auto; height: auto; margin: 0; clip: auto; overflow: visible; }
+}
+

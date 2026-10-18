@@ -36,6 +36,8 @@ import "./styles/itdos.diy.scss";
 import "./styles/mci-design.scss";
 import "./styles/theme-shape.scss";
 import "./styles/ui-density.scss";
+import "./styles/framework-appearance.scss";
+import { applyFrameworkAppearance, getAppearanceWatchValues } from "./utils/framework-appearance.js";
 import { initializeUiDensity } from "./utils/ui-density.js";
 import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
@@ -50,9 +52,8 @@ import { isEmbeddedWebosWindowRuntime } from "./utils/webos-embedded-runtime.js"
 import { installLegacyQrCodeDownload } from "./utils/legacy-qrcode.js";
 import { installMciDialogRuntime, refreshMciDialogMaskBlur } from "./utils/mci-dialog-runtime.js";
 // 主题色工具 - 360 极速浏览器兼容方案
-import { initThemeColor, setThemeColor } from "./utils/theme-color";
+import { initThemeColor } from "./utils/theme-color";
 import { initCornerStyle } from "./utils/theme-shape";
-import { resolveUserThemeColor } from "./utils/user-visual-preferences.js";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
 import * as websocket from "@microsoft/signalr";
@@ -270,24 +271,13 @@ async function initApp() {
     });
 
     // 初始化主题色（兼容生产环境 CSS 顺序差异）
-    const themeColor = resolveUserThemeColor(
-        diyStore.GetCurrentUser || {},
-        diyStore.themeColor,
-        diyStore.SysConfig?.ThemeColor,
-        "#409eff"
-    );
-    setThemeColor(themeColor);
+    applyFrameworkAppearance(diyStore);
 
     // 监听主题变化并实时应用
     watch(
-        () => [diyStore.GetCurrentUser?.ThemeColor, diyStore.themeColor, diyStore.SysConfig?.ThemeColor],
+        () => getAppearanceWatchValues(diyStore),
         () => {
-            setThemeColor(resolveUserThemeColor(
-                diyStore.GetCurrentUser || {},
-                diyStore.themeColor,
-                diyStore.SysConfig?.ThemeColor,
-                "#409eff"
-            ));
+            applyFrameworkAppearance(diyStore);
         },
         { immediate: false }
     );

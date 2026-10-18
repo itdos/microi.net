@@ -94,8 +94,10 @@
                         </el-tag>
                     </div>
                     <el-select
+                        class="search-select-control"
                         v-model="SearchSelect[field.AsName || field.Name]"
                         collapse-tags
+                        collapse-tags-tooltip
                         :multiple="true"
                         :filterable="true"
                         :loading="field.Config.DataSourceSqlRemoteLoading"
@@ -386,6 +388,11 @@
     .el-tag{
         height: 24px;
     }
+}
+// 折叠多选还要容纳计数、搜索输入和清除/展开图标；100px 会把首个标签压成 0px。
+.search-field-item :deep(.search-select-control) {
+    width: clamp(180px, 14vw, 240px);
+    flex: 0 0 auto;
 }
 .search-field-item {
     display: flex;

@@ -1349,14 +1349,14 @@ html.dark {
     > .el-dialog__title::before { content: "MESSAGE DETAILS"; }
 }
 
-/* Element Plus MessageBox（确认、警告、输入提示）的统一大圆角契约。运行时会
+/* Element Plus MessageBox（确认、警告、输入提示）的统一外观契约。运行时会
    自动覆盖直接 ElMessageBox/$confirm 调用，DiyCommon.OsConfirm 则首帧即带此类。 */
 .el-message-box.mci-unified-message-box {
     --mci-message-accent: var(--el-color-primary, #3478f6);
     --mci-message-action: var(--el-color-primary, #3478f6);
     --mci-message-surface: var(--mci-bg-card, var(--el-bg-color-overlay, #fff));
     --mci-message-line: var(--mci-border-color, var(--el-border-color-lighter, #e1e8f0));
-    width: min(540px, calc(100vw - 32px));
+    width: min(calc(440px * var(--mci-ui-scale, 1)), calc(100vw - 32px));
     max-width: calc(100vw - 32px);
     overflow: hidden;
     padding: 0 !important;
@@ -1372,11 +1372,11 @@ html.dark {
     .el-message-box__header {
         position: relative;
         display: flex;
-        min-height: 86px;
+        min-height: calc(58px * var(--mci-ui-scale, 1));
         align-items: center;
-        gap: 14px;
+        gap: var(--mci-space-3, 12px);
         box-sizing: border-box;
-        padding: 16px 72px 16px 24px;
+        padding: var(--mci-space-3, 12px) calc(var(--mci-ui-control-height, 28px) + var(--mci-space-8, 32px)) var(--mci-space-3, 12px) var(--mci-space-4, 16px);
         border-bottom: 1px solid var(--mci-message-line);
         background:
             linear-gradient(115deg, color-mix(in srgb, var(--mci-message-accent) 10%, transparent), transparent 48%),
@@ -1384,9 +1384,9 @@ html.dark {
 
         &::before {
             display: inline-flex;
-            width: 42px;
-            height: 42px;
-            flex: 0 0 42px;
+            width: var(--mci-ui-tab-height, 34px);
+            height: var(--mci-ui-tab-height, 34px);
+            flex: 0 0 var(--mci-ui-tab-height, 34px);
             align-items: center;
             justify-content: center;
             border: 1px solid color-mix(in srgb, var(--mci-message-accent) 30%, transparent);
@@ -1394,7 +1394,7 @@ html.dark {
             background: color-mix(in srgb, var(--mci-message-accent) 13%, var(--mci-message-surface));
             color: var(--mci-message-accent);
             content: "!";
-            font-size: 20px;
+            font-size: var(--mci-text-lg, 17px);
             font-weight: 850;
             box-shadow: 0 8px 20px color-mix(in srgb, var(--mci-message-accent) 14%, transparent);
         }
@@ -1410,15 +1410,15 @@ html.dark {
         flex: 1;
         flex-direction: column;
         color: var(--el-text-color-primary, #152238) !important;
-        font-size: 20px;
+        font-size: var(--mci-text-lg, 17px);
         font-weight: 760;
         line-height: 1.25;
 
         &::before {
-            margin-bottom: 5px;
+            margin-bottom: var(--mci-space-1, 4px);
             color: var(--mci-message-accent);
             content: "MICROI CONFIRM";
-            font-size: 10px;
+            font-size: calc(10px * var(--mci-ui-scale, 1));
             font-weight: 850;
             letter-spacing: .17em;
             line-height: 1;
@@ -1427,9 +1427,9 @@ html.dark {
 
     .el-message-box__headerbtn {
         top: 50%;
-        right: 20px;
-        width: 40px;
-        height: 40px;
+        right: var(--mci-space-4, 16px);
+        width: var(--mci-ui-control-height, 28px);
+        height: var(--mci-ui-control-height, 28px);
         border: 1px solid var(--mci-message-line);
         border-radius: 12px;
         background: var(--el-fill-color-light, #eef2f6);
@@ -1445,9 +1445,9 @@ html.dark {
     }
 
     .el-message-box__content {
-        min-height: 76px;
+        min-height: 0;
         box-sizing: border-box;
-        padding: 24px 28px 22px;
+        padding: var(--mci-space-4, 16px);
         color: var(--el-text-color-regular, #34435a);
         background: color-mix(in srgb, var(--el-fill-color-extra-light, #f6f8fb) 56%, var(--mci-message-surface));
     }
@@ -1456,8 +1456,8 @@ html.dark {
     .el-message-box__message {
         margin: 0;
         padding: 0;
-        font-size: 16px;
-        line-height: 1.75;
+        font-size: var(--mci-ui-base-font, 13px);
+        line-height: 1.6;
         overflow-wrap: anywhere;
     }
 
@@ -1465,19 +1465,19 @@ html.dark {
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        gap: 12px;
+        gap: var(--mci-space-2, 8px);
         box-sizing: border-box;
-        padding: 17px 24px 21px;
+        padding: var(--mci-space-3, 12px) var(--mci-space-4, 16px);
         border-top: 1px solid var(--mci-message-line);
         background: var(--mci-message-surface);
 
         .el-button {
-            min-width: 100px;
-            height: 44px;
+            min-width: calc(72px * var(--mci-ui-scale, 1));
+            height: var(--mci-ui-control-height, 28px);
             margin-left: 0;
-            padding: 0 24px;
+            padding: 0 var(--mci-space-4, 16px);
             border-radius: 13px;
-            font-size: 14px;
+            font-size: var(--mci-ui-base-font, 13px);
             font-weight: 720;
         }
 
@@ -1502,12 +1502,16 @@ html.dark {
 
 @media (max-width: 560px) {
     .el-message-box.mci-unified-message-box {
-        .el-message-box__header { min-height: 78px; padding: 13px 62px 13px 16px; }
-        .el-message-box__header::before { width: 38px; height: 38px; flex-basis: 38px; border-radius: 12px; }
-        .el-message-box__title { font-size: 18px; }
-        .el-message-box__content { padding: 20px 18px; }
-        .el-message-box__btns { padding: 14px 16px 17px; }
-        .el-message-box__btns .el-button { min-width: 92px; }
+        .el-message-box__btns { flex-wrap: wrap; }
+    }
+}
+
+// 紧凑密度压缩桌面留白；触屏按钮仍保留足够的点击区域。
+@media (pointer: coarse) {
+    .el-message-box.mci-unified-message-box {
+        .el-message-box__header { padding-right: calc(var(--mci-touch-target, 44px) + var(--mci-space-8, 32px)); }
+        .el-message-box__headerbtn,
+        .el-message-box__btns .el-button { min-width: var(--mci-touch-target, 44px); min-height: var(--mci-touch-target, 44px); }
     }
 }
 

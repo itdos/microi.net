@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 namespace Microi.Cache
 {
     /// <summary>
-    /// Redis 管理器连接参数。仅临时连接模式允许由客户端传入密码，服务端不会持久化该对象。
+    /// Redis 管理器连接参数。用于可信后端解析已保存连接，不开放匿名或临时连接。
     /// </summary>
     public class RedisManagerConnectionInput
     {
@@ -21,7 +21,7 @@ namespace Microi.Cache
     }
 
     /// <summary>
-    /// Redis 管理操作上下文。Mode: tenant（当前租户默认连接）、saved（已保存连接）、temporary（匿名临时连接）。
+    /// Redis 管理操作上下文。Mode 仅支持 tenant（当前租户默认连接）、saved（已保存连接）。
     /// </summary>
     public class RedisManagerContextRequest
     {
@@ -105,6 +105,8 @@ namespace Microi.Cache
         public string Remark { get; set; }
         public bool HasPassword { get; set; }
         public bool IsDefault { get; set; }
+        public bool CanSelectDatabase { get; set; }
+        public string AllowedKeyPrefix { get; set; }
     }
 
     public class RedisManagerKeyItem
@@ -148,5 +150,8 @@ namespace Microi.Cache
         public Dictionary<string, string> Info { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public List<string> Endpoints { get; set; } = new List<string>();
         public int SampleSize { get; set; }
+        public bool IsTenantScoped { get; set; }
+        public bool KeyCountIsEstimate { get; set; }
+        public string AllowedKeyPrefix { get; set; }
     }
 }

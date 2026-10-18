@@ -2,6 +2,11 @@ import _u from "underscore";
 
 export default {
         computed: {
+        HideMoreFunctions() {
+            // 新模块开关仅在明确开启时隐藏；旧租户未安装字段时保留入口，嵌入页仍可独立隐藏。
+            const value = this.SysMenuModel?.HideMoreFunctions;
+            return this.PropsHideMoreFunctions === true || value === true || value === 1 || value === "1" || value === "true";
+        },
         // 判断是否在diy-table列表---仅在 diy-table 列表路由显示新增按钮
         ShowAddByRoute() {
           const route = this.$route || {};

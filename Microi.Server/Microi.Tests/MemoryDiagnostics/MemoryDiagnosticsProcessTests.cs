@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using MongoDB.Driver;
 
 namespace Microi.Tests.MemoryDiagnostics;
 
@@ -38,8 +40,13 @@ public sealed class MemoryDiagnosticsProcessTests
     public async Task MongoIncidentReplay_UsesCurrentTestServer()
     {
         RequireEnvironment("MICROI_TEST_MONGO_CURRENT");
-        var output = await RunFixtureAsync(TimeSpan.FromSeconds(90), NewEvidenceDirectory(), "mongo");
-        Assert.Contains("\"Passed\":", output, StringComparison.Ordinal);
+        var tenant = NewMongoFixtureTenant();
+        try
+        {
+            var output = await RunFixtureAsync(TimeSpan.FromSeconds(90), NewEvidenceDirectory(), "mongo", tenant);
+            Assert.Contains("\"Passed\":", output, StringComparison.Ordinal);
+        }
+        finally { await CleanupMongoFixtureAsync(tenant); }
     }
 
     [Fact, Trait("Category", "FullStack")]
@@ -80,9 +87,13 @@ public sealed class MemoryDiagnosticsProcessTests
     {
         RequireEnvironment("MICROI_TEST_MONGO_CURRENT");
         var evidence = NewEvidenceDirectory();
-        using var host = StartFixture("serve", evidence);
+        var scope = NewMongoFixtureTenant();
+        var tenantA = scope + "_a";
+        var tenantB = scope + "_b";
+        Process? host = null;
         try
         {
+            host = StartFixture("serve", evidence, tenantA, tenantB);
             var ready = Path.Combine(evidence, "ready.json");
             await WaitForFileAsync(ready, host, TimeSpan.FromSeconds(40));
             using var state = JsonDocument.Parse(await File.ReadAllTextAsync(ready, TestContext.Current.CancellationToken));
@@ -93,7 +104,51 @@ public sealed class MemoryDiagnosticsProcessTests
             using var memory = JsonDocument.Parse(await client.GetStringAsync(url + "/memory", TestContext.Current.CancellationToken));
             Assert.True(memory.RootElement.TryGetProperty("Executions", out _));
         }
-        finally { await StopAsync(host); }
+        finally
+        {
+            // 子进程真正退出后才能删库，避免它仍在写 WAL/Mongo；启动失败也只清理父进程已知的两个 nonce。
+            if (host != null)
+            {
+                try { await StopAsync(host); }
+                finally { host.Dispose(); }
+            }
+            await CleanupMongoFixtureAsync(tenantA, tenantB);
+        }
+    }
+
+    [Fact]
+    public void MongoFixtureDatabaseNamesRejectFixedAndForeignTenants()
+    {
+        var tenant = NewMongoFixtureTenant();
+        Assert.NotEqual(tenant, NewMongoFixtureTenant());
+        Assert.Equal("sys_log_" + tenant, OwnedMongoDatabaseName(tenant));
+        Assert.Equal("sys_log_" + tenant + "_a", OwnedMongoDatabaseName(tenant + "_a"));
+        Assert.Equal("sys_log_" + tenant + "_b", OwnedMongoDatabaseName(tenant + "_b"));
+        foreach (var invalid in new[] { "memoryrepositorytest", "memorytesta", "iTdos", "mci_mem_", tenant + "_other", tenant + "/foreign", tenant + "\n" })
+            Assert.Throws<ArgumentException>(() => OwnedMongoDatabaseName(invalid));
+    }
+
+    private static string NewMongoFixtureTenant() => "mci_mem_" + Guid.NewGuid().ToString("N");
+
+    private static string OwnedMongoDatabaseName(string tenant)
+    {
+        if (!Regex.IsMatch(tenant, @"\Amci_mem_[a-f0-9]{32}(?:_[ab])?\z"))
+            throw new ArgumentException("Only a parent-owned random memory fixture tenant can be cleaned.", nameof(tenant));
+        return "sys_log_" + tenant;
+    }
+
+    private static async Task CleanupMongoFixtureAsync(params string[] tenants)
+    {
+        // V8MongoDB 的实际仓储为 sys_log_<tenant>。先校验全部已知名称，不枚举、不清理其它共享数据库。
+        var databases = tenants.Select(OwnedMongoDatabaseName).ToArray();
+        var connection = Environment.GetEnvironmentVariable("MICROI_TEST_MONGO_CURRENT")
+            ?? throw new InvalidOperationException("The memory fixture Mongo connection is missing during cleanup.");
+        var settings = MongoClientSettings.FromConnectionString(connection);
+        settings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
+        using var client = new MongoClient(settings);
+        // TestContext 的取消不应取消收尾；独立且有界的 token 防止失败后遗留随机测试数据。
+        using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        foreach (var database in databases) await client.DropDatabaseAsync(database, cleanup.Token);
     }
 
     private static string NewEvidenceDirectory()

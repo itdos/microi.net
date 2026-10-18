@@ -55,20 +55,20 @@ V8.Cache.HashDelete(hashKey, 'Reserved');
 平台 Redis 管理器固定路由为 `#/mci-redis-manager`：
 
 - Redis 管理器接口要求已登录且当前用户 `Level >= 9999`。它只接受 `tenant`（当前租户默认 Redis）和 `saved`（主租户 `mci_redis_connection` 中保存的额外连接）两种模式；当前源码明确拒绝 `temporary`，也没有匿名临时连接模式。
+- 从 v8.5.12 起，Redis 管理器由 `Microi.Cache` 强制实施租户边界：主租户身份以 API 宿主的 `OsClient` 配置为准，主租户超级管理员可管理当前受控连接中的全部 Key；子租户超级管理员只能扫描、读取和维护完整的 `Microi:{当前OsClient}:` 前缀，不能靠 `Level=9999`、请求参数或切换数据库取得主租户权限。精确读取、删除、覆盖、重命名的两端、TTL、批量删除和缓存失效均执行同一检查，批量请求中出现越权 Key 时整批拒绝。普通业务 `V8.Cache` 仍只允许当前租户。
+- 子租户只能选择当前连接配置的数据库；MCP 省略 `database` 时使用后端配置，不默认传 `0`。页面以 `CanSelectDatabase` / `AllowedKeyPrefix` 为事实，不能从前端账号等级推断。`*` 与普通搜索词自动限定当前租户，显式其它租户前缀直接拒绝。子租户统计不返回共享实例 INFO、DBSIZE 或节点全局 L1 统计；扫描样本数量通过 `KeyCountIsEstimate` 标识。
 - 保存连接记录必须按 `TenantOsClient` 隔离，密码只在后端保护并且不回传前端；调用方只传保存后的 `connectionId`。
 - Key 列表必须使用 `SCAN` 游标分页，禁止在生产 Redis 上使用阻塞式 `KEYS *`。内容查看支持 String、Hash、List、Set、Sorted Set、Stream；集合内容要分页并限制单次条数。
 - 写入 Hash/List/Set/Sorted Set 时先完整解析 JSON，再覆盖旧 Key；删除、覆盖、重命名和 TTL 变更属于破坏性操作，必须先展示目标连接、数据库与 Key 并要求明确确认。
 - 管理接口不开放任意 Redis 命令、Lua、`FLUSHALL` 或 `FLUSHDB`；批量删除最多 500 个 Key，重命名不覆盖既有目标。
 
-对应后端管理入口包括只读统计 `/api/cache/statistics`、节点 L1 精确失效
-`/api/cache/invalidate`、模式失效 `/api/cache/invalidate-pattern`，以及 Redis 管理器
-路由前缀 `/api/cache/redis/`。它们都属于受权管理能力，不是匿名业务 API。
+当前统一入口为 Managed 接口引擎 `platform-cache-manager`，通过 `V8.Method.ManageCache` 调用可信后端；旧 `/api/cache/*` 路由由兼容入口处理。节点全局 `Statistics` 只开放主租户，子租户使用受限 `RedisStatistics`。这些都是受权管理能力，不是匿名业务 API。
 
 MCP 默认操作当前 MCP `OsClient` 的租户 Redis；额外连接只传管理页保存后的 `connectionId`，禁止在 MCP 参数、日志或回答中传递 Redis 密码。
 
 | MCP 工具 | 用途 | 确认规则 |
 |------|------|------|
-| `microi_redis_statistics` | 服务器、内存、客户端、命中率与 Key 类型统计 | 只读 |
+| `microi_redis_statistics` | 主租户服务器统计 / 子租户命名空间 Key 样本统计 | 只读 |
 | `microi_redis_list_keys` | SCAN 分页检索 Key、类型、TTL、内存估算 | 只读 |
 | `microi_redis_get_key` | 分页查看单个 Key 内容 | 只读 |
 | `microi_redis_delete_keys` | 单个或批量删除，最多 500 个 | `confirmExecution="DELETE"` |
@@ -310,3 +310,7 @@ fire-and-forget；否则数千个 `SCAN/DEL/PUBLISH` 会同时进入同一个
 - 每个租户可能使用不同 Redis，订阅初始化状态不得用一个全局 `static bool` 共享；
 - 缓存实例必须保存创建时的准确 `OsClient`，按模式 `SCAN/DEL` 时直接使用该租户连接；禁止根据 Redis DB 编号反推连接，因为不同租户可能在不同服务器上使用相同 DB 编号；
 - 等待发布只解决回压，业务写入和缓存失效仍需保持 `OsClient` 隔离及可重试幂等。
+
+## Redis 管理隔离验收
+
+使用已登记的隔离主/子租户，在同一 Redis 数据库创建有短 TTL 的唯一测试 Key，逐个验证两台 API：子租户正常维护自身 String/Hash/List/Set/Sorted Set；扫描不返回主租户或相似前缀；读取、混合批删、跨前缀重命名、TTL、覆盖和失效越权全部拒绝，拒绝后由主租户回读原值未变。验收后只清理登记的测试 Key。禁止用官方业务租户做可写 Full，也不能用物理分库替代 Key 授权测试。

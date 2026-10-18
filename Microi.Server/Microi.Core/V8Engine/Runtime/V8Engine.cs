@@ -100,6 +100,7 @@ namespace Microi.net
             "System.RuntimeTypeHandle",
             "System.Environment",                       // 含 Exit/FailFast/SetEnvironmentVariable
             "System.GC",                                // 防止 GC.Collect 等扰乱 GC
+            "Dos.ORM.DdlExecutionDiagnostics",           // 仅可信 CLR 观察作用域；嵌套快照同样禁止
         };
 
         /// <summary>
@@ -234,6 +235,19 @@ namespace Microi.net
             MemberFilter = m => !IsBlockedMember(m)
         };
 
+        // Jint can expose IDisposable.Dispose through an interface fallback, whose
+        // DeclaringType is not the blocked facade. Reject these two exact objects
+        // before wrapper creation; ordinary CLR objects keep their normal conversion.
+        private sealed class DdlDiagnosticsObjectConverter : IObjectConverter
+        {
+            public bool TryConvert(Engine engine, object value, out JsValue result)
+            {
+                result = JsValue.Undefined;
+                return value is Dos.ORM.DdlExecutionDiagnostics
+                    || value is Dos.ORM.DdlExecutionDiagnostics.EventSnapshot;
+            }
+        }
+
         #endregion
 
         #region Engine创建
@@ -301,6 +315,7 @@ namespace Microi.net
                 // 阻止 V8 脚本通过 System.IO / System.Diagnostics.Process / System.Reflection
                 // 等危险命名空间访问宿主机能力（防 RCE / 沙箱逃逸）。
                 options.SetTypeResolver(_safeTypeResolver);
+                options.AddObjectConverter(new DdlDiagnosticsObjectConverter());
 
                 // 2026-05-01 安全加固：禁止 GetType()、Activator、反射相关 API，
                 // 防止用户脚本通过 obj.GetType().Assembly.GetTypes() 绕过黑名单。

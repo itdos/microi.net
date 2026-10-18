@@ -4,7 +4,8 @@
         transition: none;
         margin-left: 240px;
         position: relative;
-        z-index: 1;
+        // 不把业务弹层困在低于侧栏的独立层叠上下文中。
+        z-index: auto;
     }
 
     .sidebar-container-microi {
@@ -17,10 +18,11 @@
         top: 0;
         bottom: 0;
         left: 0;
-        z-index: 1; // PC端侧边栏不需要太高的z-index，避免遮挡弹窗等
-        overflow: hidden;
+        z-index: 2; // 仅高于主内容以保留边缘拖拽命中，仍低于导航弹层与业务对话框。
+        overflow: visible;
         display: flex;
         flex-direction: column;
+        .sidebar-menu-content { height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden; }
         // reset element-ui css
         .horizontal-collapse-transition {
             transition:
@@ -37,7 +39,7 @@
             right: 0px;
         }
 
-        > .el-scrollbar {
+        .sidebar-menu-content > .el-scrollbar {
             flex: 1 1 auto;
             min-height: 0;
             height: auto;
@@ -304,7 +306,8 @@
 
 .mci-sidebar-compact-flyout {
     position: fixed;
-    z-index: 3100;
+    // 导航浮层高于框架内容，低于 Element Plus 从 2000 起分配的业务弹层。
+    z-index: 1900;
     box-sizing: border-box;
     width: 214px;
     max-width: min(286px, calc(100vw - 72px));

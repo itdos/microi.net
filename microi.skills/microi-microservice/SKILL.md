@@ -280,7 +280,7 @@ window.addEventListener('appstate-change', (event) => {
 `isolation:isolate` 作为第二道边界，但不能代替子应用命名空间。验收需检查宿主 Logo/菜单样式、
 内部导航不重挂微服务、内容区局部骨架屏，以及前进/后退恢复。
 
-### 平台主题、明暗模式与租户主色（强制）
+### 平台主题、明暗模式、界面密度与租户主色（强制）
 
 所有新建或修改的 MicroService 都必须跟随宿主平台主题，不能交付只适配固定白底、固定深色或
 单一品牌色的页面。宿主下发的 `themeMode`、`themeColor`、`themePalette`、`themeOnPrimary`、
@@ -292,6 +292,10 @@ window.addEventListener('appstate-change', (event) => {
 - 主操作色优先使用 `--mci-color-primary` / `--el-color-primary` 或宿主 `themeColor`；表面、文字、边框分别使用 `themeTokens.surface/surfaceSoft/textPrimary/textSecondary/border`。成功、警告、错误色可以保持语义独立，但必须分别提供浅色与深色可读状态。
 - 表格、表单、弹窗、上传、骨架屏、空状态、错误态、禁用态、悬停和焦点环都必须覆盖浅色与深色；大面积背景不能直接写死 `#fff` 或某个深色，主题色不能只改按钮而其它视觉仍留在旧配色。
 - 主题切换必须即时生效且不重挂应用、不丢失表单/筛选/内部路由；卸载时清理本应用创建的媒体查询、数据与生命周期监听器。
+- 界面密度与主题属于同一必读契约。宿主 `uiDensity`（兼容 `themeTokens.uiDensity`）提供 `scale/factor/variables`；将 `variables` 映射到应用唯一根容器，写入 `data-mci-ui-density`，在首次挂载、主题消息和缓存实例再次显示时更新。嵌入态不得用自己的旧用户快照或 localStorage 覆盖宿主。iframe 不继承父页面 CSS，禁止声称父框架修改了变量就已适配微服务。
+- 标题、导航、图标容器、表单、表格行、卡片留白及弹层头/内容/底部/按钮都必须使用 `--mci-ui-*`、`--mci-space-*`、`--mci-text-*` 几何 Token；不能只改字体或对整页使用 `zoom/transform:scale`。二维码、图片画布可保留业务尺寸；触屏按钮保留 `--mci-touch-target` 最小点击区域。关闭渐变、阴影和边角风格也按宿主 `themeTokens` 处理。
+- 多页面共用一个微服务 bundle 时，页面 CSS 必须使用 Vue `scoped`、CSS Modules 或应用/页面命名空间。禁止把 `.hero-copy`、`.btn`、`.modal-header` 等通用裸选择器作为全局样式导入，防止切页后标题叠字、颜色冲突与布局串页。外置 CSS 也须使用 `<style scoped src="...">` 或等价隔离，不能仅把源码挪到独立文件。
+- 自动化验收增加“紧凑/标准/大字 × 浅色/深色 × 非默认主色”，在同一已打开的宿主实例中切换并验证输入不丢失。计算标题、表单与弹层各区的实际宽高/间距，确认紧凑时确实缩小、文本无重叠、按钮可点击；至少覆盖 4K 和窄屏。只搜索 CSS 中出现了 density 变量不算适配完成。
 - 自动化验收至少覆盖“浅色 + 深色 + 一个非默认租户主题色”，同时断言根属性、计算后的主色/表面/文字、基本对比度和宿主 Logo/菜单未被污染，并各保留一张真实宿主截图。只测独立 Vite 预览、只检查 CSS 文本或只显示切换按钮均不算完成。
 
 `closeTab` 与 TagsView 当前页签关闭语义一致，固定页签和最后一个页签拒绝关闭；顶部 Tab

@@ -154,3 +154,4 @@
 +    if (verifiedNet.Code !== 1) result.Code = 0;
 +    return;
 +  }
+

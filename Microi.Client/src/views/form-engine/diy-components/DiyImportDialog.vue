@@ -86,14 +86,15 @@
 
         <el-upload
             ref="workbookUpload"
+            v-model:file-list="uploadFiles"
             class="upload-drag-style mci-import-dialog__upload"
             :class="{ 'is-compact': Boolean(selectedFile) }"
             :action="importApi"
             :accept="customAccept"
             :auto-upload="false"
             :data="uploadData"
-            :headers="{ authorization: authHeader }"
-            :disabled="parsing || submitting || isTaskActive"
+            :headers="uploadHeaders"
+            :disabled="parsing || submitting || isTaskActive || legacyImportRunning || uploadPending"
             :limit="1"
             :show-file-list="false"
             :on-change="handleFileChange"
@@ -331,7 +332,7 @@
             </div>
         </section>
 
-        <div v-if="!isCustomImport" class="mci-import-dialog__legacy-tools">
+        <div v-if="!isCustomImport && (!sysMenuModel.ImportApi || sysMenuModel.ImportProgressApi)" class="mci-import-dialog__legacy-tools">
             <div class="mci-import-dialog__legacy-actions">
                 <el-button :icon="RefreshRight" @click="getImportProgress">{{ $t("Msg.ViewProgress") }}</el-button>
                 <el-tooltip v-if="isAdmin" effect="dark" :content="$t('Msg.Tips')" placement="top">
@@ -375,6 +376,7 @@ import "@vue-office/excel/lib/index.css";
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
 import { buildDiyFieldUniqueRules } from "@/utils/diy-field-unique";
+import { withRequestTenant } from "@/utils/request-tenant-context";
 import { normalizeXlsxPreviewArrayBuffer } from "../utils/excel-preview-normalizer";
 import {
     analyzeExcelWorkbook,
@@ -416,6 +418,9 @@ export default {
             importIdempotencyKey: "",
             importStepList: [],
             selectedFile: null,
+            uploadFiles: [],
+            activeUploadUid: null,
+            uploadPending: false,
             parsedImport: null,
             parsing: false,
             submitting: false,
@@ -478,8 +483,19 @@ export default {
             return (this.dialogOptions && this.dialogOptions.Accept) || ".xls,.xlsx,.csv";
         },
         importApi() {
-            if (this.sysMenuModel && this.sysMenuModel.ImportApi) return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportApi);
+            if (this.sysMenuModel && this.sysMenuModel.ImportApi) {
+                const address = this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportApi).trim();
+                // el-upload 不经过 DiyCommon 请求层；相对接口须补 API 基址，否则会 POST 到静态站点并收到 nginx 405。
+                if (/^(https?:)?\/\//i.test(address)) return address;
+                return this.DiyCommon.GetApiBase().replace(/\/+$/, "") + "/" + address.replace(/^\/+/, "");
+            }
             return this.DiyCommon.GetApiBase() + "/api/FormEngine/ImportDiyTableRow";
+        },
+        uploadHeaders() {
+            return withRequestTenant({ authorization: this.authHeader }, {
+                url: this.importApi, apiBase: this.DiyCommon.GetApiBase(),
+                osClient: this.DiyCommon.GetOsClient(), params: this.uploadData
+            });
         },
         importProgressApi() {
             if (this.sysMenuModel && this.sysMenuModel.ImportProgressApi) return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportProgressApi);
@@ -583,6 +599,7 @@ export default {
                 && this.parsedImport.mappedColumnCount
                 && !this.parsing
                 && !this.submitting
+                && !this.uploadPending
                 && !this.isTaskActive
                 && !this.legacyImportRunning
                 && !this.isTaskActive
@@ -638,8 +655,7 @@ export default {
             return (task.Msg || task.Message || this.customStatusText) + unitText;
         },
         customResultItems() {
-            if (!this.backgroundTask) return [];
-            let result = this.backgroundTask.Result;
+            let result = this.backgroundTask ? this.backgroundTask.Result : this.uploadResult;
             if (typeof result === "string") {
                 try {
                     result = JSON.parse(result);
@@ -650,6 +666,10 @@ export default {
             const data = result && result.Data !== undefined ? result.Data : result;
             if (!data) return [];
             const items = [];
+            if (data.InputCount !== undefined) items.push(this.$t("Msg.ImportInputCount", { count: data.InputCount }));
+            if (data.AddedCount !== undefined) items.push(this.$t("Msg.ImportAddedCount", { count: data.AddedCount }));
+            if (data.UpdatedCount !== undefined) items.push(this.$t("Msg.ImportUpdatedCount", { count: data.UpdatedCount }));
+            if (data.FailedCount !== undefined) items.push(this.$t("Msg.ImportFailedCount", { count: data.FailedCount }));
             if (data.ProjectName) items.push(`${this.$t("Msg.ImportProject")}: ${data.ProjectName}`);
             if (data.ImportedCount !== undefined) items.push(`${this.$t("Msg.ImportedRows")}: ${data.ImportedCount}`);
             if (data.BatchNo) items.push(`${this.$t("Msg.ImportBatch")}: ${data.BatchNo}`);
@@ -700,6 +720,9 @@ export default {
             return fixedFormData;
         },
         clearImportState(clearSelectedFile = true) {
+            this.activeUploadUid = null;
+            this.uploadPending = false;
+            this.$refs.workbookUpload?.abort?.();
             this.stopUploadWatchdog();
             this.stopImportProgressPolling();
             this.legacyImportRunning = false;
@@ -934,7 +957,7 @@ export default {
             this.workbookPreviewError = (error && (error.message || error.msg)) || this.$t("Msg.ImportOriginalWorkbookUnavailable");
         },
         async startImport() {
-            if (!this.canStartImport) return;
+            if (!this.canStartImport || this.uploadPending) return;
             if (this.isCustomImport) {
                 await this.startCustomImport();
                 return;
@@ -947,18 +970,27 @@ export default {
                 this.customError = this.$t("Msg.ImportSubmitFailed");
                 return;
             }
-            // 上传回调丢失时也必须解除按钮 Loading；重试沿用同一文件的幂等键。
+            // Element Plus 会移除传输失败的文件，并把 HTTP 200 / Code=0 的文件标成 success。
+            // 每次显式重试重建 ready 队列，保留原文件字节、映射和业务幂等键，不能只调用空队列 submit。
+            this.activeUploadUid = this.DiyCommon.NewGuid();
+            this.selectedFile.uid = this.activeUploadUid;
+            this.uploadFiles = [{ name: this.selectedFile.name, size: this.selectedFile.size,
+                uid: this.activeUploadUid, raw: this.selectedFile, status: "ready" }];
+            this.uploadPending = true;
             this.stopUploadWatchdog();
             this._uploadWatchdogTimer = window.setTimeout(() => {
                 this._uploadWatchdogTimer = null;
-                if (!this.submitting) return;
-                this.submitting = false;
-                this.customError = "上传响应超时，请先核对导入结果，再用当前文件重试。";
+                if (!this.uploadPending) return;
+                // 慢接口可能仍在事务内写入；没有终态时不能把按钮释放成可重复提交。
+                this.customError = this.$t("Msg.ImportStillProcessing");
             }, 90000);
             try {
+                await this.$nextTick();
+                if (!this.uploadPending || !this.visible) return;
                 uploader.submit();
             } catch (error) {
                 this.stopUploadWatchdog();
+                this.uploadPending = false;
                 this.submitting = false;
                 this.customError = this.formatAnalysisError(error);
             }
@@ -1056,6 +1088,9 @@ export default {
             this.visible = false;
         },
         handleDialogClosed() {
+            this.activeUploadUid = null;
+            this.uploadPending = false;
+            this.$refs?.workbookUpload?.abort?.();
             this.stopUploadWatchdog();
             this.stopBackgroundTaskPolling();
             this.stopImportProgressPolling();
@@ -1135,12 +1170,26 @@ export default {
                 }
             });
         },
-        handleUploadSuccess(result) {
+        handleUploadSuccess(result, file) {
+            if (file && (!this.visible || file.uid !== this.activeUploadUid)) return;
             this.stopUploadWatchdog();
+            this.uploadPending = false;
             this.submitting = false;
+            this.customError = "";
             this.uploadResult = result;
             if (result && Number(result.Code) === 1) {
-                // Code=1 accepts the background import; completion comes from its progress.
+                // 标准导入是异步接收；替换接口未配置进度且未声明待处理状态时，Code=1 就是同步事务终态。
+                const status = String(result.Data?.Status || "").toLowerCase();
+                if (this.sysMenuModel?.ImportApi && !this.sysMenuModel?.ImportProgressApi
+                    && !["pending", "running", "retrying"].includes(status)) {
+                    this.legacyImportRunning = false;
+                    this.uploadSucceeded = true;
+                    if (!this.customSuccessEmitted) {
+                        this.customSuccessEmitted = true;
+                        this.$emit("import-success", result);
+                    }
+                    return;
+                }
                 this.legacyImportRunning = true;
                 this.legacyProgressFailures = 0;
                 this.legacyProgressStartedAt = Date.now();
@@ -1154,15 +1203,26 @@ export default {
                 this.customError = this.$t("Msg.ImportFailed");
             }
         },
-        handleUploadError(error) {
+        handleUploadError(error, file) {
+            if (file && (!this.visible || file.uid !== this.activeUploadUid)) return;
             this.stopUploadWatchdog();
+            this.uploadPending = false;
             this.submitting = false;
-            this.customError = (error && (error.message || error.msg)) || this.$t("Msg.ImportUploadFailed");
+            const message = String(error?.message || error?.msg || "");
+            const status = Number(error?.status || 0);
+            // 代理 HTML 不是业务错误正文，不把整页 HTML 展示给用户，也不据此判断事务已回滚。
+            this.customError = status === 405
+                ? this.$t("Msg.ImportMethodNotAllowed")
+                : /<\s*(?:!doctype|html|head|body)\b/i.test(message)
+                    ? this.$t("Msg.ImportGatewayError", { status: status ? ` (HTTP ${status})` : "" })
+                    : message || this.$t("Msg.ImportUploadFailed");
         },
         handleBeforeUpload(file) {
             try {
                 this.validateExcelFile(file);
             } catch (error) {
+                this.stopUploadWatchdog();
+                this.uploadPending = false;
                 this.submitting = false;
                 this.DiyCommon.Tips(error.message, false);
                 return false;
@@ -1174,6 +1234,9 @@ export default {
         }
     },
     beforeUnmount() {
+        this.activeUploadUid = null;
+        this.uploadPending = false;
+        this.$refs.workbookUpload?.abort?.();
         this.stopUploadWatchdog();
         this.stopImportProgressPolling();
         this.stopBackgroundTaskPolling();

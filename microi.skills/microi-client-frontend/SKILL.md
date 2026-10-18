@@ -14,7 +14,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 `SysConfig.HideSystemLicenseVersion` 缺省关闭，标签可点击跳转 `/license`，不能因一次请求失败永久消失。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-client-frontend-000 sha256=ea9cdd10772c42cc8202aa50ed3f8bec0a41588b16539b2968f256c7ee05cd3a -->
+<!-- microi-progressive:chunk id=microi-client-frontend-000 sha256=9b949c68b0867fc1ecf2e6cb1fd1bec45d22c01ad3be63485e0376d0183d1795 -->
 ## 单行文本插槽按钮约定
 
 - `diy-input.vue` 的插槽按钮行为存储在 `diy_field.Config.SlotButtonV8Code`。
@@ -27,15 +27,17 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=83fb9902ca2edddfc8b72de9578f28a6a7df5cadb2626e5ffb0321d62caa0bb0 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=fcc37635c7ac9b9e7054a5e9d76b71d5a53977170d25ae3049af95481eca4061 -->
 ## 1. 技术栈和源码入口
 
-### 详情评论与代码版本的按需读取
+### 详情评论、日志与版本的按需读取
 
 - 评论用 `/api/FormEngine/AddFormComment`，只传 `ParentFormEngineKey/ParentTableRowId/_SysMenuId/Content/ParentCommentId/RequestId`。服务端固定作者、父表及回复上下文；同一提交重试必须复用 RequestId，兼容 GUID 与平台 `DiyCommon.NewGuid()` 实际生成的 ULID。
 - 评论归属为 `diy_comment.ParentTableId + TableRowId`，新表字段与复合索引通过表单引擎应用交付，主库回读保证写后可见。已有 TableId 绑定兼容，空归属历史评论禁止仅按记录 Id 自动猜测或后台回填。
-- `/api/FormEngine/GetFormRelatedData` 的版本列表只含元信息；`HistoryContentMode=OnDemand` 时，点击动作再传 `VersionId` 读取一条，并要求返回 `Authorized`。不要把 Data 缓存到列表，不要并发预取全部正文。
-- 代码历史只向当前有效的平台管理员开放代码字段白名单；当前行可读不等于历史秘密可读。局部版本比较/加载只涉及快照中的字段，保存继续走正常表单鉴权和事件。
+- `/api/FormEngine/GetFormRelatedData` 的日志和版本列表只含元信息；`HistoryContentMode=OnDemand` 时，点击动作再传 `LogId/VersionId` 读取一条，并要求返回 `Authorized`。不要预取全部正文或将版本 Data 装入列表长期缓存。
+- 历史正文单独复核当前主库有效管理员、父菜单/表/记录，普通用户与 AccessKey 会话不能仅凭当前行可读获得历史原文。代码继续使用代码字段白名单，普通数据使用当前元数据和正常 Client 读取前后未改变的字段交集；字段被任意 DataFilter、文件/模块权限隐藏、删除或改写时，不开放其历史值。密码控件、加密列、嵌套凭据及连接等敏感配置继续排除；SaaS 配置历史只允许明确安全字段白名单。
+- 历史读取观察既有父记录管线，不重新执行历史 V8，不新读业务原行、不触发业务写入。局部版本比较/加载只涉及可读快照字段，保存继续走正常表单鉴权和事件。
+- 表、记录、菜单、ApiBase/OsClient 或表单代次变化时同步清空列表、计数、评论/回复与历史弹窗，并作废旧响应。头像解析和按需正文 Promise 恢复后再次核归属；同一记录重新打开也要生成新代次，不能用列表非空代替当前记录已加载。
 - 不得为了修复右栏恢复调度器通用 FormEngine 状态写回、启动历史回填或无变化版本写入。必须同时运行评论归属/去重、按需读取以及 ScheduleRuntimeTimeWriter、V8CodeVersionService 的性能回归。
 
 - Vue 3 + Options API + mixins，构建工具是 Vite。
@@ -58,7 +60,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=299d7e415b36a0d59f8645ee8a690b26e1e0d2132d63c6aca1b1071423c93512 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=6f225c91bf18c467f30f3ff93c8929a4ea6f6914addaf677226bb92a123e4472 -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -93,6 +95,12 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 - 业务动作仍由 `ParentV8` 暴露给按钮/模板 V8；`diy-table` 只负责通用渲染、权限和分页。
 
 ### `diy-form-full.vue`
+
+- TableChild 详情的菜单元数据和关联数据请求都要携带完整 `_TableChildAuth`，嵌套子表保留 `Parent` 链；后端 `FormRelatedDataService` 的父记录授权参数也必须转交。不能以隐藏子菜单普遍授予 Read 代替父模块权限、父行范围、配置绑定和子行归属校验。
+
+- 同次打开按服务器、租户、菜单、表、完整授权上下文和打开代次合并菜单请求；初始化失败后的记录回调不重复请求/提示，但主动重试、重开和切记录仍可重试。关闭或切记录后旧响应不得覆盖新状态。
+
+- 关联 Counts 等真实表元数据与记录回调完成再调度；日志、评论、代码版本全部关闭时跳过。相同上下文在途读取可合并，菜单与 Counts 的错误提示按各自分支判断。修改时运行 `tests/tablechild-detail-context.spec.mjs`，并用只有父模块 Read 的真实账号验证正常详情、嵌套、重开、重试及伪造/跨父记录拒绝。
 
 表单外壳，不直接渲染字段。它负责：
 
@@ -159,19 +167,28 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 - 边角风格先读取当前用户 `CornerStyle`：`round/square` 显式覆盖；空值或 `System` 继承租户 `sys_config.CornerStyle`，租户空值默认为圆角。不得把空个人值提前归一为 `round`，否则会阻断租户直角设置。
 - 桌面经典布局使用 `NavigationLayout=Side/Top/TopSide`，个人空值或 `System` 继承租户，租户空值为侧边导航。`TopSide` 将一级放顶部，当前一级的二级及更深菜单复用原侧栏；单个子菜单仍留在侧栏，无可见子菜单时隐藏侧栏并释放内容宽度。侧栏仍支持收起及 `MenuChildExpandMode=System/Down/Right`。顶部导航复用当前权限路由、角标与外链，空间不足收纳到更多菜单；移动端仍采用底部导航。当前路由与一级归属由 `hybrid-navigation.js` 统一投影，禁止修改共享权限树。
-- 顶部导航整行（含功能图标和账号姓名）使用主题运行时的 `--sidebar-*` 可读表面与前景；主题面板和业务弹层保留自身语义表面。主题入口为齿轮，界面密度在同一主题面板调整且仅保存在当前设备；AI 入口使用圆圈内 AI 字母 SVG，不能回退魔法棒或图片。
+- 侧栏与角色管理组织树共用 `MciResizablePane`：右边缘拖拽、可访问分隔条、方向键/Shift/Home/End 和收起按钮必须同样可用。`sys_user.SidebarWidth/RoleTreeWidth` 为 nullable 整数像素（160–600），`SidebarCollapsed/RoleTreeCollapsed` 为 nullable 0/1；使用当前账号的 Managed 偏好白名单保存。拖拽中仅预览，松开提交，取消或卸载释放指针。视口夹紧保留主内容宽度，不能把夹紧值覆盖长期偏好；窄屏禁拖，旧租户仅用账号/租户/API 隔离的设备回退。侧栏空宽度沿用 `sys_config.MenuWidth` 后回退240px，角色树默认240px。
+- 顶部主导航与工作区 Tabs 是不同层级：`Top/TopSide` 的当前一级使用独立短底线，hover/focus 前景显式跟随可读主题，禁止继承 Element 的低对比品牌色。长弹出菜单使用独立主题表面、无异色顶边和内部滚动，嵌套层仍 Teleport；顶部菜单标题与品牌不显示 title/alt/Tooltip 类提示浮层，保留完整 aria-label 无障碍名称；顶栏整条背景色带须贴合视口或所属壳层左右边界，不能把内部 padding 当成全宽验收，内容区留白独立处理。窄视口“更多”菜单也遵守同一契约。
+- 顶部导航整行（含功能图标和账号姓名）使用主题运行时的 `--sidebar-*` 可读表面与前景；主题面板和业务弹层保留自身语义表面。主题入口为齿轮，界面密度在同一主题面板调整，已安装 `sys_user.UiDensityScale` 时保存当前账号、个人空值继承 `sys_config.UiDensityScale`，旧租户才使用按租户/账号隔离的设备回退；AI 入口使用圆圈内 AI 字母 SVG，不能回退魔法棒或图片。
 - 头像菜单【修改密码】使用标准 `DiyCustomDialog + MicroAppDialog` 打开现有平台服务 `/personal-settings`，仅传 `Data.Action=ChangePassword` 选择密码展示模式；不能用宿主输入决定目标账号/租户，不新建密码旁路。当前密码校验、Passkey/TOTP/严格人脸一次性票据与提交继续复用个人中心，成功或卸载清除密码输入。定向回归使用 `hybrid-navigation.spec.mjs`、`password-dialog.spec.mjs` 和个人偏好资源测试。
 - 桌面壳层使用视口高度与可收缩的 flex 内容区，只有路由内容滚动，导航和 Tab 不随页面滚动；移动端仍保留文档滚动。用户入口含头像与姓名，不能使用纯图标的固定 flex 宽度；异步图表须在真实 DOM 挂载后观察尺寸变化，避免侧边/顶部导航切换后撑破卡片。
 - 主题色、浅色/深色、菜单子级展开方式等需要“换设备仍生效”的选择必须保存到当前 DiyToken 用户的 `sys_user` 白名单字段；`localStorage` 只作为未安装新字段租户和匿名启动阶段的兼容回退，不能作为跨设备事实源。
 - 已安装用户偏好字段时优先级固定为“当前用户显式值 → 租户 `sys_config` → 平台安全默认”；个人菜单值 `System` 表示继承租户配置。不得让上一位用户的浏览器本地主题覆盖下一位已登录用户。
+- 主题面板的主题色、亮暗模式、边角、导航、菜单展开、密度、三个装饰开关及登录风格均有同名系统全局默认，不新建重复字段。`framework-appearance.js` 统一应用运行状态；渲染继承值不能写成个人选择。`UiDensityScale` 安全范围为 90~110、步长 5，覆盖表单标签/普通控件、系统设置表单、侧栏、表格、Tab 与 Teleport 弹层；富文本、代码、地图和子表保持内容高度，触屏最小目标仍为 44px。
+- 密度覆盖不能只改字号和单元格 padding：父菜单底圈、图标、菜单行间距与普通表格 `.cell` 的历史38/40px行高都必须采用同一密度 token。多行内容保持自然高度，不能设置固定行高裁切。直角样式需按真实选择器优先级覆盖 `.el-message-box.mci-unified-message-box` 等双class的 important 壳，并验退出确认 Teleport 首帧。
+- 【恢复默认】沿原保存队列把 `ThemeMode/ThemeColor` 清空、`CornerStyle/NavigationLayout/MenuChildExpandMode/LoginStyle` 写 `System`、`UiDensityScale/DisableGradient/DisableShadow/DisableButtonIcon` 写 `null`，只作用当前用户。同时清旧设备回退与本身份缓存；不能修改 `sys_config` 或把平台默认值写成个人覆盖。开关 `0` 与 `null` 语义不同：`0` 可覆盖全局 `1`，`null` 继承全局。
+- `DisableGradient/DisableShadow/DisableButtonIcon` 同时支持个人与租户默认，根标识分别为 `data-mci-disable-gradient/shadow/button-icon`。去装饰仍保留输入边界、键盘焦点、加载指示与纯图标操作。登录样式 `LoginStyle=Original/Minimal/Split/Console` 复用一套业务 mixin 与表单，不复制验证码、SSO、强认证、协议及回跳逻辑；匿名读取当前租户默认或本匿名上下文明确预览，不能读取上一账号的个人值。
+- `sys_config.HideFrameworkFunctions` 只控制顶栏入口，固定 Key 为 `Chat/BackgroundTasks/Search/Language/Theme/AI/Bluetooth/SystemStyle/FullScreen`，账号头像姓名始终保留。它与控制移动端等范围的原 AI 禁用开关独立，也不能代替功能权限。所有入口提供 `data-framework-function` 便于验收，未知 Key 忽略。
+- 新增全局开关 CSS 必须检查编译后选择器；scoped 中 `:global(html[attr]) .child` 会丢失后代范围，禁止用它隐藏装饰。使用独立非 scoped 且有完整登录/框架作用域的样式，或将完整选择器放进 `:global(...)`；必须断言开启全部开关时根 html、body、框架与弹层仍可见。
 - 自助保存优先使用官方 `Managed` 接口引擎，由 `V8.CurrentUser.Id` 与 `V8.OsClient` 推导用户和租户，并在服务端构造固定白名单更新对象；接口参数禁止决定目标 Id/OsClient，也禁止写入 Account、Phone、Tenant、Dept、Role、Level、State、Pwd、认证因子和登录审计字段。只有缺少可复用可信原子能力时才新增 C# DTO/端点。保存成功后调用 `V8.Method.RefreshLoginUser` 刷新登录缓存，并让微服务宿主重新同步 `CurrentUser`。
 - 右上角即时切换可以乐观应用并短防抖保存；远端保存失败时保留当前设备效果并明确提示。个人中心和右上角必须调用同一个应用包交付的白名单接口引擎（当前为 `platform-user-update-preferences`），不能分别形成两套字段、枚举或优先级。
 - 导航切入或退出 `TopSide` 会重建顶栏组件；卸载前必须发送尚未保存的偏好，在途请求与后续选择共用按 store、API 地址、租户、账号和登录会话隔离的运行时队列。新顶栏继承失败状态和重试数据，旧响应不能覆盖更新的选择或跨账号合并队列；标准续签保留 `MicroiSessionId` 时也保留最终待保存选择，计算属性显式依赖 Pinia.Token。JWT 解码仅用于本地队列归属，服务端仍通过标准 DiyToken 验证授权；不得将会话凭据写入偏好存储、日志或响应。使用真实 Vue computed 和组件生命周期回归 `theme-select-autosave-lifecycle.spec.mjs` 验证卸载、在途合并、失败重试、续签及账号/租户/会话切换。
+- 主题回归同时执行 `framework-appearance.spec.mjs`、`ui-density-runtime.spec.mjs` 与 `theme-select-autosave-lifecycle.spec.mjs`；真实浏览器至少验证 4K 系统设置与左菜单在 90/110 两档的尺寸变化、全局/个人继承与恢复、全部顶栏隐藏后账号仍在，以及装饰关闭后的亮暗和焦点可见性。
 
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-003 sha256=301f766dc1ab1c6b021aa861a76b44844905d432393ab407472f58f00d6283cd -->
+<!-- microi-progressive:chunk id=microi-client-frontend-003 sha256=a3e2b822a3c2aacea83d3cae796132786e3be45f3a18ceb621c477b6bd1a2442 -->
 ## 4. 工作流与表单提交
 
 工作流相关文件：
@@ -193,7 +210,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=c122ac25dd00abc7af5751c6db50fe5f9fed29a9979f454ba9a23209d25dbaca -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=7dc3b1091176a98d652f042c30bc789f5ae6e5b9466ed75951d20ffa3e297a6a -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）

@@ -12,9 +12,10 @@ test("form right panel uses compact Chinese log, comment and version labels", fu
     );
 
     const panel = fs.readFileSync(panelFilename, "utf8");
-    assert.equal((panel.match(/\$t\('Msg\.DataLog'\) \|\| '日志' : '日志'/g) || []).length, 2);
-    assert.equal((panel.match(/\$t\('Msg\.DataComment'\) \|\| '评论' : '评论'/g) || []).length, 2);
-    assert.equal((panel.match(/\$t\('Msg\.DataVersion'\) : '版本'/g) || []).length, 2);
+    for (const type of ["DataLog", "DataComment", "DataVersion"]) {
+        assert.equal(panel.split("GetRelatedTitle('" + type + "')").length - 1, 2);
+    }
+    assert.match(panel, /DataLog: "日志", DataComment: "评论", DataVersion: "版本"/);
     assert.match(panel, /\.el-tabs__item\s*\{\s*padding:\s*0 2px;/);
     assert.match(panel, /\.tab-label\s*\{[^}]*gap:\s*2px;/s);
     assert.match(panel, /\.mci-tab-badge\s*\{[^}]*min-width:\s*16px;[^}]*padding:\s*0 3px;/s);

@@ -1049,6 +1049,21 @@ namespace Microi.net.Api
                     }
                 }
 
+                // clientType 来自已验签 Token，不能由 Header/Body 切换为 PC 逃避开发会话约束。
+                if (McpDevelopmentSessionBoundary.IsDevelopmentSession(clientType))
+                {
+                    var developmentAuthorization = McpRoleAuthorization.Resolve(new CurrentToken {
+                        OsClient = tokenOsClient, CurrentUser = sysUser, Token = token });
+                    var descriptor = context.ActionDescriptor as ControllerActionDescriptor;
+                    var guardedMcpAction = descriptor?.ControllerTypeInfo.IsDefined(typeof(V8McpAuthorizationAttribute), true) == true
+                        && descriptor.MethodInfo.IsDefined(typeof(V8McpCapabilityAttribute), true);
+                    if (!McpDevelopmentSessionBoundary.Allows(developmentAuthorization, guardedMcpAction, descriptor?.ControllerName, descriptor?.ActionName))
+                    {
+                        context.Result = new JsonResult(new DosResult(0, null, "当前开发终端没有此 MCP 权限；受限数据操作请使用新版 MCP 工具。")) { StatusCode = 403 };
+                        return;
+                    }
+                }
+
                 #region 若token已过期或快过期，则重新获取
                 var tokenLifetime = DiyToken.ResolveClientTokenLifetime(clientModel, clientType);
                 var tokenLifetimeText = DiyToken.DescribeClientTokenLifetime(clientModel, clientType);

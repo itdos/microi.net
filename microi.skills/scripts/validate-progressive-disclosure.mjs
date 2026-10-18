@@ -6,6 +6,14 @@ import { fileURLToPath } from 'node:url'
 const skillsRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const manifest = JSON.parse(fs.readFileSync(path.join(skillsRoot, '.progressive-disclosure-manifest.json'), 'utf8'))
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex')
+// Git 检出可转换 LF/CRLF；只兼容这两种逐字符换行表示，正文和末尾换行仍必须完整匹配。
+const getTextForHash = (value, expected) => {
+  if (hash(value) === expected) return value
+  const lf = value.replace(/\r\n/g, '\n')
+  if (hash(lf) === expected) return lf
+  const crlf = lf.replace(/\n/g, '\r\n')
+  return hash(crlf) === expected ? crlf : null
+}
 const lineCount = (value) => value.length === 0 ? 0 : value.split(/\r?\n/).length
 
 // 可只验证显式修改的 Skill；默认仍检查全库，不能为并行工作区的历史漂移改写共同基线。
@@ -21,7 +29,8 @@ for (const [skillName, skill] of selected) {
   const begin = entry.indexOf('<!-- microi-progressive:begin -->')
   if (begin < 0) throw new Error(`${skillName}: missing progressive begin marker`)
   const prefix = entry.slice(0, begin)
-  if (hash(prefix) !== skill.prefixSha256) throw new Error(`${skillName}: entry prefix changed`)
+  const checkedPrefix = getTextForHash(prefix, skill.prefixSha256)
+  if (checkedPrefix === null) throw new Error(`${skillName}: entry prefix changed`)
   if (lineCount(entry) > manifest.policy.maxEntryLines) throw new Error(`${skillName}: entry exceeds line budget`)
 
   const sources = new Map([[`${skillName}/SKILL.md`, entry]])
@@ -44,11 +53,13 @@ for (const [skillName, skill] of selected) {
     const contentEnd = source.indexOf(close, contentStart)
     if (contentEnd < 0) throw new Error(`${skillName}: unterminated chunk ${chunk.id}`)
     const raw = source.slice(contentStart, contentEnd)
-    if (hash(raw) !== chunk.sha256) throw new Error(`${skillName}: chunk ${chunk.id} changed`)
-    ordered[chunk.ordinal] = raw
+    const checkedRaw = getTextForHash(raw, chunk.sha256)
+    if (checkedRaw === null) throw new Error(`${skillName}: chunk ${chunk.id} changed`)
+    ordered[chunk.ordinal] = checkedRaw
     checkedChunks += 1
   }
-  const reconstructed = prefix + ordered.join('')
+  // 每段使用其登记SHA已精确匹配的换行表示，恢复历史混合EOL；总原文仍必须逐字节命中。
+  const reconstructed = checkedPrefix + ordered.join('')
   if (hash(reconstructed) !== skill.originalSha256) {
     throw new Error(`${skillName}: reconstructed knowledge differs from original`)
   }

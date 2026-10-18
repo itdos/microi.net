@@ -32,6 +32,7 @@ public sealed class FormEngineSqlServerWriteTests
 
     [Fact(Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
     [Trait("Category", "FullStack")]
+    [Trait("DatabaseProvider", "SqlServer")]
     public void CurrentFileIndex_RepairsNullIdentitySemantics_AndPreservesVersionUniqueness()
     {
         var connection = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN")!);

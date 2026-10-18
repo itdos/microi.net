@@ -319,10 +319,11 @@
                                     @click="message.thinkingCollapsed = !message.thinkingCollapsed"
                                 >
                                     <el-icon><Cpu /></el-icon>
-                                    <span>思考过程</span>
+                                    <span>思考与执行摘要</span>
                                     <small>{{ thinkingParagraphCount(message.thinking) }} 段</small>
                                 </button>
                                 <pre v-show="!message.thinkingCollapsed" class="thinking-content">{{ message.thinking }}</pre>
+                                <small v-if="message.streaming && message.executionStatus" role="status">{{ message.executionStatus }}</small>
                             </div>
 
                             <div v-if="message.role === 'assistant' && message.streaming && !message.content && !message.thinking" class="thinking-placeholder">
@@ -424,7 +425,7 @@
                                             <small>{{ action.Action }}</small>
                                             <small v-if="action.__error" class="mcp-action-error">{{ action.__error }}</small>
                                             <small v-else-if="action.__result">已执行</small>
-                                            <details class="mcp-action-params">
+                                            <details v-if="Object.keys(action.Params || {}).length" class="mcp-action-params">
                                                 <summary>查看提交参数与代码</summary>
                                                 <pre>{{ JSON.stringify(action.Params, null, 2) }}</pre>
                                             </details>
@@ -791,7 +792,7 @@ import { useRoute } from "vue-router";
 import { useDiyStore } from "@/pinia";
 import { generateMiniMaxImage } from "./minimax-image-task.js";
 import { generateMiniMaxMusic } from "./minimax-music-task.js";
-import { mapMcpCallTrace } from "./ai-mcp-agent-result.js";
+import { consumeBuilderStream } from "./ai-builder-stream.js";
 import {
     ArrowLeft,
     ArrowRight,
@@ -2360,9 +2361,10 @@ async function sendMessage() {
         if (error?.name === "AbortError") {
             assistantMessage.content = assistantMessage.content || "已停止";
         } else {
-            assistantMessage.content = error?.message || "AI 请求失败";
-            assistantMessage.error = assistantMessage.content;
-            ElMessage.error(assistantMessage.content);
+            const errorText = error?.message || "AI 请求失败";
+            assistantMessage.content = [assistantMessage.content, errorText].filter(Boolean).join("\n\n");
+            assistantMessage.error = errorText;
+            ElMessage.error(errorText);
         }
     } finally {
         if (assistantMessage && !assistantMessage.content && !assistantMessage.thinking && !assistantMessage.code) {
@@ -2836,10 +2838,10 @@ async function sendBuilderQuestion(text, assistantMessage, attachments = []) {
 }
 
 async function sendBuilderChat(payload, assistantMessage) {
-    // 服务端完成 MCP 工具循环后一次性返回最终答案与真实工具回执。
+    // 从第一轮模型增量开始接收；网络中断后保留已有步骤，不重发建模请求。
     abortController = new AbortController();
     payload.RelayModel = isRelayStationSelected.value ? selectedRelayModel.value : "";
-    const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/Chat`, {
+    const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/ChatStream`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -2850,16 +2852,7 @@ async function sendBuilderChat(payload, assistantMessage) {
         signal: abortController.signal
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const result = await response.json();
-    if (!isOk(result)) throw new Error(result?.Msg || "在线 MCP 建模失败");
-    const answer = normalizeAiText(getData(result));
-    if (!answer.trim()) throw new Error("模型没有返回 MCP 执行结果");
-    const parts = splitThinkingText(answer);
-    assistantMessage.rawContent = answer;
-    assistantMessage.thinking = parts.thinking;
-    assistantMessage.content = parts.content;
-    assistantMessage.actions = mapMcpCallTrace(result?.DataAppend || result?.dataAppend)
-        .map(item => reactive(item));
+    await consumeBuilderStream(response, assistantMessage, { signal: abortController.signal, changed: scrollToBottom });
 }
 
 async function sendChatStream(payload, assistantMessage) {
@@ -3169,6 +3162,9 @@ async function saveMessage(message, strict = false) {
                     Title: item.Title,
                     Params: item.Params,
                     __result: item.__result || null,
+                    __error: item.__error || "",
+                    CallId: item.CallId || "",
+                    State: item.State || "",
                     __uncertain: item.__uncertain || false
                 })),
                 QueryRows: message.queryRows || [],

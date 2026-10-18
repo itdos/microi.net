@@ -710,10 +710,10 @@ function applySurfaceVars(profile, mode, interactiveProfile = profile) {
 /**
  * 设置主题色并更新所有 CSS 变量。
  */
-export function setThemeColor(primaryColor) {
+export function setThemeColor(primaryColor, options = {}) {
     const root = document.documentElement;
     const requestedProfile = createPaletteProfile(primaryColor);
-    const mode = getThemeMode();
+    const mode = options.mode === 'dark' || options.mode === 'light' ? options.mode : getThemeMode();
     // 暗色模式不接受白色或近白自定义主色，避免重新制造白色按钮和高亮块。
     const isNearWhiteCustom = requestedProfile.key === "custom"
         && getBrightness(requestedProfile.value) >= 245;
@@ -810,11 +810,11 @@ export function setThemeColor(primaryColor) {
 }
 
 /** 切换浅色/暗色显示模式。 */
-export function setThemeMode(mode) {
+export function setThemeMode(mode, options = {}) {
     const root = document.documentElement;
     const next = mode === "dark" ? "dark" : "light";
     try {
-        localStorage.setItem("mci-theme", next);
+        if (options.persist !== false) localStorage.setItem("mci-theme", next);
     } catch (e) {}
     root.setAttribute("data-theme", next);
     if (next === "dark") {
@@ -822,7 +822,7 @@ export function setThemeMode(mode) {
     } else {
         root.classList.remove("dark");
     }
-    return setThemeColor(getThemeColor());
+    return setThemeColor(getThemeColor(), { mode: next });
 }
 
 /** 获取当前 MCI 主题模式。 */

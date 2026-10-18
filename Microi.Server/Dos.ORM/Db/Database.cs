@@ -558,7 +558,7 @@ namespace Dos.ORM
 
             WriteLog(command);
 
-            return command.ExecuteNonQuery();
+            return DdlExecutionObservation.Execute(command, command.ExecuteNonQuery);
 
         }
         private IDataReader DoExecuteReader(DbCommand command, CommandBehavior cmdBehavior)
@@ -587,7 +587,7 @@ namespace Dos.ORM
                 return 0;
             }
             WriteLog(command);
-            return await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+            return await DdlExecutionObservation.ExecuteAsync(command, () => command.ExecuteNonQueryAsync()).ConfigureAwait(false);
         }
 
         private async Task<DbDataReader> DoExecuteReaderAsync(DbCommand command, CommandBehavior cmdBehavior)

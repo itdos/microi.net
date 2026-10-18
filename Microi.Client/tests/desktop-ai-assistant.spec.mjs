@@ -3,6 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { parse, compileScript } from "../node_modules/@vue/compiler-sfc/dist/compiler-sfc.esm-browser.js";
+import { normalizeHiddenFrameworkFunctions } from "../src/utils/framework-appearance.js";
+import { isMobileAiAssistantEnabled } from "../src/components/MobileTabBar/mobile-ai-entry.js";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const desktopSource = fs.readFileSync(
@@ -22,8 +25,38 @@ const aiIconSource = fs.readFileSync(
     "utf8"
 );
 
+function frameworkAiMount(source) {
+    const { descriptor, errors } = parse(source, { filename: "Navbar.vue" });
+    assert.deepEqual(errors, []);
+    const mounted = [];
+    const visit = (node) => {
+        if (node.type === 1 && node.tag === "DesktopAiAssistant") mounted.push(node);
+        for (const child of node.children || []) visit(child);
+    };
+    visit(descriptor.template.ast);
+    assert.equal(mounted.length, 1, "必须保留唯一真实 AI 组件，注释或同名字符串不能代替挂载");
+    const entry = mounted[0];
+    assert.equal(entry.props.find(prop => prop.type === 7 && prop.name === "if")?.exp?.content, "showFrameworkFunction('AI')");
+    assert.equal(entry.props.find(prop => prop.type === 6 && prop.name === "data-framework-function")?.value?.content, "AI");
+    const ast = compileScript(descriptor, { id: "navbar-ai-mount" }).scriptAst;
+    const options = ast.find(node => node.type === "ExportDefaultDeclaration")?.declaration;
+    const components = options?.properties.find(prop => prop.key?.name === "components")?.value;
+    assert.equal(components?.properties.find(prop => prop.key?.name === "DesktopAiAssistant")?.value?.name, "DesktopAiAssistant");
+    const methods = options?.properties.find(prop => prop.key?.name === "methods")?.value;
+    const guard = methods?.properties.find(prop => prop.type === "ObjectMethod" && prop.key?.name === "showFrameworkFunction");
+    assert.ok(guard, "显隐必须调用实际 Navbar 方法");
+    // 运行已解析的真实方法，验证复选字段不会被全局 AI 开关替代或反向控制移动端。
+    return new Function("normalizeHiddenFrameworkFunctions", `return ({${descriptor.script.content.slice(guard.start, guard.end)}}).showFrameworkFunction;`)(normalizeHiddenFrameworkFunctions);
+}
+
 test("PC navbar exposes the feature-gated circular AI letter entry", () => {
-    assert.match(navbarSource, /<DesktopAiAssistant\s*\/>/);
+    const showFrameworkFunction = frameworkAiMount(navbarSource);
+    assert.equal(showFrameworkFunction.call({ SysConfig: { HideFrameworkFunctions: ["AI"], DisableAiAssistant: 0 } }, "AI"), false);
+    assert.equal(showFrameworkFunction.call({ SysConfig: { HideFrameworkFunctions: [], DisableAiAssistant: 1 } }, "AI"), true);
+    assert.equal(isMobileAiAssistantEnabled({ HideFrameworkFunctions: ["AI"], DisableAiAssistant: 0 }), true);
+    assert.equal(isMobileAiAssistantEnabled({ HideFrameworkFunctions: [], DisableAiAssistant: 1 }), false);
+    assert.throws(() => frameworkAiMount(navbarSource.replace(/<DesktopAiAssistant\b[^>]*\/>/, "<!-- DesktopAiAssistant -->")));
+    assert.throws(() => frameworkAiMount(navbarSource.replace("showFrameworkFunction('AI')", "showFrameworkFunction('Bluetooth')")));
     assert.match(desktopSource, /isMobileAiAssistantEnabled\(diyStore\.SysConfig\)/);
     assert.match(desktopSource, /v-if="aiAssistantEnabled"/);
     assert.match(desktopSource, /data-testid="desktop-ai-entry"/);

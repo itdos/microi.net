@@ -156,162 +156,197 @@
     {
       "AppKey": "ai-employee-center",
       "AppId": "01M3F2GZ388EZWSFX43K6AX6FP",
-      "Version": "v1.0.0",
+      "Version": "v1.1.9",
       "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/ai-employee-center",
-      "SourceManifestHash": "f662366490a2523c8d05d1e02b707b79c07b86f0fed359bee0775b7f52d10175",
-      "ContextSha256": "45a66b0fd7ee0e1df7ed178f5f5a4e1e3585477f4f25b2d901e21035a2a609f6",
-      "FileCount": 36,
-      "SourceBytes": 309076,
+      "SourceManifestHash": "f0dce4f1c61ee5020b181209e00f0bc9658363358b03490cce90ebc44bdb4482",
+      "ContextSha256": "84c90c20d7da517efc149b11c83aee5e3151933215e9cce85a0cc776d86424ec",
+      "FileCount": 60,
+      "SourceBytes": 593382,
       "Files": [
         {
           "Path": ".gitignore",
-          "Size": 83,
-          "Sha256": "3674a74ac509526a491d05339e22c798bf8b4c97405613743e1d4f5bd7943cec"
+          "Size": 88,
+          "Sha256": "fcfe8d766d4be0f33f3d00690d352fa6f36a575313932ebc7bdcd533eb0f7528"
         },
         {
           "Path": ".microi-micro-app.json",
-          "Size": 489,
-          "Sha256": "94f71281d9694ab107e7db7927d14a299f6be323e5fedbd1802830b83c6898d7"
-        },
-        {
-          "Path": "DESIGN.md",
-          "Size": 2441,
-          "Sha256": "2f87f9bfa35dbfdbd93a15358ba8a8a509736571b850fe3528e07ce7e60344e8"
+          "Size": 543,
+          "Sha256": "19cdddc4c82e0d573cc445153703e9e13dc5ed7538ca6b66fc8d36df5f931026"
         },
         {
           "Path": "backend/draft.js",
-          "Size": 5351,
-          "Sha256": "b517bbe241e4d063e4648111fcab50e661085b3c2f1fcd9665c29783361e5479"
+          "Size": 5404,
+          "Sha256": "872822a2919d1204706922bae60e200f027072713f73e8707edbbecdb733cd12"
         },
         {
           "Path": "backend/gateway.js",
-          "Size": 24509,
-          "Sha256": "0dc6805c92a16690dad43c36c21e40899678fcc5533a9366f1726e5ae6c9709c"
+          "Size": 24839,
+          "Sha256": "3b29416a427d7a3a385e0a3ccc6f2907378c34c0e8e7f8b11fafe07fc1482dae"
+        },
+        {
+          "Path": "backend/group-chat.js",
+          "Size": 26391,
+          "Sha256": "08a65bfc9c38f3d488b481cc1633f0aa13e74d1c5f390ac46c5c1b14f6d03914"
+        },
+        {
+          "Path": "backend/group-realtime-authorize.js",
+          "Size": 1074,
+          "Sha256": "255feb15f357786b0d3d56d12f53d63c450ea71f5abd83a4ae9d99fc9c163565"
+        },
+        {
+          "Path": "backend/group-storage.js",
+          "Size": 24349,
+          "Sha256": "e2c05067502b2785829fec3a8afc12d9e757aaeb3ea0c070e51414c5ebc79bc5"
         },
         {
           "Path": "backend/roles.json",
-          "Size": 2404,
-          "Sha256": "d64ab4811f065513f8725534a325dddbd283bf9c756a7ea886014c03c8afe096"
+          "Size": 2828,
+          "Sha256": "0cfb99adafb80417bdd24faa93e071b53ac85d53790905f7ba54a92e30e0b486"
+        },
+        {
+          "Path": "DESIGN.md",
+          "Size": 10061,
+          "Sha256": "c07be5ee97367a5a08519d2204f8daec2f16b8542247cb311a2432e7ce27fcbc"
         },
         {
           "Path": "index.html",
-          "Size": 319,
-          "Sha256": "e7a5c94286704e34c2ff558161b6a0f5badaeb3125cba57c4d0c0f2958d1e9e9"
+          "Size": 331,
+          "Sha256": "366ba23bbcd3bd03f6d59efb7a8fa34d3c8967912151703e312479731f28f943"
         },
         {
           "Path": "manifest.json",
-          "Size": 64460,
-          "Sha256": "4b84e80383d111510508b72d76eaba0968d3c8595db61c81889b41e389ebe1b6"
+          "Size": 144628,
+          "Sha256": "ccf46cd0d7e8ddbd00b6d0ece89c112900f8ad209f6b810b4c111e4c33ff95d0"
         },
         {
           "Path": "microi.routes.json",
-          "Size": 994,
-          "Sha256": "5aea46b72f9ed3a265a83809c9cd6be62f1540f78a36e1747e730ed22c96253f"
+          "Size": 1223,
+          "Sha256": "61a6d9ee1bfdae665a9e315b868f6e4bdc9e6714452a70da5c55f8d3a1dbe35e"
         },
         {
           "Path": "package-lock.json",
-          "Size": 48052,
-          "Sha256": "21e7d7a4683403d462776f8803eb9920d66b9fc8d85c523e49b5af4ecfb62c50"
+          "Size": 57093,
+          "Sha256": "0d813f6f05b195c1053b35cb58306afbeb4fab294c9824d0cab6bad5e5687a98"
         },
         {
           "Path": "package.json",
-          "Size": 515,
-          "Sha256": "1ca61397765ed5a9a087851bc6ad4dfa9a70ddae337794a0cfb10342a58745ac"
+          "Size": 671,
+          "Sha256": "fc41c87dfdbf84fcf8b2c8757a83d73b999f5e2139abe714f839f57bbfb71fe1"
         },
         {
           "Path": "resource-policies.json",
-          "Size": 235,
-          "Sha256": "053afe625aa10e8175a041128c1801a3a45dd4eb7c51e568a6b02a659c1ebcf1"
+          "Size": 444,
+          "Sha256": "aed26255dc312aa3d8763bcbb148a31504f6f6e9f504363b38913387f14ad982"
         },
         {
           "Path": "scripts/build-manifest.mjs",
-          "Size": 6526,
-          "Sha256": "9bc9c85e7d87afa254b00d4154a6b59ef1278f5bc26a666485cb0eb9d96f5268"
+          "Size": 6741,
+          "Sha256": "f477399d8ee477bfff6c77ee601db496385d0a3abaa01adac99226418fea5cbe"
+        },
+        {
+          "Path": "scripts/group-manifest.mjs",
+          "Size": 5239,
+          "Sha256": "187060c78a0ced1f8486d93bfe6098178320f34ebc8303ae44be77cb3f5fdde4"
+        },
+        {
+          "Path": "scripts/test.mjs",
+          "Size": 718,
+          "Sha256": "1e9b4281b547ea9acbbe2126c255a533a06779e0e10052821234ed953c2f1114"
         },
         {
           "Path": "src/App.vue",
-          "Size": 7094,
-          "Sha256": "2839cd6cf6d9e3866c8c39945ec1ddbf44e219f3e962d6d014683f03be46901e"
+          "Size": 7434,
+          "Sha256": "039757863a15e37b40d54ea2bf44f7f24bd609cec075dd74a60ae21a7501a086"
         },
         {
           "Path": "src/auth.ts",
-          "Size": 4082,
-          "Sha256": "37b8d62e2acf20335ffcc4742e876e10edaf2f1f081515f72110c97f0e03ccb5"
+          "Size": 4185,
+          "Sha256": "b5a45698f13a093c05cb74a1ac799bee1ec7b75910e2b7c9d7d827e5c4b7467e"
         },
         {
           "Path": "src/components/TaskComposer.vue",
-          "Size": 3151,
-          "Sha256": "381921c1b40dcb46b8751b4f20acaf71d75d85fea48b9de39ecbaba7c98f4634"
+          "Size": 3180,
+          "Sha256": "abf608969dbb16fa4d74b62b5cf7e443b8a4c1adc589dd99c5390822d44131cd"
         },
         {
           "Path": "src/components/TaskDetail.vue",
-          "Size": 5058,
-          "Sha256": "3f46ba6df66906379366524177d08e65f854f93ea7d73f15b6839d4d1371dba5"
+          "Size": 5091,
+          "Sha256": "167064ada19699d51b210f67e0883af49b563d261a2b69cf80748ea3f450a5b7"
         },
         {
           "Path": "src/components/TaskList.vue",
-          "Size": 1364,
-          "Sha256": "7b6ecfc49ee03a2ae6828b26779ee37674979bc71b081221341fa25a9e871562"
+          "Size": 1376,
+          "Sha256": "602eea42031cdbc6850c9a2442b337a0ec441a7ef1be91e18273efad3f87c2df"
         },
         {
           "Path": "src/env.d.ts",
-          "Size": 387,
-          "Sha256": "e439dc9fdc58ff5d5092f490e5c1f9ca49110d8d11b5735950f9771ac7ac1cd9"
+          "Size": 399,
+          "Sha256": "061a6e354523df3ed9ebdb0682ce3592c73ca5bf0ccf9a35fef4181a709fc99c"
+        },
+        {
+          "Path": "src/groups.ts",
+          "Size": 5819,
+          "Sha256": "a433a6554fe686d2123f1164d49d714c7fc3af969a4b53b9e62a8d7aed744678"
         },
         {
           "Path": "src/main.ts",
-          "Size": 226,
-          "Sha256": "4fcb9b7fd9f7ba5351e887fa49d28061a0ea3d5114dfdce287c8e329c33e37c1"
+          "Size": 235,
+          "Sha256": "0d83945878ea01f2580c798e620149a3187e5509f376bd4a591959bdd193d601"
         },
         {
           "Path": "src/microi.ts",
-          "Size": 3830,
-          "Sha256": "cdfb776045c198b481d31c12048bf4f5efec2e35e7814734f23272b7edb5030a"
+          "Size": 3919,
+          "Sha256": "f1818623fbcb7a01a3bed12bf7c1416841630245021d09c3e6797887b6e645bb"
         },
         {
           "Path": "src/pages/EmployeesPage.vue",
-          "Size": 2882,
-          "Sha256": "b7de8e4a1fa44a751ee92e22c9ec7b02546b602ba69cc29071addd7b2c234f5b"
+          "Size": 2903,
+          "Sha256": "b352ddeea4a3ece4d4f792887143674c5aefaeac68e8ad2249b6d57f7a1be2e3"
         },
         {
           "Path": "src/pages/GoalsPage.vue",
-          "Size": 4633,
-          "Sha256": "ecd753f6ee91b89a93bee6995c54d37ae817150315a9def5ded1b8ec4af1c968"
+          "Size": 4655,
+          "Sha256": "73625a88a9ec42cb441b411df03679545abd5ad4f9448138cccd532f2cc61976"
+        },
+        {
+          "Path": "src/pages/GroupsPage.vue",
+          "Size": 10470,
+          "Sha256": "cb6db1ed4ce95847b8de774e57ba17600ada87f832591df578afc360b39c84ce"
         },
         {
           "Path": "src/pages/NodesPage.vue",
-          "Size": 1654,
-          "Sha256": "8c31e4ed58e933ee9e6cc0b945a9a99e81d1c507c5dd98adf7cb0c5e39a81e0e"
+          "Size": 1659,
+          "Sha256": "e22fe505f3d87b5855af3d132f6acba250f6fe9f16ee3f8b8597a149e5ff1b24"
         },
         {
           "Path": "src/pages/OverviewPage.vue",
-          "Size": 2401,
-          "Sha256": "2bee44b23614b1740d67616aba5794f7448cc2ab255bad74d4bd388500b3facd"
+          "Size": 2432,
+          "Sha256": "1a70fc519475f365abff9918416bddc75a0e74067eb42df6e7fbb2b7875b297c"
         },
         {
           "Path": "src/pages/ReviewsPage.vue",
-          "Size": 823,
-          "Sha256": "e6b9aef3d9c71ab94fa8eb6e4403ee04e60fad1160a2b24297f7008bf8b3c4f4"
+          "Size": 828,
+          "Sha256": "814789727dd4c2c859e75c038518f366d07a97411a6977998fd82583de043ac4"
         },
         {
           "Path": "src/pages/TasksPage.vue",
-          "Size": 1222,
-          "Sha256": "55faee57e2ddfb924cf56c8509ef7dc02cdea563a3f9d5d33b90779702ac98b5"
+          "Size": 1231,
+          "Sha256": "3798e82cd97228a230c813f9f5424932d782004f519f5565e7f21054f3de714d"
         },
         {
           "Path": "src/routes.ts",
-          "Size": 1583,
-          "Sha256": "58597b00ae0a3198ef57ea6a0760c7f34069ac4fee372303a82fd86631020ac9"
+          "Size": 1773,
+          "Sha256": "a1c37f0c42de10ae71c0beffe79d5f1b93ce0c165220dfd8ec7a5096ff62b53d"
         },
         {
           "Path": "src/style.css",
-          "Size": 14983,
-          "Sha256": "a0e957b9361baf881ee19d0a1c25a92957816da885a98946d9e9fdeaa358b66e"
+          "Size": 14997,
+          "Sha256": "4172455527243be1701fb992d62d7329d4244a71d8ba23590bb3d6ca308078d1"
         },
         {
           "Path": "src/team.ts",
-          "Size": 5019,
-          "Sha256": "7c344ee5eec3b2f3bc97a5ce972d736e2de5950f24a537cd2811765b2892a4fa"
+          "Size": 5071,
+          "Sha256": "2f6fcac43dbf3c169ab2a74100baaf4baacaca87b036d0d22ec6d8e1e948b3e4"
         },
         {
           "Path": "src/utils/microi.v8.js",
@@ -320,48 +355,115 @@
         },
         {
           "Path": "tests/context.test.cjs",
-          "Size": 1569,
-          "Sha256": "357a487c0fb7ed50b128f969c85b188467e3b260c5fff4d7d08a1405227ed82b"
+          "Size": 1580,
+          "Sha256": "29e08eb77ad79c45e6d8ceb5b5d4b6b4c4a96c8b34f2143b63603a54d94db679"
         },
         {
           "Path": "tests/draft.test.cjs",
-          "Size": 2627,
-          "Sha256": "60fe4429fd049fc27d3303cfdca475fe5a4c8d33d1ff79f55e1bef983859517a"
+          "Size": 2646,
+          "Sha256": "54f001a23ca88955bb4362d9dc77fd78aa065190b15a19a6c9061d8a710e20d5"
         },
         {
           "Path": "tests/gateway.test.cjs",
-          "Size": 12683,
-          "Sha256": "c2f12da46242537a2bc6eefcf1cbc2981ecd4af28424ce46270a2cfd583eb5e0"
+          "Size": 12827,
+          "Sha256": "d9d673d82a805c8dbc4663cbed151c17c0de6ce5c68b5b1d221eb73a108fe39c"
+        },
+        {
+          "Path": "tests/group-chat-fixture.cjs",
+          "Size": 10069,
+          "Sha256": "ec02f7f5418f0b32568d5c8895ce0ae5e57a588448d8a134d7e1db7e11006506"
+        },
+        {
+          "Path": "tests/group-chat-history.test.cjs",
+          "Size": 8124,
+          "Sha256": "61117249f9ed9d9a8251cd3eaeb9cc08a8d60e7ae148960a28d6b8ca9e6fb741"
+        },
+        {
+          "Path": "tests/group-chat-live.mjs",
+          "Size": 8144,
+          "Sha256": "f073390e384c76b903496f88c0612e0b08e1a059609d338986e788d2dea9acef"
+        },
+        {
+          "Path": "tests/group-chat.test.cjs",
+          "Size": 10256,
+          "Sha256": "2489dabbd1c30a07d4187c124b20add5c9a66c3142d6ffceee1791d67f827337"
+        },
+        {
+          "Path": "tests/group-realtime.test.cjs",
+          "Size": 4911,
+          "Sha256": "84dc9040df7ba3e80057b6d88b340c79ed08fb50831c3e9219a247fe35ac2b68"
+        },
+        {
+          "Path": "tests/group-storage-attachments.test.cjs",
+          "Size": 14919,
+          "Sha256": "30b21f182e73237a2b3d1854700b617808a9ab95962561a346ed27defb572edd"
+        },
+        {
+          "Path": "tests/group-storage-empty-page.test.cjs",
+          "Size": 6633,
+          "Sha256": "b5beadc7acff162226139ad68a0bcc05e8de360fa88b60650d0769f7f019893e"
+        },
+        {
+          "Path": "tests/group-storage.test.cjs",
+          "Size": 15355,
+          "Sha256": "612a7b056e81d6bb2d9d9dd878ba6c0bc3213c0301cef379daf1b5639ca4bf50"
+        },
+        {
+          "Path": "tests/groups-page.test.cjs",
+          "Size": 6112,
+          "Sha256": "3bf0446d79ed9de37f5f73188ba59170705cdfa522e9b564ceb6713636d9a042"
+        },
+        {
+          "Path": "tests/jint-storage/.gitignore",
+          "Size": 85,
+          "Sha256": "e11f3f7574fc6cfc7f2aa0b9bcb576094bda1088ccf7bae9f37a440444d0ae7f"
+        },
+        {
+          "Path": "tests/jint-storage/global.json",
+          "Size": 109,
+          "Sha256": "75ad142281ad3f65a55376b9e02259611bc0eb64400c61493668a75b72390881"
+        },
+        {
+          "Path": "tests/jint-storage/JintStorageInterop.csproj",
+          "Size": 1302,
+          "Sha256": "d45d70394820f9af04ea951ce800d19facff6b6612d74f2b27113a386ed7023a"
+        },
+        {
+          "Path": "tests/jint-storage/packages.lock.json",
+          "Size": 1093,
+          "Sha256": "a2245c8505ce21975193408f36d10a0181088c55b2a74cc0c5d4bdbdde9591b2"
+        },
+        {
+          "Path": "tests/jint-storage/Program.cs",
+          "Size": 14704,
+          "Sha256": "b67191dadfc5d2953ed19b88b5bf6607e3325b5a0b44b303c252ff373caf2827"
+        },
+        {
+          "Path": "tests/jint-storage/README.md",
+          "Size": 2758,
+          "Sha256": "9342b241084585766962e94e7d5015455821e536995f9637f0f103b94c6a14af"
+        },
+        {
+          "Path": "tests/jint-storage/run.mjs",
+          "Size": 3573,
+          "Sha256": "0f9a3fc66aacd14af821c09aa851cd335e0118ee6949022827bca5aef633890c"
+        },
+        {
+          "Path": "tests/manifest.test.cjs",
+          "Size": 2387,
+          "Sha256": "70fbd2a39d863c92bb31e0787425143587e7f0d2d46071f0cc8ad91d46c8aa2c"
         },
         {
           "Path": "tsconfig.json",
-          "Size": 621,
-          "Sha256": "1a0a388253edcdc1c86f0bfc071f71fe02ab522c4094d10bfbaf48876d44f51a"
+          "Size": 653,
+          "Sha256": "3401e11ddb2c554011206975f8f2126fb4be8ec6ef363bbc40f772ce03608ccd"
         },
         {
           "Path": "vite.config.ts",
-          "Size": 269,
-          "Sha256": "37d2ebfba794e5d1a4d93c1d1d7d684d74dd7e53c4a298858986eaacb6908cac"
+          "Size": 283,
+          "Sha256": "c1cfc51858fb00c2609da9ae4893be59cf94c28af82dd0284de2b0a50bd189da"
         }
       ],
-      "LocalTestOverlay": {
-        "SchemaVersion": 1,
-        "Path": "package.json",
-        "Field": "scripts.test",
-        "Value": "node --test --test-concurrency=1 tests",
-        "BaseContent": "{\n  \"name\": \"ai-employee-center\",\n  \"private\": true,\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"engines\": {\n    \"node\": \"^20.19.0 || >=22.12.0\"\n  },\n  \"scripts\": {\n    \"dev\": \"vite --host 0.0.0.0\",\n    \"typecheck\": \"vue-tsc --noEmit\",\n    \"build\": \"npm run typecheck && vite build\",\n    \"preview\": \"vite preview --host 0.0.0.0\"\n  },\n  \"dependencies\": {\n    \"vue\": \"3.5.40\"\n  },\n  \"devDependencies\": {\n    \"@vitejs/plugin-vue\": \"6.0.8\",\n    \"typescript\": \"5.9.3\",\n    \"vite\": \"7.3.6\",\n    \"vue-tsc\": \"3.3.9\"\n  }\n}\n",
-        "BaseSize": 515,
-        "BaseSha256": "1ca61397765ed5a9a087851bc6ad4dfa9a70ddae337794a0cfb10342a58745ac",
-        "LocalSize": 569,
-        "LocalSha256": "8e1e12214cb2ec8fb6f6627c58e37991c5b2a2bb69d6e33ab0666ddda3568065",
-        "TestFiles": [
-          "tests/context.test.cjs",
-          "tests/draft.test.cjs",
-          "tests/gateway.test.cjs"
-        ],
-        "LocalSourceBytes": 309130,
-        "LocalSourceManifestHash": "c1a1b5cc415e56949bbf11691b93f1890f3e9a6b5faa8f5cf08451b9ec22648d"
-      },
       "OfficialSourceReadback": {
         "ApiBase": "https://api.itdos.com",
         "OsClient": "iTdos",
@@ -370,6 +472,22 @@
         "At": "2026-10-09T10:04:03.451Z",
         "SourceManifestHash": "f662366490a2523c8d05d1e02b707b79c07b86f0fed359bee0775b7f52d10175",
         "ContextReceiptSha256": "55a541150358c44272c29b7ac2765aa3bf01dd7b85e0cb959ab196fdb8a54195"
+      },
+      "SourceReleaseLog": {
+        "ReadAt": "2026-10-16T09:58:12.093Z",
+        "ReadProtocol": "microi_list_applications + paged microi_get_application_context(includeContents=true,detail=full) + exact microi_get_application_file(detail=full)",
+        "ApiBase": "https://api.itdos.com",
+        "OsClient": "iTdos",
+        "AppId": "01M3F2GZ388EZWSFX43K6AX6FP",
+        "Version": "v1.1.9",
+        "PrivateSourcePath": "/itdos/ai-app-source-staged/01M3F2GZ388EZWSFX43K6AX6FP/src-da5f02316e2c99ccf5aefdcf654ebe5aae51836ea826c3",
+        "FileCount": 60,
+        "SourceBytes": 593382,
+        "SourceManifestHash": "f0dce4f1c61ee5020b181209e00f0bc9658363358b03490cce90ebc44bdb4482",
+        "ContextSha256": "84c90c20d7da517efc149b11c83aee5e3151933215e9cce85a0cc776d86424ec",
+        "PreviousVersion": "v1.0.0",
+        "PreviousSourceManifestHash": "f662366490a2523c8d05d1e02b707b79c07b86f0fed359bee0775b7f52d10175",
+        "Reason": "Official source advanced to v1.1.9; replace the obsolete v1.0.0 source contract from a complete authoritative byte read, without changing verification assertions."
       }
     },
     {
@@ -627,12 +745,12 @@
     {
       "AppKey": "microi-3d-engine",
       "AppId": "01M1H0CFADBMHHQM4HEVJQM1ZC",
-      "Version": "v1.9.0",
+      "Version": "v1.10.0",
       "SourceRoot": "Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.default.default/AI应用/microi-3d-engine",
-      "SourceManifestHash": "cb53c425e437289d0931989c7a456feb539e46f5e2cd647ac11157405632a42c",
-      "ContextSha256": "dad88cd8beec2ff7e98b35192677e8a72947dbf69d56843fedf52eef7cfb26f2",
-      "FileCount": 32,
-      "SourceBytes": 290388,
+      "SourceManifestHash": "0b0452bbadd808bf70bf32f7d407dfb6be8f6a99f0e7a9a31d8febbc787ef6ac",
+      "ContextSha256": "368cf883c30bb8473fb0d4429d2e58932fbfbd7c69f7eb40e8f8102d916cc887",
+      "FileCount": 43,
+      "SourceBytes": 390116,
       "Files": [
         {
           "Path": ".gitignore",
@@ -641,8 +759,8 @@
         },
         {
           "Path": ".microi-micro-app.json",
-          "Size": 493,
-          "Sha256": "a68c0e01f098c0e012a8cc1ea439f7daee2830b8f97494b095293e97d9c374fb"
+          "Size": 494,
+          "Sha256": "5175e9c95b298e0875d83cd5fbc4aff62623bb7c47dca9204132bb2e169b42e9"
         },
         {
           "Path": "index.html",
@@ -656,18 +774,18 @@
         },
         {
           "Path": "package-lock.json",
-          "Size": 59324,
-          "Sha256": "bfa11afd6481d3d0f3f4fa13b47eb92becbab3d4b953f915aa586f1ed735bde0"
+          "Size": 59326,
+          "Sha256": "45b7956d9f6019f3b71b964efb2e10e84a781a781b57a1b1b91cad1fbba95571"
         },
         {
           "Path": "package.json",
-          "Size": 655,
-          "Sha256": "a0f84829deeab9913c25544e2dc7c9407e3c91711928fa3b472a380f517ac184"
+          "Size": 653,
+          "Sha256": "43cbc158bc2082153bd37cb72b269cf9ec1382976234cc9e3ce463f5e1941bab"
         },
         {
           "Path": "src/App.vue",
-          "Size": 7169,
-          "Sha256": "e55e0348fa5bccc62e0818aee399379b89f46b0bf66ba39b1a0bcb0717e7a943"
+          "Size": 8543,
+          "Sha256": "f24d0d7725fe386701fa1d7277da540aeebe143bf444f6d6d9bce9932a2678fa"
         },
         {
           "Path": "src/auth.ts",
@@ -710,6 +828,11 @@
           "Sha256": "2a70e616ddc39b77f5f4939e48bc6c5c578e5de109e1e0c7cbb99706307830e5"
         },
         {
+          "Path": "src/three-engine/components/LisCatalogPanel.vue",
+          "Size": 8739,
+          "Sha256": "cf9c26b699f02b4e2d1a9e54f48df46477201e570ad95cdce5fbb6cc468da33a"
+        },
+        {
           "Path": "src/three-engine/components/PresetGallery.vue",
           "Size": 3319,
           "Sha256": "a20a8b8349ef627aeb829122f1c81c0e085afd74a1bab2770802df1b5cf060a5"
@@ -726,23 +849,28 @@
         },
         {
           "Path": "src/three-engine/components/Toolbar.vue",
-          "Size": 4670,
-          "Sha256": "26f2444da2c429f6ff16b8dbb69589270aa719b9600b2815b3a6eea478305fe1"
+          "Size": 5039,
+          "Sha256": "964920dc834110018540f2b1e4d913159eab4ba50c9a2535bc97998b72fc2cf5"
         },
         {
           "Path": "src/three-engine/components/Viewport.vue",
-          "Size": 5392,
-          "Sha256": "cfe712aac5c02e4c8cdedd46738cb13b9d20d7e734fab3fdb292d5968f361f18"
+          "Size": 5421,
+          "Sha256": "e8094407151d173ec3ca51d07c022851192e4cc6e3bc82944daf014c02a429a8"
         },
         {
           "Path": "src/three-engine/core/CameraPath.js",
           "Size": 7947,
-          "Sha256": "de2130ae16cd463f01c6b2c9e0c1a5b49939734c04c19beacc759bed4ed721b8"
+          "Sha256": "baa68835023a78cc620872314a4cdc0791222462ff7d91ca96221a996d88218a"
         },
         {
           "Path": "src/three-engine/core/Engine.js",
-          "Size": 36939,
-          "Sha256": "c0b1ea34e089a83bf1732cb4918b7e5b22a397d2afebc36ed9010c7c92c814fe"
+          "Size": 41972,
+          "Sha256": "ef9aad6beec0d9439de3dd31d55f366c084f7e7142690c668426e8ea477bcdd4"
+        },
+        {
+          "Path": "src/three-engine/core/LisScene.js",
+          "Size": 4748,
+          "Sha256": "9ba61f6b0c22a141ab64060ab4cf3a94cd304ddbba4aefa9fdb73aa7228ae093"
         },
         {
           "Path": "src/three-engine/core/MaterialManager.js",
@@ -751,8 +879,8 @@
         },
         {
           "Path": "src/three-engine/core/ModelExploder.js",
-          "Size": 3121,
-          "Sha256": "019fbb9b38aa8005fc5b4ee87f274302d955693e4821221c0c2a594486b42e42"
+          "Size": 3271,
+          "Sha256": "640e2d191196d96be710be53f1d2b0d9076c192cee0cae2e637c3ea5ebc10733"
         },
         {
           "Path": "src/three-engine/core/ModelLoader.js",
@@ -765,19 +893,64 @@
           "Sha256": "fb36924fb3ebb52401f7633223d57b357f58d466b460972e9615e85290c5f1fc"
         },
         {
+          "Path": "src/three-engine/core/SceneConfig.js",
+          "Size": 12588,
+          "Sha256": "a01e3b81733a730aa18d42d86e348713f744002c919cbace193a3385dcf748bc"
+        },
+        {
+          "Path": "src/three-engine/core/lis/geometry.js",
+          "Size": 8246,
+          "Sha256": "32e645d5aebe2fe598ac8fe3286c00977740077e3784891af8a207e93bae7ba3"
+        },
+        {
+          "Path": "src/three-engine/core/lis/index.js",
+          "Size": 267,
+          "Sha256": "45ece360300f368360f510afd4970b62e4b55abd6a8ea7720e909a62f6cd5de0"
+        },
+        {
+          "Path": "src/three-engine/core/lis/parser.js",
+          "Size": 14584,
+          "Sha256": "00eaea268da49d55718b48ddc0c4076e5e41f0637b95473c6b80b2779e0fbe1c"
+        },
+        {
+          "Path": "src/three-engine/core/lis/support.js",
+          "Size": 4412,
+          "Sha256": "6c54d9294810831b98ec72fd13cd5d8d62cc289e4895e33fc409af27e83c2bb6"
+        },
+        {
           "Path": "src/three-engine/designer.vue",
-          "Size": 12167,
-          "Sha256": "75e79d2d02862ec95c76c989f8d72c35f1a62f254786d46987ce54ac8d51150f"
+          "Size": 17244,
+          "Sha256": "65890fc5dd2ccbecd1aee124f1a99a36b06299fbc7b54b11c3ecf91892c1f216"
         },
         {
           "Path": "src/three-engine/renderer.vue",
-          "Size": 7876,
-          "Sha256": "4fe379c2f93b1a2ebb353a228163e2767803ffc509532698b7d2c924e9584b0f"
+          "Size": 7820,
+          "Sha256": "0848d56b359608f2f7c1bf674dd760639d116d664a062115e5fcfbb138cbc81f"
         },
         {
           "Path": "src/utils/microi.v8.js",
           "Size": 73622,
           "Sha256": "e1503fec0a0bc0077efc6429b4f16a9e2ba3e7e1188a7b5587a7aa1b1788fda0"
+        },
+        {
+          "Path": "tests/lis-import.test.mjs",
+          "Size": 12783,
+          "Sha256": "98b8795f25517174a478dc468479b94967e81c9f504db2650cd8c2fbc015ba11"
+        },
+        {
+          "Path": "tests/lis-scene.test.mjs",
+          "Size": 6981,
+          "Sha256": "d0754ef8d2ac135ca5a1d161c379abdb84350695c31ec8ded1199e958175beb8"
+        },
+        {
+          "Path": "tests/model-exploder.test.mjs",
+          "Size": 3054,
+          "Sha256": "8d4b035434de5370b31d528f806c71befd885e29f8e4040a8257f9dcb66fb89f"
+        },
+        {
+          "Path": "tests/scene-config.test.mjs",
+          "Size": 11349,
+          "Sha256": "7117bc3e7754729ab68a6cf347d1ede4ae8222e7aab8582a22e471492dbf5445"
         },
         {
           "Path": "tests/scene-contract.test.mjs",
@@ -794,7 +967,16 @@
           "Size": 269,
           "Sha256": "37d2ebfba794e5d1a4d93c1d1d7d684d74dd7e53c4a298858986eaacb6908cac"
         }
-      ]
+      ],
+      "OfficialSourceReadback": {
+        "ApiBase": "https://api.itdos.com",
+        "OsClient": "iTdos",
+        "AppId": "01M1H0CFADBMHHQM4HEVJQM1ZC",
+        "AppKey": "microi-3d-engine",
+        "At": "2026-10-15T03:12:57.239Z",
+        "SourceManifestHash": "0b0452bbadd808bf70bf32f7d407dfb6be8f6a99f0e7a9a31d8febbc787ef6ac",
+        "ContextReceiptSha256": "368cf883c30bb8473fb0d4429d2e58932fbfbd7c69f7eb40e8f8102d916cc887"
+      }
     }
   ],
   "Repositories": [

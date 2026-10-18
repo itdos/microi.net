@@ -7,6 +7,8 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 
 # Microi 吾码 Playwright E2E 自动化测试
 
+每轮测试成功、失败、取消或中断退出时，在 `finally` / teardown 中关闭本任务 browser/context 和临时写入进程，再按 [测试临时文件随任务清理](../workspace-conventions/SKILL.md#测试临时文件必须随任务清理强制) 删除本任务 `.tmp` 下的一次性脚本、夹具及无用途的截图、trace、video、日志和编译副本。交付必需证据先最小归档并回读，失败排查只暂留有明确归属和清理时机的最小集合；报告和截图路径规则不构成永久保留许可，结束后必须单独验收清理结果。
+
 > **2026-05 更新（重要）**：Microi.Agent 插件生成的E2E 配置、用例和帮助器保留在 `<projectRoot>/.microi-e2e/`；运行产物统一输出到 `<gitRoot>/.tmp/microi-e2e/<项目相对路径>/`，**不再**写入 `tests/e2e/`、根目录 `playwright.config.js` 或 `.env.e2e.example`。
 > - `playwright.config.js` 位于 `.microi-e2e/playwright.config.js`，`testDir` 为 `./` （即 `.microi-e2e/specs/`）
 > - 报告、截图、trace、video 和 test-results 放在对应 `.tmp/microi-e2e/` 项目子目录
@@ -14,6 +16,8 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 > - 本文档下方仍有大量 `tests/e2e/...` 写法，均为历史风格示意，**实际生成路径以 `.microi-e2e/` 为准**。手写测试（如 `tests/blueprint-e2e.spec.mjs`）不受影响。
 
 `E2E` 是 `End-to-End`，中文通常叫"端到端测试"。它强调从用户入口开始，穿过前端页面、接口引擎、表单引擎、权限、缓存、数据库等真实链路，验证一条业务路径是否真的可交付。
+
+真实依赖与发布范围沿用 `../workspace-conventions/SKILL.md` 的“平台回归与独立应用测试归属”：常规验证指定 MCP 实际使用的 MySQL、MongoDB、Redis 和 MinIO 或 OSS/HDFS，不要求额外 SQL Server 环境；仅用户明确指定 SQL Server 问题时才做其专项。按 [发布测试矩阵](../microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md#按指定-mcp-选择发布测试矩阵) 记录实际覆盖，保留正常登录、业务闭环与资源收尾，不以连接成功代替真实读写验收。
 
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=playwright-e2e-000 sha256=a6ef528a2a940fd0f58efaee6b73eb5dbc159db93d95afedf41c7b8642536d18 -->
@@ -140,14 +144,14 @@ PW_HOME_PATH=/#/pages/index/index
 不要只说“代码已编译”或“需要用户自己重启后端”；除非用户明确要求不要中断当前服务，否则 AI 要主动完成重启。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=ee40e4f023e1da07269f9ebb82522720c4f014cfc9500885db09778dd819b9a6 -->
+<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=acd4d4aeaf79f4d3af7fee7cdd72b01b0cec10a83c252a132b29f258a3c468bf -->
 ## 服务自启动纪律（必做）
 
 执行自动化测试、截图巡检、接口引擎回读、`/apiengine/{key}` 验收时，如果本地后端或前端不可达，不能把 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听当作任务终点。必须先自动启动所需服务，再继续完整验证。
 
 同一工作区有多个 AI 对话时，服务自启动还必须遵守共享生命周期：
 
-- 先执行 `../workspace-conventions/SKILL.md` 的“本地测试程序与依赖生命周期”统一规则：优先复用健康的本地源码程序、隔离目录中的编译产物和同组既有依赖，不按测试任务重复创建 Docker/Compose。需要双节点时启动两个本机程序进程连接同组依赖，不等于建立两套 Docker 环境。
+- 先执行 `../workspace-conventions/SKILL.md` 的“本地测试程序与依赖生命周期”统一规则：默认复用当前 MCP 对应的 MySQL、Redis、MongoDB、MinIO/OSS，以及健康本地源码程序或隔离目录的编译产物；不按测试任务重复创建 Docker/Compose，不例行询问临时容器许可。需要双节点时启动两个本机程序进程连接同组依赖，不等于建立两套 Docker 环境。不得已创建的临时容器和纯测试资源每轮必须精确删除并回读。
 - API 服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 服务使用 `assert pc`。Playwright `webServer`、自愈脚本或 AI 只在对应范围发布时等待；官网/Agent 发布不阻塞 `61500/61501`。同时启动前后端时分别检查两项。旧锁仅在真实进程证明所属范围后缩小阻塞范围，未知锁继续保护，不得删除活跃锁。
 - 端口健康且 PID/命令行属于当前工作区时直接复用，不得每个对话都无条件“先杀再启动”。
   必须重载源码时才串行重启，并在状态播报中说明旧/新 PID。

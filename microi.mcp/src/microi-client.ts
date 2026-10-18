@@ -7,6 +7,8 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { createGzip } from 'node:zlib';
 import { API } from './api-paths.js';
+import { reportOperation, reportDdlEvents } from './operation-progress.js';
+import { createReadIdentityGuard } from './context-reading.js';
 import { resolveMcpDid } from './mcp-did.js';
 import {
   normalizeAuthorizationToken,
@@ -652,6 +654,13 @@ export interface DbTable {
   _Fields?: DbField[];
 }
 
+export interface DbSchemaReadOptions {
+  detail?: 'summary' | 'fields';
+  tableName?: string;
+  tableNames?: string[];
+  fieldNames?: string[];
+}
+
 export interface DbField {
   Name: string;
   Label: string;
@@ -923,6 +932,20 @@ export class MicroiClient {
   /** Header始终来自冻结连接，所有传输分支和续签共享，不信任请求覆盖。 */
   private tenantHeaders(): Record<string, string> { return { ...this.tenantTuple }; }
 
+  /** 引用只绑定当前真实连接/会话；不保存或回传凭据，续签后旧引用自然失效。 */
+  getContextIdentity(): string {
+    if (!this.token) return '';
+    try {
+      const payload = JSON.parse(Buffer.from(this.token.split('.')[1] || '', 'base64url').toString('utf8'));
+      if (typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now()) return '';
+    } catch { /* 不假定所有历史会话都是 JWT；身份验证继续交给服务端。 */ }
+    return crypto.createHash('sha256').update(JSON.stringify([
+      this.config.apiBaseUrl.replace(/\/+$/, ''),
+      this.config.osClient ?? '', this.config.osClientType ?? '', this.config.osClientNetwork ?? '',
+      this.config.username ?? '', this.token,
+    ])).digest('hex');
+  }
+
   private assertTenantRequest(reqPath: string, ...payloads: unknown[]): void {
     for (const payload of payloads) assertTransportTenantTuple(this.tenantTuple, payload);
     const endpoint = new URL(reqPath, this.config.apiBaseUrl);
@@ -1108,7 +1131,8 @@ export class MicroiClient {
       );
       const tokenKey = tokenKeys[0];
       if (!tokenKey) return;
-      tokens[tokenKey] = tokenKeys.some(key => isProtectedSessionToken(tokens[key])) ? protectSessionToken(this.token) : this.token;
+      // Linux 的新会话始终留在 Secret Service；环境注入登录也不能落盘明文 Token。
+      tokens[tokenKey] = process.platform === 'linux' || tokenKeys.some(key => isProtectedSessionToken(tokens[key])) ? protectSessionToken(this.token) : this.token;
       const dir = path.dirname(filePath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(filePath, JSON.stringify(tokens, null, 2), { encoding: 'utf-8', mode: 0o600 });
@@ -1298,6 +1322,7 @@ export class MicroiClient {
     let text: string;
     const jsonBody = method === 'POST' ? JSON.stringify(body ?? {}) : undefined;
     try {
+      await reportOperation(reqPath, method);
       const fetchResponse = await fetch(url, {
         method,
         headers,
@@ -1320,7 +1345,7 @@ export class MicroiClient {
         );
       }
 
-      if (options.allowNativeFallback === false) {
+      if (options.allowNativeFallback === false || (method === 'POST' && options.allowNativeFallback !== true)) {
         throw new MicroiTransportError(
           `${operationName} 网络请求失败：fetch=${error instanceof Error ? error.message : String(error)}；`
           + '已禁用非幂等传输重放',
@@ -1404,6 +1429,8 @@ export class MicroiClient {
     } catch {
       throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
     }
+    await reportDdlEvents(reqPath, parsed);
+    await reportOperation(reqPath, method, true);
 
     // Microi 历史版本可能用 Code=1001/1002、ReasonCode 或签名失败文本表达身份失效。
     if (isAuthenticationFailureResponse(parsed) && authRecoveryStage !== 'credential-token') {
@@ -2060,10 +2087,81 @@ export class MicroiClient {
     });
   }
 
-  async getDbSchema(): Promise<ApiResponse<{ Tables: DbTable[] }>> {
-    return this.post(API.GET_DB_SCHEMA, {
-      OsClient: this.config.osClient,
-    });
+  async getDbSchema(options?: DbSchemaReadOptions): Promise<ApiResponse<{ Tables: DbTable[]; ReadSource?: Record<string, unknown> }>> {
+    // 不带 options 的历史调用保留旧协议；新 MCP 读取复用受保护 FormEngine，权限错误不降级绕过。
+    if (!options) return this.post(API.GET_DB_SCHEMA, { OsClient: this.config.osClient });
+    const incomplete = (message: string): ApiResponse<any> => ({ Code: 0, Data: null, Msg: message, DataAppend: { ReasonCode: 'SCHEMA_READ_INCOMPLETE' } });
+    const assertReadIdentity = createReadIdentityGuard(() => this.getContextIdentity());
+    const readAll = async (name: string, query: Record<string, unknown>, cap: number): Promise<ApiResponse<Record<string, any>[]>> => {
+      const records: Record<string, any>[] = [];
+      const seen = new Set<string>();
+      let total: number | undefined;
+      for (let page = 1; ; page++) {
+        try { assertReadIdentity(); } catch (error) { return incomplete(error instanceof Error ? error.message : String(error)); }
+        const response = await this.getTableData(name, { ...query, _PageIndex: page, _PageSize: 200, _OrderBy: 'Id', _OrderByType: 'ASC' });
+        if (response.Code !== 1) return response as ApiResponse<Record<string, any>[]>;
+        try { assertReadIdentity(); } catch (error) { return incomplete(error instanceof Error ? error.message : String(error)); }
+        const data = response.Data;
+        const rows = Array.isArray(data) ? data as Record<string, any>[] : [];
+        const count = response.DataCount;
+        if (!Array.isArray(data) || !Number.isSafeInteger(count) || Number(count) < 0) return incomplete(`${name} 未返回可验证 DataCount；请升级服务或使用旧版显式完整读取。`);
+        if (total !== undefined && total !== count) return incomplete(`${name} 分页期间发生变化，请重读。`);
+        total = count;
+        if (Number(total) > cap) return incomplete(`${name} 匹配 ${total} 条，超过本次安全范围 ${cap}；请缩小表/字段筛选。`);
+        for (const row of rows) {
+          if (!row || typeof row.Id !== 'string' || seen.has(row.Id)) return incomplete(`${name} 返回缺失或重复 Id，不能证明分页完整。`);
+          seen.add(row.Id); records.push(row);
+        }
+        if (records.length > Number(total) || (records.length < Number(total) && rows.length === 0)) return incomplete(`${name} 分页数量与 DataCount 不符，请重读。`);
+        if (records.length === total) return { ...response, Data: records };
+      }
+    };
+    const where: unknown[][] = [];
+    if (options.tableNames?.length) where.push(['Name', 'In', options.tableNames]);
+    if (options.tableName) {
+      if (where.length) where.push(['AND', '(', 'Name', 'Like', options.tableName], ['OR', 'Description', 'Like', options.tableName, ')']);
+      else where.push(['Name', 'Like', options.tableName], ['OR', 'Description', 'Like', options.tableName]);
+    }
+    const tableResponse = await readAll('diy_table', { _SelectFields: ['Id', 'Name', 'Description'], _Where: where }, 10_000);
+    if (tableResponse.Code !== 1) return tableResponse as unknown as ApiResponse<{ Tables: DbTable[] }>;
+    if (tableResponse.Data.some(table => typeof table.Name !== 'string' || !table.Name)) return incomplete('表目录缺少真实表名，不能构造可靠 Schema。');
+    const tables = tableResponse.Data.map(table => ({ Id: table.Id, Name: table.Name, Description: table.Description || '' })) as DbTable[];
+    if (options.detail !== 'fields' || tables.length === 0) return {
+      ...tableResponse, Code: 1, DataCount: tables.length, Msg: '已按权限读取表目录；未读取字段正文。', Data: {
+        Tables: tables, ReadSource: { mode: 'form-engine-scoped', tablesComplete: true, fieldsIncluded: false, fieldCountKnown: false },
+      },
+    };
+    const fieldWhere: unknown[][] = [['TableId', 'In', tables.map(table => table.Id)]];
+    if (options.fieldNames?.length) fieldWhere.push(['Name', 'In', options.fieldNames]);
+    const fieldResponse = await readAll('diy_field', {
+      _SelectFields: ['Id', 'Name', 'Label', 'Description', 'Type', 'Component', 'TableId', 'Config'], _Where: fieldWhere,
+    }, 50_000);
+    if (fieldResponse.Code !== 1) return fieldResponse as unknown as ApiResponse<{ Tables: DbTable[] }>;
+    for (const table of tables) table._Fields = [];
+    const byId = new Map(tables.map(table => [table.Id, table]));
+    for (const row of fieldResponse.Data) {
+      const table = byId.get(row.TableId);
+      if (!table) return incomplete('字段响应包含筛选范围外的 TableId，读取已停止。');
+      if (typeof row.Name !== 'string' || !row.Name) return incomplete('字段响应缺少真实字段名，读取已停止。');
+      const { TableId: _tableId, Config: config, ...field } = row;
+      let relation: Record<string, unknown> = {};
+      if (config) {
+        try { relation = typeof config === 'string' ? JSON.parse(config) : config; }
+        catch { field.ConfigReadError = 'Config JSON 无效，关联配置尚未验证。'; }
+      }
+      field.TableChildTableId = relation?.TableChildTableId ?? null;
+      field.TableChildSysMenuId = relation?.TableChildSysMenuId ?? null;
+      field.TableChildFkFieldName = relation?.TableChildFkFieldName ?? null;
+      field.RelationReferences = Object.fromEntries(['TableId', 'SysMenuId', 'JoinFormTableId', 'JoinFormSysMenuId', 'TableChildTableId', 'TableChildSysMenuId', 'TableChildFkFieldName', 'DataSourceEngineKey', 'DataSourceKey', 'ApiEngineKey'].filter(key => relation && relation[key] !== undefined).map(key => [key, relation[key]]));
+      field.ConfigIncluded = false;
+      field.FullDefinitionRead = { action: 'microi_get_field_list', params: { tableName: table.Name } };
+      table._Fields!.push(field as DbField);
+    }
+    return { ...fieldResponse, Code: 1, DataCount: tables.length, Msg: '已按权限与筛选范围读取表和字段。', DataAppend: {
+      ...fieldResponse.DataAppend, SchemaTableRead: tableResponse.DataAppend ?? null,
+    }, Data: {
+      Tables: tables, ReadSource: { mode: 'form-engine-scoped', tablesComplete: true, fieldsIncluded: true, fieldRowsComplete: true, fieldDefinitionsComplete: false, matchedFieldCount: fieldResponse.Data.length, consistency: 'count-and-id-checked-nontransactional' },
+    } };
   }
 
   async getTableIndexes(
@@ -3066,24 +3164,21 @@ export class MicroiClient {
   async getTableData(tableName: string, query: Record<string, unknown> = {}): Promise<ApiResponse> {
     return this.post(API.FORM_GET_TABLE_DATA, {
       OsClient: this.config.osClient,
-      FormEngineKey: tableName,
-      ...query,
+      Operation: 'query', TableName: tableName, Query: query,
     });
   }
 
   async addFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse> {
     return this.post(API.FORM_ADD_FORM_DATA, {
       OsClient: this.config.osClient,
-      FormEngineKey: tableName,
-      ...row,
+      Operation: 'add', TableName: tableName, Row: row, ConfirmExecution: tableName,
     });
   }
 
   async updateFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse> {
     return this.post(API.FORM_UPT_FORM_DATA, {
       OsClient: this.config.osClient,
-      FormEngineKey: tableName,
-      ...row,
+      Operation: 'update', TableName: tableName, Row: row, ConfirmExecution: tableName,
     });
   }
 
@@ -3796,55 +3891,55 @@ export class MicroiClient {
     return this.executeEngine('mci-system-observability-action', command);
   }
 
-  async getRedisStatistics(database = 0, connectionId?: string): Promise<ApiResponse> {
+  async getRedisStatistics(database?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_STATISTICS, {
       Action: 'RedisStatistics',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
     });
   }
 
-  async getRedisKeys(pattern = '*', database = 0, pageSize = 100, cursor?: string, connectionId?: string): Promise<ApiResponse> {
+  async getRedisKeys(pattern = '*', database?: number, pageSize = 100, cursor?: string, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_KEYS, {
       Action: 'Keys',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Pattern: pattern,
       PageSize: pageSize,
       Cursor: cursor || '',
     });
   }
 
-  async getRedisKey(key: string, database = 0, pageIndex = 1, pageSize = 500, connectionId?: string): Promise<ApiResponse> {
+  async getRedisKey(key: string, database?: number, pageIndex = 1, pageSize = 500, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_KEY, {
       Action: 'Key',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Key: key,
       PageIndex: pageIndex,
       PageSize: pageSize,
     });
   }
 
-  async deleteRedisKeys(keys: string[], database = 0, connectionId?: string): Promise<ApiResponse> {
+  async deleteRedisKeys(keys: string[], database?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_DELETE_KEYS, {
       Action: 'DeleteKeys',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Keys: keys,
     });
   }
 
-  async replaceRedisValue(key: string, dataType: string, value: string, database = 0, ttlSeconds?: number, connectionId?: string): Promise<ApiResponse> {
+  async replaceRedisValue(key: string, dataType: string, value: string, database?: number, ttlSeconds?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_REPLACE_VALUE, {
       Action: 'ReplaceValue',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Key: key,
       DataType: dataType,
       Value: value,
@@ -3852,23 +3947,23 @@ export class MicroiClient {
     });
   }
 
-  async renameRedisKey(key: string, newKey: string, database = 0, connectionId?: string): Promise<ApiResponse> {
+  async renameRedisKey(key: string, newKey: string, database?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_RENAME_KEY, {
       Action: 'RenameKey',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Key: key,
       NewKey: newKey,
     });
   }
 
-  async setRedisTtl(key: string, ttlSeconds: number, database = 0, connectionId?: string): Promise<ApiResponse> {
+  async setRedisTtl(key: string, ttlSeconds: number, database?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_SET_TTL, {
       Action: 'SetTtl',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Key: key,
       TtlSeconds: ttlSeconds,
     });
