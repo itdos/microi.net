@@ -8,6 +8,23 @@ import os from 'node:os';
 import * as runtime from './staged-full-runtime.mjs';
 import {validateReady,processIdentities} from './staged-full-runtime.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
+test('the exact Full HDFS evidence survives build cleanup and rejects changed or foreign bytes',()=>{
+ const results=fs.mkdtempSync(path.join(os.tmpdir(),'microi-hdfs-proof-'));
+ const directory=path.join(results,'.net-artifacts');fs.mkdirSync(directory);
+ const live=path.join(directory,'Microi.HDFS.dll'),bytes=Buffer.from('independent tested DLL bytes');
+ fs.writeFileSync(live,bytes);
+ try{
+  const build={resultsDirectory:results,runtimeDirectory:directory,...runtime.preserveHdfsEvidence(directory,results)};
+  const expected=runtime.verifyHdfsEvidence(build);
+  assert.throws(()=>runtime.preserveHdfsEvidence(directory,results),/EEXIST/,'existing proof cannot be overwritten');
+  fs.writeFileSync(live,'different runtime');assert.throws(()=>runtime.verifyHdfsEvidence(build),/differ/);
+  fs.rmSync(directory,{recursive:true});assert.equal(runtime.verifyHdfsEvidence(build),expected);
+  assert.throws(()=>runtime.verifyHdfsEvidence({...build,hdfsEvidenceFile:path.join(results,'foreign.dll')}),/belong/);
+  assert.throws(()=>runtime.verifyHdfsEvidence({...build,hdfsDllSha256:'0'.repeat(64)}),/changed/);
+  fs.writeFileSync(build.hdfsEvidenceFile,'different evidence');assert.throws(()=>runtime.verifyHdfsEvidence(build),/changed/);
+  fs.rmSync(build.hdfsEvidenceFile);assert.throws(()=>runtime.verifyHdfsEvidence(build),/ENOENT/);
+ }finally{fs.rmSync(results,{recursive:true,force:true});}
+});
 function fixture(){
  const environment={MICROI_TEST_OSCLIENT:'FixtureMain',MICROI_TEST_CHILD_OSCLIENT:'FixtureChild',MICROI_TEST_DID:'new-device',MICROI_TEST_API_BASE:'http://127.0.0.1:63971/',MICROI_TEST_PEER_API_BASE:'http://127.0.0.1:63972/',MICROI_TEST_FRONTEND_BASE:'http://127.0.0.1:63970/'};
  const profile=path.join(root,'.tmp/unit-fixture/profile'),attempt='11111111-1111-4111-8111-111111111111';

@@ -18,6 +18,25 @@ export function runtimeManifest(runtime){
  for(const name of ['Microi.net.Api.dll','Microi.net.Api.exe','Microi.net.Api.deps.json','Microi.net.Api.runtimeconfig.json'])check(files.some(row=>row.name===name),'Fresh Full runtime file is missing: '+name);
  return {files,sha256:hash(JSON.stringify(files))};
 }
+// The release entry verifies the same storage proof after Full removes its large
+// build directory. Keep the exact tested HDFS bytes outside that cleanup scope.
+export function preserveHdfsEvidence(runtime,resultsDirectory){
+ const bytes=read(path.join(runtime,'Microi.HDFS.dll'));
+ const directory=path.join(resultsDirectory,'runtime-evidence');
+ fs.mkdirSync(directory,{recursive:true});
+ const file=path.join(directory,'Microi.HDFS.dll');
+ fs.writeFileSync(file,bytes,{flag:'wx'});
+ return {hdfsDllSha256:hash(bytes),hdfsEvidenceFile:file};
+}
+export function verifyHdfsEvidence(build){
+ const expected=path.join(build.resultsDirectory,'runtime-evidence','Microi.HDFS.dll');
+ check(typeof build.hdfsEvidenceFile==='string'&&same(build.hdfsEvidenceFile,expected),'HDFS evidence must belong to this Full results directory.');
+ const digest=hash(read(expected));
+ check(digest===build.hdfsDllSha256,'Preserved Full HDFS evidence changed.');
+ const live=path.join(build.runtimeDirectory,'Microi.HDFS.dll');
+ if(fs.existsSync(live))check(hash(read(live))===digest,'Live and preserved Full HDFS bytes differ.');
+ return digest;
+}
 // 回执只记录归属；必须重读存活进程的创建时间、父进程和监听端口，防止 PID 复用冒充原桥接协调器。
 function validateSupervisor(ready,actual,environment){
  const expected=ready.supervisor,profile=path.dirname(path.dirname(environment.MICROI_TEST_RUNTIME_ENVIRONMENT_FILE||''));
@@ -78,7 +97,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  if(mode==='announce'){
   const [artifacts,matrixFile,signal]=args,plan=json(matrixFile);check(plan.sourceHead===head()&&hash(read(plan.matrixFile))===plan.matrixSha256,'Candidate or dependency matrix changed before final build announcement.');
   const runtime=path.join(artifacts,'bin','Microi.net.Api','release'),manifest=runtimeManifest(runtime);
-  write(signal,{schemaVersion:1,sourceHead:head(),buildId:randomUUID(),builtAt:new Date().toISOString(),resultsDirectory:path.dirname(matrixFile),runtimeDirectory:runtime,runtimeManifestSha256:manifest.sha256,apiDllSha256:manifest.files.find(row=>row.name==='Microi.net.Api.dll').sha256,matrixReceiptSha256:hash(read(matrixFile))});
+  write(signal,{schemaVersion:1,sourceHead:head(),buildId:randomUUID(),builtAt:new Date().toISOString(),resultsDirectory:path.dirname(matrixFile),runtimeDirectory:runtime,runtimeManifestSha256:manifest.sha256,apiDllSha256:manifest.files.find(row=>row.name==='Microi.net.Api.dll').sha256,...preserveHdfsEvidence(runtime,path.dirname(matrixFile)),matrixReceiptSha256:hash(read(matrixFile))});
  }else if(mode==='verify-ready'){
   const [buildFile,readyFile,credentialsFile]=args,build=json(buildFile),ready=json(readyFile);verifyPrivate(credentialsFile);const bytes=read(credentialsFile);
   check(build.sourceHead===head()&&runtimeManifest(build.runtimeDirectory).sha256===build.runtimeManifestSha256,'Final Full candidate/runtime changed after build.');
