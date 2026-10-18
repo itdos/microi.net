@@ -10,11 +10,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 # Microi 吾码
 
-<p class="mci-doc-home-subtitle"><strong>开源 AI 开发框架：</strong>30+ 成熟引擎融合 AI 低代码、微服务与 V8 引擎，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。</p>
-
-<p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
-
-<p class="mci-doc-home-actions"><a class="mci-doc-home-action" href="/doc/about/microi-training-syllabus.html">查看培训大纲 <span aria-hidden="true">→</span></a></p>
+<p class="mci-doc-home-subtitle"><strong>开源 AI 开发框架：</strong><code>.NET 10 + Vue 3 + Redis</code>，融合 30+ 成熟引擎、AI 低代码、微服务与 V8 引擎。<br>支持 VS Code / Codex / Copilot / Cursor / Claude + MCP + Skills；在平台能力高度复用的典型业务场景中，AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。</p>
 
 <p style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;">
   <img src="https://file.microi.net/upload/img/NET-10.svg" alt=".NET 10" />
@@ -23,12 +19,15 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://file.microi.net/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="加入吾码 QQ 交流群" /></a>
 </p>
 
-🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
-.NET10 + Vue3 + 跨数据库 / 跨平台，分布式架构、高性能（L1/L2级缓存）、开源可控、多端统一
-
-[官网](https://microi.net/) · [GitHub](https://github.com/itdos/microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
-
 </div>
+
+| 资源 | 地址 |
+|---|---|
+| 🖥️ 在线 Demo | [https://demo.microi.net/](https://demo.microi.net/)（帐号 admin，密码 123456） |
+| 🌐 官网 | [https://microi.net/](https://microi.net/)（支持在线注册免费使用） |
+| 📚 培训大纲 | [https://microi.net/doc/about/microi-training-syllabus.html](https://microi.net/doc/about/microi-training-syllabus.html "查看培训大纲") |
+| 📦 Gitee | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
+| 📦 GitHub | [https://github.com/itdos/microi.net](https://github.com/itdos/microi.net) |
 
 ---
 
@@ -178,17 +177,43 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 | 运维 / 安全负责人 | [系统日志/监控](/doc/system-engine/system-observability) · [Docker 部署](/doc/getting-started/docker-run) · [安全基线](/doc/more/security) · [任务调度](/doc/system-engine/job) · [消息通知](/doc/system-engine/message-notification) |
 | 系统集成开发者 | [接口引擎](/doc/v8-engine/api-engine) · [数据源引擎](/doc/system-engine/datasource-engine) · [MQ](/doc/system-engine/mq) / [MQTT](/doc/system-engine/mqtt-engine) · [应用商城](/doc/system-engine/app-store) |
 
-| 资源 | 地址 |
-|---|---|
-| 🌐 官网 | [https://microi.net](https://microi.net) 【<span class="mci-doc-danger">支持在线注册免费使用</span>】 |
-| 🦞 OpenClaw 吾码小龙虾 | [https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw) |
-| 📦 Gitee 源码 | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
-| 📦 GitHub 源码 | [https://github.com/itdos/microi.net](https://github.com/itdos/microi.net) |
-| 📦 GitCode 源码 | [https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview) |
-| 📝 官方 CSDN 博客 | [https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog) |
-| 📝 技术 CSDN 博客 | [https://lisaisai.blog.csdn.net](https://lisaisai.blog.csdn.net/?type=blog) |
-
 ---
+
+## 企业应用开发与工程交付
+
+Microi吾码把企业管理底座、可视化设计、业务编程和运行治理放在同一套平台中。
+开发者可以从动态表单开始，逐步增加 V8、独立 Vue 页面、微服务或 .NET 扩展，
+并继续复用原有身份、权限、数据与应用升级机制。
+
+| 企业开发关注点 | Microi吾码的能力与使用方式 |
+|---|---|
+| **组织、角色与权限** | 用户、部门、岗位、角色、菜单和按钮组成统一管理底座；表动作、列表数据范围、字段可见与只读规则由服务端校验。需要“只能修改本人单据”等行级写规则时，在后端表单事件或接口引擎配置业务校验。参见[权限与安全](https://microi.net/doc/more/security.html)。 |
+| **在线建模与代码生成** | 表、字段、关联、主子表、校验、数据源与菜单可在线设计，也可由 AI / MCP 通过 Manifest 生成。表单设计器可生成 Vue 3 列表与表单源码并保存到微服务；复杂控件、动态数据源及前端 V8 事件继续复用原表单。参见[表单设计与源码生成](https://microi.net/doc/form-engine/form-engine-info.html)。 |
+| **复杂列表与数据协作** | 组合查询、多表关联、树形加表格、分类页签、动态按钮、复合列、统计指标与移动卡片共同服务业务操作；按表启用数据日志、评论和版本，保留变更轨迹。参见[模块引擎](https://microi.net/doc/system-engine/module-engine.html)。 |
+| **审批与业务自动化** | 可视化工作流支持条件分支、多级审批、并行审批、会签、抄送、撤回、转交与节点 V8；结合后端表单事件、接口引擎和任务调度完成校验、通知及跨表处理。参见[工作流](https://microi.net/doc/system-engine/wf-engine.html)与[任务调度](https://microi.net/doc/system-engine/job.html)。 |
+| **报表、看板与打印** | 界面引擎承载指标、图表、地图与管理看板，报表引擎提供查询、汇总、明细及可配置写操作；打印模板与 Excel / Word / PowerPoint 导出满足单据和经营分析需求。参见[界面引擎](https://microi.net/doc/system-engine/page-engine.html)、[报表](https://microi.net/doc/system-engine/report-engine.html)和[Office](https://microi.net/doc/more/office.html)。 |
+| **统一身份与企业集成** | DiyToken 统一业务会话；支持双向 OIDC / SAML2 / CAS 身份联邦、Passkey / TOTP 与敏感操作验证。平台治理通过受控 HTTPS SCIM 目录同步计划、冲突处理及组织快照接入企业身份数据。参见[SSO](https://microi.net/doc/more/sso.html)、[身份验证](https://microi.net/doc/more/identity-verification.html)和[平台治理](https://microi.net/doc/system-engine/ai-platform-governance.html)。 |
+| **数据、文档与设备连接** | 多数据库与数据源引擎连接业务数据，HTTP / MQ / MQTT 连接服务和设备；对象存储、私有文件授权、文件柜与 OnlyOffice 在线编辑连接业务资料。具体数据库、文档格式和设备协议按对应组件配置与验收。 |
+| **日志、监控与可靠运行** | 登录与操作日志、慢 SQL、请求 Trace、热点接口、CPU / 内存 / 磁盘 / 网络和容器诊断支持运行排查；后台任务、共享租约、幂等与恢复机制支撑多节点运行。参见[系统日志/监控](https://microi.net/doc/system-engine/system-observability.html)。 |
+| **版本治理与应用交付** | 应用商城打包平台资源、微服务及多端应用，支持在线/离线安装、版本回读与升级；平台治理提供发布计划、审批、灰度开关、配置漂移、检查点和条件回滚。参见[应用商城](https://microi.net/doc/system-engine/app-store.html)与[平台治理](https://microi.net/doc/system-engine/ai-platform-governance.html)。 |
+| **多端与行业应用** | 同一业务底座可服务 PC、移动 H5、UniApp、小程序与 App；独立 Vue / Unity WebGL 应用可承载游戏、3D 和数字孪生。OA、CRM、ERP、MES 等按业务模型、流程和所选应用组合交付。参见[多端客户端](https://microi.net/doc/system-engine/multi-end-client.html)、[微服务](https://microi.net/doc/system-engine/micro-app.html)和[Unity](https://microi.net/doc/system-engine/unity-integration.html)。 |
+
+应用运行形态、权限与版本以当前租户实际安装和配置为准。平台基础能力、可选服务与
+行业应用各有配置入口；从文档进入对应引擎，再在在线 Demo 中体验具体页面。
+
+<details>
+<summary>标准化与生态扩展方向</summary>
+
+下列方向用于持续完善企业交付能力，属于规划或专项适配范围；发布相应组件并完成验收后，
+再按实际版本补充配置、示例与支持清单。
+
+| 扩展方向 | 当前基础与后续范围 |
+|---|---|
+| **国密与行业合规适配** | 在现有可信后端加密、密钥隔离、权限与审计基础上，规划国密算法、密码设备和行业安全基线适配；具体合规结论以产品、部署环境及项目测评为准。 |
+| **标准流程互操作** | 现有自研流程定义、节点、连线与 V8 事件可承载业务审批；BPMN 2.0 导入导出、外部流程引擎模型互转属于后续标准化方向。 |
+| **更丰富的文档与生成生态** | 在现有 Office / PDF / 图片 / CAD / 3D 预览及 Vue 表单代码生成基础上，继续扩展专用格式适配、复杂组件生成与行业应用模板；支持范围随已发布组件逐项验收。 |
+
+</details>
 
 ## ✨ 平台亮点
 
@@ -342,8 +367,6 @@ Microi.net/
 ├── Microi.Server/          # 🔧 后端源码（.NET10）
 │   ├── Microi.net.Api/     #     Web API 层（ASP.NET Core 控制器）
 │   ├── Microi.Core/        #     核心基础设施库（接口定义/模型/抽象）
-│   ├── Microi.AI/          #     AI 领域实现（模型路由、Schema/NL2SQL、代理、计量、工作流）
-│   ├── Microi.net/         #     表单、接口、模块、工作流等核心运行时
 │   ├── Microi.V8Engine/    #     V8 引擎独立模块
 │   ├── Microi.Cache/       #     缓存模块（Redis + 内存）
 │   ├── Microi.MongoDB/     #     MongoDB 集成模块
@@ -362,15 +385,11 @@ Microi.net/
 │   ├── Dos.ORM/            #     自研 ORM 基础库
 │   └── Dos.Common/         #     通用工具类库
 ├── Microi.Client/          # 🖥️ PC 传统界面源码（Vue3 + Element-Plus + Vite + Pinia）
-│   └── src/views/webos/     #     WebOS 桌面式门户（源码按对应版本授权）
 ├── Microi.UI/              # 🎨 Web / UniApp 统一设计系统
 ├── microi.uniapp/          # 📱 UniApp 移动端源码（小程序 / H5 / App）
 ├── microi.app/             # 📱 HBuilderX APK/IPA 套壳打包工程（Wap2App）
-├── Microi.Agent/          # 🧩 Microi Agent 桌面、VS Code 扩展与 CLI（独立私有仓）
 ├── microi.mcp/             # 🔌 MCP Server 源码（AI Agent 工具）
-├── microi.openclaw/        # 🦞 OpenClaw 远程 Agent 接入
 ├── Microi.Unity/           # 🌸 Unity UPM SDK 与 WebGL 集成
-├── Microi.Spider.Chrome/   # 🕷️ 真实 Chrome 采集 Worker
 ├── microi.doc/             # 📝 官方文档（基于 VitePress）
 ├── Microi-V8-Engine/       # 🤖 各服务器/租户 AI 应用及应用商城发行源码
 └── microi.skills/          # 🧠 AI Skills 知识库

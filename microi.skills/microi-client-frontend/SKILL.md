@@ -209,6 +209,8 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 ### 本地 ApiBase 与 OsClient 解析（强制）
 
+WebOS 直链容器不能只等旧版 `CallbackSysMenuModel` / `CallbackCurrentDiyTableModel`：标准页面可能不再发送这些事件，标题与图标必须回退当前权限路由的 `meta.title/icon`。路由切换时清空旧模型，回调绑定来源路由并拒绝迟到事件；嵌入窗通知、桌面和手机标题共用同一响应式结果。修改时运行 `tests/webos-page-title.spec.mjs`，并验收直链、刷新、前进后退、桌面窗口和经典界面。
+
 - 域名发现先于租户确定，固定 `platform-os-client-by-domain` 请求不能自动注入默认或缓存租户，也不能携带旧 Token；显式调用租户仍保持。没有 URL/index.html 租户时，每次冷启动重新发现域名，成功后更新缓存，失败立即停止，不写入 `iTdos` 继续请求配置。配置业务失败不是连接故障，健康检查成功不能触发循环重载；只有确认连接故障后的恢复才重载失败启动页。回归覆盖无缓存、错误缓存、显式租户及失败不重载，使用 `domain-tenant-bootstrap.spec.mjs`。
 - 登录回跳使用 Vue Router 解析完整深链接后合并 query/hash；对象式 `push({path, query})` 的 query 会覆盖 path 中原有参数，不能直接传空对象导致记录 Id 丢失。使用 `login-deep-link-query.spec.mjs` 验证编号、编码参数、重复参数和锚点。
 
