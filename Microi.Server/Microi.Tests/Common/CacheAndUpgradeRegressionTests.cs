@@ -767,7 +767,15 @@ public class CacheAndUpgradeRegressionTests
         Assert.Contains("app.microi.sso.json", resources.Keys);
         var package = JObject.Parse(resources["app.microi.sso.json"]);
         Assert.True(Assert.IsType<bool>(hasPackagedSsoRuntime!.Invoke(null, new object[] { package })));
-        Assert.Equal("v8.3.5", package["PackageInfo"]?["Version"]?.ToString());
+        var sourceText = File.ReadAllText(Path.Combine(
+            FindServerRoot(), "OfficialApplications", "Resource", "app.microi.sso.json"));
+        var sourcePackage = JObject.Parse(sourceText);
+        Assert.Equal("v8.3.6", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("63412ba1d4ba56c4ad8ed6c37a536a78d6ad2839b1da67d1424bdba2c45be652",
+            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(sourceText.Replace("\r\n", "\n")))).ToLowerInvariant());
+        Assert.True(JToken.DeepEquals(sourcePackage, package),
+            "Loaded SSO package must exactly match the pinned canonical release source.");
         Assert.Equal("Platform", package["PackageInfo"]?["ApplicationType"]?.ToString());
         Assert.Equal(35, package["SysApiEngines"]?.Children<JObject>().Count());
 
