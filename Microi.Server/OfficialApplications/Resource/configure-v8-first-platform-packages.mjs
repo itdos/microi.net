@@ -165,7 +165,6 @@ export const packageDefinitions = Object.freeze([
       'ApiEngine:platform-ai-runtime@v1.0.0',
       'ApiEngine:platform-ai-runtime@v1.1.0',
       'ApiEngine:platform-ai-runtime@v1.1.1',
-      'ApiEngine:platform-ai-runtime@v1.1.2',
       'ApiEngine:platform-ai-custom-hook@v1.0.0',
       'V8.Method.ManageAiPlatform',
       'V8.Method.RequireManagedProtocolContext',
@@ -186,6 +185,8 @@ export const packageDefinitions = Object.freeze([
       'V8.AI.RecoverMiniMaxMusicTask',
       'ServerFeature:AiMediaModelDirectoryV1',
       'ClientFeature:AiMediaModelSelectionV1',
+      // 新能力保持正式包追加顺序，重复生成不得仅因数组重排改变包哈希。
+      'ApiEngine:platform-ai-runtime@v1.1.2',
     ],
     exactEngineKeys: [
       'mci_ai_data_assistant',

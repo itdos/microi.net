@@ -111,12 +111,14 @@ async function run(action, request = {}) {
 test('platform-ai-runtime is a fixed Managed package resource', () => {
   const engine = packageEngine('platform-ai-runtime');
   assert.ok(engine);
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.4');
-  assert.equal(engine.Version, 'v1.1.1');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.5');
+  assert.equal(engine.Version, 'v1.1.2');
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes('ApiEngine:platform-ai-runtime@v1.1.2'));
   assert.equal(engine.ApiAddress, '/apiengine/platform-ai-runtime');
   assert.equal(engine.StopHttp, 0);
   assert.equal(engine.AllowAnonymous, 0);
-  assert.equal(engine.ApiV8Code, `${source.trimEnd()}\n`);
+  // 正式包正文不带末尾换行；仍逐字核验完整源码，不能只检查版本或动作名称。
+  assert.equal(engine.ApiV8Code, source.trimEnd());
   assert.deepEqual(packageModel.ResourcePolicies.ApiEngines['platform-ai-runtime'], {
     Ownership: 'Platform',
     UpgradePolicy: 'Managed',
