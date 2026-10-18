@@ -4,7 +4,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {createMatrixPlan, validateMatrixResults} from './release-test-matrix.mjs';
+import {createMatrixPlan, validateMatrixResults,validateStagedStorageProof} from './release-test-matrix.mjs';
+import {preserveHdfsEvidence} from './staged-full-runtime.mjs';
+import os from 'node:os';
+
+test('post-cleanup storage verification accepts Git Bash mixed separators and rejects another results directory',()=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-matrix-proof-'));
+ const runtime=path.join(directory,'.net-artifacts');fs.mkdirSync(runtime);fs.writeFileSync(path.join(runtime,'Microi.HDFS.dll'),'tested HDFS bytes');
+ try{
+  const build={resultsDirectory:directory,runtimeDirectory:runtime,sourceHead:'a'.repeat(40),buildId:'same-build',apiDllSha256:'b'.repeat(64),...preserveHdfsEvidence(runtime,directory)};
+  const proof={apiProbe:{buildId:build.buildId,apiDllSha256:build.apiDllSha256,hdfsDllSha256:build.hdfsDllSha256}};
+  fs.rmSync(runtime,{recursive:true});
+  const outcomes=directory+'/release-test-matrix-outcomes.json';
+  assert.doesNotThrow(()=>validateStagedStorageProof(build,{sourceHead:build.sourceHead},proof,outcomes));
+  assert.throws(()=>validateStagedStorageProof(build,{sourceHead:build.sourceHead},proof,path.join(directory,'foreign','outcomes.json')),/存储回执/u);
+  for(const key of ['sourceHead','buildId','apiDllSha256'])assert.throws(()=>validateStagedStorageProof({...build,[key]:'other'},{sourceHead:build.sourceHead},proof,outcomes),/存储回执/u);
+ }finally{fs.rmSync(directory,{recursive:true,force:true});}
+});
 
 const matrix=()=>({schemaVersion:1,observedAt:'2026-10-16T09:00:00.000Z',target:{profile:'microi_demo',apiBase:'https://api.example.com',osClient:'demo'},dependencies:{mysql:{version:'5.7.44'},redis:{version:'7.4.2'},mongo:{version:'5.0.5'},storage:{provider:'Aliyun'},sqlServer:null},fixture:{apiBase:'http://127.0.0.1:63971/',peerApiBase:'http://127.0.0.1:63972/',osClient:'FullMain_123',childOsClient:'FullChild_123'}});
 const environment=()=>({MICROI_TEST_API_BASE:'http://127.0.0.1:63971/',MICROI_TEST_PEER_API_BASE:'http://127.0.0.1:63972/',MICROI_TEST_OSCLIENT:'FullMain_123',MICROI_TEST_CHILD_OSCLIENT:'FullChild_123',MICROI_TEST_MONGO_CURRENT_VERSION:'5.0.5'});

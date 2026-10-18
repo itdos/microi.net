@@ -78,6 +78,9 @@ export function validateMatrixResults(plan,outcomes,storage){
 }
 
 function readFile(file){check(path.isAbsolute(file),'矩阵/回执路径必须是绝对路径');const stat=fs.lstatSync(file);check(stat.isFile()&&!stat.isSymbolicLink(),'矩阵/回执必须是普通文件');return fs.readFileSync(file);}
+export function validateStagedStorageProof(build,plan,storage,outcomesFile){
+ check(path.resolve(build.resultsDirectory)===path.dirname(path.resolve(outcomesFile))&&build.sourceHead===plan.sourceHead&&storage.apiProbe?.buildId===build.buildId&&storage.apiProbe.apiDllSha256===build.apiDllSha256&&storage.apiProbe.hdfsDllSha256===verifyHdfsEvidence(build),'实际API/HDFS存储回执不属于本次正式Full的新构建');
+}
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const head=()=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim();
 const write=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n');};
@@ -104,7 +107,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   const actualGeometry=JSON.parse(readFile(geometryFile).toString('utf8').replace(/^\uFEFF/,''));check(JSON.stringify(actualGeometry.stats)===JSON.stringify(outcomes.geometry.stats),'真实浏览器统计被改写');
   const actualTitles=[];const collectTitles=suite=>{for(const spec of suite.specs||[])actualTitles.push(spec.title);for(const child of suite.suites||[])collectTitles(child);};for(const suite of actualGeometry.suites||[])collectTitles(suite);check(JSON.stringify(actualTitles)===JSON.stringify(outcomes.geometry.caseTitles),'真实浏览器用例名称与原始报告不一致');
   const storageBytes=readFile(storageFile),storage=JSON.parse(storageBytes);
-  if(process.env.MICROI_TEST_RUNTIME_BUILD_FILE){const build=JSON.parse(readFile(process.env.MICROI_TEST_RUNTIME_BUILD_FILE));check(path.resolve(build.resultsDirectory)===path.dirname(receipt)&&build.sourceHead===plan.sourceHead&&storage.apiProbe?.buildId===build.buildId&&storage.apiProbe.apiDllSha256===build.apiDllSha256&&storage.apiProbe.hdfsDllSha256===verifyHdfsEvidence(build),'实际API/HDFS存储回执不属于本次正式Full的新构建');}
+  if(process.env.MICROI_TEST_RUNTIME_BUILD_FILE)validateStagedStorageProof(JSON.parse(readFile(process.env.MICROI_TEST_RUNTIME_BUILD_FILE)),plan,storage,receipt);
   const result=validateMatrixResults(plan,outcomes,storage);
   write(extra[0],{...result,storageReceipt:{file:storageFile,sha256:hash(storageBytes)},verifiedAt:new Date().toISOString()});console.log('Selected Full dependency matrix passed; unselected providers are NotApplicable.');
  }else throw Error('Usage: release-test-matrix.mjs freeze <matrix> <receipt> | verify <receipt> <outcomes> <result>');
