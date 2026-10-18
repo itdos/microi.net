@@ -44,7 +44,7 @@ test('原生 PDF 捕获绑定真实组件依赖、解码图片与最终可选择
   assert.match(verifier, /embedded\.replace\(bitmap, quality=90, subsampling=0/u, '原生合并件继续保留，用于企业优化后的全文和视觉比对')
 })
 
-test('企业导出默认验收轻量候选，技术版保持原生输出，错误回执不能成为最终件', async () => {
+test('企业与技术版均验收轻量候选，错误回执不能成为最终件', async () => {
   fs.mkdirSync(path.join(workspaceRoot, '.tmp/training-pdf-20261017/pipeline'), { recursive: true })
   const directory = fs.mkdtempSync(path.join(workspaceRoot, '.tmp/training-pdf-20261017/pipeline/native-integration-'))
   try {
@@ -54,9 +54,6 @@ test('企业导出默认验收轻量候选，技术版保持原生输出，错�
     fs.writeFileSync(nativeResult.path, source)
     const outputPath = path.join(directory, 'enterprise.pdf')
     const options = { nativeResult, outputPath, captureDirectory: directory, runtimePython: 'fixture-python' }
-    const technical = await finalizeNativeTrainingPdf({ ...options, edition: 'technical' }, () => assert.fail('技术版不调用优化器'))
-    assert.equal(technical, nativeResult)
-    assert.equal(fs.existsSync(outputPath), false)
     const optimizerSource = path.join(projectRoot, 'scripts/optimize-training-deck-pdf.py')
     const optimizerHash = createHash('sha256').update(fs.readFileSync(optimizerSource)).digest('hex')
     const candidateBytes = Buffer.from('lightweight-verified-candidate')
@@ -75,6 +72,11 @@ test('企业导出默认验收轻量候选，技术版保持原生输出，错�
     }
     const result = await finalizeNativeTrainingPdf({ ...options, edition: 'enterprise' }, runner)
     assert.equal(calls, 1)
+    const technicalPath = path.join(directory, 'technical.pdf')
+    const technical = await finalizeNativeTrainingPdf({ ...options, outputPath: technicalPath, edition: 'technical' }, runner)
+    assert.equal(calls, 2)
+    assert.equal(technical.linearized, true)
+    assert.deepEqual(fs.readFileSync(technicalPath), candidateBytes)
     assert.deepEqual(fs.readFileSync(outputPath), candidateBytes)
     assert.deepEqual(fs.readFileSync(nativeResult.path), source)
     assert.equal(result.galleryImageCount, 22, '保留原生捕获对22张截图的验收证据')

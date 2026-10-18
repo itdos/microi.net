@@ -1,7 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import {spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
-test('公开仓门禁同时拒绝旧 Microi.VSCode、新 Microi.Agent 和其余闭源根，正常公开提交可用',()=>{
+test('公开仓门禁同时拒绝旧 Microi.VSCode、新 Microi.Agent 和其余闭源根，正常公开提交可用',t=>{
  const parent=path.join(workspace,'.tmp/reports/microi-code/guard-tests');fs.mkdirSync(parent,{recursive:true});const repo=fs.mkdtempSync(path.join(parent,'repo-'));
+ t.after(()=>fs.rmSync(repo,{recursive:true,force:true}));
  const git=(args,ok=true)=>{const r=spawnSync('git',args,{cwd:repo,encoding:'utf8',windowsHide:true});if(ok)assert.equal(r.status,0,r.stderr);return r;};
  git(['init','-q']);git(['config','user.name','Microi guard fixture']);git(['config','user.email','fixture@example.invalid']);git(['config','core.autocrlf','false']);git(['config','core.hooksPath','.githooks']);
  fs.mkdirSync(path.join(repo,'.githooks'));for(const name of ['pre-commit','pre-push'])fs.writeFileSync(path.join(repo,'.githooks',name),fs.readFileSync(path.join(workspace,'.githooks',name),'utf8').replaceAll('\r\n','\n'),{mode:0o755});

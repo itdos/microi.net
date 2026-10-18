@@ -1,0 +1,14 @@
+/* 引擎截图取代装饰轨道，保留原说明和功能标签；图像与对话框均复用现有浏览器行为。 */
+.mci-engine-gallery { display:grid;gap:16px;min-width:0;align-content:center; }
+.mci-engine-gallery figure { margin:0!important;padding:0!important;border:0!important;min-width:0; }
+.mci-engine-gallery button { display:block;position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border:1px solid var(--mci-deck-line-strong);border-radius:14px;background:var(--mci-deck-surface);box-shadow:var(--mci-deck-shadow-soft); }
+.mci-engine-gallery img { display:block;width:100%!important;height:100%!important;object-fit:contain!important;margin:0!important;max-height:none!important; }
+.mci-engine-gallery button>span { position:absolute;bottom:8px;right:8px;padding:4px 10px;border-radius:6px;background:#10283eee;color:white;font-size:12px; }
+.mci-engine-gallery figcaption { color:var(--mci-deck-text-soft);font-size:13px!important;margin:6px 0 0!important;padding:0!important;line-height:1.4!important; }
+.mci-engine-gallery-tags { display:flex;flex-wrap:wrap;gap:8px; }
+.mci-engine-gallery-tags span { padding:5px 12px;border:1px solid var(--mci-deck-line);border-radius:20px;font-size:13px;color:var(--mci-engine-accent);background:var(--mci-deck-surface); }
+.mci-engine-gallery button:focus-visible { outline:3px solid var(--mci-deck-cyan);outline-offset:3px; }
+.mci-training-deck.is-artifact-capture .mci-engine-gallery { gap:12px; }
+.mci-training-deck.is-artifact-capture .mci-engine-gallery button { height:300px;aspect-ratio:auto; }
+.mci-training-deck.is-artifact-capture .mci-engine-gallery:has(figure:nth-child(2)) button { height:220px; }
+@media(max-width:767px) { .mci-engine-gallery{gap:16px}.mci-engine-gallery button{min-height:150px}.mci-engine-gallery figcaption{font-size:12px} }

@@ -30,13 +30,13 @@ test('agent release history stays at the end of the guide and preserves both pla
   assert.match(history, /客户 Windows 原生安装与启动仍待确认/)
 })
 
-test('Agent history starts with both formally released Windows archives and their guide checksums', () => {
+test('Agent history starts with the three latest released Windows archives and their guide checksums', () => {
   const component = read('docs/.vitepress/theme/components/MicroiAgentShowcase.vue')
   const guide = read('docs/doc/v8-engine/microi-agent.md')
   const catalog = component.match(/const releases = \[([\s\S]*?)\n\]/)?.[1] || ''
   const entries = [...catalog.matchAll(/\{ version: '([^']+)', platform: '([^']+)', note: '([^']+)', url: '([^']+)', sha256: '([a-f0-9]{64})' \}/g)]
-  assert.deepEqual(entries.slice(0, 2).map(entry => [entry[1], entry[2]]), [['1.4.1', 'Windows x64'], ['1.4.0', 'Windows x64']])
-  for (const [version, hash] of [['1.4.1', '03bfb220f43c95000f1b8e6df2e02595589792cc5ef23b823c24a052b54a1c32'], ['1.4.0', '5f39653d339a56056a1967cfcc79622ea4830fa0040761ad272135b0036cf014']]) {
+  assert.deepEqual(entries.slice(0, 3).map(entry => [entry[1], entry[2]]), [['1.4.2', 'Windows x64'], ['1.4.1', 'Windows x64'], ['1.4.0', 'Windows x64']])
+  for (const [version, hash] of [['1.4.2', 'e0bb17a31d453e3c496cc0168be07bec5bbb81b329d01530ea22fa4af2a222de'], ['1.4.1', '03bfb220f43c95000f1b8e6df2e02595589792cc5ef23b823c24a052b54a1c32'], ['1.4.0', '5f39653d339a56056a1967cfcc79622ea4830fa0040761ad272135b0036cf014']]) {
     const matches = entries.filter(entry => entry[1] === version && entry[2] === 'Windows x64')
     assert.equal(matches.length, 1, 'each released Windows archive appears exactly once')
     const entry = matches[0], url = new URL(entry[4])
@@ -181,7 +181,7 @@ test('current Chinese brand surfaces use one canonical positioning and keep the 
     if (name === 'training syllabus') {
       assert.match(content, /47页技术架构版与10页企业版/)
       assert.match(content, /企业版以成功案例为路线/u)
-      assert.match(content, /全部22张原始截图与系统架构图/u)
+      assert.match(content, /24张行业案例截图与系统架构图/u)
       assert.match(content, /<TrainingSyllabusDeck\s*\/>/u)
       assert.doesNotMatch(content, /企业应用版|12\s*页企业|AI\s*界面概念图/u)
     }

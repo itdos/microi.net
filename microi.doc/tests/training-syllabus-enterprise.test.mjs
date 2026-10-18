@@ -16,6 +16,7 @@ import { verifiedTrainingAssetPath } from '../scripts/prepare-training-downloads
 import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
 import * as commonContent from '../docs/.vitepress/theme/common-training-content.js'
 import { trainingCaseAssets } from '../docs/.vitepress/theme/training-case-assets.js'
+import { trainingEngineAssets } from '../docs/.vitepress/theme/training-engine-assets.js'
 import { trainingPreviewAssets, trainingPreviewPath } from '../docs/.vitepress/theme/training-previews.js'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -23,6 +24,31 @@ const component = fs.readFileSync(path.join(projectRoot, 'docs/.vitepress/theme/
 const { descriptor, errors } = parseSfc(component)
 assert.deepEqual(errors, [], 'the real presentation component must remain valid Vue source')
 const counts = { technical: 47, enterprise: 10 }
+
+test('体验链接准确覆盖指定七图，技术引擎配图全部使用已验签的轻量CDN资源', () => {
+  const linked = trainingCaseAssets.filter(asset => asset.experienceUrl)
+  assert.equal(linked.length, 7)
+  assert.deepEqual(linked.map(asset => [asset.fileName, asset.experienceUrl]), [
+    ['microi-enterprise-iot-01.png', 'https://static.itdos.com/itdos/micro-app/warehouse-strategy-twin/index.html'],
+    ['microi-enterprise-iot-02.png', 'https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html'],
+    ['microi-enterprise-iot-03.png', 'https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html'],
+    ['microi-enterprise-games-01.png', 'https://microi.net/apps.html?category=game'],
+    ['microi-enterprise-games-02.png', 'https://static.itdos.com/itdos/micro-app/microi-unity-cs/index.html'],
+    ['microi-enterprise-games-03.png', 'https://static.itdos.com/itdos/micro-app/gomoku-3d-cocos-arena/index.html'],
+    ['microi-enterprise-games-04.png', 'https://static.itdos.com/itdos/micro-app/xiangqi-3d-cocos-arena/index.html'],
+  ])
+  const ids = [...component.matchAll(/id: '([^']+)', domain:/gu)].map(match => match[1])
+  assert.equal(ids.length, 38)
+  assert.deepEqual(Object.keys(trainingEngineAssets).sort(), ids.sort())
+  for (const assets of Object.values(trainingEngineAssets)) for (const asset of assets) {
+    assert.ok(asset.bytes > 1000 && asset.bytes < 1000000)
+    assert.match(asset.url, /^https:\/\/file\.microi\.net\/itdos\/official-docs\/images\//u)
+    assert.ok(asset.url.includes(asset.sha256))
+    assert.equal(asset.mimeType, 'image/jpeg')
+    assert.ok(Date.parse(asset.verifiedAt))
+    if (asset.kind === 'diagram') assert.ok(asset.alt.includes('非系统截图'))
+  }
+})
 const slideText = slide => JSON.stringify(slide)
 
 function sourceForUrl(url) {
@@ -152,7 +178,7 @@ test('10 页企业版依用户顺序覆盖平台、系统选型和五类行业�
     [5, ['AI + Blender / CAD / 3ds Max + Three.js / Unity', '无需人工从零绘图、建模', '照片 / 视频完成AI建模', '30+引擎', 'Socket', 'MQTT', 'TCP透传', '设备与网关', 'Zigbee', 'RS-485', 'Modbus']],
     [6, ['多家国企', '集团公司', 'OA办公系统', '服装ERP', '慈溪服装工厂', '100余家', 'SaaS引擎模式', '电器ERP', '轻量级ERP']],
     [7, ['游戏服务器端', '玩家数据管理', '实时通信', '类CS', '棋牌游戏', '几天', '可商用交付产品']],
-    [8, ['500余套软件', 'CRM客户关系', 'CMS内容管理', 'B2C商城', '酒店管理', '财税服务', '考试系统', '售后系统', '企业服务平台', '商会管理', '互联网平台', '欢迎参观成功案例']],
+    [8, ['500余套软件', 'CRM客户关系', 'CMS内容管理', 'B2C商城', '酒店管理', '财税服务', '考试系统', '售后系统', '企业服务平台', '商会管理', '互联网平台', '欢迎联系我们参观更多成功案例']],
   ])
   for (const [index, phrases] of requirements) for (const phrase of phrases) assert.ok(enterpriseBodies[index].includes(phrase), `${enterpriseSlides[index].nav}: missing requirement ${phrase}`)
 })
@@ -172,26 +198,32 @@ test('两版前三页和致辞复用真实组件，完整重现用户要求的�
   }
   assert.match(enterpriseBodies[0], /企业版介绍.*以成功案例为路线.*开始介绍/u)
   assert.match(await renderedSlide('CommonTrainingSlide', { kind: 'cover', version: 'technical' }), /技术培训大纲.*以功能点为路线，现场了解平台.*开始培训/u)
-  for (const phrase of ['绝大部分研发团队', '前端框架', '后端框架', '表单引擎', '工作流引擎', '打印引擎', '分布式缓存', '分布式存储', '30+', 'Codex / WorkBuddy 直接开发软件', 'Codex / WorkBuddy + 系统框架底座', '软件产品', '8', '年', 'ChatGPT、Opus', '连续对话多年', '高性能分布式', '1 年以上', '大概率', '成熟系统框架', '至关重要', '优秀的开源系统框架很多', '许多企业', '全方位对比']) assert.ok(enterpriseBodies[1].includes(phrase), `framework selection: missing ${phrase}`)
-  assert.doesNotMatch(enterpriseBodies[1], /AI直接从需求开始开发自由度高/u)
-  for (const phrase of ['系统灵活性做到极致', '图片 / 文件上传', '模块引擎列、搜索、按钮、卡片', '1189', '万+', '截止2026年10月16日']) assert.ok(enterpriseBodies[2].includes(phrase), `why Microi: missing ${phrase}`)
+  for (const version of ['technical', 'enterprise']) {
+    const decision = (await renderedSlide('CommonTrainingSlide', { kind: 'decision', version })).replace(/框架\s*、\s*/gu, '框架、')
+    const why = await renderedSlide('CommonTrainingSlide', { kind: 'why', version })
+    for (const phrase of ['绝大部分研发团队', '前端框架', '后端框架', '表单引擎', '工作流引擎', '打印引擎', '分布式缓存', '分布式存储', 'Codex / WorkBuddy 直接开发软件', 'Codex / WorkBuddy + 系统框架底座', '软件产品', '高性能分布式', '1 年以上', '大概率', '成熟系统框架', '至关重要', '市面上有非常多优秀的', '开源前端框架、后端框架、工作流引擎等等', '许多企业正基于它们开发软件']) assert.ok(decision.includes(phrase), version + '/decision: ' + phrase)
+    assert.doesNotMatch(decision, /吾码|Microi|30\+|8年|ChatGPT、Opus|AI直接从需求开始开发自由度高/u)
+    for (const phrase of ['30+', '成熟插件化引擎', '吾码持续升级迭代', '2018', 'ChatGPT、Opus', '连续对话多年', '系统灵活性做到极致', '图片 / 文件上传', '模块引擎列、搜索、按钮、卡片', '1,207', '万+', '截至2026年10月18日', '全方位对比', 'AI 负责理解业务', '引擎负责把事做对', '一句话，开发大型企业应用']) assert.ok(why.includes(phrase), version + '/why: ' + phrase)
+    for (const group of commonContent.trainingEngineGroups) for (const engine of group.engines) assert.ok(why.includes(engine))
+  }
   assert.equal(commonContent.trainingArchitectureImage.src, 'https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg')
 })
 
-test('四类案例展示全部22张已验签原图，公开链接保留且概念图彻底退出企业正文', () => {
+test('四类案例保留21张原图、移除指定OA图，并补充3张更多行业案例', () => {
   const cases = enterpriseSlides.filter(slide => slide.layout === 'case')
   assert.equal(cases.length, 4)
-  assert.equal(trainingCaseAssets.length, 22)
-  assert.equal(new Set(trainingCaseAssets.map(asset => asset.url)).size, 22)
-  assert.equal(new Set(trainingCaseAssets.map(asset => asset.sha256)).size, 22)
-  assert.deepEqual(cases.flatMap(slide => slide.gallery), trainingCaseAssets)
-  assert.deepEqual(cases.map(slide => slide.gallery.length), [5, 6, 7, 4], 'each industry retains every supplied original')
-  assert.equal(enterpriseSlides[8].gallery.length, 0, 'the cross-industry visual page should not need screenshots')
+  assert.equal(trainingCaseAssets.length, 24)
+  assert.equal(new Set(trainingCaseAssets.map(asset => asset.url)).size, 24)
+  assert.equal(new Set(trainingCaseAssets.map(asset => asset.sha256)).size, 24)
+  assert.deepEqual(cases.flatMap(slide => slide.gallery), trainingCaseAssets.filter(asset => asset.group !== 'more'))
+  assert.deepEqual(cases.map(slide => slide.gallery.length), [5, 6, 6, 4])
+  assert.equal(enterpriseSlides[8].gallery.length, 3)
+  assert.ok(!trainingCaseAssets.some(asset => asset.fileName === 'microi-enterprise-oaerp-05.png'))
   for (const asset of trainingCaseAssets) {
     assert.ok(asset.bytes > 1000)
     assert.match(asset.sha256, /^[a-f0-9]{64}$/u)
     assert.match(asset.mimeType, /^image\/(jpeg|png|webp)$/u)
-    assert.ok(asset.alt.includes('系统实景截图'))
+    assert.ok(asset.alt.length > 5)
     assert.ok(asset.verifiedAt && Number.isFinite(Date.parse(asset.verifiedAt)))
     const url = new URL(asset.url)
     assert.equal(url.origin, 'https://file.microi.net')
@@ -240,7 +272,7 @@ test('品牌右侧两按钮真实驱动版本、下载、缩略图、搜索与�
   assert.equal(runtime.visibleSlides.value.length, 1, 'search the current edition\'s actual indexed body')
   assert.equal(runtime.visibleSlides.value[0].slide.id, 'enterprise-iot')
   runtime.searchKeyword.value = 'ChatGPT'
-  assert.deepEqual(runtime.visibleSlides.value.map(result => result.index), [1], 'shared component body participates in enterprise search')
+  assert.deepEqual(runtime.visibleSlides.value.map(result => result.index), [2], 'maturity evidence moved to page 3 and remains searchable')
   runtime.searchKeyword.value = '下载量'
   assert.deepEqual(runtime.visibleSlides.value.map(result => result.index), [0, 2, 9], 'all repeated opening advantages remain searchable')
   runtime.browser.location.hash = '#enterprise-slide-07'

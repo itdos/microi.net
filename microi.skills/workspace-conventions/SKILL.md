@@ -5,6 +5,15 @@ description: 每次 Microi 任务开始前必读的基础规范。用于识别�
 
 # Microi 工作区全局约定
 
+## 截图与大体积资源必须走 CDN（默认强制）
+
+- 截图、宣传配图、PDF、PPT/PPTX、视频、音频、模型、压缩包、安装包、导出报告及其它大体积资源不得提交或推送到 Gitee、GitHub 等源码仓库。截图和交付附件无论压缩后是否低于大小阈值都走 CDN；禁止通过 Base64、Git LFS、分卷、改后缀、强制暂存或中间提交绕过。一般“提交并推送”的授权不能解除此规则，也不再走“先上传大文件到 Git 再处理”的路径。
+- 吾码官方公开资源必须通过已核验 `https://api.itdos.com + OsClient=iTdos` 的 `microi_itdos` MCP 上传公有桶，并使用 `https://file.microi.net` 前缀访问。普通客户资源使用已授权租户 MCP 与实际 CDN/FileServer，敏感、私有资料保持私有权限，不能为了公开链接改为公有桶。大文件使用已有流式/分片上传能力，不绕过 MCP 直接使用存储密钥。
+- 源码只保存必要代码、轻量可编辑模板、CDN URL、文件名、字节数、SHA-256、MIME 和必要生成说明；原图、压缩件、PDF、下载校验缓存放任务专属临时目录，交付后按清理规则回收。上传成功后必须独立下载核对字节数、哈希和真实 MIME；PDF 同时检查 Range 分段读取。未知上传结果先回读，不能盲重传。
+- 提交前检查暂存区，推送前以刚核验的远端引用检查全部待推送提交的新增 Blob；既查资源类型，也查单个 10 MiB / 合计 50 MiB 的体积门槛。发现禁止入库资源就停止受影响的提交/推送，迁移 CDN 并从本次候选索引/提交中排除；中间提交加入后又删除也不合格。不得改写共享历史、删除用户本地原图或清空既有仓库。必要运行依赖另按真实用途审查，但不能借此提交截图和交付附件。
+
+完整上传与回读流程见 [文件上传下载规范](../v8-file-upload/SKILL.md)，Git 对象检查与历史边界见 [Git 大文件推送检查](references/progressive-03-cli-与-ide-插件错版共存约定.md#git-大文件推送检查强制)。
+
 ## 测试临时文件必须随任务清理（强制）
 
 本节适用于开发、测试、诊断和发布产生的全部自有临时资产，包括工作区根 `.tmp/`、宿主临时目录（如 `$CODEX_HOME/tmp`）和隔离 Git worktree，并替代历史“任务完成后可以不清理”的约定。目录位置和 `.gitignore` 不改变收尾责任。
@@ -128,6 +137,6 @@ AI 在任何新建或已有对话中处理 Microi吾码任务并向用户输出�
 
 - [references/progressive-01-版本更新日志保护规则-强制.md](references/progressive-01-版本更新日志保护规则-强制.md)：版本更新日志保护规则（强制）；配置文件说明中文优先规则；后端 API 配置白名单与 SaaS 单一事实源（强制）；身份、可逆业务秘密与敏感操作统一规范（强制）；多语言优先约定；后台菜单层级默认规则；后台任务与安全防护约定；业务逻辑优先接口引擎约定；应用商城优先于 Microi.Upgrade（强制）；在线 AI 应用上下文默认发现规则（强制）；VS Code 插件空目录生成规则；Microi 版本号规则；C# dynamic 强类型落地规则；根目录保留文件说明
 - [references/progressive-02-microi-net-api-本地启动约定.md](references/progressive-02-microi-net-api-本地启动约定.md)：Microi.net.Api 本地启动约定；多 AI 对话共享本地服务与发布互斥（强制）；本地租户与测试凭据读取约定；自动化登录约定；V8 远端/本地同步收尾约定；V8 缓存刷新约定；MCP 元数据更新验收约定；MCP 可用性排查约定；MCP 写入超时与降级约定；Codex MCP 单入口约定；.venv Python 环境说明；后端代码改动后的重启验收；MCP 可调用性诊断补充；Windows MCP 控制台闪窗复盘
-- [references/progressive-03-cli-与-ide-插件错版共存约定.md](references/progressive-03-cli-与-ide-插件错版共存约定.md)：CLI 与 IDE 插件错版共存约定；Git 大文件推送确认
+- [references/progressive-03-cli-与-ide-插件错版共存约定.md](references/progressive-03-cli-与-ide-插件错版共存约定.md)：CLI 与 IDE 插件错版共存约定；Git 大文件推送检查
 - [references/progressive-04-工作区与平台专项保障.md](references/progressive-04-工作区与平台专项保障.md)：工作区与平台专项保障
 <!-- microi-progressive:end -->

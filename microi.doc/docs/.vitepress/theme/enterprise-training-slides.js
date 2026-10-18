@@ -40,9 +40,9 @@ const definitions = [
       {title:'实时通信技术',text:'连接游戏客户端与服务端，支撑实时消息和互动业务。'},
       {title:'快速商业交付',text:'复用系统架构与现成能力，范围明确的类CS、棋牌游戏可在几天内开发为可商用交付产品。'},
     ],takeaway:'把时间留给玩法与体验；实际周期随玩法、素材、联机规模和验收范围变化。' },
-  { id:'enterprise-more', nav:'更多成功案例', layout:'universe', title:'跨越行业边界，连接更多可能', summary:'吾码在其它领域共计交付500余套软件，持续把业务想法变成真实系统。', eyebrow:'09 / ONE PLATFORM · MANY WORLDS', metric:'500+',metricLabel:'其它领域软件交付',
+  { id:'enterprise-more', nav:'更多成功案例', layout:'universe', group:'more', title:'跨越行业边界，连接更多可能', summary:'吾码在其它领域共计交付500余套软件，持续把业务想法变成真实系统。', eyebrow:'09 / ONE PLATFORM · MANY WORLDS', metric:'500+',metricLabel:'其它领域软件交付',
     sectors:['CRM客户关系','CMS内容管理','B2C商城','酒店管理','财税服务','考试系统','售后系统','企业服务平台','商会管理','互联网平台','园区与公共服务','物流与供应链','教育教务','农业牧场','资产管理'],
-    takeaway:'对某个领域感兴趣？欢迎参观成功案例，与我们一起深入了解实际业务。',sources:[{label:'参观成功案例',href:'/case/case-index.html'},{label:'联系吾码',href:'/contact/'}] },
+    takeaway:'对某个领域感兴趣？欢迎联系我们参观更多成功案例，与我们一起深入了解实际业务。',sources:[{label:'参观成功案例',href:'/case/case-index.html'},{label:'联系吾码',href:'/contact/'}] },
   { id:'enterprise-closing', nav:'致辞', commonKind:'closing', title:'把 AI 的速度，变成企业可持续交付力', summary:'从今天开始，少重复造轮子，多创造真正有差异的业务价值。' },
 ]
 

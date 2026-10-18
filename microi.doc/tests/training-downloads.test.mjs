@@ -73,10 +73,10 @@ test('当前四份 PDF 页数与47页技术版/10页企业版一致并包含原�
   }
 })
 
-test('企业版 PDF 控制下载体积并支持首屏分段加载，避免回退到原图重绘版本', () => {
-  for (const theme of ['dark', 'light']) {
-    const bytes = fs.readFileSync(verifiedTrainingAssetPath(trainingPdfPaths.enterprise[theme]))
-    assert.ok(bytes.length <= 8 * 1024 * 1024, `${theme}: 阅读版不能重新嵌入数十MB原图和透明装饰`)
+test('两版 PDF 控制下载体积并支持首屏分段加载，避免回退到原图重绘版本', () => {
+  for (const edition of ['enterprise', 'technical']) for (const theme of ['dark', 'light']) {
+    const bytes = fs.readFileSync(verifiedTrainingAssetPath(trainingPdfPaths[edition][theme]))
+    assert.ok(bytes.length <= (edition === 'enterprise' ? 8 : 25) * 1024 * 1024, `${edition}/${theme}: 阅读版不能重新嵌入数十MB原图和透明装饰`)
     assert.match(bytes.subarray(0, 2048).toString('latin1'), /\/Linearized\s+1\b/u, '线性化字典必须处于文件开头，配合CDN Range先显示首屏')
   }
 })
