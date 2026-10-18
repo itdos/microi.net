@@ -306,3 +306,115 @@
 .mci-common-why__promise > span { display:block;line-height:1.3!important; }
 .mci-common-why__promise > strong { display:block;margin-top:12px;font-size:clamp(17px,1.35vw,22px);line-height:1.4!important; }
 .mci-training-deck.is-artifact-capture .mci-training-slide__frame:has(.mci-common-why) { padding:34px 80px!important; }
+
+/* 第2页只讲框架选型；大号结论与生态事实优先于路径细节。 */
+.mci-framework-hero { display:grid;grid-template-columns:1.05fr 1fr;gap:28px;align-items:center;padding:22px 26px;border:1px solid var(--mci-deck-line-strong);border-left:5px solid var(--mci-deck-primary);border-radius:var(--mci-deck-radius-card);background:linear-gradient(120deg,var(--mci-deck-primary-soft),var(--mci-deck-surface));box-shadow:var(--mci-deck-shadow-soft); }
+.mci-framework-hero > strong { font-size:clamp(24px,2.05vw,34px);line-height:1.35;font-weight:850; }
+.mci-framework-hero em { display:block;color:var(--mci-deck-primary);font-style:normal; }
+.mci-framework-hero > p { font-size:clamp(19px,1.6vw,26px)!important;line-height:1.5!important;color:var(--mci-deck-text)!important; }
+.mci-framework-hero > p strong { color:var(--mci-deck-blue);font-weight:850; }
+.mci-framework-hero > p strong > span { white-space:nowrap; }
+.is-common-decision .mci-common-foundation { grid-template-columns:180px minmax(0,1fr); }
+.is-common-decision .mci-common-foundation__layers { grid-template-columns:repeat(8,minmax(0,1fr)); }
+.is-common-decision .mci-common-foundation__layers span { font-size:12px; }
+.is-common-decision .mci-common-foundation__label > strong { font-size:15px; }
+.mci-framework-maturity { display:flex;gap:18px;align-items:flex-start;padding:17px 22px;border-top:1px solid var(--mci-deck-line-strong);background:var(--mci-deck-surface-soft);border-radius:var(--mci-deck-radius-card); }
+.mci-framework-maturity > span { flex-shrink:0;padding:6px 10px;color:var(--mci-deck-purple);background:var(--mci-deck-purple-soft);font-size:13px;font-weight:800; }
+.mci-framework-maturity strong { display:block;font-size:18px;line-height:1.4;margin-bottom:7px; }
+.mci-framework-maturity p { font-size:14px!important;line-height:1.6!important; }
+.mci-framework-maturity b { color:var(--mci-deck-purple); }
+
+/* 第3页以引擎矩阵为主图，证据列保留可全屏的原架构图。 */
+.is-common-why { gap:14px; }
+.is-common-why .mci-common-heading h2 { display:flex;flex-wrap:wrap;gap:8px 24px;align-items:baseline; }
+.is-common-why .mci-common-heading h2 em { color:var(--mci-deck-primary);font-size:.87em;font-style:normal; }
+.is-common-why .mci-common-heading > div > p:last-child { font-size:clamp(15px,1.25vw,20px); }
+.mci-engine-proof { display:grid;grid-template-columns:minmax(265px,.8fr) minmax(0,2.15fr);gap:28px; }
+.mci-engine-proof__evidence { display:flex;flex-direction:column;gap:13px;min-width:0;padding-right:24px;border-right:1px solid var(--mci-deck-line); }
+.mci-engine-proof__hero { display:flex;align-items:center;gap:15px; }
+.mci-engine-proof__hero > strong { color:var(--mci-deck-primary);font-size:clamp(65px,6.2vw,98px);font-weight:900;line-height:1;letter-spacing:-.07em; }
+.mci-engine-proof__hero > strong > span { font-size:.65em; }
+.mci-engine-proof__hero > div { display:grid;gap:6px; }
+.mci-engine-proof__hero b { font-size:17px;line-height:1.4; }
+.mci-engine-proof__hero div > span { font-size:11px;line-height:1.5;color:var(--mci-deck-text-soft); }
+.mci-engine-proof__metrics { display:grid;grid-template-columns:.9fr 1.25fr;gap:16px; }
+.mci-engine-proof__metrics > div { display:flex;flex-direction:column;gap:4px;min-width:0;padding:0;border:0; }
+.mci-engine-proof__metrics strong { color:var(--mci-deck-text);font-size:36px;line-height:1.15;font-weight:850;letter-spacing:-.04em; }
+.mci-engine-proof__metrics strong > span { margin-left:4px;font-size:17px;letter-spacing:0; }
+.mci-engine-proof__metrics b { font-size:12px;font-weight:700; }
+.mci-engine-proof__metrics small { color:var(--mci-deck-text-soft);font-size:10px;line-height:1.4; }
+.mci-engine-proof__token { display:flex;gap:12px;align-items:center;padding-block:10px!important;border-block:1px solid var(--mci-deck-line)!important; }
+.mci-engine-proof__token > strong { color:var(--mci-deck-primary);font-size:38px;line-height:1;letter-spacing:-.04em; }
+.mci-engine-proof__token > span { font-size:14px;color:var(--mci-deck-text); }
+.mci-engine-proof__token small { display:block;font-size:10px;color:var(--mci-deck-text-soft); }
+.mci-engine-proof .mci-common-architecture { flex:none;aspect-ratio:2.05;min-height:0; }
+.mci-engine-proof__history { display:block;color:var(--mci-deck-text-soft);font-size:11px;line-height:1.55; }
+.mci-engine-proof__catalog { display:flex;flex-direction:column;gap:13px;min-width:0; }
+.mci-engine-matrix { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px; }
+.mci-engine-matrix > section { min-width:0; }
+.mci-engine-matrix h3 { display:flex;justify-content:space-between;align-items:baseline;gap:5px;margin-bottom:10px!important;padding-bottom:10px!important;border-bottom:1px solid var(--mci-deck-line-strong)!important;color:var(--mci-common-tone)!important;font-size:17px!important;font-weight:800;line-height:1.4; }
+.mci-engine-matrix h3 small { color:var(--mci-deck-text-muted);font:500 12px/1 Consolas,monospace; }
+.mci-engine-matrix ul { display:grid;gap:4px;margin:0!important;padding:0!important;list-style:none; }
+.mci-engine-matrix li { display:flex;justify-content:center;align-items:center;min-height:29px;margin:0!important;padding:3px 4px!important;border:1px solid var(--mci-deck-line-strong);border-radius:6px;color:var(--mci-deck-text);background:linear-gradient(130deg,var(--mci-common-tone-soft),var(--mci-deck-surface-soft));font-size:13px;line-height:1.35!important;text-align:center;box-shadow:0 3px 10px rgb(0 0 0 / .035);transition:border-color .2s,transform .2s; }
+.mci-engine-matrix li:hover { border-color:var(--mci-common-tone);transform:translateY(-2px); }
+.mci-engine-proof__more { display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px!important;line-height:1.5!important; }
+.mci-engine-proof__more b { color:var(--mci-deck-primary); }
+.mci-engine-proof__benefits { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 16px; }
+.mci-engine-proof__benefits article { display:flex;gap:10px;align-items:flex-start;min-width:0; }
+.mci-engine-proof__benefits article > span { color:var(--mci-common-tone);font:800 16px/1.4 Consolas,monospace;min-width:24px; }
+.mci-engine-proof__benefits h3 { font-size:13px!important;line-height:1.4;font-weight:800; }
+.mci-engine-proof__benefits p { margin-top:3px!important;font-size:11px!important;line-height:1.5!important; }
+.mci-engine-proof__promise { display:grid;grid-template-columns:1.1fr 1fr;gap:20px;align-items:center;padding:16px 20px;border:1px solid var(--mci-deck-line-strong);border-radius:var(--mci-deck-radius-card);background:linear-gradient(110deg,var(--mci-deck-primary-soft),var(--mci-deck-surface)); }
+.mci-engine-proof__promise .mci-common-why__promise { padding:0;text-align:left;font-size:clamp(25px,2.05vw,34px)!important;line-height:1.25!important;white-space:nowrap; }
+.mci-engine-proof__promise .mci-common-why__promise > strong { margin-top:5px;font-size:13px;line-height:1.4!important;color:var(--mci-deck-text-soft);font-weight:600; }
+.mci-engine-proof__promise > p:last-child { text-align:right;font-size:clamp(18px,1.6vw,26px);line-height:1.4!important; }
+.mci-engine-proof__promise > p:last-child > strong { display:block;color:var(--mci-deck-primary); }
+.mci-engine-proof__foundation { display:flex;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;font-size:11px;color:var(--mci-deck-text-soft); }
+.mci-engine-proof__note { font-size:10px!important;line-height:1.4!important;color:var(--mci-deck-text-muted)!important; }
+.mci-training-deck.is-artifact-capture .mci-training-slide__frame:has(.mci-engine-proof) { padding:24px 72px!important; }
+.mci-training-deck.is-artifact-capture .mci-training-slide__frame:has(.mci-framework-hero) { padding:34px 72px!important; }
+.mci-training-deck.is-artifact-capture .is-common-why { gap:14px; }
+.mci-training-deck.is-artifact-capture .is-common-decision .mci-common-foundation { grid-template-columns:180px minmax(0,1fr); }
+.mci-training-deck.is-artifact-capture .is-common-decision .mci-common-foundation__layers { grid-template-columns:repeat(8,minmax(0,1fr)); }
+
+@media (max-width:1200px) {
+  .mci-engine-proof { grid-template-columns:minmax(240px,.8fr) minmax(0,1.8fr);gap:18px; }
+  .mci-engine-proof__evidence { padding-right:15px; }
+  .mci-engine-matrix { gap:8px; }
+  .mci-engine-proof { grid-template-columns:1fr; }
+  .mci-engine-proof__evidence { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;border-right:0;padding-right:0; }
+  .mci-engine-proof__metrics { grid-column:span 2; }
+  .mci-engine-matrix h3 { font-size:14px!important; }
+  .mci-engine-matrix li { font-size:12px; }
+  .mci-engine-proof__promise .mci-common-why__promise { white-space:normal; }
+}
+@media (max-width:767px) {
+  .mci-framework-hero { grid-template-columns:1fr;gap:18px;padding:20px; }
+  .mci-framework-hero > strong { font-size:27px; }
+  .mci-framework-hero > p { font-size:21px!important; }
+  .mci-framework-hero br { display:none; }
+  .is-common-decision .mci-common-foundation { grid-template-columns:1fr; }
+  .is-common-decision .mci-common-foundation__layers { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .mci-framework-maturity { flex-direction:column;gap:12px;padding:17px; }
+  .mci-engine-proof { grid-template-columns:1fr;gap:24px; }
+  .mci-engine-proof__evidence { display:flex;border-right:0;padding-right:0;gap:18px; }
+  .mci-engine-proof__hero > strong { font-size:90px; }
+  .mci-engine-proof__hero b { font-size:20px; }
+  .mci-engine-proof__hero div > span { font-size:13px; }
+  .mci-engine-proof__metrics strong { font-size:40px; }
+  .mci-engine-proof__metrics b { font-size:14px; }
+  .mci-engine-proof__metrics small { font-size:11px; }
+  .mci-engine-proof__history { font-size:12px; }
+  .mci-engine-matrix { grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 12px; }
+  .mci-engine-matrix h3 { font-size:18px!important; }
+  .mci-engine-matrix li { min-height:39px;font-size:14px; }
+  .mci-engine-proof__more { font-size:12px!important; }
+  .mci-engine-proof__benefits { grid-template-columns:1fr;gap:17px; }
+  .mci-engine-proof__benefits h3 { font-size:16px!important; }
+  .mci-engine-proof__benefits p { font-size:13px!important; }
+  .mci-engine-proof__promise { grid-template-columns:1fr;gap:20px;padding:18px; }
+  .mci-engine-proof__promise .mci-common-why__promise { font-size:29px!important; }
+  .mci-engine-proof__promise > p:last-child { text-align:left;font-size:22px; }
+  .mci-engine-proof__foundation { font-size:12px;line-height:1.6; }
+  .mci-engine-proof__note { font-size:11px!important; }
+}

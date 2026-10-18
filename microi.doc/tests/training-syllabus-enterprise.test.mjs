@@ -198,9 +198,14 @@ test('两版前三页和致辞复用真实组件，完整重现用户要求的�
   }
   assert.match(enterpriseBodies[0], /企业版介绍.*以成功案例为路线.*开始介绍/u)
   assert.match(await renderedSlide('CommonTrainingSlide', { kind: 'cover', version: 'technical' }), /技术培训大纲.*以功能点为路线，现场了解平台.*开始培训/u)
-  for (const phrase of ['绝大部分研发团队', '前端框架', '后端框架', '表单引擎', '工作流引擎', '打印引擎', '分布式缓存', '分布式存储', '30+', 'Codex / WorkBuddy 直接开发软件', 'Codex / WorkBuddy + 系统框架底座', '软件产品', '8', '年', 'ChatGPT、Opus', '连续对话多年', '高性能分布式', '1 年以上', '大概率', '成熟系统框架', '至关重要', '优秀的开源系统框架很多', '许多企业', '全方位对比']) assert.ok(enterpriseBodies[1].includes(phrase), `framework selection: missing ${phrase}`)
-  assert.doesNotMatch(enterpriseBodies[1], /AI直接从需求开始开发自由度高/u)
-  for (const phrase of ['系统灵活性做到极致', '图片 / 文件上传', '模块引擎列、搜索、按钮、卡片', '1189', '万+', '截止2026年10月16日']) assert.ok(enterpriseBodies[2].includes(phrase), `why Microi: missing ${phrase}`)
+  for (const version of ['technical', 'enterprise']) {
+    const decision = (await renderedSlide('CommonTrainingSlide', { kind: 'decision', version })).replace(/框架\s*、\s*/gu, '框架、')
+    const why = await renderedSlide('CommonTrainingSlide', { kind: 'why', version })
+    for (const phrase of ['绝大部分研发团队', '前端框架', '后端框架', '表单引擎', '工作流引擎', '打印引擎', '分布式缓存', '分布式存储', 'Codex / WorkBuddy 直接开发软件', 'Codex / WorkBuddy + 系统框架底座', '软件产品', '高性能分布式', '1 年以上', '大概率', '成熟系统框架', '至关重要', '市面上有非常多优秀的', '开源前端框架、后端框架、工作流引擎等等', '许多企业正基于它们开发软件']) assert.ok(decision.includes(phrase), version + '/decision: ' + phrase)
+    assert.doesNotMatch(decision, /吾码|Microi|30\+|8年|ChatGPT、Opus|AI直接从需求开始开发自由度高/u)
+    for (const phrase of ['30+', '成熟插件化引擎', '吾码持续升级迭代', '2018', 'ChatGPT、Opus', '连续对话多年', '系统灵活性做到极致', '图片 / 文件上传', '模块引擎列、搜索、按钮、卡片', '1,207', '万+', '截至2026年10月18日', '全方位对比', 'AI 负责理解业务', '引擎负责把事做对', '一句话，开发大型企业应用']) assert.ok(why.includes(phrase), version + '/why: ' + phrase)
+    for (const group of commonContent.trainingEngineGroups) for (const engine of group.engines) assert.ok(why.includes(engine))
+  }
   assert.equal(commonContent.trainingArchitectureImage.src, 'https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg')
 })
 
@@ -267,7 +272,7 @@ test('品牌右侧两按钮真实驱动版本、下载、缩略图、搜索与�
   assert.equal(runtime.visibleSlides.value.length, 1, 'search the current edition\'s actual indexed body')
   assert.equal(runtime.visibleSlides.value[0].slide.id, 'enterprise-iot')
   runtime.searchKeyword.value = 'ChatGPT'
-  assert.deepEqual(runtime.visibleSlides.value.map(result => result.index), [1], 'shared component body participates in enterprise search')
+  assert.deepEqual(runtime.visibleSlides.value.map(result => result.index), [2], 'maturity evidence moved to page 3 and remains searchable')
   runtime.searchKeyword.value = '下载量'
   assert.deepEqual(runtime.visibleSlides.value.map(result => result.index), [0, 2, 9], 'all repeated opening advantages remain searchable')
   runtime.browser.location.hash = '#enterprise-slide-07'
