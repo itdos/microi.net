@@ -270,6 +270,14 @@ if ($LASTEXITCODE -ne 0) { throw "File-cabinet Office regression tests failed wi
 
 # Full 的 restore/build/test/list package 全部继承同一 SDK 输出目录。
 # API 与 PC 可并行 Full，不写对方或长期开发服务的 bin/obj；只修改本 PowerShell 子进程环境。
+$ownedArtifactTarget = $null
+$ownedArtifactLink = $null
+$retainedArtifactTarget = $null
+$previousArtifactsPath = $env:ArtifactsPath
+$previousUseArtifactsOutput = $env:UseArtifactsOutput
+$artifactGateFailed = $false
+. (Join-Path $serverRoot 'tools/Microi.TestArtifactCleanup.ps1')
+try {
 if ($Mode -eq 'Full') {
     $artifactTarget = [IO.Path]::GetFullPath((Join-Path $ResultsDirectory '.net-artifacts'))
     $workspaceRoot = [IO.Path]::GetFullPath((Split-Path -Parent $serverRoot))
@@ -277,7 +285,13 @@ if ($Mode -eq 'Full') {
     if (-not $linkRoot.StartsWith($workspaceRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Full artifact link directory escaped the workspace.'
     }
-    New-Item -ItemType Directory -Path $artifactTarget -Force | Out-Null
+    if (-not (Test-Path -LiteralPath $artifactTarget)) {
+        New-Item -ItemType Directory -Path $artifactTarget -ErrorAction Stop | Out-Null
+        $ownedArtifactTarget = $artifactTarget
+    } else {
+        $retainedArtifactTarget = $artifactTarget
+        Write-Warning "Existing artifact directory is preserved; use a fresh ResultsDirectory for automatic cleanup: $artifactTarget"
+    }
     New-Item -ItemType Directory -Path $linkRoot -Force | Out-Null
     $sha = [Security.Cryptography.SHA256]::Create()
     try {
@@ -291,6 +305,7 @@ if ($Mode -eq 'Full') {
     if ($null -eq $linkItem) {
         # 源码契约测试从 AppContext.BaseDirectory 向上寻找仓库；联接保留仓内路径，实际字节仍落在隔离结果盘。
         New-Item -ItemType $linkType -Path $artifactLink -Target $artifactTarget -ErrorAction Stop | Out-Null
+        if ($ownedArtifactTarget) { $ownedArtifactLink = $artifactLink }
         $linkItem = Get-Item -LiteralPath $artifactLink -Force -ErrorAction Stop
     }
     $existingTarget = @($linkItem.Target) | Select-Object -First 1
@@ -473,3 +488,20 @@ if ($Mode -eq 'Full') {
     }
 }
 Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory"
+
+} catch {
+    $artifactGateFailed = $true
+    throw
+} finally {
+    $env:ArtifactsPath = $previousArtifactsPath
+    $env:UseArtifactsOutput = $previousUseArtifactsOutput
+    try {
+        $cleanup = Remove-MicroiOwnedTestArtifacts -ArtifactTarget $ownedArtifactTarget -ArtifactLink $ownedArtifactLink -ResultsDirectory $ResultsDirectory
+        $cleanup | Add-Member -NotePropertyName retainedExistingArtifactTarget -NotePropertyValue $retainedArtifactTarget
+        $cleanup | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ResultsDirectory 'artifact-cleanup.json') -Encoding UTF8
+    } catch {
+        Write-Warning "Test artifact cleanup incomplete: $($_.Exception.Message); target: $ownedArtifactTarget; link: $ownedArtifactLink"
+        [pscustomobject]@{cleaned=$false;artifactTarget=$ownedArtifactTarget;artifactLink=$ownedArtifactLink;error=$_.Exception.Message} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ResultsDirectory 'artifact-cleanup.json') -Encoding UTF8
+        if (-not $artifactGateFailed) { throw }
+    }
+}

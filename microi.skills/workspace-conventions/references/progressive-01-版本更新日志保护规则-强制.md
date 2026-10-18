@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=workspace-conventions-010 sha256=b38237fe992d1a59c651d3edebbc88d57b5f211f4211696eee8caa423a20ed0d -->
+<!-- microi-progressive:chunk id=workspace-conventions-010 sha256=d4ee69df49b8cba8d6365f485bd44aab8f5fcccc4cc1c8394220af14ff68f83f -->
 ## 版本更新日志保护规则（强制）
 
 - 日常功能开发、缺陷修复、测试、普通文档补充、Skill 完善和代码重构期间，不得修改 `microi.doc/docs/doc/about/update-log.md`。
@@ -10,7 +10,7 @@
 - 如果本轮误改了更新日志，必须先按上节完成多对话归属核验；只撤回有本对话精确写入证据的 hunk。必须保留用户、其它对话或其它任务的已提交和未提交内容，归属不明时不得修改并应询问用户。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-011 sha256=679d10ac2f62cce7ff3aad49a78983ab96fbe757e3bec80c19aa97e12476c3b6 -->
+<!-- microi-progressive:chunk id=workspace-conventions-011 sha256=8e3904f45392b7c27746de274bbc4725a7eb0964f0aeab1d83918c0174336dc4 -->
 ## 配置文件说明中文优先规则
 
 AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员或用户阅读的自然语言描述，默认必须写中文。适用范围包括 `appsettings*.json`、`docker-compose*.yml`、`launchSettings.json`、`*.example`、安装脚本注释、部署说明和示例配置。
@@ -21,7 +21,7 @@ AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员
 - 修改配置说明后，必须确认 JSON/YAML 仍可解析，不能因为中文标点或注释方式导致配置文件失效。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-012 sha256=46c21f2efc17374b0561a04ad7c95e4359e06bbeddc3caf93aeecc682e05dbdf -->
+<!-- microi-progressive:chunk id=workspace-conventions-012 sha256=f54d1c6d9ce2a86496dbc89d49158fb5efa7501817be350493247bd6bde37f63 -->
 ## 后端 API 配置白名单与 SaaS 单一事实源（强制）
 
 - `Microi.net.Api` 的 `AppSettings` 与同名容器环境变量只允许：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。
@@ -30,7 +30,7 @@ AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员
 - 修改后必须用源码测试扫描生产 `.cs`、API `appsettings.json` 及在线/离线 Compose，精确断言十项白名单。不能用注释约定代替自动化守卫。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-013 sha256=b493788e58e4e6f197a8af84c766f71ec413f4649d3b4e0ac4846daef464fa40 -->
+<!-- microi-progressive:chunk id=workspace-conventions-013 sha256=dbf22caaf1673270e6abf2277704505481f632c68c1da61df992c81a577e24df -->
 ## 身份、可逆业务秘密与敏感操作统一规范（强制）
 
 - DiyToken 是吾码多租户、多终端、V8 和低代码权限体系的唯一会话入口。新增密码、SSO、OAuth、Passkey、人脸或其它登录方式时，验证成功后必须继续签发 DiyToken，并复用现有角色、部门、菜单、表权限、数据范围、终端吊销和 Token 轮换；禁止整体替换为 ASP.NET Identity 或并行建立第二套用户/权限 Token。
@@ -43,7 +43,7 @@ AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员
 - 一键安装恢复客户旧库时只允许定位精确主租户三元组；缺失则幂等创建，重复则停止，不能批量重写其它子租户。新主租户行不得持久化数据库、MongoDB 或 Redis 连接，安装器对 MinIO/OCR 等业务配置的后续更新也必须带同一三元组、活动状态条件并做唯一回读。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-014 sha256=3b7d45195afedc70110663eda83b60caf619a46fd95e6a45789dc2dca0295b3d -->
+<!-- microi-progressive:chunk id=workspace-conventions-014 sha256=d17f000dd9548f104277acca846c450066e6979a1e0bfec31879a7ba42deccfe -->
 ## 多语言优先约定
 
 Microi 平台默认支持多语言。AI 修改 `Microi.Client`、`Microi.Server`、`Microi-V8-Engine`、MCP 建模数据、菜单按钮、接口引擎或表单 V8 事件时，凡是用户可见文字都必须先考虑多语言，不要把中文提示、按钮名、Tab 名、菜单名、字段名、Toast/Msg 等硬写死后结束任务。
@@ -55,7 +55,7 @@ Microi 平台默认支持多语言。AI 修改 `Microi.Client`、`Microi.Server`
 - 完成多语言相关改动后，至少切换一次目标语言或调用对应接口验证；涉及页面的任务优先用 Playwright 截图确认关键区域没有残留明显中文。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-015 sha256=1f56a5410b27da9e3603955d903d452381f8269a51948a0f135000123b49c9e4 -->
+<!-- microi-progressive:chunk id=workspace-conventions-015 sha256=3db1eb06c79e7d3b5158a7fc4992af4848406d892c054699db3f9215849fcab4 -->
 ## 后台菜单层级默认规则
 
 AI 通过 MCP、Manifest、V8 或平台 API 创建/修复 Microi 后台菜单时，默认必须规划为至少两级菜单树。真实系统不能把一批 CRUD、报表、日志、设置页直接平铺到根级菜单。
@@ -68,7 +68,7 @@ AI 通过 MCP、Manifest、V8 或平台 API 创建/修复 Microi 后台菜单时
 - 只有表单内嵌子表、隐藏路由、系统内部入口等不应出现在导航中的菜单可以例外隐藏；隐藏菜单必须明确设置 `Display=0`、`AppDisplay=0`，并避免误标为有子级的空父菜单。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-016 sha256=53e19c6f1e369c8189fc1ca6b70117cbe6498e8b5c0e839df6d7b457bc8e30a0 -->
+<!-- microi-progressive:chunk id=workspace-conventions-016 sha256=ea4975115c96e1968ae32b8f2271b79288f99a35cd8cdbf9de672481f3964521 -->
 ## 后台任务与安全防护约定
 
 Microi 平台级长任务和安全防护属于系统能力，AI 修改框架、MCP 或 V8 示例时必须同步考虑：
@@ -83,7 +83,7 @@ Microi 平台级长任务和安全防护属于系统能力，AI 修改框架、M
 - 手动封禁、手动解封、自动解封都要有审计记录。封禁响应要返回 DosResult 风格 JSON，便于前端明确提示。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-017 sha256=f1ad92d82e78546318ab9c4115f4910c9deee9985fcedb2d54afcd0946778608 -->
+<!-- microi-progressive:chunk id=workspace-conventions-017 sha256=f3f2f378b99fc5621ea9a6dd1b924a8db171ca8e55588f6b48d3ac4084306e41 -->
 ## 业务逻辑优先接口引擎约定
 
 AI 为 Microi 平台新增或修改任何业务逻辑、后台工具、数据维护能力、官网流程、在线 AI 能力、导入导出、初始化、修复任务、页面配套接口或租户 SaaS 流程时，默认优先使用接口引擎实现，不要直接新增 `Microi.net.Api` Controller 或把业务分支写死到 C# 后端。
@@ -100,7 +100,7 @@ AI 为 Microi 平台新增或修改任何业务逻辑、后台工具、数据维
 - 平台级强制安全校验不能为了“全部低代码化”放进租户可编辑脚本而被绕过；可以留在 C#，但必须是通用、失败关闭的安全边界，不得夹带某个项目的业务文案、字段组合或状态机。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=be51cba4958670208ba1339b8035848074161574befffd0f6c2f684e86675dad -->
+<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=e33b8387bbe8dbc400249ca9d16f91656149492f5f7ce253cbfa67b80f4ca8ef -->
 ## 应用商城优先于 Microi.Upgrade（强制）
 
 能由应用包声明、差异安装和回读验收完成的升级，不得在 `Microi.Server/Microi.Upgrade/` 新增定制 .NET 升级类。表、字段、Tab、菜单、角色权限、接口引擎、表单事件、数据源、页面、打印、工作流、任务及可幂等安装的种子数据，默认都属于应用商城资源。
@@ -114,7 +114,7 @@ AI 为 Microi 平台新增或修改任何业务逻辑、后台工具、数据维
 - 评审 `Microi.Upgrade` PR 时先做资源分类：若只是补字段、Tab 或低代码元数据，移出升级器并发布应用包；若保留 C#，必须提供双节点、重复启动、租约丢失、失败不推进版本以及旧新节点共存测试。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-019 sha256=13a251a099844a74caccd58fa9311a02d5cf649dc57677e5ee431439ce146c8e -->
+<!-- microi-progressive:chunk id=workspace-conventions-019 sha256=333125c854376da9f58b988c0ff2e4e94592de5437107182da838878ceb6b447 -->
 ## 在线 AI 应用上下文默认发现规则（强制）
 
 AI 开始处理定制页面、弹窗、Web、UniApp、微服务或应用商城任务时，不能只搜索本地目录。只要当前 MCP 已连接到目标 `OsClient`，必须先读取在线 AI 应用上下文：
@@ -140,7 +140,7 @@ AI 开始处理定制页面、弹窗、Web、UniApp、微服务或应用商城�
 如果 MCP 返回登录过期，必须先修复或刷新目标 MCP 身份，再继续把 MCP 读取结果当作当前事实；不能因为读取失败就假设在线应用不存在并重复创建。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-020 sha256=fbf4a99e9bf22132d333562d0c2966e824b8fc33bc9cb9dd76c4905de1b55ebb -->
+<!-- microi-progressive:chunk id=workspace-conventions-020 sha256=60e6dac03e25861d4e0507c30ab28d28e26ada4cbe3231c3b029eb2367dc7224 -->
 ## VS Code 插件空目录生成规则
 
 Microi.Agent 面向普通用户时，用户本地可能只是一个空工作区。插件生成 AI 指令文件时不能假设用户已经有 `microi.skills/`、`Microi-V8-Engine/`、`AI-Project/` 或某个固定前端项目目录。
@@ -152,7 +152,7 @@ Microi.Agent 面向普通用户时，用户本地可能只是一个空工作区�
 - 插件升级时应继续保护用户本地修改过的 skill 文件，只覆盖插件曾生成且用户未改过的文件。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-021 sha256=46d56cffd113869dbc1a62b735c392c2309dd521efe6d5df856f0e78680386db -->
+<!-- microi-progressive:chunk id=workspace-conventions-021 sha256=963e489e2bdda4614c8b3089830b8bb855603dbd4338ddcc7ae29519d560766f -->
 ## Microi 版本号规则
 
 Microi 通用版本号采用 `主版本.次版本.修订版本` 三段数字格式，从 `1.0.0` 开始。每次发布时最后一位加 1；当某一位超过 `9` 时向前一位进位并将当前位归 `0`，例如 `1.0.9 -> 1.1.0`、`1.9.9 -> 2.0.0`、`9.9.9 -> 10.0.0`。
@@ -164,7 +164,7 @@ Microi 通用版本号采用 `主版本.次版本.修订版本` 三段数字格�
 插件初始化或升级同步 `microi.skills/` 时，必须以 `.microi-skills-manifest.json` 的逐文件 hash 判断是否可覆盖：本地文件不存在则写入；本地文件与旧 manifest hash 一致说明用户未改，可自动升级；本地文件已被用户修改、或本地版本比插件捆绑版本更新时，必须保留用户版本并提示差异。不能因为插件版本号更高或更低，就粗暴覆盖本地 skills。创始人本地随时修改 skills 的工作区尤其要保护；普通用户未修改过的旧 skills 才应该被最新插件覆盖升级。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-022 sha256=6c2baa8410140e0933bc4305b575dfeeb1f19bd55c2c2138a5139ab4e936e03a -->
+<!-- microi-progressive:chunk id=workspace-conventions-022 sha256=709c669676154b9b469feefad4761544a8cb29fba2e050262b26390c1c4e327c -->
 ## C# dynamic 强类型落地规则
 
 后端源码中从 `dynamic`、`JObject`、`ExpandoObject`、表单参数或 `DynamicHelper` 读取出来的值，如果后续要调用字符串方法、扩展方法或参与强类型判断，必须先显式落到强类型变量。不要用 `var` 承接 `DynamicHelper.GetDynamicStringValue(...)` 后再调用 `DosIsNullOrWhiteSpace()` 这类扩展方法，因为调用点可能仍按 dynamic 绑定，运行时会出现 `'string' does not contain a definition for ...`。
@@ -186,7 +186,7 @@ if (string.IsNullOrWhiteSpace(tableName)) { return; }
 如果方法内部只通过 `DynamicHelper` 读取对象字段，方法参数优先声明为 `object`，不要声明为 `dynamic`。这样可以减少 C# 运行时动态绑定进入普通字符串工具链的机会。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=8459cf9c4d00bd84d58221b1cff708248eda69da40ac3a15cdc2a9df5ebaf12b -->
+<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=44d2ca45e8fb85bb86f2f84f3fad09abc0687fb89f9e0e4f624917d258d485c3 -->
 ## 根目录保留文件说明
 
 根目录只允许存在以下类型的文件和目录：
