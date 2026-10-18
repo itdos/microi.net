@@ -235,7 +235,11 @@ test("micro-app hosts and platform pages keep the live theme contract", async fu
         assert.match(host, /themeMode:\s*this\.runtimeThemeMode/);
         assert.match(host, /themeColor:\s*this\.runtimeThemeColor/);
         assert.match(host, /new MutationObserver\(\(\) => this\.syncRuntimeTheme\(true\)\)/);
-        assert.match(host, /attributeFilter:\s*\["class", "style", "data-theme", "data-mci-palette"\]/);
+        // 逐项检查必需属性，扩展密度/边角等观察项不能被旧固定数组断言误拒绝。
+        const attributes = host.match(/attributeFilter:\s*\[([^\]]+)\]/)?.[1] || "";
+        for (const attribute of ["class", "style", "data-theme", "data-mci-palette", "data-mci-ui-density", "data-mci-corner-style", "data-mci-disable-gradient", "data-mci-disable-shadow", "data-mci-disable-button-icon"]) {
+            assert.ok(attributes.includes(JSON.stringify(attribute)), attribute);
+        }
         assert.match(host, /themePrimaryText:/);
         assert.match(host, /themeTokens:\s*\{ \.\.\.this\.runtimeThemeTokens \}/);
     }

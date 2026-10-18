@@ -3,7 +3,7 @@
         <div class="mcp-role-heading"><div><h3>允许连接 MCP 进行 AI 开发的角色</h3><p>角色授权在这里与角色管理同步；未授权角色默认关闭。</p></div><el-tag effect="plain">角色权限</el-tag></div>
         <div class="mcp-role-toolbar"><el-input v-if="!roleId" v-model="keyword" placeholder="搜索角色名称" clearable @keyup.enter="search" @clear="search"/><el-button v-if="!roleId" @click="search">搜索</el-button><el-button :loading="loading" @click="reload">刷新</el-button></div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
-        <el-table v-loading="loading" :data="rows" row-key="Id" class="mcp-role-table" max-height="380" empty-text="没有匹配的角色">
+        <el-table v-mci-loading:table="loading" :data="rows" row-key="Id" class="mcp-role-table" max-height="380" empty-text="没有匹配的角色">
             <el-table-column prop="Name" label="角色" min-width="150"><template #default="{row}"><strong>{{ row.Name }}</strong><div v-if="Number(row.Level)>=9999" class="mcp-admin-note">超级管理员始终拥有完整权限</div></template></el-table-column>
             <el-table-column label="允许 MCP 连接" width="140" align="center"><template #default="{row}"><el-switch :model-value="Number(row.Level)>=9999 || row.Policy.Enabled" :disabled="locked(row)" :aria-label="row.Name+'允许 MCP 连接'" @update:model-value="value=>change(row,'Enabled',value)"/></template></el-table-column>
             <el-table-column label="访问范围" min-width="240"><template #default="{row}"><el-select :model-value="Number(row.Level)>=9999?'Full':row.Policy.Scope" :disabled="locked(row)||!row.Policy.Enabled" :aria-label="row.Name+'MCP 访问范围'" @update:model-value="value=>change(row,'Scope',value)"><el-option label="仅角色模块及对应表单" value="Role"/><el-option label="完整 MCP 开发范围" value="Full"/></el-select></template></el-table-column>
