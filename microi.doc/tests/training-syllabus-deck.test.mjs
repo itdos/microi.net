@@ -129,8 +129,8 @@ test('slide 03 presents a compact, persuasive Microi enterprise advantage matrix
   const component = read('docs/.vitepress/theme/components/TrainingSyllabusDeck.vue')
   const shared = read('docs/.vitepress/theme/components/CommonTrainingSlide.vue')
   const content = read('docs/.vitepress/theme/common-training-content.js')
-  assert.equal(commonContent.trainingWhyAdvantages.length, 8)
-  assert.equal(new Set(commonContent.trainingWhyAdvantages.map(advantage => advantage.code)).size, 8)
+  assert.equal(commonContent.trainingWhyAdvantages.length, 4)
+  assert.equal(new Set(commonContent.trainingWhyAdvantages.map(advantage => advantage.code)).size, 4)
   for (const phrase of [
     '一句话，开发大型企业应用',
     '0 代码自然语言',
@@ -153,10 +153,85 @@ test('slide 03 presents a compact, persuasive Microi enterprise advantage matrix
   assert.match(component, /nav: '为什么选择吾码？'/u)
   assert.match(component, /<CommonTrainingSlide v-if="commonKind\(slide\)"/u)
   assert.match(shared, /v-for="advantage in trainingWhyAdvantages"/u)
-  assert.match(shared, /aria-label="企业交付闭环"/u)
+  assert.match(shared, /aria-label="五大引擎与特色能力分组"/u)
+  assert.deepEqual(commonContent.trainingEngineGroups.map(group => group.engines.length), [10, 10, 10, 10, 10])
+  assert.equal(commonContent.trainingWhyProof.totalDownloads, 12070344)
+  assert.equal(new Set(commonContent.trainingEngineGroups.flatMap(group => group.engines)).size, 50)
   assert.match(shared, /aria-label="全屏查看 Microi吾码系统架构图"/u)
   assert.match(shared, /@click="\$emit\('preview', trainingArchitectureImage\)"/u)
   assert.doesNotMatch(component, /吾码绝对优势/u)
+})
+
+test('page 03 covers every official system-engine topic and every technical engine topic', () => {
+  // 用真实文档目录与技术课件专题做覆盖门禁，新增专题时必须审阅摘要，不能默默遗漏。
+  const topics = {
+    'system-engine/ai-cad': ['AI CAD / SolidWorks'],
+    'system-engine/ai-creative-studio': ['AI 创作中心'],
+    'system-engine/ai-data-analysis': ['AI 数据分析'],
+    'system-engine/ai-employee-center': ['AI 员工 / 吾码小龙虾'],
+    'system-engine/ai-engine': ['AI 引擎 / 模型中转'],
+    'system-engine/ai-platform-governance': ['AI 平台治理'],
+    'system-engine/ai-workflow-suite': ['AI 工作流', '业务蓝图 / 状态机', '流程挖掘'],
+    'system-engine/app-store': ['应用商城'],
+    'system-engine/bluetooth-printer': ['蓝牙 / 网络打印'],
+    'system-engine/cache': ['L1 / L2 缓存引擎'],
+    'system-engine/databases': ['多数据库 / Dos.ORM', '数据库迁移与备份'],
+    'system-engine/datasource-engine': ['接口引擎 / 类型化数据'],
+    'system-engine/digital-human-live': ['数字人直播 / AI 换脸'],
+    'system-engine/email-engine': ['邮箱系统'],
+    'system-engine/file-manage': ['文件柜', '分布式存储 / HDFS', '文件同步'],
+    'system-engine/job': ['任务调度 / 后台任务'],
+    'system-engine/message-notification': ['消息通知引擎'],
+    'system-engine/micro-app': ['前端微服务'],
+    'system-engine/microi-ui': ['Microi.UI 组件库'],
+    'system-engine/module-engine': ['模块引擎'],
+    'system-engine/mq': ['MQ 消息队列引擎'],
+    'system-engine/mqtt-engine': ['MQTT 物联网引擎'],
+    'system-engine/multi-end-client': ['PC / WebOS / 移动全端', 'H5 / 小程序 / Android / iOS'],
+    'system-engine/ocr-engine': ['OCR 识别引擎'],
+    'system-engine/page-engine': ['界面引擎'],
+    'system-engine/print-engine': ['打印引擎'],
+    'system-engine/report-engine': ['报表引擎'],
+    'system-engine/saas-engine': ['SaaS 多租户引擎'],
+    'system-engine/search-engine': ['搜索引擎'],
+    'system-engine/spider-engine': ['采集引擎'],
+    'system-engine/system-observability': ['系统日志 / 监控 / 链路'],
+    'system-engine/translate-engine': ['翻译 / 多语言引擎'],
+    'system-engine/unity-integration': ['Unity / WebGL 集成'],
+    'system-engine/vision-engine': ['视觉引擎'],
+    'system-engine/visualization-engine': ['3D / CAD / 数据大屏'],
+    'system-engine/wf-engine': ['流程 / 工作流引擎'],
+    'form-engine/form-engine-info': ['表单引擎'],
+    'form-engine/model-engine': ['模板引擎'],
+    'v8-engine/v8-server': ['V8 引擎', '图片处理引擎', 'HTTP / Socket / TCP 集成'],
+    'v8-engine/api-engine': ['接口引擎 / 类型化数据'],
+    'v8-engine/microi-agent': ['Microi Agent 工作台', 'VS Code 插件 / CLI', '远程逐行调试 / 自动测试 / 压测'],
+    'v8-engine/mcp-server': ['MCP Server / Skills'],
+    'more/office': ['Office 引擎 / 在线编辑'],
+    'more/hdfs': ['分布式存储 / HDFS'],
+    'more/copy-module': ['模块复制'],
+    'more/dos-orm': ['多数据库 / Dos.ORM'],
+    'more/security': ['安全 / SSO / 强身份', '角色 / 部门 / 字段 / 数据权限'],
+    'more/sso': ['安全 / SSO / 强身份'],
+    'more/identity-verification': ['Passkey / TOTP / 第三方登录 / 人脸验证'],
+    'more/sys-config': ['系统设置 / 全局主题 / 水印'],
+    'server-panel/overview': ['服务器运维面板'],
+  }
+  for (const file of fs.readdirSync(path.join(projectRoot, 'docs/doc/system-engine')).filter(name => name.endsWith('.md'))) {
+    assert.ok(topics[`system-engine/${file.slice(0, -3)}`], `unreviewed official capability: ${file}`)
+  }
+  const technical = read('docs/.vitepress/theme/components/TrainingSyllabusDeck.vue').match(/const engineSlides[^=]*=\s*\[([\s\S]*?)\n\]/u)[1]
+  const references = [...technical.matchAll(/href: '\/doc\/([^']+)\.html(?:#[^']*)?'/gu)]
+  assert.equal(references.length, 38)
+  for (const [, topic] of references) assert.ok(topics[topic], `unreviewed technical topic: ${topic}`)
+  const labels = [...commonContent.trainingEngineGroups.flatMap(group => group.engines), ...commonContent.trainingAdditionalEngines].join('\n')
+  for (const [topic, terms] of Object.entries(topics)) {
+    assert.ok(fs.existsSync(path.join(projectRoot, `docs/doc/${topic}.md`)), topic)
+    for (const term of terms) assert.ok(labels.includes(term), `${topic} missing ${term}`)
+  }
+  assert.ok(!commonContent.trainingEngineGroups.flatMap(group => group.engines).includes('数据源引擎'), 'legacy data sources stay within the API engine')
+  assert.match(read('docs/.vitepress/theme/components/CommonTrainingSlide.vue'), /AI CAD \/ SolidWorks 为技术预览/u)
+  assert.equal(commonContent.trainingFrameworkLayers.at(-1).label, '更多框架与能力')
 })
 
 test('presentation supports mouse, keyboard, fullscreen, thumbnail navigation, and direct PDF download', () => {

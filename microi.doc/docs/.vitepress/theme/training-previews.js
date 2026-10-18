@@ -15,9 +15,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "dark",
     "index": 2,
     "legacyPath": "/images/training-deck/thumbs/slide-02.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/633bdea3f3b9d19bf72ebf0a11d626288057ff8b80fb46cb86fc4a9720bd8c73/202610/microi-training-technical-dark-slide-02-1792325720.webp",
-    "bytes": 9760,
-    "sha256": "633bdea3f3b9d19bf72ebf0a11d626288057ff8b80fb46cb86fc4a9720bd8c73",
+    "url": "https://file.microi.net/itdos/official-docs/images/30ac06d0cfcdd4630dbcb2412b247e0ea3a9353c2cf43f0763046bde2ed520f8/202610/microi-training-technical-dark-slide-02.webp",
+    "bytes": 11622,
+    "sha256": "30ac06d0cfcdd4630dbcb2412b247e0ea3a9353c2cf43f0763046bde2ed520f8",
     "mimeType": "image/webp"
   },
   {
@@ -25,9 +25,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "dark",
     "index": 3,
     "legacyPath": "/images/training-deck/thumbs/slide-03.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/684d9f4999ec73f2487b9ffbd3110ab5b50633a8441b2192e619fb42e509f480/202610/microi-training-technical-dark-slide-03.webp",
-    "bytes": 10828,
-    "sha256": "684d9f4999ec73f2487b9ffbd3110ab5b50633a8441b2192e619fb42e509f480",
+    "url": "https://file.microi.net/itdos/official-docs/images/b604e7a783c49c8cbc09f96078c719dfb2cbc9e11ecb6a8a4d47580008c7d025/202610/microi-training-technical-dark-slide-03.webp",
+    "bytes": 15646,
+    "sha256": "b604e7a783c49c8cbc09f96078c719dfb2cbc9e11ecb6a8a4d47580008c7d025",
     "mimeType": "image/webp"
   },
   {
@@ -485,9 +485,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "light",
     "index": 2,
     "legacyPath": "/images/training-deck/thumbs-light/slide-02.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/714b6c254b5b9e4e8370046b074901047d8e5021b44dd534e45ffb5ac81934e5/202610/microi-training-technical-light-slide-02-1792325741.webp",
-    "bytes": 9898,
-    "sha256": "714b6c254b5b9e4e8370046b074901047d8e5021b44dd534e45ffb5ac81934e5",
+    "url": "https://file.microi.net/itdos/official-docs/images/c6de878ad2ba79db6fb07ac1bd05695927d449f151ef2a2b052a119921070649/202610/microi-training-technical-light-slide-02.webp",
+    "bytes": 11682,
+    "sha256": "c6de878ad2ba79db6fb07ac1bd05695927d449f151ef2a2b052a119921070649",
     "mimeType": "image/webp"
   },
   {
@@ -495,9 +495,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "light",
     "index": 3,
     "legacyPath": "/images/training-deck/thumbs-light/slide-03.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/8a38a19c7035c7e2a93ab8cddfd095151a3702e935f66f4165eb0749d655d7e2/202610/microi-training-technical-light-slide-03.webp",
-    "bytes": 10934,
-    "sha256": "8a38a19c7035c7e2a93ab8cddfd095151a3702e935f66f4165eb0749d655d7e2",
+    "url": "https://file.microi.net/itdos/official-docs/images/b32983c56430897631bc1e506fa3083171ac08500ec4cba07011f098f79de16e/202610/microi-training-technical-light-slide-03.webp",
+    "bytes": 15048,
+    "sha256": "b32983c56430897631bc1e506fa3083171ac08500ec4cba07011f098f79de16e",
     "mimeType": "image/webp"
   },
   {
@@ -955,9 +955,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "dark",
     "index": 2,
     "legacyPath": "/images/training-deck-enterprise/thumbs/slide-02.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/633bdea3f3b9d19bf72ebf0a11d626288057ff8b80fb46cb86fc4a9720bd8c73/202610/microi-training-technical-dark-slide-02-1792325720.webp",
-    "bytes": 9760,
-    "sha256": "633bdea3f3b9d19bf72ebf0a11d626288057ff8b80fb46cb86fc4a9720bd8c73",
+    "url": "https://file.microi.net/itdos/official-docs/images/30ac06d0cfcdd4630dbcb2412b247e0ea3a9353c2cf43f0763046bde2ed520f8/202610/microi-training-technical-dark-slide-02.webp",
+    "bytes": 11622,
+    "sha256": "30ac06d0cfcdd4630dbcb2412b247e0ea3a9353c2cf43f0763046bde2ed520f8",
     "mimeType": "image/webp"
   },
   {
@@ -965,9 +965,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "dark",
     "index": 3,
     "legacyPath": "/images/training-deck-enterprise/thumbs/slide-03.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/edb8d01b2da99e74931c7809b84125036d9d633c94564c073216082d5ba53a4d/202610/microi-training-enterprise-dark-slide-03.webp",
-    "bytes": 10894,
-    "sha256": "edb8d01b2da99e74931c7809b84125036d9d633c94564c073216082d5ba53a4d",
+    "url": "https://file.microi.net/itdos/official-docs/images/c9180a2aa427f4f062289741ffcd71b171e43b51ce8fee4e37b760815d4ca779/202610/microi-training-enterprise-dark-slide-03.webp",
+    "bytes": 15420,
+    "sha256": "c9180a2aa427f4f062289741ffcd71b171e43b51ce8fee4e37b760815d4ca779",
     "mimeType": "image/webp"
   },
   {
@@ -1055,9 +1055,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "light",
     "index": 2,
     "legacyPath": "/images/training-deck-enterprise/thumbs-light/slide-02.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/714b6c254b5b9e4e8370046b074901047d8e5021b44dd534e45ffb5ac81934e5/202610/microi-training-technical-light-slide-02-1792325741.webp",
-    "bytes": 9898,
-    "sha256": "714b6c254b5b9e4e8370046b074901047d8e5021b44dd534e45ffb5ac81934e5",
+    "url": "https://file.microi.net/itdos/official-docs/images/c6de878ad2ba79db6fb07ac1bd05695927d449f151ef2a2b052a119921070649/202610/microi-training-technical-light-slide-02.webp",
+    "bytes": 11682,
+    "sha256": "c6de878ad2ba79db6fb07ac1bd05695927d449f151ef2a2b052a119921070649",
     "mimeType": "image/webp"
   },
   {
@@ -1065,9 +1065,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "light",
     "index": 3,
     "legacyPath": "/images/training-deck-enterprise/thumbs-light/slide-03.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/ab75b629fdf022f1f3b5fad0a90a282001af30e944fc7605edf9e7e23ba8d208/202610/microi-training-enterprise-light-slide-03.webp",
-    "bytes": 11042,
-    "sha256": "ab75b629fdf022f1f3b5fad0a90a282001af30e944fc7605edf9e7e23ba8d208",
+    "url": "https://file.microi.net/itdos/official-docs/images/aab3ae801b2610a4e483e15d8a220da7092b0742dd7888d791a38433dbb28b15/202610/microi-training-enterprise-light-slide-03.webp",
+    "bytes": 14996,
+    "sha256": "aab3ae801b2610a4e483e15d8a220da7092b0742dd7888d791a38433dbb28b15",
     "mimeType": "image/webp"
   },
   {
