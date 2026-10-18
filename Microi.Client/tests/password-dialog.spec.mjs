@@ -6,12 +6,15 @@ import { platformServiceSourcePath } from './helpers/platform-service-source.mjs
 
 const source = readFileSync(platformServiceSourcePath('src/PersonalSettings.vue'), 'utf8');
 const changePassword = source.slice(source.indexOf('async function changePassword()'), source.indexOf('\nasync function addPasskey()'));
+const loadSection = source.slice(source.indexOf('function loadSection(tabId)'), source.indexOf('\nfunction askConfirmation('));
 function fixture(overrides = {}) {
-    const calls = [], notices = [];
+    const calls = [], notices = [], capabilityLoads = [];
     const state = {
         busy:{ value:'' }, password:{ old:'old-password', next:'new-password', confirm:'new-password', totpCode:'' },
         user:{ value:{ Id:'current-user', Account:'current-account' } },
         capabilities:{ value:{} }, context:{ osClient:'current-tenant' },
+        sectionsLoaded:{}, sectionRequests:new Map(),
+        loadCapabilities:async (_, osClient) => { capabilityLoads.push(osClient);return state.capabilities.value; },
         utf8Base64:value => Buffer.from(value).toString('base64'),
         passwordActionHash:async (id, value) => `${id}:${value}`,
         showNotice:(...args) => notices.push(args),
@@ -20,8 +23,9 @@ function fixture(overrides = {}) {
     };
     state.clearPasswordInputs = () => { state.password.old = ''; state.password.next = ''; state.password.confirm = ''; state.password.totpCode = ''; };
     vm.createContext(state);
+    vm.runInContext(loadSection, state);
     const run = vm.runInContext(`(${changePassword})`, state);
-    return {state, calls, notices, run};
+    return {state, calls, notices, capabilityLoads, run};
 }
 
 test('password dialog reuses the canonical personal settings route and isolates password-only presentation', () => {
@@ -44,11 +48,37 @@ test('incomplete, short, mismatched and duplicate password submissions do not ca
 
 test('password change uses the authoritative loaded user and clears secrets after success', async () => {
     const f = fixture();await f.run();
+    assert.deepEqual(f.capabilityLoads,['current-tenant']);
     assert.equal(f.calls[0].url,'/api/SysUser/UptSysUser');
     assert.equal(f.calls[0].model.Id,'current-user');
     assert.equal(f.calls[0].model.Pwd,Buffer.from('old-password').toString('base64'));
     assert.equal(f.calls[0].model.NewPwd,Buffer.from('new-password').toString('base64'));
     assert.equal(f.state.password.old,'');assert.equal(f.state.password.next,'');assert.equal(f.state.busy.value,'');
+});
+
+test('password submission waits for loaded security policy and fails closed when loading fails', async () => {
+    let resolvePolicy;
+    const pendingPolicy = new Promise(resolve => { resolvePolicy = resolve; });
+    let challenge;
+    const f = fixture({
+        loadCapabilities:async () => pendingPolicy,
+        verifyPasskey:async (_, data) => { challenge=data;return {Code:1,Data:{Ticket:'loaded-policy-ticket'}}; }
+    });
+    const submission = f.run();
+    await Promise.resolve();
+    assert.equal(f.calls.length,0);assert.equal(challenge,undefined);
+    resolvePolicy({Enabled:true,PasswordChangeStepUp:true,HasStepUpPasskey:true});
+    await submission;
+    assert.equal(challenge.purpose,'ChangePassword');
+    assert.equal(f.calls[0].model._IdentityVerificationTicket,'loaded-policy-ticket');
+
+    const failed = fixture({loadCapabilities:async () => {throw new Error('security policy unavailable');}});
+    await failed.run();
+    assert.equal(failed.calls.length,0);
+    assert.equal(failed.notices[0][0],'security policy unavailable');
+    assert.equal(failed.state.password.old,'old-password');
+    assert.equal(failed.state.busy.value,'');
+    assert.equal(failed.state.sectionsLoaded.security,undefined);
 });
 
 test('enrolled strong factor obtains a password-bound ticket and failed verification prevents the write', async () => {
