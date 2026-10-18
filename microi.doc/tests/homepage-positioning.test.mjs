@@ -181,7 +181,7 @@ test('current Chinese brand surfaces use one canonical positioning and keep the 
     if (name === 'training syllabus') {
       assert.match(content, /47页技术架构版与10页企业版/)
       assert.match(content, /企业版以成功案例为路线/u)
-      assert.match(content, /全部22张原始截图与系统架构图/u)
+      assert.match(content, /24张行业案例截图与系统架构图/u)
       assert.match(content, /<TrainingSyllabusDeck\s*\/>/u)
       assert.doesNotMatch(content, /企业应用版|12\s*页企业|AI\s*界面概念图/u)
     }
