@@ -45,22 +45,28 @@ public sealed class DdlExecutionObservationTests
         Assert.All(scope.Events, item => Assert.False(item.TransactionPending));
     }
 
-    [Fact]
-    public async Task IndexEndpointHonorsExistingRequestAuthorizationFailureWithoutDdlAppend()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task IndexEndpointRejectsMissingMcpGrantWithoutDdlAppend(bool resolvedDisabledGrant)
     {
         var accessorField = typeof(DiyHttpContext).GetField("_httpContextAccessor", BindingFlags.Static | BindingFlags.NonPublic)!;
         var oldAccessor = accessorField.GetValue(null);
         var oldContext = (oldAccessor as IHttpContextAccessor)?.HttpContext;
         var accessor = new HttpContextAccessor();
         var context = new DefaultHttpContext();
-        var errorKey = (string)typeof(PlatformAdministratorRequestAuthorization)
-            .GetField("PermissionErrorItemKey", BindingFlags.Static | BindingFlags.NonPublic)!.GetRawConstantValue()!;
-        // 模拟可信鉴权过滤器已拒绝本请求；不伪造管理员或注入数据库/Token。
-        context.Items[errorKey] = "fixture permission denied";
+        // 覆盖无会话与已解析但未获 MCP 授权的请求，不伪造管理员或注入数据库/Token。
+        if (resolvedDisabledGrant)
+        {
+            var contextKey = (string)typeof(McpRoleRequestAuthorization)
+                .GetField("ContextKey", BindingFlags.Static | BindingFlags.NonPublic)!.GetRawConstantValue()!;
+            context.Items[contextKey] = new McpRoleAuthorization();
+        }
         try
         {
             accessor.HttpContext = context;
             DiyHttpContext.Configure(accessor);
+            using var observation = DdlExecutionObservation.Begin();
             var response = Assert.IsType<OkObjectResult>(await new V8McpEndpointService(context).CreateTableIndex(new JObject
             {
                 ["TableName"] = "test_actual", ["IndexName"] = "idx_actual_name", ["Columns"] = new JArray("Name"),
@@ -68,8 +74,9 @@ public sealed class DdlExecutionObservationTests
             }));
             var result = JObject.FromObject(response.Value!);
             Assert.Equal(0, result.Value<int>("Code"));
-            Assert.Equal("fixture permission denied", result.Value<string>("Msg"));
+            Assert.Equal("当前角色未获准连接 MCP 进行 AI 开发。", result.Value<string>("Msg"));
             Assert.True(result["DataAppend"] == null || result["DataAppend"]!.Type == JTokenType.Null);
+            Assert.Empty(observation.Events);
         }
         finally { accessor.HttpContext = oldContext; accessorField.SetValue(null, oldAccessor); }
     }

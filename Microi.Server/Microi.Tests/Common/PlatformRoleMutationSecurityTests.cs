@@ -33,7 +33,8 @@ public class PlatformRoleMutationSecurityTests
 
         Assert.Contains("Domain: 'SysRole'", source, StringComparison.Ordinal);
         Assert.Contains("V8.Method.ManageSystemDirectory", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("V8.Db", source, StringComparison.Ordinal);
+        // MCP 授权使用共享事务做参数化 CAS；不能把 V8.DbTrans 误判成独立数据库访问。
+        Assert.DoesNotMatch(@"\bV8\s*\.\s*(?:Db|DbRead|Dbs)\b", source);
         Assert.NotNull(typeof(IV8Method).GetMethod(nameof(IV8Method.ManageSystemDirectory)));
         Assert.Null(typeof(ApiEngineController).Assembly.GetType("Microi.net.Api.SysRoleController"));
         Assert.False(File.Exists(Path.Combine(

@@ -433,7 +433,10 @@ test("登录方式弹层、宿主浮层收起和个人中心公开头像保持�
     assert.match(personalSettings, /path: 'member\/public-avatar'/);
     assert.match(personalSettings, /limit: false/);
     assert.match(personalSettings, /client\.resolveFileUrl\(user\.value\.Avatar\)/);
-    assert.match(personalSettings, /identity-tech-banner\.jpg/);
+    // 个人中心样式已抽到 scoped 外部文件；继续校验真实视觉资源与隔离边界。
+    assert.match(personalSettings, /<style scoped src="\.\/personal-settings\.css"><\/style>/);
+    const personalStyles = await readFile(platformServiceSourcePath("src/personal-settings.css"), "utf8");
+    assert.match(personalStyles, /identity-tech-banner\.jpg/);
     assert.match(personalSettings, /terminalData\?\.Terminals/);
     assert.match(personalSettings, /item\.ConnectionId\s*\|\|\s*item\.DeviceClientId/);
     assert.doesNotMatch(personalSettings, /MICROI IDENTITY CENTER/);

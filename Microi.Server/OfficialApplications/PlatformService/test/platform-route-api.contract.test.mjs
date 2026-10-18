@@ -209,7 +209,11 @@ test('marketplace keeps one compact themed first-screen hierarchy', () => {
   assert.match(marketplace, /class="hero-metrics"/);
   assert.doesNotMatch(marketplace, /<section\s+class="metrics"/);
   assert.match(marketplace, /<section class="market-toolbar">[\s\S]*?class="market-toolbar__source-context"[\s\S]*?<\/section>/);
-  assert.match(marketplace, /import '\.\/marketplace-compact\.css'/);
+  // 商城样式必须经 Vue scoped 编译，不能恢复全局 CSS 导入而污染个人中心等同宿主页。
+  for (const file of ['marketplace', 'marketplace-modal', 'marketplace-compact']) {
+    assert.ok(marketplace.includes(`<style scoped src="./${file}.css"></style>`));
+  }
+  assert.doesNotMatch(marketplace, /import\s+['"]\.\/marketplace(?:-modal|-compact)?\.css['"]/);
   assert.match(compactStyle, /\.market-hero\s*\{[\s\S]*?min-height:\s*58px[\s\S]*?background:\s*transparent/);
   assert.match(compactStyle, /\.hero-copy::before\s*\{[\s\S]*?background:\s*var\(--accent-brand\)/);
   assert.match(compactStyle, /\.market-tabs button\.active\s*\{[\s\S]*?background:\s*color-mix/);
