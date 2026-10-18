@@ -25,7 +25,8 @@ const rows=ref([]), originals=ref({}), keyword=ref(''),page=ref(1),total=ref(0),
 let generation=0,pending=Promise.resolve(true);
 const changes=computed(()=>changedMcpRoles(rows.value,originals.value)),dirty=computed(()=>changes.value.length>0);
 const locked=row=>props.readonly||loading.value||saving.value||Number(row.Level)>=9999;
-const action=async(Action,data={})=>{const result=await DiyCommon.Http.Post({Url:'/apiengine/platform-sys-role',PostParam:{Action,...data}});return typeof result==='string'?JSON.parse(result):result;};
+// 角色数组与嵌套策略必须保留 JSON 类型；默认 form 会将 Roles 编码为字符串。
+const action=async(Action,data={})=>{const result=await DiyCommon.Http.Post({Url:'/apiengine/platform-sys-role',PostParam:{Action,...data},ParamType:'json'});return typeof result==='string'?JSON.parse(result):result;};
 function changed(notify=true){if(props.deferred&&rows.value[0])emit('change',{Policy:normalizeMcpPolicy(rows.value[0].Policy),Version:rows.value[0].Version},notify);}
 function change(row,key,value){row.Policy=normalizeMcpPolicy({...row.Policy,[key]:value});changed();}
 async function load(){

@@ -24,6 +24,8 @@ async function setup(page){
   window.apiCalls=[];window.formChanges=[];window.failReadback=false;
   window.roleRows=[{Id:'one',Name:'编辑角色',Level:100,Version:'v1',Policy:{Enabled:false,Scope:'Role',CanWrite:false,CanDelete:false}},{Id:'admin',Name:'超级管理员',Level:9999,Version:'none',Policy:{Enabled:false,Scope:'Role',CanWrite:false,CanDelete:false}}];
   window.fixtureApi=async p=>{const data=p.PostParam;window.apiCalls.push(structuredClone(data));
+   // 与真实接口一致：默认 form 中的复合值是文本，不能当成原生角色数组被模拟端接受。
+   if(data.Action==='SaveMcpRolePermissions'&&p.ParamType!=='json')return{Code:0,Msg:'请提交 1 至 100 个角色的变更。'};
    if(data.Action==='GetConnectionInfo')return{Code:1,Data:{ProductType:'Enterprise'}};
    if(data.Action==='GetMcpRolePermissions'){if(window.failReadback)return{Code:0,Msg:'回读失败'};return{Code:1,Data:structuredClone(window.roleRows.filter(r=>(!data.RoleId||r.Id===data.RoleId)&&(!data.Keyword||r.Name.includes(data.Keyword)))),DataCount:2};}
    if(data.Action==='SaveMcpRolePermissions'){for(const row of data.Roles){const found=window.roleRows.find(r=>r.Id===row.Id);if(found.Version!==row.Version)return{Code:0,Msg:'已被修改，请刷新'};found.Policy=structuredClone(row.Policy);found.Version='v2';}return{Code:1};}
