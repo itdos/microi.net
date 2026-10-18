@@ -25,9 +25,10 @@
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
-import { formRenderer, EventBus, usePageEngineStore } from "./index.js";
-import { computed } from "vue";
+import { formRenderer, EventBus } from "./index.js";
+import { computed, provide } from "vue";
 import { useDiyStore } from "@/pinia";
+import { PAGE_ENGINE_STORE_KEY, createIsolatedPageEngineStore } from "./engine/stores/pageEngine.js";
 
 export default {
     components: {
@@ -36,7 +37,10 @@ export default {
     setup() {
         const diyStore = useDiyStore();
         const currentUser = computed(() => diyStore.GetCurrentUser || {});
-        return { currentUser };
+        // 每个路由实例持有自己的运行状态，缓存页的迟到响应不能覆盖当前页。
+        const pageEngineStore = createIsolatedPageEngineStore();
+        provide(PAGE_ENGINE_STORE_KEY, pageEngineStore);
+        return { currentUser, pageEngineStore };
     },
     data() {
         return {
@@ -54,8 +58,7 @@ export default {
                 IsEmbedded: false
             },
             isLoading: true,
-            loadError: "",
-            pageEngineStore: null
+            loadError: ""
         };
     },
     computed: {
@@ -70,9 +73,6 @@ export default {
         }
     },
     async mounted() {
-        // 初始化 store
-        this.pageEngineStore = usePageEngineStore();
-
         // 设置token
         this.pageEngineStore.setToken(DiyCommon.getToken());
 

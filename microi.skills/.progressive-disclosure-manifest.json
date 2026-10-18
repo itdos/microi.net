@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T12:40:03.825Z",
+  "generatedAt": "2026-10-18T12:58:53.824Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -1234,25 +1234,25 @@
       ]
     },
     "page-engine": {
-      "originalSha256": "fce0a98e8b3b81ccf98cb20d5c93f0b53cfdab7da5050c7c2e94444d65e9aa48",
-      "originalLines": 476,
-      "prefixSha256": "6ae3962d142c190a5ba8a958d749759b6a4fd8266e6f965d4b6f726d7a6350f7",
-      "prefixBytes": 6255,
-      "entryLines": 228,
+      "originalSha256": "fb726d8c2e872790e4738b0212c9c61c549368660e2636a72960cfc41b3be883",
+      "originalLines": 480,
+      "prefixSha256": "14eaec95167be639a71f5d013f528bd3dd9a92a38e2ac1c47d9dc74ca1562671",
+      "prefixBytes": 6309,
+      "entryLines": 232,
       "chunks": [
         {
           "id": "page-engine-000",
           "ordinal": 0,
           "destination": "page-engine/SKILL.md",
-          "sha256": "5b79a31a8484bf0a618c2810e66c0ab542fd86ceeb76e7a5cd07a86284c4f6ac",
-          "lines": 8,
+          "sha256": "44233416e71cc6ff3712347308dadd26e55b14938b81b8a2401478c6bc14921b",
+          "lines": 12,
           "heading": "设计器源码事件"
         },
         {
           "id": "page-engine-001",
           "ordinal": 1,
           "destination": "page-engine/SKILL.md",
-          "sha256": "53cf1992d4adcf8126f4d0a04d373d685d539b38c5d74840ba07905e9cbe4589",
+          "sha256": "57717991f9c7de557b524ec36fc9bdd716080b71b682439f1b6662b0b9b2f45c",
           "lines": 18,
           "heading": "核心数据结构"
         },
@@ -1260,7 +1260,7 @@
           "id": "page-engine-002",
           "ordinal": 2,
           "destination": "page-engine/SKILL.md",
-          "sha256": "227ecf87086231eee28a9d91fde6a178a437e9196dd8f2ef1d14d53e5c5858df",
+          "sha256": "6a1a85b40bcb5f8be694b0aad73a805083acd0d6fcd9cba36278dc9b51d24dcb",
           "lines": 17,
           "heading": "formConfig 页面全局配置"
         },
@@ -1268,7 +1268,7 @@
           "id": "page-engine-003",
           "ordinal": 3,
           "destination": "page-engine/SKILL.md",
-          "sha256": "7bb7cb860f9330002f60748e93de3c639b157cddfd77b63ac8b19f0535306e65",
+          "sha256": "8afb75b0e4d85ab9f56a7ba018e1cc50f758d3e604683d8c38d5f0a45d53f135",
           "lines": 54,
           "heading": "容器类型"
         },
@@ -1276,7 +1276,7 @@
           "id": "page-engine-004",
           "ordinal": 4,
           "destination": "page-engine/SKILL.md",
-          "sha256": "66261254d94455648441bf3519a5c810ede60c64f341dce035f931e284f762ba",
+          "sha256": "9c7c85bb0d25267d07e45d9abeb5691c2f0ffd9da233351cf2f448a9b848cea5",
           "lines": 20,
           "heading": "组件通用结构"
         },
@@ -1284,7 +1284,7 @@
           "id": "page-engine-005",
           "ordinal": 5,
           "destination": "page-engine/SKILL.md",
-          "sha256": "e9667b97462c9089a72d2a407cfde00e873afe7d64593bf33ad49a523255b38d",
+          "sha256": "c1e31dede775f14761182fc197cf428d494806c4503a622ffdad3d16d091d3e0",
           "lines": 14,
           "heading": "widgetParams 参数类型"
         },
@@ -1292,7 +1292,7 @@
           "id": "page-engine-006",
           "ordinal": 6,
           "destination": "page-engine/SKILL.md",
-          "sha256": "7347b2b4290db41ae8c3ef128acc9854a5e17290268b8e274e771de47b8f752a",
+          "sha256": "2c021e43f4f0d730da1f5a5cf6a2d314589435e2bb9ff573148c787538a8cc86",
           "lines": 12,
           "heading": "数据来源（widgetParams[0]）"
         },
@@ -1300,7 +1300,7 @@
           "id": "page-engine-007",
           "ordinal": 8,
           "destination": "page-engine/SKILL.md",
-          "sha256": "5f2ed06aa1e0abbc5f968f026602d92f22f01836d76fdf502fd91ca0f945509b",
+          "sha256": "4170c6e274fc773427057d8606c4800a5bbd5fabd62d63e931aaa388262a51e9",
           "lines": 14,
           "heading": "运行态布局与滚动规范"
         },
