@@ -334,6 +334,8 @@ Web、UniApp 与 MicroService 均采用该目录；官网体验地址是 `https:
 
 v3 的 `sys_microistore.PreviewUrl/PublicPublishPath` 与版本 `PreviewUrl` 在数据库中使用以 `/` 开头的对象路径，发布完成态检查依赖该路径；官网接口和后台工作台通过租户 `FileServer` 生成完整的 CDN 体验链接。不要为了统一展示而直接将这些内部字段改成绝对 URL。
 
+官网首页、AI 应用列表和详情页共用体验地址解析器。官方公开 CDN 已统一为 `https://file.microi.net`；除读取系统设置的新 `FileServer` 外，还会兼容历史应用保存的旧官方绝对地址和旧接口返回的文件服务域名。该转换只改变公开文件域名，保留对象路径；私有签名地址、第三方租户域名及 `/micro-app/v3/` API 解析路由保持其原有语义。
+
 使用官方 `static.itdos.com` 时，发布端从当前租户“系统设置 → 安全与服务接入”的 `Integration.Cdn.Aliyun.AccessKeyId/AccessKeySecret` 读取 CDN 凭据；旧租户可沿用 `Integration.Dns.Aliyun.*` 或 SaaS 配置中的 `AlidnsKeyId/AlidnsKeySecret`。密钥必须成对配置，并具备阿里云 CDN 刷新与任务查询权限。刷新提交只会返回任务号，发布器需等任务全部为 `Complete` 且从 CDN 按大小、SHA-256 回读成功后才确认发布；凭据缺失或任务失败时会保留可恢复状态。阿里云默认每天有 URL 刷新配额，批量迁移前应核对当日配额与已用量。
 
 迁移存量应用时，旧历史对象可能已缺失。只有商城编译包、仍可访问的当前体验路由或本地归档中的原始字节与冻结发布清单的大小、SHA-256 完全一致，才可补齐；无法恢复的历史版本保持原记录并列入待补清单。当前版本独立校验通过后可以先切换固定体验入口，不能把缺失的历史目录当成已归档版本。

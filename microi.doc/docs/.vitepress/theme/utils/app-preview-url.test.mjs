@@ -12,6 +12,22 @@ const desktopWindow = {
   matchMedia: () => ({ matches: false })
 }
 
+test('migrates official launch URLs even when the public API still returns the legacy FileServer', () => {
+  const runtime = { fileServer: 'https://static.itdos.com', osClient: 'iTdos', apiBase: 'https://api.microi.net' }
+  for (const ApplicationType of ['MicroService', 'Web', 'UniApp']) {
+    for (const PreviewUrl of ['/itdos/micro-app/campus/index.html', 'https://static.itdos.com/itdos/micro-app/campus/index.html']) {
+      assert.equal(resolveStableApplicationEntry({ AppKey: 'campus', ApplicationType, PreviewUrl }, 'https://microi.net', runtime),
+        'https://file.microi.net/itdos/micro-app/campus/index.html')
+    }
+  }
+  assert.equal(resolveStableApplicationEntry({ AppKey: 'legacy', PreviewUrl: 'https://static.itdos.com/itdos/ai-app-publish/legacy/index.html?v=old' }, 'https://microi.net', runtime),
+    'https://file.microi.net/itdos/ai-app-publish/legacy/index.html')
+  assert.equal(resolveStableApplicationEntry({ AppKey: 'legacy', PreviewUrl: 'https://customer.example/legacy/index.html' }, 'https://microi.net', runtime),
+    'https://customer.example/legacy/index.html')
+  assert.equal(resolveStableApplicationEntry({ PreviewUrl: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/campus/assets/index.html' }, 'https://microi.net', runtime),
+    'https://api.microi.net/micro-app/v3/tenants/itdos/kinds/runtime/apps/campus/assets/index.html')
+})
+
 test('uses the stable latest entry and removes runtime/cache query parameters', () => {
   const actual = withPreviewVersion(
     'https://file.microi.net/itdos/ai-app-publish/microi-developer-toolbox/versions/v1.0.3/index.html?v=old&apiBase=https%3A%2F%2Fapi.microi.net&OsClient=iTdos',

@@ -65,5 +65,5 @@ export function resolveUploadedResourceUrl(value, runtime = {}) {
     return joinBase(apiBase, path)
   }
 
-  return joinBase(runtime.fileServer, path)
+  return joinBase(resolveOfficialPublicFileAlias(String(runtime.fileServer || '').trim()), path)
 }
