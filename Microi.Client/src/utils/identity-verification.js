@@ -59,9 +59,9 @@ function serializeCredential(credential) {
     return result;
 }
 
-async function post(diyCommon, action, payload) {
+async function post(diyCommon, action, payload, requestOptions) {
     if (!diyCommon?.PostAsync) throw new Error("DiyCommon.PostAsync 不可用。");
-    return diyCommon.PostAsync(`${API_ROOT}/${action}`, payload || {}, null, null, "json");
+    return diyCommon.PostAsync(`${API_ROOT}/${action}`, payload || {}, null, null, "json", requestOptions);
 }
 
 async function postExternalLogin(diyCommon, action, payload) {
@@ -156,7 +156,9 @@ export function isPasskeySupported() {
 }
 
 export async function getIdentityCapabilities(diyCommon, osClient) {
-    const result = await post(diyCommon, "GetCapabilities", { OsClient: osClient });
+    // Capability discovery is optional during ordinary password login. Keep its
+    // rejection visible to the caller and preserve normal authentication handling.
+    const result = await post(diyCommon, "GetCapabilities", { OsClient: osClient }, { suppressErrorNotification: true });
     return resultData(result);
 }
 

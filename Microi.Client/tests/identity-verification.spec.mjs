@@ -86,6 +86,13 @@ test("能力读取固定调用当前租户的 IdentityVerification API", async (
     assert.equal(calls[0][0], "/api/IdentityVerification/GetCapabilities");
     assert.deepEqual(calls[0][1], { OsClient: "iTdos" });
     assert.equal(calls[0][4], "json");
+    assert.deepEqual(calls[0][5], { suppressErrorNotification: true });
+});
+
+test("未安装身份应用的能力探测仍拒绝，不能被视作身份验证成功", async () => {
+    await assert.rejects(getIdentityCapabilities({ PostAsync: async () => ({ Code: 0, Msg: 'not installed' }) }, 'tenant'), /not installed/);
+    const unavailable = new Error('HTTP 404');
+    await assert.rejects(getIdentityCapabilities({ PostAsync: async () => { throw unavailable; } }, 'tenant'), error => error === unavailable);
 });
 
 test("Passkey 只在安全上下文且浏览器认证器可用时启用", () => {

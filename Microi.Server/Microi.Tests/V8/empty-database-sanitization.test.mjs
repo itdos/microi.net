@@ -228,6 +228,20 @@ test('department template does not write ParentName when the real legacy schema 
   assert.match(statement, /'默认部门'/)
 })
 
+test('new empty templates retain an explicit core application set instead of every platform app', () => {
+  const { result, queries } = run([
+    { Id:'core', AppKey:'app.microi.module-engine', ApplicationType:'Platform', AppPakcet:JSON.stringify({DiyTables:[{Name:'sys_menu'}]}) },
+    { Id:'optional', AppKey:'app.microi.future-feature', ApplicationType:'Platform', AppPakcet:JSON.stringify({DiyTables:[{Name:'future_feature_data'}]}) }
+  ])
+  assert.equal(result.Code, 1)
+  assert.ok(result.Data.ApplicationOwnedTables.includes('future_feature_data'))
+  assert.ok(!result.Data.ApplicationOwnedTables.includes('sys_menu'))
+  const classification = result.Data.Sql.split('INSERT IGNORE INTO temp_ai_apps (Id, AppKey)')[1].split(';')[0]
+  for (const key of ['app.microi.bootstrap','app.microi.store','app.microi.form-engine','app.microi.module-engine','app.microi.sys-config','app.microi.sys_user']) assert.ok(classification.includes(`'${key}'`), key)
+  assert.doesNotMatch(classification, /LIKE|app\.microi\.saas-engine|microi-wechat-content-security/)
+  assert.ok(queries.every(query => /^\s*(?:\/\*[\s\S]*?\*\/\s*)?SELECT\b/i.test(query)))
+})
+
 test('department schema discovery fails closed before emitting destructive SQL', () => {
   const { result } = run([], { departmentColumnFailure: true })
   assert.equal(result.Code, 0)
@@ -283,7 +297,7 @@ test('non-platform package tables and StoreId menu tables enter the cleanup SQL'
   assert.match(result.Data.Sql, /\('BusinessLegacy'\)/)
   assert.match(result.Data.Sql, /\('ExtraLegacy'\)/)
   assert.doesNotMatch(result.Data.Sql, /temp_app_owned_tables \(Name\) VALUES[^;]*\('sys_menu'\)/)
-  assert.match(result.Data.Sql, /LIKE 'app\.microi\.%'/)
+  assert.match(result.Data.Sql, /IN \('app\.microi\.bootstrap', 'app\.microi\.store'/)
   assert.equal(result.Data.StoreCount, 2)
   assert.equal(result.Data.ApplicationOwnedTableCount, 2)
   assert.deepEqual(result.Data.ApplicationOwnedTables, ['BusinessLegacy', 'ExtraLegacy'])
