@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { readOfficialEmptyDatabaseSource } from '../ReleaseGate/official-v8-source.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repo = path.resolve(here, '../../..')
@@ -16,15 +17,7 @@ const relative = path.relative(repo, sourceParent)
 assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative), '责任源码根必须位于当前工作区')
 assert.ok(fs.statSync(sourceParent).isDirectory(), '契约责任源码缺失时必须失败')
 // 脱敏接口由 SaaS 官方包单一拥有；远端拉取目录可能保留旧版本，不能成为平台发行回归的事实源。
-const packagePath = path.join(repo, 'Microi.Server/OfficialApplications/Resource/app.microi.saas-engine.json')
-const officialPackage = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
-assert.equal(officialPackage.PackageInfo.OsClient, 'iTdos')
-const engineKey = 'admin_get_empty_database_sanitization_sql'
-assert.equal(officialPackage.ResourcePolicies.ApiEngines[engineKey].UpgradePolicy, 'Managed')
-const ownedEngines = officialPackage.SysApiEngines.filter(engine => engine.ApiEngineKey === engineKey)
-assert.equal(ownedEngines.length, 1, '正式 SaaS 包必须唯一拥有空库脱敏接口')
-const engineSource = ownedEngines[0].ApiV8Code
-assert.ok(typeof engineSource === 'string' && engineSource.length > 0, '正式包必须携带实际发行正文')
+const engineSource = readOfficialEmptyDatabaseSource(repo)
 const execute = new Function('V8', engineSource)
 
 test('应用文件与版本清理先建立带主键的保留身份集合，避免 MySQL 5.7 OR 删除关联扫描', () => {
