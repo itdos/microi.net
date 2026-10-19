@@ -4,6 +4,8 @@ Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 A
 
 源码随主仓库开放：[GitHub](https://github.com/itdos/microi.net/tree/master/microi.mcp) / [Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.mcp)。普通用户推荐通过 [VS Code 插件或 CLI](/doc/v8-engine/vs-code-plugin) 使用内置版本，无需单独克隆。
 
+本文的精确读取、Manifest 会话引用及上下文载荷计量需要开发工具 **5.9.7 或以上**。升级后由新启动的 MCP 进程接管；正在运行的旧进程继续当前工作。以实际工具发现结果核对参数，完整系统和局部修改都继续执行相应质量与验收规范。
+
 ## 当前能力面
 
 按 2026-08-30 当前源码扫描，`microi.mcp/src` 中可识别 **140 个 `microi_*` 工具注册项**。数量会随版本增长，运行时应以 `tools/list`，或 Codex 单入口的 `list_tools` / `describe_tool` 返回为准。
@@ -54,7 +56,13 @@ Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 A
 
 ### 从已登录平台复制连接说明
 
-点击右上角 Api/Web 版本可查看 ApiBase、OsClient 和版本类型，并一键复制给 Codex、WorkBuddy 等工具。复制时服务器生成一个独立的开发工具 DiyToken，权限继承当前用户且可在在线终端单独撤销，不影响浏览器会话。无需把平台密码提供给 AI；访问密钥适用于已授权接口的窄权限调用，不替代需要建模、保存和发布的完整开发会话。
+只有 `Level >= 9999` 的超级管理员点击右上角 Api/Web 版本才会打开开发工具连接窗口；其他用户只显示版本。复制时服务器再次核验管理员身份，生成独立的开发工具 DiyToken，可在在线终端单独撤销，不影响浏览器会话。连接说明只保留安装 CLI、标准输入导入及初始化验收步骤，无需向 AI 提供平台密码。
+
+同一窗口的“角色 AI 开发权限”提供角色搜索、允许连接、访问范围、创建/修改、删除开关，并与角色编辑的权限明细使用同一份 `sys_rolelimit` 授权。未配置时默认关闭；超级管理员保留完整权限。保存使用加载时的版本核对，另一个窗口已修改时要求刷新，防止互相覆盖。
+
+“仅角色模块及对应表单”保留模块、表、行和字段权限，只允许受限的元数据编辑与业务数据操作，不开放服务端脚本、SQL、身份或基础设施管理。完整范围及创建/修改、删除同时开启后具有服务端代码执行能力，只应授予可信开发者；完整只读与另一个受限角色的写权限不会组合成完整写权限。后台在每次 MCP 请求重新检查当前租户主库授权，撤销无需等待旧 Token 过期；MCP/VSCode 开发会话不能改走普通 HTTP 路由绕过限制。
+
+此功能需同步升级平台、SaaS 引擎官方应用及开发工具。普通账号由管理员授权后使用自己的账号连接，不应共享管理员复制出的 Token。
 
 新版 CLI 支持 `microi auth import --session-stdin`，从标准输入读取连接 JSON 并向服务器验证，再用系统加密存储保存。Token 不应进入命令参数、项目源码或日志。接着运行 `microi ai init` 和 `microi doctor`，验证 MCP 的初始化、工具清单与当前租户状态。模型服务的登录与计费独立于平台 Token，保留 AI 工具既有模型配置；未配置时由用户通过 AI 工具自身的授权流程完成登录。Windows 导入连接的 Token 和 MCP 共享 Token 均由当前系统用户的 DPAPI 加密保护，使用支持该格式的新版 CLI/MCP 读取，不能复制保险库到另一台机器直接使用。
 
@@ -80,7 +88,11 @@ microi init --pull
 microi doctor
 ```
 
-CLI 与插件共用连接、Token、MCP、Skills、V8 工作区和同步基线。CLI 不保存帐号密码；首次生成 Codex MCP 配置后需要新开对话，已打开的会话通常不会热加载新工具。
+CLI 与插件共用连接、Token、MCP、Skills、V8 工作区和同步基线。需要自动续登时，帐号密码与 Token 通过当前系统用户的安全存储保存；项目配置仅保存引用。Windows 使用 DPAPI，macOS 使用 Keychain；支持 Linux 的新版 CLI/MCP 使用 Secret Service，需要 `/usr/bin/secret-tool`、当前用户的 D-Bus 会话和已解锁的钥匙环。无可用钥匙环时，CLI 写入和会话引用恢复会给出 `MICROI_SECURE_STORAGE_UNAVAILABLE`；MCP 凭据读取也可能报告凭据不可用，均不会回退到明文文件。首次生成 Codex MCP 配置后，已打开的会话通常不会热加载新工具，新进程再验收。
+
+无交互终端中，宿主可通过标准输入向 `microi auth login --credentials-stdin` 提交原始 JSON，字段为 `Username`、`Password`，连接仍由所选 Profile 决定；已有独立开发工具会话则使用 `auth import --session-stdin`。密码输入保留原始空格，不能先 trim。秘密不得进入命令行参数、源码、日志或公开输出；非 TTY 不再回退到会回显的普通密码输入。
+
+云平台提供的代理密钥占位符不等于原始平台密码。只有宿主支持安全注入原始凭据，且有可用系统安全存储时，才能完成上述持久登录；CLI 不能自行解开不透明占位符。HTTP 200 但 `Code=1001/0` 且提示未携带 Token 表示业务认证失败，不能据此报告登录成功。导入或登录后继续验证 `doctor`、MCP `initialize`、`tools/list` 和 `microi_get_status` 的真实身份与租户；开发源码测试通过不代表 npm 已发布该能力。
 
 ### 独立 stdio / SSE
 
@@ -115,6 +127,8 @@ action=microi_get_db_schema, params={...}
 
 ## 从自然语言生成系统
 
+质量优先于 token、耗时和回复长度。完整系统仍须执行原八项、菜单先行、业务/经营/领导报表及真实验收；局部修改先确认目标、当前版本和依赖，范围不清时扩大读取，不能依据一页摘要猜测修改。
+
 标准顺序是：
 
 1. `microi_get_db_schema`：读取已有表，避免重复建模。
@@ -126,6 +140,37 @@ action=microi_get_db_schema, params={...}
 7. `microi_validate_system`：独立回读表、字段、接口、菜单、页面、打印、流程等结果。
 
 Manifest 支持角色、表、索引、数据源、接口引擎、事件、菜单、权限、页面、打印模板、工作流和任务。常规表单字段不要默认写 `FormWidth=24`；整行控件才使用整行宽度。绑定表的菜单应同时补齐 PC/移动列、搜索列、隐藏列、排序、统计与卡片字段。
+
+### 精确读取与完整性
+
+新版读取工具先返回可遍历的摘要，减少无关信息。首次完整开发必须盘点全部相关资源，并读取字段/关系详情；摘要不等于完整结构，不能因为没有在第一页看到资源就重复创建。
+
+| 工具 | 精确读取方式 | 必须检查 |
+|---|---|---|
+| `microi_get_db_schema` | 默认表目录；`detail:"fields"`、`tableNames`、`fieldNames` 获取目标结构；查询通过受保护 FormEngine 下推 | `Paging.hasMore/nextCursor`、`Completeness`；过滤范围与权限 |
+| `microi_list_applications` | 默认应用摘要；`keyword/appType` 筛选；显式 `includeFiles:true` 才带文件清单 | 返回集合的上游完整性声明，不能把目录摘要当全租户事实 |
+| `microi_get_application_context` | 按应用获取文件清单，使用 `filePaths/pathKeyword` 选择文件；按需 `includeContents:true` | 分页、逐文件错误和是否实际读取正文 |
+| `microi_get_application_file` | `startLine/endLine` 读取行范围，`query` 做纯文本搜索；`detail:"full"` 明确读取全文 | `ReadSummary.completeFile`、源码哈希；片段不可替代全文覆盖 |
+
+分页游标绑定当前连接、查询条件和资源快照；改变身份、过滤条件或源码后应重新开始读取。二进制默认返回引用，不将大型 Base64 塞进模型上下文；显式全文请求继续受读取上限约束。错误、未知完整性和截断都需要补读，不能当成完整成功。
+
+### Manifest 引用与原有调用兼容
+
+较大 Manifest 可在 `microi_plan_system` 一次提交正文并传 `detail:"summary"` 获取 `manifestRef/manifestHash`，后续用同一引用完成 dry-run、执行和独立验收；原有直接提交 `manifest` 的方式继续支持。小正文可以继续直接传输，不为使用引用增加无意义往返。
+
+```json
+{"action":"microi_generate_system","params":{"manifestRef":"<本会话返回的引用>","manifestHash":"<原始内容哈希>","dryRun":true,"detail":"summary"}}
+```
+
+实际执行仍需要 `dryRun:false` 和目标租户的 `confirmExecution`，重新运行结构检查及当前权限校验。引用是当前 MCP 会话的传输优化，不是授权、分布式状态或持久任务；过期、凭据变化和进程重启后重传已核对正文。写入结果未知时先回读，不盲目重放。
+
+正文调用默认保留完整回执；引用调用默认摘要，保留错误、警告、资源状态和完整验证结果。通过现有 `microi_plan_system` 的 `action:"read_result" + resultRef` 可取回完整证据。部分成功、验证失败和未知结果不能被摘要成“完成”。
+
+### 可测量的节省
+
+`microi_get_context_metrics` 返回当前 MCP 会话中已验证工具参数与回执的 UTF-8 字节、调用数、错误数和耗时，不存源码或凭据。它不包含模型历史、协议外层和供应商 Usage，不能当作 token 账单。
+
+仓库提供 `microi.mcp/scripts/evaluate-context-efficiency.mjs`：使用 `--baseline`、`--candidate`、`--output` 导入脱敏计量和验收摘要。只有同任务、同模型、同验收契约且全部通过时才输出可比较的节省比例；供应商输入、缓存输入、输出、推理和费用缺失时明确显示未知。离线载荷对比不代表完整项目的实际 token 或工期改善倍数。
 
 模块 `modules[].tableHeaders` 可配置合并表头，例如 `[{"Label":"人数（人）","Fields":["Total","Male","Female"]}]`；字段名须与相邻的可见表格列一致。嵌套分组使用 `Children`。设置 `hideTableBanner: 1` 或 `hideFormBanner: 1` 可分别关闭顶部列表和表单 Banner，省略或设为 `0` 则保持显示。已有模块可用 `microi_update_module` 更新 `TableHeaders`、`HideTableBanner`、`HideFormBanner` 并回读，完整字段说明见[模块引擎](/doc/system-engine/module-engine.html)。
 

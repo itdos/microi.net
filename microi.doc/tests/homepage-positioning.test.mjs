@@ -59,13 +59,17 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(component, /chatTitle: '开源 AI 开发框架，让 AI 站在 30\+ 成熟引擎上，更快交付'/)
   assert.match(component, /减少重复生成，直接进入业务交付/)
   const actions = component.match(/<div class="ai-studio-summary__actions">([\s\S]*?)<\/div>/)?.[1] || ''
-  assert.equal((actions.match(/<a\b/g) || []).length, 2)
+  assert.equal((actions.match(/<a\b/g) || []).length, 3)
+  assert.match(actions, /class="is-start" href="\/profile\.html#\/overview"/)
+  assert.match(component, /getStartedAction: '开始使用'/)
+  assert.match(component, /getStartedAction: 'Get started'/)
+  assert.ok(actions.indexOf('class="is-start"') < actions.indexOf('class="is-primary"'), 'the personal-center entry should appear first')
   assert.match(actions, /is-primary[^>]*microi-training-syllabus/)
   assert.equal((actions.match(/microi-training-syllabus/g) || []).length, 2)
   assert.doesNotMatch(component, /href="\/doc\/getting-started\/start-use"/)
   assert.doesNotMatch(actions, /source-code-architecture/)
   assert.match(actions, /:href="MICROI_CODE_DOC_URL"/)
-  assert.equal((actions.match(/<svg\b/g) || []).length, 2, 'both primary homepage actions should have an icon')
+  assert.equal((actions.match(/<svg\b/g) || []).length, 3, 'all homepage actions should have an icon')
   assert.match(component, /\/doc\/v8-engine\/microi-agent\.html/)
   assert.equal((component.match(/secondaryAction: 'Microi Agent'/g) || []).length, 2, 'both locales keep the concise Agent entry label')
   assert.doesNotMatch(component, /downloadMeta:/)
@@ -151,7 +155,16 @@ test('current Chinese brand surfaces use one canonical positioning and keep the 
   }
 
   for (const [name, content] of Object.entries(surfaces)) {
-    assert.match(content, /开源 AI 开发框架/, `${name} should use the canonical positioning`)
+    // 培训路由的页面标题说明受众，品牌定位由它实际挂载的共用选型正文承载。
+    const branding = name === 'training syllabus' ? `${content}\n${read('docs/.vitepress/theme/common-training-content.js')}` : content
+    assert.match(branding, /开源 AI 开发框架/, `${name} should use the canonical positioning`)
+    if (name === 'training syllabus') {
+      assert.match(content, /47页技术架构版与10页企业版/)
+      assert.match(content, /企业版以成功案例为路线/u)
+      assert.match(content, /24张行业案例截图与系统架构图/u)
+      assert.match(content, /<TrainingSyllabusDeck\s*\/>/u)
+      assert.doesNotMatch(content, /企业应用版|12\s*页企业|AI\s*界面概念图/u)
+    }
     assert.doesNotMatch(
       content,
       /开源 AI 应用开发平台|企业级 AI 应用开发框架|开源 AI 低代码平台/,
@@ -187,6 +200,9 @@ test('homepage visual contract covers responsive, focus, and reduced-motion stat
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
   assert.match(styles, /animation:\s*mciHomeActionFlow[^;]*infinite/)
   assert.match(styles, /animation:\s*mciHomeParticleFloat[^;]*infinite/)
+  assert.match(styles, /\.ai-studio-summary__actions\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s)
+  assert.match(styles, /\.ai-studio-summary__actions a\.is-start\s*\{[^}]*--mci-home-action-start:\s*var\(--mci-home-start-start\)/s)
+  assert.match(styles, /\.ai-studio-summary__actions a\.is-start\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/s, 'mobile gives the main entry its own touch-friendly row')
   assert.match(styles, /--mci-home-pointer-x/)
   assert.match(component, /@pointermove="trackPointer"/)
   assert.match(component, /prefers-reduced-motion: reduce/)
@@ -203,6 +219,17 @@ test('homepage visual contract covers responsive, focus, and reduced-motion stat
   assert.match(contract, /mode: brand-narrative/)
   assert.match(contract, /低代码 → V8 → 专业源码/)
   assert.match(contract, /能力带与 NuGet 证据区保持 28px 桌面间隔/)
+})
+
+test('personal center redirects unauthenticated homepage visitors while retaining their destination', () => {
+  const profile = read('docs/.vitepress/theme/components/ProfilePage.vue')
+  const redirect = profile.match(/function redirectToLoginIfNeeded\(\) \{([\s\S]*?)\n\}/)?.[1] || ''
+  assert.match(redirect, /if \(isAuthed\.value\) return false/)
+  assert.match(redirect, /window\.location\.pathname/)
+  assert.match(redirect, /window\.location\.search/)
+  assert.match(redirect, /window\.location\.hash \|\| '#\/overview'/)
+  assert.match(redirect, /\/login\.html\?redirect=\$\{encodeURIComponent\(profileRedirect\)\}/)
+  assert.match(profile, /restoreSession\(\)[\s\S]*?if \(redirectToLoginIfNeeded\(\)\) return/)
 })
 
 test('source architecture keeps the detailed selection guidance off the homepage', () => {

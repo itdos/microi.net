@@ -1,8 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 
 import {
@@ -14,31 +12,11 @@ import {
   loadCachedNugetStats,
   loadLocalNugetStats,
   loadNugetOwnerStats,
+  loadNugetSnapshot,
   normalizeNugetStatsPayload,
   persistLocalNugetStats,
   preferHigherNugetStats
 } from '../docs/.vitepress/theme/utils/nuget-downloads.js'
-
-const ENGINE_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  'Microi-V8-Engine',
-  'Microi吾码 (api.itdos.com)',
-  'iTdos.Product.Internal',
-  '接口引擎',
-  '系统',
-  '[官网]NuGet官方实时汇总(official_nuget_stats).js'
-)
-let ENGINE_SOURCE = ''
-try {
-  ENGINE_SOURCE = await readFile(ENGINE_PATH, 'utf8')
-} catch (error) {
-  if (error?.code !== 'ENOENT') throw error
-}
-const ENGINE_TEST_OPTIONS = ENGINE_SOURCE
-  ? {}
-  : { skip: 'Microi-V8-Engine is a local MCP mirror and is not present in clean website checkouts' }
 
 const STATS = Object.freeze({
   owner: 'ITdos',
@@ -53,17 +31,6 @@ const STATS = Object.freeze({
   refreshFailed: false
 })
 
-const FIXED_NOW = '2026-08-22T01:00:20.000Z'
-class FixedDate extends Date {
-  constructor(...args) {
-    super(...(args.length ? args : [FIXED_NOW]))
-  }
-
-  static now() {
-    return new Date(FIXED_NOW).getTime()
-  }
-}
-
 test('uses the official iTdos API Engine endpoint instead of querying NuGet from every browser', async () => {
   assert.equal(
     NUGET_STATS_ENDPOINT,
@@ -74,11 +41,12 @@ test('uses the official iTdos API Engine endpoint instead of querying NuGet from
   assert.doesNotMatch(source, /api\.nuget\.org|azuresearch-[a-z]+\.nuget\.org/i)
 
   const component = await readFile(new URL('../docs/.vitepress/theme/components/MciNugetStats.vue', import.meta.url), 'utf8')
-  assert.match(component, /正在更新/)
-  assert.match(component, /当前 API 实时汇总/)
-  assert.match(component, /Redis 最近一次成功汇总/)
-  assert.match(component, /数据库每日持久快照/)
+  assert.match(component, /NUGET 官方快照数据/)
+  assert.match(component, /每 3 小时/)
+  assert.match(component, /最新成功快照/)
   assert.match(component, /浏览器最近成功快照/)
+  assert.match(component, /<time[\s\S]*:datetime="stats\.queriedAt"/)
+  assert.doesNotMatch(component, /官方实时数据|当前 API 实时汇总|OFFICIAL LIVE DATA/)
 })
 
 test('normalizes only valid ITdos server payloads and keeps the official profile URL', () => {
@@ -92,12 +60,13 @@ test('normalizes only valid ITdos server payloads and keeps the official profile
   assert.equal(result.owner, 'ITdos')
   assert.equal(result.totalDownloads, STATS.totalDownloads)
   assert.equal(result.profileUrl, 'https://www.nuget.org/profiles/ITdos')
-  assert.equal(result.isLive, true)
+  assert.equal(result.isLive, false)
   assert.throws(() => normalizeNugetStatsPayload({ ...STATS, owner: 'another-owner' }), /owner/i)
   assert.throws(() => normalizeNugetStatsPayload({ ...STATS, totalDownloads: 0 }), /invalid/i)
+  assert.throws(() => normalizeNugetStatsPayload({ ...STATS, queriedAt: 'invalid' }), /time/i)
 })
 
-test('loads the Redis last-success snapshot before the refresh request', async () => {
+test('legacy cache loader only requests the latest persisted snapshot', async () => {
   __resetNugetStatsRequestForTests()
   const requests = []
   const fetchImpl = async (url, options) => {
@@ -113,37 +82,55 @@ test('loads the Redis last-success snapshot before the refresh request', async (
   assert.equal(requests[0].options.method, 'POST')
   assert.equal(requests[0].options.headers.osclient, 'iTdos')
   assert.deepEqual(JSON.parse(requests[0].options.body), {
-    Action: 'Cache',
-    LockScope: 'NuGetCacheRead'
+    Action: 'Snapshot',
+    LockScope: 'NuGetSnapshotRead'
   })
 })
 
-test('deduplicates refreshes across every NuGet stats component on the same page', async () => {
+test('deduplicates snapshot reads across every NuGet stats component on the same page', async () => {
   __resetNugetStatsRequestForTests()
   let calls = 0
   const fetchImpl = async (_url, options) => {
     calls++
     assert.deepEqual(JSON.parse(options.body), {
-      Action: 'Refresh',
-      LockScope: 'NuGetOfficialRefresh'
+      Action: 'Snapshot',
+      LockScope: 'NuGetSnapshotRead'
     })
     await new Promise(resolve => setTimeout(resolve, 5))
     return response({
       Code: 1,
-      Data: { ...STATS, stage: 'current', cacheState: 'updated', didRefresh: true }
+      Data: { ...STATS, stage: 'snapshot', databaseState: 'persisted', refreshIntervalSeconds: 10800 }
     })
   }
 
   const [first, second, third] = await Promise.all([
-    loadNugetOwnerStats({ fetchImpl }),
+    loadCachedNugetStats({ fetchImpl }),
     loadNugetOwnerStats({ fetchImpl }),
     loadNugetOwnerStats({ fetchImpl })
   ])
 
   assert.equal(calls, 1)
-  assert.equal(first.isLive, true)
+  assert.equal(first.isLive, false)
+  assert.equal(first.stage, 'snapshot')
   assert.deepEqual(second, first)
   assert.deepEqual(third, first)
+})
+
+test('fetches the latest snapshot again after the shared in-flight read completes', async () => {
+  __resetNugetStatsRequestForTests()
+  let calls = 0
+  const fetchImpl = async () => {
+    calls++
+    return response({
+      Code: 1,
+      Data: { ...STATS, totalDownloads: STATS.totalDownloads + calls, stage: 'snapshot' }
+    })
+  }
+
+  const first = await loadNugetOwnerStats({ fetchImpl })
+  const nextVisit = await loadNugetOwnerStats({ fetchImpl })
+  assert.equal(calls, 2)
+  assert.equal(nextVisit.totalDownloads, first.totalDownloads + 1)
 })
 
 test('keeps cached data when the server reports an upstream refresh failure', async () => {
@@ -171,7 +158,7 @@ test('clears a failed shared request so a later component can retry', async () =
 
   await assert.rejects(loadNugetOwnerStats({ fetchImpl }), /temporary failure/)
   const recovered = await loadNugetOwnerStats({ fetchImpl })
-  assert.equal(recovered.isLive, true)
+  assert.equal(recovered.isLive, false)
   assert.equal(calls, 2)
 })
 
@@ -183,7 +170,7 @@ test('formats Chinese and English compact totals without rounding upward', () =>
   assert.equal(NUGET_FALLBACK_STATS.profileUrl, 'https://www.nuget.org/profiles/ITdos')
 })
 
-test('keeps the browser last-success snapshot monotonic when the official API is unreachable', () => {
+test('keeps the newest browser snapshot and uses the higher total only for equal snapshot times', () => {
   const values = new Map()
   const storage = {
     getItem: key => values.get(key) || null,
@@ -203,192 +190,100 @@ test('keeps the browser last-success snapshot monotonic when the official API is
     local
   )
 
+  persistLocalNugetStats({
+    ...STATS,
+    totalDownloads: 9100000,
+    queriedAt: '2026-08-23T00:00:00.000Z',
+    stage: 'snapshot'
+  }, { storage })
+  assert.equal(loadLocalNugetStats({ storage }).totalDownloads, 9100000)
+
   values.set(NUGET_LOCAL_STORAGE_KEY, '{broken')
   assert.equal(loadLocalNugetStats({ storage }), null)
 })
 
-test('reads the daily database snapshot and repopulates Redis after a cache loss', ENGINE_TEST_OPTIONS, () => {
-  const databaseRow = dailyRow(STATS.totalDownloads, '2026-08-21T23:00:00.000Z')
-  const execution = executeStatsEngine({
-    action: 'Cache',
-    databaseRows: [databaseRow]
-  })
-
-  assert.equal(execution.result.Code, 1)
-  assert.equal(execution.result.Data.stage, 'database')
-  assert.equal(execution.result.Data.cacheState, 'database-recovered')
-  assert.equal(execution.result.Data.totalDownloads, STATS.totalDownloads)
-  assert.ok(execution.cache.has('PublicStats:NuGetITdos'))
-})
-
-test('writes a successful refresh to Redis before adding the daily database snapshot', ENGINE_TEST_OPTIONS, () => {
-  assert.match(ENGINE_SOURCE, /Version: v1\.0\.3/)
-  assert.match(ENGINE_SOURCE, /mci_nuget_stats_daily/)
-
-  const execution = executeStatsEngine({ action: 'Refresh' })
-  const redisWrite = execution.events.indexOf('cache:set')
-  const databaseWrite = execution.events.indexOf('db:add')
-
-  assert.equal(execution.result.Code, 1)
-  assert.equal(execution.result.Data.totalDownloads, STATS.totalDownloads)
-  assert.equal(execution.result.Data.databaseState, 'persisted')
-  assert.ok(redisWrite >= 0)
-  assert.ok(databaseWrite > redisWrite)
-  assert.equal(execution.databaseRows.length, 1)
-  assert.equal(execution.databaseRows[0].StatDate, '2026-08-22')
-  assert.equal(execution.databaseRows[0].TotalDownloads, STATS.totalDownloads)
-})
-
-test('updates the same daily row when a later successful total is higher', ENGINE_TEST_OPTIONS, () => {
-  const databaseRow = dailyRow(9700000, '2026-08-22T00:00:00.000Z')
-  const execution = executeStatsEngine({
-    action: 'Refresh',
-    databaseRows: [databaseRow]
-  })
-
-  const redisWrite = execution.events.indexOf('cache:set')
-  const databaseWrite = execution.events.indexOf('db:update')
-  assert.equal(execution.result.Code, 1)
-  assert.ok(databaseWrite > redisWrite)
-  assert.equal(execution.databaseRows.length, 1)
-  assert.equal(execution.databaseRows[0].TotalDownloads, STATS.totalDownloads)
-  assert.equal(execution.databaseRows[0].StatDate, '2026-08-22')
-})
-
-test('falls back to the database and never accepts a lower NuGet regional index total', ENGINE_TEST_OPTIONS, () => {
-  const databaseRow = dailyRow(9800000, '2026-08-20T00:00:00.000Z')
-  const unavailable = executeStatsEngine({
-    action: 'Refresh',
-    databaseRows: [databaseRow],
-    httpStatus: 503
-  })
-  assert.equal(unavailable.result.Code, 1)
-  assert.equal(unavailable.result.Data.stage, 'database')
-  assert.equal(unavailable.result.Data.totalDownloads, 9800000)
-  assert.equal(unavailable.result.Data.refreshFailed, true)
-
-  const lagging = executeStatsEngine({
-    action: 'Refresh',
-    databaseRows: [databaseRow],
-    upstreamTotal: 9700000
-  })
-  assert.equal(lagging.result.Code, 1)
-  assert.equal(lagging.result.Data.cacheState, 'index-lag')
-  assert.equal(lagging.result.Data.totalDownloads, 9800000)
-})
-
-function dailyRow(totalDownloads, queriedAt) {
-  return {
-    Id: `snapshot-${String(totalDownloads)}`,
-    Owner: 'ITdos',
-    StatDate: String(queriedAt).slice(0, 10),
-    PackageCount: 38,
-    TotalDownloads: totalDownloads,
-    ProfileUrl: 'https://www.nuget.org/profiles/ITdos',
-    QueriedAt: queriedAt,
-    CachedAt: queriedAt,
-    SuccessfulEndpoints: 2,
-    Source: 'nuget-official-api',
-    SchemaVersion: 1
+test('rejects failed HTTP responses, absent snapshots, and malformed snapshot content', async () => {
+  for (const fetchImpl of [
+    async () => ({ ok: false, status: 503 }),
+    async () => response({ Code: 2, Msg: 'No successful snapshot' }),
+    async () => response({ Code: 1, Data: null }),
+    async () => response({ Code: 1, Data: { ...STATS, owner: 'other' } })
+  ]) {
+    __resetNugetStatsRequestForTests()
+    await assert.rejects(loadNugetSnapshot({ fetchImpl }))
   }
-}
+})
 
-function nugetPayload(totalDownloads) {
-  const base = Math.floor(totalDownloads / 38)
-  let remainder = totalDownloads - (base * 38)
-  return {
-    data: Array.from({ length: 38 }, (_, index) => {
-      const downloads = base + (remainder > 0 ? 1 : 0)
-      remainder = Math.max(0, remainder - 1)
-      return {
-        id: `Package.${index + 1}`,
-        owners: ['ITdos'],
-        totalDownloads: downloads
-      }
-    })
+test('storage failures do not break snapshot rendering or overwrite a valid payload', () => {
+  const storage = {
+    getItem() { throw new Error('storage denied') },
+    setItem() { throw new Error('quota exceeded') }
   }
-}
+  assert.equal(loadLocalNugetStats({ storage }), null)
+  assert.equal(persistLocalNugetStats(STATS, { storage }), null)
+})
 
-function executeStatsEngine({
-  action,
-  cacheStats = null,
-  databaseRows = [],
-  upstreamTotal = STATS.totalDownloads,
-  httpStatus = 200,
-  cacheWriteSucceeds = true
-}) {
-  const events = []
-  const cache = new Map()
-  const rows = databaseRows.map(row => ({ ...row }))
-  if (cacheStats) cache.set('PublicStats:NuGetITdos', JSON.stringify(cacheStats))
+test('component accepts the authoritative snapshot and shows its update time without triggering collection', async () => {
+  const latest = {
+    ...STATS,
+    totalDownloads: 9500000,
+    queriedAt: '2026-08-23T03:00:00.000Z',
+    stage: 'snapshot'
+  }
+  const view = await executeStatsComponent({ latest, local: STATS })
+  assert.equal(view.requests, 1)
+  assert.equal(view.stats.value, latest)
+  assert.equal(view.state.value, 'snapshot')
+  assert.equal(view.displayDownloads.value, latest.totalDownloads)
+  assert.equal(view.statusText.value, '每 3 小时更新')
+  assert.match(view.updateTime.value, /2026/)
+  assert.match(view.updateTime.value, /GMT\+8/)
+  assert.match(view.sourceText.value, /最新成功快照/)
+})
 
-  const V8 = {
-    Param: {
-      Action: action,
-      LockScope: action === 'Refresh' ? 'NuGetOfficialRefresh' : 'NuGetCacheRead'
-    },
-    DbTrans: {},
-    Cache: {
-      Get(key) {
-        events.push('cache:get')
-        return cache.has(key) ? cache.get(key) : null
-      },
-      Set(key, value) {
-        events.push('cache:set')
-        if (!cacheWriteSucceeds) return false
-        cache.set(key, value)
-        return true
-      }
-    },
-    FormEngine: {
-      GetTableData(tableName) {
-        assert.equal(tableName, 'mci_nuget_stats_daily')
-        events.push('db:list')
-        const data = rows
-          .filter(row => row.Owner === 'ITdos')
-          .sort((left, right) => String(right.StatDate).localeCompare(String(left.StatDate)))
-          .slice(0, 1)
-        return { Code: 1, Data: data }
-      },
-      GetFormData(tableName, query) {
-        assert.equal(tableName, 'mci_nuget_stats_daily')
-        events.push('db:get')
-        const expectedDate = query._Where[1][3]
-        const row = rows.find(item => item.Owner === 'ITdos' && item.StatDate === expectedDate)
-        return row ? { Code: 1, Data: row } : { Code: 2, Data: null }
-      },
-      AddFormData(tableName, form) {
-        assert.equal(tableName, 'mci_nuget_stats_daily')
-        events.push('db:add')
-        rows.push({ Id: `snapshot-${rows.length + 1}`, ...form })
-        return { Code: 1, Data: rows.at(-1) }
-      },
-      UptFormData(tableName, form) {
-        assert.equal(tableName, 'mci_nuget_stats_daily')
-        events.push('db:update')
-        const row = rows.find(item => item.Id === form.Id)
-        if (!row) return { Code: 0, Msg: 'missing row' }
-        Object.assign(row, form)
-        return { Code: 1, Data: row }
-      }
-    },
-    Http: {
-      GetResponse() {
-        events.push('http:get')
-        return {
-          StatusCode: httpStatus,
-          Content: JSON.stringify(nugetPayload(upstreamTotal))
-        }
-      }
+test('component keeps a labeled browser or embedded snapshot when snapshot service is unavailable', async () => {
+  const browser = await executeStatsComponent({ local: STATS, failure: true })
+  assert.equal(browser.state.value, 'cached')
+  assert.equal(browser.statusText.value, '浏览器最近成功快照')
+  assert.match(browser.sourceText.value, /浏览器最近成功快照/)
+  const embedded = await executeStatsComponent({ failure: true })
+  assert.equal(embedded.state.value, 'fallback')
+  assert.equal(embedded.statusText.value, '官网内置快照')
+  assert.equal(embedded.stats.value.totalDownloads, NUGET_FALLBACK_STATS.totalDownloads)
+  const olderBrowser = await executeStatsComponent({
+    local: { ...STATS, queriedAt: '2026-01-01T00:00:00.000Z' },
+    failure: true
+  })
+  assert.equal(olderBrowser.state.value, 'fallback')
+  assert.equal(olderBrowser.statusText.value, '官网内置快照')
+})
+
+async function executeStatsComponent({ latest, local = null, failure = false } = {}) {
+  const source = await readFile(new URL('../docs/.vitepress/theme/components/MciNugetStats.vue', import.meta.url), 'utf8')
+  const script = source.match(/<script setup>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import[\s\S]*?from ['"][^'"]+['"]\r?\n/gm, '')
+  let mount
+  let requests = 0
+  const view = runInNewContext(`${script}\n;({stats,state,displayDownloads,statusText,sourceText,updateTime})`, {
+    NUGET_FALLBACK_STATS,
+    formatCompactDownloads,
+    preferHigherNugetStats,
+    ref: value => ({ value }),
+    computed: getter => ({ get value() { return getter() } }),
+    defineProps: () => ({ variant: 'home', locale: 'zh-CN' }),
+    useRoute: () => ({ path: '/' }),
+    onMounted: callback => { mount = callback },
+    onBeforeUnmount() {},
+    loadLocalNugetStats: () => local ? { ...local, stage: 'browser' } : null,
+    persistLocalNugetStats() {},
+    async loadNugetSnapshot() {
+      requests++
+      if (failure) throw new Error('service unavailable')
+      return latest
     }
-  }
-
-  const result = runInNewContext(`(function () {\n${ENGINE_SOURCE}\n})()`, {
-    V8,
-    Date: FixedDate,
-    console: { log: message => events.push(`log:${message}`) }
   })
-  return { result, events, cache, databaseRows: rows }
+  await mount()
+  return { ...view, requests }
 }
 
 function response(payload) {

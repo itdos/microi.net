@@ -1,0 +1,14 @@
+{
+  "JobName": "officialNugetStatsRefresh",
+  "JobDesc": "NuGet官方汇总快照：每3小时刷新，官网只读最新成功快照",
+  "JobType": "1",
+  "ApiEngineKey": "official_nuget_stats",
+  "CronExpression": "0 0 0/3 * * ?",
+  "CronDesc": "每3小时（北京时间00、03、06、09、12、15、18、21点）",
+  "TimeZoneId": "PRC",
+  "Status": "正常",
+  "JobParam": {
+    "Action": "Refresh",
+    "LockScope": "NuGetOfficialRefresh"
+  }
+}

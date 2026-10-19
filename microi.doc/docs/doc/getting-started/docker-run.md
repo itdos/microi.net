@@ -2,20 +2,6 @@
 
 > **通过 Docker 编排部署 Microi吾码低代码平台全套环境**
 
-## 独立安装吾码服务器运维面板
-
-需要先准备服务器环境时，可直接安装 **Microi.Panel / 吾码服务器运维面板**，再在插件市场安装 Nginx、数据库、MinIO、翻译和 OCR 等服务。面板使用独立账号和 HTTPS 入口，可以与宝塔、1Panel 使用不同端口共存。完整说明见 [服务器运维面板](/doc/server-panel/overview.html)。
-
-在 Linux SSH 终端复制下面一行，按提示填写域名或服务器 IPv4。已有 Docker 会直接复用；没有 Docker 时会询问安装。默认入口端口 `61890`、目录 `/microi/panel`，账号 `paneladmin`，随机密码保存于 `/microi/panel/config/admin-password`。
-
-```bash
-panel_url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh; (if command -v curl >/dev/null 2>&1; then curl -fSL -o install-microi-panel.sh "$panel_url"; else wget -O install-microi-panel.sh "$panel_url"; fi) && sed -i 's/\r$//' install-microi-panel.sh && bash install-microi-panel.sh
-```
-
-安装脚本也提供 [GitHub 备用下载](https://github.com/itdos/microi.net/raw/refs/heads/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh)。
-
-面板与业务服务分别安装。现有 Microi.Ops 使用原 Compose 迁移为 Microi.Panel，保留原账号、目录、端口及任务账本，具体步骤见 [Ops 迁移](/doc/server-panel/overview.html#从-microi-ops-迁移)。同一主机只运行一个吾码 Ops/Panel 控制器。
-
 ## 🚀 一键安装（零门槛部署）
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
@@ -51,6 +37,22 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
 ::::
+
+### 独立安装吾码服务器运维面板（可选） {#独立安装吾码服务器运维面板}
+
+> **可选项：** 按需独立安装或补装；如已通过一键安装获得运维面板，无需重复安装。
+
+需要先准备服务器环境时，可直接安装 **Microi.Panel / 吾码服务器运维面板**，再在插件市场安装 Nginx、数据库、MinIO、翻译和 OCR 等服务。面板使用独立账号和 HTTPS 入口，可以与宝塔、1Panel 使用不同端口共存。完整说明见 [服务器运维面板](/doc/server-panel/overview.html)。
+
+在 Linux SSH 终端复制下面一行，按提示填写域名或服务器 IPv4。已有 Docker 会直接复用；没有 Docker 时会询问安装。默认入口端口 `61890`、目录 `/microi/panel`，账号 `paneladmin`，随机密码保存于 `/microi/panel/config/admin-password`。
+
+```bash
+panel_url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh; (if command -v curl >/dev/null 2>&1; then curl -fSL -o install-microi-panel.sh "$panel_url"; else wget -O install-microi-panel.sh "$panel_url"; fi) && sed -i 's/\r$//' install-microi-panel.sh && bash install-microi-panel.sh
+```
+
+安装脚本也提供 [GitHub 备用下载](https://github.com/itdos/microi.net/raw/refs/heads/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh)。
+
+面板与业务服务分别安装。现有 Microi.Ops 使用原 Compose 迁移为 Microi.Panel，保留原账号、目录、端口及任务账本，具体步骤见 [Ops 迁移](/doc/server-panel/overview.html#从-microi-ops-迁移)。同一主机只运行一个吾码 Ops/Panel 控制器。
 
 ### 📸 预览图
 

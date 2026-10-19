@@ -889,6 +889,12 @@ function navigateMicroRoute(path) {
 
 微服务 CSS 即使当前使用 iframe，也必须能在非 iframe/sandbox 策略变化时安全运行：主题变量和通用控件规则挂在 AppKey 唯一根容器（例如 `[data-mci-ui-root="your-app-key"]`）下，不能只用会被宿主或其它应用共同命中的裸 `[data-mci-ui-root]`；禁止用 `:root`、`html`、`body`、裸 `*`、裸 `button` 改写宿主。背景网格等装饰层使用根容器内的 `position:absolute`，禁止 `position:fixed; inset:0` 覆盖吾码左侧菜单。宿主容器同时使用 paint containment 作为第二道边界，但不能替代子应用样式命名空间。
 
+所有微服务必须即时跟随吾码主题色、明暗模式和界面密度。首次挂载、宿主数据更新及缓存页签重新显示时，读取 `themeColor`、`themeMode`、`themeTokens` 和 `uiDensity`，把 `uiDensity.variables` 写入本应用唯一根容器，并同步 `data-mci-ui-density`。iframe 不继承父页面 CSS，因此需要显式接收这些值。嵌入时以宿主快照为准，不用应用内旧个人设置覆盖宿主，也不通过重新挂载页面刷新主题，以免丢失未保存表单。
+
+使用 `--mci-ui-scale` 和传入的字号、控件尺寸、间距变量调整表格、表单、按钮、页头及弹窗各区；禁止整页 `zoom/transform:scale`。浅色、深色及非默认主题色分别保持表面和文字可读，边角、关闭渐变及阴影等开关也从 `themeTokens` 应用到本页面。全局 CSS 文件改为带作用域导入或 AppKey 命名空间，避免商城等页面的通用类名污染个人中心。
+
+交付前需在真实菜单和弹窗宿主中覆盖 90/100/110 密度、明暗切换、4K 与窄屏，测量输入框、按钮、表格行、页头和弹窗的实际尺寸，并确认未保存值及内部路由保留。仅独立预览或源码字符串检查不代表宿主验收通过。AI 开发此类页面前必须读取 `microi.skills/microi-microservice/SKILL.md` 的主题与密度契约。
+
 菜单型微服务遵守“单一纵向滚动所有者”契约：外层宿主只负责可用区尺寸并隐藏自身溢出，`<micro-app>` 边界提供框架兜底滚动。普通长页面只需让内容自然增高，超出可用区时由框架显示一条滚动条；如果子应用需要内部 sticky 工具栏或虚拟列表，则把自己的滚动容器约束为 `height: var(--micro-app-available-height)`（或等价的确定高度）并设置 `overflow-y:auto`，此时内容不会再溢出 `<micro-app>`，框架兜底条会自动消失，只保留子应用的一条。仅在自动高度元素上写 `overflow:auto` 不算真正的自适应滚动容器，也不会制造第二条滚动条。
 
 自动化验收至少断言：点击微服务内部菜单时主框架 URL/Tab 不变、微服务左栏 DOM 不重建、骨架屏只出现在内容区；吾码左上角 Logo 可见，主菜单不出现来自子应用的网格线、按钮或主题样式；浏览器前进/后退能恢复子应用内部页面。

@@ -1,0 +1,157 @@
+# 基线：dns_sync_ip v1.0.0；完整远端源SHA-256 8b25ff92c33fa3b24394c4ff8b37dade1db291496d3a5ad5e9eec5cb7de12abf。
+# 零上下文补丁不包含未修改的私有凭据段；完整源只能保存在ignored私有镜像。
+--- a/dns_sync_ip.js
++++ b/dns_sync_ip.js
+@@ -0,0 +1,8 @@
++/*
++ * V8 ApiEngine
++ * ApiEngineKey: dns_sync_ip
++ * Version: v1.0.7
++ * Function:
++ * - 保留指定集福鲤上游及既有15个目标/凭据。仅net.itdos.net每次先回读固定云记录，校验身份和值；漂移更新必须数字Code=1且写后回读一致，确认后60秒缓存仅作记账，失败明确标记。管理员显式CheckIpOnly+VerifyEgress只读对照固定独立IPv4服务和当前监控节点身份。
++ */
++
+@@ -11,10 +19,124 @@
+-//修改为从阿里云服务器获取IP
+-// var clientIPResult = V8.Method.GetClientIP();
+-var clientIPResult = V8.Http.Post({
+-  Url : 'https://api.nbweixin.cn/apiengine/get-client-ip'
+-});
+-clientIPResult = JSON.parse(clientIPResult);
+-if(clientIPResult.Code != 1){
+-  return clientIPResult;
+-}
+-var newIP = clientIPResult.Data;
++// 只从固定服务读取当前 API 的公网出口地址；失败时不得把空正文或代理内网地址写入 DNS。
++var clientIPResponse;
++try {
++  clientIPResponse = V8.Http.GetResponse({
++    Url: 'https://api.jifulii.com/apiengine/get-client-ip',
++    Headers: { osclient: 'xjy', apiengine: '1', 'Cache-Control': 'no-cache' },
++    Timeout: 15
++  });
++} catch (_) {
++  return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_TRANSPORT]' };
++}
++if (!clientIPResponse || !(Number(clientIPResponse.StatusCode) >= 200 && Number(clientIPResponse.StatusCode) < 300)) {
++  return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_HTTP_' + (clientIPResponse ? Number(clientIPResponse.StatusCode) || 0 : 0) + ']' };
++}
++var clientIPResult;
++try {
++  var clientIPContent = String(clientIPResponse.Content || '').trim();
++  if (!clientIPContent || clientIPContent.length > 4096) return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_BODY]' };
++  clientIPResult = JSON.parse(clientIPContent);
++} catch (_) {
++  return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_JSON]' };
++}
++if (!clientIPResult || Number(clientIPResult.Code) !== 1 || typeof clientIPResult.Data !== 'string') {
++  return { Code: 0, Msg: '获取公网IP失败[UPSTREAM_RESULT]' };
++}
++var newIP = clientIPResult.Data.trim();
++// A 记录只接受规范的公网 IPv4，拒绝私网、回环、链路本地、文档与组播等特殊网段。
++function isPublicIPv4(value) {
++  if (!/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(value)) return false;
++  var octets = value.split('.').map(Number), a = octets[0], b = octets[1], c = octets[2];
++  if (octets.some(function(x) { return x > 255; })) return false;
++  return !(a === 0 || a === 10 || a === 127 || a >= 224 ||
++    (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
++    (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
++    (a === 192 && b === 0 && (c === 0 || c === 2)) ||
++    (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
++    (a === 203 && b === 0 && c === 113));
++}
++if (!isPublicIPv4(newIP)) return { Code: 0, Msg: '获取公网IP失败[INVALID_PUBLIC_IPV4]' };
++// 只读验收在任何 DNS 调用、缓存写入和日志清理前返回，便于核验生产节点出口。
++// 明确只读诊断才请求固定独立服务；正常分钟任务仍只使用指定的集福鲤上游。
++if (V8.Param.CheckIpOnly === true || V8.Param.CheckIpOnly === '1') {
++  if (!(V8.Param.VerifyEgress === true || V8.Param.VerifyEgress === '1')) return { Code: 1, Data: newIP, Msg: '公网IP只读校验成功' };
++  if (!V8.CurrentUser || Number(V8.CurrentUser.Level || 0) < 9999) return { Code: 1002, Msg: '独立出口诊断仅允许平台管理员' };
++  var diagnostic = { UpstreamIP: newIP, Match: false, NodeId: '', RuntimeHost: '', Independent: [] };
++  // 主机身份来自现有受鉴权监控原子，不把 HTTP 请求上下文当成 Quartz 节点身份。
++  try {
++    var snapshot = V8.Method.GetSystemObservability({ Action: 'Snapshot', WindowMinutes: 1, Top: 5 });
++    var node = snapshot && Number(snapshot.Code) === 1 && snapshot.Data && snapshot.Data.RequestRuntime && snapshot.Data.RequestRuntime.Node;
++    if (node) { diagnostic.NodeId = String(node.NodeId || ''); diagnostic.RuntimeHost = String(node.MachineName || ''); }
++  } catch (_) {}
++  var sources = [{ Name: 'ipw', Url: 'https://4.ipw.cn' }, { Name: 'icanhazip', Url: 'https://ipv4.icanhazip.com' }];
++  var validCount = 0, mismatch = false;
++  for (var sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
++    var source = sources[sourceIndex];
++    var sample = { Provider: source.Name, HttpStatus: 0, IP: null, ErrorType: 'NONE' };
++    try {
++      var independentResponse = V8.Http.GetResponse({ Url: source.Url, Headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }, Timeout: 10 });
++      sample.HttpStatus = independentResponse ? Number(independentResponse.StatusCode) || 0 : 0;
++      var independentError = String(independentResponse && independentResponse.ErrorMessage || '');
++      if (independentError) sample.ErrorType = /timeout|timed out|超时/i.test(independentError) ? 'TIMEOUT' : /ssl|tls|certificate|证书/i.test(independentError) ? 'TLS' : /ssrf|blocked|拒绝/i.test(independentError) ? 'BLOCKED' : /connect|resolve|host|network/i.test(independentError) ? 'NETWORK' : 'OTHER';
++      if (!(sample.HttpStatus >= 200 && sample.HttpStatus < 300)) { if (sample.ErrorType === 'NONE') sample.ErrorType = 'HTTP'; }
++      else {
++        var independentContent = String(independentResponse.Content || '').trim();
++        if (!independentContent || independentContent.length > 128 || !isPublicIPv4(independentContent)) sample.ErrorType = 'INVALID_IPV4';
++        else { sample.IP = independentContent; validCount++; if (sample.IP !== newIP) mismatch = true; }
++      }
++    } catch (_) { sample.ErrorType = 'TRANSPORT'; }
++    diagnostic.Independent.push(sample);
++  }
++  diagnostic.Match = validCount > 0 && !mismatch;
++  return { Code: diagnostic.Match ? 1 : 0, Data: newIP, Msg: diagnostic.Match ? '固定独立服务的生产出口IP一致' : validCount ? '固定独立服务的生产出口IP不一致' : '固定独立服务未取得有效公网IPv4', DataAppend: diagnostic };
++}
++// 仅核验既有 net.itdos.net A 记录。固定云端点/动作/记录，不接受请求参数替换目标。
++function readNetItDosRecord() {
++  var model = V8.OsClientModel || {};
++  if (!model.AlidnsKeyId || !model.AlidnsKeySecret) return { Code: 0, Msg: 'NET_RECORD_CREDENTIAL_UNAVAILABLE' };
++  function encode(value) { return encodeURIComponent(String(value)).replace(/[!'()*]/g, function(x) { return '%' + x.charCodeAt(0).toString(16).toUpperCase(); }); }
++  var queryData = {
++    Action: 'DescribeDomainRecordInfo', Version: '2015-01-09', Format: 'JSON',
++    RecordId: '18719715575030784', AccessKeyId: model.AlidnsKeyId,
++    SignatureMethod: 'HMAC-SHA1', SignatureVersion: '1.0',
++    SignatureNonce: String(V8.Method.NewGuid()), Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
++  };
++  try {
++    var query = Object.keys(queryData).sort().map(function(k) { return encode(k) + '=' + encode(queryData[k]); }).join('&');
++    var signature = V8.Method.HmacSha1Sign('GET&%2F&' + encode(query), model.AlidnsKeySecret + '&');
++    var response = V8.Http.GetResponse({ Url: 'https://alidns.aliyuncs.com/?' + query + '&Signature=' + encode(signature), Headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' }, Timeout: 10 });
++    if (!response || !(Number(response.StatusCode) >= 200 && Number(response.StatusCode) < 300)) return { Code: 0, Msg: 'NET_RECORD_READ_HTTP' };
++    var content = String(response.Content || '').trim();
++    if (!content || content.length > 16384) return { Code: 0, Msg: 'NET_RECORD_READ_BODY' };
++    var record = JSON.parse(content);
++    if (!record || record.Code) return { Code: 0, Msg: 'NET_RECORD_READ_CLOUD_ERROR' };
++    if (String(record.RecordId) !== '18719715575030784' || String(record.DomainName).toLowerCase() !== 'itdos.net' || String(record.RR).toLowerCase() !== 'net' || String(record.Type) !== 'A') return { Code: 0, Msg: 'NET_RECORD_IDENTITY_MISMATCH' };
++    if (String(record.Status) !== 'ENABLE') return { Code: 0, Msg: 'NET_RECORD_DISABLED' };
++    if (typeof record.Value !== 'string' || record.Value.length > 45) return { Code: 0, Msg: 'NET_RECORD_VALUE_INVALID' };
++    return { Code: 1, Value: record.Value.trim() };
++  } catch (_) { return { Code: 0, Msg: 'NET_RECORD_READ_TRANSPORT_OR_JSON' }; }
++}
++function syncVerifiedNetItDosRecord(expectedIP) {
++  if (!isPublicIPv4(expectedIP)) return { Code: 0, Msg: 'NET_EXPECTED_IP_INVALID', CloudVerified: false };
++  var before = readNetItDosRecord();
++  if (before.Code !== 1) return { Code: 0, Msg: before.Msg, CloudVerified: false };
++  var changed = before.Value !== expectedIP;
++  if (changed) {
++    var update;
++    try {
++      update = V8.Alidns.UptDomainRecord({
++        AccessKeyId: V8.OsClientModel.AlidnsKeyId, AccessKeySecret: V8.OsClientModel.AlidnsKeySecret,
++        RecordId: '18719715575030784', Value: expectedIP, RR: 'net', Type: 'A'
++      });
++    } catch (_) { return { Code: 0, Msg: 'NET_RECORD_UPDATE_RESULT_UNKNOWN', CloudVerified: false }; }
++    // 只接受明确数字成功码；错误文本和 truthy 业务码都不能成为成功缓存。
++    if (!update || update.Code !== 1) return { Code: 0, Msg: 'NET_RECORD_UPDATE_FAILED', CloudVerified: false };
++    var after = readNetItDosRecord();
++    if (after.Code !== 1) return { Code: 0, Msg: 'NET_RECORD_POST_READ_FAILED', CloudVerified: false };
++    if (after.Value !== expectedIP) return { Code: 0, Msg: 'NET_RECORD_VERIFY_MISMATCH', CloudVerified: false };
++  }
++  var cacheRemembered = false;
++  // 缓存仅作短期记账；每次仍先读云端，不因缓存命中跳过事实核验。
++  try { cacheRemembered = V8.Cache.Set('Microi:' + V8.OsClient + ':ServerIP:net.itdos.net', expectedIP, 60) === true; } catch (_) {}
++  return { Code: 1, CloudVerified: true, CloudValue: expectedIP, PreviousValue: before.Value, Changed: changed, CacheRemembered: cacheRemembered };
++}
++
+@@ -62,0 +185,7 @@
++  if (item.Key === 'net.itdos.net') {
++    var verifiedNet = syncVerifiedNetItDosRecord(newIP);
++    result.Data[item.Key] = verifiedNet.Code === 1 ? 1 : verifiedNet.Msg;
++    result.NetItDosNet = { Code: verifiedNet.Code, CloudVerified: verifiedNet.CloudVerified === true, Changed: verifiedNet.Changed === true, CacheRemembered: verifiedNet.CacheRemembered === true, CloudValue: verifiedNet.CloudValue || null, ErrorType: verifiedNet.Code === 1 ? null : verifiedNet.Msg };
++    if (verifiedNet.Code !== 1) result.Code = 0;
++    return;
++  }
+
