@@ -1,6 +1,6 @@
 # 基础应用升级资源
 
-`Microi.Upgrade` 默认启动只消费 `build-bootstrap-package.mjs` 生成的 `app.microi.bootstrap` 最小恢复投影，包含登录、表单与模块基础元数据、系统设置和应用商城入口所需资源。先保证能登录和在商城手动安装应用；完整 SaaS 管理、SSO、消息通知、AI 等应用不属于默认启动安装范围。程序集保留完整官方包供用户显式安装、维护与离线恢复，不代表启动时会安装全部包。
+`Microi.Upgrade` 默认启动只消费 `build-bootstrap-package.mjs` 生成的 `app.microi.bootstrap` 最小恢复投影，包含登录、表单与模块基础元数据、系统设置和应用商城入口所需资源。先保证能登录和在商城手动安装应用；完整 SaaS 管理、SSO、消息通知、AI 等应用不属于默认启动安装范围。完整官方包保留在独立发行资源目录，供用户显式安装、维护与离线交付；它们不再作为完整包嵌入 `Microi.Upgrade`。
 
 最小恢复投影由正式包的显式资源清单及必要调用依赖生成，设置体积、字段、接口数量和依赖闭合检查。首次恢复在开放登录前完成商城必需菜单与运行入口；已就绪租户重启不重复导入。完整包在线读取、校验和内置回退只用于相应的显式应用安装／维护流程，不能把完整包闭包再次扩成普通启动门禁。
 
@@ -112,7 +112,7 @@ node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --initial
 
 该命令不会覆盖任何资源；任一项不一致都会拒绝建立基线。`--synchronize-local` 仅用于让 `app.microi.store.json` 内嵌的导入器、发布器、构建器与独立 JS 文件保持一致，不会访问或修改官网。正式同步会把这些独立源码和商城包内嵌代码视为同一组逻辑副本：说明文字、换行、独立升版或不同可执行代码段的修改可自动合并，只有同一段可执行逻辑被改成不同实现时才阻止发布。`ai-app-build.js` 仍是随服务器发布的本地事实源，不扩入官网十二项资源白名单。
 
-刷新后必须构建 `Microi.Upgrade`，确认十一个运行期升级资源及随服务器发布的 `ai-app-build.js`（合计十二项）均已作为 `EmbeddedResource` 写入程序集；`official-resource-api.js` 是仅供维护发布链路同步官网接口的源码，不写入运行程序集。发布包运行时不依赖这些源码文件存在。
+刷新正式资源后，运行 `build-bootstrap-package.mjs` 生成并验证最小恢复投影，再构建 `Microi.Upgrade`。该程序集只嵌入 `app.microi.bootstrap.json` 和 `import-package.js` 两项启动资源；完整九套应用包、发布控制面及其它平台应用源码留在独立发行资源目录，不得重新加入升级程序集的 `EmbeddedResource`。运行时最小恢复不依赖工作区源码文件存在。
 
 刷新脚本会拒绝低于 v1.9.1、缺少租户接口引擎所有权不可逆保护、接口引擎资源基线或“无商城标识时跳过安装计数”、MySQL 宽表行宽溢出时的非索引 `varchar` 行外文本回退、可信批量小包单事务、安装统计 JSON 字符串响应解析、接口引擎写后回读、统一应用商城、断点复用、微服务公有 HDFS 稳定路径、DB 运行产物兜底、Jint 安全清理、原生菜单保护、源码校验或安装统计能力的导入器；也会拒绝低于 v1.6.0 的发布器，以及低于 v7.0.13、缺少官方平台应用过滤、自适应安全分片、子安装失败详情透传、批量安装后台检查点、可信后台自举保护或严格 `SourceZip / BuildZip` 资产边界的商城基线。普通或社区包的 `Managed` 仍按 Base/Local/Incoming 三方保护，客户修改会整包冲突回滚；只有从固定官网实时回读并验证为官方 `ApplicationType=Platform` 的可信包，`Managed` 才按官方源码覆盖。`CreateIfMissing` 首次创建后始终归租户维护，后续不得改回 `Managed` 接管。行宽回退只在 MySQL 明确返回 65,535 字节上限且字段不参与索引时触发，类型覆盖写入共享后台任务 checkpoint；普通异常和索引字段继续失败关闭。批量引擎在兼容尚未部署后端可信调用修复的节点时使用 `StopHttp=0`，但必须同时校验由 HTTP 控制器剥离的 `_TrustedServerInvocation`、任务 Id、任务信封和正数 fencing token；普通 HTTP 仍然失败关闭。“全部安装/更新”固定只规划 `ApplicationType=Platform` 的官方平台应用；小型官方包以一个应用一个事务完成，超过字段、表、资产或随包数据安全阈值的包继续使用内部 checkpoint 分片。
 
