@@ -20,10 +20,10 @@ onBeforeUnmount(() => { observer?.disconnect(); themeObserver?.disconnect() })
 </script>
 
 <style scoped>
-.engine-city-stage{width:min(1440px,calc(100% - 48px));height:clamp(720px,57vw,920px);margin:24px auto 0;border:1px solid rgba(113,187,224,.28);border-radius:22px;overflow:hidden;background:#061529;box-shadow:0 28px 80px #0003;isolation:isolate}
+.engine-city-stage{width:min(1440px,calc(100% - 48px));height:clamp(620px,46vw,720px);margin:24px auto 0;border:1px solid rgba(113,187,224,.28);border-radius:22px;overflow:hidden;background:#061529;box-shadow:0 28px 80px #0003;isolation:isolate}
 .engine-city-stage iframe{display:block;width:100%;height:100%;border:0;color-scheme:dark}
 .engine-city-placeholder{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e1f8ff;background:radial-gradient(ellipse at center,#153c61,#061529 70%);text-align:center;padding:30px}
 .engine-city-placeholder span{font-size:12px;letter-spacing:4px;color:#75bdd9}.engine-city-placeholder strong{font-size:clamp(22px,3vw,38px);margin-top:20px}.engine-city-placeholder p{font-size:14px;color:#a4bed6}
-@media(max-width:760px){.engine-city-stage{height:720px;border-radius:15px;margin-top:18px}}
+@media(max-width:760px){.engine-city-stage{height:600px;border-radius:15px;margin-top:18px}}
 @media(max-width:640px){.engine-city-stage{width:calc(100% - 28px)}}
 </style>

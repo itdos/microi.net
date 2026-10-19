@@ -14,7 +14,7 @@ import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { SITE_URL } from '../docs/.vitepress/config/seo-policy.mjs'
-import { loadDocAssets, prepareDocAssets, verifiedDocAssetPath } from './prepare-doc-assets.mjs'
+import { nativePdfSourceFingerprint } from './generate-training-deck-native-pdfs.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspaceRoot = path.dirname(projectRoot)
@@ -72,30 +72,12 @@ async function declaredSlideCount(edition) {
 }
 
 async function sourceFingerprint() {
-  const sources = ['components/TrainingSyllabusDeck.vue', 'components/EnterpriseTrainingSlide.vue',
-    'enterprise-training-slides.js', 'training-deck-versions.js', 'training-downloads.js', 'doc-assets.js',
-    'styles/training-syllabus-deck.scss', '../config/seo-policy.mjs']
-  const digest = createHash('sha256')
-  for (const source of sources) {
-    digest.update(source)
-    digest.update(await fs.readFile(path.join(projectRoot, 'docs/.vitepress/theme', source)))
-  }
-  const { enterpriseSlides } = await import('../docs/.vitepress/theme/enterprise-training-slides.js')
-  const scenarioImages = enterpriseSlides.map(slide => slide.image?.src)
-  if (scenarioImages.length !== await declaredSlideCount('enterprise') || new Set(scenarioImages).size !== scenarioImages.length) throw new Error('企业课件必须逐页绑定不同的场景图片')
-  const assets = await loadDocAssets()
-  const scenes = scenarioImages.map(image => {
-    const asset = assets.find(row => row.url === image || row.legacyPath === image)
-    if (!asset?.legacyPath.startsWith('/images/enterprise-training/ai/')) throw new Error(`企业场景图片未绑定官方已验证清单：${image}`)
-    return asset
-  })
-  await prepareDocAssets({ assets, only: scenes.map(asset => asset.legacyPath) })
-  // CDN URL 与原始图片字节一起冻结；缓存亦逐件验签，不把 URL 本身当作内容事实。
-  for (const asset of scenes.sort((left, right) => left.legacyPath.localeCompare(right.legacyPath))) {
-    digest.update(asset.legacyPath)
-    digest.update(await fs.readFile(verifiedDocAssetPath(asset.legacyPath, assets)))
-  }
-  return digest.digest('hex')
+  // 与 PDF 共用递归源码依赖，覆盖共用页和多图案例；下载回执不进入指纹。
+  // 旧的“每页一张独立场景图”约束已不适用于当前企业版。
+  return createHash('sha256')
+    .update(await nativePdfSourceFingerprint())
+    .update(await fs.readFile(fileURLToPath(import.meta.url)))
+    .digest('hex')
 }
 
 /** 在 1600×900 确定画布上读取每个真实文本行，换行结果完全由在线组件决定。 */
@@ -224,9 +206,19 @@ async function verifySlideImagePaint() {
     }
     return { source, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight,
       left: box.left - deckBox.left, top: box.top - deckBox.top, width: box.width, height: box.height,
-      minAncestorOpacity, enterpriseFillValidated: Boolean(figure) }
+      minAncestorOpacity, enterpriseFillValidated: Boolean(figure || image.closest('.mci-enterprise-gallery, .mci-more-case-gallery, .mci-engine-gallery')) }
   })
-  if (deck.dataset.version === 'enterprise' && verified.filter(image => image.enterpriseFillValidated).length !== 1) throw new Error('企业当前页必须完整呈现唯一场景图片')
+  // 当前版本允许无图片的概览页与多图案例页，逐张检查画布及裁切边界。
+  for (const image of images) {
+    if (!image.closest('.mci-enterprise-gallery, .mci-more-case-gallery, .mci-engine-gallery')) continue
+    const box = image.getBoundingClientRect()
+    for (let parent = image.parentElement; parent && parent !== active; parent = parent.parentElement) {
+      const style = getComputedStyle(parent)
+      if (!/(?:hidden|clip|scroll|auto)/u.test(`${style.overflowX} ${style.overflowY}`)) continue
+      const bounds = parent.getBoundingClientRect()
+      if (box.left < bounds.left - 2 || box.top < bounds.top - 2 || box.right > bounds.right + 2 || box.bottom > bounds.bottom + 2) throw new Error(`PPTX 图片被裁切：${image.currentSrc || image.src}`)
+    }
+  }
   return verified
 }
 
@@ -286,7 +278,12 @@ async function captureDecks(options) {
         await page.goto(initial.href, { waitUntil: 'networkidle' })
         await page.waitForSelector('.mci-training-slide.is-active')
         await page.evaluate(theme => document.documentElement.classList.toggle('dark', theme === 'dark'), theme)
-        await page.addStyleTag({ content: '.mci-training-deck.is-artifact-capture [data-pptx-text-layer] { -webkit-text-fill-color: transparent !important; text-shadow: none !important; }' })
+        await page.addStyleTag({ content: `.mci-training-deck.is-artifact-capture [data-pptx-text-layer] { -webkit-text-fill-color: transparent !important; text-shadow: none !important; }
+          .mci-training-deck .mci-enterprise-gallery figure { border:0!important; padding:0!important; min-height:0!important; }
+          .mci-training-deck .mci-enterprise-gallery .mci-case-image { height:100%!important; min-height:0!important; }
+          .mci-training-deck .mci-enterprise-gallery button { height:100%!important; aspect-ratio:auto!important; box-sizing:border-box!important; }
+          .mci-training-deck .mci-enterprise-gallery img { width:100%!important; height:100%!important; max-height:none!important; margin:0!important; object-fit:contain!important; box-sizing:border-box!important; }
+          .mci-training-deck .mci-enterprise-gallery figcaption { display:none!important; }` })
         for (let index = 0; index < count; index += 1) {
           if (os.freemem() < os.totalmem() * 0.05) throw new Error('系统内存占用达到95%，终止本任务浏览器')
           await page.evaluate(({ edition, index }) => { location.hash = `${edition === 'enterprise' ? 'enterprise-' : ''}slide-${String(index + 1).padStart(2, '0')}` }, { edition, index })
