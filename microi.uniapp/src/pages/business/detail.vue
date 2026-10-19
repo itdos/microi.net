@@ -620,6 +620,11 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			metaField: 'KehuMC',
 			phoneFields: ['LianxiDH', 'YewuYDH', 'ShouhouRYDH'],
 			metrics: [{
+					label: '订单原价',
+					field: 'DingdanXJ',
+					format: 'money'
+				},
+				{
 					label: '订单金额',
 					field: 'DingdanJE',
 					format: 'money'
@@ -627,10 +632,6 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				{
 					label: '合作方式',
 					field: 'DingdanHZFS'
-				},
-				{
-					label: '合同状态',
-					field: 'HetongZT'
 				}
 			],
 			sections: [{
@@ -1373,7 +1374,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					statusField: dynamic.statusField || base.statusField,
 					metaField: dynamic.metaField || base.metaField,
 					phoneFields: dynamic.phoneFields?.length ? dynamic.phoneFields : base.phoneFields,
-					metrics: dynamic.metrics?.length ? dynamic.metrics : base.metrics,
+					// 订单头部固定展示两种金额和合作方式，避免旧 ViewSchema 恢复合同状态指标。
+					metrics: this.key === 'orders' ? base.metrics : (dynamic.metrics?.length ? dynamic.metrics : base.metrics),
 					sections: [],
 					summaries: dynamic.summaries?.length ? dynamic.summaries : base.summaries
 				}
