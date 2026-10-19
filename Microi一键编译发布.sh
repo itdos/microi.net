@@ -1981,7 +1981,9 @@ if [ "$PUBLISH_DOC" = true ]; then
 
     print_step "构建 Docker 镜像: microi.doc"
     # 当前阿里云镜像仓库不接受 BuildKit 附带的 OCI attestation manifest。
-    (cd microi.doc/docs/.vitepress && docker build --provenance=false --sbom=false -t microi.doc .)
+    # 本次独立标签避免并行文档构建覆盖共享 latest；后续晋级始终使用该标签。
+    DOC_IMAGE_TAG="microi.doc:docs-$(git rev-parse --short=12 HEAD)-$(date +%s)-$$"
+    (cd microi.doc/docs/.vitepress && docker build --provenance=false --sbom=false -t "$DOC_IMAGE_TAG" .)
     print_success "Docker 镜像构建完成"
 
     # 官方网站文档镜像仓库登录：仅更新配置所属地域，另一仓库沿用其受保护的 Docker 凭据。
@@ -2009,12 +2011,12 @@ if [ "$PUBLISH_DOC" = true ]; then
     done
 
     print_step "推送到北京仓库..."
-    docker tag microi.doc registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest
+    docker tag "$DOC_IMAGE_TAG" registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest
     docker push registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest
     print_success "registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest"
 
     print_step "推送到杭州仓库..."
-    docker tag microi.doc registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest
+    docker tag "$DOC_IMAGE_TAG" registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest
     docker push registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest
     print_success "registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest"
 
