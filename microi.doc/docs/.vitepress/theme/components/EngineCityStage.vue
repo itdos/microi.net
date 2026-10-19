@@ -1,13 +1,13 @@
 <template>
   <section ref="host" class="engine-city-stage" aria-label="吾码引擎之城：三维技术架构导览">
-    <iframe v-if="activate" ref="frame" :src="entry" title="吾码 · 引擎之城，六大展区与全部引擎机位" allow="fullscreen" allowfullscreen @load="sendTheme" />
-    <div v-else class="engine-city-placeholder"><span>MICROI · ENGINE CITY</span><strong>一座城，读懂吾码技术架构</strong><p>30+ 成熟引擎 · AI 低代码 · V8 · 微服务 · 全端交付</p></div>
+    <iframe v-if="activate" ref="frame" :src="entry" title="吾码 · 引擎之城，六大街区、48 座能力地标与完整架构地图" allow="fullscreen" allowfullscreen @load="sendTheme" />
+    <div v-else class="engine-city-placeholder"><span>MICROI · ENGINE CITY</span><strong>一座城，读懂吾码技术架构</strong><p>48 座能力地标 · 122 项功能 · AI 低代码 · V8 · 全端交付</p></div>
   </section>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-const entry = 'https://file.microi.net/itdos/micro-app/microi-engine-city/index.html'
+const entry = 'https://file.microi.net/itdos/micro-app/microi-engine-city/index.html?v=1.2.0'
 const host = ref(null), frame = ref(null), activate = ref(false)
 let observer, themeObserver
 function sendTheme() { frame.value?.contentWindow?.postMessage({ type: 'microi-engine-city:theme', theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light' }, new URL(entry).origin) }
