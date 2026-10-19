@@ -41,6 +41,9 @@ public static class MicroiRealtimeHostingExtensions
 
         ConfigureSmallCommandHub<GameRealtimeHub>(signalR, enableDetailedErrors);
         ConfigureSmallCommandHub<ApiEngineRealtimeHub>(signalR, enableDetailedErrors);
+        ConfigureSmallCommandHub<ApiEngineSocketHub>(signalR, false);
+        // V8 信封使用 JSON 对象；Redis 跨节点消息禁止经 MessagePack 序列化 JToken。
+        signalR.AddHubOptions<ApiEngineSocketHub>(options => options.SupportedProtocols = new[] { "json" });
 
         services.AddStackExchangeRedisCache(options =>
         {
@@ -55,6 +58,7 @@ public static class MicroiRealtimeHostingExtensions
         app.MapHub<DiyWebSocket>("/diy-websocket").RequireCors("any");
         app.MapHub<GameRealtimeHub>(GameRealtimeRuntime.HubPath).RequireCors("any");
         app.MapHub<ApiEngineRealtimeHub>(ApiEngineRealtimeRuntime.HubPath).RequireCors("any");
+        app.MapHub<ApiEngineSocketHub>(ApiEngineSocketRuntime.HubPath).RequireCors("any");
 
         var chatHub = app.Services.GetRequiredService<IHubContext<DiyWebSocket>>();
         RealtimePushRuntime.Configure((connectionIds, eventName, payload) =>

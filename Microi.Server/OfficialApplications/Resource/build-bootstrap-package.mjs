@@ -12,7 +12,8 @@ export const bootstrapEngines = [
   'platform-runtime-custom-hook', 'platform-sys-user-session',
   'platform_auth_login_event', 'platform_auth_login_hook',
   'platform-sys-menu', 'platform-background-task', 'platform-marketplace-source',
-  'platform-marketplace-source-hook', 'get-microi-store', 'get-microi-store-model',
+  'platform-marketplace-source-hook', 'platform-tenant-system-settings', 'platform-system-settings-custom-hook',
+  'get-microi-store', 'get-microi-store-model',
   'get-microi-store-versions', 'get-microi-store-legacy-route',
   'import-microi-store-package', 'bulk-import-microi-store-packages', 'microi-store-package-storage'
 ];
@@ -24,6 +25,68 @@ export const bootstrapTables = [
   'sys_microistore_package', 'mci_ai_app_file', 'mci_ai_app_version', 'mic_data_version'
 ];
 
+// SaaS configuration is hydrated from the physical row by OsClient, before the
+// form engine runs. Its complete administration UI belongs to the optional SaaS
+// application, not to ordinary login or marketplace recovery. Physical columns
+// remain intact for historical schemas and compiled entity compatibility.
+export const bootstrapPhysicalOnlyTables = ['sys_osclients'];
+// SaaS referrals and user invitations are optional application features. Their
+// indexes must not block login/marketplace recovery on an older core schema.
+export const bootstrapIndexes = [
+  'ux_microistore_package_content', 'ix_microistore_package_store_version',
+  'ix_microistore_package_status'
+];
+
+// The form designer persists defaults for every control in every field.Config.
+// Copying unrelated upload/tree/map controls into a Text field costs hundreds of
+// KB in the startup package. Keep shared/unknown settings and only remove known
+// control-specific settings for a different control; do not infer empty defaults.
+const componentConfigPrefixes = [
+  ['NumberText', ['NumberText']], ['Textarea', ['Textarea']],
+  ['Divider', ['Divider']], ['Text', ['Text']],
+  ['DateTime', ['DateTime']], ['AutoNumber', ['AutoNumber']],
+  ['ImgUpload', ['ImgUpload']], ['FileUpload', ['FileUpload']],
+  ['Upload', ['ImgUpload', 'FileUpload']], ['DevComponent', ['DevComponent']],
+  ['TableChild', ['TableChild']], ['Map', ['Map']], ['Button', ['Button']],
+  ['Department', ['Department']], ['Cascader', ['Cascader']],
+  ['SelectTree', ['SelectTree']], ['CodeEditor', ['CodeEditor']], ['RichText', ['RichText']]
+];
+const knownComponentConfigKeys = new Set([
+  'AutoNumber', 'AutoNumberFields', 'AutoNumberFixed', 'AutoNumberLength',
+  'Button', 'Cascader', 'CodeEditor', 'CodeEditorMode', 'DateTimeType', 'Department',
+  'DevComponentName', 'DevComponentPath', 'Divider', 'DividerPosition',
+  'FileUpload', 'FileUploadLimit', 'FileUploadMultiple', 'FileUploadTips',
+  'ImgUpload', 'ImgUploadLimit', 'ImgUploadMultiple', 'ImgUploadTips', 'MapCompany',
+  'NumberText', 'NumberTextBtn', 'NumberTextBtnPosition', 'NumberTextMath',
+  'NumberTextMax', 'NumberTextMin', 'NumberTextPrecision', 'NumberTextStep',
+  'RichText', 'SelectTree', 'TableChild', 'TableChildCallbackField',
+  'TableChildFkFieldName', 'TableChildRowClickV8', 'TableChildSysMenuId',
+  'TableChildSysMenuName', 'TableChildTableId', 'TextApend', 'TextApendPosition',
+  'TextAutocomplete', 'TextIcon', 'TextIconPosition', 'TextShowPassword',
+  'Textarea', 'Upload', 'UploadMaxCount'
+]);
+
+export function projectBootstrapField(field) {
+  const result = structuredClone(field);
+  // Composite/custom controls may deliberately reuse another control's settings.
+  // Only the elementary controls with an independent value contract are compacted.
+  if (!['Text', 'Textarea', 'NumberText', 'DateTime', 'Switch'].includes(field.Component)) return result;
+  if (!result.Config || typeof result.Config !== 'string') return result;
+  let config;
+  try { config = JSON.parse(result.Config); }
+  // Older packages can contain a legacy configuration literal with raw V8
+  // newlines. This is a size optimization, not a migration of that format.
+  catch { return result; }
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return result;
+  for (const key of Object.keys(config)) {
+    if (!knownComponentConfigKeys.has(key)) continue;
+    const group = componentConfigPrefixes.find(([prefix]) => key.startsWith(prefix));
+    if (group && !group[1].includes(field.Component)) delete config[key];
+  }
+  result.Config = JSON.stringify(config);
+  return result;
+}
+
 export function buildBootstrapPackage() {
   const names = ['form-engine', 'module-engine', 'sys_user', 'sys-config', 'saas-engine', 'store'];
   const packages = names.map(name => JSON.parse(fs.readFileSync(path.join(directory, `app.microi.${name}.json`))));
@@ -33,8 +96,14 @@ export function buildBootstrapPackage() {
   for (const pkg of packages) {
     for (const table of pkg.DiyTables || []) {
       if (!bootstrapTables.includes(table.Name.toLowerCase())) continue;
-      tables.set(table.Name.toLowerCase(), table);
-      for (const field of pkg.DiyFields || []) if (field.TableId === table.Id) fields.set(`${table.Name.toLowerCase()}/${field.Name}`, field);
+      const tableName = table.Name.toLowerCase();
+      const physicalOnly = bootstrapPhysicalOnlyTables.includes(tableName);
+      // Omitted UI properties are not retirement instructions: an already
+      // installed SaaS application's metadata and tenant settings stay owned by it.
+      tables.set(tableName, physicalOnly ? {Id:table.Id, Name:table.Name, Description:table.Description} : structuredClone(table));
+      if (!physicalOnly) for (const field of pkg.DiyFields || []) {
+        if (field.TableId === table.Id) fields.set(`${tableName}/${field.Name}`, projectBootstrapField(field));
+      }
     }
     for (const column of pkg.PhysicalColumns || []) if (bootstrapTables.includes(column.TABLE_NAME.toLowerCase())) columns.set(`${column.TABLE_NAME.toLowerCase()}/${column.COLUMN_NAME}`, column);
     for (const row of pkg.DDLStatements || []) {
@@ -43,7 +112,9 @@ export function buildBootstrapPackage() {
       if (!bootstrapTables.includes(row.TableName.toLowerCase())) continue;
       const index = row.DDL.match(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+[`\[]?([^`\]\s]+)/i);
       const identity = `${row.TableName.toLowerCase()}/${index ? index[1] : 'table'}`;
-      if (index) ddl.set(identity, row);
+      if (index) {
+        if (bootstrapIndexes.includes(index[1])) ddl.set(identity, row);
+      }
       else {
         const candidates = tableDdlCandidates.get(row.TableName.toLowerCase()) || [];
         candidates.push(row);
@@ -71,7 +142,7 @@ export function buildBootstrapPackage() {
   engines.set('import-microi-store-package', importer);
   // 从完整官方包投影，沿用原接口的资源策略和正文；不制造第二份可编辑业务源码。
   const pkg = {
-    PackageInfo: {Name:'启动与应用商城恢复基础', AppId:'app.microi.bootstrap', Version:'v1.0.1',
+    PackageInfo: {Name:'启动与应用商城恢复基础', AppId:'app.microi.bootstrap', Version:'v1.0.2',
       ApplicationType:'Platform', IncludeSource:false, RequiredPlatformCapabilities:[]},
     // 空库必须先创建表，再创建独立索引；Map 的收集顺序不代表 DDL 依赖顺序。
     DDLStatements:[...ddl.entries()].filter(([key]) => key.endsWith('/table')).map(([, row]) => row)

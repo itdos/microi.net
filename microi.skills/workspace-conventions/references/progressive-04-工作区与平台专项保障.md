@@ -2,7 +2,7 @@
 
 > 原规则按适用范围无损迁移；触发对应工作时必须完整读取相关章节。
 
-<!-- microi-progressive:chunk id=workspace-conventions-002 sha256=795821e68c0c347c68f8cdcb6e2f81defa9a172650216288c10d313075e3247d -->
+<!-- microi-progressive:chunk id=workspace-conventions-002 sha256=3d4204077c5fcde9e9ef7a3d89b14c44161cb756b04f26e312bba9269285d1a2 -->
 ## 分布式部署与重启安全规范（强制）
 
 Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worker 节点位于同一负载均衡入口之后，共享业务数据库、MongoDB 和 Redis，并可能在请求执行过程中滚动发布、硬重启或发生网络分区。不得先按单机实现、上线后再补分布式保护。
@@ -19,7 +19,7 @@ Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worke
 - 若要求宿主机掉电或 `kill -9` 窗口内也绝对零丢失，必须在返回业务成功前取得外部持久消息队列、共享 outbox 或同步 WAL 的持久化确认；“内存队列随后异步落盘”不能宣称覆盖尚未持久化的强杀窗口。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-003 sha256=fd7e446aa87c7d8fecac6a258dab354bfa81415a2ed60c11f5b3069557dfa049 -->
+<!-- microi-progressive:chunk id=workspace-conventions-003 sha256=a732fefbb99a8bcbf8098e5cc824e2a40db9d1a0fa4507e1ef632de918e50a6a -->
 ## 本地资源与 OOM 保护规范（强制）
 
 AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker build、浏览器自动化、压力测试或其他可能长时间占用 CPU/内存的进程前，必须先评估资源，不得为了“让构建跑过”无限抬高堆内存或 Worker 数。
@@ -32,6 +32,8 @@ AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker
 - 全量构建无法在上述阈值内完成时，先停止并改用定向 lint、类型检查、按模块构建或按测试文件验证。如仍必须进行全量验收，应明确报告资源瓶颈，交由 CI/专用构建机或经用户明确同意的独占时段执行，禁止在用户正在使用的 VS Code 会话里硬跑。
 - **本地测试程序与依赖生命周期（强制）**：默认复用当前 MCP 对应的 MySQL、Redis、MongoDB、MinIO/OSS 等实际依赖，以及健康源码/Vite；用独立测试库、租户和命名空间隔离，不按 AI 任务或节点创建整套 Docker/Compose。本机无容器、旧夹具被清理或执行 Full 都不是新建服务的理由，不再把临时测试容器许可作为常规问题。只有现有依赖确实无法满足具体验收且有证据时才采用最小必要替代方案。每轮成功、失败、取消及资源阻塞退出均精确删除自建临时容器与纯测试资源、收回自有进程和浏览器，并独立回读；既有共享服务保持原状。报告内存不足前先收回本任务遗留占用。详见[本地测试程序与依赖生命周期](progressive-02-microi-net-api-本地启动约定.md#本地测试程序与依赖生命周期强制)。
 
+固定测试库名、端口或归属标记冲突，应按上述生命周期规则改用本任务唯一命名并保留精确归属保护，不能以“隔离 Full”为由创建新的本地依赖容器。
+
 ### `Microi.Client` 框架前端构建频率（强制）
 
 - 修改吾码低代码平台框架前端 `Microi.Client/` 时，开发阶段必须优先复用已运行的 Vite 开发服务，通过热模块更新（HMR）、定向静态测试和浏览器回归验证改动。禁止把 `npm run build` 当作每轮修改后的常规检查，禁止因切换需求、修改单个组件或上下文压缩而重复执行全量构建。
@@ -39,7 +41,7 @@ AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker
 - Vite 热更新未生效时，先检查页面、控制台、文件监听和当前 61500 开发服务归属；确需重启时按共享进程与发布锁规范精确停止本工作区原有 `npm run dev`，再重新执行 `npm run dev`。不得用 `npm run build` 代替开发服务重启，也不得结束所有 `node`、浏览器或其它对话的进程。
 - 本规则只约束 `Microi.Client/` 吾码框架前端源码。独立 MicroService、Web、UniApp 等应用源码仍按其交付 Skill 在发布前执行自身必要的构建；不得因为本规则跳过微服务正式产物生成。
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-004 sha256=443f093b8ae93e4f62df416006bc34969a6d8cde4741745acc5fdec829d957da -->
+<!-- microi-progressive:chunk id=workspace-conventions-004 sha256=4de49fe8eb29baa5b19a130e638c06473d713091398408fbff880acb57e8b125 -->
 ## 临时文件与 AI 产物放置规则（强制）
 
 - 长期交付资料归对应 `AI-Project/` 项目；不得重新生成公开根仓 `output/`。本工作区既有资料在 `AI-Project/microi/文档/历史交付资料/output/`，第三方推广 Skill 在 `AI-Project/microi/推广/skills/yixiaoer/`，均不随公开源码分发。
@@ -69,7 +71,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 **2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.Agent 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=f627ee155b40014af76926b3a432601aa3f6bec5a7eb98ca0540c83fa41f1e5a -->
+<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=6f8452c0803b811589d2ce082b9cfc7c98fa29c4200aae1dda0d9ed416a80d76 -->
 ## Microi 源码路径速查（工作区根相对路径）
 
 当用户提到“吾码后端源码”“吾码前端源码”“表单引擎源码”“官网源码”等简称时，默认按下列路径定位；如果当前工作区缺少对应目录，再用 `rg --files` 或目录搜索确认实际位置。
@@ -102,7 +104,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 每个 `AI应用/{appKey}` 必须只有一个可编辑事实源，统一承载界面、微服务、Manifest、接口引擎、资源策略、测试、构建脚本与商城上传素材。普通应用默认使用当前连接下的 `Microi-V8-Engine` 目录；受审计的官方内置应用若由独立 Git 仓库维护，必须由版本管理的发布契约唯一指向该源码根，并让构建、跨工程测试和发行包共同读取契约。此时同名 `Microi-V8-Engine` 目录只是远端同步镜像，不得回退为构建源。禁止靠目录探测在多份副本之间自动择新，也禁止另建无契约的 `microi.apps/` 平行发行根。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-006 sha256=fb29cd39fe580e3e38df4c0483e5530f876697418f38b391aa421606c8fc6fe5 -->
+<!-- microi-progressive:chunk id=workspace-conventions-006 sha256=6f9ec29af60f5e40469f49a72a400b2aff2976ef53765f530275fae9b0961997 -->
 ## Skills 通用化原则
 
 编写或更新 `microi.skills/` 下的技能文档时，**不能加入特定项目名称、特定本地路径或特定业务规则**，必须保持通用性：
@@ -115,7 +117,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - ✅ 项目特定规则应维护在各项目自己的目录内（如 `AI-Project/<项目>/` 或项目根的 `tests/`）
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-007 sha256=c23d7942a3b6176b464fe267546c09dcadf990c2c243576c267c644b4502795d -->
+<!-- microi-progressive:chunk id=workspace-conventions-007 sha256=7a3bddeb52ccc86d84a6595a215dfc4c9197377f03413a0c0adaa2584727db36 -->
 ## Skills 中文优先规则
 
 编写、补充或重构 Microi 吾码相关技能文档和 AI 指令文件时，**能用中文就必须用中文**。适用范围包括 `microi.skills/**/SKILL.md`、`microi.skills/README.md`、`AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md`、`.cursorrules`、`.cursor/rules/*.mdc` 以及 VS Code 插件生成这些文件的模板源码。
@@ -127,7 +129,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 收尾时用 `rg` 扫描明显英文规范短语（如 `Use when`、`Required:`、`Forbidden:`、`Acceptance:`、`Quick Workflow`、`MCP default visibility`）。剩余英文必须属于必要标识符或专有名词。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-008 sha256=cd38647f4ae3c186e247c06ce44b45e42ce7e664d58fbed82c93595547638a7c -->
+<!-- microi-progressive:chunk id=workspace-conventions-008 sha256=3cf1a2a2d554d25ce675d364b7573f931837a3b41e426a2023ac642f2d4a3ebd -->
 ## 官方文档原位增补与中文单源规则（强制）
 
 修改 Microi 官方文档前，必须先用 `rg` 查找已有页面、标题和示例，并在最匹配的现有页面原位补充。不得因为方便就新建相近主题的 Markdown 页面、导航项或页面路由，避免同一 API 的说明散落多处。只有现有目录确实没有承载该独立主题的页面，而且新页面具有长期独立维护价值时，才允许新增页面，并需同时说明新建原因和导航归属。
@@ -139,15 +141,19 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 文档改动后执行 `npm run docs:build`；验收时检查本次没有无理由新增 `.md` 页面或导航路由。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-009 sha256=90d90834a2080c2a2f08bae1092557761b6b23c79274f8d4dc2b115c121f5b51 -->
+<!-- microi-progressive:chunk id=workspace-conventions-009 sha256=77231aff3e7ff8d5e88d846850d27d334a7b5a903d3e6ec4d005aabfd9f00af2 -->
 ## 多对话共享工作区变更归属保护（强制）
 
 ### 功能验收后的源码提交与推送（强制）
 
+- **原分支是唯一默认交付目标**：开始修改前记录原分支名、起始提交、已配置上游与真实远端。工作区已有分支时不得自动创建新的远端功能/发布/备份分支；在 detached 工作树中也不能把临时名字误当用户原分支。用户明确要求的新远端分支是唯一例外，不从“隔离测试”“发布”“提交代码”等一般授权推导该例外。
+- **隔离只发生在本地**：先复用合适的本地工作树；确需隔离时可以建立本地临时分支或 detached worktree。验收后先安全整合原分支最新提交，再将已验证的任务改动合回原分支；只使用指向原分支的明确 refspec 推送，不执行 `push --all`、`--mirror`、通配 refspec 或把临时候选标签发布出去。共享主工作区有未提交改动时在隔离工作树整合并推送原分支，不能整树 stash/reset 或覆盖他人差异；说明原工作区保留的状态。
+- **清理不能丢成果**：删除本地/远端临时分支前，核验每个分支的准确名称、当前提交与原分支的合并可达性；未合并内容先审查合入或按用户明确决定处理。检查活动工作树及其它任务，不能强制删除仍被使用的本地分支或改写共享历史。远端删除只针对用户授权或本任务创建且已安全合入的精确分支；推送后回读原分支包含全部保留成果、待删分支不存在，再清理本任务无用途的临时工作树。禁止为了“备份”再创建另一批远端分支或标签。
+
 - 每个已完成并通过相应验收的功能、修复或独立里程碑，必须把本任务源码、测试和必要文档按实际 Git 仓库分别提交并推送；不能仅保存在工作区、stash、临时目录或已发布产物中。用户明确要求不提交/不推送、只读任务和未完成的实验除外，不为无改动仓库制造空提交。
 - 提交前回读工作树、暂存区、上游和远端；按可核验的本任务 hunk 暂存，保留其它对话的改动与既有暂存项。公开根仓只提交公开代码；闭源目录只从各自独立仓库根提交并推送到其已有内部远端，严格执行公开仓闭源路径门禁，不能用 gitlink 或强制添加绕过隔离。
 - 推送前先获取上游的新提交并安全整合；共享工作区有并行改动时优先在隔离候选中合并，不用整树 stash/reset 覆盖他人成果，不强推共享分支，不绕过仓库 Hook。需要精确回滚时保留独立、说明清楚的功能提交；回滚已推送功能通常使用新的反向提交，不改写共享历史。
-- 正式发布的候选必须包含此前已交付功能和本任务已核验的源码，先按仓安全本地提交，再冻结包含闭源源码在内的完整构建输入、提交号和内容哈希；仅更新说明页面时也要核对整个站点候选。Git 远端推送/回读与制品发布是独立交付步骤，默认可并行或在制品之后补推，不能把远端已包含 HEAD、推送成功或 Gitee/GitLab/GitHub 可达作为 NuGet、API/PC Docker、官网 Docker 等合格制品的上传前置条件。保留对应产品的 Full、闭源隔离、DLL 加密、候选/产物一致性、最终冒烟和渠道回读；官网继续执行整站构建与内容/入口验收。隔离工作树干净或持有发布锁，均不能代替源码完整性检查。
+- 正式发布的候选必须包含此前已交付功能和本任务已核验的源码，先按仓安全本地提交，再冻结包含闭源源码在内的完整构建输入、提交号和内容哈希；仅更新说明页面时也要核对整个站点候选。Git 远端推送/回读与制品发布是独立交付步骤，默认可并行或在制品之后补推，不能把远端已包含 HEAD、推送成功或 Gitee/GitLab/GitHub 可达作为 NuGet、API/PC Docker、官网 Docker 等合格制品的上传前置条件。保留对应产品的 Full、闭源隔离、DLL 加密、候选/产物一致性、最终冒烟；渠道发布命令明确成功即完成该渠道发布，默认不回读、不等待传播，异常或结果未知时按需诊断。官网继续执行整站构建与内容/入口验收。隔离工作树干净或持有发布锁，均不能代替源码完整性检查。
 - 收尾逐仓记录本地提交号、远端分支和独立回读结果，分别报告源码、NuGet、Docker、官网及客户部署。远端网络、认证或容量故障首次失败后最多短重试一次，累计定向排障不超过 5 分钟；保存本地提交、失败原因和待补推清单，已通过全部制品门禁的渠道立即继续发布，不得反复请求同一例外授权。源码冲突、归属不明、保护路径违规、缺少实际构建输入或候选漂移必须先解决，不能当作可忽略的远端故障。后续合并改变源码/构建输入时重新冻结并按新候选验收，禁止将新提交冒充已发布制品来源；缺少远端回执仍标为源码未交付，不得宣称全部完成。
 - 官方应用发布仅验收 `microi_itdos` 对应主租户 `iTdos` 的更新与回读，不批量升级、不等待线上子租户；子租户升级是独立部署任务。Full 仍保留已登记的隔离主、子测试租户及越权、升级回归，不将测试夹具称为官网子租户部署。
 - 发布边界必须在 `Microi一键编译发布.sh` 及其调用入口生效，不能只依赖 AI 提示词。普通用户直接运行脚本同样保留适用的 Full、DLL 加密、冒烟和候选校验；运行脚本不授予官方 iTdos 写入权，也不授权升级其全部生产子租户。

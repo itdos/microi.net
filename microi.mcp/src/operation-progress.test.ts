@@ -100,7 +100,7 @@ async function manifestIndexHttpFixture(indexAllowed: boolean) {
         else { body.Code = 0; body.Msg = '权限不足'; }
       } else if (route === '/api/V8Engine/GetDbSchema') body.Data = { Tables: [] };
       else if (route === '/api/V8Engine/ValidateLowCodeSystem') body.Data = { Passed: true, Errors: [] };
-      else if (route === '/api/FormEngine/GetTableData') body.Data = [{ Id: 'index-table-id', Name: table.name, ...buildDefaultFormBanner(table) }];
+      else if (route === '/api/V8Engine/McpFormData') body.Data = [{ Id: 'index-table-id', Name: table.name, ...buildDefaultFormBanner(table) }];
       else if (!['/api/V8Engine/WriteMcpAuditLog', '/api/V8Engine/UpdateTable'].includes(route)) {
         body.Code = 0; body.Msg = 'Unexpected fixture route';
       }
@@ -130,7 +130,7 @@ async function manifestIndexHttpFixture(indexAllowed: boolean) {
 
 test('Manifest索引通过真实HTTP链回传submitted/executed且不宣称commit', async () => {
   const { result, requests, notices } = await manifestIndexHttpFixture(true);
-  assert.notEqual(result.isError, true);
+  assert.notEqual(result.isError, true, JSON.stringify(result));
   assert.equal(requests.filter(route => route === '/api/V8Engine/CreateTableIndex').length, 1);
   const ddl = notices.filter(notice => notice.kind === 'ddl');
   assert.deepEqual(ddl.map(item => item.state), ['submitted', 'executed']);

@@ -196,16 +196,23 @@ $env:MICROI_TEST_ALLOW_WRITES = "YES"
 各用例创建独立随机数据库并在结束时删除，不清空传入的 `upgrade_fixture` 数据库，
 也不要求复用其它任务占用的固定端口。
 
-调度共库夹具另使用专用 `schedule_gate` 空库（`127.0.0.1:62680`，预先初始化
-Quartz MySQL 表结构）与独立 Redis（`127.0.0.1:62681`）。只允许一次性测试实例，
-禁止指向业务库；测试结束关闭本任务创建的容器，不停止其它任务的共享依赖。
+默认复用当前 MCP 对应的 MySQL、Redis、MongoDB 和 HDFS/OSS/MinIO 服务，在已授权
+范围分配本任务测试命名空间；需要回环地址的现有夹具可使用已登记的本地连接映射。
+固定库名或端口被占用时不得另建本地依赖容器，也不得修改其它任务的标记。
 
-并行任务可为上述两个环境变量指定自己的回环地址高位端口，数据库仍必须为
-`schedule_gate`。使用非默认端口时，必须设置 16–80 位字母、数字、下划线或连字符组成的
-`MICROI_TEST_SCHEDULE_FIXTURE_ID`，并在自己的 MySQL 中准备
-`microi_schedule_fixture (Id int PRIMARY KEY, FixtureId varchar(100) NOT NULL)` 的 `Id=1`
-记录、在自己的 Redis 中设置 `Microi:Full:ScheduleFixture`，两者的值均为该夹具 Id。
-测试在任何调度写入前核验归属；标记缺失或不匹配会失败，调度业务断言和 Full 门禁保持不变。
+MySQL 升级夹具支持 `MICROI_TEST_UPGRADE_DATABASE=microi_test_upgrade_<任务后缀>`，
+并设置 `MICROI_TEST_UPGRADE_FIXTURE_ID`。调度夹具支持
+`MICROI_TEST_SCHEDULE_DATABASE=microi_test_schedule_<任务后缀>`，并设置
+`MICROI_TEST_SCHEDULE_FIXTURE_ID`。库名后缀为 8–40 位小写字母、数字或下划线；
+连接串中的 Database 必须与显式配置完全相同，所有者为 16–80 位字母、数字、
+下划线或连字符。调度库仍需预先初始化 Quartz MySQL 表结构。
+
+在各自已核验归属的测试库中分别准备 `microi_upgrade_fixture` /
+`microi_schedule_fixture` 表（`Id int PRIMARY KEY, FixtureId varchar(100) NOT NULL`），
+`Id=1` 的 FixtureId 必须等于对应所有者。调度 Redis 仍使用独占 DB 或已限制的连接映射，
+并设置同值的 `Microi:Full:ScheduleFixture`。测试只读核验标记，缺失、不匹配或读取失败均
+在写入前停止，不自动创建或改写标记。旧固定名称及默认端口继续兼容，但不是并行测试
+必须争用的资源。结束后只清理本任务拥有的命名空间，保留共享服务及其它任务数据。
 
 测试表至少要有一个可写短文本字段，默认名为 `Name`；若不同，设置
 `MICROI_TEST_NAME_FIELD`。测试会写入

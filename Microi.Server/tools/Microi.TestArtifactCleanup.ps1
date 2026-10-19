@@ -38,7 +38,7 @@
         }
     }
     if ($ArtifactTarget -and (Test-Path -LiteralPath $target)) {
-        Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction Stop
+        Remove-Item -LiteralPath $target -Recurse -ErrorAction Stop
     }
     if (($ArtifactTarget -and (Test-Path -LiteralPath $target)) -or
         ($ArtifactLink -and (Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue))) {

@@ -15,8 +15,8 @@ function sourceHash(value) {
 test("SaaS engine declares every changed legacy managed-engine baseline", () => {
   const fixtures = {
     admin_get_empty_database_sanitization_sql: {
-      // 保留已从官方 v8.4.29 包独立下载验真的 v1.6.5 正文；历史兼容基线保持原值。
-      current: "8de621c6dd9acedc94d595de6c1597ac3a7058543b1b25bb742d6cb4a9777514",
+      // v1.6.6 缩小新空库保留清单；历史兼容基线保持原值。
+      current: "0d225a2fd5cd8b3524798382864f173ee50a13b46d4e10faa495c029ec0f33ec",
       base: "e4a57b281874338cea6cf7f324f4eaac766040f9f42ee56ea998f21d23d9471a",
       compatible: [
         "a9fdf1568db3de5401c7d8341adf241e1ffd10a47790934795f17bef37399d80",

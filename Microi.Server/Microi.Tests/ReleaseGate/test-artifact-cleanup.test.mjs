@@ -64,3 +64,16 @@ if(-not $rejected -or -not(Test-Path -LiteralPath (Join-Path $outside 'source.tx
 Remove-MicroiOwnedTestArtifacts -ArtifactTarget $target -ResultsDirectory $results | Out-Null
 if(Test-Path -LiteralPath $target){throw 'Literal-path cleanup failed'}
 `));
+
+test('自动清理使用普通删除，不向系统传递 Force',t=>execute(t,`
+$results=Join-Path $root 'ordinary-delete';$target=Join-Path $results '.net-artifacts'
+New-Item -ItemType Directory -Path $target -Force | Out-Null
+Set-Content -LiteralPath (Join-Path $target 'output.dll') -Value 'fixture'
+function Remove-Item {
+ [CmdletBinding()]param([string]$LiteralPath,[switch]$Recurse,[switch]$Force)
+ if($Force){throw 'Automatic teardown must preserve ordinary-delete protections'}
+ Microsoft.PowerShell.Management\\Remove-Item -LiteralPath $LiteralPath -Recurse:$Recurse -ErrorAction Stop
+}
+Remove-MicroiOwnedTestArtifacts -ArtifactTarget $target -ResultsDirectory $results | Out-Null
+if(Test-Path -LiteralPath $target){throw 'Ordinary cleanup did not finish'}
+`));

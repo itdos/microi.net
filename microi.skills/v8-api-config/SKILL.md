@@ -1,6 +1,6 @@
 ---
 name: v8-api-config
-description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、ApiAddress、StopHttp、AllowAnonymous、ResponseFile、ResponseType=HTTP、锁、日志、超时和 HTTP 暴露。
+description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、ApiAddress、StopHttp、AllowAnonymous、ResponseFile、ResponseType=HTTP/SignalR、双向实时通道、锁、日志、超时和 HTTP 暴露。
 ---
 
 > **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
@@ -97,6 +97,18 @@ return {
 - `Location` 只允许站内绝对路径、HTTPS 地址或本机开发地址，禁止 CRLF、协议相对地址、非本机 HTTP 和带用户信息 URL。
 - `Set-Cookie` 等高风险头只允许由受限 `V8.Method` 可信原子生成并签名，租户 V8 无法自行伪造签名。SSO 使用 `V8.Method.RunSsoProtocol`；不要把 Secret、Cookie 值或签名密钥暴露给 V8。
 - `204/304` 不得带正文；状态码限制为 100–599，正文和响应头有大小/数量限制。HTTP 契约校验失败时宿主返回标准错误，不写出半截协议响应。
+
+### 双向实时命令（ResponseType=SignalR）
+
+- 浏览器要求持续发送命令并收回执时，选 `ResponseType=SignalR`、通用 `/api-engine-socket?OsClient={tenant}&ApiEngineKey={key}`；仅增量输出选 Stream，订阅提交后事件选下文 `/api-engine-realtime`。不要新建业务专用 Hub，也不要把 HTTP 每按钮调用包装成实时控制。
+- 先验证目标后端包含 `ApiEngineSocketHub`、MCP Schema 支持 SignalR、接口引擎应用包包含该响应选项；仅改 ResponseType 文本不代表旧服务器支持。源码新增平台能力须同步应用包、官方文档、Skills、MCP 并按一键脚本正式发布，之后实测目标地址。
+- `Invoke(requestId,message)` 只接收业务对象。可信 `V8.Param.Socket` 由宿主注入 ConnectionId、Event（Connected/Message/Disconnected）、ClientKey（地址摘要）；客户端输入保留在 Message 内，不能改变租户、接口或 CurrentUser。接口首行调用 `V8.Method.RequireApiEngineSocketContext()`，失败立即返回。
+- 当前有效 DiyToken、IsEnable、StopHttp、AllowAnonymous 和精确 ApiRole 每次仍需校验；AccessKey 不支持。匿名配对必须显式开启 AllowAnonymous，四位码只是定位符，不能创建第二套平台权限 Token。用强随机所有权秘密、服务端摘要、共享状态、碰撞分配、短租约和猜测限流限制到相机等最小业务动作。
+- 成功提交后的 `DataAppend.SocketMessages=[{ConnectionId,Data}]` 通过 EngineMessage 发送，仅能到同租户同接口连接组；失败/回滚不广播，调用方只收到 Code/Msg/Data。支持 JSON 协议，Message≤12KB、深度≤16、最多16目标/32KB，调用响应≤32KB。
+- 共享 Redis 按租户/接口/客户端摘要限制每分钟30次连接、每10秒240消息、64活动连接；75秒无业务消息断开。业务心跳建议15秒，SignalR Ping 不续业务权限。Redis故障失败关闭；节点退出用共享租约兜底，不能只依赖Disconnected。
+- 同码多端遥控用独立会话集合，禁止用单个 ControllerConnectionId 覆盖上一台手机；明确并发上限、共享锁下的队列、每端未完成指令上限、RequestId 去重、超时与实际执行 ACK。状态可广播给所有已授权端，回执只发给对应发起端；单端断开只移除自身。自动巡游在本地/远程手动操作时停止，显式开始巡游除外；不能因重连自行恢复巡游。
+- 目标端完成动作后再回 ACK，收到传输接受结果不能报告控制成功。命令编号稳定并去重，处理中禁止重放；回执超时显示结果未知。断线后重建授权/配对，停止控制立即撤销。Redis和消息不具备关系库事务原子性，持久副作用业务另做幂等/outbox。
+- 浏览器把 `@microsoft/signalr` 打入本地产物；WebSockets + skipNegotiation 可保证按钮操作始终走同一连接，不降级HTTP调用。验收至少两独立浏览器、连续镜头完成回执、取消/离线/过期/重连/重复包/跨租户、手机横竖屏；本地 mock 和单测不能替代部署验收。前后端完整示例原位维护于官方 v8-server.md / v8-client.md。
 
 ### 通用实时事件（SignalR）
 

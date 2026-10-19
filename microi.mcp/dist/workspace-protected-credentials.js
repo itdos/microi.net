@@ -32,9 +32,36 @@ function transformWindowsDpapi(input, script) {
 }
 const SESSION_TOKEN_PREFIX = 'dpapi-session-v1:';
 const MAC_SESSION_TOKEN_PREFIX = 'keychain-session-v1:';
+const LINUX_SESSION_TOKEN_PREFIX = 'secretservice-session-v1:';
 const MAC_SESSION_SERVICE = 'net.microi.cli.session.v1';
 const MAC_WORKSPACE_SERVICE = 'net.microi.cli.workspace.v1';
 const macAccount = (value) => createHash('sha256').update(value).digest('hex');
+/** CLI/MCP 共用 Secret Service 属性协议；只委托当前用户钥匙环，缺失时绝不写明文兜底。 */
+function linuxSecretCommand(action, service, account, value) {
+    if (process.platform !== 'linux' || !/^[a-f0-9]{64}$/.test(account)
+        || ![MAC_WORKSPACE_SERVICE, MAC_SESSION_SERVICE].includes(service))
+        throw new Error('Linux Secret Service 引用格式无效');
+    const args = [action, ...(action === 'store' ? ['--label=Microi CLI credentials'] : []), 'service', service, 'account', account];
+    const result = childProcess.spawnSync('/usr/bin/secret-tool', args, {
+        ...(action === 'store' ? { input: Buffer.from(value, 'utf8').toString('base64') } : {}),
+        encoding: 'utf8', timeout: 15_000, maxBuffer: 4 * 1024 * 1024,
+    });
+    if (!result.error && result.status === 1 && !String(result.stderr || '').trim() && action === 'lookup')
+        return undefined;
+    if (result.error || result.status !== 0)
+        throw new Error('MICROI_SECURE_STORAGE_UNAVAILABLE：Linux Secret Service 不可用；请安装系统 secret-tool 并启用当前用户的 D-Bus 会话和已解锁钥匙环。无安全存储的云宿主不能持久化凭据；不会回退明文文件。');
+    if (action !== 'lookup')
+        return undefined;
+    const encoded = String(result.stdout || '').trim();
+    if (!encoded || Buffer.from(encoded, 'base64').toString('base64') !== encoded)
+        throw new Error('Linux Secret Service 凭据格式无效');
+    return Buffer.from(encoded, 'base64').toString('utf8');
+}
+function linuxSecretStore(service, account, value) {
+    linuxSecretCommand('store', service, account, value);
+    if (linuxSecretCommand('lookup', service, account) !== value)
+        throw new Error('Linux Secret Service 写入回读不一致；未回退明文文件');
+}
 function macKeychainGet(account, service = MAC_SESSION_SERVICE) {
     if (process.platform !== 'darwin' || !/^[a-f0-9]{64}$/.test(account))
         throw new Error('Invalid macOS Keychain token reference');
@@ -61,13 +88,19 @@ function macKeychainStore(account, value) {
 }
 const tokenCache = new Map();
 export function isProtectedSessionToken(value) {
-    return typeof value === 'string' && (value.startsWith(SESSION_TOKEN_PREFIX) || value.startsWith(MAC_SESSION_TOKEN_PREFIX));
+    return typeof value === 'string' && (value.startsWith(SESSION_TOKEN_PREFIX) || value.startsWith(MAC_SESSION_TOKEN_PREFIX) || value.startsWith(LINUX_SESSION_TOKEN_PREFIX));
 }
 export function unprotectSessionToken(value) {
     if (typeof value !== 'string')
         return '';
     if (!isProtectedSessionToken(value))
         return value;
+    if (value.startsWith(LINUX_SESSION_TOKEN_PREFIX)) {
+        const token = linuxSecretCommand('lookup', MAC_SESSION_SERVICE, value.slice(LINUX_SESSION_TOKEN_PREFIX.length));
+        if (!token)
+            throw new Error('Linux Secret Service Token 引用不存在');
+        return token;
+    }
     if (value.startsWith(MAC_SESSION_TOKEN_PREFIX))
         return macKeychainGet(value.slice(MAC_SESSION_TOKEN_PREFIX.length));
     if (!tokenCache.has(value)) {
@@ -85,12 +118,17 @@ export function protectSessionToken(value) {
         macKeychainStore(account, value);
         return MAC_SESSION_TOKEN_PREFIX + account;
     }
+    if (process.platform === 'linux') {
+        const account = macAccount(value);
+        linuxSecretStore(MAC_SESSION_SERVICE, account, value);
+        return LINUX_SESSION_TOKEN_PREFIX + account;
+    }
     const script = DPAPI_UNPROTECT_SCRIPT.replace('::Unprotect(', '::Protect(');
     return SESSION_TOKEN_PREFIX + transformWindowsDpapi(Buffer.from(value, 'utf8'), script).toString('base64');
 }
 /**
- * 读取当前工作区 DPAPI 保险库中的单个 profile 凭据。函数只返回内存值，
- * 不输出用户名、密码、密文或 PowerShell stderr。
+ * 从当前用户的 OS 安全存储读取工作区内单个 profile 凭据。函数只返回内存值，
+ * 不输出用户名、密码、密文或系统工具 stderr。
  */
 export function readWorkspaceCredentials(location, unprotect = unprotectWithWindowsDpapi) {
     const filePath = String(location.filePath || '').trim();
@@ -98,6 +136,18 @@ export function readWorkspaceCredentials(location, unprotect = unprotectWithWind
     const passwordKey = String(location.passwordKey || '').trim();
     if (!filePath || !usernameKey || !passwordKey) {
         return undefined;
+    }
+    if (process.platform === 'linux') {
+        try {
+            // filePath 仅是稳定工作区坐标，不要求创建旧 DPAPI 文件或写入任何秘密。
+            const tokenFile = path.join(path.dirname(filePath), '.microi-mcp-tokens.json');
+            const username = linuxSecretCommand('lookup', MAC_WORKSPACE_SERVICE, macAccount(`${tokenFile}\0${usernameKey}`));
+            const password = linuxSecretCommand('lookup', MAC_WORKSPACE_SERVICE, macAccount(`${tokenFile}\0${passwordKey}`));
+            return username && password ? { username, password } : undefined;
+        }
+        catch {
+            return undefined;
+        }
     }
     if (process.platform === 'darwin') {
         try {

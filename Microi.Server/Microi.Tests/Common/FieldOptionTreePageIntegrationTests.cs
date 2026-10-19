@@ -15,7 +15,8 @@ public class FieldOptionTreePageIntegrationTests
         var connection = Environment.GetEnvironmentVariable(provider == "MySql" ? "MICROI_UPGRADE_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;
         Assert.False(string.IsNullOrWhiteSpace(connection), "所选提供商缺少隔离连接：" + provider);
         Assert.Contains("127.0.0.1", connection);
-        Assert.Contains("Database=upgrade_fixture", connection, StringComparison.OrdinalIgnoreCase);
+        if (provider == "MySql") Microi.Tests.Common.MySqlFixtureGuard.VerifyUpgrade(connection);
+        else Assert.Contains("Database=upgrade_fixture", connection, StringComparison.OrdinalIgnoreCase);
         var db = MicroiORMExtensions.CreateDbSession(connection, provider == "MySql" ? DatabaseType.MySql : DatabaseType.SqlServer);
         var table = "mci_tree_page_" + Guid.NewGuid().ToString("N");
         var quote = provider == "MySql" ? "`" + table + "`" : "[" + table + "]";

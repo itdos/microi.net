@@ -217,13 +217,6 @@ if (Test-Path -LiteralPath $v8Repository) {
     if (-not $suiteSourceParent.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $suiteSourceParent -PathType Container)) {
         throw "The contracted standard-suite source root is missing or outside the workspace: $suiteSourceParent"
     }
-    $v8TenantRoot = Split-Path -Parent $suiteSourceParent
-    $v8Sources = @(Get-ChildItem -LiteralPath $v8TenantRoot -Recurse -File `
-        -Filter "*admin_get_empty_database_sanitization_sql*.js" -ErrorAction SilentlyContinue)
-    if ($v8Sources.Count -ne 1) {
-        throw "Expected exactly one empty-database sanitization source, found $($v8Sources.Count)."
-    }
-    $v8Source = $v8Sources[0].FullName
     if (-not (Test-Path -LiteralPath $v8Test)) {
         throw "The unified V8 regression test is missing: $v8Test"
     }
@@ -231,7 +224,8 @@ if (Test-Path -LiteralPath $v8Repository) {
         throw "Node.js is required for the V8 interface-engine regression gate."
     }
     Write-Host "Checking and testing the empty-database V8 interface engine..."
-    node --check $v8Source
+    # 与行为回归使用同一个官方 Managed 包正文；不要求另有可能过时的租户拉取副本。
+    node (Join-Path $testRoot 'ReleaseGate/official-v8-source.mjs') $workspaceRoot
     if ($LASTEXITCODE -ne 0) { throw "V8 interface-engine syntax check failed with exit code $LASTEXITCODE." }
     node --test $v8Test
     if ($LASTEXITCODE -ne 0) { throw "V8 interface-engine regression tests failed with exit code $LASTEXITCODE." }
