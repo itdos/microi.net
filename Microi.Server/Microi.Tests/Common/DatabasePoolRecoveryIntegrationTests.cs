@@ -10,6 +10,8 @@ namespace Microi.Tests.Common;
 [Trait("Category", "FullStack")]
 public sealed class DatabasePoolRecoveryIntegrationTests
 {
+    public static bool HasSqlServerFixture => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
+
     internal static string Connection()
     {
         var raw = Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN");
@@ -55,7 +57,8 @@ public sealed class DatabasePoolRecoveryIntegrationTests
         Assert.Equal(0, db.GetConnectionPoolSnapshot().BackoffSeconds);
     }
 
-    [Fact]
+    [Fact(Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [Trait("DatabaseProvider", "SqlServer")]
     public async Task RealSqlServer_RotationRecoversPool_AndPreservesBorrowedTransaction()
     {
         var raw = Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN");

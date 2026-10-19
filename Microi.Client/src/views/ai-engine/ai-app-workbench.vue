@@ -444,6 +444,7 @@
 </template>
 
 <script setup>
+import { readAiConversation } from "@/utils/ai-conversation-history";
 import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useDiyStore } from "@/pinia";
@@ -1356,15 +1357,7 @@ async function backToGallery() {
 async function loadAppChatHistory(appId) {
     if (!appId) return;
     try {
-        const result = await DiyCommon.FormEngine.GetTableData("mic_ai_record", {
-            _Where: currentUserId.value ? [["UserId", "=", currentUserId.value]] : [],
-            _OrderBy: "CreateTime",
-            _OrderByType: "ASC",
-            _PageSize: 100,
-            _SelectFields: ["Id", "Content", "CreateTime"]
-        });
-        const rows = (result?.Data || result?.data || []).map((row) => parseChatRecord(row.Content || row.content))
-            .filter((item) => item && item.Source === "ai-app-workbench" && item.ConversationId === `ai_app_${appId}`);
+        const rows = await readAiConversation(DiyCommon, "ai-app-workbench", `ai_app_${appId}`);
         appChatMessages.value = rows.map((item) => ({
             id: item.Id || makeId(item.Role === "user" ? "user" : "ai"),
             role: item.Role === "user" ? "user" : "assistant",

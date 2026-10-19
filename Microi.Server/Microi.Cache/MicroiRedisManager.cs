@@ -43,10 +43,12 @@ namespace Microi.Cache
         public async Task<object> ExecuteAsync(string tenantOsClient, string action, JObject request)
         {
             request = request ?? new JObject();
+            var scope = RedisTenantScope.Current(tenantOsClient);
             switch ((action ?? "").Trim().ToLowerInvariant())
             {
                 case "statistics":
                 {
+                    if (!scope.IsMainTenant) throw new UnauthorizedAccessException("仅主租户可查看节点级缓存统计，请使用当前租户 Redis 统计。");
                     var stats = MicroiTwoLevelCache.GetStatistics();
                     return new
                     {
@@ -63,6 +65,7 @@ namespace Microi.Cache
                 {
                     var key = request["Key"]?.ToString();
                     if (key.DosIsNullOrWhiteSpace()) throw new ArgumentException("Key参数不能为空。");
+                    scope.RequireKey(key);
                     await MicroiEngine.CacheTenant.Cache(tenantOsClient).RemoveAsync(key).ConfigureAwait(false);
                     return new { Key = key };
                 }
@@ -70,6 +73,7 @@ namespace Microi.Cache
                 {
                     var pattern = request["Pattern"]?.ToString();
                     if (pattern.DosIsNullOrWhiteSpace()) throw new ArgumentException("Pattern参数不能为空。");
+                    pattern = scope.Pattern(pattern, containsSearch: false);
                     await MicroiEngine.CacheTenant.Cache(tenantOsClient).RemoveParentAsync(pattern).ConfigureAwait(false);
                     return new { Pattern = pattern };
                 }
@@ -157,6 +161,7 @@ namespace Microi.Cache
         public async Task<List<RedisManagerConnectionSummary>> GetConnectionsAsync(string tenantOsClient)
         {
             EnsureTenant(tenantOsClient);
+            var scope = RedisTenantScope.Current(tenantOsClient);
             var result = new List<RedisManagerConnectionSummary>();
             var tenantClient = OsClient.GetClient(tenantOsClient);
             var model = tenantClient?.OsClientModel;
@@ -176,7 +181,9 @@ namespace Microi.Cache
                     Status = 1,
                     Sort = 0,
                     HasPassword = !string.IsNullOrEmpty(TokenString(model["RedisPwd"])),
-                    IsDefault = true
+                    IsDefault = true,
+                    CanSelectDatabase = scope.IsMainTenant,
+                    AllowedKeyPrefix = scope.IsMainTenant ? "" : scope.KeyPrefix
                 });
             }
 
@@ -185,7 +192,7 @@ namespace Microi.Cache
                 var rows = await GetSavedRowsAsync(tenantOsClient, null).ConfigureAwait(false);
                 foreach (var row in rows)
                 {
-                    result.Add(ToSummary(row));
+                    result.Add(ApplyScope(ToSummary(row), scope));
                 }
             }
             catch (Exception ex)
@@ -211,6 +218,7 @@ namespace Microi.Cache
         public async Task<RedisManagerConnectionSummary> SaveConnectionAsync(string tenantOsClient, RedisManagerSavedConnectionInput input)
         {
             EnsureTenant(tenantOsClient);
+            var scope = RedisTenantScope.Current(tenantOsClient);
             if (input == null) throw new ArgumentException("连接参数不能为空。");
             ValidateConnection(new RedisManagerConnectionInput
             {
@@ -276,7 +284,7 @@ namespace Microi.Cache
             }
 
             var row = (await GetSavedRowsAsync(tenantOsClient, id).ConfigureAwait(false)).FirstOrDefault();
-            return row == null ? ToSummary(form) : ToSummary(row);
+            return ApplyScope(row == null ? ToSummary(form) : ToSummary(row), scope);
         }
 
         public async Task DeleteConnectionAsync(string tenantOsClient, string id)
@@ -314,6 +322,7 @@ namespace Microi.Cache
 
         public async Task<RedisManagerStatistics> GetStatisticsAsync(string tenantOsClient, RedisManagerContextRequest request)
         {
+            var scope = RedisTenantScope.Current(tenantOsClient);
             var resolved = await ResolveConnectionAsync(tenantOsClient, request).ConfigureAwait(false);
             var database = resolved.Multiplexer.GetDatabase(resolved.Database);
             var ping = await database.PingAsync().ConfigureAwait(false);
@@ -324,11 +333,15 @@ namespace Microi.Cache
                 Mode = resolved.Mode,
                 Database = resolved.Database,
                 PingMilliseconds = Math.Round(ping.TotalMilliseconds, 2),
-                Endpoints = servers.Select(server => server.EndPoint.ToString()).ToList()
+                Endpoints = scope.IsMainTenant ? servers.Select(server => server.EndPoint.ToString()).ToList() : new List<string>(),
+                IsTenantScoped = !scope.IsMainTenant,
+                AllowedKeyPrefix = scope.IsMainTenant ? "" : scope.KeyPrefix
             };
 
             foreach (var server in servers)
             {
+                // INFO、DBSIZE 和命中率属于整个共享实例，不能作为子租户统计返回。
+                if (!scope.IsMainTenant) break;
                 try
                 {
                     statistics.KeyCount += await server.DatabaseSizeAsync(resolved.Database).ConfigureAwait(false);
@@ -361,6 +374,11 @@ namespace Microi.Cache
             };
             var sample = await GetKeysAsync(tenantOsClient, sampleRequest).ConfigureAwait(false);
             statistics.SampleSize = sample.List.Count;
+            if (!scope.IsMainTenant)
+            {
+                statistics.KeyCount = sample.List.Count;
+                statistics.KeyCountIsEstimate = sample.HasMore;
+            }
             foreach (var item in sample.List)
             {
                 var type = string.IsNullOrWhiteSpace(item.Type) ? "unknown" : item.Type;
@@ -371,9 +389,10 @@ namespace Microi.Cache
 
         public async Task<RedisManagerKeyPage> GetKeysAsync(string tenantOsClient, RedisManagerKeyListRequest request)
         {
+            var scope = RedisTenantScope.Current(tenantOsClient);
+            var pattern = scope.Pattern(request?.Pattern, containsSearch: true);
             var resolved = await ResolveConnectionAsync(tenantOsClient, request).ConfigureAwait(false);
             var pageSize = Clamp(request.PageSize, 10, 500);
-            var pattern = NormalizePattern(request.Pattern);
             var servers = GetPrimaryServers(resolved.Multiplexer);
             var state = DecodeCursor(request.Cursor);
             var keys = new List<string>();
@@ -388,6 +407,8 @@ namespace Microi.Cache
                 foreach (var key in scan.Keys)
                 {
                     if (keys.Count >= pageSize) break;
+                    // 再次检查实际扫描结果，范围之外的 Key 不进入类型、TTL 或内容查询。
+                    if (!scope.AllowsKey(key)) continue;
                     if (!keys.Contains(key, StringComparer.Ordinal)) keys.Add(key);
                 }
                 state.Cursors[endpoint] = scan.NextCursor;
@@ -413,11 +434,15 @@ namespace Microi.Cache
         public async Task<RedisManagerKeyDetail> GetKeyAsync(string tenantOsClient, RedisManagerKeyRequest request)
         {
             EnsureKey(request?.Key);
+            RedisTenantScope.Current(tenantOsClient).RequireKey(request.Key);
             var resolved = await ResolveConnectionAsync(tenantOsClient, request).ConfigureAwait(false);
             var database = resolved.Multiplexer.GetDatabase(resolved.Database);
             var key = request.Key;
             var type = await database.KeyTypeAsync(key).ConfigureAwait(false);
-            if (type == RedisType.None) throw new InvalidOperationException("Redis Key 不存在或已过期。");
+            // 部分 Redis/驱动组合把不存在的 TYPE 解析为 Unknown；独立存在性检查
+            // 避免已删除 Key 被包装成成功的“未知类型”，同时保留未来真实类型的兼容性。
+            if (type == RedisType.None || (type == RedisType.Unknown && !await database.KeyExistsAsync(key).ConfigureAwait(false)))
+                throw new InvalidOperationException("Redis Key 不存在或已过期。");
             var ttl = await database.KeyTimeToLiveAsync(key).ConfigureAwait(false);
             var detail = new RedisManagerKeyDetail
             {
@@ -511,7 +536,11 @@ namespace Microi.Cache
         public async Task<long> DeleteKeysAsync(string tenantOsClient, RedisManagerDeleteRequest request)
         {
             if (request?.Keys == null || request.Keys.Count == 0) throw new ArgumentException("请选择要删除的 Redis Key。");
-            var keys = request.Keys.Where(key => !string.IsNullOrWhiteSpace(key)).Distinct(StringComparer.Ordinal).Take(500).ToArray();
+            if (request.Keys.Count > 500) throw new ArgumentException("单次最多删除 500 个 Redis Key。");
+            var scope = RedisTenantScope.Current(tenantOsClient);
+            // 先检查整批，混入一个越界 Key 即全部拒绝，不能先删合法前半批。
+            foreach (var key in request.Keys) { EnsureKey(key); scope.RequireKey(key); }
+            var keys = request.Keys.Distinct(StringComparer.Ordinal).ToArray();
             if (keys.Length == 0) throw new ArgumentException("请选择要删除的 Redis Key。");
             foreach (var key in keys) EnsureKey(key);
             var resolved = await ResolveConnectionAsync(tenantOsClient, request).ConfigureAwait(false);
@@ -522,6 +551,7 @@ namespace Microi.Cache
         public async Task ReplaceValueAsync(string tenantOsClient, RedisManagerReplaceRequest request)
         {
             EnsureKey(request?.Key);
+            RedisTenantScope.Current(tenantOsClient).RequireKey(request.Key);
             if ((request.Value ?? "").Length > 5 * 1024 * 1024) throw new ArgumentException("单次写入内容不能超过 5MB。");
             var dataType = (request.DataType ?? "string").Trim().ToLowerInvariant();
             var hashEntries = Array.Empty<HashEntry>();
@@ -608,6 +638,9 @@ namespace Microi.Cache
         {
             EnsureKey(request?.Key);
             EnsureKey(request?.NewKey);
+            var scope = RedisTenantScope.Current(tenantOsClient);
+            scope.RequireKey(request.Key);
+            scope.RequireKey(request.NewKey);
             if (request.Key == request.NewKey) return;
             var resolved = await ResolveConnectionAsync(tenantOsClient, request).ConfigureAwait(false);
             var database = resolved.Multiplexer.GetDatabase(resolved.Database);
@@ -620,6 +653,7 @@ namespace Microi.Cache
         public async Task SetTtlAsync(string tenantOsClient, RedisManagerTtlRequest request)
         {
             EnsureKey(request?.Key);
+            RedisTenantScope.Current(tenantOsClient).RequireKey(request.Key);
             var resolved = await ResolveConnectionAsync(tenantOsClient, request).ConfigureAwait(false);
             var database = resolved.Multiplexer.GetDatabase(resolved.Database);
             await ApplyTtlAsync(database, request.Key, request.TtlSeconds).ConfigureAwait(false);
@@ -726,14 +760,6 @@ namespace Microi.Cache
                 default:
                     return false;
             }
-        }
-
-        private static string NormalizePattern(string pattern)
-        {
-            var value = string.IsNullOrWhiteSpace(pattern) ? "*" : pattern.Trim();
-            if (value.Length > 500) throw new ArgumentException("Key 搜索条件不能超过 500 个字符。");
-            if (!value.Contains("*") && !value.Contains("?") && !value.Contains("[")) value = "*" + value + "*";
-            return value;
         }
 
         private static string EncodeCursor(ScanCursorState state)
@@ -865,12 +891,14 @@ namespace Microi.Cache
         private async Task<ResolvedConnection> ResolveConnectionAsync(string tenantOsClient, RedisManagerContextRequest request)
         {
             if (request == null) throw new ArgumentException("Redis 请求参数不能为空。");
+            var scope = RedisTenantScope.Current(tenantOsClient);
             var mode = (request.Mode ?? "tenant").Trim().ToLowerInvariant();
             if (mode == "tenant")
             {
                 EnsureTenant(tenantOsClient);
                 var tenantClient = OsClient.GetClient(tenantOsClient);
                 var configuredDb = SafeInt(tenantClient.OsClientModel["RedisDataBase"], 0);
+                var database = ValidateDatabase(scope.Database(request.Database, configuredDb));
                 try
                 {
                     // 确保租户连接已注册；随后复用平台已有 ConnectionMultiplexer，避免额外连接风暴。
@@ -878,7 +906,7 @@ namespace Microi.Cache
                     return new ResolvedConnection
                     {
                         Multiplexer = MicroiCacheRedis.GetConnection(tenantOsClient),
-                        Database = ValidateDatabase(request.Database ?? configuredDb),
+                        Database = database,
                         Name = "当前租户 Redis",
                         Mode = mode
                     };
@@ -913,8 +941,7 @@ namespace Microi.Cache
             }
             else if (mode == "temporary")
             {
-                input = request.Connection ?? throw new ArgumentException("临时连接参数不能为空。");
-                name = string.IsNullOrWhiteSpace(input.Name) ? "临时 Redis" : input.Name.Trim();
+                throw new UnauthorizedAccessException("缓存管理不支持 temporary 连接模式，请先保存受控连接。");
             }
             else
             {
@@ -922,11 +949,12 @@ namespace Microi.Cache
             }
 
             ValidateConnection(input, allowEmptyPassword: true);
+            var selectedDatabase = ValidateDatabase(scope.Database(request.Database, input.Database));
             var multiplexer = await GetOrCreateConnectionAsync(input).ConfigureAwait(false);
             return new ResolvedConnection
             {
                 Multiplexer = multiplexer,
-                Database = ValidateDatabase(request.Database ?? input.Database),
+                Database = selectedDatabase,
                 Name = name,
                 Mode = mode
             };
@@ -1036,6 +1064,13 @@ namespace Microi.Cache
             }
             if (servers.Count == 0) throw new InvalidOperationException("Redis 没有可用节点。");
             return servers;
+        }
+
+        private static RedisManagerConnectionSummary ApplyScope(RedisManagerConnectionSummary summary, RedisTenantScope scope)
+        {
+            summary.CanSelectDatabase = scope.IsMainTenant;
+            summary.AllowedKeyPrefix = scope.IsMainTenant ? "" : scope.KeyPrefix;
+            return summary;
         }
 
         private static RedisManagerConnectionSummary ToSummary(JObject row)

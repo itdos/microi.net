@@ -37,7 +37,7 @@
 		"test:image-lightbox": "node --test tests/doc-image-lightbox.test.mjs",
 		"test:ai-media": "node --test tests/ai-media-docs.test.mjs",
 		"test:ai-capability-docs": "node --test tests/ai-capability-docs.test.mjs",
-		"test:homepage": "node --test tests/homepage-positioning.test.mjs",
+		"test:homepage": "node --test tests/homepage-positioning.test.mjs tests/agent-142-maintenance-docs.test.mjs",
 		"prepare:training-downloads": "node scripts/prepare-training-downloads.mjs",
 		"prepare:training-previews": "node scripts/prepare-training-previews.mjs",
 		"pretest:training-deck": "npm run prepare:doc-assets && npm run prepare:training-downloads && npm run prepare:training-previews",

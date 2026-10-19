@@ -33,23 +33,31 @@ public class RuntimeColumnNullabilityTests
         var databaseName = "microi_nullable_fixture_" + Guid.NewGuid().ToString("N");
         connection.Database = "mysql";
         var master = MicroiORMExtensions.CreateDbSession(connection.ConnectionString, DatabaseType.MySql);
+        var actualVersion = master.FromSql("SELECT VERSION()").ToScalar<string>();
+        Assert.True(Version.TryParse(actualVersion.Split('-')[0], out var serverVersion));
+        var supportsNullableTextDropDefault = serverVersion!.Major >= 8;
         master.FromSql("CREATE DATABASE `" + databaseName + "` CHARACTER SET utf8mb4").ExecuteNonQuery();
         connection.Database = databaseName;
         var database = MicroiORMExtensions.CreateDbSession(connection.ConnectionString, DatabaseType.MySql);
         try
         {
-            database.FromSql(@"CREATE TABLE sys_apiengine (
+            database.FromSql($@"CREATE TABLE sys_apiengine (
                 Id varchar(36) NOT NULL PRIMARY KEY,
                 ApiEngineKey varchar(100) NOT NULL,
                 V8Limit int NOT NULL,
                 Dropped int NULL,
-                Details mediumtext NULL,
+                Details mediumtext {(supportsNullableTextDropDefault ? "NULL" : "NOT NULL")},
                 Note varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT 'NOT NULL' COMMENT '保留 NOT NULL',
                 CreateTime timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 UNIQUE KEY ux_api_key (ApiEngineKey));
                 INSERT INTO sys_apiengine (Id,ApiEngineKey,V8Limit,Details) VALUES ('old','old',1,'keep content');
-                ALTER TABLE sys_apiengine ALTER COLUMN Dropped DROP DEFAULT;
-                ALTER TABLE sys_apiengine ALTER COLUMN Details DROP DEFAULT;").ExecuteNonQuery();
+                ALTER TABLE sys_apiengine ALTER COLUMN Dropped DROP DEFAULT;").ExecuteNonQuery();
+            // MySQL5.7禁止对TEXT执行DROP DEFAULT；用旧NOT NULL文本列保留缺省失败和修复语义。
+            // MySQL8继续覆盖可空TEXT的NO_DEFAULT_VALUE_FLAG，Dropped始终覆盖可空标量的同一边界。
+            if (supportsNullableTextDropDefault)
+                database.FromSql("ALTER TABLE sys_apiengine ALTER COLUMN Details DROP DEFAULT").ExecuteNonQuery();
+            Assert.Equal(supportsNullableTextDropDefault ? "YES" : "NO", database.FromSql(
+                "SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='sys_apiengine' AND COLUMN_NAME='Details'").ToScalar<string>());
             database.FromSql(@"CREATE TABLE sys_osclients (Id varchar(36) NOT NULL PRIMARY KEY,
                 ApplicationStreamPublishMode varchar(20) NOT NULL DEFAULT 'LegacyOpen',
                 ApplicationStreamMinProtocol int NOT NULL DEFAULT 2,
@@ -57,8 +65,10 @@ public class RuntimeColumnNullabilityTests
                 INSERT INTO sys_osclients (Id) VALUES ('existing-tenant');").ExecuteNonQuery();
             database.FromSql(Upgrade25.BuildCreateGateTransitionAuditTableSql(Upgrade25.SchemaDialect.MySql)).ExecuteNonQuery();
             Assert.Equal(1, database.FromSql("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='mci_app_stream_gate_transition' AND IS_NULLABLE='NO'").ToScalar<int>());
-            Assert.Throws<MySqlException>(() => database.FromSql("SELECT DEFAULT(Dropped) FROM sys_apiengine LIMIT 0").ToScalar());
-            Assert.Throws<MySqlException>(() => database.FromSql("SELECT DEFAULT(Details) FROM sys_apiengine LIMIT 0").ToScalar());
+            var scalarDefaultError = Assert.Throws<MySqlException>(() => database.FromSql("SELECT DEFAULT(Dropped) FROM sys_apiengine LIMIT 0").ToScalar());
+            Assert.Equal(1364, scalarDefaultError.Number);
+            var textDefaultError = Assert.Throws<MySqlException>(() => database.FromSql("SELECT DEFAULT(Details) FROM sys_apiengine LIMIT 0").ToScalar());
+            Assert.Equal(1364, textDefaultError.Number);
             var client = new OsClientSecret { OsClient = "nullable_fixture", Db = database, DbRead = database };
             Assert.False(RuntimeColumnNullability.Ready(client));
             Assert.Equal(9, RuntimeColumnNullability.EnsureUnderLease(client));

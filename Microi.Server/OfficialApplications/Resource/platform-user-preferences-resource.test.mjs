@@ -146,7 +146,7 @@ test('engine rejects external routes, invalid colors and cross-tenant desktop pa
   assert.equal(run({ DefaultIndexUrl: '//evil.example/path' }).result.Code, 0);
   assert.equal(run({ DefaultIndexUrl: '/login' }).result.Code, 0);
   assert.equal(run({ ThemeColor: 'red' }).result.Code, 0);
-  assert.equal(run({ ThemeMode: 'system' }).result.Code, 0);
+  assert.equal(run({ ThemeMode: 'system' }).result.Code, 1);
   assert.equal(run({ CornerStyle: 'circle' }).result.Code, 0);
   assert.equal(run({ MenuChildExpandMode: 'popup' }).result.Code, 0);
   assert.equal(run({ NavigationLayout: 'iframe' }).result.Code, 0);

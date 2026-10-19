@@ -176,6 +176,77 @@ public class FormEngineRelatedDataTests
         Assert.Empty(f.WrittenComments);
     }
 
+    [Fact]
+    public async Task AdministratorBusinessVersionListOffersOnDemandWithoutReadingBody()
+    {
+        var f = new RelatedDataFixture { IsAdministrator = true, ParentTableName = "sys_config" };
+        var result = await Run(f, "DataVersion");
+        Assert.Equal("OnDemand", result["DataAppend"]!["HistoryContentMode"]!.Value<string>());
+        Assert.DoesNotContain("Data", Assert.Single(f.AuxiliaryArguments)._SelectFields);
+    }
+
+    [Fact]
+    public async Task AdministratorLogListOffersOnDemandWithoutReadingContent()
+    {
+        var f = new RelatedDataFixture { IsAdministrator = true, ParentTableName = "ordinary_table" };
+        var result = await Run(f, "DataLog");
+        Assert.Equal("OnDemand", result["DataAppend"]!["HistoryContentMode"]!.Value<string>());
+        Assert.DoesNotContain("Content", Assert.Single(f.AuxiliaryArguments)._SelectFields);
+    }
+
+    [Fact]
+    public async Task AdministratorBusinessVersionReadsOnlyTheSelectedProjectedSnapshot()
+    {
+        var f=new RelatedDataFixture { IsAdministrator=true, StoredVersion="""{"Id":"same-row-id","Name":"previous","Phone":"OLD-PRIVATE-PHONE","Pwd":"OLD-PASSWORD","Unknown":"OLD-UNKNOWN","Settings":{"Display":"before","Token":"OLD-TOKEN"}}""" };
+        var request=Request("DataVersion");request["VersionId"]="owned";
+        var result=await Run(f,request);
+        Assert.Equal(1,(int)result["Code"]!);Assert.Equal("Authorized",(string?)result["DataAppend"]!["HistoryContentMode"]);Assert.Equal("Data",(string?)result["DataAppend"]!["HistoryContentKind"]);
+        var snapshot=JObject.Parse((string)result["Data"]![0]!["Data"]!);
+        Assert.Equal("previous",(string?)snapshot["Name"]);Assert.Equal("before",(string?)snapshot["Settings"]!["Display"]);
+        Assert.DoesNotContain("OLD-",result.ToString());Assert.Null(snapshot["Phone"]);Assert.Null(snapshot["Pwd"]);Assert.Null(snapshot["Unknown"]);
+        Assert.Equal(1,Assert.Single(f.AuxiliaryArguments)._PageSize);Assert.Equal(1,f.ParentReads);
+    }
+
+    [Fact]
+    public async Task AdministratorLogDetailUsesCurrentFieldLabelsAndNeverLeaksMasks()
+    {
+        var f=new RelatedDataFixture { IsAdministrator=true, StoredLog="""[{"Name":"Name","Label":"OLD-LABEL","OVal":"before","NVal":"after"},{"Name":"Phone","OVal":"OLD-PRIVATE"},{"Name":"Pwd","NVal":"OLD-SECRET"}]""" };
+        var request=Request("DataLog");request["LogId"]="owned";var result=await Run(f,request);
+        Assert.Equal(1,(int)result["Code"]!);Assert.Equal("Authorized",(string?)result["DataAppend"]!["HistoryContentMode"]);
+        var changes=JArray.Parse((string)result["Data"]![0]!["Content"]!);Assert.Single(changes);Assert.Equal("字段Name",(string?)changes[0]!["Label"]);
+        Assert.DoesNotContain("OLD-",result.ToString());Assert.Equal(1,Assert.Single(f.AuxiliaryArguments)._PageSize);
+    }
+
+    [Theory]
+    [InlineData("DataVersion","VersionId")][InlineData("DataLog","LogId")]
+    public async Task AdministratorSaasSafeMetadataHistoryIsReadableWithoutInfrastructureSecrets(string type,string idField)
+    {
+        var f=new RelatedDataFixture{IsAdministrator=true,ParentTableName="sys_osclients",StoredVersion="""{"Id":"same-row-id","ClientName":"previous-client","RedisHost":"OLD-ENDPOINT","TranslateKey":"OLD-CREDENTIAL"}""",StoredLog="""[{"Name":"ClientName","OVal":"previous-client","NVal":"current-client"},{"Name":"RedisHost","OVal":"OLD-ENDPOINT"}]"""};
+        var request=Request(type);request[idField]="owned";var result=await Run(f,request);
+        Assert.Equal(1,(int)result["Code"]!);Assert.Equal("Authorized",(string?)result["DataAppend"]!["HistoryContentMode"]);
+        Assert.Contains("previous-client",result.ToString());Assert.DoesNotContain("OLD-",result.ToString());Assert.Equal(1,f.ParentReads);
+    }
+
+    [Theory]
+    [InlineData("DataLog","LogId")][InlineData("DataVersion","VersionId")]
+    public async Task OrdinaryAndAccessKeyIdentitiesCannotReadHistoryBodies(string type,string idField)
+    {
+        foreach(var accessKey in new[]{false,true})
+        {
+            var f=new RelatedDataFixture { IsAdministrator=accessKey,AccessKeySession=accessKey };
+            var request=Request(type);request[idField]="owned";
+            var result=await Run(f,request);Assert.NotEqual(1,(int)result["Code"]!);Assert.Empty(f.AuxiliaryArguments);
+        }
+    }
+
+    [Fact]
+    public async Task ForeignLogIdAndRemovedParentFieldsNeverExposeContent()
+    {
+        var f=new RelatedDataFixture { IsAdministrator=true,RemoveNameInProjection=true,StoredLog="""[{"Name":"Name","OVal":"OLD-DELETED"}]""" };
+        var request=Request("DataLog");request["LogId"]="other-table";var denied=await Run(f,request);Assert.NotEqual(1,(int)denied["Code"]!);
+        request["LogId"]="owned";var result=await Run(f,request);Assert.Equal(1,(int)result["Code"]!);Assert.Empty(JArray.Parse((string)result["Data"]![0]!["Content"]!));Assert.DoesNotContain("OLD-DELETED",result.ToString());
+    }
+
     [Theory]
     [InlineData(false, "sys_apiengine", "owned")]
     [InlineData(true, "sys_osclients", "owned")]
@@ -330,6 +401,10 @@ public class RelatedDataFixture
     public bool CommentTableBound { get; set; } = true;
     public string CommentBindingField { get; set; } = "ParentTableId";
     public bool IsAdministrator { get; set; }
+    public bool AccessKeySession { get; set; }
+    public bool RemoveNameInProjection { get; set; }
+    public string? StoredVersion { get; set; }
+    public string? StoredLog { get; set; }
     public string ParentTableName { get; set; } = "ordinary_table";
     public List<JObject> WrittenComments { get; } = new();
     public bool IsCurrentPlatformAdministrator(string osClient, JObject user) => IsAdministrator;
@@ -373,7 +448,13 @@ public class RelatedDataFixture
         engine.SetValue("owner", ParentOwner); engine.SetValue("actor", "actor");
         try { engine.Execute("if(owner!==actor)throw new Error('PARENT_ROW_FORBIDDEN');"); }
         catch { return Task.FromResult(new DosResult<dynamic>(0, null, "PARENT_ROW_FORBIDDEN")); }
-        return Task.FromResult(new DosResult<dynamic>(1, new JObject { ["Id"]="same-row-id", ["Phone"]="***" }));
+        var raw=new JObject { ["Id"]="same-row-id", ["Name"]="current", ["ClientName"]="current-client", ["RedisHost"]="current-host", ["TranslateKey"]="current-credential", ["Phone"]="current-phone", ["ApiV8Code"]="return 2;", ["Settings"]=new JObject{["Display"]="current"}, ["Pwd"]="current-password" };
+        param._HistoryProjection?.Begin(param,raw,new[]{"Name","ClientName","RedisHost","TranslateKey","Phone","ApiV8Code","Settings","Pwd"}.Select(name=>new JObject{["Name"]=name,["Label"]="字段"+name,["Component"]="Text"}));
+        var projected=(JObject)raw.DeepClone();projected["Phone"]="***";
+        if(RemoveNameInProjection)projected.Remove("Name");
+        if(AccessKeySession)param._CurrentUser["_AccessKeySession"]=true;
+        param._HistoryProjection?.Complete(param,projected,Array.Empty<string>());
+        return Task.FromResult(new DosResult<dynamic>(1, projected));
     }
 
     public Task<DosResultList<dynamic>> GetTableDataCountAsync(object argument) => Query(argument, true);
@@ -402,6 +483,8 @@ public class RelatedDataFixture
             ["Data"]="{\"Id\":\"same-row-id\",\"ApiV8Code\":\"return 1;\",\"Phone\":\"HISTORICAL-PRIVATE-PHONE\"}",
             ["Content"]="RAW-CHANGE-CONTENT", ["UserId"]="original-author", ["UserName"]="原作者", ["ParentCommentId"]=""
         }).ToList();
+        if(p.FormEngineKey=="mic_data_version"&&StoredVersion!=null)foreach(var row in rows)row["Data"]=StoredVersion;
+        if(p.FormEngineKey=="microi_datalog"&&StoredLog!=null)foreach(var row in rows)row["Content"]=StoredLog;
         if (p.FormEngineKey == "diy_comment") rows.AddRange(WrittenComments);
         foreach (JArray condition in JArray.FromObject(p._Where))
         {

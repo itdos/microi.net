@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-user-update-preferences
- * Version: v1.1.3
+ * Version: v1.1.7
  * Function:
- * - 仅允许当前 DiyToken 用户保存自己的首页、主题、边角、导航、菜单展开与桌面偏好；空值或 System 跟随租户设置。
+ * - 仅允许当前 DiyToken 用户保存自己的首页、主题、边角、导航、菜单展开、面板宽度/折叠与桌面偏好；空值或 System 跟随租户设置。
  */
 
 if (!V8.CurrentUser || !V8.CurrentUser.Id) {
@@ -28,6 +28,11 @@ var updateCount = 0;
 
 function hasValue(name) {
   return typeof param[name] !== 'undefined' && param[name] !== null;
+}
+
+// 主题重置必须保留显式 null；省略参数与清除覆盖属于不同操作。
+function hasAppearanceValue(name) {
+  return typeof param[name] !== 'undefined';
 }
 
 function text(value) {
@@ -72,7 +77,7 @@ if (hasValue('DefaultIndexUrl')) {
   updateCount++;
 }
 
-if (hasValue('ThemeColor')) {
+if (hasAppearanceValue('ThemeColor')) {
   var themeColor = text(param.ThemeColor);
   if (themeColor && !/^#[0-9a-fA-F]{6}$/.test(themeColor)) {
     return fail('主题色必须是 #RRGGBB 格式。');
@@ -81,12 +86,72 @@ if (hasValue('ThemeColor')) {
   updateCount++;
 }
 
-if (hasValue('ThemeMode')) {
+if (hasAppearanceValue('ThemeMode')) {
   var themeMode = text(param.ThemeMode).toLowerCase();
-  if (themeMode !== 'light' && themeMode !== 'dark') {
-    return fail('显示模式只能是 light 或 dark。');
+  if (themeMode !== '' && themeMode !== 'system' && themeMode !== 'light' && themeMode !== 'dark') {
+    return fail('显示模式只能是 System、light 或 dark。');
   }
-  updateModel.ThemeMode = themeMode;
+  updateModel.ThemeMode = themeMode === 'system' ? '' : themeMode;
+  updateCount++;
+}
+
+if (hasAppearanceValue('UiDensityScale')) {
+  var densityRaw = text(param.UiDensityScale);
+  var density = densityRaw === '' || densityRaw.toLowerCase() === 'system' ? null : Number(densityRaw);
+  if (density !== null && (!isFinite(density) || density < 90 || density > 110 || density % 5 !== 0)) {
+    return fail('界面密度只能为90、95、100、105、110，空值继承系统设置。');
+  }
+  updateModel.UiDensityScale = density;
+  updateCount++;
+}
+
+// 布局仅保存整数像素与三态折叠值；目标账号始终来自可信 DiyToken，视口临时裁剪不写入这里。
+var layoutWidths = ['SidebarWidth', 'RoleTreeWidth'];
+for (var widthIndex = 0; widthIndex < layoutWidths.length; widthIndex++) {
+  var widthName = layoutWidths[widthIndex];
+  if (!hasAppearanceValue(widthName)) continue;
+  if (param[widthName] !== null && typeof param[widthName] === 'object') return fail('面板宽度必须为整数像素或空值。');
+  var widthText = text(param[widthName]);
+  var widthValue = widthText === '' ? null : Number(widthText);
+  if (widthValue !== null && (!isFinite(widthValue) || widthValue % 1 !== 0 || widthValue < 160 || widthValue > 600)) {
+    return fail('面板宽度只能为160至600之间的整数像素，空值恢复默认。');
+  }
+  updateModel[widthName] = widthValue;
+  updateCount++;
+}
+var layoutCollapsedFields = ['SidebarCollapsed', 'RoleTreeCollapsed'];
+for (var collapsedIndex = 0; collapsedIndex < layoutCollapsedFields.length; collapsedIndex++) {
+  var collapsedName = layoutCollapsedFields[collapsedIndex];
+  if (!hasAppearanceValue(collapsedName)) continue;
+  if (param[collapsedName] !== null && typeof param[collapsedName] === 'object') return fail('面板收起状态只能为0、1或空值。');
+  var collapsedText = text(param[collapsedName]);
+  var collapsedFlag = normalizeFlag(param[collapsedName]);
+  if (collapsedText !== '' && !collapsedFlag.ok) return fail('面板收起状态只能为0、1或空值。');
+  updateModel[collapsedName] = collapsedText === '' ? null : collapsedFlag.value;
+  updateCount++;
+}
+
+var appearanceFlags = ['DisableGradient', 'DisableShadow', 'DisableButtonIcon'];
+for (var appearanceIndex = 0; appearanceIndex < appearanceFlags.length; appearanceIndex++) {
+  var appearanceName = appearanceFlags[appearanceIndex];
+  if (!hasAppearanceValue(appearanceName)) continue;
+  var appearanceText = text(param[appearanceName]);
+  if (appearanceText === '' || appearanceText.toLowerCase() === 'system') {
+    updateModel[appearanceName] = null;
+  } else {
+    var appearanceFlag = normalizeFlag(param[appearanceName]);
+    if (!appearanceFlag.ok) return fail('界面关闭开关只能为0、1或空值。');
+    updateModel[appearanceName] = appearanceFlag.value;
+  }
+  updateCount++;
+}
+
+if (hasAppearanceValue('LoginStyle')) {
+  var loginStyleRaw = text(param.LoginStyle).toLowerCase();
+  var loginStyles = { original: 'Original', minimal: 'Minimal', split: 'Split', console: 'Console', system: 'System' };
+  var loginStyle = loginStyleRaw === '' ? 'System' : loginStyles[loginStyleRaw];
+  if (!loginStyle) return fail('登录界面风格只能为System、Original、Minimal、Split或Console。');
+  updateModel.LoginStyle = loginStyle;
   updateCount++;
 }
 
@@ -195,7 +260,11 @@ if (updateCount === 0) {
 }
 
 function comparablePreference(name, value) {
-  if (name === 'RandomDesktopBg' || name === 'OpenTreeMenu') {
+  if (appearanceFlags.indexOf(name) >= 0) {
+    var appearanceNormalized = normalizeFlag(value);
+    return appearanceNormalized.ok ? String(appearanceNormalized.value) : text(value);
+  }
+  if (name === 'RandomDesktopBg' || name === 'OpenTreeMenu' || layoutCollapsedFields.indexOf(name) >= 0) {
     var normalized = normalizeFlag(value);
     return normalized.ok ? String(normalized.value) : text(value);
   }
@@ -215,9 +284,7 @@ function comparablePreference(name, value) {
   return result;
 }
 
-// Theme pickers can emit the current value repeatedly. Do not perform a DB
-// UPDATE or rebuild the login projection unless at least one normalized value
-// actually changed.
+// 主题控件可能重复发出当前值；相同归一化结果不写库、不重建登录投影。
 var changedModel = { Id: userId };
 var changedCount = 0;
 for (var fieldName in updateModel) {

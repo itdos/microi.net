@@ -1,12 +1,13 @@
 <template>
     <section class="mci-role-permission-field">
         <el-alert
-            title="菜单权限决定可见菜单与表单引擎增删改查；接口引擎等平台控制面仍要求 9999 级管理员。"
+            title="菜单权限决定业务访问；MCP AI 开发权限在下方单独授权，默认关闭。"
             type="warning"
             :closable="false"
             show-icon
             class="mci-role-permission-field__notice"
         />
+        <MciMcpRolePermissions v-if="isAdministrator" ref="mcpPermission" :role-id="String(FormData.Id||'')" :role-name="FormData.Name||'新角色'" :role-level="Number(FormData.Level||0)" :readonly="readonly" deferred @change="handleMcpChange"/>
         <div class="mci-role-permission-field__toolbar">
             <el-input
                 v-model="keyword"
@@ -58,6 +59,7 @@ import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
 import SysroleMenuPermissionRow from "./sysrole-menu-permission-row.vue";
 import SysroleTablePermission from "./sysrole-table-permission.vue";
+import MciMcpRolePermissions from "@/components/MciMcpRolePermissions/index.vue";
 import { ensureRoleMenuPathReadable, setRoleMenuChecked } from "../utils/sysrole-menu-permission.js";
 
 const BASE_PERMISSION_NAMES = ["Read", "Add", "Edit", "Del", "Export", "Import"];
@@ -65,7 +67,7 @@ const BUTTON_GROUPS = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "Pag
 
 export default {
     name: "SysrolePermissionField",
-    components: { SysroleMenuPermissionRow, SysroleTablePermission },
+    components: { SysroleMenuPermissionRow, SysroleTablePermission, MciMcpRolePermissions },
     props: {
         modelValue: { default: "" },
         FormData: { type: Object, default: () => ({}) },
@@ -85,6 +87,7 @@ export default {
         return {
             menus: [],
             tableLimits: [],
+            mcpPermission: null,
             parentById: Object.create(null),
             keyword: "",
             loading: false,
@@ -97,11 +100,7 @@ export default {
     },
     computed: {
         isAdministrator() {
-            const value = this.currentUser?._IsAdmin;
-            return value === true
-                || value === 1
-                || String(value || "").toLowerCase() === "true"
-                || Number(this.currentUser?.Level || 0) >= 9999;
+            return Number(this.currentUser?.Level || 0) >= 9999;
         },
         readonly() {
             return this.FieldReadonly
@@ -189,6 +188,7 @@ export default {
         },
         emitValue(notifyChange = true) {
             const value = JSON.stringify({
+                ...(this.mcpPermission ? { Mcp: this.mcpPermission } : {}),
                 Menu: this.collectLimits(this.menus, []),
                 Table: (this.tableLimits || []).map((item) => ({
                     Id: item.Id || item.FkId,
@@ -335,7 +335,15 @@ export default {
             this.tableLimits = Array.isArray(value) ? value : [];
             this.emitValue();
         },
+        handleMcpChange(value, notify = true) {
+            this.mcpPermission = value;
+            // 初始化不会标脏；后续交给表单原有保存事务，与菜单授权一起提交。
+            this.emitValue(notify && !this.loading && this.loadedRoleId !== null);
+        },
         async flushPendingSync() {
+            if (this.isAdministrator && this.$refs.mcpPermission) {
+                if (await this.$refs.mcpPermission.flushPendingSync() === false) return false;
+            }
             if (this.loading) {
                 try {
                     await this.loadPermissions();

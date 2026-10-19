@@ -6,6 +6,9 @@
                     <span class="mci-theme-heading-icon"><el-icon><Setting /></el-icon></span>
                     <strong>{{ $t('Msg.Mobile.profile.themeSettings') }}</strong>
                 </div>
+                <button type="button" class="mci-theme-reset" data-testid="theme-reset" @click="resetVisualPreferences">{{ $t('Msg.FrameworkAppearance.reset') }}</button>
+            </div>
+            <div class="mci-theme-status-row">
                 <button
                     v-if="canSyncThemePreferences"
                     type="button"
@@ -41,33 +44,6 @@
                         </button>
                     </div>
                 </div>
-
-                <!-- 当前账号可覆盖租户的界面默认值 -->
-                <div class="mci-theme-section">
-                    <div class="mci-theme-title">
-                        <el-icon><Grid /></el-icon>
-                        <span>边角风格</span>
-                    </div>
-                    <div class="mci-mode-row" role="group" aria-label="边角风格">
-                        <button v-for="option in cornerOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="cornerPreference === option.value" :class="{ active: cornerPreference === option.value }" @click="changeCornerStyle(option.value)">{{ option.label }}</button>
-                    </div>
-                </div>
-
-                <div class="mci-theme-section">
-                    <div class="mci-theme-title"><el-icon><Menu /></el-icon><span>导航菜单位置</span></div>
-                    <div class="mci-mode-row mci-navigation-mode-row" role="group" aria-label="导航菜单位置">
-                        <button v-for="option in navigationOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="navigationPreference === option.value" :class="{ active: navigationPreference === option.value }" @click="changeNavigationLayout(option.value)">{{ option.label }}</button>
-                    </div>
-                </div>
-
-                <div class="mci-theme-section">
-                    <div class="mci-theme-title"><el-icon><Expand /></el-icon><span>菜单子级展开方式</span></div>
-                    <div class="mci-mode-row" role="group" aria-label="菜单子级展开方式">
-                        <button v-for="option in menuExpandOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="menuExpandPreference === option.value" :class="{ active: menuExpandPreference === option.value }" @click="changeMenuChildExpandMode(option.value)">{{ option.label }}</button>
-                    </div>
-                </div>
-
-                <div class="mci-theme-section"><UiDensitySelect /></div>
 
                 <!-- 主题色（MCI 设计系统统一调色板） -->
                 <div class="mci-theme-section">
@@ -107,6 +83,50 @@
                         <span class="mci-custom-hint">{{ themeColor || $t('Msg.Mobile.profile.pickColor') }}</span>
                     </div>
                 </div>
+
+                <!-- 当前账号可覆盖租户的界面默认值 -->
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title">
+                        <el-icon><Grid /></el-icon>
+                        <span>{{ $t('Msg.FrameworkAppearance.corner') }}</span>
+                    </div>
+                    <div class="mci-mode-row" role="group" :aria-label="$t('Msg.FrameworkAppearance.corner')">
+                        <button v-for="option in cornerOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="cornerPreference === option.value" :class="{ active: cornerPreference === option.value }" @click="changeCornerStyle(option.value)">{{ $t('Msg.FrameworkAppearance.' + option.labelKey) }}</button>
+                    </div>
+                </div>
+
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title"><el-icon><Menu /></el-icon><span>{{ $t('Msg.FrameworkAppearance.navigation') }}</span></div>
+                    <div class="mci-mode-row mci-navigation-mode-row" role="group" :aria-label="$t('Msg.FrameworkAppearance.navigation')">
+                        <button v-for="option in navigationOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="navigationPreference === option.value" :class="{ active: navigationPreference === option.value }" @click="changeNavigationLayout(option.value)">{{ $t('Msg.FrameworkAppearance.' + option.labelKey) }}</button>
+                    </div>
+                </div>
+
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title"><el-icon><Expand /></el-icon><span>{{ $t('Msg.FrameworkAppearance.menuExpand') }}</span></div>
+                    <div class="mci-mode-row" role="group" :aria-label="$t('Msg.FrameworkAppearance.menuExpand')">
+                        <button v-for="option in menuExpandOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="menuExpandPreference === option.value" :class="{ active: menuExpandPreference === option.value }" @click="changeMenuChildExpandMode(option.value)">{{ $t('Msg.FrameworkAppearance.' + option.labelKey) }}</button>
+                    </div>
+                </div>
+
+                <div class="mci-theme-section"><UiDensitySelect @change="changeDensity" /></div>
+
+                <div class="mci-theme-section">
+                    <div class="mci-theme-title"><el-icon><Grid /></el-icon><span>{{ $t('Msg.FrameworkAppearance.loginStyle') }}</span></div>
+                    <div class="mci-mode-row mci-navigation-mode-row" role="group" :aria-label="$t('Msg.FrameworkAppearance.loginStyle')">
+                        <button v-for="option in loginOptions" :key="option.value" type="button" class="mci-mode-btn" :aria-pressed="loginPreference === option.value" :class="{ active: loginPreference === option.value }" @click="changeLoginStyle(option.value)">{{ $t('Msg.FrameworkAppearance.' + option.labelKey) }}</button>
+                    </div>
+                </div>
+
+                <div class="mci-theme-section mci-appearance-switches">
+                    <label v-for="option in appearanceSwitches" :key="option.field" class="mci-appearance-switch">
+                        <span>{{ $t('Msg.FrameworkAppearance.' + option.labelKey) }}</span>
+                        <el-switch :model-value="appearanceValue(option.field)" :aria-label="$t('Msg.FrameworkAppearance.' + option.labelKey)" @change="changeAppearanceSwitch(option.field, $event)" />
+                    </label>
+                    <p>{{ $t('Msg.FrameworkAppearance.inheritHint') }}</p>
+                </div>
+
+
             </div>
 
             <div class="mci-theme-panel-foot" :class="{ 'is-local': !canSyncThemePreferences }">
@@ -117,7 +137,7 @@
 
         <template #reference>
             <slot name="trigger">
-                <button type="button" class="theme-select-trigger" aria-label="主题设置" title="主题设置">
+                <button type="button" class="theme-select-trigger" :aria-label="$t('Msg.Mobile.profile.themeSettings')" :title="$t('Msg.Mobile.profile.themeSettings')">
                     <el-icon class="theme-icon"><Setting /></el-icon>
                 </button>
             </slot>
@@ -133,6 +153,7 @@ import { getUserVisualPreferenceSaveSession } from "@/utils/user-visual-preferen
 import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
 import { getCornerStyle, setCornerStyle } from "@/utils/theme-shape.js";
+import { APPEARANCE_RESET, applyFrameworkAppearance, clearLocalAppearance, readLocalAppearance, saveLocalAppearance, resolveAppearanceSwitch } from '@/utils/framework-appearance.js';
 import {
     getThemePalettes,
     setThemeColor as applyThemeColor,
@@ -199,7 +220,7 @@ export default {
         watch(
             () => [CurrentUser.value.ThemeColor, SysConfig.value.ThemeColor, localThemeColor.value],
             () => {
-                applyThemeColor(themeColor.value || DEFAULT_THEME_COLOR);
+                applyFrameworkAppearance(diyStore);
             }
         );
         return { diyStore, appStore, settingsStore, themeColor, localThemeColor, SysConfig, CurrentUser, preferenceSaveSession };
@@ -209,9 +230,11 @@ export default {
             ShowThemes: false,
             themeMode: 'light',
             cornerStyle: getCornerStyle(),
-            cornerOptions: [{value:'System',label:'跟随系统'},{value:'round',label:'圆角'},{value:'square',label:'直角'}],
-            navigationOptions: [{value:'System',label:'跟随系统'},{value:'Side',label:'侧边导航'},{value:'Top',label:'顶部导航'},{value:'TopSide',label:'顶部 + 侧边导航'}],
-            menuExpandOptions: [{value:'System',label:'跟随系统'},{value:'Down',label:'向下展开'},{value:'Right',label:'向右展开'}],
+            cornerOptions: [{value:'System',labelKey:'followSystem'},{value:'round',labelKey:'round'},{value:'square',labelKey:'square'}],
+            navigationOptions: [{value:'System',labelKey:'followSystem'},{value:'Side',labelKey:'side'},{value:'Top',labelKey:'top'},{value:'TopSide',labelKey:'topSide'}],
+            menuExpandOptions: [{value:'System',labelKey:'followSystem'},{value:'Down',labelKey:'down'},{value:'Right',labelKey:'right'}],
+            loginOptions: [{value:'System',labelKey:'followSystem'},{value:'Original',labelKey:'original'},{value:'Minimal',labelKey:'minimal'},{value:'Split',labelKey:'split'},{value:'Console',labelKey:'console'}],
+            appearanceSwitches: [{field:'DisableGradient',labelKey:'disableGradient'},{field:'DisableShadow',labelKey:'disableShadow'},{field:'DisableButtonIcon',labelKey:'disableButtonIcon'}],
             // 新旧顶栏共用当前账号的保存状态。
         };
     },
@@ -224,6 +247,7 @@ export default {
         cornerPreference() { return normalizeUserCornerStyle(this.CurrentUser?.CornerStyle); },
         navigationPreference() { return normalizeUserNavigationLayout(this.CurrentUser?.NavigationLayout); },
         menuExpandPreference() { return normalizeUserMenuChildExpandMode(this.CurrentUser?.MenuChildExpandMode); },
+        loginPreference() { return this.CurrentUser?.LoginStyle || 'System'; },
         // 每种显示模式固定 12 色（6 × 2）；暗色模式不出现白色主色。
         mciPresets() {
             return getThemePalettes(this.themeMode);
@@ -233,7 +257,9 @@ export default {
                 || hasInstalledUserPreference(this.CurrentUser, "ThemeColor")
                 || hasInstalledUserPreference(this.CurrentUser, "CornerStyle")
                 || hasInstalledUserPreference(this.CurrentUser, "NavigationLayout")
-                || hasInstalledUserPreference(this.CurrentUser, "MenuChildExpandMode");
+                || hasInstalledUserPreference(this.CurrentUser, "MenuChildExpandMode")
+                || hasInstalledUserPreference(this.CurrentUser, "UiDensityScale")
+                || hasInstalledUserPreference(this.CurrentUser, "DisableGradient");
         },
         preferenceSaveStatusText() {
             const keys = {
@@ -249,13 +275,13 @@ export default {
         // 已安装个人偏好字段时以服务端用户值为准；旧租户继续保留本机兼容值。
         this.themeMode = resolveUserThemeMode(
             this.CurrentUser,
-            getThemeMode(),
+            readLocalAppearance(this.diyStore).ThemeMode || '',
             this.SysConfig?.ThemeMode,
             "light"
         );
-        setThemeMode(this.themeMode);
+        setThemeMode(this.themeMode, { persist: false });
         this.applyResolvedCornerStyle();
-        const appliedColor = applyThemeColor(this.themeColor || DEFAULT_THEME_COLOR);
+        const appliedColor = applyThemeColor(this.themeColor || DEFAULT_THEME_COLOR, { mode: this.themeMode });
         if (appliedColor && !this.isActive(appliedColor)) this.diyStore.setThemeColor(appliedColor);
     },
     beforeUnmount() {
@@ -283,12 +309,32 @@ export default {
         }
     },
     methods: {
+        appearanceValue(field) {
+            return resolveAppearanceSwitch(this.CurrentUser, this.SysConfig, field, readLocalAppearance(this.diyStore));
+        },
+        changeAppearanceSwitch(field, value) {
+            this.saveInstalledVisualPreferences({ [field]: value ? 1 : 0 });
+        },
+        changeDensity(value) {
+            this.saveInstalledVisualPreferences({ UiDensityScale: value });
+        },
+        changeLoginStyle(value) {
+            this.saveInstalledVisualPreferences({ LoginStyle: value });
+        },
+        resetVisualPreferences() {
+            clearLocalAppearance(this.diyStore);
+            this.saveInstalledVisualPreferences({ ...APPEARANCE_RESET });
+            applyFrameworkAppearance(this.diyStore, {});
+            this.applyResolvedThemeMode();
+            this.applyResolvedCornerStyle();
+        },
         applyResolvedCornerStyle() {
-            this.cornerStyle = setCornerStyle(resolveUserCornerStyle(this.CurrentUser, getCornerStyle(), this.SysConfig?.CornerStyle));
+            this.cornerStyle = setCornerStyle(resolveUserCornerStyle(this.CurrentUser, readLocalAppearance(this.diyStore).CornerStyle || '', this.SysConfig?.CornerStyle), { persist: false });
         },
         changeCornerStyle(style) {
             if (!hasInstalledUserPreference(this.CurrentUser, 'CornerStyle')) {
-                this.cornerStyle = setCornerStyle(style === 'System' ? this.SysConfig?.CornerStyle : style);
+                saveLocalAppearance(this.diyStore, { CornerStyle: style });
+                this.cornerStyle = setCornerStyle(style === 'System' ? this.SysConfig?.CornerStyle : style, { persist: false });
                 return;
             }
             this.saveInstalledVisualPreferences({ CornerStyle: normalizeUserCornerStyle(style) });
@@ -303,13 +349,13 @@ export default {
         applyResolvedThemeMode() {
             const mode = resolveUserThemeMode(
                 this.CurrentUser,
-                getThemeMode(),
+                readLocalAppearance(this.diyStore).ThemeMode || '',
                 this.SysConfig?.ThemeMode,
                 "light"
             );
             if (mode !== this.themeMode) {
                 this.themeMode = mode;
-                setThemeMode(mode);
+                setThemeMode(mode, { persist: false });
             }
         },
         isActive(color) {
@@ -317,7 +363,7 @@ export default {
         },
         changeTheme(color) {
             if (!color) color = (this.SysConfig && this.SysConfig.ThemeColor) || DEFAULT_THEME_COLOR;
-            const appliedColor = applyThemeColor(color);
+            const appliedColor = applyThemeColor(color, { mode: this.themeMode });
             const nextColor = appliedColor || color;
             this.diyStore.setThemeColor(nextColor);
             this.saveInstalledVisualPreferences({ ThemeColor: nextColor });
@@ -334,14 +380,16 @@ export default {
             this.saveInstalledVisualPreferences(patch);
         },
         saveInstalledVisualPreferences(patch) {
+            const local = saveLocalAppearance(this.diyStore, patch);
             const userId = String(this.CurrentUser?.Id || "");
-            if (!userId) return;
+            if (!userId) { applyFrameworkAppearance(this.diyStore, local); return; }
             const installedPatch = Object.fromEntries(
                 Object.entries(patch || {}).filter(([key]) => hasInstalledUserPreference(this.CurrentUser, key))
             );
-            if (!Object.keys(installedPatch).length) return;
+            if (!Object.keys(installedPatch).length) { applyFrameworkAppearance(this.diyStore, local); return; }
 
             this.diyStore.setCurrentUser({ ...this.CurrentUser, ...installedPatch });
+            applyFrameworkAppearance(this.diyStore, local);
             Object.assign(this.pendingPreferencePatch, installedPatch);
             this.preferenceSaveState = "pending";
             this.preferenceSaveError = "";
@@ -379,7 +427,7 @@ export default {
                     patch
                 );
                 if (!result || result.Code !== 1) {
-                    throw new Error(result?.Msg || "个人主题偏好保存失败");
+                    throw new Error(result?.Msg || this.$t('Msg.FrameworkAppearance.saveFailed'));
                 }
                 // RefreshLoginUser may return a scheduled refresh receipt rather
                 // than the login-user projection. Keep the authenticated user
@@ -394,7 +442,7 @@ export default {
                 session.pendingPreferencePatch = { ...patch, ...session.pendingPreferencePatch };
                 session.preferenceSaveState = "error";
                 session.preferenceSaveError = error?.message || String(error);
-                if (ownsCurrentActor()) DiyCommon.Tips(`主题已在当前设备生效，但跨设备保存失败：${error?.message || error}`, false);
+                if (ownsCurrentActor()) DiyCommon.Tips(this.$t('Msg.FrameworkAppearance.deviceSaveFailed', { message: error?.message || error }), false);
             } finally {
                 session.preferenceSaveInFlight = false;
                 if (succeeded && Object.keys(session.pendingPreferencePatch).length) this.scheduleVisualPreferenceFlush(250, session);
@@ -426,6 +474,16 @@ export default {
 .mci-theme-panel {
     padding: 0;
 }
+.mci-theme-reset {
+    flex: none; border: 1px solid var(--mci-border-color); border-radius: 6px;
+    background: var(--mci-bg-elevated); color: var(--mci-text-primary);
+    padding: 5px 8px; font: inherit; font-size: 12px; cursor: pointer;
+    &:hover { border-color: var(--el-color-primary); color: var(--el-color-primary); }
+    &:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 2px; }
+}
+.mci-theme-status-row { display: flex; justify-content: flex-end; padding: 6px 16px 0; }
+.mci-appearance-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; color: var(--mci-text-primary); font-size: 13px; }
+.mci-appearance-switches p { margin: 4px 0 0; font-size: 11px; color: var(--mci-text-secondary); }
 
 .mci-theme-panel-head {
     display: flex;

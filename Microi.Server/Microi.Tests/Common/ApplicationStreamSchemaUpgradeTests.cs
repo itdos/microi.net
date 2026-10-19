@@ -371,6 +371,14 @@ public sealed class ApplicationStreamSchemaUpgradeTests
         Assert.Equal(package["PackageInfo"]!["PhysicalColumnCount"]!.Value<int>(),
             package["PhysicalColumns"]!.Count());
 
+        // 同一张表还可以声明索引 DDL；建表定义必须按语义筛选后保持唯一。
+        string CreateTableDdl(string tableName) => Assert.Single(
+            package["DDLStatements"]!.Children<JObject>(), item =>
+                item["TableName"]?.ToString() == tableName
+                && System.Text.RegularExpressions.Regex.IsMatch(item["DDL"]?.ToString() ?? "",
+                    @"^\s*CREATE\s+TABLE\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            ["DDL"]!.ToString();
+
         // TableName 是导出投影的可选字段；TableId 指向本包 DiyTables 才是字段归属。
         // 同时存在两种表示时严格检查一致，避免跨环境 Id 或缺失投影造成误判。
         string FieldTableName(JObject item)
@@ -385,8 +393,7 @@ public sealed class ApplicationStreamSchemaUpgradeTests
 
         foreach (var field in Upgrade25.Fields.Where(field => field.TableName != "sys_osclients"))
         {
-            var ddl = Assert.Single(package["DDLStatements"]!.Children<JObject>(), item =>
-                item["TableName"]?.ToString() == field.TableName)["DDL"]!.ToString();
+            var ddl = CreateTableDdl(field.TableName);
             Assert.Contains("`" + field.Name + "`", ddl);
             Assert.Single(package["PhysicalColumns"]!.Children<JObject>(), item =>
                 item["TABLE_NAME"]?.ToString() == field.TableName
@@ -396,8 +403,7 @@ public sealed class ApplicationStreamSchemaUpgradeTests
                 && item["Name"]?.ToString() == field.Name);
         }
 
-        var versionDdl = package["DDLStatements"]!.Children<JObject>().Single(item =>
-            item["TableName"]?.ToString() == "mci_ai_app_version")["DDL"]!.ToString();
+        var versionDdl = CreateTableDdl("mci_ai_app_version");
         Assert.Contains("`PublishProtocolVersion` int NOT NULL DEFAULT 2", versionDdl);
         Assert.Contains("`PublishState` varchar(50) NOT NULL DEFAULT 'LegacyUnverified'", versionDdl);
         Assert.Contains("`FencingToken` bigint NOT NULL DEFAULT 0", versionDdl);
@@ -422,8 +428,7 @@ public sealed class ApplicationStreamSchemaUpgradeTests
             Assert.Equal(1, routeMetadata.Value<int>("Readonly"));
         }
 
-        var fileDdl = package["DDLStatements"]!.Children<JObject>().Single(item =>
-            item["TableName"]?.ToString() == "mci_ai_app_file")["DDL"]!.ToString();
+        var fileDdl = CreateTableDdl("mci_ai_app_file");
         Assert.Contains("`FilePathHash` char(64) NULL", fileDdl);
 
         var multipartAuditFields = new[]
@@ -461,10 +466,32 @@ public sealed class ApplicationStreamSchemaUpgradeTests
         Assert.Equal("V8.Result = false;", uploadAuditMenu["EditCodeShowV8"]?.ToString());
         Assert.Equal("V8.Result = false;", uploadAuditMenu["DelCodeShowV8"]?.ToString());
 
-        // The portable package describes physical columns but has no provider-
-        // specific index section. A database whose ServerVersion is already
-        // current must therefore still be detected as missing every v3 index
-        // definitions so the startup invariant runs Upgrade25 after import.
+        // 索引随 DDLStatements 声明，分别严格校验归属、唯一性、列顺序和门禁标记。
+        // 下方仅验证旧缺失检测函数在模拟无索引时仍完整报告七项，不代表启动时补装应用。
+        var gateStatements = package["DDLStatements"]!.Children<JObject>()
+            .Where(item => item.Value<bool?>("ApplicationStreamGateContract") == true).ToArray();
+        Assert.Equal(Upgrade25.Indexes.Count + 1, gateStatements.Length);
+        var auditStatement = Assert.Single(gateStatements, item =>
+            item["TableName"]?.ToString() == Upgrade25.GateTransitionAuditTable
+            && System.Text.RegularExpressions.Regex.IsMatch(item["DDL"]?.ToString() ?? "",
+                @"^\s*CREATE\s+TABLE\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+        Assert.Equal(CreateTableDdl(Upgrade25.GateTransitionAuditTable), auditStatement["DDL"]!.ToString());
+        Assert.Null(auditStatement["IndexName"]);
+        Assert.Equal(Upgrade25.Indexes.Count, gateStatements.Count(item =>
+            !string.IsNullOrWhiteSpace(item["IndexName"]?.ToString())
+            && System.Text.RegularExpressions.Regex.IsMatch(item["DDL"]?.ToString() ?? "",
+                @"^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)));
+        foreach (var index in Upgrade25.Indexes)
+        {
+            var statement = Assert.Single(package["DDLStatements"]!.Children<JObject>(), item =>
+                item["TableName"]?.ToString() == index.TableName
+                && item["IndexName"]?.ToString() == index.Name);
+            Assert.True(statement.Value<bool>("ApplicationStreamGateContract"));
+            var ddl = statement["DDL"]!.ToString();
+            Assert.Matches(index.Unique ? @"(?i)^\s*CREATE\s+UNIQUE\s+INDEX\b" : @"(?i)^\s*CREATE\s+INDEX\b", ddl);
+            Assert.Contains("`" + index.Name + "` ON `" + index.TableName + "` ("
+                + string.Join(",", index.Columns.Select(column => "`" + column + "`")) + ")", ddl);
+        }
         var physicalColumns = package["PhysicalColumns"]!
             .Children<JObject>()
             .Select(item => (Table: item["TABLE_NAME"]?.ToString(), Column: item["COLUMN_NAME"]?.ToString()))

@@ -150,15 +150,20 @@ namespace Microi.net.Api
             Response.Headers["Cache-Control"] = "no-cache";
             Response.Headers["Connection"] = "keep-alive";
             Response.Headers["X-Accel-Buffering"] = "no";
+            HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>()?.DisableBuffering();
 
             try
             {
-                var result =
-                    await _microiAi.ChatStreamWithContextAsync(
+                var result = _microiAi is IAiEventStream eventStream
+                    ? await eventStream.ChatEventsWithContextAsync(param, WriteSseEventAsync)
+                    : await _microiAi.ChatStreamWithContextAsync(
                         param,
                         chunk => WriteSseEventAsync(
                             "message",
                             chunk));
+
+                if (result.DataAppend != null)
+                    await WriteSseEventAsync("receipt", JsonConvert.SerializeObject(result.DataAppend));
 
                 if (result.Code == 1 && result.Data != null)
                 {
@@ -174,7 +179,7 @@ namespace Microi.net.Api
             {
                 try
                 {
-                    await WriteSseEventAsync("error", $"服务异常：{ex.Message}");
+                    await WriteSseEventAsync("error", "AI 流式执行中断，请根据已收到的执行回执核对结果。");
                     await WriteSseEventAsync("done", "[DONE]");
                 }
                 catch { }

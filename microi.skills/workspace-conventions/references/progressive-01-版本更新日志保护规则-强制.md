@@ -2,12 +2,15 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=workspace-conventions-010 sha256=d4ee69df49b8cba8d6365f485bd44aab8f5fcccc4cc1c8394220af14ff68f83f -->
+<!-- microi-progressive:chunk id=workspace-conventions-010 sha256=f123b0b70030df276188dbb77617c41f74767ab27ea38d5472634cc3b6beca8b -->
 ## 版本更新日志保护规则（强制）
 
 - 日常功能开发、缺陷修复、测试、普通文档补充、Skill 完善和代码重构期间，不得修改 `microi.doc/docs/doc/about/update-log.md`。
 - 只有用户明确提出“发布版本”“准备发版”“更新版本日志”或直接点名要求修改该文件时，才允许编辑更新日志；“完善文档”或“补充官网说明”不等于授权修改版本日志。
 - 如果本轮误改了更新日志，必须先按上节完成多对话归属核验；只撤回有本对话精确写入证据的 hunk。必须保留用户、其它对话或其它任务的已提交和未提交内容，归属不明时不得修改并应询问用户。
+
+- 编写正式更新日志必须以“上一条已发布更新日志所对应的正式候选”为起点，逐仓核对到本次冻结候选之间的全部提交、合并和最终文件差异；不能只取最后一次提交、最后一次推送或仅看当前任务。历史改写导致的等价提交按内容去重，合并提交需要核对实际引入的功能。保留起止提交、逐项来源与纳入/排除原因的本地审计记录；客户私有业务、生成文件与重复提交不得凑成平台功能条目。
+- 页面版本断档（例如 v8.5.6 后直接是 v8.5.11）时，查验中间各正式版本的候选及渠道回执并补齐可证实的遗漏，不能把当前候选新增功能倒写为历史版本已发布。历史条目补充需用户的更新日志授权；本次新版本单列，并区分代码已完成、制品已发布与客户部署。日志内容不能以“六条概括”替代完整区间核对，也不能因条数少直接推断缺失。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=workspace-conventions-011 sha256=8e3904f45392b7c27746de274bbc4725a7eb0964f0aeab1d83918c0174336dc4 -->
@@ -186,7 +189,7 @@ if (string.IsNullOrWhiteSpace(tableName)) { return; }
 如果方法内部只通过 `DynamicHelper` 读取对象字段，方法参数优先声明为 `object`，不要声明为 `dynamic`。这样可以减少 C# 运行时动态绑定进入普通字符串工具链的机会。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=4ef009cbfca343640e69ccdb6be47f3cb13ad8a67f9ff770debce20c919f1bb3 -->
+<!-- microi-progressive:chunk id=workspace-conventions-023 sha256=44d2ca45e8fb85bb86f2f84f3fad09abc0687fb89f9e0e4f624917d258d485c3 -->
 ## 根目录保留文件说明
 
 根目录只允许存在以下类型的文件和目录：
@@ -202,7 +205,7 @@ if (string.IsNullOrWhiteSpace(tableName)) { return; }
 | `microi-v8-engine/` | V8 接口引擎代码 | 否 |
 | `AI-Project/` | 各租户/项目 | 否 |
 | `switch-env.ps1` | 本地环境切换工具 | 否（有用） |
-| `.tmp/` | AI 临时文件（gitignored） | 可删整个目录 |
+| `.tmp/` | AI 临时文件（gitignored） | 按任务归属清理，禁止整体清空共享目录 |
 | `.microi-e2e/` | Microi.Agent 插件 E2E 产物 | 可定期清理 |
 | `.microi-performance/` | 性能测试报告 | 可定期清理 |
 

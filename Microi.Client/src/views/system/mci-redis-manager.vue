@@ -99,9 +99,10 @@
                     <div class="mci-active-connection">
                         <strong>{{ activeConnection ? activeConnection.Name : '未连接' }}</strong>
                         <span v-if="activeConnection">{{ activeConnection.Host }}:{{ activeConnection.Port }} · DB {{ activeDatabase }}</span>
+                        <el-tag v-if="allowedKeyPrefix" effect="plain" size="small">仅当前租户：{{ allowedKeyPrefix }}*</el-tag>
                     </div>
                     <div class="mci-key-actions">
-                        <el-select v-model="activeDatabase" :disabled="!activeConnection" class="mci-db-select" @change="changeDatabase">
+                        <el-select v-model="activeDatabase" :disabled="activeConnection?.CanSelectDatabase !== true" class="mci-db-select" @change="changeDatabase">
                             <el-option v-for="db in databaseOptions" :key="db" :label="'DB ' + db" :value="db" />
                         </el-select>
                         <el-input
@@ -303,7 +304,7 @@
         <el-drawer v-model="statisticsVisible" title="Redis 运行统计" size="520px">
             <div class="mci-statistics" v-mci-loading:stats="statisticsLoading">
                 <div v-if="statistics" class="mci-stat-grid">
-                    <div class="mci-stat-card"><span>Key 总数</span><strong>{{ statistics.KeyCount?.toLocaleString() }}</strong></div>
+                    <div class="mci-stat-card"><span>{{ statistics.KeyCountIsEstimate ? '当前租户已扫描 Key' : 'Key 总数' }}</span><strong>{{ statistics.KeyCount?.toLocaleString() }}</strong></div>
                     <div class="mci-stat-card"><span>Ping</span><strong>{{ statistics.PingMilliseconds }} ms</strong></div>
                     <div class="mci-stat-card"><span>已用内存</span><strong>{{ statistics.Info?.used_memory_human || '-' }}</strong></div>
                     <div class="mci-stat-card"><span>连接客户端</span><strong>{{ statistics.Info?.connected_clients || '-' }}</strong></div>
@@ -337,6 +338,7 @@ import {
 } from '@element-plus/icons-vue';
 import { DiyApi, DiyCommon } from '@/utils/microi.net.import';
 import { useDiyStore } from '@/pinia';
+import { redisDatabaseOptions, redisKeyPrefix } from '@/utils/redis-management-scope';
 
 const DiyCodeEditor = defineAsyncComponent(() => import('@/views/form-engine/diy-field-component/diy-code-editor.vue'));
 const router = useRouter();
@@ -360,7 +362,8 @@ const connections = ref([]);
 const temporaryConnections = reactive({});
 const activeConnection = ref(null);
 const activeDatabase = ref(0);
-const databaseOptions = Array.from({ length: 64 }, (_, index) => index);
+const databaseOptions = computed(() => redisDatabaseOptions(activeConnection.value));
+const allowedKeyPrefix = computed(() => redisKeyPrefix(activeConnection.value));
 const keyPattern = ref('*');
 const keyList = ref([]);
 const keyCursor = ref('');
@@ -386,8 +389,7 @@ const statistics = ref(null);
 const expandedConnectionKeys = computed(() => activeConnection.value ? [`connection:${activeConnection.value.Id}`] : []);
 const connectionTree = computed(() => connections.value.map(connection => {
     if (connection.Mode === 'notice') return { key: `notice:${connection.Id}`, label: connection.Name, kind: 'notice', connection };
-    const defaultDb = Number(connection.Database || 0);
-    const dbs = Array.from(new Set([defaultDb, ...Array.from({ length: 16 }, (_, index) => index)])).sort((a, b) => a - b);
+    const dbs = redisDatabaseOptions(connection, 16);
     return {
         key: `connection:${connection.Id}`,
         label: connection.Name,
@@ -741,7 +743,7 @@ async function deleteSavedConnection(connection) {
 }
 
 function openCreateKey() {
-    Object.assign(createForm, { Key: '', DataType: 'string', Value: '{\n  "enabled": true\n}', TtlSeconds: -1 });
+    Object.assign(createForm, { Key: allowedKeyPrefix.value, DataType: 'string', Value: '{\n  "enabled": true\n}', TtlSeconds: -1 });
     createCodeEditorField.value = makeCodeField(`mci-redis-create-${Date.now()}`, 'json', 330);
     createDialogVisible.value = true;
 }

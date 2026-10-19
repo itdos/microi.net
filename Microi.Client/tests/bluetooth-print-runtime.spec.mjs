@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { parse, compileScript } from "../node_modules/@vue/compiler-sfc/dist/compiler-sfc.esm-browser.js";
+import { normalizeHiddenFrameworkFunctions } from "../src/utils/framework-appearance.js";
 import { encode } from "../src/utils/ble/encoding.js";
 import { adaptPrintPayload, resolvePrinterProfile } from "../src/utils/ble/printer-compatibility.js";
 
@@ -885,12 +887,40 @@ test("所有前端 V8 上下文共享同一个打印连接管理器", () => {
     assert.equal(first.Print, second.Print);
 });
 
+function frameworkBluetoothMount(source) {
+    const { descriptor, errors } = parse(source, { filename: "Navbar.vue" });
+    assert.deepEqual(errors, []);
+    const mounted = [];
+    const visit = (node) => {
+        if (node.type === 1 && node.tag === "BluetoothPrinterEntry") mounted.push(node);
+        for (const child of node.children || []) visit(child);
+    };
+    visit(descriptor.template.ast);
+    assert.equal(mounted.length, 1, "必须保留唯一真实蓝牙组件，注释或同名字符串不能代替挂载");
+    const entry = mounted[0];
+    assert.equal(entry.props.find(prop => prop.type === 7 && prop.name === "if")?.exp?.content, "showFrameworkFunction('Bluetooth')");
+    assert.equal(entry.props.find(prop => prop.type === 6 && prop.name === "data-framework-function")?.value?.content, "Bluetooth");
+    const ast = compileScript(descriptor, { id: "navbar-bluetooth-mount" }).scriptAst;
+    const options = ast.find(node => node.type === "ExportDefaultDeclaration")?.declaration;
+    const components = options?.properties.find(prop => prop.key?.name === "components")?.value;
+    assert.equal(components?.properties.find(prop => prop.key?.name === "BluetoothPrinterEntry")?.value?.name, "BluetoothPrinterEntry");
+    const methods = options?.properties.find(prop => prop.key?.name === "methods")?.value;
+    const guard = methods?.properties.find(prop => prop.type === "ObjectMethod" && prop.key?.name === "showFrameworkFunction");
+    assert.ok(guard, "显隐必须调用实际 Navbar 方法");
+    // 执行真实方法并核对独立枚举，避免仅放宽旧正则后错绑 AI 或删掉入口仍通过。
+    return new Function("normalizeHiddenFrameworkFunctions", `return ({${descriptor.script.content.slice(guard.start, guard.end)}}).showFrameworkFunction;`)(normalizeHiddenFrameworkFunctions);
+}
+
 test("PC 顶栏和移动端我的页都挂载统一蓝牙入口", () => {
     const navbar = readFileSync(new URL("../src/layout/components/Navbar.vue", import.meta.url), "utf8");
     const profile = readFileSync(new URL("../src/views/mobile/profile.vue", import.meta.url), "utf8");
     const entry = readFileSync(new URL("../src/components/BluetoothPrinterEntry/index.vue", import.meta.url), "utf8");
 
-    assert.match(navbar, /<BluetoothPrinterEntry\s*\/>/);
+    const showFrameworkFunction = frameworkBluetoothMount(navbar);
+    assert.equal(showFrameworkFunction.call({ SysConfig: { HideFrameworkFunctions: ["Bluetooth"] } }, "Bluetooth"), false);
+    assert.equal(showFrameworkFunction.call({ SysConfig: { HideFrameworkFunctions: ["AI"], DisableAiAssistant: 1 } }, "Bluetooth"), true);
+    assert.throws(() => frameworkBluetoothMount(navbar.replace(/<BluetoothPrinterEntry\b[^>]*\/>/, "<!-- BluetoothPrinterEntry -->")));
+    assert.throws(() => frameworkBluetoothMount(navbar.replace("showFrameworkFunction('Bluetooth')", "showFrameworkFunction('AI')")));
     assert.match(profile, /<BluetoothPrinterEntry\s+variant="profile"\s*\/>/);
     assert.match(entry, /Msg\.BluetoothConnection/);
     assert.match(entry, /Msg\.BluetoothConnected/);

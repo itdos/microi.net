@@ -153,10 +153,6 @@ function run(storeRows, options = {}) {
           return { ToArray: () => options.evidenceEngineRows || [] }
         }
         if (/FROM\s+information_schema\.tables/i.test(sql)) {
-          if (/EMPTY_DATABASE_STANDARD_SUITE_V1/.test(sql)) {
-            if (options.suiteDiscoveryFailure) throw new Error('catalog unavailable')
-            return { ToArray: () => (options.suitePhysicalTables || []).map((TableName) => ({ TableName })) }
-          }
           const optionalTables = options.optionalTables || [
             'microi_job_cron_triggers',
             'microi_job_triggers',
@@ -199,8 +195,17 @@ function run(storeRows, options = {}) {
             'wx_tpl_msg',
             'mic_msgset'
           ]
-          // 模拟真实IN筛选，不能让未列入发现SQL的表也凭测试夹具返回。
-          return { ToArray: () => optionalTables.filter((name) => sql.includes("'" + name + "'")).map((TableName) => ({ TableName })) }
+          // v1.6.5 只读一次完整物理目录，业务表与可选运行表共用同一份存在性事实。
+          // 不能沿用旧版两次查询的夹具，把真实存在的可选表错误模拟为缺失。
+          assert.match(sql, /EMPTY_DATABASE_STANDARD_SUITE_V1/)
+          assert.match(sql, /TABLE_SCHEMA\s*=\s*DATABASE\(\)/)
+          if (options.suiteDiscoveryFailure) throw new Error('catalog unavailable')
+          const physicalTables = [...new Set([
+            'sys_user', 'sys_role', 'sys_rolelimit', 'sys_dept', 'sys_config',
+            'sys_osclients', 'sys_menu', 'sys_apiengine', 'sys_microistore',
+            ...(options.suitePhysicalTables || []), ...optionalTables
+          ])]
+          return { ToArray: () => physicalTables.map((TableName) => ({ TableName })) }
         }
         return { ToArray: () => projectStoreRows(storeRows) }
       }
@@ -485,7 +490,19 @@ test('unpackaged standard suite tables, orphan batch roots and source roots ente
 test('standard suite physical discovery failure prevents incomplete cleanup SQL', () => {
   const { result } = run([], { suiteDiscoveryFailure: true })
   assert.equal(result.Code, 0)
-  assert.match(result.Msg, /标准应用.*停止/)
+  assert.match(result.Msg, /读取物理表清单失败.*停止/)
+  assert.equal(result.Data?.Sql, undefined)
+})
+
+test('one physical catalog determines business cleanup and optional runtime table presence', () => {
+  const { result, queries } = run([], {
+    suitePhysicalTables: ['mci_crm_customer'], optionalTables: ['mci_email_account']
+  })
+  assert.equal(result.Code, 1)
+  assert.equal(queries.filter(sql => /FROM\s+information_schema\.tables/i.test(sql)).length, 1)
+  assert.ok(result.Data.ApplicationOwnedTables.includes('mci_crm_customer'))
+  assert.match(result.Data.Sql, /DELETE FROM mci_email_account;/i)
+  assert.doesNotMatch(result.Data.Sql, /DELETE FROM mci_email_message;/i)
 })
 
 test('top-level AI application menu tree is removed recursively while AI assistant stays', () => {

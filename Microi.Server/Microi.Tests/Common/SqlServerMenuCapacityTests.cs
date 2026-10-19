@@ -49,10 +49,12 @@ public sealed class SqlServerMenuCapacityTests
     public static bool HasSqlServerFixture => !string.IsNullOrWhiteSpace(
         Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
 
-    [Theory(Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
-    [InlineData(DatabaseType.SqlServer)]
-    [InlineData(DatabaseType.SqlServer9)]
+    // 数据行保留独立用例身份，让显式例外回执可以精确核验两个 SQL Server provider。
+    [Theory]
+    [InlineData(DatabaseType.SqlServer, Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [InlineData(DatabaseType.SqlServer9, Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
     [Trait("Category", "FullStack")]
+    [Trait("DatabaseProvider", "SqlServer")]
     public async Task LegacyMenuMigrationWidensBeforeBackfillAndKeepsConstraintsAcrossRestart(DatabaseType provider)
     {
         var connection = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN")!);

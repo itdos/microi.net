@@ -5,7 +5,9 @@
     <div v-else-if="!isWebOS || hideShellForAnonymous" :class="classObj" class="app-wrapper-microi">
         <navbar v-if="!hideShellForAnonymous && isHybridNavigation" :hybrid-active-root="hybridNavigation.activeRoot" :hybrid-has-sidebar="showSidebar" @select-navigation-root="selectNavigationRoot" />
         <!-- 左边菜单区域（移动端不显示） -->
-        <sidebar v-if="showSidebar" :navigation-routes="isHybridNavigation ? hybridNavigation.sidebarRoutes : null" :show-brand="!isHybridNavigation" class="sidebar-container-microi" :style="GetMenuBg()" />
+        <MciResizablePane v-if="showSidebar" class="sidebar-container-microi" :style="GetMenuBg()" :width="sidebarWidthPreference" :collapsed="isCollapse" :collapsed-width="54" :show-toggle="false" keep-collapsed-content :label="$t('Msg.FrameworkAppearance.side')" @effective-width="sidebarEffectiveWidth = $event" @commit="savePanelLayout({ SidebarWidth: $event })" @update:collapsed="setSidebarCollapsed">
+            <sidebar :navigation-routes="isHybridNavigation ? hybridNavigation.sidebarRoutes : null" :show-brand="!isHybridNavigation" class="sidebar-menu-content" />
+        </MciResizablePane>
         <div :class="{ hasTagsView: !hideShellForAnonymous && needTagsView && !diyStore.IsPhoneView, 'mobile-view': diyStore.IsPhoneView, 'anonymous-shell-hidden': hideShellForAnonymous }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
             <!-- 顶部导航区域（移动端不显示） -->
             <div v-if="!hideShellForAnonymous && !diyStore.IsPhoneView" class="classic-workspace" :class="{ 'fixed-header-microi': fixedHeader, 'with-tags': needTagsView }" :style="GetFixedHeaderMicroiStyle()">
@@ -44,6 +46,8 @@ import { isEmbeddedWebosWindowRuntime } from "@/utils/webos-embedded-runtime.js"
 import { DiyCommon } from "@/utils/microi.net.import";
 import { resolveUserNavigationLayout } from '@/utils/user-visual-preferences';
 import { firstNavigationLeaf, navigationTarget, resolveHybridNavigation } from '@/utils/hybrid-navigation';
+import MciResizablePane from '@/components/MciResizablePane/index.vue';
+import PanelLayoutMixin from '@/utils/panel-layout.mixin.js';
 
 export default {
     name: "Layout",
@@ -53,12 +57,13 @@ export default {
         RightPanel,
         MobileTabBar,
         PlatformReminderDialog,
+        MciResizablePane,
         // Settings,
         Sidebar,
         TagsView
     },
-    mixins: [ResizeMixin],
-    data() { return { selectedNavigationRoot: '' }; },
+    mixins: [ResizeMixin, PanelLayoutMixin],
+    data() { return { selectedNavigationRoot: '', sidebarEffectiveWidth: 240, sidebarHydrationTarget: null }; },
     setup() {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
@@ -147,6 +152,16 @@ export default {
         }
     },
     watch: {
+        sidebarCollapsedPreference: { immediate: true, handler(value) {
+            this.sidebarHydrationTarget = !value;
+            this.appStore.sidebar.opened = !value;
+        } },
+        'sidebar.opened'(value) {
+            if (this.sidebarHydrationTarget === value) { this.sidebarHydrationTarget = null; return; }
+            if (this.diyStore.IsPhoneView) return;
+            this.savePanelLayout({ SidebarCollapsed: value ? 0 : 1 });
+        },
+        'diyStore.IsPhoneView'(value) { if (!value) { this.sidebarHydrationTarget = !this.sidebarCollapsedPreference; this.appStore.sidebar.opened = !this.sidebarCollapsedPreference; } },
         '$route.fullPath'() { this.selectedNavigationRoot = ''; },
         navigationLayout() { this.selectedNavigationRoot = ''; }
     },
@@ -154,6 +169,7 @@ export default {
         var self = this;
     },
     methods: {
+        setSidebarCollapsed(value) { this.savePanelLayout({ SidebarCollapsed: value ? 1 : 0 }); this.appStore.sidebar.opened = !value; },
         selectNavigationRoot(root) {
             this.selectedNavigationRoot = navigationTarget(root);
             const target = firstNavigationLeaf(root);
@@ -173,12 +189,6 @@ export default {
                 const top = self.ShowClassicTop != 0 ? '50px' : '0px';
                 result.top = top;
                 result.height = `calc(100% - ${top})`;
-            }
-            if (self.SysConfig.MenuWidth) {
-                //这里要判断hideSidebar
-                if (self.classObj.openSidebar) {
-                    result["width"] = self.SysConfig.MenuWidth; // + ' !important';
-                }
             }
             return result;
         },
@@ -203,9 +213,7 @@ export default {
                 return result;
             }
             
-            if (self.SysConfig.MenuWidth && self.isCollapse !== true) {
-                result["marginLeft"] = self.SysConfig.MenuWidth;
-            }
+            result["marginLeft"] = (self.isCollapse ? 54 : self.sidebarEffectiveWidth) + 'px';
             if (self.ShowClassicLeft == 0) {
                 result["marginLeft"] = "0px";
             }
@@ -300,6 +308,11 @@ export default {
         overflow-y: auto;
     }
 }
+
+// 旧 Classic 的 fixed-header 左右各有 10px 留白，顶部色带需独立铺满视口。
+.desktop-shell.top-navigation-layout .classic-workspace { padding-inline: 0 !important; }
+.desktop-shell.top-navigation-layout .classic-workspace > :deep(.tags-view-container-microi) { padding-inline: 10px;box-sizing: border-box; }
+.desktop-shell.hybrid-navigation-layout > :deep(.navbar-microi) { align-self: stretch;width: 100%;margin-inline: 0;box-sizing: border-box; }
 
 .fixed-header-microi {
     position: fixed;

@@ -186,6 +186,8 @@ if (!decoded || Number(decoded.Code) !== 1) {
 
 ### 接口引擎双向实时通道（SignalR）
 
+适用版本：后端 **8.6.1 及以上**；通过 MCP 配置时使用开发工具 **6.0.4 及以上**。
+
 需要浏览器持续发送命令并接收回执时，把接口引擎的 `ResponseType` 设置为 `SignalR`，
 连接 `/api-engine-socket?OsClient={租户}&ApiEngineKey={接口Key}`。这是通用传输入口，
 不为每个项目新增 Hub，也不把配对、房间、设备权限或业务状态写进 C# Hub。

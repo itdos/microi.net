@@ -1,5 +1,5 @@
 <template>
-  <main class="settings-page" :class="{ 'settings-page--password': passwordOnly }" :data-theme="themeMode">
+  <main class="settings-page" data-mci-ui-root="microi-platform-service" :data-mci-palette="context.themePalette" :data-mci-ui-density="context.uiDensity.scale" :data-mci-corner-style="context.themeTokens.cornerStyle" :data-disable-gradient="context.themeTokens.disableGradient" :data-disable-shadow="context.themeTokens.disableShadow" :style="presentationStyle" :class="{ 'settings-page--password': passwordOnly }" :data-theme="themeMode">
     <div v-if="loading" class="settings-skeleton" aria-label="正在加载个人设置">
       <div class="sk sk-hero"></div><div class="sk sk-nav"></div><div class="sk sk-panel"></div>
     </div>
@@ -11,13 +11,13 @@
           <img v-if="heroAvatarUrl && !heroAvatarFailed" :src="heroAvatarUrl" alt="" @error="heroAvatarFailed = true" />
           <span v-else>{{ initials }}</span>
         </div>
-        <div class="hero-copy">
+        <div class="personal-hero-copy">
           <p class="eyebrow">账户与安全</p>
           <h1>{{ user.Name || user.Account || '个人设置' }}</h1>
           <p>{{ user.Account }} · {{ user.DeptName || '未设置部门' }}</p>
         </div>
         <div class="security-score" :title="securitySummary">
-          <strong>{{ securityScore }}</strong><span>安全评分</span>
+          <strong>{{ sectionsLoaded.security ? securityScore : '—' }}</strong><span>安全评分</span>
         </div>
       </header>
 
@@ -33,7 +33,9 @@
         </nav>
 
         <section class="settings-panel">
-          <template v-if="activeTab === 'profile'">
+          <div v-if="sectionLoading" role="status" aria-live="polite">正在加载{{ tabs.find(item => item.id === activeTab)?.label }}…</div>
+          <div v-else-if="sectionError" role="alert"><p>{{ sectionError }}</p><button class="secondary" @click="selectTab(activeTab)">重新加载</button></div>
+          <template v-else-if="activeTab === 'profile'">
             <div class="panel-heading"><div><span>个人资料</span><h2>让协作伙伴更容易认出你</h2></div><span class="status-chip">DiyToken 身份</span></div>
             <div class="form-grid">
               <label><span>登录账号</span><input :value="user.Account" disabled /><small>账号由管理员维护</small></label>
@@ -235,7 +237,7 @@
 <script setup>
 import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
 import QRCode from 'qrcode'
-import { configureV8, dispatch, getContext } from './microi.js'
+import { configureV8, dispatch, getContext, subscribeContext } from './microi.js'
 import { getUserRoleNames } from './personal-settings-user.js'
 import { externalProviderGlyph } from './external-provider-presentation.js'
 import {
@@ -259,7 +261,9 @@ import {
 } from './identity-verification.js'
 
 const client = configureV8()
-const context = getContext()
+const context = reactive(getContext())
+const unsubscribeContext = subscribeContext(next => Object.assign(context, next), false)
+onBeforeUnmount(unsubscribeContext)
 // 同一页面复用密码和强因子流程；DialogData 仅决定展示模式，不决定用户、租户或授权。
 const passwordOnly = context.dialogData?.Action === 'ChangePassword'
 const tabs = [
@@ -294,6 +298,10 @@ const externalProviders = ref([])
 const externalBindings = ref([])
 const terminals = ref([])
 const availableMenus = ref([])
+const sectionsLoaded = reactive({})
+const sectionLoading = ref(false)
+const sectionError = ref('')
+const sectionRequests = new Map()
 const preference = reactive({
   DefaultIndexUrl: '',
   ThemeColor: '#409eff',
@@ -311,15 +319,27 @@ const notice = reactive({ type: 'info', text: '' })
 const confirmation = reactive({ visible: false, title: '', message: '', resolve: null })
 const requestedSection = String(context.route?.query?.section || '')
 const activeTab = ref(tabs.some((item) => item.id === requestedSection) ? requestedSection : 'profile')
-const themeMode = computed(() => preference.ThemeMode || context.themeMode || 'light')
-const themeColor = computed(() => preference.ThemeColor || context.themeColor || '#409eff')
+// 嵌入态外观由宿主统一控制；编辑偏好不会提前覆盖尚未保存的全局主题。
+const themeMode = computed(() => context.themeMode || preference.ThemeMode || 'light')
+const themeColor = computed(() => context.themeColor || preference.ThemeColor || '#409eff')
+const presentationStyle = computed(() => ({
+  ...(context.uiDensity?.variables || {}),
+  '--personal-primary': themeColor.value,
+  '--personal-on-primary': context.themeOnPrimary,
+  '--personal-primary-text': context.themePrimaryText,
+  '--personal-surface': context.themeTokens.surface || (themeMode.value === 'dark' ? '#171e2b' : '#ffffff'),
+  '--personal-soft': context.themeTokens.surfaceSoft || (themeMode.value === 'dark' ? '#0d121b' : '#f4f7fb'),
+  '--personal-text': context.themeTokens.textPrimary || (themeMode.value === 'dark' ? '#edf4ff' : '#182234'),
+  '--personal-muted': context.themeTokens.textSecondary || (themeMode.value === 'dark' ? '#aebace' : '#58677b'),
+  '--personal-border': context.themeTokens.border || (themeMode.value === 'dark' ? '#354052' : '#dce3ec'),
+}))
 const systemTitle = computed(() => context.systemTitle || context.systemShortTitle || context.osClient || '当前系统')
 const passkeyAvailable = computed(() => !!passkeySupported())
 const initials = computed(() => String(user.value.Name || user.value.Account || 'M').trim().slice(0, 2).toUpperCase())
 const heroAvatarUrl = computed(() => privateAvatarUrl.value || publicAvatarUrl.value)
 const roleNames = computed(() => getUserRoleNames(user.value))
 const securityScore = computed(() => Math.min(100, 50 + (capabilities.value.HasPasskey ? 20 : 0) + (capabilities.value.HasTotp ? 15 : 0) + (capabilities.value.HasFace ? 15 : 0)))
-const securitySummary = computed(() => `${capabilities.value.HasPasskey ? '已' : '未'}启用 Passkey，${capabilities.value.HasTotp ? '已' : '未'}启用 Authenticator，${capabilities.value.HasFace ? '已' : '未'}登记严格人脸`)
+const securitySummary = computed(() => sectionsLoaded.security ? `${capabilities.value.HasPasskey ? '已' : '未'}启用 Passkey，${capabilities.value.HasTotp ? '已' : '未'}启用 Authenticator，${capabilities.value.HasFace ? '已' : '未'}登记严格人脸` : '进入安全与登录后查看安全评分')
 const bindingByProvider = computed(() => Object.fromEntries(externalBindings.value.map((item) => [String(item.Provider || '').toLowerCase(), item])))
 
 function showNotice(text, type = 'success') {
@@ -328,8 +348,49 @@ function showNotice(text, type = 'success') {
   showNotice.timer = window.setTimeout(() => { notice.text = '' }, 5000)
 }
 
-function selectTab(tabId) {
+async function selectTab(tabId) {
   activeTab.value = tabId
+  sectionError.value = ''
+  sectionLoading.value = !sectionsLoaded[tabId] && tabId !== 'profile'
+  try { await loadSection(tabId) }
+  catch (error) {
+    // 未取得安全配置时显示可重试错误，不能把加载失败伪装成尚未配置认证器。
+    if (activeTab.value === tabId) sectionError.value = error?.Msg || error?.message || '加载失败，请重试。'
+  }
+  finally { if (activeTab.value === tabId) sectionLoading.value = false }
+}
+
+function loadSection(tabId) {
+  if (tabId === 'profile' || sectionsLoaded[tabId]) return Promise.resolve()
+  if (sectionRequests.has(tabId)) return sectionRequests.get(tabId)
+  const request = (async () => {
+    if (tabId === 'security') capabilities.value = await loadCapabilities(client, context.osClient)
+    if (tabId === 'authenticators') {
+      const [, keys, totp] = await Promise.all([loadSection('security'), listPasskeys(client), listTotpAuthenticators(client)])
+      authenticators.value = Array.isArray(keys) ? keys : []
+      totpAuthenticators.value = Array.isArray(totp) ? totp : []
+    }
+    if (tabId === 'external') {
+      const result = await listExternalBindings(client)
+      externalProviders.value = result?.Providers || []
+      externalBindings.value = result?.Bindings || []
+    }
+    if (tabId === 'preferences') {
+      const [terminalResult, menuResult] = await Promise.all([
+        client.post('/apiengine/platform-online-terminal', { Action: 'Mine' }),
+        client.post('/api/SysMenu/GetSysMenuStep', {})
+      ])
+      if (terminalResult?.Code !== 1 || menuResult?.Code !== 1) throw new Error(terminalResult?.Msg || menuResult?.Msg || '偏好信息加载失败。')
+      const terminalData = terminalResult?.Data
+      terminals.value = Array.isArray(terminalData) ? terminalData : (terminalData?.Terminals || [])
+      const menuData = menuResult?.Data
+      availableMenus.value = (Array.isArray(menuData) ? menuData : (menuData?.List || menuData?.Data || []))
+        .filter(item => item?.Id && Number(item.Display ?? 1) !== 0)
+    }
+    sectionsLoaded[tabId] = true
+  })().finally(() => sectionRequests.delete(tabId))
+  sectionRequests.set(tabId, request)
+  return request
 }
 
 function askConfirmation(title, message) {
@@ -356,7 +417,7 @@ async function refreshAvatarUrls() {
   try {
     privateAvatarUrl.value = await client.resolveFileUrl(user.value.Avatar)
   } catch (_) {
-    privateAvatarUrl.value = client.assetUrl(user.value.Avatar)
+    privateAvatarUrl.value = ''
   }
 }
 
@@ -507,15 +568,7 @@ async function uploadDesktopBackground(event) {
 async function load() {
   loading.value = true
   try {
-    const [userResult, capabilityResult, keyResult, totpResult, externalResult, terminalResult, menuResult] = await Promise.all([
-      client.post('/api/SysUser/RefreshLoginUser', {}).catch(() => client.post('/api/SysUser/GetCurrentUser', {})),
-      loadCapabilities(client, context.osClient),
-      listPasskeys(client).catch(() => []),
-      listTotpAuthenticators(client).catch(() => []),
-      listExternalBindings(client).catch(() => ({ Providers: [], Bindings: [] })),
-      client.post('/apiengine/platform-online-terminal', { Action: 'Mine' }).catch(() => ({ Data: { Terminals: [] } })),
-      client.post('/api/SysMenu/GetSysMenuStep', {}).catch(() => ({ Data: [] }))
-    ])
+    const userResult = await client.post('/apiengine/platform-current-user', { View: 'PersonalSettings' })
     if (userResult?.Code !== 1) throw new Error(userResult?.Msg || '当前用户加载失败。')
     user.value = userResult.Data || {}
     profile.Name = user.value.Name || ''
@@ -524,7 +577,8 @@ async function load() {
     profile.Lang = user.value.Lang || 'zh-CN'
     profile.Avatar = client.extractUploadPath(user.value.Avatar)
     profile.PublicAvatar = client.extractUploadPath(user.value.PublicAvatar)
-    await refreshAvatarUrls()
+    // 图片授权不阻挡资料首屏；失败保留文字头像，不猜测私有文件的公有地址。
+    void refreshAvatarUrls()
     preference.DefaultIndexUrl = user.value.DefaultIndexUrl || ''
     preference.ThemeColor = user.value.ThemeColor || context.themeColor || '#409eff'
     preference.CornerStyle = ['round', 'square'].includes(user.value.CornerStyle) ? user.value.CornerStyle : 'System'
@@ -542,19 +596,8 @@ async function load() {
     preference.RandomDesktopBg = asEnabled(user.value.RandomDesktopBg)
     preference.OpenTreeMenu = asEnabled(user.value.OpenTreeMenu)
     preference.DesktopDockMenu = parseMenuIds(user.value.DesktopDockMenu)
-    capabilities.value = capabilityResult || {}
-    authenticators.value = Array.isArray(keyResult) ? keyResult : []
-    totpAuthenticators.value = Array.isArray(totpResult) ? totpResult : []
-    externalProviders.value = Array.isArray(externalResult?.Providers) ? externalResult.Providers : []
-    externalBindings.value = Array.isArray(externalResult?.Bindings) ? externalResult.Bindings : []
-    const terminalData = terminalResult?.Data
-    terminals.value = Array.isArray(terminalData)
-      ? terminalData
-      : (Array.isArray(terminalData?.Terminals) ? terminalData.Terminals : [])
-    const menuData = menuResult?.Data
-    availableMenus.value = (Array.isArray(menuData) ? menuData : (menuData?.List || menuData?.Data || []))
-      .filter((item) => item?.Id && Number(item.Display ?? 1) !== 0)
-    if (passwordOnly || context.route?.query?.action === 'password') activeTab.value = 'security'
+    if (passwordOnly || context.route?.query?.action === 'password') void selectTab('security')
+    else if (activeTab.value !== 'profile') void selectTab(activeTab.value)
   } catch (error) {
     showNotice(error?.Msg || error?.message || '个人设置加载失败。', 'error')
   } finally { loading.value = false }
@@ -598,6 +641,7 @@ async function changePassword() {
   if (password.next !== password.confirm) return showNotice('两次输入的新密码不一致。', 'error')
   busy.value = 'password'
   try {
+    await loadSection('security')
     const encodedOld = utf8Base64(password.old)
     const encodedNew = utf8Base64(password.next)
     let ticket = ''
@@ -787,55 +831,4 @@ async function savePreference() {
 onMounted(load)
 </script>
 
-<style scoped>
-.settings-page--password { padding:12px;max-width:none; }
-.settings-page--password .settings-layout { display:block; }
-.settings-page--password .settings-panel { padding:0;border:0;background:transparent; }
-.settings-page--password .password-card { margin:0;padding:18px; }
-.settings-page--password .form-grid--password { grid-template-columns:1fr;gap:12px; }
-.settings-page{--accent:v-bind(themeColor);--bg:#f4f7fb;--panel:rgba(255,255,255,.88);--text:#182234;--muted:#6c7a90;--line:rgba(116,133,158,.2);min-height:100vh;padding:clamp(14px,2.4vw,30px);color:var(--text);background:radial-gradient(circle at 0 0,color-mix(in srgb,var(--accent) 15%,transparent),transparent 32%),var(--bg)}
-.settings-page[data-theme="dark"]{--bg:#0d121b;--panel:rgba(23,30,43,.9);--text:#edf4ff;--muted:#98a8bf;--line:rgba(168,185,209,.16)}
-.profile-hero{position:relative;display:flex;align-items:center;gap:18px;min-height:168px;padding:26px clamp(20px,3vw,38px);overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 34%,var(--line));border-radius:24px;color:#fff;background:linear-gradient(122deg,color-mix(in srgb,var(--accent) 78%,#081526),#15223a 72%);box-shadow:0 24px 60px color-mix(in srgb,var(--accent) 19%,transparent)}
-.hero-orb{position:absolute;border-radius:50%;filter:blur(3px);opacity:.5}.hero-orb--a{width:240px;height:240px;right:8%;top:-130px;background:#fff3}.hero-orb--b{width:150px;height:150px;right:-40px;bottom:-80px;background:#55e6ff55}
-.avatar{z-index:1;display:grid;flex:0 0 86px;width:86px;height:86px;place-items:center;border:1px solid #fff7;border-radius:26px;background:#fff2;box-shadow:inset 0 1px #fff8,0 16px 30px #06102455;font-size:27px;font-weight:850;letter-spacing:1px;backdrop-filter:blur(16px)}
-.hero-copy{z-index:1;min-width:0;flex:1}.eyebrow{margin:0 0 8px!important;font-size:11px!important;font-weight:800;letter-spacing:2px;opacity:.76}.hero-copy h1{margin:0;font-size:clamp(25px,3vw,38px);line-height:1.12}.hero-copy p{margin:8px 0 0;font-size:14px;opacity:.8}.security-score{z-index:1;display:grid;width:96px;height:96px;place-items:center;align-content:center;border:1px solid #fff6;border-radius:50%;background:#07122338;box-shadow:inset 0 0 0 7px #fff1;backdrop-filter:blur(12px)}.security-score strong{font-size:27px}.security-score span{font-size:11px;opacity:.8}
-.notice{display:flex;gap:10px;align-items:center;margin:14px 0;padding:12px 15px;border-radius:12px;color:#20633f;background:#eaf9f1}.notice>span{display:grid;width:22px;height:22px;place-items:center;border-radius:50%;color:#fff;background:#2bb673}.notice--error{color:#8b2e35;background:#fff0f1}.notice--error>span{background:#e2535d}
-.settings-layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;margin-top:18px}.settings-nav,.settings-panel{border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:0 12px 38px rgba(24,34,52,.07);backdrop-filter:blur(16px)}
-.settings-nav{align-self:start;padding:10px}.settings-nav button{width:100%;display:flex;gap:12px;align-items:center;padding:13px;border:0;border-radius:14px;color:var(--muted);background:transparent;text-align:left;cursor:pointer;transition:.18s}.settings-nav button:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}.settings-nav button.active{color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent);box-shadow:inset 3px 0 var(--accent)}.nav-icon{display:grid;flex:0 0 36px;width:36px;height:36px;place-items:center;border-radius:11px;background:color-mix(in srgb,var(--accent) 10%,var(--panel));font-size:19px}.settings-nav b,.settings-nav small{display:block}.settings-nav b{color:inherit;font-size:14px}.settings-nav small{margin-top:3px;font-size:11px;color:var(--muted)}
-.settings-panel{min-height:530px;padding:clamp(18px,2.8vw,34px)}.panel-heading,.subheading{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}.panel-heading{padding-bottom:22px;border-bottom:1px solid var(--line)}.panel-heading span:first-child{color:var(--accent);font-size:11px;font-weight:800;letter-spacing:1px}.panel-heading h2{margin:5px 0 0;font-size:clamp(19px,2vw,25px)}.status-chip,.device-state{padding:6px 9px;border-radius:999px;color:var(--muted);background:color-mix(in srgb,var(--muted) 10%,transparent);font-size:11px;white-space:nowrap}.status-chip--secure,.device-state.synced{color:#138459;background:#e6f8f0}
-.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:26px}.form-grid label,.wide-field{display:block}.form-grid label>span,.wide-field>span{display:block;margin-bottom:8px;font-size:12px;font-weight:750}.form-grid input,.wide-field input{width:100%;height:45px;padding:0 13px;border:1px solid var(--line);border-radius:11px;outline:none;color:var(--text);background:color-mix(in srgb,var(--panel) 88%,var(--bg));transition:.18s}.form-grid input:focus,.wide-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}.form-grid input:disabled{color:var(--muted);background:color-mix(in srgb,var(--muted) 7%,var(--panel))}.form-grid small,.wide-field small{display:block;margin-top:6px;color:var(--muted);font-size:11px}.panel-actions{display:flex;justify-content:flex-end;margin-top:24px}.panel-actions--left{justify-content:flex-start}.btn{min-height:41px;padding:0 16px;border-radius:11px;font-weight:750;cursor:pointer}.btn:disabled{opacity:.55;cursor:wait}.btn--primary{border:1px solid var(--accent);color:#fff;background:var(--accent);box-shadow:0 9px 20px color-mix(in srgb,var(--accent) 24%,transparent)}.btn--ghost{border:1px solid var(--line);color:var(--text);background:var(--panel)}
-.security-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-top:24px}.security-card{position:relative;display:grid;grid-template-columns:45px 1fr;gap:12px;padding:17px;border:1px solid var(--line);border-radius:16px;background:color-mix(in srgb,var(--panel) 84%,var(--bg))}.security-card.enabled{border-color:color-mix(in srgb,#2bb673 40%,var(--line))}.security-card__icon{display:grid;width:44px;height:44px;place-items:center;border-radius:13px;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);font-size:24px}.security-card b,.security-card p{display:block;margin:0}.security-card b{font-size:13px}.security-card p{margin-top:6px;color:var(--muted);font-size:11px;line-height:1.55}.security-card>span{position:absolute;right:12px;top:12px;color:var(--muted);font-size:10px}.password-card,.face-enroll{margin-top:18px;padding:19px;border:1px solid var(--line);border-radius:16px;background:color-mix(in srgb,var(--panel) 88%,var(--bg))}.subheading b,.subheading p{display:block;margin:0}.subheading b{font-size:14px}.subheading p{margin-top:5px;color:var(--muted);font-size:11px}.subheading>span{color:var(--accent);font-size:10px;font-weight:750}.form-grid--password{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:18px}
-.empty-state{display:grid;min-height:260px;place-items:center;align-content:center;margin-top:20px;border:1px dashed var(--line);border-radius:16px;color:var(--muted);text-align:center}.empty-state b{color:var(--text)}.empty-state p{max-width:430px;margin:7px 20px;font-size:12px;line-height:1.6}.empty-state.compact{min-height:130px}.device-list{display:grid;gap:10px;margin-top:20px}.device-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--panel) 90%,var(--bg))}.device-icon{display:grid;width:42px;height:42px;place-items:center;border-radius:13px;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);font-size:20px}.device-row b,.device-row p{display:block;margin:0}.device-row b{font-size:13px}.device-row p{margin-top:5px;color:var(--muted);font-size:11px}.device-state.local{color:#896418;background:#fff6d9}.icon-btn{padding:7px 9px;border:0;border-radius:9px;background:transparent;cursor:pointer}.icon-btn.danger{color:#d14d57}.icon-btn:hover{background:color-mix(in srgb,currentColor 9%,transparent)}.face-enroll{display:flex;align-items:center;justify-content:space-between;gap:16px}.face-enroll b,.face-enroll p{display:block;margin:0}.face-enroll p{margin-top:5px;color:var(--muted);font-size:11px}.wide-field{margin-top:25px}.terminal-title{margin-top:32px;padding-top:23px;border-top:1px solid var(--line)}
-.form-grid select,.wide-field select{box-sizing:border-box;width:100%;height:45px;padding:0 13px;border:1px solid var(--line);border-radius:11px;outline:none;color:var(--text);background:color-mix(in srgb,var(--panel) 88%,var(--bg));transition:.18s}.form-grid select:focus,.wide-field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}.form-grid select:disabled{color:var(--muted);background:color-mix(in srgb,var(--muted) 7%,var(--panel))}.form-grid select[multiple]{height:116px;padding-block:7px}.preference-section{margin-top:20px;padding:19px;border:1px solid var(--line);border-radius:17px;background:color-mix(in srgb,var(--panel) 88%,var(--bg))}.preference-section .form-grid{margin-top:16px}.preference-section .wide-field{margin-top:16px}.color-field{display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;align-items:center}.color-field input[type=color]{box-sizing:border-box;width:54px;padding:4px}.color-field code{overflow:hidden;color:var(--muted);font-size:11px;text-overflow:ellipsis}.file-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.file-field .btn{min-height:45px;white-space:nowrap}.toggle-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.toggle-grid>label{display:flex;align-items:flex-start;gap:9px;padding:13px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}.toggle-grid input{margin-top:3px;accent-color:var(--accent)}.toggle-grid b,.toggle-grid small{display:block}.toggle-grid b{font-size:12px}.toggle-grid small{margin-top:4px;color:var(--muted);font-size:10px}
-.authenticator-section{margin-top:24px;padding-top:23px;border-top:1px solid var(--line)}.policy-switches{display:grid;gap:5px;color:var(--muted);font-size:10px}.policy-switches label{display:flex;align-items:center;gap:5px;white-space:nowrap}.policy-switches input{accent-color:var(--accent)}.policy-switches--wide{grid-template-columns:repeat(2,minmax(0,1fr));font-size:11px}.totp-enrollment{display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px;align-items:center;margin-top:18px;padding:20px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--panel) 86%,var(--bg))}.totp-enrollment>img{width:220px;max-width:100%;border:8px solid #fff;border-radius:16px;box-shadow:0 13px 32px #10192a1c}.totp-enrollment__form{display:grid;gap:12px}.totp-enrollment__form>label>span{display:block;margin-bottom:6px;color:var(--muted);font-size:11px}.totp-enrollment__form input{width:100%;height:40px;padding:0 11px;border:1px solid var(--line);border-radius:10px;color:var(--text);background:var(--panel)}.totp-enrollment__form code{display:block;padding:9px 11px;overflow-wrap:anywhere;border-radius:9px;color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent);font-size:11px;line-height:1.5}.inline-actions{display:flex;gap:9px}.external-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-top:24px}.external-card{display:grid;grid-template-columns:50px minmax(0,1fr);grid-template-rows:auto 1fr auto;gap:10px 12px;min-height:205px;padding:18px;border:1px solid var(--line);border-radius:20px;background:radial-gradient(circle at 100% 0,color-mix(in srgb,var(--accent) 12%,transparent),transparent 46%),color-mix(in srgb,var(--panel) 89%,var(--bg));transition:.18s}.external-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 42%,var(--line));box-shadow:0 14px 34px color-mix(in srgb,var(--accent) 12%,transparent)}.external-card.connected{border-color:color-mix(in srgb,#2bb673 48%,var(--line))}.external-card__icon{display:grid;width:50px;height:50px;grid-row:1/3;place-items:center;border-radius:16px;color:#fff;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 75%,#fff),var(--accent));font-size:15px;font-weight:850}.external-card b,.external-card p{display:block;margin:0}.external-card b{font-size:14px}.external-card p{margin-top:5px;color:var(--muted);font-size:11px;line-height:1.55}.external-card small{grid-column:1/3;color:var(--muted);font-size:10px}.external-card>.btn{grid-column:1/3}.danger-text{color:#d14d57}
-.profile-hero{background-image:linear-gradient(98deg,rgba(2,12,31,.93) 0%,rgba(3,22,49,.72) 48%,rgba(2,16,39,.38) 100%),url('./assets/identity-tech-banner.jpg');background-size:cover;background-position:center;isolation:isolate}
-.profile-hero::after{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(110deg,color-mix(in srgb,var(--accent) 20%,transparent),transparent 52%);pointer-events:none}
-.hero-grid{position:absolute;inset:0;z-index:0;opacity:.18;background-image:linear-gradient(rgba(255,255,255,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.13) 1px,transparent 1px);background-size:34px 34px;mask-image:linear-gradient(90deg,#000,transparent 72%)}
-.avatar{overflow:hidden}.avatar img{width:100%;height:100%;display:block;object-fit:cover}.avatar span{display:grid;width:100%;height:100%;place-items:center}
-.avatar--hero{border-radius:28px;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 72%,#fff),#182d57)}
-.avatar-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:24px}
-.avatar-setting-card{position:relative;display:grid;grid-template-columns:68px minmax(0,1fr);gap:14px;align-items:center;min-height:132px;padding:17px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--panel) 88%,var(--bg))}
-.avatar-setting-card--public{border-color:color-mix(in srgb,var(--accent) 34%,var(--line));background:radial-gradient(circle at 100% 0,color-mix(in srgb,var(--accent) 14%,transparent),transparent 48%),color-mix(in srgb,var(--panel) 88%,var(--bg))}
-.avatar--setting{width:68px;height:68px;flex-basis:68px;border-radius:19px;color:#fff;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 75%,#fff),var(--accent));font-size:20px}
-.avatar-setting-card b,.avatar-setting-card p{display:block;margin:0}.avatar-setting-card b{font-size:13px}.avatar-setting-card p{margin-top:6px;color:var(--muted);font-size:10px;line-height:1.55}
-.privacy-badge{position:absolute;right:12px;top:11px;padding:4px 7px;border-radius:999px;color:var(--muted);background:color-mix(in srgb,var(--muted) 10%,transparent);font-size:9px}
-.avatar-upload-actions{grid-column:2;display:flex;align-items:center;gap:10px}.avatar-upload-actions .btn{min-height:34px;padding-inline:11px;font-size:10px}.text-button{padding:6px;border:0;background:transparent;font-size:10px;cursor:pointer}
-.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
-.totp-enrollment{grid-template-columns:minmax(260px,320px) minmax(0,1fr);align-items:start}
-.totp-enrollment__visual{display:grid;gap:12px}
-.authenticator-preview{overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));border-radius:18px;background:color-mix(in srgb,var(--panel) 92%,var(--bg));box-shadow:0 16px 34px rgba(12,25,48,.13)}
-.authenticator-preview__banner{height:92px;background-image:linear-gradient(90deg,rgba(2,16,40,.22),transparent),url('./assets/identity-tech-banner.jpg');background-size:cover;background-position:center}
-.authenticator-preview__identity{display:grid;grid-template-columns:54px minmax(0,1fr);gap:12px;align-items:center;padding:0 16px;transform:translateY(-18px);margin-bottom:-11px}
-.avatar--authenticator{width:54px;height:54px;flex-basis:54px;border:4px solid color-mix(in srgb,var(--panel) 94%,#fff);border-radius:16px;color:#fff;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 76%,#fff),var(--accent));font-size:16px;box-shadow:0 9px 22px rgba(8,20,42,.22)}
-.authenticator-preview__identity b,.authenticator-preview__identity p{display:block;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.authenticator-preview__identity b{font-size:13px}.authenticator-preview__identity p{margin-top:4px;color:var(--muted);font-size:10px}.authenticator-preview>span{display:block;padding:0 16px 13px;color:var(--muted);font-size:9px;letter-spacing:1px;text-transform:uppercase}
-.totp-qr{width:210px;max-width:100%;justify-self:center;border:8px solid #fff;border-radius:16px;box-shadow:0 13px 32px #10192a1c}
-.totp-format-note{margin:0;padding:10px 12px;border-radius:10px;color:var(--muted);background:color-mix(in srgb,var(--accent) 7%,transparent);font-size:10px;line-height:1.55}
-.btn--danger{border:1px solid #d14d57;color:#fff;background:#d14d57}.confirm-backdrop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(4,12,27,.62);backdrop-filter:blur(12px)}
-.confirm-dialog{width:min(440px,100%);display:grid;grid-template-columns:48px minmax(0,1fr);gap:16px;padding:22px;border:1px solid color-mix(in srgb,#d14d57 35%,var(--line));border-radius:22px;color:var(--text);background:var(--panel);box-shadow:0 30px 80px rgba(2,10,24,.35)}
-.confirm-dialog__icon{display:grid;width:48px;height:48px;place-items:center;border-radius:15px;color:#fff;background:#d14d57;font-size:22px;font-weight:850}.confirm-dialog small{color:#d14d57;font-size:9px;font-weight:850;letter-spacing:1.5px}.confirm-dialog h2{margin:5px 0 0;font-size:19px}.confirm-dialog p{margin:9px 0 0;color:var(--muted);font-size:12px;line-height:1.65}.confirm-dialog footer{grid-column:1/3;display:flex;justify-content:flex-end;gap:9px;margin-top:4px}
-.settings-skeleton{display:grid;gap:18px}.sk{border-radius:20px;background:linear-gradient(90deg,#e8edf4,#f6f8fb,#e8edf4);background-size:240% 100%;animation:shimmer 1.25s infinite}.sk-hero{height:168px}.sk-nav{width:260px;height:360px}.sk-panel{height:360px;margin-top:-378px;margin-left:278px}@keyframes shimmer{to{background-position:-240% 0}}
-@media(max-width:1000px){.external-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:860px){.settings-layout{grid-template-columns:1fr}.settings-nav{display:grid;grid-template-columns:repeat(5,1fr);position:sticky;top:0;z-index:3}.settings-nav button{justify-content:center;padding:10px}.settings-nav button>span:last-child{display:none}.form-grid--password{grid-template-columns:1fr}.security-grid{grid-template-columns:1fr}.sk-nav{width:100%;height:70px}.sk-panel{height:360px;margin:0}.security-score{width:78px;height:78px}.totp-enrollment{grid-template-columns:1fr}.avatar-settings{grid-template-columns:1fr}}
-@media(max-width:560px){.settings-page{padding:10px}.profile-hero{min-height:145px;padding:18px}.avatar--hero{flex-basis:64px;width:64px;height:64px;border-radius:19px}.security-score{display:none}.settings-nav{grid-template-columns:repeat(5,1fr)}.nav-icon{width:34px;height:34px}.settings-panel{padding:17px}.form-grid{grid-template-columns:1fr}.device-row{grid-template-columns:42px 1fr auto}.device-row .policy-switches{grid-column:2/4}.face-enroll{align-items:flex-start;flex-direction:column}.panel-heading{align-items:flex-start;flex-direction:column}.panel-heading>.btn{width:100%}.policy-switches--wide,.toggle-grid{grid-template-columns:1fr}.external-grid{grid-template-columns:1fr}.avatar-setting-card{grid-template-columns:58px minmax(0,1fr);padding:14px}.avatar--setting{width:58px;height:58px;flex-basis:58px}.avatar-upload-actions{grid-column:1/3;justify-content:flex-end}.authenticator-preview__banner{height:82px}.inline-actions{flex-wrap:wrap}.inline-actions .btn{flex:1}.file-field{grid-template-columns:1fr}.confirm-dialog{grid-template-columns:42px minmax(0,1fr);padding:18px}.confirm-dialog__icon{width:42px;height:42px}}
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-</style>
+<style scoped src="./personal-settings.css"></style>

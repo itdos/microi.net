@@ -1,9 +1,9 @@
 <template>
-        <section class="ui-density-panel" aria-label="界面密度设置">
+        <section class="ui-density-panel" :aria-label="$t('Msg.FrameworkAppearance.densitySettings')">
             <header>
                 <div>
-                    <strong>界面密度</strong>
-                    <p>字体、控件高度与间距同步调整</p>
+                    <strong>{{ $t('Msg.FrameworkAppearance.density') }}</strong>
+                    <p>{{ $t('Msg.FrameworkAppearance.densityHint') }}</p>
                 </div>
                 <span>{{ snapshot.scale }}%</span>
             </header>
@@ -19,9 +19,9 @@
             />
 
             <div class="ui-density-preview">
-                <span class="preview-kicker">{{ snapshot.name }}</span>
-                <strong>平台界面预览</strong>
-                <p>清晰易读，布局保持协调。</p>
+                <span class="preview-kicker">{{ $t('Msg.FrameworkAppearance.' + densityNames[snapshot.scale]) }}</span>
+                <strong>{{ $t('Msg.FrameworkAppearance.densityPreview') }}</strong>
+                <p>{{ $t('Msg.FrameworkAppearance.densityPreviewHint') }}</p>
             </div>
 
             <div class="ui-density-actions">
@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import {
     UI_DENSITY_MAX,
     UI_DENSITY_MIN,
@@ -49,14 +49,18 @@ import {
     subscribeUiDensity,
 } from "@/utils/ui-density.js";
 
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
+const densityNames = {90:'compact',95:'nearCompact',100:'standard',105:'comfortable',110:'largeText'};
 const snapshot = ref(getUiDensitySnapshot());
+const emit = defineEmits(['change']);
 const selectedScale = ref(snapshot.value.scale);
-const presets = [
-    { value: 90, label: "紧凑" },
-    { value: 100, label: "标准" },
-    { value: 110, label: "大字" },
-];
-const marks = { 90: "小", 100: "标准", 110: "大" };
+const presets = computed(() => [
+    { value: 90, label: t('Msg.FrameworkAppearance.compact') },
+    { value: 100, label: t('Msg.FrameworkAppearance.standard') },
+    { value: 110, label: t('Msg.FrameworkAppearance.largeText') },
+]);
+const marks = computed(() => ({ 90: t('Msg.FrameworkAppearance.small'), 100: t('Msg.FrameworkAppearance.standard'), 110: t('Msg.FrameworkAppearance.large') }));
 
 const unsubscribe = subscribeUiDensity((next) => {
     snapshot.value = next;
@@ -66,6 +70,7 @@ const unsubscribe = subscribeUiDensity((next) => {
 function changeScale(value) {
     snapshot.value = setUiDensityScale(value);
     selectedScale.value = snapshot.value.scale;
+    emit('change', snapshot.value.scale);
 }
 
 onBeforeUnmount(unsubscribe);

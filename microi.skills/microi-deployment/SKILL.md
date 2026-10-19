@@ -20,6 +20,12 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 - 文件/对象存储：`../v8-file-upload/SKILL.md`
 - 数据库模型：`../microi-db-schema/SKILL.md`
 
+## 发布测试范围
+
+常规发布按用户指定 MCP 的实际 MySQL、MongoDB 版本、Redis 和生效 MinIO 或 OSS/HDFS 选择测试矩阵；SQL Server 真实服务与兼容专项仅在用户明确指定解决 SQL Server 问题时执行，不作为每轮发布的默认前置条件，也无需反复申请免测。本文中的“Full/重新 Full”均指当前选定矩阵，已选必测项仍须全部通过。
+
+选择、旧脚本冲突处理及结果记录统一读取 [发布测试矩阵](../microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md#按指定-mcp-选择发布测试矩阵) 和 `../workspace-conventions/SKILL.md`；实际目标未使用的提供商不能被虚构为已验证。
+
 ## 先确认部署类型
 
 ### 吾码服务器运维面板 Microi.Panel
@@ -78,7 +84,7 @@ System.Drawing.Common 的 .NET 10 支持库引用 System.Formats.Nrbf，Dos.Comm
 | Windows 传统环境 | IIS + .NET Hosting Bundle + 独立依赖 |
 | 开发/调试 | 复用健康服务，或启动后端源码/隔离目录中的编译产物 + 前端 Vite；优先共用已授权开发/测试依赖 |
 
-本地测试遵循 `../workspace-conventions/SKILL.md` 的“本地测试程序与依赖生命周期”：不能按 AI 任务或双节点测试默认新建整套 Docker/Compose；每轮结束均收回自建进程和获准创建的临时容器，既有共享服务保持原状态。
+本地测试遵循 `../workspace-conventions/SKILL.md` 的“本地测试程序与依赖生命周期”：默认复用当前 MCP 对应的 MySQL、Redis、MongoDB、MinIO/OSS；不能按 AI 任务、Full 或双节点测试新建整套 Docker/Compose，也不把临时容器许可作为常规确认问题。确实无法复用时才记录证据并采用最小替代方案。每轮结束精确删除本次自建临时容器和纯测试资源，回读清理结果，既有共享服务保持原状态。
 
 本地 `Microi.Client` 默认读取 `src/config.json` 的 `ApiBaseDev`，也允许在 `#` 前通过 URL 参数
 临时指定运行目标：

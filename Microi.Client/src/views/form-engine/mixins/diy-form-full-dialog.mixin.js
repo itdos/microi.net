@@ -5,9 +5,15 @@ import { normalizeFormOpenMode } from '../form-open-mode.js';
 
 export default {
     methods: {
+        GetFormRelatedIdentity() {
+            return JSON.stringify([this.DiyCommon?.GetApiBase?.(), this.DiyCommon?.GetOsClient?.(), this.TableId, this.TableName, this.TableRowId,
+                this.SysMenuId || this.SysMenuModel?.Id, this.TableChildAuth || null,
+                this.FormRelatedGeneration || 0, this._sysMenuCloseGeneration || 0]);
+        },
         // ========== 打开详情（核心方法，以diy-table.vue为准） ==========
         OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
+            self.ResetFormRelatedData?.();
             formMode = normalizeFormOpenMode(formMode, tableRowModel?.Id);
             formTrace("diy-form-full:open-detail", {
                 tableId: self.TableId,
@@ -25,6 +31,7 @@ export default {
             self.FormRelatedCounts = { DataLog: 0, DataComment: 0, DataVersion: 0 };
 
             self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
+            self._sysMenuOpeningRowId = undefined;
             if (self.FormMode == "Add" || self.FormMode == "Insert") {
                 // 2026-04-17 Fix：如果父组件（diy-table）已经调用 NewGuid 并传入了 Id，则复用，避免重复请求
                 if (!self.DiyCommon.IsNull(self.TableRowId)) {
@@ -46,7 +53,6 @@ export default {
             } else {
                 self.$nextTick(async function () {
                     await self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
-                    self.LoadFormRelatedCounts();
                 });
 
                 // 日志、评论、版本由 FormRightPanel 在对应 Tab 首次可见时按需加载。
@@ -81,12 +87,15 @@ export default {
 
             // token 机制：防止旧请求覆盖新结果
             var token = ++self._DataLogLoadToken;
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
+            var current = () => !self._isDestroyed && token === self._DataLogLoadToken
+                && identity === (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]));
             self.DataLogListLoading = true;
             self.GetFormRelatedData(
                 "DataLog",
                 async function (result) {
                     // 旧请求被新请求覆盖，丢弃
-                    if (token !== self._DataLogLoadToken) return;
+                    if (!current()) return;
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
                             await Promise.all(result.Data.map(async (item) => {
@@ -105,6 +114,7 @@ export default {
                                         || self.DiyCommon.GetServerPath("./static/img/icon/personal.png")
                                     : self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
                             }));
+                            if (!current()) return;
                             self.DataLogList = result.Data;
                             self.FormRelatedCounts.DataLog = Number(result.DataCount ?? result.Data.length) || 0;
                         } else {
@@ -112,37 +122,67 @@ export default {
                             self.FormRelatedCounts.DataLog = 0;
                         }
                     } finally {
-                        self.DataLogListLoading = false;
+                        if (current()) self.DataLogListLoading = false;
                     }
                 }
             );
         },
         GetFormRelatedData(relatedType, callback, extra = {}) {
             var self = this;
+            var identity = self.GetFormRelatedIdentity();
             var parentFormEngineKey = (self.CurrentDiyTableModel && (self.CurrentDiyTableModel.Id || self.CurrentDiyTableModel.Name))
                 || self.TableId
                 || self.TableName;
-            self.DiyCommon.Post(
-                "/api/FormEngine/GetFormRelatedData",
-                {
-                    ...extra,
-                    RelatedType: relatedType,
-                    ParentFormEngineKey: parentFormEngineKey,
-                    ParentTableRowId: self.TableRowId,
-                    _SysMenuId: self.SysMenuId || (self.SysMenuModel && self.SysMenuModel.Id) || ""
-                },
-                callback
-            );
+            var param = {
+                ...extra,
+                RelatedType: relatedType,
+                ParentFormEngineKey: parentFormEngineKey,
+                ParentTableRowId: self.TableRowId,
+                _SysMenuId: self.SysMenuId || (self.SysMenuModel && self.SysMenuModel.Id) || "",
+                _TableChildAuth: self.TableChildAuth || undefined
+            };
+            // 只合并同一完整授权上下文中的在途读取，不缓存失败或历史正文，完成后仍可主动重读。
+            var key = JSON.stringify([identity, param]);
+            var pending = self._formRelatedRequests || (self._formRelatedRequests = new Map());
+            var request = pending.get(key);
+            if (request) {
+                request.callbacks.push(callback);
+                return;
+            }
+            request = { callbacks: [callback] };
+            pending.set(key, request);
+            var finish = function (result) {
+                if (pending.get(key) !== request) return;
+                pending.delete(key);
+                // 异步详情 Promise 也必须结束；仅交付无正文的失效信号，各调用方再核归属。
+                var response = !self._isDestroyed && identity === self.GetFormRelatedIdentity()
+                    ? result : { Code: 0, _StaleFormRelatedData: true };
+                request.callbacks.forEach(function (handler) {
+                    // 每个等待者都必须结束；某个组件回调异常不能卡住同一读取的其它等待者。
+                    try { handler(response); } catch (error) { console.error("关联数据回调处理失败", error); }
+                });
+            };
+            try {
+                self.DiyCommon.Post("/api/FormEngine/GetFormRelatedData", param, finish, function () {
+                    finish({ Code: 0, Msg: "关联数据读取失败，请稍后重试。" });
+                });
+            } catch (error) {
+                finish({ Code: 0, Msg: "关联数据读取失败，请稍后重试。" });
+            }
         },
         LoadFormRelatedCounts() {
             var self = this;
             if (self.DiyCommon.IsNull(self.TableRowId)
                 || self.FormMode == "Add"
-                || self.FormMode == "Insert") {
+                || self.FormMode == "Insert"
+                || (self.CurrentDiyTableModel && !["EnableDataLog", "EnableDataComment", "EnableDataVersion"]
+                    .some(name => [true, 1, "1", "true"].includes(self.CurrentDiyTableModel[name])))) {
                 self.FormRelatedCounts = { DataLog: 0, DataComment: 0, DataVersion: 0 };
                 return;
             }
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
             self.GetFormRelatedData("Counts", function (result) {
+                if (self._isDestroyed || identity !== (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]))) return;
                 if (!result || result.Code != 1 || !result.Data) return;
                 self.FormRelatedCounts = {
                     DataLog: Number(result.Data.DataLog) || 0,
@@ -178,15 +218,20 @@ export default {
             }
 
             var token = ++self._DataVersionLoadToken;
+            var identity = self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]);
+            var current = () => !self._isDestroyed && token === self._DataVersionLoadToken
+                && identity === (self.GetFormRelatedIdentity?.() ?? JSON.stringify([self.TableId, self.TableRowId, self.SysMenuId]));
             self.DataVersionListLoading = true;
             self.GetFormRelatedData(
                 "DataVersion",
                 function (result) {
-                    if (token !== self._DataVersionLoadToken) return;
+                    if (!current()) return;
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
                             result.Data.forEach(function (item) {
                                 item.HistoryContentMode = result.DataAppend?.HistoryContentMode;
+                                item.HistoryContentKind = result.DataAppend?.HistoryContentKind;
+                                item.__RelatedRecordIdentity = identity;
                                 if (item.HistoryContentMode === "MetadataOnly") delete item.Data;
                             });
                             self.DataVersionList = result.Data;
@@ -196,7 +241,7 @@ export default {
                             self.FormRelatedCounts.DataVersion = 0;
                         }
                     } finally {
-                        self.DataVersionListLoading = false;
+                        if (current()) self.DataVersionListLoading = false;
                     }
                 }
             );
@@ -216,6 +261,9 @@ export default {
             var self = this;
             self._clearFieldFormInitTimer();
             self._fieldFormOpenToken = (self._fieldFormOpenToken || 0) + 1;
+            // 关闭后在途菜单/关联读取只能结束等待者，不得写回已关闭或重新打开的表单。
+            self._sysMenuCloseGeneration = (self._sysMenuCloseGeneration || 0) + 1;
+            self._sysMenuOpeningRowId = undefined;
             self._pendingDrawerContext = null;
             self.BtnLoading = false;
         },
@@ -686,6 +734,8 @@ export default {
          */
         reinitPageForm() {
             var self = this;
+            self._formFullInitRequestToken = (self._formFullInitRequestToken || 0) + 1;
+            var initRequestToken = self._formFullInitRequestToken;
             // 清空 TableRowId，通过 v-if="TableId && TableRowId" 销毁 DiyForm 组件树
             self.TableRowId = '';
             self.CurrentDraftId = "";
@@ -698,11 +748,16 @@ export default {
                 self.FormMode = self.$route.query.FormMode;
                 self.SysMenuId = self.$route.query.SysMenuId || self.$route.query.Id || (self.$route.meta ? (self.$route.meta.Id || self.$route.meta.SysMenuId) : "");
                 self.FieldFormDefaultValues = self.ParseRouteDefaultValues(self.$route);
+                self._sysMenuOpeningRowId = self.$route.params.TableRowId || "";
+                var menuIdentity = self.GetSysMenuModelIdentity();
                 await self.EnsureSysMenuModel();
+                if (self._isDestroyed || initRequestToken !== self._formFullInitRequestToken
+                    || menuIdentity !== self.GetSysMenuModelIdentity()) return;
 
                 var newTableRowId = self.$route.params.TableRowId;
                 if (newTableRowId) {
                     self.TableRowId = newTableRowId;
+                    self._sysMenuOpeningRowId = undefined;
                 } else if (self.FormMode === 'Add' || self.FormMode === 'Insert') {
                     self.DiyCommon.PostAsync("/api/FormEngine/NewGuid").then(guidResult => {
                         if (guidResult.Code == 1) {

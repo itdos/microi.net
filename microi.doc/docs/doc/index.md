@@ -21,6 +21,8 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 </div>
 
+<div class="mci-doc-resource-links">
+
 | 资源 | 地址 |
 |---|---|
 | 🖥️ 在线 Demo | [https://demo.microi.net/](https://demo.microi.net/)（帐号 admin，密码 123456） |
@@ -28,6 +30,8 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 | 📚 培训大纲 | [https://microi.net/doc/about/microi-training-syllabus.html](https://microi.net/doc/about/microi-training-syllabus.html "查看培训大纲") |
 | 📦 Gitee | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
 | 📦 GitHub | [https://github.com/itdos/microi.net](https://github.com/itdos/microi.net) |
+
+</div>
 
 ---
 

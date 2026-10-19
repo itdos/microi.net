@@ -1,8 +1,37 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import http from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer } from './server.js';
+import { MicroiClient } from './microi-client.js';
+test('MicroService module dry run uses the selected tenant and preserves explicit legacy URLs', async () => {
+    const server = createMcpServer({}, {
+        osClient: 'loctek', apiBaseUrl: 'https://api.example.test', label: 'tenant route test',
+    });
+    const client = new Client({ name: 'microservice-route-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+        for (const explicitUrl of [undefined, '/micro-app/microi-3d-engine/designer']) {
+            const result = await client.callTool({ name: 'microi_create_module', arguments: {
+                    name: '3D engine', openType: 'MicroService', microServiceId: 'service-1',
+                    microServicePageId: 'page-1', microServiceKey: 'microi-3d-engine',
+                    microServiceRoutePath: '/designer', ...(explicitUrl ? { url: explicitUrl } : {}),
+                } });
+            assert.notEqual(result.isError, true, JSON.stringify(result.content));
+            const text = result.content.find(item => item.type === 'text');
+            assert.ok(text && text.type === 'text');
+            const preview = JSON.parse(text.text);
+            assert.equal(preview.dryRun, true);
+            assert.equal(preview.module.Url, explicitUrl || '/micro-app/loctek/microi-3d-engine/designer');
+        }
+    }
+    finally {
+        await client.close();
+        await server.close();
+    }
+});
 test('MicroService module dry run uses the selected tenant and preserves explicit legacy URLs', async () => {
     const server = createMcpServer({}, {
         osClient: 'loctek', apiBaseUrl: 'https://api.example.test', label: 'tenant route test',
@@ -41,6 +70,11 @@ test('普通 MCP 宿主初始化也收到跨模型的版本与自动更新基础
         assert.match(client.getInstructions() || '', /任何 AI 模型强制读取/);
         assert.match(client.getInstructions() || '', /Microi吾码开发工具版本/);
         assert.match(client.getInstructions() || '', /microi update --background/);
+        assert.match(client.getInstructions() || '', /microi-system-delivery\/SKILL\.md/);
+        assert.match(client.getInstructions() || '', /microi-system-delivery\/references\/progressive-01-标准工作流\.md/);
+        assert.match(client.getInstructions() || '', /原 1–8.*后续增补/);
+        assert.match(client.getInstructions() || '', /已读取的文件路径.*交付清单/s);
+        assert.match(client.getInstructions() || '', /不能声称已自动加载/);
         assert.ok((await client.listTools()).tools.length > 1);
     }
     finally {
@@ -293,4 +327,176 @@ test('microi_codex executes the same CRM table, field, menu and API-engine write
         await server.close();
     }
 });
+async function withFieldToolHttpFixture(codexMode, run, toolName = 'microi_add_field') {
+    const bodies = [];
+    const route = toolName === 'microi_add_field' ? '/api/V8Engine/AddField' : '/api/V8Engine/GetFieldList';
+    const httpServer = http.createServer((req, res) => {
+        const chunks = [];
+        req.on('data', chunk => { chunks.push(Buffer.from(chunk)); });
+        req.on('end', () => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.method !== 'POST' || req.url !== route) {
+                res.statusCode = 404;
+                res.end(JSON.stringify({ Code: 0, Msg: 'Unexpected fixture route' }));
+                return;
+            }
+            const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+            bodies.push(body);
+            if (toolName === 'microi_get_field_list') {
+                if (body.TableId === 'permission-denied') {
+                    res.statusCode = 403;
+                    res.end(JSON.stringify({ Code: 0, Msg: 'Fixture permission denied' }));
+                }
+                else if (body.TableId === 'http-failed') {
+                    res.statusCode = 503;
+                    res.end(JSON.stringify({ Code: 0, Msg: 'Fixture unavailable' }));
+                }
+                else if (body.TableId === 'business-failed') {
+                    res.end(JSON.stringify({ Code: 0, Msg: 'Fixture table unavailable' }));
+                }
+                else
+                    res.end(JSON.stringify({ Code: 1, Data: [{ Id: 'fixture-field', Name: 'Title' }] }));
+                return;
+            }
+            res.end(JSON.stringify({ Code: 1, Data: { FieldId: 'default-fixture-field' } }));
+        });
+    });
+    await new Promise(resolve => httpServer.listen(0, '127.0.0.1', resolve));
+    const apiBaseUrl = `http://127.0.0.1:${httpServer.address().port}`;
+    const api = new MicroiClient({ apiBaseUrl, username: '', password: '', token: 'fixture', osClient: 'fixture' });
+    const server = createMcpServer(api, { apiBaseUrl, osClient: 'fixture', label: 'default fixture', codexMode });
+    const client = new Client({ name: 'add-field-default-fixture', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    try {
+        await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+        await run({
+            client, bodies,
+            invoke: params => client.callTool(codexMode
+                ? { name: 'microi_codex', arguments: { action: toolName, params } }
+                : { name: toolName, arguments: params }),
+        });
+    }
+    finally {
+        try {
+            await client.close();
+        }
+        finally {
+            try {
+                await server.close();
+            }
+            finally {
+                api.destroy();
+                await new Promise((resolve, reject) => httpServer.close(error => error ? reject(error) : resolve()));
+            }
+        }
+    }
+}
+for (const codexMode of [false, true]) {
+    const entry = codexMode ? 'codex' : 'native';
+    test(`add_field defaultValue ${entry}: null/omitted省略HTTP正文，空串及原始字符串保持`, async () => {
+        await withFieldToolHttpFixture(codexMode, async ({ invoke, bodies }) => {
+            const values = [null, undefined, '', '0', '中文默认值 "quoted" \\ raw\nline'];
+            for (const [index, defaultValue] of values.entries()) {
+                const result = await invoke({ tableId: 'fixture-table', name: `Field${index}`, label: '默认值',
+                    ...(defaultValue === undefined ? {} : { defaultValue }) });
+                assert.notEqual(result.isError, true, JSON.stringify(result.content));
+                assert.equal(bodies.length, index + 1);
+                const body = bodies[index];
+                assert.equal(body.OsClient, 'fixture');
+                assert.equal(body.TableId, 'fixture-table');
+                assert.equal(body.Name, `Field${index}`);
+                if (defaultValue === null || defaultValue === undefined) {
+                    assert.equal(Object.hasOwn(body, 'DefaultValue'), false);
+                }
+                else {
+                    assert.equal(body.DefaultValue, defaultValue);
+                }
+            }
+        });
+    });
+    test(`add_field defaultValue ${entry}: 数字布尔对象数组在HTTP前拒绝，不放宽其它参数`, async () => {
+        await withFieldToolHttpFixture(codexMode, async ({ invoke, bodies }) => {
+            for (const defaultValue of [0, 1, false, true, {}, [], { value: 'raw' }]) {
+                const result = await invoke({ tableId: 'fixture-table', name: 'Rejected', label: '拒绝', defaultValue });
+                assert.equal(result.isError, true, JSON.stringify(result.content));
+                if (codexMode)
+                    assert.equal((result._meta?.microiExecution).state, 'notExecuted');
+                assert.equal(bodies.length, 0);
+            }
+            for (const invalid of [{ name: null }, { label: {} }, { tableId: null }, { type: 1 }]) {
+                const result = await invoke({ tableId: 'fixture-table', name: 'Rejected', label: '拒绝', ...invalid });
+                assert.equal(result.isError, true, JSON.stringify(result.content));
+                assert.equal(bodies.length, 0);
+            }
+        });
+    });
+}
+test('add_field defaultValue describe_tool保持string/optional并说明null和省略语义', async () => {
+    await withFieldToolHttpFixture(true, async ({ client, bodies }) => {
+        const result = await client.callTool({ name: 'microi_codex', arguments: {
+                action: 'describe_tool', params: { name: 'microi_add_field' },
+            } });
+        assert.notEqual(result.isError, true);
+        const text = result.content.find(item => item.type === 'text');
+        assert.ok(text && text.type === 'text');
+        const description = JSON.parse(text.text);
+        assert.equal(description.params.defaultValue.type, 'string');
+        assert.equal(description.params.defaultValue.required, false);
+        assert.match(description.params.defaultValue.description, /null.*omit.*unset/i);
+        assert.equal(description.params.tableId.type, 'string');
+        assert.equal(description.params.tableId.required, true);
+        assert.equal(bodies.length, 0);
+    });
+});
+for (const codexMode of [false, true]) {
+    const entry = codexMode ? 'codex' : 'native';
+    test(`get_field_list locator ${entry}: 缺两个locator及unknown keys明确notExecuted`, async () => {
+        await withFieldToolHttpFixture(codexMode, async ({ invoke, bodies }) => {
+            for (const params of [{}, { TableId: 'wrong-case-id' }, { TableName: 'wrong-case-name' }, { foreign: 'ignored' }]) {
+                const result = await invoke(params);
+                assert.equal(result.isError, true);
+                assert.equal(result._meta?.microiExecution?.state, 'notExecuted');
+                const text = result.content.find(item => item.type === 'text');
+                assert.ok(text && text.type === 'text');
+                const error = JSON.parse(text.text);
+                assert.equal(error.errorCode, 'FIELD_LOCATOR_REQUIRED');
+                assert.match(error.message, /tableId/);
+                assert.match(error.message, /tableName/);
+                assert.doesNotMatch(text.text, /wrong-case-id|wrong-case-name|foreign|ignored/);
+                assert.equal(bodies.length, 0);
+            }
+        }, 'microi_get_field_list');
+    });
+    test(`get_field_list locator ${entry}: camelCase各发1HTTP，权限业务和HTTP失败不冒充未执行`, async () => {
+        await withFieldToolHttpFixture(codexMode, async ({ invoke, bodies }) => {
+            for (const params of [{ tableId: 'fixture-table' }, { tableName: 'Fixture_Table' }]) {
+                const count = bodies.length;
+                const result = await invoke(params);
+                assert.notEqual(result.isError, true, JSON.stringify(result.content));
+                assert.equal(bodies.length, count + 1);
+                const body = bodies.at(-1);
+                assert.equal(body.OsClient, 'fixture');
+                if ('tableId' in params) {
+                    assert.equal(body.TableId, params.tableId);
+                    assert.equal(Object.hasOwn(body, 'TableName'), false);
+                }
+                else {
+                    assert.equal(body.TableName, params.tableName);
+                    assert.equal(Object.hasOwn(body, 'TableId'), false);
+                }
+                assert.equal(result._meta?.microiExecution?.state, codexMode ? 'returned' : undefined);
+            }
+            for (const tableId of ['permission-denied', 'business-failed', 'http-failed']) {
+                const count = bodies.length;
+                const result = await invoke({ tableId });
+                assert.equal(result.isError, true);
+                assert.equal(bodies.length, count + 1);
+                const state = result._meta?.microiExecution?.state;
+                assert.notEqual(state, 'notExecuted');
+                assert.equal(state, codexMode ? 'uncertain' : undefined);
+                assert.doesNotMatch(JSON.stringify(result.content), /FIELD_LOCATOR_REQUIRED/);
+            }
+        }, 'microi_get_field_list');
+    });
+}
 //# sourceMappingURL=server-codex-router.test.js.map

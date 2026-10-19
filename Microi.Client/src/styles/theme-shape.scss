@@ -12,6 +12,9 @@ html[data-mci-corner-style="square"] {
     --mci-radius-full: 0px;
     --mci-shape-dialog: 0px;
 
+    // 统一确认壳带双 class 的 important 圆角，必须匹配其优先级，包含 Teleport 弹层。
+    .el-message-box.mci-unified-message-box { border-radius:0 !important; }
+
     *, *::before, *::after {
         border-radius: 0 !important;
     }

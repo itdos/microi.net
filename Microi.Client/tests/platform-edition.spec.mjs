@@ -1,3 +1,4 @@
+import { readLoginSourceSync } from "./helpers/login-source.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -44,6 +45,6 @@ test('存量登录的空授权字段使用当前启动版本，明确的异常�
     assert.equal(mergeLoginSysConfig({ PlatformEdition: 'Personal' }, { PlatformEdition: 'future-edition' }).PlatformEdition, 'future-edition');
 });
 test('真实登录完成路径先合并运行态授权版本再写入 Pinia', () => {
-    const source = fs.readFileSync(new URL('../src/views/login/index.vue', import.meta.url), 'utf8');
+    const source = readLoginSourceSync();
     assert.match(source, /setSysConfig\(mergeLoginSysConfig\(self\.diyStore\.SysConfig, self\.LoginResult\.DataAppend\.SysConfig\)\)/);
 });

@@ -12,24 +12,23 @@ namespace Microi.Tests.Common;
 [Trait("Category", "FullStack")]
 public sealed class TenantJwtPersistenceIntegrationTests
 {
-    public static bool HasFixtures => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_MYSQL_TEST_CONN"))
-        && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
-
-    [Theory(Skip = "Requires isolated local database fixtures", SkipUnless = nameof(HasFixtures))]
-    [InlineData("MySql", null)]
-    [InlineData("MySql", "")]
-    [InlineData("MySql", " \t ")]
-    [InlineData("MySql", "short")]
-    [InlineData("SqlServer", null)]
-    [InlineData("SqlServer", "")]
-    [InlineData("SqlServer", " \t ")]
-    [InlineData("SqlServer", "short")]
+    // 每个提供商保留四种存量密钥边界，提供商过滤不能连带排除 MySQL 数据行。
+    [Theory]
+    [InlineData("MySql", null, Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("MySql", "", Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("MySql", " \t ", Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("MySql", "short", Traits = new[] { "DatabaseProvider", "MySql" })]
+    [InlineData("SqlServer", null, Traits = new[] { "DatabaseProvider", "SqlServer" })]
+    [InlineData("SqlServer", "", Traits = new[] { "DatabaseProvider", "SqlServer" })]
+    [InlineData("SqlServer", " \t ", Traits = new[] { "DatabaseProvider", "SqlServer" })]
+    [InlineData("SqlServer", "short", Traits = new[] { "DatabaseProvider", "SqlServer" })]
     public async Task NewlyAddedTenant_PersistsWeakKeyAndConvergesCompetingRefreshes(string providerName, string? previousSecret)
     {
         var databaseName = "jwt_persist_" + Guid.NewGuid().ToString("N");
         var mysql = providerName == "MySql";
         var type = mysql ? DatabaseType.MySql : DatabaseType.SqlServer;
         var connection = Environment.GetEnvironmentVariable(mysql ? "MICROI_UPGRADE_MYSQL_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;
+        Assert.False(string.IsNullOrWhiteSpace(connection), "所选提供商缺少隔离连接：" + providerName);
         string WithDatabase(string name)
         {
             if (mysql) { var b = new MySqlConnectionStringBuilder(connection); Assert.Equal("127.0.0.1", b.Server); Assert.Equal("upgrade_fixture", b.Database); b.Database = name; return b.ConnectionString; }

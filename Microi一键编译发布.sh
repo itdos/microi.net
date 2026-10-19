@@ -1096,6 +1096,17 @@ if [ "$BUMP_VERSION" = true ]; then
     print_success "共更新 $update_count 个 .csproj + ${#PACKAGE_JSON_FILES[@]} 个 package.json"
 fi
 
+# 前后端可以分别发布。前端镜像必须使用本次实际构建的 package.json 版本，
+# 不能在“版本号不变”模式下被后端较旧的版本号重新标记；统一升级仍由上方版本更新完成。
+CLIENT_VERSION="$VERSION"
+if [ "$BUILD_CLIENT" = true ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then
+    CLIENT_VERSION=$(json_value "version" "Microi.Client/package.json")
+    if [[ ! "$CLIENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        print_fail "无法读取前端 package.json 的三段发布版本，禁止使用后端版本代替。"
+    fi
+    print_info "前端发行版本: ${CLIENT_VERSION}；后端发行版本: ${VERSION}（各自保持源码声明）"
+fi
+
 # 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行完整业务回归。
 # 此处需要仍在运行的已加载候选源码的测试 API，因此必须早于 PrepareRelease。
 # 缺少隔离测试租户/凭据、测试失败或跳过均停止发布；不能靠 AI 提示词代替门禁。
@@ -1120,15 +1131,25 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
     else
         print_fail "缺少 PowerShell，无法执行 Microi.Tests Full 发布门禁。"
     fi
+    _full_test_results="$MICROI_RELEASE_GATE_DIR/$(date +%Y%m%d-%H%M%S)-$$"
+    # 常规 Full 必须使用本轮已观测依赖矩阵；历史跳过例外不能作为发布入口。
+    if [ -n "${MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:-}${MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:-}" ]; then
+        print_fail "SQL Server 跳过例外已停用；请使用冻结依赖矩阵及零跳过 Full。"
+    fi
     if ! "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
         -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode Full -Configuration Release -SolutionPath "$SLN_FILE" \
-        -ResultsDirectory "$MICROI_RELEASE_GATE_DIR/$(date +%Y%m%d-%H%M%S)-$$"; then
+        -ResultsDirectory "$_full_test_results"; then
         print_fail "全量测试未通过；本次版本仅在本地准备，已停止官方应用资源写入和平台发布。请修复后重跑，禁止跳过失败用例。"
+    fi
+    if ! node Microi.Server/Microi.Tests/ReleaseGate/release-test-matrix.mjs verify \
+        "$_full_test_results/release-test-matrix.json" "$_full_test_results/release-test-matrix-outcomes.json" \
+        "$_full_test_results/release-test-matrix-result.json"; then
+        print_fail "Full 依赖矩阵、原始 TRX、浏览器或实际存储回执无效；已停止发布。"
     fi
     if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
         print_fail "验收期间源码发生变化；必须重新加载最终候选并重跑 Full。"
     fi
-    print_success "Microi.Tests Full 全量回归通过"
+    print_success "Microi.Tests Full 冻结矩阵全量回归通过"
 fi
 
 # 插件发行修复等需要复验 Full，但不能重新生成或覆盖已成功发布的不可变平台制品。
@@ -1278,8 +1299,9 @@ if [ "$PUSH_NUGET" = true ] || { [ "$HAS_ENCRYPT" = true ] && [ "$DEPLOY_MODE" =
     echo ""
     _PACK_LOG="$(mktemp /tmp/microi-pack.XXXXXX.log)"
     _PACK_FAILED=0
+    # Pack 与 Release 编译保持相同配置，避免方案外项目引用被 SDK 重置为 Debug。
     if [ -f "${_MICROI_NET_PROJECT:-}" ]; then
-        dotnet pack "$_MICROI_NET_PROJECT" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee "$_PACK_LOG" || _PACK_FAILED=1
+        dotnet pack "$_MICROI_NET_PROJECT" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false -p:ShouldUnsetParentConfigurationAndPlatform=false 2>&1 | tee "$_PACK_LOG" || _PACK_FAILED=1
     fi
     # NPOI 五个工程由 Office 引用，但不在两套平台方案中；SDK Pack 只读取引用版本，
     # 不会递归生成它们的包。按依赖顺序显式打包，继续复用本次 Release 编译产物。
@@ -1289,10 +1311,10 @@ if [ "$PUSH_NUGET" = true ] || { [ "$HAS_ENCRYPT" = true ] && [ "$DEPLOY_MODE" =
         Microi.NPOI.OpenXmlFormats/Microi.NPOI.OpenXmlFormats.csproj \
         Microi.NPOI.OOXML/Microi.NPOI.OOXML.csproj \
         Microi.NPOI.csproj; do
-        dotnet pack "Microi.Server/Microi.NPOI/$_npoi_project" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
+        dotnet pack "Microi.Server/Microi.NPOI/$_npoi_project" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false -p:ShouldUnsetParentConfigurationAndPlatform=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
     done
     # 方案 Pack 的输出组目标仍需解析引用，禁止该遍历重新进入 Build。
-    dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
+    dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:BuildProjectReferences=false -p:ShouldUnsetParentConfigurationAndPlatform=false 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
     if [ "$_PACK_FAILED" -ne 0 ]; then
         echo ""
         echo -e "  ${RED}───── Pack 错误摘要─────${NC}"
@@ -1803,7 +1825,7 @@ docker_push_plan() {
     local _docker_build_ok=false
     local _docker_build_attempt=1
     while [ "$_docker_build_attempt" -le 3 ]; do
-        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0.13" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             _docker_build_ok=true
             break
         fi
@@ -1815,7 +1837,7 @@ docker_push_plan() {
     done
     if [ "$_docker_build_ok" != true ]; then
         print_warning "远端基础镜像连续拉取失败，尝试使用 Docker 本地缓存完成本次构建..."
-        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
+        if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0.13" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             print_warning "已使用本地缓存的基础镜像完成构建；发布后请关注远端 Registry 连通性。"
         else
             print_fail "Docker 镜像构建失败，远端拉取和本地缓存均不可用: $local_image"
@@ -1915,7 +1937,7 @@ if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]
         print_divider
     fi
     for _plan in "${SELECTED_CLIENT_PLANS[@]}"; do
-        docker_push_plan "$_plan" "$VERSION"
+        docker_push_plan "$_plan" "$CLIENT_VERSION"
     done
 fi
 
@@ -1923,7 +1945,7 @@ fi
 if [ "$PUBLISH_DOC" = true ]; then
     print_phase "发布官方网站文档"
 
-    # 个人中心必须属于已推送的候选提交；隔离旧工作树不能再覆盖已交付的页面。
+    # 官网必须属于已提交的完整本地候选；Git 远端故障不阻断合格的官网 Docker。
     node microi.doc/scripts/check-account-portal.mjs --require-committed
 
     # 依赖版本以官网声明/既有锁为准；禁止全局 pnpm 升级时重写发布锁文件。
@@ -1959,7 +1981,9 @@ if [ "$PUBLISH_DOC" = true ]; then
 
     print_step "构建 Docker 镜像: microi.doc"
     # 当前阿里云镜像仓库不接受 BuildKit 附带的 OCI attestation manifest。
-    (cd microi.doc/docs/.vitepress && docker build --provenance=false --sbom=false -t microi.doc .)
+    # 本次独立标签避免并行文档构建覆盖共享 latest；后续晋级始终使用该标签。
+    DOC_IMAGE_TAG="microi.doc:docs-$(git rev-parse --short=12 HEAD)-$(date +%s)-$$"
+    (cd microi.doc/docs/.vitepress && docker build --provenance=false --sbom=false -t "$DOC_IMAGE_TAG" .)
     print_success "Docker 镜像构建完成"
 
     # 官方网站文档镜像仓库登录：仅更新配置所属地域，另一仓库沿用其受保护的 Docker 凭据。
@@ -1987,12 +2011,12 @@ if [ "$PUBLISH_DOC" = true ]; then
     done
 
     print_step "推送到北京仓库..."
-    docker tag microi.doc registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest
+    docker tag "$DOC_IMAGE_TAG" registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest
     docker push registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest
     print_success "registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest"
 
     print_step "推送到杭州仓库..."
-    docker tag microi.doc registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest
+    docker tag "$DOC_IMAGE_TAG" registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest
     docker push registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest
     print_success "registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest"
 

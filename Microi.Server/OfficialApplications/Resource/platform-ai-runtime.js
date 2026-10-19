@@ -21,12 +21,14 @@ if(aiRuntimeActions[aiRuntimeRoute]) V8.Param.Action = aiRuntimeActions[aiRuntim
 
 
 // Microi官方接口引擎：platform-ai-runtime
-// Version: v1.1.1
+// Version: v1.1.2
 // AI_RUNTIME_MANAGED_NON_STREAM_V1：非流式兼容动作由 V8 编排，身份、租户、密钥和权限由 V8.AI 绑定。
 var param = V8.Param || {};
 var action = text(param.Action);
 var currentUser = V8.CurrentUser || {};
 var supportedActions = {
+  ListConversationSummaries: true,
+  GetConversationRecords: true,
   UpdateConversationTitle: true,
   RecognizeIntent: true,
   Chat: true,
@@ -47,6 +49,48 @@ var hookResult = V8.ApiEngine.Run('platform-ai-custom-hook', {
 });
 if (!hookResult || Number(hookResult.Code) !== 1) {
   return hookResult || { Code: 0, Msg: 'AI助手个性化 Hook 未返回结果。' };
+}
+
+if (action === 'ListConversationSummaries' || action === 'GetConversationRecords') {
+  return readConversationHistory(param, action === 'GetConversationRecords');
+}
+
+// 列表只返回有界摘要；正文只在打开指定会话时读取。身份和租户来自当前执行上下文。
+function readConversationHistory(input, details) {
+  var source = text(input.Source || 'ai-engine-workbench');
+  if (source !== 'ai-engine-workbench' && source !== 'ai-app-workbench') return { Code: 0, Msg: '不支持的会话来源。' };
+  var conversationId = text(input.ConversationId);
+  if (details && !/^[A-Za-z0-9_.:-]{1,200}$/.test(conversationId)) return { Code: 0, Msg: '会话编号无效。' };
+  var page = Math.max(1, Math.min(10000, Math.floor(Number(input.PageIndex) || 1)));
+  var pageSize = 50;
+  var where = [['UserId', '=', String(currentUser.Id)], ['Content', 'Like', details ? conversationId : source]];
+  var result = V8.FormEngine.GetTableData('mic_ai_record', {
+    _Where: where, _SelectFields: ['Id', 'Content', 'CreateTime'],
+    _OrderBys: { CreateTime: 'DESC', Id: 'DESC' }, _PageIndex: page, _PageSize: pageSize
+  });
+  if (!result || Number(result.Code) !== 1) return result || { Code: 0, Msg: '会话读取失败。' };
+  var rows = result.Data || [], records = [], groups = Object.create(null), summaries = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i], record;
+    try { record = typeof row.Content === 'string' ? JSON.parse(row.Content) : row.Content; } catch (_) { continue; }
+    if (!record || record.Source !== source || !record.ConversationId) continue;
+    if (details) {
+      if (record.ConversationId !== conversationId) continue;
+      record.__rowId = row.Id;
+      record.CreatedAt = record.CreatedAt || row.CreateTime || '';
+      records.push(record);
+    } else {
+      var id = String(record.ConversationId);
+      var time = String(record.CreatedAt || row.CreateTime || '');
+      if (!groups[id]) {
+        groups[id] = { Id: id, Source: source, Title: text(record.Title || record.Content || '新对话').split(/\r?\n/)[0].slice(0,60), LastTime: time, Archived: false };
+        summaries.push(groups[id]);
+      }
+      groups[id].Archived = groups[id].Archived || record.Archived === true || Number(record.Archived || 0) === 1;
+    }
+  }
+  var hasMore = rows.length === pageSize && (result.DataCount == null || page * pageSize < Number(result.DataCount));
+  return { Code: 1, Data: { Conversations: summaries, Records: records, HasMore: hasMore, NextPage: hasMore ? page + 1 : null } };
 }
 
 if (action === 'UpdateConversationTitle') {

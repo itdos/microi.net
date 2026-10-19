@@ -652,6 +652,13 @@ export default {
         ImportHeaderRangeInvalid: "The header start row cannot be after the header end row.",
         ImportDataRangeInvalid: "The data start row must follow the header and cannot be after the data end row.",
         ImportUploadFailed: "The file upload or import request failed",
+        ImportInputCount: "Input rows: {count}",
+        ImportAddedCount: "Added: {count}",
+        ImportUpdatedCount: "Updated: {count}",
+        ImportFailedCount: "Failed: {count}",
+        ImportStillProcessing: "The import is still processing. Wait for the result and do not submit again.",
+        ImportMethodNotAllowed: "The server rejected the import request (HTTP 405). Check the import URL and whether the gateway allows POST.",
+        ImportGatewayError: "The import returned a gateway error page{status}. Check the import results before retrying to avoid duplicate writes.",
         
         // DIY Form Design Related
         CopyField: "Copy Field",

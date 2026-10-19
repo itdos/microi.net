@@ -254,6 +254,16 @@ namespace Microi.net
             string osClient,
             JObject currentUser)
         {
+            // MCP 授权不能沿用 Token 的旧 Level，保存与校验均从主库复核；
+            // 托管 V8 继续负责表格查询和事务保存。
+            if ((string.Equals(action, "AuthorizeMcpRoleManagement", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(action, "ValidateMcpRolePermission", StringComparison.OrdinalIgnoreCase))
+                && !PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(osClient, currentUser))
+                return new DosResult(0, null, "仅当前有效的超级管理员可配置 MCP 角色授权。");
+            if (string.Equals(action, "AuthorizeMcpRoleManagement", StringComparison.OrdinalIgnoreCase))
+                return new DosResult(1);
+            if (string.Equals(action, "ValidateMcpRolePermission", StringComparison.OrdinalIgnoreCase))
+                return new DosResult(1, McpRolePermissionPolicy.Parse(payload["Policy"]));
             if (string.Equals(action, "GetDirectTableGrantPolicies", StringComparison.OrdinalIgnoreCase))
                 return new DosResult(1, PlatformResourceSecurity.DirectTableGrantPolicies);
 

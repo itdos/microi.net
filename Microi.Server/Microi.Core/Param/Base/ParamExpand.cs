@@ -510,6 +510,10 @@ namespace Microi.net
         [JsonIgnore]
         public ModuleFieldPermission _FieldPermission { get; set; }
 
+        /// <summary>仅可信 CLR 调用传递的一次读取观察器；不序列化、不接受 HTTP 标记。</summary>
+        [JsonIgnore]
+        public FormHistoryReadProjection _HistoryProjection { get; set; }
+
         /// <summary>
         /// Server-only projection marker set after an ordinary role is authorized
         /// to read sys_user. Query builders use it to remove password storage fields

@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "SSO 身份联邦",
-    "Version": "v8.3.5",
+    "Version": "v8.3.6",
     "CreateTime": "2026-08-21T12:00:00.000Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -12,13 +12,18 @@
     "NodeCount": 0,
     "LineCount": 0,
     "DDLCount": 1,
-    "PhysicalColumnCount": 310,
+    "PhysicalColumnCount": 313,
     "ApiEngineCount": 35,
     "DataSetCount": 0,
     "DataRowCount": 0,
     "AiApplicationCount": 0,
     "Description": "Microi 吾码官方双向 SSO 应用：OIDC、SAML2、CAS 与存量 Token 兼容。全部公开 HTTP 路由、连接投影、JIT/绑定、角色映射、审计与租户 Hook 均由应用接口引擎交付；Microi.net 只保留签名验签、协议编解码、一次性票据和 DiyToken 等不可覆盖的可信原子。",
     "ChangeHistory": [
+      {
+        "Version": "v8.3.6",
+        "Date": "2026-10-17",
+        "Description": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。"
+      },
       {
         "Version": "v8.3.5",
         "Date": "2026-09-14",
@@ -99,11 +104,11 @@
     ],
     "ApplicationType": "Platform",
     "ChangeLog": {
-      "Version": "v8.3.5",
-      "Title": "补齐历史单点登录入口",
+      "Version": "v8.3.6",
+      "Title": "共享模块标题物理快照",
       "ChangeType": "Fix",
-      "Content": "为旧 SsoPengrui 地址补齐多路由，复用租户已有 SSO 配置和可信 Token 签发，保留当前租户身份与权限边界。",
-      "ReleaseTime": "2026-09-14 13:29:53"
+      "Content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
+      "ReleaseTime": "2026-10-17 20:17:35"
     }
   },
   "DDLStatements": [
@@ -3833,6 +3838,42 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 64
+    },
+    {
+      "TABLE_NAME": "sys_menu",
+      "COLUMN_NAME": "DataLogTitle",
+      "COLUMN_TYPE": "varchar(100)",
+      "DATA_TYPE": "varchar",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "[日志]文字替换",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 122
+    },
+    {
+      "TABLE_NAME": "sys_menu",
+      "COLUMN_NAME": "DataCommentTitle",
+      "COLUMN_TYPE": "varchar(100)",
+      "DATA_TYPE": "varchar",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "[评论]文字替换",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 121
+    },
+    {
+      "TABLE_NAME": "sys_menu",
+      "COLUMN_NAME": "DataVersionTitle",
+      "COLUMN_TYPE": "varchar(100)",
+      "DATA_TYPE": "varchar",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "[版本]文字替换",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 123
     }
   ],
   "SysMenus": [

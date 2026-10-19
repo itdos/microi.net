@@ -1,12 +1,10 @@
+import { readLoginSourceSync } from "./helpers/login-source.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { readPlatformServiceSource } from "./helpers/platform-service-source.mjs";
 
-const loginSource = await readFile(
-  new URL("../src/views/login/index.vue", import.meta.url),
-  "utf8",
-);
+const loginSource = readLoginSourceSync();
 const permissionSource = await readFile(
   new URL("../src/permission.js", import.meta.url),
   "utf8",

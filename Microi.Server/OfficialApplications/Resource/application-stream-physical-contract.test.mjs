@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { auditTable, auditColumns, gateIndexes, applyApplicationStreamPhysicalContract } from './application-stream-physical-contract.mjs';
 import { validateOfficialPackageInstallContracts } from './resource-sync-core.mjs';
@@ -127,8 +129,58 @@ test('official fixed projection reads only catalog and rejects missing/changed s
 
 const requestedContainer = process.env.MICROI_GATE_TEST_MYSQL_CONTAINER;
 const autoMysql = process.env.MICROI_GATE_TEST_MYSQL_AUTO === '1';
-test('isolated MySQL: empty install, old missing ledger, reinstallation and index/data conflicts', { skip: !requestedContainer && !autoMysql }, async t => {
+const nativeConfig = process.env.MICROI_GATE_TEST_MYSQL_NATIVE_CONFIG;
+const nativePython = process.env.MICROI_GATE_TEST_MYSQL_NATIVE_PYTHON;
+const nativeRequested = nativeConfig !== undefined || nativePython !== undefined;
+function physicalFile(value, label) {
+  assert.ok(typeof value === 'string' && path.isAbsolute(value), label + ' must be an absolute physical file');
+  const stat = fs.lstatSync(value);
+  assert.ok(stat.isFile() && !stat.isSymbolicLink(), label + ' must be a regular file');
+  const normalize = name => process.platform === 'win32' ? path.resolve(name).toLowerCase() : path.resolve(name);
+  assert.equal(normalize(fs.realpathSync.native(value)), normalize(value), label + ' must not traverse a link');
+  return value;
+}
+function nativeTransport() {
+  assert.equal(requestedContainer, undefined, 'native MySQL cannot use a container');
+  assert.equal(autoMysql, false, 'native MySQL cannot enable automatic Docker');
+  const config = physicalFile(nativeConfig, 'native MySQL configuration');
+  const python = physicalFile(nativePython, 'native MySQL Python');
+  assert.match(path.basename(python), /^python(?:\d+(?:\.\d+)?)?(?:\.exe)?$/i);
+  const identity = spawnSync(python, ['-X', 'utf8', '-c', 'import json,os,sys;print(json.dumps({"executable":os.path.realpath(sys.executable),"version":list(sys.version_info[:2])}))'], { encoding: 'utf8', timeout: 10000, windowsHide: true });
+  assert.equal(identity.error, undefined, 'native Python identity probe failed');
+  assert.equal(identity.status, 0, 'native Python identity probe failed');
+  let runtime;
+  try { runtime = JSON.parse(identity.stdout.trim()); } catch { assert.fail('native Python identity is invalid'); }
+  const normalize = name => process.platform === 'win32' ? path.resolve(name).toLowerCase() : path.resolve(name);
+  assert.equal(normalize(runtime.executable), normalize(python), 'native Python executable identity changed');
+  assert.ok(runtime.version[0] === 3 && runtime.version[1] >= 9, 'native Python 3.9 or newer is required');
+  const hash = () => createHash('sha256').update(fs.readFileSync(config)).digest('hex');
+  const originalHash = hash();
+  const helper = fileURLToPath(new URL('../../Microi.Tests/ReleaseGate/fixtures/native-mysql-client.py', import.meta.url));
+  return (op, text) => {
+    physicalFile(config, 'native MySQL configuration');
+    assert.equal(hash(), originalHash, 'native MySQL configuration changed during the fixture');
+    const result = spawnSync(python, ['-X', 'utf8', helper, '--config', config], {
+      input: JSON.stringify(op === 'query' ? { op, sql: text } : { op }), encoding: 'utf8',
+      timeout: 60000, maxBuffer: 1024 * 1024, windowsHide: true,
+    });
+    assert.equal(result.error, undefined, 'native MySQL transport process failed');
+    let reply;
+    try { reply = JSON.parse(result.stdout.trim()); } catch { assert.fail('native MySQL transport response is invalid'); }
+    if (!reply.ok || result.status !== 0) {
+      if (reply.errorCode === 'MYSQL_DUPLICATE_ENTRY') throw Error('Duplicate entry (native MySQL fixture)');
+      const code = typeof reply.errorCode === 'string' && /^[A-Z_]{1,40}$/.test(reply.errorCode) ? reply.errorCode : 'INVALID_RESPONSE';
+      throw Error('Native MySQL fixture failed: ' + code);
+    }
+    assert.match(reply.database, /^mci_gate_[a-f0-9]{32}$/);
+    assert.ok(Array.isArray(reply.rows) && reply.rows.every(row => row && typeof row === 'object'
+      && Object.values(row).every(value => value === null || typeof value === 'string')), 'native MySQL rows must preserve CLI strings/null');
+    return reply;
+  };
+}
+test('isolated MySQL: empty install, old missing ledger, reinstallation and index/data conflicts', { skip: !nativeRequested && !requestedContainer && !autoMysql }, async t => {
   let container = requestedContainer;
+  const native = nativeRequested ? nativeTransport() : null;
   const owner = autoMysql ? 'microservice-gate-contract-' + randomUUID() : 'microservice-gate-contract-20261013';
   if (autoMysql) {
     assert.equal(requestedContainer, undefined, '自动模式不能复用调用方的现有容器');
@@ -155,11 +207,21 @@ test('isolated MySQL: empty install, old missing ledger, reinstallation and inde
     assert.equal(ready, true, '专属 MySQL 在50秒内未达到正式主进程就绪');
     t.diagnostic('专属 MySQL 容器 ' + container + '，上限512MiB/1CPU，无宿主端口；结束后按唯一label清理');
   }
-  assert.match(container, /^microi-gate-contract-/);
-  const ownership = spawnSync('docker', ['inspect', '--format', '{{index .Config.Labels "codex.task"}}', container], { encoding: 'utf8' });
-  assert.equal(ownership.status, 0); assert.equal(ownership.stdout.trim(), owner);
-  const db = 'gate_contract';
+  let db = 'gate_contract';
+  if (native) {
+    db = native('init').database;
+    t.after(() => native('cleanup'));
+    t.diagnostic('Native MySQL uses a random owner-marked database; no Docker or shared database reset');
+  } else {
+    assert.match(container, /^microi-gate-contract-/);
+    const ownership = spawnSync('docker', ['inspect', '--format', '{{index .Config.Labels "codex.task"}}', container], { encoding: 'utf8' });
+    assert.equal(ownership.status, 0); assert.equal(ownership.stdout.trim(), owner);
+  }
   function sql(text, withDb = true) {
+    if (native) {
+      assert.equal(withDb, true, 'native SQL cannot execute without its owned database');
+      return native('query', text).rows;
+    }
     const result = spawnSync('docker', ['exec', '-i', container, 'mysql', '-uroot', '-B', ...(withDb ? [db] : [])], { input: text, encoding: 'utf8' });
     if (result.status !== 0) throw Error(result.stderr || result.stdout);
     const lines = result.stdout.trim().split('\n');
@@ -177,7 +239,8 @@ test('isolated MySQL: empty install, old missing ledger, reinstallation and inde
       if (info.Kind === 'index') assert.equal(scope.ddlIndexExists(info.TableName, info.IndexName), true);
     }
   };
-  sql('DROP DATABASE IF EXISTS `' + db + '`; CREATE DATABASE `' + db + '`;', false); install(); install();
+  if (!native) sql('DROP DATABASE IF EXISTS `' + db + '`; CREATE DATABASE `' + db + '`;', false);
+  install(); install();
   assert.equal(sql('SELECT COUNT(*) AS Count FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME=\'ux_asgt_transition_id\'')[0].Count, '1');
   sql('DROP TABLE `' + auditTable + '`; INSERT INTO sys_microistore (Id,Name) VALUES (\'existing-app\',\'保留原业务\');');
   install(); assert.equal(sql("SELECT Name FROM sys_microistore WHERE Id='existing-app'")[0].Name, '保留原业务');

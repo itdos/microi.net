@@ -16,7 +16,7 @@ test("low-code role permission field uses FormEngine data and emits a virtual JS
     assert.match(source, /FormEngine\.GetTableData\("sys_rolelimit"/);
     assert.match(source, /this\.DiyApi\.GetRolePermissionTree\(\)/);
     assert.match(source, /不支持的菜单动作\|unsupported menu action/);
-    assert.match(source, /JSON\.stringify\(\{\s*Menu:/);
+    assert.match(source, /JSON\.stringify\(\{[\s\S]*?Menu:\s*this\.collectLimits\(this\.menus, \[\]\)/);
     assert.match(source, /flushPendingSync/);
     assert.match(source, /parent\.Permission\.includes\("Read"\)/);
     assert.doesNotMatch(source, /NoDetail|NoSearch/);

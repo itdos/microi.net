@@ -1,3 +1,4 @@
+import { readLoginSourceSync } from "./helpers/login-source.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -49,7 +50,7 @@ test("the user store repairs authorization before roles and protected routes are
 });
 
 test("GotoSystem repairs the login projection before assigning roles or generating routes", async () => {
-    const loginSource = await readSource("src/views/login/index.vue");
+    const loginSource = readLoginSourceSync();
     const gotoSystem = sourceSection(loginSource, "        async GotoSystem() {", "</script>");
 
     assertOrdered(gotoSystem, [

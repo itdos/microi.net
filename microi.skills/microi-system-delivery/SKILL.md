@@ -7,6 +7,8 @@ description: 已初始化吾码工作区的默认 AI 开发总控入口，用户
 
 # Microi 全系统交付复盘与总控规范
 
+所有范围的收尾都必须执行 [测试临时文件随任务清理](../workspace-conventions/SKILL.md#测试临时文件必须随任务清理强制)：每轮测试结束清理本任务 `.tmp`、宿主临时目录、隔离源码/运行副本和已结束工作树，交付必需证据先最小归档，失败/中断也要回收；独立回读删除结果，并逐项说明确需暂留的文件、体积、原因与清理时机。脚本需有实际 teardown，不能把文字规范当作自动清理功能。
+
 本 Skill 来自一次完整业务系统交付复盘。目标是让下一套 OA、ERP、MES、CRM、商城、预约、互联网项目等 Microi 系统少走返工路：先固定事实源，再用 MCP 正确建模，最后用可视化和业务闭环测试证明可交付。
 
 本 Skill 是已初始化吾码工作区的默认开发总控入口。用户直接描述需求即可，无需指定 Skill 名称；
@@ -29,6 +31,8 @@ description: 已初始化吾码工作区的默认 AI 开发总控入口，用户
 | 菜单骨架、AI 开发中占位、逐菜单切换、PageTabs、模块展示 | `module-engine`、`v8-menu-buttons` |
 | 选项 Key/Label、数据源、状态模板 | `microi-datasource-mapping`、`datasource-engine`、`v8-template-engine` |
 | 业务接口、表单事件 | `v8-crud-api`、`v8-table-event` |
+| 微服务、个人中心、菜单应用、定制组件或复杂弹窗 | `microi-microservice`、`microi-client-frontend`、`ui-design`；必须先读主题色、明暗、密度和样式隔离契约，不能只读模板后实现 |
+| MCP 连接入口、角色 AI 开发授权 | `microi-codex`、`v8-security`；服务端逐请求复核范围与操作开关，普通表单路由不能作为绕过通道 |
 | 业务统计、老板经营、领导管理看板及明细报表 | `page-engine`、`report-engine`、`datasource-engine` |
 | 真实业务、截图、账号和跨端验收 | `playwright-e2e`；有独立前端时再读相应前端 Skill |
 
@@ -47,7 +51,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 模块引擎或 `sys_menu`。逐步建模在字段完成后调用 `microi_configure_form_banner` 回读验收。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=04f08fdc316d253f167e26923066e134763ab129dd830f833c762214613c607f -->
+<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=720e0f2db0997318d879af67cd708b7d25a33c321e47100c4800ee39a25b4c9e -->
 ## 交付总原则
 
 1. **先事实源，后建模**：先读需求文档、截图、现有蓝图、数据库结构和菜单结构，形成业务蓝图；不要边猜边建表、边猜边写接口。
@@ -61,7 +65,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 9. **平台能力四项同步**：按 `workspace-conventions/SKILL.md` 首部识别创始人源码工作区；每项平台新增、增强或修复都逐项判断应用商城、官方中文文档、Skills、MCP 是否需要完善，交付时列出证据或无需修改的依据。复用已有 MCP 能力，不机械新增工具；镜像发布不等于客户部署，客户手动更新边界必须保留。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=0e58c2126bd11900a4d0f4a7012b463f304490587443e90346c64e9f85dfcf10 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=e01ae6b21425b1410100e33ece7875b6313d9456144ad3131ad0fab7fb31d33a -->
 ## 用户问题编号跟踪（强制）
 
 用户一次提出多个问题时，必须先拆成 `1、2、3、4...` 的问题清单，并在交付过程中保持同一编号，不得合并吞掉或用笼统“已优化”代替。
@@ -76,8 +80,12 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 
 最终回复必须按原始编号逐项汇总：哪些已实现、哪些未实现、是否通过全自动化测试、是否通过截图验证。不能只给总括性“都完成了”。如果某项没有测试或没有截图，必须明说“未覆盖/未截图”，并说明原因。
 
+- 用户使用 `1、2、3…`、`1. 2. 3.…` 等形式提出多项任务时，最终聊天回复本身必须保留原编号并逐条说明完成情况；不能只在附件、报告或进度消息中列出编号，也不能用源码、测试、发布等渠道汇总替代用户的任务清单。
+- 同一对话有多轮编号清单时，按“本轮要求”和“此前待办/用户要求复核的清单”分别保留各自编号；新的补充不会自动取消前一轮未完成项。用户要求重报此前清单时，必须逐项重新核对证据，不能只给报告链接。
+- 每条结论明确区分源码已改、运行验收通过、渠道已发布；发现回归或用户再次指出问题时，将对应旧项重新标为待修复/部分完成，修复后再更新结论。最后逐项核对编号总数，禁止漏项、跳号或把未取得回执的发布写成完成。
+
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=cc8ef54619f2f7a1dc3ba4268d02cbe678c855ba17e2d9e9ed3251ac0dc35e18 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=9a259382b07851aaa60a795da3ffa4773e9cf3b9f9d791a52f95e34e1944cc69 -->
 ## 交付完成定义
 
 一次 Microi 全系统交付只有同时满足以下条件才算完成：

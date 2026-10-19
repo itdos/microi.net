@@ -329,6 +329,8 @@ const tabLocation = computed(() => {
 
 //点击该组件,设置当前组件为选中状态
 const handleSetCurWidget = (e) => {
+  // 运行与预览页面必须保留链接、按钮等原生行为；只有设计器选中组件时才阻止导航。
+  if (!isDesignMode.value) return
   e.preventDefault()
   e.stopPropagation()
   //触发切换容器选项卡

@@ -295,6 +295,12 @@ export interface DbTable {
     Fields?: DbField[];
     _Fields?: DbField[];
 }
+export interface DbSchemaReadOptions {
+    detail?: 'summary' | 'fields';
+    tableName?: string;
+    tableNames?: string[];
+    fieldNames?: string[];
+}
 export interface DbField {
     Name: string;
     Label: string;
@@ -504,6 +510,8 @@ export declare class MicroiClient {
     constructor(config: MicroiConfig);
     /** Header始终来自冻结连接，所有传输分支和续签共享，不信任请求覆盖。 */
     private tenantHeaders;
+    /** 引用只绑定当前真实连接/会话；不保存或回传凭据，续签后旧引用自然失效。 */
+    getContextIdentity(): string;
     private assertTenantRequest;
     /** RSA 加密（PKCS1_PADDING，兼容 Microi 前端 JSEncrypt） */
     private rsaEncrypt;
@@ -583,8 +591,9 @@ export declare class MicroiClient {
     }): Promise<ApiResponse>;
     createMyUserAccessKey(input: CreateUserAccessKeyInput): Promise<ApiResponse<CreateUserAccessKeyResult>>;
     revokeMyUserAccessKey(id: string): Promise<ApiResponse<UserAccessKeyRecord>>;
-    getDbSchema(): Promise<ApiResponse<{
+    getDbSchema(options?: DbSchemaReadOptions): Promise<ApiResponse<{
         Tables: DbTable[];
+        ReadSource?: Record<string, unknown>;
     }>>;
     getTableIndexes(tableName: string, readback?: boolean): Promise<ApiResponse<TableIndexInfo[]>>;
     createTableIndex(data: {

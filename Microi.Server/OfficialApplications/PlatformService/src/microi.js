@@ -31,6 +31,7 @@ export function getContext(hostData) {
     themePrimaryText: data.themePrimaryText || data.themeTokens?.primaryText || data.themeColor || '#409eff',
     themeColorStrong: data.themeColorStrong || data.themeTokens?.primaryStrong || data.themeColor || '#337ecc',
     themeTokens: data.themeTokens || {},
+    uiDensity: data.uiDensity || data.themeTokens?.uiDensity || { scale: 100, variables: {} },
     systemStyle: data.systemStyle || 'Classic',
     systemTitle: data.systemTitle || data.systemShortTitle || data.osClient || '当前系统',
     systemShortTitle: data.systemShortTitle || '',
@@ -51,10 +52,14 @@ export function getContext(hostData) {
 export function subscribeContext(listener, immediate = true) {
   if (typeof listener !== 'function') return () => {}
   const microApp = window.microApp
-  const handleData = (data) => listener(getContext(data))
+  // 宿主可能只推送增量外观；保留完整坐标和身份，不能被 theme 事件重置为空。
+  let latest = microApp?.getData?.() || {}
+  const handleData = (data) => { latest = { ...latest, ...data }; listener(getContext(latest)) }
+  const afterShow = (event) => { if (event.detail?.appState === 'aftershow') handleData(microApp?.getData?.() || {}) }
   if (typeof microApp?.addDataListener === 'function') microApp.addDataListener(handleData)
+  window.addEventListener('appstate-change', afterShow)
   if (immediate) handleData(microApp?.getData?.() || {})
-  return () => microApp?.removeDataListener?.(handleData)
+  return () => { microApp?.removeDataListener?.(handleData); window.removeEventListener('appstate-change', afterShow) }
 }
 
 export function configureV8() {
@@ -63,6 +68,7 @@ export function configureV8() {
   V8.configure?.({
     apiBase: context.apiBase,
     osClient: context.osClient,
+    fileServer: context.fileServer,
     appendOsClientQuery: false,
     onTokenChanged: notifyHostTokenChanged
   })

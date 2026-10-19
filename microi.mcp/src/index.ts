@@ -121,13 +121,13 @@ async function main(): Promise<void> {
     const hasWorkspaceCredentialVault = !!config.workspaceCredentialFilePath
       && !!config.workspaceCredentialUsernameKey
       && !!config.workspaceCredentialPasswordKey
-      && fs.existsSync(config.workspaceCredentialFilePath);
+      && (['darwin', 'linux'].includes(process.platform) || fs.existsSync(config.workspaceCredentialFilePath));
     if (!config.token && (!config.username || !config.password) && !hasWorkspaceCredentialVault) {
       console.error('Missing required environment variables:');
       console.error('  MICROI_API_URL      - Microi backend API URL (e.g. https://api.example.com)');
       console.error('  MICROI_TOKEN_FILE   - Token file path (preferred, auto-managed by VS Code extension)');
       console.error('  MICROI_AUTH_RECOVERY_DIR - Optional credential-free VS Code recovery request directory');
-      console.error('  MICROI_WORKSPACE_CREDENTIAL_FILE - Optional Windows DPAPI workspace credential vault');
+      console.error('  MICROI_WORKSPACE_CREDENTIAL_FILE - Workspace OS credential location (Windows DPAPI / macOS Keychain / Linux Secret Service; no plaintext fallback)');
       console.error('  MICROI_TOKEN        - JWT token (fallback)');
       console.error('  MICROI_USERNAME     - Login username (fallback if no token)');
       console.error('  MICROI_PASSWORD     - Login password (fallback if no token)');

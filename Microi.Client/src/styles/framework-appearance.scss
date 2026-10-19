@@ -1,0 +1,70 @@
+/* 这些开关是明确的个人/租户选择。选择器覆盖框架和 body Teleport 弹层，
+ * 不隐藏纯图标操作、输入前缀或加载指示，保证关闭装饰后仍能操作。 */
+html[data-mci-disable-gradient="true"] {
+    --mci-gradient-primary: var(--mci-color-primary) !important;
+    --sidebar-bg-gradient: var(--sidebar-bg-color) !important;
+    body .el-button,
+    body #app-microi button,
+    body .mci-btn,
+    body .ve__button,
+    body .mci-mode-btn,
+    body .mci-theme-heading-icon,
+    body .mci-theme-panel-head,
+    body .ui-density-preview,
+    body .sidebar-container-microi,
+    body .navbar-microi--themed,
+    body .sidebar-container-microi .el-menu-item,
+    body .sidebar-container-microi .el-sub-menu__title {
+        background-image: none !important;
+    }
+    body .el-button--primary,
+    body .mci-mode-btn.active,
+    body .mci-theme-heading-icon { background-color: var(--el-color-primary) !important; }
+    body .sidebar-container-microi { background-color: var(--sidebar-bg-color, var(--el-color-primary)) !important; }
+    body .sidebar-container-microi::before,
+    body .sidebar-container-microi::after,
+    body .el-button::before,
+    body .el-button::after { background-image: none !important; }
+}
+
+html[data-mci-disable-shadow="true"] {
+    --mci-shadow-xs: none !important;
+    --mci-shadow-sm: none !important;
+    --mci-shadow-md: none !important;
+    --mci-shadow-lg: none !important;
+    --mci-shadow-xl: none !important;
+    --mci-shadow-button: none !important;
+    --mci-shadow-button-hover: none !important;
+    --mci-shadow-dropdown: none !important;
+    --mci-shadow-card: none !important;
+    --mci-shadow-card-hover: none !important;
+    --mci-shadow-dialog: none !important;
+    --el-box-shadow: none !important;
+    --el-box-shadow-light: none !important;
+    --el-box-shadow-lighter: none !important;
+    --el-box-shadow-dark: none !important;
+    body #app-microi button,
+    body :is(.el-button, .ve__button, .mci-btn, .el-dialog, .el-drawer, .el-popper, .el-card, .mci-mode-btn, .mci-theme-heading-icon, .navbar-microi, .sidebar-container-microi),
+    body :is(.el-button, .el-dialog, .el-drawer, .el-card)::before,
+    body :is(.el-button, .el-dialog, .el-drawer, .el-card)::after { box-shadow: none !important; filter: none !important; }
+    /* 关闭阴影是明确的最终状态，不能继续执行旧按钮的 box-shadow 淡出。 */
+    body :is(.el-button, .ve__button, .mci-btn, .mci-mode-btn) { transition-property: color, background-color, border-color, opacity, transform !important; }
+    /* 输入框依靠 inset shadow 画边界，关闭阴影也要保留可辨认控件与焦点。 */
+    body :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner) {
+        box-shadow: none !important;
+        outline: 1px solid var(--el-border-color);
+        outline-offset: -1px;
+    }
+    body :is(.el-input__wrapper, .el-select__wrapper).is-focus,
+    body .el-textarea__inner:focus { outline-color: var(--el-color-primary); }
+    body :is(button, [role="button"]):focus-visible { outline: 2px solid var(--mci-text-link, var(--el-color-primary)) !important; outline-offset: 2px; }
+}
+
+html[data-mci-disable-button-icon="true"] body {
+    /* 有可见文字才移除左侧语义图标；关闭/全屏等纯图标按钮保持可发现。 */
+    :is(.el-button,.ve__button,.mci-btn)[data-mci-text-button="true"] :is(.el-icon, .svg-inline--fa, .fa, .fas, .far, .fab):not(.is-loading):not(.el-icon--right):not(:has(.is-loading)),
+    .mci-mode-btn > .el-icon { display: none !important; }
+    .el-button > .el-icon.is-loading { display: inline-flex !important; }
+    .el-button > .el-icon + span { margin-left: 0 !important; }
+    .el-button > span > .el-icon + span { margin-left: 0 !important; }
+}

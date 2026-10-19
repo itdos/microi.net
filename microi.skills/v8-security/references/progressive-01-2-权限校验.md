@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-security-005 sha256=09f88aaf8da914fdbec8bc8668cef588a02217354a210515230471fbfdddd27f -->
+<!-- microi-progressive:chunk id=v8-security-005 sha256=657db8189d96c594073735e9182af9d3e9a91f4f7dd111ecf2c7fe1eec6d7ede -->
 ## 2. 权限校验
 
 ### DiyToken 是平台会话与权限入口，不替换为 ASP.NET Identity
@@ -15,6 +15,14 @@ DiyToken 与 `sys_user`、`OsClient`、终端 `did`、共享 Redis 登录态、�
 - ASP.NET Identity 可以作为外部身份源的适配参考，但不能整体替换吾码的租户、低代码权限、V8 和在线终端协议。
 
 开发新登录入口时只实现“验证身份 -> 获取仍启用的 `sys_user` -> 签发 DiyToken”，禁止并行创建第二套用户、角色、权限 Token 或会话有效期规则。
+
+### MCP 角色开发授权
+
+`Level >= 9999` 保留完整 MCP 权限及授权管理入口。其他账号须由超级管理员在开发工具连接窗口或角色编辑中明确授予 `McpDevelopment`，两处使用同一 `sys_rolelimit` 记录和并发版本；没有记录、损坏或重复配置一律拒绝。
+
+每次请求从当前租户主库复核活动用户、有效角色、模块/表及操作开关。访问范围与创建/修改、删除必须由同一角色同时满足；Full 只读与 Role 写入不得合成 Full 写入。Role 范围只支持明确白名单的安全元数据编辑及保留行/字段授权的业务操作，不开放可执行脚本、SQL、数据源或权限配置。已验签的 MCP/VSCode 会话也不能改走普通 FormEngine/接口引擎 HTTP 绕过限制。
+
+仅对获准的 MCP 调用，完整范围且同时具有创建/修改、删除的角色可作为可信开发者执行服务端开发；这类权限能够间接访问或修改数据，不得宣传为隔离的纯界面编辑。它不改变账号 Level，不放宽普通后台管理入口，不允许普通账号改写 MCP 授权。撤销须即时生效；受限角色、完整只读、写但不可删、多角色组合、普通 HTTP 绕过、跨租户、旧 Token 与并发授权保存必须纳入验收。
 
 ### 平台 FormEngine 授权边界
 
@@ -39,7 +47,7 @@ DiyToken 与 `sys_user`、`OsClient`、终端 `did`、共享 Redis 登录态、�
 
 跨租户公共发现接口可以匿名，但返回值必须采用严格字段白名单，只返回公开标识和展示信息，禁止返回 `ApiKey`、上游 Endpoint、连接串或内部配置。例如官方 AI 中转模型清单应保持 `IsEnable=1`、`StopHttp=0`、`AllowAnonymous=1`，且只返回模型 Id、展示名等公开字段；将这类被其它租户服务器调用的发现接口误改为非匿名，会让所有消费者得到空模型列表或 `NoAuth`，属于破坏性配置变更。发布和升级后必须用无 Token 的真实 HTTP 请求验证返回字段与匿名状态。
 
-> 后端接口引擎、后端表单 V8 和平台内部调用由服务端在构造参数时设置不可由 HTTP JSON 注入的 `_TrustedServerInvocation`，因此调用 `V8.FormEngine` 不要求 `_SysMenuId`。`_InvokeType:'Server'` 只是事件调用语义，不是外部客户端可用的授权开关；普通用户即使在请求中伪造这两个字段也不能成为可信调用。任何能让普通用户写 V8、接口引擎、任务或数据源配置的管理入口本身都必须限制为 `Level >= 9999`，否则会重新获得任意数据执行能力。
+> 后端接口引擎、后端表单 V8 和平台内部调用由服务端在构造参数时设置不可由 HTTP JSON 注入的 `_TrustedServerInvocation`，因此调用 `V8.FormEngine` 不要求 `_SysMenuId`。`_InvokeType:'Server'` 只是事件调用语义，不是外部客户端可用的授权开关；普通用户即使在请求中伪造这两个字段也不能成为可信调用。能写 V8、接口引擎、任务或数据源的普通管理入口仍限制为 `Level >= 9999`。MCP 唯一例外是上节明确授权的 Full 范围且同时具有创建/修改、删除权限的可信开发角色，并须通过 MCP 专用逐请求鉴权；不能由菜单授权或请求参数推导此例外。
 
 > 外层 `AddFormData` 的客户端菜单/`Add` 权限校验与事件内部执行权是两件事：前者防止无新增权限的用户进入事件，后者允许已经进入的 `SubmitBeforeServerV8` / `SubmitAfterServerV8` 像接口引擎一样在当前租户内执行复杂 SQL、跨表事务和其它表 CRUD。不要把客户端菜单范围再次套到服务器 V8 的嵌套调用。
 

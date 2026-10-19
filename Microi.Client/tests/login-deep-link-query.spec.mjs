@@ -1,9 +1,10 @@
+import { readLoginSourceSync } from "./helpers/login-source.mjs";
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRouter, createMemoryHistory } from 'vue-router';
-const source = await fs.readFile(new URL('../src/views/login/index.vue', import.meta.url), 'utf8');
+const source = readLoginSourceSync();
 const start = source.indexOf('                var useDefaultTarget =');
 const end = source.indexOf('                if (navigationFailure) throw navigationFailure;', start);
 const act = vm.runInNewContext(`(async function(self, url, fallbackUrl, normalizeMenuRoutePath, isRegisteredRoute) { ${source.slice(start, end)} })`);

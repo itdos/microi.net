@@ -13,11 +13,11 @@ export function getCornerStyle() {
     }
 }
 
-export function setCornerStyle(value) {
+export function setCornerStyle(value, options = {}) {
     const style = normalizeCornerStyle(value);
     document.documentElement.dataset.mciCornerStyle = style;
     try {
-        window.localStorage.setItem(STORAGE_KEY, style);
+        if (options.persist !== false) window.localStorage.setItem(STORAGE_KEY, style);
     } catch {
         // 私密模式禁用存储时仍保留本次页面的切换效果。
     }
@@ -25,5 +25,5 @@ export function setCornerStyle(value) {
 }
 
 export function initCornerStyle() {
-    return setCornerStyle(getCornerStyle());
+    return setCornerStyle(getCornerStyle(), { persist: false });
 }

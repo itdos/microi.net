@@ -9,24 +9,26 @@ namespace Microi.Tests.Common;
 
 [Collection("TenantContextGlobal")]
 [Trait("Category", "FullStack")]
+[Trait("DatabaseProvider", "SqlServer")]
 public class StartupDependencySqlServerIntegrationTests
 {
     public static bool HasSqlServerTestConnection => !string.IsNullOrWhiteSpace(
         Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
 
-    [Theory(Skip = "Requires an isolated SQL Server fixture on 127.0.0.1,62616", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("nchar(50)")]
-    [InlineData("char(50)")]
-    [InlineData("nvarchar(50)")]
-    [InlineData("nvarchar(1)")]
-    [InlineData("varchar(3)")]
-    [InlineData("nchar(3)")]
-    [InlineData("char(3)")]
-    [InlineData("nvarchar(1) NOT NULL")]
-    [InlineData("nvarchar(1) COLLATE Latin1_General_100_BIN2 NOT NULL")]
-    [InlineData(null)]
-    [InlineData("int")]
-    [InlineData("AS CONVERT(nvarchar(50), 'v0.0.0')")]
+    // 不在 Theory 总层跳过，否则十二种历史结构会折叠成一条未执行，失去精确例外证据。
+    [Theory]
+    [InlineData("nchar(50)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("char(50)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("nvarchar(50)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("nvarchar(1)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("varchar(3)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("nchar(3)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("char(3)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("nvarchar(1) NOT NULL", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("nvarchar(1) COLLATE Latin1_General_100_BIN2 NOT NULL", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData(null, Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("int", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("AS CONVERT(nvarchar(50), 'v0.0.0')", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
     public async Task ManagedStartupClosure_RepairsLegacyVersionStorageAndReplaysWithoutWrites(string? versionType)
     {
         var connection = new SqlConnectionStringBuilder(

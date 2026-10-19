@@ -13,9 +13,6 @@ import { computed, onMounted, onBeforeUnmount, getCurrentInstance } from "vue";
 import { ElConfigProvider } from "element-plus";
 import { useDiyStore, useSettingsStore, useAppStore } from "@/pinia";
 import { getElementLocale, normalizeLocale } from "@/lang";
-import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
-import { resolveUserThemeMode, resolveUserCornerStyle } from "@/utils/user-visual-preferences.js";
-import { getCornerStyle, setCornerStyle } from "@/utils/theme-shape.js";
 import {
     hasCurrentUserAuthorizationSnapshot,
     isAuthorizationResponseForActiveIdentity
@@ -29,6 +26,7 @@ import {
 import ApiServiceUnavailable from "@/components/ApiServiceUnavailable/index.vue";
 import MciFrameworkWatermark from "@/components/MciFrameworkWatermark/index.vue";
 import { isEmbeddedWebosWindowRuntime } from "@/utils/webos-embedded-runtime.js";
+import { applyFrameworkAppearance } from "@/utils/framework-appearance.js";
 // import drag from '@/views/form-engine/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
@@ -288,17 +286,10 @@ export default {
             } catch (e) {}
         },
         applyResolvedThemeMode() {
-            var mode = resolveUserThemeMode(
-                this.GetCurrentUser || {},
-                this.readLocalThemeMode(),
-                this.diyStore.SysConfig?.ThemeMode,
-                "light"
-            );
-            // 通过统一入口恢复浅色/暗色，并同步当前 palette 的全部令牌。
-            applyThemeMode(mode);
+            applyFrameworkAppearance(this.diyStore);
         },
         applyResolvedCornerStyle() {
-            setCornerStyle(resolveUserCornerStyle(this.GetCurrentUser || {}, getCornerStyle(), this.diyStore.SysConfig?.CornerStyle));
+            applyFrameworkAppearance(this.diyStore);
         },
         readLocalThemeMode() {
             try {

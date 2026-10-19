@@ -425,16 +425,16 @@
                             >
                         </el-popover>
                     </div>
-                    <el-dropdown v-if="!PropsHideMoreFunctions && !diyStore.IsPhoneView" trigger="click">
-                        <el-button type="primary" :loading="BusinessDataTranslateLoading">
+                    <el-dropdown v-if="!HideMoreFunctions && !diyStore.IsPhoneView" trigger="click">
+                        <el-button :loading="BusinessDataTranslateLoading">
                             <el-icon style="margin-right: 4px"><MoreFilled /></el-icon>{{ $t('Msg.MoreFunctions') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                         </el-button>
                         <template #dropdown>
                             <el-dropdown-menu>
-                                <el-dropdown-item v-if="!PropsHideMoreFunctions" @click="ShiftTableDisplayMode()">
+                                <el-dropdown-item @click="ShiftTableDisplayMode()">
                                     <el-icon><List /></el-icon>{{ $t('Msg.SwitchTableDisplay') }}
                                 </el-dropdown-item>
-                                <el-dropdown-item v-if="!PropsHideMoreFunctions" @click="TranslateBusinessData()">
+                                <el-dropdown-item @click="TranslateBusinessData()">
                                     <fa-icon icon="fas fa-language" class="mr-1" />{{ $t('Msg.TranslateBusinessData') }}
                                 </el-dropdown-item>
                             </el-dropdown-menu>

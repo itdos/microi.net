@@ -8,6 +8,16 @@ import { createMemoryHistory, createRouter } from "vue-router";
 const clientRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = path.join(clientRoot, "src");
 
+async function readMountedLoginBusinessSource() {
+    const componentSource = await readFile(path.join(sourceRoot, "views", "login", "index.vue"), "utf8");
+    const componentScript = componentSource.match(/<script>\s*([\s\S]*?)<\/script>/)?.[1];
+    assert.ok(componentScript, "Login component script was not found");
+    assert.match(componentScript, /import\s+loginBusinessMixin,\s*\{\s*setupLoginState\s*\}\s+from\s*["']\.\/login-business\.mixin\.js["']/);
+    assert.match(componentScript, /export default\s*\{[\s\S]*?mixins:\s*\[\s*loginBusinessMixin\s*\]/);
+    assert.match(componentScript, /export default\s*\{[\s\S]*?setup:\s*setupLoginState\b/);
+    return readFile(path.join(sourceRoot, "views", "login", "login-business.mixin.js"), "utf8");
+}
+
 async function readSourceFiles(directory) {
     const entries = await readdir(directory, { withFileTypes: true });
     const files = [];
@@ -79,7 +89,7 @@ test("anonymous bootstrap and language requests explicitly omit Authorization", 
     const ssoSource = await readFile(path.join(sourceRoot, "utils", "sso-federation.js"), "utf8");
     const permissionSource = await readFile(path.join(sourceRoot, "permission.js"), "utf8");
     const commonSource = await readFile(path.join(sourceRoot, "utils", "diy.common.js"), "utf8");
-    const loginSource = await readFile(path.join(sourceRoot, "views", "login", "index.vue"), "utf8");
+    const loginSource = await readMountedLoginBusinessSource();
     const remoteSource = await readFile(path.join(sourceRoot, "views", "file-manage", "api.js"), "utf8");
 
     assert.match(osClientSource, /platform-os-client-by-domain[\s\S]{0,400}skipAuthorization:\s*true/);
@@ -188,7 +198,7 @@ test("legacy SSO discovery has a bounded request and may degrade in the route gu
 });
 
 test("SMS registration uses the managed login token contract without changing password login", async function () {
-    const loginSource = await readFile(path.join(sourceRoot, "views", "login", "index.vue"), "utf8");
+    const loginSource = await readMountedLoginBusinessSource();
     const regStart = loginSource.indexOf("        async Reg() {");
     const regEnd = loginSource.indexOf("        GetCaptcha(", regStart);
     const passwordLoginStart = loginSource.indexOf("        async Login() {");
@@ -218,7 +228,7 @@ test("WebOS and WeChat binding no longer call tenant-only legacy ApiEngines", as
     );
     const webosFiles = await readSourceFiles(path.join(sourceRoot, "views", "webos"));
     const webosSource = webosFiles.map(file => file.source).join("\n");
-    const loginSource = await readFile(path.join(sourceRoot, "views", "login", "index.vue"), "utf8");
+    const loginSource = await readMountedLoginBusinessSource();
 
     assert.doesNotMatch(webosSource, /\/apiengine\/(?:get-sys-menu-tree|get-desktop-dock|upt-personal-setting)/);
     assert.match(adapterSource, /\/apiengine\/platform-sys-menu/);

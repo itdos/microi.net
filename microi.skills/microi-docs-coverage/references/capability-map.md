@@ -34,7 +34,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `more/office.md` | v8-export-import, microi-microservice | Office 导入导出与在线编辑集成 |
 | `more/security.md` | v8-security | 平台安全和兼容基线 |
 | `more/sso.md` | microi-sso, v8-security, app-store | 双向 OIDC/SAML2/CAS、账号映射、协议端点、安全基线、商城发布与验收 |
-| `more/sys-config.md` | v8-utilities, microi-deployment | 系统/租户配置和敏感边界 |
+| `more/sys-config.md` | v8-utilities, microi-deployment, microi-client-frontend | 系统/租户配置、全局主题与个人覆盖、框架显隐和敏感边界 |
 | `system-engine/ai-engine.md` | ai-engine, v8-http-integration, microi-ai-application | 模型代理、License、V8.AI、MCP 对话、跨端调用和安全 |
 | `system-engine/ai-cad.md` | ai-engine, v8-api-config, microi-ai-application, app-store | 吾码接口引擎到 SolidWorks 桌面插件的参数计划、模型回读、BOM 与图纸交付边界 |
 | `system-engine/digital-human-live.md` | ai-engine, microi-microservice, app-store, playwright-e2e | 自建数字人直播、本机推理、话术知识、OBS 接入、4K 功能截图与实测边界 |

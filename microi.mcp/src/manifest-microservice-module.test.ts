@@ -11,6 +11,15 @@ const portableModule = {
   microServiceRoutePath: '/overview',
 };
 
+test('module history tab titles normalize aliases, clear defaults and reject invalid input', () => {
+  const normalized=normalizeAllMenuJson({dataLogTitle:' 审计 ',DataCommentTitle:'讨论',dataVersionTitle:null});
+  assert.deepEqual(normalized.errors,[]);
+  assert.equal(normalized.data.DataLogTitle,'审计');assert.equal(normalized.data.DataCommentTitle,'讨论');assert.equal(normalized.data.DataVersionTitle,'');
+  assert.equal(normalized.data.dataLogTitle,undefined);assert.equal(normalized.data.dataVersionTitle,undefined);
+  assert.ok(normalizeAllMenuJson({DataLogTitle:'x'.repeat(101)}).errors.length);
+  assert.ok(normalizeAllMenuJson({DataCommentTitle:{text:'not a title'}}).errors.length);
+});
+
 test('module field permissions preserve identity groups and tree ordering settings', () => {
   const policy = {Version:1,Enabled:true,DefaultVisible:true,DefaultEditable:false,Rules:[{Users:['user'],Roles:['role'],Departments:['dept'],Jobs:['job'],Fields:[{Name:'Salary',Visible:false,Editable:false}]}]};
   const normalized = normalizeAllMenuJson({fieldPermissions:policy,treeDragSortEnabled:true,treeDragSortField:'Sort'});

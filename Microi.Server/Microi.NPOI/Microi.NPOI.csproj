@@ -24,7 +24,7 @@
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="SkiaSharp" Version="4.150.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.150.1" />
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
     <PackageReference Include="ZString" Version="2.6.0" />
     <None Include="LICENSE" Pack="true" PackagePath="" CopyToOutputDirectory="PreserveNewest" TargetPath="licenses/NPOI.LICENSE" />

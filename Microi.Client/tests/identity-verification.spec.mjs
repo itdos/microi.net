@@ -1,8 +1,10 @@
+import { readLoginSourceSync } from "./helpers/login-source.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { platformServiceSourcePath } from "./helpers/platform-service-source.mjs";
+import { buildMicroAppFriendlyPath, parseMicroAppPath } from "../src/router/micro-app-route.js";
 import {
     IdentityVerification,
     createPasswordChangeActionHash,
@@ -318,7 +320,7 @@ test("Microi 授权失败会清理弹窗并且不尝试签发本地会话", asyn
 
 test("客户端入口、V8 挂载和个人设置路由保持同一契约", async () => {
     const [login, navbar, mobileProfile, form, table, helper, app, router] = await Promise.all([
-        readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8"),
+        readLoginSourceSync(),
         readFile(new URL("../src/layout/components/Navbar.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/mobile/profile.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/form-engine/diy-form.vue", import.meta.url), "utf8"),
@@ -341,8 +343,44 @@ test("客户端入口、V8 挂载和个人设置路由保持同一契约", async
     assert.match(login, /LoginWithExternal/);
     assert.match(login, /LoginWithTotp/);
     assert.match(login, /LoginWithFace/);
-    assert.match(navbar, /microi-platform-service\/personal-settings/);
-    assert.match(mobileProfile, /microi-platform-service\/personal-settings/);
+    assert.match(navbar, /import \{ buildMicroAppFriendlyPath \} from ['"]@\/router\/micro-app-route\.js['"]/);
+    assert.match(mobileProfile, /import \{ buildMicroAppFriendlyPath \} from ['"]@\/router\/micro-app-route\.js['"]/);
+    const navbarMethod = navbar.match(/^\s{8}OpenPersonalSettings\(\) \{([\s\S]*?)^\s{8}\},/m);
+    const mobileMethod = mobileProfile.match(/^const openPersonalSettings = \(([^)]*)\) => \{([\s\S]*?)^\};/m);
+    assert.ok(navbarMethod, "必须执行真实 PC 个人设置入口");
+    assert.ok(mobileMethod, "必须执行真实移动端个人设置入口");
+    const openNavbarSettings = new Function("buildMicroAppFriendlyPath", navbarMethod[1]);
+    const createMobileSettings = new Function("buildMicroAppFriendlyPath", "DiyCommon", "router",
+        `return (${mobileMethod[1]}) => {${mobileMethod[2]}};`);
+    // 从真实入口取当前租户并执行共享路由，避免只匹配已被 helper 拆开的字符串。
+    for (const tenant of ["iTdos", "loctek", "租户 A/#"]) {
+        let tenantReads = 0;
+        const diyCommon = { GetOsClient: () => { tenantReads++; return tenant; } };
+        const desktopCalls = [], mobileCalls = [];
+        openNavbarSettings.call({ DiyCommon: diyCommon, $router: {
+            push: value => { desktopCalls.push(value); return Promise.resolve(); }
+        } }, buildMicroAppFriendlyPath);
+        const openMobileSettings = createMobileSettings(buildMicroAppFriendlyPath, diyCommon, {
+            push: value => { mobileCalls.push(value); return Promise.resolve(); }
+        });
+        openMobileSettings();
+        openMobileSettings("ChangePassword");
+        const expectedPath = `/micro-app/${encodeURIComponent(tenant)}/microi-platform-service/personal-settings`;
+        assert.deepEqual(desktopCalls, [expectedPath]);
+        assert.deepEqual(mobileCalls, [
+            { path: expectedPath, query: { section: "security", action: "" } },
+            { path: expectedPath, query: { section: "security", action: "ChangePassword" } }
+        ]);
+        assert.equal(tenantReads, 3, "每次入口必须读取当前租户");
+        for (const route of [desktopCalls[0], ...mobileCalls.map(call => call.path)]) {
+            const parsed = parseMicroAppPath(route, { osClient: tenant });
+            assert.equal(parsed.isTenantScoped, true);
+            assert.equal(parsed.osClient, tenant);
+            assert.equal(parsed.appKey, "microi-platform-service");
+            assert.equal(parsed.routePath, "/personal-settings");
+        }
+    }
+    assert.match(router, /path: "\/micro-app\/:osClient\/:appKey\/:microPath\(\.\*\)\*"[\s\S]*?component: MicroAppHost/);
     assert.match(form, /initV8IdentityVerification/);
     assert.match(table, /initV8IdentityVerification/);
     assert.match(helper, /ConsumeIdentityVerificationTicket/);
@@ -356,7 +394,7 @@ test("客户端入口、V8 挂载和个人设置路由保持同一契约", async
 });
 
 test("Authenticator 免密码登录使用独立安全弹层并兼顾移动端与无障碍", async () => {
-    const login = await readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8");
+    const login = readLoginSourceSync();
 
     assert.match(login, /class="totp-login-shell"/);
     assert.match(login, /modal-class="totp-login-modal"/);
@@ -376,7 +414,7 @@ test("Authenticator 免密码登录使用独立安全弹层并兼顾移动端与
 
 test("登录方式弹层、宿主浮层收起和个人中心公开头像保持完整契约", async () => {
     const [login, headerSearch, host, microAppMain, personalSettings, profileController] = await Promise.all([
-        readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8"),
+        readLoginSourceSync(),
         readFile(new URL("../src/components/HeaderSearch/index.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/micro-app/host.vue", import.meta.url), "utf8"),
         readFile(platformServiceSourcePath("src/main.js"), "utf8"),
@@ -395,7 +433,10 @@ test("登录方式弹层、宿主浮层收起和个人中心公开头像保持�
     assert.match(personalSettings, /path: 'member\/public-avatar'/);
     assert.match(personalSettings, /limit: false/);
     assert.match(personalSettings, /client\.resolveFileUrl\(user\.value\.Avatar\)/);
-    assert.match(personalSettings, /identity-tech-banner\.jpg/);
+    // 个人中心样式已抽到 scoped 外部文件；继续校验真实视觉资源与隔离边界。
+    assert.match(personalSettings, /<style scoped src="\.\/personal-settings\.css"><\/style>/);
+    const personalStyles = await readFile(platformServiceSourcePath("src/personal-settings.css"), "utf8");
+    assert.match(personalStyles, /identity-tech-banner\.jpg/);
     assert.match(personalSettings, /terminalData\?\.Terminals/);
     assert.match(personalSettings, /item\.ConnectionId\s*\|\|\s*item\.DeviceClientId/);
     assert.doesNotMatch(personalSettings, /MICROI IDENTITY CENTER/);

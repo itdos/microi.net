@@ -49,7 +49,7 @@ export const packageDefinitions = Object.freeze([
     changeLogContent: '新增隐藏字段 HomeUsageStats 与 Managed 接口 platform-home-overview；访问记录只保存在当前账号，返回结果按实时菜单权限过滤，不采集路由参数或业务页面数据。',
     releaseTime: '2026-09-03 18:00:00',
     capabilities: [
-      'ApiEngine:platform-user-update-preferences@v1.1.3',
+      'ApiEngine:platform-user-update-preferences@v1.1.7',
       'ApiEngine:platform-user-update-profile@v1.0.1',
       'ApiEngine:platform-sys-user-admin@v1.0.2',
       'ApiEngine:platform-user-custom-hook@v1.0.0',
@@ -73,7 +73,7 @@ export const packageDefinitions = Object.freeze([
       'official_account_invitations',
     ],
     engines: [
-      { key: 'platform-user-update-preferences', name: '保存当前用户界面偏好', source: 'platform-user-update-preferences.js', id: '01M0M5KNM0N2GH5T0CZS3JV4DV', version: 'v1.1.3', enableLog: 0 },
+      { key: 'platform-user-update-preferences', name: '保存当前用户界面偏好', source: 'platform-user-update-preferences.js', id: '01M0M5KNM0N2GH5T0CZS3JV4DV', version: 'v1.1.7', enableLog: 0 },
       { key: 'platform-user-update-profile', name: '更新当前用户资料', source: 'platform-user-update-profile.js', id: '019d2a01-9d63-7f91-8c02-000000000001', version: 'v1.0.1', enableLog: 1 },
       { key: 'platform-sys-user-admin', name: '系统账号管理', source: 'platform-sys-user-admin.js', id: '019d2a01-9d63-7f91-8c02-000000000009', version: 'v1.0.4', enableLog: 1 },
       { key: 'platform-user-custom-hook', name: '系统账号个性化扩展', source: 'platform-user-custom-hook.js', id: '019d2a01-9d63-7f91-8c02-000000000002', version: 'v1.0.0', enableLog: 1, stopHttp: 1, ownership: 'Tenant', upgradePolicy: 'CreateIfMissing' },
@@ -185,6 +185,8 @@ export const packageDefinitions = Object.freeze([
       'V8.AI.RecoverMiniMaxMusicTask',
       'ServerFeature:AiMediaModelDirectoryV1',
       'ClientFeature:AiMediaModelSelectionV1',
+      // 新能力保持正式包追加顺序，重复生成不得仅因数组重排改变包哈希。
+      'ApiEngine:platform-ai-runtime@v1.1.2',
     ],
     exactEngineKeys: [
       'mci_ai_data_assistant',
@@ -214,7 +216,7 @@ export const packageDefinitions = Object.freeze([
         name: 'AI 非流式兼容运行时',
         source: 'platform-ai-runtime.js',
         id: '019d2a01-9d63-7f91-8c02-00000000000a',
-        version: 'v1.1.1',
+        version: 'v1.1.2',
         enableLog: 1,
         history: '2026-09-04 v1.1.1 意图识别改传受限附件摘要并隔离 JS 集合，同时将其它动作的空附件和空历史数组归一化为 null，避免 Jint 绑定 .NET List 时触发 IConvertible 异常。',
       },
@@ -826,9 +828,12 @@ export function configurePackageModel(packageModel, definition) {
   // Existing published packages may append independent reference-table fields after
   // generated fields. Regeneration must retain that order, not create false content
   // drift by moving every regenerated field to the end. Align by natural identity.
+  const engineSourceBytes = new Map((packageModel.SysApiEngines || []).map(row => [row.ApiEngineKey, row.ApiV8Code]));
   const tableNames = new Map((packageModel.DiyTables || []).map(row => [row.Id, row.Name]));
   const fieldKey = row => `${String(row.TableName || tableNames.get(row.TableId) || '').toLowerCase()}:${String(row.Name || '').toLowerCase()}`;
   const fieldOrder = new Map((packageModel.DiyFields || []).map((row, index) => [fieldKey(row), index]));
+  const columnKey = row => `${String(row.TABLE_NAME || '').toLowerCase()}:${String(row.COLUMN_NAME || '').toLowerCase()}`;
+  const columnOrder = new Map((packageModel.PhysicalColumns || []).map((row, index) => [columnKey(row), index]));
   const removals = new Set(definition.removeEngines || []);
   const exactEngineKeys = new Set(definition.exactEngineKeys || []);
   packageModel.SysApiEngines = (packageModel.SysApiEngines || [])
@@ -857,6 +862,9 @@ export function configurePackageModel(packageModel, definition) {
   packageModel.DiyFields?.sort((left, right) =>
     (fieldOrder.get(fieldKey(left)) ?? Number.MAX_SAFE_INTEGER)
     - (fieldOrder.get(fieldKey(right)) ?? Number.MAX_SAFE_INTEGER));
+  packageModel.PhysicalColumns?.sort((left, right) =>
+    (columnOrder.get(columnKey(left)) ?? Number.MAX_SAFE_INTEGER)
+    - (columnOrder.get(columnKey(right)) ?? Number.MAX_SAFE_INTEGER));
 
   if (exactEngineKeys.size) {
     const actualKeys = (packageModel.SysApiEngines || [])
@@ -896,6 +904,14 @@ export function configurePackageModel(packageModel, definition) {
   };
   refreshPackageCounts(packageModel);
   normalizeOfficialApiEnginePolicies(packageModel, definition.file);
+  // Keep existing bytes only when both the current body and authoritative notice
+  // agree after the existing newline/trailing-whitespace normalization.
+  for (const engine of packageModel.SysApiEngines || []) {
+    const previous = engineSourceBytes.get(engine.ApiEngineKey);
+    if (typeof previous === 'string' && normalizeSource(previous) === normalizeSource(engine.ApiV8Code)) {
+      engine.ApiV8Code = previous;
+    }
+  }
   const liveEngineKeys = new Set(
     (packageModel.SysApiEngines || []).map(engine => String(engine.ApiEngineKey || '')),
   );

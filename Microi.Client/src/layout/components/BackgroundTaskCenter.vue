@@ -10,6 +10,7 @@
         class="microi-notification-dialog mci-unified-dialog"
         :title="$t('Msg.NotificationCenter')"
         width="80%"
+        append-to-body
         :modal-class="GetUnifiedOverlayClass()"
         align-center
         draggable
