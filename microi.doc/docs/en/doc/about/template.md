@@ -9,7 +9,7 @@
 | Project | Explanation |
 | :-- | :-- |
 | Technical framework | **Low code AI** development mode, which supports traditional development,. NET10 Vue2/3 Redis MySQL/SqlServer/Oracle Element-UI/Element-Plus |
-| Starts with | 2014 (based on Avalon.js),2018 Vue refactoring, November 2024 open source |
+| Starts with | 2014 (based on Avalon.js),2018 Vue refactoring, 2025 open source |
 | Official website | [https://microi.net/](https://microi.net/) |
 | WebOS Trial | [https://webos.microi.net](https://webos.microi.net) |
 | Traditional interface trial | [https://web.microi.net/](https://web.microi.net/) |

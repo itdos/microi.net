@@ -25,9 +25,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "dark",
     "index": 3,
     "legacyPath": "/images/training-deck/thumbs/slide-03.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/b604e7a783c49c8cbc09f96078c719dfb2cbc9e11ecb6a8a4d47580008c7d025/202610/microi-training-technical-dark-slide-03.webp",
-    "bytes": 15646,
-    "sha256": "b604e7a783c49c8cbc09f96078c719dfb2cbc9e11ecb6a8a4d47580008c7d025",
+    "url": "https://file.microi.net/itdos/official-docs/images/18b0ed52d8a602cfa0f96df923449fa58aa362ace90117fbb2ded65adf7ffde5/202610/microi-training-technical-dark-slide-03-20261020.webp",
+    "bytes": 15760,
+    "sha256": "18b0ed52d8a602cfa0f96df923449fa58aa362ace90117fbb2ded65adf7ffde5",
     "mimeType": "image/webp"
   },
   {
@@ -495,9 +495,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "light",
     "index": 3,
     "legacyPath": "/images/training-deck/thumbs-light/slide-03.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/b32983c56430897631bc1e506fa3083171ac08500ec4cba07011f098f79de16e/202610/microi-training-technical-light-slide-03.webp",
-    "bytes": 15048,
-    "sha256": "b32983c56430897631bc1e506fa3083171ac08500ec4cba07011f098f79de16e",
+    "url": "https://file.microi.net/itdos/official-docs/images/c35ac1da2fb1158fb6f9a4dcd4c17a118b8ada44a7ec00ff12c6588de3145643/202610/microi-training-technical-light-slide-03-20261020.webp",
+    "bytes": 15184,
+    "sha256": "c35ac1da2fb1158fb6f9a4dcd4c17a118b8ada44a7ec00ff12c6588de3145643",
     "mimeType": "image/webp"
   },
   {
@@ -965,9 +965,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "dark",
     "index": 3,
     "legacyPath": "/images/training-deck-enterprise/thumbs/slide-03.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/c9180a2aa427f4f062289741ffcd71b171e43b51ce8fee4e37b760815d4ca779/202610/microi-training-enterprise-dark-slide-03.webp",
-    "bytes": 15420,
-    "sha256": "c9180a2aa427f4f062289741ffcd71b171e43b51ce8fee4e37b760815d4ca779",
+    "url": "https://file.microi.net/itdos/official-docs/images/9a8040a506e97ec6f7f969ccbc66bc42df59d433f8c617041363957e1c866cf4/202610/microi-training-enterprise-dark-slide-03-20261020.webp",
+    "bytes": 15648,
+    "sha256": "9a8040a506e97ec6f7f969ccbc66bc42df59d433f8c617041363957e1c866cf4",
     "mimeType": "image/webp"
   },
   {
@@ -1065,9 +1065,9 @@ export const trainingPreviewAssets = Object.freeze([
     "theme": "light",
     "index": 3,
     "legacyPath": "/images/training-deck-enterprise/thumbs-light/slide-03.webp",
-    "url": "https://file.microi.net/itdos/official-docs/images/aab3ae801b2610a4e483e15d8a220da7092b0742dd7888d791a38433dbb28b15/202610/microi-training-enterprise-light-slide-03.webp",
-    "bytes": 14996,
-    "sha256": "aab3ae801b2610a4e483e15d8a220da7092b0742dd7888d791a38433dbb28b15",
+    "url": "https://file.microi.net/itdos/official-docs/images/fb52da44b0dfd52dc1c99e361fd2081397a09adac077dfe8880e6c35ac8461ad/202610/microi-training-enterprise-light-slide-03-20261020.webp",
+    "bytes": 15088,
+    "sha256": "fb52da44b0dfd52dc1c99e361fd2081397a09adac077dfe8880e6c35ac8461ad",
     "mimeType": "image/webp"
   },
   {

@@ -1,8 +1,8 @@
 # 基础应用升级资源
 
-`Microi.Upgrade` 随程序集内置一套经过校验的基础应用数据包，保证老数据库和不通外网的客户服务器至少可以自动安装表单引擎、模块引擎、SaaS 引擎、SSO 身份联邦、应用商城、系统账号、系统设置、消息通知和 AI助手，并同步交付它们依赖的官方 Managed 接口引擎与租户 CreateIfMissing Hook。
+`Microi.Upgrade` 默认启动只消费 `build-bootstrap-package.mjs` 生成的 `app.microi.bootstrap` 最小恢复投影，包含登录、表单与模块基础元数据、系统设置和应用商城入口所需资源。先保证能登录和在商城手动安装应用；完整 SaaS 管理、SSO、消息通知、AI 等应用不属于默认启动安装范围。程序集保留完整官方包供用户显式安装、维护与离线恢复，不代表启动时会安装全部包。
 
-升级程序不需要任何环境变量：并行尝试从吾码官方数据库获取并完整校验全部资源；只有整组资源都有效时才使用在线最新版，否则整组回退到程序集内置版本，绝不混用两套资源。客户服务器无法访问外网时会自动使用当前后端程序集随版本发布的基线包。
+最小恢复投影由正式包的显式资源清单及必要调用依赖生成，设置体积、字段、接口数量和依赖闭合检查。首次恢复在开放登录前完成商城必需菜单与运行入口；已就绪租户重启不重复导入。完整包在线读取、校验和内置回退只用于相应的显式应用安装／维护流程，不能把完整包闭包再次扩成普通启动门禁。
 
 ## V8-first 官方包合同
 
@@ -22,7 +22,7 @@
 
 两类源码顶部都必须保留醒目的官方所有权提示。可信官方应用安装、更新或重新安装会恢复 `Managed` 核心；`CreateIfMissing` 只在首次缺失时创建，默认可执行正文必须精确为 `return { Code : 1 };`，租户后续修改、禁用或软删除均不得被官方升级覆盖。上述 Hook 固定 `StopHttp=1`、禁止匿名，并与核心共享 `V8.DbTrans`；Hook 返回失败会阻断对应业务阶段。
 
-Upgrade13 重放这九个程序集内置官方包时，先校验固定资源名和包契约，再由宿主建立绑定 `import-microi-store-package + OsClient` 的一次性可信上下文。导入器只有同时收到内置包请求并成功消费该上下文，才可恢复 `Platform/Managed` 官方源码；客户端或普通 V8 仅伪造同名参数会失败关闭，`Tenant/CreateIfMissing` 在任何情况下都不会被这条通道覆盖。
+Upgrade13 的默认启动恢复只重放最小投影；显式完整包恢复仍先校验固定资源名和包契约，再由宿主建立绑定 `import-microi-store-package + OsClient` 的一次性可信上下文。导入器只有同时收到内置包请求并成功消费该上下文，才可恢复 `Platform/Managed` 官方源码；客户端或普通 V8 仅伪造同名参数会失败关闭，`Tenant/CreateIfMissing` 在任何情况下都不会被这条通道覆盖。
 
 商城源登录和断开必须先经过 `platform-marketplace-source` 的 `AuthorizeOperation`。其 Before Hook 只接收 `Stage / SourceApiEngineKey / Action / SourceId`，不能接收 `ApiBase`、远端 `OsClient`、账号、密码、Token 或凭据密文。SaaS 包中的 `platform-external-login-binding`、`platform-wechat-user-binding` 还必须同时保持 `StopHttp=1`、`AllowAnonymous=0`、`Lock=1`，避免普通 V8 修改或伪造协议持久化入口。
 

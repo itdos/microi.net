@@ -93,7 +93,7 @@ const coverRoute = computed(() => isEnterprise.value
       <div class="mci-engine-proof">
         <aside class="mci-engine-proof__evidence" aria-label="吾码成熟度与系统架构">
           <div class="mci-engine-proof__hero"><strong>30<span>+</span></strong><div><b>成熟插件化引擎</b><span>一套开源 AI 开发框架的底座</span></div></div>
-          <div class="mci-engine-proof__metrics"><div><strong>8<span>年</span></strong><b>吾码持续升级迭代</b><small>2018 年起持续演进</small></div><div class="mci-common-download-proof"><strong>{{ trainingWhyProof.downloads }}<span>万+</span></strong><b>微软 NuGet 下载量</b><small>截至{{ trainingWhyProof.date }}</small></div></div>
+          <div class="mci-engine-proof__metrics"><div><strong>12<span>年</span></strong><b>吾码持续升级迭代</b><small>始于2014年，2018年重构，2025年开源</small></div><div class="mci-common-download-proof"><strong>{{ trainingWhyProof.downloads }}<span>万+</span></strong><b>微软 NuGet 下载量</b><small>截至{{ trainingWhyProof.date }}</small></div></div>
           <p class="mci-engine-proof__token"><strong>10×+</strong><span>Token 更省*<small>复用通用能力，减少重复实现</small></span></p>
           <!-- 保留原始CDN架构图，网页可全屏查看；PDF中显示清晰缩略图。 -->
           <button class="mci-common-architecture" type="button" aria-label="全屏查看 Microi吾码系统架构图" @click="$emit('preview', trainingArchitectureImage)"><img :src="trainingArchitectureImage.src" :alt="trainingArchitectureImage.alt" decoding="sync"><span class="mci-screen-only">系统架构图 · 点击全屏 <i aria-hidden="true">⤢</i></span></button>

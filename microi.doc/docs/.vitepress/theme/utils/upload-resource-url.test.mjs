@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+test('normalizes an old official FileServer before joining relative public paths', () => {
+  assert.equal(resolveUploadedResourceUrl('/itdos/covers/a.png', { fileServer: 'https://static.itdos.com' }), 'https://file.microi.net/itdos/covers/a.png')
+})
+
 import { normalizeUploadPath, resolveUploadedResourceUrl } from './upload-resource-url.js'
 
 const runtime = {

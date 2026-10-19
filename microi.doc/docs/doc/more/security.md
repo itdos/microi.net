@@ -389,6 +389,8 @@ https://os.example.com/?OsClient=iTdos#/access-login?access_key=microi_ak_xxx.yy
 
 存量部署将 `sys_user.Pwd` 以可逆 DES 保存时，平台超级管理员可以在【系统账号】页面（/#/mic-sys-user）打开帐号编辑表单后点击【显示密码】。`POST /api/SysUser/GetSysUserPassword` 只允许普通管理员登录会话调用；访问密钥会话和普通角色均拒绝。接口只解密 `PwdEncode=DES`（历史空值按 DES 兼容），自定义 V8 密码编码不做通用解密；成功查看会写安全审计日志，响应禁止缓存且日志不记录明文密码。
 
+SaaS 引擎 v8.4.26 的 `platform-sys-user-session` v1.0.5 在动作归一化后、调用密码读取原子前，使用可信当前身份和当前租户主库重新核验活动用户、`Level >= 9999` 及有效管理员角色；匿名、访问密钥、停用或降级账号均提前拒绝。请求中的 `Level/CurrentUser/RoleIds` 不参与授权，历史路由固定其原动作。为只读角色精确授权本人连接信息等会话初始化入口，不会因此授予显示他人密码的权限；升级后仍应分别验收普通账号拒绝与管理员合法路径。
+
 这是存量可逆密码方案的兼容管理能力，不应扩展给业务 V8、接口引擎、普通菜单或匿名接口。新系统仍建议逐步迁移到不可逆的专用密码哈希；完成迁移后只能重置，不能读取原密码。
 
 Passkey、设备生物识别、严格人脸、改密步进验证和自定义 V8 敏感操作的完整用法见 [Passkey、设备生物识别与严格人脸验证](./identity-verification)。
