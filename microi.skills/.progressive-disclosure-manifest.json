@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T18:09:39.262Z",
+  "generatedAt": "2026-10-19T11:47:12.517Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -3241,7 +3241,7 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "ec1a5fdc1da5ce9af7ae2e621995dd2dd09bd5fd881d58dfac84c364de28712e",
+      "originalSha256": "d9daeee64f34763c297abf320fc81319b32a24ceb22365d4cd34884fe67bfc21",
       "originalLines": 677,
       "prefixSha256": "1eb3e3e8c90844f9119091af2cf4562b33ed7e15d676bd2d1193c688c261720f",
       "prefixBytes": 7897,
@@ -3251,7 +3251,7 @@
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "aca51a9aec956dd31d4865eeb25b3d33452106b363659970773b40b48d22e346",
+          "sha256": "0c3f889089f09b9b43f1ae7168f9e20a7aa3e1324b1cf5c94052a78ffb1792b9",
           "lines": 60,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
@@ -3323,7 +3323,7 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/references/progressive-04-工作区与平台专项保障.md",
-          "sha256": "90d90834a2080c2a2f08bae1092557761b6b23c79274f8d4dc2b115c121f5b51",
+          "sha256": "4551654837b9b34fc1d4dabcda3147541a61b484a52ad8ddc02ac84c1c822372",
           "lines": 40,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },
@@ -3555,7 +3555,7 @@
           "id": "workspace-conventions-038",
           "ordinal": 38,
           "destination": "workspace-conventions/references/progressive-03-cli-与-ide-插件错版共存约定.md",
-          "sha256": "5dbfb261596e9c61fcc330adca7a1ff40a3a1508cd89be3c7b10410e591aa557",
+          "sha256": "1b65652abc8ca096a22d79a62b32c74557e5fc3daa7d81f3c192c4b9e37e4665",
           "lines": 30,
           "heading": "CLI 与 IDE 插件错版共存约定"
         },

@@ -2424,7 +2424,7 @@ export class MicroiClient {
     changeSummary?: string;
     confirmLargeReduction?: boolean;
     v8Limit?: boolean;
-    responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP';
+    responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP' | 'SignalR';
     apiRoutes?: string | string[];
     /** @deprecated Compatibility alias. true maps to v8Limit=false. */
     v8Unlimited?: boolean;
@@ -2594,7 +2594,7 @@ export class MicroiClient {
     Code?: string;
     ApiAddress?: string;
     ApiRoutes?: string | string[];
-    ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP';
+    ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP' | 'SignalR';
     V8Limit?: number;
     /** @deprecated Compatibility alias. true maps to V8Limit=0. */
     V8Unlimited?: number;

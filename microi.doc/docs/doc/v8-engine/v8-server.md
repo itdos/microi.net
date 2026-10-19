@@ -184,6 +184,85 @@ if (!decoded || Number(decoded.Code) !== 1) {
 
 该原子只允许 `platform-chanjet-callback-v2` 调用，租户从当前 V8 执行上下文取得，AES Key 与 AppKey 白名单不会进入脚本；接口引擎不能传入或覆盖租户、密钥。其它回调应沿用同一模式，不要把公开路由和业务流程重新写入 Controller。
 
+### 接口引擎双向实时通道（SignalR）
+
+需要浏览器持续发送命令并接收回执时，把接口引擎的 `ResponseType` 设置为 `SignalR`，
+连接 `/api-engine-socket?OsClient={租户}&ApiEngineKey={接口Key}`。这是通用传输入口，
+不为每个项目新增 Hub，也不把配对、房间、设备权限或业务状态写进 C# Hub。
+它要求后端包含 `ApiEngineSocketHub`、MCP Schema 支持 `SignalR`，并更新接口引擎应用包的
+响应类型选项；仅修改数据库中的枚举文字不能让旧后端获得该能力。
+
+| 场景 | 配置与入口 |
+| --- | --- |
+| 普通请求/响应 | `JSON`、`String`、`File`、`HTML` 或 `HTTP` |
+| 服务端持续输出文本 | `Stream`，SSE/NDJSON，不是双向连接 |
+| 已提交事件的订阅刷新 | `/api-engine-realtime`，见下文订阅协议 |
+| 同一连接双向发送命令和回执 | `SignalR`，`/api-engine-socket` |
+
+连接在建立时绑定 `OsClient + ApiEngineKey`，消息不能切换租户或接口。
+需要登录的接口仍使用有效 DiyToken；不接受 AccessKey。
+匿名配对等场景必须由接口显式开启 `AllowAnonymous=1`，并自行实现限次配对、权限与租约。
+`IsEnable`、`StopHttp`、匿名开关和 `ApiRole` 每次调用仍走接口引擎原有校验；
+`StopHttp=1` 同样禁止外部实时调用，不能用 WebSocket 绕过。
+
+客户端调用 `connection.invoke('Invoke', requestId, message)`，服务端注入：
+
+```javascript
+V8.Param.Socket.ConnectionId // 宿主生成的连接 ID
+V8.Param.Socket.Event        // Connected / Message / Disconnected
+V8.Param.Socket.ClientKey    // 宿主生成的客户端地址摘要，用于共享限流；不是业务身份
+V8.Param.RequestId           // 本次消息编号
+V8.Param.Message             // 客户端业务对象，始终与可信上下文分开
+```
+
+接口代码应先验证可信通道，避免普通 HTTP 伪造 `Socket` 参数，亦保证旧节点失败关闭：
+
+```javascript
+var trusted = V8.Method.RequireApiEngineSocketContext();
+if (trusted.Code !== 1) return trusted;
+if (V8.Param.Socket.Event !== 'Message') return { Code: 1 };
+
+// 此例只向当前连接回复；实际业务在这里校验当前用户、动作、资源归属和 RequestId。
+return {
+  Code: 1,
+  Data: { Accepted: true },
+  DataAppend: { SocketMessages: [{
+    ConnectionId: V8.Param.Socket.ConnectionId,
+    Data: { Type: 'Receipt', RequestId: V8.Param.RequestId, At: DateNow('yyyy-MM-dd HH:mm:ss') }
+  }] }
+};
+```
+
+成功提交后，宿主把 `SocketMessages` 投递为 `EngineMessage` 事件。
+接收连接必须属于同一租户与接口的连接组；失败或回滚结果不投递。
+调用方只收到 `Code/Msg/Data`，不会收到内部连接路由或执行堆栈。
+接口成功提交、服务器接受命令与展示屏/设备实际完成是三个不同状态；
+远程控制应由目标端在动作完成后再发送业务 ACK，超时显示“结果未知”，不能直接显示成功。
+
+传输采用 JSON SignalR 协议，接收帧上限 16KB、业务 Message 上限 12KB、深度 16，
+单次最多 16 个目标、投递内容合计 32KB，调用方响应上限 32KB。
+每个租户、接口和客户端地址摘要共享连接/消息限流：每分钟 30 次建立、每 10 秒 240 条消息、
+最多 64 个活动连接；75 秒未发送业务消息会断开。因此客户端应定期发送由业务接口识别的
+心跳消息（例如每 15 秒一次），不能仅依赖 SignalR 协议 Ping 延长业务授权。
+Redis 不可用时失败关闭，多节点复用现有 Redis backplane。
+
+配对码只是低熵定位符，不能替代 DiyToken 或赋予管理员身份。展示屏必须主动允许控制，
+以浏览器随机高熵秘密证明控制码所有权，服务端只保存摘要；处理控制码冲突、配对猜测限流、
+停止授权、离线租约、断线恢复、重复命令和过期回执。权限状态放共享 Redis/数据库，
+`Disconnected` 只是尽力通知，节点退出时仍应由租约到期收回授权。
+Redis 写入不随关系库事务回滚，不能宣称消息与 Redis/数据库已经实现“恰好一次”；
+有持久副作用的业务须增加幂等键、权威版本与 outbox/恢复机制。
+
+部署时代理必须转发 WebSocket Upgrade，所有目标节点必须包含该通道及相同接口配置。
+仅使用 WebSocket 且跳过协商时不需要通过不同 HTTP 请求保持协商节点；启用其它传输时需按
+[SignalR 扩展部署说明](https://learn.microsoft.com/aspnet/core/signalr/scale) 配置节点路由。
+双节点、Redis 故障、滚动升级和真实浏览器两端验收分别记录，编译或单测通过不能替代线上联调。
+
+多端遥控使用双向命令通道：业务脚本维护展示屏与多个独立控制会话的集合，
+在共享分布式锁下实施有界 FIFO 和每端 RequestId 去重。撤销展示屏授权时终止全部会话，
+单台手机离开只撤销自身；同一画面的命令按顺序执行，执行回执仅返回发起端。
+命令入队成功、SignalR 投递成功与展示屏实际执行成功是三个不同状态，不得混为一谈。
+
 ### 接口引擎通用实时事件（SignalR）
 
 接口引擎负责业务命令、权限、事务和权威状态，SignalR 负责把事务成功后的服务端事件低延迟推送给已授权订阅者。该能力不是游戏专用：订单进度、协同编辑、设备状态、审批提醒和多人房间都使用同一个通用 Hub。共享数据库、Redis 或业务状态机仍是事实源，不能把业务完成与否只保存在 Hub、进程内字典或 SignalR 消息中。

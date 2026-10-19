@@ -546,7 +546,8 @@ export class MicroiClient {
             const tokenKey = tokenKeys[0];
             if (!tokenKey)
                 return;
-            tokens[tokenKey] = tokenKeys.some(key => isProtectedSessionToken(tokens[key])) ? protectSessionToken(this.token) : this.token;
+            // Linux 的新会话始终留在 Secret Service；环境注入登录也不能落盘明文 Token。
+            tokens[tokenKey] = process.platform === 'linux' || tokenKeys.some(key => isProtectedSessionToken(tokens[key])) ? protectSessionToken(this.token) : this.token;
             const dir = path.dirname(filePath);
             if (!fs.existsSync(dir))
                 fs.mkdirSync(dir, { recursive: true });
@@ -2256,22 +2257,19 @@ export class MicroiClient {
     async getTableData(tableName, query = {}) {
         return this.post(API.FORM_GET_TABLE_DATA, {
             OsClient: this.config.osClient,
-            FormEngineKey: tableName,
-            ...query,
+            Operation: 'query', TableName: tableName, Query: query,
         });
     }
     async addFormData(tableName, row) {
         return this.post(API.FORM_ADD_FORM_DATA, {
             OsClient: this.config.osClient,
-            FormEngineKey: tableName,
-            ...row,
+            Operation: 'add', TableName: tableName, Row: row, ConfirmExecution: tableName,
         });
     }
     async updateFormData(tableName, row) {
         return this.post(API.FORM_UPT_FORM_DATA, {
             OsClient: this.config.osClient,
-            FormEngineKey: tableName,
-            ...row,
+            Operation: 'update', TableName: tableName, Row: row, ConfirmExecution: tableName,
         });
     }
     async getEventCode(formEngineKey, eventType, options = {}) {
@@ -2871,73 +2869,73 @@ export class MicroiClient {
         }
         return this.executeEngine('mci-system-observability-action', command);
     }
-    async getRedisStatistics(database = 0, connectionId) {
+    async getRedisStatistics(database, connectionId) {
         return this.post(API.REDIS_STATISTICS, {
             Action: 'RedisStatistics',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
-            Database: database,
+            ...(database === undefined ? {} : { Database: database }),
         });
     }
-    async getRedisKeys(pattern = '*', database = 0, pageSize = 100, cursor, connectionId) {
+    async getRedisKeys(pattern = '*', database, pageSize = 100, cursor, connectionId) {
         return this.post(API.REDIS_KEYS, {
             Action: 'Keys',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
-            Database: database,
+            ...(database === undefined ? {} : { Database: database }),
             Pattern: pattern,
             PageSize: pageSize,
             Cursor: cursor || '',
         });
     }
-    async getRedisKey(key, database = 0, pageIndex = 1, pageSize = 500, connectionId) {
+    async getRedisKey(key, database, pageIndex = 1, pageSize = 500, connectionId) {
         return this.post(API.REDIS_KEY, {
             Action: 'Key',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
-            Database: database,
+            ...(database === undefined ? {} : { Database: database }),
             Key: key,
             PageIndex: pageIndex,
             PageSize: pageSize,
         });
     }
-    async deleteRedisKeys(keys, database = 0, connectionId) {
+    async deleteRedisKeys(keys, database, connectionId) {
         return this.post(API.REDIS_DELETE_KEYS, {
             Action: 'DeleteKeys',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
-            Database: database,
+            ...(database === undefined ? {} : { Database: database }),
             Keys: keys,
         });
     }
-    async replaceRedisValue(key, dataType, value, database = 0, ttlSeconds, connectionId) {
+    async replaceRedisValue(key, dataType, value, database, ttlSeconds, connectionId) {
         return this.post(API.REDIS_REPLACE_VALUE, {
             Action: 'ReplaceValue',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
-            Database: database,
+            ...(database === undefined ? {} : { Database: database }),
             Key: key,
             DataType: dataType,
             Value: value,
             ...(ttlSeconds === undefined ? {} : { TtlSeconds: ttlSeconds }),
         });
     }
-    async renameRedisKey(key, newKey, database = 0, connectionId) {
+    async renameRedisKey(key, newKey, database, connectionId) {
         return this.post(API.REDIS_RENAME_KEY, {
             Action: 'RenameKey',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
-            Database: database,
+            ...(database === undefined ? {} : { Database: database }),
             Key: key,
             NewKey: newKey,
         });
     }
-    async setRedisTtl(key, ttlSeconds, database = 0, connectionId) {
+    async setRedisTtl(key, ttlSeconds, database, connectionId) {
         return this.post(API.REDIS_SET_TTL, {
             Action: 'SetTtl',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
-            Database: database,
+            ...(database === undefined ? {} : { Database: database }),
             Key: key,
             TtlSeconds: ttlSeconds,
         });

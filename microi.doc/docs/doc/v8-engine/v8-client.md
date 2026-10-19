@@ -13,6 +13,68 @@
 - 后端接口引擎、后端表单 V8 调用 `V8.FormEngine` 默认不触发表单事件；只有明确传入 `_InvokeType:'Client'` 才触发客户端式表单事件。`_InvokeType` 不是授权开关
 - 主要用于表单属性的前端 V8 事件、模块引擎 V8 按钮代码等
 
+## 独立应用中的双向实时接口
+
+数字孪生导播、协同控制等需要“按钮指令和执行回执都走长连接”的场景，
+使用接口引擎 `ResponseType=SignalR` 与 `/api-engine-socket`。
+该通道需要对应后端能力，完整权限、消息格式和容量限制见
+[后端双向实时通道](./v8-server.md#接口引擎双向实时通道-signalr)。
+它不修改现有 `V8.Http`，也不把 SSE 当成双向连接。
+
+在 Vue/微服务项目中将 `@microsoft/signalr` 安装并打包进产物，不依赖临时外链脚本：
+
+```typescript
+import { HubConnectionBuilder, HttpTransportType } from '@microsoft/signalr';
+
+const endpoint = new URL('/api-engine-socket', apiBase);
+endpoint.searchParams.set('OsClient', osClient);
+endpoint.searchParams.set('ApiEngineKey', 'my_realtime_engine');
+const connection = new HubConnectionBuilder()
+  .withUrl(endpoint.href, {
+    transport: HttpTransportType.WebSockets,
+    skipNegotiation: true,
+    accessTokenFactory: () => currentDiyToken // 匿名专用接口可省略
+  })
+  .withAutomaticReconnect([0, 1500, 4000, 8000, 15000])
+  .build();
+
+connection.on('EngineMessage', packet => {
+  // 按业务 RequestId/Version 匹配回执，不把任意收到的消息视为本次成功。
+  handleBusinessPacket(packet);
+});
+connection.onreconnecting(() => showConnectionState('正在重连，待确认指令不可自动重放'));
+connection.onreconnected(async () => {
+  // ConnectionId 已改变；重建业务授权/配对并读取权威状态。
+  await restoreAuthorizedSession(connection);
+});
+connection.onclose(() => showConnectionState('已断开'));
+await connection.start();
+
+// 这个 invoke 在已经建立的 WebSocket 内发送，不会为每次点击发 HTTP 请求。
+const requestId = crypto.randomUUID().replaceAll('-', '');
+const accepted = await connection.invoke('Invoke', requestId, {
+  Action: 'SelectCamera', CameraId: selectedCameraId
+});
+if (accepted.Code !== 1) showError(accepted.Msg);
+// accepted.Code=1 只证明接口成功；目标屏幕实际完成后再收到业务 ACK 才显示控制成功。
+```
+
+示例中的动作、`restoreAuthorizedSession`、心跳和回执处理必须与当前业务接口约定一致。
+页面可每 15 秒通过同一 `Invoke` 发送业务心跳；卸载或停止授权时清理心跳、待回执计时器和
+监听，并 `await connection.stop()`。后台、断网、刷新和服务端拒绝都要显示可恢复状态。
+`withAutomaticReconnect` 不自动重试第一次 `start()`，首次失败应显示重试入口。
+
+使用四位控制码时，由展示屏点击“允许控制”后才连接和登记；localStorage 可保存随机设备秘密和
+偏好的控制码，重新打开页面仍需重新授权，服务端处理码冲突并回传实际分配值。
+不能把四位码当平台登录凭据，也不能在 URL、控制台日志或截图里暴露设备秘密。
+
+多台手机共享一个展示屏时，每台手机使用独立随机会话身份，展示屏的控制码保持相同。
+后端按接收顺序调度镜头命令，手机分别显示“排队中 / 执行中 / 成功或失败”；只有收到展示屏
+实际执行回执才显示成功。单台手机离开只清除自身会话，画面状态同步到所有仍在线的手机。
+本地导播操作或远程手动控制应停止自动巡游，明确点击“开始巡游”后才恢复。
+手机端将发送中、等待执行、执行成功、拒绝、超时和断线区分显示，支持主动断开及前台停止授权。
+配对租约、权限和幂等必须由服务端共享状态判定，localStorage 不是权限事实源。
+
 ## V8.Form
 >* 访问当前表单字段值
 ```js

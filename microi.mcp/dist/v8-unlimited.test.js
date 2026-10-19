@@ -10,7 +10,7 @@ test('创建和保存接口的实际Schema支持后端受控HTTP响应且拒绝�
     for (const match of matches) {
         const values = [...match[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
         const schema = z.enum(values);
-        for (const mode of ['JSON', 'String', 'File', 'HTML', 'Stream', 'HTTP'])
+        for (const mode of ['JSON', 'String', 'File', 'HTML', 'Stream', 'HTTP', 'SignalR'])
             assert.equal(schema.safeParse(mode).success, true, mode);
         for (const mode of ['RawScript', 'HTTP\r\nX-Evil: 1', ''])
             assert.equal(schema.safeParse(mode).success, false, mode);

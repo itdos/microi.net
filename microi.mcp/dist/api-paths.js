@@ -119,9 +119,9 @@ export const API = {
     // 原生引擎接口（用于验收/调试）
     RUN_DATA_SOURCE: '/apiengine/platform-data-source-run',
     // 通用 FormEngine 数据读写（用于租户业务数据维护）
-    FORM_GET_TABLE_DATA: '/api/FormEngine/GetTableData',
-    FORM_ADD_FORM_DATA: '/api/FormEngine/AddFormData',
-    FORM_UPT_FORM_DATA: '/api/FormEngine/UptFormData',
+    FORM_GET_TABLE_DATA: '/api/V8Engine/McpFormData',
+    FORM_ADD_FORM_DATA: '/api/V8Engine/McpFormData',
+    FORM_UPT_FORM_DATA: '/api/V8Engine/McpFormData',
     // 界面引擎（Page Engine）
     GET_PAGE_ENGINE_LIST: '/api/V8Engine/GetPageEngineList',
     GET_PAGE_ENGINE_DETAIL: '/api/V8Engine/GetPageEngineDetail',
