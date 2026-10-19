@@ -24,5 +24,6 @@ onBeforeUnmount(() => { observer?.disconnect(); themeObserver?.disconnect() })
 .engine-city-stage iframe{display:block;width:100%;height:100%;border:0;color-scheme:dark}
 .engine-city-placeholder{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e1f8ff;background:radial-gradient(ellipse at center,#153c61,#061529 70%);text-align:center;padding:30px}
 .engine-city-placeholder span{font-size:12px;letter-spacing:4px;color:#75bdd9}.engine-city-placeholder strong{font-size:clamp(22px,3vw,38px);margin-top:20px}.engine-city-placeholder p{font-size:14px;color:#a4bed6}
-@media(max-width:760px){.engine-city-stage{height:720px;width:calc(100% - 24px);border-radius:15px;margin-top:18px}}
+@media(max-width:760px){.engine-city-stage{height:720px;border-radius:15px;margin-top:18px}}
+@media(max-width:640px){.engine-city-stage{width:calc(100% - 28px)}}
 </style>
