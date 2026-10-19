@@ -3241,11 +3241,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "ec1a5fdc1da5ce9af7ae2e621995dd2dd09bd5fd881d58dfac84c364de28712e",
-      "originalLines": 677,
-      "prefixSha256": "1eb3e3e8c90844f9119091af2cf4562b33ed7e15d676bd2d1193c688c261720f",
-      "prefixBytes": 7897,
-      "entryLines": 143,
+      "originalSha256": "3998276ab21bbb92c90594a49b9ffc0c39aeed16d3473ad637ae6e4acd7475d9",
+      "originalLines": 685,
+      "prefixSha256": "f2d5f1c288602fb264a0171b755bec68a56e7d496ab93cce69f33b70f9ffc315",
+      "prefixBytes": 11204,
+      "entryLines": 151,
       "chunks": [
         {
           "id": "workspace-conventions-000",
