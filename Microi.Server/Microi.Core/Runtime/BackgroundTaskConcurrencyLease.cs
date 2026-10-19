@@ -1,6 +1,8 @@
 using System;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using StackExchange.Redis;
 
 namespace Microi.net
@@ -17,8 +19,9 @@ namespace Microi.net
         private readonly string _lockKey;
         private readonly string _owner;
         private readonly int _leaseMilliseconds;
+        private int _releaseConfirmed;
 
-        private BackgroundTaskConcurrencyLease(
+        internal BackgroundTaskConcurrencyLease(
             IDatabase database,
             string lockKey,
             string owner,
@@ -102,6 +105,7 @@ return 0";
 
         public void Dispose()
         {
+            if (Volatile.Read(ref _releaseConfirmed) == 1) return;
             const string script = @"
 if redis.call('get', KEYS[1]) == ARGV[1] then
   return redis.call('del', KEYS[1])
@@ -118,6 +122,48 @@ return 0";
             catch
             {
                 // TTL releases the lease after a node/network failure.
+            }
+        }
+
+        // 只有 Redis 确认旧持有者已释放或锁已不存在，才能省去分片间的保护延迟。
+        // 超时仅放弃加速；迟到命令仍按每次领取的唯一 owner 比较，不能删除新租约。
+        internal async Task<bool> ReleaseConfirmedAsync(TimeSpan timeout)
+        {
+            if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
+            if (Volatile.Read(ref _releaseConfirmed) == 1) return true;
+            const string script = @"
+local owner = redis.call('get', KEYS[1])
+if not owner then return 2 end
+if owner == ARGV[1] then
+  return redis.call('del', KEYS[1])
+end
+return 0";
+            Task<RedisResult> release;
+            try
+            {
+                release = _database.ScriptEvaluateAsync(script,
+                    new RedisKey[] { _lockKey }, new RedisValue[] { _owner }, CommandFlags.None);
+            }
+            catch { return false; }
+            using (var timeoutCancellation = new CancellationTokenSource())
+            {
+                var delay = Task.Delay(timeout, timeoutCancellation.Token);
+                if (await Task.WhenAny(release, delay).ConfigureAwait(false) != release)
+                {
+                    _ = release.ContinueWith(task => { var ignored = task.Exception; },
+                        CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted
+                        | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                    return false;
+                }
+                timeoutCancellation.Cancel();
+                try
+                {
+                    var result = (long)await release.ConfigureAwait(false);
+                    if (result != 1 && result != 2) return false;
+                    Volatile.Write(ref _releaseConfirmed, 1);
+                    return true;
+                }
+                catch { return false; }
             }
         }
 
