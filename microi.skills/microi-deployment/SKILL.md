@@ -24,6 +24,8 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 
 常规发布按用户指定 MCP 的实际 MySQL、MongoDB 版本、Redis 和生效 MinIO 或 OSS/HDFS 选择测试矩阵；SQL Server 真实服务与兼容专项仅在用户明确指定解决 SQL Server 问题时执行，不作为每轮发布的默认前置条件，也无需反复申请免测。本文中的“Full/重新 Full”均指当前选定矩阵，已选必测项仍须全部通过。
 
+发布测试默认复用上述 MCP 服务。固定夹具库名、端口或归属冲突先修正测试入口的可配置隔离，采用本任务唯一名称并核验所有者；不能因此新建本地数据库、Redis、MongoDB 或存储容器，也不能删除他人的夹具或放宽测试断言。不可复用的例外及清理要求统一见 [本地测试程序与依赖生命周期](../workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md#本地测试程序与依赖生命周期强制)。
+
 选择、旧脚本冲突处理及结果记录统一读取 [发布测试矩阵](../microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md#按指定-mcp-选择发布测试矩阵) 和 `../workspace-conventions/SKILL.md`；实际目标未使用的提供商不能被虚构为已验证。
 
 ## 先确认部署类型

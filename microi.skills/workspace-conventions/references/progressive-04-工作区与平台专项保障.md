@@ -19,7 +19,7 @@ Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worke
 - 若要求宿主机掉电或 `kill -9` 窗口内也绝对零丢失，必须在返回业务成功前取得外部持久消息队列、共享 outbox 或同步 WAL 的持久化确认；“内存队列随后异步落盘”不能宣称覆盖尚未持久化的强杀窗口。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-003 sha256=fd7e446aa87c7d8fecac6a258dab354bfa81415a2ed60c11f5b3069557dfa049 -->
+<!-- microi-progressive:chunk id=workspace-conventions-003 sha256=e2b353a4b8b4c11b4c22d7fa6d60056002f9efc94605f1732079c7940b13a464 -->
 ## 本地资源与 OOM 保护规范（强制）
 
 AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker build、浏览器自动化、压力测试或其他可能长时间占用 CPU/内存的进程前，必须先评估资源，不得为了“让构建跑过”无限抬高堆内存或 Worker 数。
@@ -31,6 +31,8 @@ AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker
 - 后台/长任务必须记录根 PID、子进程、启动时间和独立日志，每 15-30 秒监测一次进程树内存与全机可用内存。任务失败、中断或达阈值时必须停止整个子进程树，不得遗留孤儿 Node/dotnet/Java 进程。
 - 全量构建无法在上述阈值内完成时，先停止并改用定向 lint、类型检查、按模块构建或按测试文件验证。如仍必须进行全量验收，应明确报告资源瓶颈，交由 CI/专用构建机或经用户明确同意的独占时段执行，禁止在用户正在使用的 VS Code 会话里硬跑。
 - **本地测试程序与依赖生命周期（强制）**：默认复用当前 MCP 对应的 MySQL、Redis、MongoDB、MinIO/OSS 等实际依赖，以及健康源码/Vite；用独立测试库、租户和命名空间隔离，不按 AI 任务或节点创建整套 Docker/Compose。本机无容器、旧夹具被清理或执行 Full 都不是新建服务的理由，不再把临时测试容器许可作为常规问题。只有现有依赖确实无法满足具体验收且有证据时才采用最小必要替代方案。每轮成功、失败、取消及资源阻塞退出均精确删除自建临时容器与纯测试资源、收回自有进程和浏览器，并独立回读；既有共享服务保持原状。报告内存不足前先收回本任务遗留占用。详见[本地测试程序与依赖生命周期](progressive-02-microi-net-api-本地启动约定.md#本地测试程序与依赖生命周期强制)。
+
+固定测试库名、端口或归属标记冲突，应按上述生命周期规则改用本任务唯一命名并保留精确归属保护，不能以“隔离 Full”为由创建新的本地依赖容器。
 
 ### `Microi.Client` 框架前端构建频率（强制）
 

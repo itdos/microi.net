@@ -17,7 +17,7 @@ public class MarketplaceMetadataBootstrapIntegrationTests
     {
         var connection = Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN")!;
         var connectionParts = new DbConnectionStringBuilder { ConnectionString = connection };
-        Assert.Equal("upgrade_fixture", connectionParts["Database"]);
+        MySqlFixtureGuard.VerifyUpgrade(connection);
         Assert.Equal("127.0.0.1", connectionParts["Server"]);
         Assert.InRange(Convert.ToInt32(connectionParts["Port"]), 1024, 65535);
         var databaseName = "microi_metadata_fixture_" + Guid.NewGuid().ToString("N");

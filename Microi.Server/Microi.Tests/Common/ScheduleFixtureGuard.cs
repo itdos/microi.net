@@ -33,10 +33,13 @@ internal static class ScheduleFixtureGuard
     internal static async Task VerifyMySqlOwnerAsync(MySqlConnectionStringBuilder settings)
     {
         Assert.Equal("127.0.0.1", settings.Server);
-        Assert.Equal("schedule_gate", settings.Database);
         Assert.InRange(settings.Port, 1024u, 65535u);
-        if (settings.Port == 62680) return;
-        var expected = ValidateFixtureId(Environment.GetEnvironmentVariable("MICROI_TEST_SCHEDULE_FIXTURE_ID"));
+        var configuredDatabase = Environment.GetEnvironmentVariable("MICROI_TEST_SCHEDULE_DATABASE");
+        var configuredOwner = Environment.GetEnvironmentVariable("MICROI_TEST_SCHEDULE_FIXTURE_ID");
+        var namedOwner = MySqlFixtureGuard.ValidateTarget(settings, "schedule", configuredDatabase,
+            string.IsNullOrEmpty(configuredDatabase) ? null : configuredOwner);
+        if (settings.Port == 62680 && namedOwner == null) return;
+        var expected = namedOwner ?? ValidateFixtureId(configuredOwner);
         await using var connection = new MySqlConnection(settings.ConnectionString);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         using var command = new MySqlCommand("SELECT FixtureId FROM microi_schedule_fixture WHERE Id=1", connection);

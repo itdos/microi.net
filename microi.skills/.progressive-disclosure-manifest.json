@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-19T11:47:12.517Z",
+  "generatedAt": "2026-10-19T12:03:58.630Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -1382,17 +1382,17 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "4d2bdb53447bf8bfca376f2861dd6828b4c07b3511503d5ab2bdb7eb1934f83e",
-      "originalLines": 813,
-      "prefixSha256": "f691ccb80a94c5e34216ed442e750c814cbc3c2f860d6ad69dc4349ec286e8e5",
-      "prefixBytes": 3679,
-      "entryLines": 205,
+      "originalSha256": "a70cd402df73041f886f64ebd7eb315e23cae0ae1347a4806b533a63b30b2193",
+      "originalLines": 815,
+      "prefixSha256": "7a2f83e469bfc176ff5fccc556acff13ebc157cc820e5b5f1e776269f227653b",
+      "prefixBytes": 3656,
+      "entryLines": 207,
       "chunks": [
         {
           "id": "playwright-e2e-000",
           "ordinal": 0,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "f04614f276c139cfa50b9e46e89857675c6dc5e7cf0cfbfde76d6e6dbe9746c9",
+          "sha256": "a6ef528a2a940fd0f58efaee6b73eb5dbc159db93d95afedf41c7b8642536d18",
           "lines": 9,
           "heading": "是否需要 `-e2e` 后缀"
         },
@@ -1400,7 +1400,7 @@
           "id": "playwright-e2e-001",
           "ordinal": 1,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "703786ae7a5a52cb39664f1c82de7fb7aa7dfece511046d3757da64918c23063",
+          "sha256": "b3970a9a4603447651520667c05ab4ecfae01b65b3f752e9f318007c5e2699c1",
           "lines": 11,
           "heading": "适用范围"
         },
@@ -1408,7 +1408,7 @@
           "id": "playwright-e2e-002",
           "ordinal": 2,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "acef3e589cf11f3c197ee0b0ccf56d96b3f286263d54161b3c260e07c2090ed0",
+          "sha256": "5874137c92e16fd5cc729fd9c23d051caa3e64438fc7bee1d717ae9c5a0f2a90",
           "lines": 20,
           "heading": "临时文件与产物放置规则（必须遵守）"
         },
@@ -1416,7 +1416,7 @@
           "id": "playwright-e2e-003",
           "ordinal": 3,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "69b8842a221a0de60f8605c5059deee391be0f16f0b6cbc5ddfb3cfd210268db",
+          "sha256": "247ddb9017c174f0daa88d1f6e4220c5530b79c5ac976e61e128ed8bd0aa1fea",
           "lines": 20,
           "heading": "标准目录"
         },
@@ -1424,7 +1424,7 @@
           "id": "playwright-e2e-004",
           "ordinal": 4,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "4f5e11baf4651c11b5f9819a0b4f33ce2590db1733d4db72814bd1a25daf56ff",
+          "sha256": "f71fe44f7d5753b93804dac958ea8205cddcaee25188a8417b33770e305c46ed",
           "lines": 21,
           "heading": "必备环境变量"
         },
@@ -1432,7 +1432,7 @@
           "id": "playwright-e2e-005",
           "ordinal": 5,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "51567cea5fca434f9b031fef0871454100cf4715dfb65695dc1722bd275399be",
+          "sha256": "a66696c3263f060d0b7be309a527fca6a9bad95dd534eabbe84f1b6539770d8e",
           "lines": 24,
           "heading": "本地测试账号自动发现"
         },
@@ -1440,7 +1440,7 @@
           "id": "playwright-e2e-006",
           "ordinal": 6,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "88e1002cae934acd2de5af2f77f371a9ea152a525eecf11b49fe182b16a56044",
+          "sha256": "6aeefebda3a9e598564c53c2f8028a4ccefe2291c4c7c7ae4781ca15fb5d0697",
           "lines": 12,
           "heading": "后端改动后的 E2E 前置动作"
         },
@@ -1448,8 +1448,8 @@
           "id": "playwright-e2e-007",
           "ordinal": 8,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "948194cce3a29cfec216546acab77314ccaa1c0afad3cbcfd6b426a94f36d4ac",
-          "lines": 42,
+          "sha256": "f866625ae131442e50ccee9faacc98672daa138154dd4a0e5deb054271b688b2",
+          "lines": 44,
           "heading": "服务自启动纪律（必做）"
         },
         {
@@ -3241,11 +3241,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "d9daeee64f34763c297abf320fc81319b32a24ceb22365d4cd34884fe67bfc21",
-      "originalLines": 677,
-      "prefixSha256": "1eb3e3e8c90844f9119091af2cf4562b33ed7e15d676bd2d1193c688c261720f",
-      "prefixBytes": 7897,
-      "entryLines": 143,
+      "originalSha256": "5d68eb08205191872456e2f2d9405c5f19b11c321a73a1ba23470c4c0814c6d0",
+      "originalLines": 683,
+      "prefixSha256": "9930e55c049c3cbe8ec776bc9be67da4c2d944112c842c7cbd5e872b757920a3",
+      "prefixBytes": 8660,
+      "entryLines": 145,
       "chunks": [
         {
           "id": "workspace-conventions-000",
@@ -3275,8 +3275,8 @@
           "id": "workspace-conventions-003",
           "ordinal": 3,
           "destination": "workspace-conventions/references/progressive-04-工作区与平台专项保障.md",
-          "sha256": "fd7e446aa87c7d8fecac6a258dab354bfa81415a2ed60c11f5b3069557dfa049",
-          "lines": 19,
+          "sha256": "e2b353a4b8b4c11b4c22d7fa6d60056002f9efc94605f1732079c7940b13a464",
+          "lines": 21,
           "heading": "本地资源与 OOM 保护规范（强制）"
         },
         {
@@ -3563,8 +3563,8 @@
           "id": "workspace-conventions-039",
           "ordinal": 39,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "6a24718aa7e8b1b34cc6ff212d5a8331976d338bb60d99401c256c469e522a67",
-          "lines": 13,
+          "sha256": "ff09cc6c76c9c6d13280f1d0fe45db19775863bca06eae8dadd1c4b2358183d3",
+          "lines": 15,
           "heading": "本地测试程序与依赖生命周期（强制）"
         }
       ],

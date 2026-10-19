@@ -56,7 +56,7 @@ public class ScheduleRuntimeTimeWriterIntegrationTests
     {
         var parts = new DbConnectionStringBuilder { ConnectionString = Connection! };
         Assert.Equal("127.0.0.1", parts["Server"]);
-        Assert.Contains(Convert.ToString(parts["Database"]), new[] { "upgrade_fixture", "xqc_verify" });
+        MySqlFixtureGuard.VerifyUpgrade(Connection!, allowLegacyXqc: true);
         Assert.InRange(Convert.ToInt32(parts["Port"]), 1, 65535);
         var name = "microi_schedule_runtime_" + Guid.NewGuid().ToString("N");
         parts["Database"] = "mysql";

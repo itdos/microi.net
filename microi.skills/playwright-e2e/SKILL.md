@@ -22,7 +22,7 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 真实依赖与发布范围沿用 `../workspace-conventions/SKILL.md` 的“平台回归与独立应用测试归属”：常规验证指定 MCP 实际使用的 MySQL、MongoDB、Redis 和 MinIO 或 OSS/HDFS，不要求额外 SQL Server 环境；仅用户明确指定 SQL Server 问题时才做其专项。按 [发布测试矩阵](../microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md#按指定-mcp-选择发布测试矩阵) 记录实际覆盖，保留正常登录、业务闭环与资源收尾，不以连接成功代替真实读写验收。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=playwright-e2e-000 sha256=f04614f276c139cfa50b9e46e89857675c6dc5e7cf0cfbfde76d6e6dbe9746c9 -->
+<!-- microi-progressive:chunk id=playwright-e2e-000 sha256=a6ef528a2a940fd0f58efaee6b73eb5dbc159db93d95afedf41c7b8642536d18 -->
 ## 是否需要 `-e2e` 后缀
 
 建议保留 `playwright-e2e` 这个 skill 名称。
@@ -32,7 +32,7 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 - 如果未来要补更细的能力，可以新增 `playwright-api` 或 `visual-regression`，不要把当前 skill 改成泛泛的 `playwright`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-001 sha256=703786ae7a5a52cb39664f1c82de7fb7aa7dfece511046d3757da64918c23063 -->
+<!-- microi-progressive:chunk id=playwright-e2e-001 sha256=b3970a9a4603447651520667c05ab4ecfae01b65b3f752e9f318007c5e2699c1 -->
 ## 适用范围
 
 - PC 管理端：`Microi.Client`、租户后台、运营后台。
@@ -44,7 +44,7 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 不适合把 Playwright 用来替代 V8 单函数调试。单个接口引擎的入参输出优先用 VS Code 插件远程执行、MCP `microi_run_engine` 或后端单元测试。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-002 sha256=acef3e589cf11f3c197ee0b0ccf56d96b3f286263d54161b3c260e07c2090ed0 -->
+<!-- microi-progressive:chunk id=playwright-e2e-002 sha256=5874137c92e16fd5cc729fd9c23d051caa3e64438fc7bee1d717ae9c5a0f2a90 -->
 ## 临时文件与产物放置规则（必须遵守）
 
 AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测试报告**等，**绝对不能放在工作区根目录**，必须放在以下指定位置：
@@ -65,7 +65,7 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 **2026-06 强制补充**：AI 手写的一次性 Playwright 验证脚本、运行日志、截图和报告只能写到工作区根目录 `.tmp/`。不要写到 `Microi.Client/`、`Microi.Server/`、`microi.doc/` 或其它子项目目录，即使这些目录已有 `tests/` 目录也不例外。只有 Microi.Agent 插件正式初始化的可复用 E2E 工程，才使用 `.microi-e2e/`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-003 sha256=69b8842a221a0de60f8605c5059deee391be0f16f0b6cbc5ddfb3cfd210268db -->
+<!-- microi-progressive:chunk id=playwright-e2e-003 sha256=247ddb9017c174f0daa88d1f6e4220c5530b79c5ac976e61e128ed8bd0aa1fea -->
 ## 标准目录
 
 前端项目中推荐使用 `tests/e2e`，而不是根目录 `e2e`，这样能和单元测试、组件测试并列。
@@ -86,7 +86,7 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-004 sha256=4f5e11baf4651c11b5f9819a0b4f33ce2590db1733d4db72814bd1a25daf56ff -->
+<!-- microi-progressive:chunk id=playwright-e2e-004 sha256=f71fe44f7d5753b93804dac958ea8205cddcaee25188a8417b33770e305c46ed -->
 ## 必备环境变量
 
 ```bash
@@ -108,7 +108,7 @@ PW_HOME_PATH=/#/pages/index/index
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-005 sha256=51567cea5fca434f9b031fef0871454100cf4715dfb65695dc1722bd275399be -->
+<!-- microi-progressive:chunk id=playwright-e2e-005 sha256=a66696c3263f060d0b7be309a527fca6a9bad95dd534eabbe84f1b6539770d8e -->
 ## 本地测试账号自动发现
 
 当没有显式传入 `PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD` / `MICROI_OSCLIENT` 时，AI 不要把账号密码写入后端配置来制造旁路：
@@ -133,7 +133,7 @@ PW_HOME_PATH=/#/pages/index/index
    Profile/`--user-data-dir`。自动化收尾只关闭自己创建的 context/browser。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-006 sha256=88e1002cae934acd2de5af2f77f371a9ea152a525eecf11b49fe182b16a56044 -->
+<!-- microi-progressive:chunk id=playwright-e2e-006 sha256=6aeefebda3a9e598564c53c2f8028a4ccefe2291c4c7c7ae4781ca15fb5d0697 -->
 ## 后端改动后的 E2E 前置动作
 
 如果本轮任务修改过 `Microi.Server/**` 后端源码、配置、控制器、服务、依赖项目或接口行为，跑 Playwright、页面截图、接口验收或前后端联调前，必须先按 `workspace-conventions` 的“后端代码改动后的重启验收”完成：
@@ -146,8 +146,10 @@ PW_HOME_PATH=/#/pages/index/index
 不要只说“代码已编译”或“需要用户自己重启后端”；除非用户明确要求不要中断当前服务，否则 AI 要主动完成重启。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=948194cce3a29cfec216546acab77314ccaa1c0afad3cbcfd6b426a94f36d4ac -->
+<!-- microi-progressive:chunk id=playwright-e2e-007 sha256=f866625ae131442e50ccee9faacc98672daa138154dd4a0e5deb054271b688b2 -->
 ## 服务自启动纪律（必做）
+
+服务自启动只解决本次应用程序的可用性，不授权新建依赖容器。测试连接当前 MCP 对应的 MySQL、Redis、MongoDB、HDFS/OSS/MinIO；固定库名、端口或归属冲突先配置独立命名并核验所有者，不能以“夹具隔离”作为另建本地 Docker 的理由。例外判断统一遵循 [依赖生命周期](../workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md#本地测试程序与依赖生命周期强制)。
 
 执行自动化测试、截图巡检、接口引擎回读、`/apiengine/{key}` 验收时，如果本地后端或前端不可达，不能把 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听当作任务终点。必须先自动启动所需服务，再继续完整验证。
 
