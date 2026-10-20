@@ -1,6 +1,7 @@
 ﻿function Remove-MicroiOwnedTestArtifacts {
     [CmdletBinding()]
     param([string]$ArtifactTarget, [string]$ArtifactLink, [Parameter(Mandatory=$true)][string]$ResultsDirectory)
+    . (Join-Path $PSScriptRoot 'Microi.ArtifactSafety.ps1')
 
     # 只接收本次入口新建并记录的路径；已有目录不取得所有权。
     $results = [IO.Path]::GetFullPath($ResultsDirectory)
@@ -8,24 +9,12 @@
         $target = [IO.Path]::GetFullPath($ArtifactTarget)
         $expected = [IO.Path]::GetFullPath((Join-Path $results '.net-artifacts'))
         if ($target -ne $expected -or $target -eq $results) { throw 'Owned test artifact target escaped its results directory.' }
-        if (Test-Path -LiteralPath $target) {
-            $pending = [Collections.Generic.Stack[string]]::new()
-            $pending.Push($target)
-            while ($pending.Count -gt 0) {
-                $current = Get-Item -LiteralPath $pending.Pop() -Force -ErrorAction Stop
-                if (($current.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Artifact cleanup refused a reparse point: $($current.FullName)" }
-                foreach ($entry in Get-ChildItem -LiteralPath $current.FullName -Force -ErrorAction Stop) {
-                    if ($entry.Name -eq '.git' -or ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-                        throw "Artifact cleanup refused a Git marker or reparse point: $($entry.FullName)"
-                    }
-                    if ($entry.PSIsContainer) { $pending.Push($entry.FullName) }
-                }
-            }
-        }
+        Assert-MicroiArtifactTree -LiteralPath $target
     }
     if ($ArtifactLink) {
         $link = [IO.Path]::GetFullPath($ArtifactLink)
         if (-not $ArtifactTarget) { throw 'An owned artifact link requires its owned target.' }
+        Assert-MicroiArtifactPath -LiteralPath ([IO.Path]::GetDirectoryName($link))
         $item = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
         if ($null -ne $item) {
             $actualTarget = @($item.Target) | Select-Object -First 1

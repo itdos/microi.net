@@ -494,8 +494,12 @@ Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory"
         $cleanup | Add-Member -NotePropertyName retainedExistingArtifactTarget -NotePropertyValue $retainedArtifactTarget
         $cleanup | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ResultsDirectory 'artifact-cleanup.json') -Encoding UTF8
     } catch {
-        Write-Warning "Test artifact cleanup incomplete: $($_.Exception.Message); target: $ownedArtifactTarget; link: $ownedArtifactLink"
-        [pscustomobject]@{cleaned=$false;artifactTarget=$ownedArtifactTarget;artifactLink=$ownedArtifactLink;error=$_.Exception.Message} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ResultsDirectory 'artifact-cleanup.json') -Encoding UTF8
-        if (-not $artifactGateFailed) { throw }
+        $cleanupError = $_
+        Write-Warning "Test artifact cleanup incomplete: $($cleanupError.Exception.Message); target: $ownedArtifactTarget; link: $ownedArtifactLink"
+        try {
+            [pscustomobject]@{cleaned=$false;artifactTarget=$ownedArtifactTarget;artifactLink=$ownedArtifactLink;error=$cleanupError.Exception.Message} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ResultsDirectory 'artifact-cleanup.json') -Encoding UTF8
+        } catch { Write-Warning "Cannot write cleanup receipt: $($_.Exception.Message)" }
+        # 清理及回执写入失败不能覆盖原来的测试失败原因。
+        if (-not $artifactGateFailed) { throw $cleanupError }
     }
 }

@@ -118,6 +118,10 @@ SQL Server 验收还应覆盖 Unicode 文本、带单引号的创建人姓名和
 
 ## 🧪 后端自动化测试与发布门禁
 
+测试与发布会自动回收自己新建的临时文件。Full 保留测试报告和 `artifact-cleanup.json`，删除本轮 `.net-artifacts`；一键发布将构建、pack、冒烟日志及 NuGet 替换临时目录统一放入结果目录的唯一 `release-scratch-*`，退出后保留同级 `.cleanup.json` 小回执。已有目录、其它任务工作区和未提交源码不会因本轮使用而取得删除权。
+
+Windows 清理采用普通 PowerShell 删除，先检查真实路径、祖先链接、Git 标记、受保护属性和文件占用，不默认使用 `-Force`。清理失败保留归属清单及错误，不升级为强删；发布原失败码保留，原成功但清理失败则返回非零。`blocked by policy` 若发生在 shell 启动前，脚本内检查与收尾均未执行，应先定位当前执行器和拒绝阶段；不要改 ACL、清除属性或换工具绕过。硬杀或掉电后需按归属清单重新核验并补清，不能整体清空共享 `.tmp`。
+
 后端测试统一位于 `/Microi.Server/Microi.Tests`。它合并了历史
 `Dos.Common.Tests`、`Dos.ORM.Tests`，并在私有源码存在时条件纳入 AI、
 FormEngine、ApiEngine、安全与多租户边界测试。

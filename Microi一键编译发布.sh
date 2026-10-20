@@ -141,6 +141,14 @@ MICROI_ACTIVE_BUILD_PID=""
 MICROI_ACTIVE_GUARD_PID_FILE=""
 MICROI_RELEASE_LOCK_HELD=false
 MICROI_RELEASE_LOCK_DIR=""
+MICROI_RELEASE_SCRATCH=""
+MICROI_RELEASE_SCRATCH_TOOL="$PWD/Microi.Server/tools/release-scratch.mjs"
+
+# 只清理本进程新建并登记的 scratch；不扫描共享 .tmp，也不清空发布报告。
+cleanup_release_scratch() {
+    [ -z "$MICROI_RELEASE_SCRATCH" ] && return 0
+    node "$MICROI_RELEASE_SCRATCH_TOOL" cleanup "$MICROI_RELEASE_SCRATCH"
+}
 
 is_windows_shell() {
     [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]
@@ -263,6 +271,10 @@ finish_windows_session() {
     local _exit_code=$?
     trap - EXIT
     stop_active_client_build
+    if ! cleanup_release_scratch; then
+        echo "临时文件清理未完成，已保留路径及错误回执：$MICROI_RELEASE_SCRATCH" >&2
+        [ "$_exit_code" -ne 0 ] || _exit_code=1
+    fi
     release_workspace_lock
     if is_windows_shell && [ "$MICROI_SKIP_EXIT_PAUSE" != true ] && [ -t 0 ]; then
         echo ""
@@ -411,6 +423,12 @@ if [ "$MICROI_RELEASE_GATE_DIR" = / ] || [[ "$MICROI_RELEASE_GATE_DIR" =~ ^/[A-Z
     print_fail "发布结果目录不能是文件系统或盘符根目录。"
 fi
 export MICROI_RELEASE_GATE_DIR
+
+MICROI_RELEASE_SCRATCH=$(node "$MICROI_RELEASE_SCRATCH_TOOL" create "$MICROI_RELEASE_GATE_DIR")
+# Node 返回 Windows 原生路径；只在 shell 文件操作前转成 Git Bash 路径。
+if is_windows_shell; then
+    MICROI_RELEASE_SCRATCH=$(cygpath -u "$MICROI_RELEASE_SCRATCH")
+fi
 
 # 直接启动前端构建守护器，避免 Git Bash + nvm-windows 的 npm POSIX 包装器
 # 在异常关闭时留下多层 bash/npm 残留进程。
@@ -1244,17 +1262,15 @@ if [ "$BUILD_BACKEND" = true ]; then
 
     print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:ShouldUnsetParentConfigurationAndPlatform=false"
     echo ""
-    _BUILD_LOG="$(mktemp /tmp/microi-build.XXXXXX.log)"
+    _BUILD_LOG="$(mktemp "$MICROI_RELEASE_SCRATCH/build.XXXXXX.log")"
     # 方案外的 NPOI 等引用同样必须产出 Release，不能被 SDK 回退成 Debug。
     if ! dotnet build "$SLN_FILE" -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false -p:ShouldUnsetParentConfigurationAndPlatform=false 2>&1 | tee "$_BUILD_LOG"; then
         echo ""
         echo -e "  ${RED}───── 编译错误摘要（最后30行）─────${NC}"
         grep -E "error |Error |FAILED" "$_BUILD_LOG" 2>/dev/null | tail -20 || tail -30 "$_BUILD_LOG"
         echo -e "  ${RED}───────────────────────────────────${NC}"
-        rm -f "$_BUILD_LOG"
         print_fail "后端编译失败，请检查上方编译错误"
     fi
-    rm -f "$_BUILD_LOG"
     echo ""
     print_success "后端编译成功"
 fi
@@ -1297,7 +1313,7 @@ if [ "$PUSH_NUGET" = true ] || { [ "$HAS_ENCRYPT" = true ] && [ "$DEPLOY_MODE" =
     print_divider
     print_step "dotnet pack 生成 NuGet 包（--no-build，基于已编译产物）..."
     echo ""
-    _PACK_LOG="$(mktemp /tmp/microi-pack.XXXXXX.log)"
+    _PACK_LOG="$(mktemp "$MICROI_RELEASE_SCRATCH/pack.XXXXXX.log")"
     _PACK_FAILED=0
     # Pack 与 Release 编译保持相同配置，避免方案外项目引用被 SDK 重置为 Debug。
     if [ -f "${_MICROI_NET_PROJECT:-}" ]; then
@@ -1320,14 +1336,11 @@ if [ "$PUSH_NUGET" = true ] || { [ "$HAS_ENCRYPT" = true ] && [ "$DEPLOY_MODE" =
         echo -e "  ${RED}───── Pack 错误摘要─────${NC}"
         grep -E "error |Error |FAILED" "$_PACK_LOG" 2>/dev/null | tail -20 || tail -30 "$_PACK_LOG"
         echo -e "  ${RED}────────────────────────${NC}"
-        rm -f "$_PACK_LOG"
         print_fail "NuGet 包生成失败"
     fi
     if [ -f "${_MICROI_NET_PROJECT:-}" ] && [ ! -f "Microi.Server/Microi.net/bin/Release/Microi.net.${VERSION}.nupkg" ]; then
-        rm -f "$_PACK_LOG"
         print_fail "Microi.net.${VERSION}.nupkg 未生成，禁止用旧版本包继续发布"
     fi
-    rm -f "$_PACK_LOG"
     echo ""
     print_success "NuGet 包生成成功"
 fi
@@ -1436,7 +1449,7 @@ SMOKE_PORT=${SMOKE_PORT:-18080}
 SMOKE_URL="http://127.0.0.1:${SMOKE_PORT}/api/Diagnostics/liveness"
 print_divider
 print_step "冒烟测试: 验证程序能否正常启动（超时 ${SMOKE_TIMEOUT}s）..."
-SMOKE_LOG="$(mktemp /tmp/microi-smoke-test.XXXXXX.log)"
+SMOKE_LOG="$(mktemp "$MICROI_RELEASE_SCRATCH/smoke.XXXXXX.log")"
 if ! (
     cd "$PUBLISH_DIR"
 
@@ -1497,7 +1510,6 @@ if ! (
     echo "----------------"
     exit 1
 ); then
-    rm -f "$SMOKE_LOG" 2>/dev/null
     # 先还原 appsettings，再让脚本整体中止，避免把临时配置留给发布产物
     if [ "$SMOKE_INJECTED" = true ] && [ -f "$SMOKE_BACKUP" ]; then
         mv "$SMOKE_BACKUP" "$PUBLISH_DIR/appsettings.json"
@@ -1506,7 +1518,6 @@ if ! (
     cleanup_publish_artifacts "$PUBLISH_DIR"
     print_fail "冒烟测试失败，请检查编译产物"
 fi
-rm -f "$SMOKE_LOG" 2>/dev/null
 
 # --- 还原冒烟测试临时注入的 appsettings ---
 # 还原发布目录原始的 appsettings.json，避免发布产物带真实数据库/Redis/Mongo 连接串。
@@ -1571,13 +1582,12 @@ if [ "$DLL_ENCRYPTED" = true ] && { [ "$PUSH_NUGET" = true ] || [ "$DEPLOY_MODE"
         local _update_ok=false
         if command -v zip &>/dev/null; then
             local _tmp_dir
-            _tmp_dir=$(mktemp -d)
+            _tmp_dir=$(mktemp -d "$MICROI_RELEASE_SCRATCH/nuget.XXXXXX")
             mkdir -p "$_tmp_dir/$(dirname "$dll_entry")"
             cp "$encrypted_dll" "$_tmp_dir/$dll_entry"
             if (cd "$_tmp_dir" && zip -u "$abs_pkg" "$dll_entry" > /dev/null 2>&1); then
                 _update_ok=true
             fi
-            rm -rf "$_tmp_dir"
         fi
 
         if [ "$_update_ok" != true ] && [[ -n "$WINDIR" || "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
