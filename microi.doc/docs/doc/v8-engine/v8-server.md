@@ -1805,6 +1805,237 @@ return deviceResult;
 
 验收要分层记录：TCP 内部状态须为 `Listening` 且日志明确显示端口已监听（目前没有对外的 TCP 状态 HTTP 端点）；从允许网段先探测端口，再做拆包、粘包、连续心跳回环测试，并逐帧核对同连接 ACK 的字节、CRC 和设备号关联；最后由实体设备验证心跳上行、同连接应答和业务快照。配置、引擎安全位或端口冲突失败仅使 TCP 进入 `Faulted` 并记录失败阶段，HTTP API 保持运行；不能让 HTTP 健康或单纯端口连通误报为 TCP 已回 ACK。只有端口可连或回环通过，也不能宣称设备网络图标已点亮或生产数据已入库。
 
+## V8.IoT：通过设备现有 TCP 连接下行
+
+`V8.IoT.Send` 把完整协议帧交给持有设备连接的 API 节点发送，适用于设备主动连接平台、
+无法从服务器另开连接访问设备的场景。它与一次性客户端 `V8.Tcp.Send` 的连接方向不同。
+需要配套升级 Core、V8Engine 和 API；只替换 V8Engine DLL 不足以启用此能力。
+
+### 与 MQTT、TCP 的选择
+
+| 接入方式 | 使用能力 | 协议与业务的归属 |
+| --- | --- | --- |
+| 设备连接平台 MQTT Broker | 既有 MQTT 引擎 | Topic、认证、ACL 和下行按 MQTT 文档配置 |
+| 平台主动连接设备开放的 TCP 端口 | `V8.Tcp` | 一次连接内发送/收取原始字节 |
+| 设备主动连接平台原始 TCP 监听 | `V8.IoT.Send` | 沿已授权的原连接下行，跨 API 节点路由 |
+| 厂家提供 HTTP 云接口 | `V8.Http` | 接口引擎调用厂家 API |
+
+`V8.IoT` 不包含任何厂商名、制冷/制热操作码、设备业务表或固定设备编号。
+原子只处理受权连接、字节帧、去重、有效期与传输状态；厂商适配、命令序列号、
+设备权限、回执解析及业务状态机由接口引擎负责。当前公开的 IoT 传输适配器是原始 TCP，
+不会自动把 TCP 报文转换成 MQTT 或 HTTP。
+
+### 可配置的厂商协议
+
+原规则未添加 `framing` 时，保持历史格式：4 字节帧头、2 字节帧尾、
+U16 大端长度、CRC16/XMODEM 大端校验。新协议在既有规则内显式添加 `framing`：
+
+```json
+{
+  "osClient": "<OsClient>",
+  "apiEngineKey": "device-uplink",
+  "allowedCidrs": ["127.0.0.1/32"],
+  "requestHeaderHex": "A1",
+  "responseHeaderHex": "B2",
+  "tailHex": "0D0A",
+  "lengthOffset": 1,
+  "lengthAdjustment": 0,
+  "correlationOffset": 3,
+  "correlationLength": 2,
+  "framing": {
+    "mode": "LengthPrefix",
+    "lengthBytes": 2,
+    "lengthByteOrder": "LittleEndian",
+    "checksum": "Crc16Modbus",
+    "checksumByteOrder": "LittleEndian",
+    "checksumStartOffset": 0
+  },
+  "downlink": {
+    "enabled": true,
+    "deviceOffset": 3,
+    "deviceLength": 2,
+    "sendApiEngineKeys": ["device-control-dispatch"]
+  }
+}
+```
+
+这是另一套匿名示例协议，不能直接覆盖已有设备配置。示例设备地址 `0102`、
+载荷 `55` 的上报帧为 `A10A0001025511F40D0A`；CRC 应由接入方按实际协议计算并核验。
+所有偏移均从帧首按字节计数，地址可位于长度字段前或后，但不能与帧头、长度或校验区重叠。
+
+| 配置 | 语义与范围 |
+| --- | --- |
+| `framing.mode` | `LengthPrefix` 长度字段、`FixedLength` 固定帧长、`Delimiter` 结束符拆帧 |
+| `requestHeaderHex` / `responseHeaderHex` | 显式 `framing` 下各为 0–32 字节；无帧头时明确写空字符串 |
+| `tailHex` | 0–16 字节；`Delimiter` 模式必须非空，载荷不得包含未转义的结束符 |
+| `lengthOffset` / `framing.lengthBytes` | 长度字段偏移 0–128；宽度 1、2、4 字节；只在 `LengthPrefix` 模式读取 |
+| `framing.lengthByteOrder` | `BigEndian`（默认）或 `LittleEndian` |
+| `lengthAdjustment` | 实际总长度 = 长度字段值 + 此值；显式 `framing` 时允许 -65535–65535 |
+| `framing.fixedLength` | `FixedLength` 模式必填正整数，且不超过 `maxFrameBytes` |
+| `framing.checksum` | `Crc16Xmodem`（默认）、`Crc16Modbus`、`None` |
+| `framing.checksumByteOrder` | 校验字段字节序，默认 `BigEndian`；校验字段紧邻帧尾之前 |
+| `framing.checksumStartOffset` | 校验计算起点 0–128，终点为校验字段之前，不包含帧尾 |
+| `downlink.downlinkDeviceOffset` | 下行地址偏移，默认等于上报的 `deviceOffset` |
+
+上报、普通应答和主动下行共用同一套结构规则，头部可按方向不同；普通应答继续严格校验
+`correlationOffset/correlationLength`，主动下行独立验证目标设备，不能放宽 ACK 关联来发送控制帧。
+完整帧最大 65535 字节，仍受连接缓冲与待发队列总预算约束。平台不按未验证的长度分配内存。
+
+一个 API 进程当前只加载主租户的一套监听规则；这不是单端口自动识别任意厂家协议。
+不同协议可用相应的受管接入实例/网关，业务接口共用本原子；单实例多监听、TLS、转义解码、
+动态地址格式和未列出的校验算法尚未提供。遇到不满足描述的协议应补通用适配器，不能写死厂家分支。
+
+### 配置与连接授权
+
+默认不启用。在主租户既有 `sys_osclients.TcpIngressRulesJson` 中添加以下 `downlink` 节点，
+其它帧配置、端口和正常 ACK 关联规则保持原值。修改后重启 API；不增加环境变量或新进程。
+
+```json
+{
+  "downlink": {
+    "enabled": true,
+    "deviceOffset": 6,
+    "deviceLength": 8,
+    "sendApiEngineKeys": ["device-control-dispatch"],
+    "maxPendingCommands": 32,
+    "maxExpireSeconds": 120,
+    "deduplicateSeconds": 86400,
+    "leaseSeconds": 30,
+    "pollIntervalMilliseconds": 500
+  }
+}
+```
+
+上例是**添加到原规则中的节点片段**，不能用它替换完整入站配置。
+设备区域必须按实际协议填写；`deviceOffset` 是从帧首开始的零基字节偏移。
+控制接口引擎必须禁止匿名，并在生成报文前按当前用户校验设备行权限和操作权限。
+调用 Key 从后端执行上下文读取，不能由 `V8.Param` 指定；该白名单授予的是可信业务入口。
+
+内部上报接口在确认设备身份与业务绑定后，每次成功处理都需返回
+`Data.IoTDeviceId`，内容为帧内设备地址的规范十六进制，同时继续返回正常的
+`Data.ResponseFrameHex`。宿主校验两者地址一致，且 ACK 写入成功后才登记连接。
+协议明确无需平台再次应答的消息，可使用下文的显式 `None` 模式，在校验处理完成后登记/复核连接。
+未绑定设备可继续返回心跳 ACK，但不返回 `IoTDeviceId`，因而不能接收下行。
+已登记连接后续失去授权则关闭；同一物理连接不能切换设备身份。
+CRC 和设备号本身不能认证设备，实际凭据或来源限制仍按设备协议处理。
+
+| 配置 | 默认值 / 范围 |
+| --- | --- |
+| `enabled` | 必须显式为 `true`；缺失整个节点或设为 `false` 不启用 |
+| `deviceOffset` / `deviceLength` | 必填；上报偏移 0–128，地址长 1–32 字节，不能覆盖帧头/长度字段；下行偏移可单独指定 |
+| `sendApiEngineKeys` | 必填；1–32 个允许调用的接口引擎 Key |
+| `maxPendingCommands` | 32；1–128，单设备待发载荷预算最多 512 KiB |
+| `maxExpireSeconds` | 120；1–600 秒 |
+| `deduplicateSeconds` | 86400；600–604800 秒；业务去重仍须持久记录 |
+| `leaseSeconds` | 30；10–120 秒；连接持有者续租，旧连接不能删除新连接租约 |
+| `pollIntervalMilliseconds` | 500；100–5000，必须小于租约时长的三分之一 |
+
+### 调用与结果
+
+```javascript
+// 已持久记录指令并提交后，由已授权的派发接口执行。
+// 这些变量由当前业务设备记录和厂家协议生成，不能透传任意前端报文。
+return V8.IoT.Send({
+  DeviceId: deviceAddressHex,
+  CommandId: committedCommandId,
+  FrameHex: fullProtocolFrameHex,
+  ExpireSeconds: 30
+});
+```
+
+`DeviceId` 是协议设备地址，不是业务表记录 Id；接口引擎负责映射。
+`CommandId` 必须稳定，支持 1–128 位字母、数字、点、下划线和横线。
+`FrameHex` 必须是无分隔符的完整十六进制帧，经过配置的帧头、长度、尾部、
+所选校验算法和设备地址校验。其它参数，包括 `OsClient`、`Host`、`Port` 均拒绝。
+当前租户登录用户及可信后台任务身份可使用；匿名上下文、表单事件和未授权 Key 拒绝。
+
+### 动作、参数、报警和定时配置共用原子
+
+`Send` 不限制业务命令码、子操作码和载荷长度；开关、温度、提醒、阀门、定时、模式或其它
+功能都可由接口引擎生成符合配置的完整帧。新增同协议业务动作不需要再次修改 C#。
+平台传输成功、设备命令确认与设备达到目标状态必须分别记录。
+
+| 控制类型 | 接口引擎/命令目录需要配置 |
+| --- | --- |
+| 开机、关机、模式、继电器 | 业务动作 Key、协议命令/子码、允许状态、用户设备与动作权限 |
+| 温度、流量、时长、阈值 | 字段顺序、U8/U16/U32 等宽度、字节序、单位/倍率、机型范围、枚举/步长 |
+| 报警上报与恢复 | 上行命令、位图/枚举、产生/恢复事件、去重与通知；不能把上报码直接当作控制码 |
+| 报警提示开关、消音、复位 | 厂家明确提供的下行命令、字段、权限与回执；没有协议定义时保持不可用 |
+| 定时、分段参数、数组 | 重复组数、时间/时区、启用类型、流水号所在位置、总帧长 |
+| 设备执行回执 | 期望回执命令、子码、流水号偏移、成功/失败/未知值、是否需要平台再应答 |
+
+命令目录属于租户业务配置/接口引擎，不按开机、设水温或清警等具体业务动作增加厂家专属原子。
+前端仅提交受限的动作和参数，后端重新读取受权设备与机型配置，
+禁止把前端的命令码、成功码、目标设备、完整十六进制或可执行表达式直接透传。
+
+平台 `CommandId` 与设备协议流水号不是同一概念。业务 outbox 需保存二者映射，
+在同一设备、同一命令及子码范围内关联回执；重复派发复用同一编号及报文。
+不同命令的回执可能使用不同命令码、成功值或字段顺序，不能固定为单一位置或一律“0=成功”。
+未知结果保留未知；没有回执的命令只能确认传输，不能伪造设备已执行。
+
+参数范围、固件语义或帧长度存在歧义时，默认拒绝生成/派发该动作，待厂家确认后更新可信目录。
+读回快照有延迟时，不用列表字段的旧值直接证明温度、开关或报警已改变。
+
+### 控制回执不需要再次应答时
+
+部分协议中的控制回执本身就是设备对平台命令的确认，不需要平台再发一个 ACK。
+在厂家确认这种行为后，可在既有完整 `TcpIngressRulesJson` 的**根节点**增加：
+
+```json
+{ "allowNoResponse": true }
+```
+
+这是节点片段；不能替换完整规则。默认 `false`，必须是布尔值，修改后重启 API。
+上报接口先验证设备绑定、回执命令、子码、流水号和参数长度，并持久记录结果，再返回：
+
+```javascript
+return {
+  Code: 1,
+  Data: {
+    IoTDeviceId: authorizedDeviceAddressHex,
+    ResponseMode: 'None'
+  }
+};
+```
+
+此返回表示“这条上行消息已按协议处理，不需要写回字节”。它不代表设备执行成功，
+不能代替业务记录中的成功/失败/未知状态。`ResponseMode:'None'` 与 `ResponseFrameHex` 属性互斥。
+普通有应答消息继续返回 `Data.ResponseFrameHex`，可省略模式或显式设置 `ResponseMode:'Reply'`。
+
+只有配置允许且结果为数值 `Code=1`、模式精确为 `None`、物理帧有效时，宿主才保持原连接而不写任何字节。
+空结果、缺失应答、`Code=0` 的 None、未知模式和损坏帧仍关闭连接；普通失败 ACK 的既有行为保持不变。
+需要心跳应答的协议仍必须逐次回心跳 ACK，不能把所有上报都改成 None。
+每条成功的免应答消息同样复核 `IoTDeviceId`；授权撤销或设备身份切换时关闭下行连接。
+
+| 状态 | 含义与后续动作 |
+| --- | --- |
+| `Queued` | 已接受并在共享 Redis 中排队，尚未证明写入设备连接 |
+| `Sending` | 已出队开始发送；进程中断可能停留于此，结果未知，禁止自动重发 |
+| `Written` | 字节已写入 TCP；仍需设备协议回执确认执行结果 |
+| `Unknown` | 写入或保存结果失败，可能已有物理副作用，禁止自动重发 |
+| `Expired` | 排队指令已过期，不再下发 |
+| `Offline` / `QueueFull` / `Conflict` | `Code=0`，分别表示无有效连接、队列已满、相同编号对应不同内容或调用身份 |
+
+`Code=1` 表示本次命令或同编号的既有命令已被接收，不等于设备执行成功。
+相同编号在去重期内重复提交返回既有状态和 `Duplicate=true`；不会延长过期时间，
+不会因设备重连把旧队列转发到新连接。去重期结束后编号可能再次被接受，业务需保留长期唯一约束。
+
+### 事务、多节点与验收边界
+
+设备动作和 Redis 投递无法跟随数据库事务回滚。控制接口应只写已授权的指令/outbox，
+事务提交后由派发任务读取；派发任务使用同一 `CommandId` 调用本原子，再保存投递状态。
+不能在创建业务记录的同一事务里发送设备动作并期待数据库回滚撤销动作。
+设备执行结果由上报接口按厂家流水号更新，不由此原子推断。
+
+连接所有权、排队和去重使用既有租户 Redis，队列绑定连接代次，Socket 只留在持有节点。
+原 ACK 与主动指令共用串行写通道；Redis 原子抢占后不自动重投，优先避免重复物理副作用。
+Redis 故障会拒绝/关闭对应下行连接；共享 Redis 的持久化和故障转移能力由实际部署决定，
+不能把本能力描述为跨断电的绝对零丢失或设备“恰好执行一次”。
+若重连发生在所有权检查与实际写入之间，仍存在短暂竞态窗口；严格设备侧去重需协议支持。
+
+上线前分别验证旧心跳回归、跨节点路由、队列过期、重连、重复提交、写后状态保存失败，
+再验证真实设备回执与动作。离线替身与回环 Socket 测试不能代替真实 Redis/多进程及硬件验收。
+
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
 

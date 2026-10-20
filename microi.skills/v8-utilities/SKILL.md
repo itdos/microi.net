@@ -86,6 +86,7 @@ var clientDecoded = V8.Base64.decode(clientEncoded);
 | 表单 CRUD、`_Where` | `v8-crud-api`、`v8-sql-query` |
 | HTTP/第三方接口 | `v8-http-integration` |
 | TCP 原始字节/网络小票机/设备 | `v8-tcp-integration` |
+| 通用 IoT 设备原连接控制、`V8.IoT.Send`、协议拆帧与跨节点去重 | `v8-tcp-integration`；MQTT 设备使用 `v8-mq-mqtt` |
 | Redis/Hash | `v8-cache-pattern` |
 | 文件/HDFS | `v8-file-upload` |
 | 图片 | `v8-image-processing` |

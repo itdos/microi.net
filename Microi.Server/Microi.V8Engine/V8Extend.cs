@@ -80,6 +80,9 @@ namespace Microi.net
             /// <summary>一次性 TCP 原始字节发送与收发</summary>
             V8ExtensionRegistry.Register("Tcp", () => new V8Tcp());
 
+            // IoT 复用宿主持有的设备连接；权限、协议帧和回执业务由授权接口引擎编排。
+            V8ExtensionRegistry.Register("IoT", () => new V8IoT());
+
             // 邮件协议只暴露有界操作；账号授权、存储、去重与调度属于 Managed 接口引擎。
             V8ExtensionRegistry.Register("Email", () => new V8Email());
 

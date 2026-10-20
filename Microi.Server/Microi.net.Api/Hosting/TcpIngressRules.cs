@@ -35,38 +35,60 @@ public static class TcpIngressRules
             throw new InvalidOperationException("TcpIngressRulesJson.apiEngineKey 无效。");
 
         var listenPort = ParsePort(configuredPort);
-        var maxFrameBytes = ReadInt(value, "maxFrameBytes", 4096, 20, 65535);
+        var maxFrameBytes = ReadInt(value, "maxFrameBytes", 4096, value["framing"] == null ? 20 : 1, 65535);
         var maxConnections = ReadInt(value, "maxConnections", 100, 1, 1000);
         var idleTimeoutSeconds = ReadInt(value, "idleTimeoutSeconds", 90, 10, 3600);
         var executionTimeoutSeconds = ReadInt(value, "executionTimeoutSeconds", 5, 1, 120);
         var maxQueuedFrames = ReadInt(value, "maxQueuedFramesPerConnection", 8, 1, 32);
+        // 缺失响应默认仍关闭连接；仅管理员明确启用，且内部引擎逐帧声明 None，才允许无需再应答的消息。
+        if (value["allowNoResponse"] != null && value["allowNoResponse"]!.Type != JTokenType.Boolean)
+            throw new InvalidOperationException("TcpIngressRulesJson.allowNoResponse 必须为布尔值。");
+        var allowNoResponse = value.Value<bool?>("allowNoResponse") == true;
         // 每条连接都会分配接收缓冲。不能让合法但极端的三个上限相乘耗尽 API 内存。
         var perConnectionBytes = (long)maxFrameBytes * maxQueuedFrames;
         if (perConnectionBytes > 256 * 1024
             || perConnectionBytes * maxConnections > 32L * 1024 * 1024)
             throw new InvalidOperationException("TcpIngressRulesJson 接收缓冲总预算超限（单连接 256 KiB、全节点 32 MiB）。");
-        var lengthOffset = ReadRequiredInt(value, "lengthOffset", 0, 32);
-        var lengthAdjustment = ReadRequiredInt(value, "lengthAdjustment", 0, 128);
+        TcpFramePolicy requestPolicy;
+        TcpFramePolicy responsePolicy;
+        try
+        {
+            requestPolicy = TcpFramePolicy.Parse(value, false);
+            responsePolicy = TcpFramePolicy.Parse(value, true);
+        }
+        catch (ArgumentException ex) { throw new InvalidOperationException(ex.Message, ex); }
+        var lengthOffset = requestPolicy.LengthOffset;
+        var lengthAdjustment = requestPolicy.LengthAdjustment;
         var correlationOffset = ReadRequiredInt(value, "correlationOffset", 0, 128);
         var correlationLength = ReadRequiredInt(value, "correlationLength", 1, 64);
-        var requestHeader = ReadHex(value, "requestHeaderHex", 4);
-        var responseHeader = ReadHex(value, "responseHeaderHex", 4);
-        var tail = ReadHex(value, "tailHex", 2);
-        if (lengthOffset < requestHeader.Length
-            || correlationOffset + correlationLength + 4 > maxFrameBytes)
+        var requestHeader = requestPolicy.Header;
+        var responseHeader = responsePolicy.Header;
+        var tail = requestPolicy.Tail;
+        var downlink = IoTDownlinkPolicy.Parse(value);
+        if (correlationOffset + correlationLength + tail.Length + requestPolicy.ChecksumBytes > maxFrameBytes)
             throw new InvalidOperationException("TcpIngressRulesJson 帧偏移与长度上限不兼容。");
+        if (new[] { requestPolicy, responsePolicy }.Any(p => p.Mode == "FixedLength"
+                && correlationOffset + correlationLength + p.Tail.Length + p.ChecksumBytes > p.FixedLength))
+            throw new InvalidOperationException("固定帧长无法容纳应答关联区间。");
 
         if (value["allowedCidrs"] is not JArray allowed || allowed.Count == 0 || allowed.Count > 64)
             throw new InvalidOperationException("TcpIngressRulesJson.allowedCidrs 必须包含 1 至 64 个来源网段。");
+        if (value["allowAnySource"] != null && value["allowAnySource"]!.Type != JTokenType.Boolean)
+            throw new InvalidOperationException("TcpIngressRulesJson.allowAnySource 必须为布尔值。");
+        var allowAnySource = value.Value<bool?>("allowAnySource") == true;
+        // 兼容已部署规则中的显式全网例外；不因增加下行能力放宽默认来源限制或允许混合网段。
+        if (allowAnySource && (allowed.Count != 1 || allowed[0]?.Type != JTokenType.String
+            || allowed[0]!.Value<string>() != "0.0.0.0/0"))
+            throw new InvalidOperationException("allowAnySource=true 时 allowedCidrs 必须且只能为 [\"0.0.0.0/0\"]。");
         var cidrs = allowed.Select(item => TcpIngressCidr.Parse(item.Type == JTokenType.String
-                ? item.Value<string>() : null))
+                ? item.Value<string>() : null, allowAnySource))
             .ToArray();
 
         return new TcpIngressRule(
             osClient, apiEngineKey, listenPort, cidrs, requestHeader, responseHeader, tail,
             lengthOffset, lengthAdjustment, correlationOffset, correlationLength,
             maxFrameBytes, maxConnections, idleTimeoutSeconds, executionTimeoutSeconds,
-            maxQueuedFrames);
+            maxQueuedFrames, downlink, requestPolicy, responsePolicy, allowNoResponse);
     }
 
     public static int ParsePort(JToken? configuredPort)
@@ -140,7 +162,8 @@ public sealed class TcpIngressRule
         IReadOnlyList<TcpIngressCidr> allowedCidrs, byte[] requestHeader, byte[] responseHeader,
         byte[] tail, int lengthOffset, int lengthAdjustment, int correlationOffset,
         int correlationLength, int maxFrameBytes, int maxConnections, int idleTimeoutSeconds,
-        int executionTimeoutSeconds, int maxQueuedFramesPerConnection)
+        int executionTimeoutSeconds, int maxQueuedFramesPerConnection, IoTDownlinkPolicy? downlink = null,
+        TcpFramePolicy? requestPolicy = null, TcpFramePolicy? responsePolicy = null, bool allowNoResponse = false)
     {
         OsClient = osClient;
         ApiEngineKey = apiEngineKey;
@@ -158,6 +181,10 @@ public sealed class TcpIngressRule
         IdleTimeoutSeconds = idleTimeoutSeconds;
         ExecutionTimeoutSeconds = executionTimeoutSeconds;
         MaxQueuedFramesPerConnection = maxQueuedFramesPerConnection;
+        Downlink = downlink;
+        RequestPolicy = requestPolicy!;
+        ResponsePolicy = responsePolicy!;
+        AllowNoResponse = allowNoResponse;
     }
 
     public string OsClient { get; }
@@ -175,6 +202,10 @@ public sealed class TcpIngressRule
     public int IdleTimeoutSeconds { get; }
     public int ExecutionTimeoutSeconds { get; }
     public int MaxQueuedFramesPerConnection { get; }
+    public IoTDownlinkPolicy? Downlink { get; }
+    public TcpFramePolicy RequestPolicy { get; }
+    public TcpFramePolicy ResponsePolicy { get; }
+    public bool AllowNoResponse { get; }
     internal IReadOnlyList<TcpIngressCidr> AllowedCidrs { get; }
 
     public bool IsAllowed(IPAddress address) => AllowedCidrs.Any(cidr => cidr.Contains(address));
@@ -191,7 +222,7 @@ internal sealed class TcpIngressCidr
         _prefix = prefix;
     }
 
-    internal static TcpIngressCidr Parse(string? text)
+    internal static TcpIngressCidr Parse(string? text, bool allowDefaultRoute = false)
     {
         var parts = text?.Trim().Split('/', 2);
         if (parts == null || parts.Length == 0 || !parts[0].Contains('.')
@@ -201,7 +232,7 @@ internal sealed class TcpIngressCidr
         // 当前监听器只绑定 IPv4；拒绝看似有效却永远不会命中的 IPv6 白名单。
         const int maxPrefix = 32;
         var prefix = maxPrefix;
-        const int minimumPrefix = 8;
+        var minimumPrefix = allowDefaultRoute ? 0 : 8;
         if (parts.Length == 2 && (!int.TryParse(parts[1], out prefix)
                                   || prefix < minimumPrefix || prefix > maxPrefix))
             throw new InvalidOperationException("TcpIngressRulesJson.allowedCidrs 含无效前缀。");

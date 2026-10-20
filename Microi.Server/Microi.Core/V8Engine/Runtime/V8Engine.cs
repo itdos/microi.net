@@ -101,6 +101,14 @@ namespace Microi.net
             "System.Environment",                       // 含 Exit/FailFast/SetEnvironmentVariable
             "System.GC",                                // 防止 GC.Collect 等扰乱 GC
             "Dos.ORM.DdlExecutionDiagnostics",           // 仅可信 CLR 观察作用域；嵌套快照同样禁止
+            // IoT 的连接/Redis 原子只允许经过 V8.IoT.Send，不能通过 CLR 类型绕过身份与 Key 白名单。
+            "Microi.net.IoTCommandRuntime",
+            "Microi.net.RedisIoTCommandStore",
+            "Microi.net.IIoTCommandStore",
+            "Microi.net.IoTCommandClaim",
+            "Microi.net.IoTDownlinkPolicy",
+            "Microi.net.V8TenantContext",
+            "Microi.net.V8TrustedExecutionContext",
         };
 
         /// <summary>

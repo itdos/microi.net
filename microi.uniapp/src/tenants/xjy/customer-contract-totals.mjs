@@ -6,6 +6,22 @@ export function customerContractTotalsSupported(table) {
   return String(table || '').trim().toLowerCase() === 'diy_kehu'
 }
 
+// “合作客户”来自客户状态，不是企业/学校等客户类型；列表和详情共用这一显隐口径。
+export function customerContractTotalsVisible(table, row) {
+  return customerContractTotalsSupported(table) && String(row?.Zhuangtai || '').trim() === '合作客户'
+}
+
+// 金额作为普通卡片字段追加，复用卡片的标签、值、行距和换行规则，不再单独分区。
+export function buildCustomerContractCardLines(table, row) {
+  if (!customerContractTotalsVisible(table, row)) return []
+  return buildCustomerContractGroups(row[CUSTOMER_CONTRACT_TOTALS_ROW_KEY]).map(group => ({
+    field: `${CUSTOMER_CONTRACT_TOTALS_ROW_KEY}.${group.key}`,
+    label: group.title,
+    value: group.items.map(item => `${item.key === 'current' ? '当前有效' : item.label} ${item.value}`).join(' / '),
+    maxLines: 3
+  }))
+}
+
 // 空值不是零价；金额由服务端统一归类和汇总，客户端只校验并展示返回值。
 function amountValue(value) {
   if (typeof value !== 'number' && typeof value !== 'string') return null

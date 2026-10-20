@@ -405,6 +405,19 @@ export const V8ServerApiDefinitions = {
                 ].map(([name, documentation]) => [name, { label: name, kind: "Method", insertText: name, documentation }]))
             },
 
+            // ========== IoT 已建立连接下行 ==========
+            IoT: {
+                label: "IoT", kind: "Module", insertText: "IoT",
+                documentation: "后端设备连接下行。须配置 TcpIngressRulesJson.downlink 和允许调用的接口引擎；租户和用户来自可信上下文。",
+                methods: {
+                    Send: {
+                        label: "Send", kind: "Method", insertText: "Send",
+                        documentation: "向已授权设备原 TCP 连接投递完整 FrameHex。只接受 DeviceId、CommandId、FrameHex、ExpireSeconds；Code=1 表示命令已接收，执行成功须以设备回执确认。稳定 CommandId 在去重期内只发送一次，Sending/Unknown 禁止换号重试。",
+                        snippet: 'Send({\n\tDeviceId: "${1:设备地址十六进制}",\n\tCommandId: "${2:稳定指令编号}",\n\tFrameHex: "${3:完整下行帧}",\n\tExpireSeconds: ${4:30}\n})'
+                    }
+                }
+            },
+
             // ========== TCP 原始字节 ==========
             Tcp: {
                 label: "Tcp",

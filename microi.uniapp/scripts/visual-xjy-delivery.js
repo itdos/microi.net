@@ -8,12 +8,12 @@ const { findWorkspaceRoot } = require('./lib/workspace-paths');
 
 const root = path.resolve(__dirname, '..');
 const workspaceRoot = findWorkspaceRoot(root);
-const h5Root = path.join(root, 'dist', 'build', 'h5');
-const outputRoot = path.join(workspaceRoot, '.tmp', 'xjy-uniapp-visual');
+const h5Root = process.env.XJY_VISUAL_H5_ROOT || path.join(root, 'dist', 'build', 'h5');
+const outputRoot = process.env.XJY_VISUAL_OUTPUT_ROOT || path.join(workspaceRoot, '.tmp', 'xjy-uniapp-visual');
 
 const customers = [
-  { Id: 'customer-001', KehuMC: '滨江区实验学校', Zhuangtai: '合作中', KehuLX: '学校', KehuGJZT: '持续服务', FuzeR: '王经理', Chengshi: '["浙江省","杭州市","滨江区"]', XiaciGJRQ: '2026-07-18 09:30:00', YuqiJYJE: 168000, CreateTime: '2026-07-16 08:20:00' },
-  { Id: 'customer-002', KehuMC: '钱塘科创中心', Zhuangtai: '合作中', KehuLX: '园区', KehuGJZT: '方案确认', FuzeR: '陈顾问', Chengshi: '["浙江省","杭州市","钱塘区"]', XiaciGJRQ: '2026-07-19 14:00:00', YuqiJYJE: 92000, CreateTime: '2026-07-15 10:10:00' },
+  { Id: 'customer-001', KehuMC: '滨江区实验学校', Zhuangtai: '合作客户', KehuLX: '学校', KehuGJZT: '持续服务', FuzeR: '王经理', Chengshi: '["浙江省","杭州市","滨江区"]', XiaciGJRQ: '2026-07-18 09:30:00', YuqiJYJE: 168000, CreateTime: '2026-07-16 08:20:00' },
+  { Id: 'customer-002', KehuMC: '钱塘科创中心', Zhuangtai: '目标客户', KehuLX: '园区', KehuGJZT: '方案确认', FuzeR: '陈顾问', Chengshi: '["浙江省","杭州市","钱塘区"]', XiaciGJRQ: '2026-07-19 14:00:00', YuqiJYJE: 92000, CreateTime: '2026-07-15 10:10:00' },
   { Id: 'customer-003', KehuMC: '星澜健康产业园', Zhuangtai: '跟进中', KehuLX: '企业', KehuGJZT: '商务洽谈', FuzeR: '林经理', Chengshi: '["浙江省","杭州市","余杭区"]', XiaciGJRQ: '2026-07-21 10:00:00', YuqiJYJE: 235000, CreateTime: '2026-07-14 16:40:00' },
   { Id: 'customer-004', KehuMC: '湖畔人才公寓', Zhuangtai: '待签约', KehuLX: '公寓', KehuGJZT: '合同拟定', FuzeR: '周顾问', Chengshi: '["浙江省","杭州市","西湖区"]', XiaciGJRQ: '2026-07-22 15:30:00', YuqiJYJE: 76000, CreateTime: '2026-07-13 11:25:00' }
 ];
@@ -679,6 +679,10 @@ const targets = [
     forbiddenText: ['移入公海']
   },
   {
+    name: 'customer-target-detail', route: '/#/pages/business/detail?key=customers&id=customer-002', selector: '.detail-page',
+    required: ['.hero-band'], forbiddenSelectors: ['.contract-totals']
+  },
+  {
     name: 'customer-orders', route: '/#/pages/business/detail?key=customers&id=customer-001', selector: '.detail-page',
     clickSelector: '.related-tabs__item:nth-child(5)', afterSelector: '.related-status-scroll',
     required: ['.related-status-scroll', '.related-metrics--summary', '.related-valid-switch', '.related-list-body'],
@@ -1341,6 +1345,7 @@ function buildMockResponse(request) {
   if (lowerUrl.includes('getformdata') && (table === 'Diy_Kehu' || lowerUrl.includes('diy_kehu'))) {
     if (body.Id === privateCustomerDetail.Id) return { Code: 1, Data: privateCustomerDetail };
     if (body.Id === otherOwnerPrivateCustomerDetail.Id) return { Code: 1, Data: otherOwnerPrivateCustomerDetail };
+    if (body.Id === customers[1].Id) return { Code: 1, Data: { ...customerDetail, ...customers[1] } };
     return { Code: 1, Data: customerDetail };
   }
   if (lowerUrl.includes('getformdata') && (table === 'Diy_Tenant' || lowerUrl.includes('diy_tenant'))) {
@@ -1746,6 +1751,34 @@ async function setLoggedInState(cdp, options = {}) {
 
 async function inspectCustomerContractTotals(cdp, target) {
   if (!['customers', 'customer-detail'].includes(target.name)) return null;
+  if (target.name === 'customers') {
+    await waitForExpression(cdp, `document.querySelector('.data-card .field-list')?.innerText.includes('租赁总价')`);
+    const result = await cdp.send('Runtime.evaluate', {
+      expression: `(() => {
+        const cards = [...document.querySelectorAll('.data-card')];
+        const fields = [...cards[0].querySelectorAll('.field-row')];
+        const contracts = fields.filter(row => /租赁总价|买断总价|包年换芯总价/.test(row.querySelector('.field-label').innerText));
+        const style = row => ['.field-label', '.field-value'].map(selector => {
+          const s = getComputedStyle(row.querySelector(selector));
+          return [s.color, s.fontSize, s.fontWeight, s.lineHeight];
+        });
+        return { groups: contracts.map(row => row.innerText), sameStyle: contracts.every(row => JSON.stringify(style(row)) === JSON.stringify(style(fields[0]))),
+          hasBorder: contracts.some(row => parseFloat(getComputedStyle(row).borderTopWidth) > 0),
+          separateSection: !!cards[0].querySelector('.contract-totals'),
+          targetHasAmounts: /租赁总价|买断总价|包年换芯总价/.test(cards[1].innerText) };
+      })()`, returnByValue: true
+    });
+    const state = result.result.value;
+    if (state.groups.length !== 3 || !state.sameStyle || state.hasBorder || state.separateSection || state.targetHasAmounts) {
+      fail(`Customer contract card field rendering failed: ${JSON.stringify(state)}`);
+    }
+    return { source: 'local visual fixture', ...state };
+  }
+  await waitForExpression(cdp, `document.querySelector('.contract-totals__toggle')?.getAttribute('aria-expanded') === 'false' && !document.querySelector('.contract-totals__value')`);
+  return { source: 'local visual fixture', initiallyCollapsed: true };
+}
+
+async function inspectExpandedCustomerContractTotals(cdp) {
   await waitForExpression(cdp, `document.querySelectorAll('.contract-totals__value').length >= 5 && !document.querySelector('.contract-totals__value--missing')`);
   const result = await cdp.send('Runtime.evaluate', {
     expression: `(() => {
@@ -1764,7 +1797,7 @@ async function inspectCustomerContractTotals(cdp, target) {
   });
   const state = result.result.value;
   const expectedTitles = ['租赁总价', '买断总价', '包年换芯总价'];
-  const expectedLabels = target.name === 'customers' ? ['当前有效', '所有合同'] : ['当前有效合同期内', '所有合同'];
+  const expectedLabels = ['当前有效合同期内', '所有合同'];
   if (JSON.stringify(state.groups.map(group => group.title)) !== JSON.stringify(expectedTitles) ||
       JSON.stringify(state.groups.map(group => group.values.length)) !== '[2,1,2]' ||
       state.groups[0].labels.join('|') !== expectedLabels.join('|') || state.groups[2].labels.join('|') !== expectedLabels.join('|') ||
@@ -1810,13 +1843,21 @@ async function testCustomerContractCollapse(cdp, viewport) {
     })()`, returnByValue: true
   })).result.value;
   const initial = await read();
-  if (initial.expanded !== 'true' || initial.label !== '收起合同金额' || initial.values !== 5 || !initial.hint) {
-    fail(`Customer contract totals initial expansion failed: ${JSON.stringify(initial)}`);
+  if (initial.expanded !== 'false' || initial.label !== '展开合同金额' || initial.values !== 0 || initial.hint) {
+    fail(`Customer contract totals initial collapse failed: ${JSON.stringify(initial)}`);
   }
+  await cdp.send('Runtime.evaluate', { expression: `document.querySelector('.detail-page .contract-totals__toggle').click()` });
+  await inspectExpandedCustomerContractTotals(cdp);
+  const expanded = await read();
+  if (expanded.expanded !== 'true' || expanded.label !== '收起合同金额' || !expanded.hint || expanded.height <= initial.height) {
+    fail(`Customer contract totals expansion failed: ${JSON.stringify(expanded)}`);
+  }
+  const expandedShot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  fs.writeFileSync(path.join(outputRoot, `customer-detail-expanded-${viewport.name}.png`), Buffer.from(expandedShot.data, 'base64'));
   await cdp.send('Runtime.evaluate', { expression: `document.querySelector('.detail-page .contract-totals__toggle').click()` });
   await waitForExpression(cdp, `document.querySelector('.detail-page .contract-totals__toggle')?.getAttribute('aria-expanded') === 'false'`);
   const collapsed = await read();
-  if (collapsed.label !== '展开合同金额' || collapsed.values !== 0 || collapsed.hint || collapsed.height >= initial.height) {
+  if (collapsed.label !== '展开合同金额' || collapsed.values !== 0 || collapsed.hint || collapsed.height >= expanded.height) {
     fail(`Customer contract totals collapse failed: ${JSON.stringify({ initial, collapsed })}`);
   }
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -1849,7 +1890,7 @@ async function testCustomerContractCollapse(cdp, viewport) {
     }
   }
   await selectTab('基本信息');
-  await waitForExpression(cdp, `document.querySelector('.detail-page .related-tabs__item--active')?.innerText === '基本信息' && document.querySelectorAll('.detail-page .contract-totals__value').length === 5`);
+  await waitForExpression(cdp, `document.querySelector('.detail-page .related-tabs__item--active')?.innerText === '基本信息' && document.querySelector('.detail-page .contract-totals__toggle')?.getAttribute('aria-expanded') === 'false'`);
   console.log(`PASS customer-contract-tabs ${viewport.name} -> basic visible, five other tabs hidden, basic restored`);
 }
 
@@ -2473,7 +2514,7 @@ async function main() {
     try {
       const relativeProfilePath = path.relative(outputRoot, path.resolve(profileDir));
       if (relativeProfilePath && !relativeProfilePath.startsWith('..') && !path.isAbsolute(relativeProfilePath)) {
-        fs.rmSync(profileDir, { recursive: true, force: true });
+        fs.rmSync(profileDir, { recursive: true });
       }
     } catch (error) {}
   }

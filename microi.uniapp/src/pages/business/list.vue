@@ -182,8 +182,10 @@
           @phone="callPhone"
           @action="triggerRowAction"
         >
-          <xjy-customer-contract-totals v-if="showCustomerContractTotals"
-            :state="row.__xjyContractTotals" compact @retry="loadData(true, true)" />
+          <view v-if="customerContractTotalsVisible(config.table || baseConfig.table, row) && row.__xjyContractTotals?.message"
+            class="customer-contract-error" @tap.stop="loadData(true, true)">
+            <text>{{ row.__xjyContractTotals.message }}</text><text>重试</text>
+          </view>
         </mci-business-card>
         </view>
 
@@ -298,8 +300,7 @@ import {
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciListFilterField from '@/components/mci-list-filter-field/mci-list-filter-field.vue'
 import MciRestrictedRecordCard from '@/components/mci-restricted-record-card/mci-restricted-record-card.vue'
-import XjyCustomerContractTotals from '@/tenants/xjy/components/customer-contract-totals.vue'
-import { CUSTOMER_CONTRACT_TOTALS_ENGINE, customerContractTotalsSupported, hydrateCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
+import { CUSTOMER_CONTRACT_TOTALS_ENGINE, buildCustomerContractCardLines, customerContractTotalsSupported, customerContractTotalsVisible, hydrateCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
 import { loadCustomerListSummary } from '@/tenants/xjy/customer-list-summary.mjs'
 import { ORDER_CONTRACT_TOTALS_ENGINE, orderContractTotalsSupported, loadOrderListSummary } from '@/tenants/xjy/order-list-summary.mjs'
 import {
@@ -351,7 +352,7 @@ function formatMetricValue(value, metric = {}) {
 export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/business/list') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/business/list') },
-  components: { MciBusinessCard, MciRestrictedRecordCard, MciListFilterField, XjyCustomerContractTotals },
+  components: { MciBusinessCard, MciRestrictedRecordCard, MciListFilterField },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {
@@ -1209,6 +1210,7 @@ export default {
     displayValue(row, line) {
       return this.configuredFieldValue(row, line.field, line.format)
     },
+    customerContractTotalsVisible,
     cardLines(row) {
       // zhy：后台菜单会清空 config.summaryField 以保留字段标签，长文本识别必须回退到租户基础配置。
       const multilineField = cardFieldKey(this.baseConfig.summaryField || this.config.summaryField)
@@ -1218,7 +1220,7 @@ export default {
         value: this.displayValue(row, line),
         rawValue: row[line.field],
         maxLines: cardFieldKey(line.field) === multilineField ? multilineLines : (Number(line.maxLines) || 1)
-      }))
+      })).concat(buildCustomerContractCardLines(this.config.table || this.baseConfig.table, row))
     },
     periodCount(item) {
       if (Object.prototype.hasOwnProperty.call(this.periodCounts, item.value)) return this.periodCounts[item.value]
@@ -1815,6 +1817,8 @@ export default {
 .customer-valid-switch { display: flex; align-items: center; gap: 10rpx; color: #527282; font-size: 22rpx; flex-shrink: 0; }
 .customer-statistics-hint { min-width: 0; color: #788e99; font-size: 19rpx; }
 .customer-statistics-retry { flex-shrink: 0; color: #0b86d4; font-size: 22rpx; }
+.customer-contract-error { display: flex; align-items: center; justify-content: space-between; gap: 14rpx; color: var(--mci-text-secondary, #647c87); font-size: 24rpx; line-height: 34rpx; }
+.customer-contract-error > text:last-child { flex-shrink: 0; padding: 16rpx 8rpx; color: var(--mci-color-primary, #087fba); }
 
 .status-item.active {
   border-color: #0b86d4;
