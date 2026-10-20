@@ -214,7 +214,8 @@ namespace Microi.net
                 return new DosResultList<MicroiUpgradeResult>(0, results, "sys_config.ServerVersion格式错误，应为四段数字版本号。");
             var recoverAppStore = forceMarketplaceRecovery || StartVersionStep(CurrentVersion, UpgradeAppStore.Version);
             var migrateMqttSwitch = StartVersionStep(CurrentVersion, MqttEnablePolicy.NullMeansEnabledVersion);
-            if (!recoverAppStore && !migrateMqttSwitch) return new DosResultList<MicroiUpgradeResult>(1, results);
+            var repairSecurityLevels = StartVersionStep(CurrentVersion, SecurityLevelMigrationPolicy.Version);
+            if (!recoverAppStore && !migrateMqttSwitch && !repairSecurityLevels) return new DosResultList<MicroiUpgradeResult>(1, results);
             var runtimeInvariantStage = "菜单AppDisplay保护快照";
             var snapshot = recoverAppStore
                 ? CaptureMenuAppDisplaySnapshot(osClientSecret)
@@ -222,11 +223,16 @@ namespace Microi.net
             try
             {
                 UpgradeExecutionLeaseContext.ConfirmOwnership();
+                if (repairSecurityLevels)
+                {
+                    runtimeInvariantStage = "内置管理员等级兼容";
+                    await EnsureSecurityLevelsAsync(osClientSecret, CurrentVersion).ConfigureAwait(false);
+                }
                 if (recoverAppStore)
                 {
                     EnsureAuthSecretColumns(osClientSecret);
                     EnsureMicroServiceColumns(osClientSecret);
-                    EnsureSecurityLevels(osClientSecret);
+                    EnsureLegacyPasswordEncoding(osClientSecret);
                     EnsureMobileVisibilityColumns(osClientSecret);
                     EnsureApiEngineRuntimeColumns(osClientSecret);
                     EnsureLegacyFieldMetadataColumns(osClientSecret);
@@ -266,6 +272,14 @@ namespace Microi.net
                     UpgradeProgress.Complete(MqttEnablePolicy.NullMeansEnabledVersion,
                         "旧租户 MQTT 空开关已保持关闭，空值默认开启语义就绪。");
                 }
+                if (repairSecurityLevels)
+                {
+                    runtimeInvariantStage = "内置管理员等级兼容";
+                    await PersistServerVersionForwardOnlyAsync(osClientSecret, SecurityLevelMigrationPolicy.Version)
+                        .ConfigureAwait(false);
+                    UpgradeProgress.Complete(SecurityLevelMigrationPolicy.Version,
+                        "内置admin和超级管理员角色已校验；新版自定义998/999等级保持不变。");
+                }
                 return new DosResultList<MicroiUpgradeResult>(1, results);
             }
             catch (Exception ex)
@@ -285,6 +299,7 @@ namespace Microi.net
                 catch (Exception restoreError) { diagnostic += "；菜单显隐恢复失败：" + SanitizeUpgradeDiagnosticText(restoreError.Message); }
                 var queued = MicroiEngine.QueueSystemLog(osClientSecret.OsClient, "PlatformUpgrade", "TenantMigrationFailed",
                     "版本迁移失败，ServerVersion未推进", diagnostic, 3, false,
+                    runtimeInvariantStage == "内置管理员等级兼容" ? SecurityLevelMigrationPolicy.Version :
                     runtimeInvariantStage == "MQTT空值开关兼容迁移"
                         ? MqttEnablePolicy.NullMeansEnabledVersion : UpgradeAppStore.Version);
                 if (!queued) UpgradeProgress.WriteLine("Microi：系统日志队列暂不可用，失败详情已保留在控制台日志：" + diagnostic);
@@ -1663,23 +1678,13 @@ if (_microiLegacyMenuConfigChanged) {
             UpgradeProgress.WriteLine($"Microi：【保护】平台自动升级【{osClientSecret.OsClient}】已恢复 {restoredIds.Count} 个既有菜单的AppDisplay，升级包不得覆盖客户移动端显隐配置。");
         }
 
-        private void EnsureSecurityLevels(OsClientSecret osClientSecret)
+        private void EnsureLegacyPasswordEncoding(OsClientSecret osClientSecret)
         {
             if (osClientSecret?.Db == null) throw new InvalidOperationException("租户数据库连接不存在。");
             var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
             var quoteOpen = dbType == "SqlServer" ? "[" : "`";
             var quoteClose = dbType == "SqlServer" ? "]" : "`";
 
-            if (TableExists(osClientSecret, "sys_role"))
-            {
-                osClientSecret.Db.FromSql($"UPDATE {quoteOpen}sys_role{quoteClose} SET {quoteOpen}Level{quoteClose}=9999 WHERE {quoteOpen}Level{quoteClose}=999").ExecuteNonQuery();
-                osClientSecret.Db.FromSql($"UPDATE {quoteOpen}sys_role{quoteClose} SET {quoteOpen}Level{quoteClose}=9998 WHERE {quoteOpen}Level{quoteClose}=998").ExecuteNonQuery();
-            }
-            if (TableExists(osClientSecret, "sys_user"))
-            {
-                osClientSecret.Db.FromSql($"UPDATE {quoteOpen}sys_user{quoteClose} SET {quoteOpen}Level{quoteClose}=9999 WHERE {quoteOpen}Level{quoteClose}=999").ExecuteNonQuery();
-                osClientSecret.Db.FromSql($"UPDATE {quoteOpen}sys_user{quoteClose} SET {quoteOpen}Level{quoteClose}=9998 WHERE {quoteOpen}Level{quoteClose}=998").ExecuteNonQuery();
-            }
             if (TableExists(osClientSecret, "sys_config") && ColumnExists(osClientSecret, "sys_config", "PwdEncode"))
             {
                 osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_config{quoteClose}
@@ -2074,7 +2079,8 @@ if (_microiLegacyMenuConfigChanged) {
             return new[]
             {
                 new KeyValuePair<string, string>("启动与应用商城恢复", UpgradeAppStore.Version),
-                new KeyValuePair<string, string>("MQTT空值开关兼容迁移", MqttEnablePolicy.NullMeansEnabledVersion)
+                new KeyValuePair<string, string>("MQTT空值开关兼容迁移", MqttEnablePolicy.NullMeansEnabledVersion),
+                new KeyValuePair<string, string>("内置管理员等级兼容", SecurityLevelMigrationPolicy.Version)
             };
         }
 

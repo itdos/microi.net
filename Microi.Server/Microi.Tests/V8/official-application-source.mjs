@@ -12,7 +12,7 @@ const safeRelative=p=>typeof p==='string'&&p.length>0&&!p.includes('\\')&&!p.sta
 
 // 唯一官方根逐字节匹配完整 MCP 清单。开发测试脚本只能通过明确、双摘要的窄覆盖层增补。
 export function verifyOfficialApplicationSource(contract,appKey,workspace=repo){
- assert.equal(contract.SchemaVersion,1);assert.equal(contract.Origin?.ApiBase,'https://api.itdos.com');assert.equal(contract.Origin?.OsClient,'iTdos');
+ assert.equal(contract.SchemaVersion,1);assert.equal(contract.Origin?.ApiBase,'https://api.microi.net');assert.equal(contract.Origin?.OsClient,'iTdos');
  const matches=contract.Applications.filter(a=>a.AppKey===appKey);assert.equal(matches.length,1,'Official application source must have one owner');const app=matches[0];
  assert.ok(safeRelative(app.SourceRoot),'Unsafe source root');const workspaceReal=fs.realpathSync(workspace),root=path.resolve(workspaceReal,app.SourceRoot);assert.ok(root.startsWith(workspaceReal+path.sep),'Source root escapes workspace');assert.equal(fs.realpathSync(root),root,'Source root must not be a symlink');
  assert.equal(app.FileCount,app.Files.length);assert.ok(app.Files.length>0,'A complete official source cannot be empty');const seen=new Set(),rows=[],localRows=[];let total=0,localTotal=0;

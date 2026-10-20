@@ -8,9 +8,12 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
+using System.Xml.Linq;
 using Dos.Common;
 using Minio;
 using Minio.DataModel.Args;
+using Minio.Exceptions;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.net
@@ -1012,6 +1015,64 @@ namespace Microi.net
             };
         }
 
+        /// <summary>
+        /// SDK 7 在复制前额外 HEAD 整个桶；前缀受限账号可能能读写对象却无桶级权限。
+        /// 兼容路径仍由同一 SDK/租户凭据签名精确源对象和目标对象，不申请桶列表权限。
+        /// S3 默认 COPY 保留原 MIME/元数据；HTTP 200 内嵌 Error 也必须作为失败处理。
+        /// </summary>
+        private static async Task<DosResult> CopySignedObjectAsync(
+            IMinioClient client, string bucketName, string sourceKey, string destKey,
+            HttpClient httpClient, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            var sourceHeader = "/" + bucketName + "/"
+                + string.Join("/", sourceKey.Split('/').Select(Uri.EscapeDataString));
+            var signedUrl = await client.PresignedPutObjectAsync(new PresignedPutObjectArgs()
+                .WithBucket(bucketName).WithObject(destKey).WithExpiry(60)
+                .WithHeaders(new Dictionary<string, string> { ["x-amz-copy-source"] = sourceHeader }))
+                .ConfigureAwait(false);
+            // SDK 7 将附加头放入已签名查询串；两种签名形式都必须绑定同一个源路径。
+            var query = new Uri(signedUrl).Query.TrimStart('?').Split('&');
+            var signedHeaders = query.FirstOrDefault(value =>
+                value.StartsWith("X-Amz-SignedHeaders=", StringComparison.OrdinalIgnoreCase));
+            var signedSource = query.FirstOrDefault(value =>
+                value.StartsWith("x-amz-copy-source=", StringComparison.OrdinalIgnoreCase));
+            var sourceInHeaders = signedHeaders != null && Uri.UnescapeDataString(signedHeaders.Split('=')[1])
+                .Split(';').Contains("x-amz-copy-source");
+            var sourceInQuery = signedSource != null
+                && Uri.UnescapeDataString(signedSource.Substring(signedSource.IndexOf('=') + 1)) == sourceHeader;
+            if (!sourceInHeaders && !sourceInQuery)
+                return new DosResult(0, null, "MinIO 精确对象复制缺少已签名源路径，已停止发送。");
+
+            using var request = new HttpRequestMessage(HttpMethod.Put, signedUrl);
+            request.Headers.TryAddWithoutValidation("x-amz-copy-source", sourceHeader);
+            request.Content = new ByteArrayContent(Array.Empty<byte>());
+            using var response = await httpClient.SendAsync(request,
+                HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
+            if (response.StatusCode != HttpStatusCode.OK)
+                return new DosResult(0, null, $"MinIO 精确对象复制返回 HTTP {(int)response.StatusCode}，请检查源对象读取及目标对象写入权限。");
+            using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            // 有界读取成功回执，禁止把错误页或签名地址回显到客户端。
+            using var body = new MemoryStream();
+            var buffer = new byte[4096];
+            int count;
+            while ((count = await stream.ReadAsync(buffer, 0, buffer.Length, token).ConfigureAwait(false)) > 0)
+            {
+                if (body.Length + count > 65536)
+                    return new DosResult(0, null, "MinIO 精确对象复制回执超过限制，结果待回读。");
+                body.Write(buffer, 0, count);
+            }
+            body.Position = 0;
+            using var reader = XmlReader.Create(body, new XmlReaderSettings
+            { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 65536 });
+            var document = XDocument.Load(reader);
+            if (document.Root?.Name.LocalName != "CopyObjectResult"
+                || !document.Root.Elements().Any(element => element.Name.LocalName == "ETag"
+                    && !string.IsNullOrWhiteSpace(element.Value)))
+                return new DosResult(0, null, "MinIO 精确对象复制未返回成功回执，结果待回读。");
+            return new DosResult(1);
+        }
+
         /// <summary>在同一租户桶内由存储服务复制对象，保留原 MIME 和源对象。</summary>
         public async Task<DosResult> CopyObject(HDFSParam param)
         {
@@ -1040,7 +1101,17 @@ namespace Microi.net
                     .WithObject(destKey)
                     .WithCopyObjectSource(cpSrcArgs);
 
-                await minioClient.CopyObjectAsync(copyArgs, timeout.Token).ConfigureAwait(false);
+                try
+                {
+                    await minioClient.CopyObjectAsync(copyArgs, timeout.Token).ConfigureAwait(false);
+                }
+                catch (AccessDeniedException)
+                {
+                    // 不改变任何凭据或策略；让对象存储对精确 COPY 独立执行原有鉴权。
+                    // 这也兼容只允许对象读写、禁止 SDK 桶预检查的反向代理。
+                    return await CopySignedObjectAsync(minioClient, bucketName, sourceKey, destKey,
+                        ObjectReadHttpClient, timeout.Token).ConfigureAwait(false);
+                }
 
                 return new DosResult(1);
             }
@@ -1051,7 +1122,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                return new DosResult(0, null, "MinIO CopyObject Error: " + ex.Message);
+                return new DosResult(0, null, "MinIO CopyObject Error: " + ex.GetType().Name
+                    + "，复制未确认成功，请沿用原请求键回读。");
             }
         }
 

@@ -11,22 +11,48 @@ const source = fs.readFileSync(
 ).replaceAll('\r\n', '\n')
 const execute = new Function('V8', source)
 
-test('resource and package declare the v1.0.6 authenticated same-origin failover contract', () => {
+test('official domain migration accepts both client generations and sends fallback only to the canonical origin', () => {
+  for (const apiBase of ['https://api.microi.net', 'https://api.itdos.com']) {
+    const requests = []
+    const result = execute({
+      OsClient: 'customer-fixture',
+      Param: { ...officialParam(), ApiBase: apiBase, OsClient: 'customer-fixture' },
+      Method: { RunPlatformApiRuntime() { return { Code: 0, Msg: '商城源未返回 JSON（HTTP 404）。' } } },
+      Http: { Post(request) { requests.push(request); return { Code: 1, Data: { Notices: [], PlatformCount: 34 } } } },
+    })
+    assert.equal(result.Code, 1, apiBase)
+    assert.equal(requests[0].Url, 'https://api.microi.net/apiengine/get-microi-store?OsClient=iTdos')
+    assert.deepEqual(requests[0].Headers, {})
+  }
+})
+
+test('lookalike official origins cannot enter the public compatibility path', () => {
+  for (const apiBase of ['https://api.microi.net.attacker.test', 'http://api.microi.net', 'https://api.microi.net:8443']) {
+    const result = execute({
+      Param: { ...officialParam(), ApiBase: apiBase },
+      Method: { RunPlatformApiRuntime() { return { Code: 0, Msg: 'HTTP 404' } } },
+      Http: { Post() { assert.fail('untrusted source must not use official fallback') } },
+    })
+    assert.equal(result.Code, 0)
+  }
+})
+
+test('resource and package declare the v1.0.7 authenticated same-origin failover contract', () => {
   const packageModel = JSON.parse(fs.readFileSync(
     path.join(resourceDir, 'app.microi.store.json'),
     'utf8',
   ))
   const engine = packageModel.SysApiEngines.find(item => item.ApiEngineKey === 'platform-marketplace-source')
-  assert.match(source, /Version: v1\.0\.6/)
+  assert.match(source, /Version: v1\.0\.7/)
   assert.match(source, /MARKETPLACE_LIST_ROUTE_FAILOVER_V2/)
   assert.match(source, /MARKETPLACE_NESTED_JSON_PAYLOAD_V2/)
   assert.match(source, /MARKETPLACE_SOURCE_HEADER_ISOLATION_V1/)
-  assert.equal(engine.Version, 'v1.0.6')
+  assert.equal(engine.Version, 'v1.0.7')
   assert.equal(Number(engine.StopHttp), 0)
   assert.equal(Number(engine.AllowAnonymous), 0)
   assert.equal(engine.ApiV8Code.replaceAll('\r\n', '\n'), source)
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
-    'ApiEngine:platform-marketplace-source@v1.0.6',
+    'ApiEngine:platform-marketplace-source@v1.0.7',
   ))
 })
 
@@ -65,7 +91,7 @@ test('official public list falls back only for an explicitly unavailable formal 
   assert.equal(result.Code, 1)
   assert.equal(result.DataCount, 1284)
   assert.equal(requests.length, 1)
-  assert.equal(requests[0].Url, 'https://api.itdos.com/apiengine/get-microi-store?OsClient=iTdos')
+  assert.equal(requests[0].Url, 'https://api.microi.net/apiengine/get-microi-store?OsClient=iTdos')
   assert.equal(requests[0].PostParamString, undefined)
   assert.deepEqual(requests[0].PostParam, {
     _PageIndex: 1,

@@ -62,7 +62,7 @@ export default {
         OfficialApps: "Platform apps",
         NoOfficialAppUpdates: "All platform apps are installed and up to date",
         OfficialAppCheckFailed: "Platform app check failed",
-        OfficialAppCheckFailedTip: "This failure is not treated as ‘all up to date’. Refresh and retry. If it persists, update the App Store app and verify that the current API node can reach api.itdos.com.",
+        OfficialAppCheckFailedTip: "This failure is not treated as ‘all up to date’. Refresh and retry. If it persists, update the App Store app and verify that the current API node can reach api.microi.net.",
         OfficialAppUninstalled: "Not installed",
         OfficialAppOutdated: "Update available",
         OfficialAppAbnormal: "Version anomaly",

@@ -447,7 +447,7 @@ var DiyCommon = {
                 return String(value).trim().replace(/\/+$/, "");
             }
         }
-        return "https://api.itdos.com";
+        return "https://api.microi.net";
     },
     GetAppStoreSourceOsClient(row) {
         row = row || {};
@@ -1584,7 +1584,7 @@ var DiyCommon = {
                     break;
             }
         };
-        xhr.open("GET", "https://api.itdos.com/api/os/GetAppVersion?OsClient=" + DiyCommon.GetOsClient());
+        xhr.open("GET", "https://api.microi.net/api/os/GetAppVersion?OsClient=" + DiyCommon.GetOsClient());
         xhr.send();
     },
     // 下载wgt文件
@@ -1593,7 +1593,7 @@ var DiyCommon = {
         plus.nativeUI.showWaiting("正在下载更新文件...");
         plus.downloader
             .createDownload(
-                "https://api.itdos.com/api/os/DownloadWgt?OsClient=" + DiyCommon.GetOsClient(),
+                "https://api.microi.net/api/os/DownloadWgt?OsClient=" + DiyCommon.GetOsClient(),
                 {
                     filename: "_doc/update/"
                 },

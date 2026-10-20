@@ -11,7 +11,7 @@ async function fixture(t, {sourceParent = 'private-products'} = {}) {
   const root = await fs.mkdtemp(path.join(tmpdir(), 'microi-standard-candidate-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));
   const applications = Array.from({length: 6}, (_, i) => ({appKey: 'app-' + i, requirements: i < 2 ? 'shared.md' : 'app-' + i + '.md'}));
-  const contract = {schemaVersion: 1, sourceParent, requirementsRoot: 'private-requirements', target: {apiBase: 'https://api.itdos.com', osClient: 'iTdos'}, applications};
+  const contract = {schemaVersion: 1, sourceParent, requirementsRoot: 'private-requirements', target: {apiBase: 'https://api.microi.net', osClient: 'iTdos'}, applications};
   const file = path.join(root, 'AI-Project/标准产品套件/source-contract.json');
   await fs.mkdir(path.dirname(file), {recursive: true});
   await fs.writeFile(file, JSON.stringify(contract));
@@ -33,7 +33,7 @@ async function declaredOfficialInputs(root) {
   }));
   const repositories = [{RepositoryKey: 'microi.openclaw', SourceRoot: 'private-official/worker', FileCount: 1,
     Files: [{Path: 'src/worker.js', Size: 8, Sha256: 'b'.repeat(64)}]}];
-  const contract = {SchemaVersion: 1, Origin: {ApiBase: 'https://api.itdos.com', OsClient: 'iTdos'}, Applications: applications, Repositories: repositories};
+  const contract = {SchemaVersion: 1, Origin: {ApiBase: 'https://api.microi.net', OsClient: 'iTdos'}, Applications: applications, Repositories: repositories};
   const file = path.join(root, 'Microi.Server/Microi.Tests/V8/official-application-source-contract.json');
   await fs.mkdir(path.dirname(file), {recursive: true}); await fs.writeFile(file, JSON.stringify(contract));
   for (const app of [...applications, ...repositories]) {

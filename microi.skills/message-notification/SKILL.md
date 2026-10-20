@@ -139,7 +139,7 @@ await V8.Notification.MarkRead({ All: true });
 - `AfterServerRestart` 用可信后端进程启动标识和主租户当前运行分区的共享 Redis 最新批次计算 occurrence，`Presented` 按数据库稳定回执主键抢占领取资格；同帐号多页面只有一个领取，刷新和重新登录不再次弹出。展示成功前回执应已持久化；响应丢失以同一个页面 `EntryId` 恢复，不以 localStorage 作为事实源。`ShownAt` 与 `ClosedAt` 分离，当前已领取弹窗需保留到关闭、撤回或过期。
 - 超级管理员范围和重启频率的最低接收协议为 2；官方 feed 必须对协议 1 隐去此类公告，接收端出缓存后再次按当前身份裁剪。未知范围、异常协议或无法核验的启动批次失败关闭。重启频率不能再叠加周期计划；多节点滚动发布采用共享最新启动批次，验证负载切换不回退、不重复。
 - 定时任务 `platform-reminder-tick` 每分钟只发送唤醒信号；权威计划与回执保存在数据库。前端监听 `ReceivePlatformReminder` 后回读，SignalR 正常约 60 秒对账、断线约 15 秒轮询并对错误退避；关闭失败重试、撤回和过期收回，禁止使用本机定时器或 localStorage 作为已读事实源。
-- 跨服务器官方源由 `Microi.net` 固定请求 `api.itdos.com`，不允许任意 URL/重定向、不发送用户或密钥，按真实本地 License 筛选并缓存；官方源降级不得阻断本地提醒。匿名 feed 只暴露已发布的版本公告，不可读草稿、租户目标或回执。
+- 跨服务器官方源由 `Microi.net` 固定请求 `api.microi.net`，不允许任意 URL/重定向、不发送用户或密钥，按真实本地 License 筛选并缓存；官方源降级不得阻断本地提醒。匿名 feed 只暴露已发布的版本公告，不可读草稿、租户目标或回执。
 - 官方“消息通知”包单一拥有配置接口 `platform-message-notification-config`、三个提醒接口、四表六索引、统一菜单、每分钟任务与当前内置微服务产物；SaaS 包同步统一菜单、基础空库结构和旧布局退役声明。先更新支持 `DiyFieldRetirements` 的商城，再安装新版 SaaS 包，清理旧入口且保留业务数据。商城包的内置微服务版本需同步。导出母版可能不带物理索引，按已验证 Manifest 补独立 `CREATE INDEX`，由安装器幂等检查；禁止发布测试提醒、真实接收人或回执数据。
 - 共享微服务发布闭包还包含独立“系统日志/监控”包，不能只核对 SaaS、商城和消息通知。先读取相关商城选择清单与实际包，确认 `microi-platform-service` 的所有携带者；按 `platform-service-release.json` 校验同一版本、构建字节与路由。监控包从 `system-observability-package-source.json` 和当前共享运行包经 `configure-system-observability-package.mjs` 再生成，元数据变化要先合并官方母版并升独立包版本。发布前验证各包，安装全部平台应用后再验消息通知页面，避免后安装的旧运行包覆盖新页面；不能通过修改安装器的 Managed 覆盖语义规避。
 - MCP 复用 `microi_get_db_schema / microi_generate_system / microi_admin_table_data / microi_save_engine_code / microi_run_engine`，以及在线应用发现、源码同步和流式发布工具；入口调整使用 `microi_update_module / microi_update_table / microi_delete_field`，写后回读确认不存在旧入口。

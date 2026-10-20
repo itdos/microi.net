@@ -7,7 +7,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const centralPath=path.join(repo,'AI-Project','标准产品套件','source-contract.json');
 const central=JSON.parse(fs.readFileSync(centralPath,'utf8')),app=central.applications.find(x=>x.appKey==='mci-cms');
-assert.equal(central.schemaVersion,1);assert.equal(central.target.apiBase,'https://api.itdos.com');assert.equal(central.target.osClient,'iTdos');assert.ok(app);
+assert.equal(central.schemaVersion,1);assert.equal(central.target.apiBase,'https://api.microi.net');assert.equal(central.target.osClient,'iTdos');assert.ok(app);
 const source=path.resolve(repo,central.sourceParent,app.appKey),relative=path.relative(repo,source);assert.ok(relative&&!relative.startsWith('..')&&!path.isAbsolute(relative));
 const {buildArtifacts}=await import(pathToFileURL(path.join(source,'build-manifest.mjs')));
 // 中央MCP/工作区集成断言继续保留在Full，下载的应用责任测试只依赖本包真实源码与发行需求快照。

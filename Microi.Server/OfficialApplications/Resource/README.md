@@ -79,7 +79,7 @@ node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --publish
 Remove-Item Env:MICROI_UPGRADE_RESOURCE_TOKEN
 ```
 
-本地执行一键发布时，同步器默认安全复用工作区中已配置并登录的 `microi_itdos` MCP，通过同一个官方接口引擎完成十二项资源读取、三方合并、`PublishBatch` 和发布后回读；不会出现“HTTP 读一份、MCP 写另一份”的事实源分叉。它会严格校验 MCP 必须绑定 `https://api.itdos.com + iTdos`，并继续保留固定资源白名单、官网 SHA 乐观锁及发布后回读校验；同步器不会读取、打印或写入 MCP Token。Token 文件按 `ApiBase|OsClient|OsClientType|OsClientNetwork` 四段精确身份读取，即使后两段为空也保留分隔符，避免误用可能已过期的旧版兼容键；签名失效时由 VS Code SecretStorage 恢复代理重新登录并原子写回。恢复代理通过 `onStartupFinished` 确定性启动，避免大型工作区的递归 `workspaceContains` 扫描超时后无人处理恢复请求。可以用 `MICROI_UPGRADE_RESOURCE_MCP_CONFIG` 显式指定 MCP 配置文件，默认从当前工作区向上查找 `.mcp.json`、`.vscode/mcp.json` 或 `.cursor/mcp.json`；若配置仍指向已安装的旧插件目录，发布器会自动选择同目录下版本更高的已安装插件。CI 没有 MCP 配置但注入了 `MICROI_UPGRADE_RESOURCE_TOKEN` 时，`auto` 模式才回退到官网 HTTP；也可用 `MICROI_UPGRADE_RESOURCE_TRANSPORT=mcp|http|auto` 显式固定传输方式。如果本机既没有可用的官方 MCP 登录态，也没有环境变量令牌，发布仍会中止并给出明确提示。
+本地执行一键发布时，同步器默认安全复用工作区中已配置并登录的 `microi_itdos` MCP，通过同一个官方接口引擎完成十二项资源读取、三方合并、`PublishBatch` 和发布后回读；不会出现“HTTP 读一份、MCP 写另一份”的事实源分叉。它会严格校验 MCP 必须绑定 `https://api.microi.net + iTdos`，并继续保留固定资源白名单、官网 SHA 乐观锁及发布后回读校验；同步器不会读取、打印或写入 MCP Token。Token 文件按 `ApiBase|OsClient|OsClientType|OsClientNetwork` 四段精确身份读取，即使后两段为空也保留分隔符，避免误用可能已过期的旧版兼容键；签名失效时由 VS Code SecretStorage 恢复代理重新登录并原子写回。恢复代理通过 `onStartupFinished` 确定性启动，避免大型工作区的递归 `workspaceContains` 扫描超时后无人处理恢复请求。可以用 `MICROI_UPGRADE_RESOURCE_MCP_CONFIG` 显式指定 MCP 配置文件，默认从当前工作区向上查找 `.mcp.json`、`.vscode/mcp.json` 或 `.cursor/mcp.json`；若配置仍指向已安装的旧插件目录，发布器会自动选择同目录下版本更高的已安装插件。CI 没有 MCP 配置但注入了 `MICROI_UPGRADE_RESOURCE_TOKEN` 时，`auto` 模式才回退到官网 HTTP；也可用 `MICROI_UPGRADE_RESOURCE_TRANSPORT=mcp|http|auto` 显式固定传输方式。如果本机既没有可用的官方 MCP 登录态，也没有环境变量令牌，发布仍会中止并给出明确提示。
 
 `Microi一键编译发布.sh` 的后端编译/发布模式会在 `dotnet build` 前自动执行同一条 `--publish` 命令。因此，本地资源或官网资源任一侧更新后，下一次后端发布都会先完成合并、官网写回（如有）、回读和基线更新；冲突、令牌缺失、并发哈希变化或回读不一致都会阻止后端发布。
 
@@ -101,7 +101,7 @@ Remove-Item Env:MICROI_UPGRADE_RESOURCE_TOKEN
 官方接口：
 
 ```text
-https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos&Name={resourceName}
+https://api.microi.net/apiengine/get-microi-upgrade-resource?OsClient=iTdos&Name={resourceName}
 ```
 
 首次部署同步机制时，必须先人工确认十二项本地资源与官网完全一致，再执行一次：

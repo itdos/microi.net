@@ -583,7 +583,7 @@ function allowedModelRows(modelIds) {
 async function relayModelRows() {
   try {
     var raw = await V8.Http.Get({
-      Url: 'https://api.itdos.com/apiengine/official_ai_relay_models?OsClient=iTdos',
+      Url: 'https://api.microi.net/apiengine/official_ai_relay_models?OsClient=iTdos',
       Timeout: 30
     });
     if (raw && raw.Content !== undefined) raw = raw.Content;

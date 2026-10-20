@@ -3,6 +3,8 @@ name: microi-system-delivery
 description: 已初始化吾码工作区的默认 AI 开发总控入口，用户只描述需求也必须读取，无需指定 Skill 名称。用于通过 MCP、VS Code 插件、V8、低代码、UniApp/H5、PC 后台和 Playwright E2E 开发、修改、分析或交付 Microi 系统，按用户范围路由相关专项 Skills。
 ---
 
+> 修改已有 MicroService 前，必须按 `../workspace-conventions/SKILL.md` 首部的“每次修改微服务前重新拉取”规则执行完整远端拉取、本地逐文件校验和三方合并；完成后才编辑，保存修改前源码哈希并用于同步 CAS。此项不能延后到发布时才做。
+
 > **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
 
 # Microi 全系统交付复盘与总控规范

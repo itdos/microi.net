@@ -18,7 +18,7 @@ const managedTenantSettingsSource = await read(new URL('./platform-tenant-system
 const identitySource = await read(new URL('../../Microi.Core/Security/IdentityVerificationSecurity.cs', import.meta.url))
 const externalLoginSource = await read(new URL('../../Microi.Core/Security/ExternalLoginProviderOptions.cs', import.meta.url))
 const suiteContract = JSON.parse(await read(pathToFileURL(path.join(workspaceRoot, 'AI-Project/标准产品套件/source-contract.json'))))
-assert.equal(suiteContract.target.apiBase, 'https://api.itdos.com')
+assert.equal(suiteContract.target.apiBase, 'https://api.microi.net')
 assert.equal(String(suiteContract.target.osClient).toLowerCase(), 'itdos')
 const tenantSource = path.dirname(path.resolve(workspaceRoot, suiteContract.sourceParent))
 const smsCanonicalSource = await read(pathToFileURL(path.join(tenantSource, '接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js')))

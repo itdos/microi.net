@@ -80,7 +80,7 @@ namespace Microi.net
                 success,
                 resourceName);
         }
-        private const string OfficialResourceApiUrl = "https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos";
+        private const string OfficialResourceApiUrl = "https://api.microi.net/apiengine/get-microi-upgrade-resource?OsClient=iTdos";
         private const string ImportPackageResourceName = "import-package.js";
         private const string PublishAiAppResourceName = "ai-app-publish-store.js";
         private const string BuildAiAppResourceName = "ai-app-build.js";

@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.4.1
+ * Version: v1.4.2
  * Function:
  * - 规划并逐个安装或更新全部官方平台应用；持久化计划、不可变商城快照标识与子检查点，并透传结构化失败详情。
  */
@@ -220,7 +220,7 @@ var sourceApiBase = trim(
     checkpoint.SourceApiBase
     || V8.Param.StoreApiBase
     || V8.Param.AppStoreApiBase
-    || 'https://api.itdos.com'
+    || 'https://api.microi.net'
 ).replace(/\/+$/, '');
 var sourceOsClient = trim(
     checkpoint.SourceOsClient

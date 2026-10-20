@@ -62,7 +62,7 @@ export default {
         OfficialApps: "平台应用",
         NoOfficialAppUpdates: "所有平台应用均已安装且为最新版",
         OfficialAppCheckFailed: "平台应用检查失败",
-        OfficialAppCheckFailedTip: "本次失败不会被当成“全部最新”。请刷新重试；若仍失败，请先更新“应用商城”应用，并检查当前 API 节点到 api.itdos.com 的网络。",
+        OfficialAppCheckFailedTip: "本次失败不会被当成“全部最新”。请刷新重试；若仍失败，请先更新“应用商城”应用，并检查当前 API 节点到 api.microi.net 的网络。",
         OfficialAppUninstalled: "未安装",
         OfficialAppOutdated: "可更新",
         OfficialAppAbnormal: "版本异常",

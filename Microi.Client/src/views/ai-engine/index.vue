@@ -1195,7 +1195,7 @@ async function loadRelayModels() {
     relayModelsLoading.value = true;
     try {
         // 中转模型是吾码官方公开目录，不依赖当前租户是否已填写中转 ApiKey。
-        const response = await fetch("https://api.itdos.com/apiengine/official_ai_relay_models?OsClient=iTdos");
+        const response = await fetch("https://api.microi.net/apiengine/official_ai_relay_models?OsClient=iTdos");
         const json = await response.json();
         if (!response.ok || Number(json?.Code) !== 1) {
             throw new Error(json?.Msg || `HTTP ${response.status}`);

@@ -44,6 +44,14 @@ function candidateBytes(key,bytes){
 // 一键脚本在最终加密冒烟时消费本地环境标记及其选中的配置；它们即使被
 // Git 忽略也必须绑定 Full。回执只保存原始字节哈希，绝不序列化连接凭据。
 async function snapshotLocalSmokeInputs(root){
+ if(process.env.MICROI_RELEASE_SMOKE_CONFIG){
+  const filename=path.resolve(process.env.MICROI_RELEASE_SMOKE_CONFIG),stat=await lstat(filename);
+  if(stat.isSymbolicLink()||!stat.isFile())throw Error('Explicit smoke configuration must be a regular file');
+  const bytes=await readFile(filename),config=JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/,''));
+  const allowed=new Set(['OsClient','OsClientType','OsClientNetwork','OsClientDbType','OsClientDbConn','OsClientRedisHost','OsClientRedisPort','OsClientRedisPwd','OsClientRedisDataBase','OsClientDbMongoConn']);
+  if(!config.AppSettings?.OsClient||Object.keys(config.AppSettings).some(key=>!allowed.has(key)))throw Error('Explicit smoke AppSettings must contain only approved bootstrap keys');
+  return {'@smoke-config':createHash('sha256').update(bytes).digest('hex')};
+ }
  const api='Microi.Server/Microi.net.Api',markerName=api+'/.microi-local';
  const files={[markerName]:null};
  let marker;
@@ -87,7 +95,9 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }
  }
- Object.assign(files,await snapshotStandardInputs(root));
+ Object.assign(files,await snapshotStandardInputs(root,{
+  includeTestInputs:!['UserRequestedSkip','SmokeOnly'].includes(process.env.MICROI_RELEASE_TEST_POLICY)
+ }));
  Object.assign(files,await snapshotLocalSmokeInputs(root));
  // Implicit composition belongs only to this actual workspace; explicit foreign contracts still fail.
  const compositionOptions={...options,environment:options.environment??(path.resolve(root)===workspace?process.env:{})};

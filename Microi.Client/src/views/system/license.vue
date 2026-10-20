@@ -319,7 +319,7 @@
 import { Refresh, Monitor, CopyDocument, EditPen, Promotion, Search, Download, Upload, Connection } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
-const LICENSE_API_BASE = "https://api.itdos.com";
+const LICENSE_API_BASE = "https://api.microi.net";
 
 export default {
     name: "system_license",
@@ -662,7 +662,7 @@ export default {
             });
         },
 
-        // 检查授权状态（从 api.itdos.com，不发送authorization报文）
+        // 检查授权状态（从 api.microi.net，不发送authorization报文）
         checkLicense() {
             const self = this;
             if (!self.ensureMainTenant()) return;

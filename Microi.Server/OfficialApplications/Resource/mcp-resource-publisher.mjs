@@ -6,7 +6,7 @@ import { basename, dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { validateOfficialPackageChangeLog } from './resource-sync-core.mjs';
 
-const officialApiBaseUrl = 'https://api.itdos.com';
+const officialApiBaseUrl = 'https://api.microi.net';
 const officialOsClient = 'itdos';
 const officialEngineKey = 'get-microi-upgrade-resource';
 const officialApplicationResourceNames = Object.freeze([

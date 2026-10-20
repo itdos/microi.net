@@ -125,7 +125,7 @@ if [ "${1:-}" = "--mirror-dependencies" ]; then
 fi
 
 # 同版本 Docker 热修复只发布经过完整测试的本地候选，不升版、不发布 NuGet，
-# 不同步官方数据库资源；保留常规发布的 Full、混淆后冒烟和镜像门禁。
+# 不同步官方数据库资源；默认 Full，显式快速发布可跳过 Full，但混淆后冒烟不可跳过。
 MICROI_FULL_ONLY=false
 if [ "${1:-}" = "--full-only" ]; then
     MICROI_FULL_ONLY=true
@@ -133,6 +133,17 @@ fi
 MICROI_DOCKER_ONLY_HOTFIX=false
 if [ "${1:-}" = "--docker-only-hotfix" ]; then
     MICROI_DOCKER_ONLY_HOTFIX=true
+fi
+MICROI_RELEASE_SKIP_TESTS=false
+if [ "${2:-}" = "--skip-tests" ]; then
+    if [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ]; then
+        echo "--skip-tests 只能与显式 --docker-only-hotfix 配合使用。" >&2
+        exit 1
+    fi
+    MICROI_RELEASE_SKIP_TESTS=true
+    export MICROI_RELEASE_TEST_POLICY=SmokeOnly
+else
+    export MICROI_RELEASE_TEST_POLICY=Full
 fi
 
 # Windows (Git Bash) 下：正常结束时暂停便于查看结果；关闭窗口/Ctrl+C 时立即清理，不再卡在 read。
@@ -1142,6 +1153,9 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
     if ! node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
         print_fail "无法记录七个仓库的候选源码；已停止发布。"
     fi
+    if [ "$MICROI_RELEASE_SKIP_TESTS" = true ]; then
+        print_warning "用户明确要求跳过 Full；混淆后启动与配置接口冒烟仍必须通过。保留候选一致性、编译、加密和镜像字节检查。"
+    else
     if command -v pwsh >/dev/null 2>&1; then
         _test_powershell="pwsh"
     elif command -v powershell.exe >/dev/null 2>&1; then
@@ -1168,6 +1182,7 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
         print_fail "验收期间源码发生变化；必须重新加载最终候选并重跑 Full。"
     fi
     print_success "Microi.Tests Full 冻结矩阵全量回归通过"
+    fi
 fi
 
 # 插件发行修复等需要复验 Full，但不能重新生成或覆盖已成功发布的不可变平台制品。
@@ -1368,7 +1383,16 @@ fi
 # 这里临时把当前环境的 appsettings.{OsClient}.json 拷贝到发布目录，冒烟测试结束后还原。
 SMOKE_BACKUP="$PUBLISH_DIR/appsettings.json.smoke.bak"
 SMOKE_INJECTED=false
-if [ -f "Microi.Server/Microi.net.Api/.microi-local" ]; then
+if [ -n "${MICROI_RELEASE_SMOKE_CONFIG:-}" ]; then
+    _local_appsettings="$MICROI_RELEASE_SMOKE_CONFIG"
+    [ -f "$_local_appsettings" ] || print_fail "指定的冒烟配置不存在。"
+    _local_env=$(json_value "OsClient" "$_local_appsettings")
+    [ -n "$_local_env" ] || print_fail "指定的冒烟配置缺少 OsClient。"
+    cp "$PUBLISH_DIR/appsettings.json" "$SMOKE_BACKUP"
+    cp "$_local_appsettings" "$PUBLISH_DIR/appsettings.json"
+    SMOKE_INJECTED=true
+    print_info "冒烟测试已注入显式隔离环境配置: $_local_env"
+elif [ -f "Microi.Server/Microi.net.Api/.microi-local" ]; then
     _local_env=$(tr -d '\r\n[:space:]' < "Microi.Server/Microi.net.Api/.microi-local")
     _local_appsettings="Microi.Server/Microi.net.Api/appsettings.${_local_env}.json"
     if [ -f "$_local_appsettings" ] && [ -d "$PUBLISH_DIR" ]; then
@@ -1388,7 +1412,7 @@ fi
 # 静默等到 .NET 默认连接超时（30s+），跟冒烟测试的 30s 超时窗口几乎重叠，
 # 看起来像"卡住"，实际是依赖服务问题。提前 3s TCP 探测可快速定位。
 if [ "$SMOKE_INJECTED" = true ]; then
-    _appsettings_path="Microi.Server/Microi.net.Api/appsettings.${_local_env}.json"
+    _appsettings_path="$_local_appsettings"
     if [ -f "$_appsettings_path" ]; then
         print_step "预检依赖服务连通性（$_local_env）..."
 
@@ -1462,7 +1486,10 @@ if ! (
         exit 1
     fi
 
-    dotnet Microi.net.Api.dll --urls="http://127.0.0.1:${SMOKE_PORT}" > "$SMOKE_LOG" 2>&1 &
+    # 固定宿主环境，禁止 .microi-local / appsettings.{Environment}.json
+    # 覆盖刚注入的冒烟配置，误连开发或正式数据库。
+    ASPNETCORE_ENVIRONMENT=Production DOTNET_ENVIRONMENT=Production \
+        dotnet Microi.net.Api.dll --urls="http://127.0.0.1:${SMOKE_PORT}" > "$SMOKE_LOG" 2>&1 &
     SMOKE_PID=$!
 
     stop_smoke_process() {
@@ -1498,8 +1525,14 @@ if ! (
         _smoke_http_status=$(curl --silent --show-error --max-time 2 \
             --output /dev/null --write-out '%{http_code}' "$SMOKE_URL" 2>/dev/null || true)
         if [ "$_smoke_http_status" = "200" ]; then
-            echo "  ✅ 冒烟测试通过: ${SMOKE_URL} 返回 HTTP 200（${i}s）！"
-            exit 0
+            if node "$MICROI_RELEASE_WORKSPACE/Microi.Server/tools/release-smoke.mjs" \
+                "http://127.0.0.1:${SMOKE_PORT}" "$_local_env" \
+                "$MICROI_RELEASE_GATE_DIR/api-smoke.json" "$PWD"; then
+                echo "  ✅ 冒烟测试通过: 混淆后宿主和真实系统配置接口均返回成功（${i}s）！"
+                exit 0
+            fi
+            echo "  ❌ 配置接口冒烟失败，已停止发布。"
+            exit 1
         fi
         sleep 1
     done

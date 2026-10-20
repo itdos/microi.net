@@ -63,8 +63,8 @@ MCP 可信写前校验分支确认未执行时标记 `notExecuted`，保留安�
 
 内置在线 AI 有两套不能混淆的授权：
 
-- `Chat/ChatStream/NL2SQL/NL2SQLStreaming/NL2V8Engine` 统一读取宿主 `IMicroiFeatureLicense`。未修改的官方发布物只有本机通过官方 RSA 公钥、当前 HID 和有效期验证的 `Personal/Enterprise` License 才能继续推理；客户自建私钥/公钥不能替换内嵌官方信任根。验签在本机完成，`api.itdos.com` 只负责签发和周期性作废查询，不是每次调用的在线依赖。
-- `MicroiAI` 与 `AiProxyService` 会拒绝宿主替换的 `IMicroiFeatureLicense` 实现，统一回到 `Microi.net` 的封闭校验器；签发地址固定为 `https://api.itdos.com`，签发私钥目录不得进入构建、NuGet 或发布包。拥有服务器管理员权限的人仍可能篡改本地二进制或机器指令，纯本地 DRM 无法从理论上阻止这种物理控制；但没有官方私钥就不能生成可被未修改吾码节点接受、并可转发给其它正常节点使用的有效 License。
+- `Chat/ChatStream/NL2SQL/NL2SQLStreaming/NL2V8Engine` 统一读取宿主 `IMicroiFeatureLicense`。未修改的官方发布物只有本机通过官方 RSA 公钥、当前 HID 和有效期验证的 `Personal/Enterprise` License 才能继续推理；客户自建私钥/公钥不能替换内嵌官方信任根。验签在本机完成，`api.microi.net` 只负责签发和周期性作废查询，不是每次调用的在线依赖。
+- `MicroiAI` 与 `AiProxyService` 会拒绝宿主替换的 `IMicroiFeatureLicense` 实现，统一回到 `Microi.net` 的封闭校验器；签发地址固定为 `https://api.microi.net`，签发私钥目录不得进入构建、NuGet 或发布包。拥有服务器管理员权限的人仍可能篡改本地二进制或机器指令，纯本地 DRM 无法从理论上阻止这种物理控制；但没有官方私钥就不能生成可被未修改吾码节点接受、并可转发给其它正常节点使用的有效 License。
 - 官方中转站另用 `sk-microi-*` ApiKey 和账号 Token 额度鉴权。服务器 License 不能代替中转 ApiKey，中转 ApiKey 也不能把本地核心 AI 入口变成已授权。
 - `AiProxyService` 的 `ProxyChat/ProxyChatStream`、头像生成与 `/v1/chat/completions` 在领域层读取同一服务器 License，并继续执行登录态或平台 ApiKey/订阅链路。模型清单、套餐、订单和用量属于不触发模型推理的发现/账户接口，可以在未授权时用于配置与购买流程。
 

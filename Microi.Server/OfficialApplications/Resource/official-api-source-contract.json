@@ -1,7 +1,7 @@
 {
   "SchemaVersion": 1,
   "Description": "官方接口引擎与表事件的唯一可编辑发行源码契约；生成器只读取声明源码，禁止自动回退租户镜像。CreateIfMissing仅安全默认模板，不复制母租户个性化Hook。",
-  "OfficialApiBase": "https://api.itdos.com",
+  "OfficialApiBase": "https://api.microi.net",
   "OfficialOsClient": "iTdos",
   "Entries": [
     {

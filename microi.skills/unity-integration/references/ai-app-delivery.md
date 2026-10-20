@@ -93,7 +93,7 @@ tests/
 
 ## 官方发布顺序
 
-只有当前 MCP 明确绑定官方 `https://api.itdos.com`、`OsClient=iTdos` 且用户已授权写入时才执行：
+只有当前 MCP 明确绑定官方 `https://api.microi.net`、`OsClient=iTdos` 且用户已授权写入时才执行：
 
 1. `microi_list_applications` 按精确 AppKey/中文名查重。
 2. 读取远端应用上下文、源码版本、运行版本、行版本/围栏与路由快照。

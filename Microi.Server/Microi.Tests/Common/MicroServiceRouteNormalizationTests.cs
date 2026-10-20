@@ -5,6 +5,46 @@ namespace Microi.Tests.Common;
 
 public class MicroServiceRouteNormalizationTests
 {
+    [Fact]
+    public void EmptyMetadataKeepsExistingAliasesAndAcceptsTopLevelComponentPaths()
+    {
+        var old = JObject.Parse("""{"LegacyComponentPaths":["/loctek/CountingDetails"],"LegacyMenuUrls":["/pandiandan"]}""");
+        var route = JObject.Parse("""{"RouteMetaJson":"{}","LegacyComponentPaths":["/loctek/NewDetails"],"sourceFile":"src/CountingDetails.vue","InternalOnly":true}""");
+        var merged = V8McpLogic.BuildMicroServiceRouteMetadata(route, old);
+        Assert.Equal(new[] { "/loctek/CountingDetails", "/loctek/NewDetails" }, merged["LegacyComponentPaths"]!.Values<string>());
+        Assert.Equal("/pandiandan", merged["LegacyMenuUrls"]![0]!.Value<string>());
+        Assert.Equal("src/CountingDetails.vue", merged.Value<string>("SourceFile"));
+        Assert.True(merged.Value<bool>("InternalOnly"));
+        Assert.Single(old["LegacyComponentPaths"]!);
+    }
+
+    [Fact]
+    public void V3MetadataRetainsNestedMetaCompatibilityAndRejectsInvalidAliases()
+    {
+        var route = JObject.Parse("""{"Meta":{"title":"Details","LegacyComponentPaths":["/legacy"]}}""");
+        var meta = V8McpLogic.BuildMicroServiceRouteMetadata(route);
+        Assert.Equal("Details", meta.Value<string>("title"));
+        Assert.Equal("/legacy", meta["LegacyComponentPaths"]![0]!.Value<string>());
+        Assert.Throws<ArgumentException>(() => V8McpLogic.BuildMicroServiceRouteMetadata(
+            JObject.Parse("""{"LegacyComponentPaths":"not-an-array"}""")));
+    }
+
+    [Fact]
+    public void V3SnapshotCannotSilentlyDropOtherPagesOrComponentAliases()
+    {
+        var old = JObject.Parse("""{"RoutePath":"/inventory","RouteMetaJson":"{\"LegacyComponentPaths\":[\"/loctek/CountingDetails\"]}"}""");
+        var next = JObject.Parse("""{"RoutePath":"/inventory","RouteMetaJson":"{}"}""");
+        Assert.Contains("LegacyComponentPaths", V8McpLogic.ValidateMicroServiceRouteContinuity(new[] { old }, new[] { next }));
+        Assert.Contains("缺少现有路由", V8McpLogic.ValidateMicroServiceRouteContinuity(new[] { old }, Array.Empty<JObject>()));
+        next["LegacyComponentPaths"] = new JArray("/loctek/CountingDetails");
+        Assert.Null(V8McpLogic.ValidateMicroServiceRouteContinuity(new[] { old }, new[] { next }));
+        next.Remove("LegacyComponentPaths");
+        next["IsEnable"] = 0;
+        Assert.Null(V8McpLogic.ValidateMicroServiceRouteContinuity(new[] { old }, new[] { next }));
+        old["IsDeleted"] = 1;
+        Assert.Null(V8McpLogic.ValidateMicroServiceRouteContinuity(new[] { old }, Array.Empty<JObject>()));
+    }
+
     [Theory]
     [InlineData("RouteGateMain20261013", "route-probe", "/", "/micro-app/RouteGateMain20261013/route-probe")]
     [InlineData("iTdos", "MixedCaseApp", "/designer/details", "/micro-app/iTdos/MixedCaseApp/designer/details")]

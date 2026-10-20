@@ -393,7 +393,7 @@ function synchronizeBulkInstallButton(packageModel) {
       V8.Tips('后台任务工作器未就绪：' + notReadyReason + '。解决方案：确认 API 节点健康、mci_background_task 表已升级并等待工作器心跳恢复后重试。', false);
       return;
     }
-    var selectApi = String((V8.SysMenuModel && V8.SysMenuModel.SelectApi) || 'https://api.itdos.com/apiengine/get-microi-store-list?OsClient=iTdos');
+    var selectApi = String((V8.SysMenuModel && V8.SysMenuModel.SelectApi) || 'https://api.microi.net/apiengine/get-microi-store-list?OsClient=iTdos');
     var parsed = new URL(selectApi, window.location.origin);
     var sourceOsClient = parsed.searchParams.get('OsClient') || 'iTdos';
     var operationId = Date.now() + '-' + Math.random().toString(36).substring(2);

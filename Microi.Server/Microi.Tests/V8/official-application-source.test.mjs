@@ -7,7 +7,7 @@ import test from 'node:test';
 import {execFileSync} from 'node:child_process';
 import {verifyOfficialApplicationSource,verifyOfficialRepositorySource} from './official-application-source.mjs';
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
-function fixture(){const workspace=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'microi-source-contract-')));const root=path.join(workspace,'source');fs.mkdirSync(root);fs.writeFileSync(path.join(root,'source.js'),'export const fixture=1;\n');const bytes=fs.readFileSync(path.join(root,'source.js')),f={Path:'source.js',Size:bytes.length,Sha256:sha(bytes)};const app={AppKey:'official-fixture',SourceRoot:'source',FileCount:1,Files:[f],SourceBytes:f.Size,SourceManifestHash:sha(f.Path+'\t'+f.Sha256+'\t'+f.Size)};return {workspace,root,contract:{SchemaVersion:1,Origin:{ApiBase:'https://api.itdos.com',OsClient:'iTdos'},Applications:[app]},app};}
+function fixture(){const workspace=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'microi-source-contract-')));const root=path.join(workspace,'source');fs.mkdirSync(root);fs.writeFileSync(path.join(root,'source.js'),'export const fixture=1;\n');const bytes=fs.readFileSync(path.join(root,'source.js')),f={Path:'source.js',Size:bytes.length,Sha256:sha(bytes)};const app={AppKey:'official-fixture',SourceRoot:'source',FileCount:1,Files:[f],SourceBytes:f.Size,SourceManifestHash:sha(f.Path+'\t'+f.Sha256+'\t'+f.Size)};return {workspace,root,contract:{SchemaVersion:1,Origin:{ApiBase:'https://api.microi.net',OsClient:'iTdos'},Applications:[app]},app};}
 function run(fn){const f=fixture();try{fn(f);}finally{fs.rmSync(f.workspace,{recursive:true,force:true});}}
 
 function testOverlay(f){

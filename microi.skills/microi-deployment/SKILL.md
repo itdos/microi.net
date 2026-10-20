@@ -98,7 +98,7 @@ System.Drawing.Common 的 .NET 10 支持库引用 System.Formats.Nrbf，Dos.Comm
 临时指定运行目标：
 
 ```text
-http://localhost:61500/?OsClient=iTdos&ApiBase=https%3A%2F%2Fapi.itdos.com
+http://localhost:61500/?OsClient=iTdos&ApiBase=https%3A%2F%2Fapi.microi.net
 ```
 
 URL 的 `ApiBase`、`OsClient` 优先级最高，但不会隔离同源 localStorage/Pinia/Token。多个 AI

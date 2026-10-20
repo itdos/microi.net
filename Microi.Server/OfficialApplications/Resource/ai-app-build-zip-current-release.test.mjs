@@ -16,7 +16,7 @@ test('Web ZIP includes only the current v3 release and reads verified stable ass
   const urls = [];
   let entries = [];
   const v8 = {
-    EncryptHelper: { Sha256Hex: value => sha(value) }, Param: { AppId: 'app-1' }, SysConfig: { ApiBase: 'https://api.itdos.com' }, OsClient: 'iTdos',
+    EncryptHelper: { Sha256Hex: value => sha(value) }, Param: { AppId: 'app-1' }, SysConfig: { ApiBase: 'https://api.microi.net' }, OsClient: 'iTdos',
     FormEngine: {
       GetFormData: () => ({ Code: 1, Data: { Id: 'app-1', AppKey: 'demo', Name: 'Demo', AppType: 'Web' } }),
       GetTableData: table => ({ Code: 1, Data: table === 'mci_ai_app_version' ? [{ VersionNo: 'v1.0.5' }] : files }),
@@ -39,5 +39,5 @@ test('Web ZIP includes only the current v3 release and reads verified stable ass
   assert.equal(result.Code, 1);
   assert.deepEqual(entries.map(entry => entry.Path), ['index.html', 'assets/app-preview.png', 'microi-app-version.json']);
   assert.equal(urls.length, 2);
-  assert.ok(urls.every(url => url.startsWith('https://api.itdos.com/micro-app/v3/')));
+  assert.ok(urls.every(url => url.startsWith('https://api.microi.net/micro-app/v3/')));
 });

@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Microi.net;
 using Minio;
 using Minio.DataModel.Args;
+using Dos.Common;
 
 namespace Microi.Tests.Common;
 
@@ -143,5 +144,88 @@ public sealed class MicroiHdfsMinioCopyTests
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sdk.CopyObjectAsync(Args("private"), cancellation.Token));
         Assert.Equal(0, server.Copies);
+    }
+
+    private static Task<DosResult> SignedCopy(IMinioClient sdk, string bucket, HttpClient http, CancellationToken token = default) =>
+        (Task<DosResult>)typeof(MicroiHDFSMinIO)
+            .GetMethod("CopySignedObjectAsync", BindingFlags.NonPublic | BindingFlags.Static)!
+            .Invoke(null, [sdk, bucket, "tenant/中文 source.css", "tenant/copied.css", http, token])!;
+
+    private sealed class ObjectOnlyCopyServer(HttpStatusCode copyStatus, string copyBody) : HttpMessageHandler
+    {
+        public int Copies { get; private set; }
+        public int BucketProbes { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (request.Method == HttpMethod.Head)
+            {
+                BucketProbes++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)
+                {
+                    RequestMessage = request,
+                    Content = new ByteArrayContent([])
+                });
+            }
+            Assert.Equal(HttpMethod.Put, request.Method);
+            Copies++;
+            var uri = request.RequestUri!;
+            var query = uri.Query.TrimStart('?').Split('&').ToDictionary(
+                pair => Uri.UnescapeDataString(pair.Split('=')[0]),
+                pair => Uri.UnescapeDataString(pair[(pair.IndexOf('=') + 1)..]));
+            var names = query["X-Amz-SignedHeaders"];
+            var source = request.Headers.GetValues("x-amz-copy-source").Single();
+            Assert.Equal(source, query["x-amz-copy-source"]);
+            Assert.EndsWith("/tenant/%E4%B8%AD%E6%96%87%20source.css", source);
+            Assert.False(request.Headers.Contains("x-amz-metadata-directive"));
+            Assert.False(request.Headers.Contains("x-amz-tagging-directive"));
+            var canonicalQuery = string.Join("&", query.Where(pair => pair.Key != "X-Amz-Signature")
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
+            var canonicalHeaders = string.Concat(names.Split(';').Select(name => name + ":"
+                + (name == "host" ? uri.Authority : request.Headers.GetValues(name).Single()) + "\n"));
+            var canonical = "PUT\n" + uri.AbsolutePath + "\n" + canonicalQuery + "\n"
+                + canonicalHeaders + "\n" + names + "\nUNSIGNED-PAYLOAD";
+            var scope = query["X-Amz-Credential"]["test-access/".Length..];
+            var toSign = "AWS4-HMAC-SHA256\n" + query["X-Amz-Date"] + "\n" + scope + "\n"
+                + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+            var key = Encoding.UTF8.GetBytes("AWS4test-secret");
+            foreach (var part in scope.Split('/')) key = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(part));
+            Assert.Equal(query["X-Amz-Signature"],
+                Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(toSign))));
+            return Task.FromResult(new HttpResponseMessage(copyStatus) { Content = new StringContent(copyBody) });
+        }
+    }
+
+    [Theory]
+    [InlineData("private")]
+    [InlineData("public")]
+    public async Task PrefixScopedCopySignsExactObjectsWithoutRequiringBucketProbe(string bucket)
+    {
+        var transport = new ObjectOnlyCopyServer(HttpStatusCode.OK,
+            "<CopyObjectResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><ETag>\"copied\"</ETag></CopyObjectResult>");
+        using var http = CopyClient(transport);
+        using var sdk = Sdk(http);
+        await Assert.ThrowsAsync<Minio.Exceptions.AccessDeniedException>(() => sdk.CopyObjectAsync(Args(bucket)));
+        Assert.Equal(1, transport.BucketProbes);
+        var result = await SignedCopy(sdk, bucket, http);
+        Assert.True(result.Code == 1, result.Msg);
+        Assert.Equal(1, transport.BucketProbes);
+        Assert.Equal(1, transport.Copies);
+    }
+
+    [Theory]
+    [InlineData(403, "<Error><Code>AccessDenied</Code></Error>")]
+    [InlineData(200, "<Error><Code>InternalError</Code></Error>")]
+    [InlineData(200, "<CopyObjectResult></CopyObjectResult>")]
+    [InlineData(302, "")]
+    public async Task SignedCopyNeverTreatsDeniedOrEmbeddedFailureAsSuccess(int status, string body)
+    {
+        var transport = new ObjectOnlyCopyServer((HttpStatusCode)status, body);
+        using var http = CopyClient(transport);
+        using var sdk = Sdk(http);
+        Assert.Equal(0, (await SignedCopy(sdk, "private", http)).Code);
+        Assert.Equal(1, transport.Copies);
+        Assert.Equal(0, transport.BucketProbes);
     }
 }

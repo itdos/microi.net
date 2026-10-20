@@ -52,7 +52,7 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 
 - 1.3.8 起生产宿主为 DeepSeek 官方桌面。同步前读取内部源码根目录 `同步DeepSeek官方上游.md`、`apps/official-desktop/upstream.lock.json` 与维护交接记录；核对官方提交、归档 SHA、版本与完整锁。保留原始快照、自有层和精确接缝，干净安装、回归及真实包验收后才能推进基线。旧 `同步dsh-desktop上游.md` 已删除；历史派生模块只按发行快照追溯，不得恢复退役宿主或 PPT 模式。
 - Microi Agent 是内部仓库中的独立桌面发行物，基于 DeepSeek Harness 官方桌面源码及独立吾码差异层，内置固定 Harness、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。历史 DataElement 派生模块及许可证仍保留。
-- 官方 AI 登录只走吾码桌面账号窗口，在受支持的 `https://api.microi.net` / `https://api.itdos.com`、`OsClient=iTdos` 使用本人的中转 Key 和额度；它是员工业务 MCP 之外的可选计费来源。不要把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
+- 官方 AI 登录只走吾码桌面账号窗口，在受支持的 `https://api.microi.net` / `https://api.microi.net`、`OsClient=iTdos` 使用本人的中转 Key 和额度；它是员工业务 MCP 之外的可选计费来源。不要把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
 - 业务连接在「服务器连接（MCP）」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
 - macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
 - 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
@@ -68,7 +68,7 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 - 闭源商业项目要求免费可信 EXE 下载时，已发布的免费 Store MSIX 可使用 Microsoft Store Web Installer：从官方 badge 生成器的 Direct 模式取得该产品 `get.microsoft.com/installer/download/` 链接，验证真实下载的 Microsoft 签名及文件摘要。这是联网安装当前商店版的小型 EXE，不是给官网完整 NSIS EXE 签名；保留两渠道并说明版本差异，不把下载成功写成原生安装通过，不将动态安装器冒充固定版本 CDN 产物。按当前包 Manifest 的 MinVersion 和架构记录系统条件，分别说明旧 Windows、x86、ARM 仿真、LTSC/Server、离线与企业策略边界；不降低安全策略或虚构全部系统验收。自签名不能产生公众信任，免费开源签名服务不适用于私有商业源码。
 - 复用已签名 MAS 应用制作开发测试包时，必须替换 `Contents/embedded.provisionprofile`，核对描述文件中的证书与开发签名及当前设备一致；`codesign --verify` 通过仍不能替代实际启动。资料目录中的描述文件保持私有权限，复制到安装包后设为普通用户可读，并检查整个有效载荷，避免 ITMS-90255。沙盒阻止调试监听时不得扩大正式包的网络监听权限；自动化测试入口只放入独立开发副本，正式入口、preload 与界面应核对同源，测试入口和配对口令不得进入正式安装包。安装包上传成功后仍要回读 Apple 处理状态、选择构建、上传高清素材并实际提交审核。
 - 官方账号页和关于标签通过 `platform-current-user` 接口引擎读取当前 `sys_user.LicenseType`。桌面相关平台业务逻辑优先通过 `microi_itdos` 接口引擎实现；只有接口引擎缺少必需底层原子能力时才能改后端源码，并说明原因。
-- 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.itdos.com/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。
+- 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.microi.net/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。
 - Windows 安装验收必须包含旧卸载器损坏后的升级、同版本重装、超过 260 字符的路径以及全部文件 SHA-256 回读。安装器使用当次发布的兼容卸载器，并用固定哈希的 Unicode 7-Zip 直接解压到目标目录，禁止恢复临时目录解压后使用 NSIS `CopyFiles` 复制的流程；该流程会将路径或复制错误误报为“应用无法关闭”。进程检查仅匹配安装目录内的产品主程序及内置 Node，不能按整个目录匹配安装器或无关程序。
 - 长路径验收必须先安装完整旧版本，再在同一目录覆盖升级及再次重装，不能只在空目录或仅含模拟卸载器的目录安装。卸载清理、旧文件备份迁移和失败回滚均须支持 Windows 扩展路径；通过真实 NSIS 与独占文件句柄验证长路径迁移和占用回滚，不能仅用 JS 文件操作或首次解压测试替代。
 - Windows 1.2.7 起安装失败诊断直接集成于安装器：失败窗口提供「复制安装日志」与「打开日志」，不另发独立诊断工具。`build/microi-installer-log.nsh` 在实际清理/解压/回滚步骤写入安装目录外的 UTF-8 日志，`build/microi-installer-diagnostics.ps1` 作为内嵌的只读补充，记录 Win32 访问错误和 Restart Manager 占用 PID。整份日志通过原生 Unicode 剪贴板复制；超过容量时明确拒绝而不截断。验收须真实点击复制按钮、核对中文长日志、占用文件的 Win32=32 与回滚；卸载退出码 2 不等同于 Win32 错误码 2，本机通过不代表客户机升级通过。

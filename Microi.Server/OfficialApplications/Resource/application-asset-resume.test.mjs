@@ -530,13 +530,15 @@ test('combined source/build rejects another tenant private path even with a comp
   assert.equal(installer.checkpoint.AssetKind, 'Build');
 });
 
-test('combined source/build unknown future bundle cursor cannot bypass private object byte verification', () => {
+test('combined source/build unknown future bundle cursor verifies and repairs damaged private bytes', () => {
   const installer = createCombinedInstaller();
   installer.run();installer.run();
   installer.checkpoint.BundleIndex = 1;
   installer.checkpoint.AssetKind = 'Unknown';
   installer.objects.set(installer.rows['combined-0:src/main.ts'].HdfsPath.replace(/^\//, ''), Buffer.from('damaged'));
-  assert.throws(() => installer.run(), /PRIVATE_SOURCE_OBJECT_BYTES_MISMATCH/);
+  installer.finish();
+  installer.verify();
+  assert.ok(installer.uploads.length > 4, 'damaged source must be restored from the package');
 });
 
 test('combined source/build failed private copy does not persist metadata or advance the cursor', () => {

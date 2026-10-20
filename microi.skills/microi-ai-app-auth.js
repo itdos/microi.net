@@ -89,7 +89,7 @@ function runtime() {
   let osClient = context.osClient || context.OsClient || window.MicroiOsClient
     || query.get('OsClient') || query.get('osClient') || '';
   if (!apiBase && /(^|\.)static\.itdos\.com$/i.test(window.location.hostname)) {
-    apiBase = 'https://api.itdos.com';
+    apiBase = 'https://api.microi.net';
   }
   if (!osClient && /(^|\.)static\.itdos\.com$/i.test(window.location.hostname)) {
     osClient = 'iTdos';

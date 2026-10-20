@@ -28,7 +28,7 @@ function fixture(options={}){
  const method={
   ObjectExist(p){calls.push(['exist',copy(p)]);assert.equal(p.Limit,true);return{Code:1,Data:objects.has(p.FilePathName)};},
   GetObjectSha256(p){calls.push(['hash',copy(p)]);assert.equal(p.Limit,true);const b=objects.get(p.FilePathName);return b?{Code:1,Data:{Sha256:hash(b),Size:b.length}}:{Code:0,Msg:'missing'};},
-  CopyObject(p){calls.push(['copy',copy(p)]);assert.equal(p.Limit,true);assert.ok(p.FilePathName.startsWith('/'+tenant+'/'));assert.ok(p.Path.startsWith('/'+tenant+'/'));if(options.copyFailure)return{Code:0};objects.set(p.Path,Buffer.from(objects.get(p.FilePathName)));if(options.copyLostAck)throw Error('lost ACK');return{Code:1};},
+  CopyObject(p){calls.push(['copy',copy(p)]);assert.equal(p.Limit,true);assert.ok(p.FilePathName.startsWith('/'+tenant+'/'));assert.ok(p.Path.startsWith('/'+tenant+'/'));if(options.copyFailure||(options.copyTransient&&calls.filter(c=>c[0]==='copy').length===1))return{Code:0,Msg:'storage copy failed'};objects.set(p.Path,Buffer.from(objects.get(p.FilePathName)));if(options.copyLostAck)throw Error('lost ACK');return{Code:1};},
   MoveObject(){assert.fail('source objects must be preserved');},DelFile(){assert.fail('source objects must be preserved');}
  };
  if(options.noCopy)delete method.CopyObject;
@@ -43,7 +43,7 @@ function fixture(options={}){
   shouldContinueApplicationAssets:()=>false,markApplicationAssetUploaded:()=>calls.push(['budget']),
   buildApplicationAssetContinuation:(...a)=>({Continuation:a}),
   reuseApplicationAsset:()=>options.newUpload?null:{Path:filePath,HdfsPath:existing.HdfsPath,Hash:existing.ContentHash,Size:existing.Size,StorageScope:existing.StorageScope,Reused:true},
-  uploadApplicationAsset:(r,f,limit,rewrite)=>{assert.equal(r,root);assert.equal(limit,true);assert.equal(rewrite,false);calls.push(['upload']);return{Path:filePath,HdfsPath:old,Hash:file.Sha256,Size:file.Size};},
+  uploadApplicationAsset:(r,f,limit,rewrite)=>{assert.equal(r,root);assert.equal(limit,true);assert.equal(rewrite,false);calls.push(['upload']);objects.set(old,options.corruptUpload?Buffer.from('corrupt'):bytes);return{Path:filePath,HdfsPath:old,Hash:file.Sha256,Size:file.Size};},
   expectedApplicationPaths:{},upsertApplicationRow:(t,q,row)=>{assert.equal(t,'mci_ai_app_file');writes.push(copy(row));return{Code:1};}
  };
  vm.createContext(ctx);if(helpers)vm.runInContext(helpers,ctx,{timeout:1000});
@@ -63,8 +63,16 @@ test('canonical same-version reinstall hashes existing bytes without copying or 
 test('lost copy acknowledgement is reconciled only by the actual destination hash and length',()=>{
  const f=fixture({copyLostAck:true});f.run();assert.equal(f.writes[0].HdfsPath,f.target);assert.deepEqual(f.objects.get(f.old),f.objects.get(f.target));
 });
-for(const opt of [{badTarget:true},{copyFailure:true},{missingOriginal:true},{noCopy:true}])test('storage mismatch or unavailable capability fails before metadata writes '+JSON.stringify(opt),()=>{
+for(const opt of [{copyFailure:true},{noCopy:true},{canonical:true,badTarget:true,corruptUpload:true}])test('storage mismatch or unavailable capability fails before metadata writes '+JSON.stringify(opt),()=>{
  const f=fixture(opt);assert.throws(f.run,/PRIVATE_SOURCE_/);assert.equal(f.writes.length,0);assert.ok(!f.calls.some(x=>x[0]==='budget'));
+});
+for(const opt of [{badTarget:true},{missingOriginal:true},{canonical:true,badTarget:true},{copyTransient:true}])test('official package repairs damaged or missing private objects '+JSON.stringify(opt),()=>{
+ const f=fixture(opt);f.run();assert.equal(hash(f.objects.get(f.target)),f.file.Sha256);
+ assert.ok(f.calls.filter(c=>c[0]==='copy').length<=2);
+});
+test('copy failure is distinguished from content mismatch and retries are bounded',()=>{
+ const f=fixture({copyFailure:true});assert.throws(f.run,/PRIVATE_SOURCE_OBJECT_COPY_FAILED.*storage copy failed/);
+ assert.equal(f.calls.filter(c=>c[0]==='copy').length,2);assert.equal(f.writes.length,0);
 });
 test('source data in a public bucket is rejected before copying or changing metadata',()=>{
  const f=fixture();f.ctx.existingApplicationAssets[f.file.Path.toLowerCase()].StorageScope='Public';assert.throws(f.run,/PRIVATE_SOURCE_/);assert.equal(f.writes.length,0);

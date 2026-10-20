@@ -8187,7 +8187,7 @@
       "DelCallbakApi": "",
       "DataEncryptSave": 0,
       "DataEncryptTransfer": 0,
-      "ApiReplace": "{\"Insert\":\"\",\"Update\":\"\",\"Delete\":\"\",\"Select\":\"https://api.itdos.com/apiengine/get-microi-store-model?OsClient=iTdos\"}",
+      "ApiReplace": "{\"Insert\":\"\",\"Update\":\"\",\"Delete\":\"\",\"Select\":\"https://api.microi.net/apiengine/get-microi-store-model?OsClient=iTdos\"}",
       "IsAnonymousRead": 0,
       "IsAnonymousAdd": 0,
       "ServerDataV8": "",

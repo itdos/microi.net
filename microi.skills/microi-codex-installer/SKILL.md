@@ -12,7 +12,7 @@ description: 当用户在 Codex、DeepSeek Harness、WorkBuddy、CodeBuddy、Qod
 ## Microi Agent 桌面宿主
 
 - Microi Agent 是同仓独立桌面发行物，内置固定版本的 DeepSeek Harness SDK、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。
-- 官方 AI 登录只走桌面账号窗口，固定 `https://api.itdos.com`、`OsClient=iTdos`，使用当前用户的中转 Key 和额度。不要让用户把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
+- 官方 AI 登录只走桌面账号窗口，固定 `https://api.microi.net`、`OsClient=iTdos`，使用当前用户的中转 Key 和额度。不要让用户把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
 - 业务连接在「服务器连接」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
 - CLI 登录、`auth import --session-stdin` 与 MCP Token 恢复：Windows 使用 DPAPI，macOS 使用 Keychain；包含 Linux 支持的 CLI/MCP 使用 Secret Service，需要 `/usr/bin/secret-tool`、当前用户 D-Bus 和已解锁钥匙环。缺少时，CLI 写入/会话引用恢复给出 `MICROI_SECURE_STORAGE_UNAVAILABLE`，MCP 也可能报告凭据不可用，均不回退明文。核对正式包实际能力，源码或模拟 provider 测试不能代替 npm 发布及 Linux 实机验收。不要手改 Token 文件；导入后用 `doctor`、MCP `initialize`、`tools/list`、`microi_get_status` 回读。
 - 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。

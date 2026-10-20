@@ -18,7 +18,7 @@ public class LicenseKeyTrustTests
                 "MICROI_LICENSE_SERVER",
                 "https://untrusted-license.example");
             Assert.Equal(
-                "https://api.itdos.com",
+                "https://api.microi.net",
                 MicroiLicense.GetLicenseServerUrl());
         }
         finally

@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-marketplace-source
- * Version: v1.0.6
+ * Version: v1.0.7
  * Function:
  * - 请补充该 V8 代码的完整功能说明。
  */
@@ -37,7 +37,7 @@ function isOfficialPublicSource(param) {
   // trusted nested calls; the public source and API base must still match exactly.
   var sourceTenant = marketplaceText(param && param.OsClient).toLowerCase();
   return marketplaceText(param && param.SourceId).toLowerCase() === 'official'
-    && marketplaceText(param && param.ApiBase).replace(/\/+$/, '').toLowerCase() === 'https://api.itdos.com'
+    && ['https://api.microi.net', 'https://api.itdos.com'].indexOf(marketplaceText(param && param.ApiBase).replace(/\/+$/, '').toLowerCase()) >= 0
     && (sourceTenant === 'itdos'
       || (sourceTenant && sourceTenant === marketplaceText(V8.OsClient).toLowerCase()));
 }
@@ -64,7 +64,7 @@ function requestOfficialLegacyList(param, formalResult) {
     // 等嵌套数组。目标端可能仍运行不识别 PostParamString 的旧 V8 HTTP 原子；
     // ParamType=json 下 PostParam 会按完整对象序列化，且已由同租户批量升级链路验证。
     legacyResult = parseMarketplaceResponse(V8.Http.Post({
-      Url: 'https://api.itdos.com/apiengine/get-microi-store?OsClient=iTdos',
+      Url: 'https://api.microi.net/apiengine/get-microi-store?OsClient=iTdos',
       PostParam: (param && param.Param) || {},
       ParamType: 'json',
       // MARKETPLACE_SOURCE_HEADER_ISOLATION_V1：显式空 Header 阻止目标租户的
@@ -96,8 +96,13 @@ function resolveOfficialList(param, formalResult) {
 }
 
 if(['Discover','Captcha','Login','Query','Disconnect'].indexOf(marketplaceAction) >= 0){
+  // 官方域名迁移兼容旧客户端，但实际出站固定使用新域名；来源、租户和权限仍由可信运行时校验。
+  var marketplaceRuntimeParam = V8.Param || {};
+  if (isOfficialPublicSource(marketplaceRuntimeParam)) {
+    marketplaceRuntimeParam = Object.assign({}, marketplaceRuntimeParam, { ApiBase: 'https://api.microi.net' });
+  }
   var runtimeResult = V8.Method.RunPlatformApiRuntime({
-    RuntimeKey:'MarketplaceSource', Action:marketplaceAction, Param:V8.Param || {}
+    RuntimeKey:'MarketplaceSource', Action:marketplaceAction, Param:marketplaceRuntimeParam
   });
   if (!isOfficialPublicSource(V8.Param || {})) return runtimeResult;
   if (marketplaceAction === 'Query'
@@ -107,7 +112,7 @@ if(['Discover','Captcha','Login','Query','Disconnect'].indexOf(marketplaceAction
   if (marketplaceAction === 'Discover' && runtimeResult && Number(runtimeResult.Code) === 1) {
     var countParam = {
       SourceId: 'official',
-      ApiBase: 'https://api.itdos.com',
+      ApiBase: 'https://api.microi.net',
       OsClient: 'iTdos',
       Operation: 'List',
       Param: { _PageIndex: 1, _PageSize: 1 }
@@ -126,7 +131,7 @@ if(['Discover','Captcha','Login','Query','Disconnect'].indexOf(marketplaceAction
       Msg: runtimeResult.Msg || '商城源识别成功。',
       Data: {
         SourceId: discovered.SourceId || 'official',
-        ApiBase: discovered.ApiBase || 'https://api.itdos.com',
+        ApiBase: discovered.ApiBase || 'https://api.microi.net',
         OsClient: discovered.OsClient || 'iTdos',
         SystemTitle: discovered.SystemTitle || 'Microi吾码',
         SystemShortTitle: discovered.SystemShortTitle || '吾码',
@@ -145,7 +150,7 @@ if(['Discover','Captcha','Login','Query','Disconnect'].indexOf(marketplaceAction
   return runtimeResult;
 }
 
-/* V8 ApiEngine | ApiEngineKey: platform-marketplace-source | Version: v1.0.6 */
+/* V8 ApiEngine | ApiEngineKey: platform-marketplace-source | Version: v1.0.7 */
 
 var param = V8.Param || {};
 

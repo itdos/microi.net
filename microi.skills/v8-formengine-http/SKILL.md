@@ -145,7 +145,7 @@ URL 中的表名小写最稳，平台不区分大小写。匿名版本目前**�
 ## 客户端封装样板（uni-app）
 
 ```javascript
-const BASE = 'https://api.itdos.com';
+const BASE = 'https://api.microi.net';
 const OS_CLIENT = runtimeConfig.osClient;
 const TOKEN_KEY = 'mall_token';
 const DID_KEY = 'mall_did';

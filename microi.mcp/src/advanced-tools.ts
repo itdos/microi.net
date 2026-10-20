@@ -305,7 +305,7 @@ export function analyzeClientChunking(buttonInput: unknown): {
 
 export type StoreApplicationOperation = 'install' | 'update';
 
-const OFFICIAL_STORE_API_BASE = 'https://api.itdos.com';
+const OFFICIAL_STORE_API_BASE = 'https://api.microi.net';
 const OFFICIAL_STORE_OSCLIENT = 'iTdos';
 
 export interface StoreApplicationTaskInput {

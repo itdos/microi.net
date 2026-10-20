@@ -35,7 +35,7 @@ public sealed class LicenseStartupReportingTests
         }, TestContext.Current.CancellationToken);
 
         Assert.True(success);
-        Assert.Equal("https://api.itdos.com/apiengine/check-license?OsClient=iTdos", target?.ToString());
+        Assert.Equal("https://api.microi.net/apiengine/check-license?OsClient=iTdos", target?.ToString());
         var json = JObject.Parse(body!);
         Assert.Equal("device-123", json.Value<string>("HID"));
         Assert.Equal(productType, json.Value<string>("ProductType"));

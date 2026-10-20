@@ -16,7 +16,7 @@ public sealed class PlatformApplicationMaintenanceTests
         if (!string.Equals(tenant, "iTdos", StringComparison.OrdinalIgnoreCase))
         {
             await RunTwice(client, tenant, "bulk-import-microi-store-packages",
-                new JsonObject { ["ApplicationType"] = "Platform", ["StoreApiBase"] = "https://api.itdos.com", ["StoreOsClient"] = "iTdos" });
+                new JsonObject { ["ApplicationType"] = "Platform", ["StoreApiBase"] = "https://api.microi.net", ["StoreOsClient"] = "iTdos" });
         }
         await RunTwice(client, Required("MICROI_TEST_OSCLIENT"), "bulk-update-child-tenant-platform-apps",
             new JsonObject { ["TargetOsClients"] = new JsonArray(Required("MICROI_TEST_CHILD_OSCLIENT")) });
@@ -27,7 +27,7 @@ public sealed class PlatformApplicationMaintenanceTests
     {
         using var client = Client("MICROI_TEST_CHILD_TOKEN", "MICROI_TEST_CHILD_API_BASE");
         await RunTwice(client, Required("MICROI_TEST_CHILD_OSCLIENT"), "bulk-import-microi-store-packages",
-            new JsonObject { ["ApplicationType"] = "Platform", ["StoreApiBase"] = "https://api.itdos.com", ["StoreOsClient"] = "iTdos" });
+            new JsonObject { ["ApplicationType"] = "Platform", ["StoreApiBase"] = "https://api.microi.net", ["StoreOsClient"] = "iTdos" });
     }
 
     private static async Task RunTwice(HttpClient client, string tenant, string engine, JsonObject parameters)

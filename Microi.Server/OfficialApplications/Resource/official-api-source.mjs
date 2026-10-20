@@ -3,7 +3,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 const directory=import.meta.dirname;
 const contract=JSON.parse(fs.readFileSync(path.join(directory,'official-api-source-contract.json'),'utf8'));
-if(contract.SchemaVersion!==1||contract.OfficialApiBase!=='https://api.itdos.com'||contract.OfficialOsClient!=='iTdos'||!Array.isArray(contract.Entries))throw Error('官方发行源码契约身份无效');
+if(contract.SchemaVersion!==1||contract.OfficialApiBase!=='https://api.microi.net'||contract.OfficialOsClient!=='iTdos'||!Array.isArray(contract.Entries))throw Error('官方发行源码契约身份无效');
 const entries=new Map();
 for(const entry of contract.Entries){if(!entry||!entry.Key||entries.has(entry.Key)||!['CanonicalReleaseSource','SafeTenantHookTemplate'].includes(entry.SourceRole)||!['ApiEngine','FormEvent'].includes(entry.Kind)||!/^v\d+\.\d+\.\d+$/.test(entry.Version)||!/^[a-f0-9]{64}$/.test(entry.Sha256)||typeof entry.File!=='string'||!entry.File.endsWith('.js')||path.isAbsolute(entry.File)||entry.File.split(/[\\/]/).includes('..'))throw Error('官方发行源码声明无效或重复');entries.set(entry.Key,entry);}
 export function officialApiSourcePath(key){const entry=entries.get(key);if(!entry)throw Error('官方源码契约未声明资源：'+key);const target=path.resolve(directory,entry.File),real=fs.realpathSync(target);if(!real.startsWith(directory+path.sep)||real!==target||!fs.statSync(target).isFile())throw Error('官方源码路径越界或不是声明文件：'+key);return target;}

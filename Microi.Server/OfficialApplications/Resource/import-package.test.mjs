@@ -548,7 +548,7 @@ test("marketplace package reads retry empty transient responses without acceptin
   };
   vm.runInNewContext(`${marketplaceReadRetrySource[0]}\nresult = postMarketplaceReadWithRetry;`, fixture);
 
-  const result = fixture.result("读取测试包", "https://api.itdos.com/test", { Id: "store-1" }, 120);
+  const result = fixture.result("读取测试包", "https://api.microi.net/test", { Id: "store-1" }, 120);
   assert.equal(result.Code, 1);
   assert.equal(result.Data.Id, "store-1");
   assert.equal(calls.post, 2);
@@ -1680,7 +1680,7 @@ test("marketplace package reads recover response text from raw bytes", () => {
   };
   vm.runInNewContext(`${marketplaceReadRetrySource[0]}\nresult = postMarketplaceReadWithRetry;`, fixture);
 
-  const result = fixture.result("读取测试包", "https://api.itdos.com/test", { Id: "raw-store" }, 120);
+  const result = fixture.result("读取测试包", "https://api.microi.net/test", { Id: "raw-store" }, 120);
   assert.equal(result.Code, 1);
   assert.equal(result.Data.Id, "raw-store");
   assert.equal(calls.postResponse, 1);

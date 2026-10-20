@@ -7,6 +7,8 @@ description: Microi 前端微服务 MicroService 开发与交付指南。用于�
 
 # Microi 前端微服务
 
+> **每次修改前必做：** 重新拉取当前租户完整私有源码，逐文件核对本地字节与远端哈希，并完成 Base/Local/Remote 合并后才开始编辑。记录修改前的 `SourceManifestHash`，源码同步显式传 `expectedSourceManifestHash`。禁止用刚读取的新哈希为旧代码补票；正文不全、远端漂移或冲突未解决时停止写入。完整下载由工具完成，模型只按需要阅读正文。
+
 这里的 MicroService 是运行在吾码主站中的前端微应用，不是 .NET/Java 后端微服务。
 它适合复杂租户页面、多页面应用、完整表格/上传/步骤交互和独立版本交付；业务事务、
 权限和最终校验仍放接口引擎或可信后端。
@@ -29,7 +31,7 @@ description: Microi 前端微服务 MicroService 开发与交付指南。用于�
 开始写代码前：
 
 1. `microi_list_applications` 盘点当前租户全部 Web、UniApp、MicroService 和文件清单。
-2. `microi_get_application_context` 默认只读取元数据、文件哈希、运行时和页面；需要少量正文时显式开启内容读取。
+2. `microi_get_application_context` 默认只读取元数据、文件哈希、运行时和页面；只读分析按需读取正文。准备修改已有应用时必须完整拉取源码到本地并逐文件验签，不能把默认元数据预览当成完整拉取。
 3. 单个大文件按需使用 `microi_get_application_file`，不要为了查看清单把全量源码 Base64 拉入上下文。
 4. 合适应用存在时在其中新增页面/路由，不创建“一页一个微服务”。
 5. 没有合适应用时才脚手架/创建新 AppKey。
@@ -109,6 +111,9 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - `sourceFiles` 仅用于调用方本来就持有内存文件的旧版兼容场景；不得把它作为本地工程默认路径，也不得用人工切片规避上下文限制。
 
 ### 多人协作发布前远端合并门禁（强制）
+
+- 此门禁首先在**开始修改之前**执行，再在发布前复核。同步现有源码必须显式传修改前记录的 `expectedSourceManifestHash`；缺失或不匹配分别报 `SOURCE_EDIT_BASELINE_REQUIRED/CHANGED`，不能在工具内部用当前远端哈希替调用方建立编辑基线。旧 API 没有原子源码 CAS 时不得覆盖已有源码，先升级；空应用仍可初始化。
+- 路由清单同时维护组件实际注册、`microi.routes.json` 和数据库页面映射。顶层或 `RouteMetaJson` 中的 `LegacyComponentPaths/LegacyMenuUrls` 都应保留。旧发布协议会合并现存兼容别名；V3 不可变快照若遗漏现有启用路由或兼容别名会报 `MICROSERVICE_ROUTE_BASELINE_LOST`。确需停用时保留路由并明确设置 `IsEnable=0`，不能通过空对象或漏传页面隐式删除。
 
 - 每一次同步或发布（包括同版本重试、紧急修复和仅编译产物发布）开始前，必须重新调用 `microi_get_application_context` 拉取目标租户当前完整私有源码清单、正文、版本与逐文件哈希；禁止沿用任务开始时或上一次发布后的旧快照。
 - 以最近一次已确认同步的源码清单为 Base，对 Base、本地 Local、远端 Remote 做逐文件三方比较：仅远端变化先拉取，仅本地变化保留本地，双方变化必须按真实业务语义合并并重新构建测试；删除/重命名同样纳入冲突判断。没有可靠 Base、远端源码不完整或冲突未解决时失败关闭，不能把时间戳较新当作自动胜出规则。

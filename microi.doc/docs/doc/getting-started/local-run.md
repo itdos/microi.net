@@ -215,7 +215,7 @@ PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与
 
 主、子租户必须在同一维护控制面的有效租户目录中；必要时用 `MICROI_TEST_CONTROL_API_BASE`、`MICROI_TEST_CHILD_API_BASE` 指定各自入口。详细变量和测试边界见源码 `Microi.Server/Microi.Tests/README.md`，报告应区分本地候选与已部署远端的结果。
 
-这里的主、子租户是预先登记的隔离 Full 测试租户。官方应用发布与升级仅验收 `https://api.itdos.com` 的主租户 `iTdos`（`microi_itdos`）；线上子租户的安装版本、升级成功与否不属于平台发布完成条件，不因正式发布批量升级线上子租户。通过 AI 提示词或直接运行 `Microi一键编译发布.sh` 均遵守这一边界；普通用户只在自身授权范围执行，脚本不会授予官方母版写入或客户自动部署权限。
+这里的主、子租户是预先登记的隔离 Full 测试租户。官方应用发布与升级仅验收 `https://api.microi.net` 的主租户 `iTdos`（`microi_itdos`）；线上子租户的安装版本、升级成功与否不属于平台发布完成条件，不因正式发布批量升级线上子租户。通过 AI 提示词或直接运行 `Microi一键编译发布.sh` 均遵守这一边界；普通用户只在自身授权范围执行，脚本不会授予官方母版写入或客户自动部署权限。
 
 测试表至少包含一个可写短文本字段（默认 `Name`，其它名称可通过
 `MICROI_TEST_NAME_FIELD` 指定）。`MICROI_TEST_ALLOW_WRITES=YES` 是强制保护，

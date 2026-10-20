@@ -32,7 +32,7 @@ test('application stream gate transition is coordinate-bound, monotonic, and dou
     osClient: 'iTdos',
     osClientType: 'Product',
     osClientNetwork: 'Internal',
-    apiBaseUrl: 'https://api.itdos.com',
+    apiBaseUrl: 'https://api.microi.net',
     label: 'Microi official',
     codexMode: true,
   });

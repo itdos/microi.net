@@ -62,9 +62,9 @@ const publishedApplicationStoreReplicaNames = new Set(
   publishedApplicationStoreReplicaMappings.map(mapping => mapping.resourceName),
 );
 const endpoint = process.env.MICROI_UPGRADE_RESOURCE_API
-  || 'https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos';
+  || 'https://api.microi.net/apiengine/get-microi-upgrade-resource?OsClient=iTdos';
 const publishEndpoint = process.env.MICROI_UPGRADE_RESOURCE_PUBLISH_API
-  || 'https://api.itdos.com/apiengine/get-microi-upgrade-resource--OsClient--iTdos--';
+  || 'https://api.microi.net/apiengine/get-microi-upgrade-resource--OsClient--iTdos--';
 const outputDirectory = dirname(fileURLToPath(import.meta.url));
 const baseDirectory = resolve(outputDirectory, '.resource-sync-base');
 const execFileAsync = promisify(execFile);

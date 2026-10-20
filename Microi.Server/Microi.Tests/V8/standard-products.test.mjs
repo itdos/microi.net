@@ -19,7 +19,7 @@ function inside(root,relative,label){
 }
 function resolveContract(model){
   assert.equal(model.schemaVersion,1,'不支持的唯一源码契约版本');
-  assert.equal(model.target?.apiBase,'https://api.itdos.com','官方发布ApiBase不匹配');
+  assert.equal(model.target?.apiBase,'https://api.microi.net','官方发布ApiBase不匹配');
   assert.equal(String(model.target?.osClient||'').toLowerCase(),'itdos','官方发布OsClient不匹配');
   const requirements=inside(repo,model.requirementsRoot,'需求根'),parent=inside(repo,model.sourceParent,'责任源码根');
   assert.equal(requirements,path.dirname(fs.realpathSync(contractFile)),'契约必须位于声明的需求根');

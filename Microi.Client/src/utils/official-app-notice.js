@@ -1,4 +1,4 @@
-export const OFFICIAL_STORE_API_BASE = "https://api.itdos.com";
+export const OFFICIAL_STORE_API_BASE = "https://api.microi.net";
 export const OFFICIAL_STORE_OSCLIENT = "iTdos";
 export const OFFICIAL_STORE_SOURCE_ID = "official";
 export const OFFICIAL_STORE_LIST_PATH = "/apiengine/get-microi-store-list";

@@ -152,7 +152,7 @@ namespace Microi.net
                 var childParam = new JObject
                 {
                     ["ApiEngineKey"] = ChildWorkerApiEngineKey,
-                    ["StoreApiBase"] = "https://api.itdos.com",
+                    ["StoreApiBase"] = "https://api.microi.net",
                     ["StoreOsClient"] = "iTdos",
                     ["ApplicationType"] = "Platform"
                 };

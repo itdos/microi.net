@@ -1069,7 +1069,7 @@ test('无显式 Token 时只允许复用绑定官方 iTdos 的 MCP', () => {
     type: 'stdio',
     command: 'node',
     args: ['mcp-server.js'],
-    env: { MICROI_API_URL: 'https://api.itdos.com/', MICROI_OS_CLIENT: 'iTdos' },
+    env: { MICROI_API_URL: 'https://api.microi.net/', MICROI_OS_CLIENT: 'iTdos' },
   };
   assert.equal(validateItDosMcpServer(valid), valid);
   assert.throws(
@@ -1098,7 +1098,7 @@ test('官网 MCP 发布器在插件升级后自动改用最新可用入口和当
     args: [oldEntry],
     cwd: dirname(dirname(oldEntry)),
     env: {
-      MICROI_API_URL: 'https://api.itdos.com',
+      MICROI_API_URL: 'https://api.microi.net',
       MICROI_OS_CLIENT: 'itdos',
       MICROI_TOKEN_FILE: join(root, 'token.json'),
     },
@@ -1130,7 +1130,7 @@ test('官网 MCP 发布器兼容带 API 主机后缀的稳定服务器名称', a
     command: 'node',
     args: [entry],
     env: {
-      MICROI_API_URL: 'https://api.itdos.com',
+      MICROI_API_URL: 'https://api.microi.net',
       MICROI_OS_CLIENT: 'iTdos',
       MICROI_TOKEN_FILE: join(root, 'token.json'),
     },
@@ -1159,7 +1159,7 @@ test('官网 MCP 发布器支持 Codex 插件生成的 microi-cli-mcp 稳定入�
     command: 'node',
     args: [entry],
     env: {
-      MICROI_API_URL: 'https://api.itdos.com',
+      MICROI_API_URL: 'https://api.microi.net',
       MICROI_OS_CLIENT: 'iTdos',
       MICROI_TOKEN_FILE: join(root, 'token.json'),
     },
@@ -1193,7 +1193,7 @@ test('官网 MCP 发布器不会被仍存在的旧插件入口锁住', async t =
     args: [oldEntry],
     cwd: oldExtensionRoot,
     env: {
-      MICROI_API_URL: 'https://api.itdos.com',
+      MICROI_API_URL: 'https://api.microi.net',
       MICROI_OS_CLIENT: 'itdos',
       MICROI_TOKEN_FILE: join(root, 'token.json'),
     },
@@ -1249,7 +1249,7 @@ test('官网资源通过 microi_itdos MCP 单入口读取完整内容', async t 
         command: 'old-editor',
         args: [entry],
         cwd: extensionRoot,
-        env: { MICROI_API_URL: 'https://api.itdos.com', MICROI_OS_CLIENT: 'iTdos' },
+        env: { MICROI_API_URL: 'https://api.microi.net', MICROI_OS_CLIENT: 'iTdos' },
       },
     },
   }), 'utf8');
@@ -1273,7 +1273,7 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
     type: 'stdio',
     command: 'missing-editor',
     args: [join(root, 'extensions', 'microi.v8-engine-9.9.9', 'dist', 'other-server.js')],
-    env: { MICROI_API_URL: 'https://api.itdos.com', MICROI_OS_CLIENT: 'itdos' },
+    env: { MICROI_API_URL: 'https://api.microi.net', MICROI_OS_CLIENT: 'itdos' },
   };
   await assert.rejects(
     resolveItDosMcpLaunch(server, configPath),

@@ -761,7 +761,7 @@ async function loadStandaloneAiModels() {
 
 async function loadStandaloneRelayModels() {
     try {
-        const response = await fetch("https://api.itdos.com/apiengine/official_ai_relay_models?OsClient=iTdos");
+        const response = await fetch("https://api.microi.net/apiengine/official_ai_relay_models?OsClient=iTdos");
         const json = await response.json();
         if (!response.ok || Number(json?.Code) !== 1) return;
         const rows = Array.isArray(json?.Data) ? json.Data : Array.isArray(json?.Data?.Data) ? json.Data.Data : [];

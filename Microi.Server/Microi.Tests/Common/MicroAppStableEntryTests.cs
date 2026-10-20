@@ -342,7 +342,7 @@ public class MicroAppStableEntryTests
 
     [Theory]
     [InlineData("MicroService", "https://static.itdos.com/itdos/ai-app-publish/example/index.html")]
-    [InlineData("Web", "https://api.itdos.com/micro-app/iTdos/example/index.html")]
+    [InlineData("Web", "https://api.microi.net/micro-app/iTdos/example/index.html")]
     [InlineData("Web", "javascript:alert(1)")]
     public void LegacyMicroAppBookmark_DoesNotRedirectUnsupportedOrUnsafeTargets(
         string applicationType,

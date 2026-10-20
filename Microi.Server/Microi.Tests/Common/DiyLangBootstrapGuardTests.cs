@@ -35,7 +35,7 @@ public sealed class DiyLangBootstrapGuardTests
     }
 
     [Fact]
-    public void GetSysConfig_ReadsValidCacheBeforeRequestTimeLanguageDdl()
+    public void GetSysConfig_NeverRunsLanguageDdlOnAnonymousBootstrap()
     {
         var source = ReadRepositoryFile(
             "Microi.Server", "Microi.net", "FormEngine", "FormEngine.cs");
@@ -46,13 +46,27 @@ public sealed class DiyLangBootstrapGuardTests
 
         var cacheRead = method.IndexOf("cache.GetAsync<dynamic>(sysConfigCacheKey)", StringComparison.Ordinal);
         var cacheReturn = method.IndexOf("if (sysConfigCache != null)", StringComparison.Ordinal);
-        var requestTimeDdl = method.IndexOf("EnsureSysConfigLangFieldAsync(osClient)", StringComparison.Ordinal);
-
         Assert.True(cacheRead >= 0, "GetSysConfig must read the tenant sys_config cache.");
         Assert.True(cacheReturn > cacheRead, "GetSysConfig must return a valid cached snapshot.");
-        Assert.True(
-            requestTimeDdl > cacheReturn,
-            "Request-time language metadata repair must only run after a cache miss.");
+        Assert.DoesNotContain("EnsureSysConfigLangFieldAsync", method, StringComparison.Ordinal);
+        Assert.Contains("NormalizeSysConfigLangForReturn(result.Data, sysLangs)", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ColdConfiguration_NormalizesOldRowsWithoutMutatingPersistedLanguageChoices()
+    {
+        var normalize = typeof(FormEngineExtend).GetMethod(
+            "NormalizeSysConfigLangForReturn", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var oldRow = new Newtonsoft.Json.Linq.JObject { ["SysTitle"] = "Old tenant" };
+        var oldResult = Assert.IsType<Newtonsoft.Json.Linq.JObject>(
+            normalize.Invoke(null, new object[] { oldRow, "zh-CN,zh-TW,en" }));
+        Assert.Equal("zh-CN,zh-TW,en", oldResult["SysLangs"]?.ToString());
+        Assert.Equal("zh-CN", oldResult["SysLang"]?.ToString());
+        var configured = new Newtonsoft.Json.Linq.JObject { ["SysLangs"] = "en,ja", ["SysLang"] = "ja" };
+        var result = Assert.IsType<Newtonsoft.Json.Linq.JObject>(
+            normalize.Invoke(null, new object[] { configured, "zh-CN,zh-TW,en" }));
+        Assert.Equal("en,ja", result["SysLangs"]?.ToString());
+        Assert.Equal("ja", result["SysLang"]?.ToString());
     }
 
     private static string ExtractMethod(string source, string startMarker, string endMarker)

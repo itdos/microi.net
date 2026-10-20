@@ -1200,7 +1200,7 @@ export default {
                 const result = await DiyCommon.ApiEngine.RunBackground(
                     "bulk-import-microi-store-packages",
                     {
-                        StoreApiBase: "https://api.itdos.com",
+                        StoreApiBase: "https://api.microi.net",
                         StoreOsClient: "iTdos",
                         ApplicationType: "Platform"
                     },

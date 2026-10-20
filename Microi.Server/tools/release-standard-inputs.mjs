@@ -45,14 +45,16 @@ async function snapshotFounderSolution(root) {
 
 // Full 读取的标准产品责任源码按唯一契约冻结，即使它们被根公开仓忽略。
 // 只记录指纹，不把这些私有文件暂存或复制进公开仓。
-export async function snapshotStandardInputs(root) {
+export async function snapshotStandardInputs(root, {includeTestInputs = true} = {}) {
   const founder = await snapshotFounderSolution(root);
+  // 同版本免测 Docker 发布仍冻结实际方案；不要求未执行的产品测试私有夹具。
+  if (!includeTestInputs) return founder;
   const contractPath = path.join(root, 'AI-Project/标准产品套件/source-contract.json');
   let bytes;
   try { bytes = await fs.readFile(contractPath); }
   catch (error) { if (error.code === 'ENOENT') return founder; throw error; }
   const contract = JSON.parse(bytes.toString('utf8'));
-  if (contract.schemaVersion !== 1 || contract.target?.apiBase !== 'https://api.itdos.com'
+  if (contract.schemaVersion !== 1 || contract.target?.apiBase !== 'https://api.microi.net'
     || String(contract.target?.osClient).toLowerCase() !== 'itdos'
     || !Array.isArray(contract.applications) || contract.applications.length !== 6) {
     throw Error('Invalid standard product source contract');
@@ -131,7 +133,7 @@ export async function snapshotStandardInputs(root) {
   }
   const official = await optionalContract('Microi.Server/Microi.Tests/V8/official-application-source-contract.json');
   if (official) {
-    if (official.SchemaVersion !== 1 || official.Origin?.ApiBase !== 'https://api.itdos.com'
+    if (official.SchemaVersion !== 1 || official.Origin?.ApiBase !== 'https://api.microi.net'
       || official.Origin?.OsClient !== 'iTdos' || !Array.isArray(official.Applications) || !Array.isArray(official.Repositories))
       throw Error('Invalid official test input source contract');
     // 只冻结服务器与前端门禁实际使用的责任入口，不遍历其它在线应用。

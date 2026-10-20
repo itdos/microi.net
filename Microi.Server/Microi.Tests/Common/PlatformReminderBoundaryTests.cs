@@ -65,7 +65,7 @@ public class PlatformReminderBoundaryTests
     public void OfficialFeed_RequiresPublishedEditionAndExplicitTarget(string state, string scope, string target, string edition, bool expected)
     {
         var type = Type.GetType("Microi.net.PlatformReminderRuntime, Microi.net")!;
-        Assert.Equal("https://api.itdos.com/apiengine/platform-reminder-official-feed?OsClient=iTdos", type.GetField("OfficialFeedUrl")!.GetRawConstantValue());
+        Assert.Equal("https://api.microi.net/apiengine/platform-reminder-official-feed?OsClient=iTdos", type.GetField("OfficialFeedUrl")!.GetRawConstantValue());
         var method = type.GetMethod("ContainsEdition", BindingFlags.Static | BindingFlags.NonPublic)!;
         var batch = new JObject { ["State"] = state, ["SnapshotJson"] = new JObject {
             ["ScopeType"] = scope, ["AllTargets"] = true, ["TargetKeys"] = new JArray(target)

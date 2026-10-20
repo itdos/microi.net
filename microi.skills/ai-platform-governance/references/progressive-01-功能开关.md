@@ -164,7 +164,7 @@ microi_rollback_page_design
 <!-- microi-progressive:chunk id=ai-platform-governance-015 sha256=6fafd84efd63a1607c4c98c4a173d755b2ba22fb7a251a21ed4d4699556656a7 -->
 ## 应用商城发布
 
-- 官方发布使用绑定 `https://api.itdos.com`、`OsClient=iTdos` 的 `microi_itdos`。
+- 官方发布使用绑定 `https://api.microi.net`、`OsClient=iTdos` 的 `microi_itdos`。
 - 先构建 Manifest、22 项应用契约、微服务类型检查/契约/生产构建。
 - 发布请求版本、资产准备版本和包内 `PackageInfo.Version` 必须精确相同；42 个菜单、40 张治理表和 64 个接口引擎的选择必须来自当前包正文。
 - 包内 `ResourcePolicies.ApiEngines` 必须精确为 57 个 Managed + 7 个 CreateIfMissing。

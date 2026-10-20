@@ -206,7 +206,7 @@ if (Test-Path -LiteralPath $v8Repository) {
         throw "The unique standard-suite source contract is missing: $suiteContractPath"
     }
     $suiteContract = Get-Content -LiteralPath $suiteContractPath -Raw | ConvertFrom-Json
-    if ($suiteContract.schemaVersion -ne 1 -or $suiteContract.target.apiBase -cne 'https://api.itdos.com' -or $suiteContract.target.osClient -ine 'iTdos') {
+    if ($suiteContract.schemaVersion -ne 1 -or $suiteContract.target.apiBase -cne 'https://api.microi.net' -or $suiteContract.target.osClient -ine 'iTdos') {
         throw 'The standard-suite contract schema or official ApiBase/OsClient does not match.'
     }
     if ([string]::IsNullOrWhiteSpace($suiteContract.sourceParent) -or [IO.Path]::IsPathRooted($suiteContract.sourceParent)) {

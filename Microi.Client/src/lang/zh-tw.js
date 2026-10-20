@@ -219,7 +219,7 @@ const Msg = {
     OfficialApps: "平台應用",
     NoOfficialAppUpdates: "所有平台應用均已安裝且為最新版",
     OfficialAppCheckFailed: "平台應用檢查失敗",
-    OfficialAppCheckFailedTip: "本次失敗不會被當成「全部最新」。請重新整理再試；若仍失敗，請先更新「應用商城」應用，並檢查目前 API 節點到 api.itdos.com 的網路。",
+    OfficialAppCheckFailedTip: "本次失敗不會被當成「全部最新」。請重新整理再試；若仍失敗，請先更新「應用商城」應用，並檢查目前 API 節點到 api.microi.net 的網路。",
     OfficialAppUninstalled: "未安裝",
     OfficialAppOutdated: "可更新",
     OfficialAppAbnormal: "版本異常",

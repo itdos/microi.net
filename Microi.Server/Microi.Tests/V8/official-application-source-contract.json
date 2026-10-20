@@ -1,7 +1,7 @@
 {
   "SchemaVersion": 1,
   "Origin": {
-    "ApiBase": "https://api.itdos.com",
+    "ApiBase": "https://api.microi.net",
     "OsClient": "iTdos",
     "ReadProtocol": "microi_list_applications + microi_get_application_context(includeContents=true)"
   },
