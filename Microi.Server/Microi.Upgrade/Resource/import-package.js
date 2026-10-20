@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.11
+ * Version: v3.0.13
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
@@ -1045,7 +1045,9 @@ var syncStoreMetaFromRow = function () {
 };
 
 var storeRow = syncStoreMetaFromRow();
-var storeApiBase = trimRightSlash(firstTextParam([V8.Param.StoreApiBase, storeRow.StoreApiBase, storeRow.AppStoreApiBase, 'https://api.itdos.com']));
+var storeApiBase = trimRightSlash(firstTextParam([V8.Param.StoreApiBase, storeRow.StoreApiBase, storeRow.AppStoreApiBase, 'https://api.microi.net']));
+// 旧客户端与已安装记录仍可能携带历史官方源，只迁移精确官方 HTTPS 地址，不能放宽自定义源鉴权。
+if (String(storeApiBase).toLowerCase() == 'https://api.itdos.com') storeApiBase = 'https://api.microi.net';
 var storeOsClient = firstTextParam([V8.Param.StoreOsClient, V8.Param.AppStoreOsClient, storeRow.StoreOsClient, storeRow.AppStoreOsClient, storeRow.SourceOsClient, 'iTdos']);
 var storeCredentialKey = firstTextParam([V8.Param.StoreCredentialKey, storeRow.StoreCredentialKey, storeRow.CredentialKey]);
 var storeRequestHeaders = {};
@@ -1384,7 +1386,7 @@ var officialPublisherType = authoritativeStoreModel
     ? String(authoritativeStoreModel.PublisherType || '')
     : '';
 var trustedOfficialPlatformPackage = !!authoritativeStoreModel
-    && String(storeApiBase || '').toLowerCase() == 'https://api.itdos.com'
+    && String(storeApiBase || '').toLowerCase() == 'https://api.microi.net'
     && String(storeOsClient || '').toLowerCase() == 'itdos'
     && String(authoritativeStoreModel.ApplicationType || '').toLowerCase() == 'platform'
     && (officialPublisherType == '官方应用' || officialPublisherType == '平台应用');
@@ -3042,26 +3044,56 @@ try {
         if (!V8.Method || !V8.Method.CopyObject || !V8.Method.ObjectExist || !V8.Method.GetObjectSha256) {
             throw new Error('PRIVATE_SOURCE_STORAGE_CAPABILITY_MISSING：请先升级当前租户的私有对象复制与流式摘要能力。');
         }
-        var verifyObject = function (objectPath) {
-            var result = V8.Method.GetObjectSha256({ FilePathName: objectPath, Limit: true });
-            if (!result || Number(result.Code) != 1 || !result.Data
-                || String(result.Data.Sha256 || '').toLowerCase() != entry.Hash || Number(result.Data.Size) != entry.Size) {
-                throw new Error('PRIVATE_SOURCE_OBJECT_BYTES_MISMATCH：源码对象原始字节摘要或大小不一致，元数据未推进。');
-            }
+        var readObject = function (objectPath) {
+            var result;
+            try { result = V8.Method.GetObjectSha256({ FilePathName: objectPath, Limit: true }); }
+            catch (readError) { return { Ok: false, ReadFailed: true, Detail: String(readError.message || readError) }; }
+            if (!result || Number(result.Code) != 1 || !result.Data)
+                return { Ok: false, ReadFailed: true, Detail: String((result && result.Msg) || '对象读取未返回成功') };
+            return {
+                Ok: String(result.Data.Sha256 || '').toLowerCase() == entry.Hash && Number(result.Data.Size) == entry.Size,
+                ReadFailed: false,
+                Detail: '实际字节摘要或大小与已校验应用包不一致'
+            };
         };
-        var exists = V8.Method.ObjectExist({ FilePathName: target, Limit: true });
-        if (!exists || Number(exists.Code) != 1 || (exists.Data !== true && exists.Data !== false)) {
-            throw new Error('PRIVATE_SOURCE_OBJECT_EXISTENCE_UNKNOWN：私有对象存在性未确认，元数据未推进。');
+        var targetState = readObject(target);
+        if (targetState.Ok) return normalized;
+        // 包正文是 Managed 源码的事实源。旧对象损坏、丢失或同版本重装时，先准备
+        // 一份已验证的包内原始字节，再原子覆盖精确目标；不删除旧对象、不推进未验证元数据。
+        var sourceState = original == target ? targetState : readObject(original);
+        if (!sourceState.Ok) {
+            var fresh = uploadApplicationAsset(root, file, true, false);
+            original = String(fresh && fresh.HdfsPath || '');
+            var freshParts = original.replace(/^\//, '').split('/');
+            if (!original || /[\\:%?#\x00-\x1f*"<>|]/.test(original) || original.indexOf('//') >= 0
+                || freshParts.length < 4 || freshParts[0] != tenant
+                || !/^ai-app-source(?:-staged)?$/.test(freshParts[1])
+                || freshParts[2].toLowerCase() != String(appId).toLowerCase()
+                || freshParts.some(function (part) { return !part || part == '.' || part == '..'; }))
+                throw new Error('PRIVATE_SOURCE_OBJECT_IDENTITY_INVALID：重新上传的源码路径不属于当前租户应用。');
+            sourceState = readObject(original);
+            if (!sourceState.Ok)
+                throw new Error((sourceState.ReadFailed ? 'PRIVATE_SOURCE_OBJECT_READ_FAILED' : 'PRIVATE_SOURCE_OBJECT_BYTES_MISMATCH')
+                    + '：包内源码重新上传后未通过字节校验，元数据未推进。' + sourceState.Detail);
+            normalized.Reused = false;
         }
-        if (!exists.Data) {
-            verifyObject(original);
-            // Copy 的响应丢失不能触发盲目重传。目标的实际摘要/大小是本次复制是否
-            // 完成的依据；目标缺失或不一致时继续失败，保留任务与全部旧对象。
-            try { V8.Method.CopyObject({ FilePathName: original, Path: target, Limit: true }); }
-            catch (copyAcknowledgementError) {}
+        if (original == target) return normalized;
+        var copyDetail = '';
+        // 同一摘要根、同一已验证原文的覆盖可安全重试。每次先回读目标，响应丢失但
+        // 写入成功时立即完成；存储故障只有限重试，不能把失败伪装成安装成功。
+        for (var copyAttempt = 0; copyAttempt < 2; copyAttempt++) {
+            try {
+                var copyResult = V8.Method.CopyObject({ FilePathName: original, Path: target, Limit: true });
+                copyDetail = copyResult && Number(copyResult.Code) == 1 ? ''
+                    : String((copyResult && copyResult.Msg) || '对象复制未返回成功');
+            } catch (copyError) { copyDetail = String(copyError.message || copyError); }
+            targetState = readObject(target);
+            if (targetState.Ok) return normalized;
         }
-        verifyObject(target);
-        return normalized;
+        if (copyDetail)
+            throw new Error('PRIVATE_SOURCE_OBJECT_COPY_FAILED：已校验源码无法覆盖目标对象，元数据未推进。' + copyDetail);
+        throw new Error((targetState.ReadFailed ? 'PRIVATE_SOURCE_OBJECT_READ_FAILED' : 'PRIVATE_SOURCE_OBJECT_BYTES_MISMATCH')
+            + '：覆盖后的目标对象未通过原始字节校验，元数据未推进。' + targetState.Detail);
     };
 
     var pruneApplicationAssets = function (appId, expectedPaths) {
