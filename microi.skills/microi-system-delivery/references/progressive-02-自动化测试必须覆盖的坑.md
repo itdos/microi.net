@@ -2,6 +2,10 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
+## 自动清理入口回归增补
+
+临时文件回归必须调用真实 Full `finally` 与发布 `EXIT` 收尾，分别验证成功、原始失败、可捕获中断及清理失败；不能仅断言源码有 `finally`。覆盖祖先/子项链接、Git 标记、已有目录、空格及方括号路径、受保护属性与独占文件锁，断言保护项字节不变、普通删除不传 `-Force`、失败不自动强制重试、回执可定位残留。测试异常与清理异常同时发生时保留原始异常，发布锁仍释放；平台进程被硬杀不能假称已完成收尾。用例位于 `Microi.Tests/ReleaseGate/test-artifact-cleanup.test.mjs` 与 `release-scratch.test.mjs`，不为这些文件生命周期回归启动数据库或 Docker 容器。
+
 <!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=dee4ef7027b49b46a92f4b2bbd88d82997f9c992351e5d599ba6d38a03267258 -->
 ## 自动化测试必须覆盖的坑
 
