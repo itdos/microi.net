@@ -1,6 +1,6 @@
 ---
 name: v8-tcp-integration
-description: Microi 后端 V8 TCP 原始字节集成规范。用于通过 V8.Tcp.Send/SendAsync/SendAndReceive/SendAndReceiveAsync 连接网络小票机、串口服务器、PLC 或其它 TCP 设备，处理 Byte/Base64/Hex/Text 载荷、GBK/GB18030、超时、响应、幂等与出站安全。
+description: Microi 后端 TCP 与通用 IoT 集成规范。用于 V8.Tcp 一次性客户端、V8.IoT.Send 设备原连接下行、可配置拆帧/校验、跨节点路由，以及 MQTT/HTTP 能力选择、设备权限、幂等和真实验收。
 ---
 
 > **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
@@ -20,6 +20,7 @@ description: Microi 后端 V8 TCP 原始字节集成规范。用于通过 V8.Tcp
 | RabbitMQ/MQTT | `V8.MQ` 或 MQTT 引擎 |
 | 浏览器/5+App 蓝牙或 SPP 打印 | 前端 `V8.Print`，读取 `v8-frontend-events/references/bluetooth-print.md` |
 | 设备原始 TCP 上报并保持连接等待应答 | API 宿主可选的 `TcpIngressRulesJson` 入站监听；固定租户与接口引擎，协议帧交给接口引擎处理 |
+| 设备已主动连接平台，需要发送控制命令 | `V8.IoT.Send`，沿已授权原连接下行；不依赖某个厂家 |
 | TLS、任意协议、可由 V8 动态开端口、自定义连接池 | 当前不提供；单独评估安全边界和传输实现 |
 
 平台已经提供可复用原子能力后，打印模板、设备选择、订单状态、幂等和审计优先写在接口引擎/表单事件；不要为单个打印业务再写 C# Controller。
@@ -34,7 +35,56 @@ description: Microi 后端 V8 TCP 原始字节集成规范。用于通过 V8.Tcp
 
 启用前优先限制来源网段与云安全组，设置帧长、连接数和空闲时间上限；CRC、设备号都不是身份认证。经 CLB 时核对后端实际看到的源 IP，且当前不解析 Proxy Protocol v2 报头。全网例外必须有业务接口内的设备身份/授权校验、幂等与异常连接监控；如果协议本身没有不可伪造的设备凭据，应明确记录剩余风险，并在能识别来源时收窄规则及云侧放行。Docker 在同一个 API service 显式增加如 `19011:1885/tcp`（宿主机对外端口:容器内端口）的映射；不要把 `/apiengine/...` URL、HTTP 的 `80/1052` 或 `V8.Tcp.Send` 当作设备端 TCP 监听。新执行的在线一键安装器会在 `61600+` 连续宿主端口段末尾追加 MQTT/TCP 映射；离线默认宿主 `7010/7011`，都映射至 API 容器 `1883/1885` 并尝试放行宿主机防火墙。窄来源方案仍需云安全组/CLB 人工限源；已有 Compose 不会自动补映射，SaaS 内部端口改变后须同步 Compose。TCP 配置、引擎安全位或端口失败时仅 TCP 状态为 `Faulted`，HTTP 仍可健康；验收必须确认 TCP `Listening` 状态/监听日志、端口探测和合法心跳应答，再核对设备数据。只连上端口不能证明已回 ACK；当前没有对外的 TCP 状态 HTTP 端点，不能把 HTTP 健康当成 TCP 就绪。配置、回环测试、设备联调的详细步骤见官网中文后端 V8 页面；本地回环不等于客户真机已联网。
 
-## API 契约
+## 已建立 IoT 连接的主动下行
+
+`V8.IoT` 是受限的设备原连接下行扩展。
+设备主动连接平台且需要云端控制时，使用 `V8.IoT.Send({DeviceId, CommandId, FrameHex, ExpireSeconds})`，
+不能用 `V8.Tcp.Send` 新建连接代替原设备连接。须配套 Core、V8Engine 和 API 宿主更新；
+缺失 `TcpIngressRulesJson.downlink` 或 `enabled:false` 时不启用，修改配置后重启现有 API。
+
+`V8.IoT` 负责连接路由与传输状态；操作码、流水号、厂家 HTTP/MQTT 选择、设备权限和回执
+放在接口引擎。禁止在 Core/V8Engine 中新增按厂家名、业务表名或设备编号分支。
+MQTT 设备继续使用 MQTT 引擎，平台主动连接设备使用 `V8.Tcp`，厂家云接口使用 `V8.Http`。
+
+接入另一协议先读取厂家真实说明，再检查既有 `framing` 描述是否覆盖：
+
+- 省略 `framing` 保持历史 U16BE/XMODEM，不改变既有配置含义。
+- 显式 `framing.mode` 支持 `LengthPrefix`、`FixedLength`、`Delimiter`；帧头 0–32 字节、帧尾 0–16 字节。
+- `lengthBytes` 为 1/2/4，`lengthByteOrder` 为 BigEndian/LittleEndian；长度加 `lengthAdjustment` 得总帧长。
+- `fixedLength` 为固定帧总长；结束符模式必须有帧尾且载荷不含未转义结束符。
+- `checksum` 为 Crc16Xmodem/Crc16Modbus/None；`checksumByteOrder` 与 `checksumStartOffset` 可配置。
+- 上报地址由 `deviceOffset/deviceLength` 定义；下行偏移可用 `downlinkDeviceOffset`，地址不能与结构字段重叠。
+- 普通 ACK 关联规则继续严格执行；主动下行用同一结构描述单独核对设备，不通过缩短关联区间绕过校验。
+- 当前每个 API 进程只有一套监听规则；没有单端口多协议自动探测、TLS 或任意转义解码。
+  超出能力时补通用适配器，不声称全部协议均已支持；完整配置示例与限制见官网后端 V8 主文档。
+
+```javascript
+// 已完成设备行权限/操作权限校验，且业务指令已提交；由受权派发接口调用。
+return V8.IoT.Send({
+  DeviceId: deviceAddressHex,
+  CommandId: committedCommandId,
+  FrameHex: completeProtocolFrameHex,
+  ExpireSeconds: 30
+});
+```
+
+- `downlink` 必须声明 `deviceOffset`、`deviceLength` 和 `sendApiEngineKeys`；其余队列、有效期、
+  去重、租约和轮询限额见官网中文后端 V8 原页面。新设置继续使用既有 SaaS 规则，不加环境变量。
+- 内部上报引擎确认设备身份和绑定后，每个成功响应显式返回 `Data.IoTDeviceId` 及正常
+  `Data.ResponseFrameHex`；地址必须与物理帧匹配。ACK 写入后才登记下行连接。
+- 控制接口必须校验当前用户的设备与操作权限；原子从可信执行上下文获取租户、接口 Key、
+  登录用户或可信任务身份，并按管理员的 Key 白名单约束调用。禁止透传前端任意报文。
+- `DeviceId` 为定长设备地址十六进制，由业务记录映射；`CommandId` 稳定且长期持久去重。
+  `FrameHex` 为无分隔符的完整协议帧。仅四个参数允许传入，租户/Host/Port 不接受。
+- `Code=1` 只表示接受指令或发现同编号既有指令。`Queued`、`Sending`、`Written`、
+  `Unknown`、`Expired` 是传输状态；设备执行结果由协议回执确认。`Sending/Unknown` 禁止换号重发。
+- 业务记录/outbox 先提交，再由派发任务调用原子；Redis 和设备动作不能随数据库回滚。
+  Redis 队列绑定连接代次，旧连接不能清除新连接租约，已经开始发送的指令不自动重投。
+- 保持正常 ACK 的关联规则；主动下行独立校验目标、结构和 CRC，无需缩短原关联长度。
+  原 ACK 与控制指令串行写入同一 Socket，重连与 Redis 故障必须覆盖。
+- 单元/Socket 回环、真实 Redis 多节点、真实设备回执和物理动作是不同验收层；不得相互替代。
+
+## API 契约：一次性 TCP 客户端
 
 | 方法 | 行为 |
 |---|---|

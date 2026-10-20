@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+using Microi.net;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.net.Api;
@@ -50,26 +50,13 @@ public static class TcpIngressFrameCodec
             error = "规则不能为空。";
             return TcpIngressFrameReadStatus.Invalid;
         }
-        var headerLength = Math.Min(buffer.Length, rule.RequestHeader.Length);
-        if (!buffer[..headerLength].SequenceEqual(rule.RequestHeader.AsSpan(0, headerLength)))
-        {
-            error = "请求帧头无效。";
-            return TcpIngressFrameReadStatus.Invalid;
-        }
-        if (buffer.Length < rule.LengthOffset + 2)
-            return TcpIngressFrameReadStatus.NeedMore;
-
-        var declaredLength = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(rule.LengthOffset, 2));
-        totalLength = declaredLength + rule.LengthAdjustment;
-        var minimum = Math.Max(
-            Math.Max(rule.RequestHeader.Length, rule.LengthOffset + 2),
-            rule.CorrelationOffset + rule.CorrelationLength) + rule.Tail.Length + 2;
-        if (totalLength < minimum || totalLength > rule.MaxFrameBytes)
+        totalLength = rule.RequestPolicy.ReadLength(buffer);
+        if (totalLength < 0)
         {
             error = "请求帧长度超出允许范围。";
             return TcpIngressFrameReadStatus.Invalid;
         }
-        if (buffer.Length < totalLength)
+        if (totalLength == 0)
             return TcpIngressFrameReadStatus.NeedMore;
         if (!ValidateRequest(buffer[..totalLength], rule))
         {
@@ -80,14 +67,15 @@ public static class TcpIngressFrameCodec
     }
 
     public static bool ValidateRequest(ReadOnlySpan<byte> frame, TcpIngressRule rule) =>
-        ValidateFrame(frame, rule, rule.RequestHeader);
+        frame.Length >= rule.CorrelationOffset + rule.CorrelationLength + rule.Tail.Length + rule.RequestPolicy.ChecksumBytes
+        && rule.RequestPolicy.Validate(frame);
 
     public static bool ValidateResponse(
         ReadOnlySpan<byte> response, ReadOnlySpan<byte> request, TcpIngressRule rule)
     {
         if (!ValidateRequest(request, rule)
-            || !ValidateFrame(response, rule, rule.ResponseHeader)
-            || response.Length < rule.CorrelationOffset + rule.CorrelationLength)
+            || !rule.ResponsePolicy.Validate(response)
+            || response.Length < rule.CorrelationOffset + rule.CorrelationLength + rule.Tail.Length + rule.ResponsePolicy.ChecksumBytes)
             return false;
         return response.Slice(rule.CorrelationOffset, rule.CorrelationLength)
             .SequenceEqual(request.Slice(rule.CorrelationOffset, rule.CorrelationLength));
@@ -95,29 +83,6 @@ public static class TcpIngressFrameCodec
 
     public static ushort Crc16Xmodem(ReadOnlySpan<byte> bytes)
     {
-        ushort crc = 0;
-        foreach (var value in bytes)
-        {
-            crc ^= (ushort)(value << 8);
-            for (var bit = 0; bit < 8; bit++)
-                crc = (ushort)((crc & 0x8000) != 0 ? (crc << 1) ^ 0x1021 : crc << 1);
-        }
-        return crc;
-    }
-
-    private static bool ValidateFrame(
-        ReadOnlySpan<byte> frame, TcpIngressRule rule, ReadOnlySpan<byte> header)
-    {
-        var minimum = Math.Max(
-            Math.Max(header.Length, rule.LengthOffset + 2),
-            rule.CorrelationOffset + rule.CorrelationLength) + rule.Tail.Length + 2;
-        if (frame.Length < minimum || frame.Length > rule.MaxFrameBytes
-            || !frame.StartsWith(header) || !frame.EndsWith(rule.Tail))
-            return false;
-        var declaredLength = BinaryPrimitives.ReadUInt16BigEndian(frame.Slice(rule.LengthOffset, 2));
-        if (declaredLength + rule.LengthAdjustment != frame.Length) return false;
-        var crcOffset = frame.Length - rule.Tail.Length - 2;
-        var expected = BinaryPrimitives.ReadUInt16BigEndian(frame.Slice(crcOffset, 2));
-        return expected == Crc16Xmodem(frame[..crcOffset]);
+        return TcpFramePolicy.ComputeChecksum(bytes, "Crc16Xmodem");
     }
 }

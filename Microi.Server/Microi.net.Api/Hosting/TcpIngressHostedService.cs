@@ -299,8 +299,10 @@ public sealed class TcpIngressHostedService : IHostedService, IDisposable
     {
         try
         {
+            var downlink = rule.Downlink == null ? null
+                : new TcpIngressIoTSession(rule, IoTCommandRuntime.CreateStore(rule.OsClient));
             await TcpIngressSession.RunAsync(client, rule,
-                (frame, token) => ExecuteFrameAsync(frame, rule, token), stoppingToken)
+                (frame, token) => ExecuteFrameAsync(frame, rule, token, downlink), stoppingToken, downlink)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) { }
@@ -315,7 +317,7 @@ public sealed class TcpIngressHostedService : IHostedService, IDisposable
     }
 
     private async Task<byte[]?> ExecuteFrameAsync(byte[] frame, TcpIngressRule rule,
-        CancellationToken stoppingToken)
+        CancellationToken stoppingToken, TcpIngressIoTSession? downlink = null)
     {
         // 不能只在无 ACK 时复查：管理员若重新开放 HTTP，Server 调用仍可成功，
         // 因而必须在有效帧处理路径上低频核对控制面安全位。
@@ -394,6 +396,7 @@ public sealed class TcpIngressHostedService : IHostedService, IDisposable
         // 只有完整、同设备同命令的二进制应答才能回写当前 TCP 连接。
         if (TcpIngressFrameCodec.TryDecodeResponse(raw, frame, rule, out var response))
         {
+            downlink?.ObserveResponse(frame, raw!);
             Interlocked.Exchange(ref _missingAckCount, 0);
             return response;
         }

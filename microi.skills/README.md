@@ -19,7 +19,7 @@
 | **v8-table-event** | 表单 V8 事件（提交前/后、DataFilter） | `v8-table-event/SKILL.md` |
 | **v8-cache-pattern** | Redis 缓存模式（L1+L2、Key 命名、防穿透） | `v8-cache-pattern/SKILL.md` |
 | **v8-http-integration** | 调用外部 HTTP API（含下载/上传） | `v8-http-integration/SKILL.md` |
-| **v8-tcp-integration** | 后端 TCP 原始字节、小票机与设备收发 | `v8-tcp-integration/SKILL.md` |
+| **v8-tcp-integration** | 后端 TCP、`V8.IoT.Send` 通用设备原连接下行、协议描述与跨节点路由 | `v8-tcp-integration/SKILL.md` |
 | **v8-mongodb** | MongoDB 增删改查（IoT、审计日志） | `v8-mongodb/SKILL.md` |
 | **v8-mq-mqtt** | RabbitMQ 消息队列与 MQTT 物联网 | `v8-mq-mqtt/SKILL.md` |
 | **v8-workflow** | 工作流（审批流程）V8 事件 | `v8-workflow/SKILL.md` |
