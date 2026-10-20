@@ -51,6 +51,12 @@ description: 每次 Microi 任务开始前必读的基础规范。用于识别�
 工作区保护始终有效：保留他人差异与共享进程，临时产物只放根 `.tmp/`，闭源源码只从独立内部仓提交。修改/提交前读取 [共享工作区与 Git 保障](references/progressive-04-工作区与平台专项保障.md#多对话共享工作区变更归属保护强制)；启动构建、测试服务或浏览器前读取同文件资源/OOM规则并检查现有资源。后端/任务/权限变更读取分布式与安全章节；平台源码定位、文档和 Skills 修改读取对应章节。平台能力四项检查仍固定保留在本入口。
 
 <!-- microi-progressive:begin -->
+
+### 自动清理入口与退出回执
+
+- 自动化入口共用 `Microi.Server/tools/Microi.ArtifactSafety.ps1` 的祖先/目录树预检。Full 的 `Microi.TestArtifactCleanup.ps1` 在移除输出链接前检查整个目标树、受保护属性和 Windows 文件占用；发布脚本的构建/打包/冒烟日志、NuGet 解包临时目录统一进入 `release-scratch.mjs` 新建的独占目录，以目录内标记和目录外归属记录校验身份，退出后保留小型 `.cleanup.json` 回执。没有清单、身份变化或预检失败都保留，不能扫描同名前缀代替所有权。
+- 发布退出顺序为停止本次写入者、普通清理、释放本次发布锁；成功、失败及可捕获的 INT/TERM/HUP 都走同一收尾。清理失败令原成功退出变为非零，原有失败码仍保留；测试原异常不被清理/回执写入错误覆盖。硬杀、掉电和执行器在 shell 启动前拒绝无法保证运行 `finally/EXIT`，接续时先重新盘点已登记路径，不自动清理其它任务或全部历史目录。
+
 <!-- microi-progressive:chunk id=workspace-conventions-000 sha256=40f50f3fa5c30ab7fdc6719a361147493eacbd12a57d504c19ee9c9daaf99135 -->
 ## 任务启动前 Skill 读取规则（强制）
 

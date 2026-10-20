@@ -200,6 +200,8 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
 
 ## 一键发布产物边界与缓存
 
+- 一键脚本的本次构建、pack、冒烟日志和 NuGet 替换临时目录由 `Microi.Server/tools/release-scratch.mjs` 创建在发布结果目录的唯一 `release-scratch-*` 下，`EXIT` 自动收尾；归属清单与 `.cleanup.json` 回执在同级。成功仅留小回执，失败保留清单、原始错误和未清范围。它不删除 Full 报告、已发布制品、源码、共享 `.tmp` 或其它任务目录。执行器在 shell 启动前拒绝时，脚本内检查尚未运行；先定位当前宿主与拒绝阶段，不换工具绕过，也不默认添加 `-Force`、清除属性或修改 ACL。完整规则见工作区规范的“Windows 默认普通删除与策略拒绝排查”。
+
 - 需要完整解决方案构建和 NuGet 打包时，先完成一次 Release build；publish 阶段复用已验证产物，禁止先 clean 再重复编译同一项目引用链。
 - API 镜像只允许使用 `bin/Release/publish`，前端镜像只允许使用 `bin/Release/dist` 和必要的服务器配置；`net10.0`、源码、测试输出及其它构建中间目录不得进入 Docker 上下文。
 - `logs`、故障 spool、WAL 和节点诊断文件属于运行态数据。发布前后及冒烟测试后都要从 publish 清理，但不得删除源码/持久卷中尚待重放的原始 spool；项目文件应从源头设置为不复制到发布目录。
