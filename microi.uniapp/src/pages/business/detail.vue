@@ -439,7 +439,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import XjyCustomerContractTotals from '@/tenants/xjy/components/customer-contract-totals.vue'
 	import XjyDeviceIoTActions from '@/tenants/xjy/components/device-iot-actions.vue'
 	import { isDeviceIoTSelector } from '@/tenants/xjy/device-iot-actions.mjs'
-	import { customerContractTotalsSupported, loadCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
+	import { customerContractTotalsVisible, loadCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
 	import {
 		canGenerateDeviceQrCode,
 		resolveDeviceProductId,
@@ -1329,7 +1329,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 		},
 		computed: {
 			showCustomerContractTotals() {
-				return customerContractTotalsSupported(this.moduleConfig.table)
+				return customerContractTotalsVisible(this.moduleConfig.table, this.detail)
 			},
 			showCustomerContractTotalsOnActiveTab() {
 				if (!this.showCustomerContractTotals) return false

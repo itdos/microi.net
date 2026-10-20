@@ -45,7 +45,7 @@ export default {
     collapsible: { type: Boolean, default: false }
   },
   emits: ['retry'],
-  data() { return { expanded: true } },
+  data() { return { expanded: !this.collapsible } },
   computed: {
     groups() { return buildCustomerContractGroups(this.state) },
     scopeNote() { return [...new Set([this.state.explanation, this.state.scope].filter(Boolean))].join('；') }
