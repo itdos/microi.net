@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { readOfficialEmptyDatabaseSource } from '../ReleaseGate/official-v8-source.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repo = path.resolve(here, '../../..')
@@ -16,15 +17,7 @@ const relative = path.relative(repo, sourceParent)
 assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative), '责任源码根必须位于当前工作区')
 assert.ok(fs.statSync(sourceParent).isDirectory(), '契约责任源码缺失时必须失败')
 // 脱敏接口由 SaaS 官方包单一拥有；远端拉取目录可能保留旧版本，不能成为平台发行回归的事实源。
-const packagePath = path.join(repo, 'Microi.Server/OfficialApplications/Resource/app.microi.saas-engine.json')
-const officialPackage = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
-assert.equal(officialPackage.PackageInfo.OsClient, 'iTdos')
-const engineKey = 'admin_get_empty_database_sanitization_sql'
-assert.equal(officialPackage.ResourcePolicies.ApiEngines[engineKey].UpgradePolicy, 'Managed')
-const ownedEngines = officialPackage.SysApiEngines.filter(engine => engine.ApiEngineKey === engineKey)
-assert.equal(ownedEngines.length, 1, '正式 SaaS 包必须唯一拥有空库脱敏接口')
-const engineSource = ownedEngines[0].ApiV8Code
-assert.ok(typeof engineSource === 'string' && engineSource.length > 0, '正式包必须携带实际发行正文')
+const engineSource = readOfficialEmptyDatabaseSource(repo)
 const execute = new Function('V8', engineSource)
 
 test('应用文件与版本清理先建立带主键的保留身份集合，避免 MySQL 5.7 OR 删除关联扫描', () => {
@@ -235,6 +228,20 @@ test('department template does not write ParentName when the real legacy schema 
   assert.match(statement, /'默认部门'/)
 })
 
+test('new empty templates retain an explicit core application set instead of every platform app', () => {
+  const { result, queries } = run([
+    { Id:'core', AppKey:'app.microi.module-engine', ApplicationType:'Platform', AppPakcet:JSON.stringify({DiyTables:[{Name:'sys_menu'}]}) },
+    { Id:'optional', AppKey:'app.microi.future-feature', ApplicationType:'Platform', AppPakcet:JSON.stringify({DiyTables:[{Name:'future_feature_data'}]}) }
+  ])
+  assert.equal(result.Code, 1)
+  assert.ok(result.Data.ApplicationOwnedTables.includes('future_feature_data'))
+  assert.ok(!result.Data.ApplicationOwnedTables.includes('sys_menu'))
+  const classification = result.Data.Sql.split('INSERT IGNORE INTO temp_ai_apps (Id, AppKey)')[1].split(';')[0]
+  for (const key of ['app.microi.bootstrap','app.microi.store','app.microi.form-engine','app.microi.module-engine','app.microi.sys-config','app.microi.sys_user']) assert.ok(classification.includes(`'${key}'`), key)
+  assert.doesNotMatch(classification, /LIKE|app\.microi\.saas-engine|microi-wechat-content-security/)
+  assert.ok(queries.every(query => /^\s*(?:\/\*[\s\S]*?\*\/\s*)?SELECT\b/i.test(query)))
+})
+
 test('department schema discovery fails closed before emitting destructive SQL', () => {
   const { result } = run([], { departmentColumnFailure: true })
   assert.equal(result.Code, 0)
@@ -290,7 +297,7 @@ test('non-platform package tables and StoreId menu tables enter the cleanup SQL'
   assert.match(result.Data.Sql, /\('BusinessLegacy'\)/)
   assert.match(result.Data.Sql, /\('ExtraLegacy'\)/)
   assert.doesNotMatch(result.Data.Sql, /temp_app_owned_tables \(Name\) VALUES[^;]*\('sys_menu'\)/)
-  assert.match(result.Data.Sql, /LIKE 'app\.microi\.%'/)
+  assert.match(result.Data.Sql, /IN \('app\.microi\.bootstrap', 'app\.microi\.store'/)
   assert.equal(result.Data.StoreCount, 2)
   assert.equal(result.Data.ApplicationOwnedTableCount, 2)
   assert.deepEqual(result.Data.ApplicationOwnedTables, ['BusinessLegacy', 'ExtraLegacy'])

@@ -17,7 +17,7 @@ public sealed class UpgradeColdApiEngineCacheIntegrationTests
     public async Task ColdLegacyDatabase_RebuildsEnabledRoutesWithoutFormMetadataOrFormEngine()
     {
         var connection = new DbConnectionStringBuilder { ConnectionString = Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN")! };
-        Assert.Equal("upgrade_fixture", connection["Database"]);
+        MySqlFixtureGuard.VerifyUpgrade(connection.ConnectionString);
         Assert.Equal("127.0.0.1", connection["Server"]);
         var databaseName = "microi_cache_rebuild_" + Guid.NewGuid().ToString("N");
         connection["Database"] = "mysql";

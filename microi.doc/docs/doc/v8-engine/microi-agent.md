@@ -182,21 +182,13 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 
 历史 [Windows 1.3.9 不可变安装包](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.4.0/requests/9e5b8e3d0c468efe0f0777583dd1111654d46d473050af76bf53fc60ea6f7a1a/assets/Microi-Agent-1.3.9-windows-x64-setup.exe)为未签名 EXE，289,552,267 字节，SHA-256：`b6a76a4e72ac889682a6f68ca07cf58e737ad33c0ea2543c66c693aa352baa47`；[发行清单与验收摘要](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.4.0/requests/9e5b8e3d0c468efe0f0777583dd1111654d46d473050af76bf53fc60ea6f7a1a/assets/release-manifest.json)可独立回读。资源归档路径的 `v1.4.0` 是下载资源版本，软件实际版本为 **1.3.9**。完整审计证据保留于内部源码仓库，公开清单不包含凭据或本地路径。
 
-::: details 历史启动恢复、1.3.6 正式包与 1.3.7 安装修复候选
+安装后可下载 [一键原生验收工具](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-native-acceptance.zip)，解压并双击 `一键验收.cmd`。它自动回读安装后的全部文件 SHA-256，运行六项真实 NSIS 故障回归，再从完整产品主入口启动两次，检查 Worker 与 Harness 重启；结果 ZIP 位于工具 `result` 目录，失败也会保存证明。工具只导出证明 JSON 和测试截屏，不导出测试 Profile 或凭据。**当前六项 NSIS 夹具已在 Wine 通过，Windows 原生升级与启动仍待验收；自动更新 latest 暂保持 1.3.6，macOS 签名公证版仍为 1.3.6。**
 
-1.3.6 修复完整应用正常启动误用 Electron Helper 导致 Harness 原生加载器拒绝的问题。Harness、Worker 与插件命令统一使用包内独立 Node；签名 Mac 应用曾验收正常启动、重启和再次打开。macOS Universal 已签名公证，官网 Windows EXE 为未签名公开测试；该记录不代表 Windows 客户设备已经通过验收。
+**Windows 启动恢复说明**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
 
-1.3.7 是旧基座的安装修复候选，针对 `enable staged directory win32=5` 增加短暂占用重试和同盘迁移回退。候选的 [Windows x64 安装包](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-x64-setup.exe) 与 [原生验收资料](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-native-acceptance.zip) 仅保留历史复现用途。日常安装请使用顶部 latest 入口；不要以这些旧候选代替当前正式版。错误 5 本身不能确定占用进程或安全策略。
-
-1.3.2 针对早期客户设备 IPv4、IPv6 回环 HTTP 均超时的记录，增加 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。当时的构建、回归和 MacBook Harness/Electron 验证通过，客户 Windows 原生安装启动尚待确认；这属于旧宿主的历史修复记录，不能代表 1.3.8 官方桌面宿主的验证结论。
-
-:::
-
-**启动失败时**：请提供实际运行的软件版本和本次启动日志，不要先删除工作区、会话或凭据。安全模式也失败时，不能仅凭超时把原因归咎第三方插件；支持人员需要核对本次宿主、模型服务与插件的具体错误。
-
-- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 完整包为未签名 EXE，商店 MSIX 1.3.3 由微软签名。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
+- 当前 Windows 版本以页面顶部为准；SHA256 证明文件完整性，不证明发布者身份。内部源码根目录双击 `一键打包Windows.cmd` 或执行 `powershell -ExecutionPolicy Bypass -File .\一键打包Windows.ps1` 即可打包；Auto 模式发现 Microsoft Artifact Signing 或本机证书配置时自动签名，否则明确提示后继续生成未签名包。`-Signing Signed` 才会在缺少凭据时失败。商店版由商店更新，不下载或安装官网 EXE；官网 Windows 1.3.6 测试包仍为未签名 EXE，商店 MSIX 1.3.3 由微软签名。普通 Microsoft 帐号不能直接签官网 EXE。[微软分发说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
 - **Windows 商店版 1.3.3 已发布**：2026 年 10 月 3 日复查，Microsoft 后台显示“在 Microsoft Store 中”，中国区公开产品页已显示 Microi Agent 的名称、发行者、截屏与介绍；商店 MSIX 由微软签名分发。请在 Windows 设备打开 [Microsoft Store](https://apps.microsoft.com/detail/9NKCS76ZMFXR) 查看获取入口。本机 Mac 的产品页没有获取按钮，**Windows 原生获取、安装与启动仍待验收**；商店发布不会改变官网 EXE 的未签名状态。
-- **免费微软签名 EXE 在线安装器**：可直接下载 [Microi Agent 商店在线安装器](https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge)。这个小型 EXE 由 Microsoft Store 生成并签名，运行时联网检查设备条件、下载并安装当前商店版（当前为 1.3.3.0），后续由商店更新。它不包含官网完整安装包，也不会给官网 EXE 增加签名。采用[微软官方 Store Web Installer](https://learn.microsoft.com/en-us/windows/apps/distribute-through-store/how-to-use-store-web-installer-for-distribution)，无需购买代码签名证书；官网下载入口继续提供最新版完整包。
+- **免费微软签名 EXE 在线安装器**：可直接下载 [Microi Agent 商店在线安装器](https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge)。这个小型 EXE 由 Microsoft Store 生成并签名，运行时联网检查设备条件、下载并安装当前商店版（当前为 1.3.3.0），后续由商店更新。它不包含官网 1.3.6 完整安装包，也不会给该完整 EXE 增加签名。采用[微软官方 Store Web Installer](https://learn.microsoft.com/en-us/windows/apps/distribute-through-store/how-to-use-store-web-installer-for-distribution)，无需购买代码签名证书；官网下载入口继续提供最新版完整包。
 - 如果旧安装包提示 `Failed to decompress files` 或 `Error opening output file(s)`，请从本页顶部重新下载 Windows latest 安装包后运行；不要重复启动下载目录中缓存的旧安装包。新版安装器改用能处理内置中文技能文件名的解压方式，覆盖安装会保留工作区和会话数据。
 - 如果已退出应用仍提示“无法关闭”，旧安装器可能把长路径或文件复制失败误报成应用正在运行。新版使用当次发行的兼容卸载器完成升级；工作区、会话和用户配置保持不变。如果新版仍失败，请使用下面的诊断入口，不要反复重装。
 - 1.2.6 修复了已重现的长路径清理问题，但仍有客户报告“旧版本文件清理失败（错误码 2）”。该数字是卸载器退出码，不能直接判断哪个文件失败、是否被占用或缺少权限，也不能据此认为所有客户的升级问题已解决。
@@ -205,7 +197,7 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 - **Windows 1.3.1 回环恢复**：客户确认 1.2.9 仍在 `127.0.0.1` 上出现 Node 与 Chromium 双通道连接超时。新版连续确认两次连接失败后，只重启一次 Harness 到新的 IPv6 回环地址 `::1`；仍须取得本次认证信息并收到真实 HTTP 响应才加载页面，不监听公网地址、不绕过认证。IPv6 不可用时停止重试并保留具体错误。本机 HTTP 端口避开浏览器禁止端口，自动选到禁止端口时有界重选，显式配置和真实权限、占用错误继续报错。日志增加实际应用版本、监听地址和子进程内 HTTP 自检，便于区分监听失败与桌面连接失败。请从顶部永久下载入口升级，若仍失败，请提供新 `harness.log`；开发环境通过不能代替该客户 Windows 安装和启动确认。
 - **安装仍失败时**：Windows 1.2.7 起已将诊断集成进安装器。失败窗口提供「复制安装日志」和「打开日志」，无需下载独立诊断工具。日志保存在 `%LOCALAPPDATA%\Microi Agent\installer-logs\`；目录不可写时使用 `%TEMP%\Microi-Agent-installer-logs\`，退出安装后仍保留。日志包含实际失败步骤、文件路径、迁移的 Win32 错误、卸载器或 7-Zip 退出码、回滚错误，以及只读文件访问和 Restart Manager 占用 PID 检查。请把复制的日志提供给支持人员；本机测试通过仍不代表该客户设备已通过验收。
 - “工作区服务连接已断开”与云端账号未登录是不同问题。新版修复了旧空凭据保险库导致服务退出的情况；对损坏或其他 Windows 用户加密的凭据会保留原文件并报告具体错误，不会静默清空凭据。安装成功后还应打开「Microi吾码」和「AI 员工」检查本机服务连接。
-- macOS 当前已发布的 1.3.6 采用 Universal 通用架构，最低要求 macOS 13.5，已完成 Developer ID 签名、Apple 公证及 Gatekeeper 验证。1.3.8 官方宿主的新构建在内部源码根执行 `bash ./一键打包Mac.sh --signed --current`，默认按真实 Mac 宿主选择 Intel x64 或 Apple Silicon arm64；可用 `--arch x64` / `--arch arm64` 明确选择。当前新构建不接受 Universal，不能把单架构包标成通用版；各架构的运行库、签名、公证及原生启动须分别验收。脚本在隔离 HEAD 工作树构建，输出到 `apps/official-desktop/release`，不递增版本、不修改原检出的锁文件和图标；尚未提交的修改不会进入构建。固定 cloudflared 支持校验后的缓存、断点续传及 `MICROI_CLOUDFLARED_ASSET=/已下载的官方压缩包路径` 本地输入；哈希不符立即停止。`--signed` 在缺少签名或公证凭据时失败，历史未签名包以归档记录为准。
+- macOS 正式安装包采用 Universal 通用架构，原生支持 Intel 与 Apple Silicon，最低要求 macOS 13.5。正式发布使用 Developer ID Application 签名，并在发布前完成 Apple 公证及 Gatekeeper 验证；历史未签名包的状态以对应归档记录为准。内部源码根目录执行 `bash ./一键打包Mac.sh --signed --current` 可以按源码当前版本生成签名 DMG/ZIP；默认构建 Universal，也可使用 `--arch arm64` 或 `--arch x64` 选择与宿主匹配的单架构。首次打包会下载并校验固定版本的 cloudflared；网络中断后重新执行同一命令即可续传，也可通过 `MICROI_CLOUDFLARED_ASSET=/已下载的官方压缩包路径` 指定本地文件，哈希不符会停止构建。Dock 图标在 Mac 构建时自动生成合适留白。一键脚本在证书与 `notarytool` 凭据完整时自动启用签名、公证；`--signed` 在缺少凭据时失败。
 - 当前 Electron 桌面应用不能直接生成 iOS/Android 安装包。Mac App Store 版采用独立 App Sandbox 客户端，提供本地提示词管理和桌面配对会话；Node/Harness、Shell、项目文件、插件与 MCP 在已配对的桌面或其服务端执行。1.3.2（构建 1.3.3）已于 2026 年 10 月 2 日提交，最近一次后台核对为等待审核；2026 年 10 月 3 日公开入口仍**尚未开放商店下载**；商店入口为 [Mac App Store](https://apps.apple.com/app/id6818076490)。需要完整本机开发能力时，仍使用本页顶部的已签名、公证 DMG。商店版本由 App Store 更新，不安装站外更新或插件。
 
 ### Windows 版本与下载选择
@@ -214,7 +206,7 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 
 | 系统与架构 | 微软签名在线安装器 / 商店版 | 官网完整 EXE |
 | --- | --- | --- |
-| Windows 11 x64、Windows 10 2004 及以上 x64（含 22H2） | 满足包声明的系统条件；需联网，仍受商店可用性、账户、地区和管理员策略约束 | 提供页面顶部所示 latest 完整包；当前未签名，客户设备兼容性需结合实际环境验证 |
+| Windows 11 x64、Windows 10 2004 及以上 x64（含 22H2） | 满足包声明的系统条件；需联网，仍受商店可用性、账户、地区和管理员策略约束 | 提供最新版 1.3.6；当前未签名，客户原生安装、启动仍待验收 |
 | Windows 10 2004 之前的 x64（含 1809 / 1909） | 不满足当前商店包最低版本，不能用在线安装器绕过 | 当前 Electron / Node 以 Windows 10 为运行基线，但这些旧构建未验收；不承诺兼容，建议先升级系统 |
 | Windows 7 / 8 / 8.1、32 位 Windows（x86） | 不支持当前应用 | 不支持；当前 Electron 已不支持 Windows 7 / 8 / 8.1，包内 Node 和原生组件为 x64 |
 | Windows 11 ARM64 | 系统支持 x64 仿真，但本产品尚未完成 ARM 设备验收；没有 ARM64 原生包 | x64 仿真兼容性待验收；Windows 10 ARM 仅提供 x86 仿真，不能运行当前 x64 包 |
@@ -1143,17 +1135,11 @@ npm run publish:cli:resume
 > 后续用户实测发现，本版验收未覆盖“首次使用、官方会话过期与多个客户连接”组合，导致登录入口、侧栏和员工连接存在缺口。1.3.9 的实际安装验收还发现，附件上传检查不足以证明发送成功，也未证明后续岗位实际收到前文文档。下面保留当时的验证范围；不能把上传成功或模型回复非空当成文档协作已经通过。上述路径均须由最终新包重新验收。
 
 - **转向 DeepSeek 官方桌面**：生产装配采用官方 `d743267388641bc76f17c45ce8b4c231aed1d32c`、Harness `0.2.1-alpha.2` 与 Electron `44.7.0`。旧 dsh-desktop 退出正式宿主链；吾码业务保持独立插件、主进程和协议层，VS Code、CLI 与 MCP 继续共用实现。
-- **AI 员工项目群**：项目列表、持久消息与成员列表组成三栏工作台。保留原十岗并新增独立技术总监，新群默认十一个岗位；旧群不自动增删成员。岗位可分别指定本机供应商和模型，需求材料、岗位回复和历史按项目共享，精确账号邀请需要本人接受。旧任务、目标、交接和成果验收保留。文本需求材料目前支持 Markdown、TXT、JSON、CSV。
+- **AI 员工项目群**：项目列表、持久消息与成员列表组成三栏工作台。十个岗位可分别指定本机供应商和模型；需求材料、岗位回复和历史按项目共享，精确账号邀请需要本人接受。旧任务、目标、交接和成果验收保留。文本需求材料目前支持 Markdown、TXT、JSON、CSV。
 - **可靠执行与权限**：群成员身份来自当前 DiyToken；服务端拒绝伪造身份、非成员访问及越权改配置。执行采用领取、开始确认、心跳和原成果回报，断线只恢复同一结果，不自动重复推理；本机模型密钥不上传群服务。点名“在线”表示角色在席，不能代替模型健康检查。
-- **保留桌面二开**：沿用吾码账号与中转、MCP、能力中心、采集、环境服务、PPT 模板和个人模板。动态应用 Logo/名称、关于版本、手机连接、工作区审查、提示词历史及持久消息编辑/撤回接入官方插槽。配对窗口复制并校验三份品牌图片，真实入口打开本地配对页，不自动开启公网隧道。保留用户目录和安装身份，以及历史派生模块许可证。
-- **提示词与消息操作**：历史选择及上下键只召回用户实际提交的提示词，自动时间与插件注入的上下文不会混入。编辑和撤回按原消息所在轮次创建真实会话分支，原会话保留用于审计；注入上下文不能作为编辑或撤回目标。首轮撤回保留原工作区归属，空分支仍可继续输入，刷新后不会重新出现被撤回的提示词和回复。
-- **首页与兼容接缝**：新建会话继续显示吾码能力目录及 29 项图像工具，保留官方工作区和预设。正式包验证插件与所有依赖实际进入 ASAR，PPT 的私有依赖与官方依赖隔离；会话选择器和共享语言资源按官方服务签名适配，避免业务面板挂载时崩溃。所有接缝都有可重放源码及回归。
+- **保留桌面二开**：沿用吾码账号与中转、MCP、能力中心、采集、环境服务、PPT 模板和个人模板。动态应用 Logo/名称、关于版本、手机连接、工作区审查、提示词历史及持久消息编辑/撤回接入官方插槽。保留用户目录和安装身份，以及历史派生模块许可证。
 - **上游保护与构建**：新增《同步DeepSeek官方上游.md》、锁定归档/完整树校验、精确重放补丁和产品源码指纹。新一键脚本使用官方桌面装配；macOS 按 Intel x64 / Apple Silicon arm64 本机分别构建，不能将单架构产物标成 Universal。构建缓存与产物不修改已跟踪源码。
-- **开发工具协作**：合并另一台电脑同期提交的 VS Code / CLI `5.9.3` 源码及 Skills 更新，桌面 `1.3.8` 与开发工具分别管理版本；不回退或覆盖并行提交。开发工具渠道版本以 Marketplace 与 npm 实际发行记录为准。
-- **最终安装包验收**：冻结源码 `aa52110e7e12ad7849c8a1cb7e26adc126cca9a7` 构建的 Windows 1.3.8 完成实际全新安装、同版本重装、从 1.3.6 升级及升级后再装四轮验收；中文、跨盘路径与长路径文件逐项校验，安装注册和快捷方式恢复通过。最终 ASAR 的 19,490 项封存清单全部一致。实际安装软件完成七个业务菜单、29 项首页图像工具、16 个 PPT 模板、十一岗位项目群、窄屏与浅深主题等 17 项界面验收，浏览器控制台无错误。
-- **真实协作与会话验收**：同一最终安装软件使用两套明确配置的路由（同为 MiniMax 的 `MiniMax-M2.7`，并非两个模型厂商）完成十一岗位实际模型回复、需求附件、成员模型绑定、幂等回读和冷启动持久验证；本轮以 `tools: []` 生成各岗位方案草稿，不代表外部工具执行或业务系统已交付；“在线”状态另行验证，不以在席消息代替推理结果。独立普通会话完成两次真实推理、用户提示词历史与上下键召回、编辑分支、首轮撤回及刷新后旧消息/回复不再出现。配对按钮真实打开本地二维码页，三份品牌图片及路由通过；没有自动开启公网隧道。
-- **CDN 与版本独立**：官方下载资源发布完成，四件运行资产（EXE、入口页、Windows 更新清单、发行清单）均完整下载并逐件核对 SHA-256；永久 Windows latest 入口实际安装包为 1.3.8，Mac 1.3.6 更新清单保持原字节。发行文件与摘要见上方不可变链接，旧候选仅保留于历史记录。
-- **回归与边界**：官方桌面核心 114 项、群行为 30 项、浏览器 14 项、会话操作 23 项、手机资源 3 项、原生插件适配 4 项和安装事务六类故障回归通过；`api.microi.net` 真实独立会话完成邀请、接受、共享历史与非成员拒绝。上述原生验收来自本次隔离 Windows 测试环境，尚不能代替客户那台物理 Windows 11 电脑、实体手机、公网隧道或新官方宿主 macOS 的验收。Mac 下载仍使用独立已发布的 1.3.6。
+- **已验证范围**：官方桌面核心 111 项、群行为 30 项、浏览器 14 项、会话操作 15 项和真实 Windows 安装事务六类故障回归通过；`api.microi.net` 真实独立会话完成邀请、接受、共享历史与非成员拒绝。完整产品十岗真实模型、最终安装器、CDN 最新清单仍按各自收据验收；当前段落不代表这些发行门禁已经完成。macOS 下载继续按其独立、实际已发布版本显示。
 
 ### 开发工具 v5.8.6 - (2026-10-09)
 

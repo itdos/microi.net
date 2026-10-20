@@ -1331,12 +1331,23 @@ namespace Microi.net
                         {
                             nextParam[TargetExecutionOsClientParam] = executionOsClient;
                         }
+                        var requestedDelay = ParseInt(continuation["NextDelaySeconds"], 0);
+                        // 业务调用及其事务已经完成；先停续租，再确认释放两层 Redis 租约。
+                        // 任何确认失败仍使用原来的保护延迟，不降低领取和 fencing 条件。
+                        var leasesReleased = requestedDelay <= 0
+                            && await TryReleaseContinuationLeasesAsync(
+                                renewal, () => active.RenewalCancellation.Cancel(),
+                                () => laneLease.ReleaseConfirmedAsync(TimeSpan.FromMilliseconds(500)),
+                                () => concurrencyLease == null ? Task.FromResult(true)
+                                    : concurrencyLease.ReleaseConfirmedAsync(TimeSpan.FromMilliseconds(500)))
+                                .ConfigureAwait(false);
                         BackgroundTaskStore.RequeueChunk(
                             item,
                             nextParam,
                             checkpoint,
-                            ParseInt(continuation["NextDelaySeconds"], 0),
-                            continuation["Msg"]?.ToString() ?? result["Msg"]?.ToString());
+                            requestedDelay,
+                            continuation["Msg"]?.ToString() ?? result["Msg"]?.ToString(),
+                            leasesReleased);
                     }
                     else
                     {
@@ -1407,6 +1418,21 @@ namespace Microi.net
                     activity?.Stop();
                 }
             }
+        }
+
+        internal static async Task<bool> TryReleaseContinuationLeasesAsync(
+            Task renewal, Action stopRenewal, Func<Task<bool>> releaseLane,
+            Func<Task<bool>> releaseConcurrency)
+        {
+            try
+            {
+                stopRenewal();
+                if (!await WaitForWorkerCleanupAsync(renewal, RenewalShutdownTimeout).ConfigureAwait(false))
+                    return false;
+                if (!await releaseConcurrency().ConfigureAwait(false)) return false;
+                return await releaseLane().ConfigureAwait(false);
+            }
+            catch { return false; }
         }
 
         internal static async Task<bool> WaitForWorkerCleanupAsync(Task cleanup, TimeSpan timeout)

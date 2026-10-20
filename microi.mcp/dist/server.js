@@ -3960,12 +3960,12 @@ export function createMcpServer(client, context) {
             };
         }
     });
-    server.tool('microi_redis_statistics', `Get Redis server/keyspace statistics for OsClient "${osClient}". Uses the current tenant Redis by default; pass connectionId only for a connection previously saved in mci_redis_connection. Never pass Redis passwords through MCP.`, {
-        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+    server.tool('microi_redis_statistics', `Get Redis server/keyspace statistics for OsClient "${osClient}". Uses the current tenant Redis by default; pass connectionId only for a connection previously saved in mci_redis_connection. Only the main tenant may inspect all namespaces; child tenants are restricted to their own Microi:{OsClient}: prefix and tenant-only statistics. Never pass Redis passwords through MCP.`, {
+        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Omit to use the connection configured database. Child tenants cannot select another database.'),
         connectionId: z.string().optional().describe('Optional saved mci_redis_connection Id. Omit for current tenant Redis.'),
     }, async ({ database, connectionId }) => {
         try {
-            const result = await client.getRedisStatistics(database || 0, connectionId);
+            const result = await client.getRedisStatistics(database, connectionId);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
@@ -3974,15 +3974,15 @@ export function createMcpServer(client, context) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
         }
     });
-    server.tool('microi_redis_list_keys', `SCAN Redis keys for OsClient "${osClient}" without using blocking KEYS. Returns type, TTL, memory estimate and an opaque next cursor.`, {
+    server.tool('microi_redis_list_keys', `SCAN Redis keys for OsClient "${osClient}" without using blocking KEYS. Returns type, TTL, memory estimate and an opaque next cursor. Child tenant patterns are scoped by the backend to Microi:{OsClient}:; a foreign tenant prefix is rejected.`, {
         pattern: z.string().optional().describe('Redis glob pattern. Plain text is treated as a contains search. Default: *.'),
-        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Omit to use the connection configured database. Child tenants cannot select another database.'),
         pageSize: z.number().int().min(10).max(500).optional().describe('Page size. Default: 100.'),
         cursor: z.string().optional().describe('Opaque NextCursor from the previous call.'),
         connectionId: z.string().optional().describe('Optional saved connection Id. Omit for current tenant Redis.'),
     }, async ({ pattern, database, pageSize, cursor, connectionId }) => {
         try {
-            const result = await client.getRedisKeys(pattern || '*', database || 0, pageSize || 100, cursor, connectionId);
+            const result = await client.getRedisKeys(pattern || '*', database, pageSize || 100, cursor, connectionId);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
@@ -3993,13 +3993,13 @@ export function createMcpServer(client, context) {
     });
     server.tool('microi_redis_get_key', `Read one Redis key for OsClient "${osClient}". Supports String, Hash, List, Set, Sorted Set and Stream with bounded pagination.`, {
         key: z.string().describe('Exact Redis key.'),
-        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Omit to use the connection configured database. Child tenants cannot select another database.'),
         pageIndex: z.number().int().min(1).optional().describe('Collection page index. Default: 1.'),
         pageSize: z.number().int().min(10).max(1000).optional().describe('Collection page size. Default: 500.'),
         connectionId: z.string().optional().describe('Optional saved connection Id. Omit for current tenant Redis.'),
     }, async ({ key, database, pageIndex, pageSize, connectionId }) => {
         try {
-            const result = await client.getRedisKey(key, database || 0, pageIndex || 1, pageSize || 500, connectionId);
+            const result = await client.getRedisKey(key, database, pageIndex || 1, pageSize || 500, connectionId);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
@@ -4010,15 +4010,15 @@ export function createMcpServer(client, context) {
     });
     server.tool('microi_redis_delete_keys', `Delete up to 500 Redis keys for OsClient "${osClient}". This is irreversible and requires confirmExecution="DELETE".`, {
         keys: z.array(z.string()).min(1).max(500).describe('Exact Redis keys to delete.'),
-        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Omit to use the connection configured database. Child tenants cannot select another database.'),
         connectionId: z.string().optional().describe('Optional saved connection Id. Omit for current tenant Redis.'),
         confirmExecution: z.string().optional().describe('Required. Pass DELETE after reviewing the key list.'),
     }, async ({ keys, database, connectionId, confirmExecution }) => {
         if (confirmExecution !== 'DELETE') {
-            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, action: 'delete', database: database || 0, connectionId: connectionId || null, keys }, null, 2) }] };
+            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, action: 'delete', database: database ?? 'configured', connectionId: connectionId || null, keys }, null, 2) }] };
         }
         try {
-            const result = await client.deleteRedisKeys(keys, database || 0, connectionId);
+            const result = await client.deleteRedisKeys(keys, database, connectionId);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             return { content: [{ type: 'text', text: JSON.stringify(result.Data || { ok: true }, null, 2) }] };
@@ -4032,15 +4032,15 @@ export function createMcpServer(client, context) {
         dataType: z.enum(['string', 'hash', 'list', 'set', 'sortedset']).describe('Target Redis data type.'),
         value: z.string().describe('String value, or JSON object/array for collection types.'),
         ttlSeconds: z.number().int().min(-1).optional().describe('-1 permanent, 0 delete immediately, positive seconds. Omit to preserve existing TTL.'),
-        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+        database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Omit to use the connection configured database. Child tenants cannot select another database.'),
         connectionId: z.string().optional().describe('Optional saved connection Id. Omit for current tenant Redis.'),
         confirmExecution: z.string().optional().describe('Required. Pass the exact key or EXECUTE.'),
     }, async ({ key, dataType, value, ttlSeconds, database, connectionId, confirmExecution }) => {
         if (confirmExecution !== key && confirmExecution !== 'EXECUTE') {
-            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, key, dataType, ttlSeconds, database: database || 0, connectionId: connectionId || null, valueLength: value.length }, null, 2) }] };
+            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, key, dataType, ttlSeconds, database: database ?? 'configured', connectionId: connectionId || null, valueLength: value.length }, null, 2) }] };
         }
         try {
-            const result = await client.replaceRedisValue(key, dataType, value, database || 0, ttlSeconds, connectionId);
+            const result = await client.replaceRedisValue(key, dataType, value, database, ttlSeconds, connectionId);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             return { content: [{ type: 'text', text: JSON.stringify(result.Data || { ok: true }, null, 2) }] };
@@ -4057,10 +4057,10 @@ export function createMcpServer(client, context) {
         confirmExecution: z.string().optional().describe('Required. Pass newKey or EXECUTE.'),
     }, async ({ key, newKey, database, connectionId, confirmExecution }) => {
         if (confirmExecution !== newKey && confirmExecution !== 'EXECUTE') {
-            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, action: 'rename', key, newKey, database: database || 0 }, null, 2) }] };
+            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, action: 'rename', key, newKey, database: database }, null, 2) }] };
         }
         try {
-            const result = await client.renameRedisKey(key, newKey, database || 0, connectionId);
+            const result = await client.renameRedisKey(key, newKey, database, connectionId);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             return { content: [{ type: 'text', text: JSON.stringify(result.Data || { ok: true }, null, 2) }] };
@@ -4077,10 +4077,10 @@ export function createMcpServer(client, context) {
         confirmExecution: z.string().optional().describe('Required. Pass key or EXECUTE.'),
     }, async ({ key, ttlSeconds, database, connectionId, confirmExecution }) => {
         if (confirmExecution !== key && confirmExecution !== 'EXECUTE') {
-            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, action: 'ttl', key, ttlSeconds, database: database || 0 }, null, 2) }] };
+            return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, action: 'ttl', key, ttlSeconds, database: database }, null, 2) }] };
         }
         try {
-            const result = await client.setRedisTtl(key, ttlSeconds, database || 0, connectionId);
+            const result = await client.setRedisTtl(key, ttlSeconds, database, connectionId);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             return { content: [{ type: 'text', text: JSON.stringify(result.Data || { ok: true }, null, 2) }] };
@@ -4792,7 +4792,7 @@ export function createMcpServer(client, context) {
         functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
         changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
         v8Limit: z.boolean().optional().describe('Positive switch. false/default means unrestricted Jint execution budgets; true applies this engine\'s configured timeout/statement/recursion/allocation limits. Omit to preserve the current value.'),
-        responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream', 'HTTP']).optional().describe('HTTP response mode. HTTP returns validated DataAppend.HttpResponse status/headers/body; Stream emits SSE/NDJSON. Omit to preserve the current value.'),
+        responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream', 'HTTP', 'SignalR']).optional().describe('Transport mode. SignalR enables duplex Invoke/EngineMessage over /api-engine-socket (requires matching backend); HTTP returns controlled status/headers/body; Stream emits SSE/NDJSON. Omit to preserve the current value.'),
         apiRoutes: z.union([z.string(), z.array(z.string())]).optional().describe('多路由 compatibility aliases. Use a semicolon-separated string or an array of absolute paths. Omit to preserve; pass an empty string/array to clear.'),
         v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
         confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
@@ -4832,7 +4832,7 @@ export function createMcpServer(client, context) {
         changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
         apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
         apiRoutes: z.union([z.string(), z.array(z.string())]).optional().describe('多路由 compatibility aliases for the same engine. Supply absolute paths separated by English semicolons or as an array.'),
-        responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream', 'HTTP']).optional().describe('HTTP response mode. Default JSON; HTTP returns validated DataAppend.HttpResponse status/headers/body; Stream emits SSE/NDJSON.'),
+        responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream', 'HTTP', 'SignalR']).optional().describe('Transport mode. Default JSON; SignalR enables duplex Invoke/EngineMessage over /api-engine-socket (requires matching backend); HTTP returns controlled status/headers/body; Stream emits SSE/NDJSON.'),
         v8Limit: z.boolean().optional().describe('Default false. false means no Jint per-execution budget; true applies the configured runtime limits. Process resident-memory guard always remains active.'),
         v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
     }, async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, apiRoutes, responseType, v8Limit, v8Unlimited }) => {

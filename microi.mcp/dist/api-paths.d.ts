@@ -108,9 +108,9 @@ export declare const API: {
     readonly QUERY_MONGODB_LOGS: "/api/V8Engine/QueryMongodbLogs";
     readonly WRITE_MONGODB_LOG: "/api/V8Engine/WriteMongodbLog";
     readonly RUN_DATA_SOURCE: "/apiengine/platform-data-source-run";
-    readonly FORM_GET_TABLE_DATA: "/api/FormEngine/GetTableData";
-    readonly FORM_ADD_FORM_DATA: "/api/FormEngine/AddFormData";
-    readonly FORM_UPT_FORM_DATA: "/api/FormEngine/UptFormData";
+    readonly FORM_GET_TABLE_DATA: "/api/V8Engine/McpFormData";
+    readonly FORM_ADD_FORM_DATA: "/api/V8Engine/McpFormData";
+    readonly FORM_UPT_FORM_DATA: "/api/V8Engine/McpFormData";
     readonly GET_PAGE_ENGINE_LIST: "/api/V8Engine/GetPageEngineList";
     readonly GET_PAGE_ENGINE_DETAIL: "/api/V8Engine/GetPageEngineDetail";
     readonly SAVE_PAGE_ENGINE: "/api/V8Engine/SavePageEngine";

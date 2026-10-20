@@ -6,20 +6,20 @@ import test from 'node:test';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('./app.microi.saas-engine.json', import.meta.url), 'utf8'));
 const source = pkg.SysApiEngines.find(e => e.ApiEngineKey === 'admin_get_empty_database_sanitization_sql').ApiV8Code;
+const coreClassifierSource = source.slice(source.indexOf('var corePlatformApplicationKeys ='), source.indexOf('\nfunction collectPackageTableNames'));
 const functionSource = source.slice(source.indexOf('function buildInstalledVersionBaselineSql('), source.indexOf('\nvar installedVersionBaseline;'));
 const hash = text => createHash('sha256').update(text).digest('hex');
 
 function fixture(override = {}) {
   const body = JSON.stringify({ PackageInfo: { Version: 'v8.2.1' } });
-  const store = { Id: 'saas', AppId: 'app.microi.saas-engine', AppKey: 'app.microi.saas-engine', AppVersion: 'v8.2.1', PackageHdfsPath: '/package', PackageSize: Buffer.byteLength(body), PackageSha256: hash(body), ApplicationType: 'Platform', ...override };
+  const store = { Id: 'saas', AppId: 'app.microi.store', AppKey: 'app.microi.store', AppVersion: 'v8.2.1', PackageHdfsPath: '/package', PackageSize: Buffer.byteLength(body), PackageSha256: hash(body), ApplicationType: 'Platform', ...override };
   let reads = 0;
   const context = vm.createContext({
     text: value => String(value ?? '').trim(),
-    isCorePlatformApp: row => row.ApplicationType === 'Platform',
     System: { Text: { Encoding: { UTF8: { GetByteCount: value => Buffer.byteLength(value) } } } },
     V8: { OsClient: 'iTdos', Method: { GetPrivateFileText() { reads++; return { Code: 1, Data: body }; } }, EncryptHelper: { Sha256Hex: hash } }
   });
-  vm.runInContext(functionSource, context);
+  vm.runInContext(coreClassifierSource + '\n' + functionSource, context);
   return { store, run: installed => context.buildInstalledVersionBaselineSql([store], installed), reads: () => reads };
 }
 
@@ -40,6 +40,15 @@ test('absent applications and business applications do not get invented install 
   const business = fixture({ ApplicationType: 'Web' });
   assert.equal(business.run([{ StoreId: 'saas' }]).Sql, '');
   assert.equal(business.reads(), 0);
+});
+
+test('optional platform packages are not inherited by a new empty template', () => {
+  for (const key of ['app.microi.saas-engine','app.microi.ai-engine','app.microi.sso',
+    'app.microi.message-notification','microi-wechat-content-security','app.microi.future-feature']) {
+    const optional = fixture({AppId:key,AppKey:key});
+    assert.equal(optional.run([{StoreId:'saas'}]).Sql, '', key);
+    assert.equal(optional.reads(), 0, 'excluded packages need no package download');
+  }
 });
 
 test('content corruption and catalog/package version disagreement fail closed', () => {

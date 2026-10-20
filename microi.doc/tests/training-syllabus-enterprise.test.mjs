@@ -29,13 +29,13 @@ test('体验链接准确覆盖指定七图，技术引擎配图全部使用已�
   const linked = trainingCaseAssets.filter(asset => asset.experienceUrl)
   assert.equal(linked.length, 7)
   assert.deepEqual(linked.map(asset => [asset.fileName, asset.experienceUrl]), [
-    ['microi-enterprise-iot-01.png', 'https://static.itdos.com/itdos/micro-app/warehouse-strategy-twin/index.html'],
-    ['microi-enterprise-iot-02.png', 'https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html'],
-    ['microi-enterprise-iot-03.png', 'https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html'],
+    ['microi-enterprise-iot-01.png', 'https://file.microi.net/itdos/micro-app/warehouse-strategy-twin/index.html'],
+    ['microi-enterprise-iot-02.png', 'https://file.microi.net/itdos/micro-app/microi-ningbo-city-mall/index.html'],
+    ['microi-enterprise-iot-03.png', 'https://file.microi.net/itdos/micro-app/microi-ningbo-city-mall/index.html'],
     ['microi-enterprise-games-01.png', 'https://microi.net/apps.html?category=game'],
-    ['microi-enterprise-games-02.png', 'https://static.itdos.com/itdos/micro-app/microi-unity-cs/index.html'],
-    ['microi-enterprise-games-03.png', 'https://static.itdos.com/itdos/micro-app/gomoku-3d-cocos-arena/index.html'],
-    ['microi-enterprise-games-04.png', 'https://static.itdos.com/itdos/micro-app/xiangqi-3d-cocos-arena/index.html'],
+    ['microi-enterprise-games-02.png', 'https://file.microi.net/itdos/micro-app/microi-unity-cs/index.html'],
+    ['microi-enterprise-games-03.png', 'https://file.microi.net/itdos/micro-app/gomoku-3d-cocos-arena/index.html'],
+    ['microi-enterprise-games-04.png', 'https://file.microi.net/itdos/micro-app/xiangqi-3d-cocos-arena/index.html'],
   ])
   const ids = [...component.matchAll(/id: '([^']+)', domain:/gu)].map(match => match[1])
   assert.equal(ids.length, 38)

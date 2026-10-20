@@ -2,30 +2,30 @@
 export const trainingDownloads = Object.freeze([
   {
     "legacyPath": "/downloads/microi-ai-development-framework-training-syllabus-dark.pdf",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/7a48f41656d9defdb22bcde2a4a90d601df7ad1c86c75ad13f9de7169e64bb02/202610/microi-ai-development-framework-training-syllabus-dark.pdf",
-    "bytes": 21939339,
-    "sha256": "7a48f41656d9defdb22bcde2a4a90d601df7ad1c86c75ad13f9de7169e64bb02",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/6b92bd370be3c549ad6cf62506b330360bcd05746021ca330de72dc9f20ca94a/202610/microi-ai-development-framework-training-syllabus-dark.pdf",
+    "bytes": 21938761,
+    "sha256": "6b92bd370be3c549ad6cf62506b330360bcd05746021ca330de72dc9f20ca94a",
     "mimeType": "application/pdf"
   },
   {
     "legacyPath": "/downloads/microi-ai-development-framework-training-syllabus-dark.pptx",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/91fca7e19146f0be7feedc24e92f8561923d30ae4abb6e77c33eb10acf1fbca3/202610/microi-ai-development-framework-training-syllabus-dark.pptx",
-    "bytes": 11840409,
-    "sha256": "91fca7e19146f0be7feedc24e92f8561923d30ae4abb6e77c33eb10acf1fbca3",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/99271bbea9006d78b0f0654ea88630789d7e536d0b13776e3c67445f4532c7f0/202610/microi-ai-development-framework-training-syllabus-dark.pptx",
+    "bytes": 9884014,
+    "sha256": "99271bbea9006d78b0f0654ea88630789d7e536d0b13776e3c67445f4532c7f0",
     "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
   },
   {
     "legacyPath": "/downloads/microi-ai-development-framework-training-syllabus-light.pdf",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/031d1a1dc4215a4733fe42e0206ba7979f46f00e84e705e2e488a7468d55bd1f/202610/microi-ai-development-framework-training-syllabus-light.pdf",
-    "bytes": 22805965,
-    "sha256": "031d1a1dc4215a4733fe42e0206ba7979f46f00e84e705e2e488a7468d55bd1f",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/512cd2eb8ac7e2e0e142b35f8ce34d2325ff80369b487021c41d6bf742c44cb7/202610/microi-ai-development-framework-training-syllabus-light.pdf",
+    "bytes": 22804823,
+    "sha256": "512cd2eb8ac7e2e0e142b35f8ce34d2325ff80369b487021c41d6bf742c44cb7",
     "mimeType": "application/pdf"
   },
   {
     "legacyPath": "/downloads/microi-ai-development-framework-training-syllabus-light.pptx",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/1d56cbe0a01c0ff61fd12a018e3f763634250a61cd9561ca672c8b6318786ff0/202610/microi-ai-development-framework-training-syllabus-light.pptx",
-    "bytes": 11900949,
-    "sha256": "1d56cbe0a01c0ff61fd12a018e3f763634250a61cd9561ca672c8b6318786ff0",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/f44e95319d5ee75702f57aa34ef0ad68c1332d04190160138ce10bd5a0abcf7a/202610/microi-ai-development-framework-training-syllabus-light.pptx",
+    "bytes": 9822287,
+    "sha256": "f44e95319d5ee75702f57aa34ef0ad68c1332d04190160138ce10bd5a0abcf7a",
     "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
   },
   {
@@ -37,30 +37,30 @@ export const trainingDownloads = Object.freeze([
   },
   {
     "legacyPath": "/downloads/microi-enterprise-application-training-syllabus-dark.pdf",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/325aebd849fc5d7401eedfabbf6f30e9a93eac71e8294dd0b74b9a5c805f4bcf/202610/microi-enterprise-application-training-syllabus-dark.pdf",
-    "bytes": 5827126,
-    "sha256": "325aebd849fc5d7401eedfabbf6f30e9a93eac71e8294dd0b74b9a5c805f4bcf",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/0d2c0da1d95179011c6368cf73fa6d3deb0db9e12854628e6156ac2df3be539a/202610/microi-enterprise-application-training-syllabus-dark.pdf",
+    "bytes": 5828720,
+    "sha256": "0d2c0da1d95179011c6368cf73fa6d3deb0db9e12854628e6156ac2df3be539a",
     "mimeType": "application/pdf"
   },
   {
     "legacyPath": "/downloads/microi-enterprise-application-training-syllabus-dark.pptx",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/b5032ea7310acced4958f2def73aa76f35c4fc879d72aeef6df688e1c4f41009/202610/microi-enterprise-application-training-syllabus-dark.pptx",
-    "bytes": 7592513,
-    "sha256": "b5032ea7310acced4958f2def73aa76f35c4fc879d72aeef6df688e1c4f41009",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/0b430c3197055a0974a93f0fa3578ac04042c30af34c748e0285e798270ae437/202610/microi-enterprise-application-training-syllabus-dark.pptx",
+    "bytes": 3700052,
+    "sha256": "0b430c3197055a0974a93f0fa3578ac04042c30af34c748e0285e798270ae437",
     "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
   },
   {
     "legacyPath": "/downloads/microi-enterprise-application-training-syllabus-light.pdf",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/63c8a4e098732add3b5b5f114c710ef7695ac708dfc98be1db6c4691d9ff2bf0/202610/microi-enterprise-application-training-syllabus-light.pdf",
-    "bytes": 6054428,
-    "sha256": "63c8a4e098732add3b5b5f114c710ef7695ac708dfc98be1db6c4691d9ff2bf0",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/04af7c75efbc2d4faf0a996f61d41327ba214558a815b365fa9296a063c8f949/202610/microi-enterprise-application-training-syllabus-light.pdf",
+    "bytes": 6055870,
+    "sha256": "04af7c75efbc2d4faf0a996f61d41327ba214558a815b365fa9296a063c8f949",
     "mimeType": "application/pdf"
   },
   {
     "legacyPath": "/downloads/microi-enterprise-application-training-syllabus-light.pptx",
-    "url": "https://file.microi.net/itdos/official-docs/downloads/287a12d688496c9de17e2430847d5ba99c3c2d6a4908edc6ac9a08f04e3e4ad2/202610/microi-enterprise-application-training-syllabus-light.pptx",
-    "bytes": 7593780,
-    "sha256": "287a12d688496c9de17e2430847d5ba99c3c2d6a4908edc6ac9a08f04e3e4ad2",
+    "url": "https://file.microi.net/itdos/official-docs/downloads/eb56237de9996250c3d03cd8416e621f494def2c9f1c286cab5e4c967a9aaed1/202610/microi-enterprise-application-training-syllabus-light.pptx",
+    "bytes": 3915912,
+    "sha256": "eb56237de9996250c3d03cd8416e621f494def2c9f1c286cab5e4c967a9aaed1",
     "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
   }
 ].map(asset => Object.freeze(asset)))

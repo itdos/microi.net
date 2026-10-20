@@ -17,7 +17,7 @@ public class MarketplaceMetadataBootstrapIntegrationTests
     {
         var connection = Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN")!;
         var connectionParts = new DbConnectionStringBuilder { ConnectionString = connection };
-        Assert.Equal("upgrade_fixture", connectionParts["Database"]);
+        MySqlFixtureGuard.VerifyUpgrade(connection);
         Assert.Equal("127.0.0.1", connectionParts["Server"]);
         Assert.InRange(Convert.ToInt32(connectionParts["Port"]), 1024, 65535);
         var databaseName = "microi_metadata_fixture_" + Guid.NewGuid().ToString("N");
@@ -110,6 +110,22 @@ public class MarketplaceMetadataBootstrapIntegrationTests
             await UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(client, menuOnly: true);
             Assert.Equal(menuFieldCount, Convert.ToInt32(database.FromSql("SELECT COUNT(*) FROM diy_field WHERE TableId='legacy-menu-table'").ToScalar()));
             Assert.Equal(menuClears, cache.Cleared.Count);
+
+            // A physical database and some recovered metadata must not pass the
+            // pre-login gate while sys_config/sys_user are still absent.
+            Assert.False(UpgradeAppStore.StartupLoginMetadataReady(client, out var missingReason));
+            Assert.Contains("sys_config", missingReason);
+            database.FromSql("CREATE TABLE sys_config (Id varchar(36) PRIMARY KEY,SysTitle varchar(100))").ExecuteNonQuery();
+            database.FromSql("CREATE TABLE sys_user (Id varchar(36) PRIMARY KEY,Account varchar(100))").ExecuteNonQuery();
+            database.FromSql("CREATE TABLE sys_apiengine (Id varchar(36) PRIMARY KEY,ApiEngineKey varchar(100))").ExecuteNonQuery();
+            await UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(client);
+            Assert.True(UpgradeAppStore.StartupLoginMetadataReady(client, out var readyReason), readyReason);
+            database.FromSql("UPDATE diy_field SET IsDeleted=1 WHERE TableId='legacy-menu-table' AND Name='Name'").ExecuteNonQuery();
+            Assert.False(UpgradeAppStore.StartupLoginMetadataReady(client, out missingReason));
+            Assert.Contains("sys_menu.Name", missingReason);
+            await UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(client);
+            Assert.True(UpgradeAppStore.StartupLoginMetadataReady(client, out readyReason), readyReason);
+            Assert.Equal("客户自定义名称", Convert.ToString(database.FromSql("SELECT Label FROM diy_field WHERE TableId=@p0 AND Name='Name'").AddInParameter("p0", tableId).ToScalar()));
         }
         finally
         {

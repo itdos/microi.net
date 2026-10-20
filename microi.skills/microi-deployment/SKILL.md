@@ -24,9 +24,17 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 
 常规发布按用户指定 MCP 的实际 MySQL、MongoDB 版本、Redis 和生效 MinIO 或 OSS/HDFS 选择测试矩阵；SQL Server 真实服务与兼容专项仅在用户明确指定解决 SQL Server 问题时执行，不作为每轮发布的默认前置条件，也无需反复申请免测。本文中的“Full/重新 Full”均指当前选定矩阵，已选必测项仍须全部通过。
 
+发布测试默认复用上述 MCP 服务。固定夹具库名、端口或归属冲突先修正测试入口的可配置隔离，采用本任务唯一名称并核验所有者；不能因此新建本地数据库、Redis、MongoDB 或存储容器，也不能删除他人的夹具或放宽测试断言。不可复用的例外及清理要求统一见 [本地测试程序与依赖生命周期](../workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md#本地测试程序与依赖生命周期强制)。
+
 选择、旧脚本冲突处理及结果记录统一读取 [发布测试矩阵](../microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md#按指定-mcp-选择发布测试矩阵) 和 `../workspace-conventions/SKILL.md`；实际目标未使用的提供商不能被虚构为已验证。
 
 ## 先确认部署类型
+
+默认安装与升级只恢复登录、权限、导航和应用商城所需的最小基础，表单、模块和系统设置
+只带核心依赖；其余平台应用由用户登录后在商城按需安装。`ApplicationType=Platform`
+的“全部安装／更新”是显式维护动作，不得用作默认开机或普通功能联调的准备步骤。
+记录启动就绪、首次登录、商城打开、单个可选包安装和全部包维护各自耗时；全量维护通过
+不能代替最小空库验收。缩小启动范围不卸载既有租户的应用，也不删现有配置。
 
 ### 吾码服务器运维面板 Microi.Panel
 
@@ -49,7 +57,7 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 
 共享源码持续变化时，可在独立目录保存完整候选源码和依赖，以该目录运行同一 Full 与发布脚本。专用测试服务使用独立端口，通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口（默认仍为 61501、61500）；进程管理器仍必须核验 PID、命令行和工作区归属，不得结束原工作区服务。变量仅供发布脚本使用，不进入生产 API 配置。
 
-私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，实际镜像和部署仍需独立回读。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
+私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，镜像发布以推送命令明确成功为准，默认不追加渠道回读；目标部署和运行验收仍独立执行。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
 
 Windows Git Bash 发布锁必须把当前 Shell 的 MSYS PID 经真实 `ps` 的 `WINPID` 映射成 Windows 原生 PID，再以原生 PID 和唯一令牌登记、释放；映射失败或持有者退出立即停止，不借用其它进程。中文旧热修复入口通过 PowerShell UTF-8 命令行与精确工作区路径核验，不能只看标签或因大小写规范化误拒绝已核验入口。API、PC、官网和 Agent 仍各自互斥，实际 Bash 与原生宿主回归必须通过后重新 Full。
 
@@ -63,16 +71,16 @@ DLL 加密脚本只在 Git Bash、MSYS 或 Cygwin 中转换 Windows 路径，优
 
 加密脚本被 `source` 引入时只提供函数，不执行发行入口。SQLite 回归使用真实解释器及隔离标准库，Windows 选择 `python`，其它宿主使用 `python3`；不能用假解释器或跳过 SQL 断言。字节契约下的包投影、内联源码以及官方资源目录的全部 JavaScript 接口、表事件和 Hook 模板均按 Git 的 LF 规则检出，不能忽略原始字节差异来通过测试。缺少发行运行产物时，可按同版本包正文的大小与 SHA-256 恢复；明确标记为制品恢复，不能报告为新的源码构建。
 
-只要检测到闭源项目源码，就必须具备完整的五项目加密链；源码不完整、加密脚本缺失都要硬失败，不能降级为 `HAS_ENCRYPT=false` 的开源模式。一键脚本由 `release-encryption.mjs` 保存五个实际 DLL 的加密前后 SHA-256，并要求每个 DLL 字节改变且匹配原加密器指纹。上传 NuGet 前检查真实 ZIP 中所有闭源 DLL；上传后端 Docker 前从不启动、不联网的临时容器读取实际镜像内五个 DLL，与加密回执逐字节哈希核对。缺回执、明文重编译覆盖、包或镜像中的旧 DLL 均阻止上传；最终渠道仍需独立回读，不以本地检查代替已发布证据。
+只要检测到闭源项目源码，就必须具备完整的五项目加密链；源码不完整、加密脚本缺失都要硬失败，不能降级为 `HAS_ENCRYPT=false` 的开源模式。一键脚本由 `release-encryption.mjs` 保存五个实际 DLL 的加密前后 SHA-256，并要求每个 DLL 字节改变且匹配原加密器指纹。上传 NuGet 前检查真实 ZIP 中所有闭源 DLL；上传后端 Docker 前从不启动、不联网的临时容器读取实际镜像内五个 DLL，与加密回执逐字节哈希核对。缺回执、明文重编译覆盖、包或镜像中的旧 DLL 均阻止上传；NuGet、Docker 等渠道发布命令明确成功即可报告发布完成，默认不再回读渠道或等待传播；本地检查不能替代实际发布命令，目标部署和业务验收仍独立执行。
 
 在线 AI 的 MCP 运行目录必须由已锁定依赖干净安装、编译和裁剪后完整复制。生产命令的符号链接应解析为真实文件并保留执行权限，不能依赖即将清理的临时目录；损坏、越界或循环链接在替换旧运行目录前失败，重新打包清除旧依赖残留。保留制品门禁对符号链接的拒绝规则，专项验证使用同一复制逻辑并核对清理临时目录后命令仍可运行；修复打包逻辑后重新 Full。
 
 
-私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，实际镜像和部署仍需独立回读。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
+私有原生规则的静态后端组合必须设置构建专用 `MICROI_RELEASE_COMPOSITION_FILE`，不能把根仓忽略的应用源码当作已经进入 Full 候选。工作区内契约 `schema:1` 固定 `properties/files/directories/artifacts`；四个文件属性 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 必须与当前 MSBuild 环境属性一致并进入源清单。契约、规则目录、静态审批及项目文件的新增/修改/删除均绑定候选，链接和越界路径拒绝。API 最终 `publish/<规则DLL>.dll` 必须与 `artifacts` 中后台审批的实际 SHA256 一致；不重新签名另一份 DLL 来通过门禁。普通无组合发布与 PC 制品保持兼容，镜像发布以推送命令明确成功为准，默认不追加渠道回读；目标部署和运行验收仍独立执行。详细契约见官网 `getting-started/local-run.md`；这是发行进程参数，不是生产 AppSettings、V8 或 MCP 代码上传入口。
 
 组合环境只属于发行工具所在工作区；临时测试仓库和其它源码根显式传递自己的环境。不得把主发行环境传入隔离夹具，也不得吞掉显式错误组合；实际 CLI 继续严格验证全部四项属性。
 
-原生依赖审批在目标 Linux CLR 中验证完整程序集引用链及实际字节哈希。驱动扩展也属于交付依赖：Oracle Core 23.26.300 同时交付同版本 Azure、Kerberos、OCI、ConfigFile、AWS、GCP 六个官方扩展及传递依赖，以 `ProviderDependencyDeliveryTests` 验证真实装载，不连接云服务。缺文件、身份冲突和哈希变化继续失败关闭；先复现并修复包装，再重新 Full 和镜像回读，禁止跳过未执行的依赖或开放 V8/MCP 任意装载。
+原生依赖审批在目标 Linux CLR 中验证完整程序集引用链及实际字节哈希。驱动扩展也属于交付依赖：Oracle Core 23.26.300 同时交付同版本 Azure、Kerberos、OCI、ConfigFile、AWS、GCP 六个官方扩展及传递依赖，以 `ProviderDependencyDeliveryTests` 验证真实装载，不连接云服务。缺文件、身份冲突和哈希变化继续失败关闭；先复现并修复包装，再重新 Full 和镜像发布，禁止跳过未执行的依赖或开放 V8/MCP 任意装载。
 
 包清单不能代替真实程序集引用：Oracle AWS 扩展还引用清单未声明的 AWSSDK.SQS，Dos.ORM 显式交付官方 4.0.100.15 包，并由 NuGet 统一 AWS Core。回归递归检查扩展引用链，仍保留 512 个程序集预算；诊断集中列出缺失项，正式验证继续拒绝缺失和身份冲突。
 

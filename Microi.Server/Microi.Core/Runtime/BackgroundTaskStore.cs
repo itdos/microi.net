@@ -891,16 +891,17 @@ WHERE Id=@p14 AND OsClient=@p15 AND Status='Running' AND LeaseOwner=@p16 AND Fen
             JObject nextParam,
             JToken checkpoint,
             int delaySeconds,
-            string message)
+            string message,
+            bool leasesReleased = false)
         {
             item.ParamJson = (nextParam ?? new JObject()).ToString(Newtonsoft.Json.Formatting.None);
             item.CheckpointJson = checkpoint == null
                 ? ""
                 : checkpoint.ToString(Newtonsoft.Json.Formatting.None);
             item.Msg = message ?? item.Msg ?? "等待下一批";
-            // Give the current execution's finally block time to release its
-            // cross-node concurrency lease before another node claims the next chunk.
-            var nextRun = DateTime.Now.AddSeconds(Math.Max(1, Math.Min(3600, delaySeconds)));
+            // 只有工作器确认旧租约释放后，默认零延迟分片才可立即重新领取。
+            // 未确认、旧调用方及显式延迟保留原语义；数据库领取仍检查版本与所有权。
+            var nextRun = DateTime.Now.AddSeconds(ContinuationDelaySeconds(delaySeconds, leasesReleased));
             item.Status = item.CancelRequested ? "Canceled" : "Pending";
             item.StatusText = item.CancelRequested ? "已停止" : "等待下一批";
             item.NextRunTime = item.CancelRequested ? (DateTime?)null : nextRun;
@@ -927,6 +928,12 @@ EndTime=CASE WHEN CancelRequested=1 THEN @p4 ELSE EndTime END,
                     .AddInParameter("p2", item.CheckpointJson)
                     .AddInParameter("p3", DbTime(nextRun))
                     .AddInParameter("p4", DbTime(DateTime.Now)));
+        }
+
+        internal static int ContinuationDelaySeconds(int delaySeconds, bool leasesReleased)
+        {
+            if (leasesReleased && delaySeconds <= 0) return 0;
+            return Math.Max(1, Math.Min(3600, delaySeconds));
         }
 
         public static bool ReleaseToPending(

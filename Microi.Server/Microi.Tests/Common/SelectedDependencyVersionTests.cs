@@ -18,7 +18,7 @@ public sealed class SelectedDependencyVersionTests
         var dependencies = matrix.RootElement.GetProperty("dependencies");
         var connection = new MySqlConnectionStringBuilder(Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN"));
         Assert.Contains(connection.Server, new[] { "127.0.0.1", "localhost" });
-        Assert.Equal("upgrade_fixture", connection.Database);
+        MySqlFixtureGuard.VerifyUpgrade(connection.ConnectionString);
         using var mysql = new MySqlConnection(connection.ConnectionString);
         await mysql.OpenAsync(TestContext.Current.CancellationToken);
         using var query = new MySqlCommand("SELECT VERSION()", mysql);

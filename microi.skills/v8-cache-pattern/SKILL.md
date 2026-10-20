@@ -64,6 +64,10 @@ V8.Cache.HashDelete(hashKey, 'Reserved');
 
 当前统一入口为 Managed 接口引擎 `platform-cache-manager`，通过 `V8.Method.ManageCache` 调用可信后端；旧 `/api/cache/*` 路由由兼容入口处理。节点全局 `Statistics` 只开放主租户，子租户使用受限 `RedisStatistics`。这些都是受权管理能力，不是匿名业务 API。
 
+兼容地址 `/api/cache/statistics`、`/api/cache/invalidate`、`/api/cache/invalidate-pattern`
+及 `/api/cache/redis/` 下的历史动作仍执行同一权限和租户边界。实际请求路径固定旧动作，
+不能通过正文 `Action` 将只读地址改成写操作；新集成优先使用统一接口引擎或 MCP。
+
 MCP 默认操作当前 MCP `OsClient` 的租户 Redis；额外连接只传管理页保存后的 `connectionId`，禁止在 MCP 参数、日志或回答中传递 Redis 密码。
 
 | MCP 工具 | 用途 | 确认规则 |

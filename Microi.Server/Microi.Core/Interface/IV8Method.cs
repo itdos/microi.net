@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -60,6 +60,9 @@ namespace Microi.net
         /// 不接受任何 V8 参数，租户脚本不能自行签发或重放。
         /// </summary>
         DosResult RequireManagedProtocolContext();
+
+        /// <summary>验证当前租户及接口引擎确由 SignalR 双向传输宿主调用，不能通过 V8.Param 伪造。</summary>
+        DosResult RequireApiEngineSocketContext();
 
         /// <summary>
         /// 仅供畅捷通 V2 官方 Managed 接口引擎调用的租户绑定解密校验原子。

@@ -255,6 +255,41 @@ namespace Microi.net
             return result;
         }
 
+        // Login uses FormEngine before the hosted marketplace recovery runs. A
+        // healthy HTTP listener plus installed ApiEngines is insufficient when
+        // a minimal database has physical tables but no low-code metadata yet.
+        internal static bool StartupLoginMetadataReady(OsClientSecret client, out string reason)
+        {
+            reason = string.Empty;
+            if (client?.Db == null) { reason = "租户数据库连接不可用。"; return false; }
+            try
+            {
+                var database = client.Db;
+                var package = JObject.Parse(LoadBundledResources()[BootstrapPackageResourceName]);
+                foreach (var name in new[] { "diy_table", "diy_field", "sys_config", "sys_user", "sys_menu", "sys_apiengine" })
+                {
+                    var source = package["DiyTables"].Children<JObject>().Single(row =>
+                        string.Equals(row["Name"]?.ToString(), name, StringComparison.OrdinalIgnoreCase));
+                    var rows = database.FromSql($"SELECT {QuoteIdentifier(database, "Id")} FROM {QuoteIdentifier(database, "diy_table")} WHERE LOWER({QuoteIdentifier(database, "Name")})=LOWER(@p0) AND ({QuoteIdentifier(database, "IsDeleted")}=0 OR {QuoteIdentifier(database, "IsDeleted")} IS NULL)")
+                        .AddInParameter("p0", name).ToList<dynamic>()
+                        .Select(row => JObject.FromObject((object)row)["Id"]?.ToString()).ToArray();
+                    var tableId = rows.FirstOrDefault(id => string.Equals(id, source["Id"]?.ToString(), StringComparison.OrdinalIgnoreCase)) ?? rows.FirstOrDefault();
+                    if (string.IsNullOrWhiteSpace(tableId)) { reason = "登录核心表元数据缺失：" + name; return false; }
+                    var names = new HashSet<string>(database.FromSql($"SELECT {QuoteIdentifier(database, "Name")} FROM {QuoteIdentifier(database, "diy_field")} WHERE {QuoteIdentifier(database, "TableId")}=@p0 AND ({QuoteIdentifier(database, "IsDeleted")}=0 OR {QuoteIdentifier(database, "IsDeleted")} IS NULL)")
+                        .AddInParameter("p0", tableId).ToList<dynamic>()
+                        .Select(row => JObject.FromObject((object)row)["Name"]?.ToString() ?? ""), StringComparer.OrdinalIgnoreCase);
+                    var physical = ReadStartupDependencyPhysicalFields(database, client.OsClient, name);
+                    var missing = package["DiyFields"].Children<JObject>()
+                        .Where(field => string.Equals(field["TableId"]?.ToString(), source["Id"]?.ToString(), StringComparison.OrdinalIgnoreCase))
+                        .Select(field => field["Name"]?.ToString())
+                        .FirstOrDefault(field => physical.Contains(field) && !names.Contains(field));
+                    if (missing != null) { reason = "登录核心字段元数据缺失：" + name + "." + missing; return false; }
+                }
+                return true;
+            }
+            catch (Exception ex) { reason = ex.Message; return false; }
+        }
+
         internal static bool StartupDependenciesReady(OsClientSecret client, out string reason)
         {
             reason = string.Empty;

@@ -16,7 +16,7 @@ public class MySqlIdentifierForeignKeyTests
     {
         var connection = Environment.GetEnvironmentVariable("MICROI_UPGRADE_TEST_CONN")!;
         var options = new DbConnectionStringBuilder { ConnectionString = connection };
-        Assert.Equal("upgrade_fixture", options["Database"]);
+        MySqlFixtureGuard.VerifyUpgrade(connection);
         Assert.Equal("127.0.0.1", options["Server"]);
         Assert.InRange(Convert.ToInt32(options["Port"]), 1, 65535);
         var databaseName = "microi_fk_fixture_" + Guid.NewGuid().ToString("N");

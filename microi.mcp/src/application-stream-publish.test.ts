@@ -747,7 +747,7 @@ test('protocol v3 always resumes through durable multipart and sends only the mi
   }
 });
 
-test('publishMicroService falls back to native HTTP with the exact JSON body', async () => {
+test('publishMicroService does not replay an uncertain non-idempotent write through native HTTP', async () => {
   const originalFetch = globalThis.fetch;
   let capturedPath = '';
   let capturedBody = '';
@@ -779,19 +779,14 @@ test('publishMicroService falls back to native HTTP with the exact JSON body', a
       osClient: 'iTdos',
       token: 'unit-test-token',
     });
-    const result = await client.publishMicroService({
+    await assert.rejects(client.publishMicroService({
       AppId: 'existing-app',
       AppVersion: 'v1.0.1',
       FileList: [{ RelativePath: 'index.html', ContentBase64: 'PGh0bWw+' }],
-    });
-    assert.equal(result.Code, 1);
-    assert.match(capturedPath, /PublishMicroService/u);
-    assert.deepEqual(JSON.parse(capturedBody), {
-      OsClient: 'iTdos',
-      AppId: 'existing-app',
-      AppVersion: 'v1.0.1',
-      FileList: [{ RelativePath: 'index.html', ContentBase64: 'PGh0bWw+' }],
-    });
+    }), /已禁用非幂等传输重放/u);
+    assert.equal(capturedPath, '');
+    assert.equal(capturedBody, '');
+    client.destroy();
   } finally {
     globalThis.fetch = originalFetch;
     await new Promise<void>(resolve => server.close(() => resolve()));

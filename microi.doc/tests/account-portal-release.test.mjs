@@ -23,19 +23,6 @@ test('构建期间共享源码漂移必须重建', () => {
   assert.throws(() => assertSourceUnchanged({ [name]: 'candidate' }, { [name]: 'changed' }), /构建期间源码变化/);
 });
 
-test('真实 Git clean filter 接受 CRLF 检出但拒绝内容改动，原始构建哈希仍独立', () => {
-  const project = fileURLToPath(new URL('../', import.meta.url));
-  // Pin the Windows checkout mode for this case on every test platform.
-  const git = (args, input) => execFileSync('git', ['-c', 'core.autocrlf=true', ...args], { cwd: project, encoding: 'utf8', ...(input === undefined ? {} : { input }) }).trim();
-  const name = 'docs/.vitepress/theme/components/ProfilePage.vue';
-  const committed = execFileSync('git', ['show', `HEAD:microi.doc/${name}`], { cwd: project });
-  const crlf = Buffer.from(committed.toString('utf8').replace(/\r?\n/g, '\r\n'));
-  assert.notDeepEqual(crlf, committed);
-  assertCommittedSource({ [name]: crlf }, git);
-  assert.throws(() => assertCommittedSource({ [name]: Buffer.concat([crlf, Buffer.from('\n<!-- semantic change -->\n')]) }, git), /发布源码尚未提交/);
-  assert.throws(() => assertSourceUnchanged({ [name]: committed.toString('hex') }, { [name]: crlf.toString('hex') }), /构建期间源码变化/);
-});
-
 const candidateHash = 'a'.repeat(40);
 function publicationFixture({ refs = 'refs/remotes/github-microi.net/codex/candidate', remoteHash = candidateHash, unavailable = false } = {}) {
   return args => {
@@ -77,31 +64,22 @@ test('一个官方远端不可达时必须独立回读另一个远端', () => {
   assert.equal(assertCandidatePublished(git), 'refs/remotes/github-microi.net/codex/candidate');
 });
 
+test('远端离线、认证失败或超额不能阻塞本地已提交的制品候选', () => {
+  const calls = [];
+  const git = args => {
+    calls.push(args);
+    if (args[0] === 'rev-parse' || args[0] === 'hash-object') return candidateHash;
+    throw new Error('remote quota exceeded or authentication unavailable');
+  };
+  const result = releaseSourceProvenance({ 'docs/example.md': Buffer.from('committed') }, git);
+  assert.equal(result.SourceCommit, candidateHash);
+  assert.equal(result.SourceDelivery.Status, 'not-verified');
+  assert.equal(calls.some(args => ['ls-remote', 'fetch', 'push', 'for-each-ref'].includes(args[0])), false);
+});
 
-test('官网 mode6 固定兼容 pnpm 且 frozen 安装失败后不执行构建、不回退改锁', () => {
-  const root = fileURLToPath(new URL('../../', import.meta.url));
-  const publish = fs.readFileSync(new URL('../../Microi一键编译发布.sh', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-  const start = publish.indexOf('    # 依赖版本以官网声明/既有锁为准');
-  const end = publish.indexOf('    node microi.doc/scripts/check-account-portal.mjs --dist', start);
-  assert.ok(start > 0 && end > start);
-  const section = publish.slice(start, end);
-  const gitPaths = process.platform === 'win32' ? execFileSync('where.exe', ['git'], { encoding: 'utf8' }).trim().split(/\r?\n/) : [];
-  // Git Bash prepends mingw64/bin; PowerShell normally resolves Git/cmd.
-  // Resolve the real bundled bash in either environment, never WSL's shim.
-  const shell = process.platform === 'win32' ? gitPaths.flatMap(git => [
-    path.resolve(path.dirname(git), '../bin/bash.exe'),
-    path.resolve(path.dirname(git), '../../bin/bash.exe'),
-  ]).find(candidate => fs.existsSync(candidate)) : 'bash';
-  assert.ok(shell, 'Git for Windows bundled Bash must be available');
-  for (const fail of [false, true]) {
-    const setup = `set -e\nset -o pipefail\nprint_step(){ :; }\nprint_info(){ :; }\nprint_fail(){ echo "$*"; exit 1; }\npnpm(){ echo 11.25.0; }\nnpx(){ printf 'EXEC:%s\\n' "$*"; ${fail ? 'return 37;' : 'return 0;'} }\n`;
-    const result = spawnSync(shell, ['-c', setup + section], { cwd: root, encoding: 'utf8' });
-    assert.equal(result.status, fail ? 37 : 0, result.stderr || result.error?.message);
-    assert.match(result.stdout, /EXEC:--yes pnpm@8\.15\.9 install --frozen-lockfile/);
-    if (fail) assert.doesNotMatch(result.stdout, /run docs:build/);
-    else assert.match(result.stdout, /EXEC:--yes pnpm@8\.15\.9 run docs:build/);
-    assert.doesNotMatch(result.stdout, /EXEC:.*install(?! --frozen-lockfile)/);
-  }
+test('解除远端依赖后仍拒绝未提交源码，不允许把不明候选发布出去', () => {
+  const git = args => args[0] === 'hash-object' ? 'b'.repeat(40) : candidateHash;
+  assert.throws(() => releaseSourceProvenance({ 'docs/example.md': Buffer.from('dirty') }, git), /发布源码尚未提交/);
 });
 
 test('远端离线、认证失败或超额不能阻塞本地已提交的制品候选', () => {

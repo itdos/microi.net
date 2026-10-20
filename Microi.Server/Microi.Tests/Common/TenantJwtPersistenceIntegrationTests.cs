@@ -29,9 +29,10 @@ public sealed class TenantJwtPersistenceIntegrationTests
         var type = mysql ? DatabaseType.MySql : DatabaseType.SqlServer;
         var connection = Environment.GetEnvironmentVariable(mysql ? "MICROI_UPGRADE_MYSQL_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;
         Assert.False(string.IsNullOrWhiteSpace(connection), "所选提供商缺少隔离连接：" + providerName);
+        if (mysql) MySqlFixtureGuard.VerifyUpgrade(connection);
         string WithDatabase(string name)
         {
-            if (mysql) { var b = new MySqlConnectionStringBuilder(connection); Assert.Equal("127.0.0.1", b.Server); Assert.Equal("upgrade_fixture", b.Database); b.Database = name; return b.ConnectionString; }
+            if (mysql) { var b = new MySqlConnectionStringBuilder(connection); Assert.Equal("127.0.0.1", b.Server); b.Database = name; return b.ConnectionString; }
             var s = new SqlConnectionStringBuilder(connection); Assert.StartsWith("127.0.0.1,", s.DataSource); Assert.Equal("upgrade_fixture", s.InitialCatalog); s.InitialCatalog = name; return s.ConnectionString;
         }
         var master = MicroiORMExtensions.CreateDbSession(WithDatabase(mysql ? "mysql" : "master"), type);

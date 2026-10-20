@@ -110,7 +110,11 @@ namespace Microi.net
             for (var attempt = 1; attempt <= maxLeaseAttempts; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (UpgradeAppStore.StartupDependenciesReady(osClientSecret, out var readyReason))
+                var enginesReady = UpgradeAppStore.StartupDependenciesReady(osClientSecret, out var readyReason);
+                var metadataReady = UpgradeAppStore.StartupLoginMetadataReady(osClientSecret, out var metadataReason);
+                var marketplaceReason = UpgradeAppStore.IsOfficialSourceTenant(osClientSecret.OsClient)
+                    ? null : UpgradeAppStore.GetInstalledMarketplaceRuntimeRepairReason(osClientSecret);
+                if (enginesReady && metadataReady && marketplaceReason == null)
                 {
                     return new DosResult(1, new
                     {
@@ -122,7 +126,7 @@ namespace Microi.net
                 if (attempt == 1)
                 {
                     UpgradeProgress.WriteLine(
-                        $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】待修复：{readyReason}");
+                        $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】待修复：{readyReason} {metadataReason} {marketplaceReason}");
                 }
 
                 var upgradeLease = UpgradeDistributedLease.TryAcquire(
@@ -134,6 +138,14 @@ namespace Microi.net
                     using (UpgradeExecutionLeaseContext.Enter(upgradeLease))
                     {
                         upgradeLease.ThrowIfLost();
+                        if (!metadataReady && !UpgradeAppStore.IsOfficialSourceTenant(osClientSecret.OsClient))
+                        {
+                            await UpgradeAppStore.EnsureMarketplaceMetadataBootstrapUnderLeaseAsync(osClientSecret)
+                                .ConfigureAwait(false);
+                            upgradeLease.ThrowIfLost();
+                            if (!UpgradeAppStore.StartupLoginMetadataReady(osClientSecret, out metadataReason))
+                                return new DosResult(0, null, "登录核心元数据自举后回读失败：" + metadataReason);
+                        }
                         var repair = await UpgradeAppStore
                             .EnsureStartupDependenciesUnderLeaseAsync(osClientSecret)
                             .ConfigureAwait(false);
@@ -148,6 +160,23 @@ namespace Microi.net
                         {
                             return new DosResult(0, repair.Data,
                                 "平台运行时接口自愈后强回读失败：" + finalReason);
+                        }
+                        // A cold tenant must not accept a successful login while
+                        // its only usable landing page is still being installed.
+                        // Reuse the same minimal recovery and lease, never the
+                        // optional all-platform maintenance operation.
+                        if (marketplaceReason != null)
+                        {
+                            var versionRow = osClientSecret.Db.FromSql("SELECT ServerVersion FROM sys_config WHERE IsDeleted=0")
+                                .First<dynamic>();
+                            var currentVersion = versionRow == null ? null
+                                : JObject.FromObject((object)versionRow)["ServerVersion"]?.ToString();
+                            var restored = await UpgradeCore(currentVersion, osClientSecret, forceMarketplaceRecovery: true)
+                                .ConfigureAwait(false);
+                            upgradeLease.ThrowIfLost();
+                            if (restored.Code != 1) return new DosResult(0, null, restored.Msg);
+                            var remaining = UpgradeAppStore.GetInstalledMarketplaceRuntimeRepairReason(osClientSecret);
+                            if (remaining != null) return new DosResult(0, null, "首次登录前商城入口仍未就绪：" + remaining);
                         }
                         return repair;
                     }
@@ -174,12 +203,16 @@ namespace Microi.net
         ///
         /// </summary>
         /// <returns></returns>
-        public async Task<DosResultList<MicroiUpgradeResult>> Upgrade(string CurrentVersion, OsClientSecret osClientSecret)
+        public Task<DosResultList<MicroiUpgradeResult>> Upgrade(string CurrentVersion, OsClientSecret osClientSecret)
+            => UpgradeCore(CurrentVersion, osClientSecret, forceMarketplaceRecovery: false);
+
+        private async Task<DosResultList<MicroiUpgradeResult>> UpgradeCore(string CurrentVersion, OsClientSecret osClientSecret,
+            bool forceMarketplaceRecovery)
         {
             var results = new List<MicroiUpgradeResult>();
             if (!string.IsNullOrWhiteSpace(CurrentVersion) && (!System.Version.TryParse(CurrentVersion, out var parsed) || parsed.Revision < 0))
                 return new DosResultList<MicroiUpgradeResult>(0, results, "sys_config.ServerVersion格式错误，应为四段数字版本号。");
-            var recoverAppStore = StartVersionStep(CurrentVersion, UpgradeAppStore.Version);
+            var recoverAppStore = forceMarketplaceRecovery || StartVersionStep(CurrentVersion, UpgradeAppStore.Version);
             var migrateMqttSwitch = StartVersionStep(CurrentVersion, MqttEnablePolicy.NullMeansEnabledVersion);
             if (!recoverAppStore && !migrateMqttSwitch) return new DosResultList<MicroiUpgradeResult>(1, results);
             var runtimeInvariantStage = "菜单AppDisplay保护快照";

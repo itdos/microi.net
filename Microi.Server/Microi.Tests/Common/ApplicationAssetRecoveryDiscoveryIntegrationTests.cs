@@ -22,7 +22,7 @@ public class ApplicationAssetRecoveryDiscoveryIntegrationTests
         Assert.Equal("127.0.0.1", parts["Server"]);
         var databaseName = Convert.ToString(parts["Database"]);
         Assert.InRange(Convert.ToInt32(parts["Port"]), 1, 65535);
-        Assert.True(databaseName == "upgrade_fixture" || databaseName == "xqc_verify", "Refusing a non-isolated database");
+        Microi.Tests.Common.MySqlFixtureGuard.VerifyUpgrade(connection, allowLegacyXqc: true);
         databaseName = "microi_asset_fixture_" + Guid.NewGuid().ToString("N");
         parts["Database"] = "mysql";
         var master = new DbSession(DatabaseType.MySql, parts.ConnectionString);

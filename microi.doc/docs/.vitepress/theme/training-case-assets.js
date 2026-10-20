@@ -60,7 +60,7 @@ export const trainingCaseAssets = [
     "mimeType": "image/png",
     "verifiedAt": "2026-10-15T18:35:44.338Z",
     "experienceLabel": "在线体验",
-    "experienceUrl": "https://static.itdos.com/itdos/micro-app/warehouse-strategy-twin/index.html"
+    "experienceUrl": "https://file.microi.net/itdos/micro-app/warehouse-strategy-twin/index.html"
   },
   {
     "group": "iot",
@@ -72,7 +72,7 @@ export const trainingCaseAssets = [
     "mimeType": "image/png",
     "verifiedAt": "2026-10-15T18:35:46.548Z",
     "experienceLabel": "在线体验",
-    "experienceUrl": "https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html"
+    "experienceUrl": "https://file.microi.net/itdos/micro-app/microi-ningbo-city-mall/index.html"
   },
   {
     "group": "iot",
@@ -84,7 +84,7 @@ export const trainingCaseAssets = [
     "mimeType": "image/png",
     "verifiedAt": "2026-10-15T18:35:49.574Z",
     "experienceLabel": "在线体验",
-    "experienceUrl": "https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html"
+    "experienceUrl": "https://file.microi.net/itdos/micro-app/microi-ningbo-city-mall/index.html"
   },
   {
     "group": "iot",
@@ -198,7 +198,7 @@ export const trainingCaseAssets = [
     "mimeType": "image/png",
     "verifiedAt": "2026-10-15T18:36:10.818Z",
     "experienceLabel": "在线体验",
-    "experienceUrl": "https://static.itdos.com/itdos/micro-app/microi-unity-cs/index.html"
+    "experienceUrl": "https://file.microi.net/itdos/micro-app/microi-unity-cs/index.html"
   },
   {
     "group": "games",
@@ -210,7 +210,7 @@ export const trainingCaseAssets = [
     "mimeType": "image/png",
     "verifiedAt": "2026-10-15T18:36:14.114Z",
     "experienceLabel": "在线体验",
-    "experienceUrl": "https://static.itdos.com/itdos/micro-app/gomoku-3d-cocos-arena/index.html"
+    "experienceUrl": "https://file.microi.net/itdos/micro-app/gomoku-3d-cocos-arena/index.html"
   },
   {
     "group": "games",
@@ -222,7 +222,7 @@ export const trainingCaseAssets = [
     "mimeType": "image/png",
     "verifiedAt": "2026-10-15T18:36:21.293Z",
     "experienceLabel": "在线体验",
-    "experienceUrl": "https://static.itdos.com/itdos/micro-app/xiangqi-3d-cocos-arena/index.html"
+    "experienceUrl": "https://file.microi.net/itdos/micro-app/xiangqi-3d-cocos-arena/index.html"
   },
   {
     "group": "more",

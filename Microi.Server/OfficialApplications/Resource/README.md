@@ -1,8 +1,8 @@
 # 基础应用升级资源
 
-`Microi.Upgrade` 随程序集内置一套经过校验的基础应用数据包，保证老数据库和不通外网的客户服务器至少可以自动安装表单引擎、模块引擎、SaaS 引擎、SSO 身份联邦、应用商城、系统账号、系统设置、消息通知和 AI助手，并同步交付它们依赖的官方 Managed 接口引擎与租户 CreateIfMissing Hook。
+`Microi.Upgrade` 默认启动只消费 `build-bootstrap-package.mjs` 生成的 `app.microi.bootstrap` 最小恢复投影，包含登录、表单与模块基础元数据、系统设置和应用商城入口所需资源。先保证能登录和在商城手动安装应用；完整 SaaS 管理、SSO、消息通知、AI 等应用不属于默认启动安装范围。完整官方包保留在独立发行资源目录，供用户显式安装、维护与离线交付；它们不再作为完整包嵌入 `Microi.Upgrade`。
 
-升级程序不需要任何环境变量：并行尝试从吾码官方数据库获取并完整校验全部资源；只有整组资源都有效时才使用在线最新版，否则整组回退到程序集内置版本，绝不混用两套资源。客户服务器无法访问外网时会自动使用当前后端程序集随版本发布的基线包。
+最小恢复投影由正式包的显式资源清单及必要调用依赖生成，设置体积、字段、接口数量和依赖闭合检查。首次恢复在开放登录前完成商城必需菜单与运行入口；已就绪租户重启不重复导入。完整包在线读取、校验和内置回退只用于相应的显式应用安装／维护流程，不能把完整包闭包再次扩成普通启动门禁。
 
 ## V8-first 官方包合同
 
@@ -22,7 +22,7 @@
 
 两类源码顶部都必须保留醒目的官方所有权提示。可信官方应用安装、更新或重新安装会恢复 `Managed` 核心；`CreateIfMissing` 只在首次缺失时创建，默认可执行正文必须精确为 `return { Code : 1 };`，租户后续修改、禁用或软删除均不得被官方升级覆盖。上述 Hook 固定 `StopHttp=1`、禁止匿名，并与核心共享 `V8.DbTrans`；Hook 返回失败会阻断对应业务阶段。
 
-Upgrade13 重放这九个程序集内置官方包时，先校验固定资源名和包契约，再由宿主建立绑定 `import-microi-store-package + OsClient` 的一次性可信上下文。导入器只有同时收到内置包请求并成功消费该上下文，才可恢复 `Platform/Managed` 官方源码；客户端或普通 V8 仅伪造同名参数会失败关闭，`Tenant/CreateIfMissing` 在任何情况下都不会被这条通道覆盖。
+Upgrade13 的默认启动恢复只重放最小投影；显式完整包恢复仍先校验固定资源名和包契约，再由宿主建立绑定 `import-microi-store-package + OsClient` 的一次性可信上下文。导入器只有同时收到内置包请求并成功消费该上下文，才可恢复 `Platform/Managed` 官方源码；客户端或普通 V8 仅伪造同名参数会失败关闭，`Tenant/CreateIfMissing` 在任何情况下都不会被这条通道覆盖。
 
 商城源登录和断开必须先经过 `platform-marketplace-source` 的 `AuthorizeOperation`。其 Before Hook 只接收 `Stage / SourceApiEngineKey / Action / SourceId`，不能接收 `ApiBase`、远端 `OsClient`、账号、密码、Token 或凭据密文。SaaS 包中的 `platform-external-login-binding`、`platform-wechat-user-binding` 还必须同时保持 `StopHttp=1`、`AllowAnonymous=0`、`Lock=1`，避免普通 V8 修改或伪造协议持久化入口。
 
@@ -112,7 +112,7 @@ node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --initial
 
 该命令不会覆盖任何资源；任一项不一致都会拒绝建立基线。`--synchronize-local` 仅用于让 `app.microi.store.json` 内嵌的导入器、发布器、构建器与独立 JS 文件保持一致，不会访问或修改官网。正式同步会把这些独立源码和商城包内嵌代码视为同一组逻辑副本：说明文字、换行、独立升版或不同可执行代码段的修改可自动合并，只有同一段可执行逻辑被改成不同实现时才阻止发布。`ai-app-build.js` 仍是随服务器发布的本地事实源，不扩入官网十二项资源白名单。
 
-刷新后必须构建 `Microi.Upgrade`，确认十一个运行期升级资源及随服务器发布的 `ai-app-build.js`（合计十二项）均已作为 `EmbeddedResource` 写入程序集；`official-resource-api.js` 是仅供维护发布链路同步官网接口的源码，不写入运行程序集。发布包运行时不依赖这些源码文件存在。
+刷新正式资源后，运行 `build-bootstrap-package.mjs` 生成并验证最小恢复投影，再构建 `Microi.Upgrade`。该程序集只嵌入 `app.microi.bootstrap.json` 和 `import-package.js` 两项启动资源；完整九套应用包、发布控制面及其它平台应用源码留在独立发行资源目录，不得重新加入升级程序集的 `EmbeddedResource`。运行时最小恢复不依赖工作区源码文件存在。
 
 刷新脚本会拒绝低于 v1.9.1、缺少租户接口引擎所有权不可逆保护、接口引擎资源基线或“无商城标识时跳过安装计数”、MySQL 宽表行宽溢出时的非索引 `varchar` 行外文本回退、可信批量小包单事务、安装统计 JSON 字符串响应解析、接口引擎写后回读、统一应用商城、断点复用、微服务公有 HDFS 稳定路径、DB 运行产物兜底、Jint 安全清理、原生菜单保护、源码校验或安装统计能力的导入器；也会拒绝低于 v1.6.0 的发布器，以及低于 v7.0.13、缺少官方平台应用过滤、自适应安全分片、子安装失败详情透传、批量安装后台检查点、可信后台自举保护或严格 `SourceZip / BuildZip` 资产边界的商城基线。普通或社区包的 `Managed` 仍按 Base/Local/Incoming 三方保护，客户修改会整包冲突回滚；只有从固定官网实时回读并验证为官方 `ApplicationType=Platform` 的可信包，`Managed` 才按官方源码覆盖。`CreateIfMissing` 首次创建后始终归租户维护，后续不得改回 `Managed` 接管。行宽回退只在 MySQL 明确返回 65,535 字节上限且字段不参与索引时触发，类型覆盖写入共享后台任务 checkpoint；普通异常和索引字段继续失败关闭。批量引擎在兼容尚未部署后端可信调用修复的节点时使用 `StopHttp=0`，但必须同时校验由 HTTP 控制器剥离的 `_TrustedServerInvocation`、任务 Id、任务信封和正数 fencing token；普通 HTTP 仍然失败关闭。“全部安装/更新”固定只规划 `ApplicationType=Platform` 的官方平台应用；小型官方包以一个应用一个事务完成，超过字段、表、资产或随包数据安全阈值的包继续使用内部 checkpoint 分片。
 
