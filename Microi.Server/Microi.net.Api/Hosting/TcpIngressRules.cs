@@ -40,6 +40,10 @@ public static class TcpIngressRules
         var idleTimeoutSeconds = ReadInt(value, "idleTimeoutSeconds", 90, 10, 3600);
         var executionTimeoutSeconds = ReadInt(value, "executionTimeoutSeconds", 5, 1, 120);
         var maxQueuedFrames = ReadInt(value, "maxQueuedFramesPerConnection", 8, 1, 32);
+        // 缺失响应默认仍关闭连接；仅管理员明确启用，且内部引擎逐帧声明 None，才允许无需再应答的消息。
+        if (value["allowNoResponse"] != null && value["allowNoResponse"]!.Type != JTokenType.Boolean)
+            throw new InvalidOperationException("TcpIngressRulesJson.allowNoResponse 必须为布尔值。");
+        var allowNoResponse = value.Value<bool?>("allowNoResponse") == true;
         // 每条连接都会分配接收缓冲。不能让合法但极端的三个上限相乘耗尽 API 内存。
         var perConnectionBytes = (long)maxFrameBytes * maxQueuedFrames;
         if (perConnectionBytes > 256 * 1024
@@ -84,7 +88,7 @@ public static class TcpIngressRules
             osClient, apiEngineKey, listenPort, cidrs, requestHeader, responseHeader, tail,
             lengthOffset, lengthAdjustment, correlationOffset, correlationLength,
             maxFrameBytes, maxConnections, idleTimeoutSeconds, executionTimeoutSeconds,
-            maxQueuedFrames, downlink, requestPolicy, responsePolicy);
+            maxQueuedFrames, downlink, requestPolicy, responsePolicy, allowNoResponse);
     }
 
     public static int ParsePort(JToken? configuredPort)
@@ -159,7 +163,7 @@ public sealed class TcpIngressRule
         byte[] tail, int lengthOffset, int lengthAdjustment, int correlationOffset,
         int correlationLength, int maxFrameBytes, int maxConnections, int idleTimeoutSeconds,
         int executionTimeoutSeconds, int maxQueuedFramesPerConnection, IoTDownlinkPolicy? downlink = null,
-        TcpFramePolicy? requestPolicy = null, TcpFramePolicy? responsePolicy = null)
+        TcpFramePolicy? requestPolicy = null, TcpFramePolicy? responsePolicy = null, bool allowNoResponse = false)
     {
         OsClient = osClient;
         ApiEngineKey = apiEngineKey;
@@ -180,6 +184,7 @@ public sealed class TcpIngressRule
         Downlink = downlink;
         RequestPolicy = requestPolicy!;
         ResponsePolicy = responsePolicy!;
+        AllowNoResponse = allowNoResponse;
     }
 
     public string OsClient { get; }
@@ -200,6 +205,7 @@ public sealed class TcpIngressRule
     public IoTDownlinkPolicy? Downlink { get; }
     public TcpFramePolicy RequestPolicy { get; }
     public TcpFramePolicy ResponsePolicy { get; }
+    public bool AllowNoResponse { get; }
     internal IReadOnlyList<TcpIngressCidr> AllowedCidrs { get; }
 
     public bool IsAllowed(IPAddress address) => AllowedCidrs.Any(cidr => cidr.Contains(address));

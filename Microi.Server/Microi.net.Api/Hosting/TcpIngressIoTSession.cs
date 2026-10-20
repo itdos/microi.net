@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 namespace Microi.net.Api;
 
 /// <summary>
-/// 一条物理连接的下行适配器。只有内部上报引擎明确授权且正常 ACK 写入后，才注册设备；
+/// 一条物理连接的下行适配器。内部上报引擎明确授权且应答写入/显式免应答处理完成后，才注册设备；
 /// Redis 所有权用于跨节点路由，本机只持有无法跨进程共享的 Socket 与串行写锁。
 /// </summary>
 public sealed class TcpIngressIoTSession
@@ -45,7 +45,11 @@ public sealed class TcpIngressIoTSession
         Volatile.Write(ref _authorized, _candidate == null ? 0 : 1);
     }
 
-    public async Task AfterReplyWrittenAsync(CancellationToken token)
+    /// <summary>兼容原调用方；有线应答必须先写入成功，再调用连接登记。</summary>
+    public Task AfterReplyWrittenAsync(CancellationToken token) => AfterFrameAcceptedAsync(token);
+
+    /// <summary>帧通过校验并按协议完成处理后登记/复核设备；None 不产生虚构的线缆 ACK。</summary>
+    public async Task AfterFrameAcceptedAsync(CancellationToken token)
     {
         if (_device != null && _candidate != _device)
             throw new InvalidOperationException("设备下行授权已撤销。");

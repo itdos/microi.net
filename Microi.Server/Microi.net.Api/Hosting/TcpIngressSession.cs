@@ -50,7 +50,16 @@ public static class TcpIngressSession
                         buffered -= frameLength;
                         downlink?.EnsureFrameDevice(frame);
                         var response = await executeFrame(frame, stoppingToken).ConfigureAwait(false);
-                        if (response == null || !TcpIngressFrameCodec.ValidateResponse(response, frame, rule))
+                        if (response == null) return;
+                        if (response.Length == 0)
+                        {
+                            // 空数组只由已校验的显式 None 结果产生；不回 ACK-of-ACK，并保留后续心跳/指令通道。
+                            // null 仍代表缺少合法响应、必须断开；关闭下行授权的消息也须在这里及时处理。
+                            if (!rule.AllowNoResponse) return;
+                            if (downlink != null) await downlink.AfterFrameAcceptedAsync(stoppingToken).ConfigureAwait(false);
+                            continue;
+                        }
+                        if (!TcpIngressFrameCodec.ValidateResponse(response, frame, rule))
                             return;
                         using var send = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                         send.CancelAfter(TimeSpan.FromSeconds(rule.ExecutionTimeoutSeconds));
@@ -58,7 +67,7 @@ public static class TcpIngressSession
                         else
                         {
                             await downlink.WriteReplyAsync(stream, response, send.Token).ConfigureAwait(false);
-                            await downlink.AfterReplyWrittenAsync(stoppingToken).ConfigureAwait(false);
+                            await downlink.AfterFrameAcceptedAsync(stoppingToken).ConfigureAwait(false);
                         }
                     }
                     if (buffered == buffer.Length) return;

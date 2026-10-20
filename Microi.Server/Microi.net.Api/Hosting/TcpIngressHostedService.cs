@@ -393,7 +393,7 @@ public sealed class TcpIngressHostedService : IHostedService, IDisposable
             if (!deferSlotRelease) slots.Release();
         }
         // 失败业务帧也可能带协议规定的失败 ACK；Code=0 并非静默关闭依据。
-        // 只有完整、同设备同命令的二进制应答才能回写当前 TCP 连接。
+        // 有应答时必须完整且同设备同命令；明确授权的 None 结果返回零字节，不能制造 ACK-of-ACK。
         if (TcpIngressFrameCodec.TryDecodeResponse(raw, frame, rule, out var response))
         {
             downlink?.ObserveResponse(frame, raw!);

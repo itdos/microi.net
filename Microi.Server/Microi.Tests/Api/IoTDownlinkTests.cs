@@ -23,6 +23,120 @@ public class IoTDownlinkTests
         """);
     private static TcpIngressRule Rule() => TcpIngressRules.Parse(Configuration().ToString())!;
 
+    [Fact]
+    public void Explicit_successful_receipt_can_require_no_wire_reply()
+    {
+        var config = Configuration(); config["allowNoResponse"] = true;
+        var rule = TcpIngressRules.Parse(config.ToString())!;
+        var accepted = new JObject { ["Code"] = 1, ["Data"] = new JObject {
+            ["IoTDeviceId"] = Device, ["ResponseMode"] = "None" } };
+        Assert.True(TcpIngressFrameCodec.TryDecodeResponse(accepted, Heartbeat, rule, out var bytes));
+        Assert.Empty(bytes);
+    }
+
+    [Theory]
+    [InlineData(false, 1, "None", false, false)]
+    [InlineData(true, 0, "None", false, false)]
+    [InlineData(true, 1, "none", false, false)]
+    [InlineData(true, 1, "None", true, false)]
+    [InlineData(true, 1, "None", false, true)]
+    public void No_reply_requires_both_config_and_unambiguous_success(bool enabled, int code, string mode, bool conflictingFrame, bool valid)
+    {
+        var root = Configuration(); root["allowNoResponse"] = enabled;
+        var result = new JObject { ["Code"] = code, ["Data"] = new JObject { ["ResponseMode"] = mode } };
+        if (conflictingFrame) result["Data"]!["ResponseFrameHex"] = Convert.ToHexString(Ack);
+        Assert.Equal(valid, TcpIngressFrameCodec.TryDecodeResponse(result, Heartbeat, TcpIngressRules.Parse(root.ToString())!, out var response));
+        Assert.Empty(response);
+        root["allowNoResponse"] = "true";
+        Assert.Throws<InvalidOperationException>(() => TcpIngressRules.Parse(root.ToString()));
+    }
+
+    [Fact]
+    public void No_reply_never_masks_bad_frames_missing_results_or_untyped_success()
+    {
+        var root = Configuration(); root["allowNoResponse"] = true;
+        var rule = TcpIngressRules.Parse(root.ToString())!;
+        var result = JObject.Parse("""{"Code":1,"Data":{"ResponseMode":"None"}}""");
+        var damaged = Heartbeat.ToArray(); damaged[^4] ^= 1;
+        Assert.False(TcpIngressFrameCodec.TryDecodeResponse(result, damaged, rule, out _));
+        result["Code"] = "1";
+        Assert.False(TcpIngressFrameCodec.TryDecodeResponse(result, Heartbeat, rule, out _));
+        result["Code"] = 1; result["Data"]!["ResponseFrameHex"] = JValue.CreateNull();
+        Assert.False(TcpIngressFrameCodec.TryDecodeResponse(result, Heartbeat, rule, out _));
+        Assert.False(TcpIngressFrameCodec.TryDecodeResponse(new JObject { ["Code"] = 1 }, Heartbeat, rule, out _));
+        Assert.False(TcpIngressFrameCodec.TryDecodeResponse(null, Heartbeat, rule, out _));
+        Assert.True(TcpIngressFrameCodec.TryDecodeResponse(new JObject { ["Code"] = 0,
+            ["Data"] = new JObject { ["ResponseFrameHex"] = Convert.ToHexString(Ack) } }, Heartbeat, rule, out var failureAck));
+        Assert.Equal(Ack, failureAck);
+    }
+
+    private static byte[] PayloadFrame(string command, int payloadLength, bool uplink = false)
+    {
+        var frame = new byte[20 + payloadLength];
+        Convert.FromHexString(uplink ? "AA333380" : "BB666680").CopyTo(frame, 0);
+        frame[4] = (byte)((frame.Length - 4) >> 8); frame[5] = (byte)(frame.Length - 4);
+        Convert.FromHexString(Device).CopyTo(frame, 6); Convert.FromHexString(command).CopyTo(frame, 14);
+        for (var i = 0; i < payloadLength; i++) frame[16 + i] = (byte)(i + 1);
+        frame[^2] = 252; frame[^1] = 255;
+        var crc = TcpIngressFrameCodec.Crc16Xmodem(frame.AsSpan(0, frame.Length - 4));
+        frame[^4] = (byte)(crc >> 8); frame[^3] = (byte)crc;
+        return frame;
+    }
+
+    [Theory]
+    [InlineData("1101", 0)]
+    [InlineData("1102", 1)]
+    [InlineData("1103", 5)]
+    [InlineData("1104", 7)]
+    [InlineData("1105", 11)]
+    [InlineData("1106", 12)]
+    [InlineData("1107", 39)]
+    [InlineData("1108", 257)]
+    public void Send_validation_accepts_configured_frame_with_any_command_and_variable_payload(string command, int length)
+    {
+        var frame = Convert.ToHexString(PayloadFrame(command, length));
+        IoTCommandRuntime.ValidateRequest(new JObject { ["DeviceId"] = Device, ["CommandId"] = "variable-" + command,
+            ["FrameHex"] = frame, ["ExpireSeconds"] = 30 }, Rule().Downlink!, out var device, out _, out var validated, out _);
+        Assert.Equal(Device, device); Assert.Equal(frame, validated);
+    }
+
+    [Fact]
+    public async Task Receipt_without_extra_ack_keeps_heartbeat_and_next_control_on_same_socket()
+    {
+        var root = Configuration(); root["allowNoResponse"] = true;
+        var shared = new Store();
+        await using var node = await Node.Start(shared, rule: TcpIngressRules.Parse(root.ToString()), responseModel: frame =>
+            frame[14] == 0 && frame[15] == 17
+                ? new JObject { ["Code"] = 1, ["Data"] = new JObject { ["IoTDeviceId"] = Device, ["ResponseFrameHex"] = Convert.ToHexString(Ack) } }
+                : new JObject { ["Code"] = 1, ["Data"] = new JObject { ["IoTDeviceId"] = Device, ["ResponseMode"] = "None" } });
+        Assert.Equal(Ack, await node.ReadFrame());
+        foreach (var size in new[] { 7, 39 })
+        {
+            var down = PayloadFrame("1104", size);
+            await shared.EnqueueAsync("fixture", Device, "payload-" + size, Convert.ToHexString(down), "fixture-control", "u", 30, node.Rule.Downlink!);
+            Assert.Equal(down, await node.ReadFrame());
+            await node.Client.GetStream().WriteAsync(PayloadFrame("1104", 6, true).Concat(Heartbeat).ToArray(), TestContext.Current.CancellationToken);
+            // 收到的第一帧必须就是后续心跳 ACK，没有额外回执应答，也没有因 None 断开原连接。
+            Assert.Equal(Ack, await node.ReadFrame());
+        }
+        Assert.Equal(2, shared.Claimed);
+    }
+
+    [Fact]
+    public async Task One_way_protocol_registers_only_explicitly_authorized_identity_and_revocation_closes_it()
+    {
+        var root = Configuration(); root["allowNoResponse"] = true;
+        var count = 0; var shared = new Store();
+        await using var node = await Node.Start(shared, rule: TcpIngressRules.Parse(root.ToString()), responseModel: _ =>
+            new JObject { ["Code"] = 1, ["Data"] = new JObject {
+                ["IoTDeviceId"] = ++count == 1 ? Device : null, ["ResponseMode"] = "None" } });
+        var down = PayloadFrame("1104", 7);
+        await shared.EnqueueAsync("fixture", Device, "first-one-way", Convert.ToHexString(down), "fixture-control", "u", 30, node.Rule.Downlink!);
+        Assert.Equal(down, await node.ReadFrame());
+        await node.Client.GetStream().WriteAsync(Heartbeat, TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => node.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+    }
+
     // 两套匿名夹具协议的字节结构不同；平台层无需识别任何厂商名或操作码。
     private static TcpIngressRule AlternateRule(string mode = "LengthPrefix", string checksum = "Crc16Modbus")
     {
@@ -317,7 +431,7 @@ public class IoTDownlinkTests
         public Task Task = null!;
         private readonly CancellationTokenSource _stop = new(TimeSpan.FromSeconds(10));
         public static async Task<Node> Start(Store shared, bool authorize = true, TcpIngressRule? rule = null,
-            byte[]? heartbeat = null, byte[]? ack = null, string device = Device)
+            byte[]? heartbeat = null, byte[]? ack = null, string device = Device, Func<byte[], JObject>? responseModel = null)
         {
             var node = new Node();
             if (rule != null) node.Rule = rule;
@@ -330,8 +444,12 @@ public class IoTDownlinkTests
             var downlink = new TcpIngressIoTSession(node.Rule, shared);
             node.Task = TcpIngressSession.RunAsync(accepted, node.Rule, (frame, _) =>
             {
-                downlink.ObserveResponse(frame, new JObject { ["Code"] = 1, ["Data"] = new JObject { ["IoTDeviceId"] = authorize ? device : null } });
-                return System.Threading.Tasks.Task.FromResult<byte[]?>(ack ?? Ack);
+                var raw = responseModel?.Invoke(frame) ?? new JObject { ["Code"] = 1, ["Data"] = new JObject {
+                    ["IoTDeviceId"] = authorize ? device : null, ["ResponseFrameHex"] = Convert.ToHexString(ack ?? Ack) } };
+                if (!TcpIngressFrameCodec.TryDecodeResponse(raw, frame, node.Rule, out var response))
+                    return System.Threading.Tasks.Task.FromResult<byte[]?>(null);
+                downlink.ObserveResponse(frame, raw);
+                return System.Threading.Tasks.Task.FromResult<byte[]?>(response);
             }, node._stop.Token, downlink);
             await node.Client.GetStream().WriteAsync(heartbeat ?? Heartbeat);
             // ACK 写入在 Bind 之前；等待后台任务真正注册，避免把客户端读到 ACK 误当成租约已建立。

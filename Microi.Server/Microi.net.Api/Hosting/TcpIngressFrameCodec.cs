@@ -19,6 +19,7 @@ public static class TcpIngressFrameCodec
     /// <summary>
     /// 接口引擎 Code=0 也可能含协议规定的失败 ACK，故只以 Data.ResponseFrameHex
     /// 及帧完整性/关联性决定能否回包，不把业务 Code 当二进制链路状态。
+    /// 唯一的免应答例外是配置允许且 Code=1/Data.ResponseMode=None；成功返回空数组表示零字节写入。
     /// </summary>
     public static bool TryDecodeResponse(
         object? result, ReadOnlySpan<byte> request, TcpIngressRule rule, out byte[] response)
@@ -28,7 +29,22 @@ public static class TcpIngressFrameCodec
         JObject value;
         try { value = result is JObject json ? json : JObject.FromObject(result); }
         catch { return false; }
-        var responseHex = (value["Data"] as JObject)?["ResponseFrameHex"]?.Value<string>();
+        var data = value["Data"] as JObject;
+        var mode = data?["ResponseMode"];
+        if (mode != null)
+        {
+            if (mode.Type != JTokenType.String) return false;
+            if (mode.Value<string>() == "None")
+            {
+                // 显式 None 与应答帧互斥；失败、空返回、未知模式或坏物理帧绝不能被伪装成已处理。
+                var code = value["Code"];
+                return rule.AllowNoResponse && (code?.Type is JTokenType.Integer or JTokenType.Float)
+                    && code.Value<double>() == 1 && data?["ResponseFrameHex"] == null
+                    && ValidateRequest(request, rule);
+            }
+            if (mode.Value<string>() != "Reply") return false;
+        }
+        var responseHex = data?["ResponseFrameHex"]?.Value<string>();
         if (string.IsNullOrWhiteSpace(responseHex)
             || responseHex.Length > rule.MaxFrameBytes * 2
             || (responseHex.Length & 1) != 0)
