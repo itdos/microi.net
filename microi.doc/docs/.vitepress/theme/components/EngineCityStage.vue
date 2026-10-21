@@ -7,7 +7,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-const entry = 'https://file.microi.net/itdos/micro-app/microi-engine-city/index.html?v=1.6.0'
+const entry = 'https://file.microi.net/itdos/micro-app/microi-engine-city/index.html?v=1.7.0'
 const host = ref(null), frame = ref(null), activate = ref(false)
 let observer, themeObserver
 function sendTheme() { frame.value?.contentWindow?.postMessage({ type: 'microi-engine-city:theme', theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light' }, new URL(entry).origin) }
