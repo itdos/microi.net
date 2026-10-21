@@ -32,7 +32,11 @@ test('迁移后的安全与交付正文仍受完整性清单保护，引用路�
       const offset = source.indexOf(opening);
       assert.ok(offset >= 0, chunk.id);
       const start = offset + opening.length + (source.startsWith('\r\n', offset + opening.length) ? 2 : 1);
-      assert.equal(hash(source.slice(start, source.indexOf('<!-- /microi-progressive:chunk -->', start))), chunk.sha256, chunk.id);
+      const end = source.indexOf('<!-- /microi-progressive:chunk -->', start);
+      assert.ok(end >= start, chunk.id);
+      const raw = source.slice(start, end), lf = raw.replace(/\r\n/g, '\n');
+      // Match the canonical validator: Git LF/CRLF conversion is allowed, body changes are not.
+      assert.ok([raw, lf, lf.replace(/\n/g, '\r\n')].some(value => hash(value) === chunk.sha256), chunk.id);
     }
     for (const ref of skill.references) assert.ok(fs.existsSync(path.join(root, 'microi.skills', name, ref.path)), ref.path);
   }

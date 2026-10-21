@@ -54,7 +54,7 @@ test('应用详情展示独立更新日志并对旧商城源诚实降级', () =>
 })
 
 test('平台官方公共源在浏览器边界直连只读接口且绝不携带凭据', () => {
-  assert.match(marketplace, /OFFICIAL_SOURCE_API_BASE\s*=\s*'https:\/\/api\.itdos\.com'/)
+  assert.match(marketplace, /OFFICIAL_SOURCE_API_BASE\s*=\s*'https:\/\/api\.microi\.net'/)
   assert.match(marketplace, /OFFICIAL_SOURCE_OSCLIENT\s*=\s*'iTdos'/)
   assert.match(marketplace, /function isOfficialPublicSource\(source\)/)
   assert.match(marketplace, /credentials:'omit'/)
