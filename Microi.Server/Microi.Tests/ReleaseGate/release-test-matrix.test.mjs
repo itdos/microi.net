@@ -24,6 +24,13 @@ test('post-cleanup storage verification accepts Git Bash mixed separators and re
 
 const matrix=()=>({schemaVersion:1,observedAt:'2026-10-16T09:00:00.000Z',target:{profile:'microi_demo',apiBase:'https://api.example.com',osClient:'demo'},dependencies:{mysql:{version:'5.7.44'},redis:{version:'7.4.2'},mongo:{version:'5.0.5'},storage:{provider:'Aliyun'},sqlServer:null},fixture:{apiBase:'http://127.0.0.1:63971/',peerApiBase:'http://127.0.0.1:63972/',osClient:'FullMain_123',childOsClient:'FullChild_123'}});
 const environment=()=>({MICROI_TEST_API_BASE:'http://127.0.0.1:63971/',MICROI_TEST_PEER_API_BASE:'http://127.0.0.1:63972/',MICROI_TEST_OSCLIENT:'FullMain_123',MICROI_TEST_CHILD_OSCLIENT:'FullChild_123',MICROI_TEST_MONGO_CURRENT_VERSION:'5.0.5'});
+test('IoT HTTP integration prerequisites are declared before the expensive Full build',()=>{
+ const consumer=fs.readFileSync(new URL('../FullStack/IoTDownlinkHttpTests.cs',import.meta.url),'utf8');
+ const required=[...consumer.matchAll(/Required\("(MICROI_[A-Z_]+)"\)/g)].map(match=>match[1]);
+ assert.ok(required.includes('MICROI_TEST_IOT_PROBE_ENGINE'));
+ const planned=new Set(createMatrixPlan(matrix(),environment()).requiredEnvironment);
+ assert.deepEqual(required.filter(name=>!planned.has(name)),[],'Full preflight must cover the real HTTP test environment contract');
+});
 const suite=names=>({summaryOutcome:'Completed',tests:names.map(testName=>({testName,outcome:'Passed'})),counters:{total:names.length,passed:names.length,executed:names.length,notExecuted:0,failed:0}});
 const fullNames=['Dos.Common.Tests.FieldOptionTreePageIntegrationTests.LargeSourcePagesInDatabaseAndKeepsLookupInsideSourceFilter(provider: "MySql")','Microi.Tests.Common.RoleLimitActiveSnapshotTests.RealRoleLoader_ExcludesDeletedGrantsAndRetainsLegacyNulls(providerName: "MySql")',...['null','empty','blank','short'].map(value=>'Microi.Tests.Common.TenantJwtPersistenceIntegrationTests.NewlyAddedTenant_PersistsWeakKeyAndConvergesCompetingRefreshes(providerName: "MySql", previousSecret: '+value+')'),'Microi.Tests.Common.MongoLegacyCompatibilityTests.RealServers_Authenticate_PersistLogsOnce_PageWithoutDuplicates_AndIsolateTenants(variable: "MICROI_TEST_MONGO_CURRENT", versionVariable: "MICROI_TEST_MONGO_CURRENT_VERSION")','Microi.Tests.Common.MicroiQuartzSchemaRepairIntegrationTests.RealSchedule','Microi.Tests.Common.SelectedDependencyVersionTests.MySqlAndRedisMatchTheFrozenMcpDependencyVersions'];
 const geometry=()=>({stats:{expected:2,unexpected:0,skipped:0,flaky:0},caseTitles:['桌面1366','4K3840']});
