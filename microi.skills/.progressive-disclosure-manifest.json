@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-21T10:03:28.390Z",
+  "generatedAt": "2026-10-21T09:21:32.652Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,7 +763,7 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "a770a7c3dd35089c9b1884de256a8029cff431ceda098a867abb4b0014037c60",
+      "originalSha256": "5f525ce40bc074b4e6d0e19909e4420f8d76247b5dc0c8bca2ac7ef801b267c5",
       "originalLines": 711,
       "prefixSha256": "4b609f39cb11459d3cace78e0da3f848b963b2ec2ff9c5fa07b35f3f1114ea96",
       "prefixBytes": 6016,
@@ -773,7 +773,7 @@
           "id": "microi-system-delivery-000",
           "ordinal": 0,
           "destination": "microi-system-delivery/SKILL.md",
-          "sha256": "04f08fdc316d253f167e26923066e134763ab129dd830f833c762214613c607f",
+          "sha256": "83a624f454346eac4a63fe64e0e6902b5fd1d0d74c8de578208e06ea11e180cf",
           "lines": 13,
           "heading": "交付总原则"
         },
@@ -789,7 +789,7 @@
           "id": "microi-system-delivery-002",
           "ordinal": 3,
           "destination": "microi-system-delivery/references/progressive-03-安全与跨端验收.md",
-          "sha256": "1cf73c1365e3f8245b2069f5f2e24bcbfdc7f6e67c0f13524998b16f7bbf029b",
+          "sha256": "b4cd10b169b54235314d170c8e74f17bf6bcb5f658d0d4d2e10c73dc8aa37ef7",
           "lines": 52,
           "heading": "平台安全与存量兼容验收（强制）"
         },
@@ -797,7 +797,7 @@
           "id": "microi-system-delivery-003",
           "ordinal": 5,
           "destination": "microi-system-delivery/references/progressive-03-安全与跨端验收.md",
-          "sha256": "8e2891f2a149d6828b653b9f0735ea39a4df5ba60178c79f0e5b0065ce72ee84",
+          "sha256": "479ccdb65450c7741b052a30d8e4a11917bc19d80bf9b4ac89ea00092b4aaa73",
           "lines": 13,
           "heading": "前端交付检查清单"
         },
@@ -837,7 +837,7 @@
           "id": "microi-system-delivery-008",
           "ordinal": 8,
           "destination": "microi-system-delivery/references/context-quality.md",
-          "sha256": "0e9e14b98ac7ab7ca0bf1c4ef97bad2bf061d0c01b170325ddbaf961a02a0de4",
+          "sha256": "beffc0924e9b36dca7a57da12a4cecb65ab05e938cb776c295c7fc5d7f736553",
           "lines": 54,
           "heading": "质量优先的上下文与增量开发"
         }
@@ -980,11 +980,11 @@
       ]
     },
     "microi-uniapp-frontend": {
-      "originalSha256": "f3836deef4b4652d5f1df9907a10a573d1c99359ebb712ca86f9e7020f634836",
-      "originalLines": 558,
+      "originalSha256": "ddcc488e18b193f9e26e22484a4d900f1c1155015345d1953e9521a4cb9e243d",
+      "originalLines": 554,
       "prefixSha256": "55f2799d872b4b9682449adf2e554003eb8642c111af262cacf42265b99dd5f5",
       "prefixBytes": 3040,
-      "entryLines": 213,
+      "entryLines": 209,
       "chunks": [
         {
           "id": "microi-uniapp-frontend-000",
@@ -998,8 +998,8 @@
           "id": "microi-uniapp-frontend-001",
           "ordinal": 1,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "acfd8dd91195e7930896bd54e6ae7ce3d3982bdeb0d674d98337878eab1a5e82",
-          "lines": 31,
+          "sha256": "5d3fe408d73474b25414ae370e94503aa6f0b05a419c4dd758ad7f9e58905fc8",
+          "lines": 27,
           "heading": "标准产品、视图协议与租户扩展"
         },
         {
@@ -2831,11 +2831,11 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "4889e85c8daad1e41710e9ac0ee92b9373cd526845ed7a094331c3ba4a77a441",
-      "originalLines": 558,
-      "prefixSha256": "5cee41a4d3765eb7052d2d7c2acc48195a4e0596e218e88cfe18f239d2b58152",
-      "prefixBytes": 6158,
-      "entryLines": 234,
+      "originalSha256": "5cb7ae6c184c89b2eb4a6a2309a0f0c6d24e03d3b737d342071b71b614e5b2a9",
+      "originalLines": 566,
+      "prefixSha256": "52262abdb901d909adf460efdd98fbfb715b53536c081816ff0d37f7cfe2d81e",
+      "prefixBytes": 6943,
+      "entryLines": 236,
       "chunks": [
         {
           "id": "v8-security-000",
@@ -2881,8 +2881,8 @@
           "id": "v8-security-005",
           "ordinal": 3,
           "destination": "v8-security/references/progressive-01-2-权限校验.md",
-          "sha256": "00498ff986bb27a7da05f8c2056e285472cada6f199a59dc0ffd243d48e33fad",
-          "lines": 109,
+          "sha256": "e0f600f6c4d6b654e358f6da229ad60d6814f198f1566c8009948072b1e6e9c2",
+          "lines": 115,
           "heading": "2. 权限校验"
         },
         {

@@ -15,11 +15,17 @@
         <pre class="ai-connection-prompt">{{ promptPreview }}</pre>
         <p class="ai-connection-note">复制时生成独立开发工具 Token，权限与当前账号一致，按服务器的开发终端期限有效。可在在线终端中单独踢下线；账号密码无需提供给 AI。</p>
         </el-tab-pane>
+        <el-tab-pane label="AI开发推荐提示词" name="development">
+            <p class="ai-connection-intro">完成 MCP 连接后，复制下面的提示词，将【连接名】、【需求描述】和【路径，可选】替换为实际内容，再发送给 AI。</p>
+            <pre class="ai-connection-prompt ai-development-prompt" tabindex="0" aria-label="AI开发推荐提示词正文">{{ AI_DEVELOPMENT_PROMPT }}</pre>
+            <p class="ai-connection-note">提示词已包含 Skills 默认交付要求 1–10。只读分析和局部修改按实际范围执行，生产数据和客户部署需明确授权。</p>
+        </el-tab-pane>
         <el-tab-pane label="角色 AI 开发权限" name="roles" lazy><MciMcpRolePermissions/></el-tab-pane>
         </el-tabs>
         <template #footer>
             <el-button @click="visible = false">关闭</el-button>
             <el-button v-if="activeTab==='connection'" type="primary" :loading="copying" @click="copyConnection">一键复制给 AI</el-button>
+            <el-button v-if="activeTab==='development'" type="primary" :loading="copyingPrompt" @click="copyDevelopmentPrompt">复制推荐提示词</el-button>
         </template>
     </el-dialog>
 </template>
@@ -30,12 +36,13 @@ import { useRouter } from 'vue-router';
 import { useDiyStore } from '@/pinia/modules/diy';
 import { ElMessage } from 'element-plus';
 import { DiyCommon } from '@/utils/diy.common';
-import { buildAiConnectionPrompt, copyConnectionText } from '@/utils/ai-connection.js';
+import { AI_DEVELOPMENT_PROMPT, buildAiConnectionPrompt, copyConnectionText } from '@/utils/ai-connection.js';
 import { platformEditionLabel, hideSystemLicenseVersion, licenseCountdown } from '@/utils/platform-edition.js';
 import MciMcpRolePermissions from '@/components/MciMcpRolePermissions/index.vue';
 import { isMcpAdministrator } from '@/utils/mcp-role-permissions';
 defineProps({ text: { type: String, required: true } });
 const visible = ref(false), copying = ref(false), sessionEdition = ref('');
+const copyingPrompt = ref(false);
 const diyStore = useDiyStore(), router = useRouter();
 const activeTab = ref('connection');
 const canManageMcp = computed(() => isMcpAdministrator(diyStore.GetCurrentUser));
@@ -81,6 +88,15 @@ async function copyConnection() {
     } catch (error) { ElMessage.error(error.message || '复制失败，请重试。'); }
     finally { copying.value = false; }
 }
+async function copyDevelopmentPrompt() {
+    if (copyingPrompt.value || !canManageMcp.value) return;
+    copyingPrompt.value = true;
+    try {
+        await copyConnectionText(AI_DEVELOPMENT_PROMPT);
+        ElMessage.success('推荐提示词已复制，请替换需求后发送给 AI。');
+    } catch (error) { ElMessage.error(error.message || '复制失败，请重试。'); }
+    finally { copyingPrompt.value = false; }
+}
 </script>
 
 <style scoped>
@@ -97,6 +113,8 @@ async function copyConnection() {
 .ai-connection-intro { line-height:1.8; margin:calc(16px * var(--mci-ui-scale,1)) 0 calc(12px * var(--mci-ui-scale,1)); }
 .ai-connection-prompt { white-space:pre-wrap; overflow-wrap:anywhere; padding:calc(14px * var(--mci-ui-scale,1)); border:1px solid var(--el-border-color-light); border-radius:var(--el-border-radius-base); line-height:1.6; font:inherit; background:var(--el-fill-color-lighter); }
 .ai-connection-note { color:var(--el-text-color-secondary); font-size:12px; line-height:1.8; }
+.ai-development-prompt { max-height:45vh; overflow:auto; line-height:1.8; color:var(--el-text-color-primary); }
+.ai-development-prompt:focus-visible { outline:2px solid var(--el-color-primary); outline-offset:2px; }
 </style>
 <style>
 .el-dialog.ai-connection-dialog { border-radius:var(--mci-radius-lg,16px); padding:calc(16px * var(--mci-ui-scale,1)); }

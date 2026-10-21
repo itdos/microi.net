@@ -87,6 +87,7 @@
     <Compile Remove="Common\ApiEngineNestedIdentityTests.cs" />
     <Compile Remove="Common\ApiEngineManagedApplicationGuardTests.cs" />
     <Compile Remove="Common\FormEngineTenantBoundaryTests.cs" />
+    <Compile Remove="Common\TableChildDelegatedAuthorizationTests.cs" />
     <Compile Remove="Common\FormEngineSqlIdentitySnapshotTests.cs" />
     <Compile Remove="Common\FormEngineReadPrimaryTests.cs" />
     <Compile Remove="Common\FormEngineDecimalInvariantTests.cs" />

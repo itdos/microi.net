@@ -16,15 +16,16 @@
 
 ::: tip AI开发推荐提示词
 请使用 MCP【连接名】，完整开发【需求描述】，需求文档为【路径，可选】。
-开工前完整读取 `microi.skills/workspace-conventions/SKILL.md`、`microi.skills/microi-system-delivery/SKILL.md` 及其必读参考 `references/progressive-01-标准工作流.md`，执行原 1–8 项和报表、菜单先行的增补要求，并按任务读取相关 Skills。先报告实际读取的文件和逐项交付计划；文件缺失时先完成吾码 AI 工作区初始化，不得凭摘要声称已读。
+开工前完整读取 `microi.skills/workspace-conventions/SKILL.md`、`microi.skills/microi-system-delivery/SKILL.md` 及其必读参考 `microi.skills/microi-system-delivery/references/progressive-01-标准工作流.md`，逐项执行 Skills 默认交付要求 1–10：原 1–8 项、第 9 项“基于界面引擎的业务统计、老板经营和领导管理报表”、第 10 项“先创建完整菜单骨架，再逐项验收并切换真实功能”，并按任务读取相关 Skills。
+先报告实际读取的文件和 1–10 项交付计划；文件缺失时先完成吾码 AI 工作区初始化，不得凭摘要声称已读。收尾逐项提供实现位置、验收证据和未完成项。
 允许在指定开发租户创建/更新需求内资源和验收数据，并完成业务与截图验收。
 :::
 
 将连接名和需求替换为实际内容即可；当前项目已绑定连接或仅有一个已登录连接时，连 MCP 名称也可以省略，例如“帮我开发一个进销存系统，需求见附件”。验收地址、账号可沿用已配置连接，也可另行提供。只读分析和局部修改会按实际范围执行，默认路由不会自动扩张为整套系统重建。
 
-原 1–8 点完整保留在[完整系统开发 Skill](https://github.com/itdos/microi.net/blob/master/microi.skills/microi-system-delivery/SKILL.md)链接的[必读交付清单与增补要求](https://github.com/itdos/microi.net/blob/master/microi.skills/microi-system-delivery/references/progressive-01-%E6%A0%87%E5%87%86%E5%B7%A5%E4%BD%9C%E6%B5%81.md)中：
+以上提示词覆盖以下 1–10 项：1–8 对应原交付清单，9、10 分别对应报表和菜单先行要求。完整正文保留在[完整系统开发 Skill](https://github.com/itdos/microi.net/blob/master/microi.skills/microi-system-delivery/SKILL.md)链接的[必读交付清单与增补要求](https://github.com/itdos/microi.net/blob/master/microi.skills/microi-system-delivery/references/progressive-01-%E6%A0%87%E5%87%86%E5%B7%A5%E4%BD%9C%E6%B5%81.md)中：
 
-| 原条目 | Skills 默认执行的要求 |
+| 条目 | Skills 默认执行的要求 |
 |---|---|
 | 1 | 深度分析需求，在需求文件同目录持续维护详细 Markdown 文档 |
 | 2 | 盘点、复用、幂等建模；补齐业务资源、索引、关系、账号和每张业务表约 100 条以上验收数据 |
@@ -34,12 +35,14 @@
 | 6 | 折叠分组默认展开；大表/多子表合理使用表单 Tabs，类别/状态使用模块 PageTabs |
 | 7 | 每个模块的标题、副标题和动态业务指标；列宽、角标、复合列去重与移动卡片动态区域 |
 | 8 | 持续真实业务与截图验收，修复报错，并清理本次 AI 创建的临时浏览器和进程 |
-| 增补 A | 基于界面引擎交付业务统计、老板经营和领导管理报表，具备真实数据、明确口径、筛选、权限和对账验收 |
-| 增补 B | 需求分析后先创建完整菜单骨架；未完成的叶菜单展示共享开发中页面，逐项验收后切换为真实功能 |
+| 9 | 基于界面引擎交付业务统计、老板经营和领导管理报表，具备真实数据、明确口径、筛选、权限和对账验收 |
+| 10 | 需求分析后先创建完整菜单骨架；未完成的叶菜单展示共享开发中页面，逐项验收后切换为真实功能 |
+
+前端“开发工具连接”弹窗在“连接 AI 工具”右侧提供“AI开发推荐提示词”Tab，可查看并一键复制同一份提示词。完成连接后，将提示词中的连接名、需求和文档路径替换为实际内容再发给 AI。
 
 使用前通过吾码插件或 `microi ai init --workspace "<工作区绝对路径>" --json` 初始化/更新工作区，并用 `microi doctor` 检查连接和规则。5.9.4 及以前单独的 `microi mcp init` 只配置连接；本次 5.9.6 起会联动生成 Skills 和宿主规则。用户自定义或已跟踪的入口仍按保护规则保留，需要核对实际文件及版本，不能静默覆盖。宿主未读取规则、不能访问本地文件或模型忽略指令时，需要根据实际限制恢复，明确写出 Skill 名称也不是 100% 执行保证。
 
-AI 开工说明应列出实际读取的基础规范、总控、完整清单和本次专项 Skills，并将原八项及增补项映射到交付计划。收尾逐项提供实现与验收证据，不能把这张摘要表当成完整规范。只读分析和局部修改仍按实际范围执行；生产数据和客户部署服从明确授权范围。
+AI 开工说明应列出实际读取的基础规范、总控、完整清单和本次专项 Skills，并将 1–10 项映射到交付计划。收尾逐项提供实现与验收证据，不能把这张摘要表当成完整规范。只读分析和局部修改仍按实际范围执行；生产数据和客户部署服从明确授权范围。
 
 ### 先看菜单，再逐步交付
 

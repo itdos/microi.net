@@ -68,7 +68,11 @@ internal static class IncidentDurabilityAcceptance
             Check(groups.Any(g => g.Value<string>("Kind") == "Http"), "MissingDependencyWait");
             var history = await Get(b.Url, "/incidents/incident-a");
             Check(history.Value<string>("RelationalStorage") == "Available", "NoCrossNodeStorage");
-            var id = history["Items"]![0]!.Value<string>("Id")!;
+            // 另一节点也可能为同一租户产生事故；按启动标识选择 A 的证据，避免误取较新的 B 事故。
+            var origin = (history["Items"] as JArray)?.OfType<JObject>()
+                .FirstOrDefault(item => item.Value<string>("BootId") == a.Boot);
+            Check(origin != null, "OriginNodeEvidenceMissing");
+            var id = origin!.Value<string>("Id")!;
             async Task<JObject> Detail(string url, string tenant) => (JObject)(await Get(url, "/incident/" + tenant + "/" + id))["Items"]![0]!;
             var detail = await Detail(b.Url, "incident-a");
             Check(detail.Value<string>("BootId") == a.Boot && detail.Value<string>("StorageKind") == "MySqlCriticalEvidence", "WrongNodeEvidence");

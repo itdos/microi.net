@@ -15,11 +15,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("managed micro-app entry keeps a stable path and uses version only for cache busting", () => {
     assert.equal(buildMicroAppEntryUrl({
-        apiBase: "https://api.itdos.com/",
+        apiBase: "https://api.microi.net/",
         osClient: "iTdos",
         appKey: "microi-platform-service",
         version: "v1.0.3"
-    }), "https://api.itdos.com/micro-app/iTdos/microi-platform-service/index.html?v=v1.0.3");
+    }), "https://api.microi.net/micro-app/iTdos/microi-platform-service/index.html?v=v1.0.3");
 });
 
 test("managed micro-app entry remains valid when build version is unavailable", () => {

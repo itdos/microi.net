@@ -4,6 +4,7 @@ import vue from '@vitejs/plugin-vue';
 import {fileURLToPath} from 'node:url';
 import {readFile} from 'node:fs/promises';
 import {buildUiDensityVariables} from '../src/utils/ui-density.js';
+import {AI_DEVELOPMENT_PROMPT} from '../src/utils/ai-connection.js';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const stub={
  '@/utils/diy.common':`export const DiyCommon={GetApiBase:()=> 'https://fixture.invalid',GetOsClient:()=> 'fixture',Http:{Post:async p=>window.fixtureApi(p)}};`,
@@ -72,4 +73,43 @@ test('保存后回读失败明确提示，不能冒充已同步成功',async({pa
  await page.getByRole('button',{name:'保存角色授权'}).click();
  await expect(page.getByText('保存已执行，但回读失败，请刷新核对，勿重复提交。').first()).toBeVisible();
  await expect(page.getByText('已保存并回读，角色管理同步生效。')).toHaveCount(0);
+});
+
+test('推荐提示词在连接右侧，复制完整正文且不创建会话，失败后可重试',async({page},info)=>{
+ await setup(page);
+ await page.evaluate(()=>window.fixtureStore.GetCurrentUser.Level=9999);
+ await page.getByTestId('runtime-version').click();
+ await expect(page.getByRole('tab')).toHaveText(['连接 AI 工具','AI开发推荐提示词','角色 AI 开发权限']);
+ await page.getByRole('tab',{name:'AI开发推荐提示词',exact:true}).click();
+ await expect(page.getByLabel('AI开发推荐提示词正文')).toHaveText(AI_DEVELOPMENT_PROMPT);
+ await expect(page.getByRole('button',{name:'一键复制给 AI'})).toHaveCount(0);
+ // 模拟浏览器剪贴板权限拒绝后重试，捕获真实复制 helper 写入的文本。
+ await page.evaluate(()=>{
+  window.copiedPrompt='';window.rejectCopy=true;
+  document.execCommand=command=>{
+   if(command!=='copy'||window.rejectCopy)return false;
+   window.copiedPrompt=document.querySelector('textarea[readonly]').value;return true;
+  };
+ });
+ await page.getByRole('button',{name:'复制推荐提示词'}).click();
+ await expect(page.getByText('当前浏览器不允许复制。')).toBeVisible();
+ await expect(page.locator('textarea[readonly]')).toHaveCount(0);
+ await page.evaluate(()=>window.rejectCopy=false);
+ await page.getByRole('button',{name:'复制推荐提示词'}).click();
+ await expect(page.getByText('推荐提示词已复制，请替换需求后发送给 AI。')).toBeVisible();
+ expect(await page.evaluate(()=>window.copiedPrompt)).toBe(AI_DEVELOPMENT_PROMPT);
+ expect(await page.evaluate(()=>window.apiCalls.some(call=>call.Action==='CreateCliSession'))).toBe(false);
+ await expect(page.locator('.el-message')).toHaveCount(0);
+ await page.screenshot({path:info.outputPath('ai-development-prompt-desktop.png')});
+ await page.setViewportSize({width:390,height:844});
+ await expect(page.getByRole('button',{name:'复制推荐提示词'})).toBeInViewport();
+ expect(await page.getByLabel('AI开发推荐提示词正文').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ await page.screenshot({path:info.outputPath('ai-development-prompt-mobile.png')});
+ await page.addStyleTag({content:await readFile(new URL('../node_modules/element-plus/theme-chalk/dark/css-vars.css',import.meta.url),'utf8')});
+ await page.evaluate(()=>document.documentElement.classList.add('dark'));
+ await expect(page.getByLabel('AI开发推荐提示词正文')).toHaveCSS('color','rgb(229, 234, 243)');
+ await page.screenshot({path:info.outputPath('ai-development-prompt-mobile-dark.png')});
+ await page.getByRole('tab',{name:'连接 AI 工具',exact:true}).click();
+ await expect(page.getByRole('button',{name:'一键复制给 AI'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'复制推荐提示词'})).toHaveCount(0);
 });

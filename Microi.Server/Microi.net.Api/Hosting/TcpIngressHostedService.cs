@@ -104,9 +104,11 @@ public sealed class TcpIngressHostedService : IHostedService, IDisposable
             Volatile.Write(ref _configuredPort, rule.ListenPort);
             if (!string.Equals(rule.OsClient, mainTenant.OsClient, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("TCP 入站规则只能指向当前 API 主租户。");
+            if (rule.AllowAnySource)
+                _logger.LogWarning("Microi TCP 入站已显式允许任意 IPv4 来源；协议 CRC 和设备编号不能证明设备身份，请配置云侧防护并监控异常连接。");
 
             // 固定 Key 的内部 Server 调用；要求目标引擎关闭 HTTP 并禁止匿名，
-            // 避免公网 /apiengine 路由绕过 TCP 来源 CIDR。
+            // 避免公网 /apiengine 路由绕过 TCP 传输层校验。
             stage = "validate-engine-policy";
             var engineResult = await _apiEngine.GetAuthoritativeApiEngineModel(new ApiEngineParam
             {
@@ -118,7 +120,7 @@ public sealed class TcpIngressHostedService : IHostedService, IDisposable
             var engineModel = engineResult.Data is JObject model
                 ? model : JObject.FromObject((object)engineResult.Data);
             if (!TcpIngressEnginePolicy.IsEligible(engineModel))
-                throw new InvalidOperationException("TCP 入站接口引擎必须设置 StopHttp=true、AllowAnonymous=false 且启用，禁止 HTTP 绕过 TCP 来源网段。");
+                throw new InvalidOperationException("TCP 入站接口引擎必须设置 StopHttp=true、AllowAnonymous=false 且启用，禁止 HTTP 绕过 TCP 传输层校验。");
             Interlocked.Exchange(ref _lastEngineCheckUtcTicks, DateTime.UtcNow.Ticks);
 
             stage = "bind-listener";

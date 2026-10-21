@@ -14,7 +14,9 @@ public class ScheduleExecutionLogHttpTests
         string Required(string key) => Environment.GetEnvironmentVariable(key) ?? throw new InvalidOperationException("缺少 " + key);
         Assert.Equal("YES", Required("MICROI_TEST_ALLOW_WRITES"));
         var tenant = Required("MICROI_TEST_OSCLIENT");
-        Assert.StartsWith("StandardSuite", tenant);
+        Assert.True(tenant.StartsWith("StandardSuite", StringComparison.Ordinal) ||
+            string.Equals(tenant, "IotReleaseMain", StringComparison.Ordinal),
+            "日志写入验收只允许 StandardSuite 隔离租户或本次 IotReleaseMain 夹具。");
         var endpoint = new Uri(Required("MICROI_TEST_API_BASE"));
         Assert.True(endpoint.IsLoopback, "日志写入验收仅允许本机隔离夹具。");
         using var client = new HttpClient { BaseAddress = endpoint, Timeout = TimeSpan.FromSeconds(30) };

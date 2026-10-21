@@ -50,6 +50,8 @@ Preview 和确认均重验当前客户端、回调及 Scope；账号变化通过
 
 官方升级资源属于独立控制面。`get-microi-upgrade-resource` 可以匿名读取固定白名单，但 `Publish/PublishBatch` 必须调用仅绑定该 Managed ApiEngineKey 的 `V8.Method.AuthorizeOfficialResourcePublish()`：固定 `iTdos` 官方租户、拒绝访问密钥会话，并从主库复核当前用户、状态和平台管理员角色。禁止只相信 `V8.CurrentUser.Level`，也禁止把这个可信原子复用于普通接口、租户 Hook 或表单事件；资源校验、SHA 乐观锁、事务行锁、写入及回读仍由 Managed V8 编排。
 
+同一 Managed 会话接口包含本人初始化与敏感管理动作时，精确 `ApiRole` 不能代替动作级鉴权。SaaS v8.4.26 / `platform-sys-user-session` v1.0.5 对已归一化的 `GetSysUserPassword`，先拒绝匿名和访问密钥，再以可信 `V8.CurrentUser`、`V8.Db` 主库的本人活动状态/等级及有效管理员角色核验后调用原可信原子；不读取密码字段做授权，不使用 `DbRead`、客户端身份字段或角色名判断。标准角色授权可用于只读账号的本人会话初始化，不能把整引擎授权解释成敏感动作许可。负例使用预先确认不存在的固定用户 Id：普通账号必须先被管理员门拒绝，管理员仅验证合法路径返回不存在，禁止为验收读取任何真实密码。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=v8-security-000 sha256=a6a4311b1a799ea4ed005b22c01cb8230509aaf09aeead5a17c8c46da74772c8 -->
 ## 0. 租户动态系统设置与密钥边界

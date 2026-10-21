@@ -17,7 +17,7 @@ try{
  page.on('response',async r=>{if(r.url().includes('GetSysMenuStep')){try{const j=await r.json();diagnostics.menuResponse={code:j.Code,includesOps:JSON.stringify(j).includes('吾码服务器运维面板')};}catch{}}});page.on('pageerror',e=>diagnostics.errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&/GotoSystem error:|frame-ancestors|frame|CSP/i.test(m.text()))diagnostics.errors.push(m.text());});
  const frontend = new URL(process.env.PANEL_PLATFORM_FRONTEND_BASE || 'http://localhost:61500/');
  assert.equal(frontend.origin,'http://localhost:61500','Use the isolated local browser origin authorized by this fixture');
- assert(!process.env.PANEL_PLATFORM_API_BASE || new URL(process.env.PANEL_PLATFORM_API_BASE).href==='https://api.itdos.com/','Remote browser target must match the approved official credential target');
+ assert(!process.env.PANEL_PLATFORM_API_BASE || new URL(process.env.PANEL_PLATFORM_API_BASE).href==='https://api.microi.net/','Remote browser target must match the approved official credential target');
  frontend.searchParams.set('OsClient','iTdos');
  if(process.env.PANEL_PLATFORM_API_BASE)frontend.searchParams.set('ApiBase',process.env.PANEL_PLATFORM_API_BASE);
  await page.goto(frontend.href);

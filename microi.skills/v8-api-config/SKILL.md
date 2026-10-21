@@ -112,7 +112,7 @@ return {
 
 ### 通用实时事件（SignalR）
 
-订单、协作、设备、审批或多人房间需要实时刷新时，业务写命令仍由接口引擎执行并提交事务；成功结果通过 `DataAppend.RealtimeEvent` 声明提交后事件。新业务统一使用通用 v2 Hub `/api-engine-realtime`，不要再新建业务专用 Hub 或把权威状态放进 C# 进程内字典。
+订单、协作、设备、审批或多人房间只需要订阅状态刷新时，业务写命令仍由接口引擎执行并提交事务；成功结果通过 `DataAppend.RealtimeEvent` 声明提交后事件。此类订阅统一使用通用 v2 Hub `/api-engine-realtime`，双向命令按上节选择 SignalR 响应类型；不要新建业务专用 Hub 或把权威状态放进 C# 进程内字典。
 
 ```javascript
 return {

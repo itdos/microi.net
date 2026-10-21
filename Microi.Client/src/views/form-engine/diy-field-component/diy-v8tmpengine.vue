@@ -1,5 +1,5 @@
 <template>
-    <el-form-item v-show="GetFieldIsShow(field)" class="form-item">
+    <el-form-item v-show="GetFieldIsShow(field)" class="form-item diy-v8-template-item">
         <template #label>
             <span :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
                 <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
@@ -10,7 +10,7 @@
                 {{ GetFormItemLabel(field) }}
             </span>
         </template>
-        <span v-safe-html:template="FormDiyTableModel[field.Name + '_TmpEngineResult']"></span>
+        <div class="diy-v8-template-content" v-safe-html:template="FormDiyTableModel[field.Name + '_TmpEngineResult']"></div>
     </el-form-item>
 </template>
 
@@ -50,3 +50,15 @@ const GetFormItemLabel = (field) => {
     return field.Label || field.Name;
 };
 </script>
+
+<style scoped>
+.diy-v8-template-item,
+.diy-v8-template-content {
+    width: 100%;
+    min-width: 0;
+}
+
+.diy-v8-template-content {
+    flex: 1 1 100%;
+}
+</style>

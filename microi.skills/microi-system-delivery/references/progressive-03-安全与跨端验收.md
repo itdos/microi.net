@@ -2,7 +2,7 @@
 
 > 原规则按适用范围无损迁移；触发对应工作时必须完整读取相关章节。
 
-<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=1cf73c1365e3f8245b2069f5f2e24bcbfdc7f6e67c0f13524998b16f7bbf029b -->
+<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=b4cd10b169b54235314d170c8e74f17bf6bcb5f658d0d4d2e10c73dc8aa37ef7 -->
 ## 平台安全与存量兼容验收（强制）
 
 AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉及 FormEngine、菜单、角色、子表、文件、SaaS 或登录协议的交付，都必须按以下服务端边界设计和验收：
@@ -55,7 +55,7 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 9. SaaS 脱敏投影不包含基础设施密钥，Redis anonymous/temporary/非管理员管理失败。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-003 sha256=8e2891f2a149d6828b653b9f0735ea39a4df5ba60178c79f0e5b0065ce72ee84 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-003 sha256=479ccdb65450c7741b052a30d8e4a11917bc19d80bf9b4ac89ea00092b4aaa73 -->
 ## 前端交付检查清单
 
 - 底部 tabBar 图标不 404。
