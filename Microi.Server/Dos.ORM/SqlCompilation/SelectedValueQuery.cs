@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Dos.ORM.SqlCompilation
@@ -17,28 +16,37 @@ namespace Dos.ORM.SqlCompilation
         public static SelectedValueQuery Create(string sourceSql, string dbType, string valueColumn,
             string labelColumn, IReadOnlyList<string> values)
         {
-            if (values == null || values.Count == 0 || values.Count > 200
-                || values.Any(v => v == null || v.Length > 512))
+            if (values == null || values.Count == 0 || values.Count > 200)
                 throw new ArgumentException("回显查询每次只允许 1 至 200 个长度不超过 512 的保存值。");
+            foreach (var value in values)
+                if (value == null || value.Length > 512)
+                    throw new ArgumentException("回显查询每次只允许 1 至 200 个长度不超过 512 的保存值。");
             var mysql = string.Equals(dbType, "MySql", StringComparison.OrdinalIgnoreCase);
             var sqlServer = string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase);
             var oracle = string.Equals(dbType, "Oracle", StringComparison.OrdinalIgnoreCase);
             if (!mysql && !sqlServer && !oracle) throw new ArgumentException("当前数据库不支持自动选项回显。");
-            string Quote(string column)
-            {
-                if (string.IsNullOrEmpty(column) || !Regex.IsMatch(column, @"^[\p{L}_][\p{L}\p{N}_]*$"))
-                    throw new ArgumentException("回显映射必须是已配置 SQL 输出的列名。");
-                return mysql ? "`" + column + "`" : sqlServer ? "[" + column + "]" : "\"" + column + "\"";
-            }
             var source = (sourceSql ?? "").Trim();
             if (source.Length == 0 || source.Length > 100000) throw new ArgumentException("无效的选项 SQL。");
             var tokens = Scan(source);
             if (tokens.Count == 0 || tokens[0].Word != "SELECT") throw new ArgumentException("自动回显仅支持单条 SELECT。");
-            if (tokens.Any(t => new[] { "UNION", "INTERSECT", "EXCEPT", "INTO", "FOR", "LOCK", "TOP", "FETCH" }.Contains(t.Word)))
-                throw new ArgumentException("此 SQL 需要显式的选项解析接口，不能自动移除分页。");
-            var limit = tokens.FindIndex(t => t.Word == "LIMIT");
-            if (tokens.Any(t => t.Word == "OFFSET" && (limit < 0 || t.Start < tokens[limit].Start)))
-                throw new ArgumentException("当前分页语法需要显式选项解析接口。");
+            // 编译模型不缓存委托或捕获本次查询状态；显式遍历保留原有语法拒绝边界。
+            var limit = -1;
+            var order = -1;
+            for (var i = 0; i < tokens.Count; i++)
+            {
+                var word = tokens[i].Word;
+                switch (word)
+                {
+                    case "UNION": case "INTERSECT": case "EXCEPT": case "INTO":
+                    case "FOR": case "LOCK": case "TOP": case "FETCH":
+                        throw new ArgumentException("此 SQL 需要显式的选项解析接口，不能自动移除分页。");
+                }
+                if (word == "LIMIT" && limit < 0) limit = i;
+                if (word == "ORDER" && order < 0) order = i;
+            }
+            foreach (var token in tokens)
+                if (token.Word == "OFFSET" && (limit < 0 || token.Start < tokens[limit].Start))
+                    throw new ArgumentException("当前分页语法需要显式选项解析接口。");
             var end = source.Length;
             if (limit >= 0)
             {
@@ -47,7 +55,6 @@ namespace Dos.ORM.SqlCompilation
                     throw new ArgumentException("无法安全识别选项 SQL 的最外层 LIMIT。");
                 end = tokens[limit].Start;
             }
-            var order = tokens.FindIndex(t => t.Word == "ORDER");
             if (order >= 0)
             {
                 if (order + 1 >= tokens.Count || tokens[order + 1].Word != "BY") throw new ArgumentException("无效的 ORDER BY。");
@@ -55,15 +62,18 @@ namespace Dos.ORM.SqlCompilation
             }
             source = source.Substring(0, end).Trim().TrimEnd(';');
             var result = new SelectedValueQuery();
-            var names = values.Distinct(StringComparer.Ordinal).Select((v, i) =>
+            var names = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var value in values)
             {
-                var name = "@mci_selected_" + i;
-                result.Parameters.Add(name, v);
-                return name;
-            }).ToArray();
+                if (!seen.Add(value)) continue;
+                var name = "@mci_selected_" + names.Count;
+                result.Parameters.Add(name, value);
+                names.Add(name);
+            }
             // 普通派生表别名以字母开头，兼容不允许下划线开头标识符的提供商。
-            var key = "mci_selected." + Quote(valueColumn);
-            var label = "mci_selected." + Quote(labelColumn);
+            var key = "mci_selected." + Quote(valueColumn, mysql, sqlServer);
+            var label = "mci_selected." + Quote(labelColumn, mysql, sqlServer);
             // 只传回键和标签，额外取一行检测非唯一保存键，避免无界物化。
             var projection = valueColumn == labelColumn ? key : key + ", " + label;
             var take = values.Count + 1;
@@ -72,6 +82,13 @@ namespace Dos.ORM.SqlCompilation
                 + " IN (" + string.Join(",", names) + ")"
                 + (mysql ? " LIMIT " + take : oracle ? " FETCH FIRST " + take + " ROWS ONLY" : "");
             return result;
+        }
+
+        private static string Quote(string column, bool mysql, bool sqlServer)
+        {
+            if (string.IsNullOrEmpty(column) || !Regex.IsMatch(column, @"^[\p{L}_][\p{L}\p{N}_]*$"))
+                throw new ArgumentException("回显映射必须是已配置 SQL 输出的列名。");
+            return mysql ? "`" + column + "`" : sqlServer ? "[" + column + "]" : "\"" + column + "\"";
         }
 
         private sealed class Token { public string Word; public int Start; }
