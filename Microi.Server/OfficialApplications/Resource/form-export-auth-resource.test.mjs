@@ -15,7 +15,7 @@ const operationsSource = fs.readFileSync(
 
 test("form-engine package declares the protected custom export client capability", () => {
     const info = packageModel.PackageInfo;
-    assert.equal(info.Version, "v7.7.7");
+    assert.equal(info.Version, "v7.7.8");
     assert.equal(info.ChangeLog.Version, info.Version);
     // 新版共享列发行保留原导出安全发布说明，不能把旧能力要求误绑到新的标题变更日志。
     const exportHistory = info.ChangeHistory.split(/\r?\n/).find(line => line.startsWith('2026-09-21 v7.7.6 '));

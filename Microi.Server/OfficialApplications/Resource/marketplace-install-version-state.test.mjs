@@ -251,7 +251,7 @@ test("marketplace preview resolves the installed public entry and strips private
 });
 
 test("bulk discovery projects deterministic install ordering and fails closed on read errors", () => {
-    assert.match(bulkSource, /Version:\s*v1\.4\.1/);
+    assert.match(bulkSource, /Version:\s*v1\.4\.2/);
     assert.match(bulkSource, /_OrderBy:\s*'UpdateTime'/);
     assert.match(bulkSource, /_OrderByType:\s*'DESC'/);
     assert.match(bulkSource, /installedVersionLoadError/);

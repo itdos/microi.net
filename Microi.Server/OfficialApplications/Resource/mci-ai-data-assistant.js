@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: mci_ai_data_assistant
- * Version: v1.1.8
+ * Version: v1.1.9
  * Function:
  * - 所有已登录账号默认支持常规对话；业务分析独立校验角色、业务域、数据范围与模型白名单，按账号隔离保存会话。
  */
