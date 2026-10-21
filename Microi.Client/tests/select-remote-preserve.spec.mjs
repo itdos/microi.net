@@ -6,6 +6,13 @@ import {
     resolveTextSelectValueKey
 } from "../src/utils/select-option-merge.js";
 
+test("empty remote results keep names of selected scalar IDs but not other old candidates", () => {
+    const cfg = { SelectSaveField: 'Id', SelectLabel: 'Name' };
+    const result = mergeCurrentSelectOptions([], ['selected'], cfg, true,
+        [{ Id: 'selected', Name: 'Selected name' }, { Id: 'unselected', Name: 'Do not retain' }]);
+    assert.deepEqual(result, [{ Id: 'selected', Name: 'Selected name' }]);
+});
+
 // zhy：验证 Text 格式远程下拉框在选项加载前后始终使用配置的保存字段进行匹配。
 test("text-format remote select keeps its configured value key before and after options load", () => {
     const config = {

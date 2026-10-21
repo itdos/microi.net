@@ -404,6 +404,7 @@ namespace Microi.net
     }
     public partial class DiyFieldConfig
     {
+        public string DataSource { get; set; }
         public bool KeysAddVisible { get; set; }
         public string KeysAddVModel { get; set; }
         public string Sql { get; set; }

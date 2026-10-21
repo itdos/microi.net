@@ -32,7 +32,7 @@ for (const name of ['diy_table', 'diy_field']) {
 
 test('敏感表保护、普通业务授权和策略读取失败保持原有行为', () => {
     const instance = editor();
-    for (const name of ['sys_role', 'sys_rolelimit', 'sys_osclients', 'sys_apiengine']) {
+    for (const name of ['sys_role', 'sys_rolelimit', 'sys_osclients']) {
         assert.equal(instance.isTableSelectable(name), false);
         assert.equal(instance.isPermissionAllowed(name, 'Read'), false);
     }
@@ -40,4 +40,14 @@ test('敏感表保护、普通业务授权和策略读取失败保持原有行�
     instance.policyReady = false;
     assert.equal(instance.isTableSelectable('diy_table'), false);
     assert.equal(instance.isPermissionAllowed('diy_field', 'Read'), false);
+});
+
+test('接口引擎可按后端策略委托 CRUD，不再硬要求提升管理员等级', () => {
+    const instance = editor();
+    assert.equal(instance.isTableSelectable('sys_apiengine'), true);
+    for (const permission of ['Read', 'Add', 'Edit', 'Del']) {
+        assert.equal(instance.isPermissionAllowed('sys_apiengine', permission), true);
+    }
+    instance.policyReady = false;
+    assert.equal(instance.isTableSelectable('sys_apiengine'), false, '策略未读取时不得默认放开');
 });

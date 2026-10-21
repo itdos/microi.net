@@ -889,12 +889,12 @@ function buildFieldConfig(sourceType: string, options: JsonRecord): { data?: str
   if (type === 'apiengine') {
     const apiEngineKey = getString(options, 'apiEngineKey', 'DataSourceApiEngineKey');
     if (!apiEngineKey) warnings.push('接口引擎数据源缺少 apiEngineKey');
-    return { config: { DataSource: 'ApiEngine', DataSourceApiEngineKey: apiEngineKey, SelectLabel: getString(options, 'selectLabel') || 'name', SelectSaveField: getString(options, 'selectSaveField') || 'id' }, warnings };
+    return { config: { DataSource: 'ApiEngine', DataSourceApiEngineKey: apiEngineKey, SelectLabel: getString(options, 'selectLabel') || 'name', SelectSaveField: getString(options, 'selectSaveField') || 'id', ...selectedValueLookupConfig(options, warnings) }, warnings };
   }
   if (type === 'datasource') {
     const dataSourceId = getString(options, 'dataSourceId', 'DataSourceId');
     if (!dataSourceId) warnings.push('数据源引擎配置缺少 dataSourceId');
-    return { config: { DataSource: 'DataSource', DataSourceId: dataSourceId, SelectLabel: getString(options, 'selectLabel') || 'Name', SelectSaveField: getString(options, 'selectSaveField') || 'Id' }, warnings };
+    return { config: { DataSource: 'DataSource', DataSourceId: dataSourceId, SelectLabel: getString(options, 'selectLabel') || 'Name', SelectSaveField: getString(options, 'selectSaveField') || 'Id', ...selectedValueLookupConfig(options, warnings) }, warnings };
   }
   if (type === 'autonumber') {
     return { config: { AutoNumberFixed: getString(options, 'prefix', 'AutoNumberFixed'), AutoNumberLength: getNumber(options, 'length', 'AutoNumberLength') ?? 4 }, warnings };
@@ -912,6 +912,14 @@ function buildFieldConfig(sourceType: string, options: JsonRecord): { data?: str
   }
   warnings.push(`未知 sourceType: ${sourceType}，已返回空配置`);
   return { config: {}, warnings };
+}
+
+// 任意引擎必须显式实现按已选值解析契约；不把字符串 "false" 误当成启用。
+function selectedValueLookupConfig(options: JsonRecord, warnings: string[]): JsonRecord {
+  const enabled = options.selectedValueLookup ?? options.SelectedValueLookup;
+  if (enabled === undefined) return {};
+  if (typeof enabled !== 'boolean') throw new Error('SelectedValueLookup 必须为 boolean');
+  return { SelectedValueLookup: enabled };
 }
 
 function toSearchFieldModel(meta: FieldMeta, ref?: FieldRef): JsonRecord {
@@ -3196,7 +3204,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     `Build and validate Microi diy_field Data/Config JSON for option controls, SQL/APIEngine/DataSource sources, JoinForm, AutoNumber and DateTime. OsClient: ${osClient}`,
     {
       sourceType: z.enum(['Data', 'KeyValue', 'Sql', 'ApiEngine', 'DataSource', 'AutoNumber', 'JoinForm', 'DateTime', 'FileUpload']).describe('Config source type. FileUpload 的 options 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance，均为 boolean，默认 false；ConfigurableRoleIds 是最多 100 个真实角色 Id 的数组，默认 [] 允许所有角色，非空时仅可新增其中角色的附件授权。启用角色权限自动 Limit=true。'),
-      options: jsonRecordSchema.optional().describe('Source options, such as data/options, sql, apiEngineKey, dataSourceId, tableId, prefix, length'),
+      options: jsonRecordSchema.optional().describe('数据源参数：data/options、sql、apiEngineKey、dataSourceId、tableId、prefix、length。ApiEngine/DataSource 可传 selectedValueLookup（boolean，默认不启用）；仅在引擎支持 _ResolveSelectedValues=true、_SelectedValues 数组、保留权限过滤且返回 DataAppend.SelectedValuesResolved=true 后启用，需配套新前端。'),
     },
     async ({ sourceType, options }) => {
       const built = buildFieldConfig(sourceType, options || {});

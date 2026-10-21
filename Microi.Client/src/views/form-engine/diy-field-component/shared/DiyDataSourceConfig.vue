@@ -118,6 +118,11 @@
             </el-select>
         </el-form-item>
 
+        <el-form-item v-if="['ApiEngine', 'DataSource', 'Api'].includes(config.DataSource)" label="支持已选值回显">
+            <el-switch :model-value="config.SelectedValueLookup === true" @update:model-value="updateConfig('SelectedValueLookup', $event)" />
+            <div class="form-item-tip">仅在数据源已支持 _ResolveSelectedValues / _SelectedValues 批量查询并返回 SelectedValuesResolved 标识后开启；必须保留自身权限过滤。</div>
+        </el-form-item>
+
         <!-- 远程搜索 -->
         <el-form-item v-if="config.DataSource == 'Sql' || config.DataSource == 'DataSource' || config.DataSource == 'ApiEngine'" label="远程搜索">
             <el-switch :model-value="config.DataSourceSqlRemote" @update:model-value="updateConfig('DataSourceSqlRemote', $event)" active-color="#ff6c04" inactive-color="#ccc" />

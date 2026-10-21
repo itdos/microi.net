@@ -37,6 +37,8 @@ import { isEmbeddedWebosWindowRuntime } from "./webos-embedded-runtime.js";
 import { getRuntimeEndpointQuery, getRuntimeWindowValue } from "./runtime-endpoint-query.js";
 import { withRequestTenant } from "./request-tenant-context.js";
 import { buildAppStoreMap } from "./app-store-record.js";
+import { createSelectedOptionHydrator, mergeResolvedOptions } from "./selected-option-hydration.js";
+let selectedOptionHydrator;
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
 import config from "@/config.json";
@@ -4025,6 +4027,23 @@ var DiyCommon = {
 
         return null;
     },
+    ResolveFieldsSelectedData(fields, records, context = {}) {
+        selectedOptionHydrator ||= createSelectedOptionHydrator({
+            request: (url, data) => DiyCommon.PostAsync({ url, data, timeout: 15000, suppressErrorNotification: true }),
+            identity: () => {
+                const token = DiyCommon.getToken(), tenant = DiyCommon.GetOsClient(), userId = getDiyStore().GetCurrentUser?.Id;
+                const claims = DiyCommon.DecodeJwtPayload(token);
+                // Token 续期不切换会话；换租户/用户/重新登录则隔离，旧 token 无会话声明时保守失效。
+                const sameActor = String(claims?.UserId || '') === String(userId || '')
+                    && String(claims?.OsClient || '').toLowerCase() === String(tenant || '').toLowerCase();
+                return [DiyCommon.GetApiBase(), tenant, userId, sameActor && claims?.MicroiSessionId ? claims.MicroiSessionId : token].join('\0');
+            },
+            sqlUrl: '/api/FormEngine/GetFieldsDataFromBody',
+            engineUrl: key => DiyApi.GetApiEngineUrl(key), dataSourceUrl: DiyApi.GetDataSourceEngine
+        });
+        return selectedOptionHydrator(fields, records, context);
+    },
+    MergeResolvedFieldOptions: mergeResolvedOptions,
     SetFieldsData(fields, formData, tableChildAuth) {
         var self = this;
         fields.forEach((field) => {
@@ -4082,7 +4101,7 @@ var DiyCommon = {
                                 });
                             }
                         } catch (error) {}
-                        field.Data = result.Data;
+                        field.Data = mergeResolvedOptions(field, result.Data);
                     });
                 } else {
                     var fieldsMsg = "";
@@ -4174,7 +4193,7 @@ var DiyCommon = {
                                         });
                                     }
                                 } catch (error) {}
-                                field.Data = result.Data;
+                                field.Data = mergeResolvedOptions(field, result.Data);
                             }
                         }, function () {
                             field._DataLoading = false;
@@ -4287,7 +4306,7 @@ var DiyCommon = {
                                 if (fieldModel.Config.SelectSaveFormat !== "Json") {
                                     var saveField = fieldModel.Config.SelectSaveField;
                                     formDiyTableModel[formField] = selectVal.map(function(item) {
-                                        return item ? item[saveField] : item;
+                                        return item && typeof item === "object" ? item[saveField] : item;
                                     });
                                 }
                             }
@@ -4314,13 +4333,13 @@ var DiyCommon = {
                                 //如果配置了存储对应字段
                                 if (!DiyCommon.IsNull(fieldModel.Config.SelectSaveField)) {
                                     //2022-09-02：下拉框可能已經清除了值，不能獲取一個undefined，否則不會傳入到後端
-                                    if (formDiyTableModel[formField]) {
+                                    if (formDiyTableModel[formField] && typeof formDiyTableModel[formField] === "object") {
                                         formDiyTableModel[formField] = formDiyTableModel[formField][fieldModel.Config.SelectSaveField];
                                     }
                                 }
                                 //没配置存储对应字段，就存显示对应字段
                                 else {
-                                    if (formDiyTableModel[formField]) {
+                                    if (formDiyTableModel[formField] && typeof formDiyTableModel[formField] === "object") {
                                         formDiyTableModel[formField] = formDiyTableModel[formField][fieldModel.Config.SelectLabel];
                                     }
                                 }
@@ -4373,11 +4392,11 @@ var DiyCommon = {
                         if (fieldModel.Config && fieldModel.Config.DataSource === "KeyValue") {
                             var val = formDiyTableModel[formField];
                             if (Array.isArray(val) && val.length > 0) {
-                                // 检查第一个元素是否是对象
-                                if (typeof val[0] === "object") {
+                                // 历史数据可能混合对象和键值，不能由第一项决定整批转换。
+                                if (val.some(item => item && typeof item === "object")) {
                                     var keyArray = val.map(function(item) {
                                         // 兼容大小写：优先使用 Key，其次 key
-                                        return item.Key !== undefined ? item.Key : item.key;
+                                        return item && typeof item === "object" ? (item.Key !== undefined ? item.Key : item.key) : item;
                                     });
                                     formDiyTableModel[formField] = keyArray;
                                 }
@@ -4392,10 +4411,10 @@ var DiyCommon = {
                             // 如果是存字段（非 Json）
                             if (fieldModel.Config.SelectSaveFormat !== "Json") {
                                 var val = formDiyTableModel[formField];
-                                if (Array.isArray(val) && val.length > 0 && typeof val[0] === "object") {
+                                if (Array.isArray(val) && val.length > 0) {
                                     var saveField = fieldModel.Config.SelectSaveField;
                                     var fieldArray = val.map(function(item) {
-                                        return item[saveField];
+                                        return item && typeof item === "object" ? item[saveField] : item;
                                     });
                                     formDiyTableModel[formField] = fieldArray;
                                 }

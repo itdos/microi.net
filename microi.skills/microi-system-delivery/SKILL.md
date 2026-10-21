@@ -53,7 +53,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 模块引擎或 `sys_menu`。逐步建模在字段完成后调用 `microi_configure_form_banner` 回读验收。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=720e0f2db0997318d879af67cd708b7d25a33c321e47100c4800ee39a25b4c9e -->
+<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=04f08fdc316d253f167e26923066e134763ab129dd830f833c762214613c607f -->
 ## 交付总原则
 
 1. **先事实源，后建模**：先读需求文档、截图、现有蓝图、数据库结构和菜单结构，形成业务蓝图；不要边猜边建表、边猜边写接口。
@@ -67,7 +67,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 9. **平台能力四项同步**：按 `workspace-conventions/SKILL.md` 首部识别创始人源码工作区；每项平台新增、增强或修复都逐项判断应用商城、官方中文文档、Skills、MCP 是否需要完善，交付时列出证据或无需修改的依据。复用已有 MCP 能力，不机械新增工具；镜像发布不等于客户部署，客户手动更新边界必须保留。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=e01ae6b21425b1410100e33ece7875b6313d9456144ad3131ad0fab7fb31d33a -->
+<!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=167c117fc2a52cea49cd1bf2128b450fb3c8af07e8af1e955d1482a454d472ef -->
 ## 用户问题编号跟踪（强制）
 
 用户一次提出多个问题时，必须先拆成 `1、2、3、4...` 的问题清单，并在交付过程中保持同一编号，不得合并吞掉或用笼统“已优化”代替。
@@ -87,7 +87,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 - 每条结论明确区分源码已改、运行验收通过、渠道已发布；发现回归或用户再次指出问题时，将对应旧项重新标为待修复/部分完成，修复后再更新结论。最后逐项核对编号总数，禁止漏项、跳号或把未取得回执的发布写成完成。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=9a259382b07851aaa60a795da3ffa4773e9cf3b9f9d791a52f95e34e1944cc69 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=cc8ef54619f2f7a1dc3ba4268d02cbe678c855ba17e2d9e9ed3251ac0dc35e18 -->
 ## 交付完成定义
 
 一次 Microi 全系统交付只有同时满足以下条件才算完成：

@@ -9,6 +9,32 @@ import { hasSwitchNullValueEnabled, normalizeFormSwitchValue } from "@/utils/for
 
 export default {
     methods: {
+        ResolveTableSelectedOptions() {
+            // 仅补实际展示的列；同一字段的多个 JOIN 别名合并查询，不能逐行请求。
+            const displayed = (this.TableDisplayMode === "Card"
+                ? [this.CardShowDiyFieldList, this.CardSubtitleFieldList, this.CardTopFieldList,
+                    this.CardRightFieldList, this.CardContentFieldList, this.CardMetaFieldList,
+                    [this.CardPrimaryField, this.CardAvatarField]]
+                : [this.ShowDiyFieldList, this.PresentationListFieldList])
+                .flat().filter(field => field?.Id);
+            const byId = new Map((this.DiyFieldList || []).map(field => [field.Id, field]));
+            const fields = new Map(), selectedFieldNames = {};
+            for (const field of displayed) {
+                fields.set(field.Id, byId.get(field.Id) || field);
+                selectedFieldNames[field.Id] ||= [];
+                const name = field.AsName || field.Name;
+                if (!selectedFieldNames[field.Id].includes(name)) selectedFieldNames[field.Id].push(name);
+            }
+            return Promise.resolve(this.DiyCommon.ResolveFieldsSelectedData([...fields.values()], this.DiyTableRowList, {
+                tableChildAuth: this.TableChildAuth, menuId: this.SysMenuId, selectedFieldNames
+            })).then(() => {
+                // SelectFields 的列是元数据副本，需更新它们的显示数据引用，不改行/表单值。
+                for (const field of this.ShowDiyFieldList || []) {
+                    const source = byId.get(field.Id);
+                    if (source && source !== field) field.Data = source.Data;
+                }
+            });
+        },
         GetDevComponentRenderSource(field) {
             const componentName = field?.Config?.DevComponentName;
             if (!componentName) return "";
@@ -314,6 +340,7 @@ export default {
                 self.SysMenuModel
             );
             self.DiyCommon.SetFieldsData(dataSourceFields, null, self.TableChildAuth);
+            self.ResolveTableSelectedOptions();
             // self.$emit("CallbackGetDiyField", self.DiyFieldList)
         },
         GetDiyTableModel() {
@@ -511,6 +538,8 @@ export default {
                 }).join(",");
             }
             if (typeof parsedValue === "object") {
+                var resolvedOption = self._FindOptionForDisplay(parsedValue, field);
+                if (resolvedOption) return self._DisplayValueToString(self._GetOptionLabelForDisplay(resolvedOption, field));
                 var objectLabel = self._GetObjectDisplayValue(parsedValue, field, [cfg.SelectLabel, "Value", "value", "Label", "label", "Name", "name", "Text", "text"]);
                 if (!self._IsBlankDisplayValue(objectLabel)) return self._DisplayValueToString(objectLabel);
                 var matchedByObject = self._FindOptionForDisplay(parsedValue, field);

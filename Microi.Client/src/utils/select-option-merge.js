@@ -104,7 +104,7 @@ export function resolveTextSelectValueKey(config) {
  * zhy：远程搜索替换选项列表时仅保留表单当前已选值，
  * zhy：避免查看、编辑历史记录时已保存的关联值显示为空，同时不扩大远程接口返回的可选范围。
  */
-export function mergeCurrentSelectOptions(remoteOptions, selectedValue, config, multiple) {
+export function mergeCurrentSelectOptions(remoteOptions, selectedValue, config, multiple, knownOptions = []) {
     const result = Array.isArray(remoteOptions) ? [...remoteOptions] : [];
     const parsed = parseStoredValue(selectedValue);
     const selected = multiple
@@ -113,6 +113,10 @@ export function mergeCurrentSelectOptions(remoteOptions, selectedValue, config, 
     const cfg = config || {};
     const saveField = cfg.SelectSaveField || cfg.SelectLabel || "Id";
     const labelField = cfg.SelectLabel || cfg.SelectSaveField || "Name";
+    // 多选保存键数组没有名称；新搜索失败/空结果时只保留当前已选键的已知选项。
+    // 不保留上一页的其它候选，也不新增网络请求。
+    const known = new Map((Array.isArray(knownOptions) ? knownOptions : [])
+        .map(option => [optionIdentity(option, saveField, labelField), option]));
     const identities = new Set(
         result
             .map((item) => optionIdentity(item, saveField, labelField))
@@ -121,10 +125,11 @@ export function mergeCurrentSelectOptions(remoteOptions, selectedValue, config, 
 
     // zhy：仅追加远程结果中不存在的当前已选项，避免带入上次搜索的无关选项。
     selected.forEach((value) => {
-        const option = normalizeSelectedOption(value, saveField, labelField);
+        let option = normalizeSelectedOption(value, saveField, labelField);
         if (!option) return;
         const identity = optionIdentity(option, saveField, labelField);
         if (!identity || identities.has(identity)) return;
+        if (known.has(identity)) option = { ...option, ...known.get(identity) };
         result.push(option);
         identities.add(identity);
     });

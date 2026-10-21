@@ -251,7 +251,7 @@ export default {
                         },
                         function (result) {
                             if (self.DiyCommon.Result(result)) {
-                                field.Data = result.Data;
+                            field.Data = self.DiyCommon.MergeResolvedFieldOptions(field, result.Data);
                                 cb(result.Data);
                             }
                             field.Config.DataSourceSqlRemoteLoading = false;
@@ -275,7 +275,7 @@ export default {
                         },
                         function (result) {
                             if (self.DiyCommon.Result(result)) {
-                                field.Data = result.Data;
+                            field.Data = self.DiyCommon.MergeResolvedFieldOptions(field, result.Data);
                                 cb(result.Data);
                             }
                             field.Config.DataSourceSqlRemoteLoading = false;
@@ -457,6 +457,7 @@ export default {
                 DataSource: self.field.Config.DataSource || 'Data',
                 Sql: self.field.Config.Sql || '',
                 DataSourceId: self.field.Config.DataSourceId || '',
+                SelectedValueLookup: self.field.Config.SelectedValueLookup === true,
                 DataSourceApiEngineKey: self.field.Config.DataSourceApiEngineKey || '',
                 DataSourceSqlRemote: self.field.Config.DataSourceSqlRemote || false
             };
@@ -497,6 +498,7 @@ export default {
             self.field.Config.DataSource = self.configForm.DataSource;
             self.field.Config.Sql = self.configForm.Sql;
             self.field.Config.DataSourceId = self.configForm.DataSourceId;
+            self.field.Config.SelectedValueLookup = self.configForm.SelectedValueLookup === true;
             self.field.Config.DataSourceApiEngineKey = self.configForm.DataSourceApiEngineKey;
             self.field.Config.DataSourceSqlRemote = self.configForm.DataSourceSqlRemote;
             
