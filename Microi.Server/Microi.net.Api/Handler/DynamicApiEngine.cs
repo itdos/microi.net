@@ -14,6 +14,7 @@ namespace Microi.net.Api
     {
         public const string ResolvedApiEngineKeyItem = "__MicroiResolvedApiEngineKey";
         public const string ResolvedApiRouteValuesItem = "__MicroiResolvedApiRouteValues";
+        private const string ConfirmedAbsentRouteItem = "__MicroiConfirmedAbsentRoute";
         // 正则表达式静态编译（高并发优化）
         private static readonly Regex OsClientRegex = new Regex(@"--OsClient--(.*?)--$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex CanonicalApiEngineKeyRegex = new Regex(
@@ -23,55 +24,6 @@ namespace Microi.net.Api
         // 缓存键前缀常量
         private const string CacheKeyPrefix = "Microi";
         private const string ApiEngineCacheKey = "FormData:sys_apiengine";
-
-        // 标准 Controller 路由前缀（提前返回，避免缓存查询 - 性能优化）。
-        // 此清单只包含当前实际保留的宿主协议/内核 Controller；迁入 Managed
-        // ApiEngine 的旧入口必须从这里移除，避免不存在的 /api/* 路由吞掉动态地址。
-        private static readonly HashSet<string> StandardControllerPrefixes = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "/api/ai/",
-            "/api/apiengine/",
-            "/api/captcha/",
-            "/api/diagnostics/",
-            "/api/diychat/",
-            "/api/formengine/",
-            "/api/hdfs/",
-            "/api/home/",
-            "/api/license/",
-            "/api/message/",
-            "/api/microapp/",
-            "/api/os/",
-            "/api/ueditor/",
-            "/api/upload/",
-            "/api/v8debug/",
-            "/api/v8engine/"
-        };
-
-        // 保留 Controller 前缀的少量历史地址已经迁入 Managed 接口引擎，必须先让
-        // 动态路由按 ApiRoutes 精确命中；同前缀其它内核/协议方法仍走快速通道。
-        private static readonly HashSet<string> MigratedControllerRoutePaths = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "/api/diychat/sendsystemmessage",
-            "/api/formengine/getsysconfig", "/api/formengine/getlangbundle",
-            "/api/formengine/getloginwallpapers",
-            "/api/hdfs/getprivatefileurl", "/api/hdfs/mallfileurl",
-            "/api/os/getosclientbydomain", "/api/os/getosversion",
-            "/api/os/createqrcode", "/api/os/createqrcodeimage",
-            "/api/os/getmicroinetversion", "/api/os/getosclient", "/api/os/gethid",
-            "/api/os/getdatetimenow", "/api/os/microiNetinitcheck",
-            "/api/ai/updateconversationtitle", "/api/ai/recognizeintent",
-            "/api/ai/chat", "/api/ai/nl2sql", "/api/ai/nl2v8enginesync",
-            "/api/ai/relaytokensummary", "/api/ai/subgetplans", "/api/ai/subgetinfo",
-            "/api/ai/getuseraiapikey", "/api/ai/resetuseraiapikey",
-            "/api/ai/getuseraiusage", "/api/ai/subcreateorder",
-            "/api/ai/subcreatealipay", "/api/ai/subgetorders",
-            "/api/ai/subconsumequota", "/api/ai/subgetorderstatus",
-            "/api/ai/subgetapikeylist", "/api/ai/subgetapikeybindusers",
-            "/api/ai/subgetapikeycapacity", "/api/ai/generateprofileavatar",
-            "/api/ai/createminimaxvideo", "/api/ai/getminimaxvideotask",
-            "/api/ai/getminimaxvideofile", "/api/ai/persistminimaxvideofile",
-            "/api/ai/proxygetquotastatus", "/api/ai/subgetmodels"
-        };
 
         public async Task<DosResult> Init(OsClientSecret clientModel)
         {
@@ -140,9 +92,9 @@ namespace Microi.net.Api
                 _CurrentUser = null,
                 ApiAddress = apiAddress
             };
-            var result = ApiEngineAuthoritativeStore.GetEnabledModel(client, addressParam);
+            var result = ApiEngineAuthoritativeStore.GetConfiguredModel(client, addressParam);
             if (result.Code != 1 || result.Data != null) return result;
-            return ApiEngineAuthoritativeStore.GetEnabledByMultiRoute(client, apiAddress);
+            return ApiEngineAuthoritativeStore.GetConfiguredByMultiRoute(client, apiAddress);
         }
 
         /// <summary>
@@ -278,43 +230,14 @@ namespace Microi.net.Api
             return false;
         }
 
-        private static async Task<(object ApiModel, JObject RouteValues)> ResolveTemplateRouteAsync(
+        private static (object ApiModel, JObject RouteValues) ResolveTemplateRoute(
             string osClient,
             string apiPath)
         {
             if (osClient.DosIsNullOrWhiteSpace()) return (null, null);
-            var primaryResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
-            {
-                FormEngineKey = "sys_apiengine",
-                OsClient = osClient,
-                _Where = new List<DiyWhere>
-                {
-                    new DiyWhere { Name = "ApiAddress", Type = "Like", Value = "{" },
-                    new DiyWhere { Name = "IsEnable", Type = "=", Value = 1 }
-                },
-                _PageIndex = 1,
-                _PageSize = 500
-            });
-            var multiResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
-            {
-                FormEngineKey = "sys_apiengine",
-                OsClient = osClient,
-                _Where = new List<DiyWhere>
-                {
-                    new DiyWhere { Name = ApiEngineRouteAliases.MultiRouteFieldName, Type = "Like", Value = "{" },
-                    new DiyWhere { Name = "IsEnable", Type = "=", Value = 1 }
-                },
-                _PageIndex = 1,
-                _PageSize = 500
-            });
-            if ((primaryResult.Code != 1 || primaryResult.Data == null)
-                && (multiResult.Code != 1 || multiResult.Data == null)) return (null, null);
-
-            var rows = new List<JObject>();
-            if (primaryResult.Code == 1 && primaryResult.Data != null)
-                rows.AddRange(JArray.FromObject(primaryResult.Data).OfType<JObject>());
-            if (multiResult.Code == 1 && multiResult.Data != null)
-                rows.AddRange(JArray.FromObject(multiResult.Data).OfType<JObject>());
+            // 停用模板仍占用路由；读取失败或冲突不能被当成缺失并落入 Controller。
+            var rows = ApiEngineAuthoritativeStore.GetConfiguredTemplates(OsClientExtend.GetClient(osClient))
+                .Select(row => JObject.FromObject((object)row)).ToList();
             var matches = new List<(JObject Model, JObject Values)>();
             foreach (var row in rows
                 .GroupBy(item => item["Id"]?.ToString() ?? item["ApiEngineKey"]?.ToString(), StringComparer.OrdinalIgnoreCase)
@@ -338,6 +261,7 @@ namespace Microi.net.Api
                     3,
                     false,
                     apiPath);
+                throw new InvalidOperationException("接口引擎模板路由存在冲突。");
             }
             return (null, null);
         }
@@ -349,6 +273,9 @@ namespace Microi.net.Api
         {
             try
             {
+                // Key 路由和通配兼容路由可能针对同一请求依次运行。缺失结果只在
+                // 当前请求内复用，不做跨请求负缓存，新增接口保存后可立即生效。
+                if (httpContext.Items.ContainsKey(ConfirmedAbsentRouteItem)) return null;
                 var requestMethod = httpContext.Request.Method?.ToUpperInvariant();
 
                 // OPTIONS 请求快速处理
@@ -405,23 +332,8 @@ namespace Microi.net.Api
                     return values;
                 }
 
-                // FormEngine 特殊路由快速匹配
-                if (TryMapFormEngineRoute(apiPathLower, values))
-                {
-                    return values;
-                }
-
-                // 【性能优化】提前识别标准 Controller 路由，直接返回，避免缓存查询
-                // 这样可以避免每次请求都查询缓存（本地+Redis），性能提升显著
-                foreach (var prefix in StandardControllerPrefixes)
-                {
-                    if (!MigratedControllerRoutePaths.Contains(apiPathLower)
-                        && apiPathLower.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        // 标准路由，直接返回，交给 ASP.NET Core 路由系统处理
-                        return values;
-                    }
-                }
+                // 不按 Controller 前缀跳过动态路由。即使宿主有同地址 Action，
+                // 当前租户配置的 ApiAddress/ApiRoutes 仍是第一事实源。
 
                 // 提取 OsClient（多来源优先级解析）
                 var osClient = osClientFromPath;
@@ -467,6 +379,8 @@ namespace Microi.net.Api
                     var fallbackResult = GetAuthoritativeRouteByAddress(
                         osClient,
                         apiPathLower);
+                    if (fallbackResult.Code != 1)
+                        return RouteResolutionFailure(httpContext, values);
 
                     if (fallbackResult.Code == 1
                         && fallbackResult.Data == null
@@ -494,10 +408,13 @@ namespace Microi.net.Api
                                 _CurrentUser = null,
                                 ApiEngineKey = canonicalApiEngineKey
                             };
-                            fallbackResult = await MicroiEngine.ApiEngine
-                                .GetAuthoritativeApiEngineModel(keyParam);
+                            fallbackResult = ApiEngineAuthoritativeStore.GetConfiguredModel(
+                                OsClientExtend.GetClient(osClient), keyParam);
                         }
                     }
+
+                    if (fallbackResult.Code != 1)
+                        return RouteResolutionFailure(httpContext, values);
 
                     if (fallbackResult.Code == 1 && fallbackResult.Data != null)
                     {
@@ -527,7 +444,7 @@ namespace Microi.net.Api
                 if (apiModel == null && !osClient.DosIsNullOrWhiteSpace()
                     && apiPath.IndexOf('{') < 0)
                 {
-                    var templateRoute = await ResolveTemplateRouteAsync(osClient, apiPath);
+                    var templateRoute = ResolveTemplateRoute(osClient, apiPath);
                     if (templateRoute.ApiModel != null)
                     {
                         apiModel = templateRoute.ApiModel;
@@ -598,15 +515,11 @@ namespace Microi.net.Api
                     return values;
                 }
 
-                if (apiPathLower.StartsWith("/apiengine/", StringComparison.OrdinalIgnoreCase))
-                {
-                    // 即使应用尚未安装或路由缓存暂时缺失，也把明确的接口引擎地址
-                    // 交给核心入口按 ApiAddress 解析并返回结构化 DosResult，避免 404。
-                    // 存在的 File/HTML/Stream 类型仍会在上方读取模型后选择专用 Action。
-                    values["controller"] = "ApiEngine";
-                    values["action"] = requestMethod == "GET" ? "Run_Request_Get" : "Run";
-                    return values;
-                }
+                // 只有权威查询确认不存在引擎，才允许旧 FormEngine 地址或实际
+                // Controller 端点兜底；返回 null 让路由器继续选择，而不是猜测 Action。
+                if (TryMapFormEngineRoute(apiPathLower, values)) return values;
+                httpContext.Items[ConfirmedAbsentRouteItem] = true;
+                return null;
             }
             catch (Exception ex)
             {
@@ -618,9 +531,16 @@ namespace Microi.net.Api
                 {
                     values["controller"] = "LegacyMobileCompatibility";
                     values["action"] = "Run";
+                    return values;
                 }
+                return RouteResolutionFailure(httpContext, values);
             }
+        }
 
+        private static RouteValueDictionary RouteResolutionFailure(HttpContext context, RouteValueDictionary values)
+        {
+            values["controller"] = "ApiEngine";
+            values["action"] = "RouteUnavailable";
             return values;
         }
     }

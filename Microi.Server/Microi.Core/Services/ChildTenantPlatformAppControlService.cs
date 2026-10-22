@@ -1235,7 +1235,9 @@ END";
             if (string.Equals(apiEngineKey, PlatformOsClientByDomainApiEngineKey, StringComparison.Ordinal))
                 return code.IndexOf("V8.Method.ResolveOsClientByDomain", StringComparison.Ordinal) >= 0;
             if (string.Equals(apiEngineKey, PlatformSysConfigApiEngineKey, StringComparison.Ordinal))
-                return code.IndexOf("V8.Method.GetPublicSysConfig", StringComparison.Ordinal) >= 0;
+                return code.IndexOf("PUBLIC_SYS_CONFIG_ORCHESTRATION_V2", StringComparison.Ordinal) >= 0
+                       && code.IndexOf("V8.Method.ProjectPublicSysConfig", StringComparison.Ordinal) >= 0
+                       || code.IndexOf("V8.Method.GetPublicSysConfig", StringComparison.Ordinal) >= 0;
             if (string.Equals(apiEngineKey, PlatformLangBundleApiEngineKey, StringComparison.Ordinal))
                 return code.IndexOf("V8.Method.GetLangBundle", StringComparison.Ordinal) >= 0;
             if (string.Equals(apiEngineKey, PlatformCurrentUserApiEngineKey, StringComparison.Ordinal))

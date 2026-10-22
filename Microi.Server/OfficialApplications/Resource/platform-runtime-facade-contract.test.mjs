@@ -12,7 +12,7 @@ const resource = JSON.parse(fs.readFileSync(
 
 const facadeDefinitions = [
   ['platform-os-client-by-domain', 'platform-os-client-by-domain.js', 1, 'V8.Method.ResolveOsClientByDomain'],
-  ['platform-sys-config', 'platform-sys-config.js', 1, 'V8.Method.GetPublicSysConfig'],
+  ['platform-sys-config', 'platform-sys-config.js', 1, 'V8.Method.ProjectPublicSysConfig'],
   ['platform-service-health', 'platform-service-health.js', 1, 'V8.Method.GetBackendVersion'],
   ['platform-lang-bundle', 'platform-lang-bundle.js', 1, 'V8.Method.GetLangBundle'],
   ['platform-current-user', 'platform-current-user.js', 0, 'V8.CurrentUser'],

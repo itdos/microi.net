@@ -168,6 +168,23 @@ namespace Microi.net
                 .GetResult();
         }
 
+        /// <summary>仅做凭据/服务端脚本隔离，不查询数据库、不组装业务响应。</summary>
+        public DosResult ProjectPublicSysConfig(object configuration)
+        {
+            var denied = RequireTrustedApiEngine(PlatformSysConfigEngineKey);
+            if (denied != null) return denied;
+            return new DosResult(1, TenantConfigurationSecurity.CreatePublicSysConfigProjection(
+                configuration, V8TenantContext.Current.OsClient));
+        }
+
+        /// <summary>只读登录加密公钥；私钥不会进入 V8 或返回值。</summary>
+        public string GetLoginEncryptionPublicKey()
+        {
+            if (RequireTrustedApiEngine(PlatformSysConfigEngineKey) != null) return string.Empty;
+            return (ConfigHelper.GetRuntimeConfigurationValue("Security:LoginRsaPublicKey") ?? string.Empty)
+                .Replace("\\n", "\n").Trim();
+        }
+
         /// <summary>读取当前租户指定语言前缀的词条包。</summary>
         public DosResult GetLangBundle(string lang = null, string prefix = "Msg.")
         {

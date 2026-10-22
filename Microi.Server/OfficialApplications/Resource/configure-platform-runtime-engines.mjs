@@ -192,8 +192,9 @@ const engines = [
   },
   {
     key: 'platform-sys-config', name: '平台公开系统设置', file: 'platform-sys-config.js',
+    version: 'v1.1.0',
     id: '019d2a01-9d63-7f91-8c01-000000000003', enableLog: 0, allowAnonymous: 1,
-    history: '2026-08-25 v1.0.0 将浏览器公开系统设置迁移为匿名 Managed 接口引擎，强制服务端安全投影。'
+    history: '2026-10-22 v1.1.0 配置读取、失败分类和响应组装迁入接口引擎；宿主仅保留秘密投影、公钥与授权版本原子。\n2026-08-25 v1.0.0 将浏览器公开系统设置迁移为匿名 Managed 接口引擎，强制服务端安全投影。'
   },
   {
     key: 'platform-service-health', name: '平台固定服务健康检查', file: 'platform-service-health.js',

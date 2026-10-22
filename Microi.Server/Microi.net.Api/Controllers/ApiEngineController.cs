@@ -26,6 +26,11 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class ApiEngineController : Controller
     {
+        // 路由存储故障不是“接口不存在”。禁止误执行同地址的兼容 Controller。
+        [AllowAnonymous]
+        public IActionResult RouteUnavailable() => StatusCode(503,
+            new DosResult(0, null, "接口路由暂时无法确认，请稍后重试。"));
+
         /// <summary>
         /// 系统消息的持久化由接口引擎事务完成；只有精确的官方 Managed 引擎在
         /// 成功提交并声明 DeliveryPending 后，宿主才执行 best-effort SignalR 投递。

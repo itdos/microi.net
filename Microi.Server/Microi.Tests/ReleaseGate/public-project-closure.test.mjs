@@ -86,6 +86,69 @@ function missingProjectReferences(available) {
   return missing;
 }
 
+function solutionProjects(source) {
+  return new Map([...source.matchAll(/^Project\("[^"\r\n]+"\) = "[^"\r\n]+", "([^"\r\n]+\.csproj)", "(\{[^}]+\})"/gm)]
+    .map(match => [projectReferenceTarget('Microi.Server/solution.sln', match[1]), match[2]]));
+}
+
+function missingSolutionProjects(projects) {
+  const missing = new Set();
+  const visited = new Set();
+  const pending = [...projects.keys()];
+  // CLI 的递归 restore 会掩盖方案漏项；VS 只收集已加载项目的 NuGet 图，
+  // 因此公开依赖（包括 ReferenceOutputAssembly=false 的独立进程）也必须在方案中。
+  while (pending.length) {
+    const project = pending.pop();
+    if (visited.has(project)) continue;
+    visited.add(project);
+    if (!available.has(project)) continue;
+    const source = fs.readFileSync(path.join(workspace, project), 'utf8');
+    for (const match of source.matchAll(/<ProjectReference\b[^>]*\bInclude="([^"]+)"/g)) {
+      if (match[1].includes('$(')) continue;
+      const target = projectReferenceTarget(project, match[1]);
+      if (protectedRoots.some(root => target === root || target.startsWith(root + '/'))) continue;
+      if (!projects.has(target)) missing.add(target);
+      pending.push(target);
+    }
+  }
+  return [...missing].sort();
+}
+
+test('公开解决方案包含全部传递项目及每种构建配置，不依赖 CLI 递归还原补漏', () => {
+  const source = fs.readFileSync(path.join(workspace, 'Microi.Server/Microi.net.sln'), 'utf8');
+  const projects = solutionProjects(source);
+  assert.ok(projects.size > 0);
+  assert.deepEqual([...projects.keys()].filter(project => protectedRoots.some(root => project.startsWith(root + '/'))), []);
+  assert.deepEqual(missingSolutionProjects(projects), []);
+  const configurations = [...source.matchAll(/^\s*(\w+\|[^=\r\n]+?)\s*=\s*\1\s*$/gm)].map(match => match[1]);
+  assert.ok(configurations.includes('Debug|Any CPU'));
+  assert.ok(configurations.includes('Release|Any CPU'));
+  assert.equal(new Set(projects.values()).size, projects.size, '项目 GUID 不能重复');
+  for (const [project, guid] of projects) {
+    assert.ok(available.has(project), `方案项目未公开交付：${project}`);
+    for (const configuration of configurations)
+      for (const mapping of ['ActiveCfg', 'Build.0'])
+        assert.ok(source.includes(`${guid}.${configuration}.${mapping} = `), `${project} 缺少 ${configuration}.${mapping}`);
+  }
+});
+
+test('文件存在但解决方案漏列驱动、NPOI、Panel 或独立诊断夹具时仍失败', () => {
+  const projects = solutionProjects(fs.readFileSync(path.join(workspace, 'Microi.Server/Microi.net.sln'), 'utf8'));
+  for (const target of [
+    'Microi.Server/Microi.MongoDB.Driver/Microi.MongoDB.Driver.csproj',
+    'Microi.Server/Microi.NPOI/Microi.NPOI.csproj',
+    'Microi.Server/Microi.NPOI/Microi.NPOI.OOXML/Microi.NPOI.OOXML.csproj',
+    'Microi.Server/Microi.Panel/Microi.Panel.csproj',
+    'Microi.Server/Microi.MemoryDiagnostics/Microi.MemoryDiagnostics.csproj',
+    'Microi.Server/Microi.Tests/Fixtures/DatabasePoolNode/DatabasePoolNode.csproj',
+    'Microi.Server/Microi.Tests/Fixtures/MemoryDiagnosticsNode/Microi.MemoryDiagnostics.Fixture.csproj'
+  ]) {
+    assert.ok(available.has(target), `夹具文件必须真实存在：${target}`);
+    const without = new Map(projects); without.delete(target);
+    assert.ok(missingSolutionProjects(without).includes(target), target);
+  }
+});
+
 test('Windows 和 Unix csproj 引用解析为同一真实路径，保护目录仍按规范路径识别', () => {
   const project = 'Microi.Server/Microi.Cache/Microi.Cache.csproj';
   for (const dependency of ['Dos.Common', 'Microi.Core', 'Microi.net']) {
