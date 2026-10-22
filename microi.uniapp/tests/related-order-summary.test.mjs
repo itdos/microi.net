@@ -6,20 +6,22 @@ import { loadRelatedListSummary, formatRelatedSummaryMoney } from '../src/platfo
 
 const source = fs.readFileSync(new URL('../src/components/mci-business-related-list/mci-business-related-list.vue', import.meta.url), 'utf8')
 const metadata = JSON.parse(fs.readFileSync(new URL('../profiles/xjy/metadata/order-list-statistics.json', import.meta.url), 'utf8'))
-const config = { table: metadata.table, statusField: 'DingdanZT', statusOptions: ['待审批', '已审批'], relatedSummary: { apiEngineKey: metadata.engineKey },
+const config = { table: metadata.table, statusField: 'DingdanZT', statusOptions: ['待审批', '进行中'], relatedSummary: { apiEngineKey: metadata.engineKey },
   relatedMetrics: metadata.metrics.map(m => ({ key: m.Key, label: m.Label, format: 'compactMoney', unit: '' })) }
-const data = { Metrics: { rental: '128000', buyout: '400', annualFilter: '20', sum: '21000' }, StatusCounts: { All: 2, 待审批: 1, 已审批: 1 } }
+const data = { Metrics: { rental: '128000', buyout: '400', annualFilter: '20', sum: '21000' }, StatusCounts: { All: 2, 待审批: 1, 进行中: 1 } }
 const plain = value => JSON.parse(JSON.stringify(value))
 function component(run = async () => ({ Code: 1, Data: data })) {
   const requests = []
   const scope = { loadRelatedListSummary, formatRelatedSummaryMoney, getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {}, clearTimeout,
-    resolveListReadApi: () => '', loadModuleRows: async (config, options) => { requests.push(options); return { rows: [], count: 0 } },
+    resolveListReadApi: () => '', loadTenantRelatedRows: async () => null,
+    loadModuleRows: async (config, options) => { requests.push(options); return { rows: [], count: 0 } },
     V8: { ApiEngine: { Run: run } } }
   const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*;?\r?$/gm, '').replace('export default {', 'globalThis.component = {')
   vm.runInNewContext(script, scope)
   const definition = scope.component
   const state = { ...definition.data(), ...definition.methods, config, menuId: '', relationValue: 'customer-A', childFkField: 'KehuID', isPreview: false,
     tableChildAuth: { ParentRowId: 'customer-A', ParentFieldId: 'orders-field' },
+    relatedFormContext: () => ({}),
     buildFilterWhere: () => [{ Name: 'DingdanJE', Type: '>=', Value: 100 }], buildKeywordFilterWhere: () => [],
     scheduleListBodyMeasure() {}, requiresModuleAssociationQuery: () => true, relatedSelectFields: () => ['Id'],
     hydrateProposalInstallationPointRows: async rows => rows, hydrateCollectionRows: async rows => rows }
@@ -39,18 +41,18 @@ test('关联四金额与主列表定义一致，单次请求保留父记录、�
   assert.equal(calls[0].params.Filters._Keyword, '学校')
   assert.equal(calls[0].params.Filters.ValidOnly, true)
   assert.deepEqual(state.relatedMetrics.map(m => m.label), ['租赁总价', '买断总价', '包年换芯总价', '订单金额合计'])
-  assert.equal(state.relatedStatusCount('已审批'), 1)
-  assert.equal(state.relatedStatusCount('已作废'), 0)
+  assert.equal(state.relatedStatusCount('进行中'), 1)
+  assert.equal(state.relatedStatusCount('已终止'), 0)
   assert.equal(state.relatedMetrics[0].value, '¥12.80万')
 })
 
 test('有效期开关只重算统计，保留关键词、列表、状态、分页；重置恢复全部和默认开关', async () => {
   const { state } = component()
-  state.rows = [{ Id: 'order' }]; state.pageIndex = 3; state.keyword = '学校'; state.relatedStatus = '已审批'
+  state.rows = [{ Id: 'order' }]; state.pageIndex = 3; state.keyword = '学校'; state.relatedStatus = '进行中'
   state.loadData = () => { throw new Error('切换有效期不应请求列表') }
   await state.toggleRelatedValidity()
   assert.equal(state.relatedValidOnly, false); assert.equal(state.pageIndex, 3); assert.equal(state.rows.length, 1)
-  assert.equal(state.keyword, '学校'); assert.equal(state.relatedStatus, '已审批')
+  assert.equal(state.keyword, '学校'); assert.equal(state.relatedStatus, '进行中')
   state.refreshFilteredRows = () => {}
   state.resetSearch()
   assert.equal(state.relatedStatus, ''); assert.equal(state.relatedValidOnly, true); assert.equal(state.keyword, '')
@@ -58,8 +60,8 @@ test('有效期开关只重算统计，保留关键词、列表、状态、分�
 
 test('快捷状态实际过滤列表，金额查询保留其余状态的角标', async () => {
   const { state, requests } = component()
-  await state.changeRelatedStatus('已审批')
-  assert.ok(requests[0].extraWhere.some(w => w.Name === 'DingdanZT' && w.Value === '已审批'))
+  await state.changeRelatedStatus('进行中')
+  assert.ok(requests[0].extraWhere.some(w => w.Name === 'DingdanZT' && w.Value === '进行中'))
   assert.ok(requests[0].extraWhere.some(w => w.Name === 'KehuID' && w.Value === 'customer-A'))
   assert.equal(state.relatedStatusCount('待审批'), 1)
 })

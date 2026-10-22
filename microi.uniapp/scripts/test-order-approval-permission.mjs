@@ -49,3 +49,23 @@ test('平台管理员保留待审批订单入口，已审批订单仍隐藏', ()
   assert.equal(context.canApproveOrder(pending, { Level: 9999 }), true)
   assert.equal(context.canApproveOrder({ DingdanZT: '已审批', DingdanZTZ: 2 }, { Level: 9999 }), false)
 })
+
+test('终止申请改名后仍使用原按钮授权，并限制商家与订单状态', () => {
+  const active = { ...pending, DingdanZT: '进行中', DingdanZTZ: 2 }
+  const granted = user(['f8302831-ffd9-4349-90e4-fb03910b3704'])
+  assert.equal(context.canRequestOrderTermination(active, granted), true)
+  assert.equal(context.canRequestOrderTermination({ ...active, DingdanZT: '已到期' }, granted), true)
+  assert.equal(context.canRequestOrderTermination(pending, granted), false)
+  assert.equal(context.canRequestOrderTermination({ ...active, TenantId: 'merchant-b' }, granted), false)
+  assert.equal(context.canRequestOrderTermination(active, user(['终止申请'])), false)
+})
+
+test('终止审批沿用原行按钮和表单按钮 Id，普通审批权限不能替代', () => {
+  const terminating = { ...pending, DingdanZT: '终止待审批', DingdanZTZ: 5 }
+  for (const id of ['b53e2e1c-b3e0-4b10-a0d8-e1577dc7e3e4', '72cc8297-4efb-4861-ba99-afab4c7aebbe']) {
+    assert.equal(context.canApproveOrderTermination(terminating, user([id])), true)
+    assert.equal(context.canApproveOrderTermination({ ...terminating, TenantId: 'merchant-b' }, user([id])), false)
+    assert.equal(context.canApproveOrderTermination(pending, user([id])), false)
+  }
+  assert.equal(context.canApproveOrderTermination(terminating, user(buttonIds)), false)
+})

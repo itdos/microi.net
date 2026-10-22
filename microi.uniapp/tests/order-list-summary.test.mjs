@@ -8,13 +8,13 @@ import { loadOrderListSummary } from '../src/tenants/xjy/order-list-summary.mjs'
 const source = fs.readFileSync(new URL('../src/tenants/xjy/api-engines/xjy-order-contract-totals.js', import.meta.url), 'utf8')
 const menuId = 'fc56123e-cfa1-4690-a6a4-929f202a817b'
 const orders = [
-  ['active','已审批','未断约','2026-10-15','2026-10-15',1000],
+  ['active','进行中','未断约','2026-10-15','2026-10-15',1000],
   ['expired','已到期','未断约','2025-01-01','2025-12-31',2000],
-  ['ended','已审批','已断约','2026-01-01','2027-01-01',3000],
-  ['future','已审批','未断约','2026-10-16','2027-01-01',4000],
+  ['ended','进行中','已断约','2026-01-01','2027-01-01',3000],
+  ['future','进行中','未断约','2026-10-16','2027-01-01',4000],
   ['pending','待审批','未断约','2026-01-01','2027-01-01',5000],
-  ['void','已作废','未断约','2026-01-01','2027-01-01',6000],
-  ['hidden','已审批','未断约','2026-01-01','2027-01-01',7000]
+  ['void','已终止','未断约','2026-01-01','2027-01-01',6000],
+  ['hidden','进行中','未断约','2026-01-01','2027-01-01',7000]
 ]
 const products = [
   ['r1','active','租赁','2',100,null,null,2],
@@ -61,7 +61,7 @@ test('有效合同边界与组合商品、历史空设备总价按客户口径�
   const {result,requests,queries}=execute()
   assert.equal(result.Code,1,result.Msg)
   assert.deepEqual(result.Data.Metrics,{rental:'100.00',buyout:'400.00',annualFilter:'20.00',sum:'21000.00'})
-  assert.deepEqual(result.Data.StatusCounts,{All:6,已审批:3,已到期:1,待审批:1,已作废:1})
+  assert.deepEqual(result.Data.StatusCounts,{All:6,进行中:3,已到期:1,待审批:1,已终止:1})
   assert.equal(requests.length,1);assert.equal(queries.length,2)
   assert.equal(requests[0]._SysMenuId,menuId)
   assert.equal(result.Data.ValidOnly,true)
@@ -78,7 +78,7 @@ test('关联订单统计通过完整父子授权查询，仅汇总当前客户�
   const params={_TableChildAuth:auth,Filters:{SelectedStatus:'待审批'}}
   const {result,requests,queries,urls}=execute({...params,SysMenuId:''})
   assert.equal(result.Code,1,result.Msg)
-  assert.deepEqual(result.Data.StatusCounts,{All:2,已审批:1,待审批:1})
+  assert.deepEqual(result.Data.StatusCounts,{All:2,进行中:1,待审批:1})
   assert.equal(result.Data.Metrics.sum,'5000.00')
   assert.deepEqual(requests[0]._TableChildAuth,auth)
   assert.equal(requests[0]._SysMenuId,undefined)
@@ -98,7 +98,7 @@ test('快捷状态只改变金额；其余状态角标不消失，状态零值�
 })
 
 test('PC筛选、有效期顶层参数和移动端参数优先级保持一致',()=>{
-  const filters={_Keyword:'学校',_Where:[['YewuYID','=','user']],_Search:{KehuMC:'学校'},_SearchEqual:{DingdanZT:'已审批'},_SearchNumber:{DingdanJE:{Min:1}},_SearchDateTime:{CreateTime:['2026-01-01','2026-12-31']}}
+  const filters={_Keyword:'学校',_Where:[['YewuYID','=','user']],_Search:{KehuMC:'学校'},_SearchEqual:{DingdanZT:'进行中'},_SearchNumber:{DingdanJE:{Min:1}},_SearchDateTime:{CreateTime:['2026-01-01','2026-12-31']}}
   const {result,requests}=execute({Filters:filters,ValidOnly:false})
   for(const key in filters) assert.deepEqual(requests[0][key],filters[key])
   assert.equal(result.Data.ValidOnly,false)
@@ -130,10 +130,10 @@ test('客户端单次请求、全状态与四金额校验，缺失金额和权�
   const calls=[]
   const data=execute().result.Data
   data.IncompleteMetrics.buyout=1
-  const result=await loadOrderListSummary({menuId,selectedStatus:'已审批',validOnly:false,filters:{_Keyword:'学校'},run:async(key,params)=>{calls.push({key,params});return {Code:1,Data:data}}})
+  const result=await loadOrderListSummary({menuId,selectedStatus:'进行中',validOnly:false,filters:{_Keyword:'学校'},run:async(key,params)=>{calls.push({key,params});return {Code:1,Data:data}}})
   assert.equal(calls.length,1)
   assert.equal(calls[0].params.Filters.ValidOnly,false)
-  assert.equal(calls[0].params.Filters.SelectedStatus,'已审批')
+  assert.equal(calls[0].params.Filters.SelectedStatus,'进行中')
   assert.match(result.warning,/买断1项待核对/)
   for(const response of [{Code:0,Msg:'无权限'},{Code:1,Data:{...data,Metrics:{...data.Metrics,sum:null}}}]) await assert.rejects(()=>loadOrderListSummary({menuId,run:async()=>response}))
 })

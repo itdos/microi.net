@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: xjy-order-contract-totals
- * Version: v1.0.4
+ * Version: v1.0.6
  * Function:
- * - 按合同订单菜单或父记录子表授权和完整筛选只读汇总状态、合同商品与订单金额；有效期口径沿用客户管理。
+ * - - 按合同订单菜单或父记录子表授权和完整筛选只读汇总状态、合同商品与订单金额；有效期口径沿用客户管理。
  */
 
 var API_BASE = 'https://api.jifulii.com';
@@ -130,10 +130,10 @@ try {
       // 订单金额合计保持列表全状态汇总，只遵循当前筛选，不参与有效期开关。
       if (order.DingdanJE === null || String(order.DingdanJE).trim() === '') incomplete.sum++;
       else amounts.sum += cents(order.DingdanJE);
-      if (order.DingdanZT !== '已审批' && order.DingdanZT !== '已到期') continue;
+      if (order.DingdanZT !== '进行中' && order.DingdanZT !== '已到期') continue;
       allIds.push(id);
       var start = contractDay(order.HetongKSSJ), end = contractDay(order.HetongJSSJ);
-      var current = order.DingdanZT === '已审批' && order.HetongZT === '未断约' && start && end && start <= today && today <= end;
+      var current = order.DingdanZT === '进行中' && order.HetongZT === '未断约' && start && end && start <= today && today <= end;
       if (current) currentIds.push(id);
     }
     if (allIds.length) {
@@ -155,7 +155,7 @@ try {
         'SUM(CASE WHEN (' + buyout + ' AND x.Zongjia IS NULL) OR (' + unknown + ') THEN 1 ELSE 0 END) AS MissingBuyout,' +
         'SUM(CASE WHEN (' + annual + ' AND x.LvxinZJ IS NULL) OR (' + unknown + (validOnly ? ' AND x.CurrentValid=1' : '') + ') THEN 1 ELSE 0 END) AS MissingAnnual ' +
         'FROM (SELECT ' + equipment + ' AS Zongjia,p.LvxinZJ,' + kind + ' AS Kind,CASE WHEN ' + currentSql + ' THEN 1 ELSE 0 END AS CurrentValid ' +
-        "FROM Diy_DingdanSP p INNER JOIN Diy_Dingdan o ON o.Id=p.DingdanID WHERE COALESCE(p.IsDeleted,0)=0 AND COALESCE(o.IsDeleted,0)=0 AND o.DingdanZT IN ('已审批','已到期') AND o.Id IN (" + allowedIn + ')) x';
+        "FROM Diy_DingdanSP p INNER JOIN Diy_Dingdan o ON o.Id=p.DingdanID WHERE COALESCE(p.IsDeleted,0)=0 AND COALESCE(o.IsDeleted,0)=0 AND o.DingdanZT IN ('进行中','已到期') AND o.Id IN (" + allowedIn + ')) x';
       var totals = queryRows(sql, bindings);
       if (totals.length !== 1) throw new Error('合同商品汇总响应不完整');
       for (var metric of ['rental', 'buyout', 'annualFilter']) {
@@ -172,11 +172,13 @@ try {
     if (!Number.isSafeInteger(amounts[key])) throw new Error('合同汇总金额超过安全范围');
     metrics[key] = (amounts[key] / 100).toFixed(2);
   }
-  // 保留原PC合作中/已作废分类页签，同时让它们复用本接口的批量授权统计。
+  // 保留原PC合作中/已终止分类页签，同时让它们复用本接口的批量授权统计。
   var buttons = {};
   buttons['827068c8-2261-4637-882f-ad0f19f7f641'] = statusCounts.All;
-  buttons['b010f86f-954f-4b99-bd14-c3e63feebb22'] = (statusCounts['待审批'] || 0) + (statusCounts['已审批'] || 0) + (statusCounts['已驳回'] || 0);
-  buttons['01KWZP2X53ECEMTKQVZZEGH60R'] = (statusCounts['待审批作废'] || 0) + (statusCounts['已作废'] || 0) + (statusCounts['已到期'] || 0);
+  buttons['b010f86f-954f-4b99-bd14-c3e63feebb22'] = (statusCounts['待审批'] || 0) + (statusCounts['进行中'] || 0);
+  buttons['01KWZP2X53ECEMTKQVZZEGH60R'] = (statusCounts['已终止'] || 0);
+  buttons['order-expired-v2']=statusCounts['已到期']||0;
+  buttons['order-termination-pending-v2']=statusCounts['终止待审批']||0;
   return { Code: 1, Data: { Metrics: metrics, IncompleteMetrics: incomplete, StatusCounts: statusCounts,
     Buttons: buttons, ValidOnly: validOnly, AsOf: today }, Msg: '' };
 } catch (error) {

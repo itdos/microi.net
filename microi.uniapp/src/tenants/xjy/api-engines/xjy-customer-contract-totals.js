@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: xjy-customer-contract-totals
- * Version: v1.1.2
+ * Version: v1.1.5
  * Function:
- * - 只读汇总客户合同金额；PC和小程序按当前菜单权限及完整搜索条件累加已有金额，租赁和换芯支持有效期切换，买断始终累计；缺失金额附待核对项数，不清空合计、不回写业务数据。
+ * - - 只读汇总客户合同金额；PC和小程序按当前菜单权限及完整搜索条件累加已有金额，租赁和换芯支持有效期切换，买断始终累计；缺失金额附待核对项数，不清空合计、不回写业务数据。
  */
 
 var API_BASE = 'https://api.jifulii.com';
@@ -195,7 +195,7 @@ try {
   // 未指定订单菜单时，普通HTTP仍按当前用户已授权同表菜单/精确Read权限合并数据范围。
   var orderIds = customerIds.length ? readAuthorizedIds('Diy_Dingdan', '', [
     ['KehuID', 'In', customerIds],
-    ['AND', '(', 'DingdanZT', '=', '已审批'], ['OR', 'DingdanZT', '=', '已到期', ')']
+    ['AND', '(', 'DingdanZT', '=', '进行中'], ['OR', 'DingdanZT', '=', '已到期', ')']
   ], summaryMode ? 20000 : MAX_ORDERS, headers) : [];
   var today = contractDay(DateNow('yyyy-MM-dd'));
   if (!today) throw new Error('服务端合同日期不可用');
@@ -206,7 +206,7 @@ try {
     var orderBindings = [];
     var orderIn = placeholders(orderIds, orderBindings);
     var customerIn = placeholders(customerIds, orderBindings);
-    var orders = queryRows('SELECT o.Id,o.KehuID,o.DingdanZT,o.HetongZT,o.HetongKSSJ,o.HetongJSSJ FROM Diy_Dingdan o WHERE COALESCE(o.IsDeleted,0)=0 AND o.Id IN (' + orderIn + ') AND o.KehuID IN (' + customerIn + ") AND o.DingdanZT IN ('已审批','已到期')", orderBindings);
+    var orders = queryRows('SELECT o.Id,o.KehuID,o.DingdanZT,o.HetongZT,o.HetongKSSJ,o.HetongJSSJ FROM Diy_Dingdan o WHERE COALESCE(o.IsDeleted,0)=0 AND o.Id IN (' + orderIn + ') AND o.KehuID IN (' + customerIn + ") AND o.DingdanZT IN ('进行中','已到期')", orderBindings);
     if (orders.length !== orderIds.length) throw new Error('合同记录发生变化或读取不完整，请重试');
     var currentIds = [];
     var seenOrders = Object.create(null);
@@ -220,7 +220,7 @@ try {
       seenOrders[orderId] = true;
       var start = contractDay(order.HetongKSSJ);
       var end = contractDay(order.HetongJSSJ);
-      if (order.DingdanZT === '已审批' && order.HetongZT === '未断约' && start && end && start <= today && today <= end) currentIds.push(orderId);
+      if (order.DingdanZT === '进行中' && order.HetongZT === '未断约' && start && end && start <= today && today <= end) currentIds.push(orderId);
     }
 
     var bindings = [];
@@ -247,7 +247,7 @@ try {
       "SUM(CASE WHEN x.Kind NOT IN ('租赁','买断','包年换芯','买断+包年换芯','赠送','试机') AND (" + current + ") THEN 1 ELSE 0 END) AS UnknownCurrentCount," +
       "SUM(CASE WHEN x.Kind NOT IN ('租赁','买断','包年换芯','买断+包年换芯','赠送','试机') THEN 1 ELSE 0 END) AS UnknownCount," +
       "SUM(CASE WHEN (x.Kind IN ('租赁','买断','买断+包年换芯') AND x.Zongjia IS NULL) OR (x.Kind IN ('包年换芯','买断+包年换芯') AND x.LvxinZJ IS NULL) THEN 1 ELSE 0 END) AS MissingAmountCount " +
-      "FROM (SELECT o.KehuID,p.DingdanID," + equipmentTotal + " AS Zongjia,p.LvxinZJ," + kind + " AS Kind FROM Diy_DingdanSP p INNER JOIN Diy_Dingdan o ON o.Id=p.DingdanID WHERE COALESCE(p.IsDeleted,0)=0 AND COALESCE(o.IsDeleted,0)=0 AND o.Id IN (" + allowedIn + ") AND o.KehuID IN (" + relatedIn + ") AND o.DingdanZT IN ('已审批','已到期')) x GROUP BY x.KehuID";
+      "FROM (SELECT o.KehuID,p.DingdanID," + equipmentTotal + " AS Zongjia,p.LvxinZJ," + kind + " AS Kind FROM Diy_DingdanSP p INNER JOIN Diy_Dingdan o ON o.Id=p.DingdanID WHERE COALESCE(p.IsDeleted,0)=0 AND COALESCE(o.IsDeleted,0)=0 AND o.Id IN (" + allowedIn + ") AND o.KehuID IN (" + relatedIn + ") AND o.DingdanZT IN ('进行中','已到期')) x GROUP BY x.KehuID";
     var totals = queryRows(sql, bindings);
     var seenCustomers = Object.create(null);
     for (var t = 0; t < totals.length; t++) {
@@ -284,8 +284,8 @@ try {
   return {
     Code: 1, Data: {
       Customers: customers, AsOf: today,
-      Scope: '仅汇总当前账号可见的已审批和已到期合同商品；包含已断约历史，不含待审批、作废、赠送和试机',
-      CurrentDefinition: '当前有效合同：已审批、未断约，且合同开始日期≤今天≤合同结束日期；缺少或无效合同日期不计当前，服务日期不替代合同日期'
+      Scope: '仅汇总当前账号可见的进行中和已到期合同商品；包含自然到期历史，不含待审批、已终止、赠送和试机',
+      CurrentDefinition: '当前有效合同：进行中、未断约，且合同开始日期≤今天≤合同结束日期；缺少或无效合同日期不计当前，服务日期不替代合同日期'
     }, Msg: ''
   };
 } catch (error) {

@@ -53,12 +53,7 @@ export default {
                     } else {
                         //刷新子表
                         self.$refs.fieldForm.RefreshAllChildTable();
-                        // 表单未关闭：刷新右侧的"数据日志/数据评论"，让用户立即看到最新变更
-                        self.$nextTick(function () {
-                            try { self.LoadDataLog && self.LoadDataLog(); } catch (e) {}
-                            try { self.LoadDataComment && self.LoadDataComment(); } catch (e) {}
-                            try { self.LoadDataVersion && self.LoadDataVersion(); } catch (e) {}
-                        });
+                        self.RefreshFormRelatedDataAfterSave();
                     }
 
                     self.$emit("CallbackGetDiyTableRow", formParam);
@@ -71,6 +66,19 @@ export default {
                 } else {
                     self.BtnLoading = false;
                 }
+            });
+        },
+        RefreshFormRelatedDataAfterSave() {
+            // 保存并新增已切到下一条临时 Id，继续暂停；保留当前已保存记录时再刷新。
+            if (this.FormMode === "Add" || this.FormMode === "Insert" || this.DiyCommon.IsNull(this.TableRowId)) return;
+            var identity = this.GetFormRelatedIdentity();
+            this.$nextTick(() => {
+                // 关闭、重开或切记录后的旧保存回调不能读取另一张表单。
+                if (this._isDestroyed || identity !== this.GetFormRelatedIdentity()) return;
+                this.LoadFormRelatedCounts();
+                this.LoadDataLog();
+                this.LoadDataComment();
+                this.LoadDataVersion();
             });
         },
         // ========== 删除行 ==========
@@ -462,7 +470,7 @@ export default {
         },
         GetCommentList() {
             var self = this;
-            if (self.DiyCommon.IsNull(self.TableRowId)) {
+            if (self.FormMode === "Add" || self.FormMode === "Insert" || self.DiyCommon.IsNull(self.TableRowId)) {
                 self.DataCommentList = [];
                 self.DataCommentListLoading = false;
                 return;
@@ -763,6 +771,8 @@ export default {
                             self.Go_1();
                         } else {
                             self.FormMode = "Edit";
+                            self.TableRowId = param.TableRowId || formData?.Id || self.TableRowId;
+                            self.RefreshFormRelatedDataAfterSave();
                         }
                     }
                     self.SaveDiyTableCommonLoding = false;

@@ -305,7 +305,12 @@ const deviceIotTable = {
   ])
 };
 
+let visualIoTControlMode = '';
 const deviceIotFields = [
+  { Id: 'control-feedback', Name: 'IoTControlFeedback', Label: '远程控制反馈', Component: 'StaticText', Visible: 1, AppVisible: 1, Sort: 1, Tab: 'device-iot', Config: '{}' },
+  ...['PowerOn', 'PowerOff', 'Standby', 'CoolingOn', 'CoolingOff', 'HeatingOn', 'HeatingOff', 'FilterReset', 'Status'].map((name, index) => ({
+    Id: `control-${name}`, Name: `IoTControl${name}`, Label: ['设备开机', '设备关机', '设备待机', '开启制冷', '关闭制冷', '开启制热', '关闭制热', '滤芯复位', '控制状态/最近指令'][index],
+    Component: 'Button', Visible: 1, AppVisible: 1, Sort: 2 + index, Tab: 'device-iot', Config: '{}' })),
   { Id: 'iot-link-field', TableName: 'Diy_KehuSB', Name: 'XuanzeIoT', Label: '关联IoT物联网设备', Component: 'OpenTable', Visible: 1, AppVisible: 1, Sort: 31, Tab: 'device-basic', BindRole: '["role-iot"]', Config: '{"OpenTable":{"SysMenuId":"visual-menu-diy_iot_device","TableName":"diy_iot_device","TableId":"visual-table-diy_iot_device","MultipleSelect":false}}' },
   { Id: 'iot-unlink-field', TableName: 'Diy_KehuSB', Name: 'JiechuIoT', Label: '解除IoT关联', Component: 'Button', Visible: 1, AppVisible: 1, Sort: 32, Tab: 'device-basic', BindRole: '["role-iot"]', Config: '{}' },
   { Id: 'iot-create-field', TableName: 'Diy_KehuSB', Name: 'XinzengIoT', Label: '新增IoT物联网设备', Component: 'Button', Visible: 1, AppVisible: 1, Sort: 33, Tab: 'device-basic', BindRole: '["role-iot"]', Config: '{}' },
@@ -804,6 +809,15 @@ const targets = [
     expectedText: ['暂无物联网快照', '该设备尚未收到物联网数据，请稍后再查看。', '重新加载'],
     forbiddenText: ['表单加载失败', 'NoExistData', '表名：', 'WHERE', '<br>']
   },
+  ...['normal', 'expanded', 'offline'].map(mode => ({
+    name: `device-iot-controls-${mode}`, route: '/#/pages/business/detail?key=devices&id=device-001', selector: '.detail-page',
+    clickSelector: '.related-tabs__item:nth-child(2)', afterSelector: '.device-control-action',
+    ...(mode === 'expanded' ? { secondClickSelector: '.device-controls__more', afterSecondSelector: '.device-control-action--primary' } : {}),
+    required: ['.device-controls', '.device-controls__feedback', '.join-form__snapshot'],
+    forbiddenSelectors: ['.device-iot-actions', '.device-section-actions'],
+    expectedText: ['远程控制', '设备开机', '设备关机', '滤芯复位', mode === 'offline' ? '设备离线' : '可控制'],
+    forbiddenText: ['预览商品详情', '生成设备二维码', '关联IoT设备', '解除IoT关联'], iotControlMode: mode
+  })),
   {
     name: 'recruitment-detail', route: '/#/pages/business/detail?key=recruitment&id=recruit-001', selector: '.detail-page',
     required: ['.hero-band', '.relation-panel', '.info-band']
@@ -1208,7 +1222,7 @@ function buildMockResponse(request) {
     if (!body.CustomerSysMenuId || !Array.isArray(body.CustomerIds) || !body.CustomerIds.length) return { Code: 0, Msg: '测试合同金额请求缺少客户菜单或客户编号' };
     return visualCustomerContractTotals(body.CustomerIds);
   }
-  if (apiEngineKey === 'platform-current-user') return { Code: 1, Data: { ...sysUserRow, TenantId: 'tenant-xjy', Level: 10,
+  if (apiEngineKey === 'platform-current-user') return { Code: 1, Data: { ...sysUserRow, TenantId: 'tenant-xjy', Level: visualIoTControlMode ? 9999 : 10,
     _Roles: [{ Id: 'role-iot' }],
     _RoleLimits: [{ Type: 'Menu', FkId: 'visual-menu-diy_shouhoudd', Permission: [{ Name: 'Edit' }, { Name: '3e66f489-6817-4a70-bf40-26a922fd3d51' }] },
       { Type: 'Menu', FkId: 'visual-menu-diy_kehusb', Permission: [{ Name: 'Edit' }] },
@@ -1399,6 +1413,12 @@ function buildMockResponse(request) {
   }
   if (apiEngineKey === 'goods_detail') {
     return { Code: 1, Data: products[0], DataAppend: { FieldList: [] } };
+  }
+  if (apiEngineKey === 'xjy-device-iot-control') {
+    if (body.Action !== 'Inspect') return { Code: 0, Msg: '视觉验收只允许读取控制能力' };
+    return { Code: 1, Data: { Ready: visualIoTControlMode !== 'offline', Message: visualIoTControlMode === 'offline' ? '设备离线，请等待有效心跳' : '',
+      Capabilities: { Operations: ['power-on', 'power-off', 'standby', 'cooling-on', 'cooling-off', 'heating-on', 'heating-off', 'filter-reset'], Message: '设备能力已确认' },
+      FilterReset: { Ready: true, Filters: [{ Level: 1, Used: 0, Threshold: 360, Basis: 'visual-only' }] } } };
   }
   if (apiEngineKey === 'xjy-device-iot-snapshot') {
     return {
@@ -1743,6 +1763,7 @@ async function setLoggedInState(cdp, options = {}) {
       Type: 'Menu', FkId: `visual-menu-${table}`, Permission: ['Read', 'Add', 'Edit', 'Del']
     }));
   }
+  if (options.controlAdmin) user.Level = 9999;
   await cdp.send('Runtime.evaluate', {
     expression: `localStorage.setItem('microi_token', 'xjy-visual-token'); localStorage.setItem('microi_user', ${JSON.stringify(JSON.stringify(user))});`,
     returnByValue: true
@@ -1805,6 +1826,27 @@ async function inspectExpandedCustomerContractTotals(cdp) {
     fail(`Customer contract totals render failed: ${JSON.stringify(state)}`);
   }
   return { source: 'local visual fixture', ...state };
+}
+
+async function inspectDeviceIoTControls(cdp, target) {
+  if (!target.iotControlMode) return null;
+  const result = await cdp.send('Runtime.evaluate', {
+    expression: `(() => {
+      const card = document.querySelector('.device-controls');
+      const bounds = card.getBoundingClientRect();
+      const buttons = [...card.querySelectorAll('.device-control-action')].map(button => {
+        const rect = button.getBoundingClientRect();
+        return { text: button.innerText, width: rect.width, height: rect.height, left: rect.left, right: rect.right,
+          disabled: button.hasAttribute('disabled'), clipped: button.scrollWidth > button.clientWidth + 1 };
+      });
+      return { buttons, left: bounds.left, right: bounds.right, width: window.innerWidth };
+    })()`, returnByValue: true
+  });
+  const state = result.result.value, expanded = target.iotControlMode === 'expanded';
+  if (state.buttons.length !== (expanded ? 8 : 3) || state.left < 0 || state.right > state.width + 1 ||
+      state.buttons.some(button => button.height < 44 || button.clipped || button.left < state.left || button.right > state.right + 1 ||
+        button.disabled !== (target.iotControlMode === 'offline'))) fail(`Device control geometry/state failed: ${JSON.stringify(state)}`);
+  return state;
 }
 
 async function inspectDeviceIoTActions(cdp, target) {
@@ -2329,6 +2371,7 @@ async function main() {
         color: { r: 244, g: 248, b: 250, a: 1 }
       });
       for (const target of activeTargets) {
+        visualIoTControlMode = target.iotControlMode || '';
         if (target.renewalFlow) resetRenewalFixture();
         if (target.name === 'directory') directoryCardRevision = 1;
         currentContext = `${target.name}/${viewport.name}`;
@@ -2339,7 +2382,7 @@ async function main() {
             returnByValue: true
           });
         } else {
-          await setLoggedInState(cdp, { renewal: target.renewalFlow === true });
+          await setLoggedInState(cdp, { renewal: target.renewalFlow === true, controlAdmin: Boolean(target.iotControlMode) });
         }
         const route = target.route.startsWith('/#') ? target.route.slice(1) : target.route;
         const safe = viewport.safe || {};
@@ -2438,6 +2481,7 @@ async function main() {
         if (target.name === 'order-list') await inspectOrderListSummary(cdp, viewport);
         if (target.name === 'customer-orders') await inspectRelatedOrderSummary(cdp, viewport);
         const deviceIoTActions = await inspectDeviceIoTActions(cdp, target);
+        const deviceIoTControls = await inspectDeviceIoTControls(cdp, target);
         const fileName = `${target.name}-${viewport.name}.png`;
         const screenshotPath = path.join(outputRoot, fileName);
         // Prime Chromium's compositor after rapid full-page navigations. Without
@@ -2454,7 +2498,7 @@ async function main() {
         const unexpectedBrowserErrors = routeErrors.filter((item) => !allowedPatterns.some((pattern) => item.text.includes(pattern)));
         const result = {
           target: target.name, viewport: viewport.name, screenshotPath, fileSize, layout,
-          waterMotion, customerContractTotals, deviceIoTActions, renewalFlow, browserErrors: unexpectedBrowserErrors, expectedBrowserErrors
+          waterMotion, customerContractTotals, deviceIoTActions, deviceIoTControls, renewalFlow, browserErrors: unexpectedBrowserErrors, expectedBrowserErrors
         };
         report.push(result);
         if (!layout || !layout.ok) fail(`Layout check failed for ${target.name} at ${viewport.name}: ${JSON.stringify(layout)}`);

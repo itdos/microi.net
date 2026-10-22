@@ -38,6 +38,11 @@ const ORDER_APPROVAL_BUTTON_IDS = [
   '8dc40e8e-9ab5-49f9-b3bd-de525bd9e056',
   '3107624f-58a2-441d-878b-99b9637c00c0'
 ]
+const ORDER_TERMINATION_REQUEST_BUTTON_IDS = ['f8302831-ffd9-4349-90e4-fb03910b3704']
+const ORDER_TERMINATION_APPROVAL_BUTTON_IDS = [
+  'b53e2e1c-b3e0-4b10-a0d8-e1577dc7e3e4',
+  '72cc8297-4efb-4861-ba99-afab4c7aebbe'
+]
 
 function permissionNames(permission) {
   if (Array.isArray(permission)) return permission.map((item) => String(item && item.Name || item || '').trim())
@@ -83,11 +88,22 @@ export function canApproveOrder(row = {}, user = getUser() || {}) {
   return pendingApproval && sameTenant(row, user) && hasExactMenuPermission(MENU_IDS.orders, ORDER_APPROVAL_BUTTON_IDS, user)
 }
 
+// 终止按钮沿用原按钮 Id，改名后仍按原授权和商家范围判断。
+export function canRequestOrderTermination(row = {}, user = getUser() || {}) {
+  return ['进行中', '已到期'].includes(row.DingdanZT) && sameTenant(row, user) &&
+    hasExactMenuPermission(MENU_IDS.orders, ORDER_TERMINATION_REQUEST_BUTTON_IDS, user)
+}
+
+export function canApproveOrderTermination(row = {}, user = getUser() || {}) {
+  return row.DingdanZT === '终止待审批' && sameTenant(row, user) &&
+    hasExactMenuPermission(MENU_IDS.orders, ORDER_TERMINATION_APPROVAL_BUTTON_IDS, user)
+}
+
 export function canViewOrderDevice(row = {}) {
   const state = String(row.DingdanZT || '').trim()
   const stateCode = Number(row.DingdanZTZ)
   if (!state && !Number.isFinite(stateCode)) return false
-  const hiddenStates = ['待审批', '已驳回', '待审批作废', '待审批已作废']
+  const hiddenStates = ['待审批', '终止待审批', '已驳回', '待审批作废', '待审批已作废']
   return !hiddenStates.includes(state) && ![1, 5, 6].includes(stateCode)
 }
 
@@ -178,11 +194,12 @@ export function getBusinessRowActions(key, row = {}, user = getUser() || {}, men
       actions.push({ key: 'order-reject', label: '驳回', tone: 'danger', input: 'required', inputTitle: '驳回订单', inputPlaceholder: '请输入驳回原因' })
     }
     if (hasMenuPermission(MENU_IDS.orders, '复制', user)) actions.push({ key: 'order-copy', label: '复制', confirm: '确认复制当前合同订单吗？' })
-    if (!/作废|待审批作废/.test(state) && hasMenuPermission(MENU_IDS.orders, '作废申请', user)) {
-      actions.push({ key: 'order-void-request', label: '申请作废', tone: 'danger', confirm: '申请作废后，该订单下设备将进入退机流程。确认继续吗？' })
+    if (canRequestOrderTermination(row, user)) {
+      actions.push({ key: 'order-void-request', label: '申请终止', tone: 'danger', confirm: '确认提交终止申请吗？审批通过后沿用原作废处理规则。' })
     }
-    if (/待审批作废/.test(state) && hasMenuPermission(MENU_IDS.orders, '作废审批', user)) {
-      actions.push({ key: 'order-void-approve', label: '作废审批', tone: 'danger', confirm: '确认作废订单吗？该订单下设备状态将变为已退机。' })
+    if (canApproveOrderTermination(row, user)) {
+      actions.push({ key: 'order-void-approve', label: '终止审批通过', tone: 'danger', confirm: '确认批准终止订单吗？将沿用原作废处理规则。' })
+      actions.push({ key: 'order-void-reject', label: '终止审批驳回', tone: 'warning', input: 'required', inputTitle: '驳回终止申请', inputPlaceholder: '请输入驳回意见' })
     }
   }
   if (key === 'installationPositions') {
@@ -251,12 +268,12 @@ export async function executeBusinessRowAction(actionKey, row = {}, input = '', 
   if (actionKey === 'order-approve') ensure(await callApiEngine('dingdan_shenpi', { Id: id, formData: { ShenpiYJ: input } }), '订单审批失败')
   if (actionKey === 'order-reject') {
     ensure(await callApiEngine('DingdanApproveReject', { rejectData: { Id: id }, formData: { ShenpiYJ: input } }), '订单驳回失败')
-    ensure(await V8.FormEngine.UptFormData('Diy_Dingdan', { Id: id, DingdanZT: '已驳回', DingdanZTZ: 6, _InvokeType: 'Client' }), '订单状态更新失败')
   }
   if (actionKey === 'order-void-request') {
-    ensure(await V8.FormEngine.UptFormData('Diy_Dingdan', { Id: id, DingdanZT: '待审批作废', DingdanZTZ: 5, _InvokeType: 'Client' }), '作废申请失败')
+    ensure(await callApiEngine('dingdan_zuofei', { Id: id, Action: 'Request' }), '终止申请失败')
   }
-  if (actionKey === 'order-void-approve') ensure(await callApiEngine('dingdan_zuofei', { Id: id }), '订单作废失败')
+  if (actionKey === 'order-void-approve') ensure(await callApiEngine('dingdan_zuofei', { Id: id, Action: 'Approve', ShenpiYJ: input }), '订单终止失败')
+  if (actionKey === 'order-void-reject') ensure(await callApiEngine('dingdan_zuofei', { Id: id, Action: 'Reject', ShenpiYJ: input }), '终止驳回失败')
   if (actionKey === 'position-copy') {
     ensure(await callApiEngine('position-copy', {
       Id: id,

@@ -494,6 +494,7 @@
 </template>
 
 <script>
+import { resolveStatusOptions, reconcileStatusSelection } from '@/platform/status-filter-options.mjs'
 import { businessModules } from '@/platform/business.js'
 import {
   findMenu,
@@ -1642,10 +1643,7 @@ export default {
         const relatedFormTarget = await resolveRelatedFormNavigation({ ...this.relatedFormContext('Add'), resolveOnly: true })
         if (!isCurrent()) return
         this.relatedFormTarget = relatedFormTarget
-        // 卡片只配置了部分状态时，不能覆盖关联统计所需的完整状态选项。
-        if (this.config.relatedSummary) {
-          this.config.statusOptions = [...new Set([...(matched.config.statusOptions || []), ...(platformCardConfig.statusOptions || [])])]
-        }
+        this.config.statusOptions = resolveStatusOptions(platformCardConfig.statusOptions, matched.config.statusOptions)
         this.emitTitleChange()
         this.applyMenuSearchFields(menu?.SearchFieldIds || [])
         if (this.waitingForParentSave) {
@@ -1682,7 +1680,7 @@ export default {
       presentationFields.forEach((name) => {
         if (menuConfig[name] !== undefined) next[name] = menuConfig[name]
       })
-      if (next.relatedSummary) next.statusOptions = [...new Set([...(this.config.statusOptions || []), ...(menuConfig.statusOptions || [])])]
+      next.statusOptions = resolveStatusOptions(menuConfig.statusOptions, this.config.statusOptions)
       // 与普通业务列表保持一致：后台菜单字段完整接管卡片后不再使用租户摘要占位。
       next.summaryField = ''
       this.config = next
@@ -1729,6 +1727,12 @@ export default {
       }
       if (requestId !== this.presentationRequestId) return
       await this.loadViewConfig(manifestRefresh, requestId)
+      if (requestId !== this.presentationRequestId || this.componentDisposed) return
+      const status = reconcileStatusSelection(this.relatedStatus, this.config.statusOptions)
+      if (status !== this.relatedStatus) {
+        this.relatedStatus = status
+        await this.refreshFilteredRows()
+      }
     },
     resolveBusinessModule(tableName) {
       const targetTable = String(tableName || '').toLowerCase()
@@ -1797,9 +1801,9 @@ export default {
         })
         if (dynamic.statusFromViewSchema) {
           merged.statusField = dynamic.statusField || ''
-          merged.statusOptions = merged.relatedSummary
-            ? [...new Set([...(merged.statusOptions || []), ...(dynamic.statusOptions || [])])]
-            : (dynamic.statusOptions || [])
+          merged.statusOptions = dynamic.statusField || merged.relatedSummary
+            ? resolveStatusOptions(dynamic.statusOptions, merged.statusOptions)
+            : []
         }
         merged.selectFields = [...new Set([
           ...(merged.selectFields || []),

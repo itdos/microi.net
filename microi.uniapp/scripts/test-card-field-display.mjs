@@ -150,8 +150,8 @@ statusOverrideSources.forEach((file) => {
   )
   assert.match(
     source,
-    file === '../src/pages/business/list.vue'
-      ? /merged\.statusOptions = \[\.\.\.new Set\(\[[\s\S]{0,200}dynamic\.statusOptions/
+    file === '../src/pages/business/list.vue' || file.includes('mci-business-related-list')
+      ? /resolveStatusOptions\(dynamic.statusOptions, merged.statusOptions\)/
       : /merged\.statusOptions = dynamic\.statusOptions \|\| \[\]/,
     `${file} 状态筛选项应同步跟随跨端状态字段`
   )

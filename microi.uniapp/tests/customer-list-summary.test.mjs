@@ -11,9 +11,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const source = fs.readFileSync(path.join(root, 'src/tenants/xjy/api-engines/xjy-customer-contract-totals.js'), 'utf8')
 const customers = [{ Id: 'c1', Zhuangtai: '合作客户' }, { Id: 'c2', Zhuangtai: '目标客户' }]
 const orders = [
-  { Id: 'o1', KehuID: 'c1', DingdanZT: '已审批', HetongZT: '未断约', HetongKSSJ: '2026-10-14', HetongJSSJ: '2026-10-14' },
+  { Id: 'o1', KehuID: 'c1', DingdanZT: '进行中', HetongZT: '未断约', HetongKSSJ: '2026-10-14', HetongJSSJ: '2026-10-14' },
   { Id: 'o2', KehuID: 'c1', DingdanZT: '已到期', HetongZT: '未断约', HetongKSSJ: '2025-01-01', HetongJSSJ: '2025-12-31' },
-  { Id: 'o3', KehuID: 'c2', DingdanZT: '已审批', HetongZT: '已断约', HetongKSSJ: '2026-01-01', HetongJSSJ: '2027-01-01' }
+  { Id: 'o3', KehuID: 'c2', DingdanZT: '进行中', HetongZT: '已断约', HetongKSSJ: '2026-01-01', HetongJSSJ: '2027-01-01' }
 ]
 
 function execute(params, options = {}) {

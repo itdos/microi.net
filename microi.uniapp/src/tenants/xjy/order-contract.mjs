@@ -61,11 +61,4 @@ export function normalizeContractDate(value) {
   return match ? `${match[1]}-${match[2]}-${match[3]}` : ''
 }
 
-// 合同结束日当天仍有效，从次日开始进入“已断约”，与后端每日校准口径保持一致。
-export function contractStateByEndDate(endDate, today = localDateText()) {
-  const normalizedEndDate = normalizeContractDate(endDate)
-  const normalizedToday = normalizeContractDate(today)
-  return normalizedEndDate && normalizedToday && normalizedEndDate < normalizedToday
-    ? ORDER_CONTRACT_ENDED
-    : ORDER_CONTRACT_ACTIVE
-}
+// 合同状态只由实际断约申请流程写入；日期到期统一由 order-status.mjs 计算订单状态。

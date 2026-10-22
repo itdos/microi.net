@@ -1,3 +1,4 @@
+import { resolveOrderStatus } from './order-status.mjs'
 import {
   normalizeChosenLocation,
   reverseGeocode,
@@ -71,7 +72,6 @@ import {
   orderSummaryValues
 } from './order-summary.mjs'
 import {
-  contractStateByEndDate,
   orderInitialCustomerDefaults,
   orderCustomerSourceValues
 } from './order-contract.mjs'
@@ -1855,12 +1855,8 @@ export async function initialize(context) {
     context.state.orderInitialized = true
   }
   if (isOrderForm(context)) {
-    // 新增、编辑和查看首次打开时都按今天校准显示，避免等待用户再次修改日期才更新状态。
-    applyOrderValues(context, {
-      [orderFieldName(context, 'contractState', '合同状态')]: contractStateByEndDate(
-        context.form[orderFieldName(context, 'contractEnd', '合同结束时间')]
-      )
-    })
+    // 首次打开按双日期预览订单状态，实际合同断约状态保持服务端原值。
+    applyOrderValues(context, resolveOrderStatus(context.form))
     await refreshDerivedValues(context)
   }
   if (isProposalAdd(context) &&
@@ -2841,11 +2837,9 @@ export async function handleFieldChange(context, payload) {
     return { handled: true }
   }
   if (isOrderForm(context) && payload &&
-    String(payload.field && payload.field.Name || '').toLowerCase() === ORDER_FIELDS.contractEnd.toLowerCase()) {
-    // 页面即时展示与服务端保存、每日任务使用同一口径：结束日当天有效，次日转为已断约。
-    applyOrderValues(context, {
-      [orderFieldName(context, 'contractState', '合同状态')]: contractStateByEndDate(payload.value)
-    })
+    ['hetongjssj','fuwujssj'].includes(String(payload.field && payload.field.Name || '').toLowerCase())) {
+    // 两个结束日期只影响订单到期，不修改合同断约事实。
+    applyOrderValues(context, resolveOrderStatus({ ...context.form, [payload.field.Name]: payload.value }))
     return { handled: true }
   }
   if (!isProposalForm(context) || !payload ||
@@ -2939,9 +2933,7 @@ export async function beforeSubmit(context) {
     values[uploadStateName] = normalizeUploadItems(context.form[attachmentName]).length
       ? '已上传'
       : '未上传'
-    values[orderFieldName(context, 'contractState', '合同状态')] = contractStateByEndDate(
-      context.form[orderFieldName(context, 'contractEnd', '合同结束时间')]
-    )
+    Object.assign(values, resolveOrderStatus(context.form))
     if (isOrderAdd(context)) {
       // 有受控草稿明细时保留当前汇总；无商品的新订单以 0 开始，后端仍会权威重算。
       if (!context.state.orderSummaryValues) Object.assign(values, emptyOrderAmountValues())

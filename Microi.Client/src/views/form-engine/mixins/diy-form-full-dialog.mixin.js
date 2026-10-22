@@ -79,7 +79,7 @@ export default {
                 self.DataLogListLoading = false;
                 return;
             }
-            if (self.DiyCommon.IsNull(self.TableRowId)) {
+            if (self.FormMode === "Add" || self.FormMode === "Insert" || self.DiyCommon.IsNull(self.TableRowId)) {
                 self.DataLogList = [];
                 self.DataLogListLoading = false;
                 return;
@@ -129,6 +129,12 @@ export default {
         },
         GetFormRelatedData(relatedType, callback, extra = {}) {
             var self = this;
+            // 新增时预分配的 Id 不代表主记录已落库；统一拦住旁路刷新和历史正文读取，
+            // 避免把“尚未保存”误报为权限失败，同时结束等待中的回调。
+            if (self.FormMode === "Add" || self.FormMode === "Insert" || self.DiyCommon.IsNull(self.TableRowId)) {
+                callback?.({ Code: 0, _SkippedFormRelatedData: true });
+                return;
+            }
             var identity = self.GetFormRelatedIdentity();
             var parentFormEngineKey = (self.CurrentDiyTableModel && (self.CurrentDiyTableModel.Id || self.CurrentDiyTableModel.Name))
                 || self.TableId
@@ -211,7 +217,7 @@ export default {
                 self.DataVersionListLoading = false;
                 return;
             }
-            if (self.DiyCommon.IsNull(self.TableRowId)) {
+            if (self.FormMode === "Add" || self.FormMode === "Insert" || self.DiyCommon.IsNull(self.TableRowId)) {
                 self.DataVersionList = [];
                 self.DataVersionListLoading = false;
                 return;

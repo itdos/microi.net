@@ -168,8 +168,10 @@ export const businessModules = {
   }),
   cooperativeCustomers: native({
     title: '合作客户', table: 'Diy_Kehu', menuAliases: ['合作客户', '客户管理', '客户'],
+    // 仅列表限定合作状态；详情复用客户业务页，保持统计、关联页与操作一致。
+    detailKey: 'customers',
     titleField: 'KehuMC', statusField: 'Zhuangtai', tagFields: ['KehuLX'],
-    fixedWhere: [{ Name: 'Zhuangtai', Type: 'Like', Value: '合作' }],
+    fixedWhere: [{ Name: 'Zhuangtai', Type: '=', Value: '合作客户' }],
     lines: [
       { label: '负责人', field: 'FuzeR' },
       { label: '所在城市', field: 'Chengshi', format: 'region' },
@@ -245,9 +247,9 @@ export const businessModules = {
     ],
     statisticsField: 'DingdanJE', statisticsLabel: '订单金额',
     // “全部状态”需要包含合同生命周期终态；具体可见数据仍由真实菜单上下文在服务端裁剪。
-    statusOptions: ['待审批', '已审批', '已驳回', '待审批作废', '已作废', '已到期'],
+    statusOptions: ['待审批', '进行中', '已到期', '终止待审批', '已终止'],
     // 客户详情的有效订单数量/金额继续排除作废订单，不能反向限制“我的订单”主列表。
-    summaryFixedWhere: [{ Name: 'DingdanZT', Type: '!=', Value: '已作废' }],
+    summaryFixedWhere: [{ Name: 'DingdanZT', Type: '!=', Value: '已终止' }],
     filterFields: [
       { key: 'customerType', label: '新老客户订单', field: 'XinLDD', type: 'options', multiple: true, options: [
         { label: '老客户续签订单', value: '老客户续签订单' }, { label: '老客户新增订单', value: '老客户新增订单' },

@@ -1,10 +1,10 @@
+import { resolveOrderStatus } from '../src/tenants/xjy/order-status.mjs'
 import workspacePaths from './lib/workspace-paths.js'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
 import {
-  contractStateByEndDate,
   orderInitialCustomerDefaults,
   orderCustomerSourceValues
 } from '../src/tenants/xjy/order-contract.mjs'
@@ -66,19 +66,22 @@ test('客户资料仅补充新增订单默认值，入口明确传值保持优�
   })
 })
 
-test('合同结束日当天有效，次日转为已断约', () => {
-  assert.equal(contractStateByEndDate('', '2026-09-14'), '未断约')
-  assert.equal(contractStateByEndDate('2026-09-14', '2026-09-14'), '未断约')
-  assert.equal(contractStateByEndDate('2026-09-15 23:59:59', '2026-09-14'), '未断约')
-  assert.equal(contractStateByEndDate('2026-09-13 23:59:59', '2026-09-14'), '已断约')
+test('合同和服务任一结束日过去后订单到期，合同状态不被日期改写', () => {
+  const row={DingdanZTZ:2,HetongZT:'未断约'}
+  assert.equal(resolveOrderStatus({...row,HetongJSSJ:''},'2026-09-14').DingdanZT,'进行中')
+  assert.equal(resolveOrderStatus({...row,HetongJSSJ:'2026-09-14'},'2026-09-14').DingdanZT,'进行中')
+  assert.equal(resolveOrderStatus({...row,HetongJSSJ:'2026-09-13 23:59:59'},'2026-09-14').DingdanZT,'已到期')
+  assert.equal(resolveOrderStatus({...row,FuwuJSSJ:'2026-09-13'},'2026-09-14').DingdanZT,'已到期')
+  assert.equal(row.HetongZT,'未断约')
+  assert.equal(resolveOrderStatus({...row,HetongZT:'已断约',HetongJSSJ:'2026-09-13'},'2026-09-14').DingdanZT,'已终止')
 })
 
 test('移动端表单在选择、日期变化和提交三个阶段接入派生逻辑', () => {
   const source = fs.readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')
   assert.match(source, /orderCustomerSourceValues\(row, cleared\)/)
-  assert.match(source, /ORDER_FIELDS\.contractEnd\.toLowerCase\(\)/)
-  assert.match(source, /values\[orderFieldName\(context, 'contractState', '合同状态'\)\] = contractStateByEndDate/)
-  assert.match(source, /首次打开时都按今天校准显示/)
+  assert.match(source, /'hetongjssj','fuwujssj'/)
+  assert.match(source, /Object\.assign\(values, resolveOrderStatus\(context\.form\)\)/)
+  assert.match(source, /首次打开按双日期预览订单状态/)
   for (const field of [
     'LianxiR', 'LianxiDH', 'Chengshi', 'XiangxiDZ', 'ZhaunshuKF',
     'ZhuanshuKFDH', 'ShouhouRY', 'ShouhouRYDH'
@@ -118,6 +121,7 @@ test('订单新增和编辑保存均保留用户修改后的人员快照，不�
         // 普通历史订单未登记草稿、未初始化续签；后端现在通过事务查询权威标志。
         FromSql: () => ({ AddInParameter() { return this }, First: () => null })
       },
+      ApiEngine: { Run: (key,params) => { assert.equal(key,'xjy-order-status-policy'); return {Code:1,Data:resolveOrderStatus(params.Order,'2026-09-28')} } },
       CurrentUser: { TenantId: 'tenant-1', TenantName: '测试商家' },
       FormEngine: {
         GetFormData: () => ({ Code: 1, Data: {

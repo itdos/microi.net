@@ -60,8 +60,8 @@ assert.doesNotMatch(businessConfigSource, /label: '商品编号', field: 'Shangp
   '安装位置列表不能再将 ShangpinBH 显示为商品编号')
 assert.match(actionsSource, /export function canViewOrderDevice/,
   '安装位置必须统一判断设备详情是否可见')
-assert.match(actionsSource, /\['待审批', '已驳回', '待审批作废', '待审批已作废'\]/,
-  '待审批、已驳回和待审批作废订单必须隐藏设备详情按钮')
+assert.match(actionsSource, /\['待审批', '终止待审批', '已驳回', '待审批作废', '待审批已作废'\]/,
+  '待审批和终止待审批订单必须隐藏设备详情，并兼容历史状态')
 assert.match(actionsSource, /!\[1, 5, 6\]\.includes\(stateCode\)/,
   '设备详情显隐必须兼容订单状态码')
 assert.match(actionsSource, /GetFormData\('Diy_KehuSB',[\s\S]*?Name: 'KehuID'[\s\S]*?Name: 'ShebeiBH'/,

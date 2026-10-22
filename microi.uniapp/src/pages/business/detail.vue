@@ -91,6 +91,10 @@
 				<mci-related-tabs v-if="formTabs.length > 1" :items="formTabs"
 					:active-key="activeFormTabKey" @select="selectFormTab" />
 
+				<XjyDeviceIoTControls v-if="showDeviceIoTControls" :key="detail.Id || id"
+					:definition="definition || {}" :parent-id="detail.Id || id" :menu-id="menuId"
+					:user="currentUser" :tab-key="activeFormTabKey" @refresh="iotSnapshotRevision += 1" />
+
 				<view class="info-band" :class="{ 'info-band--ungrouped': section.source === 'Ungrouped' }"
 					v-for="(section, sectionIndex) in visibleSections" :key="section.key">
 					<view v-if="section.source === 'CollapseGroup'"
@@ -219,7 +223,7 @@
 						:show-floating-add="false"
 						@floating-add-state="setStandaloneRelatedAddState(relatedTab, $event)"
 						@filter-open-state="setStandaloneRelatedFilterState(relatedTab, $event)" />
-					<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
+					<mci-join-form v-else-if="relatedTab.type === 'join'" :key="`${relatedTab.key}:${iotSnapshotRevision}`" :field="relatedTab.field"
 						:parent-form="detail" parent-mode="View" readonly />
 					<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
 						:parent-table="moduleConfig.table" :parent-id="detail.Id || id"
@@ -438,6 +442,9 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	import { customerCaseChildField } from '@/tenants/xjy/native-table.js'
 	import XjyCustomerContractTotals from '@/tenants/xjy/components/customer-contract-totals.vue'
 	import XjyDeviceIoTActions from '@/tenants/xjy/components/device-iot-actions.vue'
+	import XjyDeviceIoTControls from '@/tenants/xjy/components/device-iot-controls.vue'
+	import { deviceActionSectionKey as findDeviceActionSectionKey } from '@/tenants/xjy/device-detail-actions.mjs'
+	import { deviceControlFields, isDeviceControlField } from '@/tenants/xjy/device-iot-control.mjs'
 	import { isDeviceIoTSelector } from '@/tenants/xjy/device-iot-actions.mjs'
 	import { customerContractTotalsVisible, loadCustomerContractTotals } from '@/tenants/xjy/customer-contract-totals.mjs'
 	import {
@@ -1282,7 +1289,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 	export default {
   onShareAppMessage() { return buildFriendShare(this, 'pages/business/detail') },
   onShareTimeline() { return buildTimelineShare(this, 'pages/business/detail') },
-		components: { MciBusinessRelatedList, XjyCustomerContractTotals, XjyDeviceIoTActions },
+		components: { MciBusinessRelatedList, XjyCustomerContractTotals, XjyDeviceIoTActions, XjyDeviceIoTControls },
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -1306,6 +1313,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				roleProfile: {},
 				deviceActiveTask: {},
 				deviceActionKey: '',
+				iotSnapshotRevision: 0,
+				deviceControlsActive: true,
 				definition: null,
 				viewManifest: null,
 				metricValues: {},
@@ -1477,6 +1486,8 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 					: groups
 				return activeGroups.map((group, index) => {
 					const rows = (group.fields || []).filter((field) => {
+						// 远程动作和静态反馈由原生控制卡片承接，避免再渲染成无值字段。
+						if (this.key === 'devices' && isDeviceControlField(field)) return false
 						// 客户详情保留折叠分组；分隔线不是数据字段，不能渲染成“标题 -”。
 						if (this.key === 'customers' && (field.component || field.Component) === 'Divider') return false
 						const name = String(field.Name || '')
@@ -1510,10 +1521,10 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				.filter((section) => section.fields.length || section.relatedTabs.length || section.selectorTabs.length)
 			},
 			deviceActionSectionKey() {
-				if (this.key !== 'devices' || !this.visibleSections.length) return ''
-				const exact = this.visibleSections.find((section) => String(section.title || '').trim() === '设备信息')
-				const matching = exact || this.visibleSections.find((section) => /设备.*信息/.test(String(section.title || '')))
-				return (matching || this.visibleSections[0]).key
+				return this.key === 'devices' ? findDeviceActionSectionKey(this.definition || {}) : ''
+			},
+			showDeviceIoTControls() {
+				return this.key === 'devices' && this.deviceControlsActive && deviceControlFields(this.definition || {}, this.currentUser, this.activeFormTabKey).length > 0
 			},
 			canGenerateDeviceQrCodeAction() {
 				return this.key === 'devices' && canGenerateDeviceQrCode(this.menuId, this.currentUser, 'Edit')
@@ -1983,6 +1994,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 			this.loadDetail()
 		},
 		onShow() {
+			this.deviceControlsActive = true
 			// 页面切换或系统中断不能遗留动作锁，返回详情时始终恢复可交互状态。
 			this.deviceActionKey = ''
 			if (!this.loading && this.id) {
@@ -1995,6 +2007,10 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				})
 			}
 			this.scheduleRelatedViewportMeasure()
+		},
+		onHide() {
+			// 离开页面后销毁控制会话，阻止迟到的准备响应继续下发；返回时只重读权威状态。
+			this.deviceControlsActive = false
 		},
 		onReady() {
 			this.scheduleRelatedViewportMeasure()
@@ -2815,6 +2831,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				}
 			},
 			async submitOrderApproval() {
+				if (!this.canApproveOrder) return
 				const opinion = this.approvalOpinion.trim()
 				if (this.approvalMode === 'reject' && !opinion) {
 					uni.showToast({
@@ -2831,35 +2848,13 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				})
 				try {
 					const isApprove = this.approvalMode === 'approve'
-					const result = isApprove ?
-						await callApiEngine('dingdan_shenpi', {
-							Id: this.detail.Id || this.id,
-							formData: {
-								ShenpiYJ: opinion
-							}
-						}) :
-						await callApiEngine('DingdanApproveReject', {
-							rejectData: {
-								Id: this.detail.Id || this.id
-							},
-							formData: {
-								ShenpiYJ: opinion
-							}
-						})
-					if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '审批未成功')
-					if (!isApprove) {
-						const updateResult = await V8.FormEngine.UptFormData('Diy_Dingdan', {
-							Id: this.detail.Id || this.id,
-							DingdanZT: '已驳回',
-							DingdanZTZ: 6
-						})
-						if (!updateResult || Number(updateResult.Code) !== 1) throw new Error((updateResult &&
-							updateResult.Msg) || '订单状态更新失败')
-					}
+					await executeBusinessRowAction(isApprove ? 'order-approve' : 'order-reject',
+						{ ...this.detail, Id: this.detail.Id || this.id }, opinion, this.currentUser, { menuId: this.menuId })
+					uni.$emit('microi:data-changed', { table: this.moduleConfig.table, id: this.detail.Id || this.id })
 					this.showOrderApprovalDialog = false
 					this.approvalOpinion = ''
 					uni.showToast({
-						title: isApprove ? '审批通过' : '订单已驳回',
+						title: isApprove ? '审批通过' : '已驳回，订单待审批',
 						icon: 'success'
 					})
 					await this.loadDetail(false)
