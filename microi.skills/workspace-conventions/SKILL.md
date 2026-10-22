@@ -11,6 +11,12 @@ description: 每次 Microi 任务开始前必读的基础规范。用于识别�
 
 完成比较后保存**修改前**的 `SourceManifestHash`，调用 `microi_sync_microservice_source` 时传 `expectedSourceManifestHash`。现有源码缺少基线或远端已变化时工具拒绝写入；不能只重新取一个新哈希来重试旧本地代码。发布前再次校验，保留其它页面、`LegacyComponentPaths/LegacyMenuUrls` 以及实际组件注册。此要求必须同时出现在 CLI/IDE 生成的各 AI 宿主入口中；文字规则不能冒充已执行拉取、校验或渠道分发。
 
+## 用户指定租户保持不变（强制入口）
+
+用户通过 MCP 连接语句指定的 `profile + ApiBase + OsClient + Type/Network` 是本次业务开发边界。连接、建模、源码、文件、发布和验收始终绑定该租户；多连接时逐次显式选择同一 profile。读取主控配置是后端内部职责，不代表 AI 应切换到主租户。只有用户另行明确要求主租户运维或跨租户操作时才扩大范围。
+
+`microi_get_status` 的服务器在线不等于可发布。`ApplicationAssetStreamGateReady=false` 或 `sys_osclients 门禁行数量必须为1，Actual=0` 应按平台门禁取数故障处理：保持子租户连接，保留已完成源码和发布候选，向平台报告精确三参数、后端版本和原始错误。子租户业务库同名表为空不能证明主控库登记缺失；禁止据此索要主租户账号/SSH、切换 profile、运行 `EnsureOwnedTenantRuntimeRegistration` 或补登记接口、复制/恢复业务库的 `sys_osclients` 行，或降级绕过发布门禁。后台升级成功也不代表当前宿主已加载新 MCP，报告时分别核对全局 CLI 与 `profiles.toolchain.loadedVersion`。
+
 ## Git 原分支交付（强制）
 
 禁止 AI 自动创建并推送额外远端分支。开工记录用户原本的分支及上游；优先在原分支完成工作，确有并发隔离或冻结测试输入需要时，才使用本地临时分支或 detached worktree。验收后必须安全合回原分支，只推送该原分支；不得将临时分支、发布候选、备份分支或标签推到远端代替合并。只有用户明确要求创建某个远端分支时才例外。清理前核对未合并提交、活动工作树及其它任务，保留有效成果后删除本任务临时分支和工作树。详细步骤见[共享工作区与 Git 保障](references/progressive-04-工作区与平台专项保障.md#功能验收后的源码提交与推送强制)。
@@ -63,7 +69,7 @@ description: 每次 Microi 任务开始前必读的基础规范。用于识别�
 - 自动化入口共用 `Microi.Server/tools/Microi.ArtifactSafety.ps1` 的祖先/目录树预检。Full 的 `Microi.TestArtifactCleanup.ps1` 在移除输出链接前检查整个目标树、受保护属性和 Windows 文件占用；发布脚本的构建/打包/冒烟日志、NuGet 解包临时目录统一进入 `release-scratch.mjs` 新建的独占目录，以目录内标记和目录外归属记录校验身份，退出后保留小型 `.cleanup.json` 回执。没有清单、身份变化或预检失败都保留，不能扫描同名前缀代替所有权。
 - 发布退出顺序为停止本次写入者、普通清理、释放本次发布锁；成功、失败及可捕获的 INT/TERM/HUP 都走同一收尾。清理失败令原成功退出变为非零，原有失败码仍保留；测试原异常不被清理/回执写入错误覆盖。硬杀、掉电和执行器在 shell 启动前拒绝无法保证运行 `finally/EXIT`，接续时先重新盘点已登记路径，不自动清理其它任务或全部历史目录。
 
-<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=fefc18da554473ded99a55c3b2e66d698fcc4b37506622dcd2d17bca09c2fcbc -->
+<!-- microi-progressive:chunk id=workspace-conventions-000 sha256=e3e6f49e83e80b958184a4d281559fd80aa0a3bb7cbcb0893ecc1821c4b2f001 -->
 ## 任务启动前 Skill 读取规则（强制）
 
 AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端、后端、UniApp、文档、测试或交付任务前，必须先按任务类型读取相关 `microi.skills/**/SKILL.md`。不能等到写代码或出问题后才补读。
@@ -124,7 +130,7 @@ AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端�
 - 用户明确关闭自动更新或宿主不允许终端执行时，尊重该限制，报告具体未完成项和恢复命令；不能静默宣称已是最新版。自动更新只覆盖开发工具、Skills 和本机 MCP 入口，不授权升级客户 API/数据库、部署容器或安装业务应用；已签名 Microi Agent 安装目录仍通过桌面官方更新渠道升级。
 - 只有任务明确依赖旧版本不存在的具体能力时，才准确说明该能力边界与可用降级方案；不得用“最新版未通过”“尚未授权升级”作为整项任务的失败理由。
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-001 sha256=c3db79fb5f6f00a6ea619f7129f1e81259efe899256a5100f9c84a5b5dca58f4 -->
+<!-- microi-progressive:chunk id=workspace-conventions-001 sha256=8d8dfff420c0cc768bbeb13d94e9f77f52d5002fc61d93dc82d71b3a17f2eaa0 -->
 ## Microi吾码工作进度播报规范（强制）
 
 AI 在任何新建或已有对话中处理 Microi吾码任务并向用户输出工作过程记录时，必须默认执行本规范，无需用户再次提醒：

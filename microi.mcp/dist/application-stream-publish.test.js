@@ -7,6 +7,13 @@ import path from 'node:path';
 import test from 'node:test';
 import { MicroiClient } from './microi-client.js';
 import { buildConservativeApplicationAssetStreamV3ImmutablePath, buildApplicationAssetStreamV3RouteSnapshot, buildApplicationAssetRequestId, buildApplicationFinalizeRequestId, buildLocalApplicationAssetManifest, encodeApplicationAssetStreamV3RelativePath, isLegacyApplicationStreamJValueFailure, resolveApplicationAssetStreamV3Contract, resolveLegacyApplicationStreamFallbackPolicy, runApplicationAssetStreamUpload, runApplicationDirectoryStreamPublish, tryLegacyMicroServiceStreamPublishFallback, validateLocalApplicationAssetSize, validateApplicationAssetV3FinalizeEvidence, } from './server.js';
+// Transport fixtures isolate upload/retry behavior; the real status preflight is
+// exercised separately in application-gate-diagnostic.test.ts.
+function makePublishTransportClient(config) {
+    const client = new MicroiClient(config);
+    client.getStatus = async () => ({ Code: 1, Data: { ApplicationAssetStreamGateReady: true }, Msg: '' });
+    return client;
+}
 const EMPTY_ROUTE_SNAPSHOT_JSON = '[]';
 const EMPTY_ROUTE_SNAPSHOT_HASH = crypto.createHash('sha256').update(EMPTY_ROUTE_SNAPSHOT_JSON, 'utf8').digest('hex');
 test('v3 durable verification exposes pending progress; manifest-only replay never uploads or finalizes', async () => {
@@ -369,7 +376,7 @@ test('uploadApplicationAssetStream sends raw multipart bytes without Base64 mate
                 headers: { 'Content-Type': 'application/json' },
             });
         });
-        const client = new MicroiClient({
+        const client = makePublishTransportClient({
             apiBaseUrl: 'https://api.example.test',
             username: '',
             password: '',
@@ -423,7 +430,7 @@ test('uploadApplicationAssetStream falls back to native HTTP with the same raw m
         globalThis.fetch = (async () => {
             throw new TypeError('simulated undici stream reset');
         });
-        const client = new MicroiClient({
+        const client = makePublishTransportClient({
             apiBaseUrl: `http://127.0.0.1:${address.port}`,
             username: '',
             password: '',
@@ -487,7 +494,7 @@ test('uploadApplicationAssetStream retries through gzip multipart after raw prox
         globalThis.fetch = (async () => {
             throw new TypeError('simulated proxy reset');
         });
-        const client = new MicroiClient({
+        const client = makePublishTransportClient({
             apiBaseUrl: `http://127.0.0.1:${address.port}`,
             username: '',
             password: '',
@@ -532,7 +539,7 @@ test('legacy microservice source sync never replays a failed fetch through nativ
         globalThis.fetch = (async () => {
             throw new TypeError('simulated fetch disconnect after unknown write outcome');
         });
-        const client = new MicroiClient({
+        const client = makePublishTransportClient({
             apiBaseUrl: `http://127.0.0.1:${address.port}`,
             username: '',
             password: '',
@@ -652,7 +659,7 @@ test('protocol v3 always resumes through durable multipart and sends only the mi
         });
         const address = server.address();
         assert.ok(address && typeof address === 'object');
-        const client = new MicroiClient({
+        const client = makePublishTransportClient({
             apiBaseUrl: `http://127.0.0.1:${address.port}`,
             username: '',
             password: '',
@@ -723,7 +730,7 @@ test('publishMicroService does not replay an uncertain non-idempotent write thro
         globalThis.fetch = (async () => {
             throw new TypeError('simulated undici JSON reset');
         });
-        const client = new MicroiClient({
+        const client = makePublishTransportClient({
             apiBaseUrl: `http://127.0.0.1:${address.port}`,
             username: '',
             password: '',
@@ -783,7 +790,7 @@ test('protocol v3 resumable initiation forwards canonical bigint strings and exp
                 headers: { 'Content-Type': 'application/json' },
             });
         });
-        const client = new MicroiClient({
+        const client = makePublishTransportClient({
             apiBaseUrl: 'https://api.example.test',
             username: '',
             password: '',

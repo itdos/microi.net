@@ -389,6 +389,8 @@ namespace Microi.net
             if (name.StartsWith("SaasPublicTrial", StringComparison.OrdinalIgnoreCase)
                 || name.StartsWith("SaasPromotion", StringComparison.OrdinalIgnoreCase)
                 || new[] { "ReferralUserId","ReferralLinkId","PublicTrialRequestId","PublicTrialProvisioned","TrialStartTime","TrialEndTime","PromotionStage","PromotionContact","PromotionPhone","SignupSource","PromotionNotes","PromotionNextFollowup" }.Contains(name,StringComparer.OrdinalIgnoreCase)) return false;
+            // 发布协议及代次是租户独立状态，不能随主租户普通配置复制。
+            if (name.StartsWith("ApplicationStream", StringComparison.OrdinalIgnoreCase)) return false;
             if (NeverCopyIdentityFieldSet.Contains(name)
                 || SharedInfrastructureFieldSet.Contains(name)
                 || TenantServiceCredentialFieldSet.Contains(name)

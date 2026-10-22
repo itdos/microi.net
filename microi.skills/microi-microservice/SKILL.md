@@ -127,7 +127,8 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 创建/更新元数据：`microi_create_microservice`。
 - 同步私有源码：`microi_sync_microservice_source`；本地工程必须优先传 `directory`，不构造 Base64 文件数组。
 - 真实编译目录优先 `microi_publish_application_directory_stream` 流式发布。
-- v3 提示 `mci_app_stream_gate_transition` 或发布门禁列/索引缺失时，先更新目标租户的应用商城责任包，并通过现有“升级租户数据库”入口核验责任包安装；安装完成后回读物理门禁结构及唯一索引，再重新盘点发布基线。不执行已退役 Upgrade25，不手动 reset 锁、fence、Storage 或 active/committed 指针；缺少结构与真正 CAS 漂移分别诊断。
+- 发布前读取 `microi_get_status`，分开报告服务器在线和 `ApplicationAssetStreamGateReady`。`Actual=0` 表示当前读取没有有效门禁行，不证明用户无权限或主控登记缺失。保持用户指定子租户，不索要主租户账号/SSH，不调用补登记接口，不复制业务库 `sys_osclients`，不降级绕过门禁；提交平台排查后端取数来源和版本。
+- 发布门禁由后端从启动主租户的主控库读取当前子租户 `OsClient + Type + Network` 的唯一有效 `sys_osclients` 行，文件、应用和版本仍在当前子租户。门禁转换审计在同一主控库事务中写入。缺少门禁列/审计结构属于平台侧 SaaS/应用商城责任包问题；缺少子租户的 `sys_microistore/mci_ai_app_version/mci_ai_app_file` 则通过该租户应用商城升级。不能因主控结构故障擅自更换业务连接。不执行已退役 Upgrade25，不手动 reset 锁、fence、Storage 或 active/committed 指针；缺少结构与真正 CAS 漂移分别诊断。
 - `changeSummary` 是最多 2000 字符的版本说明文本，不能传对象；v3 在首次 stage 创建版本时存入 `mci_ai_app_version.ChangeSummary`，后续同请求重放和恢复保留原说明。历史节点若发布完成但摘要仍为空，应报告后端版本缺口，不得把编译文件验证成功等同于日志验收通过。
 - 每次创建、修改、升级或重新发布微服务，必须先为目标精确 `AppVersion` 在 `sys_microistore_changelog` 写入完整日志，再同步源码、stage、finalize 或制作商城包。日志必须关联真实 `StoreId`，包含 `Title / ChangeType / Content / ReleaseTime`；流式发布显式传入与日志含义一致的非空 `changeSummary`。发布后同时回读商城日志、`mci_ai_app_version.ChangeSummary` 与包内 `PackageInfo.ChangeLog`；缺失或版本不一致必须失败关闭。
 - 发布动作必须明确区分两种模式：默认“源码+编译产物”先把完整工程同步到私有桶并逐文件回读 SHA-256，再把 `dist` 流式发布到公有桶；显式“仅编译产物”只更新公有桶，必须在界面中告知其他用户仍会拉取上一次私有源码，禁止暗示源码已同步。

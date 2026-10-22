@@ -3247,7 +3247,7 @@ export function createMcpServer(client, context) {
         try {
             const result = await client.getStatus();
             if (result.Code === 1) {
-                return { content: [{ type: 'text', text: `✅ Server is online.\n\n${JSON.stringify(result.Data, null, 2)}` }] };
+                return { content: [{ type: 'text', text: `${asJsonRecord(result.Data).ApplicationAssetStreamGateReady === false ? '⚠️ Server is online; application publishing is blocked by a platform gate configuration error. Keep this tenant connection; do not request main-tenant credentials.' : '✅ Server is online.'}\n\n${JSON.stringify(result.Data, null, 2)}` }] };
             }
             return { content: [{ type: 'text', text: `⚠️ Server returned Code=${result.Code}: ${result.Msg}` }] };
         }
