@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import {randomBytes} from 'node:crypto';
+import {createHash,randomBytes} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {fileURLToPath} from 'node:url';
+import {inspectNugetPackage,RemoteCollisionError} from './release-remote-collision.mjs';
 
 const DEFAULT_SOURCE='https://api.nuget.org/v3/index.json';
 const UPLOAD_TIMEOUT_MS=10*60*1000;
@@ -85,7 +86,11 @@ export async function pushPackage(packageFile,settings,{fetchImpl=fetch,boundary
  let stat;
  try{stat=await fsp.stat(packageFile);}catch{throw new PublishError('package-unreadable');}
  if(!stat.isFile())throw new PublishError('package-not-file');
+ // 完整集合门禁之后仍逐包回读；同版只能复用完全相同的远端原始字节。
+ const prior=await inspectNugetPackage(packageFile,settings.source,{fetchImpl});
+ if(prior.state==='same')return 'duplicate';
  const endpoint=await resolvePublishEndpoint(settings.source,fetchImpl);
+ if(createHash('sha256').update(await fsp.readFile(packageFile)).digest('hex')!==prior.localSha256)throw new PublishError('package-changed-before-upload');
  const {body,length}=multipartParts(packageFile,stat.size,boundary);
  let response;
  try{
@@ -102,7 +107,12 @@ export async function pushPackage(packageFile,settings,{fetchImpl=fetch,boundary
  }catch{throw new PublishError('upload-failed');}
  await response.body?.cancel?.().catch(()=>{});
  if(response.status===201||response.status===202)return 'uploaded';
- if(response.status===409)return 'duplicate';
+ if(response.status===409){
+  // 服务端 409 只说明身份已占用；结果未知或正文不同都必须停止后续发布。
+  const duplicate=await inspectNugetPackage(packageFile,settings.source,{fetchImpl,requirePresent:true});
+  if(duplicate.localSha256!==prior.localSha256)throw new PublishError('package-changed-after-upload');
+  return 'duplicate';
+ }
  throw new PublishError('upload-http',response.status);
 }
 
@@ -126,7 +136,7 @@ async function main(){
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  main().catch(error=>{
   // HTTP 正文、异常原文和配置正文可能回显密钥，故只打印固定代码与数字状态。
-  const code=error instanceof PublishError?error.code:'unexpected-error';
+  const code=error instanceof PublishError||error instanceof RemoteCollisionError?error.code:'unexpected-error';
   const status=error instanceof PublishError&&Number.isInteger(error.status)?` (HTTP ${error.status})`:'';
   process.stderr.write(`NuGet 安全推送失败：${code}${status}\n`);
   process.exitCode=1;

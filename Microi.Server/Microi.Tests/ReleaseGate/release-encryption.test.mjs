@@ -235,7 +235,7 @@ test('verified NUL list byte changes cannot silently reorder or replace upload i
  }finally{f.dispose();}
 });
 
-for(const mode of ['success','after-scan-byte-drift','after-scan-added-package','candidate-rejected','candidate-drift-after-first-upload','missing-platform-dependency'])test(`actual find NUL list and production NuGet shell gate ${mode}`,()=>{
+for(const mode of ['success','after-scan-byte-drift','after-scan-added-package','candidate-rejected','candidate-drift-after-first-upload','missing-platform-dependency','remote-preflight-rejected'])test(`actual find NUL list and production NuGet shell gate ${mode}`,()=>{
  const f=pendingFixture();try{
   const nested=path.join(f.server,'Integration Product/nested/bin/Release/Custom.Package.8.5.2.nupkg');fs.mkdirSync(path.dirname(nested),{recursive:true});
   zip(nested,[['Custom.Package.nuspec','<package><metadata><id>Custom.Package</id><version>8.5.2</version></metadata></package>'],['tools/mIcRoI.vIsIoN.DLL',fs.readFileSync(path.join(f.directory,'Microi.Vision.dll'))]]);f.files.push(nested);
@@ -273,6 +273,10 @@ node(){
  if [[ "$1" == *release-candidate.mjs && "$2" == verify ]]; then
   printf 'CANDIDATE_VERIFY_REACHED=%s\\n' "$3"
  fi
+ if [[ "$1" == *release-remote-collision.mjs ]]; then
+  printf 'REMOTE_PREFLIGHT_REACHED\\n'
+  return ${mode==='remote-preflight-rejected'?23:0}
+ fi
  if [[ "$1" == *secure-nuget-push.mjs ]]; then
   printf 'UPLOAD_REACHED=%s\\n' "$*"
   ${mode==='candidate-drift-after-first-upload'?`printf changed >> ${quote(probe)}`:':'}
@@ -291,11 +295,12 @@ ${source.slice(begin,end)}
    assert.equal(run.status,0,run.stderr);
    assert.equal(run.stdout.match(/CANDIDATE_VERIFY_REACHED=/g)?.length,7,'首包和每包上传前均需复核候选源码');
    assert.equal(run.stdout.match(/UPLOAD_REACHED=/g)?.length,6);
+   assert.equal(run.stdout.match(/REMOTE_PREFLIGHT_REACHED/g)?.length,1);
   }else{
    assert.equal(run.status,17,run.stderr);
    assert.equal(run.stdout.match(/CANDIDATE_VERIFY_REACHED=/g)?.length??0,mode==='missing-platform-dependency'?0:mode==='candidate-drift-after-first-upload'?3:1);
    assert.equal(run.stdout.match(/UPLOAD_REACHED=/g)?.length??0,mode==='candidate-drift-after-first-upload'?1:0);
-   assert.match(run.stderr,mode==='missing-platform-dependency'?/本次 NuGet 包正文的版本或平台依赖闭包不完整/:mode==='candidate-rejected'?/首个 NuGet 上传前候选源码发生变化/:mode==='candidate-drift-after-first-upload'?/当前 NuGet 上传前候选源码发生变化/:/首个上传前 NuGet 清单或包字节发生变化/);
+   assert.match(run.stderr,mode==='remote-preflight-rejected'?/远端 NuGet 同版本包不同或无法确认/:mode==='missing-platform-dependency'?/本次 NuGet 包正文的版本或平台依赖闭包不完整/:mode==='candidate-rejected'?/首个 NuGet 上传前候选源码发生变化/:mode==='candidate-drift-after-first-upload'?/当前 NuGet 上传前候选源码发生变化/:/首个上传前 NuGet 清单或包字节发生变化/);
   }
  }finally{f.dispose();}
 });
